@@ -385,7 +385,6 @@ function doGet(e) {
 
     if (action === 'assign')    return jsonOut_({ assignHistory: readAssign_(ss.getSheetByName(SH_ASSIGN)) });
     if (action === 'tasks')     return jsonOut_({ tasks: readTasks_(ss.getSheetByName(SH_TASK)) });
-    if (action === 'taskComments') return jsonOut_({ comments: readTaskComments_(ss.getSheetByName(SH_TASKCM), e.parameter.taskId) });
 
     if (action === 'count') {
       var shC = ss.getSheetByName(SH_CARE); var totalOrders = 0;
@@ -520,7 +519,6 @@ function doPost(e) {
     if (action === 'saveAssignHistory')   return saveAssignHistory_(data.history);
     if (action === 'saveTask')  return saveTaskEntry_(data.task);
     if (action === 'deleteTask') return deleteTask_(data.id);
-    if (action === 'saveTaskComment') return saveTaskComment_(data.comment);
     if (action === 'saveCareStatus')      return saveCareStatus_(data.careStatus);
     if (action === 'saveAIContext')        return saveAIContext_(data.type, data.content, data.context);
     if (action === 'ai')                  return callGroqAI_(data);
@@ -2048,10 +2046,7 @@ function runFollowUpScanTrigger() {
 // ═══════════════════════════════════════════════════════════════
 
 var SH_TASK = 'Tasks';
-var TASK_HEADERS = ['id','title','description','csAssigned','deadline','status','createdBy','createdAt','updatedAt','result','images','teamsAssigned'];
-
-var SH_TASKCM = 'TaskComments';
-var TASKCM_HEADERS = ['id','taskId','author','content','images','createdAt'];
+var TASK_HEADERS = ['id','title','description','csAssigned','deadline','status','createdBy','createdAt','updatedAt','teamsAssigned'];
 
 function readTasks_(sh) {
   var out = [];
@@ -2061,10 +2056,8 @@ function readTasks_(sh) {
     if (!v[i][0]) continue;
     var cs = [];
     try { cs = v[i][3] ? JSON.parse(v[i][3]) : []; } catch (e) { cs = String(v[i][3] || '').split(',').filter(Boolean); }
-    var imgs = [];
-    try { imgs = v[i][10] ? JSON.parse(v[i][10]) : []; } catch (e2) { imgs = []; }
-    var teamsAssigned = [];
-    try { teamsAssigned = v[i][11] ? JSON.parse(v[i][11]) : []; } catch (e3) { teamsAssigned = []; }
+    var tm = [];
+    try { tm = v[i][9] ? JSON.parse(v[i][9]) : []; } catch (e) { tm = String(v[i][9] || '').split(',').filter(Boolean); }
     out.push({
       id: String(v[i][0]),
       title: String(v[i][1] || ''),
@@ -2075,9 +2068,7 @@ function readTasks_(sh) {
       createdBy: String(v[i][6] || ''),
       createdAt: String(v[i][7] || ''),
       updatedAt: String(v[i][8] || ''),
-      result: String(v[i][9] || ''),
-      images: imgs,
-      teamsAssigned: teamsAssigned
+      teamsAssigned: tm
     });
   }
   return out;
@@ -2096,8 +2087,7 @@ function saveTaskEntry_(t) {
   }
   var createdAt = t.createdAt || now;
   var row = [id, t.title || '', t.description || '', JSON.stringify(t.csAssigned || []),
-             t.deadline || '', t.status || 'Chưa làm', t.createdBy || '', createdAt, now,
-             t.result || '', JSON.stringify(t.images || []), JSON.stringify(t.teamsAssigned || [])];
+             t.deadline || '', t.status || 'Chưa làm', t.createdBy || '', createdAt, now];
   if (rowIdx > 0) sh.getRange(rowIdx, 1, 1, TASK_HEADERS.length).setValues([row]);
   else sh.appendRow(row);
   return jsonOut_({ ok: true, id: id });
@@ -2113,38 +2103,3 @@ function deleteTask_(id) {
   }
   return jsonOut_({ ok: true });
 }
-
-// ── THẢO LUẬN (bình luận) theo từng công việc ──────────────────
-function readTaskComments_(sh, taskId) {
-  var out = [];
-  if (!sh || sh.getLastRow() < 2 || !taskId) return out;
-  var v = sh.getDataRange().getValues();
-  for (var i = 1; i < v.length; i++) {
-    if (!v[i][0] || String(v[i][1]) !== String(taskId)) continue;
-    var imgs = [];
-    try { imgs = v[i][4] ? JSON.parse(v[i][4]) : []; } catch (e) { imgs = []; }
-    out.push({
-      id: String(v[i][0]),
-      taskId: String(v[i][1]),
-      author: String(v[i][2] || ''),
-      content: String(v[i][3] || ''),
-      images: imgs,
-      createdAt: String(v[i][5] || '')
-    });
-  }
-  out.sort(function(a, b) { return new Date(a.createdAt) - new Date(b.createdAt); });
-  return out;
-}
-
-// Bình luận chỉ được thêm mới, không sửa/xóa (giống chat/thảo luận)
-function saveTaskComment_(c) {
-  if (!c || !c.taskId || (!String(c.content || '').trim() && !(c.images || []).length)) {
-    return jsonOut_({ error: 'Thieu noi dung binh luan' });
-  }
-  var sh = getSheet_(SH_TASKCM, TASKCM_HEADERS);
-  var now = new Date().toISOString();
-  var id = 'cm_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-  sh.appendRow([id, c.taskId, c.author || '', c.content || '', JSON.stringify(c.images || []), now]);
-  return jsonOut_({ ok: true, id: id });
-}
-
