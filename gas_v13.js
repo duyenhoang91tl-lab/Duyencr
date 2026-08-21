@@ -19,7 +19,7 @@ var SH_USER    = 'Users';
 var SH_CONTEXT = 'AIContext';
 
 var ORDER_SS_ID = '1PQT933_mEDfnnTe-cJkYAbLd8n9bMPN_yW4bc4gKxnU'; // File chua OrderData2x (doanh thu/don hang)
-var CRM_SS_ID   = '1XiPfMZObRgK4EfzJoqlPdBMLQY2Ej5ug6vMmz7m1zKY'; // File chua CareData/Users/Teams/Settings/AuditLog/AssignData/AIContext (CRM).
+var CRM_SS_ID   = '18XBtbjP7gtlvYpChikF3B62cxHkR4426s5poZj9Mj8I'; // File chua CareData/Users/Teams/Settings/AuditLog/AssignData/AIContext (CRM).
                         // De trong = dung file dang gan Apps Script nay (mac dinh, hanh vi cu).
                         // Dan Spreadsheet ID moi vao day de doi nguon CRM MA KHONG can gan lai script vao file khac.
 // >>> Muon doi nguon du lieu sau nay: chi can sua 2 dong ID o tren (ORDER_SS_ID va/hoac CRM_SS_ID) roi Deploy lai. <<<
