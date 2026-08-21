@@ -383,6 +383,32 @@ function doGet(e) {
 
     if (action === 'dashboard') return jsonOut_(buildDashboard_());
 
+    // ── Bao cao doanh so CRM moi (nguon: Google Sheet "DT tong" goc) ──
+    if (action === 'salesReportA') {
+      var pA = e.parameter || {};
+      var fA = { dateFrom: pA.dateFrom || '', dateTo: pA.dateTo || '',
+                 dateField: pA.dateField || 'ngayTao', sale: pA.sale || '', kenh: pA.kenh || '' };
+      var cacheA = CacheService.getScriptCache();
+      var cKeyA = 'salesA_' + JSON.stringify(fA);
+      var cachedA = cacheA.get(cKeyA);
+      if (cachedA) { try { return jsonOut_(JSON.parse(cachedA)); } catch(ec) {} }
+      var resA = buildSalesReportA_(fA);
+      try { cacheA.put(cKeyA, JSON.stringify(resA), 120); } catch(ec) {}
+      return jsonOut_(resA);
+    }
+    if (action === 'salesReportB') {
+      var pB = e.parameter || {};
+      var fB = { dateFrom: pB.dateFrom || '', dateTo: pB.dateTo || '',
+                 nguon: pB.nguon || '', marketer: pB.marketer || '' };
+      var cacheB = CacheService.getScriptCache();
+      var cKeyB = 'salesB_' + JSON.stringify(fB);
+      var cachedB = cacheB.get(cKeyB);
+      if (cachedB) { try { return jsonOut_(JSON.parse(cachedB)); } catch(ec) {} }
+      var resB = buildSalesReportB_(fB);
+      try { cacheB.put(cKeyB, JSON.stringify(resB), 120); } catch(ec) {}
+      return jsonOut_(resB);
+    }
+
     if (action === 'assign')    return jsonOut_({ assignHistory: readAssign_(ss.getSheetByName(SH_ASSIGN)) });
     if (action === 'tasks')     return jsonOut_({ tasks: readTasks_(ss.getSheetByName(SH_TASK)) });
 
@@ -488,6 +514,283 @@ function buildDashboard_() {
   }
   return { totalCustomers: Object.keys(phones).length, totalOrders: orders.length,
            totalRevenue: revenue, careRows: care.length, zaloFriends: friend };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BAO CAO DOANH SO CRM MOI (nguon: Google Sheet "DT tong" goc)
+//  KHONG dung ORDER_SS_ID/ORDER_SHEETS cu — day la nguon doc lap moi.
+//  Bao cao A = sheet "DT TỔNG " (cap don hang)
+//  Bao cao B = sheet "dữ liệu đơn" (cap san pham, da gui khach)
+// ═══════════════════════════════════════════════════════════════
+
+// >>> Dan Spreadsheet ID cua Google Sheet "DT tong" goc vao day roi Deploy lai.
+// De trong = tam thoi dung file dang gan script nay (placeholder, cho ID that). <<<
+var DT_SS_ID = '';
+
+var DT_TONG_SHEET     = 'DT TỔNG ';    // luu y: co dau cach o cuoi ten sheet, giu nguyen
+var DON_CHITIET_SHEET = 'dữ liệu đơn';
+
+function getDTSS_() {
+  return DT_SS_ID
+    ? SpreadsheetApp.openById(DT_SS_ID)
+    : SpreadsheetApp.getActiveSpreadsheet();
+}
+
+// ── Parse ngay dang DD/MM/YYYY (chuoi) hoac Date that (doc truc tiep tu Google Sheet) ──
+// KHONG dung new Date(chuoi) truc tiep: JS hieu chuoi kieu MM/DD/YYYY, se sai am tham
+// voi cac ngay <=12 (vd 01/07/2026 se bi hieu la 1 thang 7 thay vi 7 thang 1).
+function parseVNDate_(val) {
+  if (!val && val !== 0) return null;
+  if (Object.prototype.toString.call(val) === '[object Date]') {
+    return isNaN(val.getTime()) ? null : val;
+  }
+  var s = String(val).trim();
+  if (!s) return null;
+  // tach phan ngay khoi phan gio neu co (vd "21/08/2026 10:30")
+  var datePart = s.split(' ')[0];
+  var m = datePart.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if (!m) return null;
+  var d = Number(m[1]), mo = Number(m[2]), y = Number(m[3]);
+  if (y < 100) y += 2000;
+  var dt = new Date(y, mo - 1, d);
+  return isNaN(dt.getTime()) ? null : dt;
+}
+
+function dateInRange_(dt, fromStr, toStr) {
+  if (!dt) return !fromStr && !toStr; // khong parse duoc: chi loai neu co bo loc ngay
+  if (fromStr) {
+    var from = parseVNDate_(fromStr) || new Date(fromStr);
+    if (dt < new Date(from.getFullYear(), from.getMonth(), from.getDate())) return false;
+  }
+  if (toStr) {
+    var to = parseVNDate_(toStr) || new Date(toStr);
+    if (dt > new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59)) return false;
+  }
+  return true;
+}
+
+// Tach chuoi multi-value theo 1 dau phan cach, trim tung phan tu, bo phan tu rong
+function splitMulti_(str, delimiter) {
+  if (!str && str !== 0) return [];
+  var s = String(str);
+  if (!s.trim()) return [];
+  return s.split(delimiter).map(function(x){ return x.trim(); }).filter(function(x){ return x !== ''; });
+}
+
+// ── Doc toan bo sheet "DT TỔNG " thanh mang object ──
+function readDTTong_() {
+  var ss = getDTSS_();
+  var sh = ss.getSheetByName(DT_TONG_SHEET);
+  if (!sh) return [];
+  var last = sh.getLastRow();
+  if (last < 2) return [];
+  // cot A..T (0..19) du dung cho bao cao, tranh doc thua cot rac phia sau
+  var vals = sh.getRange(2, 1, last - 1, 20).getValues();
+  var out = [];
+  for (var i = 0; i < vals.length; i++) {
+    var r = vals[i];
+    if (!r[3] && !r[19]) continue; // dong rong: khong co ten nhiem vu lan ID
+    out.push({
+      ngayTao:        r[0],
+      giaoCho:        r[2],
+      giaiDoan:       r[6],
+      trangThai:      r[7],
+      thoiGianHT:     r[10],
+      kenhBan:        r[12] ? String(r[12]).trim() : '',
+      saleBan:        r[13] ? String(r[13]) : '',
+      sanPham:        r[14],
+      phanLoai:       r[15],
+      giaTriCoc:      Number(r[16]) || 0,
+      giaTriDon:      Number(r[17]) || 0,
+      giaTriChenh:    Number(r[18]) || 0,
+      id:             r[19]
+    });
+  }
+  return out;
+}
+
+// ── Doc toan bo sheet "dữ liệu đơn" thanh mang object ──
+function readDonChiTiet_() {
+  var ss = getDTSS_();
+  var sh = ss.getSheetByName(DON_CHITIET_SHEET);
+  if (!sh) return [];
+  var last = sh.getLastRow();
+  if (last < 2) return [];
+  var vals = sh.getRange(2, 1, last - 1, 14).getValues();
+  var out = [];
+  for (var i = 0; i < vals.length; i++) {
+    var r = vals[i];
+    if (!r[1] && !r[3]) continue; // dong rong: khong co ngay va khong co khach
+    out.push({
+      ngayTaoDon:    r[1],
+      khachHang:     r[3],
+      soDienThoai:   r[4],
+      nguonDon:      r[7] ? String(r[7]).trim() : '',
+      sanPham:       r[8] ? String(r[8]) : '',   // tach bang dau phay ','
+      maSanPham:     r[9] ? String(r[9]) : '',   // tach bang dau cham phay ';' — KHAC voi sanPham/soLuong
+      soLuong:       r[10] ? String(r[10]) : '', // tach bang dau phay ','
+      giaTriSauGiam: Number(r[11]) || 0,
+      cod:           Number(r[12]) || 0,
+      marketer:      r[13] ? String(r[13]).trim() : ''
+    });
+  }
+  return out;
+}
+
+// ── BAO CAO A: theo "DT TỔNG " ──
+// filters: { dateFrom, dateTo, dateField ('ngayTao'|'thoiGianHT'), sale (mang ten hoac ''), kenh ('' = tat ca) }
+function buildSalesReportA_(filters) {
+  filters = filters || {};
+  var dateField = filters.dateField === 'thoiGianHT' ? 'thoiGianHT' : 'ngayTao';
+  var saleFilter = filters.sale ? String(filters.sale).trim() : '';
+  var kenhFilter = filters.kenh ? String(filters.kenh).trim() : '';
+
+  var rows = readDTTong_();
+  var matched = [];
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    var dt = parseVNDate_(row[dateField]);
+    if (!dateInRange_(dt, filters.dateFrom, filters.dateTo)) continue;
+    if (kenhFilter && row.kenhBan !== kenhFilter) continue;
+    var salesOnOrder = splitMulti_(row.saleBan, ',');
+    if (saleFilter && salesOnOrder.indexOf(saleFilter) === -1) continue;
+    matched.push(row);
+  }
+
+  // Tong chung: tinh du gia tri 1 lan, KHONG chia theo sale
+  var totalCoc = 0, totalGiaTri = 0;
+  var bySale = {}; // ten sale -> { orders, coc, giaTri }
+  var byKenh = {}; // ten kenh -> { orders, coc, giaTri }
+  var UNASSIGNED = '(chưa gán sale)';
+
+  for (var j = 0; j < matched.length; j++) {
+    var m = matched[j];
+    totalCoc += m.giaTriCoc;
+    totalGiaTri += m.giaTriDon;
+
+    // breakdown theo kenh: kenh la single-value, khong chia
+    var kName = m.kenhBan || '(chưa có kênh)';
+    if (!byKenh[kName]) byKenh[kName] = { orders: 0, coc: 0, giaTri: 0 };
+    byKenh[kName].orders += 1;
+    byKenh[kName].coc += m.giaTriCoc;
+    byKenh[kName].giaTri += m.giaTriDon;
+
+    // breakdown theo sale: so don GIU NGUYEN (khong chia), phan tien CHIA DEU cho N sale tren don
+    var salesList = splitMulti_(m.saleBan, ',');
+    if (salesList.length === 0) salesList = [UNASSIGNED];
+    var n = salesList.length;
+    for (var k = 0; k < salesList.length; k++) {
+      var sName = salesList[k];
+      if (!bySale[sName]) bySale[sName] = { orders: 0, coc: 0, giaTri: 0 };
+      bySale[sName].orders += 1;                 // so don: khong chia
+      bySale[sName].coc += m.giaTriCoc / n;       // tien: chia deu cho N sale
+      bySale[sName].giaTri += m.giaTriDon / n;
+    }
+  }
+
+  function toArr(obj) {
+    var arr = [];
+    for (var key in obj) {
+      arr.push({ name: key, orders: obj[key].orders, coc: obj[key].coc, giaTri: obj[key].giaTri });
+    }
+    arr.sort(function(a, b){ return b.giaTri - a.giaTri; });
+    return arr;
+  }
+
+  return {
+    totalOrders: matched.length,
+    totalCoc: totalCoc,
+    totalGiaTri: totalGiaTri,
+    bySale: toArr(bySale),
+    byKenh: toArr(byKenh),
+    orders: matched.map(function(m){
+      return {
+        ngayTao: m.ngayTao, thoiGianHT: m.thoiGianHT, kenhBan: m.kenhBan,
+        saleBan: m.saleBan, sanPham: m.sanPham, phanLoai: m.phanLoai,
+        giaTriCoc: m.giaTriCoc, giaTriDon: m.giaTriDon,
+        giaiDoan: m.giaiDoan, trangThai: m.trangThai, id: m.id
+      };
+    })
+  };
+}
+
+// ── BAO CAO B: theo "dữ liệu đơn" (bao gom bao cao san pham) ──
+// filters: { dateFrom, dateTo, nguon, marketer }
+function buildSalesReportB_(filters) {
+  filters = filters || {};
+  var nguonFilter = filters.nguon ? String(filters.nguon).trim() : '';
+  var marketerFilter = filters.marketer ? String(filters.marketer).trim() : '';
+
+  var rows = readDonChiTiet_();
+  var matched = [];
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    var dt = parseVNDate_(row.ngayTaoDon);
+    if (!dateInRange_(dt, filters.dateFrom, filters.dateTo)) continue;
+    if (nguonFilter && row.nguonDon !== nguonFilter) continue;
+    if (marketerFilter && row.marketer !== marketerFilter) continue;
+    matched.push(row);
+  }
+
+  var totalGiaTri = 0, totalCod = 0;
+  var products = {}; // maSanPham -> { name, soLuong }
+
+  for (var j = 0; j < matched.length; j++) {
+    var m = matched[j];
+    totalGiaTri += m.giaTriSauGiam;
+    totalCod += m.cod;
+
+    // Quan trong: 3 cot dung 3 dau phan cach KHAC NHAU trong cung 1 don:
+    //  - San pham (ten):     phan cach bang ','
+    //  - Ma san pham (khoa):  phan cach bang ';'
+    //  - So luong:            phan cach bang ','
+    // Tach rieng tung cot theo dung dau cua no, sau do ghep theo VI TRI (index).
+    var names = splitMulti_(m.sanPham, ',');
+    var codes = splitMulti_(m.maSanPham, ';');
+    var qtys  = splitMulti_(m.soLuong, ',');
+
+    var len = Math.max(names.length, codes.length, qtys.length);
+    if (len === 0) continue;
+    if (names.length !== codes.length || names.length !== qtys.length) {
+      // canh bao lech cot: van xu ly toi da co the, ghep theo index, thieu thi bo trong
+    }
+    for (var p = 0; p < len; p++) {
+      var code = codes[p] || ('(không rõ mã #' + (p+1) + ')');
+      var name = names[p] || code;
+      var qty  = Number((qtys[p] || '0').replace(',', '.')) || 0;
+      if (!products[code]) products[code] = { name: name, code: code, soLuong: 0, mismatchRows: 0 };
+      products[code].soLuong += qty;
+    }
+    if (names.length !== codes.length || names.length !== qtys.length) {
+      // dong sai lech: dung mot key rieng de dem canh bao tong the
+      if (!products['__MISMATCH__']) products['__MISMATCH__'] = { name: '(dòng lệch cột — kiểm tra tay)', code: '__MISMATCH__', soLuong: 0, mismatchRows: 0 };
+      products['__MISMATCH__'].mismatchRows += 1;
+    }
+  }
+
+  var productArr = [];
+  for (var key in products) {
+    if (key === '__MISMATCH__') continue;
+    productArr.push(products[key]);
+  }
+  productArr.sort(function(a, b){ return b.soLuong - a.soLuong; });
+
+  var mismatchCount = products['__MISMATCH__'] ? products['__MISMATCH__'].mismatchRows : 0;
+
+  return {
+    totalOrders: matched.length,
+    totalGiaTri: totalGiaTri,
+    totalCod: totalCod,
+    products: productArr,
+    mismatchRows: mismatchCount, // so dong bi lech so cot giua san pham/ma/so luong — nen kiem tra tay
+    orders: matched.map(function(m){
+      return {
+        ngayTaoDon: m.ngayTaoDon, khachHang: m.khachHang, soDienThoai: m.soDienThoai,
+        nguonDon: m.nguonDon, sanPham: m.sanPham, maSanPham: m.maSanPham, soLuong: m.soLuong,
+        giaTriSauGiam: m.giaTriSauGiam, cod: m.cod, marketer: m.marketer
+      };
+    })
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════
