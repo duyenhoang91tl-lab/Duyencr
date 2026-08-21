@@ -9555,6 +9555,148 @@ function exportAudit(){
 }
 
 // ═══════════════════════════════════════════════════════
+//  BÁO CÁO DOANH SỐ (CRM mới — nguồn: Google Sheet "DT tổng" gốc)
+//  Báo cáo A = sheet "DT TỔNG " (đơn đã lên hệ thống)
+//  Báo cáo B = sheet "dữ liệu đơn" (đơn đã gửi khách) + báo cáo sản phẩm
+// ═══════════════════════════════════════════════════════
+var _srState = {
+  sub: 'A',
+  dateField: 'ngayTao',   // A: 'ngayTao' | 'thoiGianHT'
+  dateFrom: '', dateTo: '',
+  sale: '', kenh: '',      // A
+  nguon: '', marketer: '', // B
+  dataA: null, dataB: null,
+  loading: false
+};
+
+function _srMoney(n){ return fmt(Math.round(n||0)) + '₫'; }
+
+async function _srFetch(action, params){
+  if (!gsUrl) return null;
+  var sep = gsUrl.includes('?') ? '&' : '?';
+  var qs = Object.keys(params).map(function(k){ return k+'='+encodeURIComponent(params[k]||''); }).join('&');
+  try{
+    var r = await fetch(gsUrl + sep + 'action=' + action + '&' + qs, { redirect:'follow' });
+    return await r.json();
+  }catch(e){ return null; }
+}
+
+async function _srLoad(){
+  _srState.loading = true;
+  renderSalesReportTab();
+  if (_srState.sub === 'A'){
+    _srState.dataA = await _srFetch('salesReportA', {
+      dateFrom: _srState.dateFrom, dateTo: _srState.dateTo,
+      dateField: _srState.dateField, sale: _srState.sale, kenh: _srState.kenh
+    });
+  } else {
+    _srState.dataB = await _srFetch('salesReportB', {
+      dateFrom: _srState.dateFrom, dateTo: _srState.dateTo,
+      nguon: _srState.nguon, marketer: _srState.marketer
+    });
+  }
+  _srState.loading = false;
+  renderSalesReportTab();
+}
+
+function _srSetSub(sub){ _srState.sub = sub; _srLoad(); }
+function _srSetField(key, val){ _srState[key] = val; }
+function _srApply(){ _srLoad(); }
+
+function renderSalesReportTab(){
+  var wrap = document.getElementById('salesreport-wrap');
+  if (!wrap) return;
+  if (!gsUrl){
+    wrap.innerHTML = '<div style="color:var(--muted);text-align:center;padding:40px">Chưa kết nối Google Apps Script (gsUrl trống).</div>';
+    return;
+  }
+
+  var subTabs = '<div style="display:flex;gap:8px;margin-bottom:14px">' +
+    '<button class="btn '+(_srState.sub==='A'?'secondary':'sm')+'" onclick="_srSetSub(\'A\')">Báo cáo A — Theo DT tổng</button>' +
+    '<button class="btn '+(_srState.sub==='B'?'secondary':'sm')+'" onclick="_srSetSub(\'B\')">Báo cáo B — Theo dữ liệu đơn</button>' +
+    '</div>';
+
+  var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
+  filters += '<input type="date" value="'+esc(_srState.dateFrom)+'" onchange="_srSetField(\'dateFrom\',this.value)" title="Từ ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
+  filters += '<span style="color:var(--muted)">→</span>';
+  filters += '<input type="date" value="'+esc(_srState.dateTo)+'" onchange="_srSetField(\'dateTo\',this.value)" title="Đến ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
+
+  if (_srState.sub === 'A'){
+    filters += '<select onchange="_srSetField(\'dateField\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+      '<option value="ngayTao"'+(_srState.dateField==='ngayTao'?' selected':'')+'>Lọc theo Ngày tạo</option>'+
+      '<option value="thoiGianHT"'+(_srState.dateField==='thoiGianHT'?' selected':'')+'>Lọc theo Thời gian hoàn thành</option>'+
+      '</select>';
+    filters += '<input type="text" placeholder="Sale bán (đúng tên)" value="'+esc(_srState.sale)+'" onchange="_srSetField(\'sale\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);width:170px">';
+    filters += '<input type="text" placeholder="Kênh bán (đúng tên)" value="'+esc(_srState.kenh)+'" onchange="_srSetField(\'kenh\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);width:170px">';
+  } else {
+    filters += '<input type="text" placeholder="Nguồn đơn (đúng tên)" value="'+esc(_srState.nguon)+'" onchange="_srSetField(\'nguon\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);width:170px">';
+    filters += '<input type="text" placeholder="Marketer (đúng tên)" value="'+esc(_srState.marketer)+'" onchange="_srSetField(\'marketer\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);width:170px">';
+  }
+  filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
+  filters += '</div>';
+
+  var body = '';
+  if (_srState.loading){
+    body = '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>';
+  } else if (_srState.sub === 'A'){
+    body = _srRenderA(_srState.dataA);
+  } else {
+    body = _srRenderB(_srState.dataB);
+  }
+
+  wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + filters + body;
+}
+
+function _srRenderA(d){
+  if (!d) return '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
+  var html = '<div class="kpi-grid" style="margin-bottom:16px">' +
+    '<div class="kpi-card"><div class="kpi-val">'+fmt(d.totalOrders)+'</div><div class="kpi-label">Số lượng đơn</div></div>' +
+    '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalCoc)+'</div><div class="kpi-label">Tổng giá trị cọc (số tiền ck)</div></div>' +
+    '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalGiaTri)+'</div><div class="kpi-label">Tổng giá trị đơn hàng (ko ship)</div></div>' +
+    '</div>';
+
+  html += '<div class="dash-section-title">Theo Sale bán <span style="font-weight:400;color:var(--muted);font-size:11px">(số đơn giữ nguyên — tiền chia đều cho số sale/đơn)</span></div>';
+  html += '<table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Cọc</th><th style="text-align:right">Giá trị</th></tr></thead><tbody>';
+  (d.bySale||[]).forEach(function(s){
+    html += '<tr><td>'+esc(s.name)+'</td><td style="text-align:right">'+fmt(s.orders)+'</td><td style="text-align:right">'+_srMoney(s.coc)+'</td><td style="text-align:right">'+_srMoney(s.giaTri)+'</td></tr>';
+  });
+  if (!(d.bySale||[]).length) html += '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+  html += '</tbody></table>';
+
+  html += '<div class="dash-section-title">Theo Kênh bán</div>';
+  html += '<table class="dash-table"><thead><tr><th>Kênh</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Cọc</th><th style="text-align:right">Giá trị</th></tr></thead><tbody>';
+  (d.byKenh||[]).forEach(function(k){
+    html += '<tr><td>'+esc(k.name)+'</td><td style="text-align:right">'+fmt(k.orders)+'</td><td style="text-align:right">'+_srMoney(k.coc)+'</td><td style="text-align:right">'+_srMoney(k.giaTri)+'</td></tr>';
+  });
+  if (!(d.byKenh||[]).length) html += '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+  html += '</tbody></table>';
+  return html;
+}
+
+function _srRenderB(d){
+  if (!d) return '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
+  var html = '<div class="kpi-grid" style="margin-bottom:16px">' +
+    '<div class="kpi-card"><div class="kpi-val">'+fmt(d.totalOrders)+'</div><div class="kpi-label">Số lượng đơn</div></div>' +
+    '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalGiaTri)+'</div><div class="kpi-label">Tổng giá trị đơn hàng sau giảm giá</div></div>' +
+    '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalCod)+'</div><div class="kpi-label">Tổng COD</div></div>' +
+    '</div>';
+
+  if (d.mismatchRows){
+    html += '<div style="background:#fef3c7;color:#92400e;padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:14px">' +
+      '⚠️ '+fmt(d.mismatchRows)+' dòng bị lệch số phần tử giữa cột Sản phẩm/Mã sản phẩm/Số lượng — nên kiểm tra tay, số liệu sản phẩm bên dưới có thể thiếu sót ở các dòng này.</div>';
+  }
+
+  html += '<div class="dash-section-title">Báo cáo sản phẩm</div>';
+  html += '<table class="dash-table"><thead><tr><th>Mã sản phẩm</th><th>Tên sản phẩm</th><th style="text-align:right">Tổng số lượng</th></tr></thead><tbody>';
+  (d.products||[]).forEach(function(p){
+    html += '<tr><td style="font-family:monospace;font-size:12px">'+esc(p.code)+'</td><td>'+esc(p.name)+'</td><td style="text-align:right">'+fmt(p.soLuong)+'</td></tr>';
+  });
+  if (!(d.products||[]).length) html += '<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+  html += '</tbody></table>';
+  return html;
+}
+
+// ═══════════════════════════════════════════════════════
 //  CHIA DATA THEO TEAM  (tab thứ 4 trong modal chia data)
 // ═══════════════════════════════════════════════════════
 var _teamAssignPct = {}; // teamId -> percent
@@ -9744,13 +9886,14 @@ var _activeV9Tab = 'list';
 switchTab = function(tab, el){
   _v9PrevSwitchTab(tab, el);
   _activeV9Tab = tab;
-  ['dashboard','team','audit'].forEach(function(name){
+  ['dashboard','team','audit','salesreport'].forEach(function(name){
     var panel = document.getElementById('tab-'+name);
     if (panel) panel.style.display = (tab===name) ? 'flex' : 'none';
   });
   if (tab === 'dashboard') renderDashboard();
   else if (tab === 'team') renderTeamTab();
   else if (tab === 'audit') renderAuditTab();
+  else if (tab === 'salesreport') renderSalesReportTab();
 };
 
 // ═══════════════════════════════════════════════════════
@@ -9805,9 +9948,10 @@ function _injectV9UI(){
   var tabsBar = document.querySelector('.tabs');
   if (tabsBar){
     var defs = [
-      { id:'dashboard', label:'📊 Dashboard' },
-      { id:'team',      label:'👥 Quản lý Team' },
-      { id:'audit',     label:'🧾 Nhật ký' }
+      { id:'dashboard',   label:'📊 Dashboard' },
+      { id:'team',        label:'👥 Quản lý Team' },
+      { id:'audit',       label:'🧾 Nhật ký' },
+      { id:'salesreport', label:'📈 Báo cáo doanh số' }
     ];
     defs.forEach(function(d){
       var div = document.createElement('div');
@@ -9821,9 +9965,10 @@ function _injectV9UI(){
   var dataView = document.getElementById('data-view');
   if (dataView){
     var panels = [
-      { id:'tab-dashboard', inner:'<div class="dash-wrap" id="dash-wrap"></div>' },
-      { id:'tab-team',      inner:'<div class="team-wrap" id="team-wrap"></div>' },
-      { id:'tab-audit',     inner:'<div class="audit-wrap" id="audit-wrap"></div>' }
+      { id:'tab-dashboard',   inner:'<div class="dash-wrap" id="dash-wrap"></div>' },
+      { id:'tab-team',        inner:'<div class="team-wrap" id="team-wrap"></div>' },
+      { id:'tab-audit',       inner:'<div class="audit-wrap" id="audit-wrap"></div>' },
+      { id:'tab-salesreport', inner:'<div class="dash-wrap" id="salesreport-wrap"></div>' }
     ];
     panels.forEach(function(p){
       if (document.getElementById(p.id)) return;
