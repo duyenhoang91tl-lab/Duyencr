@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-//  OME CS Portal — Google Apps Script — PHIEN BAN 10.57.13.7.2026 (gio.phut.ngay.thang.nam)
+//  OME CS Portal — Google Apps Script — PHIEN BAN 00.18.22.8.2026 (gio.phut.ngay.thang.nam)
 //  v12.0: Hop nhat appweb v10.0 + ZaloAI v11.2
 //         Them birthday vao CareData (col 18)
 //         saveAllCare / saveSingleCare bao toan truong mo rong (khStatus, nickZalos, birthday)
