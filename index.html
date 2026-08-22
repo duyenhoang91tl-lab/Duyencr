@@ -2867,7 +2867,6 @@ function renderOverdueTab() {
 function markDone(id) {
   const it = schedules.find(x=>x.id===id);
   if (it) {
-    it.done=true;
     // Xóa ngày lịch nhanh tương ứng trong careData (để không còn nhắc nữa)
     const care = careData[it.phone];
     if (care) {
@@ -2889,11 +2888,14 @@ function markDone(id) {
       delSet[it.id] = true;
       saveLS('ome_dao_deleted', delSet);
     }
+    // Bấm Xong = xoá hẳn khỏi danh sách (không giữ lại bản ghi done)
+    schedules = schedules.filter(x => x.id !== id);
     saveLS('ome_sched',schedules);
+    saveLS('ome_schedules',schedules);
     // Tính lại mốc auto sắp tới (bỏ mốc đã Done) → cập nhật ô Hẹn cho đúng
     try { if (typeof syncAutoHenToCareData==='function') syncAutoHenToCareData(); } catch(e){}
     saveLS('ome_care', careData);
-    if (gsUrl) pushCareToGS(it.phone);
+    if (gsUrl) queueCareSync(it.phone);
     renderScheduleTab(); renderOverdueTab(); updateSchedBadges();
     renderReminderPanel();
     // Cập nhật panel chi tiết nếu đang mở tab Lịch hẹn của chính khách này
@@ -2902,10 +2904,10 @@ function markDone(id) {
       var _body = document.getElementById('dp-body');
       if (_cdp && _body) _body.innerHTML = renderSchedTabHtml(_cdp);
     }
-    toast('✓ Đã đánh dấu hoàn thành');
+    toast('✓ Đã hoàn thành và xoá nhắc hẹn');
   }
 }
-// Đánh dấu done lịch nhanh careData (schedGoi/SP/CS/Hen) từ reminder panel
+// Đánh dấu done lịch nhanh careData (schedGoi/SP/CS/Hen) từ reminder panel — xoá hẳn, không giữ lại
 function markCareSchedDone(phone, field) {
   const care = careData[phone] || {};
   const typeToSchedKey = {schedGoi:'goi', schedSP:'sp', schedCS:'cs', schedHen:'hen'};
@@ -2916,12 +2918,13 @@ function markCareSchedDone(phone, field) {
   careData[phone][field] = '';
   careData[phone][field+'Note'] = '';
   saveLS('ome_care', careData);
-  // Đánh dấu done trong schedules[] nếu có
+  // Xoá hẳn item tương ứng trong schedules[] nếu có (thay vì chỉ đánh dấu done)
   if (schedKey && date) {
-    const sc = schedules.find(x=>x.phone===phone&&x.type===schedKey&&x.date===date&&!x.done);
-    if (sc) { sc.done=true; saveLS('ome_sched',schedules); }
+    schedules = schedules.filter(x => !(x.phone===phone && x.type===schedKey && x.date===date && !x.done));
+    saveLS('ome_sched',schedules);
+    saveLS('ome_schedules',schedules);
   }
-  if (gsUrl) pushCareToGS(phone);
+  if (gsUrl) queueCareSync(phone);
   updateSchedBadges();
   renderReminderPanel();
   renderScheduleTab(); renderOverdueTab();
