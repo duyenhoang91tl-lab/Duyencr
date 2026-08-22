@@ -1839,15 +1839,19 @@ async function syncFromGS(opts) {
           row.updated && _oldUpdated && row.updated !== _oldUpdated) {
         _dpPhoneChanged = true;
       }
-      if (row.schedules) {
+      if (row.schedules !== undefined) {
         try {
-          const sc = JSON.parse(row.schedules);
-          for (const it of sc) { if (!schedules.find(s => s.id === it.id)) schedules.push(it); }
+          const sc = row.schedules ? JSON.parse(row.schedules) : [];
+          // Thay vì chỉ cộng dồn (khiến lịch đã xoá trên Sheet không bao giờ mất khỏi app),
+          // xoá hết lịch cũ của khách này rồi nạp đúng danh sách hiện có từ Sheet.
+          schedules = schedules.filter(s => s.phone !== _normPh && s.phone !== _ph2);
+          for (const it of sc) schedules.push(it);
         } catch(e){}
       }
       count++;
     }
     saveLS('ome_care', careData);
+    saveLS('ome_sched', schedules);
     saveLS('ome_schedules', schedules);
     // Pull cấu hình tình trạng CS (nếu admin đã đồng bộ lên GSheets)
     if (d.careStatus && Array.isArray(d.careStatus) && d.careStatus.length) {
