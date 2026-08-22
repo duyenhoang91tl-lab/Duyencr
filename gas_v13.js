@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-//  OME CS Portal — Google Apps Script — PHIEN BAN 00.18.22.8.2026 (gio.phut.ngay.thang.nam)
+//  OME CS Portal — Google Apps Script — PHIEN BAN 22.08.2026 v13.2 (chuyen don hang sang DT TONG, bo OrderData cu)
 //  v12.0: Hop nhat appweb v10.0 + ZaloAI v11.2
 //         Them birthday vao CareData (col 18)
 //         saveAllCare / saveSingleCare bao toan truong mo rong (khStatus, nickZalos, birthday)
@@ -245,48 +245,8 @@ function mergeExtFields_(r, ex) {
 }
 
 // ─── ORDER READ ────────────────────────────────────────────────
-function readOrdersByPhone_(phone) {
-  var ss = getOrderSS_();
-  var ph = normPhone_(phone);
-  var out = [];
-  for (var i = ORDER_SHEETS.length - 1; i >= 0; i--) {
-    var sh = ss.getSheetByName(ORDER_SHEETS[i].name);
-    if (!sh || sh.getLastRow() < 2) continue;
-    var vals = sh.getDataRange().getValues();
-    for (var j = 1; j < vals.length; j++) {
-      if (!vals[j][0]) continue;
-      if (normPhone_(vals[j][0]) !== ph) continue;
-      out.push({
-        sheet: sh.getName(), rowIndex: j + 1,
-        phone: vals[j][0], name: vals[j][1]||'', date: vals[j][2]||'', year: vals[j][3]||'',
-        month: vals[j][4]||'', cs: vals[j][5]||'', source: vals[j][6]||'', revenue: vals[j][7]||0,
-        product: vals[j][8]||'', productDetail: vals[j][9]||'', status: vals[j][10]||'',
-        zalo: vals[j][11]||'', note: vals[j][12]||'', careCS: vals[j][13]||''
-      });
-    }
-  }
-  // Luu y: chi khu trung dong GIONG HET (cung ngay+doanh thu+san pham). Cac dong "mat 3
-  // so 0" (doanh thu lech nhau 1000 lan, VD 708 vs 708.000) CO chu y GIU LAI ca 2 de FE
-  // (extension) tu phat hien va hien nut × cho CS xoa dung dong loi (xem _dupRevenueFlags_
-  // trong content.js) — khong tu dong xoa o day de tranh xoa nham khi chua xac nhan.
-  var seen = {}, deduped = [];
-  for (var k = 0; k < out.length; k++) {
-    var key = String(out[k].date)+'|'+String(out[k].revenue)+'|'+String(out[k].product);
-    if (!seen[key]) { seen[key] = true; deduped.push(out[k]); }
-  }
-  return deduped;
-}
-
-function readAllOrders_() {
-  var ss = getOrderSS_(), out = [];
-  for (var i = 0; i < ORDER_SHEETS.length; i++) {
-    var sh = ss.getSheetByName(ORDER_SHEETS[i].name);
-    if (sh) out = out.concat(readOrders_(sh));
-  }
-  return out;
-}
-
-function readOrders_(sh) {
+// (readOrdersByPhone_/readAllOrders_ nay doc tu DT TONG — dinh nghia o gan DT_SS_ID ben duoi)
+function _legacyReadOrdersUnused_(sh) {
   var out = [];
   if (!sh || sh.getLastRow() < 2) return out;
   var ov = sh.getDataRange().getValues();
@@ -413,12 +373,10 @@ function doGet(e) {
     if (action === 'tasks')     return jsonOut_({ tasks: readTasks_(ss.getSheetByName(SH_TASK)) });
 
     if (action === 'count') {
-      var shC = ss.getSheetByName(SH_CARE); var totalOrders = 0;
-      for (var si = 0; si < ORDER_SHEETS.length; si++) {
-        var sho = getOrderSS_().getSheetByName(ORDER_SHEETS[si].name);
-        if (sho) totalOrders += Math.max(0, sho.getLastRow() - 1);
-      }
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v10.57.13.7.2026' });
+      var shC = ss.getSheetByName(SH_CARE);
+      var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
+      var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.2-dttong' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -527,6 +485,84 @@ var DT_SS_ID = '1fiWXPMZcHuEh0zYqD6pgQjZDM0PhWzpiSK7Igj6Cug8'; // Google Sheet "
 
 var DT_TONG_SHEET     = 'DT TỔNG ';    // luu y: co dau cach o cuoi ten sheet, giu nguyen
 var DON_CHITIET_SHEET = 'dữ liệu đơn';
+
+// ─── DT TỔNG = nguon "don hang" CHUAN MOI (thay the hoan toan OrderData21_22..26 cu) ───
+// Cot (0-indexed, A=0): A=ngayTao | C=giaoCho | D=SDT khach (dat ten cot la "Ten nhiem vu"
+// nhung thuc chat luu SDT theo quy uoc noi bo) | G=giaiDoan | H=trangThai | K=thoiGianHT
+// (dung lam "ngay mua" chinh, theo yeu cau Duyen 22/8/2026) | M=kenhBan | N=saleBan |
+// O=sanPham (LUU Y: cot nay la text tu do nhan vien go tay ten KH+dia chi, KHONG phai
+// ten san pham sach — khong dung de so khop san pham cho hoi tham tu dong/bao cao SP) |
+// P=phanLoai | Q=giaTriCoc | R=giaTriDon (dung lam revenue) | S=giaTriChenh | T=id (duy
+// nhat, dung de sua/xoa dong chinh xac thay vi do theo phone+nam+thang+doanh thu nhu truoc)
+var DT_COL_NGAYTAO    = 0;
+var DT_COL_GIAOCHO    = 2;
+var DT_COL_PHONE      = 3;
+var DT_COL_GIAIDOAN   = 6;
+var DT_COL_TRANGTHAI  = 7;
+var DT_COL_THOIGIANHT = 10;
+var DT_COL_KENHBAN    = 12;
+var DT_COL_SALEBAN    = 13;
+var DT_COL_SANPHAM    = 14;
+var DT_COL_PHANLOAI   = 15;
+var DT_COL_GIATRICOC  = 16;
+var DT_COL_GIATRIDON  = 17;
+var DT_COL_GIATRICHENH= 18;
+var DT_COL_ID         = 19;
+var DT_TONG_WIDTH     = 20; // A:T
+
+// Chuyen 1 hang tho cua DT TONG thanh object "don hang" (giu ten truong nhu ORDER_HEADERS
+// cu de cac cho khac trong code/frontend it phai sua nhat co the)
+function dtRowToOrder_(row, rowIndex) {
+  var dtVal = row[DT_COL_THOIGIANHT];
+  var d = parseVNDate_(dtVal);
+  return {
+    id: row[DT_COL_ID] != null ? String(row[DT_COL_ID]) : '',
+    rowIndex: rowIndex,
+    phone: normPhone_(String(row[DT_COL_PHONE] || '')),
+    name: '', // KHONG co san ten khach rieng trong DT TONG (chi co SDT), de trong
+    date: dtVal || row[DT_COL_NGAYTAO] || '',
+    year: d ? d.getFullYear() : '',
+    month: d ? (d.getMonth() + 1) : '',
+    cs: String(row[DT_COL_SALEBAN] || ''),
+    source: String(row[DT_COL_KENHBAN] || ''),
+    revenue: Number(row[DT_COL_GIATRIDON]) || 0,
+    product: String(row[DT_COL_SANPHAM] || ''),       // text tu do, xem luu y o tren
+    productDetail: String(row[DT_COL_PHANLOAI] || ''),
+    status: String(row[DT_COL_TRANGTHAI] || ''),
+    zalo: '',
+    note: String(row[DT_COL_GIAIDOAN] || ''),
+    careCS: '' // DT TONG khong co cot rieng cho careCS — xem setOrderCareCS_ ben duoi
+  };
+}
+
+function readAllOrders_() {
+  var ss = getDTSS_();
+  var sh = ss.getSheetByName(DT_TONG_SHEET);
+  if (!sh || sh.getLastRow() < 2) return [];
+  var last = sh.getLastRow();
+  var vals = sh.getRange(2, 1, last - 1, DT_TONG_WIDTH).getValues();
+  var out = [];
+  for (var i = 0; i < vals.length; i++) {
+    var r = vals[i];
+    if (!r[DT_COL_PHONE] && !r[DT_COL_ID]) continue; // dong rong
+    out.push(dtRowToOrder_(r, i + 2));
+  }
+  return out;
+}
+
+function readOrdersByPhone_(phone) {
+  var ph = normPhone_(phone);
+  var all = readAllOrders_();
+  var out = all.filter(function (o) { return o.phone === ph; });
+  // Khu trung dong GIONG HET (cung ngay+doanh thu+san pham) — giu logic cu, KHONG tu dong
+  // xoa o day, chi de UI/extension tu phat hien va hoi xac nhan (xem findDuplicateOrders_)
+  var seen = {}, deduped = [];
+  for (var k = 0; k < out.length; k++) {
+    var key = String(out[k].date) + '|' + String(out[k].revenue) + '|' + String(out[k].product);
+    if (!seen[key]) { seen[key] = true; deduped.push(out[k]); }
+  }
+  return deduped;
+}
 
 function getDTSS_() {
   return DT_SS_ID
@@ -1055,95 +1091,74 @@ function syncZaloFriendStatus_(rows, dryRun) {
 }
 
 // ─── SAVE ORDERS ───────────────────────────────────────────────
+// Import hang loat khong con duoc dung nua tu khi bo Sasum (DT TONG do nhan vien
+// tu quan ly truc tiep tren Sheet) — tra loi ro de tranh ghi nham cot vao sheet
+// dang duoc quan ly thu cong.
 function saveOrders_(orders) {
-  if (!orders || !orders.length) return jsonOut_({ ok: true, written: 0, skipped: 0 });
-  var ss = getOrderSS_(); var groups = {};
-  for (var k = 0; k < orders.length; k++) {
-    var o = orders[k]; var shName = getOrderSheetName_(o.year);
-    if (!groups[shName]) groups[shName] = [];
-    groups[shName].push(o);
-  }
-  var totalWritten = 0, totalSkipped = 0;
-  for (var sName in groups) {
-    var sh = getOrderSheet_(sName);
-    var existing = sh.getDataRange().getValues(); var keys = {};
-    for (var i = 1; i < existing.length; i++) {
-      if (!existing[i][0]) continue;
-      keys[existing[i][0]+'|'+existing[i][3]+'|'+existing[i][4]+'|'+existing[i][7]] = true;
-    }
-    var toAppend = []; var grp = groups[sName];
-    for (var j = 0; j < grp.length; j++) {
-      var ord = grp[j];
-      var key = (ord.phone||'')+'|'+(ord.year||'')+'|'+(ord.month||'')+'|'+(ord.revenue||0);
-      if (keys[key]) { totalSkipped++; continue; }
-      keys[key] = true;
-      toAppend.push([ord.phone||'', ord.name||'', ord.date||'', ord.year||'', ord.month||'',
-        ord.cs||'', ord.source||'', ord.revenue||0, ord.product||'', ord.productDetail||'',
-        ord.status||'', ord.zalo||'', ord.note||'', ord.careCS||'']);
-    }
-    if (toAppend.length) {
-      sh.getRange(sh.getLastRow()+1, 1, toAppend.length, ORDER_HEADERS.length).setValues(toAppend);
-      totalWritten += toAppend.length;
-    }
-  }
-  return jsonOut_({ ok: true, written: totalWritten, skipped: totalSkipped });
+  return jsonOut_({ ok: false, error: 'Da ngung ho tro import hang loat don hang (saveOrders). DT TONG gio duoc quan ly truc tiep tren Google Sheet, khong con dong bo tu Sasum nua.' });
 }
 
+// Sua 1 don hang trong DT TONG. Uu tien khop theo data.id (cot T, chinh xac tuyet doi).
+// Neu khong co id (client cu chua gui), du phong khop theo phone + oldYear/oldMonth (tu
+// Thoi gian hoan thanh) + oldRevenue nhu co che cu.
 function patchOrder_(data) {
-  var ss = getOrderSS_();
-  var shName = getOrderSheetName_(data.oldYear);
-  var sheetsToSearch = [shName];
-  for (var si = 0; si < ORDER_SHEETS.length; si++) {
-    if (ORDER_SHEETS[si].name !== shName) sheetsToSearch.push(ORDER_SHEETS[si].name);
-  }
-  for (var si2 = 0; si2 < sheetsToSearch.length; si2++) {
-    var sh = ss.getSheetByName(sheetsToSearch[si2]);
-    if (!sh || sh.getLastRow() < 2) continue;
-    var vals = sh.getDataRange().getValues();
-    for (var i = 1; i < vals.length; i++) {
-      var r = vals[i];
-      if (String(r[0]) !== String(data.phone))      continue;
-      if (String(r[3]) !== String(data.oldYear))    continue;
-      if (String(r[4]) !== String(data.oldMonth))   continue;
-      if (Number(r[7]) !== Number(data.oldRevenue)) continue;
-      if (data.newDate    !== undefined) sh.getRange(i+1, 3).setValue(data.newDate);
-      if (data.newYear    !== undefined) sh.getRange(i+1, 4).setValue(data.newYear);
-      if (data.newMonth   !== undefined) sh.getRange(i+1, 5).setValue(data.newMonth);
-      if (data.newRevenue !== undefined) sh.getRange(i+1, 8).setValue(data.newRevenue);
-      if (data.newProduct)               sh.getRange(i+1, 9).setValue(data.newProduct);
-      if (data.newDetail)                sh.getRange(i+1,10).setValue(data.newDetail);
-      try { CacheService.getScriptCache().remove('lk_' + normPhone_(String(data.phone))); } catch(ec) {}
-      return jsonOut_({ ok: true, updated: true });
+  var ss = getDTSS_();
+  var sh = ss.getSheetByName(DT_TONG_SHEET);
+  if (!sh || sh.getLastRow() < 2) return jsonOut_({ ok: false, error: 'Khong tim thay sheet DT TONG' });
+  var last = sh.getLastRow();
+  var vals = sh.getRange(2, 1, last - 1, DT_TONG_WIDTH).getValues();
+  var rowIdx = -1;
+  for (var i = 0; i < vals.length; i++) {
+    var r = vals[i];
+    if (data.id) {
+      if (String(r[DT_COL_ID]) === String(data.id)) { rowIdx = i + 2; break; }
+      continue;
     }
+    var ph = normPhone_(String(r[DT_COL_PHONE] || ''));
+    if (ph !== normPhone_(String(data.phone || ''))) continue;
+    var d = parseVNDate_(r[DT_COL_THOIGIANHT]);
+    var yy = d ? d.getFullYear() : '', mm = d ? (d.getMonth() + 1) : '';
+    if (String(yy) !== String(data.oldYear)) continue;
+    if (String(mm) !== String(data.oldMonth)) continue;
+    if (Number(r[DT_COL_GIATRIDON]) !== Number(data.oldRevenue)) continue;
+    rowIdx = i + 2; break;
   }
-  var newSh = getOrderSheet_(getOrderSheetName_(data.newYear || data.oldYear));
-  newSh.appendRow([data.phone||'', '', data.newDate||'', data.newYear||data.oldYear||'',
-    data.newMonth||data.oldMonth||'', '', '', data.newRevenue||0,
-    data.newProduct||'', data.newDetail||'', '', '', '', '']);
-  return jsonOut_({ ok: true, updated: false, appended: true });
+  if (rowIdx === -1) return jsonOut_({ ok: false, updated: false, error: 'Khong tim thay dong don hang phu hop trong DT TONG' });
+
+  if (data.newDate !== undefined) {
+    var dnew = parseVNDate_(data.newDate) || new Date(data.newDate);
+    if (dnew && !isNaN(dnew.getTime())) sh.getRange(rowIdx, DT_COL_THOIGIANHT + 1).setValue(dnew);
+  }
+  if (data.newRevenue !== undefined) sh.getRange(rowIdx, DT_COL_GIATRIDON + 1).setValue(data.newRevenue);
+  if (data.newProduct)               sh.getRange(rowIdx, DT_COL_SANPHAM + 1).setValue(data.newProduct);
+  if (data.newDetail)                sh.getRange(rowIdx, DT_COL_PHANLOAI + 1).setValue(data.newDetail);
+  try { CacheService.getScriptCache().remove('lk_' + normPhone_(String(data.phone))); } catch (ec) {}
+  return jsonOut_({ ok: true, updated: true });
 }
 
+// Xoa 1 don hang trong DT TONG. Uu tien khop theo data.id; du phong theo phone+year/month/revenue.
 function deleteOrder_(data) {
-  var ss = getOrderSS_();
-  var shName = getOrderSheetName_(data.oldYear);
-  var sheetsToSearch = [shName];
-  for (var si = 0; si < ORDER_SHEETS.length; si++) {
-    if (ORDER_SHEETS[si].name !== shName) sheetsToSearch.push(ORDER_SHEETS[si].name);
-  }
-  for (var si2 = 0; si2 < sheetsToSearch.length; si2++) {
-    var sh = ss.getSheetByName(sheetsToSearch[si2]);
-    if (!sh || sh.getLastRow() < 2) continue;
-    var vals = sh.getDataRange().getValues();
-    for (var i = 1; i < vals.length; i++) {
-      var r = vals[i];
-      if (String(r[0]) !== String(data.phone))      continue;
-      if (String(r[3]) !== String(data.oldYear))    continue;
-      if (String(r[4]) !== String(data.oldMonth))   continue;
-      if (Number(r[7]) !== Number(data.oldRevenue)) continue;
-      sh.deleteRow(i + 1);
-      try { CacheService.getScriptCache().remove('lk_' + normPhone_(String(data.phone))); } catch(ec) {}
-      return jsonOut_({ ok: true, deleted: true });
+  var ss = getDTSS_();
+  var sh = ss.getSheetByName(DT_TONG_SHEET);
+  if (!sh || sh.getLastRow() < 2) return jsonOut_({ ok: false, deleted: false, error: 'Khong tim thay sheet DT TONG' });
+  var last = sh.getLastRow();
+  var vals = sh.getRange(2, 1, last - 1, DT_TONG_WIDTH).getValues();
+  for (var i = 0; i < vals.length; i++) {
+    var r = vals[i];
+    if (data.id) {
+      if (String(r[DT_COL_ID]) !== String(data.id)) continue;
+    } else {
+      var ph = normPhone_(String(r[DT_COL_PHONE] || ''));
+      if (ph !== normPhone_(String(data.phone || ''))) continue;
+      var d = parseVNDate_(r[DT_COL_THOIGIANHT]);
+      var yy = d ? d.getFullYear() : '', mm = d ? (d.getMonth() + 1) : '';
+      if (String(yy) !== String(data.oldYear)) continue;
+      if (String(mm) !== String(data.oldMonth)) continue;
+      if (Number(r[DT_COL_GIATRIDON]) !== Number(data.oldRevenue)) continue;
     }
+    sh.deleteRow(i + 2);
+    try { CacheService.getScriptCache().remove('lk_' + normPhone_(String(data.phone))); } catch (ec) {}
+    return jsonOut_({ ok: true, deleted: true });
   }
   return jsonOut_({ ok: true, deleted: false });
 }
@@ -1169,26 +1184,27 @@ function normOrderDate_(v) {
 function _normTxt_(s) { return String(s || '').trim().toLowerCase(); }
 
 function findDuplicateOrders_(phoneFilter) {
-  var ss = getOrderSS_();
+  var ss = getDTSS_();
+  var sh = ss.getSheetByName(DT_TONG_SHEET);
   var normP = phoneFilter ? normPhone_(phoneFilter) : '';
   var groupsByKey = {};
-  for (var si = 0; si < ORDER_SHEETS.length; si++) {
-    var shName = ORDER_SHEETS[si].name;
-    var sh = ss.getSheetByName(shName);
-    if (!sh || sh.getLastRow() < 2) continue;
-    var vals = sh.getDataRange().getValues();
-    for (var i = 1; i < vals.length; i++) {
+  if (sh && sh.getLastRow() >= 2) {
+    var last = sh.getLastRow();
+    var vals = sh.getRange(2, 1, last - 1, DT_TONG_WIDTH).getValues();
+    for (var i = 0; i < vals.length; i++) {
       var r = vals[i];
-      if (!r[0]) continue;
-      var np = normPhone_(r[0]);
+      if (!r[DT_COL_PHONE]) continue;
+      var np = normPhone_(String(r[DT_COL_PHONE]));
       if (normP && np !== normP) continue;
-      var nDate = normOrderDate_(r[2]);
-      var key = np + '|' + nDate + '|' + _normTxt_(r[8]) + '|' + _normTxt_(r[9]);
+      var nDate = normOrderDate_(r[DT_COL_THOIGIANHT]);
+      var key = np + '|' + nDate + '|' + _normTxt_(r[DT_COL_SANPHAM]);
       if (!groupsByKey[key]) groupsByKey[key] = [];
       groupsByKey[key].push({
-        sheet: shName, rowIndex: i + 1, phone: r[0], name: r[1] || '', date: r[2] || '',
-        year: r[3] || '', month: r[4] || '', cs: r[5] || '', source: r[6] || '',
-        revenue: r[7] || 0, product: r[8] || '', productDetail: r[9] || '', status: r[10] || ''
+        sheet: DT_TONG_SHEET, rowIndex: i + 2, id: r[DT_COL_ID] != null ? String(r[DT_COL_ID]) : '',
+        phone: r[DT_COL_PHONE], name: '', date: r[DT_COL_THOIGIANHT] || '',
+        year: '', month: '', cs: r[DT_COL_SALEBAN] || '', source: r[DT_COL_KENHBAN] || '',
+        revenue: Number(r[DT_COL_GIATRIDON]) || 0, product: r[DT_COL_SANPHAM] || '',
+        productDetail: r[DT_COL_PHANLOAI] || '', status: r[DT_COL_TRANGTHAI] || ''
       });
     }
   }
@@ -1244,33 +1260,31 @@ function findDuplicateOrders_(phoneFilter) {
 // truong hop rowIndex bi lech (co CS khac vua them/xoa dong khac trong luc do) dan den xoa NHAM dong.
 function deleteDuplicateOrders_(items) {
   if (!items || !items.length) return jsonOut_({ ok: true, deleted: 0, skipped: 0 });
-  var ss = getOrderSS_();
-  var bySheet = {};
-  items.forEach(function (it) {
-    if (!it || !it.sheet || !it.rowIndex) return;
-    if (!bySheet[it.sheet]) bySheet[it.sheet] = [];
-    bySheet[it.sheet].push(it);
-  });
+  var ss = getDTSS_();
+  var sh = ss.getSheetByName(DT_TONG_SHEET);
+  if (!sh) return jsonOut_({ ok: false, deleted: 0, skipped: items.length, error: 'Khong tim thay sheet DT TONG' });
+  // Xoa tu duoi len tren de khong lam lech chi so cac dong con lai
+  var arr = items.slice().sort(function (a, b) { return (b.rowIndex||0) - (a.rowIndex||0); });
   var deleted = 0, skipped = 0, affectedPhones = {};
-  Object.keys(bySheet).forEach(function (shName) {
-    var sh = ss.getSheetByName(shName);
-    if (!sh) return;
-    // Xoa tu duoi len tren trong cung 1 sheet de khong lam lech chi so cac dong con lai
-    var arr = bySheet[shName].slice().sort(function (a, b) { return b.rowIndex - a.rowIndex; });
-    arr.forEach(function (it) {
-      try {
-        var rowVals = sh.getRange(it.rowIndex, 1, 1, 10).getValues()[0]; // phone..productDetail
-        var match = true;
-        if (it.phone   != null && it.phone   !== '' && normPhone_(String(rowVals[0])) !== normPhone_(String(it.phone))) match = false;
-        if (match && it.date    != null && it.date    !== '' && normOrderDate_(rowVals[2]) !== normOrderDate_(it.date)) match = false;
-        if (match && it.revenue != null && it.revenue !== '' && (Number(rowVals[7]) || 0) !== (Number(it.revenue) || 0)) match = false;
-        if (match && it.product != null && it.product !== '' && _normTxt_(rowVals[8]) !== _normTxt_(it.product)) match = false;
-        if (!match) { skipped++; return; } // dong da bi dich/doi khac voi luc CS bam xoa -> KHONG xoa, tranh xoa nham
-        if (rowVals[0]) affectedPhones[normPhone_(String(rowVals[0]))] = true;
-        sh.deleteRow(it.rowIndex);
-        deleted++;
-      } catch (e) { skipped++; }
-    });
+  arr.forEach(function (it) {
+    if (!it || !it.rowIndex) { skipped++; return; }
+    try {
+      var rowVals = sh.getRange(it.rowIndex, 1, 1, DT_TONG_WIDTH).getValues()[0];
+      var match = true;
+      // Uu tien xac minh theo id (chinh xac tuyet doi); neu khong co id, du phong theo phone/date/revenue/product
+      if (it.id) {
+        if (String(rowVals[DT_COL_ID]) !== String(it.id)) match = false;
+      } else {
+        if (it.phone   != null && it.phone   !== '' && normPhone_(String(rowVals[DT_COL_PHONE])) !== normPhone_(String(it.phone))) match = false;
+        if (match && it.date    != null && it.date    !== '' && normOrderDate_(rowVals[DT_COL_THOIGIANHT]) !== normOrderDate_(it.date)) match = false;
+        if (match && it.revenue != null && it.revenue !== '' && (Number(rowVals[DT_COL_GIATRIDON]) || 0) !== (Number(it.revenue) || 0)) match = false;
+        if (match && it.product != null && it.product !== '' && _normTxt_(rowVals[DT_COL_SANPHAM]) !== _normTxt_(it.product)) match = false;
+      }
+      if (!match) { skipped++; return; } // dong da bi dich/doi khac voi luc CS bam xoa -> KHONG xoa, tranh xoa nham
+      if (rowVals[DT_COL_PHONE]) affectedPhones[normPhone_(String(rowVals[DT_COL_PHONE]))] = true;
+      sh.deleteRow(it.rowIndex);
+      deleted++;
+    } catch (e) { skipped++; }
   });
   try {
     var cache = CacheService.getScriptCache();
@@ -1279,83 +1293,22 @@ function deleteDuplicateOrders_(items) {
   return jsonOut_({ ok: true, deleted: deleted, skipped: skipped });
 }
 
+// Da ngung ho tro thay toan bo du lieu don hang tu client (truoc day dung khi dong bo
+// hang loat tu Sasum). DT TONG gio la sheet duoc nhan vien quan ly truc tiep — ghi de
+// toan bo se rat nguy hiem (mat cot Giao cho/Giai doan... ma noi bo dang dung hang ngay).
 function replaceOrders_(orders, data) {
-  orders = orders || [];
-  var allowEmpty = data && data.allowEmpty === true;
-  var force      = data && data.force === true;
-  var ss = getOrderSS_(); var prev = 0;
-  for (var si = 0; si < ORDER_SHEETS.length; si++) {
-    var sh0 = ss.getSheetByName(ORDER_SHEETS[si].name);
-    if (sh0) prev += Math.max(0, sh0.getLastRow() - 1);
-  }
-  if (orders.length === 0 && !allowEmpty) {
-    return jsonOut_({ error: 'TU_CHOI: Du lieu rong. Gui kem allowEmpty=true neu muon xoa sach.', prev: prev });
-  }
-  if (orders.length > 0 && prev > 50 && orders.length < prev * 0.4 && !force) {
-    return jsonOut_({ warn: true, needForce: true, prev: prev, incoming: orders.length,
-      error: 'CANH_BAO: Du lieu moi ('+orders.length+') it hon 40% du lieu cu ('+prev+'). Gui lai voi force=true.' });
-  }
-  var groups = {};
-  for (var si2 = 0; si2 < ORDER_SHEETS.length; si2++) groups[ORDER_SHEETS[si2].name] = [];
-  for (var k = 0; k < orders.length; k++) {
-    var o = orders[k]; var shName = getOrderSheetName_(o.year);
-    if (!groups[shName]) groups[shName] = [];
-    groups[shName].push(o);
-  }
-  var totalWritten = 0;
-  for (var sName in groups) {
-    var sh = getOrderSheet_(sName);
-    sh.clearContents();
-    sh.getRange(1, 1, 1, ORDER_HEADERS.length).setValues([ORDER_HEADERS]);
-    var grp = groups[sName]; var CHUNK = 50000; var rowPtr = 2;
-    for (var start = 0; start < grp.length; start += CHUNK) {
-      var end = Math.min(start + CHUNK, grp.length); var matrix = [];
-      for (var j = start; j < end; j++) {
-        var ord = grp[j];
-        matrix.push([ord.phone||'', ord.name||'', ord.date||'', ord.year||'', ord.month||'',
-          ord.cs||'', ord.source||'', ord.revenue||0, ord.product||'', ord.productDetail||'',
-          ord.status||'', ord.zalo||'', ord.note||'', ord.careCS||'']);
-      }
-      if (matrix.length) { sh.getRange(rowPtr, 1, matrix.length, ORDER_HEADERS.length).setValues(matrix); rowPtr += matrix.length; }
-      SpreadsheetApp.flush();
-    }
-    totalWritten += grp.length;
-  }
-  return jsonOut_({ ok: true, mode: 'replace', prev: prev, written: totalWritten });
+  return jsonOut_({ ok: false, error: 'Da ngung ho tro thay toan bo don hang (replaceOrders). DT TONG gio duoc quan ly truc tiep tren Google Sheet — dung sua/xoa tung dong qua patchOrder/deleteOrder thay vi ghi de ca sheet.' });
 }
 
+// DT TONG khong co cot rieng danh cho "careCS" (CS phu trach cham soc sau ban hang cho
+// tung don) — khac voi CareData.cs (CS phu trach chung 1 khach) van hoat dong binh thuong.
+// Tam thoi bao loi ro rang thay vi im lang khong lam gi, de tranh CS tuong nham la da luu.
 function setOrderCareCS_(phone, careCS) {
-  if (!phone) return jsonOut_({ error: 'thieu phone' });
-  var ss = getOrderSS_(); var totalUpdated = 0;
-  for (var si = 0; si < ORDER_SHEETS.length; si++) {
-    var sh = ss.getSheetByName(ORDER_SHEETS[si].name);
-    if (!sh || sh.getLastRow() < 2) continue;
-    var found = sh.getRange(2, 1, sh.getLastRow()-1, 1).createTextFinder(String(phone)).matchEntireCell(true).findAll();
-    for (var i = 0; i < found.length; i++) sh.getRange(found[i].getRow(), ORDER_HEADERS.length).setValue(careCS||'');
-    totalUpdated += found.length;
-  }
-  return jsonOut_({ ok: true, updated: totalUpdated });
+  return jsonOut_({ ok: false, updated: 0, error: 'Tinh nang gan careCS rieng cho tung don khong con duoc ho tro sau khi chuyen sang DT TONG (khong co cot luu). CS phu trach chung 1 khach van dung binh thuong o CareData.' });
 }
 
 function setOrderCareCSBatch_(updates) {
-  updates = updates || [];
-  if (!updates.length) return jsonOut_({ ok: true, updated: 0 });
-  var map = {};
-  for (var u = 0; u < updates.length; u++) { if (updates[u] && updates[u].phone != null) map[String(updates[u].phone)] = (updates[u].careCS||''); }
-  var ss = getOrderSS_(); var changed = 0;
-  for (var si = 0; si < ORDER_SHEETS.length; si++) {
-    var sh = ss.getSheetByName(ORDER_SHEETS[si].name);
-    if (!sh || sh.getLastRow() < 2) continue;
-    var last = sh.getLastRow(); var col = ORDER_HEADERS.length;
-    var phones  = sh.getRange(2, 1, last-1, 1).getValues();
-    var careCol = sh.getRange(2, col, last-1, 1).getValues();
-    for (var r = 0; r < phones.length; r++) {
-      var ph = String(phones[r][0]);
-      if (ph && map.hasOwnProperty(ph)) { careCol[r][0] = map[ph]; changed++; }
-    }
-    sh.getRange(2, col, last-1, 1).setValues(careCol);
-  }
-  return jsonOut_({ ok: true, updated: changed });
+  return jsonOut_({ ok: false, updated: 0, error: 'Tinh nang gan careCS rieng cho tung don khong con duoc ho tro sau khi chuyen sang DT TONG (khong co cot luu). CS phu trach chung 1 khach van dung binh thuong o CareData.' });
 }
 
 // ─── TEAMS / USERS / AUDIT ─────────────────────────────────────
@@ -2262,17 +2215,8 @@ function runFollowUpScan_() {
     logRows.push([np, orderKey, daysSince, new Date().toISOString(), source]);
   }
 
-  // 1) Uu tien du lieu don hang that trong OrderData
-  // Chi doc sheet nam hien tai + nam truoc (moc xa nhat la 60 ngay, khong can doc 21-25)
-  var orders = [];
-  var curY = today.getFullYear();
-  var ossFU = getOrderSS_();
-  for (var syi = 0; syi < ORDER_SHEETS.length; syi++) {
-    var shYears = ORDER_SHEETS[syi].years;
-    if (shYears.indexOf(curY) === -1 && shYears.indexOf(curY - 1) === -1) continue;
-    var shFU = ossFU.getSheetByName(ORDER_SHEETS[syi].name);
-    if (shFU) orders = orders.concat(readOrders_(shFU));
-  }
+  // 1) Uu tien du lieu don hang that trong DT TONG (thay the OrderData cu)
+  var orders = readAllOrders_();
   var phonesWithOrders = {};
   for (var i = 0; i < orders.length; i++) {
     var o = orders[i];
