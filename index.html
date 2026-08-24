@@ -185,6 +185,63 @@ select.srt{padding:4px 8px;border:1px solid var(--border);border-radius:var(--rs
 
 /* ── ADVANCED ASSIGN MODAL ── */
 .assign-modal{width:860px;}
+
+/* ── FULLSCREEN MODALS: Chia data nâng cao & Tạo công việc ── */
+/* Che kín toàn bộ màn hình gốc, có header cố định + nút X đóng, nội dung cuộn riêng */
+#assign-modal.assign-modal-overlay,
+#task-modal-overlay.assign-modal-overlay{
+  padding:0;
+  background:var(--surface);
+}
+#assign-modal .assign-modal,
+#task-modal-overlay .assign-modal{
+  width:100vw;
+  max-width:100vw;
+  height:100vh;
+  max-height:100vh;
+  border-radius:0;
+  box-shadow:none;
+}
+#assign-modal .assign-modal-hdr,
+#task-modal-overlay .assign-modal-hdr{
+  padding:16px 24px;
+  background:var(--surface);
+}
+#assign-modal .assign-modal-title,
+#task-modal-overlay .assign-modal-title{
+  font-size:16px;
+}
+#assign-modal .close-btn,
+#task-modal-overlay .close-btn{
+  width:32px;height:32px;font-size:15px;
+}
+#assign-modal .assign-tabs{
+  padding:0 24px;
+}
+#assign-modal .assign-tab{
+  padding:12px 18px;
+  font-size:13px;
+}
+#assign-modal .assign-body,
+#task-modal-overlay .assign-body{
+  padding:20px 24px;
+  max-width:960px;
+  margin:0 auto;
+  width:100%;
+  box-sizing:border-box;
+}
+#assign-modal .assign-footer,
+#task-modal-overlay .assign-footer{
+  padding:14px 24px;
+  background:var(--surface);
+}
+@media (max-width:640px){
+  #assign-modal .assign-body,
+  #task-modal-overlay .assign-body{padding:14px 16px;}
+  #assign-modal .assign-modal-hdr,
+  #task-modal-overlay .assign-modal-hdr{padding:12px 16px;}
+  #assign-modal .assign-tabs{padding:0 16px;overflow-x:auto;}
+}
 .assign-section{margin-bottom:16px;}
 .assign-section-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--hint);margin-bottom:8px;display:flex;align-items:center;gap:5px;}
 .assign-mode-row{display:flex;gap:8px;margin-bottom:10px;}
@@ -12694,7 +12751,7 @@ function openBcLogModal(phone){
   <div class="assign-modal" style="width:560px">
     <div class="assign-modal-hdr">
       <div class="assign-modal-title" id="task-modal-title">Tạo công việc</div>
-      <span style="cursor:pointer" onclick="closeTaskModal()">✕</span>
+      <button class="close-btn" onclick="closeTaskModal()">✕</button>
     </div>
     <div class="assign-body">
       <div class="assign-form-row" style="align-items:flex-start">
