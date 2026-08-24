@@ -55,6 +55,36 @@
   margin-bottom: 8px;
 }
 
+#pk-ai-phone-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+#pk-ai-phone-row input {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+#pk-ai-phone-row button {
+  padding: 5px 10px;
+  border: 1px solid #2563eb;
+  background: #fff;
+  color: #2563eb;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#pk-ai-phone-row button:hover {
+  background: #eff6ff;
+}
+
 .pk-ai-cust-loading {
   color: #888;
   font-style: italic;

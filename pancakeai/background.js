@@ -15,12 +15,16 @@ const DEFAULT_SETTINGS = {
     pancake: {
       messageList: "",
       messageItem: "",
-      replyBox: ""
+      replyBox: "",
+      phoneSelector: ""
     },
     messenger: {
-      messageList: "",
-      messageItem: "",
-      replyBox: ""
+      // Messenger dùng role/aria-label khá ổn định hơn Pancake (ít đổi class ngẫu nhiên) —
+      // để sẵn giá trị khởi điểm hợp lý, vẫn có thể ghi đè trong Options nếu Facebook đổi UI.
+      messageList: "[role='main']",
+      messageItem: "[role='row']",
+      replyBox: "div[contenteditable='true'][role='textbox']",
+      phoneSelector: ""
     }
   }
 };

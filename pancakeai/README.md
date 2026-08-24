@@ -58,8 +58,14 @@ Extension tự động tra cứu khách hàng khi mở hội thoại, dùng chun
 - Nếu để trống, extension tự quét toàn bộ vùng `messageList` tìm số điện thoại
 - Panel hiện thẻ khách hàng: tên, số đơn, tổng doanh thu, sản phẩm đã mua, trạng thái CS, ghi chú gần nhất — lấy từ đúng Google Sheet CRM mà Zalo AI đang dùng
 
+## Messenger — khác biệt so với Pancake
+
+- Đã điền sẵn selector khởi điểm cho Messenger dựa trên `role`/`aria-label` (ổn định hơn class CSS ngẫu nhiên của Facebook): `messageList = [role='main']`, `messageItem = [role='row']`, `replyBox = div[contenteditable='true'][role='textbox']`. Nếu Facebook đổi giao diện, sửa lại trong Options theo đúng cách lấy selector ở trên.
+- **Tra cứu khách theo SĐT khó ăn hơn trên Messenger** vì khung chat Messenger thường không hiển thị số điện thoại khách (khác Pancake là hệ thống bán hàng). Vì vậy panel có thêm **ô nhập SĐT thủ công** (phía trên khung gợi ý) — CS gõ tay SĐT khách rồi bấm "Tra cứu" khi tự động không tìm ra.
+- `[role='row']` trên Messenger có thể lẫn cả text không phải tin nhắn (tên người gửi, "Đã xem", giờ gửi...) — nếu gợi ý AI bị nhiễu, thử thu hẹp `messageItem` bằng selector cụ thể hơn qua F12.
+
 ## Giới hạn hiện tại
 
 - Chưa phân biệt tin nhắn khách vs nhân viên (gửi hết cho AI, để AI tự suy luận theo ngữ cảnh)
-- Tra cứu khách chỉ hoạt động khi tìm được số điện thoại VN trong vùng tin nhắn — nếu Pancake hiển thị SĐT ở định dạng khác (ví dụ có dấu cách/dấu gạch), cần chỉnh regex trong `content.js` (hàm `extractPhone`)
-- Selector Pancake/Messenger cần bạn tự điền vì mình không truy cập được giao diện thật
+- Tra cứu khách tự động chỉ hoạt động khi tìm được số điện thoại VN trong vùng tin nhắn — nếu không tìm ra, dùng ô nhập SĐT thủ công
+- Selector Pancake cần bạn tự điền vì mình không truy cập được giao diện thật; selector Messenger đã điền sẵn giá trị khởi điểm nhưng vẫn nên kiểm tra lại bằng dữ liệu thật

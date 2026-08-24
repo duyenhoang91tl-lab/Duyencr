@@ -43,6 +43,10 @@
       </div>
       <div id="pk-ai-body">
         <div id="pk-ai-customer"></div>
+        <div id="pk-ai-phone-row">
+          <input type="text" id="pk-ai-phone-input" placeholder="SĐT khách (nếu không tự nhận ra)" />
+          <button id="pk-ai-phone-btn">Tra cứu</button>
+        </div>
         <div id="pk-ai-status">Chưa có hội thoại nào được chọn.</div>
         <div id="pk-ai-suggestions"></div>
         <button id="pk-ai-refresh">Lấy gợi ý mới</button>
@@ -55,6 +59,15 @@
     });
     panelEl.querySelector("#pk-ai-collapse").addEventListener("click", () => {
       panelEl.classList.toggle("pk-ai-collapsed");
+    });
+    panelEl.querySelector("#pk-ai-phone-btn").addEventListener("click", () => {
+      const raw = panelEl.querySelector("#pk-ai-phone-input").value;
+      const phone = normPhone(raw);
+      if (!phone) { setStatus("Số điện thoại không hợp lệ."); return; }
+      lookupByPhone(phone);
+    });
+    panelEl.querySelector("#pk-ai-phone-input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") panelEl.querySelector("#pk-ai-phone-btn").click();
     });
   }
 
@@ -116,11 +129,15 @@
 
   function requestCustomerLookup() {
     const phone = extractPhone();
-    const box = panelEl.querySelector("#pk-ai-customer");
     if (!phone) {
-      box.innerHTML = "";
+      panelEl.querySelector("#pk-ai-customer").innerHTML = "";
       return;
     }
+    lookupByPhone(phone);
+  }
+
+  function lookupByPhone(phone) {
+    const box = panelEl.querySelector("#pk-ai-customer");
     box.innerHTML = `<div class="pk-ai-cust-loading">Đang tra cứu ${phone}...</div>`;
     chrome.runtime.sendMessage({ type: "LOOKUP_CUSTOMER", payload: { phone } }, (resp) => {
       if (!resp?.ok) {
