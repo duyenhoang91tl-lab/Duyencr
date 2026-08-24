@@ -1,0 +1,149 @@
+#pk-ai-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: 320px;
+  max-height: 420px;
+  background: #ffffff;
+  border: 1px solid #e2e2e2;
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
+  z-index: 2147483647;
+  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  color: #222;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#pk-ai-panel.pk-ai-collapsed #pk-ai-body {
+  display: none;
+}
+
+#pk-ai-header {
+  background: #2563eb;
+  color: #fff;
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  cursor: default;
+}
+
+#pk-ai-header button {
+  background: transparent;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+#pk-ai-body {
+  padding: 10px 12px;
+  overflow-y: auto;
+}
+
+#pk-ai-status {
+  color: #666;
+  margin-bottom: 8px;
+}
+
+#pk-ai-customer {
+  margin-bottom: 8px;
+}
+
+.pk-ai-cust-loading {
+  color: #888;
+  font-style: italic;
+  font-size: 12px;
+}
+
+.pk-ai-cust-card {
+  border: 1px solid #d1fae5;
+  background: #f0fdf4;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+}
+
+.pk-ai-cust-empty {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #9a3412;
+  padding: 8px 10px;
+}
+
+.pk-ai-cust-name {
+  font-weight: 700;
+  color: #166534;
+}
+
+.pk-ai-cust-phone {
+  font-weight: 400;
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.pk-ai-cust-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.pk-ai-chip {
+  background: #dcfce7;
+  color: #166534;
+  border-radius: 10px;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+.pk-ai-cust-products {
+  margin-top: 6px;
+  color: #374151;
+}
+
+.pk-ai-cust-note {
+  margin-top: 6px;
+  color: #6b7280;
+  font-style: italic;
+}
+
+#pk-ai-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.pk-ai-suggestion-item {
+  border: 1px solid #dbeafe;
+  background: #f0f7ff;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.pk-ai-suggestion-item:hover {
+  background: #dbeafe;
+}
+
+#pk-ai-refresh {
+  width: 100%;
+  padding: 6px;
+  border-radius: 6px;
+  border: 1px solid #2563eb;
+  background: #fff;
+  color: #2563eb;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+#pk-ai-refresh:hover {
+  background: #eff6ff;
+}

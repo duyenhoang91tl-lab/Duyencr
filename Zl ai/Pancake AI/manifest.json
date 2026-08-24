@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "Trợ lý AI Pancake",
+  "version": "0.1.0",
+  "description": "Gợi ý trả lời khách hàng bằng AI ngay trong Pancake (POS/Chat) và Messenger — dùng chung backend với trợ lý AI Zalo (Sasum).",
+  "default_locale": "vi",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": [
+    "*://*.pancake.vn/*",
+    "*://pancake.vn/*",
+    "*://*.pages.fm/*",
+    "*://*.messenger.com/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": ["*://*.pancake.vn/*", "*://pancake.vn/*", "*://*.pages.fm/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["*://*.messenger.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

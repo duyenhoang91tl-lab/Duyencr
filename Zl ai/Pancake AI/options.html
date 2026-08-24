@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<title>Cài đặt — Trợ lý AI Pancake</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; max-width: 640px; margin: 24px auto; color: #222; }
+  h1 { font-size: 18px; }
+  h2 { font-size: 14px; margin-top: 28px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+  label { display: block; font-weight: 600; margin-top: 12px; margin-bottom: 4px; }
+  input[type=text] { width: 100%; padding: 6px 8px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+  small { color: #777; }
+  button { margin-top: 20px; padding: 8px 16px; background: #2563eb; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+  #saved { color: green; margin-left: 10px; }
+  .hint { background: #f0f7ff; border: 1px solid #dbeafe; padding: 10px; border-radius: 6px; margin-top: 8px; font-size: 12.5px; }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; font-weight: 400; margin-top: 10px; }
+</style>
+</head>
+<body>
+  <h1>⚙️ Cài đặt Trợ lý AI Pancake</h1>
+
+  <h2>Backend chung (dùng chung với Zalo AI / Sasum)</h2>
+  <div class="hint">
+    Đây là cùng 1 backend Google Apps Script mà extension Zalo AI đang dùng — không phải server riêng.
+    Mở extension <b>Duyên AI</b> trên chat.zalo.me → ⚙ Cài đặt → copy nguyên URL trong ô
+    "URL Web App GAS" → dán vào đây.
+  </div>
+  <label>URL Web App GAS</label>
+  <input type="text" id="gasUrl" placeholder="https://script.google.com/macros/s/.../exec" />
+
+  <div class="checkbox-row">
+    <input type="checkbox" id="useProducts" />
+    <span>🔍 Tra cứu sản phẩm (nạp dữ liệu Google Sheet sản phẩm/FAQ khi soạn gợi ý — giống checkbox bên Zalo AI)</span>
+  </div>
+
+  <h2>Nền tảng áp dụng</h2>
+  <label><input type="checkbox" id="platformPancake" /> Kích hoạt trên Pancake (pancake.vn / pages.fm)</label>
+  <label><input type="checkbox" id="platformMessenger" /> Kích hoạt trên Messenger (messenger.com)</label>
+
+  <h2>Selector cho Pancake</h2>
+  <div class="hint">
+    Mở Pancake → mở 1 hội thoại → nhấn F12 (DevTools) → tab Elements → bấm chuột phải vào từng phần tử cần → Copy → Copy selector.
+  </div>
+  <label>Vùng chứa danh sách tin nhắn (messageList)</label>
+  <input type="text" id="pancake_messageList" placeholder="vd: .conversation-messages" />
+  <label>1 dòng tin nhắn (messageItem)</label>
+  <input type="text" id="pancake_messageItem" placeholder="vd: .message-item" />
+  <label>Ô nhập trả lời (replyBox)</label>
+  <input type="text" id="pancake_replyBox" placeholder="vd: div[contenteditable='true']" />
+  <label>Ô hiển thị SĐT khách (phoneSelector) — <small>tuỳ chọn, để trống thì tự quét toàn vùng tin nhắn</small></label>
+  <input type="text" id="pancake_phoneSelector" placeholder="vd: .customer-info .phone" />
+
+  <h2>Selector cho Messenger</h2>
+  <label>Vùng chứa danh sách tin nhắn (messageList)</label>
+  <input type="text" id="messenger_messageList" placeholder="vd: [role='main']" />
+  <label>1 dòng tin nhắn (messageItem)</label>
+  <input type="text" id="messenger_messageItem" placeholder="vd: [role='row']" />
+  <label>Ô nhập trả lời (replyBox)</label>
+  <input type="text" id="messenger_replyBox" placeholder="vd: div[contenteditable='true'][role='textbox']" />
+  <label>Ô hiển thị SĐT khách (phoneSelector) — <small>tuỳ chọn</small></label>
+  <input type="text" id="messenger_phoneSelector" placeholder="vd: .customer-info .phone" />
+
+  <button id="save">Lưu cài đặt</button>
+  <span id="saved"></span>
+
+  <script src="options.js"></script>
+</body>
+</html>
