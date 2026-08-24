@@ -6,6 +6,7 @@
 const DEFAULT_SETTINGS = {
   gasUrl: "", // dán URL Web App GAS (giống ô "URL Web App GAS" trong extension Zalo AI)
   enabled: true,
+  csName: "", // CS đang dùng máy này — ghi vào cột 'cs' khi lưu, giống ô CS sticky bên Zalo AI
   useProducts: false, // tương ứng checkbox "Tra cứu sản phẩm" bên Zalo AI
   platform: {
     pancake: true,
@@ -57,6 +58,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
     return true;
   }
+
+  if (msg?.type === "SAVE_CARE") {
+    handleSaveCare(msg.payload)
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
+  if (msg?.type === "GET_CS_NAMES") {
+    handleGetCsNames()
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
 });
 
 // Tra cứu khách theo SĐT — GET GAS_URL?action=lookup&phone=... y hệt doLookup() bên Zalo AI.
@@ -82,6 +97,43 @@ async function handleLookupCustomer(payload) {
 
   const orders = (data.orders || []).slice().sort((a, b) => parseDateSafe(b.date) - parseDateSafe(a.date));
   return { care: data.care || null, orders };
+}
+
+// Ghi 1 dong care (status/zalo/cs/note/lich hen...) — action:'saveSingle', CUNG action va
+// CUNG shape 'row' voi doSaveStatus() ben Zalo AI (content.js), de ghi dung 19 cot CareData.
+// QUAN TRONG: content.js phia truoc PHAI tu dien day du cac truong khong sua (schedules,
+// schedGoi..., nickZalos...) lay tu care hien tai — GAS se ghi DE TRONG cac cot nao thieu
+// trong payload (xem careRow_ trong gas_v13.js), khong tu merge nhu 4 truong mo rong.
+async function handleSaveCare(row) {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+  if (!row?.phone) throw new Error("Thiếu số điện thoại.");
+
+  const res = await fetch(cfg.gasUrl, {
+    method: "POST",
+    body: JSON.stringify({ action: "saveSingle", row }),
+    headers: { "Content-Type": "text/plain" }
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+// Lay danh sach ten CS — action:'users', dung chung voi Zalo AI (loadCSNames_ trong content.js)
+async function handleGetCsNames() {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) return [];
+
+  const sep = cfg.gasUrl.includes("?") ? "&" : "?";
+  const res = await fetch(cfg.gasUrl + sep + "action=users", { redirect: "follow" });
+  const data = await res.json();
+  if (!data.users) return [];
+  return data.users
+    .filter((u) => u.active !== false)
+    .map((u) => u.username || u.name)
+    .filter(Boolean);
 }
 
 function parseDateSafe(d) {

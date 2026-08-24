@@ -7,6 +7,27 @@
   let panelEl = null;
   let lastConversationSignature = "";
 
+  // ── CARE (tra cuu + sua trang thai CS) — cung du lieu/hanh vi voi Zalo AI ──
+  const CARE_STATUSES = [
+    'Chưa liên hệ','Chưa sử dụng','Hẹn gọi lại sau','Đang sd','Đang tạm ngưng',
+    'Knm/Máy bận','Cúp ngang','Thuê bao','Phân vân/Tiềm năng','Chốt',
+    'Kcnc/Không hiệu quả','Đặt hộ/Sai số','Bầu'
+  ];
+  const ZALO_STATUSES = ['','Đã kết bạn','Chưa kết bạn','Chưa đồng ý','Không nhận tn lạ','Chặn','Hủy kết bạn','Không tìm thấy zl','ZL NHD/K có','Zalo ngừng hd'];
+  const KH_STATUS_OPTS = [
+    '','1. Không thể kết nối',
+    '2.1 Không hiệu quả','2.2 Hiệu quả','2.3 Chưa rõ tác dụng',
+    '3. Chưa dùng',
+    '4.1 Không hiệu quả','4.2 Đã có kết quả','4.3 Đã đổi sang sản phẩm khác',
+    '5. Đang tạm dừng','6. Nhận hộ / Sai số','7. Ngang Cúp','8. Từ chối'
+  ];
+  const CARE_POLL_MS = 6000;
+  let CS_NAMES = [];
+  let _currentPhone = '';
+  let _currentCare = null;   // du lieu care dang hien thi/sua tren form
+  let _lastServerCare = {};  // baseline lan tra cuu/poll gan nhat — de biet CS dang sua truong nao
+  let _carePollTimer = null;
+
   init();
 
   async function init() {
@@ -15,6 +36,8 @@
 
     injectPanel();
     observeConversationChanges();
+    loadCsNames_();
+    startCarePoll_();
   }
 
   function detectPlatform() {
@@ -42,17 +65,26 @@
         <button id="pk-ai-collapse" title="Thu gọn">—</button>
       </div>
       <div id="pk-ai-body">
-        <div id="pk-ai-customer"></div>
+        <div id="pk-ai-cs-row">
+          <label>CS đang dùng</label>
+          <select id="pk-cs-sel"></select>
+        </div>
         <div id="pk-ai-phone-row">
           <input type="text" id="pk-ai-phone-input" placeholder="SĐT khách (nếu không tự nhận ra)" />
           <button id="pk-ai-phone-btn">Tra cứu</button>
         </div>
+        <div id="pk-ai-customer"></div>
         <div id="pk-ai-status">Chưa có hội thoại nào được chọn.</div>
         <div id="pk-ai-suggestions"></div>
         <button id="pk-ai-refresh">Lấy gợi ý mới</button>
       </div>
     `;
     document.body.appendChild(panelEl);
+
+    const csSel = panelEl.querySelector('#pk-cs-sel');
+    csSel.addEventListener('change', () => {
+      chrome.storage.sync.set({ csName: csSel.value });
+    });
 
     panelEl.querySelector("#pk-ai-refresh").addEventListener("click", () => {
       requestSuggestion(true);
@@ -68,6 +100,19 @@
     });
     panelEl.querySelector("#pk-ai-phone-input").addEventListener("keydown", (e) => {
       if (e.key === "Enter") panelEl.querySelector("#pk-ai-phone-btn").click();
+    });
+  }
+
+  // ── CS đang dùng (sticky theo máy, lưu chrome.storage.sync) ──
+  async function loadCsNames_() {
+    chrome.runtime.sendMessage({ type: "GET_CS_NAMES" }, (resp) => {
+      CS_NAMES = (resp?.ok && resp.data && resp.data.length) ? resp.data : [];
+      const csSel = panelEl?.querySelector('#pk-cs-sel');
+      if (!csSel) return;
+      const names = CS_NAMES.length ? CS_NAMES : [settings.csName].filter(Boolean);
+      csSel.innerHTML = '<option value="">— Chọn CS —</option>' +
+        names.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+      csSel.value = settings.csName || '';
     });
   }
 
@@ -131,6 +176,7 @@
     const phone = extractPhone();
     if (!phone) {
       panelEl.querySelector("#pk-ai-customer").innerHTML = "";
+      _currentPhone = ''; _currentCare = null; _lastServerCare = {};
       return;
     }
     lookupByPhone(phone);
@@ -144,37 +190,269 @@
         box.innerHTML = `<div class="pk-ai-cust-loading">Không tra cứu được: ${resp?.error || "lỗi không rõ"}</div>`;
         return;
       }
+      _currentPhone = phone;
+      _currentCare = resp.data.care || null;
+      _lastServerCare = _currentCare ? Object.assign({}, _currentCare) : {};
       renderCustomerCard(phone, resp.data);
     });
+  }
+
+  // ── Ghi chú CS: cung dinh dang JSON [{text,user,time}] voi Zalo AI/Sasum ──
+  function _parseNotes(raw) {
+    if (!raw) return [];
+    try { const arr = JSON.parse(raw); if (Array.isArray(arr)) return arr; } catch (e) {}
+    return [{ text: raw, user: '', time: '' }];
+  }
+  function _notesToStr(arr) { return JSON.stringify(arr); }
+  function _fmtNoteTime(d) {
+    const h = String(d.getHours()).padStart(2, '0');
+    const m = String(d.getMinutes()).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    return `${h}:${m} ${dd}/${mm}/${d.getFullYear()}`;
+  }
+  function toInputDate_(v) {
+    if (!v) return '';
+    const d = new Date(v);
+    if (isNaN(d.getTime())) return '';
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function fmtDate_(v) {
+    if (!v) return '';
+    const d = new Date(v);
+    if (isNaN(d.getTime())) return '';
+    return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
   }
 
   function renderCustomerCard(phone, data) {
     const box = panelEl.querySelector("#pk-ai-customer");
     const { care, orders } = data;
 
-    if (!care && (!orders || !orders.length)) {
-      box.innerHTML = `<div class="pk-ai-cust-card pk-ai-cust-empty">⚠️ ${phone} — chưa có trong hệ thống Sasum.</div>`;
-      return;
-    }
-
     const name = (orders && orders[0] && orders[0].name) || (care && care.name) || phone;
     const totalRevenue = (orders || []).reduce((s, o) => s + (parseFloat(o.revenue) || 0), 0);
     const products = [...new Set((orders || []).map((o) => o.product).filter(Boolean))].slice(0, 4).join(", ");
+    const isNew = !care && (!orders || !orders.length);
+
+    const optHtml = (opts, val) => opts.map((o) =>
+      `<option value="${escapeHtml(o)}"${o === (val || '') ? ' selected' : ''}>${o ? escapeHtml(o) : '— Chọn —'}</option>`
+    ).join('');
 
     const chips = [];
     if (orders?.length) chips.push(`📦 ${orders.length} đơn`);
     if (totalRevenue) chips.push(`💰 ${Math.round(totalRevenue / 1000)}K`);
-    if (care?.status) chips.push(`📋 ${escapeHtml(care.status)}`);
-    if (care?.cs) chips.push(`👤 ${escapeHtml(care.cs)}`);
+    if (care?.schedHen) chips.push(`📅 Hẹn ${fmtDate_(care.schedHen)}`);
 
     box.innerHTML = `
       <div class="pk-ai-cust-card">
         <div class="pk-ai-cust-name">${escapeHtml(name)} <span class="pk-ai-cust-phone">${phone}</span></div>
-        <div class="pk-ai-cust-chips">${chips.map((c) => `<span class="pk-ai-chip">${c}</span>`).join("")}</div>
-        ${products ? `<div class="pk-ai-cust-products">🏷 ${escapeHtml(products)}</div>` : ""}
-        ${care?.note ? `<div class="pk-ai-cust-note">📝 ${escapeHtml(String(care.note).slice(-200))}</div>` : ""}
+        ${isNew ? `<div class="pk-ai-new-tag">⚠️ Chưa có trong hệ thống Sasum — lưu sẽ tạo mới</div>` : ''}
+        ${chips.length ? `<div class="pk-ai-cust-chips">${chips.map((c) => `<span class="pk-ai-chip">${c}</span>`).join('')}</div>` : ''}
+        ${products ? `<div class="pk-ai-cust-products">🏷 ${escapeHtml(products)}</div>` : ''}
+
+        <div class="pk-form-row">
+          <div class="pk-form-col">
+            <label>Trạng thái CS</label>
+            <select id="pk-status-sel">${optHtml([''].concat(CARE_STATUSES), care?.status)}</select>
+          </div>
+          <div class="pk-form-col">
+            <label>Trạng thái Zalo</label>
+            <select id="pk-zalo-sel">${optHtml(ZALO_STATUSES, care?.zalo)}</select>
+          </div>
+        </div>
+        <div class="pk-form-row">
+          <div class="pk-form-col">
+            <label>Tình trạng KH</label>
+            <select id="pk-khstatus-sel">${optHtml(KH_STATUS_OPTS, care?.khStatus)}</select>
+          </div>
+          <div class="pk-form-col">
+            <label>Sinh nhật</label>
+            <input type="date" id="pk-birthday" value="${care?.birthday ? toInputDate_(care.birthday) : ''}" />
+          </div>
+        </div>
+
+        <div class="pk-form-row">
+          <div class="pk-form-col">
+            <label>Ngày hẹn</label>
+            <input type="date" id="pk-hen-date" value="${care?.schedHen ? toInputDate_(care.schedHen) : ''}" />
+          </div>
+          <div class="pk-form-col">
+            <button id="pk-hen-done" class="pk-btn-outline" title="Xong lịch hẹn — xoá ngày hẹn">✓ Xong hẹn</button>
+          </div>
+        </div>
+        <input type="text" id="pk-hen-note" class="pk-full-input" placeholder="Ghi chú lịch hẹn" value="${escapeHtml(care?.schedHenNote || '')}" />
+
+        <label class="pk-label-top">Ghi chú CS</label>
+        <div id="pk-note-history"></div>
+        <div class="pk-note-add-row">
+          <input type="text" id="pk-note-new" placeholder="Thêm ghi chú mới..." />
+          <button id="pk-note-add-btn" class="pk-btn-outline">+</button>
+        </div>
+        <input type="hidden" id="pk-note-raw" value="${escapeHtml(care?.note || '')}" />
+
+        <button id="pk-save-btn" class="pk-save-btn">💾 Lưu vào Sasum</button>
       </div>
     `;
+
+    renderNoteHistory_(care?.note || '');
+
+    box.querySelector('#pk-note-add-btn').addEventListener('click', addNoteEntry_);
+    box.querySelector('#pk-note-new').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') addNoteEntry_();
+    });
+    box.querySelector('#pk-hen-done').addEventListener('click', () => doneAppointment_(phone));
+    box.querySelector('#pk-save-btn').addEventListener('click', () => saveCare_(phone));
+  }
+
+  function renderNoteHistory_(raw) {
+    const hist = panelEl.querySelector('#pk-note-history');
+    if (!hist) return;
+    const arr = _parseNotes(raw);
+    if (!arr.length) { hist.innerHTML = '<div class="pk-note-empty">Chưa có ghi chú nào</div>'; return; }
+    hist.innerHTML = arr.map((n, i) => {
+      const meta = [n.user, n.time].filter(Boolean).join(' · ');
+      return `<div class="pk-note-entry">
+        ${meta ? `<div class="pk-note-meta">${escapeHtml(meta)}${i === 0 ? ' <span class="pk-note-latest">MỚI NHẤT</span>' : ''}</div>` : ''}
+        <div class="pk-note-text">${escapeHtml(n.text)}</div>
+        <button class="pk-note-del" data-idx="${i}" title="Xóa ghi chú này">✕</button>
+      </div>`;
+    }).join('');
+    hist.querySelectorAll('.pk-note-del').forEach((b) => {
+      b.addEventListener('click', () => deleteNoteEntry_(parseInt(b.dataset.idx, 10)));
+    });
+  }
+
+  function addNoteEntry_() {
+    const inp = panelEl.querySelector('#pk-note-new');
+    const text = (inp ? inp.value : '').trim();
+    if (!text) return;
+    const rawEl = panelEl.querySelector('#pk-note-raw');
+    const arr = _parseNotes(rawEl ? rawEl.value : '');
+    const userName = settings.csName || 'CS';
+    arr.unshift({ text, user: userName, time: _fmtNoteTime(new Date()) });
+    const newRaw = _notesToStr(arr);
+    if (rawEl) rawEl.value = newRaw;
+    if (inp) inp.value = '';
+    renderNoteHistory_(newRaw);
+  }
+
+  function deleteNoteEntry_(idx) {
+    if (!confirm('Xóa ghi chú này?')) return;
+    const rawEl = panelEl.querySelector('#pk-note-raw');
+    const arr = _parseNotes(rawEl ? rawEl.value : '');
+    arr.splice(idx, 1);
+    const newRaw = _notesToStr(arr);
+    if (rawEl) rawEl.value = newRaw;
+    renderNoteHistory_(newRaw);
+  }
+
+  // Gom toan bo form thanh 1 'row' de gui saveSingle. QUAN TRONG: cac truong Pancake KHONG
+  // co UI de sua (schedules, schedGoi*, schedSP*, schedCS*, nickZalos...) phai lay nguyen tu
+  // _currentCare hien tai, khong duoc de trong — neu khong GAS se ghi de trong mat du lieu
+  // (xem careRow_ trong gas_v13.js: chi 4 truong mo rong duoc tu merge, con lai thi khong).
+  function _buildRow(phone, overrides) {
+    const c = _currentCare || {};
+    return Object.assign({
+      phone,
+      status: c.status || '', zalo: c.zalo || '', cs: settings.csName || c.cs || '',
+      note: c.note || '',
+      schedules: c.schedules || '',
+      schedGoi: c.schedGoi || '', schedGoiNote: c.schedGoiNote || '',
+      schedSP: c.schedSP || '', schedSPNote: c.schedSPNote || '',
+      schedCS: c.schedCS || '', schedCSNote: c.schedCSNote || '',
+      schedHen: c.schedHen || '', schedHenNote: c.schedHenNote || '',
+      khStatus: c.khStatus || '', birthday: c.birthday || '',
+      nickZalos: c.nickZalos || []
+    }, overrides || {});
+  }
+
+  function saveCare_(phone) {
+    const btn = panelEl.querySelector('#pk-save-btn');
+    const rawEl = panelEl.querySelector('#pk-note-raw');
+    const row = _buildRow(phone, {
+      status: panelEl.querySelector('#pk-status-sel').value,
+      zalo: panelEl.querySelector('#pk-zalo-sel').value,
+      khStatus: panelEl.querySelector('#pk-khstatus-sel').value,
+      birthday: panelEl.querySelector('#pk-birthday').value,
+      schedHen: panelEl.querySelector('#pk-hen-date').value,
+      schedHenNote: panelEl.querySelector('#pk-hen-note').value.trim(),
+      note: rawEl ? rawEl.value : (_currentCare?.note || '')
+    });
+    if (btn) { btn.disabled = true; btn.textContent = 'Đang lưu...'; }
+    chrome.runtime.sendMessage({ type: 'SAVE_CARE', payload: row }, (resp) => {
+      if (btn) { btn.disabled = false; btn.textContent = '💾 Lưu vào Sasum'; }
+      if (!resp?.ok) { setStatus('Lưu thất bại: ' + (resp?.error || 'lỗi không rõ')); return; }
+      _currentCare = row;
+      _lastServerCare = Object.assign({}, row);
+      setStatus('✓ Đã lưu vào Sasum.');
+    });
+  }
+
+  // Danh dau xong lich hen — GUI DAY DU row (khong chi {phone,schedHen,schedHenNote}), tranh
+  // ghi de trong cac truong khac (dung loi cu tung gap ben Zalo AI voi doneReminder_).
+  function doneAppointment_(phone) {
+    const row = _buildRow(phone, { schedHen: '', schedHenNote: '' });
+    chrome.runtime.sendMessage({ type: 'SAVE_CARE', payload: row }, (resp) => {
+      if (!resp?.ok) { setStatus('Không xoá được lịch hẹn: ' + (resp?.error || '')); return; }
+      _currentCare = row;
+      _lastServerCare = Object.assign({}, row);
+      const henDateEl = panelEl.querySelector('#pk-hen-date');
+      const henNoteEl = panelEl.querySelector('#pk-hen-note');
+      if (henDateEl) henDateEl.value = '';
+      if (henNoteEl) henNoteEl.value = '';
+      setStatus('✓ Đã đánh dấu xong lịch hẹn.');
+    });
+  }
+
+  // ── Poll gan-tuc-thoi: phat hien thay doi tu Sasum/Zalo AI (hoac sua tay tren Sheet) ──
+  // So sanh truc tiep tung truong (khong chi dua vao cot 'updated' — sua tay tren Sheet
+  // khong cap nhat cot do) — cung cach da sua ben Zalo AI.
+  function startCarePoll_() {
+    if (_carePollTimer) return;
+    _carePollTimer = setInterval(pollCareTick_, CARE_POLL_MS);
+  }
+
+  function pollCareTick_() {
+    if (!_currentPhone) return;
+    if (typeof document.visibilityState === 'string' && document.visibilityState !== 'visible') return;
+    const phone = _currentPhone;
+    chrome.runtime.sendMessage({ type: 'LOOKUP_CUSTOMER', payload: { phone } }, (resp) => {
+      if (!resp?.ok || _currentPhone !== phone) return;
+      const newCare = resp.data.care || {};
+      const CMP = ['status','zalo','cs','note','schedHen','schedHenNote','khStatus','birthday'];
+      const base = _lastServerCare || {};
+      const changedFields = CMP.filter((k) => (base[k] || '') !== (newCare[k] || ''));
+      if (!changedFields.length) return;
+      applyPolledCare_(phone, newCare);
+    });
+  }
+
+  // Chi tu dong cap nhat field nao CS CHUA sua tren form (gia tri hien tai == baseline cu)
+  function applyPolledCare_(phone, newCare) {
+    const box = panelEl.querySelector('#pk-ai-customer');
+    if (!box.querySelector('#pk-save-btn')) return; // form chua duoc render (vd khach moi)
+    const baseline = _lastServerCare || {};
+    const syncSel = (id, key) => {
+      const el = panelEl.querySelector(id); if (!el) return;
+      if ((el.value || '') === (baseline[key] || '')) el.value = newCare[key] || '';
+    };
+    syncSel('#pk-status-sel', 'status');
+    syncSel('#pk-zalo-sel', 'zalo');
+    syncSel('#pk-khstatus-sel', 'khStatus');
+    syncSel('#pk-birthday', 'birthday');
+    syncSel('#pk-hen-note', 'schedHenNote');
+    const henEl = panelEl.querySelector('#pk-hen-date');
+    if (henEl) {
+      const baseHen = baseline.schedHen ? toInputDate_(baseline.schedHen) : '';
+      if ((henEl.value || '') === baseHen) henEl.value = newCare.schedHen ? toInputDate_(newCare.schedHen) : '';
+    }
+    const rawEl = panelEl.querySelector('#pk-note-raw');
+    if (rawEl && (rawEl.value || '') === (baseline.note || '')) {
+      rawEl.value = newCare.note || '';
+      renderNoteHistory_(rawEl.value);
+    }
+    _currentCare = newCare;
+    _lastServerCare = Object.assign({}, newCare);
+    setStatus('🔄 Vừa đồng bộ dữ liệu mới từ Sasum.');
   }
 
   function escapeHtml(s) {

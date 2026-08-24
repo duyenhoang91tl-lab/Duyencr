@@ -177,3 +177,199 @@
 #pk-ai-refresh:hover {
   background: #eff6ff;
 }
+
+#pk-ai-cs-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+#pk-ai-cs-row label {
+  font-size: 11px;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+#pk-cs-sel {
+  flex: 1;
+  padding: 4px 6px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.pk-ai-new-tag {
+  color: #9a3412;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  margin-top: 6px;
+}
+
+.pk-form-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.pk-form-col {
+  flex: 1;
+  min-width: 0;
+}
+
+.pk-form-col label {
+  display: block;
+  font-size: 10.5px;
+  color: #6b7280;
+  margin-bottom: 2px;
+}
+
+.pk-form-col select,
+.pk-form-col input {
+  width: 100%;
+  padding: 5px 6px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.pk-full-input {
+  width: 100%;
+  margin-top: 6px;
+  padding: 5px 6px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.pk-btn-outline {
+  width: 100%;
+  padding: 5px 6px;
+  border: 1px solid #2563eb;
+  background: #fff;
+  color: #2563eb;
+  border-radius: 6px;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.pk-btn-outline:hover {
+  background: #eff6ff;
+}
+
+.pk-label-top {
+  display: block;
+  font-size: 10.5px;
+  color: #6b7280;
+  margin-top: 10px;
+  margin-bottom: 3px;
+}
+
+#pk-note-history {
+  max-height: 130px;
+  overflow-y: auto;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  padding: 4px 6px;
+}
+
+.pk-note-empty {
+  color: #999;
+  font-style: italic;
+  font-size: 11px;
+  padding: 4px 0;
+}
+
+.pk-note-entry {
+  position: relative;
+  padding: 5px 20px 5px 2px;
+  border-bottom: 1px solid #f1f1f1;
+  font-size: 12px;
+}
+
+.pk-note-entry:last-child {
+  border-bottom: none;
+}
+
+.pk-note-meta {
+  font-size: 10px;
+  color: #9ca3af;
+  margin-bottom: 1px;
+}
+
+.pk-note-latest {
+  color: #16a34a;
+  font-weight: 700;
+}
+
+.pk-note-text {
+  color: #374151;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.pk-note-del {
+  position: absolute;
+  right: 0;
+  top: 5px;
+  background: none;
+  border: none;
+  color: #d1d5db;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.pk-note-del:hover {
+  color: #ef4444;
+}
+
+.pk-note-add-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.pk-note-add-row input {
+  flex: 1;
+  padding: 5px 6px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.pk-note-add-row button {
+  width: 32px;
+  border: 1px solid #2563eb;
+  background: #fff;
+  color: #2563eb;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.pk-save-btn {
+  width: 100%;
+  margin-top: 10px;
+  padding: 7px;
+  border: none;
+  background: #16a34a;
+  color: #fff;
+  border-radius: 6px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pk-save-btn:hover {
+  background: #15803d;
+}
+
+.pk-save-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

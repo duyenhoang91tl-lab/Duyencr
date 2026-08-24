@@ -64,6 +64,20 @@ Extension tự động tra cứu khách hàng khi mở hội thoại, dùng chun
 - **Tra cứu khách theo SĐT khó ăn hơn trên Messenger** vì khung chat Messenger thường không hiển thị số điện thoại khách (khác Pancake là hệ thống bán hàng). Vì vậy panel có thêm **ô nhập SĐT thủ công** (phía trên khung gợi ý) — CS gõ tay SĐT khách rồi bấm "Tra cứu" khi tự động không tìm ra.
 - `[role='row']` trên Messenger có thể lẫn cả text không phải tin nhắn (tên người gửi, "Đã xem", giờ gửi...) — nếu gợi ý AI bị nhiễu, thử thu hẹp `messageItem` bằng selector cụ thể hơn qua F12.
 
+## Sửa thông tin khách hàng (đã thêm — giống Zalo AI)
+
+Panel giờ có đầy đủ form chỉnh sửa, dùng chung 19 cột CareData với Zalo AI/Sasum:
+
+- **CS đang dùng**: chọn 1 lần ở đầu panel (load danh sách từ GAS `action:'users'`), lưu sticky theo máy — tự điền vào cột `cs` khi lưu.
+- **Trạng thái CS / Trạng thái Zalo / Tình trạng KH**: 3 dropdown, cùng danh sách giá trị với Zalo AI.
+- **Sinh nhật**.
+- **Lịch hẹn**: chọn ngày hẹn + ghi chú lịch hẹn. Nút "✓ Xong hẹn" xoá lịch hẹn (gửi kèm toàn bộ dữ liệu hiện tại để không ghi đè trống các cột khác — tránh đúng lỗi từng gặp bên Zalo AI).
+- **Ghi chú CS**: thêm/xoá từng dòng ghi chú, cùng định dạng JSON `[{text,user,time}]` với Sasum — ghi chú thêm ở đây hiển thị được cả bên Zalo AI và ngược lại.
+- **Lưu vào Sasum**: 1 nút lưu tất cả field cùng lúc (`action:'saveSingle'`).
+- **Đồng bộ gần-tức-thời**: cứ 6 giây kiểm tra lại dữ liệu mới nhất từ Sasum (so sánh từng trường, không chỉ dựa vào cột `updated` — kể cả khi ai đó sửa trực tiếp trên Google Sheet vẫn phát hiện được) và tự cập nhật các trường CS chưa sửa dở trên form.
+
+Panel Pancake tự điền đủ mọi trường không có UI riêng (schedules, schedGoi*, schedSP*, schedCS*, nickZalos...) từ dữ liệu khách hiện tại trước khi lưu, để không vô tình xoá trắng các cột đó — vì backend GAS không tự merge các trường này.
+
 ## Giới hạn hiện tại
 
 - Chưa phân biệt tin nhắn khách vs nhân viên (gửi hết cho AI, để AI tự suy luận theo ngữ cảnh)
