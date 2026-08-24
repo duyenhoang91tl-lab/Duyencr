@@ -1576,6 +1576,207 @@ function readExternalProductSheet_(query) {
 
 function callGroqAI_(data) { return callAI_(data); } // alias tuong thich cu
 
+// ═══════════════════════════════════════════════════════════════
+//  KIEN THUC TU THU MUC DRIVE (PDF / Google Doc / Google Sheet)
+// ═══════════════════════════════════════════════════════════════
+// Cau hinh: setSetting_('driveKnowledgeFolderUrl', <link thu muc Drive>) — thu muc phai
+// duoc chia se cho tai khoan chay Apps Script nay (hoac "Bat ky ai co lien ket" > Xem).
+// File anh trong thu muc bi bo qua o day (chi dung cho "kien thuc" van ban) — gui anh cho
+// khach la tinh nang rieng, chua lam trong ban nay.
+//
+// Cach hoat dong (giong het trieet ly readExternalProductSheet_ o tren — KHONG nhet ca
+// thu muc vao 1 prompt vi qua nang/cham/ton phi AI):
+//   1) Danh muc luc NHE cho tung file (ten file + tung "doan" van ban ~900 ky tu, kem
+//      snippet 300 ky tu de tim kiem) — cache rieng tung file 15 phut.
+//   2) Khi co cau hoi, tim cac doan co TU KHOA khop cau hoi khach, xep hang theo so tu khop.
+//   3) CHI luc do moi lay lai NGUYEN VAN toi da 4 doan diem cao nhat de dua vao prompt.
+//
+// PDF: Apps Script co ban KHONG doc duoc chu trong PDF. Ham _extractPdfText_ thu OCR qua
+// Drive Advanced Service (Drive.Files.copy voi ocr:true) — CAN BAT truoc trong Apps Script:
+// Extensions > Apps Script > Services (dau +) > chon "Drive API" > Add. Neu chua bat, file
+// PDF se tu dong bi bo qua (khong loi, khong chan cac file Doc/Sheet khac trong thu muc).
+// Cach thay the KHONG can bat gi ca: trong Drive, chuot phai file PDF > Mo bang > Google
+// Tai lieu — Drive tu OCR va tao ra 1 Google Doc cung thu muc, ham nay doc duoc Doc do binh
+// thuong (khong can Advanced Service).
+
+function _driveFolderIdFromUrl_(url) {
+  if (!url) return '';
+  var s = String(url).trim();
+  var m = s.match(/folders\/([a-zA-Z0-9_-]+)/);
+  if (m) return m[1];
+  if (/^[a-zA-Z0-9_-]{10,}$/.test(s)) return s; // CS dan thang ID thay vi URL day du
+  return '';
+}
+
+// Chia van ban dai thanh cac doan ~chunkLen ky tu, cat theo ranh gioi doan van (xuong dong)
+// de khong cat ngang giua cau — dung cho Doc/PDF (khong co cau truc hang/cot nhu Sheet).
+function _chunkText_(text, chunkLen) {
+  var out = [];
+  var paras = String(text || '').split(/\n{1,}/).map(function(p) { return p.trim(); }).filter(Boolean);
+  var buf = '';
+  for (var i = 0; i < paras.length; i++) {
+    if (buf && (buf + '\n' + paras[i]).length > chunkLen) { out.push(buf); buf = paras[i]; }
+    else buf = buf ? (buf + '\n' + paras[i]) : paras[i];
+  }
+  if (buf) out.push(buf);
+  return out;
+}
+
+function _driveKnowFullTextCacheKey_(fileId) { return 'dkf_full_v1_' + fileId; }
+
+// Cache tam noi dung day du cua 1 file (Doc/PDF) sau khi da doc/OCR 1 lan, de lan sau tra
+// lai dung doan (chunk) khop khong phai doc/OCR lai (OCR PDF kha cham va ton quota).
+function _cacheDriveKnowFullText_(fileId, text) {
+  try {
+    if (text && text.length <= 95000) CacheService.getScriptCache().put(_driveKnowFullTextCacheKey_(fileId), text, 900);
+  } catch (e) {}
+}
+
+// PDF khong co API doc van ban truc tiep trong Apps Script co ban — thu OCR bang Drive
+// Advanced Service. Neu chua bat service nay, ham nay se loi va tra ve '' (file bi bo qua,
+// khong chan cac file khac).
+function _extractPdfText_(fileId) {
+  try {
+    var tmp = Drive.Files.copy({ title: 'tmp_ocr_' + fileId }, fileId, { ocr: true, ocrLanguage: 'vi' });
+    var text = DocumentApp.openById(tmp.id).getBody().getText();
+    try { DriveApp.getFileById(tmp.id).setTrashed(true); } catch (ecTrash) {} // dep file OCR tam
+    return text || '';
+  } catch (e) { return ''; }
+}
+
+// Lay dung 1 doan (chunk) da tung duoc index cho 1 file Doc/PDF — uu tien doc tu cache
+// full-text, chi doc/OCR lai truc tiep khi cache da het han (hiem, vi cung TTL voi muc luc).
+function _driveKnowChunkText_(fileId, kind, chunkIdx, fallbackSnippet) {
+  try {
+    var full = CacheService.getScriptCache().get(_driveKnowFullTextCacheKey_(fileId));
+    if (full !== null) {
+      var chunks = _chunkText_(full, 900);
+      if (chunks[chunkIdx]) return chunks[chunkIdx];
+    }
+  } catch (e) {}
+  try {
+    if (kind === 'doc') {
+      var t = DocumentApp.openById(fileId).getBody().getText();
+      var cs = _chunkText_(t, 900);
+      return cs[chunkIdx] || fallbackSnippet;
+    }
+    if (kind === 'pdf') {
+      var t2 = _extractPdfText_(fileId);
+      var cs2 = _chunkText_(t2, 900);
+      return cs2[chunkIdx] || fallbackSnippet;
+    }
+  } catch (e2) {}
+  return fallbackSnippet;
+}
+
+// Muc luc 1 file trong thu muc kien thuc Drive (cache rieng tung file, 15 phut).
+function _driveKnowledgeFileIndex_(file) {
+  var fileId = file.getId();
+  var idxKey = 'dkf_idx_v1_' + fileId;
+  try {
+    var cached = CacheService.getScriptCache().get(idxKey);
+    if (cached !== null) return JSON.parse(cached);
+  } catch (ec) {}
+
+  var mime = file.getMimeType();
+  var name = file.getName();
+  var items = []; // {kind, name, tab?, row?, chunkIdx?, snippet}
+
+  try {
+    if (mime === MimeType.GOOGLE_DOCS) {
+      var text = DocumentApp.openById(fileId).getBody().getText();
+      _cacheDriveKnowFullText_(fileId, text);
+      var chunks = _chunkText_(text, 900);
+      for (var i = 0; i < chunks.length; i++) {
+        items.push({ kind: 'doc', name: name, chunkIdx: i, snippet: chunks[i].substring(0, 300) });
+      }
+    } else if (mime === MimeType.GOOGLE_SHEETS) {
+      var ss2 = SpreadsheetApp.openById(fileId);
+      var tabs = ss2.getSheets();
+      for (var t = 0; t < tabs.length; t++) {
+        var tabName = tabs[t].getName();
+        var idx = _productSheetIndexForTab_(ss2, tabName);
+        for (var r = 0; r < idx.length; r++) {
+          items.push({ kind: 'sheet', name: name, tab: tabName, row: idx[r].row, snippet: idx[r].name + ' ' + idx[r].snippet });
+        }
+      }
+    } else if (mime === MimeType.PDF) {
+      var pdfText = _extractPdfText_(fileId);
+      if (pdfText) {
+        _cacheDriveKnowFullText_(fileId, pdfText);
+        var chunksP = _chunkText_(pdfText, 900);
+        for (var p = 0; p < chunksP.length; p++) {
+          items.push({ kind: 'pdf', name: name, chunkIdx: p, snippet: chunksP[p].substring(0, 300) });
+        }
+      }
+    }
+    // Anh (jpg/png...) va cac dinh dang khac: bo qua o day — dung cho "kien thuc" van ban.
+  } catch (e) { /* file loi/khong doc duoc (chua chia se, dinh dang la...) -> bo qua file nay */ }
+
+  try { CacheService.getScriptCache().put(idxKey, JSON.stringify(items), 900); } catch (ec2) {}
+  return items;
+}
+
+// Doc toan bo thu muc kien thuc Drive (PDF/Doc/Sheet), khop tu khoa cau hoi khach, tra ve
+// toi da 4 doan lien quan nhat de dua vao prompt AI.
+function readDriveKnowledgeFolder_(query) {
+  var url = getSetting_('driveKnowledgeFolderUrl');
+  var folderId = _driveFolderIdFromUrl_(url);
+  if (!folderId) return '';
+
+  var qWords = _psheetNoAccent_(query).replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+    .filter(function(w) { return w.length >= 3 && _PSHEET_STOPWORDS_.indexOf(w) === -1; });
+  if (!qWords.length) return '';
+
+  var folder;
+  try { folder = DriveApp.getFolderById(folderId); } catch (e) { return ''; } // chua chia se / ID sai
+
+  var files = folder.getFiles();
+  var candidates = [];
+  var count = 0;
+  while (files.hasNext() && count < 40) { // gioi han so file quet 1 lan, tranh cham qua
+    var f = files.next(); count++;
+    var items = _driveKnowledgeFileIndex_(f);
+    for (var i = 0; i < items.length; i++) {
+      var hay = _psheetNoAccent_(items[i].name + ' ' + items[i].snippet);
+      var score = 0;
+      for (var w = 0; w < qWords.length; w++) { if (hay.indexOf(qWords[w]) !== -1) score++; }
+      if (score > 0) candidates.push({ fileId: f.getId(), item: items[i], score: score });
+    }
+  }
+  if (!candidates.length) return '';
+  candidates.sort(function(a, b) { return b.score - a.score; });
+  var top = candidates.slice(0, 4);
+
+  var blocks = [];
+  for (var k = 0; k < top.length; k++) {
+    var c = top[k];
+    var block = '';
+    try {
+      if (c.item.kind === 'sheet') {
+        var ss3 = SpreadsheetApp.openById(c.fileId);
+        var sh3 = ss3.getSheetByName(c.item.tab);
+        var lastCol = sh3.getLastColumn();
+        var headerVals = sh3.getRange(1, 1, 1, lastCol).getValues()[0];
+        var rowVals = sh3.getRange(c.item.row, 1, 1, lastCol).getValues()[0];
+        var parts = [];
+        for (var cc = 0; cc < headerVals.length; cc++) {
+          var h = String(headerVals[cc] || '').trim();
+          var v = String(rowVals[cc] || '').trim();
+          if (h && v && !/hinh|image|ảnh/i.test(h)) parts.push(h + ': ' + v);
+        }
+        block = '[' + c.item.name + ' — ' + c.item.tab + ']\n' + parts.join('\n');
+      } else {
+        var seg = _driveKnowChunkText_(c.fileId, c.item.kind, c.item.chunkIdx, c.item.snippet);
+        block = '[' + c.item.name + ']\n' + seg;
+      }
+    } catch (e) { continue; }
+    if (block.length > 1500) block = block.substring(0, 1500) + '...';
+    blocks.push(block);
+  }
+  return blocks.join('\n\n---\n\n');
+}
+
 // ─── Prompt he thong: kien thuc san pham CHI nap khi CS bat "Tra cuu san pham" ───
 function _buildAISystemPrompt_(userMsg, withProducts) {
   var ctx = readAIContext_();
@@ -1593,6 +1794,8 @@ function _buildAISystemPrompt_(userMsg, withProducts) {
     if (ctx.combos.length > 0)   parts.push('\n\nMAU TIN NHAN:\n' + ctx.combos.slice(0, 5).join('\n'));
     var ext = readExternalProductSheet_(userMsg);
     if (ext) parts.push('\n\nTHONG TIN CHI TIET SAN PHAM / THANH PHAN (nguon: Google Sheet rieng cua team, khop tu khoa trong yeu cau — uu tien dung khi tra loi ve thanh phan/cong dung cu the):\n' + ext);
+    var driveKnow = readDriveKnowledgeFolder_(userMsg);
+    if (driveKnow) parts.push('\n\nKIEN THUC TU THU MUC DRIVE (PDF/Doc/Sheet cua team, khop tu khoa cau hoi — uu tien dung cho cau hoi ve tai lieu/kien thuc san pham chi tiet):\n' + driveKnow);
   }
   // Q&A tu sheet FAQ (khop tu khoa cau hoi khach) — de AI hoc cach xu ly cau hoi kho theo team
   var faq = readFaqSheet_(userMsg);
