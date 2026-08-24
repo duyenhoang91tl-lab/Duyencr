@@ -13019,11 +13019,22 @@ function openTaskModal(id){
 }
 function closeTaskModal(){ document.getElementById('task-modal-overlay').classList.remove('open'); }
 
+function _taskAllUserNames(){
+  // Danh sách user tổng: ưu tiên tài khoản đăng nhập (accounts), rồi bổ sung từ dữ liệu KH/lịch sử chia
+  var set = new Set();
+  (typeof accounts !== 'undefined' ? accounts : []).forEach(function(a){
+    var n = (a && (a.name || a.username)) || '';
+    if (n && a.role !== 'admin') set.add(n);
+  });
+  (typeof _allCSNames === 'function' ? _allCSNames() : []).forEach(function(n){ if (n) set.add(n); });
+  return Array.from(set).sort(function(a,b){ return a.localeCompare(b,'vi'); });
+}
+
 function _taskRenderTeamChips(){
   var wrap = document.getElementById('task-f-team');
   var list = (typeof teams !== 'undefined' ? teams : []);
   if (!list.length){
-    wrap.innerHTML = '<div style="color:var(--muted);font-size:12px">Chưa có Team nào (thêm ở mục Nhân sự / Team trước)</div>';
+    wrap.innerHTML = '<div style="color:var(--muted);font-size:12px">Chưa có Team nào — chọn trực tiếp user bên dưới</div>';
     return;
   }
   wrap.innerHTML = list.map(function(tm){
@@ -13036,19 +13047,27 @@ function _taskRenderTeamChips(){
 
 function _taskRenderUserChips(){
   var wrap = document.getElementById('task-f-cs');
+  var noTeams = !(typeof teams !== 'undefined' && teams.length);
   var pool = new Set();
-  (typeof teams !== 'undefined' ? teams : []).forEach(function(tm){
-    if (!_taskSelectedTeams.has(tm.name)) return;
-    if (tm.leader) pool.add(tm.leader);
-    (tm.members||[]).forEach(function(m){ if (m) pool.add(m); });
-  });
-  // Bỏ chọn user không còn thuộc Team đã chọn
+
+  if (noTeams){
+    // Không có Team nào → cho chọn thẳng user (multi-select) từ toàn bộ danh sách user
+    _taskAllUserNames().forEach(function(n){ pool.add(n); });
+  } else {
+    (typeof teams !== 'undefined' ? teams : []).forEach(function(tm){
+      if (!_taskSelectedTeams.has(tm.name)) return;
+      if (tm.leader) pool.add(tm.leader);
+      (tm.members||[]).forEach(function(m){ if (m) pool.add(m); });
+    });
+  }
+  // Bỏ chọn user không còn thuộc phạm vi hiện tại (team đã chọn, hoặc danh sách chung nếu không có team)
   Array.from(_taskSelectedCS).forEach(function(n){ if (!pool.has(n)) _taskSelectedCS.delete(n); });
 
   var names = Array.from(pool).sort(function(a,b){ return a.localeCompare(b,'vi'); });
   if (!names.length){
     wrap.innerHTML = '<div style="color:var(--muted);font-size:12px">'+
-      (_taskSelectedTeams.size ? 'Team đã chọn chưa có thành viên' : 'Chọn Team ở trên trước để hiện danh sách user')+
+      (noTeams ? 'Chưa có user nào (thêm ở mục Tài khoản trước)'
+        : (_taskSelectedTeams.size ? 'Team đã chọn chưa có thành viên' : 'Chọn Team ở trên trước để hiện danh sách user'))+
       '</div>';
     return;
   }
