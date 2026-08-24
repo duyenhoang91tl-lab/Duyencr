@@ -380,7 +380,7 @@
     });
     chrome.storage.local.get(['ome_gas_url','ome_current_cs','ome_current_nz','ome_auto_ai_reply','ome_auto_ai_per_phone'], (res) => {
       GAS_URL = res.ome_gas_url || '';
-      if (GAS_URL) { inpGas.value = GAS_URL; loadCSNames_(); loadNickZaloList_(); loadCareStatusTree_(); loadProductSheetUrl_(); }
+      if (GAS_URL) { inpGas.value = GAS_URL; loadCSNames_(); loadNickZaloList_(); loadCareStatusTree_(); loadProductSheetUrl_(); loadDriveKnowledgeFolderUrl_(); }
       loadChatNamePhoneMap_();
       if (!GAS_URL) { _cfgVisible = true; cfg.style.display = 'block'; }
       _currentCS = res.ome_current_cs || '';
@@ -510,6 +510,17 @@
       const r = await fetch(GAS_URL + sep + 'action=getSetting&key=productSheetUrl', {redirect:'follow'});
       const d = await r.json();
       const el = document.getElementById('zai-product-sheet-url');
+      if (el && d && d.value) el.value = d.value;
+    } catch(e) {}
+  }
+
+  async function loadDriveKnowledgeFolderUrl_() {
+    if (!GAS_URL) return;
+    try {
+      const sep = GAS_URL.includes('?') ? '&' : '?';
+      const r = await fetch(GAS_URL + sep + 'action=getSetting&key=driveKnowledgeFolderUrl', {redirect:'follow'});
+      const d = await r.json();
+      const el = document.getElementById('zai-drive-knowledge-url');
       if (el && d && d.value) el.value = d.value;
     } catch(e) {}
   }
