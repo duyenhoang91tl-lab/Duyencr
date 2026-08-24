@@ -17,7 +17,7 @@ Ban đầu mình đoán nhầm là backend dùng Flask + RAG server riêng — *
 
 1. Mở Chrome → `chrome://extensions`
 2. Bật **Developer mode**
-3. Bấm **Load unpacked** → chọn thư mục `pancake-ai-extension`
+3. Bấm **Load unpacked** → chọn thư mục `pancakeai`
 
 ## Cấu hình bắt buộc
 
