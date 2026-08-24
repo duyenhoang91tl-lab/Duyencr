@@ -1058,9 +1058,20 @@
       if (!_currentCustData || _currentCustData.phone !== phone) return; // CS da chuyen sang khach khac trong luc cho fetch
       const newCare   = d.care || null;
       const newOrders = (d.orders||[]).slice().sort((a,b) => parseDate_(b.date)-parseDate_(a.date));
-      const oldUpdated = _lastServerCare && _lastServerCare.updated;
-      const newUpdated = newCare && newCare.updated;
-      const changed = (newUpdated || '') !== (oldUpdated || '') || newOrders.length !== (_currentCustData.orders||[]).length;
+      // FIX: truoc day chi so sanh cot 'updated' de phat hien thay doi. Nhung neu ai do
+      // sua/xoa truc tiep tren Google Sheet (vd xoa lich hen bang tay), cot 'updated' KHONG
+      // duoc dong bo lai (no chi duoc ghi khi luu qua script/app) -> poll khong thay 'thay doi'
+      // gi ca -> cache cu (con lich hen) khong duoc lam moi -> lan CS luu tiep theo se ghi de
+      // lai gia tri cu tu cache len sheet, "hoi sinh" lai lich hen vua xoa tay.
+      // Sua: so sanh truc tiep cac truong quan trong (dac biet schedHen/schedHenNote) thay vi
+      // chi dua vao 'updated'.
+      const CMP_FIELDS = ['status','zalo','cs','note','schedules','schedGoi','schedGoiNote',
+        'schedSP','schedSPNote','schedCS','schedCSNote','schedHen','schedHenNote',
+        'khStatus','birthday'];
+      const base = _lastServerCare || {};
+      const cur  = newCare || {};
+      const fieldsChanged = CMP_FIELDS.some(k => (base[k]||'') !== (cur[k]||''));
+      const changed = fieldsChanged || newOrders.length !== (_currentCustData.orders||[]).length;
       if (!changed) return;
       applyPolledCare_(phone, newCare, newOrders);
     } catch(e) { /* im lang, thu lai lan poll sau */ }
