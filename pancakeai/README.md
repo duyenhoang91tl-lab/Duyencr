@@ -78,6 +78,19 @@ Panel giờ có đầy đủ form chỉnh sửa, dùng chung 19 cột CareData v
 
 Panel Pancake tự điền đủ mọi trường không có UI riêng (schedules, schedGoi*, schedSP*, schedCS*, nickZalos...) từ dữ liệu khách hiện tại trước khi lưu, để không vô tình xoá trắng các cột đó — vì backend GAS không tự merge các trường này.
 
+## Kiến thức từ Drive (Sheet/Doc/PDF) — đã thêm, tự áp dụng luôn
+
+Backend (`gas_v13.js`, dùng chung với Zalo AI) giờ đọc được cả 1 **thư mục** Google Drive làm kiến thức bổ sung khi trả lời khách — không cần sửa gì bên Pancake AI, chỉ cần:
+
+1. Bật checkbox **"Tra cứu sản phẩm"** trong Cài đặt Pancake AI (`options.html`) — đúng cờ `useProducts` sẽ gửi kèm `withProducts:true`.
+2. Cấu hình link thư mục Drive **1 lần duy nhất** bên extension **Zalo AI** (Cài đặt ⚙ → "Link thư mục Drive kiến thức") — vì đây là cài đặt dùng chung cả team, lưu trong Google Sheet Settings, Pancake AI tự đọc lại qua GAS.
+
+Hỗ trợ đọc trực tiếp: **Google Sheet** (dạng bảng, mỗi hàng 1 sản phẩm/mục — giống hệt sheet sản phẩm hiện có) và **Google Doc**. Riêng **file ảnh trong thư mục sẽ bị bỏ qua** ở bước này (chỉ lấy phần văn bản) — phần gửi ảnh cho khách sẽ làm ở bước sau.
+
+**File PDF**: script thử tự nhận diện chữ (OCR) qua Drive Advanced Service — nếu chưa bật service này trong Apps Script, PDF sẽ tự động bị bỏ qua (không lỗi, không ảnh hưởng các file khác). Cách đơn giản không cần cấu hình gì thêm: trong Drive, chuột phải file PDF → **Mở bằng → Google Tài liệu** — Drive tự OCR ra 1 bản Google Doc cùng thư mục, AI đọc được bản Doc đó ngay.
+
+AI chỉ lấy đúng vài đoạn khớp với câu hỏi của khách (không nhét cả thư mục vào 1 lần hỏi) — giống hệt cách xử lý sheet sản phẩm đang dùng.
+
 ## Giới hạn hiện tại
 
 - Chưa phân biệt tin nhắn khách vs nhân viên (gửi hết cho AI, để AI tự suy luận theo ngữ cảnh)

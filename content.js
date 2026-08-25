@@ -132,6 +132,9 @@
     addEl(cfg, 'label', {textContent:'📄 Link Google Sheet chi tiết sản phẩm/thành phần (tuỳ chọn, dùng chung cả team)'});
     const inpProdSheet = addEl(cfg, 'input', {id:'zai-product-sheet-url', type:'text', placeholder:'https://docs.google.com/spreadsheets/d/...'});
     addEl(cfg, 'div', {style:'font-size:10px;color:#9ca3af;margin:2px 0 6px', textContent:'Hỗ trợ nhiều tab (mỗi tab 1 hãng), dòng 1 mỗi tab là tiêu đề cột, cột đầu là tên sản phẩm. Sheet phải chia sẻ "Bất kỳ ai có liên kết – Xem" hoặc chia sẻ cho tài khoản chạy GAS. AI sẽ tự tìm đúng vài sản phẩm khớp với câu hỏi/ngữ cảnh (không nhét cả sheet) để tư vấn chính xác.'});
+    addEl(cfg, 'label', {textContent:'📁 Link thư mục Drive kiến thức (PDF/Doc/Sheet, tuỳ chọn, dùng chung cả team)'});
+    const inpDriveKnow = addEl(cfg, 'input', {id:'zai-drive-knowledge-url', type:'text', placeholder:'https://drive.google.com/drive/folders/...'});
+    addEl(cfg, 'div', {style:'font-size:10px;color:#9ca3af;margin:2px 0 6px', textContent:'Đọc Google Sheet/Google Doc trực tiếp; file ảnh trong thư mục sẽ được bỏ qua (chỉ dùng phần văn bản). File PDF: nếu không đọc được, vào Drive bấm chuột phải file PDF → Mở bằng → Google Tài liệu (Drive tự nhận diện chữ), AI sẽ đọc được bản Doc đó bình thường. Thư mục phải chia sẻ giống cách chia sẻ Sheet ở trên. AI chỉ lấy đúng vài đoạn khớp câu hỏi, không nhét cả thư mục.'});
     const autoAiRow = addEl(cfg, 'label', {style:'display:flex;align-items:center;gap:6px;margin-top:8px;cursor:pointer;font-weight:400;'});
     const autoAiChk = addEl(autoAiRow, 'input', {type:'checkbox', id:'zai-auto-ai-chk'});
     addEl(autoAiRow, 'span', {textContent:'⚡ Tự động soạn 3 câu mở đầu khi mở đoạn chat khách (đỡ phải bấm Lấy TN / Tạo gợi ý)'});
@@ -377,7 +380,7 @@
     });
     chrome.storage.local.get(['ome_gas_url','ome_current_cs','ome_current_nz','ome_auto_ai_reply','ome_auto_ai_per_phone'], (res) => {
       GAS_URL = res.ome_gas_url || '';
-      if (GAS_URL) { inpGas.value = GAS_URL; loadCSNames_(); loadNickZaloList_(); loadCareStatusTree_(); loadProductSheetUrl_(); }
+      if (GAS_URL) { inpGas.value = GAS_URL; loadCSNames_(); loadNickZaloList_(); loadCareStatusTree_(); loadProductSheetUrl_(); loadDriveKnowledgeUrl_(); }
       loadChatNamePhoneMap_();
       if (!GAS_URL) { _cfgVisible = true; cfg.style.display = 'block'; }
       _currentCS = res.ome_current_cs || '';
@@ -487,6 +490,11 @@
     try {
       await fetch(GAS_URL, { method:'POST', body:JSON.stringify({action:'setSetting',key:'productSheetUrl',value:prodSheetUrl}), headers:{'Content-Type':'text/plain'} });
     } catch(e) { /* khong chan luong luu chinh neu loi rieng phan nay */ }
+    const driveKnowEl = document.getElementById('zai-drive-knowledge-url');
+    const driveKnowUrl = driveKnowEl ? driveKnowEl.value.trim() : '';
+    try {
+      await fetch(GAS_URL, { method:'POST', body:JSON.stringify({action:'setSetting',key:'driveKnowledgeFolderUrl',value:driveKnowUrl}), headers:{'Content-Type':'text/plain'} });
+    } catch(e) { /* khong chan luong luu chinh neu loi rieng phan nay */ }
     _cfgVisible = false;
     document.getElementById('zai-cfg').style.display = 'none';
     _lookupCache = {};
@@ -502,6 +510,17 @@
       const r = await fetch(GAS_URL + sep + 'action=getSetting&key=productSheetUrl', {redirect:'follow'});
       const d = await r.json();
       const el = document.getElementById('zai-product-sheet-url');
+      if (el && d && d.value) el.value = d.value;
+    } catch(e) {}
+  }
+
+  async function loadDriveKnowledgeUrl_() {
+    if (!GAS_URL) return;
+    try {
+      const sep = GAS_URL.includes('?') ? '&' : '?';
+      const r = await fetch(GAS_URL + sep + 'action=getSetting&key=driveKnowledgeFolderUrl', {redirect:'follow'});
+      const d = await r.json();
+      const el = document.getElementById('zai-drive-knowledge-url');
       if (el && d && d.value) el.value = d.value;
     } catch(e) {}
   }
