@@ -523,9 +523,9 @@ function buildDashboard_() {
 //  Bao cao B = sheet "dữ liệu đơn" (cap san pham, da gui khach)
 // ═══════════════════════════════════════════════════════════════
 
-// >>> Dan Spreadsheet ID cua Google Sheet "DT tong" goc vao day roi Deploy lai.
-// De trong = tam thoi dung file dang gan script nay (placeholder, cho ID that). <<<
-var DT_SS_ID = '';
+// ID Google Sheet "DT tong" goc — da xac nhan tu Duyen.
+// >>> Neu doi nguon sau nay: chi can sua dong ID nay roi Deploy lai. <<<
+var DT_SS_ID = '1fiWXPMZcHuEh0zYqD6pgQjZDM0PhWzpiSK7Igj6Cug8';
 
 var DT_TONG_SHEET     = 'DT TỔNG ';    // luu y: co dau cach o cuoi ten sheet, giu nguyen
 var DON_CHITIET_SHEET = 'dữ liệu đơn';
