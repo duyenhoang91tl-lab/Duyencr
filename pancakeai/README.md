@@ -102,8 +102,19 @@ Pancake không có API công khai để gửi ảnh qua tin nhắn (Facebook ch�
 - Panel hiện thêm nút **"📷 Copy ảnh: <tên file>"** dưới danh sách gợi ý. CS bấm → ảnh được chuyển sang PNG và ghi vào clipboard trình duyệt → CS tự bấm **Ctrl+V** vào khung chat Pancake, kiểm tra lại rồi mới bấm **Gửi**.
 - Cố tình **không tự động dán/gửi** — CS luôn là người xác nhận cuối cùng trước khi ảnh đến tay khách, tránh gửi nhầm và tránh phụ thuộc vào giao diện Pancake (dễ gãy nếu Pancake đổi UI).
 
+## Phân biệt tin nhắn khách / nhân viên (đã thêm)
+
+Trước đây extension gửi nguyên văn hội thoại cho AI, để AI tự đoán ai nói gì — hoạt động ổn nhưng có thể nhầm nếu hội thoại phức tạp. Giờ có thể khai báo thêm (tuỳ chọn) trong Options:
+
+- **customerMsgSelector**: CSS selector khớp đúng các dòng tin nhắn **của khách** (ví dụ `.message-in`)
+- **agentMsgSelector**: CSS selector khớp các dòng tin nhắn **của nhân viên** (ví dụ `.message-out`)
+
+Cách lấy: F12 → Elements → bấm vào 1 tin nhắn của khách, xem class riêng nó có mà tin nhân viên không có (thường Pancake/Messenger dùng class kiểu `message-in`/`message-out` hoặc căn trái/phải khác nhau) → Copy → Copy selector.
+
+Nếu để trống cả 2 (mặc định), extension vẫn hoạt động như cũ — gửi nguyên văn cho AI tự suy luận. Nếu điền, prompt gửi cho AI sẽ gắn nhãn rõ ràng `Khách: ...` / `CS: ...` từng dòng, giúp gợi ý trả lời chính xác hơn với hội thoại dài hoặc có nhiều lượt qua lại.
+
 ## Giới hạn hiện tại
 
-- Chưa phân biệt tin nhắn khách vs nhân viên (gửi hết cho AI, để AI tự suy luận theo ngữ cảnh)
+- Phân biệt tin khách/nhân viên cần tự cấu hình 2 selector ở trên — nếu để trống, AI vẫn tự suy luận được nhưng độ chính xác thấp hơn với hội thoại phức tạp
 - Tra cứu khách tự động chỉ hoạt động khi tìm được số điện thoại VN trong vùng tin nhắn — nếu không tìm ra, dùng ô nhập SĐT thủ công
 - Selector Pancake cần bạn tự điền vì mình không truy cập được giao diện thật; selector Messenger đã điền sẵn giá trị khởi điểm nhưng vẫn nên kiểm tra lại bằng dữ liệu thật

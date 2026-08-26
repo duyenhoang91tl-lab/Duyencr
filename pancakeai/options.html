@@ -55,6 +55,13 @@
     Nếu để trống, extension sẽ tự dò khung có tiêu đề "Sản phẩm order" — nhưng dò tự động không phải lúc nào cũng đúng.
     Để chắc chắn: F12 → Elements → bấm chuột phải vào khung/cột chứa tiêu đề "Sản phẩm order" (vùng khoanh xanh trong ảnh chụp bạn gửi) → Copy → Copy selector → dán vào đây.
   </div>
+  <label>Tin nhắn của khách (customerMsgSelector) — <small>tuỳ chọn, giúp AI phân biệt ai nói gì thay vì đoán</small></label>
+  <input type="text" id="pancake_customerMsgSelector" placeholder="vd: .message-in" />
+  <label>Tin nhắn của nhân viên (agentMsgSelector) — <small>tuỳ chọn</small></label>
+  <input type="text" id="pancake_agentMsgSelector" placeholder="vd: .message-out" />
+  <div class="hint">
+    Để trống cả 2 thì extension gửi nguyên văn hội thoại cho AI tự suy luận (như trước giờ) — không bắt buộc phải điền.
+  </div>
 
   <h2>Selector cho Messenger</h2>
   <label>Vùng chứa danh sách tin nhắn (messageList)</label>
@@ -65,6 +72,10 @@
   <input type="text" id="messenger_replyBox" placeholder="vd: div[contenteditable='true'][role='textbox']" />
   <label>Ô hiển thị SĐT khách (phoneSelector) — <small>tuỳ chọn</small></label>
   <input type="text" id="messenger_phoneSelector" placeholder="vd: .customer-info .phone" />
+  <label>Tin nhắn của khách (customerMsgSelector) — <small>tuỳ chọn</small></label>
+  <input type="text" id="messenger_customerMsgSelector" placeholder="vd: [role='row']:not(.outgoing)" />
+  <label>Tin nhắn của nhân viên (agentMsgSelector) — <small>tuỳ chọn</small></label>
+  <input type="text" id="messenger_agentMsgSelector" placeholder="vd: [role='row'].outgoing" />
 
   <button id="save">Lưu cài đặt</button>
   <span id="saved"></span>

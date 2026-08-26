@@ -17,7 +17,9 @@ const DEFAULT_SETTINGS = {
       messageList: "",
       messageItem: "",
       replyBox: "",
-      phoneSelector: ""
+      phoneSelector: "",
+      customerMsgSelector: "",
+      agentMsgSelector: ""
     },
     messenger: {
       // Messenger dùng role/aria-label khá ổn định hơn Pancake (ít đổi class ngẫu nhiên) —
@@ -25,7 +27,9 @@ const DEFAULT_SETTINGS = {
       messageList: "[role='main']",
       messageItem: "[role='row']",
       replyBox: "div[contenteditable='true'][role='textbox']",
-      phoneSelector: ""
+      phoneSelector: "",
+      customerMsgSelector: "",
+      agentMsgSelector: ""
     }
   }
 };
@@ -207,10 +211,19 @@ async function handleFetchSuggestion(payload) {
 // với doGenerate() bên Zalo AI content.js.
 function buildPrompt(payload) {
   const platformLabel = payload.platform === "messenger" ? "Messenger" : "Pancake";
-  const msgText = (payload.messages || [])
-    .map((m) => m.text)
-    .filter(Boolean)
-    .join("\n---\n");
+  const msgs = payload.messages || [];
+
+  // Nếu content.js đã phân biệt được khách/nhân viên (đã cấu hình customerMsgSelector/
+  // agentMsgSelector trong Options), gắn nhãn từng dòng để AI hiểu đúng ai nói gì —
+  // không thì giữ nguyên định dạng cũ (chỉ nối text, không nhãn) để không đổi hành vi
+  // với cấu hình cũ chưa có 2 selector này.
+  const known = msgs.some((m) => m.from === "customer" || m.from === "agent");
+  const msgText = known
+    ? msgs
+        .filter((m) => m.text)
+        .map((m) => `${m.from === "agent" ? "CS" : m.from === "customer" ? "Khách" : "?"}: ${m.text}`)
+        .join("\n")
+    : msgs.map((m) => m.text).filter(Boolean).join("\n---\n");
 
   return (
     `[Kênh] ${platformLabel}\n` +

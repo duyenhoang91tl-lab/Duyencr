@@ -14,11 +14,15 @@ function load() {
     document.getElementById("pancake_replyBox").value = s.selectors?.pancake?.replyBox || "";
     document.getElementById("pancake_phoneSelector").value = s.selectors?.pancake?.phoneSelector || "";
     document.getElementById("pancake_orderPanelSelector").value = s.selectors?.pancake?.orderPanelSelector || "";
+    document.getElementById("pancake_customerMsgSelector").value = s.selectors?.pancake?.customerMsgSelector || "";
+    document.getElementById("pancake_agentMsgSelector").value = s.selectors?.pancake?.agentMsgSelector || "";
 
     document.getElementById("messenger_messageList").value = s.selectors?.messenger?.messageList || "";
     document.getElementById("messenger_messageItem").value = s.selectors?.messenger?.messageItem || "";
     document.getElementById("messenger_replyBox").value = s.selectors?.messenger?.replyBox || "";
     document.getElementById("messenger_phoneSelector").value = s.selectors?.messenger?.phoneSelector || "";
+    document.getElementById("messenger_customerMsgSelector").value = s.selectors?.messenger?.customerMsgSelector || "";
+    document.getElementById("messenger_agentMsgSelector").value = s.selectors?.messenger?.agentMsgSelector || "";
   });
 }
 
@@ -37,13 +41,17 @@ function save() {
         messageItem: document.getElementById("pancake_messageItem").value.trim(),
         replyBox: document.getElementById("pancake_replyBox").value.trim(),
         phoneSelector: document.getElementById("pancake_phoneSelector").value.trim(),
-        orderPanelSelector: document.getElementById("pancake_orderPanelSelector").value.trim()
+        orderPanelSelector: document.getElementById("pancake_orderPanelSelector").value.trim(),
+        customerMsgSelector: document.getElementById("pancake_customerMsgSelector").value.trim(),
+        agentMsgSelector: document.getElementById("pancake_agentMsgSelector").value.trim()
       },
       messenger: {
         messageList: document.getElementById("messenger_messageList").value.trim(),
         messageItem: document.getElementById("messenger_messageItem").value.trim(),
         replyBox: document.getElementById("messenger_replyBox").value.trim(),
-        phoneSelector: document.getElementById("messenger_phoneSelector").value.trim()
+        phoneSelector: document.getElementById("messenger_phoneSelector").value.trim(),
+        customerMsgSelector: document.getElementById("messenger_customerMsgSelector").value.trim(),
+        agentMsgSelector: document.getElementById("messenger_agentMsgSelector").value.trim()
       }
     }
   };

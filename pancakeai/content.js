@@ -600,12 +600,23 @@
     items.forEach((el) => {
       const text = el.innerText?.trim();
       if (!text) return;
-      // Không thể biết chắc ai là người gửi nếu chưa cấu hình class riêng —
-      // để đơn giản, gửi toàn bộ text theo thứ tự, backend/RAG có thể tự suy luận theo ngữ cảnh.
-      messages.push({ from: "unknown", text });
+      messages.push({ from: detectSender_(el, sel), text });
     });
     // chỉ lấy tối đa 20 tin gần nhất để tránh payload quá lớn
     return messages.slice(-20);
+  }
+
+  // Phân biệt tin khách/nhân viên — CHỈ hoạt động khi đã cấu hình 1 trong 2 selector
+  // (customerMsgSelector/agentMsgSelector) trong Options; nếu để trống, giữ nguyên hành vi
+  // cũ (gửi "unknown", để AI tự suy luận theo ngữ cảnh) — không phá vỡ cấu hình đã lưu trước đó.
+  function detectSender_(el, sel) {
+    try {
+      if (sel.customerMsgSelector && el.matches(sel.customerMsgSelector)) return "customer";
+    } catch (e) { /* selector không hợp lệ — bỏ qua, coi như chưa cấu hình */ }
+    try {
+      if (sel.agentMsgSelector && el.matches(sel.agentMsgSelector)) return "agent";
+    } catch (e) { /* selector không hợp lệ — bỏ qua */ }
+    return "unknown";
   }
 
   async function requestSuggestion(manual) {
