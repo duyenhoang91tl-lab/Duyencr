@@ -22,11 +22,14 @@
     '5. Đang tạm dừng','6. Nhận hộ / Sai số','7. Ngang Cúp','8. Từ chối'
   ];
   const CARE_POLL_MS = 6000;
+  const REM_POLL_MS = 5 * 60 * 1000; // quet nhac hen moi 5 phut
   let CS_NAMES = [];
   let _currentPhone = '';
   let _currentCare = null;   // du lieu care dang hien thi/sua tren form
   let _lastServerCare = {};  // baseline lan tra cuu/poll gan nhat — de biet CS dang sua truong nao
   let _carePollTimer = null;
+  let _remPollTimer = null;
+  let _reminders = [];
 
   init();
 
@@ -38,6 +41,8 @@
     observeConversationChanges();
     loadCsNames_();
     startCarePoll_();
+    loadReminders_();
+    startRemPoll_();
   }
 
   function detectPlatform() {
@@ -74,6 +79,15 @@
           <button id="pk-ai-phone-btn">Tra cứu</button>
         </div>
         <div id="pk-ai-customer"></div>
+
+        <div id="pk-rem-section">
+          <div id="pk-rem-header">
+            <span>⏰ Nhắc hẹn hôm nay (<span id="pk-rem-count">0</span>)</span>
+            <button id="pk-rem-refresh" title="Tải lại">🔄</button>
+          </div>
+          <div id="pk-rem-list"></div>
+        </div>
+
         <div id="pk-ai-status">Chưa có hội thoại nào được chọn.</div>
         <div id="pk-ai-suggestions"></div>
         <button id="pk-ai-refresh">Lấy gợi ý mới</button>
@@ -84,6 +98,7 @@
     const csSel = panelEl.querySelector('#pk-cs-sel');
     csSel.addEventListener('change', () => {
       chrome.storage.sync.set({ csName: csSel.value });
+      loadReminders_();
     });
 
     panelEl.querySelector("#pk-ai-refresh").addEventListener("click", () => {
@@ -101,6 +116,7 @@
     panelEl.querySelector("#pk-ai-phone-input").addEventListener("keydown", (e) => {
       if (e.key === "Enter") panelEl.querySelector("#pk-ai-phone-btn").click();
     });
+    panelEl.querySelector("#pk-rem-refresh").addEventListener("click", () => loadReminders_());
   }
 
   // ── CS đang dùng (sticky theo máy, lưu chrome.storage.sync) ──
@@ -453,6 +469,71 @@
     _currentCare = newCare;
     _lastServerCare = Object.assign({}, newCare);
     setStatus('🔄 Vừa đồng bộ dữ liệu mới từ Sasum.');
+  }
+
+  // ── NHẮC HẸN HÔM NAY (tất cả khách, không chỉ khách đang xem) ──
+  // Dùng chung action:'reminders' với portal (index.html) — chỉ đọc, không ghi gì nên
+  // không xung đột với dữ liệu Sasum/Zalo AI đang dùng.
+  function startRemPoll_() {
+    if (_remPollTimer) return;
+    _remPollTimer = setInterval(loadReminders_, REM_POLL_MS);
+  }
+
+  function loadReminders_() {
+    const cs = (panelEl?.querySelector('#pk-cs-sel')?.value) || settings?.csName || '';
+    chrome.runtime.sendMessage({ type: 'GET_REMINDERS', payload: { cs } }, (resp) => {
+      if (!resp?.ok) { return; } // lỗi mạng/GAS -> im lặng, không làm phiền, CS bấm 🔄 để thử lại
+      _reminders = resp.data.reminders || [];
+      renderReminders_();
+    });
+  }
+
+  function renderReminders_() {
+    const countEl = panelEl?.querySelector('#pk-rem-count');
+    const listEl = panelEl?.querySelector('#pk-rem-list');
+    if (!countEl || !listEl) return;
+    countEl.textContent = String(_reminders.length);
+    if (!_reminders.length) {
+      listEl.innerHTML = '<div class="pk-rem-empty">Không có nhắc hẹn hôm nay 🎉</div>';
+      return;
+    }
+    listEl.innerHTML = _reminders.map((r, i) => `
+      <div class="pk-rem-item">
+        <div class="pk-rem-phone">${escapeHtml(r.phone)}${r.schedHenNote ? ' · ' + escapeHtml(r.schedHenNote) : ''}</div>
+        <div class="pk-rem-actions">
+          <button class="pk-btn-outline pk-rem-lookup" data-idx="${i}">🔎 Xem</button>
+          <button class="pk-btn-outline pk-rem-ai" data-idx="${i}">🤖 Soạn tin</button>
+        </div>
+      </div>
+    `).join('');
+    listEl.querySelectorAll('.pk-rem-lookup').forEach((b) => {
+      b.addEventListener('click', () => {
+        const r = _reminders[parseInt(b.dataset.idx, 10)];
+        if (!r) return;
+        panelEl.querySelector('#pk-ai-phone-input').value = r.phone;
+        lookupByPhone(r.phone);
+      });
+    });
+    listEl.querySelectorAll('.pk-rem-ai').forEach((b) => {
+      b.addEventListener('click', () => soanFollowUp_(parseInt(b.dataset.idx, 10)));
+    });
+  }
+
+  // Soạn tin follow-up chủ động cho 1 khách trong danh sách nhắc hẹn — hiện vào cùng khung
+  // gợi ý AI (#pk-ai-suggestions) để bấm chèn/copy y hệt gợi ý trả lời thường.
+  function soanFollowUp_(idx) {
+    const r = _reminders[idx];
+    if (!r) return;
+    panelEl.querySelector('#pk-ai-phone-input').value = r.phone;
+    setStatus('⏳ Đang soạn tin follow-up cho ' + r.phone + '...');
+    chrome.runtime.sendMessage(
+      { type: 'FETCH_FOLLOWUP_SUGGESTION', payload: { phone: r.phone, status: r.status, note: r.schedHenNote } },
+      (resp) => {
+        if (!resp?.ok) { setStatus('Lỗi: ' + (resp?.error || 'không rõ')); return; }
+        renderSuggestions({ suggestions: [resp.data.suggestion], provider: resp.data.provider });
+        setStatus('Nhớ tự mở đúng đoạn chat của ' + r.phone + ' trên Pancake trước khi bấm gợi ý để chèn.');
+      }
+    );
   }
 
   function escapeHtml(s) {
