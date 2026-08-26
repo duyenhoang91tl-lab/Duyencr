@@ -2691,7 +2691,7 @@ function runFollowUpScanTrigger() {
 // ═══════════════════════════════════════════════════════════════
 
 var SH_TASK = 'Tasks';
-var TASK_HEADERS = ['id','title','description','csAssigned','deadline','status','createdBy','createdAt','updatedAt','teamsAssigned'];
+var TASK_HEADERS = ['id','title','description','csAssigned','deadline','status','createdBy','createdAt','updatedAt','teamsAssigned','result','images'];
 
 function readTasks_(sh) {
   var out = [];
@@ -2703,6 +2703,8 @@ function readTasks_(sh) {
     try { cs = v[i][3] ? JSON.parse(v[i][3]) : []; } catch (e) { cs = String(v[i][3] || '').split(',').filter(Boolean); }
     var tm = [];
     try { tm = v[i][9] ? JSON.parse(v[i][9]) : []; } catch (e) { tm = String(v[i][9] || '').split(',').filter(Boolean); }
+    var imgs = [];
+    try { imgs = v[i][11] ? JSON.parse(v[i][11]) : []; } catch (e) { imgs = []; }
     out.push({
       id: String(v[i][0]),
       title: String(v[i][1] || ''),
@@ -2713,7 +2715,9 @@ function readTasks_(sh) {
       createdBy: String(v[i][6] || ''),
       createdAt: String(v[i][7] || ''),
       updatedAt: String(v[i][8] || ''),
-      teamsAssigned: tm
+      teamsAssigned: tm,
+      result: String(v[i][10] || ''),
+      images: imgs
     });
   }
   return out;
@@ -2732,7 +2736,8 @@ function saveTaskEntry_(t) {
   }
   var createdAt = t.createdAt || now;
   var row = [id, t.title || '', t.description || '', JSON.stringify(t.csAssigned || []),
-             t.deadline || '', t.status || 'Chưa làm', t.createdBy || '', createdAt, now];
+             t.deadline || '', t.status || 'Chưa làm', t.createdBy || '', createdAt, now,
+             JSON.stringify(t.teamsAssigned || []), t.result || '', JSON.stringify(t.images || [])];
   if (rowIdx > 0) sh.getRange(rowIdx, 1, 1, TASK_HEADERS.length).setValues([row]);
   else sh.appendRow(row);
   return jsonOut_({ ok: true, id: id });
