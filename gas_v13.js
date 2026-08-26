@@ -347,7 +347,9 @@ function doGet(e) {
     if (action === 'salesReportA') {
       var pA = e.parameter || {};
       var fA = { dateFrom: pA.dateFrom || '', dateTo: pA.dateTo || '',
-                 dateField: pA.dateField || 'ngayTao', sale: pA.sale || '', kenh: pA.kenh || '' };
+                 dateField: pA.dateField || 'ngayTao',
+                 sale: pA.sale ? pA.sale.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [],
+                 kenh: pA.kenh || '' };
       var cacheA = CacheService.getScriptCache();
       var cKeyA = 'salesA_' + JSON.stringify(fA);
       var cachedA = cacheA.get(cKeyA);
@@ -368,6 +370,7 @@ function doGet(e) {
       try { cacheB.put(cKeyB, JSON.stringify(resB), 120); } catch(ec) {}
       return jsonOut_(resB);
     }
+    if (action === 'salesReportOptions') return jsonOut_(getSalesReportOptions_());
 
     if (action === 'assign')    return jsonOut_({ assignHistory: readAssign_(ss.getSheetByName(SH_ASSIGN)) });
     if (action === 'tasks')     return jsonOut_({ tasks: readTasks_(ss.getSheetByName(SH_TASK)) });
@@ -673,10 +676,28 @@ function readDonChiTiet_() {
 
 // ── BAO CAO A: theo "DT TỔNG " ──
 // filters: { dateFrom, dateTo, dateField ('ngayTao'|'thoiGianHT'), sale (mang ten hoac ''), kenh ('' = tat ca) }
+// ── Lay danh sach Sale ban / Kenh ban distinct (cho UI chon, thay vi go dung ten) ──
+function getSalesReportOptions_() {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get('srptOptions_v1');
+  if (cached) { try { return JSON.parse(cached); } catch(ec) {} }
+  var rows0 = readDTTong_();
+  var saleSet = {}, kenhSet = {};
+  for (var i0 = 0; i0 < rows0.length; i0++) {
+    var salesList0 = splitMulti_(rows0[i0].saleBan, ',');
+    for (var j0 = 0; j0 < salesList0.length; j0++) saleSet[salesList0[j0]] = true;
+    if (rows0[i0].kenhBan) kenhSet[rows0[i0].kenhBan] = true;
+  }
+  var srptOpt = { sale: Object.keys(saleSet).sort(), kenh: Object.keys(kenhSet).sort() };
+  try { cache.put('srptOptions_v1', JSON.stringify(srptOpt), 1800); } catch(ec) {}
+  return srptOpt;
+}
+
 function buildSalesReportA_(filters) {
   filters = filters || {};
   var dateField = filters.dateField === 'thoiGianHT' ? 'thoiGianHT' : 'ngayTao';
-  var saleFilter = filters.sale ? String(filters.sale).trim() : '';
+  var saleFilterArr = Array.isArray(filters.sale) ? filters.sale.filter(function(s){return s;})
+    : (filters.sale ? [String(filters.sale).trim()] : []);
   var kenhFilter = filters.kenh ? String(filters.kenh).trim() : '';
 
   var rows = readDTTong_();
@@ -687,7 +708,7 @@ function buildSalesReportA_(filters) {
     if (!dateInRange_(dt, filters.dateFrom, filters.dateTo)) continue;
     if (kenhFilter && row.kenhBan !== kenhFilter) continue;
     var salesOnOrder = splitMulti_(row.saleBan, ',');
-    if (saleFilter && salesOnOrder.indexOf(saleFilter) === -1) continue;
+    if (saleFilterArr.length && !salesOnOrder.some(function(s){ return saleFilterArr.indexOf(s) !== -1; })) continue;
     matched.push(row);
   }
 
