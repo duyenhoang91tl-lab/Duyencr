@@ -188,6 +188,48 @@
     return m2 ? normPhone(m2[1]) : "";
   }
 
+  // ── Lấy tên khách từ khung "Sản phẩm order" (ghi chú đơn hàng CS tự nhập) ──
+  // Dòng đầu của khối trên cùng thường dạng "Chị : Tên", "Anh Tên", hoặc "Tên +sđt".
+  function extractOrderPanelName_() {
+    const sel = settings.selectors?.[PLATFORM];
+    let container = null;
+    if (sel?.orderPanelSelector) {
+      container = document.querySelector(sel.orderPanelSelector);
+    }
+    if (!container) {
+      // Do tu dong: tim node la (khong con con) co chu "San pham order" lam tieu de,
+      // roi lay phan tu cha lam vung chua danh sach cac khoi khach.
+      const nodes = document.querySelectorAll('body *');
+      for (const el of nodes) {
+        if (el.children.length > 0) continue;
+        const t = (el.textContent || '').trim();
+        if (t.length > 0 && t.length < 40 && /sản phẩm order/i.test(t)) {
+          container = el.closest('div')?.parentElement || el.parentElement;
+          break;
+        }
+      }
+    }
+    if (!container) return '';
+    const text = container.innerText || '';
+    if (!text.trim()) return '';
+    // Bo dong tieu de "Sản phẩm order" neu dinh kem trong cung container
+    const cleaned = text.replace(/^.*sản phẩm order.*$/im, '').trim();
+    // Tach cac khoi khach theo dong trong — khoi dau tien = khach dang xu ly (tren cung)
+    const blocks = cleaned.split(/\n\s*\n+/).map((b) => b.trim()).filter(Boolean);
+    if (!blocks.length) return '';
+    const firstLine = blocks[0].split('\n')[0].trim();
+    return _parseNameFromLine_(firstLine);
+  }
+
+  function _parseNameFromLine_(line) {
+    if (!line) return '';
+    let s = line;
+    s = s.replace(/(\+?84|0)\d{8,10}/g, '').trim(); // bo sdt dinh kem tren cung dong
+    s = s.replace(/^(anh|chị|chi|ông|ong|bà|ba|em)\b\s*[:.]?\s*/i, '').trim(); // bo xung ho
+    s = s.replace(/^[:.\-–]\s*/, '').replace(/[:.\-–]\s*$/, '').trim();
+    return s;
+  }
+
   function requestCustomerLookup() {
     const phone = extractPhone();
     if (!phone) {
@@ -244,7 +286,8 @@
     const box = panelEl.querySelector("#pk-ai-customer");
     const { care, orders } = data;
 
-    const name = (orders && orders[0] && orders[0].name) || (care && care.name) || phone;
+    const orderPanelName = extractOrderPanelName_();
+    const name = orderPanelName || (orders && orders[0] && orders[0].name) || (care && care.name) || phone;
     const totalRevenue = (orders || []).reduce((s, o) => s + (parseFloat(o.revenue) || 0), 0);
     const products = [...new Set((orders || []).map((o) => o.product).filter(Boolean))].slice(0, 4).join(", ");
     const isNew = !care && (!orders || !orders.length);
