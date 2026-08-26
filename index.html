@@ -10098,6 +10098,33 @@ async function _srLoad(){
 
 function _srSetSub(sub){ _srState.sub = sub; _srLoad(); }
 function _srSetField(key, val){ _srState[key] = val; }
+
+// Xuat bao cao dang loc (dung filter hien tai tren UI) ra 1 tab moi trong Google Sheet CRM.
+// Tai su dung dung filter payload nhu _srLoad() de so lieu tren Sheet khop 100% voi UI dang xem.
+async function exportSalesReportToSheet(){
+  if (!gsUrl){ alert('Chưa kết nối Google Apps Script (gsUrl trống).'); return; }
+  var filters = _srState.sub === 'A'
+    ? { dateFrom: _srState.dateFrom, dateTo: _srState.dateTo, dateField: _srState.dateField,
+        sale: _srState.sale || [], kenh: _srState.kenh }
+    : { dateFrom: _srState.dateFrom, dateTo: _srState.dateTo,
+        nguon: _srState.nguon, marketer: _srState.marketer };
+  var btn = document.getElementById('sr-export-sheet-btn');
+  if (btn){ btn.disabled = true; btn.textContent = '⏳ Đang xuất...'; }
+  try {
+    var r = await fetch(gsUrl, { method:'POST', redirect:'follow',
+      body: JSON.stringify({ action:'exportSalesReportSheet', reportType: _srState.sub, filters: filters }) });
+    var res = await r.json();
+    if (res && res.tabName){
+      alert('Đã xuất báo cáo ra tab "'+res.tabName+'" trong Google Sheet.'+(res.sheetUrl?'\n'+res.sheetUrl:''));
+    } else {
+      alert('Xuất thất bại: '+(res && res.error ? res.error : 'không rõ lỗi'));
+    }
+  } catch(e){
+    alert('Lỗi khi xuất ra Sheet: '+e.message);
+  } finally {
+    if (btn){ btn.disabled = false; btn.textContent = '📄 Xuất ra Sheet'; }
+  }
+}
 function _srSetSaleMulti(sel){
   _srState.sale = [...sel.options].filter(function(o){ return o.selected; }).map(function(o){ return o.value; });
 }
@@ -10140,6 +10167,7 @@ function renderSalesReportTab(){
   }
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
   filters += '<button class="btn sm" onclick="exportSalesReport()">📊 Xuất Excel</button>';
+  filters += '<button class="btn sm" id="sr-export-sheet-btn" onclick="exportSalesReportToSheet()">📄 Xuất ra Sheet</button>';
   filters += '</div>';
 
   var body = '';

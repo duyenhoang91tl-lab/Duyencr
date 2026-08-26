@@ -854,6 +854,89 @@ function buildSalesReportB_(filters) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+//  XUAT BAO CAO DOANH SO RA 1 TAB MOI TRONG GOOGLE SHEET (CRM)
+//  Dung lai dung buildSalesReportA_/B_ nen so lieu luon khop UI dang loc.
+//  Moi lan xuat tao 1 tab moi (co timestamp) — khong ghi de, giu lich su cac lan xuat.
+// ═══════════════════════════════════════════════════════════════
+function exportSalesReportToSheet_(reportType, filters) {
+  reportType = (reportType === 'B') ? 'B' : 'A';
+  var data = reportType === 'B' ? buildSalesReportB_(filters || {}) : buildSalesReportA_(filters || {});
+  var ss = getCrmSS_();
+  var ts = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Etc/GMT-7', 'yyyyMMdd_HHmmss');
+  var tabName = 'BC_' + reportType + '_' + ts;
+  var sh = ss.insertSheet(tabName);
+
+  var rows = [];
+  rows.push(['BÁO CÁO DOANH SỐ ' + reportType + (reportType === 'A' ? ' — Theo DT tổng' : ' — Theo dữ liệu đơn')]);
+  rows.push(['Xuất lúc', Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Etc/GMT-7', 'dd/MM/yyyy HH:mm:ss')]);
+
+  var f = filters || {};
+  var filterDesc = [];
+  if (f.dateFrom || f.dateTo) filterDesc.push('Khoảng ngày: ' + (f.dateFrom || '...') + ' → ' + (f.dateTo || '...'));
+  if (reportType === 'A') {
+    filterDesc.push('Lọc theo: ' + (f.dateField === 'thoiGianHT' ? 'Thời gian hoàn thành' : 'Ngày tạo'));
+    var saleArr = Array.isArray(f.sale) ? f.sale : (f.sale ? [f.sale] : []);
+    if (saleArr.length) filterDesc.push('Sale: ' + saleArr.join(', '));
+    if (f.kenh) filterDesc.push('Kênh: ' + f.kenh);
+  } else {
+    if (f.nguon) filterDesc.push('Nguồn đơn: ' + f.nguon);
+    if (f.marketer) filterDesc.push('Marketer: ' + f.marketer);
+  }
+  rows.push(['Bộ lọc', filterDesc.join(' | ') || '(không lọc)']);
+  rows.push([]);
+
+  if (reportType === 'A') {
+    rows.push(['TỔNG QUAN']);
+    rows.push(['Số lượng đơn', data.totalOrders]);
+    rows.push(['Tổng giá trị cọc (số tiền ck)', data.totalCoc]);
+    rows.push(['Tổng giá trị đơn hàng (ko ship)', data.totalGiaTri]);
+    rows.push([]);
+    rows.push(['THEO SALE BÁN', '(số đơn giữ nguyên — tiền chia đều cho số sale/đơn)']);
+    rows.push(['Sale', 'Số đơn', 'Cọc', 'Giá trị']);
+    (data.bySale || []).forEach(function(s) { rows.push([s.name, s.orders, s.coc, s.giaTri]); });
+    rows.push([]);
+    rows.push(['THEO KÊNH BÁN']);
+    rows.push(['Kênh', 'Số đơn', 'Cọc', 'Giá trị']);
+    (data.byKenh || []).forEach(function(k) { rows.push([k.name, k.orders, k.coc, k.giaTri]); });
+    rows.push([]);
+    rows.push(['CHI TIẾT ĐƠN']);
+    rows.push(['Ngày tạo', 'Thời gian HT', 'Kênh bán', 'Sale bán', 'Sản phẩm', 'Phân loại', 'Giá trị cọc', 'Giá trị đơn', 'Giai đoạn', 'Trạng thái', 'ID']);
+    (data.orders || []).forEach(function(o) {
+      rows.push([o.ngayTao, o.thoiGianHT, o.kenhBan, o.saleBan, o.sanPham, o.phanLoai, o.giaTriCoc, o.giaTriDon, o.giaiDoan, o.trangThai, o.id]);
+    });
+  } else {
+    rows.push(['TỔNG QUAN']);
+    rows.push(['Số lượng đơn', data.totalOrders]);
+    rows.push(['Tổng giá trị sau giảm giá', data.totalGiaTri]);
+    rows.push(['Tổng COD', data.totalCod]);
+    if (data.mismatchRows) rows.push(['⚠ Số dòng lệch cột (cần kiểm tra tay)', data.mismatchRows]);
+    rows.push([]);
+    rows.push(['BÁO CÁO SẢN PHẨM']);
+    rows.push(['Mã sản phẩm', 'Tên sản phẩm', 'Tổng số lượng']);
+    (data.products || []).forEach(function(p) { rows.push([p.code, p.name, p.soLuong]); });
+    rows.push([]);
+    rows.push(['CHI TIẾT ĐƠN']);
+    rows.push(['Ngày tạo đơn', 'Khách hàng', 'SĐT', 'Nguồn đơn', 'Sản phẩm', 'Mã sản phẩm', 'Số lượng', 'Giá trị sau giảm giá', 'COD', 'Marketer']);
+    (data.orders || []).forEach(function(o) {
+      rows.push([o.ngayTaoDon, o.khachHang, o.soDienThoai, o.nguonDon, o.sanPham, o.maSanPham, o.soLuong, o.giaTriSauGiam, o.cod, o.marketer]);
+    });
+  }
+
+  var maxCols = rows.reduce(function(m, r) { return Math.max(m, r.length); }, 1);
+  var padded = rows.map(function(r) {
+    var rr = r.slice();
+    while (rr.length < maxCols) rr.push('');
+    return rr;
+  });
+  if (padded.length > 0) sh.getRange(1, 1, padded.length, maxCols).setValues(padded);
+  sh.getRange(1, 1).setFontWeight('bold').setFontSize(13);
+  try { sh.autoResizeColumns(1, maxCols); } catch (ecw) {}
+
+  return { tabName: tabName, sheetId: ss.getId(), gid: sh.getSheetId(),
+           sheetUrl: ss.getUrl() + '#gid=' + sh.getSheetId() };
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  doPost
 // ═══════════════════════════════════════════════════════════════
 function doPost(e) {
@@ -867,6 +950,8 @@ function doPost(e) {
     if (action === 'saveOrders')          return saveOrders_(data.orders);
     if (action === 'patchOrder')          return patchOrder_(data);
     if (action === 'deleteOrder')         return deleteOrder_(data);
+    // ── Xuat bao cao doanh so (dang loc tren UI) ra 1 tab moi trong Google Sheet CRM ──
+    if (action === 'exportSalesReportSheet') return jsonOut_(exportSalesReportToSheet_(data.reportType, data.filters));
     // ── XOA DON TRUNG: xoa cac dong trung da duoc CS/admin xac nhan (danh sach items tra ve tu findDuplicateOrders) ──
     if (action === 'deleteDuplicateOrders') return deleteDuplicateOrders_(data.items);
     if (action === 'replaceOrders')       return replaceOrders_(data.orders, data);
