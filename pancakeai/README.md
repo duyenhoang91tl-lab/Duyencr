@@ -85,11 +85,20 @@ Backend (`gas_v13.js`, dùng chung với Zalo AI) giờ đọc được cả 1 *
 1. Bật checkbox **"Tra cứu sản phẩm"** trong Cài đặt Pancake AI (`options.html`) — đúng cờ `useProducts` sẽ gửi kèm `withProducts:true`.
 2. Cấu hình link thư mục Drive **1 lần duy nhất** bên extension **Zalo AI** (Cài đặt ⚙ → "Link thư mục Drive kiến thức") — vì đây là cài đặt dùng chung cả team, lưu trong Google Sheet Settings, Pancake AI tự đọc lại qua GAS.
 
-Hỗ trợ đọc trực tiếp: **Google Sheet** (dạng bảng, mỗi hàng 1 sản phẩm/mục — giống hệt sheet sản phẩm hiện có) và **Google Doc**. Riêng **file ảnh trong thư mục sẽ bị bỏ qua** ở bước này (chỉ lấy phần văn bản) — phần gửi ảnh cho khách sẽ làm ở bước sau.
+Hỗ trợ đọc trực tiếp: **Google Sheet** (dạng bảng, mỗi hàng 1 sản phẩm/mục — giống hệt sheet sản phẩm hiện có) và **Google Doc**. Riêng **file ảnh trong thư mục** không được nạp làm ngữ cảnh văn bản ở bước này, nhưng được dùng ở bước "Gửi ảnh sản phẩm thật cho khách" ngay dưới đây.
 
 **File PDF**: script thử tự nhận diện chữ (OCR) qua Drive Advanced Service — nếu chưa bật service này trong Apps Script, PDF sẽ tự động bị bỏ qua (không lỗi, không ảnh hưởng các file khác). Cách đơn giản không cần cấu hình gì thêm: trong Drive, chuột phải file PDF → **Mở bằng → Google Tài liệu** — Drive tự OCR ra 1 bản Google Doc cùng thư mục, AI đọc được bản Doc đó ngay.
 
 AI chỉ lấy đúng vài đoạn khớp với câu hỏi của khách (không nhét cả thư mục vào 1 lần hỏi) — giống hệt cách xử lý sheet sản phẩm đang dùng.
+
+## Gửi ảnh sản phẩm thật cho khách (đã thêm)
+
+Pancake không có API công khai để gửi ảnh qua tin nhắn (Facebook chặn gửi ảnh qua API ở tầng Messenger để tránh spam), nên cách khả thi là copy ảnh vào clipboard rồi CS tự bấm Ctrl+V dán — đúng cách Pancake hỗ trợ dán ảnh qua extension của họ:
+
+- Dùng **chung 1 thư mục Drive** với "Kiến thức từ Drive" ở trên (`driveKnowledgeFolderUrl`) — không cấu hình thêm link nào khác. Backend chỉ lọc riêng các **file ảnh** trong thư mục đó và so **tên file** với từ khoá câu hỏi khách (không đọc nội dung ảnh) — nên đặt tên ảnh rõ ràng, VD `Serum AHA 30ml.jpg` thay vì `IMG_2049.jpg`.
+- Khi CS bật **"Tra cứu sản phẩm"** và có ảnh khớp, GAS đọc ảnh đó (base64, giới hạn 3MB/ảnh) và gửi kèm luôn trong response gợi ý trả lời (`image: {name, base64, mimeType}`).
+- Panel hiện thêm nút **"📷 Copy ảnh: <tên file>"** dưới danh sách gợi ý. CS bấm → ảnh được chuyển sang PNG và ghi vào clipboard trình duyệt → CS tự bấm **Ctrl+V** vào khung chat Pancake, kiểm tra lại rồi mới bấm **Gửi**.
+- Cố tình **không tự động dán/gửi** — CS luôn là người xác nhận cuối cùng trước khi ảnh đến tay khách, tránh gửi nhầm và tránh phụ thuộc vào giao diện Pancake (dễ gãy nếu Pancake đổi UI).
 
 ## Giới hạn hiện tại
 

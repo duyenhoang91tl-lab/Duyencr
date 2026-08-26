@@ -527,6 +527,60 @@
       item.addEventListener("click", () => insertReply(text));
       box.appendChild(item);
     });
+
+    renderImageSuggestion(data.image);
+  }
+
+  // Nút "Copy ảnh sản phẩm" — chỉ hiện khi backend tìm thấy 1 ảnh khớp tên trong thư mục
+  // kiến thức Drive. Pancake không có API gửi ảnh công khai (Facebook chặn ở tầng
+  // Messenger) nên chỉ copy vào clipboard trình duyệt — CS tự bấm Ctrl+V dán vào khung
+  // chat Pancake rồi kiểm tra lại trước khi bấm Gửi. Cố tình KHÔNG tự động dán/gửi.
+  function renderImageSuggestion(image) {
+    if (!image) return;
+    const box = panelEl.querySelector("#pk-ai-suggestions");
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "pk-btn-outline";
+    btn.innerText = `📷 Copy ảnh: ${image.name}`;
+    btn.title = "Copy ảnh vào clipboard — sau đó bấm Ctrl+V vào khung chat Pancake";
+    btn.addEventListener("click", () => copyProductImage_(image, btn));
+    box.appendChild(btn);
+  }
+
+  async function copyProductImage_(image, btn) {
+    if (btn) btn.disabled = true;
+    setStatus(`Đang chuẩn bị ảnh "${image.name}"...`);
+    try {
+      const rawBlob = await (await fetch(`data:${image.mimeType};base64,${image.base64}`)).blob();
+      const pngBlob = await toPngBlob_(rawBlob);
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })]);
+      setStatus(`Đã copy ảnh "${image.name}" — bấm Ctrl+V vào khung chat Pancake để dán, kiểm tra rồi mới bấm Gửi.`);
+    } catch (e) {
+      setStatus(`Copy ảnh thất bại (${e?.message || e}) — thử bấm lại nút Copy ảnh.`);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  // ClipboardItem chỉ hỗ trợ ổn định image/png ở hầu hết trình duyệt — chuyển mọi ảnh
+  // (kể cả jpg) qua canvas rồi xuất PNG để dán được chắc chắn vào khung chat Pancake.
+  function toPngBlob_(blob) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext("2d").drawImage(img, 0, 0);
+        canvas.toBlob((pngBlob) => {
+          URL.revokeObjectURL(url);
+          pngBlob ? resolve(pngBlob) : reject(new Error("Không tạo được PNG từ ảnh."));
+        }, "image/png");
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Không đọc được dữ liệu ảnh.")); };
+      img.src = url;
+    });
   }
 
   function insertReply(text) {

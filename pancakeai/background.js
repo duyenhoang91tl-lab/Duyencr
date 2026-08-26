@@ -167,8 +167,10 @@ async function handleFetchSuggestion(payload) {
     }
 
     if (data && data.ok) {
-      // GAS trả về { ok:true, text: "...", provider: "Groq"|"Cerebras"|"Gemini" }
-      return { suggestion: (data.text || "").trim(), provider: data.provider };
+      // GAS trả về { ok:true, text:"...", provider:"...", image?: {name, base64, mimeType} }
+      // image chỉ có khi bật "Tra cứu sản phẩm" và tên 1 file ảnh trong thư mục kiến thức
+      // Drive khớp từ khoá — content.js sẽ hiện nút "Copy ảnh" nếu có.
+      return { suggestion: (data.text || "").trim(), provider: data.provider, image: data.image || null };
     }
 
     const err = String((data && data.error) || "Lỗi GAS không rõ nguyên nhân");

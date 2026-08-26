@@ -1777,6 +1777,78 @@ function readDriveKnowledgeFolder_(query) {
   return blocks.join('\n\n---\n\n');
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  ANH SAN PHAM TU THU MUC KIEN THUC DRIVE — dung CHUNG 1 thu muc voi
+//  driveKnowledgeFolderUrl o tren (CS khong phai cau hinh them link nao khac).
+//  Khac voi phan van ban: o day CHI quet FILE ANH (jpg/png/webp...) va so
+//  TEN FILE voi tu khoa cau hoi khach — khong doc noi dung anh, nen dat ten
+//  file ro rang (vd "Serum AHA 30ml.jpg") thi AI moi tim dung.
+// ═══════════════════════════════════════════════════════════════
+
+// Muc luc NHE cac file anh trong thu muc (cache rieng 15 phut, tach voi muc luc
+// van ban _driveKnowledgeFileIndex_ de khong dam vao cache cua nhau).
+function _driveImageIndex_(folderId) {
+  var cacheKey = 'dkf_img_v1_' + folderId;
+  try {
+    var cached = CacheService.getScriptCache().get(cacheKey);
+    if (cached !== null) return JSON.parse(cached);
+  } catch (ec) {}
+
+  var out = [];
+  try {
+    var folder = DriveApp.getFolderById(folderId);
+    var files = folder.getFiles();
+    var count = 0;
+    while (files.hasNext() && count < 200) { // rong hon 40 cua ham van ban vi liet ke ten file rat nhe
+      var f = files.next(); count++;
+      var mime = f.getMimeType();
+      if (mime.indexOf('image/') === 0) out.push({ fileId: f.getId(), name: f.getName() });
+    }
+  } catch (e) { /* chua chia se / ID sai -> danh sach rong, khong chan cac tinh nang khac */ }
+
+  try { CacheService.getScriptCache().put(cacheKey, JSON.stringify(out), 900); } catch (ec2) {}
+  return out;
+}
+
+// Tim 1 anh khop nhat voi cau hoi khach (so tu khoa voi TEN FILE) — dung chung
+// cach tach tu/loai stopword voi readDriveKnowledgeFolder_ o tren de nhat quan.
+// Tra ve {fileId, name} hoac null neu chua cau hinh thu muc / khong khop file nao.
+function findDriveProductImage_(query) {
+  var url = getSetting_('driveKnowledgeFolderUrl');
+  var folderId = _driveFolderIdFromUrl_(url);
+  if (!folderId) return null;
+
+  var qWords = _psheetNoAccent_(query).replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+    .filter(function(w) { return w.length >= 3 && _PSHEET_STOPWORDS_.indexOf(w) === -1; });
+  if (!qWords.length) return null;
+
+  var images = _driveImageIndex_(folderId);
+  if (!images.length) return null;
+
+  var best = null, bestScore = 0;
+  for (var i = 0; i < images.length; i++) {
+    var hay = _psheetNoAccent_(images[i].name);
+    var score = 0;
+    for (var w = 0; w < qWords.length; w++) { if (hay.indexOf(qWords[w]) !== -1) score++; }
+    if (score > bestScore) { bestScore = score; best = images[i]; }
+  }
+  return best;
+}
+
+// Doc noi dung anh ra base64 de gui thang trong cung response voi cau tra loi AI —
+// KHONG doi quyen chia se cua file, chi doc byte qua tai khoan dang chay Apps Script.
+// Gioi han ~3MB de tranh payload qua nang lam cham/loi ca response; anh qua lon se
+// tra ve null (van tra loi text binh thuong, chi thieu anh) thay vi lam hong tat ca.
+var _DRIVE_IMG_MAX_BYTES_ = 3 * 1024 * 1024;
+function _driveImageBase64_(fileId) {
+  try {
+    var blob = DriveApp.getFileById(fileId).getBlob();
+    var bytes = blob.getBytes();
+    if (bytes.length > _DRIVE_IMG_MAX_BYTES_) return null;
+    return { base64: Utilities.base64Encode(bytes), mimeType: blob.getContentType() };
+  } catch (e) { return null; }
+}
+
 // ─── Prompt he thong: kien thuc san pham CHI nap khi CS bat "Tra cuu san pham" ───
 function _buildAISystemPrompt_(userMsg, withProducts) {
   var ctx = readAIContext_();
@@ -1866,7 +1938,21 @@ function callAI_(data) {
     if (!pv.key) continue;
     anyKey = true;
     var r = pv.fn(pv, sys, userMsg);
-    if (r.ok && r.text) return jsonOut_({ ok: true, text: r.text, provider: pv.name });
+    if (r.ok && r.text) {
+      var out = { ok: true, text: r.text, provider: pv.name };
+      // Chi tim anh khi CS bat "Tra cuu san pham" (cung dieu kien voi kien thuc Drive/Sheet
+      // o tren) — loi o buoc tim/doc anh se bi nuot, khong lam hong cau tra loi text.
+      if (withProducts) {
+        try {
+          var img = findDriveProductImage_(userMsg);
+          if (img) {
+            var imgData = _driveImageBase64_(img.fileId);
+            if (imgData) out.image = { name: img.name, base64: imgData.base64, mimeType: imgData.mimeType };
+          }
+        } catch (eImg) {}
+      }
+      return jsonOut_(out);
+    }
     errors.push(pv.name + ': ' + (r.error || 'rong'));
     // loi (429/sai key/...) -> tu dong thu provider ke tiep
   }
