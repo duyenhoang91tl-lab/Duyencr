@@ -2977,6 +2977,18 @@ function markCareSchedDone(phone, field) {
   saveLS('ome_care', careData);
   // Xoá hẳn item tương ứng trong schedules[] nếu có (thay vì chỉ đánh dấu done)
   if (schedKey && date) {
+    // FIX: neu item la lich auto Data Đảo (autoDao:true), phai ghi nho vao 'ome_dao_deleted'
+    // — giong het delSched() — neu khong thi checkDataDaoRenewSchedules() (chay lai moi khi
+    // mo app / nap du lieu moi) se KHONG thay id nay trong _daoDeleted, tuong nhu chua tung
+    // xoa, va tu tao lai y het lich cu do -> "nhay lai" ca man thong bao lan man lich cham
+    // soc du CS da bam xong/xoa roi.
+    const toRemove = schedules.filter(x => x.phone===phone && x.type===schedKey && x.date===date && !x.done);
+    const autoOnes = toRemove.filter(x => x.autoDao);
+    if (autoOnes.length) {
+      const delSet = loadLS('ome_dao_deleted') || {};
+      autoOnes.forEach(x => { delSet[x.id] = true; });
+      saveLS('ome_dao_deleted', delSet);
+    }
     schedules = schedules.filter(x => !(x.phone===phone && x.type===schedKey && x.date===date && !x.done));
     saveLS('ome_sched',schedules);
     saveLS('ome_schedules',schedules);
