@@ -380,6 +380,13 @@ function doGet(e) {
     if (action === 'assign')    return jsonOut_({ assignHistory: readAssign_(ss.getSheetByName(SH_ASSIGN)) });
     if (action === 'tasks')     return jsonOut_({ tasks: readTasks_(ss.getSheetByName(SH_TASK)) });
 
+    // ── Danh sach binh luan cua 1 cong viec (tab "Thao luan") ──
+    if (action === 'taskComments') {
+      var taskIdQ = (e && e.parameter && e.parameter.taskId) ? String(e.parameter.taskId) : '';
+      if (!taskIdQ) return jsonOut_({ error: 'Thieu taskId' });
+      return jsonOut_({ comments: readTaskComments_(ss.getSheetByName(SH_TASK_COMMENT), taskIdQ) });
+    }
+
     if (action === 'count') {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
@@ -967,6 +974,8 @@ function doPost(e) {
     if (action === 'saveAssignHistory')   return saveAssignHistory_(data.history);
     if (action === 'saveTask')  return saveTaskEntry_(data.task);
     if (action === 'deleteTask') return deleteTask_(data.id);
+    // ── Binh luan/thao luan trong 1 cong viec (Task) — tab "Thao luan" tren UI ──
+    if (action === 'saveTaskComment') return saveTaskComment_(data.comment);
     if (action === 'saveCareStatus')      return saveCareStatus_(data.careStatus);
     if (action === 'saveAIContext')        return saveAIContext_(data.type, data.content, data.context);
     if (action === 'ai')                  return callGroqAI_(data);
@@ -2752,4 +2761,47 @@ function deleteTask_(id) {
     if (cell) sh.deleteRow(cell.getRow());
   }
   return jsonOut_({ ok: true });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BINH LUAN / THAO LUAN TRONG 1 CONG VIEC (tab "Thao luan" cua Task)
+//  Moi dong la 1 comment, khong sua/xoa - chi doc theo taskId + them moi.
+// ═══════════════════════════════════════════════════════════════
+var SH_TASK_COMMENT = 'TaskComments';
+var TASK_COMMENT_HEADERS = ['id','taskId','author','content','images','createdAt'];
+
+function readTaskComments_(sh, taskId) {
+  var out = [];
+  if (!sh || sh.getLastRow() < 2) return out;
+  var v = sh.getDataRange().getValues();
+  for (var i = 1; i < v.length; i++) {
+    if (!v[i][0]) continue;
+    if (String(v[i][1]) !== String(taskId)) continue;
+    var imgs = [];
+    try { imgs = v[i][4] ? JSON.parse(v[i][4]) : []; } catch (e) { imgs = []; }
+    out.push({
+      id: String(v[i][0]),
+      taskId: String(v[i][1]),
+      author: String(v[i][2] || ''),
+      content: String(v[i][3] || ''),
+      images: imgs,
+      createdAt: String(v[i][5] || '')
+    });
+  }
+  // Cu -> moi, giong thu tu chat, de UI scroll xuong duoi cung la binh luan moi nhat
+  out.sort(function (a, b) { return new Date(a.createdAt) - new Date(b.createdAt); });
+  return out;
+}
+
+function saveTaskComment_(c) {
+  if (!c || !c.taskId) return jsonOut_({ error: 'Thieu taskId' });
+  if (!String(c.content || '').trim() && !(c.images || []).length) {
+    return jsonOut_({ error: 'Binh luan rong' });
+  }
+  var sh = getSheet_(SH_TASK_COMMENT, TASK_COMMENT_HEADERS);
+  var id = 'tc_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+  var now = new Date().toISOString();
+  sh.appendRow([id, String(c.taskId), c.author || 'Ẩn danh', c.content || '',
+                JSON.stringify(c.images || []), now]);
+  return jsonOut_({ ok: true, id: id });
 }
