@@ -234,7 +234,7 @@
     const phone = extractPhone();
     if (!phone) {
       panelEl.querySelector("#pk-ai-customer").innerHTML = "";
-      _currentPhone = ''; _currentCare = null; _lastServerCare = {};
+      _currentPhone = ''; _currentCare = null; _lastServerCare = {}; _currentOrderPanelName = '';
       return;
     }
     lookupByPhone(phone);
@@ -287,6 +287,7 @@
     const { care, orders } = data;
 
     const orderPanelName = extractOrderPanelName_();
+    _currentOrderPanelName = orderPanelName;
     const name = orderPanelName || (orders && orders[0] && orders[0].name) || (care && care.name) || phone;
     const totalRevenue = (orders || []).reduce((s, o) => s + (parseFloat(o.revenue) || 0), 0);
     const products = [...new Set((orders || []).map((o) => o.product).filter(Boolean))].slice(0, 4).join(", ");
@@ -408,6 +409,7 @@
   // co UI de sua (schedules, schedGoi*, schedSP*, schedCS*, nickZalos...) phai lay nguyen tu
   // _currentCare hien tai, khong duoc de trong — neu khong GAS se ghi de trong mat du lieu
   // (xem careRow_ trong gas_v13.js: chi 4 truong mo rong duoc tu merge, con lai thi khong).
+  let _currentOrderPanelName = ''; // ten khach vua doc duoc tu khung 'San pham order' (neu co)
   function _buildRow(phone, overrides) {
     const c = _currentCare || {};
     return Object.assign({
@@ -420,7 +422,8 @@
       schedCS: c.schedCS || '', schedCSNote: c.schedCSNote || '',
       schedHen: c.schedHen || '', schedHenNote: c.schedHenNote || '',
       khStatus: c.khStatus || '', birthday: c.birthday || '',
-      nickZalos: c.nickZalos || []
+      nickZalos: c.nickZalos || [],
+      name: _currentOrderPanelName || c.name || ''
     }, overrides || {});
   }
 

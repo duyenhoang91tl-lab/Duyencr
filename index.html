@@ -2191,6 +2191,22 @@ function _latestOrderCS(orders){
   return bestCS || lastCS || '';
 }
 function buildCustomers() {
+  // Tạo sẵn customerMap cho các SĐT chỉ có trong careData (chưa có đơn nào) — vd khách mới
+  // được Pancake AI/Zalo AI phát hiện tên qua khung "Sản phẩm order" và lưu tên vào CareData
+  // (cột 'name') — để khách này vẫn hiện trong danh sách CRM thay vì "biến mất" vì chưa từng
+  // xuất hiện trong file Excel đơn hàng nào.
+  if (typeof careData !== 'undefined' && careData) {
+    Object.keys(careData).forEach(ph => {
+      if (customerMap[ph]) return;
+      const care = careData[ph] || {};
+      if (!care.name) return; // không có tên thì chưa đủ thông tin để hiện như 1 khách hàng
+      customerMap[ph] = {
+        phone: ph, name: care.name, orders: [],
+        sources: new Set(), brands: new Set(), _keys: new Set(),
+        _rawStatus: care.status||'', _rawZalo: care.zalo||'', _rawNote: care.note||''
+      };
+    });
+  }
   const JAN25_YEAR = 25;
   const JAN25_DATE = new Date(2025, 0, 1);
   allCustomers = Object.values(customerMap).map(c => {
@@ -2216,6 +2232,9 @@ function buildCustomers() {
     const care = careData[c.phone] || {};
     const careCS = care.cs || _latestOrderCS(c.orders);   // CS chăm sóc: mặc định theo đơn mới nhất
     const csSet = new Set(c.orders.map(o=>o.cs).filter(Boolean));  // CS phụ trách = người lên các đơn (giữ riêng)
+    // Nếu tên lấy từ đơn hàng chỉ là số điện thoại (chưa có tên thật trong đơn nào) nhưng
+    // CareData đã có tên (vd Pancake AI/Zalo AI đọc được từ khung "Sản phẩm order") → dùng tên đó
+    const displayName = (c.name === c.phone && care.name) ? care.name : c.name;
 
     // Precompute year/month/hour cho mỗi đơn (dùng để lọc nhanh)
     const ymList = c.orders.map(o => {
@@ -2229,6 +2248,7 @@ function buildCustomers() {
 
     return {
       ...c,
+      name: displayName,
       sources:[...c.sources], brands:[...c.brands].filter(Boolean),
       totalOrders:tot, totalRevenue:rev,
       renewOrders:renewCount, tier,
@@ -2238,7 +2258,7 @@ function buildCustomers() {
       careCS,
       csSet,
       ymList,
-      nameLower: s(c.name).toLowerCase(),
+      nameLower: s(displayName).toLowerCase(),
     };
   });
   // Compute _lastActionDate for each customer from careData + schedules done
