@@ -49,6 +49,12 @@
   <input type="text" id="pancake_replyBox" placeholder="vd: div[contenteditable='true']" />
   <label>Ô hiển thị SĐT khách (phoneSelector) — <small>tuỳ chọn, để trống thì tự quét toàn vùng tin nhắn</small></label>
   <input type="text" id="pancake_phoneSelector" placeholder="vd: .customer-info .phone" />
+  <label>Khung "Sản phẩm order" (orderPanelSelector) — <small>tuỳ chọn, để lấy đúng tên khách hàng đầu (dòng đầu tiên, dạng "Chị : Tên" / "Anh Tên")</small></label>
+  <input type="text" id="pancake_orderPanelSelector" placeholder="vd: .order-note-panel" />
+  <div class="hint">
+    Nếu để trống, extension sẽ tự dò khung có tiêu đề "Sản phẩm order" — nhưng dò tự động không phải lúc nào cũng đúng.
+    Để chắc chắn: F12 → Elements → bấm chuột phải vào khung/cột chứa tiêu đề "Sản phẩm order" (vùng khoanh xanh trong ảnh chụp bạn gửi) → Copy → Copy selector → dán vào đây.
+  </div>
 
   <h2>Selector cho Messenger</h2>
   <label>Vùng chứa danh sách tin nhắn (messageList)</label>

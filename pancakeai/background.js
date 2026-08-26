@@ -72,6 +72,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
     return true;
   }
+
+  // Danh sach khach can nhac hen HOM NAY (doc tu cot 'Hẹn' trong CareData) — action:'reminders',
+  // dung chung endpoint voi portal (index.html). Chi doc, khong ghi -> khong dung do voi Zalo AI/portal.
+  if (msg?.type === "GET_REMINDERS") {
+    handleGetReminders(msg.payload)
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
+  // Soan tin follow-up chu dong cho 1 khach trong danh sach nhac hen (khac voi FETCH_SUGGESTION
+  // la tra loi tin khach nhan toi) — dung chung action:'ai' nhung prompt khac.
+  if (msg?.type === "FETCH_FOLLOWUP_SUGGESTION") {
+    handleFetchFollowUpSuggestion(msg.payload)
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
 });
 
 // Tra cứu khách theo SĐT — GET GAS_URL?action=lookup&phone=... y hệt doLookup() bên Zalo AI.
@@ -199,4 +217,57 @@ function buildPrompt(payload) {
     `[TN khách] ${msgText}\n` +
     `Soạn 1 tin nhắn trả lời phù hợp, ngắn gọn, tiếng Việt tự nhiên.`
   );
+}
+
+// Danh sach nhac hen hom nay cho 1 CS — action:'reminders' (GET, chi doc, khong ghi gi).
+// Backend tu loc theo ngay hom nay + gop trung SDT, xem action==='reminders' trong gas_v13.js.
+async function handleGetReminders(payload) {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+
+  const cs = payload?.cs || cfg.csName || "";
+  const sep = cfg.gasUrl.includes("?") ? "&" : "?";
+  const url = cfg.gasUrl + sep + "action=reminders" + (cs ? "&cs=" + encodeURIComponent(cs) : "");
+  const res = await fetch(url, { redirect: "follow" });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return { reminders: data.reminders || [] };
+}
+
+// Soan tin follow-up chu dong cho 1 khach (khac voi tra loi tin khach nhan toi) — cung action:'ai'.
+async function handleFetchFollowUpSuggestion(payload) {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+
+  const prompt =
+    `SĐT: ${payload?.phone || ""}\n` +
+    (payload?.status ? `Tình trạng CS: ${payload.status}\n` : "") +
+    (payload?.note ? `Ghi chú lịch hẹn: ${payload.note}\n` : "") +
+    `Soạn 1 tin nhắn hỏi thăm/follow-up chủ động, ngắn gọn, thân thiện, tiếng Việt tự nhiên để chủ động nhắn cho khách này hôm nay.`;
+
+  for (let attempt = 0; attempt <= 2; attempt++) {
+    let res, data;
+    try {
+      res = await fetch(cfg.gasUrl, {
+        method: "POST",
+        body: JSON.stringify({ action: "ai", prompt, withProducts: !!cfg.useProducts }),
+        headers: { "Content-Type": "text/plain" }
+      });
+      data = await res.json();
+    } catch (e) {
+      throw new Error("Không gọi được GAS: " + e.message);
+    }
+    if (data && data.ok) return { suggestion: (data.text || "").trim(), provider: data.provider };
+    const err = String((data && data.error) || "Lỗi GAS không rõ nguyên nhân");
+    if (err.indexOf("429") !== -1 && attempt < 2) {
+      const m = err.match(/try again in ([0-9.]+)s/i);
+      const waitMs = m ? Math.ceil(parseFloat(m[1]) * 1000) + 1500 : 16000;
+      await new Promise((r) => setTimeout(r, waitMs));
+      continue;
+    }
+    throw new Error(err);
+  }
+  throw new Error("Quá số lần thử lại (rate limit).");
 }

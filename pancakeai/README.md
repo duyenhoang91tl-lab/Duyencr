@@ -57,6 +57,8 @@ Extension tự động tra cứu khách hàng khi mở hội thoại, dùng chun
 - Nếu Pancake hiển thị SĐT khách ở 1 khu vực cố định (thường là sidebar thông tin khách), bạn có thể trỏ chính xác vào đó qua ô **phoneSelector** trong Options (F12 → Copy selector, giống cách lấy `messageList`) — chính xác hơn quét toàn trang
 - Nếu để trống, extension tự quét toàn bộ vùng `messageList` tìm số điện thoại
 - Panel hiện thẻ khách hàng: tên, số đơn, tổng doanh thu, sản phẩm đã mua, trạng thái CS, ghi chú gần nhất — lấy từ đúng Google Sheet CRM mà Zalo AI đang dùng
+- **Tên khách hiển thị trên thẻ**: ưu tiên lấy từ dòng đầu tiên của khối trên cùng trong khung **"Sản phẩm order"** (ghi chú đơn hàng CS tự nhập tay khi chốt đơn — dạng "Chị : Tên", "Anh Tên", hoặc "Tên +sđt"), tự động bỏ số điện thoại và xưng hô (Anh/Chị) đi kèm. Nếu không tìm thấy khung này mới rơi về tên trong lịch sử đơn hàng, rồi mới đến số điện thoại. Extension tự dò khung có tiêu đề "Sản phẩm order" — nếu dò sai/không tìm thấy, trỏ chính xác qua ô **orderPanelSelector** trong Options (F12 → Copy selector vào đúng khung này)
+- Tên phát hiện được sẽ được **lưu vào CareData** (cột `name` mới, dùng chung với Zalo AI/Sasum) mỗi khi bấm "💾 Lưu vào Sasum" hoặc "✓ Xong hẹn" — nên khách mới (chưa có đơn hàng nào) vẫn hiện đúng tên trên **CRM Sasum**, thay vì chỉ hiện số điện thoại trong danh sách khách hàng
 
 ## Messenger — khác biệt so với Pancake
 

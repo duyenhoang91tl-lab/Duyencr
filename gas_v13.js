@@ -45,11 +45,13 @@ var ORDER_SHEETS = [
 ];
 var SH_ORDER_DEFAULT = 'OrderData26';
 
-// CARE_HEADERS: 19 cols (v10.0 co 15, v11.2 co 17, v12.0 them birthday, v13.1 them zaloSetBy)
+// CARE_HEADERS: 20 cols (v10.0 co 15, v11.2 co 17, v12.0 them birthday, v13.1 them zaloSetBy,
+// v13.2 them name — luu ten khach truc tiep trong CareData, dung cho khach MOI chua co don
+// hang nao trong OrderData nen khong co ten de lay).
 var CARE_HEADERS = ['phone','status','zalo','cs','note','schedules',
   'schedGoi','schedGoiNote','schedSP','schedSPNote',
   'schedCS','schedCSNote','schedHen','schedHenNote','updated',
-  'khStatus','nickZalos','birthday','zaloSetBy'];
+  'khStatus','nickZalos','birthday','zaloSetBy','name'];
 
 var ORDER_HEADERS  = ['phone','name','date','year','month','cs','source','revenue',
   'product','productDetail','status','zalo','note','careCS'];
@@ -170,7 +172,8 @@ function careObjFromRow_(row) {
     khStatus:     row[15]||'',
     nickZalos:    parseNZ(row[16]),
     birthday:     row[17]||'',
-    zaloSetBy:    parseSetBy(row[18]) // { cs, nick, at } - ai/nick nao vua ghi trang thai 'zalo' gan nhat
+    zaloSetBy:    parseSetBy(row[18]), // { cs, nick, at } - ai/nick nao vua ghi trang thai 'zalo' gan nhat
+    name:         row[19]||''
   };
 }
 
@@ -198,7 +201,7 @@ function findCareByPhone_(phone) {
   return null;
 }
 
-// careRow_: 19 cols. Neu truong khong co thi de trong.
+// careRow_: 20 cols. Neu truong khong co thi de trong.
 function careRow_(r) {
   var nz = r.nickZalos;
   if (!Array.isArray(nz)) { try { nz = JSON.parse(nz||'[]'); } catch(e) { nz = []; } }
@@ -209,11 +212,11 @@ function careRow_(r) {
     r.schedGoi||'', r.schedGoiNote||'', r.schedSP||'', r.schedSPNote||'',
     r.schedCS||'', r.schedCSNote||'', r.schedHen||'', r.schedHenNote||'',
     new Date().toISOString(),
-    r.khStatus||'', JSON.stringify(nz), r.birthday||'', setBy||''
+    r.khStatus||'', JSON.stringify(nz), r.birthday||'', setBy||'', r.name||''
   ];
 }
 
-// Doc du lieu existing de bao toan truong mo rong (khStatus, nickZalos, birthday, zaloSetBy)
+// Doc du lieu existing de bao toan truong mo rong (khStatus, nickZalos, birthday, zaloSetBy, name)
 // khi appweb gui len khong co cac truong nay
 function readExistingExtFields_(sh) {
   var map = {};
@@ -225,7 +228,8 @@ function readExistingExtFields_(sh) {
       khStatus:  vals[i][15]||'',
       nickZalos: vals[i][16]||'[]',
       birthday:  vals[i][17]||'',
-      zaloSetBy: vals[i][18]||''
+      zaloSetBy: vals[i][18]||'',
+      name:      vals[i][19]||''
     };
   }
   return map;
@@ -237,6 +241,7 @@ function mergeExtFields_(r, ex) {
   if (r.khStatus  === undefined || r.khStatus  === null || r.khStatus  === '') r.khStatus  = ex.khStatus  || '';
   if (r.birthday  === undefined || r.birthday  === null || r.birthday  === '') r.birthday  = ex.birthday  || '';
   if (r.zaloSetBy === undefined || r.zaloSetBy === null || r.zaloSetBy === '') r.zaloSetBy = ex.zaloSetBy || '';
+  if (r.name      === undefined || r.name      === null || r.name      === '') r.name      = ex.name      || '';
   if (r.nickZalos === undefined || r.nickZalos === null ||
       (Array.isArray(r.nickZalos) && r.nickZalos.length === 0)) {
     try { r.nickZalos = JSON.parse(ex.nickZalos||'[]'); } catch(e) { r.nickZalos = []; }
@@ -347,7 +352,9 @@ function doGet(e) {
     if (action === 'salesReportA') {
       var pA = e.parameter || {};
       var fA = { dateFrom: pA.dateFrom || '', dateTo: pA.dateTo || '',
-                 dateField: pA.dateField || 'ngayTao', sale: pA.sale || '', kenh: pA.kenh || '' };
+                 dateField: pA.dateField || 'ngayTao',
+                 sale: pA.sale ? pA.sale.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [],
+                 kenh: pA.kenh || '' };
       var cacheA = CacheService.getScriptCache();
       var cKeyA = 'salesA_' + JSON.stringify(fA);
       var cachedA = cacheA.get(cKeyA);
@@ -368,6 +375,7 @@ function doGet(e) {
       try { cacheB.put(cKeyB, JSON.stringify(resB), 120); } catch(ec) {}
       return jsonOut_(resB);
     }
+    if (action === 'salesReportOptions') return jsonOut_(getSalesReportOptions_());
 
     if (action === 'assign')    return jsonOut_({ assignHistory: readAssign_(ss.getSheetByName(SH_ASSIGN)) });
     if (action === 'tasks')     return jsonOut_({ tasks: readTasks_(ss.getSheetByName(SH_TASK)) });
@@ -673,10 +681,28 @@ function readDonChiTiet_() {
 
 // ── BAO CAO A: theo "DT TỔNG " ──
 // filters: { dateFrom, dateTo, dateField ('ngayTao'|'thoiGianHT'), sale (mang ten hoac ''), kenh ('' = tat ca) }
+// ── Lay danh sach Sale ban / Kenh ban distinct (cho UI chon, thay vi go dung ten) ──
+function getSalesReportOptions_() {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get('srptOptions_v1');
+  if (cached) { try { return JSON.parse(cached); } catch(ec) {} }
+  var rows0 = readDTTong_();
+  var saleSet = {}, kenhSet = {};
+  for (var i0 = 0; i0 < rows0.length; i0++) {
+    var salesList0 = splitMulti_(rows0[i0].saleBan, ',');
+    for (var j0 = 0; j0 < salesList0.length; j0++) saleSet[salesList0[j0]] = true;
+    if (rows0[i0].kenhBan) kenhSet[rows0[i0].kenhBan] = true;
+  }
+  var srptOpt = { sale: Object.keys(saleSet).sort(), kenh: Object.keys(kenhSet).sort() };
+  try { cache.put('srptOptions_v1', JSON.stringify(srptOpt), 1800); } catch(ec) {}
+  return srptOpt;
+}
+
 function buildSalesReportA_(filters) {
   filters = filters || {};
   var dateField = filters.dateField === 'thoiGianHT' ? 'thoiGianHT' : 'ngayTao';
-  var saleFilter = filters.sale ? String(filters.sale).trim() : '';
+  var saleFilterArr = Array.isArray(filters.sale) ? filters.sale.filter(function(s){return s;})
+    : (filters.sale ? [String(filters.sale).trim()] : []);
   var kenhFilter = filters.kenh ? String(filters.kenh).trim() : '';
 
   var rows = readDTTong_();
@@ -687,7 +713,7 @@ function buildSalesReportA_(filters) {
     if (!dateInRange_(dt, filters.dateFrom, filters.dateTo)) continue;
     if (kenhFilter && row.kenhBan !== kenhFilter) continue;
     var salesOnOrder = splitMulti_(row.saleBan, ',');
-    if (saleFilter && salesOnOrder.indexOf(saleFilter) === -1) continue;
+    if (saleFilterArr.length && !salesOnOrder.some(function(s){ return saleFilterArr.indexOf(s) !== -1; })) continue;
     matched.push(row);
   }
 
@@ -929,7 +955,7 @@ function saveSingleCare_(r) {
   if (rowIdx > 0) {
     // Doc du lieu hien tai de bao toan truong mo rong neu incoming khong co
     var existRow = sh.getRange(rowIdx, 1, 1, CARE_HEADERS.length).getValues()[0];
-    mergeExtFields_(r, { khStatus: existRow[15]||'', nickZalos: existRow[16]||'[]', birthday: existRow[17]||'', zaloSetBy: existRow[18]||'' });
+    mergeExtFields_(r, { khStatus: existRow[15]||'', nickZalos: existRow[16]||'[]', birthday: existRow[17]||'', zaloSetBy: existRow[18]||'', name: existRow[19]||'' });
     sh.getRange(rowIdx, 1, 1, CARE_HEADERS.length).setValues([careRow_(r)]);
   } else {
     sh.appendRow(careRow_(r));
@@ -951,7 +977,7 @@ function saveBatchCare_(rows) {
   for (var k = 0; k < rows.length; k++) {
     var r = rows[k]; var key = normPhone_(String(r.phone));
     if (index[key] !== undefined) {
-      mergeExtFields_(r, { khStatus: data[index[key]][15]||'', nickZalos: data[index[key]][16]||'[]', birthday: data[index[key]][17]||'', zaloSetBy: data[index[key]][18]||'' });
+      mergeExtFields_(r, { khStatus: data[index[key]][15]||'', nickZalos: data[index[key]][16]||'[]', birthday: data[index[key]][17]||'', zaloSetBy: data[index[key]][18]||'', name: data[index[key]][19]||'' });
       data[index[key]] = careRow_(r); updated++;
     } else {
       data.push(careRow_(r)); index[key] = data.length - 1; appended++;

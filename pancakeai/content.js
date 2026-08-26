@@ -22,11 +22,14 @@
     '5. Đang tạm dừng','6. Nhận hộ / Sai số','7. Ngang Cúp','8. Từ chối'
   ];
   const CARE_POLL_MS = 6000;
+  const REM_POLL_MS = 5 * 60 * 1000; // quet nhac hen moi 5 phut
   let CS_NAMES = [];
   let _currentPhone = '';
   let _currentCare = null;   // du lieu care dang hien thi/sua tren form
   let _lastServerCare = {};  // baseline lan tra cuu/poll gan nhat — de biet CS dang sua truong nao
   let _carePollTimer = null;
+  let _remPollTimer = null;
+  let _reminders = [];
 
   init();
 
@@ -38,6 +41,8 @@
     observeConversationChanges();
     loadCsNames_();
     startCarePoll_();
+    loadReminders_();
+    startRemPoll_();
   }
 
   function detectPlatform() {
@@ -74,6 +79,15 @@
           <button id="pk-ai-phone-btn">Tra cứu</button>
         </div>
         <div id="pk-ai-customer"></div>
+
+        <div id="pk-rem-section">
+          <div id="pk-rem-header">
+            <span>⏰ Nhắc hẹn hôm nay (<span id="pk-rem-count">0</span>)</span>
+            <button id="pk-rem-refresh" title="Tải lại">🔄</button>
+          </div>
+          <div id="pk-rem-list"></div>
+        </div>
+
         <div id="pk-ai-status">Chưa có hội thoại nào được chọn.</div>
         <div id="pk-ai-suggestions"></div>
         <button id="pk-ai-refresh">Lấy gợi ý mới</button>
@@ -84,6 +98,7 @@
     const csSel = panelEl.querySelector('#pk-cs-sel');
     csSel.addEventListener('change', () => {
       chrome.storage.sync.set({ csName: csSel.value });
+      loadReminders_();
     });
 
     panelEl.querySelector("#pk-ai-refresh").addEventListener("click", () => {
@@ -101,6 +116,7 @@
     panelEl.querySelector("#pk-ai-phone-input").addEventListener("keydown", (e) => {
       if (e.key === "Enter") panelEl.querySelector("#pk-ai-phone-btn").click();
     });
+    panelEl.querySelector("#pk-rem-refresh").addEventListener("click", () => loadReminders_());
   }
 
   // ── CS đang dùng (sticky theo máy, lưu chrome.storage.sync) ──
@@ -172,11 +188,53 @@
     return m2 ? normPhone(m2[1]) : "";
   }
 
+  // ── Lấy tên khách từ khung "Sản phẩm order" (ghi chú đơn hàng CS tự nhập) ──
+  // Dòng đầu của khối trên cùng thường dạng "Chị : Tên", "Anh Tên", hoặc "Tên +sđt".
+  function extractOrderPanelName_() {
+    const sel = settings.selectors?.[PLATFORM];
+    let container = null;
+    if (sel?.orderPanelSelector) {
+      container = document.querySelector(sel.orderPanelSelector);
+    }
+    if (!container) {
+      // Do tu dong: tim node la (khong con con) co chu "San pham order" lam tieu de,
+      // roi lay phan tu cha lam vung chua danh sach cac khoi khach.
+      const nodes = document.querySelectorAll('body *');
+      for (const el of nodes) {
+        if (el.children.length > 0) continue;
+        const t = (el.textContent || '').trim();
+        if (t.length > 0 && t.length < 40 && /sản phẩm order/i.test(t)) {
+          container = el.closest('div')?.parentElement || el.parentElement;
+          break;
+        }
+      }
+    }
+    if (!container) return '';
+    const text = container.innerText || '';
+    if (!text.trim()) return '';
+    // Bo dong tieu de "Sản phẩm order" neu dinh kem trong cung container
+    const cleaned = text.replace(/^.*sản phẩm order.*$/im, '').trim();
+    // Tach cac khoi khach theo dong trong — khoi dau tien = khach dang xu ly (tren cung)
+    const blocks = cleaned.split(/\n\s*\n+/).map((b) => b.trim()).filter(Boolean);
+    if (!blocks.length) return '';
+    const firstLine = blocks[0].split('\n')[0].trim();
+    return _parseNameFromLine_(firstLine);
+  }
+
+  function _parseNameFromLine_(line) {
+    if (!line) return '';
+    let s = line;
+    s = s.replace(/(\+?84|0)\d{8,10}/g, '').trim(); // bo sdt dinh kem tren cung dong
+    s = s.replace(/^(anh|chị|chi|ông|ong|bà|ba|em)\b\s*[:.]?\s*/i, '').trim(); // bo xung ho
+    s = s.replace(/^[:.\-–]\s*/, '').replace(/[:.\-–]\s*$/, '').trim();
+    return s;
+  }
+
   function requestCustomerLookup() {
     const phone = extractPhone();
     if (!phone) {
       panelEl.querySelector("#pk-ai-customer").innerHTML = "";
-      _currentPhone = ''; _currentCare = null; _lastServerCare = {};
+      _currentPhone = ''; _currentCare = null; _lastServerCare = {}; _currentOrderPanelName = '';
       return;
     }
     lookupByPhone(phone);
@@ -228,7 +286,9 @@
     const box = panelEl.querySelector("#pk-ai-customer");
     const { care, orders } = data;
 
-    const name = (orders && orders[0] && orders[0].name) || (care && care.name) || phone;
+    const orderPanelName = extractOrderPanelName_();
+    _currentOrderPanelName = orderPanelName;
+    const name = orderPanelName || (orders && orders[0] && orders[0].name) || (care && care.name) || phone;
     const totalRevenue = (orders || []).reduce((s, o) => s + (parseFloat(o.revenue) || 0), 0);
     const products = [...new Set((orders || []).map((o) => o.product).filter(Boolean))].slice(0, 4).join(", ");
     const isNew = !care && (!orders || !orders.length);
@@ -349,6 +409,7 @@
   // co UI de sua (schedules, schedGoi*, schedSP*, schedCS*, nickZalos...) phai lay nguyen tu
   // _currentCare hien tai, khong duoc de trong — neu khong GAS se ghi de trong mat du lieu
   // (xem careRow_ trong gas_v13.js: chi 4 truong mo rong duoc tu merge, con lai thi khong).
+  let _currentOrderPanelName = ''; // ten khach vua doc duoc tu khung 'San pham order' (neu co)
   function _buildRow(phone, overrides) {
     const c = _currentCare || {};
     return Object.assign({
@@ -361,7 +422,8 @@
       schedCS: c.schedCS || '', schedCSNote: c.schedCSNote || '',
       schedHen: c.schedHen || '', schedHenNote: c.schedHenNote || '',
       khStatus: c.khStatus || '', birthday: c.birthday || '',
-      nickZalos: c.nickZalos || []
+      nickZalos: c.nickZalos || [],
+      name: _currentOrderPanelName || c.name || ''
     }, overrides || {});
   }
 
@@ -453,6 +515,71 @@
     _currentCare = newCare;
     _lastServerCare = Object.assign({}, newCare);
     setStatus('🔄 Vừa đồng bộ dữ liệu mới từ Sasum.');
+  }
+
+  // ── NHẮC HẸN HÔM NAY (tất cả khách, không chỉ khách đang xem) ──
+  // Dùng chung action:'reminders' với portal (index.html) — chỉ đọc, không ghi gì nên
+  // không xung đột với dữ liệu Sasum/Zalo AI đang dùng.
+  function startRemPoll_() {
+    if (_remPollTimer) return;
+    _remPollTimer = setInterval(loadReminders_, REM_POLL_MS);
+  }
+
+  function loadReminders_() {
+    const cs = (panelEl?.querySelector('#pk-cs-sel')?.value) || settings?.csName || '';
+    chrome.runtime.sendMessage({ type: 'GET_REMINDERS', payload: { cs } }, (resp) => {
+      if (!resp?.ok) { return; } // lỗi mạng/GAS -> im lặng, không làm phiền, CS bấm 🔄 để thử lại
+      _reminders = resp.data.reminders || [];
+      renderReminders_();
+    });
+  }
+
+  function renderReminders_() {
+    const countEl = panelEl?.querySelector('#pk-rem-count');
+    const listEl = panelEl?.querySelector('#pk-rem-list');
+    if (!countEl || !listEl) return;
+    countEl.textContent = String(_reminders.length);
+    if (!_reminders.length) {
+      listEl.innerHTML = '<div class="pk-rem-empty">Không có nhắc hẹn hôm nay 🎉</div>';
+      return;
+    }
+    listEl.innerHTML = _reminders.map((r, i) => `
+      <div class="pk-rem-item">
+        <div class="pk-rem-phone">${escapeHtml(r.phone)}${r.schedHenNote ? ' · ' + escapeHtml(r.schedHenNote) : ''}</div>
+        <div class="pk-rem-actions">
+          <button class="pk-btn-outline pk-rem-lookup" data-idx="${i}">🔎 Xem</button>
+          <button class="pk-btn-outline pk-rem-ai" data-idx="${i}">🤖 Soạn tin</button>
+        </div>
+      </div>
+    `).join('');
+    listEl.querySelectorAll('.pk-rem-lookup').forEach((b) => {
+      b.addEventListener('click', () => {
+        const r = _reminders[parseInt(b.dataset.idx, 10)];
+        if (!r) return;
+        panelEl.querySelector('#pk-ai-phone-input').value = r.phone;
+        lookupByPhone(r.phone);
+      });
+    });
+    listEl.querySelectorAll('.pk-rem-ai').forEach((b) => {
+      b.addEventListener('click', () => soanFollowUp_(parseInt(b.dataset.idx, 10)));
+    });
+  }
+
+  // Soạn tin follow-up chủ động cho 1 khách trong danh sách nhắc hẹn — hiện vào cùng khung
+  // gợi ý AI (#pk-ai-suggestions) để bấm chèn/copy y hệt gợi ý trả lời thường.
+  function soanFollowUp_(idx) {
+    const r = _reminders[idx];
+    if (!r) return;
+    panelEl.querySelector('#pk-ai-phone-input').value = r.phone;
+    setStatus('⏳ Đang soạn tin follow-up cho ' + r.phone + '...');
+    chrome.runtime.sendMessage(
+      { type: 'FETCH_FOLLOWUP_SUGGESTION', payload: { phone: r.phone, status: r.status, note: r.schedHenNote } },
+      (resp) => {
+        if (!resp?.ok) { setStatus('Lỗi: ' + (resp?.error || 'không rõ')); return; }
+        renderSuggestions({ suggestions: [resp.data.suggestion], provider: resp.data.provider });
+        setStatus('Nhớ tự mở đúng đoạn chat của ' + r.phone + ' trên Pancake trước khi bấm gợi ý để chèn.');
+      }
+    );
   }
 
   function escapeHtml(s) {

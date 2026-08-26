@@ -13,6 +13,7 @@ function load() {
     document.getElementById("pancake_messageItem").value = s.selectors?.pancake?.messageItem || "";
     document.getElementById("pancake_replyBox").value = s.selectors?.pancake?.replyBox || "";
     document.getElementById("pancake_phoneSelector").value = s.selectors?.pancake?.phoneSelector || "";
+    document.getElementById("pancake_orderPanelSelector").value = s.selectors?.pancake?.orderPanelSelector || "";
 
     document.getElementById("messenger_messageList").value = s.selectors?.messenger?.messageList || "";
     document.getElementById("messenger_messageItem").value = s.selectors?.messenger?.messageItem || "";
@@ -35,7 +36,8 @@ function save() {
         messageList: document.getElementById("pancake_messageList").value.trim(),
         messageItem: document.getElementById("pancake_messageItem").value.trim(),
         replyBox: document.getElementById("pancake_replyBox").value.trim(),
-        phoneSelector: document.getElementById("pancake_phoneSelector").value.trim()
+        phoneSelector: document.getElementById("pancake_phoneSelector").value.trim(),
+        orderPanelSelector: document.getElementById("pancake_orderPanelSelector").value.trim()
       },
       messenger: {
         messageList: document.getElementById("messenger_messageList").value.trim(),
