@@ -4125,6 +4125,27 @@ function _ymd(d){
   if (!(d instanceof Date) || isNaN(d)) return '';
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
+// Parse ngay tu backend GAS: co the la chuoi ISO (khi o goc la kieu Date that trong Sheet,
+// bi JSON.stringify tu dong chuyen thanh chuoi UTC) HOAC chuoi DD/MM/YYYY (khi o goc la text).
+// KHONG dung thang new Date(chuoi) cho truong hop DD/MM/YYYY: JS hieu nham thanh MM/DD/YYYY,
+// sai am tham voi cac ngay <=12 (vd '05/08/2026' bi doc thanh 8 thang 5 thay vi 5 thang 8).
+function _parseFlexDate(val){
+  if (!val && val !== 0) return null;
+  if (val instanceof Date) return isNaN(val) ? null : val;
+  var s = String(val).trim();
+  if (!s) return null;
+  var datePart = s.split(/[T ]/)[0];
+  var m = datePart.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if (m){
+    var dd = Number(m[1]), mo = Number(m[2]), yy = Number(m[3]);
+    if (yy < 100) yy += 2000;
+    var dt1 = new Date(yy, mo-1, dd);
+    return isNaN(dt1) ? null : dt1;
+  }
+  // Khong khop DD/MM/YYYY → thu parse nhu ISO/chuan JS (cho chuoi tu Date that, vd '2026-08-20T17:00:00.000Z')
+  var dt2 = new Date(s);
+  return isNaN(dt2) ? null : dt2;
+}
 function _addDateMonths(dateStr, months) {
   var d = new Date(dateStr + 'T00:00:00');
   d.setMonth(d.getMonth() + months);
@@ -4168,10 +4189,13 @@ function checkDataDaoRenewSchedules() {
       if (oYear > 0 && oYear < 100) oYear = 2000 + +oYear;
       oYear = +oYear; oMonth = +oMonth;
 
-      // Xác định ngày gốc của đơn
+      // Xác định ngày gốc của đơn — LUON uu tien orderDate (Ngay tao, on dinh, khong doi khi
+      // don chuyen trang thai hoan thanh). Fallback ve o.date/oYear+oMonth chi de tuong thich
+      // nguoc voi ban backend cu (truoc khi co field orderDate) — nen cap nhat GAS som de tranh
+      // dung nhanh du lieu cu qua fallback nay.
       var baseDate = '';
-      var _oDateObj = o.date instanceof Date ? o.date : (o.date ? new Date(o.date) : null);
-      if (_oDateObj && !isNaN(_oDateObj)) {
+      var _oDateObj = _parseFlexDate(o.orderDate) || _parseFlexDate(o.date);
+      if (_oDateObj) {
         baseDate = _ymd(_oDateObj);
       } else if (oYear && oMonth) {
         // Không có ngày cụ thể → dùng ngày 1 của tháng làm fallback

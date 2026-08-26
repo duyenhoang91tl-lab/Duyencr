@@ -536,6 +536,12 @@ function dtRowToOrder_(row, rowIndex) {
     phone: normPhone_(String(row[DT_COL_PHONE] || '')),
     name: '', // KHONG co san ten khach rieng trong DT TONG (chi co SDT), de trong
     date: dtVal || row[DT_COL_NGAYTAO] || '',
+    // orderDate: LUON la Ngay tao, KHONG bao gio doi theo trang thai don (khac voi 'date' o
+    // tren, von chuyen sang Thoi gian hoan thanh ngay khi don duoc danh dau xong). Dung field
+    // nay lam moc goc cho cac tinh toan can ON DINH qua thoi gian (vd: lich nhac auto Data Dao
+    // +7/+14 ngay) — neu dung 'date' cu, moc goc se nhay sang ngay khac ngay khi don hoan thanh,
+    // lam ID lich nhac doi theo va khien lich da xoa/da lam bi tao lai y het (bug da gap).
+    orderDate: row[DT_COL_NGAYTAO] || '',
     year: d ? d.getFullYear() : '',
     month: d ? (d.getMonth() + 1) : '',
     cs: String(row[DT_COL_SALEBAN] || ''),
