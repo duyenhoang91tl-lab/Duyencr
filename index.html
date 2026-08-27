@@ -13680,8 +13680,11 @@ function openTaskDetailModal(id){
   document.getElementById('task-detail-status-wrap').innerHTML = _taskStatusBadge(t.status) + (_taskIsOverdue(t) ? ' <span class="assign-badge-pill has-assign">Quá hạn</span>' : '');
   document.getElementById('task-detail-desc').textContent = t.description || 'Không có mô tả';
   document.getElementById('task-detail-images').innerHTML = (t.images||[]).map(function(u){
-    return '<img src="'+esc(u)+'" style="width:90px;height:90px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:pointer" onclick="window.open(\''+esc(u)+'\',\'_blank\')">';
+    return '<img src="'+esc(u)+'" class="task-detail-img" data-img-url="'+esc(u)+'" style="width:90px;height:90px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:pointer">';
   }).join('');
+  document.querySelectorAll('#task-detail-images .task-detail-img').forEach(function(img){
+    img.addEventListener('click', function(){ window.open(img.getAttribute('data-img-url'), '_blank'); });
+  });
   document.getElementById('task-detail-result').textContent = t.result || 'Chưa có kết quả';
 
   switchTaskDetailTab('overview');
@@ -13720,7 +13723,7 @@ function renderTaskComments(){
   listEl.innerHTML = allTaskComments.map(function(c){
     var initial = (c.author || '?').trim().charAt(0).toUpperCase();
     var when = c.createdAt ? new Date(c.createdAt).toLocaleString('vi-VN', { hour:'2-digit', minute:'2-digit', day:'2-digit', month:'2-digit' }) : '';
-    var imgs = (c.images||[]).map(function(u){ return '<img src="'+esc(u)+'" class="task-cm-img" onclick="window.open(\''+esc(u)+'\',\'_blank\')">'; }).join('');
+    var imgs = (c.images||[]).map(function(u){ return '<img src="'+esc(u)+'" class="task-cm-img" data-img-url="'+esc(u)+'">'; }).join('');
     return '<div class="task-cm-item">'+
       '<div class="task-cm-avatar">'+esc(initial)+'</div>'+
       '<div class="task-cm-bubble">'+
