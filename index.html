@@ -5120,6 +5120,58 @@ function _dueReminders(){
   }
   return out.sort(function(a,b){ return a.date.localeCompare(b.date); });
 }
+
+// Xóa VĨNH VIỄN toàn bộ nhắc hẹn đang QUÁ HẠN đang hiện trong panel (cả 2 nguồn: mảng
+// schedules[] cục bộ VÀ các ô hẹn nhanh trong careData dùng chung — schedGoi/SP/CS/Hen).
+// Khác với "Tắt hết" (chỉ ẩn tạm trong ngày, mai lại hiện) — hành động này xóa hẳn, đồng bộ
+// lên GAS luôn để các trình duyệt/tài khoản khác cũng không còn thấy lại.
+function deleteAllOverdueReminders(){
+  var today = _remDateStr();
+  var overdue = _dueReminders().filter(function(rm){ return rm.date < today; });
+  if (!overdue.length){ toast('Không có nhắc hẹn quá hạn nào.'); return; }
+  if (!confirm('Xóa VĨNH VIỄN toàn bộ ' + overdue.length + ' nhắc hẹn quá hạn?\nHành động này không thể hoàn tác.')) return;
+
+  var careChanged = {};
+  var daoDelSet = loadLS('ome_dao_deleted') || {};
+  var daoChanged = false;
+
+  overdue.forEach(function(rm){
+    if (rm.careField) {
+      // Nguồn: careData quick-sched (schedGoi/schedSP/schedCS/schedHen)
+      var care = careData[rm.phone];
+      if (care && care[rm.careField] === rm.date) {
+        care[rm.careField] = '';
+        care[rm.careField + 'Note'] = '';
+        careChanged[rm.phone] = true;
+      }
+    } else if (rm.schedId) {
+      // Nguồn: mảng schedules[] cục bộ
+      var it = schedules.find(function(x){ return x.id === rm.schedId; });
+      // Nếu là mốc auto Data Đảo → ghi nhớ đã xóa tay, tránh checkDataDaoRenewSchedules() tạo lại
+      if (it && it.autoDao) { daoDelSet[it.id] = true; daoChanged = true; }
+      schedules = schedules.filter(function(x){ return x.id !== rm.schedId; });
+    }
+  });
+
+  saveLS('ome_care', careData);
+  saveLS('ome_sched', schedules);
+  saveLS('ome_schedules', schedules);
+  if (daoChanged) saveLS('ome_dao_deleted', daoDelSet);
+
+  // Lịch "Hẹn" (schedHen) có thể vẫn cần dọn thêm nếu nó từng trỏ vào 1 mốc auto vừa bị xóa
+  try { if (typeof syncAutoHenToCareData==='function') syncAutoHenToCareData(); } catch(e){}
+
+  // Đẩy các khách có careData bị sửa trực tiếp ở trên lên GAS (batch)
+  if (typeof queueCareSync === 'function') {
+    Object.keys(careChanged).forEach(function(p){ queueCareSync(p); });
+  }
+
+  updateSchedBadges();
+  renderReminderPanel();
+  if (typeof renderScheduleTab === 'function') renderScheduleTab();
+  if (typeof renderOverdueTab === 'function') renderOverdueTab();
+  toast('✓ Đã xóa vĩnh viễn ' + overdue.length + ' nhắc hẹn quá hạn');
+}
 // Cảnh báo "được chia data" cho CS hiện tại (tắt là tắt luôn)
 function _chiaDataAlerts(){
   if (typeof currentUser==='undefined' || !currentUser || currentUser.role==='admin') return [];
@@ -5150,7 +5202,9 @@ function renderReminderPanel(){
     return;
   }
   if (bell) bell.style.display='none';
+  var isAdminRP = (typeof currentUser !== 'undefined' && currentUser && currentUser.role === 'admin');
   var html = '<div class="rp-hdr"><span>🔔 Nhắc hẹn ('+total+')</span><div>'+
+    (isAdminRP ? '<button class="rp-hbtn" style="background:#b91c1c" title="Xóa vĩnh viễn toàn bộ nhắc hẹn quá hạn (không thể hoàn tác)" onclick="deleteAllOverdueReminders()">🗑 Xóa quá hạn</button>' : '') +
     '<button class="rp-hbtn" title="Tắt hết hôm nay" onclick="dismissAllReminders()">Tắt hết</button>'+
     '<button class="rp-hbtn" title="Thu gọn" onclick="toggleReminderPanel()">▾</button></div></div><div class="rp-body">';
   for (var a=0;a<alerts.length;a++){
@@ -5243,7 +5297,11 @@ function formatDate(d,yr,mo){
 }
 function fmtDate(ds){
   if(!ds) return '—';
-  const d=new Date(ds+'T00:00:00');
+  // Phòng dữ liệu ngày cũ bị hỏng định dạng (vd chuỗi ISO đã có sẵn 'T...'/khoảng trắng)
+  // — chỉ lấy đúng phần YYYY-MM-DD trước khi ghép thêm giờ, tránh ra "Invalid Date".
+  var datePart = String(ds).split(/[T ]/)[0];
+  var d = new Date(datePart+'T00:00:00');
+  if (isNaN(d)) return String(ds); // vẫn không parse được → hiện nguyên văn thay vì "Invalid Date"
   return d.toLocaleDateString('vi-VN',{weekday:'short',day:'2-digit',month:'2-digit'});
 }
 function fmtVND(n){
