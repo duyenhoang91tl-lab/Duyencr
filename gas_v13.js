@@ -1972,13 +1972,96 @@ function _driveImageIndex_(folderId) {
   return out;
 }
 
-// Tim 1 anh khop nhat voi cau hoi khach (so tu khoa voi ten thu muc con + ten
-// file) — dung chung cach tach tu/loai stopword voi readDriveKnowledgeFolder_
-// o tren de nhat quan. Uu tien driveProductImagesFolderUrl (thu muc rieng cho
-// anh, co the co thu muc con); neu chua cau hinh thi fallback dung
-// driveKnowledgeFolderUrl (thu muc kien thuc chung, khong bat buoc cau hinh
-// them ngay). Tra ve {fileId, name} hoac null neu chua cau hinh / khong khop.
+// Nhan 1 link Drive (FILE hoac FOLDER, nhieu dinh dang khac nhau tuy cach copy-share
+// cua Drive) va tra ve 1 anh dai dien {fileId, name}. La FILE anh -> dung luon. La
+// FOLDER -> lay anh dau tien tim thay ben trong. Tra ve null neu khong doc duoc/khong
+// phai anh.
+function _driveImageFromLink_(link) {
+  var s = String(link || '').trim();
+  if (!s) return null;
+
+  var m = s.match(/\/file\/d\/([a-zA-Z0-9_-]{10,})/) || s.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+  var fileId = m ? m[1] : null;
+  if (fileId) {
+    try {
+      var f = DriveApp.getFileById(fileId);
+      if (f.getMimeType().indexOf('image/') === 0) return { fileId: f.getId(), name: f.getName() };
+    } catch (e) {}
+  }
+
+  var folderId = _driveFolderIdFromUrl_(s);
+  if (folderId) {
+    try {
+      var folder = DriveApp.getFolderById(folderId);
+      var files = folder.getFiles();
+      while (files.hasNext()) {
+        var ff = files.next();
+        if (ff.getMimeType().indexOf('image/') === 0) return { fileId: ff.getId(), name: ff.getName() };
+      }
+    } catch (e2) {}
+    if (!fileId) { // la bare ID nhung khong phai folder -> co the la fileId, thu lai truoc khi bo cuoc
+      try {
+        var f2 = DriveApp.getFileById(folderId);
+        if (f2.getMimeType().indexOf('image/') === 0) return { fileId: f2.getId(), name: f2.getName() };
+      } catch (e3) {}
+    }
+  }
+  return null;
+}
+
+// Tim anh gan DUNG voi dong san pham dang khop nhat trong Sheet ngoai
+// (productSheetUrl) — chinh xac hon so ten thu muc vi bam theo DUNG dong/
+// variant (vd dung Kieu/Size) dang tra loi khach. Doc lai cot co tieu de chua
+// "hinh/image/ảnh" (dung chinh quy tac da dung de LOAI cot nay khoi prompt
+// van ban o readExternalProductSheet_) — CS dan link Drive (file hoac folder)
+// vao do la dung duoc ngay, khong can sua code khi dien them dong moi.
+function findProductSheetImage_(query) {
+  var url = getSetting_('productSheetUrl');
+  if (!url) return null;
+  var ss;
+  try { ss = SpreadsheetApp.openByUrl(url); } catch (e) { return null; }
+
+  var qWords = _psheetNoAccent_(query).replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+    .filter(function(w) { return w.length >= 3 && _PSHEET_STOPWORDS_.indexOf(w) === -1; });
+  if (!qWords.length) return null;
+
+  var tabNames = ss.getSheets().map(function(s) { return s.getName(); });
+  var bestTab = null, bestRow = 0, bestScore = 0;
+  for (var t = 0; t < tabNames.length; t++) {
+    var idx = _productSheetIndexForTab_(ss, tabNames[t]);
+    for (var i = 0; i < idx.length; i++) {
+      var hay = _psheetNoAccent_(idx[i].name + ' ' + idx[i].snippet);
+      var score = 0;
+      for (var w = 0; w < qWords.length; w++) { if (hay.indexOf(qWords[w]) !== -1) score++; }
+      if (score > bestScore) { bestScore = score; bestTab = tabNames[t]; bestRow = idx[i].row; }
+    }
+  }
+  if (!bestTab) return null;
+
+  try {
+    var sh = ss.getSheetByName(bestTab);
+    var lastCol = sh.getLastColumn();
+    var headerVals = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+    var rowVals = sh.getRange(bestRow, 1, 1, lastCol).getValues()[0];
+    var imgCol = -1;
+    for (var c = 0; c < headerVals.length; c++) {
+      if (/hinh|image|ảnh/i.test(String(headerVals[c] || ''))) { imgCol = c; break; }
+    }
+    if (imgCol === -1) return null;
+    return _driveImageFromLink_(rowVals[imgCol]);
+  } catch (e2) { return null; }
+}
+
+// Tim 1 anh san pham phu hop voi cau hoi khach — 2 nguon, thu lan luot:
+// 1) Link anh dien truc tiep trong dong Sheet san pham dang khop (chinh xac
+//    nhat — xem findProductSheetImage_).
+// 2) Fallback: thu muc anh rieng (driveProductImagesFolderUrl), so ten thu
+//    muc con + ten file — dung cho san pham CHUA kip dien link vao Sheet.
+// Tra ve {fileId, name} hoac null neu ca 2 nguon deu khong khop.
 function findDriveProductImage_(query) {
+  var fromSheet = findProductSheetImage_(query);
+  if (fromSheet) return fromSheet;
+
   var url = getSetting_('driveProductImagesFolderUrl') || getSetting_('driveKnowledgeFolderUrl');
   var folderId = _driveFolderIdFromUrl_(url);
   if (!folderId) return null;
