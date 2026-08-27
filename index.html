@@ -7306,7 +7306,7 @@ function readDonChiTiet_() {
 // ── Lay danh sach Sale ban / Kenh ban distinct (cho UI chon, thay vi go dung ten) ──
 function getSalesReportOptions_() {
   var cache = CacheService.getScriptCache();
-  var cached = cache.get('srptOptions_v1');
+  var cached = cache.get('srptOptions_v2');
   if (cached) { try { return JSON.parse(cached); } catch(ec) {} }
   var rows0 = readDTTong_();
   var saleSet = {}, kenhSet = {};
@@ -7315,8 +7315,17 @@ function getSalesReportOptions_() {
     for (var j0 = 0; j0 < salesList0.length; j0++) saleSet[salesList0[j0]] = true;
     if (rows0[i0].kenhBan) kenhSet[rows0[i0].kenhBan] = true;
   }
-  var srptOpt = { sale: Object.keys(saleSet).sort(), kenh: Object.keys(kenhSet).sort() };
-  try { cache.put('srptOptions_v1', JSON.stringify(srptOpt), 1800); } catch(ec) {}
+  var rowsB0 = readDonChiTiet_();
+  var nguonSet = {}, marketerSet = {};
+  for (var iB0 = 0; iB0 < rowsB0.length; iB0++) {
+    if (rowsB0[iB0].nguonDon) nguonSet[rowsB0[iB0].nguonDon] = true;
+    if (rowsB0[iB0].marketer) marketerSet[rowsB0[iB0].marketer] = true;
+  }
+  var srptOpt = {
+    sale: Object.keys(saleSet).sort(), kenh: Object.keys(kenhSet).sort(),
+    nguon: Object.keys(nguonSet).sort(), marketer: Object.keys(marketerSet).sort()
+  };
+  try { cache.put('srptOptions_v2', JSON.stringify(srptOpt), 1800); } catch(ec) {}
   return srptOpt;
 }
 
@@ -10076,8 +10085,8 @@ var _srState = {
   nguon: '', marketer: '', // B
   dataA: null, dataB: null,
   loading: false,
-  saleOptions: [], kenhOptions: [], optionsLoaded: false,
-  saleSearch: '', kenhSearch: '' // lọc nhanh client-side trên bảng breakdown
+  saleOptions: [], kenhOptions: [], nguonOptions: [], marketerOptions: [], optionsLoaded: false,
+  saleSearch: '', kenhSearch: '', productSearch: '' // lọc nhanh client-side trên bảng breakdown
 };
 
 function _srMoney(n){ return fmt(Math.round(n||0)) + '₫'; }
@@ -10098,6 +10107,8 @@ async function _srLoadOptions(){
   if (opts){
     _srState.saleOptions = opts.sale || [];
     _srState.kenhOptions = opts.kenh || [];
+    _srState.nguonOptions = opts.nguon || [];
+    _srState.marketerOptions = opts.marketer || [];
     renderSalesReportTab();
   }
 }
@@ -10186,8 +10197,14 @@ function renderSalesReportTab(){
       (_srState.kenhOptions||[]).map(function(kv){ return '<option value="'+esc(kv)+'"'+(_srState.kenh===kv?' selected':'')+'>'+esc(kv)+'</option>'; }).join('') +
       '</select>';
   } else {
-    filters += '<input type="text" placeholder="Nguồn đơn (đúng tên)" value="'+esc(_srState.nguon)+'" onchange="_srSetField(\'nguon\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);width:170px">';
-    filters += '<input type="text" placeholder="Marketer (đúng tên)" value="'+esc(_srState.marketer)+'" onchange="_srSetField(\'marketer\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);width:170px">';
+    filters += '<select onchange="_srSetField(\'nguon\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+      '<option value="">— Tất cả nguồn đơn —</option>'+
+      (_srState.nguonOptions||[]).map(function(nv){ return '<option value="'+esc(nv)+'"'+(_srState.nguon===nv?' selected':'')+'>'+esc(nv)+'</option>'; }).join('') +
+      '</select>';
+    filters += '<select onchange="_srSetField(\'marketer\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+      '<option value="">— Tất cả marketer —</option>'+
+      (_srState.marketerOptions||[]).map(function(mv){ return '<option value="'+esc(mv)+'"'+(_srState.marketer===mv?' selected':'')+'>'+esc(mv)+'</option>'; }).join('') +
+      '</select>';
   }
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
   filters += '<button class="btn sm" onclick="exportSalesReport()">📊 Xuất Excel</button>';
@@ -10249,12 +10266,14 @@ function _srRenderB(d){
       '⚠️ '+fmt(d.mismatchRows)+' dòng bị lệch số phần tử giữa cột Sản phẩm/Mã sản phẩm/Số lượng — nên kiểm tra tay, số liệu sản phẩm bên dưới có thể thiếu sót ở các dòng này.</div>';
   }
 
+  var productRows = (d.products||[]).filter(function(p){ return !_srState.productSearch || (p.name||'').toLowerCase().indexOf(_srState.productSearch.toLowerCase())!==-1 || (p.code||'').toLowerCase().indexOf(_srState.productSearch.toLowerCase())!==-1; });
   html += '<div class="dash-section-title">Báo cáo sản phẩm</div>';
+  html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên/mã sản phẩm..." value="'+esc(_srState.productSearch)+'" oninput="_srState.productSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:240px;margin-bottom:6px">';
   html += '<table class="dash-table"><thead><tr><th>Mã sản phẩm</th><th>Tên sản phẩm</th><th style="text-align:right">Tổng số lượng</th></tr></thead><tbody>';
-  (d.products||[]).forEach(function(p){
+  productRows.forEach(function(p){
     html += '<tr><td style="font-family:monospace;font-size:12px">'+esc(p.code)+'</td><td>'+esc(p.name)+'</td><td style="text-align:right">'+fmt(p.soLuong)+'</td></tr>';
   });
-  if (!(d.products||[]).length) html += '<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+  if (!productRows.length) html += '<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
   html += '</tbody></table>';
   return html;
 }

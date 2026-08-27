@@ -697,7 +697,7 @@ function readDonChiTiet_() {
 // ── Lay danh sach Sale ban / Kenh ban distinct (cho UI chon, thay vi go dung ten) ──
 function getSalesReportOptions_() {
   var cache = CacheService.getScriptCache();
-  var cached = cache.get('srptOptions_v1');
+  var cached = cache.get('srptOptions_v2');
   if (cached) { try { return JSON.parse(cached); } catch(ec) {} }
   var rows0 = readDTTong_();
   var saleSet = {}, kenhSet = {};
@@ -706,8 +706,17 @@ function getSalesReportOptions_() {
     for (var j0 = 0; j0 < salesList0.length; j0++) saleSet[salesList0[j0]] = true;
     if (rows0[i0].kenhBan) kenhSet[rows0[i0].kenhBan] = true;
   }
-  var srptOpt = { sale: Object.keys(saleSet).sort(), kenh: Object.keys(kenhSet).sort() };
-  try { cache.put('srptOptions_v1', JSON.stringify(srptOpt), 1800); } catch(ec) {}
+  var rowsB0 = readDonChiTiet_();
+  var nguonSet = {}, marketerSet = {};
+  for (var iB0 = 0; iB0 < rowsB0.length; iB0++) {
+    if (rowsB0[iB0].nguonDon) nguonSet[rowsB0[iB0].nguonDon] = true;
+    if (rowsB0[iB0].marketer) marketerSet[rowsB0[iB0].marketer] = true;
+  }
+  var srptOpt = {
+    sale: Object.keys(saleSet).sort(), kenh: Object.keys(kenhSet).sort(),
+    nguon: Object.keys(nguonSet).sort(), marketer: Object.keys(marketerSet).sort()
+  };
+  try { cache.put('srptOptions_v2', JSON.stringify(srptOpt), 1800); } catch(ec) {}
   return srptOpt;
 }
 
