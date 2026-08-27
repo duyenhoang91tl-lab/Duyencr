@@ -135,6 +135,9 @@
     addEl(cfg, 'label', {textContent:'📁 Link thư mục Drive kiến thức (PDF/Doc/Sheet, tuỳ chọn, dùng chung cả team)'});
     const inpDriveKnow = addEl(cfg, 'input', {id:'zai-drive-knowledge-url', type:'text', placeholder:'https://drive.google.com/drive/folders/...'});
     addEl(cfg, 'div', {style:'font-size:10px;color:#9ca3af;margin:2px 0 6px', textContent:'Đọc Google Sheet/Google Doc trực tiếp; file ảnh trong thư mục sẽ được bỏ qua (chỉ dùng phần văn bản). File PDF: nếu không đọc được, vào Drive bấm chuột phải file PDF → Mở bằng → Google Tài liệu (Drive tự nhận diện chữ), AI sẽ đọc được bản Doc đó bình thường. Thư mục phải chia sẻ giống cách chia sẻ Sheet ở trên. AI chỉ lấy đúng vài đoạn khớp câu hỏi, không nhét cả thư mục.'});
+    addEl(cfg, 'label', {textContent:'🖼️ Link thư mục ảnh sản phẩm (riêng, tuỳ chọn — để gửi ảnh thật cho khách)'});
+    const inpDriveImg = addEl(cfg, 'input', {id:'zai-drive-images-url', type:'text', placeholder:'https://drive.google.com/drive/folders/...'});
+    addEl(cfg, 'div', {style:'font-size:10px;color:#9ca3af;margin:2px 0 6px', textContent:'Có thể để ảnh thẳng trong thư mục này, hoặc chia theo 1 cấp thư mục con — mỗi thư mục con 1 sản phẩm (khuyên dùng, vì ảnh bên trong đặt tên gì cũng được, AI sẽ so theo TÊN THƯ MỤC CON). Nếu bỏ trống, AI dùng tạm thư mục kiến thức ở trên. Thư mục phải chia sẻ giống cách chia sẻ Sheet. Pancake AI/Zalo AI khi trả lời có ảnh khớp sẽ hiện nút "Copy ảnh" — CS tự Ctrl+V dán vào khung chat rồi kiểm tra trước khi Gửi.'});
     const autoAiRow = addEl(cfg, 'label', {style:'display:flex;align-items:center;gap:6px;margin-top:8px;cursor:pointer;font-weight:400;'});
     const autoAiChk = addEl(autoAiRow, 'input', {type:'checkbox', id:'zai-auto-ai-chk'});
     addEl(autoAiRow, 'span', {textContent:'⚡ Tự động soạn 3 câu mở đầu khi mở đoạn chat khách (đỡ phải bấm Lấy TN / Tạo gợi ý)'});
@@ -380,7 +383,7 @@
     });
     chrome.storage.local.get(['ome_gas_url','ome_current_cs','ome_current_nz','ome_auto_ai_reply','ome_auto_ai_per_phone'], (res) => {
       GAS_URL = res.ome_gas_url || '';
-      if (GAS_URL) { inpGas.value = GAS_URL; loadCSNames_(); loadNickZaloList_(); loadCareStatusTree_(); loadProductSheetUrl_(); loadDriveKnowledgeFolderUrl_(); }
+      if (GAS_URL) { inpGas.value = GAS_URL; loadCSNames_(); loadNickZaloList_(); loadCareStatusTree_(); loadProductSheetUrl_(); loadDriveKnowledgeFolderUrl_(); loadDriveImagesFolderUrl_(); }
       loadChatNamePhoneMap_();
       if (!GAS_URL) { _cfgVisible = true; cfg.style.display = 'block'; }
       _currentCS = res.ome_current_cs || '';
@@ -495,6 +498,11 @@
     try {
       await fetch(GAS_URL, { method:'POST', body:JSON.stringify({action:'setSetting',key:'driveKnowledgeFolderUrl',value:driveKnowUrl}), headers:{'Content-Type':'text/plain'} });
     } catch(e) { /* khong chan luong luu chinh neu loi rieng phan nay */ }
+    const driveImgEl = document.getElementById('zai-drive-images-url');
+    const driveImgUrl = driveImgEl ? driveImgEl.value.trim() : '';
+    try {
+      await fetch(GAS_URL, { method:'POST', body:JSON.stringify({action:'setSetting',key:'driveProductImagesFolderUrl',value:driveImgUrl}), headers:{'Content-Type':'text/plain'} });
+    } catch(e) { /* khong chan luong luu chinh neu loi rieng phan nay */ }
     _cfgVisible = false;
     document.getElementById('zai-cfg').style.display = 'none';
     _lookupCache = {};
@@ -521,6 +529,17 @@
       const r = await fetch(GAS_URL + sep + 'action=getSetting&key=driveKnowledgeFolderUrl', {redirect:'follow'});
       const d = await r.json();
       const el = document.getElementById('zai-drive-knowledge-url');
+      if (el && d && d.value) el.value = d.value;
+    } catch(e) {}
+  }
+
+  async function loadDriveImagesFolderUrl_() {
+    if (!GAS_URL) return;
+    try {
+      const sep = GAS_URL.includes('?') ? '&' : '?';
+      const r = await fetch(GAS_URL + sep + 'action=getSetting&key=driveProductImagesFolderUrl', {redirect:'follow'});
+      const d = await r.json();
+      const el = document.getElementById('zai-drive-images-url');
       if (el && d && d.value) el.value = d.value;
     } catch(e) {}
   }

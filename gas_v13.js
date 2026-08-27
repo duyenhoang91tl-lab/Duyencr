@@ -1913,17 +1913,21 @@ function readDriveKnowledgeFolder_(query) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  ANH SAN PHAM TU THU MUC KIEN THUC DRIVE — dung CHUNG 1 thu muc voi
-//  driveKnowledgeFolderUrl o tren (CS khong phai cau hinh them link nao khac).
-//  Khac voi phan van ban: o day CHI quet FILE ANH (jpg/png/webp...) va so
-//  TEN FILE voi tu khoa cau hoi khach — khong doc noi dung anh, nen dat ten
-//  file ro rang (vd "Serum AHA 30ml.jpg") thi AI moi tim dung.
+//  ANH SAN PHAM — doc tu thu muc RIENG driveProductImagesFolderUrl (khac voi
+//  driveKnowledgeFolderUrl o tren) vi day thuong la thu muc CHUA CAC THU MUC
+//  CON theo tung san pham, vd "Serum AHA 30ml/anh1.jpg". Neu chua cau hinh
+//  thu muc rieng nay thi fallback dung tam driveKnowledgeFolderUrl.
+//  Quet ca file anh nam THANG trong thu muc goc LAN anh nam trong 1 cap
+//  thu muc con (khong quet sau hon 1 cap). So khop dung TEN THU MUC CON (neu
+//  co) + TEN FILE voi tu khoa cau hoi khach — khong doc noi dung anh, nen dat
+//  ten thu muc con / ten file ro rang (vd thu muc "Serum AHA 30ml") thi AI
+//  moi tim dung.
 // ═══════════════════════════════════════════════════════════════
 
-// Muc luc NHE cac file anh trong thu muc (cache rieng 15 phut, tach voi muc luc
-// van ban _driveKnowledgeFileIndex_ de khong dam vao cache cua nhau).
+// Muc luc NHE cac file anh trong thu muc + 1 cap thu muc con (cache rieng 15
+// phut, tach voi muc luc van ban _driveKnowledgeFileIndex_ de khong dam cache).
 function _driveImageIndex_(folderId) {
-  var cacheKey = 'dkf_img_v1_' + folderId;
+  var cacheKey = 'dkf_img_v2_' + folderId;
   try {
     var cached = CacheService.getScriptCache().get(cacheKey);
     if (cached !== null) return JSON.parse(cached);
@@ -1932,12 +1936,35 @@ function _driveImageIndex_(folderId) {
   var out = [];
   try {
     var folder = DriveApp.getFolderById(folderId);
+
+    // 1) Anh nam thang trong thu muc goc (truong hop khong chia theo thu muc con)
     var files = folder.getFiles();
     var count = 0;
-    while (files.hasNext() && count < 200) { // rong hon 40 cua ham van ban vi liet ke ten file rat nhe
+    while (files.hasNext() && count < 200) {
       var f = files.next(); count++;
-      var mime = f.getMimeType();
-      if (mime.indexOf('image/') === 0) out.push({ fileId: f.getId(), name: f.getName() });
+      if (f.getMimeType().indexOf('image/') === 0) {
+        out.push({ fileId: f.getId(), tag: f.getName(), name: f.getName() });
+      }
+    }
+
+    // 2) 1 cap thu muc con — vd moi san pham 1 thu muc rieng chua nhieu anh.
+    // Ten thu muc con duoc gop vao 'tag' de so khop (anh ben trong co the dat
+    // ten chung chung nhu 1.jpg, IMG_001.jpg...); 'name' hien cho CS lay theo
+    // TEN THU MUC (de doc/co nghia hon ten file), lay toi da 3 anh dai dien
+    // moi thu muc con la du, khong can liet ke het.
+    var subfolders = folder.getFolders();
+    var fCount = 0;
+    while (subfolders.hasNext() && fCount < 150) {
+      var sf = subfolders.next(); fCount++;
+      var sfFiles = sf.getFiles();
+      var picked = 0;
+      while (sfFiles.hasNext() && picked < 3) {
+        var sf_f = sfFiles.next();
+        if (sf_f.getMimeType().indexOf('image/') === 0) {
+          out.push({ fileId: sf_f.getId(), tag: sf.getName() + ' ' + sf_f.getName(), name: sf.getName() });
+          picked++;
+        }
+      }
     }
   } catch (e) { /* chua chia se / ID sai -> danh sach rong, khong chan cac tinh nang khac */ }
 
@@ -1945,11 +1972,14 @@ function _driveImageIndex_(folderId) {
   return out;
 }
 
-// Tim 1 anh khop nhat voi cau hoi khach (so tu khoa voi TEN FILE) — dung chung
-// cach tach tu/loai stopword voi readDriveKnowledgeFolder_ o tren de nhat quan.
-// Tra ve {fileId, name} hoac null neu chua cau hinh thu muc / khong khop file nao.
+// Tim 1 anh khop nhat voi cau hoi khach (so tu khoa voi ten thu muc con + ten
+// file) — dung chung cach tach tu/loai stopword voi readDriveKnowledgeFolder_
+// o tren de nhat quan. Uu tien driveProductImagesFolderUrl (thu muc rieng cho
+// anh, co the co thu muc con); neu chua cau hinh thi fallback dung
+// driveKnowledgeFolderUrl (thu muc kien thuc chung, khong bat buoc cau hinh
+// them ngay). Tra ve {fileId, name} hoac null neu chua cau hinh / khong khop.
 function findDriveProductImage_(query) {
-  var url = getSetting_('driveKnowledgeFolderUrl');
+  var url = getSetting_('driveProductImagesFolderUrl') || getSetting_('driveKnowledgeFolderUrl');
   var folderId = _driveFolderIdFromUrl_(url);
   if (!folderId) return null;
 
@@ -1962,7 +1992,7 @@ function findDriveProductImage_(query) {
 
   var best = null, bestScore = 0;
   for (var i = 0; i < images.length; i++) {
-    var hay = _psheetNoAccent_(images[i].name);
+    var hay = _psheetNoAccent_(images[i].tag);
     var score = 0;
     for (var w = 0; w < qWords.length; w++) { if (hay.indexOf(qWords[w]) !== -1) score++; }
     if (score > bestScore) { bestScore = score; best = images[i]; }
