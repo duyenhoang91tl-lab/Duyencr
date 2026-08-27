@@ -10919,23 +10919,25 @@ window.addEventListener('load', function(){
 //  Lưu ý: đây là lớp đăng nhập gọn nhẹ cho nội bộ — mật khẩu được hash
 //  (SHA-256 + salt) trước khi lưu lên Google Sheet (sheet "Users").
 // ═══════════════════════════════════════════════════════
-var _PW_SALT = 'OME-CS-Portal::v9::salt';
+var _PW_SALT = 'CRM-CS-Portal::v9::salt';
+var _PW_SALT_OLD = 'OME-CS-Portal::v9::salt'; // salt cu (truoc khi doi OME -> CRM) — giu tam de khong khoa tai khoan dang co, tu nang cap sang salt moi ngay lan dang nhap ke tiep
 var accounts = (typeof loadLS === 'function' ? (loadLS('ome_accounts') || []) : []);
 var _authAccount = (typeof loadLS === 'function' ? (loadLS('ome_auth') || null) : null);
 var _bootstrapAdmin = false;
 function _aval(id){ var el = document.getElementById(id); return el ? (el.value || '') : ''; }
 
-async function _hashPass(pw){
+async function _hashPass(pw, salt){
+  salt = salt || _PW_SALT;
   pw = String(pw == null ? '' : pw);
   try{
     if (typeof crypto !== 'undefined' && crypto.subtle){
-      var data = new TextEncoder().encode(_PW_SALT + pw);
+      var data = new TextEncoder().encode(salt + pw);
       var buf = await crypto.subtle.digest('SHA-256', data);
       return Array.prototype.map.call(new Uint8Array(buf), function(b){ return ('0'+b.toString(16)).slice(-2); }).join('');
     }
   }catch(e){}
   // Fallback (môi trường không có crypto.subtle) — yếu hơn nhưng vẫn dùng được
-  var h = 0, s = _PW_SALT + pw;
+  var h = 0, s = salt + pw;
   for (var i=0;i<s.length;i++){ h = (Math.imul(h,31) + s.charCodeAt(i))|0; }
   return 'f' + (h>>>0).toString(16);
 }
@@ -11005,7 +11007,16 @@ async function doLogin(){
   if (!acct){ showErr('Sai tài khoản hoặc mật khẩu.'); return; }
   if (acct.active === false){ showErr('Tài khoản đã bị khoá. Liên hệ quản trị viên.'); return; }
   var h = await _hashPass(p);
-  if (h !== acct.passHash){ showErr('Sai tài khoản hoặc mật khẩu.'); return; }
+  if (h !== acct.passHash) {
+    // Tai khoan tao truoc khi doi salt OME -> CRM: thu voi salt cu, dung thi nang cap ngay
+    var hOld = await _hashPass(p, _PW_SALT_OLD);
+    if (hOld === acct.passHash) {
+      acct.passHash = h;
+      pushUsers().catch(function(){});
+    } else {
+      showErr('Sai tài khoản hoặc mật khẩu.'); return;
+    }
+  }
   _authAccount = { username: acct.username, role: acct.role, name: acct.name, team: acct.team };
   saveLS('ome_auth', _authAccount);
   if (errEl) errEl.style.display = 'none';
