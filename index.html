@@ -4158,6 +4158,15 @@ function _addDateDays(dateStr, days) {
 }
 
 // Gọi sau khi data load xong; tạo lịch CS theo nguồn (xem chú thích quy tắc ở trên)
+//
+// FIX (dọn lịch hẹn/nhắc hẹn auto dùng data cũ): trước đây hàm này CHỈ THÊM mốc auto mới,
+// không bao giờ xóa mốc auto cũ đã tạo từ trước — nên khi quy tắc ngày bị siết lại (vd Data Đảo
+// chỉ còn áp dụng cho đơn tháng 6/2026, thay vì "tháng hiện tại" như bản cũ), các mốc auto sinh
+// ra dưới quy tắc CŨ (đơn của các tháng khác/nguồn dữ liệu cũ) vẫn tồn tại mãi trong localStorage
+// (khóa 'ome_sched') rồi được syncAutoHenToCareData() đẩy lên CareData dùng chung — hiển thị như
+// lịch hẹn/nhắc hẹn "ma" không liên quan gì tới dữ liệu CRM mới. Giờ mỗi lần chạy, hàm sẽ tính
+// lại tập ID hợp lệ THEO QUY TẮC HIỆN TẠI rồi dọn sạch mọi mốc auto (autoDao=true, chưa done)
+// không còn nằm trong tập đó — không đụng tới lịch CS tự đặt tay hay các mốc đã done.
 function checkDataDaoRenewSchedules() {
   var now = new Date();
   var curYear = now.getFullYear();
@@ -4175,6 +4184,8 @@ function checkDataDaoRenewSchedules() {
 
   var _daoDeleted = loadLS('ome_dao_deleted') || {};
   var daoExclude = loadLS('ome_dao_exclude') || {};
+  var validAutoIds = {}; // tập ID hợp lệ theo quy tắc HIỆN TẠI — dùng để dọn rác bên dưới
+
   allCustomers.forEach(function(c) {
     if (daoExclude[c.phone]) return; // Khách đã bị bỏ lịch auto
     c.orders.forEach(function(o) {
@@ -4221,6 +4232,7 @@ function checkDataDaoRenewSchedules() {
 
         // ID duy nhất theo phone + ngày đơn + mốc → tránh tạo trùng
         var autoId = 'dao_' + c.phone + '_' + baseDate + '_' + (m.days||('m'+m.months));
+        validAutoIds[autoId] = true; // hợp lệ theo quy tắc hiện tại — giữ lại khi dọn rác
 
         // Đã bị CS xóa tay → không tạo lại
         if (_daoDeleted[autoId]) return;
@@ -4240,8 +4252,22 @@ function checkDataDaoRenewSchedules() {
     });
   });
 
+  // ── Dọn rác: mốc auto (autoDao=true, chưa done) không còn hợp lệ theo quy tắc hiện tại ──
+  // (vd sinh ra từ trước khi quy tắc bị siết lại, hoặc đơn hàng gốc không còn nằm trong cửa sổ
+  // ngày áp dụng) → xóa khỏi 'ome_sched'. Lịch CS tự đặt tay và các mốc đã done được giữ nguyên.
+  var beforeCount = schedules.length;
+  schedules = schedules.filter(function(x) {
+    if (!x || !x.autoDao || x.done) return true;
+    return !!validAutoIds[x.id];
+  });
+  var removedCount = beforeCount - schedules.length;
+
   saveLS('ome_sched', schedules);
   if (typeof updateSchedBadges === 'function') updateSchedBadges();
+  if (removedCount > 0) {
+    if (typeof renderScheduleTab === 'function') renderScheduleTab();
+    if (typeof renderOverdueTab === 'function') renderOverdueTab();
+  }
   try { syncAutoHenToCareData(); } catch(e){ console.warn('syncAutoHen', e); }
 }
 
