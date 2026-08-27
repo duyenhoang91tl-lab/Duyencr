@@ -2221,14 +2221,14 @@ function _buildAISystemPrompt_(userMsg, withProducts) {
   var ctx = readAIContext_();
   var trunc_ = function(str, n) { return str && str.length > n ? str.substring(0, n) + '...' : str; };
   var parts = [];
-  parts.push(ctx.systemPrompt || 'Ban la chuyen vien cham soc khach hang cua cong ty my pham OME. Tra loi bang tieng Viet, than thien, ngan gon.');
+  parts.push(ctx.systemPrompt || 'Ban la chuyen vien cham soc khach hang. Tra loi bang tieng Viet, than thien, ngan gon.');
   if (ctx.careProcess)    parts.push('\n\nQUY TRINH CSKH:\n'    + trunc_(ctx.careProcess, 600));
   if (ctx.callbackScript) parts.push('\n\nKICH BAN GOI LAI:\n'  + trunc_(ctx.callbackScript, 500));
   if (ctx.salesScriptCu)  parts.push('\n\nKICH BAN KHACH CU:\n' + trunc_(ctx.salesScriptCu, 500));
   if (ctx.salesScriptMoi) parts.push('\n\nKICH BAN KHACH MOI:\n'+ trunc_(ctx.salesScriptMoi, 500));
   // Chi nap kien thuc san pham (nang) khi CS chu dong bat "Tra cuu san pham" -> giu prompt nhe, tranh 429
   if (withProducts) {
-    if (ctx.products.length > 0) parts.push('\n\nSAN PHAM OME:\n' + ctx.products.slice(0, 12).join('\n'));
+    if (ctx.products.length > 0) parts.push('\n\nSAN PHAM:\n' + ctx.products.slice(0, 12).join('\n'));
     if (ctx.faqs.length > 0)     parts.push('\n\nFAQ:\n'          + ctx.faqs.slice(0, 4).join('\n'));
     if (ctx.combos.length > 0)   parts.push('\n\nMAU TIN NHAN:\n' + ctx.combos.slice(0, 5).join('\n'));
     var ext = readExternalProductSheet_(userMsg);
