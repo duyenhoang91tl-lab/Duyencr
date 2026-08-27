@@ -10081,7 +10081,7 @@ var _srState = {
   sub: 'A',
   dateField: 'ngayTao',   // A: 'ngayTao' | 'thoiGianHT'
   dateFrom: '', dateTo: '',
-  sale: '', kenh: '',      // A — sale: 1 ten duy nhat (khong phai multi-select nua), kenh: 1 gia tri (select)
+  sale: [], kenh: '',      // A — sale: mang nhieu ten (multi-select dang checkbox), kenh: 1 gia tri (select)
   nguon: '', marketer: '', // B
   dataA: null, dataB: null,
   loading: false,
@@ -10119,7 +10119,7 @@ async function _srLoad(){
   if (_srState.sub === 'A'){
     _srState.dataA = await _srFetch('salesReportA', {
       dateFrom: _srState.dateFrom, dateTo: _srState.dateTo,
-      dateField: _srState.dateField, sale: _srState.sale || '', kenh: _srState.kenh
+      dateField: _srState.dateField, sale: (_srState.sale||[]).join(','), kenh: _srState.kenh
     });
   } else {
     _srState.dataB = await _srFetch('salesReportB', {
@@ -10140,7 +10140,7 @@ async function exportSalesReportToSheet(){
   if (!gsUrl){ alert('Chưa kết nối Google Apps Script (gsUrl trống).'); return; }
   var filters = _srState.sub === 'A'
     ? { dateFrom: _srState.dateFrom, dateTo: _srState.dateTo, dateField: _srState.dateField,
-        sale: _srState.sale || '', kenh: _srState.kenh }
+        sale: _srState.sale || [], kenh: _srState.kenh }
     : { dateFrom: _srState.dateFrom, dateTo: _srState.dateTo,
         nguon: _srState.nguon, marketer: _srState.marketer };
   var btn = document.getElementById('sr-export-sheet-btn');
@@ -10161,27 +10161,39 @@ async function exportSalesReportToSheet(){
   }
 }
 
-// ── Combo chon 1 Sale (giong y phong cach "Lọc theo CS" o sidebar, nhung CHI chon duoc 1 ten —
-//    khong phai multi-select nhu truoc — va khi loc se khop moi don co ten sale do (dung logic
-//    contains da co san o backend buildSalesReportA_) ──
+// ── Combo chon NHIEU Sale (giao dien giong "Lọc theo CS" o sidebar — go tim, moi ten 1 dong
+//    rieng — nhung la kieu checkbox multi-select: click 1 ten thi TICK/BO TICK, dropdown KHONG
+//    dong lai de con chon tiep ten khac. Cac ten da chon hien thanh chip nho ben duoi o tim.
+//    Loc backend van la "khop don co BAT KY ten nao trong danh sach da chon" (contains, OR) —
+//    da co san o buildSalesReportA_, khong doi gi ben backend. ──
 var _srSaleComboData = [], _srSaleComboIdx = -1;
 function _srBuildSaleComboData(){
-  _srSaleComboData = [{value:'', label:'— Tất cả Sale —'}]
-    .concat((_srState.saleOptions||[]).map(function(sv){ return {value:sv, label:sv}; }));
+  _srSaleComboData = (_srState.saleOptions||[]).map(function(sv){ return {value:sv, label:sv}; });
 }
 function srSaleComboRender(filter){
   var list = document.getElementById('sr-sale-combo-list');
   if (!list) return;
   if (!_srSaleComboData.length) _srBuildSaleComboData();
   var q = _foldVi(filter||'');
-  var cur = _srState.sale || '';
-  var items = q ? _srSaleComboData.filter(function(it){ return it.value!=='' && _foldVi(it.label).indexOf(q)!==-1; }) : _srSaleComboData;
+  var selArr = _srState.sale || [];
+  var items = q ? _srSaleComboData.filter(function(it){ return _foldVi(it.label).indexOf(q)!==-1; }) : _srSaleComboData;
   if (!items.length){ list.innerHTML = '<div class="cs-combo-empty">Không tìm thấy Sale</div>'; _srSaleComboIdx=-1; return; }
   list.innerHTML = items.map(function(it){
-    return '<div class="cs-combo-opt '+(cur===it.value?'is-sel':'')+'" data-v="'+esc(it.value)+'" onmousedown="srSaleComboPick(event, this.getAttribute(\'data-v\'))">'+
-      '<span>'+esc(it.label)+'</span></div>';
+    var checked = selArr.indexOf(it.value)!==-1;
+    return '<div class="cs-combo-opt '+(checked?'is-sel':'')+'" data-v="'+esc(it.value)+'" onmousedown="srSaleComboToggleItem(event, this.getAttribute(\'data-v\'))">'+
+      '<span>'+(checked?'☑':'☐')+' '+esc(it.label)+'</span></div>';
   }).join('');
   _srSaleComboIdx = -1;
+}
+function srRenderSaleChips(){
+  var wrap = document.getElementById('sr-sale-chips');
+  if (!wrap) return;
+  var selArr = _srState.sale || [];
+  if (!selArr.length){ wrap.innerHTML = ''; return; }
+  wrap.innerHTML = selArr.map(function(name){
+    return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap">'+
+      esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srSaleComboRemove(\''+esc(name).replace(/'/g,"\\'")+'\')">✕</span></span>';
+  }).join('');
 }
 function srSaleComboOpen(){
   _srBuildSaleComboData();
@@ -10199,18 +10211,34 @@ function srSaleComboToggle(e){
 function srSaleComboFilter(v){
   srSaleComboRender(v);
   var l=document.getElementById('sr-sale-combo-list'); if (l) l.classList.add('open');
-  var clr=document.getElementById('sr-sale-combo-clear'); if (clr) clr.style.display = v ? '' : 'none';
 }
-function srSaleComboPick(e, value){
+// Click 1 ten trong dropdown: TICK/BO TICK ten do, KHONG dong dropdown (de chon tiep ten khac).
+// Ap dung bo loc van can bam nut "Lọc" nhu cac o khac (khong tu dong fetch moi lan tick).
+function srSaleComboToggleItem(e, value){
   if (e && e.preventDefault) e.preventDefault();
-  _srState.sale = value || '';
+  var arr = (_srState.sale || []).slice();
+  var idx = arr.indexOf(value);
+  if (idx !== -1) arr.splice(idx, 1); else arr.push(value);
+  _srState.sale = arr;
   var ci = document.getElementById('sr-sale-combo-input');
-  if (ci) ci.value = value || '';
-  var clr=document.getElementById('sr-sale-combo-clear'); if (clr) clr.style.display = value ? '' : 'none';
-  srSaleComboClose();
-  _srApply();
+  srSaleComboRender(ci ? ci.value : '');
+  srRenderSaleChips();
 }
-function srSaleComboClear(e){ if(e) e.stopPropagation(); srSaleComboPick(null,''); }
+function srSaleComboRemove(value){
+  var arr = (_srState.sale || []).filter(function(v){ return v !== value; });
+  _srState.sale = arr;
+  srRenderSaleChips();
+  var l = document.getElementById('sr-sale-combo-list');
+  if (l && l.classList.contains('open')) { var ci=document.getElementById('sr-sale-combo-input'); srSaleComboRender(ci?ci.value:''); }
+}
+function srSaleComboClear(e){
+  if (e) e.stopPropagation();
+  _srState.sale = [];
+  var ci = document.getElementById('sr-sale-combo-input'); if (ci) ci.value = '';
+  srRenderSaleChips();
+  var l = document.getElementById('sr-sale-combo-list');
+  if (l && l.classList.contains('open')) srSaleComboRender('');
+}
 function srSaleComboKey(e){
   var list = document.getElementById('sr-sale-combo-list');
   if (!list || !list.classList.contains('open')){ if (e.key==='ArrowDown') srSaleComboOpen(); return; }
@@ -10221,7 +10249,7 @@ function srSaleComboKey(e){
   else if (e.key==='Enter'){
     e.preventDefault();
     var pick = (_srSaleComboIdx>=0 && opts[_srSaleComboIdx]) ? opts[_srSaleComboIdx] : (opts.length===1 ? opts[0] : null);
-    if (pick) srSaleComboPick(e, pick.getAttribute('data-v'));
+    if (pick) srSaleComboToggleItem(e, pick.getAttribute('data-v'));
     return;
   }
   else if (e.key==='Escape'){ srSaleComboClose(); return; }
@@ -10259,13 +10287,19 @@ function renderSalesReportTab(){
       '<option value="ngayTao"'+(_srState.dateField==='ngayTao'?' selected':'')+'>Lọc theo Ngày tạo</option>'+
       '<option value="thoiGianHT"'+(_srState.dateField==='thoiGianHT'?' selected':'')+'>Lọc theo Thời gian hoàn thành</option>'+
       '</select>';
-    filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Lọc theo Sale</div>' +
-      '<div class="cs-combo" id="sr-sale-combo" style="width:170px">'+
-      '<input type="text" id="sr-sale-combo-input" class="cs-combo-input" placeholder="— Tất cả Sale —" autocomplete="off" value="'+esc(_srState.sale?_srState.sale:'')+'" '+
+    filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Lọc theo Sale'+((_srState.sale||[]).length?' <span style="color:var(--green)">('+(_srState.sale||[]).length+' đã chọn)</span>':'')+'</div>' +
+      '<div class="cs-combo" id="sr-sale-combo" style="width:190px">'+
+      '<input type="text" id="sr-sale-combo-input" class="cs-combo-input" placeholder="🔍 Tìm & chọn sale..." autocomplete="off" '+
       'oninput="srSaleComboFilter(this.value)" onfocus="srSaleComboOpen()" onkeydown="srSaleComboKey(event)">'+
-      '<button type="button" class="cs-combo-clear" id="sr-sale-combo-clear" title="Bỏ lọc Sale" onclick="srSaleComboClear(event)" style="display:'+(_srState.sale?'':'none')+'">✕</button>'+
+      '<button type="button" class="cs-combo-clear" id="sr-sale-combo-clear" title="Bỏ chọn hết Sale" onclick="srSaleComboClear(event)" style="display:'+((_srState.sale||[]).length?'':'none')+'">✕</button>'+
       '<span class="cs-combo-caret" onclick="srSaleComboToggle(event)">▾</span>'+
       '<div class="cs-combo-list" id="sr-sale-combo-list"></div>'+
+      '</div>'+
+      '<div id="sr-sale-chips" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;max-width:220px">'+
+      (_srState.sale||[]).map(function(name){
+        return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap">'+
+          esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srSaleComboRemove(\''+esc(name).replace(/'/g,"\\'")+'\')">✕</span></span>';
+      }).join('') +
       '</div></div>';
     filters += '<select onchange="_srSetField(\'kenh\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
       '<option value="">— Tất cả kênh —</option>'+
