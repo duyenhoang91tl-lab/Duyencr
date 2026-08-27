@@ -1968,7 +1968,10 @@ function showSyncErrorBanner() {
 async function pushCareToGS(phone) {
   if (!gsUrl) return;
   const care = careData[phone] || {};
-  const myScheds = schedules.filter(x => x.phone === phone);
+  // Loc dung nhu _careRow(): chi day len Sheet lich CS tu tao tay hoac lich auto DA xu ly (Done).
+  // Xem chu thich chi tiet o _careRow() phia tren — cung 1 ly do de tranh ghi de/hoi sinh lich
+  // auto ma Duyen da xoa tay truc tiep tren CareData Sheet.
+  const myScheds = schedules.filter(x => x.phone === phone && (!x.autoDao || x.done));
   const row = {
     phone,
     status: care.status||'', zalo: care.zalo||'', cs: care.cs||'', note: care.note||'',
@@ -9310,7 +9313,15 @@ var _careWriting = new Set();
 var _careTimer = null;
 function _careRow(phone){
   var care = (typeof careData !== 'undefined' && careData[phone]) || {};
-  var myScheds = (typeof schedules !== 'undefined' ? schedules : []).filter(function(x){ return x.phone === phone; });
+  // CHI dong bo len Sheet cac lich: (1) CS tu tao tay (khong phai auto), HOAC (2) auto nhung DA
+  // duoc tac dong (bam Xong/xoa). Lich auto CHUA tac dong la SO LIEU TAM TINH LAI moi lan tai
+  // trang tu don hang hien co — KHONG duoc coi la "su that" de ghi len Sheet. Neu khong loc, bat
+  // ky dong bo nao khac cua khach nay (vi ly do hoan toan khong lien quan) se vo tinh ghi de/hoi
+  // sinh lai dung lich auto ma Duyen vua xoa tay truc tiep tren CareData Sheet — dung cung dieu
+  // kien voi _hasRealCareData() ben tren de 2 cho nhat quan voi nhau.
+  var myScheds = (typeof schedules !== 'undefined' ? schedules : []).filter(function(x){
+    return x.phone === phone && (!x.autoDao || x.done);
+  });
   return {
     phone: phone,
     status: care.status||'', zalo: care.zalo||'', cs: care.cs||'', note: care.note||'',
