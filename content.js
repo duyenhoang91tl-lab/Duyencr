@@ -1661,7 +1661,7 @@ async function startReminderPoll_() {
         const d = await r.json();
         renderReminderPanel_(d.reminders || []);
         if (d.reminders && d.reminders.length && Notification && Notification.permission === 'granted') {
-          new Notification('OME: ' + d.reminders.length + ' lịch hẹn hôm nay', {
+          new Notification('Nhắc lịch hẹn: ' + d.reminders.length + ' lịch hẹn hôm nay', {
             body: d.reminders.slice(0,3).map(r2 => r2.phone + (r2.schedHenNote?' - '+r2.schedHenNote:'')).join('\n'),
             icon: ''
           });
@@ -1860,7 +1860,7 @@ async function startReminderPoll_() {
     _bcLog = _bcLog.slice(0, 60);
     const el = document.getElementById('zai-bc-log');
     if (el) el.innerHTML = _bcLog.map(l => escHtml(l)).join('<br>');
-    console.log('[OME Broadcast] ' + msg);
+    console.log('[Broadcast] ' + msg);
   }
 
   async function markBroadcastServer_(id, phone, status) {

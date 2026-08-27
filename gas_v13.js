@@ -376,6 +376,20 @@ function doGet(e) {
       return jsonOut_(resB);
     }
     if (action === 'salesReportOptions') return jsonOut_(getSalesReportOptions_());
+    if (action === 'salesReportC') {
+      var pC = e.parameter || {};
+      var fC = { dateField: pC.dateField || 'ngayTao', periodType: pC.periodType || 'week',
+                 weekOffset: pC.weekOffset || 0, monthOffset: pC.monthOffset || 0, quarterOffset: pC.quarterOffset || 0,
+                 customCurFrom: pC.customCurFrom || '', customCurTo: pC.customCurTo || '',
+                 customPrevFrom: pC.customPrevFrom || '', customPrevTo: pC.customPrevTo || '' };
+      var cacheC = CacheService.getScriptCache();
+      var cKeyC = 'salesC_' + JSON.stringify(fC);
+      var cachedC = cacheC.get(cKeyC);
+      if (cachedC) { try { return jsonOut_(JSON.parse(cachedC)); } catch(ec) {} }
+      var resC = buildSalesReportC_(fC);
+      try { cacheC.put(cKeyC, JSON.stringify(resC), 120); } catch(ec) {}
+      return jsonOut_(resC);
+    }
 
     if (action === 'assign')    return jsonOut_({ assignHistory: readAssign_(ss.getSheetByName(SH_ASSIGN)) });
     if (action === 'tasks')     return jsonOut_({ tasks: readTasks_(ss.getSheetByName(SH_TASK)) });
@@ -872,6 +886,194 @@ function buildSalesReportB_(filters) {
         giaTriSauGiam: m.giaTriSauGiam, cod: m.cod, marketer: m.marketer
       };
     })
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BAO CAO C: SO SANH THEO KY (tuan/thang/quy/tuy chinh) — theo Nhan vien (Sale ban) & Kenh ban
+//  Co doi chieu KPI/chi tieu (doc tu tab rieng KPI_ChiTieu, Duyen tu dien tay).
+// ═══════════════════════════════════════════════════════════════
+
+var KPI_SHEET = 'KPI_ChiTieu';
+
+// Tao san tab KPI_ChiTieu (co huong dan + vi du) neu chua co — de Duyen tu dien chi tieu.
+function ensureKPISheet_() {
+  var ss = getCrmSS_();
+  var sh = ss.getSheetByName(KPI_SHEET);
+  if (sh) return sh;
+  sh = ss.insertSheet(KPI_SHEET);
+  var rows = [
+    ['PeriodKey', 'LoaiDoiTuong', 'TenDoiTuong', 'KPI_ChiTieu', 'GhiChu'],
+    ['2026-W35', 'sale', 'ngoctuoi2k3', 50000000, 'VÍ DỤ — tuần ISO: YYYY-Wnn (Thứ 2 → Chủ nhật). Xóa dòng ví dụ này.'],
+    ['2026-08', 'sale', 'ngoctuoi2k3', 200000000, 'VÍ DỤ — tháng: YYYY-MM. Xóa dòng ví dụ này.'],
+    ['2026-Q3', 'kenh', 'Tiktok', 500000000, 'VÍ DỤ — quý: YYYY-Qn (Q1..Q4). Xóa dòng ví dụ này.'],
+    ['', '', '', '', 'LoaiDoiTuong chỉ nhận "sale" hoặc "kenh". TenDoiTuong phải gõ ĐÚNG y nguyên tên Sale bán / Kênh bán đang dùng trong DT TỔNG (phân biệt hoa/thường, khoảng trắng). Với kỳ "Tùy chỉnh" (2 khoảng ngày tự chọn) sẽ không tra được KPI vì không có PeriodKey cố định — chỉ áp dụng cho Tuần/Tháng/Quý.']
+  ];
+  sh.getRange(1, 1, rows.length, 5).setValues(rows);
+  sh.getRange(1, 1, 1, 5).setFontWeight('bold');
+  try { sh.autoResizeColumns(1, 5); } catch (ecw) {}
+  return sh;
+}
+
+function readKPITargets_() {
+  var ss = getCrmSS_();
+  var sh = ss.getSheetByName(KPI_SHEET);
+  if (!sh) { ensureKPISheet_(); sh = ss.getSheetByName(KPI_SHEET); }
+  var last = sh.getLastRow();
+  var map = {};
+  if (last < 2) return map;
+  var vals = sh.getRange(2, 1, last - 1, 4).getValues();
+  for (var i = 0; i < vals.length; i++) {
+    var periodKey = String(vals[i][0] || '').trim();
+    var entType = String(vals[i][1] || '').trim().toLowerCase();
+    var entName = String(vals[i][2] || '').trim();
+    var kpi = Number(vals[i][3]) || 0;
+    if (!periodKey || !entType || !entName) continue;
+    map[periodKey + '|' + entType + '|' + entName] = kpi;
+  }
+  return map;
+}
+
+function getKPI_(kpiMap, periodKey, entType, entName) {
+  if (!periodKey) return 0;
+  return kpiMap[periodKey + '|' + entType + '|' + entName] || 0;
+}
+
+// Thu 2 cua tuan chua ngay d (khong doi d truyen vao)
+function _getMonday_(d) {
+  var dt = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  var day = dt.getDay();
+  var diff = (day === 0 ? -6 : 1) - day;
+  dt.setDate(dt.getDate() + diff);
+  return dt;
+}
+function _isoWeekRange_(baseDate, weekOffset) {
+  var mon = _getMonday_(baseDate);
+  mon.setDate(mon.getDate() + weekOffset * 7);
+  var sun = new Date(mon); sun.setDate(sun.getDate() + 6);
+  return { from: mon, to: sun };
+}
+function _isoWeekKey_(d) {
+  var dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  var dayNum = dt.getUTCDay() || 7;
+  dt.setUTCDate(dt.getUTCDate() + 4 - dayNum);
+  var yearStart = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1));
+  var weekNo = Math.ceil((((dt - yearStart) / 86400000) + 1) / 7);
+  return dt.getUTCFullYear() + '-W' + String(weekNo).padStart(2, '0');
+}
+function _monthRange_(baseDate, monthOffset) {
+  var y = baseDate.getFullYear(), m = baseDate.getMonth() + monthOffset;
+  return { from: new Date(y, m, 1), to: new Date(y, m + 1, 0) };
+}
+function _monthKey_(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+function _quarterRange_(baseDate, quarterOffset) {
+  var y = baseDate.getFullYear(), q = Math.floor(baseDate.getMonth() / 3) + quarterOffset;
+  var yy = y + Math.floor(q / 4), qq = ((q % 4) + 4) % 4;
+  var startMonth = qq * 3;
+  return { from: new Date(yy, startMonth, 1), to: new Date(yy, startMonth + 3, 0) };
+}
+function _quarterKey_(d) { return d.getFullYear() + '-Q' + (Math.floor(d.getMonth() / 3) + 1); }
+function _ymdLocal_(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function _labelVN_(d) {
+  return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
+}
+
+// Tinh khoang ngay + PeriodKey cua ky nay & ky truoc, tuy periodType.
+function _resolvePeriods_(filters) {
+  var today = new Date();
+  var periodType = filters.periodType || 'week';
+  var cur, prev, curKey = '', prevKey = '';
+
+  if (periodType === 'week') {
+    var wOff = Number(filters.weekOffset) || 0;
+    cur = _isoWeekRange_(today, wOff);
+    prev = _isoWeekRange_(today, wOff - 1);
+    curKey = _isoWeekKey_(cur.from); prevKey = _isoWeekKey_(prev.from);
+  } else if (periodType === 'month') {
+    var mOff = Number(filters.monthOffset) || 0;
+    cur = _monthRange_(today, mOff);
+    prev = _monthRange_(today, mOff - 1);
+    curKey = _monthKey_(cur.from); prevKey = _monthKey_(prev.from);
+  } else if (periodType === 'quarter') {
+    var qOff = Number(filters.quarterOffset) || 0;
+    cur = _quarterRange_(today, qOff);
+    prev = _quarterRange_(today, qOff - 1);
+    curKey = _quarterKey_(cur.from); prevKey = _quarterKey_(prev.from);
+  } else { // custom — 2 khoang ngay hoan toan tu chon, khong lien quan nhau, KHONG co PeriodKey KPI
+    cur = { from: parseVNDate_(filters.customCurFrom) || today, to: parseVNDate_(filters.customCurTo) || today };
+    prev = { from: parseVNDate_(filters.customPrevFrom) || today, to: parseVNDate_(filters.customPrevTo) || today };
+    curKey = ''; prevKey = '';
+  }
+  return {
+    curFrom: _ymdLocal_(cur.from), curTo: _ymdLocal_(cur.to), curKey: curKey, curLabel: _labelVN_(cur.from) + ' - ' + _labelVN_(cur.to),
+    prevFrom: _ymdLocal_(prev.from), prevTo: _ymdLocal_(prev.to), prevKey: prevKey, prevLabel: _labelVN_(prev.from) + ' - ' + _labelVN_(prev.to)
+  };
+}
+
+function buildSalesReportC_(filters) {
+  filters = filters || {};
+  var dateField = filters.dateField === 'thoiGianHT' ? 'thoiGianHT' : 'ngayTao';
+  var per = _resolvePeriods_(filters);
+  var kpiMap = readKPITargets_();
+  var UNASSIGNED = '(chưa gán sale)';
+
+  var rows = readDTTong_();
+  // Gom theo entity rieng cho tung ky (cur/prev), dung dung logic chia tien theo N sale/don
+  // nhu buildSalesReportA_ (so don khong chia — o day khong can so don nen bo qua, chi lay tien).
+  function aggregate(fromStr, toStr) {
+    var bySale = {}, byKenh = {};
+    var matchedOrders = [];
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var dt = parseVNDate_(row[dateField]);
+      if (!dateInRange_(dt, fromStr, toStr)) continue;
+      matchedOrders.push(row);
+      var kName = row.kenhBan || '(chưa có kênh)';
+      byKenh[kName] = (byKenh[kName] || 0) + row.giaTriDon;
+      var salesList = splitMulti_(row.saleBan, ',');
+      if (salesList.length === 0) salesList = [UNASSIGNED];
+      var n = salesList.length;
+      for (var k = 0; k < salesList.length; k++) {
+        bySale[salesList[k]] = (bySale[salesList[k]] || 0) + row.giaTriDon / n;
+      }
+    }
+    return { bySale: bySale, byKenh: byKenh, orders: matchedOrders };
+  }
+
+  var curAgg = aggregate(per.curFrom, per.curTo);
+  var prevAgg = aggregate(per.prevFrom, per.prevTo);
+
+  function buildTable(curMap, prevMap, entType) {
+    var names = Object.keys(Object.assign({}, curMap, prevMap));
+    var out = names.map(function(name) {
+      var resultCur = curMap[name] || 0;
+      var resultPrev = prevMap[name] || 0;
+      var kpiCur = getKPI_(kpiMap, per.curKey, entType, name);
+      var kpiPrev = getKPI_(kpiMap, per.prevKey, entType, name);
+      var pctKpiCur = kpiCur > 0 ? (resultCur / kpiCur * 100) : null;
+      var pctKpiPrev = kpiPrev > 0 ? (resultPrev / kpiPrev * 100) : null;
+      var growthPct = resultPrev > 0 ? ((resultCur - resultPrev) / resultPrev * 100) : (resultCur > 0 ? null : 0);
+      return {
+        name: name, kpiPrev: kpiPrev, resultPrev: resultPrev, pctKpiPrev: pctKpiPrev,
+        kpiCur: kpiCur, resultCur: resultCur, pctKpiCur: pctKpiCur, growthPct: growthPct
+      };
+    });
+    out.sort(function(a, b) { return b.resultCur - a.resultCur; });
+    return out;
+  }
+
+  var mapOrder = function(o) {
+    return { ngayTao: o.ngayTao, thoiGianHT: o.thoiGianHT, kenhBan: o.kenhBan, saleBan: o.saleBan,
+             sanPham: o.sanPham, giaTriCoc: o.giaTriCoc, giaTriDon: o.giaTriDon, giaiDoan: o.giaiDoan,
+             trangThai: o.trangThai, id: o.id };
+  };
+
+  return {
+    period: per,
+    byEmployee: buildTable(curAgg.bySale, prevAgg.bySale, 'sale'),
+    byKenh: buildTable(curAgg.byKenh, prevAgg.byKenh, 'kenh'),
+    ordersCur: curAgg.orders.map(mapOrder),
+    ordersPrev: prevAgg.orders.map(mapOrder)
   };
 }
 
@@ -2102,14 +2304,14 @@ function _buildAISystemPrompt_(userMsg, withProducts) {
   var ctx = readAIContext_();
   var trunc_ = function(str, n) { return str && str.length > n ? str.substring(0, n) + '...' : str; };
   var parts = [];
-  parts.push(ctx.systemPrompt || 'Ban la chuyen vien cham soc khach hang cua cong ty my pham OME. Tra loi bang tieng Viet, than thien, ngan gon.');
+  parts.push(ctx.systemPrompt || 'Ban la chuyen vien cham soc khach hang. Tra loi bang tieng Viet, than thien, ngan gon.');
   if (ctx.careProcess)    parts.push('\n\nQUY TRINH CSKH:\n'    + trunc_(ctx.careProcess, 600));
   if (ctx.callbackScript) parts.push('\n\nKICH BAN GOI LAI:\n'  + trunc_(ctx.callbackScript, 500));
   if (ctx.salesScriptCu)  parts.push('\n\nKICH BAN KHACH CU:\n' + trunc_(ctx.salesScriptCu, 500));
   if (ctx.salesScriptMoi) parts.push('\n\nKICH BAN KHACH MOI:\n'+ trunc_(ctx.salesScriptMoi, 500));
   // Chi nap kien thuc san pham (nang) khi CS chu dong bat "Tra cuu san pham" -> giu prompt nhe, tranh 429
   if (withProducts) {
-    if (ctx.products.length > 0) parts.push('\n\nSAN PHAM OME:\n' + ctx.products.slice(0, 12).join('\n'));
+    if (ctx.products.length > 0) parts.push('\n\nSAN PHAM:\n' + ctx.products.slice(0, 12).join('\n'));
     if (ctx.faqs.length > 0)     parts.push('\n\nFAQ:\n'          + ctx.faqs.slice(0, 4).join('\n'));
     if (ctx.combos.length > 0)   parts.push('\n\nMAU TIN NHAN:\n' + ctx.combos.slice(0, 5).join('\n'));
     var ext = readExternalProductSheet_(userMsg);

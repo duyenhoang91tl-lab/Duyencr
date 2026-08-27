@@ -1685,7 +1685,7 @@ let advFilters = {
 // ═══════════════════════════════════════════════════════
 //  APPS SCRIPT CODE
 // ═══════════════════════════════════════════════════════
-const GS_SCRIPT = '// ═══════════════════════════════════════════════════════════════\n//  OME CS Portal – Google Apps Script v4\n//  Dán toàn bộ nội dung này vào Apps Script rồi Triển khai mới\n// ═══════════════════════════════════════════════════════════════\n\nfunction testScript() {\n  var ss = SpreadsheetApp.getActiveSpreadsheet();\n  var sh1 = ss.getSheetByName(\'CareData\') || ss.insertSheet(\'CareData\');\n  var sh2 = ss.getSheetByName(\'OrderData\') || ss.insertSheet(\'OrderData\');\n  Logger.log(\'CareData: \' + sh1.getLastRow() + \' dong, OrderData: \' + sh2.getLastRow() + \' dong\');\n}\n\nfunction doGet(e) {\n  try {\n    var ss = SpreadsheetApp.getActiveSpreadsheet();\n    var result = { rows: [], orders: [] };\n\n    var sh = ss.getSheetByName(\'CareData\');\n    if (sh) {\n      var vals = sh.getDataRange().getValues();\n      for (var i = 1; i < vals.length; i++) {\n        if (!vals[i][0]) continue;\n        result.rows.push({\n          phone        : vals[i][0],\n          status       : vals[i][1]  || \'\',\n          zalo         : vals[i][2]  || \'\',\n          cs           : vals[i][3]  || \'\',\n          note         : vals[i][4]  || \'\',\n          schedules    : vals[i][5]  || \'\',\n          schedGoi     : vals[i][6]  || \'\',\n          schedGoiNote : vals[i][7]  || \'\',\n          schedSP      : vals[i][8]  || \'\',\n          schedSPNote  : vals[i][9]  || \'\',\n          schedCS      : vals[i][10] || \'\',\n          schedCSNote  : vals[i][11] || \'\',\n          schedHen     : vals[i][12] || \'\',\n          schedHenNote : vals[i][13] || \'\',\n          updated      : vals[i][14] || \'\'\n        });\n      }\n    }\n\n    var sh2 = (e.parameter && e.parameter.noOrders) ? null : ss.getSheetByName(\'OrderData\');\n    if (sh2) {\n      var ov = sh2.getDataRange().getValues();\n      for (var j = 1; j < ov.length; j++) {\n        if (!ov[j][0]) continue;\n        result.orders.push({\n          phone        : ov[j][0],\n          name         : ov[j][1]  || \'\',\n          date         : ov[j][2]  || \'\',\n          year         : ov[j][3]  || \'\',\n          month        : ov[j][4]  || \'\',\n          cs           : ov[j][5]  || \'\',\n          source       : ov[j][6]  || \'\',\n          revenue      : ov[j][7]  || 0,\n          product      : ov[j][8]  || \'\',\n          productDetail: ov[j][9]  || \'\',\n          status       : ov[j][10] || \'\',\n          zalo         : ov[j][11] || \'\',\n          note         : ov[j][12] || \'\'\n        });\n      }\n    }\n\n    return ContentService\n      .createTextOutput(JSON.stringify(result))\n      .setMimeType(ContentService.MimeType.JSON);\n  } catch(err) {\n    return ContentService\n      .createTextOutput(JSON.stringify({ error: err.message }))\n      .setMimeType(ContentService.MimeType.JSON);\n  }\n}\n\nfunction doPost(e) {\n  if (!e || !e.postData) {\n    Logger.log(\'doPost phai duoc goi qua HTTP POST. Hay dung ham testScript() de test.\');\n    return;\n  }\n\n  try {\n    var ss   = SpreadsheetApp.getActiveSpreadsheet();\n    var data = JSON.parse(e.postData.contents);\n    var action = data.action;\n\n    if (action === \'save\') {\n      var sh = ss.getSheetByName(\'CareData\') || ss.insertSheet(\'CareData\');\n      var rows = data.rows;\n      sh.clearContents();\n      sh.appendRow([\n        \'phone\',\'status\',\'zalo\',\'cs\',\'note\',\'schedules\',\n        \'schedGoi\',\'schedGoiNote\',\'schedSP\',\'schedSPNote\',\n        \'schedCS\',\'schedCSNote\',\'schedHen\',\'schedHenNote\',\'updated\'\n      ]);\n      for (var i = 0; i < rows.length; i++) {\n        var r = rows[i];\n        sh.appendRow([\n          r.phone        || \'\',\n          r.status       || \'\',\n          r.zalo         || \'\',\n          r.cs           || \'\',\n          r.note         || \'\',\n          r.schedules    || \'\',\n          r.schedGoi     || \'\',\n          r.schedGoiNote || \'\',\n          r.schedSP      || \'\',\n          r.schedSPNote  || \'\',\n          r.schedCS      || \'\',\n          r.schedCSNote  || \'\',\n          r.schedHen     || \'\',\n          r.schedHenNote || \'\',\n          new Date().toISOString()\n        ]);\n      }\n      return ContentService\n        .createTextOutput(JSON.stringify({ ok: true, written: rows.length }))\n        .setMimeType(ContentService.MimeType.JSON);\n    }\n\n    if (action === \'saveSingle\') {\n      var sh = ss.getSheetByName(\'CareData\') || ss.insertSheet(\'CareData\');\n      var r    = data.row;\n      var vals = sh.getDataRange().getValues();\n      var found = false;\n\n      for (var i = 1; i < vals.length; i++) {\n        if (vals[i][0] === r.phone) {\n          sh.getRange(i + 1, 2, 1, 13).setValues([[\n            r.status       || \'\',\n            r.zalo         || \'\',\n            r.cs           || \'\',\n            r.note         || \'\',\n            r.schedules    || \'\',\n            r.schedGoi     || \'\',\n            r.schedGoiNote || \'\',\n            r.schedSP      || \'\',\n            r.schedSPNote  || \'\',\n            r.schedCS      || \'\',\n            r.schedCSNote  || \'\',\n            r.schedHen     || \'\',\n            r.schedHenNote || \'\'\n          ]]);\n          sh.getRange(i + 1, 15).setValue(new Date().toISOString());\n          found = true;\n          break;\n        }\n      }\n\n      if (!found) {\n        if (sh.getLastRow() === 0) {\n          sh.appendRow([\n            \'phone\',\'status\',\'zalo\',\'cs\',\'note\',\'schedules\',\n            \'schedGoi\',\'schedGoiNote\',\'schedSP\',\'schedSPNote\',\n            \'schedCS\',\'schedCSNote\',\'schedHen\',\'schedHenNote\',\'updated\'\n          ]);\n        }\n        sh.appendRow([\n          r.phone        || \'\',\n          r.status       || \'\',\n          r.zalo         || \'\',\n          r.cs           || \'\',\n          r.note         || \'\',\n          r.schedules    || \'\',\n          r.schedGoi     || \'\',\n          r.schedGoiNote || \'\',\n          r.schedSP      || \'\',\n          r.schedSPNote  || \'\',\n          r.schedCS      || \'\',\n          r.schedCSNote  || \'\',\n          r.schedHen     || \'\',\n          r.schedHenNote || \'\',\n          new Date().toISOString()\n        ]);\n      }\n\n      return ContentService\n        .createTextOutput(JSON.stringify({ ok: true, found: found }))\n        .setMimeType(ContentService.MimeType.JSON);\n    }\n\n    if (action === \'saveOrders\') {\n      var sh3 = ss.getSheetByName(\'OrderData\') || ss.insertSheet(\'OrderData\');\n      var orders = data.orders;\n\n      if (sh3.getLastRow() === 0) {\n        sh3.appendRow([\n          \'phone\',\'name\',\'date\',\'year\',\'month\',\'cs\',\'source\',\'revenue\',\n          \'product\',\'productDetail\',\'status\',\'zalo\',\'note\'\n        ]);\n      }\n\n      // Doc cac dong hien co, build set key de chong trung\n      var existing = sh3.getDataRange().getValues();\n      var existingKeys = {};\n      for (var i = 1; i < existing.length; i++) {\n        var row = existing[i];\n        if (!row[0]) continue;\n        var key = row[0] + \'|\' + row[3] + \'|\' + row[4] + \'|\' + row[7];\n        existingKeys[key] = true;\n      }\n\n      // Chi them dong moi (theo phone+year+month+revenue), khong xoa dong cu\n      var toAppend = [];\n      for (var k = 0; k < orders.length; k++) {\n        var o = orders[k];\n        var key = (o.phone||\'\') + \'|\' + (o.year||\'\') + \'|\' + (o.month||\'\') + \'|\' + (o.revenue||0);\n        if (existingKeys[key]) continue;\n        existingKeys[key] = true;\n        toAppend.push([\n          o.phone || \'\', o.name || \'\', o.date || \'\', o.year || \'\', o.month || \'\',\n          o.cs || \'\', o.source || \'\', o.revenue || 0, o.product || \'\',\n          o.productDetail || \'\', o.status || \'\', o.zalo || \'\', o.note || \'\'\n        ]);\n      }\n\n      if (toAppend.length) {\n        sh3.getRange(sh3.getLastRow() + 1, 1, toAppend.length, 13).setValues(toAppend);\n      }\n\n      return ContentService\n        .createTextOutput(JSON.stringify({ ok: true, written: toAppend.length, skipped: orders.length - toAppend.length }))\n        .setMimeType(ContentService.MimeType.JSON);\n    }\n\n    if (action === \'patchOrder\') {\n      var sh4 = ss.getSheetByName(\'OrderData\');\n      if (!sh4) return ContentService.createTextOutput(JSON.stringify({ error: \'OrderData sheet not found\' })).setMimeType(ContentService.MimeType.JSON);\n      var pVals = sh4.getDataRange().getValues();\n      var updated = false;\n      for (var pi = 1; pi < pVals.length; pi++) {\n        var pr = pVals[pi];\n        if (!pr[0]) continue;\n        var phoneMatch = String(pr[0]) === String(data.phone);\n        var yearMatch  = String(pr[3]) === String(data.oldYear);\n        var monthMatch = String(pr[4]) === String(data.oldMonth);\n        var revMatch   = Number(pr[7]) === Number(data.oldRevenue);\n        if (phoneMatch && yearMatch && monthMatch && revMatch) {\n          if (data.newDate)    sh4.getRange(pi+1,3).setValue(data.newDate);\n          if (data.newYear)    sh4.getRange(pi+1,4).setValue(data.newYear);\n          if (data.newMonth)   sh4.getRange(pi+1,5).setValue(data.newMonth);\n          if (data.newRevenue !== undefined) sh4.getRange(pi+1,8).setValue(data.newRevenue);\n          if (data.newProduct) sh4.getRange(pi+1,9).setValue(data.newProduct);\n          if (data.newDetail)  sh4.getRange(pi+1,10).setValue(data.newDetail);\n          updated = true;\n          break;\n        }\n      }\n      if (!updated) {\n        // Khong tim thay → append row moi\n        sh4.appendRow([data.phone||\'\', \'\', data.newDate||\'\', data.newYear||\'\', data.newMonth||\'\',\n          \'\', \'\', data.newRevenue||0, data.newProduct||\'\', data.newDetail||\'\', \'\', \'\', \'\']);\n      }\n      return ContentService\n        .createTextOutput(JSON.stringify({ ok: true, updated: updated }))\n        .setMimeType(ContentService.MimeType.JSON);\n    }\n\n    return ContentService\n      .createTextOutput(JSON.stringify({ error: \'Unknown action: \' + action }))\n      .setMimeType(ContentService.MimeType.JSON);\n\n  } catch(err) {\n    return ContentService\n      .createTextOutput(JSON.stringify({ error: err.message }))\n      .setMimeType(ContentService.MimeType.JSON);\n  }\n}\n';
+const GS_SCRIPT = '// ═══════════════════════════════════════════════════════════════\n//  CS Portal – Google Apps Script v4\n//  Dán toàn bộ nội dung này vào Apps Script rồi Triển khai mới\n// ═══════════════════════════════════════════════════════════════\n\nfunction testScript() {\n  var ss = SpreadsheetApp.getActiveSpreadsheet();\n  var sh1 = ss.getSheetByName(\'CareData\') || ss.insertSheet(\'CareData\');\n  var sh2 = ss.getSheetByName(\'OrderData\') || ss.insertSheet(\'OrderData\');\n  Logger.log(\'CareData: \' + sh1.getLastRow() + \' dong, OrderData: \' + sh2.getLastRow() + \' dong\');\n}\n\nfunction doGet(e) {\n  try {\n    var ss = SpreadsheetApp.getActiveSpreadsheet();\n    var result = { rows: [], orders: [] };\n\n    var sh = ss.getSheetByName(\'CareData\');\n    if (sh) {\n      var vals = sh.getDataRange().getValues();\n      for (var i = 1; i < vals.length; i++) {\n        if (!vals[i][0]) continue;\n        result.rows.push({\n          phone        : vals[i][0],\n          status       : vals[i][1]  || \'\',\n          zalo         : vals[i][2]  || \'\',\n          cs           : vals[i][3]  || \'\',\n          note         : vals[i][4]  || \'\',\n          schedules    : vals[i][5]  || \'\',\n          schedGoi     : vals[i][6]  || \'\',\n          schedGoiNote : vals[i][7]  || \'\',\n          schedSP      : vals[i][8]  || \'\',\n          schedSPNote  : vals[i][9]  || \'\',\n          schedCS      : vals[i][10] || \'\',\n          schedCSNote  : vals[i][11] || \'\',\n          schedHen     : vals[i][12] || \'\',\n          schedHenNote : vals[i][13] || \'\',\n          updated      : vals[i][14] || \'\'\n        });\n      }\n    }\n\n    var sh2 = (e.parameter && e.parameter.noOrders) ? null : ss.getSheetByName(\'OrderData\');\n    if (sh2) {\n      var ov = sh2.getDataRange().getValues();\n      for (var j = 1; j < ov.length; j++) {\n        if (!ov[j][0]) continue;\n        result.orders.push({\n          phone        : ov[j][0],\n          name         : ov[j][1]  || \'\',\n          date         : ov[j][2]  || \'\',\n          year         : ov[j][3]  || \'\',\n          month        : ov[j][4]  || \'\',\n          cs           : ov[j][5]  || \'\',\n          source       : ov[j][6]  || \'\',\n          revenue      : ov[j][7]  || 0,\n          product      : ov[j][8]  || \'\',\n          productDetail: ov[j][9]  || \'\',\n          status       : ov[j][10] || \'\',\n          zalo         : ov[j][11] || \'\',\n          note         : ov[j][12] || \'\'\n        });\n      }\n    }\n\n    return ContentService\n      .createTextOutput(JSON.stringify(result))\n      .setMimeType(ContentService.MimeType.JSON);\n  } catch(err) {\n    return ContentService\n      .createTextOutput(JSON.stringify({ error: err.message }))\n      .setMimeType(ContentService.MimeType.JSON);\n  }\n}\n\nfunction doPost(e) {\n  if (!e || !e.postData) {\n    Logger.log(\'doPost phai duoc goi qua HTTP POST. Hay dung ham testScript() de test.\');\n    return;\n  }\n\n  try {\n    var ss   = SpreadsheetApp.getActiveSpreadsheet();\n    var data = JSON.parse(e.postData.contents);\n    var action = data.action;\n\n    if (action === \'save\') {\n      var sh = ss.getSheetByName(\'CareData\') || ss.insertSheet(\'CareData\');\n      var rows = data.rows;\n      sh.clearContents();\n      sh.appendRow([\n        \'phone\',\'status\',\'zalo\',\'cs\',\'note\',\'schedules\',\n        \'schedGoi\',\'schedGoiNote\',\'schedSP\',\'schedSPNote\',\n        \'schedCS\',\'schedCSNote\',\'schedHen\',\'schedHenNote\',\'updated\'\n      ]);\n      for (var i = 0; i < rows.length; i++) {\n        var r = rows[i];\n        sh.appendRow([\n          r.phone        || \'\',\n          r.status       || \'\',\n          r.zalo         || \'\',\n          r.cs           || \'\',\n          r.note         || \'\',\n          r.schedules    || \'\',\n          r.schedGoi     || \'\',\n          r.schedGoiNote || \'\',\n          r.schedSP      || \'\',\n          r.schedSPNote  || \'\',\n          r.schedCS      || \'\',\n          r.schedCSNote  || \'\',\n          r.schedHen     || \'\',\n          r.schedHenNote || \'\',\n          new Date().toISOString()\n        ]);\n      }\n      return ContentService\n        .createTextOutput(JSON.stringify({ ok: true, written: rows.length }))\n        .setMimeType(ContentService.MimeType.JSON);\n    }\n\n    if (action === \'saveSingle\') {\n      var sh = ss.getSheetByName(\'CareData\') || ss.insertSheet(\'CareData\');\n      var r    = data.row;\n      var vals = sh.getDataRange().getValues();\n      var found = false;\n\n      for (var i = 1; i < vals.length; i++) {\n        if (vals[i][0] === r.phone) {\n          sh.getRange(i + 1, 2, 1, 13).setValues([[\n            r.status       || \'\',\n            r.zalo         || \'\',\n            r.cs           || \'\',\n            r.note         || \'\',\n            r.schedules    || \'\',\n            r.schedGoi     || \'\',\n            r.schedGoiNote || \'\',\n            r.schedSP      || \'\',\n            r.schedSPNote  || \'\',\n            r.schedCS      || \'\',\n            r.schedCSNote  || \'\',\n            r.schedHen     || \'\',\n            r.schedHenNote || \'\'\n          ]]);\n          sh.getRange(i + 1, 15).setValue(new Date().toISOString());\n          found = true;\n          break;\n        }\n      }\n\n      if (!found) {\n        if (sh.getLastRow() === 0) {\n          sh.appendRow([\n            \'phone\',\'status\',\'zalo\',\'cs\',\'note\',\'schedules\',\n            \'schedGoi\',\'schedGoiNote\',\'schedSP\',\'schedSPNote\',\n            \'schedCS\',\'schedCSNote\',\'schedHen\',\'schedHenNote\',\'updated\'\n          ]);\n        }\n        sh.appendRow([\n          r.phone        || \'\',\n          r.status       || \'\',\n          r.zalo         || \'\',\n          r.cs           || \'\',\n          r.note         || \'\',\n          r.schedules    || \'\',\n          r.schedGoi     || \'\',\n          r.schedGoiNote || \'\',\n          r.schedSP      || \'\',\n          r.schedSPNote  || \'\',\n          r.schedCS      || \'\',\n          r.schedCSNote  || \'\',\n          r.schedHen     || \'\',\n          r.schedHenNote || \'\',\n          new Date().toISOString()\n        ]);\n      }\n\n      return ContentService\n        .createTextOutput(JSON.stringify({ ok: true, found: found }))\n        .setMimeType(ContentService.MimeType.JSON);\n    }\n\n    if (action === \'saveOrders\') {\n      var sh3 = ss.getSheetByName(\'OrderData\') || ss.insertSheet(\'OrderData\');\n      var orders = data.orders;\n\n      if (sh3.getLastRow() === 0) {\n        sh3.appendRow([\n          \'phone\',\'name\',\'date\',\'year\',\'month\',\'cs\',\'source\',\'revenue\',\n          \'product\',\'productDetail\',\'status\',\'zalo\',\'note\'\n        ]);\n      }\n\n      // Doc cac dong hien co, build set key de chong trung\n      var existing = sh3.getDataRange().getValues();\n      var existingKeys = {};\n      for (var i = 1; i < existing.length; i++) {\n        var row = existing[i];\n        if (!row[0]) continue;\n        var key = row[0] + \'|\' + row[3] + \'|\' + row[4] + \'|\' + row[7];\n        existingKeys[key] = true;\n      }\n\n      // Chi them dong moi (theo phone+year+month+revenue), khong xoa dong cu\n      var toAppend = [];\n      for (var k = 0; k < orders.length; k++) {\n        var o = orders[k];\n        var key = (o.phone||\'\') + \'|\' + (o.year||\'\') + \'|\' + (o.month||\'\') + \'|\' + (o.revenue||0);\n        if (existingKeys[key]) continue;\n        existingKeys[key] = true;\n        toAppend.push([\n          o.phone || \'\', o.name || \'\', o.date || \'\', o.year || \'\', o.month || \'\',\n          o.cs || \'\', o.source || \'\', o.revenue || 0, o.product || \'\',\n          o.productDetail || \'\', o.status || \'\', o.zalo || \'\', o.note || \'\'\n        ]);\n      }\n\n      if (toAppend.length) {\n        sh3.getRange(sh3.getLastRow() + 1, 1, toAppend.length, 13).setValues(toAppend);\n      }\n\n      return ContentService\n        .createTextOutput(JSON.stringify({ ok: true, written: toAppend.length, skipped: orders.length - toAppend.length }))\n        .setMimeType(ContentService.MimeType.JSON);\n    }\n\n    if (action === \'patchOrder\') {\n      var sh4 = ss.getSheetByName(\'OrderData\');\n      if (!sh4) return ContentService.createTextOutput(JSON.stringify({ error: \'OrderData sheet not found\' })).setMimeType(ContentService.MimeType.JSON);\n      var pVals = sh4.getDataRange().getValues();\n      var updated = false;\n      for (var pi = 1; pi < pVals.length; pi++) {\n        var pr = pVals[pi];\n        if (!pr[0]) continue;\n        var phoneMatch = String(pr[0]) === String(data.phone);\n        var yearMatch  = String(pr[3]) === String(data.oldYear);\n        var monthMatch = String(pr[4]) === String(data.oldMonth);\n        var revMatch   = Number(pr[7]) === Number(data.oldRevenue);\n        if (phoneMatch && yearMatch && monthMatch && revMatch) {\n          if (data.newDate)    sh4.getRange(pi+1,3).setValue(data.newDate);\n          if (data.newYear)    sh4.getRange(pi+1,4).setValue(data.newYear);\n          if (data.newMonth)   sh4.getRange(pi+1,5).setValue(data.newMonth);\n          if (data.newRevenue !== undefined) sh4.getRange(pi+1,8).setValue(data.newRevenue);\n          if (data.newProduct) sh4.getRange(pi+1,9).setValue(data.newProduct);\n          if (data.newDetail)  sh4.getRange(pi+1,10).setValue(data.newDetail);\n          updated = true;\n          break;\n        }\n      }\n      if (!updated) {\n        // Khong tim thay → append row moi\n        sh4.appendRow([data.phone||\'\', \'\', data.newDate||\'\', data.newYear||\'\', data.newMonth||\'\',\n          \'\', \'\', data.newRevenue||0, data.newProduct||\'\', data.newDetail||\'\', \'\', \'\', \'\']);\n      }\n      return ContentService\n        .createTextOutput(JSON.stringify({ ok: true, updated: updated }))\n        .setMimeType(ContentService.MimeType.JSON);\n    }\n\n    return ContentService\n      .createTextOutput(JSON.stringify({ error: \'Unknown action: \' + action }))\n      .setMimeType(ContentService.MimeType.JSON);\n\n  } catch(err) {\n    return ContentService\n      .createTextOutput(JSON.stringify({ error: err.message }))\n      .setMimeType(ContentService.MimeType.JSON);\n  }\n}\n';
 
 // ═══════════════════════════════════════════════════════
 //  DATA PROCESSING
@@ -4158,6 +4158,15 @@ function _addDateDays(dateStr, days) {
 }
 
 // Gọi sau khi data load xong; tạo lịch CS theo nguồn (xem chú thích quy tắc ở trên)
+//
+// FIX (dọn lịch hẹn/nhắc hẹn auto dùng data cũ): trước đây hàm này CHỈ THÊM mốc auto mới,
+// không bao giờ xóa mốc auto cũ đã tạo từ trước — nên khi quy tắc ngày bị siết lại (vd Data Đảo
+// chỉ còn áp dụng cho đơn tháng 6/2026, thay vì "tháng hiện tại" như bản cũ), các mốc auto sinh
+// ra dưới quy tắc CŨ (đơn của các tháng khác/nguồn dữ liệu cũ) vẫn tồn tại mãi trong localStorage
+// (khóa 'ome_sched') rồi được syncAutoHenToCareData() đẩy lên CareData dùng chung — hiển thị như
+// lịch hẹn/nhắc hẹn "ma" không liên quan gì tới dữ liệu CRM mới. Giờ mỗi lần chạy, hàm sẽ tính
+// lại tập ID hợp lệ THEO QUY TẮC HIỆN TẠI rồi dọn sạch mọi mốc auto (autoDao=true, chưa done)
+// không còn nằm trong tập đó — không đụng tới lịch CS tự đặt tay hay các mốc đã done.
 function checkDataDaoRenewSchedules() {
   var now = new Date();
   var curYear = now.getFullYear();
@@ -4175,6 +4184,8 @@ function checkDataDaoRenewSchedules() {
 
   var _daoDeleted = loadLS('ome_dao_deleted') || {};
   var daoExclude = loadLS('ome_dao_exclude') || {};
+  var validAutoIds = {}; // tập ID hợp lệ theo quy tắc HIỆN TẠI — dùng để dọn rác bên dưới
+
   allCustomers.forEach(function(c) {
     if (daoExclude[c.phone]) return; // Khách đã bị bỏ lịch auto
     c.orders.forEach(function(o) {
@@ -4221,6 +4232,7 @@ function checkDataDaoRenewSchedules() {
 
         // ID duy nhất theo phone + ngày đơn + mốc → tránh tạo trùng
         var autoId = 'dao_' + c.phone + '_' + baseDate + '_' + (m.days||('m'+m.months));
+        validAutoIds[autoId] = true; // hợp lệ theo quy tắc hiện tại — giữ lại khi dọn rác
 
         // Đã bị CS xóa tay → không tạo lại
         if (_daoDeleted[autoId]) return;
@@ -4240,8 +4252,22 @@ function checkDataDaoRenewSchedules() {
     });
   });
 
+  // ── Dọn rác: mốc auto (autoDao=true, chưa done) không còn hợp lệ theo quy tắc hiện tại ──
+  // (vd sinh ra từ trước khi quy tắc bị siết lại, hoặc đơn hàng gốc không còn nằm trong cửa sổ
+  // ngày áp dụng) → xóa khỏi 'ome_sched'. Lịch CS tự đặt tay và các mốc đã done được giữ nguyên.
+  var beforeCount = schedules.length;
+  schedules = schedules.filter(function(x) {
+    if (!x || !x.autoDao || x.done) return true;
+    return !!validAutoIds[x.id];
+  });
+  var removedCount = beforeCount - schedules.length;
+
   saveLS('ome_sched', schedules);
   if (typeof updateSchedBadges === 'function') updateSchedBadges();
+  if (removedCount > 0) {
+    if (typeof renderScheduleTab === 'function') renderScheduleTab();
+    if (typeof renderOverdueTab === 'function') renderOverdueTab();
+  }
   try { syncAutoHenToCareData(); } catch(e){ console.warn('syncAutoHen', e); }
 }
 
@@ -5094,6 +5120,58 @@ function _dueReminders(){
   }
   return out.sort(function(a,b){ return a.date.localeCompare(b.date); });
 }
+
+// Xóa VĨNH VIỄN toàn bộ nhắc hẹn đang QUÁ HẠN đang hiện trong panel (cả 2 nguồn: mảng
+// schedules[] cục bộ VÀ các ô hẹn nhanh trong careData dùng chung — schedGoi/SP/CS/Hen).
+// Khác với "Tắt hết" (chỉ ẩn tạm trong ngày, mai lại hiện) — hành động này xóa hẳn, đồng bộ
+// lên GAS luôn để các trình duyệt/tài khoản khác cũng không còn thấy lại.
+function deleteAllOverdueReminders(){
+  var today = _remDateStr();
+  var overdue = _dueReminders().filter(function(rm){ return rm.date < today; });
+  if (!overdue.length){ toast('Không có nhắc hẹn quá hạn nào.'); return; }
+  if (!confirm('Xóa VĨNH VIỄN toàn bộ ' + overdue.length + ' nhắc hẹn quá hạn?\nHành động này không thể hoàn tác.')) return;
+
+  var careChanged = {};
+  var daoDelSet = loadLS('ome_dao_deleted') || {};
+  var daoChanged = false;
+
+  overdue.forEach(function(rm){
+    if (rm.careField) {
+      // Nguồn: careData quick-sched (schedGoi/schedSP/schedCS/schedHen)
+      var care = careData[rm.phone];
+      if (care && care[rm.careField] === rm.date) {
+        care[rm.careField] = '';
+        care[rm.careField + 'Note'] = '';
+        careChanged[rm.phone] = true;
+      }
+    } else if (rm.schedId) {
+      // Nguồn: mảng schedules[] cục bộ
+      var it = schedules.find(function(x){ return x.id === rm.schedId; });
+      // Nếu là mốc auto Data Đảo → ghi nhớ đã xóa tay, tránh checkDataDaoRenewSchedules() tạo lại
+      if (it && it.autoDao) { daoDelSet[it.id] = true; daoChanged = true; }
+      schedules = schedules.filter(function(x){ return x.id !== rm.schedId; });
+    }
+  });
+
+  saveLS('ome_care', careData);
+  saveLS('ome_sched', schedules);
+  saveLS('ome_schedules', schedules);
+  if (daoChanged) saveLS('ome_dao_deleted', daoDelSet);
+
+  // Lịch "Hẹn" (schedHen) có thể vẫn cần dọn thêm nếu nó từng trỏ vào 1 mốc auto vừa bị xóa
+  try { if (typeof syncAutoHenToCareData==='function') syncAutoHenToCareData(); } catch(e){}
+
+  // Đẩy các khách có careData bị sửa trực tiếp ở trên lên GAS (batch)
+  if (typeof queueCareSync === 'function') {
+    Object.keys(careChanged).forEach(function(p){ queueCareSync(p); });
+  }
+
+  updateSchedBadges();
+  renderReminderPanel();
+  if (typeof renderScheduleTab === 'function') renderScheduleTab();
+  if (typeof renderOverdueTab === 'function') renderOverdueTab();
+  toast('✓ Đã xóa vĩnh viễn ' + overdue.length + ' nhắc hẹn quá hạn');
+}
 // Cảnh báo "được chia data" cho CS hiện tại (tắt là tắt luôn)
 function _chiaDataAlerts(){
   if (typeof currentUser==='undefined' || !currentUser || currentUser.role==='admin') return [];
@@ -5124,7 +5202,9 @@ function renderReminderPanel(){
     return;
   }
   if (bell) bell.style.display='none';
+  var isAdminRP = (typeof currentUser !== 'undefined' && currentUser && currentUser.role === 'admin');
   var html = '<div class="rp-hdr"><span>🔔 Nhắc hẹn ('+total+')</span><div>'+
+    (isAdminRP ? '<button class="rp-hbtn" style="background:#b91c1c" title="Xóa vĩnh viễn toàn bộ nhắc hẹn quá hạn (không thể hoàn tác)" onclick="deleteAllOverdueReminders()">🗑 Xóa quá hạn</button>' : '') +
     '<button class="rp-hbtn" title="Tắt hết hôm nay" onclick="dismissAllReminders()">Tắt hết</button>'+
     '<button class="rp-hbtn" title="Thu gọn" onclick="toggleReminderPanel()">▾</button></div></div><div class="rp-body">';
   for (var a=0;a<alerts.length;a++){
@@ -5217,7 +5297,11 @@ function formatDate(d,yr,mo){
 }
 function fmtDate(ds){
   if(!ds) return '—';
-  const d=new Date(ds+'T00:00:00');
+  // Phòng dữ liệu ngày cũ bị hỏng định dạng (vd chuỗi ISO đã có sẵn 'T...'/khoảng trắng)
+  // — chỉ lấy đúng phần YYYY-MM-DD trước khi ghép thêm giờ, tránh ra "Invalid Date".
+  var datePart = String(ds).split(/[T ]/)[0];
+  var d = new Date(datePart+'T00:00:00');
+  if (isNaN(d)) return String(ds); // vẫn không parse được → hiện nguyên văn thay vì "Invalid Date"
   return d.toLocaleDateString('vi-VN',{weekday:'short',day:'2-digit',month:'2-digit'});
 }
 function fmtVND(n){
@@ -6647,7 +6731,7 @@ switchTab = function(tab, el) {
   <div class="login-card">
     <div class="login-logo">
       <span class="login-mark"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg></span>
-      OME CS Portal
+      CRM Thu Hiền
     </div>
     <div class="login-title">Đăng nhập</div>
     <div class="login-sub" id="login-sub">Nhập tài khoản &amp; mật khẩu do quản trị viên cấp.</div>
@@ -6662,7 +6746,7 @@ switchTab = function(tab, el) {
 </div>
 <script type="text/plain" id="gas-code-v9">
 // ═══════════════════════════════════════════════════════════════
-//  OME CS Portal — Google Apps Script — PHIEN BAN 00.18.22.8.2026 (gio.phut.ngay.thang.nam)
+//  CRM THU HIEN Portal — Google Apps Script — PHIEN BAN 00.18.22.8.2026 (gio.phut.ngay.thang.nam)
 //  v12.0: Hop nhat appweb v10.0 + ZaloAI v11.2
 //         Them birthday vao CareData (col 18)
 //         saveAllCare / saveSingleCare bao toan truong mo rong (khStatus, nickZalos, birthday)
@@ -8321,14 +8405,14 @@ function _buildAISystemPrompt_(userMsg, withProducts) {
   var ctx = readAIContext_();
   var trunc_ = function(str, n) { return str && str.length > n ? str.substring(0, n) + '...' : str; };
   var parts = [];
-  parts.push(ctx.systemPrompt || 'Ban la chuyen vien cham soc khach hang cua cong ty my pham OME. Tra loi bang tieng Viet, than thien, ngan gon.');
+  parts.push(ctx.systemPrompt || 'Ban la chuyen vien cham soc khach hang. Tra loi bang tieng Viet, than thien, ngan gon.');
   if (ctx.careProcess)    parts.push('\n\nQUY TRINH CSKH:\n'    + trunc_(ctx.careProcess, 600));
   if (ctx.callbackScript) parts.push('\n\nKICH BAN GOI LAI:\n'  + trunc_(ctx.callbackScript, 500));
   if (ctx.salesScriptCu)  parts.push('\n\nKICH BAN KHACH CU:\n' + trunc_(ctx.salesScriptCu, 500));
   if (ctx.salesScriptMoi) parts.push('\n\nKICH BAN KHACH MOI:\n'+ trunc_(ctx.salesScriptMoi, 500));
   // Chi nap kien thuc san pham (nang) khi CS chu dong bat "Tra cuu san pham" -> giu prompt nhe, tranh 429
   if (withProducts) {
-    if (ctx.products.length > 0) parts.push('\n\nSAN PHAM OME:\n' + ctx.products.slice(0, 12).join('\n'));
+    if (ctx.products.length > 0) parts.push('\n\nSAN PHAM:\n' + ctx.products.slice(0, 12).join('\n'));
     if (ctx.faqs.length > 0)     parts.push('\n\nFAQ:\n'          + ctx.faqs.slice(0, 4).join('\n'));
     if (ctx.combos.length > 0)   parts.push('\n\nMAU TIN NHAN:\n' + ctx.combos.slice(0, 5).join('\n'));
     var ext = readExternalProductSheet_(userMsg);
@@ -9103,7 +9187,7 @@ function deleteTask_(id) {
 <!-- ════════════ V9 FEATURE LAYER ════════════ -->
 <script>
 // ═══════════════════════════════════════════════════════
-//  OME CS PORTAL — V9 FEATURE LAYER
+//  CRM THU HIEN — V9 FEATURE LAYER
 //  Phân quyền (Team CS), Dashboard, Audit Log, Batch Sync
 //  (Additive — không đổi workflow CS hiện tại)
 // ═══════════════════════════════════════════════════════
@@ -10081,12 +10165,17 @@ var _srState = {
   sub: 'A',
   dateField: 'ngayTao',   // A: 'ngayTao' | 'thoiGianHT'
   dateFrom: '', dateTo: '',
-  sale: [], kenh: '',      // A — sale: mảng tên (multi-select), kenh: 1 giá trị (select)
+  sale: [], kenh: '',      // A — sale: mang nhieu ten (multi-select dang checkbox), kenh: 1 gia tri (select)
   nguon: '', marketer: '', // B
   dataA: null, dataB: null,
   loading: false,
   saleOptions: [], kenhOptions: [], nguonOptions: [], marketerOptions: [], optionsLoaded: false,
-  saleSearch: '', kenhSearch: '', productSearch: '' // lọc nhanh client-side trên bảng breakdown
+  saleSearch: '', kenhSearch: '', productSearch: '', // lọc nhanh client-side trên bảng breakdown
+  // C — So sanh theo ky
+  cPeriodType: 'week', cDateField: 'ngayTao',
+  cWeekOffset: 0, cMonthOffset: 0, cQuarterOffset: 0,
+  cCustomCurFrom: '', cCustomCurTo: '', cCustomPrevFrom: '', cCustomPrevTo: '',
+  dataC: null, cEmpSearch: '', cKenhSearch: '', cExpandedRow: ''
 };
 
 function _srMoney(n){ return fmt(Math.round(n||0)) + '₫'; }
@@ -10121,10 +10210,17 @@ async function _srLoad(){
       dateFrom: _srState.dateFrom, dateTo: _srState.dateTo,
       dateField: _srState.dateField, sale: (_srState.sale||[]).join(','), kenh: _srState.kenh
     });
-  } else {
+  } else if (_srState.sub === 'B') {
     _srState.dataB = await _srFetch('salesReportB', {
       dateFrom: _srState.dateFrom, dateTo: _srState.dateTo,
       nguon: _srState.nguon, marketer: _srState.marketer
+    });
+  } else {
+    _srState.dataC = await _srFetch('salesReportC', {
+      dateField: _srState.cDateField, periodType: _srState.cPeriodType,
+      weekOffset: _srState.cWeekOffset, monthOffset: _srState.cMonthOffset, quarterOffset: _srState.cQuarterOffset,
+      customCurFrom: _srState.cCustomCurFrom, customCurTo: _srState.cCustomCurTo,
+      customPrevFrom: _srState.cCustomPrevFrom, customPrevTo: _srState.cCustomPrevTo
     });
   }
   _srState.loading = false;
@@ -10160,9 +10256,107 @@ async function exportSalesReportToSheet(){
     if (btn){ btn.disabled = false; btn.textContent = '📄 Xuất ra Sheet'; }
   }
 }
-function _srSetSaleMulti(sel){
-  _srState.sale = [...sel.options].filter(function(o){ return o.selected; }).map(function(o){ return o.value; });
+
+// ── Combo chon NHIEU Sale (giao dien giong "Lọc theo CS" o sidebar — go tim, moi ten 1 dong
+//    rieng — nhung la kieu checkbox multi-select: click 1 ten thi TICK/BO TICK, dropdown KHONG
+//    dong lai de con chon tiep ten khac. Cac ten da chon hien thanh chip nho ben duoi o tim.
+//    Loc backend van la "khop don co BAT KY ten nao trong danh sach da chon" (contains, OR) —
+//    da co san o buildSalesReportA_, khong doi gi ben backend. ──
+var _srSaleComboData = [], _srSaleComboIdx = -1;
+function _srBuildSaleComboData(){
+  _srSaleComboData = (_srState.saleOptions||[]).map(function(sv){ return {value:sv, label:sv}; });
 }
+function srSaleComboRender(filter){
+  var list = document.getElementById('sr-sale-combo-list');
+  if (!list) return;
+  if (!_srSaleComboData.length) _srBuildSaleComboData();
+  var q = _foldVi(filter||'');
+  var selArr = _srState.sale || [];
+  var items = q ? _srSaleComboData.filter(function(it){ return _foldVi(it.label).indexOf(q)!==-1; }) : _srSaleComboData;
+  if (!items.length){ list.innerHTML = '<div class="cs-combo-empty">Không tìm thấy Sale</div>'; _srSaleComboIdx=-1; return; }
+  list.innerHTML = items.map(function(it){
+    var checked = selArr.indexOf(it.value)!==-1;
+    return '<div class="cs-combo-opt '+(checked?'is-sel':'')+'" data-v="'+esc(it.value)+'" onmousedown="srSaleComboToggleItem(event, this.getAttribute(\'data-v\'))">'+
+      '<span>'+(checked?'☑':'☐')+' '+esc(it.label)+'</span></div>';
+  }).join('');
+  _srSaleComboIdx = -1;
+}
+function srRenderSaleChips(){
+  var wrap = document.getElementById('sr-sale-chips');
+  if (!wrap) return;
+  var selArr = _srState.sale || [];
+  if (!selArr.length){ wrap.innerHTML = ''; return; }
+  wrap.innerHTML = selArr.map(function(name){
+    return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap">'+
+      esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srSaleComboRemove(\''+esc(name).replace(/'/g,"\\'")+'\')">✕</span></span>';
+  }).join('');
+}
+function srSaleComboOpen(){
+  _srBuildSaleComboData();
+  var ci = document.getElementById('sr-sale-combo-input');
+  srSaleComboRender(ci ? ci.value : '');
+  var l = document.getElementById('sr-sale-combo-list'); if (l) l.classList.add('open');
+}
+function srSaleComboClose(){ var l=document.getElementById('sr-sale-combo-list'); if(l) l.classList.remove('open'); }
+function srSaleComboToggle(e){
+  if (e) e.stopPropagation();
+  var l=document.getElementById('sr-sale-combo-list'); if(!l) return;
+  if (l.classList.contains('open')) srSaleComboClose();
+  else { var ci=document.getElementById('sr-sale-combo-input'); if(ci) ci.focus(); srSaleComboOpen(); }
+}
+function srSaleComboFilter(v){
+  srSaleComboRender(v);
+  var l=document.getElementById('sr-sale-combo-list'); if (l) l.classList.add('open');
+}
+// Click 1 ten trong dropdown: TICK/BO TICK ten do, KHONG dong dropdown (de chon tiep ten khac).
+// Ap dung bo loc van can bam nut "Lọc" nhu cac o khac (khong tu dong fetch moi lan tick).
+function srSaleComboToggleItem(e, value){
+  if (e && e.preventDefault) e.preventDefault();
+  var arr = (_srState.sale || []).slice();
+  var idx = arr.indexOf(value);
+  if (idx !== -1) arr.splice(idx, 1); else arr.push(value);
+  _srState.sale = arr;
+  var ci = document.getElementById('sr-sale-combo-input');
+  srSaleComboRender(ci ? ci.value : '');
+  srRenderSaleChips();
+}
+function srSaleComboRemove(value){
+  var arr = (_srState.sale || []).filter(function(v){ return v !== value; });
+  _srState.sale = arr;
+  srRenderSaleChips();
+  var l = document.getElementById('sr-sale-combo-list');
+  if (l && l.classList.contains('open')) { var ci=document.getElementById('sr-sale-combo-input'); srSaleComboRender(ci?ci.value:''); }
+}
+function srSaleComboClear(e){
+  if (e) e.stopPropagation();
+  _srState.sale = [];
+  var ci = document.getElementById('sr-sale-combo-input'); if (ci) ci.value = '';
+  srRenderSaleChips();
+  var l = document.getElementById('sr-sale-combo-list');
+  if (l && l.classList.contains('open')) srSaleComboRender('');
+}
+function srSaleComboKey(e){
+  var list = document.getElementById('sr-sale-combo-list');
+  if (!list || !list.classList.contains('open')){ if (e.key==='ArrowDown') srSaleComboOpen(); return; }
+  var opts = [...list.querySelectorAll('.cs-combo-opt')];
+  if (!opts.length) return;
+  if (e.key==='ArrowDown'){ e.preventDefault(); _srSaleComboIdx = Math.min(_srSaleComboIdx+1, opts.length-1); }
+  else if (e.key==='ArrowUp'){ e.preventDefault(); _srSaleComboIdx = Math.max(_srSaleComboIdx-1, 0); }
+  else if (e.key==='Enter'){
+    e.preventDefault();
+    var pick = (_srSaleComboIdx>=0 && opts[_srSaleComboIdx]) ? opts[_srSaleComboIdx] : (opts.length===1 ? opts[0] : null);
+    if (pick) srSaleComboToggleItem(e, pick.getAttribute('data-v'));
+    return;
+  }
+  else if (e.key==='Escape'){ srSaleComboClose(); return; }
+  else { return; }
+  opts.forEach(function(o,i){ o.classList.toggle('active', i===_srSaleComboIdx); });
+  if (_srSaleComboIdx>=0 && opts[_srSaleComboIdx]) opts[_srSaleComboIdx].scrollIntoView({block:'nearest'});
+}
+document.addEventListener('click', function(e){
+  var combo = document.getElementById('sr-sale-combo');
+  if (combo && !combo.contains(e.target)) srSaleComboClose();
+});
 function _srApply(){ _srLoad(); }
 
 function renderSalesReportTab(){
@@ -10174,10 +10368,13 @@ function renderSalesReportTab(){
   }
   if (!_srState.optionsLoaded) _srLoadOptions();
 
-  var subTabs = '<div style="display:flex;gap:8px;margin-bottom:14px">' +
+  var subTabs = '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">' +
     '<button class="btn '+(_srState.sub==='A'?'secondary':'sm')+'" onclick="_srSetSub(\'A\')">Báo cáo A — Theo DT tổng</button>' +
     '<button class="btn '+(_srState.sub==='B'?'secondary':'sm')+'" onclick="_srSetSub(\'B\')">Báo cáo B — Theo dữ liệu đơn</button>' +
+    '<button class="btn '+(_srState.sub==='C'?'secondary':'sm')+'" onclick="_srSetSub(\'C\')">Báo cáo C — So sánh theo kỳ</button>' +
     '</div>';
+
+  if (_srState.sub === 'C') { renderSalesReportTabC_(wrap, subTabs); return; }
 
   var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
   filters += '<input type="date" value="'+esc(_srState.dateFrom)+'" onchange="_srSetField(\'dateFrom\',this.value)" title="Từ ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
@@ -10189,9 +10386,20 @@ function renderSalesReportTab(){
       '<option value="ngayTao"'+(_srState.dateField==='ngayTao'?' selected':'')+'>Lọc theo Ngày tạo</option>'+
       '<option value="thoiGianHT"'+(_srState.dateField==='thoiGianHT'?' selected':'')+'>Lọc theo Thời gian hoàn thành</option>'+
       '</select>';
-    filters += '<select multiple title="Giữ Ctrl/Cmd để chọn nhiều sale" onchange="_srSetSaleMulti(this)" style="min-width:150px;max-height:64px;font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-      (_srState.saleOptions||[]).map(function(sv){ return '<option value="'+esc(sv)+'"'+((_srState.sale||[]).indexOf(sv)!==-1?' selected':'')+'>'+esc(sv)+'</option>'; }).join('') +
-      '</select>';
+    filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Lọc theo Sale'+((_srState.sale||[]).length?' <span style="color:var(--green)">('+(_srState.sale||[]).length+' đã chọn)</span>':'')+'</div>' +
+      '<div class="cs-combo" id="sr-sale-combo" style="width:190px">'+
+      '<input type="text" id="sr-sale-combo-input" class="cs-combo-input" placeholder="🔍 Tìm & chọn sale..." autocomplete="off" '+
+      'oninput="srSaleComboFilter(this.value)" onfocus="srSaleComboOpen()" onkeydown="srSaleComboKey(event)">'+
+      '<button type="button" class="cs-combo-clear" id="sr-sale-combo-clear" title="Bỏ chọn hết Sale" onclick="srSaleComboClear(event)" style="display:'+((_srState.sale||[]).length?'':'none')+'">✕</button>'+
+      '<span class="cs-combo-caret" onclick="srSaleComboToggle(event)">▾</span>'+
+      '<div class="cs-combo-list" id="sr-sale-combo-list"></div>'+
+      '</div>'+
+      '<div id="sr-sale-chips" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;max-width:220px">'+
+      (_srState.sale||[]).map(function(name){
+        return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap">'+
+          esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srSaleComboRemove(\''+esc(name).replace(/'/g,"\\'")+'\')">✕</span></span>';
+      }).join('') +
+      '</div></div>';
     filters += '<select onchange="_srSetField(\'kenh\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
       '<option value="">— Tất cả kênh —</option>'+
       (_srState.kenhOptions||[]).map(function(kv){ return '<option value="'+esc(kv)+'"'+(_srState.kenh===kv?' selected':'')+'>'+esc(kv)+'</option>'; }).join('') +
@@ -10276,6 +10484,150 @@ function _srRenderB(d){
   if (!productRows.length) html += '<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
   html += '</tbody></table>';
   return html;
+}
+
+// ── BAO CAO C: SO SANH THEO KY (tuan/thang/quy/tuy chinh) ──
+function renderSalesReportTabC_(wrap, subTabs){
+  var pt = _srState.cPeriodType;
+  var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
+  filters += '<select onchange="_srState.cPeriodType=this.value;renderSalesReportTab()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+    '<option value="week"'+(pt==='week'?' selected':'')+'>Theo Tuần (Thứ 2 → CN)</option>'+
+    '<option value="month"'+(pt==='month'?' selected':'')+'>Theo Tháng</option>'+
+    '<option value="quarter"'+(pt==='quarter'?' selected':'')+'>Theo Quý</option>'+
+    '<option value="custom"'+(pt==='custom'?' selected':'')+'>Tùy chỉnh (2 khoảng ngày)</option>'+
+    '</select>';
+
+  if (pt !== 'custom'){
+    var offKey = pt==='week' ? 'cWeekOffset' : (pt==='month' ? 'cMonthOffset' : 'cQuarterOffset');
+    var unitLabel = pt==='week' ? 'tuần' : (pt==='month' ? 'tháng' : 'quý');
+    filters += '<div style="display:flex;align-items:center;gap:4px;border:1px solid var(--border);border-radius:6px;padding:2px 4px;background:var(--surface)">'+
+      '<button class="btn sm" onclick="_srState.'+offKey+'--;_srApply()" title="Lùi 1 '+unitLabel+'">◀</button>'+
+      '<span style="font-size:12px;padding:0 4px;min-width:26px;text-align:center">'+
+        (_srState[offKey]===0?'Kỳ này':(_srState[offKey]<0?(-_srState[offKey])+' '+unitLabel+' trước':_srState[offKey]+' '+unitLabel+' sau'))+
+      '</span>'+
+      '<button class="btn sm" onclick="_srState.'+offKey+'++;_srApply()" title="Tiến 1 '+unitLabel+'">▶</button>'+
+      (_srState[offKey]!==0 ? '<button class="btn sm" onclick="_srState.'+offKey+'=0;_srApply()" title="Về kỳ hiện tại">⟲</button>' : '')+
+      '</div>';
+  } else {
+    filters += '<span style="font-size:11px;color:var(--muted)">Kỳ này:</span>'+
+      '<input type="date" value="'+esc(_srState.cCustomCurFrom)+'" onchange="_srState.cCustomCurFrom=this.value" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+      '<span style="color:var(--muted)">→</span>'+
+      '<input type="date" value="'+esc(_srState.cCustomCurTo)+'" onchange="_srState.cCustomCurTo=this.value" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+      '<span style="font-size:11px;color:var(--muted)">so với:</span>'+
+      '<input type="date" value="'+esc(_srState.cCustomPrevFrom)+'" onchange="_srState.cCustomPrevFrom=this.value" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+      '<span style="color:var(--muted)">→</span>'+
+      '<input type="date" value="'+esc(_srState.cCustomPrevTo)+'" onchange="_srState.cCustomPrevTo=this.value" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
+  }
+  filters += '<select onchange="_srState.cDateField=this.value" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+    '<option value="ngayTao"'+(_srState.cDateField==='ngayTao'?' selected':'')+'>Lọc theo Ngày tạo</option>'+
+    '<option value="thoiGianHT"'+(_srState.cDateField==='thoiGianHT'?' selected':'')+'>Lọc theo Thời gian hoàn thành</option>'+
+    '</select>';
+  filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
+  filters += '<button class="btn sm" onclick="exportSalesReportC()">📊 Xuất Excel</button>';
+  filters += '</div>';
+
+  var body = _srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _srRenderC(_srState.dataC);
+  wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + filters + body;
+}
+
+function _srPctStr(v){ return (v===null || v===undefined) ? '—' : Math.round(v*10)/10 + '%'; }
+function _srGrowthStr(v){
+  if (v===null || v===undefined) return '<span style="color:var(--muted)">— (mới)</span>';
+  var sign = v>0 ? '+' : '';
+  var color = v>0 ? 'var(--green)' : (v<0 ? 'var(--red)' : 'var(--muted)');
+  return '<span style="color:'+color+'">'+sign+Math.round(v*10)/10+'%</span>';
+}
+
+function _srRenderCTable(rows, entType, search, searchKey){
+  var filtered = rows.filter(function(r){ return !search || r.name.toLowerCase().indexOf(search.toLowerCase())!==-1; });
+  var html = '<table class="dash-table"><thead><tr>'+
+    '<th>'+(entType==='sale'?'Nhân viên (Sale)':'Kênh bán')+'</th>'+
+    '<th style="text-align:right">KPI kỳ trước</th><th style="text-align:right">Kết quả kỳ trước</th><th style="text-align:right">%HT KPI kỳ trước</th>'+
+    '<th style="text-align:right">KPI kỳ này</th><th style="text-align:right">Kết quả kỳ này</th><th style="text-align:right">%HT KPI kỳ này</th>'+
+    '<th style="text-align:right">% Tăng trưởng</th></tr></thead><tbody>';
+  filtered.forEach(function(r, i){
+    var rowId = entType+'_'+i;
+    var expanded = _srState.cExpandedRow === rowId;
+    html += '<tr style="cursor:pointer" onclick="_srToggleCRow(\''+rowId+'\')" title="Bấm để xem chi tiết đơn">'+
+      '<td>'+(expanded?'▾ ':'▸ ')+esc(r.name)+'</td>'+
+      '<td style="text-align:right">'+(r.kpiPrev?_srMoney(r.kpiPrev):'—')+'</td>'+
+      '<td style="text-align:right">'+_srMoney(r.resultPrev)+'</td>'+
+      '<td style="text-align:right">'+_srPctStr(r.pctKpiPrev)+'</td>'+
+      '<td style="text-align:right">'+(r.kpiCur?_srMoney(r.kpiCur):'—')+'</td>'+
+      '<td style="text-align:right">'+_srMoney(r.resultCur)+'</td>'+
+      '<td style="text-align:right">'+_srPctStr(r.pctKpiCur)+'</td>'+
+      '<td style="text-align:right">'+_srGrowthStr(r.growthPct)+'</td>'+
+      '</tr>';
+    if (expanded){
+      var d = _srState.dataC;
+      var ordCur = (d.ordersCur||[]).filter(function(o){ return entType==='sale' ? splitSaleNames_(o.saleBan).indexOf(r.name)!==-1 || (r.name==='(chưa gán sale)' && !splitSaleNames_(o.saleBan).length) : (o.kenhBan||'(chưa có kênh)')===r.name; });
+      var ordPrev = (d.ordersPrev||[]).filter(function(o){ return entType==='sale' ? splitSaleNames_(o.saleBan).indexOf(r.name)!==-1 || (r.name==='(chưa gán sale)' && !splitSaleNames_(o.saleBan).length) : (o.kenhBan||'(chưa có kênh)')===r.name; });
+      html += '<tr><td colspan="8" style="background:var(--surface2);padding:10px">'+
+        '<div style="font-weight:600;font-size:11px;margin-bottom:4px">Đơn kỳ này ('+ordCur.length+')</div>'+
+        _srMiniOrderTable(ordCur)+
+        '<div style="font-weight:600;font-size:11px;margin:8px 0 4px">Đơn kỳ trước ('+ordPrev.length+')</div>'+
+        _srMiniOrderTable(ordPrev)+
+        '</td></tr>';
+    }
+  });
+  if (!filtered.length) html += '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+  html += '</tbody></table>';
+  return html;
+}
+function splitSaleNames_(s){ return (s||'').split(',').map(function(x){return x.trim();}).filter(Boolean); }
+function _srMiniOrderTable(orders){
+  if (!orders.length) return '<div style="color:var(--muted);font-size:11px">Không có đơn</div>';
+  var html = '<table class="dash-table" style="font-size:11px"><thead><tr><th>Ngày tạo</th><th>Kênh</th><th>Sale</th><th style="text-align:right">Giá trị</th></tr></thead><tbody>';
+  orders.forEach(function(o){
+    html += '<tr><td>'+esc(String(o.ngayTao))+'</td><td>'+esc(o.kenhBan)+'</td><td>'+esc(o.saleBan)+'</td><td style="text-align:right">'+_srMoney(o.giaTriDon)+'</td></tr>';
+  });
+  html += '</tbody></table>';
+  return html;
+}
+function _srToggleCRow(rowId){
+  _srState.cExpandedRow = (_srState.cExpandedRow === rowId) ? '' : rowId;
+  renderSalesReportTab();
+}
+
+function _srRenderC(d){
+  if (!d) return '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
+  var p = d.period || {};
+  var html = '<div style="display:flex;gap:16px;margin-bottom:14px;font-size:12px">'+
+    '<div><span style="color:var(--muted)">Kỳ này:</span> <b>'+esc(p.curLabel||'')+'</b></div>'+
+    '<div><span style="color:var(--muted)">Kỳ trước:</span> <b>'+esc(p.prevLabel||'')+'</b></div>'+
+    (p.curKey ? '' : '<div style="color:var(--hint)">(Kỳ tùy chỉnh — không tra được KPI, chỉ tab Tuần/Tháng/Quý mới có KPI)</div>')+
+    '</div>';
+
+  html += '<div class="dash-section-title">Theo Nhân viên (Sale bán) <span style="font-weight:400;color:var(--muted);font-size:11px">(tiền chia đều cho số sale/đơn khi đơn có nhiều sale)</span></div>';
+  html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên..." value="'+esc(_srState.cEmpSearch)+'" oninput="_srState.cEmpSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
+  html += _srRenderCTable(d.byEmployee||[], 'sale', _srState.cEmpSearch);
+
+  html += '<div class="dash-section-title">Theo Kênh bán</div>';
+  html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên kênh..." value="'+esc(_srState.cKenhSearch)+'" oninput="_srState.cKenhSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
+  html += _srRenderCTable(d.byKenh||[], 'kenh', _srState.cKenhSearch);
+
+  html += '<div style="font-size:11px;color:var(--hint);margin-top:8px">Chỉ tiêu KPI lấy từ tab "'+esc('KPI_ChiTieu')+'" trong Google Sheet CRM — tự vào Sheet điền/sửa số. Bấm vào 1 dòng để xem chi tiết đơn của kỳ này/kỳ trước.</div>';
+  return html;
+}
+
+function exportSalesReportC(){
+  var d = _srState.dataC;
+  if (!d){ alert('Chưa có dữ liệu để xuất — bấm "Lọc" trước.'); return; }
+  var p = d.period || {};
+  var summary = [['Kỳ này', p.curLabel], ['Kỳ trước', p.prevLabel]];
+  var empRows = [['Nhân viên','KPI kỳ trước','Kết quả kỳ trước','%HT KPI kỳ trước','KPI kỳ này','Kết quả kỳ này','%HT KPI kỳ này','% Tăng trưởng']];
+  (d.byEmployee||[]).forEach(function(r){
+    empRows.push([r.name, r.kpiPrev, r.resultPrev, r.pctKpiPrev, r.kpiCur, r.resultCur, r.pctKpiCur, r.growthPct]);
+  });
+  var kenhRows = [['Kênh','KPI kỳ trước','Kết quả kỳ trước','%HT KPI kỳ trước','KPI kỳ này','Kết quả kỳ này','%HT KPI kỳ này','% Tăng trưởng']];
+  (d.byKenh||[]).forEach(function(r){
+    kenhRows.push([r.name, r.kpiPrev, r.resultPrev, r.pctKpiPrev, r.kpiCur, r.resultCur, r.pctKpiCur, r.growthPct]);
+  });
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Kỳ so sánh');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(empRows), 'Theo Nhân viên');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(kenhRows), 'Theo Kênh bán');
+  XLSX.writeFile(wb, `BaoCaoDoanhSo_C_${_ymd(new Date())}.xlsx`);
 }
 
 function exportSalesReport(){
@@ -10651,23 +11003,25 @@ window.addEventListener('load', function(){
 //  Lưu ý: đây là lớp đăng nhập gọn nhẹ cho nội bộ — mật khẩu được hash
 //  (SHA-256 + salt) trước khi lưu lên Google Sheet (sheet "Users").
 // ═══════════════════════════════════════════════════════
-var _PW_SALT = 'OME-CS-Portal::v9::salt';
+var _PW_SALT = 'CRM-CS-Portal::v9::salt';
+var _PW_SALT_OLD = 'OME-CS-Portal::v9::salt'; // salt cu (truoc khi doi OME -> CRM) — giu tam de khong khoa tai khoan dang co, tu nang cap sang salt moi ngay lan dang nhap ke tiep
 var accounts = (typeof loadLS === 'function' ? (loadLS('ome_accounts') || []) : []);
 var _authAccount = (typeof loadLS === 'function' ? (loadLS('ome_auth') || null) : null);
 var _bootstrapAdmin = false;
 function _aval(id){ var el = document.getElementById(id); return el ? (el.value || '') : ''; }
 
-async function _hashPass(pw){
+async function _hashPass(pw, salt){
+  salt = salt || _PW_SALT;
   pw = String(pw == null ? '' : pw);
   try{
     if (typeof crypto !== 'undefined' && crypto.subtle){
-      var data = new TextEncoder().encode(_PW_SALT + pw);
+      var data = new TextEncoder().encode(salt + pw);
       var buf = await crypto.subtle.digest('SHA-256', data);
       return Array.prototype.map.call(new Uint8Array(buf), function(b){ return ('0'+b.toString(16)).slice(-2); }).join('');
     }
   }catch(e){}
   // Fallback (môi trường không có crypto.subtle) — yếu hơn nhưng vẫn dùng được
-  var h = 0, s = _PW_SALT + pw;
+  var h = 0, s = salt + pw;
   for (var i=0;i<s.length;i++){ h = (Math.imul(h,31) + s.charCodeAt(i))|0; }
   return 'f' + (h>>>0).toString(16);
 }
@@ -10737,7 +11091,16 @@ async function doLogin(){
   if (!acct){ showErr('Sai tài khoản hoặc mật khẩu.'); return; }
   if (acct.active === false){ showErr('Tài khoản đã bị khoá. Liên hệ quản trị viên.'); return; }
   var h = await _hashPass(p);
-  if (h !== acct.passHash){ showErr('Sai tài khoản hoặc mật khẩu.'); return; }
+  if (h !== acct.passHash) {
+    // Tai khoan tao truoc khi doi salt OME -> CRM: thu voi salt cu, dung thi nang cap ngay
+    var hOld = await _hashPass(p, _PW_SALT_OLD);
+    if (hOld === acct.passHash) {
+      acct.passHash = h;
+      pushUsers().catch(function(){});
+    } else {
+      showErr('Sai tài khoản hoặc mật khẩu.'); return;
+    }
+  }
   _authAccount = { username: acct.username, role: acct.role, name: acct.name, team: acct.team };
   saveLS('ome_auth', _authAccount);
   if (errEl) errEl.style.display = 'none';
@@ -12148,7 +12511,7 @@ function zaiHideError() {
       <button id="bc-compose-submit" onclick="submitBroadcastCompose()" style="padding:8px 16px;border:none;background:#00b14f;color:#fff;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">💾 Lưu & đẩy vào hàng đợi gửi</button>
     </div>
     <div style="font-size:10px;color:#9ca3af;margin-top:8px;">
-      Sau khi lưu, mở extension "OME Zalo AI Helper" trên chat.zalo.me → mục 📢 Gửi hàng loạt để bắt đầu gửi.
+      Sau khi lưu, mở extension "Duyên AI" trên chat.zalo.me → mục 📢 Gửi hàng loạt để bắt đầu gửi.
     </div>
   </div>
 </div>
@@ -13375,8 +13738,11 @@ function openTaskDetailModal(id){
   document.getElementById('task-detail-status-wrap').innerHTML = _taskStatusBadge(t.status) + (_taskIsOverdue(t) ? ' <span class="assign-badge-pill has-assign">Quá hạn</span>' : '');
   document.getElementById('task-detail-desc').textContent = t.description || 'Không có mô tả';
   document.getElementById('task-detail-images').innerHTML = (t.images||[]).map(function(u){
-    return '<img src="'+esc(u)+'" style="width:90px;height:90px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:pointer" onclick="window.open(\''+esc(u)+'\',\'_blank\')">';
+    return '<img src="'+esc(u)+'" class="task-detail-img" data-img-url="'+esc(u)+'" style="width:90px;height:90px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:pointer">';
   }).join('');
+  document.querySelectorAll('#task-detail-images .task-detail-img').forEach(function(img){
+    img.addEventListener('click', function(){ window.open(img.getAttribute('data-img-url'), '_blank'); });
+  });
   document.getElementById('task-detail-result').textContent = t.result || 'Chưa có kết quả';
 
   switchTaskDetailTab('overview');
@@ -13415,7 +13781,7 @@ function renderTaskComments(){
   listEl.innerHTML = allTaskComments.map(function(c){
     var initial = (c.author || '?').trim().charAt(0).toUpperCase();
     var when = c.createdAt ? new Date(c.createdAt).toLocaleString('vi-VN', { hour:'2-digit', minute:'2-digit', day:'2-digit', month:'2-digit' }) : '';
-    var imgs = (c.images||[]).map(function(u){ return '<img src="'+esc(u)+'" class="task-cm-img" onclick="window.open(\''+esc(u)+'\',\'_blank\')">'; }).join('');
+    var imgs = (c.images||[]).map(function(u){ return '<img src="'+esc(u)+'" class="task-cm-img" data-img-url="'+esc(u)+'">'; }).join('');
     return '<div class="task-cm-item">'+
       '<div class="task-cm-avatar">'+esc(initial)+'</div>'+
       '<div class="task-cm-bubble">'+
