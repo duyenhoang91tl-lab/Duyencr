@@ -690,11 +690,14 @@ function readDonChiTiet_() {
   for (var i = 0; i < vals.length; i++) {
     var r = vals[i];
     if (!r[1] && !r[3]) continue; // dong rong: khong co ngay va khong co khach
+    var nguonDon = r[7] ? String(r[7]).trim() : '';
+    if (nguonDon.toLowerCase().indexOf('bảo hành') !== -1 || nguonDon.toLowerCase().indexOf('bao hanh') !== -1) continue; // loai don nguon bao hanh khoi bao cao doanh so B/C
     out.push({
       ngayTaoDon:    r[1],
       khachHang:     r[3],
       soDienThoai:   r[4],
-      nguonDon:      r[7] ? String(r[7]).trim() : '',
+      nguonDon:      nguonDon,
+      theSale:       r[2] ? String(r[2]) : '',   // cot "Thẻ" (C) — danh sach sale tham gia don, tach bang dau phay ','
       sanPham:       r[8] ? String(r[8]) : '',   // tach bang dau phay ','
       maSanPham:     r[9] ? String(r[9]) : '',   // tach bang dau cham phay ';' — KHAC voi sanPham/soLuong
       soLuong:       r[10] ? String(r[10]) : '', // tach bang dau phay ','
@@ -1012,29 +1015,28 @@ function _resolvePeriods_(filters) {
 
 function buildSalesReportC_(filters) {
   filters = filters || {};
-  var dateField = filters.dateField === 'thoiGianHT' ? 'thoiGianHT' : 'ngayTao';
   var per = _resolvePeriods_(filters);
   var kpiMap = readKPITargets_();
   var UNASSIGNED = '(chưa gán sale)';
 
-  var rows = readDTTong_();
-  // Gom theo entity rieng cho tung ky (cur/prev), dung dung logic chia tien theo N sale/don
-  // nhu buildSalesReportA_ (so don khong chia — o day khong can so don nen bo qua, chi lay tien).
+  var rows = readDonChiTiet_();
+  // Theo yeu cau: B va C deu tinh tu sheet "du lieu don". Doanh thu/sale = Gia tri don hang sau giam gia (cot L)
+  // chia deu cho so sale tham gia (cot C "The", tach bang dau phay). Don nguon bao hanh da bi loai tu readDonChiTiet_.
   function aggregate(fromStr, toStr) {
     var bySale = {}, byKenh = {};
     var matchedOrders = [];
     for (var i = 0; i < rows.length; i++) {
       var row = rows[i];
-      var dt = parseVNDate_(row[dateField]);
+      var dt = parseVNDate_(row.ngayTaoDon);
       if (!dateInRange_(dt, fromStr, toStr)) continue;
       matchedOrders.push(row);
-      var kName = row.kenhBan || '(chưa có kênh)';
-      byKenh[kName] = (byKenh[kName] || 0) + row.giaTriDon;
-      var salesList = splitMulti_(row.saleBan, ',');
+      var kName = row.nguonDon || '(chưa rõ nguồn)';
+      byKenh[kName] = (byKenh[kName] || 0) + row.giaTriSauGiam;
+      var salesList = splitMulti_(row.theSale, ',');
       if (salesList.length === 0) salesList = [UNASSIGNED];
       var n = salesList.length;
       for (var k = 0; k < salesList.length; k++) {
-        bySale[salesList[k]] = (bySale[salesList[k]] || 0) + row.giaTriDon / n;
+        bySale[salesList[k]] = (bySale[salesList[k]] || 0) + row.giaTriSauGiam / n;
       }
     }
     return { bySale: bySale, byKenh: byKenh, orders: matchedOrders };
@@ -1063,9 +1065,9 @@ function buildSalesReportC_(filters) {
   }
 
   var mapOrder = function(o) {
-    return { ngayTao: o.ngayTao, thoiGianHT: o.thoiGianHT, kenhBan: o.kenhBan, saleBan: o.saleBan,
-             sanPham: o.sanPham, giaTriCoc: o.giaTriCoc, giaTriDon: o.giaTriDon, giaiDoan: o.giaiDoan,
-             trangThai: o.trangThai, id: o.id };
+    return { ngayTaoDon: o.ngayTaoDon, khachHang: o.khachHang, soDienThoai: o.soDienThoai,
+             nguonDon: o.nguonDon, theSale: o.theSale, sanPham: o.sanPham,
+             giaTriSauGiam: o.giaTriSauGiam, cod: o.cod, marketer: o.marketer };
   };
 
   return {
