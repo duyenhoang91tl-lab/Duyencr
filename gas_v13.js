@@ -642,6 +642,16 @@ function dateInRange_(dt, fromStr, toStr) {
 }
 
 // Tach chuoi multi-value theo 1 dau phan cach, trim tung phan tu, bo phan tu rong
+// Chuan hoa gia tri tien: khong co don nao thuc te duoi 1 nghin dong. Neu Sheet nhap thieu 3 so 0
+// (vd go "900" thay vi "900000" — pho bien khi go tat theo don vi nghin), gia tri doc len se < 1000
+// va SAI mot cach am tham (thieu dung 1000 lan) neu khong xu ly. Voi moi so > 0 va < 1000, hieu la
+// dang nhap theo don vi nghin dong va nhan lai 1000 cho dung don vi dong that.
+function _normMoney_(n) {
+  n = Number(n) || 0;
+  if (n > 0 && n < 1000) return n * 1000;
+  return n;
+}
+
 function splitMulti_(str, delimiter) {
   if (!str && str !== 0) return [];
   var s = String(str);
@@ -672,9 +682,9 @@ function readDTTong_() {
       saleBan:        r[13] ? String(r[13]) : '',
       sanPham:        r[14],
       phanLoai:       r[15],
-      giaTriCoc:      Number(r[16]) || 0,
-      giaTriDon:      Number(r[17]) || 0,
-      giaTriChenh:    Number(r[18]) || 0,
+      giaTriCoc:      _normMoney_(r[16]),
+      giaTriDon:      _normMoney_(r[17]),
+      giaTriChenh:    _normMoney_(r[18]),
       id:             r[19]
     });
   }
@@ -704,8 +714,8 @@ function readDonChiTiet_() {
       sanPham:       r[8] ? String(r[8]) : '',   // tach bang dau phay ','
       maSanPham:     r[9] ? String(r[9]) : '',   // tach bang dau cham phay ';' — KHAC voi sanPham/soLuong
       soLuong:       r[10] ? String(r[10]) : '', // tach bang dau phay ','
-      giaTriSauGiam: Number(r[11]) || 0,
-      cod:           Number(r[12]) || 0,
+      giaTriSauGiam: _normMoney_(r[11]),
+      cod:           _normMoney_(r[12]),
       marketer:      r[13] ? String(r[13]).trim() : ''
     });
   }
