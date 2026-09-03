@@ -15,7 +15,7 @@
     "*://pancake.vn/*",
     "*://*.pages.fm/*",
     "*://*.messenger.com/*",
-    "https://*/*"
+    "https://script.google.com/*"
   ],
   "background": {
     "service_worker": "background.js"

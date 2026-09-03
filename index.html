@@ -1968,7 +1968,10 @@ function showSyncErrorBanner() {
 async function pushCareToGS(phone) {
   if (!gsUrl) return;
   const care = careData[phone] || {};
-  const myScheds = schedules.filter(x => x.phone === phone);
+  // Loc dung nhu _careRow(): chi day len Sheet lich CS tu tao tay hoac lich auto DA xu ly (Done).
+  // Xem chu thich chi tiet o _careRow() phia tren — cung 1 ly do de tranh ghi de/hoi sinh lich
+  // auto ma Duyen da xoa tay truc tiep tren CareData Sheet.
+  const myScheds = schedules.filter(x => x.phone === phone && (!x.autoDao || x.done));
   const row = {
     phone,
     status: care.status||'', zalo: care.zalo||'', cs: care.cs||'', note: care.note||'',
@@ -2703,8 +2706,8 @@ function _rowHtml(c) {
   } else {
     tacdongHtml = `<span style="color:var(--hint);font-size:11px">—</span>`;
   }
-  return `<tr onclick="openDp('${esc(c.phone)}')">
-    <td class="col-name"><div class="cname">${esc(c.name)}</div><div class="cphone" style="display:flex;align-items:center;gap:4px">${c.phone}<button onclick="event.stopPropagation();copyPhone('${esc(c.phone)}')" title="Copy SĐT" style="background:none;border:none;cursor:pointer;font-size:11px;padding:0 2px;color:var(--hint);line-height:1;opacity:.6" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'">📋</button></div></td>
+  return `<tr data-phone="${esc(c.phone)}" onclick="openDp(this.dataset.phone)">
+    <td class="col-name"><div class="cname">${esc(c.name)}</div><div class="cphone" style="display:flex;align-items:center;gap:4px">${c.phone}<button data-phone="${esc(c.phone)}" onclick="event.stopPropagation();copyPhone(this.dataset.phone)" title="Copy SĐT" style="background:none;border:none;cursor:pointer;font-size:11px;padding:0 2px;color:var(--hint);line-height:1;opacity:.6" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'">📋</button></div></td>
     <td class="col-tier">${tb}</td>
     <td class="col-care">${cb}${khb ? '<br>'+khb : ''}</td>
     <td class="col-zalo">${zb}</td>
@@ -2713,7 +2716,7 @@ function _rowHtml(c) {
     <td class="col-cs">${csHtml}</td>
     <td class="col-carecs">${careCSHtml}</td>
     <td class="col-source" style="${srcDisp}"><div class="btags">${srcTags}${srcExtra}</div></td>
-    <td class="col-bcstatus" style="cursor:pointer;${bcDisp}" onclick="event.stopPropagation();openBcLogModal('${esc(c.phone)}')" title="Nhấn để xem log gửi TN của khách này">${_bcStatusBadge(c.phone)}</td>
+    <td class="col-bcstatus" data-phone="${esc(c.phone)}" style="cursor:pointer;${bcDisp}" onclick="event.stopPropagation();openBcLogModal(this.dataset.phone)" title="Nhấn để xem log gửi TN của khách này">${_bcStatusBadge(c.phone)}</td>
     <td class="col-note" style="font-size:11px;color:var(--muted)" title="${noteTitle}">${noteStr}</td>
     <td class="col-sched">${nsHtml}</td>
     <td class="col-lastact" style="${lastActDisp}">${lastActHtml}</td>
@@ -2893,7 +2896,7 @@ function renderScheduleTab() {
           const c = allCustomers.find(x=>x.phone===it.phone);
           const st = SCHED_TYPES.find(x=>x.key===it.type)||SCHED_TYPES[0];
           const _nsh = _schedNoteShort(it);
-          html += `<div class="sched-item" onclick="openDp('${esc(it.phone)}')">
+          html += `<div class="sched-item" data-phone="${esc(it.phone)}" onclick="openDp(this.dataset.phone)">
             <div class="sched-dot" style="background:${st.color}"></div>
             <div class="sched-type" style="font-weight:700;color:${st.color}">${_schedShortCode(it)}</div>
             <div class="sched-name">${c?esc(_lastWord(c.name)):it.phone}</div>
@@ -2926,7 +2929,7 @@ function renderOverdueTab() {
       const c = allCustomers.find(x=>x.phone===it.phone);
       const st = SCHED_TYPES.find(x=>x.key===it.type)||SCHED_TYPES[0];
       const _nsh2 = _schedNoteShort(it);
-      html += `<div class="sched-item sched-overdue" onclick="openDp('${esc(it.phone)}')">
+      html += `<div class="sched-item sched-overdue" data-phone="${esc(it.phone)}" onclick="openDp(this.dataset.phone)">
         <div class="sched-dot" style="background:${st.color}"></div>
         <div class="sched-type" style="font-weight:700;color:${st.color}">${_schedShortCode(it)}</div>
         <div class="sched-name">${c?esc(_lastWord(c.name)):it.phone}</div>
@@ -3085,8 +3088,8 @@ function openDp(phone) {
   txt('dp-name', c.name);
   document.getElementById('dp-meta').innerHTML = `
     <span class="cphone" id="dp-phone-display">${c.phone}</span>
-    <button onclick="copyPhone('${esc(c.phone)}')" title="Copy số điện thoại" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">📋</button>
-    <button onclick="openEditPhone('${esc(c.phone)}')" title="Sửa số điện thoại" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">✏️</button>
+    <button data-phone="${esc(c.phone)}" onclick="copyPhone(this.dataset.phone)" title="Copy số điện thoại" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">📋</button>
+    <button data-phone="${esc(c.phone)}" onclick="openEditPhone(this.dataset.phone)" title="Sửa số điện thoại" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">✏️</button>
     ${tierBadge(c.tier)}
     ${careBadge(c.careStatus)}
     ${zaloBadge(c.zaloStatus)}
@@ -3156,10 +3159,10 @@ function renderCareTab(c) {
         <div class="nickzalo-field">
           <div class="nickzalo-label">
             <span class="nickzalo-label-text">💬 Nick Zalo</span>
-            <button class="nickzalo-manage-btn" onclick="openNickZaloModal('${esc(c.phone)}')">⚙ Quản lý danh sách</button>
+            <button class="nickzalo-manage-btn" data-phone="${esc(c.phone)}" onclick="openNickZaloModal(this.dataset.phone)">⚙ Quản lý danh sách</button>
           </div>
           <div class="nickzalo-select-row">
-            <select class="nickzalo-select" id="cs-nickzalo-sel" onchange="addNickZaloChip('${esc(c.phone)}',this)">
+            <select class="nickzalo-select" id="cs-nickzalo-sel" data-phone="${esc(c.phone)}" onchange="addNickZaloChip(this.dataset.phone,this)">
               <option value="">— Chọn nick Zalo —</option>
               ${_buildNickZaloOptions()}
             </select>
@@ -3179,14 +3182,14 @@ function renderCareTab(c) {
         </div>
         <input class="form-input" type="date" id="cs-birthday" value="${care.birthday||''}"
                title="Nhắc hẹn sinh nhật hàng năm tự động"
-               onchange="onBdayChange(this.value,'${esc(c.phone)}')">
+               data-phone="${esc(c.phone)}" onchange="onBdayChange(this.value,this.dataset.phone)">
         ${care.birthday ? `<div style="font-size:10px;color:#be185d;margin-top:2px">🔔 Sẽ nhắc mỗi năm vào ngày này</div>` : ''}
       </div>
       <div>
         <div class="form-label">🏷 Nhãn phân loại (tự đặt)</div>
         <input class="form-input" id="cs-tag" placeholder="VD: VIP, Khách sỉ, Combo A..."
                title="Nhãn tự do để lọc khi tạo chiến dịch — không liên quan tag của Zalo"
-               value="${esc(care.tag||'')}" onchange="onTagChange(this.value,'${esc(c.phone)}')">
+               value="${esc(care.tag||'')}" data-phone="${esc(c.phone)}" onchange="onTagChange(this.value,this.dataset.phone)">
       </div>
     </div>
     <div class="remind-panel">
@@ -3213,7 +3216,7 @@ function renderCareTab(c) {
                  style="width:140px;font-size:11px" title="Hoặc chọn ngày cụ thể">
           <input class="form-input" id="remind-note" placeholder="Nội dung nhắc..." style="flex:1;min-width:120px">
         </div>
-        <button class="btn secondary" style="width:100%;font-size:12px" onclick="addCustomRemind('${esc(c.phone)}')">
+        <button class="btn secondary" style="width:100%;font-size:12px" data-phone="${esc(c.phone)}" onclick="addCustomRemind(this.dataset.phone)">
           + Thêm lịch nhắc hẹn
         </button>
       </div>
@@ -3236,8 +3239,8 @@ function renderCareTab(c) {
         <div class="form-label">Số điện thoại</div>
         <div style="display:flex;gap:4px;align-items:center">
           <input class="form-input" value="${c.phone}" readonly style="background:var(--surface2);flex:1">
-          <button onclick="copyPhone('${esc(c.phone)}')" title="Copy SĐT" class="btn sm">📋</button>
-          <button onclick="openEditPhone('${esc(c.phone)}')" title="Sửa SĐT" class="btn sm">✏️ Sửa</button>
+          <button data-phone="${esc(c.phone)}" onclick="copyPhone(this.dataset.phone)" title="Copy SĐT" class="btn sm">📋</button>
+          <button data-phone="${esc(c.phone)}" onclick="openEditPhone(this.dataset.phone)" title="Sửa SĐT" class="btn sm">✏️ Sửa</button>
         </div>
       </div>
     </div>
@@ -3248,14 +3251,14 @@ function renderCareTab(c) {
       </div>
       <div style="display:flex;gap:6px;align-items:flex-start">
         <textarea class="form-ta" id="cs-note-new" placeholder="Thêm ghi chú mới..." style="min-height:52px;flex:1"></textarea>
-        <button onclick="addNoteEntry('${esc(c.phone)}')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px;white-space:nowrap;margin-top:2px">➕ Thêm</button>
+        <button data-phone="${esc(c.phone)}" onclick="addNoteEntry(this.dataset.phone)" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px;white-space:nowrap;margin-top:2px">➕ Thêm</button>
       </div>
       <div id="cs-note-history" style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
         ${_renderNoteHistory(care.note||c.careNote||'')}
       </div>
       <input type="hidden" id="cs-note" value="${esc(care.note||c.careNote||'')}">
     </div>
-    <button class="save-btn" onclick="saveCare('${esc(c.phone)}')">💾 Lưu tình trạng ${gsUrl?'+ Sync GSheets':''}</button>
+    <button class="save-btn" data-phone="${esc(c.phone)}" onclick="saveCare(this.dataset.phone)">💾 Lưu tình trạng ${gsUrl?'+ Sync GSheets':''}</button>
   </div>
   <div class="dp-section">
     <div class="dp-stitle">📅 Lịch chăm sóc nhanh</div>
@@ -3281,7 +3284,7 @@ function renderCareTab(c) {
         <input class="form-input" style="margin-top:4px" id="sched-hen-note" placeholder="Sản phẩm / lý do..." value="${esc(care.schedHenNote||'')}">
       </div>
     </div>
-    <button class="save-btn" style="background:var(--blue);border-color:var(--blue)" onclick="saveCareSchedules('${esc(c.phone)}')">💾 Lưu lịch hẹn ${gsUrl?'+ Sync GSheets':''}</button>
+    <button class="save-btn" style="background:var(--blue);border-color:var(--blue)" data-phone="${esc(c.phone)}" onclick="saveCareSchedules(this.dataset.phone)">💾 Lưu lịch hẹn ${gsUrl?'+ Sync GSheets':''}</button>
   </div>
   ${(()=>{
     const daoOrders = c.orders.filter(o => _isDataDaoRenew(o.source));
@@ -3290,7 +3293,7 @@ function renderCareTab(c) {
     return `<div class="dp-section" style="border:1.5px solid var(--orange,#e8a04a);border-radius:8px;padding:10px 12px">
       <div class="dp-stitle" style="color:var(--orange,#e8a04a);margin-bottom:6px">⚡ Lịch tự động Data Đảo</div>
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--text)">
-        <input type="checkbox" id="dao-sched-exclude" style="width:15px;height:15px;cursor:pointer" ${excluded?'checked':''} onchange="_toggleDaoSchedExclude('${esc(c.phone)}',this.checked)">
+        <input type="checkbox" id="dao-sched-exclude" data-phone="${esc(c.phone)}" style="width:15px;height:15px;cursor:pointer" ${excluded?'checked':''} onchange="_toggleDaoSchedExclude(this.dataset.phone,this.checked)">
         <span>Bỏ lịch tự động cho khách này <span style="color:var(--muted)">(tích nếu không cần chăm sóc)</span></span>
       </label>
     </div>`;
@@ -3319,7 +3322,7 @@ function renderSchedTabHtml(c) {
     <div class="form-row">
       <textarea class="form-ta" id="new-snote" placeholder="Nội dung nhắc nhở..." style="min-height:48px"></textarea>
     </div>
-    <button class="save-btn" style="margin-bottom:14px" onclick="addSched('${esc(c.phone)}')">+ Thêm lịch hẹn</button>
+    <button class="save-btn" style="margin-bottom:14px" data-phone="${esc(c.phone)}" onclick="addSched(this.dataset.phone)">+ Thêm lịch hẹn</button>
     <div class="dp-stitle">Lịch đang chờ (${upcoming.length})</div>
     ${upcoming.length ? upcoming.map(it=>{
       const st=SCHED_TYPES.find(x=>x.key===it.type)||SCHED_TYPES[0];
@@ -3348,7 +3351,7 @@ function renderSchedTabHtml(c) {
           </div>
           <textarea class="form-ta" id="${eid}_note" style="min-height:38px;margin-bottom:6px" placeholder="Nội dung nhắc...">${esc(it.note||'')}</textarea>
           <div style="display:flex;gap:5px">
-            <button class="save-btn" style="flex:1;padding:5px" onclick="_schedEditSave('${it.id}','${eid}','${esc(c.phone)}')">💾 Lưu</button>
+            <button class="save-btn" style="flex:1;padding:5px" data-phone="${esc(c.phone)}" onclick="_schedEditSave('${it.id}','${eid}',this.dataset.phone)">💾 Lưu</button>
             <button onclick="_schedEditToggle('${eid}')" style="border:1px solid var(--border);background:var(--surface);border-radius:5px;padding:5px 10px;cursor:pointer;font-size:11px">Hủy</button>
           </div>
         </div>
@@ -3403,7 +3406,7 @@ function renderHistTab(c) {
         <input type="checkbox" id="mo-auto-sched"> Tự động thêm lịch chăm sóc (+7, +14 ngày, +1, +2 tháng)
       </label>
       <div style="display:flex;gap:6px">
-        <button class="save-btn" style="flex:1;padding:6px" onclick="addManualOrder('${esc(c.phone)}')">💾 Lưu đơn hàng</button>
+        <button class="save-btn" style="flex:1;padding:6px" data-phone="${esc(c.phone)}" onclick="addManualOrder(this.dataset.phone)">💾 Lưu đơn hàng</button>
         <button onclick="_toggleAddOrderForm()" style="border:1px solid var(--border);background:var(--surface);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px">Hủy</button>
       </div>
     </div>
@@ -3425,7 +3428,7 @@ function renderHistTab(c) {
             style="border:none;background:${isMissing?'var(--orange,#e8a04a)':'var(--surface2)'};color:${isMissing?'#fff':'var(--muted)'};border-radius:4px;padding:1px 7px;font-size:11px;cursor:pointer;margin-left:6px;border:1px solid ${isMissing?'var(--orange,#e8a04a)':'var(--border)'}">
             ${isMissing?'⚠ Cập nhật':'✏ Sửa'}
           </button>
-          <button onclick="_histDeleteOrder('${esc(c.phone)}',${realIdx})" title="Xóa đơn này"
+          <button data-phone="${esc(c.phone)}" onclick="_histDeleteOrder(this.dataset.phone,${realIdx})" title="Xóa đơn này"
             style="border:1px solid var(--red-b,#fca5a5);background:var(--red-bg,#fff1f2);color:var(--red,#dc2626);border-radius:4px;padding:1px 7px;font-size:11px;cursor:pointer;margin-left:4px">
             🗑 Xóa
           </button>
@@ -3460,7 +3463,7 @@ function renderHistTab(c) {
           </div>
           <div style="display:flex;gap:6px">
             <button class="save-btn" style="flex:1;background:var(--orange,#e8a04a);border-color:var(--orange,#e8a04a);padding:6px"
-              onclick="_histEditSave('${esc(c.phone)}',${realIdx},'${eid}')">💾 Lưu cập nhật</button>
+              data-phone="${esc(c.phone)}" onclick="_histEditSave(this.dataset.phone,${realIdx},'${eid}')">💾 Lưu cập nhật</button>
             <button onclick="_histEditToggle('${eid}')"
               style="border:1px solid var(--border);background:var(--surface);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px">Hủy</button>
           </div>
@@ -3662,7 +3665,7 @@ function _renderNoteHistory(raw) {
         ${i===0 ? '<span style="background:#16a34a22;color:#16a34a;font-size:9px;padding:1px 5px;border-radius:20px;font-weight:600">MỚI NHẤT</span>' : ''}
       </div>` : ''}
       <div style="font-size:12px;white-space:pre-wrap;line-height:1.5">${esc(n.text)}</div>
-      <button onclick="deleteNoteEntry(event,this,'${esc(raw).replace(/'/g,"\\'")}',${i})"
+      <button data-raw="${esc(raw)}" onclick="deleteNoteEntry(event,this,this.dataset.raw,${i})"
         style="position:absolute;top:6px;right:6px;background:none;border:none;cursor:pointer;color:var(--hint);font-size:11px;padding:2px 4px;border-radius:4px;opacity:.5"
         onmouseover="this.style.opacity='1';this.style.background='#ef444422'"
         onmouseout="this.style.opacity='.5';this.style.background='none'" title="Xóa ghi chú này">✕</button>
@@ -3751,8 +3754,8 @@ function saveCare(phone) {
   applyFilters();
   document.getElementById('dp-meta').innerHTML = `
     <span class="cphone" id="dp-phone-display">${phone}</span>
-    <button onclick="copyPhone('${esc(phone)}')" title="Copy số điện thoại" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">📋</button>
-    <button onclick="openEditPhone('${esc(phone)}')" title="Sửa số điện thoại" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">✏️</button>
+    <button data-phone="${esc(phone)}" onclick="copyPhone(this.dataset.phone)" title="Copy số điện thoại" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">📋</button>
+    <button data-phone="${esc(phone)}" onclick="openEditPhone(this.dataset.phone)" title="Sửa số điện thoại" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">✏️</button>
     ${tierBadge(c?c.tier:'Chưa bán lại được')}
     ${careBadge(careData[phone].status)}
     ${zaloBadge(careData[phone].zalo)}
@@ -3864,7 +3867,7 @@ function _renderNickZaloChips(arr, phone) {
   if (!arr || !arr.length) return '';
   return arr.map(function(name, idx) {
     return '<span class="nickzalo-chip">💬 ' + esc(name) +
-      '<button class="nz-x" title="Bỏ nick này" onclick="removeNickZaloChip(\'' + esc(phone) + '\',' + idx + ')">✕</button>' +
+      '<button class="nz-x" data-phone="' + esc(phone) + '" title="Bỏ nick này" onclick="removeNickZaloChip(this.dataset.phone,' + idx + ')">✕</button>' +
       '</span>';
   }).join('');
 }
@@ -4642,7 +4645,7 @@ function updateBrandList() {
   const sorted=Object.entries(bc).sort((a,b)=>b[1]-a[1]);
   document.getElementById('brand-list').innerHTML=
     `<button class="section-btn bitem ${currentBrand==='all'?'active':''}" onclick="setBrand('all',this)"><span>Tất cả</span><span class="fbadge">${fmt(base.length)}</span></button>`+
-    sorted.map(([b,n])=>`<button class="section-btn bitem ${currentBrand===b?'active':''}" onclick="setBrand('${esc(b)}',this)"><span>${esc(b)}</span><span class="fbadge">${n}</span></button>`).join('');
+    sorted.map(([b,n])=>`<button class="section-btn bitem ${currentBrand===b?'active':''}" data-brand="${esc(b)}" onclick="setBrand(this.dataset.brand,this)"><span>${esc(b)}</span><span class="fbadge">${n}</span></button>`).join('');
 }
 
 // ── Đổi chế độ lọc CS: phụ trách / chăm sóc / cả hai ──
@@ -4829,13 +4832,13 @@ function openEditPhone(oldPhone) {
         <div style="font-size:11px;color:var(--hint);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">SĐT hiện tại</div>
         <div style="font-size:14px;font-weight:600;font-family:monospace;color:var(--text);margin-bottom:14px;padding:6px 10px;background:var(--surface2);border-radius:var(--rsm)">${esc(oldPhone)}</div>
         <div style="font-size:11px;color:var(--hint);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">SĐT mới</div>
-        <input id="edit-phone-input" class="form-input" type="tel" placeholder="Nhập số điện thoại mới..." value="${esc(oldPhone)}"
+        <input id="edit-phone-input" class="form-input" type="tel" placeholder="Nhập số điện thoại mới..." value="${esc(oldPhone)}" data-old-phone="${esc(oldPhone)}"
           style="width:100%;margin-bottom:8px;font-size:14px;font-family:monospace"
-          onkeydown="if(event.key==='Enter') saveEditPhone('${esc(oldPhone)}')">
+          onkeydown="if(event.key==='Enter') saveEditPhone(this.dataset.oldPhone)">
         <div id="edit-phone-err" style="font-size:11px;color:var(--red);margin-bottom:8px;display:none"></div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
           <button class="btn" onclick="document.getElementById('edit-phone-modal').remove()">Huỷ</button>
-          <button class="btn primary" onclick="saveEditPhone('${esc(oldPhone)}')">💾 Lưu${gsUrl ? ' + Sync GSheets' : ''}</button>
+          <button class="btn primary" data-old-phone="${esc(oldPhone)}" onclick="saveEditPhone(this.dataset.oldPhone)">💾 Lưu${gsUrl ? ' + Sync GSheets' : ''}</button>
         </div>
       </div>
     </div>`;
@@ -5222,15 +5225,15 @@ function renderReminderPanel(){
     var typeLabel = (rm.customLabel) ? rm.customLabel : st.label;
     var cardClass = rm.type==='birthday' ? 'rp-card rp-bday' : (rm.type==='custom'&&rm.customLabel ? 'rp-card rp-custom' : 'rp-card');
     var doneAction = rm.careField
-      ? 'event.stopPropagation();markCareSchedDone(\''+esc(rm.phone)+'\',\''+rm.careField+'\')'
+      ? 'event.stopPropagation();markCareSchedDone(this.dataset.phone,\''+rm.careField+'\')'
       : (rm.schedId ? 'event.stopPropagation();markDone(\''+rm.schedId+'\')' : 'event.stopPropagation();_dismissReminder(\''+rm.id+'\')');
-    html += '<div class="'+cardClass+'"><div class="rp-card-main" onclick="openDp(\''+esc(rm.phone)+'\')">'+
+    html += '<div class="'+cardClass+'"><div class="rp-card-main" data-phone="'+esc(rm.phone)+'" onclick="openDp(this.dataset.phone)">'+
       '<div class="rp-type" style="background:'+st.color+'">'+esc(typeLabel)+'</div>'+
       '<div class="rp-cust">'+esc(rm.name)+'</div>'+
       '<div class="rp-note" style="color:'+(over?'var(--red)':'var(--muted)')+'">'+(over?'⚠ Quá hạn · ':'📅 ')+fmtDate(rm.date)+(rm.note?(' · '+esc(rm.note)):'')+'</div>'+
       (rm.owner?('<div class="rp-owner">👤 '+esc(rm.owner)+'</div>'):'')+'</div>'+
       '<div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0">'+
-      '<button class="rp-hbtn" style="background:var(--green);color:#fff;font-size:10px;padding:2px 7px" title="Đánh dấu hoàn thành" onclick="'+doneAction+'">✓ Done</button>'+
+      '<button class="rp-hbtn" style="background:var(--green);color:#fff;font-size:10px;padding:2px 7px" data-phone="'+esc(rm.phone)+'" title="Đánh dấu hoàn thành" onclick="'+doneAction+'">✓ Done</button>'+
       '<button class="rp-dismiss" title="Tắt hôm nay" onclick="event.stopPropagation();_dismissReminder(\''+rm.id+'\')">✕</button>'+
       '</div></div>';
   }
@@ -5409,7 +5412,7 @@ function renderColDdItems(col, query) {
       </div>`;
     }
     return `<label class="col-dd-item">
-      <input type="checkbox" value="${esc(v)}" ${colFilters[col].has(v)?'checked':''} onchange="toggleColFilterVal('${col}','${esc(v)}',this.checked)">
+      <input type="checkbox" value="${esc(v)}" data-val="${esc(v)}" ${colFilters[col].has(v)?'checked':''} onchange="toggleColFilterVal('${col}',this.dataset.val,this.checked)">
       ${v ? esc(v) : '<span style="color:var(--hint)">— (trống)</span>'}
     </label>`;
   }).join('');
@@ -5485,7 +5488,7 @@ function openAdvModal() {
 function buildAdvChips(key, values, selectedSet, containerId) {
   const el = document.getElementById(containerId);
   if (!el) return;
-  el.innerHTML = values.map(v=>`<span class="adv-chip ${selectedSet.has(v)?'selected':''}" onclick="toggleAdvChip('${key}','${esc(v)}',this)">${esc(v)}</span>`).join('');
+  el.innerHTML = values.map(v=>`<span class="adv-chip ${selectedSet.has(v)?'selected':''}" data-val="${esc(v)}" onclick="toggleAdvChip('${key}',this.dataset.val,this)">${esc(v)}</span>`).join('');
 }
 function toggleAdvChip(key, val, el) {
   if (advFilters[key].has(val)) { advFilters[key].delete(val); el.classList.remove('selected'); }
@@ -5770,7 +5773,7 @@ function renderAssignCreate() {
     <input class="assign-input" id="assign-cs-search" placeholder="🔍 Gõ tên CS để tìm nhanh..." style="width:100%;margin-bottom:8px;box-sizing:border-box"
       oninput="_filterAssignCSChips(this.value)">
     <div class="assign-cs-list" id="assign-cs-chips" style="margin-bottom:8px">
-      ${allCS.map(cs => `<div class="assign-cs-chip-multi ${_advAssign.selectedCS.has(cs)?'selected':''}" onclick="_advAssignToggleCS('${esc(cs)}')">${esc(cs)}</div>`).join('')}
+      ${allCS.map(cs => `<div class="assign-cs-chip-multi ${_advAssign.selectedCS.has(cs)?'selected':''}" data-cs="${esc(cs)}" onclick="_advAssignToggleCS(this.dataset.cs)">${esc(cs)}</div>`).join('')}
       ${allCS.length===0?'<span style="color:var(--hint);font-size:12px">Chưa có CS trong hệ thống</span>':''}
     </div>
     <div style="display:flex;align-items:center;gap:8px">
@@ -5844,8 +5847,8 @@ function _renderDistTable(pool, csList, dist, distTotal, remaining) {
           const pct = totalPool > 0 ? Math.round(n/totalPool*100) : 0;
           return `<tr>
             <td><strong>${esc(cs)}</strong></td>
-            <td style="text-align:center"><input class="assign-dist-input" type="number" min="0" max="${totalPool}" value="${n}"
-              oninput="_advAssign.customDist['${esc(cs)}']=parseInt(this.value)||0;_refreshDistPreview()"></td>
+            <td style="text-align:center"><input class="assign-dist-input" type="number" min="0" max="${totalPool}" value="${n}" data-cs="${esc(cs)}"
+              oninput="_advAssign.customDist[this.dataset.cs]=parseInt(this.value)||0;_refreshDistPreview()"></td>
             <td><div class="assign-dist-bar"><div class="assign-dist-fill" style="width:${pct}%"></div></div><span style="font-size:10px;color:var(--muted)">${pct}%</span></td>
             <td style="white-space:nowrap;font-size:11px;color:var(--green);font-weight:600">${n} KH</td>
           </tr>`;
@@ -6444,7 +6447,7 @@ function renderMyDataTab() {
       const ns = nextSched ? nextSched(p) : null;
       const schedHtml = ns ? `<span style="font-size:10px;color:${isOverdue(ns)?'var(--red)':'#2563eb'}">📅 ${schedTypeLabel(ns.type)} · ${fmtDate(ns.date)}</span>` : '';
       return `<div class="my-data-row" style="flex-wrap:wrap;gap:4px">
-        <input type="checkbox" class="my-data-check" ${isDone?'checked':''} onchange="toggleMyDataDone('${p}','${esc(csName)}',this.checked)">
+        <input type="checkbox" class="my-data-check" ${isDone?'checked':''} data-cs="${esc(csName)}" onchange="toggleMyDataDone('${p}',this.dataset.cs,this.checked)">
         <div style="flex:1;min-width:0" class="${isDone?'my-data-done':''}">
           <div style="font-weight:500;display:flex;align-items:center;gap:6px">${c ? esc(c.name) : p}${lastActHtml}</div>
           <div style="font-size:11px;color:var(--muted)">${p} · ${c?c.tier:''} · ${c?careBadgeText(c.careStatus):''}</div>
@@ -7158,6 +7161,20 @@ function doGet(e) {
       return jsonOut_(resB);
     }
     if (action === 'salesReportOptions') return jsonOut_(getSalesReportOptions_());
+    if (action === 'salesReportC') {
+      var pC = e.parameter || {};
+      var fC = { dateField: pC.dateField || 'ngayTao', periodType: pC.periodType || 'week',
+                 weekOffset: pC.weekOffset || 0, monthOffset: pC.monthOffset || 0, quarterOffset: pC.quarterOffset || 0,
+                 customCurFrom: pC.customCurFrom || '', customCurTo: pC.customCurTo || '',
+                 customPrevFrom: pC.customPrevFrom || '', customPrevTo: pC.customPrevTo || '' };
+      var cacheC = CacheService.getScriptCache();
+      var cKeyC = 'salesC_' + JSON.stringify(fC);
+      var cachedC = cacheC.get(cKeyC);
+      if (cachedC) { try { return jsonOut_(JSON.parse(cachedC)); } catch(ec) {} }
+      var resC = buildSalesReportC_(fC);
+      try { cacheC.put(cKeyC, JSON.stringify(resC), 120); } catch(ec) {}
+      return jsonOut_(resC);
+    }
 
     if (action === 'assign')    return jsonOut_({ assignHistory: readAssign_(ss.getSheetByName(SH_ASSIGN)) });
     if (action === 'tasks')     return jsonOut_({ tasks: readTasks_(ss.getSheetByName(SH_TASK)) });
@@ -7369,11 +7386,14 @@ function readDonChiTiet_() {
   for (var i = 0; i < vals.length; i++) {
     var r = vals[i];
     if (!r[1] && !r[3]) continue; // dong rong: khong co ngay va khong co khach
+    var nguonDon = r[7] ? String(r[7]).trim() : '';
+    if (nguonDon.toLowerCase().indexOf('bảo hành') !== -1 || nguonDon.toLowerCase().indexOf('bao hanh') !== -1) continue; // loai don nguon bao hanh khoi bao cao doanh so B/C
     out.push({
       ngayTaoDon:    r[1],
       khachHang:     r[3],
       soDienThoai:   r[4],
-      nguonDon:      r[7] ? String(r[7]).trim() : '',
+      nguonDon:      nguonDon,
+      theSale:       r[2] ? String(r[2]) : '',   // cot "Thẻ" (C) — danh sach sale tham gia don, tach bang dau phay ','
       sanPham:       r[8] ? String(r[8]) : '',   // tach bang dau phay ','
       maSanPham:     r[9] ? String(r[9]) : '',   // tach bang dau cham phay ';' — KHAC voi sanPham/soLuong
       soLuong:       r[10] ? String(r[10]) : '', // tach bang dau phay ','
@@ -7569,6 +7589,276 @@ function buildSalesReportB_(filters) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+//  BAO CAO C: SO SANH THEO KY (tuan/thang/quy/tuy chinh) — theo Nhan vien (Sale ban) & Kenh ban
+//  Co doi chieu KPI/chi tieu (doc tu tab rieng KPI_ChiTieu, Duyen tu dien tay).
+// ═══════════════════════════════════════════════════════════════
+
+var KPI_SHEET = 'KPI_ChiTieu';
+
+// Tao san tab KPI_ChiTieu (co huong dan + vi du) neu chua co — de Duyen tu dien chi tieu.
+function ensureKPISheet_() {
+  var ss = getCrmSS_();
+  var sh = ss.getSheetByName(KPI_SHEET);
+  if (sh) return sh;
+  sh = ss.insertSheet(KPI_SHEET);
+  var rows = [
+    ['PeriodKey', 'LoaiDoiTuong', 'TenDoiTuong', 'KPI_ChiTieu', 'GhiChu'],
+    ['2026-W35', 'sale', 'ngoctuoi2k3', 50000000, 'VÍ DỤ — tuần ISO: YYYY-Wnn (Thứ 2 → Chủ nhật). Xóa dòng ví dụ này.'],
+    ['2026-08', 'sale', 'ngoctuoi2k3', 200000000, 'VÍ DỤ — tháng: YYYY-MM. Xóa dòng ví dụ này.'],
+    ['2026-Q3', 'kenh', 'Tiktok', 500000000, 'VÍ DỤ — quý: YYYY-Qn (Q1..Q4). Xóa dòng ví dụ này.'],
+    ['', '', '', '', 'LoaiDoiTuong chỉ nhận "sale" hoặc "kenh". TenDoiTuong phải gõ ĐÚNG y nguyên tên Sale bán / Kênh bán đang dùng trong DT TỔNG (phân biệt hoa/thường, khoảng trắng). Với kỳ "Tùy chỉnh" (2 khoảng ngày tự chọn) sẽ không tra được KPI vì không có PeriodKey cố định — chỉ áp dụng cho Tuần/Tháng/Quý.']
+  ];
+  sh.getRange(1, 1, rows.length, 5).setValues(rows);
+  sh.getRange(1, 1, 1, 5).setFontWeight('bold');
+  try { sh.autoResizeColumns(1, 5); } catch (ecw) {}
+  return sh;
+}
+
+function readKPITargets_() {
+  var ss = getCrmSS_();
+  var sh = ss.getSheetByName(KPI_SHEET);
+  if (!sh) { ensureKPISheet_(); sh = ss.getSheetByName(KPI_SHEET); }
+  var last = sh.getLastRow();
+  var map = {};
+  if (last < 2) return map;
+  var vals = sh.getRange(2, 1, last - 1, 4).getValues();
+  for (var i = 0; i < vals.length; i++) {
+    var periodKey = String(vals[i][0] || '').trim();
+    var entType = String(vals[i][1] || '').trim().toLowerCase();
+    var entName = String(vals[i][2] || '').trim();
+    var kpi = Number(vals[i][3]) || 0;
+    if (!periodKey || !entType || !entName) continue;
+    map[periodKey + '|' + entType + '|' + entName] = kpi;
+  }
+  return map;
+}
+
+function getKPI_(kpiMap, periodKey, entType, entName) {
+  if (!periodKey) return 0;
+  return kpiMap[periodKey + '|' + entType + '|' + entName] || 0;
+}
+
+// Thu 2 cua tuan chua ngay d (khong doi d truyen vao)
+function _getMonday_(d) {
+  var dt = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  var day = dt.getDay();
+  var diff = (day === 0 ? -6 : 1) - day;
+  dt.setDate(dt.getDate() + diff);
+  return dt;
+}
+function _isoWeekRange_(baseDate, weekOffset) {
+  var mon = _getMonday_(baseDate);
+  mon.setDate(mon.getDate() + weekOffset * 7);
+  var sun = new Date(mon); sun.setDate(sun.getDate() + 6);
+  return { from: mon, to: sun };
+}
+function _isoWeekKey_(d) {
+  var dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  var dayNum = dt.getUTCDay() || 7;
+  dt.setUTCDate(dt.getUTCDate() + 4 - dayNum);
+  var yearStart = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1));
+  var weekNo = Math.ceil((((dt - yearStart) / 86400000) + 1) / 7);
+  return dt.getUTCFullYear() + '-W' + String(weekNo).padStart(2, '0');
+}
+function _monthRange_(baseDate, monthOffset) {
+  var y = baseDate.getFullYear(), m = baseDate.getMonth() + monthOffset;
+  return { from: new Date(y, m, 1), to: new Date(y, m + 1, 0) };
+}
+function _monthKey_(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+function _quarterRange_(baseDate, quarterOffset) {
+  var y = baseDate.getFullYear(), q = Math.floor(baseDate.getMonth() / 3) + quarterOffset;
+  var yy = y + Math.floor(q / 4), qq = ((q % 4) + 4) % 4;
+  var startMonth = qq * 3;
+  return { from: new Date(yy, startMonth, 1), to: new Date(yy, startMonth + 3, 0) };
+}
+function _quarterKey_(d) { return d.getFullYear() + '-Q' + (Math.floor(d.getMonth() / 3) + 1); }
+function _ymdLocal_(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function _labelVN_(d) {
+  return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
+}
+
+// Tinh khoang ngay + PeriodKey cua ky nay & ky truoc, tuy periodType.
+function _resolvePeriods_(filters) {
+  var today = new Date();
+  var periodType = filters.periodType || 'week';
+  var cur, prev, curKey = '', prevKey = '';
+
+  if (periodType === 'week') {
+    var wOff = Number(filters.weekOffset) || 0;
+    cur = _isoWeekRange_(today, wOff);
+    prev = _isoWeekRange_(today, wOff - 1);
+    curKey = _isoWeekKey_(cur.from); prevKey = _isoWeekKey_(prev.from);
+  } else if (periodType === 'month') {
+    var mOff = Number(filters.monthOffset) || 0;
+    cur = _monthRange_(today, mOff);
+    prev = _monthRange_(today, mOff - 1);
+    curKey = _monthKey_(cur.from); prevKey = _monthKey_(prev.from);
+  } else if (periodType === 'quarter') {
+    var qOff = Number(filters.quarterOffset) || 0;
+    cur = _quarterRange_(today, qOff);
+    prev = _quarterRange_(today, qOff - 1);
+    curKey = _quarterKey_(cur.from); prevKey = _quarterKey_(prev.from);
+  } else { // custom — 2 khoang ngay hoan toan tu chon, khong lien quan nhau, KHONG co PeriodKey KPI
+    cur = { from: parseVNDate_(filters.customCurFrom) || today, to: parseVNDate_(filters.customCurTo) || today };
+    prev = { from: parseVNDate_(filters.customPrevFrom) || today, to: parseVNDate_(filters.customPrevTo) || today };
+    curKey = ''; prevKey = '';
+  }
+  return {
+    curFrom: _ymdLocal_(cur.from), curTo: _ymdLocal_(cur.to), curKey: curKey, curLabel: _labelVN_(cur.from) + ' - ' + _labelVN_(cur.to),
+    prevFrom: _ymdLocal_(prev.from), prevTo: _ymdLocal_(prev.to), prevKey: prevKey, prevLabel: _labelVN_(prev.from) + ' - ' + _labelVN_(prev.to)
+  };
+}
+
+function buildSalesReportC_(filters) {
+  filters = filters || {};
+  var per = _resolvePeriods_(filters);
+  var kpiMap = readKPITargets_();
+  var UNASSIGNED = '(chưa gán sale)';
+
+  var rows = readDonChiTiet_();
+  // Theo yeu cau: B va C deu tinh tu sheet "du lieu don". Doanh thu/sale = Gia tri don hang sau giam gia (cot L)
+  // chia deu cho so sale tham gia (cot C "The", tach bang dau phay). Don nguon bao hanh da bi loai tu readDonChiTiet_.
+  function aggregate(fromStr, toStr) {
+    var bySale = {}, byKenh = {};
+    var matchedOrders = [];
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var dt = parseVNDate_(row.ngayTaoDon);
+      if (!dateInRange_(dt, fromStr, toStr)) continue;
+      matchedOrders.push(row);
+      var kName = row.nguonDon || '(chưa rõ nguồn)';
+      byKenh[kName] = (byKenh[kName] || 0) + row.giaTriSauGiam;
+      var salesList = splitMulti_(row.theSale, ',');
+      if (salesList.length === 0) salesList = [UNASSIGNED];
+      var n = salesList.length;
+      for (var k = 0; k < salesList.length; k++) {
+        bySale[salesList[k]] = (bySale[salesList[k]] || 0) + row.giaTriSauGiam / n;
+      }
+    }
+    return { bySale: bySale, byKenh: byKenh, orders: matchedOrders };
+  }
+
+  var curAgg = aggregate(per.curFrom, per.curTo);
+  var prevAgg = aggregate(per.prevFrom, per.prevTo);
+
+  function buildTable(curMap, prevMap, entType) {
+    var names = Object.keys(Object.assign({}, curMap, prevMap));
+    var out = names.map(function(name) {
+      var resultCur = curMap[name] || 0;
+      var resultPrev = prevMap[name] || 0;
+      var kpiCur = getKPI_(kpiMap, per.curKey, entType, name);
+      var kpiPrev = getKPI_(kpiMap, per.prevKey, entType, name);
+      var pctKpiCur = kpiCur > 0 ? (resultCur / kpiCur * 100) : null;
+      var pctKpiPrev = kpiPrev > 0 ? (resultPrev / kpiPrev * 100) : null;
+      var growthPct = resultPrev > 0 ? ((resultCur - resultPrev) / resultPrev * 100) : (resultCur > 0 ? null : 0);
+      return {
+        name: name, kpiPrev: kpiPrev, resultPrev: resultPrev, pctKpiPrev: pctKpiPrev,
+        kpiCur: kpiCur, resultCur: resultCur, pctKpiCur: pctKpiCur, growthPct: growthPct
+      };
+    });
+    out.sort(function(a, b) { return b.resultCur - a.resultCur; });
+    return out;
+  }
+
+  var mapOrder = function(o) {
+    return { ngayTaoDon: o.ngayTaoDon, khachHang: o.khachHang, soDienThoai: o.soDienThoai,
+             nguonDon: o.nguonDon, theSale: o.theSale, sanPham: o.sanPham,
+             giaTriSauGiam: o.giaTriSauGiam, cod: o.cod, marketer: o.marketer };
+  };
+
+  return {
+    period: per,
+    byEmployee: buildTable(curAgg.bySale, prevAgg.bySale, 'sale'),
+    byKenh: buildTable(curAgg.byKenh, prevAgg.byKenh, 'kenh'),
+    ordersCur: curAgg.orders.map(mapOrder),
+    ordersPrev: prevAgg.orders.map(mapOrder)
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  XUAT BAO CAO DOANH SO RA 1 TAB MOI TRONG GOOGLE SHEET (CRM)
+//  Dung lai dung buildSalesReportA_/B_ nen so lieu luon khop UI dang loc.
+//  Moi lan xuat tao 1 tab moi (co timestamp) — khong ghi de, giu lich su cac lan xuat.
+// ═══════════════════════════════════════════════════════════════
+function exportSalesReportToSheet_(reportType, filters) {
+  reportType = (reportType === 'B') ? 'B' : 'A';
+  var data = reportType === 'B' ? buildSalesReportB_(filters || {}) : buildSalesReportA_(filters || {});
+  var ss = getCrmSS_();
+  var ts = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Etc/GMT-7', 'yyyyMMdd_HHmmss');
+  var tabName = 'BC_' + reportType + '_' + ts;
+  var sh = ss.insertSheet(tabName);
+
+  var rows = [];
+  rows.push(['BÁO CÁO DOANH SỐ ' + reportType + (reportType === 'A' ? ' — Theo DT tổng' : ' — Theo dữ liệu đơn')]);
+  rows.push(['Xuất lúc', Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Etc/GMT-7', 'dd/MM/yyyy HH:mm:ss')]);
+
+  var f = filters || {};
+  var filterDesc = [];
+  if (f.dateFrom || f.dateTo) filterDesc.push('Khoảng ngày: ' + (f.dateFrom || '...') + ' → ' + (f.dateTo || '...'));
+  if (reportType === 'A') {
+    filterDesc.push('Lọc theo: ' + (f.dateField === 'thoiGianHT' ? 'Thời gian hoàn thành' : 'Ngày tạo'));
+    var saleArr = Array.isArray(f.sale) ? f.sale : (f.sale ? [f.sale] : []);
+    if (saleArr.length) filterDesc.push('Sale: ' + saleArr.join(', '));
+    if (f.kenh) filterDesc.push('Kênh: ' + f.kenh);
+  } else {
+    if (f.nguon) filterDesc.push('Nguồn đơn: ' + f.nguon);
+    if (f.marketer) filterDesc.push('Marketer: ' + f.marketer);
+  }
+  rows.push(['Bộ lọc', filterDesc.join(' | ') || '(không lọc)']);
+  rows.push([]);
+
+  if (reportType === 'A') {
+    rows.push(['TỔNG QUAN']);
+    rows.push(['Số lượng đơn', data.totalOrders]);
+    rows.push(['Tổng giá trị cọc (số tiền ck)', data.totalCoc]);
+    rows.push(['Tổng giá trị đơn hàng (ko ship)', data.totalGiaTri]);
+    rows.push([]);
+    rows.push(['THEO SALE BÁN', '(số đơn giữ nguyên — tiền chia đều cho số sale/đơn)']);
+    rows.push(['Sale', 'Số đơn', 'Cọc', 'Giá trị']);
+    (data.bySale || []).forEach(function(s) { rows.push([s.name, s.orders, s.coc, s.giaTri]); });
+    rows.push([]);
+    rows.push(['THEO KÊNH BÁN']);
+    rows.push(['Kênh', 'Số đơn', 'Cọc', 'Giá trị']);
+    (data.byKenh || []).forEach(function(k) { rows.push([k.name, k.orders, k.coc, k.giaTri]); });
+    rows.push([]);
+    rows.push(['CHI TIẾT ĐƠN']);
+    rows.push(['Ngày tạo', 'Thời gian HT', 'Kênh bán', 'Sale bán', 'Sản phẩm', 'Phân loại', 'Giá trị cọc', 'Giá trị đơn', 'Giai đoạn', 'Trạng thái', 'ID']);
+    (data.orders || []).forEach(function(o) {
+      rows.push([o.ngayTao, o.thoiGianHT, o.kenhBan, o.saleBan, o.sanPham, o.phanLoai, o.giaTriCoc, o.giaTriDon, o.giaiDoan, o.trangThai, o.id]);
+    });
+  } else {
+    rows.push(['TỔNG QUAN']);
+    rows.push(['Số lượng đơn', data.totalOrders]);
+    rows.push(['Tổng giá trị sau giảm giá', data.totalGiaTri]);
+    rows.push(['Tổng COD', data.totalCod]);
+    if (data.mismatchRows) rows.push(['⚠ Số dòng lệch cột (cần kiểm tra tay)', data.mismatchRows]);
+    rows.push([]);
+    rows.push(['BÁO CÁO SẢN PHẨM']);
+    rows.push(['Mã sản phẩm', 'Tên sản phẩm', 'Tổng số lượng']);
+    (data.products || []).forEach(function(p) { rows.push([p.code, p.name, p.soLuong]); });
+    rows.push([]);
+    rows.push(['CHI TIẾT ĐƠN']);
+    rows.push(['Ngày tạo đơn', 'Khách hàng', 'SĐT', 'Nguồn đơn', 'Sản phẩm', 'Mã sản phẩm', 'Số lượng', 'Giá trị sau giảm giá', 'COD', 'Marketer']);
+    (data.orders || []).forEach(function(o) {
+      rows.push([o.ngayTaoDon, o.khachHang, o.soDienThoai, o.nguonDon, o.sanPham, o.maSanPham, o.soLuong, o.giaTriSauGiam, o.cod, o.marketer]);
+    });
+  }
+
+  var maxCols = rows.reduce(function(m, r) { return Math.max(m, r.length); }, 1);
+  var padded = rows.map(function(r) {
+    var rr = r.slice();
+    while (rr.length < maxCols) rr.push('');
+    return rr;
+  });
+  if (padded.length > 0) sh.getRange(1, 1, padded.length, maxCols).setValues(padded);
+  sh.getRange(1, 1).setFontWeight('bold').setFontSize(13);
+  try { sh.autoResizeColumns(1, maxCols); } catch (ecw) {}
+
+  return { tabName: tabName, sheetId: ss.getId(), gid: sh.getSheetId(),
+           sheetUrl: ss.getUrl() + '#gid=' + sh.getSheetId() };
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  doPost
 // ═══════════════════════════════════════════════════════════════
 function doPost(e) {
@@ -7582,6 +7872,8 @@ function doPost(e) {
     if (action === 'saveOrders')          return saveOrders_(data.orders);
     if (action === 'patchOrder')          return patchOrder_(data);
     if (action === 'deleteOrder')         return deleteOrder_(data);
+    // ── Xuat bao cao doanh so (dang loc tren UI) ra 1 tab moi trong Google Sheet CRM ──
+    if (action === 'exportSalesReportSheet') return jsonOut_(exportSalesReportToSheet_(data.reportType, data.filters));
     // ── XOA DON TRUNG: xoa cac dong trung da duoc CS/admin xac nhan (danh sach items tra ve tu findDuplicateOrders) ──
     if (action === 'deleteDuplicateOrders') return deleteDuplicateOrders_(data.items);
     if (action === 'replaceOrders')       return replaceOrders_(data.orders, data);
@@ -9394,7 +9686,15 @@ var _careWriting = new Set();
 var _careTimer = null;
 function _careRow(phone){
   var care = (typeof careData !== 'undefined' && careData[phone]) || {};
-  var myScheds = (typeof schedules !== 'undefined' ? schedules : []).filter(function(x){ return x.phone === phone; });
+  // CHI dong bo len Sheet cac lich: (1) CS tu tao tay (khong phai auto), HOAC (2) auto nhung DA
+  // duoc tac dong (bam Xong/xoa). Lich auto CHUA tac dong la SO LIEU TAM TINH LAI moi lan tai
+  // trang tu don hang hien co — KHONG duoc coi la "su that" de ghi len Sheet. Neu khong loc, bat
+  // ky dong bo nao khac cua khach nay (vi ly do hoan toan khong lien quan) se vo tinh ghi de/hoi
+  // sinh lai dung lich auto ma Duyen vua xoa tay truc tiep tren CareData Sheet — dung cung dieu
+  // kien voi _hasRealCareData() ben tren de 2 cho nhat quan voi nhau.
+  var myScheds = (typeof schedules !== 'undefined' ? schedules : []).filter(function(x){
+    return x.phone === phone && (!x.autoDao || x.done);
+  });
   return {
     phone: phone,
     status: care.status||'', zalo: care.zalo||'', cs: care.cs||'', note: care.note||'',
@@ -10000,8 +10300,8 @@ function renderTeamTab(){
     members.forEach(function(m){
       var isLeader = m === t.leader;
       html += '<span class="member-chip'+(isLeader?' leader':'')+'">'+(isLeader?'★ ':'')+esc(m)+
-        (isAdmin ? ' <span class="chip-x" title="'+(isLeader?'Bỏ làm leader sẽ vẫn còn là thành viên':'Xoá khỏi team')+'" onclick="removeTeamMember(\''+t.id+'\',\''+esc(m).replace(/'/g,"\\'")+'\')">✕</span>' : '')+
-        (isAdmin && !isLeader ? ' <span class="chip-star" title="Đặt làm leader" onclick="setTeamLeader(\''+t.id+'\',\''+esc(m).replace(/'/g,"\\'")+'\')">★</span>' : '')+
+        (isAdmin ? ' <span class="chip-x" data-name="'+esc(m)+'" title="'+(isLeader?'Bỏ làm leader sẽ vẫn còn là thành viên':'Xoá khỏi team')+'" onclick="removeTeamMember(\''+t.id+'\',this.dataset.name)">✕</span>' : '')+
+        (isAdmin && !isLeader ? ' <span class="chip-star" data-name="'+esc(m)+'" title="Đặt làm leader" onclick="setTeamLeader(\''+t.id+'\',this.dataset.name)">★</span>' : '')+
       '</span>';
     });
     html += '</div>';
@@ -10026,7 +10326,7 @@ function renderTeamTab(){
           var on = members.indexOf(n)!==-1;
           var isLeader = n===t.leader;
           html += '<label class="team-cs-chk'+(on?' on':'')+'" data-name="'+esc(n).toLowerCase()+'" title="'+(isLeader?'Leader (luôn là thành viên)':'')+'">'+
-            '<input type="checkbox" '+(on?'checked':'')+' '+(isLeader?'disabled':'')+' onchange="setTeamMemberChecked(\''+t.id+'\',\''+esc(n).replace(/'/g,"\\'")+'\',this.checked)">'+
+            '<input type="checkbox" '+(on?'checked':'')+' '+(isLeader?'disabled':'')+' data-name="'+esc(n)+'" onchange="setTeamMemberChecked(\''+t.id+'\',this.dataset.name,this.checked)">'+
             '<span>'+(isLeader?'★ ':'')+esc(n)+'</span></label>';
         });
         html += '</div></div>';
@@ -10166,11 +10466,11 @@ var _srState = {
   dateField: 'ngayTao',   // A: 'ngayTao' | 'thoiGianHT'
   dateFrom: '', dateTo: '',
   sale: [], kenh: [],      // A — ca 2 deu multi-select dang checkbox (mang nhieu gia tri)
-  nguon: '', marketer: '', // B
+  bSale: [], bNguon: [], bMarketer: [], // B — ca 3 deu multi-select (mang nhieu ten)
   dataA: null, dataB: null,
   loading: false,
-  saleOptions: [], kenhOptions: [], nguonOptions: [], marketerOptions: [], optionsLoaded: false,
-  saleSearch: '', kenhSearch: '', productSearch: '', // lọc nhanh client-side trên bảng breakdown
+  saleOptions: [], kenhOptions: [], nguonOptions: [], marketerOptions: [], saleBOptions: [], optionsLoaded: false,
+  saleSearch: '', kenhSearch: '', productSearch: '', bSaleSearch: '', // lọc nhanh client-side trên bảng breakdown
   // C — So sanh theo ky
   cPeriodType: 'week', cDateField: 'ngayTao',
   cWeekOffset: 0, cMonthOffset: 0, cQuarterOffset: 0,
@@ -10199,6 +10499,7 @@ async function _srLoadOptions(){
     _srState.kenhOptions = opts.kenh || [];
     _srState.nguonOptions = opts.nguon || [];
     _srState.marketerOptions = opts.marketer || [];
+    _srState.saleBOptions = opts.saleB || [];
     renderSalesReportTab();
   }
 }
@@ -10214,7 +10515,7 @@ async function _srLoad(){
   } else if (_srState.sub === 'B') {
     _srState.dataB = await _srFetch('salesReportB', {
       dateFrom: _srState.dateFrom, dateTo: _srState.dateTo,
-      nguon: _srState.nguon, marketer: _srState.marketer
+      sale: (_srState.bSale||[]).join(','), nguon: (_srState.bNguon||[]).join(','), marketer: (_srState.bMarketer||[]).join(',')
     });
   } else {
     _srState.dataC = await _srFetch('salesReportC', {
@@ -10248,7 +10549,7 @@ async function exportSalesReportToSheet(){
       sale: _srState.cSale || [], kenh: _srState.cKenh || [] };
   } else {
     filters = { dateFrom: _srState.dateFrom, dateTo: _srState.dateTo,
-      nguon: _srState.nguon, marketer: _srState.marketer };
+      sale: _srState.bSale || [], nguon: _srState.bNguon || [], marketer: _srState.bMarketer || [] };
   }
   var btn = document.getElementById('sr-export-sheet-btn');
   if (btn){ btn.disabled = true; btn.textContent = '⏳ Đang xuất...'; }
@@ -10298,8 +10599,8 @@ function srRenderSaleChips(){
   var selArr = _srState.sale || [];
   if (!selArr.length){ wrap.innerHTML = ''; return; }
   wrap.innerHTML = selArr.map(function(name){
-    return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap">'+
-      esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srSaleComboRemove(\''+esc(name).replace(/'/g,"\\'")+'\')">✕</span></span>';
+    return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap" data-name="'+esc(name)+'">'+
+      esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srSaleComboRemove(this.parentNode.dataset.name)">✕</span></span>';
   }).join('');
 }
 function srSaleComboOpen(){
@@ -10544,22 +10845,17 @@ function renderSalesReportTab(){
       '</div>'+
       '<div id="sr-sale-chips" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;max-width:220px">'+
       (_srState.sale||[]).map(function(name){
-        return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap">'+
-          esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srSaleComboRemove(\''+esc(name).replace(/'/g,"\\'")+'\')">✕</span></span>';
+        return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap" data-name="'+esc(name)+'">'+
+          esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srSaleComboRemove(this.parentNode.dataset.name)">✕</span></span>';
       }).join('') +
       '</div></div>';
     filters += '<select onchange="if(this.value){srPickTeam(this.value,\'sale\',\'sr-sale-combo\');this.value=\'\'}" title="Điền nhanh cả team vào ô Sale — sửa tay lại sau nếu cần" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
       '<option value="">— Chọn theo Team —</option>' + _srTeamOptionsHtml() + '</select>';
     filters += _srComboHtml('sr-kenh-combo-a', 'kenh', 'kenhOptions', 'Lọc theo Kênh', '🔍 Tìm & chọn kênh...', 170);
   } else {
-    filters += '<select onchange="_srSetField(\'nguon\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-      '<option value="">— Tất cả nguồn đơn —</option>'+
-      (_srState.nguonOptions||[]).map(function(nv){ return '<option value="'+esc(nv)+'"'+(_srState.nguon===nv?' selected':'')+'>'+esc(nv)+'</option>'; }).join('') +
-      '</select>';
-    filters += '<select onchange="_srSetField(\'marketer\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-      '<option value="">— Tất cả marketer —</option>'+
-      (_srState.marketerOptions||[]).map(function(mv){ return '<option value="'+esc(mv)+'"'+(_srState.marketer===mv?' selected':'')+'>'+esc(mv)+'</option>'; }).join('') +
-      '</select>';
+    filters += _srbComboHTML('sale');
+    filters += _srbComboHTML('nguon');
+    filters += _srbComboHTML('mkt');
   }
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
   filters += '<button class="btn sm" onclick="exportSalesReport()">📊 Xuất Excel</button>';
@@ -10621,6 +10917,16 @@ function _srRenderB(d){
       '⚠️ '+fmt(d.mismatchRows)+' dòng bị lệch số phần tử giữa cột Sản phẩm/Mã sản phẩm/Số lượng — nên kiểm tra tay, số liệu sản phẩm bên dưới có thể thiếu sót ở các dòng này.</div>';
   }
 
+  var saleRows = (d.bySale||[]).filter(function(s){ return !_srState.bSaleSearch || (s.name||'').toLowerCase().indexOf(_srState.bSaleSearch.toLowerCase())!==-1; });
+  html += '<div class="dash-section-title">Theo Sale <span style="font-weight:400;color:var(--muted);font-size:11px">(tiền chia đều cho số sale/đơn, số đơn giữ nguyên)</span></div>';
+  html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.bSaleSearch)+'" oninput="_srState.bSaleSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
+  html += '<table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Giá trị sau giảm giá</th><th style="text-align:right">COD</th></tr></thead><tbody>';
+  saleRows.forEach(function(s){
+    html += '<tr><td>'+esc(s.name)+'</td><td style="text-align:right">'+fmt(s.orders)+'</td><td style="text-align:right">'+_srMoney(s.giaTri)+'</td><td style="text-align:right">'+_srMoney(s.cod)+'</td></tr>';
+  });
+  if (!saleRows.length) html += '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+  html += '</tbody></table>';
+
   var productRows = (d.products||[]).filter(function(p){ return !_srState.productSearch || (p.name||'').toLowerCase().indexOf(_srState.productSearch.toLowerCase())!==-1 || (p.code||'').toLowerCase().indexOf(_srState.productSearch.toLowerCase())!==-1; });
   html += '<div class="dash-section-title">Báo cáo sản phẩm</div>';
   html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên/mã sản phẩm..." value="'+esc(_srState.productSearch)+'" oninput="_srState.productSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:240px;margin-bottom:6px">';
@@ -10672,7 +10978,7 @@ function renderSalesReportTabC_(wrap, subTabs){
   filters += _srComboHtml('sr-sale-combo-c', 'cSale', 'saleOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 170);
   filters += '<select onchange="if(this.value){srPickTeam(this.value,\'cSale\',\'sr-sale-combo-c\');this.value=\'\'}" title="Điền nhanh cả team vào ô Sale — sửa tay lại sau nếu cần" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
     '<option value="">— Chọn theo Team —</option>' + _srTeamOptionsHtml() + '</select>';
-  filters += _srComboHtml('sr-kenh-combo-c', 'cKenh', 'kenhOptions', 'Lọc theo Kênh', '🔍 Tìm & chọn kênh...', 170);
+  filters += _srComboHtml('sr-kenh-combo-c', 'cKenh', 'nguonOptions', 'Lọc theo Nguồn đơn', '🔍 Tìm & chọn nguồn đơn...', 170);
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
   filters += '<button class="btn sm" onclick="exportSalesReportC()">📊 Xuất Excel</button>';
   filters += '<button class="btn sm" id="sr-export-sheet-btn" onclick="exportSalesReportToSheet()">📄 Xuất ra Sheet</button>';
@@ -10693,7 +10999,7 @@ function _srGrowthStr(v){
 function _srRenderCTable(rows, entType, search, searchKey){
   var filtered = rows.filter(function(r){ return !search || r.name.toLowerCase().indexOf(search.toLowerCase())!==-1; });
   var html = '<table class="dash-table"><thead><tr>'+
-    '<th>'+(entType==='sale'?'Nhân viên (Sale)':'Kênh bán')+'</th>'+
+    '<th>'+(entType==='sale'?'Nhân viên (Sale)':'Nguồn đơn')+'</th>'+
     '<th style="text-align:right">KPI kỳ trước</th><th style="text-align:right">Kết quả kỳ trước</th><th style="text-align:right">%HT KPI kỳ trước</th>'+
     '<th style="text-align:right">KPI kỳ này</th><th style="text-align:right">Kết quả kỳ này</th><th style="text-align:right">%HT KPI kỳ này</th>'+
     '<th style="text-align:right">% Tăng trưởng</th></tr></thead><tbody>';
@@ -10712,8 +11018,8 @@ function _srRenderCTable(rows, entType, search, searchKey){
       '</tr>';
     if (expanded){
       var d = _srState.dataC;
-      var ordCur = (d.ordersCur||[]).filter(function(o){ return entType==='sale' ? splitSaleNames_(o.saleBan).indexOf(r.name)!==-1 || (r.name==='(chưa gán sale)' && !splitSaleNames_(o.saleBan).length) : (o.kenhBan||'(chưa có kênh)')===r.name; });
-      var ordPrev = (d.ordersPrev||[]).filter(function(o){ return entType==='sale' ? splitSaleNames_(o.saleBan).indexOf(r.name)!==-1 || (r.name==='(chưa gán sale)' && !splitSaleNames_(o.saleBan).length) : (o.kenhBan||'(chưa có kênh)')===r.name; });
+      var ordCur = (d.ordersCur||[]).filter(function(o){ return entType==='sale' ? splitSaleNames_(o.theSale).indexOf(r.name)!==-1 || (r.name==='(chưa gán sale)' && !splitSaleNames_(o.theSale).length) : (o.nguonDon||'(chưa rõ nguồn)')===r.name; });
+      var ordPrev = (d.ordersPrev||[]).filter(function(o){ return entType==='sale' ? splitSaleNames_(o.theSale).indexOf(r.name)!==-1 || (r.name==='(chưa gán sale)' && !splitSaleNames_(o.theSale).length) : (o.nguonDon||'(chưa rõ nguồn)')===r.name; });
       html += '<tr><td colspan="8" style="background:var(--surface2);padding:10px">'+
         '<div style="font-weight:600;font-size:11px;margin-bottom:4px">Đơn kỳ này ('+ordCur.length+')</div>'+
         _srMiniOrderTable(ordCur)+
@@ -10729,9 +11035,9 @@ function _srRenderCTable(rows, entType, search, searchKey){
 function splitSaleNames_(s){ return (s||'').split(',').map(function(x){return x.trim();}).filter(Boolean); }
 function _srMiniOrderTable(orders){
   if (!orders.length) return '<div style="color:var(--muted);font-size:11px">Không có đơn</div>';
-  var html = '<table class="dash-table" style="font-size:11px"><thead><tr><th>Ngày tạo</th><th>Kênh</th><th>Sale</th><th style="text-align:right">Giá trị</th></tr></thead><tbody>';
+  var html = '<table class="dash-table" style="font-size:11px"><thead><tr><th>Ngày tạo</th><th>Nguồn đơn</th><th>Sale (Thẻ)</th><th style="text-align:right">Giá trị</th></tr></thead><tbody>';
   orders.forEach(function(o){
-    html += '<tr><td>'+esc(String(o.ngayTao))+'</td><td>'+esc(o.kenhBan)+'</td><td>'+esc(o.saleBan)+'</td><td style="text-align:right">'+_srMoney(o.giaTriDon)+'</td></tr>';
+    html += '<tr><td>'+esc(String(o.ngayTaoDon))+'</td><td>'+esc(o.nguonDon)+'</td><td>'+esc(o.theSale)+'</td><td style="text-align:right">'+_srMoney(o.giaTriSauGiam)+'</td></tr>';
   });
   html += '</tbody></table>';
   return html;
@@ -10750,12 +11056,14 @@ function _srRenderC(d){
     (p.curKey ? '' : '<div style="color:var(--hint)">(Kỳ tùy chỉnh — không tra được KPI, chỉ tab Tuần/Tháng/Quý mới có KPI)</div>')+
     '</div>';
 
+  html += '<div style="font-size:11px;color:var(--hint);margin-bottom:10px">Tính từ sheet "dữ liệu đơn" (Giá trị đơn hàng sau giảm giá, cột Sale/"Thẻ") — đã loại các đơn có Nguồn đơn là bảo hành.</div>';
+
   html += '<div class="dash-section-title">Theo Nhân viên (Sale bán) <span style="font-weight:400;color:var(--muted);font-size:11px">(tiền chia đều cho số sale/đơn khi đơn có nhiều sale)</span></div>';
   html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên..." value="'+esc(_srState.cEmpSearch)+'" oninput="_srState.cEmpSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
   html += _srRenderCTable(d.byEmployee||[], 'sale', _srState.cEmpSearch);
 
-  html += '<div class="dash-section-title">Theo Kênh bán</div>';
-  html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên kênh..." value="'+esc(_srState.cKenhSearch)+'" oninput="_srState.cKenhSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
+  html += '<div class="dash-section-title">Theo Nguồn đơn</div>';
+  html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên nguồn..." value="'+esc(_srState.cKenhSearch)+'" oninput="_srState.cKenhSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
   html += _srRenderCTable(d.byKenh||[], 'kenh', _srState.cKenhSearch);
 
   html += '<div style="font-size:11px;color:var(--hint);margin-top:8px">Chỉ tiêu KPI lấy từ tab "'+esc('KPI_ChiTieu')+'" trong Google Sheet CRM — tự vào Sheet điền/sửa số. Bấm vào 1 dòng để xem chi tiết đơn của kỳ này/kỳ trước.</div>';
@@ -10769,21 +11077,152 @@ function exportSalesReportC(){
   var fDescC = [];
   fDescC.push('Lọc theo: ' + (_srState.cDateField==='thoiGianHT'?'Thời gian hoàn thành':'Ngày tạo'));
   if ((_srState.cSale||[]).length) fDescC.push('Sale: ' + _srState.cSale.join(', '));
-  if ((_srState.cKenh||[]).length) fDescC.push('Kênh: ' + _srState.cKenh.join(', '));
+  if ((_srState.cKenh||[]).length) fDescC.push('Nguồn đơn: ' + _srState.cKenh.join(', '));
   var summary = [['Kỳ này', p.curLabel], ['Kỳ trước', p.prevLabel], ['Bộ lọc', fDescC.join(' | ')]];
   var empRows = [['Nhân viên','KPI kỳ trước','Kết quả kỳ trước','%HT KPI kỳ trước','KPI kỳ này','Kết quả kỳ này','%HT KPI kỳ này','% Tăng trưởng']];
   (d.byEmployee||[]).forEach(function(r){
     empRows.push([r.name, r.kpiPrev, r.resultPrev, r.pctKpiPrev, r.kpiCur, r.resultCur, r.pctKpiCur, r.growthPct]);
   });
-  var kenhRows = [['Kênh','KPI kỳ trước','Kết quả kỳ trước','%HT KPI kỳ trước','KPI kỳ này','Kết quả kỳ này','%HT KPI kỳ này','% Tăng trưởng']];
+  var kenhRows = [['Nguồn đơn','KPI kỳ trước','Kết quả kỳ trước','%HT KPI kỳ trước','KPI kỳ này','Kết quả kỳ này','%HT KPI kỳ này','% Tăng trưởng']];
   (d.byKenh||[]).forEach(function(r){
     kenhRows.push([r.name, r.kpiPrev, r.resultPrev, r.pctKpiPrev, r.kpiCur, r.resultCur, r.pctKpiCur, r.growthPct]);
   });
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Kỳ so sánh');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(empRows), 'Theo Nhân viên');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(kenhRows), 'Theo Kênh bán');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(kenhRows), 'Theo Nguồn đơn');
   XLSX.writeFile(wb, `BaoCaoDoanhSo_C_${_ymd(new Date())}.xlsx`);
+}
+
+// ── Combo multi-select DUNG CHUNG cho 3 bo loc moi cua Bao cao B (Sale/Nguon don/Marketer) —
+//    cung phong cach (go tim, tick nhieu, dropdown khong dong sau moi lan chon, chip xoa rieng)
+//    nhu combo Sale cua Bao cao A, nhung viet 1 lan dung chung cho ca 3 de khong lap code 3 lan. ──
+var _SRB_COMBO_CFG = {
+  sale: { id: 'srb-sale-combo', stateKey: 'bSale', optKey: 'saleBOptions', label: 'Sale', placeholder: '🔍 Tìm & chọn sale...' },
+  nguon: { id: 'srb-nguon-combo', stateKey: 'bNguon', optKey: 'nguonOptions', label: 'Nguồn đơn', placeholder: '🔍 Tìm & chọn nguồn...' },
+  mkt: { id: 'srb-mkt-combo', stateKey: 'bMarketer', optKey: 'marketerOptions', label: 'Marketer', placeholder: '🔍 Tìm & chọn marketer...' }
+};
+var _srbComboData = {}, _srbComboIdx = {};
+function _srbBuildData(key){
+  var cfg = _SRB_COMBO_CFG[key];
+  _srbComboData[key] = (_srState[cfg.optKey]||[]).map(function(v){ return {value:v, label:v}; });
+}
+function srbComboRender(key, filter){
+  var cfg = _SRB_COMBO_CFG[key];
+  var list = document.getElementById(cfg.id+'-list');
+  if (!list) return;
+  if (!_srbComboData[key]) _srbBuildData(key);
+  var q = _foldVi(filter||'');
+  var sel = _srState[cfg.stateKey] || [];
+  var items = q ? _srbComboData[key].filter(function(it){ return _foldVi(it.label).indexOf(q)!==-1; }) : _srbComboData[key];
+  if (!items.length){ list.innerHTML = '<div class="cs-combo-empty">Không tìm thấy</div>'; _srbComboIdx[key]=-1; return; }
+  list.innerHTML = items.map(function(it){
+    var checked = sel.indexOf(it.value)!==-1;
+    return '<div class="cs-combo-opt '+(checked?'is-sel':'')+'" data-v="'+esc(it.value)+'" onmousedown="srbComboToggleItem(\''+key+'\', event, this.getAttribute(\'data-v\'))">'+
+      '<span>'+(checked?'☑':'☐')+' '+esc(it.label)+'</span></div>';
+  }).join('');
+  _srbComboIdx[key] = -1;
+}
+function srbRenderChips(key){
+  var cfg = _SRB_COMBO_CFG[key];
+  var wrap = document.getElementById(cfg.id+'-chips');
+  if (!wrap) return;
+  var sel = _srState[cfg.stateKey] || [];
+  wrap.innerHTML = sel.map(function(name){
+    return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap" data-name="'+esc(name)+'">'+
+      esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srbComboRemove(\''+key+'\', this.parentNode.dataset.name)">✕</span></span>';
+  }).join('');
+  var lbl = document.getElementById(cfg.id+'-label-count');
+  if (lbl) lbl.textContent = sel.length ? ' ('+sel.length+' đã chọn)' : '';
+  var clr = document.getElementById(cfg.id+'-clear');
+  if (clr) clr.style.display = sel.length ? '' : 'none';
+}
+function srbComboOpen(key){
+  _srbBuildData(key);
+  var cfg = _SRB_COMBO_CFG[key];
+  var ci = document.getElementById(cfg.id+'-input');
+  srbComboRender(key, ci ? ci.value : '');
+  var l = document.getElementById(cfg.id+'-list'); if (l) l.classList.add('open');
+}
+function srbComboClose(key){ var cfg=_SRB_COMBO_CFG[key]; var l=document.getElementById(cfg.id+'-list'); if(l) l.classList.remove('open'); }
+function srbComboToggle(key, e){
+  if (e) e.stopPropagation();
+  var cfg = _SRB_COMBO_CFG[key];
+  var l = document.getElementById(cfg.id+'-list'); if (!l) return;
+  if (l.classList.contains('open')) srbComboClose(key);
+  else { var ci=document.getElementById(cfg.id+'-input'); if(ci) ci.focus(); srbComboOpen(key); }
+}
+function srbComboFilter(key, v){ srbComboRender(key, v); var cfg=_SRB_COMBO_CFG[key]; var l=document.getElementById(cfg.id+'-list'); if(l) l.classList.add('open'); }
+function srbComboToggleItem(key, e, value){
+  if (e && e.preventDefault) e.preventDefault();
+  var cfg = _SRB_COMBO_CFG[key];
+  var arr = (_srState[cfg.stateKey]||[]).slice();
+  var idx = arr.indexOf(value);
+  if (idx!==-1) arr.splice(idx,1); else arr.push(value);
+  _srState[cfg.stateKey] = arr;
+  var ci = document.getElementById(cfg.id+'-input');
+  srbComboRender(key, ci?ci.value:'');
+  srbRenderChips(key);
+}
+function srbComboRemove(key, value){
+  var cfg = _SRB_COMBO_CFG[key];
+  _srState[cfg.stateKey] = (_srState[cfg.stateKey]||[]).filter(function(v){ return v!==value; });
+  srbRenderChips(key);
+  var l = document.getElementById(cfg.id+'-list');
+  if (l && l.classList.contains('open')){ var ci=document.getElementById(cfg.id+'-input'); srbComboRender(key, ci?ci.value:''); }
+}
+function srbComboClear(key, e){
+  if (e) e.stopPropagation();
+  var cfg = _SRB_COMBO_CFG[key];
+  _srState[cfg.stateKey] = [];
+  var ci = document.getElementById(cfg.id+'-input'); if (ci) ci.value = '';
+  srbRenderChips(key);
+  var l = document.getElementById(cfg.id+'-list');
+  if (l && l.classList.contains('open')) srbComboRender(key, '');
+}
+function srbComboKey(key, e){
+  var cfg = _SRB_COMBO_CFG[key];
+  var list = document.getElementById(cfg.id+'-list');
+  if (!list || !list.classList.contains('open')){ if (e.key==='ArrowDown') srbComboOpen(key); return; }
+  var opts = [...list.querySelectorAll('.cs-combo-opt')];
+  if (!opts.length) return;
+  if (e.key==='ArrowDown'){ e.preventDefault(); _srbComboIdx[key] = Math.min((_srbComboIdx[key]==null?-1:_srbComboIdx[key])+1, opts.length-1); }
+  else if (e.key==='ArrowUp'){ e.preventDefault(); _srbComboIdx[key] = Math.max((_srbComboIdx[key]==null?-1:_srbComboIdx[key])-1, 0); }
+  else if (e.key==='Enter'){
+    e.preventDefault();
+    var idx = _srbComboIdx[key];
+    var pick = (idx>=0 && opts[idx]) ? opts[idx] : (opts.length===1 ? opts[0] : null);
+    if (pick) srbComboToggleItem(key, e, pick.getAttribute('data-v'));
+    return;
+  } else if (e.key==='Escape'){ srbComboClose(key); return; }
+  else { return; }
+  opts.forEach(function(o,i){ o.classList.toggle('active', i===_srbComboIdx[key]); });
+  if (_srbComboIdx[key]>=0 && opts[_srbComboIdx[key]]) opts[_srbComboIdx[key]].scrollIntoView({block:'nearest'});
+}
+document.addEventListener('click', function(e){
+  Object.keys(_SRB_COMBO_CFG).forEach(function(key){
+    var cfg = _SRB_COMBO_CFG[key];
+    var combo = document.getElementById(cfg.id);
+    if (combo && !combo.contains(e.target)) srbComboClose(key);
+  });
+});
+function _srbComboHTML(key){
+  var cfg = _SRB_COMBO_CFG[key];
+  var sel = _srState[cfg.stateKey] || [];
+  return '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">'+cfg.label+'<span id="'+cfg.id+'-label-count" style="color:var(--green)">'+(sel.length?' ('+sel.length+' đã chọn)':'')+'</span></div>'+
+    '<div class="cs-combo" id="'+cfg.id+'" style="width:170px">'+
+    '<input type="text" id="'+cfg.id+'-input" class="cs-combo-input" placeholder="'+esc(cfg.placeholder)+'" autocomplete="off" '+
+    'oninput="srbComboFilter(\''+key+'\', this.value)" onfocus="srbComboOpen(\''+key+'\')" onkeydown="srbComboKey(\''+key+'\', event)">'+
+    '<button type="button" class="cs-combo-clear" id="'+cfg.id+'-clear" onclick="srbComboClear(\''+key+'\', event)" style="display:'+(sel.length?'':'none')+'">✕</button>'+
+    '<span class="cs-combo-caret" onclick="srbComboToggle(\''+key+'\', event)">▾</span>'+
+    '<div class="cs-combo-list" id="'+cfg.id+'-list"></div>'+
+    '</div>'+
+    '<div id="'+cfg.id+'-chips" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;max-width:200px">'+
+    sel.map(function(name){
+      return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap" data-name="'+esc(name)+'">'+
+        esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srbComboRemove(\''+key+'\', this.parentNode.dataset.name)">✕</span></span>';
+    }).join('') +
+    '</div></div>';
 }
 
 function exportSalesReport(){
@@ -10822,12 +11261,15 @@ function exportSalesReport(){
       ['Tổng COD', dB.totalCod]];
     var productRows = [['Mã sản phẩm','Tên sản phẩm','Tổng số lượng']];
     (dB.products||[]).forEach(function(p){ productRows.push([p.code, p.name, p.soLuong]); });
-    var detailRowsB = [['Ngày tạo đơn','Khách hàng','SĐT','Nguồn đơn','Sản phẩm','Mã sản phẩm','Số lượng','Giá trị sau giảm','COD','Marketer']];
+    var bySaleRowsB = [['Sale','Số đơn','Giá trị sau giảm giá','COD']];
+    (dB.bySale||[]).forEach(function(s){ bySaleRowsB.push([s.name, s.orders, s.giaTri, s.cod]); });
+    var detailRowsB = [['Ngày tạo đơn','Khách hàng','SĐT','Nguồn đơn','Sale','Sản phẩm','Mã sản phẩm','Số lượng','Giá trị sau giảm','COD','Marketer']];
     (dB.orders||[]).forEach(function(o){
-      detailRowsB.push([o.ngayTaoDon, o.khachHang, o.soDienThoai, o.nguonDon, o.sanPham, o.maSanPham, o.soLuong, o.giaTriSauGiam, o.cod, o.marketer]);
+      detailRowsB.push([o.ngayTaoDon, o.khachHang, o.soDienThoai, o.nguonDon, o.theSale, o.sanPham, o.maSanPham, o.soLuong, o.giaTriSauGiam, o.cod, o.marketer]);
     });
     var wbB = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wbB, XLSX.utils.aoa_to_sheet(summaryB), 'Tổng quan');
+    XLSX.utils.book_append_sheet(wbB, XLSX.utils.aoa_to_sheet(bySaleRowsB), 'Theo Sale');
     XLSX.utils.book_append_sheet(wbB, XLSX.utils.aoa_to_sheet(productRows), 'Báo cáo sản phẩm');
     XLSX.utils.book_append_sheet(wbB, XLSX.utils.aoa_to_sheet(detailRowsB), 'Chi tiết đơn');
     XLSX.writeFile(wbB, `BaoCaoDoanhSo_B_${_ymd(new Date())}.xlsx`);
@@ -11892,7 +12334,7 @@ function updateSidebarCareFilters() {
       var color = dotColors[i % dotColors.length];
       var active = existing === st ? 'active' : '';
       var sid = 'bc-cs-' + i;
-      return '<button class="section-btn ' + active + '" onclick="setCareFilter(\'' + esc(st).replace(/'/g,"\\'") + '\',this)">' +
+      return '<button class="section-btn ' + active + '" data-st="' + esc(st) + '" onclick="setCareFilter(this.dataset.st,this)">' +
         '<div class="fleft"><span class="fdot" style="background:' + color + '"></span><span><span style="color:var(--hint);font-size:10px;margin-right:2px">' + (i+1) + '.</span>' + esc(st) + '</span></div>' +
         '<span class="fbadge" id="' + sid + '">0</span></button>';
     }).join('');
@@ -12720,8 +13162,8 @@ function _bcRenderCsList(filter) {
   var names = _bcCsNames().filter(function(n){ return !f || n.includes(f); });
   box.innerHTML = names.length ? names.map(function(n){
     var on = _bcCsSelected.includes(n);
-    return '<label style="display:flex;align-items:center;gap:6px;padding:4px 9px;font-size:12px;cursor:pointer;border-bottom:1px solid #f3f4f6">'+
-      '<input type="checkbox" '+(on?'checked':'')+' onchange="_bcToggleCs(\''+esc(n)+'\', this.checked)"> '+esc(n)+'</label>';
+    return '<label style="display:flex;align-items:center;gap:6px;padding:4px 9px;font-size:12px;cursor:pointer;border-bottom:1px solid #f3f4f6" data-name="'+esc(n)+'">'+
+      '<input type="checkbox" '+(on?'checked':'')+' onchange="_bcToggleCs(this.closest(\'label\').dataset.name, this.checked)"> '+esc(n)+'</label>';
   }).join('') : '<div style="padding:6px 9px;font-size:11px;color:#9ca3af">Không có CS khớp</div>';
 }
 function _bcFilterCsList(v){ _bcRenderCsList(v); }
@@ -12735,8 +13177,8 @@ function _bcRenderCsChips() {
   var box = document.getElementById('bc-compose-cs-chips');
   if (!box) return;
   box.innerHTML = _bcCsSelected.map(function(n){
-    return '<span style="background:#dcfce7;color:#166534;border-radius:12px;padding:2px 9px;font-size:11px;font-weight:600">'+esc(n)+
-      ' <a href="#" onclick="_bcToggleCs(\''+esc(n)+'\',false);_bcRenderCsList(document.getElementById(\'bc-compose-cs-search\').value);return false" style="color:#166534;text-decoration:none">✕</a></span>';
+    return '<span style="background:#dcfce7;color:#166534;border-radius:12px;padding:2px 9px;font-size:11px;font-weight:600" data-name="'+esc(n)+'">'+esc(n)+
+      ' <a href="#" onclick="_bcToggleCs(this.parentNode.dataset.name,false);_bcRenderCsList(document.getElementById(\'bc-compose-cs-search\').value);return false" style="color:#166534;text-decoration:none">✕</a></span>';
   }).join('') || '<span style="font-size:11px;color:#9ca3af">Chưa chọn CS nào — mọi CS đều thấy chiến dịch</span>';
 }
 
@@ -13400,7 +13842,7 @@ function renderBcStat(){
       ? '<span style="background:#fef9c3;color:#a16207;border-radius:10px;padding:1px 8px;font-size:10px;font-weight:700">ĐANG TẮT</span>'
       : '<span style="background:#f3f4f6;color:#6b7280;border-radius:10px;padding:1px 8px;font-size:10px;font-weight:700">ĐÃ HỦY</span>';
     var togBtn = st === 'cancelled' ? '' :
-      '<button onclick="bcstatToggle(\''+esc(b.id)+'\',\''+(st==='active'?'paused':'active')+'\')" style="padding:3px 10px;border:1px solid '+(st==='active'?'#d1d5db':'#00b14f')+';background:#fff;color:'+(st==='active'?'#6b7280':'#00b14f')+';border-radius:5px;cursor:pointer;font-size:11px;font-weight:600">'+(st==='active'?'⏻ Tắt':'⏻ Kích hoạt')+'</button>';
+      '<button data-id="'+esc(b.id)+'" onclick="bcstatToggle(this.dataset.id,\''+(st==='active'?'paused':'active')+'\')" style="padding:3px 10px;border:1px solid '+(st==='active'?'#d1d5db':'#00b14f')+';background:#fff;color:'+(st==='active'?'#6b7280':'#00b14f')+';border-radius:5px;cursor:pointer;font-size:11px;font-weight:600">'+(st==='active'?'⏻ Tắt':'⏻ Kích hoạt')+'</button>';
     var dateStr = b.createdAt ? new Date(b.createdAt).toLocaleString('vi-VN') : '';
     return '<div style="border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-bottom:8px;background:#fff">'+
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">'+
@@ -13756,8 +14198,8 @@ function _taskRenderTeamChips(){
   }
   wrap.innerHTML = list.map(function(tm){
     var sel = _taskSelectedTeams.has(tm.name);
-    return '<div class="assign-cs-chip-multi'+(sel?' selected':'')+'"'+
-      (_taskIsAdmin ? ' onclick="_taskToggleTeam(this,\''+esc(tm.name)+'\')"' : ' style="cursor:default;opacity:.6"')+
+    return '<div class="assign-cs-chip-multi'+(sel?' selected':'')+'" data-name="'+esc(tm.name)+'"'+
+      (_taskIsAdmin ? ' onclick="_taskToggleTeam(this,this.dataset.name)"' : ' style="cursor:default;opacity:.6"')+
       '>'+esc(tm.name)+'</div>';
   }).join('');
 }
@@ -13790,8 +14232,8 @@ function _taskRenderUserChips(){
   }
   wrap.innerHTML = names.map(function(n){
     var sel = _taskSelectedCS.has(n);
-    return '<div class="assign-cs-chip-multi'+(sel?' selected':'')+'"'+
-      (_taskIsAdmin ? ' onclick="_taskToggleCS(this,\''+esc(n)+'\')"' : ' style="cursor:default;opacity:.6"')+
+    return '<div class="assign-cs-chip-multi'+(sel?' selected':'')+'" data-name="'+esc(n)+'"'+
+      (_taskIsAdmin ? ' onclick="_taskToggleCS(this,this.dataset.name)"' : ' style="cursor:default;opacity:.6"')+
       '>'+esc(n)+'</div>';
   }).join('');
 }
