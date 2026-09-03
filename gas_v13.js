@@ -1960,7 +1960,8 @@ function callGroqAI_(data) { return callAI_(data); } // alias tuong thich cu
 // Cau hinh: setSetting_('driveKnowledgeFolderUrl', <link thu muc Drive>) — thu muc phai
 // duoc chia se cho tai khoan chay Apps Script nay (hoac "Bat ky ai co lien ket" > Xem).
 // File anh trong thu muc bi bo qua o day (chi dung cho "kien thuc" van ban) — gui anh cho
-// khach la tinh nang rieng, chua lam trong ban nay.
+// khach la tinh nang rieng, xem findDriveProductImage_() + _driveImageBase64_() ben duoi
+// (da lam, dung chung thu muc nay lam nguon fallback anh khi chua co productSheetUrl/anh rieng).
 //
 // Cach hoat dong (giong het trieet ly readExternalProductSheet_ o tren — KHONG nhet ca
 // thu muc vao 1 prompt vi qua nang/cham/ton phi AI):
@@ -2439,6 +2440,7 @@ function callAI_(data) {
           if (img) {
             var imgData = _driveImageBase64_(img.fileId);
             if (imgData) out.image = { name: img.name, base64: imgData.base64, mimeType: imgData.mimeType };
+            else out.imageSkipped = { name: img.name, reason: 'too_large' }; // khop ten nhung qua 3MB — bao client thay vi im lang bo qua
           }
         } catch (eImg) {}
       }
