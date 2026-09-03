@@ -10466,11 +10466,11 @@ var _srState = {
   dateField: 'ngayTao',   // A: 'ngayTao' | 'thoiGianHT'
   dateFrom: '', dateTo: '',
   sale: [], kenh: '',      // A — sale: mang nhieu ten (multi-select dang checkbox), kenh: 1 gia tri (select)
-  nguon: '', marketer: '', // B
+  bSale: [], bNguon: [], bMarketer: [], // B — ca 3 deu multi-select (mang nhieu ten)
   dataA: null, dataB: null,
   loading: false,
-  saleOptions: [], kenhOptions: [], nguonOptions: [], marketerOptions: [], optionsLoaded: false,
-  saleSearch: '', kenhSearch: '', productSearch: '', // lọc nhanh client-side trên bảng breakdown
+  saleOptions: [], kenhOptions: [], nguonOptions: [], marketerOptions: [], saleBOptions: [], optionsLoaded: false,
+  saleSearch: '', kenhSearch: '', productSearch: '', bSaleSearch: '', // lọc nhanh client-side trên bảng breakdown
   // C — So sanh theo ky
   cPeriodType: 'week', cDateField: 'ngayTao',
   cWeekOffset: 0, cMonthOffset: 0, cQuarterOffset: 0,
@@ -10498,6 +10498,7 @@ async function _srLoadOptions(){
     _srState.kenhOptions = opts.kenh || [];
     _srState.nguonOptions = opts.nguon || [];
     _srState.marketerOptions = opts.marketer || [];
+    _srState.saleBOptions = opts.saleB || [];
     renderSalesReportTab();
   }
 }
@@ -10513,7 +10514,7 @@ async function _srLoad(){
   } else if (_srState.sub === 'B') {
     _srState.dataB = await _srFetch('salesReportB', {
       dateFrom: _srState.dateFrom, dateTo: _srState.dateTo,
-      nguon: _srState.nguon, marketer: _srState.marketer
+      sale: (_srState.bSale||[]).join(','), nguon: (_srState.bNguon||[]).join(','), marketer: (_srState.bMarketer||[]).join(',')
     });
   } else {
     _srState.dataC = await _srFetch('salesReportC', {
@@ -10538,7 +10539,7 @@ async function exportSalesReportToSheet(){
     ? { dateFrom: _srState.dateFrom, dateTo: _srState.dateTo, dateField: _srState.dateField,
         sale: _srState.sale || [], kenh: _srState.kenh }
     : { dateFrom: _srState.dateFrom, dateTo: _srState.dateTo,
-        nguon: _srState.nguon, marketer: _srState.marketer };
+        sale: _srState.bSale || [], nguon: _srState.bNguon || [], marketer: _srState.bMarketer || [] };
   var btn = document.getElementById('sr-export-sheet-btn');
   if (btn){ btn.disabled = true; btn.textContent = '⏳ Đang xuất...'; }
   try {
@@ -10705,14 +10706,9 @@ function renderSalesReportTab(){
       (_srState.kenhOptions||[]).map(function(kv){ return '<option value="'+esc(kv)+'"'+(_srState.kenh===kv?' selected':'')+'>'+esc(kv)+'</option>'; }).join('') +
       '</select>';
   } else {
-    filters += '<select onchange="_srSetField(\'nguon\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-      '<option value="">— Tất cả nguồn đơn —</option>'+
-      (_srState.nguonOptions||[]).map(function(nv){ return '<option value="'+esc(nv)+'"'+(_srState.nguon===nv?' selected':'')+'>'+esc(nv)+'</option>'; }).join('') +
-      '</select>';
-    filters += '<select onchange="_srSetField(\'marketer\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-      '<option value="">— Tất cả marketer —</option>'+
-      (_srState.marketerOptions||[]).map(function(mv){ return '<option value="'+esc(mv)+'"'+(_srState.marketer===mv?' selected':'')+'>'+esc(mv)+'</option>'; }).join('') +
-      '</select>';
+    filters += _srbComboHTML('sale');
+    filters += _srbComboHTML('nguon');
+    filters += _srbComboHTML('mkt');
   }
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
   filters += '<button class="btn sm" onclick="exportSalesReport()">📊 Xuất Excel</button>';
@@ -10773,6 +10769,16 @@ function _srRenderB(d){
     html += '<div style="background:#fef3c7;color:#92400e;padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:14px">' +
       '⚠️ '+fmt(d.mismatchRows)+' dòng bị lệch số phần tử giữa cột Sản phẩm/Mã sản phẩm/Số lượng — nên kiểm tra tay, số liệu sản phẩm bên dưới có thể thiếu sót ở các dòng này.</div>';
   }
+
+  var saleRows = (d.bySale||[]).filter(function(s){ return !_srState.bSaleSearch || (s.name||'').toLowerCase().indexOf(_srState.bSaleSearch.toLowerCase())!==-1; });
+  html += '<div class="dash-section-title">Theo Sale <span style="font-weight:400;color:var(--muted);font-size:11px">(tiền chia đều cho số sale/đơn, số đơn giữ nguyên)</span></div>';
+  html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.bSaleSearch)+'" oninput="_srState.bSaleSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
+  html += '<table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Giá trị sau giảm giá</th><th style="text-align:right">COD</th></tr></thead><tbody>';
+  saleRows.forEach(function(s){
+    html += '<tr><td>'+esc(s.name)+'</td><td style="text-align:right">'+fmt(s.orders)+'</td><td style="text-align:right">'+_srMoney(s.giaTri)+'</td><td style="text-align:right">'+_srMoney(s.cod)+'</td></tr>';
+  });
+  if (!saleRows.length) html += '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+  html += '</tbody></table>';
 
   var productRows = (d.products||[]).filter(function(p){ return !_srState.productSearch || (p.name||'').toLowerCase().indexOf(_srState.productSearch.toLowerCase())!==-1 || (p.code||'').toLowerCase().indexOf(_srState.productSearch.toLowerCase())!==-1; });
   html += '<div class="dash-section-title">Báo cáo sản phẩm</div>';
@@ -10928,6 +10934,137 @@ function exportSalesReportC(){
   XLSX.writeFile(wb, `BaoCaoDoanhSo_C_${_ymd(new Date())}.xlsx`);
 }
 
+// ── Combo multi-select DUNG CHUNG cho 3 bo loc moi cua Bao cao B (Sale/Nguon don/Marketer) —
+//    cung phong cach (go tim, tick nhieu, dropdown khong dong sau moi lan chon, chip xoa rieng)
+//    nhu combo Sale cua Bao cao A, nhung viet 1 lan dung chung cho ca 3 de khong lap code 3 lan. ──
+var _SRB_COMBO_CFG = {
+  sale: { id: 'srb-sale-combo', stateKey: 'bSale', optKey: 'saleBOptions', label: 'Sale', placeholder: '🔍 Tìm & chọn sale...' },
+  nguon: { id: 'srb-nguon-combo', stateKey: 'bNguon', optKey: 'nguonOptions', label: 'Nguồn đơn', placeholder: '🔍 Tìm & chọn nguồn...' },
+  mkt: { id: 'srb-mkt-combo', stateKey: 'bMarketer', optKey: 'marketerOptions', label: 'Marketer', placeholder: '🔍 Tìm & chọn marketer...' }
+};
+var _srbComboData = {}, _srbComboIdx = {};
+function _srbBuildData(key){
+  var cfg = _SRB_COMBO_CFG[key];
+  _srbComboData[key] = (_srState[cfg.optKey]||[]).map(function(v){ return {value:v, label:v}; });
+}
+function srbComboRender(key, filter){
+  var cfg = _SRB_COMBO_CFG[key];
+  var list = document.getElementById(cfg.id+'-list');
+  if (!list) return;
+  if (!_srbComboData[key]) _srbBuildData(key);
+  var q = _foldVi(filter||'');
+  var sel = _srState[cfg.stateKey] || [];
+  var items = q ? _srbComboData[key].filter(function(it){ return _foldVi(it.label).indexOf(q)!==-1; }) : _srbComboData[key];
+  if (!items.length){ list.innerHTML = '<div class="cs-combo-empty">Không tìm thấy</div>'; _srbComboIdx[key]=-1; return; }
+  list.innerHTML = items.map(function(it){
+    var checked = sel.indexOf(it.value)!==-1;
+    return '<div class="cs-combo-opt '+(checked?'is-sel':'')+'" data-v="'+esc(it.value)+'" onmousedown="srbComboToggleItem(\''+key+'\', event, this.getAttribute(\'data-v\'))">'+
+      '<span>'+(checked?'☑':'☐')+' '+esc(it.label)+'</span></div>';
+  }).join('');
+  _srbComboIdx[key] = -1;
+}
+function srbRenderChips(key){
+  var cfg = _SRB_COMBO_CFG[key];
+  var wrap = document.getElementById(cfg.id+'-chips');
+  if (!wrap) return;
+  var sel = _srState[cfg.stateKey] || [];
+  wrap.innerHTML = sel.map(function(name){
+    return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap" data-name="'+esc(name)+'">'+
+      esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srbComboRemove(\''+key+'\', this.parentNode.dataset.name)">✕</span></span>';
+  }).join('');
+  var lbl = document.getElementById(cfg.id+'-label-count');
+  if (lbl) lbl.textContent = sel.length ? ' ('+sel.length+' đã chọn)' : '';
+  var clr = document.getElementById(cfg.id+'-clear');
+  if (clr) clr.style.display = sel.length ? '' : 'none';
+}
+function srbComboOpen(key){
+  _srbBuildData(key);
+  var cfg = _SRB_COMBO_CFG[key];
+  var ci = document.getElementById(cfg.id+'-input');
+  srbComboRender(key, ci ? ci.value : '');
+  var l = document.getElementById(cfg.id+'-list'); if (l) l.classList.add('open');
+}
+function srbComboClose(key){ var cfg=_SRB_COMBO_CFG[key]; var l=document.getElementById(cfg.id+'-list'); if(l) l.classList.remove('open'); }
+function srbComboToggle(key, e){
+  if (e) e.stopPropagation();
+  var cfg = _SRB_COMBO_CFG[key];
+  var l = document.getElementById(cfg.id+'-list'); if (!l) return;
+  if (l.classList.contains('open')) srbComboClose(key);
+  else { var ci=document.getElementById(cfg.id+'-input'); if(ci) ci.focus(); srbComboOpen(key); }
+}
+function srbComboFilter(key, v){ srbComboRender(key, v); var cfg=_SRB_COMBO_CFG[key]; var l=document.getElementById(cfg.id+'-list'); if(l) l.classList.add('open'); }
+function srbComboToggleItem(key, e, value){
+  if (e && e.preventDefault) e.preventDefault();
+  var cfg = _SRB_COMBO_CFG[key];
+  var arr = (_srState[cfg.stateKey]||[]).slice();
+  var idx = arr.indexOf(value);
+  if (idx!==-1) arr.splice(idx,1); else arr.push(value);
+  _srState[cfg.stateKey] = arr;
+  var ci = document.getElementById(cfg.id+'-input');
+  srbComboRender(key, ci?ci.value:'');
+  srbRenderChips(key);
+}
+function srbComboRemove(key, value){
+  var cfg = _SRB_COMBO_CFG[key];
+  _srState[cfg.stateKey] = (_srState[cfg.stateKey]||[]).filter(function(v){ return v!==value; });
+  srbRenderChips(key);
+  var l = document.getElementById(cfg.id+'-list');
+  if (l && l.classList.contains('open')){ var ci=document.getElementById(cfg.id+'-input'); srbComboRender(key, ci?ci.value:''); }
+}
+function srbComboClear(key, e){
+  if (e) e.stopPropagation();
+  var cfg = _SRB_COMBO_CFG[key];
+  _srState[cfg.stateKey] = [];
+  var ci = document.getElementById(cfg.id+'-input'); if (ci) ci.value = '';
+  srbRenderChips(key);
+  var l = document.getElementById(cfg.id+'-list');
+  if (l && l.classList.contains('open')) srbComboRender(key, '');
+}
+function srbComboKey(key, e){
+  var cfg = _SRB_COMBO_CFG[key];
+  var list = document.getElementById(cfg.id+'-list');
+  if (!list || !list.classList.contains('open')){ if (e.key==='ArrowDown') srbComboOpen(key); return; }
+  var opts = [...list.querySelectorAll('.cs-combo-opt')];
+  if (!opts.length) return;
+  if (e.key==='ArrowDown'){ e.preventDefault(); _srbComboIdx[key] = Math.min((_srbComboIdx[key]==null?-1:_srbComboIdx[key])+1, opts.length-1); }
+  else if (e.key==='ArrowUp'){ e.preventDefault(); _srbComboIdx[key] = Math.max((_srbComboIdx[key]==null?-1:_srbComboIdx[key])-1, 0); }
+  else if (e.key==='Enter'){
+    e.preventDefault();
+    var idx = _srbComboIdx[key];
+    var pick = (idx>=0 && opts[idx]) ? opts[idx] : (opts.length===1 ? opts[0] : null);
+    if (pick) srbComboToggleItem(key, e, pick.getAttribute('data-v'));
+    return;
+  } else if (e.key==='Escape'){ srbComboClose(key); return; }
+  else { return; }
+  opts.forEach(function(o,i){ o.classList.toggle('active', i===_srbComboIdx[key]); });
+  if (_srbComboIdx[key]>=0 && opts[_srbComboIdx[key]]) opts[_srbComboIdx[key]].scrollIntoView({block:'nearest'});
+}
+document.addEventListener('click', function(e){
+  Object.keys(_SRB_COMBO_CFG).forEach(function(key){
+    var cfg = _SRB_COMBO_CFG[key];
+    var combo = document.getElementById(cfg.id);
+    if (combo && !combo.contains(e.target)) srbComboClose(key);
+  });
+});
+function _srbComboHTML(key){
+  var cfg = _SRB_COMBO_CFG[key];
+  var sel = _srState[cfg.stateKey] || [];
+  return '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">'+cfg.label+'<span id="'+cfg.id+'-label-count" style="color:var(--green)">'+(sel.length?' ('+sel.length+' đã chọn)':'')+'</span></div>'+
+    '<div class="cs-combo" id="'+cfg.id+'" style="width:170px">'+
+    '<input type="text" id="'+cfg.id+'-input" class="cs-combo-input" placeholder="'+esc(cfg.placeholder)+'" autocomplete="off" '+
+    'oninput="srbComboFilter(\''+key+'\', this.value)" onfocus="srbComboOpen(\''+key+'\')" onkeydown="srbComboKey(\''+key+'\', event)">'+
+    '<button type="button" class="cs-combo-clear" id="'+cfg.id+'-clear" onclick="srbComboClear(\''+key+'\', event)" style="display:'+(sel.length?'':'none')+'">✕</button>'+
+    '<span class="cs-combo-caret" onclick="srbComboToggle(\''+key+'\', event)">▾</span>'+
+    '<div class="cs-combo-list" id="'+cfg.id+'-list"></div>'+
+    '</div>'+
+    '<div id="'+cfg.id+'-chips" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;max-width:200px">'+
+    sel.map(function(name){
+      return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap" data-name="'+esc(name)+'">'+
+        esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srbComboRemove(\''+key+'\', this.parentNode.dataset.name)">✕</span></span>';
+    }).join('') +
+    '</div></div>';
+}
+
 function exportSalesReport(){
   if (_srState.sub === 'A'){
     var d = _srState.dataA;
@@ -10959,12 +11096,15 @@ function exportSalesReport(){
       ['Tổng COD', dB.totalCod]];
     var productRows = [['Mã sản phẩm','Tên sản phẩm','Tổng số lượng']];
     (dB.products||[]).forEach(function(p){ productRows.push([p.code, p.name, p.soLuong]); });
-    var detailRowsB = [['Ngày tạo đơn','Khách hàng','SĐT','Nguồn đơn','Sản phẩm','Mã sản phẩm','Số lượng','Giá trị sau giảm','COD','Marketer']];
+    var bySaleRowsB = [['Sale','Số đơn','Giá trị sau giảm giá','COD']];
+    (dB.bySale||[]).forEach(function(s){ bySaleRowsB.push([s.name, s.orders, s.giaTri, s.cod]); });
+    var detailRowsB = [['Ngày tạo đơn','Khách hàng','SĐT','Nguồn đơn','Sale','Sản phẩm','Mã sản phẩm','Số lượng','Giá trị sau giảm','COD','Marketer']];
     (dB.orders||[]).forEach(function(o){
-      detailRowsB.push([o.ngayTaoDon, o.khachHang, o.soDienThoai, o.nguonDon, o.sanPham, o.maSanPham, o.soLuong, o.giaTriSauGiam, o.cod, o.marketer]);
+      detailRowsB.push([o.ngayTaoDon, o.khachHang, o.soDienThoai, o.nguonDon, o.theSale, o.sanPham, o.maSanPham, o.soLuong, o.giaTriSauGiam, o.cod, o.marketer]);
     });
     var wbB = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wbB, XLSX.utils.aoa_to_sheet(summaryB), 'Tổng quan');
+    XLSX.utils.book_append_sheet(wbB, XLSX.utils.aoa_to_sheet(bySaleRowsB), 'Theo Sale');
     XLSX.utils.book_append_sheet(wbB, XLSX.utils.aoa_to_sheet(productRows), 'Báo cáo sản phẩm');
     XLSX.utils.book_append_sheet(wbB, XLSX.utils.aoa_to_sheet(detailRowsB), 'Chi tiết đơn');
     XLSX.writeFile(wbB, `BaoCaoDoanhSo_B_${_ymd(new Date())}.xlsx`);
