@@ -2706,8 +2706,8 @@ function _rowHtml(c) {
   } else {
     tacdongHtml = `<span style="color:var(--hint);font-size:11px">—</span>`;
   }
-  return `<tr onclick="openDp('${esc(c.phone)}')">
-    <td class="col-name"><div class="cname">${esc(c.name)}</div><div class="cphone" style="display:flex;align-items:center;gap:4px">${c.phone}<button onclick="event.stopPropagation();copyPhone('${esc(c.phone)}')" title="Copy SĐT" style="background:none;border:none;cursor:pointer;font-size:11px;padding:0 2px;color:var(--hint);line-height:1;opacity:.6" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'">📋</button></div></td>
+  return `<tr data-phone="${esc(c.phone)}" onclick="openDp(this.dataset.phone)">
+    <td class="col-name"><div class="cname">${esc(c.name)}</div><div class="cphone" style="display:flex;align-items:center;gap:4px">${c.phone}<button data-phone="${esc(c.phone)}" onclick="event.stopPropagation();copyPhone(this.dataset.phone)" title="Copy SĐT" style="background:none;border:none;cursor:pointer;font-size:11px;padding:0 2px;color:var(--hint);line-height:1;opacity:.6" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'">📋</button></div></td>
     <td class="col-tier">${tb}</td>
     <td class="col-care">${cb}${khb ? '<br>'+khb : ''}</td>
     <td class="col-zalo">${zb}</td>
@@ -2716,7 +2716,7 @@ function _rowHtml(c) {
     <td class="col-cs">${csHtml}</td>
     <td class="col-carecs">${careCSHtml}</td>
     <td class="col-source" style="${srcDisp}"><div class="btags">${srcTags}${srcExtra}</div></td>
-    <td class="col-bcstatus" style="cursor:pointer;${bcDisp}" onclick="event.stopPropagation();openBcLogModal('${esc(c.phone)}')" title="Nhấn để xem log gửi TN của khách này">${_bcStatusBadge(c.phone)}</td>
+    <td class="col-bcstatus" data-phone="${esc(c.phone)}" style="cursor:pointer;${bcDisp}" onclick="event.stopPropagation();openBcLogModal(this.dataset.phone)" title="Nhấn để xem log gửi TN của khách này">${_bcStatusBadge(c.phone)}</td>
     <td class="col-note" style="font-size:11px;color:var(--muted)" title="${noteTitle}">${noteStr}</td>
     <td class="col-sched">${nsHtml}</td>
     <td class="col-lastact" style="${lastActDisp}">${lastActHtml}</td>
@@ -2896,7 +2896,7 @@ function renderScheduleTab() {
           const c = allCustomers.find(x=>x.phone===it.phone);
           const st = SCHED_TYPES.find(x=>x.key===it.type)||SCHED_TYPES[0];
           const _nsh = _schedNoteShort(it);
-          html += `<div class="sched-item" onclick="openDp('${esc(it.phone)}')">
+          html += `<div class="sched-item" data-phone="${esc(it.phone)}" onclick="openDp(this.dataset.phone)">
             <div class="sched-dot" style="background:${st.color}"></div>
             <div class="sched-type" style="font-weight:700;color:${st.color}">${_schedShortCode(it)}</div>
             <div class="sched-name">${c?esc(_lastWord(c.name)):it.phone}</div>
@@ -2929,7 +2929,7 @@ function renderOverdueTab() {
       const c = allCustomers.find(x=>x.phone===it.phone);
       const st = SCHED_TYPES.find(x=>x.key===it.type)||SCHED_TYPES[0];
       const _nsh2 = _schedNoteShort(it);
-      html += `<div class="sched-item sched-overdue" onclick="openDp('${esc(it.phone)}')">
+      html += `<div class="sched-item sched-overdue" data-phone="${esc(it.phone)}" onclick="openDp(this.dataset.phone)">
         <div class="sched-dot" style="background:${st.color}"></div>
         <div class="sched-type" style="font-weight:700;color:${st.color}">${_schedShortCode(it)}</div>
         <div class="sched-name">${c?esc(_lastWord(c.name)):it.phone}</div>
@@ -3088,8 +3088,8 @@ function openDp(phone) {
   txt('dp-name', c.name);
   document.getElementById('dp-meta').innerHTML = `
     <span class="cphone" id="dp-phone-display">${c.phone}</span>
-    <button onclick="copyPhone('${esc(c.phone)}')" title="Copy số điện thoại" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">📋</button>
-    <button onclick="openEditPhone('${esc(c.phone)}')" title="Sửa số điện thoại" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">✏️</button>
+    <button data-phone="${esc(c.phone)}" onclick="copyPhone(this.dataset.phone)" title="Copy số điện thoại" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">📋</button>
+    <button data-phone="${esc(c.phone)}" onclick="openEditPhone(this.dataset.phone)" title="Sửa số điện thoại" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">✏️</button>
     ${tierBadge(c.tier)}
     ${careBadge(c.careStatus)}
     ${zaloBadge(c.zaloStatus)}
@@ -3159,10 +3159,10 @@ function renderCareTab(c) {
         <div class="nickzalo-field">
           <div class="nickzalo-label">
             <span class="nickzalo-label-text">💬 Nick Zalo</span>
-            <button class="nickzalo-manage-btn" onclick="openNickZaloModal('${esc(c.phone)}')">⚙ Quản lý danh sách</button>
+            <button class="nickzalo-manage-btn" data-phone="${esc(c.phone)}" onclick="openNickZaloModal(this.dataset.phone)">⚙ Quản lý danh sách</button>
           </div>
           <div class="nickzalo-select-row">
-            <select class="nickzalo-select" id="cs-nickzalo-sel" onchange="addNickZaloChip('${esc(c.phone)}',this)">
+            <select class="nickzalo-select" id="cs-nickzalo-sel" data-phone="${esc(c.phone)}" onchange="addNickZaloChip(this.dataset.phone,this)">
               <option value="">— Chọn nick Zalo —</option>
               ${_buildNickZaloOptions()}
             </select>
@@ -3182,14 +3182,14 @@ function renderCareTab(c) {
         </div>
         <input class="form-input" type="date" id="cs-birthday" value="${care.birthday||''}"
                title="Nhắc hẹn sinh nhật hàng năm tự động"
-               onchange="onBdayChange(this.value,'${esc(c.phone)}')">
+               data-phone="${esc(c.phone)}" onchange="onBdayChange(this.value,this.dataset.phone)">
         ${care.birthday ? `<div style="font-size:10px;color:#be185d;margin-top:2px">🔔 Sẽ nhắc mỗi năm vào ngày này</div>` : ''}
       </div>
       <div>
         <div class="form-label">🏷 Nhãn phân loại (tự đặt)</div>
         <input class="form-input" id="cs-tag" placeholder="VD: VIP, Khách sỉ, Combo A..."
                title="Nhãn tự do để lọc khi tạo chiến dịch — không liên quan tag của Zalo"
-               value="${esc(care.tag||'')}" onchange="onTagChange(this.value,'${esc(c.phone)}')">
+               value="${esc(care.tag||'')}" data-phone="${esc(c.phone)}" onchange="onTagChange(this.value,this.dataset.phone)">
       </div>
     </div>
     <div class="remind-panel">
@@ -3216,7 +3216,7 @@ function renderCareTab(c) {
                  style="width:140px;font-size:11px" title="Hoặc chọn ngày cụ thể">
           <input class="form-input" id="remind-note" placeholder="Nội dung nhắc..." style="flex:1;min-width:120px">
         </div>
-        <button class="btn secondary" style="width:100%;font-size:12px" onclick="addCustomRemind('${esc(c.phone)}')">
+        <button class="btn secondary" style="width:100%;font-size:12px" data-phone="${esc(c.phone)}" onclick="addCustomRemind(this.dataset.phone)">
           + Thêm lịch nhắc hẹn
         </button>
       </div>
@@ -3239,8 +3239,8 @@ function renderCareTab(c) {
         <div class="form-label">Số điện thoại</div>
         <div style="display:flex;gap:4px;align-items:center">
           <input class="form-input" value="${c.phone}" readonly style="background:var(--surface2);flex:1">
-          <button onclick="copyPhone('${esc(c.phone)}')" title="Copy SĐT" class="btn sm">📋</button>
-          <button onclick="openEditPhone('${esc(c.phone)}')" title="Sửa SĐT" class="btn sm">✏️ Sửa</button>
+          <button data-phone="${esc(c.phone)}" onclick="copyPhone(this.dataset.phone)" title="Copy SĐT" class="btn sm">📋</button>
+          <button data-phone="${esc(c.phone)}" onclick="openEditPhone(this.dataset.phone)" title="Sửa SĐT" class="btn sm">✏️ Sửa</button>
         </div>
       </div>
     </div>
@@ -3251,14 +3251,14 @@ function renderCareTab(c) {
       </div>
       <div style="display:flex;gap:6px;align-items:flex-start">
         <textarea class="form-ta" id="cs-note-new" placeholder="Thêm ghi chú mới..." style="min-height:52px;flex:1"></textarea>
-        <button onclick="addNoteEntry('${esc(c.phone)}')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px;white-space:nowrap;margin-top:2px">➕ Thêm</button>
+        <button data-phone="${esc(c.phone)}" onclick="addNoteEntry(this.dataset.phone)" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px;white-space:nowrap;margin-top:2px">➕ Thêm</button>
       </div>
       <div id="cs-note-history" style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
         ${_renderNoteHistory(care.note||c.careNote||'')}
       </div>
       <input type="hidden" id="cs-note" value="${esc(care.note||c.careNote||'')}">
     </div>
-    <button class="save-btn" onclick="saveCare('${esc(c.phone)}')">💾 Lưu tình trạng ${gsUrl?'+ Sync GSheets':''}</button>
+    <button class="save-btn" data-phone="${esc(c.phone)}" onclick="saveCare(this.dataset.phone)">💾 Lưu tình trạng ${gsUrl?'+ Sync GSheets':''}</button>
   </div>
   <div class="dp-section">
     <div class="dp-stitle">📅 Lịch chăm sóc nhanh</div>
@@ -3284,7 +3284,7 @@ function renderCareTab(c) {
         <input class="form-input" style="margin-top:4px" id="sched-hen-note" placeholder="Sản phẩm / lý do..." value="${esc(care.schedHenNote||'')}">
       </div>
     </div>
-    <button class="save-btn" style="background:var(--blue);border-color:var(--blue)" onclick="saveCareSchedules('${esc(c.phone)}')">💾 Lưu lịch hẹn ${gsUrl?'+ Sync GSheets':''}</button>
+    <button class="save-btn" style="background:var(--blue);border-color:var(--blue)" data-phone="${esc(c.phone)}" onclick="saveCareSchedules(this.dataset.phone)">💾 Lưu lịch hẹn ${gsUrl?'+ Sync GSheets':''}</button>
   </div>
   ${(()=>{
     const daoOrders = c.orders.filter(o => _isDataDaoRenew(o.source));
@@ -3293,7 +3293,7 @@ function renderCareTab(c) {
     return `<div class="dp-section" style="border:1.5px solid var(--orange,#e8a04a);border-radius:8px;padding:10px 12px">
       <div class="dp-stitle" style="color:var(--orange,#e8a04a);margin-bottom:6px">⚡ Lịch tự động Data Đảo</div>
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--text)">
-        <input type="checkbox" id="dao-sched-exclude" style="width:15px;height:15px;cursor:pointer" ${excluded?'checked':''} onchange="_toggleDaoSchedExclude('${esc(c.phone)}',this.checked)">
+        <input type="checkbox" id="dao-sched-exclude" data-phone="${esc(c.phone)}" style="width:15px;height:15px;cursor:pointer" ${excluded?'checked':''} onchange="_toggleDaoSchedExclude(this.dataset.phone,this.checked)">
         <span>Bỏ lịch tự động cho khách này <span style="color:var(--muted)">(tích nếu không cần chăm sóc)</span></span>
       </label>
     </div>`;
@@ -3322,7 +3322,7 @@ function renderSchedTabHtml(c) {
     <div class="form-row">
       <textarea class="form-ta" id="new-snote" placeholder="Nội dung nhắc nhở..." style="min-height:48px"></textarea>
     </div>
-    <button class="save-btn" style="margin-bottom:14px" onclick="addSched('${esc(c.phone)}')">+ Thêm lịch hẹn</button>
+    <button class="save-btn" style="margin-bottom:14px" data-phone="${esc(c.phone)}" onclick="addSched(this.dataset.phone)">+ Thêm lịch hẹn</button>
     <div class="dp-stitle">Lịch đang chờ (${upcoming.length})</div>
     ${upcoming.length ? upcoming.map(it=>{
       const st=SCHED_TYPES.find(x=>x.key===it.type)||SCHED_TYPES[0];
@@ -3351,7 +3351,7 @@ function renderSchedTabHtml(c) {
           </div>
           <textarea class="form-ta" id="${eid}_note" style="min-height:38px;margin-bottom:6px" placeholder="Nội dung nhắc...">${esc(it.note||'')}</textarea>
           <div style="display:flex;gap:5px">
-            <button class="save-btn" style="flex:1;padding:5px" onclick="_schedEditSave('${it.id}','${eid}','${esc(c.phone)}')">💾 Lưu</button>
+            <button class="save-btn" style="flex:1;padding:5px" data-phone="${esc(c.phone)}" onclick="_schedEditSave('${it.id}','${eid}',this.dataset.phone)">💾 Lưu</button>
             <button onclick="_schedEditToggle('${eid}')" style="border:1px solid var(--border);background:var(--surface);border-radius:5px;padding:5px 10px;cursor:pointer;font-size:11px">Hủy</button>
           </div>
         </div>
@@ -3406,7 +3406,7 @@ function renderHistTab(c) {
         <input type="checkbox" id="mo-auto-sched"> Tự động thêm lịch chăm sóc (+7, +14 ngày, +1, +2 tháng)
       </label>
       <div style="display:flex;gap:6px">
-        <button class="save-btn" style="flex:1;padding:6px" onclick="addManualOrder('${esc(c.phone)}')">💾 Lưu đơn hàng</button>
+        <button class="save-btn" style="flex:1;padding:6px" data-phone="${esc(c.phone)}" onclick="addManualOrder(this.dataset.phone)">💾 Lưu đơn hàng</button>
         <button onclick="_toggleAddOrderForm()" style="border:1px solid var(--border);background:var(--surface);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px">Hủy</button>
       </div>
     </div>
@@ -3428,7 +3428,7 @@ function renderHistTab(c) {
             style="border:none;background:${isMissing?'var(--orange,#e8a04a)':'var(--surface2)'};color:${isMissing?'#fff':'var(--muted)'};border-radius:4px;padding:1px 7px;font-size:11px;cursor:pointer;margin-left:6px;border:1px solid ${isMissing?'var(--orange,#e8a04a)':'var(--border)'}">
             ${isMissing?'⚠ Cập nhật':'✏ Sửa'}
           </button>
-          <button onclick="_histDeleteOrder('${esc(c.phone)}',${realIdx})" title="Xóa đơn này"
+          <button data-phone="${esc(c.phone)}" onclick="_histDeleteOrder(this.dataset.phone,${realIdx})" title="Xóa đơn này"
             style="border:1px solid var(--red-b,#fca5a5);background:var(--red-bg,#fff1f2);color:var(--red,#dc2626);border-radius:4px;padding:1px 7px;font-size:11px;cursor:pointer;margin-left:4px">
             🗑 Xóa
           </button>
@@ -3463,7 +3463,7 @@ function renderHistTab(c) {
           </div>
           <div style="display:flex;gap:6px">
             <button class="save-btn" style="flex:1;background:var(--orange,#e8a04a);border-color:var(--orange,#e8a04a);padding:6px"
-              onclick="_histEditSave('${esc(c.phone)}',${realIdx},'${eid}')">💾 Lưu cập nhật</button>
+              data-phone="${esc(c.phone)}" onclick="_histEditSave(this.dataset.phone,${realIdx},'${eid}')">💾 Lưu cập nhật</button>
             <button onclick="_histEditToggle('${eid}')"
               style="border:1px solid var(--border);background:var(--surface);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px">Hủy</button>
           </div>
@@ -3665,7 +3665,7 @@ function _renderNoteHistory(raw) {
         ${i===0 ? '<span style="background:#16a34a22;color:#16a34a;font-size:9px;padding:1px 5px;border-radius:20px;font-weight:600">MỚI NHẤT</span>' : ''}
       </div>` : ''}
       <div style="font-size:12px;white-space:pre-wrap;line-height:1.5">${esc(n.text)}</div>
-      <button onclick="deleteNoteEntry(event,this,'${esc(raw).replace(/'/g,"\\'")}',${i})"
+      <button data-raw="${esc(raw)}" onclick="deleteNoteEntry(event,this,this.dataset.raw,${i})"
         style="position:absolute;top:6px;right:6px;background:none;border:none;cursor:pointer;color:var(--hint);font-size:11px;padding:2px 4px;border-radius:4px;opacity:.5"
         onmouseover="this.style.opacity='1';this.style.background='#ef444422'"
         onmouseout="this.style.opacity='.5';this.style.background='none'" title="Xóa ghi chú này">✕</button>
@@ -3754,8 +3754,8 @@ function saveCare(phone) {
   applyFilters();
   document.getElementById('dp-meta').innerHTML = `
     <span class="cphone" id="dp-phone-display">${phone}</span>
-    <button onclick="copyPhone('${esc(phone)}')" title="Copy số điện thoại" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">📋</button>
-    <button onclick="openEditPhone('${esc(phone)}')" title="Sửa số điện thoại" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">✏️</button>
+    <button data-phone="${esc(phone)}" onclick="copyPhone(this.dataset.phone)" title="Copy số điện thoại" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">📋</button>
+    <button data-phone="${esc(phone)}" onclick="openEditPhone(this.dataset.phone)" title="Sửa số điện thoại" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">✏️</button>
     ${tierBadge(c?c.tier:'Chưa bán lại được')}
     ${careBadge(careData[phone].status)}
     ${zaloBadge(careData[phone].zalo)}
@@ -3867,7 +3867,7 @@ function _renderNickZaloChips(arr, phone) {
   if (!arr || !arr.length) return '';
   return arr.map(function(name, idx) {
     return '<span class="nickzalo-chip">💬 ' + esc(name) +
-      '<button class="nz-x" title="Bỏ nick này" onclick="removeNickZaloChip(\'' + esc(phone) + '\',' + idx + ')">✕</button>' +
+      '<button class="nz-x" data-phone="' + esc(phone) + '" title="Bỏ nick này" onclick="removeNickZaloChip(this.dataset.phone,' + idx + ')">✕</button>' +
       '</span>';
   }).join('');
 }
@@ -4645,7 +4645,7 @@ function updateBrandList() {
   const sorted=Object.entries(bc).sort((a,b)=>b[1]-a[1]);
   document.getElementById('brand-list').innerHTML=
     `<button class="section-btn bitem ${currentBrand==='all'?'active':''}" onclick="setBrand('all',this)"><span>Tất cả</span><span class="fbadge">${fmt(base.length)}</span></button>`+
-    sorted.map(([b,n])=>`<button class="section-btn bitem ${currentBrand===b?'active':''}" onclick="setBrand('${esc(b)}',this)"><span>${esc(b)}</span><span class="fbadge">${n}</span></button>`).join('');
+    sorted.map(([b,n])=>`<button class="section-btn bitem ${currentBrand===b?'active':''}" data-brand="${esc(b)}" onclick="setBrand(this.dataset.brand,this)"><span>${esc(b)}</span><span class="fbadge">${n}</span></button>`).join('');
 }
 
 // ── Đổi chế độ lọc CS: phụ trách / chăm sóc / cả hai ──
@@ -4832,13 +4832,13 @@ function openEditPhone(oldPhone) {
         <div style="font-size:11px;color:var(--hint);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">SĐT hiện tại</div>
         <div style="font-size:14px;font-weight:600;font-family:monospace;color:var(--text);margin-bottom:14px;padding:6px 10px;background:var(--surface2);border-radius:var(--rsm)">${esc(oldPhone)}</div>
         <div style="font-size:11px;color:var(--hint);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">SĐT mới</div>
-        <input id="edit-phone-input" class="form-input" type="tel" placeholder="Nhập số điện thoại mới..." value="${esc(oldPhone)}"
+        <input id="edit-phone-input" class="form-input" type="tel" placeholder="Nhập số điện thoại mới..." value="${esc(oldPhone)}" data-old-phone="${esc(oldPhone)}"
           style="width:100%;margin-bottom:8px;font-size:14px;font-family:monospace"
-          onkeydown="if(event.key==='Enter') saveEditPhone('${esc(oldPhone)}')">
+          onkeydown="if(event.key==='Enter') saveEditPhone(this.dataset.oldPhone)">
         <div id="edit-phone-err" style="font-size:11px;color:var(--red);margin-bottom:8px;display:none"></div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
           <button class="btn" onclick="document.getElementById('edit-phone-modal').remove()">Huỷ</button>
-          <button class="btn primary" onclick="saveEditPhone('${esc(oldPhone)}')">💾 Lưu${gsUrl ? ' + Sync GSheets' : ''}</button>
+          <button class="btn primary" data-old-phone="${esc(oldPhone)}" onclick="saveEditPhone(this.dataset.oldPhone)">💾 Lưu${gsUrl ? ' + Sync GSheets' : ''}</button>
         </div>
       </div>
     </div>`;
@@ -5225,15 +5225,15 @@ function renderReminderPanel(){
     var typeLabel = (rm.customLabel) ? rm.customLabel : st.label;
     var cardClass = rm.type==='birthday' ? 'rp-card rp-bday' : (rm.type==='custom'&&rm.customLabel ? 'rp-card rp-custom' : 'rp-card');
     var doneAction = rm.careField
-      ? 'event.stopPropagation();markCareSchedDone(\''+esc(rm.phone)+'\',\''+rm.careField+'\')'
+      ? 'event.stopPropagation();markCareSchedDone(this.dataset.phone,\''+rm.careField+'\')'
       : (rm.schedId ? 'event.stopPropagation();markDone(\''+rm.schedId+'\')' : 'event.stopPropagation();_dismissReminder(\''+rm.id+'\')');
-    html += '<div class="'+cardClass+'"><div class="rp-card-main" onclick="openDp(\''+esc(rm.phone)+'\')">'+
+    html += '<div class="'+cardClass+'"><div class="rp-card-main" data-phone="'+esc(rm.phone)+'" onclick="openDp(this.dataset.phone)">'+
       '<div class="rp-type" style="background:'+st.color+'">'+esc(typeLabel)+'</div>'+
       '<div class="rp-cust">'+esc(rm.name)+'</div>'+
       '<div class="rp-note" style="color:'+(over?'var(--red)':'var(--muted)')+'">'+(over?'⚠ Quá hạn · ':'📅 ')+fmtDate(rm.date)+(rm.note?(' · '+esc(rm.note)):'')+'</div>'+
       (rm.owner?('<div class="rp-owner">👤 '+esc(rm.owner)+'</div>'):'')+'</div>'+
       '<div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0">'+
-      '<button class="rp-hbtn" style="background:var(--green);color:#fff;font-size:10px;padding:2px 7px" title="Đánh dấu hoàn thành" onclick="'+doneAction+'">✓ Done</button>'+
+      '<button class="rp-hbtn" style="background:var(--green);color:#fff;font-size:10px;padding:2px 7px" data-phone="'+esc(rm.phone)+'" title="Đánh dấu hoàn thành" onclick="'+doneAction+'">✓ Done</button>'+
       '<button class="rp-dismiss" title="Tắt hôm nay" onclick="event.stopPropagation();_dismissReminder(\''+rm.id+'\')">✕</button>'+
       '</div></div>';
   }
@@ -5412,7 +5412,7 @@ function renderColDdItems(col, query) {
       </div>`;
     }
     return `<label class="col-dd-item">
-      <input type="checkbox" value="${esc(v)}" ${colFilters[col].has(v)?'checked':''} onchange="toggleColFilterVal('${col}','${esc(v)}',this.checked)">
+      <input type="checkbox" value="${esc(v)}" data-val="${esc(v)}" ${colFilters[col].has(v)?'checked':''} onchange="toggleColFilterVal('${col}',this.dataset.val,this.checked)">
       ${v ? esc(v) : '<span style="color:var(--hint)">— (trống)</span>'}
     </label>`;
   }).join('');
@@ -5488,7 +5488,7 @@ function openAdvModal() {
 function buildAdvChips(key, values, selectedSet, containerId) {
   const el = document.getElementById(containerId);
   if (!el) return;
-  el.innerHTML = values.map(v=>`<span class="adv-chip ${selectedSet.has(v)?'selected':''}" onclick="toggleAdvChip('${key}','${esc(v)}',this)">${esc(v)}</span>`).join('');
+  el.innerHTML = values.map(v=>`<span class="adv-chip ${selectedSet.has(v)?'selected':''}" data-val="${esc(v)}" onclick="toggleAdvChip('${key}',this.dataset.val,this)">${esc(v)}</span>`).join('');
 }
 function toggleAdvChip(key, val, el) {
   if (advFilters[key].has(val)) { advFilters[key].delete(val); el.classList.remove('selected'); }
@@ -5773,7 +5773,7 @@ function renderAssignCreate() {
     <input class="assign-input" id="assign-cs-search" placeholder="🔍 Gõ tên CS để tìm nhanh..." style="width:100%;margin-bottom:8px;box-sizing:border-box"
       oninput="_filterAssignCSChips(this.value)">
     <div class="assign-cs-list" id="assign-cs-chips" style="margin-bottom:8px">
-      ${allCS.map(cs => `<div class="assign-cs-chip-multi ${_advAssign.selectedCS.has(cs)?'selected':''}" onclick="_advAssignToggleCS('${esc(cs)}')">${esc(cs)}</div>`).join('')}
+      ${allCS.map(cs => `<div class="assign-cs-chip-multi ${_advAssign.selectedCS.has(cs)?'selected':''}" data-cs="${esc(cs)}" onclick="_advAssignToggleCS(this.dataset.cs)">${esc(cs)}</div>`).join('')}
       ${allCS.length===0?'<span style="color:var(--hint);font-size:12px">Chưa có CS trong hệ thống</span>':''}
     </div>
     <div style="display:flex;align-items:center;gap:8px">
@@ -5847,8 +5847,8 @@ function _renderDistTable(pool, csList, dist, distTotal, remaining) {
           const pct = totalPool > 0 ? Math.round(n/totalPool*100) : 0;
           return `<tr>
             <td><strong>${esc(cs)}</strong></td>
-            <td style="text-align:center"><input class="assign-dist-input" type="number" min="0" max="${totalPool}" value="${n}"
-              oninput="_advAssign.customDist['${esc(cs)}']=parseInt(this.value)||0;_refreshDistPreview()"></td>
+            <td style="text-align:center"><input class="assign-dist-input" type="number" min="0" max="${totalPool}" value="${n}" data-cs="${esc(cs)}"
+              oninput="_advAssign.customDist[this.dataset.cs]=parseInt(this.value)||0;_refreshDistPreview()"></td>
             <td><div class="assign-dist-bar"><div class="assign-dist-fill" style="width:${pct}%"></div></div><span style="font-size:10px;color:var(--muted)">${pct}%</span></td>
             <td style="white-space:nowrap;font-size:11px;color:var(--green);font-weight:600">${n} KH</td>
           </tr>`;
@@ -6447,7 +6447,7 @@ function renderMyDataTab() {
       const ns = nextSched ? nextSched(p) : null;
       const schedHtml = ns ? `<span style="font-size:10px;color:${isOverdue(ns)?'var(--red)':'#2563eb'}">📅 ${schedTypeLabel(ns.type)} · ${fmtDate(ns.date)}</span>` : '';
       return `<div class="my-data-row" style="flex-wrap:wrap;gap:4px">
-        <input type="checkbox" class="my-data-check" ${isDone?'checked':''} onchange="toggleMyDataDone('${p}','${esc(csName)}',this.checked)">
+        <input type="checkbox" class="my-data-check" ${isDone?'checked':''} data-cs="${esc(csName)}" onchange="toggleMyDataDone('${p}',this.dataset.cs,this.checked)">
         <div style="flex:1;min-width:0" class="${isDone?'my-data-done':''}">
           <div style="font-weight:500;display:flex;align-items:center;gap:6px">${c ? esc(c.name) : p}${lastActHtml}</div>
           <div style="font-size:11px;color:var(--muted)">${p} · ${c?c.tier:''} · ${c?careBadgeText(c.careStatus):''}</div>
@@ -10300,8 +10300,8 @@ function renderTeamTab(){
     members.forEach(function(m){
       var isLeader = m === t.leader;
       html += '<span class="member-chip'+(isLeader?' leader':'')+'">'+(isLeader?'★ ':'')+esc(m)+
-        (isAdmin ? ' <span class="chip-x" title="'+(isLeader?'Bỏ làm leader sẽ vẫn còn là thành viên':'Xoá khỏi team')+'" onclick="removeTeamMember(\''+t.id+'\',\''+esc(m).replace(/'/g,"\\'")+'\')">✕</span>' : '')+
-        (isAdmin && !isLeader ? ' <span class="chip-star" title="Đặt làm leader" onclick="setTeamLeader(\''+t.id+'\',\''+esc(m).replace(/'/g,"\\'")+'\')">★</span>' : '')+
+        (isAdmin ? ' <span class="chip-x" data-name="'+esc(m)+'" title="'+(isLeader?'Bỏ làm leader sẽ vẫn còn là thành viên':'Xoá khỏi team')+'" onclick="removeTeamMember(\''+t.id+'\',this.dataset.name)">✕</span>' : '')+
+        (isAdmin && !isLeader ? ' <span class="chip-star" data-name="'+esc(m)+'" title="Đặt làm leader" onclick="setTeamLeader(\''+t.id+'\',this.dataset.name)">★</span>' : '')+
       '</span>';
     });
     html += '</div>';
@@ -10326,7 +10326,7 @@ function renderTeamTab(){
           var on = members.indexOf(n)!==-1;
           var isLeader = n===t.leader;
           html += '<label class="team-cs-chk'+(on?' on':'')+'" data-name="'+esc(n).toLowerCase()+'" title="'+(isLeader?'Leader (luôn là thành viên)':'')+'">'+
-            '<input type="checkbox" '+(on?'checked':'')+' '+(isLeader?'disabled':'')+' onchange="setTeamMemberChecked(\''+t.id+'\',\''+esc(n).replace(/'/g,"\\'")+'\',this.checked)">'+
+            '<input type="checkbox" '+(on?'checked':'')+' '+(isLeader?'disabled':'')+' data-name="'+esc(n)+'" onchange="setTeamMemberChecked(\''+t.id+'\',this.dataset.name,this.checked)">'+
             '<span>'+(isLeader?'★ ':'')+esc(n)+'</span></label>';
         });
         html += '</div></div>';
@@ -10587,8 +10587,8 @@ function srRenderSaleChips(){
   var selArr = _srState.sale || [];
   if (!selArr.length){ wrap.innerHTML = ''; return; }
   wrap.innerHTML = selArr.map(function(name){
-    return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap">'+
-      esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srSaleComboRemove(\''+esc(name).replace(/'/g,"\\'")+'\')">✕</span></span>';
+    return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap" data-name="'+esc(name)+'">'+
+      esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srSaleComboRemove(this.parentNode.dataset.name)">✕</span></span>';
   }).join('');
 }
 function srSaleComboOpen(){
@@ -10696,8 +10696,8 @@ function renderSalesReportTab(){
       '</div>'+
       '<div id="sr-sale-chips" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;max-width:220px">'+
       (_srState.sale||[]).map(function(name){
-        return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap">'+
-          esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srSaleComboRemove(\''+esc(name).replace(/'/g,"\\'")+'\')">✕</span></span>';
+        return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap" data-name="'+esc(name)+'">'+
+          esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srSaleComboRemove(this.parentNode.dataset.name)">✕</span></span>';
       }).join('') +
       '</div></div>';
     filters += '<select onchange="_srSetField(\'kenh\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
@@ -12029,7 +12029,7 @@ function updateSidebarCareFilters() {
       var color = dotColors[i % dotColors.length];
       var active = existing === st ? 'active' : '';
       var sid = 'bc-cs-' + i;
-      return '<button class="section-btn ' + active + '" onclick="setCareFilter(\'' + esc(st).replace(/'/g,"\\'") + '\',this)">' +
+      return '<button class="section-btn ' + active + '" data-st="' + esc(st) + '" onclick="setCareFilter(this.dataset.st,this)">' +
         '<div class="fleft"><span class="fdot" style="background:' + color + '"></span><span><span style="color:var(--hint);font-size:10px;margin-right:2px">' + (i+1) + '.</span>' + esc(st) + '</span></div>' +
         '<span class="fbadge" id="' + sid + '">0</span></button>';
     }).join('');
@@ -12857,8 +12857,8 @@ function _bcRenderCsList(filter) {
   var names = _bcCsNames().filter(function(n){ return !f || n.includes(f); });
   box.innerHTML = names.length ? names.map(function(n){
     var on = _bcCsSelected.includes(n);
-    return '<label style="display:flex;align-items:center;gap:6px;padding:4px 9px;font-size:12px;cursor:pointer;border-bottom:1px solid #f3f4f6">'+
-      '<input type="checkbox" '+(on?'checked':'')+' onchange="_bcToggleCs(\''+esc(n)+'\', this.checked)"> '+esc(n)+'</label>';
+    return '<label style="display:flex;align-items:center;gap:6px;padding:4px 9px;font-size:12px;cursor:pointer;border-bottom:1px solid #f3f4f6" data-name="'+esc(n)+'">'+
+      '<input type="checkbox" '+(on?'checked':'')+' onchange="_bcToggleCs(this.closest(\'label\').dataset.name, this.checked)"> '+esc(n)+'</label>';
   }).join('') : '<div style="padding:6px 9px;font-size:11px;color:#9ca3af">Không có CS khớp</div>';
 }
 function _bcFilterCsList(v){ _bcRenderCsList(v); }
@@ -12872,8 +12872,8 @@ function _bcRenderCsChips() {
   var box = document.getElementById('bc-compose-cs-chips');
   if (!box) return;
   box.innerHTML = _bcCsSelected.map(function(n){
-    return '<span style="background:#dcfce7;color:#166534;border-radius:12px;padding:2px 9px;font-size:11px;font-weight:600">'+esc(n)+
-      ' <a href="#" onclick="_bcToggleCs(\''+esc(n)+'\',false);_bcRenderCsList(document.getElementById(\'bc-compose-cs-search\').value);return false" style="color:#166534;text-decoration:none">✕</a></span>';
+    return '<span style="background:#dcfce7;color:#166534;border-radius:12px;padding:2px 9px;font-size:11px;font-weight:600" data-name="'+esc(n)+'">'+esc(n)+
+      ' <a href="#" onclick="_bcToggleCs(this.parentNode.dataset.name,false);_bcRenderCsList(document.getElementById(\'bc-compose-cs-search\').value);return false" style="color:#166534;text-decoration:none">✕</a></span>';
   }).join('') || '<span style="font-size:11px;color:#9ca3af">Chưa chọn CS nào — mọi CS đều thấy chiến dịch</span>';
 }
 
@@ -13537,7 +13537,7 @@ function renderBcStat(){
       ? '<span style="background:#fef9c3;color:#a16207;border-radius:10px;padding:1px 8px;font-size:10px;font-weight:700">ĐANG TẮT</span>'
       : '<span style="background:#f3f4f6;color:#6b7280;border-radius:10px;padding:1px 8px;font-size:10px;font-weight:700">ĐÃ HỦY</span>';
     var togBtn = st === 'cancelled' ? '' :
-      '<button onclick="bcstatToggle(\''+esc(b.id)+'\',\''+(st==='active'?'paused':'active')+'\')" style="padding:3px 10px;border:1px solid '+(st==='active'?'#d1d5db':'#00b14f')+';background:#fff;color:'+(st==='active'?'#6b7280':'#00b14f')+';border-radius:5px;cursor:pointer;font-size:11px;font-weight:600">'+(st==='active'?'⏻ Tắt':'⏻ Kích hoạt')+'</button>';
+      '<button data-id="'+esc(b.id)+'" onclick="bcstatToggle(this.dataset.id,\''+(st==='active'?'paused':'active')+'\')" style="padding:3px 10px;border:1px solid '+(st==='active'?'#d1d5db':'#00b14f')+';background:#fff;color:'+(st==='active'?'#6b7280':'#00b14f')+';border-radius:5px;cursor:pointer;font-size:11px;font-weight:600">'+(st==='active'?'⏻ Tắt':'⏻ Kích hoạt')+'</button>';
     var dateStr = b.createdAt ? new Date(b.createdAt).toLocaleString('vi-VN') : '';
     return '<div style="border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-bottom:8px;background:#fff">'+
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">'+
@@ -13893,8 +13893,8 @@ function _taskRenderTeamChips(){
   }
   wrap.innerHTML = list.map(function(tm){
     var sel = _taskSelectedTeams.has(tm.name);
-    return '<div class="assign-cs-chip-multi'+(sel?' selected':'')+'"'+
-      (_taskIsAdmin ? ' onclick="_taskToggleTeam(this,\''+esc(tm.name)+'\')"' : ' style="cursor:default;opacity:.6"')+
+    return '<div class="assign-cs-chip-multi'+(sel?' selected':'')+'" data-name="'+esc(tm.name)+'"'+
+      (_taskIsAdmin ? ' onclick="_taskToggleTeam(this,this.dataset.name)"' : ' style="cursor:default;opacity:.6"')+
       '>'+esc(tm.name)+'</div>';
   }).join('');
 }
@@ -13927,8 +13927,8 @@ function _taskRenderUserChips(){
   }
   wrap.innerHTML = names.map(function(n){
     var sel = _taskSelectedCS.has(n);
-    return '<div class="assign-cs-chip-multi'+(sel?' selected':'')+'"'+
-      (_taskIsAdmin ? ' onclick="_taskToggleCS(this,\''+esc(n)+'\')"' : ' style="cursor:default;opacity:.6"')+
+    return '<div class="assign-cs-chip-multi'+(sel?' selected':'')+'" data-name="'+esc(n)+'"'+
+      (_taskIsAdmin ? ' onclick="_taskToggleCS(this,this.dataset.name)"' : ' style="cursor:default;opacity:.6"')+
       '>'+esc(n)+'</div>';
   }).join('');
 }
