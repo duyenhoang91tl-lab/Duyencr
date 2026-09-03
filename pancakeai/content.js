@@ -656,7 +656,9 @@
       return;
     }
 
-    setStatus(`${list.length} gợi ý${data.provider ? " (nguồn: " + data.provider + ")" : ""}:`);
+    let statusMsg = `${list.length} gợi ý${data.provider ? " (nguồn: " + data.provider + ")" : ""}:`;
+    if (data.imageSkipped) statusMsg += ` (⚠️ ảnh "${data.imageSkipped.name}" khớp nhưng >3MB nên bị bỏ qua)`;
+    setStatus(statusMsg);
     list.forEach((text) => {
       const item = document.createElement("div");
       item.className = "pk-ai-suggestion-item";

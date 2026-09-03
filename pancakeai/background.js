@@ -189,10 +189,16 @@ async function handleFetchSuggestion(payload) {
     }
 
     if (data && data.ok) {
-      // GAS trả về { ok:true, text:"...", provider:"...", image?: {name, base64, mimeType} }
-      // image chỉ có khi bật "Tra cứu sản phẩm" và tên 1 file ảnh trong thư mục kiến thức
-      // Drive khớp từ khoá — content.js sẽ hiện nút "Copy ảnh" nếu có.
-      return { suggestion: (data.text || "").trim(), provider: data.provider, image: data.image || null };
+      // GAS trả về { ok:true, text:"...", provider:"...", image?: {name, base64, mimeType},
+      // imageSkipped?: {name, reason} } — image chỉ có khi bật "Tra cứu sản phẩm" và tên 1 file
+      // ảnh trong thư mục kiến thức Drive khớp từ khoá; imageSkipped báo trường hợp khớp tên
+      // nhưng file >3MB nên GAS không đọc được — content.js hiện nút "Copy ảnh" hoặc cảnh báo tương ứng.
+      return {
+        suggestion: (data.text || "").trim(),
+        provider: data.provider,
+        image: data.image || null,
+        imageSkipped: data.imageSkipped || null
+      };
     }
 
     const err = String((data && data.error) || "Lỗi GAS không rõ nguyên nhân");
