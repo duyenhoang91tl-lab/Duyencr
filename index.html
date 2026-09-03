@@ -10165,7 +10165,7 @@ var _srState = {
   sub: 'A',
   dateField: 'ngayTao',   // A: 'ngayTao' | 'thoiGianHT'
   dateFrom: '', dateTo: '',
-  sale: [], kenh: '',      // A — sale: mang nhieu ten (multi-select dang checkbox), kenh: 1 gia tri (select)
+  sale: [], kenh: [],      // A — ca 2 deu multi-select dang checkbox (mang nhieu gia tri)
   nguon: '', marketer: '', // B
   dataA: null, dataB: null,
   loading: false,
@@ -10175,6 +10175,7 @@ var _srState = {
   cPeriodType: 'week', cDateField: 'ngayTao',
   cWeekOffset: 0, cMonthOffset: 0, cQuarterOffset: 0,
   cCustomCurFrom: '', cCustomCurTo: '', cCustomPrevFrom: '', cCustomPrevTo: '',
+  cSale: [], cKenh: [],     // C — multi-select giong A, tach rieng de doi tab A/C khong dam vao nhau
   dataC: null, cEmpSearch: '', cKenhSearch: '', cExpandedRow: ''
 };
 
@@ -10208,7 +10209,7 @@ async function _srLoad(){
   if (_srState.sub === 'A'){
     _srState.dataA = await _srFetch('salesReportA', {
       dateFrom: _srState.dateFrom, dateTo: _srState.dateTo,
-      dateField: _srState.dateField, sale: (_srState.sale||[]).join(','), kenh: _srState.kenh
+      dateField: _srState.dateField, sale: (_srState.sale||[]).join(','), kenh: (_srState.kenh||[]).join(',')
     });
   } else if (_srState.sub === 'B') {
     _srState.dataB = await _srFetch('salesReportB', {
@@ -10220,7 +10221,8 @@ async function _srLoad(){
       dateField: _srState.cDateField, periodType: _srState.cPeriodType,
       weekOffset: _srState.cWeekOffset, monthOffset: _srState.cMonthOffset, quarterOffset: _srState.cQuarterOffset,
       customCurFrom: _srState.cCustomCurFrom, customCurTo: _srState.cCustomCurTo,
-      customPrevFrom: _srState.cCustomPrevFrom, customPrevTo: _srState.cCustomPrevTo
+      customPrevFrom: _srState.cCustomPrevFrom, customPrevTo: _srState.cCustomPrevTo,
+      sale: (_srState.cSale||[]).join(','), kenh: (_srState.cKenh||[]).join(',')
     });
   }
   _srState.loading = false;
@@ -10234,11 +10236,20 @@ function _srSetField(key, val){ _srState[key] = val; }
 // Tai su dung dung filter payload nhu _srLoad() de so lieu tren Sheet khop 100% voi UI dang xem.
 async function exportSalesReportToSheet(){
   if (!gsUrl){ alert('Chưa kết nối Google Apps Script (gsUrl trống).'); return; }
-  var filters = _srState.sub === 'A'
-    ? { dateFrom: _srState.dateFrom, dateTo: _srState.dateTo, dateField: _srState.dateField,
-        sale: _srState.sale || [], kenh: _srState.kenh }
-    : { dateFrom: _srState.dateFrom, dateTo: _srState.dateTo,
-        nguon: _srState.nguon, marketer: _srState.marketer };
+  var filters;
+  if (_srState.sub === 'A') {
+    filters = { dateFrom: _srState.dateFrom, dateTo: _srState.dateTo, dateField: _srState.dateField,
+      sale: _srState.sale || [], kenh: _srState.kenh || [] };
+  } else if (_srState.sub === 'C') {
+    filters = { dateField: _srState.cDateField, periodType: _srState.cPeriodType,
+      weekOffset: _srState.cWeekOffset, monthOffset: _srState.cMonthOffset, quarterOffset: _srState.cQuarterOffset,
+      customCurFrom: _srState.cCustomCurFrom, customCurTo: _srState.cCustomCurTo,
+      customPrevFrom: _srState.cCustomPrevFrom, customPrevTo: _srState.cCustomPrevTo,
+      sale: _srState.cSale || [], kenh: _srState.cKenh || [] };
+  } else {
+    filters = { dateFrom: _srState.dateFrom, dateTo: _srState.dateTo,
+      nguon: _srState.nguon, marketer: _srState.marketer };
+  }
   var btn = document.getElementById('sr-export-sheet-btn');
   if (btn){ btn.disabled = true; btn.textContent = '⏳ Đang xuất...'; }
   try {
@@ -10359,6 +10370,143 @@ document.addEventListener('click', function(e){
 });
 function _srApply(){ _srLoad(); }
 
+// ── Combo chon NHIEU gia tri DUNG CHUNG (kenh Bao cao A, sale+kenh Bao cao C) — cung kieu
+//    giao dien/hanh vi voi combo Sale rieng cua Bao cao A o tren (khong doi combo do, de
+//    tranh dam vao tinh nang dang chay tot), nhung viet lai kieu tong quat (domId/field/optKey
+//    lam tham so) de dung duoc cho nhieu o loc khac nhau ma khong phai chep lai 8 ham/o.
+var _srComboReg = {}, _srComboData = {}, _srComboIdx = {};
+function _srComboInit(domId, field, optKey){ _srComboReg[domId] = { field: field, optKey: optKey }; }
+function _srComboBuildData(domId){
+  var r = _srComboReg[domId]; if (!r) return;
+  _srComboData[domId] = (_srState[r.optKey] || []).map(function(v){ return { value: v, label: v }; });
+}
+function srComboRender(domId, filter){
+  var r = _srComboReg[domId]; if (!r) return;
+  var list = document.getElementById(domId+'-list'); if (!list) return;
+  if (!_srComboData[domId]) _srComboBuildData(domId);
+  var q = _foldVi(filter || '');
+  var selArr = _srState[r.field] || [];
+  var items = q ? _srComboData[domId].filter(function(it){ return _foldVi(it.label).indexOf(q)!==-1; }) : _srComboData[domId];
+  if (!items.length){ list.innerHTML = '<div class="cs-combo-empty">Không tìm thấy</div>'; _srComboIdx[domId]=-1; return; }
+  list.innerHTML = items.map(function(it){
+    var checked = selArr.indexOf(it.value)!==-1;
+    return '<div class="cs-combo-opt '+(checked?'is-sel':'')+'" data-v="'+esc(it.value)+'" onmousedown="srComboToggleItem(event,\''+domId+'\',this.getAttribute(\'data-v\'))">'+
+      '<span>'+(checked?'☑':'☐')+' '+esc(it.label)+'</span></div>';
+  }).join('');
+  _srComboIdx[domId] = -1;
+}
+function srRenderComboChips(domId){
+  var r = _srComboReg[domId]; if (!r) return;
+  var wrap = document.getElementById(domId+'-chips'); if (!wrap) return;
+  var selArr = _srState[r.field] || [];
+  wrap.innerHTML = selArr.map(function(name){
+    return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap">'+
+      esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srComboRemove(\''+domId+'\',\''+esc(name).replace(/'/g,"\\'")+'\')">✕</span></span>';
+  }).join('');
+}
+function srComboOpen(domId){
+  _srComboBuildData(domId);
+  var ci = document.getElementById(domId+'-input');
+  srComboRender(domId, ci ? ci.value : '');
+  var l = document.getElementById(domId+'-list'); if (l) l.classList.add('open');
+}
+function srComboClose(domId){ var l=document.getElementById(domId+'-list'); if(l) l.classList.remove('open'); }
+function srComboToggle(e, domId){
+  if (e) e.stopPropagation();
+  var l=document.getElementById(domId+'-list'); if(!l) return;
+  if (l.classList.contains('open')) srComboClose(domId);
+  else { var ci=document.getElementById(domId+'-input'); if(ci) ci.focus(); srComboOpen(domId); }
+}
+function srComboFilter(domId, v){ srComboRender(domId, v); var l=document.getElementById(domId+'-list'); if (l) l.classList.add('open'); }
+function srComboToggleItem(e, domId, value){
+  if (e && e.preventDefault) e.preventDefault();
+  var r = _srComboReg[domId]; if (!r) return;
+  var arr = (_srState[r.field] || []).slice();
+  var idx = arr.indexOf(value);
+  if (idx !== -1) arr.splice(idx, 1); else arr.push(value);
+  _srState[r.field] = arr;
+  var ci = document.getElementById(domId+'-input');
+  srComboRender(domId, ci ? ci.value : '');
+  srRenderComboChips(domId);
+}
+function srComboRemove(domId, value){
+  var r = _srComboReg[domId]; if (!r) return;
+  _srState[r.field] = (_srState[r.field] || []).filter(function(v){ return v !== value; });
+  srRenderComboChips(domId);
+  var l = document.getElementById(domId+'-list');
+  if (l && l.classList.contains('open')) { var ci=document.getElementById(domId+'-input'); srComboRender(domId, ci?ci.value:''); }
+}
+function srComboClear(e, domId){
+  if (e) e.stopPropagation();
+  var r = _srComboReg[domId]; if (!r) return;
+  _srState[r.field] = [];
+  var ci = document.getElementById(domId+'-input'); if (ci) ci.value = '';
+  srRenderComboChips(domId);
+  var l = document.getElementById(domId+'-list');
+  if (l && l.classList.contains('open')) srComboRender(domId, '');
+}
+function srComboKey(e, domId){
+  var list = document.getElementById(domId+'-list');
+  if (!list || !list.classList.contains('open')){ if (e.key==='ArrowDown') srComboOpen(domId); return; }
+  var opts = [...list.querySelectorAll('.cs-combo-opt')];
+  if (!opts.length) return;
+  var idx = _srComboIdx[domId]===undefined ? -1 : _srComboIdx[domId];
+  if (e.key==='ArrowDown'){ e.preventDefault(); idx = Math.min(idx+1, opts.length-1); }
+  else if (e.key==='ArrowUp'){ e.preventDefault(); idx = Math.max(idx-1, 0); }
+  else if (e.key==='Enter'){
+    e.preventDefault();
+    var pick = (idx>=0 && opts[idx]) ? opts[idx] : (opts.length===1 ? opts[0] : null);
+    if (pick) srComboToggleItem(e, domId, pick.getAttribute('data-v'));
+    return;
+  }
+  else if (e.key==='Escape'){ srComboClose(domId); return; }
+  else { return; }
+  _srComboIdx[domId] = idx;
+  opts.forEach(function(o,i){ o.classList.toggle('active', i===idx); });
+  if (idx>=0 && opts[idx]) opts[idx].scrollIntoView({block:'nearest'});
+}
+document.addEventListener('click', function(e){
+  Object.keys(_srComboReg).forEach(function(domId){
+    var combo = document.getElementById(domId);
+    if (combo && !combo.contains(e.target)) srComboClose(domId);
+  });
+});
+// Render san 1 combo hoan chinh (nhan/o tim/chip) — goi lai trong renderSalesReportTab moi lan ve.
+function _srComboHtml(domId, field, optKey, label, placeholder, widthPx){
+  _srComboInit(domId, field, optKey);
+  var selArr = _srState[field] || [];
+  return '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">'+esc(label)+(selArr.length?' <span style="color:var(--green)">('+selArr.length+' đã chọn)</span>':'')+'</div>'+
+    '<div class="cs-combo" id="'+domId+'" style="width:'+(widthPx||170)+'px">'+
+    '<input type="text" id="'+domId+'-input" class="cs-combo-input" placeholder="'+esc(placeholder)+'" autocomplete="off" '+
+    'oninput="srComboFilter(\''+domId+'\',this.value)" onfocus="srComboOpen(\''+domId+'\')" onkeydown="srComboKey(event,\''+domId+'\')">'+
+    '<button type="button" class="cs-combo-clear" onclick="srComboClear(event,\''+domId+'\')" style="display:'+(selArr.length?'':'none')+'">✕</button>'+
+    '<span class="cs-combo-caret" onclick="srComboToggle(event,\''+domId+'\')">▾</span>'+
+    '<div class="cs-combo-list" id="'+domId+'-list"></div>'+
+    '</div>'+
+    '<div id="'+domId+'-chips" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;max-width:210px">'+
+    selArr.map(function(name){
+      return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap">'+
+        esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srComboRemove(\''+domId+'\',\''+esc(name).replace(/'/g,"\\'")+'\')">✕</span></span>';
+    }).join('')+
+    '</div></div>';
+}
+
+// ── Chọn theo Team: đổ toàn bộ thành viên của 1 team (leader + members, đã set up sẵn ở tab
+//    "Quản lý Team") vào ô Sale multi-select — chỉ điền, không tự bấm Lọc, để có thể bỏ bớt/
+//    thêm tay trước khi xem báo cáo. Dùng lại biến global `teams` đã có sẵn cho tab Quản lý Team.
+function _srTeamOptionsHtml(){
+  return (teams||[]).map(function(t){ return '<option value="'+esc(t.id)+'">'+esc(t.name||'(chưa đặt tên)')+'</option>'; }).join('');
+}
+function srPickTeam(teamId, saleField, domId){
+  if (!teamId) return;
+  var t = (teams||[]).find(function(x){ return x.id === teamId; });
+  if (!t){ toast('Không tìm thấy team.'); return; }
+  var members = [...(new Set([t.leader].concat(t.members||[]).filter(Boolean)))];
+  if (!members.length){ toast('Team "'+(t.name||'')+'" chưa có thành viên — set up ở tab Quản lý Team.'); return; }
+  _srState[saleField] = members;
+  srRenderComboChips(domId);
+}
+
 function renderSalesReportTab(){
   var wrap = document.getElementById('salesreport-wrap');
   if (!wrap) return;
@@ -10400,10 +10548,9 @@ function renderSalesReportTab(){
           esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srSaleComboRemove(\''+esc(name).replace(/'/g,"\\'")+'\')">✕</span></span>';
       }).join('') +
       '</div></div>';
-    filters += '<select onchange="_srSetField(\'kenh\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-      '<option value="">— Tất cả kênh —</option>'+
-      (_srState.kenhOptions||[]).map(function(kv){ return '<option value="'+esc(kv)+'"'+(_srState.kenh===kv?' selected':'')+'>'+esc(kv)+'</option>'; }).join('') +
-      '</select>';
+    filters += '<select onchange="if(this.value){srPickTeam(this.value,\'sale\',\'sr-sale-combo\');this.value=\'\'}" title="Điền nhanh cả team vào ô Sale — sửa tay lại sau nếu cần" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+      '<option value="">— Chọn theo Team —</option>' + _srTeamOptionsHtml() + '</select>';
+    filters += _srComboHtml('sr-kenh-combo-a', 'kenh', 'kenhOptions', 'Lọc theo Kênh', '🔍 Tìm & chọn kênh...', 170);
   } else {
     filters += '<select onchange="_srSetField(\'nguon\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
       '<option value="">— Tất cả nguồn đơn —</option>'+
@@ -10522,8 +10669,13 @@ function renderSalesReportTabC_(wrap, subTabs){
     '<option value="ngayTao"'+(_srState.cDateField==='ngayTao'?' selected':'')+'>Lọc theo Ngày tạo</option>'+
     '<option value="thoiGianHT"'+(_srState.cDateField==='thoiGianHT'?' selected':'')+'>Lọc theo Thời gian hoàn thành</option>'+
     '</select>';
+  filters += _srComboHtml('sr-sale-combo-c', 'cSale', 'saleOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 170);
+  filters += '<select onchange="if(this.value){srPickTeam(this.value,\'cSale\',\'sr-sale-combo-c\');this.value=\'\'}" title="Điền nhanh cả team vào ô Sale — sửa tay lại sau nếu cần" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+    '<option value="">— Chọn theo Team —</option>' + _srTeamOptionsHtml() + '</select>';
+  filters += _srComboHtml('sr-kenh-combo-c', 'cKenh', 'kenhOptions', 'Lọc theo Kênh', '🔍 Tìm & chọn kênh...', 170);
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
   filters += '<button class="btn sm" onclick="exportSalesReportC()">📊 Xuất Excel</button>';
+  filters += '<button class="btn sm" id="sr-export-sheet-btn" onclick="exportSalesReportToSheet()">📄 Xuất ra Sheet</button>';
   filters += '</div>';
 
   var body = _srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _srRenderC(_srState.dataC);
@@ -10614,7 +10766,11 @@ function exportSalesReportC(){
   var d = _srState.dataC;
   if (!d){ alert('Chưa có dữ liệu để xuất — bấm "Lọc" trước.'); return; }
   var p = d.period || {};
-  var summary = [['Kỳ này', p.curLabel], ['Kỳ trước', p.prevLabel]];
+  var fDescC = [];
+  fDescC.push('Lọc theo: ' + (_srState.cDateField==='thoiGianHT'?'Thời gian hoàn thành':'Ngày tạo'));
+  if ((_srState.cSale||[]).length) fDescC.push('Sale: ' + _srState.cSale.join(', '));
+  if ((_srState.cKenh||[]).length) fDescC.push('Kênh: ' + _srState.cKenh.join(', '));
+  var summary = [['Kỳ này', p.curLabel], ['Kỳ trước', p.prevLabel], ['Bộ lọc', fDescC.join(' | ')]];
   var empRows = [['Nhân viên','KPI kỳ trước','Kết quả kỳ trước','%HT KPI kỳ trước','KPI kỳ này','Kết quả kỳ này','%HT KPI kỳ này','% Tăng trưởng']];
   (d.byEmployee||[]).forEach(function(r){
     empRows.push([r.name, r.kpiPrev, r.resultPrev, r.pctKpiPrev, r.kpiCur, r.resultCur, r.pctKpiCur, r.growthPct]);
@@ -10634,7 +10790,12 @@ function exportSalesReport(){
   if (_srState.sub === 'A'){
     var d = _srState.dataA;
     if (!d){ alert('Chưa có dữ liệu để xuất — bấm "Lọc" trước.'); return; }
-    var summary = [['Chỉ số','Giá trị'],
+    var fDescA = ['Lọc theo: ' + (_srState.dateField==='thoiGianHT'?'Thời gian hoàn thành':'Ngày tạo')];
+    if (_srState.dateFrom || _srState.dateTo) fDescA.unshift('Khoảng ngày: ' + (_srState.dateFrom||'...') + ' → ' + (_srState.dateTo||'...'));
+    if ((_srState.sale||[]).length) fDescA.push('Sale: ' + _srState.sale.join(', '));
+    if ((_srState.kenh||[]).length) fDescA.push('Kênh: ' + _srState.kenh.join(', '));
+    var summary = [['Bộ lọc', fDescA.join(' | ')], [],
+      ['Chỉ số','Giá trị'],
       ['Số lượng đơn', d.totalOrders],
       ['Tổng giá trị cọc (số tiền ck)', d.totalCoc],
       ['Tổng giá trị đơn hàng (ko ship)', d.totalGiaTri]];
