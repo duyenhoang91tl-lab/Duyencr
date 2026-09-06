@@ -2155,29 +2155,6 @@ function mkRow(date,yr,mo,cs,name,phone,source,revenue,product,productDetail,sta
   };
 }
 
-function mergeRows(rows) {
-  for (const r of rows) {
-    const ph = normPhone(r.phone);
-    if (!ph) continue;
-    if (!customerMap[ph]) {
-      customerMap[ph] = {
-        phone:ph, name:r.name||ph, orders:[],
-        sources:new Set(), brands:new Set(), _keys:new Set(),
-        _rawStatus:'', _rawZalo:'', _rawNote:''
-      };
-    }
-    const c = customerMap[ph];
-    if (r.name && r.name.length > c.name.length) c.name = r.name;
-    if (r.source) c.sources.add(r.source);
-    if (r.product) c.brands.add(r.product);
-    if (r.status) c._rawStatus = r.status;
-    if (r.zalo) c._rawZalo = r.zalo;
-    if (r.note) c._rawNote = r.note;
-    const key = `${ph}_${r.year}_${r.month}_${r.revenue}`;
-    if (!c._keys.has(key)) { c._keys.add(key); c.orders.push(r); }
-  }
-}
-
 // CS của ĐƠN MỚI NHẤT — dùng làm mặc định cho "CS chăm sóc" khi chưa giao/đổi tay
 function _latestOrderCS(orders){
   if (!orders || !orders.length) return '';
