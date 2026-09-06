@@ -10468,13 +10468,8 @@ var _srState = {
   sub: 'A',
   dateField: 'ngayTao',   // A: 'ngayTao' | 'thoiGianHT'
   dateFrom: '', dateTo: '',
-<<<<<<< Updated upstream
   sale: [], kenh: [],      // A — ca 2 deu multi-select dang checkbox (mang nhieu gia tri)
   bSale: [], bNguon: [], bMarketer: [], // B — ca 3 deu multi-select (mang nhieu ten)
-=======
-  sale: [], kenh: [],      // A — ca 2 deu la mang nhieu gia tri (multi-select dang checkbox)
-  nguon: [], marketer: '', // B — nguon: mang nhieu gia tri (multi-select); marketer van 1 gia tri (select)
->>>>>>> Stashed changes
   dataA: null, dataB: null,
   loading: false,
   saleOptions: [], kenhOptions: [], nguonOptions: [], marketerOptions: [], saleBOptions: [], optionsLoaded: false,
@@ -10523,11 +10518,7 @@ async function _srLoad(){
   } else if (_srState.sub === 'B') {
     _srState.dataB = await _srFetch('salesReportB', {
       dateFrom: _srState.dateFrom, dateTo: _srState.dateTo,
-<<<<<<< Updated upstream
       sale: (_srState.bSale||[]).join(','), nguon: (_srState.bNguon||[]).join(','), marketer: (_srState.bMarketer||[]).join(',')
-=======
-      nguon: (_srState.nguon||[]).join(','), marketer: _srState.marketer
->>>>>>> Stashed changes
     });
   } else {
     _srState.dataC = await _srFetch('salesReportC', {
@@ -11063,7 +11054,6 @@ function renderSalesReportTab(){
           esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srSaleComboRemove(this.parentNode.dataset.name)">✕</span></span>';
       }).join('') +
       '</div></div>';
-<<<<<<< Updated upstream
     filters += '<select onchange="if(this.value){srPickTeam(this.value,\'sale\',\'sr-sale-combo\');this.value=\'\'}" title="Điền nhanh cả team vào ô Sale — sửa tay lại sau nếu cần" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
       '<option value="">— Chọn theo Team —</option>' + _srTeamOptionsHtml() + '</select>';
     filters += _srComboHtml('sr-kenh-combo-a', 'kenh', 'kenhOptions', 'Lọc theo Kênh', '🔍 Tìm & chọn kênh...', 170);
@@ -11071,41 +11061,6 @@ function renderSalesReportTab(){
     filters += _srbComboHTML('sale');
     filters += _srbComboHTML('nguon');
     filters += _srbComboHTML('mkt');
-=======
-    filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Lọc theo Kênh'+((_srState.kenh||[]).length?' <span style="color:var(--blue)">('+(_srState.kenh||[]).length+' đã chọn)</span>':'')+'</div>' +
-      '<div class="cs-combo" id="sr-kenh-combo" style="width:190px">'+
-      '<input type="text" id="sr-kenh-combo-input" class="cs-combo-input" placeholder="🔍 Tìm & chọn kênh..." autocomplete="off" '+
-      'oninput="srKenhComboFilter(this.value)" onfocus="srKenhComboOpen()" onkeydown="srKenhComboKey(event)">'+
-      '<button type="button" class="cs-combo-clear" id="sr-kenh-combo-clear" title="Bỏ chọn hết Kênh" onclick="srKenhComboClear(event)" style="display:'+((_srState.kenh||[]).length?'':'none')+'">✕</button>'+
-      '<span class="cs-combo-caret" onclick="srKenhComboToggle(event)">▾</span>'+
-      '<div class="cs-combo-list" id="sr-kenh-combo-list"></div>'+
-      '</div>'+
-      '<div id="sr-kenh-chips" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;max-width:220px">'+
-      (_srState.kenh||[]).map(function(name){
-        return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--blue-bg);color:var(--blue);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap">'+
-          esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srKenhComboRemove(\''+esc(name).replace(/'/g,"\\'")+'\')">✕</span></span>';
-      }).join('') +
-      '</div></div>';
-  } else {
-    filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Lọc theo Nguồn đơn'+((_srState.nguon||[]).length?' <span style="color:var(--blue)">('+(_srState.nguon||[]).length+' đã chọn)</span>':'')+'</div>' +
-      '<div class="cs-combo" id="sr-nguon-combo" style="width:190px">'+
-      '<input type="text" id="sr-nguon-combo-input" class="cs-combo-input" placeholder="🔍 Tìm & chọn nguồn đơn..." autocomplete="off" '+
-      'oninput="srNguonComboFilter(this.value)" onfocus="srNguonComboOpen()" onkeydown="srNguonComboKey(event)">'+
-      '<button type="button" class="cs-combo-clear" id="sr-nguon-combo-clear" title="Bỏ chọn hết Nguồn đơn" onclick="srNguonComboClear(event)" style="display:'+((_srState.nguon||[]).length?'':'none')+'">✕</button>'+
-      '<span class="cs-combo-caret" onclick="srNguonComboToggle(event)">▾</span>'+
-      '<div class="cs-combo-list" id="sr-nguon-combo-list"></div>'+
-      '</div>'+
-      '<div id="sr-nguon-chips" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;max-width:220px">'+
-      (_srState.nguon||[]).map(function(name){
-        return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--blue-bg);color:var(--blue);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap">'+
-          esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srNguonComboRemove(\''+esc(name).replace(/'/g,"\\'")+'\')">✕</span></span>';
-      }).join('') +
-      '</div></div>';
-    filters += '<select onchange="_srSetField(\'marketer\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-      '<option value="">— Tất cả marketer —</option>'+
-      (_srState.marketerOptions||[]).map(function(mv){ return '<option value="'+esc(mv)+'"'+(_srState.marketer===mv?' selected':'')+'>'+esc(mv)+'</option>'; }).join('') +
-      '</select>';
->>>>>>> Stashed changes
   }
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
   filters += '<button class="btn sm" onclick="exportSalesReport()">📊 Xuất Excel</button>';
@@ -11225,13 +11180,10 @@ function renderSalesReportTabC_(wrap, subTabs){
     '<option value="ngayTao"'+(_srState.cDateField==='ngayTao'?' selected':'')+'>Lọc theo Ngày tạo</option>'+
     '<option value="thoiGianHT"'+(_srState.cDateField==='thoiGianHT'?' selected':'')+'>Lọc theo Thời gian hoàn thành</option>'+
     '</select>';
-<<<<<<< Updated upstream
   filters += _srComboHtml('sr-sale-combo-c', 'cSale', 'saleOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 170);
   filters += '<select onchange="if(this.value){srPickTeam(this.value,\'cSale\',\'sr-sale-combo-c\');this.value=\'\'}" title="Điền nhanh cả team vào ô Sale — sửa tay lại sau nếu cần" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
     '<option value="">— Chọn theo Team —</option>' + _srTeamOptionsHtml() + '</select>';
   filters += _srComboHtml('sr-kenh-combo-c', 'cKenh', 'nguonOptions', 'Lọc theo Nguồn đơn', '🔍 Tìm & chọn nguồn đơn...', 170);
-=======
->>>>>>> Stashed changes
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
   filters += '<button class="btn sm" onclick="exportSalesReportC()">📊 Xuất Excel</button>';
   filters += '<button class="btn sm" id="sr-export-sheet-btn" onclick="exportSalesReportToSheet()">📄 Xuất ra Sheet</button>';
