@@ -441,11 +441,7 @@ function doGet(e) {
       var pB = e.parameter || {};
       var splitCSV_ = function(s){ return s ? s.split(',').map(function(x){return x.trim();}).filter(function(x){return x;}) : []; };
       var fB = { dateFrom: pB.dateFrom || '', dateTo: pB.dateTo || '',
-<<<<<<< Updated upstream
                  sale: splitCSV_(pB.sale), nguon: splitCSV_(pB.nguon), marketer: splitCSV_(pB.marketer) };
-=======
-                 nguon: pB.nguon ? pB.nguon.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [], marketer: pB.marketer || '' };
->>>>>>> Stashed changes
       var cacheB = CacheService.getScriptCache();
       var cKeyB = 'salesB_' + JSON.stringify(fB);
       var cachedB = cacheB.get(cKeyB);
@@ -912,18 +908,12 @@ function buildSalesReportA_(filters) {
 // filters: { dateFrom, dateTo, nguon, marketer }
 function buildSalesReportB_(filters) {
   filters = filters || {};
-<<<<<<< Updated upstream
   // Ho tro CA mang (multi-select) LAN chuoi don (tuong thich nguoc) cho ca 3 bo loc.
   function toArr(v){ return Array.isArray(v) ? v.filter(Boolean) : (v ? [String(v).trim()] : []); }
   var saleFilterArr = toArr(filters.sale);
   var nguonFilterArr = toArr(filters.nguon);
   var marketerFilterArr = toArr(filters.marketer);
   var UNASSIGNED = '(chưa gán sale)';
-=======
-  var nguonFilterArr = Array.isArray(filters.nguon) ? filters.nguon.filter(function(s){return s;})
-    : (filters.nguon ? [String(filters.nguon).trim()] : []);
-  var marketerFilter = filters.marketer ? String(filters.marketer).trim() : '';
->>>>>>> Stashed changes
 
   var rows = readDonChiTiet_();
   var matched = [];
@@ -932,7 +922,6 @@ function buildSalesReportB_(filters) {
     var dt = parseVNDate_(row.ngayTaoDon);
     if (!dateInRange_(dt, filters.dateFrom, filters.dateTo)) continue;
     if (nguonFilterArr.length && nguonFilterArr.indexOf(row.nguonDon) === -1) continue;
-<<<<<<< Updated upstream
     if (marketerFilterArr.length && marketerFilterArr.indexOf(row.marketer) === -1) continue;
     if (saleFilterArr.length) {
       var salesOnRow = splitMulti_(row.theSale, ',');
@@ -940,9 +929,6 @@ function buildSalesReportB_(filters) {
       for (var si = 0; si < saleFilterArr.length; si++) { if (salesOnRow.indexOf(saleFilterArr[si]) !== -1) { hit = true; break; } }
       if (!hit) continue;
     }
-=======
-    if (marketerFilter && row.marketer !== marketerFilter) continue;
->>>>>>> Stashed changes
     matched.push(row);
   }
 
