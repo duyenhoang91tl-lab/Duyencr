@@ -1153,8 +1153,8 @@ function buildSalesReportC_(filters) {
       var row = rows[i];
       var dt = parseVNDate_(row[dateField]);
       if (!dateInRange_(dt, fromStr, toStr)) continue;
-      if (kenhFilterArr.length && kenhFilterArr.indexOf(row.nguonDon) === -1) continue;
-      var salesOnRow = splitMulti_(row.theSale, ',');
+      if (kenhFilterArr.length && kenhFilterArr.indexOf(row.kenhBan) === -1) continue;
+      var salesOnRow = splitMulti_(row.saleBan, ',');
       if (saleFilterArr.length && !salesOnRow.some(function(s){ return saleFilterArr.indexOf(s) !== -1; })) continue;
       matchedOrders.push(row);
       var kName = row.kenhBan || '(chưa có kênh)';

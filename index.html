@@ -11183,7 +11183,7 @@ function renderSalesReportTabC_(wrap, subTabs){
   filters += _srComboHtml('sr-sale-combo-c', 'cSale', 'saleOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 170);
   filters += '<select onchange="if(this.value){srPickTeam(this.value,\'cSale\',\'sr-sale-combo-c\');this.value=\'\'}" title="Điền nhanh cả team vào ô Sale — sửa tay lại sau nếu cần" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
     '<option value="">— Chọn theo Team —</option>' + _srTeamOptionsHtml() + '</select>';
-  filters += _srComboHtml('sr-kenh-combo-c', 'cKenh', 'nguonOptions', 'Lọc theo Nguồn đơn', '🔍 Tìm & chọn nguồn đơn...', 170);
+  filters += _srComboHtml('sr-kenh-combo-c', 'cKenh', 'kenhOptions', 'Lọc theo Kênh bán', '🔍 Tìm & chọn kênh bán...', 170);
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
   filters += '<button class="btn sm" onclick="exportSalesReportC()">📊 Xuất Excel</button>';
   filters += '<button class="btn sm" id="sr-export-sheet-btn" onclick="exportSalesReportToSheet()">📄 Xuất ra Sheet</button>';
@@ -11280,7 +11280,7 @@ function exportSalesReportC(){
   var fDescC = [];
   fDescC.push('Lọc theo: ' + (_srState.cDateField==='thoiGianHT'?'Thời gian hoàn thành':'Ngày tạo'));
   if ((_srState.cSale||[]).length) fDescC.push('Sale: ' + _srState.cSale.join(', '));
-  if ((_srState.cKenh||[]).length) fDescC.push('Nguồn đơn: ' + _srState.cKenh.join(', '));
+  if ((_srState.cKenh||[]).length) fDescC.push('Kênh bán: ' + _srState.cKenh.join(', '));
   var summary = [['Kỳ này', p.curLabel], ['Kỳ trước', p.prevLabel], ['Bộ lọc', fDescC.join(' | ')]];
   var empRows = [['Nhân viên','KPI kỳ trước','Kết quả kỳ trước','%HT KPI kỳ trước','KPI kỳ này','Kết quả kỳ này','%HT KPI kỳ này','% Tăng trưởng']];
   (d.byEmployee||[]).forEach(function(r){
