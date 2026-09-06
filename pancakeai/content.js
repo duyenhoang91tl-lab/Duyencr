@@ -88,6 +88,15 @@
           <div id="pk-rem-list"></div>
         </div>
 
+        <div id="pk-price-section">
+          <div id="pk-price-header">💰 Tra cứu bảng giá</div>
+          <div id="pk-price-row">
+            <input type="text" id="pk-price-q" placeholder="Tên sản phẩm, kiểu/size..." />
+            <button id="pk-price-btn">Tìm</button>
+          </div>
+          <div id="pk-price-result"></div>
+        </div>
+
         <div id="pk-ai-status">Chưa có hội thoại nào được chọn.</div>
         <div id="pk-ai-suggestions"></div>
         <button id="pk-ai-refresh">Lấy gợi ý mới</button>
@@ -117,6 +126,10 @@
       if (e.key === "Enter") panelEl.querySelector("#pk-ai-phone-btn").click();
     });
     panelEl.querySelector("#pk-rem-refresh").addEventListener("click", () => loadReminders_());
+    panelEl.querySelector("#pk-price-btn").addEventListener("click", doPriceSearch_);
+    panelEl.querySelector("#pk-price-q").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") doPriceSearch_();
+    });
   }
 
   // ── CS đang dùng (sticky theo máy, lưu chrome.storage.sync) ──
@@ -580,6 +593,34 @@
         setStatus('Nhớ tự mở đúng đoạn chat của ' + r.phone + ' trên Pancake trước khi bấm gợi ý để chèn.');
       }
     );
+  }
+
+  // ── TRA CỨU BẢNG GIÁ (Sheet DANH_MUC) ──
+  // Khong hardcode ten cot: hien thi dung cac cot ma sheet dang co, uu tien cot co
+  // chua chu "gia"/"price" len dau tien cho de nhin, con lai xep sau.
+  function doPriceSearch_() {
+    const q = (panelEl.querySelector('#pk-price-q').value || '').trim();
+    const box = panelEl.querySelector('#pk-price-result');
+    box.innerHTML = '<div class="pk-price-loading">Đang tìm...</div>';
+    chrome.runtime.sendMessage({ type: 'GET_PRICE', payload: { q } }, (resp) => {
+      if (!resp?.ok) { box.innerHTML = `<div class="pk-price-loading">Lỗi: ${escapeHtml(resp?.error || 'không rõ')}</div>`; return; }
+      renderPriceRows_(resp.data.rows || [], q);
+    });
+  }
+
+  function renderPriceRows_(rows, q) {
+    const box = panelEl.querySelector('#pk-price-result');
+    if (!rows.length) {
+      box.innerHTML = `<div class="pk-price-loading">Không tìm thấy${q ? ' cho "' + escapeHtml(q) + '"' : ''}.</div>`;
+      return;
+    }
+    box.innerHTML = rows.slice(0, 30).map((row) => {
+      const keys = Object.keys(row).filter((k) => row[k] !== '' && row[k] !== null && row[k] !== undefined);
+      const priceKeys = keys.filter((k) => /gia|price/i.test(k));
+      const otherKeys = keys.filter((k) => !/gia|price/i.test(k));
+      const line = (k) => `<span class="pk-price-field"><b>${escapeHtml(k)}:</b> ${escapeHtml(row[k])}</span>`;
+      return `<div class="pk-price-item">${otherKeys.map(line).join(' ')}${priceKeys.length ? '<div class="pk-price-amount">' + priceKeys.map(line).join(' · ') + '</div>' : ''}</div>`;
+    }).join('');
   }
 
   function escapeHtml(s) {

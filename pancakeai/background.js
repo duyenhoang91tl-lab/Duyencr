@@ -94,6 +94,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
     return true;
   }
+
+  // Tra cuu bang gia — action:'priceSearch', dung chung file PRICE_SS_ID (Sheet DANH_MUC).
+  if (msg?.type === "GET_PRICE") {
+    handleGetPrice(msg.payload)
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
 });
 
 // Tra cứu khách theo SĐT — GET GAS_URL?action=lookup&phone=... y hệt doLookup() bên Zalo AI.
@@ -289,4 +297,20 @@ async function handleFetchFollowUpSuggestion(payload) {
     throw new Error(err);
   }
   throw new Error("Quá số lần thử lại (rate limit).");
+}
+
+// Tra cuu bang gia theo tu khoa — action:'priceSearch' (GET, chi doc). Backend tu tim
+// khong dau tren tat ca cot cua sheet DANH_MUC, tra ve toi da 50 dong khop.
+async function handleGetPrice(payload) {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+
+  const q = payload?.q || "";
+  const sep = cfg.gasUrl.includes("?") ? "&" : "?";
+  const url = cfg.gasUrl + sep + "action=priceSearch" + (q ? "&q=" + encodeURIComponent(q) : "");
+  const res = await fetch(url, { redirect: "follow" });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return { rows: data.rows || [], total: data.total || 0 };
 }
