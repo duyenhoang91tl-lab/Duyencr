@@ -11181,7 +11181,7 @@ function _srGrowthStr(v){
 function _srRenderCTable(rows, entType, search, searchKey){
   var filtered = rows.filter(function(r){ return !search || r.name.toLowerCase().indexOf(search.toLowerCase())!==-1; });
   var html = '<table class="dash-table"><thead><tr>'+
-    '<th>'+(entType==='sale'?'Nhân viên (Sale)':'Nguồn đơn')+'</th>'+
+    '<th>'+(entType==='sale'?'Nhân viên (Sale)':'Kênh bán')+'</th>'+
     '<th style="text-align:right">KPI kỳ trước</th><th style="text-align:right">Kết quả kỳ trước</th><th style="text-align:right">%HT KPI kỳ trước</th>'+
     '<th style="text-align:right">KPI kỳ này</th><th style="text-align:right">Kết quả kỳ này</th><th style="text-align:right">%HT KPI kỳ này</th>'+
     '<th style="text-align:right">% Tăng trưởng</th></tr></thead><tbody>';
@@ -11242,8 +11242,8 @@ function _srRenderC(d){
   html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên..." value="'+esc(_srState.cEmpSearch)+'" oninput="_srState.cEmpSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
   html += _srRenderCTable(d.byEmployee||[], 'sale', _srState.cEmpSearch);
 
-  html += '<div class="dash-section-title">Theo Nguồn đơn</div>';
-  html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên nguồn..." value="'+esc(_srState.cKenhSearch)+'" oninput="_srState.cKenhSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
+  html += '<div class="dash-section-title">Theo Kênh bán</div>';
+  html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên kênh..." value="'+esc(_srState.cKenhSearch)+'" oninput="_srState.cKenhSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
   html += _srRenderCTable(d.byKenh||[], 'kenh', _srState.cKenhSearch);
 
   html += '<div style="font-size:11px;color:var(--hint);margin-top:8px">Chỉ tiêu KPI lấy từ tab "'+esc('KPI_ChiTieu')+'" trong Google Sheet CRM — tự vào Sheet điền/sửa số. Bấm vào 1 dòng để xem chi tiết đơn của kỳ này/kỳ trước.</div>';
@@ -11263,14 +11263,14 @@ function exportSalesReportC(){
   (d.byEmployee||[]).forEach(function(r){
     empRows.push([r.name, r.kpiPrev, r.resultPrev, r.pctKpiPrev, r.kpiCur, r.resultCur, r.pctKpiCur, r.growthPct]);
   });
-  var kenhRows = [['Nguồn đơn','KPI kỳ trước','Kết quả kỳ trước','%HT KPI kỳ trước','KPI kỳ này','Kết quả kỳ này','%HT KPI kỳ này','% Tăng trưởng']];
+  var kenhRows = [['Kênh bán','KPI kỳ trước','Kết quả kỳ trước','%HT KPI kỳ trước','KPI kỳ này','Kết quả kỳ này','%HT KPI kỳ này','% Tăng trưởng']];
   (d.byKenh||[]).forEach(function(r){
     kenhRows.push([r.name, r.kpiPrev, r.resultPrev, r.pctKpiPrev, r.kpiCur, r.resultCur, r.pctKpiCur, r.growthPct]);
   });
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Kỳ so sánh');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(empRows), 'Theo Nhân viên');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(kenhRows), 'Theo Nguồn đơn');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(kenhRows), 'Theo Kênh bán');
   XLSX.writeFile(wb, `BaoCaoDoanhSo_C_${_ymd(new Date())}.xlsx`);
 }
 

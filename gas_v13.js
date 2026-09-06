@@ -1244,8 +1244,8 @@ function exportSalesReportToSheet_(reportType, filters) {
     filterDesc.push('Lọc theo: ' + (f.dateField === 'thoiGianHT' ? 'Thời gian hoàn thành' : 'Ngày tạo'));
     var saleArrC = Array.isArray(f.sale) ? f.sale : (f.sale ? [f.sale] : []);
     if (saleArrC.length) filterDesc.push('Sale: ' + saleArrC.join(', '));
-    var nguonArrC = Array.isArray(f.kenh) ? f.kenh : (f.kenh ? [f.kenh] : []);
-    if (nguonArrC.length) filterDesc.push('Nguồn đơn: ' + nguonArrC.join(', '));
+    var kenhArrC = Array.isArray(f.kenh) ? f.kenh : (f.kenh ? [f.kenh] : []);
+    if (kenhArrC.length) filterDesc.push('Kênh bán: ' + kenhArrC.join(', '));
   }
   rows.push(['Bộ lọc', filterDesc.join(' | ') || '(không lọc)']);
   rows.push([]);
@@ -1297,8 +1297,8 @@ function exportSalesReportToSheet_(reportType, filters) {
       rows.push([r.name, r.kpiPrev, r.resultPrev, r.pctKpiPrev, r.kpiCur, r.resultCur, r.pctKpiCur, r.growthPct]);
     });
     rows.push([]);
-    rows.push(['THEO NGUỒN ĐƠN']);
-    rows.push(hdrC.slice().map(function(h,i){ return i===0 ? 'Nguồn đơn' : h; }));
+    rows.push(['THEO KÊNH BÁN']);
+    rows.push(hdrC.slice().map(function(h,i){ return i===0 ? 'Kênh bán' : h; }));
     (data.byKenh || []).forEach(function(r) {
       rows.push([r.name, r.kpiPrev, r.resultPrev, r.pctKpiPrev, r.kpiCur, r.resultCur, r.pctKpiCur, r.growthPct]);
     });
