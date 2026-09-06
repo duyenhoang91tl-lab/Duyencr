@@ -20,6 +20,8 @@ var SH_CONTEXT = 'AIContext';
 
 var ORDER_SS_ID = '1fiWXPMZcHuEh0zYqD6pgQjZDM0PhWzpiSK7Igj6Cug8'; // File chua OrderData2x (doanh thu/don hang)
 var CRM_SS_ID   = '18XBtbjP7gtlvYpChikF3B62cxHkR4426s5poZj9Mj8I'; // File chua CareData/Users/Teams/Settings/AuditLog/AssignData/AIContext (CRM).
+var PRICE_SS_ID    = '1Tfn2jOH20kv0Z-cb0BULqPuxZTap9FA3z8bXeeRl5l4'; // File "Bang gia" rieng (Danh_muc/Tinh_tien/Ghi_chu_chinh_sach)
+var PRICE_SHEET_NAME = 'DANH_MUC'; // Sheet dang bang phang, de tra cuu/loc
                         // De trong = dung file dang gan Apps Script nay (mac dinh, hanh vi cu).
                         // Dan Spreadsheet ID moi vao day de doi nguon CRM MA KHONG can gan lai script vao file khac.
 // >>> Muon doi nguon du lieu sau nay: chi can sua 2 dong ID o tren (ORDER_SS_ID va/hoac CRM_SS_ID) roi Deploy lai. <<<
@@ -102,6 +104,60 @@ function normPhone_(p) {
   if (s.length === 11 && s.indexOf('84') === 0) s = '0' + s.substring(2);
   if (s.length === 9 && /^[3-9]/.test(s)) s = '0' + s;
   return s;
+}
+
+// ─── BANG GIA (Sheet DANH_MUC, file PRICE_SS_ID) ──────────────────────────
+// Bo dau tieng Viet de tim kiem khong phan biet co dau/khong dau, hoa/thuong.
+function _stripVN_(s) {
+  if (!s) return '';
+  s = String(s).toLowerCase();
+  s = s.replace(/[àáạảãâầấậẩẫăằắặẳẵ]/g, 'a');
+  s = s.replace(/[èéẹẻẽêềếệểễ]/g, 'e');
+  s = s.replace(/[ìíịỉĩ]/g, 'i');
+  s = s.replace(/[òóọỏõôồốộổỗơờớợởỡ]/g, 'o');
+  s = s.replace(/[ùúụủũưừứựửữ]/g, 'u');
+  s = s.replace(/[ỳýỵỷỹ]/g, 'y');
+  s = s.replace(/đ/g, 'd');
+  return s;
+}
+
+// Doc toan bo sheet DANH_MUC thanh mang object {tenCot: giaTri...}, dua theo dong tieu de
+// (dong 1) — khong hardcode ten cot, sheet doi/them cot van chay binh thuong.
+function readPriceCatalog_() {
+  var sh = SpreadsheetApp.openById(PRICE_SS_ID).getSheetByName(PRICE_SHEET_NAME);
+  if (!sh || sh.getLastRow() < 2) return [];
+  var lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
+  var vals = sh.getRange(1, 1, lastRow, lastCol).getValues();
+  var headers = vals[0].map(function(h){ return String(h || '').trim(); });
+  var rows = [];
+  for (var i = 1; i < vals.length; i++) {
+    var row = vals[i];
+    var isEmpty = row.every(function(c){ return c === '' || c === null; });
+    if (isEmpty) continue;
+    var obj = {};
+    for (var c = 0; c < headers.length; c++) {
+      if (!headers[c]) continue;
+      var v = row[c];
+      obj[headers[c]] = (v instanceof Date) ? v.toISOString() : v;
+    }
+    rows.push(obj);
+  }
+  return rows;
+}
+
+// Tim theo tu khoa q — khop khi MOI tu trong q (tach theo khoang trang) xuat hien trong
+// it nhat 1 cot bat ky cua dong do (khong dau, khong phan biet hoa/thuong).
+function searchPriceCatalog_(rows, q) {
+  var terms = _stripVN_(q).split(/\s+/).filter(Boolean);
+  if (!terms.length) return rows.slice(0, 50);
+  var out = [];
+  for (var i = 0; i < rows.length && out.length < 50; i++) {
+    var row = rows[i];
+    var haystack = _stripVN_(Object.keys(row).map(function(k){ return row[k]; }).join(' | '));
+    var ok = terms.every(function(t){ return haystack.indexOf(t) !== -1; });
+    if (ok) out.push(row);
+  }
+  return out;
 }
 
 // ─── SETTINGS (1 signature duy nhat) ──────────────────────────
@@ -331,6 +387,24 @@ function doGet(e) {
     if (action === 'orders')    return jsonOut_({ orders: readAllOrders_() });
     if (action === 'teams')     return jsonOut_({ teams: readTeams_(ss.getSheetByName(SH_TEAM)) });
     if (action === 'users')     return jsonOut_({ users: readUsers_(ss.getSheetByName(SH_USER)) });
+
+    // ── Tra cuu bang gia (Sheet DANH_MUC, file rieng PRICE_SS_ID) — dung chung cho
+    // portal/Sasum/Pancake. Tim khong dau, khop tren MOI cot dang text cua sheet, khong
+    // can biet truoc ten cot (tu doc dong tieu de dong 1). ──
+    if (action === 'priceSearch') {
+      var q = (e && e.parameter && e.parameter.q) ? String(e.parameter.q) : '';
+      var cachePS = CacheService.getScriptCache();
+      var cKeyPS = 'price_catalog_v1';
+      var cachedPS = cachePS.get(cKeyPS);
+      var rowsPS;
+      if (cachedPS) { try { rowsPS = JSON.parse(cachedPS); } catch(ec) {} }
+      if (!rowsPS) {
+        rowsPS = readPriceCatalog_();
+        try { cachePS.put(cKeyPS, JSON.stringify(rowsPS), 600); } catch(ec) {} // cache 10 phut, sheet gia it doi
+      }
+      var matched = q ? searchPriceCatalog_(rowsPS, q) : rowsPS.slice(0, 50);
+      return jsonOut_({ ok: true, total: rowsPS.length, count: matched.length, rows: matched });
+    }
 
     if (action === 'audit') {
       var shA = ss.getSheetByName(SH_AUDIT); var auditRows = [];
