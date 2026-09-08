@@ -15,9 +15,13 @@ Ban đầu mình đoán nhầm là backend dùng Flask + RAG server riêng — *
 
 ## Cài đặt (chế độ Developer)
 
+> Kể từ 2026.9.8, Pancake AI đã gộp chung `manifest.json` với extension "Duyên AI" (Zalo) ở thư mục gốc repo — chỉ còn 1 extension, load 1 lần, không cần load riêng thư mục `pancakeai` nữa.
+
 1. Mở Chrome → `chrome://extensions`
-2. Bật **Developer mode**
-3. Bấm **Load unpacked** → chọn thư mục `pancakeai`
+2. Nếu trước đó đã load "Duyên AI" và "Trợ lý AI Pancake" như 2 extension riêng → bấm **Remove** cả 2 (tránh chạy trùng, xung đột content script)
+3. Bật **Developer mode**
+4. Bấm **Load unpacked** → chọn **thư mục gốc của repo** (không phải thư mục `pancakeai`)
+5. Vì extension đổi ID mới → cấu hình cũ (URL Web App GAS...) không tự chuyển qua, cần nhập lại 1 lần ở bước bên dưới
 
 ## Cấu hình bắt buộc
 

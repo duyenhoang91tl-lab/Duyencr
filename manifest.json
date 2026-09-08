@@ -1,1 +1,53 @@
-{"manifest_version": 3, "name": "Duyên AI", "version": "2026.7.12.1418", "description": "Tra cuu lich su khach hang va tao goi y AI khi chat tren Zalo", "permissions": ["storage", "clipboardWrite"], "host_permissions": ["https://chat.zalo.me/*", "https://script.google.com/*", "https://script.googleusercontent.com/*"], "content_scripts": [{"matches": ["https://chat.zalo.me/*"], "js": ["content.js"], "css": ["style.css"], "run_at": "document_idle"}], "version_name": "14.18.12.7.26"}
+{
+  "manifest_version": 3,
+  "name": "Duyên AI",
+  "version": "2026.9.8.1",
+  "description": "Tra cứu lịch sử khách hàng & gợi ý trả lời AI trên Zalo, Pancake (POS/Chat) và Messenger — dùng chung 1 backend.",
+  "default_locale": "vi",
+  "icons": {
+    "16": "pancakeai/icons/icon16.png",
+    "48": "pancakeai/icons/icon48.png",
+    "128": "pancakeai/icons/icon128.png"
+  },
+  "permissions": ["storage", "clipboardWrite", "activeTab", "scripting"],
+  "host_permissions": [
+    "https://chat.zalo.me/*",
+    "*://*.pancake.vn/*",
+    "*://pancake.vn/*",
+    "*://*.pages.fm/*",
+    "*://*.messenger.com/*",
+    "https://script.google.com/*",
+    "https://script.googleusercontent.com/*"
+  ],
+  "background": {
+    "service_worker": "pancakeai/background.js"
+  },
+  "action": {
+    "default_popup": "pancakeai/popup.html",
+    "default_icon": {
+      "16": "pancakeai/icons/icon16.png",
+      "48": "pancakeai/icons/icon48.png",
+      "128": "pancakeai/icons/icon128.png"
+    }
+  },
+  "options_page": "pancakeai/options.html",
+  "content_scripts": [
+    {
+      "matches": ["https://chat.zalo.me/*"],
+      "js": ["zaloai/content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["*://*.pancake.vn/*", "*://pancake.vn/*", "*://*.pages.fm/*"],
+      "js": ["pancakeai/content.js"],
+      "css": ["pancakeai/content.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["*://*.messenger.com/*"],
+      "js": ["pancakeai/content.js"],
+      "css": ["pancakeai/content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
