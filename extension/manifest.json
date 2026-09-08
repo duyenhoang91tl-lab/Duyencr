@@ -3,7 +3,6 @@
   "name": "Duyên AI",
   "version": "2026.9.8.2",
   "description": "Tra cứu lịch sử khách hàng & gợi ý trả lời AI trên Zalo, Pancake (POS/Chat) và Messenger — dùng chung 1 backend.",
-  "default_locale": "vi",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
