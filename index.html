@@ -11249,8 +11249,8 @@ function srRenderKenhChips(){
   var selArr = _srState.kenh || [];
   if (!selArr.length){ wrap.innerHTML = ''; return; }
   wrap.innerHTML = selArr.map(function(name){
-    return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--blue-bg);color:var(--blue);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap">'+
-      esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srKenhComboRemove(\''+esc(name).replace(/'/g,"\\'")+'\')">✕</span></span>';
+    return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--blue-bg);color:var(--blue);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap" data-name="'+esc(name)+'">'+
+      esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srKenhComboRemove(this.parentNode.dataset.name)">✕</span></span>';
   }).join('');
 }
 function srKenhComboOpen(){
@@ -11350,8 +11350,8 @@ function srRenderNguonChips(){
   var selArr = _srState.nguon || [];
   if (!selArr.length){ wrap.innerHTML = ''; return; }
   wrap.innerHTML = selArr.map(function(name){
-    return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--blue-bg);color:var(--blue);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap">'+
-      esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srNguonComboRemove(\''+esc(name).replace(/'/g,"\\'")+'\')">✕</span></span>';
+    return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--blue-bg);color:var(--blue);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap" data-name="'+esc(name)+'">'+
+      esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srNguonComboRemove(this.parentNode.dataset.name)">✕</span></span>';
   }).join('');
 }
 function srNguonComboOpen(){
@@ -11452,8 +11452,8 @@ function srRenderComboChips(domId){
   var wrap = document.getElementById(domId+'-chips'); if (!wrap) return;
   var selArr = _srState[r.field] || [];
   wrap.innerHTML = selArr.map(function(name){
-    return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap">'+
-      esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srComboRemove(\''+domId+'\',\''+esc(name).replace(/'/g,"\\'")+'\')">✕</span></span>';
+    return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap" data-name="'+esc(name)+'">'+
+      esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srComboRemove(\''+domId+'\',this.parentNode.dataset.name)">✕</span></span>';
   }).join('');
 }
 function srComboOpen(domId){
@@ -11537,8 +11537,8 @@ function _srComboHtml(domId, field, optKey, label, placeholder, widthPx){
     '</div>'+
     '<div id="'+domId+'-chips" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;max-width:210px">'+
     selArr.map(function(name){
-      return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap">'+
-        esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srComboRemove(\''+domId+'\',\''+esc(name).replace(/'/g,"\\'")+'\')">✕</span></span>';
+      return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap" data-name="'+esc(name)+'">'+
+        esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srComboRemove(\''+domId+'\',this.parentNode.dataset.name)">✕</span></span>';
     }).join('')+
     '</div></div>';
 }
