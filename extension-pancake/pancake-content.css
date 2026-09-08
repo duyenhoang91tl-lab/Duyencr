@@ -1,0 +1,514 @@
+#pk-ai-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: 320px;
+  max-height: 420px;
+  background: #ffffff;
+  border: 1px solid #e2e2e2;
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
+  z-index: 2147483647;
+  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  color: #222;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#pk-ai-panel.pk-ai-collapsed #pk-ai-body {
+  display: none;
+}
+
+#pk-ai-header {
+  background: #2563eb;
+  color: #fff;
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  cursor: default;
+}
+
+#pk-ai-header button {
+  background: transparent;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+#pk-ai-body {
+  padding: 10px 12px;
+  overflow-y: auto;
+}
+
+#pk-ai-status {
+  color: #666;
+  margin-bottom: 8px;
+}
+
+#pk-ai-customer {
+  margin-bottom: 8px;
+}
+
+#pk-ai-phone-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+#pk-ai-phone-row input {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+#pk-ai-phone-row button {
+  padding: 5px 10px;
+  border: 1px solid #2563eb;
+  background: #fff;
+  color: #2563eb;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#pk-ai-phone-row button:hover {
+  background: #eff6ff;
+}
+
+.pk-ai-cust-loading {
+  color: #888;
+  font-style: italic;
+  font-size: 12px;
+}
+
+.pk-ai-cust-card {
+  border: 1px solid #d1fae5;
+  background: #f0fdf4;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+}
+
+.pk-ai-cust-empty {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #9a3412;
+  padding: 8px 10px;
+}
+
+.pk-ai-cust-name {
+  font-weight: 700;
+  color: #166534;
+}
+
+.pk-ai-cust-phone {
+  font-weight: 400;
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.pk-ai-cust-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.pk-ai-chip {
+  background: #dcfce7;
+  color: #166534;
+  border-radius: 10px;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+.pk-ai-cust-products {
+  margin-top: 6px;
+  color: #374151;
+}
+
+.pk-ai-cust-note {
+  margin-top: 6px;
+  color: #6b7280;
+  font-style: italic;
+}
+
+#pk-ai-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.pk-ai-suggestion-item {
+  border: 1px solid #dbeafe;
+  background: #f0f7ff;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.pk-ai-suggestion-item:hover {
+  background: #dbeafe;
+}
+
+#pk-ai-refresh {
+  width: 100%;
+  padding: 6px;
+  border-radius: 6px;
+  border: 1px solid #2563eb;
+  background: #fff;
+  color: #2563eb;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+#pk-ai-refresh:hover {
+  background: #eff6ff;
+}
+
+#pk-ai-cs-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+#pk-ai-cs-row label {
+  font-size: 11px;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+#pk-cs-sel {
+  flex: 1;
+  padding: 4px 6px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.pk-ai-new-tag {
+  color: #9a3412;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  margin-top: 6px;
+}
+
+.pk-form-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.pk-form-col {
+  flex: 1;
+  min-width: 0;
+}
+
+.pk-form-col label {
+  display: block;
+  font-size: 10.5px;
+  color: #6b7280;
+  margin-bottom: 2px;
+}
+
+.pk-form-col select,
+.pk-form-col input {
+  width: 100%;
+  padding: 5px 6px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.pk-full-input {
+  width: 100%;
+  margin-top: 6px;
+  padding: 5px 6px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.pk-btn-outline {
+  width: 100%;
+  padding: 5px 6px;
+  border: 1px solid #2563eb;
+  background: #fff;
+  color: #2563eb;
+  border-radius: 6px;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.pk-btn-outline:hover {
+  background: #eff6ff;
+}
+
+.pk-label-top {
+  display: block;
+  font-size: 10.5px;
+  color: #6b7280;
+  margin-top: 10px;
+  margin-bottom: 3px;
+}
+
+#pk-note-history {
+  max-height: 130px;
+  overflow-y: auto;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  padding: 4px 6px;
+}
+
+.pk-note-empty {
+  color: #999;
+  font-style: italic;
+  font-size: 11px;
+  padding: 4px 0;
+}
+
+.pk-note-entry {
+  position: relative;
+  padding: 5px 20px 5px 2px;
+  border-bottom: 1px solid #f1f1f1;
+  font-size: 12px;
+}
+
+.pk-note-entry:last-child {
+  border-bottom: none;
+}
+
+.pk-note-meta {
+  font-size: 10px;
+  color: #9ca3af;
+  margin-bottom: 1px;
+}
+
+.pk-note-latest {
+  color: #16a34a;
+  font-weight: 700;
+}
+
+.pk-note-text {
+  color: #374151;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.pk-note-del {
+  position: absolute;
+  right: 0;
+  top: 5px;
+  background: none;
+  border: none;
+  color: #d1d5db;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.pk-note-del:hover {
+  color: #ef4444;
+}
+
+.pk-note-add-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.pk-note-add-row input {
+  flex: 1;
+  padding: 5px 6px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.pk-note-add-row button {
+  width: 32px;
+  border: 1px solid #2563eb;
+  background: #fff;
+  color: #2563eb;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.pk-save-btn {
+  width: 100%;
+  margin-top: 10px;
+  padding: 7px;
+  border: none;
+  background: #16a34a;
+  color: #fff;
+  border-radius: 6px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pk-save-btn:hover {
+  background: #15803d;
+}
+
+.pk-save-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+#pk-price-section {
+  border: 1px solid #dbeafe;
+  background: #f0f7ff;
+  border-radius: 8px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+}
+
+#pk-price-header {
+  font-weight: 700;
+  font-size: 12px;
+  color: #1e3a8a;
+  margin-bottom: 6px;
+}
+
+#pk-price-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+#pk-price-row input {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+#pk-price-row button {
+  padding: 5px 10px;
+  border: 1px solid #2563eb;
+  background: #2563eb;
+  color: #fff;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#pk-price-result {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.pk-price-loading {
+  color: #1e3a8a;
+  font-size: 11.5px;
+  font-style: italic;
+  padding: 4px 0;
+}
+
+.pk-price-item {
+  border-bottom: 1px solid #dbeafe;
+  padding: 6px 0;
+  font-size: 12px;
+}
+
+.pk-price-item:last-child {
+  border-bottom: none;
+}
+
+.pk-price-field {
+  display: inline-block;
+  margin-right: 8px;
+  color: #1e3a8a;
+}
+
+.pk-price-amount {
+  margin-top: 3px;
+  font-weight: 700;
+  color: #b45309;
+}
+
+#pk-rem-section {
+  border: 1px solid #fde68a;
+  background: #fffbeb;
+  border-radius: 8px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+}
+
+#pk-rem-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+  font-size: 12px;
+  color: #92400e;
+}
+
+#pk-rem-header button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+#pk-rem-list {
+  margin-top: 6px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.pk-rem-empty {
+  color: #92400e;
+  font-size: 11.5px;
+  font-style: italic;
+  padding: 4px 0;
+}
+
+.pk-rem-item {
+  border-bottom: 1px solid #fde68a;
+  padding: 5px 0;
+  font-size: 12px;
+}
+
+.pk-rem-item:last-child {
+  border-bottom: none;
+}
+
+.pk-rem-phone {
+  color: #78350f;
+  margin-bottom: 3px;
+}
+
+.pk-rem-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.pk-rem-actions .pk-btn-outline {
+  width: auto;
+  flex: 1;
+  padding: 3px 6px;
+  font-size: 11px;
+}

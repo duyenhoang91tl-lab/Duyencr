@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<title>Cài đặt — Duyên AI (Zalo)</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; max-width: 640px; margin: 24px auto; color: #222; }
+  h1 { font-size: 18px; }
+  h2 { font-size: 14px; margin-top: 28px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+  label { display: block; font-weight: 600; margin-top: 12px; margin-bottom: 4px; }
+  input[type=text] { width: 100%; padding: 6px 8px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+  small { color: #777; }
+  button { margin-top: 20px; padding: 8px 16px; background: #2563eb; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+  #saved { color: green; margin-left: 10px; }
+  .hint { background: #f0f7ff; border: 1px solid #dbeafe; padding: 10px; border-radius: 6px; margin-top: 8px; font-size: 12.5px; }
+</style>
+</head>
+<body>
+  <h1>⚙️ Cài đặt Duyên AI - Zalo</h1>
+
+  <h2>Backend chung (dùng chung với Duyên AI - Pancake)</h2>
+  <div class="hint">
+    Đây là URL Web App của Google Apps Script backend — cùng 1 backend mà extension
+    <b>Duyên AI - Pancake</b> đang dùng. Nếu đội bạn đã có URL này rồi thì dán lại y hệt vào đây.
+  </div>
+  <label>URL Web App GAS</label>
+  <input type="text" id="gasUrl" placeholder="https://script.google.com/macros/s/.../exec" />
+
+  <button id="save">Lưu cài đặt</button>
+  <span id="saved"></span>
+
+  <h2>Các cài đặt khác</h2>
+  <div class="hint">
+    API key (Groq / Cerebras / Gemini), tên CS đang trực, tự động trả lời AI theo từng khách…
+    được cấu hình trực tiếp trong bảng ⚙ cài đặt nổi trên chính trang
+    <a href="https://chat.zalo.me/" target="_blank" rel="noopener">chat.zalo.me</a> (không nằm ở trang này),
+    vì các API key này được lưu chung trên backend GAS cho cả team, không lưu riêng theo máy.
+  </div>
+
+  <script src="zalo-options.js"></script>
+</body>
+</html>
