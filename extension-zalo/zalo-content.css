@@ -1,0 +1,528 @@
+/* Duyên AI - Zalo: stylesheet cho nút nổi + panel.
+   Trước đây extension này KHÔNG có file CSS nào — nút #ome-zai-toggle và
+   panel #ome-zai-panel bị chèn vào cuối <body> mà không có position:fixed,
+   nên nó nằm lẫn trong luồng DOM bình thường (thường bị đẩy ra ngoài màn
+   hình / che khuất bởi layout full-height của Zalo Web) => không nhìn thấy. */
+
+#ome-zai-toggle {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2147483647;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: none;
+  background: #0068ff;
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 104, 255, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: right 0.2s ease, transform 0.15s ease;
+}
+
+#ome-zai-toggle:hover {
+  transform: scale(1.06);
+}
+
+#ome-zai-toggle.shifted {
+  right: 336px; /* trượt sang trái bằng bề rộng panel khi panel đang mở */
+}
+
+#ome-zai-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 72px;
+  width: 320px;
+  max-height: 82vh;
+  background: #ffffff;
+  border: 1px solid #e2e2e2;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+  z-index: 2147483646;
+  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  color: #222;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#ome-zai-panel.open {
+  display: flex;
+}
+
+/* ── Header ── */
+.zai-hdr {
+  background: #0068ff;
+  color: #fff;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.zai-hdr-title {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.zai-hdr-sub {
+  font-size: 10.5px;
+  opacity: 0.85;
+  margin-top: 1px;
+}
+
+.zai-cfg-btn {
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: #fff;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.zai-cfg-btn:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* ── Config panel ── */
+.zai-cfg {
+  padding: 10px 14px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f8fafc;
+  flex-shrink: 0;
+}
+
+.zai-cfg label {
+  display: block;
+  font-size: 10.5px;
+  color: #374151;
+  font-weight: 600;
+  margin: 6px 0 3px;
+}
+
+.zai-cfg input[type="text"] {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.zai-cfg-save {
+  width: 100%;
+  margin-top: 8px;
+  padding: 7px;
+  border: none;
+  background: #0068ff;
+  color: #fff;
+  border-radius: 6px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.zai-cfg-save:hover {
+  background: #0055d1;
+}
+
+.zai-cfg-hint {
+  font-size: 10px;
+  color: #9ca3af;
+  margin-top: 6px;
+}
+
+/* ── Body / scroll area ── */
+.zai-body {
+  padding: 10px 14px 14px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.zai-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #374151;
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+
+.zai-div {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin: 10px 0;
+}
+
+/* ── Buttons ── */
+.zai-btn {
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12.5px;
+  padding: 7px 10px;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.zai-btn-sm {
+  font-size: 11px;
+  padding: 4px 8px;
+}
+
+.zai-btn-primary {
+  background: #0068ff;
+  color: #fff;
+}
+.zai-btn-primary:hover { background: #0055d1; }
+
+.zai-btn-secondary {
+  background: #eaf2ff;
+  color: #0068ff;
+  border: 1px solid #bcd7ff;
+}
+.zai-btn-secondary:hover { background: #dcebff; }
+
+.zai-btn-ghost {
+  background: #fff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+.zai-btn-ghost:hover { background: #f3f4f6; }
+
+.zai-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* ── Phone row ── */
+.zai-phone-row {
+  display: flex;
+  gap: 6px;
+}
+
+.zai-phone-row input {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+/* ── Tone selector ── */
+.zai-tones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.zai-tone {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #374151;
+  border-radius: 14px;
+  padding: 4px 10px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.zai-tone.active {
+  background: #0068ff;
+  border-color: #0068ff;
+  color: #fff;
+  font-weight: 700;
+}
+
+/* ── Textareas / inputs ── */
+.zai-msg-area,
+.zai-ctx-input,
+.zai-cfg textarea,
+textarea {
+  font-family: inherit;
+}
+
+.zai-msg-area {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 70px;
+  padding: 7px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 12px;
+  resize: vertical;
+}
+
+.zai-ctx-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+.zai-error {
+  color: #dc2626;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 11.5px;
+  margin-top: 6px;
+}
+
+.zai-loading {
+  color: #6b7280;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 0;
+}
+
+.zai-spinner {
+  width: 13px;
+  height: 13px;
+  border: 2px solid #dbeafe;
+  border-top-color: #0068ff;
+  border-radius: 50%;
+  animation: zai-spin 0.7s linear infinite;
+}
+
+@keyframes zai-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Customer card ── */
+.zai-not-found {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.zai-card {
+  border: 1px solid #dbeafe;
+  background: #f5f9ff;
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-size: 12.5px;
+}
+
+.zai-card-name {
+  font-weight: 700;
+  color: #0b3d91;
+  margin-bottom: 3px;
+}
+
+.zai-card-note {
+  margin-top: 6px;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.zai-card-orders {
+  margin-top: 6px;
+  color: #374151;
+}
+
+.zai-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.zai-chip {
+  background: #dbeafe;
+  color: #0b3d91;
+  border-radius: 10px;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+.zai-dup-btn {
+  width: 100%;
+}
+
+.zai-order-x {
+  margin-left: 6px;
+  color: #dc2626;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 0 4px;
+  font-size: 13px;
+}
+
+.zai-orders-toggle {
+  margin-top: 4px;
+}
+
+/* ── Update section ── */
+.zai-update-section {
+  margin-top: 4px;
+}
+
+.zai-field-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.zai-field-col {
+  flex: 1;
+  min-width: 0;
+}
+
+.zai-field-col label,
+.zai-update-section > label {
+  display: block;
+  font-size: 10.5px;
+  color: #6b7280;
+  margin-bottom: 2px;
+  margin-top: 6px;
+}
+
+.zai-field-col select,
+.zai-field-col input,
+.zai-update-section select,
+.zai-update-section input[type="date"],
+.zai-update-section input[type="text"] {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 5px 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+/* ── Notes ── */
+.zai-note-wrap {
+  margin-top: 3px;
+}
+
+.zai-note-row {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.zai-note-row textarea {
+  flex: 1;
+  box-sizing: border-box;
+  padding: 6px 7px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 12px;
+  resize: vertical;
+}
+
+.zai-note-history {
+  max-height: 130px;
+  overflow-y: auto;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  padding: 4px 6px;
+  margin-top: 6px;
+}
+
+.zai-note-empty {
+  color: #999;
+  font-style: italic;
+  font-size: 11px;
+  padding: 4px 0;
+}
+
+.zai-note-entry {
+  position: relative;
+  padding: 5px 20px 5px 2px;
+  border-bottom: 1px solid #f1f1f1;
+  font-size: 12px;
+}
+
+.zai-note-entry:last-child {
+  border-bottom: none;
+}
+
+.zai-note-meta {
+  font-size: 10px;
+  color: #9ca3af;
+  margin-bottom: 1px;
+}
+
+.zai-note-latest {
+  color: #0068ff;
+  font-weight: 700;
+}
+
+.zai-note-text {
+  color: #374151;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.zai-note-del {
+  position: absolute;
+  right: 0;
+  top: 5px;
+  background: none;
+  border: none;
+  color: #d1d5db;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.zai-note-del:hover {
+  color: #ef4444;
+}
+
+/* ── Save row ── */
+.zai-save-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.zai-save-status {
+  font-size: 11px;
+  color: #0068ff;
+}
+
+/* ── Zalo-friend scan preview ── */
+.zai-zs-chk { margin: 0; }
+
+.zai-zs-copy {
+  flex: 0 0 auto;
+  font-size: 11px;
+  padding: 2px 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.zai-zs-status {
+  font-size: 10px;
+  padding: 1px 3px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+}
+
+.zai-kb-gen-btn {
+  margin-bottom: 6px;
+}
