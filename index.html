@@ -14143,6 +14143,17 @@ async function openFuTplModal(){
 }
 function closeFuTplModal(){ document.getElementById('futpl-modal').classList.remove('open'); }
 
+// BUG FIX: nut "🎂 Sinh nhật tự động" goi openBdayTplModal() nhung ham nay chua ton tai
+// (khac voi openFuTplModal — da lam day du modal + sheet FollowUpTemplates rieng), khien
+// bam nut la loi JS "openBdayTplModal is not defined", khong lam gi ca. Chua co du du lieu
+// ve cau truc mau tin/mốc nhac sinh nhat mong muon de lam mot modal hoan chinh tuong tu
+// Hoi tham tu dong, nen tam thoi bao cho nguoi dung biet tinh nang dang duoc phat trien,
+// thay vi doan mo mot tinh nang moi co the sai logic nghiep vu.
+function openBdayTplModal(){
+  if (typeof toast === 'function') toast('🎂 Tính năng mẫu tin sinh nhật tự động đang được phát triển, chưa khả dụng.');
+  else alert('Tính năng mẫu tin sinh nhật tự động đang được phát triển, chưa khả dụng.');
+}
+
 function _buildFuCsFilter(){
   var sel = document.getElementById('futpl-cs-filter');
   var csSet = {};
