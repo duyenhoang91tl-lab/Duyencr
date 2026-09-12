@@ -943,6 +943,16 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
         <button type="button" class="cs-mode-btn" data-mode="care" onclick="setCSFilterMode('care',this)">Chăm sóc</button>
       </div>
     </div>
+    <!-- Lọc theo nguồn dữ liệu: DT tổng / Chăm sóc (KH thêm nhanh) / Dữ liệu đơn / Gộp tất cả -->
+    <div class="cs-filter-wrap">
+      <div class="cs-filter-label">Lọc theo nguồn dữ liệu</div>
+      <select class="cs-filter-sel" id="datasrc-filter" style="display:block" onchange="applyFilters()" title="Lọc khách theo sheet dữ liệu nguồn — khách vẫn được gộp theo SĐT như bình thường, chỉ lọc bớt hiển thị">
+        <option value="all">— Gộp (tất cả nguồn) —</option>
+        <option value="dt">DT tổng</option>
+        <option value="cs">Chăm sóc (KH thêm nhanh)</option>
+        <option value="don">Dữ liệu đơn</option>
+      </select>
+    </div>
     <div class="sb-label">Phân loại KH</div>
     <div class="fgroup">
       <button class="fi active" onclick="setTier('all',this)"><div class="fleft"><span>Tất cả</span></div><span class="fbadge" id="b-all">0</span></button>
@@ -1591,6 +1601,12 @@ let allCustomers = [];
 let loadedFiles = [];
 let customerMap = {};
 let careData = loadLS('ome_care') || {};
+// Nguồn "Chăm sóc": KH thêm nhanh (Tên/SĐT/Ghi chú) từ nút "+ Thêm KH/Đơn mới" — lưu ở
+// sheet RIÊNG (không chung CareData, không gộp vào báo cáo A/B/C). Key = phone.
+let careLeads = loadLS('ome_care_leads') || {};
+// Tập SĐT có trong sheet "dữ liệu đơn" (nguồn của Báo cáo B) — chỉ dùng để LỌC nguồn ở
+// màn hình chính, không kéo chi tiết sản phẩm vào danh sách khách.
+let donPhoneSet = new Set(loadLS('ome_don_phones') || []);
 let schedules = loadLS('ome_sched') || [];
 let currentPhone = null;
 let currentTier = 'all', currentCare = 'all', currentZalo = 'all', currentBrand = 'all', currentCS = 'all';
@@ -1871,6 +1887,23 @@ async function syncFromGS(opts) {
         console.warn('Orders fetch error:', orderErr.message);
         if (isManual) toast('⚠ Không tải được đơn hàng: ' + orderErr.message);
       }
+      // ── Nguồn "Chăm sóc" (sheet riêng, KH thêm nhanh) — chỉ tải cùng nhịp với orders ──
+      try {
+        const clR = await fetch(gsUrl + sepChar + 'action=careLeads', { redirect: 'follow' });
+        const clJson = await clR.json();
+        if (clJson && clJson.rows) {
+          const newLeads = {};
+          clJson.rows.forEach(function(r){ if (r.phone) newLeads[r.phone] = { name: r.name||'', note: r.note||'', cs: r.cs||'', createdAt: r.createdAt||'' }; });
+          careLeads = newLeads;
+          saveLS('ome_care_leads', careLeads);
+        }
+      } catch(clErr) { console.warn('careLeads fetch error:', clErr.message); }
+      // ── Tập SĐT có trong "dữ liệu đơn" (chỉ để lọc nguồn, không kéo chi tiết) ──
+      try {
+        const dpR = await fetch(gsUrl + sepChar + 'action=donPhones', { redirect: 'follow' });
+        const dpJson = await dpR.json();
+        if (dpJson && dpJson.phones) { donPhoneSet = new Set(dpJson.phones); saveLS('ome_don_phones', dpJson.phones); }
+      } catch(dpErr) { console.warn('donPhones fetch error:', dpErr.message); }
     }
 
     let count = 0;
@@ -2190,6 +2223,21 @@ function buildCustomers() {
       };
     });
   }
+  // Tạo sẵn customerMap cho các SĐT chỉ có ở nguồn "Chăm sóc" (sheet riêng, KH thêm nhanh
+  // qua nút "+ Thêm KH/Đơn mới") — KHÔNG gộp vào CareData/báo cáo, chỉ để KH này hiện trong
+  // danh sách chính và gộp theo SĐT như bình thường nếu sau này có đơn thật.
+  if (typeof careLeads !== 'undefined' && careLeads) {
+    Object.keys(careLeads).forEach(ph => {
+      if (customerMap[ph]) return;
+      const lead = careLeads[ph] || {};
+      if (!lead.name) return;
+      customerMap[ph] = {
+        phone: ph, name: lead.name, orders: [],
+        sources: new Set(), brands: new Set(), _keys: new Set(),
+        _rawStatus: '', _rawZalo: '', _rawNote: lead.note||''
+      };
+    });
+  }
   const JAN25_YEAR = 25;
   const JAN25_DATE = new Date(2025, 0, 1);
   allCustomers = Object.values(customerMap).map(c => {
@@ -2229,6 +2277,14 @@ function buildCustomers() {
       return { yr: oyr, mo: omo, hr: ohr, ds: ods };
     });
 
+    // Nguồn dữ liệu đóng góp cho khách này (dùng cho bộ lọc "Nguồn dữ liệu" ở màn hình chính):
+    // dt = có đơn trong DT tổng · cs = có bản ghi ở sheet Chăm sóc (KH thêm nhanh) · don = có trong "dữ liệu đơn"
+    const dataSrc = {
+      dt:  tot > 0,
+      cs:  !!(typeof careLeads !== 'undefined' && careLeads && careLeads[c.phone]),
+      don: !!(typeof donPhoneSet !== 'undefined' && donPhoneSet.has(c.phone))
+    };
+
     return {
       ...c,
       name: displayName,
@@ -2241,6 +2297,7 @@ function buildCustomers() {
       careCS,
       csSet,
       ymList,
+      dataSrc,
       nameLower: s(displayName).toLowerCase(),
     };
   });
@@ -2350,6 +2407,7 @@ function applyFilters() {
   const q = s(document.getElementById('search-input').value).toLowerCase();
   const sort = document.querySelector('.srt').value;
   const csF = document.getElementById('cs-staff-filter')?.value || 'all';
+  const dataSrcF = document.getElementById('datasrc-filter')?.value || 'all';
   const ymYear = document.getElementById('ymf-year')?.value || '';
   const ymMonth = document.getElementById('ymf-month')?.value || '';
   const hourFrom = document.getElementById('ymf-hour-from')?.value;
@@ -2415,6 +2473,14 @@ function applyFilters() {
       if (!_csModeMatch(_inOrders, _inCare, _inAssign)) return false;
     }
     if (q && !c.nameLower.includes(q) && !c.phone.includes(q)) return false;
+
+    // Lọc theo nguồn dữ liệu (DT tổng / Chăm sóc / Dữ liệu đơn) — mặc định "Gộp" = không lọc
+    if (dataSrcF !== 'all') {
+      const src = c.dataSrc || {};
+      if (dataSrcF === 'dt'  && !src.dt)  return false;
+      if (dataSrcF === 'cs'  && !src.cs)  return false;
+      if (dataSrcF === 'don' && !src.don) return false;
+    }
 
     // Campaign filter (normalize phone để tránh lỗi khoảng trắng/dấu gạch)
     if (campaignPhones !== null && !campaignPhones.has(String(c.phone).replace(/[\s\-]/g,''))) return false;
@@ -4442,7 +4508,7 @@ function closeQuickAddModal(){
   const m = document.getElementById('quick-add-modal');
   if (m) m.style.display = 'none';
 }
-function submitQuickAddCustomer(){
+async function submitQuickAddCustomer(){
   const name  = (document.getElementById('qa-name').value || '').trim();
   const phoneRaw = (document.getElementById('qa-phone').value || '').trim();
   const note  = (document.getElementById('qa-note').value || '').trim();
@@ -4453,29 +4519,39 @@ function submitQuickAddCustomer(){
   if (!phone) { toast('Số điện thoại không hợp lệ'); return; }
 
   const isNewCustomer = !allCustomers.find(x => x.phone === phone);
-  const existing = careData[phone] || {};
+  const existingLead = careLeads[phone] || {};
   const userName = (typeof currentUser !== 'undefined' && currentUser && currentUser.name) ? currentUser.name : 'CS';
 
   // Ghi chú lưu dạng lịch sử [{text,user,time}] giống ô Ghi chú CS trong trang chi tiết
-  const noteArr = _parseNotes(existing.note || '');
+  const noteArr = _parseNotes(existingLead.note || '');
   noteArr.unshift({ text: note, user: userName, time: _fmtNoteTime(new Date()) });
 
-  // Giữ nguyên các trường CS đã nhập trước đó (nếu khách đã tồn tại), chỉ set tên khi
-  // khách chưa có tên (tránh CS ghi đè nhầm tên khách cũ đã đúng).
-  careData[phone] = Object.assign({}, existing, {
-    name: existing.name || name,
+  // Lưu ý: KH thêm nhanh KHÔNG ghi vào careData/CareData sheet — mà vào 1 sheet RIÊNG
+  // ("KH Chăm sóc mới") để không gộp chung vào 3 báo cáo doanh số A/B/C hiện có.
+  // Trên màn hình chính, khách này vẫn được gộp theo SĐT như mọi khách khác.
+  careLeads[phone] = {
+    name: existingLead.name || name,
     note: _notesToStr(noteArr),
-    cs: existing.cs || userName
-  });
-  _touchCare(phone);
-  saveLS('ome_care', careData);
+    cs: existingLead.cs || userName,
+    createdAt: existingLead.createdAt || new Date().toISOString()
+  };
+  saveLS('ome_care_leads', careLeads);
   buildCustomers();
+  const _c = allCustomers.find(x => x.phone === phone);
+  if (_c) _c._lastActionDate = Date.now();
   if (typeof applyFilters === 'function') applyFilters();
-  if (gsUrl) queueCareSync(phone);
-  logAudit('order_manual', phone, '', 'Thêm KH/Đơn nhanh: ' + name + (note ? (' · ' + note) : ''));
+  logAudit('order_manual', phone, '', 'Thêm KH/Đơn nhanh (nguồn Chăm sóc): ' + name + (note ? (' · ' + note) : ''));
   closeQuickAddModal();
-  toast(isNewCustomer ? '✓ Đã thêm khách hàng mới' : '✓ Đã ghi chú thêm cho khách có sẵn');
+  toast(isNewCustomer ? '✓ Đã thêm khách hàng mới (nguồn: Chăm sóc)' : '✓ Đã ghi chú thêm cho khách có sẵn');
   openDp(phone);
+
+  // Đồng bộ lên sheet riêng "KH Chăm sóc mới" (không đụng CareData / báo cáo A-B-C)
+  if (gsUrl) {
+    try {
+      await fetch(gsUrl, { method:'POST', redirect:'follow',
+        body: JSON.stringify({ action:'addCareLead', phone, name: careLeads[phone].name, note: careLeads[phone].note, cs: careLeads[phone].cs }) });
+    } catch(e) { console.warn('addCareLead sync error:', e.message); }
+  }
 }
 
 async function addManualOrder(phone) {
@@ -11080,7 +11156,9 @@ var _srState = {
   cWeekOffset: 0, cMonthOffset: 0, cQuarterOffset: 0,
   cCustomCurFrom: '', cCustomCurTo: '', cCustomPrevFrom: '', cCustomPrevTo: '',
   cSale: [], cKenh: [],     // C — multi-select giong A, tach rieng de doi tab A/C khong dam vao nhau
-  dataC: null, cEmpSearch: '', cKenhSearch: '', cExpandedRow: ''
+  dataC: null, cEmpSearch: '', cKenhSearch: '', cExpandedRow: '',
+  // D — KH Cham soc moi (data rieng, KHONG gop A/B/C)
+  dDateFrom: '', dDateTo: '', dCs: '', dataD: null
 };
 
 function _srMoney(n){ return fmt(Math.round(n||0)) + '₫'; }
@@ -11121,13 +11199,17 @@ async function _srLoad(){
       dateFrom: _srState.dateFrom, dateTo: _srState.dateTo,
       sale: (_srState.bSale||[]).join(','), nguon: (_srState.bNguon||[]).join(','), marketer: (_srState.bMarketer||[]).join(',')
     });
-  } else {
+  } else if (_srState.sub === 'C') {
     _srState.dataC = await _srFetch('salesReportC', {
       dateField: _srState.cDateField, periodType: _srState.cPeriodType,
       weekOffset: _srState.cWeekOffset, monthOffset: _srState.cMonthOffset, quarterOffset: _srState.cQuarterOffset,
       customCurFrom: _srState.cCustomCurFrom, customCurTo: _srState.cCustomCurTo,
       customPrevFrom: _srState.cCustomPrevFrom, customPrevTo: _srState.cCustomPrevTo,
       sale: (_srState.cSale||[]).join(','), kenh: (_srState.cKenh||[]).join(',')
+    });
+  } else if (_srState.sub === 'D') {
+    _srState.dataD = await _srFetch('careLeadReport', {
+      dateFrom: _srState.dDateFrom, dateTo: _srState.dDateTo, cs: _srState.dCs
     });
   }
   _srState.loading = false;
