@@ -1701,7 +1701,7 @@ function _inCSScope(c){
   const allH = (typeof _assignAllIndex !== 'undefined') ? _assignAllIndex[c.phone] : null;
   return list.some(csF => {
     const inSeller = !!(c.csSet && c.csSet.has(csF));   // CS phụ trách = người lên đơn
-    const inCare   = (c.careCS === csF);                // CS chăm sóc = người đang chăm
+    const inCare   = !!(c.careCSSet && c.careCSSet.has(csF));  // CS chăm sóc = người đang chăm (tách theo tên riêng lẻ)
     const inAssign = allH ? allH.has(csF) : false;      // KH được chia chiến dịch cho CS này
     return _csModeMatch(inSeller, inCare, inAssign);
   });
@@ -2323,6 +2323,10 @@ function buildCustomers() {
       zaloStatus: care.zalo || c._rawZalo || '',
       careNote: care.note || c._rawNote || '',
       careCS,
+      // Tách careCS thành các tên riêng lẻ (đề phòng ai đó gõ tay "A, B" vào ô CS chăm sóc) —
+      // MỌI nơi lọc/so khớp theo CS chăm sóc phải dùng Set này thay vì so sánh chuỗi thô careCS,
+      // để tránh sinh ra lựa chọn lọc dạng gộp "A, B" không cần thiết.
+      careCSSet: new Set(splitMulti_(careCS, ',')),
       csSet,
       ymList,
       dataSrc,
@@ -2497,7 +2501,7 @@ function applyFilters() {
       const _allH = (typeof _assignAllIndex !== 'undefined') ? _assignAllIndex[c.phone] : null;
       const _matchAnyCS = csFList.some(csF => {
         const _inOrders = c.csSet.has(csF);
-        const _inCare   = c.careCS === csF;
+        const _inCare   = !!(c.careCSSet && c.careCSSet.has(csF));
         // Tra cứu O(1) qua _assignAllIndex: KH có trong chiến dịch nào của CS không (chỉ tính ở chế độ "Cả hai")
         const _inAssign = _allH ? _allH.has(csF) : false;
         return _csModeMatch(_inOrders, _inCare, _inAssign);
@@ -2535,7 +2539,7 @@ function applyFilters() {
       if (![...colFilters.cs].some(n=>c.csSet.has(n))) return false;
     }
     if (colFilters.careCS.size > 0) {
-      if (!colFilters.careCS.has(c.careCS || '')) return false;
+      if (!c.careCSSet || ![...c.careCSSet].some(n=>colFilters.careCS.has(n))) return false;
     }
 
     // Column filter: lịch kế tiếp (sched)
@@ -2645,7 +2649,7 @@ function applyFilters() {
 
     // Advanced filters
     if (advFilters.cs.size > 0) {
-      if (![...advFilters.cs].some(n=>c.csSet.has(n) || c.careCS===n)) return false;  // khớp cả CS phụ trách lẫn CS chăm sóc
+      if (![...advFilters.cs].some(n=>c.csSet.has(n) || (c.careCSSet && c.careCSSet.has(n)))) return false;  // khớp cả CS phụ trách lẫn CS chăm sóc
     }
     if (advFilters.products.size > 0 && ![...advFilters.products].some(p=>c.brands.includes(p))) return false;
     if (advFilters.sources.size > 0 && ![...advFilters.sources].some(src=>c.sources.includes(src))) return false;
@@ -2891,8 +2895,9 @@ function _schedCsFilter(it) {
   }
   if (!filterList.length) return true;
   // Lọc THEO CS CHĂM SÓC của khách (không theo người tạo lịch) — multi: khớp BẤT KỲ tên nào
-  const resp = _schedResponsibleCS(it).toLowerCase();
-  return filterList.some(f => resp === f.toLowerCase());
+  // Tách theo dấu phẩy đề phòng careCS bị gõ gộp "A, B" — so khớp từng tên riêng lẻ.
+  const respNames = splitMulti_(_schedResponsibleCS(it), ',').map(n=>n.toLowerCase());
+  return filterList.some(f => respNames.includes(f.toLowerCase()));
 }
 function _schedCsTag(it) {
   const name = _schedResponsibleCS(it);
@@ -4941,14 +4946,14 @@ document.addEventListener('click', function(e){
 function updateCSStaffList() {
   const csSet = [...new Set(allCustomers.flatMap(c=>[
     ..._buildCsSet_(c.orders, c.phone),
-    c.careCS
+    ...(c.careCSSet||[])
   ]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi'));
   // Đếm số KH mỗi CS (theo phạm vi vai trò) để hiển thị cạnh tên trong ô tìm
   const counts = {};
   for (const c of allCustomers){
     if (typeof _inUserScope==='function' && !_inUserScope(c)) continue;
     if (c.csSet) c.csSet.forEach(n=>{ counts[n]=(counts[n]||0)+1; });
-    if (c.careCS && !(c.csSet && c.csSet.has(c.careCS))) counts[c.careCS]=(counts[c.careCS]||0)+1;
+    if (c.careCSSet) c.careCSSet.forEach(n=>{ if (!(c.csSet && c.csSet.has(n))) counts[n]=(counts[n]||0)+1; });
   }
   const sel = document.getElementById('cs-staff-filter');
   const prevSelected = _csFilterList(); // giữ lại lựa chọn multi trước khi build lại <option>
@@ -5141,7 +5146,7 @@ function exportCSV() {
     if(currentTier!=='all'&&c.tier!==currentTier) return false;
     if(currentCare!=='all'&&c.careStatus!==currentCare) return false;
     if(currentBrand!=='all'&&!c.brands.includes(currentBrand)) return false;
-    if(csFList.length){const cs=_buildCsSet_(c.orders, c.phone);const _aH=(typeof _assignAllIndex!=='undefined')?_assignAllIndex[c.phone]:null;const _match=csFList.some(csF=>_csModeMatch(cs.has(csF), c.careCS===csF, _aH?_aH.has(csF):false));if(!_match) return false;}
+    if(csFList.length){const cs=_buildCsSet_(c.orders, c.phone);const _aH=(typeof _assignAllIndex!=='undefined')?_assignAllIndex[c.phone]:null;const _match=csFList.some(csF=>_csModeMatch(cs.has(csF), !!(c.careCSSet&&c.careCSSet.has(csF)), _aH?_aH.has(csF):false));if(!_match) return false;}
     if(q&&!c.name.toLowerCase().includes(q)&&!c.phone.includes(q)) return false;
     return true;
   });
@@ -5557,8 +5562,8 @@ function renderColDdItems(col, query) {
   else if (col==='care') values = ['', ...CARE_STATUS];
   else if (col==='zalo') values = ['', ...ZALO_STATUS];
   else if (col==='product') values = ['', ...[...new Set(allCustomers.flatMap(c=>c.brands).filter(Boolean))].sort()];
-  else if (col==='cs') values = [...new Set(allCustomers.flatMap(c=>[..._buildCsSet_(c.orders, c.phone),c.careCS]).filter(Boolean))].sort();
-  else if (col==='careCS') values = [...new Set(allCustomers.map(c=>c.careCS).filter(Boolean))].sort();
+  else if (col==='cs') values = [...new Set(allCustomers.flatMap(c=>[..._buildCsSet_(c.orders, c.phone),...(c.careCSSet||[])]).filter(Boolean))].sort();
+  else if (col==='careCS') values = [...new Set(allCustomers.flatMap(c=>[...(c.careCSSet||[])]).filter(Boolean))].sort();
   else if (col==='source') values = [...new Set(allCustomers.flatMap(c=>c.sources).filter(Boolean))].sort();
   else if (col==='sched') values = ['Có lịch', 'Không có lịch', ...SCHED_TYPES.map(t=>t.label)];
   else if (col==='lastact') values = ['Hôm nay', 'Hôm qua', '≤ 3 ngày', '≤ 7 ngày', '≤ 14 ngày', '≤ 30 ngày', '> 30 ngày', 'Chưa tác động', '__custom_range__'];
@@ -5646,7 +5651,7 @@ document.addEventListener('click', e=>{
 function openAdvModal() {
   // Build chips — giới hạn theo CS đang chọn ở "Lọc theo CS"
   const _base = (typeof scopedCustomers==='function') ? scopedCustomers() : allCustomers;
-  const allCS = [...new Set(allCustomers.flatMap(c=>[..._buildCsSet_(c.orders, c.phone),c.careCS]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi'));
+  const allCS = [...new Set(allCustomers.flatMap(c=>[..._buildCsSet_(c.orders, c.phone),...(c.careCSSet||[])]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi'));
   const allProducts = [...new Set(_base.flatMap(c=>c.brands).filter(Boolean))].sort();
   const allSources = [...new Set(_base.flatMap(c=>c.sources).filter(Boolean))].sort();
   buildAdvChips('cs', allCS, advFilters.cs, 'adv-cs-chips');
@@ -5882,7 +5887,7 @@ function renderAssignCreate() {
     _advAssign.customCount = _assignFilteredList.length;
   }
   const allCS = [...new Set(allCustomers.flatMap(c => [
-    ...c.orders.map(o => o.cs), c.careCS
+    ..._buildCsSet_(c.orders, c.phone), ...(c.careCSSet||[])
   ]).filter(Boolean))].sort();
 
   const totalFiltered = _assignFilteredList.length;
@@ -10413,7 +10418,7 @@ function _heldBy(c){
 function _allHoldersOf(c){
   var s = new Set();
   if (!c) return s;
-  if (c.careCS) s.add(c.careCS);
+  if (c.careCSSet) c.careCSSet.forEach(function(n){ s.add(n); });
   var idx = (typeof _assignAllIndex !== 'undefined') ? _assignAllIndex[c.phone] : null;
   if (idx) idx.forEach(function(n){ s.add(n); });
   return s;
@@ -10559,7 +10564,7 @@ function renderRolePill(){
 function _allCSNames(){
   var set = new Set();
   (typeof allCustomers !== 'undefined' ? allCustomers : []).forEach(function(c){
-    if (c.careCS) set.add(c.careCS);
+    if (c.careCSSet) c.careCSSet.forEach(function(n){ if(n) set.add(n); });
     if (c.csSet) c.csSet.forEach(function(n){ if(n) set.add(n); });
   });
   (typeof assignHistory !== 'undefined' ? assignHistory : []).forEach(function(e){ if(e.csName) set.add(e.csName); });
