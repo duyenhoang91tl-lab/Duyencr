@@ -15,13 +15,17 @@ const DEFAULT_SETTINGS = {
   selectors: {
     pancake: {
       // Xác minh qua DevTools (F12 → Elements → Copy selector) tren giao dien Pancake thuc te.
+      // Luu y: .message-text-field chi la khung boc ngoai dung chung — class phan biet khach/nhan
+      // vien (client-message / page-message) nam o div con .message-text-ele ben trong, nen
+      // messageItem phai tro thang vao .message-text-ele de el.matches(customer/agentMsgSelector)
+      // (kiem tra chinh phan tu item, khong phai phan tu con) nhan dung.
       messageList: ".mdl-js",
-      messageItem: ".message-text-field",
+      messageItem: ".message-text-ele",
       replyBox: "#replyBoxComposer",
       phoneSelector: "",
       orderPanelSelector: "",
-      customerMsgSelector: ".message-text-field",
-      agentMsgSelector: ".message-text-field"
+      customerMsgSelector: ".message-text-ele.client-message",
+      agentMsgSelector: ".message-text-ele.page-message"
     },
     messenger: {
       // Messenger dùng role/aria-label khá ổn định hơn Pancake (ít đổi class ngẫu nhiên) —
