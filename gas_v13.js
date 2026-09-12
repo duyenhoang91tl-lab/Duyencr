@@ -61,7 +61,7 @@ var TEAM_HEADERS   = ['id','name','leader','members','color'];
 var AUDIT_HEADERS  = ['timestamp','user','action','phone','oldValue','newValue'];
 var SET_HEADERS    = ['key','value'];
 var ASSIGN_HEADERS = ['id','date','csName','label','phones','donePhones'];
-var USER_HEADERS   = ['username','passHash','role','name','team','active'];
+var USER_HEADERS   = ['username','passHash','role','name','team','active','names'];
 // ── KH "Chăm sóc" thêm nhanh (nút "+ Thêm KH/Đơn mới") — SHEET RIÊNG, không gộp
 // CareData/DT TỔNG/dữ liệu đơn, không gộp vào báo cáo doanh số A/B/C. ──
 var SH_CARE_LEAD      = 'KH Chăm sóc mới';
@@ -346,11 +346,19 @@ function readUsers_(sh) {
   var v = sh.getDataRange().getValues();
   for (var i = 1; i < v.length; i++) {
     if (!v[i][0]) continue;
+    // Tài khoản CS có thể gắn NHIỀU tên (vd 1 tài khoản dùng chung, hoặc gộp nhiều bí danh của
+    // cùng 1 sale) — luu o cot 'names' (JSON array), moi rieng bien tuong thich nguoc: tai khoan
+    // tao truoc khi co tinh nang nay chi co cot 'name' don (chuoi thuong), luc do fallback ve
+    // mang 1 phan tu tu chinh cot do.
+    var namesArr = [];
+    try { namesArr = v[i][6] ? JSON.parse(v[i][6]) : []; } catch (e) { namesArr = []; }
+    if (!namesArr.length && v[i][3]) namesArr = [String(v[i][3])];
     out.push({
       username: String(v[i][0]), passHash: String(v[i][1]||''), role: v[i][2]||'cs',
       name: v[i][3]||'', team: v[i][4]||'',
       active: (v[i][5]===''||v[i][5]===undefined) ? true :
-              (v[i][5]===true||v[i][5]==='TRUE'||v[i][5]==='true'||v[i][5]===1)
+              (v[i][5]===true||v[i][5]==='TRUE'||v[i][5]==='true'||v[i][5]===1),
+      names: namesArr
     });
   }
   return out;
@@ -1938,7 +1946,10 @@ function saveUsers_(users) {
   var matrix = [USER_HEADERS];
   for (var i = 0; i < users.length; i++) {
     var u = users[i];
-    matrix.push([String(u.username||''), String(u.passHash||''), u.role||'cs', u.name||'', u.team||'', (u.active===false?false:true)]);
+    var namesArr = (u.names && u.names.length) ? u.names : (u.name ? [u.name] : []);
+    matrix.push([String(u.username||''), String(u.passHash||''), u.role||'cs',
+                 namesArr[0]||u.name||'', u.team||'', (u.active===false?false:true),
+                 JSON.stringify(namesArr)]);
   }
   sh.getRange(1, 1, matrix.length, USER_HEADERS.length).setValues(matrix);
   return jsonOut_({ ok: true, written: users.length });
