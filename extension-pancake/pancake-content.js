@@ -322,6 +322,9 @@
         ${chips.length ? `<div class="pk-ai-cust-chips">${chips.map((c) => `<span class="pk-ai-chip">${c}</span>`).join('')}</div>` : ''}
         ${products ? `<div class="pk-ai-cust-products">🏷 ${escapeHtml(products)}</div>` : ''}
 
+        <label class="pk-label-top">Tên khách</label>
+        <input type="text" id="pk-name-input" class="pk-full-input" placeholder="Tên khách hàng" value="${escapeHtml(name === phone ? '' : name)}" />
+
         <div class="pk-form-row">
           <div class="pk-form-col">
             <label>Trạng thái CS</label>
@@ -425,6 +428,8 @@
   let _currentOrderPanelName = ''; // ten khach vua doc duoc tu khung 'San pham order' (neu co)
   function _buildRow(phone, overrides) {
     const c = _currentCare || {};
+    const nameEl = panelEl?.querySelector('#pk-name-input');
+    const liveName = nameEl ? nameEl.value.trim() : '';
     return Object.assign({
       phone,
       status: c.status || '', zalo: c.zalo || '', cs: settings.csName || c.cs || '',
@@ -436,14 +441,16 @@
       schedHen: c.schedHen || '', schedHenNote: c.schedHenNote || '',
       khStatus: c.khStatus || '', birthday: c.birthday || '',
       nickZalos: c.nickZalos || [],
-      name: _currentOrderPanelName || c.name || ''
+      name: liveName || _currentOrderPanelName || c.name || ''
     }, overrides || {});
   }
 
   function saveCare_(phone) {
     const btn = panelEl.querySelector('#pk-save-btn');
     const rawEl = panelEl.querySelector('#pk-note-raw');
+    const nameEl = panelEl.querySelector('#pk-name-input');
     const row = _buildRow(phone, {
+      name: nameEl ? nameEl.value.trim() : '',
       status: panelEl.querySelector('#pk-status-sel').value,
       zalo: panelEl.querySelector('#pk-zalo-sel').value,
       khStatus: panelEl.querySelector('#pk-khstatus-sel').value,
@@ -458,6 +465,8 @@
       if (!resp?.ok) { setStatus('Lưu thất bại: ' + (resp?.error || 'lỗi không rõ')); return; }
       _currentCare = row;
       _lastServerCare = Object.assign({}, row);
+      const nameSpan = panelEl.querySelector('.pk-ai-cust-name');
+      if (nameSpan && row.name) nameSpan.innerHTML = `${escapeHtml(row.name)} <span class="pk-ai-cust-phone">${phone}</span>`;
       setStatus('✓ Đã lưu vào Sasum.');
     });
   }
@@ -493,7 +502,7 @@
     chrome.runtime.sendMessage({ type: 'LOOKUP_CUSTOMER', payload: { phone } }, (resp) => {
       if (!resp?.ok || _currentPhone !== phone) return;
       const newCare = resp.data.care || {};
-      const CMP = ['status','zalo','cs','note','schedHen','schedHenNote','khStatus','birthday'];
+      const CMP = ['status','zalo','cs','note','schedHen','schedHenNote','khStatus','birthday','name'];
       const base = _lastServerCare || {};
       const changedFields = CMP.filter((k) => (base[k] || '') !== (newCare[k] || ''));
       if (!changedFields.length) return;
@@ -515,6 +524,7 @@
     syncSel('#pk-khstatus-sel', 'khStatus');
     syncSel('#pk-birthday', 'birthday');
     syncSel('#pk-hen-note', 'schedHenNote');
+    syncSel('#pk-name-input', 'name');
     const henEl = panelEl.querySelector('#pk-hen-date');
     if (henEl) {
       const baseHen = baseline.schedHen ? toInputDate_(baseline.schedHen) : '';
