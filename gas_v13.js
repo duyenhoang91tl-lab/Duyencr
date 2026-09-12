@@ -62,6 +62,10 @@ var AUDIT_HEADERS  = ['timestamp','user','action','phone','oldValue','newValue']
 var SET_HEADERS    = ['key','value'];
 var ASSIGN_HEADERS = ['id','date','csName','label','phones','donePhones'];
 var USER_HEADERS   = ['username','passHash','role','name','team','active'];
+// ── KH "Chăm sóc" thêm nhanh (nút "+ Thêm KH/Đơn mới") — SHEET RIÊNG, không gộp
+// CareData/DT TỔNG/dữ liệu đơn, không gộp vào báo cáo doanh số A/B/C. ──
+var SH_CARE_LEAD      = 'KH Chăm sóc mới';
+var CARE_LEAD_HEADERS = ['phone','name','note','cs','createdAt'];
 
 // ─── HELPERS ───────────────────────────────────────────────────
 function getSheet_(name, headers) {
@@ -387,6 +391,18 @@ function doGet(e) {
     if (action === 'orders')    return jsonOut_({ orders: readAllOrders_() });
     if (action === 'teams')     return jsonOut_({ teams: readTeams_(ss.getSheetByName(SH_TEAM)) });
     if (action === 'users')     return jsonOut_({ users: readUsers_(ss.getSheetByName(SH_USER)) });
+    // ── Nguon "Cham soc" (KH them nhanh, sheet rieng) — khong gop CareData/bao cao A-B-C ──
+    if (action === 'careLeads') return jsonOut_({ rows: readCareLeads_() });
+    // ── Tap SDT co trong "dữ liệu đơn" — chi de loc nguon o man hinh chinh (cache 10') ──
+    if (action === 'donPhones') {
+      var cacheDP = CacheService.getScriptCache();
+      var cKeyDP = 'don_phones_v1';
+      var cachedDP = cacheDP.get(cKeyDP);
+      if (cachedDP) { try { return jsonOut_(JSON.parse(cachedDP)); } catch(ec) {} }
+      var resDP = { phones: readDonPhones_() };
+      try { cacheDP.put(cKeyDP, JSON.stringify(resDP), 600); } catch(ec) {}
+      return jsonOut_(resDP);
+    }
 
     // ── Tra cuu bang gia (Sheet DANH_MUC, file rieng PRICE_SS_ID) — dung chung cho
     // portal/Sasum/Pancake. Tim khong dau, khop tren MOI cot dang text cua sheet, khong
@@ -763,6 +779,55 @@ function readDTTong_() {
     });
   }
   return out;
+}
+
+// ── KH "Chăm sóc" thêm nhanh — sheet RIÊNG, độc lập CareData/DT TỔNG/dữ liệu đơn ──
+function readCareLeads_() {
+  var ss = getCrmSS_();
+  var sh = ss.getSheetByName(SH_CARE_LEAD);
+  if (!sh || sh.getLastRow() < 2) return [];
+  var last = sh.getLastRow();
+  var vals = sh.getRange(2, 1, last - 1, CARE_LEAD_HEADERS.length).getValues();
+  var out = [];
+  for (var i = 0; i < vals.length; i++) {
+    var r = vals[i];
+    if (!r[0]) continue;
+    out.push({
+      phone: normPhone_(String(r[0])), name: String(r[1]||''), note: String(r[2]||''),
+      cs: String(r[3]||''), createdAt: r[4] || ''
+    });
+  }
+  return out;
+}
+
+function addCareLead_(data) {
+  var sh = getSheet_(SH_CARE_LEAD, CARE_LEAD_HEADERS);
+  var phone = normPhone_(String(data.phone||''));
+  if (!phone) return jsonOut_({ ok: false, error: 'Thieu SDT' });
+  var last = sh.getLastRow(); var rowIdx = -1;
+  if (last >= 2) {
+    var colP = sh.getRange(2, 1, last-1, 1).getValues();
+    for (var i = 0; i < colP.length; i++) {
+      if (normPhone_(String(colP[i][0])) === phone) { rowIdx = i + 2; break; }
+    }
+  }
+  var row = [phone, data.name||'', data.note||'', data.cs||'', new Date().toISOString()];
+  if (rowIdx > 0) sh.getRange(rowIdx, 1, 1, CARE_LEAD_HEADERS.length).setValues([row]);
+  else sh.appendRow(row);
+  try { CacheService.getScriptCache().remove('care_leads_v1'); } catch(ec) {}
+  return jsonOut_({ ok: true, found: rowIdx > 0 });
+}
+
+// ── Chỉ tra cứu tập SDT co trong "dữ liệu đơn" (Bao cao B) — dung de LOC nguon o
+// man hinh chinh, KHONG keo chi tiet san pham vao danh sach khach ──
+function readDonPhones_() {
+  var rows = readDonChiTiet_();
+  var set = {};
+  for (var i = 0; i < rows.length; i++) {
+    var ph = normPhone_(String(rows[i].soDienThoai || ''));
+    if (ph) set[ph] = true;
+  }
+  return Object.keys(set);
 }
 
 // ── Doc toan bo sheet "dữ liệu đơn" thanh mang object ──
@@ -1206,23 +1271,45 @@ function buildSalesReportC_(filters) {
   };
 }
 
+// ── BAO CAO D: KH "Chăm sóc" thêm nhanh (sheet rieng, KHONG gop bao cao A/B/C) ──
+function buildCareLeadReport_(filters) {
+  filters = filters || {};
+  var rows = readCareLeads_();
+  var matched = rows.filter(function(r) {
+    var dt = r.createdAt ? new Date(r.createdAt) : null;
+    if (!dateInRange_(dt, filters.dateFrom, filters.dateTo)) return false;
+    if (filters.cs && String(r.cs||'') !== String(filters.cs)) return false;
+    return true;
+  });
+  var byCS = {};
+  matched.forEach(function(r) {
+    var name = r.cs || '(chưa gán)';
+    byCS[name] = (byCS[name] || 0) + 1;
+  });
+  var byCSArr = Object.keys(byCS).map(function(k) { return { name: k, count: byCS[k] }; });
+  byCSArr.sort(function(a, b) { return b.count - a.count; });
+  return { total: matched.length, byCS: byCSArr, rows: matched };
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  XUAT BAO CAO DOANH SO RA 1 TAB MOI TRONG GOOGLE SHEET (CRM)
 //  Dung lai dung buildSalesReportA_/B_ nen so lieu luon khop UI dang loc.
 //  Moi lan xuat tao 1 tab moi (co timestamp) — khong ghi de, giu lich su cac lan xuat.
 // ═══════════════════════════════════════════════════════════════
 function exportSalesReportToSheet_(reportType, filters) {
-  reportType = (reportType === 'B' || reportType === 'C') ? reportType : 'A';
+  reportType = (reportType === 'B' || reportType === 'C' || reportType === 'D') ? reportType : 'A';
   var data = reportType === 'B' ? buildSalesReportB_(filters || {})
-    : (reportType === 'C' ? buildSalesReportC_(filters || {}) : buildSalesReportA_(filters || {}));
+    : (reportType === 'C' ? buildSalesReportC_(filters || {})
+    : (reportType === 'D' ? buildCareLeadReport_(filters || {})
+    : buildSalesReportA_(filters || {})));
   var ss = getCrmSS_();
   var ts = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Etc/GMT-7', 'yyyyMMdd_HHmmss');
   var tabName = 'BC_' + reportType + '_' + ts;
   var sh = ss.insertSheet(tabName);
 
-  var titleSuffix = reportType === 'A' ? ' — Theo DT tổng' : (reportType === 'B' ? ' — Theo dữ liệu đơn' : ' — So sánh theo kỳ');
+  var titleSuffix = reportType === 'A' ? ' — Theo DT tổng' : (reportType === 'B' ? ' — Theo dữ liệu đơn' : (reportType === 'D' ? ' — KH Chăm sóc mới (data riêng, KHÔNG gộp báo cáo doanh số A/B/C)' : ' — So sánh theo kỳ'));
   var rows = [];
-  rows.push(['BÁO CÁO DOANH SỐ ' + reportType + titleSuffix]);
+  rows.push([(reportType === 'D' ? 'BÁO CÁO KH CHĂM SÓC MỚI' : ('BÁO CÁO DOANH SỐ ' + reportType)) + titleSuffix]);
   rows.push(['Xuất lúc', Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Etc/GMT-7', 'dd/MM/yyyy HH:mm:ss')]);
 
   var f = filters || {};
@@ -1239,6 +1326,9 @@ function exportSalesReportToSheet_(reportType, filters) {
     filterDesc.push('Sale: ' + (Array.isArray(f.sale) ? (f.sale.join(', ') || '(tất cả)') : (f.sale || '(tất cả)')));
     filterDesc.push('Nguồn đơn: ' + (Array.isArray(f.nguon) ? (f.nguon.join(', ') || '(tất cả)') : (f.nguon || '(tất cả)')));
     filterDesc.push('Marketer: ' + (Array.isArray(f.marketer) ? (f.marketer.join(', ') || '(tất cả)') : (f.marketer || '(tất cả)')));
+  } else if (reportType === 'D') {
+    if (f.dateFrom || f.dateTo) filterDesc.push('Khoảng ngày thêm: ' + (f.dateFrom || '...') + ' → ' + (f.dateTo || '...'));
+    if (f.cs) filterDesc.push('CS: ' + f.cs);
   } else {
     if (data.period) filterDesc.push('Kỳ này: ' + data.period.curLabel + ' | Kỳ trước: ' + data.period.prevLabel);
     filterDesc.push('Lọc theo: ' + (f.dateField === 'thoiGianHT' ? 'Thời gian hoàn thành' : 'Ngày tạo'));
@@ -1289,6 +1379,24 @@ function exportSalesReportToSheet_(reportType, filters) {
     (data.orders || []).forEach(function(o) {
       rows.push([o.ngayTaoDon, o.khachHang, o.soDienThoai, o.nguonDon, o.theSale, o.sanPham, o.maSanPham, o.soLuong, o.giaTriSauGiam, o.cod, o.marketer]);
     });
+  } else if (reportType === 'D') {
+    rows.push(['TỔNG QUAN']);
+    rows.push(['Số KH thêm mới (nguồn Chăm sóc)', data.total]);
+    rows.push([]);
+    rows.push(['THEO CS THÊM']);
+    rows.push(['CS', 'Số KH thêm']);
+    (data.byCS || []).forEach(function(x) { rows.push([x.name, x.count]); });
+    rows.push([]);
+    rows.push(['CHI TIẾT']);
+    rows.push(['SĐT', 'Tên khách', 'Ghi chú mới nhất', 'CS thêm', 'Ngày thêm']);
+    (data.rows || []).forEach(function(r) {
+      var latestNote = r.note || '';
+      try {
+        var arr = JSON.parse(r.note || '[]');
+        if (Array.isArray(arr) && arr.length) latestNote = arr[0].text || '';
+      } catch (eN) {}
+      rows.push([r.phone, r.name, latestNote, r.cs, r.createdAt]);
+    });
   } else {
     var hdrC = ['Tên', 'KPI kỳ trước', 'Kết quả kỳ trước', '%HT KPI kỳ trước', 'KPI kỳ này', 'Kết quả kỳ này', '%HT KPI kỳ này', '% Tăng trưởng'];
     rows.push(['THEO NHÂN VIÊN (SALE)']);
@@ -1330,6 +1438,7 @@ function doPost(e) {
     if (action === 'saveSingle')          return saveSingleCare_(data.row);
     if (action === 'saveBatch')           return saveBatchCare_(data.rows);
     if (action === 'saveOrders')          return saveOrders_(data.orders);
+    if (action === 'addCareLead')         return addCareLead_(data);
     if (action === 'patchOrder')          return patchOrder_(data);
     if (action === 'deleteOrder')         return deleteOrder_(data);
     // ── Xuat bao cao doanh so (dang loc tren UI) ra 1 tab moi trong Google Sheet CRM ──
