@@ -4,7 +4,7 @@
 // content.js của Zalo AI đang gọi: POST { action:'ai', prompt, withProducts }.
 
 const DEFAULT_SETTINGS = {
-  gasUrl: "", // dán URL Web App GAS (giống ô "URL Web App GAS" trong extension Zalo AI)
+  gasUrl: "https://script.google.com/macros/s/AKfycbxyqBM3v7_WdgxbXru8o3Y_GNylTtQ-eeUoJCgwWEXVjHAJxiw7-SRlHXUSjaUR7v3oSQ/exec",
   enabled: true,
   csName: "", // CS đang dùng máy này — ghi vào cột 'cs' khi lưu, giống ô CS sticky bên Zalo AI
   useProducts: false, // tương ứng checkbox "Tra cứu sản phẩm" bên Zalo AI
@@ -14,12 +14,14 @@ const DEFAULT_SETTINGS = {
   },
   selectors: {
     pancake: {
-      messageList: "",
-      messageItem: "",
-      replyBox: "",
+      // Xác minh qua DevTools (F12 → Elements → Copy selector) tren giao dien Pancake thuc te.
+      messageList: ".mdl-js",
+      messageItem: ".message-text-field",
+      replyBox: "#replyBoxComposer",
       phoneSelector: "",
-      customerMsgSelector: "",
-      agentMsgSelector: ""
+      orderPanelSelector: "",
+      customerMsgSelector: ".message-text-field",
+      agentMsgSelector: ".message-text-field"
     },
     messenger: {
       // Messenger dùng role/aria-label khá ổn định hơn Pancake (ít đổi class ngẫu nhiên) —
