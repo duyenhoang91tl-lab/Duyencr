@@ -492,6 +492,13 @@ function doGet(e) {
       return jsonOut_(resC);
     }
 
+    // ── BAO CAO D: KH "Chăm sóc" thêm nhanh (sheet riêng, KHÔNG gộp báo cáo A/B/C) ──
+    if (action === 'careLeadReport') {
+      var pD = e.parameter || {};
+      var fD = { dateFrom: pD.dateFrom || '', dateTo: pD.dateTo || '', cs: pD.cs || '' };
+      return jsonOut_(buildCareLeadReport_(fD));
+    }
+
     if (action === 'assign')    return jsonOut_({ assignHistory: readAssign_(ss.getSheetByName(SH_ASSIGN)) });
     if (action === 'tasks')     return jsonOut_({ tasks: readTasks_(ss.getSheetByName(SH_TASK)) });
 

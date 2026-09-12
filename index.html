@@ -11331,6 +11331,8 @@ async function exportSalesReportToSheet(){
       customCurFrom: _srState.cCustomCurFrom, customCurTo: _srState.cCustomCurTo,
       customPrevFrom: _srState.cCustomPrevFrom, customPrevTo: _srState.cCustomPrevTo,
       sale: _srState.cSale || [], kenh: _srState.cKenh || [] };
+  } else if (_srState.sub === 'D') {
+    filters = { dateFrom: _srState.dDateFrom, dateTo: _srState.dDateTo, cs: _srState.dCs || '' };
   } else {
     filters = { dateFrom: _srState.dateFrom, dateTo: _srState.dateTo,
       sale: _srState.bSale || [], nguon: _srState.bNguon || [], marketer: _srState.bMarketer || [] };
@@ -11606,9 +11608,11 @@ function renderSalesReportTab(){
     '<button class="btn '+(_srState.sub==='A'?'secondary':'sm')+'" onclick="_srSetSub(\'A\')">Báo cáo A — Theo DT tổng</button>' +
     '<button class="btn '+(_srState.sub==='B'?'secondary':'sm')+'" onclick="_srSetSub(\'B\')">Báo cáo B — Theo dữ liệu đơn</button>' +
     '<button class="btn '+(_srState.sub==='C'?'secondary':'sm')+'" onclick="_srSetSub(\'C\')">Báo cáo C — So sánh theo kỳ</button>' +
+    '<button class="btn '+(_srState.sub==='D'?'secondary':'sm')+'" onclick="_srSetSub(\'D\')">Báo cáo D — KH Chăm sóc mới</button>' +
     '</div>';
 
   if (_srState.sub === 'C') { renderSalesReportTabC_(wrap, subTabs); return; }
+  if (_srState.sub === 'D') { renderSalesReportTabD_(wrap, subTabs); return; }
 
   var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
   filters += '<input type="date" value="'+esc(_srState.dateFrom)+'" onchange="_srSetField(\'dateFrom\',this.value)" title="Từ ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
@@ -11770,6 +11774,48 @@ function renderSalesReportTabC_(wrap, subTabs){
   filters += '</div>';
 
   var body = _srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _srRenderC(_srState.dataC);
+  wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + filters + body;
+}
+
+// ── Báo cáo D: KH "Chăm sóc" thêm nhanh — data RIÊNG (sheet "KH Chăm sóc mới"),
+// không gộp chung báo cáo doanh số A/B/C. Nguồn dữ liệu độc lập, chỉ liên quan tới
+// việc CS ghi nhận khách mới qua nút "+ Thêm KH/Đơn mới".
+function renderSalesReportTabD_(wrap, subTabs){
+  var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
+  filters += '<input type="date" value="'+esc(_srState.dDateFrom)+'" onchange="_srState.dDateFrom=this.value" title="Từ ngày thêm" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
+  filters += '<span style="color:var(--muted)">→</span>';
+  filters += '<input type="date" value="'+esc(_srState.dDateTo)+'" onchange="_srState.dDateTo=this.value" title="Đến ngày thêm" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
+  filters += '<input type="text" value="'+esc(_srState.dCs)+'" oninput="_srState.dCs=this.value" placeholder="Lọc theo CS thêm..." style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);width:160px">';
+  filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
+  filters += '<button class="btn sm" id="sr-export-sheet-btn" onclick="exportSalesReportToSheet()">📄 Xuất ra Sheet</button>';
+  filters += '</div>';
+
+  var body;
+  if (_srState.loading) {
+    body = '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>';
+  } else {
+    var d = _srState.dataD;
+    if (!d) {
+      body = '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
+    } else {
+      var html = '<div class="kpi-grid" style="margin-bottom:16px"><div class="kpi-card"><div class="kpi-label">Số KH thêm mới (nguồn Chăm sóc)</div><div class="kpi-value">'+fmt(d.total||0)+'</div></div></div>';
+      html += '<div class="dash-section-title">Theo CS thêm</div>';
+      html += '<table class="dash-table"><thead><tr><th>CS</th><th>Số KH thêm</th></tr></thead><tbody>';
+      (d.byCS||[]).forEach(function(x){ html += '<tr><td>'+esc(x.name)+'</td><td>'+fmt(x.count)+'</td></tr>'; });
+      if (!(d.byCS||[]).length) html += '<tr><td colspan="2" style="text-align:center;color:var(--muted)">Không có dữ liệu</td></tr>';
+      html += '</tbody></table>';
+      html += '<div class="dash-section-title" style="margin-top:16px">Chi tiết khách thêm mới</div>';
+      html += '<table class="dash-table"><thead><tr><th>SĐT</th><th>Tên khách</th><th>Ghi chú mới nhất</th><th>CS thêm</th><th>Ngày thêm</th></tr></thead><tbody>';
+      (d.rows||[]).forEach(function(r){
+        var latestNote = r.note || '';
+        try { var arr = JSON.parse(r.note||'[]'); if (Array.isArray(arr) && arr.length) latestNote = arr[0].text || ''; } catch(eN){}
+        html += '<tr><td>'+esc(r.phone)+'</td><td><a href="javascript:void(0)" onclick="openDp(\''+esc(r.phone)+'\')">'+esc(r.name)+'</a></td><td>'+esc(latestNote)+'</td><td>'+esc(r.cs)+'</td><td>'+esc(String(r.createdAt||'').slice(0,16).replace('T',' '))+'</td></tr>';
+      });
+      if (!(d.rows||[]).length) html += '<tr><td colspan="5" style="text-align:center;color:var(--muted)">Không có dữ liệu</td></tr>';
+      html += '</tbody></table>';
+      body = html;
+    }
+  }
   wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + filters + body;
 }
 
