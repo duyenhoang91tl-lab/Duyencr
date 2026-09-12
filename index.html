@@ -2252,7 +2252,8 @@ function buildCustomers() {
     });
   }
   // Tạo sẵn customerMap cho các SĐT chỉ có ở nguồn "Chăm sóc" (sheet riêng, KH thêm nhanh
-  // qua nút "+ Thêm KH/Đơn mới") — KHÔNG gộp vào CareData/báo cáo, chỉ để KH này hiện trong
+  // qua nút "+ Thêm KH/Đơn mới") — phòng trường hợp careData[phone] chưa kịp đồng bộ về máy
+  // (careData giờ CŨNG được ghi trực tiếp khi thêm nhanh, xem submitQuickAddCustomer). Chỉ để KH này hiện trong
   // danh sách chính và gộp theo SĐT như bình thường nếu sau này có đơn thật.
   if (typeof careLeads !== 'undefined' && careLeads) {
     Object.keys(careLeads).forEach(ph => {
@@ -4575,22 +4576,36 @@ async function submitQuickAddCustomer(){
 
   const isNewCustomer = !allCustomers.find(x => x.phone === phone);
   const existingLead = careLeads[phone] || {};
+  const existingCare = careData[phone] || {};
   const userName = (typeof currentUser !== 'undefined' && currentUser && currentUser.name) ? currentUser.name : 'CS';
 
-  // Ghi chú lưu dạng lịch sử [{text,user,time}] giống ô Ghi chú CS trong trang chi tiết
-  const noteArr = _parseNotes(existingLead.note || '');
+  // Ghi chú lưu dạng lịch sử [{text,user,time}] — dùng CHUNG 1 lịch sử với ô "Ghi chú CS" ở
+  // trang chi tiết (đọc từ careData), để không mất ghi chú cũ dù KH đã có sẵn đơn ở DT tổng.
+  const noteArr = _parseNotes(existingCare.note || existingLead.note || '');
   noteArr.unshift({ text: note, user: userName, time: _fmtNoteTime(new Date()) });
+  const mergedNoteStr = _notesToStr(noteArr);
 
-  // Lưu ý: KH thêm nhanh KHÔNG ghi vào careData/CareData sheet — mà vào 1 sheet RIÊNG
-  // ("KH Chăm sóc mới") để không gộp chung vào 3 báo cáo doanh số A/B/C hiện có.
-  // Trên màn hình chính, khách này vẫn được gộp theo SĐT như mọi khách khác.
+  // 1) Ghi vào CareData (nguồn hiển thị chính: Ghi chú CS ở trang chi tiết, danh sách khách,
+  //    đồng bộ lịch sử tin nhắn Pancake/Zalo AI...) — để KH này (dù mới hay đã có đơn ở DT
+  //    tổng) đều thấy ngay ghi chú khi mở danh sách/trang chi tiết.
+  careData[phone] = Object.assign({}, existingCare, {
+    name: existingCare.name || name,
+    note: mergedNoteStr,
+    cs: existingCare.cs || userName
+  });
+  _touchCare(phone);
+  saveLS('ome_care', careData);
+
+  // 2) Đồng thời vẫn ghi vào sheet RIÊNG "KH Chăm sóc mới" để phục vụ Báo cáo D (tách riêng,
+  //    không gộp vào báo cáo doanh số A/B/C) — không đổi so với trước.
   careLeads[phone] = {
     name: existingLead.name || name,
-    note: _notesToStr(noteArr),
+    note: mergedNoteStr,
     cs: existingLead.cs || userName,
     createdAt: existingLead.createdAt || new Date().toISOString()
   };
   saveLS('ome_care_leads', careLeads);
+
   buildCustomers();
   const _c = allCustomers.find(x => x.phone === phone);
   if (_c) _c._lastActionDate = Date.now();
@@ -4600,8 +4615,10 @@ async function submitQuickAddCustomer(){
   toast(isNewCustomer ? '✓ Đã thêm khách hàng mới (nguồn: Chăm sóc)' : '✓ Đã ghi chú thêm cho khách có sẵn');
   openDp(phone);
 
-  // Đồng bộ lên sheet riêng "KH Chăm sóc mới" (không đụng CareData / báo cáo A-B-C)
+  // Đồng bộ CareData qua hàng đợi CHUNG (gộp cùng các thay đổi khác của KH này, tránh ghi đè
+  // chéo với các thao tác khác đang chờ đồng bộ) + ghi thêm vào sheet riêng cho Báo cáo D.
   if (gsUrl) {
+    queueCareSync(phone);
     try {
       await fetch(gsUrl, { method:'POST', redirect:'follow',
         body: JSON.stringify({ action:'addCareLead', phone, name: careLeads[phone].name, note: careLeads[phone].note, cs: careLeads[phone].cs }) });
