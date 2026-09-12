@@ -3730,11 +3730,22 @@ function _latestNoteText(raw) {
   const arr = _parseNotes(raw);
   return arr.length ? arr[0].text : '';
 }
+// CS chỉ được xoá ghi chú do CHÍNH MÌNH tạo (so khớp theo (các) tên gán cho tài khoản đăng
+// nhập); Admin xoá được mọi ghi chú. Ghi chú cũ không rõ ai tạo (user rỗng — dữ liệu trước khi
+// có tính năng gắn tên người tạo) chỉ Admin xoá được, vì không thể xác nhận ai là chủ.
+function _canDeleteNote(n){
+  if (!currentUser || currentUser.role === 'admin') return true;
+  const owner = String((n && n.user) || '').trim().toLowerCase();
+  if (!owner) return false;
+  const myNames = (currentUser.names && currentUser.names.length) ? currentUser.names : (currentUser.name?[currentUser.name]:[]);
+  return myNames.some(m => String(m).trim().toLowerCase() === owner);
+}
 function _renderNoteHistory(raw) {
   const arr = _parseNotes(raw);
   if (!arr.length) return '<div style="color:var(--hint);font-size:11px;text-align:center;padding:8px 0">Chưa có ghi chú nào</div>';
   return arr.map((n,i) => {
     const meta = [n.user, n.time].filter(Boolean).join(' · ');
+    const canDel = _canDeleteNote(n);
     return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px 10px;position:relative">
       ${meta ? `<div style="font-size:10px;color:var(--muted);margin-bottom:4px;display:flex;align-items:center;gap:6px">
         ${n.user ? `<span style="font-weight:600;color:var(--accent)">${esc(n.user)}</span>` : ''}
@@ -3742,10 +3753,10 @@ function _renderNoteHistory(raw) {
         ${i===0 ? '<span style="background:#16a34a22;color:#16a34a;font-size:9px;padding:1px 5px;border-radius:20px;font-weight:600">MỚI NHẤT</span>' : ''}
       </div>` : ''}
       <div style="font-size:12px;white-space:pre-wrap;line-height:1.5">${esc(n.text)}</div>
-      <button data-raw="${esc(raw)}" onclick="deleteNoteEntry(event,this,this.dataset.raw,${i})"
+      ${canDel ? `<button data-raw="${esc(raw)}" onclick="deleteNoteEntry(event,this,this.dataset.raw,${i})"
         style="position:absolute;top:6px;right:6px;background:none;border:none;cursor:pointer;color:var(--hint);font-size:11px;padding:2px 4px;border-radius:4px;opacity:.5"
         onmouseover="this.style.opacity='1';this.style.background='#ef444422'"
-        onmouseout="this.style.opacity='.5';this.style.background='none'" title="Xóa ghi chú này">✕</button>
+        onmouseout="this.style.opacity='.5';this.style.background='none'" title="Xóa ghi chú này">✕</button>` : ''}
     </div>`;
   }).join('');
 }
@@ -3779,12 +3790,18 @@ function addNoteEntry(phone) {
 }
 function deleteNoteEntry(ev, btn, raw, idx) {
   ev.stopPropagation();
-  if (!confirm('Xóa ghi chú này?')) return;
   const phone = currentPhone;
   if (!phone) return;
   const hiddenEl = document.getElementById('cs-note');
   const existing = hiddenEl ? hiddenEl.value : raw;
   const arr = _parseNotes(existing);
+  const target = arr[idx];
+  // Chốt chặn thật (không chỉ ẩn nút): CS chỉ xoá được ghi chú do chính mình tạo, Admin xoá được hết
+  if (!target || !_canDeleteNote(target)) {
+    toast('Bạn chỉ có thể xoá ghi chú do chính mình tạo. Chỉ Admin mới xoá được ghi chú của người khác.');
+    return;
+  }
+  if (!confirm('Xóa ghi chú này?')) return;
   arr.splice(idx, 1);
   const newRaw = _notesToStr(arr);
   if (hiddenEl) hiddenEl.value = newRaw;
