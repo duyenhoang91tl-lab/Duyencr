@@ -404,10 +404,10 @@ function doGet(e) {
     // ── Tap SDT co trong "dữ liệu đơn" — chi de loc nguon o man hinh chinh (cache 10') ──
     if (action === 'donPhones') {
       var cacheDP = CacheService.getScriptCache();
-      var cKeyDP = 'don_phones_v1';
+      var cKeyDP = 'don_phones_v2';
       var cachedDP = cacheDP.get(cKeyDP);
       if (cachedDP) { try { return jsonOut_(JSON.parse(cachedDP)); } catch(ec) {} }
-      var resDP = { phones: readDonPhones_() };
+      var resDP = { phones: readDonPhones_(), saleByPhone: getDonSaleByPhone_() };
       try { cacheDP.put(cKeyDP, JSON.stringify(resDP), 600); } catch(ec) {}
       return jsonOut_(resDP);
     }
@@ -836,6 +836,24 @@ function readDonPhones_() {
     if (ph) set[ph] = true;
   }
   return Object.keys(set);
+}
+// Map SDT -> mang ten sale tham gia don (cot "Thẻ", tach theo dau phay — 1 don co the nhieu
+// sale). Dung o client de gop vao csSet, dam bao CS dung ten o BAT KY don nao trong
+// "dữ liệu đơn" (du don co nhieu sale) van xem duoc KH do.
+function getDonSaleByPhone_() {
+  var rows = readDonChiTiet_();
+  var map = {};
+  for (var i = 0; i < rows.length; i++) {
+    var ph = normPhone_(String(rows[i].soDienThoai || ''));
+    if (!ph) continue;
+    var names = splitMulti_(rows[i].theSale, ',');
+    if (!names.length) continue;
+    if (!map[ph]) map[ph] = [];
+    for (var j = 0; j < names.length; j++) {
+      if (map[ph].indexOf(names[j]) === -1) map[ph].push(names[j]);
+    }
+  }
+  return map;
 }
 
 // ── Doc toan bo sheet "dữ liệu đơn" thanh mang object ──

@@ -1607,6 +1607,7 @@ let careLeads = loadLS('ome_care_leads') || {};
 // Tập SĐT có trong sheet "dữ liệu đơn" (nguồn của Báo cáo B) — chỉ dùng để LỌC nguồn ở
 // màn hình chính, không kéo chi tiết sản phẩm vào danh sách khách.
 let donPhoneSet = new Set(loadLS('ome_don_phones') || []);
+let donSaleByPhone = loadLS('ome_don_sale_by_phone') || {}; // { phone: [ten sale,...] } lay tu "dữ liệu đơn", gop vao csSet de phan quyen CS
 let schedules = loadLS('ome_sched') || [];
 let currentPhone = null;
 let currentTier = 'all', currentCare = 'all', currentZalo = 'all', currentBrand = 'all', currentCS = 'all';
@@ -1929,6 +1930,7 @@ async function syncFromGS(opts) {
         const dpR = await fetch(gsUrl + sepChar + 'action=donPhones', { redirect: 'follow' });
         const dpJson = await dpR.json();
         if (dpJson && dpJson.phones) { donPhoneSet = new Set(dpJson.phones); saveLS('ome_don_phones', dpJson.phones); }
+        if (dpJson && dpJson.saleByPhone) { donSaleByPhone = dpJson.saleByPhone; saveLS('ome_don_sale_by_phone', dpJson.saleByPhone); }
       } catch(dpErr) { console.warn('donPhones fetch error:', dpErr.message); }
     }
 
@@ -2288,7 +2290,7 @@ function buildCustomers() {
 
     const care = careData[c.phone] || {};
     const careCS = care.cs || _latestOrderCS(c.orders);   // CS chăm sóc: mặc định theo đơn mới nhất
-    const csSet = new Set(c.orders.map(o=>o.cs).filter(Boolean));  // CS phụ trách = người lên các đơn (giữ riêng)
+    const csSet = _buildCsSet_(c.orders, c.phone);  // CS phụ trách = người lên các đơn (DT tổng, tách nếu đơn có nhiều sale) + dữ liệu đơn
     // Nếu tên lấy từ đơn hàng chỉ là số điện thoại (chưa có tên thật trong đơn nào) nhưng
     // CareData đã có tên (vd Pancake AI/Zalo AI đọc được từ khung "Sản phẩm order") → dùng tên đó
     const displayName = (c.name === c.phone && care.name) ? care.name : c.name;
@@ -2731,7 +2733,7 @@ function _rowHtml(c) {
   const khb = khSt ? custStatusBadge(khSt) : '';
   const brandTags = c.brands.slice(0,3).map(b=>`<span class="btag">${esc(b)}</span>`).join('');
   const extra = c.brands.length>3?`<span class="btag">+${c.brands.length-3}</span>`:'';
-  const csNames = [...new Set(c.orders.map(o=>o.cs).filter(Boolean))];   // CS phụ trách = người lên đơn
+  const csNames = [..._buildCsSet_(c.orders, c.phone)];   // CS phụ trách = người lên đơn
   const csBadges = csNames.slice(0,3).map(n=>`<span class="cs-badge">${esc(n)}</span>`).join('');
   const csExtra = csNames.length>3?`<span class="cs-badge">+${csNames.length-3}</span>`:'';
   const csHtml = csNames.length ? `<div class="cs-badge-wrap">${csBadges}${csExtra}</div>` : '<span style="color:var(--hint);font-size:11px">—</span>';
@@ -3680,7 +3682,7 @@ function renderInfoTab(c) {
     const db=b.date instanceof Date?b.date:new Date(0);
     return db>da?b:a
   }, c.orders[0]);
-  const csSet = [...new Set(c.orders.map(o=>o.cs).filter(Boolean))];
+  const csSet = [..._buildCsSet_(c.orders, c.phone)];
   const care = careData[c.phone] || {};
   const schedItems = [
     {label:'📞 Hẹn gọi', date: care.schedGoi, note: care.schedGoiNote, color:'#2563eb'},
@@ -4766,7 +4768,7 @@ function rebuildCareOnCustomers() {
     c.zaloStatus = care.zalo  || c._rawZalo  || '';
     c.careNote   = care.note  || c._rawNote  || '';
     c.careCS     = care.cs    || _latestOrderCS(c.orders);
-    if (!c.csSet) c.csSet = new Set(c.orders.map(o=>o.cs).filter(Boolean));
+    if (!c.csSet) c.csSet = _buildCsSet_(c.orders, c.phone);
   }
 }
 
@@ -4938,7 +4940,7 @@ document.addEventListener('click', function(e){
 });
 function updateCSStaffList() {
   const csSet = [...new Set(allCustomers.flatMap(c=>[
-    ...new Set(c.orders.map(o=>o.cs)),
+    ..._buildCsSet_(c.orders, c.phone),
     c.careCS
   ]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi'));
   // Đếm số KH mỗi CS (theo phạm vi vai trò) để hiển thị cạnh tên trong ô tìm
@@ -5139,13 +5141,13 @@ function exportCSV() {
     if(currentTier!=='all'&&c.tier!==currentTier) return false;
     if(currentCare!=='all'&&c.careStatus!==currentCare) return false;
     if(currentBrand!=='all'&&!c.brands.includes(currentBrand)) return false;
-    if(csFList.length){const cs=new Set(c.orders.map(o=>o.cs).filter(Boolean));const _aH=(typeof _assignAllIndex!=='undefined')?_assignAllIndex[c.phone]:null;const _match=csFList.some(csF=>_csModeMatch(cs.has(csF), c.careCS===csF, _aH?_aH.has(csF):false));if(!_match) return false;}
+    if(csFList.length){const cs=_buildCsSet_(c.orders, c.phone);const _aH=(typeof _assignAllIndex!=='undefined')?_assignAllIndex[c.phone]:null;const _match=csFList.some(csF=>_csModeMatch(cs.has(csF), c.careCS===csF, _aH?_aH.has(csF):false));if(!_match) return false;}
     if(q&&!c.name.toLowerCase().includes(q)&&!c.phone.includes(q)) return false;
     return true;
   });
   const BOM='\uFEFF';
   const hdr='Tên KH,Số điện thoại,Phân loại KH,Tình trạng CS,Zalo,Số đơn,Doanh thu,Sản phẩm,Nguồn,CS phụ trách,Ghi chú\n';
-  const rows=list.map(c=>[`"${c.name}"`,c.phone,c.tier,c.careStatus,c.zaloStatus,c.totalOrders,c.totalRevenue,`"${c.brands.join('; ')}"`,`"${c.sources.join('; ')}"`,`"${[...new Set(c.orders.map(o=>o.cs).filter(Boolean))].join('; ')}"`,`"${_latestNoteText(c.careNote)}"`].join(',')).join('\n');
+  const rows=list.map(c=>[`"${c.name}"`,c.phone,c.tier,c.careStatus,c.zaloStatus,c.totalOrders,c.totalRevenue,`"${c.brands.join('; ')}"`,`"${c.sources.join('; ')}"`,`"${[..._buildCsSet_(c.orders, c.phone)].join('; ')}"`,`"${_latestNoteText(c.careNote)}"`].join(',')).join('\n');
   const blob=new Blob([BOM+hdr+rows],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`OME_KH_${_ymd(new Date())}.csv`; a.click();
 }
@@ -5555,7 +5557,7 @@ function renderColDdItems(col, query) {
   else if (col==='care') values = ['', ...CARE_STATUS];
   else if (col==='zalo') values = ['', ...ZALO_STATUS];
   else if (col==='product') values = ['', ...[...new Set(allCustomers.flatMap(c=>c.brands).filter(Boolean))].sort()];
-  else if (col==='cs') values = [...new Set(allCustomers.flatMap(c=>[...new Set(c.orders.map(o=>o.cs)),c.careCS]).filter(Boolean))].sort();
+  else if (col==='cs') values = [...new Set(allCustomers.flatMap(c=>[..._buildCsSet_(c.orders, c.phone),c.careCS]).filter(Boolean))].sort();
   else if (col==='careCS') values = [...new Set(allCustomers.map(c=>c.careCS).filter(Boolean))].sort();
   else if (col==='source') values = [...new Set(allCustomers.flatMap(c=>c.sources).filter(Boolean))].sort();
   else if (col==='sched') values = ['Có lịch', 'Không có lịch', ...SCHED_TYPES.map(t=>t.label)];
@@ -5644,7 +5646,7 @@ document.addEventListener('click', e=>{
 function openAdvModal() {
   // Build chips — giới hạn theo CS đang chọn ở "Lọc theo CS"
   const _base = (typeof scopedCustomers==='function') ? scopedCustomers() : allCustomers;
-  const allCS = [...new Set(allCustomers.flatMap(c=>[...new Set(c.orders.map(o=>o.cs)),c.careCS]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi'));
+  const allCS = [...new Set(allCustomers.flatMap(c=>[..._buildCsSet_(c.orders, c.phone),c.careCS]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi'));
   const allProducts = [...new Set(_base.flatMap(c=>c.brands).filter(Boolean))].sort();
   const allSources = [...new Set(_base.flatMap(c=>c.sources).filter(Boolean))].sort();
   buildAdvChips('cs', allCS, advFilters.cs, 'adv-cs-chips');
@@ -10389,6 +10391,20 @@ function _teamMemberSet(team){
   if (team.leader) s.add(team.leader);
   (team.members||[]).forEach(function(m){ s.add(m); });
   return s;
+}
+// Gop toan bo ten Sale/CS xuat hien tren cac don (DT tong — 1 don co the nhieu sale, tach nhau
+// boi dau phay) VA tren "dữ liệu đơn" (tra theo SDT qua donSaleByPhone) thanh 1 Set duy nhat.
+// Dung lam "CS phu trach" cho csSet — _inUserScope/cac bo loc theo CS deu doc tu day, nen chi
+// can sua o 1 cho nay la moi noi dung csSet deu tu dong duoc gom du 3 nguon.
+function _buildCsSet_(orders, phone){
+  var set = new Set();
+  (orders||[]).forEach(function(o){
+    String((o && o.cs) || '').split(',').forEach(function(n){ n = n.trim(); if (n) set.add(n); });
+  });
+  if (typeof donSaleByPhone !== 'undefined' && donSaleByPhone && phone && donSaleByPhone[phone]) {
+    donSaleByPhone[phone].forEach(function(n){ if (n) set.add(n); });
+  }
+  return set;
 }
 function _heldBy(c){
   return (c && (c.careCS || _assignIndex[c.phone])) || '';
