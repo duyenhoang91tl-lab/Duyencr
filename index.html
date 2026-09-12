@@ -1044,6 +1044,9 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
           <select class="ymf-sel" id="bc-status-filter" onchange="bcStatusFilterId=this.value;applyFilters()" style="max-width:180px" title="Xem trạng thái gửi tin của 1 chiến dịch bắn cụ thể">
             <option value="">Chiến dịch bắn gần nhất</option>
           </select>
+          <button class="btn sm primary" id="quick-add-btn" onclick="openQuickAddModal()" title="Thêm khách hàng mới hoặc ghi nhận đơn mới — chỉ cần Tên, SĐT, Ghi chú, các thông tin khác (sản phẩm, doanh thu...) điền sau trong trang chi tiết khách">
+            ➕ Thêm KH / Đơn mới
+          </button>
           <button class="btn sm" id="adv-filter-btn" onclick="openAdvModal()" title="Bộ lọc nâng cao">
             ⚙ Lọc nâng cao
           </button>
@@ -4421,6 +4424,58 @@ function quickSched(phone) {
 function _toggleAddOrderForm() {
   const el = document.getElementById('add-order-form');
   if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+// ═══════════════════════════════════════════════════════
+//  THÊM KH / ĐƠN MỚI NHANH (CS) — chỉ bắt buộc Tên, SĐT, Ghi chú.
+//  Nếu SĐT chưa có trong hệ thống -> tự tạo khách hàng mới (giống cơ chế
+//  CareData.name đã có sẵn cho "khách mới chưa có đơn hàng nào").
+//  Sản phẩm/doanh thu (đơn hàng thật) điền sau trong trang chi tiết khách.
+// ═══════════════════════════════════════════════════════
+function openQuickAddModal(){
+  const m = document.getElementById('quick-add-modal');
+  if (m) m.style.display = 'flex';
+  ['qa-name','qa-phone','qa-note'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  setTimeout(() => { const el = document.getElementById('qa-name'); if (el) el.focus(); }, 50);
+}
+function closeQuickAddModal(){
+  const m = document.getElementById('quick-add-modal');
+  if (m) m.style.display = 'none';
+}
+function submitQuickAddCustomer(){
+  const name  = (document.getElementById('qa-name').value || '').trim();
+  const phoneRaw = (document.getElementById('qa-phone').value || '').trim();
+  const note  = (document.getElementById('qa-note').value || '').trim();
+  if (!name)  { toast('Vui lòng nhập tên khách hàng'); return; }
+  if (!phoneRaw) { toast('Vui lòng nhập số điện thoại'); return; }
+  if (!note)  { toast('Vui lòng nhập ghi chú'); return; }
+  const phone = normPhone(phoneRaw);
+  if (!phone) { toast('Số điện thoại không hợp lệ'); return; }
+
+  const isNewCustomer = !allCustomers.find(x => x.phone === phone);
+  const existing = careData[phone] || {};
+  const userName = (typeof currentUser !== 'undefined' && currentUser && currentUser.name) ? currentUser.name : 'CS';
+
+  // Ghi chú lưu dạng lịch sử [{text,user,time}] giống ô Ghi chú CS trong trang chi tiết
+  const noteArr = _parseNotes(existing.note || '');
+  noteArr.unshift({ text: note, user: userName, time: _fmtNoteTime(new Date()) });
+
+  // Giữ nguyên các trường CS đã nhập trước đó (nếu khách đã tồn tại), chỉ set tên khi
+  // khách chưa có tên (tránh CS ghi đè nhầm tên khách cũ đã đúng).
+  careData[phone] = Object.assign({}, existing, {
+    name: existing.name || name,
+    note: _notesToStr(noteArr),
+    cs: existing.cs || userName
+  });
+  _touchCare(phone);
+  saveLS('ome_care', careData);
+  buildCustomers();
+  if (typeof applyFilters === 'function') applyFilters();
+  if (gsUrl) queueCareSync(phone);
+  logAudit('order_manual', phone, '', 'Thêm KH/Đơn nhanh: ' + name + (note ? (' · ' + note) : ''));
+  closeQuickAddModal();
+  toast(isNewCustomer ? '✓ Đã thêm khách hàng mới' : '✓ Đã ghi chú thêm cho khách có sẵn');
+  openDp(phone);
 }
 
 async function addManualOrder(phone) {
@@ -15004,5 +15059,31 @@ async function sendTaskComment(){
 </script>
 
 
+<div class="modal-overlay" id="quick-add-modal" style="display:none;align-items:flex-start;justify-content:center;padding-top:60px;z-index:800">
+<div class="modal" style="width:420px;max-width:94vw">
+  <div class="modal-hdr">
+    <div class="modal-title">➕ Thêm KH / Đơn mới</div>
+    <div class="modal-sub">Ghi nhanh Tên, SĐT, Ghi chú — nếu khách chưa có trong hệ thống sẽ tự tạo mới. Sản phẩm/doanh thu điền sau trong trang chi tiết khách.</div>
+  </div>
+  <div class="modal-body" style="padding:14px 18px">
+    <div style="margin-bottom:10px">
+      <div class="form-label">Tên khách hàng *</div>
+      <input class="form-input" id="qa-name" placeholder="VD: Nguyễn Thị A">
+    </div>
+    <div style="margin-bottom:10px">
+      <div class="form-label">Số điện thoại *</div>
+      <input class="form-input" id="qa-phone" placeholder="VD: 0912345678" inputmode="tel">
+    </div>
+    <div style="margin-bottom:4px">
+      <div class="form-label">Ghi chú *</div>
+      <textarea class="form-ta" id="qa-note" style="min-height:70px" placeholder="VD: Khách hỏi mua qua Zalo, hẹn gọi lại chiều mai..."></textarea>
+    </div>
+  </div>
+  <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px">
+    <button onclick="closeQuickAddModal()" style="border:1px solid var(--border);background:var(--surface);border-radius:6px;padding:7px 14px;cursor:pointer;font-size:13px">Hủy</button>
+    <button class="save-btn" style="padding:7px 16px" onclick="submitQuickAddCustomer()">💾 Lưu</button>
+  </div>
+</div>
+</div>
 </body>
 </html>
