@@ -927,7 +927,7 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
     <!-- CS Filter (gõ tên để tìm, không cần cuộn) -->
     <div class="cs-filter-wrap">
       <div class="cs-filter-label">Lọc theo CS</div>
-      <select class="cs-filter-sel" id="cs-staff-filter" style="display:none">
+      <select class="cs-filter-sel" id="cs-staff-filter" multiple style="display:none">
         <option value="all">— Tất cả CS —</option>
       </select>
       <div class="cs-combo" id="cs-combo">
@@ -1664,6 +1664,29 @@ function _relTime(t){
 // ── Phạm vi theo CS đang chọn ở "Lọc theo CS" ──
 let _csFilterMode = 'both';   // 'both' | 'seller' (CS phụ trách) | 'care' (CS chăm sóc)
 function _csScope(){ const el = document.getElementById('cs-staff-filter'); return el ? (el.value || 'all') : 'all'; }
+// Danh sách tên CS đang được chọn để lọc (multi) — đọc qua .selectedOptions thật của <select multiple>
+// (KHÔNG dùng .value nối chuỗi bằng dấu phân cách: set .value = "A|B" trên 1 <select> thật sẽ bị
+// trình duyệt reset về rỗng vì không khớp đúng 1 <option> nào — phải dùng option.selected từng cái).
+// Mảng rỗng = "— Tất cả CS —" (không lọc).
+function _csFilterList(){
+  const sel = document.getElementById('cs-staff-filter');
+  if (!sel) return [];
+  return Array.from(sel.selectedOptions || []).map(o => o.value).filter(v => v && v !== 'all');
+}
+// Đặt lại toàn bộ lựa chọn multi cho đúng danh sách tên truyền vào (thay hết, không cộng dồn)
+function _csSetFilterSelection(names){
+  const sel = document.getElementById('cs-staff-filter');
+  if (!sel) return;
+  const set = new Set(names || []);
+  Array.from(sel.options).forEach(o => { o.selected = set.has(o.value); });
+}
+// name có khớp với BẤT KỲ CS nào đang chọn không (case-insensitive) — [] = không lọc = luôn khớp
+function _csFilterHas(name){
+  const list = _csFilterList();
+  if (!list.length) return true;
+  const n = String(name||'').toLowerCase();
+  return list.some(x => x.toLowerCase() === n);
+}
 // Khớp theo chế độ lọc CS đang chọn (phụ trách / chăm sóc / cả hai) — DÙNG CHUNG cho danh sách, thống kê, xuất CSV
 function _csModeMatch(inSeller, inCare, inAssign){
   if (_csFilterMode === 'seller') return !!inSeller;          // chỉ CS phụ trách (người lên đơn)
@@ -1671,13 +1694,16 @@ function _csModeMatch(inSeller, inCare, inAssign){
   return !!(inSeller || inCare || inAssign);                  // 'both': phụ trách HOẶC chăm sóc HOẶC được chia
 }
 function _inCSScope(c){
-  const csF = _csScope();
-  if (csF === 'all') return true;
-  const inSeller = !!(c.csSet && c.csSet.has(csF));   // CS phụ trách = người lên đơn
-  const inCare   = (c.careCS === csF);                // CS chăm sóc = người đang chăm
+  const list = _csFilterList();
+  if (!list.length) return true;
+  // Multi: khách khớp phạm vi nếu thuộc về BẤT KỲ CS nào trong danh sách đã chọn (OR)
   const allH = (typeof _assignAllIndex !== 'undefined') ? _assignAllIndex[c.phone] : null;
-  const inAssign = allH ? allH.has(csF) : false;      // KH được chia chiến dịch cho CS này
-  return _csModeMatch(inSeller, inCare, inAssign);
+  return list.some(csF => {
+    const inSeller = !!(c.csSet && c.csSet.has(csF));   // CS phụ trách = người lên đơn
+    const inCare   = (c.careCS === csF);                // CS chăm sóc = người đang chăm
+    const inAssign = allH ? allH.has(csF) : false;      // KH được chia chiến dịch cho CS này
+    return _csModeMatch(inSeller, inCare, inAssign);
+  });
 }
 // Tập KH dùng để đếm cho sidebar/stats: theo vai trò + theo CS đang chọn ở dropdown
 function scopedCustomers(){
@@ -2360,13 +2386,13 @@ function updateCampaignFilter() {
   const sel = document.getElementById('campaign-filter');
   if (!sel) return;
   const cur = sel.value;
-  const csF = document.getElementById('cs-staff-filter')?.value || 'all';
+  const csFList = _csFilterList();
 
-  // Lọc chiến dịch theo CS đang chọn (nếu có)
+  // Lọc chiến dịch theo CS đang chọn (nếu có) — multi: khớp BẤT KỲ CS nào trong danh sách
   const batches = (typeof assignHistory !== 'undefined' ? assignHistory : [])
     .filter(h => {
       if (!h.phones || h.phones.length === 0) return false;
-      if (csF !== 'all' && h.csName !== csF) return false;
+      if (csFList.length && !csFList.includes(h.csName)) return false;
       return true;
     })
     .sort((a, b) => b.date.localeCompare(a.date));
@@ -2406,7 +2432,7 @@ function debouncedApplyFilters() {
 function applyFilters() {
   const q = s(document.getElementById('search-input').value).toLowerCase();
   const sort = document.querySelector('.srt').value;
-  const csF = document.getElementById('cs-staff-filter')?.value || 'all';
+  const csFList = _csFilterList();
   const dataSrcF = document.getElementById('datasrc-filter')?.value || 'all';
   const ymYear = document.getElementById('ymf-year')?.value || '';
   const ymMonth = document.getElementById('ymf-month')?.value || '';
@@ -2463,14 +2489,18 @@ function applyFilters() {
       else if (c.zaloStatus !== currentZalo) return false;
     }
     if (currentBrand !== 'all' && !c.brands.includes(currentBrand)) return false;
-    if (csF !== 'all') {
-      // Lọc theo CS đang chọn + ĐÚNG chế độ (Phụ trách / Chăm sóc / Cả hai)
-      const _inOrders = c.csSet.has(csF);
-      const _inCare   = c.careCS === csF;
-      // Tra cứu O(1) qua _assignAllIndex: KH có trong chiến dịch nào của CS không (chỉ tính ở chế độ "Cả hai")
+    if (csFList.length) {
+      // Lọc theo (các) CS đang chọn + ĐÚNG chế độ (Phụ trách / Chăm sóc / Cả hai)
+      // Multi: khớp nếu khách thuộc về BẤT KỲ CS nào trong danh sách đã chọn (OR)
       const _allH = (typeof _assignAllIndex !== 'undefined') ? _assignAllIndex[c.phone] : null;
-      const _inAssign = _allH ? _allH.has(csF) : false;
-      if (!_csModeMatch(_inOrders, _inCare, _inAssign)) return false;
+      const _matchAnyCS = csFList.some(csF => {
+        const _inOrders = c.csSet.has(csF);
+        const _inCare   = c.careCS === csF;
+        // Tra cứu O(1) qua _assignAllIndex: KH có trong chiến dịch nào của CS không (chỉ tính ở chế độ "Cả hai")
+        const _inAssign = _allH ? _allH.has(csF) : false;
+        return _csModeMatch(_inOrders, _inCare, _inAssign);
+      });
+      if (!_matchAnyCS) return false;
     }
     if (q && !c.nameLower.includes(q) && !c.phone.includes(q)) return false;
 
@@ -2852,14 +2882,15 @@ function _schedResponsibleCS(it) {
 }
 function _schedCsFilter(it) {
   // Đọc filter từ DOM (currentCS không bao giờ được cập nhật)
-  let filterCS = (document.getElementById('cs-staff-filter')?.value) || 'all';
+  let filterList = _csFilterList();
   // Khi đăng nhập role=cs mà chưa chọn filter → tự dùng tên CS đăng nhập
-  if ((!filterCS || filterCS === 'all') && typeof currentUser !== 'undefined' && currentUser && currentUser.role === 'cs' && currentUser.name) {
-    filterCS = currentUser.name;
+  if (!filterList.length && typeof currentUser !== 'undefined' && currentUser && currentUser.role === 'cs' && currentUser.name) {
+    filterList = [currentUser.name];
   }
-  if (!filterCS || filterCS === 'all') return true;
-  // Lọc THEO CS CHĂM SÓC của khách (không theo người tạo lịch)
-  return _schedResponsibleCS(it).toLowerCase() === filterCS.toLowerCase();
+  if (!filterList.length) return true;
+  // Lọc THEO CS CHĂM SÓC của khách (không theo người tạo lịch) — multi: khớp BẤT KỲ tên nào
+  const resp = _schedResponsibleCS(it).toLowerCase();
+  return filterList.some(f => resp === f.toLowerCase());
 }
 function _schedCsTag(it) {
   const name = _schedResponsibleCS(it);
@@ -4784,31 +4815,42 @@ function onCSFilterChange(){
   if (typeof renderOverdueTab === 'function') renderOverdueTab();
 }
 
-// ── Ô "Lọc theo CS" có tìm kiếm (gõ tên thay vì cuộn) ──
+// ── Ô "Lọc theo CS" có tìm kiếm (gõ tên) — MULTI-SELECT: click 1 tên = TICK/BỎ TICK, dropdown
+//    KHÔNG đóng lại để chọn tiếp tên khác (giống hệt combo chọn nhiều Sale ở Báo cáo doanh số).
 let csComboData = [{value:'all', label:'— Tất cả CS —', count:0}];
 let _csComboIdx = -1;
 function csComboRender(filter){
   const list = document.getElementById('cs-combo-list');
   if (!list) return;
   const q = _foldVi(filter||'');
-  const sel = document.getElementById('cs-staff-filter');
-  const cur = sel ? (sel.value||'all') : 'all';
+  const selected = new Set(_csFilterList());
   const items = q ? csComboData.filter(it => it.value!=='all' && _foldVi(it.label).includes(q)) : csComboData;
   if (!items.length){ list.innerHTML = '<div class="cs-combo-empty">Không tìm thấy CS</div>'; _csComboIdx=-1; return; }
-  list.innerHTML = items.map(it =>
-    `<div class="cs-combo-opt ${cur===it.value?'is-sel':''}" data-v="${esc(it.value)}" onmousedown="csComboPick(event, this.getAttribute('data-v'))">`+
-    `<span>${esc(it.label)}</span>${it.value==='all'?'':`<span class="ccnt">${fmt(it.count)}</span>`}</div>`
-  ).join('');
+  list.innerHTML = items.map(it => {
+    if (it.value === 'all') {
+      // Dòng "Tất cả" = bỏ chọn hết, không phải 1 lựa chọn thật trong tập multi
+      const noneSel = selected.size === 0;
+      return `<div class="cs-combo-opt ${noneSel?'is-sel':''}" data-v="all" onmousedown="csComboPickAll(event)">`+
+             `<span>${noneSel?'☑':'☐'} ${esc(it.label)}</span></div>`;
+    }
+    const checked = selected.has(it.value);
+    return `<div class="cs-combo-opt ${checked?'is-sel':''}" data-v="${esc(it.value)}" onmousedown="csComboToggleItem(event, this.getAttribute('data-v'))">`+
+           `<span>${checked?'☑':'☐'} ${esc(it.label)}</span><span class="ccnt">${fmt(it.count)}</span></div>`;
+  }).join('');
   _csComboIdx = -1;
 }
 function csComboOpen(){
   const sel = document.getElementById('cs-staff-filter');
   if (sel && sel.disabled) return;
   const ci = document.getElementById('cs-combo-input');
-  csComboRender(ci ? ci.value : '');
+  if (ci) ci.value = ''; // luôn mở với ô trống để gõ tìm mới, không dùng text tóm tắt (vd "3 CS đã chọn") để lọc
+  csComboRender('');
   const l = document.getElementById('cs-combo-list'); if (l) l.classList.add('open');
 }
-function csComboClose(){ const l=document.getElementById('cs-combo-list'); if(l) l.classList.remove('open'); }
+function csComboClose(){
+  const l=document.getElementById('cs-combo-list'); if(l) l.classList.remove('open');
+  syncCSCombo(); // khôi phục hiển thị tóm tắt lựa chọn hiện tại sau khi đóng
+}
 function csComboToggle(e){
   if (e) e.stopPropagation();
   const l=document.getElementById('cs-combo-list'); if(!l) return;
@@ -4818,20 +4860,26 @@ function csComboToggle(e){
 function csComboFilter(v){
   csComboRender(v);
   const l=document.getElementById('cs-combo-list'); if (l) l.classList.add('open');
-  const clr=document.getElementById('cs-combo-clear'); if (clr) clr.style.display = v ? '' : 'none';
 }
-function csComboPick(e, value){
+// Click 1 tên CS: TICK/BỎ TICK tên đó, KHÔNG đóng dropdown (để chọn tiếp tên khác)
+function csComboToggleItem(e, value){
   if (e && e.preventDefault) e.preventDefault();   // mousedown → tránh blur sớm
-  const sel = document.getElementById('cs-staff-filter');
-  if (sel) sel.value = value;
-  const it = csComboData.find(x=>String(x.value)===String(value));
+  const list = _csFilterList();
+  const idx = list.indexOf(value);
+  if (idx !== -1) list.splice(idx, 1); else list.push(value);
+  _csSetFilterSelection(list);
   const ci = document.getElementById('cs-combo-input');
-  if (ci) ci.value = (value==='all') ? '' : (it ? it.label : value);
-  const clr=document.getElementById('cs-combo-clear'); if (clr) clr.style.display = (value==='all') ? 'none' : '';
+  csComboRender(ci ? ci.value : '');
+  onCSFilterChange();
+}
+// Chọn "— Tất cả CS —" = bỏ chọn hết, đóng dropdown lại
+function csComboPickAll(e){
+  if (e && e.preventDefault) e.preventDefault();
+  _csSetFilterSelection([]);
   csComboClose();
   onCSFilterChange();
 }
-function csComboClear(e){ if(e) e.stopPropagation(); csComboPick(null,'all'); }
+function csComboClear(e){ if(e) e.stopPropagation(); _csSetFilterSelection([]); csComboClose(); onCSFilterChange(); }
 function csComboKey(e){
   const list = document.getElementById('cs-combo-list');
   if (!list || !list.classList.contains('open')){ if (e.key==='ArrowDown') csComboOpen(); return; }
@@ -4842,7 +4890,10 @@ function csComboKey(e){
   else if (e.key==='Enter'){
     e.preventDefault();
     const pick = (_csComboIdx>=0 && opts[_csComboIdx]) ? opts[_csComboIdx] : (opts.length===1 ? opts[0] : null);
-    if (pick) csComboPick(e, pick.getAttribute('data-v'));
+    if (pick){
+      const v = pick.getAttribute('data-v');
+      if (v === 'all') csComboPickAll(e); else csComboToggleItem(e, v);
+    }
     return;
   }
   else if (e.key==='Escape'){ csComboClose(); return; }
@@ -4854,11 +4905,12 @@ function syncCSCombo(){
   const sel = document.getElementById('cs-staff-filter');
   const input = document.getElementById('cs-combo-input');
   if (!sel || !input) return;
-  const v = sel.value || 'all';
-  input.value = (v==='all') ? '' : v;
+  const names = _csFilterList();
+  input.value = names.length===0 ? '' : (names.length===1 ? names[0] : names.length+' CS đã chọn');
+  input.title = names.length>1 ? names.join(', ') : ''; // hover xem đủ tên khi chọn nhiều
   input.disabled = !!sel.disabled;
   const clr = document.getElementById('cs-combo-clear');
-  if (clr) clr.style.display = (v==='all' || sel.disabled) ? 'none' : '';
+  if (clr) clr.style.display = (names.length===0 || sel.disabled) ? 'none' : '';
   const combo = document.getElementById('cs-combo');
   if (combo) combo.classList.toggle('disabled', !!sel.disabled);
 }
@@ -4880,11 +4932,12 @@ function updateCSStaffList() {
     if (c.careCS && !(c.csSet && c.csSet.has(c.careCS))) counts[c.careCS]=(counts[c.careCS]||0)+1;
   }
   const sel = document.getElementById('cs-staff-filter');
-  const prev = sel ? (sel.value||'all') : 'all';
+  const prevSelected = _csFilterList(); // giữ lại lựa chọn multi trước khi build lại <option>
   if (sel){
     sel.innerHTML = '<option value="all">— Tất cả CS —</option>' +
       csSet.map(cs=>`<option value="${esc(cs)}">${esc(cs)}</option>`).join('');
-    sel.value = (prev==='all' || csSet.includes(prev)) ? prev : 'all';
+    // Chỉ giữ lại các tên vẫn còn tồn tại trong danh sách CS mới (bỏ tên đã đổi/xóa)
+    _csSetFilterSelection(prevSelected.filter(n => csSet.includes(n)));
   }
   // Dữ liệu cho ô "Lọc theo CS" có tìm kiếm (gõ tên)
   csComboData = [{value:'all', label:'— Tất cả CS —', count:0}]
@@ -5064,12 +5117,12 @@ function switchTab(tab, el) {
 // ═══════════════════════════════════════════════════════
 function exportCSV() {
   const q=s(document.getElementById('search-input').value).toLowerCase();
-  const csF=document.getElementById('cs-staff-filter')?.value||'all';
+  const csFList=_csFilterList();
   let list=allCustomers.filter(c=>{
     if(currentTier!=='all'&&c.tier!==currentTier) return false;
     if(currentCare!=='all'&&c.careStatus!==currentCare) return false;
     if(currentBrand!=='all'&&!c.brands.includes(currentBrand)) return false;
-    if(csF!=='all'){const cs=new Set(c.orders.map(o=>o.cs).filter(Boolean));const _aH=(typeof _assignAllIndex!=='undefined')?_assignAllIndex[c.phone]:null;if(!_csModeMatch(cs.has(csF), c.careCS===csF, _aH?_aH.has(csF):false)) return false;}
+    if(csFList.length){const cs=new Set(c.orders.map(o=>o.cs).filter(Boolean));const _aH=(typeof _assignAllIndex!=='undefined')?_assignAllIndex[c.phone]:null;const _match=csFList.some(csF=>_csModeMatch(cs.has(csF), c.careCS===csF, _aH?_aH.has(csF):false));if(!_match) return false;}
     if(q&&!c.name.toLowerCase().includes(q)&&!c.phone.includes(q)) return false;
     return true;
   });
@@ -10195,7 +10248,7 @@ function _filterSignature(){
     typeof currentZalo  !== 'undefined' ? currentZalo  : '',
     typeof currentBrand !== 'undefined' ? currentBrand : '',
     val('search-input').toLowerCase(),
-    val('cs-staff-filter'),
+    _csFilterList().join('|'),
     (document.querySelector('.srt') ? document.querySelector('.srt').value : ''),
     val('ymf-year'), val('ymf-month'), val('ymf-hour-from'), val('ymf-hour-to'),
     val('ymf-date-from'), val('ymf-date-to'),
