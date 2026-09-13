@@ -55,6 +55,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // Dung cho nut "Đặt lại về mặc định" trong Options — ghi de toan bo settings hien tai
+  // bang DEFAULT_SETTINGS (GAS URL + selector da xac minh), khong can go/cai lai extension.
+  if (msg?.type === "RESET_TO_DEFAULT") {
+    chrome.storage.sync.set(DEFAULT_SETTINGS, () => {
+      sendResponse({ ok: true, settings: DEFAULT_SETTINGS });
+    });
+    return true;
+  }
+
   if (msg?.type === "FETCH_SUGGESTION") {
     handleFetchSuggestion(msg.payload)
       .then((data) => sendResponse({ ok: true, data }))

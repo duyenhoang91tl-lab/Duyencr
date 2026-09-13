@@ -19,6 +19,10 @@
 (function () {
   'use strict';
 
+  // Backend GAS dung chung voi Duyen AI - Pancake — dat san de cai moi KHONG can dan
+  // lai URL thu cong nua. Neu CS da tung luu URL khac (chrome.storage co gia tri), gia
+  // tri da luu luon duoc uu tien; default nay chi ap dung khi cai lan dau/chua tung luu.
+  const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxyqBM3v7_WdgxbXru8o3Y_GNylTtQ-eeUoJCgwWEXVjHAJxiw7-SRlHXUSjaUR7v3oSQ/exec';
   let GAS_URL = '';
   let _lookupCache = {};
   let _activeTone = 'Thân thiện';
@@ -382,7 +386,8 @@
       _bcCheckDailyReset_();
     });
     chrome.storage.local.get(['ome_gas_url','ome_current_cs','ome_current_nz','ome_auto_ai_reply','ome_auto_ai_per_phone'], (res) => {
-      GAS_URL = res.ome_gas_url || '';
+      GAS_URL = res.ome_gas_url || DEFAULT_GAS_URL;
+      if (!res.ome_gas_url) chrome.storage.local.set({ ome_gas_url: GAS_URL }); // cai lan dau -> luu luon default de lan sau khong phai dat lai
       if (GAS_URL) { inpGas.value = GAS_URL; loadCSNames_(); loadNickZaloList_(); loadCareStatusTree_(); loadProductSheetUrl_(); loadDriveKnowledgeFolderUrl_(); loadDriveImagesFolderUrl_(); }
       loadChatNamePhoneMap_();
       if (!GAS_URL) { _cfgVisible = true; cfg.style.display = 'block'; }

@@ -1,5 +1,6 @@
 document.addEventListener("DOMContentLoaded", load);
 document.getElementById("save").addEventListener("click", save);
+document.getElementById("reset").addEventListener("click", resetToDefault);
 
 function load() {
   chrome.storage.sync.get(null, (s) => {
@@ -60,5 +61,22 @@ function save() {
     const el = document.getElementById("saved");
     el.innerText = "Đã lưu ✓";
     setTimeout(() => (el.innerText = ""), 2000);
+  });
+}
+
+// Ghi de toan bo cai dat hien tai bang bo mac dinh dung (GAS URL + selector da xac minh
+// qua DevTools) — dung khi extension da cai truoc do va dang giu cau hinh cu/sai, ma
+// khong muon go-cai lai tu dau (go-cai moi tu dong ap dung mac dinh qua onInstalled).
+function resetToDefault() {
+  if (!window.confirm("Đặt lại toàn bộ cài đặt (URL GAS + tất cả selector) về mặc định? Mọi tuỳ chỉnh riêng hiện tại sẽ bị ghi đè.")) return;
+  chrome.runtime.sendMessage({ type: "RESET_TO_DEFAULT" }, (res) => {
+    if (res?.ok) {
+      load();
+      const el = document.getElementById("saved");
+      el.innerText = "Đã đặt lại về mặc định ✓";
+      setTimeout(() => (el.innerText = ""), 2500);
+    } else {
+      alert("Lỗi đặt lại: " + (res?.error || "không rõ"));
+    }
   });
 }
