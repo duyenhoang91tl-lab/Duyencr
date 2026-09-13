@@ -538,6 +538,8 @@ function doGet(e) {
       return jsonOut_(resB);
     }
     if (action === 'salesReportOptions') return jsonOut_(getSalesReportOptions_());
+    // ── TACH TEN KH: xem truoc danh sach ten doan duoc tu don hang (chua ghi gi) ──
+    if (action === 'previewCustomerNameGuesses') return jsonOut_(previewCustomerNameGuesses_());
     if (action === 'salesReportC') {
       var pC = e.parameter || {};
       var fC = { dateField: pC.dateField || 'ngayTao', periodType: pC.periodType || 'week',
@@ -768,6 +770,81 @@ function readOrdersByPhone_(phone) {
     if (!seen[key]) { seen[key] = true; deduped.push(out[k]); }
   }
   return deduped;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TACH TEN KHACH TU DON HANG (backfill hang loat)
+//  Cot "San pham" trong DT TONG la text tu do NV go tay dang "Chị Tên\nĐịa chỉ...\nĐt:...".
+//  Doan ten tu dong dau, CHI de xuat cho SDT hien CHUA co ten trong CareData — nguoi dung
+//  phai xem/duyet tren UI truoc khi ghi that (giong het co che findDuplicateOrders_ +
+//  confirm truoc khi xoa), tranh doan sai lam hong du lieu ten dang co.
+// ═══════════════════════════════════════════════════════════════
+function _parseNameFromOrderText_(text) {
+  if (!text) return '';
+  var firstLine = String(text).split('\n')[0].trim();
+  if (!firstLine) return '';
+  var s = firstLine;
+  s = s.replace(/(\+?84|0)\d{8,10}/g, '').trim(); // bo so dien thoai dinh kem tren dong dau
+  s = s.replace(/^(anh|chị|chi|ông|ong|bà|ba|em|c|a)\b\s*[:.]?\s*/i, '').trim(); // bo xung ho
+  s = s.replace(/^[:.\-–]\s*/, '').replace(/[:.\-–]\s*$/, '').trim();
+  return s;
+}
+
+// Quet toan bo DT TONG, doan ten cho tung SDT (1 lan/SDT, uu tien don dau tien tim thay ten
+// hop le) — CHI tra ve de UI hien danh sach cho nguoi dung duyet, KHONG ghi gi vao Sheet.
+function previewCustomerNameGuesses_() {
+  var orders = readAllOrders_();
+  var careRows = readCare_(getCrmSS_().getSheetByName(SH_CARE));
+  var existingNames = {};
+  for (var c = 0; c < careRows.length; c++) {
+    if (careRows[c].name) existingNames[normPhone_(String(careRows[c].phone))] = true;
+  }
+  var seen = {}, out = [];
+  for (var i = 0; i < orders.length; i++) {
+    var o = orders[i];
+    if (!o.phone || seen[o.phone] || existingNames[o.phone]) continue;
+    var guess = _parseNameFromOrderText_(o.product);
+    if (!guess || guess.length < 2 || guess.length > 60 || /^\d+$/.test(guess)) continue;
+    seen[o.phone] = true;
+    out.push({ phone: o.phone, guessedName: guess, sample: String(o.product || '').split('\n')[0].trim().substring(0, 120) });
+  }
+  return { ok: true, count: out.length, items: out };
+}
+
+// Ghi that danh sach ten DA DUOC NGUOI DUNG XAC NHAN tren UI (items: [{phone, name}]).
+// Kiem tra lai lan nua tren server: chi ghi cho SDT VAN CHUA co ten tai thoi diem ghi
+// (tranh ghi de neu vua co ai do — vd Pancake AI — cap nhat ten trong luc dang duyet danh sach).
+function applyCustomerNameGuesses_(items) {
+  if (!items || !items.length) return jsonOut_({ ok: false, error: 'Danh sach rong' });
+  var sh = getSheet_(SH_CARE, CARE_HEADERS);
+  var last = sh.getLastRow();
+  var index = {};
+  if (last >= 2) {
+    var vals = sh.getRange(2, 1, last - 1, CARE_HEADERS.length).getValues();
+    for (var i = 0; i < vals.length; i++) {
+      if (vals[i][0]) index[normPhone_(String(vals[i][0]))] = { rowNum: i + 2, name: vals[i][19] || '' };
+    }
+  }
+  var updated = 0, appended = 0, skipped = 0;
+  var newRows = [];
+  for (var k = 0; k < items.length; k++) {
+    var it = items[k];
+    var phone = normPhone_(String(it.phone || ''));
+    var name = String(it.name || '').trim();
+    if (!phone || !name) { skipped++; continue; }
+    var ex = index[phone];
+    if (ex) {
+      if (ex.name) { skipped++; continue; }
+      sh.getRange(ex.rowNum, 20).setValue(name);
+      updated++;
+    } else {
+      newRows.push(careRow_({ phone: phone, name: name }));
+      appended++;
+    }
+  }
+  if (newRows.length) sh.getRange(sh.getLastRow() + 1, 1, newRows.length, CARE_HEADERS.length).setValues(newRows);
+  try { CacheService.getScriptCache().remove('customers_v12'); } catch (ec) {}
+  return jsonOut_({ ok: true, updated: updated, appended: appended, skipped: skipped });
 }
 
 function getDTSS_() {
@@ -1535,7 +1612,8 @@ function doPost(e) {
     if (action === 'saveBatch')           return saveBatchCare_(data.rows);
     if (action === 'saveOrders')          return saveOrders_(data.orders);
     if (action === 'addCareLead')         return addCareLead_(data);
-    if (action === 'patchOrder')          return patchOrder_(data);
+    // ── TACH TEN KH: ghi that danh sach ten da duoc nguoi dung xac nhan tren UI ──
+    if (action === 'applyCustomerNameGuesses') return applyCustomerNameGuesses_(data.items);    if (action === 'patchOrder')          return patchOrder_(data);
     if (action === 'deleteOrder')         return deleteOrder_(data);
     // ── Xuat bao cao doanh so (dang loc tren UI) ra 1 tab moi trong Google Sheet CRM ──
     if (action === 'exportSalesReportSheet') return jsonOut_(exportSalesReportToSheet_(data.reportType, data.filters));
