@@ -1,7 +1,9 @@
 // background.js — Service worker (MV3)
-// Gọi thẳng backend Google Apps Script (GAS_URL) đang dùng chung với Zalo AI (Sasum) —
-// KHÔNG có server Flask/RAG riêng, mọi request đi qua 1 Web App GAS, giống hệt cách
-// content.js của Zalo AI đang gọi: POST { action:'ai', prompt, withProducts }.
+// Gọi thẳng backend Google Apps Script (GAS_URL) của CRM Duyencr — KHÔNG dùng chung
+// với link Sasum cũ nữa (2 hệ thống đã tách biệt hoàn toàn). Không có server Flask/RAG
+// riêng, mọi request đi qua 1 Web App GAS: POST { action:'ai', prompt, withProducts }.
+
+const OLD_SASUM_GAS_URL = "https://script.google.com/macros/s/AKfycbwPQ4HwD8R1HQFtU0xQslqGgr4HSlgzQlWFZs-8mtVY1CK9kBvwJWsIOzVuj6WM1mg-/exec";
 
 const DEFAULT_SETTINGS = {
   gasUrl: "https://script.google.com/macros/s/AKfycbxyqBM3v7_WdgxbXru8o3Y_GNylTtQ-eeUoJCgwWEXVjHAJxiw7-SRlHXUSjaUR7v3oSQ/exec",
@@ -46,6 +48,9 @@ chrome.runtime.onInstalled.addListener(async () => {
   const existing = await chrome.storage.sync.get(null);
   if (!existing || Object.keys(existing).length === 0) {
     await chrome.storage.sync.set(DEFAULT_SETTINGS);
+  } else if (existing.gasUrl === OLD_SASUM_GAS_URL) {
+    // Migrate: may nao lo con luu link Sasum cu -> tu dong chuyen sang link Duyencr moi.
+    await chrome.storage.sync.set({ gasUrl: DEFAULT_SETTINGS.gasUrl });
   }
 });
 
