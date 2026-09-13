@@ -3513,10 +3513,10 @@ function renderHistTab(c) {
             style="border:none;background:${isMissing?'var(--orange,#e8a04a)':'var(--surface2)'};color:${isMissing?'#fff':'var(--muted)'};border-radius:4px;padding:1px 7px;font-size:11px;cursor:pointer;margin-left:6px;border:1px solid ${isMissing?'var(--orange,#e8a04a)':'var(--border)'}">
             ${isMissing?'⚠ Cập nhật':'✏ Sửa'}
           </button>
-          <button data-phone="${esc(c.phone)}" onclick="_histDeleteOrder(this.dataset.phone,${realIdx})" title="Xóa đơn này"
+          ${((!currentUser || currentUser.role==='admin') || _isExactDuplicateOrder(c, realIdx)) ? `<button data-phone="${esc(c.phone)}" onclick="_histDeleteOrder(this.dataset.phone,${realIdx})" title="Xóa đơn này"
             style="border:1px solid var(--red-b,#fca5a5);background:var(--red-bg,#fff1f2);color:var(--red,#dc2626);border-radius:4px;padding:1px 7px;font-size:11px;cursor:pointer;margin-left:4px">
             🗑 Xóa
-          </button>
+          </button>` : ''}
         </div>
         ${o.productDetail?`<div class="hist-prod" onclick="_toggleHistProd(this)" title="Bấm để xem đầy đủ sản phẩm">${esc(o.productDetail)}</div>`:''}
         <div class="hist-tags">
@@ -3624,9 +3624,28 @@ async function _histEditSave(phone, orderIdx, eid) {
   renderTable();
   openDetail(phone, 'hist');
 }
+// CS chỉ được xoá 1 đơn qua nút thủ công này nếu nó TRÙNG Y ĐÚC với 1 đơn khác của cùng khách
+// (cùng năm/tháng, doanh thu, sản phẩm, nguồn) — tức chắc chắn là bản nhân bản, không mất dữ liệu
+// thật. Admin không bị giới hạn này.
+function _isExactDuplicateOrder(c, idx){
+  const o = c && c.orders && c.orders[idx];
+  if (!o) return false;
+  return c.orders.some((x, i) => {
+    if (i === idx) return false;
+    return x.year === o.year && x.month === o.month &&
+           (x.revenue||0) === (o.revenue||0) &&
+           String(x.product||'').trim().toLowerCase() === String(o.product||'').trim().toLowerCase() &&
+           String(x.source||'').trim().toLowerCase() === String(o.source||'').trim().toLowerCase();
+  });
+}
 async function _histDeleteOrder(phone, orderIdx) {
   const c = allCustomers.find(x => x.phone === phone);
   if (!c || !c.orders[orderIdx]) { toast('Không tìm thấy đơn hàng'); return; }
+  const isAdminDel = !currentUser || currentUser.role === 'admin';
+  if (!isAdminDel && !_isExactDuplicateOrder(c, orderIdx)) {
+    toast('Bạn chỉ được xoá đơn nếu nó trùng y đúc với 1 đơn khác (nhân bản). Đơn này không trùng — liên hệ Admin nếu cần xoá.');
+    return;
+  }
   const o = c.orders[orderIdx];
   const label = [
     o.date instanceof Date && !isNaN(o.date) ? o.date.toLocaleDateString('vi-VN') : (o.year && o.month ? `${o.month}/${o.year}` : 'Không rõ ngày'),
