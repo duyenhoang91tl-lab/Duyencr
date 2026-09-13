@@ -11862,7 +11862,7 @@ function renderSalesReportTabD_(wrap, subTabs){
     if (!d) {
       body = '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
     } else {
-      var html = '<div class="kpi-grid" style="margin-bottom:16px"><div class="kpi-card"><div class="kpi-label">Số KH thêm mới (nguồn Chăm sóc)</div><div class="kpi-value">'+fmt(d.total||0)+'</div></div></div>';
+      var html = '<div class="kpi-grid" style="margin-bottom:16px"><div class="kpi-card"><div class="kpi-label">Số KH thêm mới (nguồn Chăm sóc)</div><div class="kpi-val">'+fmt(d.total||0)+'</div></div></div>';
       html += '<div class="dash-section-title">Theo CS thêm</div>';
       html += '<table class="dash-table"><thead><tr><th>CS</th><th>Số KH thêm</th></tr></thead><tbody>';
       (d.byCS||[]).forEach(function(x){ html += '<tr><td>'+esc(x.name)+'</td><td>'+fmt(x.count)+'</td></tr>'; });
