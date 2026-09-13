@@ -512,3 +512,102 @@
   padding: 3px 6px;
   font-size: 11px;
 }
+
+/* ── Tone selector + ngữ cảnh + 3 câu mở đầu (đồng bộ giao diện với Zalo AI) ── */
+.pk-tones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 6px 0;
+}
+
+.pk-tone {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #374151;
+  border-radius: 14px;
+  padding: 4px 10px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.pk-tone.active {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+  font-weight: 700;
+}
+
+.pk-ctx-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: inherit;
+  margin-top: 4px;
+}
+
+.pk-prod-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #374151;
+  cursor: pointer;
+}
+
+.pk-opener-btn {
+  width: 100%;
+  margin: 8px 0;
+  padding: 7px;
+  border: none;
+  border-radius: 6px;
+  background: #eaf2ff;
+  color: #2563eb;
+  border: 1px solid #bcd7ff;
+  font-weight: 600;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.pk-opener-btn:hover { background: #dcebff; }
+.pk-opener-btn:disabled { opacity: 0.6; cursor: default; }
+
+.pk-opener-box {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px;
+  margin-top: 6px;
+  background: #fafafa;
+}
+
+.pk-opener-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 4px;
+}
+
+.pk-opener-box textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 12px;
+  padding: 7px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.pk-opener-btn-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.pk-opener-btn-row button {
+  flex: 1;
+}

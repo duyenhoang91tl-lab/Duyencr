@@ -62,6 +62,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // Soan 1 trong 3 "cau mo dau" chu dong (goc nhin khac nhau) — giong het OPENER_ANGLES ben
+  // Zalo AI. Dung khi CS muon chu dong nhan truoc cho khach (khong phai tra loi tin khach gui).
+  if (msg?.type === "FETCH_OPENER") {
+    handleFetchOpener(msg.payload)
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
   if (msg?.type === "LOOKUP_CUSTOMER") {
     handleLookupCustomer(msg.payload)
       .then((data) => sendResponse({ ok: true, data }))
@@ -177,44 +186,22 @@ function parseDateSafe(d) {
   return isNaN(t) ? 0 : t;
 }
 
-// Gọi GAS action:'ai' — CÙNG payload shape với content.js của Zalo AI (_aiCall_),
-// tự retry khi gặp lỗi 429 (Groq rate limit) giống hệt logic bên Zalo AI.
-async function handleFetchSuggestion(payload) {
-  const settings = await chrome.storage.sync.get(null);
-  const cfg = { ...DEFAULT_SETTINGS, ...settings };
-
-  if (!cfg.gasUrl) {
-    throw new Error("Chưa cấu hình URL Web App GAS. Mở Options của extension và dán URL (giống ô cấu hình bên Zalo AI).");
-  }
-
-  const prompt = buildPrompt(payload);
-
+// Goi GAS action:'ai' (co retry khi Groq bao 429/rate-limit) — dung chung cho ca tra loi tin
+// khach lan "3 cau mo dau" lan follow-up, tranh lap code retry 3 lan rieng le.
+async function callAiWithRetry_(gasUrl, prompt, withProducts) {
   for (let attempt = 0; attempt <= 2; attempt++) {
     let res, data;
     try {
-      res = await fetch(cfg.gasUrl, {
+      res = await fetch(gasUrl, {
         method: "POST",
-        body: JSON.stringify({ action: "ai", prompt, withProducts: !!cfg.useProducts }),
-        headers: { "Content-Type": "text/plain" } // giống content.js Zalo AI — tránh preflight CORS
+        body: JSON.stringify({ action: "ai", prompt, withProducts: !!withProducts }),
+        headers: { "Content-Type": "text/plain" }
       });
       data = await res.json();
     } catch (e) {
       throw new Error("Không gọi được GAS: " + e.message);
     }
-
-    if (data && data.ok) {
-      // GAS trả về { ok:true, text:"...", provider:"...", image?: {name, base64, mimeType},
-      // imageSkipped?: {name, reason} } — image chỉ có khi bật "Tra cứu sản phẩm" và tên 1 file
-      // ảnh trong thư mục kiến thức Drive khớp từ khoá; imageSkipped báo trường hợp khớp tên
-      // nhưng file >3MB nên GAS không đọc được — content.js hiện nút "Copy ảnh" hoặc cảnh báo tương ứng.
-      return {
-        suggestion: (data.text || "").trim(),
-        provider: data.provider,
-        image: data.image || null,
-        imageSkipped: data.imageSkipped || null
-      };
-    }
-
+    if (data && data.ok) return data;
     const err = String((data && data.error) || "Lỗi GAS không rõ nguyên nhân");
     if (err.indexOf("429") !== -1 && attempt < 2) {
       const m = err.match(/try again in ([0-9.]+)s/i);
@@ -227,11 +214,40 @@ async function handleFetchSuggestion(payload) {
   throw new Error("Quá số lần thử lại (rate limit).");
 }
 
-// Ghép tin nhắn khách + ngữ cảnh nền tảng thành 1 prompt, cùng phong cách
-// với doGenerate() bên Zalo AI content.js.
+// Gọi GAS action:'ai' — CÙNG payload shape với content.js của Zalo AI (_aiCall_),
+// tự retry khi gặp lỗi 429 (Groq rate limit) giống hệt logic bên Zalo AI.
+async function handleFetchSuggestion(payload) {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+
+  if (!cfg.gasUrl) {
+    throw new Error("Chưa cấu hình URL Web App GAS. Mở Options của extension và dán URL (giống ô cấu hình bên Zalo AI).");
+  }
+
+  const prompt = buildPrompt(payload);
+  const withProducts = payload?.withProducts !== undefined ? payload.withProducts : !!cfg.useProducts;
+  const data = await callAiWithRetry_(cfg.gasUrl, prompt, withProducts);
+  // GAS trả về { ok:true, text:"...", provider:"...", image?: {name, base64, mimeType},
+  // imageSkipped?: {name, reason} } — image chỉ có khi bật "Tra cứu sản phẩm" và tên 1 file
+  // ảnh trong thư mục kiến thức Drive khớp từ khoá; imageSkipped báo trường hợp khớp tên
+  // nhưng file >3MB nên GAS không đọc được — content.js hiện nút "Copy ảnh" hoặc cảnh báo tương ứng.
+  return {
+    suggestion: (data.text || "").trim(),
+    provider: data.provider,
+    image: data.image || null,
+    imageSkipped: data.imageSkipped || null
+  };
+}
+
+// Ghép tin nhắn khách + ngữ cảnh + hồ sơ khách (custLines) + giọng văn thành 1 prompt —
+// cùng cấu trúc với doGenerate()/buildCustLines() bên Zalo AI content.js, để 2 bên tư vấn
+// nhất quán dựa trên cùng 1 kiểu prompt.
 function buildPrompt(payload) {
   const platformLabel = payload.platform === "messenger" ? "Messenger" : "Pancake";
   const msgs = payload.messages || [];
+  const tone = payload.tone || "Thân thiện";
+  const custLines = payload.custLines || [];
+  const context = (payload.context || "").trim();
 
   // Nếu content.js đã phân biệt được khách/nhân viên (đã cấu hình customerMsgSelector/
   // agentMsgSelector trong Options), gắn nhãn từng dòng để AI hiểu đúng ai nói gì —
@@ -245,11 +261,39 @@ function buildPrompt(payload) {
         .join("\n")
     : msgs.map((m) => m.text).filter(Boolean).join("\n---\n");
 
+  const lines = custLines.slice();
+  if (context) lines.push(`Ngữ cảnh: ${context}`);
+  const custBlock = lines.length ? `[KH] ${lines.join(" | ")}\n` : "";
+
   return (
+    custBlock +
     `[Kênh] ${platformLabel}\n` +
     `[TN khách] ${msgText}\n` +
+    `[Giọng văn] ${tone}\n` +
     `Soạn 1 tin nhắn trả lời phù hợp, ngắn gọn, tiếng Việt tự nhiên.`
   );
+}
+
+// Soạn 1 trong 3 "câu mở đầu" chủ động (góc nhìn khác nhau) — payload: {custLines, tone,
+// angleInstr}. KHÔNG có [TN khách] vì đây là chủ động nhắn trước, không phải trả lời.
+async function handleFetchOpener(payload) {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+
+  const custLines = payload?.custLines || [];
+  const tone = payload?.tone || "Thân thiện";
+  const angleInstr = payload?.angleInstr || "";
+  const custBlock = custLines.length ? `[KH] ${custLines.join(" | ")}\n` : "";
+  const prompt =
+    custBlock +
+    `[Giọng văn] ${tone}\n` +
+    `Soạn 1 tin nhắn CHỦ ĐỘNG bắt chuyện với khách, theo hướng: ${angleInstr} ` +
+    `Ngắn gọn, tự nhiên, tiếng Việt, không giống mẫu quảng cáo.`;
+
+  const withProducts = payload?.withProducts !== undefined ? payload.withProducts : !!cfg.useProducts;
+  const data = await callAiWithRetry_(cfg.gasUrl, prompt, withProducts);
+  return { suggestion: (data.text || "").trim(), provider: data.provider };
 }
 
 // Danh sach nhac hen hom nay cho 1 CS — action:'reminders' (GET, chi doc, khong ghi gi).
@@ -280,29 +324,8 @@ async function handleFetchFollowUpSuggestion(payload) {
     (payload?.note ? `Ghi chú lịch hẹn: ${payload.note}\n` : "") +
     `Soạn 1 tin nhắn hỏi thăm/follow-up chủ động, ngắn gọn, thân thiện, tiếng Việt tự nhiên để chủ động nhắn cho khách này hôm nay.`;
 
-  for (let attempt = 0; attempt <= 2; attempt++) {
-    let res, data;
-    try {
-      res = await fetch(cfg.gasUrl, {
-        method: "POST",
-        body: JSON.stringify({ action: "ai", prompt, withProducts: !!cfg.useProducts }),
-        headers: { "Content-Type": "text/plain" }
-      });
-      data = await res.json();
-    } catch (e) {
-      throw new Error("Không gọi được GAS: " + e.message);
-    }
-    if (data && data.ok) return { suggestion: (data.text || "").trim(), provider: data.provider };
-    const err = String((data && data.error) || "Lỗi GAS không rõ nguyên nhân");
-    if (err.indexOf("429") !== -1 && attempt < 2) {
-      const m = err.match(/try again in ([0-9.]+)s/i);
-      const waitMs = m ? Math.ceil(parseFloat(m[1]) * 1000) + 1500 : 16000;
-      await new Promise((r) => setTimeout(r, waitMs));
-      continue;
-    }
-    throw new Error(err);
-  }
-  throw new Error("Quá số lần thử lại (rate limit).");
+  const data = await callAiWithRetry_(cfg.gasUrl, prompt, !!cfg.useProducts);
+  return { suggestion: (data.text || "").trim(), provider: data.provider };
 }
 
 // Tra cuu bang gia theo tu khoa — action:'priceSearch' (GET, chi doc). Backend tu tim
