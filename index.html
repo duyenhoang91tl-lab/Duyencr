@@ -10832,7 +10832,8 @@ function _careRow(phone){
     schedSP: care.schedSP||'', schedSPNote: care.schedSPNote||'',
     schedCS: care.schedCS||'', schedCSNote: care.schedCSNote||'',
     schedHen: care.schedHen||'', schedHenNote: care.schedHenNote||'',
-    khStatus: care.khStatus||'', nickZalos: care.nickZalos||[], birthday: care.birthday||''
+    khStatus: care.khStatus||'', nickZalos: care.nickZalos||[], birthday: care.birthday||'',
+    name: care.name||''
   };
 }
 // Chỉ đồng bộ CareData khi khách có DỮ LIỆU CS NHẬP THẬT.
@@ -10846,6 +10847,7 @@ function _hasRealCareData(phone){
   if ((care.note||'').toString().trim())     return true;
   if ((care.khStatus||'').toString().trim()) return true;
   if ((care.birthday||'').toString().trim()) return true;
+  if ((care.name||'').toString().trim())     return true;
   if (Array.isArray(care.nickZalos) && care.nickZalos.length) return true;
   // Lịch nhanh đặt tay
   if ((care.schedGoi||'').toString().trim()) return true;
