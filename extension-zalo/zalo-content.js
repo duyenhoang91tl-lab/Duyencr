@@ -245,6 +245,7 @@
     addEl(phoneRow, 'input', {id:'zai-phone-input', type:'tel', placeholder:'0901234567'});
     addEl(phoneRow, 'button', {className:'zai-btn zai-btn-primary zai-btn-sm', id:'zai-lookup-btn', textContent:'Tra cứu'});
     addEl(body, 'div', {id:'zai-auto-hint', style:'font-size:10px;color:#00b14f;margin-top:3px'});
+    addEl(body, 'div', {id:'zai-phone-candidates', style:'display:none;margin-top:5px;'});
     const perAutoRow = addEl(body, 'label', {id:'zai-per-auto-row', style:'display:none;align-items:center;gap:6px;margin-top:5px;font-size:11px;color:#374151;cursor:pointer;'});
     const perAutoChk = addEl(perAutoRow, 'input', {type:'checkbox', id:'zai-per-auto-chk'});
     addEl(perAutoRow, 'span', {textContent:'⚡ Tự động soạn câu mở đầu cho khách này'});
@@ -646,6 +647,43 @@
     const m = text.match(/(0[3-9]\d{8})/);
     return m ? m[1] : null;
   }
+
+  // Quet cac tin nhan gan day cua khach (_chatHistory, da thu thap san cho tinh nang goi y AI)
+  // tim TAT CA sdt VN xuat hien trong noi dung tin nhan — dung khi khach tu go sdt trong chat
+  // (vd nho nguoi khac nhan ho) ma ten hien thi doan chat lai khong co sdt.
+  function extractPhonesFromChatHistory_() {
+    const found = new Set();
+    for (const msg of _chatHistory) {
+      const re = /(0[3-9]\d{8})/g;
+      let m;
+      while ((m = re.exec(msg))) {
+        const p = normPhone(m[1]);
+        if (p) found.add(p);
+      }
+    }
+    return Array.from(found);
+  }
+
+  // Hien danh sach sdt "them" tim thay trong tin nhan (khac voi sdt dang tra cuu) de CS bam chuyen qua
+  function renderPhoneCandidates_(excludePhone) {
+    const box = document.getElementById('zai-phone-candidates');
+    if (!box) return;
+    const cur = excludePhone != null ? excludePhone : _currentPhone;
+    const extra = extractPhonesFromChatHistory_().filter(p => p !== cur);
+    if (!extra.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    box.style.display = 'block';
+    box.innerHTML = `<div style="font-size:10px;color:#b45309;margin-bottom:3px;">📱 Tin nhắn có thêm SĐT khác — bấm để tra cứu:</div>`;
+    extra.forEach(p => {
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.textContent = p;
+      btn.style.cssText = 'margin:0 4px 4px 0;padding:3px 8px;border:1px solid #d97706;background:#fff;color:#92400e;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;';
+      btn.addEventListener('click', () => {
+        const inp = document.getElementById('zai-phone-input');
+        if (inp) { inp.value = p; doLookup(); }
+      });
+      box.appendChild(btn);
+    });
+  }
   function getCurrentChatName() {
     const sels = ['div[contenteditable][placeholder*="tin nhắn tới"]','[placeholder*="tin nhắn tới"]','[data-placeholder*="tin nhắn tới"]'];
     for (const sel of sels) {
@@ -812,6 +850,7 @@
 
     if (last100.length) {
       _chatHistory = last100;
+      renderPhoneCandidates_();
       // Dien vao textarea (an) de du phong
       if (msgTa) msgTa.value = last100.join('\n---\n');
 
@@ -996,6 +1035,7 @@
     const updSec = document.getElementById('zai-update-section');
     updSec.style.display = 'block'; // luon hien muc cap nhat
     _currentCustData = null;
+    renderPhoneCandidates_(phone);
 
     if (!GAS_URL) { showError('Chưa cài URL GAS. Nhấn ⚙.'); area.innerHTML=''; return; }
 

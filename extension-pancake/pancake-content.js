@@ -365,19 +365,46 @@
     return s;
   }
 
-  function extractPhone() {
+  // Pancake/Messenger tự nhận diện SĐT trong tin nhắn rồi bọc bằng <span class="phone-tag ...">
+  // (đôi khi span cha còn có id dạng "m_<hash>_<sđt>"). Đọc từ đây đáng tin hơn quét chữ tự do
+  // vì nền tảng đã xác nhận đó thực sự là SĐT (khỏi nhầm mã đơn/mã vận đơn).
+  function extractTaggedPhones_(scope) {
+    const found = new Set();
+    scope.querySelectorAll('.phone-tag').forEach((el) => {
+      const p = normPhone(el.textContent);
+      if (/^0[3-9]\d{8}$/.test(p)) found.add(p);
+    });
+    scope.querySelectorAll('[id]').forEach((el) => {
+      const m = el.id.match(/_(\d{9,11})$/);
+      if (!m) return;
+      const p = normPhone(m[1]);
+      if (/^0[3-9]\d{8}$/.test(p)) found.add(p);
+    });
+    return Array.from(found);
+  }
+
+  // Trả về DANH SÁCH sđt tìm được trong đoạn chat hiện tại (có thể là 1, 2, hoặc nhiều).
+  function extractPhones() {
     const sel = settings.selectors?.[PLATFORM];
-    // Ưu tiên selector riêng cho ô hiển thị SĐT khách (nếu đã cấu hình)
+    // 1) Ưu tiên selector riêng cho ô hiển thị SĐT khách (nếu đã cấu hình)
     if (sel?.phoneSelector) {
       const el = document.querySelector(sel.phoneSelector);
       const m = el?.innerText?.match(/(0[3-9]\d{8})/);
-      if (m) return normPhone(m[1]);
+      if (m) return [normPhone(m[1])];
     }
-    // Fallback: quét toàn bộ vùng tin nhắn tìm số điện thoại VN dạng 0xxxxxxxxx
     const container = sel?.messageList ? document.querySelector(sel.messageList) : null;
     const scope = container || document.body;
+    // 2) SĐT đã được nền tảng tự gắn thẻ (span.phone-tag / id="..._<sđt>") — có thể ra nhiều số
+    const tagged = extractTaggedPhones_(scope);
+    if (tagged.length) return tagged;
+    // 3) Fallback cuối: quét chữ tự do tìm 1 SĐT VN dạng 0xxxxxxxxx (chỉ dùng khi không có thẻ)
     const m2 = scope.innerText?.match(/(0[3-9]\d{8})/);
-    return m2 ? normPhone(m2[1]) : "";
+    return m2 ? [normPhone(m2[1])] : [];
+  }
+
+  // Giữ lại tên cũ để tương thích ngược — trả về SĐT đầu tiên tìm được.
+  function extractPhone() {
+    return extractPhones()[0] || "";
   }
 
   // ── Lấy tên khách từ khung "Sản phẩm order" (ghi chú đơn hàng CS tự nhập) ──
@@ -423,13 +450,33 @@
   }
 
   function requestCustomerLookup() {
-    const phone = extractPhone() || resolvePhoneForChatKey_();
+    const phones = extractPhones();
+    if (phones.length > 1) {
+      _currentPhone = ''; _currentCare = null; _lastServerCare = {}; _currentOrderPanelName = ''; _currentOrders = [];
+      renderPhonePicker_(phones);
+      return;
+    }
+    const phone = phones[0] || resolvePhoneForChatKey_();
     if (!phone) {
       panelEl.querySelector("#pk-ai-customer").innerHTML = "";
       _currentPhone = ''; _currentCare = null; _lastServerCare = {}; _currentOrderPanelName = ''; _currentOrders = [];
       return;
     }
     lookupByPhone(phone);
+  }
+
+  // Doan chat co >=2 SDT (vd: khach nhan hang ho nguoi khac) -> de CS tu chon so can tra cuu
+  function renderPhonePicker_(phones) {
+    const box = panelEl.querySelector("#pk-ai-customer");
+    box.innerHTML = `<div class="pk-ai-phone-picker">
+      <div class="pk-ai-phone-picker-label">📱 Phát hiện ${phones.length} SĐT trong đoạn chat — chọn số để tra cứu:</div>
+      <div class="pk-ai-phone-picker-btns">
+        ${phones.map((p) => `<button type="button" class="pk-ai-phone-pick-btn" data-phone="${p}">${p}</button>`).join('')}
+      </div>
+    </div>`;
+    box.querySelectorAll('.pk-ai-phone-pick-btn').forEach((btn) => {
+      btn.addEventListener('click', () => lookupByPhone(btn.dataset.phone));
+    });
   }
 
   function lookupByPhone(phone) {
