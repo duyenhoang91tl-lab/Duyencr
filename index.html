@@ -2397,6 +2397,8 @@ function buildCustomers() {
       renewOrders:renewCount, tier,
       careStatus: care.status || c._rawStatus || '',
       zaloStatus: care.zalo || c._rawZalo || '',
+      khStatus: care.khStatus || '',
+      nickZalos: Array.isArray(care.nickZalos) ? care.nickZalos : [],
       careNote: care.note || c._rawNote || '',
       careCS,
       // Tách careCS thành các tên riêng lẻ (đề phòng ai đó gõ tay "A, B" vào ô CS chăm sóc) —
@@ -4891,6 +4893,8 @@ function rebuildCareOnCustomers() {
     const care = careData[c.phone] || {};
     c.careStatus = care.status || c._rawStatus || '';
     c.zaloStatus = care.zalo  || c._rawZalo  || '';
+    c.khStatus   = care.khStatus || '';
+    c.nickZalos  = Array.isArray(care.nickZalos) ? care.nickZalos : [];
     c.careNote   = care.note  || c._rawNote  || '';
     c.careCS     = care.cs    || _latestOrderCS(c.orders);
     if (!c.csSet) c.csSet = _buildCsSet_(c.orders, c.phone);
@@ -6421,9 +6425,11 @@ function deleteAssignEntry(id) {
 }
 
 // ── PIVOT REPORT STATE ──
-let _rptFilters = { cs: new Set(), tier: new Set(), label: new Set(), dateFrom: '', dateTo: '' };
-let _rptPivotRow = 'cs';    // cs | tier | label | month
-let _rptPivotCol = 'tier';  // tier | careStatus | done | month
+let _rptFilters = { cs: new Set(), tier: new Set(), label: new Set(), dateFrom: '', dateTo: '',
+  product: new Set(), careStatus: new Set(), khStatus: new Set(), zaloStatus: new Set(), source: new Set(), nickZalo: '' };
+let _rptPivotRow = 'cs';    // cs | tier | label | month | source
+let _rptPivotCol = 'tier';  // tier | careStatus | done | month | source
+let _rptMetric = 'kh';      // kh | orders | revenue
 let _rptSortCol = 'total';
 let _rptSortDir = -1;
 
@@ -6432,6 +6438,8 @@ function renderAssignReport() {
   const allCS    = [...new Set(assignHistory.map(h=>h.csName))].sort();
   const allLabels= [...new Set(assignHistory.map(h=>h.label))].sort();
   const allTiers = ['VIP','Thân thiết','Tiềm năng','Chưa bán lại được'];
+  const allSources = [...new Set(allCustomers.flatMap(c=>c.sources||[]).filter(Boolean))].sort();
+  const allKhStatus = (typeof _flatCustStatusValues==='function' ? _flatCustStatusValues() : []).filter(Boolean);
 
   // Apply filters to get working set of batches
   const batches = assignHistory.filter(h => {
@@ -6442,12 +6450,39 @@ function renderAssignReport() {
     return true;
   });
 
+  // Nguồn (kênh) gần nhất của 1 khách — dùng đơn có ngày mới nhất; không có đơn nào thì '—'
+  function _rptCustSource(c){
+    if (!c || !c.orders || !c.orders.length) return '—';
+    let latest = null;
+    for (const o of c.orders) {
+      if (!o.source) continue;
+      if (!latest || (o.date instanceof Date && (!(latest.date instanceof Date) || o.date > latest.date))) latest = o;
+    }
+    return (latest && latest.source) || c.sources?.[0] || '—';
+  }
+  const productTerms = [...(_rptFilters.product||[])].map(t=>_foldVi(t)).filter(Boolean);
+  const nickTerm = _foldVi(_rptFilters.nickZalo||'').trim();
+
   // Flatten to phone rows with metadata
   const phoneRows = [];
+  const custByPhone = new Map();
   for (const h of batches) {
     for (const p of h.phones) {
       const c = allCustomers.find(x=>x.phone===p);
       if (_rptFilters.tier.size && !(c && _rptFilters.tier.has(c.tier))) continue;
+      if (_rptFilters.careStatus.size && !(c && _rptFilters.careStatus.has(c.careStatus||''))) continue;
+      if (_rptFilters.khStatus.size && !(c && _rptFilters.khStatus.has(c.khStatus||''))) continue;
+      if (_rptFilters.zaloStatus.size && !(c && _rptFilters.zaloStatus.has(c.zaloStatus||''))) continue;
+      if (_rptFilters.source.size && !(c && (c.sources||[]).some(s=>_rptFilters.source.has(s)))) continue;
+      if (productTerms.length) {
+        const ptxt = (typeof _customerProductText==='function' && c) ? _customerProductText(c) : '';
+        if (!productTerms.some(t=>ptxt.indexOf(t)!==-1)) continue;
+      }
+      if (nickTerm) {
+        const nicks = (c && Array.isArray(c.nickZalos)) ? c.nickZalos : [];
+        if (!nicks.some(n=>_foldVi(n).indexOf(nickTerm)!==-1)) continue;
+      }
+      if (c && !custByPhone.has(p)) custByPhone.set(p, c);
       phoneRows.push({
         phone: p,
         csName: h.csName,
@@ -6456,11 +6491,24 @@ function renderAssignReport() {
         month: h.date ? h.date.slice(0,7) : '—',
         tier: c?.tier || '—',
         careStatus: c?.careStatus || 'Chưa liên hệ',
+        source: _rptCustSource(c),
         isDone: (h.donePhones||[]).includes(p),
         cust: c
       });
     }
   }
+  // Quy đổi giá trị 1 tập SĐT sang metric đang chọn (số KH / số đơn / doanh thu)
+  function _rptMetricValue(phoneSet){
+    if (_rptMetric === 'kh') return phoneSet.size;
+    let sum = 0;
+    phoneSet.forEach(p=>{
+      const c = custByPhone.get(p);
+      if (!c) return;
+      sum += _rptMetric==='revenue' ? (c.totalRevenue||0) : (c.totalOrders||0);
+    });
+    return sum;
+  }
+  function _rptFmtMetric(n){ return _rptMetric==='revenue' ? fmtVND(n) : fmt(n); }
 
   // Global KPIs
   const totalKH   = new Set(phoneRows.map(r=>r.phone)).size;
@@ -6495,11 +6543,12 @@ function renderAssignReport() {
   }
   const allPhoneSet = new Set(phoneRows.map(r=>r.phone));
   grandTotal = allPhoneSet.size;
+  const grandMetricVal = _rptMetricValue(allPhoneSet);
 
-  // Sort rows
+  // Sort rows (theo đúng metric đang chọn — KH / Số đơn / Doanh thu)
   const sortedRows = [...rowKeys].sort((a,b) => {
-    const va = (rowTotals[a]||new Set()).size;
-    const vb = (rowTotals[b]||new Set()).size;
+    const va = _rptMetricValue(rowTotals[a]||new Set());
+    const vb = _rptMetricValue(rowTotals[b]||new Set());
     return _rptSortDir * (vb - va);
   });
 
@@ -6514,8 +6563,8 @@ function renderAssignReport() {
   const csBarRows = Object.entries(csBar).sort((a,b)=>b[1].total.size-a[1].total.size);
   const maxBar = csBarRows.length ? csBarRows[0][1].total.size : 1;
 
-  const PIVOT_ROW_OPTS  = [{v:'cs',l:'CS phụ trách'},{v:'tier',l:'Phân loại KH'},{v:'label',l:'Đợt chia'},{v:'month',l:'Tháng chia'}];
-  const PIVOT_COL_OPTS  = [{v:'tier',l:'Phân loại KH'},{v:'careStatus',l:'Tình trạng CS'},{v:'done',l:'Hoàn thành'},{v:'month',l:'Tháng chia'}];
+  const PIVOT_ROW_OPTS  = [{v:'cs',l:'CS phụ trách'},{v:'tier',l:'Phân loại KH'},{v:'label',l:'Đợt chia'},{v:'month',l:'Tháng chia'},{v:'source',l:'Kênh (Nguồn)'}];
+  const PIVOT_COL_OPTS  = [{v:'tier',l:'Phân loại KH'},{v:'careStatus',l:'Tình trạng CS'},{v:'done',l:'Hoàn thành'},{v:'month',l:'Tháng chia'},{v:'source',l:'Kênh (Nguồn)'},{v:'cs',l:'CS phụ trách'}];
 
   const rptHtml = `
   <!-- KPI ROW -->
@@ -6564,6 +6613,38 @@ function renderAssignReport() {
         <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Đến ngày</div>
         <input type="date" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--rsm);outline:none;background:var(--surface)" value="${_rptFilters.dateTo}" oninput="_rptFilters.dateTo=this.value;renderAssignReport()">
       </div>
+      <div>
+        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Tình trạng CS</div>
+        <select multiple style="min-width:130px;max-height:70px;font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);outline:none" id="rpt-carestatus-sel" onchange="_rptSetFilter('careStatus',this)">
+          ${CARE_STATUS.map(v=>`<option value="${esc(v)}" ${_rptFilters.careStatus.has(v)?'selected':''}>${esc(v)}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Trạng thái KH</div>
+        <select multiple style="min-width:150px;max-height:70px;font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);outline:none" id="rpt-khstatus-sel" onchange="_rptSetFilter('khStatus',this)">
+          ${allKhStatus.map(v=>`<option value="${esc(v)}" ${_rptFilters.khStatus.has(v)?'selected':''}>${esc(v)}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Kết bạn Zalo</div>
+        <select multiple style="min-width:120px;max-height:70px;font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);outline:none" id="rpt-zalostatus-sel" onchange="_rptSetFilter('zaloStatus',this)">
+          ${ZALO_STATUS.map(v=>`<option value="${esc(v)}" ${_rptFilters.zaloStatus.has(v)?'selected':''}>${esc(v)}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Kênh (Nguồn)</div>
+        <select multiple style="min-width:120px;max-height:70px;font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);outline:none" id="rpt-source-sel" onchange="_rptSetFilter('source',this)">
+          ${allSources.map(v=>`<option value="${esc(v)}" ${_rptFilters.source.has(v)?'selected':''}>${esc(v)}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Sản phẩm (cách nhau bằng dấu phẩy)</div>
+        <input type="text" placeholder="vd: tỳ hưu, nhẫn 10k" style="min-width:170px;font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--rsm);outline:none;background:var(--surface)" value="${esc([..._rptFilters.product].join(', '))}" oninput="_rptFilterInputChanged('product', this.value, true)">
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Nick Zalo</div>
+        <input type="text" placeholder="Tìm nick..." style="min-width:110px;font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--rsm);outline:none;background:var(--surface)" value="${esc(_rptFilters.nickZalo||'')}" oninput="_rptFilterInputChanged('nickZalo', this.value, false)">
+      </div>
       <button class="btn sm danger" onclick="_rptResetFilters()" style="margin-bottom:1px">✕ Xóa lọc</button>
     </div>
   </div>
@@ -6609,6 +6690,12 @@ function renderAssignReport() {
         <select style="font-size:11px;padding:3px 7px;border:1px solid var(--border);border-radius:var(--rsm);outline:none;background:var(--surface)" onchange="_rptPivotCol=this.value;renderAssignReport()">
           ${PIVOT_COL_OPTS.map(o=>`<option value="${o.v}" ${_rptPivotCol===o.v?'selected':''}>${o.l}</option>`).join('')}
         </select>
+        <span style="color:var(--muted)">Metric:</span>
+        <select style="font-size:11px;padding:3px 7px;border:1px solid var(--border);border-radius:var(--rsm);outline:none;background:var(--surface)" onchange="_rptMetric=this.value;renderAssignReport()">
+          <option value="kh" ${_rptMetric==='kh'?'selected':''}>Số KH</option>
+          <option value="orders" ${_rptMetric==='orders'?'selected':''}>Số đơn</option>
+          <option value="revenue" ${_rptMetric==='revenue'?'selected':''}>Doanh thu</option>
+        </select>
         <button class="btn sm" onclick="_rptSortDir*=-1;renderAssignReport()" title="Đảo chiều sắp xếp">${_rptSortDir===-1?'↓':'↑'} Sắp xếp</button>
       </div>
     </div>
@@ -6626,20 +6713,22 @@ function renderAssignReport() {
       </thead>
       <tbody>
         ${sortedRows.map((rk,ri)=>{
-          const rowTotal = (rowTotals[rk]||new Set()).size;
-          const pct = grandTotal ? Math.round(rowTotal/grandTotal*100) : 0;
-          const fillPct = grandTotal ? rowTotal/grandTotal*100 : 0;
+          const rowPhones = rowTotals[rk]||new Set();
+          const rowVal = _rptMetricValue(rowPhones);
+          const pct = grandMetricVal ? Math.round(rowVal/grandMetricVal*100) : 0;
+          const fillPct = grandMetricVal ? rowVal/grandMetricVal*100 : 0;
           return `<tr style="border-bottom:1px solid var(--border);${ri%2===1?'background:var(--surface2)':'background:var(--surface)'}">
             <td style="padding:6px 10px;font-weight:500;position:sticky;left:0;background:inherit;white-space:nowrap">${esc(rk)}</td>
             ${colKeys.map(ck=>{
-              const n = (pivot[rk]&&pivot[rk][ck]) ? pivot[rk][ck].size : 0;
-              const pctCell = rowTotal ? Math.round(n/rowTotal*100) : 0;
+              const cellPhones = (pivot[rk]&&pivot[rk][ck]) ? pivot[rk][ck] : new Set();
+              const n = _rptMetricValue(cellPhones);
+              const pctCell = rowVal ? Math.round(n/rowVal*100) : 0;
               return `<td style="padding:6px 8px;text-align:right">
-                <div style="font-weight:${n>0?'600':'400'};color:${n>0?'var(--text)':'var(--hint)'}">${n||'—'}</div>
+                <div style="font-weight:${n>0?'600':'400'};color:${n>0?'var(--text)':'var(--hint)'}">${n?_rptFmtMetric(n):'—'}</div>
                 ${n>0?`<div style="font-size:9px;color:var(--hint)">${pctCell}%</div>`:''}
               </td>`;
             }).join('')}
-            <td style="padding:6px 8px;text-align:right;font-weight:700">${rowTotal}</td>
+            <td style="padding:6px 8px;text-align:right;font-weight:700">${_rptFmtMetric(rowVal)}</td>
             <td style="padding:6px 8px;text-align:right">
               <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
                 <div style="width:40px;height:5px;background:var(--surface3);border-radius:3px;overflow:hidden">
@@ -6654,8 +6743,8 @@ function renderAssignReport() {
       <tfoot>
         <tr style="background:var(--surface3);font-weight:700;border-top:2px solid var(--border-md)">
           <td style="padding:7px 10px;position:sticky;left:0;background:var(--surface3)">Tổng cộng</td>
-          ${colKeys.map(ck=>`<td style="padding:7px 8px;text-align:right;color:var(--text)">${(colTotals[ck]||new Set()).size||'—'}</td>`).join('')}
-          <td style="padding:7px 8px;text-align:right;color:var(--green)">${grandTotal}</td>
+          ${colKeys.map(ck=>`<td style="padding:7px 8px;text-align:right;color:var(--text)">${_rptFmtMetric(_rptMetricValue(colTotals[ck]||new Set()))||'—'}</td>`).join('')}
+          <td style="padding:7px 8px;text-align:right;color:var(--green)">${_rptFmtMetric(grandMetricVal)}</td>
           <td style="padding:7px 8px;text-align:right;color:var(--muted)">100%</td>
         </tr>
       </tfoot>
@@ -6674,8 +6763,16 @@ function _rptSetFilter(key, sel) {
   _rptFilters[key] = new Set(vals);
   renderAssignReport();
 }
+// Ô nhập tự do (Sản phẩm, Nick Zalo) — debounce để khỏi render lại (mất focus) mỗi phím gõ
+let _rptDebounceT = null;
+function _rptFilterInputChanged(key, val, isCsv) {
+  _rptFilters[key] = isCsv ? new Set((val||'').split(',').map(t=>t.trim()).filter(Boolean)) : (val||'');
+  clearTimeout(_rptDebounceT);
+  _rptDebounceT = setTimeout(renderAssignReport, 450);
+}
 function _rptResetFilters() {
-  _rptFilters = { cs: new Set(), tier: new Set(), label: new Set(), dateFrom: '', dateTo: '' };
+  _rptFilters = { cs: new Set(), tier: new Set(), label: new Set(), dateFrom: '', dateTo: '',
+    product: new Set(), careStatus: new Set(), khStatus: new Set(), zaloStatus: new Set(), source: new Set(), nickZalo: '' };
   renderAssignReport();
 }
 
