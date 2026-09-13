@@ -1662,6 +1662,7 @@ let careLeads = loadLS('ome_care_leads') || {};
 // màn hình chính, không kéo chi tiết sản phẩm vào danh sách khách.
 let donPhoneSet = new Set(loadLS('ome_don_phones') || []);
 let donSaleByPhone = loadLS('ome_don_sale_by_phone') || {}; // { phone: [ten sale,...] } lay tu "dữ liệu đơn", gop vao csSet de phan quyen CS
+let donOrderCountByPhone = loadLS('ome_don_order_count') || {}; // { phone: so don } lay tu "dữ liệu đơn" — dung de phan loai hang KH (VIP/Than thiet/...)
 let schedules = loadLS('ome_sched') || [];
 let currentPhone = null;
 let currentTier = 'all', currentCare = 'all', currentZalo = 'all', currentBrand = 'all', currentCS = 'all';
@@ -1987,6 +1988,7 @@ async function syncFromGS(opts) {
         const dpJson = await dpR.json();
         if (dpJson && dpJson.phones) { donPhoneSet = new Set(dpJson.phones); saveLS('ome_don_phones', dpJson.phones); }
         if (dpJson && dpJson.saleByPhone) { donSaleByPhone = dpJson.saleByPhone; saveLS('ome_don_sale_by_phone', dpJson.saleByPhone); }
+        if (dpJson && dpJson.orderCountByPhone) { donOrderCountByPhone = dpJson.orderCountByPhone; saveLS('ome_don_order_count', dpJson.orderCountByPhone); }
       } catch(dpErr) { console.warn('donPhones fetch error:', dpErr.message); }
     }
 
@@ -2324,26 +2326,23 @@ function buildCustomers() {
       };
     });
   }
-  const JAN25_YEAR = 25;
-  const JAN25_DATE = new Date(2025, 0, 1);
   allCustomers = Object.values(customerMap).map(c => {
     const tot = c.orders.length;
     const rev = c.orders.reduce((s,o) => s+(o.revenue||0), 0);
 
-    // Chỉ đếm đơn từ 4 nguồn renew để phân loại VIP/Thân thiết/Tiềm năng
+    // Chỉ đếm đơn từ 4 nguồn renew — dùng cho số "Renew" hiển thị ở trang chi tiết khách
+    // (KHÔNG còn dùng để phân hạng KH, xem tiêu chí hạng mới ngay dưới đây)
     const renewOrders = c.orders.filter(o => RENEW_SOURCES.includes(s(o.source).toLowerCase()));
     const renewCount = renewOrders.length;
 
-    const has25renew = renewOrders.some(o =>
-      (o.year >= JAN25_YEAR) ||
-      (o.date instanceof Date && o.date >= JAN25_DATE)
-    );
-
+    // Tiêu chí phân hạng KH (mới): đếm theo SỐ ĐƠN trong sheet "dữ liệu đơn" (không còn theo
+    // nguồn Renew ở DT tổng như trước) — 1 đơn = Chưa bán lại được, 2-4 = Tiềm năng,
+    // 5-9 = Thân thiết, ≥10 = VIP.
+    const donOrderCount = (typeof donOrderCountByPhone !== 'undefined' && donOrderCountByPhone) ? (donOrderCountByPhone[c.phone] || 0) : 0;
     let tier;
-    if (renewCount >= 10) tier = 'VIP';
-    else if (renewCount >= 5) tier = 'Thân thiết';
-    else if (renewCount >= 1 && has25renew) tier = 'Tiềm năng';
-    else if (renewCount >= 1) tier = 'Chưa bán lại được';
+    if (donOrderCount >= 10) tier = 'VIP';
+    else if (donOrderCount >= 5) tier = 'Thân thiết';
+    else if (donOrderCount >= 2) tier = 'Tiềm năng';
     else tier = 'Chưa bán lại được';
 
     const care = careData[c.phone] || {};
@@ -13995,34 +13994,34 @@ function _initKhDragSort(container) {
       <span style="font-size:16px;flex-shrink:0;margin-top:1px">👑</span>
       <div>
         <div style="font-weight:700;color:var(--vip);margin-bottom:2px">VIP</div>
-        <div style="color:var(--muted);line-height:1.6">Có <strong>≥ 10 đơn Renew</strong> từ nguồn mua lại</div>
+        <div style="color:var(--muted);line-height:1.6">Mua <strong>từ 10 đơn</strong> trở lên</div>
       </div>
     </div>
     <div style="display:flex;align-items:flex-start;gap:10px;padding:7px 10px;border-radius:7px;background:var(--tt-bg);border:1px solid var(--tt-b)">
       <span style="font-size:16px;flex-shrink:0;margin-top:1px">⭐</span>
       <div>
         <div style="font-weight:700;color:var(--tt);margin-bottom:2px">Thân thiết</div>
-        <div style="color:var(--muted);line-height:1.6">Có <strong>5 – 9 đơn Renew</strong> từ nguồn mua lại</div>
+        <div style="color:var(--muted);line-height:1.6">Mua <strong>từ 5 – 9 đơn</strong></div>
       </div>
     </div>
     <div style="display:flex;align-items:flex-start;gap:10px;padding:7px 10px;border-radius:7px;background:var(--tn-bg);border:1px solid var(--tn-b)">
       <span style="font-size:16px;flex-shrink:0;margin-top:1px">🌱</span>
       <div>
         <div style="font-weight:700;color:var(--tn);margin-bottom:2px">Tiềm năng</div>
-        <div style="color:var(--muted);line-height:1.6">Có <strong>≥ 1 đơn Renew</strong> và có ít nhất 1 đơn từ <strong>tháng 1/2025</strong> trở đi</div>
+        <div style="color:var(--muted);line-height:1.6">Mua <strong>từ 2 đơn</strong> trở lên</div>
       </div>
     </div>
     <div style="display:flex;align-items:flex-start;gap:10px;padding:7px 10px;border-radius:7px;background:var(--surface2);border:1px solid var(--border)">
       <span style="font-size:16px;flex-shrink:0;margin-top:1px">🔘</span>
       <div>
         <div style="font-weight:700;color:var(--muted);margin-bottom:2px">Chưa bán lại được</div>
-        <div style="color:var(--muted);line-height:1.6">Chưa có đơn Renew hoặc chưa đủ điều kiện trên</div>
+        <div style="color:var(--muted);line-height:1.6">Chỉ có <strong>1 đơn</strong></div>
       </div>
     </div>
   </div>
   <div style="padding:8px 14px 11px">
     <div style="font-size:10px;color:var(--hint);background:var(--surface2);border-radius:6px;padding:6px 9px;line-height:1.7">
-      📌 <strong>Nguồn Renew</strong> gồm: <em>kh renew, kh renew mkt, kh giới thiệu, data đảo renew</em>.<br>
+      📌 Số đơn tính theo <strong>sheet "dữ liệu đơn"</strong> (không còn tính theo nguồn Renew ở DT tổng như trước).<br>
       Phân loại tự động dựa trên dữ liệu đơn hàng đã nạp.
     </div>
   </div>
