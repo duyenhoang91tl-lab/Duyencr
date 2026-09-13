@@ -2853,9 +2853,10 @@ function callAI_(data) {
   // tai) va gemini-flash-latest (alias Google tu dong tro ve ban Flash on dinh moi
   // nhat, tranh phai sua code moi khi Google lai ngung ho tro 1 phien ban cu the).
   var providers = [
-    { name: 'Groq',     key: getSetting_('apiGroq') || getSetting_('geminiKey'), fn: _aiOpenAICompat_, url: 'https://api.groq.com/openai/v1/chat/completions',     model: 'openai/gpt-oss-120b' },
-    { name: 'Cerebras', key: getSetting_('apiCerebras'),                          fn: _aiOpenAICompat_, url: 'https://api.cerebras.ai/v1/chat/completions',        model: 'gpt-oss-120b' },
-    { name: 'Gemini',   key: getSetting_('apiGemini'),                            fn: _aiGemini_,       model: 'gemini-flash-latest' }
+    { name: 'Groq',       key: getSetting_('apiGroq') || getSetting_('geminiKey'), fn: _aiOpenAICompat_, url: 'https://api.groq.com/openai/v1/chat/completions',        model: 'openai/gpt-oss-120b' },
+    { name: 'Cerebras',   key: getSetting_('apiCerebras'),                          fn: _aiOpenAICompat_, url: 'https://api.cerebras.ai/v1/chat/completions',           model: 'gpt-oss-120b' },
+    { name: 'Gemini',     key: getSetting_('apiGemini'),                            fn: _aiGemini_,       model: 'gemini-flash-latest' },
+    { name: 'OpenRouter', key: getSetting_('apiOpenRouter'),                        fn: _aiOpenAICompat_, url: 'https://openrouter.ai/api/v1/chat/completions',         model: 'google/gemma-2-9b-it:free' }
   ];
 
   var errors = [], anyKey = false;
@@ -2883,7 +2884,7 @@ function callAI_(data) {
     errors.push(pv.name + ': ' + (r.error || 'rong'));
     // loi (429/sai key/...) -> tu dong thu provider ke tiep
   }
-  if (!anyKey) return jsonOut_({ error: 'Chua co API Key nao. Mo extension → banh rang → nhap it nhat 1 key (Groq/Cerebras/Gemini).' });
+  if (!anyKey) return jsonOut_({ error: 'Chua co API Key nao. Mo extension → banh rang → nhap it nhat 1 key (Groq/Cerebras/Gemini/OpenRouter).' });
   return jsonOut_({ error: 'Tat ca API deu loi: ' + errors.join(' | ') });
 }
 
