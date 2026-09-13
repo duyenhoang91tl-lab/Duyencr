@@ -4564,6 +4564,8 @@ function saveCareSchedules(phone) {
   _touchCare(phone);
   logAudit('sched', phone, '', 'Cập nhật lịch hẹn nhanh');
   updateSchedBadges();
+  // Cập nhật ngay panel "Nhắc hẹn" (không chờ chu kỳ làm mới 60s)
+  if (typeof renderReminderPanel === 'function') renderReminderPanel();
   if (gsUrl) { queueCareSync(phone); toast('✓ Đã lưu lịch hẹn'); }
   else toast('✓ Đã lưu lịch hẹn (local)');
 }
@@ -4769,6 +4771,7 @@ function addSched(phone) {
   logAudit('sched', phone, '', `Thêm lịch "${schedTypeLabel(type)}" · ${date}`);
   if (gsUrl) queueCareSync(phone);
   updateSchedBadges();
+  if (typeof renderReminderPanel === 'function') renderReminderPanel();
   const c = allCustomers.find(x=>x.phone===phone);
   document.getElementById('dp-body').innerHTML = renderSchedTabHtml(c);
   toast('✓ Đã thêm lịch hẹn');
@@ -4793,6 +4796,7 @@ function _schedEditSave(id, eid, phone) {
   logAudit('sched', phone, '', `Sửa lịch "${schedTypeLabel(newType)}" · ${newDate}`);
   if (gsUrl) queueCareSync(phone);
   updateSchedBadges();
+  if (typeof renderReminderPanel === 'function') renderReminderPanel();
   const c = allCustomers.find(x => x.phone === phone);
   if (c) document.getElementById('dp-body').innerHTML = renderSchedTabHtml(c);
   toast('✓ Đã cập nhật lịch hẹn');
@@ -4811,6 +4815,7 @@ function delSched(id) {
   if (it) logAudit('del', it.phone, `${schedTypeLabel(it.type)} · ${it.date}`, 'Đã xóa lịch');
   if (it && gsUrl) queueCareSync(it.phone);
   updateSchedBadges();
+  if (typeof renderReminderPanel === 'function') renderReminderPanel();
   const c = allCustomers.find(x=>x.phone===currentPhone);
   if (c) document.getElementById('dp-body').innerHTML = renderSchedTabHtml(c);
   toast('Đã xóa lịch');
@@ -5781,6 +5786,7 @@ if (gsUrl) {
 const AUTO_SYNC_MS = 3000;
 let _autoSyncTimer = null;
 let _autoSyncRunning = false;
+let _autoSyncTick = 0;
 
 async function autoSyncLoop() {
   if (!gsUrl || _autoSyncRunning) return;
@@ -5790,7 +5796,14 @@ async function autoSyncLoop() {
   }
   _autoSyncRunning = true;
   try {
-    await syncFromGS({ pullOrders: Object.keys(customerMap).length === 0 });
+    _autoSyncTick++;
+    // BUG (đã sửa): trước đây pullOrders chỉ true khi customerMap RỖNG — tức chỉ kéo đơn hàng/
+    // "Chăm sóc" (KH thêm nhanh)/dữ liệu đơn ĐÚNG 1 LẦN lúc mở trang, không bao giờ kéo lại nữa dù
+    // vòng lặp này vẫn chạy mỗi 3s. Hệ quả: CS A thêm đơn mới → máy CS B không tự thấy, phải bấm
+    // "Sync GS" thủ công. Giờ cứ ~10 lần lặp (~30s ở AUTO_SYNC_MS=3000) thì ép kéo lại đầy đủ luôn,
+    // không chỉ CareData (trạng thái/ghi chú/hẹn — vốn đã tự cập nhật nhanh mỗi 3s như trước).
+    const forceFullPull = (_autoSyncTick % 10 === 0);
+    await syncFromGS({ pullOrders: Object.keys(customerMap).length === 0 || forceFullPull });
   } catch(e) {
     // Silent
   }
