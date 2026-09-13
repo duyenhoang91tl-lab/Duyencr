@@ -15163,8 +15163,10 @@ function openBcLogModal(phone){
         </div>
       </div>
       <div class="assign-section-title" style="margin-top:6px">① Chọn Team tham gia</div>
+      <input type="text" id="task-f-team-search" placeholder="🔍 Gõ tìm nhanh tên Team..." oninput="_taskRenderTeamChips(this.value)" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;margin-bottom:6px">
       <div class="assign-cs-list" id="task-f-team"></div>
       <div class="assign-section-title">② Chọn user tham gia (trong Team đã chọn)</div>
+      <input type="text" id="task-f-cs-search" placeholder="🔍 Gõ tìm nhanh tên user..." oninput="_taskRenderUserChips(this.value)" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;margin-bottom:6px">
       <div class="assign-cs-list" id="task-f-cs"></div>
       <div id="task-f-perm-note" style="display:none;color:var(--hint);font-size:11px;margin-top:4px">🔒 Chỉ Admin mới có thể chọn/đổi người tham gia. Bạn vẫn tạo/sửa được các thông tin khác của công việc.</div>
     </div>
@@ -15359,6 +15361,8 @@ function openTaskModal(id){
   document.getElementById('task-f-deadline').value = t ? t.deadline : '';
   document.getElementById('task-f-status').value = t ? t.status : 'Chưa làm';
   document.getElementById('task-f-result').value = t ? (t.result||'') : '';
+  var teamSearchEl = document.getElementById('task-f-team-search'); if (teamSearchEl) teamSearchEl.value = '';
+  var csSearchEl = document.getElementById('task-f-cs-search'); if (csSearchEl) csSearchEl.value = '';
   if (t) (t.csAssigned||[]).forEach(function(n){ _taskSelectedCS.add(n); });
   if (t) (t.images||[]).forEach(function(u){ _taskPendingImages.push({ url: u }); });
   _renderTaskFormImages();
@@ -15395,14 +15399,21 @@ function _taskAllUserNames(){
   return Array.from(set).sort(function(a,b){ return a.localeCompare(b,'vi'); });
 }
 
-function _taskRenderTeamChips(){
+function _taskRenderTeamChips(filter){
+  if (filter === undefined){ var fi = document.getElementById('task-f-team-search'); filter = fi ? fi.value : ''; }
   var wrap = document.getElementById('task-f-team');
   var list = (typeof teams !== 'undefined' ? teams : []);
   if (!list.length){
     wrap.innerHTML = '<div style="color:var(--muted);font-size:12px">Chưa có Team nào — chọn trực tiếp user bên dưới</div>';
     return;
   }
-  wrap.innerHTML = list.map(function(tm){
+  var q = _foldVi(filter||'');
+  var filtered = q ? list.filter(function(tm){ return _foldVi(tm.name||'').indexOf(q)!==-1; }) : list;
+  if (!filtered.length){
+    wrap.innerHTML = '<div style="color:var(--muted);font-size:12px">Không tìm thấy Team nào khớp "'+esc(filter)+'"</div>';
+    return;
+  }
+  wrap.innerHTML = filtered.map(function(tm){
     var sel = _taskSelectedTeams.has(tm.name);
     return '<div class="assign-cs-chip-multi'+(sel?' selected':'')+'" data-name="'+esc(tm.name)+'"'+
       (_taskIsAdmin ? ' onclick="_taskToggleTeam(this,this.dataset.name)"' : ' style="cursor:default;opacity:.6"')+
@@ -15410,7 +15421,8 @@ function _taskRenderTeamChips(){
   }).join('');
 }
 
-function _taskRenderUserChips(){
+function _taskRenderUserChips(filter){
+  if (filter === undefined){ var fi = document.getElementById('task-f-cs-search'); filter = fi ? fi.value : ''; }
   var wrap = document.getElementById('task-f-cs');
   var noTeams = !(typeof teams !== 'undefined' && teams.length);
   var pool = new Set();
@@ -15436,7 +15448,13 @@ function _taskRenderUserChips(){
       '</div>';
     return;
   }
-  wrap.innerHTML = names.map(function(n){
+  var q = _foldVi(filter||'');
+  var filteredNames = q ? names.filter(function(n){ return _foldVi(n).indexOf(q)!==-1; }) : names;
+  if (!filteredNames.length){
+    wrap.innerHTML = '<div style="color:var(--muted);font-size:12px">Không tìm thấy user nào khớp "'+esc(filter)+'"</div>';
+    return;
+  }
+  wrap.innerHTML = filteredNames.map(function(n){
     var sel = _taskSelectedCS.has(n);
     return '<div class="assign-cs-chip-multi'+(sel?' selected':'')+'" data-name="'+esc(n)+'"'+
       (_taskIsAdmin ? ' onclick="_taskToggleCS(this,this.dataset.name)"' : ' style="cursor:default;opacity:.6"')+
