@@ -1498,6 +1498,29 @@ const CUSTOMER_STATUS_TREE_DEFAULT = [
   { label: '8. Từ chối', value: '8. Từ chối' },
 ];
 let CUSTOMER_STATUS_TREE = JSON.parse(JSON.stringify(loadLS('ome_kh_status_tree') || CUSTOMER_STATUS_TREE_DEFAULT));
+// Kéo bản mới nhất từ GSheets lúc tải trang (giống hệt cơ chế nickZaloList) — để CS khác cũng
+// thấy đúng cây trạng thái mà Admin vừa sửa, không chỉ đúng trên máy người bấm Lưu.
+async function _syncKhStatusTreeFromGAS() {
+  if (!gsUrl) return;
+  try {
+    var r = await fetch(gsUrl + '?action=getSetting&key=khStatusTree', {redirect:'follow'});
+    var data = await r.json();
+    if (data && data.value) {
+      var tree = JSON.parse(data.value);
+      if (Array.isArray(tree) && tree.length) {
+        CUSTOMER_STATUS_TREE.length = 0;
+        tree.forEach(function(n){ CUSTOMER_STATUS_TREE.push(n); });
+        saveLS('ome_kh_status_tree', CUSTOMER_STATUS_TREE);
+        // Refresh dropdown nếu đang mở form khi đồng bộ xong
+        var sel = document.getElementById('cs-kh-status');
+        if (sel) { var cur = sel.value; sel.innerHTML = _buildCustStatusOptions(cur); }
+      }
+    }
+  } catch(e) { /* giữ nguyên bản local nếu lỗi mạng/parse */ }
+}
+// Hoãn gọi bằng setTimeout: gsUrl được khai báo (let) ở PHÍA SAU trong cùng script này — gọi
+// ngay tại đây sẽ chạm biến trước khi khởi tạo (temporal dead zone) và ném ReferenceError.
+setTimeout(_syncKhStatusTreeFromGAS, 0);
 
 // Flatten để dùng trong filter/badge — chỉ lấy các value thực (lá hoặc không có con)
 function _flatCustStatusValues() {
@@ -13540,12 +13563,14 @@ async function saveKhStatusTree() {
   _khStatusDraft.forEach(function(n) { CUSTOMER_STATUS_TREE.push(n); });
   // Lưu local
   saveLS('ome_kh_status_tree', CUSTOMER_STATUS_TREE);
-  // Đồng bộ GSheets
+  // Đồng bộ GSheets — dùng action 'setSetting' CHUNG đã có sẵn ở backend (khoá 'khStatusTree'),
+  // giống hệt cách 'nickZaloList' đang đồng bộ. (Trước đây gọi action 'saveKhStatusTree' — action
+  // này KHÔNG tồn tại ở backend nên chưa bao giờ đồng bộ thật, dù toast vẫn báo thành công.)
   if (gsUrl) {
     try {
       var r = await fetch(gsUrl, {
         method: 'POST', redirect: 'follow',
-        body: JSON.stringify({ action: 'saveKhStatusTree', khStatusTree: CUSTOMER_STATUS_TREE })
+        body: JSON.stringify({ action: 'setSetting', key: 'khStatusTree', value: JSON.stringify(CUSTOMER_STATUS_TREE) })
       });
       var d = await r.json().catch(function(){ return {}; });
       if (d && d.error) toast('Lưu local ✓ — GSheets: ' + d.error);
