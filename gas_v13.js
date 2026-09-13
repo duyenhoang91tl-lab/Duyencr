@@ -2747,10 +2747,16 @@ function callAI_(data) {
   var withProducts = !!data.withProducts;
   var sys = _buildAISystemPrompt_(userMsg, withProducts);
 
+  // LUU Y (2026-09-13): llama-3.3-70b-versatile bi Groq NGUNG HO TRO tu 16/8/2026
+  // (model_decommissioned) va gemini-2.0-flash bi Google NGUNG HO TRO tu 1/6/2026
+  // (404) — day la ly do CA 2 provider cung loi dong loat, khong phai do sai key.
+  // Doi sang model con duoc ho tro: openai/gpt-oss-120b (Groq, model san xuat hien
+  // tai) va gemini-flash-latest (alias Google tu dong tro ve ban Flash on dinh moi
+  // nhat, tranh phai sua code moi khi Google lai ngung ho tro 1 phien ban cu the).
   var providers = [
-    { name: 'Groq',     key: getSetting_('apiGroq') || getSetting_('geminiKey'), fn: _aiOpenAICompat_, url: 'https://api.groq.com/openai/v1/chat/completions',     model: 'llama-3.3-70b-versatile' },
-    { name: 'Cerebras', key: getSetting_('apiCerebras'),                          fn: _aiOpenAICompat_, url: 'https://api.cerebras.ai/v1/chat/completions',        model: 'llama-3.3-70b' },
-    { name: 'Gemini',   key: getSetting_('apiGemini'),                            fn: _aiGemini_,       model: 'gemini-2.0-flash' }
+    { name: 'Groq',     key: getSetting_('apiGroq') || getSetting_('geminiKey'), fn: _aiOpenAICompat_, url: 'https://api.groq.com/openai/v1/chat/completions',     model: 'openai/gpt-oss-120b' },
+    { name: 'Cerebras', key: getSetting_('apiCerebras'),                          fn: _aiOpenAICompat_, url: 'https://api.cerebras.ai/v1/chat/completions',        model: 'gpt-oss-120b' },
+    { name: 'Gemini',   key: getSetting_('apiGemini'),                            fn: _aiGemini_,       model: 'gemini-flash-latest' }
   ];
 
   var errors = [], anyKey = false;
