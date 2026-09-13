@@ -250,6 +250,19 @@
 
     body.appendChild(Object.assign(document.createElement('hr'), {className:'zai-div'}));
 
+    // ── 1.5. TRA CUU BANG GIA (Sheet DANH_MUC, dung chung PRICE_SS_ID voi Pancake AI) ──
+    const priceWrap = addEl(body, 'div', {id:'zai-price-wrap',
+      style:'margin:0 0 8px;padding:6px 8px;border:1px solid #dbeafe;background:#f0f7ff;border-radius:8px;'});
+    addEl(priceWrap, 'div', {style:'font-weight:700;font-size:12px;color:#1e3a8a;margin-bottom:6px;',
+      textContent:'💰 Tra cứu bảng giá'});
+    const priceRow = addEl(priceWrap, 'div', {style:'display:flex;gap:6px;margin-bottom:6px;'});
+    addEl(priceRow, 'input', {id:'zai-price-q', type:'text', placeholder:'Tên sản phẩm, kiểu/size...',
+      style:'flex:1;padding:5px 8px;border:1px solid #bfdbfe;border-radius:6px;font-size:12px;box-sizing:border-box;'});
+    addEl(priceRow, 'button', {className:'zai-btn zai-btn-primary zai-btn-sm', id:'zai-price-btn', textContent:'Tìm'});
+    addEl(priceWrap, 'div', {id:'zai-price-result', style:'max-height:200px;overflow-y:auto;'});
+
+    body.appendChild(Object.assign(document.createElement('hr'), {className:'zai-div'}));
+
     // ── 2. AI SECTION (len tren) ──
     const aiWrap = addEl(body, 'div', {});
     const tonesDiv = addEl(aiWrap, 'div', {className:'zai-tones', style:'margin-bottom:8px'});
@@ -355,6 +368,10 @@
     cfgBtn.addEventListener('click', () => { _cfgVisible = !_cfgVisible; cfg.style.display = _cfgVisible ? 'block' : 'none'; });
     saveBtn.addEventListener('click', saveConfig);
     document.getElementById('zai-lookup-btn').addEventListener('click', doLookup);
+    document.getElementById('zai-price-btn').addEventListener('click', doPriceSearchZai_);
+    document.getElementById('zai-price-q').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') doPriceSearchZai_();
+    });
     document.getElementById('zai-save-btn').addEventListener('click', doSaveStatus);
     linkChatBtn.addEventListener('click', () => {
       const name = getCurrentChatName();
@@ -866,6 +883,41 @@
     } catch (e) {
       alert('Lỗi kết nối: ' + e.message);
     }
+  }
+
+  // ── TRA CUU BANG GIA (Sheet DANH_MUC, file PRICE_SS_ID — dung chung voi Pancake AI) ──
+  // Khong hardcode ten cot: hien dung cac cot ma sheet dang co, cot chua chu "gia"/"price"
+  // duoc tach rieng xuong dong cho de nhin.
+  async function doPriceSearchZai_() {
+    const q = (document.getElementById('zai-price-q').value || '').trim();
+    const box = document.getElementById('zai-price-result');
+    if (!GAS_URL) { box.innerHTML = '<div style="color:#1e3a8a;font-size:11.5px;font-style:italic;padding:4px 0">Chưa cài đặt URL GAS. Nhấn ⚙.</div>'; return; }
+    box.innerHTML = '<div style="color:#1e3a8a;font-size:11.5px;font-style:italic;padding:4px 0">Đang tìm...</div>';
+    try {
+      const sep = GAS_URL.includes('?') ? '&' : '?';
+      const r = await fetch(GAS_URL + sep + 'action=priceSearch' + (q ? '&q=' + encodeURIComponent(q) : ''), {redirect:'follow'});
+      const d = await r.json();
+      if (d.error) { box.innerHTML = '<div style="color:#1e3a8a;font-size:11.5px;font-style:italic;padding:4px 0">Lỗi: ' + escHtml(d.error) + '</div>'; return; }
+      renderPriceRowsZai_(d.rows || [], q);
+    } catch (e) {
+      box.innerHTML = '<div style="color:#1e3a8a;font-size:11.5px;font-style:italic;padding:4px 0">Lỗi kết nối: ' + escHtml(e.message) + '</div>';
+    }
+  }
+
+  function renderPriceRowsZai_(rows, q) {
+    const box = document.getElementById('zai-price-result');
+    if (!rows.length) {
+      box.innerHTML = '<div style="color:#1e3a8a;font-size:11.5px;font-style:italic;padding:4px 0">Không tìm thấy' + (q ? ' cho "' + escHtml(q) + '"' : '') + '.</div>';
+      return;
+    }
+    box.innerHTML = rows.slice(0, 30).map((row) => {
+      const keys = Object.keys(row).filter((k) => row[k] !== '' && row[k] !== null && row[k] !== undefined);
+      const priceKeys = keys.filter((k) => /gia|price/i.test(k));
+      const otherKeys = keys.filter((k) => !/gia|price/i.test(k));
+      const line = (k) => '<span style="display:inline-block;margin-right:8px;color:#1e3a8a"><b>' + escHtml(k) + ':</b> ' + escHtml(row[k]) + '</span>';
+      return '<div style="border-bottom:1px solid #dbeafe;padding:6px 0;font-size:12px">' + otherKeys.map(line).join(' ') +
+        (priceKeys.length ? '<div style="margin-top:3px;font-weight:700;color:#b45309">' + priceKeys.map(line).join(' · ') + '</div>' : '') + '</div>';
+    }).join('');
   }
 
   async function doLookup() {
