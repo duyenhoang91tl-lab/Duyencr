@@ -14,18 +14,20 @@ const DEFAULT_SETTINGS = {
   },
   selectors: {
     pancake: {
-      // Xác minh qua DevTools (F12 → Elements → Copy selector) tren giao dien Pancake thuc te.
-      // Luu y: .message-text-field chi la khung boc ngoai dung chung — class phan biet khach/nhan
-      // vien (client-message / page-message) nam o div con .message-text-ele ben trong, nen
-      // messageItem phai tro thang vao .message-text-ele de el.matches(customer/agentMsgSelector)
-      // (kiem tra chinh phan tu item, khong phai phan tu con) nhan dung.
-      messageList: ".mdl-js",
-      messageItem: ".message-text-ele",
+      // Xac minh qua DevTools (F12) tren giao dien Pancake thuc te + nguoi dung xac nhan
+      // truc tiep (2026-09-13): .body-conver-item la 1 dong tin nhan hoan chinh va no LUON
+      // mang san class client-message/page-message ngay tren chinh no (khong phai o phan tu
+      // con) — nen messageItem/customerMsgSelector/agentMsgSelector deu tro thang vao no de
+      // el.matches() trong detectSender_ nhan dung. #message-col-list la vung chua toan bo
+      // danh sach tin nhan cua cuoc hoi thoai dang mo (thay cho .mdl-js cu qua rong, ap dung
+      // len ca <html> nen extractPhone() fallback quet nham toan trang).
+      messageList: "#message-col-list",
+      messageItem: ".body-conver-item",
       replyBox: "#replyBoxComposer",
       phoneSelector: "",
       orderPanelSelector: "",
-      customerMsgSelector: ".message-text-ele.client-message",
-      agentMsgSelector: ".message-text-ele.page-message"
+      customerMsgSelector: ".body-conver-item.client-message",
+      agentMsgSelector: ".body-conver-item.page-message"
     },
     messenger: {
       // Messenger dùng role/aria-label khá ổn định hơn Pancake (ít đổi class ngẫu nhiên) —
@@ -51,6 +53,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === "GET_SETTINGS") {
     chrome.storage.sync.get(null, (settings) => {
       sendResponse({ ok: true, settings: { ...DEFAULT_SETTINGS, ...settings } });
+    });
+    return true;
+  }
+
+  // Dung cho nut "Đặt lại về mặc định" trong Options — ghi de toan bo settings hien tai
+  // bang DEFAULT_SETTINGS (GAS URL + selector da xac minh), khong can go/cai lai extension.
+  if (msg?.type === "RESET_TO_DEFAULT") {
+    chrome.storage.sync.set(DEFAULT_SETTINGS, () => {
+      sendResponse({ ok: true, settings: DEFAULT_SETTINGS });
     });
     return true;
   }

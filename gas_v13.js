@@ -22,9 +22,18 @@ var ORDER_SS_ID = '1fiWXPMZcHuEh0zYqD6pgQjZDM0PhWzpiSK7Igj6Cug8'; // File chua O
 var CRM_SS_ID   = '18XBtbjP7gtlvYpChikF3B62cxHkR4426s5poZj9Mj8I'; // File chua CareData/Users/Teams/Settings/AuditLog/AssignData/AIContext (CRM).
 var PRICE_SS_ID    = '1Tfn2jOH20kv0Z-cb0BULqPuxZTap9FA3z8bXeeRl5l4'; // File "Bang gia" rieng (Danh_muc/Tinh_tien/Ghi_chu_chinh_sach)
 var PRICE_SHEET_NAME = 'DANH_MUC'; // Sheet dang bang phang, de tra cuu/loc
+var CTKM_SHEET_NAME  = 'CTKM'; // Sheet CTKM (cung file PRICE_SS_ID) — doi ten hang duoi neu ten tab thuc te khac
                         // De trong = dung file dang gan Apps Script nay (mac dinh, hanh vi cu).
                         // Dan Spreadsheet ID moi vao day de doi nguon CRM MA KHONG can gan lai script vao file khac.
 // >>> Muon doi nguon du lieu sau nay: chi can sua 2 dong ID o tren (ORDER_SS_ID va/hoac CRM_SS_ID) roi Deploy lai. <<<
+
+// ─── LINK KIEN THUC CO DINH (fallback khi chua/khong set qua Settings) ───────────
+// Dan link moi vao day roi Deploy lai neu can doi — KHONG bat CS phai bam Luu trong
+// extension nua. Neu Settings sheet co gia tri (key tuong ung) thi UU TIEN dung gia
+// tri trong Settings truoc, hardcode duoi day chi la fallback dam bao luon co san.
+var DEFAULT_PRODUCT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1YJMJs8GI7dBfDl5TNZM44n7N8lhJoeSD0KOWflU2fmM/edit?gid=1833367723#gid=1833367723';
+var DEFAULT_DRIVE_KNOWLEDGE_FOLDER_URL = 'https://drive.google.com/drive/folders/1Koz4IdENS5QgdvvYMaQO1MlVEFMFAciN?hl=vi';
+var DEFAULT_DRIVE_PRODUCT_IMAGES_FOLDER_URL = 'https://drive.google.com/drive/folders/1PES3V_bsYLcmIynMjRHPVjT6rJGTc6EO?hl=vi';
 
 function getOrderSS_() {
   return ORDER_SS_ID
@@ -162,6 +171,60 @@ function searchPriceCatalog_(rows, q) {
     if (ok) out.push(row);
   }
   return out;
+}
+
+// ─── CTKM (Sheet CTKM, cung file PRICE_SS_ID) — chi nap khi khach hoi ve khuyen mai/giam gia ──
+// Doc toan bo sheet CTKM thanh mang object, giong cach doc DANH_MUC (khong hardcode ten cot).
+function readCTKMCatalog_() {
+  var sh = SpreadsheetApp.openById(PRICE_SS_ID).getSheetByName(CTKM_SHEET_NAME);
+  if (!sh || sh.getLastRow() < 2) return [];
+  var lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
+  var vals = sh.getRange(1, 1, lastRow, lastCol).getValues();
+  var headers = vals[0].map(function(h){ return String(h || '').trim(); });
+  var rows = [];
+  for (var i = 1; i < vals.length; i++) {
+    var row = vals[i];
+    var isEmpty = row.every(function(c){ return c === '' || c === null; });
+    if (isEmpty) continue;
+    var obj = {};
+    for (var c = 0; c < headers.length; c++) {
+      if (!headers[c]) continue;
+      var v = row[c];
+      obj[headers[c]] = (v instanceof Date) ? v.toISOString() : v;
+    }
+    rows.push(obj);
+  }
+  return rows;
+}
+
+// Tu khoa nhan biet khach dang hoi ve khuyen mai/giam gia (khong dau, chu thuong)
+var _CTKM_KEYWORDS_ = ['khuyen mai','khuyenmai','giam gia','giamgia','uu dai','uudai',
+  'sale','freeship','free ship','qua tang','tang qua','ma giam','magiam','voucher',
+  'flash sale','combo uu dai','ctkm',' km ','km thang','khuyen mai gi'];
+
+// Chi tra ve noi dung CTKM khi cau hoi cua khach co tu khoa lien quan — de AI KHONG
+// tu dong nhet thong tin khuyen mai vao moi cau tra loi (dung yeu cau: chi khi khach hoi).
+function readCTKMPromotions_(query) {
+  var q = ' ' + _stripVN_(query) + ' ';
+  var matched = false;
+  for (var i = 0; i < _CTKM_KEYWORDS_.length; i++) {
+    if (q.indexOf(_CTKM_KEYWORDS_[i]) !== -1) { matched = true; break; }
+  }
+  if (!matched) return '';
+  var rows = readCTKMCatalog_();
+  if (!rows.length) return '';
+  var blocks = [];
+  for (var r = 0; r < rows.length && r < 8; r++) {
+    var row = rows[r], parts = [];
+    for (var k in row) {
+      if (!row.hasOwnProperty(k)) continue;
+      var v = row[k];
+      if (v === '' || v === null || v === undefined) continue;
+      parts.push(k + ': ' + v);
+    }
+    if (parts.length) blocks.push(parts.join(' | '));
+  }
+  return blocks.join('\n');
 }
 
 // ─── SETTINGS (1 signature duy nhat) ──────────────────────────
@@ -404,10 +467,10 @@ function doGet(e) {
     // ── Tap SDT co trong "dữ liệu đơn" — chi de loc nguon o man hinh chinh (cache 10') ──
     if (action === 'donPhones') {
       var cacheDP = CacheService.getScriptCache();
-      var cKeyDP = 'don_phones_v1';
+      var cKeyDP = 'don_phones_v2';
       var cachedDP = cacheDP.get(cKeyDP);
       if (cachedDP) { try { return jsonOut_(JSON.parse(cachedDP)); } catch(ec) {} }
-      var resDP = { phones: readDonPhones_() };
+      var resDP = { phones: readDonPhones_(), saleByPhone: getDonSaleByPhone_() };
       try { cacheDP.put(cKeyDP, JSON.stringify(resDP), 600); } catch(ec) {}
       return jsonOut_(resDP);
     }
@@ -490,6 +553,13 @@ function doGet(e) {
       var resC = buildSalesReportC_(fC);
       try { cacheC.put(cKeyC, JSON.stringify(resC), 120); } catch(ec) {}
       return jsonOut_(resC);
+    }
+
+    // ── BAO CAO D: KH "Chăm sóc" thêm nhanh (sheet riêng, KHÔNG gộp báo cáo A/B/C) ──
+    if (action === 'careLeadReport') {
+      var pD = e.parameter || {};
+      var fD = { dateFrom: pD.dateFrom || '', dateTo: pD.dateTo || '', cs: pD.cs || '' };
+      return jsonOut_(buildCareLeadReport_(fD));
     }
 
     if (action === 'assign')    return jsonOut_({ assignHistory: readAssign_(ss.getSheetByName(SH_ASSIGN)) });
@@ -836,6 +906,24 @@ function readDonPhones_() {
     if (ph) set[ph] = true;
   }
   return Object.keys(set);
+}
+// Map SDT -> mang ten sale tham gia don (cot "Thẻ", tach theo dau phay — 1 don co the nhieu
+// sale). Dung o client de gop vao csSet, dam bao CS dung ten o BAT KY don nao trong
+// "dữ liệu đơn" (du don co nhieu sale) van xem duoc KH do.
+function getDonSaleByPhone_() {
+  var rows = readDonChiTiet_();
+  var map = {};
+  for (var i = 0; i < rows.length; i++) {
+    var ph = normPhone_(String(rows[i].soDienThoai || ''));
+    if (!ph) continue;
+    var names = splitMulti_(rows[i].theSale, ',');
+    if (!names.length) continue;
+    if (!map[ph]) map[ph] = [];
+    for (var j = 0; j < names.length; j++) {
+      if (map[ph].indexOf(names[j]) === -1) map[ph].push(names[j]);
+    }
+  }
+  return map;
 }
 
 // ── Doc toan bo sheet "dữ liệu đơn" thanh mang object ──
@@ -2144,7 +2232,7 @@ function readFaqSheet_(query) {
 }
 
 function readExternalProductSheet_(query) {
-  var url = getSetting_('productSheetUrl');
+  var url = getSetting_('productSheetUrl') || DEFAULT_PRODUCT_SHEET_URL;
   if (!url) return '';
   var ss;
   try { ss = SpreadsheetApp.openByUrl(url); } catch (e) { return ''; } // chua chia se quyen / URL sai
@@ -2336,7 +2424,7 @@ function _driveKnowledgeFileIndex_(file) {
 // Doc toan bo thu muc kien thuc Drive (PDF/Doc/Sheet), khop tu khoa cau hoi khach, tra ve
 // toi da 4 doan lien quan nhat de dua vao prompt AI.
 function readDriveKnowledgeFolder_(query) {
-  var url = getSetting_('driveKnowledgeFolderUrl');
+  var url = getSetting_('driveKnowledgeFolderUrl') || DEFAULT_DRIVE_KNOWLEDGE_FOLDER_URL;
   var folderId = _driveFolderIdFromUrl_(url);
   if (!folderId) return '';
 
@@ -2497,7 +2585,7 @@ function _driveImageFromLink_(link) {
 // van ban o readExternalProductSheet_) — CS dan link Drive (file hoac folder)
 // vao do la dung duoc ngay, khong can sua code khi dien them dong moi.
 function findProductSheetImage_(query) {
-  var url = getSetting_('productSheetUrl');
+  var url = getSetting_('productSheetUrl') || DEFAULT_PRODUCT_SHEET_URL;
   if (!url) return null;
   var ss;
   try { ss = SpreadsheetApp.openByUrl(url); } catch (e) { return null; }
@@ -2543,7 +2631,8 @@ function findDriveProductImage_(query) {
   var fromSheet = findProductSheetImage_(query);
   if (fromSheet) return fromSheet;
 
-  var url = getSetting_('driveProductImagesFolderUrl') || getSetting_('driveKnowledgeFolderUrl');
+  var url = getSetting_('driveProductImagesFolderUrl') || DEFAULT_DRIVE_PRODUCT_IMAGES_FOLDER_URL
+    || getSetting_('driveKnowledgeFolderUrl') || DEFAULT_DRIVE_KNOWLEDGE_FOLDER_URL;
   var folderId = _driveFolderIdFromUrl_(url);
   if (!folderId) return null;
 
@@ -2601,6 +2690,9 @@ function _buildAISystemPrompt_(userMsg, withProducts) {
   // Q&A tu sheet FAQ (khop tu khoa cau hoi khach) — de AI hoc cach xu ly cau hoi kho theo team
   var faq = readFaqSheet_(userMsg);
   if (faq) parts.push('\n\nCAC CAU HOI KHO & CACH TRA LOI MAU CUA TEAM (uu tien bam sat cach xu ly / giong dieu nay khi tra loi cau tuong tu; dieu chinh cho hop ngu canh khach, KHONG copy nguyen van neu khong khop hoan toan):\n' + faq);
+  // CTKM: chi nap khi cau hoi cua khach co tu khoa khuyen mai/giam gia (xem readCTKMPromotions_)
+  var ctkm = readCTKMPromotions_(userMsg);
+  if (ctkm) parts.push('\n\nCHUONG TRINH KHUYEN MAI (CTKM) DANG AP DUNG (chi dung khi khach hoi ve khuyen mai/giam gia, KHONG tu bia them neu khong co trong danh sach nay):\n' + ctkm);
   parts.push('\n\nYEU CAU: Chi dua ra DUY NHAT 1 cau tra loi ngan gon (toi da 150 tu). Khong danh so, khong giai thich them.');
   return parts.join('');
 }
@@ -2655,10 +2747,16 @@ function callAI_(data) {
   var withProducts = !!data.withProducts;
   var sys = _buildAISystemPrompt_(userMsg, withProducts);
 
+  // LUU Y (2026-09-13): llama-3.3-70b-versatile bi Groq NGUNG HO TRO tu 16/8/2026
+  // (model_decommissioned) va gemini-2.0-flash bi Google NGUNG HO TRO tu 1/6/2026
+  // (404) — day la ly do CA 2 provider cung loi dong loat, khong phai do sai key.
+  // Doi sang model con duoc ho tro: openai/gpt-oss-120b (Groq, model san xuat hien
+  // tai) va gemini-flash-latest (alias Google tu dong tro ve ban Flash on dinh moi
+  // nhat, tranh phai sua code moi khi Google lai ngung ho tro 1 phien ban cu the).
   var providers = [
-    { name: 'Groq',     key: getSetting_('apiGroq') || getSetting_('geminiKey'), fn: _aiOpenAICompat_, url: 'https://api.groq.com/openai/v1/chat/completions',     model: 'llama-3.3-70b-versatile' },
-    { name: 'Cerebras', key: getSetting_('apiCerebras'),                          fn: _aiOpenAICompat_, url: 'https://api.cerebras.ai/v1/chat/completions',        model: 'llama-3.3-70b' },
-    { name: 'Gemini',   key: getSetting_('apiGemini'),                            fn: _aiGemini_,       model: 'gemini-2.0-flash' }
+    { name: 'Groq',     key: getSetting_('apiGroq') || getSetting_('geminiKey'), fn: _aiOpenAICompat_, url: 'https://api.groq.com/openai/v1/chat/completions',     model: 'openai/gpt-oss-120b' },
+    { name: 'Cerebras', key: getSetting_('apiCerebras'),                          fn: _aiOpenAICompat_, url: 'https://api.cerebras.ai/v1/chat/completions',        model: 'gpt-oss-120b' },
+    { name: 'Gemini',   key: getSetting_('apiGemini'),                            fn: _aiGemini_,       model: 'gemini-flash-latest' }
   ];
 
   var errors = [], anyKey = false;
