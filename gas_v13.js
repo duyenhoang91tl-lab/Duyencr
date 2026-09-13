@@ -509,6 +509,10 @@ function doGet(e) {
 
     if (action === 'dashboard') return jsonOut_(buildDashboard_());
 
+    // ── MESSENGER/PHONG THUY AI: danh sach trang thai CS dung chung (Settings!careStatus) — nhe,
+    //    khong keo theo toan bo rows CareData nhu action 'customers'. Them 2026-09 cho extension Messenger. ──
+    if (action === 'careStatusOptions') return jsonOut_({ ok: true, options: readCareStatus_(ss) || [] });
+
     // ── Bao cao doanh so CRM moi (nguon: Google Sheet "DT tong" goc) ──
     if (action === 'salesReportA') {
       var pA = e.parameter || {};
@@ -1657,6 +1661,9 @@ function doPost(e) {
     if (action === 'dedupeCare')           return dedupeCare_();
     // ── HOI THAM TU DONG: luu bang mau tin (UI Sasum) ──
     if (action === 'saveFollowUpTemplates') return saveFollowUpTemplates_(data.templates);
+    // ── MESSENGER/PHONG THUY AI: doc bang tra menh + mau canned response (Sheet Menh/CannedResponses,
+    //    tu tao voi du lieu mac dinh neu chua co). Them 2026-09, KHONG dung chung sheet/cot voi CareData. ──
+    if (action === 'getKnowledge') return jsonOut_(getMessengerKnowledge_());
     return jsonOut_({ error: 'Unknown action: ' + action });
   } catch(err) {
     return jsonOut_({ error: err.message });
@@ -3590,4 +3597,66 @@ function saveTaskComment_(c) {
   sh.appendRow([id, String(c.taskId), c.author || 'Ẩn danh', c.content || '',
                 JSON.stringify(c.images || []), now]);
   return jsonOut_({ ok: true, id: id });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MESSENGER / PHONG THUY AI — them 2026-09, phuc vu extension-messenger.
+//  CHI THEM MOI, khong sua ham/sheet nao o tren. Dung 2 sheet rieng (Menh, CannedResponses),
+//  KHONG dung chung cot voi CareData — tranh dung do schema dang chay that cho Zalo/Pancake.
+// ═══════════════════════════════════════════════════════════════
+var SH_MENH = 'Menh';
+var SH_CANNED = 'CannedResponses';
+
+// Bang tra menh Ngu hanh nap am (chep tu bang CS da doi chieu — chi khop nam 1954-2013,
+// can chuyen gia phong thuy trong cong ty ra soat/bo sung truoc khi dung chinh thuc rong rai hon).
+var MENH_DEFAULT_ROWS = [
+  ['Kim', '1954,1955,1962,1963,1970,1971,1984,1985,1992,1993,2000,2001'],
+  ['Thủy', '1956,1957,1964,1965,1972,1973,1986,1987,1994,1995,2002,2003'],
+  ['Hỏa', '1958,1959,1966,1967,1974,1975,1988,1989,1996,1997,2004,2005'],
+  ['Mộc', '1960,1961,1968,1969,1982,1983,1990,1991,1998,1999,2012,2013'],
+  ['Thổ', '1976,1977,1978,1979,1980,1981,2006,2007,2008,2009,2010,2011']
+];
+
+// 11 mau canned response (Phan A/B/C file mau Beeftext CS gui) — Nhom | ID | Ten | NoiDung
+var CANNED_DEFAULT_ROWS = [
+  ['Theo mệnh', 'menhkim', 'Mệnh Kim', 'Dạ với người mệnh Kim thì màu hợp là màu trắng, vàng, bạc (thuộc hành Kim và Thổ vì Thổ sinh Kim ạ), nên tránh dùng nhiều màu đỏ, hồng, tím (hành Hỏa khắc Kim).\nĐá phong thủy hợp mệnh Kim: đá thạch anh trắng, đá mắt hổ vàng, ngọc trai, đá obsidian đen (Thủy tương sinh).\nBên em hiện có $$ rất phù hợp với mệnh Kim ạ, chị/anh xem qua thử nhé.'],
+  ['Theo mệnh', 'menhmoc', 'Mệnh Mộc', 'Dạ với người mệnh Mộc thì màu hợp là màu xanh lá, xanh dương, đen (hành Mộc và Thủy vì Thủy sinh Mộc ạ), nên tránh dùng nhiều màu trắng, bạc (hành Kim khắc Mộc).\nĐá phong thủy hợp mệnh Mộc: đá aventurine xanh, ngọc bích, đá obsidian đen.\nBên em hiện có $$ rất phù hợp với mệnh Mộc ạ, chị/anh xem qua thử nhé.'],
+  ['Theo mệnh', 'menhthuy', 'Mệnh Thủy', 'Dạ với người mệnh Thủy thì màu hợp là màu đen, xanh dương, trắng (hành Thủy và Kim vì Kim sinh Thủy ạ), nên tránh dùng nhiều màu vàng nâu (hành Thổ khắc Thủy).\nĐá phong thủy hợp mệnh Thủy: đá obsidian đen, đá lapis lazuli xanh, đá thạch anh trắng.\nBên em hiện có $$ rất phù hợp với mệnh Thủy ạ, chị/anh xem qua thử nhé.'],
+  ['Theo mệnh', 'menhhoa', 'Mệnh Hỏa', 'Dạ với người mệnh Hỏa thì màu hợp là màu đỏ, hồng, tím, xanh lá (hành Hỏa và Mộc vì Mộc sinh Hỏa ạ), nên tránh dùng nhiều màu đen, xanh dương (hành Thủy khắc Hỏa).\nĐá phong thủy hợp mệnh Hỏa: đá thạch anh hồng, đá garnet đỏ, đá aventurine xanh.\nBên em hiện có $$ rất phù hợp với mệnh Hỏa ạ, chị/anh xem qua thử nhé.'],
+  ['Theo mệnh', 'menhtho', 'Mệnh Thổ', 'Dạ với người mệnh Thổ thì màu hợp là màu vàng, nâu, đỏ, hồng (hành Thổ và Hỏa vì Hỏa sinh Thổ ạ), nên tránh dùng nhiều màu xanh lá (hành Mộc khắc Thổ).\nĐá phong thủy hợp mệnh Thổ: đá mắt hổ vàng, đá citrine vàng, đá thạch anh hồng.\nBên em hiện có $$ rất phù hợp với mệnh Thổ ạ, chị/anh xem qua thử nhé.'],
+  ['Giá & chính sách', 'chaohoi', 'Chào hỏi', 'Dạ em chào chị/anh, em là $$ bên shop phong thủy Thu Hiền ạ. Chị/anh cho em xin năm sinh để em tư vấn sản phẩm hợp mệnh nhất mình nhé ạ 🙏'],
+  ['Giá & chính sách', 'giaba', 'Báo giá', 'Dạ sản phẩm $$ bên em giá là $$ ạ. Giá này đã bao gồm hộp đựng và thẻ bảo hành, chưa gồm phí ship ạ. Chị/anh có muốn em tư vấn thêm mẫu khác cùng tầm giá không ạ?'],
+  ['Giá & chính sách', 'csship', 'Chính sách ship', 'Dạ bên em giao hàng toàn quốc qua đơn vị vận chuyển, thời gian dự kiến 2–4 ngày với nội thành và 3–5 ngày với tỉnh xa ạ. Chị/anh có thể xem hàng trước khi thanh toán (COD) ạ.'],
+  ['Giá & chính sách', 'csdoitra', 'Đổi trả', 'Dạ sản phẩm bên em hỗ trợ đổi trong vòng 7 ngày nếu lỗi do nhà sản xuất hoặc không đúng mẫu đã đặt ạ, còn đổi ý cá nhân thì em xin phép hỗ trợ đổi mẫu khác tương đương giá trị trong 3 ngày ạ (khách chịu phí ship đổi). Chị/anh yên tâm mua ạ 🙏'],
+  ['Giá & chính sách', 'xinttin', 'Xin thông tin lên đơn', 'Dạ để lên đơn cho chị/anh, em xin thông tin: \n- Họ tên: $$\n- Số điện thoại: $$\n- Địa chỉ nhận hàng: $$\nChị/anh gửi giúp em với ạ, em lên đơn ngay ạ.'],
+  ['Giá & chính sách', 'follow2ngay', 'Follow-up 2 ngày', 'Dạ em là $$ bên phong thủy Thu Hiền ạ, hôm trước chị/anh có quan tâm sản phẩm $$, không biết chị/anh đã quyết định chưa ạ? Hiện bên em đang có ưu đãi $$, chị/anh xem thử nhé ạ 🙏']
+];
+
+function ensureMenhSheedSeeded_(sh) {
+  if (sh.getLastRow() < 2) { for (var i = 0; i < MENH_DEFAULT_ROWS.length; i++) sh.appendRow(MENH_DEFAULT_ROWS[i]); }
+  return sh;
+}
+function ensureCannedSheetSeeded_(sh) {
+  if (sh.getLastRow() < 2) { for (var i = 0; i < CANNED_DEFAULT_ROWS.length; i++) sh.appendRow(CANNED_DEFAULT_ROWS[i]); }
+  return sh;
+}
+
+function getMessengerKnowledge_() {
+  var shMenh = ensureMenhSheedSeeded_(getSheet_(SH_MENH, ['Menh', 'NamSinh (cách nhau bởi dấu phẩy)']));
+  var menhData = shMenh.getDataRange().getValues();
+  var menhTable = {};
+  for (var r = 1; r < menhData.length; r++) {
+    var menh = String(menhData[r][0] || '').trim();
+    if (!menh) continue;
+    menhTable[menh] = String(menhData[r][1] || '').split(',').map(function (s) { return parseInt(s.trim(), 10); }).filter(function (n) { return !isNaN(n); });
+  }
+
+  var shCanned = ensureCannedSheetSeeded_(getSheet_(SH_CANNED, ['Nhom', 'ID', 'Ten', 'NoiDung']));
+  var cannedData = shCanned.getDataRange().getValues();
+  var canned = [];
+  for (var c = 1; c < cannedData.length; c++) {
+    if (!cannedData[c][1]) continue;
+    canned.push({ nhom: cannedData[c][0], id: cannedData[c][1], label: cannedData[c][2], text: cannedData[c][3] });
+  }
+  return { ok: true, menhTable: menhTable, canned: canned };
 }
