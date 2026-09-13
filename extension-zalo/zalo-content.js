@@ -363,6 +363,8 @@
 
     panel.appendChild(body);
     document.body.appendChild(panel);
+    _restorePanelState_zai_(panel);
+    _initPanelDrag_zai_(panel, hdr);
 
     // ── EVENTS ──
     cfgBtn.addEventListener('click', () => { _cfgVisible = !_cfgVisible; cfg.style.display = _cfgVisible ? 'block' : 'none'; });
@@ -484,7 +486,69 @@
     const panel = document.getElementById('ome-zai-panel');
     const btn   = document.getElementById('ome-zai-toggle');
     if (!panel) return;
-    panel.classList.toggle('open'); btn.classList.toggle('shifted');
+    const opening = !panel.classList.contains('open');
+    panel.classList.toggle('open');
+    btn.classList.toggle('shifted');
+    // Bù trừ nút tròn theo ĐÚNG bề rộng hiện tại của panel (panel giờ kéo giãn/di chuyển
+    // được, không còn cố định 320px như trước) — tránh nút tròn đè lên góc panel.
+    btn.style.right = opening ? (panel.offsetWidth + 32) + 'px' : '';
+  }
+
+  // ── Nhớ vị trí/kích thước/trạng thái mở của panel giữa các lần tải trang ──
+  function _restorePanelState_zai_(panel) {
+    try {
+      chrome.storage.local.get(['zaiPanelPos', 'zaiPanelSize'], (res) => {
+        if (res.zaiPanelPos && typeof res.zaiPanelPos.right === 'number' && typeof res.zaiPanelPos.bottom === 'number') {
+          panel.style.right = res.zaiPanelPos.right + 'px';
+          panel.style.bottom = res.zaiPanelPos.bottom + 'px';
+        }
+        if (res.zaiPanelSize && res.zaiPanelSize.width && res.zaiPanelSize.height) {
+          panel.style.width = res.zaiPanelSize.width + 'px';
+          panel.style.height = res.zaiPanelSize.height + 'px';
+        }
+      });
+    } catch (e) {}
+  }
+
+  // ── Kéo-thả di chuyển panel bằng thanh header (giữ nguyên click nút ⚙) ──
+  function _initPanelDrag_zai_(panel, header) {
+    if (!header) return;
+    let dragging = false, startX = 0, startY = 0, startRight = 0, startBottom = 0;
+
+    header.addEventListener('mousedown', (e) => {
+      if (e.target.closest('button')) return; // không kéo khi bấm nút cài đặt
+      dragging = true;
+      startX = e.clientX; startY = e.clientY;
+      const cs = getComputedStyle(panel);
+      startRight = parseFloat(cs.right) || 0;
+      startBottom = parseFloat(cs.bottom) || 0;
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - startX, dy = e.clientY - startY;
+      let newRight = startRight - dx, newBottom = startBottom - dy;
+      newRight = Math.max(4, Math.min(newRight, window.innerWidth - 80));
+      newBottom = Math.max(4, Math.min(newBottom, window.innerHeight - 40));
+      panel.style.right = newRight + 'px';
+      panel.style.bottom = newBottom + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+      if (!dragging) return;
+      dragging = false;
+      try {
+        chrome.storage.local.set({
+          zaiPanelPos: { right: parseFloat(panel.style.right) || 16, bottom: parseFloat(panel.style.bottom) || 72 }
+        });
+      } catch (e) {}
+    });
+
+    try {
+      new ResizeObserver(() => {
+        if (!panel.offsetWidth || !panel.offsetHeight) return; // panel dang dong (display:none)
+        chrome.storage.local.set({ zaiPanelSize: { width: panel.offsetWidth, height: panel.offsetHeight } });
+      }).observe(panel);
+    } catch (e) {}
   }
 
   async function saveConfig() {
