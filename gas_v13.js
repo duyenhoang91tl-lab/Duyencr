@@ -34,6 +34,12 @@ var CTKM_SHEET_NAME  = 'CTKM'; // Sheet CTKM (cung file PRICE_SS_ID) — doi ten
 var DEFAULT_PRODUCT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1YJMJs8GI7dBfDl5TNZM44n7N8lhJoeSD0KOWflU2fmM/edit?gid=1833367723#gid=1833367723';
 var DEFAULT_DRIVE_KNOWLEDGE_FOLDER_URL = 'https://drive.google.com/drive/folders/1Koz4IdENS5QgdvvYMaQO1MlVEFMFAciN?hl=vi';
 var DEFAULT_DRIVE_PRODUCT_IMAGES_FOLDER_URL = 'https://drive.google.com/drive/folders/1PES3V_bsYLcmIynMjRHPVjT6rJGTc6EO?hl=vi';
+// API key AI (Groq/Gemini/OpenRouter) cung theo pattern nay — CS dung Zalo AI/Pancake AI
+// KHONG can tu nhap key trong Cai dat nua. Cerebras chua co key co dinh nen van doc rieng
+// tu Settings (neu team tu nhap sau nay).
+var DEFAULT_API_GROQ_KEY = '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';
+var DEFAULT_API_GEMINI_KEY = 'AQ.Ab8RN6KRb0MjSj60RjCW0G8uRhM76C6CIyjPvNtLdLrD4NWWBQ';
+var DEFAULT_API_OPENROUTER_KEY = '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';
 
 function getOrderSS_() {
   return ORDER_SS_ID
@@ -2853,10 +2859,10 @@ function callAI_(data) {
   // tai) va gemini-flash-latest (alias Google tu dong tro ve ban Flash on dinh moi
   // nhat, tranh phai sua code moi khi Google lai ngung ho tro 1 phien ban cu the).
   var providers = [
-    { name: 'Groq',       key: getSetting_('apiGroq') || getSetting_('geminiKey'), fn: _aiOpenAICompat_, url: 'https://api.groq.com/openai/v1/chat/completions',        model: 'openai/gpt-oss-120b' },
-    { name: 'Cerebras',   key: getSetting_('apiCerebras'),                          fn: _aiOpenAICompat_, url: 'https://api.cerebras.ai/v1/chat/completions',           model: 'gpt-oss-120b' },
-    { name: 'Gemini',     key: getSetting_('apiGemini'),                            fn: _aiGemini_,       model: 'gemini-flash-latest' },
-    { name: 'OpenRouter', key: getSetting_('apiOpenRouter'),                        fn: _aiOpenAICompat_, url: 'https://openrouter.ai/api/v1/chat/completions',         model: 'google/gemma-2-9b-it:free' }
+    { name: 'Groq',       key: getSetting_('apiGroq') || getSetting_('geminiKey') || DEFAULT_API_GROQ_KEY, fn: _aiOpenAICompat_, url: 'https://api.groq.com/openai/v1/chat/completions',        model: 'openai/gpt-oss-120b' },
+    { name: 'Cerebras',   key: getSetting_('apiCerebras'),                                                  fn: _aiOpenAICompat_, url: 'https://api.cerebras.ai/v1/chat/completions',           model: 'gpt-oss-120b' },
+    { name: 'Gemini',     key: getSetting_('apiGemini') || DEFAULT_API_GEMINI_KEY,                          fn: _aiGemini_,       model: 'gemini-flash-latest' },
+    { name: 'OpenRouter', key: getSetting_('apiOpenRouter') || DEFAULT_API_OPENROUTER_KEY,                  fn: _aiOpenAICompat_, url: 'https://openrouter.ai/api/v1/chat/completions',         model: 'google/gemma-2-9b-it:free' }
   ];
 
   var errors = [], anyKey = false;
