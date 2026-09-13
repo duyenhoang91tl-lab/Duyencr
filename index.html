@@ -1401,6 +1401,17 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
 // ═══════════════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════════════
+// BUG FIX: splitMulti_ duoc dung o vai cho (careCSSet, _schedResponsibleCS) trong chinh
+// script nay nhung truoc day CHUA duoc dinh nghia o phia client — ham cung ten chi ton tai
+// trong ban sao code backend (khoi tham khao "Copy Apps Script Code", khong thuc thi trong
+// trinh duyet) — gay loi "splitMulti_ is not defined" khi Auto-sync chay. Dinh nghia lai
+// dung y het logic ben backend de dung o day.
+function splitMulti_(str, delimiter) {
+  if (!str && str !== 0) return [];
+  var s = String(str);
+  if (!s.trim()) return [];
+  return s.split(delimiter).map(function(x){ return x.trim(); }).filter(function(x){ return x !== ''; });
+}
 // Nguồn được tính là "mua lại" — dùng để phân loại VIP/Thân thiết/Tiềm năng
 const RENEW_SOURCES = ['kh renew','kh renew mkt','kh giới thiệu','data đảo renew'];
 // Thu thập TẤT CẢ các nguồn (không lọc bỏ nguồn nào)
