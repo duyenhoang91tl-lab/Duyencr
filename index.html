@@ -782,7 +782,6 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
     <button class="settings-row" id="pushbtn" style="display:none" onclick="closeSettingsModal();pushOrdersToGS()" title="Thêm nhanh các đơn MỚI lên Google Sheets (không xóa/sửa đơn cũ)">📤 Đẩy dữ liệu</button>
     <button class="settings-row" id="fullsyncbtn" style="display:none" onclick="closeSettingsModal();fullSyncOrdersToGS()" title="Đồng bộ 2 chiều (GỘP): tải đơn từ Google Sheets về máy + đẩy đơn mới của máy lên Sheets. KHÔNG xóa đơn nào.">🔁 Đồng bộ 2 chiều</button>
     <button class="settings-row" id="dupbtn" style="display:none" onclick="closeSettingsModal();openDupOrdersModal()" title="Quét đơn hàng bị trùng (cùng SĐT + ngày mua + sản phẩm, kể cả khi doanh thu bị lệch do lỗi nhập liệu) trên Google Sheets — luôn hỏi xác nhận trước khi xóa">🗑️ Đơn trùng</button>
-    <button class="settings-row" id="nameguessbtn" style="display:none" onclick="closeSettingsModal();openNameGuessModal()" title="Quét toàn bộ đơn hàng, đoán tên khách từ dòng đầu cột Sản phẩm (bỏ SĐT/xưng hô) cho những khách CHƯA có tên — luôn hỏi xác nhận trước khi ghi">🏷️ Tách tên KH</button>
     <div class="divider" style="margin:4px 0"></div>
     <button class="settings-row danger" id="clearbtn" style="display:none" onclick="closeSettingsModal();clearData()">Xóa data</button>
   </div>
@@ -932,7 +931,7 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
       <span class="gs-dot off" id="gs-dot"></span>
       <span id="gs-pill-txt">Google Sheets</span>
     </div>
-    <button class="btn sm" onclick="openSettingsModal()" title="Tác vụ dữ liệu: Tải Excel, Sync, Đẩy dữ liệu, Đồng bộ 2 chiều, Đơn trùng, Tách tên KH, Xóa data">⚙️ Tác vụ</button>
+    <button class="btn sm" onclick="openSettingsModal()" title="Tác vụ dữ liệu: Tải Excel, Sync, Đẩy dữ liệu, Đồng bộ 2 chiều, Đơn trùng, Xóa data">⚙️ Tác vụ</button>
     <input type="file" id="fi" accept=".xlsx,.xls" multiple onchange="handleFiles(event)">
   </div>
 </header>
@@ -1841,7 +1840,7 @@ function saveGsUrl() {
   closeGsModal();
   toast('✓ Đã lưu URL Google Sheets');
   show('syncbtn'); // Hiện nút Sync ngay
-  if (allCustomers.length) { show('pushbtn'); show('fullsyncbtn'); show('dupbtn'); show('nameguessbtn'); }
+  if (allCustomers.length) { show('pushbtn'); show('fullsyncbtn'); show('dupbtn'); }
 }
 async function testGsConnection() {
   const raw = document.getElementById('gs-url-input').value;
@@ -2038,7 +2037,7 @@ async function syncFromGS(opts) {
     if (orderCount > 0) {
       buildCustomers();
       show('syncbtn');
-      show('pushbtn'); show('fullsyncbtn'); show('dupbtn'); show('nameguessbtn'); show('nameguessbtn');
+      show('pushbtn'); show('fullsyncbtn'); show('dupbtn');
     } else {
       rebuildCareOnCustomers();
     }
@@ -2223,7 +2222,7 @@ async function processFiles(files) {
   if (gsUrl) {
     // sync-banner hidden
     show('syncbtn');
-    show('pushbtn'); show('fullsyncbtn'); show('dupbtn'); show('nameguessbtn');
+    show('pushbtn'); show('fullsyncbtn'); show('dupbtn');
     syncFromGS({ pullOrders: false });
   }
 }
@@ -2354,7 +2353,16 @@ function buildCustomers() {
     // CareData đã có tên (vd Pancake AI/Zalo AI đọc được từ khung "Sản phẩm order") → dùng tên đó
     // Ten da luu tay (care.name) LUON uu tien hon ten tu nhan dien tu don hang — mot khi CS da
     // xac nhan/sua ten thi khong de ten tu dong (co the sai/rac) ghi de len nua.
-    const displayName = care.name ? care.name : c.name;
+    let displayName = care.name ? care.name : c.name;
+    // Chưa có tên thật ở đâu cả (CareData lẫn đơn hàng) → tự động đoán từ dòng đầu cột
+    // "Sản phẩm" của đơn gần nhất có thông tin hợp lệ, CHỈ để hiển thị (xem hàm ở trên).
+    let nameGuessed = false;
+    if (displayName === c.phone) {
+      for (const o of c.orders) {
+        const guess = _parseNameFromOrderText(o.product);
+        if (guess) { displayName = guess; nameGuessed = true; break; }
+      }
+    }
 
     // Precompute year/month/hour cho mỗi đơn (dùng để lọc nhanh)
     const ymList = c.orders.map(o => {
@@ -2377,6 +2385,7 @@ function buildCustomers() {
     return {
       ...c,
       name: displayName,
+      nameGuessed,
       sources:[...c.sources], brands:[...c.brands].filter(Boolean),
       totalOrders:tot, totalRevenue:rev,
       renewOrders:renewCount, tier,
@@ -2409,7 +2418,7 @@ function buildCustomers() {
   document.getElementById('data-view').style.display = 'flex';
   document.getElementById('clearbtn').style.display = '';
   txt('fstatus', `${fmt(allCustomers.length)} KH — ${loadedFiles.length} file`);
-  if (gsUrl) { updateGsPill(true); show('syncbtn'); show('pushbtn'); show('fullsyncbtn'); show('dupbtn'); show('nameguessbtn'); }
+  if (gsUrl) { updateGsPill(true); show('syncbtn'); show('pushbtn'); show('fullsyncbtn'); show('dupbtn'); }
   if (typeof updateMyDataBadge === 'function') updateMyDataBadge();
 }
 
@@ -2850,7 +2859,7 @@ function _rowHtml(c) {
     tacdongHtml = `<span style="color:var(--hint);font-size:11px">—</span>`;
   }
   return `<tr data-phone="${esc(c.phone)}" onclick="openDp(this.dataset.phone)">
-    <td class="col-name"><div class="cname">${esc(c.name)}</div><div class="cphone" style="display:flex;align-items:center;gap:4px">${c.phone}<button data-phone="${esc(c.phone)}" onclick="event.stopPropagation();copyPhone(this.dataset.phone)" title="Copy SĐT" style="background:none;border:none;cursor:pointer;font-size:11px;padding:0 2px;color:var(--hint);line-height:1;opacity:.6" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'">📋</button></div></td>
+    <td class="col-name"><div class="cname"${c.nameGuessed ? ' style="font-style:italic;color:var(--muted)" title="Tên tự động đoán từ đơn hàng, chưa xác nhận — bấm vào khách để sửa nếu chưa đúng"' : ''}>${esc(c.name)}${c.nameGuessed ? ' <span style="font-size:10px">(đoán)</span>' : ''}</div><div class="cphone" style="display:flex;align-items:center;gap:4px">${c.phone}<button data-phone="${esc(c.phone)}" onclick="event.stopPropagation();copyPhone(this.dataset.phone)" title="Copy SĐT" style="background:none;border:none;cursor:pointer;font-size:11px;padding:0 2px;color:var(--hint);line-height:1;opacity:.6" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'">📋</button></div></td>
     <td class="col-tier">${tb}</td>
     <td class="col-care">${cb}${khb ? '<br>'+khb : ''}</td>
     <td class="col-zalo">${zb}</td>
@@ -5290,7 +5299,6 @@ function clearData() {
   document.getElementById('pushbtn').style.display='none';
   var _fsb=document.getElementById('fullsyncbtn'); if(_fsb) _fsb.style.display='none';
   var _dpb=document.getElementById('dupbtn'); if(_dpb) _dpb.style.display='none';
-  var _ngb=document.getElementById('nameguessbtn'); if(_ngb) _ngb.style.display='none';
   hide('sync-banner');
   txt('fstatus','Chưa có dữ liệu');
 }
@@ -5580,6 +5588,21 @@ function parseDate(v){
   const m=str.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
   if(m){const yr=parseInt(m[3]);return new Date(yr<100?2000+yr:yr,parseInt(m[2])-1,parseInt(m[1]));}
   return null;
+}
+// ── Đoán tên khách từ dòng đầu cột "Sản phẩm" (DT TỔNG) — NV thường gõ tay dạng
+// "Chị Tên\nĐịa chỉ...\nĐt:...". Dùng CHỈ để HIỂN THỊ tự động trong danh sách khi khách
+// chưa có tên thật ở đâu cả — KHÔNG ghi lại vào CareData/DT TỔNG (tránh đoán sai làm hỏng
+// dữ liệu gốc). Giống hệt logic `_parseNameFromOrderText_` phía backend (gas_v13.js) để
+// khớp kết quả nếu sau này có đối chiếu.
+function _parseNameFromOrderText(text){
+  if (!text) return '';
+  var firstLine = String(text).split('\n')[0].trim();
+  if (!firstLine) return '';
+  var s = firstLine;
+  s = s.replace(/(\+?84|0)\d{8,10}/g, '').trim();
+  s = s.replace(/^(anh|chị|chi|ông|ong|bà|ba|em|c|a)\b\s*[:.]?\s*/i, '').trim();
+  s = s.replace(/^[:.\-–]\s*/, '').replace(/[:.\-–]\s*$/, '').trim();
+  return s;
 }
 function normPhone(v){
   if(!v) return null;
