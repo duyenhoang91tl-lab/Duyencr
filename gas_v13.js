@@ -27,6 +27,14 @@ var CTKM_SHEET_NAME  = 'CTKM'; // Sheet CTKM (cung file PRICE_SS_ID) — doi ten
                         // Dan Spreadsheet ID moi vao day de doi nguon CRM MA KHONG can gan lai script vao file khac.
 // >>> Muon doi nguon du lieu sau nay: chi can sua 2 dong ID o tren (ORDER_SS_ID va/hoac CRM_SS_ID) roi Deploy lai. <<<
 
+// ─── LINK KIEN THUC CO DINH (fallback khi chua/khong set qua Settings) ───────────
+// Dan link moi vao day roi Deploy lai neu can doi — KHONG bat CS phai bam Luu trong
+// extension nua. Neu Settings sheet co gia tri (key tuong ung) thi UU TIEN dung gia
+// tri trong Settings truoc, hardcode duoi day chi la fallback dam bao luon co san.
+var DEFAULT_PRODUCT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1YJMJs8GI7dBfDl5TNZM44n7N8lhJoeSD0KOWflU2fmM/edit?gid=1833367723#gid=1833367723';
+var DEFAULT_DRIVE_KNOWLEDGE_FOLDER_URL = 'https://drive.google.com/drive/folders/1Koz4IdENS5QgdvvYMaQO1MlVEFMFAciN?hl=vi';
+var DEFAULT_DRIVE_PRODUCT_IMAGES_FOLDER_URL = 'https://drive.google.com/drive/folders/1PES3V_bsYLcmIynMjRHPVjT6rJGTc6EO?hl=vi';
+
 function getOrderSS_() {
   return ORDER_SS_ID
     ? SpreadsheetApp.openById(ORDER_SS_ID)
@@ -2224,7 +2232,7 @@ function readFaqSheet_(query) {
 }
 
 function readExternalProductSheet_(query) {
-  var url = getSetting_('productSheetUrl');
+  var url = getSetting_('productSheetUrl') || DEFAULT_PRODUCT_SHEET_URL;
   if (!url) return '';
   var ss;
   try { ss = SpreadsheetApp.openByUrl(url); } catch (e) { return ''; } // chua chia se quyen / URL sai
@@ -2416,7 +2424,7 @@ function _driveKnowledgeFileIndex_(file) {
 // Doc toan bo thu muc kien thuc Drive (PDF/Doc/Sheet), khop tu khoa cau hoi khach, tra ve
 // toi da 4 doan lien quan nhat de dua vao prompt AI.
 function readDriveKnowledgeFolder_(query) {
-  var url = getSetting_('driveKnowledgeFolderUrl');
+  var url = getSetting_('driveKnowledgeFolderUrl') || DEFAULT_DRIVE_KNOWLEDGE_FOLDER_URL;
   var folderId = _driveFolderIdFromUrl_(url);
   if (!folderId) return '';
 
@@ -2577,7 +2585,7 @@ function _driveImageFromLink_(link) {
 // van ban o readExternalProductSheet_) — CS dan link Drive (file hoac folder)
 // vao do la dung duoc ngay, khong can sua code khi dien them dong moi.
 function findProductSheetImage_(query) {
-  var url = getSetting_('productSheetUrl');
+  var url = getSetting_('productSheetUrl') || DEFAULT_PRODUCT_SHEET_URL;
   if (!url) return null;
   var ss;
   try { ss = SpreadsheetApp.openByUrl(url); } catch (e) { return null; }
@@ -2623,7 +2631,8 @@ function findDriveProductImage_(query) {
   var fromSheet = findProductSheetImage_(query);
   if (fromSheet) return fromSheet;
 
-  var url = getSetting_('driveProductImagesFolderUrl') || getSetting_('driveKnowledgeFolderUrl');
+  var url = getSetting_('driveProductImagesFolderUrl') || DEFAULT_DRIVE_PRODUCT_IMAGES_FOLDER_URL
+    || getSetting_('driveKnowledgeFolderUrl') || DEFAULT_DRIVE_KNOWLEDGE_FOLDER_URL;
   var folderId = _driveFolderIdFromUrl_(url);
   if (!folderId) return null;
 
