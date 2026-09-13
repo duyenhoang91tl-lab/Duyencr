@@ -830,9 +830,8 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
       <div class="adv-chips" id="adv-cs-chips"></div>
     </div>
     <div class="adv-section">
-      <div class="adv-section-label">🛍 Sản phẩm (chọn nhiều — khớp cả khi ô Sản phẩm order chứa nhiều sản phẩm gộp chung)</div>
-      <input type="text" class="col-dd-search" id="adv-product-search" placeholder="Gõ tên sản phẩm rồi Enter để thêm, hoặc tìm trong gợi ý..." style="margin:0 0 6px;width:100%;box-sizing:border-box" oninput="filterAdvChipList('products', this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();addAdvProductTerm(this);}">
-      <div class="adv-chips" id="adv-product-chips"></div>
+      <div class="adv-section-label">🛍 Sản phẩm — gõ tên, cách nhau bằng dấu phẩy để lọc nhiều sản phẩm (khớp cả khi ô Sản phẩm order chứa nhiều sản phẩm gộp chung)</div>
+      <input type="text" class="col-dd-search" id="adv-product-search" placeholder="vd: tỳ hưu, nhẫn 10k, ..." style="margin:0;width:100%;box-sizing:border-box" oninput="syncAdvProductInput(this.value)">
     </div>
     <div class="adv-section">
       <div class="adv-section-label">📦 Nguồn đơn (chọn nhiều)</div>
@@ -5810,19 +5809,14 @@ function openAdvModal() {
   // Build chips — giới hạn theo CS đang chọn ở "Lọc theo CS"
   const _base = (typeof scopedCustomers==='function') ? scopedCustomers() : allCustomers;
   const allCS = [...new Set(allCustomers.flatMap(c=>[..._buildCsSet_(c.orders, c.phone),...(c.careCSSet||[])]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi'));
-  const allProducts = [...new Set(_base.flatMap(c=>c.brands).filter(Boolean))].sort();
   const allSources = [...new Set(_base.flatMap(c=>c.sources).filter(Boolean))].sort();
-  // Từ khoá sản phẩm đã tự gõ thêm (không nằm trong danh sách brand gợi ý) vẫn phải hiện lại dạng chip đã chọn
-  const extraProductTerms = [...advFilters.products].filter(p=>!allProducts.includes(p));
   _advChipCache.cs = allCS;
-  _advChipCache.products = [...extraProductTerms, ...allProducts];
   buildAdvChips('cs', _advChipCache.cs, advFilters.cs, 'adv-cs-chips');
-  buildAdvChips('products', _advChipCache.products, advFilters.products, 'adv-product-chips');
   buildAdvChips('sources', allSources, advFilters.sources, 'adv-source-chips');
   buildAdvChips('careStatus', CARE_STATUS, advFilters.careStatus, 'adv-care-chips');
   buildAdvChips('zaloStatus', ZALO_STATUS, advFilters.zaloStatus, 'adv-zalo-chips');
   const csSearchEl = document.getElementById('adv-cs-search'); if (csSearchEl) csSearchEl.value = '';
-  const prodSearchEl = document.getElementById('adv-product-search'); if (prodSearchEl) prodSearchEl.value = '';
+  const prodSearchEl = document.getElementById('adv-product-search'); if (prodSearchEl) prodSearchEl.value = [...advFilters.products].join(', ');
   // Restore date values
   ['adv-year-from','adv-month-from','adv-year-to','adv-month-to'].forEach(id=>{
     const el=document.getElementById(id);
@@ -5834,29 +5828,25 @@ function openAdvModal() {
   updateAdvCount();
   document.getElementById('adv-modal').classList.add('open');
 }
-// Danh sách gốc (chưa lọc theo search) của từng nhóm chip, dùng để filterAdvChipList tìm lại
-const _advChipCache = { cs: [], products: [] };
+// Danh sách gốc (chưa lọc theo search) của nhóm chip CS, dùng để filterAdvChipList tìm lại
+const _advChipCache = { cs: [] };
 function buildAdvChips(key, values, selectedSet, containerId) {
   const el = document.getElementById(containerId);
   if (!el) return;
   el.innerHTML = values.map(v=>`<span class="adv-chip ${selectedSet.has(v)?'selected':''}" data-val="${esc(v)}" onclick="toggleAdvChip('${key}',this.dataset.val,this)">${esc(v)}</span>`).join('');
 }
-// Lọc danh sách chip hiển thị theo từ khoá gõ vào (không đổi lựa chọn đã chọn, chỉ ẩn/hiện)
+// Lọc danh sách chip CS hiển thị theo từ khoá gõ vào (không đổi lựa chọn đã chọn, chỉ ẩn/hiện)
 function filterAdvChipList(key, term) {
-  const containerId = key==='cs' ? 'adv-cs-chips' : 'adv-product-chips';
+  const containerId = 'adv-cs-chips';
   const src = _advChipCache[key] || [];
   const f = _foldVi(term||'').trim();
   const shown = f ? src.filter(v=>_foldVi(v).includes(f)) : src;
   buildAdvChips(key, shown, advFilters[key], containerId);
 }
-// Thêm 1 từ khoá sản phẩm tự gõ (không cần có sẵn trong gợi ý) vào bộ lọc — bấm Enter ở ô tìm sản phẩm
-function addAdvProductTerm(inputEl) {
-  const term = (inputEl.value||'').trim();
-  if (!term) return;
-  advFilters.products.add(term);
-  if (!_advChipCache.products.includes(term)) _advChipCache.products.unshift(term);
-  inputEl.value = '';
-  buildAdvChips('products', _advChipCache.products, advFilters.products, 'adv-product-chips');
+// Đồng bộ bộ lọc Sản phẩm trực tiếp từ ô nhập tự do — nhiều tên cách nhau bằng dấu phẩy
+function syncAdvProductInput(val) {
+  const terms = (val||'').split(',').map(t=>t.trim()).filter(Boolean);
+  advFilters.products = new Set(terms);
   updateAdvCount();
 }
 function toggleAdvChip(key, val, el) {
