@@ -436,6 +436,10 @@ textarea.form-ta{resize:vertical;min-height:58px;}
 .modal-sub{font-size:12px;color:var(--muted);line-height:1.6;}
 .modal-body{padding:18px 20px;}
 .modal-footer{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;}
+.settings-row{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:10px 12px;border-radius:var(--rsm);border:1px solid var(--border);background:var(--surface);font-size:13px;font-weight:500;color:var(--text);cursor:pointer;font-family:inherit;}
+.settings-row:hover{background:var(--surface2);border-color:var(--border-md);}
+.settings-row.danger{color:var(--red);border-color:var(--red-b);}
+.settings-row.danger:hover{background:var(--red-bg);}
 .step-list{display:flex;flex-direction:column;gap:10px;}
 .step{display:flex;gap:10px;align-items:flex-start;}
 .step-num{width:22px;height:22px;border-radius:50%;background:var(--green);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
@@ -762,6 +766,32 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
 </div>
 </div>
 
+<!-- SETTINGS / TÁC VỤ MODAL -->
+<div class="modal-overlay" id="settings-modal">
+<div class="modal" style="width:380px">
+  <div class="modal-hdr">
+    <div class="modal-title">⚙️ Tác vụ dữ liệu</div>
+    <div class="modal-sub">Tải lên, đồng bộ và xử lý dữ liệu với Google Sheets.</div>
+  </div>
+  <div class="modal-body" style="padding:10px 14px 14px;display:flex;flex-direction:column;gap:6px">
+    <button class="settings-row" onclick="closeSettingsModal();document.getElementById('fi').click()">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+      Tải Excel
+    </button>
+    <button class="settings-row" id="syncbtn" style="display:none" onclick="closeSettingsModal();syncFromGS({pullOrders:true,manual:true})" title="Tải dữ liệu (đơn hàng + CS) từ GSheets">↓ Sync GS <span id="sync-countdown" style="font-size:10px;opacity:0.7"></span></button>
+    <button class="settings-row" id="pushbtn" style="display:none" onclick="closeSettingsModal();pushOrdersToGS()" title="Thêm nhanh các đơn MỚI lên Google Sheets (không xóa/sửa đơn cũ)">📤 Đẩy dữ liệu</button>
+    <button class="settings-row" id="fullsyncbtn" style="display:none" onclick="closeSettingsModal();fullSyncOrdersToGS()" title="Đồng bộ 2 chiều (GỘP): tải đơn từ Google Sheets về máy + đẩy đơn mới của máy lên Sheets. KHÔNG xóa đơn nào.">🔁 Đồng bộ 2 chiều</button>
+    <button class="settings-row" id="dupbtn" style="display:none" onclick="closeSettingsModal();openDupOrdersModal()" title="Quét đơn hàng bị trùng (cùng SĐT + ngày mua + sản phẩm, kể cả khi doanh thu bị lệch do lỗi nhập liệu) trên Google Sheets — luôn hỏi xác nhận trước khi xóa">🗑️ Đơn trùng</button>
+    <button class="settings-row" id="nameguessbtn" style="display:none" onclick="closeSettingsModal();openNameGuessModal()" title="Quét toàn bộ đơn hàng, đoán tên khách từ dòng đầu cột Sản phẩm (bỏ SĐT/xưng hô) cho những khách CHƯA có tên — luôn hỏi xác nhận trước khi ghi">🏷️ Tách tên KH</button>
+    <div class="divider" style="margin:4px 0"></div>
+    <button class="settings-row danger" id="clearbtn" style="display:none" onclick="closeSettingsModal();clearData()">Xóa data</button>
+  </div>
+  <div class="modal-footer">
+    <button class="btn" onclick="closeSettingsModal()">Đóng</button>
+  </div>
+</div>
+</div>
+
 <!-- ADVANCED FILTER MODAL -->
 <div class="adv-modal-overlay" id="adv-modal">
 <div class="adv-modal">
@@ -902,16 +932,7 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
       <span class="gs-dot off" id="gs-dot"></span>
       <span id="gs-pill-txt">Google Sheets</span>
     </div>
-    <button class="btn danger sm" id="clearbtn" style="display:none" onclick="clearData()">Xóa data</button>
-    <button class="btn sm" id="syncbtn" style="display:none" onclick="syncFromGS({pullOrders:true,manual:true})" title="Tải dữ liệu (đơn hàng + CS) từ GSheets">↓ Sync GS <span id="sync-countdown" style="font-size:10px;opacity:0.7"></span></button>
-    <button class="btn sm" id="pushbtn" style="display:none" onclick="pushOrdersToGS()" title="Thêm nhanh các đơn MỚI lên Google Sheets (không xóa/sửa đơn cũ)">📤 Đẩy dữ liệu</button>
-    <button class="btn sm" id="fullsyncbtn" style="display:none" onclick="fullSyncOrdersToGS()" title="Đồng bộ 2 chiều (GỘP): tải đơn từ Google Sheets về máy + đẩy đơn mới của máy lên Sheets. KHÔNG xóa đơn nào.">🔁 Đồng bộ 2 chiều</button>
-    <button class="btn sm" id="dupbtn" style="display:none" onclick="openDupOrdersModal()" title="Quét đơn hàng bị trùng (cùng SĐT + ngày mua + sản phẩm, kể cả khi doanh thu bị lệch do lỗi nhập liệu) trên Google Sheets — luôn hỏi xác nhận trước khi xóa">🗑️ Đơn trùng</button>
-    <button class="btn sm" id="nameguessbtn" style="display:none" onclick="openNameGuessModal()" title="Quét toàn bộ đơn hàng, đoán tên khách từ dòng đầu cột Sản phẩm (bỏ SĐT/xưng hô) cho những khách CHƯA có tên — luôn hỏi xác nhận trước khi ghi">🏷️ Tách tên KH</button>
-    <button class="btn primary" onclick="document.getElementById('fi').click()">
-      <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
-      Tải Excel
-    </button>
+    <button class="btn sm" onclick="openSettingsModal()" title="Tác vụ dữ liệu: Tải Excel, Sync, Đẩy dữ liệu, Đồng bộ 2 chiều, Đơn trùng, Tách tên KH, Xóa data">⚙️ Tác vụ</button>
     <input type="file" id="fi" accept=".xlsx,.xls" multiple onchange="handleFiles(event)">
   </div>
 </header>
@@ -1801,6 +1822,8 @@ function openGsModal() {
   document.getElementById('gs-modal').classList.add('open');
 }
 function closeGsModal() { document.getElementById('gs-modal').classList.remove('open'); }
+function openSettingsModal() { document.getElementById('settings-modal').classList.add('open'); }
+function closeSettingsModal() { document.getElementById('settings-modal').classList.remove('open'); }
 function copyGsCode() {
   navigator.clipboard.writeText(GS_SCRIPT).then(() => toast('✓ Đã copy Apps Script code'));
 }
