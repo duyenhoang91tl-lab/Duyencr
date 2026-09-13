@@ -907,6 +907,7 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
     <button class="btn sm" id="pushbtn" style="display:none" onclick="pushOrdersToGS()" title="Thêm nhanh các đơn MỚI lên Google Sheets (không xóa/sửa đơn cũ)">📤 Đẩy dữ liệu</button>
     <button class="btn sm" id="fullsyncbtn" style="display:none" onclick="fullSyncOrdersToGS()" title="Đồng bộ 2 chiều (GỘP): tải đơn từ Google Sheets về máy + đẩy đơn mới của máy lên Sheets. KHÔNG xóa đơn nào.">🔁 Đồng bộ 2 chiều</button>
     <button class="btn sm" id="dupbtn" style="display:none" onclick="openDupOrdersModal()" title="Quét đơn hàng bị trùng (cùng SĐT + ngày mua + sản phẩm, kể cả khi doanh thu bị lệch do lỗi nhập liệu) trên Google Sheets — luôn hỏi xác nhận trước khi xóa">🗑️ Đơn trùng</button>
+    <button class="btn sm" id="nameguessbtn" style="display:none" onclick="openNameGuessModal()" title="Quét toàn bộ đơn hàng, đoán tên khách từ dòng đầu cột Sản phẩm (bỏ SĐT/xưng hô) cho những khách CHƯA có tên — luôn hỏi xác nhận trước khi ghi">🏷️ Tách tên KH</button>
     <button class="btn primary" onclick="document.getElementById('fi').click()">
       <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
       Tải Excel
@@ -1817,7 +1818,7 @@ function saveGsUrl() {
   closeGsModal();
   toast('✓ Đã lưu URL Google Sheets');
   show('syncbtn'); // Hiện nút Sync ngay
-  if (allCustomers.length) { show('pushbtn'); show('fullsyncbtn'); show('dupbtn'); }
+  if (allCustomers.length) { show('pushbtn'); show('fullsyncbtn'); show('dupbtn'); show('nameguessbtn'); }
 }
 async function testGsConnection() {
   const raw = document.getElementById('gs-url-input').value;
@@ -2014,7 +2015,7 @@ async function syncFromGS(opts) {
     if (orderCount > 0) {
       buildCustomers();
       show('syncbtn');
-      show('pushbtn'); show('fullsyncbtn'); show('dupbtn');
+      show('pushbtn'); show('fullsyncbtn'); show('dupbtn'); show('nameguessbtn'); show('nameguessbtn');
     } else {
       rebuildCareOnCustomers();
     }
@@ -2198,7 +2199,7 @@ async function processFiles(files) {
   if (gsUrl) {
     // sync-banner hidden
     show('syncbtn');
-    show('pushbtn'); show('fullsyncbtn'); show('dupbtn');
+    show('pushbtn'); show('fullsyncbtn'); show('dupbtn'); show('nameguessbtn');
     syncFromGS({ pullOrders: false });
   }
 }
@@ -2382,7 +2383,7 @@ function buildCustomers() {
   document.getElementById('data-view').style.display = 'flex';
   document.getElementById('clearbtn').style.display = '';
   txt('fstatus', `${fmt(allCustomers.length)} KH — ${loadedFiles.length} file`);
-  if (gsUrl) { updateGsPill(true); show('syncbtn'); show('pushbtn'); show('fullsyncbtn'); show('dupbtn'); }
+  if (gsUrl) { updateGsPill(true); show('syncbtn'); show('pushbtn'); show('fullsyncbtn'); show('dupbtn'); show('nameguessbtn'); }
   if (typeof updateMyDataBadge === 'function') updateMyDataBadge();
 }
 
@@ -5241,6 +5242,7 @@ function clearData() {
   document.getElementById('pushbtn').style.display='none';
   var _fsb=document.getElementById('fullsyncbtn'); if(_fsb) _fsb.style.display='none';
   var _dpb=document.getElementById('dupbtn'); if(_dpb) _dpb.style.display='none';
+  var _ngb=document.getElementById('nameguessbtn'); if(_ngb) _ngb.style.display='none';
   hide('sync-banner');
   txt('fstatus','Chưa có dữ liệu');
 }
