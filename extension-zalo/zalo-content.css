@@ -324,6 +324,29 @@ textarea {
   font-size: 12px;
 }
 
+/* Nhãn cảnh báo "khách mới" — dùng khi lưu sẽ tạo mới trong sheet "KH Chăm sóc mới" */
+.zai-new-tag {
+  display: inline-block;
+  color: #9a3412;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  margin-top: 6px;
+}
+
+/* Ô nhập full-width (VD: Tên khách hàng) — tương ứng .pk-full-input bên Pancake AI */
+.zai-full-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 12.5px;
+  margin-bottom: 2px;
+}
+
 .zai-card {
   border: 1px solid #dbeafe;
   background: #f5f9ff;

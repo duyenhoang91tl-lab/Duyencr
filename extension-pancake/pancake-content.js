@@ -708,8 +708,13 @@
     const btn = panelEl.querySelector('#pk-save-btn');
     const rawEl = panelEl.querySelector('#pk-note-raw');
     const nameEl = panelEl.querySelector('#pk-name-input');
+    const liveName = nameEl ? nameEl.value.trim() : '';
+    // Khách MỚI (nguồn "Chăm sóc"): chưa từng có CareData lẫn đơn hàng nào — bắt buộc nhập tên
+    // trước khi lưu, và sau khi lưu sẽ ghi thêm vào sheet riêng "KH Chăm sóc mới" (Báo cáo D).
+    const isNewCustomer = !_currentCare && (!_currentOrders || !_currentOrders.length);
+    if (isNewCustomer && !liveName) { setStatus('Khách mới — vui lòng nhập tên khách hàng trước khi lưu.'); return; }
     const row = _buildRow(phone, {
-      name: nameEl ? nameEl.value.trim() : '',
+      name: liveName,
       status: panelEl.querySelector('#pk-status-sel').value,
       zalo: panelEl.querySelector('#pk-zalo-sel').value,
       khStatus: panelEl.querySelector('#pk-khstatus-sel').value,
@@ -719,14 +724,14 @@
       note: rawEl ? rawEl.value : (_currentCare?.note || '')
     });
     if (btn) { btn.disabled = true; btn.textContent = 'Đang lưu...'; }
-    chrome.runtime.sendMessage({ type: 'SAVE_CARE', payload: row }, (resp) => {
+    chrome.runtime.sendMessage({ type: 'SAVE_CARE', payload: Object.assign({}, row, { isNewCustomer }) }, (resp) => {
       if (btn) { btn.disabled = false; btn.textContent = '💾 Lưu vào Sasum'; }
       if (!resp?.ok) { setStatus('Lưu thất bại: ' + (resp?.error || 'lỗi không rõ')); return; }
       _currentCare = row;
       _lastServerCare = Object.assign({}, row);
       const nameSpan = panelEl.querySelector('.pk-ai-cust-name');
       if (nameSpan && row.name) nameSpan.innerHTML = `${escapeHtml(row.name)} <span class="pk-ai-cust-phone">${phone}</span>`;
-      setStatus('✓ Đã lưu vào Sasum.');
+      setStatus('✓ Đã lưu vào Sasum.' + (isNewCustomer ? ' (KH mới — nguồn Chăm sóc)' : ''));
     });
   }
 

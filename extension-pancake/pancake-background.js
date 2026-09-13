@@ -190,13 +190,31 @@ async function handleSaveCare(row) {
   if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
   if (!row?.phone) throw new Error("Thiếu số điện thoại.");
 
+  const isNewCustomer = !!row.isNewCustomer;
+  const cleanRow = Object.assign({}, row);
+  delete cleanRow.isNewCustomer; // co chi de bao hieu noi bo, khong phai 1 cot CareData that
+
   const res = await fetch(cfg.gasUrl, {
     method: "POST",
-    body: JSON.stringify({ action: "saveSingle", row }),
+    body: JSON.stringify({ action: "saveSingle", row: cleanRow }),
     headers: { "Content-Type": "text/plain" }
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error);
+
+  // Khách MỚI (nguồn "Chăm sóc") — ghi thêm vào sheet riêng "KH Chăm sóc mới" để tính vào
+  // Báo cáo D, KHÔNG gộp báo cáo doanh số A/B/C (giống hệt luồng tương ứng bên Zalo AI).
+  // Không để lỗi bước này chặn kết quả lưu chính.
+  if (isNewCustomer && cleanRow.name) {
+    try {
+      await fetch(cfg.gasUrl, {
+        method: "POST",
+        body: JSON.stringify({ action: "addCareLead", phone: cleanRow.phone, name: cleanRow.name, note: cleanRow.note || '', cs: cleanRow.cs || '' }),
+        headers: { "Content-Type": "text/plain" }
+      });
+    } catch (eLead) { /* khong chan ket qua luu chinh neu buoc nay loi */ }
+  }
+
   return data;
 }
 
