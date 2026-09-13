@@ -2103,7 +2103,8 @@ async function pushCareToGS(phone) {
     schedHen: care.schedHen||'', schedHenNote: care.schedHenNote||'',
     khStatus: care.khStatus||'',
     nickZalos: care.nickZalos||[],
-    tag: care.tag||''
+    tag: care.tag||'',
+    name: care.name||''
   };
   try {
     await fetch(gsUrl, {
@@ -2351,7 +2352,9 @@ function buildCustomers() {
     const csSet = _buildCsSet_(c.orders, c.phone);  // CS phụ trách = người lên các đơn (DT tổng, tách nếu đơn có nhiều sale) + dữ liệu đơn
     // Nếu tên lấy từ đơn hàng chỉ là số điện thoại (chưa có tên thật trong đơn nào) nhưng
     // CareData đã có tên (vd Pancake AI/Zalo AI đọc được từ khung "Sản phẩm order") → dùng tên đó
-    const displayName = (c.name === c.phone && care.name) ? care.name : c.name;
+    // Ten da luu tay (care.name) LUON uu tien hon ten tu nhan dien tu don hang — mot khi CS da
+    // xac nhan/sua ten thi khong de ten tu dong (co the sai/rac) ghi de len nua.
+    const displayName = care.name ? care.name : c.name;
 
     // Precompute year/month/hour cho mỗi đơn (dùng để lọc nhanh)
     const ymList = c.orders.map(o => {
@@ -3231,7 +3234,7 @@ function openDp(phone) {
   document.getElementById('dp-meta').innerHTML = `
     <span class="cphone" id="dp-phone-display">${c.phone}</span>
     <button data-phone="${esc(c.phone)}" onclick="copyPhone(this.dataset.phone)" title="Copy số điện thoại" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">📋</button>
-    <button data-phone="${esc(c.phone)}" onclick="openEditPhone(this.dataset.phone)" title="Sửa số điện thoại" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">✏️</button>
+    <button data-phone="${esc(c.phone)}" onclick="openEditPhone(this.dataset.phone)" title="Sửa SĐT / Tên KH" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">✏️</button>
     ${tierBadge(c.tier)}
     ${careBadge(c.careStatus)}
     ${zaloBadge(c.zaloStatus)}
@@ -3933,7 +3936,7 @@ function saveCare(phone) {
   document.getElementById('dp-meta').innerHTML = `
     <span class="cphone" id="dp-phone-display">${phone}</span>
     <button data-phone="${esc(phone)}" onclick="copyPhone(this.dataset.phone)" title="Copy số điện thoại" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">📋</button>
-    <button data-phone="${esc(phone)}" onclick="openEditPhone(this.dataset.phone)" title="Sửa số điện thoại" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">✏️</button>
+    <button data-phone="${esc(phone)}" onclick="openEditPhone(this.dataset.phone)" title="Sửa SĐT / Tên KH" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">✏️</button>
     ${tierBadge(c?c.tier:'Chưa bán lại được')}
     ${careBadge(careData[phone].status)}
     ${zaloBadge(careData[phone].zalo)}
@@ -5102,16 +5105,21 @@ function copyPhone(phone) {
 function openEditPhone(oldPhone) {
   const existing = document.getElementById('edit-phone-modal');
   if (existing) existing.remove();
+  const curName = (careData[oldPhone] && careData[oldPhone].name) || '';
+  const autoName = (customerMap[oldPhone] && customerMap[oldPhone].name) || '';
   const overlay = document.createElement('div');
   overlay.id = 'edit-phone-modal';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:700;display:flex;align-items:center;justify-content:center';
   overlay.innerHTML = `
     <div style="background:var(--surface);border-radius:var(--rlg);box-shadow:0 8px 32px rgba(0,0,0,0.2);width:360px;max-width:92vw;padding:0;overflow:hidden">
       <div style="padding:14px 18px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
-        <div style="font-size:14px;font-weight:700">✏️ Sửa số điện thoại</div>
+        <div style="font-size:14px;font-weight:700">✏️ Sửa SĐT / Tên KH</div>
         <button onclick="document.getElementById('edit-phone-modal').remove()" style="background:var(--surface2);border:none;width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:13px;color:var(--muted)">✕</button>
       </div>
       <div style="padding:16px 18px">
+        <div style="font-size:11px;color:var(--hint);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Tên khách hàng</div>
+        <input id="edit-name-input" class="form-input" type="text" placeholder="${esc(autoName && autoName !== oldPhone ? 'Tên tự nhận diện: ' + autoName : 'Nhập tên khách hàng...')}" value="${esc(curName)}"
+          style="width:100%;margin-bottom:14px;font-size:14px">
         <div style="font-size:11px;color:var(--hint);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">SĐT hiện tại</div>
         <div style="font-size:14px;font-weight:600;font-family:monospace;color:var(--text);margin-bottom:14px;padding:6px 10px;background:var(--surface2);border-radius:var(--rsm)">${esc(oldPhone)}</div>
         <div style="font-size:11px;color:var(--hint);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">SĐT mới</div>
@@ -5134,16 +5142,30 @@ function openEditPhone(oldPhone) {
 
 async function saveEditPhone(oldPhone) {
   const inp = document.getElementById('edit-phone-input');
+  const nameInp = document.getElementById('edit-name-input');
   const errEl = document.getElementById('edit-phone-err');
   if (!inp) return;
   const rawNew = inp.value.trim();
   const newPhone = normPhone(rawNew) || rawNew.replace(/\D/g,'');
+  const newName = (nameInp ? nameInp.value : '').trim();
   if (!newPhone || newPhone.length < 8) {
     errEl.textContent = '⚠ Số điện thoại không hợp lệ (cần ít nhất 8 số)';
     errEl.style.display = '';
     return;
   }
   if (newPhone === oldPhone) {
+    // SĐT không đổi — chỉ lưu tên nếu có nhập/sửa, không chạy các bước migrate SĐT bên dưới
+    const oldName = (careData[oldPhone] && careData[oldPhone].name) || '';
+    if (newName !== oldName) {
+      if (!careData[oldPhone]) careData[oldPhone] = {};
+      careData[oldPhone].name = newName;
+      saveLS('ome_care', careData);
+      _invalidateFilterCache();
+      buildCustomers();
+      if (gsUrl) { syncToast('✓ Đã lưu tên → đang đồng bộ GSheets...'); await pushCareToGS(oldPhone); }
+      toast('✓ Đã lưu tên khách hàng');
+      openDp(oldPhone);
+    }
     document.getElementById('edit-phone-modal').remove();
     return;
   }
@@ -5162,12 +5184,15 @@ async function saveEditPhone(oldPhone) {
     delete customerMap[oldPhone];
   }
 
-  // 2. Cập nhật careData
+  // 2. Cập nhật careData (kèm tên mới nếu có sửa)
   if (careData[oldPhone]) {
     careData[newPhone] = { ...careData[oldPhone] };
     delete careData[oldPhone];
-    saveLS('ome_care', careData);
+  } else if (newName) {
+    careData[newPhone] = {};
   }
+  if (careData[newPhone]) careData[newPhone].name = newName;
+  saveLS('ome_care', careData);
 
   // 3. Cập nhật schedules
   let schedChanged = false;
@@ -10809,7 +10834,8 @@ function _careRow(phone){
     schedSP: care.schedSP||'', schedSPNote: care.schedSPNote||'',
     schedCS: care.schedCS||'', schedCSNote: care.schedCSNote||'',
     schedHen: care.schedHen||'', schedHenNote: care.schedHenNote||'',
-    khStatus: care.khStatus||'', nickZalos: care.nickZalos||[], birthday: care.birthday||''
+    khStatus: care.khStatus||'', nickZalos: care.nickZalos||[], birthday: care.birthday||'',
+    name: care.name||''
   };
 }
 // Chỉ đồng bộ CareData khi khách có DỮ LIỆU CS NHẬP THẬT.
@@ -10823,6 +10849,7 @@ function _hasRealCareData(phone){
   if ((care.note||'').toString().trim())     return true;
   if ((care.khStatus||'').toString().trim()) return true;
   if ((care.birthday||'').toString().trim()) return true;
+  if ((care.name||'').toString().trim())     return true;
   if (Array.isArray(care.nickZalos) && care.nickZalos.length) return true;
   // Lịch nhanh đặt tay
   if ((care.schedGoi||'').toString().trim()) return true;
