@@ -22,6 +22,7 @@ var ORDER_SS_ID = '1fiWXPMZcHuEh0zYqD6pgQjZDM0PhWzpiSK7Igj6Cug8'; // File chua O
 var CRM_SS_ID   = '18XBtbjP7gtlvYpChikF3B62cxHkR4426s5poZj9Mj8I'; // File chua CareData/Users/Teams/Settings/AuditLog/AssignData/AIContext (CRM).
 var PRICE_SS_ID    = '1Tfn2jOH20kv0Z-cb0BULqPuxZTap9FA3z8bXeeRl5l4'; // File "Bang gia" rieng (Danh_muc/Tinh_tien/Ghi_chu_chinh_sach)
 var PRICE_SHEET_NAME = 'DANH_MUC'; // Sheet dang bang phang, de tra cuu/loc
+var CTKM_SHEET_NAME  = 'CTKM'; // Sheet CTKM (cung file PRICE_SS_ID) — doi ten hang duoi neu ten tab thuc te khac
                         // De trong = dung file dang gan Apps Script nay (mac dinh, hanh vi cu).
                         // Dan Spreadsheet ID moi vao day de doi nguon CRM MA KHONG can gan lai script vao file khac.
 // >>> Muon doi nguon du lieu sau nay: chi can sua 2 dong ID o tren (ORDER_SS_ID va/hoac CRM_SS_ID) roi Deploy lai. <<<
@@ -162,6 +163,60 @@ function searchPriceCatalog_(rows, q) {
     if (ok) out.push(row);
   }
   return out;
+}
+
+// ─── CTKM (Sheet CTKM, cung file PRICE_SS_ID) — chi nap khi khach hoi ve khuyen mai/giam gia ──
+// Doc toan bo sheet CTKM thanh mang object, giong cach doc DANH_MUC (khong hardcode ten cot).
+function readCTKMCatalog_() {
+  var sh = SpreadsheetApp.openById(PRICE_SS_ID).getSheetByName(CTKM_SHEET_NAME);
+  if (!sh || sh.getLastRow() < 2) return [];
+  var lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
+  var vals = sh.getRange(1, 1, lastRow, lastCol).getValues();
+  var headers = vals[0].map(function(h){ return String(h || '').trim(); });
+  var rows = [];
+  for (var i = 1; i < vals.length; i++) {
+    var row = vals[i];
+    var isEmpty = row.every(function(c){ return c === '' || c === null; });
+    if (isEmpty) continue;
+    var obj = {};
+    for (var c = 0; c < headers.length; c++) {
+      if (!headers[c]) continue;
+      var v = row[c];
+      obj[headers[c]] = (v instanceof Date) ? v.toISOString() : v;
+    }
+    rows.push(obj);
+  }
+  return rows;
+}
+
+// Tu khoa nhan biet khach dang hoi ve khuyen mai/giam gia (khong dau, chu thuong)
+var _CTKM_KEYWORDS_ = ['khuyen mai','khuyenmai','giam gia','giamgia','uu dai','uudai',
+  'sale','freeship','free ship','qua tang','tang qua','ma giam','magiam','voucher',
+  'flash sale','combo uu dai','ctkm',' km ','km thang','khuyen mai gi'];
+
+// Chi tra ve noi dung CTKM khi cau hoi cua khach co tu khoa lien quan — de AI KHONG
+// tu dong nhet thong tin khuyen mai vao moi cau tra loi (dung yeu cau: chi khi khach hoi).
+function readCTKMPromotions_(query) {
+  var q = ' ' + _stripVN_(query) + ' ';
+  var matched = false;
+  for (var i = 0; i < _CTKM_KEYWORDS_.length; i++) {
+    if (q.indexOf(_CTKM_KEYWORDS_[i]) !== -1) { matched = true; break; }
+  }
+  if (!matched) return '';
+  var rows = readCTKMCatalog_();
+  if (!rows.length) return '';
+  var blocks = [];
+  for (var r = 0; r < rows.length && r < 8; r++) {
+    var row = rows[r], parts = [];
+    for (var k in row) {
+      if (!row.hasOwnProperty(k)) continue;
+      var v = row[k];
+      if (v === '' || v === null || v === undefined) continue;
+      parts.push(k + ': ' + v);
+    }
+    if (parts.length) blocks.push(parts.join(' | '));
+  }
+  return blocks.join('\n');
 }
 
 // ─── SETTINGS (1 signature duy nhat) ──────────────────────────
@@ -2626,6 +2681,9 @@ function _buildAISystemPrompt_(userMsg, withProducts) {
   // Q&A tu sheet FAQ (khop tu khoa cau hoi khach) — de AI hoc cach xu ly cau hoi kho theo team
   var faq = readFaqSheet_(userMsg);
   if (faq) parts.push('\n\nCAC CAU HOI KHO & CACH TRA LOI MAU CUA TEAM (uu tien bam sat cach xu ly / giong dieu nay khi tra loi cau tuong tu; dieu chinh cho hop ngu canh khach, KHONG copy nguyen van neu khong khop hoan toan):\n' + faq);
+  // CTKM: chi nap khi cau hoi cua khach co tu khoa khuyen mai/giam gia (xem readCTKMPromotions_)
+  var ctkm = readCTKMPromotions_(userMsg);
+  if (ctkm) parts.push('\n\nCHUONG TRINH KHUYEN MAI (CTKM) DANG AP DUNG (chi dung khi khach hoi ve khuyen mai/giam gia, KHONG tu bia them neu khong co trong danh sach nay):\n' + ctkm);
   parts.push('\n\nYEU CAU: Chi dua ra DUY NHAT 1 cau tra loi ngan gon (toi da 150 tu). Khong danh so, khong giai thich them.');
   return parts.join('');
 }
