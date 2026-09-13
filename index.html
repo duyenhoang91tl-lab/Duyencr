@@ -15373,8 +15373,10 @@ function openTaskModal(id){
     });
   }
 
-  _taskIsAdmin = (typeof currentUser !== 'undefined' && currentUser && currentUser.role === 'admin');
-  document.getElementById('task-f-perm-note').style.display = _taskIsAdmin ? 'none' : 'block';
+  // Truoc day chi Admin moi duoc chon/doi nguoi tham gia — theo yeu cau Duyen, bo khoa nay de
+  // MOI user tu giao duoc CS/Team khi tao/sua Cong viec.
+  _taskIsAdmin = true;
+  document.getElementById('task-f-perm-note').style.display = 'none';
   _taskRenderTeamChips();
   _taskRenderUserChips();
 
