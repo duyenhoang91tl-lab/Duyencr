@@ -2,8 +2,12 @@
   position: fixed;
   right: 16px;
   bottom: 16px;
-  width: 320px;
-  max-height: 420px;
+  width: 340px;
+  height: min(72vh, 640px);
+  min-width: 280px;
+  min-height: 200px;
+  max-width: 90vw;
+  max-height: 92vh;
   background: #ffffff;
   border: 1px solid #e2e2e2;
   border-radius: 10px;
@@ -15,6 +19,12 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  resize: both;
+}
+
+#pk-ai-panel.pk-ai-collapsed {
+  height: auto !important;
+  resize: none;
 }
 
 #pk-ai-panel.pk-ai-collapsed #pk-ai-body {
@@ -29,7 +39,13 @@
   justify-content: space-between;
   align-items: center;
   font-weight: 600;
-  cursor: default;
+  cursor: grab;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+#pk-ai-header:active {
+  cursor: grabbing;
 }
 
 #pk-ai-header button {
@@ -44,6 +60,8 @@
 #pk-ai-body {
   padding: 10px 12px;
   overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 #pk-ai-status {
@@ -92,16 +110,18 @@
 }
 
 .pk-ai-cust-card {
-  border: 1px solid #d1fae5;
-  background: #f0fdf4;
-  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  border-left: 3px solid #16a34a;
+  background: #fafafa;
+  border-radius: 6px;
   padding: 8px 10px;
   font-size: 12.5px;
 }
 
 .pk-ai-cust-empty {
-  background: #fff7ed;
-  border-color: #fed7aa;
+  background: #fafafa;
+  border-color: #e5e7eb;
+  border-left-color: #f97316;
   color: #9a3412;
   padding: 8px 10px;
 }
@@ -264,7 +284,7 @@
 
 .pk-form-col label {
   display: block;
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: #6b7280;
   margin-bottom: 2px;
 }
@@ -306,7 +326,7 @@
 
 .pk-label-top {
   display: block;
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: #6b7280;
   margin-top: 10px;
   margin-bottom: 3px;
@@ -339,7 +359,7 @@
 }
 
 .pk-note-meta {
-  font-size: 10px;
+  font-size: 10.5px;
   color: #9ca3af;
   margin-bottom: 1px;
 }
@@ -417,9 +437,10 @@
 }
 
 #pk-price-section {
-  border: 1px solid #dbeafe;
-  background: #f0f7ff;
-  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  border-left: 3px solid #2563eb;
+  background: #fafafa;
+  border-radius: 6px;
   padding: 6px 8px;
   margin-bottom: 8px;
 }
@@ -440,7 +461,7 @@
 #pk-price-row input {
   flex: 1;
   padding: 5px 8px;
-  border: 1px solid #bfdbfe;
+  border: 1px solid #cbd5e1;
   border-radius: 6px;
   font-size: 12px;
   box-sizing: border-box;
@@ -449,12 +470,16 @@
 #pk-price-row button {
   padding: 5px 10px;
   border: 1px solid #2563eb;
-  background: #2563eb;
-  color: #fff;
+  background: #fff;
+  color: #2563eb;
   border-radius: 6px;
   font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
+}
+
+#pk-price-row button:hover {
+  background: #eff6ff;
 }
 
 #pk-price-result {
@@ -492,9 +517,10 @@
 }
 
 #pk-rem-section {
-  border: 1px solid #fde68a;
-  background: #fffbeb;
-  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  border-left: 3px solid #f59e0b;
+  background: #fafafa;
+  border-radius: 6px;
   padding: 6px 8px;
   margin-bottom: 8px;
 }
@@ -529,7 +555,7 @@
 }
 
 .pk-rem-item {
-  border-bottom: 1px solid #fde68a;
+  border-bottom: 1px solid #eee;
   padding: 5px 0;
   font-size: 12px;
 }

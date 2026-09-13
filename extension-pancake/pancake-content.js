@@ -76,6 +76,70 @@
     });
   }
 
+  // ── Nhớ vị trí/kích thước/trạng thái thu gọn của panel giữa các lần tải trang
+  // (chrome.storage.local — riêng theo máy, không cần đồng bộ nhiều máy) ──
+  function _restorePanelState_() {
+    try {
+      chrome.storage.local.get(['pkPanelCollapsed', 'pkPanelPos', 'pkPanelSize'], (res) => {
+        if (res.pkPanelCollapsed) panelEl.classList.add('pk-ai-collapsed');
+        if (res.pkPanelPos && typeof res.pkPanelPos.right === 'number' && typeof res.pkPanelPos.bottom === 'number') {
+          panelEl.style.right = res.pkPanelPos.right + 'px';
+          panelEl.style.bottom = res.pkPanelPos.bottom + 'px';
+        }
+        if (res.pkPanelSize && res.pkPanelSize.width && res.pkPanelSize.height) {
+          panelEl.style.width = res.pkPanelSize.width + 'px';
+          panelEl.style.height = res.pkPanelSize.height + 'px';
+        }
+      });
+    } catch (e) {}
+  }
+
+  // ── Kéo-thả di chuyển panel bằng thanh header (giữ nguyên click nút thu gọn) ──
+  function _initPanelDrag_() {
+    const header = panelEl.querySelector('#pk-ai-header');
+    if (!header) return;
+    let dragging = false, startX = 0, startY = 0, startRight = 0, startBottom = 0;
+
+    header.addEventListener('mousedown', (e) => {
+      if (e.target.closest('button')) return; // không kéo khi bấm nút thu gọn
+      dragging = true;
+      startX = e.clientX; startY = e.clientY;
+      const rectStyle = getComputedStyle(panelEl);
+      startRight = parseFloat(rectStyle.right) || 0;
+      startBottom = parseFloat(rectStyle.bottom) || 0;
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - startX, dy = e.clientY - startY;
+      let newRight = startRight - dx, newBottom = startBottom - dy;
+      // Giữ panel trong màn hình
+      newRight = Math.max(4, Math.min(newRight, window.innerWidth - 80));
+      newBottom = Math.max(4, Math.min(newBottom, window.innerHeight - 40));
+      panelEl.style.right = newRight + 'px';
+      panelEl.style.bottom = newBottom + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+      if (!dragging) return;
+      dragging = false;
+      try {
+        chrome.storage.local.set({
+          pkPanelPos: { right: parseFloat(panelEl.style.right) || 16, bottom: parseFloat(panelEl.style.bottom) || 16 }
+        });
+      } catch (e) {}
+    });
+
+    // Nhớ kích thước khi CS kéo góc để resize (resize:both trong CSS)
+    try {
+      new ResizeObserver(() => {
+        if (panelEl.classList.contains('pk-ai-collapsed')) return;
+        chrome.storage.local.set({
+          pkPanelSize: { width: panelEl.offsetWidth, height: panelEl.offsetHeight }
+        });
+      }).observe(panelEl);
+    } catch (e) {}
+  }
+
   function injectPanel() {
     if (panelEl) return;
     panelEl = document.createElement("div");
@@ -140,6 +204,8 @@
       </div>
     `;
     document.body.appendChild(panelEl);
+    _restorePanelState_();
+    _initPanelDrag_();
 
     const csSel = panelEl.querySelector('#pk-cs-sel');
     csSel.addEventListener('change', () => {
@@ -169,6 +235,7 @@
     });
     panelEl.querySelector("#pk-ai-collapse").addEventListener("click", () => {
       panelEl.classList.toggle("pk-ai-collapsed");
+      try { chrome.storage.local.set({ pkPanelCollapsed: panelEl.classList.contains("pk-ai-collapsed") }); } catch (e) {}
     });
     panelEl.querySelector("#pk-ai-phone-btn").addEventListener("click", () => {
       const raw = panelEl.querySelector("#pk-ai-phone-input").value;
