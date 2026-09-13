@@ -7028,9 +7028,18 @@ var ORDER_SS_ID = '1fiWXPMZcHuEh0zYqD6pgQjZDM0PhWzpiSK7Igj6Cug8'; // File chua O
 var CRM_SS_ID   = '18XBtbjP7gtlvYpChikF3B62cxHkR4426s5poZj9Mj8I'; // File chua CareData/Users/Teams/Settings/AuditLog/AssignData/AIContext (CRM).
 var PRICE_SS_ID    = '1Tfn2jOH20kv0Z-cb0BULqPuxZTap9FA3z8bXeeRl5l4'; // File "Bang gia" rieng (Danh_muc/Tinh_tien/Ghi_chu_chinh_sach)
 var PRICE_SHEET_NAME = 'DANH_MUC'; // Sheet dang bang phang, de tra cuu/loc
+var CTKM_SHEET_NAME  = 'CTKM'; // Sheet CTKM (cung file PRICE_SS_ID) — doi ten hang duoi neu ten tab thuc te khac
                         // De trong = dung file dang gan Apps Script nay (mac dinh, hanh vi cu).
                         // Dan Spreadsheet ID moi vao day de doi nguon CRM MA KHONG can gan lai script vao file khac.
 // >>> Muon doi nguon du lieu sau nay: chi can sua 2 dong ID o tren (ORDER_SS_ID va/hoac CRM_SS_ID) roi Deploy lai. <<<
+
+// ─── LINK KIEN THUC CO DINH (fallback khi chua/khong set qua Settings) ───────────
+// Dan link moi vao day roi Deploy lai neu can doi — KHONG bat CS phai bam Luu trong
+// extension nua. Neu Settings sheet co gia tri (key tuong ung) thi UU TIEN dung gia
+// tri trong Settings truoc, hardcode duoi day chi la fallback dam bao luon co san.
+var DEFAULT_PRODUCT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1YJMJs8GI7dBfDl5TNZM44n7N8lhJoeSD0KOWflU2fmM/edit?gid=1833367723#gid=1833367723';
+var DEFAULT_DRIVE_KNOWLEDGE_FOLDER_URL = 'https://drive.google.com/drive/folders/1Koz4IdENS5QgdvvYMaQO1MlVEFMFAciN?hl=vi';
+var DEFAULT_DRIVE_PRODUCT_IMAGES_FOLDER_URL = 'https://drive.google.com/drive/folders/1PES3V_bsYLcmIynMjRHPVjT6rJGTc6EO?hl=vi';
 
 function getOrderSS_() {
   return ORDER_SS_ID
@@ -7067,7 +7076,11 @@ var TEAM_HEADERS   = ['id','name','leader','members','color'];
 var AUDIT_HEADERS  = ['timestamp','user','action','phone','oldValue','newValue'];
 var SET_HEADERS    = ['key','value'];
 var ASSIGN_HEADERS = ['id','date','csName','label','phones','donePhones'];
-var USER_HEADERS   = ['username','passHash','role','name','team','active'];
+var USER_HEADERS   = ['username','passHash','role','name','team','active','names'];
+// ── KH "Chăm sóc" thêm nhanh (nút "+ Thêm KH/Đơn mới") — SHEET RIÊNG, không gộp
+// CareData/DT TỔNG/dữ liệu đơn, không gộp vào báo cáo doanh số A/B/C. ──
+var SH_CARE_LEAD      = 'KH Chăm sóc mới';
+var CARE_LEAD_HEADERS = ['phone','name','note','cs','createdAt'];
 
 // ─── HELPERS ───────────────────────────────────────────────────
 function getSheet_(name, headers) {
@@ -7164,6 +7177,60 @@ function searchPriceCatalog_(rows, q) {
     if (ok) out.push(row);
   }
   return out;
+}
+
+// ─── CTKM (Sheet CTKM, cung file PRICE_SS_ID) — chi nap khi khach hoi ve khuyen mai/giam gia ──
+// Doc toan bo sheet CTKM thanh mang object, giong cach doc DANH_MUC (khong hardcode ten cot).
+function readCTKMCatalog_() {
+  var sh = SpreadsheetApp.openById(PRICE_SS_ID).getSheetByName(CTKM_SHEET_NAME);
+  if (!sh || sh.getLastRow() < 2) return [];
+  var lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
+  var vals = sh.getRange(1, 1, lastRow, lastCol).getValues();
+  var headers = vals[0].map(function(h){ return String(h || '').trim(); });
+  var rows = [];
+  for (var i = 1; i < vals.length; i++) {
+    var row = vals[i];
+    var isEmpty = row.every(function(c){ return c === '' || c === null; });
+    if (isEmpty) continue;
+    var obj = {};
+    for (var c = 0; c < headers.length; c++) {
+      if (!headers[c]) continue;
+      var v = row[c];
+      obj[headers[c]] = (v instanceof Date) ? v.toISOString() : v;
+    }
+    rows.push(obj);
+  }
+  return rows;
+}
+
+// Tu khoa nhan biet khach dang hoi ve khuyen mai/giam gia (khong dau, chu thuong)
+var _CTKM_KEYWORDS_ = ['khuyen mai','khuyenmai','giam gia','giamgia','uu dai','uudai',
+  'sale','freeship','free ship','qua tang','tang qua','ma giam','magiam','voucher',
+  'flash sale','combo uu dai','ctkm',' km ','km thang','khuyen mai gi'];
+
+// Chi tra ve noi dung CTKM khi cau hoi cua khach co tu khoa lien quan — de AI KHONG
+// tu dong nhet thong tin khuyen mai vao moi cau tra loi (dung yeu cau: chi khi khach hoi).
+function readCTKMPromotions_(query) {
+  var q = ' ' + _stripVN_(query) + ' ';
+  var matched = false;
+  for (var i = 0; i < _CTKM_KEYWORDS_.length; i++) {
+    if (q.indexOf(_CTKM_KEYWORDS_[i]) !== -1) { matched = true; break; }
+  }
+  if (!matched) return '';
+  var rows = readCTKMCatalog_();
+  if (!rows.length) return '';
+  var blocks = [];
+  for (var r = 0; r < rows.length && r < 8; r++) {
+    var row = rows[r], parts = [];
+    for (var k in row) {
+      if (!row.hasOwnProperty(k)) continue;
+      var v = row[k];
+      if (v === '' || v === null || v === undefined) continue;
+      parts.push(k + ': ' + v);
+    }
+    if (parts.length) blocks.push(parts.join(' | '));
+  }
+  return blocks.join('\n');
 }
 
 // ─── SETTINGS (1 signature duy nhat) ──────────────────────────
@@ -7348,11 +7415,19 @@ function readUsers_(sh) {
   var v = sh.getDataRange().getValues();
   for (var i = 1; i < v.length; i++) {
     if (!v[i][0]) continue;
+    // Tài khoản CS có thể gắn NHIỀU tên (vd 1 tài khoản dùng chung, hoặc gộp nhiều bí danh của
+    // cùng 1 sale) — luu o cot 'names' (JSON array), moi rieng bien tuong thich nguoc: tai khoan
+    // tao truoc khi co tinh nang nay chi co cot 'name' don (chuoi thuong), luc do fallback ve
+    // mang 1 phan tu tu chinh cot do.
+    var namesArr = [];
+    try { namesArr = v[i][6] ? JSON.parse(v[i][6]) : []; } catch (e) { namesArr = []; }
+    if (!namesArr.length && v[i][3]) namesArr = [String(v[i][3])];
     out.push({
       username: String(v[i][0]), passHash: String(v[i][1]||''), role: v[i][2]||'cs',
       name: v[i][3]||'', team: v[i][4]||'',
       active: (v[i][5]===''||v[i][5]===undefined) ? true :
-              (v[i][5]===true||v[i][5]==='TRUE'||v[i][5]==='true'||v[i][5]===1)
+              (v[i][5]===true||v[i][5]==='TRUE'||v[i][5]==='true'||v[i][5]===1),
+      names: namesArr
     });
   }
   return out;
@@ -7393,6 +7468,18 @@ function doGet(e) {
     if (action === 'orders')    return jsonOut_({ orders: readAllOrders_() });
     if (action === 'teams')     return jsonOut_({ teams: readTeams_(ss.getSheetByName(SH_TEAM)) });
     if (action === 'users')     return jsonOut_({ users: readUsers_(ss.getSheetByName(SH_USER)) });
+    // ── Nguon "Cham soc" (KH them nhanh, sheet rieng) — khong gop CareData/bao cao A-B-C ──
+    if (action === 'careLeads') return jsonOut_({ rows: readCareLeads_() });
+    // ── Tap SDT co trong "dữ liệu đơn" — chi de loc nguon o man hinh chinh (cache 10') ──
+    if (action === 'donPhones') {
+      var cacheDP = CacheService.getScriptCache();
+      var cKeyDP = 'don_phones_v2';
+      var cachedDP = cacheDP.get(cKeyDP);
+      if (cachedDP) { try { return jsonOut_(JSON.parse(cachedDP)); } catch(ec) {} }
+      var resDP = { phones: readDonPhones_(), saleByPhone: getDonSaleByPhone_() };
+      try { cacheDP.put(cKeyDP, JSON.stringify(resDP), 600); } catch(ec) {}
+      return jsonOut_(resDP);
+    }
 
     // ── Tra cuu bang gia (Sheet DANH_MUC, file rieng PRICE_SS_ID) — dung chung cho
     // portal/Sasum/Pancake. Tim khong dau, khop tren MOI cot dang text cua sheet, khong
@@ -7472,6 +7559,13 @@ function doGet(e) {
       var resC = buildSalesReportC_(fC);
       try { cacheC.put(cKeyC, JSON.stringify(resC), 120); } catch(ec) {}
       return jsonOut_(resC);
+    }
+
+    // ── BAO CAO D: KH "Chăm sóc" thêm nhanh (sheet riêng, KHÔNG gộp báo cáo A/B/C) ──
+    if (action === 'careLeadReport') {
+      var pD = e.parameter || {};
+      var fD = { dateFrom: pD.dateFrom || '', dateTo: pD.dateTo || '', cs: pD.cs || '' };
+      return jsonOut_(buildCareLeadReport_(fD));
     }
 
     if (action === 'assign')    return jsonOut_({ assignHistory: readAssign_(ss.getSheetByName(SH_ASSIGN)) });
@@ -7769,6 +7863,73 @@ function readDTTong_() {
     });
   }
   return out;
+}
+
+// ── KH "Chăm sóc" thêm nhanh — sheet RIÊNG, độc lập CareData/DT TỔNG/dữ liệu đơn ──
+function readCareLeads_() {
+  var ss = getCrmSS_();
+  var sh = ss.getSheetByName(SH_CARE_LEAD);
+  if (!sh || sh.getLastRow() < 2) return [];
+  var last = sh.getLastRow();
+  var vals = sh.getRange(2, 1, last - 1, CARE_LEAD_HEADERS.length).getValues();
+  var out = [];
+  for (var i = 0; i < vals.length; i++) {
+    var r = vals[i];
+    if (!r[0]) continue;
+    out.push({
+      phone: normPhone_(String(r[0])), name: String(r[1]||''), note: String(r[2]||''),
+      cs: String(r[3]||''), createdAt: r[4] || ''
+    });
+  }
+  return out;
+}
+
+function addCareLead_(data) {
+  var sh = getSheet_(SH_CARE_LEAD, CARE_LEAD_HEADERS);
+  var phone = normPhone_(String(data.phone||''));
+  if (!phone) return jsonOut_({ ok: false, error: 'Thieu SDT' });
+  var last = sh.getLastRow(); var rowIdx = -1;
+  if (last >= 2) {
+    var colP = sh.getRange(2, 1, last-1, 1).getValues();
+    for (var i = 0; i < colP.length; i++) {
+      if (normPhone_(String(colP[i][0])) === phone) { rowIdx = i + 2; break; }
+    }
+  }
+  var row = [phone, data.name||'', data.note||'', data.cs||'', new Date().toISOString()];
+  if (rowIdx > 0) sh.getRange(rowIdx, 1, 1, CARE_LEAD_HEADERS.length).setValues([row]);
+  else sh.appendRow(row);
+  try { CacheService.getScriptCache().remove('care_leads_v1'); } catch(ec) {}
+  return jsonOut_({ ok: true, found: rowIdx > 0 });
+}
+
+// ── Chỉ tra cứu tập SDT co trong "dữ liệu đơn" (Bao cao B) — dung de LOC nguon o
+// man hinh chinh, KHONG keo chi tiet san pham vao danh sach khach ──
+function readDonPhones_() {
+  var rows = readDonChiTiet_();
+  var set = {};
+  for (var i = 0; i < rows.length; i++) {
+    var ph = normPhone_(String(rows[i].soDienThoai || ''));
+    if (ph) set[ph] = true;
+  }
+  return Object.keys(set);
+}
+// Map SDT -> mang ten sale tham gia don (cot "Thẻ", tach theo dau phay — 1 don co the nhieu
+// sale). Dung o client de gop vao csSet, dam bao CS dung ten o BAT KY don nao trong
+// "dữ liệu đơn" (du don co nhieu sale) van xem duoc KH do.
+function getDonSaleByPhone_() {
+  var rows = readDonChiTiet_();
+  var map = {};
+  for (var i = 0; i < rows.length; i++) {
+    var ph = normPhone_(String(rows[i].soDienThoai || ''));
+    if (!ph) continue;
+    var names = splitMulti_(rows[i].theSale, ',');
+    if (!names.length) continue;
+    if (!map[ph]) map[ph] = [];
+    for (var j = 0; j < names.length; j++) {
+      if (map[ph].indexOf(names[j]) === -1) map[ph].push(names[j]);
+    }
+  }
+  return map;
 }
 
 // ── Doc toan bo sheet "dữ liệu đơn" thanh mang object ──
@@ -8212,23 +8373,45 @@ function buildSalesReportC_(filters) {
   };
 }
 
+// ── BAO CAO D: KH "Chăm sóc" thêm nhanh (sheet rieng, KHONG gop bao cao A/B/C) ──
+function buildCareLeadReport_(filters) {
+  filters = filters || {};
+  var rows = readCareLeads_();
+  var matched = rows.filter(function(r) {
+    var dt = r.createdAt ? new Date(r.createdAt) : null;
+    if (!dateInRange_(dt, filters.dateFrom, filters.dateTo)) return false;
+    if (filters.cs && String(r.cs||'') !== String(filters.cs)) return false;
+    return true;
+  });
+  var byCS = {};
+  matched.forEach(function(r) {
+    var name = r.cs || '(chưa gán)';
+    byCS[name] = (byCS[name] || 0) + 1;
+  });
+  var byCSArr = Object.keys(byCS).map(function(k) { return { name: k, count: byCS[k] }; });
+  byCSArr.sort(function(a, b) { return b.count - a.count; });
+  return { total: matched.length, byCS: byCSArr, rows: matched };
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  XUAT BAO CAO DOANH SO RA 1 TAB MOI TRONG GOOGLE SHEET (CRM)
 //  Dung lai dung buildSalesReportA_/B_ nen so lieu luon khop UI dang loc.
 //  Moi lan xuat tao 1 tab moi (co timestamp) — khong ghi de, giu lich su cac lan xuat.
 // ═══════════════════════════════════════════════════════════════
 function exportSalesReportToSheet_(reportType, filters) {
-  reportType = (reportType === 'B' || reportType === 'C') ? reportType : 'A';
+  reportType = (reportType === 'B' || reportType === 'C' || reportType === 'D') ? reportType : 'A';
   var data = reportType === 'B' ? buildSalesReportB_(filters || {})
-    : (reportType === 'C' ? buildSalesReportC_(filters || {}) : buildSalesReportA_(filters || {}));
+    : (reportType === 'C' ? buildSalesReportC_(filters || {})
+    : (reportType === 'D' ? buildCareLeadReport_(filters || {})
+    : buildSalesReportA_(filters || {})));
   var ss = getCrmSS_();
   var ts = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Etc/GMT-7', 'yyyyMMdd_HHmmss');
   var tabName = 'BC_' + reportType + '_' + ts;
   var sh = ss.insertSheet(tabName);
 
-  var titleSuffix = reportType === 'A' ? ' — Theo DT tổng' : (reportType === 'B' ? ' — Theo dữ liệu đơn' : ' — So sánh theo kỳ');
+  var titleSuffix = reportType === 'A' ? ' — Theo DT tổng' : (reportType === 'B' ? ' — Theo dữ liệu đơn' : (reportType === 'D' ? ' — KH Chăm sóc mới (data riêng, KHÔNG gộp báo cáo doanh số A/B/C)' : ' — So sánh theo kỳ'));
   var rows = [];
-  rows.push(['BÁO CÁO DOANH SỐ ' + reportType + titleSuffix]);
+  rows.push([(reportType === 'D' ? 'BÁO CÁO KH CHĂM SÓC MỚI' : ('BÁO CÁO DOANH SỐ ' + reportType)) + titleSuffix]);
   rows.push(['Xuất lúc', Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Etc/GMT-7', 'dd/MM/yyyy HH:mm:ss')]);
 
   var f = filters || {};
@@ -8245,6 +8428,9 @@ function exportSalesReportToSheet_(reportType, filters) {
     filterDesc.push('Sale: ' + (Array.isArray(f.sale) ? (f.sale.join(', ') || '(tất cả)') : (f.sale || '(tất cả)')));
     filterDesc.push('Nguồn đơn: ' + (Array.isArray(f.nguon) ? (f.nguon.join(', ') || '(tất cả)') : (f.nguon || '(tất cả)')));
     filterDesc.push('Marketer: ' + (Array.isArray(f.marketer) ? (f.marketer.join(', ') || '(tất cả)') : (f.marketer || '(tất cả)')));
+  } else if (reportType === 'D') {
+    if (f.dateFrom || f.dateTo) filterDesc.push('Khoảng ngày thêm: ' + (f.dateFrom || '...') + ' → ' + (f.dateTo || '...'));
+    if (f.cs) filterDesc.push('CS: ' + f.cs);
   } else {
     if (data.period) filterDesc.push('Kỳ này: ' + data.period.curLabel + ' | Kỳ trước: ' + data.period.prevLabel);
     filterDesc.push('Lọc theo: ' + (f.dateField === 'thoiGianHT' ? 'Thời gian hoàn thành' : 'Ngày tạo'));
@@ -8295,6 +8481,24 @@ function exportSalesReportToSheet_(reportType, filters) {
     (data.orders || []).forEach(function(o) {
       rows.push([o.ngayTaoDon, o.khachHang, o.soDienThoai, o.nguonDon, o.theSale, o.sanPham, o.maSanPham, o.soLuong, o.giaTriSauGiam, o.cod, o.marketer]);
     });
+  } else if (reportType === 'D') {
+    rows.push(['TỔNG QUAN']);
+    rows.push(['Số KH thêm mới (nguồn Chăm sóc)', data.total]);
+    rows.push([]);
+    rows.push(['THEO CS THÊM']);
+    rows.push(['CS', 'Số KH thêm']);
+    (data.byCS || []).forEach(function(x) { rows.push([x.name, x.count]); });
+    rows.push([]);
+    rows.push(['CHI TIẾT']);
+    rows.push(['SĐT', 'Tên khách', 'Ghi chú mới nhất', 'CS thêm', 'Ngày thêm']);
+    (data.rows || []).forEach(function(r) {
+      var latestNote = r.note || '';
+      try {
+        var arr = JSON.parse(r.note || '[]');
+        if (Array.isArray(arr) && arr.length) latestNote = arr[0].text || '';
+      } catch (eN) {}
+      rows.push([r.phone, r.name, latestNote, r.cs, r.createdAt]);
+    });
   } else {
     var hdrC = ['Tên', 'KPI kỳ trước', 'Kết quả kỳ trước', '%HT KPI kỳ trước', 'KPI kỳ này', 'Kết quả kỳ này', '%HT KPI kỳ này', '% Tăng trưởng'];
     rows.push(['THEO NHÂN VIÊN (SALE)']);
@@ -8336,6 +8540,7 @@ function doPost(e) {
     if (action === 'saveSingle')          return saveSingleCare_(data.row);
     if (action === 'saveBatch')           return saveBatchCare_(data.rows);
     if (action === 'saveOrders')          return saveOrders_(data.orders);
+    if (action === 'addCareLead')         return addCareLead_(data);
     if (action === 'patchOrder')          return patchOrder_(data);
     if (action === 'deleteOrder')         return deleteOrder_(data);
     // ── Xuat bao cao doanh so (dang loc tren UI) ra 1 tab moi trong Google Sheet CRM ──
@@ -8835,7 +9040,10 @@ function saveUsers_(users) {
   var matrix = [USER_HEADERS];
   for (var i = 0; i < users.length; i++) {
     var u = users[i];
-    matrix.push([String(u.username||''), String(u.passHash||''), u.role||'cs', u.name||'', u.team||'', (u.active===false?false:true)]);
+    var namesArr = (u.names && u.names.length) ? u.names : (u.name ? [u.name] : []);
+    matrix.push([String(u.username||''), String(u.passHash||''), u.role||'cs',
+                 namesArr[0]||u.name||'', u.team||'', (u.active===false?false:true),
+                 JSON.stringify(namesArr)]);
   }
   sh.getRange(1, 1, matrix.length, USER_HEADERS.length).setValues(matrix);
   return jsonOut_({ ok: true, written: users.length });
@@ -9030,7 +9238,7 @@ function readFaqSheet_(query) {
 }
 
 function readExternalProductSheet_(query) {
-  var url = getSetting_('productSheetUrl');
+  var url = getSetting_('productSheetUrl') || DEFAULT_PRODUCT_SHEET_URL;
   if (!url) return '';
   var ss;
   try { ss = SpreadsheetApp.openByUrl(url); } catch (e) { return ''; } // chua chia se quyen / URL sai
@@ -9222,7 +9430,7 @@ function _driveKnowledgeFileIndex_(file) {
 // Doc toan bo thu muc kien thuc Drive (PDF/Doc/Sheet), khop tu khoa cau hoi khach, tra ve
 // toi da 4 doan lien quan nhat de dua vao prompt AI.
 function readDriveKnowledgeFolder_(query) {
-  var url = getSetting_('driveKnowledgeFolderUrl');
+  var url = getSetting_('driveKnowledgeFolderUrl') || DEFAULT_DRIVE_KNOWLEDGE_FOLDER_URL;
   var folderId = _driveFolderIdFromUrl_(url);
   if (!folderId) return '';
 
@@ -9383,7 +9591,7 @@ function _driveImageFromLink_(link) {
 // van ban o readExternalProductSheet_) — CS dan link Drive (file hoac folder)
 // vao do la dung duoc ngay, khong can sua code khi dien them dong moi.
 function findProductSheetImage_(query) {
-  var url = getSetting_('productSheetUrl');
+  var url = getSetting_('productSheetUrl') || DEFAULT_PRODUCT_SHEET_URL;
   if (!url) return null;
   var ss;
   try { ss = SpreadsheetApp.openByUrl(url); } catch (e) { return null; }
@@ -9429,7 +9637,8 @@ function findDriveProductImage_(query) {
   var fromSheet = findProductSheetImage_(query);
   if (fromSheet) return fromSheet;
 
-  var url = getSetting_('driveProductImagesFolderUrl') || getSetting_('driveKnowledgeFolderUrl');
+  var url = getSetting_('driveProductImagesFolderUrl') || DEFAULT_DRIVE_PRODUCT_IMAGES_FOLDER_URL
+    || getSetting_('driveKnowledgeFolderUrl') || DEFAULT_DRIVE_KNOWLEDGE_FOLDER_URL;
   var folderId = _driveFolderIdFromUrl_(url);
   if (!folderId) return null;
 
@@ -9487,6 +9696,9 @@ function _buildAISystemPrompt_(userMsg, withProducts) {
   // Q&A tu sheet FAQ (khop tu khoa cau hoi khach) — de AI hoc cach xu ly cau hoi kho theo team
   var faq = readFaqSheet_(userMsg);
   if (faq) parts.push('\n\nCAC CAU HOI KHO & CACH TRA LOI MAU CUA TEAM (uu tien bam sat cach xu ly / giong dieu nay khi tra loi cau tuong tu; dieu chinh cho hop ngu canh khach, KHONG copy nguyen van neu khong khop hoan toan):\n' + faq);
+  // CTKM: chi nap khi cau hoi cua khach co tu khoa khuyen mai/giam gia (xem readCTKMPromotions_)
+  var ctkm = readCTKMPromotions_(userMsg);
+  if (ctkm) parts.push('\n\nCHUONG TRINH KHUYEN MAI (CTKM) DANG AP DUNG (chi dung khi khach hoi ve khuyen mai/giam gia, KHONG tu bia them neu khong co trong danh sach nay):\n' + ctkm);
   parts.push('\n\nYEU CAU: Chi dua ra DUY NHAT 1 cau tra loi ngan gon (toi da 150 tu). Khong danh so, khong giai thich them.');
   return parts.join('');
 }
@@ -9541,6 +9753,12 @@ function callAI_(data) {
   var withProducts = !!data.withProducts;
   var sys = _buildAISystemPrompt_(userMsg, withProducts);
 
+  // LUU Y (2026-09-13): llama-3.3-70b-versatile bi Groq NGUNG HO TRO tu 16/8/2026
+  // (model_decommissioned) va gemini-2.0-flash bi Google NGUNG HO TRO tu 1/6/2026
+  // (404) — day la ly do CA 2 provider cung loi dong loat, khong phai do sai key.
+  // Doi sang model con duoc ho tro: openai/gpt-oss-120b (Groq, model san xuat hien
+  // tai) va gemini-flash-latest (alias Google tu dong tro ve ban Flash on dinh moi
+  // nhat, tranh phai sua code moi khi Google lai ngung ho tro 1 phien ban cu the).
   var providers = [
     { name: 'Groq',     key: getSetting_('apiGroq') || getSetting_('geminiKey'), fn: _aiOpenAICompat_, url: 'https://api.groq.com/openai/v1/chat/completions',     model: 'openai/gpt-oss-120b' },
     { name: 'Cerebras', key: getSetting_('apiCerebras'),                          fn: _aiOpenAICompat_, url: 'https://api.cerebras.ai/v1/chat/completions',        model: 'gpt-oss-120b' },
