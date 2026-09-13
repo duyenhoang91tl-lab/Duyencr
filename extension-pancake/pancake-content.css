@@ -199,6 +199,48 @@
   font-size: 12px;
 }
 
+#pk-ai-nick-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+#pk-ai-nick-row label {
+  font-size: 11px;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+#pk-nick-sel {
+  flex: 1;
+  padding: 4px 6px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+#pk-nick-add {
+  border: 1px solid #2563eb;
+  background: #fff;
+  color: #2563eb;
+  border-radius: 6px;
+  padding: 3px 9px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#pk-link-chat-btn {
+  border: 1px solid #ccc;
+  background: #fff;
+  border-radius: 6px;
+  padding: 6px 9px;
+  cursor: pointer;
+}
+
+#pk-link-chat-btn:hover { background: #f3f4f6; }
+
 .pk-ai-new-tag {
   color: #9a3412;
   background: #fff7ed;

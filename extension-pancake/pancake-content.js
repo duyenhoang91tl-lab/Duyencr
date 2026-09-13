@@ -33,6 +33,10 @@
   let _activeTone = 'Thân thiện';
   let _useProducts = false;
   let CS_NAMES = [];
+  let NICK_LIST = [];
+  let _currentNick = ''; // Nick Zalo/kenh CS dang dung, sticky (chrome.storage.sync)
+  let _chatKeyPhoneMap = {}; // { chatKey: phone } — "danh ba nguoc" hoc cuc bo tren may nay
+                             // (giong _chatNamePhoneMap ben Zalo AI), dung cho nut Lien ket doan chat
   let _currentPhone = '';
   let _currentCare = null;   // du lieu care dang hien thi/sua tren form
   let _currentOrders = [];   // lich su don hang cua khach dang xem (dung de build ho so cho prompt AI)
@@ -50,6 +54,8 @@
     injectPanel();
     observeConversationChanges();
     loadCsNames_();
+    loadNickList_();
+    loadChatKeyMap_();
     startCarePoll_();
     loadReminders_();
     startRemPoll_();
@@ -87,9 +93,15 @@
           <label>CS đang dùng</label>
           <select id="pk-cs-sel"></select>
         </div>
+        <div id="pk-ai-nick-row">
+          <label>💬 Nick</label>
+          <select id="pk-nick-sel"></select>
+          <button id="pk-nick-add" title="Thêm nick mới">＋</button>
+        </div>
         <div id="pk-ai-phone-row">
           <input type="text" id="pk-ai-phone-input" placeholder="SĐT khách (nếu không tự nhận ra)" />
           <button id="pk-ai-phone-btn">Tra cứu</button>
+          <button id="pk-link-chat-btn" title="Liên kết đoạn chat ĐANG MỞ với khách này — làm 1 lần để lần sau tự nhận diện dù không đọc được SĐT/khung Sản phẩm order">🔗</button>
         </div>
         <div id="pk-ai-customer"></div>
 
@@ -135,6 +147,23 @@
       loadReminders_();
     });
 
+    const nickSel = panelEl.querySelector('#pk-nick-sel');
+    nickSel.addEventListener('change', () => {
+      _currentNick = nickSel.value;
+      chrome.storage.sync.set({ currentNick: _currentNick });
+    });
+    panelEl.querySelector('#pk-nick-add').addEventListener('click', () => {
+      const nick = (prompt('Nhập nick Zalo/kênh mới:') || '').trim();
+      if (!nick) return;
+      chrome.runtime.sendMessage({ type: 'ADD_NICK', payload: { nick } }, (resp) => {
+        NICK_LIST = (resp?.ok && resp.data?.list) ? resp.data.list : NICK_LIST;
+        if (!NICK_LIST.includes(nick)) NICK_LIST.push(nick);
+        _currentNick = nick;
+        chrome.storage.sync.set({ currentNick: nick });
+        renderNickSelect_();
+      });
+    });
+
     panelEl.querySelector("#pk-ai-refresh").addEventListener("click", () => {
       requestSuggestion(true);
     });
@@ -149,6 +178,11 @@
     });
     panelEl.querySelector("#pk-ai-phone-input").addEventListener("keydown", (e) => {
       if (e.key === "Enter") panelEl.querySelector("#pk-ai-phone-btn").click();
+    });
+    panelEl.querySelector("#pk-link-chat-btn").addEventListener("click", () => {
+      if (!_currentPhone) { setStatus("Chưa tra cứu khách nào để liên kết."); return; }
+      learnChatKeyForPhone_(_currentPhone);
+      setStatus(`🔗 Đã liên kết đoạn chat này với ${_currentPhone} — lần sau tự nhận diện.`);
     });
     panelEl.querySelector("#pk-rem-refresh").addEventListener("click", () => loadReminders_());
     panelEl.querySelector("#pk-price-btn").addEventListener("click", doPriceSearch_);
@@ -180,6 +214,47 @@
         names.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
       csSel.value = settings.csName || '';
     });
+  }
+
+  // Nick Zalo/kênh — dùng chung danh sách (setting 'nickZaloList') với Zalo AI, sticky riêng
+  // theo máy/extension này (chrome.storage.sync của Pancake AI, độc lập với Zalo AI).
+  function loadNickList_() {
+    chrome.storage.sync.get(['currentNick'], (res) => {
+      _currentNick = res.currentNick || '';
+      chrome.runtime.sendMessage({ type: "GET_NICK_LIST" }, (resp) => {
+        NICK_LIST = (resp?.ok && resp.data) ? resp.data : [];
+        renderNickSelect_();
+      });
+    });
+  }
+
+  function renderNickSelect_() {
+    const sel = panelEl?.querySelector('#pk-nick-sel');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">— Chọn nick —</option>' +
+      NICK_LIST.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+    sel.value = _currentNick || '';
+  }
+
+  // "Danh bạ ngược" (khoá hội thoại → SĐT) học cục bộ trên máy này — dùng khi CS bấm 🔗
+  // Liên kết đoạn chat, để lần sau tự nhận diện dù không đọc được SĐT/khung "Sản phẩm order".
+  function loadChatKeyMap_() {
+    chrome.storage.local.get(['pk_chat_key_map'], (res) => { _chatKeyPhoneMap = res.pk_chat_key_map || {}; });
+  }
+  function saveChatKeyMap_() { chrome.storage.local.set({ pk_chat_key_map: _chatKeyPhoneMap }); }
+
+  // Khoá nhận diện hội thoại hiện tại: ưu tiên đường dẫn URL (đa số web app SPA có URL riêng
+  // cho từng hội thoại — ổn định hơn text hiển thị vốn có thể đổi theo tên/biệt danh khách).
+  function getCurrentChatKey_() {
+    return 'url:' + location.pathname + location.search;
+  }
+  function learnChatKeyForPhone_(phone) {
+    if (!phone) return;
+    _chatKeyPhoneMap[getCurrentChatKey_()] = phone;
+    saveChatKeyMap_();
+  }
+  function resolvePhoneForChatKey_() {
+    return _chatKeyPhoneMap[getCurrentChatKey_()] || null;
   }
 
   function observeConversationChanges() {
@@ -281,7 +356,7 @@
   }
 
   function requestCustomerLookup() {
-    const phone = extractPhone();
+    const phone = extractPhone() || resolvePhoneForChatKey_();
     if (!phone) {
       panelEl.querySelector("#pk-ai-customer").innerHTML = "";
       _currentPhone = ''; _currentCare = null; _lastServerCare = {}; _currentOrderPanelName = ''; _currentOrders = [];
@@ -495,6 +570,11 @@
     const c = _currentCare || {};
     const nameEl = panelEl?.querySelector('#pk-name-input');
     const liveName = nameEl ? nameEl.value.trim() : '';
+    // Ghi nhan nick Zalo/kenh dang dung vao danh sach nick da tung tiep xuc voi khach nay —
+    // giong het cach Zalo AI lam khi luu (them vao nickZalos, khong ghi de mat nick cu).
+    const existingNicks = c.nickZalos || [];
+    const nickZalos = (_currentNick && !existingNicks.includes(_currentNick))
+      ? [...existingNicks, _currentNick] : existingNicks;
     return Object.assign({
       phone,
       status: c.status || '', zalo: c.zalo || '', cs: settings.csName || c.cs || '',
@@ -505,7 +585,7 @@
       schedCS: c.schedCS || '', schedCSNote: c.schedCSNote || '',
       schedHen: c.schedHen || '', schedHenNote: c.schedHenNote || '',
       khStatus: c.khStatus || '', birthday: c.birthday || '',
-      nickZalos: c.nickZalos || [],
+      nickZalos,
       name: liveName || _currentOrderPanelName || c.name || ''
     }, overrides || {});
   }

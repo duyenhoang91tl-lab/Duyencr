@@ -103,6 +103,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // Danh sach Nick Zalo dung chung ca team — dung chung setting 'nickZaloList' voi Zalo AI
+  // (action:'getSetting'/key:'nickZaloList'), de 2 extension hien cung 1 danh sach nick.
+  if (msg?.type === "GET_NICK_LIST") {
+    handleGetNickList()
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
+  // Them 1 nick moi vao danh sach dung chung (action:'addZaloNick' — GAS tu merge, khong ghi
+  // de mat nick cu; neu GAS cu chua co action nay thi fallback doc-merge-ghi qua setSetting,
+  // giong het logic ben Zalo AI).
+  if (msg?.type === "ADD_NICK") {
+    handleAddNick(msg.payload)
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
   // Danh sach khach can nhac hen HOM NAY (doc tu cot 'Hẹn' trong CareData) — action:'reminders',
   // dung chung endpoint voi portal (index.html). Chi doc, khong ghi -> khong dung do voi Zalo AI/portal.
   if (msg?.type === "GET_REMINDERS") {
@@ -190,6 +209,52 @@ async function handleGetCsNames() {
     .filter((u) => u.active !== false)
     .map((u) => u.username || u.name)
     .filter(Boolean);
+}
+
+// Lay danh sach Nick Zalo dung chung ca team — action:'getSetting'&key='nickZaloList',
+// dung chung setting voi Zalo AI (nickZaloList luu duoi dang JSON string).
+async function handleGetNickList() {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) return [];
+
+  const sep = cfg.gasUrl.includes("?") ? "&" : "?";
+  const res = await fetch(cfg.gasUrl + sep + "action=getSetting&key=nickZaloList", { redirect: "follow" });
+  const data = await res.json();
+  let list = [];
+  if (data.value) { try { list = JSON.parse(data.value); } catch (e) {} }
+  return Array.isArray(list) ? list : [];
+}
+
+// Them 1 nick moi vao danh sach dung chung — uu tien action:'addZaloNick' (GAS tu merge vao
+// danh sach chung, khong ghi de mat nick da co); neu ban GAS cu chua co action nay (loi tra
+// ve) thi fallback: doc list moi nhat, tu merge, roi ghi lai qua setSetting — GIONG HET logic
+// ben Zalo AI content.js (nzAddBtn handler) de 2 ben khong bao gio ghi de mat du lieu cua nhau.
+async function handleAddNick(payload) {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+  const nick = (payload?.nick || "").trim();
+  if (!nick) throw new Error("Tên nick trống.");
+
+  try {
+    const res = await fetch(cfg.gasUrl, {
+      method: "POST",
+      body: JSON.stringify({ action: "addZaloNick", nick }),
+      headers: { "Content-Type": "text/plain" }
+    });
+    const data = await res.json();
+    if (data && !data.error) return { list: await handleGetNickList() };
+  } catch (e) { /* fallback bên dưới */ }
+
+  const list = await handleGetNickList();
+  if (!list.includes(nick)) list.push(nick);
+  await fetch(cfg.gasUrl, {
+    method: "POST",
+    body: JSON.stringify({ action: "setSetting", key: "nickZaloList", value: JSON.stringify(list) }),
+    headers: { "Content-Type": "text/plain" }
+  });
+  return { list };
 }
 
 function parseDateSafe(d) {
