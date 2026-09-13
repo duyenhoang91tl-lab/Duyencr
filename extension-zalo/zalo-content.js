@@ -133,7 +133,9 @@
     addEl(cfg, 'input', {id:'zai-cerebras-key', type:'text', placeholder:'csk-... — để trống nếu giữ key cũ'});
     addEl(cfg, 'label', {textContent:'🔁 Gemini API Key (dự phòng 2 — aistudio.google.com/apikey)'});
     addEl(cfg, 'input', {id:'zai-gemini-api-key', type:'text', placeholder:'AIza... — để trống nếu giữ key cũ'});
-    addEl(cfg, 'div', {style:'font-size:10px;color:#9ca3af;margin:2px 0 6px', textContent:'AI tự chuyển sang key dự phòng khi Groq hết lượt (lỗi 429). Nên nhập cả 3 để không bao giờ đứng.'});
+    addEl(cfg, 'label', {textContent:'🔁 OpenRouter API Key (dự phòng 3 — openrouter.ai, model google/gemma-2-9b-it:free)'});
+    addEl(cfg, 'input', {id:'zai-openrouter-key', type:'text', placeholder:'sk-or-v1-... — để trống nếu giữ key cũ'});
+    addEl(cfg, 'div', {style:'font-size:10px;color:#9ca3af;margin:2px 0 6px', textContent:'AI tự chuyển sang key dự phòng khi Groq hết lượt (lỗi 429). Nên nhập cả 4 để không bao giờ đứng.'});
     addEl(cfg, 'label', {textContent:'📄 Link Google Sheet chi tiết sản phẩm/thành phần (tuỳ chọn, dùng chung cả team)'});
     const inpProdSheet = addEl(cfg, 'input', {id:'zai-product-sheet-url', type:'text', placeholder:'https://docs.google.com/spreadsheets/d/...'});
     addEl(cfg, 'div', {style:'font-size:10px;color:#9ca3af;margin:2px 0 6px', textContent:'Hỗ trợ nhiều tab (mỗi tab 1 hãng), dòng 1 mỗi tab là tiêu đề cột, cột đầu là tên sản phẩm. Sheet phải chia sẻ "Bất kỳ ai có liên kết – Xem" hoặc chia sẻ cho tài khoản chạy GAS. AI sẽ tự tìm đúng vài sản phẩm khớp với câu hỏi/ngữ cảnh (không nhét cả sheet) để tư vấn chính xác.'});
@@ -584,6 +586,7 @@
     if (!(await _saveKey('apiGroq', 'zai-gemini-key'))) return;
     if (!(await _saveKey('apiCerebras', 'zai-cerebras-key'))) return;
     if (!(await _saveKey('apiGemini', 'zai-gemini-api-key'))) return;
+    if (!(await _saveKey('apiOpenRouter', 'zai-openrouter-key'))) return;
     if (key) showMsg('zai-save-status','✓ Đã lưu API key!',3000);
     const prodSheetEl = document.getElementById('zai-product-sheet-url');
     const prodSheetUrl = prodSheetEl ? prodSheetEl.value.trim() : '';
