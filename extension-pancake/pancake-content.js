@@ -70,10 +70,56 @@
 
   function getSettings() {
     return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ type: "GET_SETTINGS" }, (resp) => {
-        resolve(resp?.settings || {});
-      });
+      try {
+        chrome.runtime.sendMessage({ type: "GET_SETTINGS" }, (resp) => {
+          if (chrome.runtime.lastError) { resolve({}); return; }
+          resolve(resp?.settings || {});
+        });
+      } catch (e) {
+        resolve({});
+      }
     });
+  }
+
+  // ── Bảo vệ khi extension bị reload/cập nhật trong lúc tab Pancake đang mở ──
+  // Khi đó chrome.runtime của content script cũ mất kết nối tới service worker mới:
+  // MỌI lệnh chrome.runtime.sendMessage sau đó đều ném lỗi "Extension context invalidated"
+  // (hoặc chrome.runtime tự thành undefined) — khiến tra cứu KH, lưu tên/SĐT/ghi chú/trạng
+  // thái Zalo, nhắc hẹn... đều im lặng không chạy, chỉ thấy lỗi đỏ trong Console (F12) chứ
+  // KHÔNG phải lỗi logic code. safeSendMessage_ bắt lỗi này, dừng các vòng lặp polling đang
+  // gây spam lỗi liên tục, và hiện banner rõ ràng yêu cầu tải lại trang (F5) thay vì im lặng.
+  let _extInvalidated = false;
+  function isExtContextValid_() {
+    try { return !!(chrome.runtime && chrome.runtime.id); } catch (e) { return false; }
+  }
+  function safeSendMessage_(message, callback) {
+    if (_extInvalidated || !isExtContextValid_()) { handleExtInvalidated_(); return; }
+    try {
+      chrome.runtime.sendMessage(message, (resp) => {
+        if (chrome.runtime.lastError) { handleExtInvalidated_(); return; }
+        callback && callback(resp);
+      });
+    } catch (e) {
+      handleExtInvalidated_();
+    }
+  }
+  function handleExtInvalidated_() {
+    if (_extInvalidated) return;
+    _extInvalidated = true;
+    if (_carePollTimer) { clearInterval(_carePollTimer); _carePollTimer = null; }
+    if (_remPollTimer) { clearInterval(_remPollTimer); _remPollTimer = null; }
+    showExtInvalidBanner_();
+  }
+  function showExtInvalidBanner_() {
+    if (!panelEl || panelEl.querySelector('#pk-ext-invalid-banner')) return;
+    const banner = document.createElement('div');
+    banner.id = 'pk-ext-invalid-banner';
+    banner.style.cssText = 'background:#fff3cd;color:#856404;border:1px solid #ffe08a;border-radius:6px;padding:10px 12px;margin:0 0 8px;font-size:13px;font-weight:600;text-align:center;';
+    banner.innerHTML = '⚠️ Extension vừa được cập nhật — vui lòng <a href="#" id="pk-reload-link" style="color:#0d6efd;text-decoration:underline;">tải lại trang</a> (F5) để tiếp tục dùng.';
+    panelEl.prepend(banner);
+    const link = banner.querySelector('#pk-reload-link');
+    if (link) link.addEventListener('click', (e) => { e.preventDefault(); location.reload(); });
+    setStatus('⚠️ Mất kết nối tới extension — vui lòng tải lại trang (F5).');
   }
 
   // ── Nhớ vị trí/kích thước/trạng thái thu gọn của panel giữa các lần tải trang
@@ -221,7 +267,7 @@
     panelEl.querySelector('#pk-nick-add').addEventListener('click', () => {
       const nick = (prompt('Nhập nick Zalo/kênh mới:') || '').trim();
       if (!nick) return;
-      chrome.runtime.sendMessage({ type: 'ADD_NICK', payload: { nick } }, (resp) => {
+      safeSendMessage_({ type: 'ADD_NICK', payload: { nick } }, (resp) => {
         NICK_LIST = (resp?.ok && resp.data?.list) ? resp.data.list : NICK_LIST;
         if (!NICK_LIST.includes(nick)) NICK_LIST.push(nick);
         _currentNick = nick;
@@ -272,7 +318,7 @@
 
   // ── CS đang dùng (sticky theo máy, lưu chrome.storage.sync) ──
   async function loadCsNames_() {
-    chrome.runtime.sendMessage({ type: "GET_CS_NAMES" }, (resp) => {
+    safeSendMessage_({ type: "GET_CS_NAMES" }, (resp) => {
       CS_NAMES = (resp?.ok && resp.data && resp.data.length) ? resp.data : [];
       const csSel = panelEl?.querySelector('#pk-cs-sel');
       if (!csSel) return;
@@ -288,7 +334,7 @@
   function loadNickList_() {
     chrome.storage.sync.get(['currentNick'], (res) => {
       _currentNick = res.currentNick || '';
-      chrome.runtime.sendMessage({ type: "GET_NICK_LIST" }, (resp) => {
+      safeSendMessage_({ type: "GET_NICK_LIST" }, (resp) => {
         NICK_LIST = (resp?.ok && resp.data) ? resp.data : [];
         renderNickSelect_();
       });
@@ -482,7 +528,7 @@
   function lookupByPhone(phone) {
     const box = panelEl.querySelector("#pk-ai-customer");
     box.innerHTML = `<div class="pk-ai-cust-loading">Đang tra cứu ${phone}...</div>`;
-    chrome.runtime.sendMessage({ type: "LOOKUP_CUSTOMER", payload: { phone } }, (resp) => {
+    safeSendMessage_({ type: "LOOKUP_CUSTOMER", payload: { phone } }, (resp) => {
       if (!resp?.ok) {
         box.innerHTML = `<div class="pk-ai-cust-loading">Không tra cứu được: ${resp?.error || "lỗi không rõ"}</div>`;
         return;
@@ -724,7 +770,7 @@
       note: rawEl ? rawEl.value : (_currentCare?.note || '')
     });
     if (btn) { btn.disabled = true; btn.textContent = 'Đang lưu...'; }
-    chrome.runtime.sendMessage({ type: 'SAVE_CARE', payload: Object.assign({}, row, { isNewCustomer }) }, (resp) => {
+    safeSendMessage_({ type: 'SAVE_CARE', payload: Object.assign({}, row, { isNewCustomer }) }, (resp) => {
       if (btn) { btn.disabled = false; btn.textContent = '💾 Lưu vào Sasum'; }
       if (!resp?.ok) { setStatus('Lưu thất bại: ' + (resp?.error || 'lỗi không rõ')); return; }
       _currentCare = row;
@@ -739,7 +785,7 @@
   // ghi de trong cac truong khac (dung loi cu tung gap ben Zalo AI voi doneReminder_).
   function doneAppointment_(phone) {
     const row = _buildRow(phone, { schedHen: '', schedHenNote: '' });
-    chrome.runtime.sendMessage({ type: 'SAVE_CARE', payload: row }, (resp) => {
+    safeSendMessage_({ type: 'SAVE_CARE', payload: row }, (resp) => {
       if (!resp?.ok) { setStatus('Không xoá được lịch hẹn: ' + (resp?.error || '')); return; }
       _currentCare = row;
       _lastServerCare = Object.assign({}, row);
@@ -763,7 +809,7 @@
     if (!_currentPhone) return;
     if (typeof document.visibilityState === 'string' && document.visibilityState !== 'visible') return;
     const phone = _currentPhone;
-    chrome.runtime.sendMessage({ type: 'LOOKUP_CUSTOMER', payload: { phone } }, (resp) => {
+    safeSendMessage_({ type: 'LOOKUP_CUSTOMER', payload: { phone } }, (resp) => {
       if (!resp?.ok || _currentPhone !== phone) return;
       const newCare = resp.data.care || {};
       const CMP = ['status','zalo','cs','note','schedHen','schedHenNote','khStatus','birthday','name'];
@@ -814,7 +860,7 @@
 
   function loadReminders_() {
     const cs = (panelEl?.querySelector('#pk-cs-sel')?.value) || settings?.csName || '';
-    chrome.runtime.sendMessage({ type: 'GET_REMINDERS', payload: { cs } }, (resp) => {
+    safeSendMessage_({ type: 'GET_REMINDERS', payload: { cs } }, (resp) => {
       if (!resp?.ok) { return; } // lỗi mạng/GAS -> im lặng, không làm phiền, CS bấm 🔄 để thử lại
       _reminders = resp.data.reminders || [];
       renderReminders_();
@@ -859,7 +905,7 @@
     if (!r) return;
     panelEl.querySelector('#pk-ai-phone-input').value = r.phone;
     setStatus('⏳ Đang soạn tin follow-up cho ' + r.phone + '...');
-    chrome.runtime.sendMessage(
+    safeSendMessage_(
       { type: 'FETCH_FOLLOWUP_SUGGESTION', payload: { phone: r.phone, status: r.status, note: r.schedHenNote } },
       (resp) => {
         if (!resp?.ok) { setStatus('Lỗi: ' + (resp?.error || 'không rõ')); return; }
@@ -876,7 +922,7 @@
     const q = (panelEl.querySelector('#pk-price-q').value || '').trim();
     const box = panelEl.querySelector('#pk-price-result');
     box.innerHTML = '<div class="pk-price-loading">Đang tìm...</div>';
-    chrome.runtime.sendMessage({ type: 'GET_PRICE', payload: { q } }, (resp) => {
+    safeSendMessage_({ type: 'GET_PRICE', payload: { q } }, (resp) => {
       if (!resp?.ok) { box.innerHTML = `<div class="pk-price-loading">Lỗi: ${escapeHtml(resp?.error || 'không rõ')}</div>`; return; }
       renderPriceRows_(resp.data.rows || [], q);
     });
@@ -944,7 +990,7 @@
     setStatus(manual ? "Đang lấy gợi ý..." : "Hội thoại thay đổi — đang lấy gợi ý mới...");
 
     const ctxEl = panelEl.querySelector("#pk-ctx-input");
-    chrome.runtime.sendMessage(
+    safeSendMessage_(
       {
         type: "FETCH_SUGGESTION",
         payload: {
@@ -984,7 +1030,7 @@
       const angle = OPENER_ANGLES[i];
       sug.innerHTML = `<div class="pk-ai-cust-loading">Đang soạn câu ${i + 1}/${OPENER_ANGLES.length} — ${escapeHtml(angle.label)}...</div>`;
       const data = await new Promise((resolve) => {
-        chrome.runtime.sendMessage(
+        safeSendMessage_(
           { type: "FETCH_OPENER", payload: { custLines, tone: _activeTone, angleInstr: angle.instr, withProducts: _useProducts } },
           (resp) => resolve(resp?.ok ? resp.data : { error: resp?.error || "lỗi không rõ" })
         );
