@@ -3110,6 +3110,17 @@ function renderOverdueTab() {
   grid.innerHTML = html;
 }
 
+// Làm mới đúng tab đang mở của panel chi tiết khách (nếu đang mở đúng khách này) — gọi sau khi
+// Done/xóa lịch hẹn từ nơi KHÁC (vd panel "Nhắc hẹn" nổi) để tránh panel đang mở vẫn hiện ngày cũ
+// đã bị xóa — nếu không, CS dễ bấm "Lưu" mà không để ý, vô tình TẠO LẠI lịch hẹn vừa Done xong.
+function _refreshOpenDpTab(phone){
+  if (typeof currentPhone === 'undefined' || currentPhone !== phone) return;
+  var c = allCustomers.find(function(x){ return x.phone === phone; });
+  var body = document.getElementById('dp-body');
+  if (!c || !body) return;
+  if (currentDpTab === 'care') body.innerHTML = renderCareTab(c);
+  else if (currentDpTab === 'schedule') body.innerHTML = renderSchedTabHtml(c);
+}
 function markDone(id) {
   const it = schedules.find(x=>x.id===id);
   if (it) {
@@ -3144,12 +3155,8 @@ function markDone(id) {
     if (gsUrl) queueCareSync(it.phone);
     renderScheduleTab(); renderOverdueTab(); updateSchedBadges();
     renderReminderPanel();
-    // Cập nhật panel chi tiết nếu đang mở tab Lịch hẹn của chính khách này
-    if (typeof currentPhone !== 'undefined' && currentPhone === it.phone && currentDpTab === 'schedule') {
-      var _cdp = allCustomers.find(function(x){ return x.phone === it.phone; });
-      var _body = document.getElementById('dp-body');
-      if (_cdp && _body) _body.innerHTML = renderSchedTabHtml(_cdp);
-    }
+    // Cập nhật panel chi tiết nếu đang mở đúng khách này (dù đang ở tab Chăm sóc hay Lịch hẹn)
+    _refreshOpenDpTab(it.phone);
     toast('✓ Đã hoàn thành và xoá nhắc hẹn');
   }
 }
@@ -3186,6 +3193,10 @@ function markCareSchedDone(phone, field) {
   updateSchedBadges();
   renderReminderPanel();
   renderScheduleTab(); renderOverdueTab();
+  // Cập nhật panel chi tiết nếu đang mở đúng khách này — trước đây hàm này KHÔNG hề làm mới
+  // dp-body, nên nếu CS đang mở tab "Chăm sóc" của đúng khách đó, ô ngày (Hẹn gọi/SP/CS/Hẹn mua
+  // lại) vẫn hiện ngày cũ dù đã Done — dễ khiến CS bấm Lưu lại và tạo nhầm lại lịch vừa Done.
+  _refreshOpenDpTab(phone);
   toast('✓ Đã hoàn thành lịch hẹn');
 }
 function updateSchedBadges() {
@@ -4306,6 +4317,7 @@ function _toggleDaoSchedExclude(phone, exclude) {
     if (typeof updateSchedBadges==='function') updateSchedBadges();
     if (typeof renderScheduleTab==='function') renderScheduleTab();
     if (typeof renderOverdueTab==='function') renderOverdueTab();
+    if (typeof renderReminderPanel==='function') renderReminderPanel();
   } else {
     delete ex[phone];
     // Tạo lại lịch auto
@@ -5504,6 +5516,11 @@ function deleteAllOverdueReminders(){
   renderReminderPanel();
   if (typeof renderScheduleTab === 'function') renderScheduleTab();
   if (typeof renderOverdueTab === 'function') renderOverdueTab();
+  // Làm mới panel chi tiết nếu khách đang mở nằm trong số vừa bị xóa (tránh hiện ngày cũ)
+  if (typeof currentPhone !== 'undefined' && currentPhone) {
+    var _touchedPhones = overdue.map(function(rm){ return rm.phone; });
+    if (_touchedPhones.indexOf(currentPhone) !== -1) _refreshOpenDpTab(currentPhone);
+  }
   toast('✓ Đã xóa vĩnh viễn ' + overdue.length + ' nhắc hẹn quá hạn');
 }
 // Cảnh báo "được chia data" cho CS hiện tại (tắt là tắt luôn)
