@@ -784,24 +784,92 @@ function readOrdersByPhone_(phone) {
 
 // ═══════════════════════════════════════════════════════════════
 //  TACH TEN KHACH TU DON HANG (backfill hang loat)
-//  Cot "San pham" trong DT TONG la text tu do NV go tay dang "Chị Tên\nĐịa chỉ...\nĐt:...".
-//  Doan ten tu dong dau, CHI de xuat cho SDT hien CHUA co ten trong CareData — nguoi dung
-//  phai xem/duyet tren UI truoc khi ghi that (giong het co che findDuplicateOrders_ +
-//  confirm truoc khi xoa), tranh doan sai lam hong du lieu ten dang co.
+//  Cot "San pham" trong DT TONG la text tu do NV go tay, KHONG theo khuon co dinh: co don ghi
+//  "Ten Sdt Dia chi...", co don ghi "Dia chi Sdt ... Ten Nhắn...", co don chi toan dia chi/ghi
+//  chu gop don khong he co ten. Doan ten tu dong, CHI de xuat cho SDT hien CHUA co ten trong
+//  CareData — nguoi dung phai xem/duyet tren UI truoc khi ghi that (giong het co che
+//  findDuplicateOrders_ + confirm truoc khi xoa), tranh doan sai lam hong du lieu ten dang co.
 // ═══════════════════════════════════════════════════════════════
+var NAME_ADDR_KEYWORDS_RE_ = /\b(đường|phố|phường|xã|quận|huyện|thành phố|tỉnh|ngõ|ngách|khu|tổ|ấp|thôn|xóm|số nhà|tòa|chung cư|đc|địa chỉ)\b/i;
+var NAME_MERGE_LABEL_RE_ = /^(gộp\s*(đơn|cùng)|ghép\s*đơn|địa chỉ)/i;
+var NAME_ALLOWED_CHARS_RE_ = /^[a-zA-ZÀ-ỹ\s.'-]+$/;
+
+function _stripHonorific_(s) {
+  return s.replace(/^(anh|chị|chi|ông|ong|bà|ba|em|c|a)(?=[\s:.]|$)\s*[:.]?\s*/i, '').trim();
+}
+function _truncateAtAddressOrDigit_(s) {
+  var digitIdx = s.search(/\d/);
+  var kwMatch = s.match(NAME_ADDR_KEYWORDS_RE_);
+  var kwIdx = kwMatch ? kwMatch.index : -1;
+  var cut = -1;
+  if (digitIdx >= 0 && kwIdx >= 0) cut = Math.min(digitIdx, kwIdx);
+  else if (digitIdx >= 0) cut = digitIdx;
+  else if (kwIdx >= 0) cut = kwIdx;
+  if (cut >= 0) s = s.substring(0, cut);
+  return s.trim();
+}
+function _isPlausibleName_(s) {
+  if (!s) return false;
+  s = s.trim();
+  if (s.length < 2 || s.length > 40) return false;
+  if (!NAME_ALLOWED_CHARS_RE_.test(s)) return false;
+  if (s.split(/\s+/).length > 5) return false;
+  return true;
+}
+// Tra ve TAT CA ten "ung vien" hop le tim duoc trong 1 doan text don hang, thu 2 cach:
+// (A) dau dong, cat truoc so/tu khoa dia chi dau tien (bat truong hop "Ten Sdt Dia chi...")
+// (B) doan ngay SAU so dien thoai, truoc chu "Nhắn" (bat truong hop "...Sdt Ten Nhắn...")
+function _guessNameCandidatesFromOrderText_(text, phoneDigits) {
+  var out = [];
+  if (!text) return out;
+  var raw = String(text);
+  var firstLine = raw.split('\n')[0].trim();
+  if (firstLine && !NAME_MERGE_LABEL_RE_.test(firstLine)) {
+    var a = firstLine.replace(/(\+?84|0)\d{8,10}/g, '');
+    a = _stripHonorific_(a);
+    a = a.replace(/^[:.\-–]\s*/, '').replace(/[:.\-–]\s*$/, '');
+    a = _truncateAtAddressOrDigit_(a);
+    if (_isPlausibleName_(a)) out.push(a);
+  }
+  if (phoneDigits) {
+    var idx = raw.indexOf(phoneDigits);
+    if (idx >= 0) {
+      var after = raw.substring(idx + phoneDigits.length);
+      var nhanMatch = after.match(/nh[ắaằ]n\b/i);
+      var seg = nhanMatch ? after.substring(0, nhanMatch.index) : after.substring(0, 40);
+      seg = _stripHonorific_(seg.trim());
+      seg = seg.replace(/^[:.\-–]\s*/, '').replace(/[:.\-–]\s*$/, '');
+      seg = _truncateAtAddressOrDigit_(seg);
+      if (_isPlausibleName_(seg)) out.push(seg);
+    }
+  }
+  return out;
+}
+// Giu lai ten cu de tuong thich cac cho khac co the dang goi (tra ve ung vien dau tien theo
+// cach (A) - hanh vi gan giong ham cu, chi them buoc cat tai dia chi/so cho chinh xac hon).
 function _parseNameFromOrderText_(text) {
-  if (!text) return '';
-  var firstLine = String(text).split('\n')[0].trim();
-  if (!firstLine) return '';
-  var s = firstLine;
-  s = s.replace(/(\+?84|0)\d{8,10}/g, '').trim(); // bo so dien thoai dinh kem tren dong dau
-  s = s.replace(/^(anh|chị|chi|ông|ong|bà|ba|em|c|a)\b\s*[:.]?\s*/i, '').trim(); // bo xung ho
-  s = s.replace(/^[:.\-–]\s*/, '').replace(/[:.\-–]\s*$/, '').trim();
-  return s;
+  var cands = _guessNameCandidatesFromOrderText_(text, '');
+  return cands.length ? cands[0] : '';
+}
+// Quet TAT CA don cua 1 sdt, gom ung vien ten tu tung don, lay ten xuat hien NHIEU LAN NHAT
+// (thay vi chi lay don dau tien tim thay — tranh vo tinh chon phai don khong co ten/co nhan
+// gop don ma bo qua cac don khac cua cung khach da co ten ro rang).
+function _guessNameForPhone_(orders, phoneDigits) {
+  var freq = {}, bestKey = null;
+  for (var i = 0; i < orders.length; i++) {
+    var cands = _guessNameCandidatesFromOrderText_(orders[i].product, phoneDigits);
+    for (var j = 0; j < cands.length; j++) {
+      var key = cands[j].toLowerCase();
+      if (!freq[key]) freq[key] = { count: 0, sample: cands[j] };
+      freq[key].count++;
+      if (!bestKey || freq[key].count > freq[bestKey].count) bestKey = key;
+    }
+  }
+  return bestKey ? freq[bestKey].sample : '';
 }
 
-// Quet toan bo DT TONG, doan ten cho tung SDT (1 lan/SDT, uu tien don dau tien tim thay ten
-// hop le) — CHI tra ve de UI hien danh sach cho nguoi dung duyet, KHONG ghi gi vao Sheet.
+// Quet toan bo DT TONG, doan ten cho tung SDT (gom TAT CA don cua sdt do, lay ten xuat hien
+// nhieu lan nhat) — CHI tra ve de UI hien danh sach cho nguoi dung duyet, KHONG ghi gi vao Sheet.
 function previewCustomerNameGuesses_() {
   var orders = readAllOrders_();
   var careRows = readCare_(getCrmSS_().getSheetByName(SH_CARE));
@@ -809,17 +877,23 @@ function previewCustomerNameGuesses_() {
   for (var c = 0; c < careRows.length; c++) {
     if (careRows[c].name) existingNames[normPhone_(String(careRows[c].phone))] = true;
   }
-  var seen = {}, out = [];
+  var byPhone = {};
   for (var i = 0; i < orders.length; i++) {
     var o = orders[i];
-    if (!o.phone || seen[o.phone] || existingNames[o.phone]) continue;
-    var guess = _parseNameFromOrderText_(o.product);
-    if (!guess || guess.length < 2 || guess.length > 60 || /^\d+$/.test(guess)) continue;
-    seen[o.phone] = true;
-    out.push({ phone: o.phone, guessedName: guess, sample: String(o.product || '').split('\n')[0].trim().substring(0, 120) });
+    if (!o.phone || existingNames[o.phone]) continue;
+    if (!byPhone[o.phone]) byPhone[o.phone] = [];
+    byPhone[o.phone].push(o);
   }
+  var out = [];
+  Object.keys(byPhone).forEach(function (phone) {
+    var phoneOrders = byPhone[phone];
+    var guess = _guessNameForPhone_(phoneOrders, phone);
+    if (!guess) return;
+    out.push({ phone: phone, guessedName: guess, sample: String(phoneOrders[0].product || '').split('\n')[0].trim().substring(0, 120) });
+  });
   return { ok: true, count: out.length, items: out };
 }
+
 
 // Ghi that danh sach ten DA DUOC NGUOI DUNG XAC NHAN tren UI (items: [{phone, name}]).
 // Kiem tra lai lan nua tren server: chi ghi cho SDT VAN CHUA co ten tai thoi diem ghi
