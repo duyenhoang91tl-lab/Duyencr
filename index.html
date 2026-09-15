@@ -8247,15 +8247,15 @@ function exportSalesReportToSheet_(reportType, filters) {
   if (reportType === 'A') {
     rows.push(['TỔNG QUAN']);
     rows.push(['Số lượng đơn', data.totalOrders]);
-    rows.push(['Tổng giá trị cọc (số tiền ck)', data.totalCoc]);
-    rows.push(['Tổng giá trị đơn hàng (ko ship)', data.totalGiaTri]);
+    rows.push(['Tổng tiền đã cọc/CK (tham khảo)', data.totalCoc]);
+    rows.push(['Tổng đơn (doanh thu, ko ship)', data.totalGiaTri]);
     rows.push([]);
     rows.push(['THEO SALE BÁN', '(số đơn giữ nguyên — tiền chia đều cho số sale/đơn)']);
-    rows.push(['Sale', 'Số đơn', 'Cọc', 'Giá trị']);
+    rows.push(['Sale', 'Số đơn', 'Cọc', 'Tổng đơn']);
     (data.bySale || []).forEach(function(s) { rows.push([s.name, s.orders, s.coc, s.giaTri]); });
     rows.push([]);
     rows.push(['THEO KÊNH BÁN']);
-    rows.push(['Kênh', 'Số đơn', 'Cọc', 'Giá trị']);
+    rows.push(['Kênh', 'Số đơn', 'Cọc', 'Tổng đơn']);
     (data.byKenh || []).forEach(function(k) { rows.push([k.name, k.orders, k.coc, k.giaTri]); });
     rows.push([]);
     rows.push(['CHI TIẾT ĐƠN']);
@@ -11731,16 +11731,17 @@ function _srRenderA(d){
   if (!d) return '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
   var html = '<div class="kpi-grid" style="margin-bottom:16px">' +
     '<div class="kpi-card"><div class="kpi-val">'+fmt(d.totalOrders)+'</div><div class="kpi-label">Số lượng đơn</div></div>' +
-    '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalCoc)+'</div><div class="kpi-label">Tổng giá trị cọc (số tiền ck)</div></div>' +
-    '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalGiaTri)+'</div><div class="kpi-label">Tổng giá trị đơn hàng (ko ship)</div></div>' +
-    '</div>';
+    '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalCoc)+'</div><div class="kpi-label">Tổng tiền đã cọc/CK (tham khảo)</div></div>' +
+    '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+_srMoney(d.totalGiaTri)+'</div><div class="kpi-label"><b>Tổng đơn (doanh thu, ko ship)</b></div></div>' +
+    '</div>' +
+    '<div style="font-size:11px;color:var(--muted);margin:-10px 0 14px">Tổng đơn = cộng dồn "Tổng giá trị đơn hàng" của TỪNG đơn (cả đơn cọc trước lẫn đơn thanh toán toàn bộ) — đây mới là số doanh thu chuẩn để đối chiếu, không phải cột Cọc.</div>';
 
   var saleRows = (d.bySale||[]).filter(function(s){ return !_srState.saleSearch || s.name.toLowerCase().indexOf(_srState.saleSearch.toLowerCase())!==-1; });
   html += '<div class="dash-section-title">Theo Sale bán <span style="font-weight:400;color:var(--muted);font-size:11px">(số đơn giữ nguyên — tiền chia đều cho số sale/đơn)</span></div>';
   html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.saleSearch)+'" oninput="_srState.saleSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
-  html += '<table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Cọc</th><th style="text-align:right">Giá trị</th></tr></thead><tbody>';
+  html += '<table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Cọc</th><th style="text-align:right"><b>Tổng đơn</b></th></tr></thead><tbody>';
   saleRows.forEach(function(s){
-    html += '<tr><td>'+esc(s.name)+'</td><td style="text-align:right">'+fmt(s.orders)+'</td><td style="text-align:right">'+_srMoney(s.coc)+'</td><td style="text-align:right">'+_srMoney(s.giaTri)+'</td></tr>';
+    html += '<tr><td>'+esc(s.name)+'</td><td style="text-align:right">'+fmt(s.orders)+'</td><td style="text-align:right">'+_srMoney(s.coc)+'</td><td style="text-align:right"><b>'+_srMoney(s.giaTri)+'</b></td></tr>';
   });
   if (!saleRows.length) html += '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
   html += '</tbody></table>';
@@ -11748,9 +11749,9 @@ function _srRenderA(d){
   var kenhRows = (d.byKenh||[]).filter(function(k){ return !_srState.kenhSearch || k.name.toLowerCase().indexOf(_srState.kenhSearch.toLowerCase())!==-1; });
   html += '<div class="dash-section-title">Theo Kênh bán</div>';
   html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên kênh..." value="'+esc(_srState.kenhSearch)+'" oninput="_srState.kenhSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
-  html += '<table class="dash-table"><thead><tr><th>Kênh</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Cọc</th><th style="text-align:right">Giá trị</th></tr></thead><tbody>';
+  html += '<table class="dash-table"><thead><tr><th>Kênh</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Cọc</th><th style="text-align:right"><b>Tổng đơn</b></th></tr></thead><tbody>';
   kenhRows.forEach(function(k){
-    html += '<tr><td>'+esc(k.name)+'</td><td style="text-align:right">'+fmt(k.orders)+'</td><td style="text-align:right">'+_srMoney(k.coc)+'</td><td style="text-align:right">'+_srMoney(k.giaTri)+'</td></tr>';
+    html += '<tr><td>'+esc(k.name)+'</td><td style="text-align:right">'+fmt(k.orders)+'</td><td style="text-align:right">'+_srMoney(k.coc)+'</td><td style="text-align:right"><b>'+_srMoney(k.giaTri)+'</b></td></tr>';
   });
   if (!kenhRows.length) html += '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
   html += '</tbody></table>';
@@ -12129,11 +12130,11 @@ function exportSalesReport(){
     var summary = [['Bộ lọc', fDescA.join(' | ')], [],
       ['Chỉ số','Giá trị'],
       ['Số lượng đơn', d.totalOrders],
-      ['Tổng giá trị cọc (số tiền ck)', d.totalCoc],
-      ['Tổng giá trị đơn hàng (ko ship)', d.totalGiaTri]];
-    var bySaleRows = [['Sale','Số đơn','Cọc','Giá trị']];
+      ['Tổng tiền đã cọc/CK (tham khảo)', d.totalCoc],
+      ['Tổng đơn (doanh thu, ko ship)', d.totalGiaTri]];
+    var bySaleRows = [['Sale','Số đơn','Cọc','Tổng đơn']];
     (d.bySale||[]).forEach(function(s){ bySaleRows.push([s.name, s.orders, s.coc, s.giaTri]); });
-    var byKenhRows = [['Kênh','Số đơn','Cọc','Giá trị']];
+    var byKenhRows = [['Kênh','Số đơn','Cọc','Tổng đơn']];
     (d.byKenh||[]).forEach(function(k){ byKenhRows.push([k.name, k.orders, k.coc, k.giaTri]); });
     var detailRows = [['Ngày tạo','Thời gian hoàn thành','Kênh bán','Sale bán','Sản phẩm','Phân loại','Cọc','Giá trị đơn','Giai đoạn','Trạng thái','ID']];
     (d.orders||[]).forEach(function(o){

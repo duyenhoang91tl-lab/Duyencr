@@ -1439,15 +1439,15 @@ function exportSalesReportToSheet_(reportType, filters) {
   if (reportType === 'A') {
     rows.push(['TỔNG QUAN']);
     rows.push(['Số lượng đơn', data.totalOrders]);
-    rows.push(['Tổng giá trị cọc (số tiền ck)', data.totalCoc]);
-    rows.push(['Tổng giá trị đơn hàng (ko ship)', data.totalGiaTri]);
+    rows.push(['Tổng tiền đã cọc/CK (tham khảo)', data.totalCoc]);
+    rows.push(['Tổng đơn (doanh thu, ko ship)', data.totalGiaTri]);
     rows.push([]);
     rows.push(['THEO SALE BÁN', '(số đơn giữ nguyên — tiền chia đều cho số sale/đơn)']);
-    rows.push(['Sale', 'Số đơn', 'Cọc', 'Giá trị']);
+    rows.push(['Sale', 'Số đơn', 'Cọc', 'Tổng đơn']);
     (data.bySale || []).forEach(function(s) { rows.push([s.name, s.orders, s.coc, s.giaTri]); });
     rows.push([]);
     rows.push(['THEO KÊNH BÁN']);
-    rows.push(['Kênh', 'Số đơn', 'Cọc', 'Giá trị']);
+    rows.push(['Kênh', 'Số đơn', 'Cọc', 'Tổng đơn']);
     (data.byKenh || []).forEach(function(k) { rows.push([k.name, k.orders, k.coc, k.giaTri]); });
     rows.push([]);
     rows.push(['CHI TIẾT ĐƠN']);
