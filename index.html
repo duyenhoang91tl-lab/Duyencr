@@ -20,7 +20,7 @@
   --shadow:0 1px 4px rgba(0,0,0,0.07);
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:13px;line-height:1.55;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6;}
 
 /* ── HEADER ── */
 header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 16px;height:50px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;gap:8px;}
@@ -48,7 +48,7 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 .app{display:flex;height:calc(100vh - 50px);}
 
 /* ── SIDEBAR ── */
-.sidebar{width:236px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.sidebar{width:260px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
 .sb-top{padding:10px 10px 4px;flex-shrink:0;}
 .sb-label{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--hint);margin-bottom:5px;margin-top:4px;padding:0 4px;}
 .search-wrap{position:relative;margin-bottom:8px;}
@@ -86,14 +86,17 @@ select.cs-filter-sel:focus{border-color:var(--green);}
 .fbadge{font-size:10px;background:var(--surface2);color:var(--hint);border-radius:20px;padding:1px 6px;min-width:22px;text-align:center;}
 .fdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
 .fleft{display:flex;align-items:center;gap:5px;}
-.divider{height:1px;background:var(--border);margin:5px 10px;}
-.sb-scroll{flex:1;overflow-y:auto;padding:2px 10px 10px;}
+.divider{height:1px;background:var(--border);margin:9px 10px;}
+.sb-scroll{flex:1;overflow-y:auto;padding:4px 10px 12px;}
 .section-btn{display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:var(--rsm);cursor:pointer;font-size:12px;color:var(--muted);transition:background .1s;border:none;background:transparent;width:100%;text-align:left;}
 .section-btn:hover,.section-btn.active{background:var(--surface2);color:var(--text);}
 .section-btn.active{font-weight:500;}
 
 /* ── MAIN ── */
 .main{flex:1;overflow:hidden;display:flex;flex-direction:column;}
+.mobile-menu-btn{display:none;align-items:center;justify-content:center;width:34px;height:34px;flex-shrink:0;border:1px solid var(--border-md);border-radius:var(--rsm);background:var(--surface);color:var(--text);cursor:pointer;}
+.sidebar-backdrop{display:none;position:fixed;top:50px;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:510;}
+.sidebar-backdrop.show{display:block;}
 
 /* ── TABS ── */
 .tabs{display:flex;border-bottom:1px solid var(--border);background:var(--surface);padding:0 16px;flex-shrink:0;}
@@ -118,7 +121,6 @@ select.srt{padding:4px 8px;border:1px solid var(--border);border-radius:var(--rs
 
 /* ── TABLE ── */
 .table-wrap{flex:1;overflow:auto;overflow-x:scroll;}
-.table-wrap
 /* ── DATA ASSIGNMENT ── */
 .assign-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:600;display:none;align-items:center;justify-content:center;}
 .reminder-panel{position:fixed;right:16px;bottom:16px;width:330px;max-width:92vw;max-height:62vh;background:var(--surface);border:1px solid var(--border-md);border-radius:12px;box-shadow:0 10px 36px rgba(0,0,0,0.24);z-index:550;display:flex;flex-direction:column;overflow:hidden;font-size:12px;}
@@ -330,15 +332,15 @@ select.srt{padding:4px 8px;border:1px solid var(--border);border-radius:var(--rs
 .rp-custom{border-color:#c4b5fd;background:#f5f3ff;}
 table{width:100%;border-collapse:collapse;font-size:12px;}
 thead{position:sticky;top:0;z-index:10;background:var(--surface);}
-th{padding:7px 10px;text-align:left;font-weight:500;color:var(--hint);border-bottom:1px solid var(--border);white-space:nowrap;font-size:10px;text-transform:uppercase;letter-spacing:.05em;}
-td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
+th{padding:9px 10px;text-align:left;font-weight:600;color:var(--hint);border-bottom:1px solid var(--border);white-space:nowrap;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;}
+td{padding:10px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
 tr:hover td{background:var(--surface2);cursor:pointer;}
-.cname{font-weight:500;font-size:12px;}
-.cphone{color:var(--muted);font-size:11px;font-family:monospace;}
+.cname{font-weight:700;font-size:13.5px;}
+.cphone{color:var(--muted);font-size:11.5px;font-family:monospace;}
 .badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap;border:1px solid transparent;}
-.bv{background:var(--vip-bg);color:var(--vip);border-color:var(--vip-b);}
-.bt{background:var(--tt-bg);color:var(--tt);border-color:var(--tt-b);}
-.bn{background:var(--tn-bg);color:var(--tn);border-color:var(--tn-b);}
+.bv{background:var(--surface2);color:var(--vip);border-color:var(--border);font-weight:500;}
+.bt{background:var(--surface2);color:var(--tt);border-color:var(--border);font-weight:500;}
+.bn{background:var(--surface2);color:var(--tn);border-color:var(--border);font-weight:500;}
 .bo{background:var(--surface2);color:var(--muted);border-color:var(--border-md);}
 .cs-chot{background:#dcfce7;color:#166534;border-color:#86efac;}
 .cs-pv{background:#fef9c3;color:#854d0e;border-color:#fde047;}
@@ -347,10 +349,10 @@ tr:hover td{background:var(--surface2);cursor:pointer;}
 .cs-kcnc{background:#fee2e2;color:#991b1b;border-color:#fca5a5;}
 .cs-ngung{background:#fef3c7;color:#92400e;border-color:#fcd34d;}
 .cs-sd{background:#d1fae5;color:#065f46;border-color:#6ee7b7;}
-.zl-kb{background:#dcfce7;color:#166534;border-color:#86efac;}
-.zl-chua{background:#f3f4f6;color:#6b7280;border-color:#d1d5db;}
-.zl-block{background:#fee2e2;color:#991b1b;border-color:#fca5a5;}
-.zl-huy{background:#fef9c3;color:#854d0e;border-color:#fde047;}
+.zl-kb{background:var(--surface2);color:#166534;border-color:var(--border);font-weight:500;}
+.zl-chua{background:var(--surface2);color:#6b7280;border-color:var(--border);font-weight:500;}
+.zl-block{background:var(--surface2);color:#991b1b;border-color:var(--border);font-weight:500;}
+.zl-huy{background:var(--surface2);color:#854d0e;border-color:var(--border);font-weight:500;}
 .btags{display:flex;flex-wrap:wrap;gap:2px;}
 .btag{font-size:9px;padding:1px 5px;background:var(--surface2);border-radius:3px;color:var(--muted);}
 
@@ -437,6 +439,10 @@ textarea.form-ta{resize:vertical;min-height:58px;}
 .modal-sub{font-size:12px;color:var(--muted);line-height:1.6;}
 .modal-body{padding:18px 20px;}
 .modal-footer{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;}
+.settings-row{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:10px 12px;border-radius:var(--rsm);border:1px solid var(--border);background:var(--surface);font-size:13px;font-weight:500;color:var(--text);cursor:pointer;font-family:inherit;}
+.settings-row:hover{background:var(--surface2);border-color:var(--border-md);}
+.settings-row.danger{color:var(--red);border-color:var(--red-b);}
+.settings-row.danger:hover{background:var(--red-bg);}
 .step-list{display:flex;flex-direction:column;gap:10px;}
 .step{display:flex;gap:10px;align-items:flex-start;}
 .step-num{width:22px;height:22px;border-radius:50%;background:var(--green);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
@@ -639,7 +645,26 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
 ::-webkit-scrollbar{width:5px;height:5px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:3px;}
-@media(max-width:768px){.sidebar{display:none;}.dp{width:100%;}.modal{width:95vw;}}
+@media(max-width:768px){
+  .dp{width:100%;}
+  .modal{width:95vw;}
+  header{padding:0 10px;gap:6px;}
+  .logo{font-size:12px;gap:4px;}
+  .logo>span{display:none;}
+  .fstatus{display:none;}
+  .gs-pill span:last-child{display:none;}
+  .mobile-menu-btn{display:flex;}
+  .sidebar{
+    display:flex;
+    position:fixed;top:50px;left:0;bottom:0;
+    width:82vw;max-width:300px;
+    transform:translateX(-100%);
+    transition:transform .22s ease;
+    z-index:520;
+    box-shadow:2px 0 16px rgba(0,0,0,0.18);
+  }
+  .sidebar.mobile-open{transform:translateX(0);}
+}
 
 /* ════════════ V9 BRIDGE (class aliases + new bits used by feature layer) ════════════ */
 .dash-section-title{font-size:13px;font-weight:700;color:var(--text);margin:4px 0 10px;display:flex;align-items:center;gap:6px;}
@@ -763,6 +788,31 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
 </div>
 </div>
 
+<!-- SETTINGS / TÁC VỤ MODAL -->
+<div class="modal-overlay" id="settings-modal">
+<div class="modal" style="width:380px">
+  <div class="modal-hdr">
+    <div class="modal-title">⚙️ Tác vụ dữ liệu</div>
+    <div class="modal-sub">Tải lên, đồng bộ và xử lý dữ liệu với Google Sheets.</div>
+  </div>
+  <div class="modal-body" style="padding:10px 14px 14px;display:flex;flex-direction:column;gap:6px">
+    <button class="settings-row" onclick="closeSettingsModal();document.getElementById('fi').click()">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+      Tải Excel
+    </button>
+    <button class="settings-row" id="syncbtn" style="display:none" onclick="closeSettingsModal();syncFromGS({pullOrders:true,manual:true})" title="Tải dữ liệu (đơn hàng + CS) từ GSheets">↓ Sync GS <span id="sync-countdown" style="font-size:10px;opacity:0.7"></span></button>
+    <button class="settings-row" id="pushbtn" style="display:none" onclick="closeSettingsModal();pushOrdersToGS()" title="Thêm nhanh các đơn MỚI lên Google Sheets (không xóa/sửa đơn cũ)">📤 Đẩy dữ liệu</button>
+    <button class="settings-row" id="fullsyncbtn" style="display:none" onclick="closeSettingsModal();fullSyncOrdersToGS()" title="Đồng bộ 2 chiều (GỘP): tải đơn từ Google Sheets về máy + đẩy đơn mới của máy lên Sheets. KHÔNG xóa đơn nào.">🔁 Đồng bộ 2 chiều</button>
+    <button class="settings-row" id="dupbtn" style="display:none" onclick="closeSettingsModal();openDupOrdersModal()" title="Quét đơn hàng bị trùng (cùng SĐT + ngày mua + sản phẩm, kể cả khi doanh thu bị lệch do lỗi nhập liệu) trên Google Sheets — luôn hỏi xác nhận trước khi xóa">🗑️ Đơn trùng</button>
+    <div class="divider" style="margin:4px 0"></div>
+    <button class="settings-row danger" id="clearbtn" style="display:none" onclick="closeSettingsModal();clearData()">Xóa data</button>
+  </div>
+  <div class="modal-footer">
+    <button class="btn" onclick="closeSettingsModal()">Đóng</button>
+  </div>
+</div>
+</div>
+
 <!-- ADVANCED FILTER MODAL -->
 <div class="adv-modal-overlay" id="adv-modal">
 <div class="adv-modal">
@@ -798,11 +848,12 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
     </div>
     <div class="adv-section">
       <div class="adv-section-label">👤 CS phụ trách (chọn nhiều)</div>
+      <input type="text" class="col-dd-search" id="adv-cs-search" placeholder="Tìm tên CS..." style="margin:0 0 6px;width:100%;box-sizing:border-box" oninput="filterAdvChipList('cs', this.value)">
       <div class="adv-chips" id="adv-cs-chips"></div>
     </div>
     <div class="adv-section">
-      <div class="adv-section-label">🛍 Sản phẩm (chọn nhiều)</div>
-      <div class="adv-chips" id="adv-product-chips"></div>
+      <div class="adv-section-label">🛍 Sản phẩm — gõ tên, cách nhau bằng dấu phẩy để lọc nhiều sản phẩm (khớp cả khi ô Sản phẩm order chứa nhiều sản phẩm gộp chung)</div>
+      <input type="text" class="col-dd-search" id="adv-product-search" placeholder="vd: tỳ hưu, nhẫn 10k, ..." style="margin:0;width:100%;box-sizing:border-box" oninput="syncAdvProductInput(this.value)">
     </div>
     <div class="adv-section">
       <div class="adv-section-label">📦 Nguồn đơn (chọn nhiều)</div>
@@ -893,6 +944,9 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
 <!-- HEADER -->
 
 <header>
+  <button class="mobile-menu-btn" onclick="toggleSidebar()" title="Menu / Bộ lọc" aria-label="Menu">
+    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
   <div class="logo">
     <div class="logo-mark"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg></div>
     Duyên CRM Portal <span style="font-size:10px;font-weight:400;color:#2d9464;margin-left:3px">11.22.10.7.2026</span>
@@ -903,20 +957,13 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
       <span class="gs-dot off" id="gs-dot"></span>
       <span id="gs-pill-txt">Google Sheets</span>
     </div>
-    <button class="btn danger sm" id="clearbtn" style="display:none" onclick="clearData()">Xóa data</button>
-    <button class="btn sm" id="syncbtn" style="display:none" onclick="syncFromGS({pullOrders:true,manual:true})" title="Tải dữ liệu (đơn hàng + CS) từ GSheets">↓ Sync GS <span id="sync-countdown" style="font-size:10px;opacity:0.7"></span></button>
-    <button class="btn sm" id="pushbtn" style="display:none" onclick="pushOrdersToGS()" title="Thêm nhanh các đơn MỚI lên Google Sheets (không xóa/sửa đơn cũ)">📤 Đẩy dữ liệu</button>
-    <button class="btn sm" id="fullsyncbtn" style="display:none" onclick="fullSyncOrdersToGS()" title="Đồng bộ 2 chiều (GỘP): tải đơn từ Google Sheets về máy + đẩy đơn mới của máy lên Sheets. KHÔNG xóa đơn nào.">🔁 Đồng bộ 2 chiều</button>
-    <button class="btn sm" id="dupbtn" style="display:none" onclick="openDupOrdersModal()" title="Quét đơn hàng bị trùng (cùng SĐT + ngày mua + sản phẩm, kể cả khi doanh thu bị lệch do lỗi nhập liệu) trên Google Sheets — luôn hỏi xác nhận trước khi xóa">🗑️ Đơn trùng</button>
-    <button class="btn primary" onclick="document.getElementById('fi').click()">
-      <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
-      Tải Excel
-    </button>
+    <button class="btn sm" onclick="openSettingsModal()" title="Tác vụ dữ liệu: Tải Excel, Sync, Đẩy dữ liệu, Đồng bộ 2 chiều, Đơn trùng, Xóa data">⚙️ Tác vụ</button>
     <input type="file" id="fi" accept=".xlsx,.xls" multiple onchange="handleFiles(event)">
   </div>
 </header>
 
 <div class="app">
+<div class="sidebar-backdrop" id="sidebar-backdrop" onclick="toggleSidebar(false)"></div>
 <!-- SIDEBAR -->
 <div class="sidebar">
   <div class="sb-top">
@@ -1402,6 +1449,17 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
 // ═══════════════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════════════
+// BUG FIX: splitMulti_ duoc dung o vai cho (careCSSet, _schedResponsibleCS) trong chinh
+// script nay nhung truoc day CHUA duoc dinh nghia o phia client — ham cung ten chi ton tai
+// trong ban sao code backend (khoi tham khao "Copy Apps Script Code", khong thuc thi trong
+// trinh duyet) — gay loi "splitMulti_ is not defined" khi Auto-sync chay. Dinh nghia lai
+// dung y het logic ben backend de dung o day.
+function splitMulti_(str, delimiter) {
+  if (!str && str !== 0) return [];
+  var s = String(str);
+  if (!s.trim()) return [];
+  return s.split(delimiter).map(function(x){ return x.trim(); }).filter(function(x){ return x !== ''; });
+}
 // Nguồn được tính là "mua lại" — dùng để phân loại VIP/Thân thiết/Tiềm năng
 const RENEW_SOURCES = ['kh renew','kh renew mkt','kh giới thiệu','data đảo renew'];
 // Thu thập TẤT CẢ các nguồn (không lọc bỏ nguồn nào)
@@ -1631,6 +1689,7 @@ let careLeads = loadLS('ome_care_leads') || {};
 // màn hình chính, không kéo chi tiết sản phẩm vào danh sách khách.
 let donPhoneSet = new Set(loadLS('ome_don_phones') || []);
 let donSaleByPhone = loadLS('ome_don_sale_by_phone') || {}; // { phone: [ten sale,...] } lay tu "dữ liệu đơn", gop vao csSet de phan quyen CS
+let donOrderCountByPhone = loadLS('ome_don_order_count') || {}; // { phone: so don } lay tu "dữ liệu đơn" — dung de phan loai hang KH (VIP/Than thiet/...)
 let schedules = loadLS('ome_sched') || [];
 let currentPhone = null;
 let currentTier = 'all', currentCare = 'all', currentZalo = 'all', currentBrand = 'all', currentCS = 'all';
@@ -1739,6 +1798,12 @@ function scopedCustomers(){
 function _foldVi(str){
   return String(str||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d');
 }
+// Gom toàn bộ nội dung "Sản phẩm order" (product + productDetail) của mọi đơn của 1 khách,
+// dùng để tìm theo chuỗi con — vì 1 ô có thể chứa nhiều sản phẩm gộp chung, không chỉ 1 brand ngắn.
+function _customerProductText(c){
+  if (!c || !c.orders || !c.orders.length) return '';
+  return _foldVi(c.orders.map(o=>(o.product||'')+' '+(o.productDetail||'')).join(' | '));
+}
 
 // Column filters
 let colFilters = { name: new Set(), tier: new Set(), care: new Set(), zalo: new Set(), product: new Set(), cs: new Set(), careCS: new Set(), source: new Set(), sched: new Set(), lastact: new Set(), tacdong: new Set(), bcstatus: new Set() };
@@ -1790,6 +1855,16 @@ function openGsModal() {
   document.getElementById('gs-modal').classList.add('open');
 }
 function closeGsModal() { document.getElementById('gs-modal').classList.remove('open'); }
+function openSettingsModal() { document.getElementById('settings-modal').classList.add('open'); }
+function closeSettingsModal() { document.getElementById('settings-modal').classList.remove('open'); }
+function toggleSidebar(force){
+  var sb = document.querySelector('.sidebar');
+  var bd = document.getElementById('sidebar-backdrop');
+  if (!sb) return;
+  var open = (typeof force === 'boolean') ? force : !sb.classList.contains('mobile-open');
+  sb.classList.toggle('mobile-open', open);
+  if (bd) bd.classList.toggle('show', open);
+}
 function copyGsCode() {
   navigator.clipboard.writeText(GS_SCRIPT).then(() => toast('✓ Đã copy Apps Script code'));
 }
@@ -1954,6 +2029,7 @@ async function syncFromGS(opts) {
         const dpJson = await dpR.json();
         if (dpJson && dpJson.phones) { donPhoneSet = new Set(dpJson.phones); saveLS('ome_don_phones', dpJson.phones); }
         if (dpJson && dpJson.saleByPhone) { donSaleByPhone = dpJson.saleByPhone; saveLS('ome_don_sale_by_phone', dpJson.saleByPhone); }
+        if (dpJson && dpJson.orderCountByPhone) { donOrderCountByPhone = dpJson.orderCountByPhone; saveLS('ome_don_order_count', dpJson.orderCountByPhone); }
       } catch(dpErr) { console.warn('donPhones fetch error:', dpErr.message); }
     }
 
@@ -2069,7 +2145,8 @@ async function pushCareToGS(phone) {
     schedHen: care.schedHen||'', schedHenNote: care.schedHenNote||'',
     khStatus: care.khStatus||'',
     nickZalos: care.nickZalos||[],
-    tag: care.tag||''
+    tag: care.tag||'',
+    name: care.name||''
   };
   try {
     await fetch(gsUrl, {
@@ -2290,26 +2367,23 @@ function buildCustomers() {
       };
     });
   }
-  const JAN25_YEAR = 25;
-  const JAN25_DATE = new Date(2025, 0, 1);
   allCustomers = Object.values(customerMap).map(c => {
     const tot = c.orders.length;
     const rev = c.orders.reduce((s,o) => s+(o.revenue||0), 0);
 
-    // Chỉ đếm đơn từ 4 nguồn renew để phân loại VIP/Thân thiết/Tiềm năng
+    // Chỉ đếm đơn từ 4 nguồn renew — dùng cho số "Renew" hiển thị ở trang chi tiết khách
+    // (KHÔNG còn dùng để phân hạng KH, xem tiêu chí hạng mới ngay dưới đây)
     const renewOrders = c.orders.filter(o => RENEW_SOURCES.includes(s(o.source).toLowerCase()));
     const renewCount = renewOrders.length;
 
-    const has25renew = renewOrders.some(o =>
-      (o.year >= JAN25_YEAR) ||
-      (o.date instanceof Date && o.date >= JAN25_DATE)
-    );
-
+    // Tiêu chí phân hạng KH (mới): đếm theo SỐ ĐƠN trong sheet "dữ liệu đơn" (không còn theo
+    // nguồn Renew ở DT tổng như trước) — 1 đơn = Chưa bán lại được, 2-4 = Tiềm năng,
+    // 5-9 = Thân thiết, ≥10 = VIP.
+    const donOrderCount = (typeof donOrderCountByPhone !== 'undefined' && donOrderCountByPhone) ? (donOrderCountByPhone[c.phone] || 0) : 0;
     let tier;
-    if (renewCount >= 10) tier = 'VIP';
-    else if (renewCount >= 5) tier = 'Thân thiết';
-    else if (renewCount >= 1 && has25renew) tier = 'Tiềm năng';
-    else if (renewCount >= 1) tier = 'Chưa bán lại được';
+    if (donOrderCount >= 10) tier = 'VIP';
+    else if (donOrderCount >= 5) tier = 'Thân thiết';
+    else if (donOrderCount >= 2) tier = 'Tiềm năng';
     else tier = 'Chưa bán lại được';
 
     const care = careData[c.phone] || {};
@@ -2317,7 +2391,16 @@ function buildCustomers() {
     const csSet = _buildCsSet_(c.orders, c.phone);  // CS phụ trách = người lên các đơn (DT tổng, tách nếu đơn có nhiều sale) + dữ liệu đơn
     // Nếu tên lấy từ đơn hàng chỉ là số điện thoại (chưa có tên thật trong đơn nào) nhưng
     // CareData đã có tên (vd Pancake AI/Zalo AI đọc được từ khung "Sản phẩm order") → dùng tên đó
-    const displayName = (c.name === c.phone && care.name) ? care.name : c.name;
+    // Ten da luu tay (care.name) LUON uu tien hon ten tu nhan dien tu don hang — mot khi CS da
+    // xac nhan/sua ten thi khong de ten tu dong (co the sai/rac) ghi de len nua.
+    let displayName = care.name ? care.name : c.name;
+    // Chưa có tên thật ở đâu cả (CareData lẫn đơn hàng) → tự động đoán từ dòng đầu cột
+    // "Sản phẩm" của đơn gần nhất có thông tin hợp lệ, CHỈ để hiển thị (xem hàm ở trên).
+    let nameGuessed = false;
+    if (displayName === c.phone) {
+      const guess = _guessNameForPhone(c.orders, c.phone);
+      if (guess) { displayName = guess; nameGuessed = true; }
+    }
 
     // Precompute year/month/hour cho mỗi đơn (dùng để lọc nhanh)
     const ymList = c.orders.map(o => {
@@ -2340,11 +2423,14 @@ function buildCustomers() {
     return {
       ...c,
       name: displayName,
+      nameGuessed,
       sources:[...c.sources], brands:[...c.brands].filter(Boolean),
       totalOrders:tot, totalRevenue:rev,
       renewOrders:renewCount, tier,
       careStatus: care.status || c._rawStatus || '',
       zaloStatus: care.zalo || c._rawZalo || '',
+      khStatus: care.khStatus || '',
+      nickZalos: Array.isArray(care.nickZalos) ? care.nickZalos : [],
       careNote: care.note || c._rawNote || '',
       careCS,
       // Tách careCS thành các tên riêng lẻ (đề phòng ai đó gõ tay "A, B" vào ô CS chăm sóc) —
@@ -2675,7 +2761,11 @@ function applyFilters() {
     if (advFilters.cs.size > 0) {
       if (![...advFilters.cs].some(n=>c.csSet.has(n) || (c.careCSSet && c.careCSSet.has(n)))) return false;  // khớp cả CS phụ trách lẫn CS chăm sóc
     }
-    if (advFilters.products.size > 0 && ![...advFilters.products].some(p=>c.brands.includes(p))) return false;
+    if (advFilters.products.size > 0) {
+      const terms = [...advFilters.products].map(t=>_foldVi(t)).filter(Boolean);
+      const ptxt = _customerProductText(c);
+      if (!terms.some(t=>ptxt.indexOf(t) !== -1)) return false;
+    }
     if (advFilters.sources.size > 0 && ![...advFilters.sources].some(src=>c.sources.includes(src))) return false;
     if (advFilters.careStatus.size > 0 && !advFilters.careStatus.has(c.careStatus || '')) return false;
     if (advFilters.zaloStatus.size > 0 && !advFilters.zaloStatus.has(c.zaloStatus || '')) return false;
@@ -3052,6 +3142,17 @@ function renderOverdueTab() {
   grid.innerHTML = html;
 }
 
+// Làm mới đúng tab đang mở của panel chi tiết khách (nếu đang mở đúng khách này) — gọi sau khi
+// Done/xóa lịch hẹn từ nơi KHÁC (vd panel "Nhắc hẹn" nổi) để tránh panel đang mở vẫn hiện ngày cũ
+// đã bị xóa — nếu không, CS dễ bấm "Lưu" mà không để ý, vô tình TẠO LẠI lịch hẹn vừa Done xong.
+function _refreshOpenDpTab(phone){
+  if (typeof currentPhone === 'undefined' || currentPhone !== phone) return;
+  var c = allCustomers.find(function(x){ return x.phone === phone; });
+  var body = document.getElementById('dp-body');
+  if (!c || !body) return;
+  if (currentDpTab === 'care') body.innerHTML = renderCareTab(c);
+  else if (currentDpTab === 'schedule') body.innerHTML = renderSchedTabHtml(c);
+}
 function markDone(id) {
   const it = schedules.find(x=>x.id===id);
   if (it) {
@@ -3086,12 +3187,8 @@ function markDone(id) {
     if (gsUrl) queueCareSync(it.phone);
     renderScheduleTab(); renderOverdueTab(); updateSchedBadges();
     renderReminderPanel();
-    // Cập nhật panel chi tiết nếu đang mở tab Lịch hẹn của chính khách này
-    if (typeof currentPhone !== 'undefined' && currentPhone === it.phone && currentDpTab === 'schedule') {
-      var _cdp = allCustomers.find(function(x){ return x.phone === it.phone; });
-      var _body = document.getElementById('dp-body');
-      if (_cdp && _body) _body.innerHTML = renderSchedTabHtml(_cdp);
-    }
+    // Cập nhật panel chi tiết nếu đang mở đúng khách này (dù đang ở tab Chăm sóc hay Lịch hẹn)
+    _refreshOpenDpTab(it.phone);
     toast('✓ Đã hoàn thành và xoá nhắc hẹn');
   }
 }
@@ -3128,6 +3225,10 @@ function markCareSchedDone(phone, field) {
   updateSchedBadges();
   renderReminderPanel();
   renderScheduleTab(); renderOverdueTab();
+  // Cập nhật panel chi tiết nếu đang mở đúng khách này — trước đây hàm này KHÔNG hề làm mới
+  // dp-body, nên nếu CS đang mở tab "Chăm sóc" của đúng khách đó, ô ngày (Hẹn gọi/SP/CS/Hẹn mua
+  // lại) vẫn hiện ngày cũ dù đã Done — dễ khiến CS bấm Lưu lại và tạo nhầm lại lịch vừa Done.
+  _refreshOpenDpTab(phone);
   toast('✓ Đã hoàn thành lịch hẹn');
 }
 function updateSchedBadges() {
@@ -3197,7 +3298,7 @@ function openDp(phone) {
   document.getElementById('dp-meta').innerHTML = `
     <span class="cphone" id="dp-phone-display">${c.phone}</span>
     <button data-phone="${esc(c.phone)}" onclick="copyPhone(this.dataset.phone)" title="Copy số điện thoại" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">📋</button>
-    <button data-phone="${esc(c.phone)}" onclick="openEditPhone(this.dataset.phone)" title="Sửa số điện thoại" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">✏️</button>
+    <button data-phone="${esc(c.phone)}" onclick="openEditPhone(this.dataset.phone)" title="Sửa SĐT / Tên KH" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">✏️</button>
     ${tierBadge(c.tier)}
     ${careBadge(c.careStatus)}
     ${zaloBadge(c.zaloStatus)}
@@ -3899,7 +4000,7 @@ function saveCare(phone) {
   document.getElementById('dp-meta').innerHTML = `
     <span class="cphone" id="dp-phone-display">${phone}</span>
     <button data-phone="${esc(phone)}" onclick="copyPhone(this.dataset.phone)" title="Copy số điện thoại" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">📋</button>
-    <button data-phone="${esc(phone)}" onclick="openEditPhone(this.dataset.phone)" title="Sửa số điện thoại" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">✏️</button>
+    <button data-phone="${esc(phone)}" onclick="openEditPhone(this.dataset.phone)" title="Sửa SĐT / Tên KH" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">✏️</button>
     ${tierBadge(c?c.tier:'Chưa bán lại được')}
     ${careBadge(careData[phone].status)}
     ${zaloBadge(careData[phone].zalo)}
@@ -4248,6 +4349,7 @@ function _toggleDaoSchedExclude(phone, exclude) {
     if (typeof updateSchedBadges==='function') updateSchedBadges();
     if (typeof renderScheduleTab==='function') renderScheduleTab();
     if (typeof renderOverdueTab==='function') renderOverdueTab();
+    if (typeof renderReminderPanel==='function') renderReminderPanel();
   } else {
     delete ex[phone];
     // Tạo lại lịch auto
@@ -4565,6 +4667,8 @@ function saveCareSchedules(phone) {
   _touchCare(phone);
   logAudit('sched', phone, '', 'Cập nhật lịch hẹn nhanh');
   updateSchedBadges();
+  // Cập nhật ngay panel "Nhắc hẹn" (không chờ chu kỳ làm mới 60s)
+  if (typeof renderReminderPanel === 'function') renderReminderPanel();
   if (gsUrl) { queueCareSync(phone); toast('✓ Đã lưu lịch hẹn'); }
   else toast('✓ Đã lưu lịch hẹn (local)');
 }
@@ -4770,6 +4874,7 @@ function addSched(phone) {
   logAudit('sched', phone, '', `Thêm lịch "${schedTypeLabel(type)}" · ${date}`);
   if (gsUrl) queueCareSync(phone);
   updateSchedBadges();
+  if (typeof renderReminderPanel === 'function') renderReminderPanel();
   const c = allCustomers.find(x=>x.phone===phone);
   document.getElementById('dp-body').innerHTML = renderSchedTabHtml(c);
   toast('✓ Đã thêm lịch hẹn');
@@ -4794,6 +4899,7 @@ function _schedEditSave(id, eid, phone) {
   logAudit('sched', phone, '', `Sửa lịch "${schedTypeLabel(newType)}" · ${newDate}`);
   if (gsUrl) queueCareSync(phone);
   updateSchedBadges();
+  if (typeof renderReminderPanel === 'function') renderReminderPanel();
   const c = allCustomers.find(x => x.phone === phone);
   if (c) document.getElementById('dp-body').innerHTML = renderSchedTabHtml(c);
   toast('✓ Đã cập nhật lịch hẹn');
@@ -4812,6 +4918,7 @@ function delSched(id) {
   if (it) logAudit('del', it.phone, `${schedTypeLabel(it.type)} · ${it.date}`, 'Đã xóa lịch');
   if (it && gsUrl) queueCareSync(it.phone);
   updateSchedBadges();
+  if (typeof renderReminderPanel === 'function') renderReminderPanel();
   const c = allCustomers.find(x=>x.phone===currentPhone);
   if (c) document.getElementById('dp-body').innerHTML = renderSchedTabHtml(c);
   toast('Đã xóa lịch');
@@ -4830,6 +4937,8 @@ function rebuildCareOnCustomers() {
     const care = careData[c.phone] || {};
     c.careStatus = care.status || c._rawStatus || '';
     c.zaloStatus = care.zalo  || c._rawZalo  || '';
+    c.khStatus   = care.khStatus || '';
+    c.nickZalos  = Array.isArray(care.nickZalos) ? care.nickZalos : [];
     c.careNote   = care.note  || c._rawNote  || '';
     c.careCS     = care.cs    || _latestOrderCS(c.orders);
     if (!c.csSet) c.csSet = _buildCsSet_(c.orders, c.phone);
@@ -5063,16 +5172,21 @@ function copyPhone(phone) {
 function openEditPhone(oldPhone) {
   const existing = document.getElementById('edit-phone-modal');
   if (existing) existing.remove();
+  const curName = (careData[oldPhone] && careData[oldPhone].name) || '';
+  const autoName = (customerMap[oldPhone] && customerMap[oldPhone].name) || '';
   const overlay = document.createElement('div');
   overlay.id = 'edit-phone-modal';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:700;display:flex;align-items:center;justify-content:center';
   overlay.innerHTML = `
     <div style="background:var(--surface);border-radius:var(--rlg);box-shadow:0 8px 32px rgba(0,0,0,0.2);width:360px;max-width:92vw;padding:0;overflow:hidden">
       <div style="padding:14px 18px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
-        <div style="font-size:14px;font-weight:700">✏️ Sửa số điện thoại</div>
+        <div style="font-size:14px;font-weight:700">✏️ Sửa SĐT / Tên KH</div>
         <button onclick="document.getElementById('edit-phone-modal').remove()" style="background:var(--surface2);border:none;width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:13px;color:var(--muted)">✕</button>
       </div>
       <div style="padding:16px 18px">
+        <div style="font-size:11px;color:var(--hint);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Tên khách hàng</div>
+        <input id="edit-name-input" class="form-input" type="text" placeholder="${esc(autoName && autoName !== oldPhone ? 'Tên tự nhận diện: ' + autoName : 'Nhập tên khách hàng...')}" value="${esc(curName)}"
+          style="width:100%;margin-bottom:14px;font-size:14px">
         <div style="font-size:11px;color:var(--hint);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">SĐT hiện tại</div>
         <div style="font-size:14px;font-weight:600;font-family:monospace;color:var(--text);margin-bottom:14px;padding:6px 10px;background:var(--surface2);border-radius:var(--rsm)">${esc(oldPhone)}</div>
         <div style="font-size:11px;color:var(--hint);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">SĐT mới</div>
@@ -5095,16 +5209,30 @@ function openEditPhone(oldPhone) {
 
 async function saveEditPhone(oldPhone) {
   const inp = document.getElementById('edit-phone-input');
+  const nameInp = document.getElementById('edit-name-input');
   const errEl = document.getElementById('edit-phone-err');
   if (!inp) return;
   const rawNew = inp.value.trim();
   const newPhone = normPhone(rawNew) || rawNew.replace(/\D/g,'');
+  const newName = (nameInp ? nameInp.value : '').trim();
   if (!newPhone || newPhone.length < 8) {
     errEl.textContent = '⚠ Số điện thoại không hợp lệ (cần ít nhất 8 số)';
     errEl.style.display = '';
     return;
   }
   if (newPhone === oldPhone) {
+    // SĐT không đổi — chỉ lưu tên nếu có nhập/sửa, không chạy các bước migrate SĐT bên dưới
+    const oldName = (careData[oldPhone] && careData[oldPhone].name) || '';
+    if (newName !== oldName) {
+      if (!careData[oldPhone]) careData[oldPhone] = {};
+      careData[oldPhone].name = newName;
+      saveLS('ome_care', careData);
+      _invalidateFilterCache();
+      buildCustomers();
+      if (gsUrl) { syncToast('✓ Đã lưu tên → đang đồng bộ GSheets...'); await pushCareToGS(oldPhone); }
+      toast('✓ Đã lưu tên khách hàng');
+      openDp(oldPhone);
+    }
     document.getElementById('edit-phone-modal').remove();
     return;
   }
@@ -5123,12 +5251,15 @@ async function saveEditPhone(oldPhone) {
     delete customerMap[oldPhone];
   }
 
-  // 2. Cập nhật careData
+  // 2. Cập nhật careData (kèm tên mới nếu có sửa)
   if (careData[oldPhone]) {
     careData[newPhone] = { ...careData[oldPhone] };
     delete careData[oldPhone];
-    saveLS('ome_care', careData);
+  } else if (newName) {
+    careData[newPhone] = {};
   }
+  if (careData[newPhone]) careData[newPhone].name = newName;
+  saveLS('ome_care', careData);
 
   // 3. Cập nhật schedules
   let schedChanged = false;
@@ -5247,7 +5378,7 @@ function careBadge(st) {
 function custStatusBadge(st) {
   if(!st) return '';
   var label = custStatusFullLabel(st) || st;
-  return `<span class="badge bo" style="background:#f0ebff;color:#6d28d9;border-color:#c4b5fd">${label}</span>`;
+  return `<span class="badge bo" style="background:var(--surface2);color:#6d28d9;border-color:var(--border);font-weight:500">${label}</span>`;
 }
 function zaloBadge(st) {
   if(!st) return '<span class="badge bo">—</span>';
@@ -5417,6 +5548,11 @@ function deleteAllOverdueReminders(){
   renderReminderPanel();
   if (typeof renderScheduleTab === 'function') renderScheduleTab();
   if (typeof renderOverdueTab === 'function') renderOverdueTab();
+  // Làm mới panel chi tiết nếu khách đang mở nằm trong số vừa bị xóa (tránh hiện ngày cũ)
+  if (typeof currentPhone !== 'undefined' && currentPhone) {
+    var _touchedPhones = overdue.map(function(rm){ return rm.phone; });
+    if (_touchedPhones.indexOf(currentPhone) !== -1) _refreshOpenDpTab(currentPhone);
+  }
   toast('✓ Đã xóa vĩnh viễn ' + overdue.length + ' nhắc hẹn quá hạn');
 }
 // Cảnh báo "được chia data" cho CS hiện tại (tắt là tắt luôn)
@@ -5515,6 +5651,80 @@ function parseDate(v){
   const m=str.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
   if(m){const yr=parseInt(m[3]);return new Date(yr<100?2000+yr:yr,parseInt(m[2])-1,parseInt(m[1]));}
   return null;
+}
+// ── Đoán tên khách từ nội dung cột "Sản phẩm" (DT TỔNG) — NV gõ tay tự do, không theo
+// khuôn cố định: có đơn ghi "Tên Sđt Địa chỉ...", có đơn ghi "Địa chỉ Sđt ... Tên Nhắn...",
+// có đơn chỉ toàn địa chỉ/ghi chú gộp đơn không hề có tên. Dùng CHỈ để HIỂN THỊ tự động
+// trong danh sách khi khách chưa có tên thật ở đâu cả — KHÔNG ghi lại vào CareData/DT TỔNG
+// (tránh đoán sai làm hỏng dữ liệu gốc). Giống hệt logic phía backend (gas_v13.js) để khớp
+// kết quả nếu sau này có đối chiếu.
+var NAME_ADDR_KEYWORDS_RE = /\b(đường|phố|phường|xã|quận|huyện|thành phố|tỉnh|ngõ|ngách|khu|tổ|ấp|thôn|xóm|số nhà|tòa|chung cư|đc|địa chỉ)\b/i;
+var NAME_MERGE_LABEL_RE = /^(gộp\s*(đơn|cùng)|ghép\s*đơn|địa chỉ)/i;
+var NAME_ALLOWED_CHARS_RE = /^[a-zA-ZÀ-ỹ\s.'-]+$/;
+function _stripHonorific(s){ return s.replace(/^(anh|chị|chi|ông|ong|bà|ba|em|c|a)(?=[\s:.]|$)\s*[:.]?\s*/i, '').trim(); }
+function _truncateAtAddressOrDigit(s){
+  var digitIdx = s.search(/\d/);
+  var kwMatch = s.match(NAME_ADDR_KEYWORDS_RE);
+  var kwIdx = kwMatch ? kwMatch.index : -1;
+  var cut = -1;
+  if (digitIdx >= 0 && kwIdx >= 0) cut = Math.min(digitIdx, kwIdx);
+  else if (digitIdx >= 0) cut = digitIdx;
+  else if (kwIdx >= 0) cut = kwIdx;
+  if (cut >= 0) s = s.substring(0, cut);
+  return s.trim();
+}
+function _isPlausibleName(s){
+  if (!s) return false;
+  s = s.trim();
+  if (s.length < 2 || s.length > 40) return false;
+  if (!NAME_ALLOWED_CHARS_RE.test(s)) return false;
+  if (s.split(/\s+/).length > 5) return false;
+  return true;
+}
+// Tra ve TAT CA ten "ung vien" hop le tim duoc trong 1 doan text don hang, thu 2 cach:
+// (A) dau dong, cat truoc so/tu khoa dia chi dau tien (bat truong hop "Ten Sdt Dia chi...")
+// (B) doan ngay SAU so dien thoai, truoc chu "Nhắn" (bat truong hop "...Sdt Ten Nhắn...")
+function _guessNameCandidatesFromOrderText(text, phoneDigits){
+  var out = [];
+  if (!text) return out;
+  var raw = String(text);
+  var firstLine = raw.split('\n')[0].trim();
+  if (firstLine && !NAME_MERGE_LABEL_RE.test(firstLine)) {
+    var a = firstLine.replace(/(\+?84|0)\d{8,10}/g, '');
+    a = _stripHonorific(a);
+    a = a.replace(/^[:.\-–]\s*/, '').replace(/[:.\-–]\s*$/, '');
+    a = _truncateAtAddressOrDigit(a);
+    if (_isPlausibleName(a)) out.push(a);
+  }
+  if (phoneDigits) {
+    var idx = raw.indexOf(phoneDigits);
+    if (idx >= 0) {
+      var after = raw.substring(idx + phoneDigits.length);
+      var nhanMatch = after.match(/nh[ắaằ]n\b/i);
+      var seg = nhanMatch ? after.substring(0, nhanMatch.index) : after.substring(0, 40);
+      seg = _stripHonorific(seg.trim());
+      seg = seg.replace(/^[:.\-–]\s*/, '').replace(/[:.\-–]\s*$/, '');
+      seg = _truncateAtAddressOrDigit(seg);
+      if (_isPlausibleName(seg)) out.push(seg);
+    }
+  }
+  return out;
+}
+// Quet TAT CA don cua 1 sdt, gom ung vien ten tu tung don, lay ten xuat hien NHIEU LAN NHAT
+// (thay vi chi lay don dau tien tim thay — de tranh vo tinh chon phai don khong co ten/co
+// nhan gop don ma bo qua cac don khac cua cung khach da co ten ro rang).
+function _guessNameForPhone(orders, phoneDigits){
+  var freq = {}, bestKey = null;
+  for (var i = 0; i < orders.length; i++) {
+    var cands = _guessNameCandidatesFromOrderText(orders[i].product, phoneDigits);
+    for (var j = 0; j < cands.length; j++) {
+      var key = cands[j].toLowerCase();
+      if (!freq[key]) freq[key] = { count: 0, sample: cands[j] };
+      freq[key].count++;
+      if (!bestKey || freq[key].count > freq[bestKey].count) bestKey = key;
+    }
+  }
+  return bestKey ? freq[bestKey].sample : '';
 }
 function normPhone(v){
   if(!v) return null;
@@ -5711,13 +5921,14 @@ function openAdvModal() {
   // Build chips — giới hạn theo CS đang chọn ở "Lọc theo CS"
   const _base = (typeof scopedCustomers==='function') ? scopedCustomers() : allCustomers;
   const allCS = [...new Set(allCustomers.flatMap(c=>[..._buildCsSet_(c.orders, c.phone),...(c.careCSSet||[])]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi'));
-  const allProducts = [...new Set(_base.flatMap(c=>c.brands).filter(Boolean))].sort();
   const allSources = [...new Set(_base.flatMap(c=>c.sources).filter(Boolean))].sort();
-  buildAdvChips('cs', allCS, advFilters.cs, 'adv-cs-chips');
-  buildAdvChips('products', allProducts, advFilters.products, 'adv-product-chips');
+  _advChipCache.cs = allCS;
+  buildAdvChips('cs', _advChipCache.cs, advFilters.cs, 'adv-cs-chips');
   buildAdvChips('sources', allSources, advFilters.sources, 'adv-source-chips');
   buildAdvChips('careStatus', CARE_STATUS, advFilters.careStatus, 'adv-care-chips');
   buildAdvChips('zaloStatus', ZALO_STATUS, advFilters.zaloStatus, 'adv-zalo-chips');
+  const csSearchEl = document.getElementById('adv-cs-search'); if (csSearchEl) csSearchEl.value = '';
+  const prodSearchEl = document.getElementById('adv-product-search'); if (prodSearchEl) prodSearchEl.value = [...advFilters.products].join(', ');
   // Restore date values
   ['adv-year-from','adv-month-from','adv-year-to','adv-month-to'].forEach(id=>{
     const el=document.getElementById(id);
@@ -5729,10 +5940,26 @@ function openAdvModal() {
   updateAdvCount();
   document.getElementById('adv-modal').classList.add('open');
 }
+// Danh sách gốc (chưa lọc theo search) của nhóm chip CS, dùng để filterAdvChipList tìm lại
+const _advChipCache = { cs: [] };
 function buildAdvChips(key, values, selectedSet, containerId) {
   const el = document.getElementById(containerId);
   if (!el) return;
   el.innerHTML = values.map(v=>`<span class="adv-chip ${selectedSet.has(v)?'selected':''}" data-val="${esc(v)}" onclick="toggleAdvChip('${key}',this.dataset.val,this)">${esc(v)}</span>`).join('');
+}
+// Lọc danh sách chip CS hiển thị theo từ khoá gõ vào (không đổi lựa chọn đã chọn, chỉ ẩn/hiện)
+function filterAdvChipList(key, term) {
+  const containerId = 'adv-cs-chips';
+  const src = _advChipCache[key] || [];
+  const f = _foldVi(term||'').trim();
+  const shown = f ? src.filter(v=>_foldVi(v).includes(f)) : src;
+  buildAdvChips(key, shown, advFilters[key], containerId);
+}
+// Đồng bộ bộ lọc Sản phẩm trực tiếp từ ô nhập tự do — nhiều tên cách nhau bằng dấu phẩy
+function syncAdvProductInput(val) {
+  const terms = (val||'').split(',').map(t=>t.trim()).filter(Boolean);
+  advFilters.products = new Set(terms);
+  updateAdvCount();
 }
 function toggleAdvChip(key, val, el) {
   if (advFilters[key].has(val)) { advFilters[key].delete(val); el.classList.remove('selected'); }
@@ -5782,6 +6009,7 @@ if (gsUrl) {
 const AUTO_SYNC_MS = 3000;
 let _autoSyncTimer = null;
 let _autoSyncRunning = false;
+let _autoSyncTick = 0;
 
 async function autoSyncLoop() {
   if (!gsUrl || _autoSyncRunning) return;
@@ -5791,7 +6019,14 @@ async function autoSyncLoop() {
   }
   _autoSyncRunning = true;
   try {
-    await syncFromGS({ pullOrders: Object.keys(customerMap).length === 0 });
+    _autoSyncTick++;
+    // BUG (đã sửa): trước đây pullOrders chỉ true khi customerMap RỖNG — tức chỉ kéo đơn hàng/
+    // "Chăm sóc" (KH thêm nhanh)/dữ liệu đơn ĐÚNG 1 LẦN lúc mở trang, không bao giờ kéo lại nữa dù
+    // vòng lặp này vẫn chạy mỗi 3s. Hệ quả: CS A thêm đơn mới → máy CS B không tự thấy, phải bấm
+    // "Sync GS" thủ công. Giờ cứ ~10 lần lặp (~30s ở AUTO_SYNC_MS=3000) thì ép kéo lại đầy đủ luôn,
+    // không chỉ CareData (trạng thái/ghi chú/hẹn — vốn đã tự cập nhật nhanh mỗi 3s như trước).
+    const forceFullPull = (_autoSyncTick % 10 === 0);
+    await syncFromGS({ pullOrders: Object.keys(customerMap).length === 0 || forceFullPull });
   } catch(e) {
     // Silent
   }
@@ -6298,9 +6533,11 @@ function deleteAssignEntry(id) {
 }
 
 // ── PIVOT REPORT STATE ──
-let _rptFilters = { cs: new Set(), tier: new Set(), label: new Set(), dateFrom: '', dateTo: '' };
-let _rptPivotRow = 'cs';    // cs | tier | label | month
-let _rptPivotCol = 'tier';  // tier | careStatus | done | month
+let _rptFilters = { cs: new Set(), tier: new Set(), label: new Set(), dateFrom: '', dateTo: '',
+  product: new Set(), careStatus: new Set(), khStatus: new Set(), zaloStatus: new Set(), source: new Set(), nickZalo: '' };
+let _rptPivotRow = 'cs';    // cs | tier | label | month | source
+let _rptPivotCol = 'tier';  // tier | careStatus | done | month | source
+let _rptMetric = 'kh';      // kh | orders | revenue
 let _rptSortCol = 'total';
 let _rptSortDir = -1;
 
@@ -6309,6 +6546,8 @@ function renderAssignReport() {
   const allCS    = [...new Set(assignHistory.map(h=>h.csName))].sort();
   const allLabels= [...new Set(assignHistory.map(h=>h.label))].sort();
   const allTiers = ['VIP','Thân thiết','Tiềm năng','Chưa bán lại được'];
+  const allSources = [...new Set(allCustomers.flatMap(c=>c.sources||[]).filter(Boolean))].sort();
+  const allKhStatus = (typeof _flatCustStatusValues==='function' ? _flatCustStatusValues() : []).filter(Boolean);
 
   // Apply filters to get working set of batches
   const batches = assignHistory.filter(h => {
@@ -6319,12 +6558,39 @@ function renderAssignReport() {
     return true;
   });
 
+  // Nguồn (kênh) gần nhất của 1 khách — dùng đơn có ngày mới nhất; không có đơn nào thì '—'
+  function _rptCustSource(c){
+    if (!c || !c.orders || !c.orders.length) return '—';
+    let latest = null;
+    for (const o of c.orders) {
+      if (!o.source) continue;
+      if (!latest || (o.date instanceof Date && (!(latest.date instanceof Date) || o.date > latest.date))) latest = o;
+    }
+    return (latest && latest.source) || c.sources?.[0] || '—';
+  }
+  const productTerms = [...(_rptFilters.product||[])].map(t=>_foldVi(t)).filter(Boolean);
+  const nickTerm = _foldVi(_rptFilters.nickZalo||'').trim();
+
   // Flatten to phone rows with metadata
   const phoneRows = [];
+  const custByPhone = new Map();
   for (const h of batches) {
     for (const p of h.phones) {
       const c = allCustomers.find(x=>x.phone===p);
       if (_rptFilters.tier.size && !(c && _rptFilters.tier.has(c.tier))) continue;
+      if (_rptFilters.careStatus.size && !(c && _rptFilters.careStatus.has(c.careStatus||''))) continue;
+      if (_rptFilters.khStatus.size && !(c && _rptFilters.khStatus.has(c.khStatus||''))) continue;
+      if (_rptFilters.zaloStatus.size && !(c && _rptFilters.zaloStatus.has(c.zaloStatus||''))) continue;
+      if (_rptFilters.source.size && !(c && (c.sources||[]).some(s=>_rptFilters.source.has(s)))) continue;
+      if (productTerms.length) {
+        const ptxt = (typeof _customerProductText==='function' && c) ? _customerProductText(c) : '';
+        if (!productTerms.some(t=>ptxt.indexOf(t)!==-1)) continue;
+      }
+      if (nickTerm) {
+        const nicks = (c && Array.isArray(c.nickZalos)) ? c.nickZalos : [];
+        if (!nicks.some(n=>_foldVi(n).indexOf(nickTerm)!==-1)) continue;
+      }
+      if (c && !custByPhone.has(p)) custByPhone.set(p, c);
       phoneRows.push({
         phone: p,
         csName: h.csName,
@@ -6333,11 +6599,24 @@ function renderAssignReport() {
         month: h.date ? h.date.slice(0,7) : '—',
         tier: c?.tier || '—',
         careStatus: c?.careStatus || 'Chưa liên hệ',
+        source: _rptCustSource(c),
         isDone: (h.donePhones||[]).includes(p),
         cust: c
       });
     }
   }
+  // Quy đổi giá trị 1 tập SĐT sang metric đang chọn (số KH / số đơn / doanh thu)
+  function _rptMetricValue(phoneSet){
+    if (_rptMetric === 'kh') return phoneSet.size;
+    let sum = 0;
+    phoneSet.forEach(p=>{
+      const c = custByPhone.get(p);
+      if (!c) return;
+      sum += _rptMetric==='revenue' ? (c.totalRevenue||0) : (c.totalOrders||0);
+    });
+    return sum;
+  }
+  function _rptFmtMetric(n){ return _rptMetric==='revenue' ? fmtVND(n) : fmt(n); }
 
   // Global KPIs
   const totalKH   = new Set(phoneRows.map(r=>r.phone)).size;
@@ -6372,11 +6651,12 @@ function renderAssignReport() {
   }
   const allPhoneSet = new Set(phoneRows.map(r=>r.phone));
   grandTotal = allPhoneSet.size;
+  const grandMetricVal = _rptMetricValue(allPhoneSet);
 
-  // Sort rows
+  // Sort rows (theo đúng metric đang chọn — KH / Số đơn / Doanh thu)
   const sortedRows = [...rowKeys].sort((a,b) => {
-    const va = (rowTotals[a]||new Set()).size;
-    const vb = (rowTotals[b]||new Set()).size;
+    const va = _rptMetricValue(rowTotals[a]||new Set());
+    const vb = _rptMetricValue(rowTotals[b]||new Set());
     return _rptSortDir * (vb - va);
   });
 
@@ -6391,8 +6671,8 @@ function renderAssignReport() {
   const csBarRows = Object.entries(csBar).sort((a,b)=>b[1].total.size-a[1].total.size);
   const maxBar = csBarRows.length ? csBarRows[0][1].total.size : 1;
 
-  const PIVOT_ROW_OPTS  = [{v:'cs',l:'CS phụ trách'},{v:'tier',l:'Phân loại KH'},{v:'label',l:'Đợt chia'},{v:'month',l:'Tháng chia'}];
-  const PIVOT_COL_OPTS  = [{v:'tier',l:'Phân loại KH'},{v:'careStatus',l:'Tình trạng CS'},{v:'done',l:'Hoàn thành'},{v:'month',l:'Tháng chia'}];
+  const PIVOT_ROW_OPTS  = [{v:'cs',l:'CS phụ trách'},{v:'tier',l:'Phân loại KH'},{v:'label',l:'Đợt chia'},{v:'month',l:'Tháng chia'},{v:'source',l:'Kênh (Nguồn)'}];
+  const PIVOT_COL_OPTS  = [{v:'tier',l:'Phân loại KH'},{v:'careStatus',l:'Tình trạng CS'},{v:'done',l:'Hoàn thành'},{v:'month',l:'Tháng chia'},{v:'source',l:'Kênh (Nguồn)'},{v:'cs',l:'CS phụ trách'}];
 
   const rptHtml = `
   <!-- KPI ROW -->
@@ -6441,6 +6721,38 @@ function renderAssignReport() {
         <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Đến ngày</div>
         <input type="date" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--rsm);outline:none;background:var(--surface)" value="${_rptFilters.dateTo}" oninput="_rptFilters.dateTo=this.value;renderAssignReport()">
       </div>
+      <div>
+        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Tình trạng CS</div>
+        <select multiple style="min-width:130px;max-height:70px;font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);outline:none" id="rpt-carestatus-sel" onchange="_rptSetFilter('careStatus',this)">
+          ${CARE_STATUS.map(v=>`<option value="${esc(v)}" ${_rptFilters.careStatus.has(v)?'selected':''}>${esc(v)}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Trạng thái KH</div>
+        <select multiple style="min-width:150px;max-height:70px;font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);outline:none" id="rpt-khstatus-sel" onchange="_rptSetFilter('khStatus',this)">
+          ${allKhStatus.map(v=>`<option value="${esc(v)}" ${_rptFilters.khStatus.has(v)?'selected':''}>${esc(v)}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Kết bạn Zalo</div>
+        <select multiple style="min-width:120px;max-height:70px;font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);outline:none" id="rpt-zalostatus-sel" onchange="_rptSetFilter('zaloStatus',this)">
+          ${ZALO_STATUS.map(v=>`<option value="${esc(v)}" ${_rptFilters.zaloStatus.has(v)?'selected':''}>${esc(v)}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Kênh (Nguồn)</div>
+        <select multiple style="min-width:120px;max-height:70px;font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);outline:none" id="rpt-source-sel" onchange="_rptSetFilter('source',this)">
+          ${allSources.map(v=>`<option value="${esc(v)}" ${_rptFilters.source.has(v)?'selected':''}>${esc(v)}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Sản phẩm (cách nhau bằng dấu phẩy)</div>
+        <input type="text" placeholder="vd: tỳ hưu, nhẫn 10k" style="min-width:170px;font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--rsm);outline:none;background:var(--surface)" value="${esc([..._rptFilters.product].join(', '))}" oninput="_rptFilterInputChanged('product', this.value, true)">
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Nick Zalo</div>
+        <input type="text" placeholder="Tìm nick..." style="min-width:110px;font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--rsm);outline:none;background:var(--surface)" value="${esc(_rptFilters.nickZalo||'')}" oninput="_rptFilterInputChanged('nickZalo', this.value, false)">
+      </div>
       <button class="btn sm danger" onclick="_rptResetFilters()" style="margin-bottom:1px">✕ Xóa lọc</button>
     </div>
   </div>
@@ -6486,6 +6798,12 @@ function renderAssignReport() {
         <select style="font-size:11px;padding:3px 7px;border:1px solid var(--border);border-radius:var(--rsm);outline:none;background:var(--surface)" onchange="_rptPivotCol=this.value;renderAssignReport()">
           ${PIVOT_COL_OPTS.map(o=>`<option value="${o.v}" ${_rptPivotCol===o.v?'selected':''}>${o.l}</option>`).join('')}
         </select>
+        <span style="color:var(--muted)">Metric:</span>
+        <select style="font-size:11px;padding:3px 7px;border:1px solid var(--border);border-radius:var(--rsm);outline:none;background:var(--surface)" onchange="_rptMetric=this.value;renderAssignReport()">
+          <option value="kh" ${_rptMetric==='kh'?'selected':''}>Số KH</option>
+          <option value="orders" ${_rptMetric==='orders'?'selected':''}>Số đơn</option>
+          <option value="revenue" ${_rptMetric==='revenue'?'selected':''}>Doanh thu</option>
+        </select>
         <button class="btn sm" onclick="_rptSortDir*=-1;renderAssignReport()" title="Đảo chiều sắp xếp">${_rptSortDir===-1?'↓':'↑'} Sắp xếp</button>
       </div>
     </div>
@@ -6503,20 +6821,22 @@ function renderAssignReport() {
       </thead>
       <tbody>
         ${sortedRows.map((rk,ri)=>{
-          const rowTotal = (rowTotals[rk]||new Set()).size;
-          const pct = grandTotal ? Math.round(rowTotal/grandTotal*100) : 0;
-          const fillPct = grandTotal ? rowTotal/grandTotal*100 : 0;
+          const rowPhones = rowTotals[rk]||new Set();
+          const rowVal = _rptMetricValue(rowPhones);
+          const pct = grandMetricVal ? Math.round(rowVal/grandMetricVal*100) : 0;
+          const fillPct = grandMetricVal ? rowVal/grandMetricVal*100 : 0;
           return `<tr style="border-bottom:1px solid var(--border);${ri%2===1?'background:var(--surface2)':'background:var(--surface)'}">
             <td style="padding:6px 10px;font-weight:500;position:sticky;left:0;background:inherit;white-space:nowrap">${esc(rk)}</td>
             ${colKeys.map(ck=>{
-              const n = (pivot[rk]&&pivot[rk][ck]) ? pivot[rk][ck].size : 0;
-              const pctCell = rowTotal ? Math.round(n/rowTotal*100) : 0;
+              const cellPhones = (pivot[rk]&&pivot[rk][ck]) ? pivot[rk][ck] : new Set();
+              const n = _rptMetricValue(cellPhones);
+              const pctCell = rowVal ? Math.round(n/rowVal*100) : 0;
               return `<td style="padding:6px 8px;text-align:right">
-                <div style="font-weight:${n>0?'600':'400'};color:${n>0?'var(--text)':'var(--hint)'}">${n||'—'}</div>
+                <div style="font-weight:${n>0?'600':'400'};color:${n>0?'var(--text)':'var(--hint)'}">${n?_rptFmtMetric(n):'—'}</div>
                 ${n>0?`<div style="font-size:9px;color:var(--hint)">${pctCell}%</div>`:''}
               </td>`;
             }).join('')}
-            <td style="padding:6px 8px;text-align:right;font-weight:700">${rowTotal}</td>
+            <td style="padding:6px 8px;text-align:right;font-weight:700">${_rptFmtMetric(rowVal)}</td>
             <td style="padding:6px 8px;text-align:right">
               <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
                 <div style="width:40px;height:5px;background:var(--surface3);border-radius:3px;overflow:hidden">
@@ -6531,8 +6851,8 @@ function renderAssignReport() {
       <tfoot>
         <tr style="background:var(--surface3);font-weight:700;border-top:2px solid var(--border-md)">
           <td style="padding:7px 10px;position:sticky;left:0;background:var(--surface3)">Tổng cộng</td>
-          ${colKeys.map(ck=>`<td style="padding:7px 8px;text-align:right;color:var(--text)">${(colTotals[ck]||new Set()).size||'—'}</td>`).join('')}
-          <td style="padding:7px 8px;text-align:right;color:var(--green)">${grandTotal}</td>
+          ${colKeys.map(ck=>`<td style="padding:7px 8px;text-align:right;color:var(--text)">${_rptFmtMetric(_rptMetricValue(colTotals[ck]||new Set()))||'—'}</td>`).join('')}
+          <td style="padding:7px 8px;text-align:right;color:var(--green)">${_rptFmtMetric(grandMetricVal)}</td>
           <td style="padding:7px 8px;text-align:right;color:var(--muted)">100%</td>
         </tr>
       </tfoot>
@@ -6551,8 +6871,16 @@ function _rptSetFilter(key, sel) {
   _rptFilters[key] = new Set(vals);
   renderAssignReport();
 }
+// Ô nhập tự do (Sản phẩm, Nick Zalo) — debounce để khỏi render lại (mất focus) mỗi phím gõ
+let _rptDebounceT = null;
+function _rptFilterInputChanged(key, val, isCsv) {
+  _rptFilters[key] = isCsv ? new Set((val||'').split(',').map(t=>t.trim()).filter(Boolean)) : (val||'');
+  clearTimeout(_rptDebounceT);
+  _rptDebounceT = setTimeout(renderAssignReport, 450);
+}
 function _rptResetFilters() {
-  _rptFilters = { cs: new Set(), tier: new Set(), label: new Set(), dateFrom: '', dateTo: '' };
+  _rptFilters = { cs: new Set(), tier: new Set(), label: new Set(), dateFrom: '', dateTo: '',
+    product: new Set(), careStatus: new Set(), khStatus: new Set(), zaloStatus: new Set(), source: new Set(), nickZalo: '' };
   renderAssignReport();
 }
 
@@ -7016,9 +7344,18 @@ var ORDER_SS_ID = '1fiWXPMZcHuEh0zYqD6pgQjZDM0PhWzpiSK7Igj6Cug8'; // File chua O
 var CRM_SS_ID   = '18XBtbjP7gtlvYpChikF3B62cxHkR4426s5poZj9Mj8I'; // File chua CareData/Users/Teams/Settings/AuditLog/AssignData/AIContext (CRM).
 var PRICE_SS_ID    = '1Tfn2jOH20kv0Z-cb0BULqPuxZTap9FA3z8bXeeRl5l4'; // File "Bang gia" rieng (Danh_muc/Tinh_tien/Ghi_chu_chinh_sach)
 var PRICE_SHEET_NAME = 'DANH_MUC'; // Sheet dang bang phang, de tra cuu/loc
+var CTKM_SHEET_NAME  = 'CTKM'; // Sheet CTKM (cung file PRICE_SS_ID) — doi ten hang duoi neu ten tab thuc te khac
                         // De trong = dung file dang gan Apps Script nay (mac dinh, hanh vi cu).
                         // Dan Spreadsheet ID moi vao day de doi nguon CRM MA KHONG can gan lai script vao file khac.
 // >>> Muon doi nguon du lieu sau nay: chi can sua 2 dong ID o tren (ORDER_SS_ID va/hoac CRM_SS_ID) roi Deploy lai. <<<
+
+// ─── LINK KIEN THUC CO DINH (fallback khi chua/khong set qua Settings) ───────────
+// Dan link moi vao day roi Deploy lai neu can doi — KHONG bat CS phai bam Luu trong
+// extension nua. Neu Settings sheet co gia tri (key tuong ung) thi UU TIEN dung gia
+// tri trong Settings truoc, hardcode duoi day chi la fallback dam bao luon co san.
+var DEFAULT_PRODUCT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1YJMJs8GI7dBfDl5TNZM44n7N8lhJoeSD0KOWflU2fmM/edit?gid=1833367723#gid=1833367723';
+var DEFAULT_DRIVE_KNOWLEDGE_FOLDER_URL = 'https://drive.google.com/drive/folders/1Koz4IdENS5QgdvvYMaQO1MlVEFMFAciN?hl=vi';
+var DEFAULT_DRIVE_PRODUCT_IMAGES_FOLDER_URL = 'https://drive.google.com/drive/folders/1PES3V_bsYLcmIynMjRHPVjT6rJGTc6EO?hl=vi';
 
 function getOrderSS_() {
   return ORDER_SS_ID
@@ -7055,7 +7392,11 @@ var TEAM_HEADERS   = ['id','name','leader','members','color'];
 var AUDIT_HEADERS  = ['timestamp','user','action','phone','oldValue','newValue'];
 var SET_HEADERS    = ['key','value'];
 var ASSIGN_HEADERS = ['id','date','csName','label','phones','donePhones'];
-var USER_HEADERS   = ['username','passHash','role','name','team','active'];
+var USER_HEADERS   = ['username','passHash','role','name','team','active','names'];
+// ── KH "Chăm sóc" thêm nhanh (nút "+ Thêm KH/Đơn mới") — SHEET RIÊNG, không gộp
+// CareData/DT TỔNG/dữ liệu đơn, không gộp vào báo cáo doanh số A/B/C. ──
+var SH_CARE_LEAD      = 'KH Chăm sóc mới';
+var CARE_LEAD_HEADERS = ['phone','name','note','cs','createdAt'];
 
 // ─── HELPERS ───────────────────────────────────────────────────
 function getSheet_(name, headers) {
@@ -7152,6 +7493,60 @@ function searchPriceCatalog_(rows, q) {
     if (ok) out.push(row);
   }
   return out;
+}
+
+// ─── CTKM (Sheet CTKM, cung file PRICE_SS_ID) — chi nap khi khach hoi ve khuyen mai/giam gia ──
+// Doc toan bo sheet CTKM thanh mang object, giong cach doc DANH_MUC (khong hardcode ten cot).
+function readCTKMCatalog_() {
+  var sh = SpreadsheetApp.openById(PRICE_SS_ID).getSheetByName(CTKM_SHEET_NAME);
+  if (!sh || sh.getLastRow() < 2) return [];
+  var lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
+  var vals = sh.getRange(1, 1, lastRow, lastCol).getValues();
+  var headers = vals[0].map(function(h){ return String(h || '').trim(); });
+  var rows = [];
+  for (var i = 1; i < vals.length; i++) {
+    var row = vals[i];
+    var isEmpty = row.every(function(c){ return c === '' || c === null; });
+    if (isEmpty) continue;
+    var obj = {};
+    for (var c = 0; c < headers.length; c++) {
+      if (!headers[c]) continue;
+      var v = row[c];
+      obj[headers[c]] = (v instanceof Date) ? v.toISOString() : v;
+    }
+    rows.push(obj);
+  }
+  return rows;
+}
+
+// Tu khoa nhan biet khach dang hoi ve khuyen mai/giam gia (khong dau, chu thuong)
+var _CTKM_KEYWORDS_ = ['khuyen mai','khuyenmai','giam gia','giamgia','uu dai','uudai',
+  'sale','freeship','free ship','qua tang','tang qua','ma giam','magiam','voucher',
+  'flash sale','combo uu dai','ctkm',' km ','km thang','khuyen mai gi'];
+
+// Chi tra ve noi dung CTKM khi cau hoi cua khach co tu khoa lien quan — de AI KHONG
+// tu dong nhet thong tin khuyen mai vao moi cau tra loi (dung yeu cau: chi khi khach hoi).
+function readCTKMPromotions_(query) {
+  var q = ' ' + _stripVN_(query) + ' ';
+  var matched = false;
+  for (var i = 0; i < _CTKM_KEYWORDS_.length; i++) {
+    if (q.indexOf(_CTKM_KEYWORDS_[i]) !== -1) { matched = true; break; }
+  }
+  if (!matched) return '';
+  var rows = readCTKMCatalog_();
+  if (!rows.length) return '';
+  var blocks = [];
+  for (var r = 0; r < rows.length && r < 8; r++) {
+    var row = rows[r], parts = [];
+    for (var k in row) {
+      if (!row.hasOwnProperty(k)) continue;
+      var v = row[k];
+      if (v === '' || v === null || v === undefined) continue;
+      parts.push(k + ': ' + v);
+    }
+    if (parts.length) blocks.push(parts.join(' | '));
+  }
+  return blocks.join('\n');
 }
 
 // ─── SETTINGS (1 signature duy nhat) ──────────────────────────
@@ -7336,11 +7731,19 @@ function readUsers_(sh) {
   var v = sh.getDataRange().getValues();
   for (var i = 1; i < v.length; i++) {
     if (!v[i][0]) continue;
+    // Tài khoản CS có thể gắn NHIỀU tên (vd 1 tài khoản dùng chung, hoặc gộp nhiều bí danh của
+    // cùng 1 sale) — luu o cot 'names' (JSON array), moi rieng bien tuong thich nguoc: tai khoan
+    // tao truoc khi co tinh nang nay chi co cot 'name' don (chuoi thuong), luc do fallback ve
+    // mang 1 phan tu tu chinh cot do.
+    var namesArr = [];
+    try { namesArr = v[i][6] ? JSON.parse(v[i][6]) : []; } catch (e) { namesArr = []; }
+    if (!namesArr.length && v[i][3]) namesArr = [String(v[i][3])];
     out.push({
       username: String(v[i][0]), passHash: String(v[i][1]||''), role: v[i][2]||'cs',
       name: v[i][3]||'', team: v[i][4]||'',
       active: (v[i][5]===''||v[i][5]===undefined) ? true :
-              (v[i][5]===true||v[i][5]==='TRUE'||v[i][5]==='true'||v[i][5]===1)
+              (v[i][5]===true||v[i][5]==='TRUE'||v[i][5]==='true'||v[i][5]===1),
+      names: namesArr
     });
   }
   return out;
@@ -7381,6 +7784,18 @@ function doGet(e) {
     if (action === 'orders')    return jsonOut_({ orders: readAllOrders_() });
     if (action === 'teams')     return jsonOut_({ teams: readTeams_(ss.getSheetByName(SH_TEAM)) });
     if (action === 'users')     return jsonOut_({ users: readUsers_(ss.getSheetByName(SH_USER)) });
+    // ── Nguon "Cham soc" (KH them nhanh, sheet rieng) — khong gop CareData/bao cao A-B-C ──
+    if (action === 'careLeads') return jsonOut_({ rows: readCareLeads_() });
+    // ── Tap SDT co trong "dữ liệu đơn" — chi de loc nguon o man hinh chinh (cache 10') ──
+    if (action === 'donPhones') {
+      var cacheDP = CacheService.getScriptCache();
+      var cKeyDP = 'don_phones_v2';
+      var cachedDP = cacheDP.get(cKeyDP);
+      if (cachedDP) { try { return jsonOut_(JSON.parse(cachedDP)); } catch(ec) {} }
+      var resDP = { phones: readDonPhones_(), saleByPhone: getDonSaleByPhone_() };
+      try { cacheDP.put(cKeyDP, JSON.stringify(resDP), 600); } catch(ec) {}
+      return jsonOut_(resDP);
+    }
 
     // ── Tra cuu bang gia (Sheet DANH_MUC, file rieng PRICE_SS_ID) — dung chung cho
     // portal/Sasum/Pancake. Tim khong dau, khop tren MOI cot dang text cua sheet, khong
@@ -7460,6 +7875,13 @@ function doGet(e) {
       var resC = buildSalesReportC_(fC);
       try { cacheC.put(cKeyC, JSON.stringify(resC), 120); } catch(ec) {}
       return jsonOut_(resC);
+    }
+
+    // ── BAO CAO D: KH "Chăm sóc" thêm nhanh (sheet riêng, KHÔNG gộp báo cáo A/B/C) ──
+    if (action === 'careLeadReport') {
+      var pD = e.parameter || {};
+      var fD = { dateFrom: pD.dateFrom || '', dateTo: pD.dateTo || '', cs: pD.cs || '' };
+      return jsonOut_(buildCareLeadReport_(fD));
     }
 
     if (action === 'assign')    return jsonOut_({ assignHistory: readAssign_(ss.getSheetByName(SH_ASSIGN)) });
@@ -7757,6 +8179,73 @@ function readDTTong_() {
     });
   }
   return out;
+}
+
+// ── KH "Chăm sóc" thêm nhanh — sheet RIÊNG, độc lập CareData/DT TỔNG/dữ liệu đơn ──
+function readCareLeads_() {
+  var ss = getCrmSS_();
+  var sh = ss.getSheetByName(SH_CARE_LEAD);
+  if (!sh || sh.getLastRow() < 2) return [];
+  var last = sh.getLastRow();
+  var vals = sh.getRange(2, 1, last - 1, CARE_LEAD_HEADERS.length).getValues();
+  var out = [];
+  for (var i = 0; i < vals.length; i++) {
+    var r = vals[i];
+    if (!r[0]) continue;
+    out.push({
+      phone: normPhone_(String(r[0])), name: String(r[1]||''), note: String(r[2]||''),
+      cs: String(r[3]||''), createdAt: r[4] || ''
+    });
+  }
+  return out;
+}
+
+function addCareLead_(data) {
+  var sh = getSheet_(SH_CARE_LEAD, CARE_LEAD_HEADERS);
+  var phone = normPhone_(String(data.phone||''));
+  if (!phone) return jsonOut_({ ok: false, error: 'Thieu SDT' });
+  var last = sh.getLastRow(); var rowIdx = -1;
+  if (last >= 2) {
+    var colP = sh.getRange(2, 1, last-1, 1).getValues();
+    for (var i = 0; i < colP.length; i++) {
+      if (normPhone_(String(colP[i][0])) === phone) { rowIdx = i + 2; break; }
+    }
+  }
+  var row = [phone, data.name||'', data.note||'', data.cs||'', new Date().toISOString()];
+  if (rowIdx > 0) sh.getRange(rowIdx, 1, 1, CARE_LEAD_HEADERS.length).setValues([row]);
+  else sh.appendRow(row);
+  try { CacheService.getScriptCache().remove('care_leads_v1'); } catch(ec) {}
+  return jsonOut_({ ok: true, found: rowIdx > 0 });
+}
+
+// ── Chỉ tra cứu tập SDT co trong "dữ liệu đơn" (Bao cao B) — dung de LOC nguon o
+// man hinh chinh, KHONG keo chi tiet san pham vao danh sach khach ──
+function readDonPhones_() {
+  var rows = readDonChiTiet_();
+  var set = {};
+  for (var i = 0; i < rows.length; i++) {
+    var ph = normPhone_(String(rows[i].soDienThoai || ''));
+    if (ph) set[ph] = true;
+  }
+  return Object.keys(set);
+}
+// Map SDT -> mang ten sale tham gia don (cot "Thẻ", tach theo dau phay — 1 don co the nhieu
+// sale). Dung o client de gop vao csSet, dam bao CS dung ten o BAT KY don nao trong
+// "dữ liệu đơn" (du don co nhieu sale) van xem duoc KH do.
+function getDonSaleByPhone_() {
+  var rows = readDonChiTiet_();
+  var map = {};
+  for (var i = 0; i < rows.length; i++) {
+    var ph = normPhone_(String(rows[i].soDienThoai || ''));
+    if (!ph) continue;
+    var names = splitMulti_(rows[i].theSale, ',');
+    if (!names.length) continue;
+    if (!map[ph]) map[ph] = [];
+    for (var j = 0; j < names.length; j++) {
+      if (map[ph].indexOf(names[j]) === -1) map[ph].push(names[j]);
+    }
+  }
+  return map;
 }
 
 // ── Doc toan bo sheet "dữ liệu đơn" thanh mang object ──
@@ -8200,23 +8689,45 @@ function buildSalesReportC_(filters) {
   };
 }
 
+// ── BAO CAO D: KH "Chăm sóc" thêm nhanh (sheet rieng, KHONG gop bao cao A/B/C) ──
+function buildCareLeadReport_(filters) {
+  filters = filters || {};
+  var rows = readCareLeads_();
+  var matched = rows.filter(function(r) {
+    var dt = r.createdAt ? new Date(r.createdAt) : null;
+    if (!dateInRange_(dt, filters.dateFrom, filters.dateTo)) return false;
+    if (filters.cs && String(r.cs||'') !== String(filters.cs)) return false;
+    return true;
+  });
+  var byCS = {};
+  matched.forEach(function(r) {
+    var name = r.cs || '(chưa gán)';
+    byCS[name] = (byCS[name] || 0) + 1;
+  });
+  var byCSArr = Object.keys(byCS).map(function(k) { return { name: k, count: byCS[k] }; });
+  byCSArr.sort(function(a, b) { return b.count - a.count; });
+  return { total: matched.length, byCS: byCSArr, rows: matched };
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  XUAT BAO CAO DOANH SO RA 1 TAB MOI TRONG GOOGLE SHEET (CRM)
 //  Dung lai dung buildSalesReportA_/B_ nen so lieu luon khop UI dang loc.
 //  Moi lan xuat tao 1 tab moi (co timestamp) — khong ghi de, giu lich su cac lan xuat.
 // ═══════════════════════════════════════════════════════════════
 function exportSalesReportToSheet_(reportType, filters) {
-  reportType = (reportType === 'B' || reportType === 'C') ? reportType : 'A';
+  reportType = (reportType === 'B' || reportType === 'C' || reportType === 'D') ? reportType : 'A';
   var data = reportType === 'B' ? buildSalesReportB_(filters || {})
-    : (reportType === 'C' ? buildSalesReportC_(filters || {}) : buildSalesReportA_(filters || {}));
+    : (reportType === 'C' ? buildSalesReportC_(filters || {})
+    : (reportType === 'D' ? buildCareLeadReport_(filters || {})
+    : buildSalesReportA_(filters || {})));
   var ss = getCrmSS_();
   var ts = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Etc/GMT-7', 'yyyyMMdd_HHmmss');
   var tabName = 'BC_' + reportType + '_' + ts;
   var sh = ss.insertSheet(tabName);
 
-  var titleSuffix = reportType === 'A' ? ' — Theo DT tổng' : (reportType === 'B' ? ' — Theo dữ liệu đơn' : ' — So sánh theo kỳ');
+  var titleSuffix = reportType === 'A' ? ' — Theo DT tổng' : (reportType === 'B' ? ' — Theo dữ liệu đơn' : (reportType === 'D' ? ' — KH Chăm sóc mới (data riêng, KHÔNG gộp báo cáo doanh số A/B/C)' : ' — So sánh theo kỳ'));
   var rows = [];
-  rows.push(['BÁO CÁO DOANH SỐ ' + reportType + titleSuffix]);
+  rows.push([(reportType === 'D' ? 'BÁO CÁO KH CHĂM SÓC MỚI' : ('BÁO CÁO DOANH SỐ ' + reportType)) + titleSuffix]);
   rows.push(['Xuất lúc', Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Etc/GMT-7', 'dd/MM/yyyy HH:mm:ss')]);
 
   var f = filters || {};
@@ -8233,6 +8744,9 @@ function exportSalesReportToSheet_(reportType, filters) {
     filterDesc.push('Sale: ' + (Array.isArray(f.sale) ? (f.sale.join(', ') || '(tất cả)') : (f.sale || '(tất cả)')));
     filterDesc.push('Nguồn đơn: ' + (Array.isArray(f.nguon) ? (f.nguon.join(', ') || '(tất cả)') : (f.nguon || '(tất cả)')));
     filterDesc.push('Marketer: ' + (Array.isArray(f.marketer) ? (f.marketer.join(', ') || '(tất cả)') : (f.marketer || '(tất cả)')));
+  } else if (reportType === 'D') {
+    if (f.dateFrom || f.dateTo) filterDesc.push('Khoảng ngày thêm: ' + (f.dateFrom || '...') + ' → ' + (f.dateTo || '...'));
+    if (f.cs) filterDesc.push('CS: ' + f.cs);
   } else {
     if (data.period) filterDesc.push('Kỳ này: ' + data.period.curLabel + ' | Kỳ trước: ' + data.period.prevLabel);
     filterDesc.push('Lọc theo: ' + (f.dateField === 'thoiGianHT' ? 'Thời gian hoàn thành' : 'Ngày tạo'));
@@ -8283,6 +8797,24 @@ function exportSalesReportToSheet_(reportType, filters) {
     (data.orders || []).forEach(function(o) {
       rows.push([o.ngayTaoDon, o.khachHang, o.soDienThoai, o.nguonDon, o.theSale, o.sanPham, o.maSanPham, o.soLuong, o.giaTriSauGiam, o.cod, o.marketer]);
     });
+  } else if (reportType === 'D') {
+    rows.push(['TỔNG QUAN']);
+    rows.push(['Số KH thêm mới (nguồn Chăm sóc)', data.total]);
+    rows.push([]);
+    rows.push(['THEO CS THÊM']);
+    rows.push(['CS', 'Số KH thêm']);
+    (data.byCS || []).forEach(function(x) { rows.push([x.name, x.count]); });
+    rows.push([]);
+    rows.push(['CHI TIẾT']);
+    rows.push(['SĐT', 'Tên khách', 'Ghi chú mới nhất', 'CS thêm', 'Ngày thêm']);
+    (data.rows || []).forEach(function(r) {
+      var latestNote = r.note || '';
+      try {
+        var arr = JSON.parse(r.note || '[]');
+        if (Array.isArray(arr) && arr.length) latestNote = arr[0].text || '';
+      } catch (eN) {}
+      rows.push([r.phone, r.name, latestNote, r.cs, r.createdAt]);
+    });
   } else {
     var hdrC = ['Tên', 'KPI kỳ trước', 'Kết quả kỳ trước', '%HT KPI kỳ trước', 'KPI kỳ này', 'Kết quả kỳ này', '%HT KPI kỳ này', '% Tăng trưởng'];
     rows.push(['THEO NHÂN VIÊN (SALE)']);
@@ -8324,6 +8856,7 @@ function doPost(e) {
     if (action === 'saveSingle')          return saveSingleCare_(data.row);
     if (action === 'saveBatch')           return saveBatchCare_(data.rows);
     if (action === 'saveOrders')          return saveOrders_(data.orders);
+    if (action === 'addCareLead')         return addCareLead_(data);
     if (action === 'patchOrder')          return patchOrder_(data);
     if (action === 'deleteOrder')         return deleteOrder_(data);
     // ── Xuat bao cao doanh so (dang loc tren UI) ra 1 tab moi trong Google Sheet CRM ──
@@ -8823,7 +9356,10 @@ function saveUsers_(users) {
   var matrix = [USER_HEADERS];
   for (var i = 0; i < users.length; i++) {
     var u = users[i];
-    matrix.push([String(u.username||''), String(u.passHash||''), u.role||'cs', u.name||'', u.team||'', (u.active===false?false:true)]);
+    var namesArr = (u.names && u.names.length) ? u.names : (u.name ? [u.name] : []);
+    matrix.push([String(u.username||''), String(u.passHash||''), u.role||'cs',
+                 namesArr[0]||u.name||'', u.team||'', (u.active===false?false:true),
+                 JSON.stringify(namesArr)]);
   }
   sh.getRange(1, 1, matrix.length, USER_HEADERS.length).setValues(matrix);
   return jsonOut_({ ok: true, written: users.length });
@@ -9018,7 +9554,7 @@ function readFaqSheet_(query) {
 }
 
 function readExternalProductSheet_(query) {
-  var url = getSetting_('productSheetUrl');
+  var url = getSetting_('productSheetUrl') || DEFAULT_PRODUCT_SHEET_URL;
   if (!url) return '';
   var ss;
   try { ss = SpreadsheetApp.openByUrl(url); } catch (e) { return ''; } // chua chia se quyen / URL sai
@@ -9210,7 +9746,7 @@ function _driveKnowledgeFileIndex_(file) {
 // Doc toan bo thu muc kien thuc Drive (PDF/Doc/Sheet), khop tu khoa cau hoi khach, tra ve
 // toi da 4 doan lien quan nhat de dua vao prompt AI.
 function readDriveKnowledgeFolder_(query) {
-  var url = getSetting_('driveKnowledgeFolderUrl');
+  var url = getSetting_('driveKnowledgeFolderUrl') || DEFAULT_DRIVE_KNOWLEDGE_FOLDER_URL;
   var folderId = _driveFolderIdFromUrl_(url);
   if (!folderId) return '';
 
@@ -9371,7 +9907,7 @@ function _driveImageFromLink_(link) {
 // van ban o readExternalProductSheet_) — CS dan link Drive (file hoac folder)
 // vao do la dung duoc ngay, khong can sua code khi dien them dong moi.
 function findProductSheetImage_(query) {
-  var url = getSetting_('productSheetUrl');
+  var url = getSetting_('productSheetUrl') || DEFAULT_PRODUCT_SHEET_URL;
   if (!url) return null;
   var ss;
   try { ss = SpreadsheetApp.openByUrl(url); } catch (e) { return null; }
@@ -9417,7 +9953,8 @@ function findDriveProductImage_(query) {
   var fromSheet = findProductSheetImage_(query);
   if (fromSheet) return fromSheet;
 
-  var url = getSetting_('driveProductImagesFolderUrl') || getSetting_('driveKnowledgeFolderUrl');
+  var url = getSetting_('driveProductImagesFolderUrl') || DEFAULT_DRIVE_PRODUCT_IMAGES_FOLDER_URL
+    || getSetting_('driveKnowledgeFolderUrl') || DEFAULT_DRIVE_KNOWLEDGE_FOLDER_URL;
   var folderId = _driveFolderIdFromUrl_(url);
   if (!folderId) return null;
 
@@ -9475,6 +10012,9 @@ function _buildAISystemPrompt_(userMsg, withProducts) {
   // Q&A tu sheet FAQ (khop tu khoa cau hoi khach) — de AI hoc cach xu ly cau hoi kho theo team
   var faq = readFaqSheet_(userMsg);
   if (faq) parts.push('\n\nCAC CAU HOI KHO & CACH TRA LOI MAU CUA TEAM (uu tien bam sat cach xu ly / giong dieu nay khi tra loi cau tuong tu; dieu chinh cho hop ngu canh khach, KHONG copy nguyen van neu khong khop hoan toan):\n' + faq);
+  // CTKM: chi nap khi cau hoi cua khach co tu khoa khuyen mai/giam gia (xem readCTKMPromotions_)
+  var ctkm = readCTKMPromotions_(userMsg);
+  if (ctkm) parts.push('\n\nCHUONG TRINH KHUYEN MAI (CTKM) DANG AP DUNG (chi dung khi khach hoi ve khuyen mai/giam gia, KHONG tu bia them neu khong co trong danh sach nay):\n' + ctkm);
   parts.push('\n\nYEU CAU: Chi dua ra DUY NHAT 1 cau tra loi ngan gon (toi da 150 tu). Khong danh so, khong giai thich them.');
   return parts.join('');
 }
@@ -9529,10 +10069,16 @@ function callAI_(data) {
   var withProducts = !!data.withProducts;
   var sys = _buildAISystemPrompt_(userMsg, withProducts);
 
+  // LUU Y (2026-09-13): llama-3.3-70b-versatile bi Groq NGUNG HO TRO tu 16/8/2026
+  // (model_decommissioned) va gemini-2.0-flash bi Google NGUNG HO TRO tu 1/6/2026
+  // (404) — day la ly do CA 2 provider cung loi dong loat, khong phai do sai key.
+  // Doi sang model con duoc ho tro: openai/gpt-oss-120b (Groq, model san xuat hien
+  // tai) va gemini-flash-latest (alias Google tu dong tro ve ban Flash on dinh moi
+  // nhat, tranh phai sua code moi khi Google lai ngung ho tro 1 phien ban cu the).
   var providers = [
-    { name: 'Groq',     key: getSetting_('apiGroq') || getSetting_('geminiKey'), fn: _aiOpenAICompat_, url: 'https://api.groq.com/openai/v1/chat/completions',     model: 'llama-3.3-70b-versatile' },
-    { name: 'Cerebras', key: getSetting_('apiCerebras'),                          fn: _aiOpenAICompat_, url: 'https://api.cerebras.ai/v1/chat/completions',        model: 'llama-3.3-70b' },
-    { name: 'Gemini',   key: getSetting_('apiGemini'),                            fn: _aiGemini_,       model: 'gemini-2.0-flash' }
+    { name: 'Groq',     key: getSetting_('apiGroq') || getSetting_('geminiKey'), fn: _aiOpenAICompat_, url: 'https://api.groq.com/openai/v1/chat/completions',     model: 'openai/gpt-oss-120b' },
+    { name: 'Cerebras', key: getSetting_('apiCerebras'),                          fn: _aiOpenAICompat_, url: 'https://api.cerebras.ai/v1/chat/completions',        model: 'gpt-oss-120b' },
+    { name: 'Gemini',   key: getSetting_('apiGemini'),                            fn: _aiGemini_,       model: 'gemini-flash-latest' }
   ];
 
   var errors = [], anyKey = false;
@@ -10543,7 +11089,8 @@ function _careRow(phone){
     schedSP: care.schedSP||'', schedSPNote: care.schedSPNote||'',
     schedCS: care.schedCS||'', schedCSNote: care.schedCSNote||'',
     schedHen: care.schedHen||'', schedHenNote: care.schedHenNote||'',
-    khStatus: care.khStatus||'', nickZalos: care.nickZalos||[], birthday: care.birthday||''
+    khStatus: care.khStatus||'', nickZalos: care.nickZalos||[], birthday: care.birthday||'',
+    name: care.name||''
   };
 }
 // Chỉ đồng bộ CareData khi khách có DỮ LIỆU CS NHẬP THẬT.
@@ -10557,6 +11104,7 @@ function _hasRealCareData(phone){
   if ((care.note||'').toString().trim())     return true;
   if ((care.khStatus||'').toString().trim()) return true;
   if ((care.birthday||'').toString().trim()) return true;
+  if ((care.name||'').toString().trim())     return true;
   if (Array.isArray(care.nickZalos) && care.nickZalos.length) return true;
   // Lịch nhanh đặt tay
   if ((care.schedGoi||'').toString().trim()) return true;
@@ -11863,7 +12411,7 @@ function renderSalesReportTabD_(wrap, subTabs){
     if (!d) {
       body = '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
     } else {
-      var html = '<div class="kpi-grid" style="margin-bottom:16px"><div class="kpi-card"><div class="kpi-label">Số KH thêm mới (nguồn Chăm sóc)</div><div class="kpi-value">'+fmt(d.total||0)+'</div></div></div>';
+      var html = '<div class="kpi-grid" style="margin-bottom:16px"><div class="kpi-card"><div class="kpi-label">Số KH thêm mới (nguồn Chăm sóc)</div><div class="kpi-val">'+fmt(d.total||0)+'</div></div></div>';
       html += '<div class="dash-section-title">Theo CS thêm</div>';
       html += '<table class="dash-table"><thead><tr><th>CS</th><th>Số KH thêm</th></tr></thead><tbody>';
       (d.byCS||[]).forEach(function(x){ html += '<tr><td>'+esc(x.name)+'</td><td>'+fmt(x.count)+'</td></tr>'; });
@@ -13680,34 +14228,34 @@ function _initKhDragSort(container) {
       <span style="font-size:16px;flex-shrink:0;margin-top:1px">👑</span>
       <div>
         <div style="font-weight:700;color:var(--vip);margin-bottom:2px">VIP</div>
-        <div style="color:var(--muted);line-height:1.6">Có <strong>≥ 10 đơn Renew</strong> từ nguồn mua lại</div>
+        <div style="color:var(--muted);line-height:1.6">Mua <strong>từ 10 đơn</strong> trở lên</div>
       </div>
     </div>
     <div style="display:flex;align-items:flex-start;gap:10px;padding:7px 10px;border-radius:7px;background:var(--tt-bg);border:1px solid var(--tt-b)">
       <span style="font-size:16px;flex-shrink:0;margin-top:1px">⭐</span>
       <div>
         <div style="font-weight:700;color:var(--tt);margin-bottom:2px">Thân thiết</div>
-        <div style="color:var(--muted);line-height:1.6">Có <strong>5 – 9 đơn Renew</strong> từ nguồn mua lại</div>
+        <div style="color:var(--muted);line-height:1.6">Mua <strong>từ 5 – 9 đơn</strong></div>
       </div>
     </div>
     <div style="display:flex;align-items:flex-start;gap:10px;padding:7px 10px;border-radius:7px;background:var(--tn-bg);border:1px solid var(--tn-b)">
       <span style="font-size:16px;flex-shrink:0;margin-top:1px">🌱</span>
       <div>
         <div style="font-weight:700;color:var(--tn);margin-bottom:2px">Tiềm năng</div>
-        <div style="color:var(--muted);line-height:1.6">Có <strong>≥ 1 đơn Renew</strong> và có ít nhất 1 đơn từ <strong>tháng 1/2025</strong> trở đi</div>
+        <div style="color:var(--muted);line-height:1.6">Mua <strong>từ 2 đơn</strong> trở lên</div>
       </div>
     </div>
     <div style="display:flex;align-items:flex-start;gap:10px;padding:7px 10px;border-radius:7px;background:var(--surface2);border:1px solid var(--border)">
       <span style="font-size:16px;flex-shrink:0;margin-top:1px">🔘</span>
       <div>
         <div style="font-weight:700;color:var(--muted);margin-bottom:2px">Chưa bán lại được</div>
-        <div style="color:var(--muted);line-height:1.6">Chưa có đơn Renew hoặc chưa đủ điều kiện trên</div>
+        <div style="color:var(--muted);line-height:1.6">Chỉ có <strong>1 đơn</strong></div>
       </div>
     </div>
   </div>
   <div style="padding:8px 14px 11px">
     <div style="font-size:10px;color:var(--hint);background:var(--surface2);border-radius:6px;padding:6px 9px;line-height:1.7">
-      📌 <strong>Nguồn Renew</strong> gồm: <em>kh renew, kh renew mkt, kh giới thiệu, data đảo renew</em>.<br>
+      📌 Số đơn tính theo <strong>sheet "dữ liệu đơn"</strong> (không còn tính theo nguồn Renew ở DT tổng như trước).<br>
       Phân loại tự động dựa trên dữ liệu đơn hàng đã nạp.
     </div>
   </div>
@@ -13913,7 +14461,7 @@ async function zaiGenerate() {
 
   try {
     var res = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + apiKey,
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=' + apiKey,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -14898,8 +15446,10 @@ function openBcLogModal(phone){
         </div>
       </div>
       <div class="assign-section-title" style="margin-top:6px">① Chọn Team tham gia</div>
+      <input type="text" id="task-f-team-search" placeholder="🔍 Gõ tìm nhanh tên Team..." oninput="_taskRenderTeamChips(this.value)" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;margin-bottom:6px">
       <div class="assign-cs-list" id="task-f-team"></div>
       <div class="assign-section-title">② Chọn user tham gia (trong Team đã chọn)</div>
+      <input type="text" id="task-f-cs-search" placeholder="🔍 Gõ tìm nhanh tên user..." oninput="_taskRenderUserChips(this.value)" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;margin-bottom:6px">
       <div class="assign-cs-list" id="task-f-cs"></div>
       <div id="task-f-perm-note" style="display:none;color:var(--hint);font-size:11px;margin-top:4px">🔒 Chỉ Admin mới có thể chọn/đổi người tham gia. Bạn vẫn tạo/sửa được các thông tin khác của công việc.</div>
     </div>
@@ -15094,6 +15644,8 @@ function openTaskModal(id){
   document.getElementById('task-f-deadline').value = t ? t.deadline : '';
   document.getElementById('task-f-status').value = t ? t.status : 'Chưa làm';
   document.getElementById('task-f-result').value = t ? (t.result||'') : '';
+  var teamSearchEl = document.getElementById('task-f-team-search'); if (teamSearchEl) teamSearchEl.value = '';
+  var csSearchEl = document.getElementById('task-f-cs-search'); if (csSearchEl) csSearchEl.value = '';
   if (t) (t.csAssigned||[]).forEach(function(n){ _taskSelectedCS.add(n); });
   if (t) (t.images||[]).forEach(function(u){ _taskPendingImages.push({ url: u }); });
   _renderTaskFormImages();
@@ -15108,8 +15660,10 @@ function openTaskModal(id){
     });
   }
 
-  _taskIsAdmin = (typeof currentUser !== 'undefined' && currentUser && currentUser.role === 'admin');
-  document.getElementById('task-f-perm-note').style.display = _taskIsAdmin ? 'none' : 'block';
+  // Truoc day chi Admin moi duoc chon/doi nguoi tham gia — theo yeu cau Duyen, bo khoa nay de
+  // MOI user tu giao duoc CS/Team khi tao/sua Cong viec.
+  _taskIsAdmin = true;
+  document.getElementById('task-f-perm-note').style.display = 'none';
   _taskRenderTeamChips();
   _taskRenderUserChips();
 
@@ -15128,14 +15682,21 @@ function _taskAllUserNames(){
   return Array.from(set).sort(function(a,b){ return a.localeCompare(b,'vi'); });
 }
 
-function _taskRenderTeamChips(){
+function _taskRenderTeamChips(filter){
+  if (filter === undefined){ var fi = document.getElementById('task-f-team-search'); filter = fi ? fi.value : ''; }
   var wrap = document.getElementById('task-f-team');
   var list = (typeof teams !== 'undefined' ? teams : []);
   if (!list.length){
     wrap.innerHTML = '<div style="color:var(--muted);font-size:12px">Chưa có Team nào — chọn trực tiếp user bên dưới</div>';
     return;
   }
-  wrap.innerHTML = list.map(function(tm){
+  var q = _foldVi(filter||'');
+  var filtered = q ? list.filter(function(tm){ return _foldVi(tm.name||'').indexOf(q)!==-1; }) : list;
+  if (!filtered.length){
+    wrap.innerHTML = '<div style="color:var(--muted);font-size:12px">Không tìm thấy Team nào khớp "'+esc(filter)+'"</div>';
+    return;
+  }
+  wrap.innerHTML = filtered.map(function(tm){
     var sel = _taskSelectedTeams.has(tm.name);
     return '<div class="assign-cs-chip-multi'+(sel?' selected':'')+'" data-name="'+esc(tm.name)+'"'+
       (_taskIsAdmin ? ' onclick="_taskToggleTeam(this,this.dataset.name)"' : ' style="cursor:default;opacity:.6"')+
@@ -15143,7 +15704,8 @@ function _taskRenderTeamChips(){
   }).join('');
 }
 
-function _taskRenderUserChips(){
+function _taskRenderUserChips(filter){
+  if (filter === undefined){ var fi = document.getElementById('task-f-cs-search'); filter = fi ? fi.value : ''; }
   var wrap = document.getElementById('task-f-cs');
   var noTeams = !(typeof teams !== 'undefined' && teams.length);
   var pool = new Set();
@@ -15169,7 +15731,13 @@ function _taskRenderUserChips(){
       '</div>';
     return;
   }
-  wrap.innerHTML = names.map(function(n){
+  var q = _foldVi(filter||'');
+  var filteredNames = q ? names.filter(function(n){ return _foldVi(n).indexOf(q)!==-1; }) : names;
+  if (!filteredNames.length){
+    wrap.innerHTML = '<div style="color:var(--muted);font-size:12px">Không tìm thấy user nào khớp "'+esc(filter)+'"</div>';
+    return;
+  }
+  wrap.innerHTML = filteredNames.map(function(n){
     var sel = _taskSelectedCS.has(n);
     return '<div class="assign-cs-chip-multi'+(sel?' selected':'')+'" data-name="'+esc(n)+'"'+
       (_taskIsAdmin ? ' onclick="_taskToggleCS(this,this.dataset.name)"' : ' style="cursor:default;opacity:.6"')+

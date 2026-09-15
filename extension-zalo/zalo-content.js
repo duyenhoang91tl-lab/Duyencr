@@ -22,6 +22,7 @@
   // Backend GAS dung chung voi Duyen AI - Pancake — dat san de cai moi KHONG can dan
   // lai URL thu cong nua. Neu CS da tung luu URL khac (chrome.storage co gia tri), gia
   // tri da luu luon duoc uu tien; default nay chi ap dung khi cai lan dau/chua tung luu.
+  const OLD_SASUM_GAS_URL = 'https://script.google.com/macros/s/AKfycbwPQ4HwD8R1HQFtU0xQslqGgr4HSlgzQlWFZs-8mtVY1CK9kBvwJWsIOzVuj6WM1mg-/exec';
   const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxyqBM3v7_WdgxbXru8o3Y_GNylTtQ-eeUoJCgwWEXVjHAJxiw7-SRlHXUSjaUR7v3oSQ/exec';
   let GAS_URL = '';
   let _lookupCache = {};
@@ -132,7 +133,9 @@
     addEl(cfg, 'input', {id:'zai-cerebras-key', type:'text', placeholder:'csk-... — để trống nếu giữ key cũ'});
     addEl(cfg, 'label', {textContent:'🔁 Gemini API Key (dự phòng 2 — aistudio.google.com/apikey)'});
     addEl(cfg, 'input', {id:'zai-gemini-api-key', type:'text', placeholder:'AIza... — để trống nếu giữ key cũ'});
-    addEl(cfg, 'div', {style:'font-size:10px;color:#9ca3af;margin:2px 0 6px', textContent:'AI tự chuyển sang key dự phòng khi Groq hết lượt (lỗi 429). Nên nhập cả 3 để không bao giờ đứng.'});
+    addEl(cfg, 'label', {textContent:'🔁 OpenRouter API Key (dự phòng 3 — openrouter.ai, model google/gemma-2-9b-it:free)'});
+    addEl(cfg, 'input', {id:'zai-openrouter-key', type:'text', placeholder:'sk-or-v1-... — để trống nếu giữ key cũ'});
+    addEl(cfg, 'div', {style:'font-size:10px;color:#9ca3af;margin:2px 0 6px', textContent:'AI tự chuyển sang key dự phòng khi Groq hết lượt (lỗi 429). Nên nhập cả 4 để không bao giờ đứng.'});
     addEl(cfg, 'label', {textContent:'📄 Link Google Sheet chi tiết sản phẩm/thành phần (tuỳ chọn, dùng chung cả team)'});
     const inpProdSheet = addEl(cfg, 'input', {id:'zai-product-sheet-url', type:'text', placeholder:'https://docs.google.com/spreadsheets/d/...'});
     addEl(cfg, 'div', {style:'font-size:10px;color:#9ca3af;margin:2px 0 6px', textContent:'Hỗ trợ nhiều tab (mỗi tab 1 hãng), dòng 1 mỗi tab là tiêu đề cột, cột đầu là tên sản phẩm. Sheet phải chia sẻ "Bất kỳ ai có liên kết – Xem" hoặc chia sẻ cho tài khoản chạy GAS. AI sẽ tự tìm đúng vài sản phẩm khớp với câu hỏi/ngữ cảnh (không nhét cả sheet) để tư vấn chính xác.'});
@@ -244,6 +247,7 @@
     addEl(phoneRow, 'input', {id:'zai-phone-input', type:'tel', placeholder:'0901234567'});
     addEl(phoneRow, 'button', {className:'zai-btn zai-btn-primary zai-btn-sm', id:'zai-lookup-btn', textContent:'Tra cứu'});
     addEl(body, 'div', {id:'zai-auto-hint', style:'font-size:10px;color:#00b14f;margin-top:3px'});
+    addEl(body, 'div', {id:'zai-phone-candidates', style:'display:none;margin-top:5px;'});
     const perAutoRow = addEl(body, 'label', {id:'zai-per-auto-row', style:'display:none;align-items:center;gap:6px;margin-top:5px;font-size:11px;color:#374151;cursor:pointer;'});
     const perAutoChk = addEl(perAutoRow, 'input', {type:'checkbox', id:'zai-per-auto-chk'});
     addEl(perAutoRow, 'span', {textContent:'⚡ Tự động soạn câu mở đầu cho khách này'});
@@ -312,6 +316,13 @@
     upd.style.display = 'block'; // hien san ngay khi mo panel (khong cho tra cuu)
     addEl(upd, 'div', {className:'zai-section-label', style:'margin-bottom:8px', textContent:'📋 Cập nhật thông tin CS'});
 
+    // Khách MỚI (nguồn "Chăm sóc" — chưa có CareData lẫn đơn hàng nào): bắt buộc nhập tên
+    // trước khi lưu; lưu xong sẽ ghi thêm 1 dòng vào sheet riêng "KH Chăm sóc mới" (Báo cáo D),
+    // KHÔNG gộp báo cáo doanh số A/B/C — giống hệt luồng bên Pancake AI.
+    addEl(upd, 'div', {className:'zai-new-tag', id:'zai-new-tag', style:'display:none', textContent:'⚠️ Khách mới — lưu sẽ tạo mới trong "KH Chăm sóc mới"'});
+    addEl(upd, 'label', {textContent:'Tên khách hàng'});
+    addEl(upd, 'input', {id:'zai-name-input', type:'text', className:'zai-full-input', placeholder:'Tên khách hàng (bắt buộc nếu là khách mới)'});
+
     const row1 = addEl(upd, 'div', {className:'zai-field-row'});
     const col1 = addEl(row1, 'div', {className:'zai-field-col'});
     addEl(col1, 'label', {textContent:'Tình trạng CS'});
@@ -363,6 +374,8 @@
 
     panel.appendChild(body);
     document.body.appendChild(panel);
+    _restorePanelState_zai_(panel);
+    _initPanelDrag_zai_(panel, hdr);
 
     // ── EVENTS ──
     cfgBtn.addEventListener('click', () => { _cfgVisible = !_cfgVisible; cfg.style.display = _cfgVisible ? 'block' : 'none'; });
@@ -404,7 +417,9 @@
     });
     chrome.storage.local.get(['ome_gas_url','ome_current_cs','ome_current_nz','ome_auto_ai_reply','ome_auto_ai_per_phone'], (res) => {
       GAS_URL = res.ome_gas_url || DEFAULT_GAS_URL;
-      if (!res.ome_gas_url) chrome.storage.local.set({ ome_gas_url: GAS_URL }); // cai lan dau -> luu luon default de lan sau khong phai dat lai
+      // Migrate: may nao lo con luu link Sasum cu -> tu dong chuyen sang link Duyencr moi.
+      if (GAS_URL === OLD_SASUM_GAS_URL) GAS_URL = DEFAULT_GAS_URL;
+      if (!res.ome_gas_url || res.ome_gas_url === OLD_SASUM_GAS_URL) chrome.storage.local.set({ ome_gas_url: GAS_URL }); // cai lan dau hoac dang migrate -> luu luon
       if (GAS_URL) { inpGas.value = GAS_URL; loadCSNames_(); loadNickZaloList_(); loadCareStatusTree_(); loadProductSheetUrl_(); loadDriveKnowledgeFolderUrl_(); loadDriveImagesFolderUrl_(); }
       loadChatNamePhoneMap_();
       if (!GAS_URL) { _cfgVisible = true; cfg.style.display = 'block'; }
@@ -484,7 +499,69 @@
     const panel = document.getElementById('ome-zai-panel');
     const btn   = document.getElementById('ome-zai-toggle');
     if (!panel) return;
-    panel.classList.toggle('open'); btn.classList.toggle('shifted');
+    const opening = !panel.classList.contains('open');
+    panel.classList.toggle('open');
+    btn.classList.toggle('shifted');
+    // Bù trừ nút tròn theo ĐÚNG bề rộng hiện tại của panel (panel giờ kéo giãn/di chuyển
+    // được, không còn cố định 320px như trước) — tránh nút tròn đè lên góc panel.
+    btn.style.right = opening ? (panel.offsetWidth + 32) + 'px' : '';
+  }
+
+  // ── Nhớ vị trí/kích thước/trạng thái mở của panel giữa các lần tải trang ──
+  function _restorePanelState_zai_(panel) {
+    try {
+      chrome.storage.local.get(['zaiPanelPos', 'zaiPanelSize'], (res) => {
+        if (res.zaiPanelPos && typeof res.zaiPanelPos.right === 'number' && typeof res.zaiPanelPos.bottom === 'number') {
+          panel.style.right = res.zaiPanelPos.right + 'px';
+          panel.style.bottom = res.zaiPanelPos.bottom + 'px';
+        }
+        if (res.zaiPanelSize && res.zaiPanelSize.width && res.zaiPanelSize.height) {
+          panel.style.width = res.zaiPanelSize.width + 'px';
+          panel.style.height = res.zaiPanelSize.height + 'px';
+        }
+      });
+    } catch (e) {}
+  }
+
+  // ── Kéo-thả di chuyển panel bằng thanh header (giữ nguyên click nút ⚙) ──
+  function _initPanelDrag_zai_(panel, header) {
+    if (!header) return;
+    let dragging = false, startX = 0, startY = 0, startRight = 0, startBottom = 0;
+
+    header.addEventListener('mousedown', (e) => {
+      if (e.target.closest('button')) return; // không kéo khi bấm nút cài đặt
+      dragging = true;
+      startX = e.clientX; startY = e.clientY;
+      const cs = getComputedStyle(panel);
+      startRight = parseFloat(cs.right) || 0;
+      startBottom = parseFloat(cs.bottom) || 0;
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - startX, dy = e.clientY - startY;
+      let newRight = startRight - dx, newBottom = startBottom - dy;
+      newRight = Math.max(4, Math.min(newRight, window.innerWidth - 80));
+      newBottom = Math.max(4, Math.min(newBottom, window.innerHeight - 40));
+      panel.style.right = newRight + 'px';
+      panel.style.bottom = newBottom + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+      if (!dragging) return;
+      dragging = false;
+      try {
+        chrome.storage.local.set({
+          zaiPanelPos: { right: parseFloat(panel.style.right) || 16, bottom: parseFloat(panel.style.bottom) || 72 }
+        });
+      } catch (e) {}
+    });
+
+    try {
+      new ResizeObserver(() => {
+        if (!panel.offsetWidth || !panel.offsetHeight) return; // panel dang dong (display:none)
+        chrome.storage.local.set({ zaiPanelSize: { width: panel.offsetWidth, height: panel.offsetHeight } });
+      }).observe(panel);
+    } catch (e) {}
   }
 
   async function saveConfig() {
@@ -509,6 +586,7 @@
     if (!(await _saveKey('apiGroq', 'zai-gemini-key'))) return;
     if (!(await _saveKey('apiCerebras', 'zai-cerebras-key'))) return;
     if (!(await _saveKey('apiGemini', 'zai-gemini-api-key'))) return;
+    if (!(await _saveKey('apiOpenRouter', 'zai-openrouter-key'))) return;
     if (key) showMsg('zai-save-status','✓ Đã lưu API key!',3000);
     const prodSheetEl = document.getElementById('zai-product-sheet-url');
     const prodSheetUrl = prodSheetEl ? prodSheetEl.value.trim() : '';
@@ -578,6 +656,43 @@
     if (!text) return null;
     const m = text.match(/(0[3-9]\d{8})/);
     return m ? m[1] : null;
+  }
+
+  // Quet cac tin nhan gan day cua khach (_chatHistory, da thu thap san cho tinh nang goi y AI)
+  // tim TAT CA sdt VN xuat hien trong noi dung tin nhan — dung khi khach tu go sdt trong chat
+  // (vd nho nguoi khac nhan ho) ma ten hien thi doan chat lai khong co sdt.
+  function extractPhonesFromChatHistory_() {
+    const found = new Set();
+    for (const msg of _chatHistory) {
+      const re = /(0[3-9]\d{8})/g;
+      let m;
+      while ((m = re.exec(msg))) {
+        const p = normPhone(m[1]);
+        if (p) found.add(p);
+      }
+    }
+    return Array.from(found);
+  }
+
+  // Hien danh sach sdt "them" tim thay trong tin nhan (khac voi sdt dang tra cuu) de CS bam chuyen qua
+  function renderPhoneCandidates_(excludePhone) {
+    const box = document.getElementById('zai-phone-candidates');
+    if (!box) return;
+    const cur = excludePhone != null ? excludePhone : _currentPhone;
+    const extra = extractPhonesFromChatHistory_().filter(p => p !== cur);
+    if (!extra.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    box.style.display = 'block';
+    box.innerHTML = `<div style="font-size:10px;color:#b45309;margin-bottom:3px;">📱 Tin nhắn có thêm SĐT khác — bấm để tra cứu:</div>`;
+    extra.forEach(p => {
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.textContent = p;
+      btn.style.cssText = 'margin:0 4px 4px 0;padding:3px 8px;border:1px solid #d97706;background:#fff;color:#92400e;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;';
+      btn.addEventListener('click', () => {
+        const inp = document.getElementById('zai-phone-input');
+        if (inp) { inp.value = p; doLookup(); }
+      });
+      box.appendChild(btn);
+    });
   }
   function getCurrentChatName() {
     const sels = ['div[contenteditable][placeholder*="tin nhắn tới"]','[placeholder*="tin nhắn tới"]','[data-placeholder*="tin nhắn tới"]'];
@@ -745,6 +860,7 @@
 
     if (last100.length) {
       _chatHistory = last100;
+      renderPhoneCandidates_();
       // Dien vao textarea (an) de du phong
       if (msgTa) msgTa.value = last100.join('\n---\n');
 
@@ -929,6 +1045,7 @@
     const updSec = document.getElementById('zai-update-section');
     updSec.style.display = 'block'; // luon hien muc cap nhat
     _currentCustData = null;
+    renderPhoneCandidates_(phone);
 
     if (!GAS_URL) { showError('Chưa cài URL GAS. Nhấn ⚙.'); area.innerHTML=''; return; }
 
@@ -972,11 +1089,15 @@
   }
 
   function showNotFoundWithForm_(area, updSec, phone, raw) {
-    area.innerHTML = `<div class="zai-not-found">⚠️ <strong>${escHtml(raw)}</strong> chưa có trong hệ thống.<br><small>Có thể thêm mới bên dưới.</small></div>`;
+    area.innerHTML = `<div class="zai-not-found">⚠️ <strong>${escHtml(raw)}</strong> chưa có trong hệ thống.<br><small>Nhập Tên khách hàng bên dưới rồi lưu để thêm mới.</small></div>`;
     _currentCustData = {phone, name: raw, care: null, orders: []};
     _lastServerCare  = {};
     updSec.style.display = 'block';
     clearForm_();
+    const nameEl = document.getElementById('zai-name-input');
+    if (nameEl) nameEl.value = '';
+    const tagEl = document.getElementById('zai-new-tag');
+    if (tagEl) tagEl.style.display = 'block';
     _updatePerPhoneToggleUI_(phone);
   }
 
@@ -1113,6 +1234,12 @@
     _lastServerCare  = care || {}; // baseline moi de so sanh khi poll (phat hien CS dang sua field nao)
 
     updSec.style.display = 'block';
+    // Da co CareData hoac don hang -> khong phai khach moi, an nhan canh bao va nap dung
+    // ten that da luu (KHONG fallback ve so dien thoai, tranh CS luu nham SDT lam ten).
+    const tagEl = document.getElementById('zai-new-tag');
+    if (tagEl) tagEl.style.display = 'none';
+    const nameEl = document.getElementById('zai-name-input');
+    if (nameEl) nameEl.value = (orders.length ? orders[0].name : '') || (care && care.name) || '';
     document.getElementById('zai-status-sel').value = care&&care.status||'';
     document.getElementById('zai-zalo-sel').value   = care&&care.zalo||'';
     // CS chăm sóc: đồng bộ từ server (care.cs), fallback nếu không có từ server thì dùng _currentCS
@@ -1235,6 +1362,14 @@
     const henDate = document.getElementById('zai-hen-date').value;
     const henNote = document.getElementById('zai-hen-note').value.trim();
     const care    = (_currentCustData && _currentCustData.care) || null;
+    const orders  = (_currentCustData && _currentCustData.orders) || [];
+    // Khách MỚI (nguồn "Chăm sóc"): chưa từng có CareData lẫn đơn hàng nào — bắt buộc nhập tên
+    // trước khi lưu, và sau khi lưu sẽ ghi thêm 1 dòng vào sheet riêng "KH Chăm sóc mới"
+    // (Báo cáo D, KHÔNG gộp báo cáo doanh số A/B/C) — giống hệt luồng bên Pancake AI.
+    const isNewCustomer = !care && !orders.length;
+    const nameEl  = document.getElementById('zai-name-input');
+    const liveName = nameEl ? nameEl.value.trim() : '';
+    if (isNewCustomer && !liveName) { showError('Khách mới — vui lòng nhập tên khách hàng trước khi lưu.'); return; }
     // Ghi chú CS: dang JSON [{text,user,time}] giong Sasum, da duoc build san qua nut "+"
     const rawEl   = document.getElementById('zai-note-raw');
     const note    = (rawEl ? rawEl.value : '') || (care && care.note) || '';
@@ -1252,6 +1387,7 @@
         schedHen:henDate||c.schedHen||'', schedHenNote:henNote||c.schedHenNote||'',
         khStatus: document.getElementById('zai-kh-status-sel').value || (c.khStatus||''),
         birthday: birthday || c.birthday || '',
+        name: liveName || c.name || '',
         nickZalos: (() => {
           const existing = c.nickZalos || [];
           if (_currentZaloNick && !existing.includes(_currentZaloNick)) return [...existing, _currentZaloNick];
@@ -1261,12 +1397,26 @@
       const res = await fetch(GAS_URL, {method:'POST', body:JSON.stringify({action:'saveSingle',row}), headers:{'Content-Type':'text/plain'}});
       const d = await res.json();
       if (d.ok) {
-        showMsg('zai-save-status','✓ Đã lưu lên GSheet!',3000);
+        // Khách MỚI — ghi thêm vào "KH Chăm sóc mới", không chặn kết quả lưu chính nếu lỗi.
+        if (isNewCustomer && row.name) {
+          try {
+            await fetch(GAS_URL, {method:'POST', body:JSON.stringify({action:'addCareLead', phone:row.phone, name:row.name, note:_latestNoteText_(note)||'', cs:row.cs||''}), headers:{'Content-Type':'text/plain'}});
+          } catch (eLead) { /* khong chan ket qua luu chinh neu buoc nay loi */ }
+        }
+        showMsg('zai-save-status','✓ Đã lưu lên GSheet!' + (isNewCustomer ? ' (KH mới — nguồn Chăm sóc)' : ''), 3000);
         delete _lookupCache[_currentCustData.phone];
         // Cap nhat baseline ngay de lan poll ke tiep khong bao "co ban moi" voi chinh du lieu vua luu
         const savedCare = { ...row, updated: new Date().toISOString() };
         _currentCustData.care = savedCare;
+        _currentCustData.name = row.name || _currentCustData.name;
         _lastServerCare = savedCare;
+        const tagEl = document.getElementById('zai-new-tag');
+        if (tagEl) tagEl.style.display = 'none';
+        const nameSpan = document.querySelector('.zai-card-name');
+        if (nameSpan && row.name) {
+          const phoneSub = nameSpan.querySelector('span');
+          nameSpan.innerHTML = `${escHtml(row.name)} <span style="font-size:11px;font-weight:400;color:#9ca3af">${escHtml(phoneSub ? phoneSub.textContent : _currentCustData.phone)}</span>`;
+        }
       } else { showError('Lỗi: '+JSON.stringify(d)); }
     } catch(e) { showError('Lỗi kết nối: '+e.message); }
     finally { btn.disabled=false; btn.textContent='💾 Lưu về GSheet'; }

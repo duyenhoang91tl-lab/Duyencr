@@ -70,10 +70,120 @@
 
   function getSettings() {
     return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ type: "GET_SETTINGS" }, (resp) => {
-        resolve(resp?.settings || {});
-      });
+      try {
+        chrome.runtime.sendMessage({ type: "GET_SETTINGS" }, (resp) => {
+          if (chrome.runtime.lastError) { resolve({}); return; }
+          resolve(resp?.settings || {});
+        });
+      } catch (e) {
+        resolve({});
+      }
     });
+  }
+
+  // ── Bảo vệ khi extension bị reload/cập nhật trong lúc tab Pancake đang mở ──
+  // Khi đó chrome.runtime của content script cũ mất kết nối tới service worker mới:
+  // MỌI lệnh chrome.runtime.sendMessage sau đó đều ném lỗi "Extension context invalidated"
+  // (hoặc chrome.runtime tự thành undefined) — khiến tra cứu KH, lưu tên/SĐT/ghi chú/trạng
+  // thái Zalo, nhắc hẹn... đều im lặng không chạy, chỉ thấy lỗi đỏ trong Console (F12) chứ
+  // KHÔNG phải lỗi logic code. safeSendMessage_ bắt lỗi này, dừng các vòng lặp polling đang
+  // gây spam lỗi liên tục, và hiện banner rõ ràng yêu cầu tải lại trang (F5) thay vì im lặng.
+  let _extInvalidated = false;
+  function isExtContextValid_() {
+    try { return !!(chrome.runtime && chrome.runtime.id); } catch (e) { return false; }
+  }
+  function safeSendMessage_(message, callback) {
+    if (_extInvalidated || !isExtContextValid_()) { handleExtInvalidated_(); return; }
+    try {
+      chrome.runtime.sendMessage(message, (resp) => {
+        if (chrome.runtime.lastError) { handleExtInvalidated_(); return; }
+        callback && callback(resp);
+      });
+    } catch (e) {
+      handleExtInvalidated_();
+    }
+  }
+  function handleExtInvalidated_() {
+    if (_extInvalidated) return;
+    _extInvalidated = true;
+    if (_carePollTimer) { clearInterval(_carePollTimer); _carePollTimer = null; }
+    if (_remPollTimer) { clearInterval(_remPollTimer); _remPollTimer = null; }
+    showExtInvalidBanner_();
+  }
+  function showExtInvalidBanner_() {
+    if (!panelEl || panelEl.querySelector('#pk-ext-invalid-banner')) return;
+    const banner = document.createElement('div');
+    banner.id = 'pk-ext-invalid-banner';
+    banner.style.cssText = 'background:#fff3cd;color:#856404;border:1px solid #ffe08a;border-radius:6px;padding:10px 12px;margin:0 0 8px;font-size:13px;font-weight:600;text-align:center;';
+    banner.innerHTML = '⚠️ Extension vừa được cập nhật — vui lòng <a href="#" id="pk-reload-link" style="color:#0d6efd;text-decoration:underline;">tải lại trang</a> (F5) để tiếp tục dùng.';
+    panelEl.prepend(banner);
+    const link = banner.querySelector('#pk-reload-link');
+    if (link) link.addEventListener('click', (e) => { e.preventDefault(); location.reload(); });
+    setStatus('⚠️ Mất kết nối tới extension — vui lòng tải lại trang (F5).');
+  }
+
+  // ── Nhớ vị trí/kích thước/trạng thái thu gọn của panel giữa các lần tải trang
+  // (chrome.storage.local — riêng theo máy, không cần đồng bộ nhiều máy) ──
+  function _restorePanelState_() {
+    try {
+      chrome.storage.local.get(['pkPanelCollapsed', 'pkPanelPos', 'pkPanelSize'], (res) => {
+        if (res.pkPanelCollapsed) panelEl.classList.add('pk-ai-collapsed');
+        if (res.pkPanelPos && typeof res.pkPanelPos.right === 'number' && typeof res.pkPanelPos.bottom === 'number') {
+          panelEl.style.right = res.pkPanelPos.right + 'px';
+          panelEl.style.bottom = res.pkPanelPos.bottom + 'px';
+        }
+        if (res.pkPanelSize && res.pkPanelSize.width && res.pkPanelSize.height) {
+          panelEl.style.width = res.pkPanelSize.width + 'px';
+          panelEl.style.height = res.pkPanelSize.height + 'px';
+        }
+      });
+    } catch (e) {}
+  }
+
+  // ── Kéo-thả di chuyển panel bằng thanh header (giữ nguyên click nút thu gọn) ──
+  function _initPanelDrag_() {
+    const header = panelEl.querySelector('#pk-ai-header');
+    if (!header) return;
+    let dragging = false, startX = 0, startY = 0, startRight = 0, startBottom = 0;
+
+    header.addEventListener('mousedown', (e) => {
+      if (e.target.closest('button')) return; // không kéo khi bấm nút thu gọn
+      dragging = true;
+      startX = e.clientX; startY = e.clientY;
+      const rectStyle = getComputedStyle(panelEl);
+      startRight = parseFloat(rectStyle.right) || 0;
+      startBottom = parseFloat(rectStyle.bottom) || 0;
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - startX, dy = e.clientY - startY;
+      let newRight = startRight - dx, newBottom = startBottom - dy;
+      // Giữ panel trong màn hình
+      newRight = Math.max(4, Math.min(newRight, window.innerWidth - 80));
+      newBottom = Math.max(4, Math.min(newBottom, window.innerHeight - 40));
+      panelEl.style.right = newRight + 'px';
+      panelEl.style.bottom = newBottom + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+      if (!dragging) return;
+      dragging = false;
+      try {
+        chrome.storage.local.set({
+          pkPanelPos: { right: parseFloat(panelEl.style.right) || 16, bottom: parseFloat(panelEl.style.bottom) || 16 }
+        });
+      } catch (e) {}
+    });
+
+    // Nhớ kích thước khi CS kéo góc để resize (resize:both trong CSS)
+    try {
+      new ResizeObserver(() => {
+        if (panelEl.classList.contains('pk-ai-collapsed')) return;
+        chrome.storage.local.set({
+          pkPanelSize: { width: panelEl.offsetWidth, height: panelEl.offsetHeight }
+        });
+      }).observe(panelEl);
+    } catch (e) {}
   }
 
   function injectPanel() {
@@ -140,6 +250,8 @@
       </div>
     `;
     document.body.appendChild(panelEl);
+    _restorePanelState_();
+    _initPanelDrag_();
 
     const csSel = panelEl.querySelector('#pk-cs-sel');
     csSel.addEventListener('change', () => {
@@ -155,7 +267,7 @@
     panelEl.querySelector('#pk-nick-add').addEventListener('click', () => {
       const nick = (prompt('Nhập nick Zalo/kênh mới:') || '').trim();
       if (!nick) return;
-      chrome.runtime.sendMessage({ type: 'ADD_NICK', payload: { nick } }, (resp) => {
+      safeSendMessage_({ type: 'ADD_NICK', payload: { nick } }, (resp) => {
         NICK_LIST = (resp?.ok && resp.data?.list) ? resp.data.list : NICK_LIST;
         if (!NICK_LIST.includes(nick)) NICK_LIST.push(nick);
         _currentNick = nick;
@@ -169,6 +281,7 @@
     });
     panelEl.querySelector("#pk-ai-collapse").addEventListener("click", () => {
       panelEl.classList.toggle("pk-ai-collapsed");
+      try { chrome.storage.local.set({ pkPanelCollapsed: panelEl.classList.contains("pk-ai-collapsed") }); } catch (e) {}
     });
     panelEl.querySelector("#pk-ai-phone-btn").addEventListener("click", () => {
       const raw = panelEl.querySelector("#pk-ai-phone-input").value;
@@ -205,7 +318,7 @@
 
   // ── CS đang dùng (sticky theo máy, lưu chrome.storage.sync) ──
   async function loadCsNames_() {
-    chrome.runtime.sendMessage({ type: "GET_CS_NAMES" }, (resp) => {
+    safeSendMessage_({ type: "GET_CS_NAMES" }, (resp) => {
       CS_NAMES = (resp?.ok && resp.data && resp.data.length) ? resp.data : [];
       const csSel = panelEl?.querySelector('#pk-cs-sel');
       if (!csSel) return;
@@ -221,7 +334,7 @@
   function loadNickList_() {
     chrome.storage.sync.get(['currentNick'], (res) => {
       _currentNick = res.currentNick || '';
-      chrome.runtime.sendMessage({ type: "GET_NICK_LIST" }, (resp) => {
+      safeSendMessage_({ type: "GET_NICK_LIST" }, (resp) => {
         NICK_LIST = (resp?.ok && resp.data) ? resp.data : [];
         renderNickSelect_();
       });
@@ -298,52 +411,93 @@
     return s;
   }
 
-  function extractPhone() {
+  // Pancake/Messenger tự nhận diện SĐT trong tin nhắn rồi bọc bằng <span class="phone-tag ...">
+  // (đôi khi span cha còn có id dạng "m_<hash>_<sđt>"). Đọc từ đây đáng tin hơn quét chữ tự do
+  // vì nền tảng đã xác nhận đó thực sự là SĐT (khỏi nhầm mã đơn/mã vận đơn).
+  function extractTaggedPhones_(scope) {
+    const found = new Set();
+    scope.querySelectorAll('.phone-tag').forEach((el) => {
+      const p = normPhone(el.textContent);
+      if (/^0[3-9]\d{8}$/.test(p)) found.add(p);
+    });
+    scope.querySelectorAll('[id]').forEach((el) => {
+      const m = el.id.match(/_(\d{9,11})$/);
+      if (!m) return;
+      const p = normPhone(m[1]);
+      if (/^0[3-9]\d{8}$/.test(p)) found.add(p);
+    });
+    return Array.from(found);
+  }
+
+  // Trả về DANH SÁCH sđt tìm được trong đoạn chat hiện tại (có thể là 1, 2, hoặc nhiều).
+  function extractPhones() {
     const sel = settings.selectors?.[PLATFORM];
-    // Ưu tiên selector riêng cho ô hiển thị SĐT khách (nếu đã cấu hình)
+    // 1) Ưu tiên selector riêng cho ô hiển thị SĐT khách (nếu đã cấu hình)
     if (sel?.phoneSelector) {
       const el = document.querySelector(sel.phoneSelector);
       const m = el?.innerText?.match(/(0[3-9]\d{8})/);
-      if (m) return normPhone(m[1]);
+      if (m) return [normPhone(m[1])];
     }
-    // Fallback: quét toàn bộ vùng tin nhắn tìm số điện thoại VN dạng 0xxxxxxxxx
+    // 2) SĐT do chính CS gõ tay vào khung "Sản phẩm order" (đáng tin — CS chủ động xác nhận cho
+    // đúng đơn đang xử lý, không lẫn số điện thoại của người khác nhắc tới trong đoạn chat)
+    const panelPhone = extractOrderPanelPhone_();
+    if (panelPhone) return [panelPhone];
     const container = sel?.messageList ? document.querySelector(sel.messageList) : null;
     const scope = container || document.body;
+    // 3) SĐT đã được nền tảng tự gắn thẻ (span.phone-tag / id="..._<sđt>") — có thể ra nhiều số
+    const tagged = extractTaggedPhones_(scope);
+    if (tagged.length) return tagged;
+    // 4) Fallback cuối: quét chữ tự do tìm 1 SĐT VN dạng 0xxxxxxxxx (chỉ dùng khi không có thẻ)
     const m2 = scope.innerText?.match(/(0[3-9]\d{8})/);
-    return m2 ? normPhone(m2[1]) : "";
+    return m2 ? [normPhone(m2[1])] : [];
+  }
+
+  // Giữ lại tên cũ để tương thích ngược — trả về SĐT đầu tiên tìm được.
+  function extractPhone() {
+    return extractPhones()[0] || "";
   }
 
   // ── Lấy tên khách từ khung "Sản phẩm order" (ghi chú đơn hàng CS tự nhập) ──
   // Dòng đầu của khối trên cùng thường dạng "Chị : Tên", "Anh Tên", hoặc "Tên +sđt".
-  function extractOrderPanelName_() {
+  function _findOrderPanelContainer_() {
     const sel = settings.selectors?.[PLATFORM];
-    let container = null;
     if (sel?.orderPanelSelector) {
-      container = document.querySelector(sel.orderPanelSelector);
+      const c = document.querySelector(sel.orderPanelSelector);
+      if (c) return c;
     }
-    if (!container) {
-      // Do tu dong: tim node la (khong con con) co chu "San pham order" lam tieu de,
-      // roi lay phan tu cha lam vung chua danh sach cac khoi khach.
-      const nodes = document.querySelectorAll('body *');
-      for (const el of nodes) {
-        if (el.children.length > 0) continue;
-        const t = (el.textContent || '').trim();
-        if (t.length > 0 && t.length < 40 && /sản phẩm order/i.test(t)) {
-          container = el.closest('div')?.parentElement || el.parentElement;
-          break;
-        }
+    // Dò tự động: tìm node lá (không còn con) có chữ "Sản phẩm order" làm tiêu đề,
+    // rồi lấy phần tử cha làm vùng chứa danh sách các khối khách.
+    const nodes = document.querySelectorAll('body *');
+    for (const el of nodes) {
+      if (el.children.length > 0) continue;
+      const t = (el.textContent || '').trim();
+      if (t.length > 0 && t.length < 40 && /sản phẩm order/i.test(t)) {
+        return el.closest('div')?.parentElement || el.parentElement;
       }
     }
+    return null;
+  }
+  function _firstOrderPanelLine_() {
+    const container = _findOrderPanelContainer_();
     if (!container) return '';
     const text = container.innerText || '';
     if (!text.trim()) return '';
-    // Bo dong tieu de "Sản phẩm order" neu dinh kem trong cung container
     const cleaned = text.replace(/^.*sản phẩm order.*$/im, '').trim();
-    // Tach cac khoi khach theo dong trong — khoi dau tien = khach dang xu ly (tren cung)
     const blocks = cleaned.split(/\n\s*\n+/).map((b) => b.trim()).filter(Boolean);
     if (!blocks.length) return '';
-    const firstLine = blocks[0].split('\n')[0].trim();
-    return _parseNameFromLine_(firstLine);
+    return blocks[0].split('\n')[0].trim();
+  }
+  function extractOrderPanelName_() {
+    return _parseNameFromLine_(_firstOrderPanelLine_());
+  }
+  // SĐT do CHÍNH CS gõ tay vào khung "Sản phẩm order" (vd "Chị Lan - 0912345678") — đáng tin cậy
+  // hơn quét chữ tự do trong toàn bộ đoạn chat, vì đây là dữ liệu CS chủ động xác nhận cho đơn
+  // đang xử lý. Trước đây dòng SĐT này chỉ bị XOÁ ĐI để tách tên, chưa từng được tận dụng.
+  function extractOrderPanelPhone_() {
+    const line = _firstOrderPanelLine_();
+    if (!line) return '';
+    const m = line.match(/(0[3-9]\d{8})/);
+    return m ? normPhone(m[1]) : '';
   }
 
   function _parseNameFromLine_(line) {
@@ -356,19 +510,47 @@
   }
 
   function requestCustomerLookup() {
-    const phone = extractPhone() || resolvePhoneForChatKey_();
-    if (!phone) {
-      panelEl.querySelector("#pk-ai-customer").innerHTML = "";
+    const phones = extractPhones();
+    if (phones.length > 1) {
       _currentPhone = ''; _currentCare = null; _lastServerCare = {}; _currentOrderPanelName = ''; _currentOrders = [];
+      renderPhonePicker_(phones);
+      return;
+    }
+    const phone = phones[0] || resolvePhoneForChatKey_();
+    if (!phone) {
+      _currentPhone = ''; _currentCare = null; _lastServerCare = {}; _currentOrderPanelName = ''; _currentOrders = [];
+      // TRƯỚC ĐÂY: để trống trơn im lặng khi không tự nhận ra SĐT — trông như panel bị lỗi/không
+      // dùng được, dù thật ra form vẫn hoạt động đầy đủ (tên/trạng thái/ghi chú...), chỉ là nó
+      // CHỈ hiện SAU KHI tra cứu được 1 khách. Giờ luôn hiện rõ hướng dẫn thay vì im lặng.
+      panelEl.querySelector("#pk-ai-customer").innerHTML =
+        `<div class="pk-ai-no-phone-hint">
+          📵 Không tự nhận ra SĐT trong đoạn chat này.<br>
+          Nhập SĐT khách vào ô phía trên rồi bấm <b>"Tra cứu"</b> để hiện đầy đủ
+          form nhập tên/trạng thái/ghi chú (giống bên Zalo AI).
+        </div>`;
       return;
     }
     lookupByPhone(phone);
   }
 
+  // Doan chat co >=2 SDT (vd: khach nhan hang ho nguoi khac) -> de CS tu chon so can tra cuu
+  function renderPhonePicker_(phones) {
+    const box = panelEl.querySelector("#pk-ai-customer");
+    box.innerHTML = `<div class="pk-ai-phone-picker">
+      <div class="pk-ai-phone-picker-label">📱 Phát hiện ${phones.length} SĐT trong đoạn chat — chọn số để tra cứu:</div>
+      <div class="pk-ai-phone-picker-btns">
+        ${phones.map((p) => `<button type="button" class="pk-ai-phone-pick-btn" data-phone="${p}">${p}</button>`).join('')}
+      </div>
+    </div>`;
+    box.querySelectorAll('.pk-ai-phone-pick-btn').forEach((btn) => {
+      btn.addEventListener('click', () => lookupByPhone(btn.dataset.phone));
+    });
+  }
+
   function lookupByPhone(phone) {
     const box = panelEl.querySelector("#pk-ai-customer");
     box.innerHTML = `<div class="pk-ai-cust-loading">Đang tra cứu ${phone}...</div>`;
-    chrome.runtime.sendMessage({ type: "LOOKUP_CUSTOMER", payload: { phone } }, (resp) => {
+    safeSendMessage_({ type: "LOOKUP_CUSTOMER", payload: { phone } }, (resp) => {
       if (!resp?.ok) {
         box.innerHTML = `<div class="pk-ai-cust-loading">Không tra cứu được: ${resp?.error || "lỗi không rõ"}</div>`;
         return;
@@ -594,8 +776,13 @@
     const btn = panelEl.querySelector('#pk-save-btn');
     const rawEl = panelEl.querySelector('#pk-note-raw');
     const nameEl = panelEl.querySelector('#pk-name-input');
+    const liveName = nameEl ? nameEl.value.trim() : '';
+    // Khách MỚI (nguồn "Chăm sóc"): chưa từng có CareData lẫn đơn hàng nào — bắt buộc nhập tên
+    // trước khi lưu, và sau khi lưu sẽ ghi thêm vào sheet riêng "KH Chăm sóc mới" (Báo cáo D).
+    const isNewCustomer = !_currentCare && (!_currentOrders || !_currentOrders.length);
+    if (isNewCustomer && !liveName) { setStatus('Khách mới — vui lòng nhập tên khách hàng trước khi lưu.'); return; }
     const row = _buildRow(phone, {
-      name: nameEl ? nameEl.value.trim() : '',
+      name: liveName,
       status: panelEl.querySelector('#pk-status-sel').value,
       zalo: panelEl.querySelector('#pk-zalo-sel').value,
       khStatus: panelEl.querySelector('#pk-khstatus-sel').value,
@@ -605,14 +792,14 @@
       note: rawEl ? rawEl.value : (_currentCare?.note || '')
     });
     if (btn) { btn.disabled = true; btn.textContent = 'Đang lưu...'; }
-    chrome.runtime.sendMessage({ type: 'SAVE_CARE', payload: row }, (resp) => {
+    safeSendMessage_({ type: 'SAVE_CARE', payload: Object.assign({}, row, { isNewCustomer }) }, (resp) => {
       if (btn) { btn.disabled = false; btn.textContent = '💾 Lưu vào Sasum'; }
       if (!resp?.ok) { setStatus('Lưu thất bại: ' + (resp?.error || 'lỗi không rõ')); return; }
       _currentCare = row;
       _lastServerCare = Object.assign({}, row);
       const nameSpan = panelEl.querySelector('.pk-ai-cust-name');
       if (nameSpan && row.name) nameSpan.innerHTML = `${escapeHtml(row.name)} <span class="pk-ai-cust-phone">${phone}</span>`;
-      setStatus('✓ Đã lưu vào Sasum.');
+      setStatus('✓ Đã lưu vào Sasum.' + (isNewCustomer ? ' (KH mới — nguồn Chăm sóc)' : ''));
     });
   }
 
@@ -620,7 +807,7 @@
   // ghi de trong cac truong khac (dung loi cu tung gap ben Zalo AI voi doneReminder_).
   function doneAppointment_(phone) {
     const row = _buildRow(phone, { schedHen: '', schedHenNote: '' });
-    chrome.runtime.sendMessage({ type: 'SAVE_CARE', payload: row }, (resp) => {
+    safeSendMessage_({ type: 'SAVE_CARE', payload: row }, (resp) => {
       if (!resp?.ok) { setStatus('Không xoá được lịch hẹn: ' + (resp?.error || '')); return; }
       _currentCare = row;
       _lastServerCare = Object.assign({}, row);
@@ -644,7 +831,7 @@
     if (!_currentPhone) return;
     if (typeof document.visibilityState === 'string' && document.visibilityState !== 'visible') return;
     const phone = _currentPhone;
-    chrome.runtime.sendMessage({ type: 'LOOKUP_CUSTOMER', payload: { phone } }, (resp) => {
+    safeSendMessage_({ type: 'LOOKUP_CUSTOMER', payload: { phone } }, (resp) => {
       if (!resp?.ok || _currentPhone !== phone) return;
       const newCare = resp.data.care || {};
       const CMP = ['status','zalo','cs','note','schedHen','schedHenNote','khStatus','birthday','name'];
@@ -695,7 +882,7 @@
 
   function loadReminders_() {
     const cs = (panelEl?.querySelector('#pk-cs-sel')?.value) || settings?.csName || '';
-    chrome.runtime.sendMessage({ type: 'GET_REMINDERS', payload: { cs } }, (resp) => {
+    safeSendMessage_({ type: 'GET_REMINDERS', payload: { cs } }, (resp) => {
       if (!resp?.ok) { return; } // lỗi mạng/GAS -> im lặng, không làm phiền, CS bấm 🔄 để thử lại
       _reminders = resp.data.reminders || [];
       renderReminders_();
@@ -740,7 +927,7 @@
     if (!r) return;
     panelEl.querySelector('#pk-ai-phone-input').value = r.phone;
     setStatus('⏳ Đang soạn tin follow-up cho ' + r.phone + '...');
-    chrome.runtime.sendMessage(
+    safeSendMessage_(
       { type: 'FETCH_FOLLOWUP_SUGGESTION', payload: { phone: r.phone, status: r.status, note: r.schedHenNote } },
       (resp) => {
         if (!resp?.ok) { setStatus('Lỗi: ' + (resp?.error || 'không rõ')); return; }
@@ -757,7 +944,7 @@
     const q = (panelEl.querySelector('#pk-price-q').value || '').trim();
     const box = panelEl.querySelector('#pk-price-result');
     box.innerHTML = '<div class="pk-price-loading">Đang tìm...</div>';
-    chrome.runtime.sendMessage({ type: 'GET_PRICE', payload: { q } }, (resp) => {
+    safeSendMessage_({ type: 'GET_PRICE', payload: { q } }, (resp) => {
       if (!resp?.ok) { box.innerHTML = `<div class="pk-price-loading">Lỗi: ${escapeHtml(resp?.error || 'không rõ')}</div>`; return; }
       renderPriceRows_(resp.data.rows || [], q);
     });
@@ -825,7 +1012,7 @@
     setStatus(manual ? "Đang lấy gợi ý..." : "Hội thoại thay đổi — đang lấy gợi ý mới...");
 
     const ctxEl = panelEl.querySelector("#pk-ctx-input");
-    chrome.runtime.sendMessage(
+    safeSendMessage_(
       {
         type: "FETCH_SUGGESTION",
         payload: {
@@ -865,7 +1052,7 @@
       const angle = OPENER_ANGLES[i];
       sug.innerHTML = `<div class="pk-ai-cust-loading">Đang soạn câu ${i + 1}/${OPENER_ANGLES.length} — ${escapeHtml(angle.label)}...</div>`;
       const data = await new Promise((resolve) => {
-        chrome.runtime.sendMessage(
+        safeSendMessage_(
           { type: "FETCH_OPENER", payload: { custLines, tone: _activeTone, angleInstr: angle.instr, withProducts: _useProducts } },
           (resp) => resolve(resp?.ok ? resp.data : { error: resp?.error || "lỗi không rõ" })
         );

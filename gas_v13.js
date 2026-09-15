@@ -34,6 +34,12 @@ var CTKM_SHEET_NAME  = 'CTKM'; // Sheet CTKM (cung file PRICE_SS_ID) — doi ten
 var DEFAULT_PRODUCT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1YJMJs8GI7dBfDl5TNZM44n7N8lhJoeSD0KOWflU2fmM/edit?gid=1833367723#gid=1833367723';
 var DEFAULT_DRIVE_KNOWLEDGE_FOLDER_URL = 'https://drive.google.com/drive/folders/1Koz4IdENS5QgdvvYMaQO1MlVEFMFAciN?hl=vi';
 var DEFAULT_DRIVE_PRODUCT_IMAGES_FOLDER_URL = 'https://drive.google.com/drive/folders/1PES3V_bsYLcmIynMjRHPVjT6rJGTc6EO?hl=vi';
+// API key AI (Groq/Gemini/OpenRouter) cung theo pattern nay — CS dung Zalo AI/Pancake AI
+// KHONG can tu nhap key trong Cai dat nua. Cerebras chua co key co dinh nen van doc rieng
+// tu Settings (neu team tu nhap sau nay).
+var DEFAULT_API_GROQ_KEY = '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';
+var DEFAULT_API_GEMINI_KEY = 'AQ.Ab8RN6KRb0MjSj60RjCW0G8uRhM76C6CIyjPvNtLdLrD4NWWBQ';
+var DEFAULT_API_OPENROUTER_KEY = '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';
 
 function getOrderSS_() {
   return ORDER_SS_ID
@@ -467,10 +473,10 @@ function doGet(e) {
     // ── Tap SDT co trong "dữ liệu đơn" — chi de loc nguon o man hinh chinh (cache 10') ──
     if (action === 'donPhones') {
       var cacheDP = CacheService.getScriptCache();
-      var cKeyDP = 'don_phones_v2';
+      var cKeyDP = 'don_phones_v3';
       var cachedDP = cacheDP.get(cKeyDP);
       if (cachedDP) { try { return jsonOut_(JSON.parse(cachedDP)); } catch(ec) {} }
-      var resDP = { phones: readDonPhones_(), saleByPhone: getDonSaleByPhone_() };
+      var resDP = { phones: readDonPhones_(), saleByPhone: getDonSaleByPhone_(), orderCountByPhone: getDonOrderCountByPhone_() };
       try { cacheDP.put(cKeyDP, JSON.stringify(resDP), 600); } catch(ec) {}
       return jsonOut_(resDP);
     }
@@ -509,6 +515,10 @@ function doGet(e) {
 
     if (action === 'dashboard') return jsonOut_(buildDashboard_());
 
+    // ── MESSENGER/PHONG THUY AI: danh sach trang thai CS dung chung (Settings!careStatus) — nhe,
+    //    khong keo theo toan bo rows CareData nhu action 'customers'. Them 2026-09 cho extension Messenger. ──
+    if (action === 'careStatusOptions') return jsonOut_({ ok: true, options: readCareStatus_(ss) || [] });
+
     // ── Bao cao doanh so CRM moi (nguon: Google Sheet "DT tong" goc) ──
     if (action === 'salesReportA') {
       var pA = e.parameter || {};
@@ -538,6 +548,8 @@ function doGet(e) {
       return jsonOut_(resB);
     }
     if (action === 'salesReportOptions') return jsonOut_(getSalesReportOptions_());
+    // ── TACH TEN KH: xem truoc danh sach ten doan duoc tu don hang (chua ghi gi) ──
+    if (action === 'previewCustomerNameGuesses') return jsonOut_(previewCustomerNameGuesses_());
     if (action === 'salesReportC') {
       var pC = e.parameter || {};
       var fC = { dateField: pC.dateField || 'ngayTao', periodType: pC.periodType || 'week',
@@ -770,6 +782,155 @@ function readOrdersByPhone_(phone) {
   return deduped;
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  TACH TEN KHACH TU DON HANG (backfill hang loat)
+//  Cot "San pham" trong DT TONG la text tu do NV go tay, KHONG theo khuon co dinh: co don ghi
+//  "Ten Sdt Dia chi...", co don ghi "Dia chi Sdt ... Ten Nhắn...", co don chi toan dia chi/ghi
+//  chu gop don khong he co ten. Doan ten tu dong, CHI de xuat cho SDT hien CHUA co ten trong
+//  CareData — nguoi dung phai xem/duyet tren UI truoc khi ghi that (giong het co che
+//  findDuplicateOrders_ + confirm truoc khi xoa), tranh doan sai lam hong du lieu ten dang co.
+// ═══════════════════════════════════════════════════════════════
+var NAME_ADDR_KEYWORDS_RE_ = /\b(đường|phố|phường|xã|quận|huyện|thành phố|tỉnh|ngõ|ngách|khu|tổ|ấp|thôn|xóm|số nhà|tòa|chung cư|đc|địa chỉ)\b/i;
+var NAME_MERGE_LABEL_RE_ = /^(gộp\s*(đơn|cùng)|ghép\s*đơn|địa chỉ)/i;
+var NAME_ALLOWED_CHARS_RE_ = /^[a-zA-ZÀ-ỹ\s.'-]+$/;
+
+function _stripHonorific_(s) {
+  return s.replace(/^(anh|chị|chi|ông|ong|bà|ba|em|c|a)(?=[\s:.]|$)\s*[:.]?\s*/i, '').trim();
+}
+function _truncateAtAddressOrDigit_(s) {
+  var digitIdx = s.search(/\d/);
+  var kwMatch = s.match(NAME_ADDR_KEYWORDS_RE_);
+  var kwIdx = kwMatch ? kwMatch.index : -1;
+  var cut = -1;
+  if (digitIdx >= 0 && kwIdx >= 0) cut = Math.min(digitIdx, kwIdx);
+  else if (digitIdx >= 0) cut = digitIdx;
+  else if (kwIdx >= 0) cut = kwIdx;
+  if (cut >= 0) s = s.substring(0, cut);
+  return s.trim();
+}
+function _isPlausibleName_(s) {
+  if (!s) return false;
+  s = s.trim();
+  if (s.length < 2 || s.length > 40) return false;
+  if (!NAME_ALLOWED_CHARS_RE_.test(s)) return false;
+  if (s.split(/\s+/).length > 5) return false;
+  return true;
+}
+// Tra ve TAT CA ten "ung vien" hop le tim duoc trong 1 doan text don hang, thu 2 cach:
+// (A) dau dong, cat truoc so/tu khoa dia chi dau tien (bat truong hop "Ten Sdt Dia chi...")
+// (B) doan ngay SAU so dien thoai, truoc chu "Nhắn" (bat truong hop "...Sdt Ten Nhắn...")
+function _guessNameCandidatesFromOrderText_(text, phoneDigits) {
+  var out = [];
+  if (!text) return out;
+  var raw = String(text);
+  var firstLine = raw.split('\n')[0].trim();
+  if (firstLine && !NAME_MERGE_LABEL_RE_.test(firstLine)) {
+    var a = firstLine.replace(/(\+?84|0)\d{8,10}/g, '');
+    a = _stripHonorific_(a);
+    a = a.replace(/^[:.\-–]\s*/, '').replace(/[:.\-–]\s*$/, '');
+    a = _truncateAtAddressOrDigit_(a);
+    if (_isPlausibleName_(a)) out.push(a);
+  }
+  if (phoneDigits) {
+    var idx = raw.indexOf(phoneDigits);
+    if (idx >= 0) {
+      var after = raw.substring(idx + phoneDigits.length);
+      var nhanMatch = after.match(/nh[ắaằ]n\b/i);
+      var seg = nhanMatch ? after.substring(0, nhanMatch.index) : after.substring(0, 40);
+      seg = _stripHonorific_(seg.trim());
+      seg = seg.replace(/^[:.\-–]\s*/, '').replace(/[:.\-–]\s*$/, '');
+      seg = _truncateAtAddressOrDigit_(seg);
+      if (_isPlausibleName_(seg)) out.push(seg);
+    }
+  }
+  return out;
+}
+// Giu lai ten cu de tuong thich cac cho khac co the dang goi (tra ve ung vien dau tien theo
+// cach (A) - hanh vi gan giong ham cu, chi them buoc cat tai dia chi/so cho chinh xac hon).
+function _parseNameFromOrderText_(text) {
+  var cands = _guessNameCandidatesFromOrderText_(text, '');
+  return cands.length ? cands[0] : '';
+}
+// Quet TAT CA don cua 1 sdt, gom ung vien ten tu tung don, lay ten xuat hien NHIEU LAN NHAT
+// (thay vi chi lay don dau tien tim thay — tranh vo tinh chon phai don khong co ten/co nhan
+// gop don ma bo qua cac don khac cua cung khach da co ten ro rang).
+function _guessNameForPhone_(orders, phoneDigits) {
+  var freq = {}, bestKey = null;
+  for (var i = 0; i < orders.length; i++) {
+    var cands = _guessNameCandidatesFromOrderText_(orders[i].product, phoneDigits);
+    for (var j = 0; j < cands.length; j++) {
+      var key = cands[j].toLowerCase();
+      if (!freq[key]) freq[key] = { count: 0, sample: cands[j] };
+      freq[key].count++;
+      if (!bestKey || freq[key].count > freq[bestKey].count) bestKey = key;
+    }
+  }
+  return bestKey ? freq[bestKey].sample : '';
+}
+
+// Quet toan bo DT TONG, doan ten cho tung SDT (gom TAT CA don cua sdt do, lay ten xuat hien
+// nhieu lan nhat) — CHI tra ve de UI hien danh sach cho nguoi dung duyet, KHONG ghi gi vao Sheet.
+function previewCustomerNameGuesses_() {
+  var orders = readAllOrders_();
+  var careRows = readCare_(getCrmSS_().getSheetByName(SH_CARE));
+  var existingNames = {};
+  for (var c = 0; c < careRows.length; c++) {
+    if (careRows[c].name) existingNames[normPhone_(String(careRows[c].phone))] = true;
+  }
+  var byPhone = {};
+  for (var i = 0; i < orders.length; i++) {
+    var o = orders[i];
+    if (!o.phone || existingNames[o.phone]) continue;
+    if (!byPhone[o.phone]) byPhone[o.phone] = [];
+    byPhone[o.phone].push(o);
+  }
+  var out = [];
+  Object.keys(byPhone).forEach(function (phone) {
+    var phoneOrders = byPhone[phone];
+    var guess = _guessNameForPhone_(phoneOrders, phone);
+    if (!guess) return;
+    out.push({ phone: phone, guessedName: guess, sample: String(phoneOrders[0].product || '').split('\n')[0].trim().substring(0, 120) });
+  });
+  return { ok: true, count: out.length, items: out };
+}
+
+
+// Ghi that danh sach ten DA DUOC NGUOI DUNG XAC NHAN tren UI (items: [{phone, name}]).
+// Kiem tra lai lan nua tren server: chi ghi cho SDT VAN CHUA co ten tai thoi diem ghi
+// (tranh ghi de neu vua co ai do — vd Pancake AI — cap nhat ten trong luc dang duyet danh sach).
+function applyCustomerNameGuesses_(items) {
+  if (!items || !items.length) return jsonOut_({ ok: false, error: 'Danh sach rong' });
+  var sh = getSheet_(SH_CARE, CARE_HEADERS);
+  var last = sh.getLastRow();
+  var index = {};
+  if (last >= 2) {
+    var vals = sh.getRange(2, 1, last - 1, CARE_HEADERS.length).getValues();
+    for (var i = 0; i < vals.length; i++) {
+      if (vals[i][0]) index[normPhone_(String(vals[i][0]))] = { rowNum: i + 2, name: vals[i][19] || '' };
+    }
+  }
+  var updated = 0, appended = 0, skipped = 0;
+  var newRows = [];
+  for (var k = 0; k < items.length; k++) {
+    var it = items[k];
+    var phone = normPhone_(String(it.phone || ''));
+    var name = String(it.name || '').trim();
+    if (!phone || !name) { skipped++; continue; }
+    var ex = index[phone];
+    if (ex) {
+      if (ex.name) { skipped++; continue; }
+      sh.getRange(ex.rowNum, 20).setValue(name);
+      updated++;
+    } else {
+      newRows.push(careRow_({ phone: phone, name: name }));
+      appended++;
+    }
+  }
+  if (newRows.length) sh.getRange(sh.getLastRow() + 1, 1, newRows.length, CARE_HEADERS.length).setValues(newRows);
+  try { CacheService.getScriptCache().remove('customers_v12'); } catch (ec) {}
+  return jsonOut_({ ok: true, updated: updated, appended: appended, skipped: skipped });
+}
+
 function getDTSS_() {
   return DT_SS_ID
     ? SpreadsheetApp.openById(DT_SS_ID)
@@ -922,6 +1083,20 @@ function getDonSaleByPhone_() {
     for (var j = 0; j < names.length; j++) {
       if (map[ph].indexOf(names[j]) === -1) map[ph].push(names[j]);
     }
+  }
+  return map;
+}
+
+// Map SDT -> so dong (so don) trong "dữ liệu đơn" — dung de PHAN LOAI HANG KH (VIP/Than
+// thiet/Tiem nang/Chua ban lai duoc) theo tieu chi moi: dem theo SO DONG trong sheet nay,
+// KHONG con dua theo nguon Renew trong DT TONG nhu truoc.
+function getDonOrderCountByPhone_() {
+  var rows = readDonChiTiet_();
+  var map = {};
+  for (var i = 0; i < rows.length; i++) {
+    var ph = normPhone_(String(rows[i].soDienThoai || ''));
+    if (!ph) continue;
+    map[ph] = (map[ph] || 0) + 1;
   }
   return map;
 }
@@ -1535,7 +1710,8 @@ function doPost(e) {
     if (action === 'saveBatch')           return saveBatchCare_(data.rows);
     if (action === 'saveOrders')          return saveOrders_(data.orders);
     if (action === 'addCareLead')         return addCareLead_(data);
-    if (action === 'patchOrder')          return patchOrder_(data);
+    // ── TACH TEN KH: ghi that danh sach ten da duoc nguoi dung xac nhan tren UI ──
+    if (action === 'applyCustomerNameGuesses') return applyCustomerNameGuesses_(data.items);    if (action === 'patchOrder')          return patchOrder_(data);
     if (action === 'deleteOrder')         return deleteOrder_(data);
     // ── Xuat bao cao doanh so (dang loc tren UI) ra 1 tab moi trong Google Sheet CRM ──
     if (action === 'exportSalesReportSheet') return jsonOut_(exportSalesReportToSheet_(data.reportType, data.filters));
@@ -1579,6 +1755,9 @@ function doPost(e) {
     if (action === 'dedupeCare')           return dedupeCare_();
     // ── HOI THAM TU DONG: luu bang mau tin (UI Sasum) ──
     if (action === 'saveFollowUpTemplates') return saveFollowUpTemplates_(data.templates);
+    // ── MESSENGER/PHONG THUY AI: doc bang tra menh + mau canned response (Sheet Menh/CannedResponses,
+    //    tu tao voi du lieu mac dinh neu chua co). Them 2026-09, KHONG dung chung sheet/cot voi CareData. ──
+    if (action === 'getKnowledge') return jsonOut_(getMessengerKnowledge_());
     return jsonOut_({ error: 'Unknown action: ' + action });
   } catch(err) {
     return jsonOut_({ error: err.message });
@@ -2754,9 +2933,10 @@ function callAI_(data) {
   // tai) va gemini-flash-latest (alias Google tu dong tro ve ban Flash on dinh moi
   // nhat, tranh phai sua code moi khi Google lai ngung ho tro 1 phien ban cu the).
   var providers = [
-    { name: 'Groq',     key: getSetting_('apiGroq') || getSetting_('geminiKey'), fn: _aiOpenAICompat_, url: 'https://api.groq.com/openai/v1/chat/completions',     model: 'openai/gpt-oss-120b' },
-    { name: 'Cerebras', key: getSetting_('apiCerebras'),                          fn: _aiOpenAICompat_, url: 'https://api.cerebras.ai/v1/chat/completions',        model: 'gpt-oss-120b' },
-    { name: 'Gemini',   key: getSetting_('apiGemini'),                            fn: _aiGemini_,       model: 'gemini-flash-latest' }
+    { name: 'Groq',       key: getSetting_('apiGroq') || getSetting_('geminiKey') || DEFAULT_API_GROQ_KEY, fn: _aiOpenAICompat_, url: 'https://api.groq.com/openai/v1/chat/completions',        model: 'openai/gpt-oss-120b' },
+    { name: 'Cerebras',   key: getSetting_('apiCerebras'),                                                  fn: _aiOpenAICompat_, url: 'https://api.cerebras.ai/v1/chat/completions',           model: 'gpt-oss-120b' },
+    { name: 'Gemini',     key: getSetting_('apiGemini') || DEFAULT_API_GEMINI_KEY,                          fn: _aiGemini_,       model: 'gemini-flash-latest' },
+    { name: 'OpenRouter', key: getSetting_('apiOpenRouter') || DEFAULT_API_OPENROUTER_KEY,                  fn: _aiOpenAICompat_, url: 'https://openrouter.ai/api/v1/chat/completions',         model: 'google/gemma-2-9b-it:free' }
   ];
 
   var errors = [], anyKey = false;
@@ -2784,7 +2964,7 @@ function callAI_(data) {
     errors.push(pv.name + ': ' + (r.error || 'rong'));
     // loi (429/sai key/...) -> tu dong thu provider ke tiep
   }
-  if (!anyKey) return jsonOut_({ error: 'Chua co API Key nao. Mo extension → banh rang → nhap it nhat 1 key (Groq/Cerebras/Gemini).' });
+  if (!anyKey) return jsonOut_({ error: 'Chua co API Key nao. Mo extension → banh rang → nhap it nhat 1 key (Groq/Cerebras/Gemini/OpenRouter).' });
   return jsonOut_({ error: 'Tat ca API deu loi: ' + errors.join(' | ') });
 }
 
@@ -3512,4 +3692,66 @@ function saveTaskComment_(c) {
   sh.appendRow([id, String(c.taskId), c.author || 'Ẩn danh', c.content || '',
                 JSON.stringify(c.images || []), now]);
   return jsonOut_({ ok: true, id: id });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MESSENGER / PHONG THUY AI — them 2026-09, phuc vu extension-messenger.
+//  CHI THEM MOI, khong sua ham/sheet nao o tren. Dung 2 sheet rieng (Menh, CannedResponses),
+//  KHONG dung chung cot voi CareData — tranh dung do schema dang chay that cho Zalo/Pancake.
+// ═══════════════════════════════════════════════════════════════
+var SH_MENH = 'Menh';
+var SH_CANNED = 'CannedResponses';
+
+// Bang tra menh Ngu hanh nap am (chep tu bang CS da doi chieu — chi khop nam 1954-2013,
+// can chuyen gia phong thuy trong cong ty ra soat/bo sung truoc khi dung chinh thuc rong rai hon).
+var MENH_DEFAULT_ROWS = [
+  ['Kim', '1954,1955,1962,1963,1970,1971,1984,1985,1992,1993,2000,2001'],
+  ['Thủy', '1956,1957,1964,1965,1972,1973,1986,1987,1994,1995,2002,2003'],
+  ['Hỏa', '1958,1959,1966,1967,1974,1975,1988,1989,1996,1997,2004,2005'],
+  ['Mộc', '1960,1961,1968,1969,1982,1983,1990,1991,1998,1999,2012,2013'],
+  ['Thổ', '1976,1977,1978,1979,1980,1981,2006,2007,2008,2009,2010,2011']
+];
+
+// 11 mau canned response (Phan A/B/C file mau Beeftext CS gui) — Nhom | ID | Ten | NoiDung
+var CANNED_DEFAULT_ROWS = [
+  ['Theo mệnh', 'menhkim', 'Mệnh Kim', 'Dạ với người mệnh Kim thì màu hợp là màu trắng, vàng, bạc (thuộc hành Kim và Thổ vì Thổ sinh Kim ạ), nên tránh dùng nhiều màu đỏ, hồng, tím (hành Hỏa khắc Kim).\nĐá phong thủy hợp mệnh Kim: đá thạch anh trắng, đá mắt hổ vàng, ngọc trai, đá obsidian đen (Thủy tương sinh).\nBên em hiện có $$ rất phù hợp với mệnh Kim ạ, chị/anh xem qua thử nhé.'],
+  ['Theo mệnh', 'menhmoc', 'Mệnh Mộc', 'Dạ với người mệnh Mộc thì màu hợp là màu xanh lá, xanh dương, đen (hành Mộc và Thủy vì Thủy sinh Mộc ạ), nên tránh dùng nhiều màu trắng, bạc (hành Kim khắc Mộc).\nĐá phong thủy hợp mệnh Mộc: đá aventurine xanh, ngọc bích, đá obsidian đen.\nBên em hiện có $$ rất phù hợp với mệnh Mộc ạ, chị/anh xem qua thử nhé.'],
+  ['Theo mệnh', 'menhthuy', 'Mệnh Thủy', 'Dạ với người mệnh Thủy thì màu hợp là màu đen, xanh dương, trắng (hành Thủy và Kim vì Kim sinh Thủy ạ), nên tránh dùng nhiều màu vàng nâu (hành Thổ khắc Thủy).\nĐá phong thủy hợp mệnh Thủy: đá obsidian đen, đá lapis lazuli xanh, đá thạch anh trắng.\nBên em hiện có $$ rất phù hợp với mệnh Thủy ạ, chị/anh xem qua thử nhé.'],
+  ['Theo mệnh', 'menhhoa', 'Mệnh Hỏa', 'Dạ với người mệnh Hỏa thì màu hợp là màu đỏ, hồng, tím, xanh lá (hành Hỏa và Mộc vì Mộc sinh Hỏa ạ), nên tránh dùng nhiều màu đen, xanh dương (hành Thủy khắc Hỏa).\nĐá phong thủy hợp mệnh Hỏa: đá thạch anh hồng, đá garnet đỏ, đá aventurine xanh.\nBên em hiện có $$ rất phù hợp với mệnh Hỏa ạ, chị/anh xem qua thử nhé.'],
+  ['Theo mệnh', 'menhtho', 'Mệnh Thổ', 'Dạ với người mệnh Thổ thì màu hợp là màu vàng, nâu, đỏ, hồng (hành Thổ và Hỏa vì Hỏa sinh Thổ ạ), nên tránh dùng nhiều màu xanh lá (hành Mộc khắc Thổ).\nĐá phong thủy hợp mệnh Thổ: đá mắt hổ vàng, đá citrine vàng, đá thạch anh hồng.\nBên em hiện có $$ rất phù hợp với mệnh Thổ ạ, chị/anh xem qua thử nhé.'],
+  ['Giá & chính sách', 'chaohoi', 'Chào hỏi', 'Dạ em chào chị/anh, em là $$ bên shop phong thủy Thu Hiền ạ. Chị/anh cho em xin năm sinh để em tư vấn sản phẩm hợp mệnh nhất mình nhé ạ 🙏'],
+  ['Giá & chính sách', 'giaba', 'Báo giá', 'Dạ sản phẩm $$ bên em giá là $$ ạ. Giá này đã bao gồm hộp đựng và thẻ bảo hành, chưa gồm phí ship ạ. Chị/anh có muốn em tư vấn thêm mẫu khác cùng tầm giá không ạ?'],
+  ['Giá & chính sách', 'csship', 'Chính sách ship', 'Dạ bên em giao hàng toàn quốc qua đơn vị vận chuyển, thời gian dự kiến 2–4 ngày với nội thành và 3–5 ngày với tỉnh xa ạ. Chị/anh có thể xem hàng trước khi thanh toán (COD) ạ.'],
+  ['Giá & chính sách', 'csdoitra', 'Đổi trả', 'Dạ sản phẩm bên em hỗ trợ đổi trong vòng 7 ngày nếu lỗi do nhà sản xuất hoặc không đúng mẫu đã đặt ạ, còn đổi ý cá nhân thì em xin phép hỗ trợ đổi mẫu khác tương đương giá trị trong 3 ngày ạ (khách chịu phí ship đổi). Chị/anh yên tâm mua ạ 🙏'],
+  ['Giá & chính sách', 'xinttin', 'Xin thông tin lên đơn', 'Dạ để lên đơn cho chị/anh, em xin thông tin: \n- Họ tên: $$\n- Số điện thoại: $$\n- Địa chỉ nhận hàng: $$\nChị/anh gửi giúp em với ạ, em lên đơn ngay ạ.'],
+  ['Giá & chính sách', 'follow2ngay', 'Follow-up 2 ngày', 'Dạ em là $$ bên phong thủy Thu Hiền ạ, hôm trước chị/anh có quan tâm sản phẩm $$, không biết chị/anh đã quyết định chưa ạ? Hiện bên em đang có ưu đãi $$, chị/anh xem thử nhé ạ 🙏']
+];
+
+function ensureMenhSheedSeeded_(sh) {
+  if (sh.getLastRow() < 2) { for (var i = 0; i < MENH_DEFAULT_ROWS.length; i++) sh.appendRow(MENH_DEFAULT_ROWS[i]); }
+  return sh;
+}
+function ensureCannedSheetSeeded_(sh) {
+  if (sh.getLastRow() < 2) { for (var i = 0; i < CANNED_DEFAULT_ROWS.length; i++) sh.appendRow(CANNED_DEFAULT_ROWS[i]); }
+  return sh;
+}
+
+function getMessengerKnowledge_() {
+  var shMenh = ensureMenhSheedSeeded_(getSheet_(SH_MENH, ['Menh', 'NamSinh (cách nhau bởi dấu phẩy)']));
+  var menhData = shMenh.getDataRange().getValues();
+  var menhTable = {};
+  for (var r = 1; r < menhData.length; r++) {
+    var menh = String(menhData[r][0] || '').trim();
+    if (!menh) continue;
+    menhTable[menh] = String(menhData[r][1] || '').split(',').map(function (s) { return parseInt(s.trim(), 10); }).filter(function (n) { return !isNaN(n); });
+  }
+
+  var shCanned = ensureCannedSheetSeeded_(getSheet_(SH_CANNED, ['Nhom', 'ID', 'Ten', 'NoiDung']));
+  var cannedData = shCanned.getDataRange().getValues();
+  var canned = [];
+  for (var c = 1; c < cannedData.length; c++) {
+    if (!cannedData[c][1]) continue;
+    canned.push({ nhom: cannedData[c][0], id: cannedData[c][1], label: cannedData[c][2], text: cannedData[c][3] });
+  }
+  return { ok: true, menhTable: menhTable, canned: canned };
 }

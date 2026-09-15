@@ -1,7 +1,9 @@
 // background.js — Service worker (MV3)
-// Gọi thẳng backend Google Apps Script (GAS_URL) đang dùng chung với Zalo AI (Sasum) —
-// KHÔNG có server Flask/RAG riêng, mọi request đi qua 1 Web App GAS, giống hệt cách
-// content.js của Zalo AI đang gọi: POST { action:'ai', prompt, withProducts }.
+// Gọi thẳng backend Google Apps Script (GAS_URL) của CRM Duyencr — KHÔNG dùng chung
+// với link Sasum cũ nữa (2 hệ thống đã tách biệt hoàn toàn). Không có server Flask/RAG
+// riêng, mọi request đi qua 1 Web App GAS: POST { action:'ai', prompt, withProducts }.
+
+const OLD_SASUM_GAS_URL = "https://script.google.com/macros/s/AKfycbwPQ4HwD8R1HQFtU0xQslqGgr4HSlgzQlWFZs-8mtVY1CK9kBvwJWsIOzVuj6WM1mg-/exec";
 
 const DEFAULT_SETTINGS = {
   gasUrl: "https://script.google.com/macros/s/AKfycbxyqBM3v7_WdgxbXru8o3Y_GNylTtQ-eeUoJCgwWEXVjHAJxiw7-SRlHXUSjaUR7v3oSQ/exec",
@@ -46,6 +48,9 @@ chrome.runtime.onInstalled.addListener(async () => {
   const existing = await chrome.storage.sync.get(null);
   if (!existing || Object.keys(existing).length === 0) {
     await chrome.storage.sync.set(DEFAULT_SETTINGS);
+  } else if (existing.gasUrl === OLD_SASUM_GAS_URL) {
+    // Migrate: may nao lo con luu link Sasum cu -> tu dong chuyen sang link Duyencr moi.
+    await chrome.storage.sync.set({ gasUrl: DEFAULT_SETTINGS.gasUrl });
   }
 });
 
@@ -185,13 +190,31 @@ async function handleSaveCare(row) {
   if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
   if (!row?.phone) throw new Error("Thiếu số điện thoại.");
 
+  const isNewCustomer = !!row.isNewCustomer;
+  const cleanRow = Object.assign({}, row);
+  delete cleanRow.isNewCustomer; // co chi de bao hieu noi bo, khong phai 1 cot CareData that
+
   const res = await fetch(cfg.gasUrl, {
     method: "POST",
-    body: JSON.stringify({ action: "saveSingle", row }),
+    body: JSON.stringify({ action: "saveSingle", row: cleanRow }),
     headers: { "Content-Type": "text/plain" }
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error);
+
+  // Khách MỚI (nguồn "Chăm sóc") — ghi thêm vào sheet riêng "KH Chăm sóc mới" để tính vào
+  // Báo cáo D, KHÔNG gộp báo cáo doanh số A/B/C (giống hệt luồng tương ứng bên Zalo AI).
+  // Không để lỗi bước này chặn kết quả lưu chính.
+  if (isNewCustomer && cleanRow.name) {
+    try {
+      await fetch(cfg.gasUrl, {
+        method: "POST",
+        body: JSON.stringify({ action: "addCareLead", phone: cleanRow.phone, name: cleanRow.name, note: cleanRow.note || '', cs: cleanRow.cs || '' }),
+        headers: { "Content-Type": "text/plain" }
+      });
+    } catch (eLead) { /* khong chan ket qua luu chinh neu buoc nay loi */ }
+  }
+
   return data;
 }
 
