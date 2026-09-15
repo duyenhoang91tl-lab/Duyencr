@@ -438,12 +438,16 @@
       const m = el?.innerText?.match(/(0[3-9]\d{8})/);
       if (m) return [normPhone(m[1])];
     }
+    // 2) SĐT do chính CS gõ tay vào khung "Sản phẩm order" (đáng tin — CS chủ động xác nhận cho
+    // đúng đơn đang xử lý, không lẫn số điện thoại của người khác nhắc tới trong đoạn chat)
+    const panelPhone = extractOrderPanelPhone_();
+    if (panelPhone) return [panelPhone];
     const container = sel?.messageList ? document.querySelector(sel.messageList) : null;
     const scope = container || document.body;
-    // 2) SĐT đã được nền tảng tự gắn thẻ (span.phone-tag / id="..._<sđt>") — có thể ra nhiều số
+    // 3) SĐT đã được nền tảng tự gắn thẻ (span.phone-tag / id="..._<sđt>") — có thể ra nhiều số
     const tagged = extractTaggedPhones_(scope);
     if (tagged.length) return tagged;
-    // 3) Fallback cuối: quét chữ tự do tìm 1 SĐT VN dạng 0xxxxxxxxx (chỉ dùng khi không có thẻ)
+    // 4) Fallback cuối: quét chữ tự do tìm 1 SĐT VN dạng 0xxxxxxxxx (chỉ dùng khi không có thẻ)
     const m2 = scope.innerText?.match(/(0[3-9]\d{8})/);
     return m2 ? [normPhone(m2[1])] : [];
   }
@@ -455,35 +459,45 @@
 
   // ── Lấy tên khách từ khung "Sản phẩm order" (ghi chú đơn hàng CS tự nhập) ──
   // Dòng đầu của khối trên cùng thường dạng "Chị : Tên", "Anh Tên", hoặc "Tên +sđt".
-  function extractOrderPanelName_() {
+  function _findOrderPanelContainer_() {
     const sel = settings.selectors?.[PLATFORM];
-    let container = null;
     if (sel?.orderPanelSelector) {
-      container = document.querySelector(sel.orderPanelSelector);
+      const c = document.querySelector(sel.orderPanelSelector);
+      if (c) return c;
     }
-    if (!container) {
-      // Do tu dong: tim node la (khong con con) co chu "San pham order" lam tieu de,
-      // roi lay phan tu cha lam vung chua danh sach cac khoi khach.
-      const nodes = document.querySelectorAll('body *');
-      for (const el of nodes) {
-        if (el.children.length > 0) continue;
-        const t = (el.textContent || '').trim();
-        if (t.length > 0 && t.length < 40 && /sản phẩm order/i.test(t)) {
-          container = el.closest('div')?.parentElement || el.parentElement;
-          break;
-        }
+    // Dò tự động: tìm node lá (không còn con) có chữ "Sản phẩm order" làm tiêu đề,
+    // rồi lấy phần tử cha làm vùng chứa danh sách các khối khách.
+    const nodes = document.querySelectorAll('body *');
+    for (const el of nodes) {
+      if (el.children.length > 0) continue;
+      const t = (el.textContent || '').trim();
+      if (t.length > 0 && t.length < 40 && /sản phẩm order/i.test(t)) {
+        return el.closest('div')?.parentElement || el.parentElement;
       }
     }
+    return null;
+  }
+  function _firstOrderPanelLine_() {
+    const container = _findOrderPanelContainer_();
     if (!container) return '';
     const text = container.innerText || '';
     if (!text.trim()) return '';
-    // Bo dong tieu de "Sản phẩm order" neu dinh kem trong cung container
     const cleaned = text.replace(/^.*sản phẩm order.*$/im, '').trim();
-    // Tach cac khoi khach theo dong trong — khoi dau tien = khach dang xu ly (tren cung)
     const blocks = cleaned.split(/\n\s*\n+/).map((b) => b.trim()).filter(Boolean);
     if (!blocks.length) return '';
-    const firstLine = blocks[0].split('\n')[0].trim();
-    return _parseNameFromLine_(firstLine);
+    return blocks[0].split('\n')[0].trim();
+  }
+  function extractOrderPanelName_() {
+    return _parseNameFromLine_(_firstOrderPanelLine_());
+  }
+  // SĐT do CHÍNH CS gõ tay vào khung "Sản phẩm order" (vd "Chị Lan - 0912345678") — đáng tin cậy
+  // hơn quét chữ tự do trong toàn bộ đoạn chat, vì đây là dữ liệu CS chủ động xác nhận cho đơn
+  // đang xử lý. Trước đây dòng SĐT này chỉ bị XOÁ ĐI để tách tên, chưa từng được tận dụng.
+  function extractOrderPanelPhone_() {
+    const line = _firstOrderPanelLine_();
+    if (!line) return '';
+    const m = line.match(/(0[3-9]\d{8})/);
+    return m ? normPhone(m[1]) : '';
   }
 
   function _parseNameFromLine_(line) {
@@ -504,8 +518,16 @@
     }
     const phone = phones[0] || resolvePhoneForChatKey_();
     if (!phone) {
-      panelEl.querySelector("#pk-ai-customer").innerHTML = "";
       _currentPhone = ''; _currentCare = null; _lastServerCare = {}; _currentOrderPanelName = ''; _currentOrders = [];
+      // TRƯỚC ĐÂY: để trống trơn im lặng khi không tự nhận ra SĐT — trông như panel bị lỗi/không
+      // dùng được, dù thật ra form vẫn hoạt động đầy đủ (tên/trạng thái/ghi chú...), chỉ là nó
+      // CHỈ hiện SAU KHI tra cứu được 1 khách. Giờ luôn hiện rõ hướng dẫn thay vì im lặng.
+      panelEl.querySelector("#pk-ai-customer").innerHTML =
+        `<div class="pk-ai-no-phone-hint">
+          📵 Không tự nhận ra SĐT trong đoạn chat này.<br>
+          Nhập SĐT khách vào ô phía trên rồi bấm <b>"Tra cứu"</b> để hiện đầy đủ
+          form nhập tên/trạng thái/ghi chú (giống bên Zalo AI).
+        </div>`;
       return;
     }
     lookupByPhone(phone);

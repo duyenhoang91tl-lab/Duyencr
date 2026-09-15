@@ -144,6 +144,16 @@
   font-size: 12px;
 }
 
+.pk-ai-no-phone-hint {
+  background: #f0f7ff;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #374151;
+}
+
 .pk-ai-cust-card {
   border: 1px solid #e5e7eb;
   border-left: 3px solid #16a34a;
