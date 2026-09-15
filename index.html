@@ -12204,7 +12204,12 @@ function srPickTeam(teamId, saleField, domId){
   var members = [...(new Set([t.leader].concat(t.members||[]).filter(Boolean)))];
   if (!members.length){ toast('Team "'+(t.name||'')+'" chưa có thành viên — set up ở tab Quản lý Team.'); return; }
   _srState[saleField] = members;
-  srRenderComboChips(domId);
+  // QUAN TRỌNG: combo "sr-sale-combo" (Báo cáo A) là combo dựng tay riêng (KHÔNG đăng ký qua
+  // _srComboReg như combo "sr-sale-combo-c" của Báo cáo C), nên gọi srRenderComboChips(domId)
+  // ở đây bị no-op (tìm _srComboReg[domId] ra undefined) — danh sách đã chọn KHÔNG hiện lên,
+  // khiến người dùng tưởng chọn Team không có tác dụng và không bấm "Lọc" để load lại doanh thu.
+  // Render lại toàn bộ thanh lọc để chip + nhãn "(N đã chọn)" luôn cập nhật đúng cho cả 2 combo.
+  renderSalesReportTab();
 }
 
 function renderSalesReportTab(){
