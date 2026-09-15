@@ -1000,7 +1000,11 @@ function readDTTong_() {
   var out = [];
   for (var i = 0; i < vals.length; i++) {
     var r = vals[i];
-    if (!r[3] && !r[19]) continue; // dong rong: khong co ten nhiem vu lan ID
+    // Dong rong that su: khong SDT, khong ID, VA khong co gia tri don hang (r[17]) — truoc day
+    // chi check thieu SDT+ID la bo qua ca dong, nhung neu dong do LAI CO gia tri doanh thu that
+    // (vd don nhap tay/import cu chua kip gan SDT/ID) thi se bi am tham mat doanh thu khoi
+    // Bao cao A (thap hon thuc te ma khong bao loi gi). Them dieu kien r[17] de an toan hon.
+    if (!r[3] && !r[19] && !r[17]) continue;
     out.push({
       ngayTao:        r[0],
       giaoCho:        r[2],
