@@ -152,6 +152,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
     return true;
   }
+
+  // Cay "Tinh trang CS" dong (co optgroup) — dung chung voi Zalo AI/appweb, de dropdown
+  // Trang thai CS ben Pancake AI hien dung nhom giong het cac noi khac.
+  if (msg?.type === "GET_CARE_STATUS_TREE") {
+    handleGetCareStatusTree()
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
 });
 
 // Tra cứu khách theo SĐT — GET GAS_URL?action=lookup&phone=... y hệt doLookup() bên Zalo AI.
@@ -247,6 +256,34 @@ async function handleGetNickList() {
   let list = [];
   if (data.value) { try { list = JSON.parse(data.value); } catch (e) {} }
   return Array.isArray(list) ? list : [];
+}
+
+// Cay "Tinh trang CS" dong tu GAS (dong bo voi appweb) — uu tien action:'getSetting'&key=
+// 'careStatus'; neu setting rieng chua co thi fallback doc tu action:'customers' (field
+// careStatus tra ve kem trong response) — CUNG LOGIC voi loadCareStatusTree_() ben Zalo AI.
+async function handleGetCareStatusTree() {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) return [];
+
+  const sep = cfg.gasUrl.includes("?") ? "&" : "?";
+  let tree = null;
+  try {
+    const res = await fetch(cfg.gasUrl + sep + "action=getSetting&key=careStatus", { redirect: "follow" });
+    const data = await res.json();
+    if (data && data.value) {
+      try { tree = typeof data.value === "string" ? JSON.parse(data.value) : data.value; } catch (e) {}
+    }
+  } catch (e) { /* thu fallback ben duoi */ }
+
+  if (!Array.isArray(tree) || !tree.length) {
+    try {
+      const res = await fetch(cfg.gasUrl + sep + "action=customers", { redirect: "follow" });
+      const data = await res.json();
+      if (data && Array.isArray(data.careStatus) && data.careStatus.length) tree = data.careStatus;
+    } catch (e) { /* het cach, tra ve mang rong -> content.js tu fallback ve CARE_STATUSES tinh */ }
+  }
+  return Array.isArray(tree) ? tree : [];
 }
 
 // Them 1 nick moi vao danh sach dung chung — uu tien action:'addZaloNick' (GAS tu merge vao

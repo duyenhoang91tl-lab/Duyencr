@@ -34,6 +34,7 @@
   let _useProducts = false;
   let CS_NAMES = [];
   let NICK_LIST = [];
+  let CARE_STATUS_TREE = null; // cay "Tinh trang CS" load dong tu GAS (dong bo voi appweb/Zalo AI)
   let _currentNick = ''; // Nick Zalo/kenh CS dang dung, sticky (chrome.storage.sync)
   let _chatKeyPhoneMap = {}; // { chatKey: phone } — "danh ba nguoc" hoc cuc bo tren may nay
                              // (giong _chatNamePhoneMap ben Zalo AI), dung cho nut Lien ket doan chat
@@ -55,6 +56,7 @@
     observeConversationChanges();
     loadCsNames_();
     loadNickList_();
+    loadCareStatusTree_();
     loadChatKeyMap_();
     startCarePoll_();
     loadReminders_();
@@ -347,6 +349,48 @@
     sel.innerHTML = '<option value="">— Chọn nick —</option>' +
       NICK_LIST.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
     sel.value = _currentNick || '';
+  }
+
+  // ── "Tình trạng CS": nạp cây phân nhóm động từ GAS (đồng bộ với appweb/Zalo AI) ──
+  // Trước đây chỉ dùng danh sách CARE_STATUSES tĩnh; giờ ưu tiên cây động (có optgroup)
+  // giống hệt Zalo AI, CARE_STATUSES chỉ còn là fallback khi chưa tải được cây.
+  function careStatusOptionsHtml_(selected) {
+    if (Array.isArray(CARE_STATUS_TREE) && CARE_STATUS_TREE.length) {
+      let html = '<option value="">— Chọn —</option>';
+      CARE_STATUS_TREE.forEach((node) => {
+        if (node.children && node.children.length) {
+          html += '<optgroup label="' + escapeHtml(node.label) + '">';
+          node.children.forEach((child) => {
+            if (!child.value) return;
+            html += `<option value="${escapeHtml(child.value)}"${selected === child.value ? ' selected' : ''}>${escapeHtml(node.label + ' - ' + (child.label || child.value))}</option>`;
+          });
+          html += '</optgroup>';
+        } else if (node.value) {
+          html += `<option value="${escapeHtml(node.value)}"${selected === node.value ? ' selected' : ''}>${escapeHtml(node.label || node.value)}</option>`;
+        }
+      });
+      return html;
+    }
+    return [''].concat(CARE_STATUSES).map((o) =>
+      `<option value="${escapeHtml(o)}"${o === (selected || '') ? ' selected' : ''}>${o ? escapeHtml(o) : '— Chọn —'}</option>`
+    ).join('');
+  }
+
+  function rebuildStatusSel_() {
+    const sel = panelEl?.querySelector('#pk-status-sel');
+    if (!sel || !Array.isArray(CARE_STATUS_TREE) || !CARE_STATUS_TREE.length) return;
+    const cur = sel.value;
+    sel.innerHTML = careStatusOptionsHtml_(cur);
+    sel.value = cur;
+  }
+
+  function loadCareStatusTree_() {
+    safeSendMessage_({ type: 'GET_CARE_STATUS_TREE' }, (resp) => {
+      if (resp?.ok && Array.isArray(resp.data) && resp.data.length) {
+        CARE_STATUS_TREE = resp.data;
+        rebuildStatusSel_();
+      }
+    });
   }
 
   // "Danh bạ ngược" (khoá hội thoại → SĐT) học cục bộ trên máy này — dùng khi CS bấm 🔗
@@ -650,7 +694,7 @@
         <div class="pk-form-row">
           <div class="pk-form-col">
             <label>Trạng thái CS</label>
-            <select id="pk-status-sel">${optHtml([''].concat(CARE_STATUSES), care?.status)}</select>
+            <select id="pk-status-sel">${careStatusOptionsHtml_(care?.status || '')}</select>
           </div>
           <div class="pk-form-col">
             <label>Trạng thái Zalo</label>
