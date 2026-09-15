@@ -51,9 +51,8 @@ gì hành vi/danh sách trạng thái bên Pancake:
 - **Trạng thái CS** đổi sang danh sách riêng phong thủy (Chờ gọi tư vấn / Đã gọi - đang theo dõi /
   Hẹn gọi lại / Không nghe máy / Đã chốt / Từ chối / Đang khiếu nại / Tạm ngừng chăm sóc) thay vì
   danh sách sản phẩm sức khỏe.
-- **"Tình trạng KH"** đổi nhãn + danh sách thành **"Phân loại khách"** (Mới/Cũ/VIP/Tiềm năng) —
-  dùng lại đúng cột `khStatus` sẵn có, không thêm cột mới vào CareData.
-- **"Trạng thái Zalo"** ẩn đi (không áp dụng cho khách Messenger).
+- **"Tình trạng KH"** và **"Trạng thái Zalo"** giữ nguyên y hệt bên Pancake — CS tự điền tay theo
+  đúng nhu cầu thực tế, không đổi nhãn/danh sách/khoá cho kênh Messenger.
 - **Sinh nhật → Mệnh**: gõ ngày sinh, panel tự tính mệnh Ngũ hành nạp âm ngay bên cạnh (tra bảng
   cục bộ, không gọi AI). ⚠ Đây là bảng CS cung cấp, chỉ khớp năm 1954–2013 — nên nhờ người có
   chuyên môn phong thủy trong công ty kiểm tra/bổ sung trước khi dùng chính thức rộng rãi hơn.

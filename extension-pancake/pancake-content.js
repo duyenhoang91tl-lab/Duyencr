@@ -29,9 +29,6 @@
     'Chờ gọi tư vấn', 'Đã gọi - đang theo dõi', 'Hẹn gọi lại',
     'Không nghe máy', 'Đã chốt', 'Từ chối', 'Đang khiếu nại', 'Tạm ngừng chăm sóc'
   ];
-  // Dung lai chinh cot 'khStatus' (von la truong mo rong chung, khong rieng nghia vu) de luu
-  // Phan loai khach cho kenh Messenger — KHONG them cot moi vao CareData.
-  const PHAN_LOAI_OPTS_MESSENGER = ['', 'Mới', 'Cũ', 'VIP', 'Tiềm năng'];
   const MENH_TABLE_DEFAULT = {
     'Kim': [1954,1955,1962,1963,1970,1971,1984,1985,1992,1993,2000,2001],
     'Thủy': [1956,1957,1964,1965,1972,1973,1986,1987,1994,1995,2002,2003],
@@ -54,8 +51,8 @@
   ];
   const IS_PHONGTHUY = PLATFORM === 'messenger';
   const ACTIVE_CARE_STATUSES = IS_PHONGTHUY ? CARE_STATUSES_MESSENGER : CARE_STATUSES;
-  const ACTIVE_KHSTATUS_OPTS = IS_PHONGTHUY ? PHAN_LOAI_OPTS_MESSENGER : KH_STATUS_OPTS;
-  const KHSTATUS_LABEL = IS_PHONGTHUY ? 'Phân loại khách' : 'Tình trạng KH';
+  const ACTIVE_KHSTATUS_OPTS = KH_STATUS_OPTS; // giu nguyen "Tinh trang KH" cho ca 2 nen tang, khong doi thanh Phan loai khach
+  const KHSTATUS_LABEL = 'Tình trạng KH';
   const KNOWLEDGE_TTL_MS = 20 * 60 * 1000; // cache 20 phut, khong goi Sheet moi tin nhan
   let _menhTable = MENH_TABLE_DEFAULT;
   let _cannedResponses = CANNED_DEFAULT_MESSENGER;
@@ -779,7 +776,7 @@
             <label>Trạng thái CS</label>
             <select id="pk-status-sel">${careStatusOptionsHtml_(care?.status || '')}</select>
           </div>
-          <div class="pk-form-col" style="${IS_PHONGTHUY ? 'display:none' : ''}">
+          <div class="pk-form-col">
             <label>Trạng thái Zalo</label>
             <select id="pk-zalo-sel">${optHtml(ZALO_STATUSES, care?.zalo)}</select>
           </div>
@@ -832,6 +829,7 @@
     if (IS_PHONGTHUY) {
       const bdayEl = box.querySelector('#pk-birthday');
       bdayEl.addEventListener('input', () => updateMenhBadge_());
+      bdayEl.addEventListener('change', () => updateMenhBadge_()); // input type=date: chon qua lich thuong chi ban 'change', khong ban 'input' o 1 so trinh duyet
       updateMenhBadge_();
     }
   }
