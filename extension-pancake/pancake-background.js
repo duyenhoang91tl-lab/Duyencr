@@ -161,6 +161,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
     return true;
   }
+
+  // Bang tra menh + mau canned response phong thuy (chi dung tren Messenger/Thu Hien) —
+  // action:'getKnowledge', doc/tu tao sheet Menh + CannedResponses rieng, KHONG dung cot CareData.
+  if (msg?.type === "GET_KNOWLEDGE") {
+    handleGetKnowledge()
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
 });
 
 // Tra cứu khách theo SĐT — GET GAS_URL?action=lookup&phone=... y hệt doLookup() bên Zalo AI.
@@ -478,4 +488,18 @@ async function handleGetPrice(payload) {
   const data = await res.json();
   if (data.error) throw new Error(data.error);
   return { rows: data.rows || [], total: data.total || 0 };
+}
+
+async function handleGetKnowledge() {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+  const res = await fetch(cfg.gasUrl, {
+    method: "POST",
+    body: JSON.stringify({ action: "getKnowledge" }),
+    redirect: "follow"
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || "Lỗi không rõ");
+  return { menhTable: data.menhTable || null, canned: data.canned || [] };
 }

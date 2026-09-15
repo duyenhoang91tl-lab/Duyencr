@@ -21,6 +21,69 @@
     '4.1 Không hiệu quả','4.2 Đã có kết quả','4.3 Đã đổi sang sản phẩm khác',
     '5. Đang tạm dừng','6. Nhận hộ / Sai số','7. Ngang Cúp','8. Từ chối'
   ];
+
+  // ═══ PHONG THUY THU HIEN (chi ap dung khi PLATFORM === 'messenger') — them 2026-09 ═══
+  // Cac list/du lieu duoi day KHONG dung cho Pancake (san pham suc khoe) de tranh lam sai
+  // ngu canh CS dang dung — moi noi dung dung PLATFORM === 'messenger' de chon nhanh.
+  const CARE_STATUSES_MESSENGER = [
+    'Chờ gọi tư vấn', 'Đã gọi - đang theo dõi', 'Hẹn gọi lại',
+    'Không nghe máy', 'Đã chốt', 'Từ chối', 'Đang khiếu nại', 'Tạm ngừng chăm sóc'
+  ];
+  // Dung lai chinh cot 'khStatus' (von la truong mo rong chung, khong rieng nghia vu) de luu
+  // Phan loai khach cho kenh Messenger — KHONG them cot moi vao CareData.
+  const PHAN_LOAI_OPTS_MESSENGER = ['', 'Mới', 'Cũ', 'VIP', 'Tiềm năng'];
+  const MENH_TABLE_DEFAULT = {
+    'Kim': [1954,1955,1962,1963,1970,1971,1984,1985,1992,1993,2000,2001],
+    'Thủy': [1956,1957,1964,1965,1972,1973,1986,1987,1994,1995,2002,2003],
+    'Hỏa': [1958,1959,1966,1967,1974,1975,1988,1989,1996,1997,2004,2005],
+    'Mộc': [1960,1961,1968,1969,1982,1983,1990,1991,1998,1999,2012,2013],
+    'Thổ': [1976,1977,1978,1979,1980,1981,2006,2007,2008,2009,2010,2011]
+  };
+  const CANNED_DEFAULT_MESSENGER = [
+    { id:'menhkim', nhom:'Theo mệnh', label:'Mệnh Kim', text:'Dạ với người mệnh Kim thì màu hợp là màu trắng, vàng, bạc (thuộc hành Kim và Thổ vì Thổ sinh Kim ạ), nên tránh dùng nhiều màu đỏ, hồng, tím (hành Hỏa khắc Kim).\nĐá phong thủy hợp mệnh Kim: đá thạch anh trắng, đá mắt hổ vàng, ngọc trai, đá obsidian đen (Thủy tương sinh).\nBên em hiện có $$ rất phù hợp với mệnh Kim ạ, chị/anh xem qua thử nhé.' },
+    { id:'menhmoc', nhom:'Theo mệnh', label:'Mệnh Mộc', text:'Dạ với người mệnh Mộc thì màu hợp là màu xanh lá, xanh dương, đen (hành Mộc và Thủy vì Thủy sinh Mộc ạ), nên tránh dùng nhiều màu trắng, bạc (hành Kim khắc Mộc).\nĐá phong thủy hợp mệnh Mộc: đá aventurine xanh, ngọc bích, đá obsidian đen.\nBên em hiện có $$ rất phù hợp với mệnh Mộc ạ, chị/anh xem qua thử nhé.' },
+    { id:'menhthuy', nhom:'Theo mệnh', label:'Mệnh Thủy', text:'Dạ với người mệnh Thủy thì màu hợp là màu đen, xanh dương, trắng (hành Thủy và Kim vì Kim sinh Thủy ạ), nên tránh dùng nhiều màu vàng nâu (hành Thổ khắc Thủy).\nĐá phong thủy hợp mệnh Thủy: đá obsidian đen, đá lapis lazuli xanh, đá thạch anh trắng.\nBên em hiện có $$ rất phù hợp với mệnh Thủy ạ, chị/anh xem qua thử nhé.' },
+    { id:'menhhoa', nhom:'Theo mệnh', label:'Mệnh Hỏa', text:'Dạ với người mệnh Hỏa thì màu hợp là màu đỏ, hồng, tím, xanh lá (hành Hỏa và Mộc vì Mộc sinh Hỏa ạ), nên tránh dùng nhiều màu đen, xanh dương (hành Thủy khắc Hỏa).\nĐá phong thủy hợp mệnh Hỏa: đá thạch anh hồng, đá garnet đỏ, đá aventurine xanh.\nBên em hiện có $$ rất phù hợp với mệnh Hỏa ạ, chị/anh xem qua thử nhé.' },
+    { id:'menhtho', nhom:'Theo mệnh', label:'Mệnh Thổ', text:'Dạ với người mệnh Thổ thì màu hợp là màu vàng, nâu, đỏ, hồng (hành Thổ và Hỏa vì Hỏa sinh Thổ ạ), nên tránh dùng nhiều màu xanh lá (hành Mộc khắc Thổ).\nĐá phong thủy hợp mệnh Thổ: đá mắt hổ vàng, đá citrine vàng, đá thạch anh hồng.\nBên em hiện có $$ rất phù hợp với mệnh Thổ ạ, chị/anh xem qua thử nhé.' },
+    { id:'chaohoi', nhom:'Giá & chính sách', label:'Chào hỏi', text:'Dạ em chào chị/anh, em là $$ bên shop phong thủy Thu Hiền ạ. Chị/anh cho em xin năm sinh để em tư vấn sản phẩm hợp mệnh nhất mình nhé ạ 🙏' },
+    { id:'giaba', nhom:'Giá & chính sách', label:'Báo giá', text:'Dạ sản phẩm $$ bên em giá là $$ ạ. Giá này đã bao gồm hộp đựng và thẻ bảo hành, chưa gồm phí ship ạ. Chị/anh có muốn em tư vấn thêm mẫu khác cùng tầm giá không ạ?' },
+    { id:'csship', nhom:'Giá & chính sách', label:'Chính sách ship', text:'Dạ bên em giao hàng toàn quốc qua đơn vị vận chuyển, thời gian dự kiến 2–4 ngày với nội thành và 3–5 ngày với tỉnh xa ạ. Chị/anh có thể xem hàng trước khi thanh toán (COD) ạ.' },
+    { id:'csdoitra', nhom:'Giá & chính sách', label:'Đổi trả', text:'Dạ sản phẩm bên em hỗ trợ đổi trong vòng 7 ngày nếu lỗi do nhà sản xuất hoặc không đúng mẫu đã đặt ạ, còn đổi ý cá nhân thì em xin phép hỗ trợ đổi mẫu khác tương đương giá trị trong 3 ngày ạ (khách chịu phí ship đổi). Chị/anh yên tâm mua ạ 🙏' },
+    { id:'xinttin', nhom:'Giá & chính sách', label:'Xin thông tin lên đơn', text:'Dạ để lên đơn cho chị/anh, em xin thông tin: \n- Họ tên: $$\n- Số điện thoại: $$\n- Địa chỉ nhận hàng: $$\nChị/anh gửi giúp em với ạ, em lên đơn ngay ạ.' },
+    { id:'follow2ngay', nhom:'Giá & chính sách', label:'Follow-up 2 ngày', text:'Dạ em là $$ bên phong thủy Thu Hiền ạ, hôm trước chị/anh có quan tâm sản phẩm $$, không biết chị/anh đã quyết định chưa ạ? Hiện bên em đang có ưu đãi $$, chị/anh xem thử nhé ạ 🙏' }
+  ];
+  const IS_PHONGTHUY = PLATFORM === 'messenger';
+  const ACTIVE_CARE_STATUSES = IS_PHONGTHUY ? CARE_STATUSES_MESSENGER : CARE_STATUSES;
+  const ACTIVE_KHSTATUS_OPTS = IS_PHONGTHUY ? PHAN_LOAI_OPTS_MESSENGER : KH_STATUS_OPTS;
+  const KHSTATUS_LABEL = IS_PHONGTHUY ? 'Phân loại khách' : 'Tình trạng KH';
+  const KNOWLEDGE_TTL_MS = 20 * 60 * 1000; // cache 20 phut, khong goi Sheet moi tin nhan
+  let _menhTable = MENH_TABLE_DEFAULT;
+  let _cannedResponses = CANNED_DEFAULT_MESSENGER;
+  function tinhMenh_(namSinhStr) {
+    const n = parseInt(namSinhStr, 10);
+    if (!n || n < 1900 || n > 2100) return null;
+    for (const menh of Object.keys(_menhTable)) if (_menhTable[menh].includes(n)) return menh;
+    return null;
+  }
+  async function loadPhongThuyKnowledge_() {
+    if (!IS_PHONGTHUY) return;
+    chrome.storage.local.get(['pkKnowledge', 'pkKnowledgeTs'], (res) => {
+      if (res.pkKnowledge) applyPhongThuyKnowledge_(res.pkKnowledge);
+      const fresh = res.pkKnowledge && res.pkKnowledgeTs && (Date.now() - res.pkKnowledgeTs < KNOWLEDGE_TTL_MS);
+      if (fresh) return;
+      chrome.runtime.sendMessage({ type: 'GET_KNOWLEDGE' }, (resp) => {
+        if (!resp?.ok || !resp.data) return; // giu ban mac dinh/cache cu neu GAS loi
+        const k = { menhTable: resp.data.menhTable || MENH_TABLE_DEFAULT, canned: (resp.data.canned && resp.data.canned.length) ? resp.data.canned : CANNED_DEFAULT_MESSENGER };
+        chrome.storage.local.set({ pkKnowledge: k, pkKnowledgeTs: Date.now() });
+        applyPhongThuyKnowledge_(k);
+      });
+    });
+  }
+  function applyPhongThuyKnowledge_(k) {
+    if (k.menhTable) _menhTable = k.menhTable;
+    if (k.canned && k.canned.length) _cannedResponses = k.canned;
+    renderCannedList_();
+  }
   const CARE_POLL_MS = 6000;
   const REM_POLL_MS = 5 * 60 * 1000; // quet nhac hen moi 5 phut
   // 3 huong mo dau khac nhau khi CHU DONG nhan truoc cho khach — CUNG NOI DUNG voi
@@ -56,10 +119,12 @@
     observeConversationChanges();
     loadCsNames_();
     loadNickList_();
-    loadCareStatusTree_();
+    if (!IS_PHONGTHUY) loadCareStatusTree_(); // cay dung chung cho Pancake/Zalo (san pham suc khoe) — khong ap dung cho phong thuy
     loadChatKeyMap_();
     startCarePoll_();
     loadReminders_();
+    loadPhongThuyKnowledge_();
+    if (IS_PHONGTHUY) setInterval(loadPhongThuyKnowledge_, KNOWLEDGE_TTL_MS);
     startRemPoll_();
   }
 
@@ -234,6 +299,14 @@
           <div id="pk-price-result"></div>
         </div>
 
+        ${IS_PHONGTHUY ? `
+        <div id="pk-canned-section">
+          <div id="pk-canned-header" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+            <span>📋 Mẫu có sẵn (phong thủy)</span><span id="pk-canned-toggle" style="font-size:11px">▼ mở</span>
+          </div>
+          <div id="pk-canned-body" style="display:none"></div>
+        </div>` : ''}
+
         <div id="pk-ai-status">Chưa có hội thoại nào được chọn.</div>
 
         <div class="pk-tones" id="pk-tones">
@@ -304,6 +377,16 @@
     panelEl.querySelector("#pk-price-q").addEventListener("keydown", (e) => {
       if (e.key === "Enter") doPriceSearch_();
     });
+    if (IS_PHONGTHUY) {
+      panelEl.querySelector('#pk-canned-header').addEventListener('click', () => {
+        const body = panelEl.querySelector('#pk-canned-body');
+        const toggle = panelEl.querySelector('#pk-canned-toggle');
+        const hidden = body.style.display === 'none';
+        body.style.display = hidden ? 'block' : 'none';
+        toggle.textContent = hidden ? '▲ thu gọn' : '▼ mở';
+        if (hidden) renderCannedList_();
+      });
+    }
     panelEl.querySelector("#pk-tones").addEventListener("click", (e) => {
       const btn = e.target.closest(".pk-tone");
       if (!btn) return;
@@ -371,7 +454,7 @@
       });
       return html;
     }
-    return [''].concat(CARE_STATUSES).map((o) =>
+    return [''].concat(ACTIVE_CARE_STATUSES).map((o) =>
       `<option value="${escapeHtml(o)}"${o === (selected || '') ? ' selected' : ''}>${o ? escapeHtml(o) : '— Chọn —'}</option>`
     ).join('');
   }
@@ -696,19 +779,22 @@
             <label>Trạng thái CS</label>
             <select id="pk-status-sel">${careStatusOptionsHtml_(care?.status || '')}</select>
           </div>
-          <div class="pk-form-col">
+          <div class="pk-form-col" style="${IS_PHONGTHUY ? 'display:none' : ''}">
             <label>Trạng thái Zalo</label>
             <select id="pk-zalo-sel">${optHtml(ZALO_STATUSES, care?.zalo)}</select>
           </div>
         </div>
         <div class="pk-form-row">
           <div class="pk-form-col">
-            <label>Tình trạng KH</label>
-            <select id="pk-khstatus-sel">${optHtml(KH_STATUS_OPTS, care?.khStatus)}</select>
+            <label>${KHSTATUS_LABEL}</label>
+            <select id="pk-khstatus-sel">${optHtml(ACTIVE_KHSTATUS_OPTS, care?.khStatus)}</select>
           </div>
           <div class="pk-form-col">
-            <label>Sinh nhật</label>
-            <input type="date" id="pk-birthday" value="${care?.birthday ? toInputDate_(care.birthday) : ''}" />
+            <label>Sinh nhật${IS_PHONGTHUY ? ' → Mệnh' : ''}</label>
+            <div style="display:flex;gap:4px;align-items:center">
+              <input type="date" id="pk-birthday" value="${care?.birthday ? toInputDate_(care.birthday) : ''}" style="flex:1" />
+              ${IS_PHONGTHUY ? '<span id="pk-menh-badge" style="font-size:11px;font-weight:700;color:#2563eb;white-space:nowrap"></span>' : ''}
+            </div>
           </div>
         </div>
 
@@ -743,6 +829,21 @@
     });
     box.querySelector('#pk-hen-done').addEventListener('click', () => doneAppointment_(phone));
     box.querySelector('#pk-save-btn').addEventListener('click', () => saveCare_(phone));
+    if (IS_PHONGTHUY) {
+      const bdayEl = box.querySelector('#pk-birthday');
+      bdayEl.addEventListener('input', () => updateMenhBadge_());
+      updateMenhBadge_();
+    }
+  }
+
+  function updateMenhBadge_() {
+    const inp = panelEl?.querySelector('#pk-birthday');
+    const out = panelEl?.querySelector('#pk-menh-badge');
+    if (!inp || !out) return;
+    const yearMatch = (inp.value || '').match(/\d{4}/);
+    if (!yearMatch) { out.textContent = ''; return; }
+    const menh = tinhMenh_(yearMatch[0]);
+    out.textContent = menh ? ('Mệnh ' + menh) : 'Chưa có DL năm này';
   }
 
   function renderNoteHistory_(raw) {
@@ -1210,6 +1311,27 @@
       };
       img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Không đọc được dữ liệu ảnh.")); };
       img.src = url;
+    });
+  }
+
+  function renderCannedList_() {
+    if (!IS_PHONGTHUY || !panelEl) return;
+    const box = panelEl.querySelector('#pk-canned-body');
+    if (!box) return;
+    const groups = {};
+    _cannedResponses.forEach(c => { (groups[c.nhom] = groups[c.nhom] || []).push(c); });
+    box.innerHTML = Object.keys(groups).map(nhom =>
+      `<div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;margin:6px 0 3px">${escapeHtml(nhom)}</div>` +
+      groups[nhom].map(c =>
+        `<div class="pk-ai-suggestion-item" data-cid="${escapeHtml(c.id)}" title="Bấm để chèn vào ô trả lời — chỗ $$ cần tự điền tay">` +
+        `<b>${escapeHtml(c.label)}</b><br>${escapeHtml(c.text.length > 90 ? c.text.slice(0, 90) + '…' : c.text)}</div>`
+      ).join('')
+    ).join('');
+    box.querySelectorAll('[data-cid]').forEach(el => {
+      el.addEventListener('click', () => {
+        const c = _cannedResponses.find(x => x.id === el.dataset.cid);
+        if (c) insertReply(c.text); // dung lai HAM CO SAN — tu dong xu ly ca contenteditable (Messenger) lan textarea
+      });
     });
   }
 

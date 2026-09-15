@@ -515,10 +515,6 @@ function doGet(e) {
 
     if (action === 'dashboard') return jsonOut_(buildDashboard_());
 
-    // ── MESSENGER/PHONG THUY AI: danh sach trang thai CS dung chung (Settings!careStatus) — nhe,
-    //    khong keo theo toan bo rows CareData nhu action 'customers'. Them 2026-09 cho extension Messenger. ──
-    if (action === 'careStatusOptions') return jsonOut_({ ok: true, options: readCareStatus_(ss) || [] });
-
     // ── Bao cao doanh so CRM moi (nguon: Google Sheet "DT tong" goc) ──
     if (action === 'salesReportA') {
       var pA = e.parameter || {};
