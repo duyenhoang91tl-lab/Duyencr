@@ -8137,6 +8137,11 @@ function dateInRange_(dt, fromStr, toStr) {
 // va SAI mot cach am tham (thieu dung 1000 lan) neu khong xu ly. Voi moi so > 0 va < 1000, hieu la
 // dang nhap theo don vi nghin dong va nhan lai 1000 cho dung don vi dong that.
 function _normMoney_(n) {
+  // Neu la chuoi text co dau phay/cham/ky hieu tien te (vd "1,000,000") thi Number() se ra NaN
+  // va "NaN || 0" am tham tra ve 0, lam mat doanh thu — bo cac ky tu nay truoc khi parse.
+  if (typeof n === 'string') {
+    n = n.replace(/[.,\s₫đĐ]/g, '');
+  }
   n = Number(n) || 0;
   if (n > 0 && n < 1000) return n * 1000;
   return n;

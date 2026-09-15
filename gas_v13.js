@@ -743,7 +743,7 @@ function dtRowToOrder_(row, rowIndex) {
     month: d ? (d.getMonth() + 1) : '',
     cs: String(row[DT_COL_SALEBAN] || ''),
     source: String(row[DT_COL_KENHBAN] || ''),
-    revenue: Number(row[DT_COL_GIATRIDON]) || 0,
+    revenue: _normMoney_(row[DT_COL_GIATRIDON]),
     product: String(row[DT_COL_SANPHAM] || ''),       // text tu do, xem luu y o tren
     productDetail: String(row[DT_COL_PHANLOAI] || ''),
     status: String(row[DT_COL_TRANGTHAI] || ''),
@@ -976,6 +976,15 @@ function dateInRange_(dt, fromStr, toStr) {
 // va SAI mot cach am tham (thieu dung 1000 lan) neu khong xu ly. Voi moi so > 0 va < 1000, hieu la
 // dang nhap theo don vi nghin dong va nhan lai 1000 cho dung don vi dong that.
 function _normMoney_(n) {
+  // Neu o tien la CHUOI TEXT (thuong gap khi copy/paste tu Excel/file khac, hoac o duoc dinh
+  // dang dang Text trong Sheet) co dau phay/cham phan cach hang nghin va/hoac ky hieu tien te
+  // (vd "1,000,000", "1.000.000đ", "1,000,000 ₫") thi Number(...) se ra NaN, va "NaN || 0" se
+  // AM THAM tra ve 0 — lam mat doanh thu ma khong bao loi gi. Don vi VND khong dung phan thap
+  // phan (khong co le), nen an toan de bo HET dau cham/phay/khoang trang/ky hieu tien te truoc
+  // khi parse so.
+  if (typeof n === 'string') {
+    n = n.replace(/[.,\s₫đĐ]/g, '');
+  }
   n = Number(n) || 0;
   if (n > 0 && n < 1000) return n * 1000;
   return n;
@@ -2003,7 +2012,7 @@ function patchOrder_(data) {
     var yy = d ? d.getFullYear() : '', mm = d ? (d.getMonth() + 1) : '';
     if (String(yy) !== String(data.oldYear)) continue;
     if (String(mm) !== String(data.oldMonth)) continue;
-    if (Number(r[DT_COL_GIATRIDON]) !== Number(data.oldRevenue)) continue;
+    if (_normMoney_(r[DT_COL_GIATRIDON]) !== _normMoney_(data.oldRevenue)) continue;
     rowIdx = i + 2; break;
   }
   if (rowIdx === -1) return jsonOut_({ ok: false, updated: false, error: 'Khong tim thay dong don hang phu hop trong DT TONG' });
@@ -2037,7 +2046,7 @@ function deleteOrder_(data) {
       var yy = d ? d.getFullYear() : '', mm = d ? (d.getMonth() + 1) : '';
       if (String(yy) !== String(data.oldYear)) continue;
       if (String(mm) !== String(data.oldMonth)) continue;
-      if (Number(r[DT_COL_GIATRIDON]) !== Number(data.oldRevenue)) continue;
+      if (_normMoney_(r[DT_COL_GIATRIDON]) !== _normMoney_(data.oldRevenue)) continue;
     }
     sh.deleteRow(i + 2);
     try { CacheService.getScriptCache().remove('lk_' + normPhone_(String(data.phone))); } catch (ec) {}
@@ -2086,7 +2095,7 @@ function findDuplicateOrders_(phoneFilter) {
         sheet: DT_TONG_SHEET, rowIndex: i + 2, id: r[DT_COL_ID] != null ? String(r[DT_COL_ID]) : '',
         phone: r[DT_COL_PHONE], name: '', date: r[DT_COL_THOIGIANHT] || '',
         year: '', month: '', cs: r[DT_COL_SALEBAN] || '', source: r[DT_COL_KENHBAN] || '',
-        revenue: Number(r[DT_COL_GIATRIDON]) || 0, product: r[DT_COL_SANPHAM] || '',
+        revenue: _normMoney_(r[DT_COL_GIATRIDON]), product: r[DT_COL_SANPHAM] || '',
         productDetail: r[DT_COL_PHANLOAI] || '', status: r[DT_COL_TRANGTHAI] || ''
       });
     }
@@ -2160,7 +2169,7 @@ function deleteDuplicateOrders_(items) {
       } else {
         if (it.phone   != null && it.phone   !== '' && normPhone_(String(rowVals[DT_COL_PHONE])) !== normPhone_(String(it.phone))) match = false;
         if (match && it.date    != null && it.date    !== '' && normOrderDate_(rowVals[DT_COL_THOIGIANHT]) !== normOrderDate_(it.date)) match = false;
-        if (match && it.revenue != null && it.revenue !== '' && (Number(rowVals[DT_COL_GIATRIDON]) || 0) !== (Number(it.revenue) || 0)) match = false;
+        if (match && it.revenue != null && it.revenue !== '' && _normMoney_(rowVals[DT_COL_GIATRIDON]) !== _normMoney_(it.revenue)) match = false;
         if (match && it.product != null && it.product !== '' && _normTxt_(rowVals[DT_COL_SANPHAM]) !== _normTxt_(it.product)) match = false;
       }
       if (!match) { skipped++; return; } // dong da bi dich/doi khac voi luc CS bam xoa -> KHONG xoa, tranh xoa nham
