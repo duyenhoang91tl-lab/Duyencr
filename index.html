@@ -1580,6 +1580,91 @@ async function _syncKhStatusTreeFromGAS() {
 // ngay tại đây sẽ chạm biến trước khi khởi tạo (temporal dead zone) và ném ReferenceError.
 setTimeout(_syncKhStatusTreeFromGAS, 0);
 
+// ════════════════════════════════════════════════════════════════════
+//  TRƯỜNG TỰ TẠO (admin tự thêm "trường lớn" ngoài 2 trường có sẵn)
+// ════════════════════════════════════════════════════════════════════
+// "Tình trạng CS" và "Trạng thái KH" là 2 trường lớn CỐ ĐỊNH (có cột riêng trong CareData trên
+// Google Sheet). Khối này cho phép admin TỰ TẠO THÊM trường lớn mới — mỗi trường có cây lựa chọn
+// mẹ/con riêng, dùng đúng cấu trúc { label, value } / { label, children:[...] } như 2 trường kia.
+// Giá trị CS chọn được lưu gộp trong careData[phone].custom = { "<id trường>": "giá trị" } nên
+// KHÔNG cần thêm cột mới vào Google Sheet mỗi lần admin tạo trường (tránh phải sửa backend GAS).
+// Cấu trúc: [{ id: 'cf_...', label: 'Tên trường', tree: [...] }]
+let CUSTOM_FIELDS = (function(){
+  try { var v = loadLS('ome_custom_fields'); return Array.isArray(v) ? v : []; } catch(e){ return []; }
+})();
+
+async function _syncCustomFieldsFromGAS() {
+  if (!gsUrl) return;
+  try {
+    var r = await fetch(gsUrl + '?action=getSetting&key=customFields', {redirect:'follow'});
+    var data = await r.json();
+    if (data && data.value) {
+      var arr = JSON.parse(data.value);
+      if (Array.isArray(arr)) {
+        CUSTOM_FIELDS.length = 0;
+        arr.forEach(function(f){ CUSTOM_FIELDS.push(f); });
+        saveLS('ome_custom_fields', CUSTOM_FIELDS);
+        // Nếu đang mở panel chi tiết 1 khách → vẽ lại để hiện trường mới admin vừa tạo
+        if (typeof currentPhone !== 'undefined' && currentPhone && typeof renderDpTab === 'function'
+            && typeof currentDpTab !== 'undefined' && currentDpTab === 'care') {
+          try { renderDpTab('care'); } catch(e){}
+        }
+      }
+    }
+  } catch(e) { /* giữ nguyên bản local nếu lỗi mạng/parse */ }
+}
+setTimeout(_syncCustomFieldsFromGAS, 0);
+
+// Build <option> cho 1 trường tự tạo — cùng cách hiển thị optgroup mẹ/con như _buildCustStatusOptions
+function _buildCustomFieldOptions(field, selected) {
+  var html = '<option value="">— Chọn —</option>';
+  (field.tree || []).forEach(function(node) {
+    if (node.children && node.children.length) {
+      html += '<optgroup label="' + esc(node.label) + '">';
+      node.children.forEach(function(ch) {
+        var v = ch.value || ch.label;
+        html += '<option value="' + esc(v) + '"' + (selected === v ? ' selected' : '') + '>'
+             + esc(node.label + ' → ' + ch.label) + '</option>';
+      });
+      html += '</optgroup>';
+    } else {
+      var v2 = node.value || node.label;
+      html += '<option value="' + esc(v2) + '"' + (selected === v2 ? ' selected' : '') + '>' + esc(node.label) + '</option>';
+    }
+  });
+  return html;
+}
+
+// HTML các ô select của trường tự tạo, chèn vào form "Thông tin chăm sóc"
+function _renderCustomFieldInputs(care) {
+  if (!CUSTOM_FIELDS.length) return '';
+  var vals = (care && care.custom) || {};
+  var cells = CUSTOM_FIELDS.map(function(f){
+    return '<div>'
+      + '<div class="form-label">' + esc(f.label) + '</div>'
+      + '<select class="form-select" id="cf-' + esc(f.id) + '" data-cfid="' + esc(f.id) + '">'
+      + _buildCustomFieldOptions(f, vals[f.id] || '')
+      + '</select></div>';
+  });
+  // Ghép 2 ô/hàng cho khớp lưới form-row-2 hiện có
+  var html = '';
+  for (var i = 0; i < cells.length; i += 2) {
+    html += '<div class="form-row-2">' + cells[i] + (cells[i+1] || '<div></div>') + '</div>';
+  }
+  return html;
+}
+
+// Đọc giá trị CS đang chọn ở các trường tự tạo (dùng khi lưu)
+function _collectCustomFieldValues(existingCustom) {
+  var out = Object.assign({}, existingCustom || {});
+  CUSTOM_FIELDS.forEach(function(f){
+    var el = document.getElementById('cf-' + f.id);
+    if (el) out[f.id] = el.value || '';
+  });
+  return out;
+}
+
+
 // Flatten để dùng trong filter/badge — chỉ lấy các value thực (lá hoặc không có con)
 function _flatCustStatusValues() {
   var out = [];
@@ -2071,7 +2156,8 @@ async function syncFromGS(opts) {
         schedCS: row.schedCS||'', schedCSNote: row.schedCSNote||'',
         schedHen: row.schedHen||'', schedHenNote: row.schedHenNote||'',
         updated: row.updated||'',
-        khStatus: row.khStatus||'', nickZalos: row.nickZalos||[], birthday: row.birthday||'', tag: row.tag||''
+        khStatus: row.khStatus||'', nickZalos: row.nickZalos||[], birthday: row.birthday||'', tag: row.tag||'',
+        custom: (row.custom && typeof row.custom === 'object') ? row.custom : {}
       };
       // KH này đang được xem trong panel chi tiết (openDp) và vừa có bản ghi mới hơn (vd: CS vừa lưu từ Zalo AI extension)
       if (typeof currentPhone !== 'undefined' && currentPhone &&
@@ -2166,7 +2252,8 @@ async function pushCareToGS(phone) {
     khStatus: care.khStatus||'',
     nickZalos: care.nickZalos||[],
     tag: care.tag||'',
-    name: care.name||''
+    name: care.name||'',
+    custom: care.custom||{}
   };
   try {
     await fetch(gsUrl, {
@@ -3403,6 +3490,7 @@ function renderCareTab(c) {
         </div>
       </div>
     </div>
+    ${_renderCustomFieldInputs(care)}
     <div class="form-row-2">
       <div>
         <div class="form-label" style="display:flex;align-items:center;gap:4px">
@@ -3994,13 +4082,21 @@ function saveCare(phone) {
   const newBirthday = (document.getElementById('cs-birthday') ? document.getElementById('cs-birthday').value : '') || existing.birthday || '';
   const newTag = (document.getElementById('cs-tag') ? document.getElementById('cs-tag').value.trim() : '') || existing.tag || '';
   const newNickZalos = (function(){ try { var el=document.getElementById('cs-nickzalo-val'); return el ? JSON.parse(el.value||'[]') : (existing.nickZalos||[]); } catch(e){ return existing.nickZalos||[]; }})();
+  // Trường tự tạo (admin thêm) — gộp chung 1 object 'custom' để không phải thêm cột mới vào Sheet
+  const newCustom = _collectCustomFieldValues(existing.custom);
   // V9 audit: ghi lại thay đổi trạng thái / CS / Zalo
   if ((existing.status||'') !== newStatus) logAudit('status', phone, existing.status||'(trống)', newStatus||'(trống)');
   if ((existing.cs||'') !== newCS)         logAudit('cs', phone, existing.cs||'(trống)', newCS||'(trống)');
   if ((existing.zalo||'') !== newZalo)     logAudit('status', phone, 'Zalo: '+(existing.zalo||'(trống)'), 'Zalo: '+(newZalo||'(trống)'));
   if ((existing.khStatus||'') !== newKhStatus) logAudit('status', phone, 'KH: '+(existing.khStatus||'(trống)'), 'KH: '+(newKhStatus||'(trống)'));
   if ((existing.tag||'') !== newTag) logAudit('status', phone, 'Nhãn: '+(existing.tag||'(trống)'), 'Nhãn: '+(newTag||'(trống)'));
-  careData[phone] = { ...existing, status: newStatus, zalo: newZalo, note: newNote, cs: newCS, khStatus: newKhStatus, birthday: newBirthday, tag: newTag, nickZalos: newNickZalos };
+  // Audit cho từng trường tự tạo có thay đổi
+  CUSTOM_FIELDS.forEach(function(f){
+    var oldV = ((existing.custom||{})[f.id]) || '';
+    var newV = (newCustom[f.id]) || '';
+    if (oldV !== newV) logAudit('status', phone, f.label+': '+(oldV||'(trống)'), f.label+': '+(newV||'(trống)'));
+  });
+  careData[phone] = { ...existing, status: newStatus, zalo: newZalo, note: newNote, cs: newCS, khStatus: newKhStatus, birthday: newBirthday, tag: newTag, nickZalos: newNickZalos, custom: newCustom };
   _touchCare(phone);
   saveLS('ome_care', careData);
   _invalidateFilterCache();
@@ -11115,7 +11211,8 @@ function _careRow(phone){
     schedCS: care.schedCS||'', schedCSNote: care.schedCSNote||'',
     schedHen: care.schedHen||'', schedHenNote: care.schedHenNote||'',
     khStatus: care.khStatus||'', nickZalos: care.nickZalos||[], birthday: care.birthday||'',
-    name: care.name||''
+    name: care.name||'',
+    custom: care.custom||{}
   };
 }
 // Chỉ đồng bộ CareData khi khách có DỮ LIỆU CS NHẬP THẬT.
@@ -11131,6 +11228,11 @@ function _hasRealCareData(phone){
   if ((care.birthday||'').toString().trim()) return true;
   if ((care.name||'').toString().trim())     return true;
   if (Array.isArray(care.nickZalos) && care.nickZalos.length) return true;
+  // Trường tự tạo (admin thêm) có giá trị → cũng là dữ liệu CS nhập thật, phải được đồng bộ
+  // (nếu thiếu điều kiện này, khách CHỈ điền trường tự tạo sẽ không bao giờ được đẩy lên Sheet)
+  if (care.custom && typeof care.custom === 'object') {
+    for (var _ck in care.custom) { if ((care.custom[_ck]||'').toString().trim()) return true; }
+  }
   // Lịch nhanh đặt tay
   if ((care.schedGoi||'').toString().trim()) return true;
   if ((care.schedSP||'').toString().trim())  return true;
@@ -13287,6 +13389,7 @@ function _renderAuthHeader(){
   var html = '';
   if (isAdmin) html += '<button class="btn sm" title="Quản lý tình trạng CS" onclick="openCareStatusModal()">⚙ Tình trạng CS</button>';
   if (isAdmin) html += '<button class="btn sm" title="Quản lý trạng thái KH" onclick="openKhStatusModal()">⚙ Trạng thái KH</button>';
+  if (isAdmin) html += '<button class="btn sm" title="Tự tạo trường lớn mới (ngoài Tình trạng CS / Trạng thái KH)" onclick="openCustomFieldsModal()">➕ Trường tự tạo</button>';
   if (isAdmin) html += '<button class="btn sm" title="Quản lý tài khoản đăng nhập" onclick="openAcctModal()">🔑 Tài khoản</button>';
   if (loggedIn) html += '<button class="btn sm" title="Đăng xuất" onclick="doLogout()">⎋ Đăng xuất</button>';
   box.innerHTML = html;
@@ -13894,9 +13997,65 @@ function updateSidebarCareFilters() {
 </div>
 </div>
 
+<!-- ══ MODAL: Quản lý TRƯỜNG TỰ TẠO (admin) ══ -->
+<div class="modal-overlay" id="cf-modal" style="display:none;align-items:flex-start;justify-content:center;padding-top:40px;z-index:700">
+<div class="modal" style="max-width:820px;width:94%;max-height:86vh;display:flex;flex-direction:column">
+  <div class="modal-header" style="flex-shrink:0">
+    <div class="modal-title">➕ Trường tự tạo</div>
+    <button class="modal-close" onclick="closeCustomFieldsModal()">✕</button>
+  </div>
+  <div class="modal-body" style="overflow:auto;flex:1">
+    <div style="font-size:11px;color:var(--hint);margin-bottom:10px">
+      Tạo thêm "trường lớn" của riêng bạn (ngang hàng với <b>Tình trạng CS</b> / <b>Trạng thái KH</b>).
+      Mỗi trường có cây lựa chọn mẹ → con riêng, hiện ngay trong form <b>Thông tin chăm sóc</b> của từng khách.
+    </div>
+    <div style="display:flex;gap:14px;align-items:flex-start">
+      <!-- Cột trái: danh sách trường -->
+      <div style="width:290px;flex-shrink:0">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--hint);margin-bottom:6px">Các trường lớn</div>
+        <div id="cf-field-list" style="border:1px solid var(--border);border-radius:var(--rsm);padding:6px;min-height:120px;max-height:320px;overflow:auto"></div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <input id="cf-new-field" class="form-input" placeholder="Tên trường mới..." style="flex:1"
+                 onkeydown="if(event.key==='Enter')_cfAddField()">
+          <button class="btn primary sm" onclick="_cfAddField()">+ Tạo</button>
+        </div>
+      </div>
+      <!-- Cột phải: cây lựa chọn -->
+      <div style="flex:1;min-width:0">
+        <div id="cf-tree-title" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--hint);margin-bottom:6px">Chọn 1 trường ở cột trái để sửa lựa chọn</div>
+        <div id="cf-tree" style="border:1px solid var(--border);border-radius:var(--rsm);padding:8px;min-height:120px;max-height:320px;overflow:auto"></div>
+        <div id="cf-tree-tools" style="display:none;margin-top:8px">
+          <div style="display:flex;gap:6px">
+            <input id="cf-new-node" class="form-input" placeholder="Tên lựa chọn mới..." style="flex:1"
+                   onkeydown="if(event.key==='Enter')_cfAddNode(false)">
+            <button class="btn primary sm" onclick="_cfAddNode(false)">+ Mục</button>
+            <button class="btn secondary sm" onclick="_cfAddNode(true)">+ Nhóm</button>
+          </div>
+          <div style="font-size:10px;color:var(--hint);margin-top:6px">
+            📁 Nhóm = chỉ làm tiêu đề, CS không chọn được. 🔹/↳ = CS chọn được. Dùng 🔄 để biến 1 mục thành nhóm có con.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-footer" style="flex-shrink:0;display:flex;justify-content:flex-end;gap:8px">
+    <button class="btn" onclick="closeCustomFieldsModal()">Đóng</button>
+    <button class="btn primary" onclick="saveCustomFields()">💾 Lưu + Sync</button>
+  </div>
+</div>
+</div>
+
 <style>
-.khs-group{margin-bottom:8px;}
-.khs-parent-row{display:flex;align-items:center;gap:7px;padding:6px 8px;background:var(--surface2);border:1px solid var(--border-md);border-radius:var(--rsm);font-weight:600;font-size:12px;cursor:default;}
+.cf-frow{display:flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);font-size:12px;cursor:pointer;margin-bottom:4px;}
+.cf-frow:hover{background:var(--surface2);}
+.cf-frow.cf-active{border-color:var(--accent,#2563eb);background:#eff6ff;}
+.cf-fname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;}
+.cf-fcnt{font-size:10px;color:var(--hint);flex-shrink:0;}
+.cf-mini{background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 6px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4;flex-shrink:0;}
+.cf-mini:hover{background:var(--surface2);}
+.cf-mini.cf-del{color:var(--red,#dc2626);border-color:var(--red-b,#fca5a5);}
+.cf-mini.cf-del:hover{background:var(--red-bg,#fff1f2);}
+.khs-group{margin-bottom:8px;}.khs-parent-row{display:flex;align-items:center;gap:7px;padding:6px 8px;background:var(--surface2);border:1px solid var(--border-md);border-radius:var(--rsm);font-weight:600;font-size:12px;cursor:default;}
 .khs-parent-row:hover{background:#e8e6e3;}
 .khs-children{padding-left:20px;margin-top:3px;display:flex;flex-direction:column;gap:3px;}
 .khs-child-row{display:flex;align-items:center;gap:7px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);font-size:12px;cursor:default;}
@@ -14127,6 +14286,205 @@ function addKhStatusItem(asGroup) {
   document.getElementById('khs-new-label').value = '';
   _renderKhStatusTree();
   _renderKhParentSel();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  QUẢN LÝ TRƯỜNG TỰ TẠO (admin)
+//  - Thêm/đổi tên/xoá "trường lớn" (ngang hàng Tình trạng CS / Trạng thái KH)
+//  - Với mỗi trường: sửa cây lựa chọn mẹ/con (thêm nhóm, thêm mục, chuyển lá↔nhóm)
+// ═══════════════════════════════════════════════════════════════════
+let _cfDraft = [];        // bản nháp toàn bộ danh sách trường
+let _cfEditingIdx = -1;   // đang mở cây của trường nào (-1 = chưa chọn)
+
+function openCustomFieldsModal() {
+  var isAdmin = (_authAccount && _authAccount.role === 'admin') || _bootstrapAdmin;
+  if (!isAdmin) { toast('Chỉ admin mới quản lý trường tự tạo.'); return; }
+  _cfDraft = JSON.parse(JSON.stringify(CUSTOM_FIELDS));
+  _cfEditingIdx = _cfDraft.length ? 0 : -1;
+  _renderCfModal();
+  var m = document.getElementById('cf-modal');
+  if (m) m.style.display = 'flex';
+}
+function closeCustomFieldsModal() {
+  var m = document.getElementById('cf-modal');
+  if (m) m.style.display = 'none';
+}
+
+function _cfNewId() { return 'cf_' + Date.now() + '_' + Math.floor(Math.random()*1000); }
+
+function _renderCfModal() {
+  // ── Cột trái: danh sách trường lớn ──
+  var listEl = document.getElementById('cf-field-list');
+  if (listEl) {
+    if (!_cfDraft.length) {
+      listEl.innerHTML = '<div style="color:var(--hint);font-size:11px;padding:10px;text-align:center">Chưa có trường nào.<br>Nhập tên bên dưới để tạo.</div>';
+    } else {
+      listEl.innerHTML = _cfDraft.map(function(f, i){
+        var cnt = (f.tree||[]).reduce(function(s,n){ return s + (n.children ? n.children.length : 1); }, 0);
+        return '<div class="cf-frow' + (i === _cfEditingIdx ? ' cf-active' : '') + '" onclick="_cfSelectField(' + i + ')">'
+          + '<span class="cf-fname">' + esc(f.label) + '</span>'
+          + '<span class="cf-fcnt">' + cnt + ' mục</span>'
+          + '<button class="cf-mini" title="Đổi tên" onclick="event.stopPropagation();_cfRenameField(' + i + ')">✏</button>'
+          + '<button class="cf-mini cf-del" title="Xoá trường" onclick="event.stopPropagation();_cfDeleteField(' + i + ')">✕</button>'
+          + '</div>';
+      }).join('');
+    }
+  }
+  // ── Cột phải: cây lựa chọn của trường đang chọn ──
+  var treeEl = document.getElementById('cf-tree');
+  var titleEl = document.getElementById('cf-tree-title');
+  var toolsEl = document.getElementById('cf-tree-tools');
+  if (!treeEl) return;
+  if (_cfEditingIdx < 0 || !_cfDraft[_cfEditingIdx]) {
+    if (titleEl) titleEl.textContent = 'Chọn 1 trường ở cột trái để sửa lựa chọn';
+    if (toolsEl) toolsEl.style.display = 'none';
+    treeEl.innerHTML = '';
+    return;
+  }
+  var f = _cfDraft[_cfEditingIdx];
+  if (titleEl) titleEl.textContent = 'Lựa chọn của: ' + f.label;
+  if (toolsEl) toolsEl.style.display = '';
+  var tree = f.tree || [];
+  if (!tree.length) {
+    treeEl.innerHTML = '<div style="color:var(--hint);font-size:11px;padding:10px;text-align:center">Chưa có lựa chọn nào.</div>';
+  } else {
+    treeEl.innerHTML = tree.map(function(node, pi){
+      if (node.children) {
+        var kids = node.children.map(function(ch, ci){
+          return '<div class="khs-child-row">'
+            + '<span class="khs-icon">↳</span>'
+            + '<span class="khs-lbl">' + esc(ch.label) + '</span>'
+            + '<button class="cf-mini" title="Đổi tên" onclick="_cfRenameNode(' + pi + ',' + ci + ')">✏</button>'
+            + '<button class="cf-mini cf-del" title="Xoá" onclick="_cfDeleteNode(' + pi + ',' + ci + ')">✕</button>'
+            + '</div>';
+        }).join('');
+        return '<div class="khs-group"><div class="khs-parent-row">'
+          + '<span class="khs-icon">📁</span>'
+          + '<span class="khs-lbl">' + esc(node.label) + '</span>'
+          + '<span class="khs-group-badge">nhóm</span>'
+          + '<button class="cf-mini" title="Đổi tên" onclick="_cfRenameNode(' + pi + ',null)">✏</button>'
+          + '<button class="cf-mini" title="Thêm mục con" onclick="_cfAddChild(' + pi + ')">+</button>'
+          + '<button class="cf-mini cf-del" title="Xoá cả nhóm" onclick="_cfDeleteNode(' + pi + ',null)">✕</button>'
+          + '</div><div class="khs-children">' + kids + '</div></div>';
+      }
+      return '<div class="khs-leaf-row">'
+        + '<span class="khs-icon">🔹</span>'
+        + '<span class="khs-lbl">' + esc(node.label) + '</span>'
+        + '<button class="cf-mini" title="Đổi tên" onclick="_cfRenameNode(' + pi + ',null)">✏</button>'
+        + '<button class="cf-mini" title="Chuyển thành nhóm (có mục con)" onclick="_cfLeafToGroup(' + pi + ')">🔄</button>'
+        + '<button class="cf-mini cf-del" title="Xoá" onclick="_cfDeleteNode(' + pi + ',null)">✕</button>'
+        + '</div>';
+    }).join('');
+  }
+}
+
+function _cfSelectField(i) { _cfEditingIdx = i; _renderCfModal(); }
+
+function _cfAddField() {
+  var inp = document.getElementById('cf-new-field');
+  var label = (inp ? inp.value : '').trim();
+  if (!label) { toast('Nhập tên trường mới'); return; }
+  if (_cfDraft.some(function(f){ return f.label.toLowerCase() === label.toLowerCase(); })) {
+    toast('Đã có trường tên này'); return;
+  }
+  _cfDraft.push({ id: _cfNewId(), label: label, tree: [] });
+  if (inp) inp.value = '';
+  _cfEditingIdx = _cfDraft.length - 1;
+  _renderCfModal();
+}
+function _cfRenameField(i) {
+  var f = _cfDraft[i]; if (!f) return;
+  var v = prompt('Đổi tên trường:', f.label);
+  if (v === null) return;
+  v = v.trim(); if (!v) return;
+  f.label = v;
+  _renderCfModal();
+}
+function _cfDeleteField(i) {
+  var f = _cfDraft[i]; if (!f) return;
+  if (!confirm('Xoá trường "' + f.label + '"?\n\nLưu ý: giá trị khách hàng đã chọn ở trường này sẽ không còn hiển thị (dữ liệu vẫn nằm trong Sheet, hiện lại nếu bạn tạo lại trường cùng tên ID).')) return;
+  _cfDraft.splice(i, 1);
+  if (_cfEditingIdx >= _cfDraft.length) _cfEditingIdx = _cfDraft.length - 1;
+  _renderCfModal();
+}
+
+function _cfAddNode(asGroup) {
+  if (_cfEditingIdx < 0) { toast('Chọn 1 trường trước'); return; }
+  var inp = document.getElementById('cf-new-node');
+  var label = (inp ? inp.value : '').trim();
+  if (!label) { toast('Nhập tên lựa chọn'); return; }
+  var f = _cfDraft[_cfEditingIdx];
+  if (!f.tree) f.tree = [];
+  f.tree.push(asGroup ? { label: label, children: [] } : { label: label, value: label });
+  if (inp) inp.value = '';
+  _renderCfModal();
+}
+function _cfAddChild(pi) {
+  var f = _cfDraft[_cfEditingIdx]; if (!f) return;
+  var node = f.tree[pi]; if (!node) return;
+  var v = prompt('Tên mục con mới trong nhóm "' + node.label + '":', '');
+  if (v === null) return;
+  v = v.trim(); if (!v) return;
+  if (!node.children) node.children = [];
+  node.children.push({ label: v, value: v });
+  _renderCfModal();
+}
+function _cfRenameNode(pi, ci) {
+  var f = _cfDraft[_cfEditingIdx]; if (!f) return;
+  var node = f.tree[pi]; if (!node) return;
+  var target = (ci === null || ci === undefined) ? node : (node.children || [])[ci];
+  if (!target) return;
+  var v = prompt('Đổi tên:', target.label);
+  if (v === null) return;
+  v = v.trim(); if (!v) return;
+  target.label = v;
+  // Mục chọn được (lá/con) thì value đi kèm label để dữ liệu lưu đúng cái CS nhìn thấy
+  if (target.value !== undefined) target.value = v;
+  _renderCfModal();
+}
+function _cfDeleteNode(pi, ci) {
+  var f = _cfDraft[_cfEditingIdx]; if (!f) return;
+  var node = f.tree[pi]; if (!node) return;
+  if (ci === null || ci === undefined) {
+    if (node.children && node.children.length && !confirm('Xoá nhóm "' + node.label + '" và toàn bộ ' + node.children.length + ' mục con?')) return;
+    f.tree.splice(pi, 1);
+  } else {
+    (node.children || []).splice(ci, 1);
+  }
+  _renderCfModal();
+}
+function _cfLeafToGroup(pi) {
+  var f = _cfDraft[_cfEditingIdx]; if (!f) return;
+  var node = f.tree[pi]; if (!node || node.children) return;
+  f.tree[pi] = { label: node.label, children: [{ label: node.label, value: node.value || node.label }] };
+  _renderCfModal();
+}
+
+async function saveCustomFields() {
+  CUSTOM_FIELDS.length = 0;
+  _cfDraft.forEach(function(f){ CUSTOM_FIELDS.push(f); });
+  saveLS('ome_custom_fields', CUSTOM_FIELDS);
+  // Đồng bộ qua action 'setSetting' CHUNG (giống khStatusTree/nickZaloList) — không cần thêm
+  // action riêng ở backend GAS.
+  if (gsUrl) {
+    try {
+      var r = await fetch(gsUrl, {
+        method: 'POST', redirect: 'follow',
+        body: JSON.stringify({ action: 'setSetting', key: 'customFields', value: JSON.stringify(CUSTOM_FIELDS) })
+      });
+      var d = await r.json().catch(function(){ return {}; });
+      if (d && d.error) toast('Lưu local ✓ — GSheets: ' + d.error);
+      else toast('✓ Đã lưu và đồng bộ trường tự tạo lên Google Sheets');
+    } catch(e) { toast('✓ Đã lưu local — chưa đồng bộ GSheets: ' + e.message); }
+  } else {
+    toast('✓ Đã lưu trường tự tạo (local)');
+  }
+  closeCustomFieldsModal();
+  // Vẽ lại form chi tiết nếu đang mở để thấy trường mới ngay
+  if (typeof currentPhone !== 'undefined' && currentPhone && typeof renderDpTab === 'function'
+      && typeof currentDpTab !== 'undefined' && currentDpTab === 'care') {
+    try { renderDpTab('care'); } catch(e){}
+  }
 }
 
 function resetKhStatusToDefault() {

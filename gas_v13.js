@@ -68,7 +68,7 @@ var SH_ORDER_DEFAULT = 'OrderData26';
 var CARE_HEADERS = ['phone','status','zalo','cs','note','schedules',
   'schedGoi','schedGoiNote','schedSP','schedSPNote',
   'schedCS','schedCSNote','schedHen','schedHenNote','updated',
-  'khStatus','nickZalos','birthday','zaloSetBy','name'];
+  'khStatus','nickZalos','birthday','zaloSetBy','name','custom'];
 
 var ORDER_HEADERS  = ['phone','name','date','year','month','cs','source','revenue',
   'product','productDetail','status','zalo','note','careCS'];
@@ -302,7 +302,10 @@ function careObjFromRow_(row) {
     nickZalos:    parseNZ(row[16]),
     birthday:     row[17]||'',
     zaloSetBy:    parseSetBy(row[18]), // { cs, nick, at } - ai/nick nao vua ghi trang thai 'zalo' gan nhat
-    name:         row[19]||''
+    name:         row[19]||'',
+    // Gia tri cac "truong tu tao" admin them (xem CUSTOM_FIELDS ben index.html) — luu gop 1 cot
+    // JSON de khong phai them cot moi moi lan admin tao them truong.
+    custom:       (function(v){ try { var o = JSON.parse(v||'{}'); return (o && typeof o === 'object') ? o : {}; } catch(e) { return {}; } })(row[20])
   };
 }
 
@@ -330,18 +333,22 @@ function findCareByPhone_(phone) {
   return null;
 }
 
-// careRow_: 20 cols. Neu truong khong co thi de trong.
+// careRow_: 21 cols. Neu truong khong co thi de trong.
 function careRow_(r) {
   var nz = r.nickZalos;
   if (!Array.isArray(nz)) { try { nz = JSON.parse(nz||'[]'); } catch(e) { nz = []; } }
   var setBy = r.zaloSetBy;
   if (setBy && typeof setBy !== 'string') { try { setBy = JSON.stringify(setBy); } catch(e) { setBy = ''; } }
+  var cust = r.custom;
+  if (typeof cust === 'string') { try { cust = JSON.parse(cust||'{}'); } catch(e) { cust = {}; } }
+  if (!cust || typeof cust !== 'object') cust = {};
   return [
     r.phone||'', r.status||'', r.zalo||'', r.cs||'', r.note||'', r.schedules||'',
     r.schedGoi||'', r.schedGoiNote||'', r.schedSP||'', r.schedSPNote||'',
     r.schedCS||'', r.schedCSNote||'', r.schedHen||'', r.schedHenNote||'',
     new Date().toISOString(),
-    r.khStatus||'', JSON.stringify(nz), r.birthday||'', setBy||'', r.name||''
+    r.khStatus||'', JSON.stringify(nz), r.birthday||'', setBy||'', r.name||'',
+    JSON.stringify(cust)
   ];
 }
 
