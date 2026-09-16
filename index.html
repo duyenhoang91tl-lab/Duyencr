@@ -4825,7 +4825,20 @@ function quickSched(phone) {
 
 function _toggleAddOrderForm() {
   const el = document.getElementById('add-order-form');
-  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  if (!el) return;
+  const opening = el.style.display === 'none';
+  el.style.display = opening ? 'block' : 'none';
+  // Khi MO form: neu KH nay den tu nguon "Chăm sóc" (da luu tai khoan qua Pancake AI/Zalo AI/
+  // nut "+ Thêm KH mới") thi dien san Nguon = "Chăm sóc" cho CS khoi phai go tay.
+  // CS van co the sua lai o nay neu don thuc te den tu nguon khac.
+  if (opening) {
+    try {
+      const srcEl = document.getElementById('mo-source');
+      const lead = (typeof currentPhone !== 'undefined' && currentPhone && typeof careLeads !== 'undefined' && careLeads)
+        ? careLeads[currentPhone] : null;
+      if (srcEl && !srcEl.value && lead && lead.cs) srcEl.value = 'Chăm sóc';
+    } catch(e){}
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -4913,7 +4926,7 @@ async function addManualOrder(phone) {
   const product = (document.getElementById('mo-product').value||'').trim();
   const revenue = parseFloat(document.getElementById('mo-revenue').value||0)||0;
   const date    = document.getElementById('mo-date').value;
-  const source  = document.getElementById('mo-source').value;
+  const rawSource = (document.getElementById('mo-source').value||'').trim();
   const detail  = (document.getElementById('mo-detail').value||'').trim();
   if (!date) { toast('Vui lòng chọn ngày đặt'); return; }
   if (!revenue) { toast('Vui lòng nhập doanh thu'); return; }
@@ -4924,15 +4937,23 @@ async function addManualOrder(phone) {
   const d = new Date(date);
   const yr = d.getFullYear();
   const mo = d.getMonth()+1;
-  // CS phu trach cua don = TAI KHOAN DANG NHAP DON (nguoi len don), dung theo quy uoc
-  // "CS phụ trách = người lên đơn" dang dung o bo loc/thong ke. Chi khi khong xac dinh duoc
-  // tai khoan (chua dang nhap) moi lui ve CS cham soc / CS cua don gan nhat nhu truoc.
-  // Luu y: truoc day dong nay dung thang `currentUser` (la OBJECT {name,role,team}) nen khi
-  // roi vao nhanh do se ghi ra "[object Object]" — da sua thanh currentUser.name.
+
+  // ── KH da duoc luu qua Pancake AI / Zalo AI / nut "+ Them KH mua moi" (co trong careLeads) ──
+  // Theo yeu cau: sau nay CS them don cho nhung KH nay thi don PHAI hien:
+  //   - Nguon  = "Chăm sóc"
+  //   - Nguoi cham soc / CS phu trach = dung ten tai khoan da luu luc them KH (careLeads[phone].cs),
+  //     KHONG lay theo nguoi dang bam them don (co the la admin/CS khac dang len don ho).
+  const lead = (typeof careLeads !== 'undefined' && careLeads) ? careLeads[phone] : null;
+  const leadCS = lead && lead.cs ? String(lead.cs).trim() : '';
+
   const enteredBy = (typeof currentUser !== 'undefined' && currentUser && currentUser.name) ? currentUser.name : '';
-  const cs = enteredBy || (careData[phone]&&careData[phone].cs) || _latestOrderCS(c.orders) || '';
+  // Nguon: KH nguon "Chăm sóc" -> luon ghi "Chăm sóc" (tru khi CS co chu dong go nguon khac vao o).
+  const source = leadCS ? (rawSource || 'Chăm sóc') : rawSource;
+  // CS phu trach: uu tien nguoi da luu tai khoan tren Pancake/Zalo AI; neu khong co moi lui ve
+  // quy uoc cu "CS phu trach = nguoi len don".
+  const cs = leadCS || enteredBy || (careData[phone]&&careData[phone].cs) || _latestOrderCS(c.orders) || '';
   // CS cham soc: giu nguyen nguoi dang cham neu da co, chua co thi gan luon cho nguoi len don.
-  const careCS = (careData[phone]&&careData[phone].cs) || enteredBy || cs;
+  const careCS = leadCS || (careData[phone]&&careData[phone].cs) || enteredBy || cs;
 
   const newOrder = {
     date: d, year: yr, month: mo,
@@ -4949,6 +4970,16 @@ async function addManualOrder(phone) {
   c.totalOrders  = c.orders.length;
   c.brands = new Set(c.orders.map(o=>o.product).filter(Boolean));
   c.renewOrders = c.orders.filter(o=>RENEW_SOURCES.includes(s(o.source).toLowerCase())).length;
+
+  // KH nguon "Chăm sóc": chot luon CS cham soc = tai khoan da luu tren Pancake/Zalo AI, de
+  // cot "CS chăm sóc" o danh sach + bo loc hien dung ngay, khong phai doi dong bo vong sau.
+  if (leadCS) {
+    careData[phone] = Object.assign({}, careData[phone]||{}, { cs: leadCS });
+    try { _touchCare(phone); } catch(e){}
+    saveLS('ome_care', careData);
+    c.careCS = leadCS;
+    c.careCSSet = new Set(splitMulti_(leadCS, ','));
+  }
 
   logAudit('order_manual', phone, '', `Thêm đơn thủ công: ${product||detail} · ${revenue} · ${date}`);
 
@@ -13475,6 +13506,9 @@ async function doLogin(){
   }
   _authAccount = { username: acct.username, role: acct.role, name: acct.name, team: acct.team };
   saveLS('ome_auth', _authAccount);
+  // Nho ten tai khoan vua dang nhap de lan sau (ke ca sau khi dang xuat / dong trinh duyet)
+  // tu dien san vao o "Tai khoan" — CHI luu username, KHONG BAO GIO luu mat khau.
+  try { localStorage.setItem('ome_last_user', acct.username); } catch(e){}
   if (errEl) errEl.style.display = 'none';
   var pEl = document.getElementById('login-pass'); if (pEl) pEl.value = '';
   _hideLogin();
@@ -13493,7 +13527,19 @@ function _showLogin(){
   var f = document.getElementById('login-form'); if (f) f.style.display = '';
   var e = document.getElementById('login-err'); if (e) e.style.display = 'none';
   ov.classList.add('show');
-  setTimeout(function(){ var u = document.getElementById('login-user'); if (u) u.focus(); }, 60);
+  // Tu dien lai ten tai khoan da dang nhap lan truoc (neu o dang trong) -> CS khong phai
+  // go lai ten moi lan mo trinh duyet. Mat khau luon de trong, phai nhap lai.
+  var uEl = document.getElementById('login-user');
+  var lastU = '';
+  try { lastU = localStorage.getItem('ome_last_user') || ''; } catch(e2){}
+  if (uEl && lastU && !uEl.value) uEl.value = lastU;
+  setTimeout(function(){
+    var u = document.getElementById('login-user');
+    var p = document.getElementById('login-pass');
+    // Da co san ten -> nhay thang vao o mat khau cho tien
+    if (u && u.value && p) { p.focus(); return; }
+    if (u) u.focus();
+  }, 60);
 }
 function _hideLogin(){ var ov = document.getElementById('login-overlay'); if (ov) ov.classList.remove('show'); }
 
