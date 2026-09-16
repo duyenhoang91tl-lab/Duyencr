@@ -768,8 +768,10 @@
     if (phone) probeExistingCustomer_(phone);
   }
 
-  // Tra cứu ngầm 1 SĐT vừa nhập ở form thêm mới — chỉ để CẢNH BÁO + nạp lại dữ liệu cũ vào
-  // các ô CS chưa sửa, không bao giờ xoá thứ CS đã gõ.
+  // Tra cứu ngầm khi CS vừa dán SĐT — CHỈ để báo sớm cho CS biết đây là khách đã có, và nạp
+  // sẵn dữ liệu cũ lên form cho dễ nhìn. Đây KHÔNG phải cơ chế bảo vệ dữ liệu: việc chống ghi
+  // đè được đảm bảo chắc chắn ở bước lưu (saveCareAddOnly_ đọc lại bản mới nhất rồi hợp nhất),
+  // nên kể cả khi CS bấm Lưu trước lúc tra cứu này trả về thì dữ liệu cũ vẫn an toàn.
   function probeExistingCustomer_(phone) {
     safeSendMessage_({ type: 'LOOKUP_CUSTOMER', payload: { phone } }, (resp) => {
       if (!resp?.ok || _currentPhone !== phone) return; // CS đã đổi sang số khác -> bỏ qua
@@ -780,7 +782,7 @@
       applyPolledCare_(phone, care || {});
       const tagEl = panelEl.querySelector('#pk-ai-new-tag');
       if (tagEl) tagEl.style.display = 'none';
-      setStatus(`⚠️ Số ${phone} đã có sẵn trong hệ thống — đã nạp lại dữ liệu cũ vào các ô chưa sửa, kiểm tra kỹ trước khi lưu.`);
+      setStatus(`ℹ️ Số ${phone} đã có sẵn trong hệ thống — bạn vẫn điền và lưu bình thường, phần bạn nhập sẽ được THÊM vào hồ sơ này chứ không ghi đè dữ liệu cũ.`);
     });
   }
 
@@ -987,6 +989,110 @@
     }, overrides || {});
   }
 
+  // ── LUU AN TOAN CHO LUONG "+ Them KH" (nguon Cham soc) ─────────────────────────────────
+  // Nguyen tac: sale CHI DUOC THEM thong tin moi, KHONG duoc ghi de/xoa du lieu cu.
+  // Truoc khi ghi, luon doc lai ban ghi MOI NHAT tren server roi hop nhat:
+  //   - Ghi chu: GIU NGUYEN toan bo lich su cu, chi noi them cac ghi chu moi CS vua go len dau.
+  //   - Cac truong khac (trang thai CS/Zalo/tinh trang KH/sinh nhat/lich hen/ten): neu server
+  //     DA CO gia tri thi giu nguyen cua server; chi dien vao nhung o server dang de trong.
+  // Nho vay du CS bam Luu truoc khi tra ngam kip tra ve, du lieu cu van an toan tuyet doi.
+  function _mergeNotesKeepOld_(serverNoteRaw, localNoteRaw) {
+    const serverArr = _parseNotes(serverNoteRaw);
+    const localArr = _parseNotes(localNoteRaw);
+    const keyOf = (n) => [n.text || '', n.user || '', n.time || ''].join('|');
+    const seen = new Set(serverArr.map(keyOf));
+    // Ghi chu moi = co trong local nhung chua co tren server -> dua len dau, giu het ban cu
+    const added = localArr.filter((n) => n.text && !seen.has(keyOf(n)));
+    return { merged: _notesToStr([...added, ...serverArr]), addedCount: added.length };
+  }
+
+  // Tra ve row da hop nhat + danh sach ten truong bi giu lai (de bao cho CS biet, minh bach)
+  function _mergeRowKeepOld_(serverCare, localRow) {
+    const kept = [];
+    const out = Object.assign({}, localRow);
+    const LABELS = {
+      name: 'Tên khách', status: 'Trạng thái CS', zalo: 'Trạng thái Zalo',
+      khStatus: KHSTATUS_LABEL, birthday: 'Sinh nhật',
+      schedHen: 'Ngày hẹn', schedHenNote: 'Ghi chú lịch hẹn'
+    };
+    Object.keys(LABELS).forEach((k) => {
+      const sv = serverCare[k];
+      const lv = localRow[k];
+      if (sv) {                       // server da co -> giu nguyen, sale khong duoc de len
+        out[k] = sv;
+        if (lv && String(lv) !== String(sv)) kept.push(LABELS[k]);
+      } else {
+        out[k] = lv || '';            // server trong -> cho phep dien moi
+      }
+    });
+    // Cac truong lich hen/schedules khac khong co UI ben Pancake: luon lay nguyen cua server
+    ['schedules','schedGoi','schedGoiNote','schedSP','schedSPNote','schedCS','schedCSNote'].forEach((k) => {
+      out[k] = serverCare[k] || localRow[k] || '';
+    });
+    // Nick Zalo/kenh: hop nhat, khong bao gio lam mat nick cu
+    const svNicks = serverCare.nickZalos || [];
+    const lcNicks = localRow.nickZalos || [];
+    out.nickZalos = [...new Set([...svNicks, ...lcNicks])];
+    // CS phu trach: neu khach da co CS cu thi giu, khong cuop quyen phu trach
+    out.cs = serverCare.cs || localRow.cs || '';
+    const noteRes = _mergeNotesKeepOld_(serverCare.note, localRow.note);
+    out.note = noteRes.merged;
+    return { row: out, kept, addedNotes: noteRes.addedCount };
+  }
+
+  function saveCareAddOnly_(phone, localRow, btn) {
+    // Doc lai ban MOI NHAT ngay truoc khi ghi — chan ca truong hop CS bam Luu qua nhanh
+    safeSendMessage_({ type: 'LOOKUP_CUSTOMER', payload: { phone } }, (lookupResp) => {
+      if (!lookupResp?.ok) {
+        if (btn) { btn.disabled = false; btn.textContent = '💾 Lưu vào Sasum'; }
+        setStatus('Chưa kiểm tra được dữ liệu cũ của số này nên tạm dừng để an toàn — bấm Lưu lại lần nữa.');
+        return;
+      }
+      const serverCare = lookupResp.data.care || null;
+      const serverOrders = lookupResp.data.orders || [];
+      const isTrulyNew = !serverCare && !serverOrders.length;
+      const { row, kept, addedNotes } = _mergeRowKeepOld_(serverCare || {}, localRow);
+      safeSendMessage_({ type: 'SAVE_CARE', payload: Object.assign({}, row, { isNewCustomer: isTrulyNew }) }, (resp) => {
+        if (btn) { btn.disabled = false; btn.textContent = '💾 Lưu vào Sasum'; }
+        if (!resp?.ok) { setStatus('Lưu thất bại: ' + (resp?.error || 'lỗi không rõ')); return; }
+        _currentCare = row;
+        _currentPhone = phone;
+        _currentOrders = serverOrders;
+        _lastServerCare = Object.assign({}, row);
+        _refreshCardAfterSave_(phone, row);
+        renderNoteHistory_(row.note);
+        const rawEl = panelEl.querySelector('#pk-note-raw');
+        if (rawEl) rawEl.value = row.note;
+        if (isTrulyNew) {
+          setStatus('✓ Đã tạo khách mới (nguồn Chăm sóc).');
+        } else {
+          let msg = `✓ Đã thêm vào khách đã có sẵn${addedNotes ? ` — ${addedNotes} ghi chú mới` : ''}.`;
+          if (kept.length) msg += ` Giữ nguyên dữ liệu cũ: ${kept.join(', ')} (sale không ghi đè được).`;
+          setStatus(msg);
+        }
+      });
+    });
+  }
+
+  function _refreshCardAfterSave_(phone, row) {
+    const nameSpan = panelEl.querySelector('.pk-ai-cust-name');
+    if (nameSpan && row.name) nameSpan.innerHTML = `${escapeHtml(row.name)} <span class="pk-ai-cust-phone">${phone}</span>`;
+    const tagEl = panelEl.querySelector('#pk-ai-new-tag');
+    if (tagEl) tagEl.style.display = 'none';
+    const newPhoneEl = panelEl.querySelector('#pk-newphone-input');
+    if (newPhoneEl) { newPhoneEl.value = phone; newPhoneEl.readOnly = true; }
+    // Dong bo lai cac o tren form theo gia tri thuc te da ghi (vd truong bi giu lai cua server)
+    const setVal = (id, v) => { const el = panelEl.querySelector(id); if (el) el.value = v || ''; };
+    setVal('#pk-name-input', row.name);
+    setVal('#pk-status-sel', row.status);
+    setVal('#pk-zalo-sel', row.zalo);
+    setVal('#pk-khstatus-sel', row.khStatus);
+    setVal('#pk-birthday', row.birthday ? toInputDate_(row.birthday) : '');
+    setVal('#pk-hen-date', row.schedHen ? toInputDate_(row.schedHen) : '');
+    setVal('#pk-hen-note', row.schedHenNote);
+    learnChatKeyForPhone_(phone);
+  }
+
   function saveCare_(phone) {
     const btn = panelEl.querySelector('#pk-save-btn');
     const rawEl = panelEl.querySelector('#pk-note-raw');
@@ -1000,10 +1106,11 @@
       if (el) el.focus();
       return;
     }
-    // Khách MỚI (nguồn "Chăm sóc"): chưa từng có CareData lẫn đơn hàng nào — bắt buộc nhập tên
-    // trước khi lưu, và sau khi lưu sẽ ghi thêm vào sheet riêng "KH Chăm sóc mới" (Báo cáo D).
-    const isNewCustomer = !_currentCare && (!_currentOrders || !_currentOrders.length);
-    if (isNewCustomer && !liveName) { setStatus('Khách mới — vui lòng nhập tên khách hàng trước khi lưu.'); return; }
+    // Form "＋ Thêm KH" (nguồn Chăm sóc do sale tự thêm): bắt buộc có tên, và đi qua đường lưu
+    // CHỈ-THÊM — đọc lại bản mới nhất rồi hợp nhất, không bao giờ ghi đè dữ liệu cũ.
+    const isAddForm = !!panelEl.querySelector('#pk-newphone-input');
+    if (isAddForm && !liveName) { setStatus('Vui lòng nhập tên khách hàng trước khi lưu.'); return; }
+
     const row = _buildRow(phone, {
       name: liveName,
       status: panelEl.querySelector('#pk-status-sel').value,
@@ -1015,6 +1122,10 @@
       note: rawEl ? rawEl.value : (_currentCare?.note || '')
     });
     if (btn) { btn.disabled = true; btn.textContent = 'Đang lưu...'; }
+    if (isAddForm) { saveCareAddOnly_(phone, row, btn); return; }
+
+    // Luồng cũ (đã tra cứu khách sẵn rồi mới sửa): giữ nguyên như trước
+    const isNewCustomer = !_currentCare && (!_currentOrders || !_currentOrders.length);
     safeSendMessage_({ type: 'SAVE_CARE', payload: Object.assign({}, row, { isNewCustomer }) }, (resp) => {
       if (btn) { btn.disabled = false; btn.textContent = '💾 Lưu vào Sasum'; }
       if (!resp?.ok) { setStatus('Lưu thất bại: ' + (resp?.error || 'lỗi không rõ')); return; }
