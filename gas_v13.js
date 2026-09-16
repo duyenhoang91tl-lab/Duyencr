@@ -245,8 +245,108 @@ function searchPriceCatalog_(rows, q) {
   return scored.slice(0, 20).map(function(x){ return x.row; });
 }
 
-// ─── CTKM (Sheet CTKM, cung file PRICE_SS_ID) — chi nap khi khach hoi ve khuyen mai/giam gia ──
-// Doc toan bo sheet CTKM thanh mang object, giong cach doc DANH_MUC (khong hardcode ten cot).
+// ─── BANG GIA CHO PROMPT AI ───────────────────────────────────────────────
+// Khac voi searchPriceCatalog_ (dung cho o "Tra cuu bang gia", khop chat theo tu khoa CS go),
+// ham nay nhan NGUYEN doan yeu cau/cau hoi cua sale (dai, nhieu tu thua) nen phai cham diem
+// thay vi bat buoc khop het tu.
+// Muc dich chinh (yeu cau Duyen): khi sale KHONG ghi ro chat lieu/size, AI phai liet ke DU
+// TAT CA cac bien the tim thay kem chat lieu + size + gia tuong ung — vi 1 ten san pham
+// (vd "VONG TAY DONG DIEU DONG LOC") co nhieu dong khac nhau ve chat lieu/mau/gia.
+var _PRICE_STOPWORDS_ = ['khach','hoi','gia','bao','nhieu','tien','san','pham','cho','minh',
+  'ban','em','anh','chi','oi','the','nao','duoc','khong','voi','nay','mua','can','tu','van',
+  'tra','loi','giup','xin','vui','long','mot','cac','va','la','co','hang','shop'];
+
+function _priceFieldPick_(row, kws) {
+  for (var k in row) {
+    var nk = _stripVN_(k);
+    for (var i = 0; i < kws.length; i++) {
+      if (nk.indexOf(kws[i]) !== -1) return { key: k, val: row[k] };
+    }
+  }
+  return null;
+}
+
+// Gom TAT CA cot gia co gia tri cua 1 dong (G = gia thuong, H = SAPHIA, I = RUBY...)
+function _priceAllPrices_(row) {
+  var out = [];
+  for (var k in row) {
+    var nk = _stripVN_(k);
+    if (nk.indexOf('gia') === -1 && nk.indexOf('price') === -1) continue;
+    var v = row[k];
+    if (v === '' || v === null || v === undefined) continue;
+    out.push(String(k).replace(/\s*\(.*?\)\s*/g, '').trim() + ': ' + v);
+  }
+  return out;
+}
+
+function _priceVariantsForPrompt_(userMsg) {
+  var rows;
+  try {
+    var cache = CacheService.getScriptCache();
+    var cached = cache.get('price_catalog_v2');
+    if (cached) { try { rows = JSON.parse(cached); } catch (e) {} }
+    if (!rows) {
+      rows = readPriceCatalog_();
+      try { cache.put('price_catalog_v2', JSON.stringify(rows), 600); } catch (e) {}
+    }
+  } catch (e) { return ''; }
+  if (!rows || !rows.length) return '';
+
+  var toks = _stripVN_(userMsg).replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+    .filter(function (w) { return w.length >= 3 && _PRICE_STOPWORDS_.indexOf(w) === -1; });
+  if (!toks.length) return '';
+
+  // Cham diem CHI tren cac cot ten (nhom/thuong mai/ten san pham) de tranh nhieu tu cot khac
+  var scored = [];
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    var nameBlob = '';
+    for (var k in r) {
+      var nk = _stripVN_(k);
+      if (nk.indexOf('ten') !== -1 || nk.indexOf('nhom') !== -1) nameBlob += ' ' + r[k];
+    }
+    nameBlob = _stripVN_(nameBlob);
+    if (!nameBlob.trim()) continue;
+    var hit = 0;
+    for (var t = 0; t < toks.length; t++) if (nameBlob.indexOf(toks[t]) !== -1) hit++;
+    if (hit >= 2) scored.push({ row: r, hit: hit, name: nameBlob });
+  }
+  if (!scored.length) return '';
+  scored.sort(function (a, b) { return b.hit - a.hit; });
+  var bestHit = scored[0].hit;
+
+  // Lay cac dong diem cao nhat, roi gom theo TEN SAN PHAM chuan hoa de keo ve DU cac bien the
+  var topNames = {};
+  for (var s = 0; s < scored.length && Object.keys(topNames).length < 3; s++) {
+    if (scored[s].hit < bestHit) break;
+    var f = _priceFieldPick_(scored[s].row, ['ten san pham', 'ten thuong mai']);
+    if (f && f.val) topNames[_stripVN_(f.val)] = String(f.val).trim();
+  }
+  if (!Object.keys(topNames).length) return '';
+
+  var blocks = [];
+  for (var nk2 in topNames) {
+    var variants = [];
+    for (var j = 0; j < rows.length && variants.length < 15; j++) {
+      var rr = rows[j];
+      var fn = _priceFieldPick_(rr, ['ten san pham', 'ten thuong mai']);
+      if (!fn || !fn.val) continue;
+      if (_stripVN_(fn.val) !== nk2) continue;
+      var mat = _priceFieldPick_(rr, ['chat lieu']);
+      var sz = _priceFieldPick_(rr, ['kieu', 'size']);
+      var prices = _priceAllPrices_(rr);
+      if (!prices.length) continue;
+      variants.push('- Chất liệu: ' + ((mat && mat.val) ? mat.val : '(không ghi)') +
+                    ' | Kiểu/Size: ' + ((sz && sz.val) ? sz.val : '(mặc định)') +
+                    ' | ' + prices.join(' · '));
+    }
+    if (variants.length) blocks.push('SẢN PHẨM: ' + topNames[nk2] + '\n' + variants.join('\n'));
+  }
+  if (!blocks.length) return '';
+  return blocks.join('\n\n');
+}
+
+// ─── CTKM (Sheet CTKM, cung file PRICE_SS_ID) — chi nap khi khach hoi ve khuyen mai/giam gia ──// Doc toan bo sheet CTKM thanh mang object, giong cach doc DANH_MUC (khong hardcode ten cot).
 function readCTKMCatalog_() {
   var sh = SpreadsheetApp.openById(PRICE_SS_ID).getSheetByName(CTKM_SHEET_NAME);
   if (!sh || sh.getLastRow() < 2) return [];
@@ -2965,7 +3065,23 @@ function _buildAISystemPrompt_(userMsg, withProducts) {
   // CTKM: chi nap khi cau hoi cua khach co tu khoa khuyen mai/giam gia (xem readCTKMPromotions_)
   var ctkm = readCTKMPromotions_(userMsg);
   if (ctkm) parts.push('\n\nCHUONG TRINH KHUYEN MAI (CTKM) DANG AP DUNG (chi dung khi khach hoi ve khuyen mai/giam gia, KHONG tu bia them neu khong co trong danh sach nay):\n' + ctkm);
-  parts.push('\n\nYEU CAU: Chi dua ra DUY NHAT 1 cau tra loi ngan gon (toi da 150 tu). Khong danh so, khong giai thich them.');
+  // ── BANG GIA: cac bien the (chat lieu/size/gia) cua san pham duoc nhac toi ──
+  var priceInfo = _priceVariantsForPrompt_(userMsg);
+  var hasMultiVariant = false;
+  if (priceInfo) {
+    hasMultiVariant = priceInfo.split('\n').filter(function (l) { return l.indexOf('- Chất liệu:') === 0; }).length > 1;
+    parts.push('\n\nBANG GIA CHINH THUC (nguon: Sheet DANH_MUC cua team — CHI dung so lieu trong day, TUYET DOI KHONG tu bia gia hay tu suy ra gia khac):\n' + priceInfo);
+    parts.push('\n\nQUY TAC BAO GIA:\n' +
+      '- Neu sale/khach DA noi ro chat lieu va size: chi bao dung 1 muc gia khop nhat.\n' +
+      '- Neu KHONG ghi ro chat lieu hoac size: PHAI liet ke DAY DU TAT CA cac truong hop tim thay o tren, moi dong ghi ro chat lieu + kieu/size + gia tuong ung, roi hoi lai khach muon loai nao. KHONG duoc tu chon 1 muc gia roi bo qua cac muc con lai.\n' +
+      '- Gia trong bang tinh bang NGHIN VND (vd 2.310 = 2.310.000d). Khi bao gia cho khach hay quy ra dong cho de hieu.\n' +
+      '- Neu san pham co them cot gia SAPHIA/RUBY thi neu ro do la gia cua loai da tuong ung.');
+  }
+  if (hasMultiVariant) {
+    parts.push('\n\nYEU CAU: Tra loi bang tieng Viet, than thien. Vi co NHIEU lua chon chat lieu/size, hay liet ke DU cac lua chon (moi lua chon 1 dong ngan: chat lieu - size - gia), sau do hoi khach chon loai nao. Khong dai dong ngoai phan bao gia.');
+  } else {
+    parts.push('\n\nYEU CAU: Chi dua ra DUY NHAT 1 cau tra loi ngan gon (toi da 150 tu). Khong danh so, khong giai thich them.');
+  }
   return parts.join('');
 }
 
