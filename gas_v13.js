@@ -34,12 +34,16 @@ var CTKM_SHEET_NAME  = 'CTKM'; // Sheet CTKM (cung file PRICE_SS_ID) — doi ten
 var DEFAULT_PRODUCT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1YJMJs8GI7dBfDl5TNZM44n7N8lhJoeSD0KOWflU2fmM/edit?gid=1833367723#gid=1833367723';
 var DEFAULT_DRIVE_KNOWLEDGE_FOLDER_URL = 'https://drive.google.com/drive/folders/1Koz4IdENS5QgdvvYMaQO1MlVEFMFAciN?hl=vi';
 var DEFAULT_DRIVE_PRODUCT_IMAGES_FOLDER_URL = 'https://drive.google.com/drive/folders/1PES3V_bsYLcmIynMjRHPVjT6rJGTc6EO?hl=vi';
-// API key AI (Groq/Gemini/OpenRouter) cung theo pattern nay — CS dung Zalo AI/Pancake AI
-// KHONG can tu nhap key trong Cai dat nua. Cerebras chua co key co dinh nen van doc rieng
-// tu Settings (neu team tu nhap sau nay).
-var DEFAULT_API_GROQ_KEY = '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';
-var DEFAULT_API_GEMINI_KEY = 'AQ.Ab8RN6KRb0MjSj60RjCW0G8uRhM76C6CIyjPvNtLdLrD4NWWBQ';
-var DEFAULT_API_OPENROUTER_KEY = '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';
+// ── API key AI: CHI doc tu sheet Settings, KHONG hardcode trong code ──────────────────────
+// TRUOC DAY (commit f6fed69) co 3 bien DEFAULT_API_GROQ_KEY / DEFAULT_API_GEMINI_KEY /
+// DEFAULT_API_OPENROUTER_KEY chua key that, de CS khoi phai tu nhap. Da BO vi 2 ly do:
+//  1) BAO MAT: file nay nam trong repo GitHub, nen key bi lo cong khai. Groq va OpenRouter
+//     deu co quet secret tu dong va THU HOI ngay key nao bi day len repo cong khai — dung
+//     la ly do bao "Invalid API Key" (Groq) va "User not found" (OpenRouter).
+//  2) CHE GIAU LOI: viet kieu `getSetting_('apiGemini') || DEFAULT_...` khien khi Settings
+//     CHUA co key (vd doi sang spreadsheet/deployment moi) he thong AM THAM dung key cu
+//     hardcode thay vi bao thieu key — nguoi dung nhap key moi ma khong hieu sao van loi.
+// Tu gio thieu key thi bao ro thieu, khong tu y thay bang key khac.
 
 function getOrderSS_() {
   return ORDER_SS_ID
@@ -306,7 +310,14 @@ function getSetting_(key) {
   if (!sh || sh.getLastRow() < 2) return null;
   var vals = sh.getDataRange().getValues();
   for (var i = 1; i < vals.length; i++) {
-    if (String(vals[i][0]) === key) return vals[i][1] || null;
+    // .trim() o CA 2 ve: copy-paste API key rat hay dinh khoang trang/xuong dong o cuoi,
+    // ma ky tu do lot vao header Authorization se lam request hong -> bao "Invalid API Key"
+    // du key go dung. Truoc day khong trim nen loi nay rat kho doan ra.
+    if (String(vals[i][0]).trim() === key) {
+      var v = vals[i][1];
+      if (v === '' || v === null || v === undefined) return null;
+      return String(v).trim() || null;
+    }
   }
   return null;
 }
@@ -3015,16 +3026,16 @@ function callAI_(data) {
   // tai) va gemini-flash-latest (alias Google tu dong tro ve ban Flash on dinh moi
   // nhat, tranh phai sua code moi khi Google lai ngung ho tro 1 phien ban cu the).
   var providers = [
-    { name: 'Groq',       key: getSetting_('apiGroq') || getSetting_('geminiKey') || DEFAULT_API_GROQ_KEY, fn: _aiOpenAICompat_, url: 'https://api.groq.com/openai/v1/chat/completions',        model: 'openai/gpt-oss-120b' },
-    { name: 'Cerebras',   key: getSetting_('apiCerebras'),                                                  fn: _aiOpenAICompat_, url: 'https://api.cerebras.ai/v1/chat/completions',           model: 'gpt-oss-120b' },
-    { name: 'Gemini',     key: getSetting_('apiGemini') || DEFAULT_API_GEMINI_KEY,                          fn: _aiGemini_,       model: 'gemini-flash-latest' },
-    { name: 'OpenRouter', key: getSetting_('apiOpenRouter') || DEFAULT_API_OPENROUTER_KEY,                  fn: _aiOpenAICompat_, url: 'https://openrouter.ai/api/v1/chat/completions',         model: 'google/gemma-2-9b-it:free' }
+    { name: 'Groq',       setting: 'apiGroq',       key: getSetting_('apiGroq') || getSetting_('geminiKey'), fn: _aiOpenAICompat_, url: 'https://api.groq.com/openai/v1/chat/completions',        model: 'openai/gpt-oss-120b' },
+    { name: 'Cerebras',   setting: 'apiCerebras',   key: getSetting_('apiCerebras'),                         fn: _aiOpenAICompat_, url: 'https://api.cerebras.ai/v1/chat/completions',           model: 'gpt-oss-120b' },
+    { name: 'Gemini',     setting: 'apiGemini',     key: getSetting_('apiGemini'),                           fn: _aiGemini_,       model: 'gemini-flash-latest' },
+    { name: 'OpenRouter', setting: 'apiOpenRouter', key: getSetting_('apiOpenRouter'),                       fn: _aiOpenAICompat_, url: 'https://openrouter.ai/api/v1/chat/completions',         model: 'google/gemma-2-9b-it:free' }
   ];
 
-  var errors = [], anyKey = false;
+  var errors = [], missing = [], anyKey = false;
   for (var i = 0; i < providers.length; i++) {
     var pv = providers[i];
-    if (!pv.key) continue;
+    if (!pv.key) { missing.push(pv.name + ' (thieu o Settings: ' + pv.setting + ')'); continue; }
     anyKey = true;
     var r = pv.fn(pv, sys, userMsg);
     if (r.ok && r.text) {
@@ -3043,11 +3054,63 @@ function callAI_(data) {
       }
       return jsonOut_(out);
     }
-    errors.push(pv.name + ': ' + (r.error || 'rong'));
-    // loi (429/sai key/...) -> tu dong thu provider ke tiep
+    // Kem theo dau key dang dung (da che) de phan biet ngay 2 truong hop rat de nham:
+    // key SAI vs key DUNG nhung het quota/het han — truoc day chi thay "401" nen kho doan.
+    errors.push(pv.name + ' [' + _maskKey_(pv.key) + ']: ' + (r.error || 'rong'));
   }
-  if (!anyKey) return jsonOut_({ error: 'Chua co API Key nao. Mo extension → banh rang → nhap it nhat 1 key (Groq/Cerebras/Gemini/OpenRouter).' });
-  return jsonOut_({ error: 'Tat ca API deu loi: ' + errors.join(' | ') });
+  if (!anyKey) {
+    return jsonOut_({ error: 'Chua co API Key nao trong sheet Settings. Mo extension → banh rang ⚙ → nhap it nhat 1 key (Groq/Cerebras/Gemini/OpenRouter) roi bam Luu. Thieu: ' + missing.join(', ') });
+  }
+  var msg = 'Tat ca API deu loi: ' + errors.join(' | ');
+  if (missing.length) msg += ' || Chua cau hinh: ' + missing.join(', ');
+  return jsonOut_({ error: msg });
+}
+
+// Che API key khi dua vao thong bao loi/chan doan: chi giu dau va duoi de doi chieu voi key
+// tren trang nha cung cap, khong bao gio lo nguyen key ra man hinh/log.
+function _maskKey_(k) {
+  k = String(k || '');
+  if (!k) return 'trong';
+  if (k.length <= 12) return k.substring(0, 3) + '***';
+  return k.substring(0, 6) + '***' + k.substring(k.length - 4) + ' (' + k.length + ' ky tu)';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CHAN DOAN API KEY — chay truc tiep trong Apps Script Editor
+//  (Chon ham diagApiKeys > bam Run > xem tab Execution log)
+//  Bao cho biet: sheet Settings dang giu key nao, dai bao nhieu, co dinh khoang trang
+//  khong, va goi thu tung nha cung cap de biet chinh xac cai nao song cai nao chet.
+// ═══════════════════════════════════════════════════════════════
+function diagApiKeys() {
+  var ss = getCrmSS_();
+  var sh = ss.getSheetByName(SH_SET);
+  Logger.log('Spreadsheet dang dung: ' + ss.getName() + ' (' + ss.getId() + ')');
+  if (!sh) { Logger.log('!! KHONG TIM THAY sheet "' + SH_SET + '" -> moi key deu rong.'); return; }
+
+  var names = ['apiGroq', 'apiCerebras', 'apiGemini', 'apiOpenRouter'];
+  var raw = sh.getDataRange().getValues();
+  Logger.log('--- Gia tri THO trong sheet Settings ---');
+  names.forEach(function (n) {
+    var found = null;
+    for (var i = 1; i < raw.length; i++) if (String(raw[i][0]).trim() === n) { found = raw[i][1]; break; }
+    if (found === null) { Logger.log(n + ': (KHONG CO DONG NAY trong sheet)'); return; }
+    var s = String(found);
+    Logger.log(n + ': ' + _maskKey_(s.trim()) +
+      (s !== s.trim() ? '  <-- CO KHOANG TRANG/XUONG DONG THUA (da tu cat khi dung)' : ''));
+  });
+
+  Logger.log('--- Goi thu tung nha cung cap ---');
+  var tests = [
+    { name: 'Groq',       key: getSetting_('apiGroq') || getSetting_('geminiKey'), fn: _aiOpenAICompat_, url: 'https://api.groq.com/openai/v1/chat/completions', model: 'openai/gpt-oss-120b' },
+    { name: 'Cerebras',   key: getSetting_('apiCerebras'),   fn: _aiOpenAICompat_, url: 'https://api.cerebras.ai/v1/chat/completions', model: 'gpt-oss-120b' },
+    { name: 'Gemini',     key: getSetting_('apiGemini'),     fn: _aiGemini_,       model: 'gemini-flash-latest' },
+    { name: 'OpenRouter', key: getSetting_('apiOpenRouter'), fn: _aiOpenAICompat_, url: 'https://openrouter.ai/api/v1/chat/completions', model: 'google/gemma-2-9b-it:free' }
+  ];
+  tests.forEach(function (t) {
+    if (!t.key) { Logger.log(t.name + ': CHUA CO KEY -> bo qua'); return; }
+    var r = t.fn(t, 'Ban la tro ly. Tra loi that ngan.', 'Noi "ok"');
+    Logger.log(t.name + ' [' + _maskKey_(t.key) + ']: ' + (r.ok ? 'OK — ' + String(r.text).substring(0, 40) : 'LOI — ' + r.error));
+  });
 }
 
 
