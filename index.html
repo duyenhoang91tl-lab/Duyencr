@@ -1984,6 +1984,10 @@ async function syncFromGS(opts) {
 
     // ── Tải đơn hàng riêng nếu cần ──
     let orderCount = 0;
+    // Ep buildCustomers() day du (thay vi chi rebuildCareOnCustomers() nhe) khi phat hien 1 SDT
+    // MOI xuat hien o nguon "Cham soc" ma app chua tung biet toi — xem giai thich chi tiet ben
+    // duoi cho tung truong hop.
+    let _forceFullBuildFromCareLeads = false;
     if (pullOrders) {
       try {
         if (isManual) txt('ltext', 'Đang tải đơn hàng từ Google Sheets...');
@@ -2012,17 +2016,6 @@ async function syncFromGS(opts) {
         console.warn('Orders fetch error:', orderErr.message);
         if (isManual) toast('⚠ Không tải được đơn hàng: ' + orderErr.message);
       }
-      // ── Nguồn "Chăm sóc" (sheet riêng, KH thêm nhanh) — chỉ tải cùng nhịp với orders ──
-      try {
-        const clR = await fetch(gsUrl + sepChar + 'action=careLeads', { redirect: 'follow' });
-        const clJson = await clR.json();
-        if (clJson && clJson.rows) {
-          const newLeads = {};
-          clJson.rows.forEach(function(r){ if (r.phone) newLeads[r.phone] = { name: r.name||'', note: r.note||'', cs: r.cs||'', createdAt: r.createdAt||'' }; });
-          careLeads = newLeads;
-          saveLS('ome_care_leads', careLeads);
-        }
-      } catch(clErr) { console.warn('careLeads fetch error:', clErr.message); }
       // ── Tập SĐT có trong "dữ liệu đơn" (chỉ để lọc nguồn, không kéo chi tiết) ──
       try {
         const dpR = await fetch(gsUrl + sepChar + 'action=donPhones', { redirect: 'follow' });
@@ -2032,6 +2025,33 @@ async function syncFromGS(opts) {
         if (dpJson && dpJson.orderCountByPhone) { donOrderCountByPhone = dpJson.orderCountByPhone; saveLS('ome_don_order_count', dpJson.orderCountByPhone); }
       } catch(dpErr) { console.warn('donPhones fetch error:', dpErr.message); }
     }
+
+    // ── Nguồn "Chăm sóc" (sheet riêng, KH thêm nhanh qua Pancake AI/Zalo AI/nút "+Thêm KH
+    // mới") — CHẠY MỖI TICK (3s), KHÔNG còn phụ thuộc nhịp kéo đơn hàng nặng (~30s, xem
+    // pullOrders ở trên). Sheet này nhỏ (chỉ các KH được thêm tay), nên kéo thường xuyên không
+    // tốn kém, và khách mới cần hiện NGAY để CS lọc theo "nguồn dữ liệu: Chăm sóc" thấy đúng.
+    //
+    // BUG (đã sửa): trước đây khối này nằm TRONG if(pullOrders) — nghĩa là ở đa số các tick 3s
+    // (khi pullOrders=false), careLeads không được kéo lại; đồng thời nhánh rebuildCareOnCustomers()
+    // (chạy khi orderCount=0, tức đa số các tick) CHỈ cập nhật field cho khách ĐÃ CÓ SẴN trong
+    // allCustomers, KHÔNG BAO GIỜ tự thêm khách mới — nên CS thêm khách mới nguồn "Chăm sóc" phải
+    // đợi tới đúng tick kéo đầy đủ tiếp theo (~30s) mới hiện, và nếu tick đó lỗi/trả về 0 đơn thì
+    // không hiện luôn cho tới khi F5. Giờ kéo độc lập mỗi 3s + phát hiện SĐT mới để ép
+    // buildCustomers() đầy đủ ngay khi cần, không phụ thuộc orderCount.
+    try {
+      const clR = await fetch(gsUrl + sepChar + 'action=careLeads', { redirect: 'follow' });
+      const clJson = await clR.json();
+      if (clJson && clJson.rows) {
+        const newLeads = {};
+        clJson.rows.forEach(function(r){ if (r.phone) newLeads[r.phone] = { name: r.name||'', note: r.note||'', cs: r.cs||'', createdAt: r.createdAt||'' }; });
+        const knownPhones = new Set(allCustomers.map(c => c.phone));
+        for (const ph in newLeads) {
+          if (!knownPhones.has(ph)) { _forceFullBuildFromCareLeads = true; break; }
+        }
+        careLeads = newLeads;
+        saveLS('ome_care_leads', careLeads);
+      }
+    } catch(clErr) { console.warn('careLeads fetch error:', clErr.message); }
 
     let count = 0;
     let _dpPhoneChanged = false; // true nếu KH đang mở trong panel chi tiết vừa có dữ liệu mới (vd: từ Zalo AI extension)
@@ -2077,7 +2097,7 @@ async function syncFromGS(opts) {
     if (d.careStatus && Array.isArray(d.careStatus) && d.careStatus.length) {
       _applyCareStatusFromGS(d.careStatus);
     }
-    if (orderCount > 0) {
+    if (orderCount > 0 || _forceFullBuildFromCareLeads) {
       buildCustomers();
       show('syncbtn');
       show('pushbtn'); show('fullsyncbtn'); show('dupbtn');
