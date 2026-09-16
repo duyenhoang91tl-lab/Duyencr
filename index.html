@@ -526,6 +526,14 @@ th.col-filtered .th-filter-icon{opacity:1;color:var(--green);}
 .adv-modal-footer{padding:10px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:space-between;align-items:center;}
 .adv-active-count{font-size:11px;color:var(--muted);}
 .adv-filter-active-badge{background:var(--green);color:#fff;border-radius:20px;padding:1px 7px;font-size:10px;font-weight:600;margin-left:4px;}
+/* ── Menu mẹ "Tác vụ" (gom Chia data / chiến dịch / công việc) ── */
+.tacvu-wrap{position:relative;display:inline-block;}
+.tacvu-menu{display:none;position:absolute;left:0;top:100%;margin-top:4px;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 28px rgba(0,0,0,.16);z-index:400;min-width:212px;padding:5px 0;}
+.tacvu-menu.open{display:block;}
+.tacvu-item{display:block;width:100%;text-align:left;padding:7px 14px;border:none;background:none;cursor:pointer;font-size:12px;white-space:nowrap;color:var(--text);font-family:inherit;}
+.tacvu-item:hover{background:var(--surface2);}
+.tacvu-group-label{padding:5px 14px 3px;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--hint);}
+.tacvu-sep{height:1px;background:var(--border);margin:4px 0;}
 
 /* ── COLUMN TOGGLE BAR ── */
 .col-toggle-bar{display:flex;align-items:center;gap:4px;padding:5px 14px;background:var(--surface2);border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto;scrollbar-width:thin;}
@@ -1107,17 +1115,27 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
           <button class="btn sm" id="adv-filter-btn" onclick="openAdvModal()" title="Bộ lọc nâng cao">
             ⚙ Lọc nâng cao
           </button>
-          <button class="btn sm secondary" id="assign-btn" onclick="openAssignModal()" title="Chia data đang lọc cho CS">
-            👥 Chia data
-          </button>
-          <button class="btn sm secondary" id="bcstat-open-btn" onclick="openBcStatModal()" title="Tình trạng chiến dịch + số khách đã gửi theo CS">📊 TK chiến dịch</button>
-          <button class="btn sm secondary" id="bct-open-btn" onclick="openBctModal()" title="Lọc khách theo sản phẩm chi tiết / số đơn / thời gian mua / nguồn / phân loại rồi soạn tin bắn">🎯 CD theo điều kiện</button>
-          <button class="btn sm secondary" id="futpl-inline-btn" onclick="openFuTplModal()" title="Mẫu tin hỏi thăm tự động theo mốc ngày sau mua — máy tự tạo chiến dịch mỗi sáng">📨 Hỏi thăm tự động</button>
-          <button class="btn sm secondary" id="task-quick-btn" onclick="openTaskModal()" title="Tạo công việc mới" style="padding:0 8px;min-width:auto">🗂️+</button>
-          <button class="btn sm secondary" id="bdaytpl-inline-btn" onclick="openBdayTplModal()" title="Mẫu tin chúc mừng sinh nhật — máy tự tạo chiến dịch mỗi sáng cho khách sinh nhật hôm đó">🎂 Sinh nhật tự động</button>
-          <button class="btn sm secondary" id="broadcast-filter-btn" onclick="openBroadcastFromCurrentFilter()" title="Tạo chiến dịch bắn trực tiếp từ danh sách đang lọc (CS, sản phẩm, nguồn, trạng thái, ngày mua...) — không cần qua Chia data">
-            📢 Tạo chiến dịch bắn
-          </button>
+          <!-- Gom toàn bộ tác vụ (chia data / chiến dịch / công việc) vào 1 menu mẹ, đặt ngay
+               cạnh "Lọc nâng cao" cho thanh công cụ gọn, dễ nhìn. -->
+          <div class="tacvu-wrap" id="tacvu-wrap">
+            <button class="btn sm secondary" id="tacvu-btn" onclick="toggleTacVuMenu(event)" title="Các tác vụ: chia data, chiến dịch bắn, hỏi thăm/sinh nhật tự động, tạo công việc">
+              🧰 Tác vụ ▾
+            </button>
+            <div class="tacvu-menu" id="tacvu-menu">
+              <div class="tacvu-group-label">Chia data & công việc</div>
+              <button class="tacvu-item" onclick="runTacVu(openAssignModal)" title="Chia data đang lọc cho CS">👥 Chia data</button>
+              <button class="tacvu-item" onclick="runTacVu(openTaskModal)" title="Tạo công việc mới">🗂️ Tạo công việc</button>
+              <div class="tacvu-sep"></div>
+              <div class="tacvu-group-label">Chiến dịch bắn</div>
+              <button class="tacvu-item" onclick="runTacVu(openBroadcastFromCurrentFilter)" title="Tạo chiến dịch bắn trực tiếp từ danh sách đang lọc (CS, sản phẩm, nguồn, trạng thái, ngày mua...) — không cần qua Chia data">📢 Tạo chiến dịch bắn</button>
+              <button class="tacvu-item" onclick="runTacVu(openBctModal)" title="Lọc khách theo sản phẩm chi tiết / số đơn / thời gian mua / nguồn / phân loại rồi soạn tin bắn">🎯 CD theo điều kiện</button>
+              <button class="tacvu-item" onclick="runTacVu(openBcStatModal)" title="Tình trạng chiến dịch + số khách đã gửi theo CS">📊 TK chiến dịch</button>
+              <div class="tacvu-sep"></div>
+              <div class="tacvu-group-label">Tự động hằng ngày</div>
+              <button class="tacvu-item" onclick="runTacVu(openFuTplModal)" title="Mẫu tin hỏi thăm tự động theo mốc ngày sau mua — máy tự tạo chiến dịch mỗi sáng">📨 Hỏi thăm tự động</button>
+              <button class="tacvu-item" onclick="runTacVu(openBdayTplModal)" title="Mẫu tin chúc mừng sinh nhật — máy tự tạo chiến dịch mỗi sáng cho khách sinh nhật hôm đó">🎂 Sinh nhật tự động</button>
+            </div>
+          </div>
         </div>
         <button class="btn sm" onclick="exportCSV()">
           <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
@@ -6044,6 +6062,29 @@ document.addEventListener('click', e=>{
 // ═══════════════════════════════════════════════════════
 //  ADVANCED FILTER MODAL
 // ═══════════════════════════════════════════════════════
+// ── Menu mẹ "Tác vụ" ────────────────────────────────────────────
+// Gom các nút chia data / chiến dịch / công việc vào 1 menu để thanh công cụ gọn.
+function toggleTacVuMenu(e){
+  if (e) e.stopPropagation();
+  var m = document.getElementById('tacvu-menu');
+  if (m) m.classList.toggle('open');
+}
+function closeTacVuMenu(){
+  var m = document.getElementById('tacvu-menu');
+  if (m) m.classList.remove('open');
+}
+// Đóng menu rồi mới mở modal — tránh menu che modal / dính lại khi quay về
+function runTacVu(fn){
+  closeTacVuMenu();
+  try { if (typeof fn === 'function') fn(); }
+  catch (err) { console.warn('Tác vụ lỗi:', err); if (typeof toast === 'function') toast('Lỗi mở tác vụ: ' + err.message); }
+}
+document.addEventListener('click', function(e){
+  var w = document.getElementById('tacvu-wrap');
+  if (w && !w.contains(e.target)) closeTacVuMenu();
+});
+document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeTacVuMenu(); });
+
 function openAdvModal() {
   // Build chips — giới hạn theo CS đang chọn ở "Lọc theo CS"
   const _base = (typeof scopedCustomers==='function') ? scopedCustomers() : allCustomers;
@@ -11396,11 +11437,25 @@ function saveRole(){
 // ═══════════════════════════════════════════════════════
 //  THỐNG KÊ CHO DASHBOARD
 // ═══════════════════════════════════════════════════════
-function _computeCSStats(){
+// Đơn có nằm trong khoảng ngày lọc của Dashboard không (bỏ trống 2 đầu = không lọc).
+// Đơn cũ chỉ có year/month (không có ngày cụ thể) → quy ước lấy ngày 01 của tháng đó.
+function _dashOrderInRange(o, dFrom, dTo){
+  if (!dFrom && !dTo) return true;
+  var t = null;
+  if (o.date instanceof Date && !isNaN(o.date)) t = new Date(o.date.getFullYear(), o.date.getMonth(), o.date.getDate()).getTime();
+  else if (o.year && o.month) t = new Date(+o.year, +o.month - 1, 1).getTime();
+  if (t === null) return false; // đơn không xác định được ngày → loại khi đang lọc theo thời gian
+  if (dFrom && t < new Date(dFrom + 'T00:00:00').getTime()) return false;
+  if (dTo   && t > new Date(dTo   + 'T23:59:59').getTime()) return false;
+  return true;
+}
+
+// list/dFrom/dTo đều tùy chọn — không truyền thì giữ nguyên hành vi cũ (toàn bộ KH, mọi thời gian)
+function _computeCSStats(list, dFrom, dTo){
   var map = {}; // name -> {name, held, closed, friend, cared, revenue, orders}
   function ensure(n){ if(!map[n]) map[n]={name:n,held:0,closed:0,friend:0,cared:0,revenue:0,orders:0}; return map[n]; }
-  var list = (typeof allCustomers !== 'undefined' ? allCustomers : []);
-  list.forEach(function(c){
+  var arr = list || (typeof allCustomers !== 'undefined' ? allCustomers : []);
+  arr.forEach(function(c){
     var h = _heldBy(c);
     if (h){
       var m = ensure(h);
@@ -11411,6 +11466,7 @@ function _computeCSStats(){
     }
     // doanh thu/đơn theo CS thực bán (order.cs)
     (c.orders||[]).forEach(function(o){
+      if (!_dashOrderInRange(o, dFrom, dTo)) return;
       if (o.cs){ var mm = ensure(o.cs); mm.revenue += (+o.revenue||0); mm.orders++; }
     });
   });
@@ -11742,11 +11798,38 @@ function _dashResetTemplate() {
 
 function renderDashboard(){
   _dashLoad();
+  _dashFilterLoad();
   var wrap = document.getElementById('dash-wrap');
   if (!wrap) return;
-  var list = (typeof allCustomers!=='undefined'?allCustomers:[]).filter(_inUserScope);
+
+  var f = _dashFilter;
+  // Danh sách CS được phép xem (theo quyền) — dùng để dựng dropdown Nhân viên
+  var scopeList = (typeof allCustomers!=='undefined'?allCustomers:[]).filter(_inUserScope);
+
+  // 1) Lọc theo TEAM / NHÂN VIÊN: giữ KH mà người phụ trách (hoặc CS đang giữ) nằm trong nhóm đã chọn
+  var nameFilter = null;               // null = không lọc
+  if (f.cs) nameFilter = new Set([f.cs]);
+  else if (f.team){
+    var tObj = teams.find(function(t){ return String(t.id)===String(f.team) || t.name===f.team; });
+    nameFilter = _teamMemberSet(tObj);
+  }
+  var list = scopeList.filter(function(c){
+    if (nameFilter && nameFilter.size){
+      var hit = false;
+      var h = _heldBy(c); if (h && nameFilter.has(h)) hit = true;
+      if (!hit && c.careCSSet) c.careCSSet.forEach(function(n){ if (nameFilter.has(n)) hit = true; });
+      if (!hit) (c.orders||[]).forEach(function(o){ if (o.cs && nameFilter.has(o.cs)) hit = true; });
+      if (!hit) return false;
+    }
+    // 2) Lọc THỜI GIAN: khi có chọn khoảng ngày, chỉ tính KH có ít nhất 1 đơn trong khoảng đó
+    if (f.from || f.to){
+      return (c.orders||[]).some(function(o){ return _dashOrderInRange(o, f.from, f.to); });
+    }
+    return true;
+  });
+
   var totalKH = list.length;
-  var csStats = _computeCSStats();
+  var csStats = _computeCSStats(list, f.from, f.to);
   var csArr = Object.keys(csStats).map(function(k){return csStats[k];});
   if (currentUser.role!=='admin'){
     var myNamesDash = (currentUser.names && currentUser.names.length) ? currentUser.names : (currentUser.name?[currentUser.name]:[]);
@@ -11756,6 +11839,7 @@ function renderDashboard(){
       var ms=_teamMemberSet(team);return ms.has(s.name);
     });
   }
+  if (nameFilter && nameFilter.size) csArr = csArr.filter(function(s){ return nameFilter.has(s.name); });
   csArr.forEach(function(s){s.closeRate=s.held?Math.round(s.closed/s.held*100):0;s.friendRate=s.held?Math.round(s.friend/s.held*100):0;});
   var teamStats=_computeTeamStats(csStats);
 
@@ -11780,7 +11864,7 @@ function renderDashboard(){
     '<button class="btn sm" onclick="_dashSaveTemplate()" title="Lưu mẫu mới">💾 Lưu mẫu</button>'+
     '<button class="btn sm" onclick="_dashDeleteTemplate()" title="Xóa mẫu này" style="color:var(--red)">🗑</button>'+
     '<button class="btn sm" onclick="_dashResetTemplate()" title="Khôi phục mặc định">↺ Reset</button>'+
-  '</div>';
+  '</div>' + _dashFilterBarHtml(scopeList);
 
   var grid='<div class="dash-widget-grid">';
   ws.forEach(function(w,i){
@@ -11790,6 +11874,87 @@ function renderDashboard(){
   grid+='</div>';
 
   wrap.innerHTML=toolbar+grid;
+}
+
+// ── BỘ LỌC DASHBOARD: thời gian / team / nhân viên ─────────────
+var _dashFilter = { from:'', to:'', team:'', cs:'' };
+function _dashFilterLoad(){
+  var saved = loadLS('ome_dash_filter');
+  if (saved && typeof saved === 'object') _dashFilter = Object.assign({ from:'', to:'', team:'', cs:'' }, saved);
+}
+function _dashFilterSave(){ saveLS('ome_dash_filter', _dashFilter); }
+function _dashSetFilter(key, val){
+  _dashFilter[key] = val || '';
+  // Chọn Team mới thì bỏ chọn nhân viên cũ (nhân viên đó có thể không thuộc team vừa chọn)
+  if (key === 'team') _dashFilter.cs = '';
+  _dashFilterSave();
+  renderDashboard();
+}
+function _dashSetPreset(preset){
+  var now = new Date(), y = now.getFullYear(), m = now.getMonth();
+  function ymd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  if (preset === 'all')        { _dashFilter.from=''; _dashFilter.to=''; }
+  else if (preset === 'month') { _dashFilter.from=ymd(new Date(y,m,1));      _dashFilter.to=ymd(new Date(y,m+1,0)); }
+  else if (preset === 'last')  { _dashFilter.from=ymd(new Date(y,m-1,1));    _dashFilter.to=ymd(new Date(y,m,0)); }
+  else if (preset === 'q')     { var q=Math.floor(m/3); _dashFilter.from=ymd(new Date(y,q*3,1)); _dashFilter.to=ymd(new Date(y,q*3+3,0)); }
+  else if (preset === 'year')  { _dashFilter.from=ymd(new Date(y,0,1));      _dashFilter.to=ymd(new Date(y,11,31)); }
+  _dashFilterSave();
+  renderDashboard();
+}
+function _dashFilterBarHtml(scopeList){
+  var f = _dashFilter;
+  // Team: admin xem hết, còn lại chỉ thấy team của mình
+  var teamOpts = teams.filter(function(t){
+    if (currentUser.role === 'admin') return true;
+    var myNames = (currentUser.names && currentUser.names.length) ? currentUser.names : (currentUser.name?[currentUser.name]:[]);
+    return t.name === currentUser.team || myNames.indexOf(t.leader) !== -1;
+  });
+  // Nhân viên: nếu đã chọn team thì chỉ liệt kê người trong team đó
+  var csNames;
+  if (f.team){
+    var tObj = teams.find(function(t){ return String(t.id)===String(f.team) || t.name===f.team; });
+    csNames = [...(_teamMemberSet(tObj)||new Set())];
+  } else {
+    csNames = [...new Set(scopeList.flatMap(function(c){
+      return [..._buildCsSet_(c.orders, c.phone), ...(c.careCSSet||[])];
+    }).filter(Boolean))];
+  }
+  csNames.sort(function(a,b){ return a.localeCompare(b,'vi'); });
+
+  var presets = [['all','Tất cả'],['month','Tháng này'],['last','Tháng trước'],['q','Quý này'],['year','Năm nay']];
+  var isAll = !f.from && !f.to;
+  var presetHtml = presets.map(function(p){
+    var active = (p[0]==='all') ? isAll : false;
+    return '<button class="btn sm'+(active?' primary':'')+'" style="padding:3px 9px;font-size:11px" onclick="_dashSetPreset(\''+p[0]+'\')">'+p[1]+'</button>';
+  }).join('');
+
+  var activeCount = (f.from||f.to?1:0) + (f.team?1:0) + (f.cs?1:0);
+
+  return '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding:9px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:8px">'+
+    '<span style="font-size:11px;font-weight:700;color:var(--muted)">🔎 Lọc</span>'+
+    presetHtml+
+    '<span style="color:var(--border-md)">|</span>'+
+    '<span style="font-size:11px;color:var(--muted)">Từ</span>'+
+    '<input type="date" value="'+esc(f.from)+'" onchange="_dashSetFilter(\'from\',this.value)" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+    '<span style="font-size:11px;color:var(--muted)">đến</span>'+
+    '<input type="date" value="'+esc(f.to)+'" onchange="_dashSetFilter(\'to\',this.value)" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+    '<span style="color:var(--border-md)">|</span>'+
+    '<select onchange="_dashSetFilter(\'team\',this.value)" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)" title="Lọc theo Team">'+
+      '<option value="">👥 Tất cả team</option>'+
+      teamOpts.map(function(t){ return '<option value="'+esc(t.id)+'"'+(String(f.team)===String(t.id)?' selected':'')+'>'+esc(t.name)+'</option>'; }).join('')+
+    '</select>'+
+    '<select onchange="_dashSetFilter(\'cs\',this.value)" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);max-width:160px" title="Lọc theo nhân viên">'+
+      '<option value="">🧑 Tất cả nhân viên</option>'+
+      csNames.map(function(n){ return '<option value="'+esc(n)+'"'+(f.cs===n?' selected':'')+'>'+esc(n)+'</option>'; }).join('')+
+    '</select>'+
+    (activeCount ? '<button class="btn sm" style="padding:3px 9px;font-size:11px;color:var(--red)" onclick="_dashClearFilter()">✕ Xoá lọc ('+activeCount+')</button>' : '')+
+    ((f.from||f.to) ? '<span style="font-size:10.5px;color:var(--hint);width:100%">Đang tính theo <b>ngày đặt đơn</b> — KH không có đơn nào trong khoảng này sẽ không được tính.</span>' : '')+
+  '</div>';
+}
+function _dashClearFilter(){
+  _dashFilter = { from:'', to:'', team:'', cs:'' };
+  _dashFilterSave();
+  renderDashboard();
 }
 
 // ═══════════════════════════════════════════════════════
