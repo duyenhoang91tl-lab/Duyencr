@@ -4860,6 +4860,9 @@ async function submitQuickAddCustomer(){
 
   // 2) Đồng thời vẫn ghi vào sheet RIÊNG "KH Chăm sóc mới" để phục vụ Báo cáo D (tách riêng,
   //    không gộp vào báo cáo doanh số A/B/C) — không đổi so với trước.
+  //    Trường `cs` ở đây CHÍNH LÀ "sale phụ trách" của số mới này: số nào sale tự thêm thì sale
+  //    đó phụ trách (xem _buildCsSet_ — nó đọc careLeads[phone].cs), nên với SỐ MỚI luôn gán
+  //    tài khoản đang thêm; chỉ giữ lại giá trị cũ khi số này đã từng được ai đó thêm trước đó.
   careLeads[phone] = {
     name: existingLead.name || name,
     note: mergedNoteStr,
@@ -4903,7 +4906,15 @@ async function addManualOrder(phone) {
   const d = new Date(date);
   const yr = d.getFullYear();
   const mo = d.getMonth()+1;
-  const cs = (careData[phone]&&careData[phone].cs) || _latestOrderCS(c.orders) || currentUser || '';
+  // CS phu trach cua don = TAI KHOAN DANG NHAP DON (nguoi len don), dung theo quy uoc
+  // "CS phụ trách = người lên đơn" dang dung o bo loc/thong ke. Chi khi khong xac dinh duoc
+  // tai khoan (chua dang nhap) moi lui ve CS cham soc / CS cua don gan nhat nhu truoc.
+  // Luu y: truoc day dong nay dung thang `currentUser` (la OBJECT {name,role,team}) nen khi
+  // roi vao nhanh do se ghi ra "[object Object]" — da sua thanh currentUser.name.
+  const enteredBy = (typeof currentUser !== 'undefined' && currentUser && currentUser.name) ? currentUser.name : '';
+  const cs = enteredBy || (careData[phone]&&careData[phone].cs) || _latestOrderCS(c.orders) || '';
+  // CS cham soc: giu nguyen nguoi dang cham neu da co, chua co thi gan luon cho nguoi len don.
+  const careCS = (careData[phone]&&careData[phone].cs) || enteredBy || cs;
 
   const newOrder = {
     date: d, year: yr, month: mo,
@@ -4957,7 +4968,7 @@ async function addManualOrder(phone) {
         cs, source, revenue, product: newOrder.product,
         productDetail: newOrder.productDetail,
         status: newOrder.status, zalo: newOrder.zalo, note: '',
-        careCS: cs
+        careCS: careCS
       }];
       const r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({action:'saveOrders', orders: payload}) });
       const txt = await r.text();
@@ -11134,6 +11145,12 @@ function _buildCsSet_(orders, phone){
   });
   if (typeof donSaleByPhone !== 'undefined' && donSaleByPhone && phone && donSaleByPhone[phone]) {
     donSaleByPhone[phone].forEach(function(n){ if (n) set.add(n); });
+  }
+  // Sale TU THEM SO MOI (nut "+ Thêm KH/Đơn nhanh") cung duoc tinh la CS phu trach cua so do
+  // — luc moi them chua co don nao trong DT tong/dữ liệu đơn nen neu khong lay tu careLeads
+  // thi so vua them se KHONG hien ra khi chinh sale do loc theo "CS phụ trách".
+  if (typeof careLeads !== 'undefined' && careLeads && phone && careLeads[phone] && careLeads[phone].cs) {
+    String(careLeads[phone].cs).split(',').forEach(function(n){ n = n.trim(); if (n) set.add(n); });
   }
   return set;
 }
