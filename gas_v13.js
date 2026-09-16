@@ -140,16 +140,53 @@ function _stripVN_(s) {
   return s;
 }
 
+// Tu do dong tieu de trong vals (mang 2 chieu). KHONG hardcode dong 1 nua:
+// file "Bang gia Hien Tour" co dong 1 gan nhu trong (chi co o gop "G7" phia tren cot
+// Gia SAPHIA/RUBY), tieu de that nam o DONG 2 -> truoc day doc dong 1 lam header khien
+// gan het cot bi bo qua (headers rong) => moi dong doc ra chi con vai truong, haystack
+// tim kiem gan nhu rong => tra cuu ten san pham dung van bao "Khong tim thay".
+// Cach do: quet toi da 10 dong dau, chon dong co NHIEU O TEXT nhat va co chua tu khoa
+// tieu de quen thuoc (ten/gia/nhom/chat lieu/size...).
+function _detectHeaderRow_(vals, maxScan) {
+  var limit = Math.min(vals.length, maxScan || 10);
+  var bestIdx = 0, bestScore = -1;
+  var KEYS = ['ten', 'gia', 'nhom', 'chat lieu', 'size', 'stt', 'san pham', 'thuong mai', 'link'];
+  for (var r = 0; r < limit; r++) {
+    var row = vals[r] || [];
+    var filled = 0, kw = 0;
+    for (var c = 0; c < row.length; c++) {
+      var t = String(row[c] == null ? '' : row[c]).trim();
+      if (!t) continue;
+      filled++;
+      var st = _stripVN_(t);
+      for (var k = 0; k < KEYS.length; k++) {
+        if (st.indexOf(KEYS[k]) !== -1) { kw++; break; }
+      }
+    }
+    // uu tien dong co tu khoa tieu de, sau do den so o co noi dung
+    var score = kw * 10 + filled;
+    if (score > bestScore) { bestScore = score; bestIdx = r; }
+  }
+  return bestIdx;
+}
+
 // Doc toan bo sheet DANH_MUC thanh mang object {tenCot: giaTri...}, dua theo dong tieu de
-// (dong 1) — khong hardcode ten cot, sheet doi/them cot van chay binh thuong.
+// (tu do, xem _detectHeaderRow_) — khong hardcode ten cot lan vi tri dong tieu de, sheet
+// doi/them cot hay chen them dong trang o tren van chay binh thuong.
 function readPriceCatalog_() {
   var sh = SpreadsheetApp.openById(PRICE_SS_ID).getSheetByName(PRICE_SHEET_NAME);
   if (!sh || sh.getLastRow() < 2) return [];
   var lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
   var vals = sh.getRange(1, 1, lastRow, lastCol).getValues();
-  var headers = vals[0].map(function(h){ return String(h || '').trim(); });
+  var hIdx = _detectHeaderRow_(vals, 10);
+  var headers = vals[hIdx].map(function(h){ return String(h || '').trim(); });
+  // Cot khong co tieu de (vd o gop) van giu lai duoi ten tam "Cot <chu cai>" de noi dung
+  // trong do KHONG bi mat khoi phan tim kiem.
+  for (var hc = 0; hc < headers.length; hc++) {
+    if (!headers[hc]) headers[hc] = 'Cot ' + _colLetter_(hc + 1);
+  }
   var rows = [];
-  for (var i = 1; i < vals.length; i++) {
+  for (var i = hIdx + 1; i < vals.length; i++) {
     var row = vals[i];
     var isEmpty = row.every(function(c){ return c === '' || c === null; });
     if (isEmpty) continue;
@@ -157,26 +194,51 @@ function readPriceCatalog_() {
     for (var c = 0; c < headers.length; c++) {
       if (!headers[c]) continue;
       var v = row[c];
+      if (v === '' || v === null) continue; // bo o rong cho gon, khong anh huong tim kiem
       obj[headers[c]] = (v instanceof Date) ? v.toISOString() : v;
     }
-    rows.push(obj);
+    if (Object.keys(obj).length) rows.push(obj);
   }
   return rows;
 }
 
+// Doi so thu tu cot (1-based) sang chu cai cot kieu Excel: 1->A, 7->G, 27->AA
+function _colLetter_(n) {
+  var s = '';
+  while (n > 0) { var m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
+  return s;
+}
+
 // Tim theo tu khoa q — khop khi MOI tu trong q (tach theo khoang trang) xuat hien trong
 // it nhat 1 cot bat ky cua dong do (khong dau, khong phan biet hoa/thuong).
+// Neu khop chat (AND) khong ra dong nao -> lui ve khop GAN DUNG: cham diem theo so tu
+// khop duoc, tra ve cac dong diem cao nhat (>= 60% so tu). Muc dich: CS go thua/thieu 1-2
+// tu (vd "khong boc vang", "mau bac") van thay duoc san pham gan nhat kem gia, thay vi
+// nhan "Khong tim thay" roi phai tu mo Sheet tra tay.
 function searchPriceCatalog_(rows, q) {
   var terms = _stripVN_(q).split(/\s+/).filter(Boolean);
   if (!terms.length) return rows.slice(0, 50);
   var out = [];
-  for (var i = 0; i < rows.length && out.length < 50; i++) {
+  var scored = [];
+  for (var i = 0; i < rows.length; i++) {
     var row = rows[i];
     var haystack = _stripVN_(Object.keys(row).map(function(k){ return row[k]; }).join(' | '));
-    var ok = terms.every(function(t){ return haystack.indexOf(t) !== -1; });
-    if (ok) out.push(row);
+    var hit = 0;
+    for (var t = 0; t < terms.length; t++) {
+      if (haystack.indexOf(terms[t]) !== -1) hit++;
+    }
+    if (hit === terms.length) {
+      if (out.length < 50) out.push(row);
+    } else if (hit > 0) {
+      scored.push({ row: row, hit: hit });
+    }
   }
-  return out;
+  if (out.length) return out;
+  // Fallback gan dung
+  var minHit = Math.max(1, Math.ceil(terms.length * 0.6));
+  scored = scored.filter(function(x){ return x.hit >= minHit; });
+  scored.sort(function(a, b){ return b.hit - a.hit; });
+  return scored.slice(0, 20).map(function(x){ return x.row; });
 }
 
 // ─── CTKM (Sheet CTKM, cung file PRICE_SS_ID) — chi nap khi khach hoi ve khuyen mai/giam gia ──
@@ -186,9 +248,13 @@ function readCTKMCatalog_() {
   if (!sh || sh.getLastRow() < 2) return [];
   var lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
   var vals = sh.getRange(1, 1, lastRow, lastCol).getValues();
-  var headers = vals[0].map(function(h){ return String(h || '').trim(); });
+  var hIdx = _detectHeaderRow_(vals, 10);
+  var headers = vals[hIdx].map(function(h){ return String(h || '').trim(); });
+  for (var hc = 0; hc < headers.length; hc++) {
+    if (!headers[hc]) headers[hc] = 'Cot ' + _colLetter_(hc + 1);
+  }
   var rows = [];
-  for (var i = 1; i < vals.length; i++) {
+  for (var i = hIdx + 1; i < vals.length; i++) {
     var row = vals[i];
     var isEmpty = row.every(function(c){ return c === '' || c === null; });
     if (isEmpty) continue;
@@ -494,7 +560,7 @@ function doGet(e) {
     if (action === 'priceSearch') {
       var q = (e && e.parameter && e.parameter.q) ? String(e.parameter.q) : '';
       var cachePS = CacheService.getScriptCache();
-      var cKeyPS = 'price_catalog_v1';
+      var cKeyPS = 'price_catalog_v2';
       var cachedPS = cachePS.get(cKeyPS);
       var rowsPS;
       if (cachedPS) { try { rowsPS = JSON.parse(cachedPS); } catch(ec) {} }
