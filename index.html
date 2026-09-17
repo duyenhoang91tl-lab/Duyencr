@@ -875,6 +875,8 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
       <div class="adv-section-label">📱 Trạng thái Zalo (chọn nhiều)</div>
       <div class="adv-chips" id="adv-zalo-chips"></div>
     </div>
+    <!-- Các trường tự tạo (admin thêm) — mỗi trường 1 nhóm chip, dựng động khi mở modal -->
+    <div id="adv-cf-sections"></div>
   </div>
   <div class="adv-modal-footer">
     <span class="adv-active-count" id="adv-count-text">Chưa có bộ lọc</span>
@@ -1033,8 +1035,9 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
       <button class="section-btn" onclick="setZaloFilter('block',this)"><div class="fleft"><span class="fdot" style="background:#dc2626"></span><span>Chặn / Hủy KB</span></div><span class="fbadge" id="bz-block">0</span></button>
     </div>
     <div class="divider" style="margin:7px 0"></div>
-    <div class="sb-label">Thương hiệu</div>
-    <div id="brand-list"></div>
+    <!-- Bộ lọc theo TRƯỜNG TỰ TẠO (admin thêm) — thay cho khối "Thương hiệu" cũ.
+         Mỗi trường admin tạo sẽ sinh ra 1 nhóm nút lọc riêng ở đây, kèm badge đếm số KH. -->
+    <div id="cf-filter-sections"></div>
   </div>
 </div>
 
@@ -1916,6 +1919,8 @@ let _colDdActive = null;
 let advFilters = {
   cs: new Set(), products: new Set(), sources: new Set(),
   careStatus: new Set(), zaloStatus: new Set(),
+  // Trường tự tạo: { '<id trường>': Set(giá trị đã chọn) } — khách khớp nếu giá trị nằm trong Set
+  custom: {},
   yearFrom: '', monthFrom: '', yearTo: '', monthTo: ''
 };
 
@@ -2555,6 +2560,8 @@ function buildCustomers() {
       careStatus: care.status || c._rawStatus || '',
       zaloStatus: care.zalo || c._rawZalo || '',
       khStatus: care.khStatus || '',
+      // Giá trị các trường tự tạo (admin thêm) — dùng cho lọc sidebar, cột bảng, badge, xuất Excel
+      custom: (care.custom && typeof care.custom === 'object') ? care.custom : {},
       nickZalos: Array.isArray(care.nickZalos) ? care.nickZalos : [],
       careNote: care.note || c._rawNote || '',
       careCS,
@@ -2647,7 +2654,7 @@ function updateCampaignFilter() {
   }
 }
 
-function setTier(t,el) { currentTier=t; currentCare='all'; currentZalo='all'; currentBrand='all'; activateBtn('.fi',el); resetSubFilters(); applyFilters(); }
+function setTier(t,el) { currentTier=t; currentCare='all'; currentZalo='all'; currentBrand='all'; currentCF={}; activateBtn('.fi',el); resetSubFilters(); applyFilters(); }
 function setCareFilter(t,el) { currentCare=t; activateBtn('#care-filters .section-btn',el); applyFilters(); }
 function setZaloFilter(t,el) { currentZalo=t; activateBtn('#zalo-filters .section-btn',el); applyFilters(); }
 function setBrand(b,el) { currentBrand=b; activateBtn('.bitem',el); applyFilters(); }
@@ -2659,9 +2666,14 @@ function clearDateFilter(){
 function activateBtn(sel,el) { document.querySelectorAll(sel).forEach(b=>b.classList.remove('active')); el.classList.add('active'); }
 function resetSubFilters() {
   currentBrand='all';
+  currentCF={};
   document.querySelectorAll('#care-filters .section-btn').forEach((b,i)=>{ b.classList.remove('active'); if(i===0)b.classList.add('active'); });
   document.querySelectorAll('#zalo-filters .section-btn').forEach((b,i)=>{ b.classList.remove('active'); if(i===0)b.classList.add('active'); });
   document.querySelectorAll('.bitem').forEach((b,i)=>{ b.classList.remove('active'); if(i===0)b.classList.add('active'); });
+  // Mỗi nhóm trường tự tạo: bỏ active hết rồi active lại nút "Tất cả" (nút đầu tiên của nhóm)
+  document.querySelectorAll('.cf-filter-group').forEach(function(g){
+    g.querySelectorAll('.section-btn').forEach(function(b,i){ b.classList.remove('active'); if(i===0) b.classList.add('active'); });
+  });
 }
 
 let _filterDebounceTimer = null;
@@ -2729,7 +2741,10 @@ function applyFilters() {
       if (currentZalo === 'block') { if (!['Chặn','Hủy kết bạn'].includes(c.zaloStatus)) return false; }
       else if (c.zaloStatus !== currentZalo) return false;
     }
-    if (currentBrand !== 'all' && !c.brands.includes(currentBrand)) return false;
+    // Lọc theo TRƯỜNG TỰ TẠO (sidebar) — khách phải khớp TẤT CẢ trường đang được lọc (AND)
+    for (var _cfId in currentCF) {
+      if (((c.custom && c.custom[_cfId]) || '') !== currentCF[_cfId]) return false;
+    }
     if (csFList.length) {
       // Lọc theo (các) CS đang chọn + ĐÚNG chế độ (Phụ trách / Chăm sóc / Cả hai)
       // Multi: khớp nếu khách thuộc về BẤT KỲ CS nào trong danh sách đã chọn (OR)
@@ -2894,6 +2909,11 @@ function applyFilters() {
     if (advFilters.sources.size > 0 && ![...advFilters.sources].some(src=>c.sources.includes(src))) return false;
     if (advFilters.careStatus.size > 0 && !advFilters.careStatus.has(c.careStatus || '')) return false;
     if (advFilters.zaloStatus.size > 0 && !advFilters.zaloStatus.has(c.zaloStatus || '')) return false;
+    // Trường tự tạo: với mỗi trường có chọn chip, khách phải khớp 1 trong các giá trị đã chọn
+    for (var _acfId in (advFilters.custom || {})) {
+      var _acfSet = advFilters.custom[_acfId];
+      if (_acfSet && _acfSet.size > 0 && !_acfSet.has((c.custom && c.custom[_acfId]) || '')) return false;
+    }
     if (advFilters.yearFrom || advFilters.monthFrom || advFilters.yearTo || advFilters.monthTo) {
       const yfr = advFilters.yearFrom ? parseInt(advFilters.yearFrom) : null;
       const mfr = advFilters.monthFrom ? parseInt(advFilters.monthFrom) : null;
@@ -3042,7 +3062,65 @@ function _rowHtml(c) {
     <td class="col-sched">${nsHtml}</td>
     <td class="col-lastact" style="${lastActDisp}">${lastActHtml}</td>
     <td class="col-tacdong" style="${tacdongDisp}">${tacdongHtml}</td>
+    ${_cfRowCells(c)}
   </tr>`;
+}
+
+// ── Cột động cho TRƯỜNG TỰ TẠO trong bảng danh sách ──
+// Cột được chèn thêm vào cuối mỗi hàng; phần <th> tương ứng do _cfSyncTableHead() chèn vào thead.
+// Mỗi cột dùng class col-cf_<id> để dùng chung cơ chế ẩn/hiện colVisible sẵn có.
+function _cfRowCells(c) {
+  if (typeof CUSTOM_FIELDS === 'undefined' || !CUSTOM_FIELDS.length) return '';
+  return CUSTOM_FIELDS.map(function(f){
+    var key = 'cf_' + f.id;
+    var vis = (typeof colVisible !== 'undefined' && colVisible[key] === false) ? 'display:none' : '';
+    var v = (c.custom && c.custom[f.id]) || '';
+    return '<td class="col-' + esc(key) + '" style="font-size:11px;' + vis + '">'
+      + (v ? '<span class="cf-cell-badge">' + esc(v) + '</span>' : '<span style="color:var(--hint)">—</span>')
+      + '</td>';
+  }).join('');
+}
+
+// Chèn/đồng bộ các <th> của trường tự tạo vào thead (gọi trước mỗi lần vẽ bảng)
+function _cfSyncTableHead() {
+  var head = document.querySelector('#main-table thead tr');
+  if (!head) return;
+  // Xoá các th cũ của trường tự tạo rồi chèn lại theo đúng danh sách hiện tại
+  head.querySelectorAll('th[data-cf-th]').forEach(function(th){ th.remove(); });
+  if (typeof CUSTOM_FIELDS === 'undefined' || !CUSTOM_FIELDS.length) return;
+  CUSTOM_FIELDS.forEach(function(f){
+    var key = 'cf_' + f.id;
+    var th = document.createElement('th');
+    th.className = 'col-' + key;
+    th.setAttribute('data-cf-th', f.id);
+    if (typeof colVisible !== 'undefined' && colVisible[key] === false) th.style.display = 'none';
+    th.innerHTML = '<div class="th-inner">' + esc(f.label) + '</div>';
+    head.appendChild(th);
+  });
+}
+
+// Chèn/đồng bộ các chip bật-tắt cột của trường tự tạo vào thanh "📋 Cột hiển thị"
+function _cfSyncColToggles() {
+  var bar = document.getElementById('col-toggle-bar');
+  if (!bar) return;
+  bar.querySelectorAll('[data-cf-chip]').forEach(function(el){ el.remove(); });
+  if (typeof CUSTOM_FIELDS === 'undefined' || !CUSTOM_FIELDS.length) return;
+  CUSTOM_FIELDS.forEach(function(f){
+    var key = 'cf_' + f.id;
+    if (!(key in colVisible)) colVisible[key] = true;   // mặc định hiện khi admin vừa tạo trường
+    var lb = document.createElement('label');
+    lb.className = 'col-toggle-chip';
+    lb.setAttribute('data-cf-chip', f.id);
+    var cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = colVisible[key] !== false;
+    cb.addEventListener('change', function(){ toggleCol(key, cb); });
+    lb.appendChild(cb);
+    lb.appendChild(document.createTextNode(' ' + f.label));
+    // Chèn trước dải phân cách/chip "Chưa tác động" ở cuối thanh
+    var sep = bar.querySelector('#no-action-chip');
+    if (sep) bar.insertBefore(lb, sep.previousSibling || sep); else bar.appendChild(lb);
+  });
 }
 
 // ═══════════════════════════════════════════════════════
@@ -3056,6 +3134,8 @@ let _vt = { list: [], raf: null, bound: false, lastStart: -1, lastEnd: -1 };
 function _vtWrap() { return document.querySelector('#tab-list .table-wrap'); }
 
 function renderTable(list) {
+  // Đồng bộ cột động của trường tự tạo trước khi vẽ (admin có thể vừa thêm/xoá trường)
+  try { _cfSyncTableHead(); _cfSyncColToggles(); } catch(e){}
   // Chữ ký danh sách hiện tại: dùng để phân biệt "đổi bộ lọc thật sự" (nên cuộn về đầu)
   // với "vẽ lại do đồng bộ dữ liệu nền / quay lại tab" (nên giữ nguyên vị trí cuộn).
   const sig = list.length + '|' + (list[0] ? list[0].phone : '') + '|' + (list[list.length-1] ? list[list.length-1].phone : '');
@@ -3427,7 +3507,7 @@ function openDp(phone) {
     ${tierBadge(c.tier)}
     ${careBadge(c.careStatus)}
     ${zaloBadge(c.zaloStatus)}
-    ${custStatusBadge((careData[c.phone]||{}).khStatus||'')}`;
+    ${custStatusBadge((careData[c.phone]||{}).khStatus||'')}${cfBadges(c.phone)}`;
   renderDpTab('care');
   document.getElementById('dp-overlay').classList.add('open');
 }
@@ -4138,7 +4218,7 @@ function saveCare(phone) {
     ${tierBadge(c?c.tier:'Chưa bán lại được')}
     ${careBadge(careData[phone].status)}
     ${zaloBadge(careData[phone].zalo)}
-    ${custStatusBadge(careData[phone].khStatus)}`;
+    ${custStatusBadge(careData[phone].khStatus)}${cfBadges(phone)}`;
   if (gsUrl) { queueCareSync(phone); toast('✓ Đã lưu'); }
   else toast('✓ Đã lưu tình trạng (local)');
   // Ghi tên CS chăm sóc xuống OrderData cột N (chỉ khi CS chăm sóc thay đổi)
@@ -5116,6 +5196,7 @@ function rebuildCareOnCustomers() {
     c.khStatus   = care.khStatus || '';
     c.nickZalos  = Array.isArray(care.nickZalos) ? care.nickZalos : [];
     c.careNote   = care.note  || c._rawNote  || '';
+    c.custom     = (care.custom && typeof care.custom === 'object') ? care.custom : {};
     c.careCS     = care.cs    || _latestOrderCS(c.orders);
     if (!c.csSet) c.csSet = _buildCsSet_(c.orders, c.phone);
   }
@@ -5145,14 +5226,56 @@ function updateSidebarBadges() {
   txt('bz-cdy',fmt(cnt(c=>c.zaloStatus==='Chưa đồng ý')));
   txt('bz-block',fmt(cnt(c=>['Chặn','Hủy kết bạn'].includes(c.zaloStatus))));
 }
+// Bộ lọc theo TRƯỜNG TỰ TẠO ở sidebar (thay cho khối "Thương hiệu" cũ).
+// GIỮ NGUYÊN TÊN HÀM updateBrandList để mọi chỗ đang gọi sẵn (setCSFilterMode, onCSFilterChange,
+// đăng nhập, sync...) vẫn hoạt động, không phải sửa rải rác.
+let currentCF = {};   // { '<id trường>': 'giá trị đang lọc' } — không có khoá = không lọc trường đó
+function setCFFilter(fieldId, val, el) {
+  if (!val || val === 'all') delete currentCF[fieldId];
+  else currentCF[fieldId] = val;
+  // Bỏ active các nút cùng nhóm trường này rồi active nút vừa bấm
+  var wrap = el && el.closest ? el.closest('.cf-filter-group') : null;
+  if (wrap) wrap.querySelectorAll('.section-btn').forEach(function(b){ b.classList.remove('active'); });
+  if (el) el.classList.add('active');
+  if (typeof _invalidateFilterCache === 'function') _invalidateFilterCache();
+  applyFilters();
+}
 function updateBrandList() {
-  const base = scopedCustomers();
-  const bc={};
-  for(const c of base) for(const b of c.brands) bc[b]=(bc[b]||0)+1;
-  const sorted=Object.entries(bc).sort((a,b)=>b[1]-a[1]);
-  document.getElementById('brand-list').innerHTML=
-    `<button class="section-btn bitem ${currentBrand==='all'?'active':''}" onclick="setBrand('all',this)"><span>Tất cả</span><span class="fbadge">${fmt(base.length)}</span></button>`+
-    sorted.map(([b,n])=>`<button class="section-btn bitem ${currentBrand===b?'active':''}" data-brand="${esc(b)}" onclick="setBrand(this.dataset.brand,this)"><span>${esc(b)}</span><span class="fbadge">${n}</span></button>`).join('');
+  var host = document.getElementById('cf-filter-sections');
+  if (!host) return;
+  if (typeof CUSTOM_FIELDS === 'undefined' || !CUSTOM_FIELDS.length) { host.innerHTML = ''; return; }
+  var base = scopedCustomers();
+  host.innerHTML = CUSTOM_FIELDS.map(function(f){
+    // Đếm số KH theo từng giá trị của trường này
+    var counts = {};
+    base.forEach(function(c){
+      var v = (c.custom && c.custom[f.id]) || '';
+      if (v) counts[v] = (counts[v] || 0) + 1;
+    });
+    // Liệt kê theo đúng thứ tự admin sắp trong cây (chỉ các mục chọn được), kèm nhãn mẹ → con
+    var opts = [];
+    (f.tree || []).forEach(function(node){
+      if (node.children && node.children.length) {
+        node.children.forEach(function(ch){
+          var v = ch.value || ch.label;
+          opts.push({ v: v, label: node.label + ' → ' + ch.label });
+        });
+      } else {
+        var v2 = node.value || node.label;
+        opts.push({ v: v2, label: node.label });
+      }
+    });
+    var cur = currentCF[f.id] || 'all';
+    var rows = '<button class="section-btn ' + (cur === 'all' ? 'active' : '') + '" data-cf="' + esc(f.id) + '" data-v="all"'
+      + ' onclick="setCFFilter(this.dataset.cf,\'all\',this)"><span>Tất cả</span><span class="fbadge">' + fmt(base.length) + '</span></button>';
+    rows += opts.map(function(o){
+      var n = counts[o.v] || 0;
+      return '<button class="section-btn ' + (cur === o.v ? 'active' : '') + '" data-cf="' + esc(f.id) + '" data-v="' + esc(o.v) + '"'
+        + ' onclick="setCFFilter(this.dataset.cf,this.dataset.v,this)"><span>' + esc(o.label) + '</span><span class="fbadge">' + fmt(n) + '</span></button>';
+    }).join('');
+    return '<div class="sb-label">' + esc(f.label) + '</div><div class="fgroup cf-filter-group">' + rows + '</div>'
+      + '<div class="divider" style="margin:7px 0"></div>';
+  }).join('');
 }
 
 // ── Đổi chế độ lọc CS: phụ trách / chăm sóc / cả hai ──
@@ -5169,7 +5292,7 @@ function setCSFilterMode(mode, el){
 // ── Khi đổi CS ở "Lọc theo CS": toàn bộ sidebar + stats + danh sách + lọc nâng cao theo CS đó ──
 function onCSFilterChange(){
   // Xem trọn bộ KH của CS được chọn → reset các bộ lọc con
-  currentTier='all'; currentCare='all'; currentZalo='all'; currentBrand='all';
+  currentTier='all'; currentCare='all'; currentZalo='all'; currentBrand='all'; currentCF={};
   document.querySelectorAll('.fi').forEach((b,i)=>{ b.classList.remove('active'); if(i===0)b.classList.add('active'); });
   if (typeof resetSubFilters==='function') resetSubFilters();
   if (typeof _invalidateFilterCache==='function') _invalidateFilterCache();
@@ -5511,21 +5634,30 @@ function exportCSV() {
   let list=allCustomers.filter(c=>{
     if(currentTier!=='all'&&c.tier!==currentTier) return false;
     if(currentCare!=='all'&&c.careStatus!==currentCare) return false;
-    if(currentBrand!=='all'&&!c.brands.includes(currentBrand)) return false;
+    // Lọc theo TRƯỜNG TỰ TẠO (sidebar) — khớp với đúng những gì đang lọc trên màn hình
+    for (var _exCfId in currentCF) {
+      if (((c.custom && c.custom[_exCfId]) || '') !== currentCF[_exCfId]) return false;
+    }
     if(csFList.length){const cs=_buildCsSet_(c.orders, c.phone);const _aH=(typeof _assignAllIndex!=='undefined')?_assignAllIndex[c.phone]:null;const _match=csFList.some(csF=>_csModeMatch(cs.has(csF), !!(c.careCSSet&&c.careCSSet.has(csF)), _aH?_aH.has(csF):false));if(!_match) return false;}
     if(q&&!c.name.toLowerCase().includes(q)&&!c.phone.includes(q)) return false;
     return true;
   });
   const BOM='\uFEFF';
-  const hdr='Tên KH,Số điện thoại,Phân loại KH,Tình trạng CS,Zalo,Số đơn,Doanh thu,Sản phẩm,Nguồn,CS phụ trách,Ghi chú\n';
-  const rows=list.map(c=>[`"${c.name}"`,c.phone,c.tier,c.careStatus,c.zaloStatus,c.totalOrders,c.totalRevenue,`"${c.brands.join('; ')}"`,`"${c.sources.join('; ')}"`,`"${[..._buildCsSet_(c.orders, c.phone)].join('; ')}"`,`"${_latestNoteText(c.careNote)}"`].join(',')).join('\n');
+  const cfCols = (typeof CUSTOM_FIELDS !== 'undefined') ? CUSTOM_FIELDS : [];
+  const hdr='Tên KH,Số điện thoại,Phân loại KH,Tình trạng CS,Zalo,Số đơn,Doanh thu,Sản phẩm,Nguồn,CS phụ trách,Ghi chú'
+    + (cfCols.length ? ',' + cfCols.map(f=>`"${f.label.replace(/"/g,'""')}"`).join(',') : '') + '\n';
+  const rows=list.map(c=>{
+    const base=[`"${c.name}"`,c.phone,c.tier,c.careStatus,c.zaloStatus,c.totalOrders,c.totalRevenue,`"${c.brands.join('; ')}"`,`"${c.sources.join('; ')}"`,`"${[..._buildCsSet_(c.orders, c.phone)].join('; ')}"`,`"${_latestNoteText(c.careNote)}"`];
+    const cfVals = cfCols.map(f => `"${((c.custom && c.custom[f.id]) || '').toString().replace(/"/g,'""')}"`);
+    return base.concat(cfVals).join(',');
+  }).join('\n');
   const blob=new Blob([BOM+hdr+rows],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`OME_KH_${_ymd(new Date())}.csv`; a.click();
 }
 
 function clearData() {
   if(!confirm('Xóa toàn bộ dữ liệu Excel đã nạp?\n(Lịch hẹn và trạng thái CS được giữ lại)')) return;
-  customerMap={}; allCustomers=[]; loadedFiles=[]; currentTier='all'; currentCare='all'; currentZalo='all'; currentBrand='all'; currentCS='all';
+  customerMap={}; allCustomers=[]; loadedFiles=[]; currentTier='all'; currentCare='all'; currentZalo='all'; currentBrand='all'; currentCF={}; currentCS='all';
   document.getElementById('data-view').style.display='none';
   document.getElementById('empty-view').style.display='flex';
   document.getElementById('clearbtn').style.display='none';
@@ -5555,6 +5687,16 @@ function custStatusBadge(st) {
   if(!st) return '';
   var label = custStatusFullLabel(st) || st;
   return `<span class="badge bo" style="background:var(--surface2);color:#6d28d9;border-color:var(--border);font-weight:500">${label}</span>`;
+}
+// Badge các TRƯỜNG TỰ TẠO có giá trị — hiện cạnh tên khách trong panel chi tiết
+function cfBadges(phone) {
+  if (typeof CUSTOM_FIELDS === 'undefined' || !CUSTOM_FIELDS.length) return '';
+  var cust = ((typeof careData !== 'undefined' && careData[phone]) || {}).custom || {};
+  return CUSTOM_FIELDS.map(function(f){
+    var v = cust[f.id];
+    if (!v) return '';
+    return '<span class="cf-dp-badge"><span class="cf-dp-k">' + esc(f.label) + ':</span> ' + esc(v) + '</span>';
+  }).join('');
 }
 function zaloBadge(st) {
   if(!st) return '<span class="badge bo">—</span>';
@@ -6126,6 +6268,7 @@ function openAdvModal() {
   buildAdvChips('sources', allSources, advFilters.sources, 'adv-source-chips');
   buildAdvChips('careStatus', CARE_STATUS, advFilters.careStatus, 'adv-care-chips');
   buildAdvChips('zaloStatus', ZALO_STATUS, advFilters.zaloStatus, 'adv-zalo-chips');
+  buildAdvCfSections();
   const csSearchEl = document.getElementById('adv-cs-search'); if (csSearchEl) csSearchEl.value = '';
   const prodSearchEl = document.getElementById('adv-product-search'); if (prodSearchEl) prodSearchEl.value = [...advFilters.products].join(', ');
   // Restore date values
@@ -6165,6 +6308,42 @@ function toggleAdvChip(key, val, el) {
   else { advFilters[key].add(val); el.classList.add('selected'); }
   updateAdvCount();
 }
+// ── Chip lọc nâng cao cho TRƯỜNG TỰ TẠO ──
+function buildAdvCfSections() {
+  var host = document.getElementById('adv-cf-sections');
+  if (!host) return;
+  if (typeof CUSTOM_FIELDS === 'undefined' || !CUSTOM_FIELDS.length) { host.innerHTML = ''; return; }
+  host.innerHTML = CUSTOM_FIELDS.map(function(f){
+    if (!advFilters.custom[f.id]) advFilters.custom[f.id] = new Set();
+    var sel = advFilters.custom[f.id];
+    var opts = [];
+    (f.tree || []).forEach(function(node){
+      if (node.children && node.children.length) {
+        node.children.forEach(function(ch){ opts.push({ v: ch.value || ch.label, label: node.label + ' → ' + ch.label }); });
+      } else {
+        opts.push({ v: node.value || node.label, label: node.label });
+      }
+    });
+    var chips = opts.map(function(o){
+      return '<span class="adv-chip ' + (sel.has(o.v) ? 'selected' : '') + '" data-cf="' + esc(f.id) + '" data-val="' + esc(o.v) + '"'
+        + ' onclick="toggleAdvCfChip(this.dataset.cf,this.dataset.val,this)">' + esc(o.label) + '</span>';
+    }).join('');
+    return '<div class="adv-section"><div class="adv-section-label">🏷 ' + esc(f.label) + ' (chọn nhiều)</div>'
+      + '<div class="adv-chips">' + (chips || '<span style="font-size:11px;color:var(--hint)">Trường này chưa có lựa chọn nào</span>') + '</div></div>';
+  }).join('');
+}
+function toggleAdvCfChip(fieldId, val, el) {
+  if (!advFilters.custom[fieldId]) advFilters.custom[fieldId] = new Set();
+  var s = advFilters.custom[fieldId];
+  if (s.has(val)) { s.delete(val); el.classList.remove('selected'); }
+  else { s.add(val); el.classList.add('selected'); }
+  updateAdvCount();
+}
+function _advCfCount() {
+  var n = 0;
+  for (var k in (advFilters.custom || {})) n += advFilters.custom[k].size;
+  return n;
+}
 function updateAdvCount() {
   const n = countAdvFilters();
   const el = document.getElementById('adv-count-text');
@@ -6172,7 +6351,7 @@ function updateAdvCount() {
 }
 function countAdvFilters() {
   return advFilters.cs.size + advFilters.products.size + advFilters.sources.size +
-    advFilters.careStatus.size + advFilters.zaloStatus.size +
+    advFilters.careStatus.size + advFilters.zaloStatus.size + _advCfCount() +
     (advFilters.yearFrom?1:0) + (advFilters.yearTo?1:0);
 }
 function applyAdvFilters() {
@@ -6186,7 +6365,7 @@ function applyAdvFilters() {
   applyFilters();
 }
 function clearAdvFilters() {
-  advFilters = { cs:new Set(), products:new Set(), sources:new Set(), careStatus:new Set(), zaloStatus:new Set(), yearFrom:'', monthFrom:'', yearTo:'', monthTo:'' };
+  advFilters = { cs:new Set(), products:new Set(), sources:new Set(), careStatus:new Set(), zaloStatus:new Set(), custom:{}, yearFrom:'', monthFrom:'', yearTo:'', monthTo:'' };
   ['adv-year-from','adv-month-from','adv-year-to','adv-month-to'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   openAdvModal(); // rebuild chips
   applyFilters();
@@ -11578,6 +11757,7 @@ function _filterSignature(){
     typeof currentCare  !== 'undefined' ? currentCare  : '',
     typeof currentZalo  !== 'undefined' ? currentZalo  : '',
     typeof currentBrand !== 'undefined' ? currentBrand : '',
+    (typeof currentCF !== 'undefined' ? JSON.stringify(currentCF) : ''),
     val('search-input').toLowerCase(),
     _csFilterList().join('|'),
     (document.querySelector('.srt') ? document.querySelector('.srt').value : ''),
@@ -11593,6 +11773,9 @@ function _filterSignature(){
     parts.push('af', _setSig(advFilters.cs), _setSig(advFilters.products), _setSig(advFilters.sources),
       _setSig(advFilters.careStatus), _setSig(advFilters.zaloStatus),
       advFilters.yearFrom, advFilters.monthFrom, advFilters.yearTo, advFilters.monthTo);
+    // Trường tự tạo ở lọc nâng cao (sắp khoá để chữ ký ổn định giữa các lần)
+    var _cfKeys = Object.keys(advFilters.custom || {}).sort();
+    parts.push('afcf', _cfKeys.map(function(k){ return k + ':' + _setSig(advFilters.custom[k]); }).join(';'));
   }
   return parts.join('§');
 }
@@ -14811,8 +14994,7 @@ function updateSidebarCareFilters() {
 </div>
 
 <style>
-.cf-frow{display:flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);font-size:12px;cursor:pointer;margin-bottom:4px;}
-.cf-frow:hover{background:var(--surface2);}
+.cf-frow{display:flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);font-size:12px;cursor:pointer;margin-bottom:4px;}.cf-frow:hover{background:var(--surface2);}
 .cf-frow.cf-active{border-color:var(--accent,#2563eb);background:#eff6ff;}
 .cf-fname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;}
 .cf-fcnt{font-size:10px;color:var(--hint);flex-shrink:0;}
@@ -14820,6 +15002,10 @@ function updateSidebarCareFilters() {
 .cf-mini:hover{background:var(--surface2);}
 .cf-mini.cf-del{color:var(--red,#dc2626);border-color:var(--red-b,#fca5a5);}
 .cf-mini.cf-del:hover{background:var(--red-bg,#fff1f2);}
+/* Giá trị trường tự tạo: badge trong bảng danh sách + cạnh tên khách ở panel chi tiết */
+.cf-cell-badge{display:inline-block;background:var(--surface2);border:1px solid var(--border-md);border-radius:10px;padding:1px 7px;font-size:10.5px;color:var(--text);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;}
+.cf-dp-badge{display:inline-flex;align-items:center;gap:3px;background:#eef2ff;border:1px solid #c7d2fe;color:#3730a3;border-radius:10px;padding:1px 8px;font-size:10.5px;font-weight:600;}
+.cf-dp-badge .cf-dp-k{opacity:.65;font-weight:500;}
 .khs-group{margin-bottom:8px;}.khs-parent-row{display:flex;align-items:center;gap:7px;padding:6px 8px;background:var(--surface2);border:1px solid var(--border-md);border-radius:var(--rsm);font-weight:600;font-size:12px;cursor:default;}
 .khs-parent-row:hover{background:#e8e6e3;}
 .khs-children{padding-left:20px;margin-top:3px;display:flex;flex-direction:column;gap:3px;}

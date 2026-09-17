@@ -162,6 +162,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // Truong tu tao (admin them ben app web chinh) — dung chung setting 'customFields' voi
+  // khStatusTree/nickZaloList, KHONG can them action rieng o backend GAS.
+  if (msg?.type === "GET_CUSTOM_FIELDS") {
+    handleGetCustomFields()
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
   // Bang tra menh + mau canned response phong thuy (chi dung tren Messenger/Thu Hien) —
   // action:'getKnowledge', doc/tu tao sheet Menh + CannedResponses rieng, KHONG dung cot CareData.
   if (msg?.type === "GET_KNOWLEDGE") {
@@ -294,6 +303,25 @@ async function handleGetCareStatusTree() {
     } catch (e) { /* het cach, tra ve mang rong -> content.js tu fallback ve CARE_STATUSES tinh */ }
   }
   return Array.isArray(tree) ? tree : [];
+}
+
+// Danh sach "truong tu tao" (admin them ben app web chinh) — action:'getSetting'&key=
+// 'customFields', CUNG co che voi khStatusTree/nickZaloList. Tra ve [] neu chua co gi.
+async function handleGetCustomFields() {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) return [];
+
+  const sep = cfg.gasUrl.includes("?") ? "&" : "?";
+  try {
+    const res = await fetch(cfg.gasUrl + sep + "action=getSetting&key=customFields", { redirect: "follow" });
+    const data = await res.json();
+    if (data && data.value) {
+      const arr = typeof data.value === "string" ? JSON.parse(data.value) : data.value;
+      if (Array.isArray(arr)) return arr;
+    }
+  } catch (e) { /* het cach, tra ve mang rong */ }
+  return [];
 }
 
 // Them 1 nick moi vao danh sach dung chung — uu tien action:'addZaloNick' (GAS tu merge vao

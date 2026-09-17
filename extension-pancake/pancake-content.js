@@ -95,6 +95,7 @@
   let CS_NAMES = [];
   let NICK_LIST = [];
   let CARE_STATUS_TREE = null; // cay "Tinh trang CS" load dong tu GAS (dong bo voi appweb/Zalo AI)
+  let CUSTOM_FIELDS = []; // "truong tu tao" (admin them ben app web chinh) — load dong tu GAS
   let _currentNick = ''; // Nick Zalo/kenh CS dang dung, sticky (chrome.storage.sync)
   let _chatKeyPhoneMap = {}; // { chatKey: phone } — "danh ba nguoc" hoc cuc bo tren may nay
                              // (giong _chatNamePhoneMap ben Zalo AI), dung cho nut Lien ket doan chat
@@ -116,7 +117,7 @@
     observeConversationChanges();
     loadCsNames_();
     loadNickList_();
-    if (!IS_PHONGTHUY) loadCareStatusTree_(); // cay dung chung cho Pancake/Zalo (san pham suc khoe) — khong ap dung cho phong thuy
+    if (!IS_PHONGTHUY) { loadCareStatusTree_(); loadCustomFields_(); } // cay dung chung cho Pancake/Zalo (san pham suc khoe) — khong ap dung cho phong thuy
     loadChatKeyMap_();
     startCarePoll_();
     loadReminders_();
@@ -544,6 +545,75 @@
     });
   }
 
+  function loadCustomFields_() {
+    safeSendMessage_({ type: 'GET_CUSTOM_FIELDS' }, (resp) => {
+      if (resp?.ok && Array.isArray(resp.data)) {
+        CUSTOM_FIELDS = resp.data;
+        // Vẽ lại panel đang mở (nếu có) để hiện đúng các trường tự tạo mới nhất
+        if (_currentPhone) renderCustomFieldSelects_(panelEl?.querySelector('#pk-cf-wrap'), _currentCare?.custom || {});
+      }
+    });
+  }
+
+  // Build <option> cho 1 trường tự tạo — CÙNG cấu trúc {label,value}/{label,children} với
+  // careStatusOptionsHtml_ ở trên.
+  function customFieldOptionsHtml_(field, selected) {
+    let html = '<option value="">— Chọn —</option>';
+    (field.tree || []).forEach((node) => {
+      if (node.children && node.children.length) {
+        html += '<optgroup label="' + escapeHtml(node.label) + '">';
+        node.children.forEach((child) => {
+          const v = child.value || child.label;
+          html += `<option value="${escapeHtml(v)}"${selected === v ? ' selected' : ''}>${escapeHtml(node.label + ' → ' + (child.label || v))}</option>`;
+        });
+        html += '</optgroup>';
+      } else {
+        const v2 = node.value || node.label;
+        html += `<option value="${escapeHtml(v2)}"${selected === v2 ? ' selected' : ''}>${escapeHtml(node.label || v2)}</option>`;
+      }
+    });
+    return html;
+  }
+
+  // Vẽ các <select> của trường tự tạo vào 1 vùng chứa cho sẵn trong form — ghép 2 trường/hàng
+  // theo đúng cấu trúc .pk-form-row > .pk-form-col mà các trường có sẵn (Sinh nhật/Ngày hẹn) đang
+  // dùng, để không bị vỡ layout (pk-form-row là flex hàng ngang, cần bọc từng ô trong pk-form-col).
+  function renderCustomFieldSelects_(wrapEl, values) {
+    if (!wrapEl) return;
+    values = values || {};
+    if (!CUSTOM_FIELDS.length) { wrapEl.innerHTML = ''; return; }
+    const cols = CUSTOM_FIELDS.map((f) => `
+      <div class="pk-form-col">
+        <label>${escapeHtml(f.label)}</label>
+        <select id="pk-cf-${escapeHtml(f.id)}" data-cfid="${escapeHtml(f.id)}">${customFieldOptionsHtml_(f, values[f.id] || '')}</select>
+      </div>
+    `);
+    let html = '';
+    for (let i = 0; i < cols.length; i += 2) {
+      html += `<div class="pk-form-row">${cols[i]}${cols[i + 1] || '<div class="pk-form-col"></div>'}</div>`;
+    }
+    wrapEl.innerHTML = html;
+  }
+
+  // Đọc giá trị các trường tự tạo đang chọn trên form (dùng khi lưu)
+  function collectCustomFieldValues_(existing) {
+    const out = Object.assign({}, existing || {});
+    CUSTOM_FIELDS.forEach((f) => {
+      const el = panelEl?.querySelector('#pk-cf-' + f.id);
+      if (el) out[f.id] = el.value || '';
+    });
+    return out;
+  }
+
+  // Chip hiển thị giá trị trường tự tạo có dữ liệu — cạnh các chip có sẵn của thẻ khách
+  function customFieldChips_(care) {
+    if (!CUSTOM_FIELDS.length || !care || !care.custom) return '';
+    return CUSTOM_FIELDS.map((f) => {
+      const v = care.custom[f.id];
+      return v ? `<span class="pk-ai-chip">🏷 ${escapeHtml(f.label)}: ${escapeHtml(v)}</span>` : '';
+    }).join('');
+  }
+
   // "Danh bạ ngược" (khoá hội thoại → SĐT) học cục bộ trên máy này — dùng khi CS bấm 🔗
   // Liên kết đoạn chat, để lần sau tự nhận diện dù không đọc được SĐT/khung "Sản phẩm order".
   function loadChatKeyMap_() {
@@ -886,7 +956,7 @@
              <input type="text" id="pk-newphone-input" class="pk-full-input" placeholder="Dán SĐT khách vào đây..." value="${escapeHtml(phone || '')}" />`
           : `<div class="pk-ai-cust-name">${escapeHtml(name)} <span class="pk-ai-cust-phone">${phone}</span></div>`}
         <div class="pk-ai-new-tag" id="pk-ai-new-tag" style="${isNew ? '' : 'display:none'}">⚠️ Chưa có trong hệ thống Sasum — lưu sẽ tạo mới</div>
-        ${chips.length ? `<div class="pk-ai-cust-chips">${chips.map((c) => `<span class="pk-ai-chip">${c}</span>`).join('')}</div>` : ''}
+        ${chips.length ? `<div class="pk-ai-cust-chips">${chips.map((c) => `<span class="pk-ai-chip">${c}</span>`).join('')}${customFieldChips_(care)}</div>` : (customFieldChips_(care) ? `<div class="pk-ai-cust-chips">${customFieldChips_(care)}</div>` : '')}
         ${products ? `<div class="pk-ai-cust-products">🏷 ${escapeHtml(products)}</div>` : ''}
 
         <label class="pk-label-top">Tên khách</label>
@@ -927,6 +997,8 @@
         </div>
         <input type="text" id="pk-hen-note" class="pk-full-input" placeholder="Ghi chú lịch hẹn" value="${escapeHtml(care?.schedHenNote || '')}" />
 
+        <div id="pk-cf-wrap"></div>
+
         <label class="pk-label-top">Ghi chú CS</label>
         <div id="pk-note-history"></div>
         <div class="pk-note-add-row">
@@ -939,6 +1011,7 @@
       </div>
     `;
 
+    renderCustomFieldSelects_(box.querySelector('#pk-cf-wrap'), care?.custom || {});
     renderNoteHistory_(care?.note || '');
 
     box.querySelector('#pk-note-add-btn').addEventListener('click', addNoteEntry_);
@@ -1055,6 +1128,7 @@
       schedHen: c.schedHen || '', schedHenNote: c.schedHenNote || '',
       khStatus: c.khStatus || '', birthday: c.birthday || '',
       nickZalos,
+      custom: c.custom || {},
       name: liveName || _currentOrderPanelName || c.name || ''
     }, overrides || {});
   }
@@ -1189,6 +1263,7 @@
       birthday: panelEl.querySelector('#pk-birthday').value,
       schedHen: panelEl.querySelector('#pk-hen-date').value,
       schedHenNote: panelEl.querySelector('#pk-hen-note').value.trim(),
+      custom: collectCustomFieldValues_(_currentCare?.custom || {}),
       note: rawEl ? rawEl.value : (_currentCare?.note || '')
     });
     if (btn) { btn.disabled = true; btn.textContent = 'Đang lưu...'; }
