@@ -306,6 +306,16 @@
 
 #pk-link-chat-btn:hover { background: #f3f4f6; }
 
+/* "＋ Thêm KH" — tô đậm hơn nút Tra cứu vì đây là lối vào nhanh CS dùng thường xuyên */
+#pk-add-new-btn {
+  border: 1px solid #16a34a !important;
+  background: #16a34a !important;
+  color: #fff !important;
+  font-weight: 600;
+}
+
+#pk-add-new-btn:hover { background: #15803d !important; border-color: #15803d !important; }
+
 .pk-ai-new-tag {
   color: #9a3412;
   background: #fff7ed;

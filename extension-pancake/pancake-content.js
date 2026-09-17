@@ -29,9 +29,6 @@
     'Chờ gọi tư vấn', 'Đã gọi - đang theo dõi', 'Hẹn gọi lại',
     'Không nghe máy', 'Đã chốt', 'Từ chối', 'Đang khiếu nại', 'Tạm ngừng chăm sóc'
   ];
-  // Dung lai chinh cot 'khStatus' (von la truong mo rong chung, khong rieng nghia vu) de luu
-  // Phan loai khach cho kenh Messenger — KHONG them cot moi vao CareData.
-  const PHAN_LOAI_OPTS_MESSENGER = ['', 'Mới', 'Cũ', 'VIP', 'Tiềm năng'];
   const MENH_TABLE_DEFAULT = {
     'Kim': [1954,1955,1962,1963,1970,1971,1984,1985,1992,1993,2000,2001],
     'Thủy': [1956,1957,1964,1965,1972,1973,1986,1987,1994,1995,2002,2003],
@@ -54,8 +51,8 @@
   ];
   const IS_PHONGTHUY = PLATFORM === 'messenger';
   const ACTIVE_CARE_STATUSES = IS_PHONGTHUY ? CARE_STATUSES_MESSENGER : CARE_STATUSES;
-  const ACTIVE_KHSTATUS_OPTS = IS_PHONGTHUY ? PHAN_LOAI_OPTS_MESSENGER : KH_STATUS_OPTS;
-  const KHSTATUS_LABEL = IS_PHONGTHUY ? 'Phân loại khách' : 'Tình trạng KH';
+  const ACTIVE_KHSTATUS_OPTS = KH_STATUS_OPTS; // giu nguyen "Tinh trang KH" cho ca 2 nen tang, khong doi thanh Phan loai khach
+  const KHSTATUS_LABEL = 'Tình trạng KH';
   const KNOWLEDGE_TTL_MS = 20 * 60 * 1000; // cache 20 phut, khong goi Sheet moi tin nhan
   let _menhTable = MENH_TABLE_DEFAULT;
   let _cannedResponses = CANNED_DEFAULT_MESSENGER;
@@ -279,6 +276,7 @@
           <input type="text" id="pk-ai-phone-input" placeholder="SĐT khách (nếu không tự nhận ra)" />
           <button id="pk-ai-phone-btn">Tra cứu</button>
           <button id="pk-link-chat-btn" title="Liên kết đoạn chat ĐANG MỞ với khách này — làm 1 lần để lần sau tự nhận diện dù không đọc được SĐT/khung Sản phẩm order">🔗</button>
+          <button id="pk-add-new-btn" title="Mở ngay form thêm khách mới — không cần tra cứu trước, dán SĐT vào form rồi điền và lưu">＋ Thêm KH</button>
         </div>
         <div id="pk-ai-customer"></div>
 
@@ -372,6 +370,7 @@
       learnChatKeyForPhone_(_currentPhone);
       setStatus(`🔗 Đã liên kết đoạn chat này với ${_currentPhone} — lần sau tự nhận diện.`);
     });
+    panelEl.querySelector("#pk-add-new-btn").addEventListener("click", quickAddNewCustomer_);
     panelEl.querySelector("#pk-rem-refresh").addEventListener("click", () => loadReminders_());
     panelEl.querySelector("#pk-price-btn").addEventListener("click", doPriceSearch_);
     panelEl.querySelector("#pk-price-q").addEventListener("keydown", (e) => {
@@ -652,8 +651,9 @@
       panelEl.querySelector("#pk-ai-customer").innerHTML =
         `<div class="pk-ai-no-phone-hint">
           📵 Không tự nhận ra SĐT trong đoạn chat này.<br>
-          Nhập SĐT khách vào ô phía trên rồi bấm <b>"Tra cứu"</b> để hiện đầy đủ
-          form nhập tên/trạng thái/ghi chú (giống bên Zalo AI).
+          • Khách <b>đã có</b> trong Sasum: nhập SĐT ở ô trên rồi bấm <b>"Tra cứu"</b>.<br>
+          • Khách <b>mới</b>: bấm thẳng <b>"＋ Thêm KH"</b> — form hiện ngay, dán SĐT vào form
+          rồi điền tên/trạng thái/ghi chú và bấm Lưu (không cần tra cứu trước).
         </div>`;
       return;
     }
@@ -744,7 +744,49 @@
     return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
   }
 
-  function renderCustomerCard(phone, data) {
+  // "＋ Thêm KH": mở NGAY form nhập khách mới, KHÔNG cần tra cứu trước và KHÔNG bắt buộc phải
+  // có sẵn SĐT — giải quyết đúng vấn đề "phải điền SĐT + bấm Tra cứu mới hiện form, mất thời
+  // gian". CS bấm nút này là form hiện liền, dán SĐT vào ô SĐT ngay trong form rồi điền tên/
+  // trạng thái/ghi chú và bấm Lưu. SĐT chỉ bắt buộc ở thời điểm LƯU (validate trong saveCare_).
+  //
+  // Để tránh rủi ro ghi đè mất dữ liệu nếu SĐT đó thật ra ĐÃ có trong Sasum, sau khi CS dán
+  // SĐT hợp lệ sẽ âm thầm tra cứu ở nền: nếu tìm thấy dữ liệu cũ thì nạp vào các ô CS CHƯA kịp
+  // sửa (dùng lại đúng cơ chế applyPolledCare_), không đụng vào ô nào CS đã gõ rồi.
+  function quickAddNewCustomer_() {
+    const phoneInput = panelEl.querySelector('#pk-ai-phone-input');
+    const phone = normPhone(phoneInput ? phoneInput.value : '');
+    _currentPhone = phone;           // có thể rỗng — form vẫn mở bình thường
+    _currentCare = null;
+    _currentOrders = [];
+    _lastServerCare = {};
+    renderCustomerCard(phone, { care: null, orders: [] }, { blankNew: true });
+    setStatus(phone
+      ? `Đã mở form thêm mới cho ${phone} — điền thông tin rồi bấm Lưu vào Sasum.`
+      : 'Đã mở form thêm khách mới — dán SĐT vào ô "SĐT khách" trong form rồi điền và bấm Lưu.');
+    const inCardPhone = panelEl.querySelector('#pk-newphone-input');
+    if (inCardPhone) inCardPhone.focus();
+    if (phone) probeExistingCustomer_(phone);
+  }
+
+  // Tra cứu ngầm khi CS vừa dán SĐT — CHỈ để báo sớm cho CS biết đây là khách đã có, và nạp
+  // sẵn dữ liệu cũ lên form cho dễ nhìn. Đây KHÔNG phải cơ chế bảo vệ dữ liệu: việc chống ghi
+  // đè được đảm bảo chắc chắn ở bước lưu (saveCareAddOnly_ đọc lại bản mới nhất rồi hợp nhất),
+  // nên kể cả khi CS bấm Lưu trước lúc tra cứu này trả về thì dữ liệu cũ vẫn an toàn.
+  function probeExistingCustomer_(phone) {
+    safeSendMessage_({ type: 'LOOKUP_CUSTOMER', payload: { phone } }, (resp) => {
+      if (!resp?.ok || _currentPhone !== phone) return; // CS đã đổi sang số khác -> bỏ qua
+      const care = resp.data.care || null;
+      const orders = resp.data.orders || [];
+      if (!care && !orders.length) return; // đúng là khách mới thật -> không cần làm gì thêm
+      _currentOrders = orders;
+      applyPolledCare_(phone, care || {});
+      const tagEl = panelEl.querySelector('#pk-ai-new-tag');
+      if (tagEl) tagEl.style.display = 'none';
+      setStatus(`ℹ️ Số ${phone} đã có sẵn trong hệ thống — bạn vẫn điền và lưu bình thường, phần bạn nhập sẽ được THÊM vào hồ sơ này chứ không ghi đè dữ liệu cũ.`);
+    });
+  }
+
+  function renderCustomerCard(phone, data, opts) {
     const box = panelEl.querySelector("#pk-ai-customer");
     const { care, orders } = data;
 
@@ -764,10 +806,16 @@
     if (totalRevenue) chips.push(`💰 ${Math.round(totalRevenue / 1000)}K`);
     if (care?.schedHen) chips.push(`📅 Hẹn ${fmtDate_(care.schedHen)}`);
 
+    const blankNew = !!(opts && opts.blankNew);
+
     box.innerHTML = `
       <div class="pk-ai-cust-card">
-        <div class="pk-ai-cust-name">${escapeHtml(name)} <span class="pk-ai-cust-phone">${phone}</span></div>
-        ${isNew ? `<div class="pk-ai-new-tag">⚠️ Chưa có trong hệ thống Sasum — lưu sẽ tạo mới</div>` : ''}
+        ${blankNew
+          ? `<div class="pk-ai-cust-name">＋ Thêm khách mới</div>
+             <label class="pk-label-top">SĐT khách <span style="color:#dc2626">*</span></label>
+             <input type="text" id="pk-newphone-input" class="pk-full-input" placeholder="Dán SĐT khách vào đây..." value="${escapeHtml(phone || '')}" />`
+          : `<div class="pk-ai-cust-name">${escapeHtml(name)} <span class="pk-ai-cust-phone">${phone}</span></div>`}
+        <div class="pk-ai-new-tag" id="pk-ai-new-tag" style="${isNew ? '' : 'display:none'}">⚠️ Chưa có trong hệ thống Sasum — lưu sẽ tạo mới</div>
         ${chips.length ? `<div class="pk-ai-cust-chips">${chips.map((c) => `<span class="pk-ai-chip">${c}</span>`).join('')}</div>` : ''}
         ${products ? `<div class="pk-ai-cust-products">🏷 ${escapeHtml(products)}</div>` : ''}
 
@@ -779,7 +827,7 @@
             <label>Trạng thái CS</label>
             <select id="pk-status-sel">${careStatusOptionsHtml_(care?.status || '')}</select>
           </div>
-          <div class="pk-form-col" style="${IS_PHONGTHUY ? 'display:none' : ''}">
+          <div class="pk-form-col">
             <label>Trạng thái Zalo</label>
             <select id="pk-zalo-sel">${optHtml(ZALO_STATUSES, care?.zalo)}</select>
           </div>
@@ -827,13 +875,37 @@
     box.querySelector('#pk-note-new').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') addNoteEntry_();
     });
-    box.querySelector('#pk-hen-done').addEventListener('click', () => doneAppointment_(phone));
-    box.querySelector('#pk-save-btn').addEventListener('click', () => saveCare_(phone));
+    box.querySelector('#pk-hen-done').addEventListener('click', () => doneAppointment_(currentFormPhone_() || phone));
+    box.querySelector('#pk-save-btn').addEventListener('click', () => saveCare_(currentFormPhone_() || phone));
+
+    // Form thêm mới: khi CS dán xong SĐT hợp lệ thì tự tra ngầm 1 lần để cảnh báo nếu số đã tồn tại
+    const newPhoneEl = box.querySelector('#pk-newphone-input');
+    if (newPhoneEl) {
+      let probed = '';
+      const onPhoneReady = () => {
+        const p = normPhone(newPhoneEl.value);
+        if (!/^0[3-9]\d{8}$/.test(p) || p === probed) return;
+        probed = p;
+        _currentPhone = p;
+        probeExistingCustomer_(p);
+      };
+      newPhoneEl.addEventListener('blur', onPhoneReady);
+      newPhoneEl.addEventListener('input', onPhoneReady);
+    }
     if (IS_PHONGTHUY) {
       const bdayEl = box.querySelector('#pk-birthday');
       bdayEl.addEventListener('input', () => updateMenhBadge_());
+      bdayEl.addEventListener('change', () => updateMenhBadge_()); // input type=date: chon qua lich thuong chi ban 'change', khong ban 'input' o 1 so trinh duyet
       updateMenhBadge_();
     }
+  }
+
+  // SĐT đang áp dụng cho form: ưu tiên ô SĐT trong form thêm mới (nếu đang mở), sau đó tới
+  // SĐT của khách vừa tra cứu.
+  function currentFormPhone_() {
+    const el = panelEl?.querySelector('#pk-newphone-input');
+    if (el) return normPhone(el.value);
+    return _currentPhone || '';
   }
 
   function updateMenhBadge_() {
@@ -917,15 +989,128 @@
     }, overrides || {});
   }
 
+  // ── LUU AN TOAN CHO LUONG "+ Them KH" (nguon Cham soc) ─────────────────────────────────
+  // Nguyen tac: sale CHI DUOC THEM thong tin moi, KHONG duoc ghi de/xoa du lieu cu.
+  // Truoc khi ghi, luon doc lai ban ghi MOI NHAT tren server roi hop nhat:
+  //   - Ghi chu: GIU NGUYEN toan bo lich su cu, chi noi them cac ghi chu moi CS vua go len dau.
+  //   - Cac truong khac (trang thai CS/Zalo/tinh trang KH/sinh nhat/lich hen/ten): neu server
+  //     DA CO gia tri thi giu nguyen cua server; chi dien vao nhung o server dang de trong.
+  // Nho vay du CS bam Luu truoc khi tra ngam kip tra ve, du lieu cu van an toan tuyet doi.
+  function _mergeNotesKeepOld_(serverNoteRaw, localNoteRaw) {
+    const serverArr = _parseNotes(serverNoteRaw);
+    const localArr = _parseNotes(localNoteRaw);
+    const keyOf = (n) => [n.text || '', n.user || '', n.time || ''].join('|');
+    const seen = new Set(serverArr.map(keyOf));
+    // Ghi chu moi = co trong local nhung chua co tren server -> dua len dau, giu het ban cu
+    const added = localArr.filter((n) => n.text && !seen.has(keyOf(n)));
+    return { merged: _notesToStr([...added, ...serverArr]), addedCount: added.length };
+  }
+
+  // Tra ve row da hop nhat + danh sach ten truong bi giu lai (de bao cho CS biet, minh bach)
+  function _mergeRowKeepOld_(serverCare, localRow) {
+    const kept = [];
+    const out = Object.assign({}, localRow);
+    const LABELS = {
+      name: 'Tên khách', status: 'Trạng thái CS', zalo: 'Trạng thái Zalo',
+      khStatus: KHSTATUS_LABEL, birthday: 'Sinh nhật',
+      schedHen: 'Ngày hẹn', schedHenNote: 'Ghi chú lịch hẹn'
+    };
+    Object.keys(LABELS).forEach((k) => {
+      const sv = serverCare[k];
+      const lv = localRow[k];
+      if (sv) {                       // server da co -> giu nguyen, sale khong duoc de len
+        out[k] = sv;
+        if (lv && String(lv) !== String(sv)) kept.push(LABELS[k]);
+      } else {
+        out[k] = lv || '';            // server trong -> cho phep dien moi
+      }
+    });
+    // Cac truong lich hen/schedules khac khong co UI ben Pancake: luon lay nguyen cua server
+    ['schedules','schedGoi','schedGoiNote','schedSP','schedSPNote','schedCS','schedCSNote'].forEach((k) => {
+      out[k] = serverCare[k] || localRow[k] || '';
+    });
+    // Nick Zalo/kenh: hop nhat, khong bao gio lam mat nick cu
+    const svNicks = serverCare.nickZalos || [];
+    const lcNicks = localRow.nickZalos || [];
+    out.nickZalos = [...new Set([...svNicks, ...lcNicks])];
+    // CS phu trach: neu khach da co CS cu thi giu, khong cuop quyen phu trach
+    out.cs = serverCare.cs || localRow.cs || '';
+    const noteRes = _mergeNotesKeepOld_(serverCare.note, localRow.note);
+    out.note = noteRes.merged;
+    return { row: out, kept, addedNotes: noteRes.addedCount };
+  }
+
+  function saveCareAddOnly_(phone, localRow, btn) {
+    // Doc lai ban MOI NHAT ngay truoc khi ghi — chan ca truong hop CS bam Luu qua nhanh
+    safeSendMessage_({ type: 'LOOKUP_CUSTOMER', payload: { phone } }, (lookupResp) => {
+      if (!lookupResp?.ok) {
+        if (btn) { btn.disabled = false; btn.textContent = '💾 Lưu vào Sasum'; }
+        setStatus('Chưa kiểm tra được dữ liệu cũ của số này nên tạm dừng để an toàn — bấm Lưu lại lần nữa.');
+        return;
+      }
+      const serverCare = lookupResp.data.care || null;
+      const serverOrders = lookupResp.data.orders || [];
+      const isTrulyNew = !serverCare && !serverOrders.length;
+      const { row, kept, addedNotes } = _mergeRowKeepOld_(serverCare || {}, localRow);
+      safeSendMessage_({ type: 'SAVE_CARE', payload: Object.assign({}, row, { isNewCustomer: isTrulyNew }) }, (resp) => {
+        if (btn) { btn.disabled = false; btn.textContent = '💾 Lưu vào Sasum'; }
+        if (!resp?.ok) { setStatus('Lưu thất bại: ' + (resp?.error || 'lỗi không rõ')); return; }
+        _currentCare = row;
+        _currentPhone = phone;
+        _currentOrders = serverOrders;
+        _lastServerCare = Object.assign({}, row);
+        _refreshCardAfterSave_(phone, row);
+        renderNoteHistory_(row.note);
+        const rawEl = panelEl.querySelector('#pk-note-raw');
+        if (rawEl) rawEl.value = row.note;
+        if (isTrulyNew) {
+          setStatus('✓ Đã tạo khách mới (nguồn Chăm sóc).');
+        } else {
+          let msg = `✓ Đã thêm vào khách đã có sẵn${addedNotes ? ` — ${addedNotes} ghi chú mới` : ''}.`;
+          if (kept.length) msg += ` Giữ nguyên dữ liệu cũ: ${kept.join(', ')} (sale không ghi đè được).`;
+          setStatus(msg);
+        }
+      });
+    });
+  }
+
+  function _refreshCardAfterSave_(phone, row) {
+    const nameSpan = panelEl.querySelector('.pk-ai-cust-name');
+    if (nameSpan && row.name) nameSpan.innerHTML = `${escapeHtml(row.name)} <span class="pk-ai-cust-phone">${phone}</span>`;
+    const tagEl = panelEl.querySelector('#pk-ai-new-tag');
+    if (tagEl) tagEl.style.display = 'none';
+    const newPhoneEl = panelEl.querySelector('#pk-newphone-input');
+    if (newPhoneEl) { newPhoneEl.value = phone; newPhoneEl.readOnly = true; }
+    // Dong bo lai cac o tren form theo gia tri thuc te da ghi (vd truong bi giu lai cua server)
+    const setVal = (id, v) => { const el = panelEl.querySelector(id); if (el) el.value = v || ''; };
+    setVal('#pk-name-input', row.name);
+    setVal('#pk-status-sel', row.status);
+    setVal('#pk-zalo-sel', row.zalo);
+    setVal('#pk-khstatus-sel', row.khStatus);
+    setVal('#pk-birthday', row.birthday ? toInputDate_(row.birthday) : '');
+    setVal('#pk-hen-date', row.schedHen ? toInputDate_(row.schedHen) : '');
+    setVal('#pk-hen-note', row.schedHenNote);
+    learnChatKeyForPhone_(phone);
+  }
+
   function saveCare_(phone) {
     const btn = panelEl.querySelector('#pk-save-btn');
     const rawEl = panelEl.querySelector('#pk-note-raw');
     const nameEl = panelEl.querySelector('#pk-name-input');
     const liveName = nameEl ? nameEl.value.trim() : '';
-    // Khách MỚI (nguồn "Chăm sóc"): chưa từng có CareData lẫn đơn hàng nào — bắt buộc nhập tên
-    // trước khi lưu, và sau khi lưu sẽ ghi thêm vào sheet riêng "KH Chăm sóc mới" (Báo cáo D).
-    const isNewCustomer = !_currentCare && (!_currentOrders || !_currentOrders.length);
-    if (isNewCustomer && !liveName) { setStatus('Khách mới — vui lòng nhập tên khách hàng trước khi lưu.'); return; }
+    // Form "＋ Thêm KH" mở được khi chưa có SĐT, nên SĐT chỉ bắt buộc ở đúng thời điểm LƯU.
+    phone = normPhone(phone);
+    if (!/^0[3-9]\d{8}$/.test(phone)) {
+      setStatus('SĐT chưa hợp lệ — nhập/dán SĐT khách (dạng 0xxxxxxxxx) trước khi lưu.');
+      const el = panelEl.querySelector('#pk-newphone-input') || panelEl.querySelector('#pk-ai-phone-input');
+      if (el) el.focus();
+      return;
+    }
+    // Form "＋ Thêm KH" (nguồn Chăm sóc do sale tự thêm): bắt buộc có tên, và đi qua đường lưu
+    // CHỈ-THÊM — đọc lại bản mới nhất rồi hợp nhất, không bao giờ ghi đè dữ liệu cũ.
+    const isAddForm = !!panelEl.querySelector('#pk-newphone-input');
+    if (isAddForm && !liveName) { setStatus('Vui lòng nhập tên khách hàng trước khi lưu.'); return; }
+
     const row = _buildRow(phone, {
       name: liveName,
       status: panelEl.querySelector('#pk-status-sel').value,
@@ -937,13 +1122,26 @@
       note: rawEl ? rawEl.value : (_currentCare?.note || '')
     });
     if (btn) { btn.disabled = true; btn.textContent = 'Đang lưu...'; }
+    if (isAddForm) { saveCareAddOnly_(phone, row, btn); return; }
+
+    // Luồng cũ (đã tra cứu khách sẵn rồi mới sửa): giữ nguyên như trước
+    const isNewCustomer = !_currentCare && (!_currentOrders || !_currentOrders.length);
     safeSendMessage_({ type: 'SAVE_CARE', payload: Object.assign({}, row, { isNewCustomer }) }, (resp) => {
       if (btn) { btn.disabled = false; btn.textContent = '💾 Lưu vào Sasum'; }
       if (!resp?.ok) { setStatus('Lưu thất bại: ' + (resp?.error || 'lỗi không rõ')); return; }
       _currentCare = row;
+      _currentPhone = phone;
       _lastServerCare = Object.assign({}, row);
       const nameSpan = panelEl.querySelector('.pk-ai-cust-name');
       if (nameSpan && row.name) nameSpan.innerHTML = `${escapeHtml(row.name)} <span class="pk-ai-cust-phone">${phone}</span>`;
+      // Lưu xong thì không còn là "khách mới" nữa: ẩn cảnh báo và khoá ô SĐT lại (tránh CS vô
+      // tình sửa số rồi bấm Lưu lần nữa làm tạo nhầm bản ghi thứ hai cho cùng 1 khách).
+      const tagEl = panelEl.querySelector('#pk-ai-new-tag');
+      if (tagEl) tagEl.style.display = 'none';
+      const newPhoneEl = panelEl.querySelector('#pk-newphone-input');
+      if (newPhoneEl) { newPhoneEl.value = phone; newPhoneEl.readOnly = true; }
+      // Ghi nhớ liên kết đoạn chat đang mở với SĐT này -> lần sau vào lại tự nhận diện luôn
+      learnChatKeyForPhone_(phone);
       setStatus('✓ Đã lưu vào Sasum.' + (isNewCustomer ? ' (KH mới — nguồn Chăm sóc)' : ''));
     });
   }
