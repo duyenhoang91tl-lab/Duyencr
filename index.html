@@ -11878,6 +11878,23 @@ var _srState = {
 
 function _srMoney(n){ return fmt(Math.round(n||0)) + '₫'; }
 
+// ── Phan quyen bao cao doanh so: CS thuong CHI xem duoc so lieu cua chinh minh, khong xem
+// duoc ca team. Admin (currentUser.role==='admin') khong bi gioi han gi. ──
+function _srIsAdmin(){ return !(typeof currentUser !== 'undefined' && currentUser && currentUser.role !== 'admin'); }
+function _srMyNames(){
+  return (typeof currentUser !== 'undefined' && currentUser && currentUser.names && currentUser.names.length)
+    ? currentUser.names.slice() : [];
+}
+// Khoa cung bo loc Sale ve dung ten cua chinh CS dang dang nhap — goi o dau moi lan render de
+// khong the nao bi doi sang xem sale khac (kien ca qua thao tac client, phong khi co lo hong UI).
+function _srEnforceScope(){
+  if (_srIsAdmin()) return;
+  var my = _srMyNames();
+  _srState.sale = my.slice();
+  _srState.bSale = my.slice();
+  _srState.cSale = my.slice();
+}
+
 async function _srFetch(action, params){
   if (!gsUrl) return null;
   var sep = gsUrl.includes('?') ? '&' : '?';
@@ -12224,6 +12241,7 @@ function renderSalesReportTab(){
     wrap.innerHTML = '<div style="color:var(--muted);text-align:center;padding:40px">Chưa kết nối Google Apps Script (gsUrl trống).</div>';
     return;
   }
+  _srEnforceScope();
   if (!_srState.optionsLoaded) _srLoadOptions();
 
   var subTabs = '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">' +
@@ -12246,31 +12264,41 @@ function renderSalesReportTab(){
       '<option value="ngayTao"'+(_srState.dateField==='ngayTao'?' selected':'')+'>Lọc theo Ngày tạo</option>'+
       '<option value="thoiGianHT"'+(_srState.dateField==='thoiGianHT'?' selected':'')+'>Lọc theo Thời gian hoàn thành</option>'+
       '</select>';
-    filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Lọc theo Sale'+((_srState.sale||[]).length?' <span style="color:var(--green)">('+(_srState.sale||[]).length+' đã chọn)</span>':'')+'</div>' +
-      '<div class="cs-combo" id="sr-sale-combo" style="width:190px">'+
-      '<input type="text" id="sr-sale-combo-input" class="cs-combo-input" placeholder="🔍 Tìm & chọn sale..." autocomplete="off" '+
-      'oninput="srSaleComboFilter(this.value)" onfocus="srSaleComboOpen()" onkeydown="srSaleComboKey(event)">'+
-      '<button type="button" class="cs-combo-clear" id="sr-sale-combo-clear" title="Bỏ chọn hết Sale" onclick="srSaleComboClear(event)" style="display:'+((_srState.sale||[]).length?'':'none')+'">✕</button>'+
-      '<span class="cs-combo-caret" onclick="srSaleComboToggle(event)">▾</span>'+
-      '<div class="cs-combo-list" id="sr-sale-combo-list"></div>'+
-      '</div>'+
-      '<div id="sr-sale-chips" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;max-width:220px">'+
-      (_srState.sale||[]).map(function(name){
-        return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap" data-name="'+esc(name)+'">'+
-          esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srSaleComboRemove(this.parentNode.dataset.name)">✕</span></span>';
-      }).join('') +
-      '</div></div>';
-    filters += '<select onchange="if(this.value){srPickTeam(this.value,\'sale\',\'sr-sale-combo\');this.value=\'\'}" title="Điền nhanh cả team vào ô Sale — sửa tay lại sau nếu cần" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-      '<option value="">— Chọn theo Team —</option>' + _srTeamOptionsHtml() + '</select>';
+    if (_srIsAdmin()){
+      filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Lọc theo Sale'+((_srState.sale||[]).length?' <span style="color:var(--green)">('+(_srState.sale||[]).length+' đã chọn)</span>':'')+'</div>' +
+        '<div class="cs-combo" id="sr-sale-combo" style="width:190px">'+
+        '<input type="text" id="sr-sale-combo-input" class="cs-combo-input" placeholder="🔍 Tìm & chọn sale..." autocomplete="off" '+
+        'oninput="srSaleComboFilter(this.value)" onfocus="srSaleComboOpen()" onkeydown="srSaleComboKey(event)">'+
+        '<button type="button" class="cs-combo-clear" id="sr-sale-combo-clear" title="Bỏ chọn hết Sale" onclick="srSaleComboClear(event)" style="display:'+((_srState.sale||[]).length?'':'none')+'">✕</button>'+
+        '<span class="cs-combo-caret" onclick="srSaleComboToggle(event)">▾</span>'+
+        '<div class="cs-combo-list" id="sr-sale-combo-list"></div>'+
+        '</div>'+
+        '<div id="sr-sale-chips" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;max-width:220px">'+
+        (_srState.sale||[]).map(function(name){
+          return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap" data-name="'+esc(name)+'">'+
+            esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srSaleComboRemove(this.parentNode.dataset.name)">✕</span></span>';
+        }).join('') +
+        '</div></div>';
+      filters += '<select onchange="if(this.value){srPickTeam(this.value,\'sale\',\'sr-sale-combo\');this.value=\'\'}" title="Điền nhanh cả team vào ô Sale — sửa tay lại sau nếu cần" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+        '<option value="">— Chọn theo Team —</option>' + _srTeamOptionsHtml() + '</select>';
+    } else {
+      filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Sale</div>'+
+        '<div style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)">🔒 '+esc((_srState.sale||[]).join(', ') || currentUser.name)+' — chỉ xem được báo cáo của mình</div></div>';
+    }
     filters += _srComboHtml('sr-kenh-combo-a', 'kenh', 'kenhOptions', 'Lọc theo Kênh', '🔍 Tìm & chọn kênh...', 170);
   } else {
-    filters += _srbComboHTML('sale');
+    if (_srIsAdmin()){
+      filters += _srbComboHTML('sale');
+    } else {
+      filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Sale</div>'+
+        '<div style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)">🔒 '+esc((_srState.bSale||[]).join(', ') || currentUser.name)+' — chỉ xem được báo cáo của mình</div></div>';
+    }
     filters += _srbComboHTML('nguon');
     filters += _srbComboHTML('mkt');
   }
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
   filters += '<button class="btn sm" onclick="exportSalesReport()">📊 Xuất Excel</button>';
-  filters += '<button class="btn sm" id="sr-export-sheet-btn" onclick="exportSalesReportToSheet()">📄 Xuất ra Sheet</button>';
+  if (_srIsAdmin()) filters += '<button class="btn sm" id="sr-export-sheet-btn" onclick="exportSalesReportToSheet()">📄 Xuất ra Sheet</button>';
   filters += '</div>';
 
   var body = '';
@@ -12304,15 +12332,17 @@ function _srRenderA(d){
   if (!saleRows.length) html += '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
   html += '</tbody></table>';
 
-  var kenhRows = (d.byKenh||[]).filter(function(k){ return !_srState.kenhSearch || k.name.toLowerCase().indexOf(_srState.kenhSearch.toLowerCase())!==-1; });
-  html += '<div class="dash-section-title">Theo Kênh bán</div>';
-  html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên kênh..." value="'+esc(_srState.kenhSearch)+'" oninput="_srState.kenhSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
-  html += '<table class="dash-table"><thead><tr><th>Kênh</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Cọc</th><th style="text-align:right"><b>Tổng đơn</b></th></tr></thead><tbody>';
-  kenhRows.forEach(function(k){
-    html += '<tr><td>'+esc(k.name)+'</td><td style="text-align:right">'+fmt(k.orders)+'</td><td style="text-align:right">'+_srMoney(k.coc)+'</td><td style="text-align:right"><b>'+_srMoney(k.giaTri)+'</b></td></tr>';
-  });
-  if (!kenhRows.length) html += '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
-  html += '</tbody></table>';
+  if (_srIsAdmin()){
+    var kenhRows = (d.byKenh||[]).filter(function(k){ return !_srState.kenhSearch || k.name.toLowerCase().indexOf(_srState.kenhSearch.toLowerCase())!==-1; });
+    html += '<div class="dash-section-title">Theo Kênh bán</div>';
+    html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên kênh..." value="'+esc(_srState.kenhSearch)+'" oninput="_srState.kenhSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
+    html += '<table class="dash-table"><thead><tr><th>Kênh</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Cọc</th><th style="text-align:right"><b>Tổng đơn</b></th></tr></thead><tbody>';
+    kenhRows.forEach(function(k){
+      html += '<tr><td>'+esc(k.name)+'</td><td style="text-align:right">'+fmt(k.orders)+'</td><td style="text-align:right">'+_srMoney(k.coc)+'</td><td style="text-align:right"><b>'+_srMoney(k.giaTri)+'</b></td></tr>';
+    });
+    if (!kenhRows.length) html += '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+    html += '</tbody></table>';
+  }
   return html;
 }
 
@@ -12339,15 +12369,17 @@ function _srRenderB(d){
   if (!saleRows.length) html += '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
   html += '</tbody></table>';
 
-  var productRows = (d.products||[]).filter(function(p){ return !_srState.productSearch || (p.name||'').toLowerCase().indexOf(_srState.productSearch.toLowerCase())!==-1 || (p.code||'').toLowerCase().indexOf(_srState.productSearch.toLowerCase())!==-1; });
-  html += '<div class="dash-section-title">Báo cáo sản phẩm</div>';
-  html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên/mã sản phẩm..." value="'+esc(_srState.productSearch)+'" oninput="_srState.productSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:240px;margin-bottom:6px">';
-  html += '<table class="dash-table"><thead><tr><th>Mã sản phẩm</th><th>Tên sản phẩm</th><th style="text-align:right">Tổng số lượng</th></tr></thead><tbody>';
-  productRows.forEach(function(p){
-    html += '<tr><td style="font-family:monospace;font-size:12px">'+esc(p.code)+'</td><td>'+esc(p.name)+'</td><td style="text-align:right">'+fmt(p.soLuong)+'</td></tr>';
-  });
-  if (!productRows.length) html += '<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
-  html += '</tbody></table>';
+  if (_srIsAdmin()){
+    var productRows = (d.products||[]).filter(function(p){ return !_srState.productSearch || (p.name||'').toLowerCase().indexOf(_srState.productSearch.toLowerCase())!==-1 || (p.code||'').toLowerCase().indexOf(_srState.productSearch.toLowerCase())!==-1; });
+    html += '<div class="dash-section-title">Báo cáo sản phẩm</div>';
+    html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên/mã sản phẩm..." value="'+esc(_srState.productSearch)+'" oninput="_srState.productSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:240px;margin-bottom:6px">';
+    html += '<table class="dash-table"><thead><tr><th>Mã sản phẩm</th><th>Tên sản phẩm</th><th style="text-align:right">Tổng số lượng</th></tr></thead><tbody>';
+    productRows.forEach(function(p){
+      html += '<tr><td style="font-family:monospace;font-size:12px">'+esc(p.code)+'</td><td>'+esc(p.name)+'</td><td style="text-align:right">'+fmt(p.soLuong)+'</td></tr>';
+    });
+    if (!productRows.length) html += '<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+    html += '</tbody></table>';
+  }
   return html;
 }
 
@@ -12387,13 +12419,18 @@ function renderSalesReportTabC_(wrap, subTabs){
     '<option value="ngayTao"'+(_srState.cDateField==='ngayTao'?' selected':'')+'>Lọc theo Ngày tạo</option>'+
     '<option value="thoiGianHT"'+(_srState.cDateField==='thoiGianHT'?' selected':'')+'>Lọc theo Thời gian hoàn thành</option>'+
     '</select>';
-  filters += _srComboHtml('sr-sale-combo-c', 'cSale', 'saleOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 170);
-  filters += '<select onchange="if(this.value){srPickTeam(this.value,\'cSale\',\'sr-sale-combo-c\');this.value=\'\'}" title="Điền nhanh cả team vào ô Sale — sửa tay lại sau nếu cần" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-    '<option value="">— Chọn theo Team —</option>' + _srTeamOptionsHtml() + '</select>';
+  if (_srIsAdmin()){
+    filters += _srComboHtml('sr-sale-combo-c', 'cSale', 'saleOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 170);
+    filters += '<select onchange="if(this.value){srPickTeam(this.value,\'cSale\',\'sr-sale-combo-c\');this.value=\'\'}" title="Điền nhanh cả team vào ô Sale — sửa tay lại sau nếu cần" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+      '<option value="">— Chọn theo Team —</option>' + _srTeamOptionsHtml() + '</select>';
+  } else {
+    filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Sale</div>'+
+      '<div style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)">🔒 '+esc((_srState.cSale||[]).join(', ') || currentUser.name)+' — chỉ xem được báo cáo của mình</div></div>';
+  }
   filters += _srComboHtml('sr-kenh-combo-c', 'cKenh', 'kenhOptions', 'Lọc theo Kênh bán', '🔍 Tìm & chọn kênh bán...', 170);
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
   filters += '<button class="btn sm" onclick="exportSalesReportC()">📊 Xuất Excel</button>';
-  filters += '<button class="btn sm" id="sr-export-sheet-btn" onclick="exportSalesReportToSheet()">📄 Xuất ra Sheet</button>';
+  if (_srIsAdmin()) filters += '<button class="btn sm" id="sr-export-sheet-btn" onclick="exportSalesReportToSheet()">📄 Xuất ra Sheet</button>';
   filters += '</div>';
 
   var body = _srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _srRenderC(_srState.dataC);
@@ -12514,9 +12551,11 @@ function _srRenderC(d){
   html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên..." value="'+esc(_srState.cEmpSearch)+'" oninput="_srState.cEmpSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
   html += _srRenderCTable(d.byEmployee||[], 'sale', _srState.cEmpSearch);
 
-  html += '<div class="dash-section-title">Theo Kênh bán</div>';
-  html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên kênh..." value="'+esc(_srState.cKenhSearch)+'" oninput="_srState.cKenhSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
-  html += _srRenderCTable(d.byKenh||[], 'kenh', _srState.cKenhSearch);
+  if (_srIsAdmin()){
+    html += '<div class="dash-section-title">Theo Kênh bán</div>';
+    html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên kênh..." value="'+esc(_srState.cKenhSearch)+'" oninput="_srState.cKenhSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
+    html += _srRenderCTable(d.byKenh||[], 'kenh', _srState.cKenhSearch);
+  }
 
   html += '<div style="font-size:11px;color:var(--hint);margin-top:8px">Chỉ tiêu KPI lấy từ tab "'+esc('KPI_ChiTieu')+'" trong Google Sheet CRM — tự vào Sheet điền/sửa số. Bấm vào 1 dòng để xem chi tiết đơn của kỳ này/kỳ trước.</div>';
   return html;
@@ -12542,7 +12581,7 @@ function exportSalesReportC(){
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Kỳ so sánh');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(empRows), 'Theo Nhân viên');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(kenhRows), 'Theo Kênh bán');
+  if (_srIsAdmin()) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(kenhRows), 'Theo Kênh bán');
   XLSX.writeFile(wb, `BaoCaoDoanhSo_C_${_ymd(new Date())}.xlsx`);
 }
 
@@ -12701,7 +12740,7 @@ function exportSalesReport(){
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Tổng quan');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(bySaleRows), 'Theo Sale bán');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(byKenhRows), 'Theo Kênh bán');
+    if (_srIsAdmin()) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(byKenhRows), 'Theo Kênh bán');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detailRows), 'Chi tiết đơn');
     XLSX.writeFile(wb, `BaoCaoDoanhSo_A_${_ymd(new Date())}.xlsx`);
   } else {
@@ -12722,7 +12761,7 @@ function exportSalesReport(){
     var wbB = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wbB, XLSX.utils.aoa_to_sheet(summaryB), 'Tổng quan');
     XLSX.utils.book_append_sheet(wbB, XLSX.utils.aoa_to_sheet(bySaleRowsB), 'Theo Sale');
-    XLSX.utils.book_append_sheet(wbB, XLSX.utils.aoa_to_sheet(productRows), 'Báo cáo sản phẩm');
+    if (_srIsAdmin()) XLSX.utils.book_append_sheet(wbB, XLSX.utils.aoa_to_sheet(productRows), 'Báo cáo sản phẩm');
     XLSX.utils.book_append_sheet(wbB, XLSX.utils.aoa_to_sheet(detailRowsB), 'Chi tiết đơn');
     XLSX.writeFile(wbB, `BaoCaoDoanhSo_B_${_ymd(new Date())}.xlsx`);
   }
