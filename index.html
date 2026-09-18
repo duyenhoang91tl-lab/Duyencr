@@ -12909,6 +12909,7 @@ var _srState = {
   dateField: 'ngayTao',   // A: 'ngayTao' | 'thoiGianHT'
   dateFrom: '', dateTo: '',
   sale: [], kenh: [],      // A — ca 2 deu multi-select dang checkbox (mang nhieu gia tri)
+  byCreator: false,        // A — tich thi doanh thu KHONG chia deu theo sale tren don, chi tinh het cho "Người tạo" (cot rieng trong DT TONG, khac "Sale bán")
   bSale: [], bNguon: [], bMarketer: [], // B — ca 3 deu multi-select (mang nhieu ten)
   dataA: null, dataB: null,
   loading: false,
@@ -12972,7 +12973,8 @@ async function _srLoad(){
   if (_srState.sub === 'A'){
     _srState.dataA = await _srFetch('salesReportA', {
       dateFrom: _srState.dateFrom, dateTo: _srState.dateTo,
-      dateField: _srState.dateField, sale: (_srState.sale||[]).join(','), kenh: (_srState.kenh||[]).join(',')
+      dateField: _srState.dateField, sale: (_srState.sale||[]).join(','), kenh: (_srState.kenh||[]).join(','),
+      byCreator: _srState.byCreator ? '1' : ''
     });
   } else if (_srState.sub === 'B') {
     _srState.dataB = await _srFetch('salesReportB', {
@@ -13006,7 +13008,7 @@ async function exportSalesReportToSheet(){
   var filters;
   if (_srState.sub === 'A') {
     filters = { dateFrom: _srState.dateFrom, dateTo: _srState.dateTo, dateField: _srState.dateField,
-      sale: _srState.sale || [], kenh: _srState.kenh || [] };
+      sale: _srState.sale || [], kenh: _srState.kenh || [], byCreator: _srState.byCreator ? '1' : '' };
   } else if (_srState.sub === 'C') {
     filters = { dateField: _srState.cDateField, periodType: _srState.cPeriodType,
       weekOffset: _srState.cWeekOffset, monthOffset: _srState.cMonthOffset, quarterOffset: _srState.cQuarterOffset,
@@ -13334,6 +13336,9 @@ function renderSalesReportTab(){
         '<div style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)">🔒 '+esc((_srState.sale||[]).join(', ') || currentUser.name)+' — chỉ xem được báo cáo của mình</div></div>';
     }
     filters += _srComboHtml('sr-kenh-combo-a', 'kenh', 'kenhOptions', 'Lọc theo Kênh', '🔍 Tìm & chọn kênh...', 170);
+    filters += '<label style="display:flex;align-items:center;gap:5px;padding:5px 9px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;cursor:pointer" title="Tích: mỗi đơn tính TOÀN BỘ doanh thu + số đơn cho đúng 1 người — người được ghi trong cột \'Người tạo\' của DT TỔNG (không phải \'Sale bán\'). Bỏ tích: chia đều doanh thu cho tất cả sale đứng tên trên đơn (mặc định).">'+
+      '<input type="checkbox" '+(_srState.byCreator?'checked':'')+' onchange="_srState.byCreator=this.checked;_srApply()">'+
+      'Tính theo người tạo đơn</label>';
   } else {
     if (_srIsAdmin()){
       filters += _srbComboHTML('sale');
@@ -13371,7 +13376,9 @@ function _srRenderA(d){
     '<div style="font-size:11px;color:var(--muted);margin:-10px 0 14px">Tổng đơn = cộng dồn "Tổng giá trị đơn hàng" của TỪNG đơn (cả đơn cọc trước lẫn đơn thanh toán toàn bộ) — đây mới là số doanh thu chuẩn để đối chiếu, không phải cột Cọc.</div>';
 
   var saleRows = (d.bySale||[]).filter(function(s){ return !_srState.saleSearch || s.name.toLowerCase().indexOf(_srState.saleSearch.toLowerCase())!==-1; });
-  html += '<div class="dash-section-title">Theo Sale bán <span style="font-weight:400;color:var(--muted);font-size:11px">(số đơn giữ nguyên — tiền chia đều cho số sale/đơn)</span></div>';
+  html += '<div class="dash-section-title">Theo Sale bán <span style="font-weight:400;color:var(--muted);font-size:11px">'+
+    (_srState.byCreator ? '(tính trọn vẹn cho người tạo đơn — không chia đều)' : '(số đơn giữ nguyên — tiền chia đều cho số sale/đơn)')+
+    '</span></div>';
   html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.saleSearch)+'" oninput="_srState.saleSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
   html += '<table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Cọc</th><th style="text-align:right"><b>Tổng đơn</b></th></tr></thead><tbody>';
   saleRows.forEach(function(s){
@@ -13772,6 +13779,7 @@ function exportSalesReport(){
     if (_srState.dateFrom || _srState.dateTo) fDescA.unshift('Khoảng ngày: ' + (_srState.dateFrom||'...') + ' → ' + (_srState.dateTo||'...'));
     if ((_srState.sale||[]).length) fDescA.push('Sale: ' + _srState.sale.join(', '));
     if ((_srState.kenh||[]).length) fDescA.push('Kênh: ' + _srState.kenh.join(', '));
+    if (_srState.byCreator) fDescA.push('Tính theo người tạo đơn (không chia đều theo sale)');
     var summary = [['Bộ lọc', fDescA.join(' | ')], [],
       ['Chỉ số','Giá trị'],
       ['Số lượng đơn', d.totalOrders],
@@ -13787,7 +13795,7 @@ function exportSalesReport(){
     });
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Tổng quan');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(bySaleRows), 'Theo Sale bán');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(bySaleRows), _srState.byCreator ? 'Theo người tạo đơn' : 'Theo Sale bán');
     if (_srIsAdmin()) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(byKenhRows), 'Theo Kênh bán');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detailRows), 'Chi tiết đơn');
     XLSX.writeFile(wb, `BaoCaoDoanhSo_A_${_ymd(new Date())}.xlsx`);

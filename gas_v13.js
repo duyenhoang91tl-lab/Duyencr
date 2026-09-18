@@ -705,7 +705,8 @@ function doGet(e) {
       var fA = { dateFrom: pA.dateFrom || '', dateTo: pA.dateTo || '',
                  dateField: pA.dateField || 'ngayTao',
                  sale: pA.sale ? pA.sale.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [],
-                 kenh: pA.kenh ? pA.kenh.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [] };
+                 kenh: pA.kenh ? pA.kenh.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [],
+                 byCreator: pA.byCreator === '1' || pA.byCreator === 'true' };
       var cacheA = CacheService.getScriptCache();
       var cKeyA = 'salesA_' + JSON.stringify(fA);
       var cachedA = cacheA.get(cKeyA);
@@ -1196,6 +1197,7 @@ function readDTTong_() {
     if (!r[3] && !r[19] && !r[17]) continue;
     out.push({
       ngayTao:        r[0],
+      nguoiTao:       r[1] ? String(r[1]).trim() : '',
       giaoCho:        r[2],
       giaiDoan:       r[6],
       trangThai:      r[7],
@@ -1363,6 +1365,10 @@ function buildSalesReportA_(filters) {
     : (filters.sale ? [String(filters.sale).trim()] : []);
   var kenhFilterArr = Array.isArray(filters.kenh) ? filters.kenh.filter(function(s){return s;})
     : (filters.kenh ? [String(filters.kenh).trim()] : []);
+  // Tich UI "Tinh theo nguoi tao don": KHONG chia deu doanh thu/so don cho tung sale tren don
+  // nua, ma tinh TRON VEN cho DUNG 1 nguoi — lay tu cot "Người tạo" that su cua DT TONG (khac
+  // voi "Sale bán", co the co nhieu ten). Bo tich (mac dinh): giu nguyen cach chia deu cu.
+  var byCreator = !!filters.byCreator;
 
   var rows = readDTTong_();
   var matched = [];
@@ -1394,16 +1400,27 @@ function buildSalesReportA_(filters) {
     byKenh[kName].coc += m.giaTriCoc;
     byKenh[kName].giaTri += m.giaTriDon;
 
-    // breakdown theo sale: so don GIU NGUYEN (khong chia), phan tien CHIA DEU cho N sale tren don
-    var salesList = splitMulti_(m.saleBan, ',');
-    if (salesList.length === 0) salesList = [UNASSIGNED];
-    var n = salesList.length;
-    for (var k = 0; k < salesList.length; k++) {
-      var sName = salesList[k];
-      if (!bySale[sName]) bySale[sName] = { orders: 0, coc: 0, giaTri: 0 };
-      bySale[sName].orders += 1;                 // so don: khong chia
-      bySale[sName].coc += m.giaTriCoc / n;       // tien: chia deu cho N sale
-      bySale[sName].giaTri += m.giaTriDon / n;
+    // breakdown theo sale:
+    // - Mac dinh: so don GIU NGUYEN (khong chia), phan tien CHIA DEU cho N sale tren don.
+    // - byCreator: ca so don LAN tien tinh TRON VEN cho DUNG 1 nguoi — nguoi duoc ghi trong cot
+    //   "Người tạo" that su cua DT TONG (KHONG phai ten dau tien trong "Sale bán").
+    if (byCreator) {
+      var creatorName = m.nguoiTao || UNASSIGNED;
+      if (!bySale[creatorName]) bySale[creatorName] = { orders: 0, coc: 0, giaTri: 0 };
+      bySale[creatorName].orders += 1;
+      bySale[creatorName].coc += m.giaTriCoc;
+      bySale[creatorName].giaTri += m.giaTriDon;
+    } else {
+      var salesList = splitMulti_(m.saleBan, ',');
+      if (salesList.length === 0) salesList = [UNASSIGNED];
+      var n = salesList.length;
+      for (var k = 0; k < salesList.length; k++) {
+        var sName = salesList[k];
+        if (!bySale[sName]) bySale[sName] = { orders: 0, coc: 0, giaTri: 0 };
+        bySale[sName].orders += 1;                 // so don: khong chia
+        bySale[sName].coc += m.giaTriCoc / n;       // tien: chia deu cho N sale
+        bySale[sName].giaTri += m.giaTriDon / n;
+      }
     }
   }
 
@@ -1785,6 +1802,7 @@ function exportSalesReportToSheet_(reportType, filters) {
     if (saleArrA.length) filterDesc.push('Sale: ' + saleArrA.join(', '));
     var kenhArrA = Array.isArray(f.kenh) ? f.kenh : (f.kenh ? [f.kenh] : []);
     if (kenhArrA.length) filterDesc.push('Kênh: ' + kenhArrA.join(', '));
+    if (f.byCreator) filterDesc.push('Tính theo người tạo đơn (không chia đều theo sale)');
   } else if (reportType === 'B') {
     if (f.dateFrom || f.dateTo) filterDesc.push('Khoảng ngày: ' + (f.dateFrom || '...') + ' → ' + (f.dateTo || '...'));
     filterDesc.push('Sale: ' + (Array.isArray(f.sale) ? (f.sale.join(', ') || '(tất cả)') : (f.sale || '(tất cả)')));
@@ -1810,7 +1828,7 @@ function exportSalesReportToSheet_(reportType, filters) {
     rows.push(['Tổng tiền đã cọc/CK (tham khảo)', data.totalCoc]);
     rows.push(['Tổng đơn (doanh thu, ko ship)', data.totalGiaTri]);
     rows.push([]);
-    rows.push(['THEO SALE BÁN', '(số đơn giữ nguyên — tiền chia đều cho số sale/đơn)']);
+    rows.push(['THEO SALE BÁN', f.byCreator ? '(tính trọn vẹn cho người tạo đơn — không chia đều)' : '(số đơn giữ nguyên — tiền chia đều cho số sale/đơn)']);
     rows.push(['Sale', 'Số đơn', 'Cọc', 'Tổng đơn']);
     (data.bySale || []).forEach(function(s) { rows.push([s.name, s.orders, s.coc, s.giaTri]); });
     rows.push([]);
