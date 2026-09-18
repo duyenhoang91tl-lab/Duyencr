@@ -6102,6 +6102,38 @@ function toggleCol(col, cb) {
   colVisible[col] = cb.checked;
   saveLS('ome_col_visible', colVisible);
   reapplyColVisibility();
+  _pushColVisibleForAccount();
+}
+// ── Cột hiển thị: lưu theo TÀI KHOẢN đăng nhập (không chỉ theo trình duyệt/máy) —
+// mỗi sale tự bật/tắt cột muốn xem, lần đăng nhập sau (kể cả trên máy khác) vẫn
+// hiện đúng như lần trước, không cần bấm lại. ──
+function _colVisAcctKey(){
+  var u = (typeof _authAccount !== 'undefined' && _authAccount && _authAccount.username) ? String(_authAccount.username).trim().toLowerCase() : '';
+  return u ? ('colVisible::' + u) : '';
+}
+async function _pullColVisibleForAccount(){
+  var key = _colVisAcctKey();
+  if (!key || !gsUrl) return;
+  try {
+    var sep = gsUrl.includes('?') ? '&' : '?';
+    var r = await fetch(gsUrl + sep + 'action=getSetting&key=' + encodeURIComponent(key), {redirect:'follow'});
+    var d = await r.json();
+    if (d && d.value) {
+      var saved = null;
+      try { saved = JSON.parse(d.value); } catch(e) { saved = null; }
+      if (saved && typeof saved === 'object') {
+        Object.assign(colVisible, saved);
+        saveLS('ome_col_visible', colVisible);
+        reapplyColVisibility();
+      }
+    }
+  } catch(e) { console.warn('_pullColVisibleForAccount lỗi:', e.message); }
+}
+function _pushColVisibleForAccount(){
+  var key = _colVisAcctKey();
+  if (!key || !gsUrl) return;
+  fetch(gsUrl, { method:'POST', redirect:'follow',
+    body: JSON.stringify({ action:'setSetting', key: key, value: JSON.stringify(colVisible) }) }).catch(function(){});
 }
 function reapplyColVisibility() {
   for (const [col, vis] of Object.entries(colVisible)) {
@@ -14202,6 +14234,9 @@ function _applyAuthIdentity(acct){
   }
   if (gsUrl && typeof pullBroadcastHistory === 'function') {
     pullBroadcastHistory().catch(function(){});
+  }
+  if (typeof _pullColVisibleForAccount === 'function') {
+    _pullColVisibleForAccount().catch(function(){});
   }
 }
 
