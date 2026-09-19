@@ -2534,25 +2534,34 @@ function savePancakeStats_(rows) {
 
   // Tap hop (date, pageId) co trong lan nap nay -> can xoa sach du lieu cu cung khoa truoc khi ghi lai
   var touchedKeys = {};
-  rows.forEach(function(r) { touchedKeys[r.date + '|' + r.pageId] = true; });
+  rows.forEach(function(r) { touchedKeys[normOrderDate_(r.date) + '|' + r.pageId] = true; });
 
   var keep = [];
   if (lastRow > 1) {
     var existing = sh.getRange(2, 1, lastRow - 1, PK_STATS_HEADERS.length).getValues();
     for (var i = 0; i < existing.length; i++) {
+      // Chuan hoa lai cot ngay TRUOC khi so khop/ghi lai: cot A dinh dang "Tu dong" nen Sheets
+      // hay tu y doi chuoi "2026-09-18" thanh kieu Date ngay khi ghi lan dau; so sanh chuoi
+      // voi mot gia tri Date se luon sai lech, lam mat han dong do khoi moi bao cao/KPI ve sau
+      // (trieu chung: nap du lieu moi xong nhung so lieu khong nhay). Chuan hoa o day vua sua
+      // dung key de so khop, vua "chua" luon gia tri se ghi lai xuong sheet (tu heal du lieu cu).
+      existing[i][0] = normOrderDate_(existing[i][0]);
       var k = existing[i][0] + '|' + existing[i][1];
       if (!touchedKeys[k]) keep.push(existing[i]);
     }
   }
 
   var newRows = rows.map(function(r) {
-    return [r.date||'', r.pageId||'', r.pageName||'', r.nhanVien||'',
+    return [normOrderDate_(r.date), r.pageId||'', r.pageName||'', r.nhanVien||'',
       +r.khCu||0, +r.khMoi||0, +r.tongTT||0, +r.tinNhan||0, +r.binhLuan||0,
       +r.hoiThoaiMoi||0, +r.dhKhMoi||0, +r.dhKhCu||0, +r.tongDH||0];
   });
 
   sh.clearContents();
   var matrix = [PK_STATS_HEADERS].concat(keep).concat(newRows);
+  // Ep cot A (ngay) ve dinh dang van ban TRUOC khi ghi gia tri, de Sheets khong tu dong doi
+  // chuoi "yyyy-MM-dd" thanh kieu Date nua (chan loi tai phat sinh cho lan luu ke tiep).
+  sh.getRange(1, 1, matrix.length, 1).setNumberFormat('@');
   sh.getRange(1, 1, matrix.length, PK_STATS_HEADERS.length).setValues(matrix);
   return jsonOut_({ ok: true, written: newRows.length, replaced: keep.length !== (lastRow > 1 ? lastRow - 1 : 0) });
 }
@@ -2613,7 +2622,7 @@ function buildPancakeReport_(from, to, split) {
   if (sh.getLastRow() >= 2) {
     var v = sh.getRange(2, 1, sh.getLastRow() - 1, PK_STATS_HEADERS.length).getValues();
     for (var i = 0; i < v.length; i++) {
-      var d = String(v[i][0]);
+      var d = normOrderDate_(v[i][0]); // chuan hoa: cot co the con vai dong Date-object cu, xem savePancakeStats_
       if (from && d < from) continue;
       if (to && d > to) continue;
       var pageId = String(v[i][1]), pageName = String(v[i][2]), nhanVien = String(v[i][3]);
@@ -2672,25 +2681,29 @@ function savePancakeSdtStats_(rows) {
   var lastRow = sh.getLastRow();
 
   var touchedKeys = {};
-  rows.forEach(function(r) { touchedKeys[r.date + '|' + r.pageId] = true; });
+  rows.forEach(function(r) { touchedKeys[normOrderDate_(r.date) + '|' + r.pageId] = true; });
 
   var keep = [];
   if (lastRow > 1) {
     var existing = sh.getRange(2, 1, lastRow - 1, PK_SDT_STATS_HEADERS.length).getValues();
     for (var i = 0; i < existing.length; i++) {
+      // Xem chu thich chi tiet o savePancakeStats_ — cung 1 loi coi Sheets tu doi chuoi ngay
+      // thanh kieu Date, chuan hoa lai o day vua sua key vua tu heal du lieu cu.
+      existing[i][0] = normOrderDate_(existing[i][0]);
       var k = existing[i][0] + '|' + existing[i][1];
       if (!touchedKeys[k]) keep.push(existing[i]);
     }
   }
 
   var newRows = rows.map(function(r) {
-    return [r.date||'', r.pageId||'', r.pageName||'', r.nhanVien||'',
+    return [normOrderDate_(r.date), r.pageId||'', r.pageName||'', r.nhanVien||'',
       +r.tinNhanTuBinhLuan||0, +r.binhLuan||0, +r.phienTLBinhLuan||0,
       +r.tinNhan||0, +r.phienTLTinNhan||0, +r.sdtMangVe||0, +r.soDonChot||0];
   });
 
   sh.clearContents();
   var matrix = [PK_SDT_STATS_HEADERS].concat(keep).concat(newRows);
+  sh.getRange(1, 1, matrix.length, 1).setNumberFormat('@');
   sh.getRange(1, 1, matrix.length, PK_SDT_STATS_HEADERS.length).setValues(matrix);
   return jsonOut_({ ok: true, written: newRows.length, replaced: keep.length !== (lastRow > 1 ? lastRow - 1 : 0) });
 }
@@ -2707,7 +2720,7 @@ function buildPancakeSdtReport_(from, to, split) {
   if (sh.getLastRow() >= 2) {
     var v = sh.getRange(2, 1, sh.getLastRow() - 1, PK_SDT_STATS_HEADERS.length).getValues();
     for (var i = 0; i < v.length; i++) {
-      var d = String(v[i][0]);
+      var d = normOrderDate_(v[i][0]); // xem chu thich o savePancakeStats_
       if (from && d < from) continue;
       if (to && d > to) continue;
       var pageId = String(v[i][1]), pageName = String(v[i][2]), nhanVien = String(v[i][3]);
@@ -2819,23 +2832,27 @@ function savePancakeTagStats_(rows) {
   var lastRow = sh.getLastRow();
 
   var touchedKeys = {};
-  rows.forEach(function(r) { touchedKeys[r.date + '|' + r.pageId + '|' + (r.tagId || r.tagName)] = true; });
+  rows.forEach(function(r) { touchedKeys[normOrderDate_(r.date) + '|' + r.pageId + '|' + (r.tagId || r.tagName)] = true; });
 
   var keep = [];
   if (lastRow > 1) {
     var existing = sh.getRange(2, 1, lastRow - 1, PK_TAG_STATS_HEADERS.length).getValues();
     for (var i = 0; i < existing.length; i++) {
+      // Xem chu thich chi tiet o savePancakeStats_ — cung 1 loi coi Sheets tu doi chuoi ngay
+      // thanh kieu Date, chuan hoa lai o day vua sua key vua tu heal du lieu cu.
+      existing[i][0] = normOrderDate_(existing[i][0]);
       var k = existing[i][0] + '|' + existing[i][1] + '|' + (existing[i][3] || existing[i][4]);
       if (!touchedKeys[k]) keep.push(existing[i]);
     }
   }
 
   var newRows = rows.map(function(r) {
-    return [r.date || '', r.pageId || '', r.pageName || '', r.tagId || '', r.tagName || '', +r.count || 0];
+    return [normOrderDate_(r.date), r.pageId || '', r.pageName || '', r.tagId || '', r.tagName || '', +r.count || 0];
   });
 
   sh.clearContents();
   var matrix = [PK_TAG_STATS_HEADERS].concat(keep).concat(newRows);
+  sh.getRange(1, 1, matrix.length, 1).setNumberFormat('@');
   sh.getRange(1, 1, matrix.length, PK_TAG_STATS_HEADERS.length).setValues(matrix);
   return jsonOut_({ ok: true, written: newRows.length });
 }
@@ -2855,7 +2872,7 @@ function buildPancakeTagReport_(from, to) {
   if (sh.getLastRow() >= 2) {
     var v = sh.getRange(2, 1, sh.getLastRow() - 1, PK_TAG_STATS_HEADERS.length).getValues();
     for (var i = 0; i < v.length; i++) {
-      var d = String(v[i][0]);
+      var d = normOrderDate_(v[i][0]); // xem chu thich o savePancakeStats_
       if (from && d < from) continue;
       if (to && d > to) continue;
       var pageId = String(v[i][1]), pageName = String(v[i][2]), tagName = String(v[i][4]), count = +v[i][5] || 0;

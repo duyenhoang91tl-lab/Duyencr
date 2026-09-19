@@ -13786,6 +13786,7 @@ async function _pkUploadToCRM(){
     _pkState.parsedRows = []; _pkState.parsedUnmapped = [];
     var fi = document.getElementById('pk-file-input'); if (fi) fi.value = '';
     _pkState.report = null; // buoc xem lai bao cao de lay du lieu moi
+    _pkState.kpiReport = null; // du lieu tuong tac vua doi -> bao cao KPI tong hop cu co the sai, yeu cau tinh lai
   } catch(e){
     toast('❌ Lưu lỗi: ' + e.message);
   } finally {
@@ -13915,6 +13916,7 @@ async function _pkUploadSdtToCRM(){
     _pkState.sdtParsedRows = [];
     var fi = document.getElementById('pk-sdt-file-input'); if (fi) fi.value = '';
     _pkState.sdtReport = null;
+    _pkState.kpiReport = null; // du lieu SDT vua doi -> bao cao KPI tong hop cu co the sai, yeu cau tinh lai
   } catch(e){
     toast('❌ Lưu lỗi: ' + e.message);
   } finally {
