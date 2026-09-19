@@ -2570,6 +2570,16 @@ function savePancakeStats_(rows) {
   return jsonOut_({ ok: true, written: newRows.length, replaced: keep.length !== (lastRow > 1 ? lastRow - 1 : 0) });
 }
 
+// Tra ve {map, mapCI} — mapCI la ban khong phan biet hoa/thuong cua map (dung khi ten Pancake
+// bi go sai hoa/thuong giua cac lan xuat file, vd "biichnguyen1993" va "Biichnguyen1993" phai
+// duoc coi la CUNG 1 nguoi thay vi tach thanh 2 dong rieng trong bao cao).
+function readPancakeMapCI_() {
+  var map = readPancakeMap_();
+  var mapCI = {};
+  Object.keys(map).forEach(function(k) { mapCI[_normTxt_(k)] = map[k]; });
+  return { map: map, mapCI: mapCI };
+}
+
 function readPancakeMap_() {
   var sh = getSheet_(SH_PK_MAP, PK_MAP_HEADERS);
   var out = {};
@@ -2588,12 +2598,16 @@ function readPancakeMap_() {
 // file vua doc, se mat neu bam Luu len CRM hoac F5 truoc khi khop het).
 function pancakeAllNames_() {
   var sh = getSheet_(SH_PK_STATS, PK_STATS_HEADERS);
-  var names = {};
+  var seen = {}, out = []; // key = ten viet thuong, khong dau khoang trang thua -> gop cac bien the hoa/thuong
   if (sh.getLastRow() >= 2) {
     var v = sh.getRange(2, 4, sh.getLastRow() - 1, 1).getValues(); // cot D = nhanVien
-    for (var i = 0; i < v.length; i++) { if (v[i][0]) names[String(v[i][0])] = true; }
+    for (var i = 0; i < v.length; i++) {
+      var nm = String(v[i][0] || '').trim(); if (!nm) continue;
+      var k = _normTxt_(nm);
+      if (!seen[k]) { seen[k] = nm; out.push(nm); } // giu dung bien the DAU TIEN gap
+    }
   }
-  return Object.keys(names);
+  return out;
 }
 
 // Ghi/cap nhat 1 dong khop ten (upsert theo pancakeName) — khong xoa cac dong khop khac.
@@ -2619,9 +2633,9 @@ function savePancakeNameMap_(pancakeName, saleName) {
 function buildPancakeReport_(from, to, split) {
   split = (split === 'full') ? 'full' : 'equal';
   var sh = getSheet_(SH_PK_STATS, PK_STATS_HEADERS);
-  var map = readPancakeMap_();
+  var mapPair = readPancakeMapCI_(), map = mapPair.map, mapCI = mapPair.mapCI;
   var byPage = {}, byCS = {};
-  var unmappedSet = {};
+  var unmappedSet = {}, unmappedCanon = {}; // ci-key -> ten hien thi (giu ban DAU TIEN gap)
 
   if (sh.getLastRow() >= 2) {
     var v = sh.getRange(2, 1, sh.getLastRow() - 1, PK_STATS_HEADERS.length).getValues();
@@ -2639,9 +2653,14 @@ function buildPancakeReport_(from, to, split) {
       bp.hoiThoaiMoi+=hoiThoaiMoi; bp.dhKhMoi+=dhKhMoi; bp.dhKhCu+=dhKhCu; bp.tongDH+=tongDH;
 
       // 1 ten Pancake co the gan cho nhieu Sale (luu dang "saleA|saleB").
-      var sales = String(map[nhanVien] || '').split('|').map(function(x) { return x.trim(); }).filter(function(x) { return x; });
+      var rawMap = map[nhanVien]; if (rawMap === undefined) rawMap = mapCI[_normTxt_(nhanVien)];
+      var sales = String(rawMap || '').split('|').map(function(x) { return x.trim(); }).filter(function(x) { return x; });
       var mapped = sales.length > 0;
-      if (!mapped) { sales = [nhanVien]; unmappedSet[nhanVien] = true; }
+      if (!mapped) {
+        var ck1 = _normTxt_(nhanVien);
+        if (!unmappedCanon[ck1]) unmappedCanon[ck1] = nhanVien;
+        sales = [unmappedCanon[ck1]]; unmappedSet[unmappedCanon[ck1]] = true;
+      }
       // split='equal': chia deu cho cac Sale (tong theo CS = tong theo Page); split='full': moi Sale tinh du.
       var w = (split === 'full') ? 1 : 1 / sales.length;
       for (var si = 0; si < sales.length; si++) {
@@ -2717,9 +2736,9 @@ function savePancakeSdtStats_(rows) {
 function buildPancakeSdtReport_(from, to, split) {
   split = (split === 'full') ? 'full' : 'equal';
   var sh = getSheet_(SH_PK_SDT, PK_SDT_STATS_HEADERS);
-  var map = readPancakeMap_();
+  var mapPair = readPancakeMapCI_(), map = mapPair.map, mapCI = mapPair.mapCI;
   var byPage = {}, byCS = {};
-  var unmappedSet = {};
+  var unmappedSet = {}, unmappedCanon = {};
 
   if (sh.getLastRow() >= 2) {
     var v = sh.getRange(2, 1, sh.getLastRow() - 1, PK_SDT_STATS_HEADERS.length).getValues();
@@ -2735,9 +2754,14 @@ function buildPancakeSdtReport_(from, to, split) {
       var bp = byPage[pageId];
       bp.sdtMangVe+=sdtMangVe; bp.soDonChot+=soDonChot; bp.tinNhan+=tinNhan; bp.binhLuan+=binhLuan;
 
-      var sales = String(map[nhanVien] || '').split('|').map(function(x) { return x.trim(); }).filter(function(x) { return x; });
+      var rawMap = map[nhanVien]; if (rawMap === undefined) rawMap = mapCI[_normTxt_(nhanVien)];
+      var sales = String(rawMap || '').split('|').map(function(x) { return x.trim(); }).filter(function(x) { return x; });
       var mapped = sales.length > 0;
-      if (!mapped) { sales = [nhanVien]; unmappedSet[nhanVien] = true; }
+      if (!mapped) {
+        var ck2 = _normTxt_(nhanVien);
+        if (!unmappedCanon[ck2]) unmappedCanon[ck2] = nhanVien;
+        sales = [unmappedCanon[ck2]]; unmappedSet[unmappedCanon[ck2]] = true;
+      }
       var w = (split === 'full') ? 1 : 1 / sales.length;
       for (var si = 0; si < sales.length; si++) {
         var saleName = sales[si];
@@ -2819,7 +2843,10 @@ var PK_STATUS_CODES_ = ['L1','L2','L3','L4','L5','L5.1','L5.2','L6','L7'];
 function classifyPancakeTag_(name, overrideMap) {
   var n = String(name || '').trim();
   var ov = overrideMap && overrideMap[n];
-  if (ov && PK_STATUS_CODES_.indexOf(ov) !== -1) return { type: 'status', code: ov };
+  if (ov) {
+    if (PK_STATUS_CODES_.indexOf(ov) !== -1) return { type: 'status', code: ov };
+    if (/^([SO])\d+$/i.test(ov)) return { type: 'sale', code: ov.toUpperCase() }; // quy chuan tay tro thang ve 1 Sale
+  }
   var m = n.match(/^([SO])\s*(\d+)(?!\d)/i);
   if (m) return { type: 'sale', code: m[1].toUpperCase() + parseInt(m[2], 10) };
   if (/^L\s*\d?\.?\s*ch[oờ]\s*ck/i.test(n) || /^L5\.1/i.test(n)) return { type: 'status', code: 'L5.1' };
@@ -3067,14 +3094,21 @@ function buildKpiReport_(from, to) {
   // voi bySaleOrders (cung la ten Sale chuan tu cot saleBan DT TONG).
   // Gop tu CA 2 bao cao: mot Sale chi co trong file "Thong ke nhan vien" (SDT) ma khong co
   // trong file "Thong ke tuong tac" truoc day bi mat hut khoi bang nay.
-  var saleAgg = {};
+  var saleAgg = {}, saleCanon = {}; // ci-key -> ten hien thi dau tien gap (gop bien the hoa/thuong giua 2 file)
+  function _saleKey(name) {
+    var ck = _normTxt_(name);
+    if (!saleCanon[ck]) saleCanon[ck] = name;
+    return ck;
+  }
   pInt.byCS.forEach(function(r) {
-    saleAgg[r.name] = { name: r.name, mapped: r.mapped, tongTT: r.tongTT || 0, sdtMangVe: 0 };
+    var k = _saleKey(r.name);
+    saleAgg[k] = { name: saleCanon[k], mapped: r.mapped, tongTT: r.tongTT || 0, sdtMangVe: 0 };
   });
   pSdt.byCS.forEach(function(r) {
-    if (!saleAgg[r.name]) saleAgg[r.name] = { name: r.name, mapped: r.mapped, tongTT: 0, sdtMangVe: 0 };
-    saleAgg[r.name].sdtMangVe = r.sdtMangVe || 0;
-    if (r.mapped) saleAgg[r.name].mapped = true;
+    var k = _saleKey(r.name);
+    if (!saleAgg[k]) saleAgg[k] = { name: saleCanon[k], mapped: r.mapped, tongTT: 0, sdtMangVe: 0 };
+    saleAgg[k].sdtMangVe = r.sdtMangVe || 0;
+    if (r.mapped) saleAgg[k].mapped = true;
   });
   var bySale = Object.keys(saleAgg).map(function(k) {
     var r = saleAgg[k];

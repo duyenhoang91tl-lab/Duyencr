@@ -13256,8 +13256,10 @@ async function _pkSaveTagOverride(sel){
     var d = await res.json();
     if (d.error) throw new Error(d.error);
     _pkState.tagOverrideMap = map;
-    logAudit('pancake_tag_map','', '', 'Quy chuẩn tag "'+tag+'" → '+(code ? _PK_STATUS_LABEL[code] : '(bỏ quy chuẩn)'));
-    toast('✓ Đã quy chuẩn "'+tag+'" → '+(code ? _PK_STATUS_LABEL[code] : '(bỏ quy chuẩn)'));
+    var saleRec = _PK_SALE_DIR.filter(function(sd){ return sd.code===code; })[0];
+    var codeLabel = code ? (_PK_STATUS_LABEL[code] || (saleRec ? (saleRec.code+' – '+saleRec.fb) : code)) : '(bỏ quy chuẩn)';
+    logAudit('pancake_tag_map','', '', 'Quy chuẩn tag "'+tag+'" → '+codeLabel);
+    toast('✓ Đã quy chuẩn "'+tag+'" → '+codeLabel);
     _pkRenderAll();
   } catch(e){
     toast('❌ Lỗi lưu quy chuẩn tag: ' + e.message);
@@ -13367,7 +13369,10 @@ function _pkClassifyTag(name){
   var n = String(name||'').trim();
   // Uu tien quy chuan tay (admin gan thu cong cho cac tag khong theo dung mau) truoc regex.
   var ov = _pkState.tagOverrideMap && _pkState.tagOverrideMap[n];
-  if (ov && _PK_STATUS_LABEL[ov]) return { type:'status', code: ov };
+  if (ov){
+    if (_PK_STATUS_LABEL[ov]) return { type:'status', code: ov };
+    if (/^([SO])\d+$/i.test(ov)) return { type:'sale', code: ov.toUpperCase() }; // gan thang ve 1 Sale du ten tag khong theo mau S#/O#
+  }
   var m = n.match(/^([SO])\s*(\d+)(?![\d])/i);
   if (m) return { type:'sale', code: m[1].toUpperCase()+parseInt(m[2],10) };
   // tag trạng thái cũ "L6. Chờ CK" (trước khi đổi tên) -> vẫn hiểu là L5.1
@@ -13622,9 +13627,13 @@ function _pkTagSectionHtml(){
   if (oth.length){
     html += '<div style="margin:12px 0 6px;padding:8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412">'+
       '<div style="margin-bottom:6px">⚠️ '+oth.length+' tag chưa theo quy tắc (S/O + số, hoặc L1–L6) — chọn quy chuẩn bên dưới để tính vào đúng bảng (áp dụng luôn cho cả dữ liệu cũ đã nạp, dùng chung cho cả team):</div>';
-    var stOpts = '<option value="">— Bỏ qua —</option>' + Object.keys(_PK_STATUS_LABEL).map(function(c){
-      return '<option value="'+esc(c)+'">'+esc(_PK_STATUS_LABEL[c])+'</option>';
-    }).join('');
+    var stOpts = '<option value="">— Bỏ qua —</option>' +
+      '<optgroup label="Trạng thái">' + Object.keys(_PK_STATUS_LABEL).map(function(c){
+        return '<option value="'+esc(c)+'">'+esc(_PK_STATUS_LABEL[c])+'</option>';
+      }).join('') + '</optgroup>' +
+      '<optgroup label="Gán về Sale">' + _PK_SALE_DIR.map(function(sd){
+        return '<option value="'+esc(sd.code)+'">'+esc(sd.code)+' – '+esc(sd.fb)+(sd.base?' ('+esc(sd.base)+')':'')+'</option>';
+      }).join('') + '</optgroup>';
     oth.forEach(function(k){
       html += '<div style="display:flex;gap:8px;align-items:center;margin:4px 0;flex-wrap:wrap">'+
         '<span style="min-width:160px">'+esc(k)+' ('+_pkN(ag.other[k].total)+')</span>'+
