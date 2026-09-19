@@ -13173,11 +13173,15 @@ var _pkState = {
   pkSplit: 'equal', mapOpen: '',
   tagRows: [], tagLoaded: false, tagFrom: '', tagTo: '',   // dữ liệu file 'Thống kê tag' (gộp nhiều ngày, lưu trên trình duyệt)
   tagOverrideMap: {}, tagOverrideLoaded: false,   // { 'tên tag lạ': 'L1'...'L7' } — quy chuẩn tay, lưu chung server (dùng chung cho cả team)
+  tagSaving: false, tagSavedAt: '',   // trạng thái lưu dữ liệu tag lên CRM (sheet PancakeTagStats) — BẮT BUỘC phải lưu thì tab "Báo cáo KPI Pancake" mới tính được tỷ lệ tag L1-L7 (server đọc từ sheet, không đọc localStorage trình duyệt)
   // ── SĐT mang về / đơn chốt (file "Thống kê nhân viên", sheet "<pageId> By staff") ──
   sdtParsedRows: [], sdtUploading: false,
   sdtReport: null, sdtReportLoading: false,
   // ── Khớp Page Pancake (pageId) ↔ Kênh bán chuẩn trong DT TỔNG ──
-  pageMapLoaded: false, pageMap: {}, serverPages: [], kenhOptions: []
+  pageMapLoaded: false, pageMap: {}, serverPages: [], kenhOptions: [],
+  // ── Báo cáo KPI Pancake tổng hợp (tab riêng) ──
+  kpiFrom: _ymd(new Date(Date.now()-6*86400000)), kpiTo: _ymd(new Date()),
+  kpiReport: null, kpiReportLoading: false, kpiPageFilter: '', kpiSaleFilter: ''
 };
 
 async function _pkLoadNameMap(){
@@ -13515,13 +13519,38 @@ function _pkTagClear(){
   _pkRenderAll();
 }
 
+// Đẩy dữ liệu tag (đang chỉ nằm trên trình duyệt máy này) lên sheet PancakeTagStats trên CRM —
+// dùng chung cho cả team, và là NGUỒN DUY NHẤT mà tab "Báo cáo KPI Pancake" đọc để tính tỷ lệ
+// L1-L7 (server không đọc được localStorage của trình duyệt). Gửi nguyên _pkState.tagRows —
+// savePancakeTagStats_ tự khử trùng theo khoá ngày+page+tag, gửi lại nhiều lần vẫn an toàn.
+async function _pkTagSaveToServer(){
+  if (!gsUrl){ toast('❌ Chưa cấu hình URL Google Apps Script.'); return; }
+  var rows = _pkState.tagRows;
+  if (!rows.length){ toast('Chưa có dữ liệu tag để lưu.'); return; }
+  _pkState.tagSaving = true; _pkRenderAll();
+  try {
+    var res = await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'savePancakeTagStats', rows: rows }) });
+    var d = await res.json();
+    if (d.error) throw new Error(d.error);
+    _pkState.tagSavedAt = new Date().toLocaleString('vi-VN');
+    _pkState.kpiReport = null; // du lieu tag vua doi -> bao cao KPI tong hop cu co the sai, yeu cau tinh lai
+    logAudit('pancake_tag_save','', '', 'Lưu '+rows.length+' dòng dữ liệu tag Pancake lên CRM');
+    toast('✓ Đã lưu '+d.written+' dòng dữ liệu tag lên CRM.');
+  } catch(e){
+    toast('❌ Lưu dữ liệu tag lỗi: ' + e.message);
+  } finally {
+    _pkState.tagSaving = false; _pkRenderAll();
+  }
+}
+
 function _pkTagSectionHtml(){
   _pkTagLoad();
   var all = _pkState.tagRows, has = all.length > 0;
   var html = '<div class="dash-section-title" style="margin-top:22px">🏷️ Báo cáo theo TAG (file "Thống kê tag")</div>';
   html += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Trên Pancake: <b>Thống kê → Thống kê tag → Xuất Excel</b> (file <code>pages_statistics_tag...xlsx</code>). Có thể chọn nhiều file cùng lúc; mỗi ngày nạp 1 file, dữ liệu được gộp và lưu trên trình duyệt này để xem theo khoảng ngày. Nạp lại file của cùng một ngày thì bản mới thay bản cũ. Tag Sale khớp theo mã <b>S1, S2… O8, O9…</b> nên tên tag bị Pancake cắt ngắn vẫn khớp đúng.</div>';
   html += '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><input type="file" id="pk-tag-file-input" accept=".xlsx,.xls" multiple onchange="_pkOnTagFileSelected(this)">'+
-    (has ? '<button class="btn sm secondary" onclick="_pkExportTagReport()">⬇ Xuất Excel</button><button class="btn sm secondary" onclick="_pkTagClear()">🗑 Xóa dữ liệu tag</button>' : '')+'</div>';
+    (has ? '<button class="btn sm primary" onclick="_pkTagSaveToServer()" '+(_pkState.tagSaving?'disabled':'')+'>'+(_pkState.tagSaving?'Đang lưu...':'💾 Lưu lên CRM (dùng chung cả team)')+'</button><button class="btn sm secondary" onclick="_pkExportTagReport()">⬇ Xuất Excel</button><button class="btn sm secondary" onclick="_pkTagClear()">🗑 Xóa dữ liệu tag (trình duyệt này)</button>' : '')+'</div>';
+  if (_pkState.tagSavedAt) html += '<div style="font-size:11px;color:var(--muted);margin:-4px 0 10px">Lần lưu lên CRM gần nhất: '+esc(_pkState.tagSavedAt)+'.</div>';
   if (!has) return html;
 
   var allDates = _pkTagDates(all);
@@ -14012,6 +14041,171 @@ async function _pkLoadReport(){
   } finally {
     _pkState.reportLoading = false; _pkRenderAll();
   }
+}
+
+// ═══════════════════════════════════════════════════════
+//  TAB "📈 KPI Pancake" — ghép DT TỔNG (đơn/doanh thu thật) + Báo cáo tương tác/SĐT/Tag
+//  Pancake, hiển thị tỷ lệ chốt & phễu chuyển đổi L1-L7 theo Page và theo Sale.
+//  Nguồn dữ liệu: action=kpiReport (buildKpiReport_ trong gas_v13.js).
+// ═══════════════════════════════════════════════════════
+var _PK_KPI_TAG_ORDER = ['L1','L2','L3','L4','L5','L6','L7'];
+var _PK_KPI_TAG_SHORT = {
+  L1:'L1 (Chuẩn)', L2:'L2 (SĐT k.nối)', L3:'L3 (Tiềm năng)', L4:'L4 (Khảo giá)',
+  L5:'L5 (Chốt)', L6:'L6 (Hủy)', L7:'L7 (Hà Nội)'
+};
+
+async function renderKpiPancakeTab(){
+  var wrap = document.getElementById('kpipancake-wrap');
+  if (!wrap) return;
+  if (!_pkState.nameMapLoaded) await _pkLoadNameMap();
+  if (!_pkState.pageMapLoaded) await _pkLoadPageMap();
+  _pkRenderKpiPancake();
+  if (!_pkState.kpiReport && !_pkState.kpiReportLoading) _pkLoadKpiReport();
+}
+
+async function _pkLoadKpiReport(){
+  if (!gsUrl){ toast('❌ Chưa cấu hình URL Google Apps Script.'); return; }
+  _pkState.kpiReportLoading = true; _pkRenderKpiPancake();
+  try {
+    var sep = gsUrl.includes('?') ? '&' : '?';
+    var r = await fetch(gsUrl + sep + 'action=kpiReport&from='+encodeURIComponent(_pkState.kpiFrom)+'&to='+encodeURIComponent(_pkState.kpiTo), { redirect:'follow' });
+    var d = await r.json();
+    if (d.error) throw new Error(d.error);
+    _pkState.kpiReport = d;
+  } catch(e){
+    toast('❌ Tải Báo cáo KPI Pancake lỗi: ' + e.message);
+  } finally {
+    _pkState.kpiReportLoading = false; _pkRenderKpiPancake();
+  }
+}
+
+function _pkKpiPct(v){ return (v||v===0) ? (v+'%') : '—'; }
+
+function _pkRenderKpiPancake(){
+  var wrap = document.getElementById('kpipancake-wrap');
+  if (!wrap) return;
+  var st = 'padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)';
+  var html = '';
+
+  html += '<div class="dash-section-title">📈 Báo cáo KPI Pancake tổng hợp</div>';
+  html += '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Ghép đơn/doanh thu thật (DT TỔNG) với tương tác, SĐT thu thập và tag L1–L7 (Thống kê tương tác / Thống kê nhân viên / Thống kê tag đã nạp ở tab "📥 Báo cáo Pancake"). '+
+    'Tag phải bấm <b>"💾 Lưu lên CRM"</b> ở tab đó thì mới hiện được ở đây (dữ liệu tag mặc định chỉ nằm trên trình duyệt).</div>';
+
+  html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px">'+
+    '<input type="date" value="'+esc(_pkState.kpiFrom)+'" onchange="_pkState.kpiFrom=this.value" style="'+st+'">'+
+    '<span>→</span>'+
+    '<input type="date" value="'+esc(_pkState.kpiTo)+'" onchange="_pkState.kpiTo=this.value" style="'+st+'">'+
+    '<button class="btn primary" onclick="_pkLoadKpiReport()">'+(_pkState.kpiReportLoading?'Đang tải...':'Xem báo cáo')+'</button>'+
+    (_pkState.kpiReport ? '<button class="btn sm secondary" onclick="_pkExportKpiReport()">⬇ Xuất Excel</button>' : '')+
+  '</div>';
+
+  var rep = _pkState.kpiReport;
+  if (!rep){
+    html += '<div style="color:var(--muted);padding:10px">'+(_pkState.kpiReportLoading?'Đang tải...':'Chọn khoảng ngày rồi bấm "Xem báo cáo".')+'</div>';
+    wrap.innerHTML = html; return;
+  }
+
+  if (rep.unmappedPages && rep.unmappedPages.length){
+    html += '<div style="margin:0 0 14px;padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412">'+
+      '⚠️ '+rep.unmappedPages.length+' Page chưa khớp Kênh bán (nên đơn/doanh thu của Page này đang tính = 0): '+
+      rep.unmappedPages.map(function(p){ return esc(p.pageName||p.pageId); }).join(', ')+
+      ' — vào tab "📥 Báo cáo Pancake" → mục "🔗 Khớp Page Pancake ↔ Kênh bán CRM" để khớp.</div>';
+  }
+
+  // ── Tổng quan ──
+  html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">'+
+    _dkpi('Tổng tương tác', _pkN(rep.totalTongTT))+
+    _dkpi('SĐT thu thập', _pkN(rep.totalSdtMangVe))+
+    _dkpi('Đơn hàng (DT TỔNG)', _pkN(rep.totalDonHang))+
+    _dkpi('Doanh thu', _dfmtV(rep.totalDoanhThu))+
+    _dkpi('Tỷ lệ chốt chung', rep.tyLeChotChung+'%', 'Đơn / Tổng tương tác')+
+  '</div>';
+
+  // ── Phễu tag L1-L7 toàn hệ thống ──
+  if (rep.tagFunnelTotal){
+    html += '<div class="dash-section-title">Phễu chuyển đổi L1 → L7 (toàn hệ thống)</div>';
+    html += '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">L1=Tổng tương tác · L2=Tổng SĐT thu thập (mẫu số riêng) · L3→L6=so với bước liền trước · L7=Tổng tương tác.</div>';
+    html += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Chỉ số</th>'+
+      _PK_KPI_TAG_ORDER.map(function(k){ return '<th style="text-align:right">'+esc(_PK_KPI_TAG_SHORT[k])+'</th>'; }).join('')+
+      '</tr></thead><tbody>'+
+      '<tr><td>Số lượng</td>'+_PK_KPI_TAG_ORDER.map(function(k){ return '<td style="text-align:right">'+_pkN(rep.tagFunnelTotal.counts[k])+'</td>'; }).join('')+'</tr>'+
+      '<tr><td>Tỷ lệ</td>'+_PK_KPI_TAG_ORDER.map(function(k){ return '<td style="text-align:right;font-weight:700">'+_pkKpiPct(rep.tagFunnelTotal.rates[k])+'</td>'; }).join('')+'</tr>'+
+      '</tbody></table></div>';
+  }
+
+  // ── Theo Page ──
+  html += '<div class="dash-section-title" style="margin-top:18px">Theo Page</div>';
+  html += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr>'+
+    '<th>Page</th><th>Kênh bán (CRM)</th><th style="text-align:right">Tương tác</th><th style="text-align:right">SĐT thu thập</th>'+
+    '<th style="text-align:right">Đơn</th><th style="text-align:right">Doanh thu</th><th style="text-align:right">TB/đơn</th>'+
+    '<th style="text-align:right">Tỷ lệ chốt</th>'+
+    _PK_KPI_TAG_ORDER.map(function(k){ return '<th style="text-align:right">'+esc(k)+'</th>'; }).join('')+
+    '</tr></thead><tbody>';
+  if (!rep.byPage.length){
+    html += '<tr><td colspan="15" style="text-align:center;color:var(--muted);padding:14px">Chưa có dữ liệu — nạp báo cáo tương tác/SĐT/tag ở tab "📥 Báo cáo Pancake" trước.</td></tr>';
+  } else {
+    rep.byPage.forEach(function(p){
+      html += '<tr>'+
+        '<td>'+esc(p.pageName)+'</td>'+
+        '<td>'+(p.mapped ? esc(p.kenhBan) : '<span style="color:#9a3412">⚠️ chưa khớp</span>')+'</td>'+
+        '<td style="text-align:right">'+_pkN(p.tongTT)+'</td>'+
+        '<td style="text-align:right">'+_pkN(p.sdtMangVe)+'</td>'+
+        '<td style="text-align:right">'+_pkN(p.donHang)+'</td>'+
+        '<td style="text-align:right">'+_dfmtV(p.doanhThu)+'</td>'+
+        '<td style="text-align:right">'+(p.trungBinhDon?_dfmtV(p.trungBinhDon):'—')+'</td>'+
+        '<td style="text-align:right;font-weight:700">'+p.tyLeChot+'%</td>'+
+        _PK_KPI_TAG_ORDER.map(function(k){ return '<td style="text-align:right">'+_pkKpiPct(p.tag && p.tag.rates[k])+'</td>'; }).join('')+
+        '</tr>';
+    });
+  }
+  html += '</tbody></table></div>';
+
+  // ── Theo Sale ──
+  html += '<div class="dash-section-title" style="margin-top:18px">Theo Sale</div>';
+  html += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr>'+
+    '<th>Sale</th><th style="text-align:right">Tương tác</th><th style="text-align:right">SĐT thu thập</th>'+
+    '<th style="text-align:right">Đơn</th><th style="text-align:right">Doanh thu</th><th style="text-align:right">Tỷ lệ chốt</th>'+
+    '</tr></thead><tbody>';
+  if (!rep.bySale.length){
+    html += '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px">Chưa có dữ liệu.</td></tr>';
+  } else {
+    rep.bySale.forEach(function(s){
+      html += '<tr>'+
+        '<td>'+esc(s.name)+(s.mapped?'':' <span style="color:#9a3412;font-size:11px">⚠️ chưa khớp tên</span>')+'</td>'+
+        '<td style="text-align:right">'+_pkN(s.tongTT)+'</td>'+
+        '<td style="text-align:right">'+_pkN(s.sdtMangVe)+'</td>'+
+        '<td style="text-align:right">'+_pkN(s.donHang)+'</td>'+
+        '<td style="text-align:right">'+_dfmtV(s.doanhThu)+'</td>'+
+        '<td style="text-align:right;font-weight:700">'+s.tyLeChot+'%</td>'+
+        '</tr>';
+    });
+  }
+  html += '</tbody></table></div>';
+
+  wrap.innerHTML = html;
+}
+
+function _pkExportKpiReport(){
+  var rep = _pkState.kpiReport; if (!rep) return;
+  var wb = XLSX.utils.book_new();
+  var pgHead = ['Page','Kênh bán','Tương tác','SĐT thu thập','Đơn','Doanh thu','TB/đơn','Tỷ lệ chốt(%)'].concat(_PK_KPI_TAG_ORDER.map(function(k){ return k+'(%)'; }));
+  var pgRows = [pgHead].concat(rep.byPage.map(function(p){
+    return [p.pageName, p.kenhBan||'', p.tongTT, p.sdtMangVe, p.donHang, p.doanhThu, p.trungBinhDon, p.tyLeChot].concat(
+      _PK_KPI_TAG_ORDER.map(function(k){ return (p.tag && p.tag.rates[k]) || 0; })
+    );
+  }));
+  var saRows = [['Sale','Tương tác','SĐT thu thập','Đơn','Doanh thu','Tỷ lệ chốt(%)']].concat(
+    rep.bySale.map(function(s){ return [s.name, s.tongTT, s.sdtMangVe, s.donHang, s.doanhThu, s.tyLeChot]; })
+  );
+  var fnHead = ['Chỉ số'].concat(_PK_KPI_TAG_ORDER);
+  var fnRows = [fnHead,
+    ['Số lượng'].concat(_PK_KPI_TAG_ORDER.map(function(k){ return rep.tagFunnelTotal.counts[k]; })),
+    ['Tỷ lệ (%)'].concat(_PK_KPI_TAG_ORDER.map(function(k){ return rep.tagFunnelTotal.rates[k]; }))
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(pgRows), 'Theo Page');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(saRows), 'Theo Sale');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(fnRows), 'Phễu L1-L7');
+  XLSX.writeFile(wb, 'BaoCaoKpiPancake_'+_pkState.kpiFrom+'_'+_pkState.kpiTo+'.xlsx');
 }
 
 function _pkRenderReportHtml(){
@@ -15251,7 +15445,7 @@ var _activeV9Tab = 'list';
 switchTab = function(tab, el){
   _v9PrevSwitchTab(tab, el);
   _activeV9Tab = tab;
-  ['dashboard','team','audit','salesreport','pancake'].forEach(function(name){
+  ['dashboard','team','audit','salesreport','pancake','kpipancake'].forEach(function(name){
     var panel = document.getElementById('tab-'+name);
     if (panel) panel.style.display = (tab===name) ? 'flex' : 'none';
   });
@@ -15260,6 +15454,7 @@ switchTab = function(tab, el){
   else if (tab === 'audit') renderAuditTab();
   else if (tab === 'salesreport') renderSalesReportTab();
   else if (tab === 'pancake') renderPancakeTab();
+  else if (tab === 'kpipancake') renderKpiPancakeTab();
 };
 
 // ═══════════════════════════════════════════════════════
@@ -15318,7 +15513,8 @@ function _injectV9UI(){
       { id:'team',        label:'👥 Quản lý Team' },
       { id:'audit',       label:'🧾 Nhật ký' },
       { id:'salesreport', label:'📈 Báo cáo doanh số' },
-      { id:'pancake',     label:'📥 Báo cáo Pancake' }
+      { id:'pancake',     label:'📥 Báo cáo Pancake' },
+      { id:'kpipancake',  label:'📈 KPI Pancake' }
     ];
     defs.forEach(function(d){
       var div = document.createElement('div');
@@ -15336,7 +15532,8 @@ function _injectV9UI(){
       { id:'tab-team',        inner:'<div class="team-wrap" id="team-wrap"></div>' },
       { id:'tab-audit',       inner:'<div class="audit-wrap" id="audit-wrap"></div>' },
       { id:'tab-salesreport', inner:'<div class="dash-wrap" id="salesreport-wrap"></div>' },
-      { id:'tab-pancake',     inner:'<div class="dash-wrap" id="pancake-wrap"></div>' }
+      { id:'tab-pancake',     inner:'<div class="dash-wrap" id="pancake-wrap"></div>' },
+      { id:'tab-kpipancake',  inner:'<div class="dash-wrap" id="kpipancake-wrap"></div>' }
     ];
     panels.forEach(function(p){
       if (document.getElementById(p.id)) return;
