@@ -8445,7 +8445,7 @@ function doGet(e) {
     if (action === 'orders')    return jsonOut_({ orders: readAllOrders_() });
     if (action === 'teams')     return jsonOut_({ teams: readTeams_(ss.getSheetByName(SH_TEAM)) });
     if (action === 'pancakeNameMap') return jsonOut_({ map: readPancakeMap_() });
-    if (action === 'pancakeReport')  return jsonOut_(buildPancakeReport_(e.parameter.from, e.parameter.to));
+    if (action === 'pancakeReport')  return jsonOut_(buildPancakeReport_(e.parameter.from, e.parameter.to, e.parameter.split));
     if (action === 'users')     return jsonOut_({ users: readUsers_(ss.getSheetByName(SH_USER)) });
     // ── Nguon "Cham soc" (KH them nhanh, sheet rieng) — khong gop CareData/bao cao A-B-C ──
     if (action === 'careLeads') return jsonOut_({ rows: readCareLeads_() });
@@ -10267,7 +10267,8 @@ function savePancakeNameMap_(pancakeName, saleName) {
   return jsonOut_({ ok: true, updated: false });
 }
 
-function buildPancakeReport_(from, to) {
+function buildPancakeReport_(from, to, split) {
+  split = (split === 'full') ? 'full' : 'equal';
   var sh = getSheet_(SH_PK_STATS, PK_STATS_HEADERS);
   var map = readPancakeMap_();
   var byPage = {}, byCS = {};
@@ -10285,29 +10286,37 @@ function buildPancakeReport_(from, to) {
       var bp = byPage[pageId];
       bp.khCu+=khCu; bp.khMoi+=khMoi; bp.tongTT+=tongTT; bp.tinNhan+=tinNhan; bp.binhLuan+=binhLuan;
       bp.hoiThoaiMoi+=hoiThoaiMoi; bp.dhKhMoi+=dhKhMoi; bp.dhKhCu+=dhKhCu; bp.tongDH+=tongDH;
-      var saleName = map[nhanVien];
-      var mapped = !!saleName;
-      if (!mapped) { saleName = nhanVien; unmappedSet[nhanVien] = true; }
-      var csKey = saleName;
-      if (!byCS[csKey]) byCS[csKey] = { name: saleName, pancakeNames: {}, mapped: mapped, khCu:0, khMoi:0, tongTT:0, tinNhan:0, binhLuan:0, hoiThoaiMoi:0, dhKhMoi:0, dhKhCu:0, tongDH:0 };
-      var bc = byCS[csKey];
-      bc.pancakeNames[nhanVien] = true;
-      if (mapped) bc.mapped = true;
-      bc.khCu+=khCu; bc.khMoi+=khMoi; bc.tongTT+=tongTT; bc.tinNhan+=tinNhan; bc.binhLuan+=binhLuan;
-      bc.hoiThoaiMoi+=hoiThoaiMoi; bc.dhKhMoi+=dhKhMoi; bc.dhKhCu+=dhKhCu; bc.tongDH+=tongDH;
+      // 1 ten Pancake co the gan cho nhieu Sale (luu dang "saleA|saleB").
+      var sales = String(map[nhanVien] || '').split('|').map(function(x) { return x.trim(); }).filter(function(x) { return x; });
+      var mapped = sales.length > 0;
+      if (!mapped) { sales = [nhanVien]; unmappedSet[nhanVien] = true; }
+      // split='equal': chia deu cho cac Sale (tong theo CS = tong theo Page); split='full': moi Sale tinh du.
+      var w = (split === 'full') ? 1 : 1 / sales.length;
+      for (var si = 0; si < sales.length; si++) {
+        var saleName = sales[si];
+        var csKey = saleName;
+        if (!byCS[csKey]) byCS[csKey] = { name: saleName, pancakeNames: {}, mapped: mapped, shared: false, khCu:0, khMoi:0, tongTT:0, tinNhan:0, binhLuan:0, hoiThoaiMoi:0, dhKhMoi:0, dhKhCu:0, tongDH:0 };
+        var bc = byCS[csKey];
+        bc.pancakeNames[nhanVien] = true;
+        if (mapped) bc.mapped = true; // neu >=1 nguon da khop thi coi la mapped
+        if (sales.length > 1) bc.shared = true;
+        bc.khCu+=khCu*w; bc.khMoi+=khMoi*w; bc.tongTT+=tongTT*w; bc.tinNhan+=tinNhan*w; bc.binhLuan+=binhLuan*w;
+        bc.hoiThoaiMoi+=hoiThoaiMoi*w; bc.dhKhMoi+=dhKhMoi*w; bc.dhKhCu+=dhKhCu*w; bc.tongDH+=tongDH*w;
+      }
     }
   }
   function finalize(obj) {
     var arr = Object.keys(obj).map(function(k) {
       var r = obj[k];
       r.tyLeCD = r.tongTT ? Math.round(r.tongDH / r.tongTT * 1000) / 10 : 0;
+      ['khCu','khMoi','tongTT','tinNhan','binhLuan','hoiThoaiMoi','dhKhMoi','dhKhCu','tongDH'].forEach(function(f) { r[f] = Math.round(r[f] * 100) / 100; });
       if (r.pancakeNames) r.pancakeNames = Object.keys(r.pancakeNames);
       return r;
     });
     arr.sort(function(a,b) { return b.tongTT - a.tongTT; });
     return arr;
   }
-  return { byPage: finalize(byPage), byCS: finalize(byCS), unmapped: Object.keys(unmappedSet).sort() };
+  return { byPage: finalize(byPage), byCS: finalize(byCS), unmapped: Object.keys(unmappedSet).sort(), split: split };
 }
 
 function saveUsers_(users) {
@@ -13145,6 +13154,7 @@ var _pkState = {
   uploading: false,
   from: _ymd(new Date(Date.now()-6*86400000)), to: _ymd(new Date()),
   report: null, reportLoading: false,
+  pkSplit: 'equal', mapOpen: '',
   tagRows: [], tagLoaded: false, tagFrom: '', tagTo: ''   // dữ liệu file 'Thống kê tag' (gộp nhiều ngày, lưu trên trình duyệt)
 };
 
@@ -13193,6 +13203,10 @@ function _pkRenderAll(){
     '<span>→</span>'+
     '<input type="date" value="'+esc(_pkState.to)+'" onchange="_pkState.to=this.value" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
     '<button class="btn primary" onclick="_pkLoadReport()">'+(_pkState.reportLoading?'Đang tải...':'Xem báo cáo')+'</button>'+
+    '<select onchange="_pkState.pkSplit=this.value;if(_pkState.report)_pkLoadReport();" title="Áp dụng khi 1 tên Pancake gắn cho nhiều Sale" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+      '<option value="equal"'+(_pkState.pkSplit==='full'?'':' selected')+'>Tên gắn nhiều Sale: chia đều</option>'+
+      '<option value="full"'+(_pkState.pkSplit==='full'?' selected':'')+'>Tên gắn nhiều Sale: tính đủ cho mỗi Sale</option>'+
+    '</select>'+
     (_pkState.report ? '<button class="btn sm secondary" onclick="_pkExportReport()">⬇ Xuất Excel</button>' : '')+
   '</div>';
   html += '<div id="pk-report-area">' + (_pkState.report ? _pkRenderReportHtml() : '<div style="color:var(--muted);padding:10px">Chọn khoảng ngày rồi bấm "Xem báo cáo".</div>') + '</div>';
@@ -13619,25 +13633,54 @@ async function _pkUploadToCRM(){
   }
 }
 
+function _pkSalesOf(v){ return String(v||'').split('|').map(function(x){ return x.trim(); }).filter(Boolean); }
+
 function _pkRenderMapTableHtml(isAdmin){
   var names = Object.keys(_pkState.nameMap);
   _pkState.parsedUnmapped.forEach(function(n){ if (names.indexOf(n)===-1) names.push(n); });
   names.sort(function(a,b){ return a.localeCompare(b,'vi'); });
-  var allCS = _allCSNames();
-  var html = '<table class="dash-table"><thead><tr><th>Tên trên Pancake</th><th>Sale CRM</th></tr></thead><tbody>';
+  var allCS = _allCSNames().filter(function(s){ return String(s).indexOf('|') === -1; });
+  var html = '<div style="font-size:12px;color:var(--muted);margin-bottom:6px">Mỗi tên Pancake có thể gắn với <b>nhiều Sale</b> (tick nhiều ô), và nhiều tên Pancake cùng gắn về 1 Sale cũng được.</div>';
+  html += '<table class="dash-table"><thead><tr><th>Tên trên Pancake</th><th>Sale CRM (chọn được nhiều)</th></tr></thead><tbody>';
   if (!names.length){
     html += '<tr><td colspan="2" style="text-align:center;color:var(--muted);padding:14px">Chưa có tên nào — nạp 1 file báo cáo để bắt đầu khớp.</td></tr>';
   }
   names.forEach(function(n){
-    var cur = _pkState.nameMap[n] || '';
-    var opts = '<option value="">— Chưa khớp —</option>' + allCS.map(function(s){ return '<option value="'+esc(s)+'"'+(s===cur?' selected':'')+'>'+esc(s)+'</option>'; }).join('');
-    html += '<tr><td>'+esc(n)+(cur?'':' <span style="color:#9a3412;font-size:11px">⚠️ chưa khớp</span>')+'</td><td>'+
-      (isAdmin ? '<select onchange="_pkMapNameInline(\''+esc(n).replace(/'/g,"\\'")+'\',this.value)" style="padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+opts+'</select>'
-               : esc(cur||'—'))+
-    '</td></tr>';
+    var cur = _pkSalesOf(_pkState.nameMap[n]);
+    var cell;
+    if (isAdmin){
+      var items = allCS.slice();
+      cur.forEach(function(c){ if (items.indexOf(c)===-1) items.push(c); }); // giữ cả Sale đã khớp nhưng không còn trong danh sách
+      items.sort(function(a,b){ return a.localeCompare(b,'vi'); });
+      var boxes = items.map(function(s){
+        return '<label style="display:flex;gap:6px;align-items:center;padding:3px 4px;cursor:pointer;white-space:nowrap"><input type="checkbox" value="'+esc(s)+'"'+(cur.indexOf(s)!==-1?' checked':'')+' onchange="_pkMapToggle(this)"> '+esc(s)+'</label>';
+      }).join('');
+      cell = '<details data-n="'+esc(n)+'"'+(_pkState.mapOpen===n?' open':'')+' ontoggle="_pkMapDetailsToggle(this)" style="position:relative">'+
+        '<summary style="cursor:pointer;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);display:inline-block;min-width:180px">'+
+          (cur.length ? esc(cur.join(', '))+(cur.length>1?' <span style="color:var(--muted);font-size:11px">('+cur.length+' Sale)</span>':'') : '— Chưa khớp —')+'</summary>'+
+        '<div style="max-height:220px;overflow:auto;margin-top:4px;padding:4px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+          (boxes || '<div style="color:var(--muted);padding:6px">Chưa có danh sách Sale.</div>')+'</div></details>';
+    } else {
+      cell = esc(cur.join(', ')||'—');
+    }
+    html += '<tr><td>'+esc(n)+(cur.length?'':' <span style="color:#9a3412;font-size:11px">⚠️ chưa khớp</span>')+'</td><td>'+cell+'</td></tr>';
   });
   html += '</tbody></table>';
   return html;
+}
+
+function _pkMapDetailsToggle(det){
+  var n = det.getAttribute('data-n');
+  if (det.open) _pkState.mapOpen = n;
+  else if (_pkState.mapOpen === n) _pkState.mapOpen = '';
+}
+
+function _pkMapToggle(cb){
+  var det = cb.closest('details'); if (!det) return;
+  var n = det.getAttribute('data-n');
+  var vals = Array.prototype.map.call(det.querySelectorAll('input[type=checkbox]:checked'), function(x){ return x.value; });
+  _pkState.mapOpen = n;
+  _pkMapNameInline(n, vals.join('|'));
 }
 
 async function _pkMapNameInline(pancakeName, saleName){
@@ -13648,8 +13691,9 @@ async function _pkMapNameInline(pancakeName, saleName){
     if (d.error) throw new Error(d.error);
     _pkState.nameMap[pancakeName] = saleName;
     _pkState.parsedUnmapped = _pkState.parsedUnmapped.filter(function(n){ return n!==pancakeName; });
-    logAudit('pancake_map','', '', 'Khớp tên Pancake "'+pancakeName+'" → Sale "'+saleName+'"');
-    toast('✓ Đã khớp "'+pancakeName+'" → "'+(saleName||'(bỏ khớp)')+'"');
+    var shown = _pkSalesOf(saleName).join(', ');
+    logAudit('pancake_map','', '', 'Khớp tên Pancake "'+pancakeName+'" → Sale "'+shown+'"');
+    toast('✓ Đã khớp "'+pancakeName+'" → "'+(shown||'(bỏ khớp)')+'"');
     _pkState.report = null; // ket qua bao cao cu co the da tinh sai ten -> yeu cau xem lai
     _pkRenderAll();
   } catch(e){
@@ -13662,7 +13706,7 @@ async function _pkLoadReport(){
   _pkState.reportLoading = true; _pkRenderAll();
   try {
     var sep = gsUrl.includes('?') ? '&' : '?';
-    var r = await fetch(gsUrl + sep + 'action=pancakeReport&from='+encodeURIComponent(_pkState.from)+'&to='+encodeURIComponent(_pkState.to), { redirect:'follow' });
+    var r = await fetch(gsUrl + sep + 'action=pancakeReport&from='+encodeURIComponent(_pkState.from)+'&to='+encodeURIComponent(_pkState.to)+'&split='+encodeURIComponent(_pkState.pkSplit||'equal'), { redirect:'follow' });
     var d = await r.json();
     _pkState.report = d;
   } catch(e){
@@ -13698,7 +13742,7 @@ function _pkRenderReportHtml(){
   html += '<div class="dash-section-title" style="margin-top:16px">Theo CS (Sale)</div>';
   html += '<table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">Tổng TT</th><th style="text-align:right">Tin nhắn</th><th style="text-align:right">Bình luận</th><th style="text-align:right">Hội thoại mới</th><th style="text-align:right">Tổng ĐH</th><th style="text-align:right">Tỉ lệ CĐ</th></tr></thead><tbody>';
   d.byCS.forEach(function(r){
-    html += '<tr><td>'+esc(r.name)+(r.mapped?'':' <span style="color:#9a3412;font-size:11px" title="Tên Pancake gốc, chưa khớp Sale">⚠️</span>')+'</td><td style="text-align:right">'+fmt(r.tongTT)+'</td><td style="text-align:right">'+fmt(r.tinNhan)+'</td><td style="text-align:right">'+fmt(r.binhLuan)+'</td><td style="text-align:right">'+fmt(r.hoiThoaiMoi)+'</td><td style="text-align:right"><b>'+fmt(r.tongDH)+'</b></td><td style="text-align:right">'+r.tyLeCD+'%</td></tr>';
+    html += '<tr><td>'+esc(r.name)+(r.mapped?'':' <span style="color:#9a3412;font-size:11px" title="Tên Pancake gốc, chưa khớp Sale">⚠️</span>')+(r.shared?' <span style="color:var(--muted);font-size:11px" title="Có tên Pancake dùng chung với Sale khác">🔀 dùng chung</span>':'')+'</td><td style="text-align:right">'+fmt(r.tongTT)+'</td><td style="text-align:right">'+fmt(r.tinNhan)+'</td><td style="text-align:right">'+fmt(r.binhLuan)+'</td><td style="text-align:right">'+fmt(r.hoiThoaiMoi)+'</td><td style="text-align:right"><b>'+fmt(r.tongDH)+'</b></td><td style="text-align:right">'+r.tyLeCD+'%</td></tr>';
   });
   if (!d.byCS.length) html += '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu trong khoảng ngày này</td></tr>';
   html += '</tbody></table>';
