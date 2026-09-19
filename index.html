@@ -13190,6 +13190,11 @@ var _pkState = {
   from: _ymd(new Date(Date.now()-6*86400000)), to: _ymd(new Date()),
   report: null, reportLoading: false,
   pkSplit: 'equal', mapOpen: '',
+  // Bo loc kieu Excel tren cac bang "Theo Page"/"Theo Sale" cua tab Bao cao KPI Pancake:
+  // { page: {colKey: Set(gia tri duoc chon)}, sale: {colKey: Set(...)} } — Set rong/khong co
+  // nghia la KHONG loc cot do (hien tat ca). Chi loc tren du lieu da tai (frontend), khong goi
+  // lai server, nen doi bo loc phan hoi tuc thi.
+  kpiColFilters: { page: {}, sale: {} },
   tagRows: [], tagLoaded: false, tagFrom: '', tagTo: '',   // dữ liệu file 'Thống kê tag' (gộp nhiều ngày, lưu trên trình duyệt)
   tagOverrideMap: {}, tagOverrideLoaded: false,   // { 'tên tag lạ': 'L1'...'L7' } — quy chuẩn tay, lưu chung server (dùng chung cho cả team)
   tagSaving: false, tagSavedAt: '',   // trạng thái lưu dữ liệu tag lên CRM (sheet PancakeTagStats) — BẮT BUỘC phải lưu thì tab "Báo cáo KPI Pancake" mới tính được tỷ lệ tag L1-L7 (server đọc từ sheet, không đọc localStorage trình duyệt)
@@ -14126,6 +14131,120 @@ function _pkKpiRefreshIfOpen(){
 
 function _pkKpiPct(v){ return (v||v===0) ? (v+'%') : '—'; }
 
+// ═══════════════════════════════════════════════════════════════
+//  BO LOC CO CAO CUA CAC BANG "Theo Page"/"Theo Sale" (tab Bao cao KPI Pancake) — dang GENERIC,
+//  KHONG dung chung state/co che voi bang "Danh sach KH" chinh (colFilters/openColDropdown), vi
+//  du lieu 2 ben khac hinh dang hoan toan. Chi loc tren du lieu da tai o trinh duyet, khong goi
+//  lai server; icon ▼ tren tieu de cot, bam ra popup danh sach gia tri (co the tim + chon nhieu).
+// ═══════════════════════════════════════════════════════════════
+function _pkUniqVals(rows, getter) {
+  var seen = {}, out = [];
+  rows.forEach(function(r) {
+    var v = getter(r); v = (v === null || v === undefined) ? '' : String(v);
+    if (!seen[v]) { seen[v] = true; out.push(v); }
+  });
+  out.sort(function(a, b) { return a.localeCompare(b, 'vi'); });
+  return out;
+}
+
+function _pkApplyColFilters(rows, tableKey, getters) {
+  var filters = _pkState.kpiColFilters[tableKey] || {};
+  var activeCols = Object.keys(filters).filter(function(c) { return filters[c] && filters[c].size > 0; });
+  if (!activeCols.length) return rows;
+  return rows.filter(function(r) {
+    return activeCols.every(function(c) {
+      var v = getters[c] ? getters[c](r) : '';
+      v = (v === null || v === undefined) ? '' : String(v);
+      return filters[c].has(v);
+    });
+  });
+}
+
+function _pkColTh(tableKey, colKey, label, getter, allRowsFn, extraStyle) {
+  var filters = _pkState.kpiColFilters[tableKey] || (_pkState.kpiColFilters[tableKey] = {});
+  var active = filters[colKey] && filters[colKey].size > 0;
+  return '<th style="' + (extraStyle || '') + '" onclick="_pkOpenColFilter(\'' + tableKey + '\',\'' + colKey + '\',event)">' +
+    '<span style="cursor:pointer;white-space:nowrap">' + esc(label) +
+    ' <span style="font-size:9px;opacity:' + (active ? '1' : '.45') + ';color:' + (active ? 'var(--green)' : 'inherit') + '">▼</span></span></th>';
+}
+
+// Dang ky nguon du lieu de popup lay danh sach gia tri duy nhat theo dung cot dang bam — goi lai
+// _pkRenderKpiPancake() sau khi Ap dung/Xoa loc de ve lai bang voi du lieu da loc.
+var _PK_COL_GETTERS = {
+  page: {
+    page: function(p) { return p.pageName; },
+    kenh: function(p) { return p.mapped ? p.kenhBan : '(chưa khớp)'; }
+  },
+  sale: {
+    ma: function(s) { return s.maSale || '—'; },
+    ten: function(s) { return s.name; },
+    nhom: function(s) { return s.nhom || '(ngoài danh sách)'; }
+  }
+};
+
+function _pkOpenColFilter(tableKey, colKey, ev) {
+  ev.stopPropagation();
+  var old = document.getElementById('pk-colfilter-pop'); if (old) old.remove();
+  var rep = _pkState.kpiReport; if (!rep) return;
+  var rawRows = tableKey === 'page' ? (rep.byPage || []) : (rep.bySale || []);
+  var getter = _PK_COL_GETTERS[tableKey][colKey];
+  var values = _pkUniqVals(rawRows, getter);
+  var filters = _pkState.kpiColFilters[tableKey] || (_pkState.kpiColFilters[tableKey] = {});
+  var curSet = filters[colKey] || new Set();
+
+  var pop = document.createElement('div');
+  pop.id = 'pk-colfilter-pop';
+  pop.style.cssText = 'position:fixed;z-index:5000;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 10px 28px rgba(0,0,0,.2);padding:8px;width:220px;font-size:12px';
+  var rect = ev.target.closest('th').getBoundingClientRect();
+  var top = rect.bottom + 4, left = Math.min(rect.left, window.innerWidth - 232);
+  pop.style.top = top + 'px'; pop.style.left = left + 'px';
+
+  pop.innerHTML = '<input type="text" placeholder="Tìm..." id="pk-colfilter-search" style="width:100%;box-sizing:border-box;padding:4px 6px;border:1px solid var(--border);border-radius:5px;margin-bottom:6px;font-size:12px">' +
+    '<div id="pk-colfilter-list" style="max-height:220px;overflow-y:auto"></div>' +
+    '<div style="display:flex;gap:6px;margin-top:8px">' +
+    '<button onclick="_pkColFilterApply(\'' + tableKey + '\',\'' + colKey + '\')" style="flex:1;padding:5px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">Áp dụng</button>' +
+    '<button onclick="_pkColFilterClear(\'' + tableKey + '\',\'' + colKey + '\')" style="flex:1;padding:5px;background:var(--surface);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px">Xoá lọc</button>' +
+    '</div>';
+  document.body.appendChild(pop);
+
+  function renderList(filterTxt) {
+    var list = document.getElementById('pk-colfilter-list'); if (!list) return;
+    var ft = (filterTxt || '').toLowerCase();
+    list.innerHTML = values.filter(function(v) { return !ft || v.toLowerCase().indexOf(ft) !== -1; }).map(function(v) {
+      var checked = curSet.size === 0 || curSet.has(v);
+      var vAttr = esc(v).replace(/"/g, '&quot;');
+      return '<label style="display:flex;align-items:center;gap:6px;padding:3px 2px;cursor:pointer">' +
+        '<input type="checkbox" data-pkcv="' + vAttr + '" ' + (checked ? 'checked' : '') + '>' +
+        '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (v || '<i style="color:var(--muted)">(trống)</i>') + '</span></label>';
+    }).join('') || '<div style="color:var(--muted);padding:6px 2px">Không có giá trị khớp.</div>';
+  }
+  renderList('');
+  document.getElementById('pk-colfilter-search').addEventListener('input', function(e) { renderList(e.target.value); });
+  document.getElementById('pk-colfilter-search').focus();
+
+  setTimeout(function() {
+    document.addEventListener('click', function _pkColFilterOutside(e) {
+      if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener('click', _pkColFilterOutside); }
+    });
+  }, 0);
+}
+
+function _pkColFilterApply(tableKey, colKey) {
+  var pop = document.getElementById('pk-colfilter-pop'); if (!pop) return;
+  var checked = Array.prototype.slice.call(pop.querySelectorAll('input[data-pkcv]:checked')).map(function(el) { return el.getAttribute('data-pkcv'); });
+  var allCbs = pop.querySelectorAll('input[data-pkcv]');
+  // Neu tich HET (khong con gioi han gi) -> coi nhu bo loc cot nay, tranh Set rong bi hieu nham la "an tat ca".
+  var filters = _pkState.kpiColFilters[tableKey];
+  filters[colKey] = (checked.length === allCbs.length) ? new Set() : new Set(checked);
+  pop.remove();
+  _pkRenderKpiPancake();
+}
+function _pkColFilterClear(tableKey, colKey) {
+  _pkState.kpiColFilters[tableKey][colKey] = new Set();
+  var pop = document.getElementById('pk-colfilter-pop'); if (pop) pop.remove();
+  _pkRenderKpiPancake();
+}
+
 function _pkRenderKpiPancake(){
   var wrap = document.getElementById('kpipancake-wrap');
   if (!wrap) return;
@@ -14193,17 +14312,20 @@ function _pkRenderKpiPancake(){
   }
 
   // ── Theo Page ──
+  var pageRowsF = _pkApplyColFilters(rep.byPage || [], 'page', _PK_COL_GETTERS.page);
   html += '<div class="dash-section-title" style="margin-top:18px">Theo Page</div>';
   html += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr>'+
-    '<th>Page</th><th>Kênh bán (CRM)</th><th style="text-align:right">Tương tác</th><th style="text-align:right">SĐT thu thập</th>'+
+    _pkColTh('page','page','Page',_PK_COL_GETTERS.page.page)+
+    _pkColTh('page','kenh','Kênh bán (CRM)',_PK_COL_GETTERS.page.kenh)+
+    '<th style="text-align:right">Tương tác</th><th style="text-align:right">SĐT thu thập</th>'+
     '<th style="text-align:right">Đơn</th><th style="text-align:right">Doanh thu</th><th style="text-align:right">TB/đơn</th>'+
     '<th style="text-align:right">Tỷ lệ chốt</th>'+
     _PK_KPI_TAG_ORDER.map(function(k){ return '<th style="text-align:right">'+esc(k)+'</th>'; }).join('')+
     '</tr></thead><tbody>';
-  if (!rep.byPage.length){
-    html += '<tr><td colspan="15" style="text-align:center;color:var(--muted);padding:14px">Chưa có dữ liệu — nạp báo cáo tương tác/SĐT/tag ở tab "📥 Báo cáo Pancake" trước.</td></tr>';
+  if (!pageRowsF.length){
+    html += '<tr><td colspan="15" style="text-align:center;color:var(--muted);padding:14px">'+(rep.byPage.length?'Không có dòng nào khớp bộ lọc cột đang chọn.':'Chưa có dữ liệu — nạp báo cáo tương tác/SĐT/tag ở tab "📥 Báo cáo Pancake" trước.')+'</td></tr>';
   } else {
-    rep.byPage.forEach(function(p){
+    pageRowsF.forEach(function(p){
       html += '<tr>'+
         '<td>'+esc(p.pageName)+'</td>'+
         '<td>'+(p.mapped ? esc(p.kenhBan) : '<span style="color:#9a3412">⚠️ chưa khớp</span>')+'</td>'+
@@ -14237,15 +14359,19 @@ function _pkRenderKpiPancake(){
     html += '</tbody></table></div>';
   }
 
+  var saleRowsF = _pkApplyColFilters(rep.bySale || [], 'sale', _PK_COL_GETTERS.sale);
   html += '<div class="dash-section-title" style="margin-top:18px">Theo Sale</div>';
   html += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr>'+
-    '<th>Mã</th><th>Sale</th><th>Nhóm</th><th style="text-align:right">Tương tác</th><th style="text-align:right">SĐT thu thập</th>'+
+    _pkColTh('sale','ma','Mã',_PK_COL_GETTERS.sale.ma)+
+    _pkColTh('sale','ten','Sale',_PK_COL_GETTERS.sale.ten)+
+    _pkColTh('sale','nhom','Nhóm',_PK_COL_GETTERS.sale.nhom)+
+    '<th style="text-align:right">Tương tác</th><th style="text-align:right">SĐT thu thập</th>'+
     '<th style="text-align:right">Đơn</th><th style="text-align:right">Doanh thu</th><th style="text-align:right">Tỷ lệ chốt</th>'+
     '</tr></thead><tbody>';
-  if (!rep.bySale.length){
-    html += '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:14px">Chưa có dữ liệu.</td></tr>';
+  if (!saleRowsF.length){
+    html += '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:14px">'+(rep.bySale.length?'Không có dòng nào khớp bộ lọc cột đang chọn.':'Chưa có dữ liệu.')+'</td></tr>';
   } else {
-    rep.bySale.forEach(function(s){
+    saleRowsF.forEach(function(s){
       html += '<tr>'+
         '<td style="color:var(--muted);font-size:11px">'+esc(s.maSale||'—')+'</td>'+
         '<td>'+esc(s.name)+(s.mapped?'':' <span style="color:#9a3412;font-size:11px">⚠️ chưa khớp tên</span>')+'</td>'+

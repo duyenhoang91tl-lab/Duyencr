@@ -3139,7 +3139,15 @@ function buildKpiReport_(from, to) {
     r.maSale = rec ? rec.code : '';
     r.inDirectory = !!rec;
   });
-  bySale.sort(function(a, b) { return b.tongTT - a.tongTT; });
+  bySale.sort(function(a, b) {
+    // Thu tu nhom: Van phong (S) -> Online (O) -> ngoai danh sach, dung theo yeu cau; trong
+    // tung nhom sap theo Ty le chot (tyLeChot) giam dan — Sale chot tot nhat len dau.
+    var rank = { 'Văn phòng': 0, 'Online': 1 };
+    var ra = rank.hasOwnProperty(a.nhom) ? rank[a.nhom] : 2;
+    var rb = rank.hasOwnProperty(b.nhom) ? rank[b.nhom] : 2;
+    if (ra !== rb) return ra - rb;
+    return b.tyLeChot - a.tyLeChot;
+  });
 
   // Tong theo nhom: don KHONG chia (1 don co the co nhieu Sale) nen chi cong doanh thu da chia
   // deu o tren -> cong lai theo nhom van dung tong the.
