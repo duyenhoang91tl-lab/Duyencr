@@ -283,21 +283,25 @@
         </div>
         <div id="pk-ai-customer"></div>
 
-        <div id="pk-rem-section">
-          <div id="pk-rem-header">
-            <span>⏰ Nhắc hẹn hôm nay (<span id="pk-rem-count">0</span>)</span>
-            <button id="pk-rem-refresh" title="Tải lại">🔄</button>
+        <div id="pk-menu-wrap">
+          <select id="pk-menu-sel">
+            <option value="">— Chọn mục —</option>
+            <option value="rem">⏰ Nhắc hẹn hôm nay (0)</option>
+            <option value="price">💰 Tra cứu bảng giá</option>
+          </select>
+          <div id="pk-menu-content">
+            <div id="pk-rem-body" style="display:none">
+              <div id="pk-rem-toolbar"><button id="pk-rem-refresh" title="Tải lại">🔄 Tải lại</button></div>
+              <div id="pk-rem-list"></div>
+            </div>
+            <div id="pk-price-body" style="display:none">
+              <div id="pk-price-row">
+                <input type="text" id="pk-price-q" placeholder="Tên sản phẩm, kiểu/size..." />
+                <button id="pk-price-btn">Tìm</button>
+              </div>
+              <div id="pk-price-result"></div>
+            </div>
           </div>
-          <div id="pk-rem-list"></div>
-        </div>
-
-        <div id="pk-price-section">
-          <div id="pk-price-header">💰 Tra cứu bảng giá</div>
-          <div id="pk-price-row">
-            <input type="text" id="pk-price-q" placeholder="Tên sản phẩm, kiểu/size..." />
-            <button id="pk-price-btn">Tìm</button>
-          </div>
-          <div id="pk-price-result"></div>
         </div>
 
         <div id="pk-cart-section" style="display:none">
@@ -416,6 +420,12 @@
       setStatus(`🔗 Đã liên kết đoạn chat này với ${_currentPhone} — lần sau tự nhận diện.`);
     });
     panelEl.querySelector("#pk-add-new-btn").addEventListener("click", quickAddNewCustomer_);
+    panelEl.querySelector("#pk-menu-sel").addEventListener("change", (e) => {
+      const v = e.target.value;
+      panelEl.querySelector("#pk-rem-body").style.display = v === "rem" ? "block" : "none";
+      panelEl.querySelector("#pk-price-body").style.display = v === "price" ? "block" : "none";
+      if (v === "rem") loadReminders_();
+    });
     panelEl.querySelector("#pk-rem-refresh").addEventListener("click", () => loadReminders_());
     panelEl.querySelector("#pk-price-btn").addEventListener("click", doPriceSearch_);
     panelEl.querySelector("#pk-price-q").addEventListener("keydown", (e) => {
@@ -1406,10 +1416,13 @@
   }
 
   function renderReminders_() {
-    const countEl = panelEl?.querySelector('#pk-rem-count');
     const listEl = panelEl?.querySelector('#pk-rem-list');
-    if (!countEl || !listEl) return;
-    countEl.textContent = String(_reminders.length);
+    const menuSel = panelEl?.querySelector('#pk-menu-sel');
+    if (!listEl) return;
+    if (menuSel) {
+      const opt = [...menuSel.options].find(o => o.value === 'rem');
+      if (opt) opt.textContent = '⏰ Nhắc hẹn hôm nay (' + _reminders.length + ')';
+    }
     if (!_reminders.length) {
       listEl.innerHTML = '<div class="pk-rem-empty">Không có nhắc hẹn hôm nay 🎉</div>';
       return;
