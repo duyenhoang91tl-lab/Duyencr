@@ -20,6 +20,7 @@ var SH_CONTEXT = 'AIContext';
 var SH_PK_STATS = 'PancakeStats';   // thong ke tuong tac/chot don hang ngay, nhap tu file Excel Pancake xuat ("Thong ke tuong tac")
 var SH_PK_MAP   = 'PancakeNameMap'; // khop ten "Nhan vien" hien thi tren Pancake <-> ten Sale chuan trong CRM
 var SH_PK_SDT   = 'PancakeSdtStats'; // thong ke SDT mang ve/don chot theo nhan vien+page, nhap tu file Excel Pancake xuat ("Thong ke nhan vien" - sheet "By staff")
+var SH_SALE_DIR = 'SaleDirectory'; // danh sach Sale chuan: ma sale, ten Facebook, user base, ten tag Pancake (S=van phong, O=online)
 var SH_PK_PAGEMAP = 'PancakePageMap'; // khop pageId Pancake <-> gia tri "Kenh ban" chuan dung trong DT TONG
 var SH_PK_TAG   = 'PancakeTagStats'; // thong ke tag (L1-L7 trang thai, S/O sale) theo Page+ngay, nhap tu file Excel "Thong ke tag" Pancake xuat
 
@@ -722,6 +723,7 @@ function doGet(e) {
     if (action === 'pancakePageMap') return jsonOut_({ map: readPancakePageMap_(), allPages: pancakeAllPages_() });
     // ── Bao cao KPI tong hop (DT TONG + Pancake tuong tac + SDT) ──
     if (action === 'kpiReport') return jsonOut_(buildKpiReport_(e.parameter.from, e.parameter.to));
+    if (action === 'saleDirectory') return jsonOut_(readSaleDirectory_());
     // ── Nguon "Cham soc" (KH them nhanh, sheet rieng) — khong gop CareData/bao cao A-B-C ──
     if (action === 'careLeads') return jsonOut_({ rows: readCareLeads_() });
     // ── Tap SDT co trong "dữ liệu đơn" — chi de loc nguon o man hinh chinh (cache 10') ──
@@ -2039,6 +2041,7 @@ function doPost(e) {
     if (action === 'savePancakeNameMap')  return savePancakeNameMap_(data.pancakeName, data.saleName);
     if (action === 'savePancakeSdtStats') return savePancakeSdtStats_(data.rows);
     if (action === 'savePancakeTagStats') return savePancakeTagStats_(data.rows);
+    if (action === 'saveSaleDirectory')   return saveSaleDirectory_(data.rows);
     if (action === 'savePancakePageMap')  return savePancakePageMap_(data.pageId, data.pageName, data.kenhBan);
     if (action === 'setSetting')          return setSetting_(data.key, data.value);
     // Them 1 nick Zalo vao danh sach chung (MERGE tren server -> khong ghi de mat nick cu)
@@ -2941,6 +2944,48 @@ function _pkSheetDateSpan_(shName, headers, from, to) {
   return out;
 }
 
+var SALE_DIR_HEADERS = ['maSale','tenFacebook','userBase','tenTagPancake'];
+
+// Danh sach Sale chuan (sheet SaleDirectory). Nhom lay tu chu cai dau cua "Ten tag Pancake":
+// S = Sale van phong (offline), O = Sale online. Tra ve map tra cuu theo CA 3 kieu ten hay gap
+// (ten Facebook, user base, ten tag) de khop duoc du bao cao Pancake ghi ten kieu nao.
+// Ghi de toan bo danh sach Sale chuan (dan tu file Excel "Danh sach Sale").
+function saveSaleDirectory_(rows) {
+  rows = rows || [];
+  var sh = getSheet_(SH_SALE_DIR, SALE_DIR_HEADERS);
+  sh.clearContents();
+  var matrix = [SALE_DIR_HEADERS].concat(rows.map(function(r) {
+    return [r.maSale || '', r.tenFacebook || '', r.userBase || '', r.tenTagPancake || ''];
+  }));
+  sh.getRange(1, 1, matrix.length, SALE_DIR_HEADERS.length).setValues(matrix);
+  return jsonOut_({ ok: true, written: rows.length });
+}
+
+function readSaleDirectory_() {
+  var sh = getSheet_(SH_SALE_DIR, SALE_DIR_HEADERS);
+  var list = [], byName = {};
+  if (sh.getLastRow() < 2) return { list: list, byName: byName };
+  var v = sh.getRange(2, 1, sh.getLastRow() - 1, SALE_DIR_HEADERS.length).getValues();
+  for (var i = 0; i < v.length; i++) {
+    var tag = String(v[i][3] || '').trim();
+    var m = tag.match(/^([SO])\s*(\d+)/i);
+    if (!m) continue; // dong khong co ma tag S#/O# -> khong phai Sale trong danh sach
+    var rec = {
+      maSale: String(v[i][0] || '').trim(),
+      tenFacebook: String(v[i][1] || '').trim(),
+      userBase: String(v[i][2] || '').trim(),
+      tenTagPancake: tag,
+      code: m[1].toUpperCase() + parseInt(m[2], 10),
+      nhom: m[1].toUpperCase() === 'S' ? 'Văn phòng' : 'Online'
+    };
+    list.push(rec);
+    [rec.tenFacebook, rec.userBase, rec.tenTagPancake, rec.code].forEach(function(k) {
+      if (k) byName[_normTxt_(k)] = rec;
+    });
+  }
+  return { list: list, byName: byName };
+}
+
 function buildKpiReport_(from, to) {
   // Thieu khoang ngay -> KHONG im lang tinh toan bo lich su (so don/doanh thu ca nam ghep voi
   // tuong tac ca nam cho ra ty le vo nghia). Mac dinh 7 ngay gan nhat va bao ro cho giao dien.
@@ -3041,7 +3086,32 @@ function buildKpiReport_(from, to) {
       tyLeChot: r.tongTT ? Math.round(dt.orders / r.tongTT * 1000) / 10 : 0
     };
   });
+  // Gan nhom Van phong (S) / Online (O) theo danh sach Sale chuan o sheet SaleDirectory.
+  var saleDir = readSaleDirectory_();
+  bySale.forEach(function(r) {
+    var rec = saleDir.byName[_normTxt_(r.name)];
+    r.nhom = rec ? rec.nhom : '';
+    r.maSale = rec ? rec.code : '';
+    r.inDirectory = !!rec;
+  });
   bySale.sort(function(a, b) { return b.tongTT - a.tongTT; });
+
+  // Tong theo nhom: don KHONG chia (1 don co the co nhieu Sale) nen chi cong doanh thu da chia
+  // deu o tren -> cong lai theo nhom van dung tong the.
+  var byGroup = {};
+  ['Văn phòng', 'Online', ''].forEach(function(g) {
+    byGroup[g || '(ngoài danh sách)'] = { nhom: g || '(ngoài danh sách)', soSale: 0, tongTT: 0, sdtMangVe: 0, donHang: 0, doanhThu: 0 };
+  });
+  bySale.forEach(function(r) {
+    var g = byGroup[r.nhom || '(ngoài danh sách)'];
+    g.soSale++; g.tongTT += r.tongTT; g.sdtMangVe += r.sdtMangVe;
+    g.donHang += r.donHang; g.doanhThu += r.doanhThu;
+  });
+  var saleGroups = Object.keys(byGroup).map(function(k) { return byGroup[k]; })
+    .filter(function(g) { return g.soSale > 0; });
+  saleGroups.forEach(function(g) {
+    g.tyLeChot = g.tongTT ? Math.round(g.donHang / g.tongTT * 1000) / 10 : 0;
+  });
 
   var totalTongTT = byPage.reduce(function(s, r) { return s + r.tongTT; }, 0);
   var totalSdtMangVe = byPage.reduce(function(s, r) { return s + r.sdtMangVe; }, 0);
@@ -3090,6 +3160,8 @@ function buildKpiReport_(from, to) {
     tagFunnelTotal: tagFunnelTotal,
     unmappedPages: unmappedPages,
     unmappedSales: unmappedSales,
+    saleGroups: saleGroups,
+    saleDirectoryCount: saleDir.list.length,
     duplicateChannels: duplicateChannels,
     dataAvail: dataAvail,
     from: from, to: to,
