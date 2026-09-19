@@ -13551,6 +13551,7 @@ async function _pkTagSaveToServer(){
     if (d.error) throw new Error(d.error);
     _pkState.tagSavedAt = new Date().toLocaleString('vi-VN');
     _pkState.kpiReport = null; // du lieu tag vua doi -> bao cao KPI tong hop cu co the sai, yeu cau tinh lai
+    _pkKpiRefreshIfOpen();
     logAudit('pancake_tag_save','', '', 'Lưu '+rows.length+' dòng dữ liệu tag Pancake lên CRM');
     toast('✓ Đã lưu '+d.written+' dòng dữ liệu tag lên CRM.');
   } catch(e){
@@ -13787,6 +13788,7 @@ async function _pkUploadToCRM(){
     var fi = document.getElementById('pk-file-input'); if (fi) fi.value = '';
     _pkState.report = null; // buoc xem lai bao cao de lay du lieu moi
     _pkState.kpiReport = null; // du lieu tuong tac vua doi -> bao cao KPI tong hop cu co the sai, yeu cau tinh lai
+    _pkKpiRefreshIfOpen();
   } catch(e){
     toast('❌ Lưu lỗi: ' + e.message);
   } finally {
@@ -13917,6 +13919,7 @@ async function _pkUploadSdtToCRM(){
     var fi = document.getElementById('pk-sdt-file-input'); if (fi) fi.value = '';
     _pkState.sdtReport = null;
     _pkState.kpiReport = null; // du lieu SDT vua doi -> bao cao KPI tong hop cu co the sai, yeu cau tinh lai
+    _pkKpiRefreshIfOpen();
   } catch(e){
     toast('❌ Lưu lỗi: ' + e.message);
   } finally {
@@ -14084,6 +14087,8 @@ async function renderKpiPancakeTab(){
 
 async function _pkLoadKpiReport(){
   if (!gsUrl){ toast('❌ Chưa cấu hình URL Google Apps Script.'); return; }
+  if (!_pkState.kpiFrom || !_pkState.kpiTo){ toast('⚠️ Hãy chọn đủ ngày bắt đầu và ngày kết thúc.'); return; }
+  if (_pkState.kpiFrom > _pkState.kpiTo){ toast('⚠️ Ngày bắt đầu đang sau ngày kết thúc — hãy đổi lại.'); return; }
   _pkState.kpiReportLoading = true; _pkRenderKpiPancake();
   try {
     var sep = gsUrl.includes('?') ? '&' : '?';
@@ -14096,6 +14101,16 @@ async function _pkLoadKpiReport(){
   } finally {
     _pkState.kpiReportLoading = false; _pkRenderKpiPancake();
   }
+}
+
+// Neu nguoi dung dang dung o tab "KPI Pancake" khi du lieu vua duoc luu -> tai lai ngay,
+// khong bat ho tu bam "Xem bao cao". Neu dang o tab khac thi thoi: kpiReport da = null nen
+// lan sau mo tab do renderKpiPancakeTab() se tu tai.
+function _pkKpiRefreshIfOpen(){
+  try {
+    var el = document.getElementById('tab-kpipancake');
+    if (el && el.style.display !== 'none' && !_pkState.kpiReportLoading) _pkLoadKpiReport();
+  } catch(e){}
 }
 
 function _pkKpiPct(v){ return (v||v===0) ? (v+'%') : '—'; }
@@ -14115,6 +14130,7 @@ function _pkRenderKpiPancake(){
     '<span>→</span>'+
     '<input type="date" value="'+esc(_pkState.kpiTo)+'" onchange="_pkState.kpiTo=this.value" style="'+st+'">'+
     '<button class="btn primary" onclick="_pkLoadKpiReport()">'+(_pkState.kpiReportLoading?'Đang tải...':'Xem báo cáo')+'</button>'+
+    ((_pkState.kpiReport && _pkState.kpiReport.from) ? '<span style="font-size:11px;color:var(--muted)">Đang xem: '+esc(_pkState.kpiReport.from)+' → '+esc(_pkState.kpiReport.to)+'</span>' : '')+
     (_pkState.kpiReport ? '<button class="btn sm secondary" onclick="_pkExportKpiReport()">⬇ Xuất Excel</button>' : '')+
   '</div>';
 
@@ -14122,6 +14138,18 @@ function _pkRenderKpiPancake(){
   if (!rep){
     html += '<div style="color:var(--muted);padding:10px">'+(_pkState.kpiReportLoading?'Đang tải...':'Chọn khoảng ngày rồi bấm "Xem báo cáo".')+'</div>';
     wrap.innerHTML = html; return;
+  }
+
+  if (rep.warnings && rep.warnings.length){
+    html += '<div style="margin:0 0 14px;padding:8px 10px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;font-size:12px;color:#92400e">'+
+      rep.warnings.map(function(w){ return '⚠️ '+esc(w); }).join('<br>')+'</div>';
+  }
+
+  if (rep.unmappedSales && rep.unmappedSales.length){
+    html += '<div style="margin:0 0 14px;padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412">'+
+      '⚠️ '+rep.unmappedSales.length+' tên Nhân viên Pancake chưa khớp Sale CRM (nên đơn/doanh thu của họ đang tính = 0): '+
+      rep.unmappedSales.map(function(n){ return esc(n); }).join(', ')+
+      ' — vào tab "📥 Báo cáo Pancake" → mục "Khớp tên" để khớp.</div>';
   }
 
   if (rep.unmappedPages && rep.unmappedPages.length){

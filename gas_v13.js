@@ -2919,7 +2919,41 @@ function _tagFunnelRates_(counts, tongTT, sdtThuThap) {
   };
 }
 
+// Quet cot ngay (cot A) cua 1 sheet Pancake: dem so dong NAM TRONG khoang [from,to] va lay
+// khoang ngay TOI DA dang co trong sheet. Dung de bao cho nguoi dung biet chinh xac vi sao
+// bao cao ra 0: "chua nap du lieu bao gio" hay "co du lieu nhung khong thuoc khoang ngay dang chon".
+function _pkSheetDateSpan_(shName, headers, from, to) {
+  var out = { rows: 0, rowsInRange: 0, minDate: '', maxDate: '' };
+  var sh = getSheet_(shName, headers);
+  if (sh.getLastRow() < 2) return out;
+  var v = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
+  for (var i = 0; i < v.length; i++) {
+    var d = normOrderDate_(v[i][0]);
+    if (!d) continue;
+    out.rows++;
+    if (!out.minDate || d < out.minDate) out.minDate = d;
+    if (!out.maxDate || d > out.maxDate) out.maxDate = d;
+    if (from && d < from) continue;
+    if (to && d > to) continue;
+    out.rowsInRange++;
+  }
+  return out;
+}
+
 function buildKpiReport_(from, to) {
+  // Thieu khoang ngay -> KHONG im lang tinh toan bo lich su (so don/doanh thu ca nam ghep voi
+  // tuong tac ca nam cho ra ty le vo nghia). Mac dinh 7 ngay gan nhat va bao ro cho giao dien.
+  var warnings = [];
+  var tz = Session.getScriptTimeZone() || 'GMT+7';
+  if (!from || !to) {
+    var now = new Date();
+    if (!to)   to   = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
+    if (!from) from = Utilities.formatDate(new Date(now.getTime() - 6 * 86400000), tz, 'yyyy-MM-dd');
+    warnings.push('Chưa chọn đủ khoảng ngày — đang tạm tính cho 7 ngày gần nhất (' + from + ' → ' + to + ').');
+  }
+  if (from && to && from > to) {
+    warnings.push('Khoảng ngày bị ngược (từ ' + from + ' sau đến ' + to + ') nên không có dữ liệu nào lọt vào. Hãy đổi lại 2 ô ngày.');
+  }
   var fromD = from ? new Date(from + 'T00:00:00') : null;
   var toD = to ? new Date(to + 'T23:59:59') : null;
 
@@ -2985,12 +3019,23 @@ function buildKpiReport_(from, to) {
 
   // 4) Ghep theo Sale: pInt.byCS da o dang ten Sale chuan (qua PancakeNameMap) -> khop thang
   // voi bySaleOrders (cung la ten Sale chuan tu cot saleBan DT TONG).
-  var bySale = pInt.byCS.map(function(r) {
+  // Gop tu CA 2 bao cao: mot Sale chi co trong file "Thong ke nhan vien" (SDT) ma khong co
+  // trong file "Thong ke tuong tac" truoc day bi mat hut khoi bang nay.
+  var saleAgg = {};
+  pInt.byCS.forEach(function(r) {
+    saleAgg[r.name] = { name: r.name, mapped: r.mapped, tongTT: r.tongTT || 0, sdtMangVe: 0 };
+  });
+  pSdt.byCS.forEach(function(r) {
+    if (!saleAgg[r.name]) saleAgg[r.name] = { name: r.name, mapped: r.mapped, tongTT: 0, sdtMangVe: 0 };
+    saleAgg[r.name].sdtMangVe = r.sdtMangVe || 0;
+    if (r.mapped) saleAgg[r.name].mapped = true;
+  });
+  var bySale = Object.keys(saleAgg).map(function(k) {
+    var r = saleAgg[k];
     var dt = bySaleOrders[r.name] || { orders: 0, revenue: 0 };
-    var sdtRow = pSdt.byCS.filter(function(x) { return x.name === r.name; })[0];
     return {
       name: r.name, mapped: r.mapped,
-      tongTT: r.tongTT, sdtMangVe: sdtRow ? sdtRow.sdtMangVe : 0,
+      tongTT: r.tongTT, sdtMangVe: r.sdtMangVe,
       donHang: dt.orders, doanhThu: Math.round(dt.revenue),
       tyLeChot: r.tongTT ? Math.round(dt.orders / r.tongTT * 1000) / 10 : 0
     };
@@ -2998,10 +3043,41 @@ function buildKpiReport_(from, to) {
   bySale.sort(function(a, b) { return b.tongTT - a.tongTT; });
 
   var totalTongTT = byPage.reduce(function(s, r) { return s + r.tongTT; }, 0);
-  var totalDonHang = byPage.reduce(function(s, r) { return s + r.donHang; }, 0);
-  var totalDoanhThu = byPage.reduce(function(s, r) { return s + r.doanhThu; }, 0);
   var totalSdtMangVe = byPage.reduce(function(s, r) { return s + r.sdtMangVe; }, 0);
+  // Don/doanh thu: cong theo KENH BAN DUY NHAT, khong cong theo dong Page. Neu 2 Page cung tro
+  // ve 1 Kenh ban thi moi dong Page deu hien tron so cua kenh do (dung khi xem tung dong),
+  // nhung cong lai se bi nhan doi -> tong phai gom theo kenh.
+  var seenKenh = {}, dupKenh = {};
+  var totalDonHang = 0, totalDoanhThu = 0;
+  byPage.forEach(function(r) {
+    if (!r.mapped) return;
+    if (seenKenh[r.kenhBan]) { dupKenh[r.kenhBan] = true; return; }
+    seenKenh[r.kenhBan] = true;
+    totalDonHang += r.donHang; totalDoanhThu += r.doanhThu;
+  });
+  var duplicateChannels = Object.keys(dupKenh);
+  if (duplicateChannels.length) {
+    warnings.push('Có nhiều Page cùng khớp về 1 Kênh bán (' + duplicateChannels.join(', ') +
+      '). Mỗi dòng Page bên dưới hiển thị trọn số đơn/doanh thu của kênh đó, nên cộng các dòng lại sẽ ra nhiều hơn tổng thật — tổng phía trên đã gom theo kênh nên không bị nhân đôi.');
+  }
   var unmappedPages = byPage.filter(function(r) { return !r.mapped; }).map(function(r) { return { pageId: r.pageId, pageName: r.pageName }; });
+  var unmappedSales = bySale.filter(function(r) { return !r.mapped; }).map(function(r) { return r.name; });
+
+  // Chan doan nguon du lieu: bao ro "chua nap bao gio" vs "co du lieu nhung ngoai khoang ngay".
+  var dataAvail = {
+    tuongTac: _pkSheetDateSpan_(SH_PK_STATS, PK_STATS_HEADERS, from, to),
+    sdt:      _pkSheetDateSpan_(SH_PK_SDT,   PK_SDT_STATS_HEADERS, from, to),
+    tag:      _pkSheetDateSpan_(SH_PK_TAG,   PK_TAG_STATS_HEADERS, from, to)
+  };
+  var LBL_ = { tuongTac: 'Thống kê tương tác', sdt: 'Thống kê nhân viên (SĐT)', tag: 'Thống kê tag' };
+  Object.keys(dataAvail).forEach(function(k) {
+    var a = dataAvail[k];
+    if (a.rows === 0) {
+      warnings.push('Chưa có dữ liệu "' + LBL_[k] + '" nào trên CRM — vào tab "📥 Báo cáo Pancake", nạp file rồi bấm "💾 Lưu lên CRM".');
+    } else if (a.rowsInRange === 0) {
+      warnings.push('Không có dòng "' + LBL_[k] + '" nào trong khoảng ngày đang chọn (dữ liệu hiện có từ ' + a.minDate + ' đến ' + a.maxDate + ').');
+    }
+  });
   // Phe do L1-L7 toan he thong: dung tong tag da gom san o buildPancakeTagReport_ (pTag.totals),
   // mau so tongTT/sdtMangVe la tong cong tat ca Page trong ky (khong phai cong ty le tung Page).
   var tagFunnelTotal = _tagFunnelRates_(pTag.totals, totalTongTT, totalSdtMangVe);
@@ -3011,7 +3087,12 @@ function buildKpiReport_(from, to) {
     totalTongTT: totalTongTT, totalDonHang: totalDonHang, totalDoanhThu: totalDoanhThu, totalSdtMangVe: totalSdtMangVe,
     tyLeChotChung: totalTongTT ? Math.round(totalDonHang / totalTongTT * 1000) / 10 : 0,
     tagFunnelTotal: tagFunnelTotal,
-    unmappedPages: unmappedPages
+    unmappedPages: unmappedPages,
+    unmappedSales: unmappedSales,
+    duplicateChannels: duplicateChannels,
+    dataAvail: dataAvail,
+    from: from, to: to,
+    warnings: warnings
   };
 }
 
