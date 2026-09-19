@@ -655,6 +655,7 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:3px;}
 @media(max-width:768px){
+  body{overflow-x:hidden;}
   .dp{width:100%;}
   .modal{width:95vw;}
   header{padding:0 10px;gap:6px;}
@@ -680,6 +681,22 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
     box-shadow:2px 0 16px rgba(0,0,0,0.18);
   }
   .sidebar.mobile-open{transform:translateX(0);}
+
+  /* Header phải: nhiều mục JS tự chèn thêm (vai trò, Tình trạng CS, Trạng thái KH, Tài khoản,
+     Đăng xuất, Mẫu hỏi thăm, Tác vụ...) — cho cuộn ngang RIÊNG trong dải này bằng ngón tay,
+     thay vì đẩy cả trang web bị tràn ngang / che mất nội dung bên dưới như trước đây. */
+  .hdr-r{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;max-width:calc(100vw - 170px);}
+  .hdr-r::-webkit-scrollbar{display:none;}
+  .role-pill{padding:3px 7px;font-size:10px;}
+
+  /* Hàng thống kê KPI: xếp 3 ô/hàng cho dễ đọc, thay vì ép 6 ô vào 1 hàng ngang bị bóp nhỏ */
+  .stats-row{flex-wrap:wrap;}
+  .sc{flex:0 0 calc((100% - 2px)/3);}
+
+  /* Toolbar (Thêm KH/Đơn mới, Lọc nâng cao, Tác vụ, bộ lọc chiến dịch...) xuống dòng
+     thay vì tràn ngang mất nút — đây chính là nguồn tràn lớn nhất khiến trang bị "cắt". */
+  .toolbar{flex-wrap:wrap;}
+  .tl-l{flex-wrap:wrap;width:100%;}
 }
 
 /* ════════════ V9 BRIDGE (class aliases + new bits used by feature layer) ════════════ */
