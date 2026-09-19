@@ -13219,7 +13219,7 @@ function _pkParseFile(file){
           for (var i=0;i<Math.min(aoa.length,10);i++){
             var cell = String(aoa[i][0]||'');
             var m = cell.match(/Thời gian tải về:\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-            if (m){ date = m[3]+'-'+m[1].padStart(2,'0')+'-'+m[2].padStart(2,'0'); break; }
+            if (m){ date = m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'); break; }
           }
           if (!date){ warnings.push('Không tìm thấy ngày báo cáo ở sheet "'+sn+'" — bỏ qua.'); return; }
 
