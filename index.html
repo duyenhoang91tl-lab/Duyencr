@@ -13172,7 +13172,7 @@ var _pkState = {
   report: null, reportLoading: false,
   pkSplit: 'equal', mapOpen: '',
   tagRows: [], tagLoaded: false, tagFrom: '', tagTo: '',   // dữ liệu file 'Thống kê tag' (gộp nhiều ngày, lưu trên trình duyệt)
-  tagOverrideMap: {}, tagOverrideLoaded: false,   // { 'tên tag lạ': 'L1'...'L7' } — quy chuẩn tay, lưu chung server (dùng chung cho cả team)
+  tagOverrideMap: {}, tagOverrideLoaded: false,   // { 'tên tag lạ': 'L1'..'L8' hoặc 'S1'/'O8'... } — quy chuẩn tay (trạng thái hoặc Sale), lưu chung server (dùng chung cho cả team)
   // ── SĐT mang về / đơn chốt (file "Thống kê nhân viên", sheet "<pageId> By staff") ──
   sdtParsedRows: [], sdtUploading: false,
   sdtReport: null, sdtReportLoading: false,
@@ -13209,7 +13209,7 @@ async function _pkLoadPageMap(){
   } catch(e){ console.error('pancakePageMap load lỗi', e); }
 }
 
-// Bản đồ "quy chuẩn tag lạ → L1..L6", lưu chung trên server (setSetting/getSetting có sẵn)
+// Bản đồ "quy chuẩn tag lạ → L1..L8 hoặc mã Sale S1/O8...", lưu chung trên server (setSetting/getSetting có sẵn)
 // để cả team dùng chung, không phụ thuộc trình duyệt như tagRows.
 async function _pkLoadTagOverrideMap(){
   if (!gsUrl) return;
@@ -13224,23 +13224,50 @@ async function _pkLoadTagOverrideMap(){
   } catch(e){ console.error('pancakeTagOverride load lỗi', e); }
 }
 
-async function _pkSaveTagOverride(sel){
-  var tag = sel.getAttribute('data-tag');
-  var code = sel.value;
-  if (!gsUrl){ toast('❌ Chưa cấu hình URL Google Apps Script.'); return; }
+// Ghi cả bản đồ quy chuẩn lên server 1 lần rồi vẽ lại báo cáo
+async function _pkPersistTagOverride(map, auditText, toastText){
+  if (!gsUrl){ toast('❌ Chưa cấu hình URL Google Apps Script.'); return false; }
   try {
-    var map = Object.assign({}, _pkState.tagOverrideMap || {});
-    if (code) map[tag] = code; else delete map[tag];
     var res = await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'setSetting', key:'pancakeTagOverride', value: JSON.stringify(map) }) });
     var d = await res.json();
     if (d.error) throw new Error(d.error);
     _pkState.tagOverrideMap = map;
-    logAudit('pancake_tag_map','', '', 'Quy chuẩn tag "'+tag+'" → '+(code ? _PK_STATUS_LABEL[code] : '(bỏ quy chuẩn)'));
-    toast('✓ Đã quy chuẩn "'+tag+'" → '+(code ? _PK_STATUS_LABEL[code] : '(bỏ quy chuẩn)'));
+    if (typeof logAudit === 'function') logAudit('pancake_tag_map','', '', auditText);
+    toast(toastText);
     _pkRenderAll();
+    return true;
   } catch(e){
     toast('❌ Lỗi lưu quy chuẩn tag: ' + e.message);
+    return false;
   }
+}
+// Đổi quy chuẩn cho 1 tag (dùng chung cho danh sách chưa gán và danh sách đã gán)
+async function _pkSaveTagOverride(sel){
+  var tag = sel.getAttribute('data-tag');
+  var code = sel.value;
+  var map = Object.assign({}, _pkState.tagOverrideMap || {});
+  if (code) map[tag] = code; else delete map[tag];
+  await _pkPersistTagOverride(map,
+    'Quy chuẩn tag "'+tag+'" → '+_pkOverrideLabel(code),
+    '✓ Đã quy chuẩn "'+tag+'" → '+_pkOverrideLabel(code));
+}
+// Gán nhanh 1 tag theo gợi ý (nút "≈ S4" cạnh tên tag)
+function _pkApplySuggest(btn){
+  var tag = btn.getAttribute('data-tag'), code = btn.getAttribute('data-code');
+  _pkSaveTagOverride({ getAttribute: function(){ return tag; }, value: code });
+}
+// Gán nhanh TẤT CẢ tag lạ đang có gợi ý — chỉ 1 lần ghi lên server
+async function _pkApplyAllSuggest(){
+  var pend = [];
+  try { pend = JSON.parse(document.getElementById('pk-suggest-data').value || '[]'); } catch(e){ pend = []; }
+  if (!pend.length){ toast('Không có gợi ý nào để áp dụng.'); return; }
+  var lines = pend.map(function(x){ return '• ' + x.tag + '  →  ' + _pkOverrideLabel(x.code); }).join('\n');
+  if (!confirm('Áp dụng ' + pend.length + ' gợi ý sau?\n\n' + lines + '\n\nBạn vẫn sửa lại được từng tag ở mục "Tag đã quy chuẩn".')) return;
+  var map = Object.assign({}, _pkState.tagOverrideMap || {});
+  pend.forEach(function(x){ map[x.tag] = x.code; });
+  await _pkPersistTagOverride(map,
+    'Áp dụng '+pend.length+' gợi ý quy chuẩn tag → Sale',
+    '✓ Đã áp dụng '+pend.length+' gợi ý');
 }
 
 async function renderPancakeTab(){
@@ -13338,15 +13365,74 @@ var _PK_SALE_DIR = [
 var _PK_STATUS_LABEL = {
   'L1':'L1. Chuẩn (đạt 3 lần phản hồi)', 'L2':'L2. SĐT kết nối', 'L3':'L3. KH tiềm năng',
   'L4':'L4. Khảo giá / KNC', 'L5':'L5. Chốt', 'L5.1':'L5.1 Chờ CK', 'L5.2':'L5.2 Chờ lên đơn',
-  'L6':'L6. Hủy', 'L7':'L7. Khu vực Hà Nội'
+  'L6':'L6. Hủy', 'L7':'L7. Khu vực Hà Nội', 'L8':'L8. Upsale'
 };
+
+// ── Helper cho quy chuẩn tag: tag lạ có thể gán về TRẠNG THÁI (L1..L8) hoặc về SALE (S1.., O8..) ──
+function _pkFindSale(code){
+  code = String(code||'').trim().toUpperCase();
+  for (var i=0;i<_PK_SALE_DIR.length;i++){ if (_PK_SALE_DIR[i].code === code) return _PK_SALE_DIR[i]; }
+  return null;
+}
+function _pkIsSaleCode(code){ return !!_pkFindSale(code); }
+function _pkSaleLabel(s){
+  if (!s) return '';
+  var who = s.base || '';
+  return s.code + (who ? ' — ' + who : '') + (s.fb ? ' ('+s.fb+')' : '');
+}
+// Nhãn hiển thị của 1 giá trị quy chuẩn (dùng cho toast / nhật ký / danh sách đã gán)
+function _pkOverrideLabel(code){
+  if (!code) return '(bỏ quy chuẩn)';
+  if (_PK_STATUS_LABEL[code]) return _PK_STATUS_LABEL[code];
+  var s = _pkFindSale(code);
+  return s ? _pkSaleLabel(s) : code;
+}
+// Bỏ dấu + ký tự lạ (emoji, dấu cách, gạch) để so khớp tên
+function _pkNormName(x){
+  return String(x==null?'':x).normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/đ/gi,'d').toLowerCase().replace(/[^a-z0-9]/g,'');
+}
+// Gợi ý Sale cho 1 tag lạ (vd "S-Dungntk" → S5). Chỉ gợi ý khi khớp chắc chắn:
+// trùng khít, hoặc là tiền tố của user base / tên Facebook (tối thiểu 4 ký tự).
+function _pkSuggestSale(tagName){
+  var raw = String(tagName||'').trim().replace(/^[SO]\s*[-–—]?\s*/i, '');
+  var t = _pkNormName(raw);
+  if (t.length < 3) return '';
+  var i, j, cands;
+  for (i=0;i<_PK_SALE_DIR.length;i++){                       // vòng 1: trùng khít
+    cands = [_pkNormName(_PK_SALE_DIR[i].base), _pkNormName(_PK_SALE_DIR[i].fb)];
+    for (j=0;j<2;j++){ if (cands[j] && cands[j] === t) return _PK_SALE_DIR[i].code; }
+  }
+  if (t.length < 4) return '';
+  for (i=0;i<_PK_SALE_DIR.length;i++){                       // vòng 2: tiền tố
+    cands = [_pkNormName(_PK_SALE_DIR[i].base), _pkNormName(_PK_SALE_DIR[i].fb)];
+    for (j=0;j<2;j++){ if (cands[j] && (cands[j].indexOf(t) === 0 || t.indexOf(cands[j]) === 0)) return _PK_SALE_DIR[i].code; }
+  }
+  return '';
+}
+// Dựng <option> cho ô chọn quy chuẩn (nhóm Trạng thái / Sale VP / Sale online)
+function _pkTagOptsHtml(cur){
+  function opt(v, l){ return '<option value="'+esc(v)+'"'+(String(cur||'')===v?' selected':'')+'>'+esc(l)+'</option>'; }
+  var h = opt('', '— Bỏ qua —');
+  h += '<optgroup label="Trạng thái (L1 → L8)">';
+  Object.keys(_PK_STATUS_LABEL).forEach(function(c){ h += opt(c, _PK_STATUS_LABEL[c]); });
+  h += '</optgroup><optgroup label="Sale — S (văn phòng)">';
+  _PK_SALE_DIR.forEach(function(x){ if (x.code.charAt(0)==='S') h += opt(x.code, _pkSaleLabel(x)); });
+  h += '</optgroup><optgroup label="Sale — O (online)">';
+  _PK_SALE_DIR.forEach(function(x){ if (x.code.charAt(0)==='O') h += opt(x.code, _pkSaleLabel(x)); });
+  h += '</optgroup>';
+  return h;
+}
 
 // Phân loại 1 tên tag -> {type:'sale'|'status'|'other', code:'S1'|'L5.1'|''}
 function _pkClassifyTag(name){
   var n = String(name||'').trim();
   // Uu tien quy chuan tay (admin gan thu cong cho cac tag khong theo dung mau) truoc regex.
   var ov = _pkState.tagOverrideMap && _pkState.tagOverrideMap[n];
-  if (ov && _PK_STATUS_LABEL[ov]) return { type:'status', code: ov };
+  if (ov){
+    if (_PK_STATUS_LABEL[ov]) return { type:'status', code: ov };
+    if (_pkIsSaleCode(ov))    return { type:'sale',   code: String(ov).toUpperCase() };
+  }
   var m = n.match(/^([SO])\s*(\d+)(?![\d])/i);
   if (m) return { type:'sale', code: m[1].toUpperCase()+parseInt(m[2],10) };
   // tag trạng thái cũ "L6. Chờ CK" (trước khi đổi tên) -> vẫn hiểu là L5.1
@@ -13543,7 +13629,7 @@ function _pkTagSectionHtml(){
   var cells = function(b){ return pages.map(function(p){ return '<td style="text-align:right">'+(b[p.id]?_pkN(b[p.id]):'')+'</td>'; }).join('')+'<td style="text-align:right"><b>'+(b.total?_pkN(b.total):'')+'</b></td>'; };
 
   // Tag trạng thái
-  html += '<div class="dash-section-title">Theo tag trạng thái (L1 → L6)</div>';
+  html += '<div class="dash-section-title">Theo tag trạng thái (L1 → L8)</div>';
   html += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Tag</th>'+headPages+th('Tổng')+'</tr></thead><tbody>';
   Object.keys(_PK_STATUS_LABEL).forEach(function(k){ html += '<tr><td>'+esc(_PK_STATUS_LABEL[k])+'</td>'+cells(ag.status[k])+'</tr>'; });
   html += '</tbody></table></div>';
@@ -13571,20 +13657,47 @@ function _pkTagSectionHtml(){
   });
   html += '</tbody></table></div>';
 
+  var selCss = 'padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);min-width:230px';
   var oth = Object.keys(ag.other).filter(function(k){ return ag.other[k].total; });
   if (oth.length){
+    // Gợi ý Sale cho các tag lạ (khớp theo user base / tên Facebook trong danh sách Sale)
+    var sugg = [];
+    oth.forEach(function(k){ var c = _pkSuggestSale(k); if (c) sugg.push({ tag:k, code:c }); });
+
     html += '<div style="margin:12px 0 6px;padding:8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412">'+
-      '<div style="margin-bottom:6px">⚠️ '+oth.length+' tag chưa theo quy tắc (S/O + số, hoặc L1–L6) — chọn quy chuẩn bên dưới để tính vào đúng bảng (áp dụng luôn cho cả dữ liệu cũ đã nạp, dùng chung cho cả team):</div>';
-    var stOpts = '<option value="">— Bỏ qua —</option>' + Object.keys(_PK_STATUS_LABEL).map(function(c){
-      return '<option value="'+esc(c)+'">'+esc(_PK_STATUS_LABEL[c])+'</option>';
-    }).join('');
+      '<div style="margin-bottom:6px">⚠️ '+oth.length+' tag chưa theo quy tắc (S/O + số, hoặc L1–L8) — chọn quy chuẩn bên dưới để tính vào đúng bảng. '+
+        'Gán được về <b>trạng thái</b> (L1…L8) <b>hoặc về đúng Sale</b> (S/O). Áp dụng luôn cho cả dữ liệu cũ đã nạp, dùng chung cho cả team:</div>';
+    if (sugg.length){
+      html += '<input type="hidden" id="pk-suggest-data" value="'+esc(JSON.stringify(sugg))+'">'+
+        '<div style="margin:0 0 8px"><button class="btn primary sm" onclick="_pkApplyAllSuggest()">⚡ Áp dụng '+sugg.length+' gợi ý Sale</button>'+
+        '<span style="margin-left:8px;color:#9a3412">(xem trước trước khi lưu — sửa lại được)</span></div>';
+    }
     oth.forEach(function(k){
+      var sg = _pkSuggestSale(k);
       html += '<div style="display:flex;gap:8px;align-items:center;margin:4px 0;flex-wrap:wrap">'+
         '<span style="min-width:160px">'+esc(k)+' ('+_pkN(ag.other[k].total)+')</span>'+
-        '<select data-tag="'+esc(k)+'" onchange="_pkSaveTagOverride(this)" style="padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+stOpts+'</select>'+
+        '<select data-tag="'+esc(k)+'" onchange="_pkSaveTagOverride(this)" style="'+selCss+'">'+_pkTagOptsHtml('')+'</select>'+
+        (sg ? '<button class="btn sm" title="Gán nhanh theo gợi ý" data-tag="'+esc(k)+'" data-code="'+esc(sg)+'" onclick="_pkApplySuggest(this)">≈ '+esc(sg)+'</button>' : '')+
       '</div>';
     });
     html += '</div>';
+  }
+
+  // ── Tag ĐÃ quy chuẩn — để sửa lại / bỏ gán khi chọn nhầm ──
+  var ovKeys = Object.keys(_pkState.tagOverrideMap || {}).sort(function(a,b){ return a.localeCompare(b,'vi'); });
+  if (ovKeys.length){
+    html += '<details style="margin:8px 0 6px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:12px">'+
+      '<summary style="cursor:pointer;font-weight:600">✅ '+ovKeys.length+' tag đã quy chuẩn (bấm để sửa lại / bỏ gán)</summary>'+
+      '<div style="margin-top:8px">';
+    ovKeys.forEach(function(k){
+      var cur = _pkState.tagOverrideMap[k];
+      html += '<div style="display:flex;gap:8px;align-items:center;margin:4px 0;flex-wrap:wrap">'+
+        '<span style="min-width:160px">'+esc(k)+'</span>'+
+        '<span style="color:var(--muted)">→</span>'+
+        '<select data-tag="'+esc(k)+'" onchange="_pkSaveTagOverride(this)" style="'+selCss+'">'+_pkTagOptsHtml(cur)+'</select>'+
+      '</div>';
+    });
+    html += '</div></details>';
   }
   return html;
 }
