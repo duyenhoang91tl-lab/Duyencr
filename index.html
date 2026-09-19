@@ -13172,7 +13172,12 @@ var _pkState = {
   report: null, reportLoading: false,
   pkSplit: 'equal', mapOpen: '',
   tagRows: [], tagLoaded: false, tagFrom: '', tagTo: '',   // dữ liệu file 'Thống kê tag' (gộp nhiều ngày, lưu trên trình duyệt)
-  tagOverrideMap: {}, tagOverrideLoaded: false   // { 'tên tag lạ': 'L1'...'L6' } — quy chuẩn tay, lưu chung server (dùng chung cho cả team)
+  tagOverrideMap: {}, tagOverrideLoaded: false,   // { 'tên tag lạ': 'L1'...'L7' } — quy chuẩn tay, lưu chung server (dùng chung cho cả team)
+  // ── SĐT mang về / đơn chốt (file "Thống kê nhân viên", sheet "<pageId> By staff") ──
+  sdtParsedRows: [], sdtUploading: false,
+  sdtReport: null, sdtReportLoading: false,
+  // ── Khớp Page Pancake (pageId) ↔ Kênh bán chuẩn trong DT TỔNG ──
+  pageMapLoaded: false, pageMap: {}, serverPages: [], kenhOptions: []
 };
 
 async function _pkLoadNameMap(){
@@ -13185,6 +13190,23 @@ async function _pkLoadNameMap(){
     _pkState.serverNames = d.allNames || [];
     _pkState.nameMapLoaded = true;
   } catch(e){ console.error('pancakeNameMap load lỗi', e); }
+}
+
+// Khop pageId Pancake <-> "Kenh ban" chuan dung trong DT TONG (de ghep doanh thu/so don
+// theo dung Page o Bao cao KPI tong hop). Cung load danh sach Kenh ban co san (tu DT TONG)
+// de lam dropdown, tranh go tay sai chinh ta lam khop nham.
+async function _pkLoadPageMap(){
+  if (!gsUrl) return;
+  try {
+    var sep = gsUrl.includes('?') ? '&' : '?';
+    var r = await fetch(gsUrl + sep + 'action=pancakePageMap', { redirect:'follow' });
+    var d = await r.json();
+    _pkState.pageMap = d.map || {};
+    _pkState.serverPages = d.allPages || [];
+    var opts = await _srFetch('salesReportOptions', {});
+    _pkState.kenhOptions = (opts && opts.kenh) || [];
+    _pkState.pageMapLoaded = true;
+  } catch(e){ console.error('pancakePageMap load lỗi', e); }
 }
 
 // Bản đồ "quy chuẩn tag lạ → L1..L6", lưu chung trên server (setSetting/getSetting có sẵn)
@@ -13226,6 +13248,7 @@ async function renderPancakeTab(){
   if (!wrap) return;
   if (!_pkState.nameMapLoaded) { wrap.innerHTML = '<div style="padding:20px;color:var(--muted)">Đang tải dữ liệu khớp tên…</div>'; await _pkLoadNameMap(); }
   if (!_pkState.tagOverrideLoaded) await _pkLoadTagOverrideMap();
+  if (!_pkState.pageMapLoaded) await _pkLoadPageMap();
   _pkRenderAll();
 }
 
@@ -13246,9 +13269,24 @@ function _pkRenderAll(){
     html += _pkRenderPreviewHtml();
   }
 
+  html += '<div class="dash-section-title" style="margin-top:22px">📱 Nhập báo cáo SĐT thu thập / đơn chốt hàng ngày</div>';
+  html += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Trên Pancake: <b>Thống kê → Thống kê nhân viên → Xuất Excel</b> (file <code>user_statistics_multi_pages...xlsx</code>). Có thể nạp lại nhiều lần trong ngày — dữ liệu cùng ngày sẽ tự ghi đè, không bị nhân đôi.</div>';
+  html += '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">'+
+    '<input type="file" id="pk-sdt-file-input" accept=".xlsx,.xls" onchange="_pkOnSdtFileSelected(this)">'+
+    (_pkState.sdtParsedRows.length ? '<span style="font-size:12px;color:var(--muted)">Đã đọc <b>'+_pkState.sdtParsedRows.length+'</b> dòng — kiểm tra bên dưới rồi bấm Lưu.</span>' : '')+
+  '</div>';
+
+  if (_pkState.sdtParsedRows.length){
+    html += _pkRenderSdtPreviewHtml();
+  }
+
   html += '<div class="dash-section-title" style="margin-top:22px">🔗 Khớp tên Nhân viên Pancake ↔ Sale CRM</div>';
   html += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Tên "Nhân viên" trên Pancake là tên Facebook cá nhân, thường không khớp tên đăng nhập (Sale) trong CRM — khớp 1 lần, dùng lại cho mọi lần nạp báo cáo sau.</div>';
   html += _pkRenderMapTableHtml(isAdmin);
+
+  html += '<div class="dash-section-title" style="margin-top:22px">🔗 Khớp Page Pancake ↔ Kênh bán CRM (DT TỔNG)</div>';
+  html += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Dùng để ghép đúng doanh thu/số đơn của mỗi Page (cột "Kênh bán" trong DT TỔNG) với số liệu tương tác/SĐT của Page đó ở Báo cáo KPI tổng hợp.</div>';
+  html += _pkRenderPageMapTableHtml(isAdmin);
 
   html += '<div class="dash-section-title" style="margin-top:22px">📊 Báo cáo theo Page &amp; theo CS</div>';
   html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">'+
@@ -13299,7 +13337,8 @@ var _PK_SALE_DIR = [
 ];
 var _PK_STATUS_LABEL = {
   'L1':'L1. Chuẩn (đạt 3 lần phản hồi)', 'L2':'L2. SĐT kết nối', 'L3':'L3. KH tiềm năng',
-  'L4':'L4. Khảo giá / KNC', 'L5':'L5. Chốt', 'L5.1':'L5.1 Chờ CK', 'L5.2':'L5.2 Chờ lên đơn', 'L6':'L6. Hủy'
+  'L4':'L4. Khảo giá / KNC', 'L5':'L5. Chốt', 'L5.1':'L5.1 Chờ CK', 'L5.2':'L5.2 Chờ lên đơn',
+  'L6':'L6. Hủy', 'L7':'L7. Khu vực Hà Nội'
 };
 
 // Phân loại 1 tên tag -> {type:'sale'|'status'|'other', code:'S1'|'L5.1'|''}
@@ -13708,6 +13747,135 @@ async function _pkUploadToCRM(){
   }
 }
 
+// ═══════════════════════════════════════════════════════
+//  SDT MANG VE / DON CHOT (file "Thong ke nhan vien" — sheet "<pageId> By staff")
+//  Cung khuon mau voi file "Thong ke tuong tac" o tren, khac o: sheet ten "By staff"
+//  (khong phai "By user"), va header la 1 DONG DUY NHAT (khong gop 2 dong nhu file kia).
+// ═══════════════════════════════════════════════════════
+function _pkParseSdtFile(file){
+  return new Promise(function(resolve, reject){
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      try {
+        var wb = XLSX.read(ev.target.result, {type:'array'});
+        var rows = [], warnings = [];
+        wb.SheetNames.forEach(function(sn){
+          if (!/By staff$/i.test(sn)) return; // bỏ qua sheet "By time" (theo ngày, không theo nhân viên)
+          var pageIdMatch = sn.match(/^(\d+)/);
+          if (!pageIdMatch) { warnings.push('Không nhận diện được Page ID ở sheet "'+sn+'" — bỏ qua.'); return; }
+          var pageId = pageIdMatch[1];
+          var aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1, defval:''});
+
+          // Tìm dòng "Thời gian tải về: DD/MM/YYYY ..." để lấy ngày báo cáo
+          var date = '';
+          for (var i=0;i<Math.min(aoa.length,10);i++){
+            var cell = String(aoa[i][0]||'');
+            var m = cell.match(/Thời gian tải về:\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+            if (m){ date = m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'); break; }
+          }
+          if (!date){ warnings.push('Không tìm thấy ngày báo cáo ở sheet "'+sn+'" — bỏ qua.'); return; }
+
+          // Tìm dòng tên Page (dòng "<Tên Page> - <pageId>")
+          var pageName = sn;
+          for (var j=0;j<Math.min(aoa.length,10);j++){
+            var c0 = String(aoa[j][0]||'');
+            if (new RegExp('\\s-\\s*'+pageId+'\\s*$').test(c0)){
+              pageName = c0.replace(new RegExp('\\s*-\\s*'+pageId+'\\s*$'), '').trim();
+              break;
+            }
+          }
+
+          // Header la 1 dong duy nhat: o dau = "Nhân viên"
+          var headerRow = -1;
+          for (var k=0;k<aoa.length;k++){
+            if (String(aoa[k][0]||'').normalize('NFC').trim() === 'Nhân viên'){ headerRow = k; break; }
+          }
+          if (headerRow === -1){ warnings.push('Không nhận diện được dòng tiêu đề cột ở sheet "'+sn+'" — bỏ qua.'); return; }
+
+          for (var r=headerRow+1; r<aoa.length; r++){
+            var row = aoa[r];
+            var nhanVien = String(row[0]||'').trim();
+            if (!nhanVien || /^tổng/i.test(nhanVien)) continue; // bỏ dòng trống / dòng tổng cuối bảng (nếu có)
+            var num = function(v){ var n = parseFloat(v); return isNaN(n) ? 0 : n; };
+            rows.push({
+              date: date, pageId: pageId, pageName: pageName, nhanVien: nhanVien,
+              tinNhanTuBinhLuan: num(row[1]), binhLuan: num(row[2]), phienTLBinhLuan: num(row[3]),
+              tinNhan: num(row[4]), phienTLTinNhan: num(row[5]),
+              sdtMangVe: num(row[7]), soDonChot: num(row[8])
+            });
+          }
+        });
+        resolve({ rows: rows, warnings: warnings });
+      } catch(err){ reject(err); }
+    };
+    reader.onerror = function(){ reject(new Error('Không đọc được file.')); };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+async function _pkOnSdtFileSelected(input){
+  var file = input.files && input.files[0];
+  if (!file) return;
+  try {
+    var res = await _pkParseSdtFile(file);
+    if (!res.rows.length){
+      toast('⚠️ Không đọc được dòng nào phù hợp trong file này — kiểm tra lại đúng file "Thống kê nhân viên" chưa.');
+      return;
+    }
+    _pkState.sdtParsedRows = res.rows;
+    var unmapped = {};
+    res.rows.forEach(function(r){ if (!_pkState.nameMap[r.nhanVien]) unmapped[r.nhanVien] = true; });
+    if (res.warnings.length) toast('⚠️ ' + res.warnings.join(' | '));
+    _pkRenderAll();
+  } catch(e){
+    toast('❌ Lỗi đọc file: ' + e.message);
+  }
+}
+
+function _pkRenderSdtPreviewHtml(){
+  var byDatePage = {};
+  _pkState.sdtParsedRows.forEach(function(r){
+    var k = r.date+'|'+r.pageName;
+    if (!byDatePage[k]) byDatePage[k] = { date:r.date, pageName:r.pageName, count:0, sdtMangVe:0, soDonChot:0 };
+    byDatePage[k].count++; byDatePage[k].sdtMangVe+=r.sdtMangVe; byDatePage[k].soDonChot+=r.soDonChot;
+  });
+  var html = '<div style="border:1px solid var(--border);border-radius:var(--rsm);padding:10px;margin-bottom:10px;background:var(--surface2)">';
+  html += '<table class="dash-table"><thead><tr><th>Ngày</th><th>Page</th><th style="text-align:right">Số nhân viên</th><th style="text-align:right">SĐT mang về</th><th style="text-align:right">Số đơn chốt</th></tr></thead><tbody>';
+  Object.values(byDatePage).forEach(function(g){
+    html += '<tr><td>'+esc(g.date)+'</td><td>'+esc(g.pageName)+'</td><td style="text-align:right">'+g.count+'</td><td style="text-align:right">'+fmt(g.sdtMangVe)+'</td><td style="text-align:right">'+fmt(g.soDonChot)+'</td></tr>';
+  });
+  html += '</tbody></table>';
+  html += '<div style="margin-top:10px;display:flex;gap:8px">'+
+    '<button class="btn primary" onclick="_pkUploadSdtToCRM()" '+(_pkState.sdtUploading?'disabled':'')+'>'+(_pkState.sdtUploading?'Đang lưu...':'💾 Lưu lên CRM ('+_pkState.sdtParsedRows.length+' dòng)')+'</button>'+
+    '<button class="btn sm secondary" onclick="_pkState.sdtParsedRows=[];_pkRenderAll()">Huỷ</button>'+
+  '</div>';
+  html += '</div>';
+  return html;
+}
+
+async function _pkUploadSdtToCRM(){
+  if (!gsUrl){ toast('❌ Chưa cấu hình URL Google Apps Script.'); return; }
+  if (!_pkState.sdtParsedRows.length) return;
+  _pkState.sdtUploading = true; _pkRenderAll();
+  try {
+    var res = await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'savePancakeSdtStats', rows:_pkState.sdtParsedRows }) });
+    var d = await res.json();
+    if (d.error) throw new Error(d.error);
+    toast('✓ Đã lưu '+d.written+' dòng lên CRM.');
+    logAudit('pancake_sdt_import','', '', 'Nhập báo cáo SĐT Pancake: '+d.written+' dòng');
+    var seen = {};
+    _pkState.sdtParsedRows.forEach(function(r){ seen[r.nhanVien] = true; });
+    Object.keys(seen).forEach(function(n){ if (_pkState.serverNames.indexOf(n)===-1) _pkState.serverNames.push(n); });
+    _pkState.sdtParsedRows = [];
+    var fi = document.getElementById('pk-sdt-file-input'); if (fi) fi.value = '';
+    _pkState.sdtReport = null;
+  } catch(e){
+    toast('❌ Lưu lỗi: ' + e.message);
+  } finally {
+    _pkState.sdtUploading = false; _pkRenderAll();
+  }
+}
+
 function _pkSalesOf(v){ return String(v||'').split('|').map(function(x){ return x.trim(); }).filter(Boolean); }
 
 function _pkRenderMapTableHtml(isAdmin){
@@ -13781,6 +13949,53 @@ async function _pkMapNameInline(pancakeName, saleName){
     _pkRenderAll();
   } catch(e){
     toast('❌ Lỗi khớp tên: ' + e.message);
+  }
+}
+
+// ── Khớp Page Pancake (pageId) ↔ Kênh bán chuẩn trong DT TỔNG (1-1, khác Sale là nhiều-nhiều) ──
+function _pkRenderPageMapTableHtml(isAdmin){
+  var pages = (_pkState.serverPages||[]).slice();
+  pages.sort(function(a,b){ return String(a.pageName||a.pageId).localeCompare(String(b.pageName||b.pageId),'vi'); });
+  var kenhOpts = _pkState.kenhOptions || [];
+  var html = '<table class="dash-table"><thead><tr><th>Page Pancake</th><th>Kênh bán CRM</th></tr></thead><tbody>';
+  if (!pages.length){
+    html += '<tr><td colspan="2" style="text-align:center;color:var(--muted);padding:14px">Chưa có Page nào — nạp 1 file báo cáo tương tác hoặc SĐT để bắt đầu khớp.</td></tr>';
+  }
+  pages.forEach(function(p){
+    var cur = _pkState.pageMap[p.pageId] || '';
+    var label = p.pageName ? p.pageName + ' (' + p.pageId + ')' : p.pageId;
+    var cell;
+    if (isAdmin){
+      var opts = '<option value="">— Chưa khớp —</option>';
+      var list = kenhOpts.slice();
+      if (cur && list.indexOf(cur) === -1) list.push(cur); // giu ca gia tri da khop nhung khong con trong danh sach kenh hien tai
+      list.sort(function(a,b){ return a.localeCompare(b,'vi'); });
+      list.forEach(function(k){ opts += '<option value="'+esc(k)+'"'+(k===cur?' selected':'')+'>'+esc(k)+'</option>'; });
+      cell = '<select data-pid="'+esc(p.pageId)+'" data-pname="'+esc(p.pageName||'')+'" onchange="_pkSavePageMapInline(this)" style="padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);min-width:200px">'+opts+'</select>';
+    } else {
+      cell = esc(cur||'—');
+    }
+    html += '<tr><td>'+esc(label)+(cur?'':' <span style="color:#9a3412;font-size:11px">⚠️ chưa khớp</span>')+'</td><td>'+cell+'</td></tr>';
+  });
+  html += '</tbody></table>';
+  return html;
+}
+
+async function _pkSavePageMapInline(sel){
+  var pageId = sel.getAttribute('data-pid');
+  var pageName = sel.getAttribute('data-pname');
+  var kenhBan = sel.value;
+  if (!gsUrl){ toast('❌ Chưa cấu hình URL Google Apps Script.'); return; }
+  try {
+    var res = await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'savePancakePageMap', pageId:pageId, pageName:pageName, kenhBan:kenhBan }) });
+    var d = await res.json();
+    if (d.error) throw new Error(d.error);
+    _pkState.pageMap[pageId] = kenhBan;
+    logAudit('pancake_page_map','', '', 'Khớp Page "'+pageName+'" ('+pageId+') → Kênh bán "'+(kenhBan||'(bỏ khớp)')+'"');
+    toast('✓ Đã khớp Page "'+(pageName||pageId)+'" → "'+(kenhBan||'(bỏ khớp)')+'"');
+    _pkState.kpiReport = null; // ket qua Bao cao KPI tong hop cu co the sai -> yeu cau tinh lai
+  } catch(e){
+    toast('❌ Lỗi khớp Page: ' + e.message);
   }
 }
 
