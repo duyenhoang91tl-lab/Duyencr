@@ -21,6 +21,7 @@ var SH_PK_STATS = 'PancakeStats';   // thong ke tuong tac/chot don hang ngay, nh
 var SH_PK_MAP   = 'PancakeNameMap'; // khop ten "Nhan vien" hien thi tren Pancake <-> ten Sale chuan trong CRM
 var SH_PK_SDT   = 'PancakeSdtStats'; // thong ke SDT mang ve/don chot theo nhan vien+page, nhap tu file Excel Pancake xuat ("Thong ke nhan vien" - sheet "By staff")
 var SH_PK_PAGEMAP = 'PancakePageMap'; // khop pageId Pancake <-> gia tri "Kenh ban" chuan dung trong DT TONG
+var SH_PK_TAG   = 'PancakeTagStats'; // thong ke tag (L1-L7 trang thai, S/O sale) theo Page+ngay, nhap tu file Excel "Thong ke tag" Pancake xuat
 
 var ORDER_SS_ID = '1fiWXPMZcHuEh0zYqD6pgQjZDM0PhWzpiSK7Igj6Cug8'; // File chua OrderData2x (doanh thu/don hang)
 var CRM_SS_ID   = '18XBtbjP7gtlvYpChikF3B62cxHkR4426s5poZj9Mj8I'; // File chua CareData/Users/Teams/Settings/AuditLog/AssignData/AIContext (CRM).
@@ -103,6 +104,13 @@ var PK_SDT_STATS_HEADERS = ['date','pageId','pageName','nhanVien',
 // PK_PAGEMAP_HEADERS: khop 1-1 pageId Pancake -> gia tri "Kenh ban" chuan dang dung trong
 // DT TONG (cot M "kenhBan"), de ghep doanh thu/so don theo dung Page.
 var PK_PAGEMAP_HEADERS = ['pageId','pageName','kenhBan'];
+// PK_TAG_STATS_HEADERS: 1 dong = 1 tag trong 1 Page, 1 ngay — nhap tu file Excel "Thong ke tag"
+// (pages_statistics_tag) Pancake xuat. Khoa duy nhat = date+pageId+(tagId||tagName) -> nap lai
+// file CUNG 1 ngay se GHI DE (khong nhan doi), giong het co che PK_STATS_HEADERS. Phan loai
+// (sale/status/L1-L7) tinh LAI tu tagName moi lan tong hop bao cao (xem classifyPancakeTag_),
+// KHONG luu type/code tinh san, de quy chuan tay (setting 'pancakeTagOverride') ap dung duoc
+// ca cho du lieu cu da luu, giong het co che ben client (_pkTagAggregate trong index.html).
+var PK_TAG_STATS_HEADERS = ['date','pageId','pageName','tagId','tagName','count'];
 // ── KH "Chăm sóc" thêm nhanh (nút "+ Thêm KH/Đơn mới") — SHEET RIÊNG, không gộp
 // CareData/DT TỔNG/dữ liệu đơn, không gộp vào báo cáo doanh số A/B/C. ──
 var SH_CARE_LEAD      = 'KH Chăm sóc mới';
@@ -2781,6 +2789,85 @@ function savePancakePageMap_(pageId, pageName, kenhBan) {
   }
   sh.appendRow([pageId, pageName || '', kenhBan || '']);
   return jsonOut_({ ok: true, updated: false });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PANCAKE — THONG KE TAG (L1-L7 trang thai, S/O sale) theo Page+ngay — luu tren CRM
+//  (truoc day chi luu trinh duyet, lam Bao cao KPI tong hop khong doc duoc). Phan loai tag
+//  tinh LAI moi lan tong hop (khong tin type/code luc luu), CUNG LOGIC voi _pkClassifyTag
+//  ben client, de quy chuan tay (pancakeTagOverride) ap dung duoc ngay ca voi du lieu cu.
+// ═══════════════════════════════════════════════════════════════
+var PK_STATUS_CODES_ = ['L1','L2','L3','L4','L5','L5.1','L5.2','L6','L7'];
+
+function classifyPancakeTag_(name, overrideMap) {
+  var n = String(name || '').trim();
+  var ov = overrideMap && overrideMap[n];
+  if (ov && PK_STATUS_CODES_.indexOf(ov) !== -1) return { type: 'status', code: ov };
+  var m = n.match(/^([SO])\s*(\d+)(?!\d)/i);
+  if (m) return { type: 'sale', code: m[1].toUpperCase() + parseInt(m[2], 10) };
+  if (/^L\s*\d?\.?\s*ch[oờ]\s*ck/i.test(n) || /^L5\.1/i.test(n)) return { type: 'status', code: 'L5.1' };
+  if (/^L5\.2/i.test(n) || /^L\s*\d?\.?\s*ch[oờ]\s*l[eê]n/i.test(n)) return { type: 'status', code: 'L5.2' };
+  m = n.match(/^L\s*(\d)(?!\d)/i);
+  if (m) return { type: 'status', code: 'L' + m[1] };
+  return { type: 'other', code: '' };
+}
+
+function savePancakeTagStats_(rows) {
+  rows = rows || [];
+  if (!rows.length) return jsonOut_({ ok: true, written: 0 });
+  var sh = getSheet_(SH_PK_TAG, PK_TAG_STATS_HEADERS);
+  var lastRow = sh.getLastRow();
+
+  var touchedKeys = {};
+  rows.forEach(function(r) { touchedKeys[r.date + '|' + r.pageId + '|' + (r.tagId || r.tagName)] = true; });
+
+  var keep = [];
+  if (lastRow > 1) {
+    var existing = sh.getRange(2, 1, lastRow - 1, PK_TAG_STATS_HEADERS.length).getValues();
+    for (var i = 0; i < existing.length; i++) {
+      var k = existing[i][0] + '|' + existing[i][1] + '|' + (existing[i][3] || existing[i][4]);
+      if (!touchedKeys[k]) keep.push(existing[i]);
+    }
+  }
+
+  var newRows = rows.map(function(r) {
+    return [r.date || '', r.pageId || '', r.pageName || '', r.tagId || '', r.tagName || '', +r.count || 0];
+  });
+
+  sh.clearContents();
+  var matrix = [PK_TAG_STATS_HEADERS].concat(keep).concat(newRows);
+  sh.getRange(1, 1, matrix.length, PK_TAG_STATS_HEADERS.length).setValues(matrix);
+  return jsonOut_({ ok: true, written: newRows.length });
+}
+
+// Tong hop bao cao tag theo Page (khong theo Sale, vi tag Pancake chi gan o muc hoi thoai/Page,
+// khong co truong "Nhan vien" nhu 2 loai bao cao Pancake kia) — dung lam nguyen lieu cho
+// buildKpiReport_ (ty le L7/tongTT theo Page, va phe do L1->L6 tong the toan he thong).
+function buildPancakeTagReport_(from, to) {
+  var sh = getSheet_(SH_PK_TAG, PK_TAG_STATS_HEADERS);
+  var overrideMap = {};
+  try { var raw = getSetting_('pancakeTagOverride'); if (raw) overrideMap = JSON.parse(raw) || {}; } catch (e) {}
+
+  var byPage = {}; // pageId -> { pageName, L1..L7:0, ... }
+  var totals = {}; // L1..L7 tong toan he thong
+  PK_STATUS_CODES_.forEach(function(c) { totals[c] = 0; });
+
+  if (sh.getLastRow() >= 2) {
+    var v = sh.getRange(2, 1, sh.getLastRow() - 1, PK_TAG_STATS_HEADERS.length).getValues();
+    for (var i = 0; i < v.length; i++) {
+      var d = String(v[i][0]);
+      if (from && d < from) continue;
+      if (to && d > to) continue;
+      var pageId = String(v[i][1]), pageName = String(v[i][2]), tagName = String(v[i][4]), count = +v[i][5] || 0;
+      if (!count) continue;
+      var cls = classifyPancakeTag_(tagName, overrideMap);
+      if (cls.type !== 'status') continue; // chi quan tam nhom trang thai L1-L7 o day (nhom Sale da co bao cao rieng)
+      if (!byPage[pageId]) { byPage[pageId] = { pageId: pageId, pageName: pageName }; PK_STATUS_CODES_.forEach(function(c) { byPage[pageId][c] = 0; }); }
+      byPage[pageId][cls.code] += count;
+      if (totals[cls.code] !== undefined) totals[cls.code] += count;
+    }
+  }
+  return { byPage: byPage, totals: totals };
 }
 
 // ═══════════════════════════════════════════════════════════════
