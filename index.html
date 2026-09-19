@@ -5997,7 +5997,15 @@ function s(v){return v===null||v===undefined?'':v.toString().trim();}
 function parseNum(v){if(!v&&v!==0) return 0;const n=parseFloat(v.toString().replace(/[^\d.-]/g,''));return isNaN(n)?0:n;}
 // Chuẩn hoá doanh thu: một số đơn lưu ở đơn vị NGHÌN (vd 948 = 948.000đ).
 // Quy ước: doanh thu > 0 và < 1000 thì ×1000 (đơn dưới 1.000đ là không thực tế).
-function _normRev(v){ var n = parseNum(v); if (n > 0 && n < 1000) n = n * 1000; return n; }
+// Nếu ô là TEXT có dấu chấm/phẩy phân cách hàng nghìn hoặc ký hiệu tiền tệ (vd "1.234.567",
+// "1,234,567₫") thì bỏ hết các ký tự đó trước khi parse — parseFloat mặc định chỉ đọc tới dấu
+// chấm/phẩy THỨ HAI rồi dừng (vd "1.234.567" → chỉ ra 1.234 = sai hẳn), giống lỗi đã sửa ở
+// backend (_normMoney_ trong gas_v13.js) khi ô Google Sheet được định dạng Text.
+function _normRev(v){
+  var n = (typeof v === 'string') ? (parseFloat(v.replace(/[.,\s₫đĐ]/g,'')) || 0) : parseNum(v);
+  if (n > 0 && n < 1000) n = n * 1000;
+  return n;
+}
 function parseYear(v){if(v===null||v===undefined) return null;const n=parseFloat(v.toString());return isNaN(n)?null:(n<100?n:n-2000);}
 function parseDate(v){
   if(!v) return null;
@@ -12424,10 +12432,20 @@ function _computeCSStats(list, dFrom, dTo){
       if (c.zaloStatus === 'Đã kết bạn') m.friend++;
       if (c.careStatus && c.careStatus !== 'Chưa liên hệ') m.cared++;
     }
-    // doanh thu/đơn theo CS thực bán (order.cs)
+    // doanh thu/đơn theo CS thực bán (order.cs) — 1 đơn có thể nhiều sale (cách nhau dấu phẩy),
+    // tách từng tên rồi CHIA ĐỀU doanh thu cho N sale/đơn, số đơn giữ nguyên cho mỗi sale —
+    // đúng quy ước đang dùng ở Báo cáo A/B/C (buildSalesReportA_/B_/C_ trong gas_v13.js), để
+    // Dashboard không hiện số khác báo cáo doanh số khi có đơn nhiều sale.
     (c.orders||[]).forEach(function(o){
       if (!_dashOrderInRange(o, dFrom, dTo)) return;
-      if (o.cs){ var mm = ensure(o.cs); mm.revenue += (+o.revenue||0); mm.orders++; }
+      var salesOnOrder = splitSaleNames_(o.cs);
+      if (!salesOnOrder.length) return;
+      var n = salesOnOrder.length;
+      salesOnOrder.forEach(function(name){
+        var mm = ensure(name);
+        mm.revenue += (+o.revenue||0) / n;
+        mm.orders++;
+      });
     });
   });
   return map;
@@ -12554,23 +12572,32 @@ function _dashPivot(list, rowKey, colKey, metric) {
   var rows={}, cols={}, data={}, colTotals={}, rowTotals={};
   var khByCell={};  // for kh metric: unique phones
 
+  // Khi CS là 1 trong 2 chiều (hàng/cột), 1 đơn nhiều sale phải tách ra CHIA ĐỀU doanh thu
+  // cho từng tên (số đơn giữ nguyên) — đúng quy ước Báo cáo A/B/C, tránh Pivot hiện sai khi
+  // gộp nguyên chuỗi "sale1, sale2" thành 1 "tên CS" ảo và cộng nguyên doanh thu vào đó.
+  var rowIsCS = rowKey === 'cs', colIsCS = colKey === 'cs';
   list.forEach(function(c){
     c.orders.forEach(function(o){
-      var r=rFn(o,c), cl=cFn(o,c);
-      rows[r]=true; cols[cl]=true;
-      var k=r+'|'+cl;
-      if (metric==='kh'){
-        if(!khByCell[k]) khByCell[k]=new Set();
-        khByCell[k].add(c.phone);
-      } else {
-        data[k]=(data[k]||0)+mFn(o,c);
-        colTotals[cl]=(colTotals[cl]||0)+mFn(o,c);
-        rowTotals[r]=(rowTotals[r]||0)+mFn(o,c);
-      }
+      var n = splitSaleNames_(o.cs).length || 1;
+      var rKeys = rowIsCS ? (splitSaleNames_(o.cs).length ? splitSaleNames_(o.cs) : ['—']) : [rFn(o,c)];
+      var cKeys = colIsCS ? (splitSaleNames_(o.cs).length ? splitSaleNames_(o.cs) : ['—']) : [cFn(o,c)];
+      rKeys.forEach(function(r){
+        cKeys.forEach(function(cl){
+          rows[r]=true; cols[cl]=true;
+          var k=r+'|'+cl;
+          if (metric==='kh'){
+            if(!khByCell[k]) khByCell[k]=new Set();
+            khByCell[k].add(c.phone);
+          } else {
+            var v = mFn(o,c);
+            if (metric === 'revenue' && (rowIsCS || colIsCS)) v = v / n; // chia đều tiền cho N sale/đơn
+            data[k]=(data[k]||0)+v;
+            colTotals[cl]=(colTotals[cl]||0)+v;
+            rowTotals[r]=(rowTotals[r]||0)+v;
+          }
+        });
+      });
     });
-    if (metric==='kh'){
-      // also ensure row/col from tier if needed
-    }
   });
 
   if (metric==='kh'){
