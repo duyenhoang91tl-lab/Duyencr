@@ -22,7 +22,7 @@ var SH_PK_MAP   = 'PancakeNameMap'; // khop ten "Nhan vien" hien thi tren Pancak
 
 var ORDER_SS_ID = '1fiWXPMZcHuEh0zYqD6pgQjZDM0PhWzpiSK7Igj6Cug8'; // File chua OrderData2x (doanh thu/don hang)
 var CRM_SS_ID   = '18XBtbjP7gtlvYpChikF3B62cxHkR4426s5poZj9Mj8I'; // File chua CareData/Users/Teams/Settings/AuditLog/AssignData/AIContext (CRM).
-var PRICE_SS_ID    = '1Tfn2jOH20kv0Z-cb0BULqPuxZTap9FA3z8bXeeRl5l4'; // File "Bang gia" rieng (Danh_muc/Tinh_tien/Ghi_chu_chinh_sach)
+var PRICE_SS_ID    = '1I4wr226_QUJuCZSKASsxXxOjloCW9UtpYz87TSy-Ldk'; // File "Bang gia" moi (Danh_muc/Tinh_tien/Ghi_chu_chinh_sach) - cap nhat 2026-09
 var PRICE_SHEET_NAME = 'DANH_MUC'; // Sheet dang bang phang, de tra cuu/loc
 var CTKM_SHEET_NAME  = 'CTKM'; // Sheet CTKM (cung file PRICE_SS_ID) — doi ten hang duoi neu ten tab thuc te khac
                         // De trong = dung file dang gan Apps Script nay (mac dinh, hanh vi cu).
@@ -276,17 +276,35 @@ function _priceFieldPick_(row, kws) {
   return null;
 }
 
-// Gom TAT CA cot gia co gia tri cua 1 dong (G = gia thuong, H = SAPHIA, I = RUBY...)
-function _priceAllPrices_(row) {
-  var out = [];
+// Gom cot gia cua 1 dong, LOC theo loai da khach hoi (stoneFilter: '' | 'SAPHIA' | 'RUBY'):
+// - stoneFilter rong (khach/sale KHONG nhac SAPHIA/RUBY) -> CHI lay cot gia MAC DINH (cot
+//   khong co chu "saphia"/"ruby" trong ten, tuc cot G "Gia thuong") — day la quy tac Duyen
+//   yeu cau 22/8/2026: khong ghi ro loai da thi luon bao gia mac dinh, KHONG liet ke ca
+//   SAPHIA/RUBY gay roi.
+// - stoneFilter = 'SAPHIA'/'RUBY' -> chi lay dung cot do; neu dong nay khong co gia rieng
+//   cho loai da đo (vd san pham chi co gia thuong) thi lui ve gia mac dinh kem chu thich.
+function _priceAllPrices_(row, stoneFilter) {
+  var defaultPrices = [], saphiaPrice = null, rubyPrice = null;
   for (var k in row) {
     var nk = _stripVN_(k);
     if (nk.indexOf('gia') === -1 && nk.indexOf('price') === -1) continue;
     var v = row[k];
     if (v === '' || v === null || v === undefined) continue;
-    out.push(String(k).replace(/\s*\(.*?\)\s*/g, '').trim() + ': ' + v);
+    var label = String(k).replace(/\s*\(.*?\)\s*/g, '').trim() + ': ' + v;
+    if (nk.indexOf('saphia') !== -1) saphiaPrice = label;
+    else if (nk.indexOf('ruby') !== -1) rubyPrice = label;
+    else defaultPrices.push(label);
   }
-  return out;
+  if (stoneFilter === 'SAPHIA') {
+    if (saphiaPrice) return [saphiaPrice];
+    return defaultPrices.length ? [defaultPrices[0] + ' (sản phẩm này không có giá riêng cho SAPHIA)'] : [];
+  }
+  if (stoneFilter === 'RUBY') {
+    if (rubyPrice) return [rubyPrice];
+    return defaultPrices.length ? [defaultPrices[0] + ' (sản phẩm này không có giá riêng cho RUBY)'] : [];
+  }
+  // Khong ro loai da -> CHI gia mac dinh, khong dua SAPHIA/RUBY vao de tranh AI bao nham
+  return defaultPrices;
 }
 
 function _priceVariantsForPrompt_(userMsg) {
@@ -302,7 +320,15 @@ function _priceVariantsForPrompt_(userMsg) {
   } catch (e) { return ''; }
   if (!rows || !rows.length) return '';
 
-  var toks = _stripVN_(userMsg).replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+  // Loai da khach/sale nhac toi (tu tin nhan, ngu canh, hoac o tick "Loai da" ben Pancake AI
+  // extension gui kem duoi dang "Loại đá khách hỏi: SAPHIA/RUBY" trong [KH]) — QUYET DINH
+  // cot gia nao duoc dua vao bang duoi day (xem _priceAllPrices_).
+  var stripped = _stripVN_(userMsg);
+  var stoneFilter = '';
+  if (stripped.indexOf('saphia') !== -1) stoneFilter = 'SAPHIA';
+  else if (stripped.indexOf('ruby') !== -1) stoneFilter = 'RUBY';
+
+  var toks = stripped.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
     .filter(function (w) { return w.length >= 3 && _PRICE_STOPWORDS_.indexOf(w) === -1; });
   if (!toks.length) return '';
 
@@ -344,7 +370,7 @@ function _priceVariantsForPrompt_(userMsg) {
       if (_stripVN_(fn.val) !== nk2) continue;
       var mat = _priceFieldPick_(rr, ['chat lieu']);
       var sz = _priceFieldPick_(rr, ['kieu', 'size']);
-      var prices = _priceAllPrices_(rr);
+      var prices = _priceAllPrices_(rr, stoneFilter);
       if (!prices.length) continue;
       variants.push('- Chất liệu: ' + ((mat && mat.val) ? mat.val : '(không ghi)') +
                     ' | Kiểu/Size: ' + ((sz && sz.val) ? sz.val : '(mặc định)') +
@@ -724,6 +750,7 @@ function doGet(e) {
                  dateField: pA.dateField || 'ngayTao',
                  sale: pA.sale ? pA.sale.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [],
                  kenh: pA.kenh ? pA.kenh.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [],
+                 sanPham: pA.sanPham || '',
                  byCreator: pA.byCreator === '1' || pA.byCreator === 'true' };
       var cacheA = CacheService.getScriptCache();
       var cKeyA = 'salesA_' + JSON.stringify(fA);
@@ -737,7 +764,10 @@ function doGet(e) {
       var pB = e.parameter || {};
       var splitCSV_ = function(s){ return s ? s.split(',').map(function(x){return x.trim();}).filter(function(x){return x;}) : []; };
       var fB = { dateFrom: pB.dateFrom || '', dateTo: pB.dateTo || '',
-                 sale: splitCSV_(pB.sale), nguon: splitCSV_(pB.nguon), marketer: splitCSV_(pB.marketer) };
+                 sale: splitCSV_(pB.sale), nguon: splitCSV_(pB.nguon), marketer: splitCSV_(pB.marketer),
+                 sanPham: pB.sanPham || '',
+                 careStatus: splitCSV_(pB.careStatus), khStatus: splitCSV_(pB.khStatus),
+                 zaloStatus: splitCSV_(pB.zaloStatus), nickZalo: pB.nickZalo || '' };
       var cacheB = CacheService.getScriptCache();
       var cKeyB = 'salesB_' + JSON.stringify(fB);
       var cachedB = cacheB.get(cKeyB);
@@ -756,7 +786,8 @@ function doGet(e) {
                  customCurFrom: pC.customCurFrom || '', customCurTo: pC.customCurTo || '',
                  customPrevFrom: pC.customPrevFrom || '', customPrevTo: pC.customPrevTo || '',
                  sale: pC.sale ? pC.sale.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [],
-                 kenh: pC.kenh ? pC.kenh.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [] };
+                 kenh: pC.kenh ? pC.kenh.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [],
+                 sanPham: pC.sanPham || '' };
       var cacheC = CacheService.getScriptCache();
       var cKeyC = 'salesC_' + JSON.stringify(fC);
       var cachedC = cacheC.get(cKeyC);
@@ -1383,6 +1414,7 @@ function buildSalesReportA_(filters) {
     : (filters.sale ? [String(filters.sale).trim()] : []);
   var kenhFilterArr = Array.isArray(filters.kenh) ? filters.kenh.filter(function(s){return s;})
     : (filters.kenh ? [String(filters.kenh).trim()] : []);
+  var sanPhamTerms = _foldTermsCSV_(filters.sanPham);
   // Tich UI "Tinh theo nguoi tao don": KHONG chia deu doanh thu/so don cho tung sale tren don
   // nua, ma tinh TRON VEN cho DUNG 1 nguoi — lay tu cot "Người tạo" that su cua DT TONG (khac
   // voi "Sale bán", co the co nhieu ten). Bo tich (mac dinh): giu nguyen cach chia deu cu.
@@ -1397,6 +1429,7 @@ function buildSalesReportA_(filters) {
     if (kenhFilterArr.length && kenhFilterArr.indexOf(row.kenhBan) === -1) continue;
     var salesOnOrder = splitMulti_(row.saleBan, ',');
     if (saleFilterArr.length && !salesOnOrder.some(function(s){ return saleFilterArr.indexOf(s) !== -1; })) continue;
+    if (!_pMatchAny_(row.sanPham, sanPhamTerms)) continue;
     matched.push(row);
   }
 
@@ -1477,7 +1510,16 @@ function buildSalesReportB_(filters) {
   var saleFilterArr = toArr(filters.sale);
   var nguonFilterArr = toArr(filters.nguon);
   var marketerFilterArr = toArr(filters.marketer);
+  var careStatusArr = toArr(filters.careStatus);
+  var khStatusArr = toArr(filters.khStatus);
+  var zaloStatusArr = toArr(filters.zaloStatus);
+  var sanPhamTerms = _foldTermsCSV_(filters.sanPham);
+  var nickZaloTerm = filters.nickZalo ? _psheetNoAccent_(String(filters.nickZalo).trim()) : '';
   var UNASSIGNED = '(chưa gán sale)';
+
+  // Chi doc CareData khi thuc su co loc theo CRM — tranh doc them 1 sheet khi khong can.
+  var needCare = careStatusArr.length || khStatusArr.length || zaloStatusArr.length || nickZaloTerm;
+  var careMap = needCare ? _careMapByPhone_() : null;
 
   var rows = readDonChiTiet_();
   var matched = [];
@@ -1492,6 +1534,18 @@ function buildSalesReportB_(filters) {
       var hit = false;
       for (var si = 0; si < saleFilterArr.length; si++) { if (salesOnRow.indexOf(saleFilterArr[si]) !== -1) { hit = true; break; } }
       if (!hit) continue;
+    }
+    if (!_pMatchAny_(row.sanPham, sanPhamTerms)) continue;
+    if (needCare) {
+      var care = careMap[normPhone_(row.soDienThoai)] || null;
+      if (careStatusArr.length && !(care && careStatusArr.indexOf(care.status) !== -1)) continue;
+      if (khStatusArr.length && !(care && khStatusArr.indexOf(care.khStatus) !== -1)) continue;
+      if (zaloStatusArr.length && !(care && zaloStatusArr.indexOf(care.zalo) !== -1)) continue;
+      if (nickZaloTerm) {
+        var nicks = (care && care.nickZalos) || [];
+        var nickHit = nicks.some(function(n){ return _psheetNoAccent_(n).indexOf(nickZaloTerm) !== -1; });
+        if (!nickHit) continue;
+      }
     }
     matched.push(row);
   }
@@ -1706,6 +1760,7 @@ function buildSalesReportC_(filters) {
   var UNASSIGNED = '(chưa gán sale)';
   var saleFilterArr = Array.isArray(filters.sale) ? filters.sale.filter(function(s){return s;}) : [];
   var kenhFilterArr = Array.isArray(filters.kenh) ? filters.kenh.filter(function(s){return s;}) : [];
+  var sanPhamTerms = _foldTermsCSV_(filters.sanPham);
 
   var rows = readDTTong_();
   // Gom theo entity rieng cho tung ky (cur/prev), dung dung logic chia tien theo N sale/don
@@ -1720,6 +1775,7 @@ function buildSalesReportC_(filters) {
       if (kenhFilterArr.length && kenhFilterArr.indexOf(row.kenhBan) === -1) continue;
       var salesOnRow = splitMulti_(row.saleBan, ',');
       if (saleFilterArr.length && !salesOnRow.some(function(s){ return saleFilterArr.indexOf(s) !== -1; })) continue;
+      if (!_pMatchAny_(row.sanPham, sanPhamTerms)) continue;
       matchedOrders.push(row);
       var kName = row.kenhBan || '(chưa có kênh)';
       byKenh[kName] = (byKenh[kName] || 0) + row.giaTriDon;
@@ -2696,6 +2752,31 @@ function _psheetNoAccent_(s) {
     .replace(/đ/g, 'd');
 }
 
+// Map SDT (da normPhone_) -> care object day du (status, khStatus, zalo, nickZalos...) —
+// dung de loc Bao cao B theo tieu chi CRM (chi B co cot SDT trong "dữ liệu đơn").
+function _careMapByPhone_() {
+  var rows = readCare_(getCrmSS_().getSheetByName(SH_CARE));
+  var map = {};
+  for (var i = 0; i < rows.length; i++) {
+    var ph = normPhone_(rows[i].phone);
+    if (ph) map[ph] = rows[i];
+  }
+  return map;
+}
+// Khop 1 chuoi voi bat ky tu khoa nao trong danh sach (khong dau, khong phan biet hoa/thuong).
+// terms rong -> coi nhu KHONG loc (tra ve true).
+function _pMatchAny_(text, foldedTerms) {
+  if (!foldedTerms || !foldedTerms.length) return true;
+  var t = _psheetNoAccent_(text || '');
+  for (var i = 0; i < foldedTerms.length; i++) {
+    if (foldedTerms[i] && t.indexOf(foldedTerms[i]) !== -1) return true;
+  }
+  return false;
+}
+function _foldTermsCSV_(s) {
+  return s ? String(s).split(',').map(function(x){ return _psheetNoAccent_(x.trim()); }).filter(function(x){ return x; }) : [];
+}
+
 function _productSheetIndexForTab_(ss, tabName) {
   var cacheKey = 'ext_idx_v2_' + tabName;
   try {
@@ -3232,7 +3313,7 @@ function _buildAISystemPrompt_(userMsg, withProducts) {
       '- Neu sale/khach DA noi ro chat lieu va size: chi bao dung 1 muc gia khop nhat.\n' +
       '- Neu KHONG ghi ro chat lieu hoac size: PHAI liet ke DAY DU TAT CA cac truong hop tim thay o tren, moi dong ghi ro chat lieu + kieu/size + gia tuong ung, roi hoi lai khach muon loai nao. KHONG duoc tu chon 1 muc gia roi bo qua cac muc con lai.\n' +
       '- Gia trong bang tinh bang NGHIN VND (vd 2.310 = 2.310.000d). Khi bao gia cho khach hay quy ra dong cho de hieu.\n' +
-      '- Neu san pham co them cot gia SAPHIA/RUBY thi neu ro do la gia cua loai da tuong ung.');
+      '- Ve loai da (SAPHIA/RUBY): bang gia o tren DA duoc loc san dung theo yeu cau — neu khach/sale KHONG nhac SAPHIA hay RUBY thi bang chi con gia MAC DINH (cot G), cu the vay ma bao, KHONG tu suy dien hay hoi lai ve loai da. Neu co nhac SAPHIA/RUBY thi bang chi con dung gia loai da do, neu ro do la gia loai da tuong ung.');
   }
   if (hasMultiVariant) {
     parts.push('\n\nYEU CAU: Tra loi bang tieng Viet, than thien. Vi co NHIEU lua chon chat lieu/size, hay liet ke DU cac lua chon (moi lua chon 1 dong ngan: chat lieu - size - gia), sau do hoi khach chon loai nao. Khong dai dong ngoai phan bao gia.');

@@ -63,3 +63,28 @@ gì hành vi/danh sách trạng thái bên Pancake:
   CRM dùng chung) qua action `getKnowledge` mới thêm ở `gas_v13.js` — cache 20 phút trên máy CS
   (`chrome.storage.local`), không gọi Sheet mỗi tin nhắn. CS sửa trực tiếp 2 sheet này trên Google
   Sheets (không cần sửa code) để cập nhật mẫu/mệnh mới nhất.
+
+## Nhập giá theo nghìn (k) trong "🧾 Đơn hàng đang tính"
+
+Tính năng giỏ hàng tạm (`#pk-cart-section`, dùng chung cho mọi nền tảng) đã có sẵn tính tổng
+Số lượng × Đơn giá + giảm giá/freeship + nút Sao chép đơn hàng — không cần làm lại. Chỉ thêm 1
+checkbox nhỏ **"Nhập giá theo nghìn (k)"** ở đầu khung giỏ hàng: khi bật, ô Đơn giá của từng dòng
+hiển thị/nhận số theo đơn vị nghìn (gõ `2800` = 2.800.000đ) thay vì phải gõ đủ số 0 — dữ liệu lưu
+trong storage và mọi phép tính (tổng, giảm giá, đơn hàng sao chép) vẫn luôn ở đơn vị đồng đầy đủ
+như cũ, chỉ đổi cách hiển thị/nhập tại ô đó. Mặc định tắt, không ảnh hưởng cách dùng hiện tại.
+
+## Chất liệu / Màu sắc / Size trong giỏ hàng
+
+M��i dòng sản phẩm trong "🧾 Đơn hàng đang tính" giờ có thêm 3 ô nhỏ **Chất liệu / Màu sắc / Size**
+(áp dụng cho cả dòng thêm thủ công lẫn dòng thêm từ tra bảng giá). Khi bấm "+ Thêm" từ kết quả tra
+bảng giá, hệ thống tự dò cột `Chất liệu` / `Màu`/`Màu sắc` / `Size`/`Kiểu` trong DANH_MUC (nếu có)
+để điền sẵn — không có cột nào khớp thì để trống, Sale tự gõ. Khi bấm "📋 Sao chép đơn hàng", 3 chi
+tiết này được ghép vào ngay sau tên sản phẩm, ví dụ: `Vòng tay ngọc bích (Ngọc bích, Xanh, 8li) x2
+— 2.800.000đ`.
+
+## File bảng giá (PRICE_SS_ID)
+
+Đã cập nhật `gas_v13.js` trỏ sang file bảng giá mới:
+https://docs.google.com/spreadsheets/d/1I4wr226_QUJuCZSKASsxXxOjloCW9UtpYz87TSy-Ldk — vẫn giữ đúng
+tên sheet `DANH_MUC` như cũ nên không cần đổi gì khác trong code; đơn vị giá trong file này là
+NGHÌN VNĐ, hợp với toggle "Nhập giá theo nghìn (k)" ở mục trên.

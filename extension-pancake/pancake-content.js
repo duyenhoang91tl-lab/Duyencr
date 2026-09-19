@@ -92,6 +92,7 @@
   ];
   let _activeTone = 'Thân thiện';
   let _useProducts = false;
+  let _stonePref = ''; // '' = mac dinh (cot G) | 'SAPHIA' | 'RUBY' — luu sticky, khoi phai go lai moi lan
   let CS_NAMES = [];
   let NICK_LIST = [];
   let CARE_STATUS_TREE = null; // cay "Tinh trang CS" load dong tu GAS (dong bo voi appweb/Zalo AI)
@@ -282,25 +283,34 @@
         </div>
         <div id="pk-ai-customer"></div>
 
-        <div id="pk-rem-section">
-          <div id="pk-rem-header">
-            <span>⏰ Nhắc hẹn hôm nay (<span id="pk-rem-count">0</span>)</span>
-            <button id="pk-rem-refresh" title="Tải lại">🔄</button>
+        <div id="pk-menu-wrap">
+          <select id="pk-menu-sel">
+            <option value="">— Chọn mục —</option>
+            <option value="rem">⏰ Nhắc hẹn hôm nay (0)</option>
+            <option value="price">💰 Tra cứu bảng giá</option>
+          </select>
+          <div id="pk-menu-content">
+            <div id="pk-rem-body" style="display:none">
+              <div id="pk-rem-toolbar"><button id="pk-rem-refresh" title="Tải lại">🔄 Tải lại</button></div>
+              <div id="pk-rem-list"></div>
+            </div>
+            <div id="pk-price-body" style="display:none">
+              <div id="pk-price-row">
+                <input type="text" id="pk-price-q" placeholder="Tên sản phẩm, kiểu/size..." />
+                <button id="pk-price-btn">Tìm</button>
+              </div>
+              <div id="pk-price-result"></div>
+            </div>
           </div>
-          <div id="pk-rem-list"></div>
-        </div>
-
-        <div id="pk-price-section">
-          <div id="pk-price-header">💰 Tra cứu bảng giá</div>
-          <div id="pk-price-row">
-            <input type="text" id="pk-price-q" placeholder="Tên sản phẩm, kiểu/size..." />
-            <button id="pk-price-btn">Tìm</button>
-          </div>
-          <div id="pk-price-result"></div>
         </div>
 
         <div id="pk-cart-section" style="display:none">
-          <div id="pk-cart-header">🧾 Đơn hàng đang tính (<span id="pk-cart-count">0</span>)</div>
+          <div id="pk-cart-header" style="display:flex;justify-content:space-between;align-items:center">
+            <span>🧾 Đơn hàng đang tính (<span id="pk-cart-count">0</span>)</span>
+            <label style="font-size:10.5px;font-weight:400;color:#831843;display:flex;align-items:center;gap:3px">
+              <input type="checkbox" id="pk-cart-price-k" /> Nhập giá theo nghìn (k)
+            </label>
+          </div>
           <div id="pk-cart-list"></div>
           <div id="pk-cart-addrow">
             <button id="pk-cart-add-manual" title="Thêm 1 dòng sản phẩm tự nhập (khi hệ thống tính sai hoặc không tra được)">＋ Thêm dòng thủ công</button>
@@ -349,6 +359,12 @@
           <input type="checkbox" id="pk-use-products-chk" />
           <span>🔍 <b>Tra cứu sản phẩm</b> (nạp dữ liệu Google Sheet để tư vấn kỹ thành phần/công dụng)</span>
         </label>
+        <div class="pk-stone-row" id="pk-stone-row" title="Không tick gì = báo giá mặc định (cột G). Tick 1 loại nếu khách hỏi đá SAPHIA/RUBY — nhớ luôn cho lần sau, khỏi phải gõ lại.">
+          <span class="pk-stone-label">💎 Loại đá:</span>
+          <label><input type="radio" name="pk-stone" id="pk-stone-none" value="" checked /> Mặc định</label>
+          <label><input type="radio" name="pk-stone" id="pk-stone-saphia" value="SAPHIA" /> SAPHIA</label>
+          <label><input type="radio" name="pk-stone" id="pk-stone-ruby" value="RUBY" /> RUBY</label>
+        </div>
         <button id="pk-opener-btn" class="pk-opener-btn">💬 Tạo 3 câu mở đầu đa dạng (mua hàng + chat)</button>
 
         <div id="pk-ai-suggestions"></div>
@@ -404,6 +420,12 @@
       setStatus(`🔗 Đã liên kết đoạn chat này với ${_currentPhone} — lần sau tự nhận diện.`);
     });
     panelEl.querySelector("#pk-add-new-btn").addEventListener("click", quickAddNewCustomer_);
+    panelEl.querySelector("#pk-menu-sel").addEventListener("change", (e) => {
+      const v = e.target.value;
+      panelEl.querySelector("#pk-rem-body").style.display = v === "rem" ? "block" : "none";
+      panelEl.querySelector("#pk-price-body").style.display = v === "price" ? "block" : "none";
+      if (v === "rem") loadReminders_();
+    });
     panelEl.querySelector("#pk-rem-refresh").addEventListener("click", () => loadReminders_());
     panelEl.querySelector("#pk-price-btn").addEventListener("click", doPriceSearch_);
     panelEl.querySelector("#pk-price-q").addEventListener("keydown", (e) => {
@@ -432,6 +454,9 @@
     panelEl.querySelector('#pk-cart-freeship').addEventListener('change', (e) => {
       _cartExtra.freeship = e.target.checked; saveCart_(); _renderCartTotal_();
     });
+    panelEl.querySelector('#pk-cart-price-k').addEventListener('change', (e) => {
+      _cartExtra.priceInK = e.target.checked; saveCart_(); renderCart_(); // render lai de doi hien thi cac dong gia da co
+    });
     panelEl.querySelector('#pk-cart-copy').addEventListener('click', () => {
       const text = _buildCartSummaryText_();
       if (!text.trim()) { setStatus('Chưa có sản phẩm nào được tick trong đơn.'); return; }
@@ -443,7 +468,7 @@
       if (!_cartItems.length) return;
       if (!confirm('Xoá toàn bộ đơn hàng đang tính cho khách này?')) return;
       _cartItems = [];
-      _cartExtra = { gift: '', discountType: 'none', discountValue: 0, freeship: false };
+      _cartExtra = { gift: '', discountType: 'none', discountValue: 0, freeship: false, priceInK: false };
       saveCart_(); renderCart_();
     });
     if (IS_PHONGTHUY) {
@@ -467,6 +492,19 @@
     prodChk.checked = !!settings.useProducts;
     prodChk.addEventListener("change", () => { _useProducts = prodChk.checked; });
     _useProducts = prodChk.checked;
+    // Loai da (SAPHIA/RUBY) — sticky theo may qua chrome.storage.sync, khong phai tick lai moi lan
+    chrome.storage.sync.get(['stonePref'], (res) => {
+      _stonePref = res.stonePref || '';
+      const target = panelEl.querySelector(`input[name="pk-stone"][value="${_stonePref}"]`);
+      if (target) target.checked = true;
+    });
+    panelEl.querySelectorAll('input[name="pk-stone"]').forEach((r) => {
+      r.addEventListener('change', () => {
+        if (!r.checked) return;
+        _stonePref = r.value;
+        chrome.storage.sync.set({ stonePref: _stonePref });
+      });
+    });
     panelEl.querySelector("#pk-opener-btn").addEventListener("click", doGenerateOpeners_);
   }
 
@@ -1378,10 +1416,13 @@
   }
 
   function renderReminders_() {
-    const countEl = panelEl?.querySelector('#pk-rem-count');
     const listEl = panelEl?.querySelector('#pk-rem-list');
-    if (!countEl || !listEl) return;
-    countEl.textContent = String(_reminders.length);
+    const menuSel = panelEl?.querySelector('#pk-menu-sel');
+    if (!listEl) return;
+    if (menuSel) {
+      const opt = [...menuSel.options].find(o => o.value === 'rem');
+      if (opt) opt.textContent = '⏰ Nhắc hẹn hôm nay (' + _reminders.length + ')';
+    }
     if (!_reminders.length) {
       listEl.innerHTML = '<div class="pk-rem-empty">Không có nhắc hẹn hôm nay 🎉</div>';
       return;
@@ -1428,6 +1469,18 @@
   // ── TRA CỨU BẢNG GIÁ (Sheet DANH_MUC) ──
   // Khong hardcode ten cot: hien thi dung cac cot ma sheet dang co, uu tien cot co
   // chua chu "gia"/"price" len dau tien cho de nhin, con lai xep sau.
+  // Bo dau tieng Viet (ban rut gon, dung o frontend) de nhan dien cot Chat lieu/Mau/Size trong
+  // DANH_MUC du ten cot the nao (co dau/khong dau, hoa/thuong) — dong bo tinh than voi _stripVN_
+  // ben gas_v13.js nhung khong goi sang duoc (chay o content script rieng).
+  function _stripVNlocal_(s) {
+    if (!s) return '';
+    s = String(s).toLowerCase();
+    s = s.replace(/[àáạảãâầấậẩẫăằắặẳẵ]/g, 'a').replace(/[èéẹẻẽêềếệểễ]/g, 'e')
+      .replace(/[ìíịỉĩ]/g, 'i').replace(/[òóọỏõôồốộổỗơờớợởỡ]/g, 'o')
+      .replace(/[ùúụủũưừứựửữ]/g, 'u').replace(/[ỳýỵỷỹ]/g, 'y').replace(/đ/g, 'd');
+    return s;
+  }
+
   function doPriceSearch_() {
     const q = (panelEl.querySelector('#pk-price-q').value || '').trim();
     const box = panelEl.querySelector('#pk-price-result');
@@ -1452,6 +1505,11 @@
       // Ten san pham: uu tien cot "ten san pham"/"ten thuong mai", khong co thi lay cot dau tien
       const nameKey = otherKeys.find((k) => /ten\s*san\s*pham|ten\s*thuong\s*mai/i.test(k)) || otherKeys[0] || '';
       const name = nameKey ? String(row[nameKey]) : ('Sản phẩm ' + (idx + 1));
+      // Tu nhan dien cot Chat lieu/Mau/Size (neu DANH_MUC co) de dien san vao 3 o moi khi bam "+ Thêm",
+      // Sale khong phai go lai tay; khong co cot nao thi de trong, Sale tu dien.
+      const chatLieuKey = otherKeys.find((k) => _stripVNlocal_(k).indexOf('chat lieu') !== -1);
+      const mauKey = otherKeys.find((k) => { const s = _stripVNlocal_(k); return s === 'mau' || s === 'mau sac' || /(^|\s)mau($|\s)/.test(s); });
+      const sizeKey = otherKeys.find((k) => { const s = _stripVNlocal_(k); return s.indexOf('size') !== -1 || s.indexOf('kieu') !== -1; });
       const noteKey = otherKeys.filter((k) => k !== nameKey).map((k) => `${k}: ${row[k]}`).join(', ');
       // Neu co nhieu cot gia (VD thuong/SAPHIA/RUBY) -> moi cot gia la 1 lua chon them-vao-don rieng,
       // vi don gia khac nhau theo loai da; chi 1 cot gia thi 1 nut "+ Them" duy nhat.
@@ -1459,9 +1517,9 @@
         ? priceKeys.map((pk) => {
             const priceNum = _parsePriceNum_(row[pk]);
             const label = priceKeys.length > 1 ? pk.replace(/\s*\(.*?\)\s*/g, '').trim() : '+ Thêm';
-            return `<button class="pk-price-addbtn" data-name="${escapeHtml(name)}" data-note="${escapeHtml(noteKey)}" data-price="${priceNum}" data-pricelabel="${escapeHtml(pk)}">${escapeHtml(label)}${priceKeys.length > 1 ? ' ' + escapeHtml(String(row[pk])) : ''}</button>`;
+            return `<button class="pk-price-addbtn" data-name="${escapeHtml(name)}" data-note="${escapeHtml(noteKey)}" data-price="${priceNum}" data-pricelabel="${escapeHtml(pk)}" data-chatlieu="${escapeHtml(chatLieuKey ? row[chatLieuKey] : '')}" data-mausac="${escapeHtml(mauKey ? row[mauKey] : '')}" data-size="${escapeHtml(sizeKey ? row[sizeKey] : '')}">${escapeHtml(label)}${priceKeys.length > 1 ? ' ' + escapeHtml(String(row[pk])) : ''}</button>`;
           }).join('')
-        : `<button class="pk-price-addbtn" data-name="${escapeHtml(name)}" data-note="${escapeHtml(noteKey)}" data-price="0" data-pricelabel="">+ Thêm (chưa có giá)</button>`;
+        : `<button class="pk-price-addbtn" data-name="${escapeHtml(name)}" data-note="${escapeHtml(noteKey)}" data-price="0" data-pricelabel="" data-chatlieu="${escapeHtml(chatLieuKey ? row[chatLieuKey] : '')}" data-mausac="${escapeHtml(mauKey ? row[mauKey] : '')}" data-size="${escapeHtml(sizeKey ? row[sizeKey] : '')}">+ Thêm (chưa có giá)</button>`;
       return `<div class="pk-price-item">${otherKeys.map(line).join(' ')}${priceKeys.length ? '<div class="pk-price-amount">' + priceKeys.map(line).join(' · ') + '</div>' : ''}<div class="pk-price-addrow">${addBtns}</div></div>`;
     }).join('');
     box.querySelectorAll('.pk-price-addbtn').forEach((btn) => {
@@ -1470,6 +1528,9 @@
           name: btn.dataset.name,
           note: btn.dataset.note + (btn.dataset.pricelabel ? (btn.dataset.note ? ' · ' : '') + 'Loại giá: ' + btn.dataset.pricelabel : ''),
           price: Number(btn.dataset.price) || 0,
+          chatLieu: btn.dataset.chatlieu || '',
+          mauSac: btn.dataset.mausac || '',
+          size: btn.dataset.size || '',
           qty: 1
         });
       });
@@ -1489,7 +1550,7 @@
   // Luu theo TUNG SDT khach (chrome.storage.local, rieng may nay) de doi qua lai giua cac
   // doan chat khac nhau khong bi lan/mat don dang tinh do.
   let _cartItems = [];
-  let _cartExtra = { gift: '', discountType: 'none', discountValue: 0, freeship: false };
+  let _cartExtra = { gift: '', discountType: 'none', discountValue: 0, freeship: false, priceInK: false };
   let _cartLoadedFor = null;
 
   function _cartKey_(phone) { return 'pkCart_' + (phone || '_no_phone_'); }
@@ -1500,7 +1561,7 @@
     chrome.storage.local.get([key], (res) => {
       const saved = res[key] || { items: [], extra: { gift: '', discountType: 'none', discountValue: 0, freeship: false } };
       _cartItems = saved.items || [];
-      _cartExtra = Object.assign({ gift: '', discountType: 'none', discountValue: 0, freeship: false }, saved.extra || {});
+      _cartExtra = Object.assign({ gift: '', discountType: 'none', discountValue: 0, freeship: false, priceInK: false }, saved.extra || {});
       _cartLoadedFor = key;
       renderCart_();
     });
@@ -1518,6 +1579,9 @@
       note: item.note || '',
       qty: item.qty || 1,
       price: item.price || 0,
+      chatLieu: item.chatLieu || '',
+      mauSac: item.mauSac || '',
+      size: item.size || '',
       checked: true
     });
     saveCart_();
@@ -1537,8 +1601,13 @@
         <input type="checkbox" class="pk-cart-chk" ${it.checked ? 'checked' : ''} />
         <input type="text" class="pk-cart-name" value="${escapeHtml(it.name)}" placeholder="Tên sản phẩm" />
         <input type="number" class="pk-cart-qty" value="${it.qty}" min="1" title="Số lượng" />
-        <input type="number" class="pk-cart-price" value="${it.price}" min="0" title="Đơn giá (đ)" />
+        <input type="number" class="pk-cart-price" value="${_cartExtra.priceInK ? (it.price ? it.price / 1000 : '') : it.price}" min="0" title="${_cartExtra.priceInK ? 'Đơn giá (nghìn đ — gõ 2800 = 2.800.000đ)' : 'Đơn giá (đ)'}" />
         <button class="pk-cart-del" title="Xoá dòng này">✕</button>
+        <div class="pk-cart-detail-row">
+          <input type="text" class="pk-cart-chatlieu" value="${escapeHtml(it.chatLieu || '')}" placeholder="Chất liệu" />
+          <input type="text" class="pk-cart-mausac" value="${escapeHtml(it.mauSac || '')}" placeholder="Màu sắc" />
+          <input type="text" class="pk-cart-size" value="${escapeHtml(it.size || '')}" placeholder="Size" />
+        </div>
         ${it.note ? `<div class="pk-cart-note">${escapeHtml(it.note)}</div>` : ''}
       </div>
     `).join('') || '<div class="pk-cart-empty">Chưa có sản phẩm nào. Bấm "+ Thêm" ở kết quả tra giá phía trên, hoặc "+ Thêm dòng thủ công".</div>';
@@ -1549,11 +1618,24 @@
       const nameEl = row.querySelector('.pk-cart-name');
       nameEl.addEventListener('input', (e) => { _updateCartItem_(id, 'name', e.target.value, true); });
       nameEl.addEventListener('change', () => { saveCart_(); });
+      const chatLieuEl = row.querySelector('.pk-cart-chatlieu');
+      chatLieuEl.addEventListener('input', (e) => { _updateCartItem_(id, 'chatLieu', e.target.value, true); });
+      chatLieuEl.addEventListener('change', () => { saveCart_(); });
+      const mauSacEl = row.querySelector('.pk-cart-mausac');
+      mauSacEl.addEventListener('input', (e) => { _updateCartItem_(id, 'mauSac', e.target.value, true); });
+      mauSacEl.addEventListener('change', () => { saveCart_(); });
+      const sizeEl = row.querySelector('.pk-cart-size');
+      sizeEl.addEventListener('input', (e) => { _updateCartItem_(id, 'size', e.target.value, true); });
+      sizeEl.addEventListener('change', () => { saveCart_(); });
       const qtyEl = row.querySelector('.pk-cart-qty');
       qtyEl.addEventListener('input', (e) => { _updateCartItem_(id, 'qty', Math.max(1, Number(e.target.value) || 1), true); });
       qtyEl.addEventListener('change', () => { saveCart_(); });
       const priceEl = row.querySelector('.pk-cart-price');
-      priceEl.addEventListener('input', (e) => { _updateCartItem_(id, 'price', Math.max(0, Number(e.target.value) || 0), true); });
+      priceEl.addEventListener('input', (e) => {
+        const raw = Math.max(0, Number(e.target.value) || 0);
+        const price = _cartExtra.priceInK ? raw * 1000 : raw; // toggle "nhap gia theo nghin" — luon luu du.lieu goc bang dong day du
+        _updateCartItem_(id, 'price', price, true);
+      });
       priceEl.addEventListener('change', () => { saveCart_(); });
       row.querySelector('.pk-cart-del').addEventListener('click', () => {
         _cartItems = _cartItems.filter((x) => x.id !== id);
@@ -1566,6 +1648,7 @@
     panelEl.querySelector('#pk-cart-discount-value').value = _cartExtra.discountValue || '';
     panelEl.querySelector('#pk-cart-discount-value').style.display = _cartExtra.discountType === 'none' ? 'none' : '';
     panelEl.querySelector('#pk-cart-freeship').checked = !!_cartExtra.freeship;
+    panelEl.querySelector('#pk-cart-price-k').checked = !!_cartExtra.priceInK;
 
     _renderCartTotal_();
   }
@@ -1599,7 +1682,8 @@
     const checked = _cartItems.filter((i) => i.checked);
     const lines = checked.map((i, idx) => {
       const lineTotal = (Number(i.qty) || 0) * (Number(i.price) || 0);
-      return `${idx + 1}. ${i.name}${i.qty > 1 ? ' x' + i.qty : ''} — ${lineTotal.toLocaleString('vi-VN')}đ`;
+      const details = [i.chatLieu, i.mauSac, i.size].filter(Boolean).join(', ');
+      return `${idx + 1}. ${i.name}${details ? ' (' + details + ')' : ''}${i.qty > 1 ? ' x' + i.qty : ''} — ${lineTotal.toLocaleString('vi-VN')}đ`;
     });
     const subtotal = checked.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.price) || 0), 0);
     let discountAmt = 0;
@@ -1672,7 +1756,8 @@
           tone: _activeTone,
           context: ctxEl ? ctxEl.value.trim() : "",
           custLines: buildCustLines(),
-          withProducts: _useProducts
+          withProducts: _useProducts,
+          stonePref: _stonePref
         }
       },
       (resp) => {
@@ -1704,7 +1789,7 @@
       sug.innerHTML = `<div class="pk-ai-cust-loading">Đang soạn câu ${i + 1}/${OPENER_ANGLES.length} — ${escapeHtml(angle.label)}...</div>`;
       const data = await new Promise((resolve) => {
         safeSendMessage_(
-          { type: "FETCH_OPENER", payload: { custLines, tone: _activeTone, angleInstr: angle.instr, withProducts: _useProducts } },
+          { type: "FETCH_OPENER", payload: { custLines, tone: _activeTone, angleInstr: angle.instr, withProducts: _useProducts, stonePref: _stonePref } },
           (resp) => resolve(resp?.ok ? resp.data : { error: resp?.error || "lỗi không rõ" })
         );
       });
