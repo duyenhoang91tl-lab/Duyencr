@@ -41,3 +41,25 @@ Các tính năng khác của Zalo AI **chưa port** vì cần xác nhận thêm 
 - **🔗 Liên kết đoạn chat**: sau khi tra cứu đúng khách (dù là tự nhận diện SĐT hay gõ tay), bấm nút này 1 lần để "học" — extension ghi nhớ hội thoại đang mở (theo URL trang) tương ứng với SĐT đó. Lần sau mở lại ĐÚNG hội thoại này, dù không tự đọc được SĐT/khung "Sản phẩm order" (VD khách đổi tên hiển thị), Pancake AI vẫn tự nhận ra đúng khách — nhờ vậy **ghi chú/trạng thái CS/lịch hẹn nhập trong Pancake luôn cập nhật đúng khách trên CRM**, không bị lạc mất vì lỗi nhận diện.
   - Lưu cục bộ trên máy (`chrome.storage.local`), không đồng bộ giữa các máy CS khác nhau — mỗi máy cần liên kết riêng 1 lần cho mỗi hội thoại.
   - Khoá nhận diện dùng đường dẫn URL của hội thoại (ổn định hơn dùng tên hiển thị như bên Zalo AI, vì URL thường không đổi ngay cả khi khách đổi tên/biệt danh).
+
+## Tư vấn phong thủy Thu Hiền (chỉ hiện trên Messenger, không ảnh hưởng Pancake)
+
+Vì trang Messenger "Thu Hiền phong thủy" dùng chung extension này nhưng là **business khác** với
+sản phẩm sức khỏe bên Pancake, các mục dưới đây chỉ bật khi `PLATFORM === 'messenger'`, không đổi
+gì hành vi/danh sách trạng thái bên Pancake:
+
+- **Trạng thái CS** đổi sang danh sách riêng phong thủy (Chờ gọi tư vấn / Đã gọi - đang theo dõi /
+  Hẹn gọi lại / Không nghe máy / Đã chốt / Từ chối / Đang khiếu nại / Tạm ngừng chăm sóc) thay vì
+  danh sách sản phẩm sức khỏe.
+- **"Tình trạng KH"** và **"Trạng thái Zalo"** giữ nguyên y hệt bên Pancake — CS tự điền tay theo
+  đúng nhu cầu thực tế, không đổi nhãn/danh sách/khoá cho kênh Messenger.
+- **Sinh nhật → Mệnh**: gõ ngày sinh, panel tự tính mệnh Ngũ hành nạp âm ngay bên cạnh (tra bảng
+  cục bộ, không gọi AI). ⚠ Đây là bảng CS cung cấp, chỉ khớp năm 1954–2013 — nên nhờ người có
+  chuyên môn phong thủy trong công ty kiểm tra/bổ sung trước khi dùng chính thức rộng rãi hơn.
+- **📋 Mẫu có sẵn**: panel mới liệt kê 11 mẫu canned response (5 mẫu theo mệnh + 6 mẫu giá/chính
+  sách, từ file mẫu Beeftext CS cung cấp) — bấm 1 mẫu để **chèn thẳng vào ô trả lời** (dùng lại hàm
+  `insertReply` có sẵn, tự xử lý cả contenteditable của Messenger).
+- Dữ liệu mệnh + mẫu canned response đọc từ 2 sheet mới `Menh`/`CannedResponses` (tự tạo trong file
+  CRM dùng chung) qua action `getKnowledge` mới thêm ở `gas_v13.js` — cache 20 phút trên máy CS
+  (`chrome.storage.local`), không gọi Sheet mỗi tin nhắn. CS sửa trực tiếp 2 sheet này trên Google
+  Sheets (không cần sửa code) để cập nhật mẫu/mệnh mới nhất.

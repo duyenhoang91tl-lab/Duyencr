@@ -526,6 +526,14 @@ th.col-filtered .th-filter-icon{opacity:1;color:var(--green);}
 .adv-modal-footer{padding:10px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:space-between;align-items:center;}
 .adv-active-count{font-size:11px;color:var(--muted);}
 .adv-filter-active-badge{background:var(--green);color:#fff;border-radius:20px;padding:1px 7px;font-size:10px;font-weight:600;margin-left:4px;}
+/* ── Menu mẹ "Tác vụ" (gom Chia data / chiến dịch / công việc) ── */
+.tacvu-wrap{position:relative;display:inline-block;}
+.tacvu-menu{display:none;position:absolute;left:0;top:100%;margin-top:4px;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 28px rgba(0,0,0,.16);z-index:400;min-width:212px;padding:5px 0;}
+.tacvu-menu.open{display:block;}
+.tacvu-item{display:block;width:100%;text-align:left;padding:7px 14px;border:none;background:none;cursor:pointer;font-size:12px;white-space:nowrap;color:var(--text);font-family:inherit;}
+.tacvu-item:hover{background:var(--surface2);}
+.tacvu-group-label{padding:5px 14px 3px;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--hint);}
+.tacvu-sep{height:1px;background:var(--border);margin:4px 0;}
 
 /* ── COLUMN TOGGLE BAR ── */
 .col-toggle-bar{display:flex;align-items:center;gap:4px;padding:5px 14px;background:var(--surface2);border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto;scrollbar-width:thin;}
@@ -867,6 +875,8 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
       <div class="adv-section-label">📱 Trạng thái Zalo (chọn nhiều)</div>
       <div class="adv-chips" id="adv-zalo-chips"></div>
     </div>
+    <!-- Các trường tự tạo (admin thêm) — mỗi trường 1 nhóm chip, dựng động khi mở modal -->
+    <div id="adv-cf-sections"></div>
   </div>
   <div class="adv-modal-footer">
     <span class="adv-active-count" id="adv-count-text">Chưa có bộ lọc</span>
@@ -1025,8 +1035,9 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
       <button class="section-btn" onclick="setZaloFilter('block',this)"><div class="fleft"><span class="fdot" style="background:#dc2626"></span><span>Chặn / Hủy KB</span></div><span class="fbadge" id="bz-block">0</span></button>
     </div>
     <div class="divider" style="margin:7px 0"></div>
-    <div class="sb-label">Thương hiệu</div>
-    <div id="brand-list"></div>
+    <!-- Bộ lọc theo TRƯỜNG TỰ TẠO (admin thêm) — thay cho khối "Thương hiệu" cũ.
+         Mỗi trường admin tạo sẽ sinh ra 1 nhóm nút lọc riêng ở đây, kèm badge đếm số KH. -->
+    <div id="cf-filter-sections"></div>
   </div>
 </div>
 
@@ -1107,17 +1118,27 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
           <button class="btn sm" id="adv-filter-btn" onclick="openAdvModal()" title="Bộ lọc nâng cao">
             ⚙ Lọc nâng cao
           </button>
-          <button class="btn sm secondary" id="assign-btn" onclick="openAssignModal()" title="Chia data đang lọc cho CS">
-            👥 Chia data
-          </button>
-          <button class="btn sm secondary" id="bcstat-open-btn" onclick="openBcStatModal()" title="Tình trạng chiến dịch + số khách đã gửi theo CS">📊 TK chiến dịch</button>
-          <button class="btn sm secondary" id="bct-open-btn" onclick="openBctModal()" title="Lọc khách theo sản phẩm chi tiết / số đơn / thời gian mua / nguồn / phân loại rồi soạn tin bắn">🎯 CD theo điều kiện</button>
-          <button class="btn sm secondary" id="futpl-inline-btn" onclick="openFuTplModal()" title="Mẫu tin hỏi thăm tự động theo mốc ngày sau mua — máy tự tạo chiến dịch mỗi sáng">📨 Hỏi thăm tự động</button>
-          <button class="btn sm secondary" id="task-quick-btn" onclick="openTaskModal()" title="Tạo công việc mới" style="padding:0 8px;min-width:auto">🗂️+</button>
-          <button class="btn sm secondary" id="bdaytpl-inline-btn" onclick="openBdayTplModal()" title="Mẫu tin chúc mừng sinh nhật — máy tự tạo chiến dịch mỗi sáng cho khách sinh nhật hôm đó">🎂 Sinh nhật tự động</button>
-          <button class="btn sm secondary" id="broadcast-filter-btn" onclick="openBroadcastFromCurrentFilter()" title="Tạo chiến dịch bắn trực tiếp từ danh sách đang lọc (CS, sản phẩm, nguồn, trạng thái, ngày mua...) — không cần qua Chia data">
-            📢 Tạo chiến dịch bắn
-          </button>
+          <!-- Gom toàn bộ tác vụ (chia data / chiến dịch / công việc) vào 1 menu mẹ, đặt ngay
+               cạnh "Lọc nâng cao" cho thanh công cụ gọn, dễ nhìn. -->
+          <div class="tacvu-wrap" id="tacvu-wrap">
+            <button class="btn sm secondary" id="tacvu-btn" onclick="toggleTacVuMenu(event)" title="Các tác vụ: chia data, chiến dịch bắn, hỏi thăm/sinh nhật tự động, tạo công việc">
+              🧰 Tác vụ ▾
+            </button>
+            <div class="tacvu-menu" id="tacvu-menu">
+              <div class="tacvu-group-label">Chia data & công việc</div>
+              <button class="tacvu-item" onclick="runTacVu(openAssignModal)" title="Chia data đang lọc cho CS">👥 Chia data</button>
+              <button class="tacvu-item" onclick="runTacVu(openTaskModal)" title="Tạo công việc mới">🗂️ Tạo công việc</button>
+              <div class="tacvu-sep"></div>
+              <div class="tacvu-group-label">Chiến dịch bắn</div>
+              <button class="tacvu-item" onclick="runTacVu(openBroadcastFromCurrentFilter)" title="Tạo chiến dịch bắn trực tiếp từ danh sách đang lọc (CS, sản phẩm, nguồn, trạng thái, ngày mua...) — không cần qua Chia data">📢 Tạo chiến dịch bắn</button>
+              <button class="tacvu-item" onclick="runTacVu(openBctModal)" title="Lọc khách theo sản phẩm chi tiết / số đơn / thời gian mua / nguồn / phân loại rồi soạn tin bắn">🎯 CD theo điều kiện</button>
+              <button class="tacvu-item" onclick="runTacVu(openBcStatModal)" title="Tình trạng chiến dịch + số khách đã gửi theo CS">📊 TK chiến dịch</button>
+              <div class="tacvu-sep"></div>
+              <div class="tacvu-group-label">Tự động hằng ngày</div>
+              <button class="tacvu-item" onclick="runTacVu(openFuTplModal)" title="Mẫu tin hỏi thăm tự động theo mốc ngày sau mua — máy tự tạo chiến dịch mỗi sáng">📨 Hỏi thăm tự động</button>
+              <button class="tacvu-item" onclick="runTacVu(openBdayTplModal)" title="Mẫu tin chúc mừng sinh nhật — máy tự tạo chiến dịch mỗi sáng cho khách sinh nhật hôm đó">🎂 Sinh nhật tự động</button>
+            </div>
+          </div>
         </div>
         <button class="btn sm" onclick="exportCSV()">
           <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
@@ -1580,6 +1601,91 @@ async function _syncKhStatusTreeFromGAS() {
 // ngay tại đây sẽ chạm biến trước khi khởi tạo (temporal dead zone) và ném ReferenceError.
 setTimeout(_syncKhStatusTreeFromGAS, 0);
 
+// ════════════════════════════════════════════════════════════════════
+//  TRƯỜNG TỰ TẠO (admin tự thêm "trường lớn" ngoài 2 trường có sẵn)
+// ════════════════════════════════════════════════════════════════════
+// "Tình trạng CS" và "Trạng thái KH" là 2 trường lớn CỐ ĐỊNH (có cột riêng trong CareData trên
+// Google Sheet). Khối này cho phép admin TỰ TẠO THÊM trường lớn mới — mỗi trường có cây lựa chọn
+// mẹ/con riêng, dùng đúng cấu trúc { label, value } / { label, children:[...] } như 2 trường kia.
+// Giá trị CS chọn được lưu gộp trong careData[phone].custom = { "<id trường>": "giá trị" } nên
+// KHÔNG cần thêm cột mới vào Google Sheet mỗi lần admin tạo trường (tránh phải sửa backend GAS).
+// Cấu trúc: [{ id: 'cf_...', label: 'Tên trường', tree: [...] }]
+let CUSTOM_FIELDS = (function(){
+  try { var v = loadLS('ome_custom_fields'); return Array.isArray(v) ? v : []; } catch(e){ return []; }
+})();
+
+async function _syncCustomFieldsFromGAS() {
+  if (!gsUrl) return;
+  try {
+    var r = await fetch(gsUrl + '?action=getSetting&key=customFields', {redirect:'follow'});
+    var data = await r.json();
+    if (data && data.value) {
+      var arr = JSON.parse(data.value);
+      if (Array.isArray(arr)) {
+        CUSTOM_FIELDS.length = 0;
+        arr.forEach(function(f){ CUSTOM_FIELDS.push(f); });
+        saveLS('ome_custom_fields', CUSTOM_FIELDS);
+        // Nếu đang mở panel chi tiết 1 khách → vẽ lại để hiện trường mới admin vừa tạo
+        if (typeof currentPhone !== 'undefined' && currentPhone && typeof renderDpTab === 'function'
+            && typeof currentDpTab !== 'undefined' && currentDpTab === 'care') {
+          try { renderDpTab('care'); } catch(e){}
+        }
+      }
+    }
+  } catch(e) { /* giữ nguyên bản local nếu lỗi mạng/parse */ }
+}
+setTimeout(_syncCustomFieldsFromGAS, 0);
+
+// Build <option> cho 1 trường tự tạo — cùng cách hiển thị optgroup mẹ/con như _buildCustStatusOptions
+function _buildCustomFieldOptions(field, selected) {
+  var html = '<option value="">— Chọn —</option>';
+  (field.tree || []).forEach(function(node) {
+    if (node.children && node.children.length) {
+      html += '<optgroup label="' + esc(node.label) + '">';
+      node.children.forEach(function(ch) {
+        var v = ch.value || ch.label;
+        html += '<option value="' + esc(v) + '"' + (selected === v ? ' selected' : '') + '>'
+             + esc(node.label + ' → ' + ch.label) + '</option>';
+      });
+      html += '</optgroup>';
+    } else {
+      var v2 = node.value || node.label;
+      html += '<option value="' + esc(v2) + '"' + (selected === v2 ? ' selected' : '') + '>' + esc(node.label) + '</option>';
+    }
+  });
+  return html;
+}
+
+// HTML các ô select của trường tự tạo, chèn vào form "Thông tin chăm sóc"
+function _renderCustomFieldInputs(care) {
+  if (!CUSTOM_FIELDS.length) return '';
+  var vals = (care && care.custom) || {};
+  var cells = CUSTOM_FIELDS.map(function(f){
+    return '<div>'
+      + '<div class="form-label">' + esc(f.label) + '</div>'
+      + '<select class="form-select" id="cf-' + esc(f.id) + '" data-cfid="' + esc(f.id) + '">'
+      + _buildCustomFieldOptions(f, vals[f.id] || '')
+      + '</select></div>';
+  });
+  // Ghép 2 ô/hàng cho khớp lưới form-row-2 hiện có
+  var html = '';
+  for (var i = 0; i < cells.length; i += 2) {
+    html += '<div class="form-row-2">' + cells[i] + (cells[i+1] || '<div></div>') + '</div>';
+  }
+  return html;
+}
+
+// Đọc giá trị CS đang chọn ở các trường tự tạo (dùng khi lưu)
+function _collectCustomFieldValues(existingCustom) {
+  var out = Object.assign({}, existingCustom || {});
+  CUSTOM_FIELDS.forEach(function(f){
+    var el = document.getElementById('cf-' + f.id);
+    if (el) out[f.id] = el.value || '';
+  });
+  return out;
+}
+
+
 // Flatten để dùng trong filter/badge — chỉ lấy các value thực (lá hoặc không có con)
 function _flatCustStatusValues() {
   var out = [];
@@ -1813,6 +1919,8 @@ let _colDdActive = null;
 let advFilters = {
   cs: new Set(), products: new Set(), sources: new Set(),
   careStatus: new Set(), zaloStatus: new Set(),
+  // Trường tự tạo: { '<id trường>': Set(giá trị đã chọn) } — khách khớp nếu giá trị nằm trong Set
+  custom: {},
   yearFrom: '', monthFrom: '', yearTo: '', monthTo: ''
 };
 
@@ -1984,6 +2092,10 @@ async function syncFromGS(opts) {
 
     // ── Tải đơn hàng riêng nếu cần ──
     let orderCount = 0;
+    // Ep buildCustomers() day du (thay vi chi rebuildCareOnCustomers() nhe) khi phat hien 1 SDT
+    // MOI xuat hien o nguon "Cham soc" ma app chua tung biet toi — xem giai thich chi tiet ben
+    // duoi cho tung truong hop.
+    let _forceFullBuildFromCareLeads = false;
     if (pullOrders) {
       try {
         if (isManual) txt('ltext', 'Đang tải đơn hàng từ Google Sheets...');
@@ -2012,17 +2124,6 @@ async function syncFromGS(opts) {
         console.warn('Orders fetch error:', orderErr.message);
         if (isManual) toast('⚠ Không tải được đơn hàng: ' + orderErr.message);
       }
-      // ── Nguồn "Chăm sóc" (sheet riêng, KH thêm nhanh) — chỉ tải cùng nhịp với orders ──
-      try {
-        const clR = await fetch(gsUrl + sepChar + 'action=careLeads', { redirect: 'follow' });
-        const clJson = await clR.json();
-        if (clJson && clJson.rows) {
-          const newLeads = {};
-          clJson.rows.forEach(function(r){ if (r.phone) newLeads[r.phone] = { name: r.name||'', note: r.note||'', cs: r.cs||'', createdAt: r.createdAt||'' }; });
-          careLeads = newLeads;
-          saveLS('ome_care_leads', careLeads);
-        }
-      } catch(clErr) { console.warn('careLeads fetch error:', clErr.message); }
       // ── Tập SĐT có trong "dữ liệu đơn" (chỉ để lọc nguồn, không kéo chi tiết) ──
       try {
         const dpR = await fetch(gsUrl + sepChar + 'action=donPhones', { redirect: 'follow' });
@@ -2032,6 +2133,33 @@ async function syncFromGS(opts) {
         if (dpJson && dpJson.orderCountByPhone) { donOrderCountByPhone = dpJson.orderCountByPhone; saveLS('ome_don_order_count', dpJson.orderCountByPhone); }
       } catch(dpErr) { console.warn('donPhones fetch error:', dpErr.message); }
     }
+
+    // ── Nguồn "Chăm sóc" (sheet riêng, KH thêm nhanh qua Pancake AI/Zalo AI/nút "+Thêm KH
+    // mới") — CHẠY MỖI TICK (3s), KHÔNG còn phụ thuộc nhịp kéo đơn hàng nặng (~30s, xem
+    // pullOrders ở trên). Sheet này nhỏ (chỉ các KH được thêm tay), nên kéo thường xuyên không
+    // tốn kém, và khách mới cần hiện NGAY để CS lọc theo "nguồn dữ liệu: Chăm sóc" thấy đúng.
+    //
+    // BUG (đã sửa): trước đây khối này nằm TRONG if(pullOrders) — nghĩa là ở đa số các tick 3s
+    // (khi pullOrders=false), careLeads không được kéo lại; đồng thời nhánh rebuildCareOnCustomers()
+    // (chạy khi orderCount=0, tức đa số các tick) CHỈ cập nhật field cho khách ĐÃ CÓ SẴN trong
+    // allCustomers, KHÔNG BAO GIỜ tự thêm khách mới — nên CS thêm khách mới nguồn "Chăm sóc" phải
+    // đợi tới đúng tick kéo đầy đủ tiếp theo (~30s) mới hiện, và nếu tick đó lỗi/trả về 0 đơn thì
+    // không hiện luôn cho tới khi F5. Giờ kéo độc lập mỗi 3s + phát hiện SĐT mới để ép
+    // buildCustomers() đầy đủ ngay khi cần, không phụ thuộc orderCount.
+    try {
+      const clR = await fetch(gsUrl + sepChar + 'action=careLeads', { redirect: 'follow' });
+      const clJson = await clR.json();
+      if (clJson && clJson.rows) {
+        const newLeads = {};
+        clJson.rows.forEach(function(r){ if (r.phone) newLeads[r.phone] = { name: r.name||'', note: r.note||'', cs: r.cs||'', createdAt: r.createdAt||'' }; });
+        const knownPhones = new Set(allCustomers.map(c => c.phone));
+        for (const ph in newLeads) {
+          if (!knownPhones.has(ph)) { _forceFullBuildFromCareLeads = true; break; }
+        }
+        careLeads = newLeads;
+        saveLS('ome_care_leads', careLeads);
+      }
+    } catch(clErr) { console.warn('careLeads fetch error:', clErr.message); }
 
     let count = 0;
     let _dpPhoneChanged = false; // true nếu KH đang mở trong panel chi tiết vừa có dữ liệu mới (vd: từ Zalo AI extension)
@@ -2051,7 +2179,8 @@ async function syncFromGS(opts) {
         schedCS: row.schedCS||'', schedCSNote: row.schedCSNote||'',
         schedHen: row.schedHen||'', schedHenNote: row.schedHenNote||'',
         updated: row.updated||'',
-        khStatus: row.khStatus||'', nickZalos: row.nickZalos||[], birthday: row.birthday||'', tag: row.tag||''
+        khStatus: row.khStatus||'', nickZalos: row.nickZalos||[], birthday: row.birthday||'', tag: row.tag||'',
+        custom: (row.custom && typeof row.custom === 'object') ? row.custom : {}
       };
       // KH này đang được xem trong panel chi tiết (openDp) và vừa có bản ghi mới hơn (vd: CS vừa lưu từ Zalo AI extension)
       if (typeof currentPhone !== 'undefined' && currentPhone &&
@@ -2077,7 +2206,7 @@ async function syncFromGS(opts) {
     if (d.careStatus && Array.isArray(d.careStatus) && d.careStatus.length) {
       _applyCareStatusFromGS(d.careStatus);
     }
-    if (orderCount > 0) {
+    if (orderCount > 0 || _forceFullBuildFromCareLeads) {
       buildCustomers();
       show('syncbtn');
       show('pushbtn'); show('fullsyncbtn'); show('dupbtn');
@@ -2146,7 +2275,8 @@ async function pushCareToGS(phone) {
     khStatus: care.khStatus||'',
     nickZalos: care.nickZalos||[],
     tag: care.tag||'',
-    name: care.name||''
+    name: care.name||'',
+    custom: care.custom||{}
   };
   try {
     await fetch(gsUrl, {
@@ -2430,6 +2560,8 @@ function buildCustomers() {
       careStatus: care.status || c._rawStatus || '',
       zaloStatus: care.zalo || c._rawZalo || '',
       khStatus: care.khStatus || '',
+      // Giá trị các trường tự tạo (admin thêm) — dùng cho lọc sidebar, cột bảng, badge, xuất Excel
+      custom: (care.custom && typeof care.custom === 'object') ? care.custom : {},
       nickZalos: Array.isArray(care.nickZalos) ? care.nickZalos : [],
       careNote: care.note || c._rawNote || '',
       careCS,
@@ -2522,7 +2654,7 @@ function updateCampaignFilter() {
   }
 }
 
-function setTier(t,el) { currentTier=t; currentCare='all'; currentZalo='all'; currentBrand='all'; activateBtn('.fi',el); resetSubFilters(); applyFilters(); }
+function setTier(t,el) { currentTier=t; currentCare='all'; currentZalo='all'; currentBrand='all'; currentCF={}; activateBtn('.fi',el); resetSubFilters(); applyFilters(); }
 function setCareFilter(t,el) { currentCare=t; activateBtn('#care-filters .section-btn',el); applyFilters(); }
 function setZaloFilter(t,el) { currentZalo=t; activateBtn('#zalo-filters .section-btn',el); applyFilters(); }
 function setBrand(b,el) { currentBrand=b; activateBtn('.bitem',el); applyFilters(); }
@@ -2534,9 +2666,14 @@ function clearDateFilter(){
 function activateBtn(sel,el) { document.querySelectorAll(sel).forEach(b=>b.classList.remove('active')); el.classList.add('active'); }
 function resetSubFilters() {
   currentBrand='all';
+  currentCF={};
   document.querySelectorAll('#care-filters .section-btn').forEach((b,i)=>{ b.classList.remove('active'); if(i===0)b.classList.add('active'); });
   document.querySelectorAll('#zalo-filters .section-btn').forEach((b,i)=>{ b.classList.remove('active'); if(i===0)b.classList.add('active'); });
   document.querySelectorAll('.bitem').forEach((b,i)=>{ b.classList.remove('active'); if(i===0)b.classList.add('active'); });
+  // Mỗi nhóm trường tự tạo: bỏ active hết rồi active lại nút "Tất cả" (nút đầu tiên của nhóm)
+  document.querySelectorAll('.cf-filter-group').forEach(function(g){
+    g.querySelectorAll('.section-btn').forEach(function(b,i){ b.classList.remove('active'); if(i===0) b.classList.add('active'); });
+  });
 }
 
 let _filterDebounceTimer = null;
@@ -2604,7 +2741,10 @@ function applyFilters() {
       if (currentZalo === 'block') { if (!['Chặn','Hủy kết bạn'].includes(c.zaloStatus)) return false; }
       else if (c.zaloStatus !== currentZalo) return false;
     }
-    if (currentBrand !== 'all' && !c.brands.includes(currentBrand)) return false;
+    // Lọc theo TRƯỜNG TỰ TẠO (sidebar) — khách phải khớp TẤT CẢ trường đang được lọc (AND)
+    for (var _cfId in currentCF) {
+      if (((c.custom && c.custom[_cfId]) || '') !== currentCF[_cfId]) return false;
+    }
     if (csFList.length) {
       // Lọc theo (các) CS đang chọn + ĐÚNG chế độ (Phụ trách / Chăm sóc / Cả hai)
       // Multi: khớp nếu khách thuộc về BẤT KỲ CS nào trong danh sách đã chọn (OR)
@@ -2769,6 +2909,11 @@ function applyFilters() {
     if (advFilters.sources.size > 0 && ![...advFilters.sources].some(src=>c.sources.includes(src))) return false;
     if (advFilters.careStatus.size > 0 && !advFilters.careStatus.has(c.careStatus || '')) return false;
     if (advFilters.zaloStatus.size > 0 && !advFilters.zaloStatus.has(c.zaloStatus || '')) return false;
+    // Trường tự tạo: với mỗi trường có chọn chip, khách phải khớp 1 trong các giá trị đã chọn
+    for (var _acfId in (advFilters.custom || {})) {
+      var _acfSet = advFilters.custom[_acfId];
+      if (_acfSet && _acfSet.size > 0 && !_acfSet.has((c.custom && c.custom[_acfId]) || '')) return false;
+    }
     if (advFilters.yearFrom || advFilters.monthFrom || advFilters.yearTo || advFilters.monthTo) {
       const yfr = advFilters.yearFrom ? parseInt(advFilters.yearFrom) : null;
       const mfr = advFilters.monthFrom ? parseInt(advFilters.monthFrom) : null;
@@ -2917,7 +3062,65 @@ function _rowHtml(c) {
     <td class="col-sched">${nsHtml}</td>
     <td class="col-lastact" style="${lastActDisp}">${lastActHtml}</td>
     <td class="col-tacdong" style="${tacdongDisp}">${tacdongHtml}</td>
+    ${_cfRowCells(c)}
   </tr>`;
+}
+
+// ── Cột động cho TRƯỜNG TỰ TẠO trong bảng danh sách ──
+// Cột được chèn thêm vào cuối mỗi hàng; phần <th> tương ứng do _cfSyncTableHead() chèn vào thead.
+// Mỗi cột dùng class col-cf_<id> để dùng chung cơ chế ẩn/hiện colVisible sẵn có.
+function _cfRowCells(c) {
+  if (typeof CUSTOM_FIELDS === 'undefined' || !CUSTOM_FIELDS.length) return '';
+  return CUSTOM_FIELDS.map(function(f){
+    var key = 'cf_' + f.id;
+    var vis = (typeof colVisible !== 'undefined' && colVisible[key] === false) ? 'display:none' : '';
+    var v = (c.custom && c.custom[f.id]) || '';
+    return '<td class="col-' + esc(key) + '" style="font-size:11px;' + vis + '">'
+      + (v ? '<span class="cf-cell-badge">' + esc(v) + '</span>' : '<span style="color:var(--hint)">—</span>')
+      + '</td>';
+  }).join('');
+}
+
+// Chèn/đồng bộ các <th> của trường tự tạo vào thead (gọi trước mỗi lần vẽ bảng)
+function _cfSyncTableHead() {
+  var head = document.querySelector('#main-table thead tr');
+  if (!head) return;
+  // Xoá các th cũ của trường tự tạo rồi chèn lại theo đúng danh sách hiện tại
+  head.querySelectorAll('th[data-cf-th]').forEach(function(th){ th.remove(); });
+  if (typeof CUSTOM_FIELDS === 'undefined' || !CUSTOM_FIELDS.length) return;
+  CUSTOM_FIELDS.forEach(function(f){
+    var key = 'cf_' + f.id;
+    var th = document.createElement('th');
+    th.className = 'col-' + key;
+    th.setAttribute('data-cf-th', f.id);
+    if (typeof colVisible !== 'undefined' && colVisible[key] === false) th.style.display = 'none';
+    th.innerHTML = '<div class="th-inner">' + esc(f.label) + '</div>';
+    head.appendChild(th);
+  });
+}
+
+// Chèn/đồng bộ các chip bật-tắt cột của trường tự tạo vào thanh "📋 Cột hiển thị"
+function _cfSyncColToggles() {
+  var bar = document.getElementById('col-toggle-bar');
+  if (!bar) return;
+  bar.querySelectorAll('[data-cf-chip]').forEach(function(el){ el.remove(); });
+  if (typeof CUSTOM_FIELDS === 'undefined' || !CUSTOM_FIELDS.length) return;
+  CUSTOM_FIELDS.forEach(function(f){
+    var key = 'cf_' + f.id;
+    if (!(key in colVisible)) colVisible[key] = true;   // mặc định hiện khi admin vừa tạo trường
+    var lb = document.createElement('label');
+    lb.className = 'col-toggle-chip';
+    lb.setAttribute('data-cf-chip', f.id);
+    var cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = colVisible[key] !== false;
+    cb.addEventListener('change', function(){ toggleCol(key, cb); });
+    lb.appendChild(cb);
+    lb.appendChild(document.createTextNode(' ' + f.label));
+    // Chèn trước dải phân cách/chip "Chưa tác động" ở cuối thanh
+    var sep = bar.querySelector('#no-action-chip');
+    if (sep) bar.insertBefore(lb, sep.previousSibling || sep); else bar.appendChild(lb);
+  });
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2931,6 +3134,8 @@ let _vt = { list: [], raf: null, bound: false, lastStart: -1, lastEnd: -1 };
 function _vtWrap() { return document.querySelector('#tab-list .table-wrap'); }
 
 function renderTable(list) {
+  // Đồng bộ cột động của trường tự tạo trước khi vẽ (admin có thể vừa thêm/xoá trường)
+  try { _cfSyncTableHead(); _cfSyncColToggles(); } catch(e){}
   // Chữ ký danh sách hiện tại: dùng để phân biệt "đổi bộ lọc thật sự" (nên cuộn về đầu)
   // với "vẽ lại do đồng bộ dữ liệu nền / quay lại tab" (nên giữ nguyên vị trí cuộn).
   const sig = list.length + '|' + (list[0] ? list[0].phone : '') + '|' + (list[list.length-1] ? list[list.length-1].phone : '');
@@ -3302,7 +3507,7 @@ function openDp(phone) {
     ${tierBadge(c.tier)}
     ${careBadge(c.careStatus)}
     ${zaloBadge(c.zaloStatus)}
-    ${custStatusBadge((careData[c.phone]||{}).khStatus||'')}`;
+    ${custStatusBadge((careData[c.phone]||{}).khStatus||'')}${cfBadges(c.phone)}`;
   renderDpTab('care');
   document.getElementById('dp-overlay').classList.add('open');
 }
@@ -3383,6 +3588,7 @@ function renderCareTab(c) {
         </div>
       </div>
     </div>
+    ${_renderCustomFieldInputs(care)}
     <div class="form-row-2">
       <div>
         <div class="form-label" style="display:flex;align-items:center;gap:4px">
@@ -3974,13 +4180,21 @@ function saveCare(phone) {
   const newBirthday = (document.getElementById('cs-birthday') ? document.getElementById('cs-birthday').value : '') || existing.birthday || '';
   const newTag = (document.getElementById('cs-tag') ? document.getElementById('cs-tag').value.trim() : '') || existing.tag || '';
   const newNickZalos = (function(){ try { var el=document.getElementById('cs-nickzalo-val'); return el ? JSON.parse(el.value||'[]') : (existing.nickZalos||[]); } catch(e){ return existing.nickZalos||[]; }})();
+  // Trường tự tạo (admin thêm) — gộp chung 1 object 'custom' để không phải thêm cột mới vào Sheet
+  const newCustom = _collectCustomFieldValues(existing.custom);
   // V9 audit: ghi lại thay đổi trạng thái / CS / Zalo
   if ((existing.status||'') !== newStatus) logAudit('status', phone, existing.status||'(trống)', newStatus||'(trống)');
   if ((existing.cs||'') !== newCS)         logAudit('cs', phone, existing.cs||'(trống)', newCS||'(trống)');
   if ((existing.zalo||'') !== newZalo)     logAudit('status', phone, 'Zalo: '+(existing.zalo||'(trống)'), 'Zalo: '+(newZalo||'(trống)'));
   if ((existing.khStatus||'') !== newKhStatus) logAudit('status', phone, 'KH: '+(existing.khStatus||'(trống)'), 'KH: '+(newKhStatus||'(trống)'));
   if ((existing.tag||'') !== newTag) logAudit('status', phone, 'Nhãn: '+(existing.tag||'(trống)'), 'Nhãn: '+(newTag||'(trống)'));
-  careData[phone] = { ...existing, status: newStatus, zalo: newZalo, note: newNote, cs: newCS, khStatus: newKhStatus, birthday: newBirthday, tag: newTag, nickZalos: newNickZalos };
+  // Audit cho từng trường tự tạo có thay đổi
+  CUSTOM_FIELDS.forEach(function(f){
+    var oldV = ((existing.custom||{})[f.id]) || '';
+    var newV = (newCustom[f.id]) || '';
+    if (oldV !== newV) logAudit('status', phone, f.label+': '+(oldV||'(trống)'), f.label+': '+(newV||'(trống)'));
+  });
+  careData[phone] = { ...existing, status: newStatus, zalo: newZalo, note: newNote, cs: newCS, khStatus: newKhStatus, birthday: newBirthday, tag: newTag, nickZalos: newNickZalos, custom: newCustom };
   _touchCare(phone);
   saveLS('ome_care', careData);
   _invalidateFilterCache();
@@ -4004,7 +4218,7 @@ function saveCare(phone) {
     ${tierBadge(c?c.tier:'Chưa bán lại được')}
     ${careBadge(careData[phone].status)}
     ${zaloBadge(careData[phone].zalo)}
-    ${custStatusBadge(careData[phone].khStatus)}`;
+    ${custStatusBadge(careData[phone].khStatus)}${cfBadges(phone)}`;
   if (gsUrl) { queueCareSync(phone); toast('✓ Đã lưu'); }
   else toast('✓ Đã lưu tình trạng (local)');
   // Ghi tên CS chăm sóc xuống OrderData cột N (chỉ khi CS chăm sóc thay đổi)
@@ -4691,7 +4905,20 @@ function quickSched(phone) {
 
 function _toggleAddOrderForm() {
   const el = document.getElementById('add-order-form');
-  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  if (!el) return;
+  const opening = el.style.display === 'none';
+  el.style.display = opening ? 'block' : 'none';
+  // Khi MO form: neu KH nay den tu nguon "Chăm sóc" (da luu tai khoan qua Pancake AI/Zalo AI/
+  // nut "+ Thêm KH mới") thi dien san Nguon = "Chăm sóc" cho CS khoi phai go tay.
+  // CS van co the sua lai o nay neu don thuc te den tu nguon khac.
+  if (opening) {
+    try {
+      const srcEl = document.getElementById('mo-source');
+      const lead = (typeof currentPhone !== 'undefined' && currentPhone && typeof careLeads !== 'undefined' && careLeads)
+        ? careLeads[currentPhone] : null;
+      if (srcEl && !srcEl.value && lead && lead.cs) srcEl.value = 'Chăm sóc';
+    } catch(e){}
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -4744,6 +4971,9 @@ async function submitQuickAddCustomer(){
 
   // 2) Đồng thời vẫn ghi vào sheet RIÊNG "KH Chăm sóc mới" để phục vụ Báo cáo D (tách riêng,
   //    không gộp vào báo cáo doanh số A/B/C) — không đổi so với trước.
+  //    Trường `cs` ở đây CHÍNH LÀ "sale phụ trách" của số mới này: số nào sale tự thêm thì sale
+  //    đó phụ trách (xem _buildCsSet_ — nó đọc careLeads[phone].cs), nên với SỐ MỚI luôn gán
+  //    tài khoản đang thêm; chỉ giữ lại giá trị cũ khi số này đã từng được ai đó thêm trước đó.
   careLeads[phone] = {
     name: existingLead.name || name,
     note: mergedNoteStr,
@@ -4776,7 +5006,7 @@ async function addManualOrder(phone) {
   const product = (document.getElementById('mo-product').value||'').trim();
   const revenue = parseFloat(document.getElementById('mo-revenue').value||0)||0;
   const date    = document.getElementById('mo-date').value;
-  const source  = document.getElementById('mo-source').value;
+  const rawSource = (document.getElementById('mo-source').value||'').trim();
   const detail  = (document.getElementById('mo-detail').value||'').trim();
   if (!date) { toast('Vui lòng chọn ngày đặt'); return; }
   if (!revenue) { toast('Vui lòng nhập doanh thu'); return; }
@@ -4787,7 +5017,23 @@ async function addManualOrder(phone) {
   const d = new Date(date);
   const yr = d.getFullYear();
   const mo = d.getMonth()+1;
-  const cs = (careData[phone]&&careData[phone].cs) || _latestOrderCS(c.orders) || currentUser || '';
+
+  // ── KH da duoc luu qua Pancake AI / Zalo AI / nut "+ Them KH mua moi" (co trong careLeads) ──
+  // Theo yeu cau: sau nay CS them don cho nhung KH nay thi don PHAI hien:
+  //   - Nguon  = "Chăm sóc"
+  //   - Nguoi cham soc / CS phu trach = dung ten tai khoan da luu luc them KH (careLeads[phone].cs),
+  //     KHONG lay theo nguoi dang bam them don (co the la admin/CS khac dang len don ho).
+  const lead = (typeof careLeads !== 'undefined' && careLeads) ? careLeads[phone] : null;
+  const leadCS = lead && lead.cs ? String(lead.cs).trim() : '';
+
+  const enteredBy = (typeof currentUser !== 'undefined' && currentUser && currentUser.name) ? currentUser.name : '';
+  // Nguon: KH nguon "Chăm sóc" -> luon ghi "Chăm sóc" (tru khi CS co chu dong go nguon khac vao o).
+  const source = leadCS ? (rawSource || 'Chăm sóc') : rawSource;
+  // CS phu trach: uu tien nguoi da luu tai khoan tren Pancake/Zalo AI; neu khong co moi lui ve
+  // quy uoc cu "CS phu trach = nguoi len don".
+  const cs = leadCS || enteredBy || (careData[phone]&&careData[phone].cs) || _latestOrderCS(c.orders) || '';
+  // CS cham soc: giu nguyen nguoi dang cham neu da co, chua co thi gan luon cho nguoi len don.
+  const careCS = leadCS || (careData[phone]&&careData[phone].cs) || enteredBy || cs;
 
   const newOrder = {
     date: d, year: yr, month: mo,
@@ -4804,6 +5050,16 @@ async function addManualOrder(phone) {
   c.totalOrders  = c.orders.length;
   c.brands = new Set(c.orders.map(o=>o.product).filter(Boolean));
   c.renewOrders = c.orders.filter(o=>RENEW_SOURCES.includes(s(o.source).toLowerCase())).length;
+
+  // KH nguon "Chăm sóc": chot luon CS cham soc = tai khoan da luu tren Pancake/Zalo AI, de
+  // cot "CS chăm sóc" o danh sach + bo loc hien dung ngay, khong phai doi dong bo vong sau.
+  if (leadCS) {
+    careData[phone] = Object.assign({}, careData[phone]||{}, { cs: leadCS });
+    try { _touchCare(phone); } catch(e){}
+    saveLS('ome_care', careData);
+    c.careCS = leadCS;
+    c.careCSSet = new Set(splitMulti_(leadCS, ','));
+  }
 
   logAudit('order_manual', phone, '', `Thêm đơn thủ công: ${product||detail} · ${revenue} · ${date}`);
 
@@ -4841,7 +5097,7 @@ async function addManualOrder(phone) {
         cs, source, revenue, product: newOrder.product,
         productDetail: newOrder.productDetail,
         status: newOrder.status, zalo: newOrder.zalo, note: '',
-        careCS: cs
+        careCS: careCS
       }];
       const r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({action:'saveOrders', orders: payload}) });
       const txt = await r.text();
@@ -4940,6 +5196,7 @@ function rebuildCareOnCustomers() {
     c.khStatus   = care.khStatus || '';
     c.nickZalos  = Array.isArray(care.nickZalos) ? care.nickZalos : [];
     c.careNote   = care.note  || c._rawNote  || '';
+    c.custom     = (care.custom && typeof care.custom === 'object') ? care.custom : {};
     c.careCS     = care.cs    || _latestOrderCS(c.orders);
     if (!c.csSet) c.csSet = _buildCsSet_(c.orders, c.phone);
   }
@@ -4969,14 +5226,56 @@ function updateSidebarBadges() {
   txt('bz-cdy',fmt(cnt(c=>c.zaloStatus==='Chưa đồng ý')));
   txt('bz-block',fmt(cnt(c=>['Chặn','Hủy kết bạn'].includes(c.zaloStatus))));
 }
+// Bộ lọc theo TRƯỜNG TỰ TẠO ở sidebar (thay cho khối "Thương hiệu" cũ).
+// GIỮ NGUYÊN TÊN HÀM updateBrandList để mọi chỗ đang gọi sẵn (setCSFilterMode, onCSFilterChange,
+// đăng nhập, sync...) vẫn hoạt động, không phải sửa rải rác.
+let currentCF = {};   // { '<id trường>': 'giá trị đang lọc' } — không có khoá = không lọc trường đó
+function setCFFilter(fieldId, val, el) {
+  if (!val || val === 'all') delete currentCF[fieldId];
+  else currentCF[fieldId] = val;
+  // Bỏ active các nút cùng nhóm trường này rồi active nút vừa bấm
+  var wrap = el && el.closest ? el.closest('.cf-filter-group') : null;
+  if (wrap) wrap.querySelectorAll('.section-btn').forEach(function(b){ b.classList.remove('active'); });
+  if (el) el.classList.add('active');
+  if (typeof _invalidateFilterCache === 'function') _invalidateFilterCache();
+  applyFilters();
+}
 function updateBrandList() {
-  const base = scopedCustomers();
-  const bc={};
-  for(const c of base) for(const b of c.brands) bc[b]=(bc[b]||0)+1;
-  const sorted=Object.entries(bc).sort((a,b)=>b[1]-a[1]);
-  document.getElementById('brand-list').innerHTML=
-    `<button class="section-btn bitem ${currentBrand==='all'?'active':''}" onclick="setBrand('all',this)"><span>Tất cả</span><span class="fbadge">${fmt(base.length)}</span></button>`+
-    sorted.map(([b,n])=>`<button class="section-btn bitem ${currentBrand===b?'active':''}" data-brand="${esc(b)}" onclick="setBrand(this.dataset.brand,this)"><span>${esc(b)}</span><span class="fbadge">${n}</span></button>`).join('');
+  var host = document.getElementById('cf-filter-sections');
+  if (!host) return;
+  if (typeof CUSTOM_FIELDS === 'undefined' || !CUSTOM_FIELDS.length) { host.innerHTML = ''; return; }
+  var base = scopedCustomers();
+  host.innerHTML = CUSTOM_FIELDS.map(function(f){
+    // Đếm số KH theo từng giá trị của trường này
+    var counts = {};
+    base.forEach(function(c){
+      var v = (c.custom && c.custom[f.id]) || '';
+      if (v) counts[v] = (counts[v] || 0) + 1;
+    });
+    // Liệt kê theo đúng thứ tự admin sắp trong cây (chỉ các mục chọn được), kèm nhãn mẹ → con
+    var opts = [];
+    (f.tree || []).forEach(function(node){
+      if (node.children && node.children.length) {
+        node.children.forEach(function(ch){
+          var v = ch.value || ch.label;
+          opts.push({ v: v, label: node.label + ' → ' + ch.label });
+        });
+      } else {
+        var v2 = node.value || node.label;
+        opts.push({ v: v2, label: node.label });
+      }
+    });
+    var cur = currentCF[f.id] || 'all';
+    var rows = '<button class="section-btn ' + (cur === 'all' ? 'active' : '') + '" data-cf="' + esc(f.id) + '" data-v="all"'
+      + ' onclick="setCFFilter(this.dataset.cf,\'all\',this)"><span>Tất cả</span><span class="fbadge">' + fmt(base.length) + '</span></button>';
+    rows += opts.map(function(o){
+      var n = counts[o.v] || 0;
+      return '<button class="section-btn ' + (cur === o.v ? 'active' : '') + '" data-cf="' + esc(f.id) + '" data-v="' + esc(o.v) + '"'
+        + ' onclick="setCFFilter(this.dataset.cf,this.dataset.v,this)"><span>' + esc(o.label) + '</span><span class="fbadge">' + fmt(n) + '</span></button>';
+    }).join('');
+    return '<div class="sb-label">' + esc(f.label) + '</div><div class="fgroup cf-filter-group">' + rows + '</div>'
+      + '<div class="divider" style="margin:7px 0"></div>';
+  }).join('');
 }
 
 // ── Đổi chế độ lọc CS: phụ trách / chăm sóc / cả hai ──
@@ -4993,7 +5292,7 @@ function setCSFilterMode(mode, el){
 // ── Khi đổi CS ở "Lọc theo CS": toàn bộ sidebar + stats + danh sách + lọc nâng cao theo CS đó ──
 function onCSFilterChange(){
   // Xem trọn bộ KH của CS được chọn → reset các bộ lọc con
-  currentTier='all'; currentCare='all'; currentZalo='all'; currentBrand='all';
+  currentTier='all'; currentCare='all'; currentZalo='all'; currentBrand='all'; currentCF={};
   document.querySelectorAll('.fi').forEach((b,i)=>{ b.classList.remove('active'); if(i===0)b.classList.add('active'); });
   if (typeof resetSubFilters==='function') resetSubFilters();
   if (typeof _invalidateFilterCache==='function') _invalidateFilterCache();
@@ -5335,21 +5634,30 @@ function exportCSV() {
   let list=allCustomers.filter(c=>{
     if(currentTier!=='all'&&c.tier!==currentTier) return false;
     if(currentCare!=='all'&&c.careStatus!==currentCare) return false;
-    if(currentBrand!=='all'&&!c.brands.includes(currentBrand)) return false;
+    // Lọc theo TRƯỜNG TỰ TẠO (sidebar) — khớp với đúng những gì đang lọc trên màn hình
+    for (var _exCfId in currentCF) {
+      if (((c.custom && c.custom[_exCfId]) || '') !== currentCF[_exCfId]) return false;
+    }
     if(csFList.length){const cs=_buildCsSet_(c.orders, c.phone);const _aH=(typeof _assignAllIndex!=='undefined')?_assignAllIndex[c.phone]:null;const _match=csFList.some(csF=>_csModeMatch(cs.has(csF), !!(c.careCSSet&&c.careCSSet.has(csF)), _aH?_aH.has(csF):false));if(!_match) return false;}
     if(q&&!c.name.toLowerCase().includes(q)&&!c.phone.includes(q)) return false;
     return true;
   });
   const BOM='\uFEFF';
-  const hdr='Tên KH,Số điện thoại,Phân loại KH,Tình trạng CS,Zalo,Số đơn,Doanh thu,Sản phẩm,Nguồn,CS phụ trách,Ghi chú\n';
-  const rows=list.map(c=>[`"${c.name}"`,c.phone,c.tier,c.careStatus,c.zaloStatus,c.totalOrders,c.totalRevenue,`"${c.brands.join('; ')}"`,`"${c.sources.join('; ')}"`,`"${[..._buildCsSet_(c.orders, c.phone)].join('; ')}"`,`"${_latestNoteText(c.careNote)}"`].join(',')).join('\n');
+  const cfCols = (typeof CUSTOM_FIELDS !== 'undefined') ? CUSTOM_FIELDS : [];
+  const hdr='Tên KH,Số điện thoại,Phân loại KH,Tình trạng CS,Zalo,Số đơn,Doanh thu,Sản phẩm,Nguồn,CS phụ trách,Ghi chú'
+    + (cfCols.length ? ',' + cfCols.map(f=>`"${f.label.replace(/"/g,'""')}"`).join(',') : '') + '\n';
+  const rows=list.map(c=>{
+    const base=[`"${c.name}"`,c.phone,c.tier,c.careStatus,c.zaloStatus,c.totalOrders,c.totalRevenue,`"${c.brands.join('; ')}"`,`"${c.sources.join('; ')}"`,`"${[..._buildCsSet_(c.orders, c.phone)].join('; ')}"`,`"${_latestNoteText(c.careNote)}"`];
+    const cfVals = cfCols.map(f => `"${((c.custom && c.custom[f.id]) || '').toString().replace(/"/g,'""')}"`);
+    return base.concat(cfVals).join(',');
+  }).join('\n');
   const blob=new Blob([BOM+hdr+rows],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`OME_KH_${_ymd(new Date())}.csv`; a.click();
 }
 
 function clearData() {
   if(!confirm('Xóa toàn bộ dữ liệu Excel đã nạp?\n(Lịch hẹn và trạng thái CS được giữ lại)')) return;
-  customerMap={}; allCustomers=[]; loadedFiles=[]; currentTier='all'; currentCare='all'; currentZalo='all'; currentBrand='all'; currentCS='all';
+  customerMap={}; allCustomers=[]; loadedFiles=[]; currentTier='all'; currentCare='all'; currentZalo='all'; currentBrand='all'; currentCF={}; currentCS='all';
   document.getElementById('data-view').style.display='none';
   document.getElementById('empty-view').style.display='flex';
   document.getElementById('clearbtn').style.display='none';
@@ -5379,6 +5687,16 @@ function custStatusBadge(st) {
   if(!st) return '';
   var label = custStatusFullLabel(st) || st;
   return `<span class="badge bo" style="background:var(--surface2);color:#6d28d9;border-color:var(--border);font-weight:500">${label}</span>`;
+}
+// Badge các TRƯỜNG TỰ TẠO có giá trị — hiện cạnh tên khách trong panel chi tiết
+function cfBadges(phone) {
+  if (typeof CUSTOM_FIELDS === 'undefined' || !CUSTOM_FIELDS.length) return '';
+  var cust = ((typeof careData !== 'undefined' && careData[phone]) || {}).custom || {};
+  return CUSTOM_FIELDS.map(function(f){
+    var v = cust[f.id];
+    if (!v) return '';
+    return '<span class="cf-dp-badge"><span class="cf-dp-k">' + esc(f.label) + ':</span> ' + esc(v) + '</span>';
+  }).join('');
 }
 function zaloBadge(st) {
   if(!st) return '<span class="badge bo">—</span>';
@@ -5784,6 +6102,38 @@ function toggleCol(col, cb) {
   colVisible[col] = cb.checked;
   saveLS('ome_col_visible', colVisible);
   reapplyColVisibility();
+  _pushColVisibleForAccount();
+}
+// ── Cột hiển thị: lưu theo TÀI KHOẢN đăng nhập (không chỉ theo trình duyệt/máy) —
+// mỗi sale tự bật/tắt cột muốn xem, lần đăng nhập sau (kể cả trên máy khác) vẫn
+// hiện đúng như lần trước, không cần bấm lại. ──
+function _colVisAcctKey(){
+  var u = (typeof _authAccount !== 'undefined' && _authAccount && _authAccount.username) ? String(_authAccount.username).trim().toLowerCase() : '';
+  return u ? ('colVisible::' + u) : '';
+}
+async function _pullColVisibleForAccount(){
+  var key = _colVisAcctKey();
+  if (!key || !gsUrl) return;
+  try {
+    var sep = gsUrl.includes('?') ? '&' : '?';
+    var r = await fetch(gsUrl + sep + 'action=getSetting&key=' + encodeURIComponent(key), {redirect:'follow'});
+    var d = await r.json();
+    if (d && d.value) {
+      var saved = null;
+      try { saved = JSON.parse(d.value); } catch(e) { saved = null; }
+      if (saved && typeof saved === 'object') {
+        Object.assign(colVisible, saved);
+        saveLS('ome_col_visible', colVisible);
+        reapplyColVisibility();
+      }
+    }
+  } catch(e) { console.warn('_pullColVisibleForAccount lỗi:', e.message); }
+}
+function _pushColVisibleForAccount(){
+  var key = _colVisAcctKey();
+  if (!key || !gsUrl) return;
+  fetch(gsUrl, { method:'POST', redirect:'follow',
+    body: JSON.stringify({ action:'setSetting', key: key, value: JSON.stringify(colVisible) }) }).catch(function(){});
 }
 function reapplyColVisibility() {
   for (const [col, vis] of Object.entries(colVisible)) {
@@ -5917,6 +6267,29 @@ document.addEventListener('click', e=>{
 // ═══════════════════════════════════════════════════════
 //  ADVANCED FILTER MODAL
 // ═══════════════════════════════════════════════════════
+// ── Menu mẹ "Tác vụ" ────────────────────────────────────────────
+// Gom các nút chia data / chiến dịch / công việc vào 1 menu để thanh công cụ gọn.
+function toggleTacVuMenu(e){
+  if (e) e.stopPropagation();
+  var m = document.getElementById('tacvu-menu');
+  if (m) m.classList.toggle('open');
+}
+function closeTacVuMenu(){
+  var m = document.getElementById('tacvu-menu');
+  if (m) m.classList.remove('open');
+}
+// Đóng menu rồi mới mở modal — tránh menu che modal / dính lại khi quay về
+function runTacVu(fn){
+  closeTacVuMenu();
+  try { if (typeof fn === 'function') fn(); }
+  catch (err) { console.warn('Tác vụ lỗi:', err); if (typeof toast === 'function') toast('Lỗi mở tác vụ: ' + err.message); }
+}
+document.addEventListener('click', function(e){
+  var w = document.getElementById('tacvu-wrap');
+  if (w && !w.contains(e.target)) closeTacVuMenu();
+});
+document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeTacVuMenu(); });
+
 function openAdvModal() {
   // Build chips — giới hạn theo CS đang chọn ở "Lọc theo CS"
   const _base = (typeof scopedCustomers==='function') ? scopedCustomers() : allCustomers;
@@ -5927,6 +6300,7 @@ function openAdvModal() {
   buildAdvChips('sources', allSources, advFilters.sources, 'adv-source-chips');
   buildAdvChips('careStatus', CARE_STATUS, advFilters.careStatus, 'adv-care-chips');
   buildAdvChips('zaloStatus', ZALO_STATUS, advFilters.zaloStatus, 'adv-zalo-chips');
+  buildAdvCfSections();
   const csSearchEl = document.getElementById('adv-cs-search'); if (csSearchEl) csSearchEl.value = '';
   const prodSearchEl = document.getElementById('adv-product-search'); if (prodSearchEl) prodSearchEl.value = [...advFilters.products].join(', ');
   // Restore date values
@@ -5966,6 +6340,42 @@ function toggleAdvChip(key, val, el) {
   else { advFilters[key].add(val); el.classList.add('selected'); }
   updateAdvCount();
 }
+// ── Chip lọc nâng cao cho TRƯỜNG TỰ TẠO ──
+function buildAdvCfSections() {
+  var host = document.getElementById('adv-cf-sections');
+  if (!host) return;
+  if (typeof CUSTOM_FIELDS === 'undefined' || !CUSTOM_FIELDS.length) { host.innerHTML = ''; return; }
+  host.innerHTML = CUSTOM_FIELDS.map(function(f){
+    if (!advFilters.custom[f.id]) advFilters.custom[f.id] = new Set();
+    var sel = advFilters.custom[f.id];
+    var opts = [];
+    (f.tree || []).forEach(function(node){
+      if (node.children && node.children.length) {
+        node.children.forEach(function(ch){ opts.push({ v: ch.value || ch.label, label: node.label + ' → ' + ch.label }); });
+      } else {
+        opts.push({ v: node.value || node.label, label: node.label });
+      }
+    });
+    var chips = opts.map(function(o){
+      return '<span class="adv-chip ' + (sel.has(o.v) ? 'selected' : '') + '" data-cf="' + esc(f.id) + '" data-val="' + esc(o.v) + '"'
+        + ' onclick="toggleAdvCfChip(this.dataset.cf,this.dataset.val,this)">' + esc(o.label) + '</span>';
+    }).join('');
+    return '<div class="adv-section"><div class="adv-section-label">🏷 ' + esc(f.label) + ' (chọn nhiều)</div>'
+      + '<div class="adv-chips">' + (chips || '<span style="font-size:11px;color:var(--hint)">Trường này chưa có lựa chọn nào</span>') + '</div></div>';
+  }).join('');
+}
+function toggleAdvCfChip(fieldId, val, el) {
+  if (!advFilters.custom[fieldId]) advFilters.custom[fieldId] = new Set();
+  var s = advFilters.custom[fieldId];
+  if (s.has(val)) { s.delete(val); el.classList.remove('selected'); }
+  else { s.add(val); el.classList.add('selected'); }
+  updateAdvCount();
+}
+function _advCfCount() {
+  var n = 0;
+  for (var k in (advFilters.custom || {})) n += advFilters.custom[k].size;
+  return n;
+}
 function updateAdvCount() {
   const n = countAdvFilters();
   const el = document.getElementById('adv-count-text');
@@ -5973,7 +6383,7 @@ function updateAdvCount() {
 }
 function countAdvFilters() {
   return advFilters.cs.size + advFilters.products.size + advFilters.sources.size +
-    advFilters.careStatus.size + advFilters.zaloStatus.size +
+    advFilters.careStatus.size + advFilters.zaloStatus.size + _advCfCount() +
     (advFilters.yearFrom?1:0) + (advFilters.yearTo?1:0);
 }
 function applyAdvFilters() {
@@ -5987,7 +6397,7 @@ function applyAdvFilters() {
   applyFilters();
 }
 function clearAdvFilters() {
-  advFilters = { cs:new Set(), products:new Set(), sources:new Set(), careStatus:new Set(), zaloStatus:new Set(), yearFrom:'', monthFrom:'', yearTo:'', monthTo:'' };
+  advFilters = { cs:new Set(), products:new Set(), sources:new Set(), careStatus:new Set(), zaloStatus:new Set(), custom:{}, yearFrom:'', monthFrom:'', yearTo:'', monthTo:'' };
   ['adv-year-from','adv-month-from','adv-year-to','adv-month-to'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   openAdvModal(); // rebuild chips
   applyFilters();
@@ -7356,6 +7766,16 @@ var CTKM_SHEET_NAME  = 'CTKM'; // Sheet CTKM (cung file PRICE_SS_ID) — doi ten
 var DEFAULT_PRODUCT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1YJMJs8GI7dBfDl5TNZM44n7N8lhJoeSD0KOWflU2fmM/edit?gid=1833367723#gid=1833367723';
 var DEFAULT_DRIVE_KNOWLEDGE_FOLDER_URL = 'https://drive.google.com/drive/folders/1Koz4IdENS5QgdvvYMaQO1MlVEFMFAciN?hl=vi';
 var DEFAULT_DRIVE_PRODUCT_IMAGES_FOLDER_URL = 'https://drive.google.com/drive/folders/1PES3V_bsYLcmIynMjRHPVjT6rJGTc6EO?hl=vi';
+// ── API key AI: CHI doc tu sheet Settings, KHONG hardcode trong code ──────────────────────
+// TRUOC DAY (commit f6fed69) co 3 bien DEFAULT_API_GROQ_KEY / DEFAULT_API_GEMINI_KEY /
+// DEFAULT_API_OPENROUTER_KEY chua key that, de CS khoi phai tu nhap. Da BO vi 2 ly do:
+//  1) BAO MAT: file nay nam trong repo GitHub, nen key bi lo cong khai. Groq va OpenRouter
+//     deu co quet secret tu dong va THU HOI ngay key nao bi day len repo cong khai — dung
+//     la ly do bao "Invalid API Key" (Groq) va "User not found" (OpenRouter).
+//  2) CHE GIAU LOI: viet kieu `getSetting_('apiGemini') || DEFAULT_...` khien khi Settings
+//     CHUA co key (vd doi sang spreadsheet/deployment moi) he thong AM THAM dung key cu
+//     hardcode thay vi bao thieu key — nguoi dung nhap key moi ma khong hieu sao van loi.
+// Tu gio thieu key thi bao ro thieu, khong tu y thay bang key khac.
 
 function getOrderSS_() {
   return ORDER_SS_ID
@@ -7384,7 +7804,7 @@ var SH_ORDER_DEFAULT = 'OrderData26';
 var CARE_HEADERS = ['phone','status','zalo','cs','note','schedules',
   'schedGoi','schedGoiNote','schedSP','schedSPNote',
   'schedCS','schedCSNote','schedHen','schedHenNote','updated',
-  'khStatus','nickZalos','birthday','zaloSetBy','name'];
+  'khStatus','nickZalos','birthday','zaloSetBy','name','custom'];
 
 var ORDER_HEADERS  = ['phone','name','date','year','month','cs','source','revenue',
   'product','productDetail','status','zalo','note','careCS'];
@@ -7456,16 +7876,53 @@ function _stripVN_(s) {
   return s;
 }
 
+// Tu do dong tieu de trong vals (mang 2 chieu). KHONG hardcode dong 1 nua:
+// file "Bang gia Hien Tour" co dong 1 gan nhu trong (chi co o gop "G7" phia tren cot
+// Gia SAPHIA/RUBY), tieu de that nam o DONG 2 -> truoc day doc dong 1 lam header khien
+// gan het cot bi bo qua (headers rong) => moi dong doc ra chi con vai truong, haystack
+// tim kiem gan nhu rong => tra cuu ten san pham dung van bao "Khong tim thay".
+// Cach do: quet toi da 10 dong dau, chon dong co NHIEU O TEXT nhat va co chua tu khoa
+// tieu de quen thuoc (ten/gia/nhom/chat lieu/size...).
+function _detectHeaderRow_(vals, maxScan) {
+  var limit = Math.min(vals.length, maxScan || 10);
+  var bestIdx = 0, bestScore = -1;
+  var KEYS = ['ten', 'gia', 'nhom', 'chat lieu', 'size', 'stt', 'san pham', 'thuong mai', 'link'];
+  for (var r = 0; r < limit; r++) {
+    var row = vals[r] || [];
+    var filled = 0, kw = 0;
+    for (var c = 0; c < row.length; c++) {
+      var t = String(row[c] == null ? '' : row[c]).trim();
+      if (!t) continue;
+      filled++;
+      var st = _stripVN_(t);
+      for (var k = 0; k < KEYS.length; k++) {
+        if (st.indexOf(KEYS[k]) !== -1) { kw++; break; }
+      }
+    }
+    // uu tien dong co tu khoa tieu de, sau do den so o co noi dung
+    var score = kw * 10 + filled;
+    if (score > bestScore) { bestScore = score; bestIdx = r; }
+  }
+  return bestIdx;
+}
+
 // Doc toan bo sheet DANH_MUC thanh mang object {tenCot: giaTri...}, dua theo dong tieu de
-// (dong 1) — khong hardcode ten cot, sheet doi/them cot van chay binh thuong.
+// (tu do, xem _detectHeaderRow_) — khong hardcode ten cot lan vi tri dong tieu de, sheet
+// doi/them cot hay chen them dong trang o tren van chay binh thuong.
 function readPriceCatalog_() {
   var sh = SpreadsheetApp.openById(PRICE_SS_ID).getSheetByName(PRICE_SHEET_NAME);
   if (!sh || sh.getLastRow() < 2) return [];
   var lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
   var vals = sh.getRange(1, 1, lastRow, lastCol).getValues();
-  var headers = vals[0].map(function(h){ return String(h || '').trim(); });
+  var hIdx = _detectHeaderRow_(vals, 10);
+  var headers = vals[hIdx].map(function(h){ return String(h || '').trim(); });
+  // Cot khong co tieu de (vd o gop) van giu lai duoi ten tam "Cot <chu cai>" de noi dung
+  // trong do KHONG bi mat khoi phan tim kiem.
+  for (var hc = 0; hc < headers.length; hc++) {
+    if (!headers[hc]) headers[hc] = 'Cot ' + _colLetter_(hc + 1);
+  }
   var rows = [];
-  for (var i = 1; i < vals.length; i++) {
+  for (var i = hIdx + 1; i < vals.length; i++) {
     var row = vals[i];
     var isEmpty = row.every(function(c){ return c === '' || c === null; });
     if (isEmpty) continue;
@@ -7473,38 +7930,167 @@ function readPriceCatalog_() {
     for (var c = 0; c < headers.length; c++) {
       if (!headers[c]) continue;
       var v = row[c];
+      if (v === '' || v === null) continue; // bo o rong cho gon, khong anh huong tim kiem
       obj[headers[c]] = (v instanceof Date) ? v.toISOString() : v;
     }
-    rows.push(obj);
+    if (Object.keys(obj).length) rows.push(obj);
   }
   return rows;
 }
 
+// Doi so thu tu cot (1-based) sang chu cai cot kieu Excel: 1->A, 7->G, 27->AA
+function _colLetter_(n) {
+  var s = '';
+  while (n > 0) { var m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
+  return s;
+}
+
 // Tim theo tu khoa q — khop khi MOI tu trong q (tach theo khoang trang) xuat hien trong
 // it nhat 1 cot bat ky cua dong do (khong dau, khong phan biet hoa/thuong).
+// Neu khop chat (AND) khong ra dong nao -> lui ve khop GAN DUNG: cham diem theo so tu
+// khop duoc, tra ve cac dong diem cao nhat (>= 60% so tu). Muc dich: CS go thua/thieu 1-2
+// tu (vd "khong boc vang", "mau bac") van thay duoc san pham gan nhat kem gia, thay vi
+// nhan "Khong tim thay" roi phai tu mo Sheet tra tay.
 function searchPriceCatalog_(rows, q) {
   var terms = _stripVN_(q).split(/\s+/).filter(Boolean);
   if (!terms.length) return rows.slice(0, 50);
   var out = [];
-  for (var i = 0; i < rows.length && out.length < 50; i++) {
+  var scored = [];
+  for (var i = 0; i < rows.length; i++) {
     var row = rows[i];
     var haystack = _stripVN_(Object.keys(row).map(function(k){ return row[k]; }).join(' | '));
-    var ok = terms.every(function(t){ return haystack.indexOf(t) !== -1; });
-    if (ok) out.push(row);
+    var hit = 0;
+    for (var t = 0; t < terms.length; t++) {
+      if (haystack.indexOf(terms[t]) !== -1) hit++;
+    }
+    if (hit === terms.length) {
+      if (out.length < 50) out.push(row);
+    } else if (hit > 0) {
+      scored.push({ row: row, hit: hit });
+    }
+  }
+  if (out.length) return out;
+  // Fallback gan dung
+  var minHit = Math.max(1, Math.ceil(terms.length * 0.6));
+  scored = scored.filter(function(x){ return x.hit >= minHit; });
+  scored.sort(function(a, b){ return b.hit - a.hit; });
+  return scored.slice(0, 20).map(function(x){ return x.row; });
+}
+
+// ─── BANG GIA CHO PROMPT AI ───────────────────────────────────────────────
+// Khac voi searchPriceCatalog_ (dung cho o "Tra cuu bang gia", khop chat theo tu khoa CS go),
+// ham nay nhan NGUYEN doan yeu cau/cau hoi cua sale (dai, nhieu tu thua) nen phai cham diem
+// thay vi bat buoc khop het tu.
+// Muc dich chinh (yeu cau Duyen): khi sale KHONG ghi ro chat lieu/size, AI phai liet ke DU
+// TAT CA cac bien the tim thay kem chat lieu + size + gia tuong ung — vi 1 ten san pham
+// (vd "VONG TAY DONG DIEU DONG LOC") co nhieu dong khac nhau ve chat lieu/mau/gia.
+var _PRICE_STOPWORDS_ = ['khach','hoi','gia','bao','nhieu','tien','san','pham','cho','minh',
+  'ban','em','anh','chi','oi','the','nao','duoc','khong','voi','nay','mua','can','tu','van',
+  'tra','loi','giup','xin','vui','long','mot','cac','va','la','co','hang','shop'];
+
+function _priceFieldPick_(row, kws) {
+  for (var k in row) {
+    var nk = _stripVN_(k);
+    for (var i = 0; i < kws.length; i++) {
+      if (nk.indexOf(kws[i]) !== -1) return { key: k, val: row[k] };
+    }
+  }
+  return null;
+}
+
+// Gom TAT CA cot gia co gia tri cua 1 dong (G = gia thuong, H = SAPHIA, I = RUBY...)
+function _priceAllPrices_(row) {
+  var out = [];
+  for (var k in row) {
+    var nk = _stripVN_(k);
+    if (nk.indexOf('gia') === -1 && nk.indexOf('price') === -1) continue;
+    var v = row[k];
+    if (v === '' || v === null || v === undefined) continue;
+    out.push(String(k).replace(/\s*\(.*?\)\s*/g, '').trim() + ': ' + v);
   }
   return out;
 }
 
-// ─── CTKM (Sheet CTKM, cung file PRICE_SS_ID) — chi nap khi khach hoi ve khuyen mai/giam gia ──
-// Doc toan bo sheet CTKM thanh mang object, giong cach doc DANH_MUC (khong hardcode ten cot).
+function _priceVariantsForPrompt_(userMsg) {
+  var rows;
+  try {
+    var cache = CacheService.getScriptCache();
+    var cached = cache.get('price_catalog_v2');
+    if (cached) { try { rows = JSON.parse(cached); } catch (e) {} }
+    if (!rows) {
+      rows = readPriceCatalog_();
+      try { cache.put('price_catalog_v2', JSON.stringify(rows), 600); } catch (e) {}
+    }
+  } catch (e) { return ''; }
+  if (!rows || !rows.length) return '';
+
+  var toks = _stripVN_(userMsg).replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+    .filter(function (w) { return w.length >= 3 && _PRICE_STOPWORDS_.indexOf(w) === -1; });
+  if (!toks.length) return '';
+
+  // Cham diem CHI tren cac cot ten (nhom/thuong mai/ten san pham) de tranh nhieu tu cot khac
+  var scored = [];
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    var nameBlob = '';
+    for (var k in r) {
+      var nk = _stripVN_(k);
+      if (nk.indexOf('ten') !== -1 || nk.indexOf('nhom') !== -1) nameBlob += ' ' + r[k];
+    }
+    nameBlob = _stripVN_(nameBlob);
+    if (!nameBlob.trim()) continue;
+    var hit = 0;
+    for (var t = 0; t < toks.length; t++) if (nameBlob.indexOf(toks[t]) !== -1) hit++;
+    if (hit >= 2) scored.push({ row: r, hit: hit, name: nameBlob });
+  }
+  if (!scored.length) return '';
+  scored.sort(function (a, b) { return b.hit - a.hit; });
+  var bestHit = scored[0].hit;
+
+  // Lay cac dong diem cao nhat, roi gom theo TEN SAN PHAM chuan hoa de keo ve DU cac bien the
+  var topNames = {};
+  for (var s = 0; s < scored.length && Object.keys(topNames).length < 3; s++) {
+    if (scored[s].hit < bestHit) break;
+    var f = _priceFieldPick_(scored[s].row, ['ten san pham', 'ten thuong mai']);
+    if (f && f.val) topNames[_stripVN_(f.val)] = String(f.val).trim();
+  }
+  if (!Object.keys(topNames).length) return '';
+
+  var blocks = [];
+  for (var nk2 in topNames) {
+    var variants = [];
+    for (var j = 0; j < rows.length && variants.length < 15; j++) {
+      var rr = rows[j];
+      var fn = _priceFieldPick_(rr, ['ten san pham', 'ten thuong mai']);
+      if (!fn || !fn.val) continue;
+      if (_stripVN_(fn.val) !== nk2) continue;
+      var mat = _priceFieldPick_(rr, ['chat lieu']);
+      var sz = _priceFieldPick_(rr, ['kieu', 'size']);
+      var prices = _priceAllPrices_(rr);
+      if (!prices.length) continue;
+      variants.push('- Chất liệu: ' + ((mat && mat.val) ? mat.val : '(không ghi)') +
+                    ' | Kiểu/Size: ' + ((sz && sz.val) ? sz.val : '(mặc định)') +
+                    ' | ' + prices.join(' · '));
+    }
+    if (variants.length) blocks.push('SẢN PHẨM: ' + topNames[nk2] + '\n' + variants.join('\n'));
+  }
+  if (!blocks.length) return '';
+  return blocks.join('\n\n');
+}
+
+// ─── CTKM (Sheet CTKM, cung file PRICE_SS_ID) — chi nap khi khach hoi ve khuyen mai/giam gia ──// Doc toan bo sheet CTKM thanh mang object, giong cach doc DANH_MUC (khong hardcode ten cot).
 function readCTKMCatalog_() {
   var sh = SpreadsheetApp.openById(PRICE_SS_ID).getSheetByName(CTKM_SHEET_NAME);
   if (!sh || sh.getLastRow() < 2) return [];
   var lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
   var vals = sh.getRange(1, 1, lastRow, lastCol).getValues();
-  var headers = vals[0].map(function(h){ return String(h || '').trim(); });
+  var hIdx = _detectHeaderRow_(vals, 10);
+  var headers = vals[hIdx].map(function(h){ return String(h || '').trim(); });
+  for (var hc = 0; hc < headers.length; hc++) {
+    if (!headers[hc]) headers[hc] = 'Cot ' + _colLetter_(hc + 1);
+  }
   var rows = [];
-  for (var i = 1; i < vals.length; i++) {
+  for (var i = hIdx + 1; i < vals.length; i++) {
     var row = vals[i];
     var isEmpty = row.every(function(c){ return c === '' || c === null; });
     if (isEmpty) continue;
@@ -7556,7 +8142,14 @@ function getSetting_(key) {
   if (!sh || sh.getLastRow() < 2) return null;
   var vals = sh.getDataRange().getValues();
   for (var i = 1; i < vals.length; i++) {
-    if (String(vals[i][0]) === key) return vals[i][1] || null;
+    // .trim() o CA 2 ve: copy-paste API key rat hay dinh khoang trang/xuong dong o cuoi,
+    // ma ky tu do lot vao header Authorization se lam request hong -> bao "Invalid API Key"
+    // du key go dung. Truoc day khong trim nen loi nay rat kho doan ra.
+    if (String(vals[i][0]).trim() === key) {
+      var v = vals[i][1];
+      if (v === '' || v === null || v === undefined) return null;
+      return String(v).trim() || null;
+    }
   }
   return null;
 }
@@ -7618,7 +8211,10 @@ function careObjFromRow_(row) {
     nickZalos:    parseNZ(row[16]),
     birthday:     row[17]||'',
     zaloSetBy:    parseSetBy(row[18]), // { cs, nick, at } - ai/nick nao vua ghi trang thai 'zalo' gan nhat
-    name:         row[19]||''
+    name:         row[19]||'',
+    // Gia tri cac "truong tu tao" admin them (xem CUSTOM_FIELDS ben index.html) — luu gop 1 cot
+    // JSON de khong phai them cot moi moi lan admin tao them truong.
+    custom:       (function(v){ try { var o = JSON.parse(v||'{}'); return (o && typeof o === 'object') ? o : {}; } catch(e) { return {}; } })(row[20])
   };
 }
 
@@ -7646,18 +8242,22 @@ function findCareByPhone_(phone) {
   return null;
 }
 
-// careRow_: 20 cols. Neu truong khong co thi de trong.
+// careRow_: 21 cols. Neu truong khong co thi de trong.
 function careRow_(r) {
   var nz = r.nickZalos;
   if (!Array.isArray(nz)) { try { nz = JSON.parse(nz||'[]'); } catch(e) { nz = []; } }
   var setBy = r.zaloSetBy;
   if (setBy && typeof setBy !== 'string') { try { setBy = JSON.stringify(setBy); } catch(e) { setBy = ''; } }
+  var cust = r.custom;
+  if (typeof cust === 'string') { try { cust = JSON.parse(cust||'{}'); } catch(e) { cust = {}; } }
+  if (!cust || typeof cust !== 'object') cust = {};
   return [
     r.phone||'', r.status||'', r.zalo||'', r.cs||'', r.note||'', r.schedules||'',
     r.schedGoi||'', r.schedGoiNote||'', r.schedSP||'', r.schedSPNote||'',
     r.schedCS||'', r.schedCSNote||'', r.schedHen||'', r.schedHenNote||'',
     new Date().toISOString(),
-    r.khStatus||'', JSON.stringify(nz), r.birthday||'', setBy||'', r.name||''
+    r.khStatus||'', JSON.stringify(nz), r.birthday||'', setBy||'', r.name||'',
+    JSON.stringify(cust)
   ];
 }
 
@@ -7791,10 +8391,10 @@ function doGet(e) {
     // ── Tap SDT co trong "dữ liệu đơn" — chi de loc nguon o man hinh chinh (cache 10') ──
     if (action === 'donPhones') {
       var cacheDP = CacheService.getScriptCache();
-      var cKeyDP = 'don_phones_v2';
+      var cKeyDP = 'don_phones_v3';
       var cachedDP = cacheDP.get(cKeyDP);
       if (cachedDP) { try { return jsonOut_(JSON.parse(cachedDP)); } catch(ec) {} }
-      var resDP = { phones: readDonPhones_(), saleByPhone: getDonSaleByPhone_() };
+      var resDP = { phones: readDonPhones_(), saleByPhone: getDonSaleByPhone_(), orderCountByPhone: getDonOrderCountByPhone_() };
       try { cacheDP.put(cKeyDP, JSON.stringify(resDP), 600); } catch(ec) {}
       return jsonOut_(resDP);
     }
@@ -7805,7 +8405,7 @@ function doGet(e) {
     if (action === 'priceSearch') {
       var q = (e && e.parameter && e.parameter.q) ? String(e.parameter.q) : '';
       var cachePS = CacheService.getScriptCache();
-      var cKeyPS = 'price_catalog_v1';
+      var cKeyPS = 'price_catalog_v2';
       var cachedPS = cachePS.get(cKeyPS);
       var rowsPS;
       if (cachedPS) { try { rowsPS = JSON.parse(cachedPS); } catch(ec) {} }
@@ -7862,6 +8462,8 @@ function doGet(e) {
       return jsonOut_(resB);
     }
     if (action === 'salesReportOptions') return jsonOut_(getSalesReportOptions_());
+    // ── TACH TEN KH: xem truoc danh sach ten doan duoc tu don hang (chua ghi gi) ──
+    if (action === 'previewCustomerNameGuesses') return jsonOut_(previewCustomerNameGuesses_());
     if (action === 'salesReportC') {
       var pC = e.parameter || {};
       var fC = { dateField: pC.dateField || 'ngayTao', periodType: pC.periodType || 'week',
@@ -8055,7 +8657,7 @@ function dtRowToOrder_(row, rowIndex) {
     month: d ? (d.getMonth() + 1) : '',
     cs: String(row[DT_COL_SALEBAN] || ''),
     source: String(row[DT_COL_KENHBAN] || ''),
-    revenue: Number(row[DT_COL_GIATRIDON]) || 0,
+    revenue: _normMoney_(row[DT_COL_GIATRIDON]),
     product: String(row[DT_COL_SANPHAM] || ''),       // text tu do, xem luu y o tren
     productDetail: String(row[DT_COL_PHANLOAI] || ''),
     status: String(row[DT_COL_TRANGTHAI] || ''),
@@ -8092,6 +8694,155 @@ function readOrdersByPhone_(phone) {
     if (!seen[key]) { seen[key] = true; deduped.push(out[k]); }
   }
   return deduped;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TACH TEN KHACH TU DON HANG (backfill hang loat)
+//  Cot "San pham" trong DT TONG la text tu do NV go tay, KHONG theo khuon co dinh: co don ghi
+//  "Ten Sdt Dia chi...", co don ghi "Dia chi Sdt ... Ten Nhắn...", co don chi toan dia chi/ghi
+//  chu gop don khong he co ten. Doan ten tu dong, CHI de xuat cho SDT hien CHUA co ten trong
+//  CareData — nguoi dung phai xem/duyet tren UI truoc khi ghi that (giong het co che
+//  findDuplicateOrders_ + confirm truoc khi xoa), tranh doan sai lam hong du lieu ten dang co.
+// ═══════════════════════════════════════════════════════════════
+var NAME_ADDR_KEYWORDS_RE_ = /\b(đường|phố|phường|xã|quận|huyện|thành phố|tỉnh|ngõ|ngách|khu|tổ|ấp|thôn|xóm|số nhà|tòa|chung cư|đc|địa chỉ)\b/i;
+var NAME_MERGE_LABEL_RE_ = /^(gộp\s*(đơn|cùng)|ghép\s*đơn|địa chỉ)/i;
+var NAME_ALLOWED_CHARS_RE_ = /^[a-zA-ZÀ-ỹ\s.'-]+$/;
+
+function _stripHonorific_(s) {
+  return s.replace(/^(anh|chị|chi|ông|ong|bà|ba|em|c|a)(?=[\s:.]|$)\s*[:.]?\s*/i, '').trim();
+}
+function _truncateAtAddressOrDigit_(s) {
+  var digitIdx = s.search(/\d/);
+  var kwMatch = s.match(NAME_ADDR_KEYWORDS_RE_);
+  var kwIdx = kwMatch ? kwMatch.index : -1;
+  var cut = -1;
+  if (digitIdx >= 0 && kwIdx >= 0) cut = Math.min(digitIdx, kwIdx);
+  else if (digitIdx >= 0) cut = digitIdx;
+  else if (kwIdx >= 0) cut = kwIdx;
+  if (cut >= 0) s = s.substring(0, cut);
+  return s.trim();
+}
+function _isPlausibleName_(s) {
+  if (!s) return false;
+  s = s.trim();
+  if (s.length < 2 || s.length > 40) return false;
+  if (!NAME_ALLOWED_CHARS_RE_.test(s)) return false;
+  if (s.split(/\s+/).length > 5) return false;
+  return true;
+}
+// Tra ve TAT CA ten "ung vien" hop le tim duoc trong 1 doan text don hang, thu 2 cach:
+// (A) dau dong, cat truoc so/tu khoa dia chi dau tien (bat truong hop "Ten Sdt Dia chi...")
+// (B) doan ngay SAU so dien thoai, truoc chu "Nhắn" (bat truong hop "...Sdt Ten Nhắn...")
+function _guessNameCandidatesFromOrderText_(text, phoneDigits) {
+  var out = [];
+  if (!text) return out;
+  var raw = String(text);
+  var firstLine = raw.split('\n')[0].trim();
+  if (firstLine && !NAME_MERGE_LABEL_RE_.test(firstLine)) {
+    var a = firstLine.replace(/(\+?84|0)\d{8,10}/g, '');
+    a = _stripHonorific_(a);
+    a = a.replace(/^[:.\-–]\s*/, '').replace(/[:.\-–]\s*$/, '');
+    a = _truncateAtAddressOrDigit_(a);
+    if (_isPlausibleName_(a)) out.push(a);
+  }
+  if (phoneDigits) {
+    var idx = raw.indexOf(phoneDigits);
+    if (idx >= 0) {
+      var after = raw.substring(idx + phoneDigits.length);
+      var nhanMatch = after.match(/nh[ắaằ]n\b/i);
+      var seg = nhanMatch ? after.substring(0, nhanMatch.index) : after.substring(0, 40);
+      seg = _stripHonorific_(seg.trim());
+      seg = seg.replace(/^[:.\-–]\s*/, '').replace(/[:.\-–]\s*$/, '');
+      seg = _truncateAtAddressOrDigit_(seg);
+      if (_isPlausibleName_(seg)) out.push(seg);
+    }
+  }
+  return out;
+}
+// Giu lai ten cu de tuong thich cac cho khac co the dang goi (tra ve ung vien dau tien theo
+// cach (A) - hanh vi gan giong ham cu, chi them buoc cat tai dia chi/so cho chinh xac hon).
+function _parseNameFromOrderText_(text) {
+  var cands = _guessNameCandidatesFromOrderText_(text, '');
+  return cands.length ? cands[0] : '';
+}
+// Quet TAT CA don cua 1 sdt, gom ung vien ten tu tung don, lay ten xuat hien NHIEU LAN NHAT
+// (thay vi chi lay don dau tien tim thay — tranh vo tinh chon phai don khong co ten/co nhan
+// gop don ma bo qua cac don khac cua cung khach da co ten ro rang).
+function _guessNameForPhone_(orders, phoneDigits) {
+  var freq = {}, bestKey = null;
+  for (var i = 0; i < orders.length; i++) {
+    var cands = _guessNameCandidatesFromOrderText_(orders[i].product, phoneDigits);
+    for (var j = 0; j < cands.length; j++) {
+      var key = cands[j].toLowerCase();
+      if (!freq[key]) freq[key] = { count: 0, sample: cands[j] };
+      freq[key].count++;
+      if (!bestKey || freq[key].count > freq[bestKey].count) bestKey = key;
+    }
+  }
+  return bestKey ? freq[bestKey].sample : '';
+}
+
+// Quet toan bo DT TONG, doan ten cho tung SDT (gom TAT CA don cua sdt do, lay ten xuat hien
+// nhieu lan nhat) — CHI tra ve de UI hien danh sach cho nguoi dung duyet, KHONG ghi gi vao Sheet.
+function previewCustomerNameGuesses_() {
+  var orders = readAllOrders_();
+  var careRows = readCare_(getCrmSS_().getSheetByName(SH_CARE));
+  var existingNames = {};
+  for (var c = 0; c < careRows.length; c++) {
+    if (careRows[c].name) existingNames[normPhone_(String(careRows[c].phone))] = true;
+  }
+  var byPhone = {};
+  for (var i = 0; i < orders.length; i++) {
+    var o = orders[i];
+    if (!o.phone || existingNames[o.phone]) continue;
+    if (!byPhone[o.phone]) byPhone[o.phone] = [];
+    byPhone[o.phone].push(o);
+  }
+  var out = [];
+  Object.keys(byPhone).forEach(function (phone) {
+    var phoneOrders = byPhone[phone];
+    var guess = _guessNameForPhone_(phoneOrders, phone);
+    if (!guess) return;
+    out.push({ phone: phone, guessedName: guess, sample: String(phoneOrders[0].product || '').split('\n')[0].trim().substring(0, 120) });
+  });
+  return { ok: true, count: out.length, items: out };
+}
+
+
+// Ghi that danh sach ten DA DUOC NGUOI DUNG XAC NHAN tren UI (items: [{phone, name}]).
+// Kiem tra lai lan nua tren server: chi ghi cho SDT VAN CHUA co ten tai thoi diem ghi
+// (tranh ghi de neu vua co ai do — vd Pancake AI — cap nhat ten trong luc dang duyet danh sach).
+function applyCustomerNameGuesses_(items) {
+  if (!items || !items.length) return jsonOut_({ ok: false, error: 'Danh sach rong' });
+  var sh = getSheet_(SH_CARE, CARE_HEADERS);
+  var last = sh.getLastRow();
+  var index = {};
+  if (last >= 2) {
+    var vals = sh.getRange(2, 1, last - 1, CARE_HEADERS.length).getValues();
+    for (var i = 0; i < vals.length; i++) {
+      if (vals[i][0]) index[normPhone_(String(vals[i][0]))] = { rowNum: i + 2, name: vals[i][19] || '' };
+    }
+  }
+  var updated = 0, appended = 0, skipped = 0;
+  var newRows = [];
+  for (var k = 0; k < items.length; k++) {
+    var it = items[k];
+    var phone = normPhone_(String(it.phone || ''));
+    var name = String(it.name || '').trim();
+    if (!phone || !name) { skipped++; continue; }
+    var ex = index[phone];
+    if (ex) {
+      if (ex.name) { skipped++; continue; }
+      sh.getRange(ex.rowNum, 20).setValue(name);
+      updated++;
+    } else {
+      newRows.push(careRow_({ phone: phone, name: name }));
+      appended++;
+    }
+  }
+  if (newRows.length) sh.getRange(sh.getLastRow() + 1, 1, newRows.length, CARE_HEADERS.length).setValues(newRows);
+  try { CacheService.getScriptCache().remove('customers_v12'); } catch (ec) {}
+  return jsonOut_({ ok: true, updated: updated, appended: appended, skipped: skipped });
 }
 
 function getDTSS_() {
@@ -8139,6 +8890,15 @@ function dateInRange_(dt, fromStr, toStr) {
 // va SAI mot cach am tham (thieu dung 1000 lan) neu khong xu ly. Voi moi so > 0 va < 1000, hieu la
 // dang nhap theo don vi nghin dong va nhan lai 1000 cho dung don vi dong that.
 function _normMoney_(n) {
+  // Neu o tien la CHUOI TEXT (thuong gap khi copy/paste tu Excel/file khac, hoac o duoc dinh
+  // dang dang Text trong Sheet) co dau phay/cham phan cach hang nghin va/hoac ky hieu tien te
+  // (vd "1,000,000", "1.000.000đ", "1,000,000 ₫") thi Number(...) se ra NaN, va "NaN || 0" se
+  // AM THAM tra ve 0 — lam mat doanh thu ma khong bao loi gi. Don vi VND khong dung phan thap
+  // phan (khong co le), nen an toan de bo HET dau cham/phay/khoang trang/ky hieu tien te truoc
+  // khi parse so.
+  if (typeof n === 'string') {
+    n = n.replace(/[.,\s₫đĐ]/g, '');
+  }
   n = Number(n) || 0;
   if (n > 0 && n < 1000) return n * 1000;
   return n;
@@ -8163,7 +8923,11 @@ function readDTTong_() {
   var out = [];
   for (var i = 0; i < vals.length; i++) {
     var r = vals[i];
-    if (!r[3] && !r[19]) continue; // dong rong: khong co ten nhiem vu lan ID
+    // Dong rong that su: khong SDT, khong ID, VA khong co gia tri don hang (r[17]) — truoc day
+    // chi check thieu SDT+ID la bo qua ca dong, nhung neu dong do LAI CO gia tri doanh thu that
+    // (vd don nhap tay/import cu chua kip gan SDT/ID) thi se bi am tham mat doanh thu khoi
+    // Bao cao A (thap hon thuc te ma khong bao loi gi). Them dieu kien r[17] de an toan hon.
+    if (!r[3] && !r[19] && !r[17]) continue;
     out.push({
       ngayTao:        r[0],
       giaoCho:        r[2],
@@ -8246,6 +9010,20 @@ function getDonSaleByPhone_() {
     for (var j = 0; j < names.length; j++) {
       if (map[ph].indexOf(names[j]) === -1) map[ph].push(names[j]);
     }
+  }
+  return map;
+}
+
+// Map SDT -> so dong (so don) trong "dữ liệu đơn" — dung de PHAN LOAI HANG KH (VIP/Than
+// thiet/Tiem nang/Chua ban lai duoc) theo tieu chi moi: dem theo SO DONG trong sheet nay,
+// KHONG con dua theo nguon Renew trong DT TONG nhu truoc.
+function getDonOrderCountByPhone_() {
+  var rows = readDonChiTiet_();
+  var map = {};
+  for (var i = 0; i < rows.length; i++) {
+    var ph = normPhone_(String(rows[i].soDienThoai || ''));
+    if (!ph) continue;
+    map[ph] = (map[ph] || 0) + 1;
   }
   return map;
 }
@@ -8859,7 +9637,8 @@ function doPost(e) {
     if (action === 'saveBatch')           return saveBatchCare_(data.rows);
     if (action === 'saveOrders')          return saveOrders_(data.orders);
     if (action === 'addCareLead')         return addCareLead_(data);
-    if (action === 'patchOrder')          return patchOrder_(data);
+    // ── TACH TEN KH: ghi that danh sach ten da duoc nguoi dung xac nhan tren UI ──
+    if (action === 'applyCustomerNameGuesses') return applyCustomerNameGuesses_(data.items);    if (action === 'patchOrder')          return patchOrder_(data);
     if (action === 'deleteOrder')         return deleteOrder_(data);
     // ── Xuat bao cao doanh so (dang loc tren UI) ra 1 tab moi trong Google Sheet CRM ──
     if (action === 'exportSalesReportSheet') return jsonOut_(exportSalesReportToSheet_(data.reportType, data.filters));
@@ -8903,6 +9682,9 @@ function doPost(e) {
     if (action === 'dedupeCare')           return dedupeCare_();
     // ── HOI THAM TU DONG: luu bang mau tin (UI Sasum) ──
     if (action === 'saveFollowUpTemplates') return saveFollowUpTemplates_(data.templates);
+    // ── MESSENGER/PHONG THUY AI: doc bang tra menh + mau canned response (Sheet Menh/CannedResponses,
+    //    tu tao voi du lieu mac dinh neu chua co). Them 2026-09, KHONG dung chung sheet/cot voi CareData. ──
+    if (action === 'getKnowledge') return jsonOut_(getMessengerKnowledge_());
     return jsonOut_({ error: 'Unknown action: ' + action });
   } catch(err) {
     return jsonOut_({ error: err.message });
@@ -9144,7 +9926,7 @@ function patchOrder_(data) {
     var yy = d ? d.getFullYear() : '', mm = d ? (d.getMonth() + 1) : '';
     if (String(yy) !== String(data.oldYear)) continue;
     if (String(mm) !== String(data.oldMonth)) continue;
-    if (Number(r[DT_COL_GIATRIDON]) !== Number(data.oldRevenue)) continue;
+    if (_normMoney_(r[DT_COL_GIATRIDON]) !== _normMoney_(data.oldRevenue)) continue;
     rowIdx = i + 2; break;
   }
   if (rowIdx === -1) return jsonOut_({ ok: false, updated: false, error: 'Khong tim thay dong don hang phu hop trong DT TONG' });
@@ -9178,7 +9960,7 @@ function deleteOrder_(data) {
       var yy = d ? d.getFullYear() : '', mm = d ? (d.getMonth() + 1) : '';
       if (String(yy) !== String(data.oldYear)) continue;
       if (String(mm) !== String(data.oldMonth)) continue;
-      if (Number(r[DT_COL_GIATRIDON]) !== Number(data.oldRevenue)) continue;
+      if (_normMoney_(r[DT_COL_GIATRIDON]) !== _normMoney_(data.oldRevenue)) continue;
     }
     sh.deleteRow(i + 2);
     try { CacheService.getScriptCache().remove('lk_' + normPhone_(String(data.phone))); } catch (ec) {}
@@ -9227,7 +10009,7 @@ function findDuplicateOrders_(phoneFilter) {
         sheet: DT_TONG_SHEET, rowIndex: i + 2, id: r[DT_COL_ID] != null ? String(r[DT_COL_ID]) : '',
         phone: r[DT_COL_PHONE], name: '', date: r[DT_COL_THOIGIANHT] || '',
         year: '', month: '', cs: r[DT_COL_SALEBAN] || '', source: r[DT_COL_KENHBAN] || '',
-        revenue: Number(r[DT_COL_GIATRIDON]) || 0, product: r[DT_COL_SANPHAM] || '',
+        revenue: _normMoney_(r[DT_COL_GIATRIDON]), product: r[DT_COL_SANPHAM] || '',
         productDetail: r[DT_COL_PHANLOAI] || '', status: r[DT_COL_TRANGTHAI] || ''
       });
     }
@@ -9301,7 +10083,7 @@ function deleteDuplicateOrders_(items) {
       } else {
         if (it.phone   != null && it.phone   !== '' && normPhone_(String(rowVals[DT_COL_PHONE])) !== normPhone_(String(it.phone))) match = false;
         if (match && it.date    != null && it.date    !== '' && normOrderDate_(rowVals[DT_COL_THOIGIANHT]) !== normOrderDate_(it.date)) match = false;
-        if (match && it.revenue != null && it.revenue !== '' && (Number(rowVals[DT_COL_GIATRIDON]) || 0) !== (Number(it.revenue) || 0)) match = false;
+        if (match && it.revenue != null && it.revenue !== '' && _normMoney_(rowVals[DT_COL_GIATRIDON]) !== _normMoney_(it.revenue)) match = false;
         if (match && it.product != null && it.product !== '' && _normTxt_(rowVals[DT_COL_SANPHAM]) !== _normTxt_(it.product)) match = false;
       }
       if (!match) { skipped++; return; } // dong da bi dich/doi khac voi luc CS bam xoa -> KHONG xoa, tranh xoa nham
@@ -10017,7 +10799,23 @@ function _buildAISystemPrompt_(userMsg, withProducts) {
   // CTKM: chi nap khi cau hoi cua khach co tu khoa khuyen mai/giam gia (xem readCTKMPromotions_)
   var ctkm = readCTKMPromotions_(userMsg);
   if (ctkm) parts.push('\n\nCHUONG TRINH KHUYEN MAI (CTKM) DANG AP DUNG (chi dung khi khach hoi ve khuyen mai/giam gia, KHONG tu bia them neu khong co trong danh sach nay):\n' + ctkm);
-  parts.push('\n\nYEU CAU: Chi dua ra DUY NHAT 1 cau tra loi ngan gon (toi da 150 tu). Khong danh so, khong giai thich them.');
+  // ── BANG GIA: cac bien the (chat lieu/size/gia) cua san pham duoc nhac toi ──
+  var priceInfo = _priceVariantsForPrompt_(userMsg);
+  var hasMultiVariant = false;
+  if (priceInfo) {
+    hasMultiVariant = priceInfo.split('\n').filter(function (l) { return l.indexOf('- Chất liệu:') === 0; }).length > 1;
+    parts.push('\n\nBANG GIA CHINH THUC (nguon: Sheet DANH_MUC cua team — CHI dung so lieu trong day, TUYET DOI KHONG tu bia gia hay tu suy ra gia khac):\n' + priceInfo);
+    parts.push('\n\nQUY TAC BAO GIA:\n' +
+      '- Neu sale/khach DA noi ro chat lieu va size: chi bao dung 1 muc gia khop nhat.\n' +
+      '- Neu KHONG ghi ro chat lieu hoac size: PHAI liet ke DAY DU TAT CA cac truong hop tim thay o tren, moi dong ghi ro chat lieu + kieu/size + gia tuong ung, roi hoi lai khach muon loai nao. KHONG duoc tu chon 1 muc gia roi bo qua cac muc con lai.\n' +
+      '- Gia trong bang tinh bang NGHIN VND (vd 2.310 = 2.310.000d). Khi bao gia cho khach hay quy ra dong cho de hieu.\n' +
+      '- Neu san pham co them cot gia SAPHIA/RUBY thi neu ro do la gia cua loai da tuong ung.');
+  }
+  if (hasMultiVariant) {
+    parts.push('\n\nYEU CAU: Tra loi bang tieng Viet, than thien. Vi co NHIEU lua chon chat lieu/size, hay liet ke DU cac lua chon (moi lua chon 1 dong ngan: chat lieu - size - gia), sau do hoi khach chon loai nao. Khong dai dong ngoai phan bao gia.');
+  } else {
+    parts.push('\n\nYEU CAU: Chi dua ra DUY NHAT 1 cau tra loi ngan gon (toi da 150 tu). Khong danh so, khong giai thich them.');
+  }
   return parts.join('');
 }
 
@@ -10078,15 +10876,16 @@ function callAI_(data) {
   // tai) va gemini-flash-latest (alias Google tu dong tro ve ban Flash on dinh moi
   // nhat, tranh phai sua code moi khi Google lai ngung ho tro 1 phien ban cu the).
   var providers = [
-    { name: 'Groq',     key: getSetting_('apiGroq') || getSetting_('geminiKey'), fn: _aiOpenAICompat_, url: 'https://api.groq.com/openai/v1/chat/completions',     model: 'openai/gpt-oss-120b' },
-    { name: 'Cerebras', key: getSetting_('apiCerebras'),                          fn: _aiOpenAICompat_, url: 'https://api.cerebras.ai/v1/chat/completions',        model: 'gpt-oss-120b' },
-    { name: 'Gemini',   key: getSetting_('apiGemini'),                            fn: _aiGemini_,       model: 'gemini-flash-latest' }
+    { name: 'Groq',       setting: 'apiGroq',       key: getSetting_('apiGroq') || getSetting_('geminiKey'), fn: _aiOpenAICompat_, url: 'https://api.groq.com/openai/v1/chat/completions',        model: 'openai/gpt-oss-120b' },
+    { name: 'Cerebras',   setting: 'apiCerebras',   key: getSetting_('apiCerebras'),                         fn: _aiOpenAICompat_, url: 'https://api.cerebras.ai/v1/chat/completions',           model: 'gpt-oss-120b' },
+    { name: 'Gemini',     setting: 'apiGemini',     key: getSetting_('apiGemini'),                           fn: _aiGemini_,       model: 'gemini-flash-latest' },
+    { name: 'OpenRouter', setting: 'apiOpenRouter', key: getSetting_('apiOpenRouter'),                       fn: _aiOpenAICompat_, url: 'https://openrouter.ai/api/v1/chat/completions',         model: 'google/gemma-2-9b-it:free' }
   ];
 
-  var errors = [], anyKey = false;
+  var errors = [], missing = [], anyKey = false;
   for (var i = 0; i < providers.length; i++) {
     var pv = providers[i];
-    if (!pv.key) continue;
+    if (!pv.key) { missing.push(pv.name + ' (thieu o Settings: ' + pv.setting + ')'); continue; }
     anyKey = true;
     var r = pv.fn(pv, sys, userMsg);
     if (r.ok && r.text) {
@@ -10105,11 +10904,63 @@ function callAI_(data) {
       }
       return jsonOut_(out);
     }
-    errors.push(pv.name + ': ' + (r.error || 'rong'));
-    // loi (429/sai key/...) -> tu dong thu provider ke tiep
+    // Kem theo dau key dang dung (da che) de phan biet ngay 2 truong hop rat de nham:
+    // key SAI vs key DUNG nhung het quota/het han — truoc day chi thay "401" nen kho doan.
+    errors.push(pv.name + ' [' + _maskKey_(pv.key) + ']: ' + (r.error || 'rong'));
   }
-  if (!anyKey) return jsonOut_({ error: 'Chua co API Key nao. Mo extension → banh rang → nhap it nhat 1 key (Groq/Cerebras/Gemini).' });
-  return jsonOut_({ error: 'Tat ca API deu loi: ' + errors.join(' | ') });
+  if (!anyKey) {
+    return jsonOut_({ error: 'Chua co API Key nao trong sheet Settings. Mo extension → banh rang ⚙ → nhap it nhat 1 key (Groq/Cerebras/Gemini/OpenRouter) roi bam Luu. Thieu: ' + missing.join(', ') });
+  }
+  var msg = 'Tat ca API deu loi: ' + errors.join(' | ');
+  if (missing.length) msg += ' || Chua cau hinh: ' + missing.join(', ');
+  return jsonOut_({ error: msg });
+}
+
+// Che API key khi dua vao thong bao loi/chan doan: chi giu dau va duoi de doi chieu voi key
+// tren trang nha cung cap, khong bao gio lo nguyen key ra man hinh/log.
+function _maskKey_(k) {
+  k = String(k || '');
+  if (!k) return 'trong';
+  if (k.length <= 12) return k.substring(0, 3) + '***';
+  return k.substring(0, 6) + '***' + k.substring(k.length - 4) + ' (' + k.length + ' ky tu)';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CHAN DOAN API KEY — chay truc tiep trong Apps Script Editor
+//  (Chon ham diagApiKeys > bam Run > xem tab Execution log)
+//  Bao cho biet: sheet Settings dang giu key nao, dai bao nhieu, co dinh khoang trang
+//  khong, va goi thu tung nha cung cap de biet chinh xac cai nao song cai nao chet.
+// ═══════════════════════════════════════════════════════════════
+function diagApiKeys() {
+  var ss = getCrmSS_();
+  var sh = ss.getSheetByName(SH_SET);
+  Logger.log('Spreadsheet dang dung: ' + ss.getName() + ' (' + ss.getId() + ')');
+  if (!sh) { Logger.log('!! KHONG TIM THAY sheet "' + SH_SET + '" -> moi key deu rong.'); return; }
+
+  var names = ['apiGroq', 'apiCerebras', 'apiGemini', 'apiOpenRouter'];
+  var raw = sh.getDataRange().getValues();
+  Logger.log('--- Gia tri THO trong sheet Settings ---');
+  names.forEach(function (n) {
+    var found = null;
+    for (var i = 1; i < raw.length; i++) if (String(raw[i][0]).trim() === n) { found = raw[i][1]; break; }
+    if (found === null) { Logger.log(n + ': (KHONG CO DONG NAY trong sheet)'); return; }
+    var s = String(found);
+    Logger.log(n + ': ' + _maskKey_(s.trim()) +
+      (s !== s.trim() ? '  <-- CO KHOANG TRANG/XUONG DONG THUA (da tu cat khi dung)' : ''));
+  });
+
+  Logger.log('--- Goi thu tung nha cung cap ---');
+  var tests = [
+    { name: 'Groq',       key: getSetting_('apiGroq') || getSetting_('geminiKey'), fn: _aiOpenAICompat_, url: 'https://api.groq.com/openai/v1/chat/completions', model: 'openai/gpt-oss-120b' },
+    { name: 'Cerebras',   key: getSetting_('apiCerebras'),   fn: _aiOpenAICompat_, url: 'https://api.cerebras.ai/v1/chat/completions', model: 'gpt-oss-120b' },
+    { name: 'Gemini',     key: getSetting_('apiGemini'),     fn: _aiGemini_,       model: 'gemini-flash-latest' },
+    { name: 'OpenRouter', key: getSetting_('apiOpenRouter'), fn: _aiOpenAICompat_, url: 'https://openrouter.ai/api/v1/chat/completions', model: 'google/gemma-2-9b-it:free' }
+  ];
+  tests.forEach(function (t) {
+    if (!t.key) { Logger.log(t.name + ': CHUA CO KEY -> bo qua'); return; }
+    var r = t.fn(t, 'Ban la tro ly. Tra loi that ngan.', 'Noi "ok"');
+    Logger.log(t.name + ' [' + _maskKey_(t.key) + ']: ' + (r.ok ? 'OK — ' + String(r.text).substring(0, 40) : 'LOI — ' + r.error));
+  });
 }
 
 
@@ -10838,6 +11689,68 @@ function saveTaskComment_(c) {
   return jsonOut_({ ok: true, id: id });
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  MESSENGER / PHONG THUY AI — them 2026-09, phuc vu extension-messenger.
+//  CHI THEM MOI, khong sua ham/sheet nao o tren. Dung 2 sheet rieng (Menh, CannedResponses),
+//  KHONG dung chung cot voi CareData — tranh dung do schema dang chay that cho Zalo/Pancake.
+// ═══════════════════════════════════════════════════════════════
+var SH_MENH = 'Menh';
+var SH_CANNED = 'CannedResponses';
+
+// Bang tra menh Ngu hanh nap am (chep tu bang CS da doi chieu — chi khop nam 1954-2013,
+// can chuyen gia phong thuy trong cong ty ra soat/bo sung truoc khi dung chinh thuc rong rai hon).
+var MENH_DEFAULT_ROWS = [
+  ['Kim', '1954,1955,1962,1963,1970,1971,1984,1985,1992,1993,2000,2001'],
+  ['Thủy', '1956,1957,1964,1965,1972,1973,1986,1987,1994,1995,2002,2003'],
+  ['Hỏa', '1958,1959,1966,1967,1974,1975,1988,1989,1996,1997,2004,2005'],
+  ['Mộc', '1960,1961,1968,1969,1982,1983,1990,1991,1998,1999,2012,2013'],
+  ['Thổ', '1976,1977,1978,1979,1980,1981,2006,2007,2008,2009,2010,2011']
+];
+
+// 11 mau canned response (Phan A/B/C file mau Beeftext CS gui) — Nhom | ID | Ten | NoiDung
+var CANNED_DEFAULT_ROWS = [
+  ['Theo mệnh', 'menhkim', 'Mệnh Kim', 'Dạ với người mệnh Kim thì màu hợp là màu trắng, vàng, bạc (thuộc hành Kim và Thổ vì Thổ sinh Kim ạ), nên tránh dùng nhiều màu đỏ, hồng, tím (hành Hỏa khắc Kim).\nĐá phong thủy hợp mệnh Kim: đá thạch anh trắng, đá mắt hổ vàng, ngọc trai, đá obsidian đen (Thủy tương sinh).\nBên em hiện có $$ rất phù hợp với mệnh Kim ạ, chị/anh xem qua thử nhé.'],
+  ['Theo mệnh', 'menhmoc', 'Mệnh Mộc', 'Dạ với người mệnh Mộc thì màu hợp là màu xanh lá, xanh dương, đen (hành Mộc và Thủy vì Thủy sinh Mộc ạ), nên tránh dùng nhiều màu trắng, bạc (hành Kim khắc Mộc).\nĐá phong thủy hợp mệnh Mộc: đá aventurine xanh, ngọc bích, đá obsidian đen.\nBên em hiện có $$ rất phù hợp với mệnh Mộc ạ, chị/anh xem qua thử nhé.'],
+  ['Theo mệnh', 'menhthuy', 'Mệnh Thủy', 'Dạ với người mệnh Thủy thì màu hợp là màu đen, xanh dương, trắng (hành Thủy và Kim vì Kim sinh Thủy ạ), nên tránh dùng nhiều màu vàng nâu (hành Thổ khắc Thủy).\nĐá phong thủy hợp mệnh Thủy: đá obsidian đen, đá lapis lazuli xanh, đá thạch anh trắng.\nBên em hiện có $$ rất phù hợp với mệnh Thủy ạ, chị/anh xem qua thử nhé.'],
+  ['Theo mệnh', 'menhhoa', 'Mệnh Hỏa', 'Dạ với người mệnh Hỏa thì màu hợp là màu đỏ, hồng, tím, xanh lá (hành Hỏa và Mộc vì Mộc sinh Hỏa ạ), nên tránh dùng nhiều màu đen, xanh dương (hành Thủy khắc Hỏa).\nĐá phong thủy hợp mệnh Hỏa: đá thạch anh hồng, đá garnet đỏ, đá aventurine xanh.\nBên em hiện có $$ rất phù hợp với mệnh Hỏa ạ, chị/anh xem qua thử nhé.'],
+  ['Theo mệnh', 'menhtho', 'Mệnh Thổ', 'Dạ với người mệnh Thổ thì màu hợp là màu vàng, nâu, đỏ, hồng (hành Thổ và Hỏa vì Hỏa sinh Thổ ạ), nên tránh dùng nhiều màu xanh lá (hành Mộc khắc Thổ).\nĐá phong thủy hợp mệnh Thổ: đá mắt hổ vàng, đá citrine vàng, đá thạch anh hồng.\nBên em hiện có $$ rất phù hợp với mệnh Thổ ạ, chị/anh xem qua thử nhé.'],
+  ['Giá & chính sách', 'chaohoi', 'Chào hỏi', 'Dạ em chào chị/anh, em là $$ bên shop phong thủy Thu Hiền ạ. Chị/anh cho em xin năm sinh để em tư vấn sản phẩm hợp mệnh nhất mình nhé ạ 🙏'],
+  ['Giá & chính sách', 'giaba', 'Báo giá', 'Dạ sản phẩm $$ bên em giá là $$ ạ. Giá này đã bao gồm hộp đựng và thẻ bảo hành, chưa gồm phí ship ạ. Chị/anh có muốn em tư vấn thêm mẫu khác cùng tầm giá không ạ?'],
+  ['Giá & chính sách', 'csship', 'Chính sách ship', 'Dạ bên em giao hàng toàn quốc qua đơn vị vận chuyển, thời gian dự kiến 2–4 ngày với nội thành và 3–5 ngày với tỉnh xa ạ. Chị/anh có thể xem hàng trước khi thanh toán (COD) ạ.'],
+  ['Giá & chính sách', 'csdoitra', 'Đổi trả', 'Dạ sản phẩm bên em hỗ trợ đổi trong vòng 7 ngày nếu lỗi do nhà sản xuất hoặc không đúng mẫu đã đặt ạ, còn đổi ý cá nhân thì em xin phép hỗ trợ đổi mẫu khác tương đương giá trị trong 3 ngày ạ (khách chịu phí ship đổi). Chị/anh yên tâm mua ạ 🙏'],
+  ['Giá & chính sách', 'xinttin', 'Xin thông tin lên đơn', 'Dạ để lên đơn cho chị/anh, em xin thông tin: \n- Họ tên: $$\n- Số điện thoại: $$\n- Địa chỉ nhận hàng: $$\nChị/anh gửi giúp em với ạ, em lên đơn ngay ạ.'],
+  ['Giá & chính sách', 'follow2ngay', 'Follow-up 2 ngày', 'Dạ em là $$ bên phong thủy Thu Hiền ạ, hôm trước chị/anh có quan tâm sản phẩm $$, không biết chị/anh đã quyết định chưa ạ? Hiện bên em đang có ưu đãi $$, chị/anh xem thử nhé ạ 🙏']
+];
+
+function ensureMenhSheedSeeded_(sh) {
+  if (sh.getLastRow() < 2) { for (var i = 0; i < MENH_DEFAULT_ROWS.length; i++) sh.appendRow(MENH_DEFAULT_ROWS[i]); }
+  return sh;
+}
+function ensureCannedSheetSeeded_(sh) {
+  if (sh.getLastRow() < 2) { for (var i = 0; i < CANNED_DEFAULT_ROWS.length; i++) sh.appendRow(CANNED_DEFAULT_ROWS[i]); }
+  return sh;
+}
+
+function getMessengerKnowledge_() {
+  var shMenh = ensureMenhSheedSeeded_(getSheet_(SH_MENH, ['Menh', 'NamSinh (cách nhau bởi dấu phẩy)']));
+  var menhData = shMenh.getDataRange().getValues();
+  var menhTable = {};
+  for (var r = 1; r < menhData.length; r++) {
+    var menh = String(menhData[r][0] || '').trim();
+    if (!menh) continue;
+    menhTable[menh] = String(menhData[r][1] || '').split(',').map(function (s) { return parseInt(s.trim(), 10); }).filter(function (n) { return !isNaN(n); });
+  }
+
+  var shCanned = ensureCannedSheetSeeded_(getSheet_(SH_CANNED, ['Nhom', 'ID', 'Ten', 'NoiDung']));
+  var cannedData = shCanned.getDataRange().getValues();
+  var canned = [];
+  for (var c = 1; c < cannedData.length; c++) {
+    if (!cannedData[c][1]) continue;
+    canned.push({ nhom: cannedData[c][0], id: cannedData[c][1], label: cannedData[c][2], text: cannedData[c][3] });
+  }
+  return { ok: true, menhTable: menhTable, canned: canned };
+}
+
 </script>
 
 <!-- ════════════ V9 FEATURE LAYER ════════════ -->
@@ -10878,6 +11791,7 @@ function _filterSignature(){
     typeof currentCare  !== 'undefined' ? currentCare  : '',
     typeof currentZalo  !== 'undefined' ? currentZalo  : '',
     typeof currentBrand !== 'undefined' ? currentBrand : '',
+    (typeof currentCF !== 'undefined' ? JSON.stringify(currentCF) : ''),
     val('search-input').toLowerCase(),
     _csFilterList().join('|'),
     (document.querySelector('.srt') ? document.querySelector('.srt').value : ''),
@@ -10893,6 +11807,9 @@ function _filterSignature(){
     parts.push('af', _setSig(advFilters.cs), _setSig(advFilters.products), _setSig(advFilters.sources),
       _setSig(advFilters.careStatus), _setSig(advFilters.zaloStatus),
       advFilters.yearFrom, advFilters.monthFrom, advFilters.yearTo, advFilters.monthTo);
+    // Trường tự tạo ở lọc nâng cao (sắp khoá để chữ ký ổn định giữa các lần)
+    var _cfKeys = Object.keys(advFilters.custom || {}).sort();
+    parts.push('afcf', _cfKeys.map(function(k){ return k + ':' + _setSig(advFilters.custom[k]); }).join(';'));
   }
   return parts.join('§');
 }
@@ -11016,6 +11933,12 @@ function _buildCsSet_(orders, phone){
   if (typeof donSaleByPhone !== 'undefined' && donSaleByPhone && phone && donSaleByPhone[phone]) {
     donSaleByPhone[phone].forEach(function(n){ if (n) set.add(n); });
   }
+  // Sale TU THEM SO MOI (nut "+ Thêm KH/Đơn nhanh") cung duoc tinh la CS phu trach cua so do
+  // — luc moi them chua co don nao trong DT tong/dữ liệu đơn nen neu khong lay tu careLeads
+  // thi so vua them se KHONG hien ra khi chinh sale do loc theo "CS phụ trách".
+  if (typeof careLeads !== 'undefined' && careLeads && phone && careLeads[phone] && careLeads[phone].cs) {
+    String(careLeads[phone].cs).split(',').forEach(function(n){ n = n.trim(); if (n) set.add(n); });
+  }
   return set;
 }
 function _heldBy(c){
@@ -11092,7 +12015,8 @@ function _careRow(phone){
     schedCS: care.schedCS||'', schedCSNote: care.schedCSNote||'',
     schedHen: care.schedHen||'', schedHenNote: care.schedHenNote||'',
     khStatus: care.khStatus||'', nickZalos: care.nickZalos||[], birthday: care.birthday||'',
-    name: care.name||''
+    name: care.name||'',
+    custom: care.custom||{}
   };
 }
 // Chỉ đồng bộ CareData khi khách có DỮ LIỆU CS NHẬP THẬT.
@@ -11108,6 +12032,11 @@ function _hasRealCareData(phone){
   if ((care.birthday||'').toString().trim()) return true;
   if ((care.name||'').toString().trim())     return true;
   if (Array.isArray(care.nickZalos) && care.nickZalos.length) return true;
+  // Trường tự tạo (admin thêm) có giá trị → cũng là dữ liệu CS nhập thật, phải được đồng bộ
+  // (nếu thiếu điều kiện này, khách CHỈ điền trường tự tạo sẽ không bao giờ được đẩy lên Sheet)
+  if (care.custom && typeof care.custom === 'object') {
+    for (var _ck in care.custom) { if ((care.custom[_ck]||'').toString().trim()) return true; }
+  }
   // Lịch nhanh đặt tay
   if ((care.schedGoi||'').toString().trim()) return true;
   if ((care.schedSP||'').toString().trim())  return true;
@@ -11264,11 +12193,25 @@ function saveRole(){
 // ═══════════════════════════════════════════════════════
 //  THỐNG KÊ CHO DASHBOARD
 // ═══════════════════════════════════════════════════════
-function _computeCSStats(){
+// Đơn có nằm trong khoảng ngày lọc của Dashboard không (bỏ trống 2 đầu = không lọc).
+// Đơn cũ chỉ có year/month (không có ngày cụ thể) → quy ước lấy ngày 01 của tháng đó.
+function _dashOrderInRange(o, dFrom, dTo){
+  if (!dFrom && !dTo) return true;
+  var t = null;
+  if (o.date instanceof Date && !isNaN(o.date)) t = new Date(o.date.getFullYear(), o.date.getMonth(), o.date.getDate()).getTime();
+  else if (o.year && o.month) t = new Date(+o.year, +o.month - 1, 1).getTime();
+  if (t === null) return false; // đơn không xác định được ngày → loại khi đang lọc theo thời gian
+  if (dFrom && t < new Date(dFrom + 'T00:00:00').getTime()) return false;
+  if (dTo   && t > new Date(dTo   + 'T23:59:59').getTime()) return false;
+  return true;
+}
+
+// list/dFrom/dTo đều tùy chọn — không truyền thì giữ nguyên hành vi cũ (toàn bộ KH, mọi thời gian)
+function _computeCSStats(list, dFrom, dTo){
   var map = {}; // name -> {name, held, closed, friend, cared, revenue, orders}
   function ensure(n){ if(!map[n]) map[n]={name:n,held:0,closed:0,friend:0,cared:0,revenue:0,orders:0}; return map[n]; }
-  var list = (typeof allCustomers !== 'undefined' ? allCustomers : []);
-  list.forEach(function(c){
+  var arr = list || (typeof allCustomers !== 'undefined' ? allCustomers : []);
+  arr.forEach(function(c){
     var h = _heldBy(c);
     if (h){
       var m = ensure(h);
@@ -11279,6 +12222,7 @@ function _computeCSStats(){
     }
     // doanh thu/đơn theo CS thực bán (order.cs)
     (c.orders||[]).forEach(function(o){
+      if (!_dashOrderInRange(o, dFrom, dTo)) return;
       if (o.cs){ var mm = ensure(o.cs); mm.revenue += (+o.revenue||0); mm.orders++; }
     });
   });
@@ -11630,11 +12574,38 @@ function _dashResetTemplate() {
 
 function renderDashboard(){
   _dashLoad();
+  _dashFilterLoad();
   var wrap = document.getElementById('dash-wrap');
   if (!wrap) return;
-  var list = (typeof allCustomers!=='undefined'?allCustomers:[]).filter(_inUserScope);
+
+  var f = _dashFilter;
+  // Danh sách CS được phép xem (theo quyền) — dùng để dựng dropdown Nhân viên
+  var scopeList = (typeof allCustomers!=='undefined'?allCustomers:[]).filter(_inUserScope);
+
+  // 1) Lọc theo TEAM / NHÂN VIÊN: giữ KH mà người phụ trách (hoặc CS đang giữ) nằm trong nhóm đã chọn
+  var nameFilter = null;               // null = không lọc
+  if (f.cs) nameFilter = new Set([f.cs]);
+  else if (f.team){
+    var tObj = teams.find(function(t){ return String(t.id)===String(f.team) || t.name===f.team; });
+    nameFilter = _teamMemberSet(tObj);
+  }
+  var list = scopeList.filter(function(c){
+    if (nameFilter && nameFilter.size){
+      var hit = false;
+      var h = _heldBy(c); if (h && nameFilter.has(h)) hit = true;
+      if (!hit && c.careCSSet) c.careCSSet.forEach(function(n){ if (nameFilter.has(n)) hit = true; });
+      if (!hit) (c.orders||[]).forEach(function(o){ if (o.cs && nameFilter.has(o.cs)) hit = true; });
+      if (!hit) return false;
+    }
+    // 2) Lọc THỜI GIAN: khi có chọn khoảng ngày, chỉ tính KH có ít nhất 1 đơn trong khoảng đó
+    if (f.from || f.to){
+      return (c.orders||[]).some(function(o){ return _dashOrderInRange(o, f.from, f.to); });
+    }
+    return true;
+  });
+
   var totalKH = list.length;
-  var csStats = _computeCSStats();
+  var csStats = _computeCSStats(list, f.from, f.to);
   var csArr = Object.keys(csStats).map(function(k){return csStats[k];});
   if (currentUser.role!=='admin'){
     var myNamesDash = (currentUser.names && currentUser.names.length) ? currentUser.names : (currentUser.name?[currentUser.name]:[]);
@@ -11644,6 +12615,7 @@ function renderDashboard(){
       var ms=_teamMemberSet(team);return ms.has(s.name);
     });
   }
+  if (nameFilter && nameFilter.size) csArr = csArr.filter(function(s){ return nameFilter.has(s.name); });
   csArr.forEach(function(s){s.closeRate=s.held?Math.round(s.closed/s.held*100):0;s.friendRate=s.held?Math.round(s.friend/s.held*100):0;});
   var teamStats=_computeTeamStats(csStats);
 
@@ -11668,7 +12640,7 @@ function renderDashboard(){
     '<button class="btn sm" onclick="_dashSaveTemplate()" title="Lưu mẫu mới">💾 Lưu mẫu</button>'+
     '<button class="btn sm" onclick="_dashDeleteTemplate()" title="Xóa mẫu này" style="color:var(--red)">🗑</button>'+
     '<button class="btn sm" onclick="_dashResetTemplate()" title="Khôi phục mặc định">↺ Reset</button>'+
-  '</div>';
+  '</div>' + _dashFilterBarHtml(scopeList);
 
   var grid='<div class="dash-widget-grid">';
   ws.forEach(function(w,i){
@@ -11678,6 +12650,87 @@ function renderDashboard(){
   grid+='</div>';
 
   wrap.innerHTML=toolbar+grid;
+}
+
+// ── BỘ LỌC DASHBOARD: thời gian / team / nhân viên ─────────────
+var _dashFilter = { from:'', to:'', team:'', cs:'' };
+function _dashFilterLoad(){
+  var saved = loadLS('ome_dash_filter');
+  if (saved && typeof saved === 'object') _dashFilter = Object.assign({ from:'', to:'', team:'', cs:'' }, saved);
+}
+function _dashFilterSave(){ saveLS('ome_dash_filter', _dashFilter); }
+function _dashSetFilter(key, val){
+  _dashFilter[key] = val || '';
+  // Chọn Team mới thì bỏ chọn nhân viên cũ (nhân viên đó có thể không thuộc team vừa chọn)
+  if (key === 'team') _dashFilter.cs = '';
+  _dashFilterSave();
+  renderDashboard();
+}
+function _dashSetPreset(preset){
+  var now = new Date(), y = now.getFullYear(), m = now.getMonth();
+  function ymd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  if (preset === 'all')        { _dashFilter.from=''; _dashFilter.to=''; }
+  else if (preset === 'month') { _dashFilter.from=ymd(new Date(y,m,1));      _dashFilter.to=ymd(new Date(y,m+1,0)); }
+  else if (preset === 'last')  { _dashFilter.from=ymd(new Date(y,m-1,1));    _dashFilter.to=ymd(new Date(y,m,0)); }
+  else if (preset === 'q')     { var q=Math.floor(m/3); _dashFilter.from=ymd(new Date(y,q*3,1)); _dashFilter.to=ymd(new Date(y,q*3+3,0)); }
+  else if (preset === 'year')  { _dashFilter.from=ymd(new Date(y,0,1));      _dashFilter.to=ymd(new Date(y,11,31)); }
+  _dashFilterSave();
+  renderDashboard();
+}
+function _dashFilterBarHtml(scopeList){
+  var f = _dashFilter;
+  // Team: admin xem hết, còn lại chỉ thấy team của mình
+  var teamOpts = teams.filter(function(t){
+    if (currentUser.role === 'admin') return true;
+    var myNames = (currentUser.names && currentUser.names.length) ? currentUser.names : (currentUser.name?[currentUser.name]:[]);
+    return t.name === currentUser.team || myNames.indexOf(t.leader) !== -1;
+  });
+  // Nhân viên: nếu đã chọn team thì chỉ liệt kê người trong team đó
+  var csNames;
+  if (f.team){
+    var tObj = teams.find(function(t){ return String(t.id)===String(f.team) || t.name===f.team; });
+    csNames = [...(_teamMemberSet(tObj)||new Set())];
+  } else {
+    csNames = [...new Set(scopeList.flatMap(function(c){
+      return [..._buildCsSet_(c.orders, c.phone), ...(c.careCSSet||[])];
+    }).filter(Boolean))];
+  }
+  csNames.sort(function(a,b){ return a.localeCompare(b,'vi'); });
+
+  var presets = [['all','Tất cả'],['month','Tháng này'],['last','Tháng trước'],['q','Quý này'],['year','Năm nay']];
+  var isAll = !f.from && !f.to;
+  var presetHtml = presets.map(function(p){
+    var active = (p[0]==='all') ? isAll : false;
+    return '<button class="btn sm'+(active?' primary':'')+'" style="padding:3px 9px;font-size:11px" onclick="_dashSetPreset(\''+p[0]+'\')">'+p[1]+'</button>';
+  }).join('');
+
+  var activeCount = (f.from||f.to?1:0) + (f.team?1:0) + (f.cs?1:0);
+
+  return '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding:9px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:8px">'+
+    '<span style="font-size:11px;font-weight:700;color:var(--muted)">🔎 Lọc</span>'+
+    presetHtml+
+    '<span style="color:var(--border-md)">|</span>'+
+    '<span style="font-size:11px;color:var(--muted)">Từ</span>'+
+    '<input type="date" value="'+esc(f.from)+'" onchange="_dashSetFilter(\'from\',this.value)" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+    '<span style="font-size:11px;color:var(--muted)">đến</span>'+
+    '<input type="date" value="'+esc(f.to)+'" onchange="_dashSetFilter(\'to\',this.value)" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+    '<span style="color:var(--border-md)">|</span>'+
+    '<select onchange="_dashSetFilter(\'team\',this.value)" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)" title="Lọc theo Team">'+
+      '<option value="">👥 Tất cả team</option>'+
+      teamOpts.map(function(t){ return '<option value="'+esc(t.id)+'"'+(String(f.team)===String(t.id)?' selected':'')+'>'+esc(t.name)+'</option>'; }).join('')+
+    '</select>'+
+    '<select onchange="_dashSetFilter(\'cs\',this.value)" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);max-width:160px" title="Lọc theo nhân viên">'+
+      '<option value="">🧑 Tất cả nhân viên</option>'+
+      csNames.map(function(n){ return '<option value="'+esc(n)+'"'+(f.cs===n?' selected':'')+'>'+esc(n)+'</option>'; }).join('')+
+    '</select>'+
+    (activeCount ? '<button class="btn sm" style="padding:3px 9px;font-size:11px;color:var(--red)" onclick="_dashClearFilter()">✕ Xoá lọc ('+activeCount+')</button>' : '')+
+    ((f.from||f.to) ? '<span style="font-size:10.5px;color:var(--hint);width:100%">Đang tính theo <b>ngày đặt đơn</b> — KH không có đơn nào trong khoảng này sẽ không được tính.</span>' : '')+
+  '</div>';
+}
+function _dashClearFilter(){
+  _dashFilter = { from:'', to:'', team:'', cs:'' };
+  _dashFilterSave();
+  renderDashboard();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -11956,6 +13009,7 @@ var _srState = {
   dateField: 'ngayTao',   // A: 'ngayTao' | 'thoiGianHT'
   dateFrom: '', dateTo: '',
   sale: [], kenh: [],      // A — ca 2 deu multi-select dang checkbox (mang nhieu gia tri)
+  byCreator: false,        // A — tich thi doanh thu KHONG chia deu theo sale tren don, chi tinh het cho "Người tạo" (cot rieng trong DT TONG, khac "Sale bán")
   bSale: [], bNguon: [], bMarketer: [], // B — ca 3 deu multi-select (mang nhieu ten)
   dataA: null, dataB: null,
   loading: false,
@@ -11972,6 +13026,23 @@ var _srState = {
 };
 
 function _srMoney(n){ return fmt(Math.round(n||0)) + '₫'; }
+
+// ── Phan quyen bao cao doanh so: CS thuong CHI xem duoc so lieu cua chinh minh, khong xem
+// duoc ca team. Admin (currentUser.role==='admin') khong bi gioi han gi. ──
+function _srIsAdmin(){ return !(typeof currentUser !== 'undefined' && currentUser && currentUser.role !== 'admin'); }
+function _srMyNames(){
+  return (typeof currentUser !== 'undefined' && currentUser && currentUser.names && currentUser.names.length)
+    ? currentUser.names.slice() : [];
+}
+// Khoa cung bo loc Sale ve dung ten cua chinh CS dang dang nhap — goi o dau moi lan render de
+// khong the nao bi doi sang xem sale khac (kien ca qua thao tac client, phong khi co lo hong UI).
+function _srEnforceScope(){
+  if (_srIsAdmin()) return;
+  var my = _srMyNames();
+  _srState.sale = my.slice();
+  _srState.bSale = my.slice();
+  _srState.cSale = my.slice();
+}
 
 async function _srFetch(action, params){
   if (!gsUrl) return null;
@@ -12002,7 +13073,8 @@ async function _srLoad(){
   if (_srState.sub === 'A'){
     _srState.dataA = await _srFetch('salesReportA', {
       dateFrom: _srState.dateFrom, dateTo: _srState.dateTo,
-      dateField: _srState.dateField, sale: (_srState.sale||[]).join(','), kenh: (_srState.kenh||[]).join(',')
+      dateField: _srState.dateField, sale: (_srState.sale||[]).join(','), kenh: (_srState.kenh||[]).join(','),
+      byCreator: _srState.byCreator ? '1' : ''
     });
   } else if (_srState.sub === 'B') {
     _srState.dataB = await _srFetch('salesReportB', {
@@ -12036,7 +13108,7 @@ async function exportSalesReportToSheet(){
   var filters;
   if (_srState.sub === 'A') {
     filters = { dateFrom: _srState.dateFrom, dateTo: _srState.dateTo, dateField: _srState.dateField,
-      sale: _srState.sale || [], kenh: _srState.kenh || [] };
+      sale: _srState.sale || [], kenh: _srState.kenh || [], byCreator: _srState.byCreator ? '1' : '' };
   } else if (_srState.sub === 'C') {
     filters = { dateField: _srState.cDateField, periodType: _srState.cPeriodType,
       weekOffset: _srState.cWeekOffset, monthOffset: _srState.cMonthOffset, quarterOffset: _srState.cQuarterOffset,
@@ -12304,7 +13376,12 @@ function srPickTeam(teamId, saleField, domId){
   var members = [...(new Set([t.leader].concat(t.members||[]).filter(Boolean)))];
   if (!members.length){ toast('Team "'+(t.name||'')+'" chưa có thành viên — set up ở tab Quản lý Team.'); return; }
   _srState[saleField] = members;
-  srRenderComboChips(domId);
+  // QUAN TRỌNG: combo "sr-sale-combo" (Báo cáo A) là combo dựng tay riêng (KHÔNG đăng ký qua
+  // _srComboReg như combo "sr-sale-combo-c" của Báo cáo C), nên gọi srRenderComboChips(domId)
+  // ở đây bị no-op (tìm _srComboReg[domId] ra undefined) — danh sách đã chọn KHÔNG hiện lên,
+  // khiến người dùng tưởng chọn Team không có tác dụng và không bấm "Lọc" để load lại doanh thu.
+  // Render lại toàn bộ thanh lọc để chip + nhãn "(N đã chọn)" luôn cập nhật đúng cho cả 2 combo.
+  renderSalesReportTab();
 }
 
 function renderSalesReportTab(){
@@ -12314,6 +13391,7 @@ function renderSalesReportTab(){
     wrap.innerHTML = '<div style="color:var(--muted);text-align:center;padding:40px">Chưa kết nối Google Apps Script (gsUrl trống).</div>';
     return;
   }
+  _srEnforceScope();
   if (!_srState.optionsLoaded) _srLoadOptions();
 
   var subTabs = '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">' +
@@ -12336,31 +13414,44 @@ function renderSalesReportTab(){
       '<option value="ngayTao"'+(_srState.dateField==='ngayTao'?' selected':'')+'>Lọc theo Ngày tạo</option>'+
       '<option value="thoiGianHT"'+(_srState.dateField==='thoiGianHT'?' selected':'')+'>Lọc theo Thời gian hoàn thành</option>'+
       '</select>';
-    filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Lọc theo Sale'+((_srState.sale||[]).length?' <span style="color:var(--green)">('+(_srState.sale||[]).length+' đã chọn)</span>':'')+'</div>' +
-      '<div class="cs-combo" id="sr-sale-combo" style="width:190px">'+
-      '<input type="text" id="sr-sale-combo-input" class="cs-combo-input" placeholder="🔍 Tìm & chọn sale..." autocomplete="off" '+
-      'oninput="srSaleComboFilter(this.value)" onfocus="srSaleComboOpen()" onkeydown="srSaleComboKey(event)">'+
-      '<button type="button" class="cs-combo-clear" id="sr-sale-combo-clear" title="Bỏ chọn hết Sale" onclick="srSaleComboClear(event)" style="display:'+((_srState.sale||[]).length?'':'none')+'">✕</button>'+
-      '<span class="cs-combo-caret" onclick="srSaleComboToggle(event)">▾</span>'+
-      '<div class="cs-combo-list" id="sr-sale-combo-list"></div>'+
-      '</div>'+
-      '<div id="sr-sale-chips" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;max-width:220px">'+
-      (_srState.sale||[]).map(function(name){
-        return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap" data-name="'+esc(name)+'">'+
-          esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srSaleComboRemove(this.parentNode.dataset.name)">✕</span></span>';
-      }).join('') +
-      '</div></div>';
-    filters += '<select onchange="if(this.value){srPickTeam(this.value,\'sale\',\'sr-sale-combo\');this.value=\'\'}" title="Điền nhanh cả team vào ô Sale — sửa tay lại sau nếu cần" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-      '<option value="">— Chọn theo Team —</option>' + _srTeamOptionsHtml() + '</select>';
+    if (_srIsAdmin()){
+      filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Lọc theo Sale'+((_srState.sale||[]).length?' <span style="color:var(--green)">('+(_srState.sale||[]).length+' đã chọn)</span>':'')+'</div>' +
+        '<div class="cs-combo" id="sr-sale-combo" style="width:190px">'+
+        '<input type="text" id="sr-sale-combo-input" class="cs-combo-input" placeholder="🔍 Tìm & chọn sale..." autocomplete="off" '+
+        'oninput="srSaleComboFilter(this.value)" onfocus="srSaleComboOpen()" onkeydown="srSaleComboKey(event)">'+
+        '<button type="button" class="cs-combo-clear" id="sr-sale-combo-clear" title="Bỏ chọn hết Sale" onclick="srSaleComboClear(event)" style="display:'+((_srState.sale||[]).length?'':'none')+'">✕</button>'+
+        '<span class="cs-combo-caret" onclick="srSaleComboToggle(event)">▾</span>'+
+        '<div class="cs-combo-list" id="sr-sale-combo-list"></div>'+
+        '</div>'+
+        '<div id="sr-sale-chips" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;max-width:220px">'+
+        (_srState.sale||[]).map(function(name){
+          return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap" data-name="'+esc(name)+'">'+
+            esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srSaleComboRemove(this.parentNode.dataset.name)">✕</span></span>';
+        }).join('') +
+        '</div></div>';
+      filters += '<select onchange="if(this.value){srPickTeam(this.value,\'sale\',\'sr-sale-combo\');this.value=\'\'}" title="Điền nhanh cả team vào ô Sale — sửa tay lại sau nếu cần" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+        '<option value="">— Chọn theo Team —</option>' + _srTeamOptionsHtml() + '</select>';
+    } else {
+      filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Sale</div>'+
+        '<div style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)">🔒 '+esc((_srState.sale||[]).join(', ') || currentUser.name)+' — chỉ xem được báo cáo của mình</div></div>';
+    }
     filters += _srComboHtml('sr-kenh-combo-a', 'kenh', 'kenhOptions', 'Lọc theo Kênh', '🔍 Tìm & chọn kênh...', 170);
+    filters += '<label style="display:flex;align-items:center;gap:5px;padding:5px 9px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;cursor:pointer" title="Tích: mỗi đơn tính TOÀN BỘ doanh thu + số đơn cho đúng 1 người — người được ghi trong cột \'Người tạo\' của DT TỔNG (không phải \'Sale bán\'). Bỏ tích: chia đều doanh thu cho tất cả sale đứng tên trên đơn (mặc định).">'+
+      '<input type="checkbox" '+(_srState.byCreator?'checked':'')+' onchange="_srState.byCreator=this.checked;_srApply()">'+
+      'Tính theo người tạo đơn</label>';
   } else {
-    filters += _srbComboHTML('sale');
+    if (_srIsAdmin()){
+      filters += _srbComboHTML('sale');
+    } else {
+      filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Sale</div>'+
+        '<div style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)">🔒 '+esc((_srState.bSale||[]).join(', ') || currentUser.name)+' — chỉ xem được báo cáo của mình</div></div>';
+    }
     filters += _srbComboHTML('nguon');
     filters += _srbComboHTML('mkt');
   }
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
   filters += '<button class="btn sm" onclick="exportSalesReport()">📊 Xuất Excel</button>';
-  filters += '<button class="btn sm" id="sr-export-sheet-btn" onclick="exportSalesReportToSheet()">📄 Xuất ra Sheet</button>';
+  if (_srIsAdmin()) filters += '<button class="btn sm" id="sr-export-sheet-btn" onclick="exportSalesReportToSheet()">📄 Xuất ra Sheet</button>';
   filters += '</div>';
 
   var body = '';
@@ -12385,7 +13476,9 @@ function _srRenderA(d){
     '<div style="font-size:11px;color:var(--muted);margin:-10px 0 14px">Tổng đơn = cộng dồn "Tổng giá trị đơn hàng" của TỪNG đơn (cả đơn cọc trước lẫn đơn thanh toán toàn bộ) — đây mới là số doanh thu chuẩn để đối chiếu, không phải cột Cọc.</div>';
 
   var saleRows = (d.bySale||[]).filter(function(s){ return !_srState.saleSearch || s.name.toLowerCase().indexOf(_srState.saleSearch.toLowerCase())!==-1; });
-  html += '<div class="dash-section-title">Theo Sale bán <span style="font-weight:400;color:var(--muted);font-size:11px">(số đơn giữ nguyên — tiền chia đều cho số sale/đơn)</span></div>';
+  html += '<div class="dash-section-title">Theo Sale bán <span style="font-weight:400;color:var(--muted);font-size:11px">'+
+    (_srState.byCreator ? '(tính trọn vẹn cho người tạo đơn — không chia đều)' : '(số đơn giữ nguyên — tiền chia đều cho số sale/đơn)')+
+    '</span></div>';
   html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.saleSearch)+'" oninput="_srState.saleSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
   html += '<table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Cọc</th><th style="text-align:right"><b>Tổng đơn</b></th></tr></thead><tbody>';
   saleRows.forEach(function(s){
@@ -12394,15 +13487,17 @@ function _srRenderA(d){
   if (!saleRows.length) html += '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
   html += '</tbody></table>';
 
-  var kenhRows = (d.byKenh||[]).filter(function(k){ return !_srState.kenhSearch || k.name.toLowerCase().indexOf(_srState.kenhSearch.toLowerCase())!==-1; });
-  html += '<div class="dash-section-title">Theo Kênh bán</div>';
-  html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên kênh..." value="'+esc(_srState.kenhSearch)+'" oninput="_srState.kenhSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
-  html += '<table class="dash-table"><thead><tr><th>Kênh</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Cọc</th><th style="text-align:right"><b>Tổng đơn</b></th></tr></thead><tbody>';
-  kenhRows.forEach(function(k){
-    html += '<tr><td>'+esc(k.name)+'</td><td style="text-align:right">'+fmt(k.orders)+'</td><td style="text-align:right">'+_srMoney(k.coc)+'</td><td style="text-align:right"><b>'+_srMoney(k.giaTri)+'</b></td></tr>';
-  });
-  if (!kenhRows.length) html += '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
-  html += '</tbody></table>';
+  if (_srIsAdmin()){
+    var kenhRows = (d.byKenh||[]).filter(function(k){ return !_srState.kenhSearch || k.name.toLowerCase().indexOf(_srState.kenhSearch.toLowerCase())!==-1; });
+    html += '<div class="dash-section-title">Theo Kênh bán</div>';
+    html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên kênh..." value="'+esc(_srState.kenhSearch)+'" oninput="_srState.kenhSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
+    html += '<table class="dash-table"><thead><tr><th>Kênh</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Cọc</th><th style="text-align:right"><b>Tổng đơn</b></th></tr></thead><tbody>';
+    kenhRows.forEach(function(k){
+      html += '<tr><td>'+esc(k.name)+'</td><td style="text-align:right">'+fmt(k.orders)+'</td><td style="text-align:right">'+_srMoney(k.coc)+'</td><td style="text-align:right"><b>'+_srMoney(k.giaTri)+'</b></td></tr>';
+    });
+    if (!kenhRows.length) html += '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+    html += '</tbody></table>';
+  }
   return html;
 }
 
@@ -12429,15 +13524,17 @@ function _srRenderB(d){
   if (!saleRows.length) html += '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
   html += '</tbody></table>';
 
-  var productRows = (d.products||[]).filter(function(p){ return !_srState.productSearch || (p.name||'').toLowerCase().indexOf(_srState.productSearch.toLowerCase())!==-1 || (p.code||'').toLowerCase().indexOf(_srState.productSearch.toLowerCase())!==-1; });
-  html += '<div class="dash-section-title">Báo cáo sản phẩm</div>';
-  html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên/mã sản phẩm..." value="'+esc(_srState.productSearch)+'" oninput="_srState.productSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:240px;margin-bottom:6px">';
-  html += '<table class="dash-table"><thead><tr><th>Mã sản phẩm</th><th>Tên sản phẩm</th><th style="text-align:right">Tổng số lượng</th></tr></thead><tbody>';
-  productRows.forEach(function(p){
-    html += '<tr><td style="font-family:monospace;font-size:12px">'+esc(p.code)+'</td><td>'+esc(p.name)+'</td><td style="text-align:right">'+fmt(p.soLuong)+'</td></tr>';
-  });
-  if (!productRows.length) html += '<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
-  html += '</tbody></table>';
+  if (_srIsAdmin()){
+    var productRows = (d.products||[]).filter(function(p){ return !_srState.productSearch || (p.name||'').toLowerCase().indexOf(_srState.productSearch.toLowerCase())!==-1 || (p.code||'').toLowerCase().indexOf(_srState.productSearch.toLowerCase())!==-1; });
+    html += '<div class="dash-section-title">Báo cáo sản phẩm</div>';
+    html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên/mã sản phẩm..." value="'+esc(_srState.productSearch)+'" oninput="_srState.productSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:240px;margin-bottom:6px">';
+    html += '<table class="dash-table"><thead><tr><th>Mã sản phẩm</th><th>Tên sản phẩm</th><th style="text-align:right">Tổng số lượng</th></tr></thead><tbody>';
+    productRows.forEach(function(p){
+      html += '<tr><td style="font-family:monospace;font-size:12px">'+esc(p.code)+'</td><td>'+esc(p.name)+'</td><td style="text-align:right">'+fmt(p.soLuong)+'</td></tr>';
+    });
+    if (!productRows.length) html += '<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+    html += '</tbody></table>';
+  }
   return html;
 }
 
@@ -12477,13 +13574,18 @@ function renderSalesReportTabC_(wrap, subTabs){
     '<option value="ngayTao"'+(_srState.cDateField==='ngayTao'?' selected':'')+'>Lọc theo Ngày tạo</option>'+
     '<option value="thoiGianHT"'+(_srState.cDateField==='thoiGianHT'?' selected':'')+'>Lọc theo Thời gian hoàn thành</option>'+
     '</select>';
-  filters += _srComboHtml('sr-sale-combo-c', 'cSale', 'saleOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 170);
-  filters += '<select onchange="if(this.value){srPickTeam(this.value,\'cSale\',\'sr-sale-combo-c\');this.value=\'\'}" title="Điền nhanh cả team vào ô Sale — sửa tay lại sau nếu cần" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-    '<option value="">— Chọn theo Team —</option>' + _srTeamOptionsHtml() + '</select>';
+  if (_srIsAdmin()){
+    filters += _srComboHtml('sr-sale-combo-c', 'cSale', 'saleOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 170);
+    filters += '<select onchange="if(this.value){srPickTeam(this.value,\'cSale\',\'sr-sale-combo-c\');this.value=\'\'}" title="Điền nhanh cả team vào ô Sale — sửa tay lại sau nếu cần" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+      '<option value="">— Chọn theo Team —</option>' + _srTeamOptionsHtml() + '</select>';
+  } else {
+    filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Sale</div>'+
+      '<div style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)">🔒 '+esc((_srState.cSale||[]).join(', ') || currentUser.name)+' — chỉ xem được báo cáo của mình</div></div>';
+  }
   filters += _srComboHtml('sr-kenh-combo-c', 'cKenh', 'kenhOptions', 'Lọc theo Kênh bán', '🔍 Tìm & chọn kênh bán...', 170);
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
   filters += '<button class="btn sm" onclick="exportSalesReportC()">📊 Xuất Excel</button>';
-  filters += '<button class="btn sm" id="sr-export-sheet-btn" onclick="exportSalesReportToSheet()">📄 Xuất ra Sheet</button>';
+  if (_srIsAdmin()) filters += '<button class="btn sm" id="sr-export-sheet-btn" onclick="exportSalesReportToSheet()">📄 Xuất ra Sheet</button>';
   filters += '</div>';
 
   var body = _srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _srRenderC(_srState.dataC);
@@ -12604,9 +13706,11 @@ function _srRenderC(d){
   html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên..." value="'+esc(_srState.cEmpSearch)+'" oninput="_srState.cEmpSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
   html += _srRenderCTable(d.byEmployee||[], 'sale', _srState.cEmpSearch);
 
-  html += '<div class="dash-section-title">Theo Kênh bán</div>';
-  html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên kênh..." value="'+esc(_srState.cKenhSearch)+'" oninput="_srState.cKenhSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
-  html += _srRenderCTable(d.byKenh||[], 'kenh', _srState.cKenhSearch);
+  if (_srIsAdmin()){
+    html += '<div class="dash-section-title">Theo Kênh bán</div>';
+    html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên kênh..." value="'+esc(_srState.cKenhSearch)+'" oninput="_srState.cKenhSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
+    html += _srRenderCTable(d.byKenh||[], 'kenh', _srState.cKenhSearch);
+  }
 
   html += '<div style="font-size:11px;color:var(--hint);margin-top:8px">Chỉ tiêu KPI lấy từ tab "'+esc('KPI_ChiTieu')+'" trong Google Sheet CRM — tự vào Sheet điền/sửa số. Bấm vào 1 dòng để xem chi tiết đơn của kỳ này/kỳ trước.</div>';
   return html;
@@ -12632,7 +13736,7 @@ function exportSalesReportC(){
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Kỳ so sánh');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(empRows), 'Theo Nhân viên');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(kenhRows), 'Theo Kênh bán');
+  if (_srIsAdmin()) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(kenhRows), 'Theo Kênh bán');
   XLSX.writeFile(wb, `BaoCaoDoanhSo_C_${_ymd(new Date())}.xlsx`);
 }
 
@@ -12775,6 +13879,7 @@ function exportSalesReport(){
     if (_srState.dateFrom || _srState.dateTo) fDescA.unshift('Khoảng ngày: ' + (_srState.dateFrom||'...') + ' → ' + (_srState.dateTo||'...'));
     if ((_srState.sale||[]).length) fDescA.push('Sale: ' + _srState.sale.join(', '));
     if ((_srState.kenh||[]).length) fDescA.push('Kênh: ' + _srState.kenh.join(', '));
+    if (_srState.byCreator) fDescA.push('Tính theo người tạo đơn (không chia đều theo sale)');
     var summary = [['Bộ lọc', fDescA.join(' | ')], [],
       ['Chỉ số','Giá trị'],
       ['Số lượng đơn', d.totalOrders],
@@ -12790,8 +13895,8 @@ function exportSalesReport(){
     });
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Tổng quan');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(bySaleRows), 'Theo Sale bán');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(byKenhRows), 'Theo Kênh bán');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(bySaleRows), _srState.byCreator ? 'Theo người tạo đơn' : 'Theo Sale bán');
+    if (_srIsAdmin()) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(byKenhRows), 'Theo Kênh bán');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detailRows), 'Chi tiết đơn');
     XLSX.writeFile(wb, `BaoCaoDoanhSo_A_${_ymd(new Date())}.xlsx`);
   } else {
@@ -12812,7 +13917,7 @@ function exportSalesReport(){
     var wbB = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wbB, XLSX.utils.aoa_to_sheet(summaryB), 'Tổng quan');
     XLSX.utils.book_append_sheet(wbB, XLSX.utils.aoa_to_sheet(bySaleRowsB), 'Theo Sale');
-    XLSX.utils.book_append_sheet(wbB, XLSX.utils.aoa_to_sheet(productRows), 'Báo cáo sản phẩm');
+    if (_srIsAdmin()) XLSX.utils.book_append_sheet(wbB, XLSX.utils.aoa_to_sheet(productRows), 'Báo cáo sản phẩm');
     XLSX.utils.book_append_sheet(wbB, XLSX.utils.aoa_to_sheet(detailRowsB), 'Chi tiết đơn');
     XLSX.writeFile(wbB, `BaoCaoDoanhSo_B_${_ymd(new Date())}.xlsx`);
   }
@@ -13238,6 +14343,9 @@ function _applyAuthIdentity(acct){
   if (gsUrl && typeof pullBroadcastHistory === 'function') {
     pullBroadcastHistory().catch(function(){});
   }
+  if (typeof _pullColVisibleForAccount === 'function') {
+    _pullColVisibleForAccount().catch(function(){});
+  }
 }
 
 async function doLogin(){
@@ -13261,6 +14369,9 @@ async function doLogin(){
   }
   _authAccount = { username: acct.username, role: acct.role, name: acct.name, team: acct.team };
   saveLS('ome_auth', _authAccount);
+  // Nho ten tai khoan vua dang nhap de lan sau (ke ca sau khi dang xuat / dong trinh duyet)
+  // tu dien san vao o "Tai khoan" — CHI luu username, KHONG BAO GIO luu mat khau.
+  try { localStorage.setItem('ome_last_user', acct.username); } catch(e){}
   if (errEl) errEl.style.display = 'none';
   var pEl = document.getElementById('login-pass'); if (pEl) pEl.value = '';
   _hideLogin();
@@ -13279,7 +14390,19 @@ function _showLogin(){
   var f = document.getElementById('login-form'); if (f) f.style.display = '';
   var e = document.getElementById('login-err'); if (e) e.style.display = 'none';
   ov.classList.add('show');
-  setTimeout(function(){ var u = document.getElementById('login-user'); if (u) u.focus(); }, 60);
+  // Tu dien lai ten tai khoan da dang nhap lan truoc (neu o dang trong) -> CS khong phai
+  // go lai ten moi lan mo trinh duyet. Mat khau luon de trong, phai nhap lai.
+  var uEl = document.getElementById('login-user');
+  var lastU = '';
+  try { lastU = localStorage.getItem('ome_last_user') || ''; } catch(e2){}
+  if (uEl && lastU && !uEl.value) uEl.value = lastU;
+  setTimeout(function(){
+    var u = document.getElementById('login-user');
+    var p = document.getElementById('login-pass');
+    // Da co san ten -> nhay thang vao o mat khau cho tien
+    if (u && u.value && p) { p.focus(); return; }
+    if (u) u.focus();
+  }, 60);
 }
 function _hideLogin(){ var ov = document.getElementById('login-overlay'); if (ov) ov.classList.remove('show'); }
 
@@ -13357,6 +14480,7 @@ function _renderAuthHeader(){
   var html = '';
   if (isAdmin) html += '<button class="btn sm" title="Quản lý tình trạng CS" onclick="openCareStatusModal()">⚙ Tình trạng CS</button>';
   if (isAdmin) html += '<button class="btn sm" title="Quản lý trạng thái KH" onclick="openKhStatusModal()">⚙ Trạng thái KH</button>';
+  if (isAdmin) html += '<button class="btn sm" title="Tự tạo trường lớn mới (ngoài Tình trạng CS / Trạng thái KH)" onclick="openCustomFieldsModal()">➕ Trường tự tạo</button>';
   if (isAdmin) html += '<button class="btn sm" title="Quản lý tài khoản đăng nhập" onclick="openAcctModal()">🔑 Tài khoản</button>';
   if (loggedIn) html += '<button class="btn sm" title="Đăng xuất" onclick="doLogout()">⎋ Đăng xuất</button>';
   box.innerHTML = html;
@@ -13964,9 +15088,68 @@ function updateSidebarCareFilters() {
 </div>
 </div>
 
+<!-- ══ MODAL: Quản lý TRƯỜNG TỰ TẠO (admin) ══ -->
+<div class="modal-overlay" id="cf-modal" style="display:none;align-items:flex-start;justify-content:center;padding-top:40px;z-index:700">
+<div class="modal" style="max-width:820px;width:94%;max-height:86vh;display:flex;flex-direction:column">
+  <div class="modal-header" style="flex-shrink:0">
+    <div class="modal-title">➕ Trường tự tạo</div>
+    <button class="modal-close" onclick="closeCustomFieldsModal()">✕</button>
+  </div>
+  <div class="modal-body" style="overflow:auto;flex:1">
+    <div style="font-size:11px;color:var(--hint);margin-bottom:10px">
+      Tạo thêm "trường lớn" của riêng bạn (ngang hàng với <b>Tình trạng CS</b> / <b>Trạng thái KH</b>).
+      Mỗi trường có cây lựa chọn mẹ → con riêng, hiện ngay trong form <b>Thông tin chăm sóc</b> của từng khách.
+    </div>
+    <div style="display:flex;gap:14px;align-items:flex-start">
+      <!-- Cột trái: danh sách trường -->
+      <div style="width:290px;flex-shrink:0">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--hint);margin-bottom:6px">Các trường lớn</div>
+        <div id="cf-field-list" style="border:1px solid var(--border);border-radius:var(--rsm);padding:6px;min-height:120px;max-height:320px;overflow:auto"></div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <input id="cf-new-field" class="form-input" placeholder="Tên trường mới..." style="flex:1"
+                 onkeydown="if(event.key==='Enter')_cfAddField()">
+          <button class="btn primary sm" onclick="_cfAddField()">+ Tạo</button>
+        </div>
+      </div>
+      <!-- Cột phải: cây lựa chọn -->
+      <div style="flex:1;min-width:0">
+        <div id="cf-tree-title" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--hint);margin-bottom:6px">Chọn 1 trường ở cột trái để sửa lựa chọn</div>
+        <div id="cf-tree" style="border:1px solid var(--border);border-radius:var(--rsm);padding:8px;min-height:120px;max-height:320px;overflow:auto"></div>
+        <div id="cf-tree-tools" style="display:none;margin-top:8px">
+          <div style="display:flex;gap:6px">
+            <input id="cf-new-node" class="form-input" placeholder="Tên lựa chọn mới..." style="flex:1"
+                   onkeydown="if(event.key==='Enter')_cfAddNode(false)">
+            <button class="btn primary sm" onclick="_cfAddNode(false)">+ Mục</button>
+            <button class="btn secondary sm" onclick="_cfAddNode(true)">+ Nhóm</button>
+          </div>
+          <div style="font-size:10px;color:var(--hint);margin-top:6px">
+            📁 Nhóm = chỉ làm tiêu đề, CS không chọn được. 🔹/↳ = CS chọn được. Dùng 🔄 để biến 1 mục thành nhóm có con.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-footer" style="flex-shrink:0;display:flex;justify-content:flex-end;gap:8px">
+    <button class="btn" onclick="closeCustomFieldsModal()">Đóng</button>
+    <button class="btn primary" onclick="saveCustomFields()">💾 Lưu + Sync</button>
+  </div>
+</div>
+</div>
+
 <style>
-.khs-group{margin-bottom:8px;}
-.khs-parent-row{display:flex;align-items:center;gap:7px;padding:6px 8px;background:var(--surface2);border:1px solid var(--border-md);border-radius:var(--rsm);font-weight:600;font-size:12px;cursor:default;}
+.cf-frow{display:flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);font-size:12px;cursor:pointer;margin-bottom:4px;}.cf-frow:hover{background:var(--surface2);}
+.cf-frow.cf-active{border-color:var(--accent,#2563eb);background:#eff6ff;}
+.cf-fname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;}
+.cf-fcnt{font-size:10px;color:var(--hint);flex-shrink:0;}
+.cf-mini{background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 6px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4;flex-shrink:0;}
+.cf-mini:hover{background:var(--surface2);}
+.cf-mini.cf-del{color:var(--red,#dc2626);border-color:var(--red-b,#fca5a5);}
+.cf-mini.cf-del:hover{background:var(--red-bg,#fff1f2);}
+/* Giá trị trường tự tạo: badge trong bảng danh sách + cạnh tên khách ở panel chi tiết */
+.cf-cell-badge{display:inline-block;background:var(--surface2);border:1px solid var(--border-md);border-radius:10px;padding:1px 7px;font-size:10.5px;color:var(--text);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;}
+.cf-dp-badge{display:inline-flex;align-items:center;gap:3px;background:#eef2ff;border:1px solid #c7d2fe;color:#3730a3;border-radius:10px;padding:1px 8px;font-size:10.5px;font-weight:600;}
+.cf-dp-badge .cf-dp-k{opacity:.65;font-weight:500;}
+.khs-group{margin-bottom:8px;}.khs-parent-row{display:flex;align-items:center;gap:7px;padding:6px 8px;background:var(--surface2);border:1px solid var(--border-md);border-radius:var(--rsm);font-weight:600;font-size:12px;cursor:default;}
 .khs-parent-row:hover{background:#e8e6e3;}
 .khs-children{padding-left:20px;margin-top:3px;display:flex;flex-direction:column;gap:3px;}
 .khs-child-row{display:flex;align-items:center;gap:7px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);font-size:12px;cursor:default;}
@@ -14197,6 +15380,205 @@ function addKhStatusItem(asGroup) {
   document.getElementById('khs-new-label').value = '';
   _renderKhStatusTree();
   _renderKhParentSel();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  QUẢN LÝ TRƯỜNG TỰ TẠO (admin)
+//  - Thêm/đổi tên/xoá "trường lớn" (ngang hàng Tình trạng CS / Trạng thái KH)
+//  - Với mỗi trường: sửa cây lựa chọn mẹ/con (thêm nhóm, thêm mục, chuyển lá↔nhóm)
+// ═══════════════════════════════════════════════════════════════════
+let _cfDraft = [];        // bản nháp toàn bộ danh sách trường
+let _cfEditingIdx = -1;   // đang mở cây của trường nào (-1 = chưa chọn)
+
+function openCustomFieldsModal() {
+  var isAdmin = (_authAccount && _authAccount.role === 'admin') || _bootstrapAdmin;
+  if (!isAdmin) { toast('Chỉ admin mới quản lý trường tự tạo.'); return; }
+  _cfDraft = JSON.parse(JSON.stringify(CUSTOM_FIELDS));
+  _cfEditingIdx = _cfDraft.length ? 0 : -1;
+  _renderCfModal();
+  var m = document.getElementById('cf-modal');
+  if (m) m.style.display = 'flex';
+}
+function closeCustomFieldsModal() {
+  var m = document.getElementById('cf-modal');
+  if (m) m.style.display = 'none';
+}
+
+function _cfNewId() { return 'cf_' + Date.now() + '_' + Math.floor(Math.random()*1000); }
+
+function _renderCfModal() {
+  // ── Cột trái: danh sách trường lớn ──
+  var listEl = document.getElementById('cf-field-list');
+  if (listEl) {
+    if (!_cfDraft.length) {
+      listEl.innerHTML = '<div style="color:var(--hint);font-size:11px;padding:10px;text-align:center">Chưa có trường nào.<br>Nhập tên bên dưới để tạo.</div>';
+    } else {
+      listEl.innerHTML = _cfDraft.map(function(f, i){
+        var cnt = (f.tree||[]).reduce(function(s,n){ return s + (n.children ? n.children.length : 1); }, 0);
+        return '<div class="cf-frow' + (i === _cfEditingIdx ? ' cf-active' : '') + '" onclick="_cfSelectField(' + i + ')">'
+          + '<span class="cf-fname">' + esc(f.label) + '</span>'
+          + '<span class="cf-fcnt">' + cnt + ' mục</span>'
+          + '<button class="cf-mini" title="Đổi tên" onclick="event.stopPropagation();_cfRenameField(' + i + ')">✏</button>'
+          + '<button class="cf-mini cf-del" title="Xoá trường" onclick="event.stopPropagation();_cfDeleteField(' + i + ')">✕</button>'
+          + '</div>';
+      }).join('');
+    }
+  }
+  // ── Cột phải: cây lựa chọn của trường đang chọn ──
+  var treeEl = document.getElementById('cf-tree');
+  var titleEl = document.getElementById('cf-tree-title');
+  var toolsEl = document.getElementById('cf-tree-tools');
+  if (!treeEl) return;
+  if (_cfEditingIdx < 0 || !_cfDraft[_cfEditingIdx]) {
+    if (titleEl) titleEl.textContent = 'Chọn 1 trường ở cột trái để sửa lựa chọn';
+    if (toolsEl) toolsEl.style.display = 'none';
+    treeEl.innerHTML = '';
+    return;
+  }
+  var f = _cfDraft[_cfEditingIdx];
+  if (titleEl) titleEl.textContent = 'Lựa chọn của: ' + f.label;
+  if (toolsEl) toolsEl.style.display = '';
+  var tree = f.tree || [];
+  if (!tree.length) {
+    treeEl.innerHTML = '<div style="color:var(--hint);font-size:11px;padding:10px;text-align:center">Chưa có lựa chọn nào.</div>';
+  } else {
+    treeEl.innerHTML = tree.map(function(node, pi){
+      if (node.children) {
+        var kids = node.children.map(function(ch, ci){
+          return '<div class="khs-child-row">'
+            + '<span class="khs-icon">↳</span>'
+            + '<span class="khs-lbl">' + esc(ch.label) + '</span>'
+            + '<button class="cf-mini" title="Đổi tên" onclick="_cfRenameNode(' + pi + ',' + ci + ')">✏</button>'
+            + '<button class="cf-mini cf-del" title="Xoá" onclick="_cfDeleteNode(' + pi + ',' + ci + ')">✕</button>'
+            + '</div>';
+        }).join('');
+        return '<div class="khs-group"><div class="khs-parent-row">'
+          + '<span class="khs-icon">📁</span>'
+          + '<span class="khs-lbl">' + esc(node.label) + '</span>'
+          + '<span class="khs-group-badge">nhóm</span>'
+          + '<button class="cf-mini" title="Đổi tên" onclick="_cfRenameNode(' + pi + ',null)">✏</button>'
+          + '<button class="cf-mini" title="Thêm mục con" onclick="_cfAddChild(' + pi + ')">+</button>'
+          + '<button class="cf-mini cf-del" title="Xoá cả nhóm" onclick="_cfDeleteNode(' + pi + ',null)">✕</button>'
+          + '</div><div class="khs-children">' + kids + '</div></div>';
+      }
+      return '<div class="khs-leaf-row">'
+        + '<span class="khs-icon">🔹</span>'
+        + '<span class="khs-lbl">' + esc(node.label) + '</span>'
+        + '<button class="cf-mini" title="Đổi tên" onclick="_cfRenameNode(' + pi + ',null)">✏</button>'
+        + '<button class="cf-mini" title="Chuyển thành nhóm (có mục con)" onclick="_cfLeafToGroup(' + pi + ')">🔄</button>'
+        + '<button class="cf-mini cf-del" title="Xoá" onclick="_cfDeleteNode(' + pi + ',null)">✕</button>'
+        + '</div>';
+    }).join('');
+  }
+}
+
+function _cfSelectField(i) { _cfEditingIdx = i; _renderCfModal(); }
+
+function _cfAddField() {
+  var inp = document.getElementById('cf-new-field');
+  var label = (inp ? inp.value : '').trim();
+  if (!label) { toast('Nhập tên trường mới'); return; }
+  if (_cfDraft.some(function(f){ return f.label.toLowerCase() === label.toLowerCase(); })) {
+    toast('Đã có trường tên này'); return;
+  }
+  _cfDraft.push({ id: _cfNewId(), label: label, tree: [] });
+  if (inp) inp.value = '';
+  _cfEditingIdx = _cfDraft.length - 1;
+  _renderCfModal();
+}
+function _cfRenameField(i) {
+  var f = _cfDraft[i]; if (!f) return;
+  var v = prompt('Đổi tên trường:', f.label);
+  if (v === null) return;
+  v = v.trim(); if (!v) return;
+  f.label = v;
+  _renderCfModal();
+}
+function _cfDeleteField(i) {
+  var f = _cfDraft[i]; if (!f) return;
+  if (!confirm('Xoá trường "' + f.label + '"?\n\nLưu ý: giá trị khách hàng đã chọn ở trường này sẽ không còn hiển thị (dữ liệu vẫn nằm trong Sheet, hiện lại nếu bạn tạo lại trường cùng tên ID).')) return;
+  _cfDraft.splice(i, 1);
+  if (_cfEditingIdx >= _cfDraft.length) _cfEditingIdx = _cfDraft.length - 1;
+  _renderCfModal();
+}
+
+function _cfAddNode(asGroup) {
+  if (_cfEditingIdx < 0) { toast('Chọn 1 trường trước'); return; }
+  var inp = document.getElementById('cf-new-node');
+  var label = (inp ? inp.value : '').trim();
+  if (!label) { toast('Nhập tên lựa chọn'); return; }
+  var f = _cfDraft[_cfEditingIdx];
+  if (!f.tree) f.tree = [];
+  f.tree.push(asGroup ? { label: label, children: [] } : { label: label, value: label });
+  if (inp) inp.value = '';
+  _renderCfModal();
+}
+function _cfAddChild(pi) {
+  var f = _cfDraft[_cfEditingIdx]; if (!f) return;
+  var node = f.tree[pi]; if (!node) return;
+  var v = prompt('Tên mục con mới trong nhóm "' + node.label + '":', '');
+  if (v === null) return;
+  v = v.trim(); if (!v) return;
+  if (!node.children) node.children = [];
+  node.children.push({ label: v, value: v });
+  _renderCfModal();
+}
+function _cfRenameNode(pi, ci) {
+  var f = _cfDraft[_cfEditingIdx]; if (!f) return;
+  var node = f.tree[pi]; if (!node) return;
+  var target = (ci === null || ci === undefined) ? node : (node.children || [])[ci];
+  if (!target) return;
+  var v = prompt('Đổi tên:', target.label);
+  if (v === null) return;
+  v = v.trim(); if (!v) return;
+  target.label = v;
+  // Mục chọn được (lá/con) thì value đi kèm label để dữ liệu lưu đúng cái CS nhìn thấy
+  if (target.value !== undefined) target.value = v;
+  _renderCfModal();
+}
+function _cfDeleteNode(pi, ci) {
+  var f = _cfDraft[_cfEditingIdx]; if (!f) return;
+  var node = f.tree[pi]; if (!node) return;
+  if (ci === null || ci === undefined) {
+    if (node.children && node.children.length && !confirm('Xoá nhóm "' + node.label + '" và toàn bộ ' + node.children.length + ' mục con?')) return;
+    f.tree.splice(pi, 1);
+  } else {
+    (node.children || []).splice(ci, 1);
+  }
+  _renderCfModal();
+}
+function _cfLeafToGroup(pi) {
+  var f = _cfDraft[_cfEditingIdx]; if (!f) return;
+  var node = f.tree[pi]; if (!node || node.children) return;
+  f.tree[pi] = { label: node.label, children: [{ label: node.label, value: node.value || node.label }] };
+  _renderCfModal();
+}
+
+async function saveCustomFields() {
+  CUSTOM_FIELDS.length = 0;
+  _cfDraft.forEach(function(f){ CUSTOM_FIELDS.push(f); });
+  saveLS('ome_custom_fields', CUSTOM_FIELDS);
+  // Đồng bộ qua action 'setSetting' CHUNG (giống khStatusTree/nickZaloList) — không cần thêm
+  // action riêng ở backend GAS.
+  if (gsUrl) {
+    try {
+      var r = await fetch(gsUrl, {
+        method: 'POST', redirect: 'follow',
+        body: JSON.stringify({ action: 'setSetting', key: 'customFields', value: JSON.stringify(CUSTOM_FIELDS) })
+      });
+      var d = await r.json().catch(function(){ return {}; });
+      if (d && d.error) toast('Lưu local ✓ — GSheets: ' + d.error);
+      else toast('✓ Đã lưu và đồng bộ trường tự tạo lên Google Sheets');
+    } catch(e) { toast('✓ Đã lưu local — chưa đồng bộ GSheets: ' + e.message); }
+  } else {
+    toast('✓ Đã lưu trường tự tạo (local)');
+  }
+  closeCustomFieldsModal();
+  // Vẽ lại form chi tiết nếu đang mở để thấy trường mới ngay
+  if (typeof currentPhone !== 'undefined' && currentPhone && typeof renderDpTab === 'function'
+      && typeof currentDpTab !== 'undefined' && currentDpTab === 'care') {
+    try { renderDpTab('care'); } catch(e){}
+  }
 }
 
 function resetKhStatusToDefault() {
