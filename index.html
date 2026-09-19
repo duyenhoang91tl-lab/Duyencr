@@ -14132,7 +14132,8 @@ function _pkRenderKpiPancake(){
 
   html += '<div class="dash-section-title">📈 Báo cáo KPI Pancake tổng hợp</div>';
   html += '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Ghép đơn/doanh thu thật (DT TỔNG) với tương tác, SĐT thu thập và tag L1–L7 (Thống kê tương tác / Thống kê nhân viên / Thống kê tag đã nạp ở tab "📥 Báo cáo Pancake"). '+
-    'Tag phải bấm <b>"💾 Lưu lên CRM"</b> ở tab đó thì mới hiện được ở đây (dữ liệu tag mặc định chỉ nằm trên trình duyệt).</div>';
+    'Tag phải bấm <b>"💾 Lưu lên CRM"</b> ở tab đó thì mới hiện được ở đây (dữ liệu tag mặc định chỉ nằm trên trình duyệt). '+
+    'Đơn hàng/doanh thu tính theo <b>ngày tạo đơn</b> (Ngày tạo), giống hệt cách "Report Page" của Base và file Base xuất ra — để đối chiếu 2 bên luôn khớp nhau.</div>';
 
   html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px">'+
     '<input type="date" value="'+esc(_pkState.kpiFrom)+'" onchange="_pkState.kpiFrom=this.value" style="'+st+'">'+
