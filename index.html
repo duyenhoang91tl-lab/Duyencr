@@ -11748,7 +11748,9 @@ var _srState = {
   dateField: 'ngayTao',   // A: 'ngayTao' | 'thoiGianHT'
   dateFrom: '', dateTo: '',
   sale: [], kenh: [],      // A — ca 2 deu multi-select dang checkbox (mang nhieu gia tri)
+  aSanPham: '',            // A — loc san pham, cach nhau dau phay
   bSale: [], bNguon: [], bMarketer: [], // B — ca 3 deu multi-select (mang nhieu ten)
+  bSanPham: '', bCareStatus: [], bKhStatus: [], bZaloStatus: [], bNickZalo: '', // B — them loc CRM (co SDT de noi)
   dataA: null, dataB: null,
   loading: false,
   saleOptions: [], kenhOptions: [], nguonOptions: [], marketerOptions: [], saleBOptions: [], optionsLoaded: false,
@@ -11758,6 +11760,7 @@ var _srState = {
   cWeekOffset: 0, cMonthOffset: 0, cQuarterOffset: 0,
   cCustomCurFrom: '', cCustomCurTo: '', cCustomPrevFrom: '', cCustomPrevTo: '',
   cSale: [], cKenh: [],     // C — multi-select giong A, tach rieng de doi tab A/C khong dam vao nhau
+  cSanPham: '',             // C — loc san pham, cach nhau dau phay
   dataC: null, cEmpSearch: '', cKenhSearch: '', cExpandedRow: '',
   // D — KH Cham soc moi (data rieng, KHONG gop A/B/C)
   dDateFrom: '', dDateTo: '', dCs: '', dataD: null
@@ -11794,12 +11797,16 @@ async function _srLoad(){
   if (_srState.sub === 'A'){
     _srState.dataA = await _srFetch('salesReportA', {
       dateFrom: _srState.dateFrom, dateTo: _srState.dateTo,
-      dateField: _srState.dateField, sale: (_srState.sale||[]).join(','), kenh: (_srState.kenh||[]).join(',')
+      dateField: _srState.dateField, sale: (_srState.sale||[]).join(','), kenh: (_srState.kenh||[]).join(','),
+      sanPham: _srState.aSanPham || ''
     });
   } else if (_srState.sub === 'B') {
     _srState.dataB = await _srFetch('salesReportB', {
       dateFrom: _srState.dateFrom, dateTo: _srState.dateTo,
-      sale: (_srState.bSale||[]).join(','), nguon: (_srState.bNguon||[]).join(','), marketer: (_srState.bMarketer||[]).join(',')
+      sale: (_srState.bSale||[]).join(','), nguon: (_srState.bNguon||[]).join(','), marketer: (_srState.bMarketer||[]).join(','),
+      sanPham: _srState.bSanPham || '',
+      careStatus: (_srState.bCareStatus||[]).join(','), khStatus: (_srState.bKhStatus||[]).join(','),
+      zaloStatus: (_srState.bZaloStatus||[]).join(','), nickZalo: _srState.bNickZalo || ''
     });
   } else if (_srState.sub === 'C') {
     _srState.dataC = await _srFetch('salesReportC', {
@@ -11807,7 +11814,8 @@ async function _srLoad(){
       weekOffset: _srState.cWeekOffset, monthOffset: _srState.cMonthOffset, quarterOffset: _srState.cQuarterOffset,
       customCurFrom: _srState.cCustomCurFrom, customCurTo: _srState.cCustomCurTo,
       customPrevFrom: _srState.cCustomPrevFrom, customPrevTo: _srState.cCustomPrevTo,
-      sale: (_srState.cSale||[]).join(','), kenh: (_srState.cKenh||[]).join(',')
+      sale: (_srState.cSale||[]).join(','), kenh: (_srState.cKenh||[]).join(','),
+      sanPham: _srState.cSanPham || ''
     });
   } else if (_srState.sub === 'D') {
     _srState.dataD = await _srFetch('careLeadReport', {
@@ -11820,6 +11828,16 @@ async function _srLoad(){
 
 function _srSetSub(sub){ _srState.sub = sub; _srLoad(); }
 function _srSetField(key, val){ _srState[key] = val; }
+// Multi-select don gian cho cac loc moi (Tinh trang CS / Trang thai KH / Ket ban Zalo) — chi dung cho Bao cao B
+function _srMultiSelectHtml(stateKey, options, label, width){
+  options = options || [];
+  var sel = _srState[stateKey] || [];
+  return '<div><div style="font-size:10px;color:var(--hint);margin-bottom:2px">'+esc(label)+'</div>'+
+    '<select multiple onchange="_srState.'+stateKey+'=[...this.options].filter(function(o){return o.selected;}).map(function(o){return o.value;})" '+
+    'style="min-width:'+(width||120)+'px;max-height:68px;font-size:11.5px;padding:3px 5px;border:1px solid var(--border);border-radius:6px;background:var(--surface);outline:none">'+
+    options.map(function(v){ return '<option value="'+esc(v)+'" '+(sel.indexOf(v)!==-1?'selected':'')+'>'+esc(v)+'</option>'; }).join('')+
+    '</select></div>';
+}
 
 // Xuat bao cao dang loc (dung filter hien tai tren UI) ra 1 tab moi trong Google Sheet CRM.
 // Tai su dung dung filter payload nhu _srLoad() de so lieu tren Sheet khop 100% voi UI dang xem.
@@ -12145,10 +12163,22 @@ function renderSalesReportTab(){
     filters += '<select onchange="if(this.value){srPickTeam(this.value,\'sale\',\'sr-sale-combo\');this.value=\'\'}" title="Điền nhanh cả team vào ô Sale — sửa tay lại sau nếu cần" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
       '<option value="">— Chọn theo Team —</option>' + _srTeamOptionsHtml() + '</select>';
     filters += _srComboHtml('sr-kenh-combo-a', 'kenh', 'kenhOptions', 'Lọc theo Kênh', '🔍 Tìm & chọn kênh...', 170);
+    filters += '<div><div style="font-size:10px;color:var(--hint);margin-bottom:2px">Sản phẩm (cách nhau bằng dấu phẩy)</div>'+
+      '<input type="text" value="'+esc(_srState.aSanPham||'')+'" onchange="_srSetField(\'aSanPham\',this.value)" placeholder="vd: tỳ hưu, nhẫn 10k" style="min-width:170px;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+      '</div>';
   } else {
     filters += _srbComboHTML('sale');
     filters += _srbComboHTML('nguon');
     filters += _srbComboHTML('mkt');
+    filters += '<div><div style="font-size:10px;color:var(--hint);margin-bottom:2px">Sản phẩm (cách nhau bằng dấu phẩy)</div>'+
+      '<input type="text" value="'+esc(_srState.bSanPham||'')+'" onchange="_srSetField(\'bSanPham\',this.value)" placeholder="vd: tỳ hưu, nhẫn 10k" style="min-width:170px;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+      '</div>';
+    filters += _srMultiSelectHtml('bCareStatus', CARE_STATUS, 'Tình trạng CS', 120);
+    filters += _srMultiSelectHtml('bKhStatus', (typeof _flatCustStatusValues==='function'?_flatCustStatusValues():[]).filter(Boolean), 'Trạng thái KH', 140);
+    filters += _srMultiSelectHtml('bZaloStatus', ZALO_STATUS, 'Kết bạn Zalo', 120);
+    filters += '<div><div style="font-size:10px;color:var(--hint);margin-bottom:2px">Nick Zalo</div>'+
+      '<input type="text" value="'+esc(_srState.bNickZalo||'')+'" onchange="_srSetField(\'bNickZalo\',this.value)" placeholder="Tìm nick..." style="min-width:100px;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+      '</div>';
   }
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
   filters += '<button class="btn sm" onclick="exportSalesReport()">📊 Xuất Excel</button>';
@@ -12272,6 +12302,9 @@ function renderSalesReportTabC_(wrap, subTabs){
   filters += '<select onchange="if(this.value){srPickTeam(this.value,\'cSale\',\'sr-sale-combo-c\');this.value=\'\'}" title="Điền nhanh cả team vào ô Sale — sửa tay lại sau nếu cần" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
     '<option value="">— Chọn theo Team —</option>' + _srTeamOptionsHtml() + '</select>';
   filters += _srComboHtml('sr-kenh-combo-c', 'cKenh', 'kenhOptions', 'Lọc theo Kênh bán', '🔍 Tìm & chọn kênh bán...', 170);
+  filters += '<div><div style="font-size:10px;color:var(--hint);margin-bottom:2px">Sản phẩm (cách nhau bằng dấu phẩy)</div>'+
+    '<input type="text" value="'+esc(_srState.cSanPham||'')+'" onchange="_srSetField(\'cSanPham\',this.value)" placeholder="vd: tỳ hưu, nhẫn 10k" style="min-width:170px;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+    '</div>';
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
   filters += '<button class="btn sm" onclick="exportSalesReportC()">📊 Xuất Excel</button>';
   filters += '<button class="btn sm" id="sr-export-sheet-btn" onclick="exportSalesReportToSheet()">📄 Xuất ra Sheet</button>';
