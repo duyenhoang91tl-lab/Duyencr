@@ -13517,16 +13517,16 @@ function _pkParseFile(file){
           var pageName = sn;
           for (var j=0;j<Math.min(aoa.length,10);j++){
             var c0 = String(aoa[j][0]||'');
-            if (c0.indexOf(pageId) !== -1 && c0.indexOf(' - ') !== -1){
+            if (new RegExp('\\s-\\s*'+pageId+'\\s*$').test(c0)){ // dòng "<Tên Page> - <pageId>" (không lấy nhầm dòng "Trang: ..." liệt kê cả 4 page)
               pageName = c0.replace(new RegExp('\\s*-\\s*'+pageId+'\\s*$'), '').trim();
               break;
             }
           }
 
-          // Tìm dòng sub-header (ô đầu rỗng, ô thứ 2 = 'KH cũ') để biết dòng dữ liệu bắt đầu từ đâu
+          // Tìm dòng sub-header (ô thứ 2 = 'KH cũ') để biết dòng dữ liệu bắt đầu từ đâu
           var headerRow = -1;
           for (var k=0;k<aoa.length;k++){
-            if (String(aoa[k][1]||'').trim() === 'KH cũ' && String(aoa[k][0]||'').trim() === ''){ headerRow = k; break; }
+            if (String(aoa[k][1]||'').normalize('NFC').trim() === 'KH cũ'){ headerRow = k; break; } // không đòi ô đầu rỗng: ô "Nhân viên" được gộp 2 dòng nên có file lặp chữ ở dòng này
           }
           if (headerRow === -1){ warnings.push('Không nhận diện được dòng tiêu đề cột ở sheet "'+sn+'" — bỏ qua.'); return; }
 
