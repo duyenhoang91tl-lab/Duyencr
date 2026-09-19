@@ -41,3 +41,50 @@ Các tính năng khác của Zalo AI **chưa port** vì cần xác nhận thêm 
 - **🔗 Liên kết đoạn chat**: sau khi tra cứu đúng khách (dù là tự nhận diện SĐT hay gõ tay), bấm nút này 1 lần để "học" — extension ghi nhớ hội thoại đang mở (theo URL trang) tương ứng với SĐT đó. Lần sau mở lại ĐÚNG hội thoại này, dù không tự đọc được SĐT/khung "Sản phẩm order" (VD khách đổi tên hiển thị), Pancake AI vẫn tự nhận ra đúng khách — nhờ vậy **ghi chú/trạng thái CS/lịch hẹn nhập trong Pancake luôn cập nhật đúng khách trên CRM**, không bị lạc mất vì lỗi nhận diện.
   - Lưu cục bộ trên máy (`chrome.storage.local`), không đồng bộ giữa các máy CS khác nhau — mỗi máy cần liên kết riêng 1 lần cho mỗi hội thoại.
   - Khoá nhận diện dùng đường dẫn URL của hội thoại (ổn định hơn dùng tên hiển thị như bên Zalo AI, vì URL thường không đổi ngay cả khi khách đổi tên/biệt danh).
+
+## Tư vấn phong thủy Thu Hiền (chỉ hiện trên Messenger, không ảnh hưởng Pancake)
+
+Vì trang Messenger "Thu Hiền phong thủy" dùng chung extension này nhưng là **business khác** với
+sản phẩm sức khỏe bên Pancake, các mục dưới đây chỉ bật khi `PLATFORM === 'messenger'`, không đổi
+gì hành vi/danh sách trạng thái bên Pancake:
+
+- **Trạng thái CS** đổi sang danh sách riêng phong thủy (Chờ gọi tư vấn / Đã gọi - đang theo dõi /
+  Hẹn gọi lại / Không nghe máy / Đã chốt / Từ chối / Đang khiếu nại / Tạm ngừng chăm sóc) thay vì
+  danh sách sản phẩm sức khỏe.
+- **"Tình trạng KH"** và **"Trạng thái Zalo"** giữ nguyên y hệt bên Pancake — CS tự điền tay theo
+  đúng nhu cầu thực tế, không đổi nhãn/danh sách/khoá cho kênh Messenger.
+- **Sinh nhật → Mệnh**: gõ ngày sinh, panel tự tính mệnh Ngũ hành nạp âm ngay bên cạnh (tra bảng
+  cục bộ, không gọi AI). ⚠ Đây là bảng CS cung cấp, chỉ khớp năm 1954–2013 — nên nhờ người có
+  chuyên môn phong thủy trong công ty kiểm tra/bổ sung trước khi dùng chính thức rộng rãi hơn.
+- **📋 Mẫu có sẵn**: panel mới liệt kê 11 mẫu canned response (5 mẫu theo mệnh + 6 mẫu giá/chính
+  sách, từ file mẫu Beeftext CS cung cấp) — bấm 1 mẫu để **chèn thẳng vào ô trả lời** (dùng lại hàm
+  `insertReply` có sẵn, tự xử lý cả contenteditable của Messenger).
+- Dữ liệu mệnh + mẫu canned response đọc từ 2 sheet mới `Menh`/`CannedResponses` (tự tạo trong file
+  CRM dùng chung) qua action `getKnowledge` mới thêm ở `gas_v13.js` — cache 20 phút trên máy CS
+  (`chrome.storage.local`), không gọi Sheet mỗi tin nhắn. CS sửa trực tiếp 2 sheet này trên Google
+  Sheets (không cần sửa code) để cập nhật mẫu/mệnh mới nhất.
+
+## Nhập giá theo nghìn (k) trong "🧾 Đơn hàng đang tính"
+
+Tính năng giỏ hàng tạm (`#pk-cart-section`, dùng chung cho mọi nền tảng) đã có sẵn tính tổng
+Số lượng × Đơn giá + giảm giá/freeship + nút Sao chép đơn hàng — không cần làm lại. Chỉ thêm 1
+checkbox nhỏ **"Nhập giá theo nghìn (k)"** ở đầu khung giỏ hàng: khi bật, ô Đơn giá của từng dòng
+hiển thị/nhận số theo đơn vị nghìn (gõ `2800` = 2.800.000đ) thay vì phải gõ đủ số 0 — dữ liệu lưu
+trong storage và mọi phép tính (tổng, giảm giá, đơn hàng sao chép) vẫn luôn ở đơn vị đồng đầy đủ
+như cũ, chỉ đổi cách hiển thị/nhập tại ô đó. Mặc định tắt, không ảnh hưởng cách dùng hiện tại.
+
+## Chất liệu / Màu sắc / Size trong giỏ hàng
+
+M��i dòng sản phẩm trong "🧾 Đơn hàng đang tính" giờ có thêm 3 ô nhỏ **Chất liệu / Màu sắc / Size**
+(áp dụng cho cả dòng thêm thủ công lẫn dòng thêm từ tra bảng giá). Khi bấm "+ Thêm" từ kết quả tra
+bảng giá, hệ thống tự dò cột `Chất liệu` / `Màu`/`Màu sắc` / `Size`/`Kiểu` trong DANH_MUC (nếu có)
+để điền sẵn — không có cột nào khớp thì để trống, Sale tự gõ. Khi bấm "📋 Sao chép đơn hàng", 3 chi
+tiết này được ghép vào ngay sau tên sản phẩm, ví dụ: `Vòng tay ngọc bích (Ngọc bích, Xanh, 8li) x2
+— 2.800.000đ`.
+
+## File bảng giá (PRICE_SS_ID)
+
+Đã cập nhật `gas_v13.js` trỏ sang file bảng giá mới:
+https://docs.google.com/spreadsheets/d/1I4wr226_QUJuCZSKASsxXxOjloCW9UtpYz87TSy-Ldk — vẫn giữ đúng
+tên sheet `DANH_MUC` như cũ nên không cần đổi gì khác trong code; đơn vị giá trong file này là
+NGHÌN VNĐ, hợp với toggle "Nhập giá theo nghìn (k)" ở mục trên.

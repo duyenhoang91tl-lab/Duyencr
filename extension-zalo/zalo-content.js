@@ -101,6 +101,10 @@
 ];
   let CS_NAMES = ['','duyenht','thaomt','dieptn','vanntt']; // fallback, se load tu GAS
   let CARE_STATUS_TREE = null; // cay Tinh trang CS load tu GAS (dong bo voi appweb)
+  // Truong tu tao (admin them tren app web chinh) — moi truong co cay lua chon rieng, dung chung
+  // co che voi Tinh trang CS/Trang thai KH nhung KHONG co san trong extension tu dau, phai tai
+  // tu GAS (action=getSetting&key=customFields) — xem loadCustomFields_() ben duoi.
+  let CUSTOM_FIELDS = [];
 
   // ── BUILD PANEL ──
   function buildPanel() {
@@ -133,7 +137,9 @@
     addEl(cfg, 'input', {id:'zai-cerebras-key', type:'text', placeholder:'csk-... — để trống nếu giữ key cũ'});
     addEl(cfg, 'label', {textContent:'🔁 Gemini API Key (dự phòng 2 — aistudio.google.com/apikey)'});
     addEl(cfg, 'input', {id:'zai-gemini-api-key', type:'text', placeholder:'AIza... — để trống nếu giữ key cũ'});
-    addEl(cfg, 'div', {style:'font-size:10px;color:#9ca3af;margin:2px 0 6px', textContent:'AI tự chuyển sang key dự phòng khi Groq hết lượt (lỗi 429). Nên nhập cả 3 để không bao giờ đứng.'});
+    addEl(cfg, 'label', {textContent:'🔁 OpenRouter API Key (dự phòng 3 — openrouter.ai, model google/gemma-2-9b-it:free)'});
+    addEl(cfg, 'input', {id:'zai-openrouter-key', type:'text', placeholder:'sk-or-v1-... — để trống nếu giữ key cũ'});
+    addEl(cfg, 'div', {style:'font-size:10px;color:#9ca3af;margin:2px 0 6px', textContent:'AI tự chuyển sang key dự phòng khi Groq hết lượt (lỗi 429). Nên nhập cả 4 để không bao giờ đứng.'});
     addEl(cfg, 'label', {textContent:'📄 Link Google Sheet chi tiết sản phẩm/thành phần (tuỳ chọn, dùng chung cả team)'});
     const inpProdSheet = addEl(cfg, 'input', {id:'zai-product-sheet-url', type:'text', placeholder:'https://docs.google.com/spreadsheets/d/...'});
     addEl(cfg, 'div', {style:'font-size:10px;color:#9ca3af;margin:2px 0 6px', textContent:'Hỗ trợ nhiều tab (mỗi tab 1 hãng), dòng 1 mỗi tab là tiêu đề cột, cột đầu là tên sản phẩm. Sheet phải chia sẻ "Bất kỳ ai có liên kết – Xem" hoặc chia sẻ cho tài khoản chạy GAS. AI sẽ tự tìm đúng vài sản phẩm khớp với câu hỏi/ngữ cảnh (không nhét cả sheet) để tư vấn chính xác.'});
@@ -344,6 +350,10 @@
     const khStatusSel = addEl(upd, 'select', {id:'zai-kh-status-sel'});
     CUST_STATUS_OPTS.forEach(s => addEl(khStatusSel, 'option', {value:s, textContent:s||'— Chọn —'}));
 
+    // Truong tu tao (admin them ben app web) — dung 1 vung chua rieng, render dong khi
+    // CUSTOM_FIELDS tai xong tu GAS (xem loadCustomFields_ + renderCustomFieldSelects_zai)
+    addEl(upd, 'div', {id:'zai-custom-fields-wrap'});
+
     const row2 = addEl(upd, 'div', {className:'zai-field-row'});
     const col3 = addEl(row2, 'div', {className:'zai-field-col'});
     addEl(col3, 'label', {textContent:'Lịch hẹn'});
@@ -418,7 +428,7 @@
       // Migrate: may nao lo con luu link Sasum cu -> tu dong chuyen sang link Duyencr moi.
       if (GAS_URL === OLD_SASUM_GAS_URL) GAS_URL = DEFAULT_GAS_URL;
       if (!res.ome_gas_url || res.ome_gas_url === OLD_SASUM_GAS_URL) chrome.storage.local.set({ ome_gas_url: GAS_URL }); // cai lan dau hoac dang migrate -> luu luon
-      if (GAS_URL) { inpGas.value = GAS_URL; loadCSNames_(); loadNickZaloList_(); loadCareStatusTree_(); loadProductSheetUrl_(); loadDriveKnowledgeFolderUrl_(); loadDriveImagesFolderUrl_(); }
+      if (GAS_URL) { inpGas.value = GAS_URL; loadCSNames_(); loadNickZaloList_(); loadCareStatusTree_(); loadCustomFields_(); loadProductSheetUrl_(); loadDriveKnowledgeFolderUrl_(); loadDriveImagesFolderUrl_(); }
       loadChatNamePhoneMap_();
       if (!GAS_URL) { _cfgVisible = true; cfg.style.display = 'block'; }
       _currentCS = res.ome_current_cs || '';
@@ -584,6 +594,7 @@
     if (!(await _saveKey('apiGroq', 'zai-gemini-key'))) return;
     if (!(await _saveKey('apiCerebras', 'zai-cerebras-key'))) return;
     if (!(await _saveKey('apiGemini', 'zai-gemini-api-key'))) return;
+    if (!(await _saveKey('apiOpenRouter', 'zai-openrouter-key'))) return;
     if (key) showMsg('zai-save-status','✓ Đã lưu API key!',3000);
     const prodSheetEl = document.getElementById('zai-product-sheet-url');
     const prodSheetUrl = prodSheetEl ? prodSheetEl.value.trim() : '';
@@ -605,6 +616,7 @@
     _lookupCache = {};
     loadCSNames_();
     loadCareStatusTree_();
+    loadCustomFields_();
     if (!key) showMsg('zai-save-status','✓ Đã lưu cài đặt',2000);
   }
 
@@ -1184,6 +1196,14 @@
   }
 
   // Chi ve lai khung the thong tin (doc, an toan de goi lai khi poll ma khong lam mat du lieu CS dang go)
+  // Chip hiển thị giá trị các trường tự tạo (admin thêm) có dữ liệu — hiện cạnh chip có sẵn
+  function _customFieldChips_zai(care) {
+    if (!CUSTOM_FIELDS.length || !care || !care.custom) return '';
+    return CUSTOM_FIELDS.map(f => {
+      const v = care.custom[f.id];
+      return v ? `<span class="zai-chip">🏷 ${escHtml(f.label)}: ${escHtml(v)}</span>` : '';
+    }).join('');
+  }
   function renderCustCard_(area, phone, raw, care, orders) {
     const name   = orders.length ? (orders[0].name||raw) : (care&&care.name||raw);
     const prods  = [...new Set(orders.map(o=>o.product).filter(Boolean))].join(', ');
@@ -1201,6 +1221,7 @@
           ${care&&care.zalo  ? `<span class="zai-chip">💬 ${escHtml(care.zalo)}</span>` : ''}
           ${care&&care.cs    ? `<span class="zai-chip">👤 ${escHtml(care.cs)}</span>` : ''}
           ${care&&care.schedHen ? `<span class="zai-chip">📅 ${fmtDate_(care.schedHen)}</span>` : ''}
+          ${_customFieldChips_zai(care)}
         </div>
         ${care&&care.note ? `<div class="zai-card-note">📝 ${escHtml(_latestNoteText_(care.note))}</div>` : ''}
         <div class="zai-card-orders" id="zai-orders-box"></div>
@@ -1247,6 +1268,8 @@
     document.getElementById('zai-hen-note').value   = care&&care.schedHenNote||'';
     document.getElementById('zai-kh-status-sel').value = care&&care.khStatus||'';
     document.getElementById('zai-birthday').value   = care&&care.birthday||'';
+    // Truong tu tao: ve lai select giu dung gia tri da luu cua khach nay
+    renderCustomFieldSelects_zai((care && care.custom) || {});
     // Ghi chú CS: đọc dữ liệu (đồng bộ 2 chiều với Sasum, cùng định dạng JSON [{text,user,time}])
     const noteNewEl = document.getElementById('zai-note-new');
     if (noteNewEl) noteNewEl.value = '';
@@ -1385,6 +1408,8 @@
         khStatus: document.getElementById('zai-kh-status-sel').value || (c.khStatus||''),
         birthday: birthday || c.birthday || '',
         name: liveName || c.name || '',
+        // Truong tu tao (admin them ben app web chinh) — thu thap gia tri dang chon tren form
+        custom: collectCustomFieldValues_zai(c.custom || {}),
         nickZalos: (() => {
           const existing = c.nickZalos || [];
           if (_currentZaloNick && !existing.includes(_currentZaloNick)) return [...existing, _currentZaloNick];
@@ -1992,6 +2017,63 @@ async function startReminderPoll_() {
       CARE_STATUS_TREE = tree;
       rebuildStatusSel_();
     }
+  }
+
+  // Tai dinh nghia cac "truong tu tao" (admin them ben app web chinh, dung chung setting
+  // 'customFields' voi khStatusTree/nickZaloList) roi ve lai cac o select tuong ung.
+  async function loadCustomFields_() {
+    if (!GAS_URL) return;
+    const sep = GAS_URL.includes('?') ? '&' : '?';
+    try {
+      const r = await fetch(GAS_URL + sep + 'action=getSetting&key=customFields', {redirect:'follow'});
+      const d = await r.json();
+      if (d && d.value) {
+        const arr = typeof d.value === 'string' ? JSON.parse(d.value) : d.value;
+        if (Array.isArray(arr)) { CUSTOM_FIELDS = arr; renderCustomFieldSelects_zai(); }
+      }
+    } catch(e) {}
+  }
+
+  // Ve lai cac o <select> cua truong tu tao vao #zai-custom-fields-wrap, giu gia tri dang
+  // chon (neu co) khi ve lai sau khi tra cuu 1 khach khac.
+  function renderCustomFieldSelects_zai(values) {
+    const wrap = document.getElementById('zai-custom-fields-wrap');
+    if (!wrap) return;
+    values = values || {};
+    wrap.innerHTML = '';
+    CUSTOM_FIELDS.forEach(f => {
+      addEl(wrap, 'label', {textContent: f.label});
+      const sel = addEl(wrap, 'select', {id: 'zai-cf-' + f.id, dataset: {cfid: f.id}});
+      addEl(sel, 'option', {value: '', textContent: '— Chọn —'});
+      (f.tree || []).forEach(node => {
+        if (node.children && node.children.length) {
+          const grp = document.createElement('optgroup');
+          grp.label = node.label;
+          node.children.forEach(ch => {
+            const v = ch.value || ch.label;
+            const op = document.createElement('option');
+            op.value = v; op.textContent = node.label + ' → ' + ch.label;
+            if (values[f.id] === v) op.selected = true;
+            grp.appendChild(op);
+          });
+          sel.appendChild(grp);
+        } else {
+          const v2 = node.value || node.label;
+          const op = addEl(sel, 'option', {value: v2, textContent: node.label});
+          if (values[f.id] === v2) op.selected = true;
+        }
+      });
+    });
+  }
+
+  // Đọc giá trị các trường tự tạo đang chọn trên form (dùng khi lưu)
+  function collectCustomFieldValues_zai(existing) {
+    const out = Object.assign({}, existing || {});
+    CUSTOM_FIELDS.forEach(f => {
+      const el = document.getElementById('zai-cf-' + f.id);
+      if (el) out[f.id] = el.value || '';
+    });
+    return out;
   }
 
   // ═══════════════════════════════════════════════════════════════

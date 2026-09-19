@@ -21,6 +21,66 @@
     '4.1 Không hiệu quả','4.2 Đã có kết quả','4.3 Đã đổi sang sản phẩm khác',
     '5. Đang tạm dừng','6. Nhận hộ / Sai số','7. Ngang Cúp','8. Từ chối'
   ];
+
+  // ═══ PHONG THUY THU HIEN (chi ap dung khi PLATFORM === 'messenger') — them 2026-09 ═══
+  // Cac list/du lieu duoi day KHONG dung cho Pancake (san pham suc khoe) de tranh lam sai
+  // ngu canh CS dang dung — moi noi dung dung PLATFORM === 'messenger' de chon nhanh.
+  const CARE_STATUSES_MESSENGER = [
+    'Chờ gọi tư vấn', 'Đã gọi - đang theo dõi', 'Hẹn gọi lại',
+    'Không nghe máy', 'Đã chốt', 'Từ chối', 'Đang khiếu nại', 'Tạm ngừng chăm sóc'
+  ];
+  const MENH_TABLE_DEFAULT = {
+    'Kim': [1954,1955,1962,1963,1970,1971,1984,1985,1992,1993,2000,2001],
+    'Thủy': [1956,1957,1964,1965,1972,1973,1986,1987,1994,1995,2002,2003],
+    'Hỏa': [1958,1959,1966,1967,1974,1975,1988,1989,1996,1997,2004,2005],
+    'Mộc': [1960,1961,1968,1969,1982,1983,1990,1991,1998,1999,2012,2013],
+    'Thổ': [1976,1977,1978,1979,1980,1981,2006,2007,2008,2009,2010,2011]
+  };
+  const CANNED_DEFAULT_MESSENGER = [
+    { id:'menhkim', nhom:'Theo mệnh', label:'Mệnh Kim', text:'Dạ với người mệnh Kim thì màu hợp là màu trắng, vàng, bạc (thuộc hành Kim và Thổ vì Thổ sinh Kim ạ), nên tránh dùng nhiều màu đỏ, hồng, tím (hành Hỏa khắc Kim).\nĐá phong thủy hợp mệnh Kim: đá thạch anh trắng, đá mắt hổ vàng, ngọc trai, đá obsidian đen (Thủy tương sinh).\nBên em hiện có $$ rất phù hợp với mệnh Kim ạ, chị/anh xem qua thử nhé.' },
+    { id:'menhmoc', nhom:'Theo mệnh', label:'Mệnh Mộc', text:'Dạ với người mệnh Mộc thì màu hợp là màu xanh lá, xanh dương, đen (hành Mộc và Thủy vì Thủy sinh Mộc ạ), nên tránh dùng nhiều màu trắng, bạc (hành Kim khắc Mộc).\nĐá phong thủy hợp mệnh Mộc: đá aventurine xanh, ngọc bích, đá obsidian đen.\nBên em hiện có $$ rất phù hợp với mệnh Mộc ạ, chị/anh xem qua thử nhé.' },
+    { id:'menhthuy', nhom:'Theo mệnh', label:'Mệnh Thủy', text:'Dạ với người mệnh Thủy thì màu hợp là màu đen, xanh dương, trắng (hành Thủy và Kim vì Kim sinh Thủy ạ), nên tránh dùng nhiều màu vàng nâu (hành Thổ khắc Thủy).\nĐá phong thủy hợp mệnh Thủy: đá obsidian đen, đá lapis lazuli xanh, đá thạch anh trắng.\nBên em hiện có $$ rất phù hợp với mệnh Thủy ạ, chị/anh xem qua thử nhé.' },
+    { id:'menhhoa', nhom:'Theo mệnh', label:'Mệnh Hỏa', text:'Dạ với người mệnh Hỏa thì màu hợp là màu đỏ, hồng, tím, xanh lá (hành Hỏa và Mộc vì Mộc sinh Hỏa ạ), nên tránh dùng nhiều màu đen, xanh dương (hành Thủy khắc Hỏa).\nĐá phong thủy hợp mệnh Hỏa: đá thạch anh hồng, đá garnet đỏ, đá aventurine xanh.\nBên em hiện có $$ rất phù hợp với mệnh Hỏa ạ, chị/anh xem qua thử nhé.' },
+    { id:'menhtho', nhom:'Theo mệnh', label:'Mệnh Thổ', text:'Dạ với người mệnh Thổ thì màu hợp là màu vàng, nâu, đỏ, hồng (hành Thổ và Hỏa vì Hỏa sinh Thổ ạ), nên tránh dùng nhiều màu xanh lá (hành Mộc khắc Thổ).\nĐá phong thủy hợp mệnh Thổ: đá mắt hổ vàng, đá citrine vàng, đá thạch anh hồng.\nBên em hiện có $$ rất phù hợp với mệnh Thổ ạ, chị/anh xem qua thử nhé.' },
+    { id:'chaohoi', nhom:'Giá & chính sách', label:'Chào hỏi', text:'Dạ em chào chị/anh, em là $$ bên shop phong thủy Thu Hiền ạ. Chị/anh cho em xin năm sinh để em tư vấn sản phẩm hợp mệnh nhất mình nhé ạ 🙏' },
+    { id:'giaba', nhom:'Giá & chính sách', label:'Báo giá', text:'Dạ sản phẩm $$ bên em giá là $$ ạ. Giá này đã bao gồm hộp đựng và thẻ bảo hành, chưa gồm phí ship ạ. Chị/anh có muốn em tư vấn thêm mẫu khác cùng tầm giá không ạ?' },
+    { id:'csship', nhom:'Giá & chính sách', label:'Chính sách ship', text:'Dạ bên em giao hàng toàn quốc qua đơn vị vận chuyển, thời gian dự kiến 2–4 ngày với nội thành và 3–5 ngày với tỉnh xa ạ. Chị/anh có thể xem hàng trước khi thanh toán (COD) ạ.' },
+    { id:'csdoitra', nhom:'Giá & chính sách', label:'Đổi trả', text:'Dạ sản phẩm bên em hỗ trợ đổi trong vòng 7 ngày nếu lỗi do nhà sản xuất hoặc không đúng mẫu đã đặt ạ, còn đổi ý cá nhân thì em xin phép hỗ trợ đổi mẫu khác tương đương giá trị trong 3 ngày ạ (khách chịu phí ship đổi). Chị/anh yên tâm mua ạ 🙏' },
+    { id:'xinttin', nhom:'Giá & chính sách', label:'Xin thông tin lên đơn', text:'Dạ để lên đơn cho chị/anh, em xin thông tin: \n- Họ tên: $$\n- Số điện thoại: $$\n- Địa chỉ nhận hàng: $$\nChị/anh gửi giúp em với ạ, em lên đơn ngay ạ.' },
+    { id:'follow2ngay', nhom:'Giá & chính sách', label:'Follow-up 2 ngày', text:'Dạ em là $$ bên phong thủy Thu Hiền ạ, hôm trước chị/anh có quan tâm sản phẩm $$, không biết chị/anh đã quyết định chưa ạ? Hiện bên em đang có ưu đãi $$, chị/anh xem thử nhé ạ 🙏' }
+  ];
+  const IS_PHONGTHUY = PLATFORM === 'messenger';
+  const ACTIVE_CARE_STATUSES = IS_PHONGTHUY ? CARE_STATUSES_MESSENGER : CARE_STATUSES;
+  const ACTIVE_KHSTATUS_OPTS = KH_STATUS_OPTS; // giu nguyen "Tinh trang KH" cho ca 2 nen tang, khong doi thanh Phan loai khach
+  const KHSTATUS_LABEL = 'Tình trạng KH';
+  const KNOWLEDGE_TTL_MS = 20 * 60 * 1000; // cache 20 phut, khong goi Sheet moi tin nhan
+  let _menhTable = MENH_TABLE_DEFAULT;
+  let _cannedResponses = CANNED_DEFAULT_MESSENGER;
+  function tinhMenh_(namSinhStr) {
+    const n = parseInt(namSinhStr, 10);
+    if (!n || n < 1900 || n > 2100) return null;
+    for (const menh of Object.keys(_menhTable)) if (_menhTable[menh].includes(n)) return menh;
+    return null;
+  }
+  async function loadPhongThuyKnowledge_() {
+    if (!IS_PHONGTHUY) return;
+    chrome.storage.local.get(['pkKnowledge', 'pkKnowledgeTs'], (res) => {
+      if (res.pkKnowledge) applyPhongThuyKnowledge_(res.pkKnowledge);
+      const fresh = res.pkKnowledge && res.pkKnowledgeTs && (Date.now() - res.pkKnowledgeTs < KNOWLEDGE_TTL_MS);
+      if (fresh) return;
+      chrome.runtime.sendMessage({ type: 'GET_KNOWLEDGE' }, (resp) => {
+        if (!resp?.ok || !resp.data) return; // giu ban mac dinh/cache cu neu GAS loi
+        const k = { menhTable: resp.data.menhTable || MENH_TABLE_DEFAULT, canned: (resp.data.canned && resp.data.canned.length) ? resp.data.canned : CANNED_DEFAULT_MESSENGER };
+        chrome.storage.local.set({ pkKnowledge: k, pkKnowledgeTs: Date.now() });
+        applyPhongThuyKnowledge_(k);
+      });
+    });
+  }
+  function applyPhongThuyKnowledge_(k) {
+    if (k.menhTable) _menhTable = k.menhTable;
+    if (k.canned && k.canned.length) _cannedResponses = k.canned;
+    renderCannedList_();
+  }
   const CARE_POLL_MS = 6000;
   const REM_POLL_MS = 5 * 60 * 1000; // quet nhac hen moi 5 phut
   // 3 huong mo dau khac nhau khi CHU DONG nhan truoc cho khach — CUNG NOI DUNG voi
@@ -32,8 +92,11 @@
   ];
   let _activeTone = 'Thân thiện';
   let _useProducts = false;
+  let _stonePref = ''; // '' = mac dinh (cot G) | 'SAPHIA' | 'RUBY' — luu sticky, khoi phai go lai moi lan
   let CS_NAMES = [];
   let NICK_LIST = [];
+  let CARE_STATUS_TREE = null; // cay "Tinh trang CS" load dong tu GAS (dong bo voi appweb/Zalo AI)
+  let CUSTOM_FIELDS = []; // "truong tu tao" (admin them ben app web chinh) — load dong tu GAS
   let _currentNick = ''; // Nick Zalo/kenh CS dang dung, sticky (chrome.storage.sync)
   let _chatKeyPhoneMap = {}; // { chatKey: phone } — "danh ba nguoc" hoc cuc bo tren may nay
                              // (giong _chatNamePhoneMap ben Zalo AI), dung cho nut Lien ket doan chat
@@ -55,9 +118,13 @@
     observeConversationChanges();
     loadCsNames_();
     loadNickList_();
+    if (!IS_PHONGTHUY) { loadCareStatusTree_(); loadCustomFields_(); } // cay dung chung cho Pancake/Zalo (san pham suc khoe) — khong ap dung cho phong thuy
     loadChatKeyMap_();
     startCarePoll_();
     loadReminders_();
+    loadCartForCurrentPhone_(); // khoi tao khu don hang dang tinh (SDT rong -> gio tam chung)
+    loadPhongThuyKnowledge_();
+    if (IS_PHONGTHUY) setInterval(loadPhongThuyKnowledge_, KNOWLEDGE_TTL_MS);
     startRemPoll_();
   }
 
@@ -70,10 +137,56 @@
 
   function getSettings() {
     return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ type: "GET_SETTINGS" }, (resp) => {
-        resolve(resp?.settings || {});
-      });
+      try {
+        chrome.runtime.sendMessage({ type: "GET_SETTINGS" }, (resp) => {
+          if (chrome.runtime.lastError) { resolve({}); return; }
+          resolve(resp?.settings || {});
+        });
+      } catch (e) {
+        resolve({});
+      }
     });
+  }
+
+  // ── Bảo vệ khi extension bị reload/cập nhật trong lúc tab Pancake đang mở ──
+  // Khi đó chrome.runtime của content script cũ mất kết nối tới service worker mới:
+  // MỌI lệnh chrome.runtime.sendMessage sau đó đều ném lỗi "Extension context invalidated"
+  // (hoặc chrome.runtime tự thành undefined) — khiến tra cứu KH, lưu tên/SĐT/ghi chú/trạng
+  // thái Zalo, nhắc hẹn... đều im lặng không chạy, chỉ thấy lỗi đỏ trong Console (F12) chứ
+  // KHÔNG phải lỗi logic code. safeSendMessage_ bắt lỗi này, dừng các vòng lặp polling đang
+  // gây spam lỗi liên tục, và hiện banner rõ ràng yêu cầu tải lại trang (F5) thay vì im lặng.
+  let _extInvalidated = false;
+  function isExtContextValid_() {
+    try { return !!(chrome.runtime && chrome.runtime.id); } catch (e) { return false; }
+  }
+  function safeSendMessage_(message, callback) {
+    if (_extInvalidated || !isExtContextValid_()) { handleExtInvalidated_(); return; }
+    try {
+      chrome.runtime.sendMessage(message, (resp) => {
+        if (chrome.runtime.lastError) { handleExtInvalidated_(); return; }
+        callback && callback(resp);
+      });
+    } catch (e) {
+      handleExtInvalidated_();
+    }
+  }
+  function handleExtInvalidated_() {
+    if (_extInvalidated) return;
+    _extInvalidated = true;
+    if (_carePollTimer) { clearInterval(_carePollTimer); _carePollTimer = null; }
+    if (_remPollTimer) { clearInterval(_remPollTimer); _remPollTimer = null; }
+    showExtInvalidBanner_();
+  }
+  function showExtInvalidBanner_() {
+    if (!panelEl || panelEl.querySelector('#pk-ext-invalid-banner')) return;
+    const banner = document.createElement('div');
+    banner.id = 'pk-ext-invalid-banner';
+    banner.style.cssText = 'background:#fff3cd;color:#856404;border:1px solid #ffe08a;border-radius:6px;padding:10px 12px;margin:0 0 8px;font-size:13px;font-weight:600;text-align:center;';
+    banner.innerHTML = '⚠️ Extension vừa được cập nhật — vui lòng <a href="#" id="pk-reload-link" style="color:#0d6efd;text-decoration:underline;">tải lại trang</a> (F5) để tiếp tục dùng.';
+    panelEl.prepend(banner);
+    const link = banner.querySelector('#pk-reload-link');
+    if (link) link.addEventListener('click', (e) => { e.preventDefault(); location.reload(); });
+    setStatus('⚠️ Mất kết nối tới extension — vui lòng tải lại trang (F5).');
   }
 
   // ── Nhớ vị trí/kích thước/trạng thái thu gọn của panel giữa các lần tải trang
@@ -166,6 +279,7 @@
           <input type="text" id="pk-ai-phone-input" placeholder="SĐT khách (nếu không tự nhận ra)" />
           <button id="pk-ai-phone-btn">Tra cứu</button>
           <button id="pk-link-chat-btn" title="Liên kết đoạn chat ĐANG MỞ với khách này — làm 1 lần để lần sau tự nhận diện dù không đọc được SĐT/khung Sản phẩm order">🔗</button>
+          <button id="pk-add-new-btn" title="Mở ngay form thêm khách mới — không cần tra cứu trước, dán SĐT vào form rồi điền và lưu">＋ Thêm KH</button>
         </div>
         <div id="pk-ai-customer"></div>
 
@@ -186,6 +300,50 @@
           <div id="pk-price-result"></div>
         </div>
 
+        <div id="pk-cart-section" style="display:none">
+          <div id="pk-cart-header" style="display:flex;justify-content:space-between;align-items:center">
+            <span>🧾 Đơn hàng đang tính (<span id="pk-cart-count">0</span>)</span>
+            <label style="font-size:10.5px;font-weight:400;color:#831843;display:flex;align-items:center;gap:3px">
+              <input type="checkbox" id="pk-cart-price-k" /> Nhập giá theo nghìn (k)
+            </label>
+          </div>
+          <div id="pk-cart-list"></div>
+          <div id="pk-cart-addrow">
+            <button id="pk-cart-add-manual" title="Thêm 1 dòng sản phẩm tự nhập (khi hệ thống tính sai hoặc không tra được)">＋ Thêm dòng thủ công</button>
+          </div>
+          <div id="pk-cart-extra">
+            <div class="pk-cart-extra-row">
+              <label>🎁 Quà tặng kèm</label>
+              <input type="text" id="pk-cart-gift" placeholder="VD: tặng 1 vòng phong thủy nhỏ..." />
+            </div>
+            <div class="pk-cart-extra-row">
+              <label>Giảm giá</label>
+              <select id="pk-cart-discount-type">
+                <option value="none">Không giảm</option>
+                <option value="percent">% </option>
+                <option value="amount">Số tiền</option>
+              </select>
+              <input type="number" id="pk-cart-discount-value" placeholder="0" min="0" style="display:none" />
+            </div>
+            <div class="pk-cart-extra-row">
+              <label><input type="checkbox" id="pk-cart-freeship" /> Freeship</label>
+            </div>
+          </div>
+          <div id="pk-cart-total"></div>
+          <div id="pk-cart-actions">
+            <button id="pk-cart-copy">📋 Sao chép đơn hàng</button>
+            <button id="pk-cart-clear">🗑 Xoá hết</button>
+          </div>
+        </div>
+
+        ${IS_PHONGTHUY ? `
+        <div id="pk-canned-section">
+          <div id="pk-canned-header" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+            <span>📋 Mẫu có sẵn (phong thủy)</span><span id="pk-canned-toggle" style="font-size:11px">▼ mở</span>
+          </div>
+          <div id="pk-canned-body" style="display:none"></div>
+        </div>` : ''}
+
         <div id="pk-ai-status">Chưa có hội thoại nào được chọn.</div>
 
         <div class="pk-tones" id="pk-tones">
@@ -197,6 +355,12 @@
           <input type="checkbox" id="pk-use-products-chk" />
           <span>🔍 <b>Tra cứu sản phẩm</b> (nạp dữ liệu Google Sheet để tư vấn kỹ thành phần/công dụng)</span>
         </label>
+        <div class="pk-stone-row" id="pk-stone-row" title="Không tick gì = báo giá mặc định (cột G). Tick 1 loại nếu khách hỏi đá SAPHIA/RUBY — nhớ luôn cho lần sau, khỏi phải gõ lại.">
+          <span class="pk-stone-label">💎 Loại đá:</span>
+          <label><input type="radio" name="pk-stone" id="pk-stone-none" value="" checked /> Mặc định</label>
+          <label><input type="radio" name="pk-stone" id="pk-stone-saphia" value="SAPHIA" /> SAPHIA</label>
+          <label><input type="radio" name="pk-stone" id="pk-stone-ruby" value="RUBY" /> RUBY</label>
+        </div>
         <button id="pk-opener-btn" class="pk-opener-btn">💬 Tạo 3 câu mở đầu đa dạng (mua hàng + chat)</button>
 
         <div id="pk-ai-suggestions"></div>
@@ -221,7 +385,7 @@
     panelEl.querySelector('#pk-nick-add').addEventListener('click', () => {
       const nick = (prompt('Nhập nick Zalo/kênh mới:') || '').trim();
       if (!nick) return;
-      chrome.runtime.sendMessage({ type: 'ADD_NICK', payload: { nick } }, (resp) => {
+      safeSendMessage_({ type: 'ADD_NICK', payload: { nick } }, (resp) => {
         NICK_LIST = (resp?.ok && resp.data?.list) ? resp.data.list : NICK_LIST;
         if (!NICK_LIST.includes(nick)) NICK_LIST.push(nick);
         _currentNick = nick;
@@ -251,11 +415,62 @@
       learnChatKeyForPhone_(_currentPhone);
       setStatus(`🔗 Đã liên kết đoạn chat này với ${_currentPhone} — lần sau tự nhận diện.`);
     });
+    panelEl.querySelector("#pk-add-new-btn").addEventListener("click", quickAddNewCustomer_);
     panelEl.querySelector("#pk-rem-refresh").addEventListener("click", () => loadReminders_());
     panelEl.querySelector("#pk-price-btn").addEventListener("click", doPriceSearch_);
     panelEl.querySelector("#pk-price-q").addEventListener("keydown", (e) => {
       if (e.key === "Enter") doPriceSearch_();
     });
+    panelEl.querySelector('#pk-cart-add-manual').addEventListener('click', () => {
+      panelEl.querySelector('#pk-cart-section').dataset.everOpened = '1';
+      addToCart_({ name: '', note: '', price: 0, qty: 1 });
+      // focus ngay vao o ten cua dong vua them cho de go
+      setTimeout(() => {
+        const rows = panelEl.querySelectorAll('#pk-cart-list .pk-cart-name');
+        if (rows.length) rows[rows.length - 1].focus();
+      }, 30);
+    });
+    panelEl.querySelector('#pk-cart-gift').addEventListener('input', (e) => { _cartExtra.gift = e.target.value; });
+    panelEl.querySelector('#pk-cart-gift').addEventListener('change', () => { saveCart_(); });
+    panelEl.querySelector('#pk-cart-discount-type').addEventListener('change', (e) => {
+      _cartExtra.discountType = e.target.value;
+      panelEl.querySelector('#pk-cart-discount-value').style.display = e.target.value === 'none' ? 'none' : '';
+      saveCart_(); _renderCartTotal_();
+    });
+    panelEl.querySelector('#pk-cart-discount-value').addEventListener('input', (e) => {
+      _cartExtra.discountValue = Number(e.target.value) || 0; _renderCartTotal_();
+    });
+    panelEl.querySelector('#pk-cart-discount-value').addEventListener('change', () => { saveCart_(); });
+    panelEl.querySelector('#pk-cart-freeship').addEventListener('change', (e) => {
+      _cartExtra.freeship = e.target.checked; saveCart_(); _renderCartTotal_();
+    });
+    panelEl.querySelector('#pk-cart-price-k').addEventListener('change', (e) => {
+      _cartExtra.priceInK = e.target.checked; saveCart_(); renderCart_(); // render lai de doi hien thi cac dong gia da co
+    });
+    panelEl.querySelector('#pk-cart-copy').addEventListener('click', () => {
+      const text = _buildCartSummaryText_();
+      if (!text.trim()) { setStatus('Chưa có sản phẩm nào được tick trong đơn.'); return; }
+      navigator.clipboard.writeText(text).then(() => {
+        setStatus('📋 Đã sao chép đơn hàng — dán vào khung chat để gửi khách.');
+      }).catch(() => { setStatus('Không sao chép được, hãy bôi đen và copy thủ công.'); });
+    });
+    panelEl.querySelector('#pk-cart-clear').addEventListener('click', () => {
+      if (!_cartItems.length) return;
+      if (!confirm('Xoá toàn bộ đơn hàng đang tính cho khách này?')) return;
+      _cartItems = [];
+      _cartExtra = { gift: '', discountType: 'none', discountValue: 0, freeship: false, priceInK: false };
+      saveCart_(); renderCart_();
+    });
+    if (IS_PHONGTHUY) {
+      panelEl.querySelector('#pk-canned-header').addEventListener('click', () => {
+        const body = panelEl.querySelector('#pk-canned-body');
+        const toggle = panelEl.querySelector('#pk-canned-toggle');
+        const hidden = body.style.display === 'none';
+        body.style.display = hidden ? 'block' : 'none';
+        toggle.textContent = hidden ? '▲ thu gọn' : '▼ mở';
+        if (hidden) renderCannedList_();
+      });
+    }
     panelEl.querySelector("#pk-tones").addEventListener("click", (e) => {
       const btn = e.target.closest(".pk-tone");
       if (!btn) return;
@@ -267,12 +482,25 @@
     prodChk.checked = !!settings.useProducts;
     prodChk.addEventListener("change", () => { _useProducts = prodChk.checked; });
     _useProducts = prodChk.checked;
+    // Loai da (SAPHIA/RUBY) — sticky theo may qua chrome.storage.sync, khong phai tick lai moi lan
+    chrome.storage.sync.get(['stonePref'], (res) => {
+      _stonePref = res.stonePref || '';
+      const target = panelEl.querySelector(`input[name="pk-stone"][value="${_stonePref}"]`);
+      if (target) target.checked = true;
+    });
+    panelEl.querySelectorAll('input[name="pk-stone"]').forEach((r) => {
+      r.addEventListener('change', () => {
+        if (!r.checked) return;
+        _stonePref = r.value;
+        chrome.storage.sync.set({ stonePref: _stonePref });
+      });
+    });
     panelEl.querySelector("#pk-opener-btn").addEventListener("click", doGenerateOpeners_);
   }
 
   // ── CS đang dùng (sticky theo máy, lưu chrome.storage.sync) ──
   async function loadCsNames_() {
-    chrome.runtime.sendMessage({ type: "GET_CS_NAMES" }, (resp) => {
+    safeSendMessage_({ type: "GET_CS_NAMES" }, (resp) => {
       CS_NAMES = (resp?.ok && resp.data && resp.data.length) ? resp.data : [];
       const csSel = panelEl?.querySelector('#pk-cs-sel');
       if (!csSel) return;
@@ -288,7 +516,7 @@
   function loadNickList_() {
     chrome.storage.sync.get(['currentNick'], (res) => {
       _currentNick = res.currentNick || '';
-      chrome.runtime.sendMessage({ type: "GET_NICK_LIST" }, (resp) => {
+      safeSendMessage_({ type: "GET_NICK_LIST" }, (resp) => {
         NICK_LIST = (resp?.ok && resp.data) ? resp.data : [];
         renderNickSelect_();
       });
@@ -301,6 +529,117 @@
     sel.innerHTML = '<option value="">— Chọn nick —</option>' +
       NICK_LIST.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
     sel.value = _currentNick || '';
+  }
+
+  // ── "Tình trạng CS": nạp cây phân nhóm động từ GAS (đồng bộ với appweb/Zalo AI) ──
+  // Trước đây chỉ dùng danh sách CARE_STATUSES tĩnh; giờ ưu tiên cây động (có optgroup)
+  // giống hệt Zalo AI, CARE_STATUSES chỉ còn là fallback khi chưa tải được cây.
+  function careStatusOptionsHtml_(selected) {
+    if (Array.isArray(CARE_STATUS_TREE) && CARE_STATUS_TREE.length) {
+      let html = '<option value="">— Chọn —</option>';
+      CARE_STATUS_TREE.forEach((node) => {
+        if (node.children && node.children.length) {
+          html += '<optgroup label="' + escapeHtml(node.label) + '">';
+          node.children.forEach((child) => {
+            if (!child.value) return;
+            html += `<option value="${escapeHtml(child.value)}"${selected === child.value ? ' selected' : ''}>${escapeHtml(node.label + ' - ' + (child.label || child.value))}</option>`;
+          });
+          html += '</optgroup>';
+        } else if (node.value) {
+          html += `<option value="${escapeHtml(node.value)}"${selected === node.value ? ' selected' : ''}>${escapeHtml(node.label || node.value)}</option>`;
+        }
+      });
+      return html;
+    }
+    return [''].concat(ACTIVE_CARE_STATUSES).map((o) =>
+      `<option value="${escapeHtml(o)}"${o === (selected || '') ? ' selected' : ''}>${o ? escapeHtml(o) : '— Chọn —'}</option>`
+    ).join('');
+  }
+
+  function rebuildStatusSel_() {
+    const sel = panelEl?.querySelector('#pk-status-sel');
+    if (!sel || !Array.isArray(CARE_STATUS_TREE) || !CARE_STATUS_TREE.length) return;
+    const cur = sel.value;
+    sel.innerHTML = careStatusOptionsHtml_(cur);
+    sel.value = cur;
+  }
+
+  function loadCareStatusTree_() {
+    safeSendMessage_({ type: 'GET_CARE_STATUS_TREE' }, (resp) => {
+      if (resp?.ok && Array.isArray(resp.data) && resp.data.length) {
+        CARE_STATUS_TREE = resp.data;
+        rebuildStatusSel_();
+      }
+    });
+  }
+
+  function loadCustomFields_() {
+    safeSendMessage_({ type: 'GET_CUSTOM_FIELDS' }, (resp) => {
+      if (resp?.ok && Array.isArray(resp.data)) {
+        CUSTOM_FIELDS = resp.data;
+        // Vẽ lại panel đang mở (nếu có) để hiện đúng các trường tự tạo mới nhất
+        if (_currentPhone) renderCustomFieldSelects_(panelEl?.querySelector('#pk-cf-wrap'), _currentCare?.custom || {});
+      }
+    });
+  }
+
+  // Build <option> cho 1 trường tự tạo — CÙNG cấu trúc {label,value}/{label,children} với
+  // careStatusOptionsHtml_ ở trên.
+  function customFieldOptionsHtml_(field, selected) {
+    let html = '<option value="">— Chọn —</option>';
+    (field.tree || []).forEach((node) => {
+      if (node.children && node.children.length) {
+        html += '<optgroup label="' + escapeHtml(node.label) + '">';
+        node.children.forEach((child) => {
+          const v = child.value || child.label;
+          html += `<option value="${escapeHtml(v)}"${selected === v ? ' selected' : ''}>${escapeHtml(node.label + ' → ' + (child.label || v))}</option>`;
+        });
+        html += '</optgroup>';
+      } else {
+        const v2 = node.value || node.label;
+        html += `<option value="${escapeHtml(v2)}"${selected === v2 ? ' selected' : ''}>${escapeHtml(node.label || v2)}</option>`;
+      }
+    });
+    return html;
+  }
+
+  // Vẽ các <select> của trường tự tạo vào 1 vùng chứa cho sẵn trong form — ghép 2 trường/hàng
+  // theo đúng cấu trúc .pk-form-row > .pk-form-col mà các trường có sẵn (Sinh nhật/Ngày hẹn) đang
+  // dùng, để không bị vỡ layout (pk-form-row là flex hàng ngang, cần bọc từng ô trong pk-form-col).
+  function renderCustomFieldSelects_(wrapEl, values) {
+    if (!wrapEl) return;
+    values = values || {};
+    if (!CUSTOM_FIELDS.length) { wrapEl.innerHTML = ''; return; }
+    const cols = CUSTOM_FIELDS.map((f) => `
+      <div class="pk-form-col">
+        <label>${escapeHtml(f.label)}</label>
+        <select id="pk-cf-${escapeHtml(f.id)}" data-cfid="${escapeHtml(f.id)}">${customFieldOptionsHtml_(f, values[f.id] || '')}</select>
+      </div>
+    `);
+    let html = '';
+    for (let i = 0; i < cols.length; i += 2) {
+      html += `<div class="pk-form-row">${cols[i]}${cols[i + 1] || '<div class="pk-form-col"></div>'}</div>`;
+    }
+    wrapEl.innerHTML = html;
+  }
+
+  // Đọc giá trị các trường tự tạo đang chọn trên form (dùng khi lưu)
+  function collectCustomFieldValues_(existing) {
+    const out = Object.assign({}, existing || {});
+    CUSTOM_FIELDS.forEach((f) => {
+      const el = panelEl?.querySelector('#pk-cf-' + f.id);
+      if (el) out[f.id] = el.value || '';
+    });
+    return out;
+  }
+
+  // Chip hiển thị giá trị trường tự tạo có dữ liệu — cạnh các chip có sẵn của thẻ khách
+  function customFieldChips_(care) {
+    if (!CUSTOM_FIELDS.length || !care || !care.custom) return '';
+    return CUSTOM_FIELDS.map((f) => {
+      const v = care.custom[f.id];
+      return v ? `<span class="pk-ai-chip">🏷 ${escapeHtml(f.label)}: ${escapeHtml(v)}</span>` : '';
+    }).join('');
   }
 
   // "Danh bạ ngược" (khoá hội thoại → SĐT) học cục bộ trên máy này — dùng khi CS bấm 🔗
@@ -392,12 +731,16 @@
       const m = el?.innerText?.match(/(0[3-9]\d{8})/);
       if (m) return [normPhone(m[1])];
     }
+    // 2) SĐT do chính CS gõ tay vào khung "Sản phẩm order" (đáng tin — CS chủ động xác nhận cho
+    // đúng đơn đang xử lý, không lẫn số điện thoại của người khác nhắc tới trong đoạn chat)
+    const panelPhone = extractOrderPanelPhone_();
+    if (panelPhone) return [panelPhone];
     const container = sel?.messageList ? document.querySelector(sel.messageList) : null;
     const scope = container || document.body;
-    // 2) SĐT đã được nền tảng tự gắn thẻ (span.phone-tag / id="..._<sđt>") — có thể ra nhiều số
+    // 3) SĐT đã được nền tảng tự gắn thẻ (span.phone-tag / id="..._<sđt>") — có thể ra nhiều số
     const tagged = extractTaggedPhones_(scope);
     if (tagged.length) return tagged;
-    // 3) Fallback cuối: quét chữ tự do tìm 1 SĐT VN dạng 0xxxxxxxxx (chỉ dùng khi không có thẻ)
+    // 4) Fallback cuối: quét chữ tự do tìm 1 SĐT VN dạng 0xxxxxxxxx (chỉ dùng khi không có thẻ)
     const m2 = scope.innerText?.match(/(0[3-9]\d{8})/);
     return m2 ? [normPhone(m2[1])] : [];
   }
@@ -409,35 +752,45 @@
 
   // ── Lấy tên khách từ khung "Sản phẩm order" (ghi chú đơn hàng CS tự nhập) ──
   // Dòng đầu của khối trên cùng thường dạng "Chị : Tên", "Anh Tên", hoặc "Tên +sđt".
-  function extractOrderPanelName_() {
+  function _findOrderPanelContainer_() {
     const sel = settings.selectors?.[PLATFORM];
-    let container = null;
     if (sel?.orderPanelSelector) {
-      container = document.querySelector(sel.orderPanelSelector);
+      const c = document.querySelector(sel.orderPanelSelector);
+      if (c) return c;
     }
-    if (!container) {
-      // Do tu dong: tim node la (khong con con) co chu "San pham order" lam tieu de,
-      // roi lay phan tu cha lam vung chua danh sach cac khoi khach.
-      const nodes = document.querySelectorAll('body *');
-      for (const el of nodes) {
-        if (el.children.length > 0) continue;
-        const t = (el.textContent || '').trim();
-        if (t.length > 0 && t.length < 40 && /sản phẩm order/i.test(t)) {
-          container = el.closest('div')?.parentElement || el.parentElement;
-          break;
-        }
+    // Dò tự động: tìm node lá (không còn con) có chữ "Sản phẩm order" làm tiêu đề,
+    // rồi lấy phần tử cha làm vùng chứa danh sách các khối khách.
+    const nodes = document.querySelectorAll('body *');
+    for (const el of nodes) {
+      if (el.children.length > 0) continue;
+      const t = (el.textContent || '').trim();
+      if (t.length > 0 && t.length < 40 && /sản phẩm order/i.test(t)) {
+        return el.closest('div')?.parentElement || el.parentElement;
       }
     }
+    return null;
+  }
+  function _firstOrderPanelLine_() {
+    const container = _findOrderPanelContainer_();
     if (!container) return '';
     const text = container.innerText || '';
     if (!text.trim()) return '';
-    // Bo dong tieu de "Sản phẩm order" neu dinh kem trong cung container
     const cleaned = text.replace(/^.*sản phẩm order.*$/im, '').trim();
-    // Tach cac khoi khach theo dong trong — khoi dau tien = khach dang xu ly (tren cung)
     const blocks = cleaned.split(/\n\s*\n+/).map((b) => b.trim()).filter(Boolean);
     if (!blocks.length) return '';
-    const firstLine = blocks[0].split('\n')[0].trim();
-    return _parseNameFromLine_(firstLine);
+    return blocks[0].split('\n')[0].trim();
+  }
+  function extractOrderPanelName_() {
+    return _parseNameFromLine_(_firstOrderPanelLine_());
+  }
+  // SĐT do CHÍNH CS gõ tay vào khung "Sản phẩm order" (vd "Chị Lan - 0912345678") — đáng tin cậy
+  // hơn quét chữ tự do trong toàn bộ đoạn chat, vì đây là dữ liệu CS chủ động xác nhận cho đơn
+  // đang xử lý. Trước đây dòng SĐT này chỉ bị XOÁ ĐI để tách tên, chưa từng được tận dụng.
+  function extractOrderPanelPhone_() {
+    const line = _firstOrderPanelLine_();
+    if (!line) return '';
+    const m = line.match(/(0[3-9]\d{8})/);
+    return m ? normPhone(m[1]) : '';
   }
 
   function _parseNameFromLine_(line) {
@@ -458,8 +811,17 @@
     }
     const phone = phones[0] || resolvePhoneForChatKey_();
     if (!phone) {
-      panelEl.querySelector("#pk-ai-customer").innerHTML = "";
       _currentPhone = ''; _currentCare = null; _lastServerCare = {}; _currentOrderPanelName = ''; _currentOrders = [];
+      // TRƯỚC ĐÂY: để trống trơn im lặng khi không tự nhận ra SĐT — trông như panel bị lỗi/không
+      // dùng được, dù thật ra form vẫn hoạt động đầy đủ (tên/trạng thái/ghi chú...), chỉ là nó
+      // CHỈ hiện SAU KHI tra cứu được 1 khách. Giờ luôn hiện rõ hướng dẫn thay vì im lặng.
+      panelEl.querySelector("#pk-ai-customer").innerHTML =
+        `<div class="pk-ai-no-phone-hint">
+          📵 Không tự nhận ra SĐT trong đoạn chat này.<br>
+          • Khách <b>đã có</b> trong Sasum: nhập SĐT ở ô trên rồi bấm <b>"Tra cứu"</b>.<br>
+          • Khách <b>mới</b>: bấm thẳng <b>"＋ Thêm KH"</b> — form hiện ngay, dán SĐT vào form
+          rồi điền tên/trạng thái/ghi chú và bấm Lưu (không cần tra cứu trước).
+        </div>`;
       return;
     }
     lookupByPhone(phone);
@@ -482,7 +844,7 @@
   function lookupByPhone(phone) {
     const box = panelEl.querySelector("#pk-ai-customer");
     box.innerHTML = `<div class="pk-ai-cust-loading">Đang tra cứu ${phone}...</div>`;
-    chrome.runtime.sendMessage({ type: "LOOKUP_CUSTOMER", payload: { phone } }, (resp) => {
+    safeSendMessage_({ type: "LOOKUP_CUSTOMER", payload: { phone } }, (resp) => {
       if (!resp?.ok) {
         box.innerHTML = `<div class="pk-ai-cust-loading">Không tra cứu được: ${resp?.error || "lỗi không rõ"}</div>`;
         return;
@@ -549,9 +911,52 @@
     return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
   }
 
-  function renderCustomerCard(phone, data) {
+  // "＋ Thêm KH": mở NGAY form nhập khách mới, KHÔNG cần tra cứu trước và KHÔNG bắt buộc phải
+  // có sẵn SĐT — giải quyết đúng vấn đề "phải điền SĐT + bấm Tra cứu mới hiện form, mất thời
+  // gian". CS bấm nút này là form hiện liền, dán SĐT vào ô SĐT ngay trong form rồi điền tên/
+  // trạng thái/ghi chú và bấm Lưu. SĐT chỉ bắt buộc ở thời điểm LƯU (validate trong saveCare_).
+  //
+  // Để tránh rủi ro ghi đè mất dữ liệu nếu SĐT đó thật ra ĐÃ có trong Sasum, sau khi CS dán
+  // SĐT hợp lệ sẽ âm thầm tra cứu ở nền: nếu tìm thấy dữ liệu cũ thì nạp vào các ô CS CHƯA kịp
+  // sửa (dùng lại đúng cơ chế applyPolledCare_), không đụng vào ô nào CS đã gõ rồi.
+  function quickAddNewCustomer_() {
+    const phoneInput = panelEl.querySelector('#pk-ai-phone-input');
+    const phone = normPhone(phoneInput ? phoneInput.value : '');
+    _currentPhone = phone;           // có thể rỗng — form vẫn mở bình thường
+    _currentCare = null;
+    _currentOrders = [];
+    _lastServerCare = {};
+    renderCustomerCard(phone, { care: null, orders: [] }, { blankNew: true });
+    setStatus(phone
+      ? `Đã mở form thêm mới cho ${phone} — điền thông tin rồi bấm Lưu vào Sasum.`
+      : 'Đã mở form thêm khách mới — dán SĐT vào ô "SĐT khách" trong form rồi điền và bấm Lưu.');
+    const inCardPhone = panelEl.querySelector('#pk-newphone-input');
+    if (inCardPhone) inCardPhone.focus();
+    if (phone) probeExistingCustomer_(phone);
+  }
+
+  // Tra cứu ngầm khi CS vừa dán SĐT — CHỈ để báo sớm cho CS biết đây là khách đã có, và nạp
+  // sẵn dữ liệu cũ lên form cho dễ nhìn. Đây KHÔNG phải cơ chế bảo vệ dữ liệu: việc chống ghi
+  // đè được đảm bảo chắc chắn ở bước lưu (saveCareAddOnly_ đọc lại bản mới nhất rồi hợp nhất),
+  // nên kể cả khi CS bấm Lưu trước lúc tra cứu này trả về thì dữ liệu cũ vẫn an toàn.
+  function probeExistingCustomer_(phone) {
+    safeSendMessage_({ type: 'LOOKUP_CUSTOMER', payload: { phone } }, (resp) => {
+      if (!resp?.ok || _currentPhone !== phone) return; // CS đã đổi sang số khác -> bỏ qua
+      const care = resp.data.care || null;
+      const orders = resp.data.orders || [];
+      if (!care && !orders.length) return; // đúng là khách mới thật -> không cần làm gì thêm
+      _currentOrders = orders;
+      applyPolledCare_(phone, care || {});
+      const tagEl = panelEl.querySelector('#pk-ai-new-tag');
+      if (tagEl) tagEl.style.display = 'none';
+      setStatus(`ℹ️ Số ${phone} đã có sẵn trong hệ thống — bạn vẫn điền và lưu bình thường, phần bạn nhập sẽ được THÊM vào hồ sơ này chứ không ghi đè dữ liệu cũ.`);
+    });
+  }
+
+  function renderCustomerCard(phone, data, opts) {
     const box = panelEl.querySelector("#pk-ai-customer");
     const { care, orders } = data;
+    loadCartForCurrentPhone_(); // don hang dang tinh gan theo tung SDT — doi khach thi doi don
 
     const orderPanelName = extractOrderPanelName_();
     _currentOrderPanelName = orderPanelName;
@@ -569,11 +974,17 @@
     if (totalRevenue) chips.push(`💰 ${Math.round(totalRevenue / 1000)}K`);
     if (care?.schedHen) chips.push(`📅 Hẹn ${fmtDate_(care.schedHen)}`);
 
+    const blankNew = !!(opts && opts.blankNew);
+
     box.innerHTML = `
       <div class="pk-ai-cust-card">
-        <div class="pk-ai-cust-name">${escapeHtml(name)} <span class="pk-ai-cust-phone">${phone}</span></div>
-        ${isNew ? `<div class="pk-ai-new-tag">⚠️ Chưa có trong hệ thống Sasum — lưu sẽ tạo mới</div>` : ''}
-        ${chips.length ? `<div class="pk-ai-cust-chips">${chips.map((c) => `<span class="pk-ai-chip">${c}</span>`).join('')}</div>` : ''}
+        ${blankNew
+          ? `<div class="pk-ai-cust-name">＋ Thêm khách mới</div>
+             <label class="pk-label-top">SĐT khách <span style="color:#dc2626">*</span></label>
+             <input type="text" id="pk-newphone-input" class="pk-full-input" placeholder="Dán SĐT khách vào đây..." value="${escapeHtml(phone || '')}" />`
+          : `<div class="pk-ai-cust-name">${escapeHtml(name)} <span class="pk-ai-cust-phone">${phone}</span></div>`}
+        <div class="pk-ai-new-tag" id="pk-ai-new-tag" style="${isNew ? '' : 'display:none'}">⚠️ Chưa có trong hệ thống Sasum — lưu sẽ tạo mới</div>
+        ${chips.length ? `<div class="pk-ai-cust-chips">${chips.map((c) => `<span class="pk-ai-chip">${c}</span>`).join('')}${customFieldChips_(care)}</div>` : (customFieldChips_(care) ? `<div class="pk-ai-cust-chips">${customFieldChips_(care)}</div>` : '')}
         ${products ? `<div class="pk-ai-cust-products">🏷 ${escapeHtml(products)}</div>` : ''}
 
         <label class="pk-label-top">Tên khách</label>
@@ -582,7 +993,7 @@
         <div class="pk-form-row">
           <div class="pk-form-col">
             <label>Trạng thái CS</label>
-            <select id="pk-status-sel">${optHtml([''].concat(CARE_STATUSES), care?.status)}</select>
+            <select id="pk-status-sel">${careStatusOptionsHtml_(care?.status || '')}</select>
           </div>
           <div class="pk-form-col">
             <label>Trạng thái Zalo</label>
@@ -591,12 +1002,15 @@
         </div>
         <div class="pk-form-row">
           <div class="pk-form-col">
-            <label>Tình trạng KH</label>
-            <select id="pk-khstatus-sel">${optHtml(KH_STATUS_OPTS, care?.khStatus)}</select>
+            <label>${KHSTATUS_LABEL}</label>
+            <select id="pk-khstatus-sel">${optHtml(ACTIVE_KHSTATUS_OPTS, care?.khStatus)}</select>
           </div>
           <div class="pk-form-col">
-            <label>Sinh nhật</label>
-            <input type="date" id="pk-birthday" value="${care?.birthday ? toInputDate_(care.birthday) : ''}" />
+            <label>Sinh nhật${IS_PHONGTHUY ? ' → Mệnh' : ''}</label>
+            <div style="display:flex;gap:4px;align-items:center">
+              <input type="date" id="pk-birthday" value="${care?.birthday ? toInputDate_(care.birthday) : ''}" style="flex:1" />
+              ${IS_PHONGTHUY ? '<span id="pk-menh-badge" style="font-size:11px;font-weight:700;color:#2563eb;white-space:nowrap"></span>' : ''}
+            </div>
           </div>
         </div>
 
@@ -611,6 +1025,8 @@
         </div>
         <input type="text" id="pk-hen-note" class="pk-full-input" placeholder="Ghi chú lịch hẹn" value="${escapeHtml(care?.schedHenNote || '')}" />
 
+        <div id="pk-cf-wrap"></div>
+
         <label class="pk-label-top">Ghi chú CS</label>
         <div id="pk-note-history"></div>
         <div class="pk-note-add-row">
@@ -623,14 +1039,54 @@
       </div>
     `;
 
+    renderCustomFieldSelects_(box.querySelector('#pk-cf-wrap'), care?.custom || {});
     renderNoteHistory_(care?.note || '');
 
     box.querySelector('#pk-note-add-btn').addEventListener('click', addNoteEntry_);
     box.querySelector('#pk-note-new').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') addNoteEntry_();
     });
-    box.querySelector('#pk-hen-done').addEventListener('click', () => doneAppointment_(phone));
-    box.querySelector('#pk-save-btn').addEventListener('click', () => saveCare_(phone));
+    box.querySelector('#pk-hen-done').addEventListener('click', () => doneAppointment_(currentFormPhone_() || phone));
+    box.querySelector('#pk-save-btn').addEventListener('click', () => saveCare_(currentFormPhone_() || phone));
+
+    // Form thêm mới: khi CS dán xong SĐT hợp lệ thì tự tra ngầm 1 lần để cảnh báo nếu số đã tồn tại
+    const newPhoneEl = box.querySelector('#pk-newphone-input');
+    if (newPhoneEl) {
+      let probed = '';
+      const onPhoneReady = () => {
+        const p = normPhone(newPhoneEl.value);
+        if (!/^0[3-9]\d{8}$/.test(p) || p === probed) return;
+        probed = p;
+        _currentPhone = p;
+        probeExistingCustomer_(p);
+      };
+      newPhoneEl.addEventListener('blur', onPhoneReady);
+      newPhoneEl.addEventListener('input', onPhoneReady);
+    }
+    if (IS_PHONGTHUY) {
+      const bdayEl = box.querySelector('#pk-birthday');
+      bdayEl.addEventListener('input', () => updateMenhBadge_());
+      bdayEl.addEventListener('change', () => updateMenhBadge_()); // input type=date: chon qua lich thuong chi ban 'change', khong ban 'input' o 1 so trinh duyet
+      updateMenhBadge_();
+    }
+  }
+
+  // SĐT đang áp dụng cho form: ưu tiên ô SĐT trong form thêm mới (nếu đang mở), sau đó tới
+  // SĐT của khách vừa tra cứu.
+  function currentFormPhone_() {
+    const el = panelEl?.querySelector('#pk-newphone-input');
+    if (el) return normPhone(el.value);
+    return _currentPhone || '';
+  }
+
+  function updateMenhBadge_() {
+    const inp = panelEl?.querySelector('#pk-birthday');
+    const out = panelEl?.querySelector('#pk-menh-badge');
+    if (!inp || !out) return;
+    const yearMatch = (inp.value || '').match(/\d{4}/);
+    if (!yearMatch) { out.textContent = ''; return; }
+    const menh = tinhMenh_(yearMatch[0]);
+    out.textContent = menh ? ('Mệnh ' + menh) : 'Chưa có DL năm này';
   }
 
   function renderNoteHistory_(raw) {
@@ -700,8 +1156,113 @@
       schedHen: c.schedHen || '', schedHenNote: c.schedHenNote || '',
       khStatus: c.khStatus || '', birthday: c.birthday || '',
       nickZalos,
+      custom: c.custom || {},
       name: liveName || _currentOrderPanelName || c.name || ''
     }, overrides || {});
+  }
+
+  // ── LUU AN TOAN CHO LUONG "+ Them KH" (nguon Cham soc) ─────────────────────────────────
+  // Nguyen tac: sale CHI DUOC THEM thong tin moi, KHONG duoc ghi de/xoa du lieu cu.
+  // Truoc khi ghi, luon doc lai ban ghi MOI NHAT tren server roi hop nhat:
+  //   - Ghi chu: GIU NGUYEN toan bo lich su cu, chi noi them cac ghi chu moi CS vua go len dau.
+  //   - Cac truong khac (trang thai CS/Zalo/tinh trang KH/sinh nhat/lich hen/ten): neu server
+  //     DA CO gia tri thi giu nguyen cua server; chi dien vao nhung o server dang de trong.
+  // Nho vay du CS bam Luu truoc khi tra ngam kip tra ve, du lieu cu van an toan tuyet doi.
+  function _mergeNotesKeepOld_(serverNoteRaw, localNoteRaw) {
+    const serverArr = _parseNotes(serverNoteRaw);
+    const localArr = _parseNotes(localNoteRaw);
+    const keyOf = (n) => [n.text || '', n.user || '', n.time || ''].join('|');
+    const seen = new Set(serverArr.map(keyOf));
+    // Ghi chu moi = co trong local nhung chua co tren server -> dua len dau, giu het ban cu
+    const added = localArr.filter((n) => n.text && !seen.has(keyOf(n)));
+    return { merged: _notesToStr([...added, ...serverArr]), addedCount: added.length };
+  }
+
+  // Tra ve row da hop nhat + danh sach ten truong bi giu lai (de bao cho CS biet, minh bach)
+  function _mergeRowKeepOld_(serverCare, localRow) {
+    const kept = [];
+    const out = Object.assign({}, localRow);
+    const LABELS = {
+      name: 'Tên khách', status: 'Trạng thái CS', zalo: 'Trạng thái Zalo',
+      khStatus: KHSTATUS_LABEL, birthday: 'Sinh nhật',
+      schedHen: 'Ngày hẹn', schedHenNote: 'Ghi chú lịch hẹn'
+    };
+    Object.keys(LABELS).forEach((k) => {
+      const sv = serverCare[k];
+      const lv = localRow[k];
+      if (sv) {                       // server da co -> giu nguyen, sale khong duoc de len
+        out[k] = sv;
+        if (lv && String(lv) !== String(sv)) kept.push(LABELS[k]);
+      } else {
+        out[k] = lv || '';            // server trong -> cho phep dien moi
+      }
+    });
+    // Cac truong lich hen/schedules khac khong co UI ben Pancake: luon lay nguyen cua server
+    ['schedules','schedGoi','schedGoiNote','schedSP','schedSPNote','schedCS','schedCSNote'].forEach((k) => {
+      out[k] = serverCare[k] || localRow[k] || '';
+    });
+    // Nick Zalo/kenh: hop nhat, khong bao gio lam mat nick cu
+    const svNicks = serverCare.nickZalos || [];
+    const lcNicks = localRow.nickZalos || [];
+    out.nickZalos = [...new Set([...svNicks, ...lcNicks])];
+    // CS phu trach: neu khach da co CS cu thi giu, khong cuop quyen phu trach
+    out.cs = serverCare.cs || localRow.cs || '';
+    const noteRes = _mergeNotesKeepOld_(serverCare.note, localRow.note);
+    out.note = noteRes.merged;
+    return { row: out, kept, addedNotes: noteRes.addedCount };
+  }
+
+  function saveCareAddOnly_(phone, localRow, btn) {
+    // Doc lai ban MOI NHAT ngay truoc khi ghi — chan ca truong hop CS bam Luu qua nhanh
+    safeSendMessage_({ type: 'LOOKUP_CUSTOMER', payload: { phone } }, (lookupResp) => {
+      if (!lookupResp?.ok) {
+        if (btn) { btn.disabled = false; btn.textContent = '💾 Lưu vào Sasum'; }
+        setStatus('Chưa kiểm tra được dữ liệu cũ của số này nên tạm dừng để an toàn — bấm Lưu lại lần nữa.');
+        return;
+      }
+      const serverCare = lookupResp.data.care || null;
+      const serverOrders = lookupResp.data.orders || [];
+      const isTrulyNew = !serverCare && !serverOrders.length;
+      const { row, kept, addedNotes } = _mergeRowKeepOld_(serverCare || {}, localRow);
+      safeSendMessage_({ type: 'SAVE_CARE', payload: Object.assign({}, row, { isNewCustomer: isTrulyNew }) }, (resp) => {
+        if (btn) { btn.disabled = false; btn.textContent = '💾 Lưu vào Sasum'; }
+        if (!resp?.ok) { setStatus('Lưu thất bại: ' + (resp?.error || 'lỗi không rõ')); return; }
+        _currentCare = row;
+        _currentPhone = phone;
+        _currentOrders = serverOrders;
+        _lastServerCare = Object.assign({}, row);
+        _refreshCardAfterSave_(phone, row);
+        renderNoteHistory_(row.note);
+        const rawEl = panelEl.querySelector('#pk-note-raw');
+        if (rawEl) rawEl.value = row.note;
+        if (isTrulyNew) {
+          setStatus('✓ Đã tạo khách mới (nguồn Chăm sóc).');
+        } else {
+          let msg = `✓ Đã thêm vào khách đã có sẵn${addedNotes ? ` — ${addedNotes} ghi chú mới` : ''}.`;
+          if (kept.length) msg += ` Giữ nguyên dữ liệu cũ: ${kept.join(', ')} (sale không ghi đè được).`;
+          setStatus(msg);
+        }
+      });
+    });
+  }
+
+  function _refreshCardAfterSave_(phone, row) {
+    const nameSpan = panelEl.querySelector('.pk-ai-cust-name');
+    if (nameSpan && row.name) nameSpan.innerHTML = `${escapeHtml(row.name)} <span class="pk-ai-cust-phone">${phone}</span>`;
+    const tagEl = panelEl.querySelector('#pk-ai-new-tag');
+    if (tagEl) tagEl.style.display = 'none';
+    const newPhoneEl = panelEl.querySelector('#pk-newphone-input');
+    if (newPhoneEl) { newPhoneEl.value = phone; newPhoneEl.readOnly = true; }
+    // Dong bo lai cac o tren form theo gia tri thuc te da ghi (vd truong bi giu lai cua server)
+    const setVal = (id, v) => { const el = panelEl.querySelector(id); if (el) el.value = v || ''; };
+    setVal('#pk-name-input', row.name);
+    setVal('#pk-status-sel', row.status);
+    setVal('#pk-zalo-sel', row.zalo);
+    setVal('#pk-khstatus-sel', row.khStatus);
+    setVal('#pk-birthday', row.birthday ? toInputDate_(row.birthday) : '');
+    setVal('#pk-hen-date', row.schedHen ? toInputDate_(row.schedHen) : '');
+    setVal('#pk-hen-note', row.schedHenNote);
+    learnChatKeyForPhone_(phone);
   }
 
   function saveCare_(phone) {
@@ -709,10 +1270,19 @@
     const rawEl = panelEl.querySelector('#pk-note-raw');
     const nameEl = panelEl.querySelector('#pk-name-input');
     const liveName = nameEl ? nameEl.value.trim() : '';
-    // Khách MỚI (nguồn "Chăm sóc"): chưa từng có CareData lẫn đơn hàng nào — bắt buộc nhập tên
-    // trước khi lưu, và sau khi lưu sẽ ghi thêm vào sheet riêng "KH Chăm sóc mới" (Báo cáo D).
-    const isNewCustomer = !_currentCare && (!_currentOrders || !_currentOrders.length);
-    if (isNewCustomer && !liveName) { setStatus('Khách mới — vui lòng nhập tên khách hàng trước khi lưu.'); return; }
+    // Form "＋ Thêm KH" mở được khi chưa có SĐT, nên SĐT chỉ bắt buộc ở đúng thời điểm LƯU.
+    phone = normPhone(phone);
+    if (!/^0[3-9]\d{8}$/.test(phone)) {
+      setStatus('SĐT chưa hợp lệ — nhập/dán SĐT khách (dạng 0xxxxxxxxx) trước khi lưu.');
+      const el = panelEl.querySelector('#pk-newphone-input') || panelEl.querySelector('#pk-ai-phone-input');
+      if (el) el.focus();
+      return;
+    }
+    // Form "＋ Thêm KH" (nguồn Chăm sóc do sale tự thêm): bắt buộc có tên, và đi qua đường lưu
+    // CHỈ-THÊM — đọc lại bản mới nhất rồi hợp nhất, không bao giờ ghi đè dữ liệu cũ.
+    const isAddForm = !!panelEl.querySelector('#pk-newphone-input');
+    if (isAddForm && !liveName) { setStatus('Vui lòng nhập tên khách hàng trước khi lưu.'); return; }
+
     const row = _buildRow(phone, {
       name: liveName,
       status: panelEl.querySelector('#pk-status-sel').value,
@@ -721,16 +1291,30 @@
       birthday: panelEl.querySelector('#pk-birthday').value,
       schedHen: panelEl.querySelector('#pk-hen-date').value,
       schedHenNote: panelEl.querySelector('#pk-hen-note').value.trim(),
+      custom: collectCustomFieldValues_(_currentCare?.custom || {}),
       note: rawEl ? rawEl.value : (_currentCare?.note || '')
     });
     if (btn) { btn.disabled = true; btn.textContent = 'Đang lưu...'; }
-    chrome.runtime.sendMessage({ type: 'SAVE_CARE', payload: Object.assign({}, row, { isNewCustomer }) }, (resp) => {
+    if (isAddForm) { saveCareAddOnly_(phone, row, btn); return; }
+
+    // Luồng cũ (đã tra cứu khách sẵn rồi mới sửa): giữ nguyên như trước
+    const isNewCustomer = !_currentCare && (!_currentOrders || !_currentOrders.length);
+    safeSendMessage_({ type: 'SAVE_CARE', payload: Object.assign({}, row, { isNewCustomer }) }, (resp) => {
       if (btn) { btn.disabled = false; btn.textContent = '💾 Lưu vào Sasum'; }
       if (!resp?.ok) { setStatus('Lưu thất bại: ' + (resp?.error || 'lỗi không rõ')); return; }
       _currentCare = row;
+      _currentPhone = phone;
       _lastServerCare = Object.assign({}, row);
       const nameSpan = panelEl.querySelector('.pk-ai-cust-name');
       if (nameSpan && row.name) nameSpan.innerHTML = `${escapeHtml(row.name)} <span class="pk-ai-cust-phone">${phone}</span>`;
+      // Lưu xong thì không còn là "khách mới" nữa: ẩn cảnh báo và khoá ô SĐT lại (tránh CS vô
+      // tình sửa số rồi bấm Lưu lần nữa làm tạo nhầm bản ghi thứ hai cho cùng 1 khách).
+      const tagEl = panelEl.querySelector('#pk-ai-new-tag');
+      if (tagEl) tagEl.style.display = 'none';
+      const newPhoneEl = panelEl.querySelector('#pk-newphone-input');
+      if (newPhoneEl) { newPhoneEl.value = phone; newPhoneEl.readOnly = true; }
+      // Ghi nhớ liên kết đoạn chat đang mở với SĐT này -> lần sau vào lại tự nhận diện luôn
+      learnChatKeyForPhone_(phone);
       setStatus('✓ Đã lưu vào Sasum.' + (isNewCustomer ? ' (KH mới — nguồn Chăm sóc)' : ''));
     });
   }
@@ -739,7 +1323,7 @@
   // ghi de trong cac truong khac (dung loi cu tung gap ben Zalo AI voi doneReminder_).
   function doneAppointment_(phone) {
     const row = _buildRow(phone, { schedHen: '', schedHenNote: '' });
-    chrome.runtime.sendMessage({ type: 'SAVE_CARE', payload: row }, (resp) => {
+    safeSendMessage_({ type: 'SAVE_CARE', payload: row }, (resp) => {
       if (!resp?.ok) { setStatus('Không xoá được lịch hẹn: ' + (resp?.error || '')); return; }
       _currentCare = row;
       _lastServerCare = Object.assign({}, row);
@@ -763,7 +1347,7 @@
     if (!_currentPhone) return;
     if (typeof document.visibilityState === 'string' && document.visibilityState !== 'visible') return;
     const phone = _currentPhone;
-    chrome.runtime.sendMessage({ type: 'LOOKUP_CUSTOMER', payload: { phone } }, (resp) => {
+    safeSendMessage_({ type: 'LOOKUP_CUSTOMER', payload: { phone } }, (resp) => {
       if (!resp?.ok || _currentPhone !== phone) return;
       const newCare = resp.data.care || {};
       const CMP = ['status','zalo','cs','note','schedHen','schedHenNote','khStatus','birthday','name'];
@@ -814,7 +1398,7 @@
 
   function loadReminders_() {
     const cs = (panelEl?.querySelector('#pk-cs-sel')?.value) || settings?.csName || '';
-    chrome.runtime.sendMessage({ type: 'GET_REMINDERS', payload: { cs } }, (resp) => {
+    safeSendMessage_({ type: 'GET_REMINDERS', payload: { cs } }, (resp) => {
       if (!resp?.ok) { return; } // lỗi mạng/GAS -> im lặng, không làm phiền, CS bấm 🔄 để thử lại
       _reminders = resp.data.reminders || [];
       renderReminders_();
@@ -859,7 +1443,7 @@
     if (!r) return;
     panelEl.querySelector('#pk-ai-phone-input').value = r.phone;
     setStatus('⏳ Đang soạn tin follow-up cho ' + r.phone + '...');
-    chrome.runtime.sendMessage(
+    safeSendMessage_(
       { type: 'FETCH_FOLLOWUP_SUGGESTION', payload: { phone: r.phone, status: r.status, note: r.schedHenNote } },
       (resp) => {
         if (!resp?.ok) { setStatus('Lỗi: ' + (resp?.error || 'không rõ')); return; }
@@ -872,11 +1456,23 @@
   // ── TRA CỨU BẢNG GIÁ (Sheet DANH_MUC) ──
   // Khong hardcode ten cot: hien thi dung cac cot ma sheet dang co, uu tien cot co
   // chua chu "gia"/"price" len dau tien cho de nhin, con lai xep sau.
+  // Bo dau tieng Viet (ban rut gon, dung o frontend) de nhan dien cot Chat lieu/Mau/Size trong
+  // DANH_MUC du ten cot the nao (co dau/khong dau, hoa/thuong) — dong bo tinh than voi _stripVN_
+  // ben gas_v13.js nhung khong goi sang duoc (chay o content script rieng).
+  function _stripVNlocal_(s) {
+    if (!s) return '';
+    s = String(s).toLowerCase();
+    s = s.replace(/[àáạảãâầấậẩẫăằắặẳẵ]/g, 'a').replace(/[èéẹẻẽêềếệểễ]/g, 'e')
+      .replace(/[ìíịỉĩ]/g, 'i').replace(/[òóọỏõôồốộổỗơờớợởỡ]/g, 'o')
+      .replace(/[ùúụủũưừứựửữ]/g, 'u').replace(/[ỳýỵỷỹ]/g, 'y').replace(/đ/g, 'd');
+    return s;
+  }
+
   function doPriceSearch_() {
     const q = (panelEl.querySelector('#pk-price-q').value || '').trim();
     const box = panelEl.querySelector('#pk-price-result');
     box.innerHTML = '<div class="pk-price-loading">Đang tìm...</div>';
-    chrome.runtime.sendMessage({ type: 'GET_PRICE', payload: { q } }, (resp) => {
+    safeSendMessage_({ type: 'GET_PRICE', payload: { q } }, (resp) => {
       if (!resp?.ok) { box.innerHTML = `<div class="pk-price-loading">Lỗi: ${escapeHtml(resp?.error || 'không rõ')}</div>`; return; }
       renderPriceRows_(resp.data.rows || [], q);
     });
@@ -888,13 +1484,207 @@
       box.innerHTML = `<div class="pk-price-loading">Không tìm thấy${q ? ' cho "' + escapeHtml(q) + '"' : ''}.</div>`;
       return;
     }
-    box.innerHTML = rows.slice(0, 30).map((row) => {
+    box.innerHTML = rows.slice(0, 30).map((row, idx) => {
       const keys = Object.keys(row).filter((k) => row[k] !== '' && row[k] !== null && row[k] !== undefined);
       const priceKeys = keys.filter((k) => /gia|price/i.test(k));
       const otherKeys = keys.filter((k) => !/gia|price/i.test(k));
       const line = (k) => `<span class="pk-price-field"><b>${escapeHtml(k)}:</b> ${escapeHtml(row[k])}</span>`;
-      return `<div class="pk-price-item">${otherKeys.map(line).join(' ')}${priceKeys.length ? '<div class="pk-price-amount">' + priceKeys.map(line).join(' · ') + '</div>' : ''}</div>`;
+      // Ten san pham: uu tien cot "ten san pham"/"ten thuong mai", khong co thi lay cot dau tien
+      const nameKey = otherKeys.find((k) => /ten\s*san\s*pham|ten\s*thuong\s*mai/i.test(k)) || otherKeys[0] || '';
+      const name = nameKey ? String(row[nameKey]) : ('Sản phẩm ' + (idx + 1));
+      // Tu nhan dien cot Chat lieu/Mau/Size (neu DANH_MUC co) de dien san vao 3 o moi khi bam "+ Thêm",
+      // Sale khong phai go lai tay; khong co cot nao thi de trong, Sale tu dien.
+      const chatLieuKey = otherKeys.find((k) => _stripVNlocal_(k).indexOf('chat lieu') !== -1);
+      const mauKey = otherKeys.find((k) => { const s = _stripVNlocal_(k); return s === 'mau' || s === 'mau sac' || /(^|\s)mau($|\s)/.test(s); });
+      const sizeKey = otherKeys.find((k) => { const s = _stripVNlocal_(k); return s.indexOf('size') !== -1 || s.indexOf('kieu') !== -1; });
+      const noteKey = otherKeys.filter((k) => k !== nameKey).map((k) => `${k}: ${row[k]}`).join(', ');
+      // Neu co nhieu cot gia (VD thuong/SAPHIA/RUBY) -> moi cot gia la 1 lua chon them-vao-don rieng,
+      // vi don gia khac nhau theo loai da; chi 1 cot gia thi 1 nut "+ Them" duy nhat.
+      const addBtns = priceKeys.length
+        ? priceKeys.map((pk) => {
+            const priceNum = _parsePriceNum_(row[pk]);
+            const label = priceKeys.length > 1 ? pk.replace(/\s*\(.*?\)\s*/g, '').trim() : '+ Thêm';
+            return `<button class="pk-price-addbtn" data-name="${escapeHtml(name)}" data-note="${escapeHtml(noteKey)}" data-price="${priceNum}" data-pricelabel="${escapeHtml(pk)}" data-chatlieu="${escapeHtml(chatLieuKey ? row[chatLieuKey] : '')}" data-mausac="${escapeHtml(mauKey ? row[mauKey] : '')}" data-size="${escapeHtml(sizeKey ? row[sizeKey] : '')}">${escapeHtml(label)}${priceKeys.length > 1 ? ' ' + escapeHtml(String(row[pk])) : ''}</button>`;
+          }).join('')
+        : `<button class="pk-price-addbtn" data-name="${escapeHtml(name)}" data-note="${escapeHtml(noteKey)}" data-price="0" data-pricelabel="" data-chatlieu="${escapeHtml(chatLieuKey ? row[chatLieuKey] : '')}" data-mausac="${escapeHtml(mauKey ? row[mauKey] : '')}" data-size="${escapeHtml(sizeKey ? row[sizeKey] : '')}">+ Thêm (chưa có giá)</button>`;
+      return `<div class="pk-price-item">${otherKeys.map(line).join(' ')}${priceKeys.length ? '<div class="pk-price-amount">' + priceKeys.map(line).join(' · ') + '</div>' : ''}<div class="pk-price-addrow">${addBtns}</div></div>`;
     }).join('');
+    box.querySelectorAll('.pk-price-addbtn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        addToCart_({
+          name: btn.dataset.name,
+          note: btn.dataset.note + (btn.dataset.pricelabel ? (btn.dataset.note ? ' · ' : '') + 'Loại giá: ' + btn.dataset.pricelabel : ''),
+          price: Number(btn.dataset.price) || 0,
+          chatLieu: btn.dataset.chatlieu || '',
+          mauSac: btn.dataset.mausac || '',
+          size: btn.dataset.size || '',
+          qty: 1
+        });
+      });
+    });
+  }
+
+  function _parsePriceNum_(v) {
+    if (v === '' || v === null || v === undefined) return 0;
+    const n = Number(String(v).replace(/[^\d.-]/g, ''));
+    return isNaN(n) ? 0 : n;
+  }
+
+  // ══════════════════════════════ ĐƠN HÀNG ĐANG TÍNH (giỏ tạm) ══════════════════════════════
+  // Muc dich: sale tra cuu nhieu san pham lien tuc, bam "+ Them" tung san pham vao 1 danh sach
+  // tam, tick chon/sua so luong/gia, sai thi xoa hoac them dong thu cong — he thong tu cong
+  // tong thanh 1 don gom nhung gi bao nhieu tien, kem qua tang/giam gia/freeship.
+  // Luu theo TUNG SDT khach (chrome.storage.local, rieng may nay) de doi qua lai giua cac
+  // doan chat khac nhau khong bi lan/mat don dang tinh do.
+  let _cartItems = [];
+  let _cartExtra = { gift: '', discountType: 'none', discountValue: 0, freeship: false, priceInK: false };
+  let _cartLoadedFor = null;
+
+  function _cartKey_(phone) { return 'pkCart_' + (phone || '_no_phone_'); }
+
+  function loadCartForCurrentPhone_() {
+    const key = _cartKey_(_currentPhone);
+    if (_cartLoadedFor === key) { renderCart_(); return; }
+    chrome.storage.local.get([key], (res) => {
+      const saved = res[key] || { items: [], extra: { gift: '', discountType: 'none', discountValue: 0, freeship: false } };
+      _cartItems = saved.items || [];
+      _cartExtra = Object.assign({ gift: '', discountType: 'none', discountValue: 0, freeship: false, priceInK: false }, saved.extra || {});
+      _cartLoadedFor = key;
+      renderCart_();
+    });
+  }
+
+  function saveCart_() {
+    const key = _cartKey_(_currentPhone);
+    chrome.storage.local.set({ [key]: { items: _cartItems, extra: _cartExtra } });
+  }
+
+  function addToCart_(item) {
+    _cartItems.push({
+      id: 'ci_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+      name: item.name || '(chưa đặt tên)',
+      note: item.note || '',
+      qty: item.qty || 1,
+      price: item.price || 0,
+      chatLieu: item.chatLieu || '',
+      mauSac: item.mauSac || '',
+      size: item.size || '',
+      checked: true
+    });
+    saveCart_();
+    renderCart_();
+  }
+
+  function renderCart_() {
+    const section = panelEl.querySelector('#pk-cart-section');
+    if (!section) return;
+    if (_cartItems.length) section.dataset.everOpened = '1';
+    section.style.display = (_cartItems.length || section.dataset.everOpened) ? 'block' : 'none';
+    panelEl.querySelector('#pk-cart-count').textContent = _cartItems.filter(i => i.checked).length;
+
+    const list = panelEl.querySelector('#pk-cart-list');
+    list.innerHTML = _cartItems.map((it) => `
+      <div class="pk-cart-row" data-id="${it.id}">
+        <input type="checkbox" class="pk-cart-chk" ${it.checked ? 'checked' : ''} />
+        <input type="text" class="pk-cart-name" value="${escapeHtml(it.name)}" placeholder="Tên sản phẩm" />
+        <input type="number" class="pk-cart-qty" value="${it.qty}" min="1" title="Số lượng" />
+        <input type="number" class="pk-cart-price" value="${_cartExtra.priceInK ? (it.price ? it.price / 1000 : '') : it.price}" min="0" title="${_cartExtra.priceInK ? 'Đơn giá (nghìn đ — gõ 2800 = 2.800.000đ)' : 'Đơn giá (đ)'}" />
+        <button class="pk-cart-del" title="Xoá dòng này">✕</button>
+        <div class="pk-cart-detail-row">
+          <input type="text" class="pk-cart-chatlieu" value="${escapeHtml(it.chatLieu || '')}" placeholder="Chất liệu" />
+          <input type="text" class="pk-cart-mausac" value="${escapeHtml(it.mauSac || '')}" placeholder="Màu sắc" />
+          <input type="text" class="pk-cart-size" value="${escapeHtml(it.size || '')}" placeholder="Size" />
+        </div>
+        ${it.note ? `<div class="pk-cart-note">${escapeHtml(it.note)}</div>` : ''}
+      </div>
+    `).join('') || '<div class="pk-cart-empty">Chưa có sản phẩm nào. Bấm "+ Thêm" ở kết quả tra giá phía trên, hoặc "+ Thêm dòng thủ công".</div>';
+
+    list.querySelectorAll('.pk-cart-row').forEach((row) => {
+      const id = row.dataset.id;
+      row.querySelector('.pk-cart-chk').addEventListener('change', (e) => { _updateCartItem_(id, 'checked', e.target.checked); saveCart_(); });
+      const nameEl = row.querySelector('.pk-cart-name');
+      nameEl.addEventListener('input', (e) => { _updateCartItem_(id, 'name', e.target.value, true); });
+      nameEl.addEventListener('change', () => { saveCart_(); });
+      const chatLieuEl = row.querySelector('.pk-cart-chatlieu');
+      chatLieuEl.addEventListener('input', (e) => { _updateCartItem_(id, 'chatLieu', e.target.value, true); });
+      chatLieuEl.addEventListener('change', () => { saveCart_(); });
+      const mauSacEl = row.querySelector('.pk-cart-mausac');
+      mauSacEl.addEventListener('input', (e) => { _updateCartItem_(id, 'mauSac', e.target.value, true); });
+      mauSacEl.addEventListener('change', () => { saveCart_(); });
+      const sizeEl = row.querySelector('.pk-cart-size');
+      sizeEl.addEventListener('input', (e) => { _updateCartItem_(id, 'size', e.target.value, true); });
+      sizeEl.addEventListener('change', () => { saveCart_(); });
+      const qtyEl = row.querySelector('.pk-cart-qty');
+      qtyEl.addEventListener('input', (e) => { _updateCartItem_(id, 'qty', Math.max(1, Number(e.target.value) || 1), true); });
+      qtyEl.addEventListener('change', () => { saveCart_(); });
+      const priceEl = row.querySelector('.pk-cart-price');
+      priceEl.addEventListener('input', (e) => {
+        const raw = Math.max(0, Number(e.target.value) || 0);
+        const price = _cartExtra.priceInK ? raw * 1000 : raw; // toggle "nhap gia theo nghin" — luon luu du.lieu goc bang dong day du
+        _updateCartItem_(id, 'price', price, true);
+      });
+      priceEl.addEventListener('change', () => { saveCart_(); });
+      row.querySelector('.pk-cart-del').addEventListener('click', () => {
+        _cartItems = _cartItems.filter((x) => x.id !== id);
+        saveCart_(); renderCart_();
+      });
+    });
+
+    panelEl.querySelector('#pk-cart-gift').value = _cartExtra.gift || '';
+    panelEl.querySelector('#pk-cart-discount-type').value = _cartExtra.discountType || 'none';
+    panelEl.querySelector('#pk-cart-discount-value').value = _cartExtra.discountValue || '';
+    panelEl.querySelector('#pk-cart-discount-value').style.display = _cartExtra.discountType === 'none' ? 'none' : '';
+    panelEl.querySelector('#pk-cart-freeship').checked = !!_cartExtra.freeship;
+    panelEl.querySelector('#pk-cart-price-k').checked = !!_cartExtra.priceInK;
+
+    _renderCartTotal_();
+  }
+
+  // skipSave = true khi dang go (input) -> khong ghi storage lien tuc, doi blur/change moi luu de do nang
+  function _updateCartItem_(id, field, value, deferSave) {
+    const it = _cartItems.find((x) => x.id === id);
+    if (!it) return;
+    it[field] = value;
+    if (!deferSave) { saveCart_(); }
+    _renderCartTotal_();
+    panelEl.querySelector('#pk-cart-count').textContent = _cartItems.filter(i => i.checked).length;
+  }
+
+  function _renderCartTotal_() {
+    const checked = _cartItems.filter((i) => i.checked);
+    const subtotal = checked.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.price) || 0), 0);
+    let discountAmt = 0;
+    if (_cartExtra.discountType === 'percent') discountAmt = Math.round(subtotal * (Number(_cartExtra.discountValue) || 0) / 100);
+    else if (_cartExtra.discountType === 'amount') discountAmt = Number(_cartExtra.discountValue) || 0;
+    discountAmt = Math.min(discountAmt, subtotal);
+    const total = subtotal - discountAmt;
+    const fmt = (n) => n.toLocaleString('vi-VN') + 'đ';
+    panelEl.querySelector('#pk-cart-total').innerHTML =
+      `<div>Tạm tính (${checked.length} sản phẩm): <b>${fmt(subtotal)}</b></div>` +
+      (discountAmt > 0 ? `<div>Giảm giá: <b>-${fmt(discountAmt)}</b></div>` : '') +
+      `<div class="pk-cart-total-final">Tổng cộng: <b>${fmt(total)}</b>${_cartExtra.freeship ? ' <span class="pk-cart-freeship-tag">Freeship</span>' : ''}</div>`;
+  }
+
+  function _buildCartSummaryText_() {
+    const checked = _cartItems.filter((i) => i.checked);
+    const lines = checked.map((i, idx) => {
+      const lineTotal = (Number(i.qty) || 0) * (Number(i.price) || 0);
+      const details = [i.chatLieu, i.mauSac, i.size].filter(Boolean).join(', ');
+      return `${idx + 1}. ${i.name}${details ? ' (' + details + ')' : ''}${i.qty > 1 ? ' x' + i.qty : ''} — ${lineTotal.toLocaleString('vi-VN')}đ`;
+    });
+    const subtotal = checked.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.price) || 0), 0);
+    let discountAmt = 0;
+    if (_cartExtra.discountType === 'percent') discountAmt = Math.round(subtotal * (Number(_cartExtra.discountValue) || 0) / 100);
+    else if (_cartExtra.discountType === 'amount') discountAmt = Number(_cartExtra.discountValue) || 0;
+    discountAmt = Math.min(discountAmt, subtotal);
+    const total = subtotal - discountAmt;
+    let out = lines.join('\n');
+    out += `\n\nTạm tính: ${subtotal.toLocaleString('vi-VN')}đ`;
+    if (discountAmt > 0) out += `\nGiảm giá: -${discountAmt.toLocaleString('vi-VN')}đ`;
+    out += `\nTổng cộng: ${total.toLocaleString('vi-VN')}đ`;
+    if (_cartExtra.gift) out += `\nQuà tặng kèm: ${_cartExtra.gift}`;
+    out += `\nGiao hàng: ${_cartExtra.freeship ? 'Freeship' : 'Thu phí ship theo thực tế'}`;
+    return out;
   }
 
   function escapeHtml(s) {
@@ -944,7 +1734,7 @@
     setStatus(manual ? "Đang lấy gợi ý..." : "Hội thoại thay đổi — đang lấy gợi ý mới...");
 
     const ctxEl = panelEl.querySelector("#pk-ctx-input");
-    chrome.runtime.sendMessage(
+    safeSendMessage_(
       {
         type: "FETCH_SUGGESTION",
         payload: {
@@ -953,7 +1743,8 @@
           tone: _activeTone,
           context: ctxEl ? ctxEl.value.trim() : "",
           custLines: buildCustLines(),
-          withProducts: _useProducts
+          withProducts: _useProducts,
+          stonePref: _stonePref
         }
       },
       (resp) => {
@@ -984,8 +1775,8 @@
       const angle = OPENER_ANGLES[i];
       sug.innerHTML = `<div class="pk-ai-cust-loading">Đang soạn câu ${i + 1}/${OPENER_ANGLES.length} — ${escapeHtml(angle.label)}...</div>`;
       const data = await new Promise((resolve) => {
-        chrome.runtime.sendMessage(
-          { type: "FETCH_OPENER", payload: { custLines, tone: _activeTone, angleInstr: angle.instr, withProducts: _useProducts } },
+        safeSendMessage_(
+          { type: "FETCH_OPENER", payload: { custLines, tone: _activeTone, angleInstr: angle.instr, withProducts: _useProducts, stonePref: _stonePref } },
           (resp) => resolve(resp?.ok ? resp.data : { error: resp?.error || "lỗi không rõ" })
         );
       });
@@ -1098,6 +1889,27 @@
       };
       img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Không đọc được dữ liệu ảnh.")); };
       img.src = url;
+    });
+  }
+
+  function renderCannedList_() {
+    if (!IS_PHONGTHUY || !panelEl) return;
+    const box = panelEl.querySelector('#pk-canned-body');
+    if (!box) return;
+    const groups = {};
+    _cannedResponses.forEach(c => { (groups[c.nhom] = groups[c.nhom] || []).push(c); });
+    box.innerHTML = Object.keys(groups).map(nhom =>
+      `<div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;margin:6px 0 3px">${escapeHtml(nhom)}</div>` +
+      groups[nhom].map(c =>
+        `<div class="pk-ai-suggestion-item" data-cid="${escapeHtml(c.id)}" title="Bấm để chèn vào ô trả lời — chỗ $$ cần tự điền tay">` +
+        `<b>${escapeHtml(c.label)}</b><br>${escapeHtml(c.text.length > 90 ? c.text.slice(0, 90) + '…' : c.text)}</div>`
+      ).join('')
+    ).join('');
+    box.querySelectorAll('[data-cid]').forEach(el => {
+      el.addEventListener('click', () => {
+        const c = _cannedResponses.find(x => x.id === el.dataset.cid);
+        if (c) insertReply(c.text); // dung lai HAM CO SAN — tu dong xu ly ca contenteditable (Messenger) lan textarea
+      });
     });
   }
 

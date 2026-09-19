@@ -152,6 +152,34 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
     return true;
   }
+
+  // Cay "Tinh trang CS" dong (co optgroup) — dung chung voi Zalo AI/appweb, de dropdown
+  // Trang thai CS ben Pancake AI hien dung nhom giong het cac noi khac.
+  if (msg?.type === "GET_CARE_STATUS_TREE") {
+    handleGetCareStatusTree()
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
+  // Truong tu tao (admin them ben app web chinh) — dung chung setting 'customFields' voi
+  // khStatusTree/nickZaloList, KHONG can them action rieng o backend GAS.
+  if (msg?.type === "GET_CUSTOM_FIELDS") {
+    handleGetCustomFields()
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
+  // Bang tra menh + mau canned response phong thuy (chi dung tren Messenger/Thu Hien) —
+  // action:'getKnowledge', doc/tu tao sheet Menh + CannedResponses rieng, KHONG dung cot CareData.
+  if (msg?.type === "GET_KNOWLEDGE") {
+    handleGetKnowledge()
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
 });
 
 // Tra cứu khách theo SĐT — GET GAS_URL?action=lookup&phone=... y hệt doLookup() bên Zalo AI.
@@ -247,6 +275,53 @@ async function handleGetNickList() {
   let list = [];
   if (data.value) { try { list = JSON.parse(data.value); } catch (e) {} }
   return Array.isArray(list) ? list : [];
+}
+
+// Cay "Tinh trang CS" dong tu GAS (dong bo voi appweb) — uu tien action:'getSetting'&key=
+// 'careStatus'; neu setting rieng chua co thi fallback doc tu action:'customers' (field
+// careStatus tra ve kem trong response) — CUNG LOGIC voi loadCareStatusTree_() ben Zalo AI.
+async function handleGetCareStatusTree() {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) return [];
+
+  const sep = cfg.gasUrl.includes("?") ? "&" : "?";
+  let tree = null;
+  try {
+    const res = await fetch(cfg.gasUrl + sep + "action=getSetting&key=careStatus", { redirect: "follow" });
+    const data = await res.json();
+    if (data && data.value) {
+      try { tree = typeof data.value === "string" ? JSON.parse(data.value) : data.value; } catch (e) {}
+    }
+  } catch (e) { /* thu fallback ben duoi */ }
+
+  if (!Array.isArray(tree) || !tree.length) {
+    try {
+      const res = await fetch(cfg.gasUrl + sep + "action=customers", { redirect: "follow" });
+      const data = await res.json();
+      if (data && Array.isArray(data.careStatus) && data.careStatus.length) tree = data.careStatus;
+    } catch (e) { /* het cach, tra ve mang rong -> content.js tu fallback ve CARE_STATUSES tinh */ }
+  }
+  return Array.isArray(tree) ? tree : [];
+}
+
+// Danh sach "truong tu tao" (admin them ben app web chinh) — action:'getSetting'&key=
+// 'customFields', CUNG co che voi khStatusTree/nickZaloList. Tra ve [] neu chua co gi.
+async function handleGetCustomFields() {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) return [];
+
+  const sep = cfg.gasUrl.includes("?") ? "&" : "?";
+  try {
+    const res = await fetch(cfg.gasUrl + sep + "action=getSetting&key=customFields", { redirect: "follow" });
+    const data = await res.json();
+    if (data && data.value) {
+      const arr = typeof data.value === "string" ? JSON.parse(data.value) : data.value;
+      if (Array.isArray(arr)) return arr;
+    }
+  } catch (e) { /* het cach, tra ve mang rong */ }
+  return [];
 }
 
 // Them 1 nick moi vao danh sach dung chung — uu tien action:'addZaloNick' (GAS tu merge vao
@@ -362,6 +437,7 @@ function buildPrompt(payload) {
 
   const lines = custLines.slice();
   if (context) lines.push(`Ngữ cảnh: ${context}`);
+  if (payload.stonePref) lines.push(`Loại đá khách hỏi: ${payload.stonePref}`);
   const custBlock = lines.length ? `[KH] ${lines.join(" | ")}\n` : "";
 
   return (
@@ -383,7 +459,8 @@ async function handleFetchOpener(payload) {
   const custLines = payload?.custLines || [];
   const tone = payload?.tone || "Thân thiện";
   const angleInstr = payload?.angleInstr || "";
-  const custBlock = custLines.length ? `[KH] ${custLines.join(" | ")}\n` : "";
+  const custLinesFull = payload?.stonePref ? [...custLines, `Loại đá khách hỏi: ${payload.stonePref}`] : custLines;
+  const custBlock = custLinesFull.length ? `[KH] ${custLinesFull.join(" | ")}\n` : "";
   const prompt =
     custBlock +
     `[Giọng văn] ${tone}\n` +
@@ -441,4 +518,18 @@ async function handleGetPrice(payload) {
   const data = await res.json();
   if (data.error) throw new Error(data.error);
   return { rows: data.rows || [], total: data.total || 0 };
+}
+
+async function handleGetKnowledge() {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+  const res = await fetch(cfg.gasUrl, {
+    method: "POST",
+    body: JSON.stringify({ action: "getKnowledge" }),
+    redirect: "follow"
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || "Lỗi không rõ");
+  return { menhTable: data.menhTable || null, canned: data.canned || [] };
 }
