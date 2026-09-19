@@ -695,7 +695,7 @@ function doGet(e) {
     if (action === 'users')     return jsonOut_({ users: readUsers_(ss.getSheetByName(SH_USER)) });
     // ── Bao cao Pancake (nhap tu file Excel "Thong ke tuong tac") ──
     if (action === 'pancakeNameMap') return jsonOut_({ map: readPancakeMap_() });
-    if (action === 'pancakeReport')  return jsonOut_(buildPancakeReport_(e.parameter.from, e.parameter.to));
+    if (action === 'pancakeReport')  return jsonOut_(buildPancakeReport_(e.parameter.from, e.parameter.to, e.parameter.split));
     // ── Nguon "Cham soc" (KH them nhanh, sheet rieng) — khong gop CareData/bao cao A-B-C ──
     if (action === 'careLeads') return jsonOut_({ rows: readCareLeads_() });
     // ── Tap SDT co trong "dữ liệu đơn" — chi de loc nguon o man hinh chinh (cache 10') ──
@@ -2561,7 +2561,8 @@ function savePancakeNameMap_(pancakeName, saleName) {
 
 // Tong hop bao cao theo Page va theo CS (da khop ten qua PancakeNameMap; ten chua khop giu
 // nguyen ten Pancake va danh dau unmapped:true de UI nhac nguoi dung di khop ten).
-function buildPancakeReport_(from, to) {
+function buildPancakeReport_(from, to, split) {
+  split = (split === 'full') ? 'full' : 'equal';
   var sh = getSheet_(SH_PK_STATS, PK_STATS_HEADERS);
   var map = readPancakeMap_();
   var byPage = {}, byCS = {};
@@ -2582,16 +2583,23 @@ function buildPancakeReport_(from, to) {
       bp.khCu+=khCu; bp.khMoi+=khMoi; bp.tongTT+=tongTT; bp.tinNhan+=tinNhan; bp.binhLuan+=binhLuan;
       bp.hoiThoaiMoi+=hoiThoaiMoi; bp.dhKhMoi+=dhKhMoi; bp.dhKhCu+=dhKhCu; bp.tongDH+=tongDH;
 
-      var saleName = map[nhanVien];
-      var mapped = !!saleName;
-      if (!mapped) { saleName = nhanVien; unmappedSet[nhanVien] = true; }
-      var csKey = saleName;
-      if (!byCS[csKey]) byCS[csKey] = { name: saleName, pancakeNames: {}, mapped: mapped, khCu:0, khMoi:0, tongTT:0, tinNhan:0, binhLuan:0, hoiThoaiMoi:0, dhKhMoi:0, dhKhCu:0, tongDH:0 };
-      var bc = byCS[csKey];
-      bc.pancakeNames[nhanVien] = true;
-      if (mapped) bc.mapped = true; // neu >=1 nguon da khop thi coi la mapped (hiem khi trung ten CS voi ten chua khop)
-      bc.khCu+=khCu; bc.khMoi+=khMoi; bc.tongTT+=tongTT; bc.tinNhan+=tinNhan; bc.binhLuan+=binhLuan;
-      bc.hoiThoaiMoi+=hoiThoaiMoi; bc.dhKhMoi+=dhKhMoi; bc.dhKhCu+=dhKhCu; bc.tongDH+=tongDH;
+      // 1 ten Pancake co the gan cho nhieu Sale (luu dang "saleA|saleB").
+      var sales = String(map[nhanVien] || '').split('|').map(function(x) { return x.trim(); }).filter(function(x) { return x; });
+      var mapped = sales.length > 0;
+      if (!mapped) { sales = [nhanVien]; unmappedSet[nhanVien] = true; }
+      // split='equal': chia deu cho cac Sale (tong theo CS = tong theo Page); split='full': moi Sale tinh du.
+      var w = (split === 'full') ? 1 : 1 / sales.length;
+      for (var si = 0; si < sales.length; si++) {
+        var saleName = sales[si];
+        var csKey = saleName;
+        if (!byCS[csKey]) byCS[csKey] = { name: saleName, pancakeNames: {}, mapped: mapped, shared: false, khCu:0, khMoi:0, tongTT:0, tinNhan:0, binhLuan:0, hoiThoaiMoi:0, dhKhMoi:0, dhKhCu:0, tongDH:0 };
+        var bc = byCS[csKey];
+        bc.pancakeNames[nhanVien] = true;
+        if (mapped) bc.mapped = true; // neu >=1 nguon da khop thi coi la mapped (hiem khi trung ten CS voi ten chua khop)
+        if (sales.length > 1) bc.shared = true;
+        bc.khCu+=khCu*w; bc.khMoi+=khMoi*w; bc.tongTT+=tongTT*w; bc.tinNhan+=tinNhan*w; bc.binhLuan+=binhLuan*w;
+        bc.hoiThoaiMoi+=hoiThoaiMoi*w; bc.dhKhMoi+=dhKhMoi*w; bc.dhKhCu+=dhKhCu*w; bc.tongDH+=tongDH*w;
+      }
     }
   }
 
@@ -2599,6 +2607,7 @@ function buildPancakeReport_(from, to) {
     var arr = Object.keys(obj).map(function(k) {
       var r = obj[k];
       r.tyLeCD = r.tongTT ? Math.round(r.tongDH / r.tongTT * 1000) / 10 : 0;
+      ['khCu','khMoi','tongTT','tinNhan','binhLuan','hoiThoaiMoi','dhKhMoi','dhKhCu','tongDH'].forEach(function(f) { r[f] = Math.round(r[f] * 100) / 100; });
       if (r.pancakeNames) r.pancakeNames = Object.keys(r.pancakeNames);
       return r;
     });
@@ -2606,7 +2615,7 @@ function buildPancakeReport_(from, to) {
     return arr;
   }
 
-  return { byPage: finalize(byPage), byCS: finalize(byCS), unmapped: Object.keys(unmappedSet).sort() };
+  return { byPage: finalize(byPage), byCS: finalize(byCS), unmapped: Object.keys(unmappedSet).sort(), split: split };
 }
 
 function saveUsers_(users) {
