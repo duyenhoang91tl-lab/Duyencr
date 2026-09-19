@@ -13144,7 +13144,8 @@ var _pkState = {
   parsedRows: [], parsedUnmapped: [],      // ket qua lan parse file gan nhat, chua luu len CRM
   uploading: false,
   from: _ymd(new Date(Date.now()-6*86400000)), to: _ymd(new Date()),
-  report: null, reportLoading: false
+  report: null, reportLoading: false,
+  tagData: null                            // kết quả đọc file 'Thống kê tag' (chỉ xem trên trình duyệt)
 };
 
 async function _pkLoadNameMap(){
@@ -13196,7 +13197,215 @@ function _pkRenderAll(){
   '</div>';
   html += '<div id="pk-report-area">' + (_pkState.report ? _pkRenderReportHtml() : '<div style="color:var(--muted);padding:10px">Chọn khoảng ngày rồi bấm "Xem báo cáo".</div>') + '</div>';
 
+  html += _pkTagSectionHtml();
+
   wrap.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════
+//  BÁO CÁO TAG PANCAKE (file "Thống kê tag") — xử lý ngay trên trình duyệt
+//  Tag Sale: S<số>/O<số> <username> (Pancake có thể cắt bớt tên -> khớp theo MÃ S1, O8...)
+//  Tag trạng thái: L1, L2, L3, L4, L5, L5.1, L5.2, L6
+// ═══════════════════════════════════════════════════════
+var _PK_SALE_DIR = [
+  {code:'S1',  fb:'Hai Yen Nguyen',    base:'yenNTH2004'},
+  {code:'S2',  fb:'Anh NgPhuong',      base:'anhNP1999'},
+  {code:'S3',  fb:'Trang Ng',          base:'trangNH2005'},
+  {code:'S4',  fb:'Thu Nguyen',        base:'thuNH1986'},
+  {code:'S5',  fb:'Nguyễn Viên Sa',    base:'dungNTK1987'},
+  {code:'S6',  fb:'Trịnh Phuong Anh',  base:'anhtrinh1995'},
+  {code:'S7',  fb:'Le Ninh',           base:'ninhLTK'},
+  {code:'O8',  fb:'Mai Huyền',         base:'huyenmaii1990'},
+  {code:'O9',  fb:'Xynk Tũn',          base:'biichnguyen1993'},
+  {code:'O10', fb:'Dung Nguyen',       base:'Dungnguyen1995'},
+  {code:'O11', fb:'Nguyên Khôi',       base:'thuyha88'},
+  {code:'O12', fb:'Minh Quách',        base:'minhquach1995'},
+  {code:'O13', fb:'Tối Hậu Thư',       base:'phuongthao2000'},
+  {code:'O14', fb:'Mai Ninh',          base:'ninhnga99'},
+  {code:'O15', fb:'Nông Hồng',         base:'nonghong1988'},
+  {code:'O16', fb:'Thu Thủy',          base:'Thuydinh1995'},
+  {code:'O17', fb:'Nguyễn Văn Hoàn',   base:''},
+  {code:'O18', fb:'Tuyet Maii Ng',     base:''}
+];
+var _PK_STATUS_LABEL = {
+  'L1':'L1. Chuẩn (đạt 3 lần phản hồi)', 'L2':'L2. SĐT kết nối', 'L3':'L3. KH tiềm năng',
+  'L4':'L4. Khảo giá / KNC', 'L5':'L5. Chốt', 'L5.1':'L5.1 Chờ CK', 'L5.2':'L5.2 Chờ lên đơn', 'L6':'L6. Hủy'
+};
+
+// Phân loại 1 tên tag -> {type:'sale'|'status'|'other', code:'S1'|'L5.1'|''}
+function _pkClassifyTag(name){
+  var n = String(name||'').trim();
+  var m = n.match(/^([SO])\s*(\d+)(?![\d])/i);
+  if (m) return { type:'sale', code: m[1].toUpperCase()+parseInt(m[2],10) };
+  // tag trạng thái cũ "L6. Chờ CK" (trước khi đổi tên) -> vẫn hiểu là L5.1
+  if (/^L\s*\d?\.?\s*ch[oờ]\s*ck/i.test(n) || /^L5\.1/i.test(n)) return { type:'status', code:'L5.1' };
+  if (/^L5\.2/i.test(n) || /^L\s*\d?\.?\s*ch[oờ]\s*l[eê]n/i.test(n)) return { type:'status', code:'L5.2' };
+  m = n.match(/^L\s*(\d)(?!\d)/i);
+  if (m) return { type:'status', code:'L'+m[1] };
+  return { type:'other', code:'' };
+}
+
+function _pkParseTagFile(file){
+  return new Promise(function(resolve, reject){
+    var reader = new FileReader();
+    reader.onload = function(ev){ try { resolve(_pkParseTagWorkbook(XLSX.read(ev.target.result, {type:'array'}))); } catch(err){ reject(err); } };
+    reader.onerror = function(){ reject(new Error('Không đọc được file.')); };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function _pkParseTagWorkbook(wb){
+  var rows = [], warnings = [], pageNames = {}, dates = {}, fileStart = '';
+  // ngày bắt đầu của file (lấy từ dòng "Thời gian tải về" ở bất kỳ sheet nào)
+  wb.SheetNames.forEach(function(sn){
+    if (fileStart) return;
+    var a0 = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1, defval:''});
+    for (var q=0;q<Math.min(a0.length,8);q++){
+      var mq = String(a0[q][0]||'').match(/Th[oờ]i gian t[aả]i v[eề]:\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (mq){ fileStart = mq[3]+'-'+mq[2].padStart(2,'0')+'-'+mq[1].padStart(2,'0'); break; }
+    }
+  });
+  wb.SheetNames.forEach(function(sn){
+    if (!/^\d+$/.test(sn.trim())) return;            // chỉ lấy sheet theo ngày "<pageId>", bỏ sheet "<pageId> today" (theo giờ)
+    var pageId = sn.trim();
+    var aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1, defval:''});
+    var hRow = -1;
+    for (var i=0;i<Math.min(aoa.length,15);i++){
+      if (String(aoa[i][0]).trim()==='ID' && String(aoa[i][1]).trim()==='name'){ hRow = i; break; }
+    }
+    if (hRow === -1){ warnings.push('Sheet "'+sn+'": không thấy dòng tiêu đề (ID, name) — bỏ qua.'); return; }
+
+    // Tên Page + năm/tháng bắt đầu từ các dòng đầu
+    var startY = new Date().getFullYear(), startM = 1;
+    for (var a=0;a<hRow;a++){
+      var c = String(aoa[a][0]||'');
+      var mp = c.match(/Th[oờ]i gian t[aả]i v[eề]:\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (mp){ startM = parseInt(mp[2],10); startY = parseInt(mp[3],10); }
+      if (/^Trang:/.test(c)){
+        var body = c.replace(/^Trang:\s*/, ''), re = /(?:^|,\s*)(.+?)\s*\((\d{8,})\)/g, mm;
+        while ((mm = re.exec(body))) pageNames[mm[2]] = mm[1].trim();
+      }
+    }
+    // Các cột ngày: '19/09' (DD/MM)
+    var head = aoa[hRow], dateCols = [];
+    for (var col=4; col<head.length; col++){
+      var dm = String(head[col]).trim().match(/^(\d{1,2})\/(\d{1,2})$/);
+      if (dm){
+        var mo = parseInt(dm[2],10), y = startY + (mo < startM ? 1 : 0);
+        dateCols.push({ col: col, date: y+'-'+String(mo).padStart(2,'0')+'-'+String(parseInt(dm[1],10)).padStart(2,'0') });
+      }
+    }
+    if (!dateCols.length){
+      // Sheet không có cột ngày (thường là page không có dữ liệu): dùng cột "total" nếu có số, ngược lại bỏ qua
+      var hasNum = false;
+      for (var z=hRow+1; z<aoa.length; z++){ if (!isNaN(parseFloat(aoa[z][3]))){ hasNum = true; break; } }
+      if (!hasNum || !fileStart) return;
+      dateCols.push({ col: 3, date: fileStart });
+    }
+    for (var r=hRow+1; r<aoa.length; r++){
+      var name = String(aoa[r][1]||'').trim();
+      if (!name) continue;
+      var cls = _pkClassifyTag(name);
+      dateCols.forEach(function(dc){
+        var v = parseFloat(aoa[r][dc.col]); if (isNaN(v)) v = 0;
+        dates[dc.date] = true;
+        rows.push({ date: dc.date, pageId: pageId, tagId: String(aoa[r][0]||''), tagName: name, type: cls.type, code: cls.code, count: v });
+      });
+    }
+  });
+  rows.forEach(function(x){ x.pageName = pageNames[x.pageId] || x.pageId; });
+  return { rows: rows, warnings: warnings, dates: Object.keys(dates).sort() };
+}
+
+function _pkTagAggregate(rows){
+  var pages = [], pageSeen = {};
+  rows.forEach(function(x){ if (!pageSeen[x.pageId]){ pageSeen[x.pageId] = 1; pages.push({id:x.pageId, name:x.pageName}); } });
+  function bucket(){ var b = {total:0}; pages.forEach(function(p){ b[p.id] = 0; }); return b; }
+  var sale = {}, status = {}, other = {};
+  _PK_SALE_DIR.forEach(function(s){ sale[s.code] = bucket(); });
+  Object.keys(_PK_STATUS_LABEL).forEach(function(k){ status[k] = bucket(); });
+  rows.forEach(function(x){
+    var tgt = null;
+    if (x.type === 'sale'){ if (!sale[x.code]) sale[x.code] = bucket(); tgt = sale[x.code]; if (!tgt.names) tgt.names = {}; tgt.names[x.tagName] = 1; }
+    else if (x.type === 'status'){ tgt = status[x.code]; }
+    else { if (!other[x.tagName]) other[x.tagName] = bucket(); tgt = other[x.tagName]; }
+    if (tgt){ tgt[x.pageId] += x.count; tgt.total += x.count; }
+  });
+  return { pages: pages, sale: sale, status: status, other: other };
+}
+
+function _pkN(v){ return (Math.round(v*100)/100).toLocaleString('vi-VN'); }
+
+async function _pkOnTagFileSelected(input){
+  var file = input.files && input.files[0];
+  if (!file) return;
+  try {
+    var res = await _pkParseTagFile(file);
+    if (!res.rows.length){
+      toast('⚠️ Không đọc được dòng nào trong file — kiểm tra lại đúng file "Thống kê tag" chưa (sheet tên là ID page, có cột ID, name).');
+      return;
+    }
+    _pkState.tagData = res;
+    if (res.warnings.length) toast('⚠️ ' + res.warnings.join(' | '));
+    _pkRenderAll();
+  } catch(e){ toast('❌ Lỗi đọc file: ' + e.message); }
+}
+
+function _pkTagSectionHtml(){
+  var html = '<div class="dash-section-title" style="margin-top:22px">🏷️ Báo cáo theo TAG (file "Thống kê tag")</div>';
+  html += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Trên Pancake: <b>Thống kê → Thống kê tag → Xuất Excel</b> (file <code>pages_statistics_tag...xlsx</code>). Báo cáo xem ngay trên trang này, chưa lưu lên CRM. Tag Sale khớp theo mã <b>S1, S2… O8, O9…</b> nên tên tag bị Pancake cắt ngắn vẫn khớp đúng.</div>';
+  html += '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px"><input type="file" id="pk-tag-file-input" accept=".xlsx,.xls" onchange="_pkOnTagFileSelected(this)">'+
+    (_pkState.tagData ? '<button class="btn sm secondary" onclick="_pkExportTagReport()">⬇ Xuất Excel</button>' : '')+'</div>';
+  var d = _pkState.tagData;
+  if (!d) return html;
+  var ag = _pkTagAggregate(d.rows), pages = ag.pages;
+  var range = d.dates.length ? (d.dates[0] === d.dates[d.dates.length-1] ? d.dates[0] : d.dates[0]+' → '+d.dates[d.dates.length-1]) : '';
+  html += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Ngày trong file: <b>'+esc(range)+'</b></div>';
+  var th = function(t){ return '<th style="text-align:right">'+esc(t)+'</th>'; };
+  var headPages = pages.map(function(p){ return th(p.name); }).join('');
+  var cells = function(b){ return pages.map(function(p){ return '<td style="text-align:right">'+(b[p.id]?_pkN(b[p.id]):'')+'</td>'; }).join('')+'<td style="text-align:right"><b>'+(b.total?_pkN(b.total):'')+'</b></td>'; };
+
+  // Tag trạng thái
+  html += '<div class="dash-section-title">Theo tag trạng thái (L1 → L6)</div>';
+  html += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Tag</th>'+headPages+th('Tổng')+'</tr></thead><tbody>';
+  Object.keys(_PK_STATUS_LABEL).forEach(function(k){ html += '<tr><td>'+esc(_PK_STATUS_LABEL[k])+'</td>'+cells(ag.status[k])+'</tr>'; });
+  html += '</tbody></table></div>';
+
+  // Tag Sale
+  html += '<div class="dash-section-title" style="margin-top:16px">Theo tag Sale (S = văn phòng, O = online)</div>';
+  html += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Mã</th><th>Sale (User Base)</th><th>Tên Facebook</th>'+headPages+th('Tổng')+'</tr></thead><tbody>';
+  var known = {};
+  _PK_SALE_DIR.forEach(function(s){ known[s.code] = 1; html += '<tr><td>'+esc(s.code)+'</td><td>'+esc(s.base||'—')+'</td><td>'+esc(s.fb)+'</td>'+cells(ag.sale[s.code])+'</tr>'; });
+  Object.keys(ag.sale).filter(function(c){ return !known[c]; }).forEach(function(c){
+    var nm = Object.keys(ag.sale[c].names||{}).join(', ');
+    html += '<tr style="background:#fff7ed"><td>'+esc(c)+'</td><td colspan="2">⚠️ Chưa có trong danh sách Sale ('+esc(nm)+')</td>'+cells(ag.sale[c])+'</tr>';
+  });
+  html += '</tbody></table></div>';
+
+  // Tag chưa nhận diện
+  var oth = Object.keys(ag.other).filter(function(k){ return ag.other[k].total; });
+  if (oth.length){
+    html += '<div style="margin:12px 0 6px;padding:8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412">⚠️ '+oth.length+' tag chưa theo quy tắc (S/O + số, hoặc L1–L6) nên chưa được tính vào bảng trên: '+
+      oth.map(function(k){ return esc(k)+' ('+_pkN(ag.other[k].total)+')'; }).join(', ')+'</div>';
+  }
+  return html;
+}
+
+function _pkExportTagReport(){
+  var d = _pkState.tagData; if (!d) return;
+  var ag = _pkTagAggregate(d.rows), pages = ag.pages;
+  var head = pages.map(function(p){ return p.name; });
+  var line = function(b){ return pages.map(function(p){ return b[p.id]||0; }).concat([b.total||0]); };
+  var st = [['Tag'].concat(head, ['Tổng'])];
+  Object.keys(_PK_STATUS_LABEL).forEach(function(k){ st.push([_PK_STATUS_LABEL[k]].concat(line(ag.status[k]))); });
+  var sa = [['Mã','Sale (User Base)','Tên Facebook'].concat(head, ['Tổng'])];
+  var known = {};
+  _PK_SALE_DIR.forEach(function(s){ known[s.code] = 1; sa.push([s.code, s.base, s.fb].concat(line(ag.sale[s.code]))); });
+  Object.keys(ag.sale).filter(function(c){ return !known[c]; }).forEach(function(c){ sa.push([c, '(chưa có trong danh sách)', Object.keys(ag.sale[c].names||{}).join(', ')].concat(line(ag.sale[c]))); });
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(st), 'Theo tag trang thai');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sa), 'Theo Sale');
+  XLSX.writeFile(wb, 'BaoCaoTagPancake_'+(d.dates[0]||'')+'.xlsx');
 }
 
 // ── Đọc file Excel (SheetJS đã có sẵn trong trang) ──
