@@ -644,15 +644,25 @@
       return;
     }
 
-    const observer = new MutationObserver(() => {
-      const messages = extractMessages();
-      const signature = messages.map((m) => m.text).join("|").slice(0, 500);
-      if (signature && signature !== lastConversationSignature) {
-        lastConversationSignature = signature;
-        requestSuggestion(false);
-        requestCustomerLookup();
-      }
-    });
+    // Debounce: React/Vue thuong ban ra NHIEU mutation record cho 1 lan doi hoi thoai/tin nhan
+    // moi (nhieu frame re-render lien tiep). Neu chay extractMessages() + goi API AI ngay tren
+    // MOI mutation se: (1) doc .innerText lap lai nhieu lan (moi lan force reflow, ton CPU), (2)
+    // co the ban TRUNG LAP nhieu request AI cho cung 1 thay doi hoi thoai (ton quota/tien, UI
+    // giat vi ket qua cu bi ghi de lien tuc). Cho DOM "yen" 500ms roi moi thuc su xu ly 1 lan.
+    let _mutDebounceTimer = null;
+    const handleMutation = () => {
+      clearTimeout(_mutDebounceTimer);
+      _mutDebounceTimer = setTimeout(() => {
+        const messages = extractMessages();
+        const signature = messages.map((m) => m.text).join("|").slice(0, 500);
+        if (signature && signature !== lastConversationSignature) {
+          lastConversationSignature = signature;
+          requestSuggestion(false);
+          requestCustomerLookup();
+        }
+      }, 500);
+    };
+    const observer = new MutationObserver(handleMutation);
 
     // Quan sát toàn bộ body vì Pancake/Messenger render lại DOM khi đổi hội thoại (SPA)
     observer.observe(document.body, { childList: true, subtree: true });

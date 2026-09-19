@@ -739,8 +739,21 @@
         }
       }
     }
-    new MutationObserver(check).observe(document.body, {childList:true, subtree:true, characterData:true});
-    setInterval(check, 1500);
+    // Debounce: quan sat toan bo document.body (subtree+characterData) rat rong — Zalo Web doi
+    // text/DOM lien tuc (tin nhan moi, trang thai da xem, dong ho thoi gian...). check() doc
+    // nhieu selector (document.querySelector x7) moi lan chay, neu goi truc tiep tren MOI
+    // mutation se quet DOM hang tram lan/giay khi chat dang hoat dong. Cho DOM "yen" 300ms roi
+    // moi thuc su check — van du nhanh de cam giac "tu dong" nhung do han CPU dang ke.
+    let _watchDebounceTimer = null;
+    const debouncedCheck = () => {
+      clearTimeout(_watchDebounceTimer);
+      _watchDebounceTimer = setTimeout(check, 300);
+    };
+    new MutationObserver(debouncedCheck).observe(document.body, {childList:true, subtree:true, characterData:true});
+    // Van giu 1 lan poll dinh ky lam luoi an toan (phong truong hop MutationObserver bo lot mot
+    // kieu thay doi nao do) — nhung keo dai tu 1.5s len 4s vi debounce o tren da xu ly phan lon
+    // truong hop phan ung nhanh roi, khong can poll qua day nua.
+    setInterval(check, 4000);
   }
 
   // Trang thai bat/tat "tu dong soan AI" hieu luc cho 1 SDT: uu tien lua chon rieng CS
