@@ -3046,6 +3046,7 @@ function buildKpiReport_(from, to) {
   // khong dong cham toi (do la quyet dinh rieng, xem chu thich o dtRowToOrder_ dong ~994).
   var orders = readAllOrders_();
   var byPageOrders = {}, bySaleOrders = {};
+  var ordersDetail = []; // danh sach tung don khop khoang ngay -> xuat Excel de doi chieu tay voi Base
   for (var i = 0; i < orders.length; i++) {
     var o = orders[i];
     var d = parseVNDate_(o.orderDate);
@@ -3056,6 +3057,10 @@ function buildKpiReport_(from, to) {
     if (!byPageOrders[page]) byPageOrders[page] = { orders: 0, revenue: 0 };
     byPageOrders[page].orders += 1;
     byPageOrders[page].revenue += Number(o.revenue) || 0;
+    ordersDetail.push({
+      id: o.id || '', ngayTao: normOrderDate_(o.orderDate), kenhBan: page,
+      sale: o.cs || '', giaTriDon: Number(o.revenue) || 0, sanPham: o.product || '', phone: o.phone || ''
+    });
 
     var salesList = splitMulti_(o.cs, ',');
     if (!salesList.length) salesList = ['(chưa gán sale)'];
@@ -3217,6 +3222,7 @@ function buildKpiReport_(from, to) {
     saleDirectoryCount: saleDir.list.length,
     duplicateChannels: duplicateChannels,
     dataAvail: dataAvail,
+    ordersDetail: ordersDetail, // danh sach tung don DT TONG khop khoang ngay -> doi chieu voi Base
     from: from, to: to,
     warnings: warnings
   };

@@ -14263,6 +14263,7 @@ function _pkRenderKpiPancake(){
     '<button class="btn primary" onclick="_pkLoadKpiReport()">'+(_pkState.kpiReportLoading?'Đang tải...':'Xem báo cáo')+'</button>'+
     ((_pkState.kpiReport && _pkState.kpiReport.from) ? '<span style="font-size:11px;color:var(--muted)">Đang xem: '+esc(_pkState.kpiReport.from)+' → '+esc(_pkState.kpiReport.to)+'</span>' : '')+
     (_pkState.kpiReport ? '<button class="btn sm secondary" onclick="_pkExportKpiReport()">⬇ Xuất Excel</button>' : '')+
+    ((_pkState.kpiReport && _pkState.kpiReport.ordersDetail && _pkState.kpiReport.ordersDetail.length) ? '<button class="btn sm secondary" onclick="_pkExportKpiOrdersDetail()" title="Liệt kê từng đơn DT TỔNG đã tính vào báo cáo này (ID, kênh, ngày tạo, sale, giá trị) — dùng để tick từng dòng đối chiếu với Report Page / file xuất của Base">⬇ Xuất chi tiết đơn (đối chiếu Base)</button>' : '')+
   '</div>';
 
   var rep = _pkState.kpiReport;
@@ -14410,6 +14411,21 @@ function _pkExportKpiReport(){
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(saRows), 'Theo Sale');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(fnRows), 'Phễu L1-L7');
   XLSX.writeFile(wb, 'BaoCaoKpiPancake_'+_pkState.kpiFrom+'_'+_pkState.kpiTo+'.xlsx');
+}
+
+// Liet ke tung don DT TONG da duoc tinh vao Bao cao KPI Pancake dang xem (theo dung khoang
+// ngay + moc ngay "Ngay tao" ma buildKpiReport_ dung) — de CS/Admin tick tung dong doi chieu
+// truc tiep voi "Report Page" hoac file xuat cua Base, thay vi chi nhin duoc so tong.
+function _pkExportKpiOrdersDetail(){
+  var rep = _pkState.kpiReport; if (!rep || !rep.ordersDetail) return;
+  var wb = XLSX.utils.book_new();
+  var head = ['ID đơn','Ngày tạo','Kênh bán (CRM)','Sale bán','SĐT','Sản phẩm','Giá trị đơn hàng'];
+  var rows = [head].concat(rep.ordersDetail.map(function(o){
+    return [o.id, o.ngayTao, o.kenhBan, o.sale, o.phone, o.sanPham, o.giaTriDon];
+  }));
+  var ws = XLSX.utils.aoa_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb, ws, 'Chi tiet don');
+  XLSX.writeFile(wb, 'ChiTietDonKpiPancake_'+_pkState.kpiFrom+'_'+_pkState.kpiTo+'.xlsx');
 }
 
 function _pkRenderReportHtml(){
