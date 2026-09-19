@@ -63,3 +63,12 @@ gì hành vi/danh sách trạng thái bên Pancake:
   CRM dùng chung) qua action `getKnowledge` mới thêm ở `gas_v13.js` — cache 20 phút trên máy CS
   (`chrome.storage.local`), không gọi Sheet mỗi tin nhắn. CS sửa trực tiếp 2 sheet này trên Google
   Sheets (không cần sửa code) để cập nhật mẫu/mệnh mới nhất.
+
+## Nhập giá theo nghìn (k) trong "🧾 Đơn hàng đang tính"
+
+Tính năng giỏ hàng tạm (`#pk-cart-section`, dùng chung cho mọi nền tảng) đã có sẵn tính tổng
+Số lượng × Đơn giá + giảm giá/freeship + nút Sao chép đơn hàng — không cần làm lại. Chỉ thêm 1
+checkbox nhỏ **"Nhập giá theo nghìn (k)"** ở đầu khung giỏ hàng: khi bật, ô Đơn giá của từng dòng
+hiển thị/nhận số theo đơn vị nghìn (gõ `2800` = 2.800.000đ) thay vì phải gõ đủ số 0 — dữ liệu lưu
+trong storage và mọi phép tính (tổng, giảm giá, đơn hàng sao chép) vẫn luôn ở đơn vị đồng đầy đủ
+như cũ, chỉ đổi cách hiển thị/nhập tại ô đó. Mặc định tắt, không ảnh hưởng cách dùng hiện tại.

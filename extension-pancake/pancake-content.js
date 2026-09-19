@@ -301,7 +301,12 @@
         </div>
 
         <div id="pk-cart-section" style="display:none">
-          <div id="pk-cart-header">🧾 Đơn hàng đang tính (<span id="pk-cart-count">0</span>)</div>
+          <div id="pk-cart-header" style="display:flex;justify-content:space-between;align-items:center">
+            <span>🧾 Đơn hàng đang tính (<span id="pk-cart-count">0</span>)</span>
+            <label style="font-size:10.5px;font-weight:400;color:#831843;display:flex;align-items:center;gap:3px">
+              <input type="checkbox" id="pk-cart-price-k" /> Nhập giá theo nghìn (k)
+            </label>
+          </div>
           <div id="pk-cart-list"></div>
           <div id="pk-cart-addrow">
             <button id="pk-cart-add-manual" title="Thêm 1 dòng sản phẩm tự nhập (khi hệ thống tính sai hoặc không tra được)">＋ Thêm dòng thủ công</button>
@@ -439,6 +444,9 @@
     panelEl.querySelector('#pk-cart-freeship').addEventListener('change', (e) => {
       _cartExtra.freeship = e.target.checked; saveCart_(); _renderCartTotal_();
     });
+    panelEl.querySelector('#pk-cart-price-k').addEventListener('change', (e) => {
+      _cartExtra.priceInK = e.target.checked; saveCart_(); renderCart_(); // render lai de doi hien thi cac dong gia da co
+    });
     panelEl.querySelector('#pk-cart-copy').addEventListener('click', () => {
       const text = _buildCartSummaryText_();
       if (!text.trim()) { setStatus('Chưa có sản phẩm nào được tick trong đơn.'); return; }
@@ -450,7 +458,7 @@
       if (!_cartItems.length) return;
       if (!confirm('Xoá toàn bộ đơn hàng đang tính cho khách này?')) return;
       _cartItems = [];
-      _cartExtra = { gift: '', discountType: 'none', discountValue: 0, freeship: false };
+      _cartExtra = { gift: '', discountType: 'none', discountValue: 0, freeship: false, priceInK: false };
       saveCart_(); renderCart_();
     });
     if (IS_PHONGTHUY) {
@@ -1509,7 +1517,7 @@
   // Luu theo TUNG SDT khach (chrome.storage.local, rieng may nay) de doi qua lai giua cac
   // doan chat khac nhau khong bi lan/mat don dang tinh do.
   let _cartItems = [];
-  let _cartExtra = { gift: '', discountType: 'none', discountValue: 0, freeship: false };
+  let _cartExtra = { gift: '', discountType: 'none', discountValue: 0, freeship: false, priceInK: false };
   let _cartLoadedFor = null;
 
   function _cartKey_(phone) { return 'pkCart_' + (phone || '_no_phone_'); }
@@ -1520,7 +1528,7 @@
     chrome.storage.local.get([key], (res) => {
       const saved = res[key] || { items: [], extra: { gift: '', discountType: 'none', discountValue: 0, freeship: false } };
       _cartItems = saved.items || [];
-      _cartExtra = Object.assign({ gift: '', discountType: 'none', discountValue: 0, freeship: false }, saved.extra || {});
+      _cartExtra = Object.assign({ gift: '', discountType: 'none', discountValue: 0, freeship: false, priceInK: false }, saved.extra || {});
       _cartLoadedFor = key;
       renderCart_();
     });
@@ -1557,7 +1565,7 @@
         <input type="checkbox" class="pk-cart-chk" ${it.checked ? 'checked' : ''} />
         <input type="text" class="pk-cart-name" value="${escapeHtml(it.name)}" placeholder="Tên sản phẩm" />
         <input type="number" class="pk-cart-qty" value="${it.qty}" min="1" title="Số lượng" />
-        <input type="number" class="pk-cart-price" value="${it.price}" min="0" title="Đơn giá (đ)" />
+        <input type="number" class="pk-cart-price" value="${_cartExtra.priceInK ? (it.price ? it.price / 1000 : '') : it.price}" min="0" title="${_cartExtra.priceInK ? 'Đơn giá (nghìn đ — gõ 2800 = 2.800.000đ)' : 'Đơn giá (đ)'}" />
         <button class="pk-cart-del" title="Xoá dòng này">✕</button>
         ${it.note ? `<div class="pk-cart-note">${escapeHtml(it.note)}</div>` : ''}
       </div>
@@ -1573,7 +1581,11 @@
       qtyEl.addEventListener('input', (e) => { _updateCartItem_(id, 'qty', Math.max(1, Number(e.target.value) || 1), true); });
       qtyEl.addEventListener('change', () => { saveCart_(); });
       const priceEl = row.querySelector('.pk-cart-price');
-      priceEl.addEventListener('input', (e) => { _updateCartItem_(id, 'price', Math.max(0, Number(e.target.value) || 0), true); });
+      priceEl.addEventListener('input', (e) => {
+        const raw = Math.max(0, Number(e.target.value) || 0);
+        const price = _cartExtra.priceInK ? raw * 1000 : raw; // toggle "nhap gia theo nghin" — luon luu du.lieu goc bang dong day du
+        _updateCartItem_(id, 'price', price, true);
+      });
       priceEl.addEventListener('change', () => { saveCart_(); });
       row.querySelector('.pk-cart-del').addEventListener('click', () => {
         _cartItems = _cartItems.filter((x) => x.id !== id);
@@ -1586,6 +1598,7 @@
     panelEl.querySelector('#pk-cart-discount-value').value = _cartExtra.discountValue || '';
     panelEl.querySelector('#pk-cart-discount-value').style.display = _cartExtra.discountType === 'none' ? 'none' : '';
     panelEl.querySelector('#pk-cart-freeship').checked = !!_cartExtra.freeship;
+    panelEl.querySelector('#pk-cart-price-k').checked = !!_cartExtra.priceInK;
 
     _renderCartTotal_();
   }
