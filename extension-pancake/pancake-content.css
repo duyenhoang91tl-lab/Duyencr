@@ -671,6 +671,25 @@
   opacity: 0.8;
 }
 
+.pk-cart-detail-row {
+  flex: 1 0 100%;
+  display: flex;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.pk-cart-chatlieu,
+.pk-cart-mausac,
+.pk-cart-size {
+  flex: 1;
+  min-width: 0;
+  font-size: 10.5px;
+  padding: 3px 5px;
+  border: 1px solid #fbcfe8;
+  border-radius: 4px;
+  background: #fffafc;
+}
+
 #pk-cart-addrow { margin: 6px 0; }
 
 #pk-cart-add-manual {

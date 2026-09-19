@@ -20,7 +20,7 @@ var SH_CONTEXT = 'AIContext';
 
 var ORDER_SS_ID = '1fiWXPMZcHuEh0zYqD6pgQjZDM0PhWzpiSK7Igj6Cug8'; // File chua OrderData2x (doanh thu/don hang)
 var CRM_SS_ID   = '18XBtbjP7gtlvYpChikF3B62cxHkR4426s5poZj9Mj8I'; // File chua CareData/Users/Teams/Settings/AuditLog/AssignData/AIContext (CRM).
-var PRICE_SS_ID    = '1Tfn2jOH20kv0Z-cb0BULqPuxZTap9FA3z8bXeeRl5l4'; // File "Bang gia" rieng (Danh_muc/Tinh_tien/Ghi_chu_chinh_sach)
+var PRICE_SS_ID    = '1I4wr226_QUJuCZSKASsxXxOjloCW9UtpYz87TSy-Ldk'; // File "Bang gia" moi (Danh_muc/Tinh_tien/Ghi_chu_chinh_sach) - cap nhat 2026-09
 var PRICE_SHEET_NAME = 'DANH_MUC'; // Sheet dang bang phang, de tra cuu/loc
 var CTKM_SHEET_NAME  = 'CTKM'; // Sheet CTKM (cung file PRICE_SS_ID) — doi ten hang duoi neu ten tab thuc te khac
                         // De trong = dung file dang gan Apps Script nay (mac dinh, hanh vi cu).

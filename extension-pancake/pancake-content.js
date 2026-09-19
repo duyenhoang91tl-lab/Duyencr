@@ -1456,6 +1456,18 @@
   // ── TRA CỨU BẢNG GIÁ (Sheet DANH_MUC) ──
   // Khong hardcode ten cot: hien thi dung cac cot ma sheet dang co, uu tien cot co
   // chua chu "gia"/"price" len dau tien cho de nhin, con lai xep sau.
+  // Bo dau tieng Viet (ban rut gon, dung o frontend) de nhan dien cot Chat lieu/Mau/Size trong
+  // DANH_MUC du ten cot the nao (co dau/khong dau, hoa/thuong) — dong bo tinh than voi _stripVN_
+  // ben gas_v13.js nhung khong goi sang duoc (chay o content script rieng).
+  function _stripVNlocal_(s) {
+    if (!s) return '';
+    s = String(s).toLowerCase();
+    s = s.replace(/[àáạảãâầấậẩẫăằắặẳẵ]/g, 'a').replace(/[èéẹẻẽêềếệểễ]/g, 'e')
+      .replace(/[ìíịỉĩ]/g, 'i').replace(/[òóọỏõôồốộổỗơờớợởỡ]/g, 'o')
+      .replace(/[ùúụủũưừứựửữ]/g, 'u').replace(/[ỳýỵỷỹ]/g, 'y').replace(/đ/g, 'd');
+    return s;
+  }
+
   function doPriceSearch_() {
     const q = (panelEl.querySelector('#pk-price-q').value || '').trim();
     const box = panelEl.querySelector('#pk-price-result');
@@ -1480,6 +1492,11 @@
       // Ten san pham: uu tien cot "ten san pham"/"ten thuong mai", khong co thi lay cot dau tien
       const nameKey = otherKeys.find((k) => /ten\s*san\s*pham|ten\s*thuong\s*mai/i.test(k)) || otherKeys[0] || '';
       const name = nameKey ? String(row[nameKey]) : ('Sản phẩm ' + (idx + 1));
+      // Tu nhan dien cot Chat lieu/Mau/Size (neu DANH_MUC co) de dien san vao 3 o moi khi bam "+ Thêm",
+      // Sale khong phai go lai tay; khong co cot nao thi de trong, Sale tu dien.
+      const chatLieuKey = otherKeys.find((k) => _stripVNlocal_(k).indexOf('chat lieu') !== -1);
+      const mauKey = otherKeys.find((k) => { const s = _stripVNlocal_(k); return s === 'mau' || s === 'mau sac' || /(^|\s)mau($|\s)/.test(s); });
+      const sizeKey = otherKeys.find((k) => { const s = _stripVNlocal_(k); return s.indexOf('size') !== -1 || s.indexOf('kieu') !== -1; });
       const noteKey = otherKeys.filter((k) => k !== nameKey).map((k) => `${k}: ${row[k]}`).join(', ');
       // Neu co nhieu cot gia (VD thuong/SAPHIA/RUBY) -> moi cot gia la 1 lua chon them-vao-don rieng,
       // vi don gia khac nhau theo loai da; chi 1 cot gia thi 1 nut "+ Them" duy nhat.
@@ -1487,9 +1504,9 @@
         ? priceKeys.map((pk) => {
             const priceNum = _parsePriceNum_(row[pk]);
             const label = priceKeys.length > 1 ? pk.replace(/\s*\(.*?\)\s*/g, '').trim() : '+ Thêm';
-            return `<button class="pk-price-addbtn" data-name="${escapeHtml(name)}" data-note="${escapeHtml(noteKey)}" data-price="${priceNum}" data-pricelabel="${escapeHtml(pk)}">${escapeHtml(label)}${priceKeys.length > 1 ? ' ' + escapeHtml(String(row[pk])) : ''}</button>`;
+            return `<button class="pk-price-addbtn" data-name="${escapeHtml(name)}" data-note="${escapeHtml(noteKey)}" data-price="${priceNum}" data-pricelabel="${escapeHtml(pk)}" data-chatlieu="${escapeHtml(chatLieuKey ? row[chatLieuKey] : '')}" data-mausac="${escapeHtml(mauKey ? row[mauKey] : '')}" data-size="${escapeHtml(sizeKey ? row[sizeKey] : '')}">${escapeHtml(label)}${priceKeys.length > 1 ? ' ' + escapeHtml(String(row[pk])) : ''}</button>`;
           }).join('')
-        : `<button class="pk-price-addbtn" data-name="${escapeHtml(name)}" data-note="${escapeHtml(noteKey)}" data-price="0" data-pricelabel="">+ Thêm (chưa có giá)</button>`;
+        : `<button class="pk-price-addbtn" data-name="${escapeHtml(name)}" data-note="${escapeHtml(noteKey)}" data-price="0" data-pricelabel="" data-chatlieu="${escapeHtml(chatLieuKey ? row[chatLieuKey] : '')}" data-mausac="${escapeHtml(mauKey ? row[mauKey] : '')}" data-size="${escapeHtml(sizeKey ? row[sizeKey] : '')}">+ Thêm (chưa có giá)</button>`;
       return `<div class="pk-price-item">${otherKeys.map(line).join(' ')}${priceKeys.length ? '<div class="pk-price-amount">' + priceKeys.map(line).join(' · ') + '</div>' : ''}<div class="pk-price-addrow">${addBtns}</div></div>`;
     }).join('');
     box.querySelectorAll('.pk-price-addbtn').forEach((btn) => {
@@ -1498,6 +1515,9 @@
           name: btn.dataset.name,
           note: btn.dataset.note + (btn.dataset.pricelabel ? (btn.dataset.note ? ' · ' : '') + 'Loại giá: ' + btn.dataset.pricelabel : ''),
           price: Number(btn.dataset.price) || 0,
+          chatLieu: btn.dataset.chatlieu || '',
+          mauSac: btn.dataset.mausac || '',
+          size: btn.dataset.size || '',
           qty: 1
         });
       });
@@ -1546,6 +1566,9 @@
       note: item.note || '',
       qty: item.qty || 1,
       price: item.price || 0,
+      chatLieu: item.chatLieu || '',
+      mauSac: item.mauSac || '',
+      size: item.size || '',
       checked: true
     });
     saveCart_();
@@ -1567,6 +1590,11 @@
         <input type="number" class="pk-cart-qty" value="${it.qty}" min="1" title="Số lượng" />
         <input type="number" class="pk-cart-price" value="${_cartExtra.priceInK ? (it.price ? it.price / 1000 : '') : it.price}" min="0" title="${_cartExtra.priceInK ? 'Đơn giá (nghìn đ — gõ 2800 = 2.800.000đ)' : 'Đơn giá (đ)'}" />
         <button class="pk-cart-del" title="Xoá dòng này">✕</button>
+        <div class="pk-cart-detail-row">
+          <input type="text" class="pk-cart-chatlieu" value="${escapeHtml(it.chatLieu || '')}" placeholder="Chất liệu" />
+          <input type="text" class="pk-cart-mausac" value="${escapeHtml(it.mauSac || '')}" placeholder="Màu sắc" />
+          <input type="text" class="pk-cart-size" value="${escapeHtml(it.size || '')}" placeholder="Size" />
+        </div>
         ${it.note ? `<div class="pk-cart-note">${escapeHtml(it.note)}</div>` : ''}
       </div>
     `).join('') || '<div class="pk-cart-empty">Chưa có sản phẩm nào. Bấm "+ Thêm" ở kết quả tra giá phía trên, hoặc "+ Thêm dòng thủ công".</div>';
@@ -1577,6 +1605,15 @@
       const nameEl = row.querySelector('.pk-cart-name');
       nameEl.addEventListener('input', (e) => { _updateCartItem_(id, 'name', e.target.value, true); });
       nameEl.addEventListener('change', () => { saveCart_(); });
+      const chatLieuEl = row.querySelector('.pk-cart-chatlieu');
+      chatLieuEl.addEventListener('input', (e) => { _updateCartItem_(id, 'chatLieu', e.target.value, true); });
+      chatLieuEl.addEventListener('change', () => { saveCart_(); });
+      const mauSacEl = row.querySelector('.pk-cart-mausac');
+      mauSacEl.addEventListener('input', (e) => { _updateCartItem_(id, 'mauSac', e.target.value, true); });
+      mauSacEl.addEventListener('change', () => { saveCart_(); });
+      const sizeEl = row.querySelector('.pk-cart-size');
+      sizeEl.addEventListener('input', (e) => { _updateCartItem_(id, 'size', e.target.value, true); });
+      sizeEl.addEventListener('change', () => { saveCart_(); });
       const qtyEl = row.querySelector('.pk-cart-qty');
       qtyEl.addEventListener('input', (e) => { _updateCartItem_(id, 'qty', Math.max(1, Number(e.target.value) || 1), true); });
       qtyEl.addEventListener('change', () => { saveCart_(); });
@@ -1632,7 +1669,8 @@
     const checked = _cartItems.filter((i) => i.checked);
     const lines = checked.map((i, idx) => {
       const lineTotal = (Number(i.qty) || 0) * (Number(i.price) || 0);
-      return `${idx + 1}. ${i.name}${i.qty > 1 ? ' x' + i.qty : ''} — ${lineTotal.toLocaleString('vi-VN')}đ`;
+      const details = [i.chatLieu, i.mauSac, i.size].filter(Boolean).join(', ');
+      return `${idx + 1}. ${i.name}${details ? ' (' + details + ')' : ''}${i.qty > 1 ? ' x' + i.qty : ''} — ${lineTotal.toLocaleString('vi-VN')}đ`;
     });
     const subtotal = checked.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.price) || 0), 0);
     let discountAmt = 0;
