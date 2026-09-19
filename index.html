@@ -13165,6 +13165,7 @@ function _teamChanPickerFilter(id, q){
 // ═══════════════════════════════════════════════════════
 var _pkState = {
   nameMapLoaded: false, nameMap: {},      // { 'Le Ninh': 'ninhnga99', ... }
+  serverNames: [],                         // TOAN BO ten Nhan vien tung xuat hien trong bao cao da luu tren server (ben vung, khong mat khi F5/luu bao cao)
   parsedRows: [], parsedUnmapped: [],      // ket qua lan parse file gan nhat, chua luu len CRM
   uploading: false,
   from: _ymd(new Date(Date.now()-6*86400000)), to: _ymd(new Date()),
@@ -13181,6 +13182,7 @@ async function _pkLoadNameMap(){
     var r = await fetch(gsUrl + sep + 'action=pancakeNameMap', { redirect:'follow' });
     var d = await r.json();
     _pkState.nameMap = d.map || {};
+    _pkState.serverNames = d.allNames || [];
     _pkState.nameMapLoaded = true;
   } catch(e){ console.error('pancakeNameMap load lỗi', e); }
 }
@@ -13691,6 +13693,11 @@ async function _pkUploadToCRM(){
     if (d.error) throw new Error(d.error);
     toast('✓ Đã lưu '+d.written+' dòng lên CRM.');
     logAudit('pancake_import','', '', 'Nhập báo cáo Pancake: '+d.written+' dòng');
+    // Ghi nhan lai toan bo ten Nhan vien trong file nay vao serverNames TRUOC khi xoa parsedRows,
+    // de bang "Khop ten" van hien du de khop tiep (khong con phu thuoc parsedUnmapped tam thoi nua).
+    var seen = {};
+    _pkState.parsedRows.forEach(function(r){ seen[r.nhanVien] = true; });
+    Object.keys(seen).forEach(function(n){ if (_pkState.serverNames.indexOf(n)===-1) _pkState.serverNames.push(n); });
     _pkState.parsedRows = []; _pkState.parsedUnmapped = [];
     var fi = document.getElementById('pk-file-input'); if (fi) fi.value = '';
     _pkState.report = null; // buoc xem lai bao cao de lay du lieu moi
@@ -13705,6 +13712,10 @@ function _pkSalesOf(v){ return String(v||'').split('|').map(function(x){ return 
 
 function _pkRenderMapTableHtml(isAdmin){
   var names = Object.keys(_pkState.nameMap);
+  // Uu tien nguon ben vung tu server (moi ten Nhan vien tung xuat hien trong bao cao da luu) —
+  // khong mat du CS da bam "Luu len CRM" hay F5 lai trang truoc khi khop het. parsedUnmapped
+  // (tu file vua doc, chua luu) chi la lop bo sung de thay ten moi ngay lap tuc.
+  (_pkState.serverNames||[]).forEach(function(n){ if (names.indexOf(n)===-1) names.push(n); });
   _pkState.parsedUnmapped.forEach(function(n){ if (names.indexOf(n)===-1) names.push(n); });
   names.sort(function(a,b){ return a.localeCompare(b,'vi'); });
   var allCS = _allCSNames().filter(function(s){ return String(s).indexOf('|') === -1; });

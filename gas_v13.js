@@ -694,7 +694,7 @@ function doGet(e) {
     if (action === 'teams')     return jsonOut_({ teams: readTeams_(ss.getSheetByName(SH_TEAM)) });
     if (action === 'users')     return jsonOut_({ users: readUsers_(ss.getSheetByName(SH_USER)) });
     // ── Bao cao Pancake (nhap tu file Excel "Thong ke tuong tac") ──
-    if (action === 'pancakeNameMap') return jsonOut_({ map: readPancakeMap_() });
+    if (action === 'pancakeNameMap') return jsonOut_({ map: readPancakeMap_(), allNames: pancakeAllNames_() });
     if (action === 'pancakeReport')  return jsonOut_(buildPancakeReport_(e.parameter.from, e.parameter.to, e.parameter.split));
     // ── Nguon "Cham soc" (KH them nhanh, sheet rieng) — khong gop CareData/bao cao A-B-C ──
     if (action === 'careLeads') return jsonOut_({ rows: readCareLeads_() });
@@ -2539,6 +2539,20 @@ function readPancakeMap_() {
     out[String(v[i][0])] = String(v[i][1] || '');
   }
   return out;
+}
+
+// Toan bo ten "Nhan vien" tung xuat hien trong bao cao Pancake da luu (khong loc theo ngay) —
+// dung de bang "Khop ten" luon hien du danh sach can khop, KE CA sau khi da nap/luu bao cao
+// va reload lai trang (khac voi _pkState.parsedUnmapped ben client chi ton tai tam thoi tu
+// file vua doc, se mat neu bam Luu len CRM hoac F5 truoc khi khop het).
+function pancakeAllNames_() {
+  var sh = getSheet_(SH_PK_STATS, PK_STATS_HEADERS);
+  var names = {};
+  if (sh.getLastRow() >= 2) {
+    var v = sh.getRange(2, 4, sh.getLastRow() - 1, 1).getValues(); // cot D = nhanVien
+    for (var i = 0; i < v.length; i++) { if (v[i][0]) names[String(v[i][0])] = true; }
+  }
+  return Object.keys(names);
 }
 
 // Ghi/cap nhat 1 dong khop ten (upsert theo pancakeName) — khong xoa cac dong khop khac.
