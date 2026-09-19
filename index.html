@@ -13155,7 +13155,8 @@ var _pkState = {
   from: _ymd(new Date(Date.now()-6*86400000)), to: _ymd(new Date()),
   report: null, reportLoading: false,
   pkSplit: 'equal', mapOpen: '',
-  tagRows: [], tagLoaded: false, tagFrom: '', tagTo: ''   // dữ liệu file 'Thống kê tag' (gộp nhiều ngày, lưu trên trình duyệt)
+  tagRows: [], tagLoaded: false, tagFrom: '', tagTo: '',   // dữ liệu file 'Thống kê tag' (gộp nhiều ngày, lưu trên trình duyệt)
+  tagOverrideMap: {}, tagOverrideLoaded: false   // { 'tên tag lạ': 'L1'...'L6' } — quy chuẩn tay, lưu chung server (dùng chung cho cả team)
 };
 
 async function _pkLoadNameMap(){
@@ -13169,10 +13170,45 @@ async function _pkLoadNameMap(){
   } catch(e){ console.error('pancakeNameMap load lỗi', e); }
 }
 
+// Bản đồ "quy chuẩn tag lạ → L1..L6", lưu chung trên server (setSetting/getSetting có sẵn)
+// để cả team dùng chung, không phụ thuộc trình duyệt như tagRows.
+async function _pkLoadTagOverrideMap(){
+  if (!gsUrl) return;
+  try {
+    var sep = gsUrl.includes('?') ? '&' : '?';
+    var r = await fetch(gsUrl + sep + 'action=getSetting&key=pancakeTagOverride', { redirect:'follow' });
+    var d = await r.json();
+    var map = {};
+    if (d && d.value) { try { map = JSON.parse(d.value) || {}; } catch(e){} }
+    _pkState.tagOverrideMap = map;
+    _pkState.tagOverrideLoaded = true;
+  } catch(e){ console.error('pancakeTagOverride load lỗi', e); }
+}
+
+async function _pkSaveTagOverride(sel){
+  var tag = sel.getAttribute('data-tag');
+  var code = sel.value;
+  if (!gsUrl){ toast('❌ Chưa cấu hình URL Google Apps Script.'); return; }
+  try {
+    var map = Object.assign({}, _pkState.tagOverrideMap || {});
+    if (code) map[tag] = code; else delete map[tag];
+    var res = await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'setSetting', key:'pancakeTagOverride', value: JSON.stringify(map) }) });
+    var d = await res.json();
+    if (d.error) throw new Error(d.error);
+    _pkState.tagOverrideMap = map;
+    logAudit('pancake_tag_map','', '', 'Quy chuẩn tag "'+tag+'" → '+(code ? _PK_STATUS_LABEL[code] : '(bỏ quy chuẩn)'));
+    toast('✓ Đã quy chuẩn "'+tag+'" → '+(code ? _PK_STATUS_LABEL[code] : '(bỏ quy chuẩn)'));
+    _pkRenderAll();
+  } catch(e){
+    toast('❌ Lỗi lưu quy chuẩn tag: ' + e.message);
+  }
+}
+
 async function renderPancakeTab(){
   var wrap = document.getElementById('pancake-wrap');
   if (!wrap) return;
   if (!_pkState.nameMapLoaded) { wrap.innerHTML = '<div style="padding:20px;color:var(--muted)">Đang tải dữ liệu khớp tên…</div>'; await _pkLoadNameMap(); }
+  if (!_pkState.tagOverrideLoaded) await _pkLoadTagOverrideMap();
   _pkRenderAll();
 }
 
@@ -13249,6 +13285,9 @@ var _PK_STATUS_LABEL = {
 // Phân loại 1 tên tag -> {type:'sale'|'status'|'other', code:'S1'|'L5.1'|''}
 function _pkClassifyTag(name){
   var n = String(name||'').trim();
+  // Uu tien quy chuan tay (admin gan thu cong cho cac tag khong theo dung mau) truoc regex.
+  var ov = _pkState.tagOverrideMap && _pkState.tagOverrideMap[n];
+  if (ov && _PK_STATUS_LABEL[ov]) return { type:'status', code: ov };
   var m = n.match(/^([SO])\s*(\d+)(?![\d])/i);
   if (m) return { type:'sale', code: m[1].toUpperCase()+parseInt(m[2],10) };
   // tag trạng thái cũ "L6. Chờ CK" (trước khi đổi tên) -> vẫn hiểu là L5.1
@@ -13339,9 +13378,10 @@ function _pkTagAggregate(rows){
   _PK_SALE_DIR.forEach(function(s){ sale[s.code] = bucket(); });
   Object.keys(_PK_STATUS_LABEL).forEach(function(k){ status[k] = bucket(); });
   rows.forEach(function(x){
+    var cls = _pkClassifyTag(x.tagName); // phan loai lai theo quy chuan hien tai (khong dung x.type/x.code da cache luc parse), de quy chuan tay ap dung duoc cho ca du lieu cu
     var tgt = null;
-    if (x.type === 'sale'){ if (!sale[x.code]) sale[x.code] = bucket(); tgt = sale[x.code]; if (!tgt.names) tgt.names = {}; tgt.names[x.tagName] = 1; }
-    else if (x.type === 'status'){ tgt = status[x.code]; }
+    if (cls.type === 'sale'){ if (!sale[cls.code]) sale[cls.code] = bucket(); tgt = sale[cls.code]; if (!tgt.names) tgt.names = {}; tgt.names[x.tagName] = 1; }
+    else if (cls.type === 'status'){ tgt = status[cls.code]; }
     else { if (!other[x.tagName]) other[x.tagName] = bucket(); tgt = other[x.tagName]; }
     if (tgt){ tgt[x.pageId] += x.count; tgt.total += x.count; }
   });
@@ -13474,8 +13514,18 @@ function _pkTagSectionHtml(){
 
   var oth = Object.keys(ag.other).filter(function(k){ return ag.other[k].total; });
   if (oth.length){
-    html += '<div style="margin:12px 0 6px;padding:8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412">⚠️ '+oth.length+' tag chưa theo quy tắc (S/O + số, hoặc L1–L6) nên chưa được tính vào bảng trên: '+
-      oth.map(function(k){ return esc(k)+' ('+_pkN(ag.other[k].total)+')'; }).join(', ')+'</div>';
+    html += '<div style="margin:12px 0 6px;padding:8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412">'+
+      '<div style="margin-bottom:6px">⚠️ '+oth.length+' tag chưa theo quy tắc (S/O + số, hoặc L1–L6) — chọn quy chuẩn bên dưới để tính vào đúng bảng (áp dụng luôn cho cả dữ liệu cũ đã nạp, dùng chung cho cả team):</div>';
+    var stOpts = '<option value="">— Bỏ qua —</option>' + Object.keys(_PK_STATUS_LABEL).map(function(c){
+      return '<option value="'+esc(c)+'">'+esc(_PK_STATUS_LABEL[c])+'</option>';
+    }).join('');
+    oth.forEach(function(k){
+      html += '<div style="display:flex;gap:8px;align-items:center;margin:4px 0;flex-wrap:wrap">'+
+        '<span style="min-width:160px">'+esc(k)+' ('+_pkN(ag.other[k].total)+')</span>'+
+        '<select data-tag="'+esc(k)+'" onchange="_pkSaveTagOverride(this)" style="padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+stOpts+'</select>'+
+      '</div>';
+    });
+    html += '</div>';
   }
   return html;
 }
@@ -13653,13 +13703,17 @@ function _pkRenderMapTableHtml(isAdmin){
       cur.forEach(function(c){ if (items.indexOf(c)===-1) items.push(c); }); // giữ cả Sale đã khớp nhưng không còn trong danh sách
       items.sort(function(a,b){ return a.localeCompare(b,'vi'); });
       var boxes = items.map(function(s){
-        return '<label style="display:flex;gap:6px;align-items:center;padding:3px 4px;cursor:pointer;white-space:nowrap"><input type="checkbox" value="'+esc(s)+'"'+(cur.indexOf(s)!==-1?' checked':'')+' onchange="_pkMapToggle(this)"> '+esc(s)+'</label>';
+        return '<label style="display:flex;gap:6px;align-items:center;padding:3px 4px;cursor:pointer;white-space:nowrap"><input type="checkbox" value="'+esc(s)+'"'+(cur.indexOf(s)!==-1?' checked':'')+'> '+esc(s)+'</label>';
       }).join('');
       cell = '<details data-n="'+esc(n)+'"'+(_pkState.mapOpen===n?' open':'')+' ontoggle="_pkMapDetailsToggle(this)" style="position:relative">'+
         '<summary style="cursor:pointer;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);display:inline-block;min-width:180px">'+
           (cur.length ? esc(cur.join(', '))+(cur.length>1?' <span style="color:var(--muted);font-size:11px">('+cur.length+' Sale)</span>':'') : '— Chưa khớp —')+'</summary>'+
         '<div style="max-height:220px;overflow:auto;margin-top:4px;padding:4px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-          (boxes || '<div style="color:var(--muted);padding:6px">Chưa có danh sách Sale.</div>')+'</div></details>';
+          (boxes || '<div style="color:var(--muted);padding:6px">Chưa có danh sách Sale.</div>')+
+          '<div style="display:flex;justify-content:flex-end;margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">'+
+            '<button type="button" class="btn sm primary" onclick="_pkMapSaveClose(this)">💾 Lưu &amp; đóng</button>'+
+          '</div>'+
+        '</div></details>';
     } else {
       cell = esc(cur.join(', ')||'—');
     }
@@ -13675,11 +13729,11 @@ function _pkMapDetailsToggle(det){
   else if (_pkState.mapOpen === n) _pkState.mapOpen = '';
 }
 
-function _pkMapToggle(cb){
-  var det = cb.closest('details'); if (!det) return;
+function _pkMapSaveClose(btn){
+  var det = btn.closest('details'); if (!det) return;
   var n = det.getAttribute('data-n');
   var vals = Array.prototype.map.call(det.querySelectorAll('input[type=checkbox]:checked'), function(x){ return x.value; });
-  _pkState.mapOpen = n;
+  _pkState.mapOpen = ''; // luu xong thi dong lai, khong giu mo nua
   _pkMapNameInline(n, vals.join('|'));
 }
 
