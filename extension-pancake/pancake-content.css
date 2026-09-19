@@ -491,20 +491,48 @@
   cursor: default;
 }
 
-#pk-price-section {
+#pk-menu-wrap {
   border: 1px solid #e5e7eb;
-  border-left: 3px solid #2563eb;
   background: #fafafa;
   border-radius: 6px;
   padding: 6px 8px;
   margin-bottom: 8px;
 }
 
-#pk-price-header {
-  font-weight: 700;
+#pk-menu-sel {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
   font-size: 12px;
-  color: #1e3a8a;
-  margin-bottom: 6px;
+  font-weight: 700;
+  color: #1e293b;
+  background: #fff;
+}
+
+#pk-menu-content {
+  margin-top: 8px;
+}
+
+#pk-rem-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 4px;
+}
+
+#pk-rem-toolbar button {
+  background: transparent;
+  border: 1px solid #d1d5db;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 8px;
+  color: #374151;
+}
+
+#pk-rem-toolbar button:hover {
+  background: #f3f4f6;
 }
 
 #pk-price-row {
@@ -671,6 +699,25 @@
   opacity: 0.8;
 }
 
+.pk-cart-detail-row {
+  flex: 1 0 100%;
+  display: flex;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.pk-cart-chatlieu,
+.pk-cart-mausac,
+.pk-cart-size {
+  flex: 1;
+  min-width: 0;
+  font-size: 10.5px;
+  padding: 3px 5px;
+  border: 1px solid #fbcfe8;
+  border-radius: 4px;
+  background: #fffafc;
+}
+
 #pk-cart-addrow { margin: 6px 0; }
 
 #pk-cart-add-manual {
@@ -750,31 +797,6 @@
 #pk-cart-copy:hover { background: #be185d; }
 #pk-cart-clear { background: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb; }
 #pk-cart-clear:hover { background: #e5e7eb; }
-
-#pk-rem-section {
-  border: 1px solid #e5e7eb;
-  border-left: 3px solid #f59e0b;
-  background: #fafafa;
-  border-radius: 6px;
-  padding: 6px 8px;
-  margin-bottom: 8px;
-}
-
-#pk-rem-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 700;
-  font-size: 12px;
-  color: #92400e;
-}
-
-#pk-rem-header button {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-size: 13px;
-}
 
 #pk-rem-list {
   margin-top: 6px;
@@ -860,6 +882,30 @@
   font-size: 11px;
   color: #374151;
   cursor: pointer;
+}
+
+.pk-stone-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 5px 7px;
+  background: #fdf4ff;
+  border: 1px solid #f0abfc;
+  border-radius: 5px;
+  font-size: 11px;
+  color: #701a75;
+}
+
+.pk-stone-label { font-weight: 700; flex: 0 0 auto; }
+
+.pk-stone-row label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 .pk-opener-btn {

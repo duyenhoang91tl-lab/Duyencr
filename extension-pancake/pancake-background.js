@@ -437,6 +437,7 @@ function buildPrompt(payload) {
 
   const lines = custLines.slice();
   if (context) lines.push(`Ngữ cảnh: ${context}`);
+  if (payload.stonePref) lines.push(`Loại đá khách hỏi: ${payload.stonePref}`);
   const custBlock = lines.length ? `[KH] ${lines.join(" | ")}\n` : "";
 
   return (
@@ -458,7 +459,8 @@ async function handleFetchOpener(payload) {
   const custLines = payload?.custLines || [];
   const tone = payload?.tone || "Thân thiện";
   const angleInstr = payload?.angleInstr || "";
-  const custBlock = custLines.length ? `[KH] ${custLines.join(" | ")}\n` : "";
+  const custLinesFull = payload?.stonePref ? [...custLines, `Loại đá khách hỏi: ${payload.stonePref}`] : custLines;
+  const custBlock = custLinesFull.length ? `[KH] ${custLinesFull.join(" | ")}\n` : "";
   const prompt =
     custBlock +
     `[Giọng văn] ${tone}\n` +

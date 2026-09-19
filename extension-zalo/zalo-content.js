@@ -191,36 +191,38 @@
     csBar.appendChild(nzRow);
     panel.appendChild(csBar);
 
-    // ── BROADCAST SECTION (gui tin hang loat) ──
-    const bcWrap = document.createElement('div');
-    bcWrap.id = 'zai-bc-wrap';
-    bcWrap.style.cssText = 'border-bottom:2px solid #bbf7d0;background:#f0fdf4;flex-shrink:0;';
-    const bcHdr = document.createElement('div');
-    bcHdr.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px 14px;cursor:pointer;';
-    bcHdr.innerHTML = '<span style="font-weight:700;color:#15803d;font-size:12px">📢 Gửi hàng loạt</span><span id="zai-bc-toggle" style="color:#15803d;font-size:11px">▼ mở</span>';
+    // ── MENU (gop 3 muc trươc day la 3 thanh tieu de xep chong: Gui hang loat / Quet
+    // Zalo / Lich hen — thanh 1 dropdown, chon muc nao hien noi dung muc do) ──
+    const menuWrap = document.createElement('div');
+    menuWrap.id = 'zai-menu-wrap';
+    menuWrap.style.cssText = 'border-bottom:2px solid #e5e7eb;background:#f9fafb;flex-shrink:0;padding:8px 14px;';
+    const menuSel = document.createElement('select');
+    menuSel.id = 'zai-menu-sel';
+    menuSel.style.cssText = 'width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#374151;font-weight:700;';
+    [
+      { v: '', label: '— Chọn mục —' },
+      { v: 'bc', label: '📢 Gửi hàng loạt' },
+      { v: 'zs', label: '🔍 Quét trạng thái kết bạn Zalo' },
+      { v: 'remind', label: '🔔 Lịch hẹn (0)' }
+    ].forEach(o => { const op = document.createElement('option'); op.value = o.v; op.textContent = o.label; menuSel.appendChild(op); });
+    menuWrap.appendChild(menuSel);
+    const menuContent = document.createElement('div');
+    menuContent.id = 'zai-menu-content';
+    menuContent.style.cssText = 'margin-top:8px;';
+    menuWrap.appendChild(menuContent);
+    panel.appendChild(menuWrap);
+
+    // 📢 Gửi hàng loạt — noi dung (giu nguyen id zai-bc-body, cac ham renderBroadcastList_/
+    // loadBroadcastQueue_ van query dung id nay nhu cu, chi doi noi chua)
     const bcBody = document.createElement('div');
     bcBody.id = 'zai-bc-body';
-    bcBody.style.cssText = 'display:none;padding:0 14px 10px;';
-    bcHdr.addEventListener('click', () => {
-      const hidden = bcBody.style.display === 'none';
-      bcBody.style.display = hidden ? 'block' : 'none';
-      document.getElementById('zai-bc-toggle').textContent = hidden ? '▲ thu gọn' : '▼ mở';
-      if (hidden) loadBroadcastQueue_();
-    });
-    bcWrap.appendChild(bcHdr);
-    bcWrap.appendChild(bcBody);
-    panel.appendChild(bcWrap);
+    bcBody.style.display = 'none';
+    menuContent.appendChild(bcBody);
 
-    // ── QUET DANH BA ZALO (du phong khi khach chua co don hang trong Sasum) ──
-    const zsWrap = document.createElement('div');
-    zsWrap.id = 'zai-zs-wrap';
-    zsWrap.style.cssText = 'border-bottom:2px solid #e5e7eb;background:#f9fafb;flex-shrink:0;';
-    const zsHdr = document.createElement('div');
-    zsHdr.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px 14px;cursor:pointer;';
-    zsHdr.innerHTML = '<span style="font-weight:700;color:#374151;font-size:12px">🔍 Quét trạng thái kết bạn Zalo (dự phòng)</span><span id="zai-zs-toggle" style="color:#374151;font-size:11px">▼ mở</span>';
+    // 🔍 Quét trạng thái kết bạn Zalo — noi dung
     const zsBody = document.createElement('div');
     zsBody.id = 'zai-zs-body';
-    zsBody.style.cssText = 'display:none;padding:8px 14px 10px;';
+    zsBody.style.display = 'none';
     zsBody.innerHTML =
       '<div style="font-size:10px;color:#6b7280;margin-bottom:6px">' +
       'Quét các số điện thoại đang thấy trên màn hình (danh bạ/tin nhắn Zalo) và tự đoán trạng thái ' +
@@ -229,16 +231,23 @@
       'sẽ được ghi kèm vào danh sách nick của từng khách.</div>' +
       '<button class="zai-btn zai-btn-secondary zai-btn-sm" id="zai-zs-scan-btn">🔍 Quét màn hình hiện tại</button>' +
       '<div id="zai-zs-preview" style="margin-top:8px"></div>';
-    zsHdr.addEventListener('click', () => {
-      const hidden = zsBody.style.display === 'none';
-      zsBody.style.display = hidden ? 'block' : 'none';
-      document.getElementById('zai-zs-toggle').textContent = hidden ? '▲ thu gọn' : '▼ mở';
-    });
-    zsWrap.appendChild(zsHdr);
-    zsWrap.appendChild(zsBody);
-    panel.appendChild(zsWrap);
+    menuContent.appendChild(zsBody);
     zsBody.querySelector('#zai-zs-scan-btn').addEventListener('click', () => {
       renderZsPreview_(scanZaloFriendStatus_());
+    });
+
+    // 🔔 Lịch hẹn quá hạn/hôm nay — noi dung (renderReminderPanel_ se render vao day)
+    const remindBody = document.createElement('div');
+    remindBody.id = 'zai-remind-body';
+    remindBody.style.display = 'none';
+    menuContent.appendChild(remindBody);
+
+    menuSel.addEventListener('change', () => {
+      const v = menuSel.value;
+      bcBody.style.display = v === 'bc' ? 'block' : 'none';
+      zsBody.style.display = v === 'zs' ? 'block' : 'none';
+      remindBody.style.display = v === 'remind' ? 'block' : 'none';
+      if (v === 'bc') loadBroadcastQueue_();
     });
 
     // Body
@@ -1789,34 +1798,28 @@
     } catch(e) {}
   }
 
-  let _remindOpen = false; // lich hen mac dinh DONG — CS tu bam mo xem chi tiet
   function renderReminderPanel_(reminders) {
-    let panel = document.getElementById('zai-remind-panel');
-    const host = document.getElementById('ome-zai-panel');
-    if (!host) return;
-    const csBar = document.getElementById('zai-cs-bar');
-    if (!panel) {
-      panel = document.createElement('div');
-      panel.id = 'zai-remind-panel';
-      panel.style.cssText = 'background:#fef2f2;border-bottom:2px solid #fca5a5;font-size:11px;';
-      if (csBar && csBar.nextSibling) host.insertBefore(panel, csBar.nextSibling);
-      else host.insertBefore(panel, host.firstChild);
-    }
+    const body = document.getElementById('zai-remind-body');
+    const menuSel = document.getElementById('zai-menu-sel');
     const toggleBtn = document.getElementById('ome-zai-toggle');
+    if (!body) return;
+
+    // Cap nhat so luong ngay tren nhan cua dropdown + vien do canh bao tren nut noi —
+    // 2 dau hieu nay van hoat dong doc lap voi viec CS dang chon xem muc nao trong menu.
+    if (menuSel) {
+      const opt = [...menuSel.options].find(o => o.value === 'remind');
+      if (opt) opt.textContent = '🔔 Lịch hẹn (' + (reminders ? reminders.length : 0) + ')';
+    }
+    if (toggleBtn) toggleBtn.style.boxShadow = (reminders && reminders.length) ? '0 0 0 3px #ef4444' : '';
+
     if (!reminders || !reminders.length) {
-      panel.style.display = 'none';
-      if (toggleBtn) toggleBtn.style.boxShadow = '';
+      body.innerHTML = '<div style="font-size:11px;color:#6b7280;padding:6px 0">Không có lịch hẹn quá hạn/hôm nay.</div>';
       return;
     }
-    if (toggleBtn) toggleBtn.style.boxShadow = '0 0 0 3px #ef4444';
-    panel.style.display = '';
+
     const today = new Date(); today.setHours(0,0,0,0);
-    panel.innerHTML =
-      '<div style="padding:5px 10px;background:#fca5a5;color:#7f1d1d;font-weight:bold;display:flex;justify-content:space-between;align-items:center;">'+
-      '<span>🔔 ' + reminders.length + ' lịch hẹn</span>'+
-      '<span id="zai-remind-toggle" style="cursor:pointer;font-size:11px;user-select:none;">' + (_remindOpen ? '▲ thu gọn' : '▼ mở rộng') + '</span></div>'+
-      '<div id="zai-remind-list" style="max-height:180px;overflow-y:auto;display:' + (_remindOpen ? '' : 'none') + ';"></div>';
-    const list = panel.querySelector('#zai-remind-list');
+    const list = document.createElement('div');
+    list.style.cssText = 'max-height:220px;overflow-y:auto;border:1px solid #fecaca;border-radius:6px;background:#fef2f2;';
     reminders.forEach(rem => {
       const item = document.createElement('div');
       item.style.cssText = 'display:flex;align-items:center;gap:4px;padding:4px 8px;border-bottom:1px solid #fecaca;';
@@ -1870,8 +1873,10 @@
         setTimeout(() => {
           item.remove();
           if (!list.children.length) {
-            panel.style.display = 'none';
+            body.innerHTML = '<div style="font-size:11px;color:#6b7280;padding:6px 0">Không có lịch hẹn quá hạn/hôm nay.</div>';
             if (toggleBtn) toggleBtn.style.boxShadow = '';
+            const opt = menuSel && [...menuSel.options].find(o => o.value === 'remind');
+            if (opt) opt.textContent = '🔔 Lịch hẹn (0)';
           }
         }, 700);
       });
@@ -1881,14 +1886,8 @@
       item.appendChild(doneBtn);
       list.appendChild(item);
     });
-    panel.querySelector('#zai-remind-toggle').addEventListener('click', () => {
-      const l = panel.querySelector('#zai-remind-list');
-      const tog = panel.querySelector('#zai-remind-toggle');
-      if (!l) return;
-      _remindOpen = l.style.display === 'none';
-      l.style.display = _remindOpen ? '' : 'none';
-      if (tog) tog.textContent = _remindOpen ? '▲ thu gọn' : '▼ mở rộng';
-    });
+    body.innerHTML = '';
+    body.appendChild(list);
   }
 async function startReminderPoll_() {
     if (!GAS_URL || !_currentCS) return;
