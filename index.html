@@ -725,6 +725,21 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
 .acct-row{display:flex;align-items:center;gap:7px;padding:8px 10px;border:1px solid var(--border);border-radius:9px;margin-bottom:6px;}
 .acct-row .ar-main{flex:1;min-width:0;}
 .acct-row .ar-badge{font-size:9px;padding:1px 7px;border-radius:10px;font-weight:700;}
+.acct-item{border:1px solid var(--border);border-radius:9px;margin-bottom:6px;overflow:hidden;}
+.acct-item.open{border-color:var(--green-mid);}
+.acct-item > .acct-row{border:none;border-radius:0;margin-bottom:0;}
+.acct-item.editing{border-color:var(--tn);box-shadow:0 0 0 2px var(--tn-bg) inset;}
+.acct-row .ar-main{cursor:pointer;}
+.ar-caret{display:inline-block;width:11px;color:var(--hint);font-size:9px;}
+.ar-count{font-size:10px;font-weight:700;padding:1px 6px;border-radius:9px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);}
+.acct-detail{border-top:1px dashed var(--border);background:var(--surface2);padding:9px 11px;}
+.acct-detail .ad-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--hint);margin-bottom:6px;}
+.acct-detail .ad-chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;}
+.acct-detail .ad-add{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.sale-chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:4px 9px;border-radius:20px;background:var(--surface);border:1px solid var(--border);}
+.sale-chip .sc-team{color:var(--hint);font-size:10px;}
+.sale-chip .chip-x{cursor:pointer;color:var(--hint);font-weight:700;font-size:11px;}
+.sale-chip .chip-x:hover{color:var(--red);}
 /* ── ZALO AI ── */
 .zai-panel{background:var(--surface2);}
 .zai-label{font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em;}
@@ -15399,6 +15414,7 @@ if (typeof openRoleModal === 'function'){
 function openAcctModal(){
   var allowed = (_authAccount && _authAccount.role === 'admin') || _bootstrapAdmin;
   if (!allowed){ if (typeof toast==='function') toast('Chỉ admin mới quản lý tài khoản.'); return; }
+  _acctEditing = '';
   renderAcctModal();
   var m = document.getElementById('acct-modal'); if (m) m.classList.add('open');
 }
@@ -15409,39 +15425,211 @@ function _acctRoleChange(){
   if (nameWrap) nameWrap.style.display = (role==='admin') ? 'none' : '';
   if (teamWrap) teamWrap.style.display = (role==='leader') ? '' : 'none';
 }
+// ── Trạng thái UI của bảng quản lý tài khoản ──
+// _acctOpen: các dòng đang mở rộng (giữ nguyên khi vẽ lại bảng)
+// _acctEditing: username đang được SỬA (rỗng = form đang ở chế độ thêm mới)
+var _acctOpen = {};
+var _acctEditing = '';
+function _acctKey(u){ return String(u == null ? '' : u).trim().toLowerCase(); }
+
+// Danh sách sale mà 1 tài khoản đang phụ trách (= phạm vi dữ liệu tài khoản đó nhìn thấy)
+function _acctNamesOf(a){
+  if (!a) return [];
+  return (a.names && a.names.length) ? a.names.slice() : (a.name ? [a.name] : []);
+}
+// Gán lại danh sách sale cho tài khoản + tự cập nhật tên chính & team (với CS)
+function _acctApplyNames(acct, arr){
+  acct.names = arr.slice();
+  acct.name  = arr[0] || '';
+  if (acct.role === 'cs'){
+    var t = null;
+    for (var i = 0; i < arr.length && !t; i++){ t = (typeof _teamOf === 'function' ? _teamOf(arr[i]) : null); }
+    acct.team = t ? t.name : '';
+  }
+}
+// Lưu thay đổi phạm vi sale + làm mới giao diện (và phiên đăng nhập nếu sửa chính mình)
+function _acctPersist(acct, auditText){
+  pushUsers();
+  if (typeof logAudit === 'function') logAudit('account', '', acct.username, auditText);
+  if (_authAccount && _acctKey(_authAccount.username) === _acctKey(acct.username) && typeof _applyAuthIdentity === 'function'){
+    try { _applyAuthIdentity(acct); } catch(e){}
+  }
+  renderAcctModal();
+}
+
+// Khối chi tiết: bấm vào 1 tài khoản sale → xem tài khoản đó đang phụ trách những sale nào
+function _acctDetailHtml(a){
+  var uk = esc(a.username);
+  if (a.role === 'admin'){
+    return '<div class="acct-detail">'+
+      '<div class="ad-title">Phạm vi xem</div>'+
+      '<div style="font-size:12px;color:var(--muted)">Tài khoản <b>Admin</b> nhìn thấy <b>toàn bộ</b> sale — không cần gán danh sách.</div>'+
+    '</div>';
+  }
+  var namesArr = _acctNamesOf(a);
+  var allCS = (typeof _allCSNames === 'function' ? _allCSNames() : []);
+  var lowerHas = {}; namesArr.forEach(function(n){ lowerHas[String(n).toLowerCase()] = 1; });
+  var addOpts = '<option value="">— Chọn sale để thêm —</option>' +
+    allCS.filter(function(n){ return !lowerHas[String(n).toLowerCase()]; })
+         .map(function(n){ return '<option value="'+esc(n)+'">'+esc(n)+'</option>'; }).join('');
+
+  var chips = namesArr.length ? namesArr.map(function(n){
+    var t = (typeof _teamOf === 'function' ? _teamOf(n) : null);
+    return '<span class="sale-chip">'+esc(n)+
+      (t ? '<span class="sc-team">· '+esc(t.name)+'</span>' : '')+
+      '<span class="chip-x" title="Cắt sale này khỏi tài khoản" data-u="'+uk+'" data-name="'+esc(n)+'" '+
+        'onclick="acctRemoveName(this.dataset.u,this.dataset.name)">✕</span></span>';
+  }).join('') : '<span style="font-size:12px;color:var(--red)">Chưa gán sale nào — tài khoản này sẽ không thấy dữ liệu.</span>';
+
+  var teamNote = '';
+  if (a.role === 'leader'){
+    var tm = (typeof teams !== 'undefined' ? teams : []).filter(function(t){ return t.name === a.team; })[0];
+    var mem = tm ? [].concat(tm.leader ? [tm.leader] : [], tm.members || []).filter(Boolean) : [];
+    teamNote = '<div style="margin-top:8px;font-size:11px;color:var(--muted);border-top:1px dashed var(--border);padding-top:7px">'+
+      '👥 Team <b>'+esc(a.team || '—')+'</b>'+(mem.length ? ': '+esc(mem.join(', ')) : ' (chưa có thành viên)')+
+      ' — Leader còn xem được dữ liệu của cả team.</div>';
+  }
+
+  return '<div class="acct-detail">'+
+    '<div class="ad-title">Đang phụ trách '+namesArr.length+' sale — chỉ thấy dữ liệu của những người này</div>'+
+    '<div class="ad-chips">'+chips+'</div>'+
+    '<div class="ad-add">'+
+      '<select class="team-add-sel ad-sel">'+addOpts+'</select>'+
+      '<input class="team-add-input ad-inp" placeholder="…hoặc gõ tên sale mới, cách nhau dấu phẩy">'+
+      '<button class="btn primary sm" data-u="'+uk+'" onclick="acctAddNames(this)">+ Thêm sale</button>'+
+    '</div>'+
+    teamNote+
+  '</div>';
+}
+
+// Mở / đóng khối chi tiết của 1 tài khoản
+function toggleAcctDetail(u){
+  var k = _acctKey(u);
+  if (_acctOpen[k]) delete _acctOpen[k]; else _acctOpen[k] = true;
+  renderAcctModal();
+}
+// Thêm sale vào phạm vi xem của tài khoản (từ khối chi tiết)
+function acctAddNames(btn){
+  var acct = _findAccount(btn.getAttribute('data-u')); if (!acct) return;
+  if (acct.role === 'admin'){ toast('Admin đã xem được toàn bộ sale.'); return; }
+  var box = btn.closest ? btn.closest('.acct-detail') : null; if (!box) return;
+  var sel = box.querySelector('.ad-sel'), inp = box.querySelector('.ad-inp');
+  var want = [];
+  if (sel && sel.value) want.push(sel.value);
+  if (inp && inp.value) String(inp.value).split(',').forEach(function(x){ x = x.trim(); if (x) want.push(x); });
+  if (!want.length){ toast('Chọn hoặc gõ tên sale muốn thêm.'); return; }
+  var cur = _acctNamesOf(acct), seen = {}, added = [];
+  cur.forEach(function(n){ seen[String(n).toLowerCase()] = 1; });
+  want.forEach(function(n){
+    var k = String(n).toLowerCase();
+    if (!seen[k]){ seen[k] = 1; cur.push(n); added.push(n); }
+  });
+  if (!added.length){ toast('Các sale này đã có sẵn trong tài khoản.'); return; }
+  _acctApplyNames(acct, cur);
+  _acctOpen[_acctKey(acct.username)] = true;
+  _acctPersist(acct, 'Thêm sale cho ' + acct.username + ': ' + added.join(', '));
+  toast('✓ Đã thêm ' + added.join(', ') + ' vào tài khoản ' + acct.username);
+}
+// Cắt bớt 1 sale khỏi phạm vi xem của tài khoản
+function acctRemoveName(u, name){
+  var acct = _findAccount(u); if (!acct) return;
+  var cur = _acctNamesOf(acct);
+  var next = cur.filter(function(n){ return n !== name; });
+  if (next.length === cur.length) return;
+  if (!next.length){ toast('Tài khoản ' + _roleLabel(acct.role) + ' phải còn ít nhất 1 sale. Thêm sale khác trước khi cắt người cuối cùng.'); return; }
+  if (!confirm('Cắt sale "' + name + '" khỏi tài khoản "' + acct.username + '"?\n\nTài khoản này sẽ KHÔNG còn nhìn thấy dữ liệu của "' + name + '".')) return;
+  _acctApplyNames(acct, next);
+  _acctOpen[_acctKey(acct.username)] = true;
+  _acctPersist(acct, 'Cắt sale khỏi ' + acct.username + ': ' + name);
+  toast('✓ Đã cắt ' + name + ' khỏi tài khoản ' + acct.username);
+}
+// Nạp 1 tài khoản vào form bên dưới để sửa (giữ nguyên các sale đang gán)
+function editAccount(u){
+  var acct = _findAccount(u); if (!acct) return;
+  _acctEditing = acct.username;
+  _acctOpen[_acctKey(acct.username)] = true;
+  renderAcctModal();
+  var box = document.getElementById('acct-form-box');
+  if (box && box.scrollIntoView) { try { box.scrollIntoView({ behavior:'smooth', block:'nearest' }); } catch(e){ box.scrollIntoView(); } }
+}
+function cancelAcctEdit(){ _acctEditing = ''; renderAcctModal(); }
+
 function renderAcctModal(){
   var body = document.getElementById('acct-modal-body'); if (!body) return;
-  var roleOpts = ['admin','leader','cs'].map(function(r){ return '<option value="'+r+'">'+_roleLabel(r)+'</option>'; }).join('');
-  var csNames = (typeof _allCSNames === 'function' ? _allCSNames() : []);
-  var nameOpts = csNames.map(function(n){ return '<option value="'+esc(n)+'">'+esc(n)+'</option>'; }).join('');
-  var teamOpts = '<option value="">—</option>' + (typeof teams!=='undefined'?teams:[]).map(function(t){ return '<option value="'+esc(t.name)+'">'+esc(t.name)+'</option>'; }).join('');
-  function q(v){ return esc(String(v)).replace(/'/g, "\\'"); }
+  var ed = _acctEditing ? _findAccount(_acctEditing) : null;
+  if (_acctEditing && !ed) _acctEditing = '';
+  var edRole  = ed ? (ed.role || 'cs') : '';
+  var edNames = ed ? _acctNamesOf(ed) : [];
+
+  var roleOpts = ['admin','leader','cs'].map(function(r){
+    return '<option value="'+r+'"'+(ed && edRole===r ? ' selected' : '')+'>'+_roleLabel(r)+'</option>';
+  }).join('');
+
+  // Universe tên CS = tên có trong dữ liệu + tên đang gán cho tài khoản đang sửa (kể cả tên gõ tay)
+  var csNames = (typeof _allCSNames === 'function' ? _allCSNames() : []).slice();
+  edNames.forEach(function(n){ if (csNames.indexOf(n) === -1) csNames.push(n); });
+  var nameOpts = csNames.map(function(n){
+    return '<option value="'+esc(n)+'"'+(edNames.indexOf(n) !== -1 ? ' selected' : '')+'>'+esc(n)+'</option>';
+  }).join('');
+
+  var teamOpts = '<option value="">—</option>' + (typeof teams!=='undefined'?teams:[]).map(function(t){
+    return '<option value="'+esc(t.name)+'"'+(ed && ed.team===t.name ? ' selected' : '')+'>'+esc(t.name)+'</option>';
+  }).join('');
+
   var list = accounts.length ? accounts.map(function(a){
     var badgeCls = a.role==='admin' ? 'vip-bg' : (a.role==='leader' ? 'blue-bg' : 'green-bg');
     var badgeCol = a.role==='admin' ? 'var(--vip)' : (a.role==='leader' ? 'var(--blue)' : 'var(--green)');
-    var namesDisp = (a.names && a.names.length) ? a.names.join(', ') : (a.name || '');
-    return '<div class="acct-row">'+
-      '<div class="ar-main"><div style="font-weight:600;font-size:12px">'+esc(a.username)+
-        ' <span class="ar-badge" style="background:var(--'+badgeCls+');color:'+badgeCol+'">'+_roleLabel(a.role)+'</span>'+
-        (a.active===false?' <span style="color:var(--red);font-size:10px">(đã khoá)</span>':'')+'</div>'+
-        '<div style="color:var(--muted);font-size:11px">'+(namesDisp?esc(namesDisp):'—')+(a.team?' · '+esc(a.team):'')+'</div></div>'+
-      '<button class="btn sm" onclick="resetPassword(\''+q(a.username)+'\')">Đổi MK</button>'+
-      '<button class="btn sm" onclick="toggleAcctActive(\''+q(a.username)+'\')">'+(a.active===false?'Mở khoá':'Khoá')+'</button>'+
-      '<button class="btn danger sm" onclick="deleteAccount(\''+q(a.username)+'\')">Xoá</button>'+
+    var namesArr = _acctNamesOf(a);
+    var namesDisp = namesArr.join(', ');
+    var uk = esc(a.username);
+    var k = _acctKey(a.username);
+    var open = !!_acctOpen[k];
+    var isEd = _acctEditing && _acctKey(_acctEditing) === k;
+    var countPill = a.role==='admin' ? '<span class="ar-count">toàn bộ</span>'
+                                     : '<span class="ar-count">'+namesArr.length+' sale</span>';
+    return '<div class="acct-item'+(open?' open':'')+(isEd?' editing':'')+'">'+
+      '<div class="acct-row">'+
+        '<div class="ar-main" title="Bấm để xem tài khoản này đang phụ trách những sale nào" '+
+             'data-u="'+uk+'" onclick="toggleAcctDetail(this.dataset.u)">'+
+          '<div style="font-weight:600;font-size:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">'+
+            '<span class="ar-caret">'+(open?'▼':'▶')+'</span>'+esc(a.username)+
+            '<span class="ar-badge" style="background:var(--'+badgeCls+');color:'+badgeCol+'">'+_roleLabel(a.role)+'</span>'+
+            countPill+
+            (a.active===false?'<span style="color:var(--red);font-size:10px">(đã khoá)</span>':'')+
+          '</div>'+
+          '<div style="color:var(--muted);font-size:11px">'+(namesDisp?esc(namesDisp):'—')+(a.team?' · '+esc(a.team):'')+'</div>'+
+        '</div>'+
+        '<button class="btn sm" title="Sửa vai trò / thêm hoặc cắt sale" data-u="'+uk+'" onclick="editAccount(this.dataset.u)">✏ Sửa</button>'+
+        '<button class="btn sm" data-u="'+uk+'" onclick="resetPassword(this.dataset.u)">Đổi MK</button>'+
+        '<button class="btn sm" data-u="'+uk+'" onclick="toggleAcctActive(this.dataset.u)">'+(a.active===false?'Mở khoá':'Khoá')+'</button>'+
+        '<button class="btn danger sm" data-u="'+uk+'" onclick="deleteAccount(this.dataset.u)">Xoá</button>'+
+      '</div>'+
+      (open ? _acctDetailHtml(a) : '')+
     '</div>';
   }).join('') : '<div style="color:var(--muted);font-size:12px;text-align:center;padding:10px">Chưa có tài khoản nào.</div>';
 
+  var formHead = ed
+    ? '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">'+
+        '<div style="font-weight:600;font-size:13px;color:var(--tn)">✏ Đang sửa tài khoản: '+esc(ed.username)+'</div>'+
+        '<button class="btn sm" onclick="cancelAcctEdit()">Huỷ sửa</button></div>'
+    : '<div style="font-weight:600;font-size:13px;margin-bottom:8px">➕ Thêm / cập nhật tài khoản</div>';
+
   body.innerHTML =
-    '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Tài khoản &amp; mật khẩu do admin cấp. Mật khẩu được mã hoá trước khi lưu. Để cấp cho cả team, hãy bật kết nối Google Sheets.</div>'+
-    '<div style="max-height:230px;overflow:auto;margin-bottom:12px">'+list+'</div>'+
-    '<div style="border-top:1px solid var(--border);padding-top:12px">'+
-      '<div style="font-weight:600;font-size:13px;margin-bottom:8px">➕ Thêm / cập nhật tài khoản</div>'+
-      '<div class="v9-field"><label>Tài khoản (để đăng nhập)</label><input id="acct-username" placeholder="vd: thaomt"></div>'+
-      '<div class="v9-field"><label>Mật khẩu</label><input id="acct-password" type="text" placeholder="đặt mật khẩu (để trống nếu không đổi)"></div>'+
+    '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Tài khoản &amp; mật khẩu do admin cấp. Mật khẩu được mã hoá trước khi lưu. '+
+      'Bấm vào 1 tài khoản để xem tài khoản đó đang phụ trách những sale nào, rồi <b>thêm</b> hoặc <b>cắt</b> sale ngay tại đó. '+
+      'Để cấp cho cả team, hãy bật kết nối Google Sheets.</div>'+
+    '<div style="max-height:300px;overflow:auto;margin-bottom:12px">'+list+'</div>'+
+    '<div id="acct-form-box" style="border-top:1px solid var(--border);padding-top:12px">'+
+      formHead+
+      '<div class="v9-field"><label>Tài khoản (để đăng nhập)</label><input id="acct-username" placeholder="vd: thaomt" '+
+        (ed ? 'value="'+esc(ed.username)+'" readonly style="background:var(--surface2);color:var(--muted)"' : '')+'></div>'+
+      '<div class="v9-field"><label>Mật khẩu</label><input id="acct-password" type="text" placeholder="'+(ed?'để trống nếu không đổi mật khẩu':'đặt mật khẩu cho tài khoản mới')+'"></div>'+
       '<div class="v9-field"><label>Vai trò</label><select id="acct-role" onchange="_acctRoleChange()">'+roleOpts+'</select></div>'+
-      '<div class="v9-field" id="acct-name-wrap"><label>Tên CS (để lọc dữ liệu của người này — chọn NHIỀU tên: giữ Ctrl/Cmd rồi click, dùng khi 1 tài khoản gộp nhiều bí danh hoặc đơn chia nhiều sale)</label><select id="acct-name-sel" multiple size="6">'+nameOpts+'</select><input id="acct-name-input" placeholder="…hoặc gõ thêm tên mới, cách nhau bằng dấu phẩy" style="margin-top:6px"></div>'+
+      '<div class="v9-field" id="acct-name-wrap"><label>Sale mà tài khoản này được nhìn thấy (giữ Ctrl/Cmd rồi click để chọn NHIỀU — bỏ chọn là cắt bớt)</label>'+
+        '<select id="acct-name-sel" multiple size="6">'+nameOpts+'</select>'+
+        '<input id="acct-name-input" placeholder="…hoặc gõ thêm tên mới, cách nhau bằng dấu phẩy" style="margin-top:6px"></div>'+
       '<div class="v9-field" id="acct-team-wrap" style="display:none"><label>Team (cho Leader)</label><select id="acct-team-sel">'+teamOpts+'</select></div>'+
-      '<button class="btn primary" style="width:100%;justify-content:center" onclick="addAccount()">Lưu tài khoản</button>'+
+      '<button class="btn primary" style="width:100%;justify-content:center" onclick="addAccount()">'+(ed?'💾 Lưu thay đổi':'Lưu tài khoản')+'</button>'+
     '</div>';
   _acctRoleChange();
 }
@@ -15484,6 +15672,12 @@ async function addAccount(){
   var res = await pushUsers();
   if (res && res.error){ toast('Lỗi lưu: ' + res.error); }
   if (typeof logAudit === 'function') logAudit('account','', '', (existing?'Cập nhật':'Tạo')+' tài khoản '+u+' ('+role+')');
+  // Nếu sửa chính tài khoản đang đăng nhập → áp dụng lại phạm vi xem ngay, không cần đăng nhập lại
+  if (_authAccount && _acctKey(_authAccount.username) === _acctKey(u) && typeof _applyAuthIdentity === 'function'){
+    try { _applyAuthIdentity(rec); } catch(e){}
+  }
+  _acctEditing = '';
+  _acctOpen[_acctKey(u)] = true;
   renderAcctModal();
   _renderAuthHeader();
   toast('✓ Đã lưu tài khoản ' + u + (gsUrl ? '' : ' (chưa kết nối GSheets — chỉ lưu trên máy này)'));
@@ -15496,6 +15690,8 @@ function deleteAccount(u){
   accounts = accounts.filter(function(a){ return String(a.username).toLowerCase()!==String(acct.username).toLowerCase(); });
   pushUsers();
   if (typeof logAudit === 'function') logAudit('account','', u, 'Xoá tài khoản');
+  if (_acctKey(_acctEditing) === _acctKey(acct.username)) _acctEditing = '';
+  delete _acctOpen[_acctKey(acct.username)];
   renderAcctModal();
 }
 async function resetPassword(u){
