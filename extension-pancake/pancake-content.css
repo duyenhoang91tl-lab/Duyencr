@@ -862,6 +862,30 @@
   cursor: pointer;
 }
 
+.pk-stone-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 5px 7px;
+  background: #fdf4ff;
+  border: 1px solid #f0abfc;
+  border-radius: 5px;
+  font-size: 11px;
+  color: #701a75;
+}
+
+.pk-stone-label { font-weight: 700; flex: 0 0 auto; }
+
+.pk-stone-row label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 .pk-opener-btn {
   width: 100%;
   margin: 8px 0;

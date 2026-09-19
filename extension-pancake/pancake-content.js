@@ -92,6 +92,7 @@
   ];
   let _activeTone = 'Thân thiện';
   let _useProducts = false;
+  let _stonePref = ''; // '' = mac dinh (cot G) | 'SAPHIA' | 'RUBY' — luu sticky, khoi phai go lai moi lan
   let CS_NAMES = [];
   let NICK_LIST = [];
   let CARE_STATUS_TREE = null; // cay "Tinh trang CS" load dong tu GAS (dong bo voi appweb/Zalo AI)
@@ -349,6 +350,12 @@
           <input type="checkbox" id="pk-use-products-chk" />
           <span>🔍 <b>Tra cứu sản phẩm</b> (nạp dữ liệu Google Sheet để tư vấn kỹ thành phần/công dụng)</span>
         </label>
+        <div class="pk-stone-row" id="pk-stone-row" title="Không tick gì = báo giá mặc định (cột G). Tick 1 loại nếu khách hỏi đá SAPHIA/RUBY — nhớ luôn cho lần sau, khỏi phải gõ lại.">
+          <span class="pk-stone-label">💎 Loại đá:</span>
+          <label><input type="radio" name="pk-stone" id="pk-stone-none" value="" checked /> Mặc định</label>
+          <label><input type="radio" name="pk-stone" id="pk-stone-saphia" value="SAPHIA" /> SAPHIA</label>
+          <label><input type="radio" name="pk-stone" id="pk-stone-ruby" value="RUBY" /> RUBY</label>
+        </div>
         <button id="pk-opener-btn" class="pk-opener-btn">💬 Tạo 3 câu mở đầu đa dạng (mua hàng + chat)</button>
 
         <div id="pk-ai-suggestions"></div>
@@ -467,6 +474,19 @@
     prodChk.checked = !!settings.useProducts;
     prodChk.addEventListener("change", () => { _useProducts = prodChk.checked; });
     _useProducts = prodChk.checked;
+    // Loai da (SAPHIA/RUBY) — sticky theo may qua chrome.storage.sync, khong phai tick lai moi lan
+    chrome.storage.sync.get(['stonePref'], (res) => {
+      _stonePref = res.stonePref || '';
+      const target = panelEl.querySelector(`input[name="pk-stone"][value="${_stonePref}"]`);
+      if (target) target.checked = true;
+    });
+    panelEl.querySelectorAll('input[name="pk-stone"]').forEach((r) => {
+      r.addEventListener('change', () => {
+        if (!r.checked) return;
+        _stonePref = r.value;
+        chrome.storage.sync.set({ stonePref: _stonePref });
+      });
+    });
     panelEl.querySelector("#pk-opener-btn").addEventListener("click", doGenerateOpeners_);
   }
 
@@ -1672,7 +1692,8 @@
           tone: _activeTone,
           context: ctxEl ? ctxEl.value.trim() : "",
           custLines: buildCustLines(),
-          withProducts: _useProducts
+          withProducts: _useProducts,
+          stonePref: _stonePref
         }
       },
       (resp) => {
@@ -1704,7 +1725,7 @@
       sug.innerHTML = `<div class="pk-ai-cust-loading">Đang soạn câu ${i + 1}/${OPENER_ANGLES.length} — ${escapeHtml(angle.label)}...</div>`;
       const data = await new Promise((resolve) => {
         safeSendMessage_(
-          { type: "FETCH_OPENER", payload: { custLines, tone: _activeTone, angleInstr: angle.instr, withProducts: _useProducts } },
+          { type: "FETCH_OPENER", payload: { custLines, tone: _activeTone, angleInstr: angle.instr, withProducts: _useProducts, stonePref: _stonePref } },
           (resp) => resolve(resp?.ok ? resp.data : { error: resp?.error || "lỗi không rõ" })
         );
       });
