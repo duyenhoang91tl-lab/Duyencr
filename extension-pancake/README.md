@@ -88,3 +88,22 @@ tiết này được ghép vào ngay sau tên sản phẩm, ví dụ: `Vòng tay
 https://docs.google.com/spreadsheets/d/1I4wr226_QUJuCZSKASsxXxOjloCW9UtpYz87TSy-Ldk — vẫn giữ đúng
 tên sheet `DANH_MUC` như cũ nên không cần đổi gì khác trong code; đơn vị giá trong file này là
 NGHÌN VNĐ, hợp với toggle "Nhập giá theo nghìn (k)" ở mục trên.
+
+## Tự sửa tên sản phẩm dính "từ cấm" khi Sao chép đơn hàng
+
+Khi bấm "📋 Sao chép đơn hàng", tên sản phẩm được tự động rà theo danh sách **"Lưu ý từ cấm"** (đọc
+trực tiếp từ file Report Sale: https://docs.google.com/spreadsheets/d/1qyyG2Pj8QOVNTb4B9JX8VQsrjFlZX-WhpovX1qDkvzM,
+tab "Lưu ý từ cấm") — có từ cấm thì tự sửa/rút gọn, ví dụ `túi tiền` → `túi`, `Lộc phúc tình` →
+`lpt`. Team sửa/thêm dòng trực tiếp trên tab đó là tự động áp dụng, không cần sửa code (đọc live
+mỗi 20 phút, cache y hệt cơ chế mệnh/canned response ở trên).
+
+**Lưu ý vận hành:**
+- Chỉ áp dụng cho **tên sản phẩm** khi copy đơn — không sửa Chất liệu/Màu sắc/Size, và không sửa gì
+  trong lúc Sale đang gõ (chỉ sửa ở bản Sao chép cuối cùng), để Sale vẫn thấy đúng tên gốc khi nhập.
+- 2 trường hợp `túi tiền`/`Lộc phúc tình` dùng đúng cách viết bạn yêu cầu (`túi`/`lpt`), ưu tiên hơn
+  cột "Cách viết lại" trong sheet cho 2 dòng đó (vì nội dung ở đó thực chất là ghi chú hướng dẫn cho
+  Sale, không phải tên rút gọn).
+- File Report Sale khác với file CRM (CareData) — nếu tài khoản chạy GAS (Apps Script) chưa được
+  **chia sẻ quyền xem** file Report Sale, hệ thống tự dùng danh sách mặc định (chép lại đúng nội
+  dung tab tại thời điểm 09/2026) để tính năng không bị gián đoạn. Nếu thấy tên sản phẩm không được
+  sửa dù có từ cấm, kiểm tra lại quyền chia sẻ file Report Sale cho tài khoản deploy GAS.

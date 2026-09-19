@@ -56,11 +56,32 @@
   const KNOWLEDGE_TTL_MS = 20 * 60 * 1000; // cache 20 phut, khong goi Sheet moi tin nhan
   let _menhTable = MENH_TABLE_DEFAULT;
   let _cannedResponses = CANNED_DEFAULT_MESSENGER;
+  let _bannedWords = []; // [{tuCam, thayThe}] doc tu sheet "Luu y tu cam" (file Report Sale) qua getKnowledge
   function tinhMenh_(namSinhStr) {
     const n = parseInt(namSinhStr, 10);
     if (!n || n < 1900 || n > 2100) return null;
     for (const menh of Object.keys(_menhTable)) if (_menhTable[menh].includes(n)) return menh;
     return null;
+  }
+  // Tu dong sua ten san pham dinh tu cam khi Sao chep don hang, theo dung sheet "Luu y tu cam" —
+  // khop cum dai truoc (vd "túi tiền" truoc "tiền") de khong cat nham chu con lai trong cum.
+  // 2 truong hop rieng nguoi dung yeu cau chinh xac (uu tien hon danh sach doc tu sheet, vi cot
+  // "Cách viết lại" trong sheet cho 2 dong nay thuc ra la GHI CHU huong dan cho Sale chu khong phai
+  // ten thay the ngan gon can dung khi len don).
+  const PRODUCT_NAME_OVERRIDES = [
+    { tuCam: 'túi tiền', thayThe: 'túi' },
+    { tuCam: 'Lộc phúc tình', thayThe: 'lpt' }
+  ];
+  function sanitizeProductName_(name) {
+    if (!name) return name;
+    let out = name;
+    const all = PRODUCT_NAME_OVERRIDES.concat(_bannedWords).sort((a, b) => b.tuCam.length - a.tuCam.length);
+    all.forEach((bw) => {
+      if (!bw.tuCam) return;
+      const esc = bw.tuCam.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      out = out.replace(new RegExp(esc, 'gi'), bw.thayThe || '');
+    });
+    return out.replace(/\s{2,}/g, ' ').trim();
   }
   async function loadPhongThuyKnowledge_() {
     if (!IS_PHONGTHUY) return;
@@ -70,7 +91,11 @@
       if (fresh) return;
       chrome.runtime.sendMessage({ type: 'GET_KNOWLEDGE' }, (resp) => {
         if (!resp?.ok || !resp.data) return; // giu ban mac dinh/cache cu neu GAS loi
-        const k = { menhTable: resp.data.menhTable || MENH_TABLE_DEFAULT, canned: (resp.data.canned && resp.data.canned.length) ? resp.data.canned : CANNED_DEFAULT_MESSENGER };
+        const k = {
+          menhTable: resp.data.menhTable || MENH_TABLE_DEFAULT,
+          canned: (resp.data.canned && resp.data.canned.length) ? resp.data.canned : CANNED_DEFAULT_MESSENGER,
+          bannedWords: resp.data.bannedWords || []
+        };
         chrome.storage.local.set({ pkKnowledge: k, pkKnowledgeTs: Date.now() });
         applyPhongThuyKnowledge_(k);
       });
@@ -79,6 +104,7 @@
   function applyPhongThuyKnowledge_(k) {
     if (k.menhTable) _menhTable = k.menhTable;
     if (k.canned && k.canned.length) _cannedResponses = k.canned;
+    if (k.bannedWords) _bannedWords = k.bannedWords;
     renderCannedList_();
   }
   const CARE_POLL_MS = 6000;
@@ -1683,7 +1709,8 @@
     const lines = checked.map((i, idx) => {
       const lineTotal = (Number(i.qty) || 0) * (Number(i.price) || 0);
       const details = [i.chatLieu, i.mauSac, i.size].filter(Boolean).join(', ');
-      return `${idx + 1}. ${i.name}${details ? ' (' + details + ')' : ''}${i.qty > 1 ? ' x' + i.qty : ''} — ${lineTotal.toLocaleString('vi-VN')}đ`;
+      const safeName = sanitizeProductName_(i.name); // tu sua ten dinh tu cam (vd: "túi tiền" -> "túi") theo sheet Luu y tu cam
+      return `${idx + 1}. ${safeName}${details ? ' (' + details + ')' : ''}${i.qty > 1 ? ' x' + i.qty : ''} — ${lineTotal.toLocaleString('vi-VN')}đ`;
     });
     const subtotal = checked.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.price) || 0), 0);
     let discountAmt = 0;

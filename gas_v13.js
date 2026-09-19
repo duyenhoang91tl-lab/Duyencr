@@ -4254,5 +4254,89 @@ function getMessengerKnowledge_() {
     if (!cannedData[c][1]) continue;
     canned.push({ nhom: cannedData[c][0], id: cannedData[c][1], label: cannedData[c][2], text: cannedData[c][3] });
   }
-  return { ok: true, menhTable: menhTable, canned: canned };
+  return { ok: true, menhTable: menhTable, canned: canned, bannedWords: readBannedWords_() };
+}
+
+// ─── TU CAM (ban tu ngu khi len don/nhan tin) — doc TRUC TIEP tu file "Report Sale" (tab
+// "Luu y tu cam") de team chinh sua tren do la tu dong cap nhat, khong can sua code. File nay
+// KHAC voi CRM_SS_ID (chi la file van hanh/bao cao Sale) nen phai mo rieng bang openById; neu tai
+// khoan chay GAS chua duoc chia se file do (loi quyen), fallback ve BANNED_WORDS_FALLBACK ben duoi
+// (chep tu dung noi dung sheet tai thoi diem 2026-09) de tinh nang khong bi gian doan.
+var REPORT_SALE_SS_ID = '1qyyG2Pj8QOVNTb4B9JX8VQsrjFlZX-WhpovX1qDkvzM';
+var BANNED_WORDS_SHEET_NAME = 'Lưu ý từ cấm';
+var BANNED_WORDS_FALLBACK = [
+  { tuCam: 'Tài lộc', thayThe: 'Thuận lợi trong công việc, thắng tiến về đường sự nghiệp' },
+  { tuCam: 'Tiền tài', thayThe: 'Thuận lợi trong công việc, thắng tiến về đường sự nghiệp' },
+  { tuCam: 'chiêu tài', thayThe: 'Làm được giữ được' },
+  { tuCam: 'Thần tài', thayThe: 'Thuận lợi trong công việc, thắng tiến về đường sự nghiệp' },
+  { tuCam: 'Sức khỏe', thayThe: 'Tốt cho cơ thể' },
+  { tuCam: 'Trộm vía', thayThe: 'Tốt cho cơ thể' },
+  { tuCam: 'Vận hạn', thayThe: '' },
+  { tuCam: 'Tam tai', thayThe: '' },
+  { tuCam: 'Thái Tuế', thayThe: '' },
+  { tuCam: 'Tình duyên', thayThe: 'tình cảm' },
+  { tuCam: 'Linh phù', thayThe: '' },
+  { tuCam: 'Mua bán', thayThe: 'kinh doanh thuận lợi' },
+  { tuCam: 'buôn bán', thayThe: 'kinh doanh thuận lợi' },
+  { tuCam: 'May mắn', thayThe: '' },
+  { tuCam: 'Bình an', thayThe: 'an yên' },
+  { tuCam: 'Bứt phá', thayThe: '' },
+  { tuCam: 'thiên lộc', thayThe: '' },
+  { tuCam: 'Thịnh vượng', thayThe: '' },
+  { tuCam: 'cam kết', thayThe: '' },
+  { tuCam: 'chắc chắn', thayThe: '' },
+  { tuCam: 'mang lại', thayThe: '' },
+  { tuCam: 'Hanh thông', thayThe: 'Mang ý nghĩa, bổ trợ, tương trợ' },
+  { tuCam: 'thất thoát', thayThe: '' },
+  { tuCam: 'Thu hút tài lộc', thayThe: 'Tặng chị 3 sản phẩm sau' },
+  { tuCam: 'combo tam lộc', thayThe: 'Tặng chị 3 sản phẩm sau' },
+  { tuCam: 'Vận may', thayThe: '' },
+  { tuCam: 'Cầu tài', thayThe: '' },
+  { tuCam: 'cầu lộc', thayThe: '' },
+  { tuCam: 'Trừ tà', thayThe: '' },
+  { tuCam: 'Charm túi tiền', thayThe: 'Charm túi' },
+  { tuCam: 'Kim Tiền', thayThe: 'Kim túi' },
+  { tuCam: 'túi tiền', thayThe: 'túi' },
+  { tuCam: 'Lộc phúc tình', thayThe: 'lpt' },
+  { tuCam: 'Lộc', thayThe: '' },
+  { tuCam: 'Tiền', thayThe: '' }
+];
+
+function readBannedWords_() {
+  try {
+    var ss = SpreadsheetApp.openById(REPORT_SALE_SS_ID);
+    var sh = ss.getSheetByName(BANNED_WORDS_SHEET_NAME);
+    if (!sh) return BANNED_WORDS_FALLBACK;
+    var vals = sh.getDataRange().getValues();
+    // Tim dong tieu de co o "Tu cam" (sheet nay co nhieu bang xep chong, khong co dong tieu de co dinh)
+    var headerRow = -1, colTuCam = -1, colDuocDung = -1, colVietLai = -1;
+    for (var r = 0; r < vals.length; r++) {
+      for (var c = 0; c < vals[r].length; c++) {
+        if (String(vals[r][c]).trim() === 'Từ cấm') { headerRow = r; colTuCam = c; break; }
+      }
+      if (headerRow !== -1) break;
+    }
+    if (headerRow === -1) return BANNED_WORDS_FALLBACK;
+    var hdr = vals[headerRow];
+    for (var c2 = 0; c2 < hdr.length; c2++) {
+      var h = String(hdr[c2]).trim();
+      if (h === 'Từ được dùng') colDuocDung = c2;
+      if (h === 'Cách viết lại') colVietLai = c2;
+    }
+    var out = [];
+    for (var r2 = headerRow + 1; r2 < vals.length; r2++) {
+      var raw = String(vals[r2][colTuCam] || '').trim();
+      if (!raw) continue;
+      if (raw.length > 300) continue; // bo qua cell ghi chu dai (khong phai danh sach tu cam thuc su)
+      var thayThe = (colVietLai !== -1 ? String(vals[r2][colVietLai] || '').trim() : '') ||
+                    (colDuocDung !== -1 ? String(vals[r2][colDuocDung] || '').trim() : '');
+      raw.split(',').forEach(function (phrase) {
+        phrase = phrase.trim();
+        if (phrase) out.push({ tuCam: phrase, thayThe: thayThe });
+      });
+    }
+    return out.length ? out : BANNED_WORDS_FALLBACK;
+  } catch (e) {
+    return BANNED_WORDS_FALLBACK; // vd: tai khoan chay GAS chua duoc chia se file Report Sale
+  }
 }
