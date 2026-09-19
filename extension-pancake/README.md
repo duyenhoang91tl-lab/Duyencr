@@ -75,7 +75,7 @@ như cũ, chỉ đổi cách hiển thị/nhập tại ô đó. Mặc định t�
 
 ## Chất liệu / Màu sắc / Size trong giỏ hàng
 
-M��i dòng sản phẩm trong "🧾 Đơn hàng đang tính" giờ có thêm 3 ô nhỏ **Chất liệu / Màu sắc / Size**
+Mỗi dòng sản phẩm trong "🧾 Đơn hàng đang tính" giờ có thêm 3 ô nhỏ **Chất liệu / Màu sắc / Size**
 (áp dụng cho cả dòng thêm thủ công lẫn dòng thêm từ tra bảng giá). Khi bấm "+ Thêm" từ kết quả tra
 bảng giá, hệ thống tự dò cột `Chất liệu` / `Màu`/`Màu sắc` / `Size`/`Kiểu` trong DANH_MUC (nếu có)
 để điền sẵn — không có cột nào khớp thì để trống, Sale tự gõ. Khi bấm "📋 Sao chép đơn hàng", 3 chi
