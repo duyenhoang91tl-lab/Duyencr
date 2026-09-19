@@ -72,7 +72,7 @@ var CARE_HEADERS = ['phone','status','zalo','cs','note','schedules',
 
 var ORDER_HEADERS  = ['phone','name','date','year','month','cs','source','revenue',
   'product','productDetail','status','zalo','note','careCS'];
-var TEAM_HEADERS   = ['id','name','leader','members','color'];
+var TEAM_HEADERS   = ['id','name','leader','members','color','channels'];
 var AUDIT_HEADERS  = ['timestamp','user','action','phone','oldValue','newValue'];
 var SET_HEADERS    = ['key','value'];
 var ASSIGN_HEADERS = ['id','date','csName','label','phones','donePhones'];
@@ -404,7 +404,12 @@ function readTeams_(sh) {
     if (!v[i][0] && !v[i][1]) continue;
     var members = [];
     try { members = v[i][3] ? JSON.parse(v[i][3]) : []; } catch(e) { members = (''+v[i][3]).split(',').filter(String); }
-    out.push({ id: v[i][0], name: v[i][1]||'', leader: v[i][2]||'', members: members, color: v[i][4]||'' });
+    // channels: danh sach ten Kenh ban (kenhBan) ma team NAY chi tinh doanh thu trong do — de
+    // trong (mang rong) = khong gioi han kenh, tinh het nhu truoc gio. Dung khi 1 so CS thuoc
+    // team khac nhung chi chay tren 1 kenh nhat dinh, can tach doanh thu rieng theo kenh do.
+    var channels = [];
+    try { channels = v[i][5] ? JSON.parse(v[i][5]) : []; } catch(e2) { channels = (''+v[i][5]).split(',').map(function(s){return s.trim();}).filter(String); }
+    out.push({ id: v[i][0], name: v[i][1]||'', leader: v[i][2]||'', members: members, color: v[i][4]||'', channels: channels });
   }
   return out;
 }
@@ -2197,7 +2202,7 @@ function saveTeams_(teams) {
   var matrix = [TEAM_HEADERS];
   for (var i = 0; i < teams.length; i++) {
     var t = teams[i];
-    matrix.push([t.id||'', t.name||'', t.leader||'', JSON.stringify(t.members||[]), t.color||'']);
+    matrix.push([t.id||'', t.name||'', t.leader||'', JSON.stringify(t.members||[]), t.color||'', JSON.stringify(t.channels||[])]);
   }
   sh.getRange(1, 1, matrix.length, TEAM_HEADERS.length).setValues(matrix);
   return jsonOut_({ ok: true, written: teams.length });

@@ -7388,7 +7388,7 @@ var CARE_HEADERS = ['phone','status','zalo','cs','note','schedules',
 
 var ORDER_HEADERS  = ['phone','name','date','year','month','cs','source','revenue',
   'product','productDetail','status','zalo','note','careCS'];
-var TEAM_HEADERS   = ['id','name','leader','members','color'];
+var TEAM_HEADERS   = ['id','name','leader','members','color','channels'];
 var AUDIT_HEADERS  = ['timestamp','user','action','phone','oldValue','newValue'];
 var SET_HEADERS    = ['key','value'];
 var ASSIGN_HEADERS = ['id','date','csName','label','phones','donePhones'];
@@ -7720,7 +7720,9 @@ function readTeams_(sh) {
     if (!v[i][0] && !v[i][1]) continue;
     var members = [];
     try { members = v[i][3] ? JSON.parse(v[i][3]) : []; } catch(e) { members = (''+v[i][3]).split(',').filter(String); }
-    out.push({ id: v[i][0], name: v[i][1]||'', leader: v[i][2]||'', members: members, color: v[i][4]||'' });
+    var channels = [];
+    try { channels = v[i][5] ? JSON.parse(v[i][5]) : []; } catch(e2) { channels = (''+v[i][5]).split(',').map(function(s){return s.trim();}).filter(String); }
+    out.push({ id: v[i][0], name: v[i][1]||'', leader: v[i][2]||'', members: members, color: v[i][4]||'', channels: channels });
   }
   return out;
 }
@@ -9340,7 +9342,7 @@ function saveTeams_(teams) {
   var matrix = [TEAM_HEADERS];
   for (var i = 0; i < teams.length; i++) {
     var t = teams[i];
-    matrix.push([t.id||'', t.name||'', t.leader||'', JSON.stringify(t.members||[]), t.color||'']);
+    matrix.push([t.id||'', t.name||'', t.leader||'', JSON.stringify(t.members||[]), t.color||'', JSON.stringify(t.channels||[])]);
   }
   sh.getRange(1, 1, matrix.length, TEAM_HEADERS.length).setValues(matrix);
   return jsonOut_({ ok: true, written: teams.length });
@@ -11178,6 +11180,16 @@ function _allCSNames(){
   teams.forEach(function(t){ if(t.leader) set.add(t.leader); (t.members||[]).forEach(function(m){ set.add(m); }); });
   return [...set].filter(Boolean).sort(function(a,b){ return a.localeCompare(b,'vi'); });
 }
+// Danh sach ten Kenh ban (kenhBan/source) tung xuat hien trong don hang — dung cho o chon
+// kenh cua Team (Quan ly Team → chon kenh cho team NEU muon gioi han doanh thu team do chi
+// tinh trong 1/vai kenh nhat dinh, vd CS thuoc team khac nhung chi chay 1 kenh FB rieng).
+function _allChannelNames(){
+  var set = new Set();
+  (typeof allCustomers !== 'undefined' ? allCustomers : []).forEach(function(c){
+    (c.orders||[]).forEach(function(o){ if (o.source) set.add(String(o.source).trim()); });
+  });
+  return [...set].filter(Boolean).sort(function(a,b){ return a.localeCompare(b,'vi'); });
+}
 function openRoleModal(){
   var ov = document.getElementById('role-modal');
   if (!ov) return;
@@ -11272,6 +11284,22 @@ function _computeCSStats(){
   });
   return map;
 }
+// Doanh thu/so don CUA RIENG 1 tap thanh vien, GIOI HAN theo kenh neu channels khong rong —
+// dung khi team co chon kenh (vd 1 so CS thuoc team khac nhung chi chay 1 kenh FB rieng, chi
+// muon tinh doanh thu team theo dung kenh do, khong tinh het moi don cua CS).
+function _revenueByMembersChannels(members, channels){
+  var memberSet = new Set(members);
+  var chanSet = channels && channels.length ? new Set(channels) : null;
+  var revenue = 0, orders = 0;
+  (typeof allCustomers !== 'undefined' ? allCustomers : []).forEach(function(c){
+    (c.orders||[]).forEach(function(o){
+      if (!o.cs || !memberSet.has(o.cs)) return;
+      if (chanSet && !chanSet.has(String(o.source||'').trim())) return;
+      revenue += (+o.revenue||0); orders++;
+    });
+  });
+  return { revenue: revenue, orders: orders };
+}
 function _computeTeamStats(csStats){
   return teams.map(function(t){
     var members = [...(new Set([t.leader].concat(t.members||[]).filter(Boolean)))];
@@ -11280,8 +11308,12 @@ function _computeTeamStats(csStats){
     members.forEach(function(n){
       var s = csStats[n]; if(!s) return;
       agg.held+=s.held; agg.closed+=s.closed; agg.friend+=s.friend; agg.cared+=s.cared;
-      agg.revenue+=s.revenue; agg.orders+=s.orders;
     });
+    // Doanh thu/don: neu team co gioi han kenh thi tinh RIENG theo dung kenh do (khong dung
+    // tong csStats cua CS, vi CS co the co don o kenh khac khong thuoc team nay). Team khong
+    // gioi han kenh thi tinh nhu cu (cong don tat ca don cua thanh vien, moi kenh deu tinh).
+    var rv = _revenueByMembersChannels(members, t.channels||[]);
+    agg.revenue = rv.revenue; agg.orders = rv.orders;
     agg.closeRate = agg.held ? Math.round(agg.closed/agg.held*100) : 0;
     agg.friendRate = agg.held ? Math.round(agg.friend/agg.held*100) : 0;
     return agg;
@@ -11661,6 +11693,7 @@ function renderTeamTab(){
   if (!wrap) return;
   var isAdmin = currentUser.role === 'admin';
   var csStats = _computeCSStats();
+  var allChannels = _allChannelNames();
   var html = '';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
     '<div class="dash-section-title" style="margin:0">👥 Quản lý Team CS</div>'+
@@ -11673,6 +11706,7 @@ function renderTeamTab(){
   var allNames = _allCSNames();
   teams.forEach(function(t){
     var members = [...(new Set([t.leader].concat(t.members||[]).filter(Boolean)))];
+    var channels = t.channels || [];
     var s = _computeTeamStats(csStats).find(function(x){ return x.id===t.id; }) || {revenue:0,orders:0,held:0,closed:0,closeRate:0};
     html += '<div class="team-card" style="border-left:4px solid '+(t.color||'var(--green)')+'">';
     html += '<div class="team-card-head">'+
@@ -11682,7 +11716,9 @@ function renderTeamTab(){
     html += '<div class="team-stat-row">'+
       '<span>Leader: <b>'+(t.leader?esc(t.leader):'<span style=\'color:var(--muted)\'>chưa đặt</span>')+'</b></span>'+
       '<span>'+members.length+' thành viên</span>'+
-      '<span>Doanh thu: <b>'+(typeof fmtVND==='function'?fmtVND(s.revenue):fmt(s.revenue))+'</b></span>'+
+      '<span>Doanh thu: <b>'+(typeof fmtVND==='function'?fmtVND(s.revenue):fmt(s.revenue))+'</b>'+
+        (channels.length ? ' <span style="color:var(--muted);font-size:11px">(chỉ tính '+channels.length+' kênh đã chọn)</span>' : '')+
+      '</span>'+
       '<span>Chốt: <b>'+s.closeRate+'%</b></span>'+
     '</div>';
     // members chips
@@ -11721,6 +11757,39 @@ function renderTeamTab(){
         });
         html += '</div></div>';
       }
+
+      // Chọn kênh cho team (multi-select) — để trống = không giới hạn, tính mọi kênh như cũ.
+      html += '<div style="margin-top:10px">';
+      html += '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">📡 Kênh bán riêng cho team (để trống = tính tất cả kênh)</div>';
+      html += '<div class="member-chips">';
+      channels.forEach(function(ch){
+        html += '<span class="member-chip">'+esc(ch)+
+          ' <span class="chip-x" data-name="'+esc(ch)+'" title="Bỏ kênh này" onclick="setTeamChannelChecked(\''+t.id+'\',this.dataset.name,false)">✕</span></span>';
+      });
+      if (!channels.length) html += '<span style="color:var(--muted);font-size:11.5px">(không giới hạn — tính tất cả kênh)</span>';
+      html += '</div>';
+      html += '<div style="display:flex;gap:8px;margin-top:6px;align-items:center;flex-wrap:wrap">'+
+        '<button class="btn sm secondary" onclick="toggleTeamChanPicker(\''+t.id+'\')">'+(_teamChanPickerOpen[t.id]?'▴ Đóng chọn kênh':'☑ Chọn kênh')+'</button>'+
+      '</div>';
+      if (_teamChanPickerOpen[t.id]){
+        html += '<div class="team-picker">';
+        html += '<div class="team-picker-bar">'+
+          '<input class="team-picker-search" placeholder="🔍 Tìm kênh…" oninput="_teamChanPickerFilter(\''+t.id+'\',this.value)">'+
+          '<button type="button" class="team-cs-all" onclick="teamChannelPickAll(\''+t.id+'\',true)">✓ Chọn tất cả</button>'+
+          '<button type="button" class="team-cs-all" onclick="teamChannelPickAll(\''+t.id+'\',false)">✕ Bỏ tất cả (= không giới hạn)</button>'+
+          '<span style="font-size:11px;color:var(--muted);margin-left:auto">Đang chọn: <b>'+channels.length+'</b>/'+allChannels.length+'</span>'+
+        '</div>';
+        html += '<div class="team-picker-grid" id="team-chan-grid-'+t.id+'">';
+        if (!allChannels.length) html += '<div style="color:var(--muted);font-size:12px;padding:8px">Chưa có kênh nào trong dữ liệu đơn hàng.</div>';
+        allChannels.forEach(function(ch){
+          var on = channels.indexOf(ch)!==-1;
+          html += '<label class="team-cs-chk'+(on?' on':'')+'" data-name="'+esc(ch).toLowerCase()+'">'+
+            '<input type="checkbox" '+(on?'checked':'')+' data-name="'+esc(ch)+'" onchange="setTeamChannelChecked(\''+t.id+'\',this.dataset.name,this.checked)">'+
+            '<span>'+esc(ch)+'</span></label>';
+        });
+        html += '</div></div>';
+      }
+      html += '</div>';
     }
     html += '</div>';
   });
@@ -11732,7 +11801,7 @@ function addTeam(){
   var name = prompt('Tên team mới:', 'Team ' + (teams.length+1));
   if (name===null) return;
   name = name.trim(); if(!name) return;
-  teams.push({ id:_genTeamId(), name:name, leader:'', members:[], color: V9_TEAM_COLORS[teams.length % V9_TEAM_COLORS.length] });
+  teams.push({ id:_genTeamId(), name:name, leader:'', members:[], color: V9_TEAM_COLORS[teams.length % V9_TEAM_COLORS.length], channels:[] });
   saveLS('ome_teams', teams);
   logAudit('team', '', '', 'Tạo team: '+name);
   pushTeamsToGS();
@@ -11797,6 +11866,37 @@ function teamPickAll(id, checked){
 function _teamPickerFilter(id, q){
   q = (q||'').toLowerCase().trim();
   var grid = document.getElementById('team-picker-grid-'+id); if(!grid) return;
+  grid.querySelectorAll('.team-cs-chk').forEach(function(el){
+    el.style.display = (!q || (el.getAttribute('data-name')||'').indexOf(q)!==-1) ? '' : 'none';
+  });
+}
+// ── Chọn kênh cho team (multi-select) — để giới hạn doanh thu team chỉ tính trong (các) kênh
+// đã chọn, dùng khi 1 số CS thuộc team khác nhưng chỉ chạy 1 kênh FB riêng cho team này. Để
+// trống (không chọn kênh nào) = không giới hạn, tính doanh thu như bình thường (mọi kênh). ──
+var _teamChanPickerOpen = {};
+function toggleTeamChanPicker(id){ _teamChanPickerOpen[id] = !_teamChanPickerOpen[id]; renderTeamTab(); }
+function setTeamChannelChecked(id, channel, checked){
+  var t = teams.find(function(x){ return x.id===id; }); if(!t) return;
+  t.channels = t.channels || [];
+  if (checked){ if (t.channels.indexOf(channel)===-1) t.channels.push(channel); }
+  else { t.channels = t.channels.filter(function(c){ return c!==channel; }); }
+  saveLS('ome_teams', teams); logAudit('team','', '', t.name+': kênh → '+(t.channels.length?t.channels.join(', '):'(không giới hạn)'));
+  pushTeamsToGS();
+  renderTeamTab();
+  if (_activeV9Tab==='dashboard') renderDashboard();
+}
+function teamChannelPickAll(id, checked){
+  var t = teams.find(function(x){ return x.id===id; }); if(!t) return;
+  t.channels = checked ? _allChannelNames() : [];
+  saveLS('ome_teams', teams);
+  logAudit('team','', '', t.name + (checked ? ': chọn TẤT CẢ kênh (= không giới hạn)' : ': bỏ hết kênh đã chọn (= không giới hạn)'));
+  pushTeamsToGS();
+  renderTeamTab();
+  if (_activeV9Tab==='dashboard') renderDashboard();
+}
+function _teamChanPickerFilter(id, q){
+  q = (q||'').toLowerCase().trim();
+  var grid = document.getElementById('team-chan-grid-'+id); if(!grid) return;
   grid.querySelectorAll('.team-cs-chk').forEach(function(el){
     el.style.display = (!q || (el.getAttribute('data-name')||'').indexOf(q)!==-1) ? '' : 'none';
   });
