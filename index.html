@@ -7749,6 +7749,8 @@ var SH_SET     = 'Settings';
 var SH_ASSIGN  = 'AssignData';
 var SH_USER    = 'Users';
 var SH_CONTEXT = 'AIContext';
+var SH_PK_STATS = 'PancakeStats';
+var SH_PK_MAP   = 'PancakeNameMap';
 
 var ORDER_SS_ID = '1fiWXPMZcHuEh0zYqD6pgQjZDM0PhWzpiSK7Igj6Cug8'; // File chua OrderData2x (doanh thu/don hang)
 var CRM_SS_ID   = '18XBtbjP7gtlvYpChikF3B62cxHkR4426s5poZj9Mj8I'; // File chua CareData/Users/Teams/Settings/AuditLog/AssignData/AIContext (CRM).
@@ -7813,6 +7815,9 @@ var AUDIT_HEADERS  = ['timestamp','user','action','phone','oldValue','newValue']
 var SET_HEADERS    = ['key','value'];
 var ASSIGN_HEADERS = ['id','date','csName','label','phones','donePhones'];
 var USER_HEADERS   = ['username','passHash','role','name','team','active','names'];
+var PK_STATS_HEADERS = ['date','pageId','pageName','nhanVien','khCu','khMoi','tongTT',
+  'tinNhan','binhLuan','hoiThoaiMoi','dhKhMoi','dhKhCu','tongDH'];
+var PK_MAP_HEADERS = ['pancakeName','saleName'];
 // ── KH "Chăm sóc" thêm nhanh (nút "+ Thêm KH/Đơn mới") — SHEET RIÊNG, không gộp
 // CareData/DT TỔNG/dữ liệu đơn, không gộp vào báo cáo doanh số A/B/C. ──
 var SH_CARE_LEAD      = 'KH Chăm sóc mới';
@@ -8385,6 +8390,8 @@ function doGet(e) {
 
     if (action === 'orders')    return jsonOut_({ orders: readAllOrders_() });
     if (action === 'teams')     return jsonOut_({ teams: readTeams_(ss.getSheetByName(SH_TEAM)) });
+    if (action === 'pancakeNameMap') return jsonOut_({ map: readPancakeMap_() });
+    if (action === 'pancakeReport')  return jsonOut_(buildPancakeReport_(e.parameter.from, e.parameter.to));
     if (action === 'users')     return jsonOut_({ users: readUsers_(ss.getSheetByName(SH_USER)) });
     // ── Nguon "Cham soc" (KH them nhanh, sheet rieng) — khong gop CareData/bao cao A-B-C ──
     if (action === 'careLeads') return jsonOut_({ rows: readCareLeads_() });
@@ -9648,6 +9655,8 @@ function doPost(e) {
     if (action === 'setOrderCareCS')      return setOrderCareCS_(data.phone, data.careCS);
     if (action === 'setOrderCareCSBatch') return setOrderCareCSBatch_(data.updates);
     if (action === 'saveTeams')           return saveTeams_(data.teams);
+    if (action === 'savePancakeStats')    return savePancakeStats_(data.rows);
+    if (action === 'savePancakeNameMap')  return savePancakeNameMap_(data.pancakeName, data.saleName);
     if (action === 'saveUsers')           return saveUsers_(data.users);
     if (action === 'saveAudit')           return saveAudit_(data.rows);
     if (action === 'setSetting')          return setSetting_(data.key, data.value);
@@ -10128,6 +10137,105 @@ function saveTeams_(teams) {
   }
   sh.getRange(1, 1, matrix.length, TEAM_HEADERS.length).setValues(matrix);
   return jsonOut_({ ok: true, written: teams.length });
+}
+
+// ── BAO CAO PANCAKE (nhap tu file Excel "Thong ke tuong tac") ──
+function savePancakeStats_(rows) {
+  rows = rows || [];
+  if (!rows.length) return jsonOut_({ ok: true, written: 0 });
+  var sh = getSheet_(SH_PK_STATS, PK_STATS_HEADERS);
+  var lastRow = sh.getLastRow();
+  var touchedKeys = {};
+  rows.forEach(function(r) { touchedKeys[r.date + '|' + r.pageId] = true; });
+  var keep = [];
+  if (lastRow > 1) {
+    var existing = sh.getRange(2, 1, lastRow - 1, PK_STATS_HEADERS.length).getValues();
+    for (var i = 0; i < existing.length; i++) {
+      var k = existing[i][0] + '|' + existing[i][1];
+      if (!touchedKeys[k]) keep.push(existing[i]);
+    }
+  }
+  var newRows = rows.map(function(r) {
+    return [r.date||'', r.pageId||'', r.pageName||'', r.nhanVien||'',
+      +r.khCu||0, +r.khMoi||0, +r.tongTT||0, +r.tinNhan||0, +r.binhLuan||0,
+      +r.hoiThoaiMoi||0, +r.dhKhMoi||0, +r.dhKhCu||0, +r.tongDH||0];
+  });
+  sh.clearContents();
+  var matrix = [PK_STATS_HEADERS].concat(keep).concat(newRows);
+  sh.getRange(1, 1, matrix.length, PK_STATS_HEADERS.length).setValues(matrix);
+  return jsonOut_({ ok: true, written: newRows.length });
+}
+
+function readPancakeMap_() {
+  var sh = getSheet_(SH_PK_MAP, PK_MAP_HEADERS);
+  var out = {};
+  if (sh.getLastRow() < 2) return out;
+  var v = sh.getRange(2, 1, sh.getLastRow() - 1, PK_MAP_HEADERS.length).getValues();
+  for (var i = 0; i < v.length; i++) {
+    if (!v[i][0]) continue;
+    out[String(v[i][0])] = String(v[i][1] || '');
+  }
+  return out;
+}
+
+function savePancakeNameMap_(pancakeName, saleName) {
+  if (!pancakeName) return jsonOut_({ error: 'Thiếu tên Nhân viên Pancake.' });
+  var sh = getSheet_(SH_PK_MAP, PK_MAP_HEADERS);
+  var lastRow = sh.getLastRow();
+  if (lastRow >= 2) {
+    var v = sh.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (var i = 0; i < v.length; i++) {
+      if (String(v[i][0]) === String(pancakeName)) {
+        sh.getRange(i + 2, 2).setValue(saleName || '');
+        return jsonOut_({ ok: true, updated: true });
+      }
+    }
+  }
+  sh.appendRow([pancakeName, saleName || '']);
+  return jsonOut_({ ok: true, updated: false });
+}
+
+function buildPancakeReport_(from, to) {
+  var sh = getSheet_(SH_PK_STATS, PK_STATS_HEADERS);
+  var map = readPancakeMap_();
+  var byPage = {}, byCS = {};
+  var unmappedSet = {};
+  if (sh.getLastRow() >= 2) {
+    var v = sh.getRange(2, 1, sh.getLastRow() - 1, PK_STATS_HEADERS.length).getValues();
+    for (var i = 0; i < v.length; i++) {
+      var d = String(v[i][0]);
+      if (from && d < from) continue;
+      if (to && d > to) continue;
+      var pageId = String(v[i][1]), pageName = String(v[i][2]), nhanVien = String(v[i][3]);
+      var khCu=+v[i][4]||0, khMoi=+v[i][5]||0, tongTT=+v[i][6]||0, tinNhan=+v[i][7]||0,
+          binhLuan=+v[i][8]||0, hoiThoaiMoi=+v[i][9]||0, dhKhMoi=+v[i][10]||0, dhKhCu=+v[i][11]||0, tongDH=+v[i][12]||0;
+      if (!byPage[pageId]) byPage[pageId] = { pageId: pageId, pageName: pageName, khCu:0, khMoi:0, tongTT:0, tinNhan:0, binhLuan:0, hoiThoaiMoi:0, dhKhMoi:0, dhKhCu:0, tongDH:0 };
+      var bp = byPage[pageId];
+      bp.khCu+=khCu; bp.khMoi+=khMoi; bp.tongTT+=tongTT; bp.tinNhan+=tinNhan; bp.binhLuan+=binhLuan;
+      bp.hoiThoaiMoi+=hoiThoaiMoi; bp.dhKhMoi+=dhKhMoi; bp.dhKhCu+=dhKhCu; bp.tongDH+=tongDH;
+      var saleName = map[nhanVien];
+      var mapped = !!saleName;
+      if (!mapped) { saleName = nhanVien; unmappedSet[nhanVien] = true; }
+      var csKey = saleName;
+      if (!byCS[csKey]) byCS[csKey] = { name: saleName, pancakeNames: {}, mapped: mapped, khCu:0, khMoi:0, tongTT:0, tinNhan:0, binhLuan:0, hoiThoaiMoi:0, dhKhMoi:0, dhKhCu:0, tongDH:0 };
+      var bc = byCS[csKey];
+      bc.pancakeNames[nhanVien] = true;
+      if (mapped) bc.mapped = true;
+      bc.khCu+=khCu; bc.khMoi+=khMoi; bc.tongTT+=tongTT; bc.tinNhan+=tinNhan; bc.binhLuan+=binhLuan;
+      bc.hoiThoaiMoi+=hoiThoaiMoi; bc.dhKhMoi+=dhKhMoi; bc.dhKhCu+=dhKhCu; bc.tongDH+=tongDH;
+    }
+  }
+  function finalize(obj) {
+    var arr = Object.keys(obj).map(function(k) {
+      var r = obj[k];
+      r.tyLeCD = r.tongTT ? Math.round(r.tongDH / r.tongTT * 1000) / 10 : 0;
+      if (r.pancakeNames) r.pancakeNames = Object.keys(r.pancakeNames);
+      return r;
+    });
+    arr.sort(function(a,b) { return b.tongTT - a.tongTT; });
+    return arr;
+  }
+  return { byPage: finalize(byPage), byCS: finalize(byCS), unmapped: Object.keys(unmappedSet).sort() };
 }
 
 function saveUsers_(users) {
@@ -12956,6 +13064,299 @@ function _teamChanPickerFilter(id, q){
 }
 
 // ═══════════════════════════════════════════════════════
+//  BÁO CÁO PANCAKE — nhập file Excel "Thống kê tương tác" (pages_statistics_engagements
+//  Pancake xuất ra), khớp tên Nhân viên Pancake ↔ Sale CRM, báo cáo theo Page + theo CS
+// ═══════════════════════════════════════════════════════
+var _pkState = {
+  nameMapLoaded: false, nameMap: {},      // { 'Le Ninh': 'ninhnga99', ... }
+  parsedRows: [], parsedUnmapped: [],      // ket qua lan parse file gan nhat, chua luu len CRM
+  uploading: false,
+  from: _ymd(new Date(Date.now()-6*86400000)), to: _ymd(new Date()),
+  report: null, reportLoading: false
+};
+
+async function _pkLoadNameMap(){
+  if (!gsUrl) return;
+  try {
+    var sep = gsUrl.includes('?') ? '&' : '?';
+    var r = await fetch(gsUrl + sep + 'action=pancakeNameMap', { redirect:'follow' });
+    var d = await r.json();
+    _pkState.nameMap = d.map || {};
+    _pkState.nameMapLoaded = true;
+  } catch(e){ console.error('pancakeNameMap load lỗi', e); }
+}
+
+async function renderPancakeTab(){
+  var wrap = document.getElementById('pancake-wrap');
+  if (!wrap) return;
+  if (!_pkState.nameMapLoaded) { wrap.innerHTML = '<div style="padding:20px;color:var(--muted)">Đang tải dữ liệu khớp tên…</div>'; await _pkLoadNameMap(); }
+  _pkRenderAll();
+}
+
+function _pkRenderAll(){
+  var wrap = document.getElementById('pancake-wrap');
+  if (!wrap) return;
+  var isAdmin = currentUser.role === 'admin';
+  var html = '';
+
+  html += '<div class="dash-section-title">📥 Nhập báo cáo Pancake hàng ngày</div>';
+  html += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Trên Pancake: <b>Thống kê → Thống kê tương tác → Xuất Excel</b> (file <code>pages_statistics_engagements...xlsx</code>). Có thể nạp lại nhiều lần trong ngày — dữ liệu cùng ngày sẽ tự ghi đè, không bị nhân đôi.</div>';
+  html += '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">'+
+    '<input type="file" id="pk-file-input" accept=".xlsx,.xls" onchange="_pkOnFileSelected(this)">'+
+    (_pkState.parsedRows.length ? '<span style="font-size:12px;color:var(--muted)">Đã đọc <b>'+_pkState.parsedRows.length+'</b> dòng — kiểm tra bên dưới rồi bấm Lưu.</span>' : '')+
+  '</div>';
+
+  if (_pkState.parsedRows.length){
+    html += _pkRenderPreviewHtml();
+  }
+
+  html += '<div class="dash-section-title" style="margin-top:22px">🔗 Khớp tên Nhân viên Pancake ↔ Sale CRM</div>';
+  html += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Tên "Nhân viên" trên Pancake là tên Facebook cá nhân, thường không khớp tên đăng nhập (Sale) trong CRM — khớp 1 lần, dùng lại cho mọi lần nạp báo cáo sau.</div>';
+  html += _pkRenderMapTableHtml(isAdmin);
+
+  html += '<div class="dash-section-title" style="margin-top:22px">📊 Báo cáo theo Page &amp; theo CS</div>';
+  html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">'+
+    '<input type="date" value="'+esc(_pkState.from)+'" onchange="_pkState.from=this.value" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+    '<span>→</span>'+
+    '<input type="date" value="'+esc(_pkState.to)+'" onchange="_pkState.to=this.value" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+    '<button class="btn primary" onclick="_pkLoadReport()">'+(_pkState.reportLoading?'Đang tải...':'Xem báo cáo')+'</button>'+
+    (_pkState.report ? '<button class="btn sm secondary" onclick="_pkExportReport()">⬇ Xuất Excel</button>' : '')+
+  '</div>';
+  html += '<div id="pk-report-area">' + (_pkState.report ? _pkRenderReportHtml() : '<div style="color:var(--muted);padding:10px">Chọn khoảng ngày rồi bấm "Xem báo cáo".</div>') + '</div>';
+
+  wrap.innerHTML = html;
+}
+
+// ── Đọc file Excel (SheetJS đã có sẵn trong trang) ──
+function _pkParseFile(file){
+  return new Promise(function(resolve, reject){
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      try {
+        var wb = XLSX.read(ev.target.result, {type:'array'});
+        var rows = [], warnings = [];
+        wb.SheetNames.forEach(function(sn){
+          if (!/By user$/i.test(sn)) return; // bỏ qua sheet "By time" (theo giờ, không theo nhân viên)
+          var pageIdMatch = sn.match(/^(\d+)/);
+          if (!pageIdMatch) { warnings.push('Không nhận diện được Page ID ở sheet "'+sn+'" — bỏ qua.'); return; }
+          var pageId = pageIdMatch[1];
+          var aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1, defval:''});
+
+          // Tìm dòng "Thời gian tải về: DD/MM/YYYY ..." để lấy ngày báo cáo
+          var date = '';
+          for (var i=0;i<Math.min(aoa.length,10);i++){
+            var cell = String(aoa[i][0]||'');
+            var m = cell.match(/Thời gian tải về:\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+            if (m){ date = m[3]+'-'+m[1].padStart(2,'0')+'-'+m[2].padStart(2,'0'); break; }
+          }
+          if (!date){ warnings.push('Không tìm thấy ngày báo cáo ở sheet "'+sn+'" — bỏ qua.'); return; }
+
+          // Tìm dòng tên Page (dòng "<Tên Page> - <pageId>")
+          var pageName = sn;
+          for (var j=0;j<Math.min(aoa.length,10);j++){
+            var c0 = String(aoa[j][0]||'');
+            if (c0.indexOf(pageId) !== -1 && c0.indexOf(' - ') !== -1){
+              pageName = c0.replace(new RegExp('\\s*-\\s*'+pageId+'\\s*$'), '').trim();
+              break;
+            }
+          }
+
+          // Tìm dòng sub-header (ô đầu rỗng, ô thứ 2 = 'KH cũ') để biết dòng dữ liệu bắt đầu từ đâu
+          var headerRow = -1;
+          for (var k=0;k<aoa.length;k++){
+            if (String(aoa[k][1]||'').trim() === 'KH cũ' && String(aoa[k][0]||'').trim() === ''){ headerRow = k; break; }
+          }
+          if (headerRow === -1){ warnings.push('Không nhận diện được dòng tiêu đề cột ở sheet "'+sn+'" — bỏ qua.'); return; }
+
+          for (var r=headerRow+1; r<aoa.length; r++){
+            var row = aoa[r];
+            var nhanVien = String(row[0]||'').trim();
+            if (!nhanVien || nhanVien === 'Tổng TT') continue; // bỏ dòng tổng cuối bảng
+            var num = function(v){ var n = parseFloat(v); return isNaN(n) ? 0 : n; };
+            rows.push({
+              date: date, pageId: pageId, pageName: pageName, nhanVien: nhanVien,
+              khCu: num(row[1]), khMoi: num(row[2]), tongTT: num(row[3]),
+              tinNhan: num(row[4]), binhLuan: num(row[5]), hoiThoaiMoi: num(row[6]),
+              dhKhMoi: num(row[7]), dhKhCu: num(row[8]), tongDH: num(row[9])
+            });
+          }
+        });
+        resolve({ rows: rows, warnings: warnings });
+      } catch(err){ reject(err); }
+    };
+    reader.onerror = function(){ reject(new Error('Không đọc được file.')); };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+async function _pkOnFileSelected(input){
+  var file = input.files && input.files[0];
+  if (!file) return;
+  try {
+    var res = await _pkParseFile(file);
+    if (!res.rows.length){
+      toast('⚠️ Không đọc được dòng nào phù hợp trong file này — kiểm tra lại đúng file "Thống kê tương tác" chưa.');
+      return;
+    }
+    _pkState.parsedRows = res.rows;
+    var unmapped = {};
+    res.rows.forEach(function(r){ if (!_pkState.nameMap[r.nhanVien]) unmapped[r.nhanVien] = true; });
+    _pkState.parsedUnmapped = Object.keys(unmapped).sort();
+    if (res.warnings.length) toast('⚠️ ' + res.warnings.join(' | '));
+    _pkRenderAll();
+  } catch(e){
+    toast('❌ Lỗi đọc file: ' + e.message);
+  }
+}
+
+function _pkRenderPreviewHtml(){
+  var byDatePage = {};
+  _pkState.parsedRows.forEach(function(r){
+    var k = r.date+'|'+r.pageName;
+    if (!byDatePage[k]) byDatePage[k] = { date:r.date, pageName:r.pageName, count:0, tongTT:0, tongDH:0 };
+    byDatePage[k].count++; byDatePage[k].tongTT+=r.tongTT; byDatePage[k].tongDH+=r.tongDH;
+  });
+  var html = '<div style="border:1px solid var(--border);border-radius:var(--rsm);padding:10px;margin-bottom:10px;background:var(--surface2)">';
+  html += '<table class="dash-table"><thead><tr><th>Ngày</th><th>Page</th><th style="text-align:right">Số nhân viên</th><th style="text-align:right">Tổng tương tác</th><th style="text-align:right">Tổng ĐH</th></tr></thead><tbody>';
+  Object.values(byDatePage).forEach(function(g){
+    html += '<tr><td>'+esc(g.date)+'</td><td>'+esc(g.pageName)+'</td><td style="text-align:right">'+g.count+'</td><td style="text-align:right">'+fmt(g.tongTT)+'</td><td style="text-align:right">'+fmt(g.tongDH)+'</td></tr>';
+  });
+  html += '</tbody></table>';
+
+  if (_pkState.parsedUnmapped.length){
+    html += '<div style="margin-top:10px;padding:8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px">';
+    html += '<b style="font-size:12px;color:#9a3412">⚠️ '+_pkState.parsedUnmapped.length+' tên Nhân viên Pancake chưa khớp Sale CRM</b> — khớp ở bảng bên dưới trước khi lưu (không bắt buộc, có thể lưu trước rồi khớp sau).';
+    html += '</div>';
+  }
+
+  html += '<div style="margin-top:10px;display:flex;gap:8px">'+
+    '<button class="btn primary" onclick="_pkUploadToCRM()" '+(_pkState.uploading?'disabled':'')+'>'+(_pkState.uploading?'Đang lưu...':'💾 Lưu lên CRM ('+_pkState.parsedRows.length+' dòng)')+'</button>'+
+    '<button class="btn sm secondary" onclick="_pkState.parsedRows=[];_pkState.parsedUnmapped=[];_pkRenderAll()">Huỷ</button>'+
+  '</div>';
+  html += '</div>';
+  return html;
+}
+
+async function _pkUploadToCRM(){
+  if (!gsUrl){ toast('❌ Chưa cấu hình URL Google Apps Script.'); return; }
+  if (!_pkState.parsedRows.length) return;
+  _pkState.uploading = true; _pkRenderAll();
+  try {
+    var res = await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'savePancakeStats', rows:_pkState.parsedRows }) });
+    var d = await res.json();
+    if (d.error) throw new Error(d.error);
+    toast('✓ Đã lưu '+d.written+' dòng lên CRM.');
+    logAudit('pancake_import','', '', 'Nhập báo cáo Pancake: '+d.written+' dòng');
+    _pkState.parsedRows = []; _pkState.parsedUnmapped = [];
+    var fi = document.getElementById('pk-file-input'); if (fi) fi.value = '';
+    _pkState.report = null; // buoc xem lai bao cao de lay du lieu moi
+  } catch(e){
+    toast('❌ Lưu lỗi: ' + e.message);
+  } finally {
+    _pkState.uploading = false; _pkRenderAll();
+  }
+}
+
+function _pkRenderMapTableHtml(isAdmin){
+  var names = Object.keys(_pkState.nameMap);
+  _pkState.parsedUnmapped.forEach(function(n){ if (names.indexOf(n)===-1) names.push(n); });
+  names.sort(function(a,b){ return a.localeCompare(b,'vi'); });
+  var allCS = _allCSNames();
+  var html = '<table class="dash-table"><thead><tr><th>Tên trên Pancake</th><th>Sale CRM</th></tr></thead><tbody>';
+  if (!names.length){
+    html += '<tr><td colspan="2" style="text-align:center;color:var(--muted);padding:14px">Chưa có tên nào — nạp 1 file báo cáo để bắt đầu khớp.</td></tr>';
+  }
+  names.forEach(function(n){
+    var cur = _pkState.nameMap[n] || '';
+    var opts = '<option value="">— Chưa khớp —</option>' + allCS.map(function(s){ return '<option value="'+esc(s)+'"'+(s===cur?' selected':'')+'>'+esc(s)+'</option>'; }).join('');
+    html += '<tr><td>'+esc(n)+(cur?'':' <span style="color:#9a3412;font-size:11px">⚠️ chưa khớp</span>')+'</td><td>'+
+      (isAdmin ? '<select onchange="_pkMapNameInline(\''+esc(n).replace(/'/g,"\\'")+'\',this.value)" style="padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+opts+'</select>'
+               : esc(cur||'—'))+
+    '</td></tr>';
+  });
+  html += '</tbody></table>';
+  return html;
+}
+
+async function _pkMapNameInline(pancakeName, saleName){
+  if (!gsUrl){ toast('❌ Chưa cấu hình URL Google Apps Script.'); return; }
+  try {
+    var res = await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'savePancakeNameMap', pancakeName:pancakeName, saleName:saleName }) });
+    var d = await res.json();
+    if (d.error) throw new Error(d.error);
+    _pkState.nameMap[pancakeName] = saleName;
+    _pkState.parsedUnmapped = _pkState.parsedUnmapped.filter(function(n){ return n!==pancakeName; });
+    logAudit('pancake_map','', '', 'Khớp tên Pancake "'+pancakeName+'" → Sale "'+saleName+'"');
+    toast('✓ Đã khớp "'+pancakeName+'" → "'+(saleName||'(bỏ khớp)')+'"');
+    _pkState.report = null; // ket qua bao cao cu co the da tinh sai ten -> yeu cau xem lai
+    _pkRenderAll();
+  } catch(e){
+    toast('❌ Lỗi khớp tên: ' + e.message);
+  }
+}
+
+async function _pkLoadReport(){
+  if (!gsUrl){ toast('❌ Chưa cấu hình URL Google Apps Script.'); return; }
+  _pkState.reportLoading = true; _pkRenderAll();
+  try {
+    var sep = gsUrl.includes('?') ? '&' : '?';
+    var r = await fetch(gsUrl + sep + 'action=pancakeReport&from='+encodeURIComponent(_pkState.from)+'&to='+encodeURIComponent(_pkState.to), { redirect:'follow' });
+    var d = await r.json();
+    _pkState.report = d;
+  } catch(e){
+    toast('❌ Tải báo cáo lỗi: ' + e.message);
+  } finally {
+    _pkState.reportLoading = false; _pkRenderAll();
+  }
+}
+
+function _pkRenderReportHtml(){
+  var d = _pkState.report;
+  if (!d) return '';
+  var totalTT = d.byPage.reduce(function(s,r){return s+r.tongTT;},0);
+  var totalDH = d.byPage.reduce(function(s,r){return s+r.tongDH;},0);
+  var html = '<div class="kpi-grid" style="margin-bottom:16px">'+
+    '<div class="kpi-card"><div class="kpi-val">'+fmt(totalTT)+'</div><div class="kpi-label">Tổng tương tác</div></div>'+
+    '<div class="kpi-card"><div class="kpi-val">'+fmt(totalDH)+'</div><div class="kpi-label">Tổng đơn hàng đã chốt</div></div>'+
+    '<div class="kpi-card"><div class="kpi-val">'+(totalTT?Math.round(totalDH/totalTT*1000)/10:0)+'%</div><div class="kpi-label">Tỉ lệ chuyển đổi TB</div></div>'+
+  '</div>';
+
+  if (d.unmapped && d.unmapped.length){
+    html += '<div style="margin-bottom:10px;padding:8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412">⚠️ '+d.unmapped.length+' tên chưa khớp Sale CRM đang tính riêng theo tên Pancake gốc trong bảng "Theo CS" bên dưới: '+d.unmapped.map(esc).join(', ')+'</div>';
+  }
+
+  html += '<div class="dash-section-title">Theo Page</div>';
+  html += '<table class="dash-table"><thead><tr><th>Page</th><th style="text-align:right">Tổng TT</th><th style="text-align:right">Tin nhắn</th><th style="text-align:right">Bình luận</th><th style="text-align:right">Hội thoại mới</th><th style="text-align:right">Tổng ĐH</th><th style="text-align:right">Tỉ lệ CĐ</th></tr></thead><tbody>';
+  d.byPage.forEach(function(r){
+    html += '<tr><td>'+esc(r.pageName)+'</td><td style="text-align:right">'+fmt(r.tongTT)+'</td><td style="text-align:right">'+fmt(r.tinNhan)+'</td><td style="text-align:right">'+fmt(r.binhLuan)+'</td><td style="text-align:right">'+fmt(r.hoiThoaiMoi)+'</td><td style="text-align:right"><b>'+fmt(r.tongDH)+'</b></td><td style="text-align:right">'+r.tyLeCD+'%</td></tr>';
+  });
+  if (!d.byPage.length) html += '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu trong khoảng ngày này</td></tr>';
+  html += '</tbody></table>';
+
+  html += '<div class="dash-section-title" style="margin-top:16px">Theo CS (Sale)</div>';
+  html += '<table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">Tổng TT</th><th style="text-align:right">Tin nhắn</th><th style="text-align:right">Bình luận</th><th style="text-align:right">Hội thoại mới</th><th style="text-align:right">Tổng ĐH</th><th style="text-align:right">Tỉ lệ CĐ</th></tr></thead><tbody>';
+  d.byCS.forEach(function(r){
+    html += '<tr><td>'+esc(r.name)+(r.mapped?'':' <span style="color:#9a3412;font-size:11px" title="Tên Pancake gốc, chưa khớp Sale">⚠️</span>')+'</td><td style="text-align:right">'+fmt(r.tongTT)+'</td><td style="text-align:right">'+fmt(r.tinNhan)+'</td><td style="text-align:right">'+fmt(r.binhLuan)+'</td><td style="text-align:right">'+fmt(r.hoiThoaiMoi)+'</td><td style="text-align:right"><b>'+fmt(r.tongDH)+'</b></td><td style="text-align:right">'+r.tyLeCD+'%</td></tr>';
+  });
+  if (!d.byCS.length) html += '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu trong khoảng ngày này</td></tr>';
+  html += '</tbody></table>';
+  return html;
+}
+
+function _pkExportReport(){
+  var d = _pkState.report; if (!d) return;
+  var byPageRows = [['Page','Tổng TT','Tin nhắn','Bình luận','Hội thoại mới','Tổng ĐH','Tỉ lệ CĐ (%)']];
+  d.byPage.forEach(function(r){ byPageRows.push([r.pageName, r.tongTT, r.tinNhan, r.binhLuan, r.hoiThoaiMoi, r.tongDH, r.tyLeCD]); });
+  var byCSRows = [['Sale','Đã khớp?','Tổng TT','Tin nhắn','Bình luận','Hội thoại mới','Tổng ĐH','Tỉ lệ CĐ (%)']];
+  d.byCS.forEach(function(r){ byCSRows.push([r.name, r.mapped?'Có':'Chưa', r.tongTT, r.tinNhan, r.binhLuan, r.hoiThoaiMoi, r.tongDH, r.tyLeCD]); });
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(byPageRows), 'Theo Page');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(byCSRows), 'Theo CS');
+  XLSX.writeFile(wb, 'BaoCaoPancake_'+_pkState.from+'_'+_pkState.to+'.xlsx');
+}
+
+
+// ═══════════════════════════════════════════════════════
 //  AUDIT LOG VIEW
 // ═══════════════════════════════════════════════════════
 function _auditActClass(a){
@@ -14113,7 +14514,7 @@ var _activeV9Tab = 'list';
 switchTab = function(tab, el){
   _v9PrevSwitchTab(tab, el);
   _activeV9Tab = tab;
-  ['dashboard','team','audit','salesreport'].forEach(function(name){
+  ['dashboard','team','audit','salesreport','pancake'].forEach(function(name){
     var panel = document.getElementById('tab-'+name);
     if (panel) panel.style.display = (tab===name) ? 'flex' : 'none';
   });
@@ -14121,6 +14522,7 @@ switchTab = function(tab, el){
   else if (tab === 'team') renderTeamTab();
   else if (tab === 'audit') renderAuditTab();
   else if (tab === 'salesreport') renderSalesReportTab();
+  else if (tab === 'pancake') renderPancakeTab();
 };
 
 // ═══════════════════════════════════════════════════════
@@ -14178,7 +14580,8 @@ function _injectV9UI(){
       { id:'dashboard',   label:'📊 Dashboard' },
       { id:'team',        label:'👥 Quản lý Team' },
       { id:'audit',       label:'🧾 Nhật ký' },
-      { id:'salesreport', label:'📈 Báo cáo doanh số' }
+      { id:'salesreport', label:'📈 Báo cáo doanh số' },
+      { id:'pancake',     label:'📥 Báo cáo Pancake' }
     ];
     defs.forEach(function(d){
       var div = document.createElement('div');
@@ -14195,7 +14598,8 @@ function _injectV9UI(){
       { id:'tab-dashboard',   inner:'<div class="dash-wrap" id="dash-wrap"></div>' },
       { id:'tab-team',        inner:'<div class="team-wrap" id="team-wrap"></div>' },
       { id:'tab-audit',       inner:'<div class="audit-wrap" id="audit-wrap"></div>' },
-      { id:'tab-salesreport', inner:'<div class="dash-wrap" id="salesreport-wrap"></div>' }
+      { id:'tab-salesreport', inner:'<div class="dash-wrap" id="salesreport-wrap"></div>' },
+      { id:'tab-pancake',     inner:'<div class="dash-wrap" id="pancake-wrap"></div>' }
     ];
     panels.forEach(function(p){
       if (document.getElementById(p.id)) return;

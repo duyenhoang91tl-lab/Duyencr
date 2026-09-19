@@ -17,6 +17,8 @@ var SH_SET     = 'Settings';
 var SH_ASSIGN  = 'AssignData';
 var SH_USER    = 'Users';
 var SH_CONTEXT = 'AIContext';
+var SH_PK_STATS = 'PancakeStats';   // thong ke tuong tac/chot don hang ngay, nhap tu file Excel Pancake xuat ("Thong ke tuong tac")
+var SH_PK_MAP   = 'PancakeNameMap'; // khop ten "Nhan vien" hien thi tren Pancake <-> ten Sale chuan trong CRM
 
 var ORDER_SS_ID = '1fiWXPMZcHuEh0zYqD6pgQjZDM0PhWzpiSK7Igj6Cug8'; // File chua OrderData2x (doanh thu/don hang)
 var CRM_SS_ID   = '18XBtbjP7gtlvYpChikF3B62cxHkR4426s5poZj9Mj8I'; // File chua CareData/Users/Teams/Settings/AuditLog/AssignData/AIContext (CRM).
@@ -81,6 +83,14 @@ var AUDIT_HEADERS  = ['timestamp','user','action','phone','oldValue','newValue']
 var SET_HEADERS    = ['key','value'];
 var ASSIGN_HEADERS = ['id','date','csName','label','phones','donePhones'];
 var USER_HEADERS   = ['username','passHash','role','name','team','active','names'];
+// PK_STATS_HEADERS: 1 dong = 1 "Nhan vien" (ten hien thi tren Pancake) trong 1 Page, 1 ngay —
+// nhap tu file Excel "Thong ke tuong tac" (pages_statistics_engagements) Pancake xuat ra.
+// Khoa duy nhat = date+pageId+nhanVien -> nap lai file CUNG 1 ngay se GHI DE (khong nhan doi).
+var PK_STATS_HEADERS = ['date','pageId','pageName','nhanVien','khCu','khMoi','tongTT',
+  'tinNhan','binhLuan','hoiThoaiMoi','dhKhMoi','dhKhCu','tongDH'];
+// PK_MAP_HEADERS: khop 1-1 ten hien thi Pancake -> ten Sale chuan trong CRM (dung chung moi
+// Page, vi thuong 1 nguoi dung 1 ten Facebook ca nhan cho ca nhieu Page).
+var PK_MAP_HEADERS = ['pancakeName','saleName'];
 // ── KH "Chăm sóc" thêm nhanh (nút "+ Thêm KH/Đơn mới") — SHEET RIÊNG, không gộp
 // CareData/DT TỔNG/dữ liệu đơn, không gộp vào báo cáo doanh số A/B/C. ──
 var SH_CARE_LEAD      = 'KH Chăm sóc mới';
@@ -657,6 +667,9 @@ function doGet(e) {
     if (action === 'orders')    return jsonOut_({ orders: readAllOrders_() });
     if (action === 'teams')     return jsonOut_({ teams: readTeams_(ss.getSheetByName(SH_TEAM)) });
     if (action === 'users')     return jsonOut_({ users: readUsers_(ss.getSheetByName(SH_USER)) });
+    // ── Bao cao Pancake (nhap tu file Excel "Thong ke tuong tac") ──
+    if (action === 'pancakeNameMap') return jsonOut_({ map: readPancakeMap_() });
+    if (action === 'pancakeReport')  return jsonOut_(buildPancakeReport_(e.parameter.from, e.parameter.to));
     // ── Nguon "Cham soc" (KH them nhanh, sheet rieng) — khong gop CareData/bao cao A-B-C ──
     if (action === 'careLeads') return jsonOut_({ rows: readCareLeads_() });
     // ── Tap SDT co trong "dữ liệu đơn" — chi de loc nguon o man hinh chinh (cache 10') ──
@@ -1939,6 +1952,9 @@ function doPost(e) {
     if (action === 'saveTeams')           return saveTeams_(data.teams);
     if (action === 'saveUsers')           return saveUsers_(data.users);
     if (action === 'saveAudit')           return saveAudit_(data.rows);
+    // ── Bao cao Pancake ──
+    if (action === 'savePancakeStats')    return savePancakeStats_(data.rows);
+    if (action === 'savePancakeNameMap')  return savePancakeNameMap_(data.pancakeName, data.saleName);
     if (action === 'setSetting')          return setSetting_(data.key, data.value);
     // Them 1 nick Zalo vao danh sach chung (MERGE tren server -> khong ghi de mat nick cu)
     if (action === 'addZaloNick')         return addZaloNick_(data.nick);
@@ -2417,6 +2433,124 @@ function saveTeams_(teams) {
   }
   sh.getRange(1, 1, matrix.length, TEAM_HEADERS.length).setValues(matrix);
   return jsonOut_({ ok: true, written: teams.length });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BAO CAO PANCAKE (nhap tu file Excel "Thong ke tuong tac" — pages_statistics_engagements)
+// ═══════════════════════════════════════════════════════════════
+
+// Ghi cac dong thong ke ngay tu file Excel upload. Idempotent theo date+pageId+nhanVien: xoa
+// het cac dong TRUNG NGAY+PAGE co trong payload roi ghi lai — nap lai file cung 1 ngay (vd
+// sua so lieu, hoac nap lai cho chac) se khong bi nhan doi du lieu.
+function savePancakeStats_(rows) {
+  rows = rows || [];
+  if (!rows.length) return jsonOut_({ ok: true, written: 0 });
+  var sh = getSheet_(SH_PK_STATS, PK_STATS_HEADERS);
+  var lastRow = sh.getLastRow();
+
+  // Tap hop (date, pageId) co trong lan nap nay -> can xoa sach du lieu cu cung khoa truoc khi ghi lai
+  var touchedKeys = {};
+  rows.forEach(function(r) { touchedKeys[r.date + '|' + r.pageId] = true; });
+
+  var keep = [];
+  if (lastRow > 1) {
+    var existing = sh.getRange(2, 1, lastRow - 1, PK_STATS_HEADERS.length).getValues();
+    for (var i = 0; i < existing.length; i++) {
+      var k = existing[i][0] + '|' + existing[i][1];
+      if (!touchedKeys[k]) keep.push(existing[i]);
+    }
+  }
+
+  var newRows = rows.map(function(r) {
+    return [r.date||'', r.pageId||'', r.pageName||'', r.nhanVien||'',
+      +r.khCu||0, +r.khMoi||0, +r.tongTT||0, +r.tinNhan||0, +r.binhLuan||0,
+      +r.hoiThoaiMoi||0, +r.dhKhMoi||0, +r.dhKhCu||0, +r.tongDH||0];
+  });
+
+  sh.clearContents();
+  var matrix = [PK_STATS_HEADERS].concat(keep).concat(newRows);
+  sh.getRange(1, 1, matrix.length, PK_STATS_HEADERS.length).setValues(matrix);
+  return jsonOut_({ ok: true, written: newRows.length, replaced: keep.length !== (lastRow > 1 ? lastRow - 1 : 0) });
+}
+
+function readPancakeMap_() {
+  var sh = getSheet_(SH_PK_MAP, PK_MAP_HEADERS);
+  var out = {};
+  if (sh.getLastRow() < 2) return out;
+  var v = sh.getRange(2, 1, sh.getLastRow() - 1, PK_MAP_HEADERS.length).getValues();
+  for (var i = 0; i < v.length; i++) {
+    if (!v[i][0]) continue;
+    out[String(v[i][0])] = String(v[i][1] || '');
+  }
+  return out;
+}
+
+// Ghi/cap nhat 1 dong khop ten (upsert theo pancakeName) — khong xoa cac dong khop khac.
+function savePancakeNameMap_(pancakeName, saleName) {
+  if (!pancakeName) return jsonOut_({ error: 'Thiếu tên Nhân viên Pancake.' });
+  var sh = getSheet_(SH_PK_MAP, PK_MAP_HEADERS);
+  var lastRow = sh.getLastRow();
+  if (lastRow >= 2) {
+    var v = sh.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (var i = 0; i < v.length; i++) {
+      if (String(v[i][0]) === String(pancakeName)) {
+        sh.getRange(i + 2, 2).setValue(saleName || '');
+        return jsonOut_({ ok: true, updated: true });
+      }
+    }
+  }
+  sh.appendRow([pancakeName, saleName || '']);
+  return jsonOut_({ ok: true, updated: false });
+}
+
+// Tong hop bao cao theo Page va theo CS (da khop ten qua PancakeNameMap; ten chua khop giu
+// nguyen ten Pancake va danh dau unmapped:true de UI nhac nguoi dung di khop ten).
+function buildPancakeReport_(from, to) {
+  var sh = getSheet_(SH_PK_STATS, PK_STATS_HEADERS);
+  var map = readPancakeMap_();
+  var byPage = {}, byCS = {};
+  var unmappedSet = {};
+
+  if (sh.getLastRow() >= 2) {
+    var v = sh.getRange(2, 1, sh.getLastRow() - 1, PK_STATS_HEADERS.length).getValues();
+    for (var i = 0; i < v.length; i++) {
+      var d = String(v[i][0]);
+      if (from && d < from) continue;
+      if (to && d > to) continue;
+      var pageId = String(v[i][1]), pageName = String(v[i][2]), nhanVien = String(v[i][3]);
+      var khCu=+v[i][4]||0, khMoi=+v[i][5]||0, tongTT=+v[i][6]||0, tinNhan=+v[i][7]||0,
+          binhLuan=+v[i][8]||0, hoiThoaiMoi=+v[i][9]||0, dhKhMoi=+v[i][10]||0, dhKhCu=+v[i][11]||0, tongDH=+v[i][12]||0;
+
+      if (!byPage[pageId]) byPage[pageId] = { pageId: pageId, pageName: pageName, khCu:0, khMoi:0, tongTT:0, tinNhan:0, binhLuan:0, hoiThoaiMoi:0, dhKhMoi:0, dhKhCu:0, tongDH:0 };
+      var bp = byPage[pageId];
+      bp.khCu+=khCu; bp.khMoi+=khMoi; bp.tongTT+=tongTT; bp.tinNhan+=tinNhan; bp.binhLuan+=binhLuan;
+      bp.hoiThoaiMoi+=hoiThoaiMoi; bp.dhKhMoi+=dhKhMoi; bp.dhKhCu+=dhKhCu; bp.tongDH+=tongDH;
+
+      var saleName = map[nhanVien];
+      var mapped = !!saleName;
+      if (!mapped) { saleName = nhanVien; unmappedSet[nhanVien] = true; }
+      var csKey = saleName;
+      if (!byCS[csKey]) byCS[csKey] = { name: saleName, pancakeNames: {}, mapped: mapped, khCu:0, khMoi:0, tongTT:0, tinNhan:0, binhLuan:0, hoiThoaiMoi:0, dhKhMoi:0, dhKhCu:0, tongDH:0 };
+      var bc = byCS[csKey];
+      bc.pancakeNames[nhanVien] = true;
+      if (mapped) bc.mapped = true; // neu >=1 nguon da khop thi coi la mapped (hiem khi trung ten CS voi ten chua khop)
+      bc.khCu+=khCu; bc.khMoi+=khMoi; bc.tongTT+=tongTT; bc.tinNhan+=tinNhan; bc.binhLuan+=binhLuan;
+      bc.hoiThoaiMoi+=hoiThoaiMoi; bc.dhKhMoi+=dhKhMoi; bc.dhKhCu+=dhKhCu; bc.tongDH+=tongDH;
+    }
+  }
+
+  function finalize(obj) {
+    var arr = Object.keys(obj).map(function(k) {
+      var r = obj[k];
+      r.tyLeCD = r.tongTT ? Math.round(r.tongDH / r.tongTT * 1000) / 10 : 0;
+      if (r.pancakeNames) r.pancakeNames = Object.keys(r.pancakeNames);
+      return r;
+    });
+    arr.sort(function(a,b) { return b.tongTT - a.tongTT; });
+    return arr;
+  }
+
+  return { byPage: finalize(byPage), byCS: finalize(byCS), unmapped: Object.keys(unmappedSet).sort() };
 }
 
 function saveUsers_(users) {
@@ -3263,6 +3397,8 @@ function testScript() {
   getSheet_(SH_SET, SET_HEADERS);
   getSheet_(SH_ASSIGN, ASSIGN_HEADERS);
   getSheet_(SH_USER, USER_HEADERS);
+  getSheet_(SH_PK_STATS, PK_STATS_HEADERS);
+  getSheet_(SH_PK_MAP, PK_MAP_HEADERS);
   var oss = getOrderSS_();
   for (var i = 0; i < ORDER_SHEETS.length; i++) {
     var _s = oss.getSheetByName(ORDER_SHEETS[i].name) || oss.insertSheet(ORDER_SHEETS[i].name);
