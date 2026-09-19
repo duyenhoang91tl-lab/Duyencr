@@ -12416,12 +12416,14 @@ function saveRole(){
 // ═══════════════════════════════════════════════════════
 // Đơn có nằm trong khoảng ngày lọc của Dashboard không (bỏ trống 2 đầu = không lọc).
 // Đơn cũ chỉ có year/month (không có ngày cụ thể) → quy ước lấy ngày 01 của tháng đó.
+// Đơn có nằm trong khoảng ngày lọc của Dashboard không (bỏ trống 2 đầu = không lọc).
+// Tính theo NGÀY TẠO đơn (o.orderDate), giống mọi báo cáo khác trong hệ thống (A/B/C/KPI
+// Pancake) — không theo ngày hoàn thành, để khớp với Base và giữa các báo cáo với nhau.
 function _dashOrderInRange(o, dFrom, dTo){
   if (!dFrom && !dTo) return true;
-  var t = null;
-  if (o.date instanceof Date && !isNaN(o.date)) t = new Date(o.date.getFullYear(), o.date.getMonth(), o.date.getDate()).getTime();
-  else if (o.year && o.month) t = new Date(+o.year, +o.month - 1, 1).getTime();
-  if (t === null) return false; // đơn không xác định được ngày → loại khi đang lọc theo thời gian
+  var dt = _parseFlexDate(o.orderDate) || _parseFlexDate(o.date);
+  if (!dt) return false; // đơn không xác định được ngày → loại khi đang lọc theo thời gian
+  var t = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime();
   if (dFrom && t < new Date(dFrom + 'T00:00:00').getTime()) return false;
   if (dTo   && t > new Date(dTo   + 'T23:59:59').getTime()) return false;
   return true;
