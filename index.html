@@ -908,7 +908,7 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
       <div class="adv-chips" id="adv-source-chips"></div>
     </div>
     <div class="adv-section">
-      <div class="adv-section-label">💬 Tình trạng CS (chọn nhiều)</div>
+      <div class="adv-section-label">💬 <span id="lbl-fieldcs-adv">Tình trạng CS</span> (chọn nhiều)</div>
       <div class="adv-chips" id="adv-care-chips"></div>
     </div>
     <div class="adv-section">
@@ -1295,7 +1295,7 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
         <span class="ymf-label">📋 Cột hiển thị</span>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('name',this)"> Khách hàng</label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('tier',this)"> Phân loại</label>
-        <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('care',this)"> Tình trạng CS</label>
+        <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('care',this)"> <span id="lbl-fieldcs-coltoggle">Tình trạng CS</span></label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('zalo',this)"> Zalo</label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('order',this)"> Đơn/DT</label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('product',this)"> Sản phẩm</label>
@@ -1318,7 +1318,7 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
           <thead><tr>
             <th class="filterable col-name" id="th-name" onclick="openColDropdown('name',event)"><div class="th-inner">Khách hàng <span class="th-filter-icon">▼</span></div></th>
             <th class="filterable col-tier" id="th-tier"><div class="th-inner"><span id="tier-label-btn" onclick="openTierTooltip(event)" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px" title="Xem tiêu chí phân loại">Phân loại</span> <span class="th-filter-icon" onclick="openColDropdown('tier',event)" style="cursor:pointer">▼</span></div></th>
-            <th class="filterable col-care" id="th-care" onclick="openColDropdown('care',event)"><div class="th-inner">Tình trạng CS <span class="th-filter-icon">▼</span></div></th>
+            <th class="filterable col-care" id="th-care" onclick="openColDropdown('care',event)"><div class="th-inner"><span id="lbl-fieldcs-th">Tình trạng CS</span> <span class="th-filter-icon">▼</span></div></th>
             <th class="filterable col-zalo" id="th-zalo" onclick="openColDropdown('zalo',event)"><div class="th-inner">Zalo <span class="th-filter-icon">▼</span></div></th>
             <th class="col-order">Đơn / DT</th>
             <th class="filterable col-product" id="th-product" onclick="openColDropdown('product',event)"><div class="th-inner">Sản phẩm <span class="th-filter-icon">▼</span></div></th>
@@ -1657,6 +1657,59 @@ async function _syncKhStatusTreeFromGAS() {
 // Hoãn gọi bằng setTimeout: gsUrl được khai báo (let) ở PHÍA SAU trong cùng script này — gọi
 // ngay tại đây sẽ chạm biến trước khi khởi tạo (temporal dead zone) và ném ReferenceError.
 setTimeout(_syncKhStatusTreeFromGAS, 0);
+
+// Tên hiển thị của 2 trường lớn CỐ ĐỊNH — cho phép admin đổi tên (khác với XÓA/tạo trường,
+// 2 trường này luôn tồn tại vì có cột riêng trong CareData, chỉ đổi được CÁCH GỌI/hiển thị).
+let FIELD_LABEL_CS = loadLS('ome_field_label_cs') || 'Tình trạng CS';
+let FIELD_LABEL_KH = loadLS('ome_field_label_kh') || 'Trạng thái KH';
+async function _syncFieldLabelsFromGAS() {
+  if (!gsUrl) return;
+  try {
+    var r1 = await fetch(gsUrl + '?action=getSetting&key=fieldLabelCS', {redirect:'follow'});
+    var d1 = await r1.json();
+    if (d1 && d1.value) { FIELD_LABEL_CS = d1.value; saveLS('ome_field_label_cs', FIELD_LABEL_CS); }
+    var r2 = await fetch(gsUrl + '?action=getSetting&key=fieldLabelKH', {redirect:'follow'});
+    var d2 = await r2.json();
+    if (d2 && d2.value) { FIELD_LABEL_KH = d2.value; saveLS('ome_field_label_kh', FIELD_LABEL_KH); }
+  } catch(e) {}
+  _applyFieldLabels();
+}
+setTimeout(_syncFieldLabelsFromGAS, 0);
+async function renameBuiltinField(which) {
+  var isAdmin = (_authAccount && _authAccount.role === 'admin') || _bootstrapAdmin;
+  if (!isAdmin) { toast('Chỉ admin mới đổi tên trường.'); return; }
+  var cur = which === 'kh' ? FIELD_LABEL_KH : FIELD_LABEL_CS;
+  var name = prompt('Đổi tên hiển thị cho trường này (áp dụng toàn bộ hệ thống sau khi tải lại trang):', cur);
+  if (name === null) return;
+  name = name.trim();
+  if (!name) { toast('Tên không được để trống.'); return; }
+  if (which === 'kh') { FIELD_LABEL_KH = name; saveLS('ome_field_label_kh', name); }
+  else { FIELD_LABEL_CS = name; saveLS('ome_field_label_cs', name); }
+  _applyFieldLabels();
+  if (gsUrl) {
+    try {
+      await fetch(gsUrl, { method:'POST', redirect:'follow',
+        body: JSON.stringify({ action:'setSetting', key: which==='kh'?'fieldLabelKH':'fieldLabelCS', value: name }) });
+      toast('✓ Đã đổi tên và đồng bộ. Tải lại trang để áp dụng đầy đủ ở mọi nơi.');
+    } catch(e) { toast('✓ Đã lưu local — không đồng bộ được GSheets: ' + e.message); }
+  } else {
+    toast('✓ Đã đổi tên (local). Tải lại trang để áp dụng đầy đủ ở mọi nơi.');
+  }
+}
+// Cập nhật các nhãn TĨNH (không nằm trong hàm render nào, chỉ set 1 lần lúc load trang) —
+// những chỗ nằm trong template literal của các hàm render thì tự động đổi ở lần render sau
+// (đã dùng biến FIELD_LABEL_CS/FIELD_LABEL_KH trực tiếp), không cần xử lý ở đây.
+function _applyFieldLabels() {
+  var map = {
+    'lbl-fieldcs-adv': FIELD_LABEL_CS, 'lbl-fieldcs-coltoggle': FIELD_LABEL_CS, 'lbl-fieldcs-th': FIELD_LABEL_CS,
+    'lbl-fieldcs-help': FIELD_LABEL_CS, 'lbl-fieldkh-help': FIELD_LABEL_KH
+  };
+  Object.keys(map).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = map[id];
+  });
+}
+setTimeout(_applyFieldLabels, 0);
 
 // ════════════════════════════════════════════════════════════════════
 //  TRƯỜNG TỰ TẠO (admin tự thêm "trường lớn" ngoài 2 trường có sẵn)
@@ -3606,7 +3659,7 @@ function renderCareTab(c) {
     <div class="dp-stitle">Thông tin chăm sóc</div>
     <div class="form-row-2">
       <div>
-        <div class="form-label">Tình trạng CS</div>
+        <div class="form-label">${esc(FIELD_LABEL_CS)}</div>
         <select class="form-select" id="cs-status">
           ${_buildCareStatusOptions(care.status||c.careStatus||'')}
         </select>
@@ -3621,7 +3674,7 @@ function renderCareTab(c) {
     </div>
     <div class="form-row-2">
       <div>
-        <div class="form-label">Trạng thái KH</div>
+        <div class="form-label">${esc(FIELD_LABEL_KH)}</div>
         <select class="form-select" id="cs-kh-status">
           ${_buildCustStatusOptions(care.khStatus||'')}
         </select>
@@ -5701,7 +5754,7 @@ function exportCSV() {
   });
   const BOM='\uFEFF';
   const cfCols = (typeof CUSTOM_FIELDS !== 'undefined') ? CUSTOM_FIELDS : [];
-  const hdr='Tên KH,Số điện thoại,Phân loại KH,Tình trạng CS,Zalo,Số đơn,Doanh thu,Sản phẩm,Nguồn,CS phụ trách,Ghi chú'
+  const hdr='Tên KH,Số điện thoại,Phân loại KH,'+FIELD_LABEL_CS+',Zalo,Số đơn,Doanh thu,Sản phẩm,Nguồn,CS phụ trách,Ghi chú'
     + (cfCols.length ? ',' + cfCols.map(f=>`"${f.label.replace(/"/g,'""')}"`).join(',') : '') + '\n';
   const rows=list.map(c=>{
     const base=[`"${c.name}"`,c.phone,c.tier,c.careStatus,c.zaloStatus,c.totalOrders,c.totalRevenue,`"${c.brands.join('; ')}"`,`"${c.sources.join('; ')}"`,`"${[..._buildCsSet_(c.orders, c.phone)].join('; ')}"`,`"${_latestNoteText(c.careNote)}"`];
@@ -7139,7 +7192,7 @@ function renderAssignReport() {
   const maxBar = csBarRows.length ? csBarRows[0][1].total.size : 1;
 
   const PIVOT_ROW_OPTS  = [{v:'cs',l:'CS phụ trách'},{v:'tier',l:'Phân loại KH'},{v:'label',l:'Đợt chia'},{v:'month',l:'Tháng chia'},{v:'source',l:'Kênh (Nguồn)'}];
-  const PIVOT_COL_OPTS  = [{v:'tier',l:'Phân loại KH'},{v:'careStatus',l:'Tình trạng CS'},{v:'done',l:'Hoàn thành'},{v:'month',l:'Tháng chia'},{v:'source',l:'Kênh (Nguồn)'},{v:'cs',l:'CS phụ trách'}];
+  const PIVOT_COL_OPTS  = [{v:'tier',l:'Phân loại KH'},{v:'careStatus',l:FIELD_LABEL_CS},{v:'done',l:'Hoàn thành'},{v:'month',l:'Tháng chia'},{v:'source',l:'Kênh (Nguồn)'},{v:'cs',l:'CS phụ trách'}];
 
   const rptHtml = `
   <!-- KPI ROW -->
@@ -7189,13 +7242,13 @@ function renderAssignReport() {
         <input type="date" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--rsm);outline:none;background:var(--surface)" value="${_rptFilters.dateTo}" oninput="_rptFilters.dateTo=this.value;renderAssignReport()">
       </div>
       <div>
-        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Tình trạng CS</div>
+        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">${esc(FIELD_LABEL_CS)}</div>
         <select multiple style="min-width:130px;max-height:70px;font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);outline:none" id="rpt-carestatus-sel" onchange="_rptSetFilter('careStatus',this)">
           ${CARE_STATUS.map(v=>`<option value="${esc(v)}" ${_rptFilters.careStatus.has(v)?'selected':''}>${esc(v)}</option>`).join('')}
         </select>
       </div>
       <div>
-        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Trạng thái KH</div>
+        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">${esc(FIELD_LABEL_KH)}</div>
         <select multiple style="min-width:150px;max-height:70px;font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);outline:none" id="rpt-khstatus-sel" onchange="_rptSetFilter('khStatus',this)">
           ${allKhStatus.map(v=>`<option value="${esc(v)}" ${_rptFilters.khStatus.has(v)?'selected':''}>${esc(v)}</option>`).join('')}
         </select>
@@ -7364,7 +7417,7 @@ function exportAssignReport() {
     rows.push([cs, d.batches, d.total, d.done, d.total>0?Math.round(d.done/d.total*100):0]);
   }
   // Detail sheet
-  const detail = [['Ngày chia', 'CS', 'Label', 'Tên KH', 'SĐT', 'Phân loại', 'Tình trạng CS', 'Đã xong']];
+  const detail = [['Ngày chia', 'CS', 'Label', 'Tên KH', 'SĐT', 'Phân loại', FIELD_LABEL_CS, 'Đã xong']];
   for (const h of assignHistory) {
     for (const p of h.phones) {
       const c = allCustomers.find(x=>x.phone===p);
@@ -7382,7 +7435,7 @@ function exportMyDataReport() {
   const csName = document.getElementById('mydata-cs-sel')?.value || '';
   const myBatches = assignHistory.filter(h => h.csName === csName);
   const allPhones = [...new Set(myBatches.flatMap(h=>h.phones))];
-  const rows = [['Tên KH','SĐT','Phân loại','Tình trạng CS','Zalo','Đã chăm xong','Batch']];
+  const rows = [['Tên KH','SĐT','Phân loại',FIELD_LABEL_CS,'Zalo','Đã chăm xong','Batch']];
   for (const p of allPhones) {
     const c = allCustomers.find(x=>x.phone===p);
     const isDone = myBatches.some(h=>(h.donePhones||[]).includes(p));
@@ -14991,8 +15044,8 @@ function renderSalesReportTab(){
     filters += '<div><div style="font-size:10px;color:var(--hint);margin-bottom:2px">Sản phẩm (cách nhau bằng dấu phẩy)</div>'+
       '<input type="text" value="'+esc(_srState.bSanPham||'')+'" onchange="_srSetField(\'bSanPham\',this.value)" placeholder="vd: tỳ hưu, nhẫn 10k" style="min-width:170px;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
       '</div>';
-    filters += _srMultiSelectHtml('bCareStatus', CARE_STATUS, 'Tình trạng CS', 120);
-    filters += _srMultiSelectHtml('bKhStatus', (typeof _flatCustStatusValues==='function'?_flatCustStatusValues():[]).filter(Boolean), 'Trạng thái KH', 140);
+    filters += _srMultiSelectHtml('bCareStatus', CARE_STATUS, FIELD_LABEL_CS, 120);
+    filters += _srMultiSelectHtml('bKhStatus', (typeof _flatCustStatusValues==='function'?_flatCustStatusValues():[]).filter(Boolean), FIELD_LABEL_KH, 140);
     filters += _srMultiSelectHtml('bZaloStatus', ZALO_STATUS, 'Kết bạn Zalo', 120);
     filters += '<div><div style="font-size:10px;color:var(--hint);margin-bottom:2px">Nick Zalo</div>'+
       '<input type="text" value="'+esc(_srState.bNickZalo||'')+'" onchange="_srSetField(\'bNickZalo\',this.value)" placeholder="Tìm nick..." style="min-width:100px;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
@@ -16036,9 +16089,11 @@ function _renderAuthHeader(){
   var isAdmin = (_authAccount && _authAccount.role === 'admin') || _bootstrapAdmin;
   var loggedIn = !!_authAccount;
   var html = '';
-  if (isAdmin) html += '<button class="btn sm" title="Quản lý tình trạng CS" onclick="openCareStatusModal()">⚙ Tình trạng CS</button>';
-  if (isAdmin) html += '<button class="btn sm" title="Quản lý trạng thái KH" onclick="openKhStatusModal()">⚙ Trạng thái KH</button>';
-  if (isAdmin) html += '<button class="btn sm" title="Tự tạo trường lớn mới (ngoài Tình trạng CS / Trạng thái KH)" onclick="openCustomFieldsModal()">➕ Trường tự tạo</button>';
+  if (isAdmin) html += '<button class="btn sm" title="Quản lý ' + esc(FIELD_LABEL_CS) + '" onclick="openCareStatusModal()">⚙ ' + esc(FIELD_LABEL_CS) + '</button>';
+  if (isAdmin) html += '<button class="btn sm" style="padding:4px 6px" title="Đổi tên trường này" onclick="renameBuiltinField(\'cs\')">✏️</button>';
+  if (isAdmin) html += '<button class="btn sm" title="Quản lý ' + esc(FIELD_LABEL_KH) + '" onclick="openKhStatusModal()">⚙ ' + esc(FIELD_LABEL_KH) + '</button>';
+  if (isAdmin) html += '<button class="btn sm" style="padding:4px 6px" title="Đổi tên trường này" onclick="renameBuiltinField(\'kh\')">✏️</button>';
+  if (isAdmin) html += '<button class="btn sm" title="Tự tạo trường lớn mới (ngoài ' + esc(FIELD_LABEL_CS) + ' / ' + esc(FIELD_LABEL_KH) + ')" onclick="openCustomFieldsModal()">➕ Trường tự tạo</button>';
   if (isAdmin) html += '<button class="btn sm" title="Quản lý tài khoản đăng nhập" onclick="openAcctModal()">🔑 Tài khoản</button>';
   if (loggedIn) html += '<button class="btn sm" title="Đăng xuất" onclick="doLogout()">⎋ Đăng xuất</button>';
   box.innerHTML = html;
@@ -16364,7 +16419,7 @@ function toggleAcctActive(u){
 <div class="modal-overlay" id="care-status-modal" style="display:none;align-items:flex-start;justify-content:center;padding-top:40px;z-index:700">
 <div class="modal" style="width:560px;max-width:96vw;max-height:84vh;display:flex;flex-direction:column;overflow:hidden">
   <div class="modal-hdr" style="flex-shrink:0">
-    <div class="modal-title">⚙ Quản lý Tình trạng CS</div>
+    <div class="modal-title" id="care-status-modal-title">⚙ Quản lý Tình trạng CS</div>
     <div class="modal-sub">Thêm nhóm mẹ / mục con. Kéo ☰ sắp xếp. Move / chuyển đổi loại. Đồng bộ Google Sheets.</div>
   </div>
   <div class="modal-body" style="padding:14px 18px;flex:1;overflow-y:auto">
@@ -16406,10 +16461,11 @@ let _careStatusDraft = [];  // bản nháp đang chỉnh trong modal (tree)
 
 function openCareStatusModal() {
   var isAdmin = (_authAccount && _authAccount.role === 'admin') || _bootstrapAdmin;
-  if (!isAdmin) { toast('Chỉ admin mới quản lý tình trạng CS.'); return; }
+  if (!isAdmin) { toast('Chỉ admin mới quản lý ' + FIELD_LABEL_CS + '.'); return; }
   _careStatusDraft = JSON.parse(JSON.stringify(CARE_STATUS_TREE));
   renderCareStatusList();
   _renderCsParentSel();
+  var t = document.getElementById('care-status-modal-title'); if (t) t.textContent = '⚙ Quản lý ' + FIELD_LABEL_CS;
   var m = document.getElementById('care-status-modal');
   if (m) m.style.display = 'flex';
   var btn = document.getElementById('cs-save-btn');
@@ -16707,12 +16763,12 @@ async function saveCareStatusList() {
       });
       var d = await r.json();
       if (d && d.error) { toast('Lưu local ✓ — GSheets báo lỗi: ' + d.error); }
-      else { toast('✓ Đã lưu và đồng bộ tình trạng CS lên Google Sheets'); }
+      else { toast('✓ Đã lưu và đồng bộ ' + FIELD_LABEL_CS + ' lên Google Sheets'); }
     } catch(e) {
       toast('✓ Đã lưu local — không đồng bộ được GSheets: ' + e.message);
     }
   } else {
-    toast('✓ Đã lưu tình trạng CS (chưa kết nối Google Sheets)');
+    toast('✓ Đã lưu ' + FIELD_LABEL_CS + ' (chưa kết nối Google Sheets)');
   }
   // Refresh toàn bộ UI liên quan
   _refreshCareStatusUI();
@@ -16793,7 +16849,7 @@ function updateSidebarCareFilters() {
 <div class="modal-overlay" id="kh-status-modal" style="display:none;align-items:flex-start;justify-content:center;padding-top:40px;z-index:700">
 <div class="modal" style="width:560px;max-width:96vw;max-height:84vh;display:flex;flex-direction:column;overflow:hidden">
   <div class="modal-hdr" style="flex-shrink:0">
-    <div class="modal-title">⚙ Quản lý Trạng thái KH</div>
+    <div class="modal-title" id="kh-status-modal-title">⚙ Quản lý Trạng thái KH</div>
     <div class="modal-sub">Thêm nhóm mẹ / mục con. Kéo ☰ sắp xếp. Move child / chuyển đổi loại (🔄). Đồng bộ GSheets.</div>
   </div>
   <div class="modal-body" style="padding:14px 18px;flex:1;overflow-y:auto">
@@ -16836,7 +16892,7 @@ function updateSidebarCareFilters() {
   </div>
   <div class="modal-body" style="overflow:auto;flex:1">
     <div style="font-size:11px;color:var(--hint);margin-bottom:10px">
-      Tạo thêm "trường lớn" của riêng bạn (ngang hàng với <b>Tình trạng CS</b> / <b>Trạng thái KH</b>).
+      Tạo thêm "trường lớn" của riêng bạn (ngang hàng với <b id="lbl-fieldcs-help">Tình trạng CS</b> / <b id="lbl-fieldkh-help">Trạng thái KH</b>).
       Mỗi trường có cây lựa chọn mẹ → con riêng, hiện ngay trong form <b>Thông tin chăm sóc</b> của từng khách.
     </div>
     <div style="display:flex;gap:14px;align-items:flex-start">
@@ -16910,10 +16966,11 @@ let _khStatusDraft = [];
 
 function openKhStatusModal() {
   var isAdmin = (_authAccount && _authAccount.role === 'admin') || _bootstrapAdmin;
-  if (!isAdmin) { toast('Chỉ admin mới quản lý Trạng thái KH.'); return; }
+  if (!isAdmin) { toast('Chỉ admin mới quản lý ' + FIELD_LABEL_KH + '.'); return; }
   _khStatusDraft = JSON.parse(JSON.stringify(CUSTOMER_STATUS_TREE));
   _renderKhStatusTree();
   _renderKhParentSel();
+  var t = document.getElementById('kh-status-modal-title'); if (t) t.textContent = '⚙ Quản lý ' + FIELD_LABEL_KH;
   var m = document.getElementById('kh-status-modal');
   if (m) m.style.display = 'flex';
   // Update save button label
@@ -17344,12 +17401,12 @@ async function saveKhStatusTree() {
       });
       var d = await r.json().catch(function(){ return {}; });
       if (d && d.error) toast('Lưu local ✓ — GSheets: ' + d.error);
-      else toast('✓ Đã lưu và đồng bộ Trạng thái KH lên Google Sheets');
+      else toast('✓ Đã lưu và đồng bộ ' + FIELD_LABEL_KH + ' lên Google Sheets');
     } catch(e) {
       toast('✓ Đã lưu local — chưa đồng bộ GSheets: ' + e.message);
     }
   } else {
-    toast('✓ Đã lưu Trạng thái KH (local)');
+    toast('✓ Đã lưu ' + FIELD_LABEL_KH + ' (local)');
   }
   closeKhStatusModal();
   // Refresh dropdown trong form nếu đang mở
