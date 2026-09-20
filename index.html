@@ -2327,7 +2327,7 @@ async function syncFromGS(opts) {
         const ordJson = await ordR.json();
         if (ordJson && ordJson.orders && ordJson.orders.length) {
           const rows = ordJson.orders.map(o => ({
-            date: o.date ? new Date(o.date) : null,
+            date: o.date ? parseVNDate_(o.date) : null,
             year: parseNum(o.year), month: parseNum(o.month),
             cs: o.cs||'', name: o.name||'', phone: o.phone||'',
             source: o.source||'', revenue: _normRev(o.revenue),
@@ -2682,7 +2682,7 @@ function _latestOrderCS(orders){
     if (o.cs) lastCS = o.cs;          // giữ cs của đơn cuối mảng (dự phòng nếu không có ngày)
     var t = NaN;
     if (o.date instanceof Date) t = o.date.getTime();
-    else if (o.date) t = new Date(o.date).getTime();
+    else if (o.date) { var pd = parseVNDate_(o.date); t = pd ? pd.getTime() : NaN; }
     if (isNaN(t) && o.year){ var yr = o.year < 100 ? 2000 + o.year : o.year; t = new Date(yr, (o.month||1)-1, 1).getTime(); }
     if (!isNaN(t) && o.cs && t >= bestT){ bestT = t; bestCS = o.cs; }
   }
