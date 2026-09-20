@@ -1001,8 +1001,8 @@ function dtRowToOrder_(row, rowIndex) {
     // +7/+14 ngay) — neu dung 'date' cu, moc goc se nhay sang ngay khac ngay khi don hoan thanh,
     // lam ID lich nhac doi theo va khien lich da xoa/da lam bi tao lai y het (bug da gap).
     orderDate: row[DT_COL_NGAYTAO] || '',
-    year: d ? d.getFullYear() : '',
-    month: d ? (d.getMonth() + 1) : '',
+    year: d ? _vnYmdParts_(d).y : '',
+    month: d ? _vnYmdParts_(d).mo : '',
     cs: String(row[DT_COL_SALEBAN] || ''),
     source: row[DT_COL_KENHBAN] ? String(row[DT_COL_KENHBAN]).trim() : '',
     revenue: _normMoney_(row[DT_COL_GIATRIDON]),
@@ -1218,6 +1218,15 @@ function _vnYmd_(dt) {
   if (!dt || isNaN(dt.getTime())) return '';
   var shifted = new Date(dt.getTime() + VN_OFFSET_MS);
   return shifted.getUTCFullYear() + '-' + String(shifted.getUTCMonth() + 1).padStart(2, '0') + '-' + String(shifted.getUTCDate()).padStart(2, '0');
+}
+// Tra ve {y, mo (1-12), d} la NGAY DUONG LICH VN dung cua 1 thoi diem (Date) bat ky — dung
+// cho MOI noi can tach nam/thang/ngay (tuan/thang/quy Bao cao C, year/month cua don hang...).
+// Cung 1 co che UTC + offset co dinh voi _vnMidnight_/_vnYmd_ o tren, khong bao gio dung
+// .getFullYear()/.getMonth()/.getDate() truc tiep (phu thuoc cau hinh Time Zone du an).
+function _vnYmdParts_(dt) {
+  if (!dt || isNaN(dt.getTime())) return null;
+  var shifted = new Date(dt.getTime() + VN_OFFSET_MS);
+  return { y: shifted.getUTCFullYear(), mo: shifted.getUTCMonth() + 1, d: shifted.getUTCDate() };
 }
 
 function parseVNDate_(val) {
@@ -1748,20 +1757,28 @@ function getKPI_(kpiMap, periodKey, entType, entName) {
 
 // Thu 2 cua tuan chua ngay d (khong doi d truyen vao)
 function _getMonday_(d) {
-  var dt = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  var day = dt.getDay();
-  var diff = (day === 0 ? -6 : 1) - day;
-  dt.setDate(dt.getDate() + diff);
-  return dt;
+  // Tim dung Thu Hai cua tuan chua ngay duong lich VN cua d — tinh toan hoan toan bang UTC +
+  // offset co dinh (qua _vnYmdParts_), KHONG dung .getDay()/.getDate() truc tiep cua d (phu
+  // thuoc cau hinh Time Zone du an, cung nguyen nhan gay bug "nhay ngay" da gap).
+  var p = _vnYmdParts_(d);
+  var utcRep = new Date(Date.UTC(p.y, p.mo - 1, p.d)); // chi dung de doc thu trong tuan (getUTCDay doc dung, khong phu thuoc offset)
+  var dow = utcRep.getUTCDay();
+  var diff = (dow === 0 ? -6 : 1) - dow;
+  var mp = new Date(Date.UTC(p.y, p.mo - 1, p.d + diff));
+  return _vnMidnight_(mp.getUTCFullYear(), mp.getUTCMonth() + 1, mp.getUTCDate());
 }
 function _isoWeekRange_(baseDate, weekOffset) {
   var mon = _getMonday_(baseDate);
+  // .setDate()/.getDate() o day CHI dung de CONG/TRU so ngay (khong doc ngay duong lich) —
+  // an toan du may chu cau hinh Time Zone gi, vi Viet Nam khong co gio mua he nen +7 ngay luon
+  // dung dung 7*24h bat ke mui gio nen la gi.
   mon.setDate(mon.getDate() + weekOffset * 7);
   var sun = new Date(mon); sun.setDate(sun.getDate() + 6);
   return { from: mon, to: sun };
 }
 function _isoWeekKey_(d) {
-  var dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  var p = _vnYmdParts_(d);
+  var dt = new Date(Date.UTC(p.y, p.mo - 1, p.d));
   var dayNum = dt.getUTCDay() || 7;
   dt.setUTCDate(dt.getUTCDate() + 4 - dayNum);
   var yearStart = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1));
@@ -1769,20 +1786,29 @@ function _isoWeekKey_(d) {
   return dt.getUTCFullYear() + '-W' + String(weekNo).padStart(2, '0');
 }
 function _monthRange_(baseDate, monthOffset) {
-  var y = baseDate.getFullYear(), m = baseDate.getMonth() + monthOffset;
-  return { from: new Date(y, m, 1), to: new Date(y, m + 1, 0) };
+  var p = _vnYmdParts_(baseDate);
+  var y = p.y, m = (p.mo - 1) + monthOffset; // m la thang muc tieu, 0-index, truoc khi normalize nam
+  var from = _vnMidnight_(y, m + 1, 1);
+  var lastDayUtc = new Date(Date.UTC(y, m + 1, 0)); // ngay 0 cua thang ke tiep = ngay cuoi thang muc tieu
+  var to = _vnMidnight_(lastDayUtc.getUTCFullYear(), lastDayUtc.getUTCMonth() + 1, lastDayUtc.getUTCDate());
+  return { from: from, to: to };
 }
-function _monthKey_(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+function _monthKey_(d) { var p = _vnYmdParts_(d); return p.y + '-' + String(p.mo).padStart(2, '0'); }
 function _quarterRange_(baseDate, quarterOffset) {
-  var y = baseDate.getFullYear(), q = Math.floor(baseDate.getMonth() / 3) + quarterOffset;
+  var p = _vnYmdParts_(baseDate);
+  var y = p.y, q = Math.floor((p.mo - 1) / 3) + quarterOffset;
   var yy = y + Math.floor(q / 4), qq = ((q % 4) + 4) % 4;
-  var startMonth = qq * 3;
-  return { from: new Date(yy, startMonth, 1), to: new Date(yy, startMonth + 3, 0) };
+  var startMonth = qq * 3; // 0-index
+  var from = _vnMidnight_(yy, startMonth + 1, 1);
+  var lastDayUtc = new Date(Date.UTC(yy, startMonth + 3, 0));
+  var to = _vnMidnight_(lastDayUtc.getUTCFullYear(), lastDayUtc.getUTCMonth() + 1, lastDayUtc.getUTCDate());
+  return { from: from, to: to };
 }
-function _quarterKey_(d) { return d.getFullYear() + '-Q' + (Math.floor(d.getMonth() / 3) + 1); }
-function _ymdLocal_(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function _quarterKey_(d) { var p = _vnYmdParts_(d); return p.y + '-Q' + (Math.floor((p.mo - 1) / 3) + 1); }
+function _ymdLocal_(d) { return _vnYmd_(d); } // giu ten cu de khoi phai sua noi goi, tro thang ve ham VN chuan
 function _labelVN_(d) {
-  return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
+  var p = _vnYmdParts_(d);
+  return String(p.d).padStart(2, '0') + '/' + String(p.mo).padStart(2, '0') + '/' + p.y;
 }
 
 // Tinh khoang ngay + PeriodKey cua ky nay & ky truoc, tuy periodType.
@@ -2353,7 +2379,7 @@ function patchOrder_(data) {
     var ph = normPhone_(String(r[DT_COL_PHONE] || ''));
     if (ph !== normPhone_(String(data.phone || ''))) continue;
     var d = parseVNDate_(r[DT_COL_THOIGIANHT]);
-    var yy = d ? d.getFullYear() : '', mm = d ? (d.getMonth() + 1) : '';
+    var _p = d ? _vnYmdParts_(d) : null; var yy = _p ? _p.y : '', mm = _p ? _p.mo : '';
     if (String(yy) !== String(data.oldYear)) continue;
     if (String(mm) !== String(data.oldMonth)) continue;
     if (_normMoney_(r[DT_COL_GIATRIDON]) !== _normMoney_(data.oldRevenue)) continue;
@@ -2387,7 +2413,7 @@ function deleteOrder_(data) {
       var ph = normPhone_(String(r[DT_COL_PHONE] || ''));
       if (ph !== normPhone_(String(data.phone || ''))) continue;
       var d = parseVNDate_(r[DT_COL_THOIGIANHT]);
-      var yy = d ? d.getFullYear() : '', mm = d ? (d.getMonth() + 1) : '';
+      var _p = d ? _vnYmdParts_(d) : null; var yy = _p ? _p.y : '', mm = _p ? _p.mo : '';
       if (String(yy) !== String(data.oldYear)) continue;
       if (String(mm) !== String(data.oldMonth)) continue;
       if (_normMoney_(r[DT_COL_GIATRIDON]) !== _normMoney_(data.oldRevenue)) continue;
