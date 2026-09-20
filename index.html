@@ -1007,7 +1007,7 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
       <span class="gs-dot off" id="gs-dot"></span>
       <span id="gs-pill-txt">Google Sheets</span>
     </div>
-    <button class="btn sm" onclick="openSettingsModal()" title="Tác vụ dữ liệu: Tải Excel, Sync, Đẩy dữ liệu, Đồng bộ 2 chiều, Đơn trùng, Xóa data">⚙️ Tác vụ</button>
+    <button class="btn sm" data-bar-id="hdr-tacvu" data-bar-home=".hdr-r" onclick="openSettingsModal()" title="Tác vụ dữ liệu: Tải Excel, Sync, Đẩy dữ liệu, Đồng bộ 2 chiều, Đơn trùng, Xóa data">⚙️ Tác vụ</button>
     <input type="file" id="fi" accept=".xlsx,.xls" multiple onchange="handleFiles(event)">
   </div>
 </header>
@@ -1110,12 +1110,12 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
 
     <!-- TABS -->
     <div class="tabs">
-      <div class="tab active" onclick="switchTab('list',this)">Danh sách KH <span class="tab-badge" id="tb-list">0</span></div>
-      <div class="tab" onclick="switchTab('schedule',this)">Lịch chăm sóc <span class="tab-badge" id="tb-sched">0</span></div>
-      <div class="tab" onclick="switchTab('overdue',this)">Quá hạn <span class="tab-badge" id="tb-over" style="background:#fee2e2;color:#991b1b">0</span></div>
-      <div class="tab" onclick="switchTab('mydata',this)">📋 Data của tôi <span class="tab-badge" id="tb-mydata">0</span></div>
-      <div class="tab" onclick="switchTab('zaloai',this)">🤖 Zalo AI</div>
-      <div class="tab" onclick="switchTab('task',this)">🗂️ Công việc <span class="tab-badge" id="tb-task">0</span></div>
+      <div class="tab active" data-bar-id="tab-kh" data-bar-home=".tabs" onclick="switchTab('list',this)">Danh sách KH <span class="tab-badge" id="tb-list">0</span></div>
+      <div class="tab" data-bar-id="tab-schedule" data-bar-home=".tabs" onclick="switchTab('schedule',this)">Lịch chăm sóc <span class="tab-badge" id="tb-sched">0</span></div>
+      <div class="tab" data-bar-id="tab-overdue" data-bar-home=".tabs" onclick="switchTab('overdue',this)">Quá hạn <span class="tab-badge" id="tb-over" style="background:#fee2e2;color:#991b1b">0</span></div>
+      <div class="tab" data-bar-id="tab-mydata" data-bar-home=".tabs" onclick="switchTab('mydata',this)">📋 Data của tôi <span class="tab-badge" id="tb-mydata">0</span></div>
+      <div class="tab" data-bar-id="tab-zaloai" data-bar-home=".tabs" onclick="switchTab('zaloai',this)">🤖 Zalo AI</div>
+      <div class="tab" data-bar-id="tab-task" data-bar-home=".tabs" onclick="switchTab('task',this)">🗂️ Công việc <span class="tab-badge" id="tb-task">0</span></div>
       <div class="tabs-mobile-toggle" onclick="event.stopPropagation();this.closest('.tabs').classList.toggle('mobile-tabs-open')">☰ Mục ▾</div>
     </div>
     <script>
@@ -6487,6 +6487,188 @@ function _saveTabCustomize_(){
   _pushTabVisibleForAccount();
   location.reload();
 }
+
+// ═══════════════════════════════════════════════════════
+//  TUỲ CHỈNH THANH MENU (kéo-thả mục vào/ra "☰ Menu") — thay cho cơ chế tick ẩn/hiện
+//  cũ ở trên (chỉ có Bật/Tắt, không có "menu"). Giờ MỌI mục ở cả 2 thanh (header phải +
+//  thanh tab) đều kéo được vào 1 nút "☰ Menu" dùng chung — kéo ra thì mục về lại đúng
+//  thanh gốc của nó (data-bar-home), không mất chức năng gì cả. Lưu riêng theo từng
+//  tài khoản đăng nhập, giống hệt cơ chế tabVisible ở trên.
+var _barMenuItems = []; // mảng id (không cần giữ thứ tự) đang nằm TRONG "☰ Menu"
+(function _barMenuMigrate(){
+  var saved = loadLS('ome_bar_menu_items');
+  if (Array.isArray(saved)) { _barMenuItems = saved; return; }
+  // Chưa từng dùng tính năng mới → chuyển tiếp 1 lần từ tabVisible cũ: tab nào đang
+  // TẮT thì coi như đang nằm trong menu, để không mất cấu hình cũ của người dùng.
+  var legacy = loadLS('ome_tab_visible') || {};
+  _barMenuItems = Object.keys(legacy).filter(function(k){ return legacy[k] === false; });
+  saveLS('ome_bar_menu_items', _barMenuItems);
+})();
+
+// Toàn bộ mục có thể kéo — id PHẢI khớp với data-bar-id gắn trên phần tử thật (xem các
+// nơi có data-bar-id trong HTML/JS: 6 tab tĩnh + nút Tác vụ tĩnh + defs tab động ở
+// _injectV9UI + các nút trong _renderAuthHeader + nút "Mẫu hỏi thăm").
+var _BAR_ITEM_DEFS = [
+  { id:'tab-kh',          label:'Danh sách KH' },
+  { id:'tab-schedule',    label:'Lịch chăm sóc' },
+  { id:'tab-overdue',     label:'Quá hạn' },
+  { id:'tab-mydata',      label:'Data của tôi' },
+  { id:'tab-zaloai',      label:'Zalo AI' },
+  { id:'tab-task',        label:'Công việc' },
+  { id:'dashboard',       label:'Dashboard' },
+  { id:'team',            label:'Quản lý Team' },
+  { id:'audit',           label:'Nhật ký' },
+  { id:'salesreport',     label:'Báo cáo doanh số' },
+  { id:'pancake',         label:'Báo cáo Pancake' },
+  { id:'kpipancake',      label:'KPI Pancake' },
+  { id:'mktchecklist',    label:'Checklist MKT' },
+  { id:'hdr-hoitham',     label:'Mẫu hỏi thăm' },
+  { id:'hdr-tacvu',       label:'Tác vụ' },
+  { id:'hdr-carestatus',  label:'Tình trạng CS' },
+  { id:'hdr-khstatus',    label:'Trạng thái KH' },
+  { id:'hdr-customfield', label:'Trường tự tạo' },
+  { id:'hdr-account',     label:'Tài khoản' },
+  { id:'hdr-logout',      label:'Đăng xuất' }
+];
+
+function _barMenuAcctKey(){
+  var u = (typeof _authAccount !== 'undefined' && _authAccount && _authAccount.username) ? String(_authAccount.username).trim().toLowerCase() : '';
+  return u ? ('barMenuItems::' + u) : '';
+}
+async function _pullBarMenuForAccount(){
+  var key = _barMenuAcctKey();
+  if (!key || !gsUrl) return;
+  try {
+    var sep = gsUrl.includes('?') ? '&' : '?';
+    var r = await fetch(gsUrl + sep + 'action=getSetting&key=' + encodeURIComponent(key), {redirect:'follow'});
+    var d = await r.json();
+    if (d && d.value) {
+      var saved = null;
+      try { saved = JSON.parse(d.value); } catch(e) { saved = null; }
+      if (Array.isArray(saved)) { _barMenuItems = saved; saveLS('ome_bar_menu_items', _barMenuItems); _applyBarCustomization(); }
+    }
+  } catch(e) { console.warn('_pullBarMenuForAccount lỗi:', e.message); }
+}
+function _pushBarMenuForAccount(){
+  var key = _barMenuAcctKey();
+  if (!key || !gsUrl) return;
+  fetch(gsUrl, { method:'POST', redirect:'follow',
+    body: JSON.stringify({ action:'setSetting', key: key, value: JSON.stringify(_barMenuItems) }) }).catch(function(){});
+}
+
+// Tạo (nếu chưa có) nút "☰ Menu" + khung sổ xuống dùng chung cho cả 2 thanh, trả về
+// phần tử khung chứa (nơi các mục bị kéo vào sẽ được appendChild tới).
+function _ensureBarMenuBtn(){
+  var existing = document.getElementById('bar-menu-list');
+  if (existing) return existing;
+  var hdrR = document.querySelector('.hdr-r');
+  if (!hdrR) return null;
+  var wrap = document.createElement('div');
+  wrap.id = 'bar-menu-wrap';
+  wrap.style.cssText = 'position:relative;display:inline-flex';
+  wrap.innerHTML = '<button class="btn sm" id="bar-menu-btn" title="Các mục bạn đã kéo vào đây" onclick="_toggleBarMenuDropdown()">☰ Menu</button>' +
+    '<div id="bar-menu-list" style="display:none;position:absolute;top:110%;right:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--rmd);box-shadow:0 8px 24px rgba(0,0,0,.15);min-width:190px;z-index:950;padding:6px;"></div>';
+  hdrR.appendChild(wrap);
+  document.addEventListener('click', function(e){
+    var list = document.getElementById('bar-menu-list'), btn = document.getElementById('bar-menu-btn');
+    if (!list || !btn || list.style.display==='none') return;
+    if (e.target===btn || btn.contains(e.target) || list.contains(e.target)) return;
+    list.style.display = 'none';
+  });
+  return document.getElementById('bar-menu-list');
+}
+function _toggleBarMenuDropdown(){
+  var list = document.getElementById('bar-menu-list');
+  if (list) list.style.display = (list.style.display === 'none') ? 'block' : 'none';
+}
+
+// Di chuyển đúng các phần tử [data-bar-id] đang nằm trong _barMenuItems vào khung "☰ Menu",
+// và trả các phần tử KHÔNG còn trong danh sách về lại thanh gốc (data-bar-home). Một số nơi
+// (VD header) render lại toàn bộ bằng innerHTML mỗi lần đổi trạng thái đăng nhập → có thể tạo
+// ra 1 bản MỚI trùng id với bản đang nằm trong menu; hàm này dọn trùng trước khi sắp xếp.
+function _applyBarCustomization(){
+  var list = _ensureBarMenuBtn();
+  if (!list) return;
+  var byId = {};
+  document.querySelectorAll('[data-bar-id]').forEach(function(el){
+    var id = el.getAttribute('data-bar-id');
+    (byId[id] = byId[id] || []).push(el);
+  });
+  Object.keys(byId).forEach(function(id){
+    var els = byId[id];
+    if (els.length <= 1) return;
+    var keep = els.filter(function(el){ return el.parentNode !== list; })[0] || els[els.length - 1];
+    els.forEach(function(el){ if (el !== keep) el.remove(); });
+    byId[id] = [keep];
+  });
+  var btn = document.getElementById('bar-menu-btn');
+  var count = 0;
+  Object.keys(byId).forEach(function(id){
+    var el = byId[id][0];
+    var inMenu = _barMenuItems.indexOf(id) !== -1;
+    if (inMenu) {
+      if (el.parentNode !== list) list.appendChild(el);
+      count++;
+    } else if (el.parentNode === list) {
+      var homeSel = el.getAttribute('data-bar-home');
+      var home = homeSel ? document.querySelector(homeSel) : null;
+      if (home) home.appendChild(el); else list.removeChild(el);
+    }
+  });
+  if (btn) btn.style.display = count ? '' : 'none';
+}
+
+function openBarCustomizeModal(){
+  var shown  = _BAR_ITEM_DEFS.filter(function(d){ return _barMenuItems.indexOf(d.id) === -1; });
+  var inMenu = _BAR_ITEM_DEFS.filter(function(d){ return _barMenuItems.indexOf(d.id) !== -1; });
+  function rowHtml(d){
+    return '<div class="bar-drag-item" draggable="true" data-id="'+d.id+'" ondragstart="_barDragStart(event)" '+
+      'style="padding:7px 10px;margin:3px 0;border:1px solid var(--border);border-radius:8px;background:var(--surface2);cursor:grab;font-size:12.5px;">'+esc(d.label)+'</div>';
+  }
+  var box = document.createElement('div');
+  box.id = 'bar-customize-overlay';
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:2900;display:flex;align-items:center;justify-content:center';
+  box.innerHTML = '<div style="background:var(--surface);border-radius:var(--rlg);padding:18px 20px;width:560px;max-width:94vw;max-height:85vh;overflow:auto">'+
+    '<div style="font-weight:700;font-size:15px;margin-bottom:4px">☰ Tuỳ chỉnh thanh menu</div>'+
+    '<div style="font-size:11px;color:var(--muted);margin-bottom:12px">Kéo mục từ bên trái sang phải để đưa vào "☰ Menu" — kéo ngược lại để đưa ra thanh gốc. Chỉ áp dụng cho tài khoản của riêng bạn.</div>'+
+    '<div style="display:flex;gap:12px">'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-weight:600;font-size:12px;margin-bottom:6px;color:var(--muted)">Đang hiển thị trên thanh</div>'+
+        '<div id="bar-col-shown" ondragover="event.preventDefault()" ondrop="_barDrop(event,false)" style="min-height:280px;border:1px dashed var(--border);border-radius:10px;padding:6px;">'+shown.map(rowHtml).join('')+'</div>'+
+      '</div>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-weight:600;font-size:12px;margin-bottom:6px;color:var(--muted)">Trong "☰ Menu"</div>'+
+        '<div id="bar-col-menu" ondragover="event.preventDefault()" ondrop="_barDrop(event,true)" style="min-height:280px;border:1px dashed var(--border);border-radius:10px;padding:6px;">'+inMenu.map(rowHtml).join('')+'</div>'+
+      '</div>'+
+    '</div>'+
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'+
+      '<button class="btn" onclick="document.getElementById(\'bar-customize-overlay\').remove()">Huỷ</button>'+
+      '<button class="btn primary" onclick="_saveBarCustomize_()">Lưu & tải lại</button>'+
+    '</div></div>';
+  box.addEventListener('click', function(e){ if (e.target===box) box.remove(); });
+  document.body.appendChild(box);
+}
+var _barDragId = null;
+function _barDragStart(e){ _barDragId = e.target.getAttribute('data-id'); e.dataTransfer.effectAllowed = 'move'; }
+function _barDrop(e, toMenu){
+  e.preventDefault();
+  if (!_barDragId) return;
+  var idx = _barMenuItems.indexOf(_barDragId);
+  if (toMenu && idx === -1) _barMenuItems.push(_barDragId);
+  if (!toMenu && idx !== -1) _barMenuItems.splice(idx, 1);
+  _barDragId = null;
+  var overlay = document.getElementById('bar-customize-overlay');
+  if (overlay) overlay.remove();
+  openBarCustomizeModal(); // vẽ lại 2 cột theo trạng thái mới, không cần tải lại trang
+}
+function _saveBarCustomize_(){
+  saveLS('ome_bar_menu_items', _barMenuItems);
+  _pushBarMenuForAccount();
+  var overlay = document.getElementById('bar-customize-overlay');
+  if (overlay) overlay.remove();
+  _applyBarCustomization();
+}
+
 
 let _lastActSortDir = 0; // 0=off, 1=asc(oldest first), -1=desc(newest first)
 function toggleLastActSort() {
@@ -17440,6 +17622,8 @@ function _injectV9UI(){
       var div = document.createElement('div');
       div.className = 'tab';
       div.id = 'v9tab-' + d.id;
+      div.setAttribute('data-bar-id', d.id);
+      div.setAttribute('data-bar-home', '.tabs');
       div.setAttribute('onclick', "switchTab('"+d.id+"',this)");
       div.innerHTML = d.label;
       tabsBar.appendChild(div);
@@ -17459,10 +17643,10 @@ function _injectV9UI(){
     var gear = document.createElement('div');
     gear.className = 'tab';
     gear.id = 'v9tab-customize';
-    gear.title = 'Tuỳ chỉnh tab hiển thị — ẩn/hiện tab bạn không dùng';
+    gear.title = 'Tuỳ chỉnh thanh menu — kéo mục vào/ra ☰ Menu theo ý bạn';
     gear.style.cssText = 'flex-shrink:0;opacity:.6';
     gear.innerHTML = '⚙';
-    gear.setAttribute('onclick', 'openTabCustomizeModal()');
+    gear.setAttribute('onclick', 'openBarCustomizeModal()');
     tabsBar.appendChild(gear);
   }
   var dataView = document.getElementById('data-view');
@@ -17530,7 +17714,7 @@ function _injectV9UI(){
 
 window.addEventListener('load', function(){
   // chạy sau cùng để chắc chắn mọi DOM/biến đã sẵn sàng
-  setTimeout(function(){ _injectV9UI(); _renderAuthHeader(); _authGate(); if (typeof startReminderChecks==='function') startReminderChecks(); if (typeof startAutoSync==='function') startAutoSync(); if (typeof _checkAndRenewBdaySchedules==='function') _checkAndRenewBdaySchedules(); if (typeof checkDataDaoRenewSchedules==='function') checkDataDaoRenewSchedules(); if (typeof reapplyColVisibility==='function') reapplyColVisibility(); }, 0);
+  setTimeout(function(){ _injectV9UI(); _renderAuthHeader(); _authGate(); if (typeof startReminderChecks==='function') startReminderChecks(); if (typeof startAutoSync==='function') startAutoSync(); if (typeof _checkAndRenewBdaySchedules==='function') _checkAndRenewBdaySchedules(); if (typeof checkDataDaoRenewSchedules==='function') checkDataDaoRenewSchedules(); if (typeof reapplyColVisibility==='function') reapplyColVisibility(); if (typeof _applyBarCustomization==='function') _applyBarCustomization(); if (typeof _pullBarMenuForAccount==='function') _pullBarMenuForAccount(); }, 0);
 });
 
 // ═══════════════════════════════════════════════════════
@@ -17760,14 +17944,15 @@ function _renderAuthHeader(){
   var isAdmin = (_authAccount && _authAccount.role === 'admin') || _bootstrapAdmin;
   var loggedIn = !!_authAccount;
   var html = '';
-  if (isAdmin) html += '<button class="btn sm" title="Quản lý ' + esc(FIELD_LABEL_CS) + '" onclick="openCareStatusModal()">⚙ ' + esc(FIELD_LABEL_CS) + '</button>';
+  if (isAdmin) html += '<button class="btn sm" data-bar-id="hdr-carestatus" data-bar-home="#auth-box" title="Quản lý ' + esc(FIELD_LABEL_CS) + '" onclick="openCareStatusModal()">⚙ ' + esc(FIELD_LABEL_CS) + '</button>';
   if (isAdmin) html += '<button class="btn sm" style="padding:4px 6px" title="Đổi tên trường này" onclick="renameBuiltinField(\'cs\')">✏️</button>';
-  if (isAdmin) html += '<button class="btn sm" title="Quản lý ' + esc(FIELD_LABEL_KH) + '" onclick="openKhStatusModal()">⚙ ' + esc(FIELD_LABEL_KH) + '</button>';
+  if (isAdmin) html += '<button class="btn sm" data-bar-id="hdr-khstatus" data-bar-home="#auth-box" title="Quản lý ' + esc(FIELD_LABEL_KH) + '" onclick="openKhStatusModal()">⚙ ' + esc(FIELD_LABEL_KH) + '</button>';
   if (isAdmin) html += '<button class="btn sm" style="padding:4px 6px" title="Đổi tên trường này" onclick="renameBuiltinField(\'kh\')">✏️</button>';
-  if (isAdmin) html += '<button class="btn sm" title="Tự tạo trường lớn mới (ngoài ' + esc(FIELD_LABEL_CS) + ' / ' + esc(FIELD_LABEL_KH) + ')" onclick="openCustomFieldsModal()">➕ Trường tự tạo</button>';
-  if (isAdmin) html += '<button class="btn sm" title="Quản lý tài khoản đăng nhập" onclick="openAcctModal()">🔑 Tài khoản</button>';
-  if (loggedIn) html += '<button class="btn sm" title="Đăng xuất" onclick="doLogout()">⎋ Đăng xuất</button>';
+  if (isAdmin) html += '<button class="btn sm" data-bar-id="hdr-customfield" data-bar-home="#auth-box" title="Tự tạo trường lớn mới (ngoài ' + esc(FIELD_LABEL_CS) + ' / ' + esc(FIELD_LABEL_KH) + ')" onclick="openCustomFieldsModal()">➕ Trường tự tạo</button>';
+  if (isAdmin) html += '<button class="btn sm" data-bar-id="hdr-account" data-bar-home="#auth-box" title="Quản lý tài khoản đăng nhập" onclick="openAcctModal()">🔑 Tài khoản</button>';
+  if (loggedIn) html += '<button class="btn sm" data-bar-id="hdr-logout" data-bar-home="#auth-box" title="Đăng xuất" onclick="doLogout()">⎋ Đăng xuất</button>';
   box.innerHTML = html;
+  if (typeof _applyBarCustomization === 'function') _applyBarCustomization();
 }
 
 // Khoá đổi vai trò xem cho người không phải admin
@@ -19918,11 +20103,14 @@ setTimeout(function(){
     var b = document.createElement('button');
     b.id = 'futpl-open-btn';
     b.className = 'btn sm';
+    b.setAttribute('data-bar-id', 'hdr-hoitham');
+    b.setAttribute('data-bar-home', '.hdr-r');
     b.textContent = '📨 Mẫu hỏi thăm';
     b.title = 'Mẫu tin nhắn hỏi thăm tự động theo mốc 7/14/30/60 ngày';
     b.onclick = openFuTplModal;
     hdrR.insertBefore(b, hdrR.firstChild);
   }
+  if (typeof _applyBarCustomization === 'function') _applyBarCustomization();
 }, 400);
 </script>
 
