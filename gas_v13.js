@@ -1202,6 +1202,24 @@ function getDTSS_() {
 // ── Parse ngay dang DD/MM/YYYY (chuoi) hoac Date that (doc truc tiep tu Google Sheet) ──
 // KHONG dung new Date(chuoi) truc tiep: JS hieu chuoi kieu MM/DD/YYYY, se sai am tham
 // voi cac ngay <=12 (vd 01/07/2026 se bi hieu la 1 thang 7 thay vi 7 thang 1).
+// Chuan hoa gio VN: dung Date.UTC() (LUON tuyet doi, khong phu thuoc cau hinh Time Zone cua du
+// an Apps Script) roi tru/cong 7 tieng — TRANH HOAN TOAN phu thuoc vao "Time Zone" cua du an
+// (Project Settings > Time zone / appsscript.json). Neu cau hinh do vo tinh KHONG phai gio VN
+// (vd bi de mac dinh khac, hoac chua ai chinh), moi cho dung new Date(chuoi)/new
+// Date(y,mo-1,d)/.getFullYear() kieu cu se BI LECH GIO AM THAM — day chinh la nguyen nhan bug
+// "ngay hom truoc lan sang ngay hom sau" da gap (Duyen xac nhan ngay 19/09/2026).
+var VN_OFFSET_MS = 7 * 3600 * 1000;
+function _vnMidnight_(y, mo, d) { return new Date(Date.UTC(y, mo - 1, d) - VN_OFFSET_MS); }
+// Tra ve chuoi 'yyyy-MM-dd' CUA DUNG NGAY DUONG LICH VIET NAM cho 1 thoi diem (Date) bat ky —
+// khong dung Utilities.formatDate/Session.getScriptTimeZone() vi ban than 2 cai do cung phu
+// thuoc cau hinh du an; tu tinh tay bang offset co dinh +7 (Viet Nam khong co DST) la chac chan
+// dung 100% du du an cau hinh Time Zone la gi.
+function _vnYmd_(dt) {
+  if (!dt || isNaN(dt.getTime())) return '';
+  var shifted = new Date(dt.getTime() + VN_OFFSET_MS);
+  return shifted.getUTCFullYear() + '-' + String(shifted.getUTCMonth() + 1).padStart(2, '0') + '-' + String(shifted.getUTCDate()).padStart(2, '0');
+}
+
 function parseVNDate_(val) {
   if (!val && val !== 0) return null;
   if (Object.prototype.toString.call(val) === '[object Date]') {
@@ -1215,19 +1233,34 @@ function parseVNDate_(val) {
   if (!m) return null;
   var d = Number(m[1]), mo = Number(m[2]), y = Number(m[3]);
   if (y < 100) y += 2000;
-  var dt = new Date(y, mo - 1, d);
+  var dt = _vnMidnight_(y, mo, d);
   return isNaN(dt.getTime()) ? null : dt;
+}
+
+// Chuyen 1 chuoi ngay bat ky (co the la 'yyyy-MM-dd' tu <input type=date>, hoac 'DD/MM/YYYY')
+// thanh chuoi 'yyyy-MM-dd' CHUAN GIO VN. Voi 'yyyy-MM-dd' thi dung thang khong qua Date object
+// nao ca — an toan tuyet doi, khong co co hoi lech gio.
+function _dateStrToVnYmd_(s) {
+  if (!s) return '';
+  s = String(s).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  var d = parseVNDate_(s);
+  return d ? _vnYmd_(d) : '';
 }
 
 function dateInRange_(dt, fromStr, toStr) {
   if (!dt) return !fromStr && !toStr; // khong parse duoc: chi loai neu co bo loc ngay
+  // So sanh bang CHUOI 'yyyy-MM-dd' (gio VN, tinh tay bang offset co dinh +7) thay vi tru Date
+  // object — tranh hoan toan cac bug lech gio do Date instant + ambient timezone gay ra (da gap
+  // bug "ngay hom truoc lan sang ngay hom sau" khi so sanh kieu cu).
+  var dKey = _vnYmd_(dt);
   if (fromStr) {
-    var from = parseVNDate_(fromStr) || new Date(fromStr);
-    if (dt < new Date(from.getFullYear(), from.getMonth(), from.getDate())) return false;
+    var fKey = _dateStrToVnYmd_(fromStr);
+    if (fKey && dKey < fKey) return false;
   }
   if (toStr) {
-    var to = parseVNDate_(toStr) || new Date(toStr);
-    if (dt > new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59)) return false;
+    var tKey = _dateStrToVnYmd_(toStr);
+    if (tKey && dKey > tKey) return false;
   }
   return true;
 }
@@ -2380,9 +2413,14 @@ function deleteOrder_(data) {
 //   can xoa, tranh xoa nham dong co doanh thu DUNG.
 function normOrderDate_(v) {
   if (!v) return '';
-  var d = (v instanceof Date) ? v : new Date(v);
-  if (isNaN(d)) return String(v).trim();
-  return Utilities.formatDate(d, Session.getScriptTimeZone() || 'GMT+7', 'yyyy-MM-dd');
+  // KHONG dung Session.getScriptTimeZone() nua (co the sai neu cau hinh Time Zone cua du an
+  // khong phai gio VN) — dung parseVNDate_ (da chuan hoa gio VN tuyet doi qua Date.UTC+offset)
+  // roi format bang _vnYmd_ (cung offset co dinh, khong qua ambient timezone nao ca).
+  var d = parseVNDate_(v);
+  if (d) return _vnYmd_(d);
+  var d2 = (v instanceof Date) ? v : new Date(v);
+  if (!isNaN(d2)) return _vnYmd_(d2);
+  return String(v).trim();
 }
 function _normTxt_(s) { return String(s || '').trim().toLowerCase(); }
 
@@ -3022,18 +3060,18 @@ function buildKpiReport_(from, to) {
   // Thieu khoang ngay -> KHONG im lang tinh toan bo lich su (so don/doanh thu ca nam ghep voi
   // tuong tac ca nam cho ra ty le vo nghia). Mac dinh 7 ngay gan nhat va bao ro cho giao dien.
   var warnings = [];
-  var tz = Session.getScriptTimeZone() || 'GMT+7';
+  // KHONG dung Session.getScriptTimeZone() de tinh "hom nay" — neu cau hinh Time Zone cua du an
+  // Apps Script khong phai gio VN (vd bi de mac dinh khac), "hom nay" se tinh sai ngay. Dung
+  // thang offset co dinh +7 (_vnYmd_) — chac chan dung du du an cau hinh Time Zone la gi.
   if (!from || !to) {
     var now = new Date();
-    if (!to)   to   = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
-    if (!from) from = Utilities.formatDate(new Date(now.getTime() - 6 * 86400000), tz, 'yyyy-MM-dd');
+    if (!to)   to   = _vnYmd_(now);
+    if (!from) from = _vnYmd_(new Date(now.getTime() - 6 * 86400000));
     warnings.push('Chưa chọn đủ khoảng ngày — đang tạm tính cho 7 ngày gần nhất (' + from + ' → ' + to + ').');
   }
   if (from && to && from > to) {
     warnings.push('Khoảng ngày bị ngược (từ ' + from + ' sau đến ' + to + ') nên không có dữ liệu nào lọt vào. Hãy đổi lại 2 ô ngày.');
   }
-  var fromD = from ? new Date(from + 'T00:00:00') : null;
-  var toD = to ? new Date(to + 'T23:59:59') : null;
 
   // 1) DT TONG: gom doanh thu/so don theo Page (kenhBan) va theo Sale (saleBan, co the nhieu
   // Sale/don, cach lam giong het buildSalesReportA_: so don KHONG chia, tien CHIA DEU cho N Sale)
@@ -3056,8 +3094,7 @@ function buildKpiReport_(from, to) {
     var o = orders[i];
     var d = parseVNDate_(o.orderDate);
     if (!d) continue;
-    if (fromD && d < fromD) continue;
-    if (toD && d > toD) continue;
+    if (!dateInRange_(d, from, to)) continue;
     var page = o.source || '(chưa có kênh)';
     if (!byPageOrders[page]) byPageOrders[page] = { orders: 0, revenue: 0 };
     byPageOrders[page].orders += 1;
