@@ -15380,6 +15380,67 @@ async function _pkLoadTagOverrideMap(){
   } catch(e){ console.error('pancakeTagOverride load lỗi', e); }
 }
 
+// ── Goi y tu dong quy chuan tag -> ma Sale (doi chieu ten tag voi Ten Facebook / User Base trong _PK_SALE_DIR) ──
+function _pkNorm_(str){
+  return String(str||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[đĐ]/g,'d').toLowerCase().replace(/[^a-z]/g,'');
+}
+function _pkBigrams_(t){ var o={}; for (var i=0;i<t.length-1;i++) o[t.substr(i,2)]=1; return o; }
+function _pkSim_(a,b){
+  if (!a||!b) return 0;
+  if (a===b) return 1;
+  var mn = Math.min(a.length,b.length);
+  if (mn>=4 && (a.indexOf(b)===0 || b.indexOf(a)===0)) return 0.9;
+  var A=_pkBigrams_(a), B=_pkBigrams_(b), ka=Object.keys(A), kb=Object.keys(B);
+  if (!ka.length||!kb.length) return 0;
+  var common=0; ka.forEach(function(k){ if (B[k]) common++; });
+  return 2*common/(ka.length+kb.length);
+}
+// tagNames: mang ten tag chua quy chuan. Tra ve {list:[{tag,code,label,score,level}], byTag:{tag:idx}}
+function _pkSuggestTagMap(tagNames){
+  var list=[], byTag={};
+  tagNames.forEach(function(tag){
+    var hint = (String(tag).match(/^\s*([SsOo])\s*[-_.]/)||[])[1];
+    hint = hint ? hint.toUpperCase() : '';
+    var t = _pkNorm_(String(tag).replace(/^\s*[SsOo]\s*[-_.]\s*/,''));
+    if (t.length<3) return;
+    var scored = _PK_SALE_DIR.filter(function(sd){ return !hint || sd.code.charAt(0)===hint; }).map(function(sd){
+      var fields=[_pkNorm_(sd.fb), _pkNorm_(sd.base)];
+      var sc=0; fields.forEach(function(f){ sc=Math.max(sc,_pkSim_(t,f)); });
+      return {sd:sd, sc:sc};
+    }).sort(function(a,b){ return b.sc-a.sc; });
+    if (!scored.length) return;
+    var best=scored[0], second=scored[1];
+    if (best.sc<0.65) return;
+    if (second && second.sc>=best.sc-0.05) return; // 2 nguoi gan ngang nhau -> khong doan
+    if (second && best.sc<0.9 && best.sc-second.sc<0.12) return;
+    var level = best.sc>=0.9 ? 'high' : 'med';
+    byTag[tag]=list.length;
+    list.push({ tag:tag, code:best.sd.code, label:best.sd.code+' \u2013 '+best.sd.fb+(best.sd.base?' ('+best.sd.base+')':''), score:best.sc, level:level });
+  });
+  return { list:list, byTag:byTag };
+}
+async function _pkSaveTagOverrideMany(pairs){ // pairs: [{tag, code}] — 1 lan ghi cho ca lo
+  if (!gsUrl){ toast('\u26a0\ufe0f Ch\u01b0a c\u1ea5u h\u00ecnh URL Google Apps Script.'); return; }
+  try {
+    var map = Object.assign({}, _pkState.tagOverrideMap || {});
+    pairs.forEach(function(p){ if (p.code) map[p.tag]=p.code; else delete map[p.tag]; });
+    var res = await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'setSetting', key:'pancakeTagOverride', value: JSON.stringify(map) }) });
+    var d = await res.json();
+    if (d.error) throw new Error(d.error);
+    _pkState.tagOverrideMap = map;
+    logAudit('pancake_tag_map','', '', 'Quy chu\u1ea9n '+pairs.length+' tag (g\u1ee3i \u00fd t\u1ef1 \u0111\u1ed9ng): '+pairs.map(function(p){ return p.tag+'\u2192'+p.code; }).join(', '));
+    toast('\u2713 \u0110\u00e3 quy chu\u1ea9n '+pairs.length+' tag');
+    _pkRenderAll();
+  } catch(e){ toast('\u26a0\ufe0f L\u1ed7i l\u01b0u quy chu\u1ea9n tag: ' + e.message); }
+}
+function _pkUseTagSuggest(i){ var x=(_pkState.tagSuggest||[])[i]; if (x) _pkSaveTagOverrideMany([{tag:x.tag, code:x.code}]); }
+function _pkUseAllTagSuggest(level){
+  var arr=(_pkState.tagSuggest||[]).filter(function(x){ return level==='all' || x.level==='high'; });
+  if (!arr.length) return;
+  var msg='\u00c1p d\u1ee5ng '+arr.length+' g\u1ee3i \u00fd?\n\n'+arr.map(function(x){ return x.tag+'  \u2192  '+x.label; }).join('\n');
+  if (confirm(msg)) _pkSaveTagOverrideMany(arr.map(function(x){ return {tag:x.tag, code:x.code}; }));
+}
+
 async function _pkSaveTagOverride(sel){
   var tag = sel.getAttribute('data-tag');
   var code = sel.value;
@@ -15782,6 +15843,16 @@ function _pkTagSectionHtml(){
   if (oth.length){
     html += '<div style="margin:12px 0 6px;padding:8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412">'+
       '<div style="margin-bottom:6px">⚠️ '+oth.length+' tag chưa theo quy tắc (S/O + số, hoặc L1–L6) — chọn quy chuẩn bên dưới để tính vào đúng bảng (áp dụng luôn cho cả dữ liệu cũ đã nạp, dùng chung cho cả team):</div>';
+    var sug = _pkSuggestTagMap(oth);
+    _pkState.tagSuggest = sug.list;
+    var nHigh = sug.list.filter(function(x){ return x.level==='high'; }).length;
+    if (sug.list.length){
+      html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 8px;padding:6px 8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;font-size:12px;color:#166534">'+
+        '\u2728 T\u00ecm \u0111\u01b0\u1ee3c <b>'+sug.list.length+'</b> g\u1ee3i \u00fd theo t\u00ean (\u0111\u1ed1i chi\u1ebfu Ten Facebook / User Base trong danh s\u00e1ch Sale).'+
+        (nHigh ? ' <button class="btn sm primary" onclick="_pkUseAllTagSuggest(\'high\')">\u00c1p d\u1ee5ng '+nHigh+' g\u1ee3i \u00fd kh\u1edbp cao</button>' : '')+
+        (sug.list.length>nHigh ? ' <button class="btn sm secondary" onclick="_pkUseAllTagSuggest(\'all\')">\u00c1p d\u1ee5ng t\u1ea5t c\u1ea3 '+sug.list.length+'</button>' : '')+
+        '<span style="color:#15803d">B\u1ea5m l\u00e0 c\u00f3 h\u1ed9p x\u00e1c nh\u1eadn danh s\u00e1ch tr\u01b0\u1edbc khi l\u01b0u.</span></div>';
+    }
     var stOpts = '<option value="">— Bỏ qua —</option>' +
       '<optgroup label="Trạng thái">' + Object.keys(_PK_STATUS_LABEL).map(function(c){
         return '<option value="'+esc(c)+'">'+esc(_PK_STATUS_LABEL[c])+'</option>';
@@ -15793,6 +15864,7 @@ function _pkTagSectionHtml(){
       html += '<div style="display:flex;gap:8px;align-items:center;margin:4px 0;flex-wrap:wrap">'+
         '<span style="min-width:160px">'+esc(k)+' ('+_pkN(ag.other[k].total)+')</span>'+
         '<select data-tag="'+esc(k)+'" onchange="_pkSaveTagOverride(this)" style="padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+stOpts+'</select>'+
+        (sug.byTag[k]!==undefined ? (function(x,i){ return '<span style="font-size:11px;color:'+(x.level==='high'?'#166534':'#92400e')+'">gợi ý: <b>'+esc(x.label)+'</b> ('+(x.level==='high'?'khớp cao':'khớp vừa — xem lại')+') <button class="btn sm" onclick="_pkUseTagSuggest('+i+')">Dùng</button></span>'; })(sug.list[sug.byTag[k]], sug.byTag[k]) : '')+
       '</div>';
     });
     html += '</div>';
