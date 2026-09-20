@@ -1027,7 +1027,13 @@ function readAllOrders_() {
   for (var i = 0; i < vals.length; i++) {
     var r = vals[i];
     if (!r[DT_COL_PHONE] && !r[DT_COL_ID]) continue; // dong rong
-    out.push(dtRowToOrder_(r, i + 2, tz));
+    try {
+      out.push(dtRowToOrder_(r, i + 2, tz));
+    } catch (eRow) {
+      // 1 dong loi (vd gia tri ngay bat thuong) KHONG duoc lam hong ca danh sach — bo qua
+      // rieng dong do, ghi log de con dieu tra, cac dong khac van doc binh thuong.
+      Logger.log('readAllOrders_: loi doc dong ' + (i + 2) + ': ' + eRow);
+    }
   }
   return out;
 }
@@ -1343,22 +1349,26 @@ function readDTTong_() {
     // (vd don nhap tay/import cu chua kip gan SDT/ID) thi se bi am tham mat doanh thu khoi
     // Bao cao A (thap hon thuc te ma khong bao loi gi). Them dieu kien r[17] de an toan hon.
     if (!r[3] && !r[19] && !r[17]) continue;
-    out.push({
-      ngayTao:        _dtCellToVnStr_(r[0], tz),
-      nguoiTao:       r[1] ? String(r[1]).trim() : '',
-      giaoCho:        r[2],
-      giaiDoan:       r[6],
-      trangThai:      r[7],
-      thoiGianHT:     _dtCellToVnStr_(r[10], tz),
-      kenhBan:        r[12] ? String(r[12]).trim() : '',
-      saleBan:        r[13] ? String(r[13]) : '',
-      sanPham:        r[14],
-      phanLoai:       r[15],
-      giaTriCoc:      _normMoney_(r[16]),
-      giaTriDon:      _normMoney_(r[17]),
-      giaTriChenh:    _normMoney_(r[18]),
-      id:             r[19]
-    });
+    try {
+      out.push({
+        ngayTao:        _dtCellToVnStr_(r[0], tz),
+        nguoiTao:       r[1] ? String(r[1]).trim() : '',
+        giaoCho:        r[2],
+        giaiDoan:       r[6],
+        trangThai:      r[7],
+        thoiGianHT:     _dtCellToVnStr_(r[10], tz),
+        kenhBan:        r[12] ? String(r[12]).trim() : '',
+        saleBan:        r[13] ? String(r[13]) : '',
+        sanPham:        r[14],
+        phanLoai:       r[15],
+        giaTriCoc:      _normMoney_(r[16]),
+        giaTriDon:      _normMoney_(r[17]),
+        giaTriChenh:    _normMoney_(r[18]),
+        id:             r[19]
+      });
+    } catch (eRow) {
+      Logger.log('readDTTong_: loi doc dong ' + (i + 2) + ': ' + eRow);
+    }
   }
   return out;
 }
