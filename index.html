@@ -16875,6 +16875,14 @@ function _mktGroupMatrixHtml_(title, rep, groups, note, nameFn, hintFn){
   simple.forEach(function(r){
     h += '<tr><td>'+r[0]+'</td>'+cols.map(function(c){ return '<td style="text-align:right">'+fmt(Math.round((c.ref[r[1]]||0)*100)/100)+'</td>'; }).join('')+'</tr>';
   });
+  // Doanh thu/Trung bình đơn: tiền nên hiện bằng fmtVND (dạng "245k"/"1.23 tỷ") thay vì fmt thô.
+  var money = [['Tổng doanh thu','baseRevenue'],['Trung bình đơn','trungBinhDon']];
+  money.forEach(function(r){
+    h += '<tr><td>'+r[0]+'</td>'+cols.map(function(c){
+      var v = c.ref[r[1]];
+      return '<td style="text-align:right" title="'+fmt(Math.round(v||0))+'đ">'+(v===null||v===undefined?'<span style="color:var(--muted)">—</span>':fmtVND(Math.round(v)))+'</td>';
+    }).join('')+'</tr>';
+  });
   h += '<tr><td>Tỷ lệ chốt tổng</td>'+cols.map(function(c){ return '<td style="text-align:right;font-weight:700">'+(c.ref.tyLeChotTong||0)+'%</td>'; }).join('')+'</tr>';
   (rep.tags||[]).forEach(function(t0, i){
     h += '<tr><td><b>'+esc(t0.code)+'</b>. '+esc(_mktLabel(t0.code))+'</td>'+cols.map(function(c){
