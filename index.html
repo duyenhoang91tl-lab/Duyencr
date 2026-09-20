@@ -6207,6 +6207,29 @@ function parseNum(v){if(!v&&v!==0) return 0;const n=parseFloat(v.toString().repl
 // Quy ước: doanh thu > 0 và < 1000 thì ×1000 (đơn dưới 1.000đ là không thực tế).
 function _normRev(v){ var n = parseNum(v); if (n > 0 && n < 1000) n = n * 1000; return n; }
 function parseYear(v){if(v===null||v===undefined) return null;const n=parseFloat(v.toString());return isNaN(n)?null:(n<100?n:n-2000);}
+// parseVNDate_: đọc chuỗi ngày dạng "dd/MM/yyyy" hoặc "dd/MM/yyyy HH:mm" mà backend
+// (readAllOrders_/readDTTong_ trong gas_v13.js) trả về cho các trường ngày của đơn hàng.
+// KHÔNG dùng new Date(chuỗi) trực tiếp như parseDate() bên dưới — JS sẽ hiểu nhầm chuỗi kiểu
+// MM/DD/YYYY, sai âm thầm với các ngày ≤12 (vd "01/07/2026" bị hiểu nhầm thành 7 tháng 1 thay
+// vì đúng là 1 tháng 7). Dùng offset VN cố định +7 (không phụ thuộc múi giờ trình duyệt của
+// từng người dùng), khớp đúng cách backend đã tính ở _vnMidnight_/parseVNDate_ (gas_v13.js).
+// (Fix 20/09/2026: hàm này trước đây bị GỌI Ở FRONTEND nhưng CHƯA TỪNG ĐƯỢC ĐỊNH NGHĨA ở đây —
+// chỉ tồn tại bên backend — khiến mọi lần tải đơn hàng báo lỗi "parseVNDate_ is not defined"
+// và toàn bộ danh sách KH/đơn bị rớt xuống chỉ còn vài KH tự thêm tay.)
+var VN_OFFSET_MS_ = 7 * 3600 * 1000;
+function parseVNDate_(val) {
+  if (!val && val !== 0) return null;
+  if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+  var s = String(val).trim();
+  if (!s) return null;
+  var datePart = s.split(' ')[0];
+  var m = datePart.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if (!m) return null;
+  var d = Number(m[1]), mo = Number(m[2]), y = Number(m[3]);
+  if (y < 100) y += 2000;
+  var dt = new Date(Date.UTC(y, mo - 1, d) - VN_OFFSET_MS_);
+  return isNaN(dt.getTime()) ? null : dt;
+}
 function parseDate(v){
   if(!v) return null;
   if(v instanceof Date) return isNaN(v)?null:v;
