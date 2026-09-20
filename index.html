@@ -6418,6 +6418,75 @@ function reapplyColVisibility() {
   });
 }
 
+// ── Tab chính (Dashboard/Quản lý Team/Nhật ký/Báo cáo doanh số/Báo cáo Pancake/KPI
+// Pancake) ẩn/hiện được theo Ý THÍCH TỪNG NGƯỜI, lưu theo TÀI KHOẢN đăng nhập — cùng
+// cơ chế với "cột hiển thị" (colVisible/_pullColVisibleForAccount) ở trên, chỉ đổi
+// đối tượng áp dụng từ cột bảng sang tab. Mặc định TẤT CẢ đang hiện (giữ hành vi cũ
+// cho ai chưa từng đụng vào cài đặt này); tab nào bị Cline thêm mới sau này cũng tự
+// hiện luôn (chỉ ẩn khi người dùng CHỦ ĐỘNG bỏ tích).
+const _tabVisDefault = { dashboard:true, team:true, audit:true, salesreport:true, pancake:true, kpipancake:true };
+const tabVisible = Object.assign({}, _tabVisDefault, loadLS('ome_tab_visible') || {});
+function _tabVisAcctKey(){
+  var u = (typeof _authAccount !== 'undefined' && _authAccount && _authAccount.username) ? String(_authAccount.username).trim().toLowerCase() : '';
+  return u ? ('tabVisible::' + u) : '';
+}
+async function _pullTabVisibleForAccount(){
+  var key = _tabVisAcctKey();
+  if (!key || !gsUrl) return;
+  try {
+    var sep = gsUrl.includes('?') ? '&' : '?';
+    var r = await fetch(gsUrl + sep + 'action=getSetting&key=' + encodeURIComponent(key), {redirect:'follow'});
+    var d = await r.json();
+    if (d && d.value) {
+      var saved = null;
+      try { saved = JSON.parse(d.value); } catch(e) { saved = null; }
+      if (saved && typeof saved === 'object') {
+        Object.assign(tabVisible, saved);
+        saveLS('ome_tab_visible', tabVisible);
+      }
+    }
+  } catch(e) { console.warn('_pullTabVisibleForAccount lỗi:', e.message); }
+}
+function _pushTabVisibleForAccount(){
+  var key = _tabVisAcctKey();
+  if (!key || !gsUrl) return;
+  fetch(gsUrl, { method:'POST', redirect:'follow',
+    body: JSON.stringify({ action:'setSetting', key: key, value: JSON.stringify(tabVisible) }) }).catch(function(){});
+}
+function openTabCustomizeModal(){
+  var defs = [
+    { id:'dashboard',   label:'📊 Dashboard' },
+    { id:'team',        label:'👥 Quản lý Team' },
+    { id:'audit',       label:'🧾 Nhật ký' },
+    { id:'salesreport', label:'📈 Báo cáo doanh số' },
+    { id:'pancake',     label:'📥 Báo cáo Pancake' },
+    { id:'kpipancake',  label:'📈 KPI Pancake' }
+  ];
+  var rows = defs.map(function(d){
+    return '<label style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--border);cursor:pointer">'+
+      '<input type="checkbox" '+(tabVisible[d.id]!==false?'checked':'')+' onchange="tabVisible[\''+d.id+'\']=this.checked">'+
+      '<span>'+d.label+'</span></label>';
+  }).join('');
+  var box = document.createElement('div');
+  box.id = 'tab-customize-overlay';
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:900;display:flex;align-items:center;justify-content:center';
+  box.innerHTML = '<div style="background:var(--surface);border-radius:var(--rlg);padding:18px 20px;width:320px;max-width:92vw;max-height:80vh;overflow:auto">'+
+    '<div style="font-weight:700;font-size:15px;margin-bottom:4px">⚙ Tuỳ chỉnh tab hiển thị</div>'+
+    '<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Bỏ tích tab nào để ẩn khỏi thanh của riêng bạn — người khác không bị ảnh hưởng.</div>'+
+    rows +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'+
+      '<button class="btn" onclick="document.getElementById(\'tab-customize-overlay\').remove()">Huỷ</button>'+
+      '<button class="btn primary" onclick="_saveTabCustomize_()">Lưu & tải lại</button>'+
+    '</div></div>';
+  box.addEventListener('click', function(e){ if (e.target===box) box.remove(); });
+  document.body.appendChild(box);
+}
+function _saveTabCustomize_(){
+  saveLS('ome_tab_visible', tabVisible);
+  _pushTabVisibleForAccount();
+  location.reload();
+}
+
 let _lastActSortDir = 0; // 0=off, 1=asc(oldest first), -1=desc(newest first)
 function toggleLastActSort() {
   _lastActSortDir = _lastActSortDir === 0 ? -1 : _lastActSortDir === -1 ? 1 : 0;
@@ -17055,7 +17124,7 @@ if (typeof syncFromGS === 'function'){
 //  INJECT UI (tabs + panels + role pill) — chạy khi load
 // ═══════════════════════════════════════════════════════
 function _injectV9UI(){
-  if (document.getElementById('v9tab-dashboard')) return; // tránh chèn 2 lần
+  if (document.getElementById('v9tab-customize')) return; // tránh chèn 2 lần (nút ⚙ luôn được thêm dù tab nào bị ẩn)
   var tabsBar = document.querySelector('.tabs');
   if (tabsBar){
     var defs = [
@@ -17066,7 +17135,7 @@ function _injectV9UI(){
       { id:'pancake',     label:'📥 Báo cáo Pancake' },
       { id:'kpipancake',  label:'📈 KPI Pancake' }
     ];
-    defs.forEach(function(d){
+    defs.filter(function(d){ return tabVisible[d.id] !== false; }).forEach(function(d){
       var div = document.createElement('div');
       div.className = 'tab';
       div.id = 'v9tab-' + d.id;
@@ -17076,6 +17145,7 @@ function _injectV9UI(){
     });
     // Đổi chỗ tab "KPI Pancake" với tab tĩnh "Quá hạn" (yêu cầu người dùng) — "Quá hạn" định
     // nghĩa sẵn trong HTML, "KPI Pancake" chèn động ở cuối thanh .tabs → đảo vị trí thủ công.
+    // Nếu KPI Pancake đang bị người dùng ẩn (tabVisible) thì kpiTab=null, tự bỏ qua bước đảo.
     var overdueTab = tabsBar.querySelector('[onclick="switchTab(\'overdue\',this)"]');
     var kpiTab = document.getElementById('v9tab-kpipancake');
     if (overdueTab && kpiTab && overdueTab.parentNode === kpiTab.parentNode){
@@ -17085,6 +17155,14 @@ function _injectV9UI(){
       swapMark.parentNode.insertBefore(kpiTab, swapMark);
       swapMark.remove();
     }
+    var gear = document.createElement('div');
+    gear.className = 'tab';
+    gear.id = 'v9tab-customize';
+    gear.title = 'Tuỳ chỉnh tab hiển thị — ẩn/hiện tab bạn không dùng';
+    gear.style.cssText = 'flex-shrink:0;opacity:.6';
+    gear.innerHTML = '⚙';
+    gear.setAttribute('onclick', 'openTabCustomizeModal()');
+    tabsBar.appendChild(gear);
   }
   var dataView = document.getElementById('data-view');
   if (dataView){
@@ -17244,6 +17322,9 @@ function _applyAuthIdentity(acct){
   }
   if (typeof _pullColVisibleForAccount === 'function') {
     _pullColVisibleForAccount().catch(function(){});
+  }
+  if (typeof _pullTabVisibleForAccount === 'function') {
+    _pullTabVisibleForAccount().catch(function(){});
   }
 }
 
