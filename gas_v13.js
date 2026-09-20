@@ -890,6 +890,10 @@ function doGet(e) {
       return jsonOut_({ ok: true, total: rowsPS.length, count: matched.length, rows: matched });
     }
 
+    // ── CHECKLIST CHAT LUONG TIN NHAN MKT (tab "Checklist MKT" tren index.html) ──
+    if (action === 'mktChecklist') return jsonOut_({ ok: true, rows: readMktRows_(), targets: readMktTargets_(), tagDefs: readMktTagDefs_() });
+    if (action === 'mktChecklistSummary') return jsonOut_(buildMktSummary_(e.parameter.from, e.parameter.to));
+
     // ─── Danh muc PHANG cho "Soan don" (Pancake AI): tra cuu theo ten -> dropdown thu hep dan ───
     if (action === 'priceCatalogFlat') {
       var flatJson = _cacheGetBig_('price_flat_v1');
@@ -2348,6 +2352,10 @@ function doPost(e) {
     // ── MESSENGER/PHONG THUY AI: doc bang tra menh + mau canned response (Sheet Menh/CannedResponses,
     //    tu tao voi du lieu mac dinh neu chua co). Them 2026-09, KHONG dung chung sheet/cot voi CareData. ──
     if (action === 'getKnowledge') return jsonOut_(getMessengerKnowledge_());
+    // ── CHECKLIST MKT: nhap tay theo ngay + muc tieu L1-L4 ──
+    if (action === 'saveMktChecklistRow')     return saveMktChecklistRow_(data.row);
+    if (action === 'deleteMktChecklistRow')   return deleteMktChecklistRow_(data.date);
+    if (action === 'saveMktChecklistTargets') return saveMktChecklistTargets_(data.targets);
     return jsonOut_({ error: 'Unknown action: ' + action });
   } catch(err) {
     return jsonOut_({ error: err.message });
@@ -3114,7 +3122,7 @@ function savePancakePageMap_(pageId, pageName, kenhBan) {
 //  tinh LAI moi lan tong hop (khong tin type/code luc luu), CUNG LOGIC voi _pkClassifyTag
 //  ben client, de quy chuan tay (pancakeTagOverride) ap dung duoc ngay ca voi du lieu cu.
 // ═══════════════════════════════════════════════════════════════
-var PK_STATUS_CODES_ = ['L1','L2','L3','L4','L5','L5.1','L5.2','L6','L7'];
+var PK_STATUS_CODES_ = ['L1','L2','L3','L4','L5','L5.1','L5.2','L6','L7','L8']; // L8 = Upsale (chi dem so luong)
 
 function classifyPancakeTag_(name, overrideMap) {
   var n = String(name || '').trim();
@@ -3219,7 +3227,7 @@ function _tagFunnelRates_(counts, tongTT, sdtThuThap, realOrders) {
   var c = counts || {};
   var l5Count = (realOrders !== undefined && realOrders !== null) ? realOrders : (c.L5 || 0);
   return {
-    counts: { L1: c.L1||0, L2: c.L2||0, L3: c.L3||0, L4: c.L4||0, L5: l5Count, L6: c.L6||0, L7: c.L7||0 },
+    counts: { L1: c.L1||0, L2: c.L2||0, L3: c.L3||0, L4: c.L4||0, L5: l5Count, L6: c.L6||0, L7: c.L7||0, L8: c.L8||0 },
     rates: {
       L1: pct(c.L1, tongTT),
       L2: pct(c.L2, sdtThuThap),
@@ -3227,7 +3235,8 @@ function _tagFunnelRates_(counts, tongTT, sdtThuThap, realOrders) {
       L4: pct(c.L4, c.L3),
       L5: pct(l5Count, tongTT),
       L6: pct(c.L6, c.L5), // van so voi L5 THEO TAG (c.L5, khong phai l5Count) — L6 la ty le huy trong so da chot-theo-tag
-      L7: pct(c.L7, tongTT)
+      L7: pct(c.L7, tongTT),
+      L8: 0 // Upsale: chua co mau so ty le chuan -> chi hien so luong (counts.L8), client hien dau "—"
     }
   };
 }
@@ -5239,4 +5248,171 @@ function readBannedWords_() {
   } catch (e) {
     return BANNED_WORDS_FALLBACK; // vd: tai khoan chay GAS chua duoc chia se file Report Sale
   }
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+//  CHECKLIST CHAT LUONG TIN NHAN MKT — tab "✅ Checklist MKT" (index.html)
+//  Mo phong file Excel "Checklist_tin_nhắn_MKT_chất_lượng.xlsx": 4 tieu chi L1-L4, nhap tay
+//  theo ngay (cac mau so nhu "So HT day Sale", "So KH da bao gia" KHONG co san trong du lieu
+//  Pancake nen khong tu tinh duoc), he thong tu tinh ty le va so voi muc tieu.
+//  3 sheet rieng (tu tao lan dau): MktChecklist (so lieu ngay), MktTagDefs (bang dinh nghia tag,
+//  sua thang tren Sheet), muc tieu luu trong Settings key 'mktChecklistTargets'.
+// ═══════════════════════════════════════════════════════════════
+var SH_MKT = 'MktChecklist';
+var MKT_HEADERS = ['date','khTiepCanL1','htDatLan3','sdtThuThap','sdtKetNoi','khTiepCanL3','khDungChanDung','khTiepCanL4','khKhaoGia','note','updatedAt'];
+var MKT_NUM_FIELDS = ['khTiepCanL1','htDatLan3','sdtThuThap','sdtKetNoi','khTiepCanL3','khDungChanDung','khTiepCanL4','khKhaoGia'];
+var SH_MKT_DEFS = 'MktTagDefs';
+var MKT_DEF_HEADERS = ['name','tieuChi','dieuKien','yNghia','khiNaoGan','congThuc'];
+var MKT_TARGETS_DEFAULT = { L1: 0.8, L2: 0.6, L3: 0.9, L4: 0.9 };
+// Noi dung mac dinh lay tu bang tieu chi tag trong index.html (_PK_STATUS_DESC) — co the sua truc tiep
+// trong sheet MktTagDefs (dan noi dung chuan tu file Excel vao la hien ngay, khong can sua code).
+var MKT_TAGDEFS_DEFAULT = [
+  ['L1. Chuẩn (đạt 3 lần phản hồi)', 'Hội thoại đạt mốc phản hồi lần 3',
+   '≥80% hội thoại đẩy Sale phải đạt mốc lần 3: (1) KH hỏi SP → (2) NV khai thác năm sinh + mong cầu, KH phản hồi → (3) NV tư vấn cụ thể, KH phản hồi tiếp.',
+   'Đo chất lượng tin nhắn MKT đẩy sang Sale.', 'Khi hội thoại đạt mốc phản hồi lần 3.', 'Số HT đạt lần 3 (Tag L1) ÷ Số KH tiếp cận (L1) — mục tiêu ≥80%'],
+  ['L2. SĐT kết nối', 'SĐT thu thập được kết nối thành công',
+   '>60% SĐT thu thập được phải kết nối thành công qua gọi điện / nhắn tin / kết bạn Zalo (KH có phản hồi thật).',
+   'Đo khả năng biến SĐT thu thập thành liên hệ thật.', 'Khi kết nối được với SĐT (KH có phản hồi).', 'Số SĐT kết nối (Tag L2) ÷ Số SĐT thu thập — mục tiêu ≥60%'],
+  ['L3. KH tiềm năng', 'KH đúng chân dung',
+   'KH không im lặng sau khi được báo giá, độ tuổi từ 27 trở lên, có mục đích mua rõ ràng — có phản hồi cụ thể về mức giá (đồng ý / cân nhắc / hỏi thêm chi tiết).',
+   'Đo tỷ lệ KH tiếp cận đúng chân dung khách hàng mục tiêu.', 'Khi KH có phản hồi cụ thể về giá sau khi được báo giá.', 'Số KH đúng chân dung (Tag L3) ÷ Số KH tiếp cận (L3) — mục tiêu ≥90%'],
+  ['L4. Khảo giá / KNC', 'KH khảo giá',
+   'Không phải nick ảo, seeding, đối thủ dò giá hoặc KH hỏi nhiều page cùng lúc không có dấu hiệu mua thật — theo dõi để LOẠI khỏi mẫu số các KPI trên.',
+   'Đo tỷ lệ KH khảo giá trong tổng KH tiếp cận.', 'Khi KH chỉ khảo giá / không có dấu hiệu mua thật.', 'Số KH khảo giá (Tag L4) ÷ Số KH tiếp cận (L4) — mục tiêu ≥90%']
+];
+
+function _mktNum_(v) { var n = Number(v); return (isNaN(n) || n < 0) ? 0 : n; }
+
+function readMktTargets_() {
+  var out = { L1: MKT_TARGETS_DEFAULT.L1, L2: MKT_TARGETS_DEFAULT.L2, L3: MKT_TARGETS_DEFAULT.L3, L4: MKT_TARGETS_DEFAULT.L4 };
+  try {
+    var raw = getSetting_('mktChecklistTargets');
+    if (raw) {
+      var o = JSON.parse(raw);
+      ['L1','L2','L3','L4'].forEach(function(k) {
+        var n = Number(o[k]);
+        if (!isNaN(n) && n >= 0 && n <= 1) out[k] = n;
+      });
+    }
+  } catch (e) {}
+  return out;
+}
+
+function saveMktChecklistTargets_(targets) {
+  if (!targets || typeof targets !== 'object') return jsonOut_({ ok: false, error: 'Thieu targets' });
+  var clean = {};
+  ['L1','L2','L3','L4'].forEach(function(k) {
+    var n = Number(targets[k]);
+    clean[k] = (isNaN(n) || n < 0) ? MKT_TARGETS_DEFAULT[k] : Math.min(n, 1);
+  });
+  return setSetting_('mktChecklistTargets', JSON.stringify(clean));
+}
+
+function readMktTagDefs_() {
+  var sh = getSheet_(SH_MKT_DEFS, MKT_DEF_HEADERS);
+  if (sh.getLastRow() < 2) {
+    sh.getRange(2, 1, MKT_TAGDEFS_DEFAULT.length, MKT_DEF_HEADERS.length).setValues(MKT_TAGDEFS_DEFAULT);
+  }
+  var v = sh.getRange(2, 1, Math.max(sh.getLastRow() - 1, 0), MKT_DEF_HEADERS.length).getValues();
+  var out = [];
+  for (var i = 0; i < v.length; i++) {
+    if (!String(v[i][0] || '').trim()) continue;
+    out.push({ name: String(v[i][0]), tieuChi: String(v[i][1] || ''), dieuKien: String(v[i][2] || ''),
+      yNghia: String(v[i][3] || ''), khiNaoGan: String(v[i][4] || ''), congThuc: String(v[i][5] || '') });
+  }
+  return out;
+}
+
+function _mktRowFromValues_(v) {
+  var d = normOrderDate_(v[0]); // cot ngay co the bi Sheets tu doi thanh kieu Date -> chuan hoa ve yyyy-MM-dd
+  var o = { date: d };
+  for (var i = 0; i < MKT_NUM_FIELDS.length; i++) o[MKT_NUM_FIELDS[i]] = _mktNum_(v[i + 1]);
+  o.note = String(v[9] || '');
+  return o;
+}
+
+// Tra ve cac dong da nhap, ngay MOI nhat len dau
+function readMktRows_() {
+  var sh = getSheet_(SH_MKT, MKT_HEADERS);
+  var last = sh.getLastRow();
+  if (last < 2) return [];
+  var vals = sh.getRange(2, 1, last - 1, MKT_HEADERS.length).getValues();
+  var out = [];
+  for (var i = 0; i < vals.length; i++) {
+    if (!vals[i][0]) continue;
+    var r = _mktRowFromValues_(vals[i]);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(r.date)) out.push(r);
+  }
+  out.sort(function(a, b) { return a.date < b.date ? 1 : (a.date > b.date ? -1 : 0); });
+  return out;
+}
+
+function _mktFindRowIndex_(sh, ymd) {
+  var last = sh.getLastRow();
+  if (last < 2) return -1;
+  var col = sh.getRange(2, 1, last - 1, 1).getValues();
+  for (var i = 0; i < col.length; i++) {
+    if (col[i][0] && normOrderDate_(col[i][0]) === ymd) return i + 2;
+  }
+  return -1;
+}
+
+// Them moi hoac ghi de theo NGAY (moi ngay dung 1 dong)
+function saveMktChecklistRow_(row) {
+  if (!row) return jsonOut_({ ok: false, error: 'Thieu du lieu' });
+  var ymd = normOrderDate_(row.date);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return jsonOut_({ ok: false, error: 'Ngay khong hop le' });
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(15000); } catch (eLock) {}
+  try {
+    var sh = getSheet_(SH_MKT, MKT_HEADERS);
+    var vals = [ymd];
+    for (var i = 0; i < MKT_NUM_FIELDS.length; i++) vals.push(_mktNum_(row[MKT_NUM_FIELDS[i]]));
+    vals.push(String(row.note || ''));
+    vals.push(new Date().toISOString());
+    var idx = _mktFindRowIndex_(sh, ymd);
+    if (idx < 0) idx = Math.max(sh.getLastRow(), 1) + 1;
+    sh.getRange(idx, 1).setNumberFormat('@'); // giu nguyen chuoi yyyy-MM-dd, Sheets khong tu doi thanh Date
+    sh.getRange(idx, 1, 1, MKT_HEADERS.length).setValues([vals]);
+    return jsonOut_({ ok: true, date: ymd, updated: true });
+  } finally {
+    try { lock.releaseLock(); } catch (eu) {}
+  }
+}
+
+function deleteMktChecklistRow_(date) {
+  var ymd = normOrderDate_(date);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return jsonOut_({ ok: false, error: 'Ngay khong hop le' });
+  var sh = getSheet_(SH_MKT, MKT_HEADERS);
+  var idx = _mktFindRowIndex_(sh, ymd);
+  if (idx < 0) return jsonOut_({ ok: true, deleted: false });
+  sh.deleteRow(idx);
+  return jsonOut_({ ok: true, deleted: true });
+}
+
+// Tong hop theo khoang ngay (giong sheet "Tong hop tuan/thang" cua Excel): cong don tu so va mau so
+// roi moi tinh ty le (KHONG lay trung binh cac ty le tung ngay). Ty le tra ve dang % (1 so le).
+function buildMktSummary_(from, to) {
+  var f = from ? normOrderDate_(from) : '', t = to ? normOrderDate_(to) : '';
+  var rows = readMktRows_().filter(function(r) {
+    if (f && r.date < f) return false;
+    if (t && r.date > t) return false;
+    return true;
+  });
+  var totals = {};
+  MKT_NUM_FIELDS.forEach(function(k) { totals[k] = 0; });
+  rows.forEach(function(r) { MKT_NUM_FIELDS.forEach(function(k) { totals[k] += r[k]; }); });
+  var pct = function(a, b) { return b ? Math.round(a / b * 1000) / 10 : 0; };
+  var rates = {
+    L1: pct(totals.htDatLan3, totals.khTiepCanL1),
+    L2: pct(totals.sdtKetNoi, totals.sdtThuThap),
+    L3: pct(totals.khDungChanDung, totals.khTiepCanL3),
+    L4: pct(totals.khKhaoGia, totals.khTiepCanL4)
+  };
+  var den = { L1: totals.khTiepCanL1, L2: totals.sdtThuThap, L3: totals.khTiepCanL3, L4: totals.khTiepCanL4 };
+  var targets = readMktTargets_();
+  var passed = {};
+  ['L1','L2','L3','L4'].forEach(function(k) { passed[k] = den[k] > 0 && rates[k] >= targets[k] * 100; });
+  return { ok: true, from: f, to: t, rows: rows, totals: totals, rates: rates, targets: targets, passed: passed };
 }
