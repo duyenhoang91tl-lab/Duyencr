@@ -9257,7 +9257,7 @@ function doGet(e) {
     if (action === 'salesReportC') {
       var pC = e.parameter || {};
       var fC = { dateField: pC.dateField || 'ngayTao', periodType: pC.periodType || 'week',
-                 weekOffset: pC.weekOffset || 0, monthOffset: pC.monthOffset || 0, quarterOffset: pC.quarterOffset || 0,
+                 weekOffset: pC.weekOffset || 0, monthOffset: pC.monthOffset || 0, quarterOffset: pC.quarterOffset || 0, yearOffset: pC.yearOffset || 0,
                  customCurFrom: pC.customCurFrom || '', customCurTo: pC.customCurTo || '',
                  customPrevFrom: pC.customPrevFrom || '', customPrevTo: pC.customPrevTo || '',
                  sale: pC.sale ? pC.sale.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [],
@@ -10326,6 +10326,12 @@ function _quarterRange_(baseDate, quarterOffset) {
   var to = _vnMidnight_(lastDayUtc.getUTCFullYear(), lastDayUtc.getUTCMonth() + 1, lastDayUtc.getUTCDate());
   return { from: from, to: to };
 }
+function _yearRange_(baseDate, yearOffset) {
+  var p = _vnYmdParts_(baseDate);
+  var y = p.y + yearOffset;
+  return { from: _vnMidnight_(y, 1, 1), to: _vnMidnight_(y, 12, 31) };
+}
+function _yearKey_(d) { return String(_vnYmdParts_(d).y); }
 function _quarterKey_(d) { var p = _vnYmdParts_(d); return p.y + '-Q' + (Math.floor((p.mo - 1) / 3) + 1); }
 function _ymdLocal_(d) { return _vnYmd_(d); } // giu ten cu de khoi phai sua noi goi, tro thang ve ham VN chuan
 function _labelVN_(d) {
@@ -10354,6 +10360,11 @@ function _resolvePeriods_(filters) {
     cur = _quarterRange_(today, qOff);
     prev = _quarterRange_(today, qOff - 1);
     curKey = _quarterKey_(cur.from); prevKey = _quarterKey_(prev.from);
+  } else if (periodType === 'year') {
+    var yOff = Number(filters.yearOffset) || 0;
+    cur = _yearRange_(today, yOff);
+    prev = _yearRange_(today, yOff - 1);
+    curKey = _yearKey_(cur.from); prevKey = _yearKey_(prev.from);
   } else { // custom — 2 khoang ngay hoan toan tu chon, khong lien quan nhau, KHONG co PeriodKey KPI
     cur = { from: parseVNDate_(filters.customCurFrom) || today, to: parseVNDate_(filters.customCurTo) || today };
     prev = { from: parseVNDate_(filters.customPrevFrom) || today, to: parseVNDate_(filters.customPrevTo) || today };
@@ -14887,13 +14898,10 @@ function _dashSetFilter(key, val){
   renderDashboard();
 }
 function _dashSetPreset(preset){
-  var now = new Date(), y = now.getFullYear(), m = now.getMonth();
-  function ymd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
-  if (preset === 'all')        { _dashFilter.from=''; _dashFilter.to=''; }
-  else if (preset === 'month') { _dashFilter.from=ymd(new Date(y,m,1));      _dashFilter.to=ymd(new Date(y,m+1,0)); }
-  else if (preset === 'last')  { _dashFilter.from=ymd(new Date(y,m-1,1));    _dashFilter.to=ymd(new Date(y,m,0)); }
-  else if (preset === 'q')     { var q=Math.floor(m/3); _dashFilter.from=ymd(new Date(y,q*3,1)); _dashFilter.to=ymd(new Date(y,q*3+3,0)); }
-  else if (preset === 'year')  { _dashFilter.from=ymd(new Date(y,0,1));      _dashFilter.to=ymd(new Date(y,11,31)); }
+  // Dung chung bo loc nhanh _pkQuickRange: hom nay/hom qua/thang/quy/nam (nay + truoc)
+  var map = { today:'today', yesterday:'yesterday', month:'thisMonth', last:'lastMonth', q:'thisQuarter', lastq:'lastQuarter', year:'thisYear', lasty:'lastYear' };
+  if (preset === 'all') { _dashFilter.from=''; _dashFilter.to=''; }
+  else if (map[preset]) { var rg = _pkQuickRange(map[preset]); if (rg){ _dashFilter.from=rg.from; _dashFilter.to=rg.to; } }
   _dashFilterSave();
   renderDashboard();
 }
@@ -14917,10 +14925,12 @@ function _dashFilterBarHtml(scopeList){
   }
   csNames.sort(function(a,b){ return a.localeCompare(b,'vi'); });
 
-  var presets = [['all','Tất cả'],['month','Tháng này'],['last','Tháng trước'],['q','Quý này'],['year','Năm nay']];
+  var presets = [['all','Tất cả'],['today','Hôm nay'],['yesterday','Hôm qua'],['month','Tháng này'],['last','Tháng trước'],['q','Quý này'],['lastq','Quý trước'],['year','Năm nay'],['lasty','Năm trước']];
   var isAll = !f.from && !f.to;
   var presetHtml = presets.map(function(p){
-    var active = (p[0]==='all') ? isAll : false;
+    var pmap = { today:'today', yesterday:'yesterday', month:'thisMonth', last:'lastMonth', q:'thisQuarter', lastq:'lastQuarter', year:'thisYear', lasty:'lastYear' };
+    var prg = pmap[p[0]] ? _pkQuickRange(pmap[p[0]]) : null;
+    var active = (p[0]==='all') ? isAll : !!(prg && f.from===prg.from && f.to===prg.to);
     return '<button class="btn sm'+(active?' primary':'')+'" style="padding:3px 9px;font-size:11px" onclick="_dashSetPreset(\''+p[0]+'\')">'+p[1]+'</button>';
   }).join('');
 
@@ -15665,6 +15675,12 @@ async function _pkOnTagFileSelected(input){
   else toast('✅ Đã nạp '+okFiles+' file tag.');
   _pkRenderAll();
 }
+function _pkTagApplyQuick(key){
+  if (key === 'custom') return;
+  var r = _pkQuickRange(key); if (!r) return;
+  _pkState.tagFrom = r.from; _pkState.tagTo = r.to;
+  _pkRenderAll();
+}
 function _pkTagSetRange(which, val){
   _pkState[which === 'from' ? 'tagFrom' : 'tagTo'] = val;
   if (_pkState.tagFrom && _pkState.tagTo && _pkState.tagFrom > _pkState.tagTo){
@@ -15718,6 +15734,7 @@ function _pkTagSectionHtml(){
   var st = 'padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)';
   html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">'+
     '<span style="font-size:12px">Khoảng ngày:</span>'+
+    _quickRangeSelectHtml('custom', "_pkTagApplyQuick(this.value)")+
     '<input type="date" value="'+esc(_pkState.tagFrom)+'" min="'+esc(allDates[0])+'" max="'+esc(allDates[allDates.length-1])+'" onchange="_pkTagSetRange(\'from\',this.value)" style="'+st+'">'+
     '<span>→</span>'+
     '<input type="date" value="'+esc(_pkState.tagTo)+'" min="'+esc(allDates[0])+'" max="'+esc(allDates[allDates.length-1])+'" onchange="_pkTagSetRange(\'to\',this.value)" style="'+st+'">'+
@@ -16961,7 +16978,7 @@ var _srState = {
   saleSearch: '', kenhSearch: '', productSearch: '', bSaleSearch: '', // lọc nhanh client-side trên bảng breakdown
   // C — So sanh theo ky
   cPeriodType: 'week', cDateField: 'ngayTao',
-  cWeekOffset: 0, cMonthOffset: 0, cQuarterOffset: 0,
+  cWeekOffset: 0, cMonthOffset: 0, cQuarterOffset: 0, cYearOffset: 0,
   cCustomCurFrom: '', cCustomCurTo: '', cCustomPrevFrom: '', cCustomPrevTo: '',
   cSale: [], cKenh: [],     // C — multi-select giong A, tach rieng de doi tab A/C khong dam vao nhau
   cSanPham: '',             // C — loc san pham, cach nhau dau phay
@@ -17036,7 +17053,7 @@ async function _srLoad(){
   } else if (_srState.sub === 'C') {
     _srState.dataC = await _srFetch('salesReportC', {
       dateField: _srState.cDateField, periodType: _srState.cPeriodType,
-      weekOffset: _srState.cWeekOffset, monthOffset: _srState.cMonthOffset, quarterOffset: _srState.cQuarterOffset,
+      weekOffset: _srState.cWeekOffset, monthOffset: _srState.cMonthOffset, quarterOffset: _srState.cQuarterOffset, yearOffset: _srState.cYearOffset,
       customCurFrom: _srState.cCustomCurFrom, customCurTo: _srState.cCustomCurTo,
       customPrevFrom: _srState.cCustomPrevFrom, customPrevTo: _srState.cCustomPrevTo,
       sale: (_srState.cSale||[]).join(','), kenh: (_srState.cKenh||[]).join(','),
@@ -17092,7 +17109,7 @@ async function exportSalesReportToSheet(){
       sale: _srState.sale || [], kenh: _srState.kenh || [], byCreator: _srState.byCreator ? '1' : '' };
   } else if (_srState.sub === 'C') {
     filters = { dateField: _srState.cDateField, periodType: _srState.cPeriodType,
-      weekOffset: _srState.cWeekOffset, monthOffset: _srState.cMonthOffset, quarterOffset: _srState.cQuarterOffset,
+      weekOffset: _srState.cWeekOffset, monthOffset: _srState.cMonthOffset, quarterOffset: _srState.cQuarterOffset, yearOffset: _srState.cYearOffset,
       customCurFrom: _srState.cCustomCurFrom, customCurTo: _srState.cCustomCurTo,
       customPrevFrom: _srState.cCustomPrevFrom, customPrevTo: _srState.cCustomPrevTo,
       sale: _srState.cSale || [], kenh: _srState.cKenh || [] };
@@ -17543,6 +17560,14 @@ function _srRenderB(d){
 }
 
 // ── BAO CAO C: SO SANH THEO KY (tuan/thang/quy/tuy chinh) ──
+// Bo loc nhanh cho 2 khoang ngay cua Bao cao C che do "Tuy chinh" (ky nay / so voi)
+function _srApplyQuickC(which, key){
+  if (key === 'custom') return;
+  var r = _pkQuickRange(key); if (!r) return;
+  if (which === 'cur'){ _srState.cCustomCurFrom = r.from; _srState.cCustomCurTo = r.to; }
+  else { _srState.cCustomPrevFrom = r.from; _srState.cCustomPrevTo = r.to; }
+  renderSalesReportTab();
+}
 function renderSalesReportTabC_(wrap, subTabs){
   var pt = _srState.cPeriodType;
   var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
@@ -17550,12 +17575,13 @@ function renderSalesReportTabC_(wrap, subTabs){
     '<option value="week"'+(pt==='week'?' selected':'')+'>Theo Tuần (Thứ 2 → CN)</option>'+
     '<option value="month"'+(pt==='month'?' selected':'')+'>Theo Tháng</option>'+
     '<option value="quarter"'+(pt==='quarter'?' selected':'')+'>Theo Quý</option>'+
+    '<option value="year"'+(pt==='year'?' selected':'')+'>Theo Năm</option>'+
     '<option value="custom"'+(pt==='custom'?' selected':'')+'>Tùy chỉnh (2 khoảng ngày)</option>'+
     '</select>';
 
   if (pt !== 'custom'){
-    var offKey = pt==='week' ? 'cWeekOffset' : (pt==='month' ? 'cMonthOffset' : 'cQuarterOffset');
-    var unitLabel = pt==='week' ? 'tuần' : (pt==='month' ? 'tháng' : 'quý');
+    var offKey = pt==='week' ? 'cWeekOffset' : (pt==='month' ? 'cMonthOffset' : (pt==='year' ? 'cYearOffset' : 'cQuarterOffset'));
+    var unitLabel = pt==='week' ? 'tuần' : (pt==='month' ? 'tháng' : (pt==='year' ? 'năm' : 'quý'));
     filters += '<div style="display:flex;align-items:center;gap:4px;border:1px solid var(--border);border-radius:6px;padding:2px 4px;background:var(--surface)">'+
       '<button class="btn sm" onclick="_srState.'+offKey+'--;_srApply()" title="Lùi 1 '+unitLabel+'">◀</button>'+
       '<span style="font-size:12px;padding:0 4px;min-width:26px;text-align:center">'+
@@ -17566,10 +17592,12 @@ function renderSalesReportTabC_(wrap, subTabs){
       '</div>';
   } else {
     filters += '<span style="font-size:11px;color:var(--muted)">Kỳ này:</span>'+
+      _quickRangeSelectHtml('custom', "_srApplyQuickC('cur',this.value)")+
       '<input type="date" value="'+esc(_srState.cCustomCurFrom)+'" onchange="_srState.cCustomCurFrom=this.value" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
       '<span style="color:var(--muted)">→</span>'+
       '<input type="date" value="'+esc(_srState.cCustomCurTo)+'" onchange="_srState.cCustomCurTo=this.value" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
       '<span style="font-size:11px;color:var(--muted)">so với:</span>'+
+      _quickRangeSelectHtml('custom', "_srApplyQuickC('prev',this.value)")+
       '<input type="date" value="'+esc(_srState.cCustomPrevFrom)+'" onchange="_srState.cCustomPrevFrom=this.value" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
       '<span style="color:var(--muted)">→</span>'+
       '<input type="date" value="'+esc(_srState.cCustomPrevTo)+'" onchange="_srState.cCustomPrevTo=this.value" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';

@@ -970,7 +970,7 @@ function doGet(e) {
     if (action === 'salesReportC') {
       var pC = e.parameter || {};
       var fC = { dateField: pC.dateField || 'ngayTao', periodType: pC.periodType || 'week',
-                 weekOffset: pC.weekOffset || 0, monthOffset: pC.monthOffset || 0, quarterOffset: pC.quarterOffset || 0,
+                 weekOffset: pC.weekOffset || 0, monthOffset: pC.monthOffset || 0, quarterOffset: pC.quarterOffset || 0, yearOffset: pC.yearOffset || 0,
                  customCurFrom: pC.customCurFrom || '', customCurTo: pC.customCurTo || '',
                  customPrevFrom: pC.customPrevFrom || '', customPrevTo: pC.customPrevTo || '',
                  sale: pC.sale ? pC.sale.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [],
@@ -2039,6 +2039,12 @@ function _quarterRange_(baseDate, quarterOffset) {
   var to = _vnMidnight_(lastDayUtc.getUTCFullYear(), lastDayUtc.getUTCMonth() + 1, lastDayUtc.getUTCDate());
   return { from: from, to: to };
 }
+function _yearRange_(baseDate, yearOffset) {
+  var p = _vnYmdParts_(baseDate);
+  var y = p.y + yearOffset;
+  return { from: _vnMidnight_(y, 1, 1), to: _vnMidnight_(y, 12, 31) };
+}
+function _yearKey_(d) { return String(_vnYmdParts_(d).y); }
 function _quarterKey_(d) { var p = _vnYmdParts_(d); return p.y + '-Q' + (Math.floor((p.mo - 1) / 3) + 1); }
 function _ymdLocal_(d) { return _vnYmd_(d); } // giu ten cu de khoi phai sua noi goi, tro thang ve ham VN chuan
 function _labelVN_(d) {
@@ -2067,6 +2073,11 @@ function _resolvePeriods_(filters) {
     cur = _quarterRange_(today, qOff);
     prev = _quarterRange_(today, qOff - 1);
     curKey = _quarterKey_(cur.from); prevKey = _quarterKey_(prev.from);
+  } else if (periodType === 'year') {
+    var yOff = Number(filters.yearOffset) || 0;
+    cur = _yearRange_(today, yOff);
+    prev = _yearRange_(today, yOff - 1);
+    curKey = _yearKey_(cur.from); prevKey = _yearKey_(prev.from);
   } else { // custom — 2 khoang ngay hoan toan tu chon, khong lien quan nhau, KHONG co PeriodKey KPI
     cur = { from: parseVNDate_(filters.customCurFrom) || today, to: parseVNDate_(filters.customCurTo) || today };
     prev = { from: parseVNDate_(filters.customPrevFrom) || today, to: parseVNDate_(filters.customPrevTo) || today };
