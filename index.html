@@ -908,7 +908,7 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
       <div class="adv-chips" id="adv-source-chips"></div>
     </div>
     <div class="adv-section">
-      <div class="adv-section-label">💬 Tình trạng CS (chọn nhiều)</div>
+      <div class="adv-section-label">💬 <span id="lbl-fieldcs-adv">Tình trạng CS</span> (chọn nhiều)</div>
       <div class="adv-chips" id="adv-care-chips"></div>
     </div>
     <div class="adv-section">
@@ -1295,7 +1295,7 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
         <span class="ymf-label">📋 Cột hiển thị</span>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('name',this)"> Khách hàng</label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('tier',this)"> Phân loại</label>
-        <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('care',this)"> Tình trạng CS</label>
+        <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('care',this)"> <span id="lbl-fieldcs-coltoggle">Tình trạng CS</span></label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('zalo',this)"> Zalo</label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('order',this)"> Đơn/DT</label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('product',this)"> Sản phẩm</label>
@@ -1318,7 +1318,7 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
           <thead><tr>
             <th class="filterable col-name" id="th-name" onclick="openColDropdown('name',event)"><div class="th-inner">Khách hàng <span class="th-filter-icon">▼</span></div></th>
             <th class="filterable col-tier" id="th-tier"><div class="th-inner"><span id="tier-label-btn" onclick="openTierTooltip(event)" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px" title="Xem tiêu chí phân loại">Phân loại</span> <span class="th-filter-icon" onclick="openColDropdown('tier',event)" style="cursor:pointer">▼</span></div></th>
-            <th class="filterable col-care" id="th-care" onclick="openColDropdown('care',event)"><div class="th-inner">Tình trạng CS <span class="th-filter-icon">▼</span></div></th>
+            <th class="filterable col-care" id="th-care" onclick="openColDropdown('care',event)"><div class="th-inner"><span id="lbl-fieldcs-th">Tình trạng CS</span> <span class="th-filter-icon">▼</span></div></th>
             <th class="filterable col-zalo" id="th-zalo" onclick="openColDropdown('zalo',event)"><div class="th-inner">Zalo <span class="th-filter-icon">▼</span></div></th>
             <th class="col-order">Đơn / DT</th>
             <th class="filterable col-product" id="th-product" onclick="openColDropdown('product',event)"><div class="th-inner">Sản phẩm <span class="th-filter-icon">▼</span></div></th>
@@ -1658,6 +1658,59 @@ async function _syncKhStatusTreeFromGAS() {
 // ngay tại đây sẽ chạm biến trước khi khởi tạo (temporal dead zone) và ném ReferenceError.
 setTimeout(_syncKhStatusTreeFromGAS, 0);
 
+// Tên hiển thị của 2 trường lớn CỐ ĐỊNH — cho phép admin đổi tên (khác với XÓA/tạo trường,
+// 2 trường này luôn tồn tại vì có cột riêng trong CareData, chỉ đổi được CÁCH GỌI/hiển thị).
+let FIELD_LABEL_CS = loadLS('ome_field_label_cs') || 'Tình trạng CS';
+let FIELD_LABEL_KH = loadLS('ome_field_label_kh') || 'Trạng thái KH';
+async function _syncFieldLabelsFromGAS() {
+  if (!gsUrl) return;
+  try {
+    var r1 = await fetch(gsUrl + '?action=getSetting&key=fieldLabelCS', {redirect:'follow'});
+    var d1 = await r1.json();
+    if (d1 && d1.value) { FIELD_LABEL_CS = d1.value; saveLS('ome_field_label_cs', FIELD_LABEL_CS); }
+    var r2 = await fetch(gsUrl + '?action=getSetting&key=fieldLabelKH', {redirect:'follow'});
+    var d2 = await r2.json();
+    if (d2 && d2.value) { FIELD_LABEL_KH = d2.value; saveLS('ome_field_label_kh', FIELD_LABEL_KH); }
+  } catch(e) {}
+  _applyFieldLabels();
+}
+setTimeout(_syncFieldLabelsFromGAS, 0);
+async function renameBuiltinField(which) {
+  var isAdmin = (_authAccount && _authAccount.role === 'admin') || _bootstrapAdmin;
+  if (!isAdmin) { toast('Chỉ admin mới đổi tên trường.'); return; }
+  var cur = which === 'kh' ? FIELD_LABEL_KH : FIELD_LABEL_CS;
+  var name = prompt('Đổi tên hiển thị cho trường này (áp dụng toàn bộ hệ thống sau khi tải lại trang):', cur);
+  if (name === null) return;
+  name = name.trim();
+  if (!name) { toast('Tên không được để trống.'); return; }
+  if (which === 'kh') { FIELD_LABEL_KH = name; saveLS('ome_field_label_kh', name); }
+  else { FIELD_LABEL_CS = name; saveLS('ome_field_label_cs', name); }
+  _applyFieldLabels();
+  if (gsUrl) {
+    try {
+      await fetch(gsUrl, { method:'POST', redirect:'follow',
+        body: JSON.stringify({ action:'setSetting', key: which==='kh'?'fieldLabelKH':'fieldLabelCS', value: name }) });
+      toast('✓ Đã đổi tên và đồng bộ. Tải lại trang để áp dụng đầy đủ ở mọi nơi.');
+    } catch(e) { toast('✓ Đã lưu local — không đồng bộ được GSheets: ' + e.message); }
+  } else {
+    toast('✓ Đã đổi tên (local). Tải lại trang để áp dụng đầy đủ ở mọi nơi.');
+  }
+}
+// Cập nhật các nhãn TĨNH (không nằm trong hàm render nào, chỉ set 1 lần lúc load trang) —
+// những chỗ nằm trong template literal của các hàm render thì tự động đổi ở lần render sau
+// (đã dùng biến FIELD_LABEL_CS/FIELD_LABEL_KH trực tiếp), không cần xử lý ở đây.
+function _applyFieldLabels() {
+  var map = {
+    'lbl-fieldcs-adv': FIELD_LABEL_CS, 'lbl-fieldcs-coltoggle': FIELD_LABEL_CS, 'lbl-fieldcs-th': FIELD_LABEL_CS,
+    'lbl-fieldcs-help': FIELD_LABEL_CS, 'lbl-fieldkh-help': FIELD_LABEL_KH
+  };
+  Object.keys(map).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = map[id];
+  });
+}
+setTimeout(_applyFieldLabels, 0);
+
 // ════════════════════════════════════════════════════════════════════
 //  TRƯỜNG TỰ TẠO (admin tự thêm "trường lớn" ngoài 2 trường có sẵn)
 // ════════════════════════════════════════════════════════════════════
@@ -1692,6 +1745,120 @@ async function _syncCustomFieldsFromGAS() {
   } catch(e) { /* giữ nguyên bản local nếu lỗi mạng/parse */ }
 }
 setTimeout(_syncCustomFieldsFromGAS, 0);
+
+// ════════════════════════════════════════════════════════════════════
+//  HOA HỒNG THEO CÁ NHÂN (override) — dùng cùng cơ chế setting chung với
+//  CUSTOM_FIELDS/khStatusTree, KHÔNG cần thêm action/cột mới ở backend.
+//  { "<tên sale>": { above15: number|'', below15: number|'' } }
+//  Ô nào để trống ('' / undefined) thì dùng % của TEAM mà người đó thuộc về
+//  (xem _resolveCommissionRate_).
+// ════════════════════════════════════════════════════════════════════
+const COMMISSION_THRESHOLD = 15000000; // 15 triệu — ngưỡng phân loại đơn "≥15tr" / "<15tr"
+let INDIVIDUAL_RATES = (function(){
+  try { var v = loadLS('ome_individual_rates'); return (v && typeof v === 'object') ? v : {}; } catch(e){ return {}; }
+})();
+
+async function _syncIndividualRatesFromGAS() {
+  if (!gsUrl) return;
+  try {
+    var r = await fetch(gsUrl + '?action=getSetting&key=individualRates', {redirect:'follow'});
+    var data = await r.json();
+    if (data && data.value) {
+      var obj = JSON.parse(data.value);
+      if (obj && typeof obj === 'object') {
+        INDIVIDUAL_RATES = obj;
+        saveLS('ome_individual_rates', INDIVIDUAL_RATES);
+        if (typeof _srState !== 'undefined' && _srState.sub === 'E') renderSalesReportTab();
+      }
+    }
+  } catch(e) { /* giữ bản local nếu lỗi mạng/parse */ }
+}
+setTimeout(_syncIndividualRatesFromGAS, 0);
+
+async function saveIndividualRates() {
+  saveLS('ome_individual_rates', INDIVIDUAL_RATES);
+  if (gsUrl) {
+    try {
+      var r = await fetch(gsUrl, { method:'POST', redirect:'follow',
+        body: JSON.stringify({ action:'setSetting', key:'individualRates', value: JSON.stringify(INDIVIDUAL_RATES) }) });
+      var d = await r.json().catch(function(){ return {}; });
+      if (d && d.error) toast('Lưu local ✓ — GSheets: ' + d.error);
+      else toast('✓ Đã lưu và đồng bộ % hoa hồng cá nhân lên Google Sheets');
+    } catch(e) { toast('✓ Đã lưu local — chưa đồng bộ GSheets: ' + e.message); }
+  } else {
+    toast('✓ Đã lưu % hoa hồng cá nhân (local)');
+  }
+}
+
+// Team mà 1 sale thuộc về (leader hoặc thành viên) — dùng để fallback rate khi cá nhân chưa cài
+function _teamRateForName_(name) {
+  for (var i = 0; i < teams.length; i++) {
+    var t = teams[i];
+    if (t.leader === name || (t.members||[]).indexOf(name) !== -1) return { team: t, rate: t.ratePct || {above15:0, below15:0} };
+  }
+  return { team: null, rate: {above15:0, below15:0} };
+}
+
+// % hoa hồng thực áp dụng cho 1 sale — ƯU TIÊN mức cá nhân (từng ô riêng: có thể chỉ set ≥15tr
+// mà để trống <15tr, khi đó <15tr vẫn lấy theo team) — hết thì lấy theo team đang thuộc về —
+// không thuộc team nào và chưa cài cá nhân thì 0%.
+function _resolveCommissionRate_(name) {
+  var indiv = INDIVIDUAL_RATES[name] || {};
+  var teamInfo = _teamRateForName_(name);
+  var hasA = indiv.above15 !== undefined && indiv.above15 !== null && indiv.above15 !== '';
+  var hasB = indiv.below15 !== undefined && indiv.below15 !== null && indiv.below15 !== '';
+  return {
+    above15: hasA ? Number(indiv.above15) : Number((teamInfo.rate||{}).above15 || 0),
+    below15: hasB ? Number(indiv.below15) : Number((teamInfo.rate||{}).below15 || 0),
+    sourceAbove15: hasA ? 'Cá nhân' : (teamInfo.team ? 'Team ' + teamInfo.team.name : 'Chưa cài'),
+    sourceBelow15: hasB ? 'Cá nhân' : (teamInfo.team ? 'Team ' + teamInfo.team.name : 'Chưa cài')
+  };
+}
+
+// Tính hoa hồng từng sale từ danh sách đơn hàng đã lọc (orders trả về từ action=salesReportA,
+// mỗi đơn có saleBan + giaTriDon) — CHIA ĐỀU doanh thu cho N sale/đơn giống hệt quy ước
+// "chia đều" đã dùng cho Báo cáo A, rồi phân loại theo ngưỡng COMMISSION_THRESHOLD và nhân
+// đúng % của TỪNG người (cá nhân/team riêng) cho phần doanh thu của họ.
+function _computeCommissionData_(orders) {
+  var bySale = {};
+  var totalOrdersAbove15 = 0, totalOrdersBelow15 = 0, totalRevenueAbove15 = 0, totalRevenueBelow15 = 0;
+  (orders||[]).forEach(function(m){
+    var giaTri = Number(m.giaTriDon) || 0;
+    var isAbove = giaTri >= COMMISSION_THRESHOLD;
+    if (isAbove) { totalOrdersAbove15++; totalRevenueAbove15 += giaTri; }
+    else { totalOrdersBelow15++; totalRevenueBelow15 += giaTri; }
+    var salesList = splitMulti_(m.saleBan, ',');
+    if (!salesList.length) salesList = ['(chưa gán sale)'];
+    var n = salesList.length;
+    var share = giaTri / n;
+    salesList.forEach(function(sName){
+      if (!bySale[sName]) bySale[sName] = { ordersAbove15:0, ordersBelow15:0, revenueAbove15:0, revenueBelow15:0 };
+      if (isAbove) { bySale[sName].ordersAbove15++; bySale[sName].revenueAbove15 += share; }
+      else { bySale[sName].ordersBelow15++; bySale[sName].revenueBelow15 += share; }
+    });
+  });
+  var rows = Object.keys(bySale).map(function(name){
+    var s = bySale[name];
+    var rate = _resolveCommissionRate_(name);
+    var commission = s.revenueAbove15 * (rate.above15/100) + s.revenueBelow15 * (rate.below15/100);
+    return {
+      name: name,
+      ordersAbove15: s.ordersAbove15, ordersBelow15: s.ordersBelow15,
+      revenueAbove15: s.revenueAbove15, revenueBelow15: s.revenueBelow15,
+      rateAbove15: rate.above15, rateBelow15: rate.below15,
+      sourceAbove15: rate.sourceAbove15, sourceBelow15: rate.sourceBelow15,
+      commission: commission
+    };
+  });
+  rows.sort(function(a,b){ return b.commission - a.commission; });
+  var totalCommission = rows.reduce(function(s,r){ return s + r.commission; }, 0);
+  return {
+    threshold: COMMISSION_THRESHOLD,
+    totalOrdersAbove15: totalOrdersAbove15, totalOrdersBelow15: totalOrdersBelow15,
+    totalRevenueAbove15: totalRevenueAbove15, totalRevenueBelow15: totalRevenueBelow15,
+    bySale: rows, totalCommission: totalCommission
+  };
+}
 
 // Build <option> cho 1 trường tự tạo — cùng cách hiển thị optgroup mẹ/con như _buildCustStatusOptions
 function _buildCustomFieldOptions(field, selected) {
@@ -3606,7 +3773,7 @@ function renderCareTab(c) {
     <div class="dp-stitle">Thông tin chăm sóc</div>
     <div class="form-row-2">
       <div>
-        <div class="form-label">Tình trạng CS</div>
+        <div class="form-label">${esc(FIELD_LABEL_CS)}</div>
         <select class="form-select" id="cs-status">
           ${_buildCareStatusOptions(care.status||c.careStatus||'')}
         </select>
@@ -3621,7 +3788,7 @@ function renderCareTab(c) {
     </div>
     <div class="form-row-2">
       <div>
-        <div class="form-label">Trạng thái KH</div>
+        <div class="form-label">${esc(FIELD_LABEL_KH)}</div>
         <select class="form-select" id="cs-kh-status">
           ${_buildCustStatusOptions(care.khStatus||'')}
         </select>
@@ -5701,7 +5868,7 @@ function exportCSV() {
   });
   const BOM='\uFEFF';
   const cfCols = (typeof CUSTOM_FIELDS !== 'undefined') ? CUSTOM_FIELDS : [];
-  const hdr='Tên KH,Số điện thoại,Phân loại KH,Tình trạng CS,Zalo,Số đơn,Doanh thu,Sản phẩm,Nguồn,CS phụ trách,Ghi chú'
+  const hdr='Tên KH,Số điện thoại,Phân loại KH,'+FIELD_LABEL_CS+',Zalo,Số đơn,Doanh thu,Sản phẩm,Nguồn,CS phụ trách,Ghi chú'
     + (cfCols.length ? ',' + cfCols.map(f=>`"${f.label.replace(/"/g,'""')}"`).join(',') : '') + '\n';
   const rows=list.map(c=>{
     const base=[`"${c.name}"`,c.phone,c.tier,c.careStatus,c.zaloStatus,c.totalOrders,c.totalRevenue,`"${c.brands.join('; ')}"`,`"${c.sources.join('; ')}"`,`"${[..._buildCsSet_(c.orders, c.phone)].join('; ')}"`,`"${_latestNoteText(c.careNote)}"`];
@@ -7139,7 +7306,7 @@ function renderAssignReport() {
   const maxBar = csBarRows.length ? csBarRows[0][1].total.size : 1;
 
   const PIVOT_ROW_OPTS  = [{v:'cs',l:'CS phụ trách'},{v:'tier',l:'Phân loại KH'},{v:'label',l:'Đợt chia'},{v:'month',l:'Tháng chia'},{v:'source',l:'Kênh (Nguồn)'}];
-  const PIVOT_COL_OPTS  = [{v:'tier',l:'Phân loại KH'},{v:'careStatus',l:'Tình trạng CS'},{v:'done',l:'Hoàn thành'},{v:'month',l:'Tháng chia'},{v:'source',l:'Kênh (Nguồn)'},{v:'cs',l:'CS phụ trách'}];
+  const PIVOT_COL_OPTS  = [{v:'tier',l:'Phân loại KH'},{v:'careStatus',l:FIELD_LABEL_CS},{v:'done',l:'Hoàn thành'},{v:'month',l:'Tháng chia'},{v:'source',l:'Kênh (Nguồn)'},{v:'cs',l:'CS phụ trách'}];
 
   const rptHtml = `
   <!-- KPI ROW -->
@@ -7189,13 +7356,13 @@ function renderAssignReport() {
         <input type="date" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--rsm);outline:none;background:var(--surface)" value="${_rptFilters.dateTo}" oninput="_rptFilters.dateTo=this.value;renderAssignReport()">
       </div>
       <div>
-        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Tình trạng CS</div>
+        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">${esc(FIELD_LABEL_CS)}</div>
         <select multiple style="min-width:130px;max-height:70px;font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);outline:none" id="rpt-carestatus-sel" onchange="_rptSetFilter('careStatus',this)">
           ${CARE_STATUS.map(v=>`<option value="${esc(v)}" ${_rptFilters.careStatus.has(v)?'selected':''}>${esc(v)}</option>`).join('')}
         </select>
       </div>
       <div>
-        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Trạng thái KH</div>
+        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">${esc(FIELD_LABEL_KH)}</div>
         <select multiple style="min-width:150px;max-height:70px;font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);outline:none" id="rpt-khstatus-sel" onchange="_rptSetFilter('khStatus',this)">
           ${allKhStatus.map(v=>`<option value="${esc(v)}" ${_rptFilters.khStatus.has(v)?'selected':''}>${esc(v)}</option>`).join('')}
         </select>
@@ -7364,7 +7531,7 @@ function exportAssignReport() {
     rows.push([cs, d.batches, d.total, d.done, d.total>0?Math.round(d.done/d.total*100):0]);
   }
   // Detail sheet
-  const detail = [['Ngày chia', 'CS', 'Label', 'Tên KH', 'SĐT', 'Phân loại', 'Tình trạng CS', 'Đã xong']];
+  const detail = [['Ngày chia', 'CS', 'Label', 'Tên KH', 'SĐT', 'Phân loại', FIELD_LABEL_CS, 'Đã xong']];
   for (const h of assignHistory) {
     for (const p of h.phones) {
       const c = allCustomers.find(x=>x.phone===p);
@@ -7382,7 +7549,7 @@ function exportMyDataReport() {
   const csName = document.getElementById('mydata-cs-sel')?.value || '';
   const myBatches = assignHistory.filter(h => h.csName === csName);
   const allPhones = [...new Set(myBatches.flatMap(h=>h.phones))];
-  const rows = [['Tên KH','SĐT','Phân loại','Tình trạng CS','Zalo','Đã chăm xong','Batch']];
+  const rows = [['Tên KH','SĐT','Phân loại',FIELD_LABEL_CS,'Zalo','Đã chăm xong','Batch']];
   for (const p of allPhones) {
     const c = allCustomers.find(x=>x.phone===p);
     const isDone = myBatches.some(h=>(h.donePhones||[]).includes(p));
@@ -12997,6 +13164,16 @@ function renderTeamTab(){
       '</span>'+
       '<span>Chốt: <b>'+s.closeRate+'%</b></span>'+
     '</div>';
+    // % hoa hồng theo team (đơn ≥15tr / <15tr) — dùng khi tính hoa hồng nhân viên (tab "💰 Hoa hồng")
+    var rp = t.ratePct || {above15:0, below15:0};
+    html += '<div class="team-stat-row" style="margin-top:2px">'+
+      '<span>💰 % đơn ≥15tr: '+(isAdmin
+        ? '<input type="number" step="0.1" min="0" max="100" value="'+(rp.above15||0)+'" style="width:60px" onchange="setTeamRate(\''+t.id+'\',\'above15\',this.value)">'
+        : '<b>'+(rp.above15||0)+'</b>')+' %</span>'+
+      '<span>% đơn &lt;15tr: '+(isAdmin
+        ? '<input type="number" step="0.1" min="0" max="100" value="'+(rp.below15||0)+'" style="width:60px" onchange="setTeamRate(\''+t.id+'\',\'below15\',this.value)">'
+        : '<b>'+(rp.below15||0)+'</b>')+' %</span>'+
+    '</div>';
     // members chips
     html += '<div class="member-chips">';
     members.forEach(function(m){
@@ -13077,7 +13254,7 @@ function addTeam(){
   var name = prompt('Tên team mới:', 'Team ' + (teams.length+1));
   if (name===null) return;
   name = name.trim(); if(!name) return;
-  teams.push({ id:_genTeamId(), name:name, leader:'', members:[], color: V9_TEAM_COLORS[teams.length % V9_TEAM_COLORS.length], channels:[] });
+  teams.push({ id:_genTeamId(), name:name, leader:'', members:[], color: V9_TEAM_COLORS[teams.length % V9_TEAM_COLORS.length], channels:[], ratePct: {above15:0, below15:0} });
   saveLS('ome_teams', teams);
   logAudit('team', '', '', 'Tạo team: '+name);
   pushTeamsToGS();
@@ -13087,6 +13264,19 @@ function renameTeam(id, name){
   var t = teams.find(function(x){ return x.id===id; }); if(!t) return;
   var old = t.name; t.name = (name||'').trim() || old;
   saveLS('ome_teams', teams); logAudit('team','', old, 'Đổi tên team → '+t.name); pushTeamsToGS();
+}
+// % hoa hồng team cho đơn ≥15tr / <15tr — dùng để tính "💰 Hoa hồng" khi nhân viên không có
+// mức riêng (xem _resolveCommissionRate_). field = 'above15' | 'below15'.
+function setTeamRate(id, field, val){
+  var t = teams.find(function(x){ return x.id===id; }); if(!t) return;
+  if (currentUser.role!=='admin'){ toast('Chỉ Admin mới đổi được % hoa hồng team'); return; }
+  var v = Math.max(0, Math.min(100, parseFloat(val)||0));
+  if (!t.ratePct) t.ratePct = {above15:0, below15:0};
+  var old = t.ratePct[field]||0;
+  t.ratePct[field] = v;
+  saveLS('ome_teams', teams);
+  logAudit('team', '', field+': '+old+'%', field+': '+v+'% (team '+t.name+')');
+  pushTeamsToGS();
 }
 function deleteTeam(id){
   var t = teams.find(function(x){ return x.id===id; }); if(!t) return;
@@ -14544,7 +14734,9 @@ var _srState = {
   cSanPham: '',             // C — loc san pham, cach nhau dau phay
   dataC: null, cEmpSearch: '', cKenhSearch: '', cExpandedRow: '',
   // D — KH Cham soc moi (data rieng, KHONG gop A/B/C)
-  dDateFrom: '', dDateTo: '', dCs: '', dataD: null
+  dDateFrom: '', dDateTo: '', dCs: '', dataD: null,
+  // E — Hoa hong nhan vien (dung lai action=salesReportA, filter rieng de khong dam vao tab A)
+  eDateFrom: '', eDateTo: '', eDateField: 'ngayTao', eSale: [], eKenh: [], dataE: null, eSaleSearch: ''
 };
 
 function _srMoney(n){ return fmt(Math.round(n||0)) + '₫'; }
@@ -14564,6 +14756,7 @@ function _srEnforceScope(){
   _srState.sale = my.slice();
   _srState.bSale = my.slice();
   _srState.cSale = my.slice();
+  _srState.eSale = my.slice();
 }
 
 async function _srFetch(action, params){
@@ -14619,6 +14812,13 @@ async function _srLoad(){
   } else if (_srState.sub === 'D') {
     _srState.dataD = await _srFetch('careLeadReport', {
       dateFrom: _srState.dDateFrom, dateTo: _srState.dDateTo, cs: _srState.dCs
+    });
+  } else if (_srState.sub === 'E') {
+    // Dùng lại ĐÚNG action=salesReportA (đã có sẵn orders[] với saleBan/giaTriDon) — không cần
+    // action riêng ở backend, tự tính hoa hồng ở client qua _computeCommissionData_().
+    _srState.dataE = await _srFetch('salesReportA', {
+      dateFrom: _srState.eDateFrom, dateTo: _srState.eDateTo,
+      dateField: _srState.eDateField, sale: (_srState.eSale||[]).join(','), kenh: (_srState.eKenh||[]).join(',')
     });
   }
   _srState.loading = false;
@@ -14936,10 +15136,12 @@ function renderSalesReportTab(){
     '<button class="btn '+(_srState.sub==='B'?'secondary':'sm')+'" onclick="_srSetSub(\'B\')">Báo cáo B — Theo dữ liệu đơn</button>' +
     '<button class="btn '+(_srState.sub==='C'?'secondary':'sm')+'" onclick="_srSetSub(\'C\')">Báo cáo C — So sánh theo kỳ</button>' +
     '<button class="btn '+(_srState.sub==='D'?'secondary':'sm')+'" onclick="_srSetSub(\'D\')">Báo cáo D — KH Chăm sóc mới</button>' +
+    '<button class="btn '+(_srState.sub==='E'?'secondary':'sm')+'" onclick="_srSetSub(\'E\')">💰 Hoa hồng nhân viên</button>' +
     '</div>';
 
   if (_srState.sub === 'C') { renderSalesReportTabC_(wrap, subTabs); return; }
   if (_srState.sub === 'D') { renderSalesReportTabD_(wrap, subTabs); return; }
+  if (_srState.sub === 'E') { renderSalesReportTabE_(wrap, subTabs); return; }
 
   var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
   filters += '<input type="date" value="'+esc(_srState.dateFrom)+'" onchange="_srSetField(\'dateFrom\',this.value)" title="Từ ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
@@ -14991,8 +15193,8 @@ function renderSalesReportTab(){
     filters += '<div><div style="font-size:10px;color:var(--hint);margin-bottom:2px">Sản phẩm (cách nhau bằng dấu phẩy)</div>'+
       '<input type="text" value="'+esc(_srState.bSanPham||'')+'" onchange="_srSetField(\'bSanPham\',this.value)" placeholder="vd: tỳ hưu, nhẫn 10k" style="min-width:170px;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
       '</div>';
-    filters += _srMultiSelectHtml('bCareStatus', CARE_STATUS, 'Tình trạng CS', 120);
-    filters += _srMultiSelectHtml('bKhStatus', (typeof _flatCustStatusValues==='function'?_flatCustStatusValues():[]).filter(Boolean), 'Trạng thái KH', 140);
+    filters += _srMultiSelectHtml('bCareStatus', CARE_STATUS, FIELD_LABEL_CS, 120);
+    filters += _srMultiSelectHtml('bKhStatus', (typeof _flatCustStatusValues==='function'?_flatCustStatusValues():[]).filter(Boolean), FIELD_LABEL_KH, 140);
     filters += _srMultiSelectHtml('bZaloStatus', ZALO_STATUS, 'Kết bạn Zalo', 120);
     filters += '<div><div style="font-size:10px;color:var(--hint);margin-bottom:2px">Nick Zalo</div>'+
       '<input type="text" value="'+esc(_srState.bNickZalo||'')+'" onchange="_srSetField(\'bNickZalo\',this.value)" placeholder="Tìm nick..." style="min-width:100px;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
@@ -15184,6 +15386,121 @@ function renderSalesReportTabD_(wrap, subTabs){
     }
   }
   wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + filters + body;
+}
+
+// ── BÁO CÁO E: HOA HỒNG NHÂN VIÊN ──
+// Dùng lại đúng "orders" trả về từ action=salesReportA (đã có sẵn saleBan/giaTriDon) — không
+// gọi action riêng ở backend. Tự phân loại đơn ≥15tr/<15tr và tính hoa hồng ở client qua
+// _computeCommissionData_() (đã định nghĩa cùng _resolveCommissionRate_/INDIVIDUAL_RATES ở trên).
+function renderSalesReportTabE_(wrap, subTabs){
+  var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
+  filters += '<input type="date" value="'+esc(_srState.eDateFrom)+'" onchange="_srSetField(\'eDateFrom\',this.value)" title="Từ ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
+  filters += '<span style="color:var(--muted)">→</span>';
+  filters += '<input type="date" value="'+esc(_srState.eDateTo)+'" onchange="_srSetField(\'eDateTo\',this.value)" title="Đến ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
+  filters += '<select onchange="_srSetField(\'eDateField\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+    '<option value="ngayTao"'+(_srState.eDateField==='ngayTao'?' selected':'')+'>Lọc theo Ngày tạo</option>'+
+    '<option value="thoiGianHT"'+(_srState.eDateField==='thoiGianHT'?' selected':'')+'>Lọc theo Thời gian hoàn thành</option>'+
+    '</select>';
+  if (_srIsAdmin()){
+    filters += _srComboHtml('sr-sale-combo-e', 'eSale', 'saleOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 190);
+    filters += '<select onchange="if(this.value){srPickTeam(this.value,\'eSale\',\'sr-sale-combo-e\');this.value=\'\'}" title="Điền nhanh cả team vào ô Sale" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+      '<option value="">— Chọn theo Team —</option>' + _srTeamOptionsHtml() + '</select>';
+  } else {
+    filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Sale</div>'+
+      '<div style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)">🔒 '+esc((_srState.eSale||[]).join(', ') || currentUser.name)+' — chỉ xem được hoa hồng của mình</div></div>';
+  }
+  filters += _srComboHtml('sr-kenh-combo-e', 'eKenh', 'kenhOptions', 'Lọc theo Kênh', '🔍 Tìm & chọn kênh...', 170);
+  filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
+  if (_srIsAdmin()) filters += '<button class="btn sm" onclick="openIndividualRatesModal()">⚙ % hoa hồng cá nhân</button>';
+  filters += '</div>';
+
+  var body = _srState.loading
+    ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>'
+    : _srRenderE_(_srState.dataE);
+
+  wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + filters + body;
+}
+
+function _srRenderE_(d){
+  if (!d) return '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
+  var c = _computeCommissionData_(d.orders || []);
+  var html = '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">'+
+    'Ngưỡng phân loại đơn: <b>'+_srMoney(COMMISSION_THRESHOLD)+'</b> — đơn từ mức này trở lên tính "≥15tr", thấp hơn tính "&lt;15tr". '+
+    'Doanh thu của mỗi người trong 1 đơn = <b>giá trị đơn ÷ số sale đứng tên trên đơn đó</b> (chia đều).</div>';
+
+  // a) Doanh thu tổng theo mức đơn hàng
+  html += '<div class="dash-section-title">a) Doanh thu theo mức đơn hàng</div>';
+  html += '<div class="kpi-grid" style="margin-bottom:16px">' +
+    '<div class="kpi-card"><div class="kpi-val">'+fmt(c.totalOrdersAbove15)+'</div><div class="kpi-label">Số đơn ≥15tr</div></div>' +
+    '<div class="kpi-card"><div class="kpi-val">'+fmt(c.totalOrdersBelow15)+'</div><div class="kpi-label">Số đơn &lt;15tr</div></div>' +
+    '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+_srMoney(c.totalRevenueAbove15)+'</div><div class="kpi-label">Doanh thu đơn ≥15tr</div></div>' +
+    '<div class="kpi-card"><div class="kpi-val">'+_srMoney(c.totalRevenueBelow15)+'</div><div class="kpi-label">Doanh thu đơn &lt;15tr</div></div>' +
+    '</div>';
+
+  // b) Hoa hồng từng nhân viên
+  var rows = (c.bySale||[]).filter(function(s){ return !_srState.eSaleSearch || s.name.toLowerCase().indexOf(_srState.eSaleSearch.toLowerCase())!==-1; });
+  html += '<div class="dash-section-title">b) Hoa hồng nhân viên <span style="font-weight:400;color:var(--muted);font-size:11px">(doanh thu = phần chia đều của người đó trong từng đơn)</span></div>';
+  html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.eSaleSearch)+'" oninput="_srState.eSaleSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
+  html += '<table class="dash-table"><thead><tr>'+
+    '<th>Sale</th><th style="text-align:right">Số đơn ≥15tr</th><th style="text-align:right">Số đơn &lt;15tr</th>'+
+    '<th style="text-align:right">DT ≥15tr</th><th style="text-align:right">DT &lt;15tr</th>'+
+    '<th style="text-align:right">% ≥15tr</th><th style="text-align:right">% &lt;15tr</th>'+
+    '<th style="text-align:right"><b>Hoa hồng</b></th></tr></thead><tbody>';
+  rows.forEach(function(s){
+    html += '<tr><td>'+esc(s.name)+'</td>'+
+      '<td style="text-align:right">'+fmt(s.ordersAbove15)+'</td>'+
+      '<td style="text-align:right">'+fmt(s.ordersBelow15)+'</td>'+
+      '<td style="text-align:right">'+_srMoney(s.revenueAbove15)+'</td>'+
+      '<td style="text-align:right">'+_srMoney(s.revenueBelow15)+'</td>'+
+      '<td style="text-align:right" title="Nguồn: '+esc(s.sourceAbove15)+'">'+s.rateAbove15+'%</td>'+
+      '<td style="text-align:right" title="Nguồn: '+esc(s.sourceBelow15)+'">'+s.rateBelow15+'%</td>'+
+      '<td style="text-align:right"><b>'+_srMoney(s.commission)+'</b></td></tr>';
+  });
+  if (!rows.length) html += '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+  html += '<tr style="font-weight:700;border-top:2px solid var(--border)"><td colspan="7" style="text-align:right">Tổng hoa hồng:</td><td style="text-align:right">'+_srMoney(c.totalCommission)+'</td></tr>';
+  html += '</tbody></table>';
+  html += '<div style="font-size:11px;color:var(--muted);margin-top:6px">Rê chuột vào % để xem nguồn áp dụng (Cá nhân / Team X / Chưa cài).</div>';
+  return html;
+}
+
+// ── Modal: % hoa hồng CÁ NHÂN (ghi đè % của team cho từng người, để trống = dùng theo team) ──
+function openIndividualRatesModal(){
+  if (currentUser.role !== 'admin'){ toast('Chỉ Admin mới cài % hoa hồng cá nhân.'); return; }
+  _renderIndividualRatesModal();
+  var m = document.getElementById('ir-modal');
+  if (m) m.style.display = 'flex';
+}
+function closeIndividualRatesModal(){
+  var m = document.getElementById('ir-modal');
+  if (m) m.style.display = 'none';
+}
+function _renderIndividualRatesModal(){
+  var body = document.getElementById('ir-body');
+  if (!body) return;
+  var names = (typeof _allCSNames === 'function' ? _allCSNames() : []).slice().sort(function(a,b){ return a.localeCompare(b,'vi'); });
+  var q = (_irSearch||'').toLowerCase();
+  var filtered = names.filter(function(n){ return !q || n.toLowerCase().indexOf(q)!==-1; });
+  var html = '<input type="text" id="ir-search" placeholder="🔍 Tìm nhanh theo tên..." value="'+esc(_irSearch||'')+'" oninput="_irSearch=this.value;_renderIndividualRatesModal()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:240px;margin-bottom:10px">';
+  html += '<table class="dash-table"><thead><tr><th>Tên</th><th>Team</th><th style="width:130px">% ≥15tr (riêng)</th><th style="width:130px">% &lt;15tr (riêng)</th></tr></thead><tbody>';
+  filtered.forEach(function(name){
+    var teamInfo = _teamRateForName_(name);
+    var indiv = INDIVIDUAL_RATES[name] || {};
+    html += '<tr><td>'+esc(name)+'</td>'+
+      '<td style="color:var(--muted);font-size:11.5px">'+(teamInfo.team ? esc(teamInfo.team.name)+' ('+(teamInfo.rate.above15||0)+'% / '+(teamInfo.rate.below15||0)+'%)' : '<span style="color:var(--red)">chưa có team</span>')+'</td>'+
+      '<td><input type="number" step="0.1" min="0" max="100" placeholder="theo team" value="'+(indiv.above15!==undefined&&indiv.above15!==null&&indiv.above15!==''?indiv.above15:'')+'" style="width:90px" onchange="_setIndividualRate(\''+esc(name).replace(/'/g,"\\'")+'\',\'above15\',this.value)"></td>'+
+      '<td><input type="number" step="0.1" min="0" max="100" placeholder="theo team" value="'+(indiv.below15!==undefined&&indiv.below15!==null&&indiv.below15!==''?indiv.below15:'')+'" style="width:90px" onchange="_setIndividualRate(\''+esc(name).replace(/'/g,"\\'")+'\',\'below15\',this.value)"></td>'+
+      '</tr>';
+  });
+  if (!filtered.length) html += '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Không có tên nào khớp</td></tr>';
+  html += '</tbody></table>';
+  body.innerHTML = html;
+}
+var _irSearch = '';
+function _setIndividualRate(name, field, val){
+  val = (val===''||val===null||val===undefined) ? '' : Math.max(0, Math.min(100, parseFloat(val)||0));
+  if (!INDIVIDUAL_RATES[name]) INDIVIDUAL_RATES[name] = {};
+  INDIVIDUAL_RATES[name][field] = val;
+  saveIndividualRates();
 }
 
 function _srPctStr(v){ return (v===null || v===undefined) ? '—' : Math.round(v*10)/10 + '%'; }
@@ -16036,9 +16353,11 @@ function _renderAuthHeader(){
   var isAdmin = (_authAccount && _authAccount.role === 'admin') || _bootstrapAdmin;
   var loggedIn = !!_authAccount;
   var html = '';
-  if (isAdmin) html += '<button class="btn sm" title="Quản lý tình trạng CS" onclick="openCareStatusModal()">⚙ Tình trạng CS</button>';
-  if (isAdmin) html += '<button class="btn sm" title="Quản lý trạng thái KH" onclick="openKhStatusModal()">⚙ Trạng thái KH</button>';
-  if (isAdmin) html += '<button class="btn sm" title="Tự tạo trường lớn mới (ngoài Tình trạng CS / Trạng thái KH)" onclick="openCustomFieldsModal()">➕ Trường tự tạo</button>';
+  if (isAdmin) html += '<button class="btn sm" title="Quản lý ' + esc(FIELD_LABEL_CS) + '" onclick="openCareStatusModal()">⚙ ' + esc(FIELD_LABEL_CS) + '</button>';
+  if (isAdmin) html += '<button class="btn sm" style="padding:4px 6px" title="Đổi tên trường này" onclick="renameBuiltinField(\'cs\')">✏️</button>';
+  if (isAdmin) html += '<button class="btn sm" title="Quản lý ' + esc(FIELD_LABEL_KH) + '" onclick="openKhStatusModal()">⚙ ' + esc(FIELD_LABEL_KH) + '</button>';
+  if (isAdmin) html += '<button class="btn sm" style="padding:4px 6px" title="Đổi tên trường này" onclick="renameBuiltinField(\'kh\')">✏️</button>';
+  if (isAdmin) html += '<button class="btn sm" title="Tự tạo trường lớn mới (ngoài ' + esc(FIELD_LABEL_CS) + ' / ' + esc(FIELD_LABEL_KH) + ')" onclick="openCustomFieldsModal()">➕ Trường tự tạo</button>';
   if (isAdmin) html += '<button class="btn sm" title="Quản lý tài khoản đăng nhập" onclick="openAcctModal()">🔑 Tài khoản</button>';
   if (loggedIn) html += '<button class="btn sm" title="Đăng xuất" onclick="doLogout()">⎋ Đăng xuất</button>';
   box.innerHTML = html;
@@ -16364,7 +16683,7 @@ function toggleAcctActive(u){
 <div class="modal-overlay" id="care-status-modal" style="display:none;align-items:flex-start;justify-content:center;padding-top:40px;z-index:700">
 <div class="modal" style="width:560px;max-width:96vw;max-height:84vh;display:flex;flex-direction:column;overflow:hidden">
   <div class="modal-hdr" style="flex-shrink:0">
-    <div class="modal-title">⚙ Quản lý Tình trạng CS</div>
+    <div class="modal-title" id="care-status-modal-title">⚙ Quản lý Tình trạng CS</div>
     <div class="modal-sub">Thêm nhóm mẹ / mục con. Kéo ☰ sắp xếp. Move / chuyển đổi loại. Đồng bộ Google Sheets.</div>
   </div>
   <div class="modal-body" style="padding:14px 18px;flex:1;overflow-y:auto">
@@ -16406,10 +16725,11 @@ let _careStatusDraft = [];  // bản nháp đang chỉnh trong modal (tree)
 
 function openCareStatusModal() {
   var isAdmin = (_authAccount && _authAccount.role === 'admin') || _bootstrapAdmin;
-  if (!isAdmin) { toast('Chỉ admin mới quản lý tình trạng CS.'); return; }
+  if (!isAdmin) { toast('Chỉ admin mới quản lý ' + FIELD_LABEL_CS + '.'); return; }
   _careStatusDraft = JSON.parse(JSON.stringify(CARE_STATUS_TREE));
   renderCareStatusList();
   _renderCsParentSel();
+  var t = document.getElementById('care-status-modal-title'); if (t) t.textContent = '⚙ Quản lý ' + FIELD_LABEL_CS;
   var m = document.getElementById('care-status-modal');
   if (m) m.style.display = 'flex';
   var btn = document.getElementById('cs-save-btn');
@@ -16707,12 +17027,12 @@ async function saveCareStatusList() {
       });
       var d = await r.json();
       if (d && d.error) { toast('Lưu local ✓ — GSheets báo lỗi: ' + d.error); }
-      else { toast('✓ Đã lưu và đồng bộ tình trạng CS lên Google Sheets'); }
+      else { toast('✓ Đã lưu và đồng bộ ' + FIELD_LABEL_CS + ' lên Google Sheets'); }
     } catch(e) {
       toast('✓ Đã lưu local — không đồng bộ được GSheets: ' + e.message);
     }
   } else {
-    toast('✓ Đã lưu tình trạng CS (chưa kết nối Google Sheets)');
+    toast('✓ Đã lưu ' + FIELD_LABEL_CS + ' (chưa kết nối Google Sheets)');
   }
   // Refresh toàn bộ UI liên quan
   _refreshCareStatusUI();
@@ -16793,7 +17113,7 @@ function updateSidebarCareFilters() {
 <div class="modal-overlay" id="kh-status-modal" style="display:none;align-items:flex-start;justify-content:center;padding-top:40px;z-index:700">
 <div class="modal" style="width:560px;max-width:96vw;max-height:84vh;display:flex;flex-direction:column;overflow:hidden">
   <div class="modal-hdr" style="flex-shrink:0">
-    <div class="modal-title">⚙ Quản lý Trạng thái KH</div>
+    <div class="modal-title" id="kh-status-modal-title">⚙ Quản lý Trạng thái KH</div>
     <div class="modal-sub">Thêm nhóm mẹ / mục con. Kéo ☰ sắp xếp. Move child / chuyển đổi loại (🔄). Đồng bộ GSheets.</div>
   </div>
   <div class="modal-body" style="padding:14px 18px;flex:1;overflow-y:auto">
@@ -16827,6 +17147,26 @@ function updateSidebarCareFilters() {
 </div>
 </div>
 
+<!-- ══ MODAL: % Hoa hồng CÁ NHÂN (admin) ══ -->
+<div class="modal-overlay" id="ir-modal" style="display:none;align-items:flex-start;justify-content:center;padding-top:40px;z-index:700">
+<div class="modal" style="max-width:640px;width:94%;max-height:86vh;display:flex;flex-direction:column">
+  <div class="modal-header" style="flex-shrink:0">
+    <div class="modal-title">⚙ % Hoa hồng cá nhân</div>
+    <button class="modal-close" onclick="closeIndividualRatesModal()">✕</button>
+  </div>
+  <div class="modal-body" style="overflow:auto;flex:1">
+    <div style="font-size:11px;color:var(--hint);margin-bottom:10px">
+      Để trống ô nào thì người đó dùng đúng % của <b>Team</b> họ thuộc về (cài ở tab "Quản lý Team").
+      Điền số vào đây sẽ <b>ghi đè</b> riêng cho người đó, không ảnh hưởng người khác trong cùng team.
+    </div>
+    <div id="ir-body"></div>
+  </div>
+  <div class="modal-footer" style="flex-shrink:0;display:flex;justify-content:flex-end">
+    <button class="btn" onclick="closeIndividualRatesModal()">Đóng</button>
+  </div>
+</div>
+</div>
+
 <!-- ══ MODAL: Quản lý TRƯỜNG TỰ TẠO (admin) ══ -->
 <div class="modal-overlay" id="cf-modal" style="display:none;align-items:flex-start;justify-content:center;padding-top:40px;z-index:700">
 <div class="modal" style="max-width:820px;width:94%;max-height:86vh;display:flex;flex-direction:column">
@@ -16836,7 +17176,7 @@ function updateSidebarCareFilters() {
   </div>
   <div class="modal-body" style="overflow:auto;flex:1">
     <div style="font-size:11px;color:var(--hint);margin-bottom:10px">
-      Tạo thêm "trường lớn" của riêng bạn (ngang hàng với <b>Tình trạng CS</b> / <b>Trạng thái KH</b>).
+      Tạo thêm "trường lớn" của riêng bạn (ngang hàng với <b id="lbl-fieldcs-help">Tình trạng CS</b> / <b id="lbl-fieldkh-help">Trạng thái KH</b>).
       Mỗi trường có cây lựa chọn mẹ → con riêng, hiện ngay trong form <b>Thông tin chăm sóc</b> của từng khách.
     </div>
     <div style="display:flex;gap:14px;align-items:flex-start">
@@ -16910,10 +17250,11 @@ let _khStatusDraft = [];
 
 function openKhStatusModal() {
   var isAdmin = (_authAccount && _authAccount.role === 'admin') || _bootstrapAdmin;
-  if (!isAdmin) { toast('Chỉ admin mới quản lý Trạng thái KH.'); return; }
+  if (!isAdmin) { toast('Chỉ admin mới quản lý ' + FIELD_LABEL_KH + '.'); return; }
   _khStatusDraft = JSON.parse(JSON.stringify(CUSTOMER_STATUS_TREE));
   _renderKhStatusTree();
   _renderKhParentSel();
+  var t = document.getElementById('kh-status-modal-title'); if (t) t.textContent = '⚙ Quản lý ' + FIELD_LABEL_KH;
   var m = document.getElementById('kh-status-modal');
   if (m) m.style.display = 'flex';
   // Update save button label
@@ -17344,12 +17685,12 @@ async function saveKhStatusTree() {
       });
       var d = await r.json().catch(function(){ return {}; });
       if (d && d.error) toast('Lưu local ✓ — GSheets: ' + d.error);
-      else toast('✓ Đã lưu và đồng bộ Trạng thái KH lên Google Sheets');
+      else toast('✓ Đã lưu và đồng bộ ' + FIELD_LABEL_KH + ' lên Google Sheets');
     } catch(e) {
       toast('✓ Đã lưu local — chưa đồng bộ GSheets: ' + e.message);
     }
   } else {
-    toast('✓ Đã lưu Trạng thái KH (local)');
+    toast('✓ Đã lưu ' + FIELD_LABEL_KH + ' (local)');
   }
   closeKhStatusModal();
   // Refresh dropdown trong form nếu đang mở
