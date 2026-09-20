@@ -15929,54 +15929,172 @@ function _pkExportKpiOrdersDetail(){
 }
 
 // ═══════════════════════════════════════════════════════
-//  CHECKLIST CHẤT LƯỢNG TIN NHẮN MKT — mô phỏng đúng file Excel
-//  "Checklist_tin_nhắn_MKT_chất_lượng.xlsx": định nghĩa tag L1-L4 + nhập tay theo
-//  ngày + tổng hợp theo khoảng ngày so với mục tiêu (%).
-//  Nguồn dữ liệu: action=mktChecklist / mktChecklistSummary (gas_v13.js).
+//  CHECKLIST CHẤT LƯỢNG TIN NHẮN MKT
+//  TỰ TÍNH từ Báo cáo Pancake (Tổng tương tác/SĐT thu thập/số lượng tag L1..Ln) + DT TỔNG
+//  (L5 = tổng số đơn Base). KHÔNG nhập tay theo ngày nữa — chỉ còn phải điền 1 LẦN mục tiêu
+//  (%) + mẫu số cho từng tag, áp dụng cho CẢ THÁNG (kế thừa sang tháng sau nếu không đổi).
+//  Nguồn dữ liệu: action=mktChecklist (GET) / saveMktChecklistConfig (POST) — gas_v13.js.
 // ═══════════════════════════════════════════════════════
 var _mktState = {
-  rows: [], targets: { L1:0.8, L2:0.6, L3:0.9, L4:0.9 }, tagDefs: [],
-  loaded: false, loading: false, showDefs: true,
-  editDate: '',
-  form: { date:'', khTiepCanL1:0, htDatLan3:0, sdtThuThap:0, sdtKetNoi:0, khTiepCanL3:0, khDungChanDung:0, khTiepCanL4:0, khKhaoGia:0, note:'' },
-  sumFrom: '', sumTo: '', summary: null, sumLoading: false,
-  targetForm: null // khi != null: dang mo form sua muc tieu, giu ban nhap rieng {L1,L2,L3,L4} (dang %)
+  loaded: false, loading: false,
+  quick: 'thisMonth', from: '', to: '',
+  report: null,
+  cfgDraft: null // khi != null: đang sửa mục tiêu/mẫu số, giữ bản nháp { L1:{target,denom}, ... } (target dạng %)
 };
+
+function _mktLabel(code){ return _PK_STATUS_LABEL[code] || ('L' + code.substring(1) + '. (tag mới)'); }
 
 async function renderMktChecklistTab(){
   var wrap = document.getElementById('mktchecklist-wrap');
   if (!wrap) return;
+  if (!_mktState.from || !_mktState.to){
+    var r = _pkQuickRange(_mktState.quick) || _pkQuickRange('thisMonth');
+    _mktState.from = r.from; _mktState.to = r.to;
+  }
   if (!_mktState.loaded && !_mktState.loading) await _mktLoad();
-  else _mktRenderChecklist();
+  else _mktRender();
 }
 
 async function _mktLoad(){
-  if (!gsUrl){ var w = document.getElementById('mktchecklist-wrap'); if (w) w.innerHTML = '<div style="padding:16px;color:var(--muted)">Chưa kết nối Google Sheets.</div>'; return; }
-  _mktState.loading = true; _mktRenderChecklist();
+  var wrap = document.getElementById('mktchecklist-wrap');
+  if (!gsUrl){ if (wrap) wrap.innerHTML = '<div style="padding:16px;color:var(--muted)">Chưa kết nối Google Sheets.</div>'; return; }
+  _mktState.loading = true; _mktRender();
   try {
     var sep = gsUrl.includes('?') ? '&' : '?';
-    var r = await fetch(gsUrl + sep + 'action=mktChecklist', { redirect:'follow' });
-    var d = await r.json();
-    _mktState.rows = d.rows || [];
-    _mktState.targets = d.targets || _mktState.targets;
-    _mktState.tagDefs = d.tagDefs || [];
+    var r = await fetch(gsUrl + sep + 'action=mktChecklist&from='+encodeURIComponent(_mktState.from)+'&to='+encodeURIComponent(_mktState.to), { redirect:'follow' });
+    _mktState.report = await r.json();
     _mktState.loaded = true;
-    var today = _ymd(new Date());
-    if (!_mktState.form.date) _mktState.form.date = today;
-    if (!_mktState.sumFrom || !_mktState.sumTo){
-      // Mac dinh xem 7 ngay gan nhat, giong tinh than "Tong hop tuan/thang" cua Excel
-      var d7 = new Date(); d7.setDate(d7.getDate() - 6);
-      _mktState.sumFrom = _ymd(d7); _mktState.sumTo = today;
-    }
   } catch(e){ toast('❌ Tải Checklist MKT lỗi: ' + e.message); }
-  finally { _mktState.loading = false; _mktRenderChecklist(); _mktLoadSummary(); }
+  finally { _mktState.loading = false; _mktRender(); }
 }
 
-function _mktPct(a,b){ return b ? Math.round(a/b*1000)/10 : 0; }
-function _mktPctColor(rate, target){ return (rate >= target*100) ? 'var(--green)' : 'var(--red, #d33)'; }
+function _mktApplyQuickRange(key){
+  _mktState.quick = key;
+  if (key !== 'custom'){ var r = _pkQuickRange(key); if (r){ _mktState.from = r.from; _mktState.to = r.to; } }
+  _mktState.cfgDraft = null;
+  _mktLoad();
+}
+function _mktSetCustomDate(which, val){
+  _mktState[which] = val; _mktState.quick = 'custom'; _mktState.cfgDraft = null; _mktLoad();
+}
 
-async function _mktSaveRow(){
-  var f = _mktState.form;
+function _mktPctColor(rate, target){
+  if (target === null || target === undefined) return 'var(--text)';
+  return (rate >= target*100) ? 'var(--green)' : 'var(--red, #d33)';
+}
+
+// ── Sửa mục tiêu (%) + mẫu số — áp dụng 1 lần cho CẢ THÁNG (tháng của ngày "Đến") ──
+function _mktOpenCfgEditor(){
+  var rep = _mktState.report; if (!rep) return;
+  var draft = {};
+  rep.tags.forEach(function(t){ draft[t.code] = { target: t.target===null ? '' : Math.round(t.target*1000)/10, denom: t.denom }; });
+  _mktState.cfgDraft = draft;
+  _mktRender();
+}
+function _mktCfgSetTarget(code, val){ _mktState.cfgDraft[code].target = val; }
+function _mktCfgSetDenom(code, val){ _mktState.cfgDraft[code].denom = val; }
+async function _mktSaveCfg(){
+  var rep = _mktState.report; if (!rep || !_mktState.cfgDraft) return;
+  var month = rep.month;
+  var config = {};
+  Object.keys(_mktState.cfgDraft).forEach(function(code){
+    var d = _mktState.cfgDraft[code];
+    var t = String(d.target).trim();
+    config[code] = { target: t === '' ? null : Math.max(0, Number(t)) / 100, denom: d.denom };
+  });
+  try {
+    var res = await fetch(gsUrl, { method:'POST', redirect:'follow',
+      body: JSON.stringify({ action:'saveMktChecklistConfig', month: month, config: config }) });
+    var d2 = await res.json();
+    if (d2 && d2.ok !== false){ toast('✓ Đã lưu mục tiêu cho tháng ' + month); _mktState.cfgDraft = null; _mktLoad(); }
+    else toast('❌ Lỗi lưu: ' + (d2 && d2.error || 'không rõ'));
+  } catch(e){ toast('❌ Lỗi kết nối: ' + e.message); }
+}
+
+function _mktRender(){
+  var wrap = document.getElementById('mktchecklist-wrap');
+  if (!wrap) return;
+  if (_mktState.loading && !_mktState.loaded){ wrap.innerHTML = '<div style="padding:16px;color:var(--muted)">Đang tải...</div>'; return; }
+  var rep = _mktState.report;
+
+  var html = '<div class="dash-section-title">✅ Checklist chất lượng tin nhắn MKT</div>';
+  html += '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Tự tính từ <b>Báo cáo Pancake</b> (Tổng tương tác / SĐT thu thập / số lượng từng tag L1..Ln) và <b>Base — DT tổng</b> (L5 = tổng số đơn, tính theo ngày tạo). Chỉ cần điền <b>mục tiêu (%) và mẫu số</b> một lần — áp dụng cho cả tháng, tháng sau tự kế thừa nếu không đổi.</div>';
+
+  html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px">'+
+    _quickRangeSelectHtml(_mktState.quick, "_mktApplyQuickRange(this.value)")+
+    '<input type="date" value="'+esc(_mktState.from)+'" onchange="_mktSetCustomDate(\'from\',this.value)" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+    '<span style="font-size:11px;color:var(--muted)">→</span>'+
+    '<input type="date" value="'+esc(_mktState.to)+'" onchange="_mktSetCustomDate(\'to\',this.value)" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+    (rep ? '<button class="btn sm secondary" onclick="_mktOpenCfgEditor()">🎯 Sửa mục tiêu & mẫu số (tháng '+esc(rep.month)+')</button>' : '')+
+  '</div>';
+
+  if (!rep){ wrap.innerHTML = html; return; }
+
+  if (rep.warnings && rep.warnings.length){
+    html += '<div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:12px">'+
+      rep.warnings.map(function(w){ return '⚠️ '+esc(w); }).join('<br>')+
+    '</div>';
+  }
+
+  html += '<div class="kpi-grid" style="margin-bottom:16px">'+
+    '<div class="kpi-card"><div class="kpi-val">'+fmt(rep.tongTT)+'</div><div class="kpi-label">Tổng tương tác</div></div>'+
+    '<div class="kpi-card"><div class="kpi-val">'+fmt(rep.sdtThuThap)+'</div><div class="kpi-label">Tổng SĐT thu thập</div></div>'+
+    '<div class="kpi-card"><div class="kpi-val">'+fmt(rep.baseOrders)+'</div><div class="kpi-label">Tổng đơn (Base — L5)</div></div>'+
+  '</div>';
+
+  if (rep.configSource && rep.configSource !== rep.month){
+    html += '<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Chưa đặt mục tiêu riêng cho tháng '+esc(rep.month)+' — đang dùng lại cấu hình '+(rep.configSource==='default'?'mặc định':'của tháng '+esc(rep.configSource))+'.</div>';
+  }
+
+  // ── Form sửa mục tiêu/mẫu số (khi mở) ──
+  if (_mktState.cfgDraft){
+    var denomOpts = [['tt','Tổng tương tác'],['sdt','Tổng SĐT thu thập']]
+      .concat(rep.tags.map(function(t){ return [t.code, 'Số lượng '+t.code]; }));
+    html += '<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:16px;background:var(--surface2)">'+
+      '<div style="font-weight:700;font-size:12px;margin-bottom:8px">🎯 Mục tiêu & mẫu số — áp dụng cho tháng '+esc(rep.month)+'</div>'+
+      '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>'+
+        '<th style="text-align:left;padding:4px 6px">Tag</th><th style="text-align:right;padding:4px 6px">Mục tiêu (%)</th><th style="text-align:left;padding:4px 6px">Mẫu số</th>'+
+      '</tr></thead><tbody>'+
+      rep.tags.map(function(t){
+        var d = _mktState.cfgDraft[t.code];
+        return '<tr><td style="padding:4px 6px">'+esc(t.code)+'. '+esc(_mktLabel(t.code))+'</td>'+
+          '<td style="text-align:right;padding:4px 6px"><input type="number" min="0" max="100" step="0.1" value="'+esc(d.target)+'" placeholder="—" onchange="_mktCfgSetTarget(\''+t.code+'\',this.value)" style="width:70px;text-align:right;font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"></td>'+
+          '<td style="padding:4px 6px"><select onchange="_mktCfgSetDenom(\''+t.code+'\',this.value)" style="font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+            [['none','— chỉ đếm số lượng —']].concat(denomOpts).map(function(o){ return '<option value="'+o[0]+'"'+(d.denom===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')+
+          '</select></td></tr>';
+      }).join('')+
+      '</tbody></table>'+
+      '<div style="margin-top:8px;display:flex;gap:8px">'+
+        '<button class="btn sm primary" onclick="_mktSaveCfg()">💾 Lưu cho tháng '+esc(rep.month)+'</button>'+
+        '<button class="btn sm secondary" onclick="_mktState.cfgDraft=null;_mktRender()">Hủy</button>'+
+      '</div>'+
+    '</div>';
+  }
+
+  // ── Bảng chỉ số L1..Ln ──
+  html += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr>'+
+    '<th>Tag</th><th style="text-align:right">Số lượng</th><th>Mẫu số</th><th style="text-align:right">Giá trị mẫu số</th>'+
+    '<th style="text-align:right">Tỷ lệ</th><th style="text-align:right">Mục tiêu</th><th>Trạng thái</th>'+
+  '</tr></thead><tbody>';
+  rep.tags.forEach(function(t){
+    var statusHtml = '<span style="color:var(--muted)">—</span>';
+    if (t.passed === true) statusHtml = '<span style="color:var(--green);font-weight:700">✓ Đạt</span>';
+    else if (t.passed === false) statusHtml = '<span style="color:var(--red,#d33);font-weight:700">✗ Chưa đạt</span>';
+    html += '<tr>'+
+      '<td><b>'+esc(t.code)+'</b>. '+esc(_mktLabel(t.code))+(t.code==='L5'?' <span style="font-size:10px;color:var(--muted)">(Base)</span>':'')+'</td>'+
+      '<td style="text-align:right;font-weight:700">'+fmt(t.count)+'</td>'+
+      '<td style="color:var(--muted);font-size:11px">'+(t.denomLabel||'—')+'</td>'+
+      '<td style="text-align:right">'+(t.denomValue!==null?fmt(t.denomValue):'—')+'</td>'+
+      '<td style="text-align:right;font-weight:700;color:'+_mktPctColor(t.rate,t.target)+'">'+(t.rate!==null?t.rate+'%':'—')+'</td>'+
+      '<td style="text-align:right;color:var(--muted)">'+(t.target!==null?'≥'+Math.round(t.target*1000)/10+'%':'—')+'</td>'+
+      '<td>'+statusHtml+'</td>'+
+    '</tr>';
+  });
+  html += '</tbody></table></div>';
+  html += '<div style="font-size:11px;color:var(--muted);margin-top:8px">Khoảng ngày: '+esc(rep.from)+' → '+esc(rep.to)+' (tính theo ngày tạo).</div>';
+
+  wrap.innerHTML = html;
+}
   if (!f.date){ toast('Chưa chọn ngày'); return; }
   try {
     var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'saveMktChecklistRow', row: f }) });
@@ -16285,10 +16403,7 @@ var _srState = {
   // D — KH Cham soc moi (data rieng, KHONG gop A/B/C)
   dDateFrom: '', dDateTo: '', dDateQuick: 'custom', dCs: '', dataD: null,
   // E — Hoa hong nhan vien (dung lai action=salesReportA, filter rieng de khong dam vao tab A)
-  eDateFrom: '', eDateTo: '', eDateQuick: 'custom', eDateField: 'ngayTao', eSale: [], eKenh: [], dataE: null, eSaleSearch: '',
-  // Danh sach ten Sale duoc phep chon o tab E — Admin = toan bo saleOptions, Leader = chi thanh
-  // vien team minh phu trach (xem _srLeaderScopeNames). Dung rieng de khong dam vao tab A/B/C.
-  eSaleOptions: []
+  eDateFrom: '', eDateTo: '', eDateQuick: 'custom', eDateField: 'ngayTao', eSale: [], eKenh: [], dataE: null, eSaleSearch: ''
 };
 
 function _srMoney(n){ return fmt(Math.round(n||0)) + '₫'; }
@@ -16300,56 +16415,15 @@ function _srMyNames(){
   return (typeof currentUser !== 'undefined' && currentUser && currentUser.names && currentUser.names.length)
     ? currentUser.names.slice() : [];
 }
-// ── LEADER: rieng tab E (Hoa hong nhan vien) duoc xem CA TEAM minh phu trach, chon theo team
-//    hoac chon nhieu ten trong team (co o go tim ten). Cac tab A/B/C van khoa nhu cu — khong
-//    noi long quyen o nhung cho khong duoc yeu cau. CS thuong van chi xem duoc chinh minh. ──
-function _srIsLeader(){
-  return (typeof currentUser !== 'undefined' && currentUser && currentUser.role === 'leader');
-}
-// Cac team ma tai khoan dang dang nhap dang lam leader (khop theo ten leader hoac theo
-// currentUser.team da gan luc dang nhap).
-function _srLeaderTeams(){
-  var my = _srMyNames();
-  var out = [];
-  (typeof teams !== 'undefined' ? teams : []).forEach(function(t){
-    if (!t) return;
-    if ((t.leader && my.indexOf(t.leader) !== -1) ||
-        (currentUser && currentUser.team && t.name === currentUser.team)) out.push(t);
-  });
-  return out;
-}
-// Toan bo ten Sale nam trong pham vi leader duoc xem = leader + thanh vien cua cac team tren,
-// luon gom ca ten cua chinh tai khoan dang dang nhap.
-function _srLeaderScopeNames(){
-  var set = {};
-  _srLeaderTeams().forEach(function(t){
-    if (t.leader) set[t.leader] = 1;
-    (t.members||[]).forEach(function(m){ if (m) set[m] = 1; });
-  });
-  _srMyNames().forEach(function(n){ if (n) set[n] = 1; });
-  return Object.keys(set).sort(function(a,b){ return a.localeCompare(b,'vi'); });
-}
-// Khoa cung bo loc Sale ve dung pham vi duoc phep — goi o dau moi lan render de khong the nao
-// bi doi sang xem sale ngoai pham vi (kien ca qua thao tac client, phong khi co lo hong UI).
+// Khoa cung bo loc Sale ve dung ten cua chinh CS dang dang nhap — goi o dau moi lan render de
+// khong the nao bi doi sang xem sale khac (kien ca qua thao tac client, phong khi co lo hong UI).
 function _srEnforceScope(){
   if (_srIsAdmin()) return;
   var my = _srMyNames();
   _srState.sale = my.slice();
   _srState.bSale = my.slice();
   _srState.cSale = my.slice();
-  if (_srIsLeader()){
-    var scope = _srLeaderScopeNames();
-    if (scope.length){
-      // Giu lai lua chon tay cua leader, chi loai cac ten nam ngoai team. Bo chon het = xem
-      // ca team (backend loc theo du danh sach thanh vien).
-      var cur = (_srState.eSale||[]).filter(function(n){ return scope.indexOf(n) !== -1; });
-      _srState.eSale = cur.length ? cur : scope.slice();
-    } else {
-      _srState.eSale = my.slice();   // chua set up team nao -> lui ve chi xem chinh minh
-    }
-  } else {
-    _srState.eSale = my.slice();
-  }
+  _srState.eSale = my.slice();
 }
 
 async function _srFetch(action, params){
@@ -16707,9 +16781,8 @@ function _srComboHtml(domId, field, optKey, label, placeholder, widthPx){
 // ── Chọn theo Team: đổ toàn bộ thành viên của 1 team (leader + members, đã set up sẵn ở tab
 //    "Quản lý Team") vào ô Sale multi-select — chỉ điền, không tự bấm Lọc, để có thể bỏ bớt/
 //    thêm tay trước khi xem báo cáo. Dùng lại biến global `teams` đã có sẵn cho tab Quản lý Team.
-function _srTeamOptionsHtml(list){
-  // list = danh sach team duoc phep chon (Leader chi thay team minh phu trach). Bo trong = tat ca.
-  return (list || teams || []).map(function(t){ return '<option value="'+esc(t.id)+'">'+esc(t.name||'(chưa đặt tên)')+'</option>'; }).join('');
+function _srTeamOptionsHtml(){
+  return (teams||[]).map(function(t){ return '<option value="'+esc(t.id)+'">'+esc(t.name||'(chưa đặt tên)')+'</option>'; }).join('');
 }
 function srPickTeam(teamId, saleField, domId){
   if (!teamId) return;
@@ -16717,13 +16790,6 @@ function srPickTeam(teamId, saleField, domId){
   if (!t){ toast('Không tìm thấy team.'); return; }
   var members = [...(new Set([t.leader].concat(t.members||[]).filter(Boolean)))];
   if (!members.length){ toast('Team "'+(t.name||'')+'" chưa có thành viên — set up ở tab Quản lý Team.'); return; }
-  // Leader chi duoc do thanh vien nam trong pham vi team minh phu trach (chan ca truong hop
-  // doi value cua the <select> bang tay tren trinh duyet).
-  if (!_srIsAdmin() && _srIsLeader()){
-    var scopeNames = _srLeaderScopeNames();
-    members = members.filter(function(m){ return scopeNames.indexOf(m) !== -1; });
-    if (!members.length){ toast('Bạn không phụ trách team này.'); return; }
-  }
   _srState[saleField] = members;
   // QUAN TRỌNG: combo "sr-sale-combo" (Báo cáo A) là combo dựng tay riêng (KHÔNG đăng ký qua
   // _srComboReg như combo "sr-sale-combo-c" của Báo cáo C), nên gọi srRenderComboChips(domId)
@@ -17016,16 +17082,10 @@ function renderSalesReportTabE_(wrap, subTabs){
     '<option value="ngayTao"'+(_srState.eDateField==='ngayTao'?' selected':'')+'>Lọc theo Ngày tạo</option>'+
     '<option value="thoiGianHT"'+(_srState.eDateField==='thoiGianHT'?' selected':'')+'>Lọc theo Thời gian hoàn thành</option>'+
     '</select>';
-  // Danh sach ten duoc phep chon: Admin = tat ca, Leader = thanh vien team minh phu trach.
-  var _eLeaderScope = (!_srIsAdmin() && _srIsLeader()) ? _srLeaderScopeNames() : [];
-  var _eCanPick = _srIsAdmin() || _eLeaderScope.length > 0;
-  _srState.eSaleOptions = _srIsAdmin() ? (_srState.saleOptions || []) : _eLeaderScope;
-  if (_eCanPick){
-    filters += _srComboHtml('sr-sale-combo-e', 'eSale', 'eSaleOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 190);
-    var _eTeamOpts = _srIsAdmin() ? _srTeamOptionsHtml() : _srTeamOptionsHtml(_srLeaderTeams());
+  if (_srIsAdmin()){
+    filters += _srComboHtml('sr-sale-combo-e', 'eSale', 'saleOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 190);
     filters += '<select onchange="if(this.value){srPickTeam(this.value,\'eSale\',\'sr-sale-combo-e\');this.value=\'\'}" title="Điền nhanh cả team vào ô Sale" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-      '<option value="">— Chọn theo Team —</option>' + _eTeamOpts + '</select>';
-    if (!_srIsAdmin()) filters += '<span style="font-size:11px;color:var(--muted)">🔒 Chỉ trong team bạn phụ trách ('+_eLeaderScope.length+' người)</span>';
+      '<option value="">— Chọn theo Team —</option>' + _srTeamOptionsHtml() + '</select>';
   } else {
     filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Sale</div>'+
       '<div style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)">🔒 '+esc((_srState.eSale||[]).join(', ') || currentUser.name)+' — chỉ xem được hoa hồng của mình</div></div>';
@@ -17058,44 +17118,9 @@ function _srRenderE_(d){
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(c.totalRevenueBelow15)+'</div><div class="kpi-label">Doanh thu đơn &lt;15tr</div></div>' +
     '</div>';
 
-  // b) Tong hop theo Team — gom cac dong o c) lai theo team ma tung nguoi dang thuoc ve
-  //    (dung dung _teamRateForName_ — cung nguon xac dinh team voi cho tinh % hoa hong).
-  var byTeam = {};
-  (c.bySale||[]).forEach(function(s){
-    var ti = _teamRateForName_(s.name);
-    var key = ti.team ? ti.team.name : '(chưa thuộc team nào)';
-    if (!byTeam[key]) byTeam[key] = { name:key, people:0, ordersAbove15:0, ordersBelow15:0, revenueAbove15:0, revenueBelow15:0, commission:0 };
-    var g = byTeam[key];
-    g.people++;
-    g.ordersAbove15 += s.ordersAbove15; g.ordersBelow15 += s.ordersBelow15;
-    g.revenueAbove15 += s.revenueAbove15; g.revenueBelow15 += s.revenueBelow15;
-    g.commission += s.commission;
-  });
-  var teamRows = Object.keys(byTeam).map(function(k){ return byTeam[k]; })
-    .sort(function(a,b){ return b.commission - a.commission; });
-  html += '<div class="dash-section-title">b) Tổng hợp theo Team <span style="font-weight:400;color:var(--muted);font-size:11px">(cộng dồn từ bảng c) bên dưới, theo team của từng người)</span></div>';
-  html += '<table class="dash-table"><thead><tr>'+
-    '<th>Team</th><th style="text-align:right">Số người</th>'+
-    '<th style="text-align:right">Số đơn ≥15tr</th><th style="text-align:right">Số đơn &lt;15tr</th>'+
-    '<th style="text-align:right">DT ≥15tr</th><th style="text-align:right">DT &lt;15tr</th>'+
-    '<th style="text-align:right"><b>Hoa hồng</b></th></tr></thead><tbody>';
-  teamRows.forEach(function(g){
-    html += '<tr><td>'+esc(g.name)+'</td>'+
-      '<td style="text-align:right">'+fmt(g.people)+'</td>'+
-      '<td style="text-align:right">'+fmt(g.ordersAbove15)+'</td>'+
-      '<td style="text-align:right">'+fmt(g.ordersBelow15)+'</td>'+
-      '<td style="text-align:right">'+_srMoney(g.revenueAbove15)+'</td>'+
-      '<td style="text-align:right">'+_srMoney(g.revenueBelow15)+'</td>'+
-      '<td style="text-align:right"><b>'+_srMoney(g.commission)+'</b></td></tr>';
-  });
-  if (!teamRows.length) html += '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
-  html += '<tr style="font-weight:700;border-top:2px solid var(--border)"><td colspan="6" style="text-align:right">Tổng hoa hồng:</td><td style="text-align:right">'+_srMoney(c.totalCommission)+'</td></tr>';
-  html += '</tbody></table>';
-  html += '<div style="font-size:11px;color:var(--muted);margin:6px 0 16px">Người chưa được gán vào team nào ở tab "Quản lý Team" sẽ nằm ở dòng "(chưa thuộc team nào)".</div>';
-
-  // c) Hoa hồng từng nhân viên
+  // b) Hoa hồng từng nhân viên
   var rows = (c.bySale||[]).filter(function(s){ return !_srState.eSaleSearch || s.name.toLowerCase().indexOf(_srState.eSaleSearch.toLowerCase())!==-1; });
-  html += '<div class="dash-section-title">c) Hoa hồng nhân viên <span style="font-weight:400;color:var(--muted);font-size:11px">(doanh thu = phần chia đều của người đó trong từng đơn)</span></div>';
+  html += '<div class="dash-section-title">b) Hoa hồng nhân viên <span style="font-weight:400;color:var(--muted);font-size:11px">(doanh thu = phần chia đều của người đó trong từng đơn)</span></div>';
   html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.eSaleSearch)+'" oninput="_srState.eSaleSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
   html += '<table class="dash-table"><thead><tr>'+
     '<th>Sale</th><th style="text-align:right">Số đơn ≥15tr</th><th style="text-align:right">Số đơn &lt;15tr</th>'+
