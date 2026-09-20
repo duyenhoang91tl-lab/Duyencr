@@ -15403,6 +15403,51 @@ function _pkColFilterClear(tableKey, colKey) {
   _pkRenderKpiPancake();
 }
 
+// Bo loc nhanh khoang ngay cho tab "KPI Pancake" — cung y tuong voi bo loc "Thoi gian tao"
+// tren Pancake (Hom nay/Hom qua/Tuan nay/Tuan truoc...), them Thang/Quy/Nam theo yeu cau.
+var _PK_QUICK_RANGES = [
+  { v:'today',      l:'Hôm nay' },
+  { v:'yesterday',  l:'Hôm qua' },
+  { v:'thisWeek',   l:'Tuần này' },
+  { v:'lastWeek',   l:'Tuần trước' },
+  { v:'thisMonth',  l:'Tháng này' },
+  { v:'lastMonth',  l:'Tháng trước' },
+  { v:'thisQuarter',l:'Quý này' },
+  { v:'lastQuarter',l:'Quý trước' },
+  { v:'thisYear',   l:'Năm này' },
+  { v:'lastYear',   l:'Năm trước' },
+  { v:'custom',     l:'Tuỳ chỉnh…' }
+];
+function _pkQuickRange(key){
+  var now = new Date();
+  var y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+  function mk(yy,mm,dd){ return new Date(yy,mm,dd); }
+  // Thu 2 dau tuan (ISO, VN): getDay()=0 la CN -> lui 6 ngay; con lai lui (getDay()-1) ngay
+  function mondayOf(dt){ var dow = dt.getDay(); var diff = (dow===0?6:dow-1); return mk(dt.getFullYear(),dt.getMonth(),dt.getDate()-diff); }
+  switch(key){
+    case 'today':      return { from:_ymd(now), to:_ymd(now) };
+    case 'yesterday':  { var y1=mk(y,m,d-1); return { from:_ymd(y1), to:_ymd(y1) }; }
+    case 'thisWeek':   { var mo=mondayOf(now); var su=mk(mo.getFullYear(),mo.getMonth(),mo.getDate()+6); return { from:_ymd(mo), to:_ymd(su) }; }
+    case 'lastWeek':   { var moT=mondayOf(now); var moL=mk(moT.getFullYear(),moT.getMonth(),moT.getDate()-7); var suL=mk(moL.getFullYear(),moL.getMonth(),moL.getDate()+6); return { from:_ymd(moL), to:_ymd(suL) }; }
+    case 'thisMonth':  return { from:_ymd(mk(y,m,1)), to:_ymd(mk(y,m+1,0)) };
+    case 'lastMonth':  return { from:_ymd(mk(y,m-1,1)), to:_ymd(mk(y,m,0)) };
+    case 'thisQuarter':{ var q=Math.floor(m/3); return { from:_ymd(mk(y,q*3,1)), to:_ymd(mk(y,q*3+3,0)) }; }
+    case 'lastQuarter':{ var q2=Math.floor(m/3)-1, yy2=y; if(q2<0){q2=3;yy2=y-1;} return { from:_ymd(mk(yy2,q2*3,1)), to:_ymd(mk(yy2,q2*3+3,0)) }; }
+    case 'thisYear':   return { from:_ymd(mk(y,0,1)), to:_ymd(mk(y,11,31)) };
+    case 'lastYear':   return { from:_ymd(mk(y-1,0,1)), to:_ymd(mk(y-1,11,31)) };
+    default: return null;
+  }
+}
+function _pkKpiApplyQuickFilter(key){
+  _pkState.kpiQuickFilter = key;
+  if (key !== 'custom'){
+    var r = _pkQuickRange(key);
+    if (r){ _pkState.kpiFrom = r.from; _pkState.kpiTo = r.to; }
+  }
+  _pkRenderKpiPancake();
+  _pkLoadKpiReport();
+}
+
 function _pkRenderKpiPancake(){
   var wrap = document.getElementById('kpipancake-wrap');
   if (!wrap) return;
@@ -15412,9 +15457,12 @@ function _pkRenderKpiPancake(){
   html += '<div class="dash-section-title">📈 Báo cáo KPI Pancake tổng hợp</div>';
 
   html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px">'+
-    '<input type="date" value="'+esc(_pkState.kpiFrom)+'" onchange="_pkState.kpiFrom=this.value" style="'+st+'">'+
+    '<select style="'+st+'" onchange="_pkKpiApplyQuickFilter(this.value)">'+
+      _PK_QUICK_RANGES.map(function(o){ return '<option value="'+o.v+'"'+((_pkState.kpiQuickFilter||'custom')===o.v?' selected':'')+'>'+o.l+'</option>'; }).join('')+
+    '</select>'+
+    '<input type="date" value="'+esc(_pkState.kpiFrom)+'" onchange="_pkState.kpiFrom=this.value;_pkState.kpiQuickFilter=\'custom\'" style="'+st+'">'+
     '<span>→</span>'+
-    '<input type="date" value="'+esc(_pkState.kpiTo)+'" onchange="_pkState.kpiTo=this.value" style="'+st+'">'+
+    '<input type="date" value="'+esc(_pkState.kpiTo)+'" onchange="_pkState.kpiTo=this.value;_pkState.kpiQuickFilter=\'custom\'" style="'+st+'">'+
     '<button class="btn primary" onclick="_pkLoadKpiReport()">'+(_pkState.kpiReportLoading?'Đang tải...':'Xem báo cáo')+'</button>'+
     ((_pkState.kpiReport && _pkState.kpiReport.from) ? '<span style="font-size:11px;color:var(--muted)">Đang xem: '+esc(_pkState.kpiReport.from)+' → '+esc(_pkState.kpiReport.to)+'</span>' : '')+
     (_pkState.kpiReport ? '<button class="btn sm secondary" onclick="_pkExportKpiReport()">⬇ Xuất Excel</button>' : '')+
@@ -17026,6 +17074,17 @@ function _injectV9UI(){
       div.innerHTML = d.label;
       tabsBar.appendChild(div);
     });
+    // Đổi chỗ tab "KPI Pancake" với tab tĩnh "Quá hạn" (yêu cầu người dùng) — "Quá hạn" định
+    // nghĩa sẵn trong HTML, "KPI Pancake" chèn động ở cuối thanh .tabs → đảo vị trí thủ công.
+    var overdueTab = tabsBar.querySelector('[onclick="switchTab(\'overdue\',this)"]');
+    var kpiTab = document.getElementById('v9tab-kpipancake');
+    if (overdueTab && kpiTab && overdueTab.parentNode === kpiTab.parentNode){
+      var swapMark = document.createComment('tab-swap');
+      overdueTab.parentNode.insertBefore(swapMark, overdueTab);
+      overdueTab.parentNode.insertBefore(overdueTab, kpiTab);
+      swapMark.parentNode.insertBefore(kpiTab, swapMark);
+      swapMark.remove();
+    }
   }
   var dataView = document.getElementById('data-view');
   if (dataView){
