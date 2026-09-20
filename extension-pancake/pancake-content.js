@@ -1588,7 +1588,7 @@
       // vi don gia khac nhau theo loai da; chi 1 cot gia thi 1 nut "+ Them" duy nhat.
       const addBtns = priceKeys.length
         ? priceKeys.map((pk) => {
-            const priceNum = _parsePriceNum_(row[pk]);
+            const priceNum = _parsePriceNum_(row[pk]) * 1000; // cột giá ghi theo nghìn đ (2310 = 2.310.000đ) — cùng quy ước với Soạn đơn
             const label = priceKeys.length > 1 ? pk.replace(/\s*\(.*?\)\s*/g, '').trim() : '+ Thêm';
             return `<button class="pk-price-addbtn" data-name="${escapeHtml(name)}" data-note="${escapeHtml(noteKey)}" data-price="${priceNum}" data-pricelabel="${escapeHtml(pk)}" data-chatlieu="${escapeHtml(chatLieuKey ? row[chatLieuKey] : '')}" data-mausac="${escapeHtml(mauKey ? row[mauKey] : '')}" data-size="${escapeHtml(sizeKey ? row[sizeKey] : '')}">${escapeHtml(label)}${priceKeys.length > 1 ? ' ' + escapeHtml(String(row[pk])) : ''}</button>`;
           }).join('')
