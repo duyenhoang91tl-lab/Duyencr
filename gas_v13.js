@@ -1000,7 +1000,7 @@ function dtRowToOrder_(row, rowIndex) {
     year: d ? d.getFullYear() : '',
     month: d ? (d.getMonth() + 1) : '',
     cs: String(row[DT_COL_SALEBAN] || ''),
-    source: String(row[DT_COL_KENHBAN] || ''),
+    source: row[DT_COL_KENHBAN] ? String(row[DT_COL_KENHBAN]).trim() : '',
     revenue: _normMoney_(row[DT_COL_GIATRIDON]),
     product: String(row[DT_COL_SANPHAM] || ''),       // text tu do, xem luu y o tren
     productDetail: String(row[DT_COL_PHANLOAI] || ''),
