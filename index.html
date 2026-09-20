@@ -14812,7 +14812,7 @@ var _PK_SALE_DIR = [
 var _PK_STATUS_LABEL = {
   'L1':'L1. Chuẩn (đạt 3 lần phản hồi)', 'L2':'L2. SĐT kết nối', 'L3':'L3. KH tiềm năng',
   'L4':'L4. Khảo giá / KNC', 'L5':'L5. Chốt', 'L5.1':'L5.1 Chờ CK', 'L5.2':'L5.2 Chờ lên đơn',
-  'L6':'L6. Hủy', 'L7':'L7. Khu vực Hà Nội', 'L8':'L8. Upsale'
+  'L6':'L6. Hủy', 'L7':'L7. Khu vực Hà Nội', 'L8':'L8. Upsale', 'L9':'L9. Chốt kéo (KH cũ)'
 };
 // Tiêu chí / điều kiện đạt chuẩn đầy đủ cho từng tag — hiện ở tooltip (title) trên bảng phễu
 // KPI Pancake, theo đúng bảng "DANH SÁCH TAG PANCAKE CẦN TẠO" (Duyên cung cấp).
@@ -15998,21 +15998,23 @@ function _mktSetCustomDate(which, val){
   _mktState[which] = val; _mktState.quick = 'custom'; _mktState.cfgDraft = null; _mktLoad();
 }
 
-function _mktPctColor(rate, target){
-  if (target === null || target === undefined) return 'var(--text)';
-  return (rate >= target*100) ? 'var(--green)' : 'var(--red, #d33)';
+function _mktPctColor(passed){
+  if (passed === null || passed === undefined) return 'var(--text)';
+  return passed ? 'var(--green)' : 'var(--red, #d33)';
 }
+var _MKT_OP_SYMBOL = { gte:'≥', lte:'≤', eq:'=' };
 
 // ── Sửa mục tiêu (%) + mẫu số — áp dụng 1 lần cho CẢ THÁNG (tháng của ngày "Đến") ──
 function _mktOpenCfgEditor(){
   var rep = _mktState.report; if (!rep) return;
   var draft = {};
-  rep.tags.forEach(function(t){ draft[t.code] = { target: t.target===null ? '' : Math.round(t.target*1000)/10, denom: t.denom }; });
+  rep.tags.forEach(function(t){ draft[t.code] = { target: t.target===null ? '' : Math.round(t.target*1000)/10, denom: t.denom, op: t.op||'gte' }; });
   _mktState.cfgDraft = draft;
   _mktRender();
 }
 function _mktCfgSetTarget(code, val){ _mktState.cfgDraft[code].target = val; }
 function _mktCfgSetDenom(code, val){ _mktState.cfgDraft[code].denom = val; }
+function _mktCfgSetOp(code, val){ _mktState.cfgDraft[code].op = val; }
 async function _mktSaveCfg(){
   var rep = _mktState.report; if (!rep || !_mktState.cfgDraft) return;
   var month = rep.month;
@@ -16020,7 +16022,7 @@ async function _mktSaveCfg(){
   Object.keys(_mktState.cfgDraft).forEach(function(code){
     var d = _mktState.cfgDraft[code];
     var t = String(d.target).trim();
-    config[code] = { target: t === '' ? null : Math.max(0, Number(t)) / 100, denom: d.denom };
+    config[code] = { target: t === '' ? null : Math.max(0, Number(t)) / 100, denom: d.denom, op: d.op||'gte' };
   });
   try {
     var res = await fetch(gsUrl, { method:'POST', redirect:'follow',
@@ -16058,8 +16060,11 @@ function _mktRender(){
 
   html += '<div class="kpi-grid" style="margin-bottom:16px">'+
     '<div class="kpi-card"><div class="kpi-val">'+fmt(rep.tongTT)+'</div><div class="kpi-label">Tổng tương tác</div></div>'+
+    '<div class="kpi-card"><div class="kpi-val">'+fmt(rep.khMoiTotal)+'</div><div class="kpi-label">Tổng tương tác KH mới</div></div>'+
+    '<div class="kpi-card"><div class="kpi-val">'+fmt(rep.khCuTotal)+'</div><div class="kpi-label">Tổng tương tác KH cũ</div></div>'+
     '<div class="kpi-card"><div class="kpi-val">'+fmt(rep.sdtThuThap)+'</div><div class="kpi-label">Tổng SĐT thu thập</div></div>'+
     '<div class="kpi-card"><div class="kpi-val">'+fmt(rep.baseOrders)+'</div><div class="kpi-label">Tổng đơn (Base — L5)</div></div>'+
+    '<div class="kpi-card"><div class="kpi-val">'+rep.tyLeChotTong+'%</div><div class="kpi-label">Tỷ lệ chốt tổng (Đơn / Tổng TT)</div></div>'+
   '</div>';
 
   if (rep.configSource && rep.configSource !== rep.month){
@@ -16068,16 +16073,20 @@ function _mktRender(){
 
   // ── Form sửa mục tiêu/mẫu số (khi mở) ──
   if (_mktState.cfgDraft){
-    var denomOpts = [['tt','Tổng tương tác'],['sdt','Tổng SĐT thu thập']]
+    var denomOpts = [['tt','Tổng tương tác'],['sdt','Tổng SĐT thu thập'],['ttMoi','Tổng tương tác KH mới'],['ttCu','Tổng tương tác KH cũ']]
       .concat(rep.tags.map(function(t){ return [t.code, 'Số lượng '+t.code]; }));
+    var opOpts = [['gte','≥ (lớn hơn hoặc bằng)'],['lte','≤ (nhỏ hơn hoặc bằng)'],['eq','= (bằng)']];
     html += '<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:16px;background:var(--surface2)">'+
       '<div style="font-weight:700;font-size:12px;margin-bottom:8px">🎯 Mục tiêu & mẫu số — áp dụng cho tháng '+esc(rep.month)+'</div>'+
       '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>'+
-        '<th style="text-align:left;padding:4px 6px">Tag</th><th style="text-align:right;padding:4px 6px">Mục tiêu (%)</th><th style="text-align:left;padding:4px 6px">Mẫu số</th>'+
+        '<th style="text-align:left;padding:4px 6px">Tag</th><th style="text-align:left;padding:4px 6px">Toán tử</th><th style="text-align:right;padding:4px 6px">Mục tiêu (%)</th><th style="text-align:left;padding:4px 6px">Mẫu số</th>'+
       '</tr></thead><tbody>'+
       rep.tags.map(function(t){
         var d = _mktState.cfgDraft[t.code];
         return '<tr><td style="padding:4px 6px">'+esc(t.code)+'. '+esc(_mktLabel(t.code))+'</td>'+
+          '<td style="padding:4px 6px"><select onchange="_mktCfgSetOp(\''+t.code+'\',this.value)" style="font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+            opOpts.map(function(o){ return '<option value="'+o[0]+'"'+(d.op===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')+
+          '</select></td>'+
           '<td style="text-align:right;padding:4px 6px"><input type="number" min="0" max="100" step="0.1" value="'+esc(d.target)+'" placeholder="—" onchange="_mktCfgSetTarget(\''+t.code+'\',this.value)" style="width:70px;text-align:right;font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"></td>'+
           '<td style="padding:4px 6px"><select onchange="_mktCfgSetDenom(\''+t.code+'\',this.value)" style="font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
             [['none','— chỉ đếm số lượng —']].concat(denomOpts).map(function(o){ return '<option value="'+o[0]+'"'+(d.denom===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')+
@@ -16105,8 +16114,8 @@ function _mktRender(){
       '<td style="text-align:right;font-weight:700">'+fmt(t.count)+'</td>'+
       '<td style="color:var(--muted);font-size:11px">'+(t.denomLabel||'—')+'</td>'+
       '<td style="text-align:right">'+(t.denomValue!==null?fmt(t.denomValue):'—')+'</td>'+
-      '<td style="text-align:right;font-weight:700;color:'+_mktPctColor(t.rate,t.target)+'">'+(t.rate!==null?t.rate+'%':'—')+'</td>'+
-      '<td style="text-align:right;color:var(--muted)">'+(t.target!==null?'≥'+Math.round(t.target*1000)/10+'%':'—')+'</td>'+
+      '<td style="text-align:right;font-weight:700;color:'+_mktPctColor(t.passed)+'">'+(t.rate!==null?t.rate+'%':'—')+'</td>'+
+      '<td style="text-align:right;color:var(--muted)">'+(t.target!==null?(_MKT_OP_SYMBOL[t.op]||'≥')+Math.round(t.target*1000)/10+'%':'—')+'</td>'+
       '<td>'+statusHtml+'</td>'+
     '</tr>';
   });

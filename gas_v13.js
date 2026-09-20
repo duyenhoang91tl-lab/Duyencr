@@ -3148,7 +3148,7 @@ function savePancakePageMap_(pageId, pageName, kenhBan) {
 //  tinh LAI moi lan tong hop (khong tin type/code luc luu), CUNG LOGIC voi _pkClassifyTag
 //  ben client, de quy chuan tay (pancakeTagOverride) ap dung duoc ngay ca voi du lieu cu.
 // ═══════════════════════════════════════════════════════════════
-var PK_STATUS_CODES_ = ['L1','L2','L3','L4','L5','L5.1','L5.2','L6','L7','L8']; // L8 = Upsale (chi dem so luong)
+var PK_STATUS_CODES_ = ['L1','L2','L3','L4','L5','L5.1','L5.2','L6','L7','L8','L9']; // L8 = Upsale, L9 = Chot keo (KH cu) — chi dem so luong tru khi da co cau hinh muc tieu
 
 function classifyPancakeTag_(name, overrideMap) {
   var n = String(name || '').trim();
@@ -5302,15 +5302,21 @@ function readBannedWords_() {
 // ═══════════════════════════════════════════════════════════════
 // Mac dinh theo dung 4 muc tieu Duyen da dat truoc day (L1 dat lan 3 >=80%/Tong tuong tac,
 // L2 ket noi SDT >=60%/Tong SDT thu thap, L3 dung chan dung >=90%/Tong tuong tac, L4 khao gia
-// >=90%/Tong tuong tac). L5 tro len chua co muc tieu chuan — chi tinh ty le tren Tong tuong
-// tac de tham khao, khong ket luan Dat/Chua dat cho toi khi Duyen dien muc tieu cho thang do.
+// >=90%/Tong tuong tac). L5 (Chot - KH MOI) va L9 (Chot keo - KH CU) moi bo sung: chua co muc
+// tieu chuan (target=null), chi tinh ty le tren dung mau so tuong ung (KH moi / KH cu) de tham
+// khao, khong ket luan Dat/Chua dat cho toi khi Duyen dien muc tieu cho thang do. L5 tro len
+// khac chua co muc tieu chuan — chi tinh ty le tren Tong tuong tac de tham khao.
+// 'op': toan tu so sanh voi muc tieu — 'gte' (>=, mac dinh), 'lte' (<=), 'eq' (=). Vi du L4
+// (Khao gia/KNC) neu Duyen muon ty le nay CANG THAP CANG TOT thi doi op sang 'lte'.
 var MKT_DEFAULT_CFG_ = {
-  L1: { target: 0.8, denom: 'tt' },
-  L2: { target: 0.6, denom: 'sdt' },
-  L3: { target: 0.9, denom: 'tt' },
-  L4: { target: 0.9, denom: 'tt' }
+  L1: { target: 0.8, denom: 'tt',    op: 'gte' },
+  L2: { target: 0.6, denom: 'sdt',   op: 'gte' },
+  L3: { target: 0.9, denom: 'tt',    op: 'gte' },
+  L4: { target: 0.9, denom: 'tt',    op: 'gte' },
+  L5: { target: null, denom: 'ttMoi', op: 'gte' }, // Chot — mau so = Tong tuong tac KH MOI
+  L9: { target: null, denom: 'ttCu',  op: 'gte' }  // Chot keo — mau so = Tong tuong tac KH CU
 };
-var MKT_MIN_TAGS_ = 8; // luon hien toi thieu L1..L8 tren bang, du chua co du lieu/cau hinh
+var MKT_MIN_TAGS_ = 9; // luon hien toi thieu L1..L9 tren bang, du chua co du lieu/cau hinh
 
 function _mktMonthOf_(ymd) { return String(ymd || '').substring(0, 7); }
 
@@ -5333,8 +5339,19 @@ function _mktCleanCfgEntry_(e) {
   if (t !== null && (isNaN(t) || t < 0)) t = null;
   if (t !== null && t > 1) t = 1;
   var d = String((e && e.denom) || 'tt');
-  if (!(d === 'tt' || d === 'sdt' || d === 'none' || /^L\d+$/.test(d))) d = 'tt';
-  return { target: t, denom: d };
+  if (!(d === 'tt' || d === 'sdt' || d === 'ttMoi' || d === 'ttCu' || d === 'none' || /^L\d+(\.\d+)?$/.test(d))) d = 'tt';
+  var op = String((e && e.op) || 'gte');
+  if (op !== 'gte' && op !== 'lte' && op !== 'eq') op = 'gte';
+  return { target: t, denom: d, op: op };
+}
+
+// So sanh 1 ty le (%) voi muc tieu (0..1) theo dung toan tu da cau hinh — dung o ca cho tinh
+// 'passed' server-side (ket luan Dat/Chua dat) lan cho UI to mau (index.html doc lai t.passed).
+function _mktCheckPass_(rate, target, op) {
+  var t = (target || 0) * 100;
+  if (op === 'lte') return rate <= t;
+  if (op === 'eq') return Math.abs(rate - t) < 0.05;
+  return rate >= t; // 'gte' mac dinh
 }
 
 // Luu cau hinh CHO 1 THANG (config = { L1:{target,denom}, ..., L9:{...} }) — ghi de ca thang do,
@@ -5368,6 +5385,8 @@ function buildMktChecklistReport_(from, to) {
   var pSdt = buildPancakeSdtReport_(from, to, 'equal');
   var pTag = buildPancakeTagReport_(from, to);
   var tongTT = pInt.byPage.reduce(function(s, r) { return s + r.tongTT; }, 0);
+  var khMoiTotal = pInt.byPage.reduce(function(s, r) { return s + (r.khMoi || 0); }, 0);
+  var khCuTotal = pInt.byPage.reduce(function(s, r) { return s + (r.khCu || 0); }, 0);
   var sdtThuThap = pSdt.byPage.reduce(function(s, r) { return s + r.sdtMangVe; }, 0);
 
   // 2) DT TONG (Base): L5 = tong so don trong khoang ngay, loc theo NGAY TAO (giong moi bao cao khac)
@@ -5395,6 +5414,8 @@ function buildMktChecklistReport_(from, to) {
   var denomLabel = function(d) {
     if (d === 'tt') return 'Tổng tương tác';
     if (d === 'sdt') return 'Tổng SĐT thu thập';
+    if (d === 'ttMoi') return 'Tổng tương tác KH mới';
+    if (d === 'ttCu') return 'Tổng tương tác KH cũ';
     if (d === 'none') return '';
     return 'Số lượng ' + d;
   };
@@ -5403,14 +5424,16 @@ function buildMktChecklistReport_(from, to) {
     var denomVal = null;
     if (e.denom === 'tt') denomVal = tongTT;
     else if (e.denom === 'sdt') denomVal = sdtThuThap;
-    else if (/^L\d+$/.test(e.denom)) denomVal = counts[e.denom] || 0;
+    else if (e.denom === 'ttMoi') denomVal = khMoiTotal;
+    else if (e.denom === 'ttCu') denomVal = khCuTotal;
+    else if (/^L\d+(\.\d+)?$/.test(e.denom)) denomVal = counts[e.denom] || 0;
     var rate = null;
     if (e.denom !== 'none') rate = denomVal > 0 ? Math.round(counts[code] / denomVal * 1000) / 10 : 0;
     var passed = null; // null = chua co muc tieu / khong tinh ty le -> UI khong ket luan Dat/Chua dat
-    if (e.target !== null && rate !== null) passed = denomVal > 0 && rate >= e.target * 100;
+    if (e.target !== null && rate !== null) passed = denomVal > 0 && _mktCheckPass_(rate, e.target, e.op);
     return { code: code, count: counts[code], source: code === 'L5' ? 'base' : 'pancakeTag',
       denom: e.denom, denomLabel: denomLabel(e.denom), denomValue: denomVal,
-      rate: rate, target: e.target, passed: passed };
+      rate: rate, target: e.target, op: e.op, passed: passed };
   });
 
   // 5) Chan doan nguon du lieu: bao ro "chua nap bao gio" vs "co nhung ngoai khoang ngay dang xem"
@@ -5430,7 +5453,12 @@ function buildMktChecklistReport_(from, to) {
   var configOut = {};
   codes.forEach(function(c) { configOut[c] = _mktCleanCfgEntry_((cf.cfg && cf.cfg[c]) || { target: null, denom: 'tt' }); });
 
+  // Ty le chot TONG (khong phan biet KH moi/cu, khong gan voi tag nao) = Tong so don (Base,
+  // cung nguon voi L5) / Tong tuong tac — chi so tong quan rieng, hien canh cac the KPI khac.
+  var tyLeChotTong = tongTT > 0 ? Math.round(baseOrders / tongTT * 1000) / 10 : 0;
+
   return { ok: true, from: from, to: to, month: month, configSource: cf.source,
-    tongTT: tongTT, sdtThuThap: sdtThuThap, baseOrders: baseOrders,
+    tongTT: tongTT, khMoiTotal: khMoiTotal, khCuTotal: khCuTotal, sdtThuThap: sdtThuThap,
+    baseOrders: baseOrders, tyLeChotTong: tyLeChotTong,
     tags: tags, config: configOut, dataAvail: dataAvail, warnings: warnings };
 }
