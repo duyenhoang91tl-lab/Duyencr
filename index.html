@@ -11154,11 +11154,12 @@ function buildPancakeTagReport_(from, to) {
 //  Page va theo Sale; phe do tag L1-L7 (ca tung Page lan toan he thong) xem cong thuc o
 //  ham _tagFunnelRates_ ngay phia tren.
 // Tinh phe do chuyen doi L1->L7 tu 1 bo dem {L1,L2,...,L7} + mau so rieng.
-// Cong thuc (thong nhat ca muc tung Page va muc toan he thong):
-//   L1 = L1 / tongTT          (ty le tuong tac dat "chuan" — 3 lan phan hoi tro len)
-//   L2 = L2 / sdtThuThap      (rieng L2: mau so la Tong SDT thu thap — theo yeu cau)
-//   L3 = L3 / L2              (buoc chuyen: trong so SDT da ket noi, bao nhieu thanh tiem nang)
-//   L4 = L4 / L3              (tiem nang -> khao gia/KNC)
+// Cong thuc — DUNG THEO BANG CHUAN "Tag Pancake" (Duyen gui 20/09/2026, cot "Công thức đo lường"):
+//   L1 = L1 / tongTT          (Chuan, dat 3 lan phan hoi — tren TONG so HT tuong tac)
+//   L2 = L2 / sdtThuThap      (SDT Ket noi — tren TONG so SDT thu thap duoc)
+//   L3 = L3 / tongTT          (KH Tiem nang — tren TONG so HT tuong tac, KHONG phai chia
+//                               theo L2 nhu ban cu — da doi chieu lai voi bang chuan 20/09/2026)
+//   L4 = L4 / tongTT          (Khao gia/KNC — tren TONG so HT tuong tac, cung ly do nhu L3)
 //   L5 = L5 / L4              (khao gia -> chot, theo TAG Pancake — khac voi "ty le chot Page"
 //                               o cho khac von tinh tren DON HANG THAT trong DT TONG)
 //   L6 = L6 / L5              (trong so da chot, bao nhieu bi huy)
@@ -11171,8 +11172,8 @@ function _tagFunnelRates_(counts, tongTT, sdtThuThap) {
     rates: {
       L1: pct(c.L1, tongTT),
       L2: pct(c.L2, sdtThuThap),
-      L3: pct(c.L3, c.L2),
-      L4: pct(c.L4, c.L3),
+      L3: pct(c.L3, tongTT),
+      L4: pct(c.L4, tongTT),
       L5: pct(c.L5, c.L4),
       L6: pct(c.L6, c.L5),
       L7: pct(c.L7, tongTT)

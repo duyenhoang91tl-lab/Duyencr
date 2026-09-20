@@ -3208,20 +3208,23 @@ function buildPancakeTagReport_(from, to) {
 //  Page va theo Sale; phe do tag L1-L7 (ca tung Page lan toan he thong) xem cong thuc o
 //  ham _tagFunnelRates_ ngay phia tren.
 // Tinh phe do chuyen doi L1->L7 tu 1 bo dem {L1,L2,...,L7} + mau so rieng.
-// Cong thuc (thong nhat ca muc tung Page va muc toan he thong):
-//   L1 = L1 / tongTT          (ty le tuong tac dat "chuan" — 3 lan phan hoi tro len)
-//   L2 = L2 / sdtThuThap      (rieng L2: mau so la Tong SDT thu thap — theo yeu cau)
-//   L3 = L3 / L2              (buoc chuyen: trong so SDT da ket noi, bao nhieu thanh tiem nang)
-//   L4 = L4 / L3              (tiem nang -> khao gia/KNC)
+// Cong thuc — DUNG THEO BANG CHUAN "Tag Pancake" (Duyen gui 20/09/2026, cot "Công thức đo lường"):
+//   L1 = L1 / tongTT          (Chuan, dat 3 lan phan hoi — tren TONG so HT tuong tac)
+//   L2 = L2 / sdtThuThap      (SDT Ket noi — tren TONG so SDT thu thap duoc)
+//   L3 = L3 / tongTT          (KH Tiem nang — tren TONG so HT tuong tac, KHONG phai chia
+//                               theo L2 nhu ban cu — da doi chieu lai voi bang chuan 20/09/2026)
+//   L4 = L4 / tongTT          (Khao gia/KNC — tren TONG so HT tuong tac, cung ly do nhu L3)
 //   L5 = realOrders / tongTT  (CHOT — theo yeu cau Duyen: KHONG lay theo tag L5/L4 nua, vi tag
 //                               "Khảo giá"/"Chốt" nhieu khi CS gan tag khong day du/khong dung
 //                               het lam ty le sai lech (vd L4=0 tag -> L5 luon ra 0% du co don
 //                               that). Doi sang DUNG SO DON THAT tren DT TONG (dt.orders/
 //                               totalDonHang, da co san o cho goi ham nay) chia cho Tong TT —
 //                               giong het cong thuc "Tỷ lệ chốt" da dung o bang "Theo Page".
-//   L6 = L6 / L5(tag)         (trong so da chot THEO TAG, bao nhieu bi huy — van dung tag vi
-//                               khong co "so don huy that" doc lap de doi chieu)
-//   L7 = L7 / tongTT          (rieng KV Ha Noi — tinh tren tong tuong tac, theo yeu cau)
+//   L6 = L6 / L5(tag)         (Huy — bang chuan khong ghi cong thuc, giu nguyen tu truoc: ty le
+//                               huy trong so da chot-theo-tag, van dung tag vi khong co "so don
+//                               huy that" doc lap de doi chieu)
+//   L7 = L7 / tongTT          (rieng KV Ha Noi — tren TONG so HT tuong tac)
+//   L8 = Upsale — bang chuan khong dinh nghia mau so ty le -> chi hien SO LUONG, khong tinh %.
 function _tagFunnelRates_(counts, tongTT, sdtThuThap, realOrders) {
   var pct = function(a, b) { return b ? Math.round(a / b * 1000) / 10 : 0; }; // 1 so le, %
   var c = counts || {};
@@ -3231,8 +3234,8 @@ function _tagFunnelRates_(counts, tongTT, sdtThuThap, realOrders) {
     rates: {
       L1: pct(c.L1, tongTT),
       L2: pct(c.L2, sdtThuThap),
-      L3: pct(c.L3, c.L2),
-      L4: pct(c.L4, c.L3),
+      L3: pct(c.L3, tongTT),
+      L4: pct(c.L4, tongTT),
       L5: pct(l5Count, tongTT),
       L6: pct(c.L6, c.L5), // van so voi L5 THEO TAG (c.L5, khong phai l5Count) — L6 la ty le huy trong so da chot-theo-tag
       L7: pct(c.L7, tongTT),
