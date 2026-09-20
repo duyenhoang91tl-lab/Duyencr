@@ -1226,9 +1226,18 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
         </select>
         <span class="ymf-sep">|</span>
         <span class="ymf-label">📆 Ngày</span>
-        <input class="ymf-date" type="date" id="ymf-date-from" onchange="applyFilters()" title="Từ ngày">
+        <select class="ymf-date" id="ymf-quick" onchange="_ymfApplyQuickRange(this.value)" style="min-width:110px">
+          <option value="custom" selected>Tuỳ chỉnh…</option>
+          <option value="today">Hôm nay</option>
+          <option value="yesterday">Hôm qua</option>
+          <option value="thisWeek">Tuần này</option>
+          <option value="lastWeek">Tuần trước</option>
+          <option value="thisMonth">Tháng này</option>
+          <option value="lastMonth">Tháng trước</option>
+        </select>
+        <input class="ymf-date" type="date" id="ymf-date-from" onchange="document.getElementById('ymf-quick').value='custom';applyFilters()" title="Từ ngày">
         <span style="font-size:11px;color:var(--hint)">–</span>
-        <input class="ymf-date" type="date" id="ymf-date-to" onchange="applyFilters()" title="Đến ngày">
+        <input class="ymf-date" type="date" id="ymf-date-to" onchange="document.getElementById('ymf-quick').value='custom';applyFilters()" title="Đến ngày">
         <button class="ymf-clear-date" id="ymf-clear-date" onclick="clearDateFilter()" title="Xóa lọc ngày" style="display:none">✕</button>
         <span class="ymf-sep">|</span>
         <span class="ymf-label">⏰ Giờ</span>
@@ -2909,6 +2918,17 @@ function setBrand(b,el) { currentBrand=b; activateBtn('.bitem',el); applyFilters
 function clearDateFilter(){
   const f=document.getElementById('ymf-date-from'), t=document.getElementById('ymf-date-to');
   if (f) f.value=''; if (t) t.value='';
+  applyFilters();
+}
+// Loc nhanh khoang ngay (chuan dung chung toan he thong: Hom nay/Hom qua/Tuan nay/Tuan truoc/
+// Thang nay/Thang truoc) cho bo loc Nam/Thang/Ngay o danh sach KH chinh — dung lai _pkQuickRange
+// (dinh nghia o khoi Pancake) de tinh khoang ngay, khong tu viet lai cong thuc.
+function _ymfApplyQuickRange(key){
+  if (key === 'custom') return;
+  var r = (typeof _pkQuickRange === 'function') ? _pkQuickRange(key) : null;
+  if (!r) return;
+  var f = document.getElementById('ymf-date-from'), t = document.getElementById('ymf-date-to');
+  if (f) f.value = r.from; if (t) t.value = r.to;
   applyFilters();
 }
 function activateBtn(sel,el) { document.querySelectorAll(sel).forEach(b=>b.classList.remove('active')); el.classList.add('active'); }
@@ -16095,195 +16115,6 @@ function _mktRender(){
 
   wrap.innerHTML = html;
 }
-  if (!f.date){ toast('Chưa chọn ngày'); return; }
-  try {
-    var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'saveMktChecklistRow', row: f }) });
-    var d = await r.json();
-    if (!d.ok){ toast('❌ Lưu lỗi: ' + (d.error||'')); return; }
-    toast('✓ Đã lưu ngày ' + f.date);
-    _mktState.editDate = '';
-    _mktState.form = { date:_ymd(new Date()), khTiepCanL1:0, htDatLan3:0, sdtThuThap:0, sdtKetNoi:0, khTiepCanL3:0, khDungChanDung:0, khTiepCanL4:0, khKhaoGia:0, note:'' };
-    await _mktLoad();
-  } catch(e){ toast('❌ Lỗi: ' + e.message); }
-}
-
-function _mktEditRow(date){
-  var row = _mktState.rows.find(function(r){ return r.date === date; });
-  if (!row) return;
-  _mktState.editDate = date;
-  _mktState.form = { date: row.date, khTiepCanL1: row.khTiepCanL1, htDatLan3: row.htDatLan3,
-    sdtThuThap: row.sdtThuThap, sdtKetNoi: row.sdtKetNoi, khTiepCanL3: row.khTiepCanL3,
-    khDungChanDung: row.khDungChanDung, khTiepCanL4: row.khTiepCanL4, khKhaoGia: row.khKhaoGia, note: row.note||'' };
-  _mktRenderChecklist();
-  var el = document.getElementById('mkt-form-anchor'); if (el) el.scrollIntoView({behavior:'smooth'});
-}
-function _mktCancelEdit(){
-  _mktState.editDate = '';
-  _mktState.form = { date:_ymd(new Date()), khTiepCanL1:0, htDatLan3:0, sdtThuThap:0, sdtKetNoi:0, khTiepCanL3:0, khDungChanDung:0, khTiepCanL4:0, khKhaoGia:0, note:'' };
-  _mktRenderChecklist();
-}
-async function _mktDeleteRow(date){
-  if (!confirm('Xóa dữ liệu ngày ' + date + '?')) return;
-  try {
-    var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'deleteMktChecklistRow', date: date }) });
-    var d = await r.json();
-    if (d.ok){ toast('✓ Đã xóa'); await _mktLoad(); }
-  } catch(e){ toast('❌ Lỗi: ' + e.message); }
-}
-
-async function _mktLoadSummary(){
-  if (!gsUrl || !_mktState.sumFrom || !_mktState.sumTo) return;
-  _mktState.sumLoading = true; _mktRenderChecklist();
-  try {
-    var sep = gsUrl.includes('?') ? '&' : '?';
-    var r = await fetch(gsUrl + sep + 'action=mktChecklistSummary&from='+encodeURIComponent(_mktState.sumFrom)+'&to='+encodeURIComponent(_mktState.sumTo), { redirect:'follow' });
-    _mktState.summary = await r.json();
-  } catch(e){ toast('❌ Tổng hợp lỗi: ' + e.message); }
-  finally { _mktState.sumLoading = false; _mktRenderChecklist(); }
-}
-
-function _mktOpenTargetForm(){
-  _mktState.targetForm = { L1: Math.round(_mktState.targets.L1*100), L2: Math.round(_mktState.targets.L2*100), L3: Math.round(_mktState.targets.L3*100), L4: Math.round(_mktState.targets.L4*100) };
-  _mktRenderChecklist();
-}
-async function _mktSaveTargets(){
-  var tf = _mktState.targetForm;
-  var targets = { L1: (+tf.L1||0)/100, L2: (+tf.L2||0)/100, L3: (+tf.L3||0)/100, L4: (+tf.L4||0)/100 };
-  try {
-    var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'saveMktChecklistTargets', targets: targets }) });
-    var d = await r.json();
-    if (d.ok){ toast('✓ Đã lưu mục tiêu'); _mktState.targets = targets; _mktState.targetForm = null; _mktLoadSummary(); }
-  } catch(e){ toast('❌ Lỗi: ' + e.message); }
-}
-
-function _mktRenderChecklist(){
-  var wrap = document.getElementById('mktchecklist-wrap');
-  if (!wrap) return;
-  if (_mktState.loading && !_mktState.loaded){ wrap.innerHTML = '<div style="padding:16px;color:var(--muted)">Đang tải...</div>'; return; }
-
-  var html = '';
-  html += '<div class="dash-section-title">✅ Checklist chất lượng tin nhắn MKT</div>';
-  html += '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Theo dõi 4 tiêu chí L1–L4 giống hệt file checklist Excel — nhập tay số liệu mỗi ngày (các mẫu số như "Số HT đẩy Sale", "Số KH đã báo giá" không có sẵn trong dữ liệu Pancake nên không tự tính được), hệ thống tự tính tỷ lệ và so với mục tiêu.</div>';
-
-  // ── Bảng định nghĩa tag (đóng/mở) ──
-  html += '<div style="margin-bottom:14px">'+
-    '<button class="btn sm secondary" onclick="_mktState.showDefs=!_mktState.showDefs;_mktRenderChecklist()">'+(_mktState.showDefs?'▲ Ẩn':'▼ Xem')+' bảng định nghĩa tag L1–L4</button>';
-  if (_mktState.showDefs){
-    html += '<div style="overflow-x:auto;margin-top:8px"><table class="dash-table" style="font-size:11.5px"><thead><tr>'+
-      '<th>STT</th><th>Tên Tag</th><th>Tiêu chí</th><th>Điều kiện đạt chuẩn</th><th>Ý nghĩa</th><th>Khi nào gắn</th><th>Công thức đo lường</th>'+
-      '</tr></thead><tbody>'+
-      (_mktState.tagDefs||[]).map(function(t,i){
-        return '<tr><td>'+(i+1)+'</td><td style="font-weight:700;white-space:nowrap">'+esc(t.name)+'</td>'+
-          '<td>'+esc(t.tieuChi)+'</td><td>'+esc(t.dieuKien)+'</td><td>'+esc(t.yNghia)+'</td>'+
-          '<td>'+esc(t.khiNaoGan)+'</td><td>'+esc(t.congThuc)+'</td></tr>';
-      }).join('')+
-      '</tbody></table></div>';
-  }
-  html += '</div>';
-
-  // ── Form nhập/sửa theo ngày ──
-  var f = _mktState.form;
-  html += '<div id="mkt-form-anchor" class="dash-section-title" style="margin-top:6px">'+(_mktState.editDate?'✏️ Sửa ngày '+esc(_mktState.editDate):'➕ Nhập KPI ngày mới')+'</div>';
-  html += '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:14px;background:var(--surface2);padding:12px;border-radius:8px">'+
-    _mktFormField('Ngày', 'date', f.date, 'date') +
-    _mktFormField('Số KH tiếp cận (L1)', 'khTiepCanL1', f.khTiepCanL1) +
-    _mktFormField('Số HT đạt lần 3 (Tag L1)', 'htDatLan3', f.htDatLan3) +
-    _mktFormField('Số SĐT thu thập', 'sdtThuThap', f.sdtThuThap) +
-    _mktFormField('Số SĐT kết nối (Tag L2)', 'sdtKetNoi', f.sdtKetNoi) +
-    _mktFormField('Số KH tiếp cận (L3)', 'khTiepCanL3', f.khTiepCanL3) +
-    _mktFormField('Số KH đúng chân dung (Tag L3)', 'khDungChanDung', f.khDungChanDung) +
-    _mktFormField('Số KH tiếp cận (L4)', 'khTiepCanL4', f.khTiepCanL4) +
-    _mktFormField('Số KH khảo giá (Tag L4)', 'khKhaoGia', f.khKhaoGia) +
-    '<div style="flex:1;min-width:160px"><div style="font-size:10px;color:var(--hint);margin-bottom:3px">Ghi chú</div>'+
-      '<input type="text" value="'+esc(f.note||'')+'" onchange="_mktState.form.note=this.value" style="width:100%;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"></div>'+
-    '<div style="display:flex;gap:6px">'+
-      '<button class="btn primary" onclick="_mktSaveRow()">💾 '+(_mktState.editDate?'Cập nhật':'Lưu')+'</button>'+
-      (_mktState.editDate ? '<button class="btn sm secondary" onclick="_mktCancelEdit()">Hủy sửa</button>' : '')+
-    '</div>'+
-    '</div>';
-
-  // ── Bảng theo dõi KPI ngày ──
-  html += '<div class="dash-section-title">📅 Theo dõi KPI ngày</div>';
-  if (!_mktState.rows.length){
-    html += '<div style="color:var(--muted);padding:10px">Chưa có dữ liệu ngày nào — nhập ở form phía trên.</div>';
-  } else {
-    html += '<div style="overflow-x:auto"><table class="dash-table" style="font-size:11.5px"><thead><tr>'+
-      '<th>Ngày</th><th style="text-align:right">KH tiếp cận</th><th style="text-align:right">Đạt lần 3 (L1)</th><th style="text-align:right">Tỷ lệ</th>'+
-      '<th style="text-align:right">SĐT thu thập</th><th style="text-align:right">SĐT k.nối (L2)</th><th style="text-align:right">Tỷ lệ</th>'+
-      '<th style="text-align:right">Đúng chân dung (L3)</th><th style="text-align:right">Tỷ lệ</th>'+
-      '<th style="text-align:right">Khảo giá (L4)</th><th style="text-align:right">Tỷ lệ</th><th></th>'+
-      '</tr></thead><tbody>'+
-      _mktState.rows.map(function(r){
-        var rL1 = _mktPct(r.htDatLan3, r.khTiepCanL1), rL2 = _mktPct(r.sdtKetNoi, r.sdtThuThap),
-            rL3 = _mktPct(r.khDungChanDung, r.khTiepCanL3), rL4 = _mktPct(r.khKhaoGia, r.khTiepCanL4);
-        return '<tr>'+
-          '<td style="white-space:nowrap">'+esc(r.date)+'</td>'+
-          '<td style="text-align:right">'+r.khTiepCanL1+'</td><td style="text-align:right">'+r.htDatLan3+'</td>'+
-          '<td style="text-align:right;font-weight:700;color:'+_mktPctColor(rL1,_mktState.targets.L1)+'">'+rL1+'%</td>'+
-          '<td style="text-align:right">'+r.sdtThuThap+'</td><td style="text-align:right">'+r.sdtKetNoi+'</td>'+
-          '<td style="text-align:right;font-weight:700;color:'+_mktPctColor(rL2,_mktState.targets.L2)+'">'+rL2+'%</td>'+
-          '<td style="text-align:right">'+r.khDungChanDung+'</td>'+
-          '<td style="text-align:right;font-weight:700;color:'+_mktPctColor(rL3,_mktState.targets.L3)+'">'+rL3+'%</td>'+
-          '<td style="text-align:right">'+r.khKhaoGia+'</td>'+
-          '<td style="text-align:right;font-weight:700;color:'+_mktPctColor(rL4,_mktState.targets.L4)+'">'+rL4+'%</td>'+
-          '<td style="white-space:nowrap"><button class="btn xs secondary" onclick="_mktEditRow(\''+r.date+'\')" title="Sửa">✏️</button> '+
-            '<button class="btn xs danger" onclick="_mktDeleteRow(\''+r.date+'\')" title="Xóa">🗑</button></td>'+
-          '</tr>';
-      }).join('')+
-      '</tbody></table></div>';
-  }
-
-  // ── Tổng hợp theo khoảng ngày (giống sheet "Tổng hợp tuần/tháng") ──
-  html += '<div class="dash-section-title" style="margin-top:18px">📊 Tổng hợp theo khoảng ngày</div>';
-  html += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">'+
-    '<span style="font-size:11px;color:var(--muted)">Từ:</span>'+
-    '<input type="date" value="'+esc(_mktState.sumFrom)+'" onchange="_mktState.sumFrom=this.value;_mktLoadSummary()" style="font-size:12px;padding:4px 7px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-    '<span style="font-size:11px;color:var(--muted)">Đến:</span>'+
-    '<input type="date" value="'+esc(_mktState.sumTo)+'" onchange="_mktState.sumTo=this.value;_mktLoadSummary()" style="font-size:12px;padding:4px 7px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-    '<button class="btn sm secondary" onclick="_mktOpenTargetForm()">🎯 Sửa mục tiêu (%)</button>'+
-    '</div>';
-
-  if (_mktState.targetForm){
-    var tf = _mktState.targetForm;
-    html += '<div style="display:flex;gap:10px;align-items:flex-end;background:var(--surface2);padding:10px;border-radius:8px;margin-bottom:10px;flex-wrap:wrap">'+
-      ['L1','L2','L3','L4'].map(function(k){
-        return '<div><div style="font-size:10px;color:var(--hint)">Mục tiêu '+k+' (%)</div>'+
-          '<input type="number" min="0" max="100" value="'+tf[k]+'" onchange="_mktState.targetForm.'+k+'=this.value" style="width:70px;font-size:12px;padding:4px 7px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"></div>';
-      }).join('')+
-      '<button class="btn primary sm" onclick="_mktSaveTargets()">💾 Lưu mục tiêu</button>'+
-      '<button class="btn sm secondary" onclick="_mktState.targetForm=null;_mktRenderChecklist()">Hủy</button>'+
-      '</div>';
-  }
-
-  if (_mktState.sumLoading){
-    html += '<div style="color:var(--muted);padding:10px">Đang tính...</div>';
-  } else if (_mktState.summary){
-    var s = _mktState.summary, t = s.totals, tg = s.targets, rt = s.rates, ps = s.passed;
-    var kpiCard = function(label, count, denom, rate, target, passed){
-      return '<div style="flex:1;min-width:160px;background:var(--surface2);border-radius:8px;padding:10px 12px;border-left:4px solid '+(passed?'var(--green)':'var(--red,#d33)')+'">'+
-        '<div style="font-size:11px;color:var(--muted)">'+esc(label)+'</div>'+
-        '<div style="font-size:20px;font-weight:800;color:'+(passed?'var(--green)':'var(--red,#d33)')+'">'+rate+'%</div>'+
-        '<div style="font-size:11px;color:var(--muted)">'+count+' / '+denom+' · mục tiêu ≥'+Math.round(target*100)+'%'+(passed?' ✓ Đạt':' ✗ Chưa đạt')+'</div>'+
-      '</div>';
-    };
-    html += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">'+
-      kpiCard('L1. Chuẩn (đạt lần 3)', t.htDatLan3, t.khTiepCanL1, rt.L1, tg.L1, ps.L1)+
-      kpiCard('L2. SĐT kết nối', t.sdtKetNoi, t.sdtThuThap, rt.L2, tg.L2, ps.L2)+
-      kpiCard('L3. KH tiềm năng (đúng chân dung)', t.khDungChanDung, t.khTiepCanL3, rt.L3, tg.L3, ps.L3)+
-      kpiCard('L4. Khảo giá / KNC', t.khKhaoGia, t.khTiepCanL4, rt.L4, tg.L4, ps.L4)+
-      '</div>';
-    html += '<div style="font-size:11px;color:var(--muted)">Tổng hợp '+s.rows.length+' ngày có dữ liệu, từ '+esc(s.from)+' đến '+esc(s.to)+'.</div>';
-  }
-
-  wrap.innerHTML = html;
-}
-
-// Field nhập số/ngày dùng chung trong form Checklist MKT
-function _mktFormField(label, key, val, type){
-  type = type || 'number';
-  return '<div><div style="font-size:10px;color:var(--hint);margin-bottom:3px">'+esc(label)+'</div>'+
-    '<input type="'+type+'" value="'+esc(val)+'" min="0" onchange="_mktState.form.'+key+'='+(type==='date'?'this.value':'(+this.value||0)')+'" style="width:'+(type==='date'?'140px':'110px')+';font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"></div>';
-}
 
 function _pkRenderReportHtml(){
   var d = _pkState.report;
@@ -16810,11 +16641,11 @@ function renderSalesReportTab(){
   if (!_srState.optionsLoaded) _srLoadOptions();
 
   var subTabs = '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">' +
-    '<button class="btn '+(_srState.sub==='A'?'secondary':'sm')+'" onclick="_srSetSub(\'A\')">Báo cáo A — Theo DT tổng</button>' +
-    '<button class="btn '+(_srState.sub==='B'?'secondary':'sm')+'" onclick="_srSetSub(\'B\')">Báo cáo B — Theo dữ liệu đơn</button>' +
-    '<button class="btn '+(_srState.sub==='C'?'secondary':'sm')+'" onclick="_srSetSub(\'C\')">Báo cáo C — So sánh theo kỳ</button>' +
-    '<button class="btn '+(_srState.sub==='D'?'secondary':'sm')+'" onclick="_srSetSub(\'D\')">Báo cáo D — KH Chăm sóc mới</button>' +
-    '<button class="btn '+(_srState.sub==='E'?'secondary':'sm')+'" onclick="_srSetSub(\'E\')">💰 Hoa hồng nhân viên</button>' +
+    '<button class="btn '+(_srState.sub==='A'?'secondary':'sm')+'" onclick="_srSetSub(\'A\')">Báo cáo A — Base</button>' +
+    '<button class="btn '+(_srState.sub==='B'?'secondary':'sm')+'" onclick="_srSetSub(\'B\')">Báo cáo B — Pos</button>' +
+    '<button class="btn '+(_srState.sub==='C'?'secondary':'sm')+'" onclick="_srSetSub(\'C\')">Báo cáo C — So sánh kỳ Base</button>' +
+    '<button class="btn '+(_srState.sub==='D'?'secondary':'sm')+'" onclick="_srSetSub(\'D\')">Báo cáo D — Sale tự thêm</button>' +
+    '<button class="btn '+(_srState.sub==='E'?'secondary':'sm')+'" onclick="_srSetSub(\'E\')">Báo cáo E — Hoa hồng nhân viên Base</button>' +
     '</div>';
 
   if (_srState.sub === 'C') { renderSalesReportTabC_(wrap, subTabs); return; }
@@ -20368,6 +20199,15 @@ async function confirmDeleteDupOrders(){
       <span>đến</span><input id="bct-max-orders" type="number" min="0" style="width:60px;padding:4px;border:1px solid #d1d5db;border-radius:5px">
       <span style="margin-left:10px">Mua từ</span><input id="bct-date-from" type="date" style="padding:4px;border:1px solid #d1d5db;border-radius:5px">
       <span>đến</span><input id="bct-date-to" type="date" style="padding:4px;border:1px solid #d1d5db;border-radius:5px">
+      <select onchange="_bctApplyQuickRange(this.value)" style="padding:4px;border:1px solid #d1d5db;border-radius:5px;font-size:12px">
+        <option value="custom" selected>Lọc nhanh…</option>
+        <option value="today">Hôm nay</option>
+        <option value="yesterday">Hôm qua</option>
+        <option value="thisWeek">Tuần này</option>
+        <option value="lastWeek">Tuần trước</option>
+        <option value="thisMonth">Tháng này</option>
+        <option value="lastMonth">Tháng trước</option>
+      </select>
     </div>
 
     <div style="font-weight:600;font-size:12px;margin-bottom:5px">3. Nguồn đơn</div>
@@ -20449,6 +20289,13 @@ function _bctCodeKws(codes){
   var out = [];
   (_bctCodeMap||[]).forEach(function(m){ if (codes.includes(m[0])) out = out.concat(m[1]||[]); });
   return out;
+}
+function _bctApplyQuickRange(key){
+  if (key === 'custom') return;
+  var r = (typeof _pkQuickRange === 'function') ? _pkQuickRange(key) : null;
+  if (!r) return;
+  var f = document.getElementById('bct-date-from'), t = document.getElementById('bct-date-to');
+  if (f) f.value = r.from; if (t) t.value = r.to;
 }
 function _bctCollectPhones(){
   var mode = document.querySelector('input[name=bct-mode]:checked').value;
