@@ -77,6 +77,30 @@
   <label>Tin nhắn của nhân viên (agentMsgSelector) — <small>tuỳ chọn</small></label>
   <input type="text" id="messenger_agentMsgSelector" placeholder="vd: [role='row'].outgoing" />
 
+  <h2>🤖 AI cá nhân (tuỳ chọn — dùng key riêng của bạn thay vì AI dùng chung)</h2>
+  <div class="hint">
+    Mặc định cả team dùng chung 1 AI qua backend công ty. Nếu bạn muốn dùng API riêng của mình
+    (nhanh hơn/không bị giới hạn chung với cả team), tự đăng ký lấy API Key ở trang nhà cung cấp
+    rồi dán vào đây. <b>Key chỉ lưu trên trình duyệt của bạn</b> (không gửi lên server công ty,
+    không ai khác xem được) — gọi thẳng từ máy bạn tới nhà cung cấp AI. Để trống ô Provider (chọn
+    "Dùng chung") thì extension hoạt động như cũ, không cần làm gì thêm.
+  </div>
+  <label>Provider</label>
+  <select id="aiProvider">
+    <option value="">— Dùng chung (mặc định, qua backend công ty) —</option>
+    <option value="grok">Grok (xAI)</option>
+    <option value="gemini">Gemini (Google)</option>
+    <option value="openai">OpenAI (ChatGPT)</option>
+  </select>
+  <label>API Key <small>(lấy tại trang nhà cung cấp — xem link gợi ý bên dưới theo Provider đã chọn)</small></label>
+  <div style="display:flex;gap:6px">
+    <input type="password" id="aiApiKey" placeholder="Dán API Key vào đây..." style="flex:1" />
+    <button type="button" id="toggleAiKey" style="margin-top:0;padding:6px 12px;background:#e5e7eb;color:#222">👁</button>
+  </div>
+  <div class="hint" id="aiProviderHint" style="display:none"></div>
+  <label>Model <small>(để trống dùng mặc định — có thể sửa nếu nhà cung cấp đổi tên model)</small></label>
+  <input type="text" id="aiModel" placeholder="vd: grok-2-latest / gemini-2.0-flash / gpt-4o-mini" />
+
   <button id="save">Lưu cài đặt</button>
   <button id="reset" style="background:#6b7280;margin-left:8px;">↺ Đặt lại về mặc định</button>
   <span id="saved"></span>

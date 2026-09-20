@@ -1,11 +1,37 @@
 document.addEventListener("DOMContentLoaded", load);
 document.getElementById("save").addEventListener("click", save);
 document.getElementById("reset").addEventListener("click", resetToDefault);
+document.getElementById("aiProvider").addEventListener("change", updateAiProviderHint);
+document.getElementById("toggleAiKey").addEventListener("click", () => {
+  const inp = document.getElementById("aiApiKey");
+  inp.type = inp.type === "password" ? "text" : "password";
+});
+
+const AI_PROVIDER_HINTS = {
+  grok: '🔗 Lấy API Key tại <a href="https://console.x.ai/" target="_blank">console.x.ai</a> (đăng ký tài khoản xAI). Model mặc định: <code>grok-2-latest</code>.',
+  gemini: '🔗 Lấy API Key tại <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> (đăng nhập bằng Google, miễn phí có giới hạn). Model mặc định: <code>gemini-2.0-flash</code>.',
+  openai: '🔗 Lấy API Key tại <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a>. Model mặc định: <code>gpt-4o-mini</code>.'
+};
+function updateAiProviderHint() {
+  const p = document.getElementById("aiProvider").value;
+  const box = document.getElementById("aiProviderHint");
+  if (p && AI_PROVIDER_HINTS[p]) {
+    box.innerHTML = AI_PROVIDER_HINTS[p];
+    box.style.display = "";
+  } else {
+    box.style.display = "none";
+  }
+}
 
 function load() {
   chrome.storage.sync.get(null, (s) => {
     document.getElementById("gasUrl").value = s.gasUrl || "";
     document.getElementById("useProducts").checked = !!s.useProducts;
+
+    document.getElementById("aiProvider").value = s.aiProvider || "";
+    document.getElementById("aiApiKey").value = s.aiApiKey || "";
+    document.getElementById("aiModel").value = s.aiModel || "";
+    updateAiProviderHint();
 
     document.getElementById("platformPancake").checked = s.platform?.pancake !== false;
     document.getElementById("platformMessenger").checked = s.platform?.messenger !== false;
@@ -31,6 +57,9 @@ function save() {
   const settings = {
     gasUrl: document.getElementById("gasUrl").value.trim(),
     useProducts: document.getElementById("useProducts").checked,
+    aiProvider: document.getElementById("aiProvider").value,
+    aiApiKey: document.getElementById("aiApiKey").value.trim(),
+    aiModel: document.getElementById("aiModel").value.trim(),
     enabled: true,
     platform: {
       pancake: document.getElementById("platformPancake").checked,

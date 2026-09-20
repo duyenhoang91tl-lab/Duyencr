@@ -10,6 +10,13 @@ const DEFAULT_SETTINGS = {
   enabled: true,
   csName: "", // CS đang dùng máy này — ghi vào cột 'cs' khi lưu, giống ô CS sticky bên Zalo AI
   useProducts: false, // tương ứng checkbox "Tra cứu sản phẩm" bên Zalo AI
+  // AI ca nhan (tuy chon): neu aiProvider + aiApiKey duoc dien, goi THANG tu trinh duyet cua CS
+  // toi nha cung cap (khong qua backend GAS/Groq chung nua). Luu trong chrome.storage.sync nen
+  // ton tai lau dai tren may CS do, khong mat khi dong trinh duyet/cap nhat extension — CS chi
+  // can dien 1 lan. de trong aiProvider ("") = dung AI chung nhu cu (hanh vi mac dinh, khong doi).
+  aiProvider: "", // "" | "grok" | "gemini" | "openai"
+  aiApiKey: "",
+  aiModel: "",
   platform: {
     pancake: true,
     messenger: true
@@ -360,9 +367,63 @@ function parseDateSafe(d) {
   return isNaN(t) ? 0 : t;
 }
 
-// Goi GAS action:'ai' (co retry khi Groq bao 429/rate-limit) — dung chung cho ca tra loi tin
+const AI_PROVIDER_DEFAULTS = {
+  grok:   { url: "https://api.x.ai/v1/chat/completions", model: "grok-2-latest" },
+  openai: { url: "https://api.openai.com/v1/chat/completions", model: "gpt-4o-mini" },
+  gemini: { model: "gemini-2.0-flash" } // URL Gemini rieng vi co API key tren query string, xem ben duoi
+};
+
+// Goi THANG toi API rieng cua CS (Grok/OpenAI dung chung 1 dinh dang "OpenAI-compatible chat
+// completions"; Gemini dinh dang rieng cua Google) — KHONG qua backend GAS/Groq chung nua.
+// Tra ve CUNG 1 hinh dang { ok, text, provider } nhu callAiWithRetry_ cu, de moi noi goi ham nay
+// (handleFetchSuggestion/handleFetchOpener/handleFetchFollowUpSuggestion) khong can sua gi them.
+async function callPersonalAi_(provider, apiKey, model, prompt) {
+  const def = AI_PROVIDER_DEFAULTS[provider];
+  const useModel = model || def.model;
+
+  if (provider === "grok" || provider === "openai") {
+    const res = await fetch(def.url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
+      body: JSON.stringify({ model: useModel, messages: [{ role: "user", content: prompt }] })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error((data && data.error && data.error.message) || ("Lỗi " + provider + " (HTTP " + res.status + ")"));
+    const text = data?.choices?.[0]?.message?.content || "";
+    return { ok: true, text, provider: provider + " (key riêng)" };
+  }
+
+  if (provider === "gemini") {
+    const url = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(useModel) + ":generateContent?key=" + encodeURIComponent(apiKey);
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error((data && data.error && data.error.message) || ("Lỗi Gemini (HTTP " + res.status + ")"));
+    const text = data?.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || "";
+    return { ok: true, text, provider: "gemini (key riêng)" };
+  }
+
+  throw new Error("Provider AI không hợp lệ: " + provider);
+}
+
+// Gọi GAS action:'ai' (co retry khi Groq bao 429/rate-limit) — dung chung cho ca tra loi tin
 // khach lan "3 cau mo dau" lan follow-up, tranh lap code retry 3 lan rieng le.
 async function callAiWithRetry_(gasUrl, prompt, withProducts) {
+  // Uu tien AI ca nhan cua CS neu da cau hinh du provider + key — goi thang, khong qua GAS/Groq
+  // chung nua. Loi tu API rieng KHONG fallback am tham ve AI chung (de CS biet key/quota cua ho
+  // co van de ma tu sua, tranh nham lan "sao van dung AI chung du da dien key").
+  const personal = await chrome.storage.sync.get(["aiProvider", "aiApiKey", "aiModel"]);
+  if (personal.aiProvider && personal.aiApiKey) {
+    try {
+      return await callPersonalAi_(personal.aiProvider, personal.aiApiKey, personal.aiModel, prompt);
+    } catch (e) {
+      throw new Error("AI cá nhân (" + personal.aiProvider + ") lỗi: " + (e?.message || e) + " — kiểm tra lại API Key/quota trong Options, hoặc bỏ trống Provider để dùng AI chung.");
+    }
+  }
+
   for (let attempt = 0; attempt <= 2; attempt++) {
     let res, data;
     try {
