@@ -3065,22 +3065,28 @@ function buildPancakeTagReport_(from, to) {
 //   L2 = L2 / sdtThuThap      (rieng L2: mau so la Tong SDT thu thap — theo yeu cau)
 //   L3 = L3 / L2              (buoc chuyen: trong so SDT da ket noi, bao nhieu thanh tiem nang)
 //   L4 = L4 / L3              (tiem nang -> khao gia/KNC)
-//   L5 = L5 / L4              (khao gia -> chot, theo TAG Pancake — khac voi "ty le chot Page"
-//                               o cho khac von tinh tren DON HANG THAT trong DT TONG)
-//   L6 = L6 / L5              (trong so da chot, bao nhieu bi huy)
+//   L5 = realOrders / tongTT  (CHOT — theo yeu cau Duyen: KHONG lay theo tag L5/L4 nua, vi tag
+//                               "Khảo giá"/"Chốt" nhieu khi CS gan tag khong day du/khong dung
+//                               het lam ty le sai lech (vd L4=0 tag -> L5 luon ra 0% du co don
+//                               that). Doi sang DUNG SO DON THAT tren DT TONG (dt.orders/
+//                               totalDonHang, da co san o cho goi ham nay) chia cho Tong TT —
+//                               giong het cong thuc "Tỷ lệ chốt" da dung o bang "Theo Page".
+//   L6 = L6 / L5(tag)         (trong so da chot THEO TAG, bao nhieu bi huy — van dung tag vi
+//                               khong co "so don huy that" doc lap de doi chieu)
 //   L7 = L7 / tongTT          (rieng KV Ha Noi — tinh tren tong tuong tac, theo yeu cau)
-function _tagFunnelRates_(counts, tongTT, sdtThuThap) {
+function _tagFunnelRates_(counts, tongTT, sdtThuThap, realOrders) {
   var pct = function(a, b) { return b ? Math.round(a / b * 1000) / 10 : 0; }; // 1 so le, %
   var c = counts || {};
+  var l5Count = (realOrders !== undefined && realOrders !== null) ? realOrders : (c.L5 || 0);
   return {
-    counts: { L1: c.L1||0, L2: c.L2||0, L3: c.L3||0, L4: c.L4||0, L5: c.L5||0, L6: c.L6||0, L7: c.L7||0 },
+    counts: { L1: c.L1||0, L2: c.L2||0, L3: c.L3||0, L4: c.L4||0, L5: l5Count, L6: c.L6||0, L7: c.L7||0 },
     rates: {
       L1: pct(c.L1, tongTT),
       L2: pct(c.L2, sdtThuThap),
       L3: pct(c.L3, c.L2),
       L4: pct(c.L4, c.L3),
-      L5: pct(c.L5, c.L4),
-      L6: pct(c.L6, c.L5),
+      L5: pct(l5Count, tongTT),
+      L6: pct(c.L6, c.L5), // van so voi L5 THEO TAG (c.L5, khong phai l5Count) — L6 la ty le huy trong so da chot-theo-tag
       L7: pct(c.L7, tongTT)
     }
   };
@@ -3228,7 +3234,7 @@ function buildKpiReport_(from, to) {
     var tongTT = info.tongTT || 0;
     var sdtMangVe = info.sdtMangVe || 0;
     var tagInfo = pTag.byPage[pid];
-    var tagFunnel = _tagFunnelRates_(tagInfo || {}, tongTT, sdtMangVe);
+    var tagFunnel = _tagFunnelRates_(tagInfo || {}, tongTT, sdtMangVe, dt.orders);
     return {
       pageId: pid, pageName: info.pageName || pid, kenhBan: kenhBan,
       mapped: !!kenhBan,
@@ -3344,7 +3350,7 @@ function buildKpiReport_(from, to) {
   });
   // Phe do L1-L7 toan he thong: dung tong tag da gom san o buildPancakeTagReport_ (pTag.totals),
   // mau so tongTT/sdtMangVe la tong cong tat ca Page trong ky (khong phai cong ty le tung Page).
-  var tagFunnelTotal = _tagFunnelRates_(pTag.totals, totalTongTT, totalSdtMangVe);
+  var tagFunnelTotal = _tagFunnelRates_(pTag.totals, totalTongTT, totalSdtMangVe, totalDonHang);
 
   return {
     byPage: byPage, bySale: bySale,
