@@ -321,11 +321,20 @@
               <div id="pk-rem-list"></div>
             </div>
             <div id="pk-price-body" style="display:none">
-              <div id="pk-price-row">
-                <input type="text" id="pk-price-q" placeholder="Tên sản phẩm, kiểu/size..." />
-                <button id="pk-price-btn">Tìm</button>
+              <div id="pk-price-mode-tabs" style="display:flex;gap:6px;margin-bottom:6px">
+                <button type="button" class="pk-price-mode-btn active" data-mode="search">🔎 Gõ tìm</button>
+                <button type="button" class="pk-price-mode-btn" data-mode="builder">🧩 Soạn đơn (chọn từng bước)</button>
               </div>
-              <div id="pk-price-result"></div>
+              <div id="pk-price-search-mode">
+                <div id="pk-price-row">
+                  <input type="text" id="pk-price-q" placeholder="Tên sản phẩm, kiểu/size..." />
+                  <button id="pk-price-btn">Tìm</button>
+                </div>
+                <div id="pk-price-result"></div>
+              </div>
+              <div id="pk-price-builder-mode" style="display:none">
+                <div id="pk-builder-steps"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -456,6 +465,16 @@
     panelEl.querySelector("#pk-price-btn").addEventListener("click", doPriceSearch_);
     panelEl.querySelector("#pk-price-q").addEventListener("keydown", (e) => {
       if (e.key === "Enter") doPriceSearch_();
+    });
+    panelEl.querySelectorAll('.pk-price-mode-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        panelEl.querySelectorAll('.pk-price-mode-btn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        const isBuilder = btn.dataset.mode === 'builder';
+        panelEl.querySelector('#pk-price-search-mode').style.display = isBuilder ? 'none' : 'block';
+        panelEl.querySelector('#pk-price-builder-mode').style.display = isBuilder ? 'block' : 'none';
+        if (isBuilder) loadBuilderTree_();
+      });
     });
     panelEl.querySelector('#pk-cart-add-manual').addEventListener('click', () => {
       panelEl.querySelector('#pk-cart-section').dataset.everOpened = '1';
@@ -1595,6 +1614,120 @@
     if (v === '' || v === null || v === undefined) return 0;
     const n = Number(String(v).replace(/[^\d.-]/g, ''));
     return isNaN(n) ? 0 : n;
+  }
+
+  // ══════════════════════════ SOẠN ĐƠN (chọn từng bước, dạng dropdown) ══════════════════════════
+  // Nhóm sản phẩm → Tên sản phẩm → Kiểu/Size (lấy từ backend, đúng cấu trúc cột có sẵn trong
+  // DANH_MUC) → Chất liệu (chỉ hiện nếu 1 Kiểu/Size có nhiều biến thể chất liệu khác giá).
+  // Màu sắc/Đậm nhạt KHÔNG tra theo dữ liệu thật — chỉ là ghi chú Sale tự chọn, không ảnh
+  // hưởng giá (theo yêu cầu: "không gắn với giá/kho theo từng SP").
+  const PK_COLOR_OPTS = ['Xanh rêu', 'Đen', 'Tím', 'Đỏ', 'Hồng', 'Trắng', 'Vàng', 'Xanh lá', 'Xanh da trời'];
+  const PK_SHADE_OPTS = ['', 'Đậm', 'Nhạt'];
+  let _priceTree = null; // { groups: [...], priceKeys: [...] }
+  let _builderSel = { nhom: '', ten: '', size: '', variantIdx: 0, mau: '', dam: '', priceKey: '' };
+
+  function loadBuilderTree_() {
+    const host = panelEl.querySelector('#pk-builder-steps');
+    if (_priceTree) { renderBuilderSteps_(); return; }
+    host.innerHTML = '<div class="pk-price-loading">Đang tải danh mục...</div>';
+    safeSendMessage_({ type: 'GET_PRICE_TREE' }, (resp) => {
+      if (!resp?.ok) { host.innerHTML = `<div class="pk-price-loading">Lỗi: ${escapeHtml(resp?.error || 'không rõ')}</div>`; return; }
+      _priceTree = resp.data;
+      if (!_priceTree.groups || !_priceTree.groups.length) {
+        host.innerHTML = '<div class="pk-price-loading">Sheet giá chưa nhận diện được cột "Nhóm sản phẩm"/"Tên sản phẩm" — dùng tạm ô "Gõ tìm".</div>';
+        return;
+      }
+      renderBuilderSteps_();
+    });
+  }
+
+  function _findGroup_(nhom) { return (_priceTree.groups || []).find((g) => g.name === nhom); }
+  function _findProduct_(nhom, ten) { const g = _findGroup_(nhom); return g ? (g.products || []).find((p) => p.name === ten) : null; }
+  function _findSizeEntry_(nhom, ten, size) { const p = _findProduct_(nhom, ten); return p ? (p.sizes || []).find((s) => s.size === size) : null; }
+
+  function renderBuilderSteps_() {
+    const host = panelEl.querySelector('#pk-builder-steps');
+    const groups = _priceTree.groups || [];
+    const product = _builderSel.nhom ? _findProduct_(_builderSel.nhom, _builderSel.ten) : null;
+    const sizeEntry = (_builderSel.nhom && _builderSel.ten && _builderSel.size) ? _findSizeEntry_(_builderSel.nhom, _builderSel.ten, _builderSel.size) : null;
+    const variants = sizeEntry ? sizeEntry.variants : [];
+    const variant = variants[_builderSel.variantIdx] || null;
+    const needChatLieuPick = variants.length > 1;
+
+    const opt = (val, label, selected) => `<option value="${escapeHtml(val)}" ${selected ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+
+    let html = '';
+    html += `<div class="pk-builder-row"><label>1. Nhóm sản phẩm</label><select id="pkb-nhom"><option value="">— Chọn —</option>${groups.map((g) => opt(g.name, g.name, g.name === _builderSel.nhom)).join('')}</select></div>`;
+
+    if (_builderSel.nhom) {
+      const g = _findGroup_(_builderSel.nhom);
+      html += `<div class="pk-builder-row"><label>2. Tên sản phẩm</label><select id="pkb-ten"><option value="">— Chọn —</option>${(g?.products || []).map((p) => opt(p.name, p.name, p.name === _builderSel.ten)).join('')}</select></div>`;
+    }
+    if (product) {
+      html += `<div class="pk-builder-row"><label>3. Kiểu/Size</label><select id="pkb-size"><option value="">— Chọn —</option>${(product.sizes || []).map((s) => opt(s.size, s.size, s.size === _builderSel.size)).join('')}</select></div>`;
+    }
+    if (needChatLieuPick) {
+      html += `<div class="pk-builder-row"><label>Chất liệu</label><select id="pkb-chatlieu"><option value="">— Chọn —</option>${variants.map((v, i) => opt(String(i), v.chatLieu || '(không ghi rõ)', i === _builderSel.variantIdx)).join('')}</select></div>`;
+    }
+    if (sizeEntry) {
+      html += `<div class="pk-builder-row"><label>Màu (ghi chú, không ảnh hưởng giá)</label><select id="pkb-mau"><option value="">— Bỏ trống —</option>${PK_COLOR_OPTS.map((c) => opt(c, c, c === _builderSel.mau)).join('')}</select></div>`;
+      html += `<div class="pk-builder-row"><label>Đậm/nhạt</label><select id="pkb-dam">${PK_SHADE_OPTS.map((c) => opt(c, c || '— Bỏ trống —', c === _builderSel.dam)).join('')}</select></div>`;
+    }
+    if (variant) {
+      const priceKeys = _priceTree.priceKeys || [];
+      const priceOpts = priceKeys.filter((pk) => { const n = _parsePriceNum_(variant.prices[pk]); return n > 0; });
+      if (priceOpts.length > 1) {
+        html += `<div class="pk-builder-row"><label>Loại giá</label><select id="pkb-pricekey">${priceOpts.map((pk) => opt(pk, pk.replace(/\s*\(.*?\)\s*/g, '').trim() + ' — ' + variant.prices[pk] + 'k', pk === _builderSel.priceKey)).join('')}</select></div>`;
+      }
+      const chosenKey = priceOpts.length > 1 ? (_builderSel.priceKey || priceOpts[0]) : priceOpts[0];
+      const priceNum = chosenKey ? _parsePriceNum_(variant.prices[chosenKey]) * 1000 : 0;
+      html += `<div class="pk-builder-summary">
+        <div><b>${escapeHtml(_builderSel.ten)}</b> — ${escapeHtml(_builderSel.size)}${variant.chatLieu ? ' — ' + escapeHtml(variant.chatLieu) : ''}</div>
+        <div class="pk-builder-price">${priceNum ? priceNum.toLocaleString('vi-VN') + 'đ' : 'Chưa có giá — Sale tự nhập'}</div>
+        <button id="pkb-add-btn" class="pk-price-addbtn">+ Thêm vào đơn</button>
+      </div>`;
+    }
+    host.innerHTML = html;
+
+    const sel = (id) => panelEl.querySelector('#' + id);
+    if (sel('pkb-nhom')) sel('pkb-nhom').addEventListener('change', (e) => {
+      _builderSel = { nhom: e.target.value, ten: '', size: '', variantIdx: 0, mau: '', dam: '', priceKey: '' };
+      renderBuilderSteps_();
+    });
+    if (sel('pkb-ten')) sel('pkb-ten').addEventListener('change', (e) => {
+      _builderSel.ten = e.target.value; _builderSel.size = ''; _builderSel.variantIdx = 0; _builderSel.priceKey = '';
+      renderBuilderSteps_();
+    });
+    if (sel('pkb-size')) sel('pkb-size').addEventListener('change', (e) => {
+      _builderSel.size = e.target.value; _builderSel.variantIdx = 0; _builderSel.priceKey = '';
+      renderBuilderSteps_();
+    });
+    if (sel('pkb-chatlieu')) sel('pkb-chatlieu').addEventListener('change', (e) => {
+      _builderSel.variantIdx = Number(e.target.value) || 0; _builderSel.priceKey = '';
+      renderBuilderSteps_();
+    });
+    if (sel('pkb-mau')) sel('pkb-mau').addEventListener('change', (e) => { _builderSel.mau = e.target.value; });
+    if (sel('pkb-dam')) sel('pkb-dam').addEventListener('change', (e) => { _builderSel.dam = e.target.value; });
+    if (sel('pkb-pricekey')) sel('pkb-pricekey').addEventListener('change', (e) => { _builderSel.priceKey = e.target.value; renderBuilderSteps_(); });
+    if (sel('pkb-add-btn')) sel('pkb-add-btn').addEventListener('click', () => {
+      const priceKeys = _priceTree.priceKeys || [];
+      const priceOpts = priceKeys.filter((pk) => _parsePriceNum_(variant.prices[pk]) > 0);
+      const chosenKey = priceOpts.length > 1 ? (_builderSel.priceKey || priceOpts[0]) : priceOpts[0];
+      const priceNum = chosenKey ? _parsePriceNum_(variant.prices[chosenKey]) * 1000 : 0;
+      const details = [_builderSel.mau, _builderSel.dam].filter(Boolean).join(' ');
+      addToCart_({
+        name: _builderSel.ten,
+        note: '',
+        price: priceNum,
+        chatLieu: variant.chatLieu || '',
+        mauSac: details,
+        size: _builderSel.size,
+        qty: 1
+      });
+      // Reset lại từ đầu để soạn sản phẩm tiếp theo, giữ Nhóm đang chọn cho nhanh
+      _builderSel = { nhom: _builderSel.nhom, ten: '', size: '', variantIdx: 0, mau: '', dam: '', priceKey: '' };
+      renderBuilderSteps_();
+    });
   }
 
   // ══════════════════════════════ ĐƠN HÀNG ĐANG TÍNH (giỏ tạm) ══════════════════════════════
