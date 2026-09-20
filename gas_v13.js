@@ -891,8 +891,7 @@ function doGet(e) {
     }
 
     // ── CHECKLIST CHAT LUONG TIN NHAN MKT (tab "Checklist MKT" tren index.html) ──
-    if (action === 'mktChecklist') return jsonOut_({ ok: true, rows: readMktRows_(), targets: readMktTargets_(), tagDefs: readMktTagDefs_() });
-    if (action === 'mktChecklistSummary') return jsonOut_(buildMktSummary_(e.parameter.from, e.parameter.to));
+    if (action === 'mktChecklist') return jsonOut_(buildMktChecklistReport_(e.parameter.from, e.parameter.to));
 
     // ─── Danh muc PHANG cho "Soan don" (Pancake AI): tra cuu theo ten -> dropdown thu hep dan ───
     if (action === 'priceCatalogFlat') {
@@ -2164,9 +2163,16 @@ function exportSalesReportToSheet_(reportType, filters) {
   var tabName = 'BC_' + reportType + '_' + ts;
   var sh = ss.insertSheet(tabName);
 
-  var titleSuffix = reportType === 'A' ? ' — Theo DT tổng' : (reportType === 'B' ? ' — Theo dữ liệu đơn' : (reportType === 'D' ? ' — KH Chăm sóc mới (data riêng, KHÔNG gộp báo cáo doanh số A/B/C)' : ' — So sánh theo kỳ'));
+  // Ten bao cao (quy uoc moi): A = Base (DT tong), B = Pos (du lieu don), C = So sanh ky Base,
+  // D = Sale tu them (KH Cham soc moi, data rieng khong gop A/B/C).
+  var reportTitles = {
+    A: 'BÁO CÁO BASE — Theo DT tổng',
+    B: 'BÁO CÁO POS — Theo dữ liệu đơn',
+    C: 'BÁO CÁO SO SÁNH KỲ BASE',
+    D: 'BÁO CÁO SALE TỰ THÊM — KH Chăm sóc mới (data riêng, KHÔNG gộp Base/Pos)'
+  };
   var rows = [];
-  rows.push([(reportType === 'D' ? 'BÁO CÁO KH CHĂM SÓC MỚI' : ('BÁO CÁO DOANH SỐ ' + reportType)) + titleSuffix]);
+  rows.push([reportTitles[reportType] || ('BÁO CÁO ' + reportType)]);
   rows.push(['Xuất lúc', Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Etc/GMT-7', 'dd/MM/yyyy HH:mm:ss')]);
 
   var f = filters || {};
@@ -2353,9 +2359,7 @@ function doPost(e) {
     //    tu tao voi du lieu mac dinh neu chua co). Them 2026-09, KHONG dung chung sheet/cot voi CareData. ──
     if (action === 'getKnowledge') return jsonOut_(getMessengerKnowledge_());
     // ── CHECKLIST MKT: nhap tay theo ngay + muc tieu L1-L4 ──
-    if (action === 'saveMktChecklistRow')     return saveMktChecklistRow_(data.row);
-    if (action === 'deleteMktChecklistRow')   return deleteMktChecklistRow_(data.date);
-    if (action === 'saveMktChecklistTargets') return saveMktChecklistTargets_(data.targets);
+    if (action === 'saveMktChecklistConfig')  return saveMktChecklistConfig_(data.month, data.config);
     return jsonOut_({ error: 'Unknown action: ' + action });
   } catch(err) {
     return jsonOut_({ error: err.message });
@@ -2663,7 +2667,18 @@ function normOrderDate_(v) {
   if (!isNaN(d2)) return _vnYmd_(d2);
   return String(v).trim();
 }
-function _normTxt_(s) { return String(s || '').trim().toLowerCase(); }
+// Chuan hoa ten de SO SANH (khong dung de hien thi): bo khoang trang dau/cuoi + cac ky tu
+// khoang trang/vo hinh Unicode hay dinh kem khi copy-paste (NBSP, zero-width space...), gop
+// nhieu khoang trang lien tiep thanh 1, roi ha chu thuong. Dung o MOI cho gop ten Sale/Nhan
+// vien theo key (Pancake report, KPI report...) de tranh 1 nguoi bi tach thanh 2 dong chi vi
+// khac hoa/thuong hoac dinh khoang trang an khi go/copy tu Pancake.
+function _normTxt_(s) {
+  return String(s || '')
+    .replace(/[\u00A0\u200B\u200C\u200D\uFEFF]/g, '') // NBSP + cac ky tu vo hinh thuong gap
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
 
 function findDuplicateOrders_(phoneFilter) {
   var ss = getDTSS_();
@@ -2920,6 +2935,9 @@ function buildPancakeReport_(from, to, split) {
   var mapPair = readPancakeMapCI_(), map = mapPair.map, mapCI = mapPair.mapCI;
   var byPage = {}, byCS = {};
   var unmappedSet = {}, unmappedCanon = {}; // ci-key -> ten hien thi (giu ban DAU TIEN gap)
+  var salesCanon = {}; // ci-key -> ten hien thi DAU TIEN gap, danh cho ten Sale DA khop qua PancakeNameMap
+                        // (phong truong hop chinh gia tri mapping bi go khac hoa/thuong/dinh khoang
+                        // trang giua 2 dong khop khac nhau, vi du "biichnguyen1993" va "Biichnguyen1993 ")
 
   if (sh.getLastRow() >= 2) {
     var v = sh.getRange(2, 1, sh.getLastRow() - 1, PK_STATS_HEADERS.length).getValues();
@@ -2949,8 +2967,13 @@ function buildPancakeReport_(from, to, split) {
       var w = (split === 'full') ? 1 : 1 / sales.length;
       for (var si = 0; si < sales.length; si++) {
         var saleName = sales[si];
-        var csKey = saleName;
-        if (!byCS[csKey]) byCS[csKey] = { name: saleName, pancakeNames: {}, mapped: mapped, shared: false, khCu:0, khMoi:0, tongTT:0, tinNhan:0, binhLuan:0, hoiThoaiMoi:0, dhKhMoi:0, dhKhCu:0, tongDH:0 };
+        // Chuan hoa key theo ten DA KHOP tu PancakeNameMap — phong truong hop chinh gia tri
+        // mapping bi go khac hoa/thuong/dinh khoang trang giua 2 dong khop khac nhau (khien
+        // CUNG 1 Sale bi tach thanh 2 dong rieng trong bang "Theo Sale", vi du da gap thuc te:
+        // "biichnguyen1993" va "Biichnguyen1993 "). Ten hien thi = ban DAU TIEN gap.
+        var csKey = _normTxt_(saleName);
+        if (!salesCanon[csKey]) salesCanon[csKey] = saleName;
+        if (!byCS[csKey]) byCS[csKey] = { name: salesCanon[csKey], pancakeNames: {}, mapped: mapped, shared: false, khCu:0, khMoi:0, tongTT:0, tinNhan:0, binhLuan:0, hoiThoaiMoi:0, dhKhMoi:0, dhKhCu:0, tongDH:0 };
         var bc = byCS[csKey];
         bc.pancakeNames[nhanVien] = true;
         if (mapped) bc.mapped = true; // neu >=1 nguon da khop thi coi la mapped (hiem khi trung ten CS voi ten chua khop)
@@ -3023,6 +3046,7 @@ function buildPancakeSdtReport_(from, to, split) {
   var mapPair = readPancakeMapCI_(), map = mapPair.map, mapCI = mapPair.mapCI;
   var byPage = {}, byCS = {};
   var unmappedSet = {}, unmappedCanon = {};
+  var salesCanon = {}; // xem chu thich o buildPancakeReport_
 
   if (sh.getLastRow() >= 2) {
     var v = sh.getRange(2, 1, sh.getLastRow() - 1, PK_SDT_STATS_HEADERS.length).getValues();
@@ -3049,8 +3073,10 @@ function buildPancakeSdtReport_(from, to, split) {
       var w = (split === 'full') ? 1 : 1 / sales.length;
       for (var si = 0; si < sales.length; si++) {
         var saleName = sales[si];
-        if (!byCS[saleName]) byCS[saleName] = { name: saleName, mapped: mapped, sdtMangVe:0, soDonChot:0, tinNhan:0, binhLuan:0 };
-        var bc = byCS[saleName];
+        var csKey = _normTxt_(saleName); // xem chu thich o buildPancakeReport_
+        if (!salesCanon[csKey]) salesCanon[csKey] = saleName;
+        if (!byCS[csKey]) byCS[csKey] = { name: salesCanon[csKey], mapped: mapped, sdtMangVe:0, soDonChot:0, tinNhan:0, binhLuan:0 };
+        var bc = byCS[csKey];
         if (mapped) bc.mapped = true;
         bc.sdtMangVe+=sdtMangVe*w; bc.soDonChot+=soDonChot*w; bc.tinNhan+=tinNhan*w; bc.binhLuan+=binhLuan*w;
       }
@@ -3128,15 +3154,17 @@ function classifyPancakeTag_(name, overrideMap) {
   var n = String(name || '').trim();
   var ov = overrideMap && overrideMap[n];
   if (ov) {
-    if (PK_STATUS_CODES_.indexOf(ov) !== -1) return { type: 'status', code: ov };
+    if (PK_STATUS_CODES_.indexOf(ov) !== -1 || /^L\d+(\.\d+)?$/i.test(ov)) return { type: 'status', code: String(ov).toUpperCase() }; // L9, L10... quy chuan tay
     if (/^([SO])\d+$/i.test(ov)) return { type: 'sale', code: ov.toUpperCase() }; // quy chuan tay tro thang ve 1 Sale
   }
   var m = n.match(/^([SO])\s*(\d+)(?!\d)/i);
   if (m) return { type: 'sale', code: m[1].toUpperCase() + parseInt(m[2], 10) };
   if (/^L\s*\d?\.?\s*ch[oờ]\s*ck/i.test(n) || /^L5\.1/i.test(n)) return { type: 'status', code: 'L5.1' };
   if (/^L5\.2/i.test(n) || /^L\s*\d?\.?\s*ch[oờ]\s*l[eê]n/i.test(n)) return { type: 'status', code: 'L5.2' };
-  m = n.match(/^L\s*(\d)(?!\d)/i);
-  if (m) return { type: 'status', code: 'L' + m[1] };
+  // \d+ (nhieu chu so) de tag L9, L10, L11... cung duoc nhan la trang thai (truoc day chi bat
+  // dung 1 chu so nen "L10" bi roi vao "other" khong phan loai duoc).
+  m = n.match(/^L\s*(\d+)(?!\d)/i);
+  if (m) return { type: 'status', code: 'L' + parseInt(m[1], 10) };
   return { type: 'other', code: '' };
 }
 
@@ -3193,10 +3221,13 @@ function buildPancakeTagReport_(from, to) {
       var pageId = String(v[i][1]), pageName = String(v[i][2]), tagName = String(v[i][4]), count = +v[i][5] || 0;
       if (!count) continue;
       var cls = classifyPancakeTag_(tagName, overrideMap);
-      if (cls.type !== 'status') continue; // chi quan tam nhom trang thai L1-L7 o day (nhom Sale da co bao cao rieng)
+      if (cls.type !== 'status') continue; // chi quan tam nhom trang thai L1-L7... o day (nhom Sale da co bao cao rieng)
+      // Ma moi (L9, L10...) tu dong duoc them cot khi gap — khong can sua PK_STATUS_CODES_/code moi lan co tag moi
       if (!byPage[pageId]) { byPage[pageId] = { pageId: pageId, pageName: pageName }; PK_STATUS_CODES_.forEach(function(c) { byPage[pageId][c] = 0; }); }
+      if (byPage[pageId][cls.code] === undefined) byPage[pageId][cls.code] = 0;
+      if (totals[cls.code] === undefined) totals[cls.code] = 0;
       byPage[pageId][cls.code] += count;
-      if (totals[cls.code] !== undefined) totals[cls.code] += count;
+      totals[cls.code] += count;
     }
   }
   return { byPage: byPage, totals: totals };
@@ -5255,167 +5286,151 @@ function readBannedWords_() {
 
 
 // ═══════════════════════════════════════════════════════════════
-//  CHECKLIST CHAT LUONG TIN NHAN MKT — tab "✅ Checklist MKT" (index.html)
-//  Mo phong file Excel "Checklist_tin_nhắn_MKT_chất_lượng.xlsx": 4 tieu chi L1-L4, nhap tay
-//  theo ngay (cac mau so nhu "So HT day Sale", "So KH da bao gia" KHONG co san trong du lieu
-//  Pancake nen khong tu tinh duoc), he thong tu tinh ty le va so voi muc tieu.
-//  3 sheet rieng (tu tao lan dau): MktChecklist (so lieu ngay), MktTagDefs (bang dinh nghia tag,
-//  sua thang tren Sheet), muc tieu luu trong Settings key 'mktChecklistTargets'.
 // ═══════════════════════════════════════════════════════════════
-var SH_MKT = 'MktChecklist';
-var MKT_HEADERS = ['date','khTiepCanL1','htDatLan3','sdtThuThap','sdtKetNoi','khTiepCanL3','khDungChanDung','khTiepCanL4','khKhaoGia','note','updatedAt'];
-var MKT_NUM_FIELDS = ['khTiepCanL1','htDatLan3','sdtThuThap','sdtKetNoi','khTiepCanL3','khDungChanDung','khTiepCanL4','khKhaoGia'];
-var SH_MKT_DEFS = 'MktTagDefs';
-var MKT_DEF_HEADERS = ['name','tieuChi','dieuKien','yNghia','khiNaoGan','congThuc'];
-var MKT_TARGETS_DEFAULT = { L1: 0.8, L2: 0.6, L3: 0.9, L4: 0.9 };
-// Noi dung mac dinh lay tu bang tieu chi tag trong index.html (_PK_STATUS_DESC) — co the sua truc tiep
-// trong sheet MktTagDefs (dan noi dung chuan tu file Excel vao la hien ngay, khong can sua code).
-var MKT_TAGDEFS_DEFAULT = [
-  ['L1. Chuẩn (đạt 3 lần phản hồi)', 'Hội thoại đạt mốc phản hồi lần 3',
-   '≥80% hội thoại đẩy Sale phải đạt mốc lần 3: (1) KH hỏi SP → (2) NV khai thác năm sinh + mong cầu, KH phản hồi → (3) NV tư vấn cụ thể, KH phản hồi tiếp.',
-   'Đo chất lượng tin nhắn MKT đẩy sang Sale.', 'Khi hội thoại đạt mốc phản hồi lần 3.', 'Số HT đạt lần 3 (Tag L1) ÷ Số KH tiếp cận (L1) — mục tiêu ≥80%'],
-  ['L2. SĐT kết nối', 'SĐT thu thập được kết nối thành công',
-   '>60% SĐT thu thập được phải kết nối thành công qua gọi điện / nhắn tin / kết bạn Zalo (KH có phản hồi thật).',
-   'Đo khả năng biến SĐT thu thập thành liên hệ thật.', 'Khi kết nối được với SĐT (KH có phản hồi).', 'Số SĐT kết nối (Tag L2) ÷ Số SĐT thu thập — mục tiêu ≥60%'],
-  ['L3. KH tiềm năng', 'KH đúng chân dung',
-   'KH không im lặng sau khi được báo giá, độ tuổi từ 27 trở lên, có mục đích mua rõ ràng — có phản hồi cụ thể về mức giá (đồng ý / cân nhắc / hỏi thêm chi tiết).',
-   'Đo tỷ lệ KH tiếp cận đúng chân dung khách hàng mục tiêu.', 'Khi KH có phản hồi cụ thể về giá sau khi được báo giá.', 'Số KH đúng chân dung (Tag L3) ÷ Số KH tiếp cận (L3) — mục tiêu ≥90%'],
-  ['L4. Khảo giá / KNC', 'KH khảo giá',
-   'Không phải nick ảo, seeding, đối thủ dò giá hoặc KH hỏi nhiều page cùng lúc không có dấu hiệu mua thật — theo dõi để LOẠI khỏi mẫu số các KPI trên.',
-   'Đo tỷ lệ KH khảo giá trong tổng KH tiếp cận.', 'Khi KH chỉ khảo giá / không có dấu hiệu mua thật.', 'Số KH khảo giá (Tag L4) ÷ Số KH tiếp cận (L4) — mục tiêu ≥90%']
-];
+//  CHECKLIST CHAT LUONG TIN NHAN MKT — tab "✅ Checklist MKT" (index.html)
+//  KHONG nhap tay theo ngay nua: TU TINH tu
+//    • Bao cao Pancake: Tong tuong tac (PancakeStats), Tong SDT thu thap (PancakeSdtStats),
+//      so luong tung tag L1..Ln (PancakeTagStats, qua buildPancakeTagReport_ — L9, L10... tu
+//      xuat hien khi co tag tuong ung, khong can sua code)
+//    • DT TONG (Base): L5 (Chot) = TONG SO DON trong khoang ngay, loc theo NGAY TAO — dung
+//      quy uoc "tinh theo ngay tao" ap dung cho moi bao cao trong he thong.
+//  Chi con phai DIEN 1 LAN CHO CA THANG: muc tieu (%) + mau so cua tung tag, luu trong
+//  Settings key 'mktChecklistConfig' = { "YYYY-MM": { L1:{target:0.8,denom:'tt'}, ... } }.
+//  Thang chua duoc cai se KE THUA cau hinh cua thang gan nhat truoc do (hoac mac dinh).
+//  Mau so ('denom'): 'tt' = Tong tuong tac | 'sdt' = Tong SDT thu thap | 'L<n>' = so luong 1
+//  tag khac (vd L1 lam mau so cho tag con) | 'none' = chi dem so luong, khong tinh ty le.
+// ═══════════════════════════════════════════════════════════════
+// Mac dinh theo dung 4 muc tieu Duyen da dat truoc day (L1 dat lan 3 >=80%/Tong tuong tac,
+// L2 ket noi SDT >=60%/Tong SDT thu thap, L3 dung chan dung >=90%/Tong tuong tac, L4 khao gia
+// >=90%/Tong tuong tac). L5 tro len chua co muc tieu chuan — chi tinh ty le tren Tong tuong
+// tac de tham khao, khong ket luan Dat/Chua dat cho toi khi Duyen dien muc tieu cho thang do.
+var MKT_DEFAULT_CFG_ = {
+  L1: { target: 0.8, denom: 'tt' },
+  L2: { target: 0.6, denom: 'sdt' },
+  L3: { target: 0.9, denom: 'tt' },
+  L4: { target: 0.9, denom: 'tt' }
+};
+var MKT_MIN_TAGS_ = 8; // luon hien toi thieu L1..L8 tren bang, du chua co du lieu/cau hinh
 
-function _mktNum_(v) { var n = Number(v); return (isNaN(n) || n < 0) ? 0 : n; }
+function _mktMonthOf_(ymd) { return String(ymd || '').substring(0, 7); }
 
-function readMktTargets_() {
-  var out = { L1: MKT_TARGETS_DEFAULT.L1, L2: MKT_TARGETS_DEFAULT.L2, L3: MKT_TARGETS_DEFAULT.L3, L4: MKT_TARGETS_DEFAULT.L4 };
-  try {
-    var raw = getSetting_('mktChecklistTargets');
-    if (raw) {
-      var o = JSON.parse(raw);
-      ['L1','L2','L3','L4'].forEach(function(k) {
-        var n = Number(o[k]);
-        if (!isNaN(n) && n >= 0 && n <= 1) out[k] = n;
-      });
-    }
-  } catch (e) {}
-  return out;
+function readMktConfigAll_() {
+  try { var raw = getSetting_('mktChecklistConfig'); if (raw) { var o = JSON.parse(raw); if (o && typeof o === 'object') return o; } } catch (e) {}
+  return {};
 }
 
-function saveMktChecklistTargets_(targets) {
-  if (!targets || typeof targets !== 'object') return jsonOut_({ ok: false, error: 'Thieu targets' });
+// Cau hinh hieu luc cho 1 thang: dung dung thang neu co, khong thi lay thang GAN NHAT TRUOC
+// do (ke thua), khong thi dung mac dinh.
+function mktConfigForMonth_(all, ym) {
+  if (all[ym]) return { cfg: all[ym], source: ym };
+  var earlier = Object.keys(all).filter(function(k) { return /^\d{4}-\d{2}$/.test(k) && k < ym; }).sort();
+  if (earlier.length) { var best = earlier[earlier.length - 1]; return { cfg: all[best], source: best }; }
+  return { cfg: MKT_DEFAULT_CFG_, source: 'default' };
+}
+
+function _mktCleanCfgEntry_(e) {
+  var t = (e && e.target !== null && e.target !== undefined && e.target !== '') ? Number(e.target) : null;
+  if (t !== null && (isNaN(t) || t < 0)) t = null;
+  if (t !== null && t > 1) t = 1;
+  var d = String((e && e.denom) || 'tt');
+  if (!(d === 'tt' || d === 'sdt' || d === 'none' || /^L\d+$/.test(d))) d = 'tt';
+  return { target: t, denom: d };
+}
+
+// Luu cau hinh CHO 1 THANG (config = { L1:{target,denom}, ..., L9:{...} }) — ghi de ca thang do,
+// cac thang khac (truoc/sau) khong doi. Dung khi Duyen "dien 1 lan ap dung ca thang".
+function saveMktChecklistConfig_(month, config) {
+  if (!/^\d{4}-\d{2}$/.test(String(month || ''))) return jsonOut_({ ok: false, error: 'Thang khong hop le (can dang YYYY-MM)' });
+  if (!config || typeof config !== 'object') return jsonOut_({ ok: false, error: 'Thieu cau hinh' });
   var clean = {};
-  ['L1','L2','L3','L4'].forEach(function(k) {
-    var n = Number(targets[k]);
-    clean[k] = (isNaN(n) || n < 0) ? MKT_TARGETS_DEFAULT[k] : Math.min(n, 1);
-  });
-  return setSetting_('mktChecklistTargets', JSON.stringify(clean));
+  Object.keys(config).forEach(function(k) { if (/^L\d+$/.test(k)) clean[k] = _mktCleanCfgEntry_(config[k]); });
+  var all = readMktConfigAll_();
+  all[month] = clean;
+  return setSetting_('mktChecklistConfig', JSON.stringify(all));
 }
 
-function readMktTagDefs_() {
-  var sh = getSheet_(SH_MKT_DEFS, MKT_DEF_HEADERS);
-  if (sh.getLastRow() < 2) {
-    sh.getRange(2, 1, MKT_TAGDEFS_DEFAULT.length, MKT_DEF_HEADERS.length).setValues(MKT_TAGDEFS_DEFAULT);
+function _mktTagNum_(code) { return parseInt(String(code).substring(1), 10) || 0; }
+
+function buildMktChecklistReport_(from, to) {
+  var warnings = [];
+  var todayVn = _vnYmd_(new Date());
+  if (!from || !to) {
+    var mo = todayVn.substring(0, 7);
+    if (!from) from = mo + '-01';
+    if (!to) to = todayVn;
+    warnings.push('Chưa chọn đủ khoảng ngày — đang tạm tính từ ' + from + ' đến ' + to + '.');
   }
-  var v = sh.getRange(2, 1, Math.max(sh.getLastRow() - 1, 0), MKT_DEF_HEADERS.length).getValues();
-  var out = [];
-  for (var i = 0; i < v.length; i++) {
-    if (!String(v[i][0] || '').trim()) continue;
-    out.push({ name: String(v[i][0]), tieuChi: String(v[i][1] || ''), dieuKien: String(v[i][2] || ''),
-      yNghia: String(v[i][3] || ''), khiNaoGan: String(v[i][4] || ''), congThuc: String(v[i][5] || '') });
+  from = normOrderDate_(from) || from; to = normOrderDate_(to) || to;
+  if (from > to) warnings.push('Khoảng ngày bị ngược (từ ' + from + ' sau đến ' + to + ') nên không có dữ liệu.');
+
+  // 1) Pancake: tuong tac + SDT + tag (dung lai ham co san, cung nguon voi tab KPI Pancake)
+  var pInt = buildPancakeReport_(from, to, 'equal');
+  var pSdt = buildPancakeSdtReport_(from, to, 'equal');
+  var pTag = buildPancakeTagReport_(from, to);
+  var tongTT = pInt.byPage.reduce(function(s, r) { return s + r.tongTT; }, 0);
+  var sdtThuThap = pSdt.byPage.reduce(function(s, r) { return s + r.sdtMangVe; }, 0);
+
+  // 2) DT TONG (Base): L5 = tong so don trong khoang ngay, loc theo NGAY TAO (giong moi bao cao khac)
+  var baseOrders = 0;
+  var rowsDt = readDTTong_();
+  for (var i = 0; i < rowsDt.length; i++) {
+    var dt = parseVNDate_(rowsDt[i].ngayTao);
+    if (dt && dateInRange_(dt, from, to)) baseOrders++;
   }
-  return out;
-}
 
-function _mktRowFromValues_(v) {
-  var d = normOrderDate_(v[0]); // cot ngay co the bi Sheets tu doi thanh kieu Date -> chuan hoa ve yyyy-MM-dd
-  var o = { date: d };
-  for (var i = 0; i < MKT_NUM_FIELDS.length; i++) o[MKT_NUM_FIELDS[i]] = _mktNum_(v[i + 1]);
-  o.note = String(v[9] || '');
-  return o;
-}
+  // 3) Cau hinh muc tieu/mau so cua thang cuoi khoang dang xem (KPI dien 1 lan cho ca thang)
+  var month = _mktMonthOf_(to);
+  var cf = mktConfigForMonth_(readMktConfigAll_(), month);
 
-// Tra ve cac dong da nhap, ngay MOI nhat len dau
-function readMktRows_() {
-  var sh = getSheet_(SH_MKT, MKT_HEADERS);
-  var last = sh.getLastRow();
-  if (last < 2) return [];
-  var vals = sh.getRange(2, 1, last - 1, MKT_HEADERS.length).getValues();
-  var out = [];
-  for (var i = 0; i < vals.length; i++) {
-    if (!vals[i][0]) continue;
-    var r = _mktRowFromValues_(vals[i]);
-    if (/^\d{4}-\d{2}-\d{2}$/.test(r.date)) out.push(r);
-  }
-  out.sort(function(a, b) { return a.date < b.date ? 1 : (a.date > b.date ? -1 : 0); });
-  return out;
-}
+  // 4) Danh sach tag: L1..L8 luon hien; L9, L10... tu them khi co trong bao cao tag hoac trong cau hinh
+  var codeSet = {};
+  for (var n = 1; n <= MKT_MIN_TAGS_; n++) codeSet['L' + n] = true;
+  Object.keys(pTag.totals || {}).forEach(function(k) { if (/^L\d+$/.test(k)) codeSet[k] = true; });
+  Object.keys(cf.cfg || {}).forEach(function(k) { if (/^L\d+$/.test(k)) codeSet[k] = true; });
+  var codes = Object.keys(codeSet).sort(function(a, b) { return _mktTagNum_(a) - _mktTagNum_(b); });
 
-function _mktFindRowIndex_(sh, ymd) {
-  var last = sh.getLastRow();
-  if (last < 2) return -1;
-  var col = sh.getRange(2, 1, last - 1, 1).getValues();
-  for (var i = 0; i < col.length; i++) {
-    if (col[i][0] && normOrderDate_(col[i][0]) === ymd) return i + 2;
-  }
-  return -1;
-}
+  var counts = {};
+  codes.forEach(function(c) { counts[c] = (c === 'L5') ? baseOrders : (pTag.totals[c] || 0); });
 
-// Them moi hoac ghi de theo NGAY (moi ngay dung 1 dong)
-function saveMktChecklistRow_(row) {
-  if (!row) return jsonOut_({ ok: false, error: 'Thieu du lieu' });
-  var ymd = normOrderDate_(row.date);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return jsonOut_({ ok: false, error: 'Ngay khong hop le' });
-  var lock = LockService.getScriptLock();
-  try { lock.waitLock(15000); } catch (eLock) {}
-  try {
-    var sh = getSheet_(SH_MKT, MKT_HEADERS);
-    var vals = [ymd];
-    for (var i = 0; i < MKT_NUM_FIELDS.length; i++) vals.push(_mktNum_(row[MKT_NUM_FIELDS[i]]));
-    vals.push(String(row.note || ''));
-    vals.push(new Date().toISOString());
-    var idx = _mktFindRowIndex_(sh, ymd);
-    if (idx < 0) idx = Math.max(sh.getLastRow(), 1) + 1;
-    sh.getRange(idx, 1).setNumberFormat('@'); // giu nguyen chuoi yyyy-MM-dd, Sheets khong tu doi thanh Date
-    sh.getRange(idx, 1, 1, MKT_HEADERS.length).setValues([vals]);
-    return jsonOut_({ ok: true, date: ymd, updated: true });
-  } finally {
-    try { lock.releaseLock(); } catch (eu) {}
-  }
-}
-
-function deleteMktChecklistRow_(date) {
-  var ymd = normOrderDate_(date);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return jsonOut_({ ok: false, error: 'Ngay khong hop le' });
-  var sh = getSheet_(SH_MKT, MKT_HEADERS);
-  var idx = _mktFindRowIndex_(sh, ymd);
-  if (idx < 0) return jsonOut_({ ok: true, deleted: false });
-  sh.deleteRow(idx);
-  return jsonOut_({ ok: true, deleted: true });
-}
-
-// Tong hop theo khoang ngay (giong sheet "Tong hop tuan/thang" cua Excel): cong don tu so va mau so
-// roi moi tinh ty le (KHONG lay trung binh cac ty le tung ngay). Ty le tra ve dang % (1 so le).
-function buildMktSummary_(from, to) {
-  var f = from ? normOrderDate_(from) : '', t = to ? normOrderDate_(to) : '';
-  var rows = readMktRows_().filter(function(r) {
-    if (f && r.date < f) return false;
-    if (t && r.date > t) return false;
-    return true;
-  });
-  var totals = {};
-  MKT_NUM_FIELDS.forEach(function(k) { totals[k] = 0; });
-  rows.forEach(function(r) { MKT_NUM_FIELDS.forEach(function(k) { totals[k] += r[k]; }); });
-  var pct = function(a, b) { return b ? Math.round(a / b * 1000) / 10 : 0; };
-  var rates = {
-    L1: pct(totals.htDatLan3, totals.khTiepCanL1),
-    L2: pct(totals.sdtKetNoi, totals.sdtThuThap),
-    L3: pct(totals.khDungChanDung, totals.khTiepCanL3),
-    L4: pct(totals.khKhaoGia, totals.khTiepCanL4)
+  var denomLabel = function(d) {
+    if (d === 'tt') return 'Tổng tương tác';
+    if (d === 'sdt') return 'Tổng SĐT thu thập';
+    if (d === 'none') return '';
+    return 'Số lượng ' + d;
   };
-  var den = { L1: totals.khTiepCanL1, L2: totals.sdtThuThap, L3: totals.khTiepCanL3, L4: totals.khTiepCanL4 };
-  var targets = readMktTargets_();
-  var passed = {};
-  ['L1','L2','L3','L4'].forEach(function(k) { passed[k] = den[k] > 0 && rates[k] >= targets[k] * 100; });
-  return { ok: true, from: f, to: t, rows: rows, totals: totals, rates: rates, targets: targets, passed: passed };
+  var tags = codes.map(function(code) {
+    var e = _mktCleanCfgEntry_((cf.cfg && cf.cfg[code]) || { target: null, denom: 'tt' });
+    var denomVal = null;
+    if (e.denom === 'tt') denomVal = tongTT;
+    else if (e.denom === 'sdt') denomVal = sdtThuThap;
+    else if (/^L\d+$/.test(e.denom)) denomVal = counts[e.denom] || 0;
+    var rate = null;
+    if (e.denom !== 'none') rate = denomVal > 0 ? Math.round(counts[code] / denomVal * 1000) / 10 : 0;
+    var passed = null; // null = chua co muc tieu / khong tinh ty le -> UI khong ket luan Dat/Chua dat
+    if (e.target !== null && rate !== null) passed = denomVal > 0 && rate >= e.target * 100;
+    return { code: code, count: counts[code], source: code === 'L5' ? 'base' : 'pancakeTag',
+      denom: e.denom, denomLabel: denomLabel(e.denom), denomValue: denomVal,
+      rate: rate, target: e.target, passed: passed };
+  });
+
+  // 5) Chan doan nguon du lieu: bao ro "chua nap bao gio" vs "co nhung ngoai khoang ngay dang xem"
+  var dataAvail = {
+    tuongTac: _pkSheetDateSpan_(SH_PK_STATS, PK_STATS_HEADERS, from, to),
+    sdt:      _pkSheetDateSpan_(SH_PK_SDT,   PK_SDT_STATS_HEADERS, from, to),
+    tag:      _pkSheetDateSpan_(SH_PK_TAG,   PK_TAG_STATS_HEADERS, from, to)
+  };
+  var LBL = { tuongTac: 'Thống kê tương tác', sdt: 'Thống kê nhân viên (SĐT)', tag: 'Thống kê tag' };
+  Object.keys(dataAvail).forEach(function(k) {
+    var a = dataAvail[k];
+    if (a.rows === 0) warnings.push('Chưa có dữ liệu "' + LBL[k] + '" nào trên CRM — vào tab "📥 Báo cáo Pancake", nạp file rồi bấm "💾 Lưu lên CRM".');
+    else if (a.rowsInRange === 0) warnings.push('Không có dòng "' + LBL[k] + '" nào trong khoảng ngày đang chọn (dữ liệu hiện có từ ' + a.minDate + ' đến ' + a.maxDate + ').');
+  });
+
+  // cau hinh day du (moi tag dang hien) de form sua muc tieu tren UI dien dung ngay
+  var configOut = {};
+  codes.forEach(function(c) { configOut[c] = _mktCleanCfgEntry_((cf.cfg && cf.cfg[c]) || { target: null, denom: 'tt' }); });
+
+  return { ok: true, from: from, to: to, month: month, configSource: cf.source,
+    tongTT: tongTT, sdtThuThap: sdtThuThap, baseOrders: baseOrders,
+    tags: tags, config: configOut, dataAvail: dataAvail, warnings: warnings };
 }
