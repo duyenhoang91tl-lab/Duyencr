@@ -996,9 +996,9 @@ var DT_TONG_WIDTH     = 20; // A:T
 
 // Chuyen 1 hang tho cua DT TONG thanh object "don hang" (giu ten truong nhu ORDER_HEADERS
 // cu de cac cho khac trong code/frontend it phai sua nhat co the)
-function dtRowToOrder_(row, rowIndex, tz) {
-  var dtVal = _dtCellToVnStr_(row[DT_COL_THOIGIANHT], tz);
-  var ngayTaoStr = _dtCellToVnStr_(row[DT_COL_NGAYTAO], tz);
+function dtRowToOrder_(row, rowIndex) {
+  var dtVal = _dtCellToVnStr_(row[DT_COL_THOIGIANHT]);
+  var ngayTaoStr = _dtCellToVnStr_(row[DT_COL_NGAYTAO]);
   var d = parseVNDate_(dtVal);
   return {
     id: row[DT_COL_ID] != null ? String(row[DT_COL_ID]) : '',
@@ -1040,7 +1040,6 @@ function readAllOrders_() {
   var ss = getDTSS_();
   var sh = ss.getSheetByName(DT_TONG_SHEET);
   if (!sh || sh.getLastRow() < 2) return [];
-  var tz = DT_TIMEZONE_VN_; // luon gio VN co dinh — xem ghi chu tai _dtCellToVnStr_ o tren
   var last = sh.getLastRow();
   var vals = sh.getRange(2, 1, last - 1, DT_TONG_WIDTH).getValues();
   var out = [];
@@ -1049,7 +1048,7 @@ function readAllOrders_() {
     var r = vals[i];
     if (!r[DT_COL_PHONE] && !r[DT_COL_ID]) continue; // dong rong
     try {
-      out.push(dtRowToOrder_(r, i + 2, tz));
+      out.push(dtRowToOrder_(r, i + 2));
     } catch (eRow) {
       // 1 dong loi (vd gia tri ngay bat thuong) KHONG duoc lam hong ca danh sach — bo qua
       // rieng dong do, ghi log de con dieu tra, cac dong khac van doc binh thuong.
@@ -1234,39 +1233,32 @@ function getDTSS_() {
 }
 
 // Chuyen 1 gia tri o "Ngay tao"/"Thoi gian hoan thanh" cua sheet DT TONG thanh chuoi
-// 'dd/MM/yyyy HH:mm' — DUNG THEO DUNG MUI GIO RIENG CUA FILE SHEET DO (File > Cai dat bang tinh
-// > Mui gio), KHONG phai mui gio cua du an Apps Script. Ly do: da doi chieu voi bao cao chuan
-// cua Base (19/09/2026) va phat hien o Date cua cot nay dang duoc Google Sheets luu/tra ve theo
-// dung SO GIO HIEN THI TREN MAN HINH SHEET (vd o hien "18/09/2026 23:14" thi Date object doc
-// duoc co gio dung la 23:14, KHONG can + hay - 7 tieng gi them) — neu cong them offset VN nhu
-// cac ham _vnYmd_/_vnYmdParts_ (dung cho cac nguon du lieu khac co epoch THAT su la UTC), cac
-// don tao vao khung 18h-24h se bi day nham sang NGAY HOM SAU (bug da phat hien: 20 don cua
-// ngay 18/09 bi tinh nham vao bao cao ngay 19/09, lech +55tr doanh thu). Dung
-// getSpreadsheetTimeZone() (mui gio rieng cua FILE, khac Session.getScriptTimeZone() la mui gio
-// du an) de dam bao luon khop CHINH XAC voi con so hien thi tren chinh sheet DT TONG, bat ke
-// file do dang cau hinh mui gio gi. Neu val da la chuoi san (khong phai kieu Date) thi giu
-// nguyen, khong dong vao.
-// Chuyen 1 gia tri o "Ngay tao"/"Thoi gian hoan thanh" cua sheet DT TONG thanh chuoi
-// 'dd/MM/yyyy HH:mm' — LUON theo GIO VIET NAM co dinh (Asia/Ho_Chi_Minh), KHONG phu thuoc
-// vao cau hinh mui gio cua file Sheet hay cua du an Apps Script.
-// (Fix 20/09/2026: ban truoc dung ss.getSpreadsheetTimeZone() — vua gay crash hang loat khi
-// gia tri tra ve khong phai String hop le [loi "Đối số không hợp lệ: timeZone"], vua cho ra
-// gio SAI neu file Sheet vo tinh dang cau hinh mui gio khac VN (Duyen xac nhan dang bi UTC).
-// Dung thang 'Asia/Ho_Chi_Minh' de bao dam luon dung gio VN va khong bao gio throw vi kieu du
-// lieu sai, giong dung nguyen tac +7 co dinh da ap dung o _vnYmd_/_vnYmdParts_ ben duoi.)
-var DT_TIMEZONE_VN_ = 'Asia/Ho_Chi_Minh';
-function _dtCellToVnStr_(val, tz) {
+// 'dd/MM/yyyy HH:mm'.
+//
+// QUAN TRONG — DA DOI CHIEU TUNG DON VOI BAO CAO CHUAN CUA BASE (19/09/2026) DE XAC NHAN:
+// Date object doc duoc tu cot nay co GIO/PHUT DUNG Y HET so dang hien tren man hinh Sheet
+// (vd o hien "18/09/2026 23:14" thi val.getUTCHours()=23, val.getUTCMinutes()=14) — TUC LA
+// KHONG CAN CONG/TRU GI THEM, chi can doc thang cac thanh phan UTC cua Date la ra dung.
+//
+// Vi vay ham nay KHONG dung Utilities.formatDate(val, tz, ...) voi bat ky ma mui gio nao
+// (khong ss.getSpreadsheetTimeZone(), cang khong hardcode 'Asia/Ho_Chi_Minh') — ca 2 cach
+// do DEU SAI cho rieng cot nay:
+//   - 'Asia/Ho_Chi_Minh' (GMT+7): CONG THEM +7 tieng vao so da dung san -> don tao khung
+//     18h-24h bi day nham sang NGAY HOM SAU (bug goc, da fix 20/09 sang nhung bi 1 ban vá
+//     sau do vo tinh dua "Asia/Ho_Chi_Minh" vao lam fallback nen tai dien: Page HT3 nhay
+//     tu dung 106tr len sai 180tr — chinh la trieu chung Duyen bao lai).
+//   - ss.getSpreadsheetTimeZone(): co the tra ve gia tri khien Utilities.formatDate throw
+//     "Đối số không hợp lệ: timeZone" hang loat (2.432 dong), lam rong ca danh sach don.
+// Doc thang tu cac ham getUTC*() cua JS Date (khong qua Utilities/mui gio nao ca) vua tranh
+// duoc crash (thuan JS, khong goi API nao co the loi "timeZone khong hop le") vua khong bao
+// gio cong/tru sai gio, bat ke Date object do lay tu Sheet dang cau hinh mui gio gi.
+function _dtCellToVnStr_(val) {
   if (val === '' || val === null || val === undefined) return '';
   if (Object.prototype.toString.call(val) === '[object Date]') {
     if (isNaN(val.getTime())) return '';
-    var useTz = (typeof tz === 'string' && tz) ? tz : DT_TIMEZONE_VN_;
-    try {
-      return Utilities.formatDate(val, useTz, 'dd/MM/yyyy HH:mm');
-    } catch (eTz) {
-      // Phong ho cuoi cung: du useTz vi ly do gi van khong hop le, KHONG duoc de throw lam
-      // mat nguyen dong don — lui ve gio VN chuan.
-      return Utilities.formatDate(val, DT_TIMEZONE_VN_, 'dd/MM/yyyy HH:mm');
-    }
+    var pad2 = function(n) { return (n < 10 ? '0' : '') + n; };
+    return pad2(val.getUTCDate()) + '/' + pad2(val.getUTCMonth() + 1) + '/' + val.getUTCFullYear() +
+      ' ' + pad2(val.getUTCHours()) + ':' + pad2(val.getUTCMinutes());
   }
   return val;
 }
@@ -1380,7 +1372,6 @@ function readDTTong_() {
   if (!sh) return [];
   var last = sh.getLastRow();
   if (last < 2) return [];
-  var tz = DT_TIMEZONE_VN_; // luon gio VN co dinh — xem ghi chu tai _dtCellToVnStr_ o tren
   var vals = sh.getRange(2, 1, last - 1, 20).getValues();
   var out = [];
   for (var i = 0; i < vals.length; i++) {
@@ -1392,12 +1383,12 @@ function readDTTong_() {
     if (!r[3] && !r[19] && !r[17]) continue;
     try {
       out.push({
-        ngayTao:        _dtCellToVnStr_(r[0], tz),
+        ngayTao:        _dtCellToVnStr_(r[0]),
         nguoiTao:       r[1] ? String(r[1]).trim() : '',
         giaoCho:        r[2],
         giaiDoan:       r[6],
         trangThai:      r[7],
-        thoiGianHT:     _dtCellToVnStr_(r[10], tz),
+        thoiGianHT:     _dtCellToVnStr_(r[10]),
         kenhBan:        r[12] ? String(r[12]).trim() : '',
         saleBan:        r[13] ? String(r[13]) : '',
         sanPham:        r[14],
