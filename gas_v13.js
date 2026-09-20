@@ -715,7 +715,17 @@ function doGet(e) {
       return jsonOut_(res2);
     }
 
-    if (action === 'orders')    return jsonOut_({ orders: readAllOrders_() });
+    if (action === 'orders') {
+      var _ordersOut = readAllOrders_();
+      var _ordersResp = { orders: _ordersOut };
+      // Neu co dong bi loi khi doc, bao ve ngoai response (khong chi nam trong Logger.log noi
+      // bo) de app hien canh bao ro rang thay vi am tham coi so dong doc duoc la toan bo su that.
+      if (readAllOrders_.lastErrorCount) {
+        _ordersResp.errorCount = readAllOrders_.lastErrorCount;
+        _ordersResp.errorSample = readAllOrders_.lastErrorSample;
+      }
+      return jsonOut_(_ordersResp);
+    }
     if (action === 'teams')     return jsonOut_({ teams: readTeams_(ss.getSheetByName(SH_TEAM)) });
     if (action === 'users')     return jsonOut_({ users: readUsers_(ss.getSheetByName(SH_USER)) });
     // ── Bao cao Pancake (nhap tu file Excel "Thong ke tuong tac") ──
@@ -1017,6 +1027,16 @@ function dtRowToOrder_(row, rowIndex, tz) {
 }
 
 function readAllOrders_() {
+  // Reset thong ke loi cua lan goi truoc (doc qua readAllOrders_.lastErrorCount/lastErrorSample
+  // NGAY SAU khi goi ham nay trong cung 1 request — dung de tra ve kem theo response cho action
+  // 'orders', tranh tinh trang loi hang loat bi NUOT AM THAM chi con thay trong Logger.log rieng
+  // ma khong ai de y — xem bug ngay 20/09: 1 dong loi -> ca readAllOrders_ throw -> 'orders'
+  // tra error -> app KHONG rebuild allCustomers (giu nguyen ban cu, van con du 2k2 KH, khong ai
+  // phat hien). Sau khi them try/catch (giao dien am tham hon), N dong loi bi bo qua -> chi con
+  // vai dong song sot -> app REBUILD allCustomers day du nhung chi voi vai KH — mat du lieu am
+  // tham con nguy hiem hon ban dau. Phai bao loi ro ra ngoai thay vi chi Logger.log noi bo.
+  readAllOrders_.lastErrorCount = 0;
+  readAllOrders_.lastErrorSample = '';
   var ss = getDTSS_();
   var sh = ss.getSheetByName(DT_TONG_SHEET);
   if (!sh || sh.getLastRow() < 2) return [];
@@ -1024,6 +1044,7 @@ function readAllOrders_() {
   var last = sh.getLastRow();
   var vals = sh.getRange(2, 1, last - 1, DT_TONG_WIDTH).getValues();
   var out = [];
+  var errCount = 0, firstErr = '';
   for (var i = 0; i < vals.length; i++) {
     var r = vals[i];
     if (!r[DT_COL_PHONE] && !r[DT_COL_ID]) continue; // dong rong
@@ -1032,9 +1053,14 @@ function readAllOrders_() {
     } catch (eRow) {
       // 1 dong loi (vd gia tri ngay bat thuong) KHONG duoc lam hong ca danh sach — bo qua
       // rieng dong do, ghi log de con dieu tra, cac dong khac van doc binh thuong.
+      errCount++;
+      var msg = 'dong ' + (i + 2) + ': ' + (eRow && eRow.message ? eRow.message : eRow);
+      if (!firstErr) firstErr = msg;
       Logger.log('readAllOrders_: loi doc dong ' + (i + 2) + ': ' + eRow);
     }
   }
+  readAllOrders_.lastErrorCount = errCount;
+  readAllOrders_.lastErrorSample = firstErr;
   return out;
 }
 

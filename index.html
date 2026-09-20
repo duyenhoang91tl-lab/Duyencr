@@ -2325,6 +2325,13 @@ async function syncFromGS(opts) {
         if (isManual) txt('ltext', 'Đang tải đơn hàng từ Google Sheets...');
         const ordR = await fetch(gsUrl + sepChar + 'action=orders', { redirect: 'follow' });
         const ordJson = await ordR.json();
+        if (ordJson && ordJson.errorCount) {
+          // Backend doc duoc mot phan don (da bo qua cac dong loi de khong crash toan bo) —
+          // PHAI canh bao ro, khong duoc coi so don/KH doc duoc la day du roi am tham rebuild
+          // danh sach (bug da gap 20/09: 8 KH thay vi 2k2 vi ~2k dong bi loi va bi nuot am tham).
+          console.warn('readAllOrders_ error rows:', ordJson.errorCount, ordJson.errorSample);
+          showRowErrorBanner(ordJson.errorCount, ordJson.errorSample);
+        }
         if (ordJson && ordJson.orders && ordJson.orders.length) {
           const rows = ordJson.orders.map(o => ({
             date: o.date ? parseVNDate_(o.date) : null,
@@ -2463,6 +2470,23 @@ async function syncFromGS(opts) {
       if (_autoSyncFailCount >= 3) { showSyncErrorBanner(); }
     }
   }
+}
+// Canh bao khi backend phai bo qua N dong don hang bi loi khi doc (xem readAllOrders_ trong
+// gas_v13.js) — danh sach KH luc nay CO THE THIEU vi chi duoc dung tren cac dong doc thanh cong.
+// errSample la text loi cua dong dau tien bi bo qua, giup tra ngay nguyen nhan ma khong can mo
+// Apps Script > Executions.
+function showRowErrorBanner(errCount, errSample) {
+  const existing = document.getElementById('row-err-banner');
+  if (existing) { existing.remove(); } // luon thay bang thong tin moi nhat (so dong loi co the doi)
+  const bar = document.getElementById('data-view');
+  if (!bar) return;
+  const banner = document.createElement('div');
+  banner.id = 'row-err-banner';
+  banner.style.cssText = 'background:#fef2f2;border-bottom:1px solid #fca5a5;padding:7px 14px;font-size:12px;color:#991b1b;display:flex;align-items:center;gap:10px;flex-shrink:0;';
+  banner.innerHTML = `
+    <span>⚠ <strong>${errCount} dòng đơn hàng bị lỗi khi đọc</strong> và đã bị bỏ qua — danh sách khách hàng/đơn hiện tại có thể THIẾU.${errSample ? ' Lỗi mẫu: <code style="background:#fff;padding:1px 4px;border-radius:3px">'+esc(String(errSample))+'</code>' : ''}</span>
+    <button onclick="this.parentElement.remove()" style="margin-left:auto;background:none;border:none;color:#991b1b;cursor:pointer;font-size:14px">✕</button>`;
+  bar.prepend(banner);
 }
 let _autoSyncFailCount = 0;
 function showSyncErrorBanner() {
