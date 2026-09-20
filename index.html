@@ -7283,7 +7283,7 @@ function deleteAssignEntry(id) {
 }
 
 // ── PIVOT REPORT STATE ──
-let _rptFilters = { cs: new Set(), tier: new Set(), label: new Set(), dateFrom: '', dateTo: '',
+let _rptFilters = { cs: new Set(), tier: new Set(), label: new Set(), dateFrom: '', dateTo: '', dateQuick: 'custom',
   product: new Set(), careStatus: new Set(), khStatus: new Set(), zaloStatus: new Set(), source: new Set(), nickZalo: '' };
 let _rptPivotRow = 'cs';    // cs | tier | label | month | source
 let _rptPivotCol = 'tier';  // tier | careStatus | done | month | source
@@ -7464,12 +7464,16 @@ function renderAssignReport() {
         </select>
       </div>
       <div>
+        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Khoảng ngày</div>
+        ${_quickRangeSelectHtml(_rptFilters.dateQuick, "_rptApplyQuickRange(this.value)")}
+      </div>
+      <div>
         <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Từ ngày</div>
-        <input type="date" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--rsm);outline:none;background:var(--surface)" value="${_rptFilters.dateFrom}" oninput="_rptFilters.dateFrom=this.value;renderAssignReport()">
+        <input type="date" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--rsm);outline:none;background:var(--surface)" value="${_rptFilters.dateFrom}" oninput="_rptFilters.dateFrom=this.value;_rptFilters.dateQuick='custom';renderAssignReport()">
       </div>
       <div>
         <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Đến ngày</div>
-        <input type="date" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--rsm);outline:none;background:var(--surface)" value="${_rptFilters.dateTo}" oninput="_rptFilters.dateTo=this.value;renderAssignReport()">
+        <input type="date" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--rsm);outline:none;background:var(--surface)" value="${_rptFilters.dateTo}" oninput="_rptFilters.dateTo=this.value;_rptFilters.dateQuick='custom';renderAssignReport()">
       </div>
       <div>
         <div style="font-size:10px;color:var(--hint);margin-bottom:3px">${esc(FIELD_LABEL_CS)}</div>
@@ -7621,6 +7625,14 @@ function _rptSetFilter(key, sel) {
   _rptFilters[key] = new Set(vals);
   renderAssignReport();
 }
+function _rptApplyQuickRange(key){
+  _rptFilters.dateQuick = key;
+  if (key !== 'custom'){
+    const r = _pkQuickRange(key);
+    if (r){ _rptFilters.dateFrom = r.from; _rptFilters.dateTo = r.to; }
+  }
+  renderAssignReport();
+}
 // Ô nhập tự do (Sản phẩm, Nick Zalo) — debounce để khỏi render lại (mất focus) mỗi phím gõ
 let _rptDebounceT = null;
 function _rptFilterInputChanged(key, val, isCsv) {
@@ -7629,7 +7641,7 @@ function _rptFilterInputChanged(key, val, isCsv) {
   _rptDebounceT = setTimeout(renderAssignReport, 450);
 }
 function _rptResetFilters() {
-  _rptFilters = { cs: new Set(), tier: new Set(), label: new Set(), dateFrom: '', dateTo: '',
+  _rptFilters = { cs: new Set(), tier: new Set(), label: new Set(), dateFrom: '', dateTo: '', dateQuick: 'custom',
     product: new Set(), careStatus: new Set(), khStatus: new Set(), zaloStatus: new Set(), source: new Set(), nickZalo: '' };
   renderAssignReport();
 }
@@ -14414,7 +14426,7 @@ var _pkState = {
   serverNames: [],                         // TOAN BO ten Nhan vien tung xuat hien trong bao cao da luu tren server (ben vung, khong mat khi F5/luu bao cao)
   parsedRows: [], parsedUnmapped: [],      // ket qua lan parse file gan nhat, chua luu len CRM
   uploading: false,
-  from: _ymd(new Date(Date.now()-6*86400000)), to: _ymd(new Date()),
+  from: _ymd(new Date(Date.now()-6*86400000)), to: _ymd(new Date()), fromQuick: 'custom',
   report: null, reportLoading: false,
   pkSplit: 'equal', mapOpen: '',
   // Bo loc kieu Excel tren cac bang "Theo Page"/"Theo Sale" cua tab Bao cao KPI Pancake:
@@ -14547,9 +14559,10 @@ function _pkRenderAll(){
 
   html += '<div class="dash-section-title" style="margin-top:22px">📊 Báo cáo theo Page &amp; theo CS</div>';
   html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">'+
-    '<input type="date" value="'+esc(_pkState.from)+'" onchange="_pkState.from=this.value" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+    _quickRangeSelectHtml(_pkState.fromQuick, "_pkApplyQuickRange(this.value)")+
+    '<input type="date" value="'+esc(_pkState.from)+'" onchange="_pkState.from=this.value;_pkState.fromQuick=\'custom\'" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
     '<span>→</span>'+
-    '<input type="date" value="'+esc(_pkState.to)+'" onchange="_pkState.to=this.value" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+    '<input type="date" value="'+esc(_pkState.to)+'" onchange="_pkState.to=this.value;_pkState.fromQuick=\'custom\'" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
     '<button class="btn primary" onclick="_pkLoadReport()">'+(_pkState.reportLoading?'Đang tải...':'Xem báo cáo')+'</button>'+
     '<select onchange="_pkState.pkSplit=this.value;if(_pkState.report)_pkLoadReport();" title="Áp dụng khi 1 tên Pancake gắn cho nhiều Sale" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
       '<option value="equal"'+(_pkState.pkSplit==='full'?'':' selected')+'>Tên gắn nhiều Sale: chia đều</option>'+
@@ -15293,6 +15306,15 @@ async function _pkSavePageMapInline(sel){
   }
 }
 
+function _pkApplyQuickRange(key){
+  _pkState.fromQuick = key;
+  if (key !== 'custom'){
+    var r = _pkQuickRange(key);
+    if (r){ _pkState.from = r.from; _pkState.to = r.to; }
+  }
+  _pkRenderAll();
+  if (_pkState.report) _pkLoadReport();
+}
 async function _pkLoadReport(){
   if (!gsUrl){ toast('❌ Chưa cấu hình URL Google Apps Script.'); return; }
   _pkState.reportLoading = true; _pkRenderAll();
@@ -15472,8 +15494,10 @@ function _pkColFilterClear(tableKey, colKey) {
   _pkRenderKpiPancake();
 }
 
-// Bo loc nhanh khoang ngay cho tab "KPI Pancake" — cung y tuong voi bo loc "Thoi gian tao"
-// tren Pancake (Hom nay/Hom qua/Tuan nay/Tuan truoc...), them Thang/Quy/Nam theo yeu cau.
+// Bo loc nhanh khoang ngay — DUNG CHUNG cho moi tab co bao cao + 2 o chon ngay (KPI Pancake,
+// Bao cao Pancake, Bao cao doanh so A/D/E, Bao cao phan cong, Dashboard...). Ten con giu tien
+// to "_pk" vi lam dau tien cho tab KPI Pancake, nhung logic hoan toan trung lap, khong phu
+// thuoc gi Pancake ca nen tai su dung thang cho cac tab khac.
 var _PK_QUICK_RANGES = [
   { v:'today',      l:'Hôm nay' },
   { v:'yesterday',  l:'Hôm qua' },
@@ -15506,6 +15530,14 @@ function _pkQuickRange(key){
     case 'lastYear':   return { from:_ymd(mk(y-1,0,1)), to:_ymd(mk(y-1,11,31)) };
     default: return null;
   }
+}
+// Sinh HTML <select> bo loc nhanh dung chung. onchangeExpr la doan JS goi ham ap dung rieng
+// cua tung tab (vd "_srApplyQuickRangeA(this.value)").
+function _quickRangeSelectHtml(selectedKey, onchangeExpr, extraStyle){
+  var st = 'font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)'+(extraStyle||'');
+  return '<select style="'+st+'" onchange="'+onchangeExpr+'">'+
+    _PK_QUICK_RANGES.map(function(o){ return '<option value="'+o.v+'"'+((selectedKey||'custom')===o.v?' selected':'')+'>'+o.l+'</option>'; }).join('')+
+    '</select>';
 }
 function _pkKpiApplyQuickFilter(key){
   _pkState.kpiQuickFilter = key;
@@ -15798,7 +15830,7 @@ function exportAudit(){
 var _srState = {
   sub: 'A',
   dateField: 'ngayTao',   // A: 'ngayTao' | 'thoiGianHT'
-  dateFrom: '', dateTo: '',
+  dateFrom: '', dateTo: '', dateQuick: 'custom',
   sale: [], kenh: [],      // A — ca 2 deu multi-select dang checkbox (mang nhieu gia tri)
   aSanPham: '',            // A — loc san pham, cach nhau dau phay
   byCreator: false,        // A — tich thi doanh thu KHONG chia deu theo sale tren don, chi tinh het cho "Người tạo" (cot rieng trong DT TONG, khac "Sale bán")
@@ -15816,9 +15848,9 @@ var _srState = {
   cSanPham: '',             // C — loc san pham, cach nhau dau phay
   dataC: null, cEmpSearch: '', cKenhSearch: '', cExpandedRow: '',
   // D — KH Cham soc moi (data rieng, KHONG gop A/B/C)
-  dDateFrom: '', dDateTo: '', dCs: '', dataD: null,
+  dDateFrom: '', dDateTo: '', dDateQuick: 'custom', dCs: '', dataD: null,
   // E — Hoa hong nhan vien (dung lai action=salesReportA, filter rieng de khong dam vao tab A)
-  eDateFrom: '', eDateTo: '', eDateField: 'ngayTao', eSale: [], eKenh: [], dataE: null, eSaleSearch: ''
+  eDateFrom: '', eDateTo: '', eDateQuick: 'custom', eDateField: 'ngayTao', eSale: [], eKenh: [], dataE: null, eSaleSearch: ''
 };
 
 function _srMoney(n){ return fmt(Math.round(n||0)) + '₫'; }
@@ -15909,6 +15941,17 @@ async function _srLoad(){
 
 function _srSetSub(sub){ _srState.sub = sub; _srLoad(); }
 function _srSetField(key, val){ _srState[key] = val; }
+// Bo loc nhanh khoang ngay dung chung cho A/D/E cua Bao cao doanh so — quickKey la ten field
+// luu lua chon dropdown ('dateQuick'/'dDateQuick'/'eDateQuick'), fromKey/toKey la 2 field ngay
+// tuong ung cua tung tab con.
+function _srApplyQuickRange(quickKey, fromKey, toKey, key){
+  _srState[quickKey] = key;
+  if (key !== 'custom'){
+    var r = _pkQuickRange(key);
+    if (r){ _srState[fromKey] = r.from; _srState[toKey] = r.to; }
+  }
+  _srApply();
+}
 // Multi-select don gian cho cac loc moi (Tinh trang CS / Trang thai KH / Ket ban Zalo) — chi dung cho Bao cao B
 function _srMultiSelectHtml(stateKey, options, label, width){
   options = options || [];
@@ -16226,9 +16269,10 @@ function renderSalesReportTab(){
   if (_srState.sub === 'E') { renderSalesReportTabE_(wrap, subTabs); return; }
 
   var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
-  filters += '<input type="date" value="'+esc(_srState.dateFrom)+'" onchange="_srSetField(\'dateFrom\',this.value)" title="Từ ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
+  filters += _quickRangeSelectHtml(_srState.dateQuick, "_srApplyQuickRange('dateQuick','dateFrom','dateTo',this.value)");
+  filters += '<input type="date" value="'+esc(_srState.dateFrom)+'" onchange="_srSetField(\'dateFrom\',this.value);_srState.dateQuick=\'custom\'" title="Từ ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
   filters += '<span style="color:var(--muted)">→</span>';
-  filters += '<input type="date" value="'+esc(_srState.dateTo)+'" onchange="_srSetField(\'dateTo\',this.value)" title="Đến ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
+  filters += '<input type="date" value="'+esc(_srState.dateTo)+'" onchange="_srSetField(\'dateTo\',this.value);_srState.dateQuick=\'custom\'" title="Đến ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
 
   if (_srState.sub === 'A'){
     filters += '<select onchange="_srSetField(\'dateField\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
@@ -16433,9 +16477,10 @@ function renderSalesReportTabC_(wrap, subTabs){
 // việc CS ghi nhận khách mới qua nút "+ Thêm KH/Đơn mới".
 function renderSalesReportTabD_(wrap, subTabs){
   var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
-  filters += '<input type="date" value="'+esc(_srState.dDateFrom)+'" onchange="_srState.dDateFrom=this.value" title="Từ ngày thêm" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
+  filters += _quickRangeSelectHtml(_srState.dDateQuick, "_srApplyQuickRange('dDateQuick','dDateFrom','dDateTo',this.value)");
+  filters += '<input type="date" value="'+esc(_srState.dDateFrom)+'" onchange="_srState.dDateFrom=this.value;_srState.dDateQuick=\'custom\'" title="Từ ngày thêm" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
   filters += '<span style="color:var(--muted)">→</span>';
-  filters += '<input type="date" value="'+esc(_srState.dDateTo)+'" onchange="_srState.dDateTo=this.value" title="Đến ngày thêm" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
+  filters += '<input type="date" value="'+esc(_srState.dDateTo)+'" onchange="_srState.dDateTo=this.value;_srState.dDateQuick=\'custom\'" title="Đến ngày thêm" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
   filters += '<input type="text" value="'+esc(_srState.dCs)+'" oninput="_srState.dCs=this.value" placeholder="Lọc theo CS thêm..." style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);width:160px">';
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
   filters += '<button class="btn sm" id="sr-export-sheet-btn" onclick="exportSalesReportToSheet()">📄 Xuất ra Sheet</button>';
@@ -16476,9 +16521,10 @@ function renderSalesReportTabD_(wrap, subTabs){
 // _computeCommissionData_() (đã định nghĩa cùng _resolveCommissionRate_/INDIVIDUAL_RATES ở trên).
 function renderSalesReportTabE_(wrap, subTabs){
   var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
-  filters += '<input type="date" value="'+esc(_srState.eDateFrom)+'" onchange="_srSetField(\'eDateFrom\',this.value)" title="Từ ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
+  filters += _quickRangeSelectHtml(_srState.eDateQuick, "_srApplyQuickRange('eDateQuick','eDateFrom','eDateTo',this.value)");
+  filters += '<input type="date" value="'+esc(_srState.eDateFrom)+'" onchange="_srSetField(\'eDateFrom\',this.value);_srState.eDateQuick=\'custom\'" title="Từ ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
   filters += '<span style="color:var(--muted)">→</span>';
-  filters += '<input type="date" value="'+esc(_srState.eDateTo)+'" onchange="_srSetField(\'eDateTo\',this.value)" title="Đến ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
+  filters += '<input type="date" value="'+esc(_srState.eDateTo)+'" onchange="_srSetField(\'eDateTo\',this.value);_srState.eDateQuick=\'custom\'" title="Đến ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
   filters += '<select onchange="_srSetField(\'eDateField\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
     '<option value="ngayTao"'+(_srState.eDateField==='ngayTao'?' selected':'')+'>Lọc theo Ngày tạo</option>'+
     '<option value="thoiGianHT"'+(_srState.eDateField==='thoiGianHT'?' selected':'')+'>Lọc theo Thời gian hoàn thành</option>'+
