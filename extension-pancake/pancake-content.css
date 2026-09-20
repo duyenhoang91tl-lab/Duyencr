@@ -960,3 +960,77 @@
 .pk-opener-btn-row button {
   flex: 1;
 }
+
+/* ── Tra cứu giá: 2 tab con "Gõ tìm" / "Soạn đơn" ── */
+.pk-price-mode-btn {
+  flex: 1;
+  font-size: 11.5px;
+  padding: 5px 6px;
+  border: 1px solid #93c5fd;
+  border-radius: 6px;
+  background: #fff;
+  color: #1e40af;
+  cursor: pointer;
+}
+.pk-price-mode-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; font-weight: 600; }
+
+/* ── Soạn đơn: gõ tên → dropdown thu hẹp dần ── */
+#pk-price-builder-mode { font-size: 11.5px; }
+.pk-builder-row { margin-bottom: 6px; }
+.pk-builder-row > label,
+.pk-builder-inline label {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #1e3a8a;
+  margin-bottom: 2px;
+}
+.pk-builder-row select,
+.pk-builder-row input[type="text"],
+.pk-builder-inline select,
+.pk-builder-inline input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 12px;
+  padding: 4px 6px;
+  border: 1px solid #93c5fd;
+  border-radius: 5px;
+  background: #fff;
+}
+.pk-builder-inline { display: flex; gap: 6px; margin-bottom: 6px; }
+.pk-builder-inline > div { flex: 1; min-width: 0; }
+.pk-builder-summary {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px dashed #93c5fd;
+  border-radius: 6px;
+  background: #eff6ff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+#pkb-line-total { color: #b45309; font-size: 12px; }
+.pk-builder-was { color: #6b7280; font-size: 10.5px; text-decoration: line-through; }
+
+/* ── Giỏ: CTKM riêng từng dòng ── */
+.pk-cart-promo-row {
+  flex: 1 0 100%;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+.pk-cart-promotype,
+.pk-cart-promoval {
+  font-size: 10.5px;
+  padding: 3px 5px;
+  border: 1px solid #fbcfe8;
+  border-radius: 4px;
+  background: #fffafc;
+  min-width: 0;
+}
+.pk-cart-promotype { flex: 0 0 auto; }
+.pk-cart-promoval { flex: 1; }
+.pk-cart-linetotal { margin-left: auto; font-size: 11px; font-weight: 700; color: #b45309; white-space: nowrap; }

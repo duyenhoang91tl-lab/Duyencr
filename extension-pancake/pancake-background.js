@@ -154,6 +154,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   // Cay Nhom SP → Ten SP → Kieu/Size cho "Soan don" (bo loc dropdown nhieu tang thay vi go tim)
+  // Danh muc PHANG (action priceCatalogFlat) cho "Soan don": go ten -> loc -> dropdown thu hep dan
+  if (msg?.type === "GET_PRICE_FLAT") {
+    handleGetPriceFlat()
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
   if (msg?.type === "GET_PRICE_TREE") {
     handleGetPriceTree()
       .then((data) => sendResponse({ ok: true, data }))
@@ -526,6 +534,19 @@ async function handleGetPrice(payload) {
   const data = await res.json();
   if (data.error) throw new Error(data.error);
   return { rows: data.rows || [], total: data.total || 0 };
+}
+
+async function handleGetPriceFlat() {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+  const sep = cfg.gasUrl.includes("?") ? "&" : "?";
+  const res = await fetch(cfg.gasUrl + sep + "action=priceCatalogFlat", { redirect: "follow" });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  // GAS ban cu khong biet action nay se tra ve du lieu mac dinh (khong co items) -> bao de client lui ve che do tim truc tiep
+  if (!Array.isArray(data.items)) throw new Error("GAS_NO_FLAT");
+  return { items: data.items };
 }
 
 async function handleGetPriceTree() {

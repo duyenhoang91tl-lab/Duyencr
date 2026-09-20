@@ -244,6 +244,127 @@ function _colLetter_(n) {
   return s;
 }
 
+// ─── CACHE LON: chia manh de vuot gioi han ~100KB/1 key cua CacheService ─────────────
+// (danh muc gia day du co the vuot 100KB nen cache.put 1 key se bi bo qua am tham)
+function _cachePutBig_(key, str, ttl) {
+  try {
+    var cache = CacheService.getScriptCache();
+    var CH = 30000, n = Math.ceil(str.length / CH), obj = {};
+    for (var i = 0; i < n; i++) obj[key + '_' + i] = str.substr(i * CH, CH);
+    obj[key + '_n'] = String(n);
+    cache.putAll(obj, ttl);
+  } catch (e) {}
+}
+function _cacheGetBig_(key) {
+  try {
+    var cache = CacheService.getScriptCache();
+    var n = parseInt(cache.get(key + '_n') || '0', 10);
+    if (!n) return null;
+    var keys = [];
+    for (var i = 0; i < n; i++) keys.push(key + '_' + i);
+    var got = cache.getAll(keys), out = '';
+    for (var j = 0; j < n; j++) {
+      var part = got[key + '_' + j];
+      if (part === undefined || part === null) return null;
+      out += part;
+    }
+    return out;
+  } catch (e) { return null; }
+}
+
+// ─── NHAN DIEN COT DANH_MUC (KHONG dau, KHONG hardcode vi tri) ──────────────────────
+// readPriceCatalog_ bo o rong cho gon nen dong dau tien co the thieu key -> gop key cua TAT CA
+// cac dong. Nhan dien bang _stripVN_ (bo dau) vi tieu de that co dau ("Giá", "Tên sản phẩm"):
+// so thang /gia/ tren "Giá" co dau se KHONG khop -> mat het cot gia (loi da gap).
+function _priceCols_(rows) {
+  var seen = {}, keys = [];
+  for (var i = 0; i < rows.length; i++) {
+    for (var k in rows[i]) { if (!seen[k]) { seen[k] = true; keys.push(k); } }
+  }
+  var cols = { nhom: '', ten: '', tm: '', size: '', cl: '', gia: [] };
+  keys.forEach(function(k) {
+    var st = _stripVN_(k);
+    if (!cols.nhom && /nhom\s*san\s*pham/.test(st)) cols.nhom = k;
+    else if (!cols.ten && /^ten\s*san\s*pham/.test(st)) cols.ten = k;
+    else if (!cols.tm && /ten\s*thuong\s*mai/.test(st)) cols.tm = k;
+    else if (!cols.size && (st.indexOf('size') !== -1 || st.indexOf('kieu') !== -1)) cols.size = k;
+    else if (!cols.cl && st.indexOf('chat lieu') !== -1) cols.cl = k;
+    else if (/gia|price/.test(st)) cols.gia.push(k);
+  });
+  return cols;
+}
+// So tien trong bang gia tinh bang NGHIN VND (7950 = 7.950.000d). Chap nhan ca chuoi "7.950"/"7,950".
+function _priceNumK_(v) {
+  if (v === '' || v === null || v === undefined) return 0;
+  if (typeof v === 'number') return v;
+  var n = Number(String(v).replace(/[^\d]/g, ''));
+  return isNaN(n) ? 0 : n;
+}
+
+// Danh muc PHANG, gon (cho o "Soan don" cua Pancake AI): moi dong DANH_MUC -> 1 item
+//   n=nhom SP | t=ten san pham | m=ten thuong mai | s=kieu/size | c=chat lieu
+//   p=gia thuong | sp=gia SAPHIA | r=gia RUBY  (deu tinh bang nghin VND, 0 = khong co)
+// Client tu loc theo tu khoa (khong dau), roi thu hep dan bang cac dropdown.
+function buildPriceCatalogFlat_() {
+  var rows = readPriceCatalog_();
+  var cols = _priceCols_(rows);
+  var items = [];
+  rows.forEach(function(row) {
+    var t = cols.ten ? String(row[cols.ten] || '').trim() : '';
+    var m = cols.tm ? String(row[cols.tm] || '').trim() : '';
+    if (!t && !m) return;
+    var it = {
+      n: cols.nhom ? String(row[cols.nhom] || '').trim() : '',
+      t: t, m: m,
+      s: cols.size ? String(row[cols.size] || '').trim() : '',
+      c: cols.cl ? String(row[cols.cl] || '').trim() : '',
+      p: 0, sp: 0, r: 0
+    };
+    cols.gia.forEach(function(k) {
+      var st = _stripVN_(k), v = _priceNumK_(row[k]);
+      if (st.indexOf('saphia') !== -1) it.sp = v;
+      else if (st.indexOf('ruby') !== -1) it.r = v;
+      else if (!it.p) it.p = v;
+    });
+    items.push(it);
+  });
+  return { ok: true, count: items.length, items: items };
+}
+
+// Cay Nhom SP → Ten SP → Kieu/Size (giu de tuong thich ban cu — o "Soan don" moi dung
+// buildPriceCatalogFlat_ o tren). Neu 1 cap (Ten SP, Kieu/Size) co NHIEU dong (khac Chat lieu)
+// thi tra ve ca mang variants.
+function buildPriceCatalogTree_() {
+  var rows = readPriceCatalog_();
+  var cols = _priceCols_(rows);
+  var nhomKey = cols.nhom, tenKey = cols.ten || cols.tm, sizeKey = cols.size, chatLieuKey = cols.cl;
+  if (!nhomKey || !tenKey) return { groups: [] }; // khong nhan dien duoc cau truc sheet
+  var priceKeys = cols.gia;
+  var groupMap = {};
+  rows.forEach(function(row) {
+    var nhom = String(row[nhomKey] || '').trim();
+    var ten = String(row[tenKey] || '').trim();
+    if (!nhom || !ten) return;
+    var size = (sizeKey ? String(row[sizeKey] || '').trim() : '') || '(mặc định)';
+    if (!groupMap[nhom]) groupMap[nhom] = {};
+    if (!groupMap[nhom][ten]) groupMap[nhom][ten] = {};
+    if (!groupMap[nhom][ten][size]) groupMap[nhom][ten][size] = [];
+    var priceObj = {};
+    priceKeys.forEach(function(pk) { if (row[pk] !== undefined) priceObj[pk] = row[pk]; });
+    groupMap[nhom][ten][size].push({ chatLieu: chatLieuKey ? String(row[chatLieuKey] || '') : '', prices: priceObj });
+  });
+  var groups = Object.keys(groupMap).sort().map(function(nhom) {
+    var products = Object.keys(groupMap[nhom]).sort().map(function(ten) {
+      var sizes = Object.keys(groupMap[nhom][ten]).sort().map(function(size) {
+        return { size: size, variants: groupMap[nhom][ten][size] };
+      });
+      return { name: ten, sizes: sizes };
+    });
+    return { name: nhom, products: products };
+  });
+  return { groups: groups, priceKeys: priceKeys };
+}
+
 // Tim theo tu khoa q — khop khi MOI tu trong q (tach theo khoang trang) xuat hien trong
 // it nhat 1 cot bat ky cua dong do (khong dau, khong phan biet hoa/thuong).
 // Neu khop chat (AND) khong ra dong nao -> lui ve khop GAN DUNG: cham diem theo so tu
@@ -767,6 +888,25 @@ function doGet(e) {
       }
       var matched = q ? searchPriceCatalog_(rowsPS, q) : rowsPS.slice(0, 50);
       return jsonOut_({ ok: true, total: rowsPS.length, count: matched.length, rows: matched });
+    }
+
+    // ─── Danh muc PHANG cho "Soan don" (Pancake AI): tra cuu theo ten -> dropdown thu hep dan ───
+    if (action === 'priceCatalogFlat') {
+      var flatJson = _cacheGetBig_('price_flat_v1');
+      if (!flatJson) {
+        flatJson = JSON.stringify(buildPriceCatalogFlat_());
+        _cachePutBig_('price_flat_v1', flatJson, 600); // cache 10 phut, sheet gia it doi
+      }
+      return ContentService.createTextOutput(flatJson).setMimeType(ContentService.MimeType.JSON);
+    }
+    // ─── Cay Nhom SP → Ten SP → Kieu/Size (ban cu, giu tuong thich) ───
+    if (action === 'priceCatalogTree') {
+      var treeJson = _cacheGetBig_('price_tree_v2');
+      if (!treeJson) {
+        treeJson = JSON.stringify(buildPriceCatalogTree_());
+        _cachePutBig_('price_tree_v2', treeJson, 600);
+      }
+      return ContentService.createTextOutput(treeJson).setMimeType(ContentService.MimeType.JSON);
     }
 
     if (action === 'audit') {

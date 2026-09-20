@@ -70,7 +70,8 @@
   // ten thay the ngan gon can dung khi len don).
   const PRODUCT_NAME_OVERRIDES = [
     { tuCam: 'túi tiền', thayThe: 'túi' },
-    { tuCam: 'Lộc phúc tình', thayThe: 'lpt' }
+    { tuCam: 'Lộc phúc tình', thayThe: 'lpt' },
+    { tuCam: 'thiên lộc', thayThe: 'TL' } // "lộc" là từ cấm → viết tắt TL khi lên đơn
   ];
   function sanitizeProductName_(name) {
     if (!name) return name;
@@ -365,7 +366,12 @@
               <input type="number" id="pk-cart-discount-value" placeholder="0" min="0" style="display:none" />
             </div>
             <div class="pk-cart-extra-row">
+              <label>Thêm vàng (k)</label>
+              <input type="number" id="pk-cart-gold" placeholder="0" min="0" title="Tiền vàng thêm, nghìn đồng (VD 500 = 500.000đ)" />
+            </div>
+            <div class="pk-cart-extra-row">
               <label><input type="checkbox" id="pk-cart-freeship" /> Freeship</label>
+              <span style="font-size:10px;color:#9d174d;opacity:.8">không tích → tự cộng 40k ship</span>
             </div>
           </div>
           <div id="pk-cart-total"></div>
@@ -473,7 +479,7 @@
         const isBuilder = btn.dataset.mode === 'builder';
         panelEl.querySelector('#pk-price-search-mode').style.display = isBuilder ? 'none' : 'block';
         panelEl.querySelector('#pk-price-builder-mode').style.display = isBuilder ? 'block' : 'none';
-        if (isBuilder) loadBuilderTree_();
+        if (isBuilder) initBuilder_();
       });
     });
     panelEl.querySelector('#pk-cart-add-manual').addEventListener('click', () => {
@@ -496,6 +502,8 @@
       _cartExtra.discountValue = Number(e.target.value) || 0; _renderCartTotal_();
     });
     panelEl.querySelector('#pk-cart-discount-value').addEventListener('change', () => { saveCart_(); });
+    panelEl.querySelector('#pk-cart-gold').addEventListener('input', (e) => { _cartExtra.gold = Math.max(0, Number(e.target.value) || 0); _renderCartTotal_(); });
+    panelEl.querySelector('#pk-cart-gold').addEventListener('change', () => { saveCart_(); });
     panelEl.querySelector('#pk-cart-freeship').addEventListener('change', (e) => {
       _cartExtra.freeship = e.target.checked; saveCart_(); _renderCartTotal_();
     });
@@ -513,7 +521,7 @@
       if (!_cartItems.length) return;
       if (!confirm('Xoá toàn bộ đơn hàng đang tính cho khách này?')) return;
       _cartItems = [];
-      _cartExtra = { gift: '', discountType: 'none', discountValue: 0, freeship: false, priceInK: false };
+      _cartExtra = { gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, priceInK: false };
       saveCart_(); renderCart_();
     });
     if (IS_PHONGTHUY) {
@@ -549,6 +557,7 @@
         _stonePref = r.value;
         chrome.storage.sync.set({ stonePref: _stonePref });
         if (_lastPriceRows.length) renderPriceRows_(_lastPriceRows, _lastPriceQ); // doi loai da -> ket qua dang hien doi gia theo
+        renderBuilderDyn_(); // Soạn đơn: giá tự nhảy theo loại đá (trừ khi Sale đã tự sửa giá)
       });
     });
     panelEl.querySelector("#pk-opener-btn").addEventListener("click", doGenerateOpeners_);
@@ -1635,117 +1644,276 @@
     return isNaN(n) ? 0 : n;
   }
 
-  // ══════════════════════════ SOẠN ĐƠN (chọn từng bước, dạng dropdown) ══════════════════════════
-  // Nhóm sản phẩm → Tên sản phẩm → Kiểu/Size (lấy từ backend, đúng cấu trúc cột có sẵn trong
-  // DANH_MUC) → Chất liệu (chỉ hiện nếu 1 Kiểu/Size có nhiều biến thể chất liệu khác giá).
-  // Màu sắc/Đậm nhạt KHÔNG tra theo dữ liệu thật — chỉ là ghi chú Sale tự chọn, không ảnh
-  // hưởng giá (theo yêu cầu: "không gắn với giá/kho theo từng SP").
+  // ══════════════════════════ SOẠN ĐƠN (gõ tên → lọc → dropdown thu hẹp dần) ══════════════════════════
+  // Luồng: gõ tên (VD "tỳ hưu") → hiện TẤT CẢ tên thương mại/tên sản phẩm liên quan → chọn Tên →
+  // Nhóm SP / Kiểu-Size / Chất liệu (chỉ gồm lựa chọn có thật của sản phẩm đó) → Màu, Đậm/nhạt (ghi chú
+  // tự do) → Số lượng, Giá (tự nhảy theo Loại đá đang tick, sửa được), CTKM → "+ Thêm vào đơn".
+  // Xong sản phẩm 1 thì form tự về trắng để soạn tiếp sản phẩm 2.
+  // Dữ liệu: danh mục PHẲNG từ GAS (action priceCatalogFlat). GAS chưa cập nhật → tự lùi về "tìm trực
+  // tiếp" qua priceSearch (tối đa 50 dòng/lần) để vẫn dùng được.
   const PK_COLOR_OPTS = ['Xanh rêu', 'Đen', 'Tím', 'Đỏ', 'Hồng', 'Trắng', 'Vàng', 'Xanh lá', 'Xanh da trời'];
-  const PK_SHADE_OPTS = ['', 'Đậm', 'Nhạt'];
-  let _priceTree = null; // { groups: [...], priceKeys: [...] }
-  let _builderSel = { nhom: '', ten: '', size: '', variantIdx: 0, mau: '', dam: '', priceKey: '' };
+  const PK_SHADE_OPTS = ['Đậm', 'Nhạt'];
+  const PK_SHIP_FEE = 40000; // không tích Freeship thì tự cộng 40k vào tổng đơn
+  const PK_FLAT_TTL_MS = 15 * 60 * 1000;
+  let _flatItems = null;      // null = chưa tải; [] = tải rồi nhưng rỗng
+  let _flatMode = 'full';     // 'full' = có cả danh mục | 'live' = tìm trực tiếp (GAS cũ)
+  let _flatLoading = false;
+  let _liveTimer = null;
+  const _bldBlank_ = () => ({ q: '', nhom: '', ten: '', size: '', cl: '', cand: '', mau: '', dam: '', qty: 1,
+    priceK: '', priceEdited: false, promoType: 'none', promoVal: '' });
+  let _bld = _bldBlank_();
 
-  function loadBuilderTree_() {
+  const _fold_ = (s) => _stripVNlocal_(String(s || '').normalize('NFC')).replace(/\s+/g, ' ').trim();
+  const _vnSort_ = (a, b) => String(a).localeCompare(String(b), 'vi', { numeric: true });
+  const _itemNames_ = (it) => {
+    const out = [];
+    if (it.t) out.push(it.t);
+    if (it.m && _fold_(it.m) !== _fold_(it.t)) out.push(it.m);
+    return out;
+  };
+  // Giá theo Loại đá đang tick: RUBY → giá RUBY, SAPHIA → giá SAPHIA, không tick → giá thường.
+  // Sản phẩm không có giá riêng cho loại đá đó thì lùi về giá thường.
+  const _priceOfItem_ = (it) => {
+    if (_stonePref === 'RUBY' && it.r) return it.r;
+    if (_stonePref === 'SAPHIA' && it.sp) return it.sp;
+    return it.p || 0;
+  };
+  const _stoneLabel_ = (it) => {
+    if (_stonePref === 'RUBY') return it.r ? 'giá RUBY' : 'giá thường (SP này không có giá RUBY)';
+    if (_stonePref === 'SAPHIA') return it.sp ? 'giá SAPHIA' : 'giá thường (SP này không có giá SAPHIA)';
+    return 'giá thường';
+  };
+  // CTKM theo từng sản phẩm: amount = giảm tiền (nghìn đ) | percent = giảm % | gift = tặng quà (chữ)
+  const _applyPromo_ = (base, type, val) => {
+    let d = 0;
+    if (type === 'amount') d = (Number(val) || 0) * 1000;
+    else if (type === 'percent') d = Math.round(base * (Number(val) || 0) / 100);
+    return base - Math.min(Math.max(d, 0), base);
+  };
+
+  // Chuẩn hoá 1 dòng thô của DANH_MUC (chế độ tìm trực tiếp) về cùng dạng với danh mục phẳng.
+  function _normPriceRow_(row) {
+    const find = (re) => Object.keys(row).find((k) => re.test(_stripVNlocal_(k)));
+    const val = (k) => (k ? String(row[k]).trim() : '');
+    const num = (v) => { if (v === '' || v === null || v === undefined) return 0; if (typeof v === 'number') return v; const n = Number(String(v).replace(/[^\d]/g, '')); return isNaN(n) ? 0 : n; };
+    const it = { n: val(find(/nhom\s*san\s*pham/)), t: val(find(/^ten\s*san\s*pham/)), m: val(find(/ten\s*thuong\s*mai/)),
+      s: val(find(/size|kieu/)), c: val(find(/chat\s*lieu/)), p: 0, sp: 0, r: 0 };
+    Object.keys(row).forEach((k) => {
+      const s = _stripVNlocal_(k);
+      if (!/gia|price/.test(s)) return;
+      const v = num(row[k]);
+      if (s.indexOf('saphia') !== -1) it.sp = v; else if (s.indexOf('ruby') !== -1) it.r = v; else if (!it.p) it.p = v;
+    });
+    return it;
+  }
+
+  function _setBldMsg_(html) {
+    const el = panelEl.querySelector('#pkb-msg');
+    if (el) { el.innerHTML = html || ''; el.style.display = html ? 'block' : 'none'; }
+  }
+
+  function initBuilder_() {
     const host = panelEl.querySelector('#pk-builder-steps');
-    if (_priceTree) { renderBuilderSteps_(); return; }
-    host.innerHTML = '<div class="pk-price-loading">Đang tải danh mục...</div>';
-    safeSendMessage_({ type: 'GET_PRICE_TREE' }, (resp) => {
-      if (!resp?.ok) { host.innerHTML = `<div class="pk-price-loading">Lỗi: ${escapeHtml(resp?.error || 'không rõ')}</div>`; return; }
-      _priceTree = resp.data;
-      if (!_priceTree.groups || !_priceTree.groups.length) {
-        host.innerHTML = '<div class="pk-price-loading">Sheet giá chưa nhận diện được cột "Nhóm sản phẩm"/"Tên sản phẩm" — dùng tạm ô "Gõ tìm".</div>';
-        return;
+    if (!host.dataset.ready) {
+      host.dataset.ready = '1';
+      host.innerHTML = `
+        <div class="pk-builder-row"><label>🔎 Gõ tên sản phẩm (VD: tỳ hưu, nhẫn, charm)</label>
+          <input type="text" id="pkb-q" placeholder="Gõ để lọc — bỏ trống thì chọn theo Nhóm sản phẩm" autocomplete="off" /></div>
+        <div id="pkb-msg" class="pk-price-loading" style="display:none"></div>
+        <div id="pkb-dyn"></div>`;
+      host.querySelector('#pkb-q').addEventListener('input', (e) => {
+        _bld = Object.assign(_bldBlank_(), { q: e.target.value });   // đổi từ khoá → chọn lại từ đầu
+        if (_flatMode === 'live') {
+          clearTimeout(_liveTimer);
+          _liveTimer = setTimeout(() => _liveSearch_(_bld.q), 350);
+        } else {
+          clearTimeout(_liveTimer);
+          _liveTimer = setTimeout(renderBuilderDyn_, 120);
+        }
+      });
+    }
+    if (_flatItems === null && !_flatLoading) loadFlat_();
+    renderBuilderDyn_();
+  }
+
+  function loadFlat_() {
+    _flatLoading = true;
+    _setBldMsg_('Đang tải danh mục sản phẩm...');
+    chrome.storage.local.get(['pkPriceFlat'], (res) => {
+      const c = res && res.pkPriceFlat;
+      if (c && Array.isArray(c.items) && c.items.length && (Date.now() - c.ts) < PK_FLAT_TTL_MS) {
+        _flatItems = c.items; _flatMode = 'full'; _flatLoading = false; _setBldMsg_(''); renderBuilderDyn_(); return;
       }
-      renderBuilderSteps_();
+      safeSendMessage_({ type: 'GET_PRICE_FLAT' }, (resp) => {
+        _flatLoading = false;
+        if (resp?.ok && resp.data?.items?.length) {
+          _flatItems = resp.data.items; _flatMode = 'full'; _setBldMsg_('');
+          try { chrome.storage.local.set({ pkPriceFlat: { ts: Date.now(), items: _flatItems } }); } catch (e) {}
+        } else if (resp?.ok) {
+          _flatItems = []; _flatMode = 'full';
+          _setBldMsg_('Đọc được sheet giá nhưng không nhận diện được cột "Tên sản phẩm"/"Tên thương mại" — dùng tạm tab "Gõ tìm".');
+        } else if (String(resp?.error || '').indexOf('GAS_NO_FLAT') !== -1) {
+          _flatMode = 'live'; _flatItems = [];
+          _setBldMsg_('⚠ GAS chưa cập nhật bản mới (thiếu <b>priceCatalogFlat</b>) — đang dùng chế độ tìm trực tiếp, tối đa 50 dòng mỗi lần gõ. Deploy lại <b>gas_v13.js</b> để có đủ danh mục.');
+        } else {
+          _flatItems = null;   // lỗi mạng/GAS → lần mở tab sau tự thử lại
+          _setBldMsg_('Lỗi tải danh mục: ' + escapeHtml(resp?.error || 'không rõ') + ' — chuyển tab rồi quay lại để thử lại.');
+        }
+        renderBuilderDyn_();
+      });
     });
   }
 
-  function _findGroup_(nhom) { return (_priceTree.groups || []).find((g) => g.name === nhom); }
-  function _findProduct_(nhom, ten) { const g = _findGroup_(nhom); return g ? (g.products || []).find((p) => p.name === ten) : null; }
-  function _findSizeEntry_(nhom, ten, size) { const p = _findProduct_(nhom, ten); return p ? (p.sizes || []).find((s) => s.size === size) : null; }
+  function _liveSearch_(q) {
+    if (_fold_(q).length < 2) { _flatItems = []; renderBuilderDyn_(); return; }
+    safeSendMessage_({ type: 'GET_PRICE', payload: { q } }, (resp) => {
+      if (q !== _bld.q) return; // đã gõ tiếp, bỏ kết quả cũ
+      if (!resp?.ok) { _setBldMsg_('Lỗi tìm: ' + escapeHtml(resp?.error || 'không rõ')); return; }
+      _flatItems = (resp.data.rows || []).map(_normPriceRow_).filter((it) => it.t || it.m);
+      renderBuilderDyn_();
+    });
+  }
 
-  function renderBuilderSteps_() {
-    const host = panelEl.querySelector('#pk-builder-steps');
-    const groups = _priceTree.groups || [];
-    const product = _builderSel.nhom ? _findProduct_(_builderSel.nhom, _builderSel.ten) : null;
-    const sizeEntry = (_builderSel.nhom && _builderSel.ten && _builderSel.size) ? _findSizeEntry_(_builderSel.nhom, _builderSel.ten, _builderSel.size) : null;
-    const variants = sizeEntry ? sizeEntry.variants : [];
-    const variant = variants[_builderSel.variantIdx] || null;
-    const needChatLieuPick = variants.length > 1;
+  function renderBuilderDyn_() {
+    const dyn = panelEl.querySelector('#pkb-dyn');
+    if (!dyn) return;
+    const items = _flatItems || [];
+    if (!items.length) {
+      dyn.innerHTML = (_flatMode === 'live' && _fold_(_bld.q).length >= 2) ? '<div class="pk-price-loading">Không tìm thấy sản phẩm nào khớp.</div>'
+        : (_flatMode === 'live' ? '<div class="pk-price-loading">Gõ ít nhất 2 chữ để tìm.</div>' : '');
+      return;
+    }
+    const words = _fold_(_bld.q).split(' ').filter(Boolean);
+    const pool = (_flatMode === 'live' || !words.length) ? items
+      : items.filter((it) => { const h = _fold_(it.n + ' ' + it.t + ' ' + it.m); return words.every((w) => h.indexOf(w) !== -1); });
+    if (!pool.length) { dyn.innerHTML = '<div class="pk-price-loading">Không tìm thấy sản phẩm nào khớp.</div>'; return; }
 
-    const opt = (val, label, selected) => `<option value="${escapeHtml(val)}" ${selected ? 'selected' : ''}>${escapeHtml(label)}</option>`;
-
+    const opt = (v, label, sel) => `<option value="${escapeHtml(v)}"${sel ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+    const row = (label, inner) => `<div class="pk-builder-row"><label>${label}</label>${inner}</div>`;
     let html = '';
-    html += `<div class="pk-builder-row"><label>1. Nhóm sản phẩm</label><select id="pkb-nhom"><option value="">— Chọn —</option>${groups.map((g) => opt(g.name, g.name, g.name === _builderSel.nhom)).join('')}</select></div>`;
+    let cand = null;
 
-    if (_builderSel.nhom) {
-      const g = _findGroup_(_builderSel.nhom);
-      html += `<div class="pk-builder-row"><label>2. Tên sản phẩm</label><select id="pkb-ten"><option value="">— Chọn —</option>${(g?.products || []).map((p) => opt(p.name, p.name, p.name === _builderSel.ten)).join('')}</select></div>`;
+    // 1) Nhóm sản phẩm
+    const groups = [...new Set(pool.map((it) => it.n).filter(Boolean))].sort(_vnSort_);
+    if (_bld.nhom && groups.indexOf(_bld.nhom) === -1) _bld.nhom = '';
+    if (groups.length === 1 && !_bld.nhom) _bld.nhom = groups[0];
+    if (groups.length) html += row(`Nhóm sản phẩm (${groups.length})`, `<select id="pkb-nhom"><option value="">— Tất cả nhóm —</option>${groups.map((g) => opt(g, g, g === _bld.nhom)).join('')}</select>`);
+    const pool2 = _bld.nhom ? pool.filter((it) => it.n === _bld.nhom) : pool;
+
+    // 2) Tên sản phẩm / tên thương mại (gộp, bỏ trùng)
+    if (!words.length && _flatMode !== 'live' && !_bld.nhom) {
+      dyn.innerHTML = html + '<div class="pk-price-loading">Gõ tên ở ô trên hoặc chọn Nhóm sản phẩm để hiện danh sách tên.</div>';
+      _bindBuilder_(dyn, null); return;
     }
-    if (product) {
-      html += `<div class="pk-builder-row"><label>3. Kiểu/Size</label><select id="pkb-size"><option value="">— Chọn —</option>${(product.sizes || []).map((s) => opt(s.size, s.size, s.size === _builderSel.size)).join('')}</select></div>`;
-    }
-    if (needChatLieuPick) {
-      html += `<div class="pk-builder-row"><label>Chất liệu</label><select id="pkb-chatlieu"><option value="">— Chọn —</option>${variants.map((v, i) => opt(String(i), v.chatLieu || '(không ghi rõ)', i === _builderSel.variantIdx)).join('')}</select></div>`;
-    }
-    if (sizeEntry) {
-      html += `<div class="pk-builder-row"><label>Màu (ghi chú, không ảnh hưởng giá)</label><select id="pkb-mau"><option value="">— Bỏ trống —</option>${PK_COLOR_OPTS.map((c) => opt(c, c, c === _builderSel.mau)).join('')}</select></div>`;
-      html += `<div class="pk-builder-row"><label>Đậm/nhạt</label><select id="pkb-dam">${PK_SHADE_OPTS.map((c) => opt(c, c || '— Bỏ trống —', c === _builderSel.dam)).join('')}</select></div>`;
-    }
-    if (variant) {
-      const priceKeys = _priceTree.priceKeys || [];
-      const priceOpts = priceKeys.filter((pk) => { const n = _parsePriceNum_(variant.prices[pk]); return n > 0; });
-      if (priceOpts.length > 1) {
-        html += `<div class="pk-builder-row"><label>Loại giá</label><select id="pkb-pricekey">${priceOpts.map((pk) => opt(pk, pk.replace(/\s*\(.*?\)\s*/g, '').trim() + ' — ' + variant.prices[pk] + 'k', pk === _builderSel.priceKey)).join('')}</select></div>`;
+    const nameMap = {};
+    pool2.forEach((it) => _itemNames_(it).forEach((nm) => { const f = _fold_(nm); if (!nameMap[f]) nameMap[f] = nm; }));
+    const names = Object.keys(nameMap).map((f) => nameMap[f]).sort(_vnSort_);
+    if (_bld.ten && !nameMap[_fold_(_bld.ten)]) _bld.ten = '';
+    if (!_bld.ten && names.length === 1) _bld.ten = names[0];
+    html += row(`Tên sản phẩm (${names.length})`, `<select id="pkb-ten"><option value="">— Chọn —</option>${names.map((n) => opt(n, n, n === _bld.ten)).join('')}</select>`);
+
+    if (_bld.ten) {
+      const tf = _fold_(_bld.ten);
+      const poolT = pool2.filter((it) => _itemNames_(it).some((nm) => _fold_(nm) === tf));
+
+      // 3) Kiểu / Size
+      const sizeVal = (it) => it.s || '__def__';
+      const sizes = [...new Set(poolT.map(sizeVal))].sort(_vnSort_);
+      if (_bld.size && sizes.indexOf(_bld.size) === -1) _bld.size = '';
+      if (!_bld.size && sizes.length === 1) _bld.size = sizes[0];
+      html += row(`Kiểu / Size (${sizes.length})`, `<select id="pkb-size"><option value="">— Chọn —</option>${sizes.map((v) => opt(v, v === '__def__' ? '(mặc định)' : v, v === _bld.size)).join('')}</select>`);
+
+      if (_bld.size) {
+        const poolS = poolT.filter((it) => sizeVal(it) === _bld.size);
+        // 4) Chất liệu (chỉ hiện khi sheet có ghi chất liệu)
+        const clVal = (it) => it.c || '__none__';
+        const cls = [...new Set(poolS.map(clVal))].sort(_vnSort_);
+        if (_bld.cl && cls.indexOf(_bld.cl) === -1) _bld.cl = '';
+        if (!_bld.cl && cls.length === 1) _bld.cl = cls[0];
+        if (cls.length > 1 || (cls.length === 1 && cls[0] !== '__none__')) {
+          html += row(`Chất liệu (${cls.length})`, `<select id="pkb-cl"><option value="">— Chọn —</option>${cls.map((v) => opt(v, v === '__none__' ? '(không ghi)' : v, v === _bld.cl)).join('')}</select>`);
+        }
+        if (_bld.cl) {
+          const cands = poolS.filter((it) => clVal(it) === _bld.cl);
+          // 5) Còn nhiều dòng khác giá → Sale tự tích đúng dòng
+          const distinct = new Set(cands.map(_priceOfItem_));
+          if (cands.length > 1 && distinct.size > 1) {
+            html += row('Chọn đúng mức giá', `<select id="pkb-cand"><option value="">— Chọn —</option>${cands.map((it, i) => opt(String(i), (_priceOfItem_(it) ? _priceOfItem_(it).toLocaleString('vi-VN') + 'k' : 'chưa có giá') + ' — ' + (it.t || it.m), String(i) === String(_bld.cand))).join('')}</select>`);
+            cand = cands[Number(_bld.cand)] || null;
+          } else {
+            cand = cands[0] || null;
+          }
+        }
       }
-      const chosenKey = priceOpts.length > 1 ? (_builderSel.priceKey || priceOpts[0]) : priceOpts[0];
-      const priceNum = chosenKey ? _parsePriceNum_(variant.prices[chosenKey]) * 1000 : 0;
-      html += `<div class="pk-builder-summary">
-        <div><b>${escapeHtml(_builderSel.ten)}</b> — ${escapeHtml(_builderSel.size)}${variant.chatLieu ? ' — ' + escapeHtml(variant.chatLieu) : ''}</div>
-        <div class="pk-builder-price">${priceNum ? priceNum.toLocaleString('vi-VN') + 'đ' : 'Chưa có giá — Sale tự nhập'}</div>
-        <button id="pkb-add-btn" class="pk-price-addbtn">+ Thêm vào đơn</button>
-      </div>`;
     }
-    host.innerHTML = html;
 
-    const sel = (id) => panelEl.querySelector('#' + id);
-    if (sel('pkb-nhom')) sel('pkb-nhom').addEventListener('change', (e) => {
-      _builderSel = { nhom: e.target.value, ten: '', size: '', variantIdx: 0, mau: '', dam: '', priceKey: '' };
-      renderBuilderSteps_();
-    });
-    if (sel('pkb-ten')) sel('pkb-ten').addEventListener('change', (e) => {
-      _builderSel.ten = e.target.value; _builderSel.size = ''; _builderSel.variantIdx = 0; _builderSel.priceKey = '';
-      renderBuilderSteps_();
-    });
-    if (sel('pkb-size')) sel('pkb-size').addEventListener('change', (e) => {
-      _builderSel.size = e.target.value; _builderSel.variantIdx = 0; _builderSel.priceKey = '';
-      renderBuilderSteps_();
-    });
-    if (sel('pkb-chatlieu')) sel('pkb-chatlieu').addEventListener('change', (e) => {
-      _builderSel.variantIdx = Number(e.target.value) || 0; _builderSel.priceKey = '';
-      renderBuilderSteps_();
-    });
-    if (sel('pkb-mau')) sel('pkb-mau').addEventListener('change', (e) => { _builderSel.mau = e.target.value; });
-    if (sel('pkb-dam')) sel('pkb-dam').addEventListener('change', (e) => { _builderSel.dam = e.target.value; });
-    if (sel('pkb-pricekey')) sel('pkb-pricekey').addEventListener('change', (e) => { _builderSel.priceKey = e.target.value; renderBuilderSteps_(); });
-    if (sel('pkb-add-btn')) sel('pkb-add-btn').addEventListener('click', () => {
-      const priceKeys = _priceTree.priceKeys || [];
-      const priceOpts = priceKeys.filter((pk) => _parsePriceNum_(variant.prices[pk]) > 0);
-      const chosenKey = priceOpts.length > 1 ? (_builderSel.priceKey || priceOpts[0]) : priceOpts[0];
-      const priceNum = chosenKey ? _parsePriceNum_(variant.prices[chosenKey]) * 1000 : 0;
-      const details = [_builderSel.mau, _builderSel.dam].filter(Boolean).join(' ');
+    if (cand) {
+      const autoK = _priceOfItem_(cand);
+      if (!_bld.priceEdited) _bld.priceK = autoK ? String(autoK) : '';
+      html += row('Màu (ghi chú, bỏ trống được)', `<select id="pkb-mau"><option value="">— Bỏ trống —</option>${PK_COLOR_OPTS.map((c) => opt(c, c, c === _bld.mau)).join('')}</select>`);
+      html += row('Đậm / nhạt', `<select id="pkb-dam"><option value="">— Bỏ trống —</option>${PK_SHADE_OPTS.map((c) => opt(c, c, c === _bld.dam)).join('')}</select>`);
+      html += `<div class="pk-builder-inline">
+        <div><label>Số lượng</label><input type="number" id="pkb-qty" min="1" value="${escapeHtml(_bld.qty)}" /></div>
+        <div><label>Giá (nghìn đ) — ${escapeHtml(_stoneLabel_(cand))}</label><input type="number" id="pkb-price" min="0" value="${escapeHtml(_bld.priceK)}" placeholder="tự nhập nếu chưa có giá" /></div>
+      </div>`;
+      html += `<div class="pk-builder-inline">
+        <div><label>CTKM cho sản phẩm này</label><select id="pkb-promotype">
+          ${opt('none', 'Không', _bld.promoType === 'none')}${opt('amount', 'Giảm tiền (k)', _bld.promoType === 'amount')}${opt('percent', 'Giảm %', _bld.promoType === 'percent')}${opt('gift', 'Tặng quà', _bld.promoType === 'gift')}
+        </select></div>
+        <div id="pkb-promoval-wrap" style="${_bld.promoType === 'none' ? 'display:none' : ''}"><label>&nbsp;</label><input type="text" id="pkb-promoval" value="${escapeHtml(_bld.promoVal)}" placeholder="${_bld.promoType === 'gift' ? 'Quà tặng (VD: dây đeo)' : (_bld.promoType === 'percent' ? '% giảm' : 'Số tiền giảm (k)')}" /></div>
+      </div>`;
+      html += `<div class="pk-builder-summary"><div id="pkb-line-total"></div><button id="pkb-add-btn" class="pk-price-addbtn">+ Thêm vào đơn</button></div>`;
+    }
+    dyn.innerHTML = html;
+    _bindBuilder_(dyn, cand);
+    if (cand) _refreshBldTotal_();
+  }
+
+  function _refreshBldTotal_() {
+    const el = panelEl.querySelector('#pkb-line-total');
+    if (!el) return;
+    const qty = Math.max(1, Number(_bld.qty) || 1);
+    const base = qty * (Number(_bld.priceK) || 0) * 1000;
+    const total = _applyPromo_(base, _bld.promoType, _bld.promoVal);
+    el.innerHTML = `Thành tiền: <b>${total.toLocaleString('vi-VN')}đ</b>` +
+      (total !== base ? ` <span class="pk-builder-was">(trước CTKM ${base.toLocaleString('vi-VN')}đ)</span>` : '') +
+      (_bld.promoType === 'gift' && _bld.promoVal ? ` · 🎁 ${escapeHtml(_bld.promoVal)}` : '');
+  }
+
+  function _bindBuilder_(dyn, cand) {
+    const on = (id, fn) => { const el = dyn.querySelector('#' + id); if (el) el.addEventListener('change', fn); };
+    on('pkb-nhom', (e) => { _bld.nhom = e.target.value; _bld.ten = ''; _bld.size = ''; _bld.cl = ''; _bld.cand = ''; _bld.priceEdited = false; renderBuilderDyn_(); });
+    on('pkb-ten', (e) => { _bld.ten = e.target.value; _bld.size = ''; _bld.cl = ''; _bld.cand = ''; _bld.priceEdited = false; renderBuilderDyn_(); });
+    on('pkb-size', (e) => { _bld.size = e.target.value; _bld.cl = ''; _bld.cand = ''; _bld.priceEdited = false; renderBuilderDyn_(); });
+    on('pkb-cl', (e) => { _bld.cl = e.target.value; _bld.cand = ''; _bld.priceEdited = false; renderBuilderDyn_(); });
+    on('pkb-cand', (e) => { _bld.cand = e.target.value; _bld.priceEdited = false; renderBuilderDyn_(); });
+    on('pkb-mau', (e) => { _bld.mau = e.target.value; });
+    on('pkb-dam', (e) => { _bld.dam = e.target.value; });
+    on('pkb-promotype', (e) => { _bld.promoType = e.target.value; _bld.promoVal = ''; renderBuilderDyn_(); });
+    const typing = (id, fn) => { const el = dyn.querySelector('#' + id); if (el) el.addEventListener('input', (e) => { fn(e.target.value); _refreshBldTotal_(); }); };
+    typing('pkb-qty', (v) => { _bld.qty = v; });
+    typing('pkb-price', (v) => { _bld.priceK = v; _bld.priceEdited = v !== ''; }); // xoá trống → quay lại giá tự động
+    typing('pkb-promoval', (v) => { _bld.promoVal = v; });
+    const addBtn = dyn.querySelector('#pkb-add-btn');
+    if (addBtn && cand) addBtn.addEventListener('click', () => {
+      const qty = Math.max(1, Number(_bld.qty) || 1);
+      const type = _bld.promoType;
       addToCart_({
-        name: _builderSel.ten,
+        name: _bld.ten,
         note: '',
-        price: priceNum,
-        chatLieu: variant.chatLieu || '',
-        mauSac: details,
-        size: _builderSel.size,
-        qty: 1
+        price: (Number(_bld.priceK) || 0) * 1000,
+        chatLieu: cand.c || '',
+        mauSac: [_bld.mau, _bld.dam].filter(Boolean).join(' '),
+        size: cand.s || '',
+        qty,
+        promoType: type,
+        promoValue: type === 'gift' ? String(_bld.promoVal || '').trim() : (type === 'none' ? '' : (Number(_bld.promoVal) || 0))
       });
-      // Reset lại từ đầu để soạn sản phẩm tiếp theo, giữ Nhóm đang chọn cho nhanh
-      _builderSel = { nhom: _builderSel.nhom, ten: '', size: '', variantIdx: 0, mau: '', dam: '', priceKey: '' };
-      renderBuilderSteps_();
+      setStatus('✅ Đã thêm "' + _bld.ten + '" vào đơn — chọn tiếp sản phẩm tiếp theo.');
+      _bld = _bldBlank_();
+      const q = panelEl.querySelector('#pkb-q'); if (q) q.value = '';
+      if (_flatMode === 'live') _flatItems = [];
+      renderBuilderDyn_();
     });
   }
 
@@ -1756,7 +1924,7 @@
   // Luu theo TUNG SDT khach (chrome.storage.local, rieng may nay) de doi qua lai giua cac
   // doan chat khac nhau khong bi lan/mat don dang tinh do.
   let _cartItems = [];
-  let _cartExtra = { gift: '', discountType: 'none', discountValue: 0, freeship: false, priceInK: false };
+  let _cartExtra = { gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, priceInK: false };
   let _cartLoadedFor = null;
 
   function _cartKey_(phone) { return 'pkCart_' + (phone || '_no_phone_'); }
@@ -1765,9 +1933,9 @@
     const key = _cartKey_(_currentPhone);
     if (_cartLoadedFor === key) { renderCart_(); return; }
     chrome.storage.local.get([key], (res) => {
-      const saved = res[key] || { items: [], extra: { gift: '', discountType: 'none', discountValue: 0, freeship: false } };
+      const saved = res[key] || { items: [], extra: { gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0 } };
       _cartItems = saved.items || [];
-      _cartExtra = Object.assign({ gift: '', discountType: 'none', discountValue: 0, freeship: false, priceInK: false }, saved.extra || {});
+      _cartExtra = Object.assign({ gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, priceInK: false }, saved.extra || {});
       _cartLoadedFor = key;
       renderCart_();
     });
@@ -1788,6 +1956,8 @@
       chatLieu: item.chatLieu || '',
       mauSac: item.mauSac || '',
       size: item.size || '',
+      promoType: item.promoType || 'none',   // CTKM riêng của dòng: none | amount (k) | percent | gift
+      promoValue: item.promoValue === undefined ? '' : item.promoValue,
       checked: true
     });
     saveCart_();
@@ -1814,9 +1984,19 @@
           <input type="text" class="pk-cart-mausac" value="${escapeHtml(it.mauSac || '')}" placeholder="Màu sắc" />
           <input type="text" class="pk-cart-size" value="${escapeHtml(it.size || '')}" placeholder="Size" />
         </div>
+        <div class="pk-cart-promo-row">
+          <select class="pk-cart-promotype" title="CTKM riêng cho sản phẩm này">
+            <option value="none"${(it.promoType || 'none') === 'none' ? ' selected' : ''}>CTKM: không</option>
+            <option value="amount"${it.promoType === 'amount' ? ' selected' : ''}>Giảm tiền (k)</option>
+            <option value="percent"${it.promoType === 'percent' ? ' selected' : ''}>Giảm %</option>
+            <option value="gift"${it.promoType === 'gift' ? ' selected' : ''}>Tặng quà</option>
+          </select>
+          <input type="text" class="pk-cart-promoval" value="${escapeHtml(it.promoValue === undefined ? '' : it.promoValue)}" placeholder="${it.promoType === 'gift' ? 'Quà tặng' : (it.promoType === 'percent' ? '% giảm' : 'Số tiền (k)')}" style="${(!it.promoType || it.promoType === 'none') ? 'display:none' : ''}" />
+          <span class="pk-cart-linetotal"></span>
+        </div>
         ${it.note ? `<div class="pk-cart-note">${escapeHtml(it.note)}</div>` : ''}
       </div>
-    `).join('') || '<div class="pk-cart-empty">Chưa có sản phẩm nào. Bấm "+ Thêm" ở kết quả tra giá phía trên, hoặc "+ Thêm dòng thủ công".</div>';
+    `).join('') || '<div class="pk-cart-empty">Chưa có sản phẩm nào. Dùng tab "Soạn đơn" hoặc "+ Thêm" ở kết quả tra giá phía trên, hoặc "+ Thêm dòng thủ công".</div>';
 
     list.querySelectorAll('.pk-cart-row').forEach((row) => {
       const id = row.dataset.id;
@@ -1843,6 +2023,16 @@
         _updateCartItem_(id, 'price', price, true);
       });
       priceEl.addEventListener('change', () => { saveCart_(); });
+      row.querySelector('.pk-cart-promotype').addEventListener('change', (e) => {
+        _updateCartItem_(id, 'promoType', e.target.value); _updateCartItem_(id, 'promoValue', '');
+        saveCart_(); renderCart_();
+      });
+      const promoValEl = row.querySelector('.pk-cart-promoval');
+      promoValEl.addEventListener('input', (e) => {
+        const it2 = _cartItems.find((x) => x.id === id);
+        _updateCartItem_(id, 'promoValue', it2 && it2.promoType === 'gift' ? e.target.value : (Number(e.target.value) || 0), true);
+      });
+      promoValEl.addEventListener('change', () => { saveCart_(); });
       row.querySelector('.pk-cart-del').addEventListener('click', () => {
         _cartItems = _cartItems.filter((x) => x.id !== id);
         saveCart_(); renderCart_();
@@ -1854,6 +2044,7 @@
     panelEl.querySelector('#pk-cart-discount-value').value = _cartExtra.discountValue || '';
     panelEl.querySelector('#pk-cart-discount-value').style.display = _cartExtra.discountType === 'none' ? 'none' : '';
     panelEl.querySelector('#pk-cart-freeship').checked = !!_cartExtra.freeship;
+    panelEl.querySelector('#pk-cart-gold').value = _cartExtra.gold || '';
     panelEl.querySelector('#pk-cart-price-k').checked = !!_cartExtra.priceInK;
 
     _renderCartTotal_();
@@ -1869,42 +2060,71 @@
     panelEl.querySelector('#pk-cart-count').textContent = _cartItems.filter(i => i.checked).length;
   }
 
-  function _renderCartTotal_() {
-    const checked = _cartItems.filter((i) => i.checked);
-    const subtotal = checked.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.price) || 0), 0);
-    let discountAmt = 0;
-    if (_cartExtra.discountType === 'percent') discountAmt = Math.round(subtotal * (Number(_cartExtra.discountValue) || 0) / 100);
-    else if (_cartExtra.discountType === 'amount') discountAmt = Number(_cartExtra.discountValue) || 0;
-    discountAmt = Math.min(discountAmt, subtotal);
-    const total = subtotal - discountAmt;
-    const fmt = (n) => n.toLocaleString('vi-VN') + 'đ';
-    panelEl.querySelector('#pk-cart-total').innerHTML =
-      `<div>Tạm tính (${checked.length} sản phẩm): <b>${fmt(subtotal)}</b></div>` +
-      (discountAmt > 0 ? `<div>Giảm giá: <b>-${fmt(discountAmt)}</b></div>` : '') +
-      `<div class="pk-cart-total-final">Tổng cộng: <b>${fmt(total)}</b>${_cartExtra.freeship ? ' <span class="pk-cart-freeship-tag">Freeship</span>' : ''}</div>`;
+  // Thành tiền 1 dòng = số lượng × đơn giá, rồi trừ CTKM riêng của dòng (giảm tiền k / giảm % / tặng quà không đổi tiền)
+  function _lineTotal_(i) {
+    const base = (Number(i.qty) || 0) * (Number(i.price) || 0);
+    return _applyPromo_(base, i.promoType, i.promoValue);
   }
 
-  function _buildCartSummaryText_() {
+  // Tính tổng cả đơn: tạm tính (đã trừ CTKM từng dòng) − giảm giá chung + tiền vàng + ship (40k nếu không Freeship)
+  function _cartTotals_() {
     const checked = _cartItems.filter((i) => i.checked);
-    const lines = checked.map((i, idx) => {
-      const lineTotal = (Number(i.qty) || 0) * (Number(i.price) || 0);
-      const details = [i.chatLieu, i.mauSac, i.size].filter(Boolean).join(', ');
-      const safeName = sanitizeProductName_(i.name); // tu sua ten dinh tu cam (vd: "túi tiền" -> "túi") theo sheet Luu y tu cam
-      return `${idx + 1}. ${safeName}${details ? ' (' + details + ')' : ''}${i.qty > 1 ? ' x' + i.qty : ''} — ${lineTotal.toLocaleString('vi-VN')}đ`;
-    });
-    const subtotal = checked.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.price) || 0), 0);
+    const subtotal = checked.reduce((s, i) => s + _lineTotal_(i), 0);
     let discountAmt = 0;
     if (_cartExtra.discountType === 'percent') discountAmt = Math.round(subtotal * (Number(_cartExtra.discountValue) || 0) / 100);
     else if (_cartExtra.discountType === 'amount') discountAmt = Number(_cartExtra.discountValue) || 0;
     discountAmt = Math.min(discountAmt, subtotal);
-    const total = subtotal - discountAmt;
-    let out = lines.join('\n');
-    out += `\n\nTạm tính: ${subtotal.toLocaleString('vi-VN')}đ`;
-    if (discountAmt > 0) out += `\nGiảm giá: -${discountAmt.toLocaleString('vi-VN')}đ`;
-    out += `\nTổng cộng: ${total.toLocaleString('vi-VN')}đ`;
-    if (_cartExtra.gift) out += `\nQuà tặng kèm: ${_cartExtra.gift}`;
-    out += `\nGiao hàng: ${_cartExtra.freeship ? 'Freeship' : 'Thu phí ship theo thực tế'}`;
-    return out;
+    const gold = (Number(_cartExtra.gold) || 0) * 1000;
+    const ship = _cartExtra.freeship ? 0 : PK_SHIP_FEE;
+    const total = subtotal - discountAmt + gold + ship;
+    return { checked, subtotal, discountAmt, gold, ship, total };
+  }
+
+  function _renderCartTotal_() {
+    const t = _cartTotals_();
+    const fmt = (n) => n.toLocaleString('vi-VN') + 'đ';
+    // cập nhật thành tiền từng dòng
+    panelEl.querySelectorAll('#pk-cart-list .pk-cart-row').forEach((rowEl) => {
+      const it = _cartItems.find((x) => x.id === rowEl.dataset.id);
+      const el = rowEl.querySelector('.pk-cart-linetotal');
+      if (it && el) el.textContent = '= ' + fmt(_lineTotal_(it)) + (it.promoType === 'gift' && it.promoValue ? ' 🎁' : '');
+    });
+    panelEl.querySelector('#pk-cart-total').innerHTML =
+      `<div>Tạm tính (${t.checked.length} sản phẩm): <b>${fmt(t.subtotal)}</b></div>` +
+      (t.discountAmt > 0 ? `<div>Giảm giá chung: <b>-${fmt(t.discountAmt)}</b></div>` : '') +
+      (t.gold > 0 ? `<div>Thêm vàng: <b>+${fmt(t.gold)}</b></div>` : '') +
+      `<div>Phí ship: <b>${t.ship ? '+' + fmt(t.ship) : 'Miễn phí'}</b></div>` +
+      `<div class="pk-cart-total-final">Tổng đơn: <b>${fmt(t.total)}</b>${_cartExtra.freeship ? ' <span class="pk-cart-freeship-tag">Freeship</span>' : ''}</div>`;
+  }
+
+  // Đơn để copy gửi khách, theo mẫu:
+  //   1. 1 nhẫn tỳ hưu TL size 1 chất liệu lam thủy màu vàng nhạt giá 6.350k
+  //   2. 1 lắc tỳ hưu truyền thống ... giá 10.550k
+  //   3. miễn phí ship, tổng đơn 16.900k
+  // Mỗi dòng đều qua sanitizeProductName_ (sheet "Lưu ý từ cấm") để không dính từ cấm.
+  function _buildCartSummaryText_() {
+    const t = _cartTotals_();
+    const k = (n) => (n / 1000).toLocaleString('vi-VN') + 'k';
+    const clean = (str) => sanitizeProductName_(str);
+    const lines = t.checked.map((i) => {
+      const qty = Number(i.qty) || 1;
+      const size = (i.size && i.size !== '(mặc định)') ? ' ' + String(i.size).toLowerCase() : '';
+      const cl = i.chatLieu ? ' chất liệu ' + String(i.chatLieu).toLowerCase() : '';
+      const mau = i.mauSac ? ' màu ' + String(i.mauSac).toLowerCase() : '';
+      let promo = '';
+      if (i.promoType === 'amount' && Number(i.promoValue)) promo = ` (đã giảm ${Number(i.promoValue).toLocaleString('vi-VN')}k)`;
+      else if (i.promoType === 'percent' && Number(i.promoValue)) promo = ` (đã giảm ${Number(i.promoValue)}%)`;
+      else if (i.promoType === 'gift' && i.promoValue) promo = ` + tặng ${i.promoValue}`;
+      // tên hạ chữ thường TRƯỚC khi sanitize để các viết tắt (TL, lpt) giữ nguyên
+      return clean(`${qty} ${String(i.name || '').toLowerCase().replace(/^trang sức\s+/, '')}${size}${cl}${mau} giá ${k(_lineTotal_(i))}${promo}`);
+    });
+    const extra = [];
+    if (t.gold > 0) extra.push(`thêm vàng ${k(t.gold)}`);
+    if (t.discountAmt > 0) extra.push(`giảm thêm ${k(t.discountAmt)}`);
+    if (_cartExtra.gift) extra.push(`tặng kèm ${_cartExtra.gift}`);
+    extra.push(t.ship ? `phí ship ${k(t.ship)}, tổng đơn ${k(t.total)}` : `miễn phí ship, tổng đơn ${k(t.total)}`);
+    const all = lines.concat(extra.map(clean));
+    return all.map((l, idx) => `${idx + 1}. ${l}`).join('\n');
   }
 
   function escapeHtml(s) {
