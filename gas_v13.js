@@ -1040,7 +1040,7 @@ function readAllOrders_() {
   var ss = getDTSS_();
   var sh = ss.getSheetByName(DT_TONG_SHEET);
   if (!sh || sh.getLastRow() < 2) return [];
-  var tz = ss.getSpreadsheetTimeZone();
+  var tz = DT_TIMEZONE_VN_; // luon gio VN co dinh — xem ghi chu tai _dtCellToVnStr_ o tren
   var last = sh.getLastRow();
   var vals = sh.getRange(2, 1, last - 1, DT_TONG_WIDTH).getValues();
   var out = [];
@@ -1246,11 +1246,27 @@ function getDTSS_() {
 // du an) de dam bao luon khop CHINH XAC voi con so hien thi tren chinh sheet DT TONG, bat ke
 // file do dang cau hinh mui gio gi. Neu val da la chuoi san (khong phai kieu Date) thi giu
 // nguyen, khong dong vao.
+// Chuyen 1 gia tri o "Ngay tao"/"Thoi gian hoan thanh" cua sheet DT TONG thanh chuoi
+// 'dd/MM/yyyy HH:mm' — LUON theo GIO VIET NAM co dinh (Asia/Ho_Chi_Minh), KHONG phu thuoc
+// vao cau hinh mui gio cua file Sheet hay cua du an Apps Script.
+// (Fix 20/09/2026: ban truoc dung ss.getSpreadsheetTimeZone() — vua gay crash hang loat khi
+// gia tri tra ve khong phai String hop le [loi "Đối số không hợp lệ: timeZone"], vua cho ra
+// gio SAI neu file Sheet vo tinh dang cau hinh mui gio khac VN (Duyen xac nhan dang bi UTC).
+// Dung thang 'Asia/Ho_Chi_Minh' de bao dam luon dung gio VN va khong bao gio throw vi kieu du
+// lieu sai, giong dung nguyen tac +7 co dinh da ap dung o _vnYmd_/_vnYmdParts_ ben duoi.)
+var DT_TIMEZONE_VN_ = 'Asia/Ho_Chi_Minh';
 function _dtCellToVnStr_(val, tz) {
   if (val === '' || val === null || val === undefined) return '';
   if (Object.prototype.toString.call(val) === '[object Date]') {
     if (isNaN(val.getTime())) return '';
-    return Utilities.formatDate(val, tz, 'dd/MM/yyyy HH:mm');
+    var useTz = (typeof tz === 'string' && tz) ? tz : DT_TIMEZONE_VN_;
+    try {
+      return Utilities.formatDate(val, useTz, 'dd/MM/yyyy HH:mm');
+    } catch (eTz) {
+      // Phong ho cuoi cung: du useTz vi ly do gi van khong hop le, KHONG duoc de throw lam
+      // mat nguyen dong don — lui ve gio VN chuan.
+      return Utilities.formatDate(val, DT_TIMEZONE_VN_, 'dd/MM/yyyy HH:mm');
+    }
   }
   return val;
 }
@@ -1364,8 +1380,7 @@ function readDTTong_() {
   if (!sh) return [];
   var last = sh.getLastRow();
   if (last < 2) return [];
-  var tz = ss.getSpreadsheetTimeZone();
-  // cot A..T (0..19) du dung cho bao cao, tranh doc thua cot rac phia sau
+  var tz = DT_TIMEZONE_VN_; // luon gio VN co dinh — xem ghi chu tai _dtCellToVnStr_ o tren
   var vals = sh.getRange(2, 1, last - 1, 20).getValues();
   var out = [];
   for (var i = 0; i < vals.length; i++) {

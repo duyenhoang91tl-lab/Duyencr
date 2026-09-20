@@ -7997,12 +7997,16 @@ var SH_SET     = 'Settings';
 var SH_ASSIGN  = 'AssignData';
 var SH_USER    = 'Users';
 var SH_CONTEXT = 'AIContext';
-var SH_PK_STATS = 'PancakeStats';
-var SH_PK_MAP   = 'PancakeNameMap';
+var SH_PK_STATS = 'PancakeStats';   // thong ke tuong tac/chot don hang ngay, nhap tu file Excel Pancake xuat ("Thong ke tuong tac")
+var SH_PK_MAP   = 'PancakeNameMap'; // khop ten "Nhan vien" hien thi tren Pancake <-> ten Sale chuan trong CRM
+var SH_PK_SDT   = 'PancakeSdtStats'; // thong ke SDT mang ve/don chot theo nhan vien+page, nhap tu file Excel Pancake xuat ("Thong ke nhan vien" - sheet "By staff")
+var SH_SALE_DIR = 'SaleDirectory'; // danh sach Sale chuan: ma sale, ten Facebook, user base, ten tag Pancake (S=van phong, O=online)
+var SH_PK_PAGEMAP = 'PancakePageMap'; // khop pageId Pancake <-> gia tri "Kenh ban" chuan dung trong DT TONG
+var SH_PK_TAG   = 'PancakeTagStats'; // thong ke tag (L1-L7 trang thai, S/O sale) theo Page+ngay, nhap tu file Excel "Thong ke tag" Pancake xuat
 
 var ORDER_SS_ID = '1fiWXPMZcHuEh0zYqD6pgQjZDM0PhWzpiSK7Igj6Cug8'; // File chua OrderData2x (doanh thu/don hang)
 var CRM_SS_ID   = '18XBtbjP7gtlvYpChikF3B62cxHkR4426s5poZj9Mj8I'; // File chua CareData/Users/Teams/Settings/AuditLog/AssignData/AIContext (CRM).
-var PRICE_SS_ID    = '1Tfn2jOH20kv0Z-cb0BULqPuxZTap9FA3z8bXeeRl5l4'; // File "Bang gia" rieng (Danh_muc/Tinh_tien/Ghi_chu_chinh_sach)
+var PRICE_SS_ID    = '1I4wr226_QUJuCZSKASsxXxOjloCW9UtpYz87TSy-Ldk'; // File "Bang gia" moi (Danh_muc/Tinh_tien/Ghi_chu_chinh_sach) - cap nhat 2026-09
 var PRICE_SHEET_NAME = 'DANH_MUC'; // Sheet dang bang phang, de tra cuu/loc
 var CTKM_SHEET_NAME  = 'CTKM'; // Sheet CTKM (cung file PRICE_SS_ID) — doi ten hang duoi neu ten tab thuc te khac
                         // De trong = dung file dang gan Apps Script nay (mac dinh, hanh vi cu).
@@ -8058,14 +8062,36 @@ var CARE_HEADERS = ['phone','status','zalo','cs','note','schedules',
 
 var ORDER_HEADERS  = ['phone','name','date','year','month','cs','source','revenue',
   'product','productDetail','status','zalo','note','careCS'];
-var TEAM_HEADERS   = ['id','name','leader','members','color','channels'];
+var TEAM_HEADERS   = ['id','name','leader','members','color','channels','ratePct'];
 var AUDIT_HEADERS  = ['timestamp','user','action','phone','oldValue','newValue'];
 var SET_HEADERS    = ['key','value'];
 var ASSIGN_HEADERS = ['id','date','csName','label','phones','donePhones'];
 var USER_HEADERS   = ['username','passHash','role','name','team','active','names'];
+// PK_STATS_HEADERS: 1 dong = 1 "Nhan vien" (ten hien thi tren Pancake) trong 1 Page, 1 ngay —
+// nhap tu file Excel "Thong ke tuong tac" (pages_statistics_engagements) Pancake xuat ra.
+// Khoa duy nhat = date+pageId+nhanVien -> nap lai file CUNG 1 ngay se GHI DE (khong nhan doi).
 var PK_STATS_HEADERS = ['date','pageId','pageName','nhanVien','khCu','khMoi','tongTT',
   'tinNhan','binhLuan','hoiThoaiMoi','dhKhMoi','dhKhCu','tongDH'];
+// PK_MAP_HEADERS: khop 1-1 ten hien thi Pancake -> ten Sale chuan trong CRM (dung chung moi
+// Page, vi thuong 1 nguoi dung 1 ten Facebook ca nhan cho ca nhieu Page).
 var PK_MAP_HEADERS = ['pancakeName','saleName'];
+// PK_SDT_STATS_HEADERS: 1 dong = 1 "Nhan vien" trong 1 Page, 1 ngay — nhap tu file Excel
+// "Thong ke nhan vien" (user_statistics_multi_pages, sheet "<pageId> By staff") Pancake xuat.
+// Khoa duy nhat = date+pageId (nap lai file CUNG 1 ngay se GHI DE toan bo nhan vien cua page
+// do trong ngay do — giong het co che PK_STATS_HEADERS o tren).
+var PK_SDT_STATS_HEADERS = ['date','pageId','pageName','nhanVien',
+  'tinNhanTuBinhLuan','binhLuan','phienTLBinhLuan','tinNhan','phienTLTinNhan',
+  'sdtMangVe','soDonChot'];
+// PK_PAGEMAP_HEADERS: khop 1-1 pageId Pancake -> gia tri "Kenh ban" chuan dang dung trong
+// DT TONG (cot M "kenhBan"), de ghep doanh thu/so don theo dung Page.
+var PK_PAGEMAP_HEADERS = ['pageId','pageName','kenhBan'];
+// PK_TAG_STATS_HEADERS: 1 dong = 1 tag trong 1 Page, 1 ngay — nhap tu file Excel "Thong ke tag"
+// (pages_statistics_tag) Pancake xuat. Khoa duy nhat = date+pageId+(tagId||tagName) -> nap lai
+// file CUNG 1 ngay se GHI DE (khong nhan doi), giong het co che PK_STATS_HEADERS. Phan loai
+// (sale/status/L1-L7) tinh LAI tu tagName moi lan tong hop bao cao (xem classifyPancakeTag_),
+// KHONG luu type/code tinh san, de quy chuan tay (setting 'pancakeTagOverride') ap dung duoc
+// ca cho du lieu cu da luu, giong het co che ben client (_pkTagAggregate trong index.html).
+var PK_TAG_STATS_HEADERS = ['date','pageId','pageName','tagId','tagName','count'];
 // ── KH "Chăm sóc" thêm nhanh (nút "+ Thêm KH/Đơn mới") — SHEET RIÊNG, không gộp
 // CareData/DT TỔNG/dữ liệu đơn, không gộp vào báo cáo doanh số A/B/C. ──
 var SH_CARE_LEAD      = 'KH Chăm sóc mới';
@@ -8604,7 +8630,11 @@ function readTeams_(sh) {
     // team khac nhung chi chay tren 1 kenh nhat dinh, can tach doanh thu rieng theo kenh do.
     var channels = [];
     try { channels = v[i][5] ? JSON.parse(v[i][5]) : []; } catch(e2) { channels = (''+v[i][5]).split(',').map(function(s){return s.trim();}).filter(String); }
-    out.push({ id: v[i][0], name: v[i][1]||'', leader: v[i][2]||'', members: members, color: v[i][4]||'', channels: channels });
+    // % hoa hong theo team cho don >=15tr / <15tr (xem COMMISSION_THRESHOLD) - admin cai o
+    // "Quan ly Team". Sheet tao truoc khi co tinh nang nay chua co cot nay -> mac dinh {0,0}.
+    var ratePct = { above15: 0, below15: 0 };
+    try { var rp = v[i][6] ? JSON.parse(v[i][6]) : null; if (rp && typeof rp === 'object') ratePct = { above15: Number(rp.above15)||0, below15: Number(rp.below15)||0 }; } catch(e) {}
+    out.push({ id: v[i][0], name: v[i][1]||'', leader: v[i][2]||'', members: members, color: v[i][4]||'', channels: channels, ratePct: ratePct });
   }
   return out;
 }
@@ -8665,11 +8695,29 @@ function doGet(e) {
       return jsonOut_(res2);
     }
 
-    if (action === 'orders')    return jsonOut_({ orders: readAllOrders_() });
+    if (action === 'orders') {
+      var _ordersOut = readAllOrders_();
+      var _ordersResp = { orders: _ordersOut };
+      // Neu co dong bi loi khi doc, bao ve ngoai response (khong chi nam trong Logger.log noi
+      // bo) de app hien canh bao ro rang thay vi am tham coi so dong doc duoc la toan bo su that.
+      if (readAllOrders_.lastErrorCount) {
+        _ordersResp.errorCount = readAllOrders_.lastErrorCount;
+        _ordersResp.errorSample = readAllOrders_.lastErrorSample;
+      }
+      return jsonOut_(_ordersResp);
+    }
     if (action === 'teams')     return jsonOut_({ teams: readTeams_(ss.getSheetByName(SH_TEAM)) });
-    if (action === 'pancakeNameMap') return jsonOut_({ map: readPancakeMap_() });
-    if (action === 'pancakeReport')  return jsonOut_(buildPancakeReport_(e.parameter.from, e.parameter.to, e.parameter.split));
     if (action === 'users')     return jsonOut_({ users: readUsers_(ss.getSheetByName(SH_USER)) });
+    // ── Bao cao Pancake (nhap tu file Excel "Thong ke tuong tac") ──
+    if (action === 'pancakeNameMap') return jsonOut_({ map: readPancakeMap_(), allNames: pancakeAllNames_() });
+    if (action === 'pancakeReport')  return jsonOut_(buildPancakeReport_(e.parameter.from, e.parameter.to, e.parameter.split));
+    // ── Bao cao SDT mang ve/don chot Pancake (nhap tu file "Thong ke nhan vien") ──
+    if (action === 'pancakeSdtReport') return jsonOut_(buildPancakeSdtReport_(e.parameter.from, e.parameter.to, e.parameter.split));
+    // ── Khop Page Pancake (pageId) <-> Kenh ban chuan trong DT TONG ──
+    if (action === 'pancakePageMap') return jsonOut_({ map: readPancakePageMap_(), allPages: pancakeAllPages_() });
+    // ── Bao cao KPI tong hop (DT TONG + Pancake tuong tac + SDT) ──
+    if (action === 'kpiReport') return jsonOut_(buildKpiReport_(e.parameter.from, e.parameter.to));
+    if (action === 'saleDirectory') return jsonOut_(readSaleDirectory_());
     // ── Nguon "Cham soc" (KH them nhanh, sheet rieng) — khong gop CareData/bao cao A-B-C ──
     if (action === 'careLeads') return jsonOut_({ rows: readCareLeads_() });
     // ── Tap SDT co trong "dữ liệu đơn" — chi de loc nguon o man hinh chinh (cache 10') ──
@@ -8724,6 +8772,7 @@ function doGet(e) {
                  dateField: pA.dateField || 'ngayTao',
                  sale: pA.sale ? pA.sale.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [],
                  kenh: pA.kenh ? pA.kenh.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [],
+                 sanPham: pA.sanPham || '',
                  byCreator: pA.byCreator === '1' || pA.byCreator === 'true' };
       var cacheA = CacheService.getScriptCache();
       var cKeyA = 'salesA_' + JSON.stringify(fA);
@@ -8737,7 +8786,10 @@ function doGet(e) {
       var pB = e.parameter || {};
       var splitCSV_ = function(s){ return s ? s.split(',').map(function(x){return x.trim();}).filter(function(x){return x;}) : []; };
       var fB = { dateFrom: pB.dateFrom || '', dateTo: pB.dateTo || '',
-                 sale: splitCSV_(pB.sale), nguon: splitCSV_(pB.nguon), marketer: splitCSV_(pB.marketer) };
+                 sale: splitCSV_(pB.sale), nguon: splitCSV_(pB.nguon), marketer: splitCSV_(pB.marketer),
+                 sanPham: pB.sanPham || '',
+                 careStatus: splitCSV_(pB.careStatus), khStatus: splitCSV_(pB.khStatus),
+                 zaloStatus: splitCSV_(pB.zaloStatus), nickZalo: pB.nickZalo || '' };
       var cacheB = CacheService.getScriptCache();
       var cKeyB = 'salesB_' + JSON.stringify(fB);
       var cachedB = cacheB.get(cKeyB);
@@ -8756,7 +8808,8 @@ function doGet(e) {
                  customCurFrom: pC.customCurFrom || '', customCurTo: pC.customCurTo || '',
                  customPrevFrom: pC.customPrevFrom || '', customPrevTo: pC.customPrevTo || '',
                  sale: pC.sale ? pC.sale.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [],
-                 kenh: pC.kenh ? pC.kenh.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [] };
+                 kenh: pC.kenh ? pC.kenh.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [],
+                 sanPham: pC.sanPham || '' };
       var cacheC = CacheService.getScriptCache();
       var cKeyC = 'salesC_' + JSON.stringify(fC);
       var cachedC = cacheC.get(cKeyC);
@@ -8923,25 +8976,26 @@ var DT_TONG_WIDTH     = 20; // A:T
 
 // Chuyen 1 hang tho cua DT TONG thanh object "don hang" (giu ten truong nhu ORDER_HEADERS
 // cu de cac cho khac trong code/frontend it phai sua nhat co the)
-function dtRowToOrder_(row, rowIndex) {
-  var dtVal = row[DT_COL_THOIGIANHT];
+function dtRowToOrder_(row, rowIndex, tz) {
+  var dtVal = _dtCellToVnStr_(row[DT_COL_THOIGIANHT], tz);
+  var ngayTaoStr = _dtCellToVnStr_(row[DT_COL_NGAYTAO], tz);
   var d = parseVNDate_(dtVal);
   return {
     id: row[DT_COL_ID] != null ? String(row[DT_COL_ID]) : '',
     rowIndex: rowIndex,
     phone: normPhone_(String(row[DT_COL_PHONE] || '')),
     name: '', // KHONG co san ten khach rieng trong DT TONG (chi co SDT), de trong
-    date: dtVal || row[DT_COL_NGAYTAO] || '',
+    date: dtVal || ngayTaoStr || '',
     // orderDate: LUON la Ngay tao, KHONG bao gio doi theo trang thai don (khac voi 'date' o
     // tren, von chuyen sang Thoi gian hoan thanh ngay khi don duoc danh dau xong). Dung field
     // nay lam moc goc cho cac tinh toan can ON DINH qua thoi gian (vd: lich nhac auto Data Dao
     // +7/+14 ngay) — neu dung 'date' cu, moc goc se nhay sang ngay khac ngay khi don hoan thanh,
     // lam ID lich nhac doi theo va khien lich da xoa/da lam bi tao lai y het (bug da gap).
-    orderDate: row[DT_COL_NGAYTAO] || '',
-    year: d ? d.getFullYear() : '',
-    month: d ? (d.getMonth() + 1) : '',
+    orderDate: ngayTaoStr || '',
+    year: d ? _vnYmdParts_(d).y : '',
+    month: d ? _vnYmdParts_(d).mo : '',
     cs: String(row[DT_COL_SALEBAN] || ''),
-    source: String(row[DT_COL_KENHBAN] || ''),
+    source: row[DT_COL_KENHBAN] ? String(row[DT_COL_KENHBAN]).trim() : '',
     revenue: _normMoney_(row[DT_COL_GIATRIDON]),
     product: String(row[DT_COL_SANPHAM] || ''),       // text tu do, xem luu y o tren
     productDetail: String(row[DT_COL_PHANLOAI] || ''),
@@ -8953,17 +9007,40 @@ function dtRowToOrder_(row, rowIndex) {
 }
 
 function readAllOrders_() {
+  // Reset thong ke loi cua lan goi truoc (doc qua readAllOrders_.lastErrorCount/lastErrorSample
+  // NGAY SAU khi goi ham nay trong cung 1 request — dung de tra ve kem theo response cho action
+  // 'orders', tranh tinh trang loi hang loat bi NUOT AM THAM chi con thay trong Logger.log rieng
+  // ma khong ai de y — xem bug ngay 20/09: 1 dong loi -> ca readAllOrders_ throw -> 'orders'
+  // tra error -> app KHONG rebuild allCustomers (giu nguyen ban cu, van con du 2k2 KH, khong ai
+  // phat hien). Sau khi them try/catch (giao dien am tham hon), N dong loi bi bo qua -> chi con
+  // vai dong song sot -> app REBUILD allCustomers day du nhung chi voi vai KH — mat du lieu am
+  // tham con nguy hiem hon ban dau. Phai bao loi ro ra ngoai thay vi chi Logger.log noi bo.
+  readAllOrders_.lastErrorCount = 0;
+  readAllOrders_.lastErrorSample = '';
   var ss = getDTSS_();
   var sh = ss.getSheetByName(DT_TONG_SHEET);
   if (!sh || sh.getLastRow() < 2) return [];
+  var tz = DT_TIMEZONE_VN_; // luon gio VN co dinh — xem ghi chu tai _dtCellToVnStr_ o tren
   var last = sh.getLastRow();
   var vals = sh.getRange(2, 1, last - 1, DT_TONG_WIDTH).getValues();
   var out = [];
+  var errCount = 0, firstErr = '';
   for (var i = 0; i < vals.length; i++) {
     var r = vals[i];
     if (!r[DT_COL_PHONE] && !r[DT_COL_ID]) continue; // dong rong
-    out.push(dtRowToOrder_(r, i + 2));
+    try {
+      out.push(dtRowToOrder_(r, i + 2, tz));
+    } catch (eRow) {
+      // 1 dong loi (vd gia tri ngay bat thuong) KHONG duoc lam hong ca danh sach — bo qua
+      // rieng dong do, ghi log de con dieu tra, cac dong khac van doc binh thuong.
+      errCount++;
+      var msg = 'dong ' + (i + 2) + ': ' + (eRow && eRow.message ? eRow.message : eRow);
+      if (!firstErr) firstErr = msg;
+      Logger.log('readAllOrders_: loi doc dong ' + (i + 2) + ': ' + eRow);
+    }
   }
+  readAllOrders_.lastErrorCount = errCount;
+  readAllOrders_.lastErrorSample = firstErr;
   return out;
 }
 
@@ -9136,9 +9213,74 @@ function getDTSS_() {
     : SpreadsheetApp.getActiveSpreadsheet();
 }
 
+// Chuyen 1 gia tri o "Ngay tao"/"Thoi gian hoan thanh" cua sheet DT TONG thanh chuoi
+// 'dd/MM/yyyy HH:mm' — DUNG THEO DUNG MUI GIO RIENG CUA FILE SHEET DO (File > Cai dat bang tinh
+// > Mui gio), KHONG phai mui gio cua du an Apps Script. Ly do: da doi chieu voi bao cao chuan
+// cua Base (19/09/2026) va phat hien o Date cua cot nay dang duoc Google Sheets luu/tra ve theo
+// dung SO GIO HIEN THI TREN MAN HINH SHEET (vd o hien "18/09/2026 23:14" thi Date object doc
+// duoc co gio dung la 23:14, KHONG can + hay - 7 tieng gi them) — neu cong them offset VN nhu
+// cac ham _vnYmd_/_vnYmdParts_ (dung cho cac nguon du lieu khac co epoch THAT su la UTC), cac
+// don tao vao khung 18h-24h se bi day nham sang NGAY HOM SAU (bug da phat hien: 20 don cua
+// ngay 18/09 bi tinh nham vao bao cao ngay 19/09, lech +55tr doanh thu). Dung
+// getSpreadsheetTimeZone() (mui gio rieng cua FILE, khac Session.getScriptTimeZone() la mui gio
+// du an) de dam bao luon khop CHINH XAC voi con so hien thi tren chinh sheet DT TONG, bat ke
+// file do dang cau hinh mui gio gi. Neu val da la chuoi san (khong phai kieu Date) thi giu
+// nguyen, khong dong vao.
+// Chuyen 1 gia tri o "Ngay tao"/"Thoi gian hoan thanh" cua sheet DT TONG thanh chuoi
+// 'dd/MM/yyyy HH:mm' — LUON theo GIO VIET NAM co dinh (Asia/Ho_Chi_Minh), KHONG phu thuoc
+// vao cau hinh mui gio cua file Sheet hay cua du an Apps Script.
+// (Fix 20/09/2026: ban truoc dung ss.getSpreadsheetTimeZone() — vua gay crash hang loat khi
+// gia tri tra ve khong phai String hop le [loi "Đối số không hợp lệ: timeZone"], vua cho ra
+// gio SAI neu file Sheet vo tinh dang cau hinh mui gio khac VN (Duyen xac nhan dang bi UTC).
+// Dung thang 'Asia/Ho_Chi_Minh' de bao dam luon dung gio VN va khong bao gio throw vi kieu du
+// lieu sai, giong dung nguyen tac +7 co dinh da ap dung o _vnYmd_/_vnYmdParts_ ben duoi.)
+var DT_TIMEZONE_VN_ = 'Asia/Ho_Chi_Minh';
+function _dtCellToVnStr_(val, tz) {
+  if (val === '' || val === null || val === undefined) return '';
+  if (Object.prototype.toString.call(val) === '[object Date]') {
+    if (isNaN(val.getTime())) return '';
+    var useTz = (typeof tz === 'string' && tz) ? tz : DT_TIMEZONE_VN_;
+    try {
+      return Utilities.formatDate(val, useTz, 'dd/MM/yyyy HH:mm');
+    } catch (eTz) {
+      // Phong ho cuoi cung: du useTz vi ly do gi van khong hop le, KHONG duoc de throw lam
+      // mat nguyen dong don — lui ve gio VN chuan.
+      return Utilities.formatDate(val, DT_TIMEZONE_VN_, 'dd/MM/yyyy HH:mm');
+    }
+  }
+  return val;
+}
+
 // ── Parse ngay dang DD/MM/YYYY (chuoi) hoac Date that (doc truc tiep tu Google Sheet) ──
 // KHONG dung new Date(chuoi) truc tiep: JS hieu chuoi kieu MM/DD/YYYY, se sai am tham
 // voi cac ngay <=12 (vd 01/07/2026 se bi hieu la 1 thang 7 thay vi 7 thang 1).
+// Chuan hoa gio VN: dung Date.UTC() (LUON tuyet doi, khong phu thuoc cau hinh Time Zone cua du
+// an Apps Script) roi tru/cong 7 tieng — TRANH HOAN TOAN phu thuoc vao "Time Zone" cua du an
+// (Project Settings > Time zone / appsscript.json). Neu cau hinh do vo tinh KHONG phai gio VN
+// (vd bi de mac dinh khac, hoac chua ai chinh), moi cho dung new Date(chuoi)/new
+// Date(y,mo-1,d)/.getFullYear() kieu cu se BI LECH GIO AM THAM — day chinh la nguyen nhan bug
+// "ngay hom truoc lan sang ngay hom sau" da gap (Duyen xac nhan ngay 19/09/2026).
+var VN_OFFSET_MS = 7 * 3600 * 1000;
+function _vnMidnight_(y, mo, d) { return new Date(Date.UTC(y, mo - 1, d) - VN_OFFSET_MS); }
+// Tra ve chuoi 'yyyy-MM-dd' CUA DUNG NGAY DUONG LICH VIET NAM cho 1 thoi diem (Date) bat ky —
+// khong dung Utilities.formatDate/Session.getScriptTimeZone() vi ban than 2 cai do cung phu
+// thuoc cau hinh du an; tu tinh tay bang offset co dinh +7 (Viet Nam khong co DST) la chac chan
+// dung 100% du du an cau hinh Time Zone la gi.
+function _vnYmd_(dt) {
+  if (!dt || isNaN(dt.getTime())) return '';
+  var shifted = new Date(dt.getTime() + VN_OFFSET_MS);
+  return shifted.getUTCFullYear() + '-' + String(shifted.getUTCMonth() + 1).padStart(2, '0') + '-' + String(shifted.getUTCDate()).padStart(2, '0');
+}
+// Tra ve {y, mo (1-12), d} la NGAY DUONG LICH VN dung cua 1 thoi diem (Date) bat ky — dung
+// cho MOI noi can tach nam/thang/ngay (tuan/thang/quy Bao cao C, year/month cua don hang...).
+// Cung 1 co che UTC + offset co dinh voi _vnMidnight_/_vnYmd_ o tren, khong bao gio dung
+// .getFullYear()/.getMonth()/.getDate() truc tiep (phu thuoc cau hinh Time Zone du an).
+function _vnYmdParts_(dt) {
+  if (!dt || isNaN(dt.getTime())) return null;
+  var shifted = new Date(dt.getTime() + VN_OFFSET_MS);
+  return { y: shifted.getUTCFullYear(), mo: shifted.getUTCMonth() + 1, d: shifted.getUTCDate() };
+}
+
 function parseVNDate_(val) {
   if (!val && val !== 0) return null;
   if (Object.prototype.toString.call(val) === '[object Date]') {
@@ -9152,19 +9294,34 @@ function parseVNDate_(val) {
   if (!m) return null;
   var d = Number(m[1]), mo = Number(m[2]), y = Number(m[3]);
   if (y < 100) y += 2000;
-  var dt = new Date(y, mo - 1, d);
+  var dt = _vnMidnight_(y, mo, d);
   return isNaN(dt.getTime()) ? null : dt;
+}
+
+// Chuyen 1 chuoi ngay bat ky (co the la 'yyyy-MM-dd' tu <input type=date>, hoac 'DD/MM/YYYY')
+// thanh chuoi 'yyyy-MM-dd' CHUAN GIO VN. Voi 'yyyy-MM-dd' thi dung thang khong qua Date object
+// nao ca — an toan tuyet doi, khong co co hoi lech gio.
+function _dateStrToVnYmd_(s) {
+  if (!s) return '';
+  s = String(s).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  var d = parseVNDate_(s);
+  return d ? _vnYmd_(d) : '';
 }
 
 function dateInRange_(dt, fromStr, toStr) {
   if (!dt) return !fromStr && !toStr; // khong parse duoc: chi loai neu co bo loc ngay
+  // So sanh bang CHUOI 'yyyy-MM-dd' (gio VN, tinh tay bang offset co dinh +7) thay vi tru Date
+  // object — tranh hoan toan cac bug lech gio do Date instant + ambient timezone gay ra (da gap
+  // bug "ngay hom truoc lan sang ngay hom sau" khi so sanh kieu cu).
+  var dKey = _vnYmd_(dt);
   if (fromStr) {
-    var from = parseVNDate_(fromStr) || new Date(fromStr);
-    if (dt < new Date(from.getFullYear(), from.getMonth(), from.getDate())) return false;
+    var fKey = _dateStrToVnYmd_(fromStr);
+    if (fKey && dKey < fKey) return false;
   }
   if (toStr) {
-    var to = parseVNDate_(toStr) || new Date(toStr);
-    if (dt > new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59)) return false;
+    var tKey = _dateStrToVnYmd_(toStr);
+    if (tKey && dKey > tKey) return false;
   }
   return true;
 }
@@ -9203,7 +9360,7 @@ function readDTTong_() {
   if (!sh) return [];
   var last = sh.getLastRow();
   if (last < 2) return [];
-  // cot A..T (0..19) du dung cho bao cao, tranh doc thua cot rac phia sau
+  var tz = DT_TIMEZONE_VN_; // luon gio VN co dinh — xem ghi chu tai _dtCellToVnStr_ o tren
   var vals = sh.getRange(2, 1, last - 1, 20).getValues();
   var out = [];
   for (var i = 0; i < vals.length; i++) {
@@ -9213,22 +9370,26 @@ function readDTTong_() {
     // (vd don nhap tay/import cu chua kip gan SDT/ID) thi se bi am tham mat doanh thu khoi
     // Bao cao A (thap hon thuc te ma khong bao loi gi). Them dieu kien r[17] de an toan hon.
     if (!r[3] && !r[19] && !r[17]) continue;
-    out.push({
-      ngayTao:        r[0],
-      nguoiTao:       r[1] ? String(r[1]).trim() : '',
-      giaoCho:        r[2],
-      giaiDoan:       r[6],
-      trangThai:      r[7],
-      thoiGianHT:     r[10],
-      kenhBan:        r[12] ? String(r[12]).trim() : '',
-      saleBan:        r[13] ? String(r[13]) : '',
-      sanPham:        r[14],
-      phanLoai:       r[15],
-      giaTriCoc:      _normMoney_(r[16]),
-      giaTriDon:      _normMoney_(r[17]),
-      giaTriChenh:    _normMoney_(r[18]),
-      id:             r[19]
-    });
+    try {
+      out.push({
+        ngayTao:        _dtCellToVnStr_(r[0], tz),
+        nguoiTao:       r[1] ? String(r[1]).trim() : '',
+        giaoCho:        r[2],
+        giaiDoan:       r[6],
+        trangThai:      r[7],
+        thoiGianHT:     _dtCellToVnStr_(r[10], tz),
+        kenhBan:        r[12] ? String(r[12]).trim() : '',
+        saleBan:        r[13] ? String(r[13]) : '',
+        sanPham:        r[14],
+        phanLoai:       r[15],
+        giaTriCoc:      _normMoney_(r[16]),
+        giaTriDon:      _normMoney_(r[17]),
+        giaTriChenh:    _normMoney_(r[18]),
+        id:             r[19]
+      });
+    } catch (eRow) {
+      Logger.log('readDTTong_: loi doc dong ' + (i + 2) + ': ' + eRow);
+    }
   }
   return out;
 }
@@ -9383,6 +9544,7 @@ function buildSalesReportA_(filters) {
     : (filters.sale ? [String(filters.sale).trim()] : []);
   var kenhFilterArr = Array.isArray(filters.kenh) ? filters.kenh.filter(function(s){return s;})
     : (filters.kenh ? [String(filters.kenh).trim()] : []);
+  var sanPhamTerms = _foldTermsCSV_(filters.sanPham);
   // Tich UI "Tinh theo nguoi tao don": KHONG chia deu doanh thu/so don cho tung sale tren don
   // nua, ma tinh TRON VEN cho DUNG 1 nguoi — lay tu cot "Người tạo" that su cua DT TONG (khac
   // voi "Sale bán", co the co nhieu ten). Bo tich (mac dinh): giu nguyen cach chia deu cu.
@@ -9397,6 +9559,7 @@ function buildSalesReportA_(filters) {
     if (kenhFilterArr.length && kenhFilterArr.indexOf(row.kenhBan) === -1) continue;
     var salesOnOrder = splitMulti_(row.saleBan, ',');
     if (saleFilterArr.length && !salesOnOrder.some(function(s){ return saleFilterArr.indexOf(s) !== -1; })) continue;
+    if (!_pMatchAny_(row.sanPham, sanPhamTerms)) continue;
     matched.push(row);
   }
 
@@ -9477,7 +9640,16 @@ function buildSalesReportB_(filters) {
   var saleFilterArr = toArr(filters.sale);
   var nguonFilterArr = toArr(filters.nguon);
   var marketerFilterArr = toArr(filters.marketer);
+  var careStatusArr = toArr(filters.careStatus);
+  var khStatusArr = toArr(filters.khStatus);
+  var zaloStatusArr = toArr(filters.zaloStatus);
+  var sanPhamTerms = _foldTermsCSV_(filters.sanPham);
+  var nickZaloTerm = filters.nickZalo ? _psheetNoAccent_(String(filters.nickZalo).trim()) : '';
   var UNASSIGNED = '(chưa gán sale)';
+
+  // Chi doc CareData khi thuc su co loc theo CRM — tranh doc them 1 sheet khi khong can.
+  var needCare = careStatusArr.length || khStatusArr.length || zaloStatusArr.length || nickZaloTerm;
+  var careMap = needCare ? _careMapByPhone_() : null;
 
   var rows = readDonChiTiet_();
   var matched = [];
@@ -9492,6 +9664,18 @@ function buildSalesReportB_(filters) {
       var hit = false;
       for (var si = 0; si < saleFilterArr.length; si++) { if (salesOnRow.indexOf(saleFilterArr[si]) !== -1) { hit = true; break; } }
       if (!hit) continue;
+    }
+    if (!_pMatchAny_(row.sanPham, sanPhamTerms)) continue;
+    if (needCare) {
+      var care = careMap[normPhone_(row.soDienThoai)] || null;
+      if (careStatusArr.length && !(care && careStatusArr.indexOf(care.status) !== -1)) continue;
+      if (khStatusArr.length && !(care && khStatusArr.indexOf(care.khStatus) !== -1)) continue;
+      if (zaloStatusArr.length && !(care && zaloStatusArr.indexOf(care.zalo) !== -1)) continue;
+      if (nickZaloTerm) {
+        var nicks = (care && care.nickZalos) || [];
+        var nickHit = nicks.some(function(n){ return _psheetNoAccent_(n).indexOf(nickZaloTerm) !== -1; });
+        if (!nickHit) continue;
+      }
     }
     matched.push(row);
   }
@@ -9629,20 +9813,28 @@ function getKPI_(kpiMap, periodKey, entType, entName) {
 
 // Thu 2 cua tuan chua ngay d (khong doi d truyen vao)
 function _getMonday_(d) {
-  var dt = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  var day = dt.getDay();
-  var diff = (day === 0 ? -6 : 1) - day;
-  dt.setDate(dt.getDate() + diff);
-  return dt;
+  // Tim dung Thu Hai cua tuan chua ngay duong lich VN cua d — tinh toan hoan toan bang UTC +
+  // offset co dinh (qua _vnYmdParts_), KHONG dung .getDay()/.getDate() truc tiep cua d (phu
+  // thuoc cau hinh Time Zone du an, cung nguyen nhan gay bug "nhay ngay" da gap).
+  var p = _vnYmdParts_(d);
+  var utcRep = new Date(Date.UTC(p.y, p.mo - 1, p.d)); // chi dung de doc thu trong tuan (getUTCDay doc dung, khong phu thuoc offset)
+  var dow = utcRep.getUTCDay();
+  var diff = (dow === 0 ? -6 : 1) - dow;
+  var mp = new Date(Date.UTC(p.y, p.mo - 1, p.d + diff));
+  return _vnMidnight_(mp.getUTCFullYear(), mp.getUTCMonth() + 1, mp.getUTCDate());
 }
 function _isoWeekRange_(baseDate, weekOffset) {
   var mon = _getMonday_(baseDate);
+  // .setDate()/.getDate() o day CHI dung de CONG/TRU so ngay (khong doc ngay duong lich) —
+  // an toan du may chu cau hinh Time Zone gi, vi Viet Nam khong co gio mua he nen +7 ngay luon
+  // dung dung 7*24h bat ke mui gio nen la gi.
   mon.setDate(mon.getDate() + weekOffset * 7);
   var sun = new Date(mon); sun.setDate(sun.getDate() + 6);
   return { from: mon, to: sun };
 }
 function _isoWeekKey_(d) {
-  var dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  var p = _vnYmdParts_(d);
+  var dt = new Date(Date.UTC(p.y, p.mo - 1, p.d));
   var dayNum = dt.getUTCDay() || 7;
   dt.setUTCDate(dt.getUTCDate() + 4 - dayNum);
   var yearStart = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1));
@@ -9650,20 +9842,29 @@ function _isoWeekKey_(d) {
   return dt.getUTCFullYear() + '-W' + String(weekNo).padStart(2, '0');
 }
 function _monthRange_(baseDate, monthOffset) {
-  var y = baseDate.getFullYear(), m = baseDate.getMonth() + monthOffset;
-  return { from: new Date(y, m, 1), to: new Date(y, m + 1, 0) };
+  var p = _vnYmdParts_(baseDate);
+  var y = p.y, m = (p.mo - 1) + monthOffset; // m la thang muc tieu, 0-index, truoc khi normalize nam
+  var from = _vnMidnight_(y, m + 1, 1);
+  var lastDayUtc = new Date(Date.UTC(y, m + 1, 0)); // ngay 0 cua thang ke tiep = ngay cuoi thang muc tieu
+  var to = _vnMidnight_(lastDayUtc.getUTCFullYear(), lastDayUtc.getUTCMonth() + 1, lastDayUtc.getUTCDate());
+  return { from: from, to: to };
 }
-function _monthKey_(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+function _monthKey_(d) { var p = _vnYmdParts_(d); return p.y + '-' + String(p.mo).padStart(2, '0'); }
 function _quarterRange_(baseDate, quarterOffset) {
-  var y = baseDate.getFullYear(), q = Math.floor(baseDate.getMonth() / 3) + quarterOffset;
+  var p = _vnYmdParts_(baseDate);
+  var y = p.y, q = Math.floor((p.mo - 1) / 3) + quarterOffset;
   var yy = y + Math.floor(q / 4), qq = ((q % 4) + 4) % 4;
-  var startMonth = qq * 3;
-  return { from: new Date(yy, startMonth, 1), to: new Date(yy, startMonth + 3, 0) };
+  var startMonth = qq * 3; // 0-index
+  var from = _vnMidnight_(yy, startMonth + 1, 1);
+  var lastDayUtc = new Date(Date.UTC(yy, startMonth + 3, 0));
+  var to = _vnMidnight_(lastDayUtc.getUTCFullYear(), lastDayUtc.getUTCMonth() + 1, lastDayUtc.getUTCDate());
+  return { from: from, to: to };
 }
-function _quarterKey_(d) { return d.getFullYear() + '-Q' + (Math.floor(d.getMonth() / 3) + 1); }
-function _ymdLocal_(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function _quarterKey_(d) { var p = _vnYmdParts_(d); return p.y + '-Q' + (Math.floor((p.mo - 1) / 3) + 1); }
+function _ymdLocal_(d) { return _vnYmd_(d); } // giu ten cu de khoi phai sua noi goi, tro thang ve ham VN chuan
 function _labelVN_(d) {
-  return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
+  var p = _vnYmdParts_(d);
+  return String(p.d).padStart(2, '0') + '/' + String(p.mo).padStart(2, '0') + '/' + p.y;
 }
 
 // Tinh khoang ngay + PeriodKey cua ky nay & ky truoc, tuy periodType.
@@ -9706,6 +9907,7 @@ function buildSalesReportC_(filters) {
   var UNASSIGNED = '(chưa gán sale)';
   var saleFilterArr = Array.isArray(filters.sale) ? filters.sale.filter(function(s){return s;}) : [];
   var kenhFilterArr = Array.isArray(filters.kenh) ? filters.kenh.filter(function(s){return s;}) : [];
+  var sanPhamTerms = _foldTermsCSV_(filters.sanPham);
 
   var rows = readDTTong_();
   // Gom theo entity rieng cho tung ky (cur/prev), dung dung logic chia tien theo N sale/don
@@ -9720,6 +9922,7 @@ function buildSalesReportC_(filters) {
       if (kenhFilterArr.length && kenhFilterArr.indexOf(row.kenhBan) === -1) continue;
       var salesOnRow = splitMulti_(row.saleBan, ',');
       if (saleFilterArr.length && !salesOnRow.some(function(s){ return saleFilterArr.indexOf(s) !== -1; })) continue;
+      if (!_pMatchAny_(row.sanPham, sanPhamTerms)) continue;
       matchedOrders.push(row);
       var kName = row.kenhBan || '(chưa có kênh)';
       byKenh[kName] = (byKenh[kName] || 0) + row.giaTriDon;
@@ -9950,10 +10153,15 @@ function doPost(e) {
     if (action === 'setOrderCareCS')      return setOrderCareCS_(data.phone, data.careCS);
     if (action === 'setOrderCareCSBatch') return setOrderCareCSBatch_(data.updates);
     if (action === 'saveTeams')           return saveTeams_(data.teams);
-    if (action === 'savePancakeStats')    return savePancakeStats_(data.rows);
-    if (action === 'savePancakeNameMap')  return savePancakeNameMap_(data.pancakeName, data.saleName);
     if (action === 'saveUsers')           return saveUsers_(data.users);
     if (action === 'saveAudit')           return saveAudit_(data.rows);
+    // ── Bao cao Pancake ──
+    if (action === 'savePancakeStats')    return savePancakeStats_(data.rows);
+    if (action === 'savePancakeNameMap')  return savePancakeNameMap_(data.pancakeName, data.saleName);
+    if (action === 'savePancakeSdtStats') return savePancakeSdtStats_(data.rows);
+    if (action === 'savePancakeTagStats') return savePancakeTagStats_(data.rows);
+    if (action === 'saveSaleDirectory')   return saveSaleDirectory_(data.rows);
+    if (action === 'savePancakePageMap')  return savePancakePageMap_(data.pageId, data.pageName, data.kenhBan);
     if (action === 'setSetting')          return setSetting_(data.key, data.value);
     // Them 1 nick Zalo vao danh sach chung (MERGE tren server -> khong ghi de mat nick cu)
     if (action === 'addZaloNick')         return addZaloNick_(data.nick);
@@ -10227,7 +10435,7 @@ function patchOrder_(data) {
     var ph = normPhone_(String(r[DT_COL_PHONE] || ''));
     if (ph !== normPhone_(String(data.phone || ''))) continue;
     var d = parseVNDate_(r[DT_COL_THOIGIANHT]);
-    var yy = d ? d.getFullYear() : '', mm = d ? (d.getMonth() + 1) : '';
+    var _p = d ? _vnYmdParts_(d) : null; var yy = _p ? _p.y : '', mm = _p ? _p.mo : '';
     if (String(yy) !== String(data.oldYear)) continue;
     if (String(mm) !== String(data.oldMonth)) continue;
     if (_normMoney_(r[DT_COL_GIATRIDON]) !== _normMoney_(data.oldRevenue)) continue;
@@ -10261,7 +10469,7 @@ function deleteOrder_(data) {
       var ph = normPhone_(String(r[DT_COL_PHONE] || ''));
       if (ph !== normPhone_(String(data.phone || ''))) continue;
       var d = parseVNDate_(r[DT_COL_THOIGIANHT]);
-      var yy = d ? d.getFullYear() : '', mm = d ? (d.getMonth() + 1) : '';
+      var _p = d ? _vnYmdParts_(d) : null; var yy = _p ? _p.y : '', mm = _p ? _p.mo : '';
       if (String(yy) !== String(data.oldYear)) continue;
       if (String(mm) !== String(data.oldMonth)) continue;
       if (_normMoney_(r[DT_COL_GIATRIDON]) !== _normMoney_(data.oldRevenue)) continue;
@@ -10287,9 +10495,14 @@ function deleteOrder_(data) {
 //   can xoa, tranh xoa nham dong co doanh thu DUNG.
 function normOrderDate_(v) {
   if (!v) return '';
-  var d = (v instanceof Date) ? v : new Date(v);
-  if (isNaN(d)) return String(v).trim();
-  return Utilities.formatDate(d, Session.getScriptTimeZone() || 'GMT+7', 'yyyy-MM-dd');
+  // KHONG dung Session.getScriptTimeZone() nua (co the sai neu cau hinh Time Zone cua du an
+  // khong phai gio VN) — dung parseVNDate_ (da chuan hoa gio VN tuyet doi qua Date.UTC+offset)
+  // roi format bang _vnYmd_ (cung offset co dinh, khong qua ambient timezone nao ca).
+  var d = parseVNDate_(v);
+  if (d) return _vnYmd_(d);
+  var d2 = (v instanceof Date) ? v : new Date(v);
+  if (!isNaN(d2)) return _vnYmd_(d2);
+  return String(v).trim();
 }
 function _normTxt_(s) { return String(s || '').trim().toLowerCase(); }
 
@@ -10428,37 +10641,68 @@ function saveTeams_(teams) {
   var matrix = [TEAM_HEADERS];
   for (var i = 0; i < teams.length; i++) {
     var t = teams[i];
-    matrix.push([t.id||'', t.name||'', t.leader||'', JSON.stringify(t.members||[]), t.color||'', JSON.stringify(t.channels||[])]);
+    var ratePct = (t.ratePct && typeof t.ratePct === 'object') ? { above15: Number(t.ratePct.above15)||0, below15: Number(t.ratePct.below15)||0 } : { above15: 0, below15: 0 };
+    matrix.push([t.id||'', t.name||'', t.leader||'', JSON.stringify(t.members||[]), t.color||'', JSON.stringify(t.channels||[]), JSON.stringify(ratePct)]);
   }
   sh.getRange(1, 1, matrix.length, TEAM_HEADERS.length).setValues(matrix);
   return jsonOut_({ ok: true, written: teams.length });
 }
 
-// ── BAO CAO PANCAKE (nhap tu file Excel "Thong ke tuong tac") ──
+// ═══════════════════════════════════════════════════════════════
+//  BAO CAO PANCAKE (nhap tu file Excel "Thong ke tuong tac" — pages_statistics_engagements)
+// ═══════════════════════════════════════════════════════════════
+
+// Ghi cac dong thong ke ngay tu file Excel upload. Idempotent theo date+pageId+nhanVien: xoa
+// het cac dong TRUNG NGAY+PAGE co trong payload roi ghi lai — nap lai file cung 1 ngay (vd
+// sua so lieu, hoac nap lai cho chac) se khong bi nhan doi du lieu.
 function savePancakeStats_(rows) {
   rows = rows || [];
   if (!rows.length) return jsonOut_({ ok: true, written: 0 });
   var sh = getSheet_(SH_PK_STATS, PK_STATS_HEADERS);
   var lastRow = sh.getLastRow();
+
+  // Tap hop (date, pageId) co trong lan nap nay -> can xoa sach du lieu cu cung khoa truoc khi ghi lai
   var touchedKeys = {};
-  rows.forEach(function(r) { touchedKeys[r.date + '|' + r.pageId] = true; });
+  rows.forEach(function(r) { touchedKeys[normOrderDate_(r.date) + '|' + r.pageId] = true; });
+
   var keep = [];
   if (lastRow > 1) {
     var existing = sh.getRange(2, 1, lastRow - 1, PK_STATS_HEADERS.length).getValues();
     for (var i = 0; i < existing.length; i++) {
+      // Chuan hoa lai cot ngay TRUOC khi so khop/ghi lai: cot A dinh dang "Tu dong" nen Sheets
+      // hay tu y doi chuoi "2026-09-18" thanh kieu Date ngay khi ghi lan dau; so sanh chuoi
+      // voi mot gia tri Date se luon sai lech, lam mat han dong do khoi moi bao cao/KPI ve sau
+      // (trieu chung: nap du lieu moi xong nhung so lieu khong nhay). Chuan hoa o day vua sua
+      // dung key de so khop, vua "chua" luon gia tri se ghi lai xuong sheet (tu heal du lieu cu).
+      existing[i][0] = normOrderDate_(existing[i][0]);
       var k = existing[i][0] + '|' + existing[i][1];
       if (!touchedKeys[k]) keep.push(existing[i]);
     }
   }
+
   var newRows = rows.map(function(r) {
-    return [r.date||'', r.pageId||'', r.pageName||'', r.nhanVien||'',
+    return [normOrderDate_(r.date), r.pageId||'', r.pageName||'', r.nhanVien||'',
       +r.khCu||0, +r.khMoi||0, +r.tongTT||0, +r.tinNhan||0, +r.binhLuan||0,
       +r.hoiThoaiMoi||0, +r.dhKhMoi||0, +r.dhKhCu||0, +r.tongDH||0];
   });
+
   sh.clearContents();
   var matrix = [PK_STATS_HEADERS].concat(keep).concat(newRows);
+  // Ep cot A (ngay) ve dinh dang van ban TRUOC khi ghi gia tri, de Sheets khong tu dong doi
+  // chuoi "yyyy-MM-dd" thanh kieu Date nua (chan loi tai phat sinh cho lan luu ke tiep).
+  sh.getRange(1, 1, matrix.length, 1).setNumberFormat('@');
   sh.getRange(1, 1, matrix.length, PK_STATS_HEADERS.length).setValues(matrix);
-  return jsonOut_({ ok: true, written: newRows.length });
+  return jsonOut_({ ok: true, written: newRows.length, replaced: keep.length !== (lastRow > 1 ? lastRow - 1 : 0) });
+}
+
+// Tra ve {map, mapCI} — mapCI la ban khong phan biet hoa/thuong cua map (dung khi ten Pancake
+// bi go sai hoa/thuong giua cac lan xuat file, vd "biichnguyen1993" va "Biichnguyen1993" phai
+// duoc coi la CUNG 1 nguoi thay vi tach thanh 2 dong rieng trong bao cao).
+function readPancakeMapCI_() {
+  var map = readPancakeMap_();
+  var mapCI = {};
+  Object.keys(map).forEach(function(k) { mapCI[_normTxt_(k)] = map[k]; });
+  return { map: map, mapCI: mapCI };
 }
 
 function readPancakeMap_() {
@@ -10473,6 +10717,25 @@ function readPancakeMap_() {
   return out;
 }
 
+// Toan bo ten "Nhan vien" tung xuat hien trong bao cao Pancake da luu (khong loc theo ngay) —
+// dung de bang "Khop ten" luon hien du danh sach can khop, KE CA sau khi da nap/luu bao cao
+// va reload lai trang (khac voi _pkState.parsedUnmapped ben client chi ton tai tam thoi tu
+// file vua doc, se mat neu bam Luu len CRM hoac F5 truoc khi khop het).
+function pancakeAllNames_() {
+  var sh = getSheet_(SH_PK_STATS, PK_STATS_HEADERS);
+  var seen = {}, out = []; // key = ten viet thuong, khong dau khoang trang thua -> gop cac bien the hoa/thuong
+  if (sh.getLastRow() >= 2) {
+    var v = sh.getRange(2, 4, sh.getLastRow() - 1, 1).getValues(); // cot D = nhanVien
+    for (var i = 0; i < v.length; i++) {
+      var nm = String(v[i][0] || '').trim(); if (!nm) continue;
+      var k = _normTxt_(nm);
+      if (!seen[k]) { seen[k] = nm; out.push(nm); } // giu dung bien the DAU TIEN gap
+    }
+  }
+  return out;
+}
+
+// Ghi/cap nhat 1 dong khop ten (upsert theo pancakeName) — khong xoa cac dong khop khac.
 function savePancakeNameMap_(pancakeName, saleName) {
   if (!pancakeName) return jsonOut_({ error: 'Thiếu tên Nhân viên Pancake.' });
   var sh = getSheet_(SH_PK_MAP, PK_MAP_HEADERS);
@@ -10490,29 +10753,39 @@ function savePancakeNameMap_(pancakeName, saleName) {
   return jsonOut_({ ok: true, updated: false });
 }
 
+// Tong hop bao cao theo Page va theo CS (da khop ten qua PancakeNameMap; ten chua khop giu
+// nguyen ten Pancake va danh dau unmapped:true de UI nhac nguoi dung di khop ten).
 function buildPancakeReport_(from, to, split) {
   split = (split === 'full') ? 'full' : 'equal';
   var sh = getSheet_(SH_PK_STATS, PK_STATS_HEADERS);
-  var map = readPancakeMap_();
+  var mapPair = readPancakeMapCI_(), map = mapPair.map, mapCI = mapPair.mapCI;
   var byPage = {}, byCS = {};
-  var unmappedSet = {};
+  var unmappedSet = {}, unmappedCanon = {}; // ci-key -> ten hien thi (giu ban DAU TIEN gap)
+
   if (sh.getLastRow() >= 2) {
     var v = sh.getRange(2, 1, sh.getLastRow() - 1, PK_STATS_HEADERS.length).getValues();
     for (var i = 0; i < v.length; i++) {
-      var d = String(v[i][0]);
+      var d = normOrderDate_(v[i][0]); // chuan hoa: cot co the con vai dong Date-object cu, xem savePancakeStats_
       if (from && d < from) continue;
       if (to && d > to) continue;
       var pageId = String(v[i][1]), pageName = String(v[i][2]), nhanVien = String(v[i][3]);
       var khCu=+v[i][4]||0, khMoi=+v[i][5]||0, tongTT=+v[i][6]||0, tinNhan=+v[i][7]||0,
           binhLuan=+v[i][8]||0, hoiThoaiMoi=+v[i][9]||0, dhKhMoi=+v[i][10]||0, dhKhCu=+v[i][11]||0, tongDH=+v[i][12]||0;
+
       if (!byPage[pageId]) byPage[pageId] = { pageId: pageId, pageName: pageName, khCu:0, khMoi:0, tongTT:0, tinNhan:0, binhLuan:0, hoiThoaiMoi:0, dhKhMoi:0, dhKhCu:0, tongDH:0 };
       var bp = byPage[pageId];
       bp.khCu+=khCu; bp.khMoi+=khMoi; bp.tongTT+=tongTT; bp.tinNhan+=tinNhan; bp.binhLuan+=binhLuan;
       bp.hoiThoaiMoi+=hoiThoaiMoi; bp.dhKhMoi+=dhKhMoi; bp.dhKhCu+=dhKhCu; bp.tongDH+=tongDH;
+
       // 1 ten Pancake co the gan cho nhieu Sale (luu dang "saleA|saleB").
-      var sales = String(map[nhanVien] || '').split('|').map(function(x) { return x.trim(); }).filter(function(x) { return x; });
+      var rawMap = map[nhanVien]; if (rawMap === undefined) rawMap = mapCI[_normTxt_(nhanVien)];
+      var sales = String(rawMap || '').split('|').map(function(x) { return x.trim(); }).filter(function(x) { return x; });
       var mapped = sales.length > 0;
-      if (!mapped) { sales = [nhanVien]; unmappedSet[nhanVien] = true; }
+      if (!mapped) {
+        var ck1 = _normTxt_(nhanVien);
+        if (!unmappedCanon[ck1]) unmappedCanon[ck1] = nhanVien;
+        sales = [unmappedCanon[ck1]]; unmappedSet[unmappedCanon[ck1]] = true;
+      }
       // split='equal': chia deu cho cac Sale (tong theo CS = tong theo Page); split='full': moi Sale tinh du.
       var w = (split === 'full') ? 1 : 1 / sales.length;
       for (var si = 0; si < sales.length; si++) {
@@ -10521,13 +10794,14 @@ function buildPancakeReport_(from, to, split) {
         if (!byCS[csKey]) byCS[csKey] = { name: saleName, pancakeNames: {}, mapped: mapped, shared: false, khCu:0, khMoi:0, tongTT:0, tinNhan:0, binhLuan:0, hoiThoaiMoi:0, dhKhMoi:0, dhKhCu:0, tongDH:0 };
         var bc = byCS[csKey];
         bc.pancakeNames[nhanVien] = true;
-        if (mapped) bc.mapped = true; // neu >=1 nguon da khop thi coi la mapped
+        if (mapped) bc.mapped = true; // neu >=1 nguon da khop thi coi la mapped (hiem khi trung ten CS voi ten chua khop)
         if (sales.length > 1) bc.shared = true;
         bc.khCu+=khCu*w; bc.khMoi+=khMoi*w; bc.tongTT+=tongTT*w; bc.tinNhan+=tinNhan*w; bc.binhLuan+=binhLuan*w;
         bc.hoiThoaiMoi+=hoiThoaiMoi*w; bc.dhKhMoi+=dhKhMoi*w; bc.dhKhCu+=dhKhCu*w; bc.tongDH+=tongDH*w;
       }
     }
   }
+
   function finalize(obj) {
     var arr = Object.keys(obj).map(function(k) {
       var r = obj[k];
@@ -10539,7 +10813,543 @@ function buildPancakeReport_(from, to, split) {
     arr.sort(function(a,b) { return b.tongTT - a.tongTT; });
     return arr;
   }
+
   return { byPage: finalize(byPage), byCS: finalize(byCS), unmapped: Object.keys(unmappedSet).sort(), split: split };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PANCAKE — THONG KE SDT MANG VE / DON CHOT (file "Thong ke nhan vien",
+//  sheet "<pageId> By staff") — luu tren CRM (KHONG chi luu trinh duyet nhu Tag),
+//  dung lam mau so cho ty le tag L2 va cho Bao cao KPI tong hop.
+// ═══════════════════════════════════════════════════════════════
+function savePancakeSdtStats_(rows) {
+  rows = rows || [];
+  if (!rows.length) return jsonOut_({ ok: true, written: 0 });
+  var sh = getSheet_(SH_PK_SDT, PK_SDT_STATS_HEADERS);
+  var lastRow = sh.getLastRow();
+
+  var touchedKeys = {};
+  rows.forEach(function(r) { touchedKeys[normOrderDate_(r.date) + '|' + r.pageId] = true; });
+
+  var keep = [];
+  if (lastRow > 1) {
+    var existing = sh.getRange(2, 1, lastRow - 1, PK_SDT_STATS_HEADERS.length).getValues();
+    for (var i = 0; i < existing.length; i++) {
+      // Xem chu thich chi tiet o savePancakeStats_ — cung 1 loi coi Sheets tu doi chuoi ngay
+      // thanh kieu Date, chuan hoa lai o day vua sua key vua tu heal du lieu cu.
+      existing[i][0] = normOrderDate_(existing[i][0]);
+      var k = existing[i][0] + '|' + existing[i][1];
+      if (!touchedKeys[k]) keep.push(existing[i]);
+    }
+  }
+
+  var newRows = rows.map(function(r) {
+    return [normOrderDate_(r.date), r.pageId||'', r.pageName||'', r.nhanVien||'',
+      +r.tinNhanTuBinhLuan||0, +r.binhLuan||0, +r.phienTLBinhLuan||0,
+      +r.tinNhan||0, +r.phienTLTinNhan||0, +r.sdtMangVe||0, +r.soDonChot||0];
+  });
+
+  sh.clearContents();
+  var matrix = [PK_SDT_STATS_HEADERS].concat(keep).concat(newRows);
+  sh.getRange(1, 1, matrix.length, 1).setNumberFormat('@');
+  sh.getRange(1, 1, matrix.length, PK_SDT_STATS_HEADERS.length).setValues(matrix);
+  return jsonOut_({ ok: true, written: newRows.length, replaced: keep.length !== (lastRow > 1 ? lastRow - 1 : 0) });
+}
+
+// Tong hop bao cao SDT theo Page va theo CS — cung co che khop ten qua PancakeNameMap
+// nhu buildPancakeReport_ (dung chung 1 bang khop, khong can khop rieng lan 2).
+function buildPancakeSdtReport_(from, to, split) {
+  split = (split === 'full') ? 'full' : 'equal';
+  var sh = getSheet_(SH_PK_SDT, PK_SDT_STATS_HEADERS);
+  var mapPair = readPancakeMapCI_(), map = mapPair.map, mapCI = mapPair.mapCI;
+  var byPage = {}, byCS = {};
+  var unmappedSet = {}, unmappedCanon = {};
+
+  if (sh.getLastRow() >= 2) {
+    var v = sh.getRange(2, 1, sh.getLastRow() - 1, PK_SDT_STATS_HEADERS.length).getValues();
+    for (var i = 0; i < v.length; i++) {
+      var d = normOrderDate_(v[i][0]); // xem chu thich o savePancakeStats_
+      if (from && d < from) continue;
+      if (to && d > to) continue;
+      var pageId = String(v[i][1]), pageName = String(v[i][2]), nhanVien = String(v[i][3]);
+      var tinNhanTuBinhLuan=+v[i][4]||0, binhLuan=+v[i][5]||0, phienTLBinhLuan=+v[i][6]||0,
+          tinNhan=+v[i][7]||0, phienTLTinNhan=+v[i][8]||0, sdtMangVe=+v[i][9]||0, soDonChot=+v[i][10]||0;
+
+      if (!byPage[pageId]) byPage[pageId] = { pageId: pageId, pageName: pageName, sdtMangVe:0, soDonChot:0, tinNhan:0, binhLuan:0 };
+      var bp = byPage[pageId];
+      bp.sdtMangVe+=sdtMangVe; bp.soDonChot+=soDonChot; bp.tinNhan+=tinNhan; bp.binhLuan+=binhLuan;
+
+      var rawMap = map[nhanVien]; if (rawMap === undefined) rawMap = mapCI[_normTxt_(nhanVien)];
+      var sales = String(rawMap || '').split('|').map(function(x) { return x.trim(); }).filter(function(x) { return x; });
+      var mapped = sales.length > 0;
+      if (!mapped) {
+        var ck2 = _normTxt_(nhanVien);
+        if (!unmappedCanon[ck2]) unmappedCanon[ck2] = nhanVien;
+        sales = [unmappedCanon[ck2]]; unmappedSet[unmappedCanon[ck2]] = true;
+      }
+      var w = (split === 'full') ? 1 : 1 / sales.length;
+      for (var si = 0; si < sales.length; si++) {
+        var saleName = sales[si];
+        if (!byCS[saleName]) byCS[saleName] = { name: saleName, mapped: mapped, sdtMangVe:0, soDonChot:0, tinNhan:0, binhLuan:0 };
+        var bc = byCS[saleName];
+        if (mapped) bc.mapped = true;
+        bc.sdtMangVe+=sdtMangVe*w; bc.soDonChot+=soDonChot*w; bc.tinNhan+=tinNhan*w; bc.binhLuan+=binhLuan*w;
+      }
+    }
+  }
+
+  function finalize(obj) {
+    var arr = Object.keys(obj).map(function(k) {
+      var r = obj[k];
+      ['sdtMangVe','soDonChot','tinNhan','binhLuan'].forEach(function(f) { r[f] = Math.round(r[f] * 100) / 100; });
+      return r;
+    });
+    arr.sort(function(a,b) { return b.sdtMangVe - a.sdtMangVe; });
+    return arr;
+  }
+
+  return { byPage: finalize(byPage), byCS: finalize(byCS), unmapped: Object.keys(unmappedSet).sort(), split: split };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PANCAKE — KHOP TEN PAGE (pageId) <-> "Kenh ban" chuan trong DT TONG
+//  Cung co che voi PancakeNameMap (khop Nhan vien <-> Sale) o tren.
+// ═══════════════════════════════════════════════════════════════
+function readPancakePageMap_() {
+  var sh = getSheet_(SH_PK_PAGEMAP, PK_PAGEMAP_HEADERS);
+  var out = {};
+  if (sh.getLastRow() < 2) return out;
+  var v = sh.getRange(2, 1, sh.getLastRow() - 1, PK_PAGEMAP_HEADERS.length).getValues();
+  for (var i = 0; i < v.length; i++) {
+    if (!v[i][0]) continue;
+    out[String(v[i][0])] = String(v[i][2] || ''); // key = pageId -> kenhBan
+  }
+  return out;
+}
+
+// Toan bo (pageId,pageName) tung xuat hien trong PancakeStats/PancakeSdtStats da luu — dung
+// de bang "Khop ten Page" luon hien du danh sach can khop.
+function pancakeAllPages_() {
+  var out = {}; // pageId -> pageName
+  [SH_PK_STATS, SH_PK_SDT].forEach(function(shName) {
+    var sh = getSheet_(shName, shName === SH_PK_STATS ? PK_STATS_HEADERS : PK_SDT_STATS_HEADERS);
+    if (sh.getLastRow() < 2) return;
+    var v = sh.getRange(2, 2, sh.getLastRow() - 1, 2).getValues(); // cot B=pageId, C=pageName
+    for (var i = 0; i < v.length; i++) { if (v[i][0]) out[String(v[i][0])] = String(v[i][1] || ''); }
+  });
+  return Object.keys(out).map(function(pid) { return { pageId: pid, pageName: out[pid] }; });
+}
+
+function savePancakePageMap_(pageId, pageName, kenhBan) {
+  if (!pageId) return jsonOut_({ error: 'Thieu Page ID.' });
+  var sh = getSheet_(SH_PK_PAGEMAP, PK_PAGEMAP_HEADERS);
+  var lastRow = sh.getLastRow();
+  if (lastRow >= 2) {
+    var v = sh.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (var i = 0; i < v.length; i++) {
+      if (String(v[i][0]) === String(pageId)) {
+        sh.getRange(i + 2, 2, 1, 2).setValues([[pageName || '', kenhBan || '']]);
+        return jsonOut_({ ok: true, updated: true });
+      }
+    }
+  }
+  sh.appendRow([pageId, pageName || '', kenhBan || '']);
+  return jsonOut_({ ok: true, updated: false });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PANCAKE — THONG KE TAG (L1-L7 trang thai, S/O sale) theo Page+ngay — luu tren CRM
+//  (truoc day chi luu trinh duyet, lam Bao cao KPI tong hop khong doc duoc). Phan loai tag
+//  tinh LAI moi lan tong hop (khong tin type/code luc luu), CUNG LOGIC voi _pkClassifyTag
+//  ben client, de quy chuan tay (pancakeTagOverride) ap dung duoc ngay ca voi du lieu cu.
+// ═══════════════════════════════════════════════════════════════
+var PK_STATUS_CODES_ = ['L1','L2','L3','L4','L5','L5.1','L5.2','L6','L7'];
+
+function classifyPancakeTag_(name, overrideMap) {
+  var n = String(name || '').trim();
+  var ov = overrideMap && overrideMap[n];
+  if (ov) {
+    if (PK_STATUS_CODES_.indexOf(ov) !== -1) return { type: 'status', code: ov };
+    if (/^([SO])\d+$/i.test(ov)) return { type: 'sale', code: ov.toUpperCase() }; // quy chuan tay tro thang ve 1 Sale
+  }
+  var m = n.match(/^([SO])\s*(\d+)(?!\d)/i);
+  if (m) return { type: 'sale', code: m[1].toUpperCase() + parseInt(m[2], 10) };
+  if (/^L\s*\d?\.?\s*ch[oờ]\s*ck/i.test(n) || /^L5\.1/i.test(n)) return { type: 'status', code: 'L5.1' };
+  if (/^L5\.2/i.test(n) || /^L\s*\d?\.?\s*ch[oờ]\s*l[eê]n/i.test(n)) return { type: 'status', code: 'L5.2' };
+  m = n.match(/^L\s*(\d)(?!\d)/i);
+  if (m) return { type: 'status', code: 'L' + m[1] };
+  return { type: 'other', code: '' };
+}
+
+function savePancakeTagStats_(rows) {
+  rows = rows || [];
+  if (!rows.length) return jsonOut_({ ok: true, written: 0 });
+  var sh = getSheet_(SH_PK_TAG, PK_TAG_STATS_HEADERS);
+  var lastRow = sh.getLastRow();
+
+  var touchedKeys = {};
+  rows.forEach(function(r) { touchedKeys[normOrderDate_(r.date) + '|' + r.pageId + '|' + (r.tagId || r.tagName)] = true; });
+
+  var keep = [];
+  if (lastRow > 1) {
+    var existing = sh.getRange(2, 1, lastRow - 1, PK_TAG_STATS_HEADERS.length).getValues();
+    for (var i = 0; i < existing.length; i++) {
+      // Xem chu thich chi tiet o savePancakeStats_ — cung 1 loi coi Sheets tu doi chuoi ngay
+      // thanh kieu Date, chuan hoa lai o day vua sua key vua tu heal du lieu cu.
+      existing[i][0] = normOrderDate_(existing[i][0]);
+      var k = existing[i][0] + '|' + existing[i][1] + '|' + (existing[i][3] || existing[i][4]);
+      if (!touchedKeys[k]) keep.push(existing[i]);
+    }
+  }
+
+  var newRows = rows.map(function(r) {
+    return [normOrderDate_(r.date), r.pageId || '', r.pageName || '', r.tagId || '', r.tagName || '', +r.count || 0];
+  });
+
+  sh.clearContents();
+  var matrix = [PK_TAG_STATS_HEADERS].concat(keep).concat(newRows);
+  sh.getRange(1, 1, matrix.length, 1).setNumberFormat('@');
+  sh.getRange(1, 1, matrix.length, PK_TAG_STATS_HEADERS.length).setValues(matrix);
+  return jsonOut_({ ok: true, written: newRows.length });
+}
+
+// Tong hop bao cao tag theo Page (khong theo Sale, vi tag Pancake chi gan o muc hoi thoai/Page,
+// khong co truong "Nhan vien" nhu 2 loai bao cao Pancake kia) — dung lam nguyen lieu cho
+// buildKpiReport_ (ty le L7/tongTT theo Page, va phe do L1->L6 tong the toan he thong).
+function buildPancakeTagReport_(from, to) {
+  var sh = getSheet_(SH_PK_TAG, PK_TAG_STATS_HEADERS);
+  var overrideMap = {};
+  try { var raw = getSetting_('pancakeTagOverride'); if (raw) overrideMap = JSON.parse(raw) || {}; } catch (e) {}
+
+  var byPage = {}; // pageId -> { pageName, L1..L7:0, ... }
+  var totals = {}; // L1..L7 tong toan he thong
+  PK_STATUS_CODES_.forEach(function(c) { totals[c] = 0; });
+
+  if (sh.getLastRow() >= 2) {
+    var v = sh.getRange(2, 1, sh.getLastRow() - 1, PK_TAG_STATS_HEADERS.length).getValues();
+    for (var i = 0; i < v.length; i++) {
+      var d = normOrderDate_(v[i][0]); // xem chu thich o savePancakeStats_
+      if (from && d < from) continue;
+      if (to && d > to) continue;
+      var pageId = String(v[i][1]), pageName = String(v[i][2]), tagName = String(v[i][4]), count = +v[i][5] || 0;
+      if (!count) continue;
+      var cls = classifyPancakeTag_(tagName, overrideMap);
+      if (cls.type !== 'status') continue; // chi quan tam nhom trang thai L1-L7 o day (nhom Sale da co bao cao rieng)
+      if (!byPage[pageId]) { byPage[pageId] = { pageId: pageId, pageName: pageName }; PK_STATUS_CODES_.forEach(function(c) { byPage[pageId][c] = 0; }); }
+      byPage[pageId][cls.code] += count;
+      if (totals[cls.code] !== undefined) totals[cls.code] += count;
+    }
+  }
+  return { byPage: byPage, totals: totals };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BAO CAO KPI TONG HOP — ghep DT TONG (don hang/doanh thu that) + Bao cao Pancake
+//  (tuong tac + SDT mang ve) + Bao cao Tag (L1-L7, tu sheet PancakeTagStats). Tra ve theo
+//  Page va theo Sale; phe do tag L1-L7 (ca tung Page lan toan he thong) xem cong thuc o
+//  ham _tagFunnelRates_ ngay phia tren.
+// Tinh phe do chuyen doi L1->L7 tu 1 bo dem {L1,L2,...,L7} + mau so rieng.
+// Cong thuc (thong nhat ca muc tung Page va muc toan he thong):
+//   L1 = L1 / tongTT          (ty le tuong tac dat "chuan" — 3 lan phan hoi tro len)
+//   L2 = L2 / sdtThuThap      (rieng L2: mau so la Tong SDT thu thap — theo yeu cau)
+//   L3 = L3 / L2              (buoc chuyen: trong so SDT da ket noi, bao nhieu thanh tiem nang)
+//   L4 = L4 / L3              (tiem nang -> khao gia/KNC)
+//   L5 = L5 / L4              (khao gia -> chot, theo TAG Pancake — khac voi "ty le chot Page"
+//                               o cho khac von tinh tren DON HANG THAT trong DT TONG)
+//   L6 = L6 / L5              (trong so da chot, bao nhieu bi huy)
+//   L7 = L7 / tongTT          (rieng KV Ha Noi — tinh tren tong tuong tac, theo yeu cau)
+function _tagFunnelRates_(counts, tongTT, sdtThuThap) {
+  var pct = function(a, b) { return b ? Math.round(a / b * 1000) / 10 : 0; }; // 1 so le, %
+  var c = counts || {};
+  return {
+    counts: { L1: c.L1||0, L2: c.L2||0, L3: c.L3||0, L4: c.L4||0, L5: c.L5||0, L6: c.L6||0, L7: c.L7||0 },
+    rates: {
+      L1: pct(c.L1, tongTT),
+      L2: pct(c.L2, sdtThuThap),
+      L3: pct(c.L3, c.L2),
+      L4: pct(c.L4, c.L3),
+      L5: pct(c.L5, c.L4),
+      L6: pct(c.L6, c.L5),
+      L7: pct(c.L7, tongTT)
+    }
+  };
+}
+
+// Quet cot ngay (cot A) cua 1 sheet Pancake: dem so dong NAM TRONG khoang [from,to] va lay
+// khoang ngay TOI DA dang co trong sheet. Dung de bao cho nguoi dung biet chinh xac vi sao
+// bao cao ra 0: "chua nap du lieu bao gio" hay "co du lieu nhung khong thuoc khoang ngay dang chon".
+function _pkSheetDateSpan_(shName, headers, from, to) {
+  var out = { rows: 0, rowsInRange: 0, minDate: '', maxDate: '' };
+  var sh = getSheet_(shName, headers);
+  if (sh.getLastRow() < 2) return out;
+  var v = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
+  for (var i = 0; i < v.length; i++) {
+    var d = normOrderDate_(v[i][0]);
+    if (!d) continue;
+    out.rows++;
+    if (!out.minDate || d < out.minDate) out.minDate = d;
+    if (!out.maxDate || d > out.maxDate) out.maxDate = d;
+    if (from && d < from) continue;
+    if (to && d > to) continue;
+    out.rowsInRange++;
+  }
+  return out;
+}
+
+var SALE_DIR_HEADERS = ['maSale','tenFacebook','userBase','tenTagPancake'];
+
+// Danh sach Sale chuan (sheet SaleDirectory). Nhom lay tu chu cai dau cua "Ten tag Pancake":
+// S = Sale van phong (offline), O = Sale online. Tra ve map tra cuu theo CA 3 kieu ten hay gap
+// (ten Facebook, user base, ten tag) de khop duoc du bao cao Pancake ghi ten kieu nao.
+// Ghi de toan bo danh sach Sale chuan (dan tu file Excel "Danh sach Sale").
+function saveSaleDirectory_(rows) {
+  rows = rows || [];
+  var sh = getSheet_(SH_SALE_DIR, SALE_DIR_HEADERS);
+  sh.clearContents();
+  var matrix = [SALE_DIR_HEADERS].concat(rows.map(function(r) {
+    return [r.maSale || '', r.tenFacebook || '', r.userBase || '', r.tenTagPancake || ''];
+  }));
+  sh.getRange(1, 1, matrix.length, SALE_DIR_HEADERS.length).setValues(matrix);
+  return jsonOut_({ ok: true, written: rows.length });
+}
+
+function readSaleDirectory_() {
+  var sh = getSheet_(SH_SALE_DIR, SALE_DIR_HEADERS);
+  var list = [], byName = {};
+  if (sh.getLastRow() < 2) return { list: list, byName: byName };
+  var v = sh.getRange(2, 1, sh.getLastRow() - 1, SALE_DIR_HEADERS.length).getValues();
+  for (var i = 0; i < v.length; i++) {
+    var tag = String(v[i][3] || '').trim();
+    var m = tag.match(/^([SO])\s*(\d+)/i);
+    if (!m) continue; // dong khong co ma tag S#/O# -> khong phai Sale trong danh sach
+    var rec = {
+      maSale: String(v[i][0] || '').trim(),
+      tenFacebook: String(v[i][1] || '').trim(),
+      userBase: String(v[i][2] || '').trim(),
+      tenTagPancake: tag,
+      code: m[1].toUpperCase() + parseInt(m[2], 10),
+      nhom: m[1].toUpperCase() === 'S' ? 'Văn phòng' : 'Online'
+    };
+    list.push(rec);
+    [rec.tenFacebook, rec.userBase, rec.tenTagPancake, rec.code].forEach(function(k) {
+      if (k) byName[_normTxt_(k)] = rec;
+    });
+  }
+  return { list: list, byName: byName };
+}
+
+function buildKpiReport_(from, to) {
+  // Thieu khoang ngay -> KHONG im lang tinh toan bo lich su (so don/doanh thu ca nam ghep voi
+  // tuong tac ca nam cho ra ty le vo nghia). Mac dinh 7 ngay gan nhat va bao ro cho giao dien.
+  var warnings = [];
+  // KHONG dung Session.getScriptTimeZone() de tinh "hom nay" — neu cau hinh Time Zone cua du an
+  // Apps Script khong phai gio VN (vd bi de mac dinh khac), "hom nay" se tinh sai ngay. Dung
+  // thang offset co dinh +7 (_vnYmd_) — chac chan dung du du an cau hinh Time Zone la gi.
+  if (!from || !to) {
+    var now = new Date();
+    if (!to)   to   = _vnYmd_(now);
+    if (!from) from = _vnYmd_(new Date(now.getTime() - 6 * 86400000));
+    warnings.push('Chưa chọn đủ khoảng ngày — đang tạm tính cho 7 ngày gần nhất (' + from + ' → ' + to + ').');
+  }
+  if (from && to && from > to) {
+    warnings.push('Khoảng ngày bị ngược (từ ' + from + ' sau đến ' + to + ') nên không có dữ liệu nào lọt vào. Hãy đổi lại 2 ô ngày.');
+  }
+
+  // 1) DT TONG: gom doanh thu/so don theo Page (kenhBan) va theo Sale (saleBan, co the nhieu
+  // Sale/don, cach lam giong het buildSalesReportA_: so don KHONG chia, tien CHIA DEU cho N Sale)
+  //
+  // LUU Y quan trong ve moc ngay dung de loc: bao cao nay PHAI khop voi "Report Page" cua
+  // chinh Base (widget bao cao co san tren workflow "ĐƠN CÁC KÊNH") va voi file Base xuat ra
+  // (Export -> "Ngày tạo"), vi CS doi chieu 2 ben voi nhau. Ca 2 cho do deu gom don theo
+  // NGAY TAO don (Ngay tao), KHONG theo ngay hoan thanh. Truoc day cho nay dung o.date, ma
+  // o.date lai UU TIEN "Thoi gian hoan thanh" (xem dtRowToOrder_) — nen 1 don duoc TAO tu
+  // hom truoc nhung moi duoc CHUYEN GIAI DOAN/hoan thanh vao dung ngay dang xem se bi tinh
+  // GOP THEM vao ngay do, lam doanh thu bao cao nay CAO HON han so voi Base that (da gap:
+  // vi du ngay 19/09/2026 Base tinh 222.327.000d nhung bao cao nay ra toi 244.572.000d).
+  // Sua: dung dung o.orderDate (= cot "Ngày tạo" that su, khong doi theo trang thai) cho
+  // rieng bao cao KPI nay. Cac bao cao doanh so A/B/C khac VAN giu nguyen o.date nhu cu,
+  // khong dong cham toi (do la quyet dinh rieng, xem chu thich o dtRowToOrder_ dong ~994).
+  var orders = readAllOrders_();
+  var byPageOrders = {}, bySaleOrders = {};
+  var ordersDetail = []; // danh sach tung don khop khoang ngay -> xuat Excel de doi chieu tay voi Base
+  for (var i = 0; i < orders.length; i++) {
+    var o = orders[i];
+    var d = parseVNDate_(o.orderDate);
+    if (!d) continue;
+    if (!dateInRange_(d, from, to)) continue;
+    var page = o.source || '(chưa có kênh)';
+    if (!byPageOrders[page]) byPageOrders[page] = { orders: 0, revenue: 0 };
+    byPageOrders[page].orders += 1;
+    byPageOrders[page].revenue += Number(o.revenue) || 0;
+    ordersDetail.push({
+      id: o.id || '', ngayTao: normOrderDate_(o.orderDate), kenhBan: page,
+      sale: o.cs || '', giaTriDon: Number(o.revenue) || 0, sanPham: o.product || '', phone: o.phone || ''
+    });
+
+    var salesList = splitMulti_(o.cs, ',');
+    if (!salesList.length) salesList = ['(chưa gán sale)'];
+    var w = 1 / salesList.length;
+    for (var si = 0; si < salesList.length; si++) {
+      var sName = salesList[si];
+      if (!bySaleOrders[sName]) bySaleOrders[sName] = { orders: 0, revenue: 0 };
+      bySaleOrders[sName].orders += 1; // so don: khong chia
+      bySaleOrders[sName].revenue += (Number(o.revenue) || 0) * w; // tien: chia deu
+    }
+  }
+
+  // 2) Bao cao Pancake (tuong tac + SDT) — dung lai 2 ham da co, split='equal'
+  var pInt = buildPancakeReport_(from, to, 'equal');
+  var pSdt = buildPancakeSdtReport_(from, to, 'equal');
+  var pageMap = readPancakePageMap_(); // pageId -> kenhBan
+  var pTag = buildPancakeTagReport_(from, to); // tong hop tag L1-L7 theo Page (tu sheet PancakeTagStats)
+
+  // 3) Ghep theo Page: hop cac pageId tung xuat hien o ca 2 bao cao Pancake
+  var pageInfo = {}; // pageId -> {pageName}
+  pInt.byPage.forEach(function(r) { pageInfo[r.pageId] = { pageName: r.pageName, tongTT: r.tongTT, tongDH_pancake: r.tongDH }; });
+  pSdt.byPage.forEach(function(r) {
+    if (!pageInfo[r.pageId]) pageInfo[r.pageId] = { pageName: r.pageName, tongTT: 0, tongDH_pancake: 0 };
+    pageInfo[r.pageId].sdtMangVe = r.sdtMangVe;
+  });
+  var byPage = Object.keys(pageInfo).map(function(pid) {
+    var info = pageInfo[pid];
+    var kenhBan = pageMap[pid] || '';
+    var dt = kenhBan && byPageOrders[kenhBan] ? byPageOrders[kenhBan] : { orders: 0, revenue: 0 };
+    var tongTT = info.tongTT || 0;
+    var sdtMangVe = info.sdtMangVe || 0;
+    var tagInfo = pTag.byPage[pid];
+    var tagFunnel = _tagFunnelRates_(tagInfo || {}, tongTT, sdtMangVe);
+    return {
+      pageId: pid, pageName: info.pageName || pid, kenhBan: kenhBan,
+      mapped: !!kenhBan,
+      tongTT: tongTT, sdtMangVe: sdtMangVe,
+      donHang: dt.orders, doanhThu: dt.revenue,
+      tyLeChot: tongTT ? Math.round(dt.orders / tongTT * 1000) / 10 : 0, // % (theo DON HANG THAT trong DT TONG)
+      trungBinhDon: dt.orders ? Math.round(dt.revenue / dt.orders) : 0,
+      tag: tagFunnel // { counts:{L1..L7}, rates:{L1..L7} } — xem cong thuc o _tagFunnelRates_
+    };
+  });
+  byPage.sort(function(a, b) { return b.tongTT - a.tongTT; });
+
+  // 4) Ghep theo Sale: pInt.byCS da o dang ten Sale chuan (qua PancakeNameMap) -> khop thang
+  // voi bySaleOrders (cung la ten Sale chuan tu cot saleBan DT TONG).
+  // Gop tu CA 2 bao cao: mot Sale chi co trong file "Thong ke nhan vien" (SDT) ma khong co
+  // trong file "Thong ke tuong tac" truoc day bi mat hut khoi bang nay.
+  var saleAgg = {}, saleCanon = {}; // ci-key -> ten hien thi dau tien gap (gop bien the hoa/thuong giua 2 file)
+  function _saleKey(name) {
+    var ck = _normTxt_(name);
+    if (!saleCanon[ck]) saleCanon[ck] = name;
+    return ck;
+  }
+  pInt.byCS.forEach(function(r) {
+    var k = _saleKey(r.name);
+    saleAgg[k] = { name: saleCanon[k], mapped: r.mapped, tongTT: r.tongTT || 0, sdtMangVe: 0 };
+  });
+  pSdt.byCS.forEach(function(r) {
+    var k = _saleKey(r.name);
+    if (!saleAgg[k]) saleAgg[k] = { name: saleCanon[k], mapped: r.mapped, tongTT: 0, sdtMangVe: 0 };
+    saleAgg[k].sdtMangVe = r.sdtMangVe || 0;
+    if (r.mapped) saleAgg[k].mapped = true;
+  });
+  var bySale = Object.keys(saleAgg).map(function(k) {
+    var r = saleAgg[k];
+    var dt = bySaleOrders[r.name] || { orders: 0, revenue: 0 };
+    return {
+      name: r.name, mapped: r.mapped,
+      tongTT: r.tongTT, sdtMangVe: r.sdtMangVe,
+      donHang: dt.orders, doanhThu: Math.round(dt.revenue),
+      tyLeChot: r.tongTT ? Math.round(dt.orders / r.tongTT * 1000) / 10 : 0
+    };
+  });
+  // Gan nhom Van phong (S) / Online (O) theo danh sach Sale chuan o sheet SaleDirectory.
+  var saleDir = readSaleDirectory_();
+  bySale.forEach(function(r) {
+    var rec = saleDir.byName[_normTxt_(r.name)];
+    r.nhom = rec ? rec.nhom : '';
+    r.maSale = rec ? rec.code : '';
+    r.inDirectory = !!rec;
+  });
+  bySale.sort(function(a, b) {
+    // Thu tu nhom: Van phong (S) -> Online (O) -> ngoai danh sach, dung theo yeu cau; trong
+    // tung nhom sap theo Ty le chot (tyLeChot) giam dan — Sale chot tot nhat len dau.
+    var rank = { 'Văn phòng': 0, 'Online': 1 };
+    var ra = rank.hasOwnProperty(a.nhom) ? rank[a.nhom] : 2;
+    var rb = rank.hasOwnProperty(b.nhom) ? rank[b.nhom] : 2;
+    if (ra !== rb) return ra - rb;
+    return b.tyLeChot - a.tyLeChot;
+  });
+
+  // Tong theo nhom: don KHONG chia (1 don co the co nhieu Sale) nen chi cong doanh thu da chia
+  // deu o tren -> cong lai theo nhom van dung tong the.
+  var byGroup = {};
+  ['Văn phòng', 'Online', ''].forEach(function(g) {
+    byGroup[g || '(ngoài danh sách)'] = { nhom: g || '(ngoài danh sách)', soSale: 0, tongTT: 0, sdtMangVe: 0, donHang: 0, doanhThu: 0 };
+  });
+  bySale.forEach(function(r) {
+    var g = byGroup[r.nhom || '(ngoài danh sách)'];
+    g.soSale++; g.tongTT += r.tongTT; g.sdtMangVe += r.sdtMangVe;
+    g.donHang += r.donHang; g.doanhThu += r.doanhThu;
+  });
+  var saleGroups = Object.keys(byGroup).map(function(k) { return byGroup[k]; })
+    .filter(function(g) { return g.soSale > 0; });
+  saleGroups.forEach(function(g) {
+    g.tyLeChot = g.tongTT ? Math.round(g.donHang / g.tongTT * 1000) / 10 : 0;
+  });
+
+  var totalTongTT = byPage.reduce(function(s, r) { return s + r.tongTT; }, 0);
+  var totalSdtMangVe = byPage.reduce(function(s, r) { return s + r.sdtMangVe; }, 0);
+  // Don/doanh thu: cong theo KENH BAN DUY NHAT, khong cong theo dong Page. Neu 2 Page cung tro
+  // ve 1 Kenh ban thi moi dong Page deu hien tron so cua kenh do (dung khi xem tung dong),
+  // nhung cong lai se bi nhan doi -> tong phai gom theo kenh.
+  var seenKenh = {}, dupKenh = {};
+  var totalDonHang = 0, totalDoanhThu = 0;
+  byPage.forEach(function(r) {
+    if (!r.mapped) return;
+    if (seenKenh[r.kenhBan]) { dupKenh[r.kenhBan] = true; return; }
+    seenKenh[r.kenhBan] = true;
+    totalDonHang += r.donHang; totalDoanhThu += r.doanhThu;
+  });
+  var duplicateChannels = Object.keys(dupKenh);
+  if (duplicateChannels.length) {
+    warnings.push('Có nhiều Page cùng khớp về 1 Kênh bán (' + duplicateChannels.join(', ') +
+      '). Mỗi dòng Page bên dưới hiển thị trọn số đơn/doanh thu của kênh đó, nên cộng các dòng lại sẽ ra nhiều hơn tổng thật — tổng phía trên đã gom theo kênh nên không bị nhân đôi.');
+  }
+  var unmappedPages = byPage.filter(function(r) { return !r.mapped; }).map(function(r) { return { pageId: r.pageId, pageName: r.pageName }; });
+  var unmappedSales = bySale.filter(function(r) { return !r.mapped; }).map(function(r) { return r.name; });
+
+  // Chan doan nguon du lieu: bao ro "chua nap bao gio" vs "co du lieu nhung ngoai khoang ngay".
+  var dataAvail = {
+    tuongTac: _pkSheetDateSpan_(SH_PK_STATS, PK_STATS_HEADERS, from, to),
+    sdt:      _pkSheetDateSpan_(SH_PK_SDT,   PK_SDT_STATS_HEADERS, from, to),
+    tag:      _pkSheetDateSpan_(SH_PK_TAG,   PK_TAG_STATS_HEADERS, from, to)
+  };
+  var LBL_ = { tuongTac: 'Thống kê tương tác', sdt: 'Thống kê nhân viên (SĐT)', tag: 'Thống kê tag' };
+  Object.keys(dataAvail).forEach(function(k) {
+    var a = dataAvail[k];
+    if (a.rows === 0) {
+      warnings.push('Chưa có dữ liệu "' + LBL_[k] + '" nào trên CRM — vào tab "📥 Báo cáo Pancake", nạp file rồi bấm "💾 Lưu lên CRM".');
+    } else if (a.rowsInRange === 0) {
+      warnings.push('Không có dòng "' + LBL_[k] + '" nào trong khoảng ngày đang chọn (dữ liệu hiện có từ ' + a.minDate + ' đến ' + a.maxDate + ').');
+    }
+  });
+  // Phe do L1-L7 toan he thong: dung tong tag da gom san o buildPancakeTagReport_ (pTag.totals),
+  // mau so tongTT/sdtMangVe la tong cong tat ca Page trong ky (khong phai cong ty le tung Page).
+  var tagFunnelTotal = _tagFunnelRates_(pTag.totals, totalTongTT, totalSdtMangVe);
+
+  return {
+    byPage: byPage, bySale: bySale,
+    totalTongTT: totalTongTT, totalDonHang: totalDonHang, totalDoanhThu: totalDoanhThu, totalSdtMangVe: totalSdtMangVe,
+    tyLeChotChung: totalTongTT ? Math.round(totalDonHang / totalTongTT * 1000) / 10 : 0,
+    tagFunnelTotal: tagFunnelTotal,
+    unmappedPages: unmappedPages,
+    unmappedSales: unmappedSales,
+    saleGroups: saleGroups,
+    saleDirectoryCount: saleDir.list.length,
+    duplicateChannels: duplicateChannels,
+    dataAvail: dataAvail,
+    ordersDetail: ordersDetail, // danh sach tung don DT TONG khop khoang ngay -> doi chieu voi Base
+    from: from, to: to,
+    warnings: warnings
+  };
 }
 
 function saveUsers_(users) {
@@ -10683,6 +11493,31 @@ function _psheetNoAccent_(s) {
   return String(s||'').toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/đ/g, 'd');
+}
+
+// Map SDT (da normPhone_) -> care object day du (status, khStatus, zalo, nickZalos...) —
+// dung de loc Bao cao B theo tieu chi CRM (chi B co cot SDT trong "dữ liệu đơn").
+function _careMapByPhone_() {
+  var rows = readCare_(getCrmSS_().getSheetByName(SH_CARE));
+  var map = {};
+  for (var i = 0; i < rows.length; i++) {
+    var ph = normPhone_(rows[i].phone);
+    if (ph) map[ph] = rows[i];
+  }
+  return map;
+}
+// Khop 1 chuoi voi bat ky tu khoa nao trong danh sach (khong dau, khong phan biet hoa/thuong).
+// terms rong -> coi nhu KHONG loc (tra ve true).
+function _pMatchAny_(text, foldedTerms) {
+  if (!foldedTerms || !foldedTerms.length) return true;
+  var t = _psheetNoAccent_(text || '');
+  for (var i = 0; i < foldedTerms.length; i++) {
+    if (foldedTerms[i] && t.indexOf(foldedTerms[i]) !== -1) return true;
+  }
+  return false;
+}
+function _foldTermsCSV_(s) {
+  return s ? String(s).split(',').map(function(x){ return _psheetNoAccent_(x.trim()); }).filter(function(x){ return x; }) : [];
 }
 
 function _productSheetIndexForTab_(ss, tabName) {
@@ -11386,6 +12221,8 @@ function testScript() {
   getSheet_(SH_SET, SET_HEADERS);
   getSheet_(SH_ASSIGN, ASSIGN_HEADERS);
   getSheet_(SH_USER, USER_HEADERS);
+  getSheet_(SH_PK_STATS, PK_STATS_HEADERS);
+  getSheet_(SH_PK_MAP, PK_MAP_HEADERS);
   var oss = getOrderSS_();
   for (var i = 0; i < ORDER_SHEETS.length; i++) {
     var _s = oss.getSheetByName(ORDER_SHEETS[i].name) || oss.insertSheet(ORDER_SHEETS[i].name);
@@ -11892,8 +12729,8 @@ function runFollowUpScan_() {
 
   function tryAdd(phone, orderDate, productText, name, source) {
     if (!phone || !orderDate) return;
-    var d = (orderDate instanceof Date) ? orderDate : new Date(orderDate);
-    if (isNaN(d)) return;
+    var d = parseVNDate_(orderDate); // ho tro ca Date that lan chuoi 'dd/MM/yyyy...' (readAllOrders_ tra ve chuoi)
+    if (!d || isNaN(d)) return;
     d.setHours(0, 0, 0, 0);
     if (d < FU_START) return; // chi hoi tham khach mua tu 5/2026 tro di
     var daysSince = Math.round((today - d) / 86400000);
@@ -11901,7 +12738,7 @@ function runFollowUpScan_() {
     var np = normPhone_(phone);
     if (!np || matchedPhones[np]) return; // 1 KH chi nhan 1 tin moi lan chay, tranh spam neu khop nhieu don
 
-    var orderKey = (orderDate instanceof Date ? orderDate.toISOString().slice(0, 10) : String(orderDate));
+    var orderKey = _vnYmd_(d) || String(orderDate);
     var logKey = np + '|' + orderKey + '|' + daysSince;
     if (doneKeys[logKey]) return;
 
@@ -12160,7 +12997,91 @@ function getMessengerKnowledge_() {
     if (!cannedData[c][1]) continue;
     canned.push({ nhom: cannedData[c][0], id: cannedData[c][1], label: cannedData[c][2], text: cannedData[c][3] });
   }
-  return { ok: true, menhTable: menhTable, canned: canned };
+  return { ok: true, menhTable: menhTable, canned: canned, bannedWords: readBannedWords_() };
+}
+
+// ─── TU CAM (ban tu ngu khi len don/nhan tin) — doc TRUC TIEP tu file "Report Sale" (tab
+// "Luu y tu cam") de team chinh sua tren do la tu dong cap nhat, khong can sua code. File nay
+// KHAC voi CRM_SS_ID (chi la file van hanh/bao cao Sale) nen phai mo rieng bang openById; neu tai
+// khoan chay GAS chua duoc chia se file do (loi quyen), fallback ve BANNED_WORDS_FALLBACK ben duoi
+// (chep tu dung noi dung sheet tai thoi diem 2026-09) de tinh nang khong bi gian doan.
+var REPORT_SALE_SS_ID = '1qyyG2Pj8QOVNTb4B9JX8VQsrjFlZX-WhpovX1qDkvzM';
+var BANNED_WORDS_SHEET_NAME = 'Lưu ý từ cấm';
+var BANNED_WORDS_FALLBACK = [
+  { tuCam: 'Tài lộc', thayThe: 'Thuận lợi trong công việc, thắng tiến về đường sự nghiệp' },
+  { tuCam: 'Tiền tài', thayThe: 'Thuận lợi trong công việc, thắng tiến về đường sự nghiệp' },
+  { tuCam: 'chiêu tài', thayThe: 'Làm được giữ được' },
+  { tuCam: 'Thần tài', thayThe: 'Thuận lợi trong công việc, thắng tiến về đường sự nghiệp' },
+  { tuCam: 'Sức khỏe', thayThe: 'Tốt cho cơ thể' },
+  { tuCam: 'Trộm vía', thayThe: 'Tốt cho cơ thể' },
+  { tuCam: 'Vận hạn', thayThe: '' },
+  { tuCam: 'Tam tai', thayThe: '' },
+  { tuCam: 'Thái Tuế', thayThe: '' },
+  { tuCam: 'Tình duyên', thayThe: 'tình cảm' },
+  { tuCam: 'Linh phù', thayThe: '' },
+  { tuCam: 'Mua bán', thayThe: 'kinh doanh thuận lợi' },
+  { tuCam: 'buôn bán', thayThe: 'kinh doanh thuận lợi' },
+  { tuCam: 'May mắn', thayThe: '' },
+  { tuCam: 'Bình an', thayThe: 'an yên' },
+  { tuCam: 'Bứt phá', thayThe: '' },
+  { tuCam: 'thiên lộc', thayThe: '' },
+  { tuCam: 'Thịnh vượng', thayThe: '' },
+  { tuCam: 'cam kết', thayThe: '' },
+  { tuCam: 'chắc chắn', thayThe: '' },
+  { tuCam: 'mang lại', thayThe: '' },
+  { tuCam: 'Hanh thông', thayThe: 'Mang ý nghĩa, bổ trợ, tương trợ' },
+  { tuCam: 'thất thoát', thayThe: '' },
+  { tuCam: 'Thu hút tài lộc', thayThe: 'Tặng chị 3 sản phẩm sau' },
+  { tuCam: 'combo tam lộc', thayThe: 'Tặng chị 3 sản phẩm sau' },
+  { tuCam: 'Vận may', thayThe: '' },
+  { tuCam: 'Cầu tài', thayThe: '' },
+  { tuCam: 'cầu lộc', thayThe: '' },
+  { tuCam: 'Trừ tà', thayThe: '' },
+  { tuCam: 'Charm túi tiền', thayThe: 'Charm túi' },
+  { tuCam: 'Kim Tiền', thayThe: 'Kim túi' },
+  { tuCam: 'túi tiền', thayThe: 'túi' },
+  { tuCam: 'Lộc phúc tình', thayThe: 'lpt' },
+  { tuCam: 'Lộc', thayThe: '' },
+  { tuCam: 'Tiền', thayThe: '' }
+];
+
+function readBannedWords_() {
+  try {
+    var ss = SpreadsheetApp.openById(REPORT_SALE_SS_ID);
+    var sh = ss.getSheetByName(BANNED_WORDS_SHEET_NAME);
+    if (!sh) return BANNED_WORDS_FALLBACK;
+    var vals = sh.getDataRange().getValues();
+    // Tim dong tieu de co o "Tu cam" (sheet nay co nhieu bang xep chong, khong co dong tieu de co dinh)
+    var headerRow = -1, colTuCam = -1, colDuocDung = -1, colVietLai = -1;
+    for (var r = 0; r < vals.length; r++) {
+      for (var c = 0; c < vals[r].length; c++) {
+        if (String(vals[r][c]).trim() === 'Từ cấm') { headerRow = r; colTuCam = c; break; }
+      }
+      if (headerRow !== -1) break;
+    }
+    if (headerRow === -1) return BANNED_WORDS_FALLBACK;
+    var hdr = vals[headerRow];
+    for (var c2 = 0; c2 < hdr.length; c2++) {
+      var h = String(hdr[c2]).trim();
+      if (h === 'Từ được dùng') colDuocDung = c2;
+      if (h === 'Cách viết lại') colVietLai = c2;
+    }
+    var out = [];
+    for (var r2 = headerRow + 1; r2 < vals.length; r2++) {
+      var raw = String(vals[r2][colTuCam] || '').trim();
+      if (!raw) continue;
+      if (raw.length > 300) continue; // bo qua cell ghi chu dai (khong phai danh sach tu cam thuc su)
+      var thayThe = (colVietLai !== -1 ? String(vals[r2][colVietLai] || '').trim() : '') ||
+                    (colDuocDung !== -1 ? String(vals[r2][colDuocDung] || '').trim() : '');
+      raw.split(',').forEach(function (phrase) {
+        phrase = phrase.trim();
+        if (phrase) out.push({ tuCam: phrase, thayThe: thayThe });
+      });
+    }
+    return out.length ? out : BANNED_WORDS_FALLBACK;
+  } catch (e) {
+    return BANNED_WORDS_FALLBACK; // vd: tai khoan chay GAS chua duoc chia se file Report Sale
+  }
 }
 
 </script>
