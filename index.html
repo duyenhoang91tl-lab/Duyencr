@@ -16285,7 +16285,10 @@ var _srState = {
   // D — KH Cham soc moi (data rieng, KHONG gop A/B/C)
   dDateFrom: '', dDateTo: '', dDateQuick: 'custom', dCs: '', dataD: null,
   // E — Hoa hong nhan vien (dung lai action=salesReportA, filter rieng de khong dam vao tab A)
-  eDateFrom: '', eDateTo: '', eDateQuick: 'custom', eDateField: 'ngayTao', eSale: [], eKenh: [], dataE: null, eSaleSearch: ''
+  eDateFrom: '', eDateTo: '', eDateQuick: 'custom', eDateField: 'ngayTao', eSale: [], eKenh: [], dataE: null, eSaleSearch: '',
+  // Danh sach ten Sale duoc phep chon o tab E — Admin = toan bo saleOptions, Leader = chi thanh
+  // vien team minh phu trach (xem _srLeaderScopeNames). Dung rieng de khong dam vao tab A/B/C.
+  eSaleOptions: []
 };
 
 function _srMoney(n){ return fmt(Math.round(n||0)) + '₫'; }
@@ -16297,15 +16300,56 @@ function _srMyNames(){
   return (typeof currentUser !== 'undefined' && currentUser && currentUser.names && currentUser.names.length)
     ? currentUser.names.slice() : [];
 }
-// Khoa cung bo loc Sale ve dung ten cua chinh CS dang dang nhap — goi o dau moi lan render de
-// khong the nao bi doi sang xem sale khac (kien ca qua thao tac client, phong khi co lo hong UI).
+// ── LEADER: rieng tab E (Hoa hong nhan vien) duoc xem CA TEAM minh phu trach, chon theo team
+//    hoac chon nhieu ten trong team (co o go tim ten). Cac tab A/B/C van khoa nhu cu — khong
+//    noi long quyen o nhung cho khong duoc yeu cau. CS thuong van chi xem duoc chinh minh. ──
+function _srIsLeader(){
+  return (typeof currentUser !== 'undefined' && currentUser && currentUser.role === 'leader');
+}
+// Cac team ma tai khoan dang dang nhap dang lam leader (khop theo ten leader hoac theo
+// currentUser.team da gan luc dang nhap).
+function _srLeaderTeams(){
+  var my = _srMyNames();
+  var out = [];
+  (typeof teams !== 'undefined' ? teams : []).forEach(function(t){
+    if (!t) return;
+    if ((t.leader && my.indexOf(t.leader) !== -1) ||
+        (currentUser && currentUser.team && t.name === currentUser.team)) out.push(t);
+  });
+  return out;
+}
+// Toan bo ten Sale nam trong pham vi leader duoc xem = leader + thanh vien cua cac team tren,
+// luon gom ca ten cua chinh tai khoan dang dang nhap.
+function _srLeaderScopeNames(){
+  var set = {};
+  _srLeaderTeams().forEach(function(t){
+    if (t.leader) set[t.leader] = 1;
+    (t.members||[]).forEach(function(m){ if (m) set[m] = 1; });
+  });
+  _srMyNames().forEach(function(n){ if (n) set[n] = 1; });
+  return Object.keys(set).sort(function(a,b){ return a.localeCompare(b,'vi'); });
+}
+// Khoa cung bo loc Sale ve dung pham vi duoc phep — goi o dau moi lan render de khong the nao
+// bi doi sang xem sale ngoai pham vi (kien ca qua thao tac client, phong khi co lo hong UI).
 function _srEnforceScope(){
   if (_srIsAdmin()) return;
   var my = _srMyNames();
   _srState.sale = my.slice();
   _srState.bSale = my.slice();
   _srState.cSale = my.slice();
-  _srState.eSale = my.slice();
+  if (_srIsLeader()){
+    var scope = _srLeaderScopeNames();
+    if (scope.length){
+      // Giu lai lua chon tay cua leader, chi loai cac ten nam ngoai team. Bo chon het = xem
+      // ca team (backend loc theo du danh sach thanh vien).
+      var cur = (_srState.eSale||[]).filter(function(n){ return scope.indexOf(n) !== -1; });
+      _srState.eSale = cur.length ? cur : scope.slice();
+    } else {
+      _srState.eSale = my.slice();   // chua set up team nao -> lui ve chi xem chinh minh
+    }
+  } else {
+    _srState.eSale = my.slice();
+  }
 }
 
 async function _srFetch(action, params){
@@ -16663,8 +16707,9 @@ function _srComboHtml(domId, field, optKey, label, placeholder, widthPx){
 // ── Chọn theo Team: đổ toàn bộ thành viên của 1 team (leader + members, đã set up sẵn ở tab
 //    "Quản lý Team") vào ô Sale multi-select — chỉ điền, không tự bấm Lọc, để có thể bỏ bớt/
 //    thêm tay trước khi xem báo cáo. Dùng lại biến global `teams` đã có sẵn cho tab Quản lý Team.
-function _srTeamOptionsHtml(){
-  return (teams||[]).map(function(t){ return '<option value="'+esc(t.id)+'">'+esc(t.name||'(chưa đặt tên)')+'</option>'; }).join('');
+function _srTeamOptionsHtml(list){
+  // list = danh sach team duoc phep chon (Leader chi thay team minh phu trach). Bo trong = tat ca.
+  return (list || teams || []).map(function(t){ return '<option value="'+esc(t.id)+'">'+esc(t.name||'(chưa đặt tên)')+'</option>'; }).join('');
 }
 function srPickTeam(teamId, saleField, domId){
   if (!teamId) return;
@@ -16672,6 +16717,13 @@ function srPickTeam(teamId, saleField, domId){
   if (!t){ toast('Không tìm thấy team.'); return; }
   var members = [...(new Set([t.leader].concat(t.members||[]).filter(Boolean)))];
   if (!members.length){ toast('Team "'+(t.name||'')+'" chưa có thành viên — set up ở tab Quản lý Team.'); return; }
+  // Leader chi duoc do thanh vien nam trong pham vi team minh phu trach (chan ca truong hop
+  // doi value cua the <select> bang tay tren trinh duyet).
+  if (!_srIsAdmin() && _srIsLeader()){
+    var scopeNames = _srLeaderScopeNames();
+    members = members.filter(function(m){ return scopeNames.indexOf(m) !== -1; });
+    if (!members.length){ toast('Bạn không phụ trách team này.'); return; }
+  }
   _srState[saleField] = members;
   // QUAN TRỌNG: combo "sr-sale-combo" (Báo cáo A) là combo dựng tay riêng (KHÔNG đăng ký qua
   // _srComboReg như combo "sr-sale-combo-c" của Báo cáo C), nên gọi srRenderComboChips(domId)
@@ -16964,10 +17016,16 @@ function renderSalesReportTabE_(wrap, subTabs){
     '<option value="ngayTao"'+(_srState.eDateField==='ngayTao'?' selected':'')+'>Lọc theo Ngày tạo</option>'+
     '<option value="thoiGianHT"'+(_srState.eDateField==='thoiGianHT'?' selected':'')+'>Lọc theo Thời gian hoàn thành</option>'+
     '</select>';
-  if (_srIsAdmin()){
-    filters += _srComboHtml('sr-sale-combo-e', 'eSale', 'saleOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 190);
+  // Danh sach ten duoc phep chon: Admin = tat ca, Leader = thanh vien team minh phu trach.
+  var _eLeaderScope = (!_srIsAdmin() && _srIsLeader()) ? _srLeaderScopeNames() : [];
+  var _eCanPick = _srIsAdmin() || _eLeaderScope.length > 0;
+  _srState.eSaleOptions = _srIsAdmin() ? (_srState.saleOptions || []) : _eLeaderScope;
+  if (_eCanPick){
+    filters += _srComboHtml('sr-sale-combo-e', 'eSale', 'eSaleOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 190);
+    var _eTeamOpts = _srIsAdmin() ? _srTeamOptionsHtml() : _srTeamOptionsHtml(_srLeaderTeams());
     filters += '<select onchange="if(this.value){srPickTeam(this.value,\'eSale\',\'sr-sale-combo-e\');this.value=\'\'}" title="Điền nhanh cả team vào ô Sale" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-      '<option value="">— Chọn theo Team —</option>' + _srTeamOptionsHtml() + '</select>';
+      '<option value="">— Chọn theo Team —</option>' + _eTeamOpts + '</select>';
+    if (!_srIsAdmin()) filters += '<span style="font-size:11px;color:var(--muted)">🔒 Chỉ trong team bạn phụ trách ('+_eLeaderScope.length+' người)</span>';
   } else {
     filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Sale</div>'+
       '<div style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)">🔒 '+esc((_srState.eSale||[]).join(', ') || currentUser.name)+' — chỉ xem được hoa hồng của mình</div></div>';
@@ -17000,9 +17058,44 @@ function _srRenderE_(d){
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(c.totalRevenueBelow15)+'</div><div class="kpi-label">Doanh thu đơn &lt;15tr</div></div>' +
     '</div>';
 
-  // b) Hoa hồng từng nhân viên
+  // b) Tong hop theo Team — gom cac dong o c) lai theo team ma tung nguoi dang thuoc ve
+  //    (dung dung _teamRateForName_ — cung nguon xac dinh team voi cho tinh % hoa hong).
+  var byTeam = {};
+  (c.bySale||[]).forEach(function(s){
+    var ti = _teamRateForName_(s.name);
+    var key = ti.team ? ti.team.name : '(chưa thuộc team nào)';
+    if (!byTeam[key]) byTeam[key] = { name:key, people:0, ordersAbove15:0, ordersBelow15:0, revenueAbove15:0, revenueBelow15:0, commission:0 };
+    var g = byTeam[key];
+    g.people++;
+    g.ordersAbove15 += s.ordersAbove15; g.ordersBelow15 += s.ordersBelow15;
+    g.revenueAbove15 += s.revenueAbove15; g.revenueBelow15 += s.revenueBelow15;
+    g.commission += s.commission;
+  });
+  var teamRows = Object.keys(byTeam).map(function(k){ return byTeam[k]; })
+    .sort(function(a,b){ return b.commission - a.commission; });
+  html += '<div class="dash-section-title">b) Tổng hợp theo Team <span style="font-weight:400;color:var(--muted);font-size:11px">(cộng dồn từ bảng c) bên dưới, theo team của từng người)</span></div>';
+  html += '<table class="dash-table"><thead><tr>'+
+    '<th>Team</th><th style="text-align:right">Số người</th>'+
+    '<th style="text-align:right">Số đơn ≥15tr</th><th style="text-align:right">Số đơn &lt;15tr</th>'+
+    '<th style="text-align:right">DT ≥15tr</th><th style="text-align:right">DT &lt;15tr</th>'+
+    '<th style="text-align:right"><b>Hoa hồng</b></th></tr></thead><tbody>';
+  teamRows.forEach(function(g){
+    html += '<tr><td>'+esc(g.name)+'</td>'+
+      '<td style="text-align:right">'+fmt(g.people)+'</td>'+
+      '<td style="text-align:right">'+fmt(g.ordersAbove15)+'</td>'+
+      '<td style="text-align:right">'+fmt(g.ordersBelow15)+'</td>'+
+      '<td style="text-align:right">'+_srMoney(g.revenueAbove15)+'</td>'+
+      '<td style="text-align:right">'+_srMoney(g.revenueBelow15)+'</td>'+
+      '<td style="text-align:right"><b>'+_srMoney(g.commission)+'</b></td></tr>';
+  });
+  if (!teamRows.length) html += '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+  html += '<tr style="font-weight:700;border-top:2px solid var(--border)"><td colspan="6" style="text-align:right">Tổng hoa hồng:</td><td style="text-align:right">'+_srMoney(c.totalCommission)+'</td></tr>';
+  html += '</tbody></table>';
+  html += '<div style="font-size:11px;color:var(--muted);margin:6px 0 16px">Người chưa được gán vào team nào ở tab "Quản lý Team" sẽ nằm ở dòng "(chưa thuộc team nào)".</div>';
+
+  // c) Hoa hồng từng nhân viên
   var rows = (c.bySale||[]).filter(function(s){ return !_srState.eSaleSearch || s.name.toLowerCase().indexOf(_srState.eSaleSearch.toLowerCase())!==-1; });
-  html += '<div class="dash-section-title">b) Hoa hồng nhân viên <span style="font-weight:400;color:var(--muted);font-size:11px">(doanh thu = phần chia đều của người đó trong từng đơn)</span></div>';
+  html += '<div class="dash-section-title">c) Hoa hồng nhân viên <span style="font-weight:400;color:var(--muted);font-size:11px">(doanh thu = phần chia đều của người đó trong từng đơn)</span></div>';
   html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.eSaleSearch)+'" oninput="_srState.eSaleSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
   html += '<table class="dash-table"><thead><tr>'+
     '<th>Sale</th><th style="text-align:right">Số đơn ≥15tr</th><th style="text-align:right">Số đơn &lt;15tr</th>'+
