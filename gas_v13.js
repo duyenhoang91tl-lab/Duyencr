@@ -986,21 +986,22 @@ var DT_TONG_WIDTH     = 20; // A:T
 
 // Chuyen 1 hang tho cua DT TONG thanh object "don hang" (giu ten truong nhu ORDER_HEADERS
 // cu de cac cho khac trong code/frontend it phai sua nhat co the)
-function dtRowToOrder_(row, rowIndex) {
-  var dtVal = row[DT_COL_THOIGIANHT];
+function dtRowToOrder_(row, rowIndex, tz) {
+  var dtVal = _dtCellToVnStr_(row[DT_COL_THOIGIANHT], tz);
+  var ngayTaoStr = _dtCellToVnStr_(row[DT_COL_NGAYTAO], tz);
   var d = parseVNDate_(dtVal);
   return {
     id: row[DT_COL_ID] != null ? String(row[DT_COL_ID]) : '',
     rowIndex: rowIndex,
     phone: normPhone_(String(row[DT_COL_PHONE] || '')),
     name: '', // KHONG co san ten khach rieng trong DT TONG (chi co SDT), de trong
-    date: dtVal || row[DT_COL_NGAYTAO] || '',
+    date: dtVal || ngayTaoStr || '',
     // orderDate: LUON la Ngay tao, KHONG bao gio doi theo trang thai don (khac voi 'date' o
     // tren, von chuyen sang Thoi gian hoan thanh ngay khi don duoc danh dau xong). Dung field
     // nay lam moc goc cho cac tinh toan can ON DINH qua thoi gian (vd: lich nhac auto Data Dao
     // +7/+14 ngay) — neu dung 'date' cu, moc goc se nhay sang ngay khac ngay khi don hoan thanh,
     // lam ID lich nhac doi theo va khien lich da xoa/da lam bi tao lai y het (bug da gap).
-    orderDate: row[DT_COL_NGAYTAO] || '',
+    orderDate: ngayTaoStr || '',
     year: d ? _vnYmdParts_(d).y : '',
     month: d ? _vnYmdParts_(d).mo : '',
     cs: String(row[DT_COL_SALEBAN] || ''),
@@ -1019,13 +1020,14 @@ function readAllOrders_() {
   var ss = getDTSS_();
   var sh = ss.getSheetByName(DT_TONG_SHEET);
   if (!sh || sh.getLastRow() < 2) return [];
+  var tz = ss.getSpreadsheetTimeZone();
   var last = sh.getLastRow();
   var vals = sh.getRange(2, 1, last - 1, DT_TONG_WIDTH).getValues();
   var out = [];
   for (var i = 0; i < vals.length; i++) {
     var r = vals[i];
     if (!r[DT_COL_PHONE] && !r[DT_COL_ID]) continue; // dong rong
-    out.push(dtRowToOrder_(r, i + 2));
+    out.push(dtRowToOrder_(r, i + 2, tz));
   }
   return out;
 }
@@ -1199,6 +1201,28 @@ function getDTSS_() {
     : SpreadsheetApp.getActiveSpreadsheet();
 }
 
+// Chuyen 1 gia tri o "Ngay tao"/"Thoi gian hoan thanh" cua sheet DT TONG thanh chuoi
+// 'dd/MM/yyyy HH:mm' — DUNG THEO DUNG MUI GIO RIENG CUA FILE SHEET DO (File > Cai dat bang tinh
+// > Mui gio), KHONG phai mui gio cua du an Apps Script. Ly do: da doi chieu voi bao cao chuan
+// cua Base (19/09/2026) va phat hien o Date cua cot nay dang duoc Google Sheets luu/tra ve theo
+// dung SO GIO HIEN THI TREN MAN HINH SHEET (vd o hien "18/09/2026 23:14" thi Date object doc
+// duoc co gio dung la 23:14, KHONG can + hay - 7 tieng gi them) — neu cong them offset VN nhu
+// cac ham _vnYmd_/_vnYmdParts_ (dung cho cac nguon du lieu khac co epoch THAT su la UTC), cac
+// don tao vao khung 18h-24h se bi day nham sang NGAY HOM SAU (bug da phat hien: 20 don cua
+// ngay 18/09 bi tinh nham vao bao cao ngay 19/09, lech +55tr doanh thu). Dung
+// getSpreadsheetTimeZone() (mui gio rieng cua FILE, khac Session.getScriptTimeZone() la mui gio
+// du an) de dam bao luon khop CHINH XAC voi con so hien thi tren chinh sheet DT TONG, bat ke
+// file do dang cau hinh mui gio gi. Neu val da la chuoi san (khong phai kieu Date) thi giu
+// nguyen, khong dong vao.
+function _dtCellToVnStr_(val, tz) {
+  if (val === '' || val === null || val === undefined) return '';
+  if (Object.prototype.toString.call(val) === '[object Date]') {
+    if (isNaN(val.getTime())) return '';
+    return Utilities.formatDate(val, tz, 'dd/MM/yyyy HH:mm');
+  }
+  return val;
+}
+
 // ── Parse ngay dang DD/MM/YYYY (chuoi) hoac Date that (doc truc tiep tu Google Sheet) ──
 // KHONG dung new Date(chuoi) truc tiep: JS hieu chuoi kieu MM/DD/YYYY, se sai am tham
 // voi cac ngay <=12 (vd 01/07/2026 se bi hieu la 1 thang 7 thay vi 7 thang 1).
@@ -1308,6 +1332,7 @@ function readDTTong_() {
   if (!sh) return [];
   var last = sh.getLastRow();
   if (last < 2) return [];
+  var tz = ss.getSpreadsheetTimeZone();
   // cot A..T (0..19) du dung cho bao cao, tranh doc thua cot rac phia sau
   var vals = sh.getRange(2, 1, last - 1, 20).getValues();
   var out = [];
@@ -1319,12 +1344,12 @@ function readDTTong_() {
     // Bao cao A (thap hon thuc te ma khong bao loi gi). Them dieu kien r[17] de an toan hon.
     if (!r[3] && !r[19] && !r[17]) continue;
     out.push({
-      ngayTao:        r[0],
+      ngayTao:        _dtCellToVnStr_(r[0], tz),
       nguoiTao:       r[1] ? String(r[1]).trim() : '',
       giaoCho:        r[2],
       giaiDoan:       r[6],
       trangThai:      r[7],
-      thoiGianHT:     r[10],
+      thoiGianHT:     _dtCellToVnStr_(r[10], tz),
       kenhBan:        r[12] ? String(r[12]).trim() : '',
       saleBan:        r[13] ? String(r[13]) : '',
       sanPham:        r[14],
@@ -4673,8 +4698,8 @@ function runFollowUpScan_() {
 
   function tryAdd(phone, orderDate, productText, name, source) {
     if (!phone || !orderDate) return;
-    var d = (orderDate instanceof Date) ? orderDate : new Date(orderDate);
-    if (isNaN(d)) return;
+    var d = parseVNDate_(orderDate); // ho tro ca Date that lan chuoi 'dd/MM/yyyy...' (readAllOrders_ tra ve chuoi)
+    if (!d || isNaN(d)) return;
     d.setHours(0, 0, 0, 0);
     if (d < FU_START) return; // chi hoi tham khach mua tu 5/2026 tro di
     var daysSince = Math.round((today - d) / 86400000);
@@ -4682,7 +4707,7 @@ function runFollowUpScan_() {
     var np = normPhone_(phone);
     if (!np || matchedPhones[np]) return; // 1 KH chi nhan 1 tin moi lan chay, tranh spam neu khop nhieu don
 
-    var orderKey = (orderDate instanceof Date ? orderDate.toISOString().slice(0, 10) : String(orderDate));
+    var orderKey = _vnYmd_(d) || String(orderDate);
     var logKey = np + '|' + orderKey + '|' + daysSince;
     if (doneKeys[logKey]) return;
 
