@@ -548,6 +548,7 @@
         if (!r.checked) return;
         _stonePref = r.value;
         chrome.storage.sync.set({ stonePref: _stonePref });
+        if (_lastPriceRows.length) renderPriceRows_(_lastPriceRows, _lastPriceQ); // doi loai da -> ket qua dang hien doi gia theo
       });
     });
     panelEl.querySelector("#pk-opener-btn").addEventListener("click", doGenerateOpeners_);
@@ -1554,6 +1555,8 @@
     return s;
   }
 
+  let _lastPriceRows = []; let _lastPriceQ = '';
+
   function doPriceSearch_() {
     const q = (panelEl.querySelector('#pk-price-q').value || '').trim();
     const box = panelEl.querySelector('#pk-price-result');
@@ -1570,36 +1573,52 @@
       box.innerHTML = `<div class="pk-price-loading">Không tìm thấy${q ? ' cho "' + escapeHtml(q) + '"' : ''}.</div>`;
       return;
     }
+    _lastPriceRows = rows; _lastPriceQ = q;
     box.innerHTML = rows.slice(0, 30).map((row, idx) => {
       const keys = Object.keys(row).filter((k) => row[k] !== '' && row[k] !== null && row[k] !== undefined);
-      const priceKeys = keys.filter((k) => /gia|price/i.test(k));
-      const otherKeys = keys.filter((k) => !/gia|price/i.test(k));
-      const line = (k) => `<span class="pk-price-field"><b>${escapeHtml(k)}:</b> ${escapeHtml(row[k])}</span>`;
+      const isPriceKey = (k) => /gia|price/.test(_stripVNlocal_(k)); // bo dau truoc khi so: header co the la "Giá" co dau
+      // Bo hẳn cot STT va cot "Khoa (an dung de tra cuu)" khoi ket qua — khong can Sale nhin thay.
+      const isHiddenKey = (k) => { const s = _stripVNlocal_(k).trim(); return s === 'stt' || s.indexOf('khoa') === 0; };
+      const priceKeys = keys.filter(isPriceKey);
+      const otherKeys = keys.filter((k) => !isPriceKey(k) && !isHiddenKey(k));
       // Ten san pham: uu tien cot "ten san pham"/"ten thuong mai", khong co thi lay cot dau tien
       const nameKey = otherKeys.find((k) => /ten\s*san\s*pham|ten\s*thuong\s*mai/i.test(k)) || otherKeys[0] || '';
       const name = nameKey ? String(row[nameKey]) : ('Sản phẩm ' + (idx + 1));
-      // Tu nhan dien cot Chat lieu/Mau/Size (neu DANH_MUC co) de dien san vao 3 o moi khi bam "+ Thêm",
-      // Sale khong phai go lai tay; khong co cot nao thi de trong, Sale tu dien.
+      // Neu "Ten thuong mai" trung y het "Ten san pham" thi chi hien 1 dong cho gon
+      const shownKeys = otherKeys.filter((k) => !(k !== nameKey && String(row[k]).trim() === name.trim() && /ten/i.test(_stripVNlocal_(k))));
+      const line = (k) => `<span class="pk-price-field"><b>${escapeHtml(k)}:</b> ${escapeHtml(row[k])}</span>`;
+      // Tu nhan dien cot Chat lieu/Mau/Size (neu DANH_MUC co) de dien san vao 3 o moi khi bam "+ Thêm"
       const chatLieuKey = otherKeys.find((k) => _stripVNlocal_(k).indexOf('chat lieu') !== -1);
       const mauKey = otherKeys.find((k) => { const s = _stripVNlocal_(k); return s === 'mau' || s === 'mau sac' || /(^|\s)mau($|\s)/.test(s); });
       const sizeKey = otherKeys.find((k) => { const s = _stripVNlocal_(k); return s.indexOf('size') !== -1 || s.indexOf('kieu') !== -1; });
       const noteKey = otherKeys.filter((k) => k !== nameKey).map((k) => `${k}: ${row[k]}`).join(', ');
-      // Neu co nhieu cot gia (VD thuong/SAPHIA/RUBY) -> moi cot gia la 1 lua chon them-vao-don rieng,
-      // vi don gia khac nhau theo loai da; chi 1 cot gia thi 1 nut "+ Them" duy nhat.
-      const addBtns = priceKeys.length
-        ? priceKeys.map((pk) => {
-            const priceNum = _parsePriceNum_(row[pk]) * 1000; // cột giá ghi theo nghìn đ (2310 = 2.310.000đ) — cùng quy ước với Soạn đơn
-            const label = priceKeys.length > 1 ? pk.replace(/\s*\(.*?\)\s*/g, '').trim() : '+ Thêm';
-            return `<button class="pk-price-addbtn" data-name="${escapeHtml(name)}" data-note="${escapeHtml(noteKey)}" data-price="${priceNum}" data-pricelabel="${escapeHtml(pk)}" data-chatlieu="${escapeHtml(chatLieuKey ? row[chatLieuKey] : '')}" data-mausac="${escapeHtml(mauKey ? row[mauKey] : '')}" data-size="${escapeHtml(sizeKey ? row[sizeKey] : '')}">${escapeHtml(label)}${priceKeys.length > 1 ? ' ' + escapeHtml(String(row[pk])) : ''}</button>`;
-          }).join('')
-        : `<button class="pk-price-addbtn" data-name="${escapeHtml(name)}" data-note="${escapeHtml(noteKey)}" data-price="0" data-pricelabel="" data-chatlieu="${escapeHtml(chatLieuKey ? row[chatLieuKey] : '')}" data-mausac="${escapeHtml(mauKey ? row[mauKey] : '')}" data-size="${escapeHtml(sizeKey ? row[sizeKey] : '')}">+ Thêm (chưa có giá)</button>`;
-      return `<div class="pk-price-item">${otherKeys.map(line).join(' ')}${priceKeys.length ? '<div class="pk-price-amount">' + priceKeys.map(line).join(' · ') + '</div>' : ''}<div class="pk-price-addrow">${addBtns}</div></div>`;
+
+      // Chon DUNG 1 cot gia theo Loai da dang tick: RUBY -> gia RUBY, SAPHIA -> gia SAPHIA,
+      // khong tick -> gia thuong (cot gia khong chua chu saphia/ruby). San pham khong co gia rieng
+      // cho loai da dang tick thi lui ve gia thuong va ghi chu ro de Sale biet.
+      const stoneKey = (kw) => priceKeys.find((k) => _stripVNlocal_(k).indexOf(kw) !== -1);
+      const defaultKey = priceKeys.find((k) => { const s = _stripVNlocal_(k); return s.indexOf('saphia') === -1 && s.indexOf('ruby') === -1; });
+      let chosenKey = defaultKey || priceKeys[0] || '';
+      let priceLabel = 'Giá thường';
+      let fallbackNote = '';
+      if (_stonePref === 'RUBY' || _stonePref === 'SAPHIA') {
+        const sk = stoneKey(_stonePref.toLowerCase());
+        if (sk) { chosenKey = sk; priceLabel = 'Giá ' + _stonePref; }
+        else fallbackNote = ` (không có giá riêng cho ${_stonePref}, đang dùng giá thường)`;
+      }
+      const priceNum = chosenKey ? _parsePriceNum_(row[chosenKey]) * 1000 : 0; // cot gia ghi theo nghin d (7950 = 7.950.000d)
+      const priceHtml = chosenKey
+        ? `<div class="pk-price-amount"><span class="pk-price-field"><b>${escapeHtml(priceLabel)}:</b> ${escapeHtml(priceNum ? priceNum.toLocaleString('vi-VN') + 'đ' : String(row[chosenKey]))}${escapeHtml(fallbackNote)}</span></div>`
+        : '';
+      const noteFull = noteKey + (chosenKey ? (noteKey ? ' · ' : '') + 'Loại giá: ' + priceLabel : '');
+      const addBtn = `<button class="pk-price-addbtn" data-name="${escapeHtml(name)}" data-note="${escapeHtml(noteFull)}" data-price="${priceNum}" data-chatlieu="${escapeHtml(chatLieuKey ? row[chatLieuKey] : '')}" data-mausac="${escapeHtml(mauKey ? row[mauKey] : '')}" data-size="${escapeHtml(sizeKey ? row[sizeKey] : '')}">${chosenKey ? '+ Thêm' : '+ Thêm (chưa có giá)'}</button>`;
+      return `<div class="pk-price-item">${shownKeys.map(line).join(' ')}${priceHtml}<div class="pk-price-addrow">${addBtn}</div></div>`;
     }).join('');
     box.querySelectorAll('.pk-price-addbtn').forEach((btn) => {
       btn.addEventListener('click', () => {
         addToCart_({
           name: btn.dataset.name,
-          note: btn.dataset.note + (btn.dataset.pricelabel ? (btn.dataset.note ? ' · ' : '') + 'Loại giá: ' + btn.dataset.pricelabel : ''),
+          note: btn.dataset.note,
           price: Number(btn.dataset.price) || 0,
           chatLieu: btn.dataset.chatlieu || '',
           mauSac: btn.dataset.mausac || '',
