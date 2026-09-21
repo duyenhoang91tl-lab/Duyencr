@@ -13787,7 +13787,7 @@ function _mktCleanCfgEntry_(e) {
   if (t !== null && (isNaN(t) || t < 0)) t = null;
   if (t !== null && t > 1) t = 1;
   var d = String((e && e.denom) || 'tt');
-  if (!(d === 'tt' || d === 'sdt' || d === 'ttMoi' || d === 'ttCu' || d === 'none' || /^L\d+(\.\d+)?$/.test(d))) d = 'tt';
+  if (!(d === 'tt' || d === 'sdt' || d === 'ttMoi' || d === 'ttCu' || d === 'none' || d === 'donFb' || /^L\d+(\.\d+)?$/.test(d) || /^sum:L\d+(\.\d+)?(\+L\d+(\.\d+)?)*$/.test(d))) d = 'tt';
   var op = String((e && e.op) || 'gte');
   if (op !== 'gte' && op !== 'lte' && op !== 'eq') op = 'gte';
   return { target: t, denom: d, op: op };
@@ -13825,6 +13825,8 @@ function _mktTagRows_(codes, counts, base, cfg) {
     if (d === 'ttMoi') return 'Tổng tương tác KH mới';
     if (d === 'ttCu') return 'Tổng tương tác KH cũ';
     if (d === 'none') return '';
+    if (d === 'donFb') return 'Tổng đơn (kênh FB)';
+    if (d.indexOf('sum:') === 0) return 'Tổng ' + d.substring(4).split('+').join(' + ');
     return 'Số lượng ' + d;
   };
   return codes.map(function(code) {
@@ -13836,6 +13838,15 @@ function _mktTagRows_(codes, counts, base, cfg) {
     else if (e.denom === 'sdt') denomVal = base.sdt;
     else if (e.denom === 'ttMoi') denomVal = base.ttMoi;
     else if (e.denom === 'ttCu') denomVal = base.ttCu;
+    else if (e.denom === 'donFb') denomVal = (base.donFb === undefined) ? null : base.donFb;
+    else if (e.denom.indexOf('sum:') === 0) {
+      var sumTot = 0, sumMiss = false;
+      e.denom.substring(4).split('+').forEach(function(pc) {
+        var cv = counts[pc];
+        if (cv === null || cv === undefined) sumMiss = true; else sumTot += cv;
+      });
+      denomVal = sumMiss ? null : sumTot;
+    }
     else if (/^L\d+(\.\d+)?$/.test(e.denom)) denomVal = (counts[e.denom] === null || counts[e.denom] === undefined) ? null : counts[e.denom];
     var rate = null;
     if (!noData && e.denom !== 'none' && denomVal !== null) rate = denomVal > 0 ? Math.round(cnt / denomVal * 1000) / 10 : 0;
@@ -13869,7 +13880,10 @@ function buildMktChecklistReport_(from, to) {
   var sdtThuThap = pSdt.byPage.reduce(function(s, r) { return s + r.sdtMangVe; }, 0);
 
   // 2) DT TONG (Base): L5 = tong so don trong khoang ngay, loc theo NGAY TAO (giong moi bao cao khac)
-  var baseOrders = 0, kenhOrders = {}, saleOrders = {};
+  var baseOrders = 0, kenhOrders = {}, saleOrders = {}, saleOrdersFb = {}, donFbTotal = 0;
+  // "Kenh FB" = cac Kenh ban da khop voi 1 Page Pancake (PancakePageMap)
+  var fbKenh = {}, pmK = readPancakePageMap_();
+  Object.keys(pmK).forEach(function(pid) { if (pmK[pid]) fbKenh[pmK[pid]] = true; });
   var rowsDt = readDTTong_();
   for (var i = 0; i < rowsDt.length; i++) {
     var dt = parseVNDate_(rowsDt[i].ngayTao);
@@ -13878,6 +13892,10 @@ function buildMktChecklistReport_(from, to) {
       var kk = rowsDt[i].kenhBan || '(chưa có kênh)';
       kenhOrders[kk] = (kenhOrders[kk] || 0) + 1;
       splitMulti_(rowsDt[i].saleBan, ',').forEach(function(sn) { saleOrders[sn] = (saleOrders[sn] || 0) + 1; });
+      if (fbKenh[kk]) {
+        donFbTotal++;
+        splitMulti_(rowsDt[i].saleBan, ',').forEach(function(sn) { saleOrdersFb[sn] = (saleOrdersFb[sn] || 0) + 1; });
+      }
     }
   }
 
@@ -13895,7 +13913,7 @@ function buildMktChecklistReport_(from, to) {
   var counts = {};
   codes.forEach(function(c) { counts[c] = (c === 'L5') ? baseOrders : (pTag.totals[c] || 0); });
 
-  var base = { tt: tongTT, sdt: sdtThuThap, ttMoi: khMoiTotal, ttCu: khCuTotal };
+  var base = { tt: tongTT, sdt: sdtThuThap, ttMoi: khMoiTotal, ttCu: khCuTotal, donFb: donFbTotal };
   var tags = _mktTagRows_(codes, counts, base, cf.cfg);
 
   // 4b) Chia theo TEAM MKT (nhom page do nguoi dung chon, xem MktTeams) va theo TEAM SALE (S van phong / O online).
@@ -13906,7 +13924,7 @@ function buildMktChecklistReport_(from, to) {
   var pwM = _mktPageWeights_(mktTeams);
   var kwM = _mktKenhWeights_(mktTeams, readPancakePageMap_());
   var mktG = {};
-  var newG = function(id, name, color) { return { id: id, name: name, color: color || '', pages: [], tt: 0, sdt: 0, ttMoi: 0, ttCu: 0, counts: {}, orders: 0 }; };
+  var newG = function(id, name, color) { return { id: id, name: name, color: color || '', pages: [], tt: 0, sdt: 0, ttMoi: 0, ttCu: 0, counts: {}, orders: 0, donFb: 0 }; };
   mktTeams.forEach(function(t) { mktG[t.id] = newG(t.id, t.name, t.color); });
   var getG = function(x) { return mktG[x.id] || (mktG[x.id] = newG(x.id, x.name, '')); };
   var NOMKT = [{ id: '_none', name: '(chưa gán MKT)', w: 1 }];
@@ -13923,7 +13941,7 @@ function buildMktChecklistReport_(from, to) {
     (pwM[r.pageId] || NOMKT).forEach(function(x) { getG(x).sdt += r.sdtMangVe * x.w; });
   });
   Object.keys(kenhOrders).forEach(function(kn) {
-    (kwM[kn] || NOMKT).forEach(function(x) { getG(x).orders += kenhOrders[kn] * x.w; });
+    (kwM[kn] || NOMKT).forEach(function(x) { getG(x).orders += kenhOrders[kn] * x.w; if (fbKenh[kn]) getG(x).donFb += kenhOrders[kn] * x.w; });
   });
   var r2 = function(n) { return Math.round(n * 100) / 100; };
   var mktGroups = Object.keys(mktG).map(function(k) { return mktG[k]; })
@@ -13933,23 +13951,24 @@ function buildMktChecklistReport_(from, to) {
       codes.forEach(function(c) { cnt[c] = (c === 'L5') ? r2(g.orders) : r2(g.counts[c] || 0); });
       var tr = g.tt > 0 ? Math.round(g.orders / g.tt * 1000) / 10 : 0;
       return { id: g.id, name: g.name, color: g.color, pages: g.pages, tongTT: r2(g.tt), khMoiTotal: r2(g.ttMoi), khCuTotal: r2(g.ttCu),
-        sdtThuThap: r2(g.sdt), baseOrders: r2(g.orders), tyLeChotTong: tr,
-        tags: _mktTagRows_(codes, cnt, { tt: g.tt, sdt: g.sdt, ttMoi: g.ttMoi, ttCu: g.ttCu }, cf.cfg) };
+        sdtThuThap: r2(g.sdt), baseOrders: r2(g.orders), donFb: r2(g.donFb), tyLeChotTong: tr,
+        tags: _mktTagRows_(codes, cnt, { tt: g.tt, sdt: g.sdt, ttMoi: g.ttMoi, ttCu: g.ttCu, donFb: g.donFb }, cf.cfg) };
     });
 
   var saleDirM = readSaleDirectory_();
   var nhomOf = function(name) { var rec = saleDirM.byName[_normTxt_(name)]; return rec ? rec.nhom : '(ngoài danh sách)'; };
   var saleG = {};
-  var getSG = function(nh) { return saleG[nh] || (saleG[nh] = { nhom: nh, soSale: 0, tt: 0, sdt: 0, ttMoi: 0, ttCu: 0, orders: 0 }); };
+  var getSG = function(nh) { return saleG[nh] || (saleG[nh] = { nhom: nh, soSale: 0, tt: 0, sdt: 0, ttMoi: 0, ttCu: 0, orders: 0, donFb: 0 }); };
   pInt.byCS.forEach(function(r) { var g = getSG(nhomOf(r.name)); g.soSale++; g.tt += r.tongTT; g.ttMoi += r.khMoi || 0; g.ttCu += r.khCu || 0; });
   pSdt.byCS.forEach(function(r) { getSG(nhomOf(r.name)).sdt += r.sdtMangVe; });
   Object.keys(saleOrders).forEach(function(nm) { getSG(nhomOf(nm)).orders += saleOrders[nm]; });
+  Object.keys(saleOrdersFb).forEach(function(nm) { getSG(nhomOf(nm)).donFb += saleOrdersFb[nm]; });
   var saleGroupsOut = ['Văn phòng', 'Online', '(ngoài danh sách)'].filter(function(nh) { return saleG[nh]; }).map(function(nh) {
     var g = saleG[nh], cnt = {};
     codes.forEach(function(c) { cnt[c] = (c === 'L5') ? g.orders : null; });
     return { nhom: nh, soSale: g.soSale, tongTT: r2(g.tt), khMoiTotal: r2(g.ttMoi), khCuTotal: r2(g.ttCu), sdtThuThap: r2(g.sdt),
-      baseOrders: g.orders, tyLeChotTong: g.tt > 0 ? Math.round(g.orders / g.tt * 1000) / 10 : 0,
-      tags: _mktTagRows_(codes, cnt, { tt: g.tt, sdt: g.sdt, ttMoi: g.ttMoi, ttCu: g.ttCu }, cf.cfg) };
+      baseOrders: g.orders, donFb: g.donFb, tyLeChotTong: g.tt > 0 ? Math.round(g.orders / g.tt * 1000) / 10 : 0,
+      tags: _mktTagRows_(codes, cnt, { tt: g.tt, sdt: g.sdt, ttMoi: g.ttMoi, ttCu: g.ttCu, donFb: g.donFb }, cf.cfg) };
   });
 
   // 5) Chan doan nguon du lieu: bao ro "chua nap bao gio" vs "co nhung ngoai khoang ngay dang xem"
@@ -13975,7 +13994,7 @@ function buildMktChecklistReport_(from, to) {
 
   return { ok: true, from: from, to: to, month: month, configSource: cf.source,
     tongTT: tongTT, khMoiTotal: khMoiTotal, khCuTotal: khCuTotal, sdtThuThap: sdtThuThap,
-    baseOrders: baseOrders, tyLeChotTong: tyLeChotTong,
+    baseOrders: baseOrders, donFb: donFbTotal, tyLeChotTong: tyLeChotTong,
     tags: tags, groups: { mkt: mktGroups, sale: saleGroupsOut },
     config: configOut, dataAvail: dataAvail, warnings: warnings };
 }
@@ -16811,7 +16830,21 @@ function _mktOpenCfgEditor(){
   _mktRender();
 }
 function _mktCfgSetTarget(code, val){ _mktState.cfgDraft[code].target = val; }
-function _mktCfgSetDenom(code, val){ _mktState.cfgDraft[code].denom = val; }
+function _mktCfgSetDenom(code, val){
+  // 'multi' = mau so la TONG so luong cua nhieu tag (vd L5 + L9), luu dang 'sum:L5+L9'
+  _mktState.cfgDraft[code].denom = (val === 'multi') ? 'sum:L5+L9' : val;
+  _mktRender();
+}
+function _mktCfgToggleSum(code, tag, on){
+  var d = _mktState.cfgDraft[code];
+  var cur = String(d.denom).indexOf('sum:')===0 ? String(d.denom).substring(4).split('+').filter(Boolean) : [];
+  var i = cur.indexOf(tag);
+  if (on && i<0) cur.push(tag); if (!on && i>=0) cur.splice(i,1);
+  cur.sort(function(a,b){ return parseInt(a.substring(1),10)-parseInt(b.substring(1),10); });
+  d.denom = cur.length ? 'sum:'+cur.join('+') : 'none';
+  // giu o che do nhieu tag ke ca khi bo tick het (hien 'none' -> ve 'chi dem so luong'); re-render de cap nhat
+  _mktRender();
+}
 function _mktCfgSetOp(code, val){ _mktState.cfgDraft[code].op = val; }
 async function _mktSaveCfg(){
   var rep = _mktState.report; if (!rep || !_mktState.cfgDraft) return;
@@ -16838,7 +16871,7 @@ function _mktGroupMatrixHtml_(title, rep, groups, note, nameFn, hintFn){
   var cols = [{ name:'Tổng', hint:'', ref: rep }].concat(groups.map(function(g){ return { name: nameFn(g), hint: hintFn(g), ref: g }; }));
   h += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Chỉ số</th>'+
     cols.map(function(c){ return '<th style="text-align:right;white-space:nowrap" title="'+esc(c.hint)+'">'+esc(c.name)+'</th>'; }).join('')+'</tr></thead><tbody>';
-  var simple = [['Tổng tương tác','tongTT'],['Tương tác KH mới','khMoiTotal'],['Tương tác KH cũ','khCuTotal'],['Tổng SĐT thu thập','sdtThuThap'],['Tổng đơn (Base)','baseOrders']];
+  var simple = [['Tổng tương tác','tongTT'],['Tương tác KH mới','khMoiTotal'],['Tương tác KH cũ','khCuTotal'],['Tổng SĐT thu thập','sdtThuThap'],['Tổng đơn (Base)','baseOrders'],['Tổng đơn (kênh FB)','donFb']];
   simple.forEach(function(r){
     h += '<tr><td>'+r[0]+'</td>'+cols.map(function(c){ return '<td style="text-align:right">'+fmt(Math.round((c.ref[r[1]]||0)*100)/100)+'</td>'; }).join('')+'</tr>';
   });
@@ -16894,7 +16927,7 @@ function _mktRender(){
 
   // ── Form sửa mục tiêu/mẫu số (khi mở) ──
   if (_mktState.cfgDraft){
-    var denomOpts = [['tt','Tổng tương tác'],['sdt','Tổng SĐT thu thập'],['ttMoi','Tổng tương tác KH mới'],['ttCu','Tổng tương tác KH cũ']]
+    var denomOpts = [['donFb','T\u1ed5ng \u0111\u01a1n (k\u00eanh FB)'],['multi','Nhi\u1ec1u tag (c\u1ed9ng l\u1ea1i, vd L5 + L9)\u2026'],['tt','Tổng tương tác'],['sdt','Tổng SĐT thu thập'],['ttMoi','Tổng tương tác KH mới'],['ttCu','Tổng tương tác KH cũ']]
       .concat(rep.tags.map(function(t){ return [t.code, 'Số lượng '+t.code]; }));
     var opOpts = [['gte','≥ (lớn hơn hoặc bằng)'],['lte','≤ (nhỏ hơn hoặc bằng)'],['eq','= (bằng)']];
     html += '<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:16px;background:var(--surface2)">'+
@@ -16910,8 +16943,15 @@ function _mktRender(){
           '</select></td>'+
           '<td style="text-align:right;padding:4px 6px"><input type="number" min="0" max="100" step="0.1" value="'+esc(d.target)+'" placeholder="—" onchange="_mktCfgSetTarget(\''+t.code+'\',this.value)" style="width:70px;text-align:right;font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"></td>'+
           '<td style="padding:4px 6px"><select onchange="_mktCfgSetDenom(\''+t.code+'\',this.value)" style="font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-            [['none','— chỉ đếm số lượng —']].concat(denomOpts).map(function(o){ return '<option value="'+o[0]+'"'+(d.denom===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')+
-          '</select></td></tr>';
+            [['none','— chỉ đếm số lượng —']].concat(denomOpts).map(function(o){ return '<option value="'+o[0]+'"'+((d.denom===o[0] || (o[0]==='multi' && String(d.denom).indexOf('sum:')===0))?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')+
+          '</select></td></tr>'+
+          (String(d.denom).indexOf('sum:')===0 ? (function(){
+            var picked = String(d.denom).substring(4).split('+');
+            return '<tr><td colspan="4" style="padding:2px 6px 8px 24px;font-size:12px;color:var(--muted)">M\u1eabu s\u1ed1 = t\u1ed5ng s\u1ed1 l\u01b0\u1ee3ng c\u00e1c tag: '+
+              rep.tags.filter(function(t2){ return t2.code!==t.code; }).map(function(t2){
+                return '<label style="margin-right:10px;white-space:nowrap;color:var(--text)"><input type="checkbox" '+(picked.indexOf(t2.code)!==-1?'checked ':'')+'onchange="_mktCfgToggleSum(\''+t.code+'\',\''+t2.code+'\',this.checked)"> '+esc(t2.code)+'</label>';
+              }).join('')+'</td></tr>';
+          })() : '');
       }).join('')+
       '</tbody></table>'+
       '<div style="margin-top:8px;display:flex;gap:8px">'+

@@ -5500,7 +5500,7 @@ function _mktCleanCfgEntry_(e) {
   if (t !== null && (isNaN(t) || t < 0)) t = null;
   if (t !== null && t > 1) t = 1;
   var d = String((e && e.denom) || 'tt');
-  if (!(d === 'tt' || d === 'sdt' || d === 'ttMoi' || d === 'ttCu' || d === 'none' || /^L\d+(\.\d+)?$/.test(d))) d = 'tt';
+  if (!(d === 'tt' || d === 'sdt' || d === 'ttMoi' || d === 'ttCu' || d === 'none' || d === 'donFb' || /^L\d+(\.\d+)?$/.test(d) || /^sum:L\d+(\.\d+)?(\+L\d+(\.\d+)?)*$/.test(d))) d = 'tt';
   var op = String((e && e.op) || 'gte');
   if (op !== 'gte' && op !== 'lte' && op !== 'eq') op = 'gte';
   return { target: t, denom: d, op: op };
@@ -5538,6 +5538,8 @@ function _mktTagRows_(codes, counts, base, cfg) {
     if (d === 'ttMoi') return 'Tổng tương tác KH mới';
     if (d === 'ttCu') return 'Tổng tương tác KH cũ';
     if (d === 'none') return '';
+    if (d === 'donFb') return 'Tổng đơn (kênh FB)';
+    if (d.indexOf('sum:') === 0) return 'Tổng ' + d.substring(4).split('+').join(' + ');
     return 'Số lượng ' + d;
   };
   return codes.map(function(code) {
@@ -5549,6 +5551,15 @@ function _mktTagRows_(codes, counts, base, cfg) {
     else if (e.denom === 'sdt') denomVal = base.sdt;
     else if (e.denom === 'ttMoi') denomVal = base.ttMoi;
     else if (e.denom === 'ttCu') denomVal = base.ttCu;
+    else if (e.denom === 'donFb') denomVal = (base.donFb === undefined) ? null : base.donFb;
+    else if (e.denom.indexOf('sum:') === 0) {
+      var sumTot = 0, sumMiss = false;
+      e.denom.substring(4).split('+').forEach(function(pc) {
+        var cv = counts[pc];
+        if (cv === null || cv === undefined) sumMiss = true; else sumTot += cv;
+      });
+      denomVal = sumMiss ? null : sumTot;
+    }
     else if (/^L\d+(\.\d+)?$/.test(e.denom)) denomVal = (counts[e.denom] === null || counts[e.denom] === undefined) ? null : counts[e.denom];
     var rate = null;
     if (!noData && e.denom !== 'none' && denomVal !== null) rate = denomVal > 0 ? Math.round(cnt / denomVal * 1000) / 10 : 0;
@@ -5582,7 +5593,10 @@ function buildMktChecklistReport_(from, to) {
   var sdtThuThap = pSdt.byPage.reduce(function(s, r) { return s + r.sdtMangVe; }, 0);
 
   // 2) DT TONG (Base): L5 = tong so don trong khoang ngay, loc theo NGAY TAO (giong moi bao cao khac)
-  var baseOrders = 0, kenhOrders = {}, saleOrders = {};
+  var baseOrders = 0, kenhOrders = {}, saleOrders = {}, saleOrdersFb = {}, donFbTotal = 0;
+  // "Kenh FB" = cac Kenh ban da khop voi 1 Page Pancake (PancakePageMap)
+  var fbKenh = {}, pmK = readPancakePageMap_();
+  Object.keys(pmK).forEach(function(pid) { if (pmK[pid]) fbKenh[pmK[pid]] = true; });
   var rowsDt = readDTTong_();
   for (var i = 0; i < rowsDt.length; i++) {
     var dt = parseVNDate_(rowsDt[i].ngayTao);
@@ -5591,6 +5605,10 @@ function buildMktChecklistReport_(from, to) {
       var kk = rowsDt[i].kenhBan || '(chưa có kênh)';
       kenhOrders[kk] = (kenhOrders[kk] || 0) + 1;
       splitMulti_(rowsDt[i].saleBan, ',').forEach(function(sn) { saleOrders[sn] = (saleOrders[sn] || 0) + 1; });
+      if (fbKenh[kk]) {
+        donFbTotal++;
+        splitMulti_(rowsDt[i].saleBan, ',').forEach(function(sn) { saleOrdersFb[sn] = (saleOrdersFb[sn] || 0) + 1; });
+      }
     }
   }
 
@@ -5608,7 +5626,7 @@ function buildMktChecklistReport_(from, to) {
   var counts = {};
   codes.forEach(function(c) { counts[c] = (c === 'L5') ? baseOrders : (pTag.totals[c] || 0); });
 
-  var base = { tt: tongTT, sdt: sdtThuThap, ttMoi: khMoiTotal, ttCu: khCuTotal };
+  var base = { tt: tongTT, sdt: sdtThuThap, ttMoi: khMoiTotal, ttCu: khCuTotal, donFb: donFbTotal };
   var tags = _mktTagRows_(codes, counts, base, cf.cfg);
 
   // 4b) Chia theo TEAM MKT (nhom page do nguoi dung chon, xem MktTeams) va theo TEAM SALE (S van phong / O online).
@@ -5619,7 +5637,7 @@ function buildMktChecklistReport_(from, to) {
   var pwM = _mktPageWeights_(mktTeams);
   var kwM = _mktKenhWeights_(mktTeams, readPancakePageMap_());
   var mktG = {};
-  var newG = function(id, name, color) { return { id: id, name: name, color: color || '', pages: [], tt: 0, sdt: 0, ttMoi: 0, ttCu: 0, counts: {}, orders: 0 }; };
+  var newG = function(id, name, color) { return { id: id, name: name, color: color || '', pages: [], tt: 0, sdt: 0, ttMoi: 0, ttCu: 0, counts: {}, orders: 0, donFb: 0 }; };
   mktTeams.forEach(function(t) { mktG[t.id] = newG(t.id, t.name, t.color); });
   var getG = function(x) { return mktG[x.id] || (mktG[x.id] = newG(x.id, x.name, '')); };
   var NOMKT = [{ id: '_none', name: '(chưa gán MKT)', w: 1 }];
@@ -5636,7 +5654,7 @@ function buildMktChecklistReport_(from, to) {
     (pwM[r.pageId] || NOMKT).forEach(function(x) { getG(x).sdt += r.sdtMangVe * x.w; });
   });
   Object.keys(kenhOrders).forEach(function(kn) {
-    (kwM[kn] || NOMKT).forEach(function(x) { getG(x).orders += kenhOrders[kn] * x.w; });
+    (kwM[kn] || NOMKT).forEach(function(x) { getG(x).orders += kenhOrders[kn] * x.w; if (fbKenh[kn]) getG(x).donFb += kenhOrders[kn] * x.w; });
   });
   var r2 = function(n) { return Math.round(n * 100) / 100; };
   var mktGroups = Object.keys(mktG).map(function(k) { return mktG[k]; })
@@ -5646,23 +5664,24 @@ function buildMktChecklistReport_(from, to) {
       codes.forEach(function(c) { cnt[c] = (c === 'L5') ? r2(g.orders) : r2(g.counts[c] || 0); });
       var tr = g.tt > 0 ? Math.round(g.orders / g.tt * 1000) / 10 : 0;
       return { id: g.id, name: g.name, color: g.color, pages: g.pages, tongTT: r2(g.tt), khMoiTotal: r2(g.ttMoi), khCuTotal: r2(g.ttCu),
-        sdtThuThap: r2(g.sdt), baseOrders: r2(g.orders), tyLeChotTong: tr,
-        tags: _mktTagRows_(codes, cnt, { tt: g.tt, sdt: g.sdt, ttMoi: g.ttMoi, ttCu: g.ttCu }, cf.cfg) };
+        sdtThuThap: r2(g.sdt), baseOrders: r2(g.orders), donFb: r2(g.donFb), tyLeChotTong: tr,
+        tags: _mktTagRows_(codes, cnt, { tt: g.tt, sdt: g.sdt, ttMoi: g.ttMoi, ttCu: g.ttCu, donFb: g.donFb }, cf.cfg) };
     });
 
   var saleDirM = readSaleDirectory_();
   var nhomOf = function(name) { var rec = saleDirM.byName[_normTxt_(name)]; return rec ? rec.nhom : '(ngoài danh sách)'; };
   var saleG = {};
-  var getSG = function(nh) { return saleG[nh] || (saleG[nh] = { nhom: nh, soSale: 0, tt: 0, sdt: 0, ttMoi: 0, ttCu: 0, orders: 0 }); };
+  var getSG = function(nh) { return saleG[nh] || (saleG[nh] = { nhom: nh, soSale: 0, tt: 0, sdt: 0, ttMoi: 0, ttCu: 0, orders: 0, donFb: 0 }); };
   pInt.byCS.forEach(function(r) { var g = getSG(nhomOf(r.name)); g.soSale++; g.tt += r.tongTT; g.ttMoi += r.khMoi || 0; g.ttCu += r.khCu || 0; });
   pSdt.byCS.forEach(function(r) { getSG(nhomOf(r.name)).sdt += r.sdtMangVe; });
   Object.keys(saleOrders).forEach(function(nm) { getSG(nhomOf(nm)).orders += saleOrders[nm]; });
+  Object.keys(saleOrdersFb).forEach(function(nm) { getSG(nhomOf(nm)).donFb += saleOrdersFb[nm]; });
   var saleGroupsOut = ['Văn phòng', 'Online', '(ngoài danh sách)'].filter(function(nh) { return saleG[nh]; }).map(function(nh) {
     var g = saleG[nh], cnt = {};
     codes.forEach(function(c) { cnt[c] = (c === 'L5') ? g.orders : null; });
     return { nhom: nh, soSale: g.soSale, tongTT: r2(g.tt), khMoiTotal: r2(g.ttMoi), khCuTotal: r2(g.ttCu), sdtThuThap: r2(g.sdt),
-      baseOrders: g.orders, tyLeChotTong: g.tt > 0 ? Math.round(g.orders / g.tt * 1000) / 10 : 0,
-      tags: _mktTagRows_(codes, cnt, { tt: g.tt, sdt: g.sdt, ttMoi: g.ttMoi, ttCu: g.ttCu }, cf.cfg) };
+      baseOrders: g.orders, donFb: g.donFb, tyLeChotTong: g.tt > 0 ? Math.round(g.orders / g.tt * 1000) / 10 : 0,
+      tags: _mktTagRows_(codes, cnt, { tt: g.tt, sdt: g.sdt, ttMoi: g.ttMoi, ttCu: g.ttCu, donFb: g.donFb }, cf.cfg) };
   });
 
   // 5) Chan doan nguon du lieu: bao ro "chua nap bao gio" vs "co nhung ngoai khoang ngay dang xem"
@@ -5688,7 +5707,7 @@ function buildMktChecklistReport_(from, to) {
 
   return { ok: true, from: from, to: to, month: month, configSource: cf.source,
     tongTT: tongTT, khMoiTotal: khMoiTotal, khCuTotal: khCuTotal, sdtThuThap: sdtThuThap,
-    baseOrders: baseOrders, tyLeChotTong: tyLeChotTong,
+    baseOrders: baseOrders, donFb: donFbTotal, tyLeChotTong: tyLeChotTong,
     tags: tags, groups: { mkt: mktGroups, sale: saleGroupsOut },
     config: configOut, dataAvail: dataAvail, warnings: warnings };
 }
