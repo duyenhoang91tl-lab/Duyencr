@@ -15706,6 +15706,7 @@ function _pkTagResetRange(){
   var ds = _pkTagDates(_pkState.tagRows);
   _pkState.tagFrom = ds.length ? ds[0] : '';
   _pkState.tagTo = ds.length ? ds[ds.length-1] : '';
+  _pkState.tagQuick = 'custom';
 }
 function _pkTagFiltered(){
   var f = _pkState.tagFrom, t = _pkState.tagTo;
@@ -15737,13 +15738,26 @@ async function _pkOnTagFileSelected(input){
   _pkRenderAll();
 }
 function _pkTagApplyQuick(key){
-  if (key === 'custom') return;
-  var r = _pkQuickRange(key); if (!r) return;
-  _pkState.tagFrom = r.from; _pkState.tagTo = r.to;
+  _pkState.tagQuick = key;
+  if (key === 'custom'){ _pkRenderAll(); return; }
+  var r = _pkQuickRange(key); if (!r){ _pkRenderAll(); return; }
+  // FIX: du lieu tag chi co trong khoang ngay THUC SU da tung nap (allDates), khac voi cac
+  // bao cao doc thang tu Sheet — chon nhanh "Nam truoc" ma chi co 1 tuan du lieu se ra khoang
+  // trong, khong co gi de xem. Gioi han (clamp) ket qua trong khoang du lieu that co.
+  var allDates = _pkTagDates(_pkState.tagRows);
+  if (allDates.length){
+    var from = r.from < allDates[0] ? allDates[0] : r.from;
+    var to = r.to > allDates[allDates.length-1] ? allDates[allDates.length-1] : r.to;
+    if (from > to){ from = allDates[0]; to = allDates[allDates.length-1]; }
+    _pkState.tagFrom = from; _pkState.tagTo = to;
+  } else {
+    _pkState.tagFrom = r.from; _pkState.tagTo = r.to;
+  }
   _pkRenderAll();
 }
 function _pkTagSetRange(which, val){
   _pkState[which === 'from' ? 'tagFrom' : 'tagTo'] = val;
+  _pkState.tagQuick = 'custom';
   if (_pkState.tagFrom && _pkState.tagTo && _pkState.tagFrom > _pkState.tagTo){
     var tmp = _pkState.tagFrom; _pkState.tagFrom = _pkState.tagTo; _pkState.tagTo = tmp;
   }
@@ -15795,7 +15809,7 @@ function _pkTagSectionHtml(){
   var st = 'padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)';
   html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">'+
     '<span style="font-size:12px">Khoảng ngày:</span>'+
-    _quickRangeSelectHtml('custom', "_pkTagApplyQuick(this.value)")+
+    _quickRangeSelectHtml(_pkState.tagQuick, "_pkTagApplyQuick(this.value)")+
     '<input type="date" value="'+esc(_pkState.tagFrom)+'" min="'+esc(allDates[0])+'" max="'+esc(allDates[allDates.length-1])+'" onchange="_pkTagSetRange(\'from\',this.value)" style="'+st+'">'+
     '<span>→</span>'+
     '<input type="date" value="'+esc(_pkState.tagTo)+'" min="'+esc(allDates[0])+'" max="'+esc(allDates[allDates.length-1])+'" onchange="_pkTagSetRange(\'to\',this.value)" style="'+st+'">'+
