@@ -6525,9 +6525,59 @@ var _barMenuItems = []; // mảng id (không cần giữ thứ tự) đang nằm
   saveLS('ome_bar_menu_items', _barMenuItems);
 })();
 
-// Toàn bộ mục có thể kéo — id PHẢI khớp với data-bar-id gắn trên phần tử thật (xem các
-// nơi có data-bar-id trong HTML/JS: 6 tab tĩnh + nút Tác vụ tĩnh + defs tab động ở
-// _injectV9UI + các nút trong _renderAuthHeader + nút "Mẫu hỏi thăm").
+// ═══════════════════════════════════════════════════════
+//  PHÂN QUYỀN XEM MENU (Admin gán qua modal "🔑 Tài khoản") — khác với "☰ Menu" ở trên
+//  (đó là NGƯỜI DÙNG tự sắp xếp thẩm mỹ cho mình). Đây là ADMIN khoá cứng: nhân viên
+//  KHÔNG tự bật lại được các mục bị giới hạn, kể cả qua thao tác client.
+// ═══════════════════════════════════════════════════════
+var _PERM_TAB_DEFS = [
+  { id:'tab-kh',       label:'Danh sách KH' },
+  { id:'tab-schedule', label:'Lịch chăm sóc' },
+  { id:'tab-overdue',  label:'Quá hạn' },
+  { id:'tab-mydata',   label:'Data của tôi' },
+  { id:'tab-zaloai',   label:'Zalo AI' },
+  { id:'tab-task',     label:'Công việc' },
+  { id:'dashboard',    label:'Dashboard' },
+  { id:'team',         label:'Quản lý Team' },
+  { id:'audit',        label:'Nhật ký' },
+  { id:'salesreport',  label:'Báo cáo doanh số' },
+  { id:'pancake',      label:'Báo cáo Pancake' },
+  { id:'kpipancake',   label:'KPI Pancake' },
+  { id:'mktchecklist', label:'Checklist MKT' }
+];
+// true = tài khoản đang đăng nhập được phép thấy tab id này. perms null/rỗng = KHÔNG giới
+// hạn (mặc định mọi tài khoản mới/cũ đều xem đủ như trước — Admin phải CHỦ ĐỘNG bật giới
+// hạn thì mới thu hẹp lại).
+function _tabAllowedForUser(id){
+  if (!currentUser || currentUser.role === 'admin') return true;
+  if (!currentUser.perms || !currentUser.perms.length) return true;
+  return currentUser.perms.indexOf(id) !== -1;
+}
+// Ẩn hẳn (display:none) các tab bị Admin giới hạn — chạy sau khi currentUser.perms đã có
+// (đăng nhập xong / mở app xong), áp dụng cho CẢ 6 tab tĩnh lẫn các tab tạo động qua defs.
+// Nếu tab đang active bị ẩn (VD Admin vừa giới hạn ngay lúc đang xem) thì tự chuyển về
+// "Danh sách KH" để tránh màn hình trắng.
+function _applyUserTabPermissions(){
+  var hidActive = false;
+  _PERM_TAB_DEFS.forEach(function(d){
+    var el = document.querySelector('[data-bar-id="'+d.id+'"]');
+    if (!el) return;
+    if (_tabAllowedForUser(d.id)) { el.style.display = ''; }
+    else { if (el.classList.contains('active')) hidActive = true; el.style.display = 'none'; }
+  });
+  // Nhóm "📊 Báo cáo ▾" gộp 4 tab con (salesreport/pancake/kpipancake/mktchecklist) — nếu cả 4
+  // đều bị chặn thì ẩn luôn nút nhóm, tránh để lại 1 nút bấm ra menu rỗng gây khó hiểu.
+  var grp = document.querySelector('[data-bar-id="reportsgroup"]');
+  if (grp){
+    var anyReportAllowed = ['salesreport','pancake','kpipancake','mktchecklist'].some(_tabAllowedForUser);
+    grp.style.display = anyReportAllowed ? '' : 'none';
+  }
+  if (hidActive){
+    var home = document.querySelector('[data-bar-id="tab-kh"]');
+    if (home && typeof switchTab === 'function') switchTab('list', home);
+  }
+}
+
 var _BAR_ITEM_DEFS = [
   { id:'tab-kh',          label:'Danh sách KH' },
   { id:'tab-schedule',    label:'Lịch chăm sóc' },
@@ -18863,7 +18913,7 @@ function _injectV9UI(){
 
 window.addEventListener('load', function(){
   // chạy sau cùng để chắc chắn mọi DOM/biến đã sẵn sàng
-  setTimeout(function(){ _injectV9UI(); _renderAuthHeader(); _authGate(); if (typeof startReminderChecks==='function') startReminderChecks(); if (typeof startAutoSync==='function') startAutoSync(); if (typeof _checkAndRenewBdaySchedules==='function') _checkAndRenewBdaySchedules(); if (typeof checkDataDaoRenewSchedules==='function') checkDataDaoRenewSchedules(); if (typeof reapplyColVisibility==='function') reapplyColVisibility(); if (typeof _applyBarCustomization==='function') _applyBarCustomization(); if (typeof _pullBarMenuForAccount==='function') _pullBarMenuForAccount(); }, 0);
+  setTimeout(function(){ _injectV9UI(); _renderAuthHeader(); _authGate(); if (typeof startReminderChecks==='function') startReminderChecks(); if (typeof startAutoSync==='function') startAutoSync(); if (typeof _checkAndRenewBdaySchedules==='function') _checkAndRenewBdaySchedules(); if (typeof checkDataDaoRenewSchedules==='function') checkDataDaoRenewSchedules(); if (typeof reapplyColVisibility==='function') reapplyColVisibility(); if (typeof _applyBarCustomization==='function') _applyBarCustomization(); if (typeof _pullBarMenuForAccount==='function') _pullBarMenuForAccount(); if (typeof _applyUserTabPermissions==='function') _applyUserTabPermissions(); }, 0);
 });
 
 // ═══════════════════════════════════════════════════════
@@ -18924,8 +18974,9 @@ function _applyAuthIdentity(acct){
   _bootstrapAdmin = false;
   var namesArr = (acct.names && acct.names.length) ? acct.names.slice() : (acct.name ? [acct.name] : []);
   var primaryName = acct.role==='admin' ? 'Admin' : (namesArr[0] || acct.username);
-  currentUser = { name: primaryName, names: acct.role==='admin' ? [] : namesArr, role: acct.role || 'cs', team: acct.team || '' };
+  currentUser = { name: primaryName, names: acct.role==='admin' ? [] : namesArr, role: acct.role || 'cs', team: acct.team || '', perms: (Array.isArray(acct.perms) ? acct.perms : null) };
   saveLS('ome_user', currentUser);
+  if (typeof _applyUserTabPermissions === 'function') _applyUserTabPermissions();
   var csFilter = document.getElementById('cs-staff-filter');
   if (csFilter){
     if (currentUser.role === 'cs' && currentUser.names.length){
@@ -19193,6 +19244,25 @@ function _acctDetailHtml(a){
       ' — Leader còn xem được dữ liệu của cả team.</div>';
   }
 
+  var isLimited = Array.isArray(a.perms);
+  var permHtml = '<div style="margin-top:10px;border-top:1px dashed var(--border);padding-top:9px">'+
+    '<label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;cursor:pointer">'+
+      '<input type="checkbox" '+(isLimited?'checked':'')+' onchange="acctTogglePermLimit(\''+uk+'\',this.checked)"> '+
+      '🔒 Giới hạn menu được xem (chỉ cho xem 1 số mục nhất định)'+
+    '</label>'+
+    (isLimited ?
+      '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">'+
+        _PERM_TAB_DEFS.map(function(d){
+          var checked = a.perms.indexOf(d.id) !== -1;
+          return '<label style="display:flex;align-items:center;gap:4px;font-size:11.5px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer">'+
+            '<input type="checkbox" '+(checked?'checked':'')+' onchange="acctTogglePermTab(\''+uk+'\',\''+d.id+'\',this.checked)"> '+esc(d.label)+
+          '</label>';
+        }).join('')+
+      '</div>'+
+      '<div style="font-size:10.5px;color:var(--muted);margin-top:5px">Bỏ tick = tài khoản này sẽ KHÔNG thấy mục đó ở đâu cả (kể cả trong "☰ Menu").</div>'
+    : '<div style="font-size:10.5px;color:var(--muted);margin-top:4px">Đang KHÔNG giới hạn — tài khoản xem đủ menu theo đúng vai trò hiện tại.</div>')+
+  '</div>';
+
   return '<div class="acct-detail">'+
     '<div class="ad-title">Đang phụ trách '+namesArr.length+' sale — chỉ thấy dữ liệu của những người này</div>'+
     '<div class="ad-chips">'+chips+'</div>'+
@@ -19202,7 +19272,22 @@ function _acctDetailHtml(a){
       '<button class="btn primary sm" data-u="'+uk+'" onclick="acctAddNames(this)">+ Thêm sale</button>'+
     '</div>'+
     teamNote+
+    permHtml+
   '</div>';
+}
+// Bật/tắt chế độ giới hạn menu của 1 tài khoản. Bật lần đầu -> mặc định cho phép ĐỦ mọi
+// mục (Admin bỏ tick dần để thu hẹp), tránh vô tình khoá trắng tài khoản người ta.
+function acctTogglePermLimit(u, on){
+  var acct = _findAccount(u); if (!acct) return;
+  acct.perms = on ? _PERM_TAB_DEFS.map(function(d){ return d.id; }) : null;
+  _acctPersist(acct, on ? 'Bật giới hạn menu' : 'Bỏ giới hạn menu');
+}
+function acctTogglePermTab(u, tabId, on){
+  var acct = _findAccount(u); if (!acct || !Array.isArray(acct.perms)) return;
+  var idx = acct.perms.indexOf(tabId);
+  if (on && idx === -1) acct.perms.push(tabId);
+  if (!on && idx !== -1) acct.perms.splice(idx, 1);
+  _acctPersist(acct, (on?'Cho phép xem: ':'Chặn xem: ') + tabId);
 }
 
 // Mở / đóng khối chi tiết của 1 tài khoản

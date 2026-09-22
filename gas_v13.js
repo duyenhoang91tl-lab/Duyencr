@@ -88,7 +88,7 @@ var TEAM_HEADERS   = ['id','name','leader','members','color','channels','ratePct
 var AUDIT_HEADERS  = ['timestamp','user','action','phone','oldValue','newValue'];
 var SET_HEADERS    = ['key','value'];
 var ASSIGN_HEADERS = ['id','date','csName','label','phones','donePhones'];
-var USER_HEADERS   = ['username','passHash','role','name','team','active','names'];
+var USER_HEADERS   = ['username','passHash','role','name','team','active','names','perms'];
 // PK_STATS_HEADERS: 1 dong = 1 "Nhan vien" (ten hien thi tren Pancake) trong 1 Page, 1 ngay —
 // nhap tu file Excel "Thong ke tuong tac" (pages_statistics_engagements) Pancake xuat ra.
 // Khoa duy nhat = date+pageId+nhanVien -> nap lai file CUNG 1 ngay se GHI DE (khong nhan doi).
@@ -795,12 +795,19 @@ function readUsers_(sh) {
     var namesArr = [];
     try { namesArr = v[i][6] ? JSON.parse(v[i][6]) : []; } catch (e) { namesArr = []; }
     if (!namesArr.length && v[i][3]) namesArr = [String(v[i][3])];
+    // perms: danh sach ID cac tab/menu tai khoan nay DUOC PHEP xem (Admin gan qua modal
+    // "Tai khoan"). null/rong = KHONG gioi han (thay theo mac dinh phan quyen vai tro cu),
+    // chi khi Admin CHU DONG gioi han moi thu hep lai — tranh tai khoan cu tu dung bi khoa
+    // het menu khi nang cap len ban co tinh nang nay.
+    var permsArr = null;
+    try { var pRaw = v[i][7]; if (pRaw) { var pParsed = JSON.parse(pRaw); if (Array.isArray(pParsed)) permsArr = pParsed; } } catch (e) { permsArr = null; }
     out.push({
       username: String(v[i][0]), passHash: String(v[i][1]||''), role: v[i][2]||'cs',
       name: v[i][3]||'', team: v[i][4]||'',
       active: (v[i][5]===''||v[i][5]===undefined) ? true :
               (v[i][5]===true||v[i][5]==='TRUE'||v[i][5]==='true'||v[i][5]===1),
-      names: namesArr
+      names: namesArr,
+      perms: permsArr
     });
   }
   return out;
@@ -3766,7 +3773,8 @@ function saveUsers_(users) {
     var namesArr = (u.names && u.names.length) ? u.names : (u.name ? [u.name] : []);
     matrix.push([String(u.username||''), String(u.passHash||''), u.role||'cs',
                  namesArr[0]||u.name||'', u.team||'', (u.active===false?false:true),
-                 JSON.stringify(namesArr)]);
+                 JSON.stringify(namesArr),
+                 (Array.isArray(u.perms) ? JSON.stringify(u.perms) : '')]);
   }
   sh.getRange(1, 1, matrix.length, USER_HEADERS.length).setValues(matrix);
   return jsonOut_({ ok: true, written: users.length });
