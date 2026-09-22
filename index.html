@@ -9771,7 +9771,17 @@ function dateInRange_(dt, fromStr, toStr) {
   return true;
 }
 
-// Tach chuoi multi-value theo 1 dau phan cach, trim tung phan tu, bo phan tu rong
+// Loai don theo "Trang thai" (cot H, DT TONG) khoi doanh so/so don — theo dung Quy che thu lao
+// thuong Sale Online (HKD Hien Tour, 10/9/2026), Muc 3: "Doanh so tinh thu lao, thuong la doanh
+// so len don SAU KHI TRU gia tri don hang bi huy, tra lai, hoan tien hoac dang trong qua trinh
+// xu ly khieu nai." Khong doi accent-insensitive de khop du go co dau/khong dau/viet tat.
+function _isExcludedOrderStatus_(trangThai) {
+  var s = _stripVN_(trangThai);
+  if (!s) return false;
+  return /that bai|huy|hoan tien|hoan tra|tra lai|khieu nai/.test(s);
+}
+
+
 // Chuan hoa gia tri tien: khong co don nao thuc te duoi 1 nghin dong. Neu Sheet nhap thieu 3 so 0
 // (vd go "900" thay vi "900000" — pho bien khi go tat theo don vi nghin), gia tri doc len se < 1000
 // va SAI mot cach am tham (thieu dung 1000 lan) neu khong xu ly. Voi moi so > 0 va < 1000, hieu la
@@ -10000,6 +10010,7 @@ function buildSalesReportA_(filters) {
     var row = rows[i];
     var dt = parseVNDate_(row[dateField]);
     if (!dateInRange_(dt, filters.dateFrom, filters.dateTo)) continue;
+    if (_isExcludedOrderStatus_(row.trangThai)) continue; // bo don Huy/Tra lai/Hoan tien/Thai bai/Khieu nai (Quy che thu lao Sale)
     if (kenhFilterArr.length && kenhFilterArr.indexOf(row.kenhBan) === -1) continue;
     var salesOnOrder = splitMulti_(row.saleBan, ',');
     if (saleFilterArr.length && !salesOnOrder.some(function(s){ return saleFilterArr.indexOf(s) !== -1; })) continue;
@@ -10396,6 +10407,7 @@ function buildSalesReportC_(filters) {
       var row = rows[i];
       var dt = parseVNDate_(row[dateField]);
       if (!dateInRange_(dt, fromStr, toStr)) continue;
+      if (_isExcludedOrderStatus_(row.trangThai)) continue; // bo don Huy/Tra lai/Hoan tien/Thai bai/Khieu nai (Quy che thu lao Sale)
       if (kenhFilterArr.length && kenhFilterArr.indexOf(row.kenhBan) === -1) continue;
       var salesOnRow = splitMulti_(row.saleBan, ',');
       if (saleFilterArr.length && !salesOnRow.some(function(s){ return saleFilterArr.indexOf(s) !== -1; })) continue;
