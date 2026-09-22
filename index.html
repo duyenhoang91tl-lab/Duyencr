@@ -16786,12 +16786,15 @@ function _pkExportKpiOrdersDetail(){
 //  (%) + mẫu số cho từng tag, áp dụng cho CẢ THÁNG (kế thừa sang tháng sau nếu không đổi).
 //  Nguồn dữ liệu: action=mktChecklist (GET) / saveMktChecklistConfig (POST) — gas_v13.js.
 // ═══════════════════════════════════════════════════════
-var _mktState = {
-  loaded: false, loading: false,
-  quick: 'thisMonth', from: '', to: '',
-  report: null,
-  cfgDraft: null // khi != null: đang sửa mục tiêu/mẫu số, giữ bản nháp { L1:{target,denom}, ... } (target dạng %)
-};
+var _mktState = (function(){
+  var r = (typeof _pkQuickRange === 'function') ? _pkQuickRange('thisMonth') : null;
+  return {
+    loaded: false, loading: false,
+    quick: 'thisMonth', from: r ? r.from : '', to: r ? r.to : '',
+    report: null,
+    cfgDraft: null // khi != null: đang sửa mục tiêu/mẫu số, giữ bản nháp { L1:{target,denom}, ... } (target dạng %)
+  };
+})();
 
 function _mktLabel(code){ return _PK_STATUS_LABEL[code] || ('L' + code.substring(1) + '. (tag mới)'); }
 

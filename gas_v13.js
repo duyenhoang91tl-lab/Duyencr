@@ -2205,7 +2205,8 @@ function exportSalesReportToSheet_(reportType, filters) {
     A: 'BÁO CÁO BASE — Theo DT tổng',
     B: 'BÁO CÁO POS — Theo dữ liệu đơn',
     C: 'BÁO CÁO SO SÁNH KỲ BASE',
-    D: 'BÁO CÁO SALE TỰ THÊM — KH Chăm sóc mới (data riêng, KHÔNG gộp Base/Pos)'
+    D: 'BÁO CÁO SALE TỰ THÊM — KH Chăm sóc mới (data riêng, KHÔNG gộp Base/Pos)',
+    E: 'BÁO CÁO HOA HỒNG NHÂN VIÊN BASE'
   };
   var rows = [];
   rows.push([reportTitles[reportType] || ('BÁO CÁO ' + reportType)]);
