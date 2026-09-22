@@ -1521,6 +1521,22 @@ function splitMulti_(str, delimiter) {
   return s.split(delimiter).map(function(x){ return x.trim(); }).filter(function(x){ return x !== ''; });
 }
 
+// Cot "Thẻ" trong sheet "dữ liệu đơn" (Pancake POS) chua CA ten sale LAN trang thai don,
+// vd "anhNP1999, Đang giao hàng" hoac "dungnguyen1995, bichnguyen1993, Giao không thành"
+// (2 sale + 1 trang thai). Truoc day tach thang bang dau phay roi coi TAT CA la ten sale —
+// khien trang thai don ("Đang giao hàng", "Chưa đối soát", "Giao không thành"...) bi hieu
+// nham thanh 1 "sale" ao, gay 2 hau qua:
+//  1) Don chi co 1 sale that + 1 trang thai -> tuong la 2 sale -> sale that chi duoc tinh
+//     1/2 doanh thu thay vi tron ven; don co 2 sale that + 1 trang thai -> bi chia thanh 3
+//     phan thay vi 2 (moi sale that le ra duoc 1/2, lai chi con 1/3).
+//  2) Danh sach loc "Sale" cua Bao cao B hien them cac "sale" ao trung ten trang thai don.
+// Quy uoc phan biet: ten dang nhap sale luon la 1 CHUOI LIEN, khong co khoang trang; trang
+// thai don cua Pancake luon la CUM TU tieng Viet nhieu chu co khoang trang. Nen chi giu lai
+// token KHONG co khoang trang de lam ten sale, bo qua moi token co khoang trang.
+function _donSaleNamesFromThe_(theStr) {
+  return splitMulti_(theStr, ',').filter(function(tok) { return tok && !/\s/.test(tok); });
+}
+
 // ── Doc toan bo sheet "DT TỔNG " thanh mang object ──
 function readDTTong_() {
   var ss = getDTSS_();
@@ -1618,7 +1634,7 @@ function getDonSaleByPhone_() {
   for (var i = 0; i < rows.length; i++) {
     var ph = normPhone_(String(rows[i].soDienThoai || ''));
     if (!ph) continue;
-    var names = splitMulti_(rows[i].theSale, ',');
+    var names = _donSaleNamesFromThe_(rows[i].theSale);
     if (!names.length) continue;
     if (!map[ph]) map[ph] = [];
     for (var j = 0; j < names.length; j++) {
@@ -1692,7 +1708,7 @@ function getSalesReportOptions_() {
   for (var iB0 = 0; iB0 < rowsB0.length; iB0++) {
     if (rowsB0[iB0].nguonDon) nguonSet[rowsB0[iB0].nguonDon] = true;
     if (rowsB0[iB0].marketer) marketerSet[rowsB0[iB0].marketer] = true;
-    var saleBList0 = splitMulti_(rowsB0[iB0].theSale, ',');
+    var saleBList0 = _donSaleNamesFromThe_(rowsB0[iB0].theSale);
     for (var jB0 = 0; jB0 < saleBList0.length; jB0++) saleBSet[saleBList0[jB0]] = true;
   }
   var srptOpt = {
@@ -1850,7 +1866,7 @@ function buildSalesReportB_(filters) {
     if (nguonFilterArr.length && nguonFilterArr.indexOf(row.nguonDon) === -1) continue;
     if (marketerFilterArr.length && marketerFilterArr.indexOf(row.marketer) === -1) continue;
     if (saleFilterArr.length) {
-      var salesOnRow = splitMulti_(row.theSale, ',');
+      var salesOnRow = _donSaleNamesFromThe_(row.theSale);
       var hit = false;
       for (var si = 0; si < saleFilterArr.length; si++) { if (salesOnRow.indexOf(saleFilterArr[si]) !== -1) { hit = true; break; } }
       if (!hit) continue;
@@ -1882,7 +1898,7 @@ function buildSalesReportB_(filters) {
     // Breakdown theo Sale (cot "Thẻ") — dung dung quy uoc da chot o Bao cao A: so don giu
     // nguyen (khong chia), tien (Gia tri sau giam + COD) chia deu cho so sale/don de tranh cong
     // trung khi tong theo team. Don khong co sale nao gom vao "(chưa gán sale)".
-    var salesOnOrder = splitMulti_(m.theSale, ',');
+    var salesOnOrder = _donSaleNamesFromThe_(m.theSale);
     if (salesOnOrder.length === 0) salesOnOrder = [UNASSIGNED];
     var nSale = salesOnOrder.length;
     for (var si2 = 0; si2 < salesOnOrder.length; si2++) {
