@@ -860,7 +860,10 @@ function doGet(e) {
     // ── Khop Page Pancake (pageId) <-> Kenh ban chuan trong DT TONG ──
     if (action === 'pancakePageMap') return jsonOut_({ map: readPancakePageMap_(), allPages: pancakeAllPages_() });
     // ── Bao cao KPI tong hop (DT TONG + Pancake tuong tac + SDT) ──
-    if (action === 'kpiReport') return jsonOut_(buildKpiReport_(e.parameter.from, e.parameter.to));
+    if (action === 'kpiReport') {
+      var pKpiSale = (e.parameter.sale || '').split(',').map(function(s){return s.trim();}).filter(function(s){return s;});
+      return jsonOut_(buildKpiReport_(e.parameter.from, e.parameter.to, pKpiSale));
+    }
     if (action === 'saleDirectory') return jsonOut_(readSaleDirectory_());
     // ── Nguon "Cham soc" (KH them nhanh, sheet rieng) — khong gop CareData/bao cao A-B-C ──
     if (action === 'careLeads') return jsonOut_({ rows: readCareLeads_() });
@@ -3496,7 +3499,8 @@ function readSaleDirectory_() {
   return { list: list, byName: byName };
 }
 
-function buildKpiReport_(from, to) {
+function buildKpiReport_(from, to, saleFilter) {
+  var saleFilterArr = Array.isArray(saleFilter) ? saleFilter.filter(function(s){return s;}) : [];
   // Thieu khoang ngay -> KHONG im lang tinh toan bo lich su (so don/doanh thu ca nam ghep voi
   // tuong tac ca nam cho ra ty le vo nghia). Mac dinh 7 ngay gan nhat va bao ro cho giao dien.
   var warnings = [];
@@ -3535,6 +3539,13 @@ function buildKpiReport_(from, to) {
     var d = parseVNDate_(o.orderDate);
     if (!d) continue;
     if (!dateInRange_(d, from, to)) continue;
+    // Loc theo pham vi Sale (CS thuong: chi don cua chinh minh; Leader: don cua ca team) —
+    // ap dung TU PHIA SERVER, khong chi an bot o giao dien, de khong the xem duoc doanh thu
+    // cua nguoi khac du co sua duoc request phia client.
+    if (saleFilterArr.length) {
+      var salesOnOrderKpi = splitMulti_(o.cs, ',');
+      if (!salesOnOrderKpi.some(function(s){ return saleFilterArr.indexOf(s) !== -1; })) continue;
+    }
     var page = o.source || '(chưa có kênh)';
     if (!byPageOrders[page]) byPageOrders[page] = { orders: 0, revenue: 0 };
     byPageOrders[page].orders += 1;

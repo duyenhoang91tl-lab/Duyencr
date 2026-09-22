@@ -16392,9 +16392,24 @@ var _PK_KPI_TAG_SHORT = {
   L5:'L5 (Chốt)', L6:'L6 (Hủy)', L7:'L7 (Hà Nội)', L8:'L8 (Upsale)'
 };
 
+// Khoa pham vi Sale cho tab KPI Pancake giong het co che _srEnforceScope() ben Bao cao doanh
+// so (dung lai _srIsAdmin/_srMyNames/_srLeaderTeamNames co san): CS thuong chi xem duoc doanh
+// thu cua chinh minh, Leader xem duoc ca team minh phu trach, Admin xem het khong gioi han.
+function _pkEnforceScope(){
+  if (typeof _srIsAdmin !== 'function' || _srIsAdmin()) { _pkState.kpiSaleScope = null; return; }
+  var my = (typeof _srMyNames === 'function') ? _srMyNames() : [];
+  if (currentUser && currentUser.role === 'leader' && typeof _srLeaderTeamNames === 'function') {
+    var teamNames = _srLeaderTeamNames();
+    _pkState.kpiSaleScope = teamNames.length ? teamNames : my;
+  } else {
+    _pkState.kpiSaleScope = my;
+  }
+}
+
 async function renderKpiPancakeTab(){
   var wrap = document.getElementById('kpipancake-wrap');
   if (!wrap) return;
+  _pkEnforceScope();
   if (!_pkState.nameMapLoaded) await _pkLoadNameMap();
   if (!_pkState.pageMapLoaded) await _pkLoadPageMap();
   _pkRenderKpiPancake();
@@ -16408,7 +16423,8 @@ async function _pkLoadKpiReport(){
   _pkState.kpiReportLoading = true; _pkRenderKpiPancake();
   try {
     var sep = gsUrl.includes('?') ? '&' : '?';
-    var r = await fetch(gsUrl + sep + 'action=kpiReport&from='+encodeURIComponent(_pkState.kpiFrom)+'&to='+encodeURIComponent(_pkState.kpiTo), { redirect:'follow' });
+    var saleQ = (_pkState.kpiSaleScope && _pkState.kpiSaleScope.length) ? '&sale='+encodeURIComponent(_pkState.kpiSaleScope.join(',')) : '';
+    var r = await fetch(gsUrl + sep + 'action=kpiReport&from='+encodeURIComponent(_pkState.kpiFrom)+'&to='+encodeURIComponent(_pkState.kpiTo)+saleQ, { redirect:'follow' });
     var d = await r.json();
     if (d.error) throw new Error(d.error);
     _pkState.kpiReport = d;
@@ -16607,6 +16623,12 @@ function _pkRenderKpiPancake(){
   var html = '';
 
   html += '<div class="dash-section-title">📈 Báo cáo KPI Pancake tổng hợp</div>';
+
+  if (_pkState.kpiSaleScope && _pkState.kpiSaleScope.length){
+    html += '<div style="margin:0 0 10px;padding:6px 10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:12px;color:#1e40af">'+
+      '🔒 Đang giới hạn theo phạm vi của bạn ('+(currentUser.role==='leader'?'Trưởng nhóm — cả team':'Sale')+'): '+
+      esc(_pkState.kpiSaleScope.join(', '))+'. Số liệu Tương tác/SĐT theo Page vẫn hiện toàn Page (không tách được theo cá nhân), chỉ riêng Đơn/Doanh thu là đã lọc đúng phạm vi.</div>';
+  }
 
   html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px">'+
     '<select style="'+st+'" onchange="_pkKpiApplyQuickFilter(this.value)">'+
