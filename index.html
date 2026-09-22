@@ -17209,7 +17209,7 @@ function _srChartSvg(rows, nameKey, valueKey, type, moneyFmt){
   }).join('');
 
   if (type === 'pie'){
-    var cx=100, cy=100, r=90, angle=-90, paths='';
+    var cx=100, cy=100, r=90, angle=-90, paths='', labels='';
     data.forEach(function(d,i){
       var frac = total ? d.value/total : 0;
       var sweep = frac*360;
@@ -17223,8 +17223,17 @@ function _srChartSvg(rows, nameKey, valueKey, type, moneyFmt){
       } else {
         paths += '<path d="M'+cx+','+cy+' L'+x1.toFixed(2)+','+y1.toFixed(2)+' A'+r+','+r+' 0 '+large+' 1 '+x2.toFixed(2)+','+y2.toFixed(2)+' Z" fill="'+color+'"><title>'+esc(d.name)+': '+fmtVal(d.value)+'</title></path>';
       }
+      // Nhan % NGAY TREN mieng banh — chi hien voi mieng du to (>=5%) de khong chong chit chu voi
+      // cac mieng nho; chu trang co vien mo (paint-order stroke) de doc duoc tren MOI mau nen.
+      if (frac >= 0.05){
+        var midAngle = angle + sweep/2, lr = r*0.62;
+        var lx = cx + lr*Math.cos(midAngle*Math.PI/180), ly = cy + lr*Math.sin(midAngle*Math.PI/180);
+        labels += '<text x="'+lx.toFixed(2)+'" y="'+ly.toFixed(2)+'" text-anchor="middle" dominant-baseline="central" font-size="10" font-weight="700" fill="#fff" '+
+          'style="paint-order:stroke;stroke:rgba(0,0,0,.45);stroke-width:2.5px;stroke-linejoin:round;pointer-events:none">'+Math.round(frac*1000)/10+'%</text>';
+      }
       angle = endAngle;
     });
+    paths += labels;
     // Bieu do to hon (240px thay vi 200px) + khung chu thich KHONG con gioi han chieu cao/thanh
     // keo nua: dung CSS "columns" de tu chay sang cot 2, cot 3... khi danh sach dai (con hon
     // scroll), so cot tu dieu chinh theo be rong man hinh va so luong ten.
