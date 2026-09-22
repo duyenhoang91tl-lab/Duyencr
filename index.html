@@ -15005,8 +15005,8 @@ function _dashSetFilter(key, val){
   renderDashboard();
 }
 function _dashSetPreset(preset){
-  // Dung chung bo loc nhanh _pkQuickRange: hom nay/hom qua/thang/quy/nam (nay + truoc)
-  var map = { today:'today', yesterday:'yesterday', month:'thisMonth', last:'lastMonth', q:'thisQuarter', lastq:'lastQuarter', year:'thisYear', lasty:'lastYear' };
+  // Dung chung bo loc nhanh _pkQuickRange: hom nay/hom qua/tuan/thang/quy/nam (nay + truoc)
+  var map = { today:'today', yesterday:'yesterday', thisweek:'thisWeek', lastweek:'lastWeek', month:'thisMonth', last:'lastMonth', q:'thisQuarter', lastq:'lastQuarter', year:'thisYear', lasty:'lastYear' };
   if (preset === 'all') { _dashFilter.from=''; _dashFilter.to=''; }
   else if (map[preset]) { var rg = _pkQuickRange(map[preset]); if (rg){ _dashFilter.from=rg.from; _dashFilter.to=rg.to; } }
   _dashFilterSave();
@@ -15032,10 +15032,10 @@ function _dashFilterBarHtml(scopeList){
   }
   csNames.sort(function(a,b){ return a.localeCompare(b,'vi'); });
 
-  var presets = [['all','Tất cả'],['today','Hôm nay'],['yesterday','Hôm qua'],['month','Tháng này'],['last','Tháng trước'],['q','Quý này'],['lastq','Quý trước'],['year','Năm nay'],['lasty','Năm trước']];
+  var presets = [['all','Tất cả'],['today','Hôm nay'],['yesterday','Hôm qua'],['thisweek','Tuần này'],['lastweek','Tuần trước'],['month','Tháng này'],['last','Tháng trước'],['q','Quý này'],['lastq','Quý trước'],['year','Năm nay'],['lasty','Năm trước']];
   var isAll = !f.from && !f.to;
   var presetHtml = presets.map(function(p){
-    var pmap = { today:'today', yesterday:'yesterday', month:'thisMonth', last:'lastMonth', q:'thisQuarter', lastq:'lastQuarter', year:'thisYear', lasty:'lastYear' };
+    var pmap = { today:'today', yesterday:'yesterday', thisweek:'thisWeek', lastweek:'lastWeek', month:'thisMonth', last:'lastMonth', q:'thisQuarter', lastq:'lastQuarter', year:'thisYear', lasty:'lastYear' };
     var prg = pmap[p[0]] ? _pkQuickRange(pmap[p[0]]) : null;
     var active = (p[0]==='all') ? isAll : !!(prg && f.from===prg.from && f.to===prg.to);
     return '<button class="btn sm'+(active?' primary':'')+'" style="padding:3px 9px;font-size:11px" onclick="_dashSetPreset(\''+p[0]+'\')">'+p[1]+'</button>';
