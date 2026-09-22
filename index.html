@@ -17133,7 +17133,8 @@ var _srState = {
   // D — KH Cham soc moi (data rieng, KHONG gop A/B/C)
   dDateFrom: '', dDateTo: '', dDateQuick: 'custom', dCs: '', dataD: null,
   // E — Hoa hong nhan vien (dung lai action=salesReportA, filter rieng de khong dam vao tab A)
-  eDateFrom: '', eDateTo: '', eDateQuick: 'custom', eDateField: 'ngayTao', eSale: [], eKenh: [], dataE: null, eSaleSearch: ''
+  eDateFrom: '', eDateTo: '', eDateQuick: 'custom', eDateField: 'ngayTao', eSale: [], eKenh: [], dataE: null, eSaleSearch: '',
+  eSaleCustomized: false, leaderTeamOptions: []
 };
 
 function _srMoney(n){ return fmt(Math.round(n||0)) + '₫'; }
@@ -17147,12 +17148,35 @@ function _srMyNames(){
 }
 // Khoa cung bo loc Sale ve dung ten cua chinh CS dang dang nhap — goi o dau moi lan render de
 // khong the nao bi doi sang xem sale khac (kien ca qua thao tac client, phong khi co lo hong UI).
+// RIENG bao cao E (Hoa hong): Leader duoc xem CA TEAM cua minh (giong dung quyen xem KH da co san
+// o _inUserScope cho leader), khong chi rieng ten minh nhu CS thuong — vi Truong nhom can doi
+// chieu hoa hong ca nhom. Neu leader tu bo bot/chon lai vai ten trong team (qua combo o dươi),
+// _srState.eSaleCustomized se bat len va giu nguyen lua chon do, chi loc bo ten NGOAI team.
+function _srLeaderTeamNames(){
+  var my = _srMyNames();
+  for (var i=0;i<(teams||[]).length;i++){
+    var t = teams[i];
+    if (my.indexOf(t.leader)!==-1 || t.name===currentUser.team){
+      return Array.from(_teamMemberSet(t));
+    }
+  }
+  return [];
+}
 function _srEnforceScope(){
   if (_srIsAdmin()) return;
   var my = _srMyNames();
   _srState.sale = my.slice();
   _srState.bSale = my.slice();
   _srState.cSale = my.slice();
+  if (currentUser && currentUser.role === 'leader'){
+    var teamNames = _srLeaderTeamNames();
+    _srState.leaderTeamOptions = teamNames;
+    if (teamNames.length){
+      if (!_srState.eSaleCustomized) _srState.eSale = teamNames.slice();
+      else _srState.eSale = (_srState.eSale||[]).filter(function(n){ return teamNames.indexOf(n)!==-1; });
+      return;
+    }
+  }
   _srState.eSale = my.slice();
 }
 
@@ -17442,6 +17466,7 @@ function srComboToggleItem(e, domId, value){
   var idx = arr.indexOf(value);
   if (idx !== -1) arr.splice(idx, 1); else arr.push(value);
   _srState[r.field] = arr;
+  if (r.field === 'eSale') _srState.eSaleCustomized = true;
   var ci = document.getElementById(domId+'-input');
   srComboRender(domId, ci ? ci.value : '');
   srRenderComboChips(domId);
@@ -17449,6 +17474,7 @@ function srComboToggleItem(e, domId, value){
 function srComboRemove(domId, value){
   var r = _srComboReg[domId]; if (!r) return;
   _srState[r.field] = (_srState[r.field] || []).filter(function(v){ return v !== value; });
+  if (r.field === 'eSale') _srState.eSaleCustomized = true;
   srRenderComboChips(domId);
   var l = document.getElementById(domId+'-list');
   if (l && l.classList.contains('open')) { var ci=document.getElementById(domId+'-input'); srComboRender(domId, ci?ci.value:''); }
@@ -17457,6 +17483,7 @@ function srComboClear(e, domId){
   if (e) e.stopPropagation();
   var r = _srComboReg[domId]; if (!r) return;
   _srState[r.field] = [];
+  if (r.field === 'eSale') _srState.eSaleCustomized = true;
   var ci = document.getElementById(domId+'-input'); if (ci) ci.value = '';
   srRenderComboChips(domId);
   var l = document.getElementById(domId+'-list');
@@ -17835,6 +17862,9 @@ function renderSalesReportTabE_(wrap, subTabs){
     filters += _srComboHtml('sr-sale-combo-e', 'eSale', 'saleOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 190);
     filters += '<select onchange="if(this.value){srPickTeam(this.value,\'eSale\',\'sr-sale-combo-e\');this.value=\'\'}" title="Điền nhanh cả team vào ô Sale" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
       '<option value="">— Chọn theo Team —</option>' + _srTeamOptionsHtml() + '</select>';
+  } else if (currentUser.role === 'leader' && (_srState.leaderTeamOptions||[]).length){
+    filters += _srComboHtml('sr-sale-combo-e', 'eSale', 'leaderTeamOptions', 'Lọc theo tên (team của bạn)', '🔍 Tìm tên trong team...', 190);
+    filters += '<button class="btn sm" title="Xem lại hoa hồng của cả team (bỏ hết lựa chọn riêng)" onclick="_srState.eSale=_srState.leaderTeamOptions.slice();_srState.eSaleCustomized=false;_srApply()">🔄 Cả team</button>';
   } else {
     filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Sale</div>'+
       '<div style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)">🔒 '+esc((_srState.eSale||[]).join(', ') || currentUser.name)+' — chỉ xem được hoa hồng của mình</div></div>';
