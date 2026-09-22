@@ -17139,6 +17139,12 @@ var _srState = {
   loading: false,
   saleOptions: [], kenhOptions: [], nguonOptions: [], marketerOptions: [], saleBOptions: [], optionsLoaded: false,
   saleSearch: '', kenhSearch: '', productSearch: '', bSaleSearch: '', // lọc nhanh client-side trên bảng breakdown
+  // Che do xem (bang/tron/cot) cho tung bang breakdown — KHONG anh huong gi den bo loc/tim kiem o tren,
+  // chi doi cach hien thi PHAN DU LIEU DA LOC. Mac dinh 'table' de giu nguyen giao dien cu.
+  aSaleView: 'table', aKenhView: 'table', aMktView: 'table',
+  bSaleView: 'table', bProductView: 'table',
+  cEmpView: 'table', cKenhView: 'table',
+  dCsView: 'table',
   // C — So sanh theo ky
   cPeriodType: 'week', cDateField: 'ngayTao',
   cWeekOffset: 0, cMonthOffset: 0, cQuarterOffset: 0, cYearOffset: 0,
@@ -17154,6 +17160,73 @@ var _srState = {
 };
 
 function _srMoney(n){ return fmt(Math.round(n||0)) + '₫'; }
+
+// ── Toggle chế độ xem Bảng / Biểu đồ tròn / Biểu đồ cột cho các bảng breakdown ──
+// KHÔNG đụng tới bất kỳ state lọc/tìm kiếm nào — chỉ đổi cách hiển thị phần dữ liệu ĐÃ được
+// lọc sẵn (rows truyền vào _srChartSvg luôn là mảng đã qua đúng filter/search như bảng cũ).
+function _srViewToggleHtml(viewKey){
+  var v = _srState[viewKey] || 'table';
+  function b(val, label){
+    return '<button type="button" class="btn '+(v===val?'secondary':'sm')+'" style="padding:3px 9px;font-size:11px" '+
+      'onclick="_srState[\''+viewKey+'\']=\''+val+'\';renderSalesReportTab()">'+label+'</button>';
+  }
+  return '<div style="display:inline-flex;gap:4px;margin-left:10px;vertical-align:middle">'+
+    b('table','📋 Bảng')+b('pie','🥧 Tròn')+b('bar','📊 Cột')+'</div>';
+}
+
+var _SR_CHART_COLORS = ['#2563eb','#16a34a','#dc2626','#d97706','#7c3aed','#0891b2','#db2777','#65a30d','#ea580c','#0d9488','#9333ea','#ca8a04','#e11d48','#4f46e5','#059669','#0284c7'];
+
+// rows: mảng object đã lọc sẵn (giống hệt mảng dùng để vẽ bảng); nameKey/valueKey: tên field;
+// type: 'pie'|'bar'; moneyFmt: true để format tiền (_srMoney), false để format số thường (fmt).
+function _srChartSvg(rows, nameKey, valueKey, type, moneyFmt){
+  var data = (rows||[]).map(function(r){ return {name: (r[nameKey]||'(chưa gán)'), value: Math.abs(Number(r[valueKey])||0)}; })
+    .filter(function(d){ return d.value>0; });
+  if (!data.length) return '<div style="color:var(--muted);text-align:center;padding:30px">Không có dữ liệu để vẽ biểu đồ</div>';
+  data.sort(function(a,b){ return b.value-a.value; });
+  var fmtVal = function(v){ return moneyFmt ? _srMoney(v) : fmt(v); };
+  var total = data.reduce(function(s,d){ return s+d.value; }, 0);
+  var legend = data.map(function(d,i){
+    var pct = total ? (d.value/total*100) : 0;
+    return '<div style="display:flex;align-items:center;gap:6px;font-size:11.5px;margin-bottom:4px">'+
+      '<span style="width:10px;height:10px;border-radius:2px;background:'+_SR_CHART_COLORS[i%_SR_CHART_COLORS.length]+';flex:none;display:inline-block"></span>'+
+      '<span style="flex:1">'+esc(d.name)+'</span>'+
+      '<span style="color:var(--muted);white-space:nowrap">'+fmtVal(d.value)+' ('+pct.toFixed(1)+'%)</span></div>';
+  }).join('');
+
+  if (type === 'pie'){
+    var cx=100, cy=100, r=90, angle=-90, paths='';
+    data.forEach(function(d,i){
+      var frac = total ? d.value/total : 0;
+      var sweep = frac*360;
+      var x1 = cx + r*Math.cos(angle*Math.PI/180), y1 = cy + r*Math.sin(angle*Math.PI/180);
+      var endAngle = angle+sweep;
+      var x2 = cx + r*Math.cos(endAngle*Math.PI/180), y2 = cy + r*Math.sin(endAngle*Math.PI/180);
+      var large = sweep>180?1:0;
+      var color = _SR_CHART_COLORS[i%_SR_CHART_COLORS.length];
+      if (frac>=0.9999){
+        paths += '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="'+color+'"><title>'+esc(d.name)+': '+fmtVal(d.value)+'</title></circle>';
+      } else {
+        paths += '<path d="M'+cx+','+cy+' L'+x1.toFixed(2)+','+y1.toFixed(2)+' A'+r+','+r+' 0 '+large+' 1 '+x2.toFixed(2)+','+y2.toFixed(2)+' Z" fill="'+color+'"><title>'+esc(d.name)+': '+fmtVal(d.value)+'</title></path>';
+      }
+      angle = endAngle;
+    });
+    return '<div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;padding:10px 0">'+
+      '<svg viewBox="0 0 200 200" style="width:200px;height:200px;flex:none">'+paths+'</svg>'+
+      '<div style="flex:1;min-width:180px;max-height:260px;overflow-y:auto">'+legend+'</div></div>';
+  }
+
+  // bar chart ngang
+  var maxV = data[0].value || 1;
+  var barsHtml = data.map(function(d,i){
+    var w = maxV ? (d.value/maxV*100) : 0;
+    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'+
+      '<div style="width:130px;font-size:11.5px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(d.name)+'">'+esc(d.name)+'</div>'+
+      '<div style="flex:1;background:var(--surface2);border-radius:4px;overflow:hidden;height:16px">'+
+      '<div style="width:'+w.toFixed(1)+'%;height:100%;background:'+_SR_CHART_COLORS[i%_SR_CHART_COLORS.length]+'"></div></div>'+
+      '<div style="width:120px;font-size:11px;color:var(--muted)">'+fmtVal(d.value)+'</div></div>';
+  }).join('');
+  return '<div style="padding:10px 0;max-height:440px;overflow-y:auto">'+barsHtml+'</div>';
+}
 
 // ── Phan quyen bao cao doanh so: CS thuong CHI xem duoc so lieu cua chinh minh, khong xem
 // duoc ca team. Admin (currentUser.role==='admin') khong bi gioi han gi. ──
@@ -17682,32 +17755,44 @@ function _srRenderA(d){
   var saleRows = (d.bySale||[]).filter(function(s){ return !_srState.saleSearch || s.name.toLowerCase().indexOf(_srState.saleSearch.toLowerCase())!==-1; });
   html += '<div class="dash-section-title">Theo Sale bán <span style="font-weight:400;color:var(--muted);font-size:11px">'+
     (_srState.byCreator ? '(tính trọn vẹn cho người tạo đơn — không chia đều)' : '(số đơn giữ nguyên — tiền chia đều cho số sale/đơn)')+
-    '</span></div>';
+    '</span>'+_srViewToggleHtml('aSaleView')+'</div>';
   html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.saleSearch)+'" oninput="_srState.saleSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
-  html += '<table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Cọc</th><th style="text-align:right"><b>Tổng đơn</b></th><th style="text-align:right">TB đơn</th></tr></thead><tbody>';
-  saleRows.forEach(function(s){
-    html += '<tr><td>'+esc(s.name)+'</td><td style="text-align:right">'+fmt(s.orders)+'</td><td style="text-align:right">'+_srMoney(s.coc)+'</td><td style="text-align:right"><b>'+_srMoney(s.giaTri)+'</b></td><td style="text-align:right">'+_srMoney(s.trungBinhDon)+'</td></tr>';
-  });
-  if (!saleRows.length) html += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
-  html += '</tbody></table>';
+  if (_srState.aSaleView === 'table'){
+    html += '<table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Cọc</th><th style="text-align:right"><b>Tổng đơn</b></th><th style="text-align:right">TB đơn</th></tr></thead><tbody>';
+    saleRows.forEach(function(s){
+      html += '<tr><td>'+esc(s.name)+'</td><td style="text-align:right">'+fmt(s.orders)+'</td><td style="text-align:right">'+_srMoney(s.coc)+'</td><td style="text-align:right"><b>'+_srMoney(s.giaTri)+'</b></td><td style="text-align:right">'+_srMoney(s.trungBinhDon)+'</td></tr>';
+    });
+    if (!saleRows.length) html += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+    html += '</tbody></table>';
+  } else {
+    html += _srChartSvg(saleRows, 'name', 'giaTri', _srState.aSaleView, true);
+  }
 
   if (_srIsAdmin()){
     var kenhRows = (d.byKenh||[]).filter(function(k){ return !_srState.kenhSearch || k.name.toLowerCase().indexOf(_srState.kenhSearch.toLowerCase())!==-1; });
-    html += '<div class="dash-section-title">Theo Kênh bán</div>';
+    html += '<div class="dash-section-title">Theo Kênh bán'+_srViewToggleHtml('aKenhView')+'</div>';
     html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên kênh..." value="'+esc(_srState.kenhSearch)+'" oninput="_srState.kenhSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
-    html += '<table class="dash-table"><thead><tr><th>Kênh</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Cọc</th><th style="text-align:right"><b>Tổng đơn</b></th><th style="text-align:right">TB đơn</th></tr></thead><tbody>';
-    kenhRows.forEach(function(k){
-      html += '<tr><td>'+esc(k.name)+'</td><td style="text-align:right">'+fmt(k.orders)+'</td><td style="text-align:right">'+_srMoney(k.coc)+'</td><td style="text-align:right"><b>'+_srMoney(k.giaTri)+'</b></td><td style="text-align:right">'+_srMoney(k.trungBinhDon)+'</td></tr>';
-    });
-    if (!kenhRows.length) html += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
-    html += '</tbody></table>';
-    html += '<div class="dash-section-title">Theo MKT <span style="font-weight:400;color:var(--muted);font-size:11px">(gom theo nhóm MKT ở tab Team → "Nhóm MKT"; Page chạy chung chia theo tỷ lệ)</span></div>';
-    html += '<table class="dash-table"><thead><tr><th>MKT</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Cọc</th><th style="text-align:right"><b>Tổng đơn</b></th><th style="text-align:right">TB đơn</th></tr></thead><tbody>';
-    (d.byMkt||[]).forEach(function(k){
-      html += '<tr><td>'+esc(k.name)+'</td><td style="text-align:right">'+fmt(k.orders)+'</td><td style="text-align:right">'+_srMoney(k.coc)+'</td><td style="text-align:right"><b>'+_srMoney(k.giaTri)+'</b></td><td style="text-align:right">'+_srMoney(k.trungBinhDon)+'</td></tr>';
-    });
-    if (!(d.byMkt||[]).length) html += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Chưa có nhóm MKT — vào tab Team → "Nhóm MKT" để tạo.</td></tr>';
-    html += '</tbody></table>';
+    if (_srState.aKenhView === 'table'){
+      html += '<table class="dash-table"><thead><tr><th>Kênh</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Cọc</th><th style="text-align:right"><b>Tổng đơn</b></th><th style="text-align:right">TB đơn</th></tr></thead><tbody>';
+      kenhRows.forEach(function(k){
+        html += '<tr><td>'+esc(k.name)+'</td><td style="text-align:right">'+fmt(k.orders)+'</td><td style="text-align:right">'+_srMoney(k.coc)+'</td><td style="text-align:right"><b>'+_srMoney(k.giaTri)+'</b></td><td style="text-align:right">'+_srMoney(k.trungBinhDon)+'</td></tr>';
+      });
+      if (!kenhRows.length) html += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+      html += '</tbody></table>';
+    } else {
+      html += _srChartSvg(kenhRows, 'name', 'giaTri', _srState.aKenhView, true);
+    }
+    html += '<div class="dash-section-title">Theo MKT <span style="font-weight:400;color:var(--muted);font-size:11px">(gom theo nhóm MKT ở tab Team → "Nhóm MKT"; Page chạy chung chia theo tỷ lệ)</span>'+_srViewToggleHtml('aMktView')+'</div>';
+    if (_srState.aMktView === 'table'){
+      html += '<table class="dash-table"><thead><tr><th>MKT</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Cọc</th><th style="text-align:right"><b>Tổng đơn</b></th><th style="text-align:right">TB đơn</th></tr></thead><tbody>';
+      (d.byMkt||[]).forEach(function(k){
+        html += '<tr><td>'+esc(k.name)+'</td><td style="text-align:right">'+fmt(k.orders)+'</td><td style="text-align:right">'+_srMoney(k.coc)+'</td><td style="text-align:right"><b>'+_srMoney(k.giaTri)+'</b></td><td style="text-align:right">'+_srMoney(k.trungBinhDon)+'</td></tr>';
+      });
+      if (!(d.byMkt||[]).length) html += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Chưa có nhóm MKT — vào tab Team → "Nhóm MKT" để tạo.</td></tr>';
+      html += '</tbody></table>';
+    } else {
+      html += _srChartSvg(d.byMkt||[], 'name', 'giaTri', _srState.aMktView, true);
+    }
   }
   return html;
 }
@@ -17726,25 +17811,33 @@ function _srRenderB(d){
   }
 
   var saleRows = (d.bySale||[]).filter(function(s){ return !_srState.bSaleSearch || (s.name||'').toLowerCase().indexOf(_srState.bSaleSearch.toLowerCase())!==-1; });
-  html += '<div class="dash-section-title">Theo Sale <span style="font-weight:400;color:var(--muted);font-size:11px">(tiền chia đều cho số sale/đơn, số đơn giữ nguyên)</span></div>';
+  html += '<div class="dash-section-title">Theo Sale <span style="font-weight:400;color:var(--muted);font-size:11px">(tiền chia đều cho số sale/đơn, số đơn giữ nguyên)</span>'+_srViewToggleHtml('bSaleView')+'</div>';
   html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.bSaleSearch)+'" oninput="_srState.bSaleSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
-  html += '<table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Giá trị sau giảm giá</th><th style="text-align:right">COD</th></tr></thead><tbody>';
-  saleRows.forEach(function(s){
-    html += '<tr><td>'+esc(s.name)+'</td><td style="text-align:right">'+fmt(s.orders)+'</td><td style="text-align:right">'+_srMoney(s.giaTri)+'</td><td style="text-align:right">'+_srMoney(s.cod)+'</td></tr>';
-  });
-  if (!saleRows.length) html += '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
-  html += '</tbody></table>';
+  if (_srState.bSaleView === 'table'){
+    html += '<table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Giá trị sau giảm giá</th><th style="text-align:right">COD</th></tr></thead><tbody>';
+    saleRows.forEach(function(s){
+      html += '<tr><td>'+esc(s.name)+'</td><td style="text-align:right">'+fmt(s.orders)+'</td><td style="text-align:right">'+_srMoney(s.giaTri)+'</td><td style="text-align:right">'+_srMoney(s.cod)+'</td></tr>';
+    });
+    if (!saleRows.length) html += '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+    html += '</tbody></table>';
+  } else {
+    html += _srChartSvg(saleRows, 'name', 'giaTri', _srState.bSaleView, true);
+  }
 
   if (_srIsAdmin()){
     var productRows = (d.products||[]).filter(function(p){ return !_srState.productSearch || (p.name||'').toLowerCase().indexOf(_srState.productSearch.toLowerCase())!==-1 || (p.code||'').toLowerCase().indexOf(_srState.productSearch.toLowerCase())!==-1; });
-    html += '<div class="dash-section-title">Báo cáo sản phẩm</div>';
+    html += '<div class="dash-section-title">Báo cáo sản phẩm'+_srViewToggleHtml('bProductView')+'</div>';
     html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên/mã sản phẩm..." value="'+esc(_srState.productSearch)+'" oninput="_srState.productSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:240px;margin-bottom:6px">';
-    html += '<table class="dash-table"><thead><tr><th>Mã sản phẩm</th><th>Tên sản phẩm</th><th style="text-align:right">Tổng số lượng</th></tr></thead><tbody>';
-    productRows.forEach(function(p){
-      html += '<tr><td style="font-family:monospace;font-size:12px">'+esc(p.code)+'</td><td>'+esc(p.name)+'</td><td style="text-align:right">'+fmt(p.soLuong)+'</td></tr>';
-    });
-    if (!productRows.length) html += '<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
-    html += '</tbody></table>';
+    if (_srState.bProductView === 'table'){
+      html += '<table class="dash-table"><thead><tr><th>Mã sản phẩm</th><th>Tên sản phẩm</th><th style="text-align:right">Tổng số lượng</th></tr></thead><tbody>';
+      productRows.forEach(function(p){
+        html += '<tr><td style="font-family:monospace;font-size:12px">'+esc(p.code)+'</td><td>'+esc(p.name)+'</td><td style="text-align:right">'+fmt(p.soLuong)+'</td></tr>';
+      });
+      if (!productRows.length) html += '<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+      html += '</tbody></table>';
+    } else {
+      html += _srChartSvg(productRows, 'name', 'soLuong', _srState.bProductView, false);
+    }
   }
   return html;
 }
@@ -17840,11 +17933,15 @@ function renderSalesReportTabD_(wrap, subTabs){
       body = '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
     } else {
       var html = '<div class="kpi-grid" style="margin-bottom:16px"><div class="kpi-card"><div class="kpi-label">Số KH thêm mới (nguồn Chăm sóc)</div><div class="kpi-val">'+fmt(d.total||0)+'</div></div></div>';
-      html += '<div class="dash-section-title">Theo CS thêm</div>';
-      html += '<table class="dash-table"><thead><tr><th>CS</th><th>Số KH thêm</th></tr></thead><tbody>';
-      (d.byCS||[]).forEach(function(x){ html += '<tr><td>'+esc(x.name)+'</td><td>'+fmt(x.count)+'</td></tr>'; });
-      if (!(d.byCS||[]).length) html += '<tr><td colspan="2" style="text-align:center;color:var(--muted)">Không có dữ liệu</td></tr>';
-      html += '</tbody></table>';
+      html += '<div class="dash-section-title">Theo CS thêm'+_srViewToggleHtml('dCsView')+'</div>';
+      if (_srState.dCsView === 'table'){
+        html += '<table class="dash-table"><thead><tr><th>CS</th><th>Số KH thêm</th></tr></thead><tbody>';
+        (d.byCS||[]).forEach(function(x){ html += '<tr><td>'+esc(x.name)+'</td><td>'+fmt(x.count)+'</td></tr>'; });
+        if (!(d.byCS||[]).length) html += '<tr><td colspan="2" style="text-align:center;color:var(--muted)">Không có dữ liệu</td></tr>';
+        html += '</tbody></table>';
+      } else {
+        html += _srChartSvg(d.byCS||[], 'name', 'count', _srState.dCsView, false);
+      }
       html += '<div class="dash-section-title" style="margin-top:16px">Chi tiết khách thêm mới</div>';
       html += '<table class="dash-table"><thead><tr><th>SĐT</th><th>Tên khách</th><th>Ghi chú mới nhất</th><th>CS thêm</th><th>Ngày thêm</th></tr></thead><tbody>';
       (d.rows||[]).forEach(function(r){
@@ -18047,14 +18144,26 @@ function _srRenderC(d){
     (p.curKey ? '' : '<div style="color:var(--hint)">(Kỳ tùy chỉnh — không tra được KPI, chỉ tab Tuần/Tháng/Quý mới có KPI)</div>')+
     '</div>';
 
-  html += '<div class="dash-section-title">Theo Nhân viên (Sale bán) <span style="font-weight:400;color:var(--muted);font-size:11px">(tiền chia đều cho số sale/đơn khi đơn có nhiều sale)</span></div>';
+  html += '<div class="dash-section-title">Theo Nhân viên (Sale bán) <span style="font-weight:400;color:var(--muted);font-size:11px">(tiền chia đều cho số sale/đơn khi đơn có nhiều sale)</span>'+_srViewToggleHtml('cEmpView')+'</div>';
   html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên..." value="'+esc(_srState.cEmpSearch)+'" oninput="_srState.cEmpSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
-  html += _srRenderCTable(d.byEmployee||[], 'sale', _srState.cEmpSearch);
+  if (_srState.cEmpView === 'table'){
+    html += _srRenderCTable(d.byEmployee||[], 'sale', _srState.cEmpSearch);
+  } else {
+    var empRowsChart = (d.byEmployee||[]).filter(function(r){ return !_srState.cEmpSearch || r.name.toLowerCase().indexOf(_srState.cEmpSearch.toLowerCase())!==-1; });
+    html += '<div style="font-size:11px;color:var(--hint);margin-bottom:4px">Vẽ theo "Kết quả kỳ này"</div>';
+    html += _srChartSvg(empRowsChart, 'name', 'resultCur', _srState.cEmpView, true);
+  }
 
   if (_srIsAdmin()){
-    html += '<div class="dash-section-title">Theo Kênh bán</div>';
+    html += '<div class="dash-section-title">Theo Kênh bán'+_srViewToggleHtml('cKenhView')+'</div>';
     html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên kênh..." value="'+esc(_srState.cKenhSearch)+'" oninput="_srState.cKenhSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
-    html += _srRenderCTable(d.byKenh||[], 'kenh', _srState.cKenhSearch);
+    if (_srState.cKenhView === 'table'){
+      html += _srRenderCTable(d.byKenh||[], 'kenh', _srState.cKenhSearch);
+    } else {
+      var kenhRowsChart = (d.byKenh||[]).filter(function(r){ return !_srState.cKenhSearch || r.name.toLowerCase().indexOf(_srState.cKenhSearch.toLowerCase())!==-1; });
+      html += '<div style="font-size:11px;color:var(--hint);margin-bottom:4px">Vẽ theo "Kết quả kỳ này"</div>';
+      html += _srChartSvg(kenhRowsChart, 'name', 'resultCur', _srState.cKenhView, true);
+    }
   }
 
   html += '<div style="font-size:11px;color:var(--hint);margin-top:8px">Chỉ tiêu KPI lấy từ tab "'+esc('KPI_ChiTieu')+'" trong Google Sheet CRM — tự vào Sheet điền/sửa số. Bấm vào 1 dòng để xem chi tiết đơn của kỳ này/kỳ trước.</div>';
