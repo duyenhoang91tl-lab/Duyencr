@@ -17376,16 +17376,7 @@ function _srApplyQuickRange(quickKey, fromKey, toKey, key){
   }
   _srApply();
 }
-// Multi-select don gian cho cac loc moi (Tinh trang CS / Trang thai KH / Ket ban Zalo) — chi dung cho Bao cao B
-function _srMultiSelectHtml(stateKey, options, label, width){
-  options = options || [];
-  var sel = _srState[stateKey] || [];
-  return '<div><div style="font-size:10px;color:var(--hint);margin-bottom:2px">'+esc(label)+'</div>'+
-    '<select multiple onchange="_srState.'+stateKey+'=[...this.options].filter(function(o){return o.selected;}).map(function(o){return o.value;})" '+
-    'style="min-width:'+(width||120)+'px;max-height:68px;font-size:11.5px;padding:3px 5px;border:1px solid var(--border);border-radius:6px;background:var(--surface);outline:none">'+
-    options.map(function(v){ return '<option value="'+esc(v)+'" '+(sel.indexOf(v)!==-1?'selected':'')+'>'+esc(v)+'</option>'; }).join('')+
-    '</select></div>';
-}
+// (Da thay bang combo go-tim/tick-nhieu dung chung _srbComboHTML — xem _SRB_COMBO_CFG.cs/kh/zalo)
 
 // Xuat bao cao dang loc (dung filter hien tai tren UI) ra 1 tab moi trong Google Sheet CRM.
 // Tai su dung dung filter payload nhu _srLoad() de so lieu tren Sheet khop 100% voi UI dang xem.
@@ -17405,7 +17396,9 @@ async function exportSalesReportToSheet(){
     filters = { dateFrom: _srState.dDateFrom, dateTo: _srState.dDateTo, cs: _srState.dCs || '' };
   } else {
     filters = { dateFrom: _srState.dateFrom, dateTo: _srState.dateTo,
-      sale: _srState.bSale || [], nguon: _srState.bNguon || [], marketer: _srState.bMarketer || [] };
+      sale: _srState.bSale || [], nguon: _srState.bNguon || [], marketer: _srState.bMarketer || [],
+      careStatus: _srState.bCareStatus || [], khStatus: _srState.bKhStatus || [],
+      zaloStatus: _srState.bZaloStatus || [], nickZalo: _srState.bNickZalo || '' };
   }
   var btn = document.getElementById('sr-export-sheet-btn');
   if (btn){ btn.disabled = true; btn.textContent = '⏳ Đang xuất...'; }
@@ -17746,9 +17739,9 @@ function renderSalesReportTab(){
     filters += '<div><div style="font-size:10px;color:var(--hint);margin-bottom:2px">Sản phẩm (cách nhau bằng dấu phẩy)</div>'+
       '<input type="text" value="'+esc(_srState.bSanPham||'')+'" onchange="_srSetField(\'bSanPham\',this.value)" placeholder="vd: tỳ hưu, nhẫn 10k" style="min-width:170px;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
       '</div>';
-    filters += _srMultiSelectHtml('bCareStatus', CARE_STATUS, FIELD_LABEL_CS, 120);
-    filters += _srMultiSelectHtml('bKhStatus', (typeof _flatCustStatusValues==='function'?_flatCustStatusValues():[]).filter(Boolean), FIELD_LABEL_KH, 140);
-    filters += _srMultiSelectHtml('bZaloStatus', ZALO_STATUS, 'Kết bạn Zalo', 120);
+    filters += _srbComboHTML('cs');
+    filters += _srbComboHTML('kh');
+    filters += _srbComboHTML('zalo');
     filters += '<div><div style="font-size:10px;color:var(--hint);margin-bottom:2px">Nick Zalo</div>'+
       '<input type="text" value="'+esc(_srState.bNickZalo||'')+'" onchange="_srSetField(\'bNickZalo\',this.value)" placeholder="Tìm nick..." style="min-width:100px;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
       '</div>';
@@ -18241,12 +18234,29 @@ function exportSalesReportC(){
 var _SRB_COMBO_CFG = {
   sale: { id: 'srb-sale-combo', stateKey: 'bSale', optKey: 'saleBOptions', label: 'Sale', placeholder: '🔍 Tìm & chọn sale...' },
   nguon: { id: 'srb-nguon-combo', stateKey: 'bNguon', optKey: 'nguonOptions', label: 'Nguồn đơn', placeholder: '🔍 Tìm & chọn nguồn...' },
-  mkt: { id: 'srb-mkt-combo', stateKey: 'bMarketer', optKey: 'marketerOptions', label: 'Marketer', placeholder: '🔍 Tìm & chọn marketer...' }
+  mkt: { id: 'srb-mkt-combo', stateKey: 'bMarketer', optKey: 'marketerOptions', label: 'Marketer', placeholder: '🔍 Tìm & chọn marketer...' },
+  // 3 bo loc CRM — truoc day la <select multiple> hien san nhieu dong (choan cho), gio dung
+  // chung 1 kieu combo go-tim/tick-nhieu/chip nhu Sale/Nguon/Marketer o tren. Dung getOptions/
+  // getLabel (ham, khong phai gia tri tinh) vi danh sach Tinh trang CS/Trang thai KH co the
+  // duoc admin sua qua modal Quan ly, va nhan FIELD_LABEL_CS/KH co the duoc doi ten rieng —
+  // phai doc lai moi lan mo dropdown/ve lai filter bar, khong duoc ghim gia tri cu luc khai bao.
+  cs: { id: 'srb-cs-combo', stateKey: 'bCareStatus', label: 'Tình trạng CS',
+    getLabel: function(){ return (typeof FIELD_LABEL_CS!=='undefined' && FIELD_LABEL_CS) || 'Tình trạng CS'; },
+    getOptions: function(){ return (typeof CARE_STATUS!=='undefined' ? CARE_STATUS : []) || []; },
+    placeholder: '🔍 Tìm & chọn tình trạng CS...' },
+  kh: { id: 'srb-kh-combo', stateKey: 'bKhStatus', label: 'Trạng thái KH',
+    getLabel: function(){ return (typeof FIELD_LABEL_KH!=='undefined' && FIELD_LABEL_KH) || 'Trạng thái KH'; },
+    getOptions: function(){ return (typeof _flatCustStatusValues==='function' ? _flatCustStatusValues() : []).filter(Boolean); },
+    placeholder: '🔍 Tìm & chọn trạng thái KH...' },
+  zalo: { id: 'srb-zalo-combo', stateKey: 'bZaloStatus', label: 'Kết bạn Zalo',
+    getOptions: function(){ return (typeof ZALO_STATUS!=='undefined' ? ZALO_STATUS : []).filter(Boolean); },
+    placeholder: '🔍 Tìm & chọn kết bạn Zalo...' }
 };
 var _srbComboData = {}, _srbComboIdx = {};
 function _srbBuildData(key){
   var cfg = _SRB_COMBO_CFG[key];
-  _srbComboData[key] = (_srState[cfg.optKey]||[]).map(function(v){ return {value:v, label:v}; });
+  var raw = cfg.getOptions ? cfg.getOptions() : (_srState[cfg.optKey]||[]);
+  _srbComboData[key] = (raw||[]).map(function(v){ return {value:v, label:v}; });
 }
 function srbComboRender(key, filter){
   var cfg = _SRB_COMBO_CFG[key];
@@ -18350,7 +18360,8 @@ document.addEventListener('click', function(e){
 function _srbComboHTML(key){
   var cfg = _SRB_COMBO_CFG[key];
   var sel = _srState[cfg.stateKey] || [];
-  return '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">'+cfg.label+'<span id="'+cfg.id+'-label-count" style="color:var(--green)">'+(sel.length?' ('+sel.length+' đã chọn)':'')+'</span></div>'+
+  var lbl = cfg.getLabel ? cfg.getLabel() : cfg.label;
+  return '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">'+esc(lbl)+'<span id="'+cfg.id+'-label-count" style="color:var(--green)">'+(sel.length?' ('+sel.length+' đã chọn)':'')+'</span></div>'+
     '<div class="cs-combo" id="'+cfg.id+'" style="width:170px">'+
     '<input type="text" id="'+cfg.id+'-input" class="cs-combo-input" placeholder="'+esc(cfg.placeholder)+'" autocomplete="off" '+
     'oninput="srbComboFilter(\''+key+'\', this.value)" onfocus="srbComboOpen(\''+key+'\')" onkeydown="srbComboKey(\''+key+'\', event)">'+
