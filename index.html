@@ -6531,6 +6531,7 @@ var _barMenuItems = []; // mảng id (không cần giữ thứ tự) đang nằm
 var _BAR_ITEM_DEFS = [
   { id:'tab-kh',          label:'Danh sách KH' },
   { id:'tab-schedule',    label:'Lịch chăm sóc' },
+  { id:'reportsgroup',    label:'📊 Báo cáo (gộp Doanh số/Pancake/KPI/Checklist)' },
   { id:'tab-overdue',     label:'Quá hạn' },
   { id:'tab-mydata',      label:'Data của tôi' },
   { id:'tab-zaloai',      label:'Zalo AI' },
@@ -6602,6 +6603,18 @@ function _toggleBarMenuDropdown(){
   if (list) list.style.display = (list.style.display === 'none') ? 'block' : 'none';
 }
 
+// Đặt 1 phần tử [data-bar-id] về đúng "nhà" của nó: có data-bar-after thì chèn NGAY SAU phần
+// tử được trỏ tới (vd luôn nằm cạnh "Lịch chăm sóc" dù kéo ra/vào ☰ Menu bao nhiêu lần); không
+// có/không tìm thấy thì mới appendChild vào data-bar-home như cơ chế cũ.
+function _barPlaceHome(el){
+  var afterSel = el.getAttribute('data-bar-after');
+  var afterEl = afterSel ? document.querySelector(afterSel) : null;
+  if (afterEl && afterEl.parentNode){ afterEl.parentNode.insertBefore(el, afterEl.nextSibling); return; }
+  var homeSel = el.getAttribute('data-bar-home');
+  var home = homeSel ? document.querySelector(homeSel) : null;
+  if (home) home.appendChild(el);
+}
+
 // Di chuyển đúng các phần tử [data-bar-id] đang nằm trong _barMenuItems vào khung "☰ Menu",
 // và trả các phần tử KHÔNG còn trong danh sách về lại thanh gốc (data-bar-home). Một số nơi
 // (VD header) render lại toàn bộ bằng innerHTML mỗi lần đổi trạng thái đăng nhập → có thể tạo
@@ -6630,9 +6643,8 @@ function _applyBarCustomization(){
       if (el.parentNode !== list) list.appendChild(el);
       count++;
     } else if (el.parentNode === list) {
-      var homeSel = el.getAttribute('data-bar-home');
-      var home = homeSel ? document.querySelector(homeSel) : null;
-      if (home) home.appendChild(el); else list.removeChild(el);
+      _barPlaceHome(el);
+      if (el.parentNode === list) list.removeChild(el); // khong tim duoc noi de ve -> danh phai bo khoi menu de khoi mat tich
     }
   });
   if (btn) btn.style.display = count ? '' : 'none';
@@ -18685,6 +18697,9 @@ function _injectV9UI(){
       var group = document.createElement('div');
       group.className = 'tab';
       group.id = 'v9tab-reportsgroup';
+      group.setAttribute('data-bar-id', 'reportsgroup');
+      group.setAttribute('data-bar-home', '.tabs');
+      group.setAttribute('data-bar-after', "[data-bar-id='tab-schedule']"); // luon nam NGAY CANH "Lich cham soc", du keo ra/vao ☰ Menu bao nhieu lan
       group.style.cssText = 'position:relative';
       group.innerHTML = '📊 Báo cáo ▾';
       group.setAttribute('onclick', '_toggleReportsGroupDropdown(event)');
@@ -18703,7 +18718,7 @@ function _injectV9UI(){
         rgList.appendChild(item);
       });
       group.appendChild(rgList);
-      tabsBar.appendChild(group);
+      _barPlaceHome(group); // gan NGAY SAU "Lich cham soc" thay vi cuoi thanh tab
       document.addEventListener('click', function(e){
         var list = document.getElementById('reportsgroup-list');
         var grp = document.getElementById('v9tab-reportsgroup');
