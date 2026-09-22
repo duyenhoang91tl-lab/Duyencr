@@ -18640,6 +18640,15 @@ if (typeof syncFromGS === 'function'){
 // ═══════════════════════════════════════════════════════
 //  INJECT UI (tabs + panels + role pill) — chạy khi load
 // ═══════════════════════════════════════════════════════
+// Mở/đóng dropdown "📊 Báo cáo ▾" gom 4 tab báo cáo — cùng kiểu click-để-mở/click-ra-ngoài-để-đóng
+// như nút "☰ Menu" đã có (_toggleBarMenuDropdown ở trên), viết riêng vì khác điểm neo/nội dung.
+function _toggleReportsGroupDropdown(e){
+  if (e) e.stopPropagation();
+  var list = document.getElementById('reportsgroup-list');
+  if (!list) return;
+  list.style.display = (list.style.display === 'none') ? 'block' : 'none';
+}
+
 function _injectV9UI(){
   if (document.getElementById('v9tab-customize')) return; // tránh chèn 2 lần (nút ⚙ luôn được thêm dù tab nào bị ẩn)
   var tabsBar = document.querySelector('.tabs');
@@ -18647,11 +18656,7 @@ function _injectV9UI(){
     var defs = [
       { id:'dashboard',   label:'📊 Dashboard' },
       { id:'team',        label:'👥 Quản lý Team' },
-      { id:'audit',       label:'🧾 Nhật ký' },
-      { id:'salesreport', label:'📈 Báo cáo doanh số' },
-      { id:'pancake',     label:'📥 Báo cáo Pancake' },
-      { id:'kpipancake',  label:'📈 KPI Pancake' },
-      { id:'mktchecklist',label:'✅ Checklist MKT' }
+      { id:'audit',       label:'🧾 Nhật ký' }
     ];
     defs.filter(function(d){ return tabVisible[d.id] !== false; }).forEach(function(d){
       var div = document.createElement('div');
@@ -18663,17 +18668,49 @@ function _injectV9UI(){
       div.innerHTML = d.label;
       tabsBar.appendChild(div);
     });
-    // Đổi chỗ tab "KPI Pancake" với tab tĩnh "Quá hạn" (yêu cầu người dùng) — "Quá hạn" định
-    // nghĩa sẵn trong HTML, "KPI Pancake" chèn động ở cuối thanh .tabs → đảo vị trí thủ công.
-    // Nếu KPI Pancake đang bị người dùng ẩn (tabVisible) thì kpiTab=null, tự bỏ qua bước đảo.
-    var overdueTab = tabsBar.querySelector('[onclick="switchTab(\'overdue\',this)"]');
-    var kpiTab = document.getElementById('v9tab-kpipancake');
-    if (overdueTab && kpiTab && overdueTab.parentNode === kpiTab.parentNode){
-      var swapMark = document.createComment('tab-swap');
-      overdueTab.parentNode.insertBefore(swapMark, overdueTab);
-      overdueTab.parentNode.insertBefore(overdueTab, kpiTab);
-      swapMark.parentNode.insertBefore(kpiTab, swapMark);
-      swapMark.remove();
+    // Gom 4 tab báo cáo (Báo cáo doanh số / Báo cáo Pancake / KPI Pancake / Checklist MKT)
+    // vào chung 1 menu sổ xuống "📊 Báo cáo ▾" cho đỡ chật thanh tab, thay vì để 4 tab rời
+    // như trước (đã bỏ luôn bước đảo chỗ KPI Pancake ↔ "Quá hạn" vì không còn cần thiết —
+    // KPI Pancake giờ nằm gọn trong dropdown này). Tab nào bị ẩn qua "⚙ Tuỳ chỉnh tab hiển thị"
+    // (tabVisible) thì tự động không xuất hiện trong dropdown; nếu ẩn hết cả 4 thì cả nút
+    // "📊 Báo cáo ▾" cũng tự ẩn theo.
+    var reportDefs = [
+      { id:'salesreport', label:'📈 Báo cáo doanh số' },
+      { id:'pancake',     label:'📥 Báo cáo Pancake' },
+      { id:'kpipancake',  label:'📈 KPI Pancake' },
+      { id:'mktchecklist',label:'✅ Checklist MKT' }
+    ];
+    var visibleReportDefs = reportDefs.filter(function(d){ return tabVisible[d.id] !== false; });
+    if (visibleReportDefs.length){
+      var group = document.createElement('div');
+      group.className = 'tab';
+      group.id = 'v9tab-reportsgroup';
+      group.style.cssText = 'position:relative';
+      group.innerHTML = '📊 Báo cáo ▾';
+      group.setAttribute('onclick', '_toggleReportsGroupDropdown(event)');
+      var rgList = document.createElement('div');
+      rgList.id = 'reportsgroup-list';
+      rgList.style.cssText = 'display:none;position:absolute;top:100%;left:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--rmd);box-shadow:0 8px 24px rgba(0,0,0,.15);min-width:200px;z-index:950;padding:6px;';
+      visibleReportDefs.forEach(function(d){
+        var item = document.createElement('div');
+        item.className = 'tab';
+        item.id = 'v9tab-' + d.id;
+        item.setAttribute('data-bar-id', d.id);
+        item.setAttribute('data-bar-home', '#reportsgroup-list');
+        item.style.cssText = 'display:block;padding:8px 10px;border-radius:6px;margin:0;white-space:nowrap;';
+        item.setAttribute('onclick', "event.stopPropagation();switchTab('"+d.id+"',this);document.getElementById('reportsgroup-list').style.display='none';");
+        item.innerHTML = d.label;
+        rgList.appendChild(item);
+      });
+      group.appendChild(rgList);
+      tabsBar.appendChild(group);
+      document.addEventListener('click', function(e){
+        var list = document.getElementById('reportsgroup-list');
+        var grp = document.getElementById('v9tab-reportsgroup');
+        if (!list || !grp || list.style.display === 'none') return;
+        if (grp.contains(e.target)) return;
+        list.style.display = 'none';
+      });
     }
     var gear = document.createElement('div');
     gear.className = 'tab';
