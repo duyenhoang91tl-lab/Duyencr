@@ -17187,10 +17187,10 @@ function _srChartSvg(rows, nameKey, valueKey, type, moneyFmt){
   var total = data.reduce(function(s,d){ return s+d.value; }, 0);
   var legend = data.map(function(d,i){
     var pct = total ? (d.value/total*100) : 0;
-    return '<div style="display:flex;align-items:center;gap:6px;font-size:11.5px;margin-bottom:4px">'+
+    return '<div style="display:flex;align-items:center;gap:8px;font-size:11.5px;margin-bottom:4px">'+
       '<span style="width:10px;height:10px;border-radius:2px;background:'+_SR_CHART_COLORS[i%_SR_CHART_COLORS.length]+';flex:none;display:inline-block"></span>'+
-      '<span style="flex:1">'+esc(d.name)+'</span>'+
-      '<span style="color:var(--muted);white-space:nowrap">'+fmtVal(d.value)+' ('+pct.toFixed(1)+'%)</span></div>';
+      '<span style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(d.name)+'">'+esc(d.name)+'</span>'+
+      '<span style="color:var(--muted);white-space:nowrap;margin-left:auto;padding-left:6px">'+fmtVal(d.value)+' ('+pct.toFixed(1)+'%)</span></div>';
   }).join('');
 
   if (type === 'pie'){
@@ -17212,7 +17212,7 @@ function _srChartSvg(rows, nameKey, valueKey, type, moneyFmt){
     });
     return '<div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;padding:10px 0">'+
       '<svg viewBox="0 0 200 200" style="width:200px;height:200px;flex:none">'+paths+'</svg>'+
-      '<div style="flex:1;min-width:180px;max-height:260px;overflow-y:auto">'+legend+'</div></div>';
+      '<div style="flex:0 1 auto;min-width:220px;max-width:420px;max-height:260px;overflow-y:auto">'+legend+'</div></div>';
   }
 
   // bar chart ngang
