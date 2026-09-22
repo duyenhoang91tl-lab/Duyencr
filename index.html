@@ -17199,10 +17199,13 @@ function _srChartSvg(rows, nameKey, valueKey, type, moneyFmt){
   var total = data.reduce(function(s,d){ return s+d.value; }, 0);
   var legend = data.map(function(d,i){
     var pct = total ? (d.value/total*100) : 0;
-    return '<div style="display:flex;align-items:center;gap:8px;font-size:11.5px;margin-bottom:4px">'+
+    // break-inside:avoid — khi tràn sang cột 2/3 (xem CSS "columns" ở khung cha) thì KHÔNG bị
+    // cắt đôi 1 dòng giữa 2 cột. Bỏ ellipsis/max-width cũ (từng làm cụt tên) — để 1 dòng, tên dài
+    // vẫn hiện đủ, cột tự rộng theo layout multi-column bên dưới thay vì cắt bớt chữ.
+    return '<div style="display:flex;align-items:center;gap:8px;font-size:11.5px;margin-bottom:6px;break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid">'+
       '<span style="width:10px;height:10px;border-radius:2px;background:'+_SR_CHART_COLORS[i%_SR_CHART_COLORS.length]+';flex:none;display:inline-block"></span>'+
-      '<span style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(d.name)+'">'+esc(d.name)+'</span>'+
-      '<span style="color:var(--muted);white-space:nowrap;margin-left:auto;padding-left:6px">'+fmtVal(d.value)+' ('+pct.toFixed(1)+'%)</span></div>';
+      '<span style="white-space:nowrap">'+esc(d.name)+'</span>'+
+      '<span style="color:var(--muted);white-space:nowrap;margin-left:auto;padding-left:8px">'+fmtVal(d.value)+' ('+pct.toFixed(1)+'%)</span></div>';
   }).join('');
 
   if (type === 'pie'){
@@ -17222,9 +17225,12 @@ function _srChartSvg(rows, nameKey, valueKey, type, moneyFmt){
       }
       angle = endAngle;
     });
-    return '<div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;padding:10px 0">'+
-      '<svg viewBox="0 0 200 200" style="width:200px;height:200px;flex:none">'+paths+'</svg>'+
-      '<div style="flex:0 1 auto;min-width:220px;max-width:420px;max-height:260px;overflow-y:auto">'+legend+'</div></div>';
+    // Bieu do to hon (240px thay vi 200px) + khung chu thich KHONG con gioi han chieu cao/thanh
+    // keo nua: dung CSS "columns" de tu chay sang cot 2, cot 3... khi danh sach dai (con hon
+    // scroll), so cot tu dieu chinh theo be rong man hinh va so luong ten.
+    return '<div style="display:flex;gap:26px;flex-wrap:wrap;align-items:center;padding:10px 0">'+
+      '<svg viewBox="0 0 200 200" style="width:240px;height:240px;flex:none">'+paths+'</svg>'+
+      '<div style="flex:1 1 420px;min-width:260px;max-width:1000px;columns:230px;column-gap:26px">'+legend+'</div></div>';
   }
 
   // bar chart ngang
