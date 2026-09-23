@@ -975,7 +975,8 @@ function doGet(e) {
                  customPrevFrom: pC.customPrevFrom || '', customPrevTo: pC.customPrevTo || '',
                  sale: pC.sale ? pC.sale.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [],
                  kenh: pC.kenh ? pC.kenh.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [],
-                 sanPham: pC.sanPham || '' };
+                 sanPham: pC.sanPham || '',
+                 byCreator: pC.byCreator === '1' || pC.byCreator === 'true' };
       var cacheC = CacheService.getScriptCache();
       var cKeyC = 'salesC_' + JSON.stringify(fC);
       var cachedC = cacheC.get(cKeyC);
@@ -2109,6 +2110,10 @@ function buildSalesReportC_(filters) {
   var saleFilterArr = Array.isArray(filters.sale) ? filters.sale.filter(function(s){return s;}) : [];
   var kenhFilterArr = Array.isArray(filters.kenh) ? filters.kenh.filter(function(s){return s;}) : [];
   var sanPhamTerms = _foldTermsCSV_(filters.sanPham);
+  // Giong het quy uoc "Tinh theo nguoi tao don" cua buildSalesReportA_: tich thi tinh TRON VEN
+  // ket qua cho DUNG 1 nguoi (cot "Người tạo" that su cua DT TONG), bo tich thi chia deu cho
+  // tat ca sale dung ten tren don (mac dinh, giu nguyen hanh vi cu).
+  var byCreator = !!filters.byCreator;
 
   var rows = readDTTong_();
   // Gom theo entity rieng cho tung ky (cur/prev), dung dung logic chia tien theo N sale/don
@@ -2128,11 +2133,16 @@ function buildSalesReportC_(filters) {
       matchedOrders.push(row);
       var kName = row.kenhBan || '(chưa có kênh)';
       byKenh[kName] = (byKenh[kName] || 0) + row.giaTriDon;
-      var salesList = splitMulti_(row.saleBan, ',');
-      if (salesList.length === 0) salesList = [UNASSIGNED];
-      var n = salesList.length;
-      for (var k = 0; k < salesList.length; k++) {
-        bySale[salesList[k]] = (bySale[salesList[k]] || 0) + row.giaTriDon / n;
+      if (byCreator) {
+        var creatorName = row.nguoiTao || UNASSIGNED;
+        bySale[creatorName] = (bySale[creatorName] || 0) + row.giaTriDon;
+      } else {
+        var salesList = splitMulti_(row.saleBan, ',');
+        if (salesList.length === 0) salesList = [UNASSIGNED];
+        var n = salesList.length;
+        for (var k = 0; k < salesList.length; k++) {
+          bySale[salesList[k]] = (bySale[salesList[k]] || 0) + row.giaTriDon / n;
+        }
       }
     }
     return { bySale: bySale, byKenh: byKenh, orders: matchedOrders };
@@ -2249,6 +2259,7 @@ function exportSalesReportToSheet_(reportType, filters) {
     if (saleArrC.length) filterDesc.push('Sale: ' + saleArrC.join(', '));
     var kenhArrC = Array.isArray(f.kenh) ? f.kenh : (f.kenh ? [f.kenh] : []);
     if (kenhArrC.length) filterDesc.push('Kênh bán: ' + kenhArrC.join(', '));
+    if (f.byCreator) filterDesc.push('Tính theo người tạo đơn (không chia đều theo sale)');
   }
   rows.push(['Bộ lọc', filterDesc.join(' | ') || '(không lọc)']);
   rows.push([]);

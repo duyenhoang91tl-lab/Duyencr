@@ -9262,7 +9262,8 @@ function doGet(e) {
                  customPrevFrom: pC.customPrevFrom || '', customPrevTo: pC.customPrevTo || '',
                  sale: pC.sale ? pC.sale.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [],
                  kenh: pC.kenh ? pC.kenh.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [],
-                 sanPham: pC.sanPham || '' };
+                 sanPham: pC.sanPham || '',
+                 byCreator: pC.byCreator === '1' || pC.byCreator === 'true' };
       var cacheC = CacheService.getScriptCache();
       var cKeyC = 'salesC_' + JSON.stringify(fC);
       var cachedC = cacheC.get(cKeyC);
@@ -10396,6 +10397,10 @@ function buildSalesReportC_(filters) {
   var saleFilterArr = Array.isArray(filters.sale) ? filters.sale.filter(function(s){return s;}) : [];
   var kenhFilterArr = Array.isArray(filters.kenh) ? filters.kenh.filter(function(s){return s;}) : [];
   var sanPhamTerms = _foldTermsCSV_(filters.sanPham);
+  // Giong het quy uoc "Tinh theo nguoi tao don" cua buildSalesReportA_: tich thi tinh TRON VEN
+  // ket qua cho DUNG 1 nguoi (cot "Người tạo" that su cua DT TONG), bo tich thi chia deu cho
+  // tat ca sale dung ten tren don (mac dinh, giu nguyen hanh vi cu).
+  var byCreator = !!filters.byCreator;
 
   var rows = readDTTong_();
   // Gom theo entity rieng cho tung ky (cur/prev), dung dung logic chia tien theo N sale/don
@@ -10415,11 +10420,16 @@ function buildSalesReportC_(filters) {
       matchedOrders.push(row);
       var kName = row.kenhBan || '(chưa có kênh)';
       byKenh[kName] = (byKenh[kName] || 0) + row.giaTriDon;
-      var salesList = splitMulti_(row.saleBan, ',');
-      if (salesList.length === 0) salesList = [UNASSIGNED];
-      var n = salesList.length;
-      for (var k = 0; k < salesList.length; k++) {
-        bySale[salesList[k]] = (bySale[salesList[k]] || 0) + row.giaTriDon / n;
+      if (byCreator) {
+        var creatorName = row.nguoiTao || UNASSIGNED;
+        bySale[creatorName] = (bySale[creatorName] || 0) + row.giaTriDon;
+      } else {
+        var salesList = splitMulti_(row.saleBan, ',');
+        if (salesList.length === 0) salesList = [UNASSIGNED];
+        var n = salesList.length;
+        for (var k = 0; k < salesList.length; k++) {
+          bySale[salesList[k]] = (bySale[salesList[k]] || 0) + row.giaTriDon / n;
+        }
       }
     }
     return { bySale: bySale, byKenh: byKenh, orders: matchedOrders };
@@ -10536,6 +10546,7 @@ function exportSalesReportToSheet_(reportType, filters) {
     if (saleArrC.length) filterDesc.push('Sale: ' + saleArrC.join(', '));
     var kenhArrC = Array.isArray(f.kenh) ? f.kenh : (f.kenh ? [f.kenh] : []);
     if (kenhArrC.length) filterDesc.push('Kênh bán: ' + kenhArrC.join(', '));
+    if (f.byCreator) filterDesc.push('Tính theo người tạo đơn (không chia đều theo sale)');
   }
   rows.push(['Bộ lọc', filterDesc.join(' | ') || '(không lọc)']);
   rows.push([]);
@@ -17317,7 +17328,8 @@ async function _srLoad(){
       customCurFrom: _srState.cCustomCurFrom, customCurTo: _srState.cCustomCurTo,
       customPrevFrom: _srState.cCustomPrevFrom, customPrevTo: _srState.cCustomPrevTo,
       sale: (_srState.cSale||[]).join(','), kenh: (_srState.cKenh||[]).join(','),
-      sanPham: _srState.cSanPham || ''
+      sanPham: _srState.cSanPham || '',
+      byCreator: _srState.byCreator ? '1' : ''
     });
   } else if (_srState.sub === 'D') {
     _srState.dataD = await _srFetch('careLeadReport', {
@@ -17372,7 +17384,7 @@ async function exportSalesReportToSheet(){
       weekOffset: _srState.cWeekOffset, monthOffset: _srState.cMonthOffset, quarterOffset: _srState.cQuarterOffset, yearOffset: _srState.cYearOffset,
       customCurFrom: _srState.cCustomCurFrom, customCurTo: _srState.cCustomCurTo,
       customPrevFrom: _srState.cCustomPrevFrom, customPrevTo: _srState.cCustomPrevTo,
-      sale: _srState.cSale || [], kenh: _srState.cKenh || [] };
+      sale: _srState.cSale || [], kenh: _srState.cKenh || [], byCreator: _srState.byCreator ? '1' : '' };
   } else if (_srState.sub === 'D') {
     filters = { dateFrom: _srState.dDateFrom, dateTo: _srState.dDateTo, cs: _srState.dCs || '' };
   } else {
@@ -17901,6 +17913,9 @@ function renderSalesReportTabC_(wrap, subTabs){
   filters += '<div><div style="font-size:10px;color:var(--hint);margin-bottom:2px">Sản phẩm (cách nhau bằng dấu phẩy)</div>'+
     '<input type="text" value="'+esc(_srState.cSanPham||'')+'" onchange="_srSetField(\'cSanPham\',this.value)" placeholder="vd: tỳ hưu, nhẫn 10k" style="min-width:170px;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
     '</div>';
+  filters += '<label style="display:flex;align-items:center;gap:5px;padding:5px 9px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;cursor:pointer" title="Tích: mỗi đơn tính TOÀN BỘ kết quả cho đúng 1 người — người được ghi trong cột \'Người tạo\' của DT TỔNG (không phải \'Sale bán\'). Bỏ tích: chia đều cho tất cả sale đứng tên trên đơn (mặc định). Dùng chung 1 lựa chọn với Báo cáo A.">'+
+    '<input type="checkbox" '+(_srState.byCreator?'checked':'')+' onchange="_srState.byCreator=this.checked;_srApply()">'+
+    'Tính theo người tạo đơn</label>';
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
   filters += '<button class="btn sm" onclick="exportSalesReportC()">📊 Xuất Excel</button>';
   if (_srIsAdmin()) filters += '<button class="btn sm" id="sr-export-sheet-btn" onclick="exportSalesReportToSheet()">📄 Xuất ra Sheet</button>';
@@ -18144,7 +18159,9 @@ function _srRenderC(d){
     (p.curKey ? '' : '<div style="color:var(--hint)">(Kỳ tùy chỉnh — không tra được KPI, chỉ tab Tuần/Tháng/Quý mới có KPI)</div>')+
     '</div>';
 
-  html += '<div class="dash-section-title">Theo Nhân viên (Sale bán) <span style="font-weight:400;color:var(--muted);font-size:11px">(tiền chia đều cho số sale/đơn khi đơn có nhiều sale)</span>'+_srViewToggleHtml('cEmpView')+'</div>';
+  html += '<div class="dash-section-title">Theo Nhân viên (Sale bán) <span style="font-weight:400;color:var(--muted);font-size:11px">'+
+    (_srState.byCreator ? '(tính trọn vẹn cho người tạo đơn — không chia đều)' : '(tiền chia đều cho số sale/đơn khi đơn có nhiều sale)')+
+    '</span>'+_srViewToggleHtml('cEmpView')+'</div>';
   html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên..." value="'+esc(_srState.cEmpSearch)+'" oninput="_srState.cEmpSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
   if (_srState.cEmpView === 'table'){
     html += _srRenderCTable(d.byEmployee||[], 'sale', _srState.cEmpSearch);
@@ -18178,6 +18195,7 @@ function exportSalesReportC(){
   fDescC.push('Lọc theo: ' + (_srState.cDateField==='thoiGianHT'?'Thời gian hoàn thành':'Ngày tạo'));
   if ((_srState.cSale||[]).length) fDescC.push('Sale: ' + _srState.cSale.join(', '));
   if ((_srState.cKenh||[]).length) fDescC.push('Kênh bán: ' + _srState.cKenh.join(', '));
+  if (_srState.byCreator) fDescC.push('Tính theo người tạo đơn (không chia đều theo sale)');
   var summary = [['Kỳ này', p.curLabel], ['Kỳ trước', p.prevLabel], ['Bộ lọc', fDescC.join(' | ')]];
   var empRows = [['Nhân viên','KPI kỳ trước','Kết quả kỳ trước','%HT KPI kỳ trước','KPI kỳ này','Kết quả kỳ này','%HT KPI kỳ này','% Tăng trưởng']];
   (d.byEmployee||[]).forEach(function(r){
