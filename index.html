@@ -17323,6 +17323,15 @@ var _srState = {
 
 function _srMoney(n){ return fmt(Math.round(n||0)) + '₫'; }
 
+// Dong "Tong" bold, ke tren cung, dung chung cho MOI bang breakdown (Theo Sale/Kenh/MKT/San
+// pham/CS/Hoa hong...) de nhat quan 1 kieu hien thi giua cac bao cao A/B/C/D/E.
+// cells: mang cac chuoi HTML da format san cho tung cot dau tien (thuong la nhan "Tổng"), cac
+// cot con lai deu can-phai (text-align:right) khop voi cach cac bang breakdown dang dung.
+function _srTotalRowHtml_(cells){
+  return '<tr style="border-top:2px solid var(--border-strong);font-weight:700;background:var(--surface2)">'+
+    cells.map(function(c,i){ return '<td'+(i>0?' style="text-align:right"':'')+'>'+c+'</td>'; }).join('')+'</tr>';
+}
+
 // ── Toggle chế độ xem Bảng / Biểu đồ tròn / Biểu đồ cột cho các bảng breakdown ──
 // KHÔNG đụng tới bất kỳ state lọc/tìm kiếm nào — chỉ đổi cách hiển thị phần dữ liệu ĐÃ được
 // lọc sẵn (rows truyền vào _srChartSvg luôn là mảng đã qua đúng filter/search như bảng cũ).
@@ -17391,6 +17400,14 @@ function _srChartSvg(rows, nameKey, valueKey, type, moneyFmt){
       angle = endAngle;
     });
     paths += labels;
+    // Khoet lo giua thanh donut + hien TONG ngay giua bieu do — dat SAU cac mieng banh nen de
+    // len tren, ban kinh 45 nho hon ban kinh dat nhan (0.66*90=59.4) nen khong chong chu %.
+    var totalLine1 = moneyFmt ? 'Tổng' : 'Tổng';
+    var totalTxt = fmtVal(total);
+    var totalFs = totalTxt.length > 11 ? 13 : (totalTxt.length > 8 ? 15 : 17);
+    paths += '<circle cx="'+cx+'" cy="'+cy+'" r="45" fill="var(--surface)"></circle>'+
+      '<text x="'+cx+'" y="'+(cy-9)+'" text-anchor="middle" dominant-baseline="central" font-size="10" fill="var(--muted)" font-weight="600">'+totalLine1+'</text>'+
+      '<text x="'+cx+'" y="'+(cy+9)+'" text-anchor="middle" dominant-baseline="central" font-size="'+totalFs+'" fill="var(--text)" font-weight="800">'+esc(totalTxt)+'</text>';
     // Bieu do to hon (240px thay vi 200px) + khung chu thich KHONG con gioi han chieu cao/thanh
     // keo nua: dung CSS "columns" de tu chay sang cot 2, cot 3... khi danh sach dai (con hon
     // scroll), so cot tu dieu chinh theo be rong man hinh va so luong ten.
@@ -17409,7 +17426,9 @@ function _srChartSvg(rows, nameKey, valueKey, type, moneyFmt){
       '<div style="width:'+w.toFixed(1)+'%;height:100%;background:'+_SR_CHART_COLORS[i%_SR_CHART_COLORS.length]+'"></div></div>'+
       '<div style="width:120px;font-size:11px;color:var(--muted)">'+fmtVal(d.value)+'</div></div>';
   }).join('');
-  return '<div style="padding:10px 0;max-height:440px;overflow-y:auto">'+barsHtml+'</div>';
+  return '<div style="padding:10px 0;max-height:480px;overflow-y:auto">'+
+    '<div style="font-weight:700;font-size:13px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)">Tổng: '+fmtVal(total)+'</div>'+
+    barsHtml+'</div>';
 }
 
 // ── Phan quyen bao cao doanh so: CS thuong CHI xem duoc so lieu cua chinh minh, khong xem
@@ -17942,6 +17961,12 @@ function _srRenderA(d){
       html += '<tr><td>'+esc(s.name)+'</td><td style="text-align:right">'+fmt(s.orders)+'</td><td style="text-align:right">'+_srMoney(s.coc)+'</td><td style="text-align:right"><b>'+_srMoney(s.giaTri)+'</b></td><td style="text-align:right">'+_srMoney(s.trungBinhDon)+'</td></tr>';
     });
     if (!saleRows.length) html += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+    else {
+      var saleTotOrders = saleRows.reduce(function(s,r){ return s+(r.orders||0); },0);
+      var saleTotCoc = saleRows.reduce(function(s,r){ return s+(r.coc||0); },0);
+      var saleTotGT = saleRows.reduce(function(s,r){ return s+(r.giaTri||0); },0);
+      html += _srTotalRowHtml_(['Tổng', fmt(saleTotOrders), _srMoney(saleTotCoc), _srMoney(saleTotGT), _srMoney(saleTotOrders?saleTotGT/saleTotOrders:0)]);
+    }
     html += '</tbody></table>';
   } else {
     html += _srChartSvg(saleRows, 'name', 'giaTri', _srState.aSaleView, true);
@@ -17957,6 +17982,12 @@ function _srRenderA(d){
         html += '<tr><td>'+esc(k.name)+'</td><td style="text-align:right">'+fmt(k.orders)+'</td><td style="text-align:right">'+_srMoney(k.coc)+'</td><td style="text-align:right"><b>'+_srMoney(k.giaTri)+'</b></td><td style="text-align:right">'+_srMoney(k.trungBinhDon)+'</td></tr>';
       });
       if (!kenhRows.length) html += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+      else {
+        var kenhTotOrders = kenhRows.reduce(function(s,r){ return s+(r.orders||0); },0);
+        var kenhTotCoc = kenhRows.reduce(function(s,r){ return s+(r.coc||0); },0);
+        var kenhTotGT = kenhRows.reduce(function(s,r){ return s+(r.giaTri||0); },0);
+        html += _srTotalRowHtml_(['Tổng', fmt(kenhTotOrders), _srMoney(kenhTotCoc), _srMoney(kenhTotGT), _srMoney(kenhTotOrders?kenhTotGT/kenhTotOrders:0)]);
+      }
       html += '</tbody></table>';
     } else {
       html += _srChartSvg(kenhRows, 'name', 'giaTri', _srState.aKenhView, true);
@@ -17968,6 +17999,12 @@ function _srRenderA(d){
         html += '<tr><td>'+esc(k.name)+'</td><td style="text-align:right">'+fmt(k.orders)+'</td><td style="text-align:right">'+_srMoney(k.coc)+'</td><td style="text-align:right"><b>'+_srMoney(k.giaTri)+'</b></td><td style="text-align:right">'+_srMoney(k.trungBinhDon)+'</td></tr>';
       });
       if (!(d.byMkt||[]).length) html += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Chưa có nhóm MKT — vào tab Team → "Nhóm MKT" để tạo.</td></tr>';
+      else {
+        var mktTotOrders = (d.byMkt||[]).reduce(function(s,r){ return s+(r.orders||0); },0);
+        var mktTotCoc = (d.byMkt||[]).reduce(function(s,r){ return s+(r.coc||0); },0);
+        var mktTotGT = (d.byMkt||[]).reduce(function(s,r){ return s+(r.giaTri||0); },0);
+        html += _srTotalRowHtml_(['Tổng', fmt(mktTotOrders), _srMoney(mktTotCoc), _srMoney(mktTotGT), _srMoney(mktTotOrders?mktTotGT/mktTotOrders:0)]);
+      }
       html += '</tbody></table>';
     } else {
       html += _srChartSvg(d.byMkt||[], 'name', 'giaTri', _srState.aMktView, true);
@@ -17998,6 +18035,7 @@ function _srRenderB(d){
       html += '<tr><td>'+esc(s.name)+'</td><td style="text-align:right">'+fmt(s.orders)+'</td><td style="text-align:right">'+_srMoney(s.giaTri)+'</td><td style="text-align:right">'+_srMoney(s.cod)+'</td></tr>';
     });
     if (!saleRows.length) html += '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+    else html += _srTotalRowHtml_(['Tổng', fmt(saleRows.reduce(function(s,r){return s+(r.orders||0);},0)), _srMoney(saleRows.reduce(function(s,r){return s+(r.giaTri||0);},0)), _srMoney(saleRows.reduce(function(s,r){return s+(r.cod||0);},0))]);
     html += '</tbody></table>';
   } else {
     html += _srChartSvg(saleRows, 'name', 'giaTri', _srState.bSaleView, true);
@@ -18013,6 +18051,7 @@ function _srRenderB(d){
         html += '<tr><td style="font-family:monospace;font-size:12px">'+esc(p.code)+'</td><td>'+esc(p.name)+'</td><td style="text-align:right">'+fmt(p.soLuong)+'</td></tr>';
       });
       if (!productRows.length) html += '<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+      else html += _srTotalRowHtml_(['Tổng', '', fmt(productRows.reduce(function(s,r){return s+(r.soLuong||0);},0))]);
       html += '</tbody></table>';
     } else {
       html += _srChartSvg(productRows, 'name', 'soLuong', _srState.bProductView, false);
@@ -18120,6 +18159,7 @@ function renderSalesReportTabD_(wrap, subTabs){
         html += '<table class="dash-table"><thead><tr><th>CS</th><th>Số KH thêm</th></tr></thead><tbody>';
         (d.byCS||[]).forEach(function(x){ html += '<tr><td>'+esc(x.name)+'</td><td>'+fmt(x.count)+'</td></tr>'; });
         if (!(d.byCS||[]).length) html += '<tr><td colspan="2" style="text-align:center;color:var(--muted)">Không có dữ liệu</td></tr>';
+        else html += _srTotalRowHtml_(['Tổng', fmt((d.byCS||[]).reduce(function(s,r){return s+(r.count||0);},0))]);
         html += '</tbody></table>';
       } else {
         html += _srChartSvg(d.byCS||[], 'name', 'count', _srState.dCsView, false);
@@ -18187,6 +18227,7 @@ function _srRenderE_(d){
   html += '<div class="dash-section-title">a) Doanh thu theo mức đơn hàng'+_srViewToggleHtml('eBucketView')+'</div>';
   if (_srState.eBucketView === 'table'){
     html += '<div class="kpi-grid" style="margin-bottom:16px">' +
+      '<div class="kpi-card" style="border:1.5px solid var(--text)"><div class="kpi-val">'+_srMoney(c.totalRevenueAbove15+c.totalRevenueBelow15)+'</div><div class="kpi-label"><b>Tổng doanh thu</b></div></div>' +
       '<div class="kpi-card"><div class="kpi-val">'+fmt(c.totalOrdersAbove15)+'</div><div class="kpi-label">Số đơn ≥15tr</div></div>' +
       '<div class="kpi-card"><div class="kpi-val">'+fmt(c.totalOrdersBelow15)+'</div><div class="kpi-label">Số đơn &lt;15tr</div></div>' +
       '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+_srMoney(c.totalRevenueAbove15)+'</div><div class="kpi-label">Doanh thu đơn ≥15tr</div></div>' +
@@ -18221,7 +18262,12 @@ function _srRenderE_(d){
         '<td style="text-align:right"><b>'+_srMoney(s.commission)+'</b></td></tr>';
     });
     if (!rows.length) html += '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
-    html += '<tr style="font-weight:700;border-top:2px solid var(--border)"><td colspan="7" style="text-align:right">Tổng hoa hồng:</td><td style="text-align:right">'+_srMoney(c.totalCommission)+'</td></tr>';
+    else html += _srTotalRowHtml_(['Tổng',
+      fmt(rows.reduce(function(s,r){return s+(r.ordersAbove15||0);},0)),
+      fmt(rows.reduce(function(s,r){return s+(r.ordersBelow15||0);},0)),
+      _srMoney(rows.reduce(function(s,r){return s+(r.revenueAbove15||0);},0)),
+      _srMoney(rows.reduce(function(s,r){return s+(r.revenueBelow15||0);},0)),
+      '', '', '<b>'+_srMoney(c.totalCommission)+'</b>']);
     html += '</tbody></table>';
     html += '<div style="font-size:11px;color:var(--muted);margin-top:6px">Rê chuột vào % để xem nguồn áp dụng (Cá nhân / Team X / Chưa cài).</div>';
   } else {
@@ -18312,6 +18358,23 @@ function _srRenderCTable(rows, entType, search, searchKey){
     }
   });
   if (!filtered.length) html += '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+  else {
+    // Tong tien cong don binh thuong; % thi phai tinh lai theo TY LE TONG (khong duoc cong don
+    // cac % rieng le voi nhau), vi khong co y nghia thong ke — VD 2 sale dat 50% va 200% KPI thi
+    // "tong %" khong phai 250%, ma phai la tong ket qua chia tong KPI cua ca 2.
+    var sumKpiPrev=0, sumResultPrev=0, sumKpiCur=0, sumResultCur=0;
+    filtered.forEach(function(r){
+      sumKpiPrev += Number(r.kpiPrev)||0; sumResultPrev += Number(r.resultPrev)||0;
+      sumKpiCur += Number(r.kpiCur)||0; sumResultCur += Number(r.resultCur)||0;
+    });
+    var pctPrevTot = sumKpiPrev ? (sumResultPrev/sumKpiPrev*100) : null;
+    var pctCurTot = sumKpiCur ? (sumResultCur/sumKpiCur*100) : null;
+    var growthTot = sumResultPrev ? ((sumResultCur-sumResultPrev)/sumResultPrev*100) : null;
+    html += _srTotalRowHtml_(['Tổng',
+      sumKpiPrev?_srMoney(sumKpiPrev):'—', _srMoney(sumResultPrev), _srPctStr(pctPrevTot),
+      sumKpiCur?_srMoney(sumKpiCur):'—', _srMoney(sumResultCur), _srPctStr(pctCurTot),
+      _srGrowthStr(growthTot)]);
+  }
   html += '</tbody></table>';
   return html;
 }
