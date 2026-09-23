@@ -2483,6 +2483,8 @@ function doPost(e) {
     if (action === 'getKnowledge') return jsonOut_(getMessengerKnowledge_());
     // ── CHECKLIST MKT: nhap tay theo ngay + muc tieu L1-L4 ──
     if (action === 'saveMktChecklistConfig')  return saveMktChecklistConfig_(data.month, data.config);
+    // ── NHAT KY BAO CAO HANG NGAY (Sale/Kenh/MKT/Tag) -> Google Sheet rieng ──
+    if (action === 'exportDailyReportLogs') return exportDailyReportLogs_(data.from, data.to);
     return jsonOut_({ error: 'Unknown action: ' + action });
   } catch(err) {
     return jsonOut_({ error: err.message });
@@ -5815,3 +5817,145 @@ function buildMktChecklistReport_(from, to) {
     tags: tags, groups: { mkt: mktGroups, sale: saleGroupsOut },
     config: configOut, dataAvail: dataAvail, warnings: warnings };
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  NHAT KY BAO CAO HANG NGAY — xuat rieng ra 1 Google Sheet CO DINH (khac voi CRM_SS_ID/
+//  ORDER_SS_ID), moi loai (Sale ban / Kenh ban / MKT / Tag) 1 SHEET DUY NHAT, GOP DAN theo
+//  tung lan xuat — KHONG tao tab moi moi lan nhu exportSalesReportToSheet_. Du lieu tach
+//  theo TUNG NGAY (khong gop ca khoang ngay), xuat lai trung ngay se THAY THE (xoa dong cu
+//  cua dung ngay do, ghi lai dong moi). Cot STT la so dong lien tiep 1..N cua CA SHEET, tu
+//  dong renumber lai moi lan ghi de khong bi hut so.
+//  Yeu cau ngay 23/09/2026 (Duyen): "xuat bao cao tu Base (bao cao A) va bao cao tong hop tu
+//  Pancake" — dung lai buildSalesReportA_ (Sale/Kenh) va buildMktChecklistReport_/
+//  buildPancakeTagReport_ (MKT/Tag) GOI RIENG CHO TUNG NGAY trong khoang duoc chon, de ra
+//  dung 1 dong/ngay/doi tuong giong anh mau Duyen gui.
+// ═══════════════════════════════════════════════════════════════
+var EXPORT_LOG_SS_ID = '1s1UlRMquiryI7A2lJ8gJlPMsIGBLGum1RdLJga3ldlI';
+function getExportLogSS_() { return SpreadsheetApp.openById(EXPORT_LOG_SS_ID); }
+
+var EXPORT_LOG_SHEETS_ = {
+  sale: { name: 'Sale bán', headers: ['STT','Ngày','Tháng','Sale','Số đơn','Cọc','Tổng đơn','TB đơn'] },
+  kenh: { name: 'Kênh bán', headers: ['STT','Ngày','Tháng','Kênh','Số đơn','Cọc','Tổng đơn','TB đơn'] },
+  mkt:  { name: 'MKT',      headers: ['STT','Ngày','Tháng','MKT','Tương tác','SĐT thu thập','Số đơn','Tỷ lệ chốt (%)'] },
+  tag:  { name: 'Tag',      headers: ['STT','Ngày','Tháng','Kênh (Page)','L1','L2','L3','L4','L5','L6','L7','L8','L9'] }
+};
+
+function _exportLogGetSheet_(kind) {
+  var def = EXPORT_LOG_SHEETS_[kind];
+  var ss = getExportLogSS_();
+  var sh = ss.getSheetByName(def.name);
+  if (!sh) sh = ss.insertSheet(def.name);
+  if (sh.getLastRow() === 0) {
+    sh.getRange(1, 1, 1, def.headers.length).setValues([def.headers]);
+    sh.getRange(1, 1, 1, def.headers.length).setFontWeight('bold');
+  }
+  return sh;
+}
+
+// Ghi/thay the du lieu cho 1 nhom NGAY vao 1 sheet loai (kind). rowsByDate: { 'yyyy-MM-dd':
+// [ [ngay,thang,...cot con lai theo dung thu tu headers (BO cot STT)], ... ] } — PHAI co du
+// 1 key cho MOI ngay trong khoang dang xuat, KE CA khi ngay do khong con dong nao (mang rong)
+// — de dong cu cua ngay do van bi xoa dung theo yeu cau "xuat lai trung ngay se thay the".
+function _exportLogWriteDays_(kind, rowsByDate) {
+  var def = EXPORT_LOG_SHEETS_[kind];
+  var sh = _exportLogGetSheet_(kind);
+  var last = sh.getLastRow();
+  var nCols = def.headers.length;
+  var existing = last >= 2 ? sh.getRange(2, 1, last - 1, nCols).getValues() : [];
+
+  // Key doi chieu = "Ngay/Thang" (dung dinh dang hien co, KHONG co nam — xem gioi han o
+  // comment cuoi ham exportDailyReportLogs_ ben duoi).
+  var touchedKeys = {};
+  Object.keys(rowsByDate).forEach(function(dKey) {
+    var p = dKey.split('-'); // yyyy-mm-dd
+    touchedKeys[String(+p[2]) + '/' + String(+p[1])] = true;
+  });
+  var keep = existing.filter(function(r) { return !touchedKeys[String(r[1]) + '/' + String(r[2])]; });
+
+  var added = [];
+  Object.keys(rowsByDate).forEach(function(dKey) {
+    (rowsByDate[dKey] || []).forEach(function(row) { added.push([null].concat(row)); }); // cho STT (dien lai o duoi)
+  });
+
+  var all = keep.concat(added);
+  // Sap theo Thang -> Ngay tang dan cho de doc (giu nguyen thu tu trong cung 1 ngay)
+  all.sort(function(a, b) {
+    if (+a[2] !== +b[2]) return +a[2] - +b[2];
+    return +a[1] - +b[1];
+  });
+  var out = all.map(function(r, i) { var rr = r.slice(); rr[0] = i + 1; return rr; });
+
+  sh.clearContents();
+  sh.getRange(1, 1, 1, nCols).setValues([def.headers]);
+  sh.getRange(1, 1, 1, nCols).setFontWeight('bold');
+  if (out.length) sh.getRange(2, 1, out.length, nCols).setValues(out);
+  return { total: out.length, added: added.length, removed: existing.length - keep.length };
+}
+
+// Danh sach chuoi 'yyyy-MM-dd' lien tiep tu 'from' den 'to' (bao gom ca 2 dau).
+function _dateRangeList_(from, to) {
+  var out = [];
+  var d = parseVNDate_(from), dEnd = parseVNDate_(to);
+  if (!d || !dEnd) return out;
+  while (d.getTime() <= dEnd.getTime()) {
+    out.push(_vnYmd_(d));
+    d = new Date(d.getTime() + 86400000);
+  }
+  return out;
+}
+
+// Ham chinh — goi tu UI: xuat nhat ky Sale ban / Kenh ban / MKT / Tag cho tung ngay trong
+// khoang [from,to] vao Google Sheet EXPORT_LOG_SS_ID. Gioi han 31 ngay/lan de tranh vuot thoi
+// gian chay toi da cua Apps Script (moi ngay phai goi lai buildSalesReportA_/
+// buildMktChecklistReport_/buildPancakeTagReport_ rieng, kha ton thoi gian voi khoang dai).
+function exportDailyReportLogs_(from, to) {
+  from = normOrderDate_(from); to = normOrderDate_(to);
+  if (!from || !to) return jsonOut_({ ok: false, error: 'Thiếu khoảng ngày' });
+  if (from > to) return jsonOut_({ ok: false, error: 'Khoảng ngày bị ngược (từ ngày sau đến ngày trước)' });
+  var days = _dateRangeList_(from, to);
+  if (!days.length) return jsonOut_({ ok: false, error: 'Không đọc được khoảng ngày' });
+  if (days.length > 31) return jsonOut_({ ok: false, error: 'Khoảng ngày quá dài (' + days.length + ' ngày) — tối đa 31 ngày/lần xuất để tránh vượt thời gian chạy của Apps Script. Xuất theo từng tháng nhé.' });
+
+  var bySale = {}, byKenh = {}, byMkt = {}, byTag = {};
+
+  days.forEach(function(dayStr) {
+    var p = dayStr.split('-'); var dd = String(+p[2]), mm = String(+p[1]);
+
+    var repA = buildSalesReportA_({ dateFrom: dayStr, dateTo: dayStr, dateField: 'ngayTao' });
+    bySale[dayStr] = (repA.bySale || []).map(function(s) {
+      return [dd, mm, s.name, s.orders, Math.round(s.coc), Math.round(s.giaTri), s.orders ? Math.round(s.giaTri / s.orders) : 0];
+    });
+    byKenh[dayStr] = (repA.byKenh || []).map(function(k) {
+      return [dd, mm, k.name, k.orders, Math.round(k.coc), Math.round(k.giaTri), k.orders ? Math.round(k.giaTri / k.orders) : 0];
+    });
+
+    var repMkt = buildMktChecklistReport_(dayStr, dayStr);
+    byMkt[dayStr] = ((repMkt.groups && repMkt.groups.mkt) || []).map(function(g) {
+      return [dd, mm, g.name, Math.round(g.tongTT), Math.round(g.sdtThuThap), Math.round(g.baseOrders), g.tyLeChotTong];
+    });
+
+    var repTag = buildPancakeTagReport_(dayStr, dayStr);
+    var pageIds = Object.keys(repTag.byPage || {});
+    byTag[dayStr] = pageIds.map(function(pid) {
+      var pg = repTag.byPage[pid];
+      return [dd, mm, pg.pageName || pid, pg.L1||0, pg.L2||0, pg.L3||0, pg.L4||0, pg.L5||0, pg.L6||0, pg.L7||0, pg.L8||0, pg.L9||0];
+    });
+  });
+
+  var rSale = _exportLogWriteDays_('sale', bySale);
+  var rKenh = _exportLogWriteDays_('kenh', byKenh);
+  var rMkt  = _exportLogWriteDays_('mkt', byMkt);
+  var rTag  = _exportLogWriteDays_('tag', byTag);
+
+  return jsonOut_({
+    ok: true, from: from, to: to, days: days.length,
+    sheetUrl: getExportLogSS_().getUrl(),
+    result: { sale: rSale, kenh: rKenh, mkt: rMkt, tag: rTag }
+    // GIOI HAN: khop trung ngay de "thay the" dang dung khoa "Ngày/Tháng" (khong co Nam) —
+    // dung theo dung 4 cot hien trong anh mau Duyen gui (khong co cot Nam). Neu du lieu keo
+    // dai qua nhieu nam va co trung Ngay+Thang o 2 nam khac nhau, ghi de co the nham sang
+    // dong cua nam khac. Bao Duyen biet neu can them cot Nam de tranh truong hop nay.
+  });
+}
+
+
