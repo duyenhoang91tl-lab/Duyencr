@@ -17992,7 +17992,7 @@ function _srRenderA(d){
     } else {
       html += _srChartSvg(kenhRows, 'name', 'giaTri', _srState.aKenhView, true);
     }
-    html += '<div class="dash-section-title">Theo MKT <span style="font-weight:400;color:var(--muted);font-size:11px">(gom theo nhóm MKT ở tab Team → "Nhóm MKT"; Page chạy chung chia theo tỷ lệ)</span>'+_srViewToggleHtml('aMktView')+'</div>';
+    html += '<div class="dash-section-title">Theo MKT'+_srViewToggleHtml('aMktView')+'</div>';
     if (_srState.aMktView === 'table'){
       html += '<table class="dash-table"><thead><tr><th>MKT</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Cọc</th><th style="text-align:right"><b>Tổng đơn</b></th><th style="text-align:right">TB đơn</th></tr></thead><tbody>';
       (d.byMkt||[]).forEach(function(k){
