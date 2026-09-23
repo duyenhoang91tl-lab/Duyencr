@@ -6525,12 +6525,63 @@ var _barMenuItems = []; // mảng id (không cần giữ thứ tự) đang nằm
   saveLS('ome_bar_menu_items', _barMenuItems);
 })();
 
-// Toàn bộ mục có thể kéo — id PHẢI khớp với data-bar-id gắn trên phần tử thật (xem các
-// nơi có data-bar-id trong HTML/JS: 6 tab tĩnh + nút Tác vụ tĩnh + defs tab động ở
-// _injectV9UI + các nút trong _renderAuthHeader + nút "Mẫu hỏi thăm").
+// ═══════════════════════════════════════════════════════
+//  PHÂN QUYỀN XEM MENU (Admin gán qua modal "🔑 Tài khoản") — khác với "☰ Menu" ở trên
+//  (đó là NGƯỜI DÙNG tự sắp xếp thẩm mỹ cho mình). Đây là ADMIN khoá cứng: nhân viên
+//  KHÔNG tự bật lại được các mục bị giới hạn, kể cả qua thao tác client.
+// ═══════════════════════════════════════════════════════
+var _PERM_TAB_DEFS = [
+  { id:'tab-kh',       label:'Danh sách KH' },
+  { id:'tab-schedule', label:'Lịch chăm sóc' },
+  { id:'tab-overdue',  label:'Quá hạn' },
+  { id:'tab-mydata',   label:'Data của tôi' },
+  { id:'tab-zaloai',   label:'Zalo AI' },
+  { id:'tab-task',     label:'Công việc' },
+  { id:'dashboard',    label:'Dashboard' },
+  { id:'team',         label:'Quản lý Team' },
+  { id:'audit',        label:'Nhật ký' },
+  { id:'salesreport',  label:'Báo cáo doanh số' },
+  { id:'pancake',      label:'Báo cáo Pancake' },
+  { id:'kpipancake',   label:'KPI Pancake' },
+  { id:'mktchecklist', label:'Checklist MKT' }
+];
+// true = tài khoản đang đăng nhập được phép thấy tab id này. perms null/rỗng = KHÔNG giới
+// hạn (mặc định mọi tài khoản mới/cũ đều xem đủ như trước — Admin phải CHỦ ĐỘNG bật giới
+// hạn thì mới thu hẹp lại).
+function _tabAllowedForUser(id){
+  if (!currentUser || currentUser.role === 'admin') return true;
+  if (!currentUser.perms || !currentUser.perms.length) return true;
+  return currentUser.perms.indexOf(id) !== -1;
+}
+// Ẩn hẳn (display:none) các tab bị Admin giới hạn — chạy sau khi currentUser.perms đã có
+// (đăng nhập xong / mở app xong), áp dụng cho CẢ 6 tab tĩnh lẫn các tab tạo động qua defs.
+// Nếu tab đang active bị ẩn (VD Admin vừa giới hạn ngay lúc đang xem) thì tự chuyển về
+// "Danh sách KH" để tránh màn hình trắng.
+function _applyUserTabPermissions(){
+  var hidActive = false;
+  _PERM_TAB_DEFS.forEach(function(d){
+    var el = document.querySelector('[data-bar-id="'+d.id+'"]');
+    if (!el) return;
+    if (_tabAllowedForUser(d.id)) { el.style.display = ''; }
+    else { if (el.classList.contains('active')) hidActive = true; el.style.display = 'none'; }
+  });
+  // Nhóm "📊 Báo cáo ▾" gộp 4 tab con (salesreport/pancake/kpipancake/mktchecklist) — nếu cả 4
+  // đều bị chặn thì ẩn luôn nút nhóm, tránh để lại 1 nút bấm ra menu rỗng gây khó hiểu.
+  var grp = document.querySelector('[data-bar-id="reportsgroup"]');
+  if (grp){
+    var anyReportAllowed = ['salesreport','pancake','kpipancake','mktchecklist'].some(_tabAllowedForUser);
+    grp.style.display = anyReportAllowed ? '' : 'none';
+  }
+  if (hidActive){
+    var home = document.querySelector('[data-bar-id="tab-kh"]');
+    if (home && typeof switchTab === 'function') switchTab('list', home);
+  }
+}
+
 var _BAR_ITEM_DEFS = [
   { id:'tab-kh',          label:'Danh sách KH' },
   { id:'tab-schedule',    label:'Lịch chăm sóc' },
+  { id:'reportsgroup',    label:'📊 Báo cáo (gộp Doanh số/Pancake/KPI/Checklist)' },
   { id:'tab-overdue',     label:'Quá hạn' },
   { id:'tab-mydata',      label:'Data của tôi' },
   { id:'tab-zaloai',      label:'Zalo AI' },
@@ -6602,6 +6653,18 @@ function _toggleBarMenuDropdown(){
   if (list) list.style.display = (list.style.display === 'none') ? 'block' : 'none';
 }
 
+// Đặt 1 phần tử [data-bar-id] về đúng "nhà" của nó: có data-bar-after thì chèn NGAY SAU phần
+// tử được trỏ tới (vd luôn nằm cạnh "Lịch chăm sóc" dù kéo ra/vào ☰ Menu bao nhiêu lần); không
+// có/không tìm thấy thì mới appendChild vào data-bar-home như cơ chế cũ.
+function _barPlaceHome(el){
+  var afterSel = el.getAttribute('data-bar-after');
+  var afterEl = afterSel ? document.querySelector(afterSel) : null;
+  if (afterEl && afterEl.parentNode){ afterEl.parentNode.insertBefore(el, afterEl.nextSibling); return; }
+  var homeSel = el.getAttribute('data-bar-home');
+  var home = homeSel ? document.querySelector(homeSel) : null;
+  if (home) home.appendChild(el);
+}
+
 // Di chuyển đúng các phần tử [data-bar-id] đang nằm trong _barMenuItems vào khung "☰ Menu",
 // và trả các phần tử KHÔNG còn trong danh sách về lại thanh gốc (data-bar-home). Một số nơi
 // (VD header) render lại toàn bộ bằng innerHTML mỗi lần đổi trạng thái đăng nhập → có thể tạo
@@ -6630,9 +6693,8 @@ function _applyBarCustomization(){
       if (el.parentNode !== list) list.appendChild(el);
       count++;
     } else if (el.parentNode === list) {
-      var homeSel = el.getAttribute('data-bar-home');
-      var home = homeSel ? document.querySelector(homeSel) : null;
-      if (home) home.appendChild(el); else list.removeChild(el);
+      _barPlaceHome(el);
+      if (el.parentNode === list) list.removeChild(el); // khong tim duoc noi de ve -> danh phai bo khoi menu de khoi mat tich
     }
   });
   if (btn) btn.style.display = count ? '' : 'none';
@@ -14954,8 +15016,8 @@ function _dashSetFilter(key, val){
   renderDashboard();
 }
 function _dashSetPreset(preset){
-  // Dung chung bo loc nhanh _pkQuickRange: hom nay/hom qua/thang/quy/nam (nay + truoc)
-  var map = { today:'today', yesterday:'yesterday', month:'thisMonth', last:'lastMonth', q:'thisQuarter', lastq:'lastQuarter', year:'thisYear', lasty:'lastYear' };
+  // Dung chung bo loc nhanh _pkQuickRange: hom nay/hom qua/tuan/thang/quy/nam (nay + truoc)
+  var map = { today:'today', yesterday:'yesterday', thisweek:'thisWeek', lastweek:'lastWeek', month:'thisMonth', last:'lastMonth', q:'thisQuarter', lastq:'lastQuarter', year:'thisYear', lasty:'lastYear' };
   if (preset === 'all') { _dashFilter.from=''; _dashFilter.to=''; }
   else if (map[preset]) { var rg = _pkQuickRange(map[preset]); if (rg){ _dashFilter.from=rg.from; _dashFilter.to=rg.to; } }
   _dashFilterSave();
@@ -14981,10 +15043,10 @@ function _dashFilterBarHtml(scopeList){
   }
   csNames.sort(function(a,b){ return a.localeCompare(b,'vi'); });
 
-  var presets = [['all','Tất cả'],['today','Hôm nay'],['yesterday','Hôm qua'],['month','Tháng này'],['last','Tháng trước'],['q','Quý này'],['lastq','Quý trước'],['year','Năm nay'],['lasty','Năm trước']];
+  var presets = [['all','Tất cả'],['today','Hôm nay'],['yesterday','Hôm qua'],['thisweek','Tuần này'],['lastweek','Tuần trước'],['month','Tháng này'],['last','Tháng trước'],['q','Quý này'],['lastq','Quý trước'],['year','Năm nay'],['lasty','Năm trước']];
   var isAll = !f.from && !f.to;
   var presetHtml = presets.map(function(p){
-    var pmap = { today:'today', yesterday:'yesterday', month:'thisMonth', last:'lastMonth', q:'thisQuarter', lastq:'lastQuarter', year:'thisYear', lasty:'lastYear' };
+    var pmap = { today:'today', yesterday:'yesterday', thisweek:'thisWeek', lastweek:'lastWeek', month:'thisMonth', last:'lastMonth', q:'thisQuarter', lastq:'lastQuarter', year:'thisYear', lasty:'lastYear' };
     var prg = pmap[p[0]] ? _pkQuickRange(pmap[p[0]]) : null;
     var active = (p[0]==='all') ? isAll : !!(prg && f.from===prg.from && f.to===prg.to);
     return '<button class="btn sm'+(active?' primary':'')+'" style="padding:3px 9px;font-size:11px" onclick="_dashSetPreset(\''+p[0]+'\')">'+p[1]+'</button>';
@@ -16391,9 +16453,24 @@ var _PK_KPI_TAG_SHORT = {
   L5:'L5 (Chốt)', L6:'L6 (Hủy)', L7:'L7 (Hà Nội)', L8:'L8 (Upsale)'
 };
 
+// Khoa pham vi Sale cho tab KPI Pancake giong het co che _srEnforceScope() ben Bao cao doanh
+// so (dung lai _srIsAdmin/_srMyNames/_srLeaderTeamNames co san): CS thuong chi xem duoc doanh
+// thu cua chinh minh, Leader xem duoc ca team minh phu trach, Admin xem het khong gioi han.
+function _pkEnforceScope(){
+  if (typeof _srIsAdmin !== 'function' || _srIsAdmin()) { _pkState.kpiSaleScope = null; return; }
+  var my = (typeof _srMyNames === 'function') ? _srMyNames() : [];
+  if (currentUser && currentUser.role === 'leader' && typeof _srLeaderTeamNames === 'function') {
+    var teamNames = _srLeaderTeamNames();
+    _pkState.kpiSaleScope = teamNames.length ? teamNames : my;
+  } else {
+    _pkState.kpiSaleScope = my;
+  }
+}
+
 async function renderKpiPancakeTab(){
   var wrap = document.getElementById('kpipancake-wrap');
   if (!wrap) return;
+  _pkEnforceScope();
   if (!_pkState.nameMapLoaded) await _pkLoadNameMap();
   if (!_pkState.pageMapLoaded) await _pkLoadPageMap();
   _pkRenderKpiPancake();
@@ -16407,7 +16484,8 @@ async function _pkLoadKpiReport(){
   _pkState.kpiReportLoading = true; _pkRenderKpiPancake();
   try {
     var sep = gsUrl.includes('?') ? '&' : '?';
-    var r = await fetch(gsUrl + sep + 'action=kpiReport&from='+encodeURIComponent(_pkState.kpiFrom)+'&to='+encodeURIComponent(_pkState.kpiTo), { redirect:'follow' });
+    var saleQ = (_pkState.kpiSaleScope && _pkState.kpiSaleScope.length) ? '&sale='+encodeURIComponent(_pkState.kpiSaleScope.join(',')) : '';
+    var r = await fetch(gsUrl + sep + 'action=kpiReport&from='+encodeURIComponent(_pkState.kpiFrom)+'&to='+encodeURIComponent(_pkState.kpiTo)+saleQ, { redirect:'follow' });
     var d = await r.json();
     if (d.error) throw new Error(d.error);
     _pkState.kpiReport = d;
@@ -16606,6 +16684,12 @@ function _pkRenderKpiPancake(){
   var html = '';
 
   html += '<div class="dash-section-title">📈 Báo cáo KPI Pancake tổng hợp</div>';
+
+  if (_pkState.kpiSaleScope && _pkState.kpiSaleScope.length){
+    html += '<div style="margin:0 0 10px;padding:6px 10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:12px;color:#1e40af">'+
+      '🔒 Đang giới hạn theo phạm vi của bạn ('+(currentUser.role==='leader'?'Trưởng nhóm — cả team':'Sale')+'): '+
+      esc(_pkState.kpiSaleScope.join(', '))+'. Số liệu Tương tác/SĐT theo Page vẫn hiện toàn Page (không tách được theo cá nhân), chỉ riêng Đơn/Doanh thu là đã lọc đúng phạm vi.</div>';
+  }
 
   html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px">'+
     '<select style="'+st+'" onchange="_pkKpiApplyQuickFilter(this.value)">'+
@@ -17156,6 +17240,7 @@ var _srState = {
   bSaleView: 'table', bProductView: 'table',
   cEmpView: 'table', cKenhView: 'table',
   dCsView: 'table',
+  eBucketView: 'table', eSaleView: 'table',
   // C — So sanh theo ky
   cPeriodType: 'week', cDateField: 'ngayTao',
   cWeekOffset: 0, cMonthOffset: 0, cQuarterOffset: 0, cYearOffset: 0,
@@ -17198,14 +17283,17 @@ function _srChartSvg(rows, nameKey, valueKey, type, moneyFmt){
   var total = data.reduce(function(s,d){ return s+d.value; }, 0);
   var legend = data.map(function(d,i){
     var pct = total ? (d.value/total*100) : 0;
-    return '<div style="display:flex;align-items:center;gap:6px;font-size:11.5px;margin-bottom:4px">'+
+    // break-inside:avoid — khi tràn sang cột 2/3 (xem CSS "columns" ở khung cha) thì KHÔNG bị
+    // cắt đôi 1 dòng giữa 2 cột. Bỏ ellipsis/max-width cũ (từng làm cụt tên) — để 1 dòng, tên dài
+    // vẫn hiện đủ, cột tự rộng theo layout multi-column bên dưới thay vì cắt bớt chữ.
+    return '<div style="display:flex;align-items:center;gap:8px;font-size:11.5px;margin-bottom:6px;break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid">'+
       '<span style="width:10px;height:10px;border-radius:2px;background:'+_SR_CHART_COLORS[i%_SR_CHART_COLORS.length]+';flex:none;display:inline-block"></span>'+
-      '<span style="flex:1">'+esc(d.name)+'</span>'+
-      '<span style="color:var(--muted);white-space:nowrap">'+fmtVal(d.value)+' ('+pct.toFixed(1)+'%)</span></div>';
+      '<span style="white-space:nowrap">'+esc(d.name)+'</span>'+
+      '<span style="color:var(--muted);white-space:nowrap;margin-left:auto;padding-left:8px">'+fmtVal(d.value)+' ('+pct.toFixed(1)+'%)</span></div>';
   }).join('');
 
   if (type === 'pie'){
-    var cx=100, cy=100, r=90, angle=-90, paths='';
+    var cx=100, cy=100, r=90, angle=-90, paths='', labels='';
     data.forEach(function(d,i){
       var frac = total ? d.value/total : 0;
       var sweep = frac*360;
@@ -17219,11 +17307,23 @@ function _srChartSvg(rows, nameKey, valueKey, type, moneyFmt){
       } else {
         paths += '<path d="M'+cx+','+cy+' L'+x1.toFixed(2)+','+y1.toFixed(2)+' A'+r+','+r+' 0 '+large+' 1 '+x2.toFixed(2)+','+y2.toFixed(2)+' Z" fill="'+color+'"><title>'+esc(d.name)+': '+fmtVal(d.value)+'</title></path>';
       }
+      // Nhan % NGAY TREN mieng banh — chi hien voi mieng du to (>=5%) de khong chong chit chu voi
+      // cac mieng nho; chu trang co vien mo (paint-order stroke) de doc duoc tren MOI mau nen.
+      if (frac >= 0.05){
+        var midAngle = angle + sweep/2, lr = r*0.62;
+        var lx = cx + lr*Math.cos(midAngle*Math.PI/180), ly = cy + lr*Math.sin(midAngle*Math.PI/180);
+        labels += '<text x="'+lx.toFixed(2)+'" y="'+ly.toFixed(2)+'" text-anchor="middle" dominant-baseline="central" font-size="10" font-weight="700" fill="#fff" '+
+          'style="paint-order:stroke;stroke:rgba(0,0,0,.45);stroke-width:2.5px;stroke-linejoin:round;pointer-events:none">'+Math.round(frac*1000)/10+'%</text>';
+      }
       angle = endAngle;
     });
-    return '<div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;padding:10px 0">'+
-      '<svg viewBox="0 0 200 200" style="width:200px;height:200px;flex:none">'+paths+'</svg>'+
-      '<div style="flex:1;min-width:180px;max-height:260px;overflow-y:auto">'+legend+'</div></div>';
+    paths += labels;
+    // Bieu do to hon (240px thay vi 200px) + khung chu thich KHONG con gioi han chieu cao/thanh
+    // keo nua: dung CSS "columns" de tu chay sang cot 2, cot 3... khi danh sach dai (con hon
+    // scroll), so cot tu dieu chinh theo be rong man hinh va so luong ten.
+    return '<div style="display:flex;gap:26px;flex-wrap:wrap;align-items:center;padding:10px 0">'+
+      '<svg viewBox="0 0 200 200" style="width:240px;height:240px;flex:none">'+paths+'</svg>'+
+      '<div style="flex:1 1 420px;min-width:260px;max-width:1000px;columns:230px;column-gap:26px">'+legend+'</div></div>';
   }
 
   // bar chart ngang
@@ -17360,16 +17460,7 @@ function _srApplyQuickRange(quickKey, fromKey, toKey, key){
   }
   _srApply();
 }
-// Multi-select don gian cho cac loc moi (Tinh trang CS / Trang thai KH / Ket ban Zalo) — chi dung cho Bao cao B
-function _srMultiSelectHtml(stateKey, options, label, width){
-  options = options || [];
-  var sel = _srState[stateKey] || [];
-  return '<div><div style="font-size:10px;color:var(--hint);margin-bottom:2px">'+esc(label)+'</div>'+
-    '<select multiple onchange="_srState.'+stateKey+'=[...this.options].filter(function(o){return o.selected;}).map(function(o){return o.value;})" '+
-    'style="min-width:'+(width||120)+'px;max-height:68px;font-size:11.5px;padding:3px 5px;border:1px solid var(--border);border-radius:6px;background:var(--surface);outline:none">'+
-    options.map(function(v){ return '<option value="'+esc(v)+'" '+(sel.indexOf(v)!==-1?'selected':'')+'>'+esc(v)+'</option>'; }).join('')+
-    '</select></div>';
-}
+// (Da thay bang combo go-tim/tick-nhieu dung chung _srbComboHTML — xem _SRB_COMBO_CFG.cs/kh/zalo)
 
 // Xuat bao cao dang loc (dung filter hien tai tren UI) ra 1 tab moi trong Google Sheet CRM.
 // Tai su dung dung filter payload nhu _srLoad() de so lieu tren Sheet khop 100% voi UI dang xem.
@@ -17389,7 +17480,9 @@ async function exportSalesReportToSheet(){
     filters = { dateFrom: _srState.dDateFrom, dateTo: _srState.dDateTo, cs: _srState.dCs || '' };
   } else {
     filters = { dateFrom: _srState.dateFrom, dateTo: _srState.dateTo,
-      sale: _srState.bSale || [], nguon: _srState.bNguon || [], marketer: _srState.bMarketer || [] };
+      sale: _srState.bSale || [], nguon: _srState.bNguon || [], marketer: _srState.bMarketer || [],
+      careStatus: _srState.bCareStatus || [], khStatus: _srState.bKhStatus || [],
+      zaloStatus: _srState.bZaloStatus || [], nickZalo: _srState.bNickZalo || '' };
   }
   var btn = document.getElementById('sr-export-sheet-btn');
   if (btn){ btn.disabled = true; btn.textContent = '⏳ Đang xuất...'; }
@@ -17730,9 +17823,9 @@ function renderSalesReportTab(){
     filters += '<div><div style="font-size:10px;color:var(--hint);margin-bottom:2px">Sản phẩm (cách nhau bằng dấu phẩy)</div>'+
       '<input type="text" value="'+esc(_srState.bSanPham||'')+'" onchange="_srSetField(\'bSanPham\',this.value)" placeholder="vd: tỳ hưu, nhẫn 10k" style="min-width:170px;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
       '</div>';
-    filters += _srMultiSelectHtml('bCareStatus', CARE_STATUS, FIELD_LABEL_CS, 120);
-    filters += _srMultiSelectHtml('bKhStatus', (typeof _flatCustStatusValues==='function'?_flatCustStatusValues():[]).filter(Boolean), FIELD_LABEL_KH, 140);
-    filters += _srMultiSelectHtml('bZaloStatus', ZALO_STATUS, 'Kết bạn Zalo', 120);
+    filters += _srbComboHTML('cs');
+    filters += _srbComboHTML('kh');
+    filters += _srbComboHTML('zalo');
     filters += '<div><div style="font-size:10px;color:var(--hint);margin-bottom:2px">Nick Zalo</div>'+
       '<input type="text" value="'+esc(_srState.bNickZalo||'')+'" onchange="_srSetField(\'bNickZalo\',this.value)" placeholder="Tìm nick..." style="min-width:100px;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
       '</div>';
@@ -18017,37 +18110,50 @@ function _srRenderE_(d){
     'Doanh thu của mỗi người trong 1 đơn = <b>giá trị đơn ÷ số sale đứng tên trên đơn đó</b> (chia đều).</div>';
 
   // a) Doanh thu tổng theo mức đơn hàng
-  html += '<div class="dash-section-title">a) Doanh thu theo mức đơn hàng</div>';
-  html += '<div class="kpi-grid" style="margin-bottom:16px">' +
-    '<div class="kpi-card"><div class="kpi-val">'+fmt(c.totalOrdersAbove15)+'</div><div class="kpi-label">Số đơn ≥15tr</div></div>' +
-    '<div class="kpi-card"><div class="kpi-val">'+fmt(c.totalOrdersBelow15)+'</div><div class="kpi-label">Số đơn &lt;15tr</div></div>' +
-    '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+_srMoney(c.totalRevenueAbove15)+'</div><div class="kpi-label">Doanh thu đơn ≥15tr</div></div>' +
-    '<div class="kpi-card"><div class="kpi-val">'+_srMoney(c.totalRevenueBelow15)+'</div><div class="kpi-label">Doanh thu đơn &lt;15tr</div></div>' +
-    '</div>';
+  html += '<div class="dash-section-title">a) Doanh thu theo mức đơn hàng'+_srViewToggleHtml('eBucketView')+'</div>';
+  if (_srState.eBucketView === 'table'){
+    html += '<div class="kpi-grid" style="margin-bottom:16px">' +
+      '<div class="kpi-card"><div class="kpi-val">'+fmt(c.totalOrdersAbove15)+'</div><div class="kpi-label">Số đơn ≥15tr</div></div>' +
+      '<div class="kpi-card"><div class="kpi-val">'+fmt(c.totalOrdersBelow15)+'</div><div class="kpi-label">Số đơn &lt;15tr</div></div>' +
+      '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+_srMoney(c.totalRevenueAbove15)+'</div><div class="kpi-label">Doanh thu đơn ≥15tr</div></div>' +
+      '<div class="kpi-card"><div class="kpi-val">'+_srMoney(c.totalRevenueBelow15)+'</div><div class="kpi-label">Doanh thu đơn &lt;15tr</div></div>' +
+      '</div>';
+  } else {
+    var bucketRows = [
+      { name: 'Đơn ≥15tr', value: c.totalRevenueAbove15 },
+      { name: 'Đơn <15tr', value: c.totalRevenueBelow15 }
+    ];
+    html += _srChartSvg(bucketRows, 'name', 'value', _srState.eBucketView, true);
+  }
 
   // b) Hoa hồng từng nhân viên
   var rows = (c.bySale||[]).filter(function(s){ return !_srState.eSaleSearch || s.name.toLowerCase().indexOf(_srState.eSaleSearch.toLowerCase())!==-1; });
-  html += '<div class="dash-section-title">b) Hoa hồng nhân viên <span style="font-weight:400;color:var(--muted);font-size:11px">(doanh thu = phần chia đều của người đó trong từng đơn)</span></div>';
+  html += '<div class="dash-section-title">b) Hoa hồng nhân viên <span style="font-weight:400;color:var(--muted);font-size:11px">(doanh thu = phần chia đều của người đó trong từng đơn)</span>'+_srViewToggleHtml('eSaleView')+'</div>';
   html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.eSaleSearch)+'" oninput="_srState.eSaleSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
-  html += '<table class="dash-table"><thead><tr>'+
-    '<th>Sale</th><th style="text-align:right">Số đơn ≥15tr</th><th style="text-align:right">Số đơn &lt;15tr</th>'+
-    '<th style="text-align:right">DT ≥15tr</th><th style="text-align:right">DT &lt;15tr</th>'+
-    '<th style="text-align:right">% ≥15tr</th><th style="text-align:right">% &lt;15tr</th>'+
-    '<th style="text-align:right"><b>Hoa hồng</b></th></tr></thead><tbody>';
-  rows.forEach(function(s){
-    html += '<tr><td>'+esc(s.name)+'</td>'+
-      '<td style="text-align:right">'+fmt(s.ordersAbove15)+'</td>'+
-      '<td style="text-align:right">'+fmt(s.ordersBelow15)+'</td>'+
-      '<td style="text-align:right">'+_srMoney(s.revenueAbove15)+'</td>'+
-      '<td style="text-align:right">'+_srMoney(s.revenueBelow15)+'</td>'+
-      '<td style="text-align:right" title="Nguồn: '+esc(s.sourceAbove15)+'">'+s.rateAbove15+'%</td>'+
-      '<td style="text-align:right" title="Nguồn: '+esc(s.sourceBelow15)+'">'+s.rateBelow15+'%</td>'+
-      '<td style="text-align:right"><b>'+_srMoney(s.commission)+'</b></td></tr>';
-  });
-  if (!rows.length) html += '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
-  html += '<tr style="font-weight:700;border-top:2px solid var(--border)"><td colspan="7" style="text-align:right">Tổng hoa hồng:</td><td style="text-align:right">'+_srMoney(c.totalCommission)+'</td></tr>';
-  html += '</tbody></table>';
-  html += '<div style="font-size:11px;color:var(--muted);margin-top:6px">Rê chuột vào % để xem nguồn áp dụng (Cá nhân / Team X / Chưa cài).</div>';
+  if (_srState.eSaleView === 'table'){
+    html += '<table class="dash-table"><thead><tr>'+
+      '<th>Sale</th><th style="text-align:right">Số đơn ≥15tr</th><th style="text-align:right">Số đơn &lt;15tr</th>'+
+      '<th style="text-align:right">DT ≥15tr</th><th style="text-align:right">DT &lt;15tr</th>'+
+      '<th style="text-align:right">% ≥15tr</th><th style="text-align:right">% &lt;15tr</th>'+
+      '<th style="text-align:right"><b>Hoa hồng</b></th></tr></thead><tbody>';
+    rows.forEach(function(s){
+      html += '<tr><td>'+esc(s.name)+'</td>'+
+        '<td style="text-align:right">'+fmt(s.ordersAbove15)+'</td>'+
+        '<td style="text-align:right">'+fmt(s.ordersBelow15)+'</td>'+
+        '<td style="text-align:right">'+_srMoney(s.revenueAbove15)+'</td>'+
+        '<td style="text-align:right">'+_srMoney(s.revenueBelow15)+'</td>'+
+        '<td style="text-align:right" title="Nguồn: '+esc(s.sourceAbove15)+'">'+s.rateAbove15+'%</td>'+
+        '<td style="text-align:right" title="Nguồn: '+esc(s.sourceBelow15)+'">'+s.rateBelow15+'%</td>'+
+        '<td style="text-align:right"><b>'+_srMoney(s.commission)+'</b></td></tr>';
+    });
+    if (!rows.length) html += '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+    html += '<tr style="font-weight:700;border-top:2px solid var(--border)"><td colspan="7" style="text-align:right">Tổng hoa hồng:</td><td style="text-align:right">'+_srMoney(c.totalCommission)+'</td></tr>';
+    html += '</tbody></table>';
+    html += '<div style="font-size:11px;color:var(--muted);margin-top:6px">Rê chuột vào % để xem nguồn áp dụng (Cá nhân / Team X / Chưa cài).</div>';
+  } else {
+    html += '<div style="font-size:11px;color:var(--hint);margin-bottom:4px">Vẽ theo "Hoa hồng"</div>';
+    html += _srChartSvg(rows, 'name', 'commission', _srState.eSaleView, true);
+  }
   return html;
 }
 
@@ -18218,12 +18324,29 @@ function exportSalesReportC(){
 var _SRB_COMBO_CFG = {
   sale: { id: 'srb-sale-combo', stateKey: 'bSale', optKey: 'saleBOptions', label: 'Sale', placeholder: '🔍 Tìm & chọn sale...' },
   nguon: { id: 'srb-nguon-combo', stateKey: 'bNguon', optKey: 'nguonOptions', label: 'Nguồn đơn', placeholder: '🔍 Tìm & chọn nguồn...' },
-  mkt: { id: 'srb-mkt-combo', stateKey: 'bMarketer', optKey: 'marketerOptions', label: 'Marketer', placeholder: '🔍 Tìm & chọn marketer...' }
+  mkt: { id: 'srb-mkt-combo', stateKey: 'bMarketer', optKey: 'marketerOptions', label: 'Marketer', placeholder: '🔍 Tìm & chọn marketer...' },
+  // 3 bo loc CRM — truoc day la <select multiple> hien san nhieu dong (choan cho), gio dung
+  // chung 1 kieu combo go-tim/tick-nhieu/chip nhu Sale/Nguon/Marketer o tren. Dung getOptions/
+  // getLabel (ham, khong phai gia tri tinh) vi danh sach Tinh trang CS/Trang thai KH co the
+  // duoc admin sua qua modal Quan ly, va nhan FIELD_LABEL_CS/KH co the duoc doi ten rieng —
+  // phai doc lai moi lan mo dropdown/ve lai filter bar, khong duoc ghim gia tri cu luc khai bao.
+  cs: { id: 'srb-cs-combo', stateKey: 'bCareStatus', label: 'Tình trạng CS',
+    getLabel: function(){ return (typeof FIELD_LABEL_CS!=='undefined' && FIELD_LABEL_CS) || 'Tình trạng CS'; },
+    getOptions: function(){ return (typeof CARE_STATUS!=='undefined' ? CARE_STATUS : []) || []; },
+    placeholder: '🔍 Tìm & chọn tình trạng CS...' },
+  kh: { id: 'srb-kh-combo', stateKey: 'bKhStatus', label: 'Trạng thái KH',
+    getLabel: function(){ return (typeof FIELD_LABEL_KH!=='undefined' && FIELD_LABEL_KH) || 'Trạng thái KH'; },
+    getOptions: function(){ return (typeof _flatCustStatusValues==='function' ? _flatCustStatusValues() : []).filter(Boolean); },
+    placeholder: '🔍 Tìm & chọn trạng thái KH...' },
+  zalo: { id: 'srb-zalo-combo', stateKey: 'bZaloStatus', label: 'Kết bạn Zalo',
+    getOptions: function(){ return (typeof ZALO_STATUS!=='undefined' ? ZALO_STATUS : []).filter(Boolean); },
+    placeholder: '🔍 Tìm & chọn kết bạn Zalo...' }
 };
 var _srbComboData = {}, _srbComboIdx = {};
 function _srbBuildData(key){
   var cfg = _SRB_COMBO_CFG[key];
-  _srbComboData[key] = (_srState[cfg.optKey]||[]).map(function(v){ return {value:v, label:v}; });
+  var raw = cfg.getOptions ? cfg.getOptions() : (_srState[cfg.optKey]||[]);
+  _srbComboData[key] = (raw||[]).map(function(v){ return {value:v, label:v}; });
 }
 function srbComboRender(key, filter){
   var cfg = _SRB_COMBO_CFG[key];
@@ -18327,7 +18450,8 @@ document.addEventListener('click', function(e){
 function _srbComboHTML(key){
   var cfg = _SRB_COMBO_CFG[key];
   var sel = _srState[cfg.stateKey] || [];
-  return '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">'+cfg.label+'<span id="'+cfg.id+'-label-count" style="color:var(--green)">'+(sel.length?' ('+sel.length+' đã chọn)':'')+'</span></div>'+
+  var lbl = cfg.getLabel ? cfg.getLabel() : cfg.label;
+  return '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">'+esc(lbl)+'<span id="'+cfg.id+'-label-count" style="color:var(--green)">'+(sel.length?' ('+sel.length+' đã chọn)':'')+'</span></div>'+
     '<div class="cs-combo" id="'+cfg.id+'" style="width:170px">'+
     '<input type="text" id="'+cfg.id+'-input" class="cs-combo-input" placeholder="'+esc(cfg.placeholder)+'" autocomplete="off" '+
     'oninput="srbComboFilter(\''+key+'\', this.value)" onfocus="srbComboOpen(\''+key+'\')" onkeydown="srbComboKey(\''+key+'\', event)">'+
@@ -18703,6 +18827,9 @@ function _injectV9UI(){
       var group = document.createElement('div');
       group.className = 'tab';
       group.id = 'v9tab-reportsgroup';
+      group.setAttribute('data-bar-id', 'reportsgroup');
+      group.setAttribute('data-bar-home', '.tabs');
+      group.setAttribute('data-bar-after', "[data-bar-id='tab-schedule']"); // luon nam NGAY CANH "Lich cham soc", du keo ra/vao ☰ Menu bao nhieu lan
       group.style.cssText = 'position:relative';
       group.innerHTML = '📊 Báo cáo ▾';
       group.setAttribute('onclick', '_toggleReportsGroupDropdown(event)');
@@ -18721,7 +18848,7 @@ function _injectV9UI(){
         rgList.appendChild(item);
       });
       group.appendChild(rgList);
-      tabsBar.appendChild(group);
+      _barPlaceHome(group); // gan NGAY SAU "Lich cham soc" thay vi cuoi thanh tab
       document.addEventListener('click', function(e){
         var list = document.getElementById('reportsgroup-list');
         var grp = document.getElementById('v9tab-reportsgroup');
@@ -18804,7 +18931,7 @@ function _injectV9UI(){
 
 window.addEventListener('load', function(){
   // chạy sau cùng để chắc chắn mọi DOM/biến đã sẵn sàng
-  setTimeout(function(){ _injectV9UI(); _renderAuthHeader(); _authGate(); if (typeof startReminderChecks==='function') startReminderChecks(); if (typeof startAutoSync==='function') startAutoSync(); if (typeof _checkAndRenewBdaySchedules==='function') _checkAndRenewBdaySchedules(); if (typeof checkDataDaoRenewSchedules==='function') checkDataDaoRenewSchedules(); if (typeof reapplyColVisibility==='function') reapplyColVisibility(); if (typeof _applyBarCustomization==='function') _applyBarCustomization(); if (typeof _pullBarMenuForAccount==='function') _pullBarMenuForAccount(); }, 0);
+  setTimeout(function(){ _injectV9UI(); _renderAuthHeader(); _authGate(); if (typeof startReminderChecks==='function') startReminderChecks(); if (typeof startAutoSync==='function') startAutoSync(); if (typeof _checkAndRenewBdaySchedules==='function') _checkAndRenewBdaySchedules(); if (typeof checkDataDaoRenewSchedules==='function') checkDataDaoRenewSchedules(); if (typeof reapplyColVisibility==='function') reapplyColVisibility(); if (typeof _applyBarCustomization==='function') _applyBarCustomization(); if (typeof _pullBarMenuForAccount==='function') _pullBarMenuForAccount(); if (typeof _applyUserTabPermissions==='function') _applyUserTabPermissions(); }, 0);
 });
 
 // ═══════════════════════════════════════════════════════
@@ -18865,8 +18992,9 @@ function _applyAuthIdentity(acct){
   _bootstrapAdmin = false;
   var namesArr = (acct.names && acct.names.length) ? acct.names.slice() : (acct.name ? [acct.name] : []);
   var primaryName = acct.role==='admin' ? 'Admin' : (namesArr[0] || acct.username);
-  currentUser = { name: primaryName, names: acct.role==='admin' ? [] : namesArr, role: acct.role || 'cs', team: acct.team || '' };
+  currentUser = { name: primaryName, names: acct.role==='admin' ? [] : namesArr, role: acct.role || 'cs', team: acct.team || '', perms: (Array.isArray(acct.perms) ? acct.perms : null) };
   saveLS('ome_user', currentUser);
+  if (typeof _applyUserTabPermissions === 'function') _applyUserTabPermissions();
   var csFilter = document.getElementById('cs-staff-filter');
   if (csFilter){
     if (currentUser.role === 'cs' && currentUser.names.length){
@@ -19134,6 +19262,25 @@ function _acctDetailHtml(a){
       ' — Leader còn xem được dữ liệu của cả team.</div>';
   }
 
+  var isLimited = Array.isArray(a.perms);
+  var permHtml = '<div style="margin-top:10px;border-top:1px dashed var(--border);padding-top:9px">'+
+    '<label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;cursor:pointer">'+
+      '<input type="checkbox" '+(isLimited?'checked':'')+' onchange="acctTogglePermLimit(\''+uk+'\',this.checked)"> '+
+      '🔒 Giới hạn menu được xem (chỉ cho xem 1 số mục nhất định)'+
+    '</label>'+
+    (isLimited ?
+      '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">'+
+        _PERM_TAB_DEFS.map(function(d){
+          var checked = a.perms.indexOf(d.id) !== -1;
+          return '<label style="display:flex;align-items:center;gap:4px;font-size:11.5px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer">'+
+            '<input type="checkbox" '+(checked?'checked':'')+' onchange="acctTogglePermTab(\''+uk+'\',\''+d.id+'\',this.checked)"> '+esc(d.label)+
+          '</label>';
+        }).join('')+
+      '</div>'+
+      '<div style="font-size:10.5px;color:var(--muted);margin-top:5px">Bỏ tick = tài khoản này sẽ KHÔNG thấy mục đó ở đâu cả (kể cả trong "☰ Menu").</div>'
+    : '<div style="font-size:10.5px;color:var(--muted);margin-top:4px">Đang KHÔNG giới hạn — tài khoản xem đủ menu theo đúng vai trò hiện tại.</div>')+
+  '</div>';
+
   return '<div class="acct-detail">'+
     '<div class="ad-title">Đang phụ trách '+namesArr.length+' sale — chỉ thấy dữ liệu của những người này</div>'+
     '<div class="ad-chips">'+chips+'</div>'+
@@ -19143,7 +19290,22 @@ function _acctDetailHtml(a){
       '<button class="btn primary sm" data-u="'+uk+'" onclick="acctAddNames(this)">+ Thêm sale</button>'+
     '</div>'+
     teamNote+
+    permHtml+
   '</div>';
+}
+// Bật/tắt chế độ giới hạn menu của 1 tài khoản. Bật lần đầu -> mặc định cho phép ĐỦ mọi
+// mục (Admin bỏ tick dần để thu hẹp), tránh vô tình khoá trắng tài khoản người ta.
+function acctTogglePermLimit(u, on){
+  var acct = _findAccount(u); if (!acct) return;
+  acct.perms = on ? _PERM_TAB_DEFS.map(function(d){ return d.id; }) : null;
+  _acctPersist(acct, on ? 'Bật giới hạn menu' : 'Bỏ giới hạn menu');
+}
+function acctTogglePermTab(u, tabId, on){
+  var acct = _findAccount(u); if (!acct || !Array.isArray(acct.perms)) return;
+  var idx = acct.perms.indexOf(tabId);
+  if (on && idx === -1) acct.perms.push(tabId);
+  if (!on && idx !== -1) acct.perms.splice(idx, 1);
+  _acctPersist(acct, (on?'Cho phép xem: ':'Chặn xem: ') + tabId);
 }
 
 // Mở / đóng khối chi tiết của 1 tài khoản
