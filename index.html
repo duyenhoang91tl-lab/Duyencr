@@ -8378,6 +8378,8 @@ var SH_PK_TAG   = 'PancakeTagStats'; // thong ke tag (L1-L7 trang thai, S/O sale
 var ORDER_SS_ID = '1fiWXPMZcHuEh0zYqD6pgQjZDM0PhWzpiSK7Igj6Cug8'; // File chua OrderData2x (doanh thu/don hang)
 var CRM_SS_ID   = '18XBtbjP7gtlvYpChikF3B62cxHkR4426s5poZj9Mj8I'; // File chua CareData/Users/Teams/Settings/AuditLog/AssignData/AIContext (CRM).
 var PRICE_SS_ID    = '1I4wr226_QUJuCZSKASsxXxOjloCW9UtpYz87TSy-Ldk'; // File "Bang gia" moi (Danh_muc/Tinh_tien/Ghi_chu_chinh_sach) - cap nhat 2026-09
+var EXPORT_BASE_SS_ID  = '1s1UlRMquiryI7A2lJ8gJlPMsIGBLGum1RdLJga3ldlI'; // File Google Sheet RIENG de xuat Bao cao Base (nut "📌 Cập nhật Sheet Base") — theo yeu cau Duyen 2026-09.
+var EXPORT_BASE_GID    = 0; // Tab dich trong file tren (lay tu URL "#gid=..."). Doi tab/doi file: sua 2 dong nay roi Deploy lai, KHONG can sua gi khac.
 var PRICE_SHEET_NAME = 'DANH_MUC'; // Sheet dang bang phang, de tra cuu/loc
 var CTKM_SHEET_NAME  = 'CTKM'; // Sheet CTKM (cung file PRICE_SS_ID) — doi ten hang duoi neu ten tab thuc te khac
                         // De trong = dung file dang gan Apps Script nay (mac dinh, hanh vi cu).
@@ -10052,6 +10054,15 @@ function readDonChiTiet_() {
 // ── BAO CAO A: theo "DT TỔNG " ──
 // filters: { dateFrom, dateTo, dateField ('ngayTao'|'thoiGianHT'), sale (mang ten hoac ''), kenh ('' = tat ca) }
 // ── Lay danh sach Sale ban / Kenh ban distinct (cho UI chon, thay vi go dung ten) ──
+// Tim 1 tab trong spreadsheet theo gid (lay tu URL "#gid=..."). Khong thay thi lui ve tab DAU
+// TIEN cua file (gid=0 hau het la tab mac dinh nay) de khong bao giolam ho ghi that bai vi le
+// nguoi dung xoa/doi ten tab do.
+function _sheetByGid_(ss, gid) {
+  var sheets = ss.getSheets();
+  for (var i = 0; i < sheets.length; i++) { if (sheets[i].getSheetId() === gid) return sheets[i]; }
+  return sheets[0] || null;
+}
+
 function getSalesReportOptions_() {
   var cache = CacheService.getScriptCache();
   var cached = cache.get('srptOptions_v3');
@@ -10591,18 +10602,26 @@ function exportSalesReportToSheet_(reportType, filters) {
     : (reportType === 'C' ? buildSalesReportC_(filters || {})
     : (reportType === 'D' ? buildCareLeadReport_(filters || {})
     : buildSalesReportA_(filters || {})));
-  var ss = getCrmSS_();
-  // Bao cao Base (A): CHI 1 tab CO DINH, moi lan xuat GHI DE lai noi dung cu — theo yeu cau
-  // Duyen 2026-09 ("chi ra 1 trang tinh thoi, khong bi moi lan xuat lai 1 trang moi"). Cac loai
-  // bao cao khac (B/C/D) VAN giu nguyen co che cu: moi lan xuat tao 1 tab moi co timestamp, de
-  // giu lai lich su cac lan xuat truoc do.
-  var tabName, sh, fixedTab = (reportType === 'A');
+  // Bao cao Base (A): ghi vao FILE GOOGLE SHEET RIENG (EXPORT_BASE_SS_ID, dung tab theo
+  // EXPORT_BASE_GID) — file nay PHAI duoc chia se (Editor) cho tai khoan dang chay Apps Script.
+  // CHI 1 tab CO DINH, moi lan xuat GHI DE lai noi dung cu, KHONG tao tab moi — theo yeu cau
+  // Duyen 2026-09 ("chi ra 1 trang tinh thoi, khong bi moi lan xuat lai 1 trang moi", va sau do
+  // "xuat cho minh vao link nay" — doi sang file rieng thay vi file CRM).
+  // Cac loai bao cao khac (B/C/D) VAN giu nguyen: ghi vao file CRM, moi lan xuat tao 1 tab moi
+  // co timestamp, de giu lai lich su cac lan xuat truoc do.
+  var ss, tabName, sh, fixedTab = (reportType === 'A');
   if (fixedTab) {
-    tabName = 'BC_A_Base';
-    sh = ss.getSheetByName(tabName);
-    if (sh) sh.clear(); // ghi de: xoa sach noi dung/dinh dang cu truoc khi ghi lai
-    else sh = ss.insertSheet(tabName);
+    try {
+      ss = SpreadsheetApp.openById(EXPORT_BASE_SS_ID);
+    } catch (eExt) {
+      return jsonOut_({ error: 'Không mở được file Google Sheet đích (EXPORT_BASE_SS_ID) — kiểm tra lại ID/quyền chia sẻ (Editor) cho tài khoản đang chạy Apps Script. Chi tiết: ' + eExt.message });
+    }
+    sh = _sheetByGid_(ss, EXPORT_BASE_GID);
+    if (!sh) return jsonOut_({ error: 'File đích chưa có tab nào (rỗng) — mở file, tạo ít nhất 1 tab rồi thử lại.' });
+    sh.clear(); // ghi de: xoa sach noi dung/dinh dang cu truoc khi ghi lai
+    tabName = sh.getName();
   } else {
+    ss = getCrmSS_();
     var ts = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Etc/GMT-7', 'yyyyMMdd_HHmmss');
     tabName = 'BC_' + reportType + '_' + ts;
     sh = ss.insertSheet(tabName);
