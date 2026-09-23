@@ -49,6 +49,8 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 
 /* ── SIDEBAR ── */
 .sidebar{width:260px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+/* Thu gọn sidebar bộ lọc KH (dùng khi xem Báo cáo doanh số để có đủ chỗ chụp màn hình) */
+.app.sr-sidebar-hidden .sidebar{display:none;}
 .sb-top{padding:10px 10px 4px;flex-shrink:0;}
 .sb-label{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--hint);margin-bottom:5px;margin-top:4px;padding:0 4px;}
 .search-wrap{position:relative;margin-bottom:8px;}
@@ -2205,6 +2207,16 @@ function toggleSidebar(force){
   var open = (typeof force === 'boolean') ? force : !sb.classList.contains('mobile-open');
   sb.classList.toggle('mobile-open', open);
   if (bd) bd.classList.toggle('show', open);
+}
+// Ẩn/hiện HẲN sidebar bộ lọc KH bên trái (khác toggleSidebar ở trên — cái đó chỉ dành cho
+// off-canvas mobile). Dùng ở màn "Báo cáo doanh số" để nhường chỗ cho biểu đồ khi cần chụp màn
+// hình gửi báo cáo — bấm lại để hiện lại bình thường.
+var _srSidebarHidden = false;
+function _srToggleSidebar(){
+  _srSidebarHidden = !_srSidebarHidden;
+  var app = document.querySelector('.app');
+  if (app) app.classList.toggle('sr-sidebar-hidden', _srSidebarHidden);
+  renderSalesReportTab();
 }
 function copyGsCode() {
   navigator.clipboard.writeText(GS_SCRIPT).then(() => toast('✓ Đã copy Apps Script code'));
@@ -17937,7 +17949,64 @@ function renderSalesReportTab(){
     body = _srRenderB(_srState.dataB);
   }
 
-  wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + filters + body;
+  var titleRow = '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:0">'+
+    '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>'+
+    '<button class="btn sm" onclick="_srToggleSidebar()" title="Ẩn/hiện bộ lọc KH bên trái để có thêm chỗ, tiện chụp màn hình báo cáo">'+
+    (_srSidebarHidden ? '📂 Hiện bộ lọc KH' : '📁 Ẩn bộ lọc KH — chụp màn hình')+'</button></div>';
+  wrap.innerHTML = titleRow + subTabs + filters + body;
+}
+
+// ── Tỷ lệ chốt (theo Sale / theo Kênh) ─────────────────────────────────────
+// Dùng CHUNG cách tính "chốt" đã có sẵn ở tab Dashboard (careStatus === 'Chốt' trên tổng số
+// KH được giao/ghi nhận) — khác nguồn dữ liệu với bảng doanh thu bên trên (bảng doanh thu lấy
+// từ Google Sheet qua salesReportA, còn tỷ lệ chốt lấy từ allCustomers ở client vì cần careStatus).
+function _srCustKenh_(c){
+  if (!c || !c.orders || !c.orders.length) return (c && c.sources && c.sources[0]) || '';
+  var latest = null;
+  for (var i=0;i<c.orders.length;i++){
+    var o = c.orders[i]; if (!o.source) continue;
+    if (!latest || (o.date instanceof Date && (!(latest.date instanceof Date) || o.date > latest.date))) latest = o;
+  }
+  return (latest && latest.source) || (c.sources && c.sources[0]) || '';
+}
+function _srCloseRateGroups_(keyFn){
+  var arr = (typeof allCustomers !== 'undefined' ? allCustomers : []).filter(_inUserScope);
+  var map = {};
+  arr.forEach(function(c){
+    var k = keyFn(c);
+    if (!k) return;
+    if (!map[k]) map[k] = {name:k, held:0, closed:0};
+    map[k].held++;
+    if (c.careStatus === 'Chốt') map[k].closed++;
+  });
+  return Object.keys(map).map(function(k){
+    var g = map[k]; g.closeRate = g.held ? Math.round(g.closed/g.held*100) : 0; return g;
+  });
+}
+function _srCloseRateBySale_(){ return _srCloseRateGroups_(function(c){ return _heldBy(c) || ''; }); }
+function _srCloseRateByKenh_(){ return _srCloseRateGroups_(_srCustKenh_); }
+
+// Vẽ cột ngang tỷ lệ chốt — xanh/vàng/đỏ theo mức %, kèm số liệu chốt/tổng bên cạnh mỗi cột,
+// và dòng trung bình chung ở trên để dễ đối chiếu nhanh khi chụp màn hình gửi sếp.
+function _srCloseRateBarHtml_(rows, searchTerm){
+  var filtered = (rows||[]).filter(function(r){ return r.held>0 && (!searchTerm || r.name.toLowerCase().indexOf(searchTerm.toLowerCase())!==-1); });
+  if (!filtered.length) return '<div style="color:var(--muted);text-align:center;padding:20px;font-size:12px">Không có dữ liệu để tính tỷ lệ chốt</div>';
+  filtered.sort(function(a,b){ return b.closeRate-a.closeRate; });
+  var totHeld = filtered.reduce(function(s,r){return s+r.held;},0);
+  var totClosed = filtered.reduce(function(s,r){return s+r.closed;},0);
+  var avgRate = totHeld ? Math.round(totClosed/totHeld*100) : 0;
+  function colorFor(p){ return p>=50 ? '#16a34a' : (p>=30 ? '#d97706' : '#dc2626'); }
+  var bars = filtered.map(function(r){
+    var w = Math.max(2, r.closeRate);
+    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">'+
+      '<div style="width:112px;font-size:11.5px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(r.name)+'">'+esc(r.name)+'</div>'+
+      '<div style="flex:1;background:var(--surface2);border-radius:4px;overflow:hidden;height:15px">'+
+      '<div style="width:'+w+'%;height:100%;background:'+colorFor(r.closeRate)+';border-radius:4px"></div></div>'+
+      '<div style="width:104px;font-size:11px;color:var(--muted);white-space:nowrap"><b style="color:var(--text)">'+r.closeRate+'%</b> ('+r.closed+'/'+r.held+')</div></div>';
+  }).join('');
+  return '<div style="padding:4px 0 10px">'+
+    '<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Trung bình: <b style="color:var(--text)">'+avgRate+'%</b> ('+totClosed+'/'+totHeld+' KH) &nbsp;·&nbsp; <span style="color:#16a34a">■</span> ≥50% &nbsp;<span style="color:#d97706">■</span> 30–49% &nbsp;<span style="color:#dc2626">■</span> &lt;30%</div>'+
+    bars+'</div>';
 }
 
 function _srRenderA(d){
@@ -17951,47 +18020,61 @@ function _srRenderA(d){
     '<div style="font-size:11px;color:var(--muted);margin:-10px 0 14px">Tổng đơn = cộng dồn "Tổng giá trị đơn hàng" của TỪNG đơn (cả đơn cọc trước lẫn đơn thanh toán toàn bộ) — đây mới là số doanh thu chuẩn để đối chiếu, không phải cột Cọc.</div>';
 
   var saleRows = (d.bySale||[]).filter(function(s){ return !_srState.saleSearch || s.name.toLowerCase().indexOf(_srState.saleSearch.toLowerCase())!==-1; });
-  html += '<div class="dash-section-title">Theo Sale bán <span style="font-weight:400;color:var(--muted);font-size:11px">'+
+  var saleHtml = '<div class="dash-section-title">Theo Sale bán <span style="font-weight:400;color:var(--muted);font-size:11px">'+
     (_srState.byCreator ? '(tính trọn vẹn cho người tạo đơn — không chia đều)' : '(số đơn giữ nguyên — tiền chia đều cho số sale/đơn)')+
     '</span>'+_srViewToggleHtml('aSaleView')+'</div>';
-  html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.saleSearch)+'" oninput="_srState.saleSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
+  saleHtml += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.saleSearch)+'" oninput="_srState.saleSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
   if (_srState.aSaleView === 'table'){
-    html += '<table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Cọc</th><th style="text-align:right"><b>Tổng đơn</b></th><th style="text-align:right">TB đơn</th></tr></thead><tbody>';
+    saleHtml += '<table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Cọc</th><th style="text-align:right"><b>Tổng đơn</b></th><th style="text-align:right">TB đơn</th></tr></thead><tbody>';
     saleRows.forEach(function(s){
-      html += '<tr><td>'+esc(s.name)+'</td><td style="text-align:right">'+fmt(s.orders)+'</td><td style="text-align:right">'+_srMoney(s.coc)+'</td><td style="text-align:right"><b>'+_srMoney(s.giaTri)+'</b></td><td style="text-align:right">'+_srMoney(s.trungBinhDon)+'</td></tr>';
+      saleHtml += '<tr><td>'+esc(s.name)+'</td><td style="text-align:right">'+fmt(s.orders)+'</td><td style="text-align:right">'+_srMoney(s.coc)+'</td><td style="text-align:right"><b>'+_srMoney(s.giaTri)+'</b></td><td style="text-align:right">'+_srMoney(s.trungBinhDon)+'</td></tr>';
     });
-    if (!saleRows.length) html += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+    if (!saleRows.length) saleHtml += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
     else {
       var saleTotOrders = saleRows.reduce(function(s,r){ return s+(r.orders||0); },0);
       var saleTotCoc = saleRows.reduce(function(s,r){ return s+(r.coc||0); },0);
       var saleTotGT = saleRows.reduce(function(s,r){ return s+(r.giaTri||0); },0);
-      html += _srTotalRowHtml_(['Tổng', fmt(saleTotOrders), _srMoney(saleTotCoc), _srMoney(saleTotGT), _srMoney(saleTotOrders?saleTotGT/saleTotOrders:0)]);
+      saleHtml += _srTotalRowHtml_(['Tổng', fmt(saleTotOrders), _srMoney(saleTotCoc), _srMoney(saleTotGT), _srMoney(saleTotOrders?saleTotGT/saleTotOrders:0)]);
     }
-    html += '</tbody></table>';
+    saleHtml += '</tbody></table>';
   } else {
-    html += _srChartSvg(saleRows, 'name', 'giaTri', _srState.aSaleView, true);
+    saleHtml += _srChartSvg(saleRows, 'name', 'giaTri', _srState.aSaleView, true);
   }
+  // Tỷ lệ chốt theo Sale — đặt BÊN CẠNH biểu đồ doanh thu theo Sale (2 cột, tự xuống dòng trên màn hẹp)
+  var saleCloseHtml = '<div class="dash-section-title">Tỷ lệ chốt theo Sale <span style="font-weight:400;color:var(--muted);font-size:11px">(số Chốt / tổng KH được giao)</span></div>'+
+    _srCloseRateBarHtml_(_srCloseRateBySale_(), _srState.saleSearch);
+  html += '<div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">'+
+    '<div style="flex:1 1 380px;min-width:320px">'+saleHtml+'</div>'+
+    '<div style="flex:1 1 320px;min-width:280px">'+saleCloseHtml+'</div>'+
+    '</div>';
 
   if (_srIsAdmin()){
     var kenhRows = (d.byKenh||[]).filter(function(k){ return !_srState.kenhSearch || k.name.toLowerCase().indexOf(_srState.kenhSearch.toLowerCase())!==-1; });
-    html += '<div class="dash-section-title">Theo Kênh bán'+_srViewToggleHtml('aKenhView')+'</div>';
-    html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên kênh..." value="'+esc(_srState.kenhSearch)+'" oninput="_srState.kenhSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
+    var kenhHtml = '<div class="dash-section-title">Theo Kênh bán'+_srViewToggleHtml('aKenhView')+'</div>';
+    kenhHtml += '<input type="text" placeholder="🔍 Tìm nhanh theo tên kênh..." value="'+esc(_srState.kenhSearch)+'" oninput="_srState.kenhSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
     if (_srState.aKenhView === 'table'){
-      html += '<table class="dash-table"><thead><tr><th>Kênh</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Cọc</th><th style="text-align:right"><b>Tổng đơn</b></th><th style="text-align:right">TB đơn</th></tr></thead><tbody>';
+      kenhHtml += '<table class="dash-table"><thead><tr><th>Kênh</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Cọc</th><th style="text-align:right"><b>Tổng đơn</b></th><th style="text-align:right">TB đơn</th></tr></thead><tbody>';
       kenhRows.forEach(function(k){
-        html += '<tr><td>'+esc(k.name)+'</td><td style="text-align:right">'+fmt(k.orders)+'</td><td style="text-align:right">'+_srMoney(k.coc)+'</td><td style="text-align:right"><b>'+_srMoney(k.giaTri)+'</b></td><td style="text-align:right">'+_srMoney(k.trungBinhDon)+'</td></tr>';
+        kenhHtml += '<tr><td>'+esc(k.name)+'</td><td style="text-align:right">'+fmt(k.orders)+'</td><td style="text-align:right">'+_srMoney(k.coc)+'</td><td style="text-align:right"><b>'+_srMoney(k.giaTri)+'</b></td><td style="text-align:right">'+_srMoney(k.trungBinhDon)+'</td></tr>';
       });
-      if (!kenhRows.length) html += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+      if (!kenhRows.length) kenhHtml += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
       else {
         var kenhTotOrders = kenhRows.reduce(function(s,r){ return s+(r.orders||0); },0);
         var kenhTotCoc = kenhRows.reduce(function(s,r){ return s+(r.coc||0); },0);
         var kenhTotGT = kenhRows.reduce(function(s,r){ return s+(r.giaTri||0); },0);
-        html += _srTotalRowHtml_(['Tổng', fmt(kenhTotOrders), _srMoney(kenhTotCoc), _srMoney(kenhTotGT), _srMoney(kenhTotOrders?kenhTotGT/kenhTotOrders:0)]);
+        kenhHtml += _srTotalRowHtml_(['Tổng', fmt(kenhTotOrders), _srMoney(kenhTotCoc), _srMoney(kenhTotGT), _srMoney(kenhTotOrders?kenhTotGT/kenhTotOrders:0)]);
       }
-      html += '</tbody></table>';
+      kenhHtml += '</tbody></table>';
     } else {
-      html += _srChartSvg(kenhRows, 'name', 'giaTri', _srState.aKenhView, true);
+      kenhHtml += _srChartSvg(kenhRows, 'name', 'giaTri', _srState.aKenhView, true);
     }
+    // Tỷ lệ chốt theo Kênh — cũng đặt bên cạnh biểu đồ doanh thu theo Kênh
+    var kenhCloseHtml = '<div class="dash-section-title">Tỷ lệ chốt theo Kênh <span style="font-weight:400;color:var(--muted);font-size:11px">(số Chốt / tổng KH được giao)</span></div>'+
+      _srCloseRateBarHtml_(_srCloseRateByKenh_(), _srState.kenhSearch);
+    html += '<div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">'+
+      '<div style="flex:1 1 380px;min-width:320px">'+kenhHtml+'</div>'+
+      '<div style="flex:1 1 320px;min-width:280px">'+kenhCloseHtml+'</div>'+
+      '</div>';
     html += '<div class="dash-section-title">Theo MKT'+_srViewToggleHtml('aMktView')+'</div>';
     if (_srState.aMktView === 'table'){
       html += '<table class="dash-table"><thead><tr><th>MKT</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Cọc</th><th style="text-align:right"><b>Tổng đơn</b></th><th style="text-align:right">TB đơn</th></tr></thead><tbody>';
