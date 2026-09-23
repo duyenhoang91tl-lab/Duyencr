@@ -2243,9 +2243,21 @@ function exportSalesReportToSheet_(reportType, filters) {
     : (reportType === 'D' ? buildCareLeadReport_(filters || {})
     : buildSalesReportA_(filters || {})));
   var ss = getCrmSS_();
-  var ts = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Etc/GMT-7', 'yyyyMMdd_HHmmss');
-  var tabName = 'BC_' + reportType + '_' + ts;
-  var sh = ss.insertSheet(tabName);
+  // Bao cao Base (A): CHI 1 tab CO DINH, moi lan xuat GHI DE lai noi dung cu — theo yeu cau
+  // Duyen 2026-09 ("chi ra 1 trang tinh thoi, khong bi moi lan xuat lai 1 trang moi"). Cac loai
+  // bao cao khac (B/C/D) VAN giu nguyen co che cu: moi lan xuat tao 1 tab moi co timestamp, de
+  // giu lai lich su cac lan xuat truoc do.
+  var tabName, sh, fixedTab = (reportType === 'A');
+  if (fixedTab) {
+    tabName = 'BC_A_Base';
+    sh = ss.getSheetByName(tabName);
+    if (sh) sh.clear(); // ghi de: xoa sach noi dung/dinh dang cu truoc khi ghi lai
+    else sh = ss.insertSheet(tabName);
+  } else {
+    var ts = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Etc/GMT-7', 'yyyyMMdd_HHmmss');
+    tabName = 'BC_' + reportType + '_' + ts;
+    sh = ss.insertSheet(tabName);
+  }
 
   // Ten bao cao (quy uoc moi): A = Base (DT tong), B = Pos (du lieu don), C = So sanh ky Base,
   // D = Sale tu them (KH Cham soc moi, data rieng khong gop A/B/C).
@@ -2377,7 +2389,7 @@ function exportSalesReportToSheet_(reportType, filters) {
   sh.getRange(1, 1).setFontWeight('bold').setFontSize(13);
   try { sh.autoResizeColumns(1, maxCols); } catch (ecw) {}
 
-  return { tabName: tabName, sheetId: ss.getId(), gid: sh.getSheetId(),
+  return { tabName: tabName, fixedTab: fixedTab, sheetId: ss.getId(), gid: sh.getSheetId(),
            sheetUrl: ss.getUrl() + '#gid=' + sh.getSheetId() };
 }
 
