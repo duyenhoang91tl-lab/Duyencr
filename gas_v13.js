@@ -1504,7 +1504,7 @@ function dateInRange_(dt, fromStr, toStr) {
 function _isExcludedOrderStatus_(trangThai) {
   var s = _stripVN_(trangThai);
   if (!s) return false;
-  return /that bai|huy|hoan tien|hoan tra|tra lai|khieu nai/.test(s);
+  return /that bai|huy|hoan tien|hoan tra|tra lai|khieu nai|khong thanh/.test(s);
 }
 
 
@@ -1548,6 +1548,13 @@ function splitMulti_(str, delimiter) {
 // token KHONG co khoang trang de lam ten sale, bo qua moi token co khoang trang.
 function _donSaleNamesFromThe_(theStr) {
   return splitMulti_(theStr, ',').filter(function(tok) { return tok && !/\s/.test(tok); });
+}
+// Token CO khoang trang trong cot "Thẻ" la trang thai don Pancake (xem chu thich tren) — dung
+// _isExcludedOrderStatus_ (Huy/Tra lai/Hoan tien/That bai/Khieu nai, gom ca "Giao không thành")
+// de loai luon don do khoi doanh so/so don Bao cao B, giong cach A/C da loai theo cot Trang thai.
+function _donHasExcludedStatus_(theStr) {
+  var tokens = splitMulti_(theStr, ',').filter(function(tok) { return tok && /\s/.test(tok); });
+  return tokens.some(function(t) { return _isExcludedOrderStatus_(t); });
 }
 
 // ── Doc toan bo sheet "DT TỔNG " thanh mang object ──
@@ -1968,6 +1975,7 @@ function buildSalesReportB_(filters) {
     var row = rows[i];
     var dt = parseVNDate_(row.ngayTaoDon);
     if (!dateInRange_(dt, filters.dateFrom, filters.dateTo)) continue;
+    if (_donHasExcludedStatus_(row.theSale)) continue; // bo don Huy/Giao khong thanh/Hoan tien... (trang thai nam chung cot The o POS)
     if (nguonFilterArr.length && nguonFilterArr.indexOf(row.nguonDon) === -1) continue;
     if (marketerFilterArr.length && marketerFilterArr.indexOf(row.marketer) === -1) continue;
     if (saleFilterArr.length) {

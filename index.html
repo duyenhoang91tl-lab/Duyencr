@@ -9865,7 +9865,7 @@ function dateInRange_(dt, fromStr, toStr) {
 function _isExcludedOrderStatus_(trangThai) {
   var s = _stripVN_(trangThai);
   if (!s) return false;
-  return /that bai|huy|hoan tien|hoan tra|tra lai|khieu nai/.test(s);
+  return /that bai|huy|hoan tien|hoan tra|tra lai|khieu nai|khong thanh/.test(s);
 }
 
 
@@ -9909,6 +9909,13 @@ function splitMulti_(str, delimiter) {
 // token KHONG co khoang trang de lam ten sale, bo qua moi token co khoang trang.
 function _donSaleNamesFromThe_(theStr) {
   return splitMulti_(theStr, ',').filter(function(tok) { return tok && !/\s/.test(tok); });
+}
+// Token CO khoang trang trong cot "Thẻ" la trang thai don Pancake (xem chu thich tren) — dung
+// _isExcludedOrderStatus_ (Huy/Tra lai/Hoan tien/That bai/Khieu nai, gom ca "Giao không thành")
+// de loai luon don do khoi doanh so/so don Bao cao B, giong cach A/C da loai theo cot Trang thai.
+function _donHasExcludedStatus_(theStr) {
+  var tokens = splitMulti_(theStr, ',').filter(function(tok) { return tok && /\s/.test(tok); });
+  return tokens.some(function(t) { return _isExcludedOrderStatus_(t); });
 }
 
 // ── Doc toan bo sheet "DT TỔNG " thanh mang object ──
@@ -10329,6 +10336,7 @@ function buildSalesReportB_(filters) {
     var row = rows[i];
     var dt = parseVNDate_(row.ngayTaoDon);
     if (!dateInRange_(dt, filters.dateFrom, filters.dateTo)) continue;
+    if (_donHasExcludedStatus_(row.theSale)) continue; // bo don Huy/Giao khong thanh/Hoan tien... (trang thai nam chung cot The o POS)
     if (nguonFilterArr.length && nguonFilterArr.indexOf(row.nguonDon) === -1) continue;
     if (marketerFilterArr.length && marketerFilterArr.indexOf(row.marketer) === -1) continue;
     if (saleFilterArr.length) {
@@ -17613,7 +17621,8 @@ var _srState = {
   dataC: null, cEmpSearch: '', cKenhSearch: '', cExpandedRow: '',
   // D — KH Cham soc moi (data rieng, KHONG gop A/B/C)
   dDateFrom: '', dDateTo: '', dDateQuick: 'custom', dCs: '', dataD: null,
-  // E — Hoa hong nhan vien (dung lai action=salesReportA, filter rieng de khong dam vao tab A)
+  // E — Hoa hong nhan vien (dung lai action=salesReportA/B tuy eSource, filter rieng de khong dam vao tab A/B)
+  eSource: 'base',        // 'base' = doanh so theo DT TONG (nhu cu) | 'pos' = theo "du lieu don" (giong Bao cao B) — cach tinh hoa hong y het, chi khac nguon doanh thu
   eDateFrom: '', eDateTo: '', eDateQuick: 'custom', eDateField: 'ngayTao', eSale: [], eKenh: [], dataE: null, eSaleSearch: '',
   eSaleCustomized: false, leaderTeamOptions: []
 };
@@ -17825,12 +17834,23 @@ async function _srLoad(){
       dateFrom: _srState.dDateFrom, dateTo: _srState.dDateTo, cs: _srState.dCs
     });
   } else if (_srState.sub === 'E') {
-    // Dùng lại ĐÚNG action=salesReportA (đã có sẵn orders[] với saleBan/giaTriDon) — không cần
-    // action riêng ở backend, tự tính hoa hồng ở client qua _computeCommissionData_().
-    _srState.dataE = await _srFetch('salesReportA', {
-      dateFrom: _srState.eDateFrom, dateTo: _srState.eDateTo,
-      dateField: _srState.eDateField, sale: (_srState.eSale||[]).join(','), kenh: (_srState.eKenh||[]).join(',')
-    });
+    // 'base': dùng lại ĐÚNG action=salesReportA (đã có sẵn orders[] với saleBan/giaTriDon).
+    // 'pos': dùng lại action=salesReportB (đã có sẵn orders[] với theSale/giaTriSauGiam) — chuẩn
+    // hoá lại tên field cho khớp shape {saleBan, giaTriDon} mà _computeCommissionData_() cần, để
+    // CÁCH TÍNH HOA HỒNG (splitMulti_ + chia đều/theo ngưỡng) dùng chung y hệt, không viết lại.
+    if (_srState.eSource === 'pos') {
+      var dPos = await _srFetch('salesReportB', {
+        dateFrom: _srState.eDateFrom, dateTo: _srState.eDateTo,
+        sale: (_srState.eSale||[]).join(',')
+      });
+      if (dPos && dPos.orders) dPos.orders = dPos.orders.map(function(o){ return Object.assign({}, o, { saleBan: o.theSale, giaTriDon: o.giaTriSauGiam }); });
+      _srState.dataE = dPos;
+    } else {
+      _srState.dataE = await _srFetch('salesReportA', {
+        dateFrom: _srState.eDateFrom, dateTo: _srState.eDateTo,
+        dateField: _srState.eDateField, sale: (_srState.eSale||[]).join(','), kenh: (_srState.eKenh||[]).join(',')
+      });
+    }
   }
   _srState.loading = false;
   renderSalesReportTab();
@@ -18600,14 +18620,20 @@ function renderSalesReportTabD_(wrap, subTabs){
 // _computeCommissionData_() (đã định nghĩa cùng _resolveCommissionRate_/INDIVIDUAL_RATES ở trên).
 function renderSalesReportTabE_(wrap, subTabs){
   var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
+  filters += '<select onchange="_srState.eSource=this.value;_srApply()" title="Cách tính hoa hồng giống hệt nhau — chỉ khác nguồn doanh thu dùng để tính" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-weight:700">'+
+    '<option value="base"'+(_srState.eSource!=='pos'?' selected':'')+'>Theo Base</option>'+
+    '<option value="pos"'+(_srState.eSource==='pos'?' selected':'')+'>Theo Pos</option>'+
+    '</select>';
   filters += _quickRangeSelectHtml(_srState.eDateQuick, "_srApplyQuickRange('eDateQuick','eDateFrom','eDateTo',this.value)");
   filters += '<input type="date" value="'+esc(_srState.eDateFrom)+'" onchange="_srSetField(\'eDateFrom\',this.value);_srState.eDateQuick=\'custom\'" title="Từ ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
   filters += '<span style="color:var(--muted)">→</span>';
   filters += '<input type="date" value="'+esc(_srState.eDateTo)+'" onchange="_srSetField(\'eDateTo\',this.value);_srState.eDateQuick=\'custom\'" title="Đến ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
-  filters += '<select onchange="_srSetField(\'eDateField\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-    '<option value="ngayTao"'+(_srState.eDateField==='ngayTao'?' selected':'')+'>Lọc theo Ngày tạo</option>'+
-    '<option value="thoiGianHT"'+(_srState.eDateField==='thoiGianHT'?' selected':'')+'>Lọc theo Thời gian hoàn thành</option>'+
-    '</select>';
+  if (_srState.eSource !== 'pos') {
+    filters += '<select onchange="_srSetField(\'eDateField\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+      '<option value="ngayTao"'+(_srState.eDateField==='ngayTao'?' selected':'')+'>Lọc theo Ngày tạo</option>'+
+      '<option value="thoiGianHT"'+(_srState.eDateField==='thoiGianHT'?' selected':'')+'>Lọc theo Thời gian hoàn thành</option>'+
+      '</select>';
+  }
   if (_srIsAdmin()){
     filters += _srComboHtml('sr-sale-combo-e', 'eSale', 'saleOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 190);
     filters += '<select onchange="if(this.value){srPickTeam(this.value,\'eSale\',\'sr-sale-combo-e\');this.value=\'\'}" title="Điền nhanh cả team vào ô Sale" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
@@ -18619,7 +18645,7 @@ function renderSalesReportTabE_(wrap, subTabs){
     filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Sale</div>'+
       '<div style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)">🔒 '+esc((_srState.eSale||[]).join(', ') || currentUser.name)+' — chỉ xem được hoa hồng của mình</div></div>';
   }
-  filters += _srComboHtml('sr-kenh-combo-e', 'eKenh', 'kenhOptions', 'Lọc theo Kênh', '🔍 Tìm & chọn kênh...', 170);
+  if (_srState.eSource !== 'pos') filters += _srComboHtml('sr-kenh-combo-e', 'eKenh', 'kenhOptions', 'Lọc theo Kênh', '🔍 Tìm & chọn kênh...', 170);
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
   if (_srIsAdmin()) filters += '<button class="btn sm" onclick="openIndividualRatesModal()">⚙ % hoa hồng cá nhân</button>';
   filters += '</div>';
