@@ -1742,6 +1742,22 @@ function getSalesReportOptions_() {
   return srptOpt;
 }
 
+// "Đơn đổi" (doi hang) — giaTriDon van tinh doanh thu nhu binh thuong ("khong ship" — dung
+// y voi nhan san co tren UI Bao cao A). Rieng cot "Gia tri chenh lech" (giaTriChenh, cot S)
+// truoc gio CHUA duoc cong vao doanh thu o dau ca — sua: CONG THEM (khong thay the giaTriDon)
+// phan chenh lech nay cho cac dong duoc phan loai la "doi hang", dung yeu cau "doanh thu =
+// tong gia tri don khong ship + gia tri chenh lech cua don doi". Nhan dien don doi theo cot
+// "Phan loai" chua tu "doi" (khong dau, khong phan biet hoa/thuong) — vd "Đơn đổi", "Đổi
+// hàng"... deu khop; neu sheet dung 1 cum tu khac (khong chua "doi") thi dong do se khong
+// duoc cong THEM phan chenh lech (van an toan, khong bi tru nham doanh thu that).
+function _dtIsExchangeOrder_(phanLoai) {
+  return _psheetNoAccent_(phanLoai).indexOf('doi') !== -1;
+}
+function _dtOrderRevenue_(m) {
+  var extra = _dtIsExchangeOrder_(m.phanLoai) ? (m.giaTriChenh || 0) : 0;
+  return m.giaTriDon + extra;
+}
+
 function buildSalesReportA_(filters) {
   filters = filters || {};
   var dateField = filters.dateField === 'thoiGianHT' ? 'thoiGianHT' : 'ngayTao';
@@ -1770,22 +1786,32 @@ function buildSalesReportA_(filters) {
   }
 
   // Tong chung: tinh du gia tri 1 lan, KHONG chia theo sale
-  var totalCoc = 0, totalGiaTri = 0;
+  var totalCoc = 0, totalGiaTri = 0, totalGiaTriChenh = 0;
   var bySale = {}; // ten sale -> { orders, coc, giaTri }
   var byKenh = {}; // ten kenh -> { orders, coc, giaTri }
   var UNASSIGNED = '(chưa gán sale)';
 
+  // Team Sale: sale -> ten team (readTeams_ dung chung voi tab "Quan ly Team")
+  var saleTeamMap = {}; // ten sale (username) -> ten team
+  readTeams_(getCrmSS_().getSheetByName(SH_TEAM)).forEach(function(t) {
+    (t.members || []).forEach(function(u) { saleTeamMap[u] = t.name; });
+  });
+  var UNASSIGNED_TEAM = '(chưa có Team)';
+  var byTeamSale = {};
+
   for (var j = 0; j < matched.length; j++) {
     var m = matched[j];
+    var revenue = _dtOrderRevenue_(m);
+    if (_dtIsExchangeOrder_(m.phanLoai)) totalGiaTriChenh += (m.giaTriChenh || 0);
     totalCoc += m.giaTriCoc;
-    totalGiaTri += m.giaTriDon;
+    totalGiaTri += revenue;
 
     // breakdown theo kenh: kenh la single-value, khong chia
     var kName = m.kenhBan || '(chưa có kênh)';
     if (!byKenh[kName]) byKenh[kName] = { orders: 0, coc: 0, giaTri: 0 };
     byKenh[kName].orders += 1;
     byKenh[kName].coc += m.giaTriCoc;
-    byKenh[kName].giaTri += m.giaTriDon;
+    byKenh[kName].giaTri += revenue;
 
     // breakdown theo sale:
     // - Mac dinh: so don GIU NGUYEN (khong chia), phan tien CHIA DEU cho N sale tren don.
@@ -1796,18 +1822,34 @@ function buildSalesReportA_(filters) {
       if (!bySale[creatorName]) bySale[creatorName] = { orders: 0, coc: 0, giaTri: 0 };
       bySale[creatorName].orders += 1;
       bySale[creatorName].coc += m.giaTriCoc;
-      bySale[creatorName].giaTri += m.giaTriDon;
+      bySale[creatorName].giaTri += revenue;
+
+      var creatorTeam = saleTeamMap[creatorName] || UNASSIGNED_TEAM;
+      if (!byTeamSale[creatorTeam]) byTeamSale[creatorTeam] = { orders: 0, coc: 0, giaTri: 0 };
+      byTeamSale[creatorTeam].orders += 1;
+      byTeamSale[creatorTeam].coc += m.giaTriCoc;
+      byTeamSale[creatorTeam].giaTri += revenue;
     } else {
       var salesList = splitMulti_(m.saleBan, ',');
       if (salesList.length === 0) salesList = [UNASSIGNED];
       var n = salesList.length;
+      // So don theo Team: dem 1 lan cho moi TEAM KHAC NHAU xuat hien tren don (tranh 1 don co
+      // 2 sale CUNG team bi dem 2 lan); tien van chia deu theo tung sale nhu bySale.
+      var teamsOnOrder = {};
       for (var k = 0; k < salesList.length; k++) {
         var sName = salesList[k];
         if (!bySale[sName]) bySale[sName] = { orders: 0, coc: 0, giaTri: 0 };
         bySale[sName].orders += 1;                 // so don: khong chia
         bySale[sName].coc += m.giaTriCoc / n;       // tien: chia deu cho N sale
-        bySale[sName].giaTri += m.giaTriDon / n;
+        bySale[sName].giaTri += revenue / n;
+
+        var tName = saleTeamMap[sName] || UNASSIGNED_TEAM;
+        if (!byTeamSale[tName]) byTeamSale[tName] = { orders: 0, coc: 0, giaTri: 0 };
+        byTeamSale[tName].coc += m.giaTriCoc / n;
+        byTeamSale[tName].giaTri += revenue / n;
+        teamsOnOrder[tName] = true;
       }
+      Object.keys(teamsOnOrder).forEach(function(tName2) { byTeamSale[tName2].orders += 1; });
     }
   }
 
@@ -1844,15 +1886,17 @@ function buildSalesReportA_(filters) {
     totalOrders: matched.length,
     totalCoc: totalCoc,
     totalGiaTri: totalGiaTri,
+    totalGiaTriChenh: totalGiaTriChenh,
     bySale: toArr(bySale),
     byKenh: toArr(byKenh),
+    byTeamSale: toArr(byTeamSale),
     byMkt: byMktArr,
     trungBinhDon: matched.length ? Math.round(totalGiaTri / matched.length) : 0,
     orders: matched.map(function(m){
       return {
         ngayTao: m.ngayTao, thoiGianHT: m.thoiGianHT, kenhBan: m.kenhBan,
         saleBan: m.saleBan, sanPham: m.sanPham, phanLoai: m.phanLoai,
-        giaTriCoc: m.giaTriCoc, giaTriDon: m.giaTriDon,
+        giaTriCoc: m.giaTriCoc, giaTriDon: m.giaTriDon, giaTriChenh: m.giaTriChenh,
         giaiDoan: m.giaiDoan, trangThai: m.trangThai, id: m.id
       };
     })
