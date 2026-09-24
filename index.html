@@ -10243,6 +10243,43 @@ function buildSalesReportA_(filters) {
              trungBinhDon: o.orders ? Math.round(o.giaTri / o.orders) : 0 };
   }).sort(function(a, b){ return b.giaTri - a.giaTri; });
 
+  // ── Tỷ lệ chốt theo Sale (widget "Tỷ lệ chốt theo Sale" ở tab Báo cáo doanh số) — theo yêu
+  // cầu Duyen (24/09/2026): đổi mẫu số từ "tổng KH được giao" (careStatus, allCustomers phía
+  // client) sang ĐÚNG công thức đã dùng ở bảng "Theo Page"/"KPI Pancake": số đơn / tổng tương
+  // tác Pancake (buildPancakeReport_.byCS, đã có sẵn theo TỪNG SALE RIÊNG — không gộp nhiều
+  // sale chung 1 dòng như careCS cũ). Chỉ tính từ NGÀY CÓ DỮ LIỆU TƯƠNG TÁC PANCAKE trở đi
+  // (bỏ qua các ngày đầu kỳ chưa nạp báo cáo Pancake), tránh số đơn bị tính đủ cả kỳ trong khi
+  // mẫu số tương tác bị thiếu những ngày đó làm tỷ lệ sai lệch (ảo cao hoặc ảo thấp).
+  var saleCloseRate = [];
+  var tuongTacSpan = _pkSheetDateSpan_(SH_PK_STATS, PK_STATS_HEADERS, filters.dateFrom, filters.dateTo);
+  var closeFrom = tuongTacSpan.minDate || ''; // rong neu CHUA TUNG nap du lieu tuong tac Pancake ngay nao
+  if (closeFrom && filters.dateFrom && _dateStrToVnYmd_(filters.dateFrom) > closeFrom) closeFrom = _dateStrToVnYmd_(filters.dateFrom);
+  if (closeFrom) {
+    var closeOrdersBySale = {};
+    for (var ci = 0; ci < matched.length; ci++) {
+      var mc = matched[ci];
+      if (!dateInRange_(parseVNDate_(mc[dateField]), closeFrom, filters.dateTo)) continue;
+      var salesOnOrderC = splitMulti_(mc.saleBan, ',');
+      if (!salesOnOrderC.length) salesOnOrderC = [UNASSIGNED];
+      salesOnOrderC.forEach(function(sn) { closeOrdersBySale[sn] = (closeOrdersBySale[sn] || 0) + 1; });
+    }
+    var pInt2 = buildPancakeReport_(closeFrom, filters.dateTo, 'equal');
+    var closeCanon = {};
+    var closeKey = function(n) { var ck = _normTxt_(n); if (!closeCanon[ck]) closeCanon[ck] = n; return ck; };
+    var closeAgg = {};
+    pInt2.byCS.forEach(function(r) { var k = closeKey(r.name); closeAgg[k] = { name: closeCanon[k], tongTT: r.tongTT || 0, orders: 0 }; });
+    Object.keys(closeOrdersBySale).forEach(function(sn) {
+      var k = closeKey(sn);
+      if (!closeAgg[k]) closeAgg[k] = { name: closeCanon[k], tongTT: 0, orders: 0 };
+      closeAgg[k].orders += closeOrdersBySale[sn];
+    });
+    saleCloseRate = Object.keys(closeAgg).map(function(k) {
+      var r = closeAgg[k];
+      return { name: r.name, held: Math.round(r.tongTT * 100) / 100, closed: r.orders,
+               closeRate: r.tongTT ? Math.round(r.orders / r.tongTT * 1000) / 10 : 0 };
+    });
+  }
+
   return {
     totalOrders: matched.length,
     totalCoc: totalCoc,
@@ -10252,6 +10289,8 @@ function buildSalesReportA_(filters) {
     byKenh: toArr(byKenh),
     byTeamSale: toArr(byTeamSale),
     byMkt: byMktArr,
+    saleCloseRate: saleCloseRate,
+    saleCloseRateFrom: closeFrom || null,
     trungBinhDon: matched.length ? Math.round(totalGiaTri / matched.length) : 0,
     orders: matched.map(function(m){
       return {
@@ -18219,7 +18258,8 @@ function _srCloseRateByKenh_(){ return _srCloseRateGroups_(_srCustKenh_); }
 
 // Vẽ cột ngang tỷ lệ chốt — xanh/vàng/đỏ theo mức %, kèm số liệu chốt/tổng bên cạnh mỗi cột,
 // và dòng trung bình chung ở trên để dễ đối chiếu nhanh khi chụp màn hình gửi sếp.
-function _srCloseRateBarHtml_(rows, searchTerm){
+function _srCloseRateBarHtml_(rows, searchTerm, unitLabel){
+  unitLabel = unitLabel || 'KH';
   var filtered = (rows||[]).filter(function(r){ return r.held>0 && (!searchTerm || r.name.toLowerCase().indexOf(searchTerm.toLowerCase())!==-1); });
   if (!filtered.length) return '<div style="color:var(--muted);text-align:center;padding:20px;font-size:12px">Không có dữ liệu để tính tỷ lệ chốt</div>';
   filtered.sort(function(a,b){ return b.closeRate-a.closeRate; });
@@ -18228,7 +18268,7 @@ function _srCloseRateBarHtml_(rows, searchTerm){
   var avgRate = totHeld ? Math.round(totClosed/totHeld*100) : 0;
   function colorFor(p){ return p>=50 ? '#16a34a' : (p>=30 ? '#d97706' : '#dc2626'); }
   var bars = filtered.map(function(r){
-    var w = Math.max(2, r.closeRate);
+    var w = Math.max(2, Math.min(100, r.closeRate));
     return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">'+
       '<div style="width:112px;font-size:11.5px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(r.name)+'">'+esc(r.name)+'</div>'+
       '<div style="flex:1;background:var(--surface2);border-radius:4px;overflow:hidden;height:15px">'+
@@ -18236,7 +18276,7 @@ function _srCloseRateBarHtml_(rows, searchTerm){
       '<div style="width:104px;font-size:11px;color:var(--muted);white-space:nowrap"><b style="color:var(--text)">'+r.closeRate+'%</b> ('+r.closed+'/'+r.held+')</div></div>';
   }).join('');
   return '<div style="padding:4px 0 10px">'+
-    '<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Trung bình: <b style="color:var(--text)">'+avgRate+'%</b> ('+totClosed+'/'+totHeld+' KH) &nbsp;·&nbsp; <span style="color:#16a34a">■</span> ≥50% &nbsp;<span style="color:#d97706">■</span> 30–49% &nbsp;<span style="color:#dc2626">■</span> &lt;30%</div>'+
+    '<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Trung bình: <b style="color:var(--text)">'+avgRate+'%</b> ('+totClosed+'/'+totHeld+' '+esc(unitLabel)+') &nbsp;·&nbsp; <span style="color:#16a34a">■</span> ≥50% &nbsp;<span style="color:#d97706">■</span> 30–49% &nbsp;<span style="color:#dc2626">■</span> &lt;30%</div>'+
     bars+'</div>';
 }
 
@@ -18283,8 +18323,13 @@ function _srRenderA(d){
     saleHtml += _srChartSvg(saleRows, 'name', 'giaTri', _srState.aSaleView, true);
   }
   // Tỷ lệ chốt theo Sale — đặt BÊN CẠNH biểu đồ doanh thu theo Sale (2 cột, tự xuống dòng trên màn hẹp)
-  var saleCloseHtml = '<div class="dash-section-title">Tỷ lệ chốt theo Sale <span style="font-weight:400;color:var(--muted);font-size:11px">(số Chốt / tổng KH được giao)</span></div>'+
-    _srCloseRateBarHtml_(_srCloseRateBySale_(), _srState.saleSearch);
+  // Công thức: Số đơn trong kỳ / Tổng tương tác Pancake trong kỳ (byCS), tính THEO TỪNG SALE
+  // riêng lẻ (không gộp nhiều sale vào 1 dòng), và chỉ tính từ ngày có dữ liệu tương tác Pancake
+  // trở đi (xem saleCloseRateFrom, bo qua nếu chưa từng nạp báo cáo Pancake ngày nào).
+  var saleCloseNote = d.saleCloseRateFrom ? ' — tính từ '+esc(d.saleCloseRateFrom) : '';
+  var saleCloseHtml = '<div class="dash-section-title">Tỷ lệ chốt theo Sale <span style="font-weight:400;color:var(--muted);font-size:11px">(Số đơn / Tổng tương tác Pancake'+saleCloseNote+')</span></div>'+
+    (d.saleCloseRateFrom ? _srCloseRateBarHtml_(d.saleCloseRate, _srState.saleSearch, 'tương tác') :
+      '<div style="color:var(--muted);text-align:center;padding:20px;font-size:12px">Chưa nạp báo cáo tương tác Pancake ngày nào — vào tab "📥 Báo cáo Pancake" để nạp trước khi xem tỷ lệ chốt theo Sale.</div>');
   html += '<div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">'+
     '<div style="flex:1 1 380px;min-width:320px">'+saleHtml+'</div>'+
     '<div style="flex:1 1 320px;min-width:280px">'+saleCloseHtml+'</div>'+

@@ -1882,6 +1882,43 @@ function buildSalesReportA_(filters) {
              trungBinhDon: o.orders ? Math.round(o.giaTri / o.orders) : 0 };
   }).sort(function(a, b){ return b.giaTri - a.giaTri; });
 
+  // ── Tỷ lệ chốt theo Sale (widget "Tỷ lệ chốt theo Sale" ở tab Báo cáo doanh số) — theo yêu
+  // cầu Duyen (24/09/2026): đổi mẫu số từ "tổng KH được giao" (careStatus, allCustomers phía
+  // client) sang ĐÚNG công thức đã dùng ở bảng "Theo Page"/"KPI Pancake": số đơn / tổng tương
+  // tác Pancake (buildPancakeReport_.byCS, đã có sẵn theo TỪNG SALE RIÊNG — không gộp nhiều
+  // sale chung 1 dòng như careCS cũ). Chỉ tính từ NGÀY CÓ DỮ LIỆU TƯƠNG TÁC PANCAKE trở đi
+  // (bỏ qua các ngày đầu kỳ chưa nạp báo cáo Pancake), tránh số đơn bị tính đủ cả kỳ trong khi
+  // mẫu số tương tác bị thiếu những ngày đó làm tỷ lệ sai lệch (ảo cao hoặc ảo thấp).
+  var saleCloseRate = [];
+  var tuongTacSpan = _pkSheetDateSpan_(SH_PK_STATS, PK_STATS_HEADERS, filters.dateFrom, filters.dateTo);
+  var closeFrom = tuongTacSpan.minDate || ''; // rong neu CHUA TUNG nap du lieu tuong tac Pancake ngay nao
+  if (closeFrom && filters.dateFrom && _dateStrToVnYmd_(filters.dateFrom) > closeFrom) closeFrom = _dateStrToVnYmd_(filters.dateFrom);
+  if (closeFrom) {
+    var closeOrdersBySale = {};
+    for (var ci = 0; ci < matched.length; ci++) {
+      var mc = matched[ci];
+      if (!dateInRange_(parseVNDate_(mc[dateField]), closeFrom, filters.dateTo)) continue;
+      var salesOnOrderC = splitMulti_(mc.saleBan, ',');
+      if (!salesOnOrderC.length) salesOnOrderC = [UNASSIGNED];
+      salesOnOrderC.forEach(function(sn) { closeOrdersBySale[sn] = (closeOrdersBySale[sn] || 0) + 1; });
+    }
+    var pInt2 = buildPancakeReport_(closeFrom, filters.dateTo, 'equal');
+    var closeCanon = {};
+    var closeKey = function(n) { var ck = _normTxt_(n); if (!closeCanon[ck]) closeCanon[ck] = n; return ck; };
+    var closeAgg = {};
+    pInt2.byCS.forEach(function(r) { var k = closeKey(r.name); closeAgg[k] = { name: closeCanon[k], tongTT: r.tongTT || 0, orders: 0 }; });
+    Object.keys(closeOrdersBySale).forEach(function(sn) {
+      var k = closeKey(sn);
+      if (!closeAgg[k]) closeAgg[k] = { name: closeCanon[k], tongTT: 0, orders: 0 };
+      closeAgg[k].orders += closeOrdersBySale[sn];
+    });
+    saleCloseRate = Object.keys(closeAgg).map(function(k) {
+      var r = closeAgg[k];
+      return { name: r.name, held: Math.round(r.tongTT * 100) / 100, closed: r.orders,
+               closeRate: r.tongTT ? Math.round(r.orders / r.tongTT * 1000) / 10 : 0 };
+    });
+  }
+
   return {
     totalOrders: matched.length,
     totalCoc: totalCoc,
@@ -1891,6 +1928,8 @@ function buildSalesReportA_(filters) {
     byKenh: toArr(byKenh),
     byTeamSale: toArr(byTeamSale),
     byMkt: byMktArr,
+    saleCloseRate: saleCloseRate,
+    saleCloseRateFrom: closeFrom || null,
     trungBinhDon: matched.length ? Math.round(totalGiaTri / matched.length) : 0,
     orders: matched.map(function(m){
       return {
