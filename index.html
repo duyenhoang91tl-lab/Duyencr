@@ -1669,6 +1669,39 @@ async function _syncKhStatusTreeFromGAS() {
 // ngay tại đây sẽ chạm biến trước khi khởi tạo (temporal dead zone) và ném ReferenceError.
 setTimeout(_syncKhStatusTreeFromGAS, 0);
 
+// Mốc màu xanh/vàng/đỏ cho widget "Tỷ lệ chốt theo Sale" — admin tự chỉnh được (yêu cầu
+// 2026-09-24): mặc định đỏ <2%, vàng 2–10%, xanh >10% (khác mặc định cũ cứng 30/50 chỉ hợp
+// khi mẫu số là số ĐƠN, không hợp khi mẫu số đổi thành TỔNG TƯƠNG TÁC Pancake — tỷ lệ tự
+// nhiên thấp hơn nhiều). Luu chung 1 setting ('closeRateThresholds') cho ca CRM, dung GIONG
+// pattern khStatusTree/fieldLabelCS o tren (cache local + dong bo GAS).
+let CLOSE_RATE_THRESHOLDS = loadLS('ome_close_rate_thresholds') || { red: 2, green: 10 };
+async function _syncCloseRateThresholdsFromGAS() {
+  if (!gsUrl) return;
+  try {
+    var r = await fetch(gsUrl + '?action=getSetting&key=closeRateThresholds', {redirect:'follow'});
+    var data = await r.json();
+    if (data && data.value) {
+      var t = JSON.parse(data.value);
+      if (t && typeof t.red === 'number' && typeof t.green === 'number') {
+        CLOSE_RATE_THRESHOLDS = t;
+        saveLS('ome_close_rate_thresholds', CLOSE_RATE_THRESHOLDS);
+        if (typeof renderSalesReportTab === 'function' && _activeV9Tab === 'salesreport') renderSalesReportTab();
+        if (typeof renderKpiPancakeTab === 'function' && _activeV9Tab === 'kpipancake') renderKpiPancakeTab();
+      }
+    }
+  } catch(e) { /* giữ nguyên bản local nếu lỗi mạng/parse */ }
+}
+setTimeout(_syncCloseRateThresholdsFromGAS, 0);
+async function _saveCloseRateThresholds(red, green){
+  CLOSE_RATE_THRESHOLDS = { red: red, green: green };
+  saveLS('ome_close_rate_thresholds', CLOSE_RATE_THRESHOLDS);
+  if (!gsUrl) return;
+  try {
+    await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'setSetting', key:'closeRateThresholds', value: JSON.stringify(CLOSE_RATE_THRESHOLDS) }) });
+    logAudit('setting','', '', 'Đổi mốc màu Tỷ lệ chốt: đỏ <'+red+'%, vàng '+red+'–'+green+'%, xanh >'+green+'%');
+  } catch(e){ toast('❌ Lưu mốc màu lỗi: ' + e.message); }
+}
+
 // Tên hiển thị của 2 trường lớn CỐ ĐỊNH — cho phép admin đổi tên (khác với XÓA/tạo trường,
 // 2 trường này luôn tồn tại vì có cột riêng trong CareData, chỉ đổi được CÁCH GỌI/hiển thị).
 let FIELD_LABEL_CS = loadLS('ome_field_label_cs') || 'Tình trạng CS';
@@ -18301,7 +18334,8 @@ function _srCloseRateBarHtml_(rows, searchTerm, unitLabel){
   var totHeld = filtered.reduce(function(s,r){return s+r.held;},0);
   var totClosed = filtered.reduce(function(s,r){return s+r.closed;},0);
   var avgRate = totHeld ? Math.round(totClosed/totHeld*100) : 0;
-  function colorFor(p){ return p>=50 ? '#16a34a' : (p>=30 ? '#d97706' : '#dc2626'); }
+  var th = CLOSE_RATE_THRESHOLDS || { red:2, green:10 };
+  function colorFor(p){ return p>th.green ? '#16a34a' : (p>=th.red ? '#d97706' : '#dc2626'); }
   var bars = filtered.map(function(r){
     var w = Math.max(2, Math.min(100, r.closeRate));
     return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">'+
@@ -18310,9 +18344,33 @@ function _srCloseRateBarHtml_(rows, searchTerm, unitLabel){
       '<div style="width:'+w+'%;height:100%;background:'+colorFor(r.closeRate)+';border-radius:4px"></div></div>'+
       '<div style="width:104px;font-size:11px;color:var(--muted);white-space:nowrap"><b style="color:var(--text)">'+r.closeRate+'%</b> ('+r.closed+'/'+r.held+')</div></div>';
   }).join('');
+  var isAdmin = currentUser.role === 'admin';
+  var legend = '<span style="color:#16a34a">■</span> &gt;'+th.green+'% &nbsp;<span style="color:#d97706">■</span> '+th.red+'–'+th.green+'% &nbsp;<span style="color:#dc2626">■</span> &lt;'+th.red+'%';
+  var editBtn = isAdmin ? ' &nbsp;<a href="javascript:void(0)" onclick="_srToggleCloseRateEdit(this)" style="font-size:10.5px;color:var(--muted);text-decoration:underline">✎ sửa mốc</a>' : '';
   return '<div style="padding:4px 0 10px">'+
-    '<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Trung bình: <b style="color:var(--text)">'+avgRate+'%</b> ('+totClosed+'/'+totHeld+' '+esc(unitLabel)+') &nbsp;·&nbsp; <span style="color:#16a34a">■</span> ≥50% &nbsp;<span style="color:#d97706">■</span> 30–49% &nbsp;<span style="color:#dc2626">■</span> &lt;30%</div>'+
+    '<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Trung bình: <b style="color:var(--text)">'+avgRate+'%</b> ('+totClosed+'/'+totHeld+' '+esc(unitLabel)+') &nbsp;·&nbsp; '+legend+editBtn+'</div>'+
+    (isAdmin ? '<div class="close-rate-edit-form" style="display:none;margin:-4px 0 10px;padding:8px;background:var(--surface2);border-radius:6px;font-size:11.5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+      '<span>Đỏ dưới</span><input type="number" min="0" max="100" value="'+th.red+'" style="width:52px;padding:3px 5px;border:1px solid var(--border);border-radius:4px;background:var(--surface)" id="cr-edit-red">%'+
+      '<span>&nbsp;·&nbsp;Vàng đến</span><input type="number" min="0" max="100" value="'+th.green+'" style="width:52px;padding:3px 5px;border:1px solid var(--border);border-radius:4px;background:var(--surface)" id="cr-edit-green">%'+
+      '<span>&nbsp;·&nbsp;Xanh trên đó</span>'+
+      '<button class="btn sm primary" onclick="_srSaveCloseRateEdit(this)">Lưu</button>'+
+    '</div>' : '')+
     bars+'</div>';
+}
+function _srToggleCloseRateEdit(a){
+  var form = a.closest('div').nextElementSibling;
+  if (form && form.classList.contains('close-rate-edit-form')) form.style.display = form.style.display==='none' ? 'flex' : 'none';
+}
+function _srSaveCloseRateEdit(btn){
+  var form = btn.closest('.close-rate-edit-form');
+  var red = parseFloat(form.querySelector('#cr-edit-red').value);
+  var green = parseFloat(form.querySelector('#cr-edit-green').value);
+  if (isNaN(red) || isNaN(green) || red < 0 || green < 0 || red > 100 || green > 100){ toast('⚠️ Mốc % không hợp lệ.'); return; }
+  if (red > green){ toast('⚠️ Mốc đỏ phải nhỏ hơn hoặc bằng mốc vàng.'); return; }
+  _saveCloseRateThresholds(red, green);
+  toast('✓ Đã lưu mốc màu: đỏ <'+red+'%, vàng '+red+'–'+green+'%, xanh >'+green+'%');
+  if (_activeV9Tab === 'salesreport') renderSalesReportTab();
+  if (_activeV9Tab === 'kpipancake') renderKpiPancakeTab();
 }
 
 function _srCocTh(){ return _srState.showCoc ? '<th style="text-align:right">Cọc</th>' : ''; }
