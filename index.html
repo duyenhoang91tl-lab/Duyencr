@@ -16533,6 +16533,36 @@ function _pkEnforceScope(){
   }
 }
 
+// ── Xuất nhật ký báo cáo hàng ngày (Sale/Kênh/MKT/Tag) -> Google Sheet riêng, mỗi loại 1 sheet ──
+var _expLogState = { from: '', to: '', loading: false, result: null };
+
+async function _expLogRun(){
+  if (!gsUrl){ toast('❌ Chưa cấu hình URL Google Apps Script.'); return; }
+  if (!_expLogState.from || !_expLogState.to){ toast('⚠️ Chọn đủ khoảng ngày trước đã.'); return; }
+  if (_expLogState.from > _expLogState.to){ toast('⚠️ Ngày bắt đầu đang sau ngày kết thúc.'); return; }
+  _expLogState.loading = true; _pkRenderKpiPancake();
+  try {
+    var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'exportDailyReportLogs', from: _expLogState.from, to: _expLogState.to }) });
+    var d = await r.json();
+    if (!d.ok){ toast('❌ Xuất lỗi: ' + (d.error||'')); _expLogState.result = null; }
+    else { toast('✓ Đã xuất nhật ký ' + d.days + ' ngày'); _expLogState.result = d; }
+  } catch(e){ toast('❌ Lỗi: ' + e.message); }
+  finally { _expLogState.loading = false; _pkRenderKpiPancake(); }
+}
+
+function _expLogRenderResult(){
+  var d = _expLogState.result; if (!d) return '';
+  var lbl = { sale:'Sale bán', kenh:'Kênh bán', mkt:'MKT', tag:'Tag' };
+  return '<div style="margin-top:10px;font-size:11.5px;color:var(--text)">'+
+    '<div>✓ Đã xuất <b>'+d.days+'</b> ngày ('+esc(d.from)+' → '+esc(d.to)+') — <a href="'+esc(d.sheetUrl)+'" target="_blank" style="color:var(--primary,#2563eb)">mở Google Sheet</a></div>'+
+    '<div style="margin-top:4px;color:var(--muted)">'+
+      Object.keys(lbl).map(function(k){
+        var s = d.result && d.result[k];
+        return (s ? (lbl[k]+': '+s.total+' dòng (thêm '+s.added+', xóa '+s.removed+')') : '');
+      }).filter(Boolean).join(' · ')+
+    '</div></div>';
+}
+
 async function renderKpiPancakeTab(){
   var wrap = document.getElementById('kpipancake-wrap');
   if (!wrap) return;
@@ -16768,6 +16798,20 @@ function _pkRenderKpiPancake(){
     ((_pkState.kpiReport && _pkState.kpiReport.from) ? '<span style="font-size:11px;color:var(--muted)">Đang xem: '+esc(_pkState.kpiReport.from)+' → '+esc(_pkState.kpiReport.to)+'</span>' : '')+
     (_pkState.kpiReport ? '<button class="btn sm secondary" onclick="_pkExportKpiReport()">⬇ Xuất Excel</button>' : '')+
     ((_pkState.kpiReport && _pkState.kpiReport.ordersDetail && _pkState.kpiReport.ordersDetail.length) ? '<button class="btn sm secondary" onclick="_pkExportKpiOrdersDetail()" title="Liệt kê từng đơn DT TỔNG đã tính vào báo cáo này (ID, kênh, ngày tạo, sale, giá trị) — dùng để tick từng dòng đối chiếu với Report Page / file xuất của Base">⬇ Xuất chi tiết đơn (đối chiếu Base)</button>' : '')+
+  '</div>';
+
+  // ── Xuất nhật ký báo cáo hàng ngày (Sale/Kênh/MKT/Tag) ra Google Sheet riêng ──
+  html += '<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:16px;background:var(--surface2)">'+
+    '<div style="font-weight:700;font-size:13px;margin-bottom:2px">📅 Xuất nhật ký báo cáo hàng ngày</div>'+
+    '<div style="font-size:11.5px;color:var(--muted);margin-bottom:8px">Xuất báo cáo Sale bán + Kênh bán (theo Base/DT TỔNG) và MKT + Tag (tổng hợp từ Pancake) ra 4 sheet cố định trong 1 Google Sheet riêng — mỗi loại 1 sheet, mỗi ngày 1 dòng. Xuất lại trùng ngày sẽ tự thay thế dòng cũ của đúng ngày đó (tối đa 31 ngày/lần).</div>'+
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+      '<span style="font-size:11px;color:var(--muted)">Từ:</span>'+
+      '<input type="date" value="'+esc(_expLogState.from)+'" onchange="_expLogState.from=this.value" style="'+st+'">'+
+      '<span style="font-size:11px;color:var(--muted)">Đến:</span>'+
+      '<input type="date" value="'+esc(_expLogState.to)+'" onchange="_expLogState.to=this.value" style="'+st+'">'+
+      '<button class="btn primary sm" onclick="_expLogRun()">'+(_expLogState.loading?'Đang xuất...':'📤 Xuất nhật ký')+'</button>'+
+    '</div>'+
+    (_expLogState.result ? _expLogRenderResult() : '')+
   '</div>';
 
   var rep = _pkState.kpiReport;
