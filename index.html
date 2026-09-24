@@ -14864,18 +14864,33 @@ function _computeCSStats(list, dFrom, dTo){
   function ensure(n){ if(!map[n]) map[n]={name:n,held:0,closed:0,friend:0,cared:0,revenue:0,orders:0}; return map[n]; }
   var arr = list || (typeof allCustomers !== 'undefined' ? allCustomers : []);
   arr.forEach(function(c){
-    var h = _heldBy(c);
-    if (h){
+    // 1 KH co the duoc chia/cham soc boi NHIEU sale (careCSSet) — cong held/closed/friend/cared
+    // cho TUNG sale rieng, khong gop chung thanh 1 dong ten "saleA, saleB" nhu truoc (_heldBy
+    // don le tra ve chuoi gop khi khong co careCSSet).
+    var holders = c.careCSSet && c.careCSSet.size ? [...c.careCSSet] : (_heldBy(c) ? [_heldBy(c)] : []);
+    holders.forEach(function(h){
+      if (!h) return;
       var m = ensure(h);
       m.held++;
       if (c.careStatus === 'Chốt') m.closed++;
       if (c.zaloStatus === 'Đã kết bạn') m.friend++;
       if (c.careStatus && c.careStatus !== 'Chưa liên hệ') m.cared++;
-    }
-    // doanh thu/đơn theo CS thực bán (order.cs)
+    });
+    // doanh thu/đơn theo CS thực bán (order.cs) — 1 don cung co the co NHIEU sale (o.cs dang
+    // "saleA, saleB"), phai tach ra roi cong cho TUNG sale thay vi coi ca chuoi gop la 1 ten CS.
+    // So don: giu nguyen (khong chia) cho moi sale tren don; doanh thu: chia deu cho N sale —
+    // dong bo voi quy uoc dang dung o buildSalesReportA_/buildKpiReport_ (gas_v13.js).
     (c.orders||[]).forEach(function(o){
       if (!_dashOrderInRange(o, dFrom, dTo)) return;
-      if (o.cs){ var mm = ensure(o.cs); mm.revenue += (+o.revenue||0); mm.orders++; }
+      if (!o.cs) return;
+      var salesOnOrder = splitMulti_(o.cs, ',');
+      if (!salesOnOrder.length) return;
+      var n = salesOnOrder.length;
+      salesOnOrder.forEach(function(sn){
+        var mm = ensure(sn);
+        mm.revenue += (+o.revenue||0) / n;
+        mm.orders++;
+      });
     });
   });
   return map;
