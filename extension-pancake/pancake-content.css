@@ -704,6 +704,7 @@
   display: flex;
   gap: 4px;
   margin-top: 2px;
+  flex-wrap: wrap;
 }
 
 .pk-cart-chatlieu,
@@ -716,6 +717,36 @@
   border: 1px solid #fbcfe8;
   border-radius: 4px;
   background: #fffafc;
+}
+
+.pk-cart-chatlieu-multi {
+  flex: 1 0 100%;
+  background: #fffafc;
+  border: 1px solid #fbcfe8;
+  border-radius: 4px;
+  padding: 5px 7px;
+}
+
+.pk-cl-multi-label {
+  font-size: 9.5px;
+  color: #9d174d;
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+
+.pk-cl-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
+  margin: 0 10px 4px 0;
+  cursor: pointer;
+  color: #374151;
+}
+
+.pk-cl-opt input {
+  margin: 0;
+  cursor: pointer;
 }
 
 #pk-cart-addrow { margin: 6px 0; }
