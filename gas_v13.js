@@ -90,7 +90,7 @@ var TEAM_HEADERS   = ['id','name','leader','members','color','channels','ratePct
 var AUDIT_HEADERS  = ['timestamp','user','action','phone','oldValue','newValue'];
 var SET_HEADERS    = ['key','value'];
 var ASSIGN_HEADERS = ['id','date','csName','label','phones','donePhones'];
-var USER_HEADERS   = ['username','passHash','role','name','team','active','names','perms'];
+var USER_HEADERS   = ['username','passHash','role','name','team','active','names','perms','saleType','startDate'];
 // PK_STATS_HEADERS: 1 dong = 1 "Nhan vien" (ten hien thi tren Pancake) trong 1 Page, 1 ngay —
 // nhap tu file Excel "Thong ke tuong tac" (pages_statistics_engagements) Pancake xuat ra.
 // Khoa duy nhat = date+pageId+nhanVien -> nap lai file CUNG 1 ngay se GHI DE (khong nhan doi).
@@ -809,7 +809,9 @@ function readUsers_(sh) {
       active: (v[i][5]===''||v[i][5]===undefined) ? true :
               (v[i][5]===true||v[i][5]==='TRUE'||v[i][5]==='true'||v[i][5]===1),
       names: namesArr,
-      perms: permsArr
+      perms: permsArr,
+      saleType: v[i][8] || '',   // 'online' | 'offline' | '' — dung de tinh Bao cao hoa hong dung chuong trinh thuong
+      startDate: v[i][9] || ''   // YYYY-MM-DD — moc "ngay bat dau" de tinh cac muc thuong theo "ngay thu N" (sale thu viec)
     });
   }
   return out;
@@ -2001,13 +2003,22 @@ function readSaleKpiConfig_() {
 function buildSaleKpiReport_(filters) {
   var a = buildSalesReportA_(filters);
   var cfg = readSaleKpiConfig_();
-  var saleDir = readSaleDirectory_();
+  // Nhom Van phong/Online: dung CHUNG 1 nguon voi "🏆 Chương trình thưởng" o Bao cao E — setting
+  // 'saleChannels' ({ ten Sale -> 'online'|'offline' }, cai o modal "🏷️ Phân loại Online/Offline"
+  // trong Quan ly Team) — THEO YEU CAU DUYEN 2026-09 (truoc do dang dung 2 nguon khac nhau: cho
+  // nay dung SaleDirectory, ben Chuong trinh thuong dung saleChannels — gay lech nhau).
+  var channels = {};
+  try {
+    var rawCh = getSetting_('saleChannels');
+    if (rawCh) { var oCh = JSON.parse(rawCh); if (oCh && typeof oCh === 'object') channels = oCh; }
+  } catch (eCh) {}
 
   var rowsMap = {};
   function ensureRow(name) {
     if (!rowsMap[name]) {
-      var rec = saleDir.byName[_normTxt_(name)];
-      rowsMap[name] = { name: name, nhom: rec ? rec.nhom : '(ngoài danh sách)', revenue: 0, orders: 0 };
+      var ch = channels[name] || '';
+      var nhom = ch === 'online' ? 'Online' : (ch === 'offline' ? 'Văn phòng' : '(chưa phân loại)');
+      rowsMap[name] = { name: name, nhom: nhom, revenue: 0, orders: 0 };
     }
     return rowsMap[name];
   }
@@ -2015,12 +2026,9 @@ function buildSaleKpiReport_(filters) {
     var r = ensureRow(s.name);
     r.revenue += s.giaTri; r.orders += s.orders;
   });
-  // Them ca Sale CHUA co doanh thu trong ky dang xem (0d) — de van thay duoc muc tieu/0% thay vi
-  // bien mat khoi bao cao chi vi ky nay chua ban duoc gi.
-  saleDir.list.forEach(function(rec) {
-    var displayName = rec.tenFacebook || rec.userBase || rec.code;
-    if (displayName) ensureRow(displayName);
-  });
+  // Them ca Sale DA duoc phan loai Online/Offline nhung CHUA co doanh thu trong ky dang xem (0d)
+  // — de van thay duoc muc tieu/0% thay vi bien mat khoi bao cao chi vi ky nay chua ban duoc gi.
+  Object.keys(channels).forEach(function(name) { if (channels[name]) ensureRow(name); });
 
   var rows = Object.keys(rowsMap).map(function(name) {
     var r = rowsMap[name];
@@ -2034,7 +2042,7 @@ function buildSaleKpiReport_(filters) {
       if (tier) { target = cfg.tierTargets[tier] || 0; source = 'tier'; }
       else { source = 'no-tier'; }
     } else {
-      source = 'unlisted'; // khong co trong SaleDirectory -> khong biet van phong hay online, khong tu doan
+      source = 'unclassified'; // chua duoc gan Online/Offline o "🏷️ Phân loại Online/Offline" -> khong tu doan
     }
     var pct = (target && target > 0) ? Math.round(r.revenue / target * 1000) / 10 : null;
     return { name: name, nhom: r.nhom, tier: tier, revenue: r.revenue, orders: r.orders,
@@ -2053,7 +2061,8 @@ function buildSaleKpiReport_(filters) {
   return { ok: true, rows: rows, config: cfg,
     totalRevenue: totalRevenue, totalTarget: totalTarget,
     totalPct: totalTarget > 0 ? Math.round(totalRevenue / totalTarget * 1000) / 10 : null,
-    saleDirectoryCount: saleDir.list.length, totalOrders: a.totalOrders, totalGiaTri: a.totalGiaTri };
+    classifiedCount: Object.keys(channels).filter(function(k){ return channels[k]; }).length,
+    totalOrders: a.totalOrders, totalGiaTri: a.totalGiaTri };
 }
 
 // ── BAO CAO B: theo "dữ liệu đơn" (bao gom bao cao san pham) ──
@@ -4092,7 +4101,8 @@ function saveUsers_(users) {
     matrix.push([String(u.username||''), String(u.passHash||''), u.role||'cs',
                  namesArr[0]||u.name||'', u.team||'', (u.active===false?false:true),
                  JSON.stringify(namesArr),
-                 (Array.isArray(u.perms) ? JSON.stringify(u.perms) : '')]);
+                 (Array.isArray(u.perms) ? JSON.stringify(u.perms) : ''),
+                 u.saleType||'', u.startDate||'']);
   }
   sh.getRange(1, 1, matrix.length, USER_HEADERS.length).setValues(matrix);
   return jsonOut_({ ok: true, written: users.length });

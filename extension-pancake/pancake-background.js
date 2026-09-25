@@ -55,6 +55,12 @@ chrome.runtime.onInstalled.addListener(async () => {
 });
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.type === "OPEN_OPTIONS") {
+    // Content script khong duoc phep goi truc tiep chrome.runtime.openOptionsPage() — chi
+    // background/extension pages moi co quyen nay, nen panel nho background mo ho.
+    chrome.runtime.openOptionsPage();
+    return false;
+  }
   if (msg?.type === "GET_SETTINGS") {
     chrome.storage.sync.get(null, (settings) => {
       sendResponse({ ok: true, settings: { ...DEFAULT_SETTINGS, ...settings } });
