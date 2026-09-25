@@ -17349,13 +17349,19 @@ function _pkRenderKpiPancake(){
       ' — vào tab "📥 Báo cáo Pancake" → mục "🔗 Khớp Page Pancake ↔ Kênh bán CRM" để khớp.</div>';
   }
 
-  // ── Tổng quan ──
+  // ── Tổng quan: tách khối "Kết quả bán hàng" nổi bật (chụp gửi sếp) khỏi khối phễu tương tác ──
+  var kpiTbDon = rep.totalDonHang ? Math.round(rep.totalDoanhThu/rep.totalDonHang) : 0;
+  html += '<div style="font-size:13px;font-weight:700;margin:4px 0 8px">💰 Kết quả bán hàng</div>';
+  html += '<div class="kpi-grid" style="margin-bottom:14px">'+
+    '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+_pkN(rep.totalDonHang)+'</div><div class="kpi-label"><b>Đơn hàng</b> (DT TỔNG)</div></div>'+
+    '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+_dfmtV(rep.totalDoanhThu)+'</div><div class="kpi-label"><b>Doanh thu</b></div></div>'+
+    '<div class="kpi-card"><div class="kpi-val">'+_dfmtV(kpiTbDon)+'</div><div class="kpi-label">Trung bình đơn</div></div>'+
+    '<div class="kpi-card"><div class="kpi-val">'+rep.tyLeChotChung+'%</div><div class="kpi-label">Tỷ lệ chốt chung</div></div>'+
+  '</div>';
+  html += '<div style="font-size:13px;font-weight:700;margin:4px 0 8px">💬 Phễu tương tác Pancake</div>';
   html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">'+
     _dkpi('Tổng tương tác', _pkN(rep.totalTongTT))+
     _dkpi('SĐT thu thập', _pkN(rep.totalSdtMangVe))+
-    _dkpi('Đơn hàng (DT TỔNG)', _pkN(rep.totalDonHang))+
-    _dkpi('Doanh thu', _dfmtV(rep.totalDoanhThu))+
-    _dkpi('Tỷ lệ chốt chung', rep.tyLeChotChung+'%', 'Đơn / Tổng tương tác')+
   '</div>';
 
   // ── Phễu tag L1-L8 toàn hệ thống ──
@@ -17762,8 +17768,8 @@ function _pkRenderReportHtml(){
   var totalDH = d.byPage.reduce(function(s,r){return s+r.tongDH;},0);
   var html = '<div class="kpi-grid" style="margin-bottom:16px">'+
     '<div class="kpi-card"><div class="kpi-val">'+fmt(totalTT)+'</div><div class="kpi-label">Tổng tương tác</div></div>'+
-    '<div class="kpi-card"><div class="kpi-val">'+fmt(totalDH)+'</div><div class="kpi-label">Tổng đơn hàng đã chốt</div></div>'+
-    '<div class="kpi-card"><div class="kpi-val">'+(totalTT?Math.round(totalDH/totalTT*1000)/10:0)+'%</div><div class="kpi-label">Tỉ lệ chuyển đổi TB</div></div>'+
+    '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+fmt(totalDH)+'</div><div class="kpi-label"><b>Tổng đơn hàng đã chốt</b></div></div>'+
+    '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+(totalTT?Math.round(totalDH/totalTT*1000)/10:0)+'%</div><div class="kpi-label"><b>Tỉ lệ chuyển đổi TB</b></div></div>'+
   '</div>';
 
   if (d.unmapped && d.unmapped.length){
@@ -18760,9 +18766,11 @@ function _srRenderA(d){
 
 function _srRenderB(d){
   if (!d) return '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
+  var bTb = d.totalOrders ? Math.round(d.totalGiaTri/d.totalOrders) : 0;
   var html = '<div class="kpi-grid" style="margin-bottom:16px">' +
-    '<div class="kpi-card"><div class="kpi-val">'+fmt(d.totalOrders)+'</div><div class="kpi-label">Số lượng đơn</div></div>' +
-    '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalGiaTri)+'</div><div class="kpi-label">Tổng giá trị đơn hàng sau giảm giá</div></div>' +
+    '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+fmt(d.totalOrders)+'</div><div class="kpi-label"><b>Số lượng đơn</b></div></div>' +
+    '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+_srMoney(d.totalGiaTri)+'</div><div class="kpi-label"><b>Tổng giá trị đơn hàng sau giảm giá</b></div></div>' +
+    '<div class="kpi-card"><div class="kpi-val">'+_srMoney(bTb)+'</div><div class="kpi-label">Trung bình đơn</div></div>' +
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalCod)+'</div><div class="kpi-label">Tổng COD</div></div>' +
     '</div>';
 
@@ -18775,12 +18783,14 @@ function _srRenderB(d){
   html += '<div class="dash-section-title">Theo Sale <span style="font-weight:400;color:var(--muted);font-size:11px">(tiền chia đều cho số sale/đơn, số đơn giữ nguyên)</span>'+_srViewToggleHtml('bSaleView')+'</div>';
   html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.bSaleSearch)+'" oninput="_srState.bSaleSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
   if (_srState.bSaleView === 'table'){
-    html += '<table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Giá trị sau giảm giá</th><th style="text-align:right">COD</th></tr></thead><tbody>';
+    html += '<table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Giá trị sau giảm giá</th><th style="text-align:right">TB đơn</th><th style="text-align:right">COD</th></tr></thead><tbody>';
     saleRows.forEach(function(s){
-      html += '<tr><td>'+esc(s.name)+'</td><td style="text-align:right">'+fmt(s.orders)+'</td><td style="text-align:right">'+_srMoney(s.giaTri)+'</td><td style="text-align:right">'+_srMoney(s.cod)+'</td></tr>';
+      var tb = s.orders ? Math.round(s.giaTri/s.orders) : 0;
+      html += '<tr><td>'+esc(s.name)+'</td><td style="text-align:right">'+fmt(s.orders)+'</td><td style="text-align:right">'+_srMoney(s.giaTri)+'</td><td style="text-align:right">'+_srMoney(tb)+'</td><td style="text-align:right">'+_srMoney(s.cod)+'</td></tr>';
     });
-    if (!saleRows.length) html += '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
-    else html += _srTotalRowHtml_(['Tổng', fmt(saleRows.reduce(function(s,r){return s+(r.orders||0);},0)), _srMoney(saleRows.reduce(function(s,r){return s+(r.giaTri||0);},0)), _srMoney(saleRows.reduce(function(s,r){return s+(r.cod||0);},0))]);
+    if (!saleRows.length) html += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+    else { var bSOrd=saleRows.reduce(function(s,r){return s+(r.orders||0);},0), bSGt=saleRows.reduce(function(s,r){return s+(r.giaTri||0);},0);
+      html += _srTotalRowHtml_(['Tổng', fmt(bSOrd), _srMoney(bSGt), _srMoney(bSOrd?Math.round(bSGt/bSOrd):0), _srMoney(saleRows.reduce(function(s,r){return s+(r.cod||0);},0))]); }
     html += '</tbody></table>';
   } else {
     html += _srChartSvg(saleRows, 'name', 'giaTri', _srState.bSaleView, true, 'orders');
@@ -19666,7 +19676,16 @@ function _srToggleCRow(rowId){
 function _srRenderC(d){
   if (!d) return '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
   var p = d.period || {};
-  var html = '<div style="display:flex;gap:16px;margin-bottom:14px;font-size:12px">'+
+  var cCur = (d.byEmployee||[]).reduce(function(s,r){return s+(r.resultCur||0);},0);
+  var cPrev = (d.byEmployee||[]).reduce(function(s,r){return s+(r.resultPrev||0);},0);
+  var cGrowth = cPrev>0 ? Math.round((cCur-cPrev)/cPrev*1000)/10 : (cCur>0?null:0);
+  var cGrowColor = cGrowth===null ? 'var(--muted)' : (cGrowth>=0 ? '#16a34a' : '#dc2626');
+  var html = '<div class="kpi-grid" style="margin-bottom:14px">'+
+    '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+_srMoney(cCur)+'</div><div class="kpi-label"><b>Doanh thu kỳ này</b> ('+esc(p.curLabel||'')+')</div></div>'+
+    '<div class="kpi-card"><div class="kpi-val">'+_srMoney(cPrev)+'</div><div class="kpi-label">Doanh thu kỳ trước ('+esc(p.prevLabel||'')+')</div></div>'+
+    '<div class="kpi-card" style="border:1.5px solid '+cGrowColor+'"><div class="kpi-val" style="color:'+cGrowColor+'">'+(cGrowth===null?'—':(cGrowth>=0?'+':'')+cGrowth+'%')+'</div><div class="kpi-label">Tăng trưởng so kỳ trước</div></div>'+
+  '</div>';
+  html += '<div style="display:flex;gap:16px;margin-bottom:14px;font-size:12px">'+
     '<div><span style="color:var(--muted)">Kỳ này:</span> <b>'+esc(p.curLabel||'')+'</b></div>'+
     '<div><span style="color:var(--muted)">Kỳ trước:</span> <b>'+esc(p.prevLabel||'')+'</b></div>'+
     (p.curKey ? '' : '<div style="color:var(--hint)">(Kỳ tùy chỉnh — không tra được KPI, chỉ tab Tuần/Tháng/Quý mới có KPI)</div>')+
