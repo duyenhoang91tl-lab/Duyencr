@@ -9321,6 +9321,15 @@ function doGet(e) {
       try { cacheA.put(cKeyA, JSON.stringify(resA), 120); } catch(ec) {}
       return jsonOut_(resA);
     }
+    if (action === 'saleKpiReport') {
+      var pF = e.parameter || {};
+      var fF = { dateFrom: pF.dateFrom || '', dateTo: pF.dateTo || '',
+                 dateField: pF.dateField || 'ngayTao',
+                 sale: pF.sale ? pF.sale.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [],
+                 kenh: pF.kenh ? pF.kenh.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [],
+                 sanPham: pF.sanPham || '', byCreator: false };
+      return jsonOut_(buildSaleKpiReport_(fF));
+    }
     if (action === 'salesReportB') {
       var pB = e.parameter || {};
       var splitCSV_ = function(s){ return s ? s.split(',').map(function(x){return x.trim();}).filter(function(x){return x;}) : []; };
@@ -10301,6 +10310,104 @@ function buildSalesReportA_(filters) {
       };
     })
   };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BAO CAO F: TY LE HOAN THANH KPI THEO SALE — theo yeu cau Duyen 2026-09.
+//  - Sale van phong (Nhom = "Văn phòng" trong SaleDirectory) duoc gan 1 trong 3 BAC, moi bac 1
+//    muc KPI rieng (mac dinh Bac 1 = 400tr, Bac 2 = 500tr, Bac 3 = 500tr — Duyen tu sua duoc).
+//  - Sale online (Nhom = "Online") KHONG chia bac, dung CHUNG 1 muc KPI (mac dinh 500tr).
+//  - Moi Sale (bat ke van phong/online) co the dat 1 muc KPI COMMIT RIENG, UU TIEN TUYET DOI
+//    hon bac/nhom neu co dat.
+//  Cau hinh luu O 1 SETTING DUY NHAT 'saleKpiConfig' — KHONG chia theo thang, sua la ap dung
+//  ngay (giong het co che "% hoa hong ca nhan" / individualRates da co san, client tu doc/ghi
+//  qua action getSetting/setSetting chung, KHONG can route rieng cho phan luu cau hinh).
+// ═══════════════════════════════════════════════════════════════
+var SALE_KPI_DEFAULT_CFG_ = {
+  tierTargets: { '1': 400000000, '2': 500000000, '3': 500000000 },
+  onlineTarget: 500000000,
+  tiers: {},      // ten Sale (dung y het chuoi "Sale bán" trong DT TONG) -> '1'|'2'|'3'
+  overrides: {}   // ten Sale -> so tien KPI rieng (uu tien tuyet doi, bo qua bac/nhom)
+};
+
+function readSaleKpiConfig_() {
+  var out = JSON.parse(JSON.stringify(SALE_KPI_DEFAULT_CFG_));
+  try {
+    var raw = getSetting_('saleKpiConfig');
+    if (raw) {
+      var o = JSON.parse(raw);
+      if (o && typeof o === 'object') {
+        if (o.tierTargets) { ['1', '2', '3'].forEach(function(k) { var n = Number(o.tierTargets[k]); if (!isNaN(n) && n >= 0) out.tierTargets[k] = n; }); }
+        if (o.onlineTarget !== undefined) { var n2 = Number(o.onlineTarget); if (!isNaN(n2) && n2 >= 0) out.onlineTarget = n2; }
+        if (o.tiers && typeof o.tiers === 'object') out.tiers = o.tiers;
+        if (o.overrides && typeof o.overrides === 'object') out.overrides = o.overrides;
+      }
+    }
+  } catch (e) {}
+  return out;
+}
+
+// Doanh thu thuc te dung lai DUNG buildSalesReportA_ (cung bo loc ngay/sale/kenh, cung quy uoc
+// chia deu N-sale/don) — khong tao them 1 cach tinh doanh thu rieng de tranh so lieu lech nhau
+// giua cac bao cao. Nhom (Van phong/Online) khop qua SaleDirectory, dung DUNG _normTxt_ nhu
+// buildKpiReport_ da dung (client KHONG the tu lam viec nay chinh xac — _foldVi phia client bo
+// dau, con _normTxt_ o day KHONG bo dau, 2 ham fold khac nhau se khop SAI ten co dau).
+function buildSaleKpiReport_(filters) {
+  var a = buildSalesReportA_(filters);
+  var cfg = readSaleKpiConfig_();
+  var saleDir = readSaleDirectory_();
+
+  var rowsMap = {};
+  function ensureRow(name) {
+    if (!rowsMap[name]) {
+      var rec = saleDir.byName[_normTxt_(name)];
+      rowsMap[name] = { name: name, nhom: rec ? rec.nhom : '(ngoài danh sách)', revenue: 0, orders: 0 };
+    }
+    return rowsMap[name];
+  }
+  (a.bySale || []).forEach(function(s) {
+    var r = ensureRow(s.name);
+    r.revenue += s.giaTri; r.orders += s.orders;
+  });
+  // Them ca Sale CHUA co doanh thu trong ky dang xem (0d) — de van thay duoc muc tieu/0% thay vi
+  // bien mat khoi bao cao chi vi ky nay chua ban duoc gi.
+  saleDir.list.forEach(function(rec) {
+    var displayName = rec.tenFacebook || rec.userBase || rec.code;
+    if (displayName) ensureRow(displayName);
+  });
+
+  var rows = Object.keys(rowsMap).map(function(name) {
+    var r = rowsMap[name];
+    var target = null, source = 'no-tier', tier = '';
+    if (cfg.overrides[name] !== undefined && cfg.overrides[name] !== null) {
+      target = Number(cfg.overrides[name]) || 0; source = 'override';
+    } else if (r.nhom === 'Online') {
+      target = cfg.onlineTarget; source = 'online';
+    } else if (r.nhom === 'Văn phòng') {
+      tier = cfg.tiers[name] || '';
+      if (tier) { target = cfg.tierTargets[tier] || 0; source = 'tier'; }
+      else { source = 'no-tier'; }
+    } else {
+      source = 'unlisted'; // khong co trong SaleDirectory -> khong biet van phong hay online, khong tu doan
+    }
+    var pct = (target && target > 0) ? Math.round(r.revenue / target * 1000) / 10 : null;
+    return { name: name, nhom: r.nhom, tier: tier, revenue: r.revenue, orders: r.orders,
+      target: target, source: source, pct: pct, passed: (pct !== null) ? pct >= 100 : null };
+  });
+  var rank = { 'Văn phòng': 0, 'Online': 1 };
+  rows.sort(function(x, y) {
+    var rx = rank.hasOwnProperty(x.nhom) ? rank[x.nhom] : 2, ry = rank.hasOwnProperty(y.nhom) ? rank[y.nhom] : 2;
+    if (rx !== ry) return rx - ry;
+    if (x.nhom === 'Văn phòng' && x.tier !== y.tier) return (x.tier || '9').localeCompare(y.tier || '9');
+    return y.revenue - x.revenue;
+  });
+
+  var totalRevenue = rows.reduce(function(s, r) { return s + r.revenue; }, 0);
+  var totalTarget = rows.reduce(function(s, r) { return s + (r.target || 0); }, 0);
+  return { ok: true, rows: rows, config: cfg,
+    totalRevenue: totalRevenue, totalTarget: totalTarget,
+    totalPct: totalTarget > 0 ? Math.round(totalRevenue / totalTarget * 1000) / 10 : null,
+    saleDirectoryCount: saleDir.list.length, totalOrders: a.totalOrders, totalGiaTri: a.totalGiaTri };
 }
 
 // ── BAO CAO B: theo "dữ liệu đơn" (bao gom bao cao san pham) ──
@@ -17615,7 +17722,10 @@ var _srState = {
   dDateFrom: '', dDateTo: '', dDateQuick: 'custom', dCs: '', dataD: null,
   // E — Hoa hong nhan vien (dung lai action=salesReportA, filter rieng de khong dam vao tab A)
   eDateFrom: '', eDateTo: '', eDateQuick: 'custom', eDateField: 'ngayTao', eSale: [], eKenh: [], dataE: null, eSaleSearch: '',
-  eSaleCustomized: false, leaderTeamOptions: []
+  eSaleCustomized: false, leaderTeamOptions: [],
+  // F — Ty le hoan thanh KPI theo Sale (Bac Van phong / KPI co dinh Online / KPI commit rieng)
+  fDateFrom: '', fDateTo: '', fDateQuick: 'thisMonth', fDateField: 'ngayTao', fSale: [], dataF: null,
+  fSaleSearch: '', fSaleCustomized: false, fKpiView: 'table', fEditing: null
 };
 
 function _srMoney(n){ return fmt(Math.round(n||0)) + '₫'; }
@@ -17763,10 +17873,13 @@ function _srEnforceScope(){
     if (teamNames.length){
       if (!_srState.eSaleCustomized) _srState.eSale = teamNames.slice();
       else _srState.eSale = (_srState.eSale||[]).filter(function(n){ return teamNames.indexOf(n)!==-1; });
+      if (!_srState.fSaleCustomized) _srState.fSale = teamNames.slice();
+      else _srState.fSale = (_srState.fSale||[]).filter(function(n){ return teamNames.indexOf(n)!==-1; });
       return;
     }
   }
   _srState.eSale = my.slice();
+  _srState.fSale = my.slice();
 }
 
 async function _srFetch(action, params){
@@ -17830,6 +17943,11 @@ async function _srLoad(){
     _srState.dataE = await _srFetch('salesReportA', {
       dateFrom: _srState.eDateFrom, dateTo: _srState.eDateTo,
       dateField: _srState.eDateField, sale: (_srState.eSale||[]).join(','), kenh: (_srState.eKenh||[]).join(',')
+    });
+  } else if (_srState.sub === 'F') {
+    _srState.dataF = await _srFetch('saleKpiReport', {
+      dateFrom: _srState.fDateFrom, dateTo: _srState.fDateTo,
+      dateField: _srState.fDateField, sale: (_srState.fSale||[]).join(',')
     });
   }
   _srState.loading = false;
@@ -18156,11 +18274,13 @@ function renderSalesReportTab(){
     '<button class="btn '+(_srState.sub==='C'?'secondary':'sm')+'" onclick="_srSetSub(\'C\')">Báo cáo C — So sánh kỳ Base</button>' +
     '<button class="btn '+(_srState.sub==='D'?'secondary':'sm')+'" onclick="_srSetSub(\'D\')">Báo cáo D — Sale tự thêm</button>' +
     '<button class="btn '+(_srState.sub==='E'?'secondary':'sm')+'" onclick="_srSetSub(\'E\')">Báo cáo E — Hoa hồng nhân viên Base</button>' +
+    '<button class="btn '+(_srState.sub==='F'?'secondary':'sm')+'" onclick="_srSetSub(\'F\')">Báo cáo F — KPI Sale</button>' +
     '</div>';
 
   if (_srState.sub === 'C') { renderSalesReportTabC_(wrap, subTabs); return; }
   if (_srState.sub === 'D') { renderSalesReportTabD_(wrap, subTabs); return; }
   if (_srState.sub === 'E') { renderSalesReportTabE_(wrap, subTabs); return; }
+  if (_srState.sub === 'F') { renderSalesReportTabF_(wrap, subTabs); return; }
 
   var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
   filters += _quickRangeSelectHtml(_srState.dateQuick, "_srApplyQuickRange('dateQuick','dateFrom','dateTo',this.value)");
@@ -18690,6 +18810,197 @@ function _srRenderE_(d){
     html += _srChartSvg(rows, 'name', 'commission', _srState.eSaleView, true);
   }
   return html;
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  BÁO CÁO F: TỶ LỆ HOÀN THÀNH KPI THEO SALE — theo yêu cầu Duyên 2026-09.
+//  Sale văn phòng (offline) được gán 1 trong 3 BẬC, mỗi bậc 1 mức KPI riêng (mặc định Bậc 1 =
+//  400tr, Bậc 2 = 500tr, Bậc 3 = 500tr). Sale online KHÔNG chia bậc, dùng CHUNG 1 mức KPI (mặc
+//  định 500tr). Mỗi Sale (bất kể văn phòng/online) có thể đặt 1 mức KPI COMMIT RIÊNG, ưu tiên
+//  tuyệt đối hơn bậc/nhóm nếu có đặt. Nhóm (Văn phòng/Online) lấy từ SaleDirectory — cùng nguồn
+//  với tab "KPI Pancake". Cấu hình lưu 1 setting duy nhất 'saleKpiConfig', KHÔNG chia theo
+//  tháng — sửa là áp dụng ngay, giống hệt cơ chế "% hoa hồng cá nhân" đã có.
+// ════════════════════════════════════════════════════════════════════
+function renderSalesReportTabF_(wrap, subTabs){
+  var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
+  filters += _quickRangeSelectHtml(_srState.fDateQuick, "_srApplyQuickRange('fDateQuick','fDateFrom','fDateTo',this.value)");
+  filters += '<input type="date" value="'+esc(_srState.fDateFrom)+'" onchange="_srSetField(\'fDateFrom\',this.value);_srState.fDateQuick=\'custom\'" title="Từ ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
+  filters += '<span style="color:var(--muted)">→</span>';
+  filters += '<input type="date" value="'+esc(_srState.fDateTo)+'" onchange="_srSetField(\'fDateTo\',this.value);_srState.fDateQuick=\'custom\'" title="Đến ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
+  filters += '<select onchange="_srSetField(\'fDateField\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+    '<option value="ngayTao"'+(_srState.fDateField==='ngayTao'?' selected':'')+'>Lọc theo Ngày tạo</option>'+
+    '<option value="thoiGianHT"'+(_srState.fDateField==='thoiGianHT'?' selected':'')+'>Lọc theo Thời gian hoàn thành</option>'+
+    '</select>';
+  if (_srIsAdmin()){
+    filters += _srComboHtml('sr-sale-combo-f', 'fSale', 'saleOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 190);
+  } else if (currentUser.role === 'leader' && (_srState.leaderTeamOptions||[]).length){
+    filters += _srComboHtml('sr-sale-combo-f', 'fSale', 'leaderTeamOptions', 'Lọc theo tên (team của bạn)', '🔍 Tìm tên trong team...', 190);
+    filters += '<button class="btn sm" title="Xem lại KPI của cả team (bỏ hết lựa chọn riêng)" onclick="_srState.fSale=_srState.leaderTeamOptions.slice();_srState.fSaleCustomized=false;_srApply()">🔄 Cả team</button>';
+  } else {
+    filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Sale</div>'+
+      '<div style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)">🔒 '+esc((_srState.fSale||[]).join(', ') || currentUser.name)+' — chỉ xem được KPI của mình</div></div>';
+  }
+  filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
+  if (_srIsAdmin()) filters += '<button class="btn sm" onclick="openSaleKpiConfigModal_()">🎯 Cài đặt KPI (bậc / online / commit riêng)</button>';
+  filters += '</div>';
+
+  var body = _srState.loading
+    ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>'
+    : _srRenderF_(_srState.dataF);
+
+  wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + filters + body;
+}
+
+function _srRenderF_(d){
+  if (!d) return '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
+  if (d.error) return '<div style="color:#dc2626;text-align:center;padding:30px">Lỗi: '+esc(d.error)+'</div>';
+  var cfg = d.config || {};
+  var rows = (d.rows||[]).filter(function(r){ return !_srState.fSaleSearch || r.name.toLowerCase().indexOf(_srState.fSaleSearch.toLowerCase())!==-1; });
+
+  var html = '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">'+
+    'Mục tiêu: <b>Văn phòng</b> — Bậc 1 = '+_srMoney(cfg.tierTargets && cfg.tierTargets['1'])+', Bậc 2 = '+_srMoney(cfg.tierTargets && cfg.tierTargets['2'])+', Bậc 3 = '+_srMoney(cfg.tierTargets && cfg.tierTargets['3'])+
+    ' · <b>Online</b> — '+_srMoney(cfg.onlineTarget)+
+    ' · Ai có <b>KPI commit riêng</b> thì dùng số đó thay vì bậc/nhóm. Nhóm lấy từ danh sách Sale chuẩn (SaleDirectory) — cùng nguồn với tab KPI Pancake.'+
+    (d.saleDirectoryCount ? '' : ' <b style="color:#9a3412">Chưa nạp danh sách Sale nên chưa chia nhóm được.</b>')+
+    '</div>';
+
+  html += '<div class="kpi-grid" style="margin-bottom:16px">'+
+    '<div class="kpi-card" style="border:1.5px solid var(--text)"><div class="kpi-val">'+_srMoney(d.totalRevenue)+'</div><div class="kpi-label"><b>Tổng doanh thu</b></div></div>'+
+    '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalTarget)+'</div><div class="kpi-label">Tổng KPI mục tiêu</div></div>'+
+    '<div class="kpi-card" style="border:1.5px solid '+(d.totalPct!==null && d.totalPct>=100 ? '#16a34a' : '#dc2626')+'"><div class="kpi-val" style="color:'+(d.totalPct!==null && d.totalPct>=100 ? '#16a34a' : '#dc2626')+'">'+(d.totalPct===null?'—':d.totalPct+'%')+'</div><div class="kpi-label">% hoàn thành chung</div></div>'+
+    '</div>';
+
+  html += '<div class="dash-section-title">Chi tiết theo Sale'+_srViewToggleHtml('fKpiView')+'</div>';
+  html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.fSaleSearch)+'" oninput="_srState.fSaleSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
+
+  if (_srState.fKpiView === 'table'){
+    html += '<table class="dash-table"><thead><tr>'+
+      '<th>Sale</th><th>Nhóm</th><th>Bậc</th><th style="text-align:right">Doanh thu</th>'+
+      '<th style="text-align:right">KPI mục tiêu</th><th style="text-align:right">% hoàn thành</th><th>Kết quả</th></tr></thead><tbody>';
+    rows.forEach(function(r){
+      var tierLabel = r.tier ? 'Bậc '+r.tier : (r.nhom==='Văn phòng' ? '<span style="color:var(--hint)">chưa gán</span>' : '—');
+      var pctColor = r.pct===null ? 'var(--muted)' : (r.pct>=100 ? '#16a34a' : '#dc2626');
+      var resultTxt = r.pct===null ? '<span style="color:var(--hint)">chưa có mục tiêu</span>' : (r.pct>=100 ? '✓ Đạt' : '✗ Chưa đạt');
+      var srcNote = r.source==='override' ? ' <span title="Dùng KPI commit riêng, không theo bậc/nhóm" style="cursor:help">📌</span>' : '';
+      html += '<tr><td>'+esc(r.name)+'</td><td>'+esc(r.nhom)+'</td><td>'+tierLabel+srcNote+'</td>'+
+        '<td style="text-align:right">'+_srMoney(r.revenue)+'</td>'+
+        '<td style="text-align:right">'+(r.target?_srMoney(r.target):'<span style="color:var(--hint)">—</span>')+'</td>'+
+        '<td style="text-align:right;font-weight:700;color:'+pctColor+'">'+(r.pct===null?'—':r.pct+'%')+'</td>'+
+        '<td style="font-weight:600;color:'+pctColor+'">'+resultTxt+'</td></tr>';
+    });
+    if (!rows.length) html += '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+    else html += _srTotalRowHtml_(['Tổng','','', _srMoney(rows.reduce(function(s,r){return s+r.revenue;},0)), _srMoney(rows.reduce(function(s,r){return s+(r.target||0);},0)), '', '']);
+    html += '</tbody></table>';
+  } else {
+    html += '<div style="font-size:11px;color:var(--hint);margin-bottom:4px">Vẽ theo "Doanh thu"</div>';
+    html += _srChartSvg(rows, 'name', 'revenue', _srState.fKpiView, true);
+  }
+  return html;
+}
+
+// ── Modal: Cài đặt KPI (Bậc 1/2/3, KPI Online, gán bậc từng người, KPI commit riêng) ──
+// Dùng lại chính dataF.rows đang có (đã gồm ĐỦ mọi Sale trong SaleDirectory, kể cả 0 doanh thu
+// kỳ này) — không cần gọi thêm action nào để mở modal.
+function openSaleKpiConfigModal_(){
+  var d = _srState.dataF;
+  if (!d || !d.rows){ toast('Chưa tải được danh sách Sale — bấm "Lọc" trước.'); return; }
+  var cfg = d.config || {};
+  // LUU Y: state duoi day giu DUNG DON VI TRIEU (khong phai VND tho) ngay tu day, vi cac o
+  // nhap trong modal deu nhap theo trieu — neu giu VND tho o day thi truong nao NGUOI DUNG
+  // KHONG dong den se bi nhan nham x1.000.000 mot lan nua khi luu (_srSaveKpiConfig_ luon nhan
+  // moi truong len x1.000.000, gia dinh state dang o don vi trieu).
+  _srState.fEditing = {
+    tierTargets: {
+      '1': Math.round(((cfg.tierTargets && cfg.tierTargets['1']) || 0)/1000000),
+      '2': Math.round(((cfg.tierTargets && cfg.tierTargets['2']) || 0)/1000000),
+      '3': Math.round(((cfg.tierTargets && cfg.tierTargets['3']) || 0)/1000000)
+    },
+    onlineTarget: Math.round((cfg.onlineTarget || 0)/1000000),
+    rows: d.rows.map(function(r){ return { name:r.name, nhom:r.nhom, tier:r.tier||'', override: (cfg.overrides && cfg.overrides[r.name]!==undefined) ? Math.round(cfg.overrides[r.name]/1000000) : '' }; })
+  };
+  _srRenderKpiConfigModal_();
+}
+function _srKpiEditSetTarget(tier, val){ _srState.fEditing.tierTargets[tier] = val; }
+function _srKpiEditSetOnline(val){ _srState.fEditing.onlineTarget = val; }
+function _srKpiEditSetTier(i, val){ _srState.fEditing.rows[i].tier = val; }
+function _srKpiEditSetOverride(i, val){ _srState.fEditing.rows[i].override = val; }
+function _srKpiEditSearch(q){
+  var body = document.getElementById('sr-kpi-modal-rows');
+  if (body) body.innerHTML = _srKpiConfigRowsHtml_(q);
+}
+function _srKpiConfigRowsHtml_(q){
+  var ed = _srState.fEditing;
+  var qf = (q||'').toLowerCase();
+  var groups = [['Văn phòng','Văn phòng — chọn Bậc cho từng người'],['Online','Online — mức KPI chung, chỉ cần đặt Commit riêng nếu muốn khác'],['(ngoài danh sách)','Ngoài danh sách Sale chuẩn — chưa rõ Văn phòng hay Online']];
+  var html = '';
+  groups.forEach(function(g){
+    var idxs = []; ed.rows.forEach(function(r,i){ if (r.nhom===g[0] && (!qf || r.name.toLowerCase().indexOf(qf)!==-1)) idxs.push(i); });
+    if (!idxs.length) return;
+    html += '<div style="font-weight:700;font-size:11.5px;margin:10px 0 4px;color:var(--muted)">'+esc(g[1])+' ('+idxs.length+')</div>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:12px"><tbody>';
+    idxs.forEach(function(i){
+      var r = ed.rows[i];
+      var tierCell = g[0]==='Văn phòng'
+        ? '<select onchange="_srKpiEditSetTier('+i+',this.value)" style="padding:3px 6px;border:1px solid var(--border);border-radius:5px;background:var(--surface)">'+
+            '<option value=""'+(r.tier===''?' selected':'')+'>— chưa gán —</option>'+
+            '<option value="1"'+(r.tier==='1'?' selected':'')+'>Bậc 1</option>'+
+            '<option value="2"'+(r.tier==='2'?' selected':'')+'>Bậc 2</option>'+
+            '<option value="3"'+(r.tier==='3'?' selected':'')+'>Bậc 3</option></select>'
+        : '<span style="color:var(--hint)">—</span>';
+      html += '<tr><td style="padding:3px 8px 3px 0;width:35%">'+esc(r.name)+'</td>'+
+        '<td style="width:30%">'+tierCell+'</td>'+
+        '<td><input type="number" min="0" step="1" placeholder="để trống = mặc định" value="'+esc(r.override)+'" oninput="_srKpiEditSetOverride('+i+',this.value)" style="width:100%;padding:3px 6px;border:1px solid var(--border);border-radius:5px;background:var(--surface)"> <span style="color:var(--hint);font-size:10.5px">triệu commit riêng</span></td></tr>';
+    });
+    html += '</tbody></table>';
+  });
+  if (!html) html = '<div style="color:var(--muted);padding:10px 0">Không tìm thấy Sale nào khớp.</div>';
+  return html;
+}
+function _srRenderKpiConfigModal_(){
+  var ed = _srState.fEditing;
+  var m = document.getElementById('sr-kpi-modal');
+  if (m) m.remove();
+  var el = document.createElement('div');
+  el.id = 'sr-kpi-modal';
+  el.className = 'modal-overlay open';
+  el.innerHTML = '<div class="modal-box" style="max-width:640px;max-height:85vh;overflow-y:auto">'+
+    '<div class="modal-title">🎯 Cài đặt KPI theo Sale</div>'+
+    '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Sửa là áp dụng ngay cho mọi kỳ đang xem (không chia theo tháng). Nhập số theo <b>triệu đồng</b> cho gọn.</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">'+
+      ['1','2','3'].map(function(t){ return '<div><label style="font-size:11px;color:var(--muted);display:block">Bậc '+t+' (Văn phòng)</label>'+
+        '<input type="number" min="0" step="1" value="'+esc(ed.tierTargets[t])+'" oninput="_srKpiEditSetTarget(\''+t+'\',this.value)" style="width:110px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"> triệu</div>'; }).join('')+
+      '<div><label style="font-size:11px;color:var(--muted);display:block">Online (chung)</label>'+
+        '<input type="number" min="0" step="1" value="'+esc(ed.onlineTarget)+'" oninput="_srKpiEditSetOnline(this.value)" style="width:110px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"> triệu</div>'+
+    '</div>'+
+    '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." oninput="_srKpiEditSearch(this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:100%;margin-bottom:4px">'+
+    '<div id="sr-kpi-modal-rows">'+_srKpiConfigRowsHtml_('')+'</div>'+
+    '<div style="display:flex;gap:8px;margin-top:14px"><button class="btn primary" onclick="_srSaveKpiConfig_()">💾 Lưu</button><button class="btn secondary" onclick="document.getElementById(\'sr-kpi-modal\').remove()">Hủy</button></div>'+
+    '</div>';
+  document.body.appendChild(el);
+}
+async function _srSaveKpiConfig_(){
+  var ed = _srState.fEditing;
+  var config = {
+    tierTargets: { '1': (Number(ed.tierTargets['1'])||0)*1000000, '2': (Number(ed.tierTargets['2'])||0)*1000000, '3': (Number(ed.tierTargets['3'])||0)*1000000 },
+    onlineTarget: (Number(ed.onlineTarget)||0)*1000000,
+    tiers: {}, overrides: {}
+  };
+  ed.rows.forEach(function(r){
+    if (r.tier) config.tiers[r.name] = r.tier;
+    if (r.override !== '' && r.override !== null && r.override !== undefined && !isNaN(Number(r.override))) {
+      config.overrides[r.name] = Number(r.override)*1000000;
+    }
+  });
+  try {
+    var res = await fetch(gsUrl, { method:'POST', redirect:'follow',
+      body: JSON.stringify({ action:'setSetting', key:'saleKpiConfig', value: JSON.stringify(config) }) });
+    var d = await res.json().catch(function(){ return {}; });
+    if (d && d.error){ toast('❌ '+d.error); return; }
+    toast('✓ Đã lưu cấu hình KPI');
+    var m = document.getElementById('sr-kpi-modal'); if (m) m.remove();
+    _srState.fEditing = null;
+    _srLoad();
+  } catch(e){ toast('❌ Lỗi: '+e.message); }
 }
 
 // ── Modal: % hoa hồng CÁ NHÂN (ghi đè % của team cho từng người, để trống = dùng theo team) ──
