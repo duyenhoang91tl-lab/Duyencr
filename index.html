@@ -17906,13 +17906,25 @@ var _SR_CHART_COLORS = ['#2563eb','#16a34a','#dc2626','#d97706','#7c3aed','#0891
 
 // rows: mảng object đã lọc sẵn (giống hệt mảng dùng để vẽ bảng); nameKey/valueKey: tên field;
 // type: 'pie'|'bar'; moneyFmt: true để format tiền (_srMoney), false để format số thường (fmt).
-function _srChartSvg(rows, nameKey, valueKey, type, moneyFmt){
-  var data = (rows||[]).map(function(r){ return {name: (r[nameKey]||'(chưa gán)'), value: Math.abs(Number(r[valueKey])||0)}; })
+function _srChartSvg(rows, nameKey, valueKey, type, moneyFmt, ordersKey){
+  var data = (rows||[]).map(function(r){ return {name: (r[nameKey]||'(chưa gán)'), value: Math.abs(Number(r[valueKey])||0), orders: ordersKey?(Number(r[ordersKey])||0):0}; })
     .filter(function(d){ return d.value>0; });
   if (!data.length) return '<div style="color:var(--muted);text-align:center;padding:30px">Không có dữ liệu để vẽ biểu đồ</div>';
   data.sort(function(a,b){ return b.value-a.value; });
   var fmtVal = function(v){ return moneyFmt ? _srMoney(v) : fmt(v); };
   var total = data.reduce(function(s,d){ return s+d.value; }, 0);
+  // Tong so don + TB don (chi tinh khi bang co cot dem don — vd cot "orders") — hien thanh 1
+  // thanh KPI gon phia tren bieu do, canh nhau tren 1 hang de chup man hinh gui bao cao duoc
+  // ngay, khong phai crop/ghep nhieu anh: Tong so don | Tong tien | TB don.
+  var totalOrders = ordersKey ? data.reduce(function(s,d){ return s+d.orders; }, 0) : 0;
+  var avgOrder = totalOrders ? total/totalOrders : 0;
+  var summaryStrip = ordersKey ? (
+    '<div style="display:flex;gap:28px;flex-wrap:wrap;margin-bottom:14px;padding:12px 18px;background:var(--surface2);border-radius:10px;border:1px solid var(--border)">'+
+      '<div><div style="font-size:10.5px;color:var(--muted);font-weight:700;letter-spacing:.3px">📦 TỔNG SỐ ĐƠN</div><div style="font-size:19px;font-weight:800;margin-top:2px">'+fmt(totalOrders)+'</div></div>'+
+      '<div><div style="font-size:10.5px;color:var(--muted);font-weight:700;letter-spacing:.3px">'+(moneyFmt?'💰 TỔNG DOANH THU':'💰 TỔNG SỐ LƯỢNG')+'</div><div style="font-size:19px;font-weight:800;margin-top:2px;color:var(--green)">'+fmtVal(total)+'</div></div>'+
+      '<div><div style="font-size:10.5px;color:var(--muted);font-weight:700;letter-spacing:.3px">📊 TRUNG BÌNH / ĐƠN</div><div style="font-size:19px;font-weight:800;margin-top:2px">'+fmtVal(avgOrder)+'</div></div>'+
+    '</div>'
+  ) : '';
   var legend = data.map(function(d,i){
     var pct = total ? (d.value/total*100) : 0;
     // break-inside:avoid — khi tràn sang cột 2/3 (xem CSS "columns" ở khung cha) thì KHÔNG bị
@@ -17968,7 +17980,7 @@ function _srChartSvg(rows, nameKey, valueKey, type, moneyFmt){
     // Bieu do to hon (240px thay vi 200px) + khung chu thich KHONG con gioi han chieu cao/thanh
     // keo nua: dung CSS "columns" de tu chay sang cot 2, cot 3... khi danh sach dai (con hon
     // scroll), so cot tu dieu chinh theo be rong man hinh va so luong ten.
-    return '<div style="display:flex;gap:26px;flex-wrap:wrap;align-items:center;padding:10px 0">'+
+    return summaryStrip+'<div style="display:flex;gap:26px;flex-wrap:wrap;align-items:center;padding:10px 0">'+
       '<svg viewBox="0 0 200 200" style="width:240px;height:240px;flex:none">'+paths+'</svg>'+
       '<div style="flex:1 1 420px;min-width:260px;max-width:1000px;columns:230px;column-gap:26px">'+legend+'</div></div>';
   }
@@ -17984,7 +17996,7 @@ function _srChartSvg(rows, nameKey, valueKey, type, moneyFmt){
       '<div style="width:120px;font-size:11px;color:var(--muted)">'+fmtVal(d.value)+'</div></div>';
   }).join('');
   return '<div style="padding:10px 0;max-height:480px;overflow-y:auto">'+
-    '<div style="font-weight:700;font-size:13px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)">Tổng: '+fmtVal(total)+'</div>'+
+    (summaryStrip || '<div style="font-weight:700;font-size:13px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)">Tổng: '+fmtVal(total)+'</div>')+
     barsHtml+'</div>';
 }
 
@@ -18641,7 +18653,7 @@ function _srRenderA(d){
     }
     saleHtml += '</tbody></table>';
   } else {
-    saleHtml += _srChartSvg(saleRows, 'name', 'giaTri', _srState.aSaleView, true);
+    saleHtml += _srChartSvg(saleRows, 'name', 'giaTri', _srState.aSaleView, true, 'orders');
   }
   // Tỷ lệ chốt theo Sale — đặt BÊN CẠNH biểu đồ doanh thu theo Sale (2 cột, tự xuống dòng trên màn hẹp)
   // Công thức: Số đơn trong kỳ / Tổng tương tác Pancake trong kỳ (byCS), tính THEO TỪNG SALE
@@ -18701,7 +18713,7 @@ function _srRenderA(d){
       }
       kenhHtml += '</tbody></table>';
     } else {
-      kenhHtml += _srChartSvg(kenhRows, 'name', 'giaTri', _srState.aKenhView, true);
+      kenhHtml += _srChartSvg(kenhRows, 'name', 'giaTri', _srState.aKenhView, true, 'orders');
     }
     // Tỷ lệ chốt theo Kênh — cũng đặt bên cạnh biểu đồ doanh thu theo Kênh
     var kenhCloseHtml = '<div class="dash-section-title">Tỷ lệ chốt theo Kênh <span style="font-weight:400;color:var(--muted);font-size:11px">(số Chốt / tổng KH được giao)</span></div>'+
@@ -18728,7 +18740,7 @@ function _srRenderA(d){
       }
       html += '</tbody></table>';
     } else {
-      html += _srChartSvg(d.byMkt||[], 'name', 'giaTri', _srState.aMktView, true);
+      html += _srChartSvg(d.byMkt||[], 'name', 'giaTri', _srState.aMktView, true, 'orders');
     }
   }
   return html;
@@ -18759,7 +18771,7 @@ function _srRenderB(d){
     else html += _srTotalRowHtml_(['Tổng', fmt(saleRows.reduce(function(s,r){return s+(r.orders||0);},0)), _srMoney(saleRows.reduce(function(s,r){return s+(r.giaTri||0);},0)), _srMoney(saleRows.reduce(function(s,r){return s+(r.cod||0);},0))]);
     html += '</tbody></table>';
   } else {
-    html += _srChartSvg(saleRows, 'name', 'giaTri', _srState.bSaleView, true);
+    html += _srChartSvg(saleRows, 'name', 'giaTri', _srState.bSaleView, true, 'orders');
   }
 
   if (_srIsAdmin()){
@@ -19096,10 +19108,10 @@ function _srRenderE_(d){
       '</div>';
   } else {
     var bucketRows = [
-      { name: 'Đơn ≥15tr', value: c.totalRevenueAbove15 },
-      { name: 'Đơn <15tr', value: c.totalRevenueBelow15 }
+      { name: 'Đơn ≥15tr', value: c.totalRevenueAbove15, orders: c.totalOrdersAbove15 },
+      { name: 'Đơn <15tr', value: c.totalRevenueBelow15, orders: c.totalOrdersBelow15 }
     ];
-    html += _srChartSvg(bucketRows, 'name', 'value', _srState.eBucketView, true);
+    html += _srChartSvg(bucketRows, 'name', 'value', _srState.eBucketView, true, 'orders');
   }
 
   // b) Hoa hồng từng nhân viên
