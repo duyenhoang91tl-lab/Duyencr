@@ -14654,6 +14654,9 @@ function exportDailyReportLogs_(from, to) {
     // dong cua nam khac. Bao Duyen biet neu can them cot Nam de tranh truong hop nay.
   });
 }
+
+
+
 </script>
 
 <!-- ════════════ V9 FEATURE LAYER ════════════ -->
@@ -17662,13 +17665,22 @@ function _mktRender(){
     '</div>';
   }
 
+  // Khoi "Ket qua ban hang" — noi bat, xep dau tien de chup man hinh gui sep: Tong don,
+  // Doanh thu, TB don, Ty le chot deu la con so lanh dao quan tam nhat, tach rieng khoi cac
+  // chi so "phau" (tuong tac/SDT) o khoi thu 2 ben duoi de khong bi loang khi nhin nhanh.
+  html += '<div style="font-size:13px;font-weight:700;margin:4px 0 8px">💰 Kết quả bán hàng ('+esc(rep.from)+' → '+esc(rep.to)+')</div>';
+  html += '<div class="kpi-grid" style="margin-bottom:14px">'+
+    '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+fmt(rep.baseOrders)+'</div><div class="kpi-label"><b>Tổng đơn</b> (Base — L5)</div></div>'+
+    '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+fmtVND(Math.round(rep.baseRevenue||0))+'</div><div class="kpi-label"><b>Tổng doanh thu</b></div></div>'+
+    '<div class="kpi-card"><div class="kpi-val">'+fmtVND(Math.round(rep.trungBinhDon||0))+'</div><div class="kpi-label">Trung bình đơn (Doanh thu ÷ đơn)</div></div>'+
+    '<div class="kpi-card"><div class="kpi-val">'+rep.tyLeChotTong+'%</div><div class="kpi-label">Tỷ lệ chốt tổng (Đơn / Tổng TT)</div></div>'+
+  '</div>';
+  html += '<div style="font-size:13px;font-weight:700;margin:4px 0 8px">💬 Phễu tương tác Pancake</div>';
   html += '<div class="kpi-grid" style="margin-bottom:16px">'+
     '<div class="kpi-card"><div class="kpi-val">'+fmt(rep.tongTT)+'</div><div class="kpi-label">Tổng tương tác</div></div>'+
     '<div class="kpi-card"><div class="kpi-val">'+fmt(rep.khMoiTotal)+'</div><div class="kpi-label">Tổng tương tác KH mới</div></div>'+
     '<div class="kpi-card"><div class="kpi-val">'+fmt(rep.khCuTotal)+'</div><div class="kpi-label">Tổng tương tác KH cũ</div></div>'+
     '<div class="kpi-card"><div class="kpi-val">'+fmt(rep.sdtThuThap)+'</div><div class="kpi-label">Tổng SĐT thu thập</div></div>'+
-    '<div class="kpi-card"><div class="kpi-val">'+fmt(rep.baseOrders)+'</div><div class="kpi-label">Tổng đơn (Base — L5)</div></div>'+
-    '<div class="kpi-card"><div class="kpi-val">'+rep.tyLeChotTong+'%</div><div class="kpi-label">Tỷ lệ chốt tổng (Đơn / Tổng TT)</div></div>'+
   '</div>';
 
   if (rep.configSource && rep.configSource !== rep.month){
