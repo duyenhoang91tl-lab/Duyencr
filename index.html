@@ -12165,6 +12165,14 @@ function buildKpiReport_(from, to, saleFilter) {
   var orders = readAllOrders_();
   var byPageOrders = {}, bySaleOrders = {};
   var ordersDetail = []; // danh sach tung don khop khoang ngay -> xuat Excel de doi chieu tay voi Base
+  // Kenh nay KHONG co du lieu tren Pancake (khong xuat hien trong file "Thong ke tuong tac" /
+  // "Thong ke nhan vien" ma Duyen nap vao) nen mau so "tongTT" cua Sale phu trach kenh nay
+  // KHONG he tang len du don van ve. Neu van cong don cua kenh nay vao tu so (donHang) thi
+  // "Ty le chot" bi thoi phong ao (tu so tang, mau so dung yen). Quy uoc: loai don cua kenh
+  // nay khoi CA so don LAN doanh thu dung de tinh bySale/tyLeChot (khong dung lam mau so ty
+  // le chua co du lieu doi chieu). Bang theo Page (byPage) khong bi anh huong gi vi von di
+  // da chi liet ke cac Page CO trong Pancake (xem pageInfo o duoi), khong lien quan kenh nay.
+  var KPI_TYLECHOT_EXCLUDED_KENH_ = 'Fb Phạm Thu Hiền';
   for (var i = 0; i < orders.length; i++) {
     var o = orders[i];
     var d = parseVNDate_(o.orderDate);
@@ -12185,6 +12193,8 @@ function buildKpiReport_(from, to, saleFilter) {
       id: o.id || '', ngayTao: normOrderDate_(o.orderDate), kenhBan: page,
       sale: o.cs || '', giaTriDon: Number(o.revenue) || 0, sanPham: o.product || '', phone: o.phone || ''
     });
+
+    if (_normTxt_(page) === _normTxt_(KPI_TYLECHOT_EXCLUDED_KENH_)) continue; // bo qua kenh khong co tren Pancake — khong tinh vao bySale/tyLeChot
 
     var salesList = splitMulti_(o.cs, ',');
     if (!salesList.length) salesList = ['(chưa gán sale)'];
