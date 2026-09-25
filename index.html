@@ -17725,14 +17725,14 @@ var _srState = {
   sub: 'A',
   dateField: 'ngayTao',   // A: 'ngayTao' | 'thoiGianHT'
   dateFrom: '', dateTo: '', dateQuick: 'custom',
-  sale: [], kenh: [],      // A — ca 2 deu multi-select dang checkbox (mang nhieu gia tri)
+  sale: [], kenh: [], team: [],      // A — ca 2 deu multi-select dang checkbox (mang nhieu gia tri); team = loc theo Team (rong = khong loc)
   aSanPham: '',            // A — loc san pham, cach nhau dau phay
   byCreator: false,        // A — tich thi doanh thu KHONG chia deu theo sale tren don, chi tinh het cho "Người tạo" (cot rieng trong DT TONG, khac "Sale bán")
   bSale: [], bNguon: [], bMarketer: [], // B — ca 3 deu multi-select (mang nhieu ten)
   bSanPham: '', bCareStatus: [], bKhStatus: [], bZaloStatus: [], bNickZalo: '', // B — them loc CRM (co SDT de noi)
   dataA: null, dataB: null,
   loading: false,
-  saleOptions: [], kenhOptions: [], nguonOptions: [], marketerOptions: [], saleBOptions: [], optionsLoaded: false,
+  saleOptions: [], kenhOptions: [], nguonOptions: [], marketerOptions: [], saleBOptions: [], teamOptions: [], optionsLoaded: false,
   saleSearch: '', kenhSearch: '', teamSearch: '', productSearch: '', bSaleSearch: '', // lọc nhanh client-side trên bảng breakdown
   showCoc: true, // A — hiện/ẩn cột Cọc trên các bảng breakdown (chỉ tham khảo, không tính vào doanh thu)
   // Che do xem (bang/tron/cot) cho tung bang breakdown — KHONG anh huong gi den bo loc/tim kiem o tren,
@@ -17747,14 +17747,14 @@ var _srState = {
   cPeriodType: 'week', cDateField: 'ngayTao',
   cWeekOffset: 0, cMonthOffset: 0, cQuarterOffset: 0, cYearOffset: 0,
   cCustomCurFrom: '', cCustomCurTo: '', cCustomPrevFrom: '', cCustomPrevTo: '',
-  cSale: [], cKenh: [],     // C — multi-select giong A, tach rieng de doi tab A/C khong dam vao nhau
+  cSale: [], cKenh: [], cTeam: [],     // C — multi-select giong A, tach rieng de doi tab A/C khong dam vao nhau
   cSanPham: '',             // C — loc san pham, cach nhau dau phay
   dataC: null, cEmpSearch: '', cKenhSearch: '', cExpandedRow: '',
   // D — KH Cham soc moi (data rieng, KHONG gop A/B/C)
   dDateFrom: '', dDateTo: '', dDateQuick: 'custom', dCs: '', dataD: null,
   // E — Hoa hong nhan vien (dung lai action=salesReportA/B tuy eSource, filter rieng de khong dam vao tab A/B)
   eSource: 'base',        // 'base' = doanh so theo DT TONG (nhu cu) | 'pos' = theo "du lieu don" (giong Bao cao B) — cach tinh hoa hong y het, chi khac nguon doanh thu
-  eDateFrom: '', eDateTo: '', eDateQuick: 'custom', eDateField: 'ngayTao', eSale: [], eKenh: [], dataE: null, eSaleSearch: '',
+  eDateFrom: '', eDateTo: '', eDateQuick: 'custom', eDateField: 'ngayTao', eSale: [], eKenh: [], eTeam: [], dataE: null, eSaleSearch: '',
   eSaleCustomized: false, leaderTeamOptions: []
 };
 
@@ -18152,6 +18152,24 @@ function _srApply(){ _srLoad(); }
 //    lam tham so) de dung duoc cho nhieu o loc khac nhau ma khong phai chep lai 8 ham/o.
 var _srComboReg = {}, _srComboData = {}, _srComboIdx = {};
 function _srComboInit(domId, field, optKey){ _srComboReg[domId] = { field: field, optKey: optKey }; }
+// ── Lọc theo TEAM (multi-select) — chọn nhiều team thì ô Sale tương ứng TỰ ĐỘNG được set lại
+//    đúng bằng hợp các thành viên của những team đã chọn (loại hết những sale không thuộc team
+//    nào trong số đó). Bỏ chọn hết team (rỗng) thì KHÔNG đụng vào ô Sale, để còn tự chọn tay.
+var _srTeamFieldToSaleField_ = { team: 'sale', cTeam: 'cSale', eTeam: 'eSale' };
+function _srSyncTeamToSale_(teamField){
+  var saleField = _srTeamFieldToSaleField_[teamField];
+  if (!saleField) return;
+  var selTeams = _srState[teamField] || [];
+  if (!selTeams.length) return;
+  var union = [];
+  selTeams.forEach(function(tname){
+    var t = (teams||[]).find(function(x){ return (x.name || '(chưa đặt tên)') === tname; });
+    if (!t) return;
+    [t.leader].concat(t.members||[]).filter(Boolean).forEach(function(n){ if (union.indexOf(n)===-1) union.push(n); });
+  });
+  _srState[saleField] = union;
+  if (saleField === 'eSale') _srState.eSaleCustomized = true;
+}
 function _srComboBuildData(domId){
   var r = _srComboReg[domId]; if (!r) return;
   _srComboData[domId] = (_srState[r.optKey] || []).map(function(v){ return { value: v, label: v }; });
@@ -18202,6 +18220,7 @@ function srComboToggleItem(e, domId, value){
   if (idx !== -1) arr.splice(idx, 1); else arr.push(value);
   _srState[r.field] = arr;
   if (r.field === 'eSale') _srState.eSaleCustomized = true;
+  if (_srTeamFieldToSaleField_[r.field]){ _srSyncTeamToSale_(r.field); renderSalesReportTab(); return; }
   var ci = document.getElementById(domId+'-input');
   srComboRender(domId, ci ? ci.value : '');
   srRenderComboChips(domId);
@@ -18210,6 +18229,7 @@ function srComboRemove(domId, value){
   var r = _srComboReg[domId]; if (!r) return;
   _srState[r.field] = (_srState[r.field] || []).filter(function(v){ return v !== value; });
   if (r.field === 'eSale') _srState.eSaleCustomized = true;
+  if (_srTeamFieldToSaleField_[r.field]){ _srSyncTeamToSale_(r.field); renderSalesReportTab(); return; }
   srRenderComboChips(domId);
   var l = document.getElementById(domId+'-list');
   if (l && l.classList.contains('open')) { var ci=document.getElementById(domId+'-input'); srComboRender(domId, ci?ci.value:''); }
@@ -18219,6 +18239,7 @@ function srComboClear(e, domId){
   var r = _srComboReg[domId]; if (!r) return;
   _srState[r.field] = [];
   if (r.field === 'eSale') _srState.eSaleCustomized = true;
+  if (_srTeamFieldToSaleField_[r.field]){ renderSalesReportTab(); return; }
   var ci = document.getElementById(domId+'-input'); if (ci) ci.value = '';
   srRenderComboChips(domId);
   var l = document.getElementById(domId+'-list');
@@ -18300,6 +18321,9 @@ function renderSalesReportTab(){
   }
   _srEnforceScope();
   if (!_srState.optionsLoaded) _srLoadOptions();
+  // Danh sách team cho combo "Lọc theo Team" — lấy trực tiếp từ `teams` (tab Quản lý Team), không
+  // cần gọi thêm action backend. Đặt tên trùng để tránh 2 team trùng tên gây nhầm khi lọc.
+  _srState.teamOptions = (teams||[]).map(function(t){ return t.name || '(chưa đặt tên)'; });
 
   var subTabs = '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">' +
     '<button class="btn '+(_srState.sub==='A'?'secondary':'sm')+'" onclick="_srSetSub(\'A\')">Báo cáo A — Base</button>' +
@@ -18339,8 +18363,7 @@ function renderSalesReportTab(){
             esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srSaleComboRemove(this.parentNode.dataset.name)">✕</span></span>';
         }).join('') +
         '</div></div>';
-      filters += '<select onchange="if(this.value){srPickTeam(this.value,\'sale\',\'sr-sale-combo\');this.value=\'\'}" title="Điền nhanh cả team vào ô Sale — sửa tay lại sau nếu cần" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-        '<option value="">— Chọn theo Team —</option>' + _srTeamOptionsHtml() + '</select>';
+      filters += _srComboHtml('sr-team-combo-a', 'team', 'teamOptions', 'Lọc theo Team', '🔍 Tìm & chọn team...', 190);
     } else {
       filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Sale</div>'+
         '<div style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)">🔒 '+esc((_srState.sale||[]).join(', ') || currentUser.name)+' — chỉ xem được báo cáo của mình</div></div>';
@@ -18700,8 +18723,7 @@ function renderSalesReportTabC_(wrap, subTabs){
     '</select>';
   if (_srIsAdmin()){
     filters += _srComboHtml('sr-sale-combo-c', 'cSale', 'saleOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 170);
-    filters += '<select onchange="if(this.value){srPickTeam(this.value,\'cSale\',\'sr-sale-combo-c\');this.value=\'\'}" title="Điền nhanh cả team vào ô Sale — sửa tay lại sau nếu cần" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-      '<option value="">— Chọn theo Team —</option>' + _srTeamOptionsHtml() + '</select>';
+    filters += _srComboHtml('sr-team-combo-c', 'cTeam', 'teamOptions', 'Lọc theo Team', '🔍 Tìm & chọn team...', 190);
   } else {
     filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Sale</div>'+
       '<div style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)">🔒 '+esc((_srState.cSale||[]).join(', ') || currentUser.name)+' — chỉ xem được báo cáo của mình</div></div>';
@@ -18792,8 +18814,7 @@ function renderSalesReportTabE_(wrap, subTabs){
   }
   if (_srIsAdmin()){
     filters += _srComboHtml('sr-sale-combo-e', 'eSale', 'saleOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 190);
-    filters += '<select onchange="if(this.value){srPickTeam(this.value,\'eSale\',\'sr-sale-combo-e\');this.value=\'\'}" title="Điền nhanh cả team vào ô Sale" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-      '<option value="">— Chọn theo Team —</option>' + _srTeamOptionsHtml() + '</select>';
+    filters += _srComboHtml('sr-team-combo-e', 'eTeam', 'teamOptions', 'Lọc theo Team', '🔍 Tìm & chọn team...', 190);
   } else if (currentUser.role === 'leader' && (_srState.leaderTeamOptions||[]).length){
     filters += _srComboHtml('sr-sale-combo-e', 'eSale', 'leaderTeamOptions', 'Lọc theo tên (team của bạn)', '🔍 Tìm tên trong team...', 190);
     filters += '<button class="btn sm" title="Xem lại hoa hồng của cả team (bỏ hết lựa chọn riêng)" onclick="_srState.eSale=_srState.leaderTeamOptions.slice();_srState.eSaleCustomized=false;_srApply()">🔄 Cả team</button>';
