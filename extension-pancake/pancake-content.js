@@ -290,9 +290,11 @@
           <div style="font-weight:700">🤖 Pancake AI</div>
           <div style="font-size:10px;font-weight:400;opacity:.85">Tra cứu & gợi ý phản hồi khách</div>
         </div>
+        <button id="pk-ai-settings" title="Cài đặt AI cá nhân (dùng key riêng thay vì AI dùng chung)" style="background:rgba(255,255,255,.2);border:none;border-radius:5px;color:#fff;padding:3px 7px;font-size:11px;cursor:pointer;margin-right:6px;white-space:nowrap">⚙ AI</button>
         <button id="pk-ai-collapse" title="Thu gọn">—</button>
       </div>
       <div id="pk-ai-body">
+        <div id="pk-ai-key-banner" style="display:none;font-size:11px;padding:6px 10px;border-bottom:1px solid var(--pk-border,#e5e7eb)"></div>
         <div id="pk-ai-cs-row">
           <label>CS đang dùng</label>
           <select id="pk-cs-sel"></select>
@@ -442,10 +444,41 @@
     panelEl.querySelector("#pk-ai-refresh").addEventListener("click", () => {
       requestSuggestion(true);
     });
-    panelEl.querySelector("#pk-ai-collapse").addEventListener("click", () => {
+    var _AI_PROVIDER_LABEL = { grok: "Grok (xAI)", gemini: "Gemini (Google)", openai: "OpenAI (ChatGPT)" };
+  function _refreshAiKeyBanner() {
+    var box = panelEl && panelEl.querySelector("#pk-ai-key-banner");
+    if (!box) return;
+    chrome.storage.sync.get(["aiProvider", "aiApiKey"], (s) => {
+      if (s.aiProvider && s.aiApiKey) {
+        box.style.display = "block";
+        box.style.background = "#f0fdf4"; box.style.color = "#166534";
+        box.innerHTML = "🔑 Đang dùng AI riêng: <b>" + (_AI_PROVIDER_LABEL[s.aiProvider] || s.aiProvider) + "</b> — bấm ⚙ AI để đổi/xoá.";
+      } else if (s.aiProvider && !s.aiApiKey) {
+        box.style.display = "block";
+        box.style.background = "#fffbeb"; box.style.color = "#92400e";
+        box.innerHTML = "⚠️ Đã chọn " + (_AI_PROVIDER_LABEL[s.aiProvider] || s.aiProvider) + " nhưng chưa dán API Key — bấm ⚙ AI để hoàn tất, tạm thời vẫn dùng AI chung.";
+      } else {
+        box.style.display = "none";
+      }
+    });
+  }
+
+  panelEl.querySelector("#pk-ai-collapse").addEventListener("click", () => {
       panelEl.classList.toggle("pk-ai-collapsed");
       try { chrome.storage.local.set({ pkPanelCollapsed: panelEl.classList.contains("pk-ai-collapsed") }); } catch (e) {}
     });
+    panelEl.querySelector("#pk-ai-settings").addEventListener("click", () => {
+      // content script khong co quyen goi thang chrome.runtime.openOptionsPage() — nho background mo ho.
+      chrome.runtime.sendMessage({ type: "OPEN_OPTIONS" });
+    });
+    _refreshAiKeyBanner();
+    // CS luu key o trang Options (tab rieng) — panel dang mo can tu cap nhat lai banner khi co
+    // thay doi, khong bat CS phai bam F5 lai trang Messenger/Pancake.
+    try {
+      chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === "sync" && (changes.aiProvider || changes.aiApiKey)) _refreshAiKeyBanner();
+      });
+    } catch (e) {}
     panelEl.querySelector("#pk-ai-phone-btn").addEventListener("click", () => {
       const raw = panelEl.querySelector("#pk-ai-phone-input").value;
       const phone = normPhone(raw);
@@ -1644,6 +1677,31 @@
     return isNaN(n) ? 0 : n;
   }
 
+  // Cot "Chất liệu"/"Kiểu-Size" trong DANH_MUC đôi khi nhét NHIỀU lựa chọn vào chung 1 ô theo
+  // dạng "1. Aqua xanh biển 2. Citrin: vàng mỡ gà 3. Thạch anh..." thay vì tách riêng từng dòng.
+  // Trước đây "+ Thêm" nhét thẳng cả chuỗi thô này vào ô Chất liệu của giỏ hàng — Sale phải tự
+  // tay xoá bớt, dễ gửi nhầm nguyên cụm cho khách. Hàm này nhận diện đúng dạng đánh số 1,2,3...
+  // liên tục và tách thành mảng lựa chọn riêng lẻ; trả về null nếu chuỗi KHÔNG phải danh sách
+  // đánh số (ví dụ "BẠC 925 CÓ XỈ TRẮNG" — có số nhưng không phải số thứ tự liên tục từ 1).
+  function _parseNumberedList_(str) {
+    str = String(str || '').trim();
+    if (!str) return null;
+    const re = /(\d+)\.\s*/g;
+    const marks = [];
+    let m;
+    while ((m = re.exec(str))) marks.push({ idx: m.index, num: Number(m[1]), end: re.lastIndex });
+    if (marks.length < 2) return null;
+    for (let i = 0; i < marks.length; i++) { if (marks[i].num !== i + 1) return null; }
+    const out = [];
+    for (let i = 0; i < marks.length; i++) {
+      const start = marks[i].end;
+      const stop = i + 1 < marks.length ? marks[i + 1].idx : str.length;
+      const piece = str.slice(start, stop).trim();
+      if (piece) out.push(piece);
+    }
+    return out.length >= 2 ? out : null;
+  }
+
   // ══════════════════════════ SOẠN ĐƠN (gõ tên → lọc → dropdown thu hẹp dần) ══════════════════════════
   // Luồng: gõ tên (VD "tỳ hưu") → hiện TẤT CẢ tên thương mại/tên sản phẩm liên quan → chọn Tên →
   // Nhóm SP / Kiểu-Size / Chất liệu (chỉ gồm lựa chọn có thật của sản phẩm đó) → Màu, Đậm/nhạt (ghi chú
@@ -1947,13 +2005,18 @@
   }
 
   function addToCart_(item) {
+    // Neu Chat lieu la 1 o gom nhieu lua chon danh so chung (vd "1. X 2. Y 3. Z") thi tach rieng
+    // thanh danh sach de Sale TICK CHON tung cai (co the chon nhieu) thay vi nhet ca cum cho khach.
+    // Chua chon gi -> chatLieu de trong (khong con mac dinh nhet nguyen chuoi tho nhu truoc).
+    const clOptions = _parseNumberedList_(item.chatLieu);
     _cartItems.push({
       id: 'ci_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
       name: item.name || '(chưa đặt tên)',
       note: item.note || '',
       qty: item.qty || 1,
       price: item.price || 0,
-      chatLieu: item.chatLieu || '',
+      chatLieu: clOptions ? '' : (item.chatLieu || ''),
+      chatLieuOptions: clOptions || null,
       mauSac: item.mauSac || '',
       size: item.size || '',
       promoType: item.promoType || 'none',   // CTKM riêng của dòng: none | amount (k) | percent | gift
@@ -1972,7 +2035,23 @@
     panelEl.querySelector('#pk-cart-count').textContent = _cartItems.filter(i => i.checked).length;
 
     const list = panelEl.querySelector('#pk-cart-list');
-    list.innerHTML = _cartItems.map((it) => `
+    list.innerHTML = _cartItems.map((it) => {
+      // Neu day la dong co Chat lieu duoc tach tu 1 o gom nhieu lua chon (xem _parseNumberedList_
+      // trong addToCart_), hien checkbox tick tung lua chon (duoc tick nhieu) thay vi 1 o text
+      // nhet nguyen chuoi. Dong nhap thu cong / chat lieu don gian (vd "VÀNG 10K") van la o text
+      // nhu cu — khong ep phai co danh sach khi khong can.
+      const selectedCl = new Set((it.chatLieu || '').split(',').map((s) => s.trim()).filter(Boolean));
+      const chatLieuHtml = (it.chatLieuOptions && it.chatLieuOptions.length)
+        ? `<div class="pk-cart-chatlieu-multi">
+            <div class="pk-cl-multi-label">Chất liệu (tick 1 hoặc nhiều):</div>
+            ${it.chatLieuOptions.map((opt) => `
+              <label class="pk-cl-opt">
+                <input type="checkbox" class="pk-cl-opt-chk" data-opt="${escapeHtml(opt)}" ${selectedCl.has(opt) ? 'checked' : ''} />
+                <span>${escapeHtml(opt)}</span>
+              </label>`).join('')}
+          </div>`
+        : `<input type="text" class="pk-cart-chatlieu" value="${escapeHtml(it.chatLieu || '')}" placeholder="Chất liệu" />`;
+      return `
       <div class="pk-cart-row" data-id="${it.id}">
         <input type="checkbox" class="pk-cart-chk" ${it.checked ? 'checked' : ''} />
         <input type="text" class="pk-cart-name" value="${escapeHtml(it.name)}" placeholder="Tên sản phẩm" />
@@ -1980,7 +2059,7 @@
         <input type="number" class="pk-cart-price" value="${_cartExtra.priceInK ? (it.price ? it.price / 1000 : '') : it.price}" min="0" title="${_cartExtra.priceInK ? 'Đơn giá (nghìn đ — gõ 2800 = 2.800.000đ)' : 'Đơn giá (đ)'}" />
         <button class="pk-cart-del" title="Xoá dòng này">✕</button>
         <div class="pk-cart-detail-row">
-          <input type="text" class="pk-cart-chatlieu" value="${escapeHtml(it.chatLieu || '')}" placeholder="Chất liệu" />
+          ${chatLieuHtml}
           <input type="text" class="pk-cart-mausac" value="${escapeHtml(it.mauSac || '')}" placeholder="Màu sắc" />
           <input type="text" class="pk-cart-size" value="${escapeHtml(it.size || '')}" placeholder="Size" />
         </div>
@@ -1996,7 +2075,18 @@
         </div>
         ${it.note ? `<div class="pk-cart-note">${escapeHtml(it.note)}</div>` : ''}
       </div>
-    `).join('') || '<div class="pk-cart-empty">Chưa có sản phẩm nào. Dùng tab "Soạn đơn" hoặc "+ Thêm" ở kết quả tra giá phía trên, hoặc "+ Thêm dòng thủ công".</div>';
+    `;
+    }).join('') || '<div class="pk-cart-empty">Chưa có sản phẩm nào. Dùng tab "Soạn đơn" hoặc "+ Thêm" ở kết quả tra giá phía trên, hoặc "+ Thêm dòng thủ công".</div>';
+
+    list.querySelectorAll('.pk-cl-opt-chk').forEach((chk) => {
+      chk.addEventListener('change', (e) => {
+        const rowEl = e.target.closest('.pk-cart-row');
+        const id = rowEl.dataset.id;
+        const checkedOpts = [...rowEl.querySelectorAll('.pk-cl-opt-chk:checked')].map((c) => c.dataset.opt);
+        _updateCartItem_(id, 'chatLieu', checkedOpts.join(', '), true);
+        saveCart_();
+      });
+    });
 
     list.querySelectorAll('.pk-cart-row').forEach((row) => {
       const id = row.dataset.id;
@@ -2005,8 +2095,10 @@
       nameEl.addEventListener('input', (e) => { _updateCartItem_(id, 'name', e.target.value, true); });
       nameEl.addEventListener('change', () => { saveCart_(); });
       const chatLieuEl = row.querySelector('.pk-cart-chatlieu');
-      chatLieuEl.addEventListener('input', (e) => { _updateCartItem_(id, 'chatLieu', e.target.value, true); });
-      chatLieuEl.addEventListener('change', () => { saveCart_(); });
+      if (chatLieuEl) {
+        chatLieuEl.addEventListener('input', (e) => { _updateCartItem_(id, 'chatLieu', e.target.value, true); });
+        chatLieuEl.addEventListener('change', () => { saveCart_(); });
+      }
       const mauSacEl = row.querySelector('.pk-cart-mausac');
       mauSacEl.addEventListener('input', (e) => { _updateCartItem_(id, 'mauSac', e.target.value, true); });
       mauSacEl.addEventListener('change', () => { saveCart_(); });

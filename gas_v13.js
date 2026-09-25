@@ -90,7 +90,7 @@ var TEAM_HEADERS   = ['id','name','leader','members','color','channels','ratePct
 var AUDIT_HEADERS  = ['timestamp','user','action','phone','oldValue','newValue'];
 var SET_HEADERS    = ['key','value'];
 var ASSIGN_HEADERS = ['id','date','csName','label','phones','donePhones'];
-var USER_HEADERS   = ['username','passHash','role','name','team','active','names','perms'];
+var USER_HEADERS   = ['username','passHash','role','name','team','active','names','perms','saleType','startDate'];
 // PK_STATS_HEADERS: 1 dong = 1 "Nhan vien" (ten hien thi tren Pancake) trong 1 Page, 1 ngay —
 // nhap tu file Excel "Thong ke tuong tac" (pages_statistics_engagements) Pancake xuat ra.
 // Khoa duy nhat = date+pageId+nhanVien -> nap lai file CUNG 1 ngay se GHI DE (khong nhan doi).
@@ -809,7 +809,9 @@ function readUsers_(sh) {
       active: (v[i][5]===''||v[i][5]===undefined) ? true :
               (v[i][5]===true||v[i][5]==='TRUE'||v[i][5]==='true'||v[i][5]===1),
       names: namesArr,
-      perms: permsArr
+      perms: permsArr,
+      saleType: v[i][8] || '',   // 'online' | 'offline' | '' — dung de tinh Bao cao hoa hong dung chuong trinh thuong
+      startDate: v[i][9] || ''   // YYYY-MM-DD — moc "ngay bat dau" de tinh cac muc thuong theo "ngay thu N" (sale thu viec)
     });
   }
   return out;
@@ -959,6 +961,15 @@ function doGet(e) {
       var resA = buildSalesReportA_(fA);
       try { cacheA.put(cKeyA, JSON.stringify(resA), 120); } catch(ec) {}
       return jsonOut_(resA);
+    }
+    if (action === 'saleKpiReport') {
+      var pF = e.parameter || {};
+      var fF = { dateFrom: pF.dateFrom || '', dateTo: pF.dateTo || '',
+                 dateField: pF.dateField || 'ngayTao',
+                 sale: pF.sale ? pF.sale.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [],
+                 kenh: pF.kenh ? pF.kenh.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [],
+                 sanPham: pF.sanPham || '', byCreator: false };
+      return jsonOut_(buildSaleKpiReport_(fF));
     }
     if (action === 'salesReportB') {
       var pB = e.parameter || {};
@@ -1947,6 +1958,111 @@ function buildSalesReportA_(filters) {
       };
     })
   };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BAO CAO F: TY LE HOAN THANH KPI THEO SALE — theo yeu cau Duyen 2026-09.
+//  - Sale van phong (Nhom = "Văn phòng" trong SaleDirectory) duoc gan 1 trong 3 BAC, moi bac 1
+//    muc KPI rieng (mac dinh Bac 1 = 400tr, Bac 2 = 500tr, Bac 3 = 500tr — Duyen tu sua duoc).
+//  - Sale online (Nhom = "Online") KHONG chia bac, dung CHUNG 1 muc KPI (mac dinh 500tr).
+//  - Moi Sale (bat ke van phong/online) co the dat 1 muc KPI COMMIT RIENG, UU TIEN TUYET DOI
+//    hon bac/nhom neu co dat.
+//  Cau hinh luu O 1 SETTING DUY NHAT 'saleKpiConfig' — KHONG chia theo thang, sua la ap dung
+//  ngay (giong het co che "% hoa hong ca nhan" / individualRates da co san, client tu doc/ghi
+//  qua action getSetting/setSetting chung, KHONG can route rieng cho phan luu cau hinh).
+// ═══════════════════════════════════════════════════════════════
+var SALE_KPI_DEFAULT_CFG_ = {
+  tierTargets: { '1': 400000000, '2': 500000000, '3': 500000000 },
+  onlineTarget: 500000000,
+  tiers: {},      // ten Sale (dung y het chuoi "Sale bán" trong DT TONG) -> '1'|'2'|'3'
+  overrides: {}   // ten Sale -> so tien KPI rieng (uu tien tuyet doi, bo qua bac/nhom)
+};
+
+function readSaleKpiConfig_() {
+  var out = JSON.parse(JSON.stringify(SALE_KPI_DEFAULT_CFG_));
+  try {
+    var raw = getSetting_('saleKpiConfig');
+    if (raw) {
+      var o = JSON.parse(raw);
+      if (o && typeof o === 'object') {
+        if (o.tierTargets) { ['1', '2', '3'].forEach(function(k) { var n = Number(o.tierTargets[k]); if (!isNaN(n) && n >= 0) out.tierTargets[k] = n; }); }
+        if (o.onlineTarget !== undefined) { var n2 = Number(o.onlineTarget); if (!isNaN(n2) && n2 >= 0) out.onlineTarget = n2; }
+        if (o.tiers && typeof o.tiers === 'object') out.tiers = o.tiers;
+        if (o.overrides && typeof o.overrides === 'object') out.overrides = o.overrides;
+      }
+    }
+  } catch (e) {}
+  return out;
+}
+
+// Doanh thu thuc te dung lai DUNG buildSalesReportA_ (cung bo loc ngay/sale/kenh, cung quy uoc
+// chia deu N-sale/don) — khong tao them 1 cach tinh doanh thu rieng de tranh so lieu lech nhau
+// giua cac bao cao. Nhom (Van phong/Online) khop qua SaleDirectory, dung DUNG _normTxt_ nhu
+// buildKpiReport_ da dung (client KHONG the tu lam viec nay chinh xac — _foldVi phia client bo
+// dau, con _normTxt_ o day KHONG bo dau, 2 ham fold khac nhau se khop SAI ten co dau).
+function buildSaleKpiReport_(filters) {
+  var a = buildSalesReportA_(filters);
+  var cfg = readSaleKpiConfig_();
+  // Nhom Van phong/Online: dung CHUNG 1 nguon voi "🏆 Chương trình thưởng" o Bao cao E — setting
+  // 'saleChannels' ({ ten Sale -> 'online'|'offline' }, cai o modal "🏷️ Phân loại Online/Offline"
+  // trong Quan ly Team) — THEO YEU CAU DUYEN 2026-09 (truoc do dang dung 2 nguon khac nhau: cho
+  // nay dung SaleDirectory, ben Chuong trinh thuong dung saleChannels — gay lech nhau).
+  var channels = {};
+  try {
+    var rawCh = getSetting_('saleChannels');
+    if (rawCh) { var oCh = JSON.parse(rawCh); if (oCh && typeof oCh === 'object') channels = oCh; }
+  } catch (eCh) {}
+
+  var rowsMap = {};
+  function ensureRow(name) {
+    if (!rowsMap[name]) {
+      var ch = channels[name] || '';
+      var nhom = ch === 'online' ? 'Online' : (ch === 'offline' ? 'Văn phòng' : '(chưa phân loại)');
+      rowsMap[name] = { name: name, nhom: nhom, revenue: 0, orders: 0 };
+    }
+    return rowsMap[name];
+  }
+  (a.bySale || []).forEach(function(s) {
+    var r = ensureRow(s.name);
+    r.revenue += s.giaTri; r.orders += s.orders;
+  });
+  // Them ca Sale DA duoc phan loai Online/Offline nhung CHUA co doanh thu trong ky dang xem (0d)
+  // — de van thay duoc muc tieu/0% thay vi bien mat khoi bao cao chi vi ky nay chua ban duoc gi.
+  Object.keys(channels).forEach(function(name) { if (channels[name]) ensureRow(name); });
+
+  var rows = Object.keys(rowsMap).map(function(name) {
+    var r = rowsMap[name];
+    var target = null, source = 'no-tier', tier = '';
+    if (cfg.overrides[name] !== undefined && cfg.overrides[name] !== null) {
+      target = Number(cfg.overrides[name]) || 0; source = 'override';
+    } else if (r.nhom === 'Online') {
+      target = cfg.onlineTarget; source = 'online';
+    } else if (r.nhom === 'Văn phòng') {
+      tier = cfg.tiers[name] || '';
+      if (tier) { target = cfg.tierTargets[tier] || 0; source = 'tier'; }
+      else { source = 'no-tier'; }
+    } else {
+      source = 'unclassified'; // chua duoc gan Online/Offline o "🏷️ Phân loại Online/Offline" -> khong tu doan
+    }
+    var pct = (target && target > 0) ? Math.round(r.revenue / target * 1000) / 10 : null;
+    return { name: name, nhom: r.nhom, tier: tier, revenue: r.revenue, orders: r.orders,
+      target: target, source: source, pct: pct, passed: (pct !== null) ? pct >= 100 : null };
+  });
+  var rank = { 'Văn phòng': 0, 'Online': 1 };
+  rows.sort(function(x, y) {
+    var rx = rank.hasOwnProperty(x.nhom) ? rank[x.nhom] : 2, ry = rank.hasOwnProperty(y.nhom) ? rank[y.nhom] : 2;
+    if (rx !== ry) return rx - ry;
+    if (x.nhom === 'Văn phòng' && x.tier !== y.tier) return (x.tier || '9').localeCompare(y.tier || '9');
+    return y.revenue - x.revenue;
+  });
+
+  var totalRevenue = rows.reduce(function(s, r) { return s + r.revenue; }, 0);
+  var totalTarget = rows.reduce(function(s, r) { return s + (r.target || 0); }, 0);
+  return { ok: true, rows: rows, config: cfg,
+    totalRevenue: totalRevenue, totalTarget: totalTarget,
+    totalPct: totalTarget > 0 ? Math.round(totalRevenue / totalTarget * 1000) / 10 : null,
+    classifiedCount: Object.keys(channels).filter(function(k){ return channels[k]; }).length,
+    totalOrders: a.totalOrders, totalGiaTri: a.totalGiaTri };
 }
 
 // ── BAO CAO B: theo "dữ liệu đơn" (bao gom bao cao san pham) ──
@@ -3676,6 +3792,14 @@ function buildKpiReport_(from, to, saleFilter) {
   var orders = readAllOrders_();
   var byPageOrders = {}, bySaleOrders = {};
   var ordersDetail = []; // danh sach tung don khop khoang ngay -> xuat Excel de doi chieu tay voi Base
+  // Kenh nay KHONG co du lieu tren Pancake (khong xuat hien trong file "Thong ke tuong tac" /
+  // "Thong ke nhan vien" ma Duyen nap vao) nen mau so "tongTT" cua Sale phu trach kenh nay
+  // KHONG he tang len du don van ve. Neu van cong don cua kenh nay vao tu so (donHang) thi
+  // "Ty le chot" bi thoi phong ao (tu so tang, mau so dung yen). Quy uoc: loai don cua kenh
+  // nay khoi CA so don LAN doanh thu dung de tinh bySale/tyLeChot (khong dung lam mau so ty
+  // le chua co du lieu doi chieu). Bang theo Page (byPage) khong bi anh huong gi vi von di
+  // da chi liet ke cac Page CO trong Pancake (xem pageInfo o duoi), khong lien quan kenh nay.
+  var KPI_TYLECHOT_EXCLUDED_KENH_ = 'Fb Phạm Thu Hiền';
   for (var i = 0; i < orders.length; i++) {
     var o = orders[i];
     var d = parseVNDate_(o.orderDate);
@@ -3696,6 +3820,8 @@ function buildKpiReport_(from, to, saleFilter) {
       id: o.id || '', ngayTao: normOrderDate_(o.orderDate), kenhBan: page,
       sale: o.cs || '', giaTriDon: Number(o.revenue) || 0, sanPham: o.product || '', phone: o.phone || ''
     });
+
+    if (_normTxt_(page) === _normTxt_(KPI_TYLECHOT_EXCLUDED_KENH_)) continue; // bo qua kenh khong co tren Pancake — khong tinh vao bySale/tyLeChot
 
     var salesList = splitMulti_(o.cs, ',');
     if (!salesList.length) salesList = ['(chưa gán sale)'];
@@ -3909,7 +4035,8 @@ function saveUsers_(users) {
     matrix.push([String(u.username||''), String(u.passHash||''), u.role||'cs',
                  namesArr[0]||u.name||'', u.team||'', (u.active===false?false:true),
                  JSON.stringify(namesArr),
-                 (Array.isArray(u.perms) ? JSON.stringify(u.perms) : '')]);
+                 (Array.isArray(u.perms) ? JSON.stringify(u.perms) : ''),
+                 u.saleType||'', u.startDate||'']);
   }
   sh.getRange(1, 1, matrix.length, USER_HEADERS.length).setValues(matrix);
   return jsonOut_({ ok: true, written: users.length });
