@@ -290,9 +290,11 @@
           <div style="font-weight:700">🤖 Pancake AI</div>
           <div style="font-size:10px;font-weight:400;opacity:.85">Tra cứu & gợi ý phản hồi khách</div>
         </div>
+        <button id="pk-ai-settings" title="Cài đặt AI cá nhân (dùng key riêng thay vì AI dùng chung)" style="background:rgba(255,255,255,.2);border:none;border-radius:5px;color:#fff;padding:3px 7px;font-size:11px;cursor:pointer;margin-right:6px;white-space:nowrap">⚙ AI</button>
         <button id="pk-ai-collapse" title="Thu gọn">—</button>
       </div>
       <div id="pk-ai-body">
+        <div id="pk-ai-key-banner" style="display:none;font-size:11px;padding:6px 10px;border-bottom:1px solid var(--pk-border,#e5e7eb)"></div>
         <div id="pk-ai-cs-row">
           <label>CS đang dùng</label>
           <select id="pk-cs-sel"></select>
@@ -442,10 +444,41 @@
     panelEl.querySelector("#pk-ai-refresh").addEventListener("click", () => {
       requestSuggestion(true);
     });
-    panelEl.querySelector("#pk-ai-collapse").addEventListener("click", () => {
+    var _AI_PROVIDER_LABEL = { grok: "Grok (xAI)", gemini: "Gemini (Google)", openai: "OpenAI (ChatGPT)" };
+  function _refreshAiKeyBanner() {
+    var box = panelEl && panelEl.querySelector("#pk-ai-key-banner");
+    if (!box) return;
+    chrome.storage.sync.get(["aiProvider", "aiApiKey"], (s) => {
+      if (s.aiProvider && s.aiApiKey) {
+        box.style.display = "block";
+        box.style.background = "#f0fdf4"; box.style.color = "#166534";
+        box.innerHTML = "🔑 Đang dùng AI riêng: <b>" + (_AI_PROVIDER_LABEL[s.aiProvider] || s.aiProvider) + "</b> — bấm ⚙ AI để đổi/xoá.";
+      } else if (s.aiProvider && !s.aiApiKey) {
+        box.style.display = "block";
+        box.style.background = "#fffbeb"; box.style.color = "#92400e";
+        box.innerHTML = "⚠️ Đã chọn " + (_AI_PROVIDER_LABEL[s.aiProvider] || s.aiProvider) + " nhưng chưa dán API Key — bấm ⚙ AI để hoàn tất, tạm thời vẫn dùng AI chung.";
+      } else {
+        box.style.display = "none";
+      }
+    });
+  }
+
+  panelEl.querySelector("#pk-ai-collapse").addEventListener("click", () => {
       panelEl.classList.toggle("pk-ai-collapsed");
       try { chrome.storage.local.set({ pkPanelCollapsed: panelEl.classList.contains("pk-ai-collapsed") }); } catch (e) {}
     });
+    panelEl.querySelector("#pk-ai-settings").addEventListener("click", () => {
+      // content script khong co quyen goi thang chrome.runtime.openOptionsPage() — nho background mo ho.
+      chrome.runtime.sendMessage({ type: "OPEN_OPTIONS" });
+    });
+    _refreshAiKeyBanner();
+    // CS luu key o trang Options (tab rieng) — panel dang mo can tu cap nhat lai banner khi co
+    // thay doi, khong bat CS phai bam F5 lai trang Messenger/Pancake.
+    try {
+      chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === "sync" && (changes.aiProvider || changes.aiApiKey)) _refreshAiKeyBanner();
+      });
+    } catch (e) {}
     panelEl.querySelector("#pk-ai-phone-btn").addEventListener("click", () => {
       const raw = panelEl.querySelector("#pk-ai-phone-input").value;
       const phone = normPhone(raw);
