@@ -1,7 +1,8 @@
 // background.js — Service worker (MV3)
 // Gọi thẳng backend Google Apps Script (GAS_URL) của CRM Duyencr — KHÔNG dùng chung
 // với link Sasum cũ nữa (2 hệ thống đã tách biệt hoàn toàn). Không có server Flask/RAG
-// riêng, mọi request đi qua 1 Web App GAS: POST { action:'ai', prompt, withProducts }.
+// riêng, mọi request (trừ khi CS cấu hình "AI cá nhân" — xem callAI_ dưới) đi qua 1 Web App
+// GAS: POST { action:'ai', prompt, withProducts }.
 
 const OLD_SASUM_GAS_URL = "https://script.google.com/macros/s/AKfycbwPQ4HwD8R1HQFtU0xQslqGgr4HSlgzQlWFZs-8mtVY1CK9kBvwJWsIOzVuj6WM1mg-/exec";
 
@@ -389,6 +390,97 @@ function parseDateSafe(d) {
   return isNaN(t) ? 0 : t;
 }
 
+// ─── Goi truc tiep Gemini (dinh dang rieng cua Google) bang key CA NHAN cua CS — cung
+// dinh dang request/response voi _aiGemini_ trong gas_v13.js de nhat quan, nhung goi THANG
+// tu may CS toi Google (khong qua GAS, khong dung key chung cua team). model mac dinh dung
+// alias 'gemini-flash-latest' (luon tro toi ban Flash moi nhat con duoc ho tro) — KHONG dung
+// 'gemini-2.0-flash' nhu truoc day vi model do Google da chinh thuc khai tu/shutdown.
+async function _callGeminiDirect_(apiKey, model, prompt) {
+  const m = (model || "").trim() || "gemini-flash-latest";
+  const url = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(m) + ":generateContent?key=" + encodeURIComponent(apiKey);
+  let res, txt;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 400 }
+      })
+    });
+    txt = await res.text();
+  } catch (e) {
+    throw new Error("Không gọi được Gemini (mạng/CORS): " + e.message);
+  }
+  if (!res.ok) {
+    let msg = txt;
+    try { const j = JSON.parse(txt); msg = (j.error && j.error.message) || txt; } catch (e) {}
+    // Loi hay gap: 400 API key khong hop le (sai/thieu quyen), 404 sai ten model (vd model da
+    // bi Google khai tu), 429 het quota mien phi trong ngay.
+    throw new Error(`Gemini lỗi ${res.status}: ${String(msg).substring(0, 300)}`);
+  }
+  let d;
+  try { d = JSON.parse(txt); } catch (e) { throw new Error("Gemini trả về dữ liệu không đọc được: " + txt.substring(0, 200)); }
+  const t = d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts && d.candidates[0].content.parts[0] && d.candidates[0].content.parts[0].text;
+  if (!t) {
+    // Vd bi chan boi safety filter -> candidates[0].finishReason = 'SAFETY', khong co text.
+    const reason = d.candidates && d.candidates[0] && d.candidates[0].finishReason;
+    throw new Error("Gemini không trả về nội dung" + (reason ? ` (finishReason: ${reason})` : "") + ".");
+  }
+  return { text: t, provider: "Gemini (key riêng)" };
+}
+
+// ─── Goi truc tiep OpenAI (chat completions) bang key CA NHAN cua CS ───
+async function _callOpenAiDirect_(apiKey, model, prompt) {
+  const m = (model || "").trim() || "gpt-5.4-mini";
+  let res, txt;
+  try {
+    res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
+      body: JSON.stringify({
+        model: m,
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.7,
+        max_tokens: 400
+      })
+    });
+    txt = await res.text();
+  } catch (e) {
+    throw new Error("Không gọi được OpenAI (mạng/CORS): " + e.message);
+  }
+  if (!res.ok) {
+    let msg = txt;
+    try { const j = JSON.parse(txt); msg = (j.error && j.error.message) || txt; } catch (e) {}
+    throw new Error(`OpenAI lỗi ${res.status}: ${String(msg).substring(0, 300)}`);
+  }
+  let d;
+  try { d = JSON.parse(txt); } catch (e) { throw new Error("OpenAI trả về dữ liệu không đọc được: " + txt.substring(0, 200)); }
+  const t = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;
+  if (!t) throw new Error("OpenAI không trả về nội dung.");
+  return { text: t, provider: "OpenAI (key riêng)" };
+}
+
+// ─── Dispatcher dung chung cho MOI noi can sinh van ban AI (tra loi tin khach / 3 cau mo
+// dau / follow-up nhac hen): neu CS da cau hinh "AI ca nhan" (Options → dien Provider +
+// API Key) thi goi THANG toi nha cung cap do tu chinh may CS, khong di qua GAS/key chung cua
+// team. Neu chua cau hinh (hoac con gia tri 'grok' cu luu tu truoc khi bo Grok khoi UI — xem
+// commit lien quan) thi roi ve duong cu, goi GAS dung AI chung, KHONG bao loi.
+//
+// Luu y quan trong: goi truc tiep kieu nay se KHONG co tinh nang "Tra cuu san pham" (tu dinh
+// kem anh tu Google Drive) vi tinh nang do can GAS truy cap Drive cua team — AI rieng chi
+// tra ve van ban.
+async function callAI_(cfg, prompt, withProducts) {
+  if (cfg.aiProvider === "gemini" && cfg.aiApiKey) {
+    return await _callGeminiDirect_(cfg.aiApiKey, cfg.aiModel, prompt);
+  }
+  if (cfg.aiProvider === "openai" && cfg.aiApiKey) {
+    return await _callOpenAiDirect_(cfg.aiApiKey, cfg.aiModel, prompt);
+  }
+  const data = await callAiWithRetry_(cfg.gasUrl, prompt, withProducts);
+  return { text: data.text, provider: data.provider, image: data.image || null, imageSkipped: data.imageSkipped || null };
+}
+
 // Goi GAS action:'ai' (co retry khi Groq bao 429/rate-limit) — dung chung cho ca tra loi tin
 // khach lan "3 cau mo dau" lan follow-up, tranh lap code retry 3 lan rieng le.
 async function callAiWithRetry_(gasUrl, prompt, withProducts) {
@@ -429,11 +521,12 @@ async function handleFetchSuggestion(payload) {
 
   const prompt = buildPrompt(payload);
   const withProducts = payload?.withProducts !== undefined ? payload.withProducts : !!cfg.useProducts;
-  const data = await callAiWithRetry_(cfg.gasUrl, prompt, withProducts);
+  const data = await callAI_(cfg, prompt, withProducts);
   // GAS trả về { ok:true, text:"...", provider:"...", image?: {name, base64, mimeType},
   // imageSkipped?: {name, reason} } — image chỉ có khi bật "Tra cứu sản phẩm" và tên 1 file
   // ảnh trong thư mục kiến thức Drive khớp từ khoá; imageSkipped báo trường hợp khớp tên
   // nhưng file >3MB nên GAS không đọc được — content.js hiện nút "Copy ảnh" hoặc cảnh báo tương ứng.
+  // (Khi dùng AI riêng qua callAI_, image/imageSkipped luôn null — xem ghi chú trên callAI_.)
   return {
     suggestion: (data.text || "").trim(),
     provider: data.provider,
@@ -497,7 +590,7 @@ async function handleFetchOpener(payload) {
     `Ngắn gọn, tự nhiên, tiếng Việt, không giống mẫu quảng cáo.`;
 
   const withProducts = payload?.withProducts !== undefined ? payload.withProducts : !!cfg.useProducts;
-  const data = await callAiWithRetry_(cfg.gasUrl, prompt, withProducts);
+  const data = await callAI_(cfg, prompt, withProducts);
   return { suggestion: (data.text || "").trim(), provider: data.provider };
 }
 
@@ -529,7 +622,7 @@ async function handleFetchFollowUpSuggestion(payload) {
     (payload?.note ? `Ghi chú lịch hẹn: ${payload.note}\n` : "") +
     `Soạn 1 tin nhắn hỏi thăm/follow-up chủ động, ngắn gọn, thân thiện, tiếng Việt tự nhiên để chủ động nhắn cho khách này hôm nay.`;
 
-  const data = await callAiWithRetry_(cfg.gasUrl, prompt, !!cfg.useProducts);
+  const data = await callAI_(cfg, prompt, !!cfg.useProducts);
   return { suggestion: (data.text || "").trim(), provider: data.provider };
 }
 

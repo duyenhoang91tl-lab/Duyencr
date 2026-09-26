@@ -83,11 +83,13 @@
     rồi dán vào đây. <b>Key chỉ lưu trên trình duyệt của bạn</b> (không gửi lên server công ty,
     không ai khác xem được) — gọi thẳng từ máy bạn tới nhà cung cấp AI. Để trống ô Provider (chọn
     "Dùng chung") thì extension hoạt động như cũ, không cần làm gì thêm.
+    <br /><b>Lưu ý:</b> khi dùng AI riêng, tính năng "Tra cứu sản phẩm" (tự đính kèm ảnh từ
+    Google Drive) sẽ KHÔNG hoạt động — tính năng đó cần đi qua GAS của team. AI riêng chỉ soạn
+    được câu chữ trả lời.
   </div>
   <label>Provider</label>
   <select id="aiProvider">
     <option value="">— Dùng chung (mặc định, qua backend công ty) —</option>
-    <option value="grok">Grok (xAI)</option>
     <option value="gemini">Gemini (Google)</option>
     <option value="openai">OpenAI (ChatGPT)</option>
   </select>
@@ -98,7 +100,7 @@
   </div>
   <div class="hint" id="aiProviderHint" style="display:none"></div>
   <label>Model <small>(để trống dùng mặc định — có thể sửa nếu nhà cung cấp đổi tên model)</small></label>
-  <input type="text" id="aiModel" placeholder="vd: grok-2-latest / gemini-2.0-flash / gpt-4o-mini" />
+  <input type="text" id="aiModel" placeholder="vd: gemini-flash-latest / gpt-5.4-mini" />
 
   <button id="save">Lưu cài đặt</button>
   <button id="reset" style="background:#6b7280;margin-left:8px;">↺ Đặt lại về mặc định</button>

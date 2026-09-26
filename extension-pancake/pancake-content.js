@@ -444,7 +444,7 @@
     panelEl.querySelector("#pk-ai-refresh").addEventListener("click", () => {
       requestSuggestion(true);
     });
-    var _AI_PROVIDER_LABEL = { grok: "Grok (xAI)", gemini: "Gemini (Google)", openai: "OpenAI (ChatGPT)" };
+    var _AI_PROVIDER_LABEL = { gemini: "Gemini (Google)", openai: "OpenAI (ChatGPT)" };
   function _refreshAiKeyBanner() {
     var box = panelEl && panelEl.querySelector("#pk-ai-key-banner");
     if (!box) return;

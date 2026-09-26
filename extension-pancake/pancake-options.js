@@ -8,9 +8,8 @@ document.getElementById("toggleAiKey").addEventListener("click", () => {
 });
 
 const AI_PROVIDER_HINTS = {
-  grok: '🔗 Lấy API Key tại <a href="https://console.x.ai/" target="_blank">console.x.ai</a> (đăng ký tài khoản xAI). Model mặc định: <code>grok-2-latest</code>.',
-  gemini: '🔗 Lấy API Key tại <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> (đăng nhập bằng Google, miễn phí có giới hạn). Model mặc định: <code>gemini-2.0-flash</code>.',
-  openai: '🔗 Lấy API Key tại <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a>. Model mặc định: <code>gpt-4o-mini</code>.'
+  gemini: '🔗 Lấy API Key tại <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> (đăng nhập bằng Google, miễn phí có giới hạn). Model mặc định: <code>gemini-flash-latest</code> (alias luôn trỏ tới bản Flash mới nhất — model cũ <code>gemini-2.0-flash</code> đã bị Google khai tử, không dùng được nữa).',
+  openai: '🔗 Lấy API Key tại <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a>. Model mặc định: <code>gpt-5.4-mini</code>.'
 };
 function updateAiProviderHint() {
   const p = document.getElementById("aiProvider").value;

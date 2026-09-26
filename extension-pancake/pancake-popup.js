@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
   chrome.storage.sync.get(null, (s) => {
     document.getElementById("enabled").checked = s.enabled !== false;
-    const labelByProvider = { grok: "Grok (xAI) — key riêng", gemini: "Gemini — key riêng", openai: "OpenAI — key riêng" };
+    const labelByProvider = { gemini: "Gemini — key riêng", openai: "OpenAI — key riêng" };
     document.getElementById("aiStatus").textContent =
       s.aiProvider && s.aiApiKey ? "🔑 Đang dùng: " + (labelByProvider[s.aiProvider] || s.aiProvider) : "☁️ Đang dùng: AI chung (backend công ty)";
   });
