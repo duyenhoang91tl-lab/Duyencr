@@ -1509,20 +1509,19 @@ function dateInRange_(dt, fromStr, toStr) {
   return true;
 }
 
-// Loai don theo "Trang thai" (cot H, DT TONG) khoi doanh so/so don — theo dung Quy che thu lao
-// thuong Sale Online (HKD Hien Tour, 10/9/2026), Muc 3: "Doanh so tinh thu lao, thuong la doanh
-// so len don SAU KHI TRU gia tri don hang bi huy, tra lai, hoan tien hoac dang trong qua trinh
-// xu ly khieu nai." Khong doi accent-insensitive de khop du go co dau/khong dau/viet tat.
+// Loai don khoi doanh so/so don theo dung 1 nguon DUY NHAT: cot "Trang thai don" (DT TONG:
+// cot H; Bao cao B/POS: token khong-khoang-trang... KHONG, token CO khoang trang trong cot
+// "Thẻ" — xem _donHasExcludedStatus_). KHONG suy dien them tu "Giai doan"/nguon khac.
+// Theo xac nhan cua Duyen (24/09/2026): cot nay CHI TUNG xuat hien dung 6 gia tri can loai —
+// Da hoan, Dang hoan, Dang hoan hang, Da hoan hang, Hoan hang, Hoan tien — so sanh KHOP TOAN
+// BO chuoi (khong phai substring) de tuyet doi khong dung nham cac trang thai khac (vd "Hoan
+// thanh" la don TOT, khong duoc loai). Neu sau nay Pancake/Base sinh them trang thai moi cung
+// nghia "hoan/huy" thi them dung vao mang duoi day, khong doan mo rong bang regex.
+var EXCLUDED_ORDER_STATUSES_ = ['da hoan', 'dang hoan', 'dang hoan hang', 'da hoan hang', 'hoan hang', 'hoan tien'];
 function _isExcludedOrderStatus_(trangThai) {
   var s = _stripVN_(trangThai).trim();
   if (!s) return false;
-  // Trang thai dung GON "Da hoan"/"Dang hoan" (khong kem chu gi khac) — vd Pancake POS ghi tat
-  // trong cot "Thẻ". Dung so sanh TOAN BO chuoi (khong phai substring) de KHONG vo tinh khop
-  // nham "Da hoan thanh" (hoan thanh = tot, KHONG duoc loai) — "da hoan thanh" khac han "da hoan".
-  if (/^(da hoan|dang hoan)$/.test(s)) return true;
-  // "hoan hang" bat cac bien the day du: "Dang hoan hang", "Da hoan hang", "Hoan hang"... (tra
-  // hang ve nguoi ban) — KHONG dung "hoan" don le vi se khop nham voi "hoan thanh".
-  return /that bai|huy|hoan tien|hoan tra|hoan hang|tra lai|khieu nai|khong thanh/.test(s);
+  return EXCLUDED_ORDER_STATUSES_.indexOf(s) !== -1;
 }
 
 

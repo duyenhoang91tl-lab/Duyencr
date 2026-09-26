@@ -9998,20 +9998,19 @@ function dateInRange_(dt, fromStr, toStr) {
   return true;
 }
 
-// Loai don theo "Trang thai" (cot H, DT TONG) khoi doanh so/so don — theo dung Quy che thu lao
-// thuong Sale Online (HKD Hien Tour, 10/9/2026), Muc 3: "Doanh so tinh thu lao, thuong la doanh
-// so len don SAU KHI TRU gia tri don hang bi huy, tra lai, hoan tien hoac dang trong qua trinh
-// xu ly khieu nai." Khong doi accent-insensitive de khop du go co dau/khong dau/viet tat.
+// Loai don khoi doanh so/so don theo dung 1 nguon DUY NHAT: cot "Trang thai don" (DT TONG:
+// cot H; Bao cao B/POS: token khong-khoang-trang... KHONG, token CO khoang trang trong cot
+// "Thẻ" — xem _donHasExcludedStatus_). KHONG suy dien them tu "Giai doan"/nguon khac.
+// Theo xac nhan cua Duyen (24/09/2026): cot nay CHI TUNG xuat hien dung 6 gia tri can loai —
+// Da hoan, Dang hoan, Dang hoan hang, Da hoan hang, Hoan hang, Hoan tien — so sanh KHOP TOAN
+// BO chuoi (khong phai substring) de tuyet doi khong dung nham cac trang thai khac (vd "Hoan
+// thanh" la don TOT, khong duoc loai). Neu sau nay Pancake/Base sinh them trang thai moi cung
+// nghia "hoan/huy" thi them dung vao mang duoi day, khong doan mo rong bang regex.
+var EXCLUDED_ORDER_STATUSES_ = ['da hoan', 'dang hoan', 'dang hoan hang', 'da hoan hang', 'hoan hang', 'hoan tien'];
 function _isExcludedOrderStatus_(trangThai) {
   var s = _stripVN_(trangThai).trim();
   if (!s) return false;
-  // Trang thai dung GON "Da hoan"/"Dang hoan" (khong kem chu gi khac) — vd Pancake POS ghi tat
-  // trong cot "Thẻ". Dung so sanh TOAN BO chuoi (khong phai substring) de KHONG vo tinh khop
-  // nham "Da hoan thanh" (hoan thanh = tot, KHONG duoc loai) — "da hoan thanh" khac han "da hoan".
-  if (/^(da hoan|dang hoan)$/.test(s)) return true;
-  // "hoan hang" bat cac bien the day du: "Dang hoan hang", "Da hoan hang", "Hoan hang"... (tra
-  // hang ve nguoi ban) — KHONG dung "hoan" don le vi se khop nham voi "hoan thanh".
-  return /that bai|huy|hoan tien|hoan tra|hoan hang|tra lai|khieu nai|khong thanh/.test(s);
+  return EXCLUDED_ORDER_STATUSES_.indexOf(s) !== -1;
 }
 
 
@@ -18024,18 +18023,6 @@ var _srState = {
 };
 
 function _srMoney(n){ return fmt(Math.round(n||0)) + '₫'; }
-// Rut gon so tien de vua trong tam bieu do tron (xem _srChartSvg) — KHONG dung o bat ky cho
-// nao khac (bang/chu thich van hien so DAY DU qua _srMoney).
-function _srCompactMoney_(v){
-  v = Math.round(Number(v)||0);
-  var neg = v<0; v = Math.abs(v);
-  var out;
-  if (v >= 1e9) out = (Math.round(v/1e8)/10).toString().replace('.', ',') + ' tỷ';
-  else if (v >= 1e6) out = (Math.round(v/1e5)/10).toString().replace('.', ',') + ' tr';
-  else if (v >= 1e3) out = Math.round(v/1e3) + ' k';
-  else out = fmt(v);
-  return (neg?'-':'') + out + 'đ';
-}
 
 // Dong "Tong" bold, ke tren cung, dung chung cho MOI bang breakdown (Theo Sale/Kenh/MKT/San
 // pham/CS/Hoa hong...) de nhat quan 1 kieu hien thi giua cac bao cao A/B/C/D/E.
@@ -18223,12 +18210,11 @@ function _srChartSvg(rows, nameKey, valueKey, type, moneyFmt, ordersKey){
     // Khoet lo giua thanh donut + hien TONG ngay giua bieu do — dat SAU cac mieng banh nen de
     // len tren, ban kinh 45 nho hon ban kinh dat nhan (0.66*90=59.4) nen khong chong chu %.
     var totalLine1 = 'Tổng';
-    // Chu trong tam donut phai GON de khong tran ra ngoai vong tron (duong kinh chi 90 unit) —
-    // voi so tien lon (vd 6.899.743.500đ = 15 ky tu) du co thu nho font toi da van khong vua.
-    // Rieng nhan giua tam: rut gon ve dang "X,X tỷ"/"X tr" (con so ĐẦY ĐỦ van hien nguyen ở chú
-    // thích/bảng bên cạnh, chỉ tâm biểu đồ mới rút gọn).
-    var totalTxt = moneyFmt ? _srCompactMoney_(total) : fmtVal(total);
-    var totalFs = totalTxt.length > 10 ? 12 : (totalTxt.length > 7 ? 14.5 : 17);
+    // Van hien so DAY DU (khong rut gon) — Duyen chap nhan tran nhe ra ngoai vong tron mien la
+    // chu du nho de nhin duoc, hon la rut gon mat chi tiet. Ha them 1 nac font nho (toi thieu 10
+    // thay vi 13 truoc day) cho chuoi dai.
+    var totalTxt = fmtVal(total);
+    var totalFs = totalTxt.length > 13 ? 10 : (totalTxt.length > 11 ? 11.5 : (totalTxt.length > 8 ? 14 : 17));
     paths += '<circle cx="'+cx+'" cy="'+cy+'" r="46" fill="var(--surface)"></circle>'+
       '<text x="'+cx+'" y="'+(cy-9)+'" text-anchor="middle" dominant-baseline="central" font-size="10" fill="var(--muted)" font-weight="600">'+totalLine1+'</text>'+
       '<text x="'+cx+'" y="'+(cy+9)+'" text-anchor="middle" dominant-baseline="central" font-size="'+totalFs+'" fill="var(--text)" font-weight="800">'+esc(totalTxt)+'</text>';
@@ -18910,13 +18896,15 @@ function _srRenderA(d){
       '<input type="checkbox" '+(_srState.showCoc!==false?'checked':'')+' onchange="_srState.showCoc=this.checked;renderSalesReportTab()"> Hiện cột Cọc trong các bảng bên dưới'+
     '</label>';
 
-  var saleRows = (d.bySale||[]).filter(function(s){ return !_srState.saleSearch || s.name.toLowerCase().indexOf(_srState.saleSearch.toLowerCase())!==-1; });
+  _SR_COLTH_ROWSFN_['aSale'] = function(){ return (_srState.dataA && _srState.dataA.bySale) || []; };
+  _SR_COLTH_GETTER_['aSale'] = { name: function(r){ return r.name; } };
+  var saleRows = _srApplyColFilters_(d.bySale||[], 'aSale', _SR_COLTH_GETTER_['aSale']).filter(function(s){ return !_srState.saleSearch || s.name.toLowerCase().indexOf(_srState.saleSearch.toLowerCase())!==-1; });
   var saleHtml = '<div class="dash-section-title">Theo Sale bán <span style="font-weight:400;color:var(--muted);font-size:11px">'+
     (_srState.byCreator ? '(tính trọn vẹn cho người tạo đơn — không chia đều)' : '(số đơn giữ nguyên — tiền chia đều cho số sale/đơn)')+
     '</span>'+_srViewToggleHtml('aSaleView')+'</div>';
   saleHtml += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.saleSearch)+'" oninput="_srState.saleSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
   if (_srState.aSaleView === 'table'){
-    saleHtml += '<table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">Số đơn</th>'+_srCocTh()+'<th style="text-align:right"><b>Tổng đơn</b></th><th style="text-align:right">TB đơn</th></tr></thead><tbody>';
+    saleHtml += '<table class="dash-table"><thead><tr>'+_srColTh_('aSale','name','Sale',_SR_COLTH_ROWSFN_['aSale'],_SR_COLTH_GETTER_['aSale'].name)+'<th style="text-align:right">Số đơn</th>'+_srCocTh()+'<th style="text-align:right"><b>Tổng đơn</b></th><th style="text-align:right">TB đơn</th></tr></thead><tbody>';
     saleRows.forEach(function(s){
       saleHtml += '<tr><td>'+esc(s.name)+'</td><td style="text-align:right">'+fmt(s.orders)+'</td>'+_srCocTd(s.coc)+'<td style="text-align:right"><b>'+_srMoney(s.giaTri)+'</b></td><td style="text-align:right">'+_srMoney(s.trungBinhDon)+'</td></tr>';
     });
@@ -18948,11 +18936,13 @@ function _srRenderA(d){
     '</div>';
 
   if (_srIsAdmin()){
-    var teamRows = (d.byTeamSale||[]).filter(function(t){ return !_srState.teamSearch || t.name.toLowerCase().indexOf(_srState.teamSearch.toLowerCase())!==-1; });
+    _SR_COLTH_ROWSFN_['aTeam'] = function(){ return (_srState.dataA && _srState.dataA.byTeamSale) || []; };
+    _SR_COLTH_GETTER_['aTeam'] = { name: function(r){ return r.name; } };
+    var teamRows = _srApplyColFilters_(d.byTeamSale||[], 'aTeam', _SR_COLTH_GETTER_['aTeam']).filter(function(t){ return !_srState.teamSearch || t.name.toLowerCase().indexOf(_srState.teamSearch.toLowerCase())!==-1; });
     var teamHtml = '<div class="dash-section-title">Theo Team Sale'+_srViewToggleHtml('aTeamView')+'</div>';
     teamHtml += '<input type="text" placeholder="🔍 Tìm nhanh theo tên team..." value="'+esc(_srState.teamSearch)+'" oninput="_srState.teamSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
     if (_srState.aTeamView === 'table'){
-      teamHtml += '<table class="dash-table"><thead><tr><th>Team Sale</th><th style="text-align:right">Số đơn</th>'+_srCocTh()+'<th style="text-align:right"><b>Tổng đơn</b></th><th style="text-align:right">TB đơn</th></tr></thead><tbody>';
+      teamHtml += '<table class="dash-table"><thead><tr>'+_srColTh_('aTeam','name','Team Sale',_SR_COLTH_ROWSFN_['aTeam'],_SR_COLTH_GETTER_['aTeam'].name)+'<th style="text-align:right">Số đơn</th>'+_srCocTh()+'<th style="text-align:right"><b>Tổng đơn</b></th><th style="text-align:right">TB đơn</th></tr></thead><tbody>';
       teamRows.forEach(function(t){
         teamHtml += '<tr><td>'+esc(t.name)+'</td><td style="text-align:right">'+fmt(t.orders)+'</td>'+_srCocTd(t.coc)+'<td style="text-align:right"><b>'+_srMoney(t.giaTri)+'</b></td><td style="text-align:right">'+_srMoney(t.trungBinhDon)+'</td></tr>';
       });
@@ -18972,11 +18962,13 @@ function _srRenderA(d){
     }
     html += teamHtml;
 
-    var kenhRows = (d.byKenh||[]).filter(function(k){ return !_srState.kenhSearch || k.name.toLowerCase().indexOf(_srState.kenhSearch.toLowerCase())!==-1; });
+    _SR_COLTH_ROWSFN_['aKenh'] = function(){ return (_srState.dataA && _srState.dataA.byKenh) || []; };
+    _SR_COLTH_GETTER_['aKenh'] = { name: function(r){ return r.name; } };
+    var kenhRows = _srApplyColFilters_(d.byKenh||[], 'aKenh', _SR_COLTH_GETTER_['aKenh']).filter(function(k){ return !_srState.kenhSearch || k.name.toLowerCase().indexOf(_srState.kenhSearch.toLowerCase())!==-1; });
     var kenhHtml = '<div class="dash-section-title">Theo Kênh bán'+_srViewToggleHtml('aKenhView')+'</div>';
     kenhHtml += '<input type="text" placeholder="🔍 Tìm nhanh theo tên kênh..." value="'+esc(_srState.kenhSearch)+'" oninput="_srState.kenhSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
     if (_srState.aKenhView === 'table'){
-      kenhHtml += '<table class="dash-table"><thead><tr><th>Kênh</th><th style="text-align:right">Số đơn</th>'+_srCocTh()+'<th style="text-align:right"><b>Tổng đơn</b></th><th style="text-align:right">TB đơn</th></tr></thead><tbody>';
+      kenhHtml += '<table class="dash-table"><thead><tr>'+_srColTh_('aKenh','name','Kênh',_SR_COLTH_ROWSFN_['aKenh'],_SR_COLTH_GETTER_['aKenh'].name)+'<th style="text-align:right">Số đơn</th>'+_srCocTh()+'<th style="text-align:right"><b>Tổng đơn</b></th><th style="text-align:right">TB đơn</th></tr></thead><tbody>';
       kenhRows.forEach(function(k){
         kenhHtml += '<tr><td>'+esc(k.name)+'</td><td style="text-align:right">'+fmt(k.orders)+'</td>'+_srCocTd(k.coc)+'<td style="text-align:right"><b>'+_srMoney(k.giaTri)+'</b></td><td style="text-align:right">'+_srMoney(k.trungBinhDon)+'</td></tr>';
       });
@@ -19002,16 +18994,19 @@ function _srRenderA(d){
       '<div style="flex:1 1 320px;min-width:280px">'+kenhCloseHtml+'</div>'+
       '</div>';
     html += '<div class="dash-section-title">Theo MKT'+_srViewToggleHtml('aMktView')+'</div>';
+    _SR_COLTH_ROWSFN_['aMkt'] = function(){ return (_srState.dataA && _srState.dataA.byMkt) || []; };
+    _SR_COLTH_GETTER_['aMkt'] = { name: function(r){ return r.name; } };
+    var mktRowsF = _srApplyColFilters_(d.byMkt||[], 'aMkt', _SR_COLTH_GETTER_['aMkt']);
     if (_srState.aMktView === 'table'){
-      html += '<table class="dash-table"><thead><tr><th>MKT</th><th style="text-align:right">Số đơn</th>'+_srCocTh()+'<th style="text-align:right"><b>Tổng đơn</b></th><th style="text-align:right">TB đơn</th></tr></thead><tbody>';
-      (d.byMkt||[]).forEach(function(k){
+      html += '<table class="dash-table"><thead><tr>'+_srColTh_('aMkt','name','MKT',_SR_COLTH_ROWSFN_['aMkt'],_SR_COLTH_GETTER_['aMkt'].name)+'<th style="text-align:right">Số đơn</th>'+_srCocTh()+'<th style="text-align:right"><b>Tổng đơn</b></th><th style="text-align:right">TB đơn</th></tr></thead><tbody>';
+      mktRowsF.forEach(function(k){
         html += '<tr><td>'+esc(k.name)+'</td><td style="text-align:right">'+fmt(k.orders)+'</td>'+_srCocTd(k.coc)+'<td style="text-align:right"><b>'+_srMoney(k.giaTri)+'</b></td><td style="text-align:right">'+_srMoney(k.trungBinhDon)+'</td></tr>';
       });
-      if (!(d.byMkt||[]).length) html += '<tr><td colspan="'+_srCocColspan(5)+'" style="text-align:center;color:var(--muted);padding:14px">Chưa có nhóm MKT — vào tab Team → "Nhóm MKT" để tạo.</td></tr>';
+      if (!mktRowsF.length) html += '<tr><td colspan="'+_srCocColspan(5)+'" style="text-align:center;color:var(--muted);padding:14px">Chưa có nhóm MKT — vào tab Team → "Nhóm MKT" để tạo.</td></tr>';
       else {
-        var mktTotOrders = (d.byMkt||[]).reduce(function(s,r){ return s+(r.orders||0); },0);
-        var mktTotCoc = (d.byMkt||[]).reduce(function(s,r){ return s+(r.coc||0); },0);
-        var mktTotGT = (d.byMkt||[]).reduce(function(s,r){ return s+(r.giaTri||0); },0);
+        var mktTotOrders = mktRowsF.reduce(function(s,r){ return s+(r.orders||0); },0);
+        var mktTotCoc = mktRowsF.reduce(function(s,r){ return s+(r.coc||0); },0);
+        var mktTotGT = mktRowsF.reduce(function(s,r){ return s+(r.giaTri||0); },0);
         var mktTotCells = ['Tổng', fmt(mktTotOrders)];
         if (_srState.showCoc) mktTotCells.push(_srMoney(mktTotCoc));
         mktTotCells.push(_srMoney(mktTotGT), _srMoney(mktTotOrders?mktTotGT/mktTotOrders:0));
@@ -19019,7 +19014,7 @@ function _srRenderA(d){
       }
       html += '</tbody></table>';
     } else {
-      html += _srChartSvg(d.byMkt||[], 'name', 'giaTri', _srState.aMktView, true, 'orders');
+      html += _srChartSvg(mktRowsF, 'name', 'giaTri', _srState.aMktView, true, 'orders');
     }
   }
   return html;
@@ -19399,12 +19394,14 @@ function _srRenderE_(d){
   }
 
   // b) Hoa hồng từng nhân viên
-  var rows = (c.bySale||[]).filter(function(s){ return !_srState.eSaleSearch || s.name.toLowerCase().indexOf(_srState.eSaleSearch.toLowerCase())!==-1; });
+  _SR_COLTH_ROWSFN_['eSale'] = function(){ return _computeCommissionData_((_srState.dataE&&_srState.dataE.orders)||[]).bySale || []; };
+  _SR_COLTH_GETTER_['eSale'] = { name: function(r){ return r.name; } };
+  var rows = _srApplyColFilters_(c.bySale||[], 'eSale', _SR_COLTH_GETTER_['eSale']).filter(function(s){ return !_srState.eSaleSearch || s.name.toLowerCase().indexOf(_srState.eSaleSearch.toLowerCase())!==-1; });
   html += '<div class="dash-section-title">b) Hoa hồng nhân viên <span style="font-weight:400;color:var(--muted);font-size:11px">(doanh thu = phần chia đều của người đó trong từng đơn)</span>'+_srViewToggleHtml('eSaleView')+'</div>';
   html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.eSaleSearch)+'" oninput="_srState.eSaleSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
   if (_srState.eSaleView === 'table'){
     html += '<table class="dash-table"><thead><tr>'+
-      '<th>Sale</th><th style="text-align:right">Số đơn ≥15tr</th><th style="text-align:right">Số đơn &lt;15tr</th>'+
+      _srColTh_('eSale','name','Sale',_SR_COLTH_ROWSFN_['eSale'],_SR_COLTH_GETTER_['eSale'].name)+'<th style="text-align:right">Số đơn ≥15tr</th><th style="text-align:right">Số đơn &lt;15tr</th>'+
       '<th style="text-align:right">DT ≥15tr</th><th style="text-align:right">DT &lt;15tr</th>'+
       '<th style="text-align:right">% ≥15tr</th><th style="text-align:right">% &lt;15tr</th>'+
       '<th style="text-align:right"><b>Hoa hồng</b></th></tr></thead><tbody>';
@@ -19438,8 +19435,10 @@ function _srRenderE_(d){
   if (!BONUS_PROGRAMS.length){
     html += '<div style="color:var(--muted);font-size:12px;padding:10px 0">Chưa có chương trình thưởng nào — bấm "🏆 Chương trình thưởng" ở trên để thêm.</div>';
   } else {
-    var bonusRows = bonus.bySale.filter(function(s){ return !_srState.eSaleSearch || s.name.toLowerCase().indexOf(_srState.eSaleSearch.toLowerCase())!==-1; });
-    html += '<table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">Số lượt thưởng</th><th style="text-align:right"><b>Tổng thưởng</b></th><th></th></tr></thead><tbody>';
+    _SR_COLTH_ROWSFN_['eBonus'] = function(){ return _computeBonusData_((_srState.dataE&&_srState.dataE.orders)||[]).bySale || []; };
+    _SR_COLTH_GETTER_['eBonus'] = { name: function(r){ return r.name; } };
+    var bonusRows = _srApplyColFilters_(bonus.bySale, 'eBonus', _SR_COLTH_GETTER_['eBonus']).filter(function(s){ return !_srState.eSaleSearch || s.name.toLowerCase().indexOf(_srState.eSaleSearch.toLowerCase())!==-1; });
+    html += '<table class="dash-table"><thead><tr>'+_srColTh_('eBonus','name','Sale',_SR_COLTH_ROWSFN_['eBonus'],_SR_COLTH_GETTER_['eBonus'].name)+'<th style="text-align:right">Số lượt thưởng</th><th style="text-align:right"><b>Tổng thưởng</b></th><th></th></tr></thead><tbody>';
     bonusRows.forEach(function(s, i){
       var rid = 'bn_'+i;
       var expanded = _srState.bonusExpandedRow === rid;
@@ -19509,7 +19508,9 @@ function _srRenderF_(d){
   if (!d) return '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
   if (d.error) return '<div style="color:#dc2626;text-align:center;padding:30px">Lỗi: '+esc(d.error)+'</div>';
   var cfg = d.config || {};
-  var rows = (d.rows||[]).filter(function(r){ return !_srState.fSaleSearch || r.name.toLowerCase().indexOf(_srState.fSaleSearch.toLowerCase())!==-1; });
+  _SR_COLTH_ROWSFN_['fSale'] = function(){ return (_srState.dataF && _srState.dataF.rows) || []; };
+  _SR_COLTH_GETTER_['fSale'] = { name: function(r){ return r.name; } };
+  var rows = _srApplyColFilters_(d.rows||[], 'fSale', _SR_COLTH_GETTER_['fSale']).filter(function(r){ return !_srState.fSaleSearch || r.name.toLowerCase().indexOf(_srState.fSaleSearch.toLowerCase())!==-1; });
 
   var html = '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">'+
     'Mục tiêu: <b>Văn phòng</b> — Bậc 1 = '+_srMoney(cfg.tierTargets && cfg.tierTargets['1'])+', Bậc 2 = '+_srMoney(cfg.tierTargets && cfg.tierTargets['2'])+', Bậc 3 = '+_srMoney(cfg.tierTargets && cfg.tierTargets['3'])+
@@ -19529,7 +19530,7 @@ function _srRenderF_(d){
 
   if (_srState.fKpiView === 'table'){
     html += '<table class="dash-table"><thead><tr>'+
-      '<th>Sale</th><th>Nhóm</th><th>Bậc</th><th style="text-align:right">Doanh thu</th>'+
+      _srColTh_('fSale','name','Sale',_SR_COLTH_ROWSFN_['fSale'],_SR_COLTH_GETTER_['fSale'].name)+'<th>Nhóm</th><th>Bậc</th><th style="text-align:right">Doanh thu</th>'+
       '<th style="text-align:right">KPI mục tiêu</th><th style="text-align:right">% hoàn thành</th><th>Kết quả</th></tr></thead><tbody>';
     rows.forEach(function(r){
       var tierLabel = r.tier ? 'Bậc '+r.tier : (r.nhom==='Văn phòng' ? '<span style="color:var(--hint)">chưa gán</span>' : '—');
