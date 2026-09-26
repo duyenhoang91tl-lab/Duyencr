@@ -8777,10 +8777,6 @@ function _cacheGetBig_(key) {
 // readPriceCatalog_ bo o rong cho gon nen dong dau tien co the thieu key -> gop key cua TAT CA
 // cac dong. Nhan dien bang _stripVN_ (bo dau) vi tieu de that co dau ("Giá", "Tên sản phẩm"):
 // so thang /gia/ tren "Giá" co dau se KHONG khop -> mat het cot gia (loi da gap).
-// ─── NHAN DIEN COT DANH_MUC (KHONG dau, KHONG hardcode vi tri) ──────────────────────
-// readPriceCatalog_ bo o rong cho gon nen dong dau tien co the thieu key -> gop key cua TAT CA
-// cac dong. Nhan dien bang _stripVN_ (bo dau) vi tieu de that co dau ("Giá", "Tên sản phẩm"):
-// so thang /gia/ tren "Giá" co dau se KHONG khop -> mat het cot gia (loi da gap).
 //
 // QUAN TRONG (fix bug chon nham cot gia): thu tu cot.gia PHAI theo dung thu tu cot THAT cua
 // sheet (rows.__headers, trai->phai) — KHONG duoc suy tu Object.keys(rows[i]) nhu truoc, vi
@@ -8789,8 +8785,21 @@ function _cacheGetBig_(key) {
 // the trong o o nhung cot gia khac nhau -> thu tu "gap thay dau tien" tinh rieng tung dong se
 // LECH khoi thu tu cot that, khien buildPriceCatalogFlat_ vo tinh lay gia tu 1 cot KHAC (vd
 // dot khuyen mai cu) thay vi dung cot "Gia thuong" hien dang hien thi cho khach.
-// Neu co NHIEU cot gia (khong tinh Saphia/Ruby), UU TIEN cot nao co chu "thuong" (Gia thuong)
-// truoc — chi khi KHONG cot nao ghi ro "thuong" moi lui ve thu tu trai->phai nhu cu.
+//
+// GIOI HAN VUNG COT GIA (theo yeu cau Duyen 26/09/2026): sheet BANG GIA hien tai dung 3 cot
+// CHINH THUC bôi do la G (Gia thuong), H (Gia SAPHIA), I (Gia RUBY) — cac cot ben phai tu do
+// tro di (vd X->AF) CHI la vung cong thuc/mau nguon de "do" gia ra 3 cot G/H/I (qua 1 cong thuc
+// dieu khien boi o G7), KHONG PHAI du lieu gia chinh thuc, nhung van co chu "gia" trong tieu de
+// nen truoc day bi quet nham vao giaCandidates. Vi vay CHI nhan dien cot gia trong pham vi cot
+// A->I (idx+1 <= GIA_COL_LIMIT) — cac cot ten/nhom/size/chat lieu van duoc do toan bo be rong
+// sheet nhu cu vi khong lien quan toi vung cong thuc nay.
+var GIA_COL_LIMIT_ = 9; // cot I (A=1, B=2, ... I=9)
+// Neu co NHIEU cot gia THUONG (khong tinh Saphia/Ruby), UU TIEN cot nao co chu "thuong" (Gia
+// thuong) truoc — chi khi KHONG cot nao ghi ro "thuong" moi lui ve thu tu trai->phai nhu cu.
+// FIX (26/09/2026): cot Saphia/Ruby PHAI luon duoc giu lai bat ke co cot "thuong" hay khong —
+// truoc day gop chung Saphia/Ruby vao cung danh sach roi loc theo "thuong" khien 2 cot nay bi
+// LOAI BO hoan toan moi khi co san 1 cot "Gia thuong" (vi ten Saphia/Ruby khong chua chu
+// "thuong"), lam bang gia flat luon tra ve sp=0, r=0 du sheet co du lieu.
 function _priceCols_(rows) {
   var headerOrder = rows.__headers || (function() {
     // Du phong khi khong co __headers (vd goi truc tiep tu test): lay lai theo cach cu.
@@ -8799,8 +8808,8 @@ function _priceCols_(rows) {
     return keys;
   })();
   var cols = { nhom: '', ten: '', tm: '', size: '', cl: '', gia: [] };
-  var giaCandidates = []; // { key, isThuong } theo DUNG thu tu cot that cua sheet
-  headerOrder.forEach(function(k) {
+  var giaCandidates = []; // { key, isThuong, isSpecial } theo DUNG thu tu cot that cua sheet
+  headerOrder.forEach(function(k, idx) {
     if (!k) return;
     var st = _stripVN_(k);
     if (!cols.nhom && /nhom\s*san\s*pham/.test(st)) cols.nhom = k;
@@ -8808,15 +8817,19 @@ function _priceCols_(rows) {
     else if (!cols.tm && /ten\s*thuong\s*mai/.test(st)) cols.tm = k;
     else if (!cols.size && (st.indexOf('size') !== -1 || st.indexOf('kieu') !== -1)) cols.size = k;
     else if (!cols.cl && st.indexOf('chat lieu') !== -1) cols.cl = k;
-    else if (/gia|price/.test(st)) giaCandidates.push({ key: k, isThuong: st.indexOf('thuong') !== -1 });
+    else if (/gia|price/.test(st) && (idx + 1) <= GIA_COL_LIMIT_) {
+      var isSpecial = st.indexOf('saphia') !== -1 || st.indexOf('ruby') !== -1;
+      giaCandidates.push({ key: k, isThuong: st.indexOf('thuong') !== -1, isSpecial: isSpecial });
+    }
   });
-  // buildPriceCatalogFlat_ tu tach rieng cot Saphia/Ruby qua tu khoa trong ten cot (khong phu
-  // thuoc thu tu trong cols.gia) — o day chi can lo dung THU TU cho phan gia THUONG (khong
-  // phai Saphia/Ruby): neu co bat ky cot nao ghi ro "thuong" (Gia thuong), CHI dung nhung cot
-  // do (van giu dung thu tu trai->phai giua chung neu co nhieu hon 1); chi khi KHONG cot nao
-  // ghi ro "thuong" moi lui ve dung TOAN BO cot gia con lai theo thu tu trai->phai nhu cu.
-  var thuongOnes = giaCandidates.filter(function(g) { return g.isThuong; }).map(function(g) { return g.key; });
-  cols.gia = thuongOnes.length ? thuongOnes : giaCandidates.map(function(g) { return g.key; });
+  var specialKeys = giaCandidates.filter(function(g) { return g.isSpecial; }).map(function(g) { return g.key; });
+  var normalOnes = giaCandidates.filter(function(g) { return !g.isSpecial; });
+  var thuongKeys = normalOnes.filter(function(g) { return g.isThuong; }).map(function(g) { return g.key; });
+  var pickedNormal = thuongKeys.length ? thuongKeys : normalOnes.map(function(g) { return g.key; });
+  var pickedSet = {};
+  pickedNormal.concat(specialKeys).forEach(function(k) { pickedSet[k] = true; });
+  // Giu dung thu tu cot that (trai->phai) trong danh sach cuoi cung.
+  cols.gia = headerOrder.filter(function(k) { return pickedSet[k]; });
   return cols;
 }
 // So tien trong bang gia tinh bang NGHIN VND (7950 = 7.950.000d). Chap nhan ca chuoi "7.950"/"7,950".
