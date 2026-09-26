@@ -788,14 +788,8 @@
     // messageList bi ket lai mai, gay hieu lam sai nguyen nhan goc). Nay: moi lan mutation, danh
     // gia lai container tu dau va CHI bao loi/xoa loi khi trang thai THAY DOI, tranh spam.
     let _listMissing = !document.querySelector(sel.messageList);
-    if (_listMissing) {
-      setStatus(
-        `⚠️ Không tìm thấy khung tin nhắn trên trang này (selector "${sel.messageList}" không khớp) — có thể Pancake/Messenger vừa đổi giao diện. Mở Options → cập nhật lại messageList (F12 → Elements → chuột phải khung tin nhắn → Copy selector).`
-      );
-      // Van tiep tuc gan observer o duoi (khong return som) — phong khi khung tin nhan xuat
-      // hien MUON hon (SPA tai lai/chuyen trang) thi debounce callback van tu phat hien duoc,
-      // khong can F5 lai trang.
-    }
+    // (Đã bỏ cảnh báo hiển thị cho CS theo yêu cầu Duyen — vẫn giữ theo dõi _listMissing để
+    // gate không xử lý/gọi AI khi khung tin nhắn chưa khớp, chỉ là không còn hiện banner nữa.)
 
     // Debounce: React/Vue thuong ban ra NHIEU mutation record cho 1 lan doi hoi thoai/tin nhan
     // moi (nhieu frame re-render lien tiep). Neu chay extractMessages() + goi API AI ngay tren
@@ -808,12 +802,6 @@
       _mutDebounceTimer = setTimeout(() => {
         const nowMissing = !document.querySelector(sel.messageList);
         if (nowMissing) {
-          if (!_listMissing) {
-            // Container VUA bien mat (vd doi hoi thoai giua chung SPA re-render) -> bao lai.
-            setStatus(
-              `⚠️ Không tìm thấy khung tin nhắn trên trang này (selector "${sel.messageList}" không khớp) — có thể Pancake/Messenger vừa đổi giao diện. Mở Options → cập nhật lại messageList (F12 → Elements → chuột phải khung tin nhắn → Copy selector).`
-            );
-          }
           _listMissing = true;
           return; // van chua khop -> bo qua, khong xu ly tiep
         }
