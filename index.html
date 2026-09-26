@@ -10422,27 +10422,47 @@ function buildSalesReportA_(filters) {
              trungBinhDon: o.orders ? Math.round(o.giaTri / o.orders) : 0 };
   }).sort(function(a, b){ return b.giaTri - a.giaTri; });
 
-  // ── Tỷ lệ chốt theo Sale (widget "Tỷ lệ chốt theo Sale" ở tab Báo cáo doanh số) — theo yêu
-  // cầu Duyen (24/09/2026): đổi mẫu số từ "tổng KH được giao" (careStatus, allCustomers phía
-  // client) sang ĐÚNG công thức đã dùng ở bảng "Theo Page"/"KPI Pancake": số đơn / tổng tương
-  // tác Pancake (buildPancakeReport_.byCS, đã có sẵn theo TỪNG SALE RIÊNG — không gộp nhiều
-  // sale chung 1 dòng như careCS cũ). Chỉ tính từ NGÀY CÓ DỮ LIỆU TƯƠNG TÁC PANCAKE trở đi
-  // (bỏ qua các ngày đầu kỳ chưa nạp báo cáo Pancake), tránh số đơn bị tính đủ cả kỳ trong khi
-  // mẫu số tương tác bị thiếu những ngày đó làm tỷ lệ sai lệch (ảo cao hoặc ảo thấp).
+  // ── Tỷ lệ chốt theo Sale / theo Kênh / theo Page (3 bảng ở tab Báo cáo doanh số) — công thức:
+  // số đơn / tổng tương tác Pancake. Theo yêu cầu Duyên (26/09/2026): CHỈ tính đơn của đúng
+  // NGÀY + PAGE thực sự có dữ liệu tương tác Pancake đã nạp — không phải cứ nằm trong khoảng
+  // ngày đang lọc là tính. Ví dụ kỳ lọc có 30 ngày nhưng 1 Page chỉ mới nạp thống kê 5 ngày, thì
+  // đơn của Page đó ở 25 ngày còn lại (dù vẫn trong khoảng lọc) sẽ KHÔNG được tính vào tử số của
+  // cả 3 bảng — tránh đơn bị tính đủ trong khi tương tác bị thiếu ngày làm tỷ lệ ảo cao/ảo thấp.
+  // Dùng chung _pkTrackedDatesByPageAndSale_ (đã có sẵn, dùng cho KPI Pancake/Checklist MKT) để
+  // xác định "Page nào, ngày nào có dữ liệu". Khớp đơn -> Page qua PancakePageMap (kenhBan <->
+  // pageId); đơn không khớp được Page nào thì bỏ qua (không đủ căn cứ để biết ngày đó có dữ liệu).
+  var fFromYmd = _dateStrToVnYmd_(filters.dateFrom), fToYmd = _dateStrToVnYmd_(filters.dateTo);
+  var pageCoveredDates = _pkTrackedDatesByPageAndSale_(fFromYmd, fToYmd).datesByPage;
+  var hasAnyPkData = Object.keys(pageCoveredDates).length > 0;
+  var pkPageMap = readPancakePageMap_(); // pageId -> kenhBan
+  var kenhToPageIds = {};
+  Object.keys(pkPageMap).forEach(function(pid) {
+    var kn = pkPageMap[pid]; if (!kn) return;
+    if (!kenhToPageIds[kn]) kenhToPageIds[kn] = [];
+    kenhToPageIds[kn].push(pid);
+  });
+  // Đơn có "đủ căn cứ" (khớp Page + đúng ngày Page đó có dữ liệu) hay không — dùng chung cho cả 3 bảng dưới.
+  function _srOrderCovered_(kenhBan, ymd){
+    var pids = kenhToPageIds[kenhBan] || [];
+    return pids.some(function(pid){ return pageCoveredDates[pid] && pageCoveredDates[pid][ymd]; });
+  }
+
   var saleCloseRate = [];
-  var tuongTacSpan = _pkSheetDateSpan_(SH_PK_STATS, PK_STATS_HEADERS, filters.dateFrom, filters.dateTo);
-  var closeFrom = tuongTacSpan.minDate || ''; // rong neu CHUA TUNG nap du lieu tuong tac Pancake ngay nao
-  if (closeFrom && filters.dateFrom && _dateStrToVnYmd_(filters.dateFrom) > closeFrom) closeFrom = _dateStrToVnYmd_(filters.dateFrom);
-  if (closeFrom) {
+  var closeFrom = '';
+  if (hasAnyPkData) {
     var closeOrdersBySale = {};
     for (var ci = 0; ci < matched.length; ci++) {
       var mc = matched[ci];
-      if (!dateInRange_(parseVNDate_(mc[dateField]), closeFrom, filters.dateTo)) continue;
+      var mcDt = parseVNDate_(mc[dateField]);
+      if (!mcDt) continue;
+      var mcYmd = _vnYmd_(mcDt);
+      if (!_srOrderCovered_(mc.kenhBan, mcYmd)) continue;
+      if (!closeFrom || mcYmd < closeFrom) closeFrom = mcYmd; // chi de hien thi ghi chu, khong dung de loc
       var salesOnOrderC = splitMulti_(mc.saleBan, ',');
       if (!salesOnOrderC.length) salesOnOrderC = [UNASSIGNED];
       salesOnOrderC.forEach(function(sn) { closeOrdersBySale[sn] = (closeOrdersBySale[sn] || 0) + 1; });
     }
-    var pInt2 = buildPancakeReport_(closeFrom, filters.dateTo, 'equal');
+    var pInt2 = buildPancakeReport_(filters.dateFrom, filters.dateTo, 'equal');
     var closeCanon = {};
     var closeKey = function(n) { var ck = _normTxt_(n); if (!closeCanon[ck]) closeCanon[ck] = n; return ck; };
     var closeAgg = {};
@@ -10459,6 +10479,109 @@ function buildSalesReportA_(filters) {
     });
   }
 
+  // ── Tỷ lệ chốt theo Kênh — cùng công thức + cùng điều kiện "đúng ngày Page có dữ liệu" ở trên.
+  var kenhCloseRate = [];
+  if (hasAnyPkData) {
+    var closeOrdersByKenh = {};
+    for (var cki = 0; cki < matched.length; cki++) {
+      var mck = matched[cki];
+      var mckDt = parseVNDate_(mck[dateField]);
+      if (!mckDt) continue;
+      var mckYmd = _vnYmd_(mckDt);
+      var kn = mck.kenhBan || '(chưa có kênh)';
+      if (!_srOrderCovered_(kn, mckYmd)) continue;
+      closeOrdersByKenh[kn] = (closeOrdersByKenh[kn] || 0) + 1;
+    }
+    var pInt3 = buildPancakeReport_(filters.dateFrom, filters.dateTo, 'equal');
+    var tongTTByKenh = {};
+    pInt3.byPage.forEach(function(p) {
+      var kn2 = pkPageMap[p.pageId] || '';
+      if (!kn2) return; // Page chua khop kenh ban -> khong co mau so, bo qua (giong het "Theo Page")
+      tongTTByKenh[kn2] = (tongTTByKenh[kn2] || 0) + (p.tongTT || 0);
+    });
+    var allKenhKeys = {};
+    Object.keys(closeOrdersByKenh).forEach(function(k){ allKenhKeys[k]=1; });
+    Object.keys(tongTTByKenh).forEach(function(k){ allKenhKeys[k]=1; });
+    kenhCloseRate = Object.keys(allKenhKeys).map(function(kn3) {
+      var tongTTk = tongTTByKenh[kn3] || 0;
+      var closedK = closeOrdersByKenh[kn3] || 0;
+      return { name: kn3, held: Math.round(tongTTk * 100) / 100, closed: closedK,
+               closeRate: tongTTk ? Math.round(closedK / tongTTk * 1000) / 10 : 0 };
+    });
+  }
+
+  // ── Tỷ lệ chốt theo Sale, TÁCH RIÊNG TỪNG PAGE + cột tổng cá nhân — cùng điều kiện "đúng ngày
+  // Page có dữ liệu" ở trên (trước đây chỉ lọc theo 1 mốc closeFrom chung cho cả kỳ).
+  var saleCloseByPage = { pages: [], rows: [] };
+  if (hasAnyPkData) {
+    var shPkStats = getSheet_(SH_PK_STATS, PK_STATS_HEADERS);
+    var mapSaleK = readPancakeMap_(); // pancakeName -> "sale1|sale2"
+    var pageInfoByKenh = {}; // kenhBan -> {pageId, pageName, kenhBan} (Page dau tien khop kenh do)
+    var ttBySaleKenh = {};   // "sale|||kenh" -> tong tuong tac
+    if (shPkStats.getLastRow() >= 2) {
+      var vPk = shPkStats.getRange(2, 1, shPkStats.getLastRow() - 1, PK_STATS_HEADERS.length).getValues();
+      for (var pki = 0; pki < vPk.length; pki++) {
+        var dPk = normOrderDate_(vPk[pki][0]);
+        if (fFromYmd && dPk < fFromYmd) continue;
+        if (fToYmd && dPk > fToYmd) continue;
+        var pageIdPk = String(vPk[pki][1]), pageNamePk = String(vPk[pki][2]), nhanVienPk = String(vPk[pki][3]), ttPk = +vPk[pki][6] || 0;
+        if (!ttPk) continue;
+        var kenhPk = pkPageMap[pageIdPk] || '';
+        if (!kenhPk) continue; // Page chua khop kenh -> khong co cach doi chieu voi don hang, bo qua
+        if (!pageInfoByKenh[kenhPk]) pageInfoByKenh[kenhPk] = { pageId: pageIdPk, pageName: pageNamePk, kenhBan: kenhPk };
+        var salesPk = String(mapSaleK[nhanVienPk] || '').split('|').map(function(x){return x.trim();}).filter(function(x){return x;});
+        if (!salesPk.length) salesPk = [nhanVienPk];
+        salesPk.forEach(function(spn) {
+          var key = spn + '|||' + kenhPk;
+          ttBySaleKenh[key] = (ttBySaleKenh[key] || 0) + ttPk;
+        });
+      }
+    }
+    var closedBySaleKenh = {}; // "sale|||kenh" -> so don
+    for (var cpi = 0; cpi < matched.length; cpi++) {
+      var mcp = matched[cpi];
+      var mcpDt = parseVNDate_(mcp[dateField]);
+      if (!mcpDt) continue;
+      var mcpYmd = _vnYmd_(mcpDt);
+      var kenhP = mcp.kenhBan || '(chưa có kênh)';
+      if (!_srOrderCovered_(kenhP, mcpYmd)) continue;
+      var salesOnP = splitMulti_(mcp.saleBan, ',');
+      if (!salesOnP.length) salesOnP = [UNASSIGNED];
+      salesOnP.forEach(function(spn2) {
+        var key2 = spn2 + '|||' + kenhP;
+        closedBySaleKenh[key2] = (closedBySaleKenh[key2] || 0) + 1;
+      });
+    }
+    var pagesList = Object.keys(pageInfoByKenh).map(function(k){ return pageInfoByKenh[k]; })
+      .sort(function(a,b){ return a.pageName.localeCompare(b.pageName,'vi'); });
+    var byPageSaleCanon = {}, byPageSaleKey = function(n){ var ck=_normTxt_(n); if(!byPageSaleCanon[ck]) byPageSaleCanon[ck]=n; return ck; };
+    var rowsMap = {};
+    function ensureRow(sn) {
+      var k = byPageSaleKey(sn);
+      if (!rowsMap[k]) rowsMap[k] = { name: byPageSaleCanon[k], perPage: {}, totalHeld: 0, totalClosed: 0 };
+      return rowsMap[k];
+    }
+    Object.keys(ttBySaleKenh).forEach(function(key) {
+      var parts = key.split('|||'), sn = parts[0], kn = parts[1];
+      var r = ensureRow(sn);
+      var held = ttBySaleKenh[key] || 0, closed = closedBySaleKenh[key] || 0;
+      r.perPage[kn] = { held: Math.round(held*100)/100, closed: closed, rate: held ? Math.round(closed/held*1000)/10 : 0 };
+      r.totalHeld += held; r.totalClosed += closed;
+    });
+    Object.keys(closedBySaleKenh).forEach(function(key) {
+      var parts = key.split('|||'), sn = parts[0], kn = parts[1];
+      var r = ensureRow(sn);
+      if (!r.perPage[kn]) { r.perPage[kn] = { held: 0, closed: closedBySaleKenh[key], rate: 0 }; r.totalClosed += closedBySaleKenh[key]; }
+    });
+    saleCloseByPage.pages = pagesList;
+    saleCloseByPage.rows = Object.keys(rowsMap).map(function(k) {
+      var r = rowsMap[k];
+      return { name: r.name, perPage: r.perPage,
+        total: { held: Math.round(r.totalHeld*100)/100, closed: r.totalClosed,
+                 rate: r.totalHeld ? Math.round(r.totalClosed/r.totalHeld*1000)/10 : 0 } };
+    });
+  }
+
   return {
     totalOrders: matched.length,
     totalCoc: totalCoc,
@@ -10470,6 +10593,9 @@ function buildSalesReportA_(filters) {
     byMkt: byMktArr,
     saleCloseRate: saleCloseRate,
     saleCloseRateFrom: closeFrom || null,
+    kenhCloseRate: kenhCloseRate,
+    kenhCloseRateFrom: closeFrom || null,
+    saleCloseByPage: saleCloseByPage,
     trungBinhDon: matched.length ? Math.round(totalGiaTri / matched.length) : 0,
     orders: matched.map(function(m){
       return {
@@ -14814,9 +14940,6 @@ function exportDailyReportLogs_(from, to) {
     // dong cua nam khac. Bao Duyen biet neu can them cot Nam de tranh truong hop nay.
   });
 }
-
-
-
 </script>
 
 <!-- ════════════ V9 FEATURE LAYER ════════════ -->
