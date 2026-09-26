@@ -778,7 +778,16 @@
     // hien ra binh thuong (CS/SDT...) nhung "khong co gi" xay ra tiep theo, rat kho nhan biet
     // ly do. Them canh bao ro rang ngay tai day de CS biet ngay can vao Options cap nhat lai
     // selector, thay vi tuong extension bi "treo" khong ro nguyen nhan.
-    if (!document.querySelector(sel.messageList)) {
+    // _listMissing theo doi trang thai "container messageList co dang ton tai tren trang hay
+    // khong" qua thoi gian (khac voi chi kiem tra 1 LAN duy nhat luc init). Ly do: luc panel
+    // moi mo thuong CHUA chon hoi thoai nao (container that su chua ton tai — dung), nhung neu
+    // sau do nguoi dung mo 1 hoi thoai va container xuat hien, ma canh bao van hien nguyen do
+    // KHONG co cho nao chu dong "xoa" no di (truoc day chi duoc ghi de gian tiep khi
+    // extractMessages() tim duoc tin nhan — neu messageItem CUNG dang sai luon thi canh bao ve
+    // messageList bi ket lai mai, gay hieu lam sai nguyen nhan goc). Nay: moi lan mutation, danh
+    // gia lai container tu dau va CHI bao loi/xoa loi khi trang thai THAY DOI, tranh spam.
+    let _listMissing = !document.querySelector(sel.messageList);
+    if (_listMissing) {
       setStatus(
         `⚠️ Không tìm thấy khung tin nhắn trên trang này (selector "${sel.messageList}" không khớp) — có thể Pancake/Messenger vừa đổi giao diện. Mở Options → cập nhật lại messageList (F12 → Elements → chuột phải khung tin nhắn → Copy selector).`
       );
@@ -796,7 +805,18 @@
     const handleMutation = () => {
       clearTimeout(_mutDebounceTimer);
       _mutDebounceTimer = setTimeout(() => {
-        if (!document.querySelector(sel.messageList)) return; // van chua khop -> bo qua, khong spam trang thai
+        const nowMissing = !document.querySelector(sel.messageList);
+        if (nowMissing) {
+          if (!_listMissing) {
+            // Container VUA bien mat (vd doi hoi thoai giua chung SPA re-render) -> bao lai.
+            setStatus(
+              `⚠️ Không tìm thấy khung tin nhắn trên trang này (selector "${sel.messageList}" không khớp) — có thể Pancake/Messenger vừa đổi giao diện. Mở Options → cập nhật lại messageList (F12 → Elements → chuột phải khung tin nhắn → Copy selector).`
+            );
+          }
+          _listMissing = true;
+          return; // van chua khop -> bo qua, khong xu ly tiep
+        }
+        _listMissing = false; // container da xuat hien/con day -> canh bao messageList (neu co) coi nhu qua han, cac buoc duoi se tu cap nhat trang thai moi
         const messages = extractMessages();
         const signature = messages.map((m) => m.text).join("|").slice(0, 500);
         if (signature && signature !== lastConversationSignature) {

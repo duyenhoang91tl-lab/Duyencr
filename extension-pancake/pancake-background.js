@@ -17,19 +17,26 @@ const DEFAULT_SETTINGS = {
   selectors: {
     pancake: {
       // Xac minh qua DevTools (F12) tren giao dien Pancake thuc te + nguoi dung xac nhan
-      // truc tiep (2026-09-13): .body-conver-item la 1 dong tin nhan hoan chinh va no LUON
-      // mang san class client-message/page-message ngay tren chinh no (khong phai o phan tu
-      // con) — nen messageItem/customerMsgSelector/agentMsgSelector deu tro thang vao no de
-      // el.matches() trong detectSender_ nhan dung. #message-col-list la vung chua toan bo
-      // danh sach tin nhan cua cuoc hoi thoai dang mo (thay cho .mdl-js cu qua rong, ap dung
-      // len ca <html> nen extractPhone() fallback quet nham toan trang).
+      // truc tiep (2026-09-26): Pancake da doi cau truc DOM tin nhan — .body-conver-item
+      // (dung truoc 2026-09-13) KHONG CON nua. Cau truc moi (xac nhan bang anh chup DevTools
+      // cho ca 2 chieu tin, khach va page):
+      //   div.media-body
+      //     div.media-body-text.media-message-from-customer(-.has-avatar) | .media-message-from-page
+      //       div.message-text-field
+      //         div.message-text-ele.client-message   <- tin cua KHACH (giu nguyen ten class)
+      //         div.message-text-ele.page-message      <- tin cua PAGE/shop (giu nguyen ten class)
+      // #message-col-list (vung chua toan bo list) KHONG doi, van dung. messageItem tro thang
+      // vao .message-text-ele (khong phai .media-body ben ngoai) vi day la cap doi la noi mang
+      // class client-message/page-message truc tiep tren chinh no — de el.matches() trong
+      // detectSender_ nhan dung (neu messageItem la .media-body thi client-message/page-message
+      // nam o phan tu con chau, el.matches() se luon fail va sender luon ra "unknown").
       messageList: "#message-col-list",
-      messageItem: ".body-conver-item",
+      messageItem: ".message-text-ele",
       replyBox: "#replyBoxComposer",
       phoneSelector: "",
       orderPanelSelector: "",
-      customerMsgSelector: ".body-conver-item.client-message",
-      agentMsgSelector: ".body-conver-item.page-message"
+      customerMsgSelector: ".message-text-ele.client-message",
+      agentMsgSelector: ".message-text-ele.page-message"
     },
     messenger: {
       // Messenger dùng role/aria-label khá ổn định hơn Pancake (ít đổi class ngẫu nhiên) —
