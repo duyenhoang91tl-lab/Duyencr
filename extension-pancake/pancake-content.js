@@ -1879,6 +1879,16 @@
 
     const opt = (v, label, sel) => `<option value="${escapeHtml(v)}"${sel ? ' selected' : ''}>${escapeHtml(label)}</option>`;
     const row = (label, inner) => `<div class="pk-builder-row"><label>${label}</label>${inner}</div>`;
+    // Cac danh sach dai (ten nhom, ten san pham, mau, dam nhat) doi tu <select> sang
+    // <input list> + <datalist>: van bam chon binh thuong tu dropdown nhu cu, nhung them
+    // duoc go chu de loc/tim nhanh ngay trong o do (khong phai keo chuot lot qua het danh
+    // sach dai nhu anh CS gui). Chi ap dung cho cac muc ma value===label (khong co code an
+    // nhu '__def__'/'__none__'/index) de khong pha logic cascading phia duoi — Kieu/Size,
+    // Chat lieu, Chon muc gia van giu <select> thuong vi it lua chon hon va co gia tri
+    // ngam khac voi nhan hien thi.
+    const searchInput = (id, values, curVal, placeholder) =>
+      `<input type="text" id="${id}" list="${id}-dl" autocomplete="off" placeholder="${escapeHtml(placeholder)}" value="${escapeHtml(curVal || '')}" />` +
+      `<datalist id="${id}-dl">${values.map((v) => `<option value="${escapeHtml(v)}"></option>`).join('')}</datalist>`;
     let html = '';
     let cand = null;
 
@@ -1886,7 +1896,7 @@
     const groups = [...new Set(pool.map((it) => it.n).filter(Boolean))].sort(_vnSort_);
     if (_bld.nhom && groups.indexOf(_bld.nhom) === -1) _bld.nhom = '';
     if (groups.length === 1 && !_bld.nhom) _bld.nhom = groups[0];
-    if (groups.length) html += row(`Nhóm sản phẩm (${groups.length})`, `<select id="pkb-nhom"><option value="">— Tất cả nhóm —</option>${groups.map((g) => opt(g, g, g === _bld.nhom)).join('')}</select>`);
+    if (groups.length) html += row(`Nhóm sản phẩm (${groups.length})`, searchInput('pkb-nhom', groups, _bld.nhom, '— Tất cả nhóm — (gõ để tìm hoặc bấm chọn)'));
     const pool2 = _bld.nhom ? pool.filter((it) => it.n === _bld.nhom) : pool;
 
     // 2) Tên sản phẩm / tên thương mại (gộp, bỏ trùng)
@@ -1899,7 +1909,7 @@
     const names = Object.keys(nameMap).map((f) => nameMap[f]).sort(_vnSort_);
     if (_bld.ten && !nameMap[_fold_(_bld.ten)]) _bld.ten = '';
     if (!_bld.ten && names.length === 1) _bld.ten = names[0];
-    html += row(`Tên sản phẩm (${names.length})`, `<select id="pkb-ten"><option value="">— Chọn —</option>${names.map((n) => opt(n, n, n === _bld.ten)).join('')}</select>`);
+    html += row(`Tên sản phẩm (${names.length})`, searchInput('pkb-ten', names, _bld.ten, '— Chọn — (gõ để tìm hoặc bấm chọn)'));
 
     if (_bld.ten) {
       const tf = _fold_(_bld.ten);
@@ -1939,8 +1949,8 @@
     if (cand) {
       const autoK = _priceOfItem_(cand);
       if (!_bld.priceEdited) _bld.priceK = autoK ? String(autoK) : '';
-      html += row('Màu (ghi chú, bỏ trống được)', `<select id="pkb-mau"><option value="">— Bỏ trống —</option>${PK_COLOR_OPTS.map((c) => opt(c, c, c === _bld.mau)).join('')}</select>`);
-      html += row('Đậm / nhạt', `<select id="pkb-dam"><option value="">— Bỏ trống —</option>${PK_SHADE_OPTS.map((c) => opt(c, c, c === _bld.dam)).join('')}</select>`);
+      html += row('Màu (ghi chú, bỏ trống được)', searchInput('pkb-mau', PK_COLOR_OPTS, _bld.mau, '— Bỏ trống — (gõ để tìm hoặc bấm chọn)'));
+      html += row('Đậm / nhạt', searchInput('pkb-dam', PK_SHADE_OPTS, _bld.dam, '— Bỏ trống — (gõ để tìm hoặc bấm chọn)'));
       html += `<div class="pk-builder-inline">
         <div><label>Số lượng</label><input type="number" id="pkb-qty" min="1" value="${escapeHtml(_bld.qty)}" /></div>
         <div><label>Giá (nghìn đ) — ${escapeHtml(_stoneLabel_(cand))}</label><input type="number" id="pkb-price" min="0" value="${escapeHtml(_bld.priceK)}" placeholder="tự nhập nếu chưa có giá" /></div>
