@@ -25,7 +25,6 @@ function updateAiProviderHint() {
 
 function load() {
   chrome.storage.sync.get(null, (s) => {
-    document.getElementById("gasUrl").value = s.gasUrl || "";
     document.getElementById("useProducts").checked = !!s.useProducts;
 
     document.getElementById("aiProvider").value = s.aiProvider || "";
@@ -55,7 +54,8 @@ function load() {
 
 function save() {
   const settings = {
-    gasUrl: document.getElementById("gasUrl").value.trim(),
+    // gasUrl KHONG con doc tu form nua — da co dinh san trong DEFAULT_SETTINGS
+    // (pancake-background.js), khong ghi de o day de tranh vo tinh xoa mat URL dang dung.
     useProducts: document.getElementById("useProducts").checked,
     aiProvider: document.getElementById("aiProvider").value,
     aiApiKey: document.getElementById("aiApiKey").value.trim(),

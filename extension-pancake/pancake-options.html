@@ -21,12 +21,11 @@
 
   <h2>Backend chung (dùng chung với Duyên AI - Zalo)</h2>
   <div class="hint">
-    Đây là cùng 1 backend Google Apps Script mà extension <b>Duyên AI - Zalo</b> (cài riêng, extension khác)
-    đang dùng — không phải server riêng. Mở extension Duyên AI - Zalo → biểu tượng extension → Mở cài đặt
-    (hoặc ⚙ Cài đặt ngay trên chat.zalo.me) → copy nguyên URL trong ô "URL Web App GAS" → dán vào đây.
+    URL Web App GAS giờ đã <b>cố định sẵn trong extension</b> (dùng chung 1 backend với <b>Duyên AI - Zalo</b>)
+    — không cần dán tay nữa, nên đã bỏ ô nhập ở đây. Nếu sau này Duyên đổi sang 1 URL GAS khác, sửa thẳng
+    trong file <code>pancake-background.js</code> (biến <code>gasUrl</code> trong <code>DEFAULT_SETTINGS</code>)
+    rồi phát hành bản cập nhật — mọi máy cài extension sẽ tự dùng URL mới, không ai phải tự sửa cài đặt.
   </div>
-  <label>URL Web App GAS</label>
-  <input type="text" id="gasUrl" placeholder="https://script.google.com/macros/s/.../exec" />
 
   <div class="checkbox-row">
     <input type="checkbox" id="useProducts" />

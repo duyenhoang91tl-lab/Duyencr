@@ -22,13 +22,47 @@
   resize: both;
 }
 
+/* Thu gọn = chỉ còn 1 icon tròn nhỏ nổi góc màn hình (không phải cả thanh tiêu đề dài) —
+   ẩn hẳn phần chữ "Pancake AI" + nút ⚙ AI, chỉ giữ lại nút toggle làm icon, ép panel về
+   kích thước cố định 44x44 bất kể đã resize/lưu kích thước to trước đó (!important thắng
+   cả inline style width/height do _restorePanelState_ gán). */
 #pk-ai-panel.pk-ai-collapsed {
-  height: auto !important;
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 50%;
   resize: none;
+  overflow: hidden;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
 }
 
 #pk-ai-panel.pk-ai-collapsed #pk-ai-body {
   display: none;
+}
+
+#pk-ai-panel.pk-ai-collapsed #pk-ai-header {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+#pk-ai-panel.pk-ai-collapsed #pk-ai-header-title,
+#pk-ai-panel.pk-ai-collapsed #pk-ai-settings {
+  display: none;
+}
+
+#pk-ai-panel.pk-ai-collapsed #pk-ai-collapse {
+  font-size: 20px;
+  line-height: 1;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 #pk-ai-header {
@@ -704,6 +738,7 @@
   display: flex;
   gap: 4px;
   margin-top: 2px;
+  flex-wrap: wrap;
 }
 
 .pk-cart-chatlieu,
@@ -716,6 +751,36 @@
   border: 1px solid #fbcfe8;
   border-radius: 4px;
   background: #fffafc;
+}
+
+.pk-cart-chatlieu-multi {
+  flex: 1 0 100%;
+  background: #fffafc;
+  border: 1px solid #fbcfe8;
+  border-radius: 4px;
+  padding: 5px 7px;
+}
+
+.pk-cl-multi-label {
+  font-size: 9.5px;
+  color: #9d174d;
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+
+.pk-cl-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
+  margin: 0 10px 4px 0;
+  cursor: pointer;
+  color: #374151;
+}
+
+.pk-cl-opt input {
+  margin: 0;
+  cursor: pointer;
 }
 
 #pk-cart-addrow { margin: 6px 0; }

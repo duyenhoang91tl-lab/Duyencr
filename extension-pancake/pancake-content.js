@@ -209,12 +209,21 @@
     setStatus('⚠️ Mất kết nối tới extension — vui lòng tải lại trang (F5).');
   }
 
+  // Doi icon + title cua nut thu gon/mo rong theo trang thai (— khi dang mo, 🤖 khi da thu
+  // nho lai thanh 1 icon tron de CS biet bam vao dau de mo lai).
+  function _setCollapseBtnIcon_(collapsed) {
+    const btn = panelEl && panelEl.querySelector('#pk-ai-collapse');
+    if (!btn) return;
+    btn.textContent = collapsed ? '🤖' : '—';
+    btn.title = collapsed ? 'Mở lại Pancake AI' : 'Thu gọn';
+  }
+
   // ── Nhớ vị trí/kích thước/trạng thái thu gọn của panel giữa các lần tải trang
   // (chrome.storage.local — riêng theo máy, không cần đồng bộ nhiều máy) ──
   function _restorePanelState_() {
     try {
       chrome.storage.local.get(['pkPanelCollapsed', 'pkPanelPos', 'pkPanelSize'], (res) => {
-        if (res.pkPanelCollapsed) panelEl.classList.add('pk-ai-collapsed');
+        if (res.pkPanelCollapsed) { panelEl.classList.add('pk-ai-collapsed'); _setCollapseBtnIcon_(true); }
         if (res.pkPanelPos && typeof res.pkPanelPos.right === 'number' && typeof res.pkPanelPos.bottom === 'number') {
           panelEl.style.right = res.pkPanelPos.right + 'px';
           panelEl.style.bottom = res.pkPanelPos.bottom + 'px';
@@ -279,13 +288,15 @@
     panelEl.id = "pk-ai-panel";
     panelEl.innerHTML = `
       <div id="pk-ai-header">
-        <div style="flex:1">
+        <div id="pk-ai-header-title" style="flex:1">
           <div style="font-weight:700">🤖 Pancake AI</div>
           <div style="font-size:10px;font-weight:400;opacity:.85">Tra cứu & gợi ý phản hồi khách</div>
         </div>
+        <button id="pk-ai-settings" title="Cài đặt AI cá nhân (dùng key riêng thay vì AI dùng chung)" style="background:rgba(255,255,255,.2);border:none;border-radius:5px;color:#fff;padding:3px 7px;font-size:11px;cursor:pointer;margin-right:6px;white-space:nowrap">⚙ AI</button>
         <button id="pk-ai-collapse" title="Thu gọn">—</button>
       </div>
       <div id="pk-ai-body">
+        <div id="pk-ai-key-banner" style="display:none;font-size:11px;padding:6px 10px;border-bottom:1px solid var(--pk-border,#e5e7eb)"></div>
         <div id="pk-ai-cs-row">
           <label>CS đang dùng</label>
           <select id="pk-cs-sel"></select>
@@ -433,10 +444,43 @@
     panelEl.querySelector("#pk-ai-refresh").addEventListener("click", () => {
       requestSuggestion(true);
     });
-    panelEl.querySelector("#pk-ai-collapse").addEventListener("click", () => {
-      panelEl.classList.toggle("pk-ai-collapsed");
-      try { chrome.storage.local.set({ pkPanelCollapsed: panelEl.classList.contains("pk-ai-collapsed") }); } catch (e) {}
+    var _AI_PROVIDER_LABEL = { grok: "Grok (xAI)", gemini: "Gemini (Google)", openai: "OpenAI (ChatGPT)" };
+  function _refreshAiKeyBanner() {
+    var box = panelEl && panelEl.querySelector("#pk-ai-key-banner");
+    if (!box) return;
+    chrome.storage.sync.get(["aiProvider", "aiApiKey"], (s) => {
+      if (s.aiProvider && s.aiApiKey) {
+        box.style.display = "block";
+        box.style.background = "#f0fdf4"; box.style.color = "#166534";
+        box.innerHTML = "🔑 Đang dùng AI riêng: <b>" + (_AI_PROVIDER_LABEL[s.aiProvider] || s.aiProvider) + "</b> — bấm ⚙ AI để đổi/xoá.";
+      } else if (s.aiProvider && !s.aiApiKey) {
+        box.style.display = "block";
+        box.style.background = "#fffbeb"; box.style.color = "#92400e";
+        box.innerHTML = "⚠️ Đã chọn " + (_AI_PROVIDER_LABEL[s.aiProvider] || s.aiProvider) + " nhưng chưa dán API Key — bấm ⚙ AI để hoàn tất, tạm thời vẫn dùng AI chung.";
+      } else {
+        box.style.display = "none";
+      }
     });
+  }
+
+  panelEl.querySelector("#pk-ai-collapse").addEventListener("click", () => {
+      panelEl.classList.toggle("pk-ai-collapsed");
+      const collapsed = panelEl.classList.contains("pk-ai-collapsed");
+      _setCollapseBtnIcon_(collapsed);
+      try { chrome.storage.local.set({ pkPanelCollapsed: collapsed }); } catch (e) {}
+    });
+    panelEl.querySelector("#pk-ai-settings").addEventListener("click", () => {
+      // content script khong co quyen goi thang chrome.runtime.openOptionsPage() — nho background mo ho.
+      chrome.runtime.sendMessage({ type: "OPEN_OPTIONS" });
+    });
+    _refreshAiKeyBanner();
+    // CS luu key o trang Options (tab rieng) — panel dang mo can tu cap nhat lai banner khi co
+    // thay doi, khong bat CS phai bam F5 lai trang Messenger/Pancake.
+    try {
+      chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === "sync" && (changes.aiProvider || changes.aiApiKey)) _refreshAiKeyBanner();
+      });
+    } catch (e) {}
     panelEl.querySelector("#pk-ai-phone-btn").addEventListener("click", () => {
       const raw = panelEl.querySelector("#pk-ai-phone-input").value;
       const phone = normPhone(raw);
@@ -735,7 +779,16 @@
     // hien ra binh thuong (CS/SDT...) nhung "khong co gi" xay ra tiep theo, rat kho nhan biet
     // ly do. Them canh bao ro rang ngay tai day de CS biet ngay can vao Options cap nhat lai
     // selector, thay vi tuong extension bi "treo" khong ro nguyen nhan.
-    if (!document.querySelector(sel.messageList)) {
+    // _listMissing theo doi trang thai "container messageList co dang ton tai tren trang hay
+    // khong" qua thoi gian (khac voi chi kiem tra 1 LAN duy nhat luc init). Ly do: luc panel
+    // moi mo thuong CHUA chon hoi thoai nao (container that su chua ton tai — dung), nhung neu
+    // sau do nguoi dung mo 1 hoi thoai va container xuat hien, ma canh bao van hien nguyen do
+    // KHONG co cho nao chu dong "xoa" no di (truoc day chi duoc ghi de gian tiep khi
+    // extractMessages() tim duoc tin nhan — neu messageItem CUNG dang sai luon thi canh bao ve
+    // messageList bi ket lai mai, gay hieu lam sai nguyen nhan goc). Nay: moi lan mutation, danh
+    // gia lai container tu dau va CHI bao loi/xoa loi khi trang thai THAY DOI, tranh spam.
+    let _listMissing = !document.querySelector(sel.messageList);
+    if (_listMissing) {
       setStatus(
         `⚠️ Không tìm thấy khung tin nhắn trên trang này (selector "${sel.messageList}" không khớp) — có thể Pancake/Messenger vừa đổi giao diện. Mở Options → cập nhật lại messageList (F12 → Elements → chuột phải khung tin nhắn → Copy selector).`
       );
@@ -753,7 +806,18 @@
     const handleMutation = () => {
       clearTimeout(_mutDebounceTimer);
       _mutDebounceTimer = setTimeout(() => {
-        if (!document.querySelector(sel.messageList)) return; // van chua khop -> bo qua, khong spam trang thai
+        const nowMissing = !document.querySelector(sel.messageList);
+        if (nowMissing) {
+          if (!_listMissing) {
+            // Container VUA bien mat (vd doi hoi thoai giua chung SPA re-render) -> bao lai.
+            setStatus(
+              `⚠️ Không tìm thấy khung tin nhắn trên trang này (selector "${sel.messageList}" không khớp) — có thể Pancake/Messenger vừa đổi giao diện. Mở Options → cập nhật lại messageList (F12 → Elements → chuột phải khung tin nhắn → Copy selector).`
+            );
+          }
+          _listMissing = true;
+          return; // van chua khop -> bo qua, khong xu ly tiep
+        }
+        _listMissing = false; // container da xuat hien/con day -> canh bao messageList (neu co) coi nhu qua han, cac buoc duoi se tu cap nhat trang thai moi
         const messages = extractMessages();
         const signature = messages.map((m) => m.text).join("|").slice(0, 500);
         if (signature && signature !== lastConversationSignature) {
@@ -1634,6 +1698,31 @@
     return isNaN(n) ? 0 : n;
   }
 
+  // Cot "Chất liệu"/"Kiểu-Size" trong DANH_MUC đôi khi nhét NHIỀU lựa chọn vào chung 1 ô theo
+  // dạng "1. Aqua xanh biển 2. Citrin: vàng mỡ gà 3. Thạch anh..." thay vì tách riêng từng dòng.
+  // Trước đây "+ Thêm" nhét thẳng cả chuỗi thô này vào ô Chất liệu của giỏ hàng — Sale phải tự
+  // tay xoá bớt, dễ gửi nhầm nguyên cụm cho khách. Hàm này nhận diện đúng dạng đánh số 1,2,3...
+  // liên tục và tách thành mảng lựa chọn riêng lẻ; trả về null nếu chuỗi KHÔNG phải danh sách
+  // đánh số (ví dụ "BẠC 925 CÓ XỈ TRẮNG" — có số nhưng không phải số thứ tự liên tục từ 1).
+  function _parseNumberedList_(str) {
+    str = String(str || '').trim();
+    if (!str) return null;
+    const re = /(\d+)\.\s*/g;
+    const marks = [];
+    let m;
+    while ((m = re.exec(str))) marks.push({ idx: m.index, num: Number(m[1]), end: re.lastIndex });
+    if (marks.length < 2) return null;
+    for (let i = 0; i < marks.length; i++) { if (marks[i].num !== i + 1) return null; }
+    const out = [];
+    for (let i = 0; i < marks.length; i++) {
+      const start = marks[i].end;
+      const stop = i + 1 < marks.length ? marks[i + 1].idx : str.length;
+      const piece = str.slice(start, stop).trim();
+      if (piece) out.push(piece);
+    }
+    return out.length >= 2 ? out : null;
+  }
+
   // ══════════════════════════ SOẠN ĐƠN (gõ tên → lọc → dropdown thu hẹp dần) ══════════════════════════
   // Luồng: gõ tên (VD "tỳ hưu") → hiện TẤT CẢ tên thương mại/tên sản phẩm liên quan → chọn Tên →
   // Nhóm SP / Kiểu-Size / Chất liệu (chỉ gồm lựa chọn có thật của sản phẩm đó) → Màu, Đậm/nhạt (ghi chú
@@ -1780,6 +1869,16 @@
 
     const opt = (v, label, sel) => `<option value="${escapeHtml(v)}"${sel ? ' selected' : ''}>${escapeHtml(label)}</option>`;
     const row = (label, inner) => `<div class="pk-builder-row"><label>${label}</label>${inner}</div>`;
+    // Cac danh sach dai (ten nhom, ten san pham, mau, dam nhat) doi tu <select> sang
+    // <input list> + <datalist>: van bam chon binh thuong tu dropdown nhu cu, nhung them
+    // duoc go chu de loc/tim nhanh ngay trong o do (khong phai keo chuot lot qua het danh
+    // sach dai nhu anh CS gui). Chi ap dung cho cac muc ma value===label (khong co code an
+    // nhu '__def__'/'__none__'/index) de khong pha logic cascading phia duoi — Kieu/Size,
+    // Chat lieu, Chon muc gia van giu <select> thuong vi it lua chon hon va co gia tri
+    // ngam khac voi nhan hien thi.
+    const searchInput = (id, values, curVal, placeholder) =>
+      `<input type="text" id="${id}" list="${id}-dl" autocomplete="off" placeholder="${escapeHtml(placeholder)}" value="${escapeHtml(curVal || '')}" />` +
+      `<datalist id="${id}-dl">${values.map((v) => `<option value="${escapeHtml(v)}"></option>`).join('')}</datalist>`;
     let html = '';
     let cand = null;
 
@@ -1787,7 +1886,7 @@
     const groups = [...new Set(pool.map((it) => it.n).filter(Boolean))].sort(_vnSort_);
     if (_bld.nhom && groups.indexOf(_bld.nhom) === -1) _bld.nhom = '';
     if (groups.length === 1 && !_bld.nhom) _bld.nhom = groups[0];
-    if (groups.length) html += row(`Nhóm sản phẩm (${groups.length})`, `<select id="pkb-nhom"><option value="">— Tất cả nhóm —</option>${groups.map((g) => opt(g, g, g === _bld.nhom)).join('')}</select>`);
+    if (groups.length) html += row(`Nhóm sản phẩm (${groups.length})`, searchInput('pkb-nhom', groups, _bld.nhom, '— Tất cả nhóm — (gõ để tìm hoặc bấm chọn)'));
     const pool2 = _bld.nhom ? pool.filter((it) => it.n === _bld.nhom) : pool;
 
     // 2) Tên sản phẩm / tên thương mại (gộp, bỏ trùng)
@@ -1800,7 +1899,7 @@
     const names = Object.keys(nameMap).map((f) => nameMap[f]).sort(_vnSort_);
     if (_bld.ten && !nameMap[_fold_(_bld.ten)]) _bld.ten = '';
     if (!_bld.ten && names.length === 1) _bld.ten = names[0];
-    html += row(`Tên sản phẩm (${names.length})`, `<select id="pkb-ten"><option value="">— Chọn —</option>${names.map((n) => opt(n, n, n === _bld.ten)).join('')}</select>`);
+    html += row(`Tên sản phẩm (${names.length})`, searchInput('pkb-ten', names, _bld.ten, '— Chọn — (gõ để tìm hoặc bấm chọn)'));
 
     if (_bld.ten) {
       const tf = _fold_(_bld.ten);
@@ -1840,8 +1939,8 @@
     if (cand) {
       const autoK = _priceOfItem_(cand);
       if (!_bld.priceEdited) _bld.priceK = autoK ? String(autoK) : '';
-      html += row('Màu (ghi chú, bỏ trống được)', `<select id="pkb-mau"><option value="">— Bỏ trống —</option>${PK_COLOR_OPTS.map((c) => opt(c, c, c === _bld.mau)).join('')}</select>`);
-      html += row('Đậm / nhạt', `<select id="pkb-dam"><option value="">— Bỏ trống —</option>${PK_SHADE_OPTS.map((c) => opt(c, c, c === _bld.dam)).join('')}</select>`);
+      html += row('Màu (ghi chú, bỏ trống được)', searchInput('pkb-mau', PK_COLOR_OPTS, _bld.mau, '— Bỏ trống — (gõ để tìm hoặc bấm chọn)'));
+      html += row('Đậm / nhạt', searchInput('pkb-dam', PK_SHADE_OPTS, _bld.dam, '— Bỏ trống — (gõ để tìm hoặc bấm chọn)'));
       html += `<div class="pk-builder-inline">
         <div><label>Số lượng</label><input type="number" id="pkb-qty" min="1" value="${escapeHtml(_bld.qty)}" /></div>
         <div><label>Giá (nghìn đ) — ${escapeHtml(_stoneLabel_(cand))}</label><input type="number" id="pkb-price" min="0" value="${escapeHtml(_bld.priceK)}" placeholder="tự nhập nếu chưa có giá" /></div>
@@ -1937,13 +2036,18 @@
   }
 
   function addToCart_(item) {
+    // Neu Chat lieu la 1 o gom nhieu lua chon danh so chung (vd "1. X 2. Y 3. Z") thi tach rieng
+    // thanh danh sach de Sale TICK CHON tung cai (co the chon nhieu) thay vi nhet ca cum cho khach.
+    // Chua chon gi -> chatLieu de trong (khong con mac dinh nhet nguyen chuoi tho nhu truoc).
+    const clOptions = _parseNumberedList_(item.chatLieu);
     _cartItems.push({
       id: 'ci_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
       name: item.name || '(chưa đặt tên)',
       note: item.note || '',
       qty: item.qty || 1,
       price: item.price || 0,
-      chatLieu: item.chatLieu || '',
+      chatLieu: clOptions ? '' : (item.chatLieu || ''),
+      chatLieuOptions: clOptions || null,
       mauSac: item.mauSac || '',
       size: item.size || '',
       promoType: item.promoType || 'none',   // CTKM riêng của dòng: none | amount (k) | percent | gift
@@ -1962,7 +2066,23 @@
     panelEl.querySelector('#pk-cart-count').textContent = _cartItems.filter(i => i.checked).length;
 
     const list = panelEl.querySelector('#pk-cart-list');
-    list.innerHTML = _cartItems.map((it) => `
+    list.innerHTML = _cartItems.map((it) => {
+      // Neu day la dong co Chat lieu duoc tach tu 1 o gom nhieu lua chon (xem _parseNumberedList_
+      // trong addToCart_), hien checkbox tick tung lua chon (duoc tick nhieu) thay vi 1 o text
+      // nhet nguyen chuoi. Dong nhap thu cong / chat lieu don gian (vd "VÀNG 10K") van la o text
+      // nhu cu — khong ep phai co danh sach khi khong can.
+      const selectedCl = new Set((it.chatLieu || '').split(',').map((s) => s.trim()).filter(Boolean));
+      const chatLieuHtml = (it.chatLieuOptions && it.chatLieuOptions.length)
+        ? `<div class="pk-cart-chatlieu-multi">
+            <div class="pk-cl-multi-label">Chất liệu (tick 1 hoặc nhiều):</div>
+            ${it.chatLieuOptions.map((opt) => `
+              <label class="pk-cl-opt">
+                <input type="checkbox" class="pk-cl-opt-chk" data-opt="${escapeHtml(opt)}" ${selectedCl.has(opt) ? 'checked' : ''} />
+                <span>${escapeHtml(opt)}</span>
+              </label>`).join('')}
+          </div>`
+        : `<input type="text" class="pk-cart-chatlieu" value="${escapeHtml(it.chatLieu || '')}" placeholder="Chất liệu" />`;
+      return `
       <div class="pk-cart-row" data-id="${it.id}">
         <input type="checkbox" class="pk-cart-chk" ${it.checked ? 'checked' : ''} />
         <input type="text" class="pk-cart-name" value="${escapeHtml(it.name)}" placeholder="Tên sản phẩm" />
@@ -1970,7 +2090,7 @@
         <input type="number" class="pk-cart-price" value="${_cartExtra.priceInK ? (it.price ? it.price / 1000 : '') : it.price}" min="0" title="${_cartExtra.priceInK ? 'Đơn giá (nghìn đ — gõ 2800 = 2.800.000đ)' : 'Đơn giá (đ)'}" />
         <button class="pk-cart-del" title="Xoá dòng này">✕</button>
         <div class="pk-cart-detail-row">
-          <input type="text" class="pk-cart-chatlieu" value="${escapeHtml(it.chatLieu || '')}" placeholder="Chất liệu" />
+          ${chatLieuHtml}
           <input type="text" class="pk-cart-mausac" value="${escapeHtml(it.mauSac || '')}" placeholder="Màu sắc" />
           <input type="text" class="pk-cart-size" value="${escapeHtml(it.size || '')}" placeholder="Size" />
         </div>
@@ -1986,7 +2106,18 @@
         </div>
         ${it.note ? `<div class="pk-cart-note">${escapeHtml(it.note)}</div>` : ''}
       </div>
-    `).join('') || '<div class="pk-cart-empty">Chưa có sản phẩm nào. Dùng tab "Soạn đơn" hoặc "+ Thêm" ở kết quả tra giá phía trên, hoặc "+ Thêm dòng thủ công".</div>';
+    `;
+    }).join('') || '<div class="pk-cart-empty">Chưa có sản phẩm nào. Dùng tab "Soạn đơn" hoặc "+ Thêm" ở kết quả tra giá phía trên, hoặc "+ Thêm dòng thủ công".</div>';
+
+    list.querySelectorAll('.pk-cl-opt-chk').forEach((chk) => {
+      chk.addEventListener('change', (e) => {
+        const rowEl = e.target.closest('.pk-cart-row');
+        const id = rowEl.dataset.id;
+        const checkedOpts = [...rowEl.querySelectorAll('.pk-cl-opt-chk:checked')].map((c) => c.dataset.opt);
+        _updateCartItem_(id, 'chatLieu', checkedOpts.join(', '), true);
+        saveCart_();
+      });
+    });
 
     list.querySelectorAll('.pk-cart-row').forEach((row) => {
       const id = row.dataset.id;
@@ -1995,8 +2126,10 @@
       nameEl.addEventListener('input', (e) => { _updateCartItem_(id, 'name', e.target.value, true); });
       nameEl.addEventListener('change', () => { saveCart_(); });
       const chatLieuEl = row.querySelector('.pk-cart-chatlieu');
-      chatLieuEl.addEventListener('input', (e) => { _updateCartItem_(id, 'chatLieu', e.target.value, true); });
-      chatLieuEl.addEventListener('change', () => { saveCart_(); });
+      if (chatLieuEl) {
+        chatLieuEl.addEventListener('input', (e) => { _updateCartItem_(id, 'chatLieu', e.target.value, true); });
+        chatLieuEl.addEventListener('change', () => { saveCart_(); });
+      }
       const mauSacEl = row.querySelector('.pk-cart-mausac');
       mauSacEl.addEventListener('input', (e) => { _updateCartItem_(id, 'mauSac', e.target.value, true); });
       mauSacEl.addEventListener('change', () => { saveCart_(); });
