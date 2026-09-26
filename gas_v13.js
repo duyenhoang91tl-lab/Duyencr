@@ -1943,6 +1943,111 @@ function buildSalesReportA_(filters) {
     });
   }
 
+  // ── Tỷ lệ chốt theo Kênh (widget "Tỷ lệ chốt theo Kênh" ở tab Báo cáo doanh số) — dong bo
+  // cung logic voi "Tỷ lệ chốt theo Sale" o tren, theo yeu cau Duyen: mau so la TONG TUONG
+  // TAC PANCAKE cua (cac) Page da khop voi kenh do (khong phai "tong KH duoc giao" nhu cu),
+  // tu so la so don ban tu kenh do. Vi mau so lay tu Pancake nen CHI TINH DUOC tu ngay co du
+  // lieu tuong tac Pancake tro di (dung chung bien closeFrom da tinh o tren cho phan Sale).
+  var kenhCloseRate = [];
+  if (closeFrom) {
+    var closeOrdersByKenh = {};
+    for (var cki = 0; cki < matched.length; cki++) {
+      var mck = matched[cki];
+      if (!dateInRange_(parseVNDate_(mck[dateField]), closeFrom, filters.dateTo)) continue;
+      var kn = mck.kenhBan || '(chưa có kênh)';
+      closeOrdersByKenh[kn] = (closeOrdersByKenh[kn] || 0) + 1;
+    }
+    var pInt3 = buildPancakeReport_(closeFrom, filters.dateTo, 'equal');
+    var pageMapK = readPancakePageMap_(); // pageId -> kenhBan
+    var tongTTByKenh = {};
+    pInt3.byPage.forEach(function(p) {
+      var kn2 = pageMapK[p.pageId] || '';
+      if (!kn2) return; // Page chua khop kenh ban -> khong co mau so, bo qua (giong het "Theo Page")
+      tongTTByKenh[kn2] = (tongTTByKenh[kn2] || 0) + (p.tongTT || 0);
+    });
+    var allKenhKeys = {};
+    Object.keys(closeOrdersByKenh).forEach(function(k){ allKenhKeys[k]=1; });
+    Object.keys(tongTTByKenh).forEach(function(k){ allKenhKeys[k]=1; });
+    kenhCloseRate = Object.keys(allKenhKeys).map(function(kn3) {
+      var tongTTk = tongTTByKenh[kn3] || 0;
+      var closedK = closeOrdersByKenh[kn3] || 0;
+      return { name: kn3, held: Math.round(tongTTk * 100) / 100, closed: closedK,
+               closeRate: tongTTk ? Math.round(closedK / tongTTk * 1000) / 10 : 0 };
+    });
+  }
+
+  // ── Tỷ lệ chốt theo Sale, TÁCH RIÊNG TỪNG PAGE + cột tổng cá nhân — theo yêu cầu Duyên: mỗi
+  // Sale cần thấy tỷ lệ chốt của MÌNH trên TỪNG Page (không gộp chung tất cả các Page vào 1 số
+  // như bảng "Tỷ lệ chốt theo Sale" ở trên), kèm 1 cột tổng cá nhân giống hệt bảng đó để so sánh.
+  // Đọc thẳng sheet PancakeStats (đã có sẵn pageId + nhanVien trên từng dòng) để nhóm theo
+  // (Sale, Page) — quy đổi pageId -> kênh bán qua PancakePageMap để cộng với số đơn theo kênh.
+  var saleCloseByPage = { pages: [], rows: [] };
+  if (closeFrom) {
+    var shPkStats = getSheet_(SH_PK_STATS, PK_STATS_HEADERS);
+    var mapSaleK = readPancakeMap_(); // pancakeName -> "sale1|sale2"
+    var pageMapK2 = readPancakePageMap_(); // pageId -> kenhBan
+    var pageInfoByKenh = {}; // kenhBan -> {pageId, pageName, kenhBan} (Page dau tien khop kenh do)
+    var ttBySaleKenh = {};   // "sale|||kenh" -> tong tuong tac
+    if (shPkStats.getLastRow() >= 2) {
+      var vPk = shPkStats.getRange(2, 1, shPkStats.getLastRow() - 1, PK_STATS_HEADERS.length).getValues();
+      for (var pki = 0; pki < vPk.length; pki++) {
+        var dPk = normOrderDate_(vPk[pki][0]);
+        if (dPk < closeFrom || (filters.dateTo && dPk > filters.dateTo)) continue;
+        var pageIdPk = String(vPk[pki][1]), pageNamePk = String(vPk[pki][2]), nhanVienPk = String(vPk[pki][3]), ttPk = +vPk[pki][6] || 0;
+        if (!ttPk) continue;
+        var kenhPk = pageMapK2[pageIdPk] || '';
+        if (!kenhPk) continue; // Page chua khop kenh -> khong co cach doi chieu voi don hang, bo qua
+        if (!pageInfoByKenh[kenhPk]) pageInfoByKenh[kenhPk] = { pageId: pageIdPk, pageName: pageNamePk, kenhBan: kenhPk };
+        var salesPk = String(mapSaleK[nhanVienPk] || '').split('|').map(function(x){return x.trim();}).filter(function(x){return x;});
+        if (!salesPk.length) salesPk = [nhanVienPk];
+        salesPk.forEach(function(spn) {
+          var key = spn + '|||' + kenhPk;
+          ttBySaleKenh[key] = (ttBySaleKenh[key] || 0) + ttPk;
+        });
+      }
+    }
+    var closedBySaleKenh = {}; // "sale|||kenh" -> so don
+    for (var cpi = 0; cpi < matched.length; cpi++) {
+      var mcp = matched[cpi];
+      if (!dateInRange_(parseVNDate_(mcp[dateField]), closeFrom, filters.dateTo)) continue;
+      var salesOnP = splitMulti_(mcp.saleBan, ',');
+      if (!salesOnP.length) salesOnP = [UNASSIGNED];
+      var kenhP = mcp.kenhBan || '(chưa có kênh)';
+      salesOnP.forEach(function(spn2) {
+        var key2 = spn2 + '|||' + kenhP;
+        closedBySaleKenh[key2] = (closedBySaleKenh[key2] || 0) + 1;
+      });
+    }
+    var pagesList = Object.keys(pageInfoByKenh).map(function(k){ return pageInfoByKenh[k]; })
+      .sort(function(a,b){ return a.pageName.localeCompare(b.pageName,'vi'); });
+    var byPageSaleCanon = {}, byPageSaleKey = function(n){ var ck=_normTxt_(n); if(!byPageSaleCanon[ck]) byPageSaleCanon[ck]=n; return ck; };
+    var rowsMap = {};
+    function ensureRow(sn) {
+      var k = byPageSaleKey(sn);
+      if (!rowsMap[k]) rowsMap[k] = { name: byPageSaleCanon[k], perPage: {}, totalHeld: 0, totalClosed: 0 };
+      return rowsMap[k];
+    }
+    Object.keys(ttBySaleKenh).forEach(function(key) {
+      var parts = key.split('|||'), sn = parts[0], kn = parts[1];
+      var r = ensureRow(sn);
+      var held = ttBySaleKenh[key] || 0, closed = closedBySaleKenh[key] || 0;
+      r.perPage[kn] = { held: Math.round(held*100)/100, closed: closed, rate: held ? Math.round(closed/held*1000)/10 : 0 };
+      r.totalHeld += held; r.totalClosed += closed;
+    });
+    Object.keys(closedBySaleKenh).forEach(function(key) {
+      var parts = key.split('|||'), sn = parts[0], kn = parts[1];
+      var r = ensureRow(sn);
+      if (!r.perPage[kn]) { r.perPage[kn] = { held: 0, closed: closedBySaleKenh[key], rate: 0 }; r.totalClosed += closedBySaleKenh[key]; }
+    });
+    saleCloseByPage.pages = pagesList;
+    saleCloseByPage.rows = Object.keys(rowsMap).map(function(k) {
+      var r = rowsMap[k];
+      return { name: r.name, perPage: r.perPage,
+        total: { held: Math.round(r.totalHeld*100)/100, closed: r.totalClosed,
+                 rate: r.totalHeld ? Math.round(r.totalClosed/r.totalHeld*1000)/10 : 0 } };
+    });
+  }
+
   return {
     totalOrders: matched.length,
     totalCoc: totalCoc,
@@ -1954,6 +2059,9 @@ function buildSalesReportA_(filters) {
     byMkt: byMktArr,
     saleCloseRate: saleCloseRate,
     saleCloseRateFrom: closeFrom || null,
+    kenhCloseRate: kenhCloseRate,
+    kenhCloseRateFrom: closeFrom || null,
+    saleCloseByPage: saleCloseByPage,
     trungBinhDon: matched.length ? Math.round(totalGiaTri / matched.length) : 0,
     orders: matched.map(function(m){
       return {

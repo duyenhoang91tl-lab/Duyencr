@@ -18935,6 +18935,32 @@ function _srRenderA(d){
     '<div style="flex:1 1 320px;min-width:280px">'+saleCloseHtml+'</div>'+
     '</div>';
 
+  // Bang Ty le chot theo Sale x TUNG PAGE rieng + cot Tong ca nhan — theo yeu cau Duyen, de
+  // moi Sale doi chieu duoc phong do tren tung Page rieng thay vi chi 1 con so gop chung.
+  if (d.saleCloseByPage && d.saleCloseByPage.pages && d.saleCloseByPage.pages.length){
+    var scbp = d.saleCloseByPage;
+    var scbpRows = scbp.rows.filter(function(r){ return !_srState.saleSearch || r.name.toLowerCase().indexOf(_srState.saleSearch.toLowerCase())!==-1; });
+    scbpRows.sort(function(a,b){ return b.total.rate - a.total.rate; });
+    html += '<div class="dash-section-title" style="margin-top:18px">Tỷ lệ chốt theo Sale — từng Page<span style="font-weight:400;color:var(--muted);font-size:11px">'+saleCloseNote+'</span></div>';
+    html += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Sale</th>'+
+      scbp.pages.map(function(p){ return '<th style="text-align:right">'+esc(p.pageName)+'</th>'; }).join('')+
+      '<th style="text-align:right"><b>Tổng cá nhân</b></th></tr></thead><tbody>';
+    if (!scbpRows.length){
+      html += '<tr><td colspan="'+(scbp.pages.length+2)+'" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+    } else {
+      scbpRows.forEach(function(r){
+        html += '<tr><td>'+esc(r.name)+'</td>'+
+          scbp.pages.map(function(p){
+            var cell = r.perPage[p.kenhBan];
+            if (!cell || !cell.held) return '<td style="text-align:right;color:var(--muted)">—</td>';
+            return '<td style="text-align:right">'+cell.rate+'% <span style="color:var(--muted);font-size:10.5px">('+cell.closed+'/'+cell.held+')</span></td>';
+          }).join('')+
+          '<td style="text-align:right"><b>'+r.total.rate+'%</b> <span style="color:var(--muted);font-size:10.5px">('+r.total.closed+'/'+r.total.held+')</span></td></tr>';
+      });
+    }
+    html += '</tbody></table></div>';
+  }
+
   if (_srIsAdmin()){
     _SR_COLTH_ROWSFN_['aTeam'] = function(){ return (_srState.dataA && _srState.dataA.byTeamSale) || []; };
     _SR_COLTH_GETTER_['aTeam'] = { name: function(r){ return r.name; } };
@@ -18986,9 +19012,14 @@ function _srRenderA(d){
     } else {
       kenhHtml += _srChartSvg(kenhRows, 'name', 'giaTri', _srState.aKenhView, true, 'orders');
     }
-    // Tỷ lệ chốt theo Kênh — cũng đặt bên cạnh biểu đồ doanh thu theo Kênh
-    var kenhCloseHtml = '<div class="dash-section-title">Tỷ lệ chốt theo Kênh <span style="font-weight:400;color:var(--muted);font-size:11px">(số Chốt / tổng KH được giao)</span></div>'+
-      _srCloseRateBarHtml_(_srCloseRateByKenh_(), _srState.kenhSearch);
+    // Tỷ lệ chốt theo Kênh — cũng đặt bên cạnh biểu đồ doanh thu theo Kênh. Công thức: Số đơn
+    // bán từ kênh / Tổng tương tác Pancake của (các) Page đã khớp với kênh đó — CHỈ tính được
+    // từ ngày có dữ liệu tương tác Pancake trở đi (xem kenhCloseRateFrom), giống hệt cách làm
+    // ở "Tỷ lệ chốt theo Sale".
+    var kenhCloseNote = d.kenhCloseRateFrom ? ' — tính từ '+esc(d.kenhCloseRateFrom) : '';
+    var kenhCloseHtml = '<div class="dash-section-title">Tỷ lệ chốt theo Kênh <span style="font-weight:400;color:var(--muted);font-size:11px">(Số đơn / Tổng tương tác Pancake'+kenhCloseNote+')</span></div>'+
+      (d.kenhCloseRateFrom ? _srCloseRateBarHtml_(d.kenhCloseRate, _srState.kenhSearch, 'tương tác') :
+        '<div style="color:var(--muted);text-align:center;padding:20px;font-size:12px">Chưa nạp báo cáo tương tác Pancake ngày nào — vào tab "📥 Báo cáo Pancake" để nạp trước khi xem tỷ lệ chốt theo Kênh.</div>');
     html += '<div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">'+
       '<div style="flex:1 1 380px;min-width:320px">'+kenhHtml+'</div>'+
       '<div style="flex:1 1 320px;min-width:280px">'+kenhCloseHtml+'</div>'+
