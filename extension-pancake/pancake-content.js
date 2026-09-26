@@ -1706,6 +1706,12 @@
   let _flatMode = 'full';     // 'full' = có cả danh mục | 'live' = tìm trực tiếp (GAS cũ)
   let _flatLoading = false;
   let _liveTimer = null;
+  // CTKM (sheet CTKM, cùng file giá, nằm cạnh sheet DANH_MUC) — tải 1 lần, cache y hệt cách
+  // làm với bảng giá, để CS xem được các chương trình khuyến mãi đang áp dụng ngay trong lúc
+  // soạn đơn thay vì phải mở Sheet riêng ra tra.
+  let _ctkmRows = null;       // null = chưa tải; [] = tải rồi nhưng rỗng/GAS cũ chưa hỗ trợ
+  let _ctkmLoading = false;
+  const PK_CTKM_TTL_MS = 15 * 60 * 1000;
   const _bldBlank_ = () => ({ q: '', nhom: '', ten: '', size: '', cl: '', cand: '', mau: '', dam: '', qty: 1,
     priceK: '', priceEdited: false, promoType: 'none', promoVal: '' });
   let _bld = _bldBlank_();
@@ -1780,6 +1786,7 @@
       });
     }
     if (_flatItems === null && !_flatLoading) loadFlat_();
+    if (_ctkmRows === null && !_ctkmLoading) loadCtkm_();
     renderBuilderDyn_();
   }
 
@@ -1809,6 +1816,51 @@
         renderBuilderDyn_();
       });
     });
+  }
+
+  function loadCtkm_() {
+    if (_ctkmLoading || _ctkmRows !== null) return;
+    _ctkmLoading = true;
+    chrome.storage.local.get(['pkCtkm'], (res) => {
+      const c = res && res.pkCtkm;
+      if (c && Array.isArray(c.rows) && (Date.now() - c.ts) < PK_CTKM_TTL_MS) {
+        _ctkmRows = c.rows; _ctkmLoading = false; renderBuilderDyn_(); return;
+      }
+      safeSendMessage_({ type: 'GET_CTKM' }, (resp) => {
+        _ctkmLoading = false;
+        // GAS bản cũ chưa có action ctkmCatalog, hoặc lỗi mạng → coi như KHÔNG có CTKM (ẩn
+        // panel đi), không chặn/không báo lỗi giữa form đang soạn đơn — tính năng phụ trợ,
+        // không được làm gián đoạn luồng chính lên đơn.
+        _ctkmRows = (resp?.ok && Array.isArray(resp.data?.rows)) ? resp.data.rows : [];
+        if (_ctkmRows.length) { try { chrome.storage.local.set({ pkCtkm: { ts: Date.now(), rows: _ctkmRows } }); } catch (e) {} }
+        renderBuilderDyn_();
+      });
+    });
+  }
+  // Gộp toàn bộ giá trị 1 dòng CTKM thành 1 khối text để hiển thị + để so khớp từ khoá, giống
+  // hệt cách readCTKMPromotions_ bên GAS đang trình bày cho AI — CS xem quen mắt, dễ đối chiếu.
+  function _ctkmRowText_(row) {
+    const parts = [];
+    Object.keys(row || {}).forEach((k) => {
+      const v = row[k];
+      if (v === '' || v === null || v === undefined) return;
+      parts.push(k + ': ' + v);
+    });
+    return parts.join(' | ');
+  }
+  // Lọc các dòng CTKM có nhắc tới tên sản phẩm đang soạn (so khớp không dấu) — chỉ hiện
+  // CTKM LIÊN QUAN, tránh liệt kê hết cả chục chương trình không ăn nhập gây rối mắt.
+  function _ctkmForProduct_(ten, tm) {
+    if (!Array.isArray(_ctkmRows) || !_ctkmRows.length) return [];
+    const nameFold = _fold_(ten || tm || '');
+    if (!nameFold) return _ctkmRows.slice(0, 5).map(_ctkmRowText_);
+    const nameToks = nameFold.split(' ').filter((w) => w.length >= 2);
+    const hits = [];
+    _ctkmRows.forEach((row) => {
+      const text = _fold_(_ctkmRowText_(row));
+      if (nameToks.some((w) => text.indexOf(w) !== -1)) hits.push(_ctkmRowText_(row));
+    });
+    return hits.slice(0, 5);
   }
 
   function _liveSearch_(q) {
@@ -1919,6 +1971,20 @@
         </select></div>
         <div id="pkb-promoval-wrap" style="${_bld.promoType === 'none' ? 'display:none' : ''}"><label>&nbsp;</label><input type="text" id="pkb-promoval" value="${escapeHtml(_bld.promoVal)}" placeholder="${_bld.promoType === 'gift' ? 'Quà tặng (VD: dây đeo)' : (_bld.promoType === 'percent' ? '% giảm' : 'Số tiền giảm (k)')}" /></div>
       </div>`;
+      {
+        // Panel tham khảo: các dòng CTKM (sheet CTKM, nằm cạnh sheet giá) có nhắc tới sản phẩm
+        // đang soạn — CHỈ để CS xem/đối chiếu, KHÔNG tự điền vào ô Giảm tiền/Giảm % ở trên (cấu
+        // trúc sheet CTKM tự do, không đoán chắc được số tiền/% để tự áp — tránh áp nhầm).
+        const ctkmMatches = _ctkmForProduct_(cand.t, cand.m);
+        if (ctkmMatches.length) {
+          html += `<div class="pk-builder-ctkm-box">
+            <div class="pk-builder-ctkm-title">🎉 CTKM đang có, liên quan sản phẩm này (tham khảo — không tự áp vào giá):</div>
+            ${ctkmMatches.map((t) => `<div class="pk-builder-ctkm-row">${escapeHtml(t)}</div>`).join('')}
+          </div>`;
+        } else if (Array.isArray(_ctkmRows) && _ctkmRows.length) {
+          html += `<div class="pk-builder-ctkm-box pk-builder-ctkm-empty">🎉 Sheet CTKM hiện không có chương trình nào nhắc tới sản phẩm này.</div>`;
+        }
+      }
       html += `<div class="pk-builder-summary"><div id="pkb-line-total"></div><button id="pkb-add-btn" class="pk-price-addbtn">+ Thêm vào đơn</button></div>`;
     }
     dyn.innerHTML = html;

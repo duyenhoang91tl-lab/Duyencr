@@ -183,6 +183,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // CTKM (sheet CTKM, cung file gia, nam ben canh sheet DANH_MUC) cho "Soan don": doc toan
+  // bo cac chuong trinh khuyen mai dang co de CS xem/doi chieu khi len don.
+  if (msg?.type === "GET_CTKM") {
+    handleGetCtkm()
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
   // Cay "Tinh trang CS" dong (co optgroup) — dung chung voi Zalo AI/appweb, de dropdown
   // Trang thai CS ben Pancake AI hien dung nhom giong het cac noi khac.
   if (msg?.type === "GET_CARE_STATUS_TREE") {
@@ -664,6 +673,19 @@ async function handleGetPriceTree() {
   const data = await res.json();
   if (data.error) throw new Error(data.error);
   return { groups: data.groups || [], priceKeys: data.priceKeys || [] };
+}
+
+async function handleGetCtkm() {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+  const sep = cfg.gasUrl.includes("?") ? "&" : "?";
+  const res = await fetch(cfg.gasUrl + sep + "action=ctkmCatalog", { redirect: "follow" });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  // GAS ban cu chua co action nay se tra ve {} (khong co rows) -> bao rieng de client biet ma an panel di, khong bao loi om
+  if (!Array.isArray(data.rows)) throw new Error("GAS_NO_CTKM");
+  return { rows: data.rows };
 }
 
 async function handleGetKnowledge() {

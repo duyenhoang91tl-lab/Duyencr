@@ -992,6 +992,18 @@ function doGet(e) {
       }
       return ContentService.createTextOutput(flatJson).setMimeType(ContentService.MimeType.JSON);
     }
+    // ─── CTKM (Sheet CTKM, cung file PRICE_SS_ID, nam canh sheet DANH_MUC) cho "Soan don" cua
+    // Pancake AI: tra ve NGUYEN VAN toan bo dong (khong loc theo tu khoa nhu readCTKMPromotions_,
+    // vi o day CS can XEM DUOC het cac CTKM dang co de tu doi chieu, khong phai dang hoi AI).
+    // Cache 10 phut, giong het cach lam voi bang gia — CTKM cung it doi trong ngay. ──
+    if (action === 'ctkmCatalog') {
+      var ctkmJson = _cacheGetBig_('ctkm_catalog_v1');
+      if (!ctkmJson) {
+        ctkmJson = JSON.stringify({ ok: true, rows: readCTKMCatalog_() });
+        _cachePutBig_('ctkm_catalog_v1', ctkmJson, 600);
+      }
+      return ContentService.createTextOutput(ctkmJson).setMimeType(ContentService.MimeType.JSON);
+    }
     // ─── Cay Nhom SP → Ten SP → Kieu/Size (ban cu, giu tuong thich) ───
     if (action === 'priceCatalogTree') {
       var treeJson = _cacheGetBig_('price_tree_v2');

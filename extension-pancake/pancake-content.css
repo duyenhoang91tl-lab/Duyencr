@@ -1079,6 +1079,20 @@
 #pkb-line-total { color: #b45309; font-size: 12px; }
 .pk-builder-was { color: #6b7280; font-size: 10.5px; text-decoration: line-through; }
 
+.pk-builder-ctkm-box {
+  margin-top: 6px;
+  padding: 7px 9px;
+  border: 1px dashed #f59e0b;
+  border-radius: 6px;
+  background: #fffbeb;
+  font-size: 11px;
+  color: #78350f;
+}
+.pk-builder-ctkm-title { font-weight: 600; margin-bottom: 4px; }
+.pk-builder-ctkm-row { padding: 2px 0; line-height: 1.4; word-break: break-word; }
+.pk-builder-ctkm-row + .pk-builder-ctkm-row { border-top: 1px dotted #fde68a; }
+.pk-builder-ctkm-empty { color: #92400e; font-style: italic; }
+
 /* ── Giỏ: CTKM riêng từng dòng ── */
 .pk-cart-promo-row {
   flex: 1 0 100%;
