@@ -9101,7 +9101,34 @@ function setSetting_(key, value) {
   }
   if (rowIdx > 0) sh.getRange(rowIdx, 2).setValue(value);
   else sh.appendRow([key, value]);
+  // "🏷️ Phân loại Online/Offline" (Quan ly Team) ghi vao day — dong bo luon sang truong saleType
+  // cua tai khoan dang nhap trung ten, de PHAN LOAI NAY AP DUNG CA CHO DANG NHAP (theo yeu cau
+  // Duyen 2026-09: 1 nguon phan loai Online/Offline dung chung MOI NOI, ke ca tai khoan dang nhap),
+  // khong chi rieng cac bao cao doanh so.
+  if (key === 'saleChannels') { try { _syncSaleChannelsToUsers_(value); } catch (eSync) {} }
   return jsonOut_({ ok: true });
+}
+function _syncSaleChannelsToUsers_(rawValue) {
+  var channels; try { channels = JSON.parse(rawValue); } catch (e) { return; }
+  if (!channels || typeof channels !== 'object') return;
+  var shU = getSheet_(SH_USER, USER_HEADERS);
+  if (shU.getLastRow() < 2) return;
+  var v = shU.getRange(2, 1, shU.getLastRow() - 1, USER_HEADERS.length).getValues();
+  var saleTypeCol = USER_HEADERS.indexOf('saleType'); // cot 'saleType' (index 8)
+  if (saleTypeCol === -1) return;
+  for (var i = 0; i < v.length; i++) {
+    // Dung DUNG cach doc 'names' nhu readUsers_: JSON array o cot 'names' (index 6), fallback ve
+    // 1 phan tu tu cot 'name' don (index 3) neu tai khoan cu chua co cot 'names'.
+    var namesArr = []; try { namesArr = v[i][6] ? JSON.parse(v[i][6]) : []; } catch (e2) { namesArr = []; }
+    if (!namesArr.length && v[i][3]) namesArr = [String(v[i][3])];
+    var matchCh = null;
+    for (var j = 0; j < namesArr.length; j++) {
+      if (channels[namesArr[j]] !== undefined) { matchCh = channels[namesArr[j]]; break; }
+    }
+    if (matchCh && (matchCh === 'online' || matchCh === 'offline') && String(v[i][saleTypeCol] || '') !== matchCh) {
+      shU.getRange(i + 2, saleTypeCol + 1).setValue(matchCh);
+    }
+  }
 }
 function addZaloNick_(nick) {
   nick = String(nick || '').trim();
@@ -12233,18 +12260,26 @@ function readSaleDirectory_() {
   var sh = getSheet_(SH_SALE_DIR, SALE_DIR_HEADERS);
   var list = [], byName = {};
   if (sh.getLastRow() < 2) return { list: list, byName: byName };
+  // Doc chung 1 nguon Van phong/Online voi Bao cao E/F ("🏷️ Phân loại Online/Offline", setting
+  // 'saleChannels') THEO YEU CAU DUYEN 2026-09 (ap dung dong bo cho MOI bao cao, ke ca tai khoan
+  // dang nhap qua _syncSaleChannelsToUsers_ trong setSetting_) — chi fallback ve tag Pancake S#/O#
+  // cho Sale nao CHUA duoc phan loai qua modal do, tranh mat du lieu Nhom cua nhung Sale cu.
+  var channels = {};
+  try { var rawCh = getSetting_('saleChannels'); if (rawCh) { var oCh = JSON.parse(rawCh); if (oCh && typeof oCh === 'object') channels = oCh; } } catch (eCh) {}
   var v = sh.getRange(2, 1, sh.getLastRow() - 1, SALE_DIR_HEADERS.length).getValues();
   for (var i = 0; i < v.length; i++) {
     var tag = String(v[i][3] || '').trim();
     var m = tag.match(/^([SO])\s*(\d+)/i);
     if (!m) continue; // dong khong co ma tag S#/O# -> khong phai Sale trong danh sach
+    var tenFacebook = String(v[i][1] || '').trim(), userBase = String(v[i][2] || '').trim();
+    var chVal = channels[tenFacebook] || channels[userBase] || channels[tag] || '';
     var rec = {
       maSale: String(v[i][0] || '').trim(),
-      tenFacebook: String(v[i][1] || '').trim(),
-      userBase: String(v[i][2] || '').trim(),
+      tenFacebook: tenFacebook,
+      userBase: userBase,
       tenTagPancake: tag,
       code: m[1].toUpperCase() + parseInt(m[2], 10),
-      nhom: m[1].toUpperCase() === 'S' ? 'Văn phòng' : 'Online'
+      nhom: chVal === 'online' ? 'Online' : (chVal === 'offline' ? 'Văn phòng' : (m[1].toUpperCase() === 'S' ? 'Văn phòng' : 'Online'))
     };
     list.push(rec);
     [rec.tenFacebook, rec.userBase, rec.tenTagPancake, rec.code].forEach(function(k) {
