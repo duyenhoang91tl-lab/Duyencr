@@ -1514,9 +1514,15 @@ function dateInRange_(dt, fromStr, toStr) {
 // so len don SAU KHI TRU gia tri don hang bi huy, tra lai, hoan tien hoac dang trong qua trinh
 // xu ly khieu nai." Khong doi accent-insensitive de khop du go co dau/khong dau/viet tat.
 function _isExcludedOrderStatus_(trangThai) {
-  var s = _stripVN_(trangThai);
+  var s = _stripVN_(trangThai).trim();
   if (!s) return false;
-  return /that bai|huy|hoan tien|hoan tra|tra lai|khieu nai|khong thanh/.test(s);
+  // Trang thai dung GON "Da hoan"/"Dang hoan" (khong kem chu gi khac) — vd Pancake POS ghi tat
+  // trong cot "Thẻ". Dung so sanh TOAN BO chuoi (khong phai substring) de KHONG vo tinh khop
+  // nham "Da hoan thanh" (hoan thanh = tot, KHONG duoc loai) — "da hoan thanh" khac han "da hoan".
+  if (/^(da hoan|dang hoan)$/.test(s)) return true;
+  // "hoan hang" bat cac bien the day du: "Dang hoan hang", "Da hoan hang", "Hoan hang"... (tra
+  // hang ve nguoi ban) — KHONG dung "hoan" don le vi se khop nham voi "hoan thanh".
+  return /that bai|huy|hoan tien|hoan tra|hoan hang|tra lai|khieu nai|khong thanh/.test(s);
 }
 
 
