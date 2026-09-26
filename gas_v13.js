@@ -1012,7 +1012,8 @@ function doGet(e) {
     // ── BAO CAO D: KH "Chăm sóc" thêm nhanh (sheet riêng, KHÔNG gộp báo cáo A/B/C) ──
     if (action === 'careLeadReport') {
       var pD = e.parameter || {};
-      var fD = { dateFrom: pD.dateFrom || '', dateTo: pD.dateTo || '', cs: pD.cs || '' };
+      var fD = { dateFrom: pD.dateFrom || '', dateTo: pD.dateTo || '',
+                 cs: pD.cs ? pD.cs.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : [] };
       return jsonOut_(buildCareLeadReport_(fD));
     }
 
@@ -2432,11 +2433,13 @@ function buildSalesReportC_(filters) {
 // ── BAO CAO D: KH "Chăm sóc" thêm nhanh (sheet rieng, KHONG gop bao cao A/B/C) ──
 function buildCareLeadReport_(filters) {
   filters = filters || {};
+  var csFilterArr = Array.isArray(filters.cs) ? filters.cs.filter(function(s){return s;})
+    : (filters.cs ? [String(filters.cs).trim()] : []);
   var rows = readCareLeads_();
   var matched = rows.filter(function(r) {
     var dt = r.createdAt ? new Date(r.createdAt) : null;
     if (!dateInRange_(dt, filters.dateFrom, filters.dateTo)) return false;
-    if (filters.cs && String(r.cs||'') !== String(filters.cs)) return false;
+    if (csFilterArr.length && csFilterArr.indexOf(String(r.cs||'')) === -1) return false;
     return true;
   });
   var byCS = {};
