@@ -22,13 +22,47 @@
   resize: both;
 }
 
+/* Thu gọn = chỉ còn 1 icon tròn nhỏ nổi góc màn hình (không phải cả thanh tiêu đề dài) —
+   ẩn hẳn phần chữ "Pancake AI" + nút ⚙ AI, chỉ giữ lại nút toggle làm icon, ép panel về
+   kích thước cố định 44x44 bất kể đã resize/lưu kích thước to trước đó (!important thắng
+   cả inline style width/height do _restorePanelState_ gán). */
 #pk-ai-panel.pk-ai-collapsed {
-  height: auto !important;
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 50%;
   resize: none;
+  overflow: hidden;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
 }
 
 #pk-ai-panel.pk-ai-collapsed #pk-ai-body {
   display: none;
+}
+
+#pk-ai-panel.pk-ai-collapsed #pk-ai-header {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+#pk-ai-panel.pk-ai-collapsed #pk-ai-header-title,
+#pk-ai-panel.pk-ai-collapsed #pk-ai-settings {
+  display: none;
+}
+
+#pk-ai-panel.pk-ai-collapsed #pk-ai-collapse {
+  font-size: 20px;
+  line-height: 1;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 #pk-ai-header {
