@@ -19031,6 +19031,7 @@ function _srSaveCloseRateEdit(btn){
   if (isNaN(red) || isNaN(green) || red < 0 || green < 0 || red > 100 || green > 100){ toast('⚠️ Mốc % không hợp lệ.'); return; }
   if (red > green){ toast('⚠️ Mốc đỏ phải nhỏ hơn hoặc bằng mốc vàng.'); return; }
   _saveCloseRateThresholds(red, green);
+  form.style.display = 'none'; // an ngay hang nhap mac (Do duoi/Vang den/Xanh tren) sau khi luu
   toast('✓ Đã lưu mốc màu: đỏ <'+red+'%, vàng '+red+'–'+green+'%, xanh >'+green+'%');
   if (_activeV9Tab === 'salesreport') renderSalesReportTab();
   if (_activeV9Tab === 'kpipancake') renderKpiPancakeTab();
