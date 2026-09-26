@@ -20705,8 +20705,14 @@ function _acctDetailHtml(a){
   // kể từ ngày bắt đầu" (thưởng sale thử việc).
   var saleTypeHtml = '';
   if (a.role === 'cs') {
+    // Nguon HIEN THI = SALE_CHANNELS (cung 1 nguon voi "🏆 Chương trình thưởng" + Báo cáo F —
+    // theo yeu cau Duyen: "mỗi sale chỉ có on/off, phân loại ở đâu thì báo cáo cũng tính theo
+    // đó"), khong con doc rieng a.saleType nua (van giu cot do tren Users lam du phong khi
+    // TAI KHOAN nay CHUA co ten nao xuat hien trong SALE_CHANNELS, vd nhan vien moi chua ban gi).
+    var stNames = _acctNamesOf(a);
+    var stCur = stNames.map(function(n){ return SALE_CHANNELS[n]; }).filter(Boolean)[0] || a.saleType || '';
     var stOpts = [['','— Chưa gán —'],['online','Sale online'],['offline','Sale offline']].map(function(o){
-      return '<option value="'+o[0]+'"'+((a.saleType||'')===o[0]?' selected':'')+'>'+o[1]+'</option>';
+      return '<option value="'+o[0]+'"'+(stCur===o[0]?' selected':'')+'>'+o[1]+'</option>';
     }).join('');
     saleTypeHtml = '<div style="margin-top:10px;border-top:1px dashed var(--border);padding-top:9px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">'+
       '<div><div style="font-size:10.5px;color:var(--hint);margin-bottom:2px">Loại Sale (áp dụng chương trình thưởng)</div>'+
@@ -20765,6 +20771,14 @@ function acctTogglePermTab(u, tabId, on){
 function acctSetSaleType(u, val){
   var acct = _findAccount(u); if (!acct) return;
   acct.saleType = val || '';
+  // Ghi THẲNG vào SALE_CHANNELS cho MỌI tên bí danh của tài khoản này — đây là nguồn DUY NHẤT mà
+  // "🏆 Chương trình thưởng" và "Báo cáo F — KPI Sale" đang đọc, để đặt ở đâu (Quản lý tài khoản
+  // hay Quản lý Team > 🏷️ Phân loại Online/Offline) thì mọi báo cáo cũng tính theo đúng 1 kết quả.
+  _acctNamesOf(acct).forEach(function(n){
+    if (!n) return;
+    if (val) SALE_CHANNELS[n] = val; else delete SALE_CHANNELS[n];
+  });
+  saveSaleChannels();
   _acctPersist(acct, 'Đặt loại Sale: ' + (val || '(bỏ trống)'));
 }
 function acctSetStartDate(u, val){
