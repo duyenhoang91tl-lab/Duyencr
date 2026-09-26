@@ -1901,27 +1901,58 @@ function buildSalesReportA_(filters) {
              trungBinhDon: o.orders ? Math.round(o.giaTri / o.orders) : 0 };
   }).sort(function(a, b){ return b.giaTri - a.giaTri; });
 
-  // ── Tỷ lệ chốt theo Sale (widget "Tỷ lệ chốt theo Sale" ở tab Báo cáo doanh số) — theo yêu
-  // cầu Duyen (24/09/2026): đổi mẫu số từ "tổng KH được giao" (careStatus, allCustomers phía
-  // client) sang ĐÚNG công thức đã dùng ở bảng "Theo Page"/"KPI Pancake": số đơn / tổng tương
-  // tác Pancake (buildPancakeReport_.byCS, đã có sẵn theo TỪNG SALE RIÊNG — không gộp nhiều
-  // sale chung 1 dòng như careCS cũ). Chỉ tính từ NGÀY CÓ DỮ LIỆU TƯƠNG TÁC PANCAKE trở đi
-  // (bỏ qua các ngày đầu kỳ chưa nạp báo cáo Pancake), tránh số đơn bị tính đủ cả kỳ trong khi
-  // mẫu số tương tác bị thiếu những ngày đó làm tỷ lệ sai lệch (ảo cao hoặc ảo thấp).
+  // ── Tỷ lệ chốt theo Sale (widget "Tỷ lệ chốt theo Sale" ở tab Báo cáo doanh số) — công thức:
+  // số đơn / tổng tương tác Pancake (buildPancakeReport_.byCS, theo TỪNG SALE RIÊNG).
+  // Cập nhật theo yêu cầu Duyên (26/09/2026): CHỈ tính đơn của đúng NGÀY + PAGE thực sự có dữ
+  // liệu tương tác Pancake đã nạp — không phải cứ nằm trong khoảng ngày đang lọc là tính. Ví dụ
+  // kỳ lọc có 30 ngày nhưng 1 Page chỉ mới nạp thống kê 5 ngày, thì đơn của Page đó ở 25 ngày
+  // còn lại (dù vẫn trong khoảng lọc) sẽ KHÔNG được tính vào tử số/mẫu số của tỷ lệ chốt — tránh
+  // đơn bị tính đủ trong khi tương tác bị thiếu ngày làm tỷ lệ ảo cao/ảo thấp. Khớp đơn -> Page
+  // qua PancakePageMap (kenhBan <-> pageId); đơn không khớp được Page nào thì bỏ qua (không đủ
+  // căn cứ để biết ngày đó Page có dữ liệu hay không).
   var saleCloseRate = [];
-  var tuongTacSpan = _pkSheetDateSpan_(SH_PK_STATS, PK_STATS_HEADERS, filters.dateFrom, filters.dateTo);
-  var closeFrom = tuongTacSpan.minDate || ''; // rong neu CHUA TUNG nap du lieu tuong tac Pancake ngay nao
-  if (closeFrom && filters.dateFrom && _dateStrToVnYmd_(filters.dateFrom) > closeFrom) closeFrom = _dateStrToVnYmd_(filters.dateFrom);
-  if (closeFrom) {
+  var pkPageMap = readPancakePageMap_(); // pageId -> kenhBan
+  var kenhToPageIds = {};
+  Object.keys(pkPageMap).forEach(function(pid) {
+    var kn = pkPageMap[pid]; if (!kn) return;
+    if (!kenhToPageIds[kn]) kenhToPageIds[kn] = [];
+    kenhToPageIds[kn].push(pid);
+  });
+  var fFromYmd = _dateStrToVnYmd_(filters.dateFrom), fToYmd = _dateStrToVnYmd_(filters.dateTo);
+  var pageCoveredDates = {}; // pageId -> { 'yyyy-MM-dd': true }
+  var hasAnyPkData = false;
+  (function() {
+    var shPk = getSheet_(SH_PK_STATS, PK_STATS_HEADERS);
+    if (shPk.getLastRow() < 2) return;
+    var vPk = shPk.getRange(2, 1, shPk.getLastRow() - 1, PK_STATS_HEADERS.length).getValues();
+    for (var pi = 0; pi < vPk.length; pi++) {
+      var pd = normOrderDate_(vPk[pi][0]);
+      if (!pd) continue;
+      if (fFromYmd && pd < fFromYmd) continue;
+      if (fToYmd && pd > fToYmd) continue;
+      hasAnyPkData = true;
+      var pid2 = String(vPk[pi][1]);
+      if (!pageCoveredDates[pid2]) pageCoveredDates[pid2] = {};
+      pageCoveredDates[pid2][pd] = true;
+    }
+  })();
+  var closeFrom = '';
+  if (hasAnyPkData) {
     var closeOrdersBySale = {};
     for (var ci = 0; ci < matched.length; ci++) {
       var mc = matched[ci];
-      if (!dateInRange_(parseVNDate_(mc[dateField]), closeFrom, filters.dateTo)) continue;
+      var mcDt = parseVNDate_(mc[dateField]);
+      if (!mcDt) continue;
+      var mcYmd = _vnYmd_(mcDt);
+      var pidsForKenh = kenhToPageIds[mc.kenhBan] || [];
+      var covered = pidsForKenh.some(function(pid3){ return pageCoveredDates[pid3] && pageCoveredDates[pid3][mcYmd]; });
+      if (!covered) continue;
+      if (!closeFrom || mcYmd < closeFrom) closeFrom = mcYmd; // chi de hien thi ghi chu, khong dung de loc
       var salesOnOrderC = splitMulti_(mc.saleBan, ',');
       if (!salesOnOrderC.length) salesOnOrderC = [UNASSIGNED];
       salesOnOrderC.forEach(function(sn) { closeOrdersBySale[sn] = (closeOrdersBySale[sn] || 0) + 1; });
     }
-    var pInt2 = buildPancakeReport_(closeFrom, filters.dateTo, 'equal');
+    var pInt2 = buildPancakeReport_(filters.dateFrom, filters.dateTo, 'equal');
     var closeCanon = {};
     var closeKey = function(n) { var ck = _normTxt_(n); if (!closeCanon[ck]) closeCanon[ck] = n; return ck; };
     var closeAgg = {};
