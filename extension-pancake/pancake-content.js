@@ -216,12 +216,21 @@
     setStatus('⚠️ Mất kết nối tới extension — vui lòng tải lại trang (F5).');
   }
 
+  // Doi icon + title cua nut thu gon/mo rong theo trang thai (— khi dang mo, 🤖 khi da thu
+  // nho lai thanh 1 icon tron de CS biet bam vao dau de mo lai).
+  function _setCollapseBtnIcon_(collapsed) {
+    const btn = panelEl && panelEl.querySelector('#pk-ai-collapse');
+    if (!btn) return;
+    btn.textContent = collapsed ? '🤖' : '—';
+    btn.title = collapsed ? 'Mở lại Pancake AI' : 'Thu gọn';
+  }
+
   // ── Nhớ vị trí/kích thước/trạng thái thu gọn của panel giữa các lần tải trang
   // (chrome.storage.local — riêng theo máy, không cần đồng bộ nhiều máy) ──
   function _restorePanelState_() {
     try {
       chrome.storage.local.get(['pkPanelCollapsed', 'pkPanelPos', 'pkPanelSize'], (res) => {
-        if (res.pkPanelCollapsed) panelEl.classList.add('pk-ai-collapsed');
+        if (res.pkPanelCollapsed) { panelEl.classList.add('pk-ai-collapsed'); _setCollapseBtnIcon_(true); }
         if (res.pkPanelPos && typeof res.pkPanelPos.right === 'number' && typeof res.pkPanelPos.bottom === 'number') {
           panelEl.style.right = res.pkPanelPos.right + 'px';
           panelEl.style.bottom = res.pkPanelPos.bottom + 'px';
@@ -286,7 +295,7 @@
     panelEl.id = "pk-ai-panel";
     panelEl.innerHTML = `
       <div id="pk-ai-header">
-        <div style="flex:1">
+        <div id="pk-ai-header-title" style="flex:1">
           <div style="font-weight:700">🤖 Pancake AI</div>
           <div style="font-size:10px;font-weight:400;opacity:.85">Tra cứu & gợi ý phản hồi khách</div>
         </div>
@@ -465,7 +474,9 @@
 
   panelEl.querySelector("#pk-ai-collapse").addEventListener("click", () => {
       panelEl.classList.toggle("pk-ai-collapsed");
-      try { chrome.storage.local.set({ pkPanelCollapsed: panelEl.classList.contains("pk-ai-collapsed") }); } catch (e) {}
+      const collapsed = panelEl.classList.contains("pk-ai-collapsed");
+      _setCollapseBtnIcon_(collapsed);
+      try { chrome.storage.local.set({ pkPanelCollapsed: collapsed }); } catch (e) {}
     });
     panelEl.querySelector("#pk-ai-settings").addEventListener("click", () => {
       // content script khong co quyen goi thang chrome.runtime.openOptionsPage() — nho background mo ho.
