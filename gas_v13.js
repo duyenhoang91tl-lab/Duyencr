@@ -238,6 +238,14 @@ function readPriceCatalog_() {
     }
     if (Object.keys(obj).length) rows.push(obj);
   }
+  // Giu lai THU TU COT THAT (trai->phai) cua sheet duoi 1 thuoc tinh an tren mang tra ve —
+  // KHONG dua vao Object.keys(row) cua tung dong de suy ra thu tu cot nhu truoc (xem
+  // _priceCols_): vi readPriceCatalog_ bo qua o rong, cac dong khac nhau co the co o gia nao
+  // rong khac nhau, khien thu tu "gap thay cot dau tien" tinh theo tung dong RIENG LE bi lech
+  // khoi thu tu cot THAT cua sheet — day chinh la nguyen nhan bug chon nham cot gia (VD sheet
+  // co nhieu cot cung chua chu "gia" cho nhieu chuong trinh/dot gia khac nhau, cot "Gia thuong"
+  // hien thi dung nhung lai KHONG phai cot duoc chon do tinh co dung dau tien theo kieu cu).
+  rows.__headers = headers;
   return rows;
 }
 
@@ -280,21 +288,59 @@ function _cacheGetBig_(key) {
 // readPriceCatalog_ bo o rong cho gon nen dong dau tien co the thieu key -> gop key cua TAT CA
 // cac dong. Nhan dien bang _stripVN_ (bo dau) vi tieu de that co dau ("Giá", "Tên sản phẩm"):
 // so thang /gia/ tren "Giá" co dau se KHONG khop -> mat het cot gia (loi da gap).
+//
+// QUAN TRONG (fix bug chon nham cot gia): thu tu cot.gia PHAI theo dung thu tu cot THAT cua
+// sheet (rows.__headers, trai->phai) — KHONG duoc suy tu Object.keys(rows[i]) nhu truoc, vi
+// sheet co the co NHIEU cot cung chua chu "gia" (VD nhieu dot/chuong trinh gia khac nhau nam o
+// cot an, duoc 1 cot hien thi vd "Gia thuong" rut ra bang cong thuc) va cac dong khac nhau co
+// the trong o o nhung cot gia khac nhau -> thu tu "gap thay dau tien" tinh rieng tung dong se
+// LECH khoi thu tu cot that, khien buildPriceCatalogFlat_ vo tinh lay gia tu 1 cot KHAC (vd
+// dot khuyen mai cu) thay vi dung cot "Gia thuong" hien dang hien thi cho khach.
+//
+// GIOI HAN VUNG COT GIA (theo yeu cau Duyen 26/09/2026): sheet BANG GIA hien tai dung 3 cot
+// CHINH THUC bôi do la G (Gia thuong), H (Gia SAPHIA), I (Gia RUBY) — cac cot ben phai tu do
+// tro di (vd X->AF) CHI la vung cong thuc/mau nguon de "do" gia ra 3 cot G/H/I (qua 1 cong thuc
+// dieu khien boi o G7), KHONG PHAI du lieu gia chinh thuc, nhung van co chu "gia" trong tieu de
+// nen truoc day bi quet nham vao giaCandidates. Vi vay CHI nhan dien cot gia trong pham vi cot
+// A->I (idx+1 <= GIA_COL_LIMIT) — cac cot ten/nhom/size/chat lieu van duoc do toan bo be rong
+// sheet nhu cu vi khong lien quan toi vung cong thuc nay.
+var GIA_COL_LIMIT_ = 9; // cot I (A=1, B=2, ... I=9)
+// Neu co NHIEU cot gia THUONG (khong tinh Saphia/Ruby), UU TIEN cot nao co chu "thuong" (Gia
+// thuong) truoc — chi khi KHONG cot nao ghi ro "thuong" moi lui ve thu tu trai->phai nhu cu.
+// FIX (26/09/2026): cot Saphia/Ruby PHAI luon duoc giu lai bat ke co cot "thuong" hay khong —
+// truoc day gop chung Saphia/Ruby vao cung danh sach roi loc theo "thuong" khien 2 cot nay bi
+// LOAI BO hoan toan moi khi co san 1 cot "Gia thuong" (vi ten Saphia/Ruby khong chua chu
+// "thuong"), lam bang gia flat luon tra ve sp=0, r=0 du sheet co du lieu.
 function _priceCols_(rows) {
-  var seen = {}, keys = [];
-  for (var i = 0; i < rows.length; i++) {
-    for (var k in rows[i]) { if (!seen[k]) { seen[k] = true; keys.push(k); } }
-  }
+  var headerOrder = rows.__headers || (function() {
+    // Du phong khi khong co __headers (vd goi truc tiep tu test): lay lai theo cach cu.
+    var seen = {}, keys = [];
+    for (var i = 0; i < rows.length; i++) { for (var k in rows[i]) { if (!seen[k]) { seen[k] = true; keys.push(k); } } }
+    return keys;
+  })();
   var cols = { nhom: '', ten: '', tm: '', size: '', cl: '', gia: [] };
-  keys.forEach(function(k) {
+  var giaCandidates = []; // { key, isThuong, isSpecial } theo DUNG thu tu cot that cua sheet
+  headerOrder.forEach(function(k, idx) {
+    if (!k) return;
     var st = _stripVN_(k);
     if (!cols.nhom && /nhom\s*san\s*pham/.test(st)) cols.nhom = k;
     else if (!cols.ten && /^ten\s*san\s*pham/.test(st)) cols.ten = k;
     else if (!cols.tm && /ten\s*thuong\s*mai/.test(st)) cols.tm = k;
     else if (!cols.size && (st.indexOf('size') !== -1 || st.indexOf('kieu') !== -1)) cols.size = k;
     else if (!cols.cl && st.indexOf('chat lieu') !== -1) cols.cl = k;
-    else if (/gia|price/.test(st)) cols.gia.push(k);
+    else if (/gia|price/.test(st) && (idx + 1) <= GIA_COL_LIMIT_) {
+      var isSpecial = st.indexOf('saphia') !== -1 || st.indexOf('ruby') !== -1;
+      giaCandidates.push({ key: k, isThuong: st.indexOf('thuong') !== -1, isSpecial: isSpecial });
+    }
   });
+  var specialKeys = giaCandidates.filter(function(g) { return g.isSpecial; }).map(function(g) { return g.key; });
+  var normalOnes = giaCandidates.filter(function(g) { return !g.isSpecial; });
+  var thuongKeys = normalOnes.filter(function(g) { return g.isThuong; }).map(function(g) { return g.key; });
+  var pickedNormal = thuongKeys.length ? thuongKeys : normalOnes.map(function(g) { return g.key; });
+  var pickedSet = {};
+  pickedNormal.concat(specialKeys).forEach(function(k) { pickedSet[k] = true; });
+  // Giu dung thu tu cot that (trai->phai) trong danh sach cuoi cung.
+  cols.gia = headerOrder.filter(function(k) { return pickedSet[k]; });
   return cols;
 }
 // So tien trong bang gia tinh bang NGHIN VND (7950 = 7.950.000d). Chap nhan ca chuoi "7.950"/"7,950".
@@ -612,7 +658,34 @@ function setSetting_(key, value) {
   }
   if (rowIdx > 0) sh.getRange(rowIdx, 2).setValue(value);
   else sh.appendRow([key, value]);
+  // "🏷️ Phân loại Online/Offline" (Quan ly Team) ghi vao day — dong bo luon sang truong saleType
+  // cua tai khoan dang nhap trung ten, de PHAN LOAI NAY AP DUNG CA CHO DANG NHAP (theo yeu cau
+  // Duyen 2026-09: 1 nguon phan loai Online/Offline dung chung MOI NOI, ke ca tai khoan dang nhap),
+  // khong chi rieng cac bao cao doanh so.
+  if (key === 'saleChannels') { try { _syncSaleChannelsToUsers_(value); } catch (eSync) {} }
   return jsonOut_({ ok: true });
+}
+function _syncSaleChannelsToUsers_(rawValue) {
+  var channels; try { channels = JSON.parse(rawValue); } catch (e) { return; }
+  if (!channels || typeof channels !== 'object') return;
+  var shU = getSheet_(SH_USER, USER_HEADERS);
+  if (shU.getLastRow() < 2) return;
+  var v = shU.getRange(2, 1, shU.getLastRow() - 1, USER_HEADERS.length).getValues();
+  var saleTypeCol = USER_HEADERS.indexOf('saleType'); // cot 'saleType' (index 8)
+  if (saleTypeCol === -1) return;
+  for (var i = 0; i < v.length; i++) {
+    // Dung DUNG cach doc 'names' nhu readUsers_: JSON array o cot 'names' (index 6), fallback ve
+    // 1 phan tu tu cot 'name' don (index 3) neu tai khoan cu chua co cot 'names'.
+    var namesArr = []; try { namesArr = v[i][6] ? JSON.parse(v[i][6]) : []; } catch (e2) { namesArr = []; }
+    if (!namesArr.length && v[i][3]) namesArr = [String(v[i][3])];
+    var matchCh = null;
+    for (var j = 0; j < namesArr.length; j++) {
+      if (channels[namesArr[j]] !== undefined) { matchCh = channels[namesArr[j]]; break; }
+    }
+    if (matchCh && (matchCh === 'online' || matchCh === 'offline') && String(v[i][saleTypeCol] || '') !== matchCh) {
+      shU.getRange(i + 2, saleTypeCol + 1).setValue(matchCh);
+    }
+  }
 }
 function addZaloNick_(nick) {
   nick = String(nick || '').trim();
@@ -3870,18 +3943,26 @@ function readSaleDirectory_() {
   var sh = getSheet_(SH_SALE_DIR, SALE_DIR_HEADERS);
   var list = [], byName = {};
   if (sh.getLastRow() < 2) return { list: list, byName: byName };
+  // Doc chung 1 nguon Van phong/Online voi Bao cao E/F ("🏷️ Phân loại Online/Offline", setting
+  // 'saleChannels') THEO YEU CAU DUYEN 2026-09 (ap dung dong bo cho MOI bao cao, ke ca tai khoan
+  // dang nhap qua _syncSaleChannelsToUsers_ trong setSetting_) — chi fallback ve tag Pancake S#/O#
+  // cho Sale nao CHUA duoc phan loai qua modal do, tranh mat du lieu Nhom cua nhung Sale cu.
+  var channels = {};
+  try { var rawCh = getSetting_('saleChannels'); if (rawCh) { var oCh = JSON.parse(rawCh); if (oCh && typeof oCh === 'object') channels = oCh; } } catch (eCh) {}
   var v = sh.getRange(2, 1, sh.getLastRow() - 1, SALE_DIR_HEADERS.length).getValues();
   for (var i = 0; i < v.length; i++) {
     var tag = String(v[i][3] || '').trim();
     var m = tag.match(/^([SO])\s*(\d+)/i);
     if (!m) continue; // dong khong co ma tag S#/O# -> khong phai Sale trong danh sach
+    var tenFacebook = String(v[i][1] || '').trim(), userBase = String(v[i][2] || '').trim();
+    var chVal = channels[tenFacebook] || channels[userBase] || channels[tag] || '';
     var rec = {
       maSale: String(v[i][0] || '').trim(),
-      tenFacebook: String(v[i][1] || '').trim(),
-      userBase: String(v[i][2] || '').trim(),
+      tenFacebook: tenFacebook,
+      userBase: userBase,
       tenTagPancake: tag,
       code: m[1].toUpperCase() + parseInt(m[2], 10),
-      nhom: m[1].toUpperCase() === 'S' ? 'Văn phòng' : 'Online'
+      nhom: chVal === 'online' ? 'Online' : (chVal === 'offline' ? 'Văn phòng' : (m[1].toUpperCase() === 'S' ? 'Văn phòng' : 'Online'))
     };
     list.push(rec);
     [rec.tenFacebook, rec.userBase, rec.tenTagPancake, rec.code].forEach(function(k) {
