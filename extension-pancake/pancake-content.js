@@ -110,13 +110,6 @@
   }
   const CARE_POLL_MS = 6000;
   const REM_POLL_MS = 5 * 60 * 1000; // quet nhac hen moi 5 phut
-  // 3 huong mo dau khac nhau khi CHU DONG nhan truoc cho khach — CUNG NOI DUNG voi
-  // OPENER_ANGLES ben Zalo AI, de 2 kenh tu van nhat quan.
-  const OPENER_ANGLES = [
-    { key: 'follow', label: '🩺 Hỏi thăm trải nghiệm', instr: 'Hỏi thăm cảm nhận/trải nghiệm khách sau khi dùng sản phẩm đã mua gần nhất, thể hiện sự quan tâm chân thành.' },
-    { key: 'upsell', label: '🛍 Gợi ý sản phẩm liên quan', instr: 'Gợi ý nhẹ nhàng 1 sản phẩm liên quan hoặc dùng kèm với sản phẩm khách đã mua, mở đầu bằng câu hỏi/quan tâm chứ không chào bán trực tiếp.' },
-    { key: 'connect', label: '✨ Khơi gợi trò chuyện', instr: 'Mở đầu bằng 1 câu hỏi mở hoặc chia sẻ nhỏ (ưu đãi mới, mẹo dùng sản phẩm, hỏi thăm dịp gần đây) để khơi gợi khách phản hồi, tạo cảm giác gần gũi cá nhân.' }
-  ];
   let _activeTone = 'Thân thiện';
   let _useProducts = false;
   let _stonePref = ''; // '' = mac dinh (cot G) | 'SAPHIA' | 'RUBY' — luu sticky, khoi phai go lai moi lan
@@ -406,8 +399,6 @@
           <label><input type="radio" name="pk-stone" id="pk-stone-saphia" value="SAPHIA" /> SAPHIA</label>
           <label><input type="radio" name="pk-stone" id="pk-stone-ruby" value="RUBY" /> RUBY</label>
         </div>
-        <button id="pk-opener-btn" class="pk-opener-btn">💬 Tạo 3 câu mở đầu đa dạng (mua hàng + chat)</button>
-
         <div id="pk-ai-suggestions"></div>
         <button id="pk-ai-refresh">Lấy gợi ý mới</button>
       </div>
@@ -560,7 +551,6 @@
         renderBuilderDyn_(); // Soạn đơn: giá tự nhảy theo loại đá (trừ khi Sale đã tự sửa giá)
       });
     });
-    panelEl.querySelector("#pk-opener-btn").addEventListener("click", doGenerateOpeners_);
   }
 
   // ── CS đang dùng (sticky theo máy, lưu chrome.storage.sync) ──
@@ -2195,64 +2185,6 @@
         renderSuggestions(resp.data);
       }
     );
-  }
-
-  // ── 3 câu mở đầu chủ động (dùng khi CS muốn nhắn trước cho khách) ──
-  // giống hệt luồng doGenerateOpener() bên Zalo AI: gọi tuần tự 3 hướng (không Promise.all
-  // vì Groq giới hạn token/phút, bắn cùng lúc dễ dính 429), mỗi hướng ra 1 ô sửa được +
-  // nút "Chèn vào ô trả lời" (KHÔNG có nút tự gửi như bên Zalo — Pancake/Messenger không có
-  // API gửi tin công khai, CS luôn tự kiểm tra và bấm Gửi tay, giữ đúng nguyên tắc an toàn
-  // đã áp dụng cho phần gửi ảnh).
-  async function doGenerateOpeners_() {
-    const btn = panelEl.querySelector("#pk-opener-btn");
-    const sug = panelEl.querySelector("#pk-ai-suggestions");
-    btn.disabled = true; btn.textContent = "AI đang soạn...";
-    sug.innerHTML = '<div class="pk-ai-cust-loading">Đang soạn 3 câu mở đầu...</div>';
-
-    const custLines = buildCustLines();
-    const results = [];
-    for (let i = 0; i < OPENER_ANGLES.length; i++) {
-      const angle = OPENER_ANGLES[i];
-      sug.innerHTML = `<div class="pk-ai-cust-loading">Đang soạn câu ${i + 1}/${OPENER_ANGLES.length} — ${escapeHtml(angle.label)}...</div>`;
-      const data = await new Promise((resolve) => {
-        safeSendMessage_(
-          { type: "FETCH_OPENER", payload: { custLines, tone: _activeTone, angleInstr: angle.instr, withProducts: _useProducts, stonePref: _stonePref } },
-          (resp) => resolve(resp?.ok ? resp.data : { error: resp?.error || "lỗi không rõ" })
-        );
-      });
-      results.push({ angle, ...data });
-    }
-
-    sug.innerHTML = "";
-    const label = document.createElement("div");
-    label.className = "pk-opener-label";
-    label.textContent = "💡 3 câu mở đầu — sửa nếu cần rồi chèn vào ô trả lời";
-    sug.appendChild(label);
-    results.forEach((r) => {
-      const box = document.createElement("div");
-      box.className = "pk-opener-box";
-      if (r.error) {
-        box.innerHTML = `<div class="pk-opener-label">${escapeHtml(r.angle.label)}</div><div style="color:#dc2626;font-size:12px">Lỗi: ${escapeHtml(r.error)}</div>`;
-        sug.appendChild(box);
-        return;
-      }
-      const ta = document.createElement("textarea");
-      ta.rows = 3;
-      ta.value = r.suggestion || "";
-      const btnRow = document.createElement("div");
-      btnRow.className = "pk-opener-btn-row";
-      const insertBtn = document.createElement("button");
-      insertBtn.className = "pk-btn-outline";
-      insertBtn.textContent = "📥 Chèn vào ô trả lời";
-      insertBtn.addEventListener("click", () => insertReply(ta.value));
-      btnRow.appendChild(insertBtn);
-      box.innerHTML = `<div class="pk-opener-label">${escapeHtml(r.angle.label)}</div>`;
-      box.appendChild(ta);
-      box.appendChild(btnRow);
-      sug.appendChild(box);
-    });
-
-    btn.disabled = false; btn.textContent = "💬 Tạo 3 câu mở đầu đa dạng (mua hàng + chat)";
   }
 
   function renderSuggestions(data) {
