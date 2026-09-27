@@ -718,6 +718,21 @@ function getSetting_(key) {
   }
   return null;
 }
+// Chia gas_v13.js thanh nhieu manh <=45.000 ky tu, ghi qua setSetting_ (gasSourceChunk_0, _1,...).
+// Neu ban moi it manh hon ban truoc, xoa het cac key manh du (gasSourceChunk_N tro len) de khong
+// bi lan sang du lieu manh cu khi getGasSource_ doc.
+function setGasSource_(code) {
+  code = String(code || '');
+  var CHUNK = 45000;
+  var oldCount = parseInt(getSetting_('gasSourceChunkCount') || '0', 10) || 0;
+  var chunks = [];
+  for (var i = 0; i < code.length; i += CHUNK) chunks.push(code.slice(i, i + CHUNK));
+  for (var c = 0; c < chunks.length; c++) setSetting_('gasSourceChunk_' + c, chunks[c]);
+  for (var d = chunks.length; d < oldCount; d++) setSetting_('gasSourceChunk_' + d, '');
+  setSetting_('gasSourceChunkCount', String(chunks.length));
+  setSetting_('gasSourceUpdatedAt', new Date().toISOString());
+  return jsonOut_({ ok: true, chunks: chunks.length, length: code.length });
+}
 function setSetting_(key, value) {
   var sh = getSheet_(SH_SET, SET_HEADERS);
   var last = sh.getLastRow(); var rowIdx = -1;
@@ -1257,6 +1272,18 @@ function doGet(e) {
     if (action === 'getSetting') {
       var skey = (e && e.parameter && e.parameter.key) ? String(e.parameter.key) : '';
       return jsonOut_({ value: getSetting_(skey) });
+    }
+
+    // ── lay ma nguon gas_v13.js (nut "Copy Apps Script Code" trong index.html) — luu cac
+    // manh (chunk) qua getSetting_/setSetting_ (key gasSourceChunk_0, _1, ...) vi 1 o tinh Sheet
+    // gioi han 50.000 ky tu, code hien ~330k ky tu nen phai chia manh. Xem setGasSource (doPost)
+    // — moi lan Duyen sua xong gas_v13.js VA da Deploy lai thu cong, phai vao CRM > nut Google
+    // Sheets > dan lai code moi + bam "Dong bo" 1 lan de nut Copy luon dua dung ban moi nhat.
+    if (action === 'getGasSource') {
+      var gsChunks = parseInt(getSetting_('gasSourceChunkCount') || '0', 10) || 0;
+      var gsCode = '';
+      for (var gci = 0; gci < gsChunks; gci++) gsCode += (getSetting_('gasSourceChunk_' + gci) || '');
+      return jsonOut_({ code: gsCode, chunks: gsChunks, updatedAt: getSetting_('gasSourceUpdatedAt') || null });
     }
 
     // ── BROADCAST: hang doi tin gui hang loat cho 1 CS (ZaloAI extension) ──
@@ -3120,6 +3147,10 @@ function doPost(e) {
     if (action === 'saveSaleDirectory')   return saveSaleDirectory_(data.rows);
     if (action === 'savePancakePageMap')  return savePancakePageMap_(data.pageId, data.pageName, data.kenhBan);
     if (action === 'setSetting')          return setSetting_(data.key, data.value);
+    // ── Dong bo lai ma nguon gas_v13.js cho nut "Copy Apps Script Code" (xem getGasSource, doGet)
+    // — chia thanh cac manh <=45.000 ky tu (o tinh Sheet gioi han 50.000), xoa manh cu thua neu
+    // ban moi it manh hon ban truoc, roi ghi "gasSourceUpdatedAt" de UI hien luc dong bo gan nhat.
+    if (action === 'setGasSource')        return setGasSource_(data.code);
     // Them 1 nick Zalo vao danh sach chung (MERGE tren server -> khong ghi de mat nick cu)
     if (action === 'addZaloNick')         return addZaloNick_(data.nick);
     if (action === 'saveAssign')          return saveAssignEntry_(data.entry);
