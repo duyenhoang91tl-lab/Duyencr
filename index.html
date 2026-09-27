@@ -7,39 +7,50 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root {
-  --bg:#f5f4f2; --surface:#fff; --surface2:#f0efed; --surface3:#e8e6e3;
-  --border:rgba(0,0,0,0.09); --border-md:rgba(0,0,0,0.15); --border-strong:rgba(0,0,0,0.22);
-  --text:#18170f; --muted:#6a6760; --hint:#a09d99;
-  --green:#1a6b45; --green-bg:#e6f3ec; --green-mid:#2d9464;
+  --bg:#f6f5f3; --surface:#fff; --surface2:#f1efec; --surface3:#e7e4e0;
+  --border:rgba(20,20,10,0.08); --border-md:rgba(20,20,10,0.14); --border-strong:rgba(20,20,10,0.22);
+  --text:#18170f; --muted:#68655e; --hint:#9d9a94;
+  --green:#146245; --green-bg:#e7f4ee; --green-mid:#1f8a5c;
   --vip:#6d28d9; --vip-bg:#f0ebff; --vip-b:#c4b5fd;
   --tt:#1558a8; --tt-bg:#e6f0fb; --tt-b:#93c5fd;
   --tn:#b45309; --tn-bg:#fef3e2; --tn-b:#fcd34d;
   --red:#b91c1c; --red-bg:#fef2f2; --red-b:#fca5a5;
   --blue:#1d4ed8; --blue-bg:#eff6ff; --blue-b:#93c5fd;
   --r:8px; --rsm:5px; --rlg:12px;
-  --shadow:0 1px 4px rgba(0,0,0,0.07);
+  --shadow:0 1px 3px rgba(20,20,10,0.05), 0 1px 2px rgba(20,20,10,0.04);
+  --shadow-md:0 4px 14px rgba(20,20,10,0.09), 0 1px 3px rgba(20,20,10,0.06);
+  --ease:cubic-bezier(.2,.7,.3,1);
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6;}
+*:focus-visible{outline:2px solid var(--green-mid);outline-offset:1px;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.55;-webkit-tap-highlight-color:transparent;}
+::selection{background:var(--green-bg);color:var(--green);}
 
 /* ── HEADER ── */
 header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 16px;height:50px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;gap:8px;}
 .logo{font-size:14px;font-weight:700;color:var(--green);display:flex;align-items:center;gap:6px;letter-spacing:.02em;white-space:nowrap;}
-.logo-mark{width:22px;height:22px;background:var(--green);border-radius:5px;display:flex;align-items:center;justify-content:center;}
+.logo-mark{width:22px;height:22px;background:var(--green);border-radius:6px;display:flex;align-items:center;justify-content:center;}
 .logo-mark svg{color:#fff;}
 .hdr-r{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;}
-.btn{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:var(--rsm);border:1px solid var(--border-md);background:var(--surface);color:var(--muted);font-size:12px;cursor:pointer;transition:all .12s;white-space:nowrap;}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:var(--rsm);border:1px solid var(--border-md);background:var(--surface);color:var(--muted);font-size:12px;cursor:pointer;transition:background .12s var(--ease),color .12s var(--ease),border-color .12s var(--ease),transform .08s var(--ease);white-space:nowrap;}
 .btn:hover{background:var(--surface2);color:var(--text);}
+.btn:active{transform:scale(.97);}
 .btn.primary{background:var(--green);color:#fff;border-color:var(--green);}
-.btn.primary:hover{background:#155a38;}
+.btn.primary:hover{background:#0f4d37;}
 .btn.secondary{background:var(--blue-bg);color:var(--blue);border-color:var(--blue-b);}
 .btn.secondary:hover{background:#dbeafe;}
 .btn.danger{color:var(--red);border-color:var(--red-b);}
 .btn.danger:hover{background:var(--red-bg);}
 .btn.sm{padding:3px 8px;font-size:11px;}
+/* Menu "⚙ Cài đặt" gọn — gộp nhiều nút cài đặt phụ (chỉ Admin dùng, không phải thao tác chính)
+   vào 1 nút để đỡ rối hàng bộ lọc, nhất là ở Báo cáo. */
+.gear-menu{position:relative;display:inline-block;}
+.gear-menu-list{position:absolute;top:100%;right:0;margin-top:4px;background:var(--surface);border:1px solid var(--border-md);border-radius:var(--r);box-shadow:var(--shadow-md);z-index:60;min-width:200px;overflow:hidden;}
+.gear-menu-list div{padding:8px 13px;font-size:12px;cursor:pointer;white-space:nowrap;color:var(--text);}
+.gear-menu-list div:hover{background:var(--surface2);}
 #fi{display:none;}
 .fstatus{font-size:11px;color:var(--hint);white-space:nowrap;}
-.gs-pill{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:20px;background:var(--green-bg);color:var(--green);border:1px solid rgba(26,107,69,0.18);white-space:nowrap;}
+.gs-pill{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:20px;background:var(--green-bg);color:var(--green);border:1px solid rgba(20,98,69,0.16);white-space:nowrap;}
 .gs-pill.disconnected{background:var(--surface2);color:var(--hint);border-color:var(--border);}
 .gs-dot{width:6px;height:6px;border-radius:50%;background:var(--green);}
 .gs-dot.off{background:var(--hint);}
@@ -575,15 +586,26 @@ th.col-filtered .th-filter-icon{opacity:1;color:var(--green);}
 .dash-sec-title{font-size:13px;font-weight:700;color:var(--text);margin:4px 0 10px;display:flex;align-items:center;gap:6px;}
 .dash-sec-title:not(:first-child){margin-top:22px;}
 .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
-.kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rlg);padding:13px 15px;box-shadow:var(--shadow);}
-.kpi-card .kpi-n{font-size:23px;font-weight:800;line-height:1;letter-spacing:-.01em;}
+.kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rlg);padding:12px 14px;box-shadow:var(--shadow);transition:box-shadow .15s var(--ease),border-color .15s var(--ease);}
+.kpi-card:hover{box-shadow:var(--shadow-md);border-color:var(--border-md);}
+.kpi-card .kpi-n{font-size:22px;font-weight:800;line-height:1;letter-spacing:-.01em;}
 .kpi-card .kpi-l{font-size:11px;color:var(--muted);margin-top:5px;font-weight:500;}
 .kpi-card .kpi-sub{font-size:10px;color:var(--hint);margin-top:2px;}
 .dash-table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-radius:var(--rlg);overflow:hidden;font-size:12px;}
-.dash-table th{background:var(--surface2);text-align:left;padding:9px 12px;font-size:11px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);}
-.dash-table td{padding:9px 12px;border-bottom:1px solid var(--border);}
+.dash-table th{background:var(--surface2);text-align:left;padding:8px 12px;font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--border);}
+.dash-table td{padding:8px 12px;border-bottom:1px solid var(--border);}
 .dash-table tr:last-child td{border-bottom:none;}
 .dash-table tr:hover td{background:var(--surface2);}
+.dash-table tr{transition:background .1s var(--ease);}
+/* Bảng rộng (nhiều cột) trên màn hẹp: cuộn ngang RIÊNG trong khung của nó thay vì đẩy tràn cả
+   trang — bọc tự động bằng JS (xem "auto-wrap bảng cuộn ngang" cuối script), không cần sửa
+   từng nơi tạo bảng. */
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:var(--rlg);}
+.table-scroll .dash-table,.table-scroll .audit-table{border-radius:0;}
+@media(max-width:820px){
+  .table-scroll{border:1px solid var(--border);}
+  .table-scroll .dash-table,.table-scroll .audit-table{border:none;min-width:540px;}
+}
 .dash-bar{height:6px;border-radius:4px;background:var(--surface3);overflow:hidden;min-width:60px;}
 .dash-bar-fill{height:100%;background:var(--green-mid);border-radius:4px;}
 .rank-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:11px;font-weight:700;background:var(--surface3);color:var(--muted);}
@@ -19719,9 +19741,13 @@ function renderSalesReportTabE_(wrap, subTabs){
   }
   if (_srState.eSource !== 'pos') filters += _srComboHtml('sr-kenh-combo-e', 'eKenh', 'kenhOptions', 'Lọc theo Kênh', '🔍 Tìm & chọn kênh...', 170);
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
-  if (_srIsAdmin()) filters += '<button class="btn sm" onclick="openIndividualRatesModal()">⚙ % hoa hồng cá nhân</button>';
-  if (_srIsAdmin()) filters += '<button class="btn sm" onclick="openBonusProgramsModal()">🏆 Chương trình thưởng</button>';
-  if (_srIsAdmin()) filters += '<button class="btn sm" onclick="openSaleChannelsModal()">🏷️ Phân loại Online/Offline</button>';
+  if (_srIsAdmin()) filters += '<div class="gear-menu">'+
+      '<button class="btn sm" onclick="_srToggleGearMenu(event,\'sr-gear-e\')">⚙ Cài đặt</button>'+
+      '<div class="gear-menu-list" id="sr-gear-e" onclick="event.stopPropagation()">'+
+        '<div onclick="closeGearMenus();openIndividualRatesModal()">⚙ % hoa hồng cá nhân</div>'+
+        '<div onclick="closeGearMenus();openBonusProgramsModal()">🏆 Chương trình thưởng</div>'+
+        '<div onclick="closeGearMenus();openSaleChannelsModal()">🏷️ Phân loại Online/Offline</div>'+
+      '</div></div>';
   filters += '</div>';
 
   var body = _srState.loading
@@ -20154,6 +20180,19 @@ async function _srSaveKpiConfig_(){
 }
 
 // ── Modal: % hoa hồng CÁ NHÂN (ghi đè % của team cho từng người, để trống = dùng theo team) ──
+// Menu "⚙ Cài đặt" gộp gọn các nút cài đặt phụ (Báo cáo E) — chỉ 1 menu mở tại 1 thời điểm.
+function _srToggleGearMenu(e, id){
+  if (e) e.stopPropagation();
+  var el = document.getElementById(id);
+  var willOpen = el && el.style.display !== 'block';
+  closeGearMenus();
+  if (willOpen && el) el.style.display = 'block';
+}
+function closeGearMenus(){
+  document.querySelectorAll('.gear-menu-list').forEach(function(el){ el.style.display = 'none'; });
+}
+document.addEventListener('click', closeGearMenus);
+
 function openIndividualRatesModal(){
   if (currentUser.role !== 'admin'){ toast('Chỉ Admin mới cài % hoa hồng cá nhân.'); return; }
   _renderIndividualRatesModal();
@@ -24674,5 +24713,35 @@ async function sendTaskComment(){
   </div>
 </div>
 </div>
+<script>
+// ── Tự động bọc khung cuộn ngang cho bảng rộng trên màn hẹp ──
+// Nhiều màn (Báo cáo, Nhật ký...) tạo bảng qua .innerHTML ở rất nhiều nơi khác nhau, nên thay vì
+// sửa từng chỗ, dùng MutationObserver bọc CHUNG mọi bảng .dash-table/.audit-table chưa có khung
+// cuộn (.table-scroll) ngay khi nó xuất hiện trong DOM — bảng vẫn giữ nguyên layout/cột, chỉ
+// cuộn ngang trong khung riêng của nó thay vì đẩy tràn cả trang trên điện thoại.
+(function(){
+  function wrapTable(t){
+    if (!t || t.closest('.table-scroll')) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'table-scroll';
+    t.parentNode.insertBefore(wrap, t);
+    wrap.appendChild(t);
+  }
+  function scan(root){
+    (root.querySelectorAll ? root.querySelectorAll('table.dash-table,table.audit-table') : []).forEach(wrapTable);
+  }
+  scan(document);
+  var obs = new MutationObserver(function(mutations){
+    mutations.forEach(function(m){
+      m.addedNodes && m.addedNodes.forEach(function(n){
+        if (n.nodeType !== 1) return;
+        if (n.matches && (n.matches('table.dash-table') || n.matches('table.audit-table'))) wrapTable(n);
+        else if (n.querySelectorAll) scan(n);
+      });
+    });
+  });
+  obs.observe(document.body, { childList: true, subtree: true });
+})();
+</script>
 </body>
 </html>
