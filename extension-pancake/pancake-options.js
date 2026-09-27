@@ -6,7 +6,18 @@ document.getElementById("toggleAiKey").addEventListener("click", () => {
   const inp = document.getElementById("aiApiKey");
   inp.type = inp.type === "password" ? "text" : "password";
 });
+document.getElementById("getAiKeyBtn").addEventListener("click", () => {
+  const p = document.getElementById("aiProvider").value;
+  if (AI_PROVIDER_SIGNUP_URL[p]) window.open(AI_PROVIDER_SIGNUP_URL[p], "_blank");
+});
+document.getElementById("testAiKeyBtn").addEventListener("click", testAiKey);
 
+// Link trang dang ky lay API Key rieng cho tung nha cung cap — nut "🔗 Lay API Key" mo thang
+// trang nay o tab moi, khong bat CS phai tu tim link trong doan hint dai.
+const AI_PROVIDER_SIGNUP_URL = {
+  gemini: "https://aistudio.google.com/apikey",
+  openai: "https://platform.openai.com/api-keys"
+};
 const AI_PROVIDER_HINTS = {
   gemini: '🔗 Lấy API Key tại <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> (đăng nhập bằng Google, miễn phí có giới hạn). Model mặc định: <code>gemini-flash-latest</code> (alias luôn trỏ tới bản Flash mới nhất — model cũ <code>gemini-2.0-flash</code> đã bị Google khai tử, không dùng được nữa).',
   openai: '🔗 Lấy API Key tại <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a>. Model mặc định: <code>gpt-5.4-mini</code>.'
@@ -14,12 +25,49 @@ const AI_PROVIDER_HINTS = {
 function updateAiProviderHint() {
   const p = document.getElementById("aiProvider").value;
   const box = document.getElementById("aiProviderHint");
+  const getBtn = document.getElementById("getAiKeyBtn");
+  document.getElementById("testAiKeyResult").innerText = ""; // doi Provider -> ket qua Kiem tra cu (neu co) khong con dung nua
   if (p && AI_PROVIDER_HINTS[p]) {
     box.innerHTML = AI_PROVIDER_HINTS[p];
     box.style.display = "";
+    getBtn.style.display = AI_PROVIDER_SIGNUP_URL[p] ? "" : "none";
   } else {
     box.style.display = "none";
+    getBtn.style.display = "none";
   }
+}
+
+// "Kiem tra Key" — goi 1 request that (khong luu) toi dung nha cung cap dang chon voi key
+// dang go trong o, de CS TU biet ngay key co chay duoc hay khong (sai key/sai quyen/het
+// quota/model bi doi ten...) TRUOC khi bam Luu, thay vi phai doi den luc tra loi khach that
+// moi phat hien loi. Dung message TEST_AI_KEY rieng, KHONG dung chung voi FETCH_SUGGESTION
+// that de tranh gui nham du lieu hoi thoai that trong luc chi dang thu key.
+function testAiKey() {
+  const provider = document.getElementById("aiProvider").value;
+  const apiKey = document.getElementById("aiApiKey").value.trim();
+  const model = document.getElementById("aiModel").value.trim();
+  const btn = document.getElementById("testAiKeyBtn");
+  const result = document.getElementById("testAiKeyResult");
+
+  if (!provider) { result.innerHTML = '⚠️ Chọn Provider trước đã.'; result.style.color = "#b45309"; return; }
+  if (!apiKey) { result.innerHTML = '⚠️ Dán API Key vào ô bên trên trước đã.'; result.style.color = "#b45309"; return; }
+
+  btn.disabled = true;
+  result.style.color = "#555";
+  result.innerHTML = "⏳ Đang kiểm tra...";
+  chrome.runtime.sendMessage({ type: "TEST_AI_KEY", payload: { provider, apiKey, model } }, (res) => {
+    btn.disabled = false;
+    if (res?.ok) {
+      result.style.color = "#059669";
+      result.innerHTML = "✅ Key hoạt động tốt! (" + escapeHtmlLite_(res.data?.reply || "") + ")";
+    } else {
+      result.style.color = "#dc2626";
+      result.innerHTML = "❌ " + escapeHtmlLite_(res?.error || "Lỗi không rõ");
+    }
+  });
+}
+function escapeHtmlLite_(s) {
+  return String(s || "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 }
 
 function load() {
