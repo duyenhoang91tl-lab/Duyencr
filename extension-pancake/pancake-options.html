@@ -76,13 +76,20 @@
   <label>Tin nhắn của nhân viên (agentMsgSelector) — <small>tuỳ chọn</small></label>
   <input type="text" id="messenger_agentMsgSelector" placeholder="vd: [role='row'].outgoing" />
 
-  <h2>🤖 AI cá nhân (tuỳ chọn — dùng key riêng của bạn thay vì AI dùng chung)</h2>
+  <h2>🤖 AI cá nhân (tuỳ chọn — mỗi người tự lấy API Key riêng, tự cài vào máy mình)</h2>
   <div class="hint">
-    Mặc định cả team dùng chung 1 AI qua backend công ty. Nếu bạn muốn dùng API riêng của mình
-    (nhanh hơn/không bị giới hạn chung với cả team), tự đăng ký lấy API Key ở trang nhà cung cấp
-    rồi dán vào đây. <b>Key chỉ lưu trên trình duyệt của bạn</b> (không gửi lên server công ty,
-    không ai khác xem được) — gọi thẳng từ máy bạn tới nhà cung cấp AI. Để trống ô Provider (chọn
-    "Dùng chung") thì extension hoạt động như cũ, không cần làm gì thêm.
+    Mặc định cả team dùng chung 1 AI qua backend công ty (không cần làm gì thêm ở mục này).
+    Nếu bạn muốn dùng API riêng của mình (nhanh hơn/không bị giới hạn chung với cả team), làm
+    theo <b>4 bước tự phục vụ</b> dưới đây — không cần nhờ ai cài hộ:
+    <ol style="margin:6px 0 0 18px;padding:0">
+      <li><b>Chọn nhà cung cấp</b> ở ô Provider bên dưới.</li>
+      <li><b>Bấm nút "🔗 Lấy API Key"</b> — mở đúng trang đăng ký của nhà cung cấp đó ở tab mới, đăng nhập rồi tạo key (thường miễn phí, có giới hạn dùng/ngày).</li>
+      <li><b>Dán key</b> vừa tạo vào ô API Key, rồi bấm <b>"🔍 Kiểm tra Key"</b> để chắc chắn key chạy được trước khi lưu (không phải đợi tới lúc trả lời khách mới biết sai).</li>
+      <li>Thấy báo ✅ thì bấm <b>"Lưu cài đặt"</b> ở cuối trang là xong.</li>
+    </ol>
+    <b>Key chỉ lưu trên trình duyệt của chính bạn</b> (không gửi lên server công ty, không ai
+    khác xem được) — gọi thẳng từ máy bạn tới nhà cung cấp AI. Để trống ô Provider (chọn
+    "Dùng chung") thì extension hoạt động như cũ.
     <br /><b>Lưu ý:</b> khi dùng AI riêng, tính năng "Tra cứu sản phẩm" (tự đính kèm ảnh từ
     Google Drive) sẽ KHÔNG hoạt động — tính năng đó cần đi qua GAS của team. AI riêng chỉ soạn
     được câu chữ trả lời.
@@ -93,12 +100,15 @@
     <option value="gemini">Gemini (Google)</option>
     <option value="openai">OpenAI (ChatGPT)</option>
   </select>
-  <label>API Key <small>(lấy tại trang nhà cung cấp — xem link gợi ý bên dưới theo Provider đã chọn)</small></label>
+  <div id="aiProviderHint" class="hint" style="display:none"></div>
+  <button type="button" id="getAiKeyBtn" style="margin-top:10px;display:none;background:#059669">🔗 Lấy API Key (mở trang đăng ký)</button>
+  <label>API Key</label>
   <div style="display:flex;gap:6px">
-    <input type="password" id="aiApiKey" placeholder="Dán API Key vào đây..." style="flex:1" />
+    <input type="password" id="aiApiKey" placeholder="Dán API Key vừa tạo vào đây..." style="flex:1" />
     <button type="button" id="toggleAiKey" style="margin-top:0;padding:6px 12px;background:#e5e7eb;color:#222">👁</button>
   </div>
-  <div class="hint" id="aiProviderHint" style="display:none"></div>
+  <button type="button" id="testAiKeyBtn" style="margin-top:10px;background:#7c3aed">🔍 Kiểm tra Key</button>
+  <span id="testAiKeyResult" style="margin-left:8px;font-size:13px"></span>
   <label>Model <small>(để trống dùng mặc định — có thể sửa nếu nhà cung cấp đổi tên model)</small></label>
   <input type="text" id="aiModel" placeholder="vd: gemini-flash-latest / gpt-5.4-mini" />
 
