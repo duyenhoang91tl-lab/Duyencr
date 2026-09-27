@@ -110,6 +110,8 @@
   }
   const CARE_POLL_MS = 6000;
   const REM_POLL_MS = 5 * 60 * 1000; // quet nhac hen moi 5 phut
+  let _activeTone = 'Thân thiện';
+  let _useProducts = false;
   let _stonePref = ''; // '' = mac dinh (cot G) | 'SAPHIA' | 'RUBY' — luu sticky, khoi phai go lai moi lan
   let _ctkmLoadedOnce = false; // mo tab "Tra cuu khuyen mai" lan dau la tu nap toan bo danh sach
   let CS_NAMES = [];
@@ -421,12 +423,23 @@
 
         <div id="pk-ai-status">Chưa có hội thoại nào được chọn.</div>
 
+        <div class="pk-tones" id="pk-tones">
+          ${['Thân thiện','Chuyên nghiệp','Ngắn gọn','Nhiệt tình'].map((t,i) =>
+            `<button class="pk-tone${i===0?' active':''}" data-tone="${t}">${t}</button>`).join('')}
+        </div>
+        <input type="text" id="pk-ctx-input" class="pk-ctx-input" placeholder="Ngữ cảnh / Sản phẩm (tuỳ chọn) — VD: khách hỏi về giá, muốn mua thêm..." />
+        <label class="pk-prod-row">
+          <input type="checkbox" id="pk-use-products-chk" />
+          <span>🔍 <b>Tra cứu sản phẩm</b> (nạp dữ liệu Google Sheet để tư vấn kỹ thành phần/công dụng)</span>
+        </label>
         <div class="pk-stone-row" id="pk-stone-row" title="Không tick gì = báo giá mặc định (cột G). Tick 1 loại nếu khách hỏi đá SAPHIA/RUBY — nhớ luôn cho lần sau, khỏi phải gõ lại.">
           <span class="pk-stone-label">💎 Loại đá:</span>
           <label><input type="radio" name="pk-stone" id="pk-stone-none" value="" checked /> Mặc định</label>
           <label><input type="radio" name="pk-stone" id="pk-stone-saphia" value="SAPHIA" /> SAPHIA</label>
           <label><input type="radio" name="pk-stone" id="pk-stone-ruby" value="RUBY" /> RUBY</label>
         </div>
+        <div id="pk-ai-suggestions"></div>
+        <button id="pk-ai-refresh">Lấy gợi ý mới</button>
       </div>
     `;
     document.body.appendChild(panelEl);
@@ -467,6 +480,9 @@
       });
     });
 
+    panelEl.querySelector("#pk-ai-refresh").addEventListener("click", () => {
+      requestSuggestion(true);
+    });
     var _AI_PROVIDER_LABEL = { gemini: "Gemini (Google)", openai: "OpenAI (ChatGPT)" };
   function _refreshAiKeyBanner() {
     var box = panelEl && panelEl.querySelector("#pk-ai-key-banner");
@@ -598,6 +614,17 @@
         if (hidden) renderCannedList_();
       });
     }
+    panelEl.querySelector("#pk-tones").addEventListener("click", (e) => {
+      const btn = e.target.closest(".pk-tone");
+      if (!btn) return;
+      panelEl.querySelectorAll(".pk-tone").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      _activeTone = btn.dataset.tone;
+    });
+    const prodChk = panelEl.querySelector("#pk-use-products-chk");
+    prodChk.checked = !!settings.useProducts;
+    prodChk.addEventListener("change", () => { _useProducts = prodChk.checked; });
+    _useProducts = prodChk.checked;
     // Loai da (SAPHIA/RUBY) — sticky theo may qua chrome.storage.sync, khong phai tick lai moi lan
     chrome.storage.sync.get(['stonePref'], (res) => {
       _stonePref = res.stonePref || '';
@@ -828,6 +855,7 @@
         const signature = messages.map((m) => m.text).join("|").slice(0, 500);
         if (signature && signature !== lastConversationSignature) {
           lastConversationSignature = signature;
+          requestSuggestion(false);
           requestCustomerLookup();
         }
       }, 500);
@@ -841,6 +869,7 @@
     const initial = extractMessages();
     if (initial.length) {
       lastConversationSignature = initial.map((m) => m.text).join("|").slice(0, 500);
+      requestSuggestion(false);
       requestCustomerLookup();
     }
   }
@@ -1573,6 +1602,7 @@
         <div class="pk-rem-phone">${escapeHtml(r.phone)}${r.schedHenNote ? ' · ' + escapeHtml(r.schedHenNote) : ''}</div>
         <div class="pk-rem-actions">
           <button class="pk-btn-outline pk-rem-lookup" data-idx="${i}">🔎 Xem</button>
+          <button class="pk-btn-outline pk-rem-ai" data-idx="${i}">🤖 Soạn tin</button>
         </div>
       </div>
     `).join('');
@@ -1584,6 +1614,26 @@
         lookupByPhone(r.phone);
       });
     });
+    listEl.querySelectorAll('.pk-rem-ai').forEach((b) => {
+      b.addEventListener('click', () => soanFollowUp_(parseInt(b.dataset.idx, 10)));
+    });
+  }
+
+  // Soạn tin follow-up chủ động cho 1 khách trong danh sách nhắc hẹn — hiện vào cùng khung
+  // gợi ý AI (#pk-ai-suggestions) để bấm chèn/copy y hệt gợi ý trả lời thường.
+  function soanFollowUp_(idx) {
+    const r = _reminders[idx];
+    if (!r) return;
+    panelEl.querySelector('#pk-ai-phone-input').value = r.phone;
+    setStatus('⏳ Đang soạn tin follow-up cho ' + r.phone + '...');
+    safeSendMessage_(
+      { type: 'FETCH_FOLLOWUP_SUGGESTION', payload: { phone: r.phone, status: r.status, note: r.schedHenNote } },
+      (resp) => {
+        if (!resp?.ok) { setStatus('Lỗi: ' + (resp?.error || 'không rõ')); return; }
+        renderSuggestions({ suggestions: [resp.data.suggestion], provider: resp.data.provider });
+        setStatus('Nhớ tự mở đúng đoạn chat của ' + r.phone + ' trên Pancake trước khi bấm gợi ý để chèn.');
+      }
+    );
   }
 
   // ── TRA CỨU BẢNG GIÁ (Sheet DANH_MUC) ──
@@ -2365,6 +2415,116 @@
       if (sel.agentMsgSelector && el.matches(sel.agentMsgSelector)) return "agent";
     } catch (e) { /* selector không hợp lệ — bỏ qua */ }
     return "unknown";
+  }
+
+  async function requestSuggestion(manual) {
+    const messages = extractMessages();
+    if (!messages.length) {
+      setStatus("Không tìm thấy tin nhắn nào. Kiểm tra lại selector trong Options.");
+      return;
+    }
+
+    setStatus(manual ? "Đang lấy gợi ý..." : "Hội thoại thay đổi — đang lấy gợi ý mới...");
+
+    const ctxEl = panelEl.querySelector("#pk-ctx-input");
+    safeSendMessage_(
+      {
+        type: "FETCH_SUGGESTION",
+        payload: {
+          platform: PLATFORM,
+          messages,
+          tone: _activeTone,
+          context: ctxEl ? ctxEl.value.trim() : "",
+          custLines: buildCustLines(),
+          withProducts: _useProducts,
+          stonePref: _stonePref
+        }
+      },
+      (resp) => {
+        if (!resp?.ok) {
+          setStatus("Lỗi: " + (resp?.error || "không rõ nguyên nhân"));
+          return;
+        }
+        renderSuggestions(resp.data);
+      }
+    );
+  }
+
+  function renderSuggestions(data) {
+    const list = data.suggestions?.length ? data.suggestions : data.suggestion ? [data.suggestion] : [];
+    const box = panelEl.querySelector("#pk-ai-suggestions");
+    box.innerHTML = "";
+
+    if (!list.length) {
+      setStatus("Backend không trả về gợi ý nào.");
+      return;
+    }
+
+    let statusMsg = `${list.length} gợi ý${data.provider ? " (nguồn: " + data.provider + ")" : ""}:`;
+    if (data.imageSkipped) statusMsg += ` (⚠️ ảnh "${data.imageSkipped.name}" khớp nhưng >3MB nên bị bỏ qua)`;
+    setStatus(statusMsg);
+    list.forEach((text) => {
+      const item = document.createElement("div");
+      item.className = "pk-ai-suggestion-item";
+      item.innerText = text;
+      item.title = "Bấm để chèn vào ô trả lời";
+      item.addEventListener("click", () => insertReply(text));
+      box.appendChild(item);
+    });
+
+    renderImageSuggestion(data.image);
+  }
+
+  // Nút "Copy ảnh sản phẩm" — chỉ hiện khi backend tìm thấy 1 ảnh khớp tên trong thư mục
+  // kiến thức Drive. Pancake không có API gửi ảnh công khai (Facebook chặn ở tầng
+  // Messenger) nên chỉ copy vào clipboard trình duyệt — CS tự bấm Ctrl+V dán vào khung
+  // chat Pancake rồi kiểm tra lại trước khi bấm Gửi. Cố tình KHÔNG tự động dán/gửi.
+  function renderImageSuggestion(image) {
+    if (!image) return;
+    const box = panelEl.querySelector("#pk-ai-suggestions");
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "pk-btn-outline";
+    btn.innerText = `📷 Copy ảnh: ${image.name}`;
+    btn.title = "Copy ảnh vào clipboard — sau đó bấm Ctrl+V vào khung chat Pancake";
+    btn.addEventListener("click", () => copyProductImage_(image, btn));
+    box.appendChild(btn);
+  }
+
+  async function copyProductImage_(image, btn) {
+    if (btn) btn.disabled = true;
+    setStatus(`Đang chuẩn bị ảnh "${image.name}"...`);
+    try {
+      const rawBlob = await (await fetch(`data:${image.mimeType};base64,${image.base64}`)).blob();
+      const pngBlob = await toPngBlob_(rawBlob);
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })]);
+      setStatus(`Đã copy ảnh "${image.name}" — bấm Ctrl+V vào khung chat Pancake để dán, kiểm tra rồi mới bấm Gửi.`);
+    } catch (e) {
+      setStatus(`Copy ảnh thất bại (${e?.message || e}) — thử bấm lại nút Copy ảnh.`);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  // ClipboardItem chỉ hỗ trợ ổn định image/png ở hầu hết trình duyệt — chuyển mọi ảnh
+  // (kể cả jpg) qua canvas rồi xuất PNG để dán được chắc chắn vào khung chat Pancake.
+  function toPngBlob_(blob) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext("2d").drawImage(img, 0, 0);
+        canvas.toBlob((pngBlob) => {
+          URL.revokeObjectURL(url);
+          pngBlob ? resolve(pngBlob) : reject(new Error("Không tạo được PNG từ ảnh."));
+        }, "image/png");
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Không đọc được dữ liệu ảnh.")); };
+      img.src = url;
+    });
   }
 
   function renderCannedList_() {
