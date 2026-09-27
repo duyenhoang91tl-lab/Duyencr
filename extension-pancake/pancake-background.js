@@ -168,9 +168,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   // Tra cuu CTKM (khuyen mai/giam gia) — action:'ctkmSearch', cung file PRICE_SS_ID (Sheet
-  // CTKM), TRUC TIEP theo tu khoa, KHONG qua AI (giong het co che GET_PRICE o tren).
-  if (msg?.type === "GET_CTKM") {
-    handleGetCtkm(msg.payload)
+  // CTKM), TRUC TIEP theo tu khoa, KHONG qua AI (giong het co che GET_PRICE o tren). Doi ten
+  // rieng GET_CTKM_SEARCH (khong dung chung GET_CTKM) de khong dam voi kenh GET_CTKM da co san
+  // (load nguyen van CTKM cho "Soan don", khong loc tu khoa) — 2 tinh nang khac muc dich.
+  if (msg?.type === "GET_CTKM_SEARCH") {
+    handleGetCtkmSearch(msg.payload)
       .then((data) => sendResponse({ ok: true, data }))
       .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
     return true;
@@ -661,8 +663,10 @@ async function handleGetPrice(payload) {
 }
 
 // Tra cuu CTKM theo tu khoa — action:'ctkmSearch' (GET, chi doc). Cung co che voi
-// handleGetPrice o tren, chi doi sang sheet CTKM.
-async function handleGetCtkm(payload) {
+// handleGetPrice o tren, chi doi sang sheet CTKM. Ten rieng (khac handleGetCtkm() ben duoi,
+// vom load nguyen van cho "Soan don") de tranh dam ten ham (function hoisting se de 1 ham
+// ghi de ham kia neu trung ten).
+async function handleGetCtkmSearch(payload) {
   const settings = await chrome.storage.sync.get(null);
   const cfg = { ...DEFAULT_SETTINGS, ...settings };
   if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");

@@ -1681,7 +1681,7 @@
     const q = (panelEl.querySelector('#pk-ctkm-q').value || '').trim();
     const box = panelEl.querySelector('#pk-ctkm-result');
     box.innerHTML = '<div class="pk-price-loading">Đang tìm...</div>';
-    safeSendMessage_({ type: 'GET_CTKM', payload: { q } }, (resp) => {
+    safeSendMessage_({ type: 'GET_CTKM_SEARCH', payload: { q } }, (resp) => {
       if (!resp?.ok) { box.innerHTML = `<div class="pk-price-loading">Lỗi: ${escapeHtml(resp?.error || 'không rõ')}</div>`; return; }
       renderCtkmRows_(resp.data.rows || [], q);
     });

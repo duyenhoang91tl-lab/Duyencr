@@ -987,7 +987,7 @@ function doGet(e) {
     if (action === 'ctkmSearch') {
       var qCT = (e && e.parameter && e.parameter.q) ? String(e.parameter.q) : '';
       var cacheCT = CacheService.getScriptCache();
-      var cKeyCT = 'ctkm_catalog_v1';
+      var cKeyCT = 'ctkm_search_catalog_v1'; // key rieng, KHONG trung voi 'ctkm_catalog_v1' cua action ctkmCatalog (dung _cacheGetBig_/_cachePutBig_ khac co che)
       var cachedCT = cacheCT.get(cKeyCT);
       var rowsCT;
       if (cachedCT) { try { rowsCT = JSON.parse(cachedCT); } catch(ec) {} }
