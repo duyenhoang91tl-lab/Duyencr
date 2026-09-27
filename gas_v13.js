@@ -1660,6 +1660,28 @@ function _donHasExcludedStatus_(theStr) {
 }
 
 // ── Doc toan bo sheet "DT TỔNG " thanh mang object ──
+// Cai dat "An/Hien Page & Sale khoi bao cao chung" (yeu cau 2026-09-25): admin tu chon
+// nhung Page/kenh va Sale khong thuoc pham vi quan ly cua minh de AN khoi moi bao cao
+// dung chung (Dashboard, Bao cao doanh so A-E, KPI Pancake...). Luu 2 setting JSON array
+// dung chung pattern voi cac setting khac (getSetting_/setSetting_).
+function _hiddenPageSaleSets_() {
+  var hc = [], hs = [];
+  try { var v = getSetting_('hiddenChannels'); if (v) hc = JSON.parse(v); } catch (e) {}
+  try { var v2 = getSetting_('hiddenSales'); if (v2) hs = JSON.parse(v2); } catch (e2) {}
+  return { channels: hc, sales: hs };
+}
+// 1 dong DT TONG bi AN neu: kenh ban nam trong danh sach an, HOAC tat ca sale tren dong do
+// (co the nhieu ten, cach nhau dau phay) deu nam trong danh sach an sale (con >=1 sale
+// KHONG bi an thi van hien binh thuong, tranh an nham don co ca sale minh quan ly dung chung).
+function _isDTRowHidden_(kenhBan, saleBan, sets) {
+  if (sets.channels.length && kenhBan && sets.channels.indexOf(kenhBan) !== -1) return true;
+  if (sets.sales.length && saleBan) {
+    var names = String(saleBan).split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+    if (names.length && names.every(function(n){ return sets.sales.indexOf(n) !== -1; })) return true;
+  }
+  return false;
+}
+
 function readDTTong_() {
   var ss = getDTSS_();
   var sh = ss.getSheetByName(DT_TONG_SHEET);
@@ -1667,6 +1689,7 @@ function readDTTong_() {
   var last = sh.getLastRow();
   if (last < 2) return [];
   var vals = sh.getRange(2, 1, last - 1, 20).getValues();
+  var hiddenSets = _hiddenPageSaleSets_();
   var out = [];
   for (var i = 0; i < vals.length; i++) {
     var r = vals[i];
@@ -1675,6 +1698,9 @@ function readDTTong_() {
     // (vd don nhap tay/import cu chua kip gan SDT/ID) thi se bi am tham mat doanh thu khoi
     // Bao cao A (thap hon thuc te ma khong bao loi gi). Them dieu kien r[17] de an toan hon.
     if (!r[3] && !r[19] && !r[17]) continue;
+    var kenhBan = r[12] ? String(r[12]).trim() : '';
+    var saleBan = r[13] ? String(r[13]) : '';
+    if (_isDTRowHidden_(kenhBan, saleBan, hiddenSets)) continue;
     try {
       out.push({
         ngayTao:        _dtCellToVnStr_(r[0]),
@@ -1683,8 +1709,8 @@ function readDTTong_() {
         giaiDoan:       r[6],
         trangThai:      r[7],
         thoiGianHT:     _dtCellToVnStr_(r[10]),
-        kenhBan:        r[12] ? String(r[12]).trim() : '',
-        saleBan:        r[13] ? String(r[13]) : '',
+        kenhBan:        kenhBan,
+        saleBan:        saleBan,
         sanPham:        r[14],
         phanLoai:       r[15],
         giaTriCoc:      _normMoney_(r[16]),
@@ -3622,7 +3648,7 @@ function buildPancakeReport_(from, to, split) {
     }
   }
 
-  function finalize(obj) {
+  function finalize(obj, hiddenSet, keyProp) {
     var arr = Object.keys(obj).map(function(k) {
       var r = obj[k];
       r.tyLeCD = r.tongTT ? Math.round(r.tongDH / r.tongTT * 1000) / 10 : 0;
@@ -3630,11 +3656,16 @@ function buildPancakeReport_(from, to, split) {
       if (r.pancakeNames) r.pancakeNames = Object.keys(r.pancakeNames);
       return r;
     });
+    // An Page/Sale theo cai dat admin (setSetting hiddenChannels/hiddenSales) — cung 1 danh
+    // sach dung chung voi readDTTong_, de moi bao cao (Sales report A-E, KPI Pancake, widget
+    // Ty le chot theo Sale) deu nhat quan an cung 1 tap Page/Sale.
+    if (hiddenSet && hiddenSet.length) arr = arr.filter(function(r) { return hiddenSet.indexOf(r[keyProp]) === -1; });
     arr.sort(function(a,b) { return b.tongTT - a.tongTT; });
     return arr;
   }
 
-  return { byPage: finalize(byPage), byCS: finalize(byCS), unmapped: Object.keys(unmappedSet).sort(), split: split };
+  var hiddenSets2 = _hiddenPageSaleSets_();
+  return { byPage: finalize(byPage, hiddenSets2.channels, 'pageName'), byCS: finalize(byCS, hiddenSets2.sales, 'name'), unmapped: Object.keys(unmappedSet).sort(), split: split };
 }
 
 // ═══════════════════════════════════════════════════════════════

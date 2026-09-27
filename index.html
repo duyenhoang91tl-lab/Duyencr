@@ -1702,6 +1702,37 @@ async function _saveCloseRateThresholds(red, green){
   } catch(e){ toast('❌ Lưu mốc màu lỗi: ' + e.message); }
 }
 
+// Ẩn/hiện Page & Sale khỏi báo cáo chung (yêu cầu 2026-09-25): admin tự chọn những
+// Page/kênh và Sale KHÔNG thuộc phạm vi mình quản lý để ẩn khỏi Dashboard/Báo cáo doanh
+// số/KPI Pancake — khác _inUserScope (đó là ẩn theo VAI TRÒ đăng nhập, cái này là danh
+// sách admin TỰ CHỌN, áp dụng chung cho MỌI người xem báo cáo, kể cả admin khác).
+let HIDDEN_CHANNELS = loadLS('ome_hidden_channels') || [];
+let HIDDEN_SALES = loadLS('ome_hidden_sales') || [];
+async function _syncHiddenPageSaleFromGAS() {
+  if (!gsUrl) return;
+  try {
+    var r1 = await fetch(gsUrl + '?action=getSetting&key=hiddenChannels', {redirect:'follow'});
+    var d1 = await r1.json();
+    if (d1 && d1.value) { var hc = JSON.parse(d1.value); if (Array.isArray(hc)) { HIDDEN_CHANNELS = hc; saveLS('ome_hidden_channels', HIDDEN_CHANNELS); } }
+    var r2 = await fetch(gsUrl + '?action=getSetting&key=hiddenSales', {redirect:'follow'});
+    var d2 = await r2.json();
+    if (d2 && d2.value) { var hs = JSON.parse(d2.value); if (Array.isArray(hs)) { HIDDEN_SALES = hs; saveLS('ome_hidden_sales', HIDDEN_SALES); } }
+    if (typeof renderDashboard === 'function' && _activeV9Tab === 'dashboard') renderDashboard();
+    if (typeof renderSalesReportTab === 'function' && _activeV9Tab === 'salesreport') renderSalesReportTab();
+  } catch(e) { /* giữ nguyên bản local nếu lỗi mạng/parse */ }
+}
+setTimeout(_syncHiddenPageSaleFromGAS, 0);
+async function _saveHiddenPageSale(){
+  saveLS('ome_hidden_channels', HIDDEN_CHANNELS);
+  saveLS('ome_hidden_sales', HIDDEN_SALES);
+  if (!gsUrl) return;
+  try {
+    await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'setSetting', key:'hiddenChannels', value: JSON.stringify(HIDDEN_CHANNELS) }) });
+    await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'setSetting', key:'hiddenSales', value: JSON.stringify(HIDDEN_SALES) }) });
+    logAudit('setting','', '', 'Ẩn khỏi báo cáo chung — Page: '+(HIDDEN_CHANNELS.join(', ')||'(không)')+' | Sale: '+(HIDDEN_SALES.join(', ')||'(không)'));
+  } catch(e){ toast('❌ Lưu cài đặt ẩn Page/Sale lỗi: ' + e.message); }
+}
+
 // Tên hiển thị của 2 trường lớn CỐ ĐỊNH — cho phép admin đổi tên (khác với XÓA/tạo trường,
 // 2 trường này luôn tồn tại vì có cột riêng trong CareData, chỉ đổi được CÁCH GỌI/hiển thị).
 let FIELD_LABEL_CS = loadLS('ome_field_label_cs') || 'Tình trạng CS';
@@ -18731,6 +18762,60 @@ document.addEventListener('click', function(e){
 
 function _srApply(){ _srLoad(); }
 
+// ── An/Hien Page & Sale khoi bao cao chung (yeu cau 2026-09-25) ──
+function _srToggleHiddenPanel(){
+  _srState.hiddenPanelOpen = !_srState.hiddenPanelOpen;
+  if (_srState.hiddenPanelOpen) {
+    _srState.hiddenDraftChannels = HIDDEN_CHANNELS.slice();
+    _srState.hiddenDraftSales = HIDDEN_SALES.slice();
+  }
+  renderSalesReportTab();
+}
+function _srSetHiddenDraft(el){
+  var kind = el.dataset.kind, name = el.dataset.name, visible = el.checked;
+  var key = kind === 'channel' ? 'hiddenDraftChannels' : 'hiddenDraftSales';
+  var arr = _srState[key] || [];
+  if (visible) arr = arr.filter(function(n){ return n !== name; }); // tick = hien -> bo khoi danh sach an
+  else if (arr.indexOf(name) === -1) arr.push(name);               // bo tick = an -> them vao danh sach an
+  _srState[key] = arr;
+}
+function _srHiddenPageSaleCol_(title, allNames, draftArr, kind, searchKey){
+  var q = (_srState[searchKey]||'').toLowerCase();
+  var html = '<div style="min-width:220px;flex:1">';
+  html += '<b style="font-size:12px">'+title+'</b>';
+  html += '<input type="text" placeholder="🔍 Tìm..." value="'+esc(_srState[searchKey]||'')+'" oninput="_srState.'+searchKey+'=this.value;renderSalesReportTab()" style="width:100%;margin:6px 0;padding:4px 7px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:11.5px">';
+  html += '<div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:2px">';
+  allNames.filter(function(n){ return !q || n.toLowerCase().indexOf(q)!==-1; }).forEach(function(n){
+    var visible = draftArr.indexOf(n) === -1;
+    html += '<label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:2px 4px;border-radius:4px'+(visible?'':';opacity:.55;text-decoration:line-through')+'">'+
+      '<input type="checkbox" '+(visible?'checked':'')+' data-kind="'+kind+'" data-name="'+esc(n)+'" onchange="_srSetHiddenDraft(this)">'+esc(n)+'</label>';
+  });
+  if (!allNames.length) html += '<div style="color:var(--muted);font-size:11.5px;padding:6px">Chưa có dữ liệu.</div>';
+  html += '</div></div>';
+  return html;
+}
+function _srHiddenPageSaleHtml(){
+  var html = '<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px;background:var(--surface2)">';
+  html += '<div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">Bỏ tích Page/kênh hoặc Sale KHÔNG thuộc phạm vi quản lý của bạn — sẽ ẩn khỏi Dashboard, Báo cáo doanh số A–E và KPI Pancake ngay khi bấm Lưu (không xoá dữ liệu, chỉ ẩn khỏi báo cáo chung).</div>';
+  html += '<div style="display:flex;gap:20px;flex-wrap:wrap">';
+  html += _srHiddenPageSaleCol_('📡 Page / Kênh bán', _allChannelNames(), _srState.hiddenDraftChannels||[], 'channel', 'hiddenSearchChannel');
+  html += _srHiddenPageSaleCol_('👤 Sale', _allCSNames(), _srState.hiddenDraftSales||[], 'sale', 'hiddenSearchSale');
+  html += '</div>';
+  html += '<div style="margin-top:10px;display:flex;gap:8px">'+
+    '<button class="btn primary sm" onclick="_srSaveHiddenPanel()">💾 Lưu &amp; ẩn ngay</button>'+
+    '<button class="btn sm secondary" onclick="_srToggleHiddenPanel()">Đóng</button></div>';
+  html += '</div>';
+  return html;
+}
+function _srSaveHiddenPanel(){
+  HIDDEN_CHANNELS = (_srState.hiddenDraftChannels||[]).slice();
+  HIDDEN_SALES = (_srState.hiddenDraftSales||[]).slice();
+  _srState.hiddenPanelOpen = false;
+  _saveHiddenPageSale();
+  toast('✓ Đã lưu — Page/Sale bị ẩn sẽ biến mất khỏi báo cáo.');
+  _srApply();
+}
+
 // ── Combo chon NHIEU gia tri DUNG CHUNG (kenh Bao cao A, sale+kenh Bao cao C) — cung kieu
 //    giao dien/hanh vi voi combo Sale rieng cua Bao cao A o tren (khong doi combo do, de
 //    tranh dam vao tinh nang dang chay tot), nhung viet lai kieu tong quat (domId/field/optKey
@@ -18985,9 +19070,11 @@ function renderSalesReportTab(){
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
   filters += '<button class="btn sm" onclick="exportSalesReport()">📊 Xuất Excel</button>';
   if (_srIsAdmin()) filters += '<button class="btn sm" id="sr-export-sheet-btn" title="'+(_srState.sub==='A' ? 'Ghi đè vào ĐÚNG 1 tab cố định (BC_A_Base) — không tạo tab mới mỗi lần xuất' : 'Tạo 1 tab mới có timestamp, giữ lại lịch sử các lần xuất trước')+'" onclick="exportSalesReportToSheet()">'+(_srState.sub==='A' ? '📌 Cập nhật Sheet Base' : '📄 Xuất ra Sheet')+'</button>';
+  if (_srIsAdmin()) filters += '<button class="btn sm secondary" onclick="_srToggleHiddenPanel()" title="Chọn Page/kênh và Sale không thuộc phạm vi quản lý để ẩn khỏi mọi báo cáo chung">👁 Ẩn/Hiện Page &amp; Sale</button>';
   filters += '</div>';
 
   var body = '';
+  var hiddenPanelHtml = (_srIsAdmin() && _srState.hiddenPanelOpen) ? _srHiddenPageSaleHtml() : '';
   if (_srState.loading){
     body = '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>';
   } else if (_srState.sub === 'A'){
@@ -19000,7 +19087,7 @@ function renderSalesReportTab(){
     '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>'+
     '<button class="btn sm" onclick="_srToggleSidebar()" title="Ẩn/hiện bộ lọc KH bên trái để có thêm chỗ, tiện chụp màn hình báo cáo">'+
     (_srSidebarHidden ? '📂 Hiện bộ lọc KH' : '📁 Ẩn bộ lọc KH — chụp màn hình')+'</button></div>';
-  wrap.innerHTML = titleRow + subTabs + filters + body;
+  wrap.innerHTML = titleRow + subTabs + filters + hiddenPanelHtml + body;
 }
 
 // ── Tỷ lệ chốt (theo Sale / theo Kênh) ─────────────────────────────────────
@@ -19016,12 +19103,13 @@ function _srCustKenh_(c){
   }
   return (latest && latest.source) || (c.sources && c.sources[0]) || '';
 }
-function _srCloseRateGroups_(keyFn){
+function _srCloseRateGroups_(keyFn, hiddenSet){
   var arr = (typeof allCustomers !== 'undefined' ? allCustomers : []).filter(_inUserScope);
   var map = {};
   arr.forEach(function(c){
     var k = keyFn(c);
     if (!k) return;
+    if (hiddenSet && hiddenSet.length && hiddenSet.indexOf(k) !== -1) return; // an theo cai dat admin
     if (!map[k]) map[k] = {name:k, held:0, closed:0};
     map[k].held++;
     if (c.careStatus === 'Chốt') map[k].closed++;
@@ -19030,8 +19118,8 @@ function _srCloseRateGroups_(keyFn){
     var g = map[k]; g.closeRate = g.held ? Math.round(g.closed/g.held*100) : 0; return g;
   });
 }
-function _srCloseRateBySale_(){ return _srCloseRateGroups_(function(c){ return _heldBy(c) || ''; }); }
-function _srCloseRateByKenh_(){ return _srCloseRateGroups_(_srCustKenh_); }
+function _srCloseRateBySale_(){ return _srCloseRateGroups_(function(c){ return _heldBy(c) || ''; }, HIDDEN_SALES); }
+function _srCloseRateByKenh_(){ return _srCloseRateGroups_(_srCustKenh_, HIDDEN_CHANNELS); }
 
 // Vẽ cột ngang tỷ lệ chốt — xanh/vàng/đỏ theo mức %, kèm số liệu chốt/tổng bên cạnh mỗi cột,
 // và dòng trung bình chung ở trên để dễ đối chiếu nhanh khi chụp màn hình gửi sếp.
