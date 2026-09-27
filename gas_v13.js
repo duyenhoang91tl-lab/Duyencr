@@ -980,6 +980,25 @@ function doGet(e) {
       return jsonOut_({ ok: true, total: rowsPS.length, count: matched.length, rows: matched });
     }
 
+    // ── Tra cuu CHUONG TRINH KHUYEN MAI (Sheet CTKM, cung file PRICE_SS_ID voi DANH_MUC) —
+    // tra cuu TRUC TIEP theo tu khoa (giong het co che priceSearch o tren, dung lai
+    // searchPriceCatalog_ vi ham do khong hardcode ten cot/sheet), KHONG qua AI — de dung duoc
+    // ngay ca khi cac API AI (Groq/Cerebras/Gemini/OpenRouter) dang loi (yeu cau Duyen 26/09/2026).
+    if (action === 'ctkmSearch') {
+      var qCT = (e && e.parameter && e.parameter.q) ? String(e.parameter.q) : '';
+      var cacheCT = CacheService.getScriptCache();
+      var cKeyCT = 'ctkm_catalog_v1';
+      var cachedCT = cacheCT.get(cKeyCT);
+      var rowsCT;
+      if (cachedCT) { try { rowsCT = JSON.parse(cachedCT); } catch(ec) {} }
+      if (!rowsCT) {
+        rowsCT = readCTKMCatalog_();
+        try { cacheCT.put(cKeyCT, JSON.stringify(rowsCT), 600); } catch(ec) {} // cache 10 phut, CTKM it doi
+      }
+      var matchedCT = qCT ? searchPriceCatalog_(rowsCT, qCT) : rowsCT.slice(0, 50);
+      return jsonOut_({ ok: true, total: rowsCT.length, count: matchedCT.length, rows: matchedCT });
+    }
+
     // ── CHECKLIST CHAT LUONG TIN NHAN MKT (tab "Checklist MKT" tren index.html) ──
     if (action === 'mktChecklist') return jsonOut_(buildMktChecklistReport_(e.parameter.from, e.parameter.to));
 

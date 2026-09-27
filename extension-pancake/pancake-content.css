@@ -627,6 +627,12 @@
   color: #1e3a8a;
 }
 
+.pk-ctkm-title {
+  font-weight: 700;
+  color: #831843;
+  margin-bottom: 3px;
+}
+
 .pk-price-amount {
   margin-top: 3px;
   font-weight: 700;

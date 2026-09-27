@@ -167,6 +167,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // Tra cuu CTKM (khuyen mai/giam gia) — action:'ctkmSearch', cung file PRICE_SS_ID (Sheet
+  // CTKM), TRUC TIEP theo tu khoa, KHONG qua AI (giong het co che GET_PRICE o tren).
+  if (msg?.type === "GET_CTKM") {
+    handleGetCtkm(msg.payload)
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
   // Cay Nhom SP → Ten SP → Kieu/Size cho "Soan don" (bo loc dropdown nhieu tang thay vi go tim)
   // Danh muc PHANG (action priceCatalogFlat) cho "Soan don": go ten -> loc -> dropdown thu hep dan
   if (msg?.type === "GET_PRICE_FLAT") {
@@ -636,6 +645,22 @@ async function handleGetPrice(payload) {
   const q = payload?.q || "";
   const sep = cfg.gasUrl.includes("?") ? "&" : "?";
   const url = cfg.gasUrl + sep + "action=priceSearch" + (q ? "&q=" + encodeURIComponent(q) : "");
+  const res = await fetch(url, { redirect: "follow" });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return { rows: data.rows || [], total: data.total || 0 };
+}
+
+// Tra cuu CTKM theo tu khoa — action:'ctkmSearch' (GET, chi doc). Cung co che voi
+// handleGetPrice o tren, chi doi sang sheet CTKM.
+async function handleGetCtkm(payload) {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+
+  const q = payload?.q || "";
+  const sep = cfg.gasUrl.includes("?") ? "&" : "?";
+  const url = cfg.gasUrl + sep + "action=ctkmSearch" + (q ? "&q=" + encodeURIComponent(q) : "");
   const res = await fetch(url, { redirect: "follow" });
   const data = await res.json();
   if (data.error) throw new Error(data.error);

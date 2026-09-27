@@ -111,6 +111,7 @@
   const CARE_POLL_MS = 6000;
   const REM_POLL_MS = 5 * 60 * 1000; // quet nhac hen moi 5 phut
   let _stonePref = ''; // '' = mac dinh (cot G) | 'SAPHIA' | 'RUBY' — luu sticky, khoi phai go lai moi lan
+  let _ctkmLoadedOnce = false; // mo tab "Tra cuu khuyen mai" lan dau la tu nap toan bo danh sach
   let CS_NAMES = [];
   let NICK_LIST = [];
   let CARE_STATUS_TREE = null; // cay "Tinh trang CS" load dong tu GAS (dong bo voi appweb/Zalo AI)
@@ -336,6 +337,7 @@
             <option value="">— Chọn mục —</option>
             <option value="rem">⏰ Nhắc hẹn hôm nay (0)</option>
             <option value="price">💰 Tra cứu bảng giá</option>
+            <option value="ctkm">🎁 Tra cứu khuyến mãi</option>
           </select>
           <div id="pk-menu-content">
             <div id="pk-rem-body" style="display:none">
@@ -357,6 +359,13 @@
               <div id="pk-price-builder-mode" style="display:none">
                 <div id="pk-builder-steps"></div>
               </div>
+            </div>
+            <div id="pk-ctkm-body" style="display:none">
+              <div id="pk-ctkm-row">
+                <input type="text" id="pk-ctkm-q" placeholder="Từ khoá khuyến mãi (để trống = xem tất cả)..." />
+                <button id="pk-ctkm-btn">Tìm</button>
+              </div>
+              <div id="pk-ctkm-result"></div>
             </div>
           </div>
         </div>
@@ -514,12 +523,18 @@
       const v = e.target.value;
       panelEl.querySelector("#pk-rem-body").style.display = v === "rem" ? "block" : "none";
       panelEl.querySelector("#pk-price-body").style.display = v === "price" ? "block" : "none";
+      panelEl.querySelector("#pk-ctkm-body").style.display = v === "ctkm" ? "block" : "none";
       if (v === "rem") loadReminders_();
+      if (v === "ctkm" && !_ctkmLoadedOnce) { _ctkmLoadedOnce = true; doCtkmSearch_(); } // mo tab la nap luon toan bo CTKM, khoi phai go gi cung thay ngay
     });
     panelEl.querySelector("#pk-rem-refresh").addEventListener("click", () => loadReminders_());
     panelEl.querySelector("#pk-price-btn").addEventListener("click", doPriceSearch_);
     panelEl.querySelector("#pk-price-q").addEventListener("keydown", (e) => {
       if (e.key === "Enter") doPriceSearch_();
+    });
+    panelEl.querySelector("#pk-ctkm-btn").addEventListener("click", doCtkmSearch_);
+    panelEl.querySelector("#pk-ctkm-q").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") doCtkmSearch_();
     });
     panelEl.querySelectorAll('.pk-price-mode-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -1658,6 +1673,37 @@
         });
       });
     });
+  }
+
+  // ── TRA CỨU CHƯƠNG TRÌNH KHUYẾN MÃI (Sheet CTKM) — hiển thị nguyên các cột của sheet dạng
+  // thẻ, KHÔNG có giá/nút thêm giỏ hàng như bảng giá (CTKM chỉ để đọc, không phải sản phẩm).
+  function doCtkmSearch_() {
+    const q = (panelEl.querySelector('#pk-ctkm-q').value || '').trim();
+    const box = panelEl.querySelector('#pk-ctkm-result');
+    box.innerHTML = '<div class="pk-price-loading">Đang tìm...</div>';
+    safeSendMessage_({ type: 'GET_CTKM', payload: { q } }, (resp) => {
+      if (!resp?.ok) { box.innerHTML = `<div class="pk-price-loading">Lỗi: ${escapeHtml(resp?.error || 'không rõ')}</div>`; return; }
+      renderCtkmRows_(resp.data.rows || [], q);
+    });
+  }
+
+  function renderCtkmRows_(rows, q) {
+    const box = panelEl.querySelector('#pk-ctkm-result');
+    if (!rows.length) {
+      box.innerHTML = `<div class="pk-price-loading">Không tìm thấy${q ? ' cho "' + escapeHtml(q) + '"' : ''} — kiểm tra lại sheet CTKM (cùng file với bảng giá).</div>`;
+      return;
+    }
+    box.innerHTML = rows.slice(0, 30).map((row) => {
+      const keys = Object.keys(row).filter((k) => row[k] !== '' && row[k] !== null && row[k] !== undefined && _stripVNlocal_(k).trim() !== 'stt');
+      if (!keys.length) return '';
+      // Cot dau tien con lai lam tieu de the (thuong la "Ten chuong trinh"/"Noi dung"), cac cot
+      // sau hien duoi dang nhan phu — KHONG doan/hardcode ten cot cu the vi sheet CTKM co the
+      // dat ten khac nhau tuy tung thoi diem.
+      const titleKey = keys[0];
+      const restKeys = keys.slice(1);
+      const line = (k) => `<span class="pk-price-field"><b>${escapeHtml(k)}:</b> ${escapeHtml(row[k])}</span>`;
+      return `<div class="pk-price-item"><div class="pk-ctkm-title">${escapeHtml(String(row[titleKey]))}</div>${restKeys.map(line).join(' ')}</div>`;
+    }).join('');
   }
 
   function _parsePriceNum_(v) {
