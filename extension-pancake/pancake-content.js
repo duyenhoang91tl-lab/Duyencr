@@ -110,7 +110,17 @@
   }
   const CARE_POLL_MS = 6000;
   const REM_POLL_MS = 5 * 60 * 1000; // quet nhac hen moi 5 phut
+  // 3 huong mo dau khac nhau khi CHU DONG nhan truoc cho khach — CUNG NOI DUNG voi
+  // OPENER_ANGLES ben Zalo AI, de 2 kenh tu van nhat quan.
+  const OPENER_ANGLES = [
+    { key: 'follow', label: '🩺 Hỏi thăm trải nghiệm', instr: 'Hỏi thăm cảm nhận/trải nghiệm khách sau khi dùng sản phẩm đã mua gần nhất, thể hiện sự quan tâm chân thành.' },
+    { key: 'upsell', label: '🛍 Gợi ý sản phẩm liên quan', instr: 'Gợi ý nhẹ nhàng 1 sản phẩm liên quan hoặc dùng kèm với sản phẩm khách đã mua, mở đầu bằng câu hỏi/quan tâm chứ không chào bán trực tiếp.' },
+    { key: 'connect', label: '✨ Khơi gợi trò chuyện', instr: 'Mở đầu bằng 1 câu hỏi mở hoặc chia sẻ nhỏ (ưu đãi mới, mẹo dùng sản phẩm, hỏi thăm dịp gần đây) để khơi gợi khách phản hồi, tạo cảm giác gần gũi cá nhân.' }
+  ];
+  let _activeTone = 'Thân thiện';
+  let _useProducts = false;
   let _stonePref = ''; // '' = mac dinh (cot G) | 'SAPHIA' | 'RUBY' — luu sticky, khoi phai go lai moi lan
+  let _ctkmLoadedOnce = false; // mo tab "Tra cuu khuyen mai" lan dau la tu nap toan bo danh sach
   let CS_NAMES = [];
   let NICK_LIST = [];
   let CARE_STATUS_TREE = null; // cay "Tinh trang CS" load dong tu GAS (dong bo voi appweb/Zalo AI)
@@ -336,6 +346,7 @@
             <option value="">— Chọn mục —</option>
             <option value="rem">⏰ Nhắc hẹn hôm nay (0)</option>
             <option value="price">💰 Tra cứu bảng giá</option>
+            <option value="ctkm">🎁 Tra cứu khuyến mãi</option>
           </select>
           <div id="pk-menu-content">
             <div id="pk-rem-body" style="display:none">
@@ -357,6 +368,13 @@
               <div id="pk-price-builder-mode" style="display:none">
                 <div id="pk-builder-steps"></div>
               </div>
+            </div>
+            <div id="pk-ctkm-body" style="display:none">
+              <div id="pk-ctkm-row">
+                <input type="text" id="pk-ctkm-q" placeholder="Từ khoá khuyến mãi (để trống = xem tất cả)..." />
+                <button id="pk-ctkm-btn">Tìm</button>
+              </div>
+              <div id="pk-ctkm-result"></div>
             </div>
           </div>
         </div>
@@ -412,12 +430,25 @@
 
         <div id="pk-ai-status">Chưa có hội thoại nào được chọn.</div>
 
+        <div class="pk-tones" id="pk-tones">
+          ${['Thân thiện','Chuyên nghiệp','Ngắn gọn','Nhiệt tình'].map((t,i) =>
+            `<button class="pk-tone${i===0?' active':''}" data-tone="${t}">${t}</button>`).join('')}
+        </div>
+        <input type="text" id="pk-ctx-input" class="pk-ctx-input" placeholder="Ngữ cảnh / Sản phẩm (tuỳ chọn) — VD: khách hỏi về giá, muốn mua thêm..." />
+        <label class="pk-prod-row">
+          <input type="checkbox" id="pk-use-products-chk" />
+          <span>🔍 <b>Tra cứu sản phẩm</b> (nạp dữ liệu Google Sheet để tư vấn kỹ thành phần/công dụng)</span>
+        </label>
         <div class="pk-stone-row" id="pk-stone-row" title="Không tick gì = báo giá mặc định (cột G). Tick 1 loại nếu khách hỏi đá SAPHIA/RUBY — nhớ luôn cho lần sau, khỏi phải gõ lại.">
           <span class="pk-stone-label">💎 Loại đá:</span>
           <label><input type="radio" name="pk-stone" id="pk-stone-none" value="" checked /> Mặc định</label>
           <label><input type="radio" name="pk-stone" id="pk-stone-saphia" value="SAPHIA" /> SAPHIA</label>
           <label><input type="radio" name="pk-stone" id="pk-stone-ruby" value="RUBY" /> RUBY</label>
         </div>
+        <button id="pk-opener-btn" class="pk-opener-btn">💬 Tạo 3 câu mở đầu đa dạng (mua hàng + chat)</button>
+
+        <div id="pk-ai-suggestions"></div>
+        <button id="pk-ai-refresh">Lấy gợi ý mới</button>
       </div>
     `;
     document.body.appendChild(panelEl);
@@ -458,6 +489,9 @@
       });
     });
 
+    panelEl.querySelector("#pk-ai-refresh").addEventListener("click", () => {
+      requestSuggestion(true);
+    });
     var _AI_PROVIDER_LABEL = { gemini: "Gemini (Google)", openai: "OpenAI (ChatGPT)" };
   function _refreshAiKeyBanner() {
     var box = panelEl && panelEl.querySelector("#pk-ai-key-banner");
@@ -514,12 +548,18 @@
       const v = e.target.value;
       panelEl.querySelector("#pk-rem-body").style.display = v === "rem" ? "block" : "none";
       panelEl.querySelector("#pk-price-body").style.display = v === "price" ? "block" : "none";
+      panelEl.querySelector("#pk-ctkm-body").style.display = v === "ctkm" ? "block" : "none";
       if (v === "rem") loadReminders_();
+      if (v === "ctkm" && !_ctkmLoadedOnce) { _ctkmLoadedOnce = true; doCtkmSearch_(); } // mo tab la nap luon toan bo CTKM, khoi phai go gi cung thay ngay
     });
     panelEl.querySelector("#pk-rem-refresh").addEventListener("click", () => loadReminders_());
     panelEl.querySelector("#pk-price-btn").addEventListener("click", doPriceSearch_);
     panelEl.querySelector("#pk-price-q").addEventListener("keydown", (e) => {
       if (e.key === "Enter") doPriceSearch_();
+    });
+    panelEl.querySelector("#pk-ctkm-btn").addEventListener("click", doCtkmSearch_);
+    panelEl.querySelector("#pk-ctkm-q").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") doCtkmSearch_();
     });
     panelEl.querySelectorAll('.pk-price-mode-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -583,6 +623,17 @@
         if (hidden) renderCannedList_();
       });
     }
+    panelEl.querySelector("#pk-tones").addEventListener("click", (e) => {
+      const btn = e.target.closest(".pk-tone");
+      if (!btn) return;
+      panelEl.querySelectorAll(".pk-tone").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      _activeTone = btn.dataset.tone;
+    });
+    const prodChk = panelEl.querySelector("#pk-use-products-chk");
+    prodChk.checked = !!settings.useProducts;
+    prodChk.addEventListener("change", () => { _useProducts = prodChk.checked; });
+    _useProducts = prodChk.checked;
     // Loai da (SAPHIA/RUBY) — sticky theo may qua chrome.storage.sync, khong phai tick lai moi lan
     chrome.storage.sync.get(['stonePref'], (res) => {
       _stonePref = res.stonePref || '';
@@ -598,6 +649,7 @@
         renderBuilderDyn_(); // Soạn đơn: giá tự nhảy theo loại đá (trừ khi Sale đã tự sửa giá)
       });
     });
+    panelEl.querySelector("#pk-opener-btn").addEventListener("click", doGenerateOpeners_);
   }
 
   // ── CS đang dùng (sticky theo máy, lưu chrome.storage.sync) ──
@@ -813,6 +865,7 @@
         const signature = messages.map((m) => m.text).join("|").slice(0, 500);
         if (signature && signature !== lastConversationSignature) {
           lastConversationSignature = signature;
+          requestSuggestion(false);
           requestCustomerLookup();
         }
       }, 500);
@@ -826,6 +879,7 @@
     const initial = extractMessages();
     if (initial.length) {
       lastConversationSignature = initial.map((m) => m.text).join("|").slice(0, 500);
+      requestSuggestion(false);
       requestCustomerLookup();
     }
   }
@@ -1558,6 +1612,7 @@
         <div class="pk-rem-phone">${escapeHtml(r.phone)}${r.schedHenNote ? ' · ' + escapeHtml(r.schedHenNote) : ''}</div>
         <div class="pk-rem-actions">
           <button class="pk-btn-outline pk-rem-lookup" data-idx="${i}">🔎 Xem</button>
+          <button class="pk-btn-outline pk-rem-ai" data-idx="${i}">🤖 Soạn tin</button>
         </div>
       </div>
     `).join('');
@@ -1569,6 +1624,26 @@
         lookupByPhone(r.phone);
       });
     });
+    listEl.querySelectorAll('.pk-rem-ai').forEach((b) => {
+      b.addEventListener('click', () => soanFollowUp_(parseInt(b.dataset.idx, 10)));
+    });
+  }
+
+  // Soạn tin follow-up chủ động cho 1 khách trong danh sách nhắc hẹn — hiện vào cùng khung
+  // gợi ý AI (#pk-ai-suggestions) để bấm chèn/copy y hệt gợi ý trả lời thường.
+  function soanFollowUp_(idx) {
+    const r = _reminders[idx];
+    if (!r) return;
+    panelEl.querySelector('#pk-ai-phone-input').value = r.phone;
+    setStatus('⏳ Đang soạn tin follow-up cho ' + r.phone + '...');
+    safeSendMessage_(
+      { type: 'FETCH_FOLLOWUP_SUGGESTION', payload: { phone: r.phone, status: r.status, note: r.schedHenNote } },
+      (resp) => {
+        if (!resp?.ok) { setStatus('Lỗi: ' + (resp?.error || 'không rõ')); return; }
+        renderSuggestions({ suggestions: [resp.data.suggestion], provider: resp.data.provider });
+        setStatus('Nhớ tự mở đúng đoạn chat của ' + r.phone + ' trên Pancake trước khi bấm gợi ý để chèn.');
+      }
+    );
   }
 
   // ── TRA CỨU BẢNG GIÁ (Sheet DANH_MUC) ──
@@ -1658,6 +1733,53 @@
         });
       });
     });
+  }
+
+  // ── TRA CỨU CHƯƠNG TRÌNH KHUYẾN MÃI (Sheet CTKM) — hiển thị nguyên các cột của sheet dạng
+  // thẻ, KHÔNG có giá/nút thêm giỏ hàng như bảng giá (CTKM chỉ để đọc, không phải sản phẩm).
+  function doCtkmSearch_() {
+    const q = (panelEl.querySelector('#pk-ctkm-q').value || '').trim();
+    const box = panelEl.querySelector('#pk-ctkm-result');
+    box.innerHTML = '<div class="pk-price-loading">Đang tìm...</div>';
+    safeSendMessage_({ type: 'GET_CTKM_SEARCH', payload: { q } }, (resp) => {
+      if (!resp?.ok) { box.innerHTML = `<div class="pk-price-loading">Lỗi: ${escapeHtml(resp?.error || 'không rõ')}</div>`; return; }
+      renderCtkmRows_(resp.data.rows || [], q);
+    });
+  }
+
+  function renderCtkmRows_(rows, q) {
+    const box = panelEl.querySelector('#pk-ctkm-result');
+    if (!rows.length) {
+      box.innerHTML = `<div class="pk-price-loading">Không tìm thấy${q ? ' cho "' + escapeHtml(q) + '"' : ''} — kiểm tra lại sheet CTKM (cùng file với bảng giá).</div>`;
+      return;
+    }
+    box.innerHTML = rows.slice(0, 30).map((row) => {
+      const exclKey = row.__ctkmExclusionKey || '';
+      const keys = Object.keys(row).filter((k) =>
+        row[k] !== '' && row[k] !== null && row[k] !== undefined &&
+        _stripVNlocal_(k).trim() !== 'stt' &&
+        k.indexOf('__ctkm') !== 0 &&      // bo cac field noi bo (trang thai/ngoai le da tach rieng hien ben duoi)
+        k !== exclKey                      // bo trung cot dieu kien loai tru (da hien rieng, khong lap lai o day)
+      );
+      if (!keys.length) return '';
+      // Cot dau tien con lai lam tieu de the (thuong la "Ten chuong trinh"/"Noi dung"), cac cot
+      // sau hien duoi dang nhan phu — KHONG doan/hardcode ten cot cu the vi sheet CTKM co the
+      // dat ten khac nhau tuy tung thoi diem.
+      const titleKey = keys[0];
+      const restKeys = keys.slice(1);
+      const line = (k) => `<span class="pk-price-field"><b>${escapeHtml(k)}:</b> ${escapeHtml(row[k])}</span>`;
+      // Han su dung (yeu cau Duyen 27/09/2026): gan nhan trang thai ro rang ngay duoi tieu de —
+      // CTKM da het han van hien (de tham khao) nhung to mo, tranh Sale tu van nham cho khach.
+      const statusHtml = row.__ctkmStatusLabel
+        ? `<div class="pk-ctkm-status${row.__ctkmExpired ? ' pk-ctkm-status-expired' : (row.__ctkmUpcoming ? ' pk-ctkm-status-upcoming' : ' pk-ctkm-status-active')}">${escapeHtml(row.__ctkmStatusLabel)}</div>`
+        : '';
+      // Dieu kien KHONG ap dung/ngoai le — lam noi bat rieng thay vi lan vao cac field thuong,
+      // vi day la thong tin de Sale KIEM TRA TRUOC khi ap dung cho khach, de bo sot neu de chung.
+      const exclHtml = row.__ctkmExclusionNote
+        ? `<div class="pk-ctkm-excl">⚠️ <b>${exclKey ? escapeHtml(exclKey) : 'Điều kiện không áp dụng'}:</b> ${escapeHtml(row.__ctkmExclusionNote)}</div>`
+        : '';
+      return `<div class="pk-price-item${row.__ctkmExpired ? ' pk-ctkm-item-expired' : ''}"><div class="pk-ctkm-title">${escapeHtml(String(row[titleKey]))}</div>${statusHtml}${restKeys.map(line).join(' ')}${exclHtml}</div>`;
+    }).join('');
   }
 
   function _parsePriceNum_(v) {
@@ -1839,24 +1961,35 @@
   }
   // Gộp toàn bộ giá trị 1 dòng CTKM thành 1 khối text để hiển thị + để so khớp từ khoá, giống
   // hệt cách readCTKMPromotions_ bên GAS đang trình bày cho AI — CS xem quen mắt, dễ đối chiếu.
+  // Bỏ các field nội bộ (__ctkm*) và cột điều kiện loại trừ (đã tách hiện riêng ở cuối, có nhãn
+  // "⚠️ Điều kiện không áp dụng" cho dễ chú ý — không lặp lại trong phần liệt kê thường).
   function _ctkmRowText_(row) {
+    const exclKey = row.__ctkmExclusionKey || '';
     const parts = [];
     Object.keys(row || {}).forEach((k) => {
+      if (k.indexOf('__ctkm') === 0 || k === exclKey) return;
       const v = row[k];
       if (v === '' || v === null || v === undefined) return;
       parts.push(k + ': ' + v);
     });
-    return parts.join(' | ');
+    let text = parts.join(' | ');
+    if (row.__ctkmStatusLabel) text = row.__ctkmStatusLabel + ' — ' + text;
+    if (row.__ctkmExclusionNote) text += ' | ⚠️ Không áp dụng: ' + row.__ctkmExclusionNote;
+    return text;
   }
   // Lọc các dòng CTKM có nhắc tới tên sản phẩm đang soạn (so khớp không dấu) — chỉ hiện
   // CTKM LIÊN QUAN, tránh liệt kê hết cả chục chương trình không ăn nhập gây rối mắt.
+  // Đang lên đơn NGAY BÂY GIỜ nên chỉ tham khảo CTKM CÒN HIỆU LỰC hôm nay — bỏ hẳn CTKM đã hết
+  // hạn/chưa bắt đầu khỏi gợi ý ở đây (khác với tab "Tra cứu khuyến mãi" vẫn hiện cả để xem lại
+  // lịch sử), tránh Sale vô tình áp 1 chương trình không còn/chưa áp dụng được vào đơn đang lên.
   function _ctkmForProduct_(ten, tm) {
     if (!Array.isArray(_ctkmRows) || !_ctkmRows.length) return [];
+    const validRows = _ctkmRows.filter((row) => !row.__ctkmExpired && !row.__ctkmUpcoming);
     const nameFold = _fold_(ten || tm || '');
-    if (!nameFold) return _ctkmRows.slice(0, 5).map(_ctkmRowText_);
+    if (!nameFold) return validRows.slice(0, 5).map(_ctkmRowText_);
     const nameToks = nameFold.split(' ').filter((w) => w.length >= 2);
     const hits = [];
-    _ctkmRows.forEach((row) => {
+    validRows.forEach((row) => {
       const text = _fold_(_ctkmRowText_(row));
       if (nameToks.some((w) => text.indexOf(w) !== -1)) hits.push(_ctkmRowText_(row));
     });
@@ -2319,6 +2452,174 @@
       if (sel.agentMsgSelector && el.matches(sel.agentMsgSelector)) return "agent";
     } catch (e) { /* selector không hợp lệ — bỏ qua */ }
     return "unknown";
+  }
+
+  async function requestSuggestion(manual) {
+    const messages = extractMessages();
+    if (!messages.length) {
+      setStatus("Không tìm thấy tin nhắn nào. Kiểm tra lại selector trong Options.");
+      return;
+    }
+
+    setStatus(manual ? "Đang lấy gợi ý..." : "Hội thoại thay đổi — đang lấy gợi ý mới...");
+
+    const ctxEl = panelEl.querySelector("#pk-ctx-input");
+    safeSendMessage_(
+      {
+        type: "FETCH_SUGGESTION",
+        payload: {
+          platform: PLATFORM,
+          messages,
+          tone: _activeTone,
+          context: ctxEl ? ctxEl.value.trim() : "",
+          custLines: buildCustLines(),
+          withProducts: _useProducts,
+          stonePref: _stonePref
+        }
+      },
+      (resp) => {
+        if (!resp?.ok) {
+          setStatus("Lỗi: " + (resp?.error || "không rõ nguyên nhân"));
+          return;
+        }
+        renderSuggestions(resp.data);
+      }
+    );
+  }
+
+  // ── 3 câu mở đầu chủ động (dùng khi CS muốn nhắn trước cho khách) ──
+  // giống hệt luồng doGenerateOpener() bên Zalo AI: gọi tuần tự 3 hướng (không Promise.all
+  // vì Groq giới hạn token/phút, bắn cùng lúc dễ dính 429), mỗi hướng ra 1 ô sửa được +
+  // nút "Chèn vào ô trả lời" (KHÔNG có nút tự gửi như bên Zalo — Pancake/Messenger không có
+  // API gửi tin công khai, CS luôn tự kiểm tra và bấm Gửi tay, giữ đúng nguyên tắc an toàn
+  // đã áp dụng cho phần gửi ảnh).
+  async function doGenerateOpeners_() {
+    const btn = panelEl.querySelector("#pk-opener-btn");
+    const sug = panelEl.querySelector("#pk-ai-suggestions");
+    btn.disabled = true; btn.textContent = "AI đang soạn...";
+    sug.innerHTML = '<div class="pk-ai-cust-loading">Đang soạn 3 câu mở đầu...</div>';
+
+    const custLines = buildCustLines();
+    const results = [];
+    for (let i = 0; i < OPENER_ANGLES.length; i++) {
+      const angle = OPENER_ANGLES[i];
+      sug.innerHTML = `<div class="pk-ai-cust-loading">Đang soạn câu ${i + 1}/${OPENER_ANGLES.length} — ${escapeHtml(angle.label)}...</div>`;
+      const data = await new Promise((resolve) => {
+        safeSendMessage_(
+          { type: "FETCH_OPENER", payload: { custLines, tone: _activeTone, angleInstr: angle.instr, withProducts: _useProducts, stonePref: _stonePref } },
+          (resp) => resolve(resp?.ok ? resp.data : { error: resp?.error || "lỗi không rõ" })
+        );
+      });
+      results.push({ angle, ...data });
+    }
+
+    sug.innerHTML = "";
+    const label = document.createElement("div");
+    label.className = "pk-opener-label";
+    label.textContent = "💡 3 câu mở đầu — sửa nếu cần rồi chèn vào ô trả lời";
+    sug.appendChild(label);
+    results.forEach((r) => {
+      const box = document.createElement("div");
+      box.className = "pk-opener-box";
+      if (r.error) {
+        box.innerHTML = `<div class="pk-opener-label">${escapeHtml(r.angle.label)}</div><div style="color:#dc2626;font-size:12px">Lỗi: ${escapeHtml(r.error)}</div>`;
+        sug.appendChild(box);
+        return;
+      }
+      const ta = document.createElement("textarea");
+      ta.rows = 3;
+      ta.value = r.suggestion || "";
+      const btnRow = document.createElement("div");
+      btnRow.className = "pk-opener-btn-row";
+      const insertBtn = document.createElement("button");
+      insertBtn.className = "pk-btn-outline";
+      insertBtn.textContent = "📥 Chèn vào ô trả lời";
+      insertBtn.addEventListener("click", () => insertReply(ta.value));
+      btnRow.appendChild(insertBtn);
+      box.innerHTML = `<div class="pk-opener-label">${escapeHtml(r.angle.label)}</div>`;
+      box.appendChild(ta);
+      box.appendChild(btnRow);
+      sug.appendChild(box);
+    });
+
+    btn.disabled = false; btn.textContent = "💬 Tạo 3 câu mở đầu đa dạng (mua hàng + chat)";
+  }
+
+  function renderSuggestions(data) {
+    const list = data.suggestions?.length ? data.suggestions : data.suggestion ? [data.suggestion] : [];
+    const box = panelEl.querySelector("#pk-ai-suggestions");
+    box.innerHTML = "";
+
+    if (!list.length) {
+      setStatus("Backend không trả về gợi ý nào.");
+      return;
+    }
+
+    let statusMsg = `${list.length} gợi ý${data.provider ? " (nguồn: " + data.provider + ")" : ""}:`;
+    if (data.imageSkipped) statusMsg += ` (⚠️ ảnh "${data.imageSkipped.name}" khớp nhưng >3MB nên bị bỏ qua)`;
+    setStatus(statusMsg);
+    list.forEach((text) => {
+      const item = document.createElement("div");
+      item.className = "pk-ai-suggestion-item";
+      item.innerText = text;
+      item.title = "Bấm để chèn vào ô trả lời";
+      item.addEventListener("click", () => insertReply(text));
+      box.appendChild(item);
+    });
+
+    renderImageSuggestion(data.image);
+  }
+
+  // Nút "Copy ảnh sản phẩm" — chỉ hiện khi backend tìm thấy 1 ảnh khớp tên trong thư mục
+  // kiến thức Drive. Pancake không có API gửi ảnh công khai (Facebook chặn ở tầng
+  // Messenger) nên chỉ copy vào clipboard trình duyệt — CS tự bấm Ctrl+V dán vào khung
+  // chat Pancake rồi kiểm tra lại trước khi bấm Gửi. Cố tình KHÔNG tự động dán/gửi.
+  function renderImageSuggestion(image) {
+    if (!image) return;
+    const box = panelEl.querySelector("#pk-ai-suggestions");
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "pk-btn-outline";
+    btn.innerText = `📷 Copy ảnh: ${image.name}`;
+    btn.title = "Copy ảnh vào clipboard — sau đó bấm Ctrl+V vào khung chat Pancake";
+    btn.addEventListener("click", () => copyProductImage_(image, btn));
+    box.appendChild(btn);
+  }
+
+  async function copyProductImage_(image, btn) {
+    if (btn) btn.disabled = true;
+    setStatus(`Đang chuẩn bị ảnh "${image.name}"...`);
+    try {
+      const rawBlob = await (await fetch(`data:${image.mimeType};base64,${image.base64}`)).blob();
+      const pngBlob = await toPngBlob_(rawBlob);
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })]);
+      setStatus(`Đã copy ảnh "${image.name}" — bấm Ctrl+V vào khung chat Pancake để dán, kiểm tra rồi mới bấm Gửi.`);
+    } catch (e) {
+      setStatus(`Copy ảnh thất bại (${e?.message || e}) — thử bấm lại nút Copy ảnh.`);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  // ClipboardItem chỉ hỗ trợ ổn định image/png ở hầu hết trình duyệt — chuyển mọi ảnh
+  // (kể cả jpg) qua canvas rồi xuất PNG để dán được chắc chắn vào khung chat Pancake.
+  function toPngBlob_(blob) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext("2d").drawImage(img, 0, 0);
+        canvas.toBlob((pngBlob) => {
+          URL.revokeObjectURL(url);
+          pngBlob ? resolve(pngBlob) : reject(new Error("Không tạo được PNG từ ảnh."));
+        }, "image/png");
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Không đọc được dữ liệu ảnh.")); };
+      img.src = url;
+    });
   }
 
   function renderCannedList_() {

@@ -85,6 +85,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // Dung rieng cho trang Options — CS dan Provider/Key/Model (CHUA luu) vao form, bam nut
+  // "🔍 Kiem tra Key" o do la toi thang day, goi 1 request that toi nha cung cap (KHONG qua
+  // GAS, khong luu gi ca) voi 1 prompt ngan de bao ngay key co chay duoc khong, kem NGUYEN
+  // VAN loi that tu nha cung cap neu sai (het quota/sai quyen/model bi doi ten...) — tu phuc
+  // vu, khong phai doi den luc tra loi khach that moi biet key hong.
+  if (msg?.type === "TEST_AI_KEY") {
+    handleTestAiKey(msg.payload)
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
   if (msg?.type === "FETCH_SUGGESTION") {
     handleFetchSuggestion(msg.payload)
       .then((data) => sendResponse({ ok: true, data }))
@@ -162,6 +174,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // Tra cuu bang gia — action:'priceSearch', dung chung file PRICE_SS_ID (Sheet DANH_MUC).
   if (msg?.type === "GET_PRICE") {
     handleGetPrice(msg.payload)
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
+  // Tra cuu CTKM (khuyen mai/giam gia) — action:'ctkmSearch', cung file PRICE_SS_ID (Sheet
+  // CTKM), TRUC TIEP theo tu khoa, KHONG qua AI (giong het co che GET_PRICE o tren). Doi ten
+  // rieng GET_CTKM_SEARCH (khong dung chung GET_CTKM) de khong dam voi kenh GET_CTKM da co san
+  // (load nguyen van CTKM cho "Soan don", khong loc tu khoa) — 2 tinh nang khac muc dich.
+  if (msg?.type === "GET_CTKM_SEARCH") {
+    handleGetCtkmSearch(msg.payload)
       .then((data) => sendResponse({ ok: true, data }))
       .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
     return true;
@@ -490,6 +513,23 @@ async function callAI_(cfg, prompt, withProducts) {
   return { text: data.text, provider: data.provider, image: data.image || null, imageSkipped: data.imageSkipped || null };
 }
 
+// Dung cho nut "🔍 Kiem tra Key" trong trang Options — CHI goi truc tiep Gemini/OpenAI (khong
+// bao gio roi ve GAS/AI chung, khac voi callAI_ o tren), vi muc dich la kiem tra DUNG cai key
+// CS vua dan co tu no chay duoc khong, khong phai lay 1 cau tra loi bang moi gia. Khong luu gi
+// vao storage — payload la du lieu form CHUA luu, chi dung 1 lan roi bo.
+async function handleTestAiKey(payload) {
+  const provider = payload?.provider;
+  const apiKey = (payload?.apiKey || "").trim();
+  const model = (payload?.model || "").trim();
+  if (!provider || !apiKey) throw new Error("Thiếu Provider hoặc API Key.");
+  const testPrompt = 'Trả lời đúng 2 chữ "Đã kết nối" để xác nhận API key hoạt động, không thêm gì khác.';
+  let data;
+  if (provider === "gemini") data = await _callGeminiDirect_(apiKey, model, testPrompt);
+  else if (provider === "openai") data = await _callOpenAiDirect_(apiKey, model, testPrompt);
+  else throw new Error("Provider không hợp lệ: " + provider);
+  return { reply: (data.text || "").trim().slice(0, 60) };
+}
+
 // Goi GAS action:'ai' (co retry khi Groq bao 429/rate-limit) — dung chung cho ca tra loi tin
 // khach lan "3 cau mo dau" lan follow-up, tranh lap code retry 3 lan rieng le.
 async function callAiWithRetry_(gasUrl, prompt, withProducts) {
@@ -645,6 +685,24 @@ async function handleGetPrice(payload) {
   const q = payload?.q || "";
   const sep = cfg.gasUrl.includes("?") ? "&" : "?";
   const url = cfg.gasUrl + sep + "action=priceSearch" + (q ? "&q=" + encodeURIComponent(q) : "");
+  const res = await fetch(url, { redirect: "follow" });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return { rows: data.rows || [], total: data.total || 0 };
+}
+
+// Tra cuu CTKM theo tu khoa — action:'ctkmSearch' (GET, chi doc). Cung co che voi
+// handleGetPrice o tren, chi doi sang sheet CTKM. Ten rieng (khac handleGetCtkm() ben duoi,
+// vom load nguyen van cho "Soan don") de tranh dam ten ham (function hoisting se de 1 ham
+// ghi de ham kia neu trung ten).
+async function handleGetCtkmSearch(payload) {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+
+  const q = payload?.q || "";
+  const sep = cfg.gasUrl.includes("?") ? "&" : "?";
+  const url = cfg.gasUrl + sep + "action=ctkmSearch" + (q ? "&q=" + encodeURIComponent(q) : "");
   const res = await fetch(url, { redirect: "follow" });
   const data = await res.json();
   if (data.error) throw new Error(data.error);
