@@ -1694,7 +1694,13 @@
       return;
     }
     box.innerHTML = rows.slice(0, 30).map((row) => {
-      const keys = Object.keys(row).filter((k) => row[k] !== '' && row[k] !== null && row[k] !== undefined && _stripVNlocal_(k).trim() !== 'stt');
+      const exclKey = row.__ctkmExclusionKey || '';
+      const keys = Object.keys(row).filter((k) =>
+        row[k] !== '' && row[k] !== null && row[k] !== undefined &&
+        _stripVNlocal_(k).trim() !== 'stt' &&
+        k.indexOf('__ctkm') !== 0 &&      // bo cac field noi bo (trang thai/ngoai le da tach rieng hien ben duoi)
+        k !== exclKey                      // bo trung cot dieu kien loai tru (da hien rieng, khong lap lai o day)
+      );
       if (!keys.length) return '';
       // Cot dau tien con lai lam tieu de the (thuong la "Ten chuong trinh"/"Noi dung"), cac cot
       // sau hien duoi dang nhan phu — KHONG doan/hardcode ten cot cu the vi sheet CTKM co the
@@ -1702,7 +1708,17 @@
       const titleKey = keys[0];
       const restKeys = keys.slice(1);
       const line = (k) => `<span class="pk-price-field"><b>${escapeHtml(k)}:</b> ${escapeHtml(row[k])}</span>`;
-      return `<div class="pk-price-item"><div class="pk-ctkm-title">${escapeHtml(String(row[titleKey]))}</div>${restKeys.map(line).join(' ')}</div>`;
+      // Han su dung (yeu cau Duyen 27/09/2026): gan nhan trang thai ro rang ngay duoi tieu de —
+      // CTKM da het han van hien (de tham khao) nhung to mo, tranh Sale tu van nham cho khach.
+      const statusHtml = row.__ctkmStatusLabel
+        ? `<div class="pk-ctkm-status${row.__ctkmExpired ? ' pk-ctkm-status-expired' : (row.__ctkmUpcoming ? ' pk-ctkm-status-upcoming' : ' pk-ctkm-status-active')}">${escapeHtml(row.__ctkmStatusLabel)}</div>`
+        : '';
+      // Dieu kien KHONG ap dung/ngoai le — lam noi bat rieng thay vi lan vao cac field thuong,
+      // vi day la thong tin de Sale KIEM TRA TRUOC khi ap dung cho khach, de bo sot neu de chung.
+      const exclHtml = row.__ctkmExclusionNote
+        ? `<div class="pk-ctkm-excl">⚠️ <b>${exclKey ? escapeHtml(exclKey) : 'Điều kiện không áp dụng'}:</b> ${escapeHtml(row.__ctkmExclusionNote)}</div>`
+        : '';
+      return `<div class="pk-price-item${row.__ctkmExpired ? ' pk-ctkm-item-expired' : ''}"><div class="pk-ctkm-title">${escapeHtml(String(row[titleKey]))}</div>${statusHtml}${restKeys.map(line).join(' ')}${exclHtml}</div>`;
     }).join('');
   }
 
@@ -1885,24 +1901,35 @@
   }
   // Gộp toàn bộ giá trị 1 dòng CTKM thành 1 khối text để hiển thị + để so khớp từ khoá, giống
   // hệt cách readCTKMPromotions_ bên GAS đang trình bày cho AI — CS xem quen mắt, dễ đối chiếu.
+  // Bỏ các field nội bộ (__ctkm*) và cột điều kiện loại trừ (đã tách hiện riêng ở cuối, có nhãn
+  // "⚠️ Điều kiện không áp dụng" cho dễ chú ý — không lặp lại trong phần liệt kê thường).
   function _ctkmRowText_(row) {
+    const exclKey = row.__ctkmExclusionKey || '';
     const parts = [];
     Object.keys(row || {}).forEach((k) => {
+      if (k.indexOf('__ctkm') === 0 || k === exclKey) return;
       const v = row[k];
       if (v === '' || v === null || v === undefined) return;
       parts.push(k + ': ' + v);
     });
-    return parts.join(' | ');
+    let text = parts.join(' | ');
+    if (row.__ctkmStatusLabel) text = row.__ctkmStatusLabel + ' — ' + text;
+    if (row.__ctkmExclusionNote) text += ' | ⚠️ Không áp dụng: ' + row.__ctkmExclusionNote;
+    return text;
   }
   // Lọc các dòng CTKM có nhắc tới tên sản phẩm đang soạn (so khớp không dấu) — chỉ hiện
   // CTKM LIÊN QUAN, tránh liệt kê hết cả chục chương trình không ăn nhập gây rối mắt.
+  // Đang lên đơn NGAY BÂY GIỜ nên chỉ tham khảo CTKM CÒN HIỆU LỰC hôm nay — bỏ hẳn CTKM đã hết
+  // hạn/chưa bắt đầu khỏi gợi ý ở đây (khác với tab "Tra cứu khuyến mãi" vẫn hiện cả để xem lại
+  // lịch sử), tránh Sale vô tình áp 1 chương trình không còn/chưa áp dụng được vào đơn đang lên.
   function _ctkmForProduct_(ten, tm) {
     if (!Array.isArray(_ctkmRows) || !_ctkmRows.length) return [];
+    const validRows = _ctkmRows.filter((row) => !row.__ctkmExpired && !row.__ctkmUpcoming);
     const nameFold = _fold_(ten || tm || '');
-    if (!nameFold) return _ctkmRows.slice(0, 5).map(_ctkmRowText_);
+    if (!nameFold) return validRows.slice(0, 5).map(_ctkmRowText_);
     const nameToks = nameFold.split(' ').filter((w) => w.length >= 2);
     const hits = [];
-    _ctkmRows.forEach((row) => {
+    validRows.forEach((row) => {
       const text = _fold_(_ctkmRowText_(row));
       if (nameToks.some((w) => text.indexOf(w) !== -1)) hits.push(_ctkmRowText_(row));
     });

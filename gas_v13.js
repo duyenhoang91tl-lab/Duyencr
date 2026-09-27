@@ -575,6 +575,50 @@ function _priceVariantsForPrompt_(userMsg) {
 }
 
 // ─── CTKM (Sheet CTKM, cung file PRICE_SS_ID) — chi nap khi khach hoi ve khuyen mai/giam gia ──// Doc toan bo sheet CTKM thanh mang object, giong cach doc DANH_MUC (khong hardcode ten cot).
+//
+// NHAN DIEN HAN SU DUNG + DIEU KIEN LOAI TRU (yeu cau Duyen 27/09/2026): sheet CTKM thuong co
+// 1 cot ghi NGAY KET THUC chuong trinh va 1 cot ghi DIEU KIEN KHONG AP DUNG/ngoai le. Neu chi
+// hien nguyen van cho Sale tu doc, de bi bo sot (van tu van CTKM da het han, hoac quen dieu kien
+// loai tru). Ham nay TU DONG do (khong hardcode ten cot, giong tinh than _priceCols_ o tren):
+// so ngay HOM NAY (gio VN) voi cot ngay ket thuc de gan nhan trang thai ro rang, va tach rieng
+// noi dung cot dieu kien loai tru de FE lam noi bat len — VAN GIU nguyen dong du lieu goc (khong
+// an di dong nao) de Sale con xem lai neu can, chi gan them nhan trang thai.
+var _CTKM_END_KW_   = ['ket thuc', 'den ngay', 'han su dung', 'het han', 'ap dung den', 'han ap dung', 'ngay het han', 'han dung'];
+var _CTKM_START_KW_ = ['bat dau', 'tu ngay', 'ap dung tu'];
+var _CTKM_EXCL_KW_  = ['khong ap dung', 'ngoai le', 'loai tru', 'dieu kien loai tru', 'khong dung'];
+
+function _ctkmDetectCols_(headers) {
+  var endKey = '', startKey = '', exclKey = '';
+  for (var i = 0; i < headers.length; i++) {
+    var st = _stripVN_(headers[i]);
+    if (!endKey && _CTKM_END_KW_.some(function(kw) { return st.indexOf(kw) !== -1; })) { endKey = headers[i]; continue; }
+    if (!startKey && _CTKM_START_KW_.some(function(kw) { return st.indexOf(kw) !== -1; })) { startKey = headers[i]; continue; }
+    if (!exclKey && _CTKM_EXCL_KW_.some(function(kw) { return st.indexOf(kw) !== -1; })) exclKey = headers[i];
+  }
+  return { endKey: endKey, startKey: startKey, exclKey: exclKey };
+}
+
+// Parse 1 gia tri ngay tu sheet CTKM: co the la Date object (Sheets date cell, con nguyen luc
+// nay vi ham nay duoc goi TRUOC khi readCTKMCatalog_ chuyen Date -> chuoi ISO), chuoi ISO (neu
+// da bi chuyen roi), hoac chuoi "DD/MM/YYYY" go tay — thu ca 3 dang, khong bao gio throw.
+function _ctkmParseDate_(v) {
+  if (!v) return null;
+  if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+  var s = String(v).trim();
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) { var d1 = new Date(s); return isNaN(d1.getTime()) ? null : d1; }
+  return parseVNDate_(s);
+}
+
+// Dinh dang ngay hien thi kieu VN (dd/MM/yyyy) — dung _vnYmdParts_ (offset +7 co dinh) thay vi
+// Utilities.formatDate, dong bo voi ly do da giai thich o _vnYmd_ o tren (tranh phu thuoc Time
+// Zone cua du an Apps Script).
+function _ctkmFmtDateVN_(dt) {
+  var p = _vnYmdParts_(dt);
+  if (!p) return '';
+  return String(p.d).padStart(2, '0') + '/' + String(p.mo).padStart(2, '0') + '/' + p.y;
+}
+
 function readCTKMCatalog_() {
   var sh = SpreadsheetApp.openById(PRICE_SS_ID).getSheetByName(CTKM_SHEET_NAME);
   if (!sh || sh.getLastRow() < 2) return [];
@@ -585,19 +629,40 @@ function readCTKMCatalog_() {
   for (var hc = 0; hc < headers.length; hc++) {
     if (!headers[hc]) headers[hc] = 'Cot ' + _colLetter_(hc + 1);
   }
+  var specialCols = _ctkmDetectCols_(headers);
+  var todayYmd = _vnYmd_(new Date());
   var rows = [];
   for (var i = hIdx + 1; i < vals.length; i++) {
     var row = vals[i];
     var isEmpty = row.every(function(c){ return c === '' || c === null; });
     if (isEmpty) continue;
     var obj = {};
+    var endRawCell = null, startRawCell = null;
     for (var c = 0; c < headers.length; c++) {
       if (!headers[c]) continue;
       var v = row[c];
+      if (headers[c] === specialCols.endKey) endRawCell = v;     // giu RAW (co the la Date) truoc khi chuyen ISO
+      if (headers[c] === specialCols.startKey) startRawCell = v;
       obj[headers[c]] = (v instanceof Date) ? v.toISOString() : v;
     }
+    var endDt = specialCols.endKey ? _ctkmParseDate_(endRawCell) : null;
+    var startDt = specialCols.startKey ? _ctkmParseDate_(startRawCell) : null;
+    var expired = endDt ? (_vnYmd_(endDt) < todayYmd) : false;
+    var upcoming = (!expired && startDt) ? (_vnYmd_(startDt) > todayYmd) : false;
+    var statusLabel = '';
+    if (expired) statusLabel = '❌ Đã hết hạn (kết thúc ' + _ctkmFmtDateVN_(endDt) + ')';
+    else if (upcoming) statusLabel = '⏳ Chưa bắt đầu (từ ' + _ctkmFmtDateVN_(startDt) + ')';
+    else if (endDt) statusLabel = '✅ Còn áp dụng (đến ' + _ctkmFmtDateVN_(endDt) + ')';
+    obj.__ctkmExpired = expired;
+    obj.__ctkmUpcoming = upcoming;
+    obj.__ctkmStatusLabel = statusLabel;
+    obj.__ctkmExclusionNote = specialCols.exclKey ? (obj[specialCols.exclKey] || '') : '';
+    obj.__ctkmExclusionKey = specialCols.exclKey || '';
     rows.push(obj);
   }
+  // Con dang ap dung len truoc, het han/chua toi xep xuong cuoi — Sale luon thay CTKM dung
+  // duoc TRUOC TIEN, khong phai luot qua ca dong het han moi den dong con dung.
+  rows.sort(function(a, b) { return (a.__ctkmExpired ? 1 : 0) - (b.__ctkmExpired ? 1 : 0); });
   return rows;
 }
 
@@ -618,14 +683,18 @@ function readCTKMPromotions_(query) {
   var rows = readCTKMCatalog_();
   if (!rows.length) return '';
   var blocks = [];
-  for (var r = 0; r < rows.length && r < 8; r++) {
-    var row = rows[r], parts = [];
+  for (var r = 0; r < rows.length && blocks.length < 8; r++) {
+    var row = rows[r];
+    if (row.__ctkmExpired) continue; // KHONG dua CTKM da het han vao goi y cho AI — tranh AI tu van nham chuong trinh khong con ap dung
+    var parts = [];
     for (var k in row) {
       if (!row.hasOwnProperty(k)) continue;
+      if (k.indexOf('__ctkm') === 0) continue; // cac field noi bo (trang thai/ngoai le) khong dua nguyen vao day, xu ly rieng ben duoi
       var v = row[k];
       if (v === '' || v === null || v === undefined) continue;
       parts.push(k + ': ' + v);
     }
+    if (row.__ctkmStatusLabel) parts.push('Trạng thái: ' + row.__ctkmStatusLabel);
     if (parts.length) blocks.push(parts.join(' | '));
   }
   return blocks.join('\n');
