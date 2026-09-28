@@ -915,24 +915,51 @@
   // Trả về DANH SÁCH sđt tìm được trong đoạn chat hiện tại (có thể là 1, 2, hoặc nhiều).
   function extractPhones() {
     const sel = settings.selectors?.[PLATFORM];
-    // 1) Ưu tiên selector riêng cho ô hiển thị SĐT khách (nếu đã cấu hình)
+    // 1) Ưu tiên cao nhất: SĐT trong khung "Thông tin" (info-order) — dữ liệu KHÁCH HÀNG THẬT
+    // do chính Pancake hiển thị cho đúng khách/đơn đang mở, đáng tin hơn quét chữ tự do.
+    // LƯU Ý khi lấy selector qua DevTools: KHÔNG dùng id kiểu "#copy-xxxx-xxxx..." — id đó do
+    // Pancake SINH NGẪU NHIÊN RIÊNG cho từng khách/đơn, sẽ đổi khác mỗi khi mở khách khác nên
+    // không dùng làm selector cố định được. Nên bám vào các class ổn định như "info-order",
+    // "info-text"... y hệt cách cấu hình mặc định bên dưới.
+    const infoPhone = extractInfoPanelPhone_();
+    if (infoPhone) return [infoPhone];
+    // 2) Ưu tiên selector riêng cho ô hiển thị SĐT khách (nếu đã cấu hình)
     if (sel?.phoneSelector) {
       const el = document.querySelector(sel.phoneSelector);
       const m = el?.innerText?.match(/(0[3-9]\d{8})/);
       if (m) return [normPhone(m[1])];
     }
-    // 2) SĐT do chính CS gõ tay vào khung "Sản phẩm order" (đáng tin — CS chủ động xác nhận cho
+    // 3) SĐT do chính CS gõ tay vào khung "Sản phẩm order" (đáng tin — CS chủ động xác nhận cho
     // đúng đơn đang xử lý, không lẫn số điện thoại của người khác nhắc tới trong đoạn chat)
     const panelPhone = extractOrderPanelPhone_();
     if (panelPhone) return [panelPhone];
     const container = sel?.messageList ? document.querySelector(sel.messageList) : null;
     const scope = container || document.body;
-    // 3) SĐT đã được nền tảng tự gắn thẻ (span.phone-tag / id="..._<sđt>") — có thể ra nhiều số
+    // 4) SĐT đã được nền tảng tự gắn thẻ (span.phone-tag / id="..._<sđt>") — có thể ra nhiều số
     const tagged = extractTaggedPhones_(scope);
     if (tagged.length) return tagged;
-    // 4) Fallback cuối: quét chữ tự do tìm 1 SĐT VN dạng 0xxxxxxxxx (chỉ dùng khi không có thẻ)
+    // 5) Fallback cuối: quét chữ tự do tìm 1 SĐT VN dạng 0xxxxxxxxx (chỉ dùng khi không có thẻ)
     const m2 = scope.innerText?.match(/(0[3-9]\d{8})/);
     return m2 ? [normPhone(m2[1])] : [];
+  }
+
+  // SĐT hiển thị trong khung "Thông tin" bên phải (info-order) khi CS mở 1 đơn hàng/hội thoại
+  // trên Pancake — ví dụ khung có dòng "📞 0367881545 Viettel". Đây là dữ liệu Pancake tự hiển
+  // thị cho đúng khách đang xem, không phải số nhắc tới trong nội dung chat nên đáng tin nhất.
+  function extractInfoPanelPhone_() {
+    const sel = settings.selectors?.[PLATFORM];
+    let container = null;
+    if (sel?.infoPanelSelector) container = document.querySelector(sel.infoPanelSelector);
+    if (!container) {
+      // Dò tự động theo class Pancake đang dùng (xem README nếu Pancake đổi giao diện làm
+      // dò sai — cấu hình lại qua ô infoPanelSelector trong Options, KHÔNG dùng id "#copy-...").
+      container = document.querySelector('.info-order');
+    }
+    if (!container) return '';
+    // Chỉ lấy dòng ĐẦU TIÊN có dạng SĐT trong khung — tránh vơ nhầm SĐT khác nếu khung liệt kê
+    // thêm SĐT người nhận hàng/ghi chú ở dưới.
+    const m = (container.innerText || '').match(/(0[3-9]\d{8})/);
+    return m ? normPhone(m[1]) : '';
   }
 
   // Giữ lại tên cũ để tương thích ngược — trả về SĐT đầu tiên tìm được.
