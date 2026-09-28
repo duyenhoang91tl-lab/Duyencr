@@ -50,6 +50,13 @@
   <input type="text" id="pancake_phoneSelector" placeholder="vd: .customer-info .phone" />
   <label>Khung "Sản phẩm order" (orderPanelSelector) — <small>tuỳ chọn, để lấy đúng tên khách hàng đầu (dòng đầu tiên, dạng "Chị : Tên" / "Anh Tên")</small></label>
   <input type="text" id="pancake_orderPanelSelector" placeholder="vd: .order-note-panel" />
+  <label>Khung "Thông tin" hiển thị SĐT khách (infoPanelSelector) — <small>tuỳ chọn, mặc định tự dò class ".info-order"</small></label>
+  <input type="text" id="pancake_infoPanelSelector" placeholder="vd: .info-order" />
+  <div class="hint">
+    Đây là khung "Thông tin" bên phải khi mở 1 đơn/hội thoại (chỗ hiện số điện thoại + nhà mạng, vd "📞 0367881545 Viettel") — nguồn tra SĐT đáng tin nhất vì do chính Pancake hiển thị.
+    Nếu tự dò sai: F12 → Elements → chuột phải vào dòng số điện thoại → Copy → Copy selector.
+    <b>Lưu ý:</b> tuyệt đối KHÔNG dùng id dạng "#copy-xxxx-xxxx..." — Pancake sinh ngẫu nhiên id đó riêng cho từng khách nên sẽ đổi khác mỗi khi mở khách khác, không dùng làm selector cố định được. Chỉ dùng selector theo <b>class</b> (chữ sau dấu chấm, vd ".info-order" hoặc ".info-text").
+  </div>
   <div class="hint">
     Nếu để trống, extension sẽ tự dò khung có tiêu đề "Sản phẩm order" — nhưng dò tự động không phải lúc nào cũng đúng.
     Để chắc chắn: F12 → Elements → bấm chuột phải vào khung/cột chứa tiêu đề "Sản phẩm order" (vùng khoanh xanh trong ảnh chụp bạn gửi) → Copy → Copy selector → dán vào đây.
