@@ -11935,6 +11935,13 @@ var _srState = {
   fDateFrom: '', fDateTo: '', fDateQuick: 'thisMonth', fDateField: 'ngayTao', fSale: [], fTeam: [], dataF: null,
   fSaleSearch: '', fSaleCustomized: false, fKpiView: 'table', fEditing: null
 };
+// Bao cao F mac dinh 'Tháng này' nhung fDateFrom/fDateTo truoc day de rong -> dropdown hien
+// 'Tháng này' trong khi request khong co ngay nao => backend cong DON CA TU TRUOC DEN NAY
+// (14,5 ty thay vi 5,1 ty cua thang nay). Dien san khoang ngay theo dropdown ngay khi tai trang.
+(function(){
+  var r = (typeof _pkQuickRange === 'function') ? _pkQuickRange(_srState.fDateQuick) : null;
+  if (r){ _srState.fDateFrom = r.from; _srState.fDateTo = r.to; }
+})();
 
 function _srMoney(n){ return fmt(Math.round(n||0)) + '₫'; }
 
@@ -12273,6 +12280,12 @@ async function _srLoad(){
       });
     }
   } else if (_srState.sub === 'F') {
+    // Dropdown khong phai 'custom' -> khoang ngay PHAI khop dropdown (tranh dropdown 'Tháng này'
+    // ma 2 o ngay rong / cu sang thang khac => bao cao tinh nham toan bo lich su don).
+    if (_srState.fDateQuick && _srState.fDateQuick !== 'custom'){
+      var rF = _pkQuickRange(_srState.fDateQuick);
+      if (rF){ _srState.fDateFrom = rF.from; _srState.fDateTo = rF.to; }
+    }
     _srState.dataF = await _srFetch('saleKpiReport', {
       dateFrom: _srState.fDateFrom, dateTo: _srState.fDateTo,
       dateField: _srState.fDateField, sale: (_srState.fSale||[]).join(',')
