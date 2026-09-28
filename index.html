@@ -755,6 +755,10 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
 /* ===== V9.2 Đăng nhập / Tài khoản ===== */
 #login-overlay{position:fixed;inset:0;z-index:3000;background:linear-gradient(135deg,#0e3a2b,#16553c 60%,#0e3a2b);display:none;align-items:center;justify-content:center;padding:18px;}
 #login-overlay.show{display:flex;}
+/* Trang RIENG Bao cao ngay (?view=dailybrief): an toan bo khung CRM, chi con bao cao ngay day trang */
+html.db-standalone header,html.db-standalone .sidebar,html.db-standalone .sidebar-backdrop,html.db-standalone .tabs,html.db-standalone #files-bar,html.db-standalone #sync-banner{display:none!important}
+html.db-standalone #tab-dailybrief{position:fixed!important;inset:0;z-index:2500;background:var(--bg);display:flex!important;flex-direction:column;overflow:auto!important;padding:18px 20px}
+html.db-standalone #dailybrief-wrap{width:100%;max-width:1120px;margin:0 auto}
 .login-card{background:var(--surface);border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.35);width:360px;max-width:94vw;padding:26px 24px;animation:loginIn .2s ease;}
 @keyframes loginIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .login-logo{display:flex;align-items:center;justify-content:center;gap:7px;font-weight:700;font-size:15px;color:var(--green);margin-bottom:12px;}
@@ -11655,7 +11659,8 @@ function _mktRender(){
 //  thành 1 màn hình duy nhất cho 1 ngày, tối ưu để chụp ảnh gửi sếp — không thêm phép tính
 //  doanh thu/tỷ lệ chốt/TB đơn nào mới, chỉ trình bày lại đúng số đã có sẵn ở 2 báo cáo kia.
 // ═══════════════════════════════════════════════════════
-var _dbState = { date: _ymd(new Date()), loading: false, loaded: false, kpi: null, mkt: null };
+var _dbState = { date: _ymd(new Date()), loading: false, loaded: false, kpi: null, mkt: null,
+  views: { sale: 'both', page: 'both', mkt: 'both' } }; // both = bieu do tron + bang | table | pie | bar
 
 function _dbFmtDateVN(ymd){ var p = String(ymd||'').split('-'); return p.length===3 ? (p[2]+'/'+p[1]+'/'+p[0]) : (ymd||''); }
 
@@ -11664,6 +11669,35 @@ function _dbSetDate(key, val){
   else if (key === 'yesterday') { var d = new Date(); d.setDate(d.getDate()-1); _dbState.date = _ymd(d); }
   else { _dbState.date = val; }
   _dbLoad();
+}
+
+// Che do xem cua tung muc trong Bao cao ngay (state rieng, KHONG dung _srState nen bam doi
+// che do chi ve lai Bao cao ngay, khong keo theo Bao cao doanh so).
+function _dbViewToggleHtml(key){
+  var v = (_dbState.views && _dbState.views[key]) || 'both';
+  function b(val, label){
+    return '<button type="button" class="btn '+(v===val?'secondary':'sm')+'" style="padding:3px 9px;font-size:11px" '+
+      'onclick="_dbSetView(\''+key+'\',\''+val+'\')">'+label+'</button>';
+  }
+  return '<div style="display:inline-flex;gap:4px;margin-left:10px;vertical-align:middle;flex-wrap:wrap">'+
+    b('both','🥧 Tròn + Bảng')+b('pie','🥧 Tròn')+b('bar','📊 Cột')+b('table','📋 Bảng')+'</div>';
+}
+function _dbSetView(key, val){ _dbState.views[key] = val; _dbRender(); }
+// Dung lai _srChartSvg (donut co TONG o giua, dung chung voi Bao cao doanh so) — khong tu ve lai.
+function _dbBody(key, rows, nameKey, valueKey, moneyFmt, tableHtml){
+  var v = (_dbState.views && _dbState.views[key]) || 'both';
+  if (v === 'table') return tableHtml;
+  if (v === 'pie' || v === 'bar') return _srChartSvg(rows, nameKey, valueKey, v, moneyFmt);
+  return _srChartSvg(rows, nameKey, valueKey, 'pie', moneyFmt) + tableHtml;
+}
+
+// ── Trang RIENG chi co Bao cao ngay: mo tab moi cung file nay voi ?view=dailybrief ──
+var _dbStandalone = /(?:^|[?&])view=dailybrief(?:&|$)/.test(location.search);
+function _dbOpenStandalone(){
+  var url = location.href.split('#')[0].split('?')[0] + '?view=dailybrief';
+  var w = null;
+  try { w = window.open(url, '_blank'); } catch(e){}
+  if (!w) location.href = url; // trinh duyet chan popup -> mo ngay trong tab hien tai
 }
 
 async function renderDailyBriefTab(){
@@ -11700,13 +11734,13 @@ function _dbRender(){
   var isToday = _dbState.date === _ymd(new Date());
   var y = new Date(); y.setDate(y.getDate()-1);
   var isYesterday = _dbState.date === _ymd(y);
-  var html = '<div class="dash-section-title">🎯 Báo cáo ngày</div>'+
-    '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Gộp 1 màn hình để gửi sếp: Doanh thu/Sale/Page lấy từ <b>KPI Pancake</b>, khối Marketing lấy từ <b>Checklist MKT</b> — số liệu giống hệt 2 tab đó, chỉ trình bày gọn lại. Chụp ảnh cả trang là đủ.</div>';
+  var html = '<div class="dash-section-title">🎯 Báo cáo ngày</div>';
   html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px">'+
     '<button class="btn sm'+(isToday?' primary':'')+'" onclick="_dbSetDate(\'today\')">Hôm nay</button>'+
     '<button class="btn sm'+(isYesterday?' primary':'')+'" onclick="_dbSetDate(\'yesterday\')">Hôm qua</button>'+
     '<input type="date" value="'+esc(_dbState.date)+'" onchange="_dbSetDate(\'custom\',this.value)" style="'+stI+'">'+
     '<span style="font-size:12px;color:var(--muted)">Ngày '+_dbFmtDateVN(_dbState.date)+'</span>'+
+    '<button class="btn sm" onclick="_dbLoad()" title="Tải lại số liệu mới nhất">🔄 Tải lại</button>'+
   '</div>';
 
   if (_dbState.loading && !_dbState.loaded){ wrap.innerHTML = html + '<div style="padding:16px;color:var(--muted)">Đang tải...</div>'; return; }
@@ -11733,47 +11767,51 @@ function _dbRender(){
 
   // ── Theo doi Sale (dung lai kpi.bySale — da xep Van phong -> Online -> ngoai danh sach,
   // trong tung nhom theo Ty le chot giam dan) ──
-  html += '<div class="dash-section-title">👥 Theo đội Sale</div>';
+  html += '<div class="dash-section-title">👥 Theo đội Sale'+_dbViewToggleHtml('sale')+'</div>';
   var saleRows = kpi.bySale || [];
   if (!saleRows.length){
     html += '<div style="color:var(--muted);font-size:12px;padding:8px 0 16px">Chưa có dữ liệu Sale trong ngày này.</div>';
   } else {
-    html += '<div style="overflow-x:auto;margin-bottom:20px"><table class="dash-table"><thead><tr><th>Sale</th><th>Nhóm</th><th style="text-align:right">Đơn</th><th style="text-align:right">Doanh thu</th><th style="text-align:right">Tỷ lệ chốt</th><th style="text-align:right">TB đơn</th></tr></thead><tbody>';
+    var saleTable = '';
+    saleTable += '<div style="overflow-x:auto;margin-bottom:20px"><table class="dash-table"><thead><tr><th>Sale</th><th>Nhóm</th><th style="text-align:right">Đơn</th><th style="text-align:right">Doanh thu</th><th style="text-align:right">Tỷ lệ chốt</th><th style="text-align:right">TB đơn</th></tr></thead><tbody>';
     saleRows.forEach(function(r){
-      html += '<tr><td>'+esc(r.name)+(r.mapped?'':' <span style="color:var(--hint);font-size:10px">(chưa khớp)</span>')+'</td>'+
+      saleTable += '<tr><td>'+esc(r.name)+(r.mapped?'':' <span style="color:var(--hint);font-size:10px">(chưa khớp)</span>')+'</td>'+
         '<td style="color:var(--muted)">'+esc(r.nhom||'—')+'</td>'+
         '<td style="text-align:right">'+fmt(r.donHang)+'</td><td style="text-align:right">'+fmtVND(r.doanhThu)+'</td>'+
         '<td style="text-align:right">'+r.tyLeChot+'%</td><td style="text-align:right">'+fmtVND(r.trungBinhDon)+'</td></tr>';
     });
-    html += '<tr style="font-weight:700;border-top:2px solid var(--border)"><td>Tổng</td><td></td>'+
+    saleTable += '<tr style="font-weight:700;border-top:2px solid var(--border)"><td>Tổng</td><td></td>'+
       '<td style="text-align:right">'+fmt(kpi.totalDonHang)+'</td><td style="text-align:right">'+fmtVND(kpi.totalDoanhThu)+'</td>'+
       '<td style="text-align:right">'+(kpi.tyLeChotChung||0)+'%</td><td style="text-align:right">'+fmtVND(tbDonTong)+'</td></tr>';
-    html += '</tbody></table></div>';
+    saleTable += '</tbody></table></div>';
+    html += _dbBody('sale', saleRows, 'name', 'doanhThu', true, saleTable);
   }
 
   // ── Theo Page (dung lai kpi.byPage — da xep theo Tong tuong tac giam dan) ──
-  html += '<div class="dash-section-title">📄 Theo Page</div>';
+  html += '<div class="dash-section-title">📄 Theo Page'+_dbViewToggleHtml('page')+'</div>';
   var pageRows = kpi.byPage || [];
   if (!pageRows.length){
     html += '<div style="color:var(--muted);font-size:12px;padding:8px 0 16px">Chưa có dữ liệu Page trong ngày này.</div>';
   } else {
-    html += '<div style="overflow-x:auto;margin-bottom:20px"><table class="dash-table"><thead><tr><th>Page</th><th style="text-align:right">Tương tác</th><th style="text-align:right">SĐT</th><th style="text-align:right">Đơn</th><th style="text-align:right">Doanh thu</th><th style="text-align:right">Tỷ lệ chốt</th><th style="text-align:right">TB đơn</th></tr></thead><tbody>';
+    var pageTable = '';
+    pageTable += '<div style="overflow-x:auto;margin-bottom:20px"><table class="dash-table"><thead><tr><th>Page</th><th style="text-align:right">Tương tác</th><th style="text-align:right">SĐT</th><th style="text-align:right">Đơn</th><th style="text-align:right">Doanh thu</th><th style="text-align:right">Tỷ lệ chốt</th><th style="text-align:right">TB đơn</th></tr></thead><tbody>';
     pageRows.forEach(function(r){
-      html += '<tr><td>'+esc(r.pageName)+(r.mapped?'':' <span style="color:var(--hint);font-size:10px">(chưa khớp kênh)</span>')+'</td>'+
+      pageTable += '<tr><td>'+esc(r.pageName)+(r.mapped?'':' <span style="color:var(--hint);font-size:10px">(chưa khớp kênh)</span>')+'</td>'+
         '<td style="text-align:right">'+fmt(r.tongTT)+'</td><td style="text-align:right">'+fmt(r.sdtMangVe)+'</td>'+
         '<td style="text-align:right">'+fmt(r.donHang)+'</td><td style="text-align:right">'+fmtVND(r.doanhThu)+'</td>'+
         '<td style="text-align:right">'+r.tyLeChot+'%</td><td style="text-align:right">'+fmtVND(r.trungBinhDon)+'</td></tr>';
     });
-    html += '<tr style="font-weight:700;border-top:2px solid var(--border)"><td>Tổng</td>'+
+    pageTable += '<tr style="font-weight:700;border-top:2px solid var(--border)"><td>Tổng</td>'+
       '<td style="text-align:right">'+fmt(kpi.totalTongTT)+'</td><td style="text-align:right">'+fmt(kpi.totalSdtMangVe)+'</td>'+
       '<td style="text-align:right">'+fmt(kpi.totalDonHang)+'</td><td style="text-align:right">'+fmtVND(kpi.totalDoanhThu)+'</td>'+
       '<td style="text-align:right">'+(kpi.tyLeChotChung||0)+'%</td><td style="text-align:right">'+fmtVND(tbDonTong)+'</td></tr>';
-    html += '</tbody></table></div>';
+    pageTable += '</tbody></table></div>';
+    html += _dbBody('page', pageRows, 'pageName', 'doanhThu', true, pageTable);
   }
 
   // ── Marketing — MUC RIENG, tach nen de phan biet ro voi ket qua ban hang o tren ──
   html += '<div style="margin-top:8px;padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--rlg)">';
-  html += '<div class="dash-section-title" style="margin-top:0">📣 Marketing</div>';
+  html += '<div class="dash-section-title" style="margin-top:0">📣 Marketing'+_dbViewToggleHtml('mkt')+'</div>';
   html += '<div class="kpi-grid" style="margin-bottom:14px">'+
     '<div class="kpi-card"><div class="kpi-val">'+fmt(mkt.tongTT)+'</div><div class="kpi-label">Tổng tương tác</div></div>'+
     '<div class="kpi-card"><div class="kpi-val">'+fmt(mkt.sdtThuThap)+'</div><div class="kpi-label">SĐT thu thập</div></div>'+
@@ -11784,13 +11822,15 @@ function _dbRender(){
   '</div>';
   var mktGroups = (mkt.groups && mkt.groups.mkt) || [];
   if (mktGroups.length){
-    html += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Nhóm MKT</th><th style="text-align:right">Đơn</th><th style="text-align:right">Doanh thu</th><th style="text-align:right">TB đơn</th><th style="text-align:right">Tỷ lệ chốt</th></tr></thead><tbody>';
+    var mktTable = '';
+    mktTable += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Nhóm MKT</th><th style="text-align:right">Đơn</th><th style="text-align:right">Doanh thu</th><th style="text-align:right">TB đơn</th><th style="text-align:right">Tỷ lệ chốt</th></tr></thead><tbody>';
     mktGroups.forEach(function(g){
-      html += '<tr><td>'+esc(g.name)+'</td><td style="text-align:right">'+fmt(Math.round(g.baseOrders||0))+'</td>'+
+      mktTable += '<tr><td>'+esc(g.name)+'</td><td style="text-align:right">'+fmt(Math.round(g.baseOrders||0))+'</td>'+
         '<td style="text-align:right">'+fmtVND(Math.round(g.baseRevenue||0))+'</td><td style="text-align:right">'+fmtVND(Math.round(g.trungBinhDon||0))+'</td>'+
         '<td style="text-align:right">'+(g.tyLeChotTong||0)+'%</td></tr>';
     });
-    html += '</tbody></table></div>';
+    mktTable += '</tbody></table></div>';
+    html += _dbBody('mkt', mktGroups, 'name', 'baseRevenue', true, mktTable);
   } else {
     html += '<div style="color:var(--muted);font-size:12px">Chưa có nhóm MKT nào (đặt ở tab Quản lý Team → "Nhóm MKT").</div>';
   }
@@ -14443,6 +14483,7 @@ function _updateNoActionBadge(){
 var _v9PrevSwitchTab = switchTab;
 var _activeV9Tab = 'list';
 switchTab = function(tab, el){
+  if (tab === 'dailybrief' && !_dbStandalone){ _dbOpenStandalone(); return; } // Bao cao ngay = trang rieng
   _v9PrevSwitchTab(tab, el);
   _activeV9Tab = tab;
   ['dashboard','team','audit','salesreport','pancake','kpipancake','mktchecklist','dailybrief'].forEach(function(name){
@@ -14927,6 +14968,32 @@ async function _authGate(){
     _hideLogin();
     console.error('authGate error', e);
   }
+}
+
+// ── Trang riêng Báo cáo ngày (?view=dailybrief) ──
+// Chờ cổng đăng nhập chạy xong (cần biết đúng tài khoản/phạm vi Sale) rồi mới vẽ báo cáo; nếu
+// chưa đăng nhập thì form đăng nhập vẫn hiện như thường, đăng nhập xong báo cáo tự hiện ra.
+if (typeof _dbStandalone !== 'undefined' && _dbStandalone){
+  document.documentElement.classList.add('db-standalone');
+  document.title = 'Báo cáo ngày — Sasum';
+  var _dbOrigAuthGate = _authGate;
+  _authGate = async function(){
+    try { return await _dbOrigAuthGate.apply(this, arguments); }
+    finally { window._dbGateDone = true; }
+  };
+  var _dbBootTimer = setInterval(function(){
+    var wrap = document.getElementById('dailybrief-wrap');
+    var ov = document.getElementById('login-overlay');
+    if (!window._dbGateDone || !wrap || (ov && ov.classList.contains('show'))) return;
+    clearInterval(_dbBootTimer);
+    var panel = document.getElementById('tab-dailybrief');
+    if (panel && panel.parentNode !== document.body) document.body.appendChild(panel); // tach khoi #data-view (dang display:none)
+    if (typeof _tabAllowedForUser === 'function' && !_tabAllowedForUser('dailybrief')){
+      wrap.innerHTML = '<div style="padding:24px;color:var(--muted)">Tài khoản này chưa được cấp quyền xem Báo cáo ngày.</div>';
+      return;
+    }
+    renderDailyBriefTab();
+  }, 250);
 }
 
 // Nút tài khoản / đăng xuất trên header
