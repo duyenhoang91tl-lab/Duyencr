@@ -212,10 +212,13 @@ function _detectHeaderRow_(vals, maxScan) {
 // Doc toan bo sheet DANH_MUC thanh mang object {tenCot: giaTri...}, dua theo dong tieu de
 // (tu do, xem _detectHeaderRow_) — khong hardcode ten cot lan vi tri dong tieu de, sheet
 // doi/them cot hay chen them dong trang o tren van chay binh thuong.
+// Bang tra cuu gia CHI lay co dinh cot A -> M (yeu cau Duyen): cac cot ben phai M (vung cong thuc/
+// du lieu nguon) khong duoc doc, khong dua vao tim kiem/hien thi.
+var PRICE_LAST_COL_ = 13; // cot M (A=1 ... M=13)
 function readPriceCatalog_() {
   var sh = SpreadsheetApp.openById(PRICE_SS_ID).getSheetByName(PRICE_SHEET_NAME);
   if (!sh || sh.getLastRow() < 2) return [];
-  var lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
+  var lastRow = sh.getLastRow(), lastCol = Math.min(sh.getLastColumn(), PRICE_LAST_COL_);
   var vals = sh.getRange(1, 1, lastRow, lastCol).getValues();
   var hIdx = _detectHeaderRow_(vals, 10);
   var headers = vals[hIdx].map(function(h){ return String(h || '').trim(); });
@@ -304,7 +307,7 @@ function _cacheGetBig_(key) {
 // nen truoc day bi quet nham vao giaCandidates. Vi vay CHI nhan dien cot gia trong pham vi cot
 // A->I (idx+1 <= GIA_COL_LIMIT) — cac cot ten/nhom/size/chat lieu van duoc do toan bo be rong
 // sheet nhu cu vi khong lien quan toi vung cong thuc nay.
-var GIA_COL_LIMIT_ = 9; // cot I (A=1, B=2, ... I=9)
+var GIA_COL_LIMIT_ = 13; // cot M (A=1, B=2, ... M=13) — khop PRICE_LAST_COL_
 // Neu co NHIEU cot gia THUONG (khong tinh Saphia/Ruby), UU TIEN cot nao co chu "thuong" (Gia
 // thuong) truoc — chi khi KHONG cot nao ghi ro "thuong" moi lui ve thu tu trai->phai nhu cu.
 // FIX (26/09/2026): cot Saphia/Ruby PHAI luon duoc giu lai bat ke co cot "thuong" hay khong —
@@ -503,11 +506,11 @@ function _priceVariantsForPrompt_(userMsg) {
   var rows;
   try {
     var cache = CacheService.getScriptCache();
-    var cached = cache.get('price_catalog_v2');
+    var cached = cache.get('price_catalog_v3');
     if (cached) { try { rows = JSON.parse(cached); } catch (e) {} }
     if (!rows) {
       rows = readPriceCatalog_();
-      try { cache.put('price_catalog_v2', JSON.stringify(rows), 600); } catch (e) {}
+      try { cache.put('price_catalog_v3', JSON.stringify(rows), 600); } catch (e) {}
     }
   } catch (e) { return ''; }
   if (!rows || !rows.length) return '';
@@ -1052,7 +1055,7 @@ function doGet(e) {
     if (action === 'priceSearch') {
       var q = (e && e.parameter && e.parameter.q) ? String(e.parameter.q) : '';
       var cachePS = CacheService.getScriptCache();
-      var cKeyPS = 'price_catalog_v2';
+      var cKeyPS = 'price_catalog_v3';
       var cachedPS = cachePS.get(cKeyPS);
       var rowsPS;
       if (cachedPS) { try { rowsPS = JSON.parse(cachedPS); } catch(ec) {} }
@@ -1088,10 +1091,10 @@ function doGet(e) {
 
     // ─── Danh muc PHANG cho "Soan don" (Pancake AI): tra cuu theo ten -> dropdown thu hep dan ───
     if (action === 'priceCatalogFlat') {
-      var flatJson = _cacheGetBig_('price_flat_v1');
+      var flatJson = _cacheGetBig_('price_flat_v2');
       if (!flatJson) {
         flatJson = JSON.stringify(buildPriceCatalogFlat_());
-        _cachePutBig_('price_flat_v1', flatJson, 600); // cache 10 phut, sheet gia it doi
+        _cachePutBig_('price_flat_v2', flatJson, 600); // cache 10 phut, sheet gia it doi
       }
       return ContentService.createTextOutput(flatJson).setMimeType(ContentService.MimeType.JSON);
     }
@@ -1109,10 +1112,10 @@ function doGet(e) {
     }
     // ─── Cay Nhom SP → Ten SP → Kieu/Size (ban cu, giu tuong thich) ───
     if (action === 'priceCatalogTree') {
-      var treeJson = _cacheGetBig_('price_tree_v2');
+      var treeJson = _cacheGetBig_('price_tree_v3');
       if (!treeJson) {
         treeJson = JSON.stringify(buildPriceCatalogTree_());
-        _cachePutBig_('price_tree_v2', treeJson, 600);
+        _cachePutBig_('price_tree_v3', treeJson, 600);
       }
       return ContentService.createTextOutput(treeJson).setMimeType(ContentService.MimeType.JSON);
     }
