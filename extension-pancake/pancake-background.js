@@ -36,6 +36,10 @@ const DEFAULT_SETTINGS = {
       replyBox: "#replyBoxComposer",
       phoneSelector: "",
       orderPanelSelector: "",
+      // SĐT hiển thị trong khung "Thông tin" bên phải khi mở 1 đơn/hội thoại (class ổn định
+      // "info-order" — KHÔNG dùng id kiểu "#copy-xxxx..." vì Pancake sinh ngẫu nhiên id đó
+      // riêng cho từng khách, đổi khác mỗi lần mở khách khác).
+      infoPanelSelector: ".info-order",
       customerMsgSelector: ".message-text-ele.client-message",
       agentMsgSelector: ".message-text-ele.page-message"
     },
