@@ -237,6 +237,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // Don gia 1 don vi "vang" trong gio hang Soan don — dung chung setting 'goldUnitAmount' voi
+  // CRM (2 noi admin co the cai: gear Cai dat tren CRM, hoac Options cua extension nay).
+  if (msg?.type === "GET_GOLD_UNIT") {
+    handleGetGoldUnit()
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
+  // Admin luu don gia vang tu trang Options — ghi chung setting GAS 'goldUnitAmount' voi CRM.
+  if (msg?.type === "SET_GOLD_UNIT") {
+    handleSetGoldUnit(msg.payload)
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
   // Bang tra menh + mau canned response phong thuy (chi dung tren Messenger/Thu Hien) —
   // action:'getKnowledge', doc/tu tao sheet Menh + CannedResponses rieng, KHONG dung cot CareData.
   if (msg?.type === "GET_KNOWLEDGE") {
@@ -388,6 +405,40 @@ async function handleGetCustomFields() {
     }
   } catch (e) { /* het cach, tra ve mang rong */ }
   return [];
+}
+
+// Don gia 1 don vi "vang" (d) trong gio hang "Soan don" — setting dung chung 'goldUnitAmount'
+// voi CRM (admin cai o gear "Cai dat" trong Bao cao doanh so, HOAC ngay trong Options cua
+// Pancake AI — ca 2 cung ghi/doc 1 key GAS nen chi can cai 1 cho la ap dung toan team).
+async function handleGetGoldUnit() {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) return 350000;
+
+  const sep = cfg.gasUrl.includes("?") ? "&" : "?";
+  try {
+    const res = await fetch(cfg.gasUrl + sep + "action=getSetting&key=goldUnitAmount", { redirect: "follow" });
+    const data = await res.json();
+    const n = Number(data?.value);
+    if (n > 0) return n;
+  } catch (e) { /* het cach, dung mac dinh */ }
+  return 350000;
+}
+
+// Admin cai don gia vang truc tiep tu Options cua Pancake AI — ghi vao setting chung GAS
+// 'goldUnitAmount' (setSetting), CUNG 1 key ma CRM doc/ghi, nen ap dung cho ca team ngay.
+async function handleSetGoldUnit(payload) {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+  const n = Number(payload?.amount);
+  if (!(n > 0)) throw new Error("Đơn giá vàng không hợp lệ.");
+  await fetch(cfg.gasUrl, {
+    method: "POST",
+    body: JSON.stringify({ action: "setSetting", key: "goldUnitAmount", value: String(n) }),
+    headers: { "Content-Type": "text/plain" }
+  });
+  return { amount: n };
 }
 
 // Them 1 nick moi vao danh sach dung chung — uu tien action:'addZaloNick' (GAS tu merge vao

@@ -126,6 +126,9 @@
   let CARE_STATUS_TREE = null; // cay "Tinh trang CS" load dong tu GAS (dong bo voi appweb/Zalo AI)
   let CUSTOM_FIELDS = []; // "truong tu tao" (admin them ben app web chinh) — load dong tu GAS
   let _currentNick = ''; // Nick Zalo/kenh CS dang dung, sticky (chrome.storage.sync)
+  let _goldUnitAmount = 350000; // Don gia 1 don vi "vang" (d) — admin cai o CRM (gear Cai dat >
+                                 // Don gia vang) hoac o Options cua Pancake AI, luu chung setting
+                                 // GAS 'goldUnitAmount' de dong bo toan team. Mac dinh 350k neu chua cai.
   let _chatKeyPhoneMap = {}; // { chatKey: phone } — "danh ba nguoc" hoc cuc bo tren may nay
                              // (giong _chatNamePhoneMap ben Zalo AI), dung cho nut Lien ket doan chat
   let _currentPhone = '';
@@ -146,6 +149,7 @@
     observeConversationChanges();
     loadCsNames_();
     loadNickList_();
+    loadGoldUnitAmount_();
     if (!IS_PHONGTHUY) { loadCareStatusTree_(); loadCustomFields_(); } // cay dung chung cho Pancake/Zalo (san pham suc khoe) — khong ap dung cho phong thuy
     loadChatKeyMap_();
     startCarePoll_();
@@ -329,7 +333,7 @@
           <select id="pk-cs-sel"></select>
         </div>
         <div id="pk-ai-nick-row">
-          <label>💬 Nick</label>
+          <label>💬 Nick Zalo</label>
           <select id="pk-nick-sel"></select>
           <button id="pk-nick-add" title="Thêm nick mới">＋</button>
         </div>
@@ -405,8 +409,8 @@
               <input type="number" id="pk-cart-discount-value" placeholder="0" min="0" style="display:none" />
             </div>
             <div class="pk-cart-extra-row">
-              <label>Thêm vàng (k)</label>
-              <input type="number" id="pk-cart-gold" placeholder="0" min="0" title="Tiền vàng thêm, nghìn đồng (VD 500 = 500.000đ)" />
+              <label id="pk-cart-gold-label">Thêm vàng (SL × 350.000đ)</label>
+              <input type="number" id="pk-cart-gold" placeholder="0" min="0" title="Nhập số lượng — mỗi đơn vị = 350.000đ (VD: 2 = 700.000đ). Đơn giá do admin cài trên CRM hoặc Options Pancake AI." />
             </div>
             <div class="pk-cart-extra-row">
               <label><input type="checkbox" id="pk-cart-freeship" /> Freeship</label>
@@ -683,6 +687,25 @@
     sel.innerHTML = '<option value="">— Chọn nick —</option>' +
       NICK_LIST.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
     sel.value = _currentNick || '';
+  }
+
+  // Đơn giá 1 đơn vị "vàng" (đ) — admin cài ở CRM (⚙ Cài đặt > Đơn giá vàng, trong Báo cáo
+  // doanh số) hoặc ở Options của Pancake AI; cả 2 nơi đều ghi chung setting GAS 'goldUnitAmount'
+  // nên chỉ cần cài 1 chỗ là áp dụng cho toàn team. Mặc định 350.000đ nếu GAS chưa có setting này.
+  function loadGoldUnitAmount_() {
+    safeSendMessage_({ type: "GET_GOLD_UNIT" }, (resp) => {
+      const n = Number(resp?.ok ? resp.data : NaN);
+      _goldUnitAmount = (n > 0) ? n : 350000;
+      updateGoldUnitLabel_();
+    });
+  }
+
+  function updateGoldUnitLabel_() {
+    const label = panelEl?.querySelector('#pk-cart-gold-label');
+    const input = panelEl?.querySelector('#pk-cart-gold');
+    const unitTxt = _goldUnitAmount.toLocaleString('vi-VN') + 'đ';
+    if (label) label.textContent = `Thêm vàng (SL × ${unitTxt})`;
+    if (input) input.title = `Nhập số lượng — mỗi đơn vị = ${unitTxt} (VD: 2 = ${(2 * _goldUnitAmount).toLocaleString('vi-VN')}đ). Đơn giá do admin cài trên CRM hoặc Options Pancake AI.`;
   }
 
   // ── "Tình trạng CS": nạp cây phân nhóm động từ GAS (đồng bộ với appweb/Zalo AI) ──
@@ -2391,7 +2414,7 @@
     if (_cartExtra.discountType === 'percent') discountAmt = Math.round(subtotal * (Number(_cartExtra.discountValue) || 0) / 100);
     else if (_cartExtra.discountType === 'amount') discountAmt = Number(_cartExtra.discountValue) || 0;
     discountAmt = Math.min(discountAmt, subtotal);
-    const gold = (Number(_cartExtra.gold) || 0) * 1000;
+    const gold = (Number(_cartExtra.gold) || 0) * _goldUnitAmount;
     const ship = _cartExtra.freeship ? 0 : PK_SHIP_FEE;
     const total = subtotal - discountAmt + gold + ship;
     return { checked, subtotal, discountAmt, gold, ship, total };

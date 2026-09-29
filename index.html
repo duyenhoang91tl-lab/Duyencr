@@ -1769,6 +1769,38 @@ async function _saveHiddenPageSale(){
     logAudit('setting','', '', 'Ẩn khỏi báo cáo chung — Page: '+(HIDDEN_CHANNELS.join(', ')||'(không)')+' | Sale: '+(HIDDEN_SALES.join(', ')||'(không)'));
   } catch(e){ toast('❌ Lưu cài đặt ẩn Page/Sale lỗi: ' + e.message); }
 }
+// Don gia 1 don vi "vang" (mục "Thêm vàng" trong giỏ hàng Soạn đơn của Pancake AI) — admin cài
+// ở đây (gear Cài đặt > 💰 Đơn giá vàng, trong Báo cáo doanh số) HOẶC ngay ở trang Options của
+// Pancake AI; cả 2 nơi cùng đọc/ghi 1 setting GAS 'goldUnitAmount' nên chỉ cần cài 1 chỗ là áp
+// dụng cho cả team ngay. Mặc định 350.000đ nếu GAS chưa có setting này.
+let GOLD_UNIT_AMOUNT = loadLS('ome_gold_unit_amount') || 350000;
+async function _syncGoldUnitAmountFromGAS() {
+  if (!gsUrl) return;
+  try {
+    var r = await fetch(gsUrl + '?action=getSetting&key=goldUnitAmount', {redirect:'follow'});
+    var data = await r.json();
+    var n = Number(data && data.value);
+    if (n > 0) { GOLD_UNIT_AMOUNT = n; saveLS('ome_gold_unit_amount', GOLD_UNIT_AMOUNT); }
+  } catch(e) { /* giữ nguyên bản local nếu lỗi mạng/parse */ }
+}
+setTimeout(_syncGoldUnitAmountFromGAS, 0);
+async function saveGoldUnitAmount(newVal){
+  var n = Number(newVal);
+  if (!(n > 0)) { toast('⚠️ Đơn giá vàng không hợp lệ.'); return; }
+  GOLD_UNIT_AMOUNT = n;
+  saveLS('ome_gold_unit_amount', GOLD_UNIT_AMOUNT);
+  if (!gsUrl) { toast('✓ Đã lưu đơn giá vàng (local)'); return; }
+  try {
+    await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'setSetting', key:'goldUnitAmount', value: String(n) }) });
+    logAudit('setting','', '', 'Đổi đơn giá vàng (Pancake AI): ' + n.toLocaleString('vi-VN') + 'đ / đơn vị');
+    toast('✓ Đã lưu và áp dụng đơn giá vàng cho cả team');
+  } catch(e){ toast('✓ Đã lưu local — chưa đồng bộ GSheets: ' + e.message); }
+}
+function openGoldUnitModal(){
+  var v = prompt('Đơn giá 1 đơn vị vàng (đ) — áp dụng cho ô "Thêm vàng" bên Pancake AI:', GOLD_UNIT_AMOUNT);
+  if (v === null) return;
+  saveGoldUnitAmount(v.replace(/[^\d]/g,''));
+}
 
 // Tên hiển thị của 2 trường lớn CỐ ĐỊNH — cho phép admin đổi tên (khác với XÓA/tạo trường,
 // 2 trường này luôn tồn tại vì có cột riêng trong CareData, chỉ đổi được CÁCH GỌI/hiển thị).
@@ -13302,6 +13334,7 @@ function renderSalesReportTabE_(wrap, subTabs){
         '<div onclick="closeGearMenus();openIndividualRatesModal()">⚙ % hoa hồng cá nhân</div>'+
         '<div onclick="closeGearMenus();openBonusProgramsModal()">🏆 Chương trình thưởng</div>'+
         '<div onclick="closeGearMenus();openSaleChannelsModal()">🏷️ Phân loại Online/Offline</div>'+
+        '<div onclick="closeGearMenus();openGoldUnitModal()">💰 Đơn giá vàng (Pancake AI)</div>'+
       '</div></div>';
   filters += '</div>';
 
