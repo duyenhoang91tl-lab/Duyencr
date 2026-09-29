@@ -392,6 +392,20 @@
           </div>
           <div id="pk-cart-extra">
             <div class="pk-cart-extra-row">
+              <label>Danh xưng</label>
+              <select id="pk-cart-honorific" style="width:76px">
+                <option value="">—</option>
+                <option value="Anh">Anh</option>
+                <option value="Chị">Chị</option>
+              </select>
+              <input type="text" id="pk-cart-custname" placeholder="Tên khách hàng" style="flex:1" />
+              <input type="text" id="pk-cart-custphone" placeholder="SĐT" style="width:110px" />
+            </div>
+            <div class="pk-cart-extra-row">
+              <label>📍 Địa chỉ</label>
+              <input type="text" id="pk-cart-address" placeholder="Địa chỉ giao hàng..." style="flex:1" />
+            </div>
+            <div class="pk-cart-extra-row">
               <label>🎁 Quà tặng kèm</label>
               <input type="text" id="pk-cart-gift" placeholder="VD: tặng 1 vòng phong thủy nhỏ..." />
             </div>
@@ -411,6 +425,10 @@
             <div class="pk-cart-extra-row">
               <label><input type="checkbox" id="pk-cart-freeship" /> Freeship</label>
               <span style="font-size:10px;color:#9d174d;opacity:.8">không tích → tự cộng 40k ship</span>
+            </div>
+            <div class="pk-cart-extra-row">
+              <label>Trạng thái đơn</label>
+              <input type="text" id="pk-cart-status" placeholder="VD: ĐÃ CHUYỂN FULL - khách qua cửa hàng lấy" style="flex:1" />
             </div>
           </div>
           <div id="pk-cart-total"></div>
@@ -580,6 +598,15 @@
         if (rows.length) rows[rows.length - 1].focus();
       }, 30);
     });
+    panelEl.querySelector('#pk-cart-honorific').addEventListener('change', (e) => { _cartExtra.honorific = e.target.value; saveCart_(); });
+    panelEl.querySelector('#pk-cart-custname').addEventListener('input', (e) => { _cartExtra.custName = e.target.value; });
+    panelEl.querySelector('#pk-cart-custname').addEventListener('change', () => { saveCart_(); });
+    panelEl.querySelector('#pk-cart-custphone').addEventListener('input', (e) => { _cartExtra.custPhone = e.target.value; });
+    panelEl.querySelector('#pk-cart-custphone').addEventListener('change', () => { saveCart_(); });
+    panelEl.querySelector('#pk-cart-address').addEventListener('input', (e) => { _cartExtra.address = e.target.value; });
+    panelEl.querySelector('#pk-cart-address').addEventListener('change', () => { saveCart_(); });
+    panelEl.querySelector('#pk-cart-status').addEventListener('input', (e) => { _cartExtra.status = e.target.value; });
+    panelEl.querySelector('#pk-cart-status').addEventListener('change', () => { saveCart_(); });
     panelEl.querySelector('#pk-cart-gift').addEventListener('input', (e) => { _cartExtra.gift = e.target.value; });
     panelEl.querySelector('#pk-cart-gift').addEventListener('change', () => { saveCart_(); });
     panelEl.querySelector('#pk-cart-discount-type').addEventListener('change', (e) => {
@@ -610,7 +637,7 @@
       if (!_cartItems.length) return;
       if (!confirm('Xoá toàn bộ đơn hàng đang tính cho khách này?')) return;
       _cartItems = [];
-      _cartExtra = { gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, priceInK: false };
+      _cartExtra = { honorific: '', custName: '', custPhone: '', address: '', gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, status: '', priceInK: false };
       saveCart_(); renderCart_();
     });
     if (IS_PHONGTHUY) {
@@ -2207,7 +2234,7 @@
   // Luu theo TUNG SDT khach (chrome.storage.local, rieng may nay) de doi qua lai giua cac
   // doan chat khac nhau khong bi lan/mat don dang tinh do.
   let _cartItems = [];
-  let _cartExtra = { gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, priceInK: false };
+  let _cartExtra = { honorific: '', custName: '', custPhone: '', address: '', gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, status: '', priceInK: false };
   let _cartLoadedFor = null;
 
   function _cartKey_(phone) { return 'pkCart_' + (phone || '_no_phone_'); }
@@ -2216,9 +2243,9 @@
     const key = _cartKey_(_currentPhone);
     if (_cartLoadedFor === key) { renderCart_(); return; }
     chrome.storage.local.get([key], (res) => {
-      const saved = res[key] || { items: [], extra: { gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0 } };
+      const saved = res[key] || { items: [], extra: { honorific: '', custName: '', custPhone: '', address: '', gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, status: '', priceInK: false } };
       _cartItems = saved.items || [];
-      _cartExtra = Object.assign({ gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, priceInK: false }, saved.extra || {});
+      _cartExtra = Object.assign({ honorific: '', custName: '', custPhone: '', address: '', gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, status: '', priceInK: false }, saved.extra || {});
       _cartLoadedFor = key;
       renderCart_();
     });
@@ -2356,6 +2383,14 @@
       });
     });
 
+    panelEl.querySelector('#pk-cart-honorific').value = _cartExtra.honorific || '';
+    panelEl.querySelector('#pk-cart-custname').value = _cartExtra.custName || '';
+    // Tu dien SDT tu ngu canh doan chat (_currentPhone) neu Sale CHUA tung go gi vao o nay —
+    // go tay roi thi giu nguyen theo Sale, khong ghi de nua (vd SDT nguoi nhan khac SDT chat).
+    if (!_cartExtra.custPhone && _currentPhone) _cartExtra.custPhone = _currentPhone;
+    panelEl.querySelector('#pk-cart-custphone').value = _cartExtra.custPhone || '';
+    panelEl.querySelector('#pk-cart-address').value = _cartExtra.address || '';
+    panelEl.querySelector('#pk-cart-status').value = _cartExtra.status || '';
     panelEl.querySelector('#pk-cart-gift').value = _cartExtra.gift || '';
     panelEl.querySelector('#pk-cart-discount-type').value = _cartExtra.discountType || 'none';
     panelEl.querySelector('#pk-cart-discount-value').value = _cartExtra.discountValue || '';
@@ -2414,34 +2449,76 @@
       `<div class="pk-cart-total-final">Tổng đơn: <b>${fmt(t.total)}</b>${_cartExtra.freeship ? ' <span class="pk-cart-freeship-tag">Freeship</span>' : ''}</div>`;
   }
 
-  // Đơn để copy gửi khách, theo mẫu:
-  //   1. 1 nhẫn tỳ hưu TL size 1 chất liệu lam thủy màu vàng nhạt giá 6.350k
-  //   2. 1 lắc tỳ hưu truyền thống ... giá 10.550k
-  //   3. miễn phí ship, tổng đơn 16.900k
+  // Viet hoa chu cai DAU TIEN cua ca cau, phan con lai ha chu thuong — de ten san pham tu
+  // DANH_MUC (thuong go VIET HOA HET) in ra don gon nhu Sale tu go tay ("Cuốn 5 ngọc lam thuỷ"),
+  // khong VIET HOA HET nhu la dang HET (gay cam giac quat thao/gap).
+  function _sentenceCase_(s) {
+    s = String(s || '').trim().toLowerCase();
+    if (!s) return s;
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
+  // Đơn để copy gửi khách, theo mẫu Duyên yêu cầu 2026-09:
+  //   Chị My Dung Luu 0979766576
+  //   Địa chỉ: 244 nguyễn thái học ba đình hà nội
+  //   Cuốn 5 ngọc lam thuỷ 4950k giảm 5% còn 4702k
+  //   Mix bi vàng 10k 380x2 = 760k
+  //   Tổng sau giảm: 10.535k
+  //   Freeship
+  //   Quà tặng kèm: một bình đá
+  //   ĐÃ CHUYỂN FULL - khách qua cửa hàng lấy
   // Mỗi dòng đều qua sanitizeProductName_ (sheet "Lưu ý từ cấm") để không dính từ cấm.
   function _buildCartSummaryText_() {
     const t = _cartTotals_();
-    const k = (n) => (n / 1000).toLocaleString('vi-VN') + 'k';
+    if (!t.checked.length) return ''; // chua tick san pham nao -> tra ve rong, nut Sao chep se bao "chua co san pham" thay vi copy 1 don gan nhu trong
+    // kNum: chỉ số đã quy đổi nghìn, CHƯA có chữ 'k' (dùng trong "380x2 = ..." — số nhân KHÔNG
+    // kèm 'k', chỉ số cuối mới kèm). k: có kèm 'k' (dùng cho giá gốc/giá sau giảm).
+    const kNum = (n) => Math.round(n / 1000).toLocaleString('vi-VN');
+    const k = (n) => kNum(n) + 'k';
     const clean = (str) => sanitizeProductName_(str);
-    const lines = t.checked.map((i) => {
-      const qty = Number(i.qty) || 1;
+
+    const itemLines = t.checked.map((i) => {
+      const name = _sentenceCase_(String(i.name || '').replace(/^trang sức\s+/i, ''));
       const size = (i.size && i.size !== '(mặc định)') ? ' ' + String(i.size).toLowerCase() : '';
       const cl = i.chatLieu ? ' chất liệu ' + String(i.chatLieu).toLowerCase() : '';
       const mau = i.mauSac ? ' màu ' + String(i.mauSac).toLowerCase() : '';
-      let promo = '';
-      if (i.promoType === 'amount' && Number(i.promoValue)) promo = ` (đã giảm ${Number(i.promoValue).toLocaleString('vi-VN')}k)`;
-      else if (i.promoType === 'percent' && Number(i.promoValue)) promo = ` (đã giảm ${Number(i.promoValue)}%)`;
-      else if (i.promoType === 'gift' && i.promoValue) promo = ` + tặng ${i.promoValue}`;
-      // tên hạ chữ thường TRƯỚC khi sanitize để các viết tắt (TL, lpt) giữ nguyên
-      return clean(`${qty} ${String(i.name || '').toLowerCase().replace(/^trang sức\s+/, '')}${size}${cl}${mau} giá ${k(_lineTotal_(i))}${promo}`);
+      const desc = `${name}${size}${cl}${mau}`;
+      const qty = Math.max(1, Number(i.qty) || 1);
+      const unit = Number(i.price) || 0;
+      const total = _lineTotal_(i);
+
+      let priceText;
+      if (i.promoType === 'percent' && Number(i.promoValue) > 0) {
+        priceText = `${k(unit)}${qty > 1 ? 'x' + qty : ''} giảm ${Number(i.promoValue)}% còn ${k(total)}`;
+      } else if (i.promoType === 'amount' && Number(i.promoValue) > 0) {
+        priceText = `${k(unit)}${qty > 1 ? 'x' + qty : ''} giảm ${Number(i.promoValue).toLocaleString('vi-VN')}k còn ${k(total)}`;
+      } else if (qty > 1) {
+        priceText = `${kNum(unit)}x${qty} = ${k(total)}`; // vd "380x2 = 760k" — so nhan KHONG kem 'k'
+      } else {
+        priceText = k(total);
+      }
+      const giftSuffix = (i.promoType === 'gift' && i.promoValue) ? ` + tặng ${i.promoValue}` : '';
+      return clean(`${desc} ${priceText}${giftSuffix}`);
     });
-    const extra = [];
-    if (t.gold > 0) extra.push(`thêm vàng ${k(t.gold)}`);
-    if (t.discountAmt > 0) extra.push(`giảm thêm ${k(t.discountAmt)}`);
-    if (_cartExtra.gift) extra.push(`tặng kèm ${_cartExtra.gift}`);
-    extra.push(t.ship ? `phí ship ${k(t.ship)}, tổng đơn ${k(t.total)}` : `miễn phí ship, tổng đơn ${k(t.total)}`);
-    const all = lines.concat(extra.map(clean));
-    return all.map((l, idx) => `${idx + 1}. ${l}`).join('\n');
+
+    const lines = [];
+    const custLine = [_cartExtra.honorific, _cartExtra.custName, _cartExtra.custPhone].filter((x) => x && String(x).trim()).join(' ');
+    if (custLine) lines.push(clean(custLine));
+    if (_cartExtra.address) lines.push(clean(`Địa chỉ: ${_cartExtra.address}`));
+    lines.push(...itemLines);
+
+    // "Tổng sau giảm" = tạm tính đã trừ CTKM từng dòng + giảm giá chung — CHƯA gồm vàng/ship.
+    const afterDiscount = t.subtotal - t.discountAmt;
+    lines.push(`Tổng sau giảm: ${k(afterDiscount)}`);
+    if (t.gold > 0) lines.push(`Thêm vàng: ${k(t.gold)}`);
+    lines.push(t.ship > 0 ? `Phí ship: ${k(t.ship)}` : 'Freeship');
+    if (_cartExtra.gift) lines.push(clean(`Quà tặng kèm: ${_cartExtra.gift}`));
+    // Chi them dong "Tong cong" khi co vang/ship lam tong cuoi KHAC voi "Tong sau giam" o tren —
+    // tranh lap lai 1 con so y het (nhu vi du cua Duyen: Freeship + khong vang -> khong can dong nay).
+    if (t.total !== afterDiscount) lines.push(`Tổng cộng: ${k(t.total)}`);
+    if (_cartExtra.status) lines.push(clean(_cartExtra.status));
+
+    return lines.join('\n');
   }
 
   function escapeHtml(s) {
