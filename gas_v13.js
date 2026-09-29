@@ -1801,7 +1801,13 @@ function _donSaleNamesFromThe_(theStr) {
 // Token CO khoang trang trong cot "Thẻ" la trang thai don Pancake (xem chu thich tren) — dung
 // _isExcludedOrderStatus_ (Huy/Tra lai/Hoan tien/That bai/Khieu nai, gom ca "Giao không thành")
 // de loai luon don do khoi doanh so/so don Bao cao B, giong cach A/C da loai theo cot Trang thai.
-function _donHasExcludedStatus_(theStr) {
+// SUA 2026-09: mot so don chi ghi trang thai HOAN o cot rieng "Trạng thái" (cot O trong sheet
+// "dữ liệu đơn"), KHONG lap lai trong cot "Thẻ" — truoc day chi check cot "Thẻ" nen bo sot,
+// khien Bao cao B con tinh ca doanh thu don da hoan (vd sale ninhnga99 ky 1-10/9: CRM 217,95tr
+// vs ke toan 205,51tr — lech dung bang cac don "Đã hoàn" chi nam o cot Trạng thái). Gio check
+// CA 2 nguon: token trong "Thẻ" HOAC gia tri cot "Trạng thái" rieng — trung 1 trong 2 la loai.
+function _donHasExcludedStatus_(theStr, trangThaiCol) {
+  if (_isExcludedOrderStatus_(trangThaiCol)) return true;
   var tokens = splitMulti_(theStr, ',').filter(function(tok) { return tok && /\s/.test(tok); });
   return tokens.some(function(t) { return _isExcludedOrderStatus_(t); });
 }
@@ -1960,7 +1966,7 @@ function readDonChiTiet_() {
   if (!sh) return [];
   var last = sh.getLastRow();
   if (last < 2) return [];
-  var vals = sh.getRange(2, 1, last - 1, 14).getValues();
+  var vals = sh.getRange(2, 1, last - 1, 15).getValues();
   var out = [];
   for (var i = 0; i < vals.length; i++) {
     var r = vals[i];
@@ -1973,6 +1979,7 @@ function readDonChiTiet_() {
       soDienThoai:   r[4],
       nguonDon:      nguonDon,
       theSale:       r[2] ? String(r[2]) : '',   // cot "Thẻ" (C) — danh sach sale tham gia don, tach bang dau phay ','
+      trangThai:     r[14] ? String(r[14]).trim() : '', // cot "Trạng thái" (O) — nguon RIENG, doc lap voi trang thai co the lap trong cot "Thẻ"
       sanPham:       r[8] ? String(r[8]) : '',   // tach bang dau phay ','
       maSanPham:     r[9] ? String(r[9]) : '',   // tach bang dau cham phay ';' — KHAC voi sanPham/soLuong
       soLuong:       r[10] ? String(r[10]) : '', // tach bang dau phay ','
@@ -2588,7 +2595,7 @@ function buildSalesReportB_(filters) {
     var row = rows[i];
     var dt = parseVNDate_(row.ngayTaoDon);
     if (!dateInRange_(dt, filters.dateFrom, filters.dateTo)) continue;
-    if (_donHasExcludedStatus_(row.theSale)) continue; // bo don Huy/Giao khong thanh/Hoan tien... (trang thai nam chung cot The o POS)
+    if (_donHasExcludedStatus_(row.theSale, row.trangThai)) continue; // bo don Huy/Giao khong thanh/Hoan tien... (co the nam o cot "Thẻ" hoac cot "Trạng thái" rieng)
     if (nguonFilterArr.length && nguonFilterArr.indexOf(row.nguonDon) === -1) continue;
     if (marketerFilterArr.length && marketerFilterArr.indexOf(row.marketer) === -1) continue;
     if (saleFilterArr.length) {
@@ -2686,7 +2693,7 @@ function buildSalesReportB_(filters) {
     orders: matched.map(function(m){
       return {
         ngayTaoDon: m.ngayTaoDon, khachHang: m.khachHang, soDienThoai: m.soDienThoai,
-        nguonDon: m.nguonDon, theSale: m.theSale, sanPham: m.sanPham, maSanPham: m.maSanPham, soLuong: m.soLuong,
+        nguonDon: m.nguonDon, theSale: m.theSale, trangThai: m.trangThai, sanPham: m.sanPham, maSanPham: m.maSanPham, soLuong: m.soLuong,
         giaTriSauGiam: m.giaTriSauGiam, cod: m.cod, marketer: m.marketer
       };
     })
