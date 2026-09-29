@@ -2558,11 +2558,27 @@ async function syncFromGS(opts) {
           }
         } else if (ordJson && ordJson.error) {
           console.warn('Orders sync error from GAS:', ordJson.error);
-          if (isManual) toast('⚠ Lỗi tải đơn hàng: ' + ordJson.error);
+          if (isManual) {
+            toast('⚠ Lỗi tải đơn hàng: ' + ordJson.error);
+          } else {
+            // TRUOC DAY: auto-sync loi rieng phan don hang chi console.warn, KHONG hien gi ca
+            // cho nguoi dung thay — neu loi nay lap lai (vd sheet "DT TỔNG " bi doi ten/xoa,
+            // xem readAllOrders_ trong gas_v13.js) thi danh sach KH se mai mai chi con vai KH
+            // tu luu tay (careLeads) ma KHONG CO CANH BAO NAO, giong dung trieu chung "CRM bi
+            // crash chi hien vai KH moi tu luu, khong dong bo tu Sheet ve" da gap. Dung chung
+            // 1 bo dem loi voi nhanh CareData ben tren de sau 3 lan loi lien tiep thi bao ro.
+            _autoSyncFailCount = (_autoSyncFailCount || 0) + 1;
+            if (_autoSyncFailCount >= 3) showSyncErrorBanner('Lỗi tải đơn hàng: ' + ordJson.error);
+          }
         }
       } catch(orderErr) {
         console.warn('Orders fetch error:', orderErr.message);
-        if (isManual) toast('⚠ Không tải được đơn hàng: ' + orderErr.message);
+        if (isManual) {
+          toast('⚠ Không tải được đơn hàng: ' + orderErr.message);
+        } else {
+          _autoSyncFailCount = (_autoSyncFailCount || 0) + 1;
+          if (_autoSyncFailCount >= 3) showSyncErrorBanner('Không tải được đơn hàng: ' + orderErr.message);
+        }
       }
       // ── Tập SĐT có trong "dữ liệu đơn" (chỉ để lọc nguồn, không kéo chi tiết) ──
       try {
@@ -2698,16 +2714,16 @@ function showRowErrorBanner(errCount, errSample) {
   bar.prepend(banner);
 }
 let _autoSyncFailCount = 0;
-function showSyncErrorBanner() {
+function showSyncErrorBanner(msg) {
   const existing = document.getElementById('sync-err-banner');
-  if (existing) return;
+  if (existing) existing.remove(); // luon thay bang thong bao MOI NHAT (ly do that co the doi — vd tu "chua deploy" sang "loi doc sheet don hang")
   const bar = document.getElementById('data-view');
   if (!bar) return;
   const banner = document.createElement('div');
   banner.id = 'sync-err-banner';
   banner.style.cssText = 'background:#fef2f2;border-bottom:1px solid #fca5a5;padding:7px 14px;font-size:12px;color:#991b1b;display:flex;align-items:center;gap:10px;flex-shrink:0;';
   banner.innerHTML = `
-    <span>⚠ <strong>Auto-sync thất bại</strong> — Apps Script chưa được deploy đúng ("Who has access: Anyone"). Data sẽ không tự cập nhật.</span>
+    <span>⚠ <strong>Auto-sync thất bại</strong> — ${msg ? esc(msg) : 'Apps Script chưa được deploy đúng ("Who has access: Anyone"). Data sẽ không tự cập nhật.'}</span>
     <button onclick="openGsModal()" style="padding:3px 10px;border-radius:4px;border:1px solid #fca5a5;background:#fff;color:#991b1b;font-size:11px;cursor:pointer;white-space:nowrap">Kiểm tra cài đặt</button>
     <button onclick="syncFromGS({pullOrders:true,manual:true})" style="padding:3px 10px;border-radius:4px;border:1px solid #fca5a5;background:#fff;color:#991b1b;font-size:11px;cursor:pointer;white-space:nowrap">↓ Sync thủ công</button>
     <button onclick="this.parentElement.remove()" style="margin-left:auto;background:none;border:none;color:#991b1b;cursor:pointer;font-size:14px">✕</button>`;
