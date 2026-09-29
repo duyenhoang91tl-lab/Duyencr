@@ -426,6 +426,56 @@ function parseDateSafe(d) {
   return isNaN(t) ? 0 : t;
 }
 
+// ─── Goi truc tiep 1 provider dang OpenAI-compatible (Groq/Cerebras/OpenRouter/OpenAI deu
+// cung dinh dang request/response chat completions) bang key CA NHAN cua CS — cung dinh dang
+// voi _aiOpenAICompat_ trong gas_v13.js de nhat quan, nhung goi THANG tu may CS, khong qua GAS.
+async function _callOpenAICompatDirect_(baseUrl, apiKey, model, defaultModel, prompt, label) {
+  const m = (model || "").trim() || defaultModel;
+  let res, txt;
+  try {
+    res = await fetch(baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
+      body: JSON.stringify({
+        model: m,
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.7,
+        max_tokens: 400
+      })
+    });
+    txt = await res.text();
+  } catch (e) {
+    throw new Error(`Không gọi được ${label} (mạng/CORS): ` + e.message);
+  }
+  if (!res.ok) {
+    let msg = txt;
+    try { const j = JSON.parse(txt); msg = (j.error && (j.error.message || j.error)) || txt; } catch (e) {}
+    throw new Error(`${label} lỗi ${res.status}: ${String(msg).substring(0, 300)}`);
+  }
+  let d;
+  try { d = JSON.parse(txt); } catch (e) { throw new Error(`${label} trả về dữ liệu không đọc được: ` + txt.substring(0, 200)); }
+  const t = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;
+  if (!t) throw new Error(`${label} không trả về nội dung.`);
+  return { text: t, provider: `${label} (key riêng)` };
+}
+
+// Dang ky tat ca provider ho tro cho "AI ca nhan" — moi provider mo rong sau nay CHI can them
+// 1 dong o day, khong phai sua callAI_/handleTestAiKey (dispatcher doc du lieu tu day).
+const AI_DIRECT_PROVIDERS = {
+  gemini:     { label: "Gemini",     kind: "gemini",        defaultModel: "gemini-flash-latest" },
+  groq:       { label: "Groq",       kind: "openai-compat", baseUrl: "https://api.groq.com/openai/v1/chat/completions",  defaultModel: "openai/gpt-oss-120b" },
+  cerebras:   { label: "Cerebras",   kind: "openai-compat", baseUrl: "https://api.cerebras.ai/v1/chat/completions",      defaultModel: "gpt-oss-120b" },
+  openrouter: { label: "OpenRouter", kind: "openai-compat", baseUrl: "https://openrouter.ai/api/v1/chat/completions",    defaultModel: "google/gemma-2-9b-it:free" },
+  openai:     { label: "OpenAI",     kind: "openai-compat", baseUrl: "https://api.openai.com/v1/chat/completions",      defaultModel: "gpt-5.4-mini" }
+};
+
+async function _callAiDirect_(provider, apiKey, model, prompt) {
+  const pv = AI_DIRECT_PROVIDERS[provider];
+  if (!pv) throw new Error("Provider không hợp lệ: " + provider);
+  if (pv.kind === "gemini") return await _callGeminiDirect_(apiKey, model, prompt);
+  return await _callOpenAICompatDirect_(pv.baseUrl, apiKey, model, pv.defaultModel, prompt, pv.label);
+}
+
 // ─── Goi truc tiep Gemini (dinh dang rieng cua Google) bang key CA NHAN cua CS — cung
 // dinh dang request/response voi _aiGemini_ trong gas_v13.js de nhat quan, nhung goi THANG
 // tu may CS toi Google (khong qua GAS, khong dung key chung cua team). model mac dinh dung
@@ -466,71 +516,34 @@ async function _callGeminiDirect_(apiKey, model, prompt) {
   return { text: t, provider: "Gemini (key riêng)" };
 }
 
-// ─── Goi truc tiep OpenAI (chat completions) bang key CA NHAN cua CS ───
-async function _callOpenAiDirect_(apiKey, model, prompt) {
-  const m = (model || "").trim() || "gpt-5.4-mini";
-  let res, txt;
-  try {
-    res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
-      body: JSON.stringify({
-        model: m,
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
-        max_tokens: 400
-      })
-    });
-    txt = await res.text();
-  } catch (e) {
-    throw new Error("Không gọi được OpenAI (mạng/CORS): " + e.message);
-  }
-  if (!res.ok) {
-    let msg = txt;
-    try { const j = JSON.parse(txt); msg = (j.error && j.error.message) || txt; } catch (e) {}
-    throw new Error(`OpenAI lỗi ${res.status}: ${String(msg).substring(0, 300)}`);
-  }
-  let d;
-  try { d = JSON.parse(txt); } catch (e) { throw new Error("OpenAI trả về dữ liệu không đọc được: " + txt.substring(0, 200)); }
-  const t = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;
-  if (!t) throw new Error("OpenAI không trả về nội dung.");
-  return { text: t, provider: "OpenAI (key riêng)" };
-}
-
 // ─── Dispatcher dung chung cho MOI noi can sinh van ban AI (tra loi tin khach / 3 cau mo
 // dau / follow-up nhac hen): neu CS da cau hinh "AI ca nhan" (Options → dien Provider +
-// API Key) thi goi THANG toi nha cung cap do tu chinh may CS, khong di qua GAS/key chung cua
-// team. Neu chua cau hinh (hoac con gia tri 'grok' cu luu tu truoc khi bo Grok khoi UI — xem
-// commit lien quan) thi roi ve duong cu, goi GAS dung AI chung, KHONG bao loi.
+// API Key, bat ky provider nao trong AI_DIRECT_PROVIDERS) thi goi THANG toi nha cung cap do tu
+// chinh may CS, khong di qua GAS/key chung cua team. Neu chua cau hinh thi roi ve duong cu, goi
+// GAS dung AI chung, KHONG bao loi.
 //
 // Luu y quan trong: goi truc tiep kieu nay se KHONG co tinh nang "Tra cuu san pham" (tu dinh
 // kem anh tu Google Drive) vi tinh nang do can GAS truy cap Drive cua team — AI rieng chi
 // tra ve van ban.
 async function callAI_(cfg, prompt, withProducts) {
-  if (cfg.aiProvider === "gemini" && cfg.aiApiKey) {
-    return await _callGeminiDirect_(cfg.aiApiKey, cfg.aiModel, prompt);
-  }
-  if (cfg.aiProvider === "openai" && cfg.aiApiKey) {
-    return await _callOpenAiDirect_(cfg.aiApiKey, cfg.aiModel, prompt);
+  if (cfg.aiProvider && AI_DIRECT_PROVIDERS[cfg.aiProvider] && cfg.aiApiKey) {
+    return await _callAiDirect_(cfg.aiProvider, cfg.aiApiKey, cfg.aiModel, prompt);
   }
   const data = await callAiWithRetry_(cfg.gasUrl, prompt, withProducts);
   return { text: data.text, provider: data.provider, image: data.image || null, imageSkipped: data.imageSkipped || null };
 }
 
-// Dung cho nut "🔍 Kiem tra Key" trong trang Options — CHI goi truc tiep Gemini/OpenAI (khong
-// bao gio roi ve GAS/AI chung, khac voi callAI_ o tren), vi muc dich la kiem tra DUNG cai key
-// CS vua dan co tu no chay duoc khong, khong phai lay 1 cau tra loi bang moi gia. Khong luu gi
-// vao storage — payload la du lieu form CHUA luu, chi dung 1 lan roi bo.
+// Dung cho nut "🔍 Kiem tra Key" trong trang Options — CHI goi truc tiep provider CS vua chon
+// (khong bao gio roi ve GAS/AI chung, khac voi callAI_ o tren), vi muc dich la kiem tra DUNG cai
+// key CS vua dan co tu no chay duoc khong, khong phai lay 1 cau tra loi bang moi gia. Khong luu
+// gi vao storage — payload la du lieu form CHUA luu, chi dung 1 lan roi bo.
 async function handleTestAiKey(payload) {
   const provider = payload?.provider;
   const apiKey = (payload?.apiKey || "").trim();
   const model = (payload?.model || "").trim();
   if (!provider || !apiKey) throw new Error("Thiếu Provider hoặc API Key.");
   const testPrompt = 'Trả lời đúng 2 chữ "Đã kết nối" để xác nhận API key hoạt động, không thêm gì khác.';
-  let data;
-  if (provider === "gemini") data = await _callGeminiDirect_(apiKey, model, testPrompt);
-  else if (provider === "openai") data = await _callOpenAiDirect_(apiKey, model, testPrompt);
-  else throw new Error("Provider không hợp lệ: " + provider);
+  const data = await _callAiDirect_(provider, apiKey, model, testPrompt);
   return { reply: (data.text || "").trim().slice(0, 60) };
 }
 

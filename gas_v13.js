@@ -5297,12 +5297,75 @@ function _driveImageBase64_(fileId) {
   } catch (e) { return null; }
 }
 
+// ─── TU CAM (Sheet "Lưu ý từ cấm", file rieng "Report Sale" — theo yeu cau Duyen 27/09/2026):
+// AI TUYET DOI KHONG duoc dung cac tu/cum tu trong cot "Từ cấm" khi soan cau tra loi (vi du:
+// ngon ngu thien ve tam linh/mac dinh nhu "tai loc", "van may", tu mang tinh cam ket chac chan
+// nhu "cam kết"/"mang lai", dieu huong sang nen tang khac...). Kem theo goi y "Từ được dùng"
+// (cach dien dat thay the duoc phep) khi cot do co du lieu. Doc dong (khong hardcode ten cot cu
+// the, chi do theo tu khoa header "tu cam"/"duoc dung" — cung tinh than voi _priceCols_/CTKM o
+// tren) tu 1 file Google Sheet KHAC voi PRICE_SS_ID (file "Report Sale" rieng cua team Sale).
+var BANNED_WORDS_SS_ID = '1qyyG2Pj8QOVNTb4B9JX8VQsrjFlZX-WhpovX1qDkvzM';
+var BANNED_WORDS_GID = 1343060455; // tab "Lưu ý từ cấm"
+
+function readBannedWordsList_() {
+  try {
+    var ss = SpreadsheetApp.openById(BANNED_WORDS_SS_ID);
+    var sh = ss.getSheetById(BANNED_WORDS_GID);
+    if (!sh || sh.getLastRow() < 2) return [];
+    var lastRow = sh.getLastRow(), lastCol = Math.max(sh.getLastColumn(), 3);
+    var vals = sh.getRange(1, 1, lastRow, lastCol).getValues();
+    var hIdx = _detectHeaderRow_(vals, 12);
+    var headers = vals[hIdx].map(function(h) { return String(h || '').trim(); });
+    var bannedIdx = -1, allowedIdx = -1;
+    for (var c = 0; c < headers.length; c++) {
+      var st = _stripVN_(headers[c]);
+      if (bannedIdx < 0 && st.indexOf('tu cam') !== -1) { bannedIdx = c; continue; }
+      if (allowedIdx < 0 && st.indexOf('duoc dung') !== -1) allowedIdx = c;
+    }
+    if (bannedIdx < 0) return []; // khong tim thay cot "Tu cam" -> khong co gi de ap, bo qua an toan
+    var out = [];
+    for (var i = hIdx + 1; i < vals.length; i++) {
+      var cell = vals[i][bannedIdx];
+      if (!cell) continue;
+      var words = String(cell).split(/[,;\/\n]/).map(function(w) { return w.trim(); }).filter(Boolean);
+      if (!words.length) continue;
+      var allowed = allowedIdx >= 0 ? String(vals[i][allowedIdx] || '').trim() : '';
+      out.push({ words: words, allowed: allowed });
+    }
+    return out;
+  } catch (e) { return []; } // loi doc sheet (vd mat quyen truy cap) -> bo qua danh sach tu cam, KHONG lam hong ca cau tra loi AI
+}
+
+// Cache 30 phut — danh sach tu cam it thay doi, tranh mo them 1 spreadsheet MOI LAN goi AI.
+function _bannedWordsPromptBlock_() {
+  var cache = CacheService.getScriptCache();
+  var cKey = 'banned_words_v1';
+  var cached = cache.get(cKey);
+  var list;
+  if (cached) { try { list = JSON.parse(cached); } catch (e) {} }
+  if (!list) {
+    list = readBannedWordsList_();
+    try { cache.put(cKey, JSON.stringify(list), 1800); } catch (e) {}
+  }
+  if (!list || !list.length) return '';
+  var lines = list.map(function(item) {
+    var s = '- KHONG duoc dung: ' + item.words.join(', ');
+    if (item.allowed) s += ' → thay bằng: "' + item.allowed + '"';
+    return s;
+  });
+  return '\n\n⚠️ DANH SÁCH TỪ CẤM (BẮT BUỘC — TUYỆT ĐỐI KHÔNG được dùng trong câu trả lời, kể cả viết tắt/biến thể gần giống, kể cả khi khách hỏi trực tiếp bằng từ đó):\n' +
+    lines.join('\n') +
+    '\n\nNếu cần diễn đạt ý liên quan, dùng từ ngữ thay thế phù hợp (xem gợi ý "→" ở trên nếu có), KHÔNG dùng nguyên văn từ cấm dưới bất kỳ hình thức nào.';
+}
+
 // ─── Prompt he thong: kien thuc san pham CHI nap khi CS bat "Tra cuu san pham" ───
 function _buildAISystemPrompt_(userMsg, withProducts) {
   var ctx = readAIContext_();
   var trunc_ = function(str, n) { return str && str.length > n ? str.substring(0, n) + '...' : str; };
   var parts = [];
   parts.push(ctx.systemPrompt || 'Ban la chuyen vien cham soc khach hang. Tra loi bang tieng Viet, than thien, ngan gon.');
+  var bannedBlock = _bannedWordsPromptBlock_();
+  if (bannedBlock) parts.push(bannedBlock);
   if (ctx.careProcess)    parts.push('\n\nQUY TRINH CSKH:\n'    + trunc_(ctx.careProcess, 600));
   if (ctx.callbackScript) parts.push('\n\nKICH BAN GOI LAI:\n'  + trunc_(ctx.callbackScript, 500));
   if (ctx.salesScriptCu)  parts.push('\n\nKICH BAN KHACH CU:\n' + trunc_(ctx.salesScriptCu, 500));
@@ -5340,6 +5403,7 @@ function _buildAISystemPrompt_(userMsg, withProducts) {
   } else {
     parts.push('\n\nYEU CAU: Chi dua ra DUY NHAT 1 cau tra loi ngan gon (toi da 150 tu). Khong danh so, khong giai thich them.');
   }
+  if (bannedBlock) parts.push('\n\nNHAC LAI: kiem tra cau tra loi TRUOC KHI gui — neu co dung tu nao trong DANH SACH TU CAM o tren, PHAI viet lai bang tu thay the, KHONG duoc gui cau co chua tu cam.');
   return parts.join('');
 }
 
