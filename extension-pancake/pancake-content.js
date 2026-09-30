@@ -126,6 +126,9 @@
   let CARE_STATUS_TREE = null; // cay "Tinh trang CS" load dong tu GAS (dong bo voi appweb/Zalo AI)
   let CUSTOM_FIELDS = []; // "truong tu tao" (admin them ben app web chinh) — load dong tu GAS
   let _currentNick = ''; // Nick Zalo/kenh CS dang dung, sticky (chrome.storage.sync)
+  let _goldUnitAmount = 350000; // Don gia 1 don vi "vang" (d) — admin cai o CRM (gear Cai dat >
+                                 // Don gia vang) hoac o Options cua Pancake AI, luu chung setting
+                                 // GAS 'goldUnitAmount' de dong bo toan team. Mac dinh 350k neu chua cai.
   let _chatKeyPhoneMap = {}; // { chatKey: phone } — "danh ba nguoc" hoc cuc bo tren may nay
                              // (giong _chatNamePhoneMap ben Zalo AI), dung cho nut Lien ket doan chat
   let _currentPhone = '';
@@ -146,6 +149,7 @@
     observeConversationChanges();
     loadCsNames_();
     loadNickList_();
+    loadGoldUnitAmount_();
     if (!IS_PHONGTHUY) { loadCareStatusTree_(); loadCustomFields_(); } // cay dung chung cho Pancake/Zalo (san pham suc khoe) — khong ap dung cho phong thuy
     loadChatKeyMap_();
     startCarePoll_();
@@ -329,7 +333,7 @@
           <select id="pk-cs-sel"></select>
         </div>
         <div id="pk-ai-nick-row">
-          <label>💬 Nick</label>
+          <label>💬 Nick Zalo</label>
           <select id="pk-nick-sel"></select>
           <button id="pk-nick-add" title="Thêm nick mới">＋</button>
         </div>
@@ -419,8 +423,8 @@
               <input type="number" id="pk-cart-discount-value" placeholder="0" min="0" style="display:none" />
             </div>
             <div class="pk-cart-extra-row">
-              <label>Thêm vàng (k)</label>
-              <input type="number" id="pk-cart-gold" placeholder="0" min="0" title="Tiền vàng thêm, nghìn đồng (VD 500 = 500.000đ)" />
+              <label id="pk-cart-gold-label">Thêm vàng (SL × 350.000đ)</label>
+              <input type="number" id="pk-cart-gold" placeholder="0" min="0" title="Nhập số lượng — mỗi đơn vị = 350.000đ (VD: 2 = 700.000đ). Đơn giá do admin cài trên CRM hoặc Options Pancake AI." />
             </div>
             <div class="pk-cart-extra-row">
               <label><input type="checkbox" id="pk-cart-freeship" /> Freeship</label>
@@ -710,6 +714,25 @@
     sel.innerHTML = '<option value="">— Chọn nick —</option>' +
       NICK_LIST.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
     sel.value = _currentNick || '';
+  }
+
+  // Đơn giá 1 đơn vị "vàng" (đ) — admin cài ở CRM (⚙ Cài đặt > Đơn giá vàng, trong Báo cáo
+  // doanh số) hoặc ở Options của Pancake AI; cả 2 nơi đều ghi chung setting GAS 'goldUnitAmount'
+  // nên chỉ cần cài 1 chỗ là áp dụng cho toàn team. Mặc định 350.000đ nếu GAS chưa có setting này.
+  function loadGoldUnitAmount_() {
+    safeSendMessage_({ type: "GET_GOLD_UNIT" }, (resp) => {
+      const n = Number(resp?.ok ? resp.data : NaN);
+      _goldUnitAmount = (n > 0) ? n : 350000;
+      updateGoldUnitLabel_();
+    });
+  }
+
+  function updateGoldUnitLabel_() {
+    const label = panelEl?.querySelector('#pk-cart-gold-label');
+    const input = panelEl?.querySelector('#pk-cart-gold');
+    const unitTxt = _goldUnitAmount.toLocaleString('vi-VN') + 'đ';
+    if (label) label.textContent = `Thêm vàng (SL × ${unitTxt})`;
+    if (input) input.title = `Nhập số lượng — mỗi đơn vị = ${unitTxt} (VD: 2 = ${(2 * _goldUnitAmount).toLocaleString('vi-VN')}đ). Đơn giá do admin cài trên CRM hoặc Options Pancake AI.`;
   }
 
   // ── "Tình trạng CS": nạp cây phân nhóm động từ GAS (đồng bộ với appweb/Zalo AI) ──
@@ -1891,6 +1914,11 @@
   const _bldBlank_ = () => ({ q: '', nhom: '', ten: '', size: '', cl: '', cand: '', mau: '', dam: '', qty: 1,
     priceK: '', priceEdited: false, promoType: 'none', promoVal: '' });
   let _bld = _bldBlank_();
+  // Bat/tat rieng khoi "CTKM tham khao" (thong tin cac chuong trinh CTKM lien quan san pham dang
+  // chon) trong Soan don — TACH BIET voi muc "CTKM cho sản phẩm này" (select Khong/Giam tien/Giam
+  // %/Tang qua) o tren, muc do LUON hien de Sale ap CTKM cho tung don nhu binh thuong. Mac dinh AN
+  // cho gon (nhieu san pham khong co CTKM nao, hien san se roi mat); Sale tu tich de xem khi can.
+  let _showCtkmInfo = false;
 
   const _fold_ = (s) => _stripVNlocal_(String(s || '').normalize('NFC')).replace(/\s+/g, ' ').trim();
   const _vnSort_ = (a, b) => String(a).localeCompare(String(b), 'vi', { numeric: true });
@@ -2162,14 +2190,19 @@
         // Panel tham khảo: các dòng CTKM (sheet CTKM, nằm cạnh sheet giá) có nhắc tới sản phẩm
         // đang soạn — CHỈ để CS xem/đối chiếu, KHÔNG tự điền vào ô Giảm tiền/Giảm % ở trên (cấu
         // trúc sheet CTKM tự do, không đoán chắc được số tiền/% để tự áp — tránh áp nhầm).
-        const ctkmMatches = _ctkmForProduct_(cand.t, cand.m);
-        if (ctkmMatches.length) {
-          html += `<div class="pk-builder-ctkm-box">
-            <div class="pk-builder-ctkm-title">🎉 CTKM đang có, liên quan sản phẩm này (tham khảo — không tự áp vào giá):</div>
-            ${ctkmMatches.map((t) => `<div class="pk-builder-ctkm-row">${escapeHtml(t)}</div>`).join('')}
-          </div>`;
-        } else if (Array.isArray(_ctkmRows) && _ctkmRows.length) {
-          html += `<div class="pk-builder-ctkm-box pk-builder-ctkm-empty">🎉 Sheet CTKM hiện không có chương trình nào nhắc tới sản phẩm này.</div>`;
+        // Rieng KHOI nay co the AN/HIEN qua 1 o tich nho (khac voi muc "CTKM cho sản phẩm này" ở
+        // trên, muc do luon hien de Sale ap CTKM binh thuong) — mac dinh AN cho gon, tich moi hien.
+        html += `<label class="pk-ctkm-info-toggle"><input type="checkbox" id="pkb-ctkm-info-toggle" ${_showCtkmInfo ? 'checked' : ''} /> 🎁 Hiện thông tin CTKM tham khảo cho sản phẩm này</label>`;
+        if (_showCtkmInfo) {
+          const ctkmMatches = _ctkmForProduct_(cand.t, cand.m);
+          if (ctkmMatches.length) {
+            html += `<div class="pk-builder-ctkm-box">
+              <div class="pk-builder-ctkm-title">🎉 CTKM đang có, liên quan sản phẩm này (tham khảo — không tự áp vào giá):</div>
+              ${ctkmMatches.map((t) => `<div class="pk-builder-ctkm-row">${escapeHtml(t)}</div>`).join('')}
+            </div>`;
+          } else if (Array.isArray(_ctkmRows) && _ctkmRows.length) {
+            html += `<div class="pk-builder-ctkm-box pk-builder-ctkm-empty">🎉 Sheet CTKM hiện không có chương trình nào nhắc tới sản phẩm này.</div>`;
+          }
         }
       }
       html += `<div class="pk-builder-summary"><div id="pkb-line-total"></div><button id="pkb-add-btn" class="pk-price-addbtn">+ Thêm vào đơn</button></div>`;
@@ -2200,6 +2233,7 @@
     on('pkb-mau', (e) => { _bld.mau = e.target.value; });
     on('pkb-dam', (e) => { _bld.dam = e.target.value; });
     on('pkb-promotype', (e) => { _bld.promoType = e.target.value; _bld.promoVal = ''; renderBuilderDyn_(); });
+    on('pkb-ctkm-info-toggle', (e) => { _showCtkmInfo = e.target.checked; renderBuilderDyn_(); });
     const typing = (id, fn) => { const el = dyn.querySelector('#' + id); if (el) el.addEventListener('input', (e) => { fn(e.target.value); _refreshBldTotal_(); }); };
     typing('pkb-qty', (v) => { _bld.qty = v; });
     typing('pkb-price', (v) => { _bld.priceK = v; _bld.priceEdited = v !== ''; }); // xoá trống → quay lại giá tự động
@@ -2426,7 +2460,7 @@
     if (_cartExtra.discountType === 'percent') discountAmt = Math.round(subtotal * (Number(_cartExtra.discountValue) || 0) / 100);
     else if (_cartExtra.discountType === 'amount') discountAmt = Number(_cartExtra.discountValue) || 0;
     discountAmt = Math.min(discountAmt, subtotal);
-    const gold = (Number(_cartExtra.gold) || 0) * 1000;
+    const gold = (Number(_cartExtra.gold) || 0) * _goldUnitAmount;
     const ship = _cartExtra.freeship ? 0 : PK_SHIP_FEE;
     const total = subtotal - discountAmt + gold + ship;
     return { checked, subtotal, discountAmt, gold, ship, total };
