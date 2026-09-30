@@ -1975,7 +1975,10 @@ function readDonChiTiet_() {
     var r = vals[i];
     if (!r[1] && !r[3]) continue; // dong rong: khong co ngay va khong co khach
     var nguonDon = r[7] ? String(r[7]).trim() : '';
-    if (nguonDon.toLowerCase().indexOf('bảo hành') !== -1 || nguonDon.toLowerCase().indexOf('bao hanh') !== -1) continue; // loai don nguon bao hanh khoi bao cao doanh so B/C
+    // SUA 2026-09-30: TRUOC DAY loai don nguon "Bảo hành" khoi Bao cao B/C — nhung doi chieu
+    // voi bang ke toan (Duyen xac nhan), doanh thu don bao hanh CO duoc tinh (vd nguyenngo1988
+    // ky 1-10/9: 18.505.000 chi khop tuyet doi neu TINH ca 28 don nguon "Bảo hành" trong ky).
+    // Bo han dieu kien loai nay — khong con exclude theo nguonDon nua.
     out.push({
       ngayTaoDon:    r[1],
       khachHang:     r[3],
