@@ -1887,6 +1887,11 @@
   const _bldBlank_ = () => ({ q: '', nhom: '', ten: '', size: '', cl: '', cand: '', mau: '', dam: '', qty: 1,
     priceK: '', priceEdited: false, promoType: 'none', promoVal: '' });
   let _bld = _bldBlank_();
+  // Bat/tat rieng khoi "CTKM tham khao" (thong tin cac chuong trinh CTKM lien quan san pham dang
+  // chon) trong Soan don — TACH BIET voi muc "CTKM cho sản phẩm này" (select Khong/Giam tien/Giam
+  // %/Tang qua) o tren, muc do LUON hien de Sale ap CTKM cho tung don nhu binh thuong. Mac dinh AN
+  // cho gon (nhieu san pham khong co CTKM nao, hien san se roi mat); Sale tu tich de xem khi can.
+  let _showCtkmInfo = false;
 
   const _fold_ = (s) => _stripVNlocal_(String(s || '').normalize('NFC')).replace(/\s+/g, ' ').trim();
   const _vnSort_ = (a, b) => String(a).localeCompare(String(b), 'vi', { numeric: true });
@@ -2158,14 +2163,19 @@
         // Panel tham khảo: các dòng CTKM (sheet CTKM, nằm cạnh sheet giá) có nhắc tới sản phẩm
         // đang soạn — CHỈ để CS xem/đối chiếu, KHÔNG tự điền vào ô Giảm tiền/Giảm % ở trên (cấu
         // trúc sheet CTKM tự do, không đoán chắc được số tiền/% để tự áp — tránh áp nhầm).
-        const ctkmMatches = _ctkmForProduct_(cand.t, cand.m);
-        if (ctkmMatches.length) {
-          html += `<div class="pk-builder-ctkm-box">
-            <div class="pk-builder-ctkm-title">🎉 CTKM đang có, liên quan sản phẩm này (tham khảo — không tự áp vào giá):</div>
-            ${ctkmMatches.map((t) => `<div class="pk-builder-ctkm-row">${escapeHtml(t)}</div>`).join('')}
-          </div>`;
-        } else if (Array.isArray(_ctkmRows) && _ctkmRows.length) {
-          html += `<div class="pk-builder-ctkm-box pk-builder-ctkm-empty">🎉 Sheet CTKM hiện không có chương trình nào nhắc tới sản phẩm này.</div>`;
+        // Rieng KHOI nay co the AN/HIEN qua 1 o tich nho (khac voi muc "CTKM cho sản phẩm này" ở
+        // trên, muc do luon hien de Sale ap CTKM binh thuong) — mac dinh AN cho gon, tich moi hien.
+        html += `<label class="pk-ctkm-info-toggle"><input type="checkbox" id="pkb-ctkm-info-toggle" ${_showCtkmInfo ? 'checked' : ''} /> 🎁 Hiện thông tin CTKM tham khảo cho sản phẩm này</label>`;
+        if (_showCtkmInfo) {
+          const ctkmMatches = _ctkmForProduct_(cand.t, cand.m);
+          if (ctkmMatches.length) {
+            html += `<div class="pk-builder-ctkm-box">
+              <div class="pk-builder-ctkm-title">🎉 CTKM đang có, liên quan sản phẩm này (tham khảo — không tự áp vào giá):</div>
+              ${ctkmMatches.map((t) => `<div class="pk-builder-ctkm-row">${escapeHtml(t)}</div>`).join('')}
+            </div>`;
+          } else if (Array.isArray(_ctkmRows) && _ctkmRows.length) {
+            html += `<div class="pk-builder-ctkm-box pk-builder-ctkm-empty">🎉 Sheet CTKM hiện không có chương trình nào nhắc tới sản phẩm này.</div>`;
+          }
         }
       }
       html += `<div class="pk-builder-summary"><div id="pkb-line-total"></div><button id="pkb-add-btn" class="pk-price-addbtn">+ Thêm vào đơn</button></div>`;
@@ -2196,6 +2206,7 @@
     on('pkb-mau', (e) => { _bld.mau = e.target.value; });
     on('pkb-dam', (e) => { _bld.dam = e.target.value; });
     on('pkb-promotype', (e) => { _bld.promoType = e.target.value; _bld.promoVal = ''; renderBuilderDyn_(); });
+    on('pkb-ctkm-info-toggle', (e) => { _showCtkmInfo = e.target.checked; renderBuilderDyn_(); });
     const typing = (id, fn) => { const el = dyn.querySelector('#' + id); if (el) el.addEventListener('input', (e) => { fn(e.target.value); _refreshBldTotal_(); }); };
     typing('pkb-qty', (v) => { _bld.qty = v; });
     typing('pkb-price', (v) => { _bld.priceK = v; _bld.priceEdited = v !== ''; }); // xoá trống → quay lại giá tự động

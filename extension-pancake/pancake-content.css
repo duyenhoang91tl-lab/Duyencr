@@ -1120,6 +1120,16 @@
   font-size: 11px;
   color: #78350f;
 }
+.pk-ctkm-info-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #92400e;
+  cursor: pointer;
+}
+.pk-ctkm-info-toggle input { margin: 0; }
 .pk-builder-ctkm-title { font-weight: 600; margin-bottom: 4px; }
 .pk-builder-ctkm-row { padding: 2px 0; line-height: 1.4; word-break: break-word; }
 .pk-builder-ctkm-row + .pk-builder-ctkm-row { border-top: 1px dotted #fde68a; }
