@@ -1430,7 +1430,19 @@ function readAllOrders_() {
   readAllOrders_.lastErrorSample = '';
   var ss = getDTSS_();
   var sh = ss.getSheetByName(DT_TONG_SHEET);
-  if (!sh || sh.getLastRow() < 2) return [];
+  // QUAN TRONG: truoc day dong nay la `if (!sh || sh.getLastRow() < 2) return [];` — gop chung
+  // 2 truong hop rat khac nhau vao 1 nhanh IM LANG (khong loi, khong log): (a) sheet CO ton tai
+  // nhung chua co don nao (hop le, dung tra ve rong) va (b) sheet KHONG con ton tai/bi doi ten
+  // (vd DT_TONG_SHEET = 'DT TỔNG ' co dau cach cuoi rat de bi xoa nham khi co ai sua sheet, hoac
+  // DT_SS_ID tro sang spreadsheet khac/mat quyen truy cap) — day la LOI THAT nhung truoc day bi
+  // nuot am tham thanh "0 don", khien app chi con hien vai KH tu luu tay (careLeads) ma khong ai
+  // biet ly do vi khong co canh bao nao ca. Tach rieng: sheet KHONG ton tai -> throw ro rang
+  // (doGet se bat va tra { error: ... } cho client hien canh bao that su); sheet CO ton tai nhung
+  // rong -> van tra ve [] nhu cu (hop le, khong phai loi).
+  if (!sh) {
+    throw new Error('Khong tim thay sheet "' + DT_TONG_SHEET + '" trong spreadsheet don hang (DT_SS_ID) — kiem tra sheet co bi doi ten/xoa khong, hoac DT_SS_ID co con dung khong.');
+  }
+  if (sh.getLastRow() < 2) return [];
   var last = sh.getLastRow();
   var vals = sh.getRange(2, 1, last - 1, DT_TONG_WIDTH).getValues();
   var out = [];
