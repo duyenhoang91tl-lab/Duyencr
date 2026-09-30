@@ -1749,7 +1749,7 @@ function dateInRange_(dt, fromStr, toStr) {
 // BO chuoi (khong phai substring) de tuyet doi khong dung nham cac trang thai khac (vd "Hoan
 // thanh" la don TOT, khong duoc loai). Neu sau nay Pancake/Base sinh them trang thai moi cung
 // nghia "hoan/huy" thi them dung vao mang duoi day, khong doan mo rong bang regex.
-var EXCLUDED_ORDER_STATUSES_ = ['da hoan', 'dang hoan', 'dang hoan hang', 'da hoan hang', 'hoan hang', 'hoan tien'];
+var EXCLUDED_ORDER_STATUSES_ = ['huy', 'da huy', 'da hoan', 'dang hoan', 'dang hoan hang', 'da hoan hang', 'hoan hang', 'hoan tien']; // 'huy'/'da huy' them 2026-09-30 theo xac nhan cua Duyen (rieng cot Trạng thái cua Bao cao B/POS co gia tri nay)
 function _isExcludedOrderStatus_(trangThai) {
   var s = _stripVN_(trangThai).trim();
   if (!s) return false;
@@ -1798,18 +1798,14 @@ function splitMulti_(str, delimiter) {
 function _donSaleNamesFromThe_(theStr) {
   return splitMulti_(theStr, ',').filter(function(tok) { return tok && !/\s/.test(tok); });
 }
-// Token CO khoang trang trong cot "Thẻ" la trang thai don Pancake (xem chu thich tren) — dung
-// _isExcludedOrderStatus_ (Huy/Tra lai/Hoan tien/That bai/Khieu nai, gom ca "Giao không thành")
-// de loai luon don do khoi doanh so/so don Bao cao B, giong cach A/C da loai theo cot Trang thai.
-// SUA 2026-09: mot so don chi ghi trang thai HOAN o cot rieng "Trạng thái" (cot O trong sheet
-// "dữ liệu đơn"), KHONG lap lai trong cot "Thẻ" — truoc day chi check cot "Thẻ" nen bo sot,
-// khien Bao cao B con tinh ca doanh thu don da hoan (vd sale ninhnga99 ky 1-10/9: CRM 217,95tr
-// vs ke toan 205,51tr — lech dung bang cac don "Đã hoàn" chi nam o cot Trạng thái). Gio check
-// CA 2 nguon: token trong "Thẻ" HOAC gia tri cot "Trạng thái" rieng — trung 1 trong 2 la loai.
-function _donHasExcludedStatus_(theStr, trangThaiCol) {
-  if (_isExcludedOrderStatus_(trangThaiCol)) return true;
-  var tokens = splitMulti_(theStr, ',').filter(function(tok) { return tok && /\s/.test(tok); });
-  return tokens.some(function(t) { return _isExcludedOrderStatus_(t); });
+// SUA 2026-09-30 theo xac nhan CUOI CUNG cua Duyen: viec loai don khoi doanh so Bao cao B
+// CHI dua vao MOT nguon DUY NHAT — cot rieng "Trạng thái" (cot O trong sheet "dữ liệu đơn"):
+// loai neu la Huỷ / Đã hoàn / Đang hoàn. Cot "Thẻ" (C) TUYET DOI KHONG con dung de xet trang
+// thai nua — chi dung de tach ten sale chia doanh thu (xem _donSaleNamesFromThe_ o tren).
+// (Ban than sheet cung da duoc Duyen xoa het cac dong Huy/Hoan/Dang hoan thu cong; ham nay
+// van giu de an toan cho du lieu phat sinh sau nay.)
+function _donHasExcludedStatus_(trangThaiCol) {
+  return _isExcludedOrderStatus_(trangThaiCol);
 }
 
 // ── Doc toan bo sheet "DT TỔNG " thanh mang object ──
@@ -2595,7 +2591,7 @@ function buildSalesReportB_(filters) {
     var row = rows[i];
     var dt = parseVNDate_(row.ngayTaoDon);
     if (!dateInRange_(dt, filters.dateFrom, filters.dateTo)) continue;
-    if (_donHasExcludedStatus_(row.theSale, row.trangThai)) continue; // bo don Huy/Giao khong thanh/Hoan tien... (co the nam o cot "Thẻ" hoac cot "Trạng thái" rieng)
+    if (_donHasExcludedStatus_(row.trangThai)) continue; // bo don Huy/Da hoan/Dang hoan — CHI xet theo cot "Trạng thái" rieng (cot O), khong xet cot "Thẻ" nua
     if (nguonFilterArr.length && nguonFilterArr.indexOf(row.nguonDon) === -1) continue;
     if (marketerFilterArr.length && marketerFilterArr.indexOf(row.marketer) === -1) continue;
     if (saleFilterArr.length) {
