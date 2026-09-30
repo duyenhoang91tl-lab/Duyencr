@@ -217,7 +217,11 @@ function _detectHeaderRow_(vals, maxScan) {
 var PRICE_LAST_COL_ = 13; // cot M
 function readPriceCatalog_() {
   var sh = SpreadsheetApp.openById(PRICE_SS_ID).getSheetByName(PRICE_SHEET_NAME);
-  if (!sh || sh.getLastRow() < 2) return [];
+  // Ap dung dung nguyen tac da sua o readAllOrders_ (xem chu thich o do): sheet KHONG ton tai la
+  // LOI THAT (doi ten/xoa nham, hoac PRICE_SS_ID sai/mat quyen) - phai throw de doGet tra ve loi
+  // ro rang cho client, khong duoc am tham thanh "khong co gia nao" giong het truong hop rong.
+  if (!sh) throw new Error('Khong tim thay sheet "' + PRICE_SHEET_NAME + '" trong spreadsheet bang gia (PRICE_SS_ID) — kiem tra sheet co bi doi ten/xoa khong, hoac PRICE_SS_ID co con dung khong.');
+  if (sh.getLastRow() < 2) return [];
   var lastRow = sh.getLastRow(), lastCol = Math.min(sh.getLastColumn(), PRICE_LAST_COL_);
   var vals = sh.getRange(1, 1, lastRow, lastCol).getValues();
   var hIdx = _detectHeaderRow_(vals, 10);
@@ -625,7 +629,10 @@ function _ctkmFmtDateVN_(dt) {
 
 function readCTKMCatalog_() {
   var sh = SpreadsheetApp.openById(PRICE_SS_ID).getSheetByName(CTKM_SHEET_NAME);
-  if (!sh || sh.getLastRow() < 2) return [];
+  // Cung nguyen tac voi readAllOrders_/readPriceCatalog_: sheet KHONG ton tai la LOI THAT, phai
+  // throw thay vi am tham tra ve rong (xem chu thich chi tiet o readAllOrders_).
+  if (!sh) throw new Error('Khong tim thay sheet "' + CTKM_SHEET_NAME + '" trong spreadsheet bang gia (PRICE_SS_ID) — kiem tra sheet co bi doi ten/xoa khong.');
+  if (sh.getLastRow() < 2) return [];
   var lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
   var vals = sh.getRange(1, 1, lastRow, lastCol).getValues();
   var hIdx = _detectHeaderRow_(vals, 10);
