@@ -7294,7 +7294,17 @@ async function autoSyncLoop() {
     const forceFullPull = (_autoSyncTick % 10 === 0);
     await syncFromGS({ pullOrders: Object.keys(customerMap).length === 0 || forceFullPull });
   } catch(e) {
-    // Silent
+    // BUG (đã sửa): trước đây catch này ghi "// Silent" — MỌI lỗi JS thật xảy ra trong
+    // syncFromGS() sau khi fetch đã thành công (vd throw trong buildCustomers()/mergeRows()
+    // khi xử lý dữ liệu thật, khác với lỗi fetch/GAS đã có banner riêng ở syncFromGS) bị NUỐT
+    // HOÀN TOÀN — không log, không banner, không gì cả. Đây rất có thể là nguyên nhân của
+    // triệu chứng "CRM vẫn lỗi nhưng không thấy cảnh báo gì" dù đã sửa các lỗi sync ở
+    // syncFromGS — vì lỗi này nằm NGOÀI syncFromGS, không đi qua các try/catch đã sửa ở đó.
+    // Giờ log ra console (F12 xem được ngay) + tính vào cùng bộ đếm lỗi để hiện banner sau
+    // 3 lần liên tiếp, kèm rõ đây là lỗi xử lý dữ liệu chứ không phải lỗi tải từ Sheet.
+    console.error('autoSyncLoop lỗi (không phải lỗi tải dữ liệu — lỗi xử lý sau khi tải):', e);
+    _autoSyncFailCount = (_autoSyncFailCount || 0) + 1;
+    if (_autoSyncFailCount >= 3) showSyncErrorBanner('Lỗi xử lý dữ liệu sau khi tải: ' + (e?.message || e) + ' (xem chi tiết ở Console - F12)');
   }
   _autoSyncRunning = false;
   _autoSyncTimer = setTimeout(autoSyncLoop, AUTO_SYNC_MS);
