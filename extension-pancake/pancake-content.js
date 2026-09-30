@@ -414,13 +414,14 @@
               <input type="text" id="pk-cart-gift" placeholder="VD: tặng 1 vòng phong thủy nhỏ..." />
             </div>
             <div class="pk-cart-extra-row">
-              <label>Giảm giá</label>
+              <label>Giảm giá tổng</label>
               <select id="pk-cart-discount-type">
                 <option value="none">Không giảm</option>
                 <option value="percent">% </option>
                 <option value="amount">Số tiền</option>
               </select>
               <input type="number" id="pk-cart-discount-value" placeholder="0" min="0" style="display:none" />
+              <span style="font-size:10px;color:#9d174d;opacity:.8;display:block;width:100%">Chỉ áp dụng cho SP có tích "Tính vào Giảm giá tổng" ở từng dòng bên trên</span>
             </div>
             <div class="pk-cart-extra-row">
               <label id="pk-cart-gold-label">Thêm vàng (SL × 350.000đ)</label>
@@ -2299,6 +2300,8 @@
       id: 'ci_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
       name: item.name || '(chưa đặt tên)',
       note: item.note || '',
+      noteExtra: item.noteExtra || '', // Ghi chú thêm — CS tự gõ riêng cho sản phẩm này, độc lập với "note"
+                                        // nguồn (từ bảng giá) và độc lập với CTKM/giảm giá/tặng quà.
       qty: item.qty || 1,
       price: item.price || 0,
       chatLieu: clOptions ? '' : (item.chatLieu || ''),
@@ -2307,6 +2310,9 @@
       size: item.size || '',
       promoType: item.promoType || 'none',   // CTKM riêng của dòng: none | amount (k) | percent | gift
       promoValue: item.promoValue === undefined ? '' : item.promoValue,
+      inTotalDiscount: item.inTotalDiscount !== false, // co tinh vao "Giam gia TONG" (o pk-cart-discount-*,
+                                                        // ap dung tren tong cac SP duoc tich) hay khong.
+                                                        // Mac dinh CO tinh — bo tick de loai rieng SP nay ra.
       checked: true
     });
     saveCart_();
@@ -2359,6 +2365,12 @@
           <input type="text" class="pk-cart-promoval" value="${escapeHtml(it.promoValue === undefined ? '' : it.promoValue)}" placeholder="${it.promoType === 'gift' ? 'Quà tặng' : (it.promoType === 'percent' ? '% giảm' : 'Số tiền (k)')}" style="${(!it.promoType || it.promoType === 'none') ? 'display:none' : ''}" />
           <span class="pk-cart-linetotal"></span>
         </div>
+        <div class="pk-cart-noteextra-row">
+          <input type="text" class="pk-cart-noteextra" value="${escapeHtml(it.noteExtra || '')}" placeholder="📝 Ghi chú thêm cho sản phẩm này (không bắt buộc)" />
+        </div>
+        <label class="pk-cart-total-disc-chk" title="Có tính sản phẩm này vào mục 'Giảm giá tổng' bên dưới không">
+          <input type="checkbox" class="pk-cart-intotaldisc" ${it.inTotalDiscount !== false ? 'checked' : ''} /> Tính vào Giảm giá tổng
+        </label>
         ${it.note ? `<div class="pk-cart-note">${escapeHtml(it.note)}</div>` : ''}
       </div>
     `;
@@ -2411,6 +2423,12 @@
         _updateCartItem_(id, 'promoValue', it2 && it2.promoType === 'gift' ? e.target.value : (Number(e.target.value) || 0), true);
       });
       promoValEl.addEventListener('change', () => { saveCart_(); });
+      const noteExtraEl = row.querySelector('.pk-cart-noteextra');
+      noteExtraEl.addEventListener('input', (e) => { _updateCartItem_(id, 'noteExtra', e.target.value, true); });
+      noteExtraEl.addEventListener('change', () => { saveCart_(); });
+      row.querySelector('.pk-cart-intotaldisc').addEventListener('change', (e) => {
+        _updateCartItem_(id, 'inTotalDiscount', e.target.checked); saveCart_();
+      });
       row.querySelector('.pk-cart-del').addEventListener('click', () => {
         _cartItems = _cartItems.filter((x) => x.id !== id);
         saveCart_(); renderCart_();
@@ -2452,18 +2470,21 @@
     return _applyPromo_(base, i.promoType, i.promoValue);
   }
 
-  // Tính tổng cả đơn: tạm tính (đã trừ CTKM từng dòng) − giảm giá chung + tiền vàng + ship (40k nếu không Freeship)
+  // Tính tổng cả đơn: tạm tính (đã trừ CTKM từng dòng) − Giảm giá TỔNG (chỉ tính trên các dòng có
+  // tích "Tính vào Giảm giá tổng" — VD 10 SP mà chỉ tích 3 thì % hoặc số tiền giảm chỉ áp trên
+  // tổng 3 dòng đó, không áp lên cả đơn) + tiền vàng + ship (40k nếu không Freeship).
   function _cartTotals_() {
     const checked = _cartItems.filter((i) => i.checked);
     const subtotal = checked.reduce((s, i) => s + _lineTotal_(i), 0);
+    const discBase = checked.filter((i) => i.inTotalDiscount !== false).reduce((s, i) => s + _lineTotal_(i), 0);
     let discountAmt = 0;
-    if (_cartExtra.discountType === 'percent') discountAmt = Math.round(subtotal * (Number(_cartExtra.discountValue) || 0) / 100);
+    if (_cartExtra.discountType === 'percent') discountAmt = Math.round(discBase * (Number(_cartExtra.discountValue) || 0) / 100);
     else if (_cartExtra.discountType === 'amount') discountAmt = Number(_cartExtra.discountValue) || 0;
-    discountAmt = Math.min(discountAmt, subtotal);
+    discountAmt = Math.min(discountAmt, discBase);
     const gold = (Number(_cartExtra.gold) || 0) * _goldUnitAmount;
     const ship = _cartExtra.freeship ? 0 : PK_SHIP_FEE;
     const total = subtotal - discountAmt + gold + ship;
-    return { checked, subtotal, discountAmt, gold, ship, total };
+    return { checked, subtotal, discBase, discountAmt, gold, ship, total };
   }
 
   function _renderCartTotal_() {
@@ -2477,7 +2498,7 @@
     });
     panelEl.querySelector('#pk-cart-total').innerHTML =
       `<div>Tạm tính (${t.checked.length} sản phẩm): <b>${fmt(t.subtotal)}</b></div>` +
-      (t.discountAmt > 0 ? `<div>Giảm giá chung: <b>-${fmt(t.discountAmt)}</b></div>` : '') +
+      (t.discountAmt > 0 ? `<div>Giảm giá tổng (trên ${_cartItems.filter(i=>i.checked && i.inTotalDiscount!==false).length} SP đã tích): <b>-${fmt(t.discountAmt)}</b></div>` : '') +
       (t.gold > 0 ? `<div>Thêm vàng: <b>+${fmt(t.gold)}</b></div>` : '') +
       `<div>Phí ship: <b>${t.ship ? '+' + fmt(t.ship) : 'Miễn phí'}</b></div>` +
       `<div class="pk-cart-total-final">Tổng đơn: <b>${fmt(t.total)}</b>${_cartExtra.freeship ? ' <span class="pk-cart-freeship-tag">Freeship</span>' : ''}</div>`;
@@ -2532,7 +2553,8 @@
         priceText = k(total);
       }
       const giftSuffix = (i.promoType === 'gift' && i.promoValue) ? ` + tặng ${i.promoValue}` : '';
-      return clean(`${desc} ${priceText}${giftSuffix}`);
+      const noteSuffix = i.noteExtra ? ` (${i.noteExtra})` : '';
+      return clean(`${desc} ${priceText}${giftSuffix}${noteSuffix}`);
     });
 
     const lines = [];

@@ -1155,3 +1155,26 @@
 .pk-cart-promotype { flex: 0 0 auto; }
 .pk-cart-promoval { flex: 1; }
 .pk-cart-linetotal { margin-left: auto; font-size: 11px; font-weight: 700; color: #b45309; white-space: nowrap; }
+
+/* ── Giỏ: Ghi chú thêm (độc lập với note nguồn) + tích "Tính vào Giảm giá tổng" ── */
+.pk-cart-noteextra-row { flex: 1 0 100%; margin-top: 3px; }
+.pk-cart-noteextra {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 10.5px;
+  padding: 3px 5px;
+  border: 1px solid #fbcfe8;
+  border-radius: 4px;
+  background: #fffafc;
+}
+.pk-cart-total-disc-chk {
+  flex: 1 0 100%;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+  font-size: 10px;
+  color: #9d174d;
+  opacity: .85;
+}
+
