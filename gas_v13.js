@@ -1963,13 +1963,21 @@ function getDonOrderCountByPhone_() {
 }
 
 // ── Doc toan bo sheet "dữ liệu đơn" thanh mang object ──
+// Doc sheet "dữ liệu đơn" (nguon Bao cao B — Pos), co CACHE ngan (90s) vi day la sheet lon
+// (hang nghin dong) chi de DOC (CRM khong bao gio ghi vao sheet nay — du lieu vao tu Base/Pos
+// dong bo rieng), nen cache ngan giup Bao cao B/thay doi bo loc khong phai doc lai toan bo
+// sheet moi lan bam Loc — tang toc ro ret ma van cap nhat du lieu moi trong vong <=90s.
 function readDonChiTiet_() {
+  var cached = _cacheGetBig_('donChiTiet_v2');
+  if (cached) { try { return JSON.parse(cached); } catch (eParse) {} }
+
   var ss = getDTSS_();
   var sh = ss.getSheetByName(DON_CHITIET_SHEET);
   if (!sh) return [];
   var last = sh.getLastRow();
   if (last < 2) return [];
   var vals = sh.getRange(2, 1, last - 1, 15).getValues();
+  var tz = Session.getScriptTimeZone() || 'Etc/GMT-7';
   var out = [];
   for (var i = 0; i < vals.length; i++) {
     var r = vals[i];
@@ -1979,8 +1987,17 @@ function readDonChiTiet_() {
     // voi bang ke toan (Duyen xac nhan), doanh thu don bao hanh CO duoc tinh (vd nguyenngo1988
     // ky 1-10/9: 18.505.000 chi khop tuyet doi neu TINH ca 28 don nguon "Bảo hành" trong ky).
     // Bo han dieu kien loai nay — khong con exclude theo nguonDon nua.
+    // Chuan hoa ve chuoi "dd/MM/yyyy" NGAY TAI DAY (khong giu nguyen Date object) — de:
+    //  (1) parseVNDate_ luon nhan dung 1 dinh dang bat ke o goc la Date hay text,
+    //  (2) ket qua serialize/deserialize duoc qua JSON.stringify khi cache (Date bi doi
+    //      thanh chuoi ISO "T..." se KHONG khop dinh dang parseVNDate_ dang cho, gay sai lech
+    //      ngay am tham neu khong chuan hoa truoc).
+    var ngayRaw = r[1];
+    var ngayTaoDon = (Object.prototype.toString.call(ngayRaw) === '[object Date]' && !isNaN(ngayRaw))
+      ? Utilities.formatDate(ngayRaw, tz, 'dd/MM/yyyy')
+      : ngayRaw;
     out.push({
-      ngayTaoDon:    r[1],
+      ngayTaoDon:    ngayTaoDon,
       khachHang:     r[3],
       soDienThoai:   r[4],
       nguonDon:      nguonDon,
@@ -1994,6 +2011,7 @@ function readDonChiTiet_() {
       marketer:      r[13] ? String(r[13]).trim() : ''
     });
   }
+  try { _cachePutBig_('donChiTiet_v2', JSON.stringify(out), 90); } catch (eCache) {}
   return out;
 }
 
