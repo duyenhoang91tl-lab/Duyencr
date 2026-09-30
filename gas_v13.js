@@ -217,7 +217,11 @@ function _detectHeaderRow_(vals, maxScan) {
 var PRICE_LAST_COL_ = 13; // cot M
 function readPriceCatalog_() {
   var sh = SpreadsheetApp.openById(PRICE_SS_ID).getSheetByName(PRICE_SHEET_NAME);
-  if (!sh || sh.getLastRow() < 2) return [];
+  // Ap dung dung nguyen tac da sua o readAllOrders_ (xem chu thich o do): sheet KHONG ton tai la
+  // LOI THAT (doi ten/xoa nham, hoac PRICE_SS_ID sai/mat quyen) - phai throw de doGet tra ve loi
+  // ro rang cho client, khong duoc am tham thanh "khong co gia nao" giong het truong hop rong.
+  if (!sh) throw new Error('Khong tim thay sheet "' + PRICE_SHEET_NAME + '" trong spreadsheet bang gia (PRICE_SS_ID) — kiem tra sheet co bi doi ten/xoa khong, hoac PRICE_SS_ID co con dung khong.');
+  if (sh.getLastRow() < 2) return [];
   var lastRow = sh.getLastRow(), lastCol = Math.min(sh.getLastColumn(), PRICE_LAST_COL_);
   var vals = sh.getRange(1, 1, lastRow, lastCol).getValues();
   var hIdx = _detectHeaderRow_(vals, 10);
@@ -625,7 +629,10 @@ function _ctkmFmtDateVN_(dt) {
 
 function readCTKMCatalog_() {
   var sh = SpreadsheetApp.openById(PRICE_SS_ID).getSheetByName(CTKM_SHEET_NAME);
-  if (!sh || sh.getLastRow() < 2) return [];
+  // Cung nguyen tac voi readAllOrders_/readPriceCatalog_: sheet KHONG ton tai la LOI THAT, phai
+  // throw thay vi am tham tra ve rong (xem chu thich chi tiet o readAllOrders_).
+  if (!sh) throw new Error('Khong tim thay sheet "' + CTKM_SHEET_NAME + '" trong spreadsheet bang gia (PRICE_SS_ID) — kiem tra sheet co bi doi ten/xoa khong.');
+  if (sh.getLastRow() < 2) return [];
   var lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
   var vals = sh.getRange(1, 1, lastRow, lastCol).getValues();
   var hIdx = _detectHeaderRow_(vals, 10);
@@ -1430,7 +1437,19 @@ function readAllOrders_() {
   readAllOrders_.lastErrorSample = '';
   var ss = getDTSS_();
   var sh = ss.getSheetByName(DT_TONG_SHEET);
-  if (!sh || sh.getLastRow() < 2) return [];
+  // QUAN TRONG: truoc day dong nay la `if (!sh || sh.getLastRow() < 2) return [];` — gop chung
+  // 2 truong hop rat khac nhau vao 1 nhanh IM LANG (khong loi, khong log): (a) sheet CO ton tai
+  // nhung chua co don nao (hop le, dung tra ve rong) va (b) sheet KHONG con ton tai/bi doi ten
+  // (vd DT_TONG_SHEET = 'DT TỔNG ' co dau cach cuoi rat de bi xoa nham khi co ai sua sheet, hoac
+  // DT_SS_ID tro sang spreadsheet khac/mat quyen truy cap) — day la LOI THAT nhung truoc day bi
+  // nuot am tham thanh "0 don", khien app chi con hien vai KH tu luu tay (careLeads) ma khong ai
+  // biet ly do vi khong co canh bao nao ca. Tach rieng: sheet KHONG ton tai -> throw ro rang
+  // (doGet se bat va tra { error: ... } cho client hien canh bao that su); sheet CO ton tai nhung
+  // rong -> van tra ve [] nhu cu (hop le, khong phai loi).
+  if (!sh) {
+    throw new Error('Khong tim thay sheet "' + DT_TONG_SHEET + '" trong spreadsheet don hang (DT_SS_ID) — kiem tra sheet co bi doi ten/xoa khong, hoac DT_SS_ID co con dung khong.');
+  }
+  if (sh.getLastRow() < 2) return [];
   var last = sh.getLastRow();
   var vals = sh.getRange(2, 1, last - 1, DT_TONG_WIDTH).getValues();
   var out = [];
@@ -1737,7 +1756,7 @@ function dateInRange_(dt, fromStr, toStr) {
 // BO chuoi (khong phai substring) de tuyet doi khong dung nham cac trang thai khac (vd "Hoan
 // thanh" la don TOT, khong duoc loai). Neu sau nay Pancake/Base sinh them trang thai moi cung
 // nghia "hoan/huy" thi them dung vao mang duoi day, khong doan mo rong bang regex.
-var EXCLUDED_ORDER_STATUSES_ = ['da hoan', 'dang hoan', 'dang hoan hang', 'da hoan hang', 'hoan hang', 'hoan tien'];
+var EXCLUDED_ORDER_STATUSES_ = ['huy', 'da huy', 'da hoan', 'dang hoan', 'dang hoan hang', 'da hoan hang', 'hoan hang', 'hoan tien']; // 'huy'/'da huy' them 2026-09-30 theo xac nhan cua Duyen (rieng cot Trạng thái cua Bao cao B/POS co gia tri nay)
 function _isExcludedOrderStatus_(trangThai) {
   var s = _stripVN_(trangThai).trim();
   if (!s) return false;
@@ -1786,12 +1805,14 @@ function splitMulti_(str, delimiter) {
 function _donSaleNamesFromThe_(theStr) {
   return splitMulti_(theStr, ',').filter(function(tok) { return tok && !/\s/.test(tok); });
 }
-// Token CO khoang trang trong cot "Thẻ" la trang thai don Pancake (xem chu thich tren) — dung
-// _isExcludedOrderStatus_ (Huy/Tra lai/Hoan tien/That bai/Khieu nai, gom ca "Giao không thành")
-// de loai luon don do khoi doanh so/so don Bao cao B, giong cach A/C da loai theo cot Trang thai.
-function _donHasExcludedStatus_(theStr) {
-  var tokens = splitMulti_(theStr, ',').filter(function(tok) { return tok && /\s/.test(tok); });
-  return tokens.some(function(t) { return _isExcludedOrderStatus_(t); });
+// SUA 2026-09-30 theo xac nhan CUOI CUNG cua Duyen: viec loai don khoi doanh so Bao cao B
+// CHI dua vao MOT nguon DUY NHAT — cot rieng "Trạng thái" (cot O trong sheet "dữ liệu đơn"):
+// loai neu la Huỷ / Đã hoàn / Đang hoàn. Cot "Thẻ" (C) TUYET DOI KHONG con dung de xet trang
+// thai nua — chi dung de tach ten sale chia doanh thu (xem _donSaleNamesFromThe_ o tren).
+// (Ban than sheet cung da duoc Duyen xoa het cac dong Huy/Hoan/Dang hoan thu cong; ham nay
+// van giu de an toan cho du lieu phat sinh sau nay.)
+function _donHasExcludedStatus_(trangThaiCol) {
+  return _isExcludedOrderStatus_(trangThaiCol);
 }
 
 // ── Doc toan bo sheet "DT TỔNG " thanh mang object ──
@@ -1948,7 +1969,7 @@ function readDonChiTiet_() {
   if (!sh) return [];
   var last = sh.getLastRow();
   if (last < 2) return [];
-  var vals = sh.getRange(2, 1, last - 1, 14).getValues();
+  var vals = sh.getRange(2, 1, last - 1, 15).getValues();
   var out = [];
   for (var i = 0; i < vals.length; i++) {
     var r = vals[i];
@@ -1961,6 +1982,7 @@ function readDonChiTiet_() {
       soDienThoai:   r[4],
       nguonDon:      nguonDon,
       theSale:       r[2] ? String(r[2]) : '',   // cot "Thẻ" (C) — danh sach sale tham gia don, tach bang dau phay ','
+      trangThai:     r[14] ? String(r[14]).trim() : '', // cot "Trạng thái" (O) — nguon RIENG, doc lap voi trang thai co the lap trong cot "Thẻ"
       sanPham:       r[8] ? String(r[8]) : '',   // tach bang dau phay ','
       maSanPham:     r[9] ? String(r[9]) : '',   // tach bang dau cham phay ';' — KHAC voi sanPham/soLuong
       soLuong:       r[10] ? String(r[10]) : '', // tach bang dau phay ','
@@ -2576,7 +2598,7 @@ function buildSalesReportB_(filters) {
     var row = rows[i];
     var dt = parseVNDate_(row.ngayTaoDon);
     if (!dateInRange_(dt, filters.dateFrom, filters.dateTo)) continue;
-    if (_donHasExcludedStatus_(row.theSale)) continue; // bo don Huy/Giao khong thanh/Hoan tien... (trang thai nam chung cot The o POS)
+    if (_donHasExcludedStatus_(row.trangThai)) continue; // bo don Huy/Da hoan/Dang hoan — CHI xet theo cot "Trạng thái" rieng (cot O), khong xet cot "Thẻ" nua
     if (nguonFilterArr.length && nguonFilterArr.indexOf(row.nguonDon) === -1) continue;
     if (marketerFilterArr.length && marketerFilterArr.indexOf(row.marketer) === -1) continue;
     if (saleFilterArr.length) {
@@ -2674,7 +2696,7 @@ function buildSalesReportB_(filters) {
     orders: matched.map(function(m){
       return {
         ngayTaoDon: m.ngayTaoDon, khachHang: m.khachHang, soDienThoai: m.soDienThoai,
-        nguonDon: m.nguonDon, theSale: m.theSale, sanPham: m.sanPham, maSanPham: m.maSanPham, soLuong: m.soLuong,
+        nguonDon: m.nguonDon, theSale: m.theSale, trangThai: m.trangThai, sanPham: m.sanPham, maSanPham: m.maSanPham, soLuong: m.soLuong,
         giaTriSauGiam: m.giaTriSauGiam, cod: m.cod, marketer: m.marketer
       };
     })
