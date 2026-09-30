@@ -74,6 +74,11 @@ function load() {
   chrome.storage.sync.get(null, (s) => {
     document.getElementById("useProducts").checked = !!s.useProducts;
 
+    chrome.runtime.sendMessage({ type: "GET_GOLD_UNIT" }, (resp) => {
+      const n = Number(resp?.ok ? resp.data : NaN);
+      document.getElementById("goldUnitAmount").value = (n > 0) ? n : 350000;
+    });
+
     document.getElementById("aiProvider").value = s.aiProvider || "";
     document.getElementById("aiApiKey").value = s.aiApiKey || "";
     document.getElementById("aiModel").value = s.aiModel || "";
@@ -138,6 +143,19 @@ function save() {
     el.innerText = "Đã lưu ✓";
     setTimeout(() => (el.innerText = ""), 2000);
   });
+
+  // Don gia vang: ghi rieng qua GAS setSetting (dung chung voi CRM), khong nam trong
+  // chrome.storage.sync cua rieng may nay — de doi 1 lan la ap dung ca team.
+  const goldEl = document.getElementById("goldUnitAmount");
+  const goldStatusEl = document.getElementById("goldUnitStatus");
+  const goldAmount = Number(goldEl.value);
+  if (goldAmount > 0) {
+    goldStatusEl.innerText = "Đang lưu...";
+    chrome.runtime.sendMessage({ type: "SET_GOLD_UNIT", payload: { amount: goldAmount } }, (resp) => {
+      goldStatusEl.innerText = resp?.ok ? "✓ Đã áp dụng cho cả team" : ("❌ " + (resp?.error || "Lỗi lưu"));
+      setTimeout(() => (goldStatusEl.innerText = ""), 3000);
+    });
+  }
 }
 
 // Ghi de toan bo cai dat hien tai bang bo mac dinh dung (GAS URL + selector da xac minh
