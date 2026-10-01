@@ -16,10 +16,16 @@ document.getElementById("testAiKeyBtn").addEventListener("click", testAiKey);
 // trang nay o tab moi, khong bat CS phai tu tim link trong doan hint dai.
 const AI_PROVIDER_SIGNUP_URL = {
   gemini: "https://aistudio.google.com/apikey",
+  groq: "https://console.groq.com/keys",
+  cerebras: "https://cloud.cerebras.ai/",
+  openrouter: "https://openrouter.ai/keys",
   openai: "https://platform.openai.com/api-keys"
 };
 const AI_PROVIDER_HINTS = {
   gemini: '🔗 Lấy API Key tại <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> (đăng nhập bằng Google, miễn phí có giới hạn). Model mặc định: <code>gemini-flash-latest</code> (alias luôn trỏ tới bản Flash mới nhất — model cũ <code>gemini-2.0-flash</code> đã bị Google khai tử, không dùng được nữa).',
+  groq: '🔗 Lấy API Key tại <a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a> (miễn phí, giới hạn theo phút/ngày). Model mặc định: <code>openai/gpt-oss-120b</code>.',
+  cerebras: '🔗 Lấy API Key tại <a href="https://cloud.cerebras.ai/" target="_blank">cloud.cerebras.ai</a> (đăng ký tài khoản, có gói miễn phí). Model mặc định: <code>gpt-oss-120b</code>.',
+  openrouter: '🔗 Lấy API Key tại <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a> (có model miễn phí, một số model tính phí theo dùng). Model mặc định: <code>google/gemma-2-9b-it:free</code>.',
   openai: '🔗 Lấy API Key tại <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a>. Model mặc định: <code>gpt-5.4-mini</code>.'
 };
 function updateAiProviderHint() {
