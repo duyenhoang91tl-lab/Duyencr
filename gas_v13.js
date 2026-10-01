@@ -1822,6 +1822,25 @@ function _pancakeKnownSaleNameSet_() {
 // khop duoc danh sach da biet (vd sale qua moi, chua tung xuat hien o dau) moi lui ve heuristic
 // cu: giu token khong co khoang trang (ten dang nhap Pancake khong co dau cach; tag/trang thai
 // tieng Viet nhieu chu luon co) — de khong lam mat hoan toan 1 sale that nhung chua kip ghi nhan.
+// Loc "Theo Team" o Bao cao B (POS) bi ra 0 doanh thu du Team da co du thanh vien — nguyen nhan:
+// cot "Thẻ" trong sheet "dữ liệu đơn" ghi USERNAME dang nhap Pancake (vd "ninhnga99"), trong khi
+// Team/CareData.cs dung TEN SALE CHUAN (vd "Ngà") — 2 dang ten KHAC NHAU, so sanh truc tiep
+// khong bao gio khop. PancakeNameMap da co san anh xa 2 chieu nay (dung cho Bao cao tuong tac/SDT
+// Pancake) — tai su dung de MO RONG moi ten trong bo loc thanh ca chinh no LAN cac username
+// Pancake da tung khop voi ten do, truoc khi dem so sanh voi "Thẻ".
+function _expandSaleFilterWithPancakeAliases_(names) {
+  if (!names || !names.length) return names;
+  var map = readPancakeMap_(); // pancakeName -> saleName (co the "saleA|saleB")
+  var foldIn = {};
+  names.forEach(function(n) { if (n) foldIn[_normTxt_(n)] = true; });
+  var out = names.slice();
+  Object.keys(map).forEach(function(pancakeName) {
+    var saleNames = String(map[pancakeName] || '').split('|').map(function(s){ return s.trim(); }).filter(Boolean);
+    if (saleNames.some(function(sn) { return foldIn[_normTxt_(sn)]; })) out.push(pancakeName);
+  });
+  return out;
+}
+
 function _donSaleNamesFromThe_(theStr) {
   var tokens = splitMulti_(theStr, ',');
   if (!tokens.length) return [];
@@ -2628,7 +2647,8 @@ function buildSalesReportB_(filters) {
   filters = filters || {};
   // Ho tro CA mang (multi-select) LAN chuoi don (tuong thich nguoc) cho ca 3 bo loc.
   function toArr(v){ return Array.isArray(v) ? v.filter(Boolean) : (v ? [String(v).trim()] : []); }
-  var saleFilterArr = toArr(filters.sale);
+  var saleFilterArr = _expandSaleFilterWithPancakeAliases_(toArr(filters.sale));
+  var saleFilterFold = saleFilterArr.map(_normTxt_);
   var nguonFilterArr = toArr(filters.nguon);
   var marketerFilterArr = toArr(filters.marketer);
   var careStatusArr = toArr(filters.careStatus);
@@ -2652,9 +2672,9 @@ function buildSalesReportB_(filters) {
     if (nguonFilterArr.length && nguonFilterArr.indexOf(row.nguonDon) === -1) continue;
     if (marketerFilterArr.length && marketerFilterArr.indexOf(row.marketer) === -1) continue;
     if (saleFilterArr.length) {
-      var salesOnRow = _donSaleNamesFromThe_(row.theSale);
+      var salesOnRow = _donSaleNamesFromThe_(row.theSale).map(_normTxt_);
       var hit = false;
-      for (var si = 0; si < saleFilterArr.length; si++) { if (salesOnRow.indexOf(saleFilterArr[si]) !== -1) { hit = true; break; } }
+      for (var si = 0; si < saleFilterFold.length; si++) { if (salesOnRow.indexOf(saleFilterFold[si]) !== -1) { hit = true; break; } }
       if (!hit) continue;
     }
     if (!_pMatchAny_(row.sanPham, sanPhamTerms)) continue;
