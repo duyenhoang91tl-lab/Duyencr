@@ -217,7 +217,11 @@ function _detectHeaderRow_(vals, maxScan) {
 var PRICE_LAST_COL_ = 13; // cot M
 function readPriceCatalog_() {
   var sh = SpreadsheetApp.openById(PRICE_SS_ID).getSheetByName(PRICE_SHEET_NAME);
-  if (!sh || sh.getLastRow() < 2) return [];
+  // Ap dung dung nguyen tac da sua o readAllOrders_ (xem chu thich o do): sheet KHONG ton tai la
+  // LOI THAT (doi ten/xoa nham, hoac PRICE_SS_ID sai/mat quyen) - phai throw de doGet tra ve loi
+  // ro rang cho client, khong duoc am tham thanh "khong co gia nao" giong het truong hop rong.
+  if (!sh) throw new Error('Khong tim thay sheet "' + PRICE_SHEET_NAME + '" trong spreadsheet bang gia (PRICE_SS_ID) — kiem tra sheet co bi doi ten/xoa khong, hoac PRICE_SS_ID co con dung khong.');
+  if (sh.getLastRow() < 2) return [];
   var lastRow = sh.getLastRow(), lastCol = Math.min(sh.getLastColumn(), PRICE_LAST_COL_);
   var vals = sh.getRange(1, 1, lastRow, lastCol).getValues();
   var hIdx = _detectHeaderRow_(vals, 10);
@@ -625,7 +629,10 @@ function _ctkmFmtDateVN_(dt) {
 
 function readCTKMCatalog_() {
   var sh = SpreadsheetApp.openById(PRICE_SS_ID).getSheetByName(CTKM_SHEET_NAME);
-  if (!sh || sh.getLastRow() < 2) return [];
+  // Cung nguyen tac voi readAllOrders_/readPriceCatalog_: sheet KHONG ton tai la LOI THAT, phai
+  // throw thay vi am tham tra ve rong (xem chu thich chi tiet o readAllOrders_).
+  if (!sh) throw new Error('Khong tim thay sheet "' + CTKM_SHEET_NAME + '" trong spreadsheet bang gia (PRICE_SS_ID) — kiem tra sheet co bi doi ten/xoa khong.');
+  if (sh.getLastRow() < 2) return [];
   var lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
   var vals = sh.getRange(1, 1, lastRow, lastCol).getValues();
   var hIdx = _detectHeaderRow_(vals, 10);
@@ -1430,7 +1437,19 @@ function readAllOrders_() {
   readAllOrders_.lastErrorSample = '';
   var ss = getDTSS_();
   var sh = ss.getSheetByName(DT_TONG_SHEET);
-  if (!sh || sh.getLastRow() < 2) return [];
+  // QUAN TRONG: truoc day dong nay la `if (!sh || sh.getLastRow() < 2) return [];` — gop chung
+  // 2 truong hop rat khac nhau vao 1 nhanh IM LANG (khong loi, khong log): (a) sheet CO ton tai
+  // nhung chua co don nao (hop le, dung tra ve rong) va (b) sheet KHONG con ton tai/bi doi ten
+  // (vd DT_TONG_SHEET = 'DT TỔNG ' co dau cach cuoi rat de bi xoa nham khi co ai sua sheet, hoac
+  // DT_SS_ID tro sang spreadsheet khac/mat quyen truy cap) — day la LOI THAT nhung truoc day bi
+  // nuot am tham thanh "0 don", khien app chi con hien vai KH tu luu tay (careLeads) ma khong ai
+  // biet ly do vi khong co canh bao nao ca. Tach rieng: sheet KHONG ton tai -> throw ro rang
+  // (doGet se bat va tra { error: ... } cho client hien canh bao that su); sheet CO ton tai nhung
+  // rong -> van tra ve [] nhu cu (hop le, khong phai loi).
+  if (!sh) {
+    throw new Error('Khong tim thay sheet "' + DT_TONG_SHEET + '" trong spreadsheet don hang (DT_SS_ID) — kiem tra sheet co bi doi ten/xoa khong, hoac DT_SS_ID co con dung khong.');
+  }
+  if (sh.getLastRow() < 2) return [];
   var last = sh.getLastRow();
   var vals = sh.getRange(2, 1, last - 1, DT_TONG_WIDTH).getValues();
   var out = [];
@@ -1737,7 +1756,7 @@ function dateInRange_(dt, fromStr, toStr) {
 // BO chuoi (khong phai substring) de tuyet doi khong dung nham cac trang thai khac (vd "Hoan
 // thanh" la don TOT, khong duoc loai). Neu sau nay Pancake/Base sinh them trang thai moi cung
 // nghia "hoan/huy" thi them dung vao mang duoi day, khong doan mo rong bang regex.
-var EXCLUDED_ORDER_STATUSES_ = ['da hoan', 'dang hoan', 'dang hoan hang', 'da hoan hang', 'hoan hang', 'hoan tien'];
+var EXCLUDED_ORDER_STATUSES_ = ['huy', 'da huy', 'da hoan', 'dang hoan', 'dang hoan hang', 'da hoan hang', 'hoan hang', 'hoan tien']; // 'huy'/'da huy' them 2026-09-30 theo xac nhan cua Duyen (rieng cot Trạng thái cua Bao cao B/POS co gia tri nay)
 function _isExcludedOrderStatus_(trangThai) {
   var s = _stripVN_(trangThai).trim();
   if (!s) return false;
@@ -1786,12 +1805,14 @@ function splitMulti_(str, delimiter) {
 function _donSaleNamesFromThe_(theStr) {
   return splitMulti_(theStr, ',').filter(function(tok) { return tok && !/\s/.test(tok); });
 }
-// Token CO khoang trang trong cot "Thẻ" la trang thai don Pancake (xem chu thich tren) — dung
-// _isExcludedOrderStatus_ (Huy/Tra lai/Hoan tien/That bai/Khieu nai, gom ca "Giao không thành")
-// de loai luon don do khoi doanh so/so don Bao cao B, giong cach A/C da loai theo cot Trang thai.
-function _donHasExcludedStatus_(theStr) {
-  var tokens = splitMulti_(theStr, ',').filter(function(tok) { return tok && /\s/.test(tok); });
-  return tokens.some(function(t) { return _isExcludedOrderStatus_(t); });
+// SUA 2026-09-30 theo xac nhan CUOI CUNG cua Duyen: viec loai don khoi doanh so Bao cao B
+// CHI dua vao MOT nguon DUY NHAT — cot rieng "Trạng thái" (cot O trong sheet "dữ liệu đơn"):
+// loai neu la Huỷ / Đã hoàn / Đang hoàn. Cot "Thẻ" (C) TUYET DOI KHONG con dung de xet trang
+// thai nua — chi dung de tach ten sale chia doanh thu (xem _donSaleNamesFromThe_ o tren).
+// (Ban than sheet cung da duoc Duyen xoa het cac dong Huy/Hoan/Dang hoan thu cong; ham nay
+// van giu de an toan cho du lieu phat sinh sau nay.)
+function _donHasExcludedStatus_(trangThaiCol) {
+  return _isExcludedOrderStatus_(trangThaiCol);
 }
 
 // ── Doc toan bo sheet "DT TỔNG " thanh mang object ──
@@ -1942,25 +1963,46 @@ function getDonOrderCountByPhone_() {
 }
 
 // ── Doc toan bo sheet "dữ liệu đơn" thanh mang object ──
+// Doc sheet "dữ liệu đơn" (nguon Bao cao B — Pos), co CACHE ngan (90s) vi day la sheet lon
+// (hang nghin dong) chi de DOC (CRM khong bao gio ghi vao sheet nay — du lieu vao tu Base/Pos
+// dong bo rieng), nen cache ngan giup Bao cao B/thay doi bo loc khong phai doc lai toan bo
+// sheet moi lan bam Loc — tang toc ro ret ma van cap nhat du lieu moi trong vong <=90s.
 function readDonChiTiet_() {
+  var cached = _cacheGetBig_('donChiTiet_v2');
+  if (cached) { try { return JSON.parse(cached); } catch (eParse) {} }
+
   var ss = getDTSS_();
   var sh = ss.getSheetByName(DON_CHITIET_SHEET);
   if (!sh) return [];
   var last = sh.getLastRow();
   if (last < 2) return [];
-  var vals = sh.getRange(2, 1, last - 1, 14).getValues();
+  var vals = sh.getRange(2, 1, last - 1, 15).getValues();
+  var tz = Session.getScriptTimeZone() || 'Etc/GMT-7';
   var out = [];
   for (var i = 0; i < vals.length; i++) {
     var r = vals[i];
     if (!r[1] && !r[3]) continue; // dong rong: khong co ngay va khong co khach
     var nguonDon = r[7] ? String(r[7]).trim() : '';
-    if (nguonDon.toLowerCase().indexOf('bảo hành') !== -1 || nguonDon.toLowerCase().indexOf('bao hanh') !== -1) continue; // loai don nguon bao hanh khoi bao cao doanh so B/C
+    // SUA 2026-09-30: TRUOC DAY loai don nguon "Bảo hành" khoi Bao cao B/C — nhung doi chieu
+    // voi bang ke toan (Duyen xac nhan), doanh thu don bao hanh CO duoc tinh (vd nguyenngo1988
+    // ky 1-10/9: 18.505.000 chi khop tuyet doi neu TINH ca 28 don nguon "Bảo hành" trong ky).
+    // Bo han dieu kien loai nay — khong con exclude theo nguonDon nua.
+    // Chuan hoa ve chuoi "dd/MM/yyyy" NGAY TAI DAY (khong giu nguyen Date object) — de:
+    //  (1) parseVNDate_ luon nhan dung 1 dinh dang bat ke o goc la Date hay text,
+    //  (2) ket qua serialize/deserialize duoc qua JSON.stringify khi cache (Date bi doi
+    //      thanh chuoi ISO "T..." se KHONG khop dinh dang parseVNDate_ dang cho, gay sai lech
+    //      ngay am tham neu khong chuan hoa truoc).
+    var ngayRaw = r[1];
+    var ngayTaoDon = (Object.prototype.toString.call(ngayRaw) === '[object Date]' && !isNaN(ngayRaw))
+      ? Utilities.formatDate(ngayRaw, tz, 'dd/MM/yyyy')
+      : ngayRaw;
     out.push({
-      ngayTaoDon:    r[1],
+      ngayTaoDon:    ngayTaoDon,
       khachHang:     r[3],
       soDienThoai:   r[4],
       nguonDon:      nguonDon,
       theSale:       r[2] ? String(r[2]) : '',   // cot "Thẻ" (C) — danh sach sale tham gia don, tach bang dau phay ','
+      trangThai:     r[14] ? String(r[14]).trim() : '', // cot "Trạng thái" (O) — nguon RIENG, doc lap voi trang thai co the lap trong cot "Thẻ"
       sanPham:       r[8] ? String(r[8]) : '',   // tach bang dau phay ','
       maSanPham:     r[9] ? String(r[9]) : '',   // tach bang dau cham phay ';' — KHAC voi sanPham/soLuong
       soLuong:       r[10] ? String(r[10]) : '', // tach bang dau phay ','
@@ -1969,6 +2011,7 @@ function readDonChiTiet_() {
       marketer:      r[13] ? String(r[13]).trim() : ''
     });
   }
+  try { _cachePutBig_('donChiTiet_v2', JSON.stringify(out), 90); } catch (eCache) {}
   return out;
 }
 
@@ -2576,7 +2619,7 @@ function buildSalesReportB_(filters) {
     var row = rows[i];
     var dt = parseVNDate_(row.ngayTaoDon);
     if (!dateInRange_(dt, filters.dateFrom, filters.dateTo)) continue;
-    if (_donHasExcludedStatus_(row.theSale)) continue; // bo don Huy/Giao khong thanh/Hoan tien... (trang thai nam chung cot The o POS)
+    if (_donHasExcludedStatus_(row.trangThai)) continue; // bo don Huy/Da hoan/Dang hoan — CHI xet theo cot "Trạng thái" rieng (cot O), khong xet cot "Thẻ" nua
     if (nguonFilterArr.length && nguonFilterArr.indexOf(row.nguonDon) === -1) continue;
     if (marketerFilterArr.length && marketerFilterArr.indexOf(row.marketer) === -1) continue;
     if (saleFilterArr.length) {
@@ -2674,7 +2717,7 @@ function buildSalesReportB_(filters) {
     orders: matched.map(function(m){
       return {
         ngayTaoDon: m.ngayTaoDon, khachHang: m.khachHang, soDienThoai: m.soDienThoai,
-        nguonDon: m.nguonDon, theSale: m.theSale, sanPham: m.sanPham, maSanPham: m.maSanPham, soLuong: m.soLuong,
+        nguonDon: m.nguonDon, theSale: m.theSale, trangThai: m.trangThai, sanPham: m.sanPham, maSanPham: m.maSanPham, soLuong: m.soLuong,
         giaTriSauGiam: m.giaTriSauGiam, cod: m.cod, marketer: m.marketer
       };
     })
@@ -5297,12 +5340,75 @@ function _driveImageBase64_(fileId) {
   } catch (e) { return null; }
 }
 
+// ─── TU CAM (Sheet "Lưu ý từ cấm", file rieng "Report Sale" — theo yeu cau Duyen 27/09/2026):
+// AI TUYET DOI KHONG duoc dung cac tu/cum tu trong cot "Từ cấm" khi soan cau tra loi (vi du:
+// ngon ngu thien ve tam linh/mac dinh nhu "tai loc", "van may", tu mang tinh cam ket chac chan
+// nhu "cam kết"/"mang lai", dieu huong sang nen tang khac...). Kem theo goi y "Từ được dùng"
+// (cach dien dat thay the duoc phep) khi cot do co du lieu. Doc dong (khong hardcode ten cot cu
+// the, chi do theo tu khoa header "tu cam"/"duoc dung" — cung tinh than voi _priceCols_/CTKM o
+// tren) tu 1 file Google Sheet KHAC voi PRICE_SS_ID (file "Report Sale" rieng cua team Sale).
+var BANNED_WORDS_SS_ID = '1qyyG2Pj8QOVNTb4B9JX8VQsrjFlZX-WhpovX1qDkvzM';
+var BANNED_WORDS_GID = 1343060455; // tab "Lưu ý từ cấm"
+
+function readBannedWordsList_() {
+  try {
+    var ss = SpreadsheetApp.openById(BANNED_WORDS_SS_ID);
+    var sh = ss.getSheetById(BANNED_WORDS_GID);
+    if (!sh || sh.getLastRow() < 2) return [];
+    var lastRow = sh.getLastRow(), lastCol = Math.max(sh.getLastColumn(), 3);
+    var vals = sh.getRange(1, 1, lastRow, lastCol).getValues();
+    var hIdx = _detectHeaderRow_(vals, 12);
+    var headers = vals[hIdx].map(function(h) { return String(h || '').trim(); });
+    var bannedIdx = -1, allowedIdx = -1;
+    for (var c = 0; c < headers.length; c++) {
+      var st = _stripVN_(headers[c]);
+      if (bannedIdx < 0 && st.indexOf('tu cam') !== -1) { bannedIdx = c; continue; }
+      if (allowedIdx < 0 && st.indexOf('duoc dung') !== -1) allowedIdx = c;
+    }
+    if (bannedIdx < 0) return []; // khong tim thay cot "Tu cam" -> khong co gi de ap, bo qua an toan
+    var out = [];
+    for (var i = hIdx + 1; i < vals.length; i++) {
+      var cell = vals[i][bannedIdx];
+      if (!cell) continue;
+      var words = String(cell).split(/[,;\/\n]/).map(function(w) { return w.trim(); }).filter(Boolean);
+      if (!words.length) continue;
+      var allowed = allowedIdx >= 0 ? String(vals[i][allowedIdx] || '').trim() : '';
+      out.push({ words: words, allowed: allowed });
+    }
+    return out;
+  } catch (e) { return []; } // loi doc sheet (vd mat quyen truy cap) -> bo qua danh sach tu cam, KHONG lam hong ca cau tra loi AI
+}
+
+// Cache 30 phut — danh sach tu cam it thay doi, tranh mo them 1 spreadsheet MOI LAN goi AI.
+function _bannedWordsPromptBlock_() {
+  var cache = CacheService.getScriptCache();
+  var cKey = 'banned_words_v1';
+  var cached = cache.get(cKey);
+  var list;
+  if (cached) { try { list = JSON.parse(cached); } catch (e) {} }
+  if (!list) {
+    list = readBannedWordsList_();
+    try { cache.put(cKey, JSON.stringify(list), 1800); } catch (e) {}
+  }
+  if (!list || !list.length) return '';
+  var lines = list.map(function(item) {
+    var s = '- KHONG duoc dung: ' + item.words.join(', ');
+    if (item.allowed) s += ' → thay bằng: "' + item.allowed + '"';
+    return s;
+  });
+  return '\n\n⚠️ DANH SÁCH TỪ CẤM (BẮT BUỘC — TUYỆT ĐỐI KHÔNG được dùng trong câu trả lời, kể cả viết tắt/biến thể gần giống, kể cả khi khách hỏi trực tiếp bằng từ đó):\n' +
+    lines.join('\n') +
+    '\n\nNếu cần diễn đạt ý liên quan, dùng từ ngữ thay thế phù hợp (xem gợi ý "→" ở trên nếu có), KHÔNG dùng nguyên văn từ cấm dưới bất kỳ hình thức nào.';
+}
+
 // ─── Prompt he thong: kien thuc san pham CHI nap khi CS bat "Tra cuu san pham" ───
 function _buildAISystemPrompt_(userMsg, withProducts) {
   var ctx = readAIContext_();
   var trunc_ = function(str, n) { return str && str.length > n ? str.substring(0, n) + '...' : str; };
   var parts = [];
   parts.push(ctx.systemPrompt || 'Ban la chuyen vien cham soc khach hang. Tra loi bang tieng Viet, than thien, ngan gon.');
+  var bannedBlock = _bannedWordsPromptBlock_();
+  if (bannedBlock) parts.push(bannedBlock);
   if (ctx.careProcess)    parts.push('\n\nQUY TRINH CSKH:\n'    + trunc_(ctx.careProcess, 600));
   if (ctx.callbackScript) parts.push('\n\nKICH BAN GOI LAI:\n'  + trunc_(ctx.callbackScript, 500));
   if (ctx.salesScriptCu)  parts.push('\n\nKICH BAN KHACH CU:\n' + trunc_(ctx.salesScriptCu, 500));
@@ -5340,6 +5446,7 @@ function _buildAISystemPrompt_(userMsg, withProducts) {
   } else {
     parts.push('\n\nYEU CAU: Chi dua ra DUY NHAT 1 cau tra loi ngan gon (toi da 150 tu). Khong danh so, khong giai thich them.');
   }
+  if (bannedBlock) parts.push('\n\nNHAC LAI: kiem tra cau tra loi TRUOC KHI gui — neu co dung tu nao trong DANH SACH TU CAM o tren, PHAI viet lai bang tu thay the, KHONG duoc gui cau co chua tu cam.');
   return parts.join('');
 }
 

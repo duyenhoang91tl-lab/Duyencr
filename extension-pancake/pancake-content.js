@@ -126,6 +126,9 @@
   let CARE_STATUS_TREE = null; // cay "Tinh trang CS" load dong tu GAS (dong bo voi appweb/Zalo AI)
   let CUSTOM_FIELDS = []; // "truong tu tao" (admin them ben app web chinh) — load dong tu GAS
   let _currentNick = ''; // Nick Zalo/kenh CS dang dung, sticky (chrome.storage.sync)
+  let _goldUnitAmount = 350000; // Don gia 1 don vi "vang" (d) — admin cai o CRM (gear Cai dat >
+                                 // Don gia vang) hoac o Options cua Pancake AI, luu chung setting
+                                 // GAS 'goldUnitAmount' de dong bo toan team. Mac dinh 350k neu chua cai.
   let _chatKeyPhoneMap = {}; // { chatKey: phone } — "danh ba nguoc" hoc cuc bo tren may nay
                              // (giong _chatNamePhoneMap ben Zalo AI), dung cho nut Lien ket doan chat
   let _currentPhone = '';
@@ -146,6 +149,7 @@
     observeConversationChanges();
     loadCsNames_();
     loadNickList_();
+    loadGoldUnitAmount_();
     if (!IS_PHONGTHUY) { loadCareStatusTree_(); loadCustomFields_(); } // cay dung chung cho Pancake/Zalo (san pham suc khoe) — khong ap dung cho phong thuy
     loadChatKeyMap_();
     startCarePoll_();
@@ -329,7 +333,7 @@
           <select id="pk-cs-sel"></select>
         </div>
         <div id="pk-ai-nick-row">
-          <label>💬 Nick</label>
+          <label>💬 Nick Zalo</label>
           <select id="pk-nick-sel"></select>
           <button id="pk-nick-add" title="Thêm nick mới">＋</button>
         </div>
@@ -392,25 +396,44 @@
           </div>
           <div id="pk-cart-extra">
             <div class="pk-cart-extra-row">
+              <label>Danh xưng</label>
+              <select id="pk-cart-honorific" style="width:76px">
+                <option value="">—</option>
+                <option value="Anh">Anh</option>
+                <option value="Chị">Chị</option>
+              </select>
+              <input type="text" id="pk-cart-custname" placeholder="Tên khách hàng" style="flex:1" />
+              <input type="text" id="pk-cart-custphone" placeholder="SĐT" style="width:110px" />
+            </div>
+            <div class="pk-cart-extra-row">
+              <label>📍 Địa chỉ</label>
+              <input type="text" id="pk-cart-address" placeholder="Địa chỉ giao hàng..." style="flex:1" />
+            </div>
+            <div class="pk-cart-extra-row">
               <label>🎁 Quà tặng kèm</label>
               <input type="text" id="pk-cart-gift" placeholder="VD: tặng 1 vòng phong thủy nhỏ..." />
             </div>
             <div class="pk-cart-extra-row">
-              <label>Giảm giá</label>
+              <label>Giảm giá tổng</label>
               <select id="pk-cart-discount-type">
                 <option value="none">Không giảm</option>
                 <option value="percent">% </option>
                 <option value="amount">Số tiền</option>
               </select>
               <input type="number" id="pk-cart-discount-value" placeholder="0" min="0" style="display:none" />
+              <span style="font-size:10px;color:#9d174d;opacity:.8;display:block;width:100%">Chỉ áp dụng cho SP có tích "Tính vào Giảm giá tổng" ở từng dòng bên trên</span>
             </div>
             <div class="pk-cart-extra-row">
-              <label>Thêm vàng (k)</label>
-              <input type="number" id="pk-cart-gold" placeholder="0" min="0" title="Tiền vàng thêm, nghìn đồng (VD 500 = 500.000đ)" />
+              <label id="pk-cart-gold-label">Thêm vàng (SL × 350.000đ)</label>
+              <input type="number" id="pk-cart-gold" placeholder="0" min="0" title="Nhập số lượng — mỗi đơn vị = 350.000đ (VD: 2 = 700.000đ). Đơn giá do admin cài trên CRM hoặc Options Pancake AI." />
             </div>
             <div class="pk-cart-extra-row">
               <label><input type="checkbox" id="pk-cart-freeship" /> Freeship</label>
               <span style="font-size:10px;color:#9d174d;opacity:.8">không tích → tự cộng 40k ship</span>
+            </div>
+            <div class="pk-cart-extra-row">
+              <label>Trạng thái đơn</label>
+              <input type="text" id="pk-cart-status" placeholder="VD: ĐÃ CHUYỂN FULL - khách qua cửa hàng lấy" style="flex:1" />
             </div>
           </div>
           <div id="pk-cart-total"></div>
@@ -492,7 +515,7 @@
     panelEl.querySelector("#pk-ai-refresh").addEventListener("click", () => {
       requestSuggestion(true);
     });
-    var _AI_PROVIDER_LABEL = { gemini: "Gemini (Google)", openai: "OpenAI (ChatGPT)" };
+    var _AI_PROVIDER_LABEL = { gemini: "Gemini (Google)", groq: "Groq", cerebras: "Cerebras", openrouter: "OpenRouter", openai: "OpenAI (ChatGPT)" };
   function _refreshAiKeyBanner() {
     var box = panelEl && panelEl.querySelector("#pk-ai-key-banner");
     if (!box) return;
@@ -580,6 +603,15 @@
         if (rows.length) rows[rows.length - 1].focus();
       }, 30);
     });
+    panelEl.querySelector('#pk-cart-honorific').addEventListener('change', (e) => { _cartExtra.honorific = e.target.value; saveCart_(); });
+    panelEl.querySelector('#pk-cart-custname').addEventListener('input', (e) => { _cartExtra.custName = e.target.value; });
+    panelEl.querySelector('#pk-cart-custname').addEventListener('change', () => { saveCart_(); });
+    panelEl.querySelector('#pk-cart-custphone').addEventListener('input', (e) => { _cartExtra.custPhone = e.target.value; });
+    panelEl.querySelector('#pk-cart-custphone').addEventListener('change', () => { saveCart_(); });
+    panelEl.querySelector('#pk-cart-address').addEventListener('input', (e) => { _cartExtra.address = e.target.value; });
+    panelEl.querySelector('#pk-cart-address').addEventListener('change', () => { saveCart_(); });
+    panelEl.querySelector('#pk-cart-status').addEventListener('input', (e) => { _cartExtra.status = e.target.value; });
+    panelEl.querySelector('#pk-cart-status').addEventListener('change', () => { saveCart_(); });
     panelEl.querySelector('#pk-cart-gift').addEventListener('input', (e) => { _cartExtra.gift = e.target.value; });
     panelEl.querySelector('#pk-cart-gift').addEventListener('change', () => { saveCart_(); });
     panelEl.querySelector('#pk-cart-discount-type').addEventListener('change', (e) => {
@@ -610,7 +642,7 @@
       if (!_cartItems.length) return;
       if (!confirm('Xoá toàn bộ đơn hàng đang tính cho khách này?')) return;
       _cartItems = [];
-      _cartExtra = { gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, priceInK: false };
+      _cartExtra = { honorific: '', custName: '', custPhone: '', address: '', gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, status: '', priceInK: false };
       saveCart_(); renderCart_();
     });
     if (IS_PHONGTHUY) {
@@ -683,6 +715,25 @@
     sel.innerHTML = '<option value="">— Chọn nick —</option>' +
       NICK_LIST.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
     sel.value = _currentNick || '';
+  }
+
+  // Đơn giá 1 đơn vị "vàng" (đ) — admin cài ở CRM (⚙ Cài đặt > Đơn giá vàng, trong Báo cáo
+  // doanh số) hoặc ở Options của Pancake AI; cả 2 nơi đều ghi chung setting GAS 'goldUnitAmount'
+  // nên chỉ cần cài 1 chỗ là áp dụng cho toàn team. Mặc định 350.000đ nếu GAS chưa có setting này.
+  function loadGoldUnitAmount_() {
+    safeSendMessage_({ type: "GET_GOLD_UNIT" }, (resp) => {
+      const n = Number(resp?.ok ? resp.data : NaN);
+      _goldUnitAmount = (n > 0) ? n : 350000;
+      updateGoldUnitLabel_();
+    });
+  }
+
+  function updateGoldUnitLabel_() {
+    const label = panelEl?.querySelector('#pk-cart-gold-label');
+    const input = panelEl?.querySelector('#pk-cart-gold');
+    const unitTxt = _goldUnitAmount.toLocaleString('vi-VN') + 'đ';
+    if (label) label.textContent = `Thêm vàng (SL × ${unitTxt})`;
+    if (input) input.title = `Nhập số lượng — mỗi đơn vị = ${unitTxt} (VD: 2 = ${(2 * _goldUnitAmount).toLocaleString('vi-VN')}đ). Đơn giá do admin cài trên CRM hoặc Options Pancake AI.`;
   }
 
   // ── "Tình trạng CS": nạp cây phân nhóm động từ GAS (đồng bộ với appweb/Zalo AI) ──
@@ -1864,6 +1915,11 @@
   const _bldBlank_ = () => ({ q: '', nhom: '', ten: '', size: '', cl: '', cand: '', mau: '', dam: '', qty: 1,
     priceK: '', priceEdited: false, promoType: 'none', promoVal: '' });
   let _bld = _bldBlank_();
+  // Bat/tat rieng khoi "CTKM tham khao" (thong tin cac chuong trinh CTKM lien quan san pham dang
+  // chon) trong Soan don — TACH BIET voi muc "CTKM cho sản phẩm này" (select Khong/Giam tien/Giam
+  // %/Tang qua) o tren, muc do LUON hien de Sale ap CTKM cho tung don nhu binh thuong. Mac dinh AN
+  // cho gon (nhieu san pham khong co CTKM nao, hien san se roi mat); Sale tu tich de xem khi can.
+  let _showCtkmInfo = false;
 
   const _fold_ = (s) => _stripVNlocal_(String(s || '').normalize('NFC')).replace(/\s+/g, ' ').trim();
   const _vnSort_ = (a, b) => String(a).localeCompare(String(b), 'vi', { numeric: true });
@@ -2135,14 +2191,19 @@
         // Panel tham khảo: các dòng CTKM (sheet CTKM, nằm cạnh sheet giá) có nhắc tới sản phẩm
         // đang soạn — CHỈ để CS xem/đối chiếu, KHÔNG tự điền vào ô Giảm tiền/Giảm % ở trên (cấu
         // trúc sheet CTKM tự do, không đoán chắc được số tiền/% để tự áp — tránh áp nhầm).
-        const ctkmMatches = _ctkmForProduct_(cand.t, cand.m);
-        if (ctkmMatches.length) {
-          html += `<div class="pk-builder-ctkm-box">
-            <div class="pk-builder-ctkm-title">🎉 CTKM đang có, liên quan sản phẩm này (tham khảo — không tự áp vào giá):</div>
-            ${ctkmMatches.map((t) => `<div class="pk-builder-ctkm-row">${escapeHtml(t)}</div>`).join('')}
-          </div>`;
-        } else if (Array.isArray(_ctkmRows) && _ctkmRows.length) {
-          html += `<div class="pk-builder-ctkm-box pk-builder-ctkm-empty">🎉 Sheet CTKM hiện không có chương trình nào nhắc tới sản phẩm này.</div>`;
+        // Rieng KHOI nay co the AN/HIEN qua 1 o tich nho (khac voi muc "CTKM cho sản phẩm này" ở
+        // trên, muc do luon hien de Sale ap CTKM binh thuong) — mac dinh AN cho gon, tich moi hien.
+        html += `<label class="pk-ctkm-info-toggle"><input type="checkbox" id="pkb-ctkm-info-toggle" ${_showCtkmInfo ? 'checked' : ''} /> 🎁 Hiện thông tin CTKM tham khảo cho sản phẩm này</label>`;
+        if (_showCtkmInfo) {
+          const ctkmMatches = _ctkmForProduct_(cand.t, cand.m);
+          if (ctkmMatches.length) {
+            html += `<div class="pk-builder-ctkm-box">
+              <div class="pk-builder-ctkm-title">🎉 CTKM đang có, liên quan sản phẩm này (tham khảo — không tự áp vào giá):</div>
+              ${ctkmMatches.map((t) => `<div class="pk-builder-ctkm-row">${escapeHtml(t)}</div>`).join('')}
+            </div>`;
+          } else if (Array.isArray(_ctkmRows) && _ctkmRows.length) {
+            html += `<div class="pk-builder-ctkm-box pk-builder-ctkm-empty">🎉 Sheet CTKM hiện không có chương trình nào nhắc tới sản phẩm này.</div>`;
+          }
         }
       }
       html += `<div class="pk-builder-summary"><div id="pkb-line-total"></div><button id="pkb-add-btn" class="pk-price-addbtn">+ Thêm vào đơn</button></div>`;
@@ -2173,6 +2234,7 @@
     on('pkb-mau', (e) => { _bld.mau = e.target.value; });
     on('pkb-dam', (e) => { _bld.dam = e.target.value; });
     on('pkb-promotype', (e) => { _bld.promoType = e.target.value; _bld.promoVal = ''; renderBuilderDyn_(); });
+    on('pkb-ctkm-info-toggle', (e) => { _showCtkmInfo = e.target.checked; renderBuilderDyn_(); });
     const typing = (id, fn) => { const el = dyn.querySelector('#' + id); if (el) el.addEventListener('input', (e) => { fn(e.target.value); _refreshBldTotal_(); }); };
     typing('pkb-qty', (v) => { _bld.qty = v; });
     typing('pkb-price', (v) => { _bld.priceK = v; _bld.priceEdited = v !== ''; }); // xoá trống → quay lại giá tự động
@@ -2207,7 +2269,7 @@
   // Luu theo TUNG SDT khach (chrome.storage.local, rieng may nay) de doi qua lai giua cac
   // doan chat khac nhau khong bi lan/mat don dang tinh do.
   let _cartItems = [];
-  let _cartExtra = { gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, priceInK: false };
+  let _cartExtra = { honorific: '', custName: '', custPhone: '', address: '', gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, status: '', priceInK: false };
   let _cartLoadedFor = null;
 
   function _cartKey_(phone) { return 'pkCart_' + (phone || '_no_phone_'); }
@@ -2216,9 +2278,9 @@
     const key = _cartKey_(_currentPhone);
     if (_cartLoadedFor === key) { renderCart_(); return; }
     chrome.storage.local.get([key], (res) => {
-      const saved = res[key] || { items: [], extra: { gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0 } };
+      const saved = res[key] || { items: [], extra: { honorific: '', custName: '', custPhone: '', address: '', gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, status: '', priceInK: false } };
       _cartItems = saved.items || [];
-      _cartExtra = Object.assign({ gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, priceInK: false }, saved.extra || {});
+      _cartExtra = Object.assign({ honorific: '', custName: '', custPhone: '', address: '', gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, status: '', priceInK: false }, saved.extra || {});
       _cartLoadedFor = key;
       renderCart_();
     });
@@ -2238,6 +2300,8 @@
       id: 'ci_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
       name: item.name || '(chưa đặt tên)',
       note: item.note || '',
+      noteExtra: item.noteExtra || '', // Ghi chú thêm — CS tự gõ riêng cho sản phẩm này, độc lập với "note"
+                                        // nguồn (từ bảng giá) và độc lập với CTKM/giảm giá/tặng quà.
       qty: item.qty || 1,
       price: item.price || 0,
       chatLieu: clOptions ? '' : (item.chatLieu || ''),
@@ -2246,6 +2310,9 @@
       size: item.size || '',
       promoType: item.promoType || 'none',   // CTKM riêng của dòng: none | amount (k) | percent | gift
       promoValue: item.promoValue === undefined ? '' : item.promoValue,
+      inTotalDiscount: item.inTotalDiscount !== false, // co tinh vao "Giam gia TONG" (o pk-cart-discount-*,
+                                                        // ap dung tren tong cac SP duoc tich) hay khong.
+                                                        // Mac dinh CO tinh — bo tick de loai rieng SP nay ra.
       checked: true
     });
     saveCart_();
@@ -2298,6 +2365,12 @@
           <input type="text" class="pk-cart-promoval" value="${escapeHtml(it.promoValue === undefined ? '' : it.promoValue)}" placeholder="${it.promoType === 'gift' ? 'Quà tặng' : (it.promoType === 'percent' ? '% giảm' : 'Số tiền (k)')}" style="${(!it.promoType || it.promoType === 'none') ? 'display:none' : ''}" />
           <span class="pk-cart-linetotal"></span>
         </div>
+        <div class="pk-cart-noteextra-row">
+          <input type="text" class="pk-cart-noteextra" value="${escapeHtml(it.noteExtra || '')}" placeholder="📝 Ghi chú thêm cho sản phẩm này (không bắt buộc)" />
+        </div>
+        <label class="pk-cart-total-disc-chk" title="Có tính sản phẩm này vào mục 'Giảm giá tổng' bên dưới không">
+          <input type="checkbox" class="pk-cart-intotaldisc" ${it.inTotalDiscount !== false ? 'checked' : ''} /> Tính vào Giảm giá tổng
+        </label>
         ${it.note ? `<div class="pk-cart-note">${escapeHtml(it.note)}</div>` : ''}
       </div>
     `;
@@ -2350,12 +2423,26 @@
         _updateCartItem_(id, 'promoValue', it2 && it2.promoType === 'gift' ? e.target.value : (Number(e.target.value) || 0), true);
       });
       promoValEl.addEventListener('change', () => { saveCart_(); });
+      const noteExtraEl = row.querySelector('.pk-cart-noteextra');
+      noteExtraEl.addEventListener('input', (e) => { _updateCartItem_(id, 'noteExtra', e.target.value, true); });
+      noteExtraEl.addEventListener('change', () => { saveCart_(); });
+      row.querySelector('.pk-cart-intotaldisc').addEventListener('change', (e) => {
+        _updateCartItem_(id, 'inTotalDiscount', e.target.checked); saveCart_();
+      });
       row.querySelector('.pk-cart-del').addEventListener('click', () => {
         _cartItems = _cartItems.filter((x) => x.id !== id);
         saveCart_(); renderCart_();
       });
     });
 
+    panelEl.querySelector('#pk-cart-honorific').value = _cartExtra.honorific || '';
+    panelEl.querySelector('#pk-cart-custname').value = _cartExtra.custName || '';
+    // Tu dien SDT tu ngu canh doan chat (_currentPhone) neu Sale CHUA tung go gi vao o nay —
+    // go tay roi thi giu nguyen theo Sale, khong ghi de nua (vd SDT nguoi nhan khac SDT chat).
+    if (!_cartExtra.custPhone && _currentPhone) _cartExtra.custPhone = _currentPhone;
+    panelEl.querySelector('#pk-cart-custphone').value = _cartExtra.custPhone || '';
+    panelEl.querySelector('#pk-cart-address').value = _cartExtra.address || '';
+    panelEl.querySelector('#pk-cart-status').value = _cartExtra.status || '';
     panelEl.querySelector('#pk-cart-gift').value = _cartExtra.gift || '';
     panelEl.querySelector('#pk-cart-discount-type').value = _cartExtra.discountType || 'none';
     panelEl.querySelector('#pk-cart-discount-value').value = _cartExtra.discountValue || '';
@@ -2383,18 +2470,21 @@
     return _applyPromo_(base, i.promoType, i.promoValue);
   }
 
-  // Tính tổng cả đơn: tạm tính (đã trừ CTKM từng dòng) − giảm giá chung + tiền vàng + ship (40k nếu không Freeship)
+  // Tính tổng cả đơn: tạm tính (đã trừ CTKM từng dòng) − Giảm giá TỔNG (chỉ tính trên các dòng có
+  // tích "Tính vào Giảm giá tổng" — VD 10 SP mà chỉ tích 3 thì % hoặc số tiền giảm chỉ áp trên
+  // tổng 3 dòng đó, không áp lên cả đơn) + tiền vàng + ship (40k nếu không Freeship).
   function _cartTotals_() {
     const checked = _cartItems.filter((i) => i.checked);
     const subtotal = checked.reduce((s, i) => s + _lineTotal_(i), 0);
+    const discBase = checked.filter((i) => i.inTotalDiscount !== false).reduce((s, i) => s + _lineTotal_(i), 0);
     let discountAmt = 0;
-    if (_cartExtra.discountType === 'percent') discountAmt = Math.round(subtotal * (Number(_cartExtra.discountValue) || 0) / 100);
+    if (_cartExtra.discountType === 'percent') discountAmt = Math.round(discBase * (Number(_cartExtra.discountValue) || 0) / 100);
     else if (_cartExtra.discountType === 'amount') discountAmt = Number(_cartExtra.discountValue) || 0;
-    discountAmt = Math.min(discountAmt, subtotal);
-    const gold = (Number(_cartExtra.gold) || 0) * 1000;
+    discountAmt = Math.min(discountAmt, discBase);
+    const gold = (Number(_cartExtra.gold) || 0) * _goldUnitAmount;
     const ship = _cartExtra.freeship ? 0 : PK_SHIP_FEE;
     const total = subtotal - discountAmt + gold + ship;
-    return { checked, subtotal, discountAmt, gold, ship, total };
+    return { checked, subtotal, discBase, discountAmt, gold, ship, total };
   }
 
   function _renderCartTotal_() {
@@ -2408,40 +2498,83 @@
     });
     panelEl.querySelector('#pk-cart-total').innerHTML =
       `<div>Tạm tính (${t.checked.length} sản phẩm): <b>${fmt(t.subtotal)}</b></div>` +
-      (t.discountAmt > 0 ? `<div>Giảm giá chung: <b>-${fmt(t.discountAmt)}</b></div>` : '') +
+      (t.discountAmt > 0 ? `<div>Giảm giá tổng (trên ${_cartItems.filter(i=>i.checked && i.inTotalDiscount!==false).length} SP đã tích): <b>-${fmt(t.discountAmt)}</b></div>` : '') +
       (t.gold > 0 ? `<div>Thêm vàng: <b>+${fmt(t.gold)}</b></div>` : '') +
       `<div>Phí ship: <b>${t.ship ? '+' + fmt(t.ship) : 'Miễn phí'}</b></div>` +
       `<div class="pk-cart-total-final">Tổng đơn: <b>${fmt(t.total)}</b>${_cartExtra.freeship ? ' <span class="pk-cart-freeship-tag">Freeship</span>' : ''}</div>`;
   }
 
-  // Đơn để copy gửi khách, theo mẫu:
-  //   1. 1 nhẫn tỳ hưu TL size 1 chất liệu lam thủy màu vàng nhạt giá 6.350k
-  //   2. 1 lắc tỳ hưu truyền thống ... giá 10.550k
-  //   3. miễn phí ship, tổng đơn 16.900k
+  // Viet hoa chu cai DAU TIEN cua ca cau, phan con lai ha chu thuong — de ten san pham tu
+  // DANH_MUC (thuong go VIET HOA HET) in ra don gon nhu Sale tu go tay ("Cuốn 5 ngọc lam thuỷ"),
+  // khong VIET HOA HET nhu la dang HET (gay cam giac quat thao/gap).
+  function _sentenceCase_(s) {
+    s = String(s || '').trim().toLowerCase();
+    if (!s) return s;
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
+  // Đơn để copy gửi khách, theo mẫu Duyên yêu cầu 2026-09:
+  //   Chị My Dung Luu 0979766576
+  //   Địa chỉ: 244 nguyễn thái học ba đình hà nội
+  //   Cuốn 5 ngọc lam thuỷ 4950k giảm 5% còn 4702k
+  //   Mix bi vàng 10k 380x2 = 760k
+  //   Tổng sau giảm: 10.535k
+  //   Freeship
+  //   Quà tặng kèm: một bình đá
+  //   ĐÃ CHUYỂN FULL - khách qua cửa hàng lấy
   // Mỗi dòng đều qua sanitizeProductName_ (sheet "Lưu ý từ cấm") để không dính từ cấm.
   function _buildCartSummaryText_() {
     const t = _cartTotals_();
-    const k = (n) => (n / 1000).toLocaleString('vi-VN') + 'k';
+    if (!t.checked.length) return ''; // chua tick san pham nao -> tra ve rong, nut Sao chep se bao "chua co san pham" thay vi copy 1 don gan nhu trong
+    // kNum: chỉ số đã quy đổi nghìn, CHƯA có chữ 'k' (dùng trong "380x2 = ..." — số nhân KHÔNG
+    // kèm 'k', chỉ số cuối mới kèm). k: có kèm 'k' (dùng cho giá gốc/giá sau giảm).
+    const kNum = (n) => Math.round(n / 1000).toLocaleString('vi-VN');
+    const k = (n) => kNum(n) + 'k';
     const clean = (str) => sanitizeProductName_(str);
-    const lines = t.checked.map((i) => {
-      const qty = Number(i.qty) || 1;
+
+    const itemLines = t.checked.map((i) => {
+      const name = _sentenceCase_(String(i.name || '').replace(/^trang sức\s+/i, ''));
       const size = (i.size && i.size !== '(mặc định)') ? ' ' + String(i.size).toLowerCase() : '';
       const cl = i.chatLieu ? ' chất liệu ' + String(i.chatLieu).toLowerCase() : '';
       const mau = i.mauSac ? ' màu ' + String(i.mauSac).toLowerCase() : '';
-      let promo = '';
-      if (i.promoType === 'amount' && Number(i.promoValue)) promo = ` (đã giảm ${Number(i.promoValue).toLocaleString('vi-VN')}k)`;
-      else if (i.promoType === 'percent' && Number(i.promoValue)) promo = ` (đã giảm ${Number(i.promoValue)}%)`;
-      else if (i.promoType === 'gift' && i.promoValue) promo = ` + tặng ${i.promoValue}`;
-      // tên hạ chữ thường TRƯỚC khi sanitize để các viết tắt (TL, lpt) giữ nguyên
-      return clean(`${qty} ${String(i.name || '').toLowerCase().replace(/^trang sức\s+/, '')}${size}${cl}${mau} giá ${k(_lineTotal_(i))}${promo}`);
+      const desc = `${name}${size}${cl}${mau}`;
+      const qty = Math.max(1, Number(i.qty) || 1);
+      const unit = Number(i.price) || 0;
+      const total = _lineTotal_(i);
+
+      let priceText;
+      if (i.promoType === 'percent' && Number(i.promoValue) > 0) {
+        priceText = `${k(unit)}${qty > 1 ? 'x' + qty : ''} giảm ${Number(i.promoValue)}% còn ${k(total)}`;
+      } else if (i.promoType === 'amount' && Number(i.promoValue) > 0) {
+        priceText = `${k(unit)}${qty > 1 ? 'x' + qty : ''} giảm ${Number(i.promoValue).toLocaleString('vi-VN')}k còn ${k(total)}`;
+      } else if (qty > 1) {
+        priceText = `${kNum(unit)}x${qty} = ${k(total)}`; // vd "380x2 = 760k" — so nhan KHONG kem 'k'
+      } else {
+        priceText = k(total);
+      }
+      const giftSuffix = (i.promoType === 'gift' && i.promoValue) ? ` + tặng ${i.promoValue}` : '';
+      const noteSuffix = i.noteExtra ? ` (${i.noteExtra})` : '';
+      return clean(`${desc} ${priceText}${giftSuffix}${noteSuffix}`);
     });
-    const extra = [];
-    if (t.gold > 0) extra.push(`thêm vàng ${k(t.gold)}`);
-    if (t.discountAmt > 0) extra.push(`giảm thêm ${k(t.discountAmt)}`);
-    if (_cartExtra.gift) extra.push(`tặng kèm ${_cartExtra.gift}`);
-    extra.push(t.ship ? `phí ship ${k(t.ship)}, tổng đơn ${k(t.total)}` : `miễn phí ship, tổng đơn ${k(t.total)}`);
-    const all = lines.concat(extra.map(clean));
-    return all.map((l, idx) => `${idx + 1}. ${l}`).join('\n');
+
+    const lines = [];
+    const custLine = [_cartExtra.honorific, _cartExtra.custName, _cartExtra.custPhone].filter((x) => x && String(x).trim()).join(' ');
+    if (custLine) lines.push(clean(custLine));
+    if (_cartExtra.address) lines.push(clean(`Địa chỉ: ${_cartExtra.address}`));
+    lines.push(...itemLines);
+
+    // "Tổng sau giảm" = tạm tính đã trừ CTKM từng dòng + giảm giá chung — CHƯA gồm vàng/ship.
+    const afterDiscount = t.subtotal - t.discountAmt;
+    lines.push(`Tổng sau giảm: ${k(afterDiscount)}`);
+    if (t.gold > 0) lines.push(`Thêm vàng: ${k(t.gold)}`);
+    lines.push(t.ship > 0 ? `Phí ship: ${k(t.ship)}` : 'Freeship');
+    if (_cartExtra.gift) lines.push(clean(`Quà tặng kèm: ${_cartExtra.gift}`));
+    // Chi them dong "Tong cong" khi co vang/ship lam tong cuoi KHAC voi "Tong sau giam" o tren —
+    // tranh lap lai 1 con so y het (nhu vi du cua Duyen: Freeship + khong vang -> khong can dong nay).
+    if (t.total !== afterDiscount) lines.push(`Tổng cộng: ${k(t.total)}`);
+    if (_cartExtra.status) lines.push(clean(_cartExtra.status));
+
+    return lines.join('\n');
   }
 
   function escapeHtml(s) {

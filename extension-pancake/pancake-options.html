@@ -32,6 +32,17 @@
     <span>🔍 Tra cứu sản phẩm (nạp dữ liệu Google Sheet sản phẩm/FAQ khi soạn gợi ý — giống checkbox bên Zalo AI)</span>
   </div>
 
+  <h2>💰 Đơn giá vàng (mục "Thêm vàng" trong Soạn đơn)</h2>
+  <div class="hint">
+    Ô "Thêm vàng" trong giỏ hàng giờ nhập theo <b>số lượng</b> (1, 2, 3...), không phải tiền trực tiếp nữa.
+    Số tiền cộng vào đơn = số lượng × đơn giá bên dưới. Đơn giá này dùng CHUNG với CRM (chỉnh ở đây hoặc
+    chỉnh trên CRM đều áp dụng cho <b>cả team</b> ngay, vì cùng lưu 1 setting trên Google Sheets).
+  </div>
+  <label>Đơn giá 1 đơn vị vàng (đ)
+    <input type="number" id="goldUnitAmount" min="1" step="1000" placeholder="350000" style="width:140px" />
+  </label>
+  <span id="goldUnitStatus" class="hint" style="display:inline-block;margin-left:8px"></span>
+
   <h2>Nền tảng áp dụng</h2>
   <label><input type="checkbox" id="platformPancake" /> Kích hoạt trên Pancake (pancake.vn / pages.fm)</label>
   <label><input type="checkbox" id="platformMessenger" /> Kích hoạt trên Messenger (messenger.com)</label>
@@ -105,6 +116,9 @@
   <select id="aiProvider">
     <option value="">— Dùng chung (mặc định, qua backend công ty) —</option>
     <option value="gemini">Gemini (Google)</option>
+    <option value="groq">Groq</option>
+    <option value="cerebras">Cerebras</option>
+    <option value="openrouter">OpenRouter</option>
     <option value="openai">OpenAI (ChatGPT)</option>
   </select>
   <div id="aiProviderHint" class="hint" style="display:none"></div>
