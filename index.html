@@ -12005,6 +12005,7 @@ var _srState = {
   bSanPham: '', bCareStatus: [], bKhStatus: [], bZaloStatus: [], bNickZalo: '', // B — them loc CRM (co SDT de noi)
   dataA: null, dataB: null,
   loading: false,
+  lastFetchError: '', // thong bao loi THAT cua lan _srFetch gan nhat (timeout/mang/GAS loi) — de phan biet voi "that su khong co don nao khop bo loc"
   saleOptions: [], kenhOptions: [], nguonOptions: [], marketerOptions: [], saleBOptions: [], teamOptions: [], optionsLoaded: false,
   saleSearch: '', kenhSearch: '', teamSearch: '', productSearch: '', bSaleSearch: '', // lọc nhanh client-side trên bảng breakdown
   showCoc: true, // A — hiện/ẩn cột Cọc trên các bảng breakdown (chỉ tham khảo, không tính vào doanh thu)
@@ -12310,14 +12311,58 @@ function _srEnforceScope(){
   _srState.fSale = my.slice();
 }
 
+// SUA (theo bao cao Duyen: "lọc tháng 7-8-9 load khá lâu nhưng không ra kết quả"): truoc day
+// MOI loai loi (timeout do khoang ngay loc qua rong/nhieu don, GAS tra ve trang loi HTML thay vi
+// JSON, mat mang...) deu bi nuot am tham thanh return null, khien cac man hinh bao cao hien
+// y het "Chưa có dữ liệu" NHU THE la khong co don nao khop bo loc — trong khi that ra request
+// bi LOI/TIMEOUT chu khong phai that su rong. Gio ghi lai LOI THAT vao _srState.lastFetchError
+// de cac man hinh phan biet duoc va bao dung nguyen nhan cho CS, thay vi danh lua la "0 ket qua".
+// Them timeout 55s (AbortController) de khong treo vo han khi GAS xu ly qua lau voi khoang ngay
+// rong (vd loc gop nhieu thang) — qua gio bao loi ro rang kem goi y thu loc tung thang mot.
 async function _srFetch(action, params){
   if (!gsUrl) return null;
+  _srState.lastFetchError = '';
   var sep = gsUrl.includes('?') ? '&' : '?';
   var qs = Object.keys(params).map(function(k){ return k+'='+encodeURIComponent(params[k]||''); }).join('&');
+  var ac = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+  var timer = ac ? setTimeout(function(){ ac.abort(); }, 55000) : null;
   try{
-    var r = await fetch(gsUrl + sep + 'action=' + action + '&' + qs, { redirect:'follow' });
-    return await r.json();
-  }catch(e){ return null; }
+    var r = await fetch(gsUrl + sep + 'action=' + action + '&' + qs, { redirect:'follow', signal: ac ? ac.signal : undefined });
+    if (timer) clearTimeout(timer);
+    if (!r.ok) {
+      _srState.lastFetchError = 'Server trả về lỗi HTTP ' + r.status + ' — thử lọc lại, nếu vẫn vậy thì báo lại khoảng ngày/bộ lọc đang dùng.';
+      return null;
+    }
+    var txt = await r.text();
+    try {
+      return JSON.parse(txt);
+    } catch (eParse) {
+      // GAS thuong tra ve 1 trang HTML loi (vd "Exceeded maximum execution time") thay vi JSON
+      // khi script chay qua 6 phut hoac gap loi khong bat duoc — rat hay gap khi khoang ngay loc
+      // qua rong (nhieu don) lam doc+xu ly sheet qua lau.
+      var looksTimeout = /exceeded maximum execution time/i.test(txt) || /timeout/i.test(txt);
+      _srState.lastFetchError = looksTimeout
+        ? 'Yêu cầu chạy quá lâu và bị GAS huỷ giữa chừng (khoảng ngày lọc có thể quá rộng, quá nhiều đơn) — thử lọc từng tháng một thay vì gộp nhiều tháng.'
+        : 'Server trả về dữ liệu không đọc được (không phải JSON) — có thể do lỗi tạm thời, thử lọc lại.';
+      return null;
+    }
+  } catch(e) {
+    if (timer) clearTimeout(timer);
+    _srState.lastFetchError = (e && e.name === 'AbortError')
+      ? 'Yêu cầu quá 55 giây chưa có phản hồi nên đã huỷ — khoảng ngày lọc có thể quá rộng (nhiều đơn), thử lọc từng tháng một.'
+      : 'Không gọi được server (mất mạng hoặc URL GAS sai) — kiểm tra lại kết nối rồi lọc lại.';
+    return null;
+  }
+}
+
+// Dung chung cho MOI man hinh bao cao doanh so khi chua co du lieu (d rong/null): neu lan goi
+// gan nhat THAT SU loi (xem _srFetch), hien ro nguyen nhan thay vi "Chưa có dữ liệu" gay hieu
+// lam la khong co don nao khop bo loc.
+function _srNoDataHtml_(){
+  if (_srState.lastFetchError) {
+    return '<div style="color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;text-align:center;padding:20px;font-size:13px">⚠️ ' + _srState.lastFetchError + '</div>';
+  }
+  return '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
 }
 
 async function _srLoadOptions(){
@@ -12976,7 +13021,7 @@ function _srCocTd(v){ return _srState.showCoc ? '<td style="text-align:right">'+
 function _srCocColspan(base){ return _srState.showCoc ? base : base-1; }
 
 function _srRenderA(d){
-  if (!d) return '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
+  if (!d) return _srNoDataHtml_();
   var html = '<div class="kpi-grid" style="margin-bottom:16px">' +
     '<div class="kpi-card"><div class="kpi-val">'+fmt(d.totalOrders)+'</div><div class="kpi-label">Số lượng đơn</div></div>' +
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalCoc)+'</div><div class="kpi-label">Tổng tiền đã cọc/CK (tham khảo)</div></div>' +
@@ -13145,7 +13190,7 @@ function _srRenderA(d){
 }
 
 function _srRenderB(d){
-  if (!d) return '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
+  if (!d) return _srNoDataHtml_();
   var bTb = d.totalOrders ? Math.round(d.totalGiaTri/d.totalOrders) : 0;
   var html = '<div class="kpi-grid" style="margin-bottom:16px">' +
     '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+fmt(d.totalOrders)+'</div><div class="kpi-label"><b>Số lượng đơn</b></div></div>' +
@@ -13288,7 +13333,7 @@ function renderSalesReportTabD_(wrap, subTabs){
   } else {
     var d = _srState.dataD;
     if (!d) {
-      body = '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
+      body = _srNoDataHtml_();
     } else {
       var html = '<div class="kpi-grid" style="margin-bottom:16px"><div class="kpi-card"><div class="kpi-label">Số KH thêm mới (nguồn Chăm sóc)</div><div class="kpi-val">'+fmt(d.total||0)+'</div></div></div>';
       html += '<div class="dash-section-title">Theo CS thêm'+_srViewToggleHtml('dCsView')+'</div>';
@@ -13487,7 +13532,7 @@ function _computeBonusData_(orders){
 }
 
 function _srRenderE_(d){
-  if (!d) return '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
+  if (!d) return _srNoDataHtml_();
   var c = _computeCommissionData_(d.orders || []);
   var html = '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">'+
     'Ngưỡng phân loại đơn: <b>'+_srMoney(COMMISSION_THRESHOLD)+'</b> — đơn từ mức này trở lên tính "≥15tr", thấp hơn tính "&lt;15tr". '+
@@ -13619,7 +13664,7 @@ function renderSalesReportTabF_(wrap, subTabs){
 }
 
 function _srRenderF_(d){
-  if (!d) return '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
+  if (!d) return _srNoDataHtml_();
   if (d.error) return '<div style="color:#dc2626;text-align:center;padding:30px">Lỗi: '+esc(d.error)+'</div>';
   var cfg = d.config || {};
   _SR_COLTH_ROWSFN_['fSale'] = function(){ return (_srState.dataF && _srState.dataF.rows) || []; };
@@ -13694,7 +13739,7 @@ function renderSalesReportTabG_(wrap, subTabs){
   } else {
     var d = _srState.dataG;
     if (!d) {
-      body = '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
+      body = _srNoDataHtml_();
     } else if (d.error) {
       body = '<div style="color:#dc2626;text-align:center;padding:30px">Lỗi: '+esc(d.error)+'</div>';
     } else {
@@ -14134,7 +14179,7 @@ function _srToggleCRow(rowId){
 }
 
 function _srRenderC(d){
-  if (!d) return '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
+  if (!d) return _srNoDataHtml_();
   var p = d.period || {};
   var cCur = (d.byEmployee||[]).reduce(function(s,r){return s+(r.resultCur||0);},0);
   var cPrev = (d.byEmployee||[]).reduce(function(s,r){return s+(r.resultPrev||0);},0);

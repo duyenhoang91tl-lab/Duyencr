@@ -2021,7 +2021,6 @@ function readDonChiTiet_() {
   var last = sh.getLastRow();
   if (last < 2) return [];
   var vals = sh.getRange(2, 1, last - 1, 15).getValues();
-  var tz = Session.getScriptTimeZone() || 'Etc/GMT-7';
   var out = [];
   for (var i = 0; i < vals.length; i++) {
     var r = vals[i];
@@ -2036,10 +2035,17 @@ function readDonChiTiet_() {
     //  (2) ket qua serialize/deserialize duoc qua JSON.stringify khi cache (Date bi doi
     //      thanh chuoi ISO "T..." se KHONG khop dinh dang parseVNDate_ dang cho, gay sai lech
     //      ngay am tham neu khong chuan hoa truoc).
+    // FIX: KHONG dung Utilities.formatDate/Session.getScriptTimeZone() (code truoc do dung) —
+    // ca 2 deu phu thuoc cau hinh Time Zone cua du an Apps Script, chinh la nguyen nhan da gay
+    // bug "ngay hom truoc lan sang ngay hom sau" tung gap (xem giai thich day du o _vnYmd_ phia
+    // tren). Dung _vnYmdParts_ (offset VN +7 co dinh, khong phu thuoc cau hinh du an) de chuyen
+    // Date -> "dd/MM/yyyy" AN TOAN TUYET DOI, dung voi moi du an bat ke Time Zone dang de la gi.
     var ngayRaw = r[1];
-    var ngayTaoDon = (Object.prototype.toString.call(ngayRaw) === '[object Date]' && !isNaN(ngayRaw))
-      ? Utilities.formatDate(ngayRaw, tz, 'dd/MM/yyyy')
-      : ngayRaw;
+    var ngayTaoDon = ngayRaw;
+    if (Object.prototype.toString.call(ngayRaw) === '[object Date]' && !isNaN(ngayRaw)) {
+      var pDon = _vnYmdParts_(ngayRaw);
+      if (pDon) ngayTaoDon = String(pDon.d).padStart(2, '0') + '/' + String(pDon.mo).padStart(2, '0') + '/' + pDon.y;
+    }
     out.push({
       ngayTaoDon:    ngayTaoDon,
       khachHang:     r[3],
