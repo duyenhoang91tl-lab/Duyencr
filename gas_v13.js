@@ -2664,6 +2664,44 @@ function buildSalesReportB_(filters) {
   var nickZaloTerm = filters.nickZalo ? _psheetNoAccent_(String(filters.nickZalo).trim()) : '';
   var UNASSIGNED = '(chưa gán sale)';
 
+  // THEM 2026-09: Theo Team / Theo Nguon / Theo MKT — de Bao cao B (Pos) co cau truc giong
+  // Bao cao A (Base), giu nguyen phan "Bao cao san pham" rieng cua B.
+  // Luu y: Bao cao B KHONG co truong tuong duong "kenhBan" (Page FB/Zalo) nhu Bao cao A — chi
+  // co "nguonDon" (nguon don, vd Pancake/Website...), nen KHONG the tinh "Ty le chot theo
+  // Kenh/Page" (can khop PancakePageMap) cho Bao cao B — phan nay co chu dinh BO QUA, xem ghi
+  // chu o cuoi ham.
+  var UNASSIGNED_TEAM = '(chưa có Team)';
+  var saleTeamMap = {}; // ten sale (username) -> ten team — dung chung voi tab "Quan ly Team"
+  readTeams_(getCrmSS_().getSheetByName(SH_TEAM)).forEach(function(t) {
+    (t.members || []).forEach(function(u) { saleTeamMap[u] = t.name; });
+  });
+  // Khop fold-insensitive (giong _expandSaleFilterWithPancakeAliases_/_normTxt_ da dung o bo
+  // loc Team phia tren) + tra qua readPancakeMap_ khi ten tren "Thẻ" la username Pancake (vd
+  // "ninhnga99") khac voi ten chuan trong Team (vd "Ngà") — neu khong se rot het vao "(chưa có
+  // Team)" oan du ho da duoc gan Team day du, dung HET nguyen nhan ma commit fix loc Team vua nêu.
+  var saleTeamMapFold_ = {};
+  Object.keys(saleTeamMap).forEach(function(u) { saleTeamMapFold_[_normTxt_(u)] = saleTeamMap[u]; });
+  var pancakeMapB_ = readPancakeMap_(); // pancakeName -> "saleA|saleB"
+  var pancakeMapFoldB_ = {};
+  Object.keys(pancakeMapB_).forEach(function(pn) { pancakeMapFoldB_[_normTxt_(pn)] = pancakeMapB_[pn]; });
+  function _resolveTeamForSaleB_(rawName) {
+    var fold = _normTxt_(rawName);
+    if (saleTeamMapFold_[fold]) return saleTeamMapFold_[fold];
+    var mapped = pancakeMapFoldB_[fold];
+    if (mapped) {
+      var cands = String(mapped).split('|').map(function(s){ return s.trim(); }).filter(Boolean);
+      for (var ci = 0; ci < cands.length; ci++) {
+        var t = saleTeamMapFold_[_normTxt_(cands[ci])];
+        if (t) return t;
+      }
+    }
+    return UNASSIGNED_TEAM;
+  }
+  var byTeamSale = {}; // ten team -> { orders, giaTri, cod }
+  var byNguon = {};    // nguon don -> { orders, giaTri, cod } — tuong duong "Theo Kenh ban" cua Bao cao A
+  var byMktObj = {};   // ten Marketer (co san tren tung dong, khong can suy ra qua Page) -> { orders, giaTri, cod }
+  var UNASSIGNED_MKT = '(chưa gán MKT)';
+
   // Chi doc CareData khi thuc su co loc theo CRM — tranh doc them 1 sheet khi khong can.
   var needCare = careStatusArr.length || khStatusArr.length || zaloStatusArr.length || nickZaloTerm;
   var careMap = needCare ? _careMapByPhone_() : null;
@@ -2713,15 +2751,42 @@ function buildSalesReportB_(filters) {
     var salesOnOrder = _donSaleNamesFromThe_(m.theSale);
     if (salesOnOrder.length === 0) salesOnOrder = [UNASSIGNED];
     var nSale = salesOnOrder.length;
+    var teamsOnOrderB = {};
     for (var si2 = 0; si2 < salesOnOrder.length; si2++) {
       var sName = salesOnOrder[si2];
       if (!bySale[sName]) bySale[sName] = { orders: 0, giaTri: 0, cod: 0 };
       bySale[sName].orders += 1;
       bySale[sName].giaTri += m.giaTriSauGiam / nSale;
       bySale[sName].cod += m.cod / nSale;
+
+      // Theo Team Sale — cung quy uoc chia deu nhu bySale; so don theo Team dem 1 lan cho moi
+      // TEAM KHAC NHAU xuat hien tren don (tranh cong trung khi 2 sale cung team dung 1 don).
+      var tNameB = _resolveTeamForSaleB_(sName);
+      if (!byTeamSale[tNameB]) byTeamSale[tNameB] = { orders: 0, giaTri: 0, cod: 0 };
+      byTeamSale[tNameB].giaTri += m.giaTriSauGiam / nSale;
+      byTeamSale[tNameB].cod += m.cod / nSale;
+      teamsOnOrderB[tNameB] = true;
     }
+    Object.keys(teamsOnOrderB).forEach(function(tNameB2) { byTeamSale[tNameB2].orders += 1; });
+
+    // Theo Nguồn đơn — tương đương "Theo Kênh bán" của Báo cáo A nhưng dùng đúng cột "Nguồn
+    // đơn" sẵn có của Báo cáo B (nguonDon là single-value/đơn, không chia như sale).
+    var nguonNameB = m.nguonDon || '(chưa có nguồn)';
+    if (!byNguon[nguonNameB]) byNguon[nguonNameB] = { orders: 0, giaTri: 0, cod: 0 };
+    byNguon[nguonNameB].orders += 1;
+    byNguon[nguonNameB].giaTri += m.giaTriSauGiam;
+    byNguon[nguonNameB].cod += m.cod;
+
+    // Theo MKT — Báo cáo B có sẵn cột "Marketer" trên từng đơn (không cần suy ra qua Page/Kênh
+    // như Báo cáo A), nên lấy trực tiếp, đơn giản và chính xác hơn.
+    var mktNameB = m.marketer || UNASSIGNED_MKT;
+    if (!byMktObj[mktNameB]) byMktObj[mktNameB] = { orders: 0, giaTri: 0, cod: 0 };
+    byMktObj[mktNameB].orders += 1;
+    byMktObj[mktNameB].giaTri += m.giaTriSauGiam;
+    byMktObj[mktNameB].cod += m.cod;
 
     // Quan trong: 3 cot dung 3 dau phan cach KHAC NHAU trong cung 1 don:
+
     //  - San pham (ten):     phan cach bang ','
     //  - Ma san pham (khoa):  phan cach bang ';'
     //  - So luong:            phan cach bang ','
@@ -2760,6 +2825,21 @@ function buildSalesReportB_(filters) {
   for (var skey in bySale) bySaleArr.push({ name: skey, orders: bySale[skey].orders, giaTri: bySale[skey].giaTri, cod: bySale[skey].cod });
   bySaleArr.sort(function(a, b){ return b.giaTri - a.giaTri; });
 
+  // Format chung cho 3 bang moi (Theo Team/Theo Nguon/Theo MKT) — cung hinh dang {name, orders,
+  // giaTri, cod, trungBinhDon} nhu cac bang tuong ung cua Bao cao A de frontend dung chung UI.
+  function toArrB_(obj) {
+    var arr = [];
+    for (var k in obj) {
+      arr.push({ name: k, orders: obj[k].orders, giaTri: obj[k].giaTri, cod: obj[k].cod,
+                 trungBinhDon: obj[k].orders ? Math.round(obj[k].giaTri / obj[k].orders) : 0 });
+    }
+    arr.sort(function(a, b){ return b.giaTri - a.giaTri; });
+    return arr;
+  }
+  var byTeamSaleArr = toArrB_(byTeamSale);
+  var byNguonArr = toArrB_(byNguon);
+  var byMktArrB = toArrB_(byMktObj);
+
   var mismatchCount = products['__MISMATCH__'] ? products['__MISMATCH__'].mismatchRows : 0;
 
   return {
@@ -2768,6 +2848,10 @@ function buildSalesReportB_(filters) {
     totalCod: totalCod,
     products: productArr,
     bySale: bySaleArr,
+    byTeamSale: byTeamSaleArr,
+    byNguon: byNguonArr,
+    byMkt: byMktArrB,
+    trungBinhDon: matched.length ? Math.round(totalGiaTri / matched.length) : 0,
     mismatchRows: mismatchCount, // so dong bi lech so cot giua san pham/ma/so luong — nen kiem tra tay
     orders: matched.map(function(m){
       return {
@@ -3162,6 +3246,18 @@ function exportSalesReportToSheet_(reportType, filters) {
     rows.push(['THEO SALE', '(số đơn giữ nguyên — tiền chia đều cho số sale/đơn)']);
     rows.push(['Sale', 'Số đơn', 'Giá trị sau giảm giá', 'COD']);
     (data.bySale || []).forEach(function(s) { rows.push([s.name, s.orders, s.giaTri, s.cod]); });
+    rows.push([]);
+    rows.push(['THEO TEAM SALE']);
+    rows.push(['Team Sale', 'Số đơn', 'Giá trị sau giảm giá', 'TB đơn', 'COD']);
+    (data.byTeamSale || []).forEach(function(t) { rows.push([t.name, t.orders, t.giaTri, t.trungBinhDon, t.cod]); });
+    rows.push([]);
+    rows.push(['THEO NGUỒN ĐƠN']);
+    rows.push(['Nguồn đơn', 'Số đơn', 'Giá trị sau giảm giá', 'TB đơn', 'COD']);
+    (data.byNguon || []).forEach(function(k) { rows.push([k.name, k.orders, k.giaTri, k.trungBinhDon, k.cod]); });
+    rows.push([]);
+    rows.push(['THEO MKT']);
+    rows.push(['MKT', 'Số đơn', 'Giá trị sau giảm giá', 'TB đơn', 'COD']);
+    (data.byMkt || []).forEach(function(k) { rows.push([k.name, k.orders, k.giaTri, k.trungBinhDon, k.cod]); });
     rows.push([]);
     rows.push(['BÁO CÁO SẢN PHẨM']);
     rows.push(['Mã sản phẩm', 'Tên sản phẩm', 'Tổng số lượng']);
