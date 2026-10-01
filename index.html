@@ -12373,7 +12373,10 @@ async function _srLoad(){
         dateFrom: _srState.eDateFrom, dateTo: _srState.eDateTo,
         sale: (_srState.eSale||[]).join(',')
       });
-      if (dPos && dPos.orders) dPos.orders = dPos.orders.map(function(o){ return Object.assign({}, o, { saleBan: o.theSale, giaTriDon: o.giaTriSauGiam }); });
+      // QUAN TRONG: phai map ca ngayTaoDon -> ngayTao (don Pos KHONG co san field "ngayTao") —
+      // thieu dong nay thi moi bo loc theo ngay/ngay thu viec cua _computeBonusData_ se LUON
+      // rong vi o.ngayTao undefined o moi don Pos, du da map dung saleBan/giaTriDon.
+      if (dPos && dPos.orders) dPos.orders = dPos.orders.map(function(o){ return Object.assign({}, o, { saleBan: o.theSale, giaTriDon: o.giaTriSauGiam, ngayTao: o.ngayTaoDon }); });
       _srState.dataE = dPos;
     } else {
       _srState.dataE = await _srFetch('salesReportA', {
