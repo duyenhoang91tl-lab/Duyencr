@@ -12005,13 +12005,14 @@ var _srState = {
   bSanPham: '', bCareStatus: [], bKhStatus: [], bZaloStatus: [], bNickZalo: '', // B — them loc CRM (co SDT de noi)
   dataA: null, dataB: null,
   loading: false,
+  lastFetchError: '', // thong bao loi THAT cua lan _srFetch gan nhat (timeout/mang/GAS loi) — de phan biet voi "that su khong co don nao khop bo loc"
   saleOptions: [], kenhOptions: [], nguonOptions: [], marketerOptions: [], saleBOptions: [], teamOptions: [], optionsLoaded: false,
-  saleSearch: '', kenhSearch: '', teamSearch: '', productSearch: '', bSaleSearch: '', // lọc nhanh client-side trên bảng breakdown
+  saleSearch: '', kenhSearch: '', teamSearch: '', productSearch: '', bSaleSearch: '', bTeamSearch: '', bNguonSearch: '', bMktSearch: '', // lọc nhanh client-side trên bảng breakdown
   showCoc: true, // A — hiện/ẩn cột Cọc trên các bảng breakdown (chỉ tham khảo, không tính vào doanh thu)
   // Che do xem (bang/tron/cot) cho tung bang breakdown — KHONG anh huong gi den bo loc/tim kiem o tren,
   // chi doi cach hien thi PHAN DU LIEU DA LOC. Mac dinh 'table' de giu nguyen giao dien cu.
   aSaleView: 'table', aKenhView: 'table', aMktView: 'table', aTeamView: 'table',
-  bSaleView: 'table', bProductView: 'table',
+  bSaleView: 'table', bProductView: 'table', bTeamView: 'table', bNguonView: 'table', bMktView: 'table',
   cEmpView: 'table', cKenhView: 'table',
   dCsView: 'table',
   eBucketView: 'table', eSaleView: 'table',
@@ -12025,8 +12026,10 @@ var _srState = {
   dataC: null, cEmpSearch: '', cKenhSearch: '', cExpandedRow: '',
   // D — KH Cham soc moi (data rieng, KHONG gop A/B/C)
   dDateFrom: '', dDateTo: '', dDateQuick: 'custom', dCs: [], dTeam: [], dataD: null,
-  // E — Hoa hong nhan vien (dung lai action=salesReportA/B tuy eSource, filter rieng de khong dam vao tab A/B)
-  eSource: 'pos',        // 'base' = doanh so theo DT TONG (cu) | 'pos' = theo "du lieu don" (giong Bao cao B, mac dinh tu 2026-09) — cach tinh hoa hong y het, chi khac nguon doanh thu
+  // E — Hoa hong nhan vien + Chuong trinh thuong (dung lai action=salesReportB — "dữ liệu đơn"/POS;
+  // KHONG con dung salesReportA/"base" nua — theo yeu cau Duyen 2026-09-30, co dinh 1 nguon duy
+  // nhat de khop voi KPI va Bao cao B, tranh lech so lieu giua cac bao cao).
+  eSource: 'pos',
   eDateFrom: '', eDateTo: '', eDateQuick: 'custom', eDateField: 'ngayTao', eSale: [], eKenh: [], eTeam: [], dataE: null, eSaleSearch: '',
   eSaleCustomized: false, leaderTeamOptions: [],
   // F — Ty le hoan thanh KPI theo Sale (Bac Van phong / KPI co dinh Online / KPI commit rieng)
@@ -12308,14 +12311,58 @@ function _srEnforceScope(){
   _srState.fSale = my.slice();
 }
 
+// SUA (theo bao cao Duyen: "lọc tháng 7-8-9 load khá lâu nhưng không ra kết quả"): truoc day
+// MOI loai loi (timeout do khoang ngay loc qua rong/nhieu don, GAS tra ve trang loi HTML thay vi
+// JSON, mat mang...) deu bi nuot am tham thanh return null, khien cac man hinh bao cao hien
+// y het "Chưa có dữ liệu" NHU THE la khong co don nao khop bo loc — trong khi that ra request
+// bi LOI/TIMEOUT chu khong phai that su rong. Gio ghi lai LOI THAT vao _srState.lastFetchError
+// de cac man hinh phan biet duoc va bao dung nguyen nhan cho CS, thay vi danh lua la "0 ket qua".
+// Them timeout 55s (AbortController) de khong treo vo han khi GAS xu ly qua lau voi khoang ngay
+// rong (vd loc gop nhieu thang) — qua gio bao loi ro rang kem goi y thu loc tung thang mot.
 async function _srFetch(action, params){
   if (!gsUrl) return null;
+  _srState.lastFetchError = '';
   var sep = gsUrl.includes('?') ? '&' : '?';
   var qs = Object.keys(params).map(function(k){ return k+'='+encodeURIComponent(params[k]||''); }).join('&');
+  var ac = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+  var timer = ac ? setTimeout(function(){ ac.abort(); }, 55000) : null;
   try{
-    var r = await fetch(gsUrl + sep + 'action=' + action + '&' + qs, { redirect:'follow' });
-    return await r.json();
-  }catch(e){ return null; }
+    var r = await fetch(gsUrl + sep + 'action=' + action + '&' + qs, { redirect:'follow', signal: ac ? ac.signal : undefined });
+    if (timer) clearTimeout(timer);
+    if (!r.ok) {
+      _srState.lastFetchError = 'Server trả về lỗi HTTP ' + r.status + ' — thử lọc lại, nếu vẫn vậy thì báo lại khoảng ngày/bộ lọc đang dùng.';
+      return null;
+    }
+    var txt = await r.text();
+    try {
+      return JSON.parse(txt);
+    } catch (eParse) {
+      // GAS thuong tra ve 1 trang HTML loi (vd "Exceeded maximum execution time") thay vi JSON
+      // khi script chay qua 6 phut hoac gap loi khong bat duoc — rat hay gap khi khoang ngay loc
+      // qua rong (nhieu don) lam doc+xu ly sheet qua lau.
+      var looksTimeout = /exceeded maximum execution time/i.test(txt) || /timeout/i.test(txt);
+      _srState.lastFetchError = looksTimeout
+        ? 'Yêu cầu chạy quá lâu và bị GAS huỷ giữa chừng (khoảng ngày lọc có thể quá rộng, quá nhiều đơn) — thử lọc từng tháng một thay vì gộp nhiều tháng.'
+        : 'Server trả về dữ liệu không đọc được (không phải JSON) — có thể do lỗi tạm thời, thử lọc lại.';
+      return null;
+    }
+  } catch(e) {
+    if (timer) clearTimeout(timer);
+    _srState.lastFetchError = (e && e.name === 'AbortError')
+      ? 'Yêu cầu quá 55 giây chưa có phản hồi nên đã huỷ — khoảng ngày lọc có thể quá rộng (nhiều đơn), thử lọc từng tháng một.'
+      : 'Không gọi được server (mất mạng hoặc URL GAS sai) — kiểm tra lại kết nối rồi lọc lại.';
+    return null;
+  }
+}
+
+// Dung chung cho MOI man hinh bao cao doanh so khi chua co du lieu (d rong/null): neu lan goi
+// gan nhat THAT SU loi (xem _srFetch), hien ro nguyen nhan thay vi "Chưa có dữ liệu" gay hieu
+// lam la khong co don nao khop bo loc.
+function _srNoDataHtml_(){
+  if (_srState.lastFetchError) {
+    return '<div style="color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;text-align:center;padding:20px;font-size:13px">⚠️ ' + _srState.lastFetchError + '</div>';
+  }
+  return '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
 }
 
 async function _srLoadOptions(){
@@ -12364,26 +12411,19 @@ async function _srLoad(){
       dateFrom: _srState.dDateFrom, dateTo: _srState.dDateTo, cs: (_srState.dCs||[]).join(',')
     });
   } else if (_srState.sub === 'E') {
-    // 'base': dùng lại ĐÚNG action=salesReportA (đã có sẵn orders[] với saleBan/giaTriDon).
-    // 'pos': dùng lại action=salesReportB (đã có sẵn orders[] với theSale/giaTriSauGiam) — chuẩn
-    // hoá lại tên field cho khớp shape {saleBan, giaTriDon} mà _computeCommissionData_() cần, để
-    // CÁCH TÍNH HOA HỒNG (splitMulti_ + chia đều/theo ngưỡng) dùng chung y hệt, không viết lại.
-    if (_srState.eSource === 'pos') {
-      var dPos = await _srFetch('salesReportB', {
-        dateFrom: _srState.eDateFrom, dateTo: _srState.eDateTo,
-        sale: (_srState.eSale||[]).join(',')
-      });
-      // QUAN TRONG: phai map ca ngayTaoDon -> ngayTao (don Pos KHONG co san field "ngayTao") —
-      // thieu dong nay thi moi bo loc theo ngay/ngay thu viec cua _computeBonusData_ se LUON
-      // rong vi o.ngayTao undefined o moi don Pos, du da map dung saleBan/giaTriDon.
-      if (dPos && dPos.orders) dPos.orders = dPos.orders.map(function(o){ return Object.assign({}, o, { saleBan: o.theSale, giaTriDon: o.giaTriSauGiam, ngayTao: o.ngayTaoDon }); });
-      _srState.dataE = dPos;
-    } else {
-      _srState.dataE = await _srFetch('salesReportA', {
-        dateFrom: _srState.eDateFrom, dateTo: _srState.eDateTo,
-        dateField: _srState.eDateField, sale: (_srState.eSale||[]).join(','), kenh: (_srState.eKenh||[]).join(',')
-      });
-    }
+    // Hoa hong & Chuong trinh thuong: LUON dung action=salesReportB ("dữ liệu đơn"/POS) — khong
+    // con nhanh 'base' (salesReportA/DT TONG) nua. Chuan hoa lai ten field cho khop shape
+    // {saleBan, giaTriDon} ma _computeCommissionData_()/_computeBonusData_() can, de CACH TINH
+    // (splitMulti_ + chia deu/theo nguong) dung chung y het, khong viet lai.
+    var dPos = await _srFetch('salesReportB', {
+      dateFrom: _srState.eDateFrom, dateTo: _srState.eDateTo,
+      sale: (_srState.eSale||[]).join(',')
+    });
+    // QUAN TRONG: phai map ca ngayTaoDon -> ngayTao (don Pos KHONG co san field "ngayTao") —
+    // thieu dong nay thi moi bo loc theo ngay/ngay thu viec cua _computeBonusData_ se LUON
+    // rong vi o.ngayTao undefined o moi don Pos, du da map dung saleBan/giaTriDon.
+    if (dPos && dPos.orders) dPos.orders = dPos.orders.map(function(o){ return Object.assign({}, o, { saleBan: o.theSale, giaTriDon: o.giaTriSauGiam, ngayTao: o.ngayTaoDon }); });
+    _srState.dataE = dPos;
   } else if (_srState.sub === 'F') {
     // Dropdown khong phai 'custom' -> khoang ngay PHAI khop dropdown (tranh dropdown 'Tháng này'
     // ma 2 o ngay rong / cu sang thang khac => bao cao tinh nham toan bo lich su don).
@@ -12984,7 +13024,7 @@ function _srCocTd(v){ return _srState.showCoc ? '<td style="text-align:right">'+
 function _srCocColspan(base){ return _srState.showCoc ? base : base-1; }
 
 function _srRenderA(d){
-  if (!d) return '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
+  if (!d) return _srNoDataHtml_();
   var html = '<div class="kpi-grid" style="margin-bottom:16px">' +
     '<div class="kpi-card"><div class="kpi-val">'+fmt(d.totalOrders)+'</div><div class="kpi-label">Số lượng đơn</div></div>' +
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalCoc)+'</div><div class="kpi-label">Tổng tiền đã cọc/CK (tham khảo)</div></div>' +
@@ -13153,7 +13193,7 @@ function _srRenderA(d){
 }
 
 function _srRenderB(d){
-  if (!d) return '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
+  if (!d) return _srNoDataHtml_();
   var bTb = d.totalOrders ? Math.round(d.totalGiaTri/d.totalOrders) : 0;
   var html = '<div class="kpi-grid" style="margin-bottom:16px">' +
     '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+fmt(d.totalOrders)+'</div><div class="kpi-label"><b>Số lượng đơn</b></div></div>' +
@@ -13187,8 +13227,68 @@ function _srRenderB(d){
   }
 
   if (_srIsAdmin()){
+    // Theo Team Sale — cung bang/bieu do nhu Bao cao A, du lieu tu byTeamSale moi tra ve tu backend.
+    _SR_COLTH_ROWSFN_['bTeam'] = function(){ return (_srState.dataB && _srState.dataB.byTeamSale) || []; };
+    _SR_COLTH_GETTER_['bTeam'] = { name: function(r){ return r.name; } };
+    var bTeamRows = _srApplyColFilters_(d.byTeamSale||[], 'bTeam', _SR_COLTH_GETTER_['bTeam']).filter(function(t){ return !_srState.bTeamSearch || t.name.toLowerCase().indexOf(_srState.bTeamSearch.toLowerCase())!==-1; });
+    html += '<div class="dash-section-title" style="margin-top:18px">Theo Team Sale'+_srViewToggleHtml('bTeamView')+'</div>';
+    html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên team..." value="'+esc(_srState.bTeamSearch)+'" oninput="_srState.bTeamSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
+    if (_srState.bTeamView === 'table'){
+      html += '<table class="dash-table"><thead><tr>'+_srColTh_('bTeam','name','Team Sale',_SR_COLTH_ROWSFN_['bTeam'],_SR_COLTH_GETTER_['bTeam'].name)+'<th style="text-align:right">Số đơn</th><th style="text-align:right"><b>Giá trị sau giảm giá</b></th><th style="text-align:right">TB đơn</th><th style="text-align:right">COD</th></tr></thead><tbody>';
+      bTeamRows.forEach(function(t){
+        html += '<tr><td>'+esc(t.name)+'</td><td style="text-align:right">'+fmt(t.orders)+'</td><td style="text-align:right"><b>'+_srMoney(t.giaTri)+'</b></td><td style="text-align:right">'+_srMoney(t.trungBinhDon)+'</td><td style="text-align:right">'+_srMoney(t.cod)+'</td></tr>';
+      });
+      if (!bTeamRows.length) html += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Chưa có Team nào — vào tab "Quản lý Team" để tạo và thêm thành viên.</td></tr>';
+      else { var bTOrd=bTeamRows.reduce(function(s,r){return s+(r.orders||0);},0), bTGt=bTeamRows.reduce(function(s,r){return s+(r.giaTri||0);},0);
+        html += _srTotalRowHtml_(['Tổng', fmt(bTOrd), '<b>'+_srMoney(bTGt)+'</b>', _srMoney(bTOrd?Math.round(bTGt/bTOrd):0), _srMoney(bTeamRows.reduce(function(s,r){return s+(r.cod||0);},0))]); }
+      html += '</tbody></table>';
+    } else {
+      html += _srChartSvg(bTeamRows, 'name', 'giaTri', _srState.bTeamView, true, 'orders');
+    }
+
+    // Theo Nguồn đơn — tương đương vị trí "Theo Kênh bán" của Báo cáo A. Báo cáo B không có dữ
+    // liệu Page-level để khớp với thống kê tương tác Pancake, nên KHÔNG có bảng "Tỷ lệ chốt"
+    // đi kèm như bên A (xem ghi chú ở backend buildSalesReportB_).
+    _SR_COLTH_ROWSFN_['bNguon'] = function(){ return (_srState.dataB && _srState.dataB.byNguon) || []; };
+    _SR_COLTH_GETTER_['bNguon'] = { name: function(r){ return r.name; } };
+    var bNguonRows = _srApplyColFilters_(d.byNguon||[], 'bNguon', _SR_COLTH_GETTER_['bNguon']).filter(function(k){ return !_srState.bNguonSearch || k.name.toLowerCase().indexOf(_srState.bNguonSearch.toLowerCase())!==-1; });
+    html += '<div class="dash-section-title" style="margin-top:18px">Theo Nguồn đơn'+_srViewToggleHtml('bNguonView')+'</div>';
+    html += '<input type="text" placeholder="🔍 Tìm nhanh theo nguồn đơn..." value="'+esc(_srState.bNguonSearch)+'" oninput="_srState.bNguonSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
+    if (_srState.bNguonView === 'table'){
+      html += '<table class="dash-table"><thead><tr>'+_srColTh_('bNguon','name','Nguồn đơn',_SR_COLTH_ROWSFN_['bNguon'],_SR_COLTH_GETTER_['bNguon'].name)+'<th style="text-align:right">Số đơn</th><th style="text-align:right"><b>Giá trị sau giảm giá</b></th><th style="text-align:right">TB đơn</th><th style="text-align:right">COD</th></tr></thead><tbody>';
+      bNguonRows.forEach(function(k){
+        html += '<tr><td>'+esc(k.name)+'</td><td style="text-align:right">'+fmt(k.orders)+'</td><td style="text-align:right"><b>'+_srMoney(k.giaTri)+'</b></td><td style="text-align:right">'+_srMoney(k.trungBinhDon)+'</td><td style="text-align:right">'+_srMoney(k.cod)+'</td></tr>';
+      });
+      if (!bNguonRows.length) html += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+      else { var bNOrd=bNguonRows.reduce(function(s,r){return s+(r.orders||0);},0), bNGt=bNguonRows.reduce(function(s,r){return s+(r.giaTri||0);},0);
+        html += _srTotalRowHtml_(['Tổng', fmt(bNOrd), '<b>'+_srMoney(bNGt)+'</b>', _srMoney(bNOrd?Math.round(bNGt/bNOrd):0), _srMoney(bNguonRows.reduce(function(s,r){return s+(r.cod||0);},0))]); }
+      html += '</tbody></table>';
+    } else {
+      html += _srChartSvg(bNguonRows, 'name', 'giaTri', _srState.bNguonView, true, 'orders');
+    }
+
+    // Theo MKT — lay truc tiep tu cot "Marketer" co san tren tung dong cua Bao cao B (don gian
+    // va chinh xac hon cach suy ra qua Page/Kenh cua Bao cao A).
+    _SR_COLTH_ROWSFN_['bMkt'] = function(){ return (_srState.dataB && _srState.dataB.byMkt) || []; };
+    _SR_COLTH_GETTER_['bMkt'] = { name: function(r){ return r.name; } };
+    var bMktRows = _srApplyColFilters_(d.byMkt||[], 'bMkt', _SR_COLTH_GETTER_['bMkt']).filter(function(k){ return !_srState.bMktSearch || k.name.toLowerCase().indexOf(_srState.bMktSearch.toLowerCase())!==-1; });
+    html += '<div class="dash-section-title" style="margin-top:18px">Theo MKT'+_srViewToggleHtml('bMktView')+'</div>';
+    html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên MKT..." value="'+esc(_srState.bMktSearch)+'" oninput="_srState.bMktSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
+    if (_srState.bMktView === 'table'){
+      html += '<table class="dash-table"><thead><tr>'+_srColTh_('bMkt','name','MKT',_SR_COLTH_ROWSFN_['bMkt'],_SR_COLTH_GETTER_['bMkt'].name)+'<th style="text-align:right">Số đơn</th><th style="text-align:right"><b>Giá trị sau giảm giá</b></th><th style="text-align:right">TB đơn</th><th style="text-align:right">COD</th></tr></thead><tbody>';
+      bMktRows.forEach(function(k){
+        html += '<tr><td>'+esc(k.name)+'</td><td style="text-align:right">'+fmt(k.orders)+'</td><td style="text-align:right"><b>'+_srMoney(k.giaTri)+'</b></td><td style="text-align:right">'+_srMoney(k.trungBinhDon)+'</td><td style="text-align:right">'+_srMoney(k.cod)+'</td></tr>';
+      });
+      if (!bMktRows.length) html += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Chưa có nhóm MKT — vào tab Team → "Nhóm MKT" để tạo.</td></tr>';
+      else { var bMOrd=bMktRows.reduce(function(s,r){return s+(r.orders||0);},0), bMGt=bMktRows.reduce(function(s,r){return s+(r.giaTri||0);},0);
+        html += _srTotalRowHtml_(['Tổng', fmt(bMOrd), '<b>'+_srMoney(bMGt)+'</b>', _srMoney(bMOrd?Math.round(bMGt/bMOrd):0), _srMoney(bMktRows.reduce(function(s,r){return s+(r.cod||0);},0))]); }
+      html += '</tbody></table>';
+    } else {
+      html += _srChartSvg(bMktRows, 'name', 'giaTri', _srState.bMktView, true, 'orders');
+    }
+
     var productRows = (d.products||[]).filter(function(p){ return !_srState.productSearch || (p.name||'').toLowerCase().indexOf(_srState.productSearch.toLowerCase())!==-1 || (p.code||'').toLowerCase().indexOf(_srState.productSearch.toLowerCase())!==-1; });
-    html += '<div class="dash-section-title">Báo cáo sản phẩm'+_srViewToggleHtml('bProductView')+'</div>';
+    html += '<div class="dash-section-title" style="margin-top:18px">Báo cáo sản phẩm'+_srViewToggleHtml('bProductView')+'</div>';
     html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên/mã sản phẩm..." value="'+esc(_srState.productSearch)+'" oninput="_srState.productSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:240px;margin-bottom:6px">';
     if (_srState.bProductView === 'table'){
       html += '<table class="dash-table"><thead><tr><th>Mã sản phẩm</th><th>Tên sản phẩm</th><th style="text-align:right">Tổng số lượng</th></tr></thead><tbody>';
@@ -13296,7 +13396,7 @@ function renderSalesReportTabD_(wrap, subTabs){
   } else {
     var d = _srState.dataD;
     if (!d) {
-      body = '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
+      body = _srNoDataHtml_();
     } else {
       var html = '<div class="kpi-grid" style="margin-bottom:16px"><div class="kpi-card"><div class="kpi-label">Số KH thêm mới (nguồn Chăm sóc)</div><div class="kpi-val">'+fmt(d.total||0)+'</div></div></div>';
       html += '<div class="dash-section-title">Theo CS thêm'+_srViewToggleHtml('dCsView')+'</div>';
@@ -13330,20 +13430,10 @@ function renderSalesReportTabD_(wrap, subTabs){
 // _computeCommissionData_() (đã định nghĩa cùng _resolveCommissionRate_/INDIVIDUAL_RATES ở trên).
 function renderSalesReportTabE_(wrap, subTabs){
   var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
-  filters += '<select onchange="_srState.eSource=this.value;_srApply()" title="Cách tính hoa hồng giống hệt nhau — chỉ khác nguồn doanh thu dùng để tính" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-weight:700">'+
-    '<option value="base"'+(_srState.eSource!=='pos'?' selected':'')+'>Theo Base</option>'+
-    '<option value="pos"'+(_srState.eSource==='pos'?' selected':'')+'>Theo Pos</option>'+
-    '</select>';
   filters += _quickRangeSelectHtml(_srState.eDateQuick, "_srApplyQuickRange('eDateQuick','eDateFrom','eDateTo',this.value)");
   filters += '<input type="date" value="'+esc(_srState.eDateFrom)+'" onchange="_srSetField(\'eDateFrom\',this.value);_srState.eDateQuick=\'custom\'" title="Từ ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
   filters += '<span style="color:var(--muted)">→</span>';
   filters += '<input type="date" value="'+esc(_srState.eDateTo)+'" onchange="_srSetField(\'eDateTo\',this.value);_srState.eDateQuick=\'custom\'" title="Đến ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
-  if (_srState.eSource !== 'pos') {
-    filters += '<select onchange="_srSetField(\'eDateField\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-      '<option value="ngayTao"'+(_srState.eDateField==='ngayTao'?' selected':'')+'>Lọc theo Ngày tạo</option>'+
-      '<option value="thoiGianHT"'+(_srState.eDateField==='thoiGianHT'?' selected':'')+'>Lọc theo Thời gian hoàn thành</option>'+
-      '</select>';
-  }
   if (_srIsAdmin()){
     filters += _srComboHtml('sr-sale-combo-e', 'eSale', 'saleOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 190);
     filters += _srComboHtml('sr-team-combo-e', 'eTeam', 'teamOptions', 'Lọc theo Team', '🔍 Tìm & chọn team...', 190);
@@ -13354,7 +13444,6 @@ function renderSalesReportTabE_(wrap, subTabs){
     filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Sale</div>'+
       '<div style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)">🔒 '+esc((_srState.eSale||[]).join(', ') || currentUser.name)+' — chỉ xem được hoa hồng của mình</div></div>';
   }
-  if (_srState.eSource !== 'pos') filters += _srComboHtml('sr-kenh-combo-e', 'eKenh', 'kenhOptions', 'Lọc theo Kênh', '🔍 Tìm & chọn kênh...', 170);
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
   if (_srIsAdmin()) filters += '<div class="gear-menu">'+
       '<button class="btn sm" onclick="_srToggleGearMenu(event,\'sr-gear-e\')">⚙ Cài đặt</button>'+
@@ -13558,7 +13647,7 @@ function _computeBonusData_(orders){
 }
 
 function _srRenderE_(d){
-  if (!d) return '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
+  if (!d) return _srNoDataHtml_();
   var c = _computeCommissionData_(d.orders || []);
   var html = '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">'+
     'Ngưỡng phân loại đơn: <b>'+_srMoney(COMMISSION_THRESHOLD)+'</b> — đơn từ mức này trở lên tính "≥15tr", thấp hơn tính "&lt;15tr". '+
@@ -13667,10 +13756,6 @@ function renderSalesReportTabF_(wrap, subTabs){
   filters += '<input type="date" value="'+esc(_srState.fDateFrom)+'" onchange="_srSetField(\'fDateFrom\',this.value);_srState.fDateQuick=\'custom\'" title="Từ ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
   filters += '<span style="color:var(--muted)">→</span>';
   filters += '<input type="date" value="'+esc(_srState.fDateTo)+'" onchange="_srSetField(\'fDateTo\',this.value);_srState.fDateQuick=\'custom\'" title="Đến ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
-  filters += '<select onchange="_srSetField(\'fDateField\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-    '<option value="ngayTao"'+(_srState.fDateField==='ngayTao'?' selected':'')+'>Lọc theo Ngày tạo</option>'+
-    '<option value="thoiGianHT"'+(_srState.fDateField==='thoiGianHT'?' selected':'')+'>Lọc theo Thời gian hoàn thành</option>'+
-    '</select>';
   if (_srIsAdmin()){
     filters += _srComboHtml('sr-sale-combo-f', 'fSale', 'saleOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 190);
     filters += _srComboHtml('sr-team-combo-f', 'fTeam', 'teamOptions', 'Lọc theo Team', '🔍 Tìm & chọn team...', 190);
@@ -13694,7 +13779,7 @@ function renderSalesReportTabF_(wrap, subTabs){
 }
 
 function _srRenderF_(d){
-  if (!d) return '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
+  if (!d) return _srNoDataHtml_();
   if (d.error) return '<div style="color:#dc2626;text-align:center;padding:30px">Lỗi: '+esc(d.error)+'</div>';
   var cfg = d.config || {};
   _SR_COLTH_ROWSFN_['fSale'] = function(){ return (_srState.dataF && _srState.dataF.rows) || []; };
@@ -13769,7 +13854,7 @@ function renderSalesReportTabG_(wrap, subTabs){
   } else {
     var d = _srState.dataG;
     if (!d) {
-      body = '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
+      body = _srNoDataHtml_();
     } else if (d.error) {
       body = '<div style="color:#dc2626;text-align:center;padding:30px">Lỗi: '+esc(d.error)+'</div>';
     } else {
@@ -14269,7 +14354,7 @@ function _srToggleCRow(rowId){
 }
 
 function _srRenderC(d){
-  if (!d) return '<div style="color:var(--muted);text-align:center;padding:30px">Chưa có dữ liệu — bấm "Lọc" để tải.</div>';
+  if (!d) return _srNoDataHtml_();
   var p = d.period || {};
   var cCur = (d.byEmployee||[]).reduce(function(s,r){return s+(r.resultCur||0);},0);
   var cPrev = (d.byEmployee||[]).reduce(function(s,r){return s+(r.resultPrev||0);},0);
