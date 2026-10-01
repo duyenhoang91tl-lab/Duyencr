@@ -2565,7 +2565,12 @@
 
     // "Tổng sau giảm" = tạm tính đã trừ CTKM từng dòng + giảm giá chung — CHƯA gồm vàng/ship.
     const afterDiscount = t.subtotal - t.discountAmt;
-    lines.push(`Tổng sau giảm: ${k(afterDiscount)}`);
+    // Chỉ ghi "Tổng sau giảm" khi THẬT SỰ có giảm giá (giảm giá tổng của đơn, hoặc ít nhất 1
+    // dòng có giảm % / giảm tiền) — nếu không áp dụng giảm nào cả thì đây chỉ là báo giá bình
+    // thường, ghi "Tổng sau giảm" sẽ gây hiểu lầm là có giảm (yêu cầu Duyên).
+    const hasAnyDiscount = t.discountAmt > 0 || t.checked.some((i) =>
+      (i.promoType === 'percent' || i.promoType === 'amount') && Number(i.promoValue) > 0);
+    lines.push(`${hasAnyDiscount ? 'Tổng sau giảm' : 'Báo giá'}: ${k(afterDiscount)}`);
     if (t.gold > 0) lines.push(`Thêm vàng: ${k(t.gold)}`);
     lines.push(t.ship > 0 ? `Phí ship: ${k(t.ship)}` : 'Freeship');
     if (_cartExtra.gift) lines.push(clean(`Quà tặng kèm: ${_cartExtra.gift}`));
