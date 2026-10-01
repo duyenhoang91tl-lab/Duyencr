@@ -2773,7 +2773,13 @@ function buildSalesReportB_(filters) {
       return {
         ngayTaoDon: m.ngayTaoDon, khachHang: m.khachHang, soDienThoai: m.soDienThoai,
         nguonDon: m.nguonDon, theSale: m.theSale, trangThai: m.trangThai, sanPham: m.sanPham, maSanPham: m.maSanPham, soLuong: m.soLuong,
-        giaTriSauGiam: m.giaTriSauGiam, cod: m.cod, marketer: m.marketer
+        giaTriSauGiam: m.giaTriSauGiam, cod: m.cod, marketer: m.marketer,
+        // saleBanValid: danh sach ten sale đã qua _donSaleNamesFromThe_ (loc theo danh sach ten
+        // sale THAT, giong het cach bySale o tren tinh) — khac voi theSale (chuoi THO nguyen van
+        // cot "Thẻ", co the dinh ghi chu/ten sai chinh ta). Bao cao E (Hoa hong + Chuong trinh
+        // thuong) phai dung field nay (khong dung theSale truc tiep) de khop CHINH XAC voi cach
+        // ke toan tinh — xem _computeCommissionData_/_computeBonusData_ o index.html.
+        saleBanValid: _donSaleNamesFromThe_(m.theSale).join(',')
       };
     })
   };
