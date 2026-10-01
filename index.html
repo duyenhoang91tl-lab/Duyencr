@@ -12419,7 +12419,7 @@ async function _srLoad(){
       dateFrom: _srState.eDateFrom, dateTo: _srState.eDateTo,
       sale: (_srState.eSale||[]).join(',')
     });
-    if (dPos && dPos.orders) dPos.orders = dPos.orders.map(function(o){ return Object.assign({}, o, { saleBan: o.theSale, giaTriDon: o.giaTriSauGiam }); });
+    if (dPos && dPos.orders) dPos.orders = dPos.orders.map(function(o){ return Object.assign({}, o, { saleBan: o.saleBanValid || o.theSale, giaTriDon: o.giaTriSauGiam }); });
     _srState.dataE = dPos;
   } else if (_srState.sub === 'F') {
     // Dropdown khong phai 'custom' -> khoang ngay PHAI khop dropdown (tranh dropdown 'Tháng này'
