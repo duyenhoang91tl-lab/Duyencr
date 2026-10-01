@@ -92,6 +92,7 @@ function load() {
     document.getElementById("pancake_replyBox").value = s.selectors?.pancake?.replyBox || "";
     document.getElementById("pancake_phoneSelector").value = s.selectors?.pancake?.phoneSelector || "";
     document.getElementById("pancake_orderPanelSelector").value = s.selectors?.pancake?.orderPanelSelector || "";
+    document.getElementById("pancake_infoPanelSelector").value = s.selectors?.pancake?.infoPanelSelector || "";
     document.getElementById("pancake_customerMsgSelector").value = s.selectors?.pancake?.customerMsgSelector || "";
     document.getElementById("pancake_agentMsgSelector").value = s.selectors?.pancake?.agentMsgSelector || "";
 
@@ -124,6 +125,7 @@ function save() {
         replyBox: document.getElementById("pancake_replyBox").value.trim(),
         phoneSelector: document.getElementById("pancake_phoneSelector").value.trim(),
         orderPanelSelector: document.getElementById("pancake_orderPanelSelector").value.trim(),
+        infoPanelSelector: document.getElementById("pancake_infoPanelSelector").value.trim(),
         customerMsgSelector: document.getElementById("pancake_customerMsgSelector").value.trim(),
         agentMsgSelector: document.getElementById("pancake_agentMsgSelector").value.trim()
       },
