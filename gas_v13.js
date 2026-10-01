@@ -1790,20 +1790,45 @@ function splitMulti_(str, delimiter) {
   return s.split(delimiter).map(function(x){ return x.trim(); }).filter(function(x){ return x !== ''; });
 }
 
-// Cot "Thẻ" trong sheet "dữ liệu đơn" (Pancake POS) chua CA ten sale LAN trang thai don,
-// vd "anhNP1999, Đang giao hàng" hoac "dungnguyen1995, bichnguyen1993, Giao không thành"
-// (2 sale + 1 trang thai). Truoc day tach thang bang dau phay roi coi TAT CA la ten sale —
-// khien trang thai don ("Đang giao hàng", "Chưa đối soát", "Giao không thành"...) bi hieu
-// nham thanh 1 "sale" ao, gay 2 hau qua:
-//  1) Don chi co 1 sale that + 1 trang thai -> tuong la 2 sale -> sale that chi duoc tinh
-//     1/2 doanh thu thay vi tron ven; don co 2 sale that + 1 trang thai -> bi chia thanh 3
-//     phan thay vi 2 (moi sale that le ra duoc 1/2, lai chi con 1/3).
-//  2) Danh sach loc "Sale" cua Bao cao B hien them cac "sale" ao trung ten trang thai don.
-// Quy uoc phan biet: ten dang nhap sale luon la 1 CHUOI LIEN, khong co khoang trang; trang
-// thai don cua Pancake luon la CUM TU tieng Viet nhieu chu co khoang trang. Nen chi giu lai
-// token KHONG co khoang trang de lam ten sale, bo qua moi token co khoang trang.
+// Toan bo ten that da tung duoc ghi nhan la Nhan vien/Sale (gop ca ten hien thi tren Pancake
+// VA ten Sale CRM da khop trong bang "Khớp tên Nhân viên Pancake ↔ Sale CRM"), chuan hoa qua
+// _normTxt_ (bo khoang trang thua + chu thuong, GIU dau) de so khop khong phan biet hoa/thuong.
+// Cache trong pham vi 1 lan chay (doGet/doPost) — khong can doc lai sheet nhieu lan trong cung
+// 1 request du goi _donSaleNamesFromThe_ hang chuc/hang tram lan (vd duyet het dong "dữ liệu đơn").
+var __pancakeKnownSaleSet_ = null;
+function _pancakeKnownSaleNameSet_() {
+  if (__pancakeKnownSaleSet_) return __pancakeKnownSaleSet_;
+  var set = {};
+  try { pancakeAllNames_().forEach(function(n){ set[_normTxt_(n)] = true; }); } catch (e) {}
+  try {
+    var map = readPancakeMap_();
+    Object.keys(map).forEach(function(k){
+      set[_normTxt_(k)] = true;
+      if (map[k]) set[_normTxt_(map[k])] = true;
+    });
+  } catch (e) {}
+  __pancakeKnownSaleSet_ = set;
+  return set;
+}
+
+// Cot "Thẻ" trong sheet "dữ liệu đơn" (Pancake POS) chua CA ten sale LAN cac tag KHONG PHAI
+// sale (trang thai don nhu "Đang giao hàng"/"Chưa đối soát"/"Giao không thành", hoac cac nhan
+// khac nhu "VIP"/"Freeship"...), vd "anhNP1999, Đang đối soát, VIP" hoac "dungnguyen1995,
+// bichnguyen1993, Giao không thành" (nhieu sale + nhieu tag khac). Ban chat: don vAn chia cho
+// DUNG NHUNG SALE THAT SU co mat, bat ke con lai bao nhieu hang muc the khac khong phai sale.
+// Uu tien doi chieu tung token voi danh sach Nhan vien/Sale THAT SU da tung ghi nhan (xem
+// _pancakeKnownSaleNameSet_) — cach nay dung duoc ca voi tag 1-tu khong phai sale (vd "VIP",
+// "Freeship") ma heuristic khoang-trang truoc day khong loai duoc. Chi khi KHONG token nao
+// khop duoc danh sach da biet (vd sale qua moi, chua tung xuat hien o dau) moi lui ve heuristic
+// cu: giu token khong co khoang trang (ten dang nhap Pancake khong co dau cach; tag/trang thai
+// tieng Viet nhieu chu luon co) — de khong lam mat hoan toan 1 sale that nhung chua kip ghi nhan.
 function _donSaleNamesFromThe_(theStr) {
-  return splitMulti_(theStr, ',').filter(function(tok) { return tok && !/\s/.test(tok); });
+  var tokens = splitMulti_(theStr, ',');
+  if (!tokens.length) return [];
+  var known = _pancakeKnownSaleNameSet_();
+  var matched = tokens.filter(function(tok) { return known[_normTxt_(tok)]; });
+  if (matched.length) return matched;
+  return tokens.filter(function(tok) { return tok && !/\s/.test(tok); });
 }
 // SUA 2026-09-30 theo xac nhan CUOI CUNG cua Duyen: viec loai don khoi doanh so Bao cao B
 // CHI dua vao MOT nguon DUY NHAT — cot rieng "Trạng thái" (cot O trong sheet "dữ liệu đơn"):
