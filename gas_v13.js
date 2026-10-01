@@ -2422,7 +2422,11 @@ function readSaleKpiConfig_() {
 // buildKpiReport_ da dung (client KHONG the tu lam viec nay chinh xac — _foldVi phia client bo
 // dau, con _normTxt_ o day KHONG bo dau, 2 ham fold khac nhau se khop SAI ten co dau).
 function buildSaleKpiReport_(filters) {
-  var a = buildSalesReportA_(filters);
+  // SUA 2026-09-30 (yeu cau Duyen): doi nguon doanh thu cho KPI tu buildSalesReportA_ ("base"/
+  // DT TONG) sang buildSalesReportB_ ("dữ liệu đơn"/POS) — dong bo voi Bao cao E (Hoa hong +
+  // Chuong trinh thuong, da chuyen sang POS tu truoc). Ca 2 ham deu tra ve bySale/totalOrders/
+  // totalGiaTri CUNG SHAPE {name, giaTri, orders} nen khong can sua gi them ben duoi.
+  var a = buildSalesReportB_(filters);
   var cfg = readSaleKpiConfig_();
   // Nhom Van phong/Online: dung CHUNG 1 nguon voi "🏆 Chương trình thưởng" o Bao cao E — setting
   // 'saleChannels' ({ ten Sale -> 'online'|'offline' }, cai o modal "🏷️ Phân loại Online/Offline"
