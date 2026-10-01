@@ -2675,6 +2675,28 @@ function buildSalesReportB_(filters) {
   readTeams_(getCrmSS_().getSheetByName(SH_TEAM)).forEach(function(t) {
     (t.members || []).forEach(function(u) { saleTeamMap[u] = t.name; });
   });
+  // Khop fold-insensitive (giong _expandSaleFilterWithPancakeAliases_/_normTxt_ da dung o bo
+  // loc Team phia tren) + tra qua readPancakeMap_ khi ten tren "Thẻ" la username Pancake (vd
+  // "ninhnga99") khac voi ten chuan trong Team (vd "Ngà") — neu khong se rot het vao "(chưa có
+  // Team)" oan du ho da duoc gan Team day du, dung HET nguyen nhan ma commit fix loc Team vua nêu.
+  var saleTeamMapFold_ = {};
+  Object.keys(saleTeamMap).forEach(function(u) { saleTeamMapFold_[_normTxt_(u)] = saleTeamMap[u]; });
+  var pancakeMapB_ = readPancakeMap_(); // pancakeName -> "saleA|saleB"
+  var pancakeMapFoldB_ = {};
+  Object.keys(pancakeMapB_).forEach(function(pn) { pancakeMapFoldB_[_normTxt_(pn)] = pancakeMapB_[pn]; });
+  function _resolveTeamForSaleB_(rawName) {
+    var fold = _normTxt_(rawName);
+    if (saleTeamMapFold_[fold]) return saleTeamMapFold_[fold];
+    var mapped = pancakeMapFoldB_[fold];
+    if (mapped) {
+      var cands = String(mapped).split('|').map(function(s){ return s.trim(); }).filter(Boolean);
+      for (var ci = 0; ci < cands.length; ci++) {
+        var t = saleTeamMapFold_[_normTxt_(cands[ci])];
+        if (t) return t;
+      }
+    }
+    return UNASSIGNED_TEAM;
+  }
   var byTeamSale = {}; // ten team -> { orders, giaTri, cod }
   var byNguon = {};    // nguon don -> { orders, giaTri, cod } — tuong duong "Theo Kenh ban" cua Bao cao A
   var byMktObj = {};   // ten Marketer (co san tren tung dong, khong can suy ra qua Page) -> { orders, giaTri, cod }
@@ -2739,7 +2761,7 @@ function buildSalesReportB_(filters) {
 
       // Theo Team Sale — cung quy uoc chia deu nhu bySale; so don theo Team dem 1 lan cho moi
       // TEAM KHAC NHAU xuat hien tren don (tranh cong trung khi 2 sale cung team dung 1 don).
-      var tNameB = saleTeamMap[sName] || UNASSIGNED_TEAM;
+      var tNameB = _resolveTeamForSaleB_(sName);
       if (!byTeamSale[tNameB]) byTeamSale[tNameB] = { orders: 0, giaTri: 0, cod: 0 };
       byTeamSale[tNameB].giaTri += m.giaTriSauGiam / nSale;
       byTeamSale[tNameB].cod += m.cod / nSale;
