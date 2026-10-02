@@ -9961,7 +9961,7 @@ var _pkState = {
   uploading: false,
   from: _ymd(new Date(Date.now()-6*86400000)), to: _ymd(new Date()), fromQuick: 'custom',
   report: null, reportLoading: false,
-  pkSplit: 'equal', mapOpen: '',
+  pkSplit: 'equal', mapOpen: '', nameMapSectionOpen: false,
   // Bo loc kieu Excel tren cac bang "Theo Page"/"Theo Sale" cua tab Bao cao KPI Pancake:
   // { page: {colKey: Set(gia tri duoc chon)}, sale: {colKey: Set(...)} } — Set rong/khong co
   // nghia la KHONG loc cot do (hien tat ca). Chi loc tren du lieu da tai (frontend), khong goi
@@ -10143,9 +10143,11 @@ function _pkRenderAll(){
     html += _pkRenderSdtPreviewHtml();
   }
 
-  html += '<div class="dash-section-title" style="margin-top:22px">🔗 Khớp tên Nhân viên Pancake ↔ Sale CRM</div>';
-  html += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Tên "Nhân viên" trên Pancake là tên Facebook cá nhân, thường không khớp tên đăng nhập (Sale) trong CRM — khớp 1 lần, dùng lại cho mọi lần nạp báo cáo sau.</div>';
-  html += _pkRenderMapTableHtml(isAdmin);
+  html += '<details'+(_pkState.nameMapSectionOpen?' open':'')+' ontoggle="_pkState.nameMapSectionOpen=this.open" style="margin-top:22px">'+
+    '<summary class="dash-section-title" style="cursor:pointer;display:inline-block">🔗 Khớp tên Nhân viên Pancake ↔ Sale CRM</summary>'+
+    '<div style="font-size:12px;color:var(--muted);margin:8px 0">Tên "Nhân viên" trên Pancake là tên Facebook cá nhân, thường không khớp tên đăng nhập (Sale) trong CRM — khớp 1 lần, dùng lại cho mọi lần nạp báo cáo sau.</div>'+
+    _pkRenderMapTableHtml(isAdmin)+
+  '</details>';
 
   html += '<div class="dash-section-title" style="margin-top:22px">🔗 Khớp Page Pancake ↔ Kênh bán CRM (DT TỔNG)</div>';
   html += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Dùng để ghép đúng doanh thu/số đơn của mỗi Page (cột "Kênh bán" trong DT TỔNG) với số liệu tương tác/SĐT của Page đó ở Báo cáo KPI tổng hợp.</div>';
