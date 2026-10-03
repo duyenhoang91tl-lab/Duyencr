@@ -4844,6 +4844,12 @@ function buildKpiReport_(from, to, saleFilter) {
     var d = parseVNDate_(o.orderDate);
     if (!d) continue;
     if (!dateInRange_(d, from, to)) continue;
+    // SUA 2026-10-03: thieu dieu kien loai don Huy/Da hoan/Dang hoan (_isExcludedOrderStatus_)
+    // nhu buildSalesReportA_/C da lam — khien "Báo cáo ngày" (tab Daily brief) cong CA doanh
+    // thu cua don da huy/hoan vao kpi.totalDoanhThu va bySale/byPage, cao hon han so voi Bao
+    // cao A that (Duyen bao "doanh thu Base dang bi gap doi" — don Huy/Hoan o cua hang nay rat
+    // nhieu nen doanh thu gop gan gap doi doanh thu that da tru hoan/huy).
+    if (_isExcludedOrderStatus_(o.status)) continue;
     // Loc theo pham vi Sale (CS thuong: chi don cua chinh minh; Leader: don cua ca team) —
     // ap dung TU PHIA SERVER, khong chi an bot o giao dien, de khong the xem duoc doanh thu
     // cua nguoi khac du co sua duoc request phia client.
@@ -7053,7 +7059,12 @@ function buildMktChecklistReport_(from, to) {
   var rowsDt = readDTTong_();
   for (var i = 0; i < rowsDt.length; i++) {
     var dt = parseVNDate_(rowsDt[i].ngayTao);
-    if (dt && dateInRange_(dt, from, to)) {
+    // SUA 2026-10-03: thieu dieu kien loai don Huy/Da hoan/Dang hoan (_isExcludedOrderStatus_)
+    // nhu buildSalesReportA_/C da lam cho cung nguon DT TONG — khien "Doanh thu Base" (mkt.
+    // baseRevenue, the KPI mau xanh trong khoi Marketing cua tab "Báo cáo ngày") cong CA doanh
+    // thu don da huy/hoan, cao hon han Bao cao A that (Duyen bao "doanh thu Base dang bi gap
+    // doi"). Them dung 1 dieu kien vao if ben duoi, KHONG doi gi khac trong vong lap.
+    if (dt && dateInRange_(dt, from, to) && !_isExcludedOrderStatus_(rowsDt[i].trangThai)) {
       var dKeyM = normOrderDate_(rowsDt[i].ngayTao);
       baseOrders++;
       var rev = Number(rowsDt[i].giaTriDon) || 0;
