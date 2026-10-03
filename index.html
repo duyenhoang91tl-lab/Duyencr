@@ -11523,6 +11523,15 @@ function _mktPctColor(passed){
   return passed ? 'var(--green)' : 'var(--red, #d33)';
 }
 var _MKT_OP_SYMBOL = { gte:'≥', lte:'≤', eq:'=' };
+// So ngay trong khoang [from,to] (chuoi 'yyyy-MM-dd', ca 2 dau duoc tinh) — dung cho cot/dong
+// "TB/ngày" trong Checklist MKT. parseVNDate_-style: new Date('yyyy-MM-dd') la UTC-safe, khong
+// bi lech mui gio nhu dinh dang 'dd/MM/yyyy'. Toi thieu 1 de khong chia cho 0.
+function _mktDaysInRange_(from, to){
+  var a = new Date(String(from||'')+'T00:00:00Z'), b = new Date(String(to||'')+'T00:00:00Z');
+  if (isNaN(a.getTime()) || isNaN(b.getTime())) return 1;
+  var days = Math.round((b.getTime()-a.getTime())/86400000) + 1;
+  return days > 0 ? days : 1;
+}
 
 // ── Sửa mục tiêu (%) + mẫu số — áp dụng 1 lần cho CẢ THÁNG (tháng của ngày "Đến") ──
 function _mktOpenCfgEditor(){
@@ -11626,10 +11635,11 @@ function _mktRender(){
   // Khoi "Ket qua ban hang" — noi bat, xep dau tien de chup man hinh gui sep: Tong don,
   // Doanh thu, TB don, Ty le chot deu la con so lanh dao quan tam nhat, tach rieng khoi cac
   // chi so "phau" (tuong tac/SDT) o khoi thu 2 ben duoi de khong bi loang khi nhin nhanh.
-  html += '<div style="font-size:13px;font-weight:700;margin:4px 0 8px">💰 Kết quả bán hàng ('+esc(rep.from)+' → '+esc(rep.to)+')</div>';
+  var mktDays = _mktDaysInRange_(rep.from, rep.to);
+  html += '<div style="font-size:13px;font-weight:700;margin:4px 0 8px">💰 Kết quả bán hàng ('+esc(rep.from)+' → '+esc(rep.to)+', '+mktDays+' ngày)</div>';
   html += '<div class="kpi-grid" style="margin-bottom:14px">'+
-    '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+fmt(rep.baseOrders)+'</div><div class="kpi-label"><b>Tổng đơn</b> (Base — L5)</div></div>'+
-    '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+fmtVND(Math.round(rep.baseRevenue||0))+'</div><div class="kpi-label"><b>Tổng doanh thu</b></div></div>'+
+    '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+fmt(rep.baseOrders)+'</div><div class="kpi-label"><b>Tổng đơn</b> (Base — L5)<div style="color:var(--muted);font-weight:400">TB/ngày: '+fmt(Math.round((rep.baseOrders||0)/mktDays*10)/10)+'</div></div></div>'+
+    '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+fmtVND(Math.round(rep.baseRevenue||0))+'</div><div class="kpi-label"><b>Tổng doanh thu</b><div style="color:var(--muted);font-weight:400">TB/ngày: '+fmtVND(Math.round((rep.baseRevenue||0)/mktDays))+'</div></div></div>'+
     '<div class="kpi-card"><div class="kpi-val">'+fmtVND(Math.round(rep.trungBinhDon||0))+'</div><div class="kpi-label">Trung bình đơn (Doanh thu ÷ đơn)</div></div>'+
     '<div class="kpi-card"><div class="kpi-val">'+rep.tyLeChotTong+'%</div><div class="kpi-label">Tỷ lệ chốt tổng (Đơn / Tổng TT)</div></div>'+
   '</div>';
@@ -11683,16 +11693,18 @@ function _mktRender(){
 
   // ── Bảng chỉ số L1..Ln ──
   html += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr>'+
-    '<th>Tag</th><th style="text-align:right">Số lượng</th><th>Mẫu số</th><th style="text-align:right">Giá trị mẫu số</th>'+
+    '<th>Tag</th><th style="text-align:right">Số lượng</th><th style="text-align:right">TB/ngày</th><th>Mẫu số</th><th style="text-align:right">Giá trị mẫu số</th>'+
     '<th style="text-align:right">Tỷ lệ</th><th style="text-align:right">Mục tiêu</th><th>Trạng thái</th>'+
   '</tr></thead><tbody>';
   rep.tags.forEach(function(t){
     var statusHtml = '<span style="color:var(--muted)">—</span>';
     if (t.passed === true) statusHtml = '<span style="color:var(--green);font-weight:700">✓ Đạt</span>';
     else if (t.passed === false) statusHtml = '<span style="color:var(--red,#d33);font-weight:700">✗ Chưa đạt</span>';
+    var tbNgay = (t.count===null || t.count===undefined) ? null : Math.round((t.count/mktDays)*10)/10;
     html += '<tr>'+
       '<td><b>'+esc(t.code)+'</b>. '+esc(_mktLabel(t.code))+(t.code==='L5'?' <span style="font-size:10px;color:var(--muted)">(Base)</span>':'')+'</td>'+
       '<td style="text-align:right;font-weight:700">'+fmt(t.count)+'</td>'+
+      '<td style="text-align:right;color:var(--muted)">'+(tbNgay!==null?fmt(tbNgay):'—')+'</td>'+
       '<td style="color:var(--muted);font-size:11px">'+(t.denomLabel||'—')+'</td>'+
       '<td style="text-align:right">'+(t.denomValue!==null?fmt(t.denomValue):'—')+'</td>'+
       '<td style="text-align:right;font-weight:700;color:'+_mktPctColor(t.passed)+'">'+(t.rate!==null?t.rate+'%':'—')+'</td>'+
