@@ -13757,8 +13757,7 @@ function renderSalesReportTabF_(wrap, subTabs){
       '<div style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)">🔒 '+esc((_srState.fSale||[]).join(', ') || currentUser.name)+' — chỉ xem được KPI của mình</div></div>';
   }
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
-  if (_srIsAdmin()) filters += '<button class="btn sm" onclick="openSaleKpiConfigModal_()">🎯 Cài đặt KPI (bậc / online / commit riêng)</button>';
-  if (_srIsAdmin()) filters += '<button class="btn sm" onclick="openSaleChannelsModal()">🏷️ Phân loại Online/Offline</button>';
+  if (_srIsAdmin()) filters += '<button class="btn sm" onclick="openSaleKpiConfigModal_()">🎯 Cài đặt KPI (bậc / commit riêng)</button>';
   filters += '</div>';
 
   var body = _srState.loading
@@ -13776,11 +13775,16 @@ function _srRenderF_(d){
   _SR_COLTH_GETTER_['fSale'] = { name: function(r){ return r.name; } };
   var rows = _srApplyColFilters_(d.rows||[], 'fSale', _SR_COLTH_GETTER_['fSale']).filter(function(r){ return !_srState.fSaleSearch || r.name.toLowerCase().indexOf(_srState.fSaleSearch.toLowerCase())!==-1; });
 
+  var tt = cfg.tierTargets || {};
+  var noTierCount = (d.rows||[]).filter(function(r){ return r.nhom==='(chưa gán bậc)'; }).length;
   var html = '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">'+
-    'Mục tiêu: <b>Văn phòng</b> — Bậc 1 = '+_srMoney(cfg.tierTargets && cfg.tierTargets['1'])+', Bậc 2 = '+_srMoney(cfg.tierTargets && cfg.tierTargets['2'])+', Bậc 3 = '+_srMoney(cfg.tierTargets && cfg.tierTargets['3'])+
-    ' · <b>Online</b> — '+_srMoney(cfg.onlineTarget)+
-    ' · Ai có <b>KPI commit riêng</b> thì dùng số đó thay vì bậc/nhóm. Nhóm lấy từ <b>🏷️ Phân loại Online/Offline</b> (Quản lý Team) — cùng nguồn với "🏆 Chương trình thưởng" ở Báo cáo E.'+
-    (d.classifiedCount ? '' : ' <b style="color:#9a3412">Chưa phân loại Sale nào — bấm nút "🏷️ Phân loại Online/Offline" bên dưới để gán.</b>')+
+    'Mục tiêu theo bậc (tự động tăng/giảm hàng tháng theo doanh thu, bắt đầu theo dõi từ <b>'+esc(cfg.trackingStartMonth||'')+'</b>): '+
+    '<b>F1</b>='+_srMoney(tt.F1)+' · <b>F2</b>='+_srMoney(tt.F2)+' · <b>F3</b>='+_srMoney(tt.F3)+
+    ' · <b>O1</b>='+_srMoney(tt.O1)+' · <b>O2</b>='+_srMoney(tt.O2)+' · <b>O3</b>='+_srMoney(tt.O3)+
+    ' · <b>O</b> (không nhảy bậc)='+_srMoney(tt.O)+
+    ' · <b>Thử việc</b>: TVF1='+_srMoney(tt.TVF1)+', TVF2='+_srMoney(tt.TVF2)+' (luôn đúng 1 tháng, tháng sau tự động lên F1)'+
+    ' · Ai có <b>KPI commit riêng</b> thì dùng số đó thay vì bậc.'+
+    (noTierCount ? ' <b style="color:#9a3412">'+noTierCount+' Sale chưa được gán Bậc bắt đầu — bấm "🎯 Cài đặt KPI" để gán.</b>' : '')+
     '</div>';
 
   html += '<div class="kpi-grid" style="margin-bottom:16px">'+
@@ -13797,10 +13801,10 @@ function _srRenderF_(d){
       _srColTh_('fSale','name','Sale',_SR_COLTH_ROWSFN_['fSale'],_SR_COLTH_GETTER_['fSale'].name)+'<th>Nhóm</th><th>Bậc</th><th style="text-align:right">Doanh thu</th>'+
       '<th style="text-align:right">KPI mục tiêu</th><th style="text-align:right">% hoàn thành</th><th>Kết quả</th></tr></thead><tbody>';
     rows.forEach(function(r){
-      var tierLabel = r.tier ? 'Bậc '+r.tier : (r.nhom==='Văn phòng' ? '<span style="color:var(--hint)">chưa gán</span>' : '—');
+      var tierLabel = r.tier ? esc(r.tier) : '<span style="color:var(--hint)">chưa gán</span>';
       var pctColor = r.pct===null ? 'var(--muted)' : (r.pct>=100 ? '#16a34a' : '#dc2626');
       var resultTxt = r.pct===null ? '<span style="color:var(--hint)">chưa có mục tiêu</span>' : (r.pct>=100 ? '✓ Đạt' : '✗ Chưa đạt');
-      var srcNote = r.source==='override' ? ' <span title="Dùng KPI commit riêng, không theo bậc/nhóm" style="cursor:help">📌</span>' : '';
+      var srcNote = r.source==='override' ? ' <span title="Dùng KPI commit riêng, không theo bậc tự động" style="cursor:help">📌</span>' : '';
       html += '<tr><td>'+esc(r.name)+'</td><td>'+esc(r.nhom)+'</td><td>'+tierLabel+srcNote+'</td>'+
         '<td style="text-align:right">'+_srMoney(r.revenue)+'</td>'+
         '<td style="text-align:right">'+(r.target?_srMoney(r.target):'<span style="color:var(--hint)">—</span>')+'</td>'+
@@ -13888,6 +13892,13 @@ function renderSalesReportTabG_(wrap, subTabs){
 // ── Modal: Cài đặt KPI (Bậc 1/2/3, KPI Online, gán bậc từng người, KPI commit riêng) ──
 // Dùng lại chính dataF.rows đang có (đã gồm ĐỦ mọi Sale trong SaleDirectory, kể cả 0 doanh thu
 // kỳ này) — không cần gọi thêm action nào để mở modal.
+var SALE_TIER_ORDER_CLIENT_ = ['TVF1','TVF2','F1','F2','F3','O1','O2','O3','O'];
+var SALE_TIER_LABEL_CLIENT_ = {
+  TVF1:'TVF1 — Thử việc 1', TVF2:'TVF2 — Thử việc 2',
+  F1:'F1 — Văn phòng', F2:'F2 — Văn phòng', F3:'F3 — Văn phòng',
+  O1:'O1 — Online (nhảy bậc)', O2:'O2 — Online (nhảy bậc)', O3:'O3 — Online (nhảy bậc)',
+  O:'O — Online (không nhảy bậc)'
+};
 function openSaleKpiConfigModal_(){
   var d = _srState.dataF;
   if (!d || !d.rows){ toast('Chưa tải được danh sách Sale — bấm "Lọc" trước.'); return; }
@@ -13896,20 +13907,18 @@ function openSaleKpiConfigModal_(){
   // nhap trong modal deu nhap theo trieu — neu giu VND tho o day thi truong nao NGUOI DUNG
   // KHONG dong den se bi nhan nham x1.000.000 mot lan nua khi luu (_srSaveKpiConfig_ luon nhan
   // moi truong len x1.000.000, gia dinh state dang o don vi trieu).
+  var tierTargets = {};
+  SALE_TIER_ORDER_CLIENT_.forEach(function(k){ tierTargets[k] = Math.round(((cfg.tierTargets && cfg.tierTargets[k]) || 0)/1000000); });
   _srState.fEditing = {
-    tierTargets: {
-      '1': Math.round(((cfg.tierTargets && cfg.tierTargets['1']) || 0)/1000000),
-      '2': Math.round(((cfg.tierTargets && cfg.tierTargets['2']) || 0)/1000000),
-      '3': Math.round(((cfg.tierTargets && cfg.tierTargets['3']) || 0)/1000000)
-    },
-    onlineTarget: Math.round((cfg.onlineTarget || 0)/1000000),
-    rows: d.rows.map(function(r){ return { name:r.name, nhom:r.nhom, tier:r.tier||'', override: (cfg.overrides && cfg.overrides[r.name]!==undefined) ? Math.round(cfg.overrides[r.name]/1000000) : '' }; })
+    tierTargets: tierTargets,
+    trackingStartMonth: cfg.trackingStartMonth || '2026-09',
+    rows: d.rows.map(function(r){ return { name:r.name, startTier: (cfg.startTier && cfg.startTier[r.name]) || '', override: (cfg.overrides && cfg.overrides[r.name]!==undefined) ? Math.round(cfg.overrides[r.name]/1000000) : '' }; })
   };
   _srRenderKpiConfigModal_();
 }
 function _srKpiEditSetTarget(tier, val){ _srState.fEditing.tierTargets[tier] = val; }
-function _srKpiEditSetOnline(val){ _srState.fEditing.onlineTarget = val; }
-function _srKpiEditSetTier(i, val){ _srState.fEditing.rows[i].tier = val; }
+function _srKpiEditSetStartMonth(val){ _srState.fEditing.trackingStartMonth = val; }
+function _srKpiEditSetStartTier(i, val){ _srState.fEditing.rows[i].startTier = val; }
 function _srKpiEditSetOverride(i, val){ _srState.fEditing.rows[i].override = val; }
 function _srKpiEditSearch(q){
   var body = document.getElementById('sr-kpi-modal-rows');
@@ -13918,29 +13927,21 @@ function _srKpiEditSearch(q){
 function _srKpiConfigRowsHtml_(q){
   var ed = _srState.fEditing;
   var qf = (q||'').toLowerCase();
-  var groups = [['Văn phòng','Văn phòng — chọn Bậc cho từng người'],['Online','Online — mức KPI chung, chỉ cần đặt Commit riêng nếu muốn khác'],['(chưa phân loại)','Chưa phân loại Online/Offline — bấm "🏷️ Phân loại Online/Offline" ở thanh lọc trước, chỉ đặt được Commit riêng ở đây']];
-  var html = '';
-  groups.forEach(function(g){
-    var idxs = []; ed.rows.forEach(function(r,i){ if (r.nhom===g[0] && (!qf || r.name.toLowerCase().indexOf(qf)!==-1)) idxs.push(i); });
-    if (!idxs.length) return;
-    html += '<div style="font-weight:700;font-size:11.5px;margin:10px 0 4px;color:var(--muted)">'+esc(g[1])+' ('+idxs.length+')</div>';
-    html += '<table style="width:100%;border-collapse:collapse;font-size:12px"><tbody>';
-    idxs.forEach(function(i){
-      var r = ed.rows[i];
-      var tierCell = g[0]==='Văn phòng'
-        ? '<select onchange="_srKpiEditSetTier('+i+',this.value)" style="padding:3px 6px;border:1px solid var(--border);border-radius:5px;background:var(--surface)">'+
-            '<option value=""'+(r.tier===''?' selected':'')+'>— chưa gán —</option>'+
-            '<option value="1"'+(r.tier==='1'?' selected':'')+'>Bậc 1</option>'+
-            '<option value="2"'+(r.tier==='2'?' selected':'')+'>Bậc 2</option>'+
-            '<option value="3"'+(r.tier==='3'?' selected':'')+'>Bậc 3</option></select>'
-        : '<span style="color:var(--hint)">—</span>';
-      html += '<tr><td style="padding:3px 8px 3px 0;width:35%">'+esc(r.name)+'</td>'+
-        '<td style="width:30%">'+tierCell+'</td>'+
-        '<td><input type="number" min="0" step="1" placeholder="để trống = mặc định" value="'+esc(r.override)+'" oninput="_srKpiEditSetOverride('+i+',this.value)" style="width:100%;padding:3px 6px;border:1px solid var(--border);border-radius:5px;background:var(--surface)"> <span style="color:var(--hint);font-size:10.5px">triệu commit riêng</span></td></tr>';
-    });
-    html += '</tbody></table>';
+  var idxs = []; ed.rows.forEach(function(r,i){ if (!qf || r.name.toLowerCase().indexOf(qf)!==-1) idxs.push(i); });
+  if (!idxs.length) return '<div style="color:var(--muted);padding:10px 0">Không tìm thấy Sale nào khớp.</div>';
+  var html = '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>'+
+    '<th style="text-align:left;padding:3px 8px 3px 0">Sale</th><th style="text-align:left;width:34%">Bậc bắt đầu</th><th>Commit riêng</th></tr></thead><tbody>';
+  idxs.forEach(function(i){
+    var r = ed.rows[i];
+    var tierCell = '<select onchange="_srKpiEditSetStartTier('+i+',this.value)" style="width:100%;padding:3px 6px;border:1px solid var(--border);border-radius:5px;background:var(--surface)">'+
+        '<option value=""'+(r.startTier===''?' selected':'')+'>— chưa gán —</option>'+
+        SALE_TIER_ORDER_CLIENT_.map(function(t){ return '<option value="'+t+'"'+(r.startTier===t?' selected':'')+'>'+esc(SALE_TIER_LABEL_CLIENT_[t])+'</option>'; }).join('')+
+      '</select>';
+    html += '<tr><td style="padding:3px 8px 3px 0">'+esc(r.name)+'</td>'+
+      '<td>'+tierCell+'</td>'+
+      '<td><input type="number" min="0" step="1" placeholder="để trống = theo bậc" value="'+esc(r.override)+'" oninput="_srKpiEditSetOverride('+i+',this.value)" style="width:100%;padding:3px 6px;border:1px solid var(--border);border-radius:5px;background:var(--surface)"> <span style="color:var(--hint);font-size:10.5px">triệu</span></td></tr>';
   });
-  if (!html) html = '<div style="color:var(--muted);padding:10px 0">Không tìm thấy Sale nào khớp.</div>';
+  html += '</tbody></table>';
   return html;
 }
 function _srRenderKpiConfigModal_(){
@@ -13950,15 +13951,20 @@ function _srRenderKpiConfigModal_(){
   var el = document.createElement('div');
   el.id = 'sr-kpi-modal';
   el.className = 'modal-overlay open';
-  el.innerHTML = '<div class="modal-box" style="max-width:640px;max-height:85vh;overflow-y:auto">'+
-    '<div class="modal-title">🎯 Cài đặt KPI theo Sale</div>'+
-    '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Sửa là áp dụng ngay cho mọi kỳ đang xem (không chia theo tháng). Nhập số theo <b>triệu đồng</b> cho gọn.</div>'+
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">'+
-      ['1','2','3'].map(function(t){ return '<div><label style="font-size:11px;color:var(--muted);display:block">Bậc '+t+' (Văn phòng)</label>'+
-        '<input type="number" min="0" step="1" value="'+esc(ed.tierTargets[t])+'" oninput="_srKpiEditSetTarget(\''+t+'\',this.value)" style="width:110px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"> triệu</div>'; }).join('')+
-      '<div><label style="font-size:11px;color:var(--muted);display:block">Online (chung)</label>'+
-        '<input type="number" min="0" step="1" value="'+esc(ed.onlineTarget)+'" oninput="_srKpiEditSetOnline(this.value)" style="width:110px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"> triệu</div>'+
-    '</div>'+
+  var fTrack = ['TVF1','TVF2','F1','F2','F3'], oTrack = ['O1','O2','O3','O'];
+  function targetInput(t){
+    return '<div><label style="font-size:11px;color:var(--muted);display:block">'+t+'</label>'+
+      '<input type="number" min="0" step="1" value="'+esc(ed.tierTargets[t])+'" oninput="_srKpiEditSetTarget(\''+t+'\',this.value)" style="width:90px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"> triệu</div>';
+  }
+  el.innerHTML = '<div class="modal-box" style="max-width:680px;max-height:85vh;overflow-y:auto">'+
+    '<div class="modal-title">🎯 Cài đặt KPI theo Bậc</div>'+
+    '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Mỗi Sale có 1 <b>Bậc bắt đầu</b> tính từ tháng bắt đầu theo dõi bên dưới; bậc các tháng sau <b>tự tính</b> theo quy tắc: 3 tháng liên tiếp TB ≥125% KPI bậc hiện tại (không tháng nào &lt;70%) → lên 1 bậc (tối đa bậc 3); 3 tháng liên tiếp TB &lt;80% KPI bậc hiện tại → xuống 1 bậc. Bậc <b>O</b> không bao giờ đổi. Bậc <b>Thử việc</b> (TVF1/TVF2) luôn đúng 1 tháng rồi tự động lên F1. Nhập số theo <b>triệu đồng</b> cho gọn.</div>'+
+    '<div style="margin-bottom:10px"><label style="font-size:11px;color:var(--muted);display:block">Tháng bắt đầu theo dõi</label>'+
+      '<input type="month" value="'+esc(ed.trackingStartMonth)+'" onchange="_srKpiEditSetStartMonth(this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"></div>'+
+    '<div style="margin-bottom:6px"><div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:3px">KPI theo Bậc — Văn phòng (F)</div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+fTrack.map(targetInput).join('')+'</div></div>'+
+    '<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)"><div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:3px">KPI theo Bậc — Online (O)</div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+oTrack.map(targetInput).join('')+'</div></div>'+
     '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." oninput="_srKpiEditSearch(this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:100%;margin-bottom:4px">'+
     '<div id="sr-kpi-modal-rows">'+_srKpiConfigRowsHtml_('')+'</div>'+
     '<div style="display:flex;gap:8px;margin-top:14px"><button class="btn primary" onclick="_srSaveKpiConfig_()">💾 Lưu</button><button class="btn secondary" onclick="document.getElementById(\'sr-kpi-modal\').remove()">Hủy</button></div>'+
@@ -13967,13 +13973,10 @@ function _srRenderKpiConfigModal_(){
 }
 async function _srSaveKpiConfig_(){
   var ed = _srState.fEditing;
-  var config = {
-    tierTargets: { '1': (Number(ed.tierTargets['1'])||0)*1000000, '2': (Number(ed.tierTargets['2'])||0)*1000000, '3': (Number(ed.tierTargets['3'])||0)*1000000 },
-    onlineTarget: (Number(ed.onlineTarget)||0)*1000000,
-    tiers: {}, overrides: {}
-  };
+  var config = { tierTargets: {}, trackingStartMonth: ed.trackingStartMonth || '2026-09', startTier: {}, overrides: {} };
+  SALE_TIER_ORDER_CLIENT_.forEach(function(k){ config.tierTargets[k] = (Number(ed.tierTargets[k])||0)*1000000; });
   ed.rows.forEach(function(r){
-    if (r.tier) config.tiers[r.name] = r.tier;
+    if (r.startTier) config.startTier[r.name] = r.startTier;
     if (r.override !== '' && r.override !== null && r.override !== undefined && !isNaN(Number(r.override))) {
       config.overrides[r.name] = Number(r.override)*1000000;
     }

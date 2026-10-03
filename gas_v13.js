@@ -2542,11 +2542,34 @@ function buildSalesReportA_(filters) {
 //  ngay (giong het co che "% hoa hong ca nhan" / individualRates da co san, client tu doc/ghi
 //  qua action getSetting/setSetting chung, KHONG can route rieng cho phan luu cau hinh).
 // ═══════════════════════════════════════════════════════════════
+// 9 bac: TVF1/TVF2 (thu viec, F track) -> F1/F2/F3 (Van phong chinh thuc) VA O1/O2/O3 (Online
+// co nhay bac) VA O (Online KHONG nhay bac, giu nguyen KPI mai mai). Theo dung sheet "Bậc" Duyen
+// gui 2026-10-01. track dung de +-1 cap (F1<->F2<->F3, O1<->O2<->O3); probation=true: luon CHI
+// giu dung 1 thang roi tu dong chuyen F1 (bat ke ket qua thang do), khong xet 3 thang nhu binh
+// thuong; track 'OFLAT': khong bao gio doi bac, bo qua toan bo cong thuc tang/giam.
+var SALE_TIER_ORDER_ = ['TVF1', 'TVF2', 'F1', 'F2', 'F3', 'O1', 'O2', 'O3', 'O'];
+var SALE_TIER_DEFAULT_TARGETS_ = {
+  TVF1: 240000000, TVF2: 300000000,
+  F1: 400000000, F2: 500000000, F3: 600000000,
+  O1: 700000000, O2: 800000000, O3: 900000000,
+  O: 500000000
+};
+var SALE_TIER_META_ = {
+  TVF1: { track: 'F', level: 0, probation: true },
+  TVF2: { track: 'F', level: 0, probation: true },
+  F1: { track: 'F', level: 1 },
+  F2: { track: 'F', level: 2 },
+  F3: { track: 'F', level: 3 },
+  O1: { track: 'O', level: 1 },
+  O2: { track: 'O', level: 2 },
+  O3: { track: 'O', level: 3 },
+  O: { track: 'OFLAT', level: 0 }
+};
 var SALE_KPI_DEFAULT_CFG_ = {
-  tierTargets: { '1': 400000000, '2': 500000000, '3': 500000000 },
-  onlineTarget: 500000000,
-  tiers: {},      // ten Sale (dung y het chuoi "Sale bán" trong DT TONG) -> '1'|'2'|'3'
-  overrides: {}   // ten Sale -> so tien KPI rieng (uu tien tuyet doi, bo qua bac/nhom)
+  tierTargets: JSON.parse(JSON.stringify(SALE_TIER_DEFAULT_TARGETS_)),
+  startTier: {},                   // ten Sale (dung y het chuoi "Sale bán"/"Thẻ") -> 1 trong SALE_TIER_ORDER_
+  trackingStartMonth: '2026-09',   // 'YYYY-MM' - thang bat dau tu dong tinh bac theo quy che
+  overrides: {}                    // ten Sale -> so tien KPI rieng (uu tien tuyet doi, bo qua bac tu dong)
 };
 
 function readSaleKpiConfig_() {
@@ -2556,87 +2579,179 @@ function readSaleKpiConfig_() {
     if (raw) {
       var o = JSON.parse(raw);
       if (o && typeof o === 'object') {
-        if (o.tierTargets) { ['1', '2', '3'].forEach(function(k) { var n = Number(o.tierTargets[k]); if (!isNaN(n) && n >= 0) out.tierTargets[k] = n; }); }
-        if (o.onlineTarget !== undefined) { var n2 = Number(o.onlineTarget); if (!isNaN(n2) && n2 >= 0) out.onlineTarget = n2; }
-        if (o.tiers && typeof o.tiers === 'object') out.tiers = o.tiers;
+        if (o.tierTargets && typeof o.tierTargets === 'object') {
+          SALE_TIER_ORDER_.forEach(function(k) { var n = Number(o.tierTargets[k]); if (!isNaN(n) && n >= 0) out.tierTargets[k] = n; });
+        }
+        if (o.trackingStartMonth) out.trackingStartMonth = String(o.trackingStartMonth);
+        if (o.startTier && typeof o.startTier === 'object') {
+          Object.keys(o.startTier).forEach(function(name) { if (SALE_TIER_META_[o.startTier[name]]) out.startTier[name] = o.startTier[name]; });
+        }
         if (o.overrides && typeof o.overrides === 'object') out.overrides = o.overrides;
+        // Migration tu cau hinh CU (truoc 2026-10, 3 bac chung "1"/"2"/"3" + 1 muc Online phang):
+        // neu CHUA co startTier moi ma con du lieu cu (o.tiers), tu suy startTier 1 lan de khong
+        // mat trang toan bo cau hinh da cham truoc do. "1"/"2"/"3" (Van phong) -> F1/F2/F3; Sale
+        // tung duoc gan saleChannels='online' nhung chua co trong o.tiers -> mac dinh 'O' (phang,
+        // an toan nhat vi khong biet ho dang o muc nao trong O1-O3) — Duyen sua lai tung nguoi sau.
+        if ((!o.startTier || !Object.keys(o.startTier).length)) {
+          var oldMap = { '1': 'F1', '2': 'F2', '3': 'F3' };
+          if (o.tiers && typeof o.tiers === 'object') {
+            Object.keys(o.tiers).forEach(function(name) { var mapped = oldMap[o.tiers[name]]; if (mapped) out.startTier[name] = mapped; });
+          }
+          try {
+            var rawCh = getSetting_('saleChannels');
+            if (rawCh) {
+              var oCh = JSON.parse(rawCh);
+              Object.keys(oCh || {}).forEach(function(name) { if (oCh[name] === 'online' && !out.startTier[name]) out.startTier[name] = 'O'; });
+            }
+          } catch (eCh) {}
+        }
       }
     }
   } catch (e) {}
   return out;
 }
 
-// Doanh thu thuc te dung lai DUNG buildSalesReportA_ (cung bo loc ngay/sale/kenh, cung quy uoc
-// chia deu N-sale/don) — khong tao them 1 cach tinh doanh thu rieng de tranh so lieu lech nhau
-// giua cac bao cao. Nhom (Van phong/Online) khop qua SaleDirectory, dung DUNG _normTxt_ nhu
-// buildKpiReport_ da dung (client KHONG the tu lam viec nay chinh xac — _foldVi phia client bo
-// dau, con _normTxt_ o day KHONG bo dau, 2 ham fold khac nhau se khop SAI ten co dau).
+// ── Thang (YYYY-MM) helpers cho state machine tinh bac tu dong ──
+function _ymAdd_(ym, delta) {
+  var parts = String(ym).split('-');
+  var y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) - 1;
+  m += delta; y += Math.floor(m / 12); m = ((m % 12) + 12) % 12;
+  return y + '-' + (m + 1 < 10 ? '0' : '') + (m + 1);
+}
+function _ymMonthsBetween_(fromYm, toYm) {
+  var out = [], cur = fromYm, guard = 0;
+  while (true) {
+    out.push(cur);
+    if (cur === toYm || guard++ > 240) break; // guard 20 nam, tranh vong lap vo han neu cau hinh loi
+    cur = _ymAdd_(cur, 1);
+  }
+  return out;
+}
+function _ymFirstDay_(ym) { return ym + '-01'; }
+function _ymLastDay_(ym) {
+  var parts = ym.split('-'), y = parseInt(parts[0], 10), m = parseInt(parts[1], 10);
+  var last = new Date(y, m, 0).getDate();
+  return ym + '-' + (last < 10 ? '0' : '') + last;
+}
+function _todayYm_() {
+  return Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Asia/Ho_Chi_Minh', 'yyyy-MM');
+}
+
+// Doanh thu THEO TUNG THANG cho moi Sale, tu buildSalesReportB_ (POS/"dữ liệu đơn", dung nguon
+// voi Bao cao B/E) — can de chay state machine tang/giam bac (xem _computeSaleTierTimeline_).
+// Cache 5 phut qua _cachePutBig_/_cacheGetBig_ (ho tro payload lon, khac CacheService.put thuong
+// bi am tham bo qua khi vuot ~100KB) — danh sach thang it doi trong ngay nen cache ngan la du,
+// tranh phai quet lai sheet don cho moi lan bam Loc/doi bo loc trong Bao cao F.
+function _computeSaleMonthlyRevenue_(months) {
+  var cKey = 'saleMonthlyRev_v1_' + months[0] + '_' + months[months.length - 1];
+  try { var cached = _cacheGetBig_(cKey); if (cached) return JSON.parse(cached); } catch (e) {}
+  var out = {};
+  months.forEach(function(ym) {
+    var res = buildSalesReportB_({ dateFrom: _ymFirstDay_(ym), dateTo: _ymLastDay_(ym) });
+    (res.bySale || []).forEach(function(s) {
+      if (!out[s.name]) out[s.name] = {};
+      out[s.name][ym] = s.giaTri;
+    });
+  });
+  try { _cachePutBig_(cKey, JSON.stringify(out), 300); } catch (e) {}
+  return out;
+}
+
+// State machine tinh bac tung thang cho 1 Sale, bat dau tu startTier o thang dau tien cua mang
+// months (= trackingStartMonth). Quy tac (theo sheet "Bậc" + xac nhan Duyen 2026-10-01):
+//  - Bac thu viec (probation): CHI giu dung 1 thang, thang ke tiep LUON tu dong thanh F1, bat ke
+//    ket qua thang thu viec the nao (khong xet 3 thang).
+//  - Bac 'O' (track OFLAT): khong bao gio doi, giu nguyen KPI mai mai.
+//  - Bac chinh thuc (F1-F3, O1-O3): moi thang, neu 3 thang LIEN TIEP NGAY TRUOC do CUNG o dung 1
+//    bac nay (tranh xet nua voi trong luc dang doi bac):
+//      + TB doanh thu 3 thang do >= 125% KPI bac hien tai VA KHONG thang nao < 70% KPI bac hien
+//        tai => TANG 1 bac (toi da bac 3 trong track, F3/O3 khong tang them).
+//      + TB doanh thu 3 thang do < 80% KPI bac hien tai => GIAM 1 bac (toi thieu bac 1, F1/O1
+//        khong giam them).
+//      + Nguoc lai: giu nguyen bac.
+function _computeSaleTierTimeline_(startTier, months, monthlyRevenue, tierTargets) {
+  var timeline = {};
+  for (var i = 0; i < months.length; i++) {
+    var ym = months[i];
+    if (i === 0) { timeline[ym] = startTier; continue; }
+    var prevYm = months[i - 1], prevTier = timeline[prevYm], meta = SALE_TIER_META_[prevTier];
+    if (!meta) { timeline[ym] = prevTier; continue; }
+    if (meta.probation) { timeline[ym] = 'F1'; continue; }
+    if (meta.track === 'OFLAT') { timeline[ym] = prevTier; continue; }
+    if (i >= 3 && timeline[months[i - 3]] === prevTier && timeline[months[i - 2]] === prevTier) {
+      var kpi = tierTargets[prevTier] || 0;
+      var r1 = monthlyRevenue[months[i - 3]] || 0, r2 = monthlyRevenue[months[i - 2]] || 0, r3 = monthlyRevenue[prevYm] || 0;
+      var avg3 = (r1 + r2 + r3) / 3, min3 = Math.min(r1, r2, r3);
+      if (kpi > 0 && avg3 >= kpi * 1.25 && min3 >= kpi * 0.70 && meta.level < 3) { timeline[ym] = meta.track + (meta.level + 1); continue; }
+      if (kpi > 0 && avg3 < kpi * 0.80 && meta.level > 1) { timeline[ym] = meta.track + (meta.level - 1); continue; }
+    }
+    timeline[ym] = prevTier;
+  }
+  return timeline;
+}
+
 function buildSaleKpiReport_(filters) {
-  // SUA 2026-09-30 (yeu cau Duyen): doi nguon doanh thu cho KPI tu buildSalesReportA_ ("base"/
-  // DT TONG) sang buildSalesReportB_ ("dữ liệu đơn"/POS) — dong bo voi Bao cao E (Hoa hong +
-  // Chuong trinh thuong, da chuyen sang POS tu truoc). Ca 2 ham deu tra ve bySale/totalOrders/
-  // totalGiaTri CUNG SHAPE {name, giaTri, orders} nen khong can sua gi them ben duoi.
   var a = buildSalesReportB_(filters);
   var cfg = readSaleKpiConfig_();
-  // Nhom Van phong/Online: dung CHUNG 1 nguon voi "🏆 Chương trình thưởng" o Bao cao E — setting
-  // 'saleChannels' ({ ten Sale -> 'online'|'offline' }, cai o modal "🏷️ Phân loại Online/Offline"
-  // trong Quan ly Team) — THEO YEU CAU DUYEN 2026-09 (truoc do dang dung 2 nguon khac nhau: cho
-  // nay dung SaleDirectory, ben Chuong trinh thuong dung saleChannels — gay lech nhau).
-  var channels = {};
-  try {
-    var rawCh = getSetting_('saleChannels');
-    if (rawCh) { var oCh = JSON.parse(rawCh); if (oCh && typeof oCh === 'object') channels = oCh; }
-  } catch (eCh) {}
+
+  var todayYm = _todayYm_();
+  var startYm = cfg.trackingStartMonth || '2026-09';
+  var months = (startYm <= todayYm) ? _ymMonthsBetween_(startYm, todayYm) : [startYm];
+  var monthlyRevByName = _computeSaleMonthlyRevenue_(months);
 
   var rowsMap = {};
   function ensureRow(name) {
-    if (!rowsMap[name]) {
-      var ch = channels[name] || '';
-      var nhom = ch === 'online' ? 'Online' : (ch === 'offline' ? 'Văn phòng' : '(chưa phân loại)');
-      rowsMap[name] = { name: name, nhom: nhom, revenue: 0, orders: 0 };
-    }
+    if (!rowsMap[name]) rowsMap[name] = { name: name, revenue: 0, orders: 0 };
     return rowsMap[name];
   }
   (a.bySale || []).forEach(function(s) {
     var r = ensureRow(s.name);
     r.revenue += s.giaTri; r.orders += s.orders;
   });
-  // Them ca Sale DA duoc phan loai Online/Offline nhung CHUA co doanh thu trong ky dang xem (0d)
-  // — de van thay duoc muc tieu/0% thay vi bien mat khoi bao cao chi vi ky nay chua ban duoc gi.
-  Object.keys(channels).forEach(function(name) { if (channels[name]) ensureRow(name); });
+  // Them ca Sale DA duoc gan Bac bat dau / dat KPI rieng nhung CHUA co doanh thu trong ky dang
+  // xem (0d) — de van thay duoc muc tieu/0% thay vi bien mat khoi bao cao.
+  Object.keys(cfg.startTier).forEach(function(name) { ensureRow(name); });
+  Object.keys(cfg.overrides).forEach(function(name) { ensureRow(name); });
+
+  // Thang nao trong "months" thuc su nam trong ky dang xem (filters.dateFrom/dateTo) — de cong
+  // dung KPI muc tieu cua DUNG CAC THANG duoc xem, ke ca khi ky xem trai dai nhieu thang.
+  var rangeFrom = filters.dateFrom || _ymFirstDay_(months[0]);
+  var rangeTo = filters.dateTo || _ymLastDay_(months[months.length - 1]);
+  var monthsInRange = months.filter(function(ym) { return _ymLastDay_(ym) >= rangeFrom && _ymFirstDay_(ym) <= rangeTo; });
+  if (!monthsInRange.length) monthsInRange = [months[months.length - 1]]; // ky loc nam ngoai pham vi theo doi -> tam lay thang gan nhat de van co so hien thi
 
   var rows = Object.keys(rowsMap).map(function(name) {
     var r = rowsMap[name];
-    var target = null, source = 'no-tier', tier = '';
+    var target = null, source = 'no-tier', tierNow = '', timeline = null;
+    if (cfg.startTier[name]) {
+      timeline = _computeSaleTierTimeline_(cfg.startTier[name], months, monthlyRevByName[name] || {}, cfg.tierTargets);
+      tierNow = timeline[monthsInRange[monthsInRange.length - 1]] || cfg.startTier[name];
+      target = monthsInRange.reduce(function(sum, ym) { return sum + (cfg.tierTargets[timeline[ym] || cfg.startTier[name]] || 0); }, 0);
+      source = 'tier-auto';
+    }
     if (cfg.overrides[name] !== undefined && cfg.overrides[name] !== null) {
       target = Number(cfg.overrides[name]) || 0; source = 'override';
-    } else if (r.nhom === 'Online') {
-      target = cfg.onlineTarget; source = 'online';
-    } else if (r.nhom === 'Văn phòng') {
-      tier = cfg.tiers[name] || '';
-      if (tier) { target = cfg.tierTargets[tier] || 0; source = 'tier'; }
-      else { source = 'no-tier'; }
-    } else {
-      source = 'unclassified'; // chua duoc gan Online/Offline o "🏷️ Phân loại Online/Offline" -> khong tu doan
     }
+    var meta = tierNow ? SALE_TIER_META_[tierNow] : null;
+    var nhom = meta ? (meta.track === 'F' ? 'Văn phòng' : 'Online') : '(chưa gán bậc)';
     var pct = (target && target > 0) ? Math.round(r.revenue / target * 1000) / 10 : null;
-    return { name: name, nhom: r.nhom, tier: tier, revenue: r.revenue, orders: r.orders,
-      target: target, source: source, pct: pct, passed: (pct !== null) ? pct >= 100 : null };
+    return { name: name, nhom: nhom, tier: tierNow, revenue: r.revenue, orders: r.orders,
+      target: target, source: source, pct: pct, passed: (pct !== null) ? pct >= 100 : null,
+      timeline: timeline };
   });
   var rank = { 'Văn phòng': 0, 'Online': 1 };
   rows.sort(function(x, y) {
     var rx = rank.hasOwnProperty(x.nhom) ? rank[x.nhom] : 2, ry = rank.hasOwnProperty(y.nhom) ? rank[y.nhom] : 2;
     if (rx !== ry) return rx - ry;
-    if (x.nhom === 'Văn phòng' && x.tier !== y.tier) return (x.tier || '9').localeCompare(y.tier || '9');
+    if (x.tier !== y.tier) return (x.tier || '~').localeCompare(y.tier || '~');
     return y.revenue - x.revenue;
   });
 
   var totalRevenue = rows.reduce(function(s, r) { return s + r.revenue; }, 0);
   var totalTarget = rows.reduce(function(s, r) { return s + (r.target || 0); }, 0);
-  return { ok: true, rows: rows, config: cfg,
+  return { ok: true, rows: rows, config: cfg, trackedMonths: months,
     totalRevenue: totalRevenue, totalTarget: totalTarget,
     totalPct: totalTarget > 0 ? Math.round(totalRevenue / totalTarget * 1000) / 10 : null,
-    classifiedCount: Object.keys(channels).filter(function(k){ return channels[k]; }).length,
     totalOrders: a.totalOrders, totalGiaTri: a.totalGiaTri };
 }
 
