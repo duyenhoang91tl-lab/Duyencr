@@ -351,74 +351,84 @@ function _priceCols_(rows) {
   cols.gia = headerOrder.filter(function(k) { return pickedSet[k]; });
   return cols;
 }
-// Tim anh san pham THEO DUNG TEN SAN PHAM/TEN THUONG MAI, doc TRUC TIEP tu sheet DANH_MUC
-// (PRICE_SS_ID) — code RIENG, KHONG dung chung readPriceCatalog_/_priceCols_ (2 ham do GIOI HAN
-// chi doc toi cot PRICE_LAST_COL_ de "Tra cuu bang gia" khong bi nhiem noi dung cac cot cong
-// thuc/mau phia xa ben phai — xem giai thich o _priceCols_/GIA_COL_LIMIT_). Cot "Link ảnh sản
-// phẩm" co the nam o BAT KY vi tri nao (ke ca ngoai vung PRICE_LAST_COL_), nen ham nay TU QUET
-// TOAN BO be rong tieu de de tim dung 3 cot can — Ten san pham, Ten thuong mai, Link anh — roi
-// CHI doc rieng 3 cot do (khong doc het be rong sheet) de khong lam cham va KHONG anh huong gi
-// toi _priceCols_/tinh nang Tra cuu bang gia dang dung. Theo dung yeu cau Duyen 30/09/2026:
-// "chi can khop ten thuong mai hoac ten san pham la duoc" — CHI so khop tren 2 cot ten nay,
-// KHONG khop sang gia/size/chat lieu/cot khac nhu searchPriceCatalog_ van lam.
-function findProductImageInPriceCatalog_(query) {
+// ── ANH SAN PHAM trong DANH_MUC (cot "Link ảnh sản phẩm" CS tu dien san, chua link Google
+// Drive) — code RIENG, KHONG dung chung readPriceCatalog_/_priceCols_ (2 ham do GIOI HAN chi doc
+// toi cot PRICE_LAST_COL_ de "Tra cuu bang gia" khong bi nhiem noi dung cac cot cong thuc/mau
+// phia xa ben phai — xem giai thich o _priceCols_/GIA_COL_LIMIT_). Cot "Link ảnh sản phẩm" co
+// the nam o BAT KY vi tri nao (ke ca ngoai vung PRICE_LAST_COL_), nen cac ham duoi day TU QUET
+// TOAN BO be rong tieu de de tim dung cac cot can, roi CHI doc rieng cac cot do — khong doc het
+// be rong sheet, khong anh huong gi toi _priceCols_/tinh nang Tra cuu bang gia dang dung.
+//
+// SUA (30/09/2026, theo yeu cau Duyen): truoc day chi co 1 o go-ten-tu-do roi tu doan dong KHOP
+// NHAT — de chon NHAM dong (sai Size/Chat lieu) khi 1 san pham co nhieu bien the, moi bien the
+// co the co anh khac nhau. Nay doi sang cung co che "thu hep dan" (Nhom SP -> Ten SP -> Kieu/
+// Size -> Chat lieu, deu CO THE BO TRONG) giong het "Soan don" — buildProductImageFlat_ tra ve
+// danh sach PHANG du du lieu de FE tu dung lai UI cascading da co, roi goi driveImageFromLink_
+// rieng cho DUNG dong CS chon, thay vi doan.
+function _productImgCols_(headers) {
+  var nhomIdx = -1, tenIdx = -1, tmIdx = -1, sizeIdx = -1, clIdx = -1, imgIdx = -1;
+  for (var c = 0; c < headers.length; c++) {
+    var st = _stripVN_(headers[c]);
+    if (nhomIdx < 0 && /nhom\s*san\s*pham/.test(st)) { nhomIdx = c; continue; }
+    if (tenIdx < 0 && /^ten\s*san\s*pham/.test(st)) { tenIdx = c; continue; }
+    if (tmIdx < 0 && /ten\s*thuong\s*mai/.test(st)) { tmIdx = c; continue; }
+    if (sizeIdx < 0 && (st.indexOf('size') !== -1 || st.indexOf('kieu') !== -1)) { sizeIdx = c; continue; }
+    if (clIdx < 0 && st.indexOf('chat lieu') !== -1) { clIdx = c; continue; }
+    if (imgIdx < 0 && (st.indexOf('hinh anh') !== -1 || st.indexOf('link anh') !== -1 ||
+        st.indexOf('anh san pham') !== -1 || /\bhinh\b/.test(st) || /\banh\b/.test(st) || /\bimage\b/.test(st))) imgIdx = c;
+  }
+  return { nhomIdx: nhomIdx, tenIdx: tenIdx, tmIdx: tmIdx, sizeIdx: sizeIdx, clIdx: clIdx, imgIdx: imgIdx };
+}
+
+// Danh sach PHANG cho tinh nang "Tim ảnh sản phẩm" — cung hinh dang voi buildPriceCatalogFlat_
+// (n=nhom, t=ten, m=ten thuong mai, s=size, c=chat lieu) de FE dung LAI y het logic cascading
+// cua "Soan don" (xem renderBuilderDyn_), kem them img=link anh de lay anh SAU KHI da thu hep
+// dung ve 1 (hoac vai) dong, thay vi khop mo ho theo ten roi doan dai nhat.
+function buildProductImageFlat_() {
   var sh = SpreadsheetApp.openById(PRICE_SS_ID).getSheetByName(PRICE_SHEET_NAME);
   if (!sh) return { ok: false, error: 'Không tìm thấy sheet "' + PRICE_SHEET_NAME + '".' };
   var lastRow = sh.getLastRow(), lastColFull = sh.getLastColumn();
-  if (lastRow < 2) return { ok: false, error: 'Sheet DANH_MUC chưa có dữ liệu.' };
+  if (lastRow < 2) return { ok: true, items: [] };
 
   var headerScanRows = Math.min(lastRow, 12);
   var headerVals = sh.getRange(1, 1, headerScanRows, lastColFull).getValues();
   var hIdx = _detectHeaderRow_(headerVals, 12);
   var headers = headerVals[hIdx].map(function(h) { return String(h || '').trim(); });
+  var ci = _productImgCols_(headers);
 
-  var tenIdx = -1, tmIdx = -1, imgIdx = -1;
-  for (var c = 0; c < headers.length; c++) {
-    var st = _stripVN_(headers[c]);
-    if (tenIdx < 0 && /^ten\s*san\s*pham/.test(st)) { tenIdx = c; continue; }
-    if (tmIdx < 0 && /ten\s*thuong\s*mai/.test(st)) { tmIdx = c; continue; }
-    if (imgIdx < 0 && (st.indexOf('hinh anh') !== -1 || st.indexOf('link anh') !== -1 ||
-        st.indexOf('anh san pham') !== -1 || /\bhinh\b/.test(st) || /\banh\b/.test(st) || /\bimage\b/.test(st))) imgIdx = c;
-  }
-  if (imgIdx < 0) return { ok: false, error: 'Không tìm thấy cột link ảnh sản phẩm trong DANH_MUC (tên cột cần chứa "hình ảnh"/"link ảnh"/"image").' };
-  if (tenIdx < 0 && tmIdx < 0) return { ok: false, error: 'Không nhận diện được cột Tên sản phẩm/Tên thương mại trong DANH_MUC.' };
+  if (ci.imgIdx < 0) return { ok: false, error: 'Không tìm thấy cột link ảnh sản phẩm trong DANH_MUC (tên cột cần chứa "hình ảnh"/"link ảnh"/"image").' };
+  if (ci.tenIdx < 0 && ci.tmIdx < 0) return { ok: false, error: 'Không nhận diện được cột Tên sản phẩm/Tên thương mại trong DANH_MUC.' };
 
-  var dataStartRow = hIdx + 2; // 1-based: hang ke sau tieu de
+  var dataStartRow = hIdx + 2;
   var numDataRows = lastRow - dataStartRow + 1;
-  if (numDataRows < 1) return { ok: false, error: 'Sheet DANH_MUC chưa có dữ liệu.' };
+  if (numDataRows < 1) return { ok: true, items: [] };
 
-  var neededCols = [tenIdx, tmIdx, imgIdx].filter(function(x) { return x >= 0; });
+  var neededCols = [ci.nhomIdx, ci.tenIdx, ci.tmIdx, ci.sizeIdx, ci.clIdx, ci.imgIdx].filter(function(x) { return x >= 0; });
   var minCol = Math.min.apply(null, neededCols), maxCol = Math.max.apply(null, neededCols);
   var block = sh.getRange(dataStartRow, minCol + 1, numDataRows, maxCol - minCol + 1).getValues();
 
-  var qWords = _stripVN_(query).split(/\s+/).filter(Boolean);
-  if (!qWords.length) return { ok: false, error: 'Thiếu từ khoá.' };
-
-  var bestRow = null, bestScore = 0;
+  var items = [];
   for (var i = 0; i < block.length; i++) {
     var r = block[i];
-    var tenVal = tenIdx >= 0 ? String(r[tenIdx - minCol] || '') : '';
-    var tmVal = tmIdx >= 0 ? String(r[tmIdx - minCol] || '') : '';
-    var hay = _stripVN_(tenVal + ' ' + tmVal);
-    var score = 0;
-    for (var w = 0; w < qWords.length; w++) { if (hay.indexOf(qWords[w]) !== -1) score++; }
-    if (score > bestScore) { bestScore = score; bestRow = r; }
+    var get = (function(row) { return function(idx) { return idx >= 0 ? String(row[idx - minCol] || '').trim() : ''; }; })(r);
+    var t = get(ci.tenIdx), m = get(ci.tmIdx);
+    if (!t && !m) continue;
+    items.push({ n: get(ci.nhomIdx), t: t, m: m, s: get(ci.sizeIdx), c: get(ci.clIdx), img: get(ci.imgIdx) });
   }
-  if (!bestRow || !bestScore) return { ok: false, error: 'Không tìm thấy sản phẩm khớp tên "' + query + '".' };
+  return { ok: true, items: items };
+}
 
-  var nameOut = (tmIdx >= 0 && bestRow[tmIdx - minCol]) ? String(bestRow[tmIdx - minCol]) : (tenIdx >= 0 ? String(bestRow[tenIdx - minCol] || '') : '');
-  var link = String(bestRow[imgIdx - minCol] || '').trim();
-  if (!link) return { ok: true, name: nameOut, imageLink: '', image: null, note: 'Sản phẩm khớp nhưng ô link ảnh đang trống.' };
-
-  // _driveImageFromLink_/_driveImageBase64_ da co san (dung chung voi tinh nang anh kien thuc AI
-  // cu) — thu doc that anh tu Drive truoc; neu khong doc duoc (chua chia se/qua 3MB/link hong)
-  // VAN tra ve nguyen van link de CS tu bam mo xem, khong de trang tay (dung yeu cau Duyen).
-  var drv = _driveImageFromLink_(link);
+// Doc 1 anh THEO DUNG link CS/FE da chon (sau khi thu hep dan ve dung 1 dong bang
+// buildProductImageFlat_) — khong can tim kiem lai, chi doc va tra anh. Ten co "Action" de
+// tranh nham lan voi _driveImageFromLink_ (ham noi bo, chi tra {fileId,name}).
+function driveImageFromLinkAction_(link) {
+  var s = String(link || '').trim();
+  if (!s) return { ok: false, error: 'Thiếu link ảnh.' };
+  var drv = _driveImageFromLink_(s);
   var imgData = drv ? _driveImageBase64_(drv.fileId) : null;
   return {
     ok: true,
-    name: nameOut,
-    imageLink: link,
+    imageLink: s,
     image: imgData ? { base64: imgData.base64, mimeType: imgData.mimeType, name: drv.name } : null
   };
 }
@@ -1167,11 +1177,21 @@ function doGet(e) {
     }
 
     // ── TIM ANH SAN PHAM (cot "Link ảnh sản phẩm" CS da dien san trong DANH_MUC, chua link
-    // Google Drive) — theo yeu cau Duyen 30/09/2026. Chi so khop theo Ten SP/Ten thuong mai.
-    if (action === 'productImage') {
-      var qImg = (e && e.parameter && e.parameter.q) ? String(e.parameter.q) : '';
-      if (!qImg) return jsonOut_({ ok: false, error: 'Thiếu từ khoá sản phẩm (tham số q).' });
-      return jsonOut_(findProductImageInPriceCatalog_(qImg));
+    // Google Drive) — theo yeu cau Duyen 30/09/2026: thu hep dan giong "Soan don" (Nhom SP ->
+    // Ten SP -> Kieu/Size -> Chat lieu, deu co the bo trong) de tim dung bien the, thay vi chi
+    // go ten tu do roi doan dai nhat (de nham khi 1 ten co nhieu Size/Chat lieu khac anh nhau).
+    if (action === 'productImageFlat') {
+      var cacheKeyPIF = 'product_img_flat_v1';
+      var cachePIF = CacheService.getScriptCache();
+      var cachedPIF = cachePIF.get(cacheKeyPIF);
+      if (cachedPIF) { try { return jsonOut_(JSON.parse(cachedPIF)); } catch (ecPIF) {} }
+      var resultPIF = buildProductImageFlat_();
+      try { if (resultPIF.ok) cachePIF.put(cacheKeyPIF, JSON.stringify(resultPIF), 600); } catch (ecPIF2) {} // cache 10 phut
+      return jsonOut_(resultPIF);
+    }
+    if (action === 'driveImageFromLink') {
+      var linkParam = (e && e.parameter && e.parameter.link) ? String(e.parameter.link) : '';
+      return jsonOut_(driveImageFromLinkAction_(linkParam));
     }
 
     // ── CHECKLIST CHAT LUONG TIN NHAN MKT (tab "Checklist MKT" tren index.html) ──
