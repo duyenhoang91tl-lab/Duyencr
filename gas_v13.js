@@ -351,6 +351,78 @@ function _priceCols_(rows) {
   cols.gia = headerOrder.filter(function(k) { return pickedSet[k]; });
   return cols;
 }
+// Tim anh san pham THEO DUNG TEN SAN PHAM/TEN THUONG MAI, doc TRUC TIEP tu sheet DANH_MUC
+// (PRICE_SS_ID) — code RIENG, KHONG dung chung readPriceCatalog_/_priceCols_ (2 ham do GIOI HAN
+// chi doc toi cot PRICE_LAST_COL_ de "Tra cuu bang gia" khong bi nhiem noi dung cac cot cong
+// thuc/mau phia xa ben phai — xem giai thich o _priceCols_/GIA_COL_LIMIT_). Cot "Link ảnh sản
+// phẩm" co the nam o BAT KY vi tri nao (ke ca ngoai vung PRICE_LAST_COL_), nen ham nay TU QUET
+// TOAN BO be rong tieu de de tim dung 3 cot can — Ten san pham, Ten thuong mai, Link anh — roi
+// CHI doc rieng 3 cot do (khong doc het be rong sheet) de khong lam cham va KHONG anh huong gi
+// toi _priceCols_/tinh nang Tra cuu bang gia dang dung. Theo dung yeu cau Duyen 30/09/2026:
+// "chi can khop ten thuong mai hoac ten san pham la duoc" — CHI so khop tren 2 cot ten nay,
+// KHONG khop sang gia/size/chat lieu/cot khac nhu searchPriceCatalog_ van lam.
+function findProductImageInPriceCatalog_(query) {
+  var sh = SpreadsheetApp.openById(PRICE_SS_ID).getSheetByName(PRICE_SHEET_NAME);
+  if (!sh) return { ok: false, error: 'Không tìm thấy sheet "' + PRICE_SHEET_NAME + '".' };
+  var lastRow = sh.getLastRow(), lastColFull = sh.getLastColumn();
+  if (lastRow < 2) return { ok: false, error: 'Sheet DANH_MUC chưa có dữ liệu.' };
+
+  var headerScanRows = Math.min(lastRow, 12);
+  var headerVals = sh.getRange(1, 1, headerScanRows, lastColFull).getValues();
+  var hIdx = _detectHeaderRow_(headerVals, 12);
+  var headers = headerVals[hIdx].map(function(h) { return String(h || '').trim(); });
+
+  var tenIdx = -1, tmIdx = -1, imgIdx = -1;
+  for (var c = 0; c < headers.length; c++) {
+    var st = _stripVN_(headers[c]);
+    if (tenIdx < 0 && /^ten\s*san\s*pham/.test(st)) { tenIdx = c; continue; }
+    if (tmIdx < 0 && /ten\s*thuong\s*mai/.test(st)) { tmIdx = c; continue; }
+    if (imgIdx < 0 && (st.indexOf('hinh anh') !== -1 || st.indexOf('link anh') !== -1 ||
+        st.indexOf('anh san pham') !== -1 || /\bhinh\b/.test(st) || /\banh\b/.test(st) || /\bimage\b/.test(st))) imgIdx = c;
+  }
+  if (imgIdx < 0) return { ok: false, error: 'Không tìm thấy cột link ảnh sản phẩm trong DANH_MUC (tên cột cần chứa "hình ảnh"/"link ảnh"/"image").' };
+  if (tenIdx < 0 && tmIdx < 0) return { ok: false, error: 'Không nhận diện được cột Tên sản phẩm/Tên thương mại trong DANH_MUC.' };
+
+  var dataStartRow = hIdx + 2; // 1-based: hang ke sau tieu de
+  var numDataRows = lastRow - dataStartRow + 1;
+  if (numDataRows < 1) return { ok: false, error: 'Sheet DANH_MUC chưa có dữ liệu.' };
+
+  var neededCols = [tenIdx, tmIdx, imgIdx].filter(function(x) { return x >= 0; });
+  var minCol = Math.min.apply(null, neededCols), maxCol = Math.max.apply(null, neededCols);
+  var block = sh.getRange(dataStartRow, minCol + 1, numDataRows, maxCol - minCol + 1).getValues();
+
+  var qWords = _stripVN_(query).split(/\s+/).filter(Boolean);
+  if (!qWords.length) return { ok: false, error: 'Thiếu từ khoá.' };
+
+  var bestRow = null, bestScore = 0;
+  for (var i = 0; i < block.length; i++) {
+    var r = block[i];
+    var tenVal = tenIdx >= 0 ? String(r[tenIdx - minCol] || '') : '';
+    var tmVal = tmIdx >= 0 ? String(r[tmIdx - minCol] || '') : '';
+    var hay = _stripVN_(tenVal + ' ' + tmVal);
+    var score = 0;
+    for (var w = 0; w < qWords.length; w++) { if (hay.indexOf(qWords[w]) !== -1) score++; }
+    if (score > bestScore) { bestScore = score; bestRow = r; }
+  }
+  if (!bestRow || !bestScore) return { ok: false, error: 'Không tìm thấy sản phẩm khớp tên "' + query + '".' };
+
+  var nameOut = (tmIdx >= 0 && bestRow[tmIdx - minCol]) ? String(bestRow[tmIdx - minCol]) : (tenIdx >= 0 ? String(bestRow[tenIdx - minCol] || '') : '');
+  var link = String(bestRow[imgIdx - minCol] || '').trim();
+  if (!link) return { ok: true, name: nameOut, imageLink: '', image: null, note: 'Sản phẩm khớp nhưng ô link ảnh đang trống.' };
+
+  // _driveImageFromLink_/_driveImageBase64_ da co san (dung chung voi tinh nang anh kien thuc AI
+  // cu) — thu doc that anh tu Drive truoc; neu khong doc duoc (chua chia se/qua 3MB/link hong)
+  // VAN tra ve nguyen van link de CS tu bam mo xem, khong de trang tay (dung yeu cau Duyen).
+  var drv = _driveImageFromLink_(link);
+  var imgData = drv ? _driveImageBase64_(drv.fileId) : null;
+  return {
+    ok: true,
+    name: nameOut,
+    imageLink: link,
+    image: imgData ? { base64: imgData.base64, mimeType: imgData.mimeType, name: drv.name } : null
+  };
+}
+
 // So tien trong bang gia tinh bang NGHIN VND (7950 = 7.950.000d). Chap nhan ca chuoi "7.950"/"7,950".
 function _priceNumK_(v) {
   if (v === '' || v === null || v === undefined) return 0;
@@ -1092,6 +1164,14 @@ function doGet(e) {
       }
       var matchedCT = qCT ? searchPriceCatalog_(rowsCT, qCT) : rowsCT.slice(0, 50);
       return jsonOut_({ ok: true, total: rowsCT.length, count: matchedCT.length, rows: matchedCT });
+    }
+
+    // ── TIM ANH SAN PHAM (cot "Link ảnh sản phẩm" CS da dien san trong DANH_MUC, chua link
+    // Google Drive) — theo yeu cau Duyen 30/09/2026. Chi so khop theo Ten SP/Ten thuong mai.
+    if (action === 'productImage') {
+      var qImg = (e && e.parameter && e.parameter.q) ? String(e.parameter.q) : '';
+      if (!qImg) return jsonOut_({ ok: false, error: 'Thiếu từ khoá sản phẩm (tham số q).' });
+      return jsonOut_(findProductImageInPriceCatalog_(qImg));
     }
 
     // ── CHECKLIST CHAT LUONG TIN NHAN MKT (tab "Checklist MKT" tren index.html) ──

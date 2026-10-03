@@ -194,6 +194,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // Tim anh san pham — action:'productImage', doc cot "Link ảnh sản phẩm" CS da dien san trong
+  // DANH_MUC (cung file PRICE_SS_ID voi bang gia), chi khop theo Ten SP/Ten thuong mai, KHONG
+  // qua AI (giong co che GET_PRICE/GET_CTKM_SEARCH o tren).
+  if (msg?.type === "GET_PRODUCT_IMAGE") {
+    handleGetProductImage(msg.payload)
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
   // Cay Nhom SP → Ten SP → Kieu/Size cho "Soan don" (bo loc dropdown nhieu tang thay vi go tim)
   // Danh muc PHANG (action priceCatalogFlat) cho "Soan don": go ten -> loc -> dropdown thu hep dan
   if (msg?.type === "GET_PRICE_FLAT") {
@@ -775,6 +785,24 @@ async function handleGetCtkmSearch(payload) {
   const data = await res.json();
   if (data.error) throw new Error(data.error);
   return { rows: data.rows || [], total: data.total || 0 };
+}
+
+// Tim anh san pham theo ten — action:'productImage' (GET, chi doc). Tra ve { name, imageLink,
+// image: {base64,mimeType,name} | null, note? } — image=null nghia la khong doc duoc anh tu
+// Drive (chua chia se/qua 3MB/link hong) nhung VAN co imageLink de CS tu mo xem.
+async function handleGetProductImage(payload) {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+
+  const q = payload?.q || "";
+  if (!q) throw new Error("Thiếu từ khoá sản phẩm.");
+  const sep = cfg.gasUrl.includes("?") ? "&" : "?";
+  const url = cfg.gasUrl + sep + "action=productImage&q=" + encodeURIComponent(q);
+  const res = await fetch(url, { redirect: "follow" });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || "Không tìm thấy ảnh sản phẩm.");
+  return data;
 }
 
 async function handleGetPriceFlat() {

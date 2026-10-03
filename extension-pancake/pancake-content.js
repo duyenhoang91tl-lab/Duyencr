@@ -351,6 +351,7 @@
             <option value="rem">⏰ Nhắc hẹn hôm nay (0)</option>
             <option value="price">💰 Tra cứu bảng giá</option>
             <option value="ctkm">🎁 Tra cứu khuyến mãi</option>
+            <option value="img">🖼 Tìm ảnh sản phẩm</option>
           </select>
           <div id="pk-menu-content">
             <div id="pk-rem-body" style="display:none">
@@ -379,6 +380,13 @@
                 <button id="pk-ctkm-btn">Tìm</button>
               </div>
               <div id="pk-ctkm-result"></div>
+            </div>
+            <div id="pk-img-body" style="display:none">
+              <div id="pk-img-row">
+                <input type="text" id="pk-img-q" placeholder="Tên sản phẩm hoặc tên thương mại..." />
+                <button id="pk-img-btn">Tìm</button>
+              </div>
+              <div id="pk-img-result"></div>
             </div>
           </div>
         </div>
@@ -572,6 +580,7 @@
       panelEl.querySelector("#pk-rem-body").style.display = v === "rem" ? "block" : "none";
       panelEl.querySelector("#pk-price-body").style.display = v === "price" ? "block" : "none";
       panelEl.querySelector("#pk-ctkm-body").style.display = v === "ctkm" ? "block" : "none";
+      panelEl.querySelector("#pk-img-body").style.display = v === "img" ? "block" : "none";
       if (v === "rem") loadReminders_();
       if (v === "ctkm" && !_ctkmLoadedOnce) { _ctkmLoadedOnce = true; doCtkmSearch_(); } // mo tab la nap luon toan bo CTKM, khoi phai go gi cung thay ngay
     });
@@ -583,6 +592,10 @@
     panelEl.querySelector("#pk-ctkm-btn").addEventListener("click", doCtkmSearch_);
     panelEl.querySelector("#pk-ctkm-q").addEventListener("keydown", (e) => {
       if (e.key === "Enter") doCtkmSearch_();
+    });
+    panelEl.querySelector("#pk-img-btn").addEventListener("click", doProductImageSearch_);
+    panelEl.querySelector("#pk-img-q").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") doProductImageSearch_();
     });
     panelEl.querySelectorAll('.pk-price-mode-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -1858,6 +1871,40 @@
         : '';
       return `<div class="pk-price-item${row.__ctkmExpired ? ' pk-ctkm-item-expired' : ''}"><div class="pk-ctkm-title">${escapeHtml(String(row[titleKey]))}</div>${statusHtml}${restKeys.map(line).join(' ')}${exclHtml}</div>`;
     }).join('');
+  }
+
+  // ── TÌM ẢNH SẢN PHẨM (cột "Link ảnh sản phẩm" trong DANH_MUC) — chỉ khớp theo Ten SP/Ten
+  // thương mại. Ưu tiên hiện ẢNH THẬT (đọc được từ Drive); nếu không đọc được (chưa chia sẻ/quá
+  // 3MB/link hỏng) thì vẫn hiện LINK để bấm mở xem trực tiếp, không để trắng tay.
+  function doProductImageSearch_() {
+    const q = (panelEl.querySelector('#pk-img-q').value || '').trim();
+    const box = panelEl.querySelector('#pk-img-result');
+    if (!q) { box.innerHTML = '<div class="pk-price-loading">Gõ tên sản phẩm hoặc tên thương mại rồi bấm Tìm.</div>'; return; }
+    box.innerHTML = '<div class="pk-price-loading">Đang tìm ảnh...</div>';
+    safeSendMessage_({ type: 'GET_PRODUCT_IMAGE', payload: { q } }, (resp) => {
+      if (!resp?.ok) { box.innerHTML = `<div class="pk-price-loading">${escapeHtml(resp?.error || 'Không tìm thấy.')}</div>`; return; }
+      renderProductImage_(resp.data);
+    });
+  }
+
+  function renderProductImage_(data) {
+    const box = panelEl.querySelector('#pk-img-result');
+    const nameHtml = `<div class="pk-ctkm-title">${escapeHtml(data.name || '')}</div>`;
+    if (data.image && data.image.base64) {
+      const src = `data:${data.image.mimeType};base64,${data.image.base64}`;
+      box.innerHTML = nameHtml +
+        `<img src="${src}" style="max-width:100%;border-radius:8px;border:1px solid var(--pk-border,#e5e7eb);margin-top:6px" />` +
+        (data.imageLink ? `<div style="margin-top:6px"><a href="${escapeHtml(data.imageLink)}" target="_blank" class="pk-btn-outline" style="display:inline-block;text-decoration:none">🔗 Mở trên Drive</a></div>` : '');
+      return;
+    }
+    if (data.imageLink) {
+      // Khong doc duoc anh tu Drive (chua chia se/qua 3MB/link hong) — van dua link de CS tu mo.
+      box.innerHTML = nameHtml +
+        `<div class="pk-price-loading">Không hiển thị được ảnh trực tiếp (có thể file chưa chia sẻ hoặc quá lớn) — bấm link dưới để xem:</div>` +
+        `<div style="margin-top:6px"><a href="${escapeHtml(data.imageLink)}" target="_blank" class="pk-btn-outline" style="display:inline-block;text-decoration:none">🔗 Mở ảnh</a></div>`;
+      return;
+    }
+    box.innerHTML = nameHtml + `<div class="pk-price-loading">${escapeHtml(data.note || 'Sản phẩm này chưa có link ảnh trong DANH_MUC.')}</div>`;
   }
 
   function _parsePriceNum_(v) {
