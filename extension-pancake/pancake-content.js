@@ -401,18 +401,25 @@
           </div>
           <div id="pk-cart-extra">
             <div class="pk-cart-extra-row">
-              <label>Danh xưng</label>
-              <select id="pk-cart-honorific" style="width:76px">
-                <option value="">—</option>
-                <option value="Anh">Anh</option>
-                <option value="Chị">Chị</option>
-              </select>
-              <input type="text" id="pk-cart-custname" placeholder="Tên khách hàng" style="flex:1" />
-              <input type="text" id="pk-cart-custphone" placeholder="SĐT" style="width:110px" />
+              <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+                <input type="checkbox" id="pk-cart-showcust" /> + Thêm thông tin KH (tên, SĐT, địa chỉ)
+              </label>
             </div>
-            <div class="pk-cart-extra-row">
-              <label>📍 Địa chỉ</label>
-              <input type="text" id="pk-cart-address" placeholder="Địa chỉ giao hàng..." style="flex:1" />
+            <div id="pk-cart-custinfo" style="display:none">
+              <div class="pk-cart-extra-row">
+                <label>Danh xưng</label>
+                <select id="pk-cart-honorific" style="width:76px">
+                  <option value="">—</option>
+                  <option value="Anh">Anh</option>
+                  <option value="Chị">Chị</option>
+                </select>
+                <input type="text" id="pk-cart-custname" placeholder="Tên khách hàng" style="flex:1" />
+                <input type="text" id="pk-cart-custphone" placeholder="SĐT" style="width:110px" />
+              </div>
+              <div class="pk-cart-extra-row">
+                <label>📍 Địa chỉ</label>
+                <input type="text" id="pk-cart-address" placeholder="Địa chỉ giao hàng..." style="flex:1" />
+              </div>
             </div>
             <div class="pk-cart-extra-row">
               <label>🎁 Quà tặng kèm</label>
@@ -610,6 +617,11 @@
         if (rows.length) rows[rows.length - 1].focus();
       }, 30);
     });
+    panelEl.querySelector('#pk-cart-showcust').addEventListener('change', (e) => {
+      _cartExtra.showCustInfo = e.target.checked;
+      panelEl.querySelector('#pk-cart-custinfo').style.display = e.target.checked ? '' : 'none';
+      saveCart_();
+    });
     panelEl.querySelector('#pk-cart-honorific').addEventListener('change', (e) => { _cartExtra.honorific = e.target.value; saveCart_(); });
     panelEl.querySelector('#pk-cart-custname').addEventListener('input', (e) => { _cartExtra.custName = e.target.value; });
     panelEl.querySelector('#pk-cart-custname').addEventListener('change', () => { saveCart_(); });
@@ -649,7 +661,7 @@
       if (!_cartItems.length) return;
       if (!confirm('Xoá toàn bộ đơn hàng đang tính cho khách này?')) return;
       _cartItems = [];
-      _cartExtra = { honorific: '', custName: '', custPhone: '', address: '', gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, status: '', priceInK: false };
+      _cartExtra = { showCustInfo: false, honorific: '', custName: '', custPhone: '', address: '', gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, status: '', priceInK: false };
       saveCart_(); renderCart_();
     });
     if (IS_PHONGTHUY) {
@@ -2431,7 +2443,7 @@
   // Luu theo TUNG SDT khach (chrome.storage.local, rieng may nay) de doi qua lai giua cac
   // doan chat khac nhau khong bi lan/mat don dang tinh do.
   let _cartItems = [];
-  let _cartExtra = { honorific: '', custName: '', custPhone: '', address: '', gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, status: '', priceInK: false };
+  let _cartExtra = { showCustInfo: false, honorific: '', custName: '', custPhone: '', address: '', gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, status: '', priceInK: false };
   let _cartLoadedFor = null;
 
   function _cartKey_(phone) { return 'pkCart_' + (phone || '_no_phone_'); }
@@ -2440,9 +2452,9 @@
     const key = _cartKey_(_currentPhone);
     if (_cartLoadedFor === key) { renderCart_(); return; }
     chrome.storage.local.get([key], (res) => {
-      const saved = res[key] || { items: [], extra: { honorific: '', custName: '', custPhone: '', address: '', gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, status: '', priceInK: false } };
+      const saved = res[key] || { items: [], extra: { showCustInfo: false, honorific: '', custName: '', custPhone: '', address: '', gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, status: '', priceInK: false } };
       _cartItems = saved.items || [];
-      _cartExtra = Object.assign({ honorific: '', custName: '', custPhone: '', address: '', gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, status: '', priceInK: false }, saved.extra || {});
+      _cartExtra = Object.assign({ showCustInfo: false, honorific: '', custName: '', custPhone: '', address: '', gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, status: '', priceInK: false }, saved.extra || {});
       _cartLoadedFor = key;
       renderCart_();
     });
@@ -2597,6 +2609,8 @@
       });
     });
 
+    panelEl.querySelector('#pk-cart-showcust').checked = !!_cartExtra.showCustInfo;
+    panelEl.querySelector('#pk-cart-custinfo').style.display = _cartExtra.showCustInfo ? '' : 'none';
     panelEl.querySelector('#pk-cart-honorific').value = _cartExtra.honorific || '';
     panelEl.querySelector('#pk-cart-custname').value = _cartExtra.custName || '';
     // Tu dien SDT tu ngu canh doan chat (_currentPhone) neu Sale CHUA tung go gi vao o nay —
@@ -2720,9 +2734,13 @@
     });
 
     const lines = [];
-    const custLine = [_cartExtra.honorific, _cartExtra.custName, _cartExtra.custPhone].filter((x) => x && String(x).trim()).join(' ');
-    if (custLine) lines.push(clean(custLine));
-    if (_cartExtra.address) lines.push(clean(`Địa chỉ: ${_cartExtra.address}`));
+    // Chi dua ten/SDT/dia chi vao don khi o "+ Them thong tin KH" dang TICH — tich tat thi
+    // KHONG dung du du lieu con luu lai tu don truoc (tranh dinh nham ten/SDT/dia chi cu).
+    if (_cartExtra.showCustInfo) {
+      const custLine = [_cartExtra.honorific, _cartExtra.custName, _cartExtra.custPhone].filter((x) => x && String(x).trim()).join(' ');
+      if (custLine) lines.push(clean(custLine));
+      if (_cartExtra.address) lines.push(clean(`Địa chỉ: ${_cartExtra.address}`));
+    }
     lines.push(...itemLines);
 
     // "Tổng sau giảm" = tạm tính đã trừ CTKM từng dòng + giảm giá chung — CHƯA gồm vàng/ship.
