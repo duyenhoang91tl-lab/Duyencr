@@ -806,6 +806,14 @@ html.db-standalone #dailybrief-wrap{width:100%;max-width:1120px;margin:0 auto}
 .zai-loading{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;padding:12px 0;}
 .zai-spinner{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite;}
 </style>
+<style>
+/* Chế độ báo cáo: ẩn mọi thứ không thuộc báo cáo để chụp màn hình (xem _RPT_MODE_TABS trong script) */
+#rpt-bar{display:none}
+body.rpt-mode #rpt-bar{display:flex;align-items:center;gap:10px;padding:8px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+#rpt-mode-sel{font-size:13px;font-weight:600;padding:5px 8px;border:1px solid var(--border-md,var(--border));border-radius:6px;background:var(--surface);color:var(--text)}
+body.rpt-mode header,body.rpt-mode .sidebar,body.rpt-mode .sidebar-backdrop,body.rpt-mode .tabs,body.rpt-mode .stats-row,body.rpt-mode #files-bar,body.rpt-mode #sync-banner{display:none !important}
+body.rpt-mode .app{height:100vh}
+</style>
 </head>
 <body>
 
@@ -14782,6 +14790,53 @@ switchTab = function(tab, el){
   else if (tab === 'kpipancake') renderKpiPancakeTab();
   else if (tab === 'mktchecklist') renderMktChecklistTab();
   else if (tab === 'dailybrief') renderDailyBriefTab();
+};
+
+// ═══════════════════════════════════════════════════════
+//  CHẾ ĐỘ BÁO CÁO (chụp màn hình gửi sếp): vào tab báo cáo nào thì ẩn header, sidebar lọc KH, thanh
+//  tab và dải số KH; chỉ còn 1 thanh gọn = menu chọn báo cáo + nút "Về màn hình chính".
+//  Chỉ bật/tắt class "rpt-mode" trên <body> (CSS ở khối <style> dưới) nên không đụng gì tới logic
+//  render của từng báo cáo. "Báo cáo ngày" tự mở trang riêng nên không nằm trong chế độ này.
+// ═══════════════════════════════════════════════════════
+var _RPT_MODE_TABS = ['salesreport','pancake','kpipancake','mktchecklist'];
+var _RPT_MODE_LABELS = {
+  salesreport:'📈 Báo cáo doanh số', pancake:'📥 Báo cáo Pancake', kpipancake:'📈 KPI Pancake',
+  mktchecklist:'✅ Checklist MKT', dailybrief:'🎯 Báo cáo ngày'
+};
+function _rptModeBuildBar_(current){
+  var dv = document.getElementById('data-view');
+  if (!dv) return;
+  var bar = document.getElementById('rpt-bar');
+  if (!bar){
+    bar = document.createElement('div');
+    bar.id = 'rpt-bar';
+    dv.insertBefore(bar, dv.firstChild);
+  }
+  var opts = _RPT_MODE_TABS.concat(['dailybrief']).filter(function(id){
+    if (typeof tabVisible !== 'undefined' && tabVisible[id] === false) return false;
+    if (typeof _tabAllowedForUser === 'function' && !_tabAllowedForUser(id)) return false;
+    return true;
+  });
+  bar.innerHTML = '<select id="rpt-mode-sel" onchange="_rptModeGo_(this.value)" title="Chọn báo cáo">'
+    + opts.map(function(id){ return '<option value="'+id+'"'+(id===current?' selected':'')+'>'+_RPT_MODE_LABELS[id]+'</option>'; }).join('')
+    + '</select>'
+    + '<button class="btn sm" onclick="_rptModeBack_()" title="Hiện lại đầy đủ menu, bộ lọc">← Về màn hình chính</button>';
+}
+function _rptModeGo_(id){
+  var el = document.getElementById('v9tab-' + id);
+  switchTab(id, el || document.createElement('div'));
+}
+function _rptModeBack_(){
+  var el = document.querySelector("[data-bar-id='tab-kh']") || document.querySelector('.tab');
+  switchTab('list', el);
+}
+var _v9PrevSwitchTab2 = switchTab;
+switchTab = function(tab, el){
+  if (tab === 'dailybrief' && !_dbStandalone){ _v9PrevSwitchTab2(tab, el); return; } // mo trang rieng, giu nguyen man hinh hien tai
+  _v9PrevSwitchTab2(tab, el);
+  var on = !_dbStandalone && _RPT_MODE_TABS.indexOf(tab) !== -1;
+  document.body.classList.toggle('rpt-mode', on);
+  if (on) _rptModeBuildBar_(tab);
 };
 
 // ═══════════════════════════════════════════════════════
