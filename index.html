@@ -9961,7 +9961,7 @@ var _pkState = {
   uploading: false,
   from: _ymd(new Date(Date.now()-6*86400000)), to: _ymd(new Date()), fromQuick: 'custom',
   report: null, reportLoading: false,
-  pkSplit: 'equal', mapOpen: '',
+  pkSplit: 'equal', mapOpen: '', nameMapSectionOpen: false,
   // Bo loc kieu Excel tren cac bang "Theo Page"/"Theo Sale" cua tab Bao cao KPI Pancake:
   // { page: {colKey: Set(gia tri duoc chon)}, sale: {colKey: Set(...)} } — Set rong/khong co
   // nghia la KHONG loc cot do (hien tat ca). Chi loc tren du lieu da tai (frontend), khong goi
@@ -10143,9 +10143,11 @@ function _pkRenderAll(){
     html += _pkRenderSdtPreviewHtml();
   }
 
-  html += '<div class="dash-section-title" style="margin-top:22px">🔗 Khớp tên Nhân viên Pancake ↔ Sale CRM</div>';
-  html += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Tên "Nhân viên" trên Pancake là tên Facebook cá nhân, thường không khớp tên đăng nhập (Sale) trong CRM — khớp 1 lần, dùng lại cho mọi lần nạp báo cáo sau.</div>';
-  html += _pkRenderMapTableHtml(isAdmin);
+  html += '<details'+(_pkState.nameMapSectionOpen?' open':'')+' ontoggle="_pkState.nameMapSectionOpen=this.open" style="margin-top:22px">'+
+    '<summary class="dash-section-title" style="cursor:pointer;display:inline-block">🔗 Khớp tên Nhân viên Pancake ↔ Sale CRM</summary>'+
+    '<div style="font-size:12px;color:var(--muted);margin:8px 0">Tên "Nhân viên" trên Pancake là tên Facebook cá nhân, thường không khớp tên đăng nhập (Sale) trong CRM — khớp 1 lần, dùng lại cho mọi lần nạp báo cáo sau.</div>'+
+    _pkRenderMapTableHtml(isAdmin)+
+  '</details>';
 
   html += '<div class="dash-section-title" style="margin-top:22px">🔗 Khớp Page Pancake ↔ Kênh bán CRM (DT TỔNG)</div>';
   html += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Dùng để ghép đúng doanh thu/số đơn của mỗi Page (cột "Kênh bán" trong DT TỔNG) với số liệu tương tác/SĐT của Page đó ở Báo cáo KPI tổng hợp.</div>';
@@ -12421,8 +12423,10 @@ async function _srLoad(){
     });
     // QUAN TRONG: phai map ca ngayTaoDon -> ngayTao (don Pos KHONG co san field "ngayTao") —
     // thieu dong nay thi moi bo loc theo ngay/ngay thu viec cua _computeBonusData_ se LUON
-    // rong vi o.ngayTao undefined o moi don Pos, du da map dung saleBan/giaTriDon.
-    if (dPos && dPos.orders) dPos.orders = dPos.orders.map(function(o){ return Object.assign({}, o, { saleBan: o.theSale, giaTriDon: o.giaTriSauGiam, ngayTao: o.ngayTaoDon }); });
+    // rong vi o.ngayTao undefined o moi don Pos, du da map dung saleBan/giaTriDon. Dung
+    // saleBanValid (ten sale da loc hop le, xem _donSaleNamesFromThe_) thay vi theSale tho de
+    // tranh ghi chu/ten sai chinh ta trong cot Thẻ bi tinh nham thanh 1 "sale" ao.
+    if (dPos && dPos.orders) dPos.orders = dPos.orders.map(function(o){ return Object.assign({}, o, { saleBan: o.saleBanValid || o.theSale, giaTriDon: o.giaTriSauGiam, ngayTao: o.ngayTaoDon }); });
     _srState.dataE = dPos;
   } else if (_srState.sub === 'F') {
     // Dropdown khong phai 'custom' -> khoang ngay PHAI khop dropdown (tranh dropdown 'Tháng này'
@@ -13210,20 +13214,54 @@ function _srRenderB(d){
   _SR_COLTH_ROWSFN_['bSale'] = function(){ return (_srState.dataB && _srState.dataB.bySale) || []; };
   _SR_COLTH_GETTER_['bSale'] = { name: function(s){ return s.name; } };
   var saleRows = _srApplyColFilters_(d.bySale||[], 'bSale', _SR_COLTH_GETTER_['bSale']).filter(function(s){ return !_srState.bSaleSearch || (s.name||'').toLowerCase().indexOf(_srState.bSaleSearch.toLowerCase())!==-1; });
-  html += '<div class="dash-section-title">Theo Sale <span style="font-weight:400;color:var(--muted);font-size:11px">(tiền chia đều cho số sale/đơn, số đơn giữ nguyên)</span>'+_srViewToggleHtml('bSaleView')+'</div>';
-  html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.bSaleSearch)+'" oninput="_srState.bSaleSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
+  var saleHtmlB_ = '<div class="dash-section-title">Theo Sale <span style="font-weight:400;color:var(--muted);font-size:11px">(tiền chia đều cho số sale/đơn, số đơn giữ nguyên)</span>'+_srViewToggleHtml('bSaleView')+'</div>';
+  saleHtmlB_ += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.bSaleSearch)+'" oninput="_srState.bSaleSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
   if (_srState.bSaleView === 'table'){
-    html += '<table class="dash-table"><thead><tr>'+_srColTh_('bSale','name','Sale',_SR_COLTH_ROWSFN_['bSale'],_SR_COLTH_GETTER_['bSale'].name)+'<th style="text-align:right">Số đơn</th><th style="text-align:right">Giá trị sau giảm giá</th><th style="text-align:right">TB đơn</th><th style="text-align:right">COD</th></tr></thead><tbody>';
+    saleHtmlB_ += '<table class="dash-table"><thead><tr>'+_srColTh_('bSale','name','Sale',_SR_COLTH_ROWSFN_['bSale'],_SR_COLTH_GETTER_['bSale'].name)+'<th style="text-align:right">Số đơn</th><th style="text-align:right">Giá trị sau giảm giá</th><th style="text-align:right">TB đơn</th><th style="text-align:right">COD</th></tr></thead><tbody>';
     saleRows.forEach(function(s){
       var tb = s.orders ? Math.round(s.giaTri/s.orders) : 0;
-      html += '<tr><td>'+esc(s.name)+'</td><td style="text-align:right">'+fmt(s.orders)+'</td><td style="text-align:right">'+_srMoney(s.giaTri)+'</td><td style="text-align:right">'+_srMoney(tb)+'</td><td style="text-align:right">'+_srMoney(s.cod)+'</td></tr>';
+      saleHtmlB_ += '<tr><td>'+esc(s.name)+'</td><td style="text-align:right">'+fmt(s.orders)+'</td><td style="text-align:right">'+_srMoney(s.giaTri)+'</td><td style="text-align:right">'+_srMoney(tb)+'</td><td style="text-align:right">'+_srMoney(s.cod)+'</td></tr>';
     });
-    if (!saleRows.length) html += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+    if (!saleRows.length) saleHtmlB_ += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
     else { var bSOrd=saleRows.reduce(function(s,r){return s+(r.orders||0);},0), bSGt=saleRows.reduce(function(s,r){return s+(r.giaTri||0);},0);
-      html += _srTotalRowHtml_(['Tổng', fmt(bSOrd), _srMoney(bSGt), _srMoney(bSOrd?Math.round(bSGt/bSOrd):0), _srMoney(saleRows.reduce(function(s,r){return s+(r.cod||0);},0))]); }
-    html += '</tbody></table>';
+      saleHtmlB_ += _srTotalRowHtml_(['Tổng', fmt(bSOrd), _srMoney(bSGt), _srMoney(bSOrd?Math.round(bSGt/bSOrd):0), _srMoney(saleRows.reduce(function(s,r){return s+(r.cod||0);},0))]); }
+    saleHtmlB_ += '</tbody></table>';
   } else {
-    html += _srChartSvg(saleRows, 'name', 'giaTri', _srState.bSaleView, true, 'orders');
+    saleHtmlB_ += _srChartSvg(saleRows, 'name', 'giaTri', _srState.bSaleView, true, 'orders');
+  }
+  // Tỷ lệ chốt theo Sale — đặt bên cạnh "Theo Sale", cùng công thức/hàm dùng chung với Báo cáo A.
+  var bSaleCloseNote = d.saleCloseRateFrom ? ' — tính từ '+esc(d.saleCloseRateFrom) : '';
+  var saleCloseHtmlB_ = '<div class="dash-section-title">Tỷ lệ chốt theo Sale <span style="font-weight:400;color:var(--muted);font-size:11px">(Số đơn / Tổng tương tác Pancake'+bSaleCloseNote+')</span></div>'+
+    (d.saleCloseRateFrom ? _srCloseRateBarHtml_(d.saleCloseRate, _srState.bSaleSearch, 'tương tác') :
+      '<div style="color:var(--muted);text-align:center;padding:20px;font-size:12px">Chưa nạp báo cáo tương tác Pancake ngày nào — vào tab "📥 Báo cáo Pancake" để nạp trước khi xem tỷ lệ chốt theo Sale.</div>');
+  html += '<div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">'+
+    '<div style="flex:1 1 380px;min-width:320px">'+saleHtmlB_+'</div>'+
+    '<div style="flex:1 1 320px;min-width:280px">'+saleCloseHtmlB_+'</div>'+
+    '</div>';
+
+  // Tỷ lệ chốt theo Sale — từng Page (chỉ gồm Page đã trích được ID từ "Nguồn đơn" và khớp PancakePageMap).
+  if (d.saleCloseByPage && d.saleCloseByPage.pages && d.saleCloseByPage.pages.length){
+    var scbpB_ = d.saleCloseByPage;
+    var scbpRowsB_ = scbpB_.rows.filter(function(r){ return !_srState.bSaleSearch || r.name.toLowerCase().indexOf(_srState.bSaleSearch.toLowerCase())!==-1; });
+    scbpRowsB_.sort(function(a,b){ return b.total.rate - a.total.rate; });
+    html += '<div class="dash-section-title" style="margin-top:18px">Tỷ lệ chốt theo Sale — từng Page<span style="font-weight:400;color:var(--muted);font-size:11px">'+bSaleCloseNote+'</span></div>';
+    html += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Sale</th>'+
+      scbpB_.pages.map(function(p){ return '<th style="text-align:right">'+esc(p.pageName)+'</th>'; }).join('')+
+      '<th style="text-align:right"><b>Tổng cá nhân</b></th></tr></thead><tbody>';
+    if (!scbpRowsB_.length){
+      html += '<tr><td colspan="'+(scbpB_.pages.length+2)+'" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+    } else {
+      scbpRowsB_.forEach(function(r){
+        html += '<tr><td>'+esc(r.name)+'</td>'+
+          scbpB_.pages.map(function(p){
+            var cell = r.perPage[p.kenhBan];
+            if (!cell || !cell.held) return '<td style="text-align:right;color:var(--muted)">—</td>';
+            return '<td style="text-align:right">'+cell.rate+'% <span style="color:var(--muted);font-size:10.5px">('+cell.closed+'/'+cell.held+')</span></td>';
+          }).join('')+
+          '<td style="text-align:right"><b>'+r.total.rate+'%</b> <span style="color:var(--muted);font-size:10.5px">('+r.total.closed+'/'+r.total.held+')</span></td></tr>';
+      });
+    }
+    html += '</tbody></table></div>';
   }
 
   if (_srIsAdmin()){
@@ -13246,26 +13284,35 @@ function _srRenderB(d){
       html += _srChartSvg(bTeamRows, 'name', 'giaTri', _srState.bTeamView, true, 'orders');
     }
 
-    // Theo Nguồn đơn — tương đương vị trí "Theo Kênh bán" của Báo cáo A. Báo cáo B không có dữ
-    // liệu Page-level để khớp với thống kê tương tác Pancake, nên KHÔNG có bảng "Tỷ lệ chốt"
-    // đi kèm như bên A (xem ghi chú ở backend buildSalesReportB_).
+    // Theo Nguồn đơn — tương đương vị trí "Theo Kênh bán" của Báo cáo A, nay đã có "Tỷ lệ chốt"
+    // đi kèm nhờ trích được ID Page từ cuối chuỗi "Nguồn đơn" (khớp PancakePageMap).
     _SR_COLTH_ROWSFN_['bNguon'] = function(){ return (_srState.dataB && _srState.dataB.byNguon) || []; };
     _SR_COLTH_GETTER_['bNguon'] = { name: function(r){ return r.name; } };
     var bNguonRows = _srApplyColFilters_(d.byNguon||[], 'bNguon', _SR_COLTH_GETTER_['bNguon']).filter(function(k){ return !_srState.bNguonSearch || k.name.toLowerCase().indexOf(_srState.bNguonSearch.toLowerCase())!==-1; });
-    html += '<div class="dash-section-title" style="margin-top:18px">Theo Nguồn đơn'+_srViewToggleHtml('bNguonView')+'</div>';
-    html += '<input type="text" placeholder="🔍 Tìm nhanh theo nguồn đơn..." value="'+esc(_srState.bNguonSearch)+'" oninput="_srState.bNguonSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
+    var nguonHtmlB_ = '<div class="dash-section-title">Theo Nguồn đơn'+_srViewToggleHtml('bNguonView')+'</div>';
+    nguonHtmlB_ += '<input type="text" placeholder="🔍 Tìm nhanh theo nguồn đơn..." value="'+esc(_srState.bNguonSearch)+'" oninput="_srState.bNguonSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
     if (_srState.bNguonView === 'table'){
-      html += '<table class="dash-table"><thead><tr>'+_srColTh_('bNguon','name','Nguồn đơn',_SR_COLTH_ROWSFN_['bNguon'],_SR_COLTH_GETTER_['bNguon'].name)+'<th style="text-align:right">Số đơn</th><th style="text-align:right"><b>Giá trị sau giảm giá</b></th><th style="text-align:right">TB đơn</th><th style="text-align:right">COD</th></tr></thead><tbody>';
+      nguonHtmlB_ += '<table class="dash-table"><thead><tr>'+_srColTh_('bNguon','name','Nguồn đơn',_SR_COLTH_ROWSFN_['bNguon'],_SR_COLTH_GETTER_['bNguon'].name)+'<th style="text-align:right">Số đơn</th><th style="text-align:right"><b>Giá trị sau giảm giá</b></th><th style="text-align:right">TB đơn</th><th style="text-align:right">COD</th></tr></thead><tbody>';
       bNguonRows.forEach(function(k){
-        html += '<tr><td>'+esc(k.name)+'</td><td style="text-align:right">'+fmt(k.orders)+'</td><td style="text-align:right"><b>'+_srMoney(k.giaTri)+'</b></td><td style="text-align:right">'+_srMoney(k.trungBinhDon)+'</td><td style="text-align:right">'+_srMoney(k.cod)+'</td></tr>';
+        nguonHtmlB_ += '<tr><td>'+esc(k.name)+'</td><td style="text-align:right">'+fmt(k.orders)+'</td><td style="text-align:right"><b>'+_srMoney(k.giaTri)+'</b></td><td style="text-align:right">'+_srMoney(k.trungBinhDon)+'</td><td style="text-align:right">'+_srMoney(k.cod)+'</td></tr>';
       });
-      if (!bNguonRows.length) html += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+      if (!bNguonRows.length) nguonHtmlB_ += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
       else { var bNOrd=bNguonRows.reduce(function(s,r){return s+(r.orders||0);},0), bNGt=bNguonRows.reduce(function(s,r){return s+(r.giaTri||0);},0);
-        html += _srTotalRowHtml_(['Tổng', fmt(bNOrd), '<b>'+_srMoney(bNGt)+'</b>', _srMoney(bNOrd?Math.round(bNGt/bNOrd):0), _srMoney(bNguonRows.reduce(function(s,r){return s+(r.cod||0);},0))]); }
-      html += '</tbody></table>';
+        nguonHtmlB_ += _srTotalRowHtml_(['Tổng', fmt(bNOrd), '<b>'+_srMoney(bNGt)+'</b>', _srMoney(bNOrd?Math.round(bNGt/bNOrd):0), _srMoney(bNguonRows.reduce(function(s,r){return s+(r.cod||0);},0))]); }
+      nguonHtmlB_ += '</tbody></table>';
     } else {
-      html += _srChartSvg(bNguonRows, 'name', 'giaTri', _srState.bNguonView, true, 'orders');
+      nguonHtmlB_ += _srChartSvg(bNguonRows, 'name', 'giaTri', _srState.bNguonView, true, 'orders');
     }
+    // Tỷ lệ chốt theo Nguồn đơn — ghép từ "kenhCloseRate" (tên gọi nội bộ kế thừa từ Báo cáo A;
+    // với B, kenh đã được suy ra từ ID Page trong "Nguồn đơn" nên vẫn đúng khái niệm).
+    var bKenhCloseNote = d.kenhCloseRateFrom ? ' — tính từ '+esc(d.kenhCloseRateFrom) : '';
+    var nguonCloseHtmlB_ = '<div class="dash-section-title">Tỷ lệ chốt theo Nguồn đơn <span style="font-weight:400;color:var(--muted);font-size:11px">(Số đơn / Tổng tương tác Pancake'+bKenhCloseNote+' — chỉ tính được các dòng Nguồn đơn có kèm ID Page, vd "Facebook / Tên Page (ID)")</span></div>'+
+      (d.kenhCloseRateFrom ? _srCloseRateBarHtml_(d.kenhCloseRate, _srState.bNguonSearch, 'tương tác') :
+        '<div style="color:var(--muted);text-align:center;padding:20px;font-size:12px">Chưa nạp báo cáo tương tác Pancake ngày nào — vào tab "📥 Báo cáo Pancake" để nạp trước khi xem tỷ lệ chốt theo Nguồn.</div>');
+    html += '<div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">'+
+      '<div style="flex:1 1 380px;min-width:320px">'+nguonHtmlB_+'</div>'+
+      '<div style="flex:1 1 320px;min-width:280px">'+nguonCloseHtmlB_+'</div>'+
+      '</div>';
 
     // Theo MKT — lay truc tiep tu cot "Marketer" co san tren tung dong cua Bao cao B (don gian
     // va chinh xac hon cach suy ra qua Page/Kenh cua Bao cao A).
