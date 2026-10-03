@@ -1985,6 +1985,57 @@ async function saveSaleChannels() {
 }
 
 // ════════════════════════════════════════════════════════════════════
+//  % HOA HỒNG THEO KÊNH (Nguồn đơn) — admin cài ở modal "📡 % hoa hồng theo Kênh"
+//  (mở từ gear-menu Báo cáo E). Đơn thuộc 1 Nguồn đơn (nguonDon) đã được cài ở đây sẽ
+//  tính hoa hồng THEO ĐÚNG % cố định đó, BỎ QUA hoàn toàn % cá nhân/team và ngưỡng 15tr.
+//  CHANNEL_COMMISSION_RATES = { "<nguonDon viết thường, đã trim>": <số %, vd 1 = 1%> }
+//  Key luôn lưu viết thường + trim để so khớp không phân biệt hoa/thường.
+// ════════════════════════════════════════════════════════════════════
+let CHANNEL_COMMISSION_RATES = (function(){
+  try { var v = loadLS('ome_channel_commission_rates'); return (v && typeof v === 'object') ? v : {}; } catch(e){ return {}; }
+})();
+
+async function _syncChannelCommissionRatesFromGAS() {
+  if (!gsUrl) return;
+  try {
+    var r = await fetch(gsUrl + '?action=getSetting&key=channelCommissionRates', {redirect:'follow'});
+    var data = await r.json();
+    if (data && data.value) {
+      var obj = JSON.parse(data.value);
+      if (obj && typeof obj === 'object') {
+        CHANNEL_COMMISSION_RATES = obj;
+        saveLS('ome_channel_commission_rates', CHANNEL_COMMISSION_RATES);
+        if (typeof _srState !== 'undefined' && _srState.sub === 'E') renderSalesReportTab();
+      }
+    }
+  } catch(e) { /* giữ bản local nếu lỗi mạng/parse */ }
+}
+setTimeout(_syncChannelCommissionRatesFromGAS, 0);
+
+async function saveChannelCommissionRates() {
+  saveLS('ome_channel_commission_rates', CHANNEL_COMMISSION_RATES);
+  if (gsUrl) {
+    try {
+      var r = await fetch(gsUrl, { method:'POST', redirect:'follow',
+        body: JSON.stringify({ action:'setSetting', key:'channelCommissionRates', value: JSON.stringify(CHANNEL_COMMISSION_RATES) }) });
+      var d = await r.json().catch(function(){ return {}; });
+      if (d && d.error) toast('Lưu local ✓ — GSheets: ' + d.error);
+      else toast('✓ Đã lưu và đồng bộ % hoa hồng theo Kênh lên Google Sheets');
+    } catch(e) { toast('✓ Đã lưu local — chưa đồng bộ GSheets: ' + e.message); }
+  } else {
+    toast('✓ Đã lưu % hoa hồng theo Kênh (local)');
+  }
+}
+
+function _channelCommissionRate_(kenh){
+  if (!kenh) return null;
+  var k = String(kenh).trim().toLowerCase();
+  if (!k || !Object.prototype.hasOwnProperty.call(CHANNEL_COMMISSION_RATES, k)) return null;
+  var v = CHANNEL_COMMISSION_RATES[k];
+  return (v === '' || v === null || v === undefined || isNaN(Number(v))) ? null : Number(v);
+}
+
+// ════════════════════════════════════════════════════════════════════
 //  CHƯƠNG TRÌNH THƯỞNG — admin cài ở modal "🏆 Chương trình thưởng" (mở từ Báo cáo
 //  hoa hồng). Mỗi chương trình gồm các điều kiện CÓ CẤU TRÚC (để tự tính được) và 2 ô
 //  ghi chú tự do (chỉ để nhắc kế toán, KHÔNG được tự động chấm — vì là văn bản tự do).
@@ -2072,28 +2123,40 @@ function _computeCommissionData_(orders) {
   (orders||[]).forEach(function(m){
     var giaTri = Number(m.giaTriDon) || 0;
     var isAbove = giaTri >= COMMISSION_THRESHOLD;
-    if (isAbove) { totalOrdersAbove15++; totalRevenueAbove15 += giaTri; }
-    else { totalOrdersBelow15++; totalRevenueBelow15 += giaTri; }
+    // Nguồn đơn đã được admin cài % riêng (vd "facebook" = 1%) -> BỎ QUA hoàn toàn ngưỡng
+    // 15tr + % cá nhân/team, tính thẳng theo đúng % kênh đó cho phần doanh thu chia của sale.
+    var chRate = _channelCommissionRate_(m.nguonDon);
+    if (chRate === null) {
+      if (isAbove) { totalOrdersAbove15++; totalRevenueAbove15 += giaTri; }
+      else { totalOrdersBelow15++; totalRevenueBelow15 += giaTri; }
+    }
     var salesList = splitMulti_(m.saleBan, ',');
     if (!salesList.length) salesList = ['(chưa gán sale)'];
     var n = salesList.length;
     var share = giaTri / n;
     salesList.forEach(function(sName){
-      if (!bySale[sName]) bySale[sName] = { ordersAbove15:0, ordersBelow15:0, revenueAbove15:0, revenueBelow15:0 };
-      if (isAbove) { bySale[sName].ordersAbove15++; bySale[sName].revenueAbove15 += share; }
+      if (!bySale[sName]) bySale[sName] = { ordersAbove15:0, ordersBelow15:0, revenueAbove15:0, revenueBelow15:0, channelRevenue:0, channelCommission:0, channelBreakdown:{} };
+      if (chRate !== null) {
+        var kenhKey = String(m.nguonDon||'').trim();
+        bySale[sName].channelRevenue += share;
+        bySale[sName].channelCommission += share * (chRate/100);
+        if (!bySale[sName].channelBreakdown[kenhKey]) bySale[sName].channelBreakdown[kenhKey] = { revenue:0, rate:chRate };
+        bySale[sName].channelBreakdown[kenhKey].revenue += share;
+      } else if (isAbove) { bySale[sName].ordersAbove15++; bySale[sName].revenueAbove15 += share; }
       else { bySale[sName].ordersBelow15++; bySale[sName].revenueBelow15 += share; }
     });
   });
   var rows = Object.keys(bySale).map(function(name){
     var s = bySale[name];
     var rate = _resolveCommissionRate_(name);
-    var commission = s.revenueAbove15 * (rate.above15/100) + s.revenueBelow15 * (rate.below15/100);
+    var commission = s.revenueAbove15 * (rate.above15/100) + s.revenueBelow15 * (rate.below15/100) + s.channelCommission;
     return {
       name: name,
       ordersAbove15: s.ordersAbove15, ordersBelow15: s.ordersBelow15,
       revenueAbove15: s.revenueAbove15, revenueBelow15: s.revenueBelow15,
       rateAbove15: rate.above15, rateBelow15: rate.below15,
       sourceAbove15: rate.sourceAbove15, sourceBelow15: rate.sourceBelow15,
+      channelRevenue: s.channelRevenue, channelCommission: s.channelCommission, channelBreakdown: s.channelBreakdown,
       commission: commission
     };
   });
@@ -13519,6 +13582,7 @@ function renderSalesReportTabE_(wrap, subTabs){
         '<div onclick="closeGearMenus();openBonusProgramsModal()">🏆 Chương trình thưởng</div>'+
         '<div onclick="closeGearMenus();openSaleChannelsModal()">🏷️ Phân loại Online/Offline</div>'+
         '<div onclick="closeGearMenus();openGoldUnitModal()">💰 Đơn giá vàng (Pancake AI)</div>'+
+        '<div onclick="closeGearMenus();openChannelRatesModal()">📡 % hoa hồng theo Kênh</div>'+
       '</div></div>';
   filters += '</div>';
 
@@ -13749,8 +13813,12 @@ function _srRenderE_(d){
       _srColTh_('eSale','name','Sale',_SR_COLTH_ROWSFN_['eSale'],_SR_COLTH_GETTER_['eSale'].name)+'<th style="text-align:right">Số đơn ≥15tr</th><th style="text-align:right">Số đơn &lt;15tr</th>'+
       '<th style="text-align:right">DT ≥15tr</th><th style="text-align:right">DT &lt;15tr</th>'+
       '<th style="text-align:right">% ≥15tr</th><th style="text-align:right">% &lt;15tr</th>'+
+      '<th style="text-align:right">DT kênh riêng</th>'+
       '<th style="text-align:right"><b>Hoa hồng</b></th></tr></thead><tbody>';
     rows.forEach(function(s){
+      var chTitle = s.channelBreakdown && Object.keys(s.channelBreakdown).length
+        ? Object.keys(s.channelBreakdown).map(function(k){ var cb=s.channelBreakdown[k]; return k+': '+_srMoney(cb.revenue)+' × '+cb.rate+'%'; }).join(' | ')
+        : '';
       html += '<tr><td>'+esc(s.name)+'</td>'+
         '<td style="text-align:right">'+fmt(s.ordersAbove15)+'</td>'+
         '<td style="text-align:right">'+fmt(s.ordersBelow15)+'</td>'+
@@ -13758,15 +13826,18 @@ function _srRenderE_(d){
         '<td style="text-align:right">'+_srMoney(s.revenueBelow15)+'</td>'+
         '<td style="text-align:right" title="Nguồn: '+esc(s.sourceAbove15)+'">'+s.rateAbove15+'%</td>'+
         '<td style="text-align:right" title="Nguồn: '+esc(s.sourceBelow15)+'">'+s.rateBelow15+'%</td>'+
+        '<td style="text-align:right"'+(chTitle?(' title="'+esc(chTitle)+'"'):'')+'>'+(s.channelRevenue ? _srMoney(s.channelRevenue) : '—')+'</td>'+
         '<td style="text-align:right"><b>'+_srMoney(s.commission)+'</b></td></tr>';
     });
-    if (!rows.length) html += '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+    if (!rows.length) html += '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
     else html += _srTotalRowHtml_(['Tổng',
       fmt(rows.reduce(function(s,r){return s+(r.ordersAbove15||0);},0)),
       fmt(rows.reduce(function(s,r){return s+(r.ordersBelow15||0);},0)),
       _srMoney(rows.reduce(function(s,r){return s+(r.revenueAbove15||0);},0)),
       _srMoney(rows.reduce(function(s,r){return s+(r.revenueBelow15||0);},0)),
-      '', '', '<b>'+_srMoney(c.totalCommission)+'</b>']);
+      '', '',
+      _srMoney(rows.reduce(function(s,r){return s+(r.channelRevenue||0);},0)),
+      '<b>'+_srMoney(c.totalCommission)+'</b>']);
     html += '</tbody></table>';
     html += '<div style="font-size:11px;color:var(--muted);margin-top:6px">Rê chuột vào % để xem nguồn áp dụng (Cá nhân / Team X / Chưa cài).</div>';
   } else {
@@ -14163,6 +14234,63 @@ function _renderSaleChannelsModal(){
 function _setSaleChannel(name, val){
   if (val) SALE_CHANNELS[name] = val; else delete SALE_CHANNELS[name];
   saveSaleChannels();
+}
+
+// ── Modal: % hoa hồng theo KÊNH (Nguồn đơn) — vd "facebook" = 1% cố định, bỏ qua ngưỡng 15tr
+// và % cá nhân/team cho đơn thuộc kênh đó. Admin tự gõ tên Nguồn đơn (so khớp không phân biệt
+// hoa/thường, tự trim) + % muốn áp — để trống % hoặc xoá dòng = bỏ cài, tính như cũ. ──
+var _crNewKey = '';
+function openChannelRatesModal(){
+  if (currentUser.role !== 'admin'){ toast('Chỉ Admin mới cài % hoa hồng theo Kênh.'); return; }
+  _crNewKey = '';
+  _renderChannelRatesModal();
+  var m = document.getElementById('cr-modal');
+  if (m) m.style.display = 'flex';
+}
+function closeChannelRatesModal(){
+  var m = document.getElementById('cr-modal');
+  if (m) m.style.display = 'none';
+}
+function _renderChannelRatesModal(){
+  var body = document.getElementById('cr-body');
+  if (!body) return;
+  var keys = Object.keys(CHANNEL_COMMISSION_RATES).sort(function(a,b){ return a.localeCompare(b,'vi'); });
+  var nguonOptions = (_srState && _srState.nguonOptions) || [];
+  var html = '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Đơn có Nguồn đơn khớp đúng (không phân biệt hoa/thường) 1 trong các tên dưới đây sẽ tính hoa hồng theo % cố định này, bỏ qua ngưỡng 15tr và % cá nhân/team.</div>';
+  html += '<table class="dash-table"><thead><tr><th>Nguồn đơn</th><th style="width:140px">% hoa hồng</th><th style="width:60px"></th></tr></thead><tbody>';
+  keys.forEach(function(k){
+    html += '<tr><td>'+esc(k)+'</td>'+
+      '<td><input type="number" step="0.1" min="0" value="'+esc(String(CHANNEL_COMMISSION_RATES[k]))+'" style="width:90px" onchange="_setChannelRate(\''+esc(k).replace(/'/g,"\\'")+'\',this.value)"></td>'+
+      '<td><button class="btn sm" style="color:var(--red)" onclick="_setChannelRate(\''+esc(k).replace(/'/g,"\\'")+'\',\'\')">✕</button></td></tr>';
+  });
+  if (!keys.length) html += '<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:14px">Chưa cài kênh nào — mọi đơn vẫn tính theo % cá nhân/team như cũ</td></tr>';
+  html += '</tbody></table>';
+  html += '<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center">'+
+    '<input list="cr-known-nguon" id="cr-new-key" placeholder="Tên Nguồn đơn (vd: facebook)" value="'+esc(_crNewKey||'')+'" oninput="_crNewKey=this.value" style="flex:1;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px">'+
+    '<input type="number" step="0.1" min="0" id="cr-new-rate" placeholder="%" style="width:90px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px">'+
+    '<button class="btn sm" onclick="_addChannelRate()">+ Thêm</button>'+
+    '</div>';
+  if (nguonOptions.length) {
+    html += '<datalist id="cr-known-nguon">' + nguonOptions.map(function(n){ return '<option value="'+esc(n)+'">'; }).join('') + '</datalist>';
+  }
+  body.innerHTML = html;
+}
+function _setChannelRate(key, val){
+  if (val === '' || val === null || val === undefined) delete CHANNEL_COMMISSION_RATES[key];
+  else CHANNEL_COMMISSION_RATES[key] = Math.max(0, parseFloat(val)||0);
+  saveChannelCommissionRates();
+  _renderChannelRatesModal();
+}
+function _addChannelRate(){
+  var keyEl = document.getElementById('cr-new-key'), rateEl = document.getElementById('cr-new-rate');
+  var key = ((keyEl ? keyEl.value : _crNewKey) || '').trim().toLowerCase();
+  var rate = rateEl ? parseFloat(rateEl.value) : NaN;
+  if (!key){ toast('Nhập tên kênh (Nguồn đơn) trước đã.'); return; }
+  if (isNaN(rate) || rate < 0){ toast('Nhập % hợp lệ (vd 1 hoặc 0.8).'); return; }
+  CHANNEL_COMMISSION_RATES[key] = rate;
+  _crNewKey = '';
+  saveChannelCommissionRates();
+  _renderChannelRatesModal();
 }
 
 // ── Modal: CHƯƠNG TRÌNH THƯỞNG (CRUD) ──
@@ -16373,6 +16501,20 @@ function updateSidebarCareFilters() {
   </div>
   <div class="modal-footer" style="flex-shrink:0;display:flex;justify-content:flex-end">
     <button class="btn" onclick="closeSaleChannelsModal()">Đóng</button>
+  </div>
+</div>
+</div>
+
+<!-- ══ MODAL: % hoa hồng theo Kênh ══ -->
+<div class="modal-overlay" id="cr-modal" style="display:none;align-items:flex-start;justify-content:center;padding-top:40px;z-index:700">
+<div class="modal" style="max-width:620px;width:94%;max-height:86vh;display:flex;flex-direction:column">
+  <div class="modal-header" style="flex-shrink:0">
+    <div class="modal-title">📡 % hoa hồng theo Kênh</div>
+    <button class="modal-close" onclick="closeChannelRatesModal()">✕</button>
+  </div>
+  <div class="modal-body" style="overflow:auto;flex:1"><div id="cr-body"></div></div>
+  <div class="modal-footer" style="flex-shrink:0;display:flex;justify-content:flex-end">
+    <button class="btn" onclick="closeChannelRatesModal()">Đóng</button>
   </div>
 </div>
 </div>
