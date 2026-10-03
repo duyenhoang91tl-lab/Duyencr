@@ -2362,11 +2362,28 @@ function _srCloseRateSections_(normRows, filters) {
 // Trich pageId (so cuoi trong ngoac don o cuoi chuoi) tu cot "Nguồn đơn" cua Bao cao B, vd
 // "Facebook / Hiền Phạm Tourmaline (862972056891669)" -> "862972056891669". Dong khong co ID
 // dang nay (vd "Bảo hành", "Quầy Hào Nam", "Fb Phạm Thu Hiền" go tay khong theo chuan) tra ve
-// chuoi rong — cac don nay se tu dong bi bo qua o buoc khop Page, giong het cach Bao cao A bo
-// qua kenh chua khop duoc Page (xem _srCloseRateSections_).
+// chuoi rong — cac don nay se duoc thu khop tiep theo TEN Page qua _extractPageNameFromNguonDon_
+// (xem buildSalesReportB_), chi thuc su bi bo qua neu CA 2 cach deu khong khop duoc Page nao.
 function _extractPageIdFromNguonDon_(nguonDon) {
   var m = String(nguonDon || '').match(/\((\d+)\)\s*$/);
   return m ? m[1] : '';
+}
+
+// Trich TEN Page tu cot "Nguồn đơn" (du phong khi khong co ID kem theo, theo yeu cau Duyen
+// 2026-10: khop "theo ten Page HOAC Id Page"). Bo tien to "Nen tang / " (neu co dau "/") va hau
+// to "(ID)" o cuoi (neu co) — vd "Facebook / Hiền Tour Shop (678324468689325)" -> "Hiền Tour
+// Shop"; "Quầy Hào Nam" (khong co "/" , khong co ID) -> giu nguyen "Quầy Hào Nam"; "Fb Phạm Thu
+// Hiền" (khong co "/") -> giu nguyen ca chuoi. Dung ket hop voi readPancakePageMapByName_ de
+// khop cac Page KHONG co ID Pancake thuc (vd quay ban truc tiep/kenh thu cong) MA admin da tu
+// dien ten + "Kênh bán" tuong ung thang vao sheet PancakePageMap (pageId co the la gia tri tu
+// dat, khong can trung voi ID Pancake thuc vi cot nay chi dung lam khoa duy nhat cua dong).
+function _extractPageNameFromNguonDon_(nguonDon) {
+  var t = String(nguonDon || '').trim();
+  if (!t) return '';
+  var nameOnly = t.replace(/\(\d+\)\s*$/, '').trim();
+  var slashIdx = nameOnly.indexOf('/');
+  if (slashIdx !== -1) nameOnly = nameOnly.slice(slashIdx + 1).trim();
+  return nameOnly;
 }
 
 function buildSalesReportA_(filters) {
@@ -3021,15 +3038,25 @@ function buildSalesReportB_(filters) {
 
   // Ty le chot theo Sale/Kenh/Page — dung LAI CHINH XAC cong thuc cua Bao cao A qua ham dung
   // chung _srCloseRateSections_. Khac biet duy nhat voi A: "kenhBan" cua moi don B khong co san
-  // (B chi co "Nguon don") nen phai trich ID Page tu cuoi chuoi Nguon don (vd "Facebook / Hiền
-  // Phạm Tourmaline (862972056891669)" -> "862972056891669") roi tra qua PancakePageMap de ra
-  // dung "kenhBan" chuan — xac nhan 2026-10 cua Duyen: Nguon don CO chua ID Page that. Don khong
-  // trich duoc ID (vd "Bảo hành", "Quầy Hào Nam", ten go tay khong theo chuan) se tu dong bi bo
-  // qua o buoc nay, giong het cach A bo qua kenh chua khop Page.
+  // (B chi co "Nguon don") nen phai tu suy ra "kenhBan" chuan tu chuoi Nguon don, THU 2 CACH
+  // theo dung yeu cau Duyen 2026-10 ("khớp theo tên Page HOẶC Id Page"):
+  //   1) Trich ID Page o cuoi chuoi (vd "Facebook / Hiền Phạm Tourmaline (862972056891669)" ->
+  //      "862972056891669") roi tra qua PancakePageMap (readPancakePageMap_, khoa=pageId).
+  //   2) Neu (1) khong ra ket qua (khong co ID, vd "Bảo hành", "Quầy Hào Nam", "Fb Phạm Thu
+  //      Hiền" go tay khong theo chuan) — thu tiep trich TEN Page (bo tien to "Nen tang / " +
+  //      hau to "(ID)" neu co) va tra qua readPancakePageMapByName_ (khoa=pageName chuan hoa).
+  // Don khong khop duoc o CA 2 cach (chua tung duoc admin khop Page nao trong PancakePageMap)
+  // moi thuc su bi bo qua o buoc tinh ty le chot, giong cach A bo qua kenh chua khop Page.
   var pkPageMapB_ = readPancakePageMap_();
+  var pkPageMapByNameB_ = readPancakePageMapByName_();
   var normRowsB_ = matched.map(function(m) {
     var pid = _extractPageIdFromNguonDon_(m.nguonDon);
-    return { kenhBan: pid ? (pkPageMapB_[pid] || '') : '', dateStr: m.ngayTaoDon, saleBanRaw: m.theSale };
+    var kenhB_ = pid ? (pkPageMapB_[pid] || '') : '';
+    if (!kenhB_) {
+      var pname_ = _extractPageNameFromNguonDon_(m.nguonDon);
+      if (pname_) kenhB_ = pkPageMapByNameB_[_normTxt_(pname_)] || '';
+    }
+    return { kenhBan: kenhB_, dateStr: m.ngayTaoDon, saleBanRaw: m.theSale };
   });
   var closeSectionsB_ = _srCloseRateSections_(normRowsB_, filters);
 
@@ -4458,6 +4485,25 @@ function readPancakePageMap_() {
   for (var i = 0; i < v.length; i++) {
     if (!v[i][0]) continue;
     out[String(v[i][0])] = String(v[i][2] || ''); // key = pageId -> kenhBan
+  }
+  return out;
+}
+
+// Ban do du phong theo TEN Page (chuan hoa qua _normTxt_) -> "Kênh bán", doc CUNG 1 sheet
+// PancakePageMap nhu readPancakePageMap_ (chi doi khoa tu pageId sang pageName). Dung khi mot
+// don "dữ liệu đơn" khong trich duoc pageId tu cot "Nguồn đơn" (xem _extractPageNameFromNguonDon_)
+// — cho phep khop ca nhung "Page" khong co ID Pancake thuc (quay ban truc tiep, kenh thu cong)
+// ma admin da tu tay ghi 1 dong vao PancakePageMap (pageId o day chi can la khoa duy nhat, khong
+// bat buoc la ID Pancake thuc). Nhieu pageName trung nhau (khac pageId) se lay dong doc sau cung.
+function readPancakePageMapByName_() {
+  var sh = getSheet_(SH_PK_PAGEMAP, PK_PAGEMAP_HEADERS);
+  var out = {};
+  if (sh.getLastRow() < 2) return out;
+  var v = sh.getRange(2, 1, sh.getLastRow() - 1, PK_PAGEMAP_HEADERS.length).getValues();
+  for (var i = 0; i < v.length; i++) {
+    var pname = String(v[i][1] || '').trim();
+    if (!pname) continue;
+    out[_normTxt_(pname)] = String(v[i][2] || '');
   }
   return out;
 }
