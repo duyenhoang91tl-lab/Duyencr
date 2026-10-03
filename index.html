@@ -13843,7 +13843,7 @@ function _srRenderF_(d){
 
 // ── BÁO CÁO G: ĐƠN BỊ LOẠI (Hủy/Trả lại/Hoàn tiền/Thất bại/Khiếu nại) ──
 // Nguồn POS ("dữ liệu đơn", cùng nguồn Báo cáo B/E/F) và cùng định nghĩa trạng thái bị loại
-// (_isExcludedOrderStatus_ ở backend) như Báo cáo B, nhưng CHỈ lấy đúng các đơn đã bị loại đó để xem
+// (Pos chỉ loại "Đã hoàn" và "Đang hoàn" — _donHasExcludedStatus_ ở backend) như Báo cáo B, nhưng CHỈ lấy đúng các đơn đã bị loại đó để xem
 // riêng: bao nhiêu đơn, thuộc sale nào, MKT nào, lý do gì. COD/Giá trị CHỈ để tham khảo — KHÔNG tính vào doanh số.
 function renderSalesReportTabG_(wrap, subTabs){
   var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
