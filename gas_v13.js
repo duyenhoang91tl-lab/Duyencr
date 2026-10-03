@@ -4788,8 +4788,11 @@ function readSaleDirectory_() {
   var v = sh.getRange(2, 1, sh.getLastRow() - 1, SALE_DIR_HEADERS.length).getValues();
   for (var i = 0; i < v.length; i++) {
     var tag = String(v[i][3] || '').trim();
-    var m = tag.match(/^([SO])\s*(\d+)/i);
-    if (!m) continue; // dong khong co ma tag S#/O# -> khong phai Sale trong danh sach
+    // TV# = Sale thu viec (rieng, KHAC S#/O# chinh thuc) — nhan dien TRUOC S/O vi "TV" cung bat
+    // dau bang chu T, tranh vo tinh khop nham voi mot bang chu cai khac sau nay.
+    var mTV = tag.match(/^TV\s*(\d+)/i);
+    var m = !mTV ? tag.match(/^([SO])\s*(\d+)/i) : null;
+    if (!mTV && !m) continue; // dong khong co ma tag TV#/S#/O# -> khong phai Sale trong danh sach
     var tenFacebook = String(v[i][1] || '').trim(), userBase = String(v[i][2] || '').trim();
     var chVal = channels[tenFacebook] || channels[userBase] || channels[tag] || '';
     var rec = {
@@ -4797,8 +4800,12 @@ function readSaleDirectory_() {
       tenFacebook: tenFacebook,
       userBase: userBase,
       tenTagPancake: tag,
-      code: m[1].toUpperCase() + parseInt(m[2], 10),
-      nhom: chVal === 'online' ? 'Online' : (chVal === 'offline' ? 'Văn phòng' : (m[1].toUpperCase() === 'S' ? 'Văn phòng' : 'Online'))
+      code: mTV ? ('TV' + parseInt(mTV[1], 10)) : (m[1].toUpperCase() + parseInt(m[2], 10)),
+      // Uu tien phan loai tu SALE_CHANNELS (nguon thong nhat moi bao cao); neu Sale CHUA duoc
+      // phan loai qua modal "🏷️ Phân loại Online/Offline" thi fallback theo DUNG tien to ma tag:
+      // TV -> Thu viec, S -> Van phong, O -> Online.
+      nhom: chVal === 'online' ? 'Online' : (chVal === 'offline' ? 'Văn phòng' : (chVal === 'probation' ? 'Thử việc' :
+        (mTV ? 'Thử việc' : (m[1].toUpperCase() === 'S' ? 'Văn phòng' : 'Online'))))
     };
     list.push(rec);
     [rec.tenFacebook, rec.userBase, rec.tenTagPancake, rec.code].forEach(function(k) {
@@ -5030,9 +5037,9 @@ function buildKpiReport_(from, to, saleFilter) {
   bySale.sort(function(a, b) {
     // Thu tu nhom: Van phong (S) -> Online (O) -> ngoai danh sach, dung theo yeu cau; trong
     // tung nhom sap theo Ty le chot (tyLeChot) giam dan — Sale chot tot nhat len dau.
-    var rank = { 'Văn phòng': 0, 'Online': 1 };
-    var ra = rank.hasOwnProperty(a.nhom) ? rank[a.nhom] : 2;
-    var rb = rank.hasOwnProperty(b.nhom) ? rank[b.nhom] : 2;
+    var rank = { 'Văn phòng': 0, 'Online': 1, 'Thử việc': 2 };
+    var ra = rank.hasOwnProperty(a.nhom) ? rank[a.nhom] : 3;
+    var rb = rank.hasOwnProperty(b.nhom) ? rank[b.nhom] : 3;
     if (ra !== rb) return ra - rb;
     return b.tyLeChot - a.tyLeChot;
   });
@@ -5040,7 +5047,7 @@ function buildKpiReport_(from, to, saleFilter) {
   // Tong theo nhom: don KHONG chia (1 don co the co nhieu Sale) nen chi cong doanh thu da chia
   // deu o tren -> cong lai theo nhom van dung tong the.
   var byGroup = {};
-  ['Văn phòng', 'Online', ''].forEach(function(g) {
+  ['Văn phòng', 'Online', 'Thử việc', ''].forEach(function(g) {
     byGroup[g || '(ngoài danh sách)'] = { nhom: g || '(ngoài danh sách)', soSale: 0, tongTT: 0, sdtMangVe: 0, donHang: 0, doanhThu: 0, donHangForRate: 0 };
   });
   bySale.forEach(function(r) {
@@ -7229,7 +7236,7 @@ function buildMktChecklistReport_(from, to) {
     sg.ordersForRate += _mktSumOnDates_(saleOrdersByDate, nm, datesBySaleM[nm] || {});
   });
   Object.keys(saleOrdersFb).forEach(function(nm) { getSG(nhomOf(nm)).donFb += saleOrdersFb[nm]; });
-  var saleGroupsOut = ['Văn phòng', 'Online', '(ngoài danh sách)'].filter(function(nh) { return saleG[nh]; }).map(function(nh) {
+  var saleGroupsOut = ['Văn phòng', 'Online', 'Thử việc', '(ngoài danh sách)'].filter(function(nh) { return saleG[nh]; }).map(function(nh) {
     var g = saleG[nh], cnt = {};
     codes.forEach(function(c) { cnt[c] = (c === 'L5') ? g.orders : null; });
     return { nhom: nh, soSale: g.soSale, tongTT: r2(g.tt), khMoiTotal: r2(g.ttMoi), khCuTotal: r2(g.ttCu), sdtThuThap: r2(g.sdt),
