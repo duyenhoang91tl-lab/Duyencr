@@ -13853,7 +13853,7 @@ function renderSalesReportTabG_(wrap, subTabs){
   filters += '<input type="date" value="'+esc(_srState.gDateTo)+'" onchange="_srSetField(\'gDateTo\',this.value);_srState.gDateQuick=\'custom\'" title="Đến ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
   filters += '<input type="text" value="'+esc(_srState.gSanPham)+'" oninput="_srState.gSanPham=this.value" placeholder="Lọc theo sản phẩm..." style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);width:150px">';
   filters += _srComboHtml('sr-sale-combo-g', 'gSale', 'saleBOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 180);
-  filters += _srComboHtml('sr-nguon-combo-g', 'gNguon', 'nguonOptions', 'Lọc theo Nguồn đơn', '🔍 Tìm & chọn nguồn...', 170);
+  filters += _srComboHtml('sr-nguon-combo-g', 'gNguon', 'nguonOptions', 'Lọc theo Kênh bán', '🔍 Tìm & chọn kênh...', 170);
   filters += _srComboHtml('sr-mkt-combo-g', 'gMarketer', 'marketerOptions', 'Lọc theo Marketer', '🔍 Tìm & chọn MKT...', 170);
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
   filters += '<button class="btn sm" id="sr-export-sheet-btn" onclick="exportSalesReportToSheet()">📄 Xuất ra Sheet</button>';
@@ -13890,11 +13890,11 @@ function renderSalesReportTabG_(wrap, subTabs){
       };
       html += section('Theo lý do (trạng thái đơn)', d.byLyDo, 'gLyDoView');
       html += section('Theo Sale', d.bySale, 'gSaleView', 'mỗi sale trên đơn đều tính 1 đơn, không chia đều như doanh thu');
-      html += section('Theo Nguồn đơn', d.byNguon, 'gNguonView');
+      html += section('Theo Kênh bán', d.byNguon, 'gNguonView', 'Kênh bán = Nguồn đơn của Pos');
       html += section('Theo MKT', d.byMkt, 'gMktView', 'Marketer ghi trên từng đơn, giống Báo cáo B');
 
       html += '<div class="dash-section-title" style="margin-top:16px">Chi tiết đơn bị loại</div>';
-      html += '<table class="dash-table"><thead><tr><th>Ngày tạo</th><th>Nguồn đơn</th><th>Sale</th><th>Sản phẩm</th><th>Giá trị đơn</th><th>Trạng thái</th></tr></thead><tbody>';
+      html += '<table class="dash-table"><thead><tr><th>Ngày tạo</th><th>Kênh bán</th><th>Sale</th><th>Sản phẩm</th><th>Giá trị đơn</th><th>Trạng thái</th></tr></thead><tbody>';
       (d.orders||[]).forEach(function(o){
         html += '<tr><td>'+esc(o.ngayTao)+'</td><td>'+esc(o.nguonDon)+'</td><td>'+esc(o.saleBan)+'</td><td>'+esc(o.sanPham)+'</td><td>'+moneyFmt(o.giaTriDon)+'</td><td>'+esc(o.trangThai)+'</td></tr>';
       });

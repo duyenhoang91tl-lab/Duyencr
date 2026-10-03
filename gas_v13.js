@@ -2778,8 +2778,8 @@ function buildSaleKpiReport_(filters) {
 // bi loai o Base nhung van tinh doanh thu o Pos hoac nguoc lai. Nay dung readDonChiTiet_ +
 // cung dinh nghia trang thai bi loai (_donHasExcludedStatus_ -> cot "Trạng thái") nhung DAO
 // NGUOC dieu kien cua Bao cao B: CHI lay cac dong DA BI LOAI. Bo loc giong B: Sale (cot "Thẻ",
-// qua _expandSaleFilterWithPancakeAliases_), Nguon don, Marketer, San pham. Pos KHONG co "kenhBan"/
-// "thoiGianHT" nen bo 2 bo loc do (ngay luon theo "ngayTaoDon"). So don/sale: moi sale tren don
+// qua _expandSaleFilterWithPancakeAliases_), Nguon don, Marketer, San pham. "Kenh ban" cua Pos chinh la cot "Nguon don" (Duyen xac nhan 2026-10-03) nen loc/nhom theo nguonDon;
+// Pos khong co "thoiGianHT" nen bo loc do (ngay luon theo "ngayTaoDon"). So don/sale: moi sale tren don
 // deu tinh 1 don (khong chia deu) — muc dich xem "don bi loai thuoc ve ai", khong phai doanh thu.
 function buildFailedOrderReport_(filters) {
   filters = filters || {};
@@ -3423,7 +3423,7 @@ function exportSalesReportToSheet_(reportType, filters) {
     var saleArrG = Array.isArray(f.sale) ? f.sale : (f.sale ? [f.sale] : []);
     if (saleArrG.length) filterDesc.push('Sale: ' + saleArrG.join(', '));
     var nguonArrG = Array.isArray(f.nguon) ? f.nguon : (f.nguon ? [f.nguon] : []);
-    if (nguonArrG.length) filterDesc.push('Nguồn đơn: ' + nguonArrG.join(', '));
+    if (nguonArrG.length) filterDesc.push('Kênh bán (Nguồn đơn): ' + nguonArrG.join(', '));
     var mktArrG = Array.isArray(f.marketer) ? f.marketer : (f.marketer ? [f.marketer] : []);
     if (mktArrG.length) filterDesc.push('Marketer: ' + mktArrG.join(', '));
   } else {
@@ -3526,8 +3526,8 @@ function exportSalesReportToSheet_(reportType, filters) {
     rows.push(['Sale', 'Số đơn', 'COD', 'Giá trị']);
     (data.bySale || []).forEach(function(s) { rows.push([s.name, s.orders, s.cod, s.giaTri]); });
     rows.push([]);
-    rows.push(['THEO NGUỒN ĐƠN']);
-    rows.push(['Nguồn đơn', 'Số đơn', 'COD', 'Giá trị']);
+    rows.push(['THEO KÊNH BÁN (Nguồn đơn)']);
+    rows.push(['Kênh bán', 'Số đơn', 'COD', 'Giá trị']);
     (data.byNguon || []).forEach(function(k) { rows.push([k.name, k.orders, k.cod, k.giaTri]); });
     rows.push([]);
     rows.push(['THEO MKT (Marketer trên đơn)']);
@@ -3535,7 +3535,7 @@ function exportSalesReportToSheet_(reportType, filters) {
     (data.byMkt || []).forEach(function(k) { rows.push([k.name, k.orders, k.cod, k.giaTri]); });
     rows.push([]);
     rows.push(['CHI TIẾT']);
-    rows.push(['Ngày tạo', 'Nguồn đơn', 'Marketer', 'Sale', 'Sản phẩm', 'Giá trị sau giảm', 'COD', 'Trạng thái']);
+    rows.push(['Ngày tạo', 'Kênh bán', 'Marketer', 'Sale', 'Sản phẩm', 'Giá trị sau giảm', 'COD', 'Trạng thái']);
     (data.orders || []).forEach(function(o) {
       rows.push([o.ngayTao, o.nguonDon, o.marketer, o.saleBan, o.sanPham, o.giaTriDon, o.cod, o.trangThai]);
     });
