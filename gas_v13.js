@@ -1250,6 +1250,11 @@ function doGet(e) {
                  sanPham: pF.sanPham || '', byCreator: false };
       return jsonOut_(buildSaleKpiReport_(fF));
     }
+    // ── BAO CAO H: Thuong offline (Sale thu viec) — xem buildOfflineBonusReport_ ──
+    if (action === 'offlineBonusReport') {
+      var pH = e.parameter || {};
+      return jsonOut_(buildOfflineBonusReport_({ dateFrom: pH.dateFrom || '', dateTo: pH.dateTo || '' }));
+    }
     // ── BAO CAO G: Don bi loai (Huy/Tra lai/Hoan tien/That bai/Khieu nai) — dung chung filter voi A ──
     if (action === 'failedOrderReport') {
       var pG = e.parameter || {};
@@ -2092,7 +2097,10 @@ function getDonOrderCountByPhone_() {
 // dong bo rieng), nen cache ngan giup Bao cao B/thay doi bo loc khong phai doc lai toan bo
 // sheet moi lan bam Loc — tang toc ro ret ma van cap nhat du lieu moi trong vong <=90s.
 function readDonChiTiet_() {
-  var cached = _cacheGetBig_('donChiTiet_v2');
+  // v3: them cot Q "Ghi chú nội bộ" (16 -> 17 cot) — dung lam KHOA GHEP voi DT TỔNG
+  // (mã bộ đếm nam trong ghi chu noi bo, vd "1006T09/2026", "BH368T09/2026/9290") cho
+  // Bao cao H - Thuong offline. Doi ten cache key (v2->v3) de khong dinh du lieu cu thieu cot.
+  var cached = _cacheGetBig_('donChiTiet_v3');
   if (cached) { try { return JSON.parse(cached); } catch (eParse) {} }
 
   var ss = getDTSS_();
@@ -2100,7 +2108,7 @@ function readDonChiTiet_() {
   if (!sh) return [];
   var last = sh.getLastRow();
   if (last < 2) return [];
-  var vals = sh.getRange(2, 1, last - 1, 15).getValues();
+  var vals = sh.getRange(2, 1, last - 1, 17).getValues();
   var out = [];
   for (var i = 0; i < vals.length; i++) {
     var r = vals[i];
@@ -2138,10 +2146,11 @@ function readDonChiTiet_() {
       soLuong:       r[10] ? String(r[10]) : '', // tach bang dau phay ','
       giaTriSauGiam: _normMoney_(r[11]),
       cod:           _normMoney_(r[12]),
-      marketer:      r[13] ? String(r[13]).trim() : ''
+      marketer:      r[13] ? String(r[13]).trim() : '',
+      ghiChuNoiBo:   r[16] ? String(r[16]) : ''  // cot Q — chua ma bo dem de ghep voi DT TỔNG (Bao cao H)
     });
   }
-  try { _cachePutBig_('donChiTiet_v2', JSON.stringify(out), 90); } catch (eCache) {}
+  try { _cachePutBig_('donChiTiet_v3', JSON.stringify(out), 90); } catch (eCache) {}
   return out;
 }
 
@@ -7207,3 +7216,193 @@ function exportDailyReportLogs_(from, to) {
 }
 
 
+
+
+// ═══════════════════════════════════════════════════════════════
+// BAO CAO H — Thuong offline (Sale thu viec)
+// Quy tac (Duyen chot 2026-10-02, doi chieu voi sheet "Thuong offline"):
+//  - 1 don tinh thuong CHI KHI co ca trong "DT TỔNG " (khop "Nguoi tao") VA "dữ liệu đơn"
+//    (khop qua Ma bo dem nam trong cot Q "Ghi chu noi bo" cua dữ liệu đơn, vd "1006T09/2026").
+//  - Loai don co Trang thai (cot O, dữ liệu đơn) la Da hoan/Dang hoan.
+//  - "Don tinh thuong" (so don/ngay) CHI cong cho dung Nguoi tao don do (khong cong cho sale
+//    con lai duoc gan chung "Sale ban").
+//  - "Doanh thu ngay" = tong doanh thu CHIA DEU cho tat ca sale trong "Sale ban" cua moi don
+//    (ca don chi minh 1 nguoi lan don chia nhieu nguoi), cong don theo tung sale rieng.
+//  - Cac tier (2/3/5 don, 25/50/80tr) CHI ap dung tu ngay thu 4 thu viec tro di (tinh theo
+//    ngay bat dau rieng tung sale, xem trialSaleBonusConfig). "Don dau" (mot lan/ngay, toi da
+//    3 ngay dau) tach rieng, khong cong don voi cac tier khac trong 3 ngay do.
+//  - T21/T31: thuong theo TUNG DON gia tri lon (>=21.5tr/>=31.5tr), ap dung tu ngay co dinh
+//    OFFLINE_BONUS_T21_FROM, CHI cho Nguoi tao con dang trong thoi gian thu viec (tu ngay thu 4).
+// CAN SUA TAY khi co thay doi quy tac (them tier, doi muc tien, doi ngay ap dung T21/T31...).
+// ═══════════════════════════════════════════════════════════════
+
+var OFFLINE_BONUS_SETTING_KEY = 'trialSaleBonusConfig'; // [{sale, startDate:'yyyy-mm-dd', endDate:'yyyy-mm-dd'|null, note}]
+var OFFLINE_BONUS_ALIAS_KEY   = 'creatorNameAlias';     // {"tenNguoiTaoSheet":"tenSaleBanChuan"} — vd cung 1 nguoi nhung 2 he thong ghi ten khac nhau
+
+var OFFLINE_BONUS_DON_TIERS = [ { min: 5, amt: 100000, label: '5 đơn' }, { min: 3, amt: 50000, label: '3 đơn' }, { min: 2, amt: 30000, label: '2 đơn' } ];
+var OFFLINE_BONUS_DT_TIERS  = [ { min: 80000000, amt: 100000, label: '80tr' }, { min: 50000000, amt: 50000, label: '50tr' }, { min: 25000000, amt: 30000, label: '25tr' } ];
+var OFFLINE_BONUS_DAUDON_AMT  = 50000;
+var OFFLINE_BONUS_DAUDON_DAYS = 3; // "03 ngày đầu kể từ ngày bắt đầu chat khách"
+var OFFLINE_BONUS_T21_FROM = '2026-09-21'; // theo sheet "Thưởng offline" — SUA LAI neu co quy tac moi
+var OFFLINE_BONUS_T21_MIN = 21500000, OFFLINE_BONUS_T21_AMT = 100000;
+var OFFLINE_BONUS_T31_MIN = 31500000, OFFLINE_BONUS_T31_AMT = 200000;
+var OFFLINE_BONUS_CODE_RE = /(?<!\w)\d{1,5}T\d{2}\/\d{4}/g; // bo qua ma co prefix (vd "BH368T09/2026") — khac he danh so voi Ma bo dem DT TỔNG
+
+function _obReadTrialConfig_() {
+  try {
+    var raw = getSetting_(OFFLINE_BONUS_SETTING_KEY);
+    var list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list : [];
+  } catch (e) { return []; }
+}
+function _obReadAlias_() {
+  try {
+    var raw = getSetting_(OFFLINE_BONUS_ALIAS_KEY);
+    var obj = raw ? JSON.parse(raw) : {};
+    return (obj && typeof obj === 'object' && !Array.isArray(obj)) ? obj : {};
+  } catch (e) { return {}; }
+}
+function _obAddDays_(ymd, n) {
+  var parts = String(ymd).split('-').map(Number);
+  var dt = new Date(_vnMidnight_(parts[0], parts[1], parts[2]).getTime() + n * 86400000);
+  return _vnYmd_(dt);
+}
+
+function buildOfflineBonusReport_(filters) {
+  filters = filters || {};
+  var dateFrom = filters.dateFrom || '';
+  var dateTo = filters.dateTo || '';
+
+  var trialList = _obReadTrialConfig_();
+  var trialBySale = {};
+  trialList.forEach(function (t) { if (t && t.sale) trialBySale[t.sale] = t; });
+  var alias = _obReadAlias_();
+
+  // Index dữ liệu đơn theo mã bộ đếm rút ra tu cot "Ghi chú nội bộ"
+  var donRows = readDonChiTiet_();
+  var ddCodeIndex = {};
+  donRows.forEach(function (r) {
+    if (!r.ghiChuNoiBo) return;
+    var codes = String(r.ghiChuNoiBo).match(OFFLINE_BONUS_CODE_RE);
+    if (!codes) return;
+    codes.forEach(function (c) {
+      if (!ddCodeIndex[c]) ddCodeIndex[c] = [];
+      ddCodeIndex[c].push(r);
+    });
+  });
+
+  // Doc truc tiep DT TỔNG (can them Mã bộ đếm + Date goc — readDTTong_ hien khong co 2 truong nay)
+  var ss = getDTSS_();
+  var sh = ss.getSheetByName(DT_TONG_SHEET);
+  var dtRows = [];
+  if (sh && sh.getLastRow() >= 2) {
+    var vals = sh.getRange(2, 1, sh.getLastRow() - 1, 21).getValues();
+    for (var i = 0; i < vals.length; i++) {
+      var r = vals[i];
+      if (!r[0] || !r[20]) continue; // can co ngay + ma bo dem moi ghep duoc
+      dtRows.push({ ngayRaw: r[0], nguoiTao: r[1] ? String(r[1]).trim() : '', saleBan: r[13] ? String(r[13]) : '', giaTriDon: Number(r[17]) || 0, maBoDem: String(r[20]).trim() });
+    }
+  }
+
+  var orderCount = {}, revenue = {}, countedOrders = [], excludedOrders = [];
+
+  dtRows.forEach(function (r) {
+    var ymd = _vnYmd_(r.ngayRaw);
+    if (!ymd) return;
+    if (dateFrom && ymd < dateFrom) return;
+    if (dateTo && ymd > dateTo) return;
+
+    var saleBanList = splitMulti_(r.saleBan, ',');
+    if (!saleBanList.length) return;
+    var creator = alias[r.nguoiTao] || r.nguoiTao;
+
+    var matches = ddCodeIndex[r.maBoDem];
+    if (!matches || !matches.length) {
+      excludedOrders.push({ ymd: ymd, ma: r.maBoDem, nguoiTao: creator, saleBan: r.saleBan, giaTri: r.giaTriDon, lyDo: 'khong_khop_du_lieu_don' });
+      return;
+    }
+    if (matches.every(function (m) { return _isExcludedOrderStatus_(m.trangThai); })) {
+      excludedOrders.push({ ymd: ymd, ma: r.maBoDem, nguoiTao: creator, saleBan: r.saleBan, giaTri: r.giaTriDon, lyDo: 'trang_thai_hoan' });
+      return;
+    }
+
+    var n = saleBanList.length;
+    var share = r.giaTriDon / n;
+    saleBanList.forEach(function (s) {
+      var k = s + '|' + ymd;
+      revenue[k] = (revenue[k] || 0) + share;
+    });
+    if (saleBanList.indexOf(creator) !== -1) {
+      var ck = creator + '|' + ymd;
+      orderCount[ck] = (orderCount[ck] || 0) + 1;
+    }
+    countedOrders.push({ ymd: ymd, ma: r.maBoDem, nguoiTao: creator, saleBan: r.saleBan, giaTriDon: r.giaTriDon, share: Math.round(share) });
+  });
+
+  // Ap tier cho tung sale thu viec (theo ngay bat dau rieng tung nguoi)
+  var results = [];
+  Object.keys(trialBySale).forEach(function (sale) {
+    var cfg = trialBySale[sale];
+    if (!cfg.startDate) return;
+    var dauDonDays = [];
+    for (var di = 0; di < OFFLINE_BONUS_DAUDON_DAYS; di++) dauDonDays.push(_obAddDays_(cfg.startDate, di));
+    var tier4Start = _obAddDays_(cfg.startDate, OFFLINE_BONUS_DAUDON_DAYS);
+    var tier4End = cfg.endDate || null;
+
+    var allYmds = {};
+    Object.keys(orderCount).forEach(function (k) { if (k.indexOf(sale + '|') === 0) allYmds[k.split('|')[1]] = 1; });
+    Object.keys(revenue).forEach(function (k) { if (k.indexOf(sale + '|') === 0) allYmds[k.split('|')[1]] = 1; });
+    dauDonDays.forEach(function (d) { allYmds[d] = 1; });
+
+    Object.keys(allYmds).sort().forEach(function (ymd) {
+      if (dateFrom && ymd < dateFrom) return;
+      if (dateTo && ymd > dateTo) return;
+      var oc = orderCount[sale + '|' + ymd] || 0;
+      var rv = revenue[sale + '|' + ymd] || 0;
+      var items = [];
+
+      if (dauDonDays.indexOf(ymd) !== -1) {
+        if (oc >= 1) items.push({ label: 'Đơn đầu', amt: OFFLINE_BONUS_DAUDON_AMT, loai: 'don' });
+      } else if (ymd >= tier4Start && (!tier4End || ymd <= tier4End)) {
+        for (var ti = 0; ti < OFFLINE_BONUS_DON_TIERS.length; ti++) {
+          if (oc >= OFFLINE_BONUS_DON_TIERS[ti].min) { items.push({ label: OFFLINE_BONUS_DON_TIERS[ti].label, amt: OFFLINE_BONUS_DON_TIERS[ti].amt, loai: 'don' }); break; }
+        }
+        for (var tj = 0; tj < OFFLINE_BONUS_DT_TIERS.length; tj++) {
+          if (rv >= OFFLINE_BONUS_DT_TIERS[tj].min) { items.push({ label: OFFLINE_BONUS_DT_TIERS[tj].label, amt: OFFLINE_BONUS_DT_TIERS[tj].amt, loai: 'doanhthu' }); break; }
+        }
+      }
+      if (items.length) {
+        var tong = items.reduce(function (s, it) { return s + it.amt; }, 0);
+        results.push({ sale: sale, ymd: ymd, soDon: oc, doanhThu: Math.round(rv), items: items, tongTien: tong });
+      }
+    });
+  });
+
+  // T21/T31: theo tung don rieng le, chi cho Nguoi tao dang trong thoi gian thu viec (tu ngay thu 4)
+  var t21t31 = [];
+  countedOrders.forEach(function (o) {
+    var cfg = trialBySale[o.nguoiTao];
+    if (!cfg || !cfg.startDate) return;
+    if (o.ymd < OFFLINE_BONUS_T21_FROM) return;
+    var tier4Start = _obAddDays_(cfg.startDate, OFFLINE_BONUS_DAUDON_DAYS);
+    if (o.ymd < tier4Start) return;
+    if (cfg.endDate && o.ymd > cfg.endDate) return;
+    var label = null, amt = 0;
+    if (o.giaTriDon >= OFFLINE_BONUS_T31_MIN) { label = 'T31'; amt = OFFLINE_BONUS_T31_AMT; }
+    else if (o.giaTriDon >= OFFLINE_BONUS_T21_MIN) { label = 'T21'; amt = OFFLINE_BONUS_T21_AMT; }
+    if (label) t21t31.push({ ymd: o.ymd, ma: o.ma, sale: o.nguoiTao, giaTriDon: o.giaTriDon, label: label, amt: amt });
+  });
+
+  var tongTheoSale = {};
+  results.forEach(function (r) { tongTheoSale[r.sale] = (tongTheoSale[r.sale] || 0) + r.tongTien; });
+  t21t31.forEach(function (o) { tongTheoSale[o.sale] = (tongTheoSale[o.sale] || 0) + o.amt; });
+
+  return {
+    results: results,
+    t21t31: t21t31,
+    tongTheoSale: Object.keys(tongTheoSale).map(function (s) { return { sale: s, tong: tongTheoSale[s] }; }),
+    countedOrdersCount: countedOrders.length,
+    excludedOrders: excludedOrders.filter(function (o) { return trialBySale[o.nguoiTao]; }),
+    trialList: trialList
+  };
+}

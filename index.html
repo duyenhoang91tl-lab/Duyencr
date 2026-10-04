@@ -1919,6 +1919,55 @@ async function _syncIndividualRatesFromGAS() {
 }
 setTimeout(_syncIndividualRatesFromGAS, 0);
 
+// ════════════════════════════════════════════════════════════════════
+//  BAO CAO H — Thuong offline (Sale thu viec)
+//  TRIAL_SALE_BONUS_CONFIG: [{ sale, startDate:'yyyy-mm-dd', endDate:'yyyy-mm-dd'|'', note }]
+//  CREATOR_NAME_ALIAS: { "<ten Nguoi tao ghi tren DT TỔNG>": "<ten Sale ban chuan>" } — dung khi
+//  2 he thong ghi ten khac nhau cho CUNG 1 nguoi (vd 'anhTP1995' -> 'anhtrinh1995').
+// ════════════════════════════════════════════════════════════════════
+let TRIAL_SALE_BONUS_CONFIG = (function(){
+  try { var v = loadLS('ome_trial_sale_bonus'); return Array.isArray(v) ? v : []; } catch(e){ return []; }
+})();
+let CREATOR_NAME_ALIAS = (function(){
+  try { var v = loadLS('ome_creator_name_alias'); return (v && typeof v === 'object') ? v : {}; } catch(e){ return {}; }
+})();
+
+async function _syncTrialBonusConfigFromGAS() {
+  if (!gsUrl) return;
+  try {
+    var r = await fetch(gsUrl + '?action=getSetting&key=trialSaleBonusConfig', {redirect:'follow'});
+    var data = await r.json();
+    if (data && data.value) {
+      var arr = JSON.parse(data.value);
+      if (Array.isArray(arr)) { TRIAL_SALE_BONUS_CONFIG = arr; saveLS('ome_trial_sale_bonus', TRIAL_SALE_BONUS_CONFIG); }
+    }
+    var r2 = await fetch(gsUrl + '?action=getSetting&key=creatorNameAlias', {redirect:'follow'});
+    var data2 = await r2.json();
+    if (data2 && data2.value) {
+      var obj = JSON.parse(data2.value);
+      if (obj && typeof obj === 'object') { CREATOR_NAME_ALIAS = obj; saveLS('ome_creator_name_alias', CREATOR_NAME_ALIAS); }
+    }
+    if (typeof _srState !== 'undefined' && _srState.sub === 'H') renderSalesReportTab();
+  } catch(e) { /* giu ban local neu loi mang/parse */ }
+}
+setTimeout(_syncTrialBonusConfigFromGAS, 0);
+
+async function saveTrialBonusConfig() {
+  saveLS('ome_trial_sale_bonus', TRIAL_SALE_BONUS_CONFIG);
+  saveLS('ome_creator_name_alias', CREATOR_NAME_ALIAS);
+  if (gsUrl) {
+    try {
+      await fetch(gsUrl, { method:'POST', redirect:'follow',
+        body: JSON.stringify({ action:'setSetting', key:'trialSaleBonusConfig', value: JSON.stringify(TRIAL_SALE_BONUS_CONFIG) }) });
+      await fetch(gsUrl, { method:'POST', redirect:'follow',
+        body: JSON.stringify({ action:'setSetting', key:'creatorNameAlias', value: JSON.stringify(CREATOR_NAME_ALIAS) }) });
+      toast('✓ Đã lưu và đồng bộ danh sách Sale thử việc lên Google Sheets');
+    } catch(e) { toast('✓ Đã lưu local — chưa đồng bộ GSheets: ' + e.message); }
+  } else {
+    toast('✓ Đã lưu (local)');
+  }
+}
+
 async function saveIndividualRates() {
   saveLS('ome_individual_rates', INDIVIDUAL_RATES);
   if (gsUrl) {
@@ -12040,14 +12089,18 @@ var _srState = {
   // G — Don bi loai (Huy/Tra lai/Hoan tien/That bai/Khieu nai) — dung chung filter dang voi A
   gDateField: 'ngayTao', gDateFrom: '', gDateTo: '', gDateQuick: 'custom', gSale: [], gKenh: [], gSanPham: '',
   dataG: null, gSaleSearch: '', gKenhSearch: '',
-  gSaleView: 'table', gKenhView: 'table', gMktView: 'table', gLyDoView: 'table'
+  gSaleView: 'table', gKenhView: 'table', gMktView: 'table', gLyDoView: 'table',
+  // H — Thuong offline (Sale thu viec) — xem buildOfflineBonusReport_ (gas_v13.js)
+  hDateFrom: '', hDateTo: '', hDateQuick: 'thisMonth', dataH: null, hConfigEditing: null
 };
-// Bao cao F mac dinh 'Tháng này' nhung fDateFrom/fDateTo truoc day de rong -> dropdown hien
-// 'Tháng này' trong khi request khong co ngay nao => backend cong DON CA TU TRUOC DEN NAY
-// (14,5 ty thay vi 5,1 ty cua thang nay). Dien san khoang ngay theo dropdown ngay khi tai trang.
+// Bao cao F/H mac dinh 'Tháng này' nhung fDateFrom/fDateTo (hay hDateFrom/hDateTo) truoc day de
+// rong -> dropdown hien 'Tháng này' trong khi request khong co ngay nao => backend cong DON CA
+// TU TRUOC DEN NAY. Dien san khoang ngay theo dropdown ngay khi tai trang.
 (function(){
   var r = (typeof _pkQuickRange === 'function') ? _pkQuickRange(_srState.fDateQuick) : null;
   if (r){ _srState.fDateFrom = r.from; _srState.fDateTo = r.to; }
+  var r2 = (typeof _pkQuickRange === 'function') ? _pkQuickRange(_srState.hDateQuick) : null;
+  if (r2){ _srState.hDateFrom = r2.from; _srState.hDateTo = r2.to; }
 })();
 
 function _srMoney(n){ return fmt(Math.round(n||0)) + '₫'; }
@@ -12439,6 +12492,14 @@ async function _srLoad(){
       dateFrom: _srState.gDateFrom, dateTo: _srState.gDateTo,
       dateField: _srState.gDateField, sale: (_srState.gSale||[]).join(','), kenh: (_srState.gKenh||[]).join(','),
       sanPham: _srState.gSanPham || ''
+    });
+  } else if (_srState.sub === 'H') {
+    if (_srState.hDateQuick && _srState.hDateQuick !== 'custom'){
+      var rH = _pkQuickRange(_srState.hDateQuick);
+      if (rH){ _srState.hDateFrom = rH.from; _srState.hDateTo = rH.to; }
+    }
+    _srState.dataH = await _srFetch('offlineBonusReport', {
+      dateFrom: _srState.hDateFrom, dateTo: _srState.hDateTo
     });
   }
   _srState.loading = false;
@@ -12848,6 +12909,7 @@ function renderSalesReportTab(){
     '<button class="btn '+(_srState.sub==='E'?'secondary':'sm')+'" onclick="_srSetSub(\'E\')">Báo cáo E — Hoa hồng nhân viên Base</button>' +
     '<button class="btn '+(_srState.sub==='F'?'secondary':'sm')+'" onclick="_srSetSub(\'F\')">Báo cáo F — KPI Sale</button>' +
     '<button class="btn '+(_srState.sub==='G'?'secondary':'sm')+'" onclick="_srSetSub(\'G\')">Báo cáo G — Đơn bị loại</button>' +
+    '<button class="btn '+(_srState.sub==='H'?'secondary':'sm')+'" onclick="_srSetSub(\'H\')">Báo cáo H — Thưởng offline</button>' +
     '</div>';
 
   if (_srState.sub === 'C') { renderSalesReportTabC_(wrap, subTabs); return; }
@@ -12855,6 +12917,7 @@ function renderSalesReportTab(){
   if (_srState.sub === 'E') { renderSalesReportTabE_(wrap, subTabs); return; }
   if (_srState.sub === 'F') { renderSalesReportTabF_(wrap, subTabs); return; }
   if (_srState.sub === 'G') { renderSalesReportTabG_(wrap, subTabs); return; }
+  if (_srState.sub === 'H') { renderSalesReportTabH_(wrap, subTabs); return; }
 
   var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
   filters += _quickRangeSelectHtml(_srState.dateQuick, "_srApplyQuickRange('dateQuick','dateFrom','dateTo',this.value)");
@@ -13883,6 +13946,141 @@ function renderSalesReportTabG_(wrap, subTabs){
     }
   }
   wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + filters + body;
+}
+
+// ── Báo cáo H: Thưởng offline (Sale thử việc) ──
+// Quy tắc đầy đủ + lý do thiết kế: xem comment đầu buildOfflineBonusReport_() trong gas_v13.js.
+function renderSalesReportTabH_(wrap, subTabs){
+  var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
+  filters += _quickRangeSelectHtml(_srState.hDateQuick, "_srApplyQuickRange('hDateQuick','hDateFrom','hDateTo',this.value)");
+  filters += '<input type="date" value="'+esc(_srState.hDateFrom)+'" onchange="_srSetField(\'hDateFrom\',this.value);_srState.hDateQuick=\'custom\'" title="Từ ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
+  filters += '<span style="color:var(--muted)">→</span>';
+  filters += '<input type="date" value="'+esc(_srState.hDateTo)+'" onchange="_srSetField(\'hDateTo\',this.value);_srState.hDateQuick=\'custom\'" title="Đến ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
+  filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
+  filters += '<button class="btn sm" onclick="openTrialBonusConfigModal_()">⚙️ Sale thử việc & tên thay thế</button>';
+  filters += '</div>';
+
+  var body;
+  if (_srState.loading) {
+    body = '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>';
+  } else {
+    var d = _srState.dataH;
+    if (!d) { body = _srNoDataHtml_(); }
+    else if (d.error) { body = '<div style="color:#dc2626;text-align:center;padding:30px">Lỗi: '+esc(d.error)+'</div>'; }
+    else {
+      var moneyFmt = function(n){ return (Number(n)||0).toLocaleString('vi-VN') + 'đ'; };
+      if (!(d.trialList||[]).length) {
+        body = '<div style="color:var(--muted);text-align:center;padding:30px">Chưa khai báo Sale thử việc nào — bấm "⚙️ Sale thử việc & tên thay thế" để thêm.</div>';
+      } else {
+        var html = '<div class="dash-section-title" style="margin-top:0">Tổng thưởng theo Sale</div>';
+        html += '<table class="dash-table"><thead><tr><th>Sale</th><th>Tổng thưởng</th></tr></thead><tbody>';
+        (d.tongTheoSale||[]).sort(function(a,b){ return b.tong-a.tong; }).forEach(function(x){
+          html += '<tr><td>'+esc(x.sale)+'</td><td>'+moneyFmt(x.tong)+'</td></tr>';
+        });
+        if (!(d.tongTheoSale||[]).length) html += '<tr><td colspan="2" style="text-align:center;color:var(--muted)">Chưa có ngày nào đạt mốc thưởng trong kỳ lọc</td></tr>';
+        html += '</tbody></table>';
+
+        html += '<div class="dash-section-title" style="margin-top:18px">Chi tiết theo ngày</div>';
+        html += '<table class="dash-table"><thead><tr><th>Ngày</th><th>Sale</th><th>Số đơn (người tạo)</th><th>Doanh thu ngày (đã chia đều)</th><th>Hạng mục đạt</th><th>Tiền thưởng</th></tr></thead><tbody>';
+        (d.results||[]).sort(function(a,b){ return a.ymd<b.ymd?-1:(a.ymd>b.ymd?1:0); }).forEach(function(r){
+          var items = r.items.map(function(it){ return it.label+' ('+moneyFmt(it.amt)+')'; }).join(', ');
+          html += '<tr><td>'+esc(r.ymd)+'</td><td>'+esc(r.sale)+'</td><td>'+fmt(r.soDon)+'</td><td>'+moneyFmt(r.doanhThu)+'</td><td>'+esc(items)+'</td><td>'+moneyFmt(r.tongTien)+'</td></tr>';
+        });
+        if (!(d.results||[]).length) html += '<tr><td colspan="6" style="text-align:center;color:var(--muted)">Không có ngày nào đạt mốc thưởng</td></tr>';
+        html += '</tbody></table>';
+
+        html += '<div class="dash-section-title" style="margin-top:18px">Thưởng đơn giá trị cao (T21/T31)</div>';
+        html += '<table class="dash-table"><thead><tr><th>Ngày</th><th>Mã bộ đếm (Base)</th><th>Sale</th><th>Giá trị đơn</th><th>Hạng mục</th><th>Tiền thưởng</th></tr></thead><tbody>';
+        (d.t21t31||[]).forEach(function(o){
+          html += '<tr><td>'+esc(o.ymd)+'</td><td>'+esc(o.ma)+'</td><td>'+esc(o.sale)+'</td><td>'+moneyFmt(o.giaTriDon)+'</td><td>'+esc(o.label)+'</td><td>'+moneyFmt(o.amt)+'</td></tr>';
+        });
+        if (!(d.t21t31||[]).length) html += '<tr><td colspan="6" style="text-align:center;color:var(--muted)">Không có đơn nào đạt mốc T21/T31 trong kỳ lọc</td></tr>';
+        html += '</tbody></table>';
+
+        html += '<details style="margin-top:18px"><summary class="dash-section-title" style="cursor:pointer;display:inline-block">Đơn bị loại (không tính — bấm để xem)</summary>';
+        html += '<div style="font-size:12px;color:var(--muted);margin:8px 0">Đơn không khớp được với "dữ liệu đơn" (cột ghi chú/mã bộ đếm) hoặc có trạng thái Đã hoàn/Đang hoàn, nên không tính vào thưởng — chỉ hiện đơn của các Sale thử việc đã khai báo.</div>';
+        html += '<table class="dash-table"><thead><tr><th>Ngày</th><th>Mã bộ đếm (Base)</th><th>Người tạo</th><th>Sale bán</th><th>Giá trị</th><th>Lý do loại</th></tr></thead><tbody>';
+        (d.excludedOrders||[]).forEach(function(o){
+          html += '<tr><td>'+esc(o.ymd)+'</td><td>'+esc(o.ma)+'</td><td>'+esc(o.nguoiTao)+'</td><td>'+esc(o.saleBan)+'</td><td>'+moneyFmt(o.giaTri)+'</td><td>'+esc(o.lyDo==='khong_khop_du_lieu_don'?'Không tìm thấy trong dữ liệu đơn (POS)':'Trạng thái Đã hoàn/Đang hoàn')+'</td></tr>';
+        });
+        if (!(d.excludedOrders||[]).length) html += '<tr><td colspan="6" style="text-align:center;color:var(--muted)">Không có đơn nào bị loại</td></tr>';
+        html += '</tbody></table></details>';
+        body = html;
+      }
+    }
+  }
+  wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + filters + body;
+}
+
+// ── Modal: khai báo Sale thử việc (ngày bắt đầu/kết thúc) + tên thay thế (Người tạo ↔ Sale bán) ──
+function openTrialBonusConfigModal_(){
+  _srState.hConfigEditing = {
+    trial: TRIAL_SALE_BONUS_CONFIG.map(function(t){ return Object.assign({}, t); }),
+    alias: Object.keys(CREATOR_NAME_ALIAS).map(function(k){ return { from:k, to:CREATOR_NAME_ALIAS[k] }; })
+  };
+  _srRenderTrialBonusConfigModal_();
+}
+function _srTrialEditSet(i, key, val){ _srState.hConfigEditing.trial[i][key] = val; }
+function _srTrialEditAdd(){ _srState.hConfigEditing.trial.push({ sale:'', startDate:'', endDate:'', note:'' }); _srRenderTrialBonusConfigModal_(); }
+function _srTrialEditRemove(i){ _srState.hConfigEditing.trial.splice(i,1); _srRenderTrialBonusConfigModal_(); }
+function _srAliasEditSet(i, key, val){ _srState.hConfigEditing.alias[i][key] = val; }
+function _srAliasEditAdd(){ _srState.hConfigEditing.alias.push({ from:'', to:'' }); _srRenderTrialBonusConfigModal_(); }
+function _srAliasEditRemove(i){ _srState.hConfigEditing.alias.splice(i,1); _srRenderTrialBonusConfigModal_(); }
+
+function _srRenderTrialBonusConfigModal_(){
+  var ed = _srState.hConfigEditing;
+  var rows = ed.trial.map(function(t,i){
+    return '<tr>' +
+      '<td><input type="text" value="'+esc(t.sale)+'" oninput="_srTrialEditSet('+i+',\'sale\',this.value)" placeholder="username CRM" style="width:120px;padding:4px 6px;border:1px solid var(--border);border-radius:4px"></td>' +
+      '<td><input type="date" value="'+esc(t.startDate)+'" onchange="_srTrialEditSet('+i+',\'startDate\',this.value)" style="padding:4px 6px;border:1px solid var(--border);border-radius:4px"></td>' +
+      '<td><input type="date" value="'+esc(t.endDate)+'" onchange="_srTrialEditSet('+i+',\'endDate\',this.value)" style="padding:4px 6px;border:1px solid var(--border);border-radius:4px" title="Để trống nếu còn đang thử việc"></td>' +
+      '<td><input type="text" value="'+esc(t.note||'')+'" oninput="_srTrialEditSet('+i+',\'note\',this.value)" placeholder="Ghi chú (vd Họ tên thật)" style="width:150px;padding:4px 6px;border:1px solid var(--border);border-radius:4px"></td>' +
+      '<td><button class="btn sm" onclick="_srTrialEditRemove('+i+')">🗑️</button></td>' +
+    '</tr>';
+  }).join('');
+  var aliasRows = ed.alias.map(function(a,i){
+    return '<tr>' +
+      '<td><input type="text" value="'+esc(a.from)+'" oninput="_srAliasEditSet('+i+',\'from\',this.value)" placeholder="Tên trên Người tạo" style="width:140px;padding:4px 6px;border:1px solid var(--border);border-radius:4px"></td>' +
+      '<td><input type="text" value="'+esc(a.to)+'" oninput="_srAliasEditSet('+i+',\'to\',this.value)" placeholder="Tên chuẩn (Sale bán)" style="width:140px;padding:4px 6px;border:1px solid var(--border);border-radius:4px"></td>' +
+      '<td><button class="btn sm" onclick="_srAliasEditRemove('+i+')">🗑️</button></td>' +
+    '</tr>';
+  }).join('');
+
+  var old = document.getElementById('trial-bonus-modal');
+  if (old) old.remove();
+  var el = document.createElement('div');
+  el.id = 'trial-bonus-modal';
+  el.className = 'modal-overlay open';
+  el.onclick = function(ev){ if (ev.target===el) closeTrialBonusConfigModal_(); };
+  el.innerHTML = '<div class="modal-box" style="max-width:720px;max-height:85vh;overflow-y:auto">' +
+      '<div class="modal-title">⚙️ Sale thử việc & tên thay thế</div>' +
+      '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Ngày bắt đầu = ngày bắt đầu chat khách (3 ngày đầu chỉ tính "Đơn đầu", từ ngày thứ 4 mới tính các mốc đơn/ngày và doanh thu/ngày). Để trống Ngày kết thúc nếu còn đang thử việc.</div>' +
+      '<table class="dash-table"><thead><tr><th>Sale (username CRM)</th><th>Ngày bắt đầu</th><th>Ngày kết thúc</th><th>Ghi chú</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>' +
+      '<button class="btn sm" style="margin-top:8px" onclick="_srTrialEditAdd()">+ Thêm Sale thử việc</button>' +
+      '<div class="dash-section-title" style="margin-top:18px">Tên thay thế (khi "Người tạo" trên Base ghi khác tên "Sale bán")</div>' +
+      '<table class="dash-table"><thead><tr><th>Tên trên "Người tạo"</th><th>Tên chuẩn (Sale bán)</th><th></th></tr></thead><tbody>'+aliasRows+'</tbody></table>' +
+      '<button class="btn sm" style="margin-top:8px" onclick="_srAliasEditAdd()">+ Thêm tên thay thế</button>' +
+      '<div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end">' +
+        '<button class="btn" onclick="closeTrialBonusConfigModal_()">Đóng</button>' +
+        '<button class="btn secondary" onclick="_srSaveTrialBonusConfig()">💾 Lưu & đồng bộ</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(el);
+}
+function closeTrialBonusConfigModal_(){
+  var el = document.getElementById('trial-bonus-modal');
+  if (el) el.remove();
+  _srState.hConfigEditing = null;
+}
+async function _srSaveTrialBonusConfig(){
+  var ed = _srState.hConfigEditing;
+  TRIAL_SALE_BONUS_CONFIG = ed.trial.filter(function(t){ return t.sale && t.startDate; });
+  var aliasObj = {};
+  ed.alias.forEach(function(a){ if (a.from && a.to) aliasObj[a.from] = a.to; });
+  CREATOR_NAME_ALIAS = aliasObj;
+  await saveTrialBonusConfig();
+  closeTrialBonusConfigModal_();
+  _srApply();
 }
 
 // ── Modal: Cài đặt KPI (Bậc 1/2/3, KPI Online, gán bậc từng người, KPI commit riêng) ──
