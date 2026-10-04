@@ -13972,6 +13972,11 @@ function _srRenderF_(d){
   var fTotalRevenue = rows.reduce(function(s,r){ return s+r.revenue; }, 0);
   var fTotalTarget = rows.reduce(function(s,r){ return s+(r.target||0); }, 0);
   var fTotalPct = fTotalTarget>0 ? Math.round(fTotalRevenue/fTotalTarget*1000)/10 : null;
+  // Commit riêng (SỬA 2026-10-04): chạy SONG SONG với KPI theo bậc, KHÔNG thay thế — tính tổng
+  // Commit/%HT Commit riêng trên CHÍNH tập "rows" đã lọc self-view ở trên (giống hệt cách
+  // fTotalRevenue/fTotalTarget đã làm), tránh lộ số của người khác khi 1 Sale thường tự xem mình.
+  var fTotalCommit = rows.reduce(function(s,r){ return s+(r.commit||0); }, 0);
+  var fTotalPctCommit = fTotalCommit>0 ? Math.round(fTotalRevenue/fTotalCommit*1000)/10 : null;
 
   var selfBanner = '';
   if (_fSelfView) {
@@ -13996,7 +14001,7 @@ function _srRenderF_(d){
     ' · <b>O1</b>='+_srMoney(tt.O1)+' · <b>O2</b>='+_srMoney(tt.O2)+' · <b>O3</b>='+_srMoney(tt.O3)+
     ' · <b>O</b> (không nhảy bậc)='+_srMoney(tt.O)+
     ' · <b>Thử việc</b>: TVF1='+_srMoney(tt.TVF1)+', TVF2='+_srMoney(tt.TVF2)+' (luôn đúng 1 tháng, tháng sau tự động lên F1)'+
-    ' · Ai có <b>KPI commit riêng</b> thì dùng số đó thay vì bậc.'+
+    ' · Ai có <b>Commit riêng</b> thì xem thêm 2 cột Commit/%HT Commit — chạy SONG SONG với KPI theo bậc (không thay thế).'+
     (!_fSelfView && noTierCount ? ' <b style="color:#9a3412">'+noTierCount+' Sale chưa được gán Bậc bắt đầu — bấm "🎯 Cài đặt KPI" để gán.</b>' : '')+
     '</div>';
 
@@ -14005,33 +14010,68 @@ function _srRenderF_(d){
     '<div class="kpi-card" style="border:1.5px solid var(--text)"><div class="kpi-val">'+_srMoney(fTotalRevenue)+'</div><div class="kpi-label"><b>'+(_fSelfView?'Doanh thu của bạn':'Tổng doanh thu')+'</b></div></div>'+
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(fTotalTarget)+'</div><div class="kpi-label">'+(_fSelfView?'KPI mục tiêu':'Tổng KPI mục tiêu')+'</div></div>'+
     '<div class="kpi-card" style="border:1.5px solid '+(fTotalPct!==null && fTotalPct>=100 ? '#16a34a' : '#dc2626')+'"><div class="kpi-val" style="color:'+(fTotalPct!==null && fTotalPct>=100 ? '#16a34a' : '#dc2626')+'">'+(fTotalPct===null?'—':fTotalPct+'%')+'</div><div class="kpi-label">% hoàn thành'+(_fSelfView?'':' chung')+'</div></div>'+
+    (fTotalCommit ? '<div class="kpi-card" style="border:1.5px solid '+(fTotalPctCommit!==null && fTotalPctCommit>=100 ? '#16a34a' : '#dc2626')+'"><div class="kpi-val" style="color:'+(fTotalPctCommit!==null && fTotalPctCommit>=100 ? '#16a34a' : '#dc2626')+'">'+(fTotalPctCommit===null?'—':fTotalPctCommit+'%')+'</div><div class="kpi-label">% hoàn thành Commit'+(_fSelfView?'':' chung')+'</div></div>' : '')+
     '</div>';
 
   html += '<div class="dash-section-title">Chi tiết theo Sale'+_srViewToggleHtml('fKpiView')+'</div>';
   html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.fSaleSearch)+'" oninput="_srState.fSaleSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
 
   if (_srState.fKpiView === 'table'){
-    html += '<table class="dash-table"><thead><tr>'+
+    html += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr>'+
       _srColTh_('fSale','name','Sale',_SR_COLTH_ROWSFN_['fSale'],_SR_COLTH_GETTER_['fSale'].name)+'<th>Nhóm</th><th>Bậc</th><th style="text-align:right">Doanh thu</th>'+
-      '<th style="text-align:right">KPI mục tiêu</th><th style="text-align:right">% hoàn thành</th><th>Kết quả</th></tr></thead><tbody>';
+      '<th style="text-align:right">KPI (bậc)</th><th style="text-align:right">%HT KPI</th>'+
+      '<th style="text-align:right">Commit riêng</th><th style="text-align:right">%HT Commit</th>'+
+      '<th>Kết quả</th></tr></thead><tbody>';
     rows.forEach(function(r){
       var tierLabel = r.tier ? esc(r.tier)+' <span style="font-size:10.5px;color:var(--muted)">('+_fTierStatusLabel_(r.tier)+')</span>' : '<span style="color:var(--hint)">chưa gán</span>';
       var pctColor = r.pct===null ? 'var(--muted)' : (r.pct>=100 ? '#16a34a' : '#dc2626');
       var resultTxt = r.pct===null ? '<span style="color:var(--hint)">chưa có mục tiêu</span>' : (r.pct>=100 ? '✓ Đạt' : '✗ Chưa đạt');
-      var srcNote = r.source==='override' ? ' <span title="Dùng KPI commit riêng, không theo bậc tự động" style="cursor:help">📌</span>' : '';
+      var srcNote = r.commit!==null && r.commit!==undefined ? ' <span title="Có đặt Commit riêng — xem cột Commit/%HT Commit, chạy song song với KPI theo bậc" style="cursor:help">📌</span>' : '';
+      var pctCColor = r.pctCommit===null ? 'var(--muted)' : (r.pctCommit>=100 ? '#16a34a' : '#dc2626');
       html += '<tr><td>'+esc(r.name)+'</td><td>'+esc(r.nhom)+'</td><td>'+tierLabel+srcNote+'</td>'+
         '<td style="text-align:right">'+_srMoney(r.revenue)+'</td>'+
         '<td style="text-align:right">'+(r.target?_srMoney(r.target):'<span style="color:var(--hint)">—</span>')+'</td>'+
         '<td style="text-align:right;font-weight:700;color:'+pctColor+'">'+(r.pct===null?'—':r.pct+'%')+'</td>'+
+        '<td style="text-align:right">'+(r.commit?_srMoney(r.commit):'<span style="color:var(--hint)">—</span>')+'</td>'+
+        '<td style="text-align:right;font-weight:700;color:'+pctCColor+'">'+(r.pctCommit===null?'—':r.pctCommit+'%')+'</td>'+
         '<td style="font-weight:600;color:'+pctColor+'">'+resultTxt+'</td></tr>';
     });
-    if (!rows.length) html += '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
-    else if (!_fSelfView) html += _srTotalRowHtml_(['Tổng','','', _srMoney(fTotalRevenue), _srMoney(fTotalTarget), '', '']);
-    html += '</tbody></table>';
+    if (!rows.length) html += '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+    else if (!_fSelfView) html += _srTotalRowHtml_(['Tổng','','', _srMoney(fTotalRevenue), _srMoney(fTotalTarget), '', _srMoney(fTotalCommit), '', '']);
+    html += '</tbody></table></div>';
   } else {
     html += '<div style="font-size:11px;color:var(--hint);margin-bottom:4px">Vẽ theo "Doanh thu"</div>';
     html += _srChartSvg(rows, 'name', 'revenue', _srState.fKpiView, true);
   }
+
+  // ── Lich su Bac theo thang (THEM 2026-10-04, yeu cau Duyen) — backend da tinh san timeline
+  // cho moi Sale (xem _computeSaleTierTimeline_/buildSaleKpiReport_ o gas_v13.js), o day chi ve
+  // thanh bang ngang: 1 cot/thang (d.trackedMonths, tu trackingStartMonth den thang hien tai),
+  // giong dung cach xem T9->T10->T11->... trong file Excel "Theo doi doanh thu". O doi bac so
+  // voi thang ngay truoc duoc to vang de de ra soat, giong Excel. Dung "rows" (da loc self-view
+  // o tren), KHONG dung d.rows truc tiep — tranh 1 Sale thuong tu xem minh lai thay lich su bac
+  // cua nguoi khac.
+  var months = d.trackedMonths || [];
+  var rowsWithTimeline = rows.filter(function(r){ return r.timeline; });
+  if (months.length && rowsWithTimeline.length){
+    function monthLabel(ym){ var p = String(ym).split('-'); return p[1]+'/'+p[0]; }
+    html += '<div class="dash-section-title" style="margin-top:16px">📅 Lịch sử Bậc theo tháng'+
+      '<span style="font-size:11px;color:var(--hint);font-weight:400"> — ô tô vàng = tháng có đổi bậc so với tháng trước</span></div>';
+    html += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Sale</th>'+
+      months.map(function(ym){ return '<th style="text-align:center">'+esc(monthLabel(ym))+'</th>'; }).join('')+
+      '</tr></thead><tbody>';
+    rowsWithTimeline.forEach(function(r){
+      html += '<tr><td>'+esc(r.name)+'</td>';
+      months.forEach(function(ym, i){
+        var tier = r.timeline[ym] || '';
+        var changed = i > 0 && tier && tier !== (r.timeline[months[i-1]] || '');
+        html += '<td style="text-align:center'+(changed ? ';background:#fef9c3;font-weight:700' : '')+'">'+(tier ? esc(tier) : '<span style="color:var(--hint)">—</span>')+'</td>';
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+
   return html;
 }
 
@@ -14150,7 +14190,7 @@ function _srKpiConfigRowsHtml_(q){
       '</select>';
     html += '<tr><td style="padding:3px 8px 3px 0">'+esc(r.name)+'</td>'+
       '<td>'+tierCell+'</td>'+
-      '<td><input type="number" min="0" step="1" placeholder="để trống = theo bậc" value="'+esc(r.override)+'" oninput="_srKpiEditSetOverride('+i+',this.value)" style="width:100%;padding:3px 6px;border:1px solid var(--border);border-radius:5px;background:var(--surface)"> <span style="color:var(--hint);font-size:10.5px">triệu</span></td></tr>';
+      '<td><input type="number" min="0" step="1" placeholder="để trống = không đặt" value="'+esc(r.override)+'" oninput="_srKpiEditSetOverride('+i+',this.value)" style="width:100%;padding:3px 6px;border:1px solid var(--border);border-radius:5px;background:var(--surface)"> <span style="color:var(--hint);font-size:10.5px">triệu</span></td></tr>';
   });
   html += '</tbody></table>';
   return html;
@@ -14169,7 +14209,7 @@ function _srRenderKpiConfigModal_(){
   }
   el.innerHTML = '<div class="modal-box" style="max-width:680px;max-height:85vh;overflow-y:auto">'+
     '<div class="modal-title">🎯 Cài đặt KPI theo Bậc</div>'+
-    '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Mỗi Sale có 1 <b>Bậc bắt đầu</b> tính từ tháng bắt đầu theo dõi bên dưới; bậc các tháng sau <b>tự tính</b> theo quy tắc: 3 tháng liên tiếp TB ≥125% KPI bậc hiện tại (không tháng nào &lt;70%) → lên 1 bậc (tối đa bậc 3); 3 tháng liên tiếp TB &lt;80% KPI bậc hiện tại → xuống 1 bậc. Bậc <b>O</b> không bao giờ đổi. Bậc <b>Thử việc</b> (TVF1/TVF2) luôn đúng 1 tháng rồi tự động lên F1. Nhập số theo <b>triệu đồng</b> cho gọn.</div>'+
+    '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Mỗi Sale có 1 <b>Bậc bắt đầu</b> tính từ tháng bắt đầu theo dõi bên dưới; bậc các tháng sau <b>tự tính</b> theo quy tắc: 3 tháng liên tiếp TB ≥125% KPI bậc hiện tại (không tháng nào &lt;70%) → lên 1 bậc (tối đa bậc 3); 3 tháng liên tiếp TB &lt;80% KPI bậc hiện tại → xuống 1 bậc. Bậc <b>O</b> không bao giờ đổi. Bậc <b>Thử việc</b> (TVF1/TVF2) luôn đúng 1 tháng rồi tự động lên F1. <b>Commit riêng</b> (nếu đặt) chạy SONG SONG với KPI theo bậc — có cột %HT riêng, không thay thế bậc. Nhập số theo <b>triệu đồng</b> cho gọn.</div>'+
     '<div style="margin-bottom:10px"><label style="font-size:11px;color:var(--muted);display:block">Tháng bắt đầu theo dõi</label>'+
       '<input type="month" value="'+esc(ed.trackingStartMonth)+'" onchange="_srKpiEditSetStartMonth(this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"></div>'+
     '<div style="margin-bottom:6px"><div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:3px">KPI theo Bậc — Văn phòng (F)</div>'+
