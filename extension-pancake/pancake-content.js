@@ -382,11 +382,8 @@
               <div id="pk-ctkm-result"></div>
             </div>
             <div id="pk-img-body" style="display:none">
-              <div id="pk-img-row">
-                <input type="text" id="pk-img-q" placeholder="Tên sản phẩm hoặc tên thương mại..." />
-                <button id="pk-img-btn">Tìm</button>
-              </div>
-              <div id="pk-img-result"></div>
+              <input type="text" id="pk-img-q" placeholder="Gõ tên sản phẩm (VD: tỷ hưu, nhẫn, charm) — có thể bỏ trống các mục dưới" autocomplete="off" />
+              <div id="pk-img-dyn"></div>
             </div>
           </div>
         </div>
@@ -590,6 +587,7 @@
       panelEl.querySelector("#pk-img-body").style.display = v === "img" ? "block" : "none";
       if (v === "rem") loadReminders_();
       if (v === "ctkm" && !_ctkmLoadedOnce) { _ctkmLoadedOnce = true; doCtkmSearch_(); } // mo tab la nap luon toan bo CTKM, khoi phai go gi cung thay ngay
+      if (v === "img") initImgSearch_();
     });
     panelEl.querySelector("#pk-rem-refresh").addEventListener("click", () => loadReminders_());
     panelEl.querySelector("#pk-price-btn").addEventListener("click", doPriceSearch_);
@@ -599,10 +597,6 @@
     panelEl.querySelector("#pk-ctkm-btn").addEventListener("click", doCtkmSearch_);
     panelEl.querySelector("#pk-ctkm-q").addEventListener("keydown", (e) => {
       if (e.key === "Enter") doCtkmSearch_();
-    });
-    panelEl.querySelector("#pk-img-btn").addEventListener("click", doProductImageSearch_);
-    panelEl.querySelector("#pk-img-q").addEventListener("keydown", (e) => {
-      if (e.key === "Enter") doProductImageSearch_();
     });
     panelEl.querySelectorAll('.pk-price-mode-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -1885,38 +1879,173 @@
     }).join('');
   }
 
-  // ── TÌM ẢNH SẢN PHẨM (cột "Link ảnh sản phẩm" trong DANH_MUC) — chỉ khớp theo Ten SP/Ten
-  // thương mại. Ưu tiên hiện ẢNH THẬT (đọc được từ Drive); nếu không đọc được (chưa chia sẻ/quá
-  // 3MB/link hỏng) thì vẫn hiện LINK để bấm mở xem trực tiếp, không để trắng tay.
-  function doProductImageSearch_() {
-    const q = (panelEl.querySelector('#pk-img-q').value || '').trim();
-    const box = panelEl.querySelector('#pk-img-result');
-    if (!q) { box.innerHTML = '<div class="pk-price-loading">Gõ tên sản phẩm hoặc tên thương mại rồi bấm Tìm.</div>'; return; }
-    box.innerHTML = '<div class="pk-price-loading">Đang tìm ảnh...</div>';
-    safeSendMessage_({ type: 'GET_PRODUCT_IMAGE', payload: { q } }, (resp) => {
-      if (!resp?.ok) { box.innerHTML = `<div class="pk-price-loading">${escapeHtml(resp?.error || 'Không tìm thấy.')}</div>`; return; }
-      renderProductImage_(resp.data);
+  // ── TÌM ẢNH SẢN PHẨM (cột "Link ảnh sản phẩm" trong DANH_MUC) — dùng LẠI y hệt logic thu hẹp
+  // dần của "Soạn đơn" (Nhóm SP -> Tên SP -> Kiểu/Size -> Chất liệu, đều CÓ THỂ BỎ TRỐNG) để tìm
+  // đúng dòng/biến thể trước khi lấy ảnh — thay vì chỉ gõ tên rồi đoán dòng khớp nhất như trước
+  // (dễ nhầm khi 1 sản phẩm có nhiều Size/Chất liệu, mỗi biến thể có thể có ảnh khác nhau).
+  // Theo yêu cầu Duyên 30/09/2026.
+  let _imgFlatItems = null;   // null = chưa tải; [] = tải rồi nhưng rỗng
+  let _imgFlatLoading = false;
+  let _imgLiveTimer = null;
+  const _imgBldBlank_ = () => ({ q: '', nhom: '', ten: '', size: '', cl: '', mau: '' });
+  let _imgBld = _imgBldBlank_();
+
+  function initImgSearch_() {
+    const host = panelEl.querySelector('#pk-img-body');
+    if (!host.dataset.ready) {
+      host.dataset.ready = '1';
+      host.querySelector('#pk-img-q').addEventListener('input', (e) => {
+        _imgBld = Object.assign(_imgBldBlank_(), { q: e.target.value }); // đổi từ khoá → chọn lại từ đầu
+        clearTimeout(_imgLiveTimer);
+        _imgLiveTimer = setTimeout(renderImgDyn_, 120);
+      });
+    }
+    if (_imgFlatItems === null && !_imgFlatLoading) loadImgFlat_();
+    renderImgDyn_();
+  }
+
+  function loadImgFlat_() {
+    _imgFlatLoading = true;
+    const dyn = panelEl.querySelector('#pk-img-dyn');
+    if (dyn) dyn.innerHTML = '<div class="pk-price-loading">Đang tải danh mục sản phẩm...</div>';
+    safeSendMessage_({ type: 'GET_PRODUCT_IMAGE_FLAT' }, (resp) => {
+      _imgFlatLoading = false;
+      if (resp?.ok) {
+        _imgFlatItems = resp.data.items || [];
+      } else {
+        _imgFlatItems = [];
+        if (dyn) dyn.innerHTML = `<div class="pk-price-loading">Lỗi: ${escapeHtml(resp?.error || 'không tải được danh mục')}</div>`;
+        return;
+      }
+      renderImgDyn_();
     });
   }
 
-  function renderProductImage_(data) {
-    const box = panelEl.querySelector('#pk-img-result');
-    const nameHtml = `<div class="pk-ctkm-title">${escapeHtml(data.name || '')}</div>`;
-    if (data.image && data.image.base64) {
-      const src = `data:${data.image.mimeType};base64,${data.image.base64}`;
-      box.innerHTML = nameHtml +
-        `<img src="${src}" style="max-width:100%;border-radius:8px;border:1px solid var(--pk-border,#e5e7eb);margin-top:6px" />` +
-        (data.imageLink ? `<div style="margin-top:6px"><a href="${escapeHtml(data.imageLink)}" target="_blank" class="pk-btn-outline" style="display:inline-block;text-decoration:none">🔗 Mở trên Drive</a></div>` : '');
+  function renderImgDyn_() {
+    const dyn = panelEl.querySelector('#pk-img-dyn');
+    if (!dyn || _imgFlatLoading) return; // dang co thong bao loading roi, khong ghi de
+    const items = _imgFlatItems || [];
+    if (!items.length) { dyn.innerHTML = _imgFlatItems === null ? '' : '<div class="pk-price-loading">Không tải được danh mục sản phẩm (kiểm tra lại cột Link ảnh trong DANH_MUC).</div>'; return; }
+
+    const words = _fold_(_imgBld.q).split(' ').filter(Boolean);
+    const pool0 = words.length ? items.filter((it) => { const h = _fold_(it.n + ' ' + it.t + ' ' + it.m); return words.every((w) => h.indexOf(w) !== -1); }) : items;
+    if (!pool0.length) { dyn.innerHTML = '<div class="pk-price-loading">Không tìm thấy sản phẩm nào khớp.</div>'; return; }
+
+    const opt = (v, label, sel) => `<option value="${escapeHtml(v)}"${sel ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+    const row = (label, inner) => `<div class="pk-builder-row"><label>${label}</label>${inner}</div>`;
+    const searchInput = (id, values, curVal, placeholder) =>
+      `<input type="text" id="${id}" list="${id}-dl" autocomplete="off" placeholder="${escapeHtml(placeholder)}" value="${escapeHtml(curVal || '')}" />` +
+      `<datalist id="${id}-dl">${values.map((v) => `<option value="${escapeHtml(v)}"></option>`).join('')}</datalist>`;
+    let html = '';
+
+    // 1) Nhóm sản phẩm (bỏ trống được)
+    const groups = [...new Set(pool0.map((it) => it.n).filter(Boolean))].sort(_vnSort_);
+    if (_imgBld.nhom && groups.indexOf(_imgBld.nhom) === -1) _imgBld.nhom = '';
+    if (groups.length === 1 && !_imgBld.nhom) _imgBld.nhom = groups[0];
+    if (groups.length) html += row(`Nhóm sản phẩm (${groups.length})`, searchInput('pkimg-nhom', groups, _imgBld.nhom, '— Tất cả nhóm — (gõ để tìm hoặc bấm chọn)'));
+    const pool1 = _imgBld.nhom ? pool0.filter((it) => it.n === _imgBld.nhom) : pool0;
+
+    // 2) Tên sản phẩm / tên thương mại (bỏ trống được)
+    if (!words.length && !_imgBld.nhom) {
+      dyn.innerHTML = html + '<div class="pk-price-loading">Gõ tên ở ô trên hoặc chọn Nhóm sản phẩm để hiện danh sách tên.</div>';
+      _bindImgBuilder_(dyn); return;
+    }
+    const nameMap = {};
+    pool1.forEach((it) => _itemNames_(it).forEach((nm) => { const f = _fold_(nm); if (!nameMap[f]) nameMap[f] = nm; }));
+    const names = Object.keys(nameMap).map((f) => nameMap[f]).sort(_vnSort_);
+    if (_imgBld.ten && !nameMap[_fold_(_imgBld.ten)]) _imgBld.ten = '';
+    if (!_imgBld.ten && names.length === 1) _imgBld.ten = names[0];
+    html += row(`Tên sản phẩm (${names.length})`, searchInput('pkimg-ten', names, _imgBld.ten, '— Tất cả — (gõ để tìm hoặc bấm chọn)'));
+
+    let candidates = pool1;
+    if (_imgBld.ten) {
+      const tf = _fold_(_imgBld.ten);
+      const poolT = pool1.filter((it) => _itemNames_(it).some((nm) => _fold_(nm) === tf));
+
+      // 3) Kiểu / Size (bỏ trống được)
+      const sizeVal = (it) => it.s || '__def__';
+      const sizes = [...new Set(poolT.map(sizeVal))].sort(_vnSort_);
+      if (_imgBld.size && sizes.indexOf(_imgBld.size) === -1) _imgBld.size = '';
+      if (!_imgBld.size && sizes.length === 1) _imgBld.size = sizes[0];
+      if (sizes.length > 1 || (sizes.length === 1 && sizes[0] !== '__def__')) {
+        html += row(`Kiểu / Size (${sizes.length})`, `<select id="pkimg-size"><option value="">— Tất cả — (bỏ trống nếu không chắc)</option>${sizes.map((v) => opt(v, v === '__def__' ? '(mặc định)' : v, v === _imgBld.size)).join('')}</select>`);
+      }
+      const poolS = _imgBld.size ? poolT.filter((it) => sizeVal(it) === _imgBld.size) : poolT;
+
+      // 4) Chất liệu (bỏ trống được)
+      const clVal = (it) => it.c || '__none__';
+      const cls = [...new Set(poolS.map(clVal))].sort(_vnSort_);
+      if (_imgBld.cl && cls.indexOf(_imgBld.cl) === -1) _imgBld.cl = '';
+      if (!_imgBld.cl && cls.length === 1) _imgBld.cl = cls[0];
+      if (cls.length > 1 || (cls.length === 1 && cls[0] !== '__none__')) {
+        html += row(`Chất liệu (${cls.length})`, `<select id="pkimg-cl"><option value="">— Tất cả — (bỏ trống nếu không chắc)</option>${cls.map((v) => opt(v, v === '__none__' ? '(không ghi)' : v, v === _imgBld.cl)).join('')}</select>`);
+      }
+      const poolCl = _imgBld.cl ? poolS.filter((it) => clVal(it) === _imgBld.cl) : poolS;
+
+      // 5) Màu sắc (CHỈ hiện nếu DANH_MUC có cột "Màu sắc" — không phải hệ thống tự nhận diện
+      // màu từ ảnh, chỉ đọc đúng dữ liệu chữ trong sheet, xem _productImgCols_ bên gas_v13.js)
+      const mauVal = (it) => it.mau || '__none__';
+      const maus = [...new Set(poolCl.map(mauVal))].filter(Boolean).sort(_vnSort_);
+      if (_imgBld.mau && maus.indexOf(_imgBld.mau) === -1) _imgBld.mau = '';
+      if (!_imgBld.mau && maus.length === 1) _imgBld.mau = maus[0];
+      if (maus.length > 1 || (maus.length === 1 && maus[0] !== '__none__')) {
+        html += row(`Màu sắc (${maus.length})`, `<select id="pkimg-mau"><option value="">— Tất cả — (bỏ trống nếu không chắc)</option>${maus.map((v) => opt(v, v === '__none__' ? '(không ghi)' : v, v === _imgBld.mau)).join('')}</select>`);
+      }
+      candidates = _imgBld.mau ? poolCl.filter((it) => mauVal(it) === _imgBld.mau) : poolCl;
+    } else {
+      candidates = null; // chua chon ten -> chua hien anh gi, tranh liet ke qua nhieu
+    }
+
+    if (candidates && candidates.length) {
+      // Loai trung link anh (nhieu dong co the cung 1 anh) de khong hien trung lap.
+      const seen = new Set();
+      const uniq = candidates.filter((it) => { const key = it.img || ''; if (key && seen.has(key)) return false; if (key) seen.add(key); return true; });
+      const toShow = uniq.slice(0, 6);
+      // 6 ảnh này LÀ KẾT QUẢ CUỐI sau khi đã áp hết các bộ lọc đang chọn ở trên (kể cả khi 1 vài
+      // mục cố ý để trống) — không phải bước trung gian còn lọc tiếp ngầm phía sau.
+      html += `<div id="pkimg-results">` + toShow.map((it, i) => {
+        const label = [it.t || it.m, it.s, it.c, it.mau].filter(Boolean).join(' · ');
+        return `<div class="pk-price-item">
+          <div class="pk-ctkm-title">${escapeHtml(label)}</div>
+          <div id="pkimg-slot-${i}">${it.img ? '<div class="pk-price-loading">Đang tải ảnh...</div>' : '<div class="pk-price-loading">Sản phẩm này chưa có link ảnh.</div>'}</div>
+        </div>`;
+      }).join('') + '</div>';
+      if (uniq.length > toShow.length) html += `<div class="pk-price-loading">Còn ${uniq.length - toShow.length} biến thể khác chưa hiện — chọn thêm Kiểu/Size/Chất liệu/Màu sắc ở trên để thu hẹp xuống dưới 6.</div>`;
+      dyn.innerHTML = html;
+      _bindImgBuilder_(dyn);
+      toShow.forEach((it, i) => { if (it.img) _loadImgSlot_(i, it.img); });
       return;
     }
-    if (data.imageLink) {
-      // Khong doc duoc anh tu Drive (chua chia se/qua 3MB/link hong) — van dua link de CS tu mo.
-      box.innerHTML = nameHtml +
-        `<div class="pk-price-loading">Không hiển thị được ảnh trực tiếp (có thể file chưa chia sẻ hoặc quá lớn) — bấm link dưới để xem:</div>` +
-        `<div style="margin-top:6px"><a href="${escapeHtml(data.imageLink)}" target="_blank" class="pk-btn-outline" style="display:inline-block;text-decoration:none">🔗 Mở ảnh</a></div>`;
-      return;
-    }
-    box.innerHTML = nameHtml + `<div class="pk-price-loading">${escapeHtml(data.note || 'Sản phẩm này chưa có link ảnh trong DANH_MUC.')}</div>`;
+
+    dyn.innerHTML = html;
+    _bindImgBuilder_(dyn);
+  }
+
+  function _loadImgSlot_(i, link) {
+    safeSendMessage_({ type: 'GET_DRIVE_IMAGE', payload: { link } }, (resp) => {
+      const slot = panelEl.querySelector(`#pkimg-slot-${i}`);
+      if (!slot) return;
+      if (!resp?.ok) { slot.innerHTML = `<div class="pk-price-loading">Lỗi: ${escapeHtml(resp?.error || 'không đọc được ảnh')}</div>`; return; }
+      const data = resp.data;
+      if (data.image && data.image.base64) {
+        slot.innerHTML = `<img src="data:${data.image.mimeType};base64,${data.image.base64}" style="max-width:100%;border-radius:8px;border:1px solid var(--pk-border,#e5e7eb)" />` +
+          `<div style="margin-top:4px"><a href="${escapeHtml(data.imageLink)}" target="_blank" class="pk-btn-outline" style="display:inline-block;text-decoration:none;font-size:11px">🔗 Mở trên Drive</a></div>`;
+      } else if (data.imageLink) {
+        slot.innerHTML = `<div class="pk-price-loading">Không hiển thị được ảnh trực tiếp (file chưa chia sẻ hoặc quá lớn):</div>` +
+          `<a href="${escapeHtml(data.imageLink)}" target="_blank" class="pk-btn-outline" style="display:inline-block;text-decoration:none;font-size:11px">🔗 Mở ảnh</a>`;
+      } else {
+        slot.innerHTML = '<div class="pk-price-loading">Chưa có link ảnh.</div>';
+      }
+    });
+  }
+
+  function _bindImgBuilder_(dyn) {
+    const on = (id, fn) => { const el = dyn.querySelector('#' + id); if (el) el.addEventListener('change', fn); };
+    on('pkimg-nhom', (e) => { _imgBld.nhom = e.target.value; _imgBld.ten = ''; _imgBld.size = ''; _imgBld.cl = ''; _imgBld.mau = ''; renderImgDyn_(); });
+    on('pkimg-ten', (e) => { _imgBld.ten = e.target.value; _imgBld.size = ''; _imgBld.cl = ''; _imgBld.mau = ''; renderImgDyn_(); });
+    on('pkimg-size', (e) => { _imgBld.size = e.target.value; _imgBld.cl = ''; _imgBld.mau = ''; renderImgDyn_(); });
+    on('pkimg-cl', (e) => { _imgBld.cl = e.target.value; _imgBld.mau = ''; renderImgDyn_(); });
+    on('pkimg-mau', (e) => { _imgBld.mau = e.target.value; renderImgDyn_(); });
   }
 
   function _parsePriceNum_(v) {

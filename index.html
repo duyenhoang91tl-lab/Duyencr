@@ -13858,7 +13858,7 @@ function _srRenderE_(d){
     bonusRows.forEach(function(s, i){
       var rid = 'bn_'+i;
       var expanded = _srState.bonusExpandedRow === rid;
-      html += '<tr><td>'+esc(s.name)+(SALE_CHANNELS[s.name] ? ' <span style="font-size:10px;color:var(--muted)">('+(SALE_CHANNELS[s.name]==='online'?'Online':'Offline')+')</span>' : ' <span style="font-size:10px;color:var(--red)">(chưa phân loại)</span>')+'</td>'+
+      html += '<tr><td>'+esc(s.name)+(SALE_CHANNELS[s.name] ? ' <span style="font-size:10px;color:var(--muted)">('+(SALE_CHANNELS[s.name]==='online'?'Online':(SALE_CHANNELS[s.name]==='probation'?'Thử việc':'Offline'))+')</span>' : ' <span style="font-size:10px;color:var(--red)">(chưa phân loại)</span>')+'</td>'+
         '<td style="text-align:right">'+fmt(s.items.length)+'</td>'+
         '<td style="text-align:right"><b>'+_srMoney(s.total)+'</b></td>'+
         '<td><button class="btn sm" onclick="_srState.bonusExpandedRow='+(expanded?"''":"'"+rid+"'")+';renderSalesReportTab()">'+(expanded?'Ẩn':'Chi tiết')+'</button></td></tr>';
@@ -14225,6 +14225,7 @@ function _renderSaleChannelsModal(){
       '<option value=""'+(cur===''?' selected':'')+'>— Chưa phân loại —</option>'+
       '<option value="online"'+(cur==='online'?' selected':'')+'>🌐 Online</option>'+
       '<option value="offline"'+(cur==='offline'?' selected':'')+'>🏬 Offline</option>'+
+      '<option value="probation"'+(cur==='probation'?' selected':'')+'>🌱 Thử việc (TV)</option>'+
       '</select></td></tr>';
   });
   if (!filtered.length) html += '<tr><td colspan="2" style="text-align:center;color:var(--muted);padding:14px">Không có tên nào khớp</td></tr>';
@@ -15706,7 +15707,7 @@ function _acctDetailHtml(a){
     // TAI KHOAN nay CHUA co ten nao xuat hien trong SALE_CHANNELS, vd nhan vien moi chua ban gi).
     var stNames = _acctNamesOf(a);
     var stCur = stNames.map(function(n){ return SALE_CHANNELS[n]; }).filter(Boolean)[0] || a.saleType || '';
-    var stOpts = [['','— Chưa gán —'],['online','Sale online'],['offline','Sale offline']].map(function(o){
+    var stOpts = [['','— Chưa gán —'],['online','Sale online'],['offline','Sale offline'],['probation','Sale thử việc (TV)']].map(function(o){
       return '<option value="'+o[0]+'"'+(stCur===o[0]?' selected':'')+'>'+o[1]+'</option>';
     }).join('');
     saleTypeHtml = '<div style="margin-top:10px;border-top:1px dashed var(--border);padding-top:9px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">'+
