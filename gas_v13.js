@@ -2764,12 +2764,15 @@ function buildSaleKpiReport_(filters) {
       target: target, source: source, pct: pct, passed: (pct !== null) ? pct >= 100 : null,
       timeline: timeline };
   });
-  var rank = { 'Văn phòng': 0, 'Online': 1 };
+  // Xep theo % THUC DAT tren KPI, TU TREN XUONG DUOI (cao nhat len dau) — theo yeu cau Duyen
+  // 2026-10 ("tinh ty le thuc dat tren KPI... xep tu tren xuong duoi"), thay cho kieu xep theo
+  // nhom/bac truoc day. Ai chua co bac/muc tieu (pct = null) xep xuong cuoi (theo doanh thu),
+  // khong lam xao tron thu hang nhung nguoi da co % that su.
   rows.sort(function(x, y) {
-    var rx = rank.hasOwnProperty(x.nhom) ? rank[x.nhom] : 2, ry = rank.hasOwnProperty(y.nhom) ? rank[y.nhom] : 2;
-    if (rx !== ry) return rx - ry;
-    if (x.tier !== y.tier) return (x.tier || '~').localeCompare(y.tier || '~');
-    return y.revenue - x.revenue;
+    if (x.pct === null && y.pct === null) return y.revenue - x.revenue;
+    if (x.pct === null) return 1;
+    if (y.pct === null) return -1;
+    return y.pct - x.pct;
   });
 
   var totalRevenue = rows.reduce(function(s, r) { return s + r.revenue; }, 0);
