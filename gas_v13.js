@@ -1285,7 +1285,7 @@ function doGet(e) {
                  sale: splitG_(pG.sale), nguon: splitG_(pG.nguon), marketer: splitG_(pG.marketer),
                  sanPham: pG.sanPham || '' };
       var cacheG = CacheService.getScriptCache();
-      var cKeyG = 'salesG_pos2_' + JSON.stringify(fG);
+      var cKeyG = 'salesG_pos3_' + JSON.stringify(fG);
       var cachedG = cacheG.get(cKeyG);
       if (cachedG) { try { return jsonOut_(JSON.parse(cachedG)); } catch(ec) {} }
       var resG = buildFailedOrderReport_(fG);
@@ -1301,7 +1301,7 @@ function doGet(e) {
                  careStatus: splitCSV_(pB.careStatus), khStatus: splitCSV_(pB.khStatus),
                  zaloStatus: splitCSV_(pB.zaloStatus), nickZalo: pB.nickZalo || '' };
       var cacheB = CacheService.getScriptCache();
-      var cKeyB = 'salesB2_' + JSON.stringify(fB);
+      var cKeyB = 'salesB3_' + JSON.stringify(fB);
       var cachedB = cacheB.get(cKeyB);
       if (cachedB) { try { return jsonOut_(JSON.parse(cachedB)); } catch(ec) {} }
       var resB = buildSalesReportB_(fB);
@@ -1352,7 +1352,7 @@ function doGet(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.6-pos-ghep-base' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.7-pos-dong-thieu-ngay' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -2132,7 +2132,7 @@ function getDonOrderCountByPhone_() {
 // dong bo rieng), nen cache ngan giup Bao cao B/thay doi bo loc khong phai doc lai toan bo
 // sheet moi lan bam Loc — tang toc ro ret ma van cap nhat du lieu moi trong vong <=90s.
 function readDonChiTiet_() {
-  var cached = _cacheGetBig_('donChiTiet_v3'); // v3: them field ghiChu (cot Q)
+  var cached = _cacheGetBig_('donChiTiet_v4'); // v4: giu dong thieu ngay/khach co ma bo dem o cot Q + ke thua ngay
   if (cached) { try { return JSON.parse(cached); } catch (eParse) {} }
 
   var ss = getDTSS_();
@@ -2142,9 +2142,14 @@ function readDonChiTiet_() {
   if (last < 2) return [];
   var vals = sh.getRange(2, 1, last - 1, Math.min(DON_CHITIET_WIDTH, sh.getMaxColumns())).getValues();
   var out = [];
+  var lastNgayTaoDon = ''; // ngay cua dong co ngay gan nhat phia tren — de dong thieu ngay van loc duoc theo ky
   for (var i = 0; i < vals.length; i++) {
     var r = vals[i];
-    if (!r[1] && !r[3]) continue; // dong rong: khong co ngay va khong co khach
+    // SUA 2026-10-04 theo yeu cau Duyen: dong KHONG co ngay va KHONG co ten khach van la don THAT neu cot Q
+    // "Ghi chú đơn" co ma bo dem (= ma bo dem cot U cua don goc o DT TONG: don len DT TONG truoc, khong bi
+    // huy moi len Pos kem ghi chu; don Pos huy thi Base huy theo) -> PHAI tinh. Dong khong ngay, khong khach,
+    // khong ma o Q (dong rong, dong "Tong" cuoi sheet, dong noi tiep khong phai don) thi bo.
+    if (!r[1] && !r[3] && !(r[DON_COL_GHICHU] && String(r[DON_COL_GHICHU]).trim())) continue;
     var nguonDon = r[7] ? String(r[7]).trim() : '';
     // SUA 2026-09-30: TRUOC DAY loai don nguon "Bảo hành" khoi Bao cao B/C — nhung doi chieu
     // voi bang ke toan (Duyen xac nhan), doanh thu don bao hanh CO duoc tinh (vd nguyenngo1988
@@ -2166,6 +2171,10 @@ function readDonChiTiet_() {
       var pDon = _vnYmdParts_(ngayRaw);
       if (pDon) ngayTaoDon = String(pDon.d).padStart(2, '0') + '/' + String(pDon.mo).padStart(2, '0') + '/' + pDon.y;
     }
+    // Dong thieu ngay -> ke thua ngay cua dong co ngay gan nhat phia tren (neu khong, dateInRange_ se loai no
+    // ngay khi co bo loc ngay va doanh thu bi mat am tham).
+    if (ngayTaoDon === '' || ngayTaoDon === null || ngayTaoDon === undefined) ngayTaoDon = lastNgayTaoDon;
+    else lastNgayTaoDon = ngayTaoDon;
     out.push({
       ngayTaoDon:    ngayTaoDon,
       khachHang:     r[3],
@@ -2182,7 +2191,7 @@ function readDonChiTiet_() {
       ghiChu:        r[DON_COL_GHICHU] ? String(r[DON_COL_GHICHU]) : '' // cot Q — ghi chu don ("Ghép cùng đơn" + ma bo dem)
     });
   }
-  try { _cachePutBig_('donChiTiet_v3', JSON.stringify(out), 90); } catch (eCache) {}
+  try { _cachePutBig_('donChiTiet_v4', JSON.stringify(out), 90); } catch (eCache) {}
   return out;
 }
 

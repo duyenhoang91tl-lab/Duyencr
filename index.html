@@ -2120,6 +2120,7 @@ function _resolveCommissionRate_(name) {
 function _computeCommissionData_(orders) {
   var bySale = {};
   var totalOrdersAbove15 = 0, totalOrdersBelow15 = 0, totalRevenueAbove15 = 0, totalRevenueBelow15 = 0;
+  var totalOrdersChannel = 0, totalRevenueChannel = 0; // don thuoc kenh co % rieng — van la doanh thu that, phai vao TONG
   (orders||[]).forEach(function(m){
     var giaTri = Number(m.giaTriDon) || 0;
     var isAbove = giaTri >= COMMISSION_THRESHOLD;
@@ -2129,7 +2130,7 @@ function _computeCommissionData_(orders) {
     if (chRate === null) {
       if (isAbove) { totalOrdersAbove15++; totalRevenueAbove15 += giaTri; }
       else { totalOrdersBelow15++; totalRevenueBelow15 += giaTri; }
-    }
+    } else { totalOrdersChannel++; totalRevenueChannel += giaTri; }
     // Don Pos GHEP voi Base (backend tra saleShares = [{name, frac}], tong frac = 1): chia doanh thu theo ty le
     // cua tung don goc ben Base, KHONG chia deu. Don thuong: chia deu cho N sale nhu cu.
     var shareMap = null, salesList;
@@ -2154,7 +2155,9 @@ function _computeCommissionData_(orders) {
       else { bySale[sName].ordersBelow15++; bySale[sName].revenueBelow15 += share; }
     });
   });
-  var rows = Object.keys(bySale).map(function(name){
+  // Giong Bao cao B (Theo Sale): KHONG liet ke "(chưa gán sale)" — khong co nguoi nao de tra hoa hong.
+  // Doanh thu cua don do van nam trong cac the TONG o tren (khong mat).
+  var rows = Object.keys(bySale).filter(function(name){ return name !== '(chưa gán sale)'; }).map(function(name){
     var s = bySale[name];
     var rate = _resolveCommissionRate_(name);
     var commission = s.revenueAbove15 * (rate.above15/100) + s.revenueBelow15 * (rate.below15/100) + s.channelCommission;
@@ -2174,6 +2177,7 @@ function _computeCommissionData_(orders) {
     threshold: COMMISSION_THRESHOLD,
     totalOrdersAbove15: totalOrdersAbove15, totalOrdersBelow15: totalOrdersBelow15,
     totalRevenueAbove15: totalRevenueAbove15, totalRevenueBelow15: totalRevenueBelow15,
+    totalOrdersChannel: totalOrdersChannel, totalRevenueChannel: totalRevenueChannel,
     bySale: rows, totalCommission: totalCommission
   };
 }
@@ -12517,7 +12521,7 @@ async function _srLoad(){
     // rong vi o.ngayTao undefined o moi don Pos, du da map dung saleBan/giaTriDon. Dung
     // saleBanValid (ten sale da loc hop le, xem _donSaleNamesFromThe_) thay vi theSale tho de
     // tranh ghi chu/ten sai chinh ta trong cot Thẻ bi tinh nham thanh 1 "sale" ao.
-    if (dPos && dPos.orders) dPos.orders = dPos.orders.map(function(o){ return Object.assign({}, o, { saleBan: o.saleBanValid || o.theSale, giaTriDon: o.giaTriSauGiam, ngayTao: o.ngayTaoDon }); });
+    if (dPos && dPos.orders) dPos.orders = dPos.orders.map(function(o){ return Object.assign({}, o, { saleBan: (o.saleBanValid !== undefined ? o.saleBanValid : o.theSale), giaTriDon: o.giaTriSauGiam, ngayTao: o.ngayTaoDon }); });
     _srState.dataE = dPos;
   } else if (_srState.sub === 'F') {
     // Dropdown khong phai 'custom' -> khoang ngay PHAI khop dropdown (tranh dropdown 'Tháng này'
@@ -13809,17 +13813,19 @@ function _srRenderE_(d){
   html += '<div class="dash-section-title">a) Doanh thu theo mức đơn hàng'+_srViewToggleHtml('eBucketView')+'</div>';
   if (_srState.eBucketView === 'table'){
     html += '<div class="kpi-grid" style="margin-bottom:16px">' +
-      '<div class="kpi-card" style="border:1.5px solid var(--text)"><div class="kpi-val">'+_srMoney(c.totalRevenueAbove15+c.totalRevenueBelow15)+'</div><div class="kpi-label"><b>Tổng doanh thu</b></div></div>' +
+      '<div class="kpi-card" style="border:1.5px solid var(--text)"><div class="kpi-val">'+_srMoney(c.totalRevenueAbove15+c.totalRevenueBelow15+c.totalRevenueChannel)+'</div><div class="kpi-label"><b>Tổng doanh thu</b></div></div>' +
       '<div class="kpi-card"><div class="kpi-val">'+fmt(c.totalOrdersAbove15)+'</div><div class="kpi-label">Số đơn ≥15tr</div></div>' +
       '<div class="kpi-card"><div class="kpi-val">'+fmt(c.totalOrdersBelow15)+'</div><div class="kpi-label">Số đơn &lt;15tr</div></div>' +
       '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+_srMoney(c.totalRevenueAbove15)+'</div><div class="kpi-label">Doanh thu đơn ≥15tr</div></div>' +
       '<div class="kpi-card"><div class="kpi-val">'+_srMoney(c.totalRevenueBelow15)+'</div><div class="kpi-label">Doanh thu đơn &lt;15tr</div></div>' +
+      (c.totalOrdersChannel ? '<div class="kpi-card"><div class="kpi-val">'+_srMoney(c.totalRevenueChannel)+'</div><div class="kpi-label">DT kênh % riêng ('+fmt(c.totalOrdersChannel)+' đơn)</div></div>' : '') +
       '</div>';
   } else {
     var bucketRows = [
       { name: 'Đơn ≥15tr', value: c.totalRevenueAbove15, orders: c.totalOrdersAbove15 },
       { name: 'Đơn <15tr', value: c.totalRevenueBelow15, orders: c.totalOrdersBelow15 }
     ];
+    if (c.totalOrdersChannel) bucketRows.push({ name: 'Kênh % riêng', value: c.totalRevenueChannel, orders: c.totalOrdersChannel });
     html += _srChartSvg(bucketRows, 'name', 'value', _srState.eBucketView, true, 'orders');
   }
 
