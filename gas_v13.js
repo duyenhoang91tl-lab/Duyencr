@@ -2322,12 +2322,11 @@ function _srCloseRateSections_(normRows, filters) {
 
   var saleCloseByPage = { pages: [], rows: [] };
   if (hasAnyPkData) {
-    var shPkStats = getSheet_(SH_PK_STATS, PK_STATS_HEADERS);
     var mapSaleK = readPancakeMap_();
     var pageInfoByKenh = {};
     var ttBySaleKenh = {};
-    if (shPkStats.getLastRow() >= 2) {
-      var vPk = shPkStats.getRange(2, 1, shPkStats.getLastRow() - 1, PK_STATS_HEADERS.length).getValues();
+    var vPk = _pkStatsRowsMemo_();
+    if (vPk.length) {
       for (var pki = 0; pki < vPk.length; pki++) {
         var dPk = normOrderDate_(vPk[pki][0]);
         if (fFromYmd && dPk < fFromYmd) continue;
@@ -4333,11 +4332,42 @@ function savePancakeNameMap_(pancakeName, saleName) {
   return jsonOut_({ ok: true, updated: false });
 }
 
+// FIX 2026-10 (Bao cao B/Pos bi timeout "qua 55 giay" o khoang ngay rong): trong 1 request tai
+// Bao cao A/B, sheet SH_PK_STATS (lich su tuong tac Pancake, co the da tich luy rat nhieu dong
+// theo thoi gian) bi doc TOAN BO (sh.getRange(...).getValues() — khong gioi han ngay o tang doc
+// sheet, loc ngay chi lam sau khi da keo het du lieu ve) nhieu lan GIONG HET NHAU:
+//   1) buildPancakeReport_ — goi 2 LAN voi CUNG from/to/split trong _srCloseRateSections_ (1
+//      lan tinh saleCloseRate, 1 lan tinh kenhCloseRate)
+//   2) _pkTrackedDatesByPageAndSale_ — goi 1 lan rieng, cung sheet
+//   3) khoi "saleCloseByPage" (Ty le chot theo Sale x Page) trong _srCloseRateSections_ — tu
+//      doc rieng 1 lan nua, khong qua ham dung chung nao ca
+// Tong cong 1 request co the keo ca sheet nay ve 4 LAN — day la chi phi lon nhat (goi API doc
+// Sheets, khong phai vong lap JS) gay vuot 55s. Dung CHUNG 1 lan doc qua _pkStatsRowsMemo_() cho
+// ca 3 noi tren (memo ngan han 5s, du dung trong 1 request, tu lam moi o request sau de khong
+// giu du lieu cu qua lau) — giam tu toi da 4 lan doc sheet xuong CON 1 LAN, khong doi logic/ket
+// qua tra ve cua tung noi.
+var _pkStatsRowsMemoCache_ = null; // { time, rows }
+function _pkStatsRowsMemo_() {
+  var now = Date.now();
+  if (_pkStatsRowsMemoCache_ && (now - _pkStatsRowsMemoCache_.time) < 5000) return _pkStatsRowsMemoCache_.rows;
+  var sh = getSheet_(SH_PK_STATS, PK_STATS_HEADERS);
+  var rows = sh.getLastRow() >= 2 ? sh.getRange(2, 1, sh.getLastRow() - 1, PK_STATS_HEADERS.length).getValues() : [];
+  _pkStatsRowsMemoCache_ = { time: now, rows: rows };
+  return rows;
+}
+
 // Tong hop bao cao theo Page va theo CS (da khop ten qua PancakeNameMap; ten chua khop giu
 // nguyen ten Pancake va danh dau unmapped:true de UI nhac nguoi dung di khop ten).
+// Memo hoa KET QUA theo key (from|to|split) — xem giai thich day du o _pkStatsRowsMemo_() phia
+// tren; ham nay bi goi 2 lan voi cung tham so trong cung 1 request tu _srCloseRateSections_.
+var _pkReportMemoCache_ = null; // { key, time, data }
 function buildPancakeReport_(from, to, split) {
   split = (split === 'full') ? 'full' : 'equal';
-  var sh = getSheet_(SH_PK_STATS, PK_STATS_HEADERS);
+  var _pkMemoKey_ = from + '|' + to + '|' + split;
+  var _pkMemoNow_ = Date.now();
+  if (_pkReportMemoCache_ && _pkReportMemoCache_.key === _pkMemoKey_ && (_pkMemoNow_ - _pkReportMemoCache_.time) < 5000) {
+    return _pkReportMemoCache_.data;
+  }
   var mapPair = readPancakeMapCI_(), map = mapPair.map, mapCI = mapPair.mapCI;
   var byPage = {}, byCS = {};
   var unmappedSet = {}, unmappedCanon = {}; // ci-key -> ten hien thi (giu ban DAU TIEN gap)
@@ -4345,8 +4375,8 @@ function buildPancakeReport_(from, to, split) {
                         // (phong truong hop chinh gia tri mapping bi go khac hoa/thuong/dinh khoang
                         // trang giua 2 dong khop khac nhau, vi du "biichnguyen1993" va "Biichnguyen1993 ")
 
-  if (sh.getLastRow() >= 2) {
-    var v = sh.getRange(2, 1, sh.getLastRow() - 1, PK_STATS_HEADERS.length).getValues();
+  var v = _pkStatsRowsMemo_();
+  if (v.length) {
     for (var i = 0; i < v.length; i++) {
       var d = normOrderDate_(v[i][0]); // chuan hoa: cot co the con vai dong Date-object cu, xem savePancakeStats_
       if (from && d < from) continue;
@@ -4407,7 +4437,9 @@ function buildPancakeReport_(from, to, split) {
   }
 
   var hiddenSets2 = _hiddenPageSaleSets_();
-  return { byPage: finalize(byPage, hiddenSets2.channels, 'pageName'), byCS: finalize(byCS, hiddenSets2.sales, 'name'), unmapped: Object.keys(unmappedSet).sort(), split: split };
+  var _pkReportResult_ = { byPage: finalize(byPage, hiddenSets2.channels, 'pageName'), byCS: finalize(byCS, hiddenSets2.sales, 'name'), unmapped: Object.keys(unmappedSet).sort(), split: split };
+  _pkReportMemoCache_ = { key: _pkMemoKey_, time: _pkMemoNow_, data: _pkReportResult_ };
+  return _pkReportResult_;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -4784,10 +4816,9 @@ function readSaleDirectory_() {
 // tương tự với sale, tỷ lệ chốt của sale cũng chỉ tính những ngày sale có báo cáo pancake".
 function _pkTrackedDatesByPageAndSale_(from, to) {
   var datesByPage = {}, datesBySale = {};
-  var sh = getSheet_(SH_PK_STATS, PK_STATS_HEADERS);
-  if (sh.getLastRow() < 2) return { datesByPage: datesByPage, datesBySale: datesBySale };
+  var v = _pkStatsRowsMemo_();
+  if (!v.length) return { datesByPage: datesByPage, datesBySale: datesBySale };
   var mapPair = readPancakeMapCI_(), map = mapPair.map, mapCI = mapPair.mapCI;
-  var v = sh.getRange(2, 1, sh.getLastRow() - 1, PK_STATS_HEADERS.length).getValues();
   for (var i = 0; i < v.length; i++) {
     var d = normOrderDate_(v[i][0]);
     if (from && d < from) continue;
