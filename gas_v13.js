@@ -1473,6 +1473,7 @@ var DT_SS_ID = '1fiWXPMZcHuEh0zYqD6pgQjZDM0PhWzpiSK7Igj6Cug8'; // Google Sheet "
 
 var DT_TONG_SHEET     = 'DT TỔNG ';    // luu y: co dau cach o cuoi ten sheet, giu nguyen
 var DON_CHITIET_SHEET = 'dữ liệu đơn';
+var DON_CHITIET_WIDTH = 15; // A:O — xem readDonChiTiet_ (doc dung 15 cot), dung chung cho _autoDedupExactRowsInSheet_
 
 // ─── DT TỔNG = nguon "don hang" CHUAN MOI (thay the hoan toan OrderData21_22..26 cu) ───
 // Cot (0-indexed, A=0): A=ngayTao | C=giaoCho | D=SDT khach (dat ten cot la "Ten nhiem vu"
@@ -4106,6 +4107,92 @@ function deleteDuplicateOrders_(items) {
     Object.keys(affectedPhones).forEach(function (p) { cache.remove('lk_' + p); });
   } catch (ec) {}
   return jsonOut_({ ok: true, deleted: deleted, skipped: skipped });
+}
+
+// ═══ TỰ ĐỘNG XOÁ DÒNG TRÙNG TUYỆT ĐỐI (Base + Pos) — thêm 2026-10-04 theo yêu cầu Duyên ═══
+// Khác với findDuplicateOrders_/deleteDuplicateOrders_ ở trên (chỉ ĐỀ XUẤT, bắt buộc người
+// dùng xác nhận trước khi xoá — vì nhóm trùng theo SĐT+ngày+SP có thể là 2 đơn THẬT lệch
+// doanh thu): hàm dưới đây CHỈ xử lý trường hợp an toàn tuyệt đối — 1 dòng GIỐNG Y HỆT từng
+// cột với 1 dòng khác (gần như chắc chắn là lỡ tay dán/nạp trùng 2 lần, không phải 2 đơn khác
+// nhau) — nên mới được phép tự xoá mà KHÔNG cần ai xác nhận, chạy ngay khi sheet "DT TỔNG "
+// (Base) hoặc "dữ liệu đơn" (Pos) có thay đổi (xem onChangeDedupTrigger_ + installAutoDedupTrigger_).
+function _rowKeyExact_(row) {
+  return JSON.stringify(row.map(function (v) {
+    if (Object.prototype.toString.call(v) === '[object Date]') return 'D:' + v.getTime();
+    return v;
+  }));
+}
+function _rowIsBlank_(row) {
+  return row.every(function (v) { return v === '' || v === null || v === undefined; });
+}
+// Xoá các dòng trùng TUYỆT ĐỐI (mọi cột giống y hệt) trong 1 sheet, giữ lại dòng ĐẦU TIÊN
+// của mỗi nhóm trùng, xoá (các) dòng còn lại. Bỏ qua dòng rỗng hoàn toàn (không tính là trùng).
+function _autoDedupExactRowsInSheet_(sh, width) {
+  if (!sh) return { deleted: 0, groupCount: 0 };
+  var last = sh.getLastRow();
+  if (last < 3) return { deleted: 0, groupCount: 0 }; // can >=2 dong du lieu moi co the trung
+  var vals = sh.getRange(2, 1, last - 1, width).getValues();
+  var seen = {}, toDelete = [], groupCount = 0;
+  for (var i = 0; i < vals.length; i++) {
+    var row = vals[i];
+    if (_rowIsBlank_(row)) continue;
+    var key = _rowKeyExact_(row);
+    if (!seen[key]) { seen[key] = true; }
+    else { toDelete.push(i + 2); groupCount++; }
+  }
+  if (!toDelete.length) return { deleted: 0, groupCount: 0 };
+  toDelete.sort(function (a, b) { return b - a; }); // xoa tu duoi len tren, tranh lech chi so
+  var deleted = 0;
+  toDelete.forEach(function (rowIdx) {
+    try { sh.deleteRow(rowIdx); deleted++; } catch (e) {}
+  });
+  return { deleted: deleted, groupCount: groupCount };
+}
+var SH_AUTO_DEDUP_LOG = 'Nhật ký xoá trùng tự động';
+var AUTO_DEDUP_LOG_HEADERS = ['thoiGian', 'sheet', 'soDongDaXoa', 'ghiChu'];
+function _autoDedupLog_(sheetName, deleted) {
+  if (!deleted) return;
+  try {
+    var sh = getSheet_(SH_AUTO_DEDUP_LOG, AUTO_DEDUP_LOG_HEADERS);
+    sh.appendRow([new Date(), sheetName, deleted, 'Tự động xoá dòng trùng tuyệt đối (trigger onChange) — xem lại sheet "' + sheetName + '" nếu thấy nghi ngờ.']);
+  } catch (e) {}
+}
+// Ham duoc Google Sheets TU GOI khi spreadsheet DT_SS_ID (chua ca Base + Pos) co bat ky thay
+// doi nao (dan/nhap/xoa dong, sua 1 o...) — xem installAutoDedupTrigger_ o duoi de cai dat
+// trigger nay 1 LAN. Dung LockService de tranh 2 lan chay cung luc dam vao nhau khi co nhieu
+// thay doi lien tiep gan nhau (vd dan nhieu lo du lieu gan sat nhau).
+function onChangeDedupTrigger_(e) {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) return; // dang co lan chay khac xu ly, bo qua lan nay (se duoc don o lan thay doi tiep theo)
+  try {
+    var ss = getDTSS_();
+    var resBase = _autoDedupExactRowsInSheet_(ss.getSheetByName(DT_TONG_SHEET), DT_TONG_WIDTH);
+    _autoDedupLog_(DT_TONG_SHEET, resBase.deleted);
+    var resPos = _autoDedupExactRowsInSheet_(ss.getSheetByName(DON_CHITIET_SHEET), DON_CHITIET_WIDTH);
+    _autoDedupLog_(DON_CHITIET_SHEET, resPos.deleted);
+    try {
+      var cache = CacheService.getScriptCache();
+      if (resPos.deleted) cache.remove('donChiTiet_v2_n'); // force doc lai sheet Pos ngay, khong doi het 90s cache
+      if (resBase.deleted) cache.remove('srptOptions_v3');
+    } catch (ecCache) {}
+  } finally {
+    lock.releaseLock();
+  }
+}
+// CHAY 1 LAN DUY NHAT tu Apps Script Editor (chon ham "installAutoDedupTrigger_" trong dropdown
+// -> bam Run, lan dau se hoi cap quyen thi Allow) de cai dat trigger "On change" cho spreadsheet
+// DT_SS_ID. Trigger nay la installable trigger, TON TAI DOC LAP voi cac lan deploy Web App ve
+// sau (khong bi mat khi dan de code moi + Deploy New version) — nen KHONG can chay lai ham nay
+// moi lan sua code, chi can chay 1 LAN duy nhat. Ham tu kiem tra truoc, chay lai nhieu lan van
+// an toan (khong tao trigger trung).
+function installAutoDedupTrigger_() {
+  var ss = getDTSS_();
+  var existing = ScriptApp.getProjectTriggers().filter(function (t) {
+    return t.getHandlerFunction() === 'onChangeDedupTrigger_' && t.getTriggerSourceId() === ss.getId();
+  });
+  if (existing.length) return 'Trigger "onChangeDedupTrigger_" da ton tai (' + existing.length + '), khong tao them.';
+  ScriptApp.newTrigger('onChangeDedupTrigger_').forSpreadsheet(ss).onChange().create();
+  return 'Da tao trigger "On change" cho spreadsheet DT_SS_ID (' + ss.getId() + ') thanh cong.';
 }
 
 // Da ngung ho tro thay toan bo du lieu don hang tu client (truoc day dung khi dong bo
