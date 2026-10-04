@@ -2001,6 +2001,39 @@ let SALE_CHANNELS = (function(){
   try { var v = loadLS('ome_sale_channels'); return (v && typeof v === 'object') ? v : {}; } catch(e){ return {}; }
 })();
 
+// Danh sach "doi Sale" — truoc chi co 2 nhom co dinh Online/Van phong, gio Admin tu dinh nghia
+// them nhom moi (vd CSKH/Quay...) o modal "🏷️ Phân loại đội Sale". 2 muc mac dinh nay GIU
+// NGUYEN key 'online'/'offline' de khong vo du lieu SALE_CHANNELS/saleType da luu tu truoc.
+let SALE_GROUPS = (function(){
+  try { var v = loadLS('ome_sale_groups'); return (Array.isArray(v) && v.length) ? v : [{key:'online',label:'Online'},{key:'offline',label:'Văn phòng'}]; }
+  catch(e){ return [{key:'online',label:'Online'},{key:'offline',label:'Văn phòng'}]; }
+})();
+function saleGroupLabel(key){ var g = SALE_GROUPS.find(function(x){return x.key===key;}); return g ? g.label : key; }
+async function _syncSaleGroupsFromGAS() {
+  if (!gsUrl) return;
+  try {
+    var r = await fetch(gsUrl + '?action=saleGroups', {redirect:'follow'});
+    var data = await r.json();
+    if (data && data.ok && Array.isArray(data.groups) && data.groups.length) {
+      SALE_GROUPS = data.groups;
+      saveLS('ome_sale_groups', SALE_GROUPS);
+    }
+  } catch(e) { /* giu ban local/mac dinh neu loi mang */ }
+}
+setTimeout(_syncSaleGroupsFromGAS, 0);
+async function saveSaleGroups(list) {
+  SALE_GROUPS = list;
+  saveLS('ome_sale_groups', SALE_GROUPS);
+  if (!gsUrl) { toast('✓ Đã lưu danh sách đội (local)'); return; }
+  try {
+    var r = await fetch(gsUrl, { method:'POST', redirect:'follow',
+      body: JSON.stringify({ action:'saveSaleGroups', groups: list }) });
+    var d = await r.json().catch(function(){ return {}; });
+    if (d && d.ok) toast('✓ Đã lưu danh sách đội lên Google Sheets');
+    else toast('Lưu local ✓ — GSheets: ' + (d.error||'lỗi không rõ'));
+  } catch(e) { toast('✓ Đã lưu local — chưa đồng bộ GSheets: ' + e.message); }
+}
+
 async function _syncSaleChannelsFromGAS() {
   if (!gsUrl) return;
   try {
@@ -10384,7 +10417,7 @@ function renderTeamTab(){
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
     '<div class="dash-section-title" style="margin:0">👥 Quản lý Team CS</div>'+
     (isAdmin ? '<div style="display:flex;gap:8px">'+
-        '<button class="btn sm" onclick="openSaleChannelsModal()">🏷️ Phân loại Online/Offline</button>'+
+        '<button class="btn sm" onclick="openSaleChannelsModal()">🏷️ Phân loại đội Sale</button>'+
         '<button class="btn primary" onclick="addTeam()">+ Thêm Team</button></div>'
              : '<span style="color:var(--muted);font-size:12px">Chỉ Admin mới chỉnh sửa được</span>')+
   '</div>';
@@ -14207,7 +14240,7 @@ function renderSalesReportTabE_(wrap, subTabs){
       '<div class="gear-menu-list" id="sr-gear-e" onclick="event.stopPropagation()">'+
         '<div onclick="closeGearMenus();openIndividualRatesModal()">⚙ % hoa hồng cá nhân</div>'+
         '<div onclick="closeGearMenus();openBonusProgramsModal()">🏆 Chương trình thưởng</div>'+
-        '<div onclick="closeGearMenus();openSaleChannelsModal()">🏷️ Phân loại Online/Offline</div>'+
+        '<div onclick="closeGearMenus();openSaleChannelsModal()">🏷️ Phân loại đội Sale</div>'+
         '<div onclick="closeGearMenus();openGoldUnitModal()">💰 Đơn giá vàng (Pancake AI)</div>'+
         '<div onclick="closeGearMenus();openChannelRatesModal()">📡 % hoa hồng theo Kênh</div>'+
       '</div></div>';
@@ -14540,6 +14573,7 @@ function renderSalesReportTabF_(wrap, subTabs){
   }
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
   if (_srIsAdmin()) filters += '<button class="btn sm" onclick="openSaleKpiConfigModal_()">🎯 Cài đặt KPI (bậc / commit riêng)</button>';
+  if (_srIsAdmin()) filters += '<button class="btn sm" onclick="openSaleChannelsModal()">🏷️ Phân loại đội Sale</button>';
   filters += '</div>';
 
   var body = _srState.loading
@@ -15035,27 +15069,59 @@ function closeSaleChannelsModal(){
   if (m) m.style.display = 'none';
 }
 var _scSearch = '';
+var _scGroupsOpen = false;     // dong/mo khoi "Quan ly danh sach doi"
+var _scGroupsDraft = null;     // ban nhap dang sua, null = chua mo
 function _renderSaleChannelsModal(){
   var body = document.getElementById('sc-body');
   if (!body) return;
+  var html = '';
+
+  // ── Khoi quan ly danh sach doi (them/sua/xoa) ──
+  html += '<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:12px;overflow:hidden">'+
+    '<div style="padding:8px 10px;background:var(--surface2);cursor:pointer;font-weight:600;font-size:13px;display:flex;justify-content:space-between;align-items:center" onclick="_scGroupsOpen=!_scGroupsOpen;'+(_scGroupsOpen?'':'_scGroupsDraft=null;')+'_renderSaleChannelsModal()">'+
+      '<span>⚙ Quản lý danh sách đội ('+SALE_GROUPS.length+' đội)</span><span>'+(_scGroupsOpen?'▲':'▼')+'</span></div>';
+  if (_scGroupsOpen){
+    if (!_scGroupsDraft) _scGroupsDraft = SALE_GROUPS.map(function(g){ return {key:g.key, label:g.label}; });
+    html += '<div style="padding:10px">';
+    _scGroupsDraft.forEach(function(g, i){
+      var isDefault = (g.key==='online' || g.key==='offline');
+      html += '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">'+
+        '<input type="text" value="'+esc(g.label)+'" placeholder="Tên đội (vd: CSKH, Quầy...)" oninput="_scGroupsDraft['+i+'].label=this.value" style="flex:1;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px">'+
+        '<code style="font-size:10px;color:var(--muted);min-width:60px">'+esc(g.key)+'</code>'+
+        (isDefault ? '<span style="font-size:10px;color:var(--muted)" title="2 đội mặc định, không xoá được">🔒</span>'
+          : '<button class="btn xs danger" onclick="_scGroupsDraft.splice('+i+',1);_renderSaleChannelsModal()" title="Xoá đội">🗑</button>')+
+        '</div>';
+    });
+    html += '<button class="btn sm secondary" onclick="_scGroupsDraft.push({key:\'g\'+Date.now(),label:\'\'});_renderSaleChannelsModal()">+ Thêm đội mới</button> '+
+      '<button class="btn sm primary" onclick="_scSaveGroups()">💾 Lưu danh sách đội</button>'+
+      '</div>';
+  }
+  html += '</div>';
+
+  // ── Bang phan loai tung Sale, dropdown dong theo SALE_GROUPS ──
   var names = (typeof _allCSNames === 'function' ? _allCSNames() : []).slice().sort(function(a,b){ return a.localeCompare(b,'vi'); });
   var q = (_scSearch||'').toLowerCase();
   var filtered = names.filter(function(n){ return !q || n.toLowerCase().indexOf(q)!==-1; });
-  var html = '<input type="text" placeholder="🔍 Tìm nhanh theo tên..." value="'+esc(_scSearch||'')+'" oninput="_scSearch=this.value;_renderSaleChannelsModal()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:240px;margin-bottom:10px">';
-  html += '<table class="dash-table"><thead><tr><th>Tên</th><th style="width:220px">Phân loại</th></tr></thead><tbody>';
+  html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên..." value="'+esc(_scSearch||'')+'" oninput="_scSearch=this.value;_renderSaleChannelsModal()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:240px;margin-bottom:10px">';
+  html += '<table class="dash-table"><thead><tr><th>Tên</th><th style="width:220px">Đội</th></tr></thead><tbody>';
   filtered.forEach(function(name){
     var cur = SALE_CHANNELS[name] || '';
     html += '<tr><td>'+esc(name)+'</td><td>'+
       '<select onchange="_setSaleChannel(\''+esc(name).replace(/'/g,"\\'")+'\',this.value)" style="width:200px">'+
       '<option value=""'+(cur===''?' selected':'')+'>— Chưa phân loại —</option>'+
-      '<option value="online"'+(cur==='online'?' selected':'')+'>🌐 Online</option>'+
-      '<option value="offline"'+(cur==='offline'?' selected':'')+'>🏬 Offline</option>'+
-      '<option value="probation"'+(cur==='probation'?' selected':'')+'>🌱 Thử việc (TV)</option>'+
+      SALE_GROUPS.map(function(g){ return '<option value="'+esc(g.key)+'"'+(cur===g.key?' selected':'')+'>'+esc(g.label)+'</option>'; }).join('')+
       '</select></td></tr>';
   });
   if (!filtered.length) html += '<tr><td colspan="2" style="text-align:center;color:var(--muted);padding:14px">Không có tên nào khớp</td></tr>';
   html += '</tbody></table>';
   body.innerHTML = html;
+}
+function _scSaveGroups(){
+  var clean = _scGroupsDraft.filter(function(g){ return (g.label||'').trim(); }).map(function(g){ return {key:g.key, label:g.label.trim()}; });
+  if (!clean.length){ toast('Cần ít nhất 1 đội'); return; }
+  _scGroupsDraft = null; _scGroupsOpen = false;
+  saveSaleGroups(clean);
+  _renderSaleChannelsModal();
 }
 function _setSaleChannel(name, val){
   if (val) SALE_CHANNELS[name] = val; else delete SALE_CHANNELS[name];
@@ -17058,11 +17124,11 @@ function _acctDetailHtml(a){
     // TAI KHOAN nay CHUA co ten nao xuat hien trong SALE_CHANNELS, vd nhan vien moi chua ban gi).
     var stNames = _acctNamesOf(a);
     var stCur = stNames.map(function(n){ return SALE_CHANNELS[n]; }).filter(Boolean)[0] || a.saleType || '';
-    var stOpts = [['','— Chưa gán —'],['online','Sale online'],['offline','Sale offline'],['probation','Sale thử việc (TV)']].map(function(o){
+    var stOpts = [['','— Chưa gán —']].concat(SALE_GROUPS.map(function(g){ return [g.key, g.label]; })).map(function(o){
       return '<option value="'+o[0]+'"'+(stCur===o[0]?' selected':'')+'>'+o[1]+'</option>';
     }).join('');
     saleTypeHtml = '<div style="margin-top:10px;border-top:1px dashed var(--border);padding-top:9px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">'+
-      '<div><div style="font-size:10.5px;color:var(--hint);margin-bottom:2px">Loại Sale (áp dụng chương trình thưởng)</div>'+
+      '<div><div style="font-size:10.5px;color:var(--hint);margin-bottom:2px">Đội (áp dụng chương trình thưởng)</div>'+
         '<select onchange="acctSetSaleType(\''+uk+'\',this.value)" style="font-size:12px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+stOpts+'</select></div>'+
       '<div><div style="font-size:10.5px;color:var(--hint);margin-bottom:2px">Ngày bắt đầu (mốc tính thưởng theo ngày thử việc)</div>'+
         '<input type="date" value="'+esc(a.startDate||'')+'" onchange="acctSetStartDate(\''+uk+'\',this.value)" style="font-size:12px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"></div>'+
@@ -17120,7 +17186,7 @@ function acctSetSaleType(u, val){
   acct.saleType = val || '';
   // Ghi THẲNG vào SALE_CHANNELS cho MỌI tên bí danh của tài khoản này — đây là nguồn DUY NHẤT mà
   // "🏆 Chương trình thưởng" và "Báo cáo F — KPI Sale" đang đọc, để đặt ở đâu (Quản lý tài khoản
-  // hay Quản lý Team > 🏷️ Phân loại Online/Offline) thì mọi báo cáo cũng tính theo đúng 1 kết quả.
+  // hay Quản lý Team > 🏷️ Phân loại đội Sale) thì mọi báo cáo cũng tính theo đúng 1 kết quả.
   _acctNamesOf(acct).forEach(function(n){
     if (!n) return;
     if (val) SALE_CHANNELS[n] = val; else delete SALE_CHANNELS[n];
@@ -17841,7 +17907,7 @@ function updateSidebarCareFilters() {
 <div class="modal-overlay" id="sc-modal" style="display:none;align-items:flex-start;justify-content:center;padding-top:40px;z-index:700">
 <div class="modal" style="max-width:520px;width:94%;max-height:86vh;display:flex;flex-direction:column">
   <div class="modal-header" style="flex-shrink:0">
-    <div class="modal-title">🏷️ Phân loại Sale Online/Offline</div>
+    <div class="modal-title">🏷️ Phân loại đội Sale</div>
     <button class="modal-close" onclick="closeSaleChannelsModal()">✕</button>
   </div>
   <div class="modal-body" style="overflow:auto;flex:1">

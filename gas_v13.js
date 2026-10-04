@@ -838,6 +838,45 @@ function setGasSource_(code) {
   setSetting_('gasSourceUpdatedAt', new Date().toISOString());
   return jsonOut_({ ok: true, chunks: chunks.length, length: code.length });
 }
+// ─── NHOM SALE (truoc chi co 2 nhom co dinh Online/Van phong, gio Admin tu dinh nghia them nhom
+// moi vd CSKH/Quay...) — luu trong setting 'saleGroups' = [{key,label}]. 'online'/'offline' la 2
+// key MAC DINH giu nguyen de KHONG vo du lieu cu (saleChannels/saleType dang dung dung 2 key nay).
+var SALE_GROUPS_DEFAULT_ = [
+  { key: 'online', label: 'Online' },
+  { key: 'offline', label: 'Văn phòng' },
+  { key: 'probation', label: 'Thử việc' }
+];
+function readSaleGroups_() {
+  try {
+    var raw = getSetting_('saleGroups');
+    if (raw) {
+      var arr = JSON.parse(raw);
+      if (Array.isArray(arr) && arr.length) {
+        return arr.filter(function(g) { return g && g.key; }).map(function(g) { return { key: String(g.key), label: String(g.label || g.key) }; });
+      }
+    }
+  } catch (e) {}
+  return JSON.parse(JSON.stringify(SALE_GROUPS_DEFAULT_));
+}
+function saveSaleGroups_(list) {
+  if (!Array.isArray(list)) return jsonOut_({ ok: false, error: 'Danh sách nhóm không hợp lệ' });
+  var clean = [], seen = {};
+  for (var i = 0; i < list.length; i++) {
+    var key = String((list[i] && list[i].key) || '').trim();
+    var label = String((list[i] && list[i].label) || '').trim();
+    if (!key || !label || seen[key]) continue;
+    seen[key] = true;
+    clean.push({ key: key, label: label });
+  }
+  if (!clean.length) return jsonOut_({ ok: false, error: 'Cần ít nhất 1 nhóm' });
+  return setSetting_('saleGroups', JSON.stringify(clean));
+}
+function _saleGroupLabel_(key, groups) {
+  groups = groups || readSaleGroups_();
+  var g = groups.filter(function(x) { return x.key === key; })[0];
+  return g ? g.label : '';
+}
+
 function setSetting_(key, value) {
   var sh = getSheet_(SH_SET, SET_HEADERS);
   var last = sh.getLastRow(); var rowIdx = -1;
@@ -857,6 +896,7 @@ function setSetting_(key, value) {
 function _syncSaleChannelsToUsers_(rawValue) {
   var channels; try { channels = JSON.parse(rawValue); } catch (e) { return; }
   if (!channels || typeof channels !== 'object') return;
+  var validKeys = {}; readSaleGroups_().forEach(function(g) { validKeys[g.key] = true; }); // chap nhan BAT KY nhom nao Admin da dinh nghia, khong con chi 2 gia tri co dinh
   var shU = getSheet_(SH_USER, USER_HEADERS);
   if (shU.getLastRow() < 2) return;
   var v = shU.getRange(2, 1, shU.getLastRow() - 1, USER_HEADERS.length).getValues();
@@ -871,7 +911,7 @@ function _syncSaleChannelsToUsers_(rawValue) {
     for (var j = 0; j < namesArr.length; j++) {
       if (channels[namesArr[j]] !== undefined) { matchCh = channels[namesArr[j]]; break; }
     }
-    if (matchCh && (matchCh === 'online' || matchCh === 'offline') && String(v[i][saleTypeCol] || '') !== matchCh) {
+    if (matchCh && validKeys[matchCh] && String(v[i][saleTypeCol] || '') !== matchCh) {
       shU.getRange(i + 2, saleTypeCol + 1).setValue(matchCh);
     }
   }
@@ -1153,6 +1193,7 @@ function doGet(e) {
       return jsonOut_(buildKpiReport_(e.parameter.from, e.parameter.to, pKpiSale));
     }
     if (action === 'saleDirectory') return jsonOut_(readSaleDirectory_());
+    if (action === 'saleGroups') return jsonOut_({ ok: true, groups: readSaleGroups_() });
     // ── Nguon "Cham soc" (KH them nhanh, sheet rieng) — khong gop CareData/bao cao A-B-C ──
     if (action === 'careLeads') return jsonOut_({ rows: readCareLeads_() });
     // ── Tap SDT co trong "dữ liệu đơn" — chi de loc nguon o man hinh chinh (cache 10') ──
@@ -2745,6 +2786,10 @@ function readSaleKpiConfig_() {
       }
     }
   } catch (e) {}
+  // Config cu chi co onlineTarget, chua tung luu targets.online rieng -> lay onlineTarget lam gia tri khoi diem.
+  if (out.targets.online === SALE_KPI_DEFAULT_CFG_.targets.online && out.onlineTarget !== SALE_KPI_DEFAULT_CFG_.onlineTarget) {
+    out.targets.online = out.onlineTarget;
+  }
   return out;
 }
 
@@ -2855,19 +2900,30 @@ function buildSaleKpiReport_(filters) {
   var months = (startYm <= todayYm) ? _ymMonthsBetween_(startYm, todayYm) : [startYm];
   var monthlyRevByName = _computeSaleMonthlyRevenue_(months);
 
+  // Nhom chung (Online/Van phong/CSKH/Quay...) — CHI dung de LOC/hien thi trong bao cao nay, khac
+  // hoan toan voi F-track/O-track cua he thong bac tu dong (van la nguon tinh KPI DUY NHAT, khong
+  // dong vao nhau). Doc tu cung 1 nguon voi "🏷️ Phân loại đội Sale" o Quan ly Team.
+  var channels = {};
+  try { var rawCh = getSetting_('saleChannels'); if (rawCh) { var oCh = JSON.parse(rawCh); if (oCh && typeof oCh === 'object') channels = oCh; } } catch (eCh) {}
+  var groupDefs = readSaleGroups_();
+
   var rowsMap = {};
   function ensureRow(name) {
-    if (!rowsMap[name]) rowsMap[name] = { name: name, revenue: 0, orders: 0 };
+    if (!rowsMap[name]) {
+      var nhomKey = channels[name] || '';
+      rowsMap[name] = { name: name, nhomKey: nhomKey, revenue: 0, orders: 0 };
+    }
     return rowsMap[name];
   }
   (a.bySale || []).forEach(function(s) {
     var r = ensureRow(s.name);
     r.revenue += s.giaTri; r.orders += s.orders;
   });
-  // Them ca Sale DA duoc gan Bac bat dau / dat KPI rieng nhung CHUA co doanh thu trong ky dang
-  // xem (0d) — de van thay duoc muc tieu/0% thay vi bien mat khoi bao cao.
+  // Them ca Sale DA duoc gan Bac bat dau / dat KPI rieng / da phan loai doi nhung CHUA co doanh
+  // thu trong ky dang xem (0d) — de van thay duoc muc tieu/0% thay vi bien mat khoi bao cao.
   Object.keys(cfg.startTier).forEach(function(name) { ensureRow(name); });
   Object.keys(cfg.overrides).forEach(function(name) { ensureRow(name); });
+  Object.keys(channels).forEach(function(name) { if (channels[name]) ensureRow(name); });
 
   // Thang nao trong "months" thuc su nam trong ky dang xem (filters.dateFrom/dateTo) — de cong
   // dung KPI muc tieu cua DUNG CAC THANG duoc xem, ke ca khi ky xem trai dai nhieu thang.
@@ -2900,7 +2956,10 @@ function buildSaleKpiReport_(filters) {
     return { name: name, nhom: nhom, tier: tierNow, revenue: r.revenue, orders: r.orders,
       target: target, source: source, pct: pct, passed: (pct !== null) ? pct >= 100 : null,
       commit: commit, pctCommit: pctCommit, passedCommit: (pctCommit !== null) ? pctCommit >= 100 : null,
-      timeline: timeline };
+      timeline: timeline,
+      // Doi chung (Online/Van phong/CSKH/Quay...) — rieng cho LOC/hien thi, khong dinh gi den
+      // target/tier/commit phia tren. nhomChung = '' neu chua phan loai o "🏷️ Phân loại đội Sale".
+      nhomChungKey: r.nhomKey, nhomChung: r.nhomKey ? (_saleGroupLabel_(r.nhomKey, groupDefs) || r.nhomKey) : '' };
   });
   // Xep theo % THUC DAT tren KPI, TU TREN XUONG DUOI (cao nhat len dau) — theo yeu cau Duyen
   // 2026-10 ("tinh ty le thuc dat tren KPI... xep tu tren xuong duoi"), thay cho kieu xep theo
@@ -2916,7 +2975,7 @@ function buildSaleKpiReport_(filters) {
   var totalRevenue = rows.reduce(function(s, r) { return s + r.revenue; }, 0);
   var totalTarget = rows.reduce(function(s, r) { return s + (r.target || 0); }, 0);
   var totalCommit = rows.reduce(function(s, r) { return s + (r.commit || 0); }, 0);
-  return { ok: true, rows: rows, config: cfg, trackedMonths: months,
+  return { ok: true, rows: rows, config: cfg, trackedMonths: months, saleGroups: groupDefs,
     totalRevenue: totalRevenue, totalTarget: totalTarget,
     totalCommit: totalCommit, totalPctCommit: totalCommit > 0 ? Math.round(totalRevenue / totalCommit * 1000) / 10 : null,
     totalPct: totalTarget > 0 ? Math.round(totalRevenue / totalTarget * 1000) / 10 : null,
@@ -4297,6 +4356,7 @@ function doPost(e) {
     if (action === 'saveSaleDirectory')   return saveSaleDirectory_(data.rows);
     if (action === 'savePancakePageMap')  return savePancakePageMap_(data.pageId, data.pageName, data.kenhBan);
     if (action === 'setSetting')          return setSetting_(data.key, data.value);
+    if (action === 'saveSaleGroups')      return saveSaleGroups_(data.groups);
     // ── Dong bo lai ma nguon gas_v13.js cho nut "Copy Apps Script Code" (xem getGasSource, doGet)
     // — chia thanh cac manh <=45.000 ky tu (o tinh Sheet gioi han 50.000), xoa manh cu thua neu
     // ban moi it manh hon ban truoc, roi ghi "gasSourceUpdatedAt" de UI hien luc dong bo gan nhat.
@@ -5536,6 +5596,7 @@ function readSaleDirectory_() {
   // cho Sale nao CHUA duoc phan loai qua modal do, tranh mat du lieu Nhom cua nhung Sale cu.
   var channels = {};
   try { var rawCh = getSetting_('saleChannels'); if (rawCh) { var oCh = JSON.parse(rawCh); if (oCh && typeof oCh === 'object') channels = oCh; } } catch (eCh) {}
+  var groupDefs = readSaleGroups_();
   var v = sh.getRange(2, 1, sh.getLastRow() - 1, SALE_DIR_HEADERS.length).getValues();
   for (var i = 0; i < v.length; i++) {
     var tag = String(v[i][3] || '').trim();
@@ -5546,17 +5607,18 @@ function readSaleDirectory_() {
     if (!mTV && !m) continue; // dong khong co ma tag TV#/S#/O# -> khong phai Sale trong danh sach
     var tenFacebook = String(v[i][1] || '').trim(), userBase = String(v[i][2] || '').trim();
     var chVal = channels[tenFacebook] || channels[userBase] || channels[tag] || '';
+    // Uu tien phan loai tu SALE_CHANNELS (nguon thong nhat moi bao cao, qua "🏷️ Phân loại đội
+    // Sale"); neu Sale CHUA duoc phan loai thi fallback theo DUNG tien to ma tag: TV -> probation
+    // (Thu viec), S -> offline (Van phong), O -> online.
+    var groupKey = chVal || (mTV ? 'probation' : (m[1].toUpperCase() === 'S' ? 'offline' : 'online'));
     var rec = {
       maSale: String(v[i][0] || '').trim(),
       tenFacebook: tenFacebook,
       userBase: userBase,
       tenTagPancake: tag,
       code: mTV ? ('TV' + parseInt(mTV[1], 10)) : (m[1].toUpperCase() + parseInt(m[2], 10)),
-      // Uu tien phan loai tu SALE_CHANNELS (nguon thong nhat moi bao cao); neu Sale CHUA duoc
-      // phan loai qua modal "🏷️ Phân loại Online/Offline" thi fallback theo DUNG tien to ma tag:
-      // TV -> Thu viec, S -> Van phong, O -> Online.
-      nhom: chVal === 'online' ? 'Online' : (chVal === 'offline' ? 'Văn phòng' : (chVal === 'probation' ? 'Thử việc' :
-        (mTV ? 'Thử việc' : (m[1].toUpperCase() === 'S' ? 'Văn phòng' : 'Online'))))
+      nhomKey: groupKey,
+      nhom: _saleGroupLabel_(groupKey, groupDefs) || groupKey
     };
     list.push(rec);
     [rec.tenFacebook, rec.userBase, rec.tenTagPancake, rec.code].forEach(function(k) {
