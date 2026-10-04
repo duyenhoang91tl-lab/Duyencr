@@ -14017,7 +14017,7 @@ function _srRenderF_(d){
     '<b>F1</b>='+_srMoney(tt.F1)+' · <b>F2</b>='+_srMoney(tt.F2)+' · <b>F3</b>='+_srMoney(tt.F3)+
     ' · <b>O1</b>='+_srMoney(tt.O1)+' · <b>O2</b>='+_srMoney(tt.O2)+' · <b>O3</b>='+_srMoney(tt.O3)+
     ' · <b>O</b> (không nhảy bậc)='+_srMoney(tt.O)+
-    ' · <b>Thử việc</b>: TVF1='+_srMoney(tt.TVF1)+', TVF2='+_srMoney(tt.TVF2)+' (luôn đúng 1 tháng, tháng sau tự động lên F1)'+
+    ' · <b>Thử việc</b>: TVF1='+_srMoney(tt.TVF1)+', TVF2='+_srMoney(tt.TVF2)+' (luôn đúng 1 tháng; tháng sau TVF1→F1, TVF2→F2 — riêng TVF2→F2 phải 2 tháng đầu MỖI tháng đạt ≥100% KPI F2, không đạt thì xuống F1 làm lại)'+
     ' · Ai có <b>Commit riêng</b> thì xem thêm 2 cột Commit/%HT Commit — chạy SONG SONG với KPI theo bậc (không thay thế).'+
     (!_fSelfView && noTierCount ? ' <b style="color:#9a3412">'+noTierCount+' Sale chưa được gán Bậc bắt đầu — bấm "🎯 Cài đặt KPI" để gán.</b>' : '')+
     '</div>';
@@ -14226,7 +14226,7 @@ function _srRenderKpiConfigModal_(){
   }
   el.innerHTML = '<div class="modal-box" style="max-width:680px;max-height:85vh;overflow-y:auto">'+
     '<div class="modal-title">🎯 Cài đặt KPI theo Bậc</div>'+
-    '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Mỗi Sale có 1 <b>Bậc bắt đầu</b> tính từ tháng bắt đầu theo dõi bên dưới; bậc các tháng sau <b>tự tính</b> theo quy tắc: 3 tháng liên tiếp TB ≥125% KPI bậc hiện tại (không tháng nào &lt;70%) → lên 1 bậc (tối đa bậc 3); 3 tháng liên tiếp TB &lt;80% KPI bậc hiện tại → xuống 1 bậc. Bậc <b>O</b> không bao giờ đổi. Bậc <b>Thử việc</b> (TVF1/TVF2) luôn đúng 1 tháng rồi tự động lên F1. <b>Commit riêng</b> (nếu đặt) chạy SONG SONG với KPI theo bậc — có cột %HT riêng, không thay thế bậc. Nhập số theo <b>triệu đồng</b> cho gọn.</div>'+
+    '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Mỗi Sale có 1 <b>Bậc bắt đầu</b> tính từ tháng bắt đầu theo dõi bên dưới; bậc các tháng sau <b>tự tính</b> theo quy tắc: 3 tháng liên tiếp TB ≥125% KPI bậc hiện tại (không tháng nào &lt;70%) → lên 1 bậc (tối đa bậc 3); 3 tháng liên tiếp TB &lt;80% KPI bậc hiện tại → xuống 1 bậc. Bậc <b>O</b> không bao giờ đổi. Bậc <b>Thử việc</b> (TVF1/TVF2) luôn đúng 1 tháng; tháng sau TVF1→F1, TVF2→F2. Riêng TVF2→F2: 2 tháng đầu làm F2 phải MỖI tháng đạt ≥100% KPI F2, không đạt (dù chỉ 1 tháng) thì xuống ngay F1 để xét lại từ đầu. <b>Commit riêng</b> (nếu đặt) chạy SONG SONG với KPI theo bậc — có cột %HT riêng, không thay thế bậc. Nhập số theo <b>triệu đồng</b> cho gọn.</div>'+
     '<div style="margin-bottom:10px"><label style="font-size:11px;color:var(--muted);display:block">Tháng bắt đầu theo dõi</label>'+
       '<input type="month" value="'+esc(ed.trackingStartMonth)+'" onchange="_srKpiEditSetStartMonth(this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"></div>'+
     '<div style="margin-bottom:6px"><div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:3px">KPI theo Bậc — Văn phòng (F)</div>'+

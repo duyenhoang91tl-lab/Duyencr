@@ -2734,12 +2734,20 @@ function _computeSaleMonthlyRevenue_(months) {
 }
 
 // State machine tinh bac tung thang cho 1 Sale, bat dau tu startTier o thang dau tien cua mang
-// months (= trackingStartMonth). Quy tac (theo sheet "Bậc" + xac nhan Duyen 2026-10-01):
-//  - Bac thu viec (probation): CHI giu dung 1 thang, thang ke tiep LUON tu dong thanh F1, bat ke
-//    ket qua thang thu viec the nao (khong xet 3 thang).
+// months (= trackingStartMonth). Quy tac (theo sheet "Bậc" + xac nhan Duyen 2026-10-01, va xac
+// nhan rieng ve "Riêng Bậc 2" ngay 2026-10-04):
+//  - Bac thu viec (probation): CHI giu dung 1 thang. Thang ke tiep tu dong ky chinh thuc:
+//      + TVF1 -> F1 (binh thuong, khong co dieu kien gi them).
+//      + TVF2 -> F2 (vao thang chinh thuc DAU TIEN), NHUNG rieng truong hop nay phai qua them
+//        1 lan kiem tra rieng ("Riêng Bậc 2"): DUNG 2 THANG DAU TIEN lam F2 phai MOI THANG rieng
+//        deu dat >=100% KPI cua F2 — khong dat (du chi 1 trong 2 thang) thi HA NGAY xuong F1 o
+//        thang thu 3 de "chay lai" tu dau theo quy tac thuong (khong cho o lai F2 cho het 3 thang
+//        nhu quy tac tang/giam binh thuong). Neu qua duoc 2 thang nay, tu thang thu 3 tro di xet
+//        theo dung quy tac 3-thang binh thuong nhu moi bac khac.
 //  - Bac 'O' (track OFLAT): khong bao gio doi, giu nguyen KPI mai mai.
-//  - Bac chinh thuc (F1-F3, O1-O3): moi thang, neu 3 thang LIEN TIEP NGAY TRUOC do CUNG o dung 1
-//    bac nay (tranh xet nua voi trong luc dang doi bac):
+//  - Bac chinh thuc (F1-F3, O1-O3) O NGOAI giai doan kiem tra rieng 2 thang dau cua F2 noi tren:
+//    moi thang, neu 3 thang LIEN TIEP NGAY TRUOC do CUNG o dung 1 bac nay (tranh xet nua voi
+//    trong luc dang doi bac):
 //      + TB doanh thu 3 thang do >= 125% KPI bac hien tai VA KHONG thang nao < 70% KPI bac hien
 //        tai => TANG 1 bac (toi da bac 3 trong track, F3/O3 khong tang them).
 //      + TB doanh thu 3 thang do < 80% KPI bac hien tai => GIAM 1 bac (toi thieu bac 1, F1/O1
@@ -2752,8 +2760,19 @@ function _computeSaleTierTimeline_(startTier, months, monthlyRevenue, tierTarget
     if (i === 0) { timeline[ym] = startTier; continue; }
     var prevYm = months[i - 1], prevTier = timeline[prevYm], meta = SALE_TIER_META_[prevTier];
     if (!meta) { timeline[ym] = prevTier; continue; }
-    if (meta.probation) { timeline[ym] = 'F1'; continue; }
+    if (meta.probation) { timeline[ym] = (prevTier === 'TVF2') ? 'F2' : 'F1'; continue; }
     if (meta.track === 'OFLAT') { timeline[ym] = prevTier; continue; }
+    // "Riêng Bậc 2": dung luc dang o thang thu 3 lam F2 ke tu khi ky chinh thuc tu TVF2 (2 thang
+    // truoc la TVF2 -> F2, van con F2 den gio) — kiem tra RIENG 2 thang do thay vi quy tac 3-thang
+    // thuong. Dat dieu kien nay TRUOC quy tac 3-thang chung de khong bi dung nham (thang i-3 la
+    // TVF2 chu khong phai F2 nen quy tac 3-thang thuong cung khong khop o day, nhung ghi ro cho de doc).
+    if (prevTier === 'F2' && i >= 3 && timeline[months[i - 3]] === 'TVF2' && timeline[months[i - 2]] === 'F2') {
+      var kpiF2 = tierTargets['F2'] || 0;
+      var rm2 = monthlyRevenue[months[i - 2]] || 0, rm1 = monthlyRevenue[prevYm] || 0;
+      var passed2mo = kpiF2 > 0 && rm2 >= kpiF2 && rm1 >= kpiF2; // CA 2 thang deu phai rieng >=100%
+      timeline[ym] = passed2mo ? 'F2' : 'F1';
+      continue;
+    }
     if (i >= 3 && timeline[months[i - 3]] === prevTier && timeline[months[i - 2]] === prevTier) {
       var kpi = tierTargets[prevTier] || 0;
       var r1 = monthlyRevenue[months[i - 3]] || 0, r2 = monthlyRevenue[months[i - 2]] || 0, r3 = monthlyRevenue[prevYm] || 0;
