@@ -13923,6 +13923,44 @@ function _srRenderF_(d){
   _SR_COLTH_GETTER_['fSale'] = { name: function(r){ return r.name; } };
   var rows = _srApplyColFilters_(d.rows||[], 'fSale', _SR_COLTH_GETTER_['fSale']).filter(function(r){ return !_srState.fSaleSearch || r.name.toLowerCase().indexOf(_srState.fSaleSearch.toLowerCase())!==-1; });
 
+  // Sale thuong (khong phai Admin) CHI duoc xem dung dong cua chinh minh — mac dinh moi tai
+  // khoan deu xem duoc tab "Bao cao doanh so" tru khi Admin chu dong gioi han (xem
+  // _tabAllowedForUser), nen neu khong thu hep o day thi tung Sale se thay het doanh thu/bac
+  // cua ca cong ty. Admin van thay day du nhu cu, khong doi gi.
+  var _fIsAdmin = (typeof currentUser!=='undefined' && currentUser && currentUser.role==='admin');
+  var _fSelfView = !_fIsAdmin;
+  if (_fSelfView) {
+    var _fMyNames = (typeof currentUser!=='undefined' && currentUser && currentUser.names && currentUser.names.length)
+      ? currentUser.names : ((typeof currentUser!=='undefined' && currentUser && currentUser.name) ? [currentUser.name] : []);
+    var _fMyNamesLc = _fMyNames.map(function(n){ return String(n).trim().toLowerCase(); });
+    rows = rows.filter(function(r){ return _fMyNamesLc.indexOf(String(r.name).trim().toLowerCase())!==-1; });
+  }
+  function _fTierStatusLabel_(tier){
+    if (!tier) return '';
+    return (tier==='TVF1' || tier==='TVF2') ? '🔰 Đang thử việc' : '✅ Chính thức';
+  }
+  // Tong theo DUNG tap dong dang hien (da loc/thu hep o tren) — KHONG dung d.totalRevenue/
+  // totalTarget/totalPct truc tiep nua, vi 2 gia tri do luon tinh tren TOAN BO cong ty phia
+  // server, se lam lo doanh thu nguoi khac vao the KPI khi 1 Sale thuong dang tu xem minh.
+  var fTotalRevenue = rows.reduce(function(s,r){ return s+r.revenue; }, 0);
+  var fTotalTarget = rows.reduce(function(s,r){ return s+(r.target||0); }, 0);
+  var fTotalPct = fTotalTarget>0 ? Math.round(fTotalRevenue/fTotalTarget*1000)/10 : null;
+
+  var selfBanner = '';
+  if (_fSelfView) {
+    if (!rows.length) {
+      selfBanner = '<div style="padding:10px 14px;background:var(--surface2);border-radius:8px;margin-bottom:10px;color:var(--muted)">Chưa tìm thấy Bậc KPI gắn với tài khoản của bạn — liên hệ quản trị viên để được gán Bậc bắt đầu.</div>';
+    } else {
+      selfBanner = rows.map(function(r){
+        var statusLabel = _fTierStatusLabel_(r.tier);
+        return '<div style="padding:10px 14px;background:var(--surface2);border-radius:8px;margin-bottom:10px">'+
+          '<b style="font-size:13px">'+(statusLabel||'<span style=\'color:var(--hint)\'>Chưa gán bậc</span>')+'</b>'+
+          (r.tier ? ' — Bậc <b>'+esc(r.tier)+'</b>' : '')+
+          '</div>';
+      }).join('');
+    }
+  }
+
   var tt = cfg.tierTargets || {};
   var noTierCount = (d.rows||[]).filter(function(r){ return r.nhom==='(chưa gán bậc)'; }).length;
   var html = '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">'+
@@ -13932,13 +13970,14 @@ function _srRenderF_(d){
     ' · <b>O</b> (không nhảy bậc)='+_srMoney(tt.O)+
     ' · <b>Thử việc</b>: TVF1='+_srMoney(tt.TVF1)+', TVF2='+_srMoney(tt.TVF2)+' (luôn đúng 1 tháng, tháng sau tự động lên F1)'+
     ' · Ai có <b>KPI commit riêng</b> thì dùng số đó thay vì bậc.'+
-    (noTierCount ? ' <b style="color:#9a3412">'+noTierCount+' Sale chưa được gán Bậc bắt đầu — bấm "🎯 Cài đặt KPI" để gán.</b>' : '')+
+    (!_fSelfView && noTierCount ? ' <b style="color:#9a3412">'+noTierCount+' Sale chưa được gán Bậc bắt đầu — bấm "🎯 Cài đặt KPI" để gán.</b>' : '')+
     '</div>';
 
+  html += selfBanner;
   html += '<div class="kpi-grid" style="margin-bottom:16px">'+
-    '<div class="kpi-card" style="border:1.5px solid var(--text)"><div class="kpi-val">'+_srMoney(d.totalRevenue)+'</div><div class="kpi-label"><b>Tổng doanh thu</b></div></div>'+
-    '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalTarget)+'</div><div class="kpi-label">Tổng KPI mục tiêu</div></div>'+
-    '<div class="kpi-card" style="border:1.5px solid '+(d.totalPct!==null && d.totalPct>=100 ? '#16a34a' : '#dc2626')+'"><div class="kpi-val" style="color:'+(d.totalPct!==null && d.totalPct>=100 ? '#16a34a' : '#dc2626')+'">'+(d.totalPct===null?'—':d.totalPct+'%')+'</div><div class="kpi-label">% hoàn thành chung</div></div>'+
+    '<div class="kpi-card" style="border:1.5px solid var(--text)"><div class="kpi-val">'+_srMoney(fTotalRevenue)+'</div><div class="kpi-label"><b>'+(_fSelfView?'Doanh thu của bạn':'Tổng doanh thu')+'</b></div></div>'+
+    '<div class="kpi-card"><div class="kpi-val">'+_srMoney(fTotalTarget)+'</div><div class="kpi-label">'+(_fSelfView?'KPI mục tiêu':'Tổng KPI mục tiêu')+'</div></div>'+
+    '<div class="kpi-card" style="border:1.5px solid '+(fTotalPct!==null && fTotalPct>=100 ? '#16a34a' : '#dc2626')+'"><div class="kpi-val" style="color:'+(fTotalPct!==null && fTotalPct>=100 ? '#16a34a' : '#dc2626')+'">'+(fTotalPct===null?'—':fTotalPct+'%')+'</div><div class="kpi-label">% hoàn thành'+(_fSelfView?'':' chung')+'</div></div>'+
     '</div>';
 
   html += '<div class="dash-section-title">Chi tiết theo Sale'+_srViewToggleHtml('fKpiView')+'</div>';
@@ -13949,7 +13988,7 @@ function _srRenderF_(d){
       _srColTh_('fSale','name','Sale',_SR_COLTH_ROWSFN_['fSale'],_SR_COLTH_GETTER_['fSale'].name)+'<th>Nhóm</th><th>Bậc</th><th style="text-align:right">Doanh thu</th>'+
       '<th style="text-align:right">KPI mục tiêu</th><th style="text-align:right">% hoàn thành</th><th>Kết quả</th></tr></thead><tbody>';
     rows.forEach(function(r){
-      var tierLabel = r.tier ? esc(r.tier) : '<span style="color:var(--hint)">chưa gán</span>';
+      var tierLabel = r.tier ? esc(r.tier)+' <span style="font-size:10.5px;color:var(--muted)">('+_fTierStatusLabel_(r.tier)+')</span>' : '<span style="color:var(--hint)">chưa gán</span>';
       var pctColor = r.pct===null ? 'var(--muted)' : (r.pct>=100 ? '#16a34a' : '#dc2626');
       var resultTxt = r.pct===null ? '<span style="color:var(--hint)">chưa có mục tiêu</span>' : (r.pct>=100 ? '✓ Đạt' : '✗ Chưa đạt');
       var srcNote = r.source==='override' ? ' <span title="Dùng KPI commit riêng, không theo bậc tự động" style="cursor:help">📌</span>' : '';
@@ -13960,7 +13999,7 @@ function _srRenderF_(d){
         '<td style="font-weight:600;color:'+pctColor+'">'+resultTxt+'</td></tr>';
     });
     if (!rows.length) html += '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
-    else html += _srTotalRowHtml_(['Tổng','','', _srMoney(rows.reduce(function(s,r){return s+r.revenue;},0)), _srMoney(rows.reduce(function(s,r){return s+(r.target||0);},0)), '', '']);
+    else if (!_fSelfView) html += _srTotalRowHtml_(['Tổng','','', _srMoney(fTotalRevenue), _srMoney(fTotalTarget), '', '']);
     html += '</tbody></table>';
   } else {
     html += '<div style="font-size:11px;color:var(--hint);margin-bottom:4px">Vẽ theo "Doanh thu"</div>';
