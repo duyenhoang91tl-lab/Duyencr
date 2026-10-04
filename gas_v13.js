@@ -7728,4 +7728,11 @@ function exportDailyReportLogs_(from, to) {
   });
 }
 
-
+// Ham goi TAT (ten de nho, tieng Viet) cho installAutoDedupTrigger_ — chay ham nay 1 LAN DUY
+// NHAT tu Apps Script Editor (chon "chayCaiDatTrigger" trong dropdown -> bam Run, lan dau se
+// hoi cap quyen thi bam Allow) de cai dat trigger "On change" tu dong xoa dong trung tuyet doi
+// cho Base + Pos (xem _autoDedupExactRowsInSheet_/onChangeDedupTrigger_ o tren). Khong can chay
+// lai moi lan Deploy sau — trigger installable ton tai doc lap voi cac lan deploy Web App.
+function chayCaiDatTrigger() {
+  installAutoDedupTrigger_();
+}
