@@ -1887,7 +1887,7 @@
   let _imgFlatItems = null;   // null = chưa tải; [] = tải rồi nhưng rỗng
   let _imgFlatLoading = false;
   let _imgLiveTimer = null;
-  const _imgBldBlank_ = () => ({ q: '', nhom: '', ten: '', size: '', cl: '' });
+  const _imgBldBlank_ = () => ({ q: '', nhom: '', ten: '', size: '', cl: '', mau: '' });
   let _imgBld = _imgBldBlank_();
 
   function initImgSearch_() {
@@ -1980,7 +1980,18 @@
       if (cls.length > 1 || (cls.length === 1 && cls[0] !== '__none__')) {
         html += row(`Chất liệu (${cls.length})`, `<select id="pkimg-cl"><option value="">— Tất cả — (bỏ trống nếu không chắc)</option>${cls.map((v) => opt(v, v === '__none__' ? '(không ghi)' : v, v === _imgBld.cl)).join('')}</select>`);
       }
-      candidates = _imgBld.cl ? poolS.filter((it) => clVal(it) === _imgBld.cl) : poolS;
+      const poolCl = _imgBld.cl ? poolS.filter((it) => clVal(it) === _imgBld.cl) : poolS;
+
+      // 5) Màu sắc (CHỈ hiện nếu DANH_MUC có cột "Màu sắc" — không phải hệ thống tự nhận diện
+      // màu từ ảnh, chỉ đọc đúng dữ liệu chữ trong sheet, xem _productImgCols_ bên gas_v13.js)
+      const mauVal = (it) => it.mau || '__none__';
+      const maus = [...new Set(poolCl.map(mauVal))].filter(Boolean).sort(_vnSort_);
+      if (_imgBld.mau && maus.indexOf(_imgBld.mau) === -1) _imgBld.mau = '';
+      if (!_imgBld.mau && maus.length === 1) _imgBld.mau = maus[0];
+      if (maus.length > 1 || (maus.length === 1 && maus[0] !== '__none__')) {
+        html += row(`Màu sắc (${maus.length})`, `<select id="pkimg-mau"><option value="">— Tất cả — (bỏ trống nếu không chắc)</option>${maus.map((v) => opt(v, v === '__none__' ? '(không ghi)' : v, v === _imgBld.mau)).join('')}</select>`);
+      }
+      candidates = _imgBld.mau ? poolCl.filter((it) => mauVal(it) === _imgBld.mau) : poolCl;
     } else {
       candidates = null; // chua chon ten -> chua hien anh gi, tranh liet ke qua nhieu
     }
@@ -1990,14 +2001,16 @@
       const seen = new Set();
       const uniq = candidates.filter((it) => { const key = it.img || ''; if (key && seen.has(key)) return false; if (key) seen.add(key); return true; });
       const toShow = uniq.slice(0, 6);
+      // 6 ảnh này LÀ KẾT QUẢ CUỐI sau khi đã áp hết các bộ lọc đang chọn ở trên (kể cả khi 1 vài
+      // mục cố ý để trống) — không phải bước trung gian còn lọc tiếp ngầm phía sau.
       html += `<div id="pkimg-results">` + toShow.map((it, i) => {
-        const label = [it.t || it.m, it.s, it.c].filter(Boolean).join(' · ');
+        const label = [it.t || it.m, it.s, it.c, it.mau].filter(Boolean).join(' · ');
         return `<div class="pk-price-item">
           <div class="pk-ctkm-title">${escapeHtml(label)}</div>
           <div id="pkimg-slot-${i}">${it.img ? '<div class="pk-price-loading">Đang tải ảnh...</div>' : '<div class="pk-price-loading">Sản phẩm này chưa có link ảnh.</div>'}</div>
         </div>`;
       }).join('') + '</div>';
-      if (uniq.length > toShow.length) html += `<div class="pk-price-loading">Còn ${uniq.length - toShow.length} biến thể khác — chọn thêm Kiểu/Size/Chất liệu ở trên để thu hẹp.</div>`;
+      if (uniq.length > toShow.length) html += `<div class="pk-price-loading">Còn ${uniq.length - toShow.length} biến thể khác chưa hiện — chọn thêm Kiểu/Size/Chất liệu/Màu sắc ở trên để thu hẹp xuống dưới 6.</div>`;
       dyn.innerHTML = html;
       _bindImgBuilder_(dyn);
       toShow.forEach((it, i) => { if (it.img) _loadImgSlot_(i, it.img); });
@@ -2028,10 +2041,11 @@
 
   function _bindImgBuilder_(dyn) {
     const on = (id, fn) => { const el = dyn.querySelector('#' + id); if (el) el.addEventListener('change', fn); };
-    on('pkimg-nhom', (e) => { _imgBld.nhom = e.target.value; _imgBld.ten = ''; _imgBld.size = ''; _imgBld.cl = ''; renderImgDyn_(); });
-    on('pkimg-ten', (e) => { _imgBld.ten = e.target.value; _imgBld.size = ''; _imgBld.cl = ''; renderImgDyn_(); });
-    on('pkimg-size', (e) => { _imgBld.size = e.target.value; _imgBld.cl = ''; renderImgDyn_(); });
-    on('pkimg-cl', (e) => { _imgBld.cl = e.target.value; renderImgDyn_(); });
+    on('pkimg-nhom', (e) => { _imgBld.nhom = e.target.value; _imgBld.ten = ''; _imgBld.size = ''; _imgBld.cl = ''; _imgBld.mau = ''; renderImgDyn_(); });
+    on('pkimg-ten', (e) => { _imgBld.ten = e.target.value; _imgBld.size = ''; _imgBld.cl = ''; _imgBld.mau = ''; renderImgDyn_(); });
+    on('pkimg-size', (e) => { _imgBld.size = e.target.value; _imgBld.cl = ''; _imgBld.mau = ''; renderImgDyn_(); });
+    on('pkimg-cl', (e) => { _imgBld.cl = e.target.value; _imgBld.mau = ''; renderImgDyn_(); });
+    on('pkimg-mau', (e) => { _imgBld.mau = e.target.value; renderImgDyn_(); });
   }
 
   function _parsePriceNum_(v) {

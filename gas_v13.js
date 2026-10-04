@@ -366,7 +366,7 @@ function _priceCols_(rows) {
 // danh sach PHANG du du lieu de FE tu dung lai UI cascading da co, roi goi driveImageFromLink_
 // rieng cho DUNG dong CS chon, thay vi doan.
 function _productImgCols_(headers) {
-  var nhomIdx = -1, tenIdx = -1, tmIdx = -1, sizeIdx = -1, clIdx = -1, imgIdx = -1;
+  var nhomIdx = -1, tenIdx = -1, tmIdx = -1, sizeIdx = -1, clIdx = -1, mauIdx = -1, imgIdx = -1;
   for (var c = 0; c < headers.length; c++) {
     var st = _stripVN_(headers[c]);
     if (nhomIdx < 0 && /nhom\s*san\s*pham/.test(st)) { nhomIdx = c; continue; }
@@ -374,16 +374,22 @@ function _productImgCols_(headers) {
     if (tmIdx < 0 && /ten\s*thuong\s*mai/.test(st)) { tmIdx = c; continue; }
     if (sizeIdx < 0 && (st.indexOf('size') !== -1 || st.indexOf('kieu') !== -1)) { sizeIdx = c; continue; }
     if (clIdx < 0 && st.indexOf('chat lieu') !== -1) { clIdx = c; continue; }
+    // Cot MAU SAC (neu sheet co) — vd "Màu sắc"/"Màu" — de phan biet bien the cung ten/size/chat
+    // lieu nhung khac mau (va co the khac anh). KHONG phai nhan dien mau TU PIXEL anh — he thong
+    // chi doc du lieu CHU trong sheet, khong phan tich noi dung anh (xem giai thich trong tra loi
+    // cho Duyen 01/10/2026).
+    if (mauIdx < 0 && (st.indexOf('mau sac') !== -1 || /\bmau\b/.test(st))) { mauIdx = c; continue; }
     if (imgIdx < 0 && (st.indexOf('hinh anh') !== -1 || st.indexOf('link anh') !== -1 ||
         st.indexOf('anh san pham') !== -1 || /\bhinh\b/.test(st) || /\banh\b/.test(st) || /\bimage\b/.test(st))) imgIdx = c;
   }
-  return { nhomIdx: nhomIdx, tenIdx: tenIdx, tmIdx: tmIdx, sizeIdx: sizeIdx, clIdx: clIdx, imgIdx: imgIdx };
+  return { nhomIdx: nhomIdx, tenIdx: tenIdx, tmIdx: tmIdx, sizeIdx: sizeIdx, clIdx: clIdx, mauIdx: mauIdx, imgIdx: imgIdx };
 }
 
 // Danh sach PHANG cho tinh nang "Tim ảnh sản phẩm" — cung hinh dang voi buildPriceCatalogFlat_
 // (n=nhom, t=ten, m=ten thuong mai, s=size, c=chat lieu) de FE dung LAI y het logic cascading
-// cua "Soan don" (xem renderBuilderDyn_), kem them img=link anh de lay anh SAU KHI da thu hep
-// dung ve 1 (hoac vai) dong, thay vi khop mo ho theo ten roi doan dai nhat.
+// cua "Soan don" (xem renderBuilderDyn_), kem them mau=mau sac (neu sheet co cot nay) va
+// img=link anh de lay anh SAU KHI da thu hep dung ve 1 (hoac vai) dong, thay vi khop mo ho theo
+// ten roi doan dai nhat.
 function buildProductImageFlat_() {
   var sh = SpreadsheetApp.openById(PRICE_SS_ID).getSheetByName(PRICE_SHEET_NAME);
   if (!sh) return { ok: false, error: 'Không tìm thấy sheet "' + PRICE_SHEET_NAME + '".' };
@@ -403,7 +409,7 @@ function buildProductImageFlat_() {
   var numDataRows = lastRow - dataStartRow + 1;
   if (numDataRows < 1) return { ok: true, items: [] };
 
-  var neededCols = [ci.nhomIdx, ci.tenIdx, ci.tmIdx, ci.sizeIdx, ci.clIdx, ci.imgIdx].filter(function(x) { return x >= 0; });
+  var neededCols = [ci.nhomIdx, ci.tenIdx, ci.tmIdx, ci.sizeIdx, ci.clIdx, ci.mauIdx, ci.imgIdx].filter(function(x) { return x >= 0; });
   var minCol = Math.min.apply(null, neededCols), maxCol = Math.max.apply(null, neededCols);
   var block = sh.getRange(dataStartRow, minCol + 1, numDataRows, maxCol - minCol + 1).getValues();
 
@@ -413,7 +419,7 @@ function buildProductImageFlat_() {
     var get = (function(row) { return function(idx) { return idx >= 0 ? String(row[idx - minCol] || '').trim() : ''; }; })(r);
     var t = get(ci.tenIdx), m = get(ci.tmIdx);
     if (!t && !m) continue;
-    items.push({ n: get(ci.nhomIdx), t: t, m: m, s: get(ci.sizeIdx), c: get(ci.clIdx), img: get(ci.imgIdx) });
+    items.push({ n: get(ci.nhomIdx), t: t, m: m, s: get(ci.sizeIdx), c: get(ci.clIdx), mau: get(ci.mauIdx), img: get(ci.imgIdx) });
   }
   return { ok: true, items: items };
 }
