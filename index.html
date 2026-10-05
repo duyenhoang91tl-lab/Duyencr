@@ -12317,10 +12317,12 @@ var _srState = {
   // F — Ty le hoan thanh KPI theo Sale (Bac Van phong / KPI co dinh Online / KPI commit rieng)
   fDateFrom: '', fDateTo: '', fDateQuick: 'thisMonth', fDateField: 'ngayTao', fSale: [], fTeam: [], dataF: null,
   fSaleSearch: '', fSaleCustomized: false, fKpiView: 'table', fEditing: null,
-  // G — Don bi loai (Huy/Tra lai/Hoan tien/That bai/Khieu nai) — dung chung filter dang voi A
-  gDateFrom: '', gDateTo: '', gDateQuick: 'custom', gSale: [], gNguon: [], gMarketer: [], gSanPham: '',
+  // G — Chuong trinh thuong Thu viec / Chinh thuc (truoc day la "Don bi loai"; action failedOrderReport con trong backend nhung khong con tab nao goi)
+  gDateFrom: '', gDateTo: '', gDateQuick: 'thisMonth', gSale: [], gNguon: [], gMarketer: [], gSanPham: '',
   dataG: null, gSaleSearch: '',
-  gSaleView: 'table', gNguonView: 'table', gMktView: 'table', gLyDoView: 'table'
+  gSaleView: 'table', gNguonView: 'table', gMktView: 'table', gLyDoView: 'table',
+  // G da doi thanh "Chuong trinh thuong Thu viec / Chinh thuc" (2026-10-04): dung nguon don Pos nhu E
+  gSaleCustomized: false, gBonusExpanded: ''
 };
 // Bao cao F mac dinh 'Tháng này' nhung fDateFrom/fDateTo truoc day de rong -> dropdown hien
 // 'Tháng này' trong khi request khong co ngay nao => backend cong DON CA TU TRUOC DEN NAY
@@ -12328,6 +12330,8 @@ var _srState = {
 (function(){
   var r = (typeof _pkQuickRange === 'function') ? _pkQuickRange(_srState.fDateQuick) : null;
   if (r){ _srState.fDateFrom = r.from; _srState.fDateTo = r.to; }
+  var rG = (typeof _pkQuickRange === 'function') ? _pkQuickRange(_srState.gDateQuick) : null;
+  if (rG){ _srState.gDateFrom = rG.from; _srState.gDateTo = rG.to; }
 })();
 
 function _srMoney(n){ return fmt(Math.round(n||0)) + '₫'; }
@@ -12586,11 +12590,14 @@ function _srEnforceScope(){
       else _srState.eSale = (_srState.eSale||[]).filter(function(n){ return teamNames.indexOf(n)!==-1; });
       if (!_srState.fSaleCustomized) _srState.fSale = teamNames.slice();
       else _srState.fSale = (_srState.fSale||[]).filter(function(n){ return teamNames.indexOf(n)!==-1; });
+      if (!_srState.gSaleCustomized) _srState.gSale = teamNames.slice();
+      else _srState.gSale = (_srState.gSale||[]).filter(function(n){ return teamNames.indexOf(n)!==-1; });
       return;
     }
   }
   _srState.eSale = my.slice();
   _srState.fSale = my.slice();
+  _srState.gSale = my.slice();
 }
 
 // SUA (theo bao cao Duyen: "lọc tháng 7-8-9 load khá lâu nhưng không ra kết quả"): truoc day
@@ -12720,11 +12727,18 @@ async function _srLoad(){
       sale: (_srState.fSale||[]).join(',')
     });
   } else if (_srState.sub === 'G') {
-    _srState.dataG = await _srFetch('failedOrderReport', {
+    // Chuong trinh thuong Thu viec/Chinh thuc: CUNG nguon va cach map field voi Bao cao E (salesReportB/Pos)
+    // de _computeBonusData_ dung chung nguyen ven. Dropdown khong phai 'custom' -> khoang ngay PHAI khop dropdown.
+    if (_srState.gDateQuick && _srState.gDateQuick !== 'custom'){
+      var rGq = _pkQuickRange(_srState.gDateQuick);
+      if (rGq){ _srState.gDateFrom = rGq.from; _srState.gDateTo = rGq.to; }
+    }
+    var dPosG = await _srFetch('salesReportB', {
       dateFrom: _srState.gDateFrom, dateTo: _srState.gDateTo,
-      sale: (_srState.gSale||[]).join(','), nguon: (_srState.gNguon||[]).join(','), marketer: (_srState.gMarketer||[]).join(','),
-      sanPham: _srState.gSanPham || ''
+      sale: (_srState.gSale||[]).join(',')
     });
+    if (dPosG && dPosG.orders) dPosG.orders = dPosG.orders.map(function(o){ return Object.assign({}, o, { saleBan: (o.saleBanValid !== undefined ? o.saleBanValid : o.theSale), giaTriDon: o.giaTriSauGiam, ngayTao: o.ngayTaoDon }); });
+    _srState.dataG = dPosG;
   }
   _srState.loading = false;
   renderSalesReportTab();
@@ -12969,6 +12983,7 @@ function _srSyncTeamToSale_(teamField){
   });
   _srState[saleField] = union;
   if (saleField === 'eSale') _srState.eSaleCustomized = true;
+  if (saleField === 'gSale') _srState.gSaleCustomized = true;
 }
 function _srComboBuildData(domId){
   var r = _srComboReg[domId]; if (!r) return;
@@ -13020,6 +13035,7 @@ function srComboToggleItem(e, domId, value){
   if (idx !== -1) arr.splice(idx, 1); else arr.push(value);
   _srState[r.field] = arr;
   if (r.field === 'eSale') _srState.eSaleCustomized = true;
+  if (r.field === 'gSale') _srState.gSaleCustomized = true;
   if (_srTeamFieldToSaleField_[r.field]){ _srSyncTeamToSale_(r.field); renderSalesReportTab(); return; }
   var ci = document.getElementById(domId+'-input');
   srComboRender(domId, ci ? ci.value : '');
@@ -13029,6 +13045,7 @@ function srComboRemove(domId, value){
   var r = _srComboReg[domId]; if (!r) return;
   _srState[r.field] = (_srState[r.field] || []).filter(function(v){ return v !== value; });
   if (r.field === 'eSale') _srState.eSaleCustomized = true;
+  if (r.field === 'gSale') _srState.gSaleCustomized = true;
   if (_srTeamFieldToSaleField_[r.field]){ _srSyncTeamToSale_(r.field); renderSalesReportTab(); return; }
   srRenderComboChips(domId);
   var l = document.getElementById(domId+'-list');
@@ -13039,6 +13056,7 @@ function srComboClear(e, domId){
   var r = _srComboReg[domId]; if (!r) return;
   _srState[r.field] = [];
   if (r.field === 'eSale') _srState.eSaleCustomized = true;
+  if (r.field === 'gSale') _srState.gSaleCustomized = true;
   if (_srTeamFieldToSaleField_[r.field]){ renderSalesReportTab(); return; }
   var ci = document.getElementById(domId+'-input'); if (ci) ci.value = '';
   srRenderComboChips(domId);
@@ -13132,7 +13150,7 @@ function renderSalesReportTab(){
     '<button class="btn '+(_srState.sub==='D'?'secondary':'sm')+'" onclick="_srSetSub(\'D\')">Báo cáo D — Sale tự thêm</button>' +
     '<button class="btn '+(_srState.sub==='E'?'secondary':'sm')+'" onclick="_srSetSub(\'E\')">Báo cáo E — Hoa hồng nhân viên Pos</button>' +
     '<button class="btn '+(_srState.sub==='F'?'secondary':'sm')+'" onclick="_srSetSub(\'F\')">Báo cáo F — KPI Sale</button>' +
-    '<button class="btn '+(_srState.sub==='G'?'secondary':'sm')+'" onclick="_srSetSub(\'G\')">Báo cáo G — Đơn bị loại</button>' +
+    '<button class="btn '+(_srState.sub==='G'?'secondary':'sm')+'" onclick="_srSetSub(\'G\')">Báo cáo G — Thưởng thử việc / chính thức</button>' +
     '</div>';
 
   if (_srState.sub === 'C') { renderSalesReportTabC_(wrap, subTabs); return; }
@@ -14254,64 +14272,176 @@ function _srRenderF_(d){
 // Nguồn POS ("dữ liệu đơn", cùng nguồn Báo cáo B/E/F) và cùng định nghĩa trạng thái bị loại
 // (Pos chỉ loại "Đã hoàn" và "Đang hoàn" — _donHasExcludedStatus_ ở backend) như Báo cáo B, nhưng CHỈ lấy đúng các đơn đã bị loại đó để xem
 // riêng: bao nhiêu đơn, thuộc sale nào, MKT nào, lý do gì. COD/Giá trị CHỈ để tham khảo — KHÔNG tính vào doanh số.
+// ════════════════════════════════════════════════════════════════════
+//  BÁO CÁO G: CHƯƠNG TRÌNH THƯỞNG — THỬ VIỆC & CHÍNH THỨC (thay cho "Đơn bị loại", yêu cầu Duyên 2026-10-04).
+//  Dùng ĐÚNG engine thưởng của Báo cáo E (_computeBonusData_ + BONUS_PROGRAMS, cùng nguồn đơn Pos
+//  action=salesReportB, cùng bản đồ Online/Offline/Thử việc SALE_CHANNELS) — chỉ khác là tách riêng 2 nhóm:
+//   • Thử việc  = Sale được phân loại "Thử việc" (SALE_CHANNELS[name]==='probation'), kèm Ngày bắt đầu + ngày thứ mấy.
+//   • Chính thức = mọi Sale còn lại (Online / Offline / chưa phân loại).
+//  Có xuất CSV (chi tiết từng lượt thưởng / tổng hợp / đơn đã dùng để tính) để kế toán đối chiếu.
+//  Backend action failedOrderReport giữ nguyên (không còn tab nào gọi), chỉ bỏ giao diện.
+// ════════════════════════════════════════════════════════════════════
+function _srGSaleTypeLabel_(name){
+  var c = SALE_CHANNELS[name];
+  return c === 'probation' ? 'Thử việc' : (c === 'online' ? 'Online' : (c === 'offline' ? 'Offline' : 'Chưa phân loại'));
+}
+function _srGDecode_(s){
+  return String(s == null ? '' : s).replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#0?39;/g,"'").replace(/&amp;/g,'&');
+}
+// Tách kết quả _computeBonusData_ thành 2 nhóm + tổng hợp theo chương trình.
+function _srGBuildGroups_(orders){
+  var bonus = _computeBonusData_(orders || []);
+  var g = { tv: { rows: [], total: 0 }, ct: { rows: [], total: 0 }, total: bonus.total, programs: {} };
+  bonus.bySale.forEach(function(r){
+    var isTv = SALE_CHANNELS[r.name] === 'probation';
+    var grp = isTv ? g.tv : g.ct;
+    grp.rows.push(r); grp.total += r.total;
+    r.items.forEach(function(it){
+      var p = g.programs[it.program] || (g.programs[it.program] = { name: it.program, tvCount: 0, tvAmount: 0, ctCount: 0, ctAmount: 0 });
+      if (isTv){ p.tvCount++; p.tvAmount += it.amount; } else { p.ctCount++; p.ctAmount += it.amount; }
+    });
+  });
+  return g;
+}
+function _srRenderG_(d){
+  if (!d) return _srNoDataHtml_();
+  if (d.error) return '<div style="color:#dc2626;text-align:center;padding:30px">Lỗi: '+esc(d.error)+'</div>';
+  if (!BONUS_PROGRAMS.length){
+    return '<div style="color:var(--muted);font-size:12px;padding:14px 0">Chưa có chương trình thưởng nào'+(_srIsAdmin() ? ' — bấm "⚙ Cài đặt → 🏆 Chương trình thưởng" ở trên để thêm.' : '.')+'</div>';
+  }
+  var g = _srGBuildGroups_(d.orders || []);
+  var html = '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Thưởng tính theo đúng các chương trình đã cài ở "🏆 Chương trình thưởng" (cùng cách tính với mục c) của Báo cáo E), '+
+    'trên đơn Pos trong khoảng ngày lọc. <b>Thử việc</b> = Sale phân loại "Thử việc"; <b>Chính thức</b> = Sale Online/Offline/chưa phân loại. '+
+    'Nhóm cơ chế "theo ngày" chỉ lấy mức cao nhất; các nhóm khác nhau cộng dồn.</div>';
+
+  html += '<div class="kpi-grid" style="margin-bottom:16px">'+
+    '<div class="kpi-card" style="border:1.5px solid var(--text)"><div class="kpi-val">'+_srMoney(g.total)+'</div><div class="kpi-label"><b>Tổng thưởng</b></div></div>'+
+    '<div class="kpi-card"><div class="kpi-val">'+_srMoney(g.tv.total)+'</div><div class="kpi-label">Thưởng Thử việc ('+fmt(g.tv.rows.length)+' Sale)</div></div>'+
+    '<div class="kpi-card"><div class="kpi-val">'+_srMoney(g.ct.total)+'</div><div class="kpi-label">Thưởng Chính thức ('+fmt(g.ct.rows.length)+' Sale)</div></div>'+
+    '<div class="kpi-card"><div class="kpi-val">'+fmt((d.orders||[]).length)+'</div><div class="kpi-label">Đơn Pos dùng để tính</div></div>'+
+    '</div>';
+
+  function groupTable(title, key, grp, isTv){
+    var h = '<div class="dash-section-title" style="margin-top:16px">'+title+'</div>';
+    h += '<table class="dash-table"><thead><tr><th>Sale</th>'+(isTv ? '<th>Ngày bắt đầu</th>' : '<th>Loại</th>')+
+      '<th style="text-align:right">Số lượt thưởng</th><th style="text-align:right"><b>Tổng thưởng</b></th><th></th></tr></thead><tbody>';
+    grp.rows.forEach(function(s, i){
+      var rid = key+'_'+i;
+      var expanded = _srState.gBonusExpanded === rid;
+      var sd = isTv ? _saleStartDate_(s.name) : '';
+      h += '<tr><td>'+esc(s.name)+'</td>'+
+        '<td>'+(isTv ? (sd ? esc(sd) : '<span style="color:#9a3412">chưa đặt Ngày bắt đầu</span>') : esc(_srGSaleTypeLabel_(s.name)))+'</td>'+
+        '<td style="text-align:right">'+fmt(s.items.length)+'</td>'+
+        '<td style="text-align:right"><b>'+_srMoney(s.total)+'</b></td>'+
+        '<td><button class="btn sm" onclick="_srState.gBonusExpanded='+(expanded ? "''" : "'"+rid+"'")+';renderSalesReportTab()">'+(expanded ? 'Ẩn' : 'Chi tiết')+'</button></td></tr>';
+      if (expanded){
+        h += '<tr><td colspan="5" style="background:var(--surface2);padding:8px 14px"><table class="dash-table" style="margin:0"><thead><tr><th>Ngày</th>'+(isTv ? '<th>Ngày thứ</th>' : '')+'<th>Phạm vi</th><th>Chương trình</th><th>Chi tiết</th><th style="text-align:right">Thưởng</th></tr></thead><tbody>'+
+          s.items.map(function(it){
+            var dn = (isTv && sd) ? _daysSinceStart_(sd, it.date) : null;
+            return '<tr><td>'+esc(it.date)+'</td>'+(isTv ? '<td>'+(dn === null ? '—' : dn)+'</td>' : '')+'<td>'+esc(it.scope)+'</td><td>'+esc(it.program)+'</td><td style="font-size:11px;color:var(--muted)">'+it.detail+'</td><td style="text-align:right">'+_srMoney(it.amount)+'</td></tr>';
+          }).join('')+'</tbody></table></td></tr>';
+      }
+    });
+    if (!grp.rows.length) h += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Không có thưởng nào phát sinh trong khoảng lọc</td></tr>';
+    else h += _srTotalRowHtml_(['Tổng', '', fmt(grp.rows.reduce(function(s,r){return s+r.items.length;},0)), '<b>'+_srMoney(grp.total)+'</b>', '']);
+    h += '</tbody></table>';
+    return h;
+  }
+  html += groupTable('🌱 Sale Thử việc', 'tv', g.tv, true);
+  html += groupTable('🏅 Sale Chính thức', 'ct', g.ct, false);
+
+  var progs = Object.keys(g.programs).map(function(k){ return g.programs[k]; }).sort(function(a,b){ return (b.tvAmount+b.ctAmount)-(a.tvAmount+a.ctAmount); });
+  html += '<div class="dash-section-title" style="margin-top:16px">Theo chương trình thưởng</div>';
+  html += '<table class="dash-table"><thead><tr><th>Chương trình</th><th style="text-align:right">Lượt (Thử việc)</th><th style="text-align:right">Thưởng (Thử việc)</th><th style="text-align:right">Lượt (Chính thức)</th><th style="text-align:right">Thưởng (Chính thức)</th><th style="text-align:right"><b>Tổng</b></th></tr></thead><tbody>';
+  progs.forEach(function(p){
+    html += '<tr><td>'+esc(p.name)+'</td><td style="text-align:right">'+fmt(p.tvCount)+'</td><td style="text-align:right">'+_srMoney(p.tvAmount)+'</td><td style="text-align:right">'+fmt(p.ctCount)+'</td><td style="text-align:right">'+_srMoney(p.ctAmount)+'</td><td style="text-align:right"><b>'+_srMoney(p.tvAmount+p.ctAmount)+'</b></td></tr>';
+  });
+  if (!progs.length) html += '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px">Chưa có chương trình nào phát sinh thưởng</td></tr>';
+  else html += _srTotalRowHtml_(['Tổng', fmt(progs.reduce(function(s,p){return s+p.tvCount;},0)), _srMoney(g.tv.total), fmt(progs.reduce(function(s,p){return s+p.ctCount;},0)), _srMoney(g.ct.total), '<b>'+_srMoney(g.total)+'</b>']);
+  html += '</tbody></table>';
+  html += '<div style="font-size:11px;color:var(--muted);margin-top:6px">"SL ước tính" ở chương trình theo sản phẩm là ước lượng từ ô mô tả sản phẩm — nên đối chiếu lại bằng file CSV trước khi chi nếu số tiền lớn. Sale chưa phân loại Online/Offline/Thử việc chỉ nhận được các chương trình không giới hạn đối tượng. Sale Thử việc chưa đặt "Ngày bắt đầu" (👤 Quản lý tài khoản) sẽ không nhận các chương trình theo ngày thử việc.</div>';
+  return html;
+}
+
+// ── Xuất CSV (UTF-8 có BOM để Excel đọc đúng tiếng Việt) ──
+function _srGCsvCell_(v){ return '"'+String(v == null ? '' : v).replace(/"/g,'""')+'"'; }
+function _srGDownloadCsv_(filename, rows){
+  var csv = '\uFEFF' + rows.map(function(r){ return r.map(_srGCsvCell_).join(','); }).join('\r\n');
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+function _srGExportCsv_(kind){
+  var d = _srState.dataG;
+  if (!d || !d.orders){ toast('Chưa có dữ liệu — bấm "Lọc" trước.'); return; }
+  var tag = (_srState.gDateFrom || 'tu-dau') + '_' + (_srState.gDateTo || 'den-nay');
+  if (kind === 'orders'){
+    var rows = [['Ngày tạo','Kênh bán (Nguồn đơn)','Sale (đã lọc hợp lệ)','Sản phẩm','Giá trị sau giảm','COD','Marketer','Trạng thái','Ghi chú đơn (cột Q)']];
+    d.orders.forEach(function(o){ rows.push([o.ngayTao, o.nguonDon, o.saleBan, o.sanPham, o.giaTriDon, o.cod, o.marketer, o.trangThai, o.ghiChu]); });
+    _srGDownloadCsv_('don-pos-tinh-thuong_'+tag+'.csv', rows); return;
+  }
+  var g = _srGBuildGroups_(d.orders);
+  if (kind === 'detail'){
+    var det = [['Nhóm','Sale','Loại Sale','Ngày bắt đầu (Thử việc)','Ngày thưởng','Ngày thứ (Thử việc)','Phạm vi','Chương trình','Chi tiết','Mã đơn','Tiền thưởng']];
+    [['Thử việc', g.tv], ['Chính thức', g.ct]].forEach(function(pair){
+      pair[1].rows.forEach(function(s){
+        var sd = pair[0] === 'Thử việc' ? _saleStartDate_(s.name) : '';
+        s.items.forEach(function(it){
+          var dn = sd ? _daysSinceStart_(sd, it.date) : '';
+          det.push([pair[0], s.name, _srGSaleTypeLabel_(s.name), sd, it.date, dn === null ? '' : dn, it.scope, it.program, _srGDecode_(it.detail), it.orderId || '', it.amount]);
+        });
+      });
+    });
+    _srGDownloadCsv_('thuong-chi-tiet_'+tag+'.csv', det); return;
+  }
+  // summary
+  var sum = [['Nhóm','Sale','Loại Sale','Ngày bắt đầu (Thử việc)','Số lượt thưởng','Tổng thưởng']];
+  [['Thử việc', g.tv], ['Chính thức', g.ct]].forEach(function(pair){
+    pair[1].rows.forEach(function(s){ sum.push([pair[0], s.name, _srGSaleTypeLabel_(s.name), pair[0] === 'Thử việc' ? _saleStartDate_(s.name) : '', s.items.length, s.total]); });
+    sum.push([pair[0]+' — TỔNG','','','', pair[1].rows.reduce(function(a,r){return a+r.items.length;},0), pair[1].total]);
+  });
+  sum.push(['TỔNG CHUNG','','','','', g.total]);
+  sum.push([]); sum.push(['Chương trình','Lượt (Thử việc)','Thưởng (Thử việc)','Lượt (Chính thức)','Thưởng (Chính thức)','Tổng']);
+  Object.keys(g.programs).forEach(function(k){ var p = g.programs[k]; sum.push([p.name, p.tvCount, p.tvAmount, p.ctCount, p.ctAmount, p.tvAmount+p.ctAmount]); });
+  _srGDownloadCsv_('thuong-tong-hop_'+tag+'.csv', sum);
+}
+
 function renderSalesReportTabG_(wrap, subTabs){
   var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
   filters += _quickRangeSelectHtml(_srState.gDateQuick, "_srApplyQuickRange('gDateQuick','gDateFrom','gDateTo',this.value)");
   filters += '<input type="date" value="'+esc(_srState.gDateFrom)+'" onchange="_srSetField(\'gDateFrom\',this.value);_srState.gDateQuick=\'custom\'" title="Từ ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
   filters += '<span style="color:var(--muted)">→</span>';
   filters += '<input type="date" value="'+esc(_srState.gDateTo)+'" onchange="_srSetField(\'gDateTo\',this.value);_srState.gDateQuick=\'custom\'" title="Đến ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
-  filters += '<input type="text" value="'+esc(_srState.gSanPham)+'" oninput="_srState.gSanPham=this.value" placeholder="Lọc theo sản phẩm..." style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);width:150px">';
-  filters += _srComboHtml('sr-sale-combo-g', 'gSale', 'saleBOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 180);
-  filters += _srComboHtml('sr-nguon-combo-g', 'gNguon', 'nguonOptions', 'Lọc theo Kênh bán', '🔍 Tìm & chọn kênh...', 170);
-  filters += _srComboHtml('sr-mkt-combo-g', 'gMarketer', 'marketerOptions', 'Lọc theo Marketer', '🔍 Tìm & chọn MKT...', 170);
+  if (_srIsAdmin()){
+    filters += _srComboHtml('sr-sale-combo-g', 'gSale', 'saleBOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 190);
+  } else if (currentUser.role === 'leader' && (_srState.leaderTeamOptions||[]).length){
+    filters += _srComboHtml('sr-sale-combo-g', 'gSale', 'leaderTeamOptions', 'Lọc theo tên (team của bạn)', '🔍 Tìm tên trong team...', 190);
+    filters += '<button class="btn sm" title="Xem lại cả team (bỏ hết lựa chọn riêng)" onclick="_srState.gSale=_srState.leaderTeamOptions.slice();_srState.gSaleCustomized=false;_srApply()">🔄 Cả team</button>';
+  } else {
+    filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Sale</div>'+
+      '<div style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)">🔒 '+esc((_srState.gSale||[]).join(', ') || currentUser.name)+' — chỉ xem được thưởng của mình</div></div>';
+  }
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
-  filters += '<button class="btn sm" id="sr-export-sheet-btn" onclick="exportSalesReportToSheet()">📄 Xuất ra Sheet</button>';
+  filters += '<div class="gear-menu"><button class="btn sm" onclick="_srToggleGearMenu(event,\'sr-gear-g-export\')">⬇️ Xuất CSV</button>'+
+    '<div class="gear-menu-list" id="sr-gear-g-export" onclick="event.stopPropagation()">'+
+      '<div onclick="closeGearMenus();_srGExportCsv_(\'summary\')">📊 Tổng hợp (theo Sale + theo chương trình)</div>'+
+      '<div onclick="closeGearMenus();_srGExportCsv_(\'detail\')">🧾 Chi tiết từng lượt thưởng</div>'+
+      '<div onclick="closeGearMenus();_srGExportCsv_(\'orders\')">📦 Đơn Pos dùng để tính (đối chiếu)</div>'+
+    '</div></div>';
+  if (_srIsAdmin()) filters += '<div class="gear-menu">'+
+      '<button class="btn sm" onclick="_srToggleGearMenu(event,\'sr-gear-g\')">⚙ Cài đặt</button>'+
+      '<div class="gear-menu-list" id="sr-gear-g" onclick="event.stopPropagation()">'+
+        '<div onclick="closeGearMenus();openBonusProgramsModal()">🏆 Chương trình thưởng</div>'+
+        '<div onclick="closeGearMenus();openSaleChannelsModal()">🏷️ Phân loại Online/Offline/Thử việc</div>'+
+      '</div></div>';
   filters += '</div>';
 
-  var body;
-  if (_srState.loading) {
-    body = '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>';
-  } else {
-    var d = _srState.dataG;
-    if (!d) {
-      body = _srNoDataHtml_();
-    } else if (d.error) {
-      body = '<div style="color:#dc2626;text-align:center;padding:30px">Lỗi: '+esc(d.error)+'</div>';
-    } else {
-      var moneyFmt = function(n){ return (Number(n)||0).toLocaleString('vi-VN') + 'đ'; };
-      var html = '<div class="kpi-grid" style="margin-bottom:16px">' +
-        '<div class="kpi-card"><div class="kpi-label">Số đơn bị loại</div><div class="kpi-val">'+fmt(d.totalOrders||0)+'</div></div>' +
-        '<div class="kpi-card"><div class="kpi-label">Tổng COD (tham khảo)</div><div class="kpi-val">'+moneyFmt(d.totalCod)+'</div></div>' +
-        '<div class="kpi-card"><div class="kpi-label">Tổng giá trị (tham khảo — KHÔNG tính doanh số)</div><div class="kpi-val">'+moneyFmt(d.totalGiaTri)+'</div></div>' +
-      '</div>';
+  var body = _srState.loading
+    ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>'
+    : _srRenderG_(_srState.dataG);
 
-      var section = function(title, arr, viewKey, note){
-        var h = '<div class="dash-section-title" style="margin-top:16px">'+title+(note?' <span style="font-size:11px;color:var(--muted);font-weight:400">('+note+')</span>':'')+_srViewToggleHtml(viewKey)+'</div>';
-        if (_srState[viewKey] === 'table') {
-          h += '<table class="dash-table"><thead><tr><th>Tên</th><th>Số đơn</th><th>COD</th><th>Giá trị</th></tr></thead><tbody>';
-          (arr||[]).forEach(function(x){ h += '<tr><td>'+esc(x.name)+'</td><td>'+fmt(x.orders)+'</td><td>'+moneyFmt(x.cod)+'</td><td>'+moneyFmt(x.giaTri)+'</td></tr>'; });
-          if (!(arr||[]).length) h += '<tr><td colspan="4" style="text-align:center;color:var(--muted)">Không có đơn nào khớp bộ lọc</td></tr>';
-          h += '</tbody></table>';
-        } else {
-          h += _srChartSvg(arr||[], 'name', 'orders', _srState[viewKey], false);
-        }
-        return h;
-      };
-      html += section('Theo lý do (trạng thái đơn)', d.byLyDo, 'gLyDoView');
-      html += section('Theo Sale', d.bySale, 'gSaleView', 'mỗi sale trên đơn đều tính 1 đơn, không chia đều như doanh thu');
-      html += section('Theo Kênh bán', d.byNguon, 'gNguonView', 'Kênh bán = Nguồn đơn của Pos');
-      html += section('Theo MKT', d.byMkt, 'gMktView', 'Marketer ghi trên từng đơn, giống Báo cáo B');
-
-      html += '<div class="dash-section-title" style="margin-top:16px">Chi tiết đơn bị loại</div>';
-      html += '<table class="dash-table"><thead><tr><th>Ngày tạo</th><th>Kênh bán</th><th>Sale</th><th>Sản phẩm</th><th>Giá trị đơn</th><th>Trạng thái</th></tr></thead><tbody>';
-      (d.orders||[]).forEach(function(o){
-        html += '<tr><td>'+esc(o.ngayTao)+'</td><td>'+esc(o.nguonDon)+'</td><td>'+esc(o.saleBan)+'</td><td>'+esc(o.sanPham)+'</td><td>'+moneyFmt(o.giaTriDon)+'</td><td>'+esc(o.trangThai)+'</td></tr>';
-      });
-      if (!(d.orders||[]).length) html += '<tr><td colspan="6" style="text-align:center;color:var(--muted)">Không có đơn nào khớp bộ lọc</td></tr>';
-      html += '</tbody></table>';
-      body = html;
-    }
-  }
   wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + filters + body;
 }
 
