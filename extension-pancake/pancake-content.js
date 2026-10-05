@@ -1973,14 +1973,18 @@
       const poolS = _imgBld.size ? poolT.filter((it) => sizeVal(it) === _imgBld.size) : poolT;
 
       // 4) Chất liệu (bỏ trống được)
-      const clVal = (it) => it.c || '__none__';
-      const cls = [...new Set(poolS.map(clVal))].sort(_vnSort_);
+      // SỬA 2026-10-05 theo yêu cầu Duyên: 1 ô "Chất liệu" trong DANH_MUC thường nhét NHIỀU chất liệu
+      // chung 1 ô (mỗi chất liệu 1 dòng/đánh số 1. 2. 3./ngăn bằng ; hoặc |) — trước đây dropdown hiện NGUYÊN Ô
+      // làm 1 lựa chọn dài loằng ngoằng. Nay tách thành TỪNG chất liệu riêng để chọn (xem _splitMaterialOptions_);
+      // 1 biến thể có nhiều chất liệu sẽ xuất hiện dưới từng chất liệu của nó khi lọc.
+      const clVals = (it) => { const p = _splitMaterialOptions_(it.c); return p.length ? p : ['__none__']; };
+      const cls = [...new Set(poolS.reduce((acc, it) => acc.concat(clVals(it)), []))].sort(_vnSort_);
       if (_imgBld.cl && cls.indexOf(_imgBld.cl) === -1) _imgBld.cl = '';
       if (!_imgBld.cl && cls.length === 1) _imgBld.cl = cls[0];
       if (cls.length > 1 || (cls.length === 1 && cls[0] !== '__none__')) {
         html += row(`Chất liệu (${cls.length})`, `<select id="pkimg-cl"><option value="">— Tất cả — (bỏ trống nếu không chắc)</option>${cls.map((v) => opt(v, v === '__none__' ? '(không ghi)' : v, v === _imgBld.cl)).join('')}</select>`);
       }
-      const poolCl = _imgBld.cl ? poolS.filter((it) => clVal(it) === _imgBld.cl) : poolS;
+      const poolCl = _imgBld.cl ? poolS.filter((it) => clVals(it).indexOf(_imgBld.cl) !== -1) : poolS;
 
       // 5) Màu sắc (CHỈ hiện nếu DANH_MUC có cột "Màu sắc" — không phải hệ thống tự nhận diện
       // màu từ ảnh, chỉ đọc đúng dữ liệu chữ trong sheet, xem _productImgCols_ bên gas_v13.js)
@@ -2004,7 +2008,7 @@
       // 6 ảnh này LÀ KẾT QUẢ CUỐI sau khi đã áp hết các bộ lọc đang chọn ở trên (kể cả khi 1 vài
       // mục cố ý để trống) — không phải bước trung gian còn lọc tiếp ngầm phía sau.
       html += `<div id="pkimg-results">` + toShow.map((it, i) => {
-        const label = [it.t || it.m, it.s, it.c, it.mau].filter(Boolean).join(' · ');
+        const label = [it.t || it.m, it.s, (_imgBld.cl && _imgBld.cl !== '__none__') ? _imgBld.cl : _splitMaterialOptions_(it.c).join(' / '), it.mau].filter(Boolean).join(' · ');
         return `<div class="pk-price-item">
           <div class="pk-ctkm-title">${escapeHtml(label)}</div>
           <div id="pkimg-slot-${i}">${it.img ? '<div class="pk-price-loading">Đang tải ảnh...</div>' : '<div class="pk-price-loading">Sản phẩm này chưa có link ảnh.</div>'}</div>
@@ -2077,6 +2081,21 @@
       if (piece) out.push(piece);
     }
     return out.length >= 2 ? out : null;
+  }
+
+  // Tách 1 ô "Chất liệu" gồm NHIỀU chất liệu thành mảng từng chất liệu riêng (đã bỏ trùng, giữ thứ tự):
+  //  1) dạng đánh số liên tục "1. X 2. Y 3. Z" (xem _parseNumberedList_);
+  //  2) hoặc mỗi chất liệu 1 dòng (xuống dòng Alt+Enter trong ô Sheet) / ngăn bằng ";" hoặc "|".
+  // KHÔNG tách theo dấu phẩy: dấu phẩy thường nằm BÊN TRONG 1 chất liệu (vd "Ngọc bích, lam thủy, cẩm thạch
+  // type B", "Đá Tourmaline ( Xanh lá, vàng, hồng tím )"). Ô chỉ có 1 chất liệu → trả về mảng 1 phần tử; ô trống → [].
+  function _splitMaterialOptions_(str) {
+    str = String(str || '').trim();
+    if (!str) return [];
+    const numbered = _parseNumberedList_(str);
+    const parts = numbered || str.split(/\r?\n|;|\|/);
+    const out = [];
+    parts.forEach((x) => { const t = String(x).replace(/\s+/g, ' ').trim(); if (t && out.indexOf(t) === -1) out.push(t); });
+    return out;
   }
 
   // ══════════════════════════ SOẠN ĐƠN (gõ tên → lọc → dropdown thu hẹp dần) ══════════════════════════
