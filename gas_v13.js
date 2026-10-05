@@ -1329,6 +1329,16 @@ function doGet(e) {
       try { cacheB.put(cKeyB, JSON.stringify(resB), 120); } catch(ec) {}
       return jsonOut_(resB);
     }
+    // So lieu ca nhan cua 1 CS cho extension Pancake AI (chi doc) — xem buildCsStats_.
+    if (action === 'csStats') {
+      var pCs = e.parameter || {};
+      var cacheCs = CacheService.getScriptCache();
+      var cKeyCs = 'csStats1_' + (pCs.cs || '') + '|' + (pCs.dateFrom || '') + '|' + (pCs.dateTo || '');
+      try { var cachedCs = cacheCs.get(cKeyCs); if (cachedCs) return jsonOut_(JSON.parse(cachedCs)); } catch(ecs) {}
+      var resCs = buildCsStats_(pCs.cs, pCs.dateFrom, pCs.dateTo);
+      if (resCs && resCs.ok) { try { cacheCs.put(cKeyCs, JSON.stringify(resCs), 90); } catch(ecs2) {} }
+      return jsonOut_(resCs);
+    }
     if (action === 'salesReportOptions') return jsonOut_(getSalesReportOptions_());
     // ── TACH TEN KH: xem truoc danh sach ten doan duoc tu don hang (chua ghi gi) ──
     if (action === 'previewCustomerNameGuesses') return jsonOut_(previewCustomerNameGuesses_());
@@ -1373,7 +1383,7 @@ function doGet(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.9-pos-ghep-fast' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.10-cs-stats' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -3512,6 +3522,269 @@ function buildSalesReportB_(filters) {
         saleBanValid: m.ghepShares ? m.ghepShares.map(function(x){ return x.name; }).join(',') : _donSaleNamesFromThe_(m.theSale).join(',')
       };
     })
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SO LIEU CA NHAN CUA 1 CS cho Pancake AI (action 'csStats') — yeu cau Duyen 2026-10-05:
+//  tong so don, doanh thu, ty le chot, hoa hong (don >=15tr / <15tr + kenh co % rieng), tong hoa hong, chuong
+//  trinh thuong. DUNG CHUNG nguon so lieu voi CRM: don + chia sale lay tu buildSalesReportB_ (Pos, da ghep Base,
+//  da tinh 30/70), ty le chot tu saleCloseRate cua B; hoa hong/thuong la BAN PORT CUA _computeCommissionData_ /
+//  _computeBonusData_ trong index.html (CRM) — NEU SUA QUY TAC HOA HONG/THUONG O CRM THI PHAI SUA CA O DAY.
+// ═══════════════════════════════════════════════════════════════
+var CS_COMMISSION_THRESHOLD_ = 15000000; // phai khop COMMISSION_THRESHOLD o index.html
+
+function _csJsonSetting_(key, fallback) {
+  try { var raw = getSetting_(key); if (!raw) return fallback; var v = JSON.parse(raw); return (v === null || v === undefined) ? fallback : v; }
+  catch (e) { return fallback; }
+}
+function _csYmdFromDmy_(s) {
+  var m = String(s || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (!m) return '';
+  return m[3] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[1]).slice(-2);
+}
+function _csDaysSinceStart_(startYmd, dateYmd) {
+  var s = String(startYmd || '').match(/^(\d{4})-(\d{2})-(\d{2})/), d = String(dateYmd || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!s || !d) return null;
+  return Math.round((Date.UTC(+d[1], +d[2] - 1, +d[3]) - Date.UTC(+s[1], +s[2] - 1, +s[3])) / 86400000) + 1;
+}
+function _csBonusProductQty_(sanPham, keywordsStr) {
+  var text = String(sanPham || '').toLowerCase();
+  var kws = String(keywordsStr || '').split(',').map(function(s) { return s.trim().toLowerCase(); }).filter(Boolean);
+  if (!kws.length || !text) return { matched: false, qty: 0 };
+  var totalQty = 0, matched = false;
+  kws.forEach(function(kw) {
+    var idx = 0;
+    while (true) {
+      var pos = text.indexOf(kw, idx);
+      if (pos === -1) break;
+      matched = true;
+      var tail = text.substr(pos + kw.length, 10);
+      var m = tail.match(/^[\s]*[x×][\s]*([0-9]+)/) || tail.match(/^[\s]*\(([0-9]+)\)/);
+      totalQty += m ? (parseInt(m[1], 10) || 1) : 1;
+      idx = pos + kw.length;
+    }
+  });
+  return { matched: matched, qty: totalQty };
+}
+function _csBonusApplies_(p, dateStr, channel, startYmd) {
+  if (p.dateFrom && dateStr && dateStr < p.dateFrom) return false;
+  if (p.dateTo && dateStr && dateStr > p.dateTo) return false;
+  var aud = p.audience || {};
+  if (aud.online || aud.offline) {
+    if (!channel) return false;
+    if (channel === 'online' && !aud.online) return false;
+    if (channel === 'offline' && !aud.offline) return false;
+    if (channel === 'probation') return false;
+  }
+  if (p.probationDay && p.probationDay.enabled) {
+    if (!startYmd) return false;
+    var dayNum = _csDaysSinceStart_(startYmd, dateStr);
+    if (dayNum === null || dayNum < 1) return false;
+    var from = (p.probationDay.from !== '' && p.probationDay.from != null) ? Number(p.probationDay.from) : 1;
+    var to = (p.probationDay.to !== '' && p.probationDay.to != null) ? Number(p.probationDay.to) : Infinity;
+    if (dayNum < from || dayNum > to) return false;
+  }
+  return true;
+}
+function _csMoney_(n) { return Math.round(Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.') + 'đ'; }
+// Mo ta ngan 1 chuong trinh thuong de hien cho CS (khong tu cham — chi doc cac dieu kien co cau truc)
+function _csBonusSummary_(p) {
+  var parts = [];
+  if (p.tier && p.tier.enabled && (p.tier.rows || []).length) {
+    parts.push('Số đơn/ngày: ' + p.tier.rows.slice().sort(function(a, b) { return Number(a.count) - Number(b.count); })
+      .map(function(t) { return '≥' + t.count + ' đơn = ' + _csMoney_(t.bonus); }).join('; '));
+  }
+  if (p.revenue && p.revenue.enabled) {
+    var lo = (p.revenue.min !== '' && p.revenue.min != null) ? 'từ ' + _csMoney_(p.revenue.min) : '';
+    var hi = (p.revenue.max !== '' && p.revenue.max != null) ? ' đến ' + _csMoney_(p.revenue.max) : '';
+    parts.push((p.revenue.scope === 'day' ? 'Doanh số ngày ' : 'Giá trị 1 đơn ') + (lo + hi).trim() + ' = ' + _csMoney_(p.bonusAmount));
+  }
+  if (p.product && String(p.product).trim()) parts.push('SP "' + String(p.product).trim() + '" = ' + _csMoney_(p.bonusAmount) + '/SP');
+  if (p.firstOrder && p.firstOrder.enabled) parts.push('Đơn đầu tiên trong ngày = ' + _csMoney_(p.firstOrder.amount));
+  return parts.join(' · ');
+}
+
+function buildCsStats_(cs, dateFrom, dateTo) {
+  cs = String(cs || '').trim();
+  if (!cs) return { ok: false, error: 'Thiếu tên CS.' };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateFrom || '') || !/^\d{4}-\d{2}-\d{2}$/.test(dateTo || '')) return { ok: false, error: 'Khoảng ngày không hợp lệ (cần dạng YYYY-MM-DD).' };
+  if (dateFrom > dateTo) return { ok: false, error: 'Ngày bắt đầu phải trước ngày kết thúc.' };
+
+  // 1) Tên của CS này: tên đang chọn + các tên/bí danh khai báo ở tài khoản (Users.names)
+  var names = [cs], user = null;
+  try {
+    readUsers_(getCrmSS_().getSheetByName(SH_USER)).forEach(function(u) {
+      var all = (u.names || []).concat([u.name]);
+      if (all.some(function(x) { return x && _normTxt_(x) === _normTxt_(cs); })) {
+        user = user || u;
+        all.forEach(function(x) { if (x && names.indexOf(x) === -1) names.push(x); });
+      }
+    });
+  } catch (eU) {}
+  var myFold = {};
+  _expandSaleFilterWithPancakeAliases_(names).forEach(function(n) { myFold[_normTxt_(n)] = true; });
+  function pick(map) { // lay gia tri cua ten dau tien co trong map (INDIVIDUAL_RATES/SALE_CHANNELS khoa theo ten Sale)
+    if (!map || typeof map !== 'object') return undefined;
+    for (var i = 0; i < names.length; i++) if (Object.prototype.hasOwnProperty.call(map, names[i])) return map[names[i]];
+    return undefined;
+  }
+
+  // 2) Don cua CS trong ky (Pos da ghep Base, da chia sale/30-70) — cung bo loc voi Bao cao B/E
+  var rep = buildSalesReportB_({ dateFrom: dateFrom, dateTo: dateTo, sale: names });
+
+  // 3) Cau hinh hoa hong / thuong (admin cai o CRM)
+  var indiv = pick(_csJsonSetting_('individualRates', {})) || {};
+  var channel = pick(_csJsonSetting_('saleChannels', {})) || '';
+  var chRates = _csJsonSetting_('channelCommissionRates', {});
+  var programs = _csJsonSetting_('bonusPrograms', []); if (!Array.isArray(programs)) programs = [];
+  var teamRate = null, teamName = '';
+  try {
+    readTeams_(getCrmSS_().getSheetByName(SH_TEAM)).forEach(function(t) {
+      if (teamRate) return;
+      var inTeam = names.some(function(n) { return t.leader === n || (t.members || []).indexOf(n) !== -1; });
+      if (inTeam) { teamRate = t.ratePct || { above15: 0, below15: 0 }; teamName = t.name; }
+    });
+  } catch (eT) {}
+  var hasA = indiv.above15 !== undefined && indiv.above15 !== null && indiv.above15 !== '';
+  var hasB = indiv.below15 !== undefined && indiv.below15 !== null && indiv.below15 !== '';
+  var teamA = teamRate && Number(teamRate.above15) > 0, teamB = teamRate && Number(teamRate.below15) > 0;
+  var def = channel === 'online' ? { a: 1.5, b: 1, label: 'Mặc định Online' } : channel === 'offline' ? { a: 1, b: 0.8, label: 'Mặc định Offline' } : null;
+  function src(has, teamHas) { return has ? 'Cá nhân' : (teamHas ? 'Team ' + teamName : (def ? def.label : 'Chưa cài')); }
+  var rateA = hasA ? Number(indiv.above15) : (teamA ? Number(teamRate.above15) : (def ? def.a : 0));
+  var rateB = hasB ? Number(indiv.below15) : (teamB ? Number(teamRate.below15) : (def ? def.b : 0));
+  function channelRate(kenh) { // % rieng cua nguon don (vd facebook = 1%) — bo qua nguong 15tr
+    var k = String(kenh || '').trim().toLowerCase();
+    if (!k) return null;
+    if (k === 'facebook' && !Object.prototype.hasOwnProperty.call(chRates, k)) return 1;
+    if (!Object.prototype.hasOwnProperty.call(chRates, k)) return null;
+    var v = chRates[k];
+    return (v === '' || v === null || v === undefined || isNaN(Number(v))) ? null : Number(v);
+  }
+
+  // 4) Duyet don: so don, doanh thu (phan cua toi), hoa hong
+  var T = CS_COMMISSION_THRESHOLD_;
+  var totalOrders = 0, revenue = 0;
+  var ordA = 0, ordB = 0, revA = 0, revB = 0, ordCh = 0, revCh = 0, commCh = 0, chBreak = {};
+  var mine = []; // don cua toi (de cham thuong)
+  (rep.orders || []).forEach(function(o) {
+    var giaTri = Number(o.giaTriSauGiam) || 0, frac = 0;
+    if (o.saleShares && o.saleShares.length) {
+      o.saleShares.forEach(function(x) { if (myFold[_normTxt_(x.name)]) frac += Number(x.frac) || 0; });
+    } else {
+      var ns = String(o.saleBanValid || '').split(',').map(function(x) { return x.trim(); }).filter(Boolean);
+      if (ns.length) { var c = 0; ns.forEach(function(x) { if (myFold[_normTxt_(x)]) c++; }); frac = c / ns.length; }
+    }
+    if (!(frac > 0)) return;
+    var share = giaTri * frac * (Number(o.saleRatio) || 1);
+    totalOrders++; revenue += share;
+    mine.push({ date: _csYmdFromDmy_(o.ngayTaoDon), time: (String(o.ngayTaoDon || '').match(/(\d{1,2}):(\d{2})/) || [''])[0], giaTri: giaTri, sanPham: o.sanPham });
+    var chR = channelRate(o.nguonDon);
+    if (chR !== null) {
+      ordCh++; revCh += share; commCh += share * chR / 100;
+      var kk = String(o.nguonDon || '').trim();
+      if (!chBreak[kk]) chBreak[kk] = { revenue: 0, rate: chR };
+      chBreak[kk].revenue += share;
+    } else if (giaTri >= T) { ordA++; revA += share; }
+    else { ordB++; revB += share; }
+  });
+  var commA = revA * rateA / 100, commB = revB * rateB / 100;
+
+  // 5) Thuong (port _computeBonusData_ cho 1 sale)
+  var startYmd = (user && user.startDate) ? String(user.startDate) : '';
+  var bonusItems = [], bonusTotal = 0;
+  var byDay = {};
+  mine.forEach(function(o) {
+    if (!byDay[o.date]) byDay[o.date] = { date: o.date, revenue: 0, count: 0, first: null };
+    var g = byDay[o.date];
+    g.revenue += o.giaTri; g.count++;
+    if (o.time && (g.first === null || o.time < g.first)) g.first = o.time;
+  });
+  Object.keys(byDay).forEach(function(k) {
+    var g = byDay[k], bestTier = null, bestRev = null, bestFirst = null;
+    programs.forEach(function(p) {
+      if (!_csBonusApplies_(p, g.date, channel, startYmd)) return;
+      if (p.revenue && p.revenue.enabled && p.revenue.scope === 'day') {
+        var mn = (p.revenue.min !== '' && p.revenue.min != null) ? Number(p.revenue.min) : null;
+        var mx = (p.revenue.max !== '' && p.revenue.max != null) ? Number(p.revenue.max) : null;
+        if ((mn === null || g.revenue >= mn) && (mx === null || g.revenue <= mx)) {
+          var amt = Number(p.bonusAmount) || 0;
+          if (amt > 0 && (!bestRev || amt > bestRev.amount)) bestRev = { amount: amt, program: p, detail: 'Doanh số ngày ' + _csMoney_(g.revenue) };
+        }
+      }
+      if (p.tier && p.tier.enabled && (p.tier.rows || []).length) {
+        var hit = null;
+        p.tier.rows.slice().sort(function(a, b) { return Number(a.count) - Number(b.count); }).forEach(function(t) { if (g.count >= Number(t.count)) hit = t; });
+        if (hit) {
+          var amt2 = Number(hit.bonus) || 0;
+          if (amt2 > 0 && (!bestTier || amt2 > bestTier.amount)) bestTier = { amount: amt2, program: p, detail: 'Đạt ' + g.count + ' đơn/ngày (bậc từ ' + hit.count + ' đơn)' };
+        }
+      }
+      if (p.firstOrder && p.firstOrder.enabled) {
+        var amt3 = Number(p.firstOrder.amount) || 0;
+        if (amt3 > 0 && (!bestFirst || amt3 > bestFirst.amount)) bestFirst = { amount: amt3, program: p, detail: 'Đơn đầu tiên trong ngày' + (g.first ? ' (lúc ' + g.first + ')' : '') };
+      }
+    });
+    [[bestTier, 'Theo ngày (số đơn)'], [bestRev, 'Theo ngày (doanh số)'], [bestFirst, 'Theo ngày (đơn đầu tiên)']].forEach(function(pr) {
+      if (!pr[0]) return;
+      bonusTotal += pr[0].amount;
+      bonusItems.push({ date: g.date, scope: pr[1], program: pr[0].program.name, amount: pr[0].amount, detail: pr[0].detail });
+    });
+  });
+  mine.forEach(function(o) {
+    var best = null;
+    programs.forEach(function(p) {
+      if (!_csBonusApplies_(p, o.date, channel, startYmd)) return;
+      if (p.product && String(p.product).trim()) {
+        var pq = _csBonusProductQty_(o.sanPham, p.product);
+        if (pq.matched && pq.qty > 0) {
+          var amt = (Number(p.bonusAmount) || 0) * pq.qty;
+          if (amt > 0 && (!best || amt > best.amount)) best = { amount: amt, program: p, detail: 'SL ước tính: ' + pq.qty + ' — SP: "' + String(o.sanPham || '') + '"' };
+        }
+      }
+      if (p.revenue && p.revenue.enabled && p.revenue.scope === 'order') {
+        var mn = (p.revenue.min !== '' && p.revenue.min != null) ? Number(p.revenue.min) : null;
+        var mx = (p.revenue.max !== '' && p.revenue.max != null) ? Number(p.revenue.max) : null;
+        if ((mn === null || o.giaTri >= mn) && (mx === null || o.giaTri <= mx)) {
+          var amt2 = Number(p.bonusAmount) || 0;
+          if (amt2 > 0 && (!best || amt2 > best.amount)) best = { amount: amt2, program: p, detail: 'Giá trị đơn ' + _csMoney_(o.giaTri) };
+        }
+      }
+    });
+    if (best) { bonusTotal += best.amount; bonusItems.push({ date: o.date, scope: 'Theo đơn', program: best.program.name, amount: best.amount, detail: best.detail }); }
+  });
+  bonusItems.sort(function(a, b) { return String(a.date).localeCompare(String(b.date)); });
+
+  // Chuong trinh thuong dang ap dung cho CS trong ky (de CS biet minh dang co chuong trinh nao)
+  var activePrograms = programs.filter(function(p) {
+    if (p.dateFrom && p.dateFrom > dateTo) return false;
+    if (p.dateTo && p.dateTo < dateFrom) return false;
+    return _csBonusApplies_(p, dateFrom, channel, '') || _csBonusApplies_(p, dateTo, channel, '') || !!(p.probationDay && p.probationDay.enabled);
+  }).map(function(p) { return { name: p.name || '', dateFrom: p.dateFrom || '', dateTo: p.dateTo || '', summary: _csBonusSummary_(p) }; });
+
+  // 6) Ty le chot (tu ty le chot theo Sale cua Bao cao B: so don chot / so khach tuong tac)
+  var closeRate = null;
+  (rep.saleCloseRate || []).forEach(function(r) {
+    if (myFold[_normTxt_(r.name)]) {
+      if (!closeRate) closeRate = { held: 0, closed: 0, rate: 0 };
+      closeRate.held += Number(r.held) || 0; closeRate.closed += Number(r.closed) || 0;
+    }
+  });
+  if (closeRate) closeRate.rate = closeRate.held ? Math.round(closeRate.closed / closeRate.held * 1000) / 10 : 0;
+
+  return {
+    ok: true, cs: cs, names: names, from: dateFrom, to: dateTo,
+    totalOrders: totalOrders, revenue: Math.round(revenue),
+    closeRate: closeRate,
+    commission: {
+      threshold: T, rateAbove15: rateA, rateBelow15: rateB, sourceAbove15: src(hasA, teamA), sourceBelow15: src(hasB, teamB),
+      ordersAbove15: ordA, revenueAbove15: Math.round(revA), commissionAbove15: Math.round(commA),
+      ordersBelow15: ordB, revenueBelow15: Math.round(revB), commissionBelow15: Math.round(commB),
+      ordersChannel: ordCh, revenueChannel: Math.round(revCh), commissionChannel: Math.round(commCh), channelBreakdown: chBreak,
+      total: Math.round(commA + commB + commCh)
+    },
+    bonus: { total: Math.round(bonusTotal), items: bonusItems, activePrograms: activePrograms },
+    ghepLoi: (rep.ghep && rep.ghep.loi) ? rep.ghep.loi : ''
   };
 }
 

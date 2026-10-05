@@ -175,6 +175,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // So lieu ca nhan cua CS (tong don, doanh thu, ty le chot, hoa hong, thuong) — action:'csStats' (GET, chi doc).
+  if (msg?.type === "GET_CS_STATS") {
+    handleGetCsStats(msg.payload)
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
   // Soan tin follow-up chu dong cho 1 khach trong danh sach nhac hen (khac voi FETCH_SUGGESTION
   // la tra loi tin khach nhan toi) — dung chung action:'ai' nhung prompt khac.
   if (msg?.type === "FETCH_FOLLOWUP_SUGGESTION") {
@@ -783,6 +791,24 @@ async function handleGetReminders(payload) {
   const data = await res.json();
   if (data.error) throw new Error(data.error);
   return { reminders: data.reminders || [] };
+}
+
+// So lieu ca nhan cua 1 CS trong khoang ngay — action:'csStats' (GET). Tra ve { ok, totalOrders, revenue, closeRate,
+// commission{...}, bonus{...} } — tinh o GAS (buildCsStats_) cung quy tac voi Bao cao E cua CRM.
+async function handleGetCsStats(payload) {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+  const cs = payload?.cs || cfg.csName || "";
+  if (!cs) throw new Error("Chưa chọn CS.");
+  const sep = cfg.gasUrl.includes("?") ? "&" : "?";
+  const url = cfg.gasUrl + sep + "action=csStats&cs=" + encodeURIComponent(cs) +
+    "&dateFrom=" + encodeURIComponent(payload?.dateFrom || "") + "&dateTo=" + encodeURIComponent(payload?.dateTo || "");
+  const res = await fetch(url, { redirect: "follow" });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  if (data.ok === false) throw new Error("Không tính được số liệu.");
+  return data;
 }
 
 // Soan tin follow-up chu dong cho 1 khach (khac voi tra loi tin khach nhan toi) — cung action:'ai'.
