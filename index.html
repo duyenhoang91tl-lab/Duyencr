@@ -4288,6 +4288,23 @@ function renderCareTab(c) {
         ${_renderZaloPhoneField(care, c)}
       </div>
     </div>
+    <div id="cs-kh-hint" style="font-size:10.5px;color:var(--muted);margin:-4px 0 8px"></div>
+    ${(function(){
+      var isChot = (typeof _hIsChot_==='function') && _hIsChot_(care.status||c.careStatus||'');
+      var ex = (typeof _hChotToday_==='function' && _hChotToday_(c.phone)) || {};
+      return `<div id="cs-chot-box" style="display:${isChot?'block':'none'};margin-bottom:10px;padding:10px;border:1px solid #bbf7d0;background:#f0fdf4;border-radius:8px">
+        <div class="form-label" style="color:var(--green)">🧾 Đơn chốt hôm nay</div>
+        <div class="form-row-2">
+          <div>
+            <div class="form-label">💰 Doanh thu đơn (đ)</div>
+            <input class="form-input" id="cs-chot-rev" inputmode="numeric" placeholder="VD: 3.000.000" value="${ex.rev?Number(ex.rev).toLocaleString('vi-VN'):''}" oninput="_hFmtMoneyInput_(this)">
+          </div>
+          <div></div>
+        </div>
+        <div class="form-label" style="margin-top:6px">📝 Ghi chú đơn (đơn gồm những gì)</div>
+        <textarea class="form-input" id="cs-chot-note" rows="2" placeholder="VD: 1 nhẫn Kim Tiền size 12 + 1 lắc tay, ship COD, giao thứ 6..." style="resize:vertical">${esc(ex.note||'')}</textarea>
+      </div>`;
+    })()}
     ${_renderCustomFieldInputs(care)}
     <div class="form-row-2">
       <div>
@@ -4895,6 +4912,7 @@ function saveCare(phone) {
     var newV = (newCustom[f.id]) || '';
     if (oldV !== newV) logAudit('status', phone, f.label+': '+(oldV||'(trống)'), f.label+': '+(newV||'(trống)'));
   });
+  try { if (typeof _hIsChot_==='function' && _hIsChot_(newStatus)) _hSaveChotFromForm_(phone, newCS); } catch(e){ console.warn('Lưu đơn chốt lỗi:', e); }
   careData[phone] = { ...existing, status: newStatus, zalo: newZalo, note: newNote, cs: newCS, khStatus: newKhStatus, birthday: newBirthday, tag: newTag, nickZalos: newNickZalos, zaloPhones: newZaloPhones, custom: newCustom };
   _touchCare(phone);
   saveLS('ome_care', careData);
@@ -12744,6 +12762,7 @@ async function _srLoad(){
     _srState.loading = false;
     renderSalesReportTab();
     _hLoadManual_();
+    _hLoadChot_();
     return;
   }
   _srState.loading = true;
@@ -15123,12 +15142,99 @@ function _hAutoKh_(status){
   }
   return '';
 }
-// Form cập nhật CS: đổi Tình trạng CS -> Trạng thái KH tự nhảy theo, TRỪ khi CS đã tự chọn tay ô KH trong lần mở form này.
+// Nhãn (con, nhóm mẹ) của 1 Tình trạng CS theo CARE_STATUS_TREE hiện hành
+function _hLabelsOf_(status){
+  var tree = (typeof CARE_STATUS_TREE !== 'undefined' && CARE_STATUS_TREE) ? CARE_STATUS_TREE : [], out = { leaf:'', group:'' };
+  tree.forEach(function(n){
+    if (n.children){ n.children.forEach(function(c){ if (c.value === status){ out.leaf = c.label || c.value; out.group = n.label || ''; } }); }
+    else if (n.value === status){ out.leaf = n.label || n.value; out.group = n.label || ''; }
+  });
+  return out;
+}
+// Tình trạng CS thuộc nhóm "Chốt" (hoặc "Đã chốt") -> form hiện thêm ô Doanh thu đơn + Ghi chú đơn
+function _hIsChot_(status){
+  if (!status) return false;
+  var l = _hLabelsOf_(status), re = /^(da)?chot$/;
+  return re.test(_hFold_(l.group)) || re.test(_hFold_(l.leaf));
+}
+// Form cập nhật CS: đổi Tình trạng CS -> (1) hiện/ẩn khung đơn chốt, (2) Trạng thái KH tự nhảy theo, TRỪ khi CS đã tự chọn tay ô KH trong lần mở form này.
 function _hOnCsStatusChange_(){
   var st = document.getElementById('cs-status'), kh = document.getElementById('cs-kh-status');
-  if (!st || !kh || kh.dataset.manual === '1') return;
-  var v = _hAutoKh_(st.value);
-  if (v && Array.prototype.some.call(kh.options, function(o){ return o.value === v; })) kh.value = v;
+  if (!st) return;
+  try {
+    var box = document.getElementById('cs-chot-box');
+    if (box) box.style.display = _hIsChot_(st.value) ? 'block' : 'none';
+    if (!kh || kh.dataset.manual === '1') return;
+    var hint = document.getElementById('cs-kh-hint');
+    var v = _hAutoKh_(st.value);
+    if (v && Array.prototype.some.call(kh.options, function(o){ return o.value === v; })){
+      kh.value = v;
+      if (hint) hint.textContent = '↻ Tự nhảy theo Tình trạng CS — bạn vẫn đổi tay được';
+    } else if (hint){
+      hint.textContent = st.value ? 'Chưa có quy tắc tự nhảy cho tình trạng này — chọn tay (Admin có thể gán ở Báo cáo H → ⚙ Trạng thái KH tự nhảy)' : '';
+    }
+  } catch(e){ console.warn('_hOnCsStatusChange_ lỗi:', e); }
+}
+
+// ── Đơn chốt do CS nhập ở form (Doanh thu + Ghi chú đơn) ──
+// Lưu theo tháng vào Settings (chotOrders_YYYY-MM) + cache localStorage; id = SĐT|ngày nên lưu lại cùng ngày là CẬP NHẬT chứ không nhân đôi đơn.
+var _hChot = {};          // { 'YYYY-MM': { id: {id,phone,cs,date,rev,note,t} } }
+var _hChotLoaded = {};
+var _hChotTimers = {};
+function _hChotMonth_(mk){ return _hChot[mk] || (_hChot[mk] = loadLS('ome_chot_orders_' + mk) || {}); }
+function _hChotMerge_(mk, remote){
+  var cur = _hChotMonth_(mk);
+  Object.keys(remote || {}).forEach(function(k){ if (!cur[k] || (remote[k].t || 0) > (cur[k].t || 0)) cur[k] = remote[k]; });
+}
+function _hChotToday_(phone){ var d = _ymd(new Date()); return _hChotMonth_(d.slice(0,7))[phone + '|' + d] || null; }
+function _hFmtMoneyInput_(el){
+  var n = parseInt(String(el.value).replace(/[^\d]/g, ''), 10);
+  el.value = n ? n.toLocaleString('vi-VN') : '';
+}
+async function _hPushChot_(mk){
+  if (!gsUrl) return;
+  try {
+    var r = await fetch(gsUrl + '?action=getSetting&key=chotOrders_' + mk, { redirect:'follow' });
+    var d = await r.json();
+    if (d && d.value) _hChotMerge_(mk, JSON.parse(d.value));
+    saveLS('ome_chot_orders_' + mk, _hChot[mk]);
+    await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'setSetting', key:'chotOrders_' + mk, value: JSON.stringify(_hChot[mk]) }) });
+  } catch(e) { toast('⚠ Đơn chốt đã lưu trên máy — chưa đồng bộ được lên Google Sheet: ' + e.message); }
+}
+// Gọi từ saveCare khi Tình trạng CS thuộc nhóm Chốt
+function _hSaveChotFromForm_(phone, cs){
+  var revEl = document.getElementById('cs-chot-rev'), noteEl = document.getElementById('cs-chot-note');
+  if (!revEl && !noteEl) return;
+  var rev = parseInt(String(revEl ? revEl.value : '').replace(/[^\d]/g, ''), 10) || 0;
+  var note = noteEl ? noteEl.value.trim() : '';
+  var d = _ymd(new Date()), mk = d.slice(0,7), id = phone + '|' + d, cur = _hChotMonth_(mk);
+  if (!rev && !note && !cur[id]) return;   // chưa nhập gì -> không tạo đơn rỗng
+  cur[id] = { id:id, phone:phone, cs: cs || (currentUser && currentUser.name) || '', date:d, rev:rev, note:note, t:Date.now() };
+  saveLS('ome_chot_orders_' + mk, cur);
+  clearTimeout(_hChotTimers[mk]);
+  _hChotTimers[mk] = setTimeout(function(){ _hPushChot_(mk); }, 700);
+  if (typeof _srState !== 'undefined' && _srState.sub === 'H') renderSalesReportTab();
+}
+function _hChotMonthsInRange_(){
+  var from = (_srState.hDateFrom || _ymd(new Date())).slice(0,7), now = _ymd(new Date()).slice(0,7), out = [], y = +from.slice(0,4), m = +from.slice(5,7), n = 0;
+  while ((y + '-' + String(m).padStart(2,'0')) <= now && n++ < 12){ out.push(y + '-' + String(m).padStart(2,'0')); m++; if (m > 12){ m = 1; y++; } }
+  return out;
+}
+async function _hLoadChot_(){
+  var months = _hChotMonthsInRange_(), changed = false;
+  for (var i = 0; i < months.length; i++){
+    var mk = months[i];
+    if (_hChotLoaded[mk]) continue;
+    _hChotLoaded[mk] = true;
+    _hChotMonth_(mk);
+    if (!gsUrl) continue;
+    try {
+      var r = await fetch(gsUrl + '?action=getSetting&key=chotOrders_' + mk, { redirect:'follow' });
+      var d = await r.json();
+      if (d && d.value){ _hChotMerge_(mk, JSON.parse(d.value)); saveLS('ome_chot_orders_' + mk, _hChot[mk]); changed = true; }
+    } catch(e) {}
+  }
+  if (changed && _srState.sub === 'H') renderSalesReportTab();
 }
 
 // ── Số đơn chốt / Doanh thu nhập tay ──
@@ -15221,6 +15327,8 @@ function _hBuild_(){
     r.mkeys[d + '|' + cs] = 1;
   });
   var rows = Object.keys(map).map(function(k){ return map[k]; });
+  var chotList = [];
+  Object.keys(_hChot).forEach(function(mk){ Object.keys(_hChot[mk]).forEach(function(id){ chotList.push(_hChot[mk][id]); }); });
   rows.forEach(function(r){
     r.total = r.phones.size; r.g = groups.map(function(){ return 0; }); r.other = 0; r.none = 0;
     r.contact = { ok:0, kll:0, none:0 }; r.zalo = {}; r.kh = {};
@@ -15235,7 +15343,12 @@ function _hBuild_(){
       var z = c.zalo || '(chưa rõ)'; r.zalo[z] = (r.zalo[z]||0) + 1;
       var k = c.khStatus || _hAutoKh_(st) || '(chưa có)'; r.kh[k] = (r.kh[k]||0) + 1;
     });
-    r.orders = 0; r.revenue = 0;
+    // Don chot CS nhap o form (chi tinh SDT nam trong data da chia cho CHINH CS do, don tao tu ngay chia tro di) + phan bo sung tay
+    r.autoOrders = 0; r.autoRevenue = 0;
+    chotList.forEach(function(e){
+      if (e.cs === r.cs && r.phones.has(e.phone) && (!r.date || e.date >= r.date)){ r.autoOrders++; r.autoRevenue += e.rev || 0; }
+    });
+    r.orders = r.autoOrders; r.revenue = r.autoRevenue;
     Object.keys(r.mkeys).forEach(function(mk){ var m = _hManualGet_(mk); r.orders += m.o || 0; r.revenue += m.r || 0; });
   });
   var teamOrder = {}; (teams||[]).forEach(function(t, i){ teamOrder[t.name || '(chưa đặt tên)'] = i; });
@@ -15283,8 +15396,8 @@ function _srRenderH_(d){
     groups.map(function(g){ return '<th '+th+' title="Tình trạng CS — nhóm mẹ">'+esc(g.label)+'</th>'; }).join('')+
     '<th '+th+' title="Có SĐT chưa có Tình trạng CS (CS chưa chăm sóc)">Chưa CS</th>'+
     '<th>Tình trạng liên hệ</th><th>Trạng thái Zalo</th><th>Trạng thái KH</th>'+
-    '<th '+th+'>Số đơn chốt <span style="color:var(--hint);font-weight:400">(nhập tay)</span></th>'+
-    '<th '+th+'>Doanh thu <span style="color:var(--hint);font-weight:400">(nhập tay)</span></th>'+
+    '<th '+th+'>Số đơn chốt <span style="color:var(--hint);font-weight:400">(form + bổ sung tay)</span></th>'+
+    '<th '+th+'>Doanh thu <span style="color:var(--hint);font-weight:400">(form + bổ sung tay)</span></th>'+
     '<th '+th+'>TB / đơn</th></tr></thead><tbody>';
   function totalRow(label, s, strong){
     var bg = strong ? 'background:var(--surface2);' : 'background:#f8fafc;';
@@ -15307,9 +15420,10 @@ function _srRenderH_(d){
       if (byCs){ oCell = fmt(r.orders); rCell = _hMoney_(r.revenue); }
       else {
         var m = _hManualGet_(mk);
+        var autoNote = function(v){ return v ? '<div style="font-size:10px;color:var(--muted);white-space:nowrap" title="CS nhập ở form chăm sóc khi chọn Chốt">Từ form: '+v+'</div>' : ''; };
         var inSt = 'text-align:right;padding:3px 6px;border:1px solid var(--border);border-radius:5px;background:var(--surface)';
-        oCell = '<input type="text" inputmode="numeric" data-k="'+esc(mk)+'" value="'+(m.o||'')+'" placeholder="0" onchange="_hSetManual_(this.dataset.k,\'o\',this.value)" style="width:60px;'+inSt+'">';
-        rCell = '<input type="text" inputmode="numeric" data-k="'+esc(mk)+'" value="'+(m.r ? _hMoney_(m.r) : '')+'" placeholder="0" onchange="_hSetManual_(this.dataset.k,\'r\',this.value)" style="width:110px;'+inSt+'">';
+        oCell = autoNote(r.autoOrders) + '<input type="text" inputmode="numeric" data-k="'+esc(mk)+'" value="'+(m.o||'')+'" placeholder="0" onchange="_hSetManual_(this.dataset.k,\'o\',this.value)" style="width:60px;'+inSt+'">';
+        rCell = autoNote(r.autoRevenue ? _hMoney_(r.autoRevenue) : 0) + '<input type="text" inputmode="numeric" data-k="'+esc(mk)+'" value="'+(m.r ? _hMoney_(m.r) : '')+'" placeholder="0" onchange="_hSetManual_(this.dataset.k,\'r\',this.value)" style="width:110px;'+inSt+'">';
       }
       html += '<tr><td style="white-space:nowrap">'+(r.date ? esc(r.date.split('-').reverse().join('/')) : '—')+'</td><td>'+esc(r.cs)+'</td>'+
         '<td style="text-align:right;font-weight:600">'+fmt(r.total)+'</td>'+
@@ -15325,7 +15439,7 @@ function _srRenderH_(d){
   html += '</tbody></table></div>';
   html += '<div style="margin-top:8px;font-size:11px;color:var(--muted);line-height:1.5">'+
     'ℹ️ Tình trạng CS / Zalo / Trạng thái KH tính theo <b>trạng thái HIỆN TẠI</b> của từng SĐT trong data đã chia (không phải trạng thái tại ngày chia). '+
-    'Trạng thái KH để trống sẽ tự suy ra từ Tình trạng CS. '+(byCs ? 'Đang gộp theo CS: muốn nhập đơn/doanh thu hãy chuyển sang "Theo ngày × CS".' : 'Số đơn chốt và Doanh thu nhập tay, tự lưu và đồng bộ cho cả team.')+'</div>';
+    'Trạng thái KH để trống sẽ tự suy ra từ Tình trạng CS. '+(byCs ? 'Đang gộp theo CS: muốn nhập đơn/doanh thu hãy chuyển sang "Theo ngày × CS".' : 'Số đơn chốt / Doanh thu = đơn CS nhập ở form chăm sóc khi chọn Chốt (hiện "Từ form") + phần bổ sung tay ở ô nhập; tự lưu và đồng bộ cho cả team.')+'</div>';
   return html;
 }
 function renderSalesReportTabH_(wrap, subTabs){
