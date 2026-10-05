@@ -79,10 +79,16 @@ var SH_ORDER_DEFAULT = 'OrderData26';
 // CARE_HEADERS: 20 cols (v10.0 co 15, v11.2 co 17, v12.0 them birthday, v13.1 them zaloSetBy,
 // v13.2 them name — luu ten khach truc tiep trong CareData, dung cho khach MOI chua co don
 // hang nao trong OrderData nen khong co ten de lay).
+// v13.3 (2026-09): them zaloPhones — SDT khach dang dung de ket ban Zalo, CS tu ghi (chon tu
+// SDT co san cua khach hoac go moi), THAY THE hoan toan phan "Nick Zalo" rieng cua Pancake
+// (khach tren Pancake ket ban Zalo bang cac SDT/tai khoan khac nhau, khong co dinh theo 1
+// Page nen tracking theo "nick" khong con dung nua). zaloPhones KHAC nickZalos: nickZalos van
+// giu nguyen, van do Zalo AI ghi (nick/kenh CUA DOI NGU dang dung de nhan tin, phuc vu dinh
+// tuyen gui hang loat) — khong dung chung cot, tranh 2 tinh nang dam vao nhau.
 var CARE_HEADERS = ['phone','status','zalo','cs','note','schedules',
   'schedGoi','schedGoiNote','schedSP','schedSPNote',
   'schedCS','schedCSNote','schedHen','schedHenNote','updated',
-  'khStatus','nickZalos','birthday','zaloSetBy','name','custom'];
+  'khStatus','nickZalos','birthday','zaloSetBy','name','custom','zaloPhones'];
 
 var ORDER_HEADERS  = ['phone','name','date','year','month','cs','source','revenue',
   'product','productDetail','status','zalo','note','careCS'];
@@ -920,7 +926,9 @@ function careObjFromRow_(row) {
     name:         row[19]||'',
     // Gia tri cac "truong tu tao" admin them (xem CUSTOM_FIELDS ben index.html) — luu gop 1 cot
     // JSON de khong phai them cot moi moi lan admin tao them truong.
-    custom:       (function(v){ try { var o = JSON.parse(v||'{}'); return (o && typeof o === 'object') ? o : {}; } catch(e) { return {}; } })(row[20])
+    custom:       (function(v){ try { var o = JSON.parse(v||'{}'); return (o && typeof o === 'object') ? o : {}; } catch(e) { return {}; } })(row[20]),
+    // SDT khach dung de ket ban Zalo (mang chuoi, CS tu them) — xem chu thich tai CARE_HEADERS
+    zaloPhones:   (function(v){ try { var a = JSON.parse(v||'[]'); return Array.isArray(a) ? a : []; } catch(e) { return []; } })(row[21])
   };
 }
 
@@ -957,13 +965,15 @@ function careRow_(r) {
   var cust = r.custom;
   if (typeof cust === 'string') { try { cust = JSON.parse(cust||'{}'); } catch(e) { cust = {}; } }
   if (!cust || typeof cust !== 'object') cust = {};
+  var zp = r.zaloPhones;
+  if (!Array.isArray(zp)) { try { zp = JSON.parse(zp||'[]'); } catch(e) { zp = []; } }
   return [
     r.phone||'', r.status||'', r.zalo||'', r.cs||'', r.note||'', r.schedules||'',
     r.schedGoi||'', r.schedGoiNote||'', r.schedSP||'', r.schedSPNote||'',
     r.schedCS||'', r.schedCSNote||'', r.schedHen||'', r.schedHenNote||'',
     new Date().toISOString(),
     r.khStatus||'', JSON.stringify(nz), r.birthday||'', setBy||'', r.name||'',
-    JSON.stringify(cust)
+    JSON.stringify(cust), JSON.stringify(zp)
   ];
 }
 
@@ -980,7 +990,8 @@ function readExistingExtFields_(sh) {
       nickZalos: vals[i][16]||'[]',
       birthday:  vals[i][17]||'',
       zaloSetBy: vals[i][18]||'',
-      name:      vals[i][19]||''
+      name:      vals[i][19]||'',
+      zaloPhones: vals[i][21]||'[]'
     };
   }
   return map;
@@ -996,6 +1007,16 @@ function mergeExtFields_(r, ex) {
   if (r.nickZalos === undefined || r.nickZalos === null ||
       (Array.isArray(r.nickZalos) && r.nickZalos.length === 0)) {
     try { r.nickZalos = JSON.parse(ex.nickZalos||'[]'); } catch(e) { r.nickZalos = []; }
+  }
+  // zaloPhones: CHỈ bảo tồn khi client không hề biết đến trường này (undefined/null — gửi
+  // thiếu hẳn key, như mọi lời gọi saveSingle/saveBatch có TỪ TRƯỚC khi trường này ra đời).
+  // KHÔNG áp dụng "mảng rỗng cũng bảo tồn" như nickZalos ở trên: CRM/Pancake là 2 nơi DUY NHẤT
+  // quản lý trường này, và mảng rỗng [] do 2 nơi đó gửi lên nghĩa là Sale CHỦ ĐỘNG xoá hết SĐT
+  // (vd bỏ nốt SĐT cuối cùng) — nếu coi rỗng là "chưa gửi" thì sẽ không bao giờ xoá về 0 được.
+  if (r.zaloPhones === undefined || r.zaloPhones === null) {
+    try { r.zaloPhones = JSON.parse(ex.zaloPhones||'[]'); } catch(e) { r.zaloPhones = []; }
+  } else if (!Array.isArray(r.zaloPhones)) {
+    try { r.zaloPhones = JSON.parse(r.zaloPhones||'[]'); } catch(e) { r.zaloPhones = []; }
   }
   return r;
 }
@@ -4081,7 +4102,7 @@ function saveSingleCare_(r) {
   if (rowIdx > 0) {
     // Doc du lieu hien tai de bao toan truong mo rong neu incoming khong co
     var existRow = sh.getRange(rowIdx, 1, 1, CARE_HEADERS.length).getValues()[0];
-    mergeExtFields_(r, { khStatus: existRow[15]||'', nickZalos: existRow[16]||'[]', birthday: existRow[17]||'', zaloSetBy: existRow[18]||'', name: existRow[19]||'' });
+    mergeExtFields_(r, { khStatus: existRow[15]||'', nickZalos: existRow[16]||'[]', birthday: existRow[17]||'', zaloSetBy: existRow[18]||'', name: existRow[19]||'', zaloPhones: existRow[21]||'[]' });
     sh.getRange(rowIdx, 1, 1, CARE_HEADERS.length).setValues([careRow_(r)]);
   } else {
     sh.appendRow(careRow_(r));
@@ -4103,7 +4124,7 @@ function saveBatchCare_(rows) {
   for (var k = 0; k < rows.length; k++) {
     var r = rows[k]; var key = normPhone_(String(r.phone));
     if (index[key] !== undefined) {
-      mergeExtFields_(r, { khStatus: data[index[key]][15]||'', nickZalos: data[index[key]][16]||'[]', birthday: data[index[key]][17]||'', zaloSetBy: data[index[key]][18]||'', name: data[index[key]][19]||'' });
+      mergeExtFields_(r, { khStatus: data[index[key]][15]||'', nickZalos: data[index[key]][16]||'[]', birthday: data[index[key]][17]||'', zaloSetBy: data[index[key]][18]||'', name: data[index[key]][19]||'', zaloPhones: data[index[key]][21]||'[]' });
       data[index[key]] = careRow_(r); updated++;
     } else {
       data.push(careRow_(r)); index[key] = data.length - 1; appended++;

@@ -298,38 +298,6 @@
   font-size: 12px;
 }
 
-#pk-ai-nick-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-
-#pk-ai-nick-row label {
-  font-size: 11px;
-  color: #6b7280;
-  white-space: nowrap;
-}
-
-#pk-nick-sel {
-  flex: 1;
-  padding: 4px 6px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  font-size: 12px;
-}
-
-#pk-nick-add {
-  border: 1px solid #2563eb;
-  background: #fff;
-  color: #2563eb;
-  border-radius: 6px;
-  padding: 3px 9px;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
 #pk-link-chat-btn {
   border: 1px solid #ccc;
   background: #fff;
@@ -397,6 +365,83 @@
   font-size: 12px;
   box-sizing: border-box;
 }
+
+/* SDT Zalo (thay the Nick Zalo rieng cua Pancake — xem pancake-content.js) */
+.zalophone-field {
+  background: #eff6ff;
+  border: 1px solid #93c5fd;
+  border-radius: 7px;
+  padding: 8px 10px;
+  margin-top: 8px;
+}
+.zalophone-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1d4ed8;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin-bottom: 5px;
+}
+.zalophone-locked-note {
+  font-size: 10px;
+  color: #6b7280;
+  font-style: italic;
+}
+.zalophone-select-row {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.zalophone-select-row select,
+.zalophone-select-row input {
+  flex: 1;
+  min-width: 90px;
+  padding: 5px 6px;
+  border: 1px solid #93c5fd;
+  border-radius: 6px;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+.zalophone-add-btn {
+  background: #1d4ed8;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 9px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.zalophone-add-btn:hover { background: #1e40af; }
+.zalophone-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+.zalophone-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  border: 1px solid #93c5fd;
+  font-weight: 500;
+}
+.zalophone-chip .zp-x {
+  background: none;
+  border: none;
+  color: #1d4ed8;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0 1px;
+  line-height: 1;
+  opacity: .7;
+}
+.zalophone-chip .zp-x:hover { opacity: 1; color: #dc2626; }
 
 .pk-btn-outline {
   width: 100%;

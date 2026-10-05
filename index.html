@@ -314,6 +314,22 @@ select.srt{padding:4px 8px;border:1px solid var(--border);border-radius:var(--rs
 .nickzalo-chip .nz-x{background:none;border:none;color:#15803d;cursor:pointer;font-size:11px;padding:0 1px;line-height:1;opacity:.7;}
 .nickzalo-chip .nz-x:hover{opacity:1;color:var(--red);}
 
+/* ── SDT ZALO FIELD (thay the Nick Zalo rieng cua Pancake — xem CARE_HEADERS o gas_v13.js) ── */
+.zalophone-field{background:#eff6ff;border:1px solid #93c5fd;border-radius:7px;padding:8px 10px;margin-bottom:2px;}
+.zalophone-label{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;}
+.zalophone-label-text{font-size:11px;font-weight:600;color:#1d4ed8;text-transform:uppercase;letter-spacing:.06em;}
+.zalophone-locked-note{font-size:10px;color:var(--muted);font-style:italic;}
+.zalophone-select-row{display:flex;gap:5px;align-items:center;flex-wrap:wrap;}
+.zalophone-select{flex:1;min-width:110px;padding:5px 8px;border:1px solid #93c5fd;border-radius:var(--rsm);font-size:12px;background:#fff;color:var(--text);outline:none;}
+.zalophone-input{flex:1;min-width:110px;padding:5px 8px;border:1px solid #93c5fd;border-radius:var(--rsm);font-size:12px;background:#fff;color:var(--text);outline:none;}
+.zalophone-select:focus,.zalophone-input:focus{border-color:#1d4ed8;}
+.zalophone-add-btn{background:#1d4ed8;color:#fff;border:none;border-radius:var(--rsm);padding:5px 9px;font-size:11px;cursor:pointer;white-space:nowrap;}
+.zalophone-add-btn:hover{background:#1e40af;}
+.zalophone-chip-row{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;}
+.zalophone-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;font-weight:500;}
+.zalophone-chip .zp-x{background:none;border:none;color:#1d4ed8;cursor:pointer;font-size:11px;padding:0 1px;line-height:1;opacity:.7;}
+.zalophone-chip .zp-x:hover{opacity:1;color:var(--red);}
+
 /* Modal quản lý Nick Zalo */
 .nz-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:700;display:none;align-items:center;justify-content:center;}
 .nz-modal-overlay.open{display:flex;}
@@ -2786,7 +2802,7 @@ async function syncFromGS(opts) {
         schedCS: row.schedCS||'', schedCSNote: row.schedCSNote||'',
         schedHen: row.schedHen||'', schedHenNote: row.schedHenNote||'',
         updated: row.updated||'',
-        khStatus: row.khStatus||'', nickZalos: row.nickZalos||[], birthday: row.birthday||'', tag: row.tag||'',
+        khStatus: row.khStatus||'', nickZalos: row.nickZalos||[], zaloPhones: row.zaloPhones||[], birthday: row.birthday||'', tag: row.tag||'',
         custom: (row.custom && typeof row.custom === 'object') ? row.custom : {}
       };
       // KH này đang được xem trong panel chi tiết (openDp) và vừa có bản ghi mới hơn (vd: CS vừa lưu từ Zalo AI extension)
@@ -2898,6 +2914,7 @@ async function pushCareToGS(phone) {
     schedHen: care.schedHen||'', schedHenNote: care.schedHenNote||'',
     khStatus: care.khStatus||'',
     nickZalos: care.nickZalos||[],
+    zaloPhones: care.zaloPhones||[],
     tag: care.tag||'',
     name: care.name||'',
     custom: care.custom||{}
@@ -3187,6 +3204,7 @@ function buildCustomers() {
       // Giá trị các trường tự tạo (admin thêm) — dùng cho lọc sidebar, cột bảng, badge, xuất Excel
       custom: (care.custom && typeof care.custom === 'object') ? care.custom : {},
       nickZalos: Array.isArray(care.nickZalos) ? care.nickZalos : [],
+      zaloPhones: Array.isArray(care.zaloPhones) ? care.zaloPhones : [],
       careNote: care.note || c._rawNote || '',
       careCS,
       // Tách careCS thành các tên riêng lẻ (đề phòng ai đó gõ tay "A, B" vào ô CS chăm sóc) —
@@ -4205,22 +4223,7 @@ function renderCareTab(c) {
         </select>
       </div>
       <div>
-        <div class="nickzalo-field">
-          <div class="nickzalo-label">
-            <span class="nickzalo-label-text">💬 Nick Zalo</span>
-            <button class="nickzalo-manage-btn" data-phone="${esc(c.phone)}" onclick="openNickZaloModal(this.dataset.phone)">⚙ Quản lý danh sách</button>
-          </div>
-          <div class="nickzalo-select-row">
-            <select class="nickzalo-select" id="cs-nickzalo-sel" data-phone="${esc(c.phone)}" onchange="addNickZaloChip(this.dataset.phone,this)">
-              <option value="">— Chọn nick Zalo —</option>
-              ${_buildNickZaloOptions()}
-            </select>
-          </div>
-          <div class="nickzalo-chip-row" id="cs-nickzalo-chips">
-            ${_renderNickZaloChips(care.nickZalos||[], c.phone)}
-          </div>
-          <input type="hidden" id="cs-nickzalo-val" value="${esc(JSON.stringify(care.nickZalos||[]))}">
-        </div>
+        ${_renderZaloPhoneField(care, c)}
       </div>
     </div>
     ${_renderCustomFieldInputs(care)}
@@ -4815,6 +4818,7 @@ function saveCare(phone) {
   const newBirthday = (document.getElementById('cs-birthday') ? document.getElementById('cs-birthday').value : '') || existing.birthday || '';
   const newTag = (document.getElementById('cs-tag') ? document.getElementById('cs-tag').value.trim() : '') || existing.tag || '';
   const newNickZalos = (function(){ try { var el=document.getElementById('cs-nickzalo-val'); return el ? JSON.parse(el.value||'[]') : (existing.nickZalos||[]); } catch(e){ return existing.nickZalos||[]; }})();
+  const newZaloPhones = (function(){ try { var el=document.getElementById('cs-zalophone-val'); return el ? JSON.parse(el.value||'[]') : (existing.zaloPhones||[]); } catch(e){ return existing.zaloPhones||[]; }})();
   // Trường tự tạo (admin thêm) — gộp chung 1 object 'custom' để không phải thêm cột mới vào Sheet
   const newCustom = _collectCustomFieldValues(existing.custom);
   // V9 audit: ghi lại thay đổi trạng thái / CS / Zalo
@@ -4829,7 +4833,7 @@ function saveCare(phone) {
     var newV = (newCustom[f.id]) || '';
     if (oldV !== newV) logAudit('status', phone, f.label+': '+(oldV||'(trống)'), f.label+': '+(newV||'(trống)'));
   });
-  careData[phone] = { ...existing, status: newStatus, zalo: newZalo, note: newNote, cs: newCS, khStatus: newKhStatus, birthday: newBirthday, tag: newTag, nickZalos: newNickZalos, custom: newCustom };
+  careData[phone] = { ...existing, status: newStatus, zalo: newZalo, note: newNote, cs: newCS, khStatus: newKhStatus, birthday: newBirthday, tag: newTag, nickZalos: newNickZalos, zaloPhones: newZaloPhones, custom: newCustom };
   _touchCare(phone);
   saveLS('ome_care', careData);
   _invalidateFilterCache();
@@ -5035,12 +5039,9 @@ function openNickZaloModal(phone) {
 function closeNickZaloModal() {
   var ov = document.getElementById('nz-modal-overlay');
   if (ov) ov.classList.remove('open');
-  // Refresh select options in care panel
-  var sel = document.getElementById('cs-nickzalo-sel');
-  if (sel) {
-    var cur = sel.value;
-    sel.innerHTML = '<option value="">— Chọn nick Zalo —</option>' + _buildNickZaloOptions(cur);
-  }
+  // Lam moi dropdown con dung danh sach nay (broadcast compose) — form cham soc khach khong
+  // con o nay nua, da thay bang SDT Zalo (zaloPhones), xem openZaloPhoneSettingsModal/_renderZaloPhoneField.
+  if (typeof _bcLoadNickList === 'function') { try { _bcLoadNickList(); } catch(e){} }
 }
 
 function _renderNickZaloModalList() {
@@ -5095,6 +5096,152 @@ async function deleteNickZaloFromList(idx) {
     await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({action:'setSetting', key:'nickZaloList', value: JSON.stringify(_nickZaloList)}) });
     toast('Đã xóa "' + name + '"');
   } catch(e) { toast('⚠ Xóa cục bộ nhưng lưu máy chủ lỗi: ' + e.message); }
+}
+
+// ═══════════════════════════════════════════════════════
+//  SDT ZALO — SDT khach dang dung de ket ban Zalo (2026-09, thay the "Nick Zalo" rieng cua
+//  Pancake, vi khach tren Pancake ket ban Zalo bang nhieu SDT/tai khoan khac nhau, khong co
+//  dinh 1 Page nen theo doi theo "nick" khong con dung). Moi khach co 1 MANG cac SDT (co the
+//  doi/them theo thoi gian), CS tu go SDT moi hoac chon nhanh SDT chinh cua khach.
+//  Cot luu: zaloPhones trong CareData — KHAC HOAN TOAN nickZalos (van giu nguyen rieng cho
+//  Zalo AI dinh tuyen gui hang loat theo tai khoan doi ngu, khong dong vao o day).
+//  Admin dieu khien qua 2 setting chung (giong nickZaloList): zaloPhoneFieldLocked (khoa han
+//  ca truong) va zaloPhoneSaleCanAdd (Sale co duoc tu them SDT khong, mac dinh CO).
+// ═══════════════════════════════════════════════════════
+let _zaloPhoneFieldLocked = false;
+let _zaloPhoneSaleCanAdd = true; // mac dinh: Sale duoc phep them (dung yeu cau ban dau)
+async function _syncZaloPhoneSettingsFromGAS() {
+  if (!gsUrl) return;
+  try {
+    var r = await fetch(gsUrl + '?action=getSetting&key=zaloPhoneFieldLocked', {redirect:'follow'});
+    var d = await r.json();
+    _zaloPhoneFieldLocked = d && d.value === 'true';
+    var r2 = await fetch(gsUrl + '?action=getSetting&key=zaloPhoneSaleCanAdd', {redirect:'follow'});
+    var d2 = await r2.json();
+    _zaloPhoneSaleCanAdd = !(d2 && d2.value === 'false'); // chi tat khi luu ro rang la 'false'
+  } catch(e) { /* giu mac dinh neu loi mang */ }
+}
+_syncZaloPhoneSettingsFromGAS();
+
+// Co Sale nay duoc them SDT Zalo khong: Admin luon duoc (khong bi khoa boi 2 setting tren)
+function _zaloPhoneCanAdd() {
+  if (typeof _srIsAdmin === 'function' && _srIsAdmin()) return true;
+  return _zaloPhoneSaleCanAdd;
+}
+// Truong co dang bi khoa hoan toan khong (an voi ca Sale lan Admin xem tren form khach —
+// Admin van bat/tat duoc o modal Cai dat): Admin xem duoc khi ho tu mo modal quan ly, nhung
+// tren FORM KHACH thi khoa la an voi tat ca de dung 1 quy tac de hieu.
+function _zaloPhoneFieldVisible() { return !_zaloPhoneFieldLocked; }
+
+function _buildZaloPhoneOptions(mainPhone, existing) {
+  var opts = '<option value="">— SĐT có sẵn —</option>';
+  if (mainPhone && (existing||[]).indexOf(mainPhone) === -1) {
+    opts += '<option value="' + esc(mainPhone) + '">SĐT chính: ' + esc(mainPhone) + '</option>';
+  }
+  return opts;
+}
+function _renderZaloPhoneChips(arr, phone) {
+  var canEdit = _zaloPhoneCanAdd();
+  if (!arr || !arr.length) return '<span style="font-size:11px;color:var(--muted)">Chưa có SĐT nào</span>';
+  return arr.map(function(sdt, idx) {
+    return '<span class="zalophone-chip">📱 ' + esc(sdt) +
+      (canEdit ? '<button class="zp-x" data-phone="' + esc(phone) + '" title="Bỏ SĐT này" onclick="removeZaloPhoneChip(this.dataset.phone,' + idx + ')">✕</button>' : '') +
+      '</span>';
+  }).join('');
+}
+// Khoi HTML day du cho 1 khach (goi tu form cham soc) — tu quyet dinh an/hien theo 2 setting
+function _renderZaloPhoneField(care, c) {
+  var isAdm = (typeof _srIsAdmin === 'function' && _srIsAdmin());
+  if (!_zaloPhoneFieldVisible()) {
+    // Khoa: an het voi Sale; Admin van thay 1 dong gon kem nut Cai dat de tu mo khoa lai duoc
+    if (!isAdm) return '';
+    return '<div class="zalophone-field" style="opacity:.7">' +
+        '<div class="zalophone-label"><span class="zalophone-label-text">📱 SĐT Zalo (đang khoá)</span>' +
+        '<button class="nickzalo-manage-btn" onclick="openZaloPhoneSettingsModal()">⚙ Cài đặt</button></div>' +
+      '</div>';
+  }
+  var arr = care.zaloPhones || [];
+  var canAdd = _zaloPhoneCanAdd();
+  var addRow = canAdd
+    ? ('<div class="zalophone-select-row">' +
+        '<select class="zalophone-select" id="cs-zalophone-sel" data-phone="' + esc(c.phone) + '">' +
+          _buildZaloPhoneOptions(c.phone, arr) +
+        '</select>' +
+        '<input type="text" class="zalophone-input" id="cs-zalophone-input" placeholder="...hoặc gõ SĐT khác" inputmode="tel">' +
+        '<button class="zalophone-add-btn" data-phone="' + esc(c.phone) + '" onclick="addZaloPhoneChip(this.dataset.phone)">+ Thêm</button>' +
+      '</div>')
+    : '<div class="zalophone-locked-note">Chỉ Admin được thêm SĐT ở trường này.</div>';
+  return '<div class="zalophone-field">' +
+      '<div class="zalophone-label"><span class="zalophone-label-text">📱 SĐT Zalo</span>' +
+      (isAdm ? '<button class="nickzalo-manage-btn" onclick="openZaloPhoneSettingsModal()">⚙ Cài đặt</button>' : '') +
+      '</div>' +
+      addRow +
+      '<div class="zalophone-chip-row" id="cs-zalophone-chips">' + _renderZaloPhoneChips(arr, c.phone) + '</div>' +
+      '<input type="hidden" id="cs-zalophone-val" value="' + esc(JSON.stringify(arr)) + '">' +
+    '</div>';
+}
+function addZaloPhoneChip(phone) {
+  if (!_zaloPhoneCanAdd()) { toast('Bạn không có quyền thêm SĐT Zalo.'); return; }
+  var selEl = document.getElementById('cs-zalophone-sel');
+  var inpEl = document.getElementById('cs-zalophone-input');
+  var raw = (inpEl && inpEl.value.trim()) ? inpEl.value.trim() : (selEl ? selEl.value : '');
+  if (!raw) { toast('Chọn hoặc gõ 1 SĐT trước đã.'); return; }
+  var np = normPhone(raw);
+  if (!np) { toast('SĐT "' + raw + '" không hợp lệ.'); return; }
+  var hidEl = document.getElementById('cs-zalophone-val');
+  var arr = []; try { arr = JSON.parse((hidEl && hidEl.value) || '[]'); } catch(e){ arr = []; }
+  if (arr.indexOf(np) >= 0) { toast('SĐT này đã có trong danh sách.'); return; }
+  arr.push(np);
+  if (hidEl) hidEl.value = JSON.stringify(arr);
+  if (inpEl) inpEl.value = '';
+  if (selEl) selEl.innerHTML = _buildZaloPhoneOptions(phone, arr);
+  var chipsEl = document.getElementById('cs-zalophone-chips');
+  if (chipsEl) chipsEl.innerHTML = _renderZaloPhoneChips(arr, phone);
+}
+function removeZaloPhoneChip(phone, idx) {
+  if (!_zaloPhoneCanAdd()) { toast('Bạn không có quyền sửa SĐT Zalo.'); return; }
+  var hidEl = document.getElementById('cs-zalophone-val');
+  var arr = []; try { arr = JSON.parse((hidEl && hidEl.value) || '[]'); } catch(e){ arr = []; }
+  arr.splice(idx, 1);
+  if (hidEl) hidEl.value = JSON.stringify(arr);
+  var selEl = document.getElementById('cs-zalophone-sel');
+  if (selEl) selEl.innerHTML = _buildZaloPhoneOptions(phone, arr);
+  var chipsEl = document.getElementById('cs-zalophone-chips');
+  if (chipsEl) chipsEl.innerHTML = _renderZaloPhoneChips(arr, phone);
+}
+
+// ── Modal Admin: khoa/mo truong SDT Zalo + cho phep Sale them hay khong ──
+function openZaloPhoneSettingsModal() {
+  if (typeof _srIsAdmin === 'function' && !_srIsAdmin()) { toast('Chỉ admin mới cấu hình được mục này.'); return; }
+  var div = document.createElement('div');
+  div.className = 'nz-modal-overlay open';
+  div.innerHTML =
+    '<div class="nz-modal" style="width:380px">' +
+      '<div class="nz-modal-header"><div class="nz-modal-title">📱 Cài đặt SĐT Zalo</div>' +
+      '<button class="close-btn" onclick="this.closest(\'.nz-modal-overlay\').remove()">✕</button></div>' +
+      '<div style="padding:14px 16px;display:flex;flex-direction:column;gap:12px">' +
+        '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">' +
+          '<input type="checkbox" id="zp-set-locked" ' + (_zaloPhoneFieldLocked?'checked':'') + '> Khoá hẳn trường SĐT Zalo (ẩn với mọi người trên form khách)</label>' +
+        '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">' +
+          '<input type="checkbox" id="zp-set-saleadd" ' + (_zaloPhoneSaleCanAdd?'checked':'') + '> Cho phép Sale tự thêm SĐT mới (tắt = chỉ Admin thêm được)</label>' +
+        '<button class="btn primary" style="width:100%;justify-content:center" onclick="_saveZaloPhoneSettings(this)">Lưu</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(div);
+  div.addEventListener('click', function(e){ if (e.target === div) div.remove(); });
+}
+async function _saveZaloPhoneSettings(btn) {
+  var locked = document.getElementById('zp-set-locked').checked;
+  var saleAdd = document.getElementById('zp-set-saleadd').checked;
+  try {
+    await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({action:'setSetting', key:'zaloPhoneFieldLocked', value: locked?'true':'false'}) });
+    await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({action:'setSetting', key:'zaloPhoneSaleCanAdd', value: saleAdd?'true':'false'}) });
+    _zaloPhoneFieldLocked = locked; _zaloPhoneSaleCanAdd = saleAdd;
+    toast('✓ Đã lưu cài đặt SĐT Zalo');
+    btn.closest('.nz-modal-overlay').remove();
+    if (typeof currentPhone !== 'undefined' && currentPhone && typeof renderDpTab === 'function'
+        && typeof currentDpTab !== 'undefined' && currentDpTab === 'care') { try { renderDpTab('care'); } catch(e){} }
+  } catch(e) { toast('❌ Lưu lỗi: ' + e.message); }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -5830,6 +5977,7 @@ function rebuildCareOnCustomers() {
     c.zaloStatus = care.zalo  || c._rawZalo  || '';
     c.khStatus   = care.khStatus || '';
     c.nickZalos  = Array.isArray(care.nickZalos) ? care.nickZalos : [];
+    c.zaloPhones = Array.isArray(care.zaloPhones) ? care.zaloPhones : [];
     c.careNote   = care.note  || c._rawNote  || '';
     c.custom     = (care.custom && typeof care.custom === 'object') ? care.custom : {};
     c.careCS     = care.cs    || _latestOrderCS(c.orders);
@@ -8989,7 +9137,7 @@ function _careRow(phone){
     schedSP: care.schedSP||'', schedSPNote: care.schedSPNote||'',
     schedCS: care.schedCS||'', schedCSNote: care.schedCSNote||'',
     schedHen: care.schedHen||'', schedHenNote: care.schedHenNote||'',
-    khStatus: care.khStatus||'', nickZalos: care.nickZalos||[], birthday: care.birthday||'',
+    khStatus: care.khStatus||'', nickZalos: care.nickZalos||[], zaloPhones: care.zaloPhones||[], birthday: care.birthday||'',
     name: care.name||'',
     custom: care.custom||{}
   };
@@ -9007,6 +9155,7 @@ function _hasRealCareData(phone){
   if ((care.birthday||'').toString().trim()) return true;
   if ((care.name||'').toString().trim())     return true;
   if (Array.isArray(care.nickZalos) && care.nickZalos.length) return true;
+  if (Array.isArray(care.zaloPhones) && care.zaloPhones.length) return true;
   // Trường tự tạo (admin thêm) có giá trị → cũng là dữ liệu CS nhập thật, phải được đồng bộ
   // (nếu thiếu điều kiện này, khách CHỈ điền trường tự tạo sẽ không bao giờ được đẩy lên Sheet)
   if (care.custom && typeof care.custom === 'object') {
@@ -17809,7 +17958,9 @@ function zaiHideError() {
     <label style="font-weight:600;font-size:12px;display:block;margin-bottom:4px;">Nội dung tin nhắn</label>
     <textarea id="bc-compose-msg" rows="5" placeholder="Nội dung tin nhắn gửi cho khách..." style="width:100%;padding:7px 9px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;margin-bottom:10px;box-sizing:border-box;font-family:inherit;resize:vertical;"></textarea>
 
-    <label style="font-weight:600;font-size:12px;display:block;margin-bottom:4px;">Nick Zalo phụ trách (tuỳ chọn — danh sách đồng bộ chung với Zalo AI)</label>
+    <label style="font-weight:600;font-size:12px;display:block;margin-bottom:4px;">Nick Zalo phụ trách (tuỳ chọn — danh sách đồng bộ chung với Zalo AI)
+      <button type="button" class="nickzalo-manage-btn" style="margin-left:6px" onclick="openNickZaloModal()">⚙ Quản lý danh sách</button>
+    </label>
     <select id="bc-compose-nick" style="width:100%;padding:7px 9px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;margin-bottom:10px;box-sizing:border-box;background:#fff;">
       <option value="">— Không chỉ định nick —</option>
     </select>

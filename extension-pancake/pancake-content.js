@@ -124,10 +124,15 @@
   let _tplLoadedOnce = false; // mo tab "Mau tin nhan tu van" lan dau la tu nap toan bo thu vien
   let _msgTemplates = []; // cache trong phien lam viec (tai lai khi bam 🔄 hoac mo lai panel)
   let CS_NAMES = [];
-  let NICK_LIST = [];
   let CARE_STATUS_TREE = null; // cay "Tinh trang CS" load dong tu GAS (dong bo voi appweb/Zalo AI)
   let CUSTOM_FIELDS = []; // "truong tu tao" (admin them ben app web chinh) — load dong tu GAS
-  let _currentNick = ''; // Nick Zalo/kenh CS dang dung, sticky (chrome.storage.sync)
+  // SDT Zalo (2026-09): thay the hoan toan "Nick Zalo" rieng cua Pancake — khach tren Pancake
+  // ket ban Zalo bang nhieu SDT/tai khoan khac nhau, khong co dinh 1 Page nen "nick" khong con
+  // dung. Sale tu ghi SDT dang dung de ket ban Zalo voi khach (chon SDT chinh cua khach hoac go
+  // moi). KHAC HOAN TOAN nickZalos (van giu nguyen rieng cho Zalo AI dinh tuyen gui hang loat).
+  let _zaloPhoneFieldLocked = false;
+  let _zaloPhoneSaleCanAdd = true; // mac dinh Sale duoc them, dung yeu cau ban dau
+  let _pkZaloPhones = []; // danh sach SDT Zalo cua khach DANG MO tren form (sua truc tiep tren mang nay)
   let _goldUnitAmount = 350000; // Don gia 1 don vi "vang" (d) — admin cai o CRM (gear Cai dat >
                                  // Don gia vang) hoac o Options cua Pancake AI, luu chung setting
                                  // GAS 'goldUnitAmount' de dong bo toan team. Mac dinh 350k neu chua cai.
@@ -150,7 +155,7 @@
     injectPanel();
     observeConversationChanges();
     loadCsNames_();
-    loadNickList_();
+    loadZaloPhoneSettings_();
     loadGoldUnitAmount_();
     if (!IS_PHONGTHUY) { loadCareStatusTree_(); loadCustomFields_(); } // cay dung chung cho Pancake/Zalo (san pham suc khoe) — khong ap dung cho phong thuy
     loadChatKeyMap_();
@@ -334,11 +339,6 @@
           <label>CS đang dùng</label>
           <select id="pk-cs-sel"></select>
         </div>
-        <div id="pk-ai-nick-row">
-          <label>💬 Nick Zalo</label>
-          <select id="pk-nick-sel"></select>
-          <button id="pk-nick-add" title="Thêm nick mới">＋</button>
-        </div>
         <div id="pk-ai-phone-row">
           <input type="text" id="pk-ai-phone-input" placeholder="SĐT khách (nếu không tự nhận ra)" />
           <button id="pk-ai-phone-btn">Tra cứu</button>
@@ -515,23 +515,6 @@
     csSel.addEventListener('change', () => {
       chrome.storage.sync.set({ csName: csSel.value });
       loadReminders_();
-    });
-
-    const nickSel = panelEl.querySelector('#pk-nick-sel');
-    nickSel.addEventListener('change', () => {
-      _currentNick = nickSel.value;
-      chrome.storage.sync.set({ currentNick: _currentNick });
-    });
-    panelEl.querySelector('#pk-nick-add').addEventListener('click', () => {
-      const nick = (prompt('Nhập nick Zalo/kênh mới:') || '').trim();
-      if (!nick) return;
-      safeSendMessage_({ type: 'ADD_NICK', payload: { nick } }, (resp) => {
-        NICK_LIST = (resp?.ok && resp.data?.list) ? resp.data.list : NICK_LIST;
-        if (!NICK_LIST.includes(nick)) NICK_LIST.push(nick);
-        _currentNick = nick;
-        chrome.storage.sync.set({ currentNick: nick });
-        renderNickSelect_();
-      });
     });
 
     panelEl.querySelector("#pk-ai-refresh").addEventListener("click", () => {
@@ -730,24 +713,15 @@
     });
   }
 
-  // Nick Zalo/kênh — dùng chung danh sách (setting 'nickZaloList') với Zalo AI, sticky riêng
-  // theo máy/extension này (chrome.storage.sync của Pancake AI, độc lập với Zalo AI).
-  function loadNickList_() {
-    chrome.storage.sync.get(['currentNick'], (res) => {
-      _currentNick = res.currentNick || '';
-      safeSendMessage_({ type: "GET_NICK_LIST" }, (resp) => {
-        NICK_LIST = (resp?.ok && resp.data) ? resp.data : [];
-        renderNickSelect_();
-      });
+  // 2 co Admin dieu khien truong SDT Zalo (khoa han / cho Sale tu them) — xem chu thich tai
+  // khai bao _zaloPhoneFieldLocked/_zaloPhoneSaleCanAdd o tren.
+  function loadZaloPhoneSettings_() {
+    safeSendMessage_({ type: 'GET_ZALOPHONE_SETTINGS' }, (resp) => {
+      if (resp?.ok && resp.data) {
+        _zaloPhoneFieldLocked = !!resp.data.locked;
+        _zaloPhoneSaleCanAdd = resp.data.saleCanAdd !== false;
+      }
     });
-  }
-
-  function renderNickSelect_() {
-    const sel = panelEl?.querySelector('#pk-nick-sel');
-    if (!sel) return;
-    sel.innerHTML = '<option value="">— Chọn nick —</option>' +
-      NICK_LIST.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
-    sel.value = _currentNick || '';
   }
 
   // Đơn giá 1 đơn vị "vàng" (đ) — admin cài ở CRM (⚙ Cài đặt > Đơn giá vàng, trong Báo cáo
@@ -878,6 +852,63 @@
       const v = care.custom[f.id];
       return v ? `<span class="pk-ai-chip">🏷 ${escapeHtml(f.label)}: ${escapeHtml(v)}</span>` : '';
     }).join('');
+  }
+
+  // ── SDT ZALO: thay the "Nick Zalo" — xem chu thich day du tai khai bao _pkZaloPhones o tren.
+  // Dung chung quy uoc/CSS voi appweb (CARE_HEADERS.zaloPhones trong gas_v13.js). ──
+  function _pkBuildZaloPhoneOptions_(mainPhone, existing) {
+    let opts = '<option value="">— SĐT có sẵn —</option>';
+    if (mainPhone && !(existing || []).includes(mainPhone)) {
+      opts += `<option value="${escapeHtml(mainPhone)}">SĐT chính: ${escapeHtml(mainPhone)}</option>`;
+    }
+    return opts;
+  }
+  function _pkRenderZaloPhoneChips_() {
+    const canEdit = _zaloPhoneSaleCanAdd;
+    if (!_pkZaloPhones.length) return '<span style="font-size:11px;color:#888">Chưa có SĐT nào</span>';
+    return _pkZaloPhones.map((sdt, idx) =>
+      `<span class="zalophone-chip">📱 ${escapeHtml(sdt)}${canEdit ? ` <button class="zp-x" data-idx="${idx}" title="Bỏ SĐT này">✕</button>` : ''}</span>`
+    ).join('');
+  }
+  // Tra ve HTML day du cho 1 khach — tu an/khoa theo 2 co Admin da nap tu loadZaloPhoneSettings_
+  function _pkRenderZaloPhoneField_(mainPhone) {
+    if (_zaloPhoneFieldLocked) return '';
+    const addRow = _zaloPhoneSaleCanAdd
+      ? `<div class="zalophone-select-row">
+           <select id="pk-zalophone-sel">${_pkBuildZaloPhoneOptions_(mainPhone, _pkZaloPhones)}</select>
+           <input type="text" id="pk-zalophone-input" placeholder="...hoặc gõ SĐT khác" inputmode="tel">
+           <button id="pk-zalophone-add" class="zalophone-add-btn" type="button">+ Thêm</button>
+         </div>`
+      : `<div class="zalophone-locked-note">Chỉ Admin được thêm SĐT ở trường này.</div>`;
+    return `<div class="zalophone-field">
+        <div class="zalophone-label"><span class="zalophone-label-text">📱 SĐT Zalo</span></div>
+        ${addRow}
+        <div class="zalophone-chip-row" id="pk-zalophone-chips">${_pkRenderZaloPhoneChips_()}</div>
+      </div>`;
+  }
+  function _pkRefreshZaloPhoneUI_(mainPhone) {
+    const sel = panelEl?.querySelector('#pk-zalophone-sel');
+    if (sel) sel.innerHTML = _pkBuildZaloPhoneOptions_(mainPhone, _pkZaloPhones);
+    const chips = panelEl?.querySelector('#pk-zalophone-chips');
+    if (chips) chips.innerHTML = _pkRenderZaloPhoneChips_();
+  }
+  function addZaloPhoneChip_(mainPhone) {
+    if (!_zaloPhoneSaleCanAdd) return;
+    const selEl = panelEl.querySelector('#pk-zalophone-sel');
+    const inpEl = panelEl.querySelector('#pk-zalophone-input');
+    const raw = (inpEl?.value || '').trim() || (selEl?.value || '');
+    if (!raw) { setStatus('⚠️ Chọn hoặc gõ 1 SĐT trước đã.'); return; }
+    const np = normPhone(raw);
+    if (!/^0[3-9]\d{8}$/.test(np)) { setStatus(`⚠️ SĐT "${raw}" không hợp lệ.`); return; }
+    if (_pkZaloPhones.includes(np)) { setStatus('⚠️ SĐT này đã có trong danh sách.'); return; }
+    _pkZaloPhones.push(np);
+    if (inpEl) inpEl.value = '';
+    _pkRefreshZaloPhoneUI_(mainPhone);
+  }
+  function removeZaloPhoneChip_(idx, mainPhone) {
+    if (!_zaloPhoneSaleCanAdd) return;
+    _pkZaloPhones.splice(idx, 1);
+    _pkRefreshZaloPhoneUI_(mainPhone);
   }
 
   // "Danh bạ ngược" (khoá hội thoại → SĐT) học cục bộ trên máy này — dùng khi CS bấm 🔗
@@ -1265,6 +1296,7 @@
     const totalRevenue = (orders || []).reduce((s, o) => s + (parseFloat(o.revenue) || 0), 0);
     const products = [...new Set((orders || []).map((o) => o.product).filter(Boolean))].slice(0, 4).join(", ");
     const isNew = !care && (!orders || !orders.length);
+    _pkZaloPhones = Array.isArray(care?.zaloPhones) ? care.zaloPhones.slice() : [];
 
     const optHtml = (opts, val) => opts.map((o) =>
       `<option value="${escapeHtml(o)}"${o === (val || '') ? ' selected' : ''}>${o ? escapeHtml(o) : '— Chọn —'}</option>`
@@ -1301,6 +1333,7 @@
             <select id="pk-zalo-sel">${optHtml(ZALO_STATUSES, care?.zalo)}</select>
           </div>
         </div>
+        ${_pkRenderZaloPhoneField_(phone)}
         <div class="pk-form-row">
           <div class="pk-form-col">
             <label>${KHSTATUS_LABEL}</label>
@@ -1349,6 +1382,20 @@
     });
     box.querySelector('#pk-hen-done').addEventListener('click', () => doneAppointment_(currentFormPhone_() || phone));
     box.querySelector('#pk-save-btn').addEventListener('click', () => saveCare_(currentFormPhone_() || phone));
+
+    // SDT Zalo: nut them (chi ton tai khi _zaloPhoneSaleCanAdd=true) + go bo tung chip (uy
+    // thac su kien tren khung chip vi cac nut ✕ duoc ve lai moi lan them/xoa)
+    const zpAddBtn = box.querySelector('#pk-zalophone-add');
+    if (zpAddBtn) zpAddBtn.addEventListener('click', () => addZaloPhoneChip_(currentFormPhone_() || phone));
+    const zpInput = box.querySelector('#pk-zalophone-input');
+    if (zpInput) zpInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); addZaloPhoneChip_(currentFormPhone_() || phone); }
+    });
+    const zpChips = box.querySelector('#pk-zalophone-chips');
+    if (zpChips) zpChips.addEventListener('click', (e) => {
+      const btn = e.target.closest('.zp-x');
+      if (btn) removeZaloPhoneChip_(Number(btn.dataset.idx), currentFormPhone_() || phone);
+    });
 
     // Form thêm mới: khi CS dán xong SĐT hợp lệ thì tự tra ngầm 1 lần để cảnh báo nếu số đã tồn tại
     const newPhoneEl = box.querySelector('#pk-newphone-input');
@@ -1441,11 +1488,6 @@
     const c = _currentCare || {};
     const nameEl = panelEl?.querySelector('#pk-name-input');
     const liveName = nameEl ? nameEl.value.trim() : '';
-    // Ghi nhan nick Zalo/kenh dang dung vao danh sach nick da tung tiep xuc voi khach nay —
-    // giong het cach Zalo AI lam khi luu (them vao nickZalos, khong ghi de mat nick cu).
-    const existingNicks = c.nickZalos || [];
-    const nickZalos = (_currentNick && !existingNicks.includes(_currentNick))
-      ? [...existingNicks, _currentNick] : existingNicks;
     return Object.assign({
       phone,
       status: c.status || '', zalo: c.zalo || '', cs: settings.csName || c.cs || '',
@@ -1456,7 +1498,8 @@
       schedCS: c.schedCS || '', schedCSNote: c.schedCSNote || '',
       schedHen: c.schedHen || '', schedHenNote: c.schedHenNote || '',
       khStatus: c.khStatus || '', birthday: c.birthday || '',
-      nickZalos,
+      nickZalos: c.nickZalos || [], // khong dong vao — rieng cua Zalo AI, Pancake khong sua
+      zaloPhones: _zaloPhoneFieldLocked ? (c.zaloPhones || []) : _pkZaloPhones.slice(),
       custom: c.custom || {},
       name: liveName || _currentOrderPanelName || c.name || ''
     }, overrides || {});
@@ -1503,9 +1546,13 @@
       out[k] = serverCare[k] || localRow[k] || '';
     });
     // Nick Zalo/kenh: hop nhat, khong bao gio lam mat nick cu
-    const svNicks = serverCare.nickZalos || [];
-    const lcNicks = localRow.nickZalos || [];
-    out.nickZalos = [...new Set([...svNicks, ...lcNicks])];
+    // Nick Zalo/kenh: Pancake khong con sua truong nay — giu nguyen y server, phong truong
+    // hop server co cap nhat moi tu Zalo AI sau khi form Pancake nay da mo.
+    out.nickZalos = serverCare.nickZalos || localRow.nickZalos || [];
+    // SDT Zalo: hop nhat, khong bao gio lam mat SDT cu (ca nguoi khac vua them luc minh dang mo form)
+    const svZaloPhones = serverCare.zaloPhones || [];
+    const lcZaloPhones = localRow.zaloPhones || [];
+    out.zaloPhones = [...new Set([...svZaloPhones, ...lcZaloPhones])];
     // CS phu trach: neu khach da co CS cu thi giu, khong cuop quyen phu trach
     out.cs = serverCare.cs || localRow.cs || '';
     const noteRes = _mergeNotesKeepOld_(serverCare.note, localRow.note);
