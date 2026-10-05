@@ -1111,6 +1111,7 @@ body.rpt-mode .app{height:100vh}
         <option value="dt">DT tổng</option>
         <option value="cs">Chăm sóc (KH thêm nhanh)</option>
         <option value="don">Dữ liệu đơn</option>
+        <option value="assign">Chia data (được chia cho tôi)</option>
       </select>
     </div>
     <div class="sb-label">Phân loại KH</div>
@@ -3413,12 +3414,20 @@ function applyFilters() {
     }
     if (q && !c.nameLower.includes(q) && !c.phone.includes(q)) return false;
 
-    // Lọc theo nguồn dữ liệu (DT tổng / Chăm sóc / Dữ liệu đơn) — mặc định "Gộp" = không lọc
+    // Lọc theo nguồn dữ liệu (DT tổng / Chăm sóc / Dữ liệu đơn / Chia data) — mặc định "Gộp" = không lọc
     if (dataSrcF !== 'all') {
       const src = c.dataSrc || {};
       if (dataSrcF === 'dt'  && !src.dt)  return false;
       if (dataSrcF === 'cs'  && !src.cs)  return false;
       if (dataSrcF === 'don' && !src.don) return false;
+      // "Chia data": KH đang nằm trong (các) đợt phân công (sheet AssignData) của CHÍNH tài
+      // khoản đang đăng nhập — tra qua _assignAllIndex (phone -> Set<csName>) giống hệt cách
+      // bộ lọc CS ở trên đang dùng, không bake vào c.dataSrc vì AssignData có thể được tải/đổi
+      // mà không rebuild lại toàn bộ danh sách khách.
+      if (dataSrcF === 'assign') {
+        const _aIdx = (typeof _assignAllIndex !== 'undefined') ? _assignAllIndex[c.phone] : null;
+        if (!_aIdx || !_aIdx.has(currentUser.name)) return false;
+      }
     }
 
     // Campaign filter (normalize phone để tránh lỗi khoảng trắng/dấu gạch)
