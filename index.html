@@ -1530,6 +1530,29 @@ body.rpt-mode .app{height:100vh}
 
       <!-- Error -->
       <div id="zai-error" style="display:none;color:#dc2626;font-size:12px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:8px 12px"></div>
+
+      <!-- Thu vien mau tin nhan tu van khach (them 2026-10): luu san mau de tra cuu/copy khi nhan tin
+           khach, dong bo dung 1 nguon qua action 'messageTemplates' voi extension Pancake AI. -->
+      <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+          <div class="zai-label" style="margin:0;font-size:13px;font-weight:700">📚 Thư viện mẫu tin nhắn tư vấn</div>
+          <input id="mt-search" class="zai-input" placeholder="Tìm theo tiêu đề / nội dung / tag..." style="flex:1;min-width:180px" oninput="renderMsgTemplateList()">
+          <button class="btn sm primary" onclick="openMsgTemplateForm()">+ Thêm mẫu</button>
+        </div>
+        <div id="mt-form-wrap" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:12px;margin-bottom:10px">
+          <input type="hidden" id="mt-f-id">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+            <input id="mt-f-title" class="zai-input" placeholder="Tiêu đề mẫu (VD: Giữ gìn thành quả)" style="flex:1;min-width:200px">
+            <input id="mt-f-tags" class="zai-input" placeholder="Tag, phân cách bằng dấu phẩy (VD: dong-vien, giu-khach)" style="flex:1;min-width:200px">
+          </div>
+          <textarea id="mt-f-content" class="zai-textarea" placeholder="Nội dung mẫu tin nhắn..." rows="4" style="width:100%;margin-bottom:8px"></textarea>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn sm" onclick="closeMsgTemplateForm()">Hủy</button>
+            <button class="btn sm primary" id="mt-f-save-btn" onclick="saveMsgTemplateUI()">Lưu mẫu</button>
+          </div>
+        </div>
+        <div id="mt-list" style="display:flex;flex-direction:column;gap:8px"></div>
+      </div>
     </div>
 
     <div id="tab-mydata" style="display:none;flex:1;overflow:hidden;flex-direction:column" class="main">
@@ -17442,8 +17465,125 @@ function _closeTierOnOutside(e) {
     _prevSwitch(tab, el);
     var zp = document.getElementById('tab-zaloai');
     if (zp) zp.style.display = (tab === 'zaloai') ? 'flex' : 'none';
+    if (tab === 'zaloai') loadMsgTemplates();
   };
 })();
+
+// ═══════════════════════════════════════════════════════
+//  THU VIEN MAU TIN NHAN TU VAN KHACH (them 2026-10) — doc/ghi qua action
+//  'messageTemplates'/'saveMessageTemplate'/'deleteMessageTemplate' (gas_v13.js). Cung 1 nguon
+//  du lieu voi extension Pancake AI, nen KHONG cache rieng trong localStorage — luon fetch lai
+//  khi mo tab de thay thay doi tu noi khac (vd extension vua them mau moi).
+// ═══════════════════════════════════════════════════════
+var _msgTemplates = [];
+async function loadMsgTemplates() {
+  var listEl = document.getElementById('mt-list');
+  if (!listEl) return;
+  listEl.innerHTML = '<div style="font-size:12px;color:var(--muted)">Đang tải mẫu...</div>';
+  try {
+    var sep = gsUrl.indexOf('?') >= 0 ? '&' : '?';
+    var r = await fetch(gsUrl + sep + 'action=messageTemplates', { redirect: 'follow' });
+    var d = await r.json();
+    _msgTemplates = (d && d.templates) || [];
+  } catch (e) {
+    listEl.innerHTML = '<div style="font-size:12px;color:#dc2626">Lỗi tải thư viện mẫu, thử lại.</div>';
+    return;
+  }
+  renderMsgTemplateList();
+}
+
+function renderMsgTemplateList() {
+  var listEl = document.getElementById('mt-list');
+  if (!listEl) return;
+  var q = (document.getElementById('mt-search').value || '').trim().toLowerCase();
+  var items = _msgTemplates.filter(function (t) {
+    if (!q) return true;
+    return (t.title || '').toLowerCase().indexOf(q) >= 0 ||
+      (t.content || '').toLowerCase().indexOf(q) >= 0 ||
+      (t.tags || '').toLowerCase().indexOf(q) >= 0;
+  });
+  if (!items.length) {
+    listEl.innerHTML = '<div style="font-size:12px;color:var(--muted)">' + (_msgTemplates.length ? 'Không tìm thấy mẫu phù hợp.' : 'Chưa có mẫu nào — bấm "+ Thêm mẫu" để tạo mẫu đầu tiên.') + '</div>';
+    return;
+  }
+  listEl.innerHTML = items.map(function (t) {
+    var tagsHtml = (t.tags || '').split(',').map(function (tg) { tg = tg.trim(); return tg ? '<span class="zi-chip">#' + esc(tg) + '</span>' : ''; }).join('');
+    return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:10px 12px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px">' +
+        '<div style="font-weight:700;font-size:13px">' + esc(t.title) + '</div>' +
+        '<div style="display:flex;gap:4px;flex-shrink:0">' +
+          '<button class="btn sm" onclick="copyMsgTemplate(\'' + t.id + '\')" title="Copy nội dung">📋 Copy</button>' +
+          '<button class="btn sm" onclick="openMsgTemplateForm(\'' + t.id + '\')" title="Sửa">✏️</button>' +
+          '<button class="btn sm" onclick="deleteMsgTemplateUI(\'' + t.id + '\')" title="Xóa">🗑</button>' +
+        '</div>' +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--text);white-space:pre-wrap;margin-bottom:6px">' + esc(t.content) + '</div>' +
+      (tagsHtml ? '<div class="zi-row">' + tagsHtml + '</div>' : '') +
+    '</div>';
+  }).join('');
+}
+
+function openMsgTemplateForm(id) {
+  var wrap = document.getElementById('mt-form-wrap');
+  var t = id ? _msgTemplates.find(function (x) { return x.id === id; }) : null;
+  document.getElementById('mt-f-id').value = t ? t.id : '';
+  document.getElementById('mt-f-title').value = t ? t.title : '';
+  document.getElementById('mt-f-tags').value = t ? t.tags : '';
+  document.getElementById('mt-f-content').value = t ? t.content : '';
+  wrap.style.display = 'block';
+  document.getElementById('mt-f-title').focus();
+}
+
+function closeMsgTemplateForm() {
+  document.getElementById('mt-form-wrap').style.display = 'none';
+}
+
+async function saveMsgTemplateUI() {
+  var title = (document.getElementById('mt-f-title').value || '').trim();
+  var content = (document.getElementById('mt-f-content').value || '').trim();
+  var tags = (document.getElementById('mt-f-tags').value || '').trim();
+  var id = (document.getElementById('mt-f-id').value || '').trim();
+  if (!title || !content) { alert('Vui lòng nhập tiêu đề và nội dung mẫu.'); return; }
+  var btn = document.getElementById('mt-f-save-btn');
+  btn.disabled = true; btn.textContent = 'Đang lưu...';
+  try {
+    var body = { action: 'saveMessageTemplate', template: {
+      id: id || undefined, title: title, content: content, tags: tags,
+      createdBy: (typeof currentUser !== 'undefined' && currentUser && currentUser.name) || ''
+    } };
+    var r = await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify(body) });
+    var d = await r.json();
+    if (d && d.error) { alert('Lỗi: ' + d.error); return; }
+  } catch (e) { alert('Lỗi kết nối, thử lại.'); return; }
+  finally { btn.disabled = false; btn.textContent = 'Lưu mẫu'; }
+  closeMsgTemplateForm();
+  loadMsgTemplates();
+}
+
+async function deleteMsgTemplateUI(id) {
+  if (!confirm('Xóa mẫu tin nhắn này?')) return;
+  try {
+    var r = await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify({ action: 'deleteMessageTemplate', id: id }) });
+    var d = await r.json();
+    if (d && d.error) { alert('Lỗi: ' + d.error); return; }
+  } catch (e) { alert('Lỗi kết nối, thử lại.'); return; }
+  loadMsgTemplates();
+}
+
+function copyMsgTemplate(id) {
+  var t = _msgTemplates.find(function (x) { return x.id === id; });
+  if (!t) return;
+  navigator.clipboard.writeText(t.content).then(function () {
+    var btns = document.querySelectorAll('#mt-list button');
+    // phan hoi nhanh bang cach doi tam text nut vua bam (tim theo id trong onclick)
+    btns.forEach(function (b) {
+      if (b.getAttribute('onclick') === "copyMsgTemplate('" + id + "')") {
+        var old = b.textContent; b.textContent = '✅ Đã copy';
+        setTimeout(function () { b.textContent = old; }, 1200);
+      }
+    });
+  }).catch(function () { alert('Không copy được, vui lòng copy thủ công.'); });
+}
 
 function zaiTone(btn) {
   document.querySelectorAll('.zai-tone').forEach(function(b){ b.classList.remove('active'); });
