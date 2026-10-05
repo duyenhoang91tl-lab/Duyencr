@@ -1887,7 +1887,7 @@
   let _imgFlatItems = null;   // null = chưa tải; [] = tải rồi nhưng rỗng
   let _imgFlatLoading = false;
   let _imgLiveTimer = null;
-  const _imgBldBlank_ = () => ({ q: '', nhom: '', ten: '', size: '', cl: '', mau: '' });
+  const _imgBldBlank_ = () => ({ q: '', nhom: '', ten: '', size: '', cl: '', cl2: '', mau: '' });
   let _imgBld = _imgBldBlank_();
 
   function initImgSearch_() {
@@ -1972,19 +1972,29 @@
       }
       const poolS = _imgBld.size ? poolT.filter((it) => sizeVal(it) === _imgBld.size) : poolT;
 
-      // 4) Chất liệu (bỏ trống được)
-      // SỬA 2026-10-05 theo yêu cầu Duyên: 1 ô "Chất liệu" trong DANH_MUC thường nhét NHIỀU chất liệu
-      // chung 1 ô (mỗi chất liệu 1 dòng/đánh số 1. 2. 3./ngăn bằng ; hoặc |) — trước đây dropdown hiện NGUYÊN Ô
-      // làm 1 lựa chọn dài loằng ngoằng. Nay tách thành TỪNG chất liệu riêng để chọn (xem _splitMaterialOptions_);
-      // 1 biến thể có nhiều chất liệu sẽ xuất hiện dưới từng chất liệu của nó khi lọc.
-      const clVals = (it) => { const p = _splitMaterialOptions_(it.c); return p.length ? p : ['__none__']; };
-      const cls = [...new Set(poolS.reduce((acc, it) => acc.concat(clVals(it)), []))].sort(_vnSort_);
-      if (_imgBld.cl && cls.indexOf(_imgBld.cl) === -1) _imgBld.cl = '';
+      // 4) Chất liệu (bỏ trống được) — 2 CẤP theo xác nhận Duyên 2026-10-05: 1 ô DANH_MUC nhét nhiều chất liệu
+      // ("1. Aqua xanh biển 2. Citrin: vàng mỡ gà 3. Thạch anh: dâu xanh, dâu hồng 4. Ngọc: Cẩm thạch Type B, lam thủy,
+      // ngọc bích"); chữ đứng TRƯỚC dấu ":" là chất liệu CHA, phần SAU ":" là các mục CON của nó. Dropdown 4 chọn
+      // CHA; chọn xong nếu cha có mục con thì hiện thêm dropdown 4b chọn CON (xem _parseMaterialTree_).
+      const clTree = (it) => { const t = _parseMaterialTree_(it.c); return t.length ? t : [{ parent: '__none__', children: [] }]; };
+      const cls = [...new Set(poolS.reduce((acc, it) => acc.concat(clTree(it).map((n) => n.parent)), []))].sort(_vnSort_);
+      if (_imgBld.cl && cls.indexOf(_imgBld.cl) === -1) { _imgBld.cl = ''; _imgBld.cl2 = ''; }
       if (!_imgBld.cl && cls.length === 1) _imgBld.cl = cls[0];
       if (cls.length > 1 || (cls.length === 1 && cls[0] !== '__none__')) {
         html += row(`Chất liệu (${cls.length})`, `<select id="pkimg-cl"><option value="">— Tất cả — (bỏ trống nếu không chắc)</option>${cls.map((v) => opt(v, v === '__none__' ? '(không ghi)' : v, v === _imgBld.cl)).join('')}</select>`);
       }
-      const poolCl = _imgBld.cl ? poolS.filter((it) => clVals(it).indexOf(_imgBld.cl) !== -1) : poolS;
+      const hasParent = (it) => clTree(it).some((n) => n.parent === _imgBld.cl);
+      let poolCl = _imgBld.cl ? poolS.filter(hasParent) : poolS;
+      // 4b) Mục CON của chất liệu cha đang chọn (chỉ hiện khi có)
+      if (_imgBld.cl) {
+        const kids = [...new Set(poolCl.reduce((acc, it) => acc.concat(clTree(it).filter((n) => n.parent === _imgBld.cl).reduce((a2, n) => a2.concat(n.children), [])), []))].sort(_vnSort_);
+        if (_imgBld.cl2 && kids.indexOf(_imgBld.cl2) === -1) _imgBld.cl2 = '';
+        if (!_imgBld.cl2 && kids.length === 1) _imgBld.cl2 = kids[0];
+        if (kids.length) {
+          html += row(`${escapeHtml(_imgBld.cl === '__none__' ? 'Chi tiết' : _imgBld.cl)} — chi tiết (${kids.length})`, `<select id="pkimg-cl2"><option value="">— Tất cả — (bỏ trống nếu không chắc)</option>${kids.map((v) => opt(v, v, v === _imgBld.cl2)).join('')}</select>`);
+        }
+        if (_imgBld.cl2) poolCl = poolCl.filter((it) => clTree(it).some((n) => n.parent === _imgBld.cl && n.children.indexOf(_imgBld.cl2) !== -1));
+      }
 
       // 5) Màu sắc (CHỈ hiện nếu DANH_MUC có cột "Màu sắc" — không phải hệ thống tự nhận diện
       // màu từ ảnh, chỉ đọc đúng dữ liệu chữ trong sheet, xem _productImgCols_ bên gas_v13.js)
@@ -2008,7 +2018,7 @@
       // 6 ảnh này LÀ KẾT QUẢ CUỐI sau khi đã áp hết các bộ lọc đang chọn ở trên (kể cả khi 1 vài
       // mục cố ý để trống) — không phải bước trung gian còn lọc tiếp ngầm phía sau.
       html += `<div id="pkimg-results">` + toShow.map((it, i) => {
-        const label = [it.t || it.m, it.s, (_imgBld.cl && _imgBld.cl !== '__none__') ? _imgBld.cl : _splitMaterialOptions_(it.c).join(' / '), it.mau].filter(Boolean).join(' · ');
+        const label = [it.t || it.m, it.s, (_imgBld.cl && _imgBld.cl !== '__none__') ? (_imgBld.cl + (_imgBld.cl2 ? ': ' + _imgBld.cl2 : '')) : _parseMaterialTree_(it.c).map((n) => n.parent).join(' / '), it.mau].filter(Boolean).join(' · ');
         return `<div class="pk-price-item">
           <div class="pk-ctkm-title">${escapeHtml(label)}</div>
           <div id="pkimg-slot-${i}">${it.img ? '<div class="pk-price-loading">Đang tải ảnh...</div>' : '<div class="pk-price-loading">Sản phẩm này chưa có link ảnh.</div>'}</div>
@@ -2045,10 +2055,11 @@
 
   function _bindImgBuilder_(dyn) {
     const on = (id, fn) => { const el = dyn.querySelector('#' + id); if (el) el.addEventListener('change', fn); };
-    on('pkimg-nhom', (e) => { _imgBld.nhom = e.target.value; _imgBld.ten = ''; _imgBld.size = ''; _imgBld.cl = ''; _imgBld.mau = ''; renderImgDyn_(); });
-    on('pkimg-ten', (e) => { _imgBld.ten = e.target.value; _imgBld.size = ''; _imgBld.cl = ''; _imgBld.mau = ''; renderImgDyn_(); });
-    on('pkimg-size', (e) => { _imgBld.size = e.target.value; _imgBld.cl = ''; _imgBld.mau = ''; renderImgDyn_(); });
-    on('pkimg-cl', (e) => { _imgBld.cl = e.target.value; _imgBld.mau = ''; renderImgDyn_(); });
+    on('pkimg-nhom', (e) => { _imgBld.nhom = e.target.value; _imgBld.ten = ''; _imgBld.size = ''; _imgBld.cl = ''; _imgBld.cl2 = ''; _imgBld.mau = ''; renderImgDyn_(); });
+    on('pkimg-ten', (e) => { _imgBld.ten = e.target.value; _imgBld.size = ''; _imgBld.cl = ''; _imgBld.cl2 = ''; _imgBld.mau = ''; renderImgDyn_(); });
+    on('pkimg-size', (e) => { _imgBld.size = e.target.value; _imgBld.cl = ''; _imgBld.cl2 = ''; _imgBld.mau = ''; renderImgDyn_(); });
+    on('pkimg-cl', (e) => { _imgBld.cl = e.target.value; _imgBld.cl2 = ''; _imgBld.mau = ''; renderImgDyn_(); });
+    on('pkimg-cl2', (e) => { _imgBld.cl2 = e.target.value; _imgBld.mau = ''; renderImgDyn_(); });
     on('pkimg-mau', (e) => { _imgBld.mau = e.target.value; renderImgDyn_(); });
   }
 
@@ -2083,16 +2094,17 @@
     return out.length >= 2 ? out : null;
   }
 
-  // Tách 1 ô "Chất liệu" gồm NHIỀU chất liệu thành mảng TỪNG chất liệu riêng (bỏ trùng, giữ thứ tự).
-  // Quy tắc (theo ví dụ Duyên 2026-10-05):
-  //  1) Ngăn các nhóm lớn: đánh số "1. X 2. Y 3. Z" (xem _parseNumberedList_) — hoặc mỗi nhóm 1 dòng / ngăn bằng ";" "|"
-  //     — và trong mỗi dòng ngăn tiếp bằng " - " (có khoảng trắng 2 bên). Kiểu "2 GRANAT ĐỎ - 1 CITRIN - 1NGỌC BÍCH"
-  //     → 3 chất liệu GRANAT ĐỎ / CITRIN / NGỌC BÍCH (số đứng đầu là SỐ LƯỢNG, bỏ đi; chỉ bỏ số 1-2 chữ số dính liền
-  //     chữ cái, nên "VÀNG 10K", "BẠC 925" không bị ảnh hưởng).
-  //  2) Trong mỗi nhóm, dấu PHẨY (nằm NGOÀI ngoặc) ngăn từng chất liệu riêng. Nhóm có dạng "Loại: a, b" thì mỗi
-  //     chất liệu gắn lại tên loại: "Thạch anh: dâu xanh, dâu hồng" → "Thạch anh: dâu xanh" + "Thạch anh: dâu hồng".
+  // Phân tích 1 ô "Chất liệu" gồm NHIỀU chất liệu thành CÂY 2 cấp: [{ parent, children: [] }, ...] (bỏ trùng, giữ thứ tự).
+  // Quy tắc (theo xác nhận của Duyên 2026-10-05):
+  //  1) Các nhóm lớn (mỗi nhóm = 1 chất liệu CHA) ngăn bằng: đánh số "1. X 2. Y 3. Z" (xem _parseNumberedList_) — hoặc
+  //     mỗi nhóm 1 dòng / ngăn bằng ";" "|" — và trong mỗi dòng ngăn tiếp bằng " - " (có khoảng trắng 2 bên). Kiểu
+  //     "2 GRANAT ĐỎ - 1 CITRIN - 1NGỌC BÍCH" → 3 chất liệu cha GRANAT ĐỎ / CITRIN / NGỌC BÍCH (số đứng đầu là SỐ
+  //     LƯỢNG, bỏ đi; chỉ bỏ số 1-2 chữ số dính liền chữ cái nên "VÀNG 10K", "BẠC 925" không bị ảnh hưởng).
+  //  2) Trong 1 nhóm, chữ đứng TRƯỚC dấu ":" là CHA; phần SAU ":" là các mục CON, ngăn bằng dấu PHẨY (ngoài ngoặc):
+  //     "Thạch anh: dâu xanh, dâu hồng" → cha "Thạch anh", con ["dâu xanh","dâu hồng"].
+  //     Nhóm KHÔNG có ":" mà có phẩy ngoài ngoặc ("Ngọc bích, lam thủy") → mỗi phần là 1 cha riêng, không có con.
   //     Dấu phẩy TRONG ngoặc "( Xanh lá, vàng, hồng tím )" được giữ nguyên, không tách.
-  // Ô chỉ có 1 chất liệu → mảng 1 phần tử; ô trống → [].
+  // Ô trống → [].
   function _splitTopLevel_(str, sepChar) {
     const out = []; let depth = 0, cur = '';
     for (const ch of String(str)) {
@@ -2103,11 +2115,11 @@
     out.push(cur);
     return out;
   }
-  function _splitMaterialOptions_(str) {
+  function _parseMaterialTree_(str) {
     str = String(str || '').trim();
     if (!str) return [];
     const clean = (x) => String(x).replace(/\s+/g, ' ').trim();
-    // Bước 1: các nhóm lớn
+    // Bước 1: các nhóm lớn (mỗi nhóm = 1 cha)
     let groups = _parseNumberedList_(str);
     if (!groups) {
       groups = [];
@@ -2117,18 +2129,26 @@
         else groups.push(line);
       });
     }
-    // Bước 2: trong mỗi nhóm, tách theo dấu phẩy (ngoài ngoặc), gắn lại tên loại nếu có "Loại: ..."
-    const out = []; const seen = {};
-    const add = (t) => { t = clean(t); const k = t.toLowerCase(); if (t && !seen[k]) { seen[k] = true; out.push(t); } };
+    // Bước 2: mỗi nhóm → cha (+ con nếu có ":")
+    const tree = []; const byKey = {};
+    const addNode = (parent, kids) => {
+      parent = clean(parent); if (!parent) return;
+      const k = parent.toLowerCase();
+      let node = byKey[k];
+      if (!node) { node = { parent: parent, children: [] }; byKey[k] = node; tree.push(node); }
+      (kids || []).forEach((c) => { c = clean(c); if (c && node.children.indexOf(c) === -1) node.children.push(c); });
+    };
     groups.forEach((g) => {
-      g = clean(g);
+      g = clean(g).replace(/^\d{1,2}\.\s+/, ''); // ô chỉ có 1 mục đánh số lẻ loi "1. Citrin: ..." → bỏ số thứ tự
       if (!g) return;
       const colon = _splitTopLevel_(g, ':');
-      let cat = '', rest = g;
-      if (colon.length >= 2 && clean(colon[0]) && clean(colon[0]).indexOf(',') === -1) { cat = clean(colon[0]); rest = colon.slice(1).join(':'); }
-      _splitTopLevel_(rest, ',').forEach((leaf) => { leaf = clean(leaf); if (leaf) add(cat ? cat + ': ' + leaf : leaf); });
+      if (colon.length >= 2 && clean(colon[0]) && clean(colon[0]).indexOf(',') === -1) {
+        addNode(colon[0], _splitTopLevel_(colon.slice(1).join(':'), ','));
+      } else {
+        _splitTopLevel_(g, ',').forEach((part) => addNode(part, []));
+      }
     });
-    return out;
+    return tree;
   }
 
   // ══════════════════════════ SOẠN ĐƠN (gõ tên → lọc → dropdown thu hẹp dần) ══════════════════════════
