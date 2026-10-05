@@ -1158,10 +1158,10 @@ function doGet(e) {
     // ── Tap SDT co trong "dữ liệu đơn" — chi de loc nguon o man hinh chinh (cache 10') ──
     if (action === 'donPhones') {
       var cacheDP = CacheService.getScriptCache();
-      var cKeyDP = 'don_phones_v3';
+      var cKeyDP = 'don_phones_v4'; // v4: them lastDateByPhone
       var cachedDP = cacheDP.get(cKeyDP);
       if (cachedDP) { try { return jsonOut_(JSON.parse(cachedDP)); } catch(ec) {} }
-      var resDP = { phones: readDonPhones_(), saleByPhone: getDonSaleByPhone_(), orderCountByPhone: getDonOrderCountByPhone_() };
+      var resDP = { phones: readDonPhones_(), saleByPhone: getDonSaleByPhone_(), orderCountByPhone: getDonOrderCountByPhone_(), lastDateByPhone: getDonLastDateByPhone_() };
       try { cacheDP.put(cKeyDP, JSON.stringify(resDP), 600); } catch(ec) {}
       return jsonOut_(resDP);
     }
@@ -2161,6 +2161,23 @@ function getDonOrderCountByPhone_() {
     var ph = normPhone_(String(rows[i].soDienThoai || ''));
     if (!ph) continue;
     map[ph] = (map[ph] || 0) + 1;
+  }
+  return map;
+}
+
+// Ngay mua GAN NHAT (nguon Pos = sheet "dữ liệu đơn") theo SDT -> { phone: 'yyyy-mm-dd' }. Dung cho cot "Ngày mua gần nhất"
+// o Danh sach KH (index.html). Bo qua dong khong parse duoc ngay.
+function getDonLastDateByPhone_() {
+  var rows = readDonChiTiet_();
+  var map = {};
+  for (var i = 0; i < rows.length; i++) {
+    var ph = normPhone_(String(rows[i].soDienThoai || ''));
+    if (!ph) continue;
+    var dt = parseVNDate_(rows[i].ngayTaoDon);
+    if (!dt) continue;
+    var iso = _vnYmd_(dt); // ngay duong lich VN (parseVNDate_ tra ve 00:00 gio VN = 17:00Z hom truoc, KHONG dung getDate() theo mui gio du an)
+    if (!iso) continue;
+    if (!map[ph] || iso > map[ph]) map[ph] = iso;
   }
   return map;
 }

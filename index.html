@@ -585,7 +585,7 @@ th.col-filtered .th-filter-icon{opacity:1;color:var(--green);}
 .col-cs{width:150px;} .col-carecs{width:140px;} .col-source{width:120px;} .col-note{width:185px;} .col-sched{width:132px;}
 #cs-note-history { max-height: 320px; overflow-y: auto; }
 #cs-note-new { resize: vertical; }
-.col-lastact{width:130px;} .col-tacdong{width:140px;}
+.col-lastpos{width:112px;} .col-lastact{width:130px;} .col-tacdong{width:140px;}
 #main-table td.col-product .btags,#main-table td.col-cs .cs-badge-wrap,#main-table td.col-source .btags{white-space:nowrap;overflow:hidden;flex-wrap:nowrap;}
 #main-table td.col-name .cname{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
@@ -1019,6 +1019,11 @@ body.rpt-mode .app{height:100vh}
   <div id="col-dd-sched-items" style="max-height:200px;overflow-y:auto"></div>
   <div class="col-dd-footer"><button class="col-dd-clear" onclick="clearColFilter('sched')">Xóa lọc</button><button class="col-dd-apply" onclick="applyColFilter('sched')">Áp dụng</button></div>
 </div>
+<!-- COLUMN DROPDOWN: lastpos (ngày mua gần nhất — Pos) -->
+<div class="col-dropdown" id="col-dd-lastpos">
+  <div id="col-dd-lastpos-items" style="max-height:220px;overflow-y:auto"></div>
+  <div class="col-dd-footer"><button class="col-dd-clear" onclick="clearColFilter('lastpos')">Xóa lọc</button><button class="col-dd-apply" onclick="applyColFilter('lastpos')">Áp dụng</button></div>
+</div>
 <!-- COLUMN DROPDOWN: lastact -->
 <div class="col-dropdown" id="col-dd-lastact">
   <div id="col-dd-lastact-items" style="max-height:200px;overflow-y:auto"></div>
@@ -1220,6 +1225,8 @@ body.rpt-mode .app{height:100vh}
             <option value="revenue_desc">Doanh thu cao</option>
             <option value="name_asc">Tên A–Z</option>
             <option value="sched_asc">Lịch sắp tới</option>
+            <option value="lastpos_desc">Ngày mua gần nhất (mới → cũ)</option>
+            <option value="lastpos_asc">Ngày mua gần nhất (cũ → mới)</option>
             <option value="lastact_asc">Tác động lâu nhất</option>
             <option value="lastact_desc">Tác động gần nhất</option>
           </select>
@@ -1366,6 +1373,7 @@ body.rpt-mode .app{height:100vh}
       <!-- COLUMN TOGGLE BAR -->
       <div class="col-toggle-bar" id="col-toggle-bar">
         <span class="ymf-label">📋 Cột hiển thị</span>
+        <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('lastpos',this)"> Ngày mua gần nhất</label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('name',this)"> Khách hàng</label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('tier',this)"> Phân loại</label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('care',this)"> <span id="lbl-fieldcs-coltoggle">Tình trạng CS</span></label>
@@ -1389,6 +1397,7 @@ body.rpt-mode .app{height:100vh}
       <div class="table-wrap">
         <table id="main-table">
           <thead><tr>
+            <th class="filterable col-lastpos" id="th-lastpos" style="min-width:104px" onclick="openColDropdown('lastpos',event)" title="Ngày mua gần nhất theo đơn Pos — nhấn ▼ để lọc"><div class="th-inner">Ngày mua gần nhất <span class="th-filter-icon">▼</span></div></th>
             <th class="filterable col-name" id="th-name" onclick="openColDropdown('name',event)"><div class="th-inner">Khách hàng <span class="th-filter-icon">▼</span></div></th>
             <th class="filterable col-tier" id="th-tier"><div class="th-inner"><span id="tier-label-btn" onclick="openTierTooltip(event)" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px" title="Xem tiêu chí phân loại">Phân loại</span> <span class="th-filter-icon" onclick="openColDropdown('tier',event)" style="cursor:pointer">▼</span></div></th>
             <th class="filterable col-care" id="th-care" onclick="openColDropdown('care',event)"><div class="th-inner"><span id="lbl-fieldcs-th">Tình trạng CS</span> <span class="th-filter-icon">▼</span></div></th>
@@ -2394,6 +2403,7 @@ let careLeads = loadLS('ome_care_leads') || {};
 // màn hình chính, không kéo chi tiết sản phẩm vào danh sách khách.
 let donPhoneSet = new Set(loadLS('ome_don_phones') || []);
 let donSaleByPhone = loadLS('ome_don_sale_by_phone') || {}; // { phone: [ten sale,...] } lay tu "dữ liệu đơn", gop vao csSet de phan quyen CS
+let donLastDateByPhone = loadLS('ome_don_last_date') || {}; // { phone: 'yyyy-mm-dd' } ngay mua gan nhat tu Pos (cot "Ngày mua gần nhất")
 let donOrderCountByPhone = loadLS('ome_don_order_count') || {}; // { phone: so don } lay tu "dữ liệu đơn" — dung de phan loai hang KH (VIP/Than thiet/...)
 let schedules = loadLS('ome_sched') || [];
 let currentPhone = null;
@@ -2511,7 +2521,7 @@ function _customerProductText(c){
 }
 
 // Column filters
-let colFilters = { name: new Set(), tier: new Set(), care: new Set(), zalo: new Set(), product: new Set(), cs: new Set(), careCS: new Set(), source: new Set(), sched: new Set(), lastact: new Set(), tacdong: new Set(), bcstatus: new Set() };
+let colFilters = { name: new Set(), tier: new Set(), care: new Set(), zalo: new Set(), product: new Set(), cs: new Set(), careCS: new Set(), source: new Set(), sched: new Set(), lastact: new Set(), tacdong: new Set(), bcstatus: new Set(), lastpos: new Set() };
 let _colDdActive = null;
 
 // Advanced filters state
@@ -2754,6 +2764,7 @@ async function syncFromGS(opts) {
         const dpJson = await dpR.json();
         if (dpJson && dpJson.phones) { donPhoneSet = new Set(dpJson.phones); saveLS('ome_don_phones', dpJson.phones); }
         if (dpJson && dpJson.saleByPhone) { donSaleByPhone = dpJson.saleByPhone; saveLS('ome_don_sale_by_phone', dpJson.saleByPhone); }
+        if (dpJson && dpJson.lastDateByPhone) { donLastDateByPhone = dpJson.lastDateByPhone; saveLS('ome_don_last_date', dpJson.lastDateByPhone); }
         if (dpJson && dpJson.orderCountByPhone) { donOrderCountByPhone = dpJson.orderCountByPhone; saveLS('ome_don_order_count', dpJson.orderCountByPhone); }
       } catch(dpErr) { console.warn('donPhones fetch error:', dpErr.message); }
     }
@@ -3191,9 +3202,14 @@ function buildCustomers() {
       cs:  !!(typeof careLeads !== 'undefined' && careLeads && careLeads[c.phone]),
       don: !!(typeof donPhoneSet !== 'undefined' && donPhoneSet.has(c.phone))
     };
+    // Ngày mua gần nhất theo Pos (timestamp 00:00 local) — null nếu KH chưa có đơn Pos
+    const _lpIso = (typeof donLastDateByPhone !== 'undefined' && donLastDateByPhone) ? donLastDateByPhone[c.phone] : '';
+    const _lpM = _lpIso ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(_lpIso) : null;
+    const lastPosDate = _lpM ? new Date(+_lpM[1], +_lpM[2]-1, +_lpM[3]).getTime() : null;
 
     return {
       ...c,
+      lastPosDate,
       name: displayName,
       nameGuessed,
       sources:[...c.sources], brands:[...c.brands].filter(Boolean),
@@ -3479,6 +3495,23 @@ function applyFilters() {
       if (!matchSched) return false;
     }
 
+    // Column filter: ngày mua gần nhất (Pos)
+    if (colFilters.lastpos.size > 0) {
+      const lp = c.lastPosDate;
+      const lpDa = lp ? _calendarDaysAgo(lp) : null;
+      const matchLP = [...colFilters.lastpos].some(v => {
+        if (v === 'Chưa có đơn Pos') return !lp;
+        if (!lp) return false;
+        if (v === 'Hôm nay') return lpDa === 0;
+        if (v === '≤ 7 ngày') return lpDa <= 7;
+        if (v === '≤ 30 ngày') return lpDa <= 30;
+        if (v === '≤ 90 ngày') return lpDa <= 90;
+        if (v === '> 90 ngày') return lpDa > 90;
+        return false;
+      });
+      if (!matchLP) return false;
+    }
+
     // Column filter: lần tác động (lastact — số ngày trước)
     if (colFilters.lastact.size > 0) {
       const la = c._lastActionDate;
@@ -3608,6 +3641,8 @@ function applyFilters() {
       return _lastActSortDir === -1 ? db - da : da - db;
     });
   } else if (sort==='lastact_asc') list.sort((a,b)=>(a._lastActionDate||0)-(b._lastActionDate||0));
+  else if (sort==='lastpos_desc') list.sort((a,b)=>(b.lastPosDate||0)-(a.lastPosDate||0));
+  else if (sort==='lastpos_asc') list.sort((a,b)=>(a.lastPosDate||Infinity)-(b.lastPosDate||Infinity));
   else if (sort==='lastact_desc') list.sort((a,b)=>(b._lastActionDate||0)-(a._lastActionDate||0));
   else if (sort==='orders_desc') list.sort((a,b)=>b.totalOrders-a.totalOrders);
   else if (sort==='orders_asc') list.sort((a,b)=>a.totalOrders-b.totalOrders);
@@ -3717,7 +3752,17 @@ function _rowHtml(c) {
   } else {
     tacdongHtml = `<span style="color:var(--hint);font-size:11px">—</span>`;
   }
+  const lastPosDisp = (typeof colVisible !== 'undefined' && colVisible.lastpos !== false) ? '' : 'display:none';
+  let lastPosHtml;
+  if (c.lastPosDate) {
+    const _lpDa = _calendarDaysAgo(c.lastPosDate);
+    const _lpCol = _lpDa <= 30 ? 'var(--green)' : _lpDa <= 90 ? 'var(--tn)' : 'var(--hint)';
+    lastPosHtml = `<span style="color:${_lpCol};font-size:12px;font-weight:600;white-space:nowrap" title="${_lpDa === 0 ? 'Hôm nay' : _lpDa + ' ngày trước'} (đơn Pos)">${new Date(c.lastPosDate).toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'})}</span>`;
+  } else {
+    lastPosHtml = '<span style="color:var(--hint);font-size:11px">—</span>';
+  }
   return `<tr data-phone="${esc(c.phone)}" onclick="openDp(this.dataset.phone)">
+    <td class="col-lastpos" style="${lastPosDisp}">${lastPosHtml}</td>
     <td class="col-name"><div class="cname">${esc(c.name)}</div><div class="cphone" style="display:flex;align-items:center;gap:4px">${c.phone}<button data-phone="${esc(c.phone)}" onclick="event.stopPropagation();copyPhone(this.dataset.phone)" title="Copy SĐT" style="background:none;border:none;cursor:pointer;font-size:11px;padding:0 2px;color:var(--hint);line-height:1;opacity:.6" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'">📋</button></div></td>
     <td class="col-tier">${tb}</td>
     <td class="col-care">${cb}${khb ? '<br>'+khb : ''}</td>
@@ -3832,7 +3877,7 @@ function _renderVirtualWindow(force) {
   if (!tbody) return;
   const list = _vt.list;
   if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;padding:32px;color:var(--hint)">Không có kết quả</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:32px;color:var(--hint)">Không có kết quả</td></tr>';
     return;
   }
   const wrap = _vtWrap();
@@ -3850,9 +3895,9 @@ function _renderVirtualWindow(force) {
   const botH = Math.max(0, (total - end) * VT_ROW_H);
 
   // Dùng DocumentFragment + 1 lần ghi innerHTML (batch DOM)
-  let html = `<tr class="vspacer" aria-hidden="true"><td colspan="13" style="height:${topH}px"></td></tr>`;
+  let html = `<tr class="vspacer" aria-hidden="true"><td colspan="14" style="height:${topH}px"></td></tr>`;
   for (let i = start; i < end; i++) html += _rowHtml(list[i]);
-  html += `<tr class="vspacer" aria-hidden="true"><td colspan="13" style="height:${botH}px"></td></tr>`;
+  html += `<tr class="vspacer" aria-hidden="true"><td colspan="14" style="height:${botH}px"></td></tr>`;
   tbody.innerHTML = html;
   reapplyColVisibility();
 }
@@ -6918,7 +6963,7 @@ function loadLS(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):nu
 function saveLS(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
 
 // Column visibility state
-const _colVisDefault = { name:true, tier:true, care:true, zalo:true, order:true, product:true, cs:true, source:false, note:true, sched:true, lastact:true, tacdong:true, carecs:true, bcstatus:true };
+const _colVisDefault = { lastpos:true, name:true, tier:true, care:true, zalo:true, order:true, product:true, cs:true, source:false, note:true, sched:true, lastact:true, tacdong:true, carecs:true, bcstatus:true };
 const colVisible = Object.assign({}, _colVisDefault, loadLS('ome_col_visible') || {});
 
 function toggleCol(col, cb) {
@@ -7325,6 +7370,7 @@ function renderColDdItems(col, query) {
   else if (col==='careCS') values = [...new Set(allCustomers.flatMap(c=>[...(c.careCSSet||[])]).filter(Boolean))].sort();
   else if (col==='source') values = [...new Set(allCustomers.flatMap(c=>c.sources).filter(Boolean))].sort();
   else if (col==='sched') values = ['Có lịch', 'Không có lịch', ...SCHED_TYPES.map(t=>t.label)];
+  else if (col==='lastpos') values = ['Hôm nay', '≤ 7 ngày', '≤ 30 ngày', '≤ 90 ngày', '> 90 ngày', 'Chưa có đơn Pos'];
   else if (col==='lastact') values = ['Hôm nay', 'Hôm qua', '≤ 3 ngày', '≤ 7 ngày', '≤ 14 ngày', '≤ 30 ngày', '> 30 ngày', 'Chưa tác động', '__custom_range__'];
   else if (col==='tacdong') values = ['Trong 24h', 'Hôm nay', 'Hôm qua', '≤ 3 ngày', '≤ 7 ngày', '> 7 ngày', 'Chưa có'];
   else if (col==='bcstatus') values = ['Đã gửi', 'Gửi lỗi', 'Bỏ qua', 'Chưa gửi', 'Không trong chiến dịch'];
@@ -8941,7 +8987,7 @@ function _filterSignature(){
   ];
   if (typeof colFilters === 'object') {
     parts.push('cf', _setSig(colFilters.name), _setSig(colFilters.tier), _setSig(colFilters.care),
-      _setSig(colFilters.zalo), _setSig(colFilters.product), _setSig(colFilters.source), _setSig(colFilters.cs), _setSig(colFilters.careCS));
+      _setSig(colFilters.zalo), _setSig(colFilters.product), _setSig(colFilters.source), _setSig(colFilters.cs), _setSig(colFilters.careCS), _setSig(colFilters.lastpos));
   }
   if (typeof advFilters === 'object') {
     parts.push('af', _setSig(advFilters.cs), _setSig(advFilters.products), _setSig(advFilters.sources),
