@@ -4301,8 +4301,8 @@ function renderCareTab(c) {
           </div>
           <div></div>
         </div>
-        <div class="form-label" style="margin-top:6px">📝 Ghi chú đơn (đơn gồm những gì)</div>
-        <textarea class="form-input" id="cs-chot-note" rows="2" placeholder="VD: 1 nhẫn Kim Tiền size 12 + 1 lắc tay, ship COD, giao thứ 6..." style="resize:vertical">${esc(ex.note||'')}</textarea>
+        <div class="form-label" style="margin-top:6px">📝 Thông tin đơn hàng</div>
+        <textarea class="form-ta" id="cs-chot-note" placeholder="VD: 1 nhẫn Kim Tiền size 12 + 1 lắc tay, ship COD, giao thứ 6..." style="min-height:52px">${esc(ex.note||'')}</textarea>
       </div>`;
     })()}
     ${_renderCustomFieldInputs(care)}
