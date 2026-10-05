@@ -2083,18 +2083,51 @@
     return out.length >= 2 ? out : null;
   }
 
-  // Tách 1 ô "Chất liệu" gồm NHIỀU chất liệu thành mảng từng chất liệu riêng (đã bỏ trùng, giữ thứ tự):
-  //  1) dạng đánh số liên tục "1. X 2. Y 3. Z" (xem _parseNumberedList_);
-  //  2) hoặc mỗi chất liệu 1 dòng (xuống dòng Alt+Enter trong ô Sheet) / ngăn bằng ";" hoặc "|".
-  // KHÔNG tách theo dấu phẩy: dấu phẩy thường nằm BÊN TRONG 1 chất liệu (vd "Ngọc bích, lam thủy, cẩm thạch
-  // type B", "Đá Tourmaline ( Xanh lá, vàng, hồng tím )"). Ô chỉ có 1 chất liệu → trả về mảng 1 phần tử; ô trống → [].
+  // Tách 1 ô "Chất liệu" gồm NHIỀU chất liệu thành mảng TỪNG chất liệu riêng (bỏ trùng, giữ thứ tự).
+  // Quy tắc (theo ví dụ Duyên 2026-10-05):
+  //  1) Ngăn các nhóm lớn: đánh số "1. X 2. Y 3. Z" (xem _parseNumberedList_) — hoặc mỗi nhóm 1 dòng / ngăn bằng ";" "|"
+  //     — và trong mỗi dòng ngăn tiếp bằng " - " (có khoảng trắng 2 bên). Kiểu "2 GRANAT ĐỎ - 1 CITRIN - 1NGỌC BÍCH"
+  //     → 3 chất liệu GRANAT ĐỎ / CITRIN / NGỌC BÍCH (số đứng đầu là SỐ LƯỢNG, bỏ đi; chỉ bỏ số 1-2 chữ số dính liền
+  //     chữ cái, nên "VÀNG 10K", "BẠC 925" không bị ảnh hưởng).
+  //  2) Trong mỗi nhóm, dấu PHẨY (nằm NGOÀI ngoặc) ngăn từng chất liệu riêng. Nhóm có dạng "Loại: a, b" thì mỗi
+  //     chất liệu gắn lại tên loại: "Thạch anh: dâu xanh, dâu hồng" → "Thạch anh: dâu xanh" + "Thạch anh: dâu hồng".
+  //     Dấu phẩy TRONG ngoặc "( Xanh lá, vàng, hồng tím )" được giữ nguyên, không tách.
+  // Ô chỉ có 1 chất liệu → mảng 1 phần tử; ô trống → [].
+  function _splitTopLevel_(str, sepChar) {
+    const out = []; let depth = 0, cur = '';
+    for (const ch of String(str)) {
+      if (ch === '(' || ch === '[') depth++;
+      else if ((ch === ')' || ch === ']') && depth > 0) depth--;
+      if (ch === sepChar && depth === 0) { out.push(cur); cur = ''; } else cur += ch;
+    }
+    out.push(cur);
+    return out;
+  }
   function _splitMaterialOptions_(str) {
     str = String(str || '').trim();
     if (!str) return [];
-    const numbered = _parseNumberedList_(str);
-    const parts = numbered || str.split(/\r?\n|;|\|/);
-    const out = [];
-    parts.forEach((x) => { const t = String(x).replace(/\s+/g, ' ').trim(); if (t && out.indexOf(t) === -1) out.push(t); });
+    const clean = (x) => String(x).replace(/\s+/g, ' ').trim();
+    // Bước 1: các nhóm lớn
+    let groups = _parseNumberedList_(str);
+    if (!groups) {
+      groups = [];
+      str.split(/\r?\n|;|\|/).forEach((line) => {
+        const parts = line.split(/\s+[-\u2013\u2014]\s+/);
+        if (parts.length >= 2) parts.forEach((x) => groups.push(x.replace(/^\s*\d{1,2}\s*(?=\p{L}{2,})/u, ''))); // bỏ SỐ LƯỢNG đứng đầu
+        else groups.push(line);
+      });
+    }
+    // Bước 2: trong mỗi nhóm, tách theo dấu phẩy (ngoài ngoặc), gắn lại tên loại nếu có "Loại: ..."
+    const out = []; const seen = {};
+    const add = (t) => { t = clean(t); const k = t.toLowerCase(); if (t && !seen[k]) { seen[k] = true; out.push(t); } };
+    groups.forEach((g) => {
+      g = clean(g);
+      if (!g) return;
+      const colon = _splitTopLevel_(g, ':');
+      let cat = '', rest = g;
+      if (colon.length >= 2 && clean(colon[0]) && clean(colon[0]).indexOf(',') === -1) { cat = clean(colon[0]); rest = colon.slice(1).join(':'); }
+      _splitTopLevel_(rest, ',').forEach((leaf) => { leaf = clean(leaf); if (leaf) add(cat ? cat + ': ' + leaf : leaf); });
+    });
     return out;
   }
 
