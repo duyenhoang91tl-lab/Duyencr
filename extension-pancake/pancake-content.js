@@ -121,6 +121,8 @@
   let _useProducts = false;
   let _stonePref = ''; // '' = mac dinh (cot G) | 'SAPHIA' | 'RUBY' — luu sticky, khoi phai go lai moi lan
   let _ctkmLoadedOnce = false; // mo tab "Tra cuu khuyen mai" lan dau la tu nap toan bo danh sach
+  let _tplLoadedOnce = false; // mo tab "Mau tin nhan tu van" lan dau la tu nap toan bo thu vien
+  let _msgTemplates = []; // cache trong phien lam viec (tai lai khi bam 🔄 hoac mo lai panel)
   let CS_NAMES = [];
   let NICK_LIST = [];
   let CARE_STATUS_TREE = null; // cay "Tinh trang CS" load dong tu GAS (dong bo voi appweb/Zalo AI)
@@ -352,6 +354,7 @@
             <option value="price">💰 Tra cứu bảng giá</option>
             <option value="ctkm">🎁 Tra cứu khuyến mãi</option>
             <option value="img">🖼 Tìm ảnh sản phẩm</option>
+            <option value="tpl">📚 Mẫu tin nhắn tư vấn</option>
           </select>
           <div id="pk-menu-content">
             <div id="pk-rem-body" style="display:none">
@@ -384,6 +387,13 @@
             <div id="pk-img-body" style="display:none">
               <input type="text" id="pk-img-q" placeholder="Gõ tên sản phẩm (VD: tỷ hưu, nhẫn, charm) — có thể bỏ trống các mục dưới" autocomplete="off" />
               <div id="pk-img-dyn"></div>
+            </div>
+            <div id="pk-tpl-body" style="display:none">
+              <div id="pk-tpl-row">
+                <input type="text" id="pk-tpl-q" placeholder="Tìm theo tiêu đề / nội dung / tag..." autocomplete="off" />
+                <button id="pk-tpl-refresh" title="Tải lại từ CRM">🔄</button>
+              </div>
+              <div id="pk-tpl-result"></div>
             </div>
           </div>
         </div>
@@ -585,9 +595,11 @@
       panelEl.querySelector("#pk-price-body").style.display = v === "price" ? "block" : "none";
       panelEl.querySelector("#pk-ctkm-body").style.display = v === "ctkm" ? "block" : "none";
       panelEl.querySelector("#pk-img-body").style.display = v === "img" ? "block" : "none";
+      panelEl.querySelector("#pk-tpl-body").style.display = v === "tpl" ? "block" : "none";
       if (v === "rem") loadReminders_();
       if (v === "ctkm" && !_ctkmLoadedOnce) { _ctkmLoadedOnce = true; doCtkmSearch_(); } // mo tab la nap luon toan bo CTKM, khoi phai go gi cung thay ngay
       if (v === "img") initImgSearch_();
+      if (v === "tpl" && !_tplLoadedOnce) { _tplLoadedOnce = true; loadMsgTemplates_(); } // mo tab la nap luon toan bo mau, khoi phai go gi cung thay ngay
     });
     panelEl.querySelector("#pk-rem-refresh").addEventListener("click", () => loadReminders_());
     panelEl.querySelector("#pk-price-btn").addEventListener("click", doPriceSearch_);
@@ -598,6 +610,8 @@
     panelEl.querySelector("#pk-ctkm-q").addEventListener("keydown", (e) => {
       if (e.key === "Enter") doCtkmSearch_();
     });
+    panelEl.querySelector("#pk-tpl-refresh").addEventListener("click", () => loadMsgTemplates_());
+    panelEl.querySelector("#pk-tpl-q").addEventListener("input", () => renderMsgTemplateRows_());
     panelEl.querySelectorAll('.pk-price-mode-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         panelEl.querySelectorAll('.pk-price-mode-btn').forEach((b) => b.classList.remove('active'));
@@ -1877,6 +1891,51 @@
         : '';
       return `<div class="pk-price-item${row.__ctkmExpired ? ' pk-ctkm-item-expired' : ''}"><div class="pk-ctkm-title">${escapeHtml(String(row[titleKey]))}</div>${statusHtml}${restKeys.map(line).join(' ')}${exclHtml}</div>`;
     }).join('');
+  }
+
+  // ── MAU TIN NHAN TU VAN KHACH (them 2026-10, theo yeu cau Duyen "crm + pancake ai") — doc
+  // CUNG 1 thu vien voi form them/sua tren CRM (tab Zalo AI) qua action 'messageTemplates'.
+  // Bam vao 1 mau se CHEN THANG vao o tra loi dang mo (dung lai insertReply() co san), khong chi
+  // copy clipboard — nhanh hon cho CS khi dang chat that.
+  function loadMsgTemplates_() {
+    const box = panelEl.querySelector('#pk-tpl-result');
+    box.innerHTML = '<div class="pk-price-loading">Đang tải thư viện mẫu...</div>';
+    safeSendMessage_({ type: 'GET_MESSAGE_TEMPLATES' }, (resp) => {
+      if (!resp?.ok) { box.innerHTML = `<div class="pk-price-loading">Lỗi: ${escapeHtml(resp?.error || 'không rõ')}</div>`; return; }
+      _msgTemplates = resp.data.templates || [];
+      renderMsgTemplateRows_();
+    });
+  }
+
+  function renderMsgTemplateRows_() {
+    const box = panelEl.querySelector('#pk-tpl-result');
+    if (!box) return;
+    const q = _stripVNlocal_((panelEl.querySelector('#pk-tpl-q').value || '').trim().toLowerCase());
+    const rows = _msgTemplates.filter((t) => {
+      if (!q) return true;
+      const hay = _stripVNlocal_(((t.title || '') + ' ' + (t.content || '') + ' ' + (t.tags || '')).toLowerCase());
+      return hay.indexOf(q) >= 0;
+    });
+    if (!rows.length) {
+      box.innerHTML = `<div class="pk-price-loading">${_msgTemplates.length ? 'Không tìm thấy mẫu phù hợp.' : 'Chưa có mẫu nào — vào CRM tab "Zalo AI" để thêm mẫu đầu tiên.'}</div>`;
+      return;
+    }
+    box.innerHTML = rows.map((t) => {
+      const tags = (t.tags || '').split(',').map((s) => s.trim()).filter(Boolean)
+        .map((tg) => `<span class="pk-price-field">#${escapeHtml(tg)}</span>`).join(' ');
+      const preview = t.content.length > 160 ? t.content.slice(0, 160) + '…' : t.content;
+      return `<div class="pk-price-item pk-ai-suggestion-item" data-tid="${escapeHtml(t.id)}" title="Bấm để chèn vào ô trả lời">` +
+        `<div class="pk-ctkm-title">${escapeHtml(t.title)}</div>` +
+        `<div>${escapeHtml(preview)}</div>` +
+        (tags ? `<div style="margin-top:3px">${tags}</div>` : '') +
+        `</div>`;
+    }).join('');
+    box.querySelectorAll('[data-tid]').forEach((el) => {
+      el.addEventListener('click', () => {
+        const t = _msgTemplates.find((x) => x.id === el.dataset.tid);
+        if (t) insertReply(t.content); // dung lai ham co san — tu dong xu ly ca contenteditable lan textarea
+      });
+    });
   }
 
   // ── TÌM ẢNH SẢN PHẨM (cột "Link ảnh sản phẩm" trong DANH_MUC) — dùng LẠI y hệt logic thu hẹp
