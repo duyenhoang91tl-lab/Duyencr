@@ -1436,6 +1436,11 @@ function doGet(e) {
     }
     if (action === 'dedupeCare') return dedupeCare_();
 
+    // ── MAU TIN NHAN TU VAN KHACH: danh sach mau (CRM tab ZALO AI va extension Pancake AI dung chung) ──
+    if (action === 'messageTemplates') {
+      return jsonOut_({ templates: readMessageTemplates_() });
+    }
+
     // default — backward compat voi appweb v10
     var resD = { rows: readCare_(ss.getSheetByName(SH_CARE)), orders: [] };
     if (!(e && e.parameter && e.parameter.noOrders)) resD.orders = readAllOrders_();
@@ -3923,6 +3928,9 @@ function doPost(e) {
     // ── MESSENGER/PHONG THUY AI: doc bang tra menh + mau canned response (Sheet Menh/CannedResponses,
     //    tu tao voi du lieu mac dinh neu chua co). Them 2026-09, KHONG dung chung sheet/cot voi CareData. ──
     if (action === 'getKnowledge') return jsonOut_(getMessengerKnowledge_());
+    // ── MAU TIN NHAN TU VAN KHACH: them/sua (form tren CRM tab ZALO AI) / xoa 1 mau ──
+    if (action === 'saveMessageTemplate')   return saveMessageTemplate_(data.template || data);
+    if (action === 'deleteMessageTemplate') return deleteMessageTemplate_(data.id);
     // ── CHECKLIST MKT: nhap tay theo ngay + muc tieu L1-L4 ──
     if (action === 'saveMktChecklistConfig')  return saveMktChecklistConfig_(data.month, data.config);
     // ── NHAT KY BAO CAO HANG NGAY (Sale/Kenh/MKT/Tag) -> Google Sheet rieng ──
@@ -7198,6 +7206,84 @@ function getMessengerKnowledge_() {
     canned.push({ nhom: cannedData[c][0], id: cannedData[c][1], label: cannedData[c][2], text: cannedData[c][3] });
   }
   return { ok: true, menhTable: menhTable, canned: canned, bannedWords: readBannedWords_() };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MAU TIN NHAN TU VAN KHACH (MessageTemplates) — them 2026-10. KHAC voi SH_CANNED (canned
+//  response co dinh cho extension-messenger/phong thuy, KHONG co form sua): day la thu vien mau
+//  do chinh team tu them/sua qua form tren CRM (tab ZALO AI), hien thi goi y khi tra cuu khach
+//  tai CRM VA tai extension Pancake AI (action 'messageTemplates' dung chung cho ca 2 noi).
+//  Sheet rieng, KHONG dung chung cot voi CareData/AIContext/CannedResponses.
+// ═══════════════════════════════════════════════════════════════
+var SH_MSG_TPL = 'MessageTemplates';
+var MSG_TPL_HEADERS = ['id', 'title', 'content', 'tags', 'createdBy', 'createdAt', 'updatedAt'];
+
+function readMessageTemplates_() {
+  var sh = getSheet_(SH_MSG_TPL, MSG_TPL_HEADERS);
+  var vals = sh.getDataRange().getValues();
+  var out = [];
+  for (var i = 1; i < vals.length; i++) {
+    var row = vals[i];
+    if (!row[0]) continue; // bo dong trong (id rong)
+    out.push({
+      id: String(row[0]),
+      title: String(row[1] || ''),
+      content: String(row[2] || ''),
+      tags: String(row[3] || ''),
+      createdBy: String(row[4] || ''),
+      createdAt: row[5] || '',
+      updatedAt: row[6] || ''
+    });
+  }
+  // Moi nhat len dau cho de tim trong form. Dung getTime() (khong dung String(Date)) vi
+  // Date.toString() chi chinh xac den giay va thu tu "Thu, Thang..." khong sap xep dung theo
+  // thoi gian thuc -> 2 mau luu cung giay se bi sap xep SAI thu tu neu so sanh chuoi.
+  function tplTime_(t) { var d = t.updatedAt || t.createdAt; var ms = d ? new Date(d).getTime() : 0; return isNaN(ms) ? 0 : ms; }
+  out.sort(function (a, b) { return tplTime_(b) - tplTime_(a); });
+  return out;
+}
+
+// data: {id (co thi la sua, khong co/khong tim thay thi tao moi), title, content, tags, createdBy}
+function saveMessageTemplate_(data) {
+  if (!data || !String(data.title || '').trim() || !String(data.content || '').trim()) {
+    return jsonOut_({ error: 'Thieu tieu de hoac noi dung mau tin' });
+  }
+  var sh = getSheet_(SH_MSG_TPL, MSG_TPL_HEADERS);
+  var vals = sh.getDataRange().getValues();
+  var now = new Date();
+  var title = String(data.title).trim();
+  var content = String(data.content).trim();
+  var tags = String(data.tags || '').trim();
+  var createdBy = String(data.createdBy || '').trim();
+
+  if (data.id) {
+    for (var i = 1; i < vals.length; i++) {
+      if (String(vals[i][0]) === String(data.id)) {
+        sh.getRange(i + 1, 2, 1, 6).setValues([[title, content, tags, vals[i][4] || createdBy, vals[i][5] || now, now]]);
+        return jsonOut_({ ok: true, id: String(data.id) });
+      }
+    }
+    // co id truyen len nhung khong tim thay dong -> coi nhu tao moi voi id do (vd dong bo tu client)
+    sh.appendRow([String(data.id), title, content, tags, createdBy, now, now]);
+    return jsonOut_({ ok: true, id: String(data.id) });
+  }
+
+  var newId = 'mt_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+  sh.appendRow([newId, title, content, tags, createdBy, now, now]);
+  return jsonOut_({ ok: true, id: newId });
+}
+
+function deleteMessageTemplate_(id) {
+  if (!id) return jsonOut_({ error: 'Thieu id mau tin can xoa' });
+  var sh = getSheet_(SH_MSG_TPL, MSG_TPL_HEADERS);
+  var vals = sh.getDataRange().getValues();
+  for (var i = 1; i < vals.length; i++) {
+    if (String(vals[i][0]) === String(id)) {
+      sh.deleteRow(i + 1);
+      return jsonOut_({ ok: true });
+    }
+  }
+  return jsonOut_({ ok: true, note: 'Khong tim thay id (co the da bi xoa truoc do)' });
 }
 
 // ─── TU CAM (ban tu ngu khi len don/nhan tin) — doc TRUC TIEP tu file "Report Sale" (tab
