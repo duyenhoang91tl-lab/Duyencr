@@ -13314,23 +13314,8 @@ function _srRenderB(d){
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalCod)+'</div><div class="kpi-label">Tổng COD</div></div>' +
     '</div>';
 
-  if (d.mismatchRows){
-    html += '<div style="background:#fef3c7;color:#92400e;padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:14px">' +
-      '⚠️ '+fmt(d.mismatchRows)+' dòng bị lệch số phần tử giữa cột Sản phẩm/Mã sản phẩm/Số lượng — nên kiểm tra tay, số liệu sản phẩm bên dưới có thể thiếu sót ở các dòng này.</div>';
-  }
-
-  // Don Pos GHEP voi Base (ghi chu cot Q co ma bo dem): doanh thu/sale da tinh theo don goc Base (xem backend
-  // buildSalesReportB_). Hien thong ke + canh bao cac don co ma nhung KHONG ghep duoc (van chia theo Pos).
-  if (d.ghep && d.ghep.donCoMa){
-    var gp = d.ghep, gWarn = (gp.khongKhop||[]).length + (gp.trungDonGoc||[]).length;
-    html += '<div style="background:'+(gWarn?'#fef3c7;color:#92400e':'#ecfdf5;color:#065f46')+';padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:14px">' +
-      '🔗 '+fmt(gp.donCoMa)+' đơn Pos có mã bộ đếm trong ghi chú — '+fmt(gp.daGhep)+' đơn đã tính lại theo đơn gốc Base' +
-      (gp.gocBiLoai ? ', '+fmt(gp.gocBiLoai)+' đơn bị loại vì mọi đơn gốc đã Hủy/Hoàn' : '') + '.' +
-      (gWarn ? '<br>⚠️ '+fmt(gWarn)+' đơn KHÔNG ghép được (chia theo Pos, nên kiểm tra tay): ' +
-        (gp.khongKhop||[]).slice(0,5).map(function(x){ return esc(x.ngay)+' – không thấy '+esc((x.maKhongTim||[]).join(', '))+' trong Base'; }).concat(
-         (gp.trungDonGoc||[]).slice(0,5).map(function(x){ return esc(x.ngay)+' – '+esc((x.maCoDon||[]).join(', '))+' đã gắn cho đơn Pos khác'; })).join('; ') : '') +
-      '</div>';
-  }
+  // Da bo 2 dong thong bao vang (lech so phan tu cot San pham/Ma/So luong + thong ke ghep don Pos<->Base) theo yeu cau Duyen 2026-10-05.
+  // Du lieu d.mismatchRows / d.ghep van duoc backend tra ve (dung de debug), chi khong hien tren man hinh nua.
 
   _SR_COLTH_ROWSFN_['bSale'] = function(){ return (_srState.dataB && _srState.dataB.bySale) || []; };
   _SR_COLTH_GETTER_['bSale'] = { name: function(s){ return s.name; } };
