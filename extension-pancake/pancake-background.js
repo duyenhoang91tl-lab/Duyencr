@@ -194,11 +194,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
-  // Tim anh san pham — action:'productImage', doc cot "Link ảnh sản phẩm" CS da dien san trong
-  // DANH_MUC (cung file PRICE_SS_ID voi bang gia), chi khop theo Ten SP/Ten thuong mai, KHONG
-  // qua AI (giong co che GET_PRICE/GET_CTKM_SEARCH o tren).
-  if (msg?.type === "GET_PRODUCT_IMAGE") {
-    handleGetProductImage(msg.payload)
+  // Danh sach PHANG cho "Tim anh san pham" — action:'productImageFlat', cung co che voi
+  // GET_PRICE_FLAT (cascading Nhom SP -> Ten SP -> Kieu/Size -> Chat lieu), kem link anh moi
+  // dong de FE goi tiep GET_DRIVE_IMAGE khi CS da thu hep dung ve 1 dong.
+  if (msg?.type === "GET_PRODUCT_IMAGE_FLAT") {
+    handleGetProductImageFlat()
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+  // Doc 1 anh THEO DUNG link CS da chon (sau khi thu hep dan) — action:'driveImageFromLink'.
+  if (msg?.type === "GET_DRIVE_IMAGE") {
+    handleGetDriveImage(msg.payload)
       .then((data) => sendResponse({ ok: true, data }))
       .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
     return true;
@@ -787,21 +794,37 @@ async function handleGetCtkmSearch(payload) {
   return { rows: data.rows || [], total: data.total || 0 };
 }
 
-// Tim anh san pham theo ten — action:'productImage' (GET, chi doc). Tra ve { name, imageLink,
-// image: {base64,mimeType,name} | null, note? } — image=null nghia la khong doc duoc anh tu
-// Drive (chua chia se/qua 3MB/link hong) nhung VAN co imageLink de CS tu mo xem.
-async function handleGetProductImage(payload) {
+// Danh sach phang san pham + link anh — action:'productImageFlat' (GET, chi doc). Tra ve
+// { items: [{n,t,m,s,c,img}, ...] } — FE tu loc cascading (Nhom SP -> Ten SP -> Size -> Chat
+// lieu) giong het "Soan don", roi goi handleGetDriveImage voi dung link cua dong da chon.
+async function handleGetProductImageFlat() {
   const settings = await chrome.storage.sync.get(null);
   const cfg = { ...DEFAULT_SETTINGS, ...settings };
   if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
 
-  const q = payload?.q || "";
-  if (!q) throw new Error("Thiếu từ khoá sản phẩm.");
   const sep = cfg.gasUrl.includes("?") ? "&" : "?";
-  const url = cfg.gasUrl + sep + "action=productImage&q=" + encodeURIComponent(q);
+  const url = cfg.gasUrl + sep + "action=productImageFlat";
   const res = await fetch(url, { redirect: "follow" });
   const data = await res.json();
-  if (!data.ok) throw new Error(data.error || "Không tìm thấy ảnh sản phẩm.");
+  if (!data.ok) throw new Error(data.error || "Không tải được danh sách sản phẩm.");
+  return { items: data.items || [] };
+}
+
+// Doc 1 anh THEO DUNG link — action:'driveImageFromLink' (GET, chi doc). Tra ve { imageLink,
+// image: {base64,mimeType,name} | null } — image=null nghia la khong doc duoc anh tu Drive
+// (chua chia se/qua 3MB/link hong) nhung VAN co imageLink de CS tu mo xem.
+async function handleGetDriveImage(payload) {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+
+  const link = payload?.link || "";
+  if (!link) throw new Error("Thiếu link ảnh.");
+  const sep = cfg.gasUrl.includes("?") ? "&" : "?";
+  const url = cfg.gasUrl + sep + "action=driveImageFromLink&link=" + encodeURIComponent(link);
+  const res = await fetch(url, { redirect: "follow" });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || "Không đọc được ảnh.");
   return data;
 }
 

@@ -806,6 +806,14 @@ html.db-standalone #dailybrief-wrap{width:100%;max-width:1120px;margin:0 auto}
 .zai-loading{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;padding:12px 0;}
 .zai-spinner{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite;}
 </style>
+<style>
+/* Chế độ báo cáo: ẩn mọi thứ không thuộc báo cáo để chụp màn hình (xem _RPT_MODE_TABS trong script) */
+#rpt-bar{display:none}
+body.rpt-mode #rpt-bar{display:flex;align-items:center;gap:10px;padding:8px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+#rpt-mode-sel{font-size:13px;font-weight:600;padding:5px 8px;border:1px solid var(--border-md,var(--border));border-radius:6px;background:var(--surface);color:var(--text)}
+body.rpt-mode header,body.rpt-mode .sidebar,body.rpt-mode .sidebar-backdrop,body.rpt-mode .tabs,body.rpt-mode .stats-row,body.rpt-mode #files-bar,body.rpt-mode #sync-banner{display:none !important}
+body.rpt-mode .app{height:100vh}
+</style>
 </head>
 <body>
 
@@ -2026,6 +2034,57 @@ async function saveSaleChannels() {
 }
 
 // ════════════════════════════════════════════════════════════════════
+//  % HOA HỒNG THEO KÊNH (Nguồn đơn) — admin cài ở modal "📡 % hoa hồng theo Kênh"
+//  (mở từ gear-menu Báo cáo E). Đơn thuộc 1 Nguồn đơn (nguonDon) đã được cài ở đây sẽ
+//  tính hoa hồng THEO ĐÚNG % cố định đó, BỎ QUA hoàn toàn % cá nhân/team và ngưỡng 15tr.
+//  CHANNEL_COMMISSION_RATES = { "<nguonDon viết thường, đã trim>": <số %, vd 1 = 1%> }
+//  Key luôn lưu viết thường + trim để so khớp không phân biệt hoa/thường.
+// ════════════════════════════════════════════════════════════════════
+let CHANNEL_COMMISSION_RATES = (function(){
+  try { var v = loadLS('ome_channel_commission_rates'); return (v && typeof v === 'object') ? v : {}; } catch(e){ return {}; }
+})();
+
+async function _syncChannelCommissionRatesFromGAS() {
+  if (!gsUrl) return;
+  try {
+    var r = await fetch(gsUrl + '?action=getSetting&key=channelCommissionRates', {redirect:'follow'});
+    var data = await r.json();
+    if (data && data.value) {
+      var obj = JSON.parse(data.value);
+      if (obj && typeof obj === 'object') {
+        CHANNEL_COMMISSION_RATES = obj;
+        saveLS('ome_channel_commission_rates', CHANNEL_COMMISSION_RATES);
+        if (typeof _srState !== 'undefined' && _srState.sub === 'E') renderSalesReportTab();
+      }
+    }
+  } catch(e) { /* giữ bản local nếu lỗi mạng/parse */ }
+}
+setTimeout(_syncChannelCommissionRatesFromGAS, 0);
+
+async function saveChannelCommissionRates() {
+  saveLS('ome_channel_commission_rates', CHANNEL_COMMISSION_RATES);
+  if (gsUrl) {
+    try {
+      var r = await fetch(gsUrl, { method:'POST', redirect:'follow',
+        body: JSON.stringify({ action:'setSetting', key:'channelCommissionRates', value: JSON.stringify(CHANNEL_COMMISSION_RATES) }) });
+      var d = await r.json().catch(function(){ return {}; });
+      if (d && d.error) toast('Lưu local ✓ — GSheets: ' + d.error);
+      else toast('✓ Đã lưu và đồng bộ % hoa hồng theo Kênh lên Google Sheets');
+    } catch(e) { toast('✓ Đã lưu local — chưa đồng bộ GSheets: ' + e.message); }
+  } else {
+    toast('✓ Đã lưu % hoa hồng theo Kênh (local)');
+  }
+}
+
+function _channelCommissionRate_(kenh){
+  if (!kenh) return null;
+  var k = String(kenh).trim().toLowerCase();
+  if (!k || !Object.prototype.hasOwnProperty.call(CHANNEL_COMMISSION_RATES, k)) return null;
+  var v = CHANNEL_COMMISSION_RATES[k];
+  return (v === '' || v === null || v === undefined || isNaN(Number(v))) ? null : Number(v);
+}
+
+// ════════════════════════════════════════════════════════════════════
 //  CHƯƠNG TRÌNH THƯỞNG — admin cài ở modal "🏆 Chương trình thưởng" (mở từ Báo cáo
 //  hoa hồng). Mỗi chương trình gồm các điều kiện CÓ CẤU TRÚC (để tự tính được) và 2 ô
 //  ghi chú tự do (chỉ để nhắc kế toán, KHÔNG được tự động chấm — vì là văn bản tự do).
@@ -2110,31 +2169,54 @@ function _resolveCommissionRate_(name) {
 function _computeCommissionData_(orders) {
   var bySale = {};
   var totalOrdersAbove15 = 0, totalOrdersBelow15 = 0, totalRevenueAbove15 = 0, totalRevenueBelow15 = 0;
+  var totalOrdersChannel = 0, totalRevenueChannel = 0; // don thuoc kenh co % rieng — van la doanh thu that, phai vao TONG
   (orders||[]).forEach(function(m){
     var giaTri = Number(m.giaTriDon) || 0;
     var isAbove = giaTri >= COMMISSION_THRESHOLD;
-    if (isAbove) { totalOrdersAbove15++; totalRevenueAbove15 += giaTri; }
-    else { totalOrdersBelow15++; totalRevenueBelow15 += giaTri; }
-    var salesList = splitMulti_(m.saleBan, ',');
-    if (!salesList.length) salesList = ['(chưa gán sale)'];
+    // Nguồn đơn đã được admin cài % riêng (vd "facebook" = 1%) -> BỎ QUA hoàn toàn ngưỡng
+    // 15tr + % cá nhân/team, tính thẳng theo đúng % kênh đó cho phần doanh thu chia của sale.
+    var chRate = _channelCommissionRate_(m.nguonDon);
+    if (chRate === null) {
+      if (isAbove) { totalOrdersAbove15++; totalRevenueAbove15 += giaTri; }
+      else { totalOrdersBelow15++; totalRevenueBelow15 += giaTri; }
+    } else { totalOrdersChannel++; totalRevenueChannel += giaTri; }
+    // Don Pos GHEP voi Base (backend tra saleShares = [{name, frac}], tong frac = 1): chia doanh thu theo ty le
+    // cua tung don goc ben Base, KHONG chia deu. Don thuong: chia deu cho N sale nhu cu.
+    var shareMap = null, salesList;
+    if (m.saleShares && m.saleShares.length) {
+      shareMap = {};
+      salesList = m.saleShares.map(function(x){ shareMap[x.name] = x.frac; return x.name; });
+    } else {
+      salesList = splitMulti_(m.saleBan, ',');
+      if (!salesList.length) salesList = ['(chưa gán sale)'];
+    }
     var n = salesList.length;
-    var share = giaTri / n;
     salesList.forEach(function(sName){
-      if (!bySale[sName]) bySale[sName] = { ordersAbove15:0, ordersBelow15:0, revenueAbove15:0, revenueBelow15:0 };
-      if (isAbove) { bySale[sName].ordersAbove15++; bySale[sName].revenueAbove15 += share; }
+      var share = shareMap ? giaTri * shareMap[sName] : giaTri / n;
+      if (!bySale[sName]) bySale[sName] = { ordersAbove15:0, ordersBelow15:0, revenueAbove15:0, revenueBelow15:0, channelRevenue:0, channelCommission:0, channelBreakdown:{} };
+      if (chRate !== null) {
+        var kenhKey = String(m.nguonDon||'').trim();
+        bySale[sName].channelRevenue += share;
+        bySale[sName].channelCommission += share * (chRate/100);
+        if (!bySale[sName].channelBreakdown[kenhKey]) bySale[sName].channelBreakdown[kenhKey] = { revenue:0, rate:chRate };
+        bySale[sName].channelBreakdown[kenhKey].revenue += share;
+      } else if (isAbove) { bySale[sName].ordersAbove15++; bySale[sName].revenueAbove15 += share; }
       else { bySale[sName].ordersBelow15++; bySale[sName].revenueBelow15 += share; }
     });
   });
-  var rows = Object.keys(bySale).map(function(name){
+  // Giong Bao cao B (Theo Sale): KHONG liet ke "(chưa gán sale)" — khong co nguoi nao de tra hoa hong.
+  // Doanh thu cua don do van nam trong cac the TONG o tren (khong mat).
+  var rows = Object.keys(bySale).filter(function(name){ return name !== '(chưa gán sale)'; }).map(function(name){
     var s = bySale[name];
     var rate = _resolveCommissionRate_(name);
-    var commission = s.revenueAbove15 * (rate.above15/100) + s.revenueBelow15 * (rate.below15/100);
+    var commission = s.revenueAbove15 * (rate.above15/100) + s.revenueBelow15 * (rate.below15/100) + s.channelCommission;
     return {
       name: name,
       ordersAbove15: s.ordersAbove15, ordersBelow15: s.ordersBelow15,
       revenueAbove15: s.revenueAbove15, revenueBelow15: s.revenueBelow15,
       rateAbove15: rate.above15, rateBelow15: rate.below15,
       sourceAbove15: rate.sourceAbove15, sourceBelow15: rate.sourceBelow15,
+      channelRevenue: s.channelRevenue, channelCommission: s.channelCommission, channelBreakdown: s.channelBreakdown,
       commission: commission
     };
   });
@@ -2144,6 +2226,7 @@ function _computeCommissionData_(orders) {
     threshold: COMMISSION_THRESHOLD,
     totalOrdersAbove15: totalOrdersAbove15, totalOrdersBelow15: totalOrdersBelow15,
     totalRevenueAbove15: totalRevenueAbove15, totalRevenueBelow15: totalRevenueBelow15,
+    totalOrdersChannel: totalOrdersChannel, totalRevenueChannel: totalRevenueChannel,
     bySale: rows, totalCommission: totalCommission
   };
 }
@@ -11572,6 +11655,15 @@ function _mktPctColor(passed){
   return passed ? 'var(--green)' : 'var(--red, #d33)';
 }
 var _MKT_OP_SYMBOL = { gte:'≥', lte:'≤', eq:'=' };
+// So ngay trong khoang [from,to] (chuoi 'yyyy-MM-dd', ca 2 dau duoc tinh) — dung cho cot/dong
+// "TB/ngày" trong Checklist MKT. parseVNDate_-style: new Date('yyyy-MM-dd') la UTC-safe, khong
+// bi lech mui gio nhu dinh dang 'dd/MM/yyyy'. Toi thieu 1 de khong chia cho 0.
+function _mktDaysInRange_(from, to){
+  var a = new Date(String(from||'')+'T00:00:00Z'), b = new Date(String(to||'')+'T00:00:00Z');
+  if (isNaN(a.getTime()) || isNaN(b.getTime())) return 1;
+  var days = Math.round((b.getTime()-a.getTime())/86400000) + 1;
+  return days > 0 ? days : 1;
+}
 
 // ── Sửa mục tiêu (%) + mẫu số — áp dụng 1 lần cho CẢ THÁNG (tháng của ngày "Đến") ──
 function _mktOpenCfgEditor(){
@@ -11675,10 +11767,11 @@ function _mktRender(){
   // Khoi "Ket qua ban hang" — noi bat, xep dau tien de chup man hinh gui sep: Tong don,
   // Doanh thu, TB don, Ty le chot deu la con so lanh dao quan tam nhat, tach rieng khoi cac
   // chi so "phau" (tuong tac/SDT) o khoi thu 2 ben duoi de khong bi loang khi nhin nhanh.
-  html += '<div style="font-size:13px;font-weight:700;margin:4px 0 8px">💰 Kết quả bán hàng ('+esc(rep.from)+' → '+esc(rep.to)+')</div>';
+  var mktDays = _mktDaysInRange_(rep.from, rep.to);
+  html += '<div style="font-size:13px;font-weight:700;margin:4px 0 8px">💰 Kết quả bán hàng ('+esc(rep.from)+' → '+esc(rep.to)+', '+mktDays+' ngày)</div>';
   html += '<div class="kpi-grid" style="margin-bottom:14px">'+
-    '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+fmt(rep.baseOrders)+'</div><div class="kpi-label"><b>Tổng đơn</b> (Base — L5)</div></div>'+
-    '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+fmtVND(Math.round(rep.baseRevenue||0))+'</div><div class="kpi-label"><b>Tổng doanh thu</b></div></div>'+
+    '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+fmt(rep.baseOrders)+'</div><div class="kpi-label"><b>Tổng đơn</b> (Base — L5)<div style="color:var(--muted);font-weight:400">TB/ngày: '+fmt(Math.round((rep.baseOrders||0)/mktDays*10)/10)+'</div></div></div>'+
+    '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+fmtVND(Math.round(rep.baseRevenue||0))+'</div><div class="kpi-label"><b>Tổng doanh thu</b><div style="color:var(--muted);font-weight:400">TB/ngày: '+fmtVND(Math.round((rep.baseRevenue||0)/mktDays))+'</div></div></div>'+
     '<div class="kpi-card"><div class="kpi-val">'+fmtVND(Math.round(rep.trungBinhDon||0))+'</div><div class="kpi-label">Trung bình đơn (Doanh thu ÷ đơn)</div></div>'+
     '<div class="kpi-card"><div class="kpi-val">'+rep.tyLeChotTong+'%</div><div class="kpi-label">Tỷ lệ chốt tổng (Đơn / Tổng TT)</div></div>'+
   '</div>';
@@ -11732,16 +11825,18 @@ function _mktRender(){
 
   // ── Bảng chỉ số L1..Ln ──
   html += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr>'+
-    '<th>Tag</th><th style="text-align:right">Số lượng</th><th>Mẫu số</th><th style="text-align:right">Giá trị mẫu số</th>'+
+    '<th>Tag</th><th style="text-align:right">Số lượng</th><th style="text-align:right">TB/ngày</th><th>Mẫu số</th><th style="text-align:right">Giá trị mẫu số</th>'+
     '<th style="text-align:right">Tỷ lệ</th><th style="text-align:right">Mục tiêu</th><th>Trạng thái</th>'+
   '</tr></thead><tbody>';
   rep.tags.forEach(function(t){
     var statusHtml = '<span style="color:var(--muted)">—</span>';
     if (t.passed === true) statusHtml = '<span style="color:var(--green);font-weight:700">✓ Đạt</span>';
     else if (t.passed === false) statusHtml = '<span style="color:var(--red,#d33);font-weight:700">✗ Chưa đạt</span>';
+    var tbNgay = (t.count===null || t.count===undefined) ? null : Math.round((t.count/mktDays)*10)/10;
     html += '<tr>'+
       '<td><b>'+esc(t.code)+'</b>. '+esc(_mktLabel(t.code))+(t.code==='L5'?' <span style="font-size:10px;color:var(--muted)">(Base)</span>':'')+'</td>'+
       '<td style="text-align:right;font-weight:700">'+fmt(t.count)+'</td>'+
+      '<td style="text-align:right;color:var(--muted)">'+(tbNgay!==null?fmt(tbNgay):'—')+'</td>'+
       '<td style="color:var(--muted);font-size:11px">'+(t.denomLabel||'—')+'</td>'+
       '<td style="text-align:right">'+(t.denomValue!==null?fmt(t.denomValue):'—')+'</td>'+
       '<td style="text-align:right;font-weight:700;color:'+_mktPctColor(t.passed)+'">'+(t.rate!==null?t.rate+'%':'—')+'</td>'+
@@ -12087,9 +12182,9 @@ var _srState = {
   fDateFrom: '', fDateTo: '', fDateQuick: 'thisMonth', fDateField: 'ngayTao', fSale: [], fTeam: [], dataF: null,
   fSaleSearch: '', fSaleCustomized: false, fKpiView: 'table', fEditing: null,
   // G — Don bi loai (Huy/Tra lai/Hoan tien/That bai/Khieu nai) — dung chung filter dang voi A
-  gDateField: 'ngayTao', gDateFrom: '', gDateTo: '', gDateQuick: 'custom', gSale: [], gKenh: [], gSanPham: '',
-  dataG: null, gSaleSearch: '', gKenhSearch: '',
-  gSaleView: 'table', gKenhView: 'table', gMktView: 'table', gLyDoView: 'table',
+  gDateFrom: '', gDateTo: '', gDateQuick: 'custom', gSale: [], gNguon: [], gMarketer: [], gSanPham: '',
+  dataG: null, gSaleSearch: '',
+  gSaleView: 'table', gNguonView: 'table', gMktView: 'table', gLyDoView: 'table',
   // H — Thuong offline (Sale thu viec) — xem buildOfflineBonusReport_ (gas_v13.js)
   hDateFrom: '', hDateTo: '', hDateQuick: 'thisMonth', dataH: null, hConfigEditing: null
 };
@@ -12474,7 +12569,12 @@ async function _srLoad(){
       dateFrom: _srState.eDateFrom, dateTo: _srState.eDateTo,
       sale: (_srState.eSale||[]).join(',')
     });
-    if (dPos && dPos.orders) dPos.orders = dPos.orders.map(function(o){ return Object.assign({}, o, { saleBan: o.saleBanValid || o.theSale, giaTriDon: o.giaTriSauGiam }); });
+    // QUAN TRONG: phai map ca ngayTaoDon -> ngayTao (don Pos KHONG co san field "ngayTao") —
+    // thieu dong nay thi moi bo loc theo ngay/ngay thu viec cua _computeBonusData_ se LUON
+    // rong vi o.ngayTao undefined o moi don Pos, du da map dung saleBan/giaTriDon. Dung
+    // saleBanValid (ten sale da loc hop le, xem _donSaleNamesFromThe_) thay vi theSale tho de
+    // tranh ghi chu/ten sai chinh ta trong cot Thẻ bi tinh nham thanh 1 "sale" ao.
+    if (dPos && dPos.orders) dPos.orders = dPos.orders.map(function(o){ return Object.assign({}, o, { saleBan: (o.saleBanValid !== undefined ? o.saleBanValid : o.theSale), giaTriDon: o.giaTriSauGiam, ngayTao: o.ngayTaoDon }); });
     _srState.dataE = dPos;
   } else if (_srState.sub === 'F') {
     // Dropdown khong phai 'custom' -> khoang ngay PHAI khop dropdown (tranh dropdown 'Tháng này'
@@ -12485,12 +12585,12 @@ async function _srLoad(){
     }
     _srState.dataF = await _srFetch('saleKpiReport', {
       dateFrom: _srState.fDateFrom, dateTo: _srState.fDateTo,
-      dateField: _srState.fDateField, sale: (_srState.fSale||[]).join(',')
+      sale: (_srState.fSale||[]).join(',')
     });
   } else if (_srState.sub === 'G') {
     _srState.dataG = await _srFetch('failedOrderReport', {
       dateFrom: _srState.gDateFrom, dateTo: _srState.gDateTo,
-      dateField: _srState.gDateField, sale: (_srState.gSale||[]).join(','), kenh: (_srState.gKenh||[]).join(','),
+      sale: (_srState.gSale||[]).join(','), nguon: (_srState.gNguon||[]).join(','), marketer: (_srState.gMarketer||[]).join(','),
       sanPham: _srState.gSanPham || ''
     });
   } else if (_srState.sub === 'H') {
@@ -12538,8 +12638,8 @@ async function exportSalesReportToSheet(){
   } else if (_srState.sub === 'D') {
     filters = { dateFrom: _srState.dDateFrom, dateTo: _srState.dDateTo, cs: _srState.dCs || [] };
   } else if (_srState.sub === 'G') {
-    filters = { dateFrom: _srState.gDateFrom, dateTo: _srState.gDateTo, dateField: _srState.gDateField,
-      sale: _srState.gSale || [], kenh: _srState.gKenh || [], sanPham: _srState.gSanPham || '' };
+    filters = { dateFrom: _srState.gDateFrom, dateTo: _srState.gDateTo,
+      sale: _srState.gSale || [], nguon: _srState.gNguon || [], marketer: _srState.gMarketer || [], sanPham: _srState.gSanPham || '' };
   } else {
     filters = { dateFrom: _srState.dateFrom, dateTo: _srState.dateTo,
       sale: _srState.bSale || [], nguon: _srState.bNguon || [], marketer: _srState.bMarketer || [],
@@ -12906,7 +13006,7 @@ function renderSalesReportTab(){
     '<button class="btn '+(_srState.sub==='B'?'secondary':'sm')+'" onclick="_srSetSub(\'B\')">Báo cáo B — Pos</button>' +
     '<button class="btn '+(_srState.sub==='C'?'secondary':'sm')+'" onclick="_srSetSub(\'C\')">Báo cáo C — So sánh kỳ Base</button>' +
     '<button class="btn '+(_srState.sub==='D'?'secondary':'sm')+'" onclick="_srSetSub(\'D\')">Báo cáo D — Sale tự thêm</button>' +
-    '<button class="btn '+(_srState.sub==='E'?'secondary':'sm')+'" onclick="_srSetSub(\'E\')">Báo cáo E — Hoa hồng nhân viên Base</button>' +
+    '<button class="btn '+(_srState.sub==='E'?'secondary':'sm')+'" onclick="_srSetSub(\'E\')">Báo cáo E — Hoa hồng nhân viên Pos</button>' +
     '<button class="btn '+(_srState.sub==='F'?'secondary':'sm')+'" onclick="_srSetSub(\'F\')">Báo cáo F — KPI Sale</button>' +
     '<button class="btn '+(_srState.sub==='G'?'secondary':'sm')+'" onclick="_srSetSub(\'G\')">Báo cáo G — Đơn bị loại</button>' +
     '<button class="btn '+(_srState.sub==='H'?'secondary':'sm')+'" onclick="_srSetSub(\'H\')">Báo cáo H — Thưởng offline</button>' +
@@ -13269,6 +13369,19 @@ function _srRenderB(d){
       '⚠️ '+fmt(d.mismatchRows)+' dòng bị lệch số phần tử giữa cột Sản phẩm/Mã sản phẩm/Số lượng — nên kiểm tra tay, số liệu sản phẩm bên dưới có thể thiếu sót ở các dòng này.</div>';
   }
 
+  // Don Pos GHEP voi Base (ghi chu cot Q co ma bo dem): doanh thu/sale da tinh theo don goc Base (xem backend
+  // buildSalesReportB_). Hien thong ke + canh bao cac don co ma nhung KHONG ghep duoc (van chia theo Pos).
+  if (d.ghep && d.ghep.donCoMa){
+    var gp = d.ghep, gWarn = (gp.khongKhop||[]).length + (gp.trungDonGoc||[]).length;
+    html += '<div style="background:'+(gWarn?'#fef3c7;color:#92400e':'#ecfdf5;color:#065f46')+';padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:14px">' +
+      '🔗 '+fmt(gp.donCoMa)+' đơn Pos có mã bộ đếm trong ghi chú — '+fmt(gp.daGhep)+' đơn đã tính lại theo đơn gốc Base' +
+      (gp.gocBiLoai ? ', '+fmt(gp.gocBiLoai)+' đơn bị loại vì mọi đơn gốc đã Hủy/Hoàn' : '') + '.' +
+      (gWarn ? '<br>⚠️ '+fmt(gWarn)+' đơn KHÔNG ghép được (chia theo Pos, nên kiểm tra tay): ' +
+        (gp.khongKhop||[]).slice(0,5).map(function(x){ return esc(x.ngay)+' – không thấy '+esc((x.maKhongTim||[]).join(', '))+' trong Base'; }).concat(
+         (gp.trungDonGoc||[]).slice(0,5).map(function(x){ return esc(x.ngay)+' – '+esc((x.maCoDon||[]).join(', '))+' đã gắn cho đơn Pos khác'; })).join('; ') : '') +
+      '</div>';
+  }
+
   _SR_COLTH_ROWSFN_['bSale'] = function(){ return (_srState.dataB && _srState.dataB.bySale) || []; };
   _SR_COLTH_GETTER_['bSale'] = { name: function(s){ return s.name; } };
   var saleRows = _srApplyColFilters_(d.bySale||[], 'bSale', _SR_COLTH_GETTER_['bSale']).filter(function(s){ return !_srState.bSaleSearch || (s.name||'').toLowerCase().indexOf(_srState.bSaleSearch.toLowerCase())!==-1; });
@@ -13540,7 +13653,7 @@ function renderSalesReportTabE_(wrap, subTabs){
   filters += '<span style="color:var(--muted)">→</span>';
   filters += '<input type="date" value="'+esc(_srState.eDateTo)+'" onchange="_srSetField(\'eDateTo\',this.value);_srState.eDateQuick=\'custom\'" title="Đến ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
   if (_srIsAdmin()){
-    filters += _srComboHtml('sr-sale-combo-e', 'eSale', 'saleOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 190);
+    filters += _srComboHtml('sr-sale-combo-e', 'eSale', 'saleBOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 190);
     filters += _srComboHtml('sr-team-combo-e', 'eTeam', 'teamOptions', 'Lọc theo Team', '🔍 Tìm & chọn team...', 190);
   } else if (currentUser.role === 'leader' && (_srState.leaderTeamOptions||[]).length){
     filters += _srComboHtml('sr-sale-combo-e', 'eSale', 'leaderTeamOptions', 'Lọc theo tên (team của bạn)', '🔍 Tìm tên trong team...', 190);
@@ -13557,6 +13670,7 @@ function renderSalesReportTabE_(wrap, subTabs){
         '<div onclick="closeGearMenus();openBonusProgramsModal()">🏆 Chương trình thưởng</div>'+
         '<div onclick="closeGearMenus();openSaleChannelsModal()">🏷️ Phân loại Online/Offline</div>'+
         '<div onclick="closeGearMenus();openGoldUnitModal()">💰 Đơn giá vàng (Pancake AI)</div>'+
+        '<div onclick="closeGearMenus();openChannelRatesModal()">📡 % hoa hồng theo Kênh</div>'+
       '</div></div>';
   filters += '</div>';
 
@@ -13568,12 +13682,14 @@ function renderSalesReportTabE_(wrap, subTabs){
 }
 
 // ── Tính CHƯƠNG TRÌNH THƯỞNG cho các đơn đang lọc (dùng CHUNG d.orders với phần hoa hồng ở trên) ──
-// Quy ước đã chốt với người dùng: nếu 1 đơn/1 ngày thoả NHIỀU chương trình cùng lúc thì CHỈ lấy
-// đúng 1 chương trình có mức thưởng CAO NHẤT (không cộng dồn). Tách 2 nhóm phạm vi riêng vì bản
-// chất khác nhau: "theo NGÀY" (doanh số/ngày, số đơn/ngày) so 1 sale trong 1 ngày lấy 1 CT lớn
-// nhất; "theo ĐƠN" (giá trị đơn, sản phẩm) so từng đơn của 1 sale lấy 1 CT lớn nhất — 1 sale có
-// thể vừa nhận thưởng theo ngày vừa nhận thưởng theo từng đơn trong ngày đó (2 phạm vi khác nhau).
-function _bonusProgramApplies_(p, dateStr, channel){
+// Quy ước CẬP NHẬT theo văn bản "Cơ chế thưởng kích hoạt Sale mới" (24/09/2026): trong CÙNG 1
+// NHÓM cơ chế (VD nhiều bậc "số đơn/ngày", hoặc nhiều mốc "doanh số/ngày") thì chỉ lấy đúng 1
+// mức CAO NHẤT đạt được (không cộng dồn trong cùng nhóm). NHƯNG giữa 2 nhóm KHÁC NHAU trong cùng
+// phạm vi "theo ngày" (số đơn/ngày VS doanh số/ngày VS đơn đầu tiên/ngày) thì CỘNG DỒN với nhau —
+// đúng ví dụ trong văn bản: 5 đơn (100k, bậc số đơn) + 55 triệu (50k, mốc doanh số) = 150k.
+// "Theo ĐƠN" (giá trị đơn, sản phẩm) vẫn tách riêng như cũ — 1 sale có thể vừa nhận thưởng theo
+// ngày vừa nhận thưởng theo từng đơn trong ngày đó (khác phạm vi hoàn toàn).
+function _bonusProgramApplies_(p, dateStr, channel, saleName){
   if (p.dateFrom && dateStr && dateStr < p.dateFrom) return false;
   if (p.dateTo && dateStr && dateStr > p.dateTo) return false;
   var aud = p.audience || {};
@@ -13582,7 +13698,47 @@ function _bonusProgramApplies_(p, dateStr, channel){
     if (channel === 'online' && !aud.online) return false;
     if (channel === 'offline' && !aud.offline) return false;
   }
+  // Giới hạn theo "ngày thứ mấy kể từ Ngày bắt đầu" của TỪNG Sale (VD chương trình thử việc:
+  // Giai đoạn 1 = ngày 1-3, Giai đoạn 2 = từ ngày 4). "Ngày bắt đầu" đặt riêng từng Sale ở
+  // 👤 Quản lý tài khoản. Sale chưa được đặt Ngày bắt đầu -> KHÔNG áp dụng các CT có bật mục này.
+  if (p.probationDay && p.probationDay.enabled){
+    var sd = _saleStartDate_(saleName);
+    if (!sd) return false;
+    var dayNum = _daysSinceStart_(sd, dateStr);
+    if (dayNum === null || dayNum < 1) return false;
+    var from = (p.probationDay.from !== '' && p.probationDay.from != null) ? Number(p.probationDay.from) : 1;
+    var to = (p.probationDay.to !== '' && p.probationDay.to != null) ? Number(p.probationDay.to) : Infinity;
+    if (dayNum < from || dayNum > to) return false;
+  }
   return true;
+}
+// Chuyển "dd/MM/yyyy" hoặc "dd/MM/yyyy HH:mm" (định dạng ngày của DT TỔNG) sang "yyyy-MM-dd" để
+// so sánh đúng với dateFrom/dateTo (input type=date, vốn luôn là "yyyy-MM-dd") — trước đây so
+// sánh thẳng 2 định dạng khác nhau bằng chuỗi (< / >) là SAI, tình cờ ít bị phát hiện.
+function _ddmmyyyyToYmd_(s){
+  var m = String(s||'').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (!m) return '';
+  var d = ('0'+m[1]).slice(-2), mo = ('0'+m[2]).slice(-2), y = m[3];
+  return y+'-'+mo+'-'+d;
+}
+// Số ngày kể từ "Ngày bắt đầu" (yyyy-MM-dd) đến 1 ngày cụ thể (yyyy-MM-dd) — ngày bắt đầu = ngày
+// thứ 1. Cả 2 tham số PHẢI đã ở dạng "yyyy-MM-dd" (dùng _ddmmyyyyToYmd_ để quy đổi trước khi gọi).
+function _daysSinceStart_(startYmd, dateYmd){
+  var s = String(startYmd||'').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  var d = String(dateYmd||'').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!s || !d) return null;
+  var sMs = Date.UTC(+s[1], +s[2]-1, +s[3]);
+  var dMs = Date.UTC(+d[1], +d[2]-1, +d[3]);
+  return Math.round((dMs - sMs) / 86400000) + 1;
+}
+// Tra "Ngày bắt đầu" đã đặt cho 1 tên Sale (qua Quản lý tài khoản — 1 tài khoản có thể có nhiều
+// tên/bí danh, xem _acctNamesOf) — dùng chung nguồn "accounts" (đã tải sẵn toàn cục).
+function _saleStartDate_(name){
+  if (!name || typeof accounts === 'undefined') return '';
+  for (var i = 0; i < accounts.length; i++){
+    if (_acctNamesOf(accounts[i]).indexOf(name) !== -1) return accounts[i].startDate || '';
+  }
+  return '';
 }
 // Ước lượng số lượng sản phẩm khớp từ khoá trong ô "Sản phẩm" (văn bản tự do, vd "Tỳ hưu x2, Vòng tay x1")
 // — tìm dạng "x2"/"×2"/"(2)" ngay sau từ khoá, không thấy thì tính là 1. Đây là ƯỚC LƯỢNG, hiển thị
@@ -13613,30 +13769,35 @@ function _computeBonusData_(orders){
   var bySale = {};
   function ensure(name){ if (!bySale[name]) bySale[name] = {total:0, items:[]}; return bySale[name]; }
 
-  // Gom theo (sale, ngày) để chấm các CT phạm vi "theo ngày"
+  // Gom theo (sale, ngày) để chấm các CT phạm vi "theo ngày" — kèm giờ:phút của đơn SỚM NHẤT
+  // trong ngày (dùng cho CT "Đơn đầu tiên trong ngày").
   var bySaleDay = {};
   orders.forEach(function(o){
-    var dateStr = String(o.ngayTao||'').slice(0,10);
+    var dateStr = _ddmmyyyyToYmd_(o.ngayTao);
+    var timeMatch = String(o.ngayTao||'').match(/(\d{1,2}):(\d{2})/);
+    var timeStr = timeMatch ? timeMatch[0] : '';
     splitMulti_(o.saleBan, ',').forEach(function(name){
       if (!name) return;
       var key = name+'|'+dateStr;
-      if (!bySaleDay[key]) bySaleDay[key] = {name:name, date:dateStr, revenue:0, count:0};
+      if (!bySaleDay[key]) bySaleDay[key] = {name:name, date:dateStr, revenue:0, count:0, firstOrderTime:null};
       bySaleDay[key].revenue += Number(o.giaTriDon)||0;
       bySaleDay[key].count++;
+      if (timeStr && (bySaleDay[key].firstOrderTime===null || timeStr < bySaleDay[key].firstOrderTime)) bySaleDay[key].firstOrderTime = timeStr;
     });
   });
   Object.keys(bySaleDay).forEach(function(key){
     var g = bySaleDay[key];
     var channel = SALE_CHANNELS[g.name] || '';
-    var best = null;
+    // 3 nhóm riêng theo phạm vi "theo ngày" — CỘNG DỒN giữa các nhóm, trong 1 nhóm chỉ lấy cao nhất.
+    var bestTier = null, bestRevDay = null, bestFirstOrder = null;
     BONUS_PROGRAMS.forEach(function(p){
-      if (!_bonusProgramApplies_(p, g.date, channel)) return;
+      if (!_bonusProgramApplies_(p, g.date, channel, g.name)) return;
       if (p.revenue && p.revenue.enabled && p.revenue.scope === 'day'){
         var min = (p.revenue.min!=='' && p.revenue.min!=null) ? Number(p.revenue.min) : null;
         var max = (p.revenue.max!=='' && p.revenue.max!=null) ? Number(p.revenue.max) : null;
         if ((min===null || g.revenue>=min) && (max===null || g.revenue<=max)){
           var amt = Number(p.bonusAmount)||0;
-          if (amt>0 && (!best || amt>best.amount)) best = {amount:amt, program:p, detail:'Doanh số ngày '+_srMoney(g.revenue)};
+          if (amt>0 && (!bestRevDay || amt>bestRevDay.amount)) bestRevDay = {amount:amt, program:p, detail:'Doanh số ngày '+_srMoney(g.revenue)};
         }
       }
       if (p.tier && p.tier.enabled && (p.tier.rows||[]).length){
@@ -13646,27 +13807,32 @@ function _computeBonusData_(orders){
         });
         if (hit){
           var amt2 = Number(hit.bonus)||0;
-          if (amt2>0 && (!best || amt2>best.amount)) best = {amount:amt2, program:p, detail:'Đạt '+g.count+' đơn/ngày (bậc từ '+hit.count+' đơn)'};
+          if (amt2>0 && (!bestTier || amt2>bestTier.amount)) bestTier = {amount:amt2, program:p, detail:'Đạt '+g.count+' đơn/ngày (bậc từ '+hit.count+' đơn)'};
         }
       }
+      if (p.firstOrder && p.firstOrder.enabled){
+        var amt3 = Number(p.firstOrder.amount)||0;
+        if (amt3>0 && (!bestFirstOrder || amt3>bestFirstOrder.amount)) bestFirstOrder = {amount:amt3, program:p, detail:'Đơn đầu tiên trong ngày'+(g.firstOrderTime?' (lúc '+g.firstOrderTime+')':'')};
+      }
     });
-    if (best){
+    [[bestTier,'Theo ngày (số đơn)'], [bestRevDay,'Theo ngày (doanh số)'], [bestFirstOrder,'Theo ngày (đơn đầu tiên)']].forEach(function(pair){
+      var best = pair[0]; if (!best) return;
       var rec = ensure(g.name);
       rec.total += best.amount;
-      rec.items.push({date:g.date, scope:'Theo ngày', program:best.program.name, amount:best.amount, detail:best.detail});
-    }
+      rec.items.push({date:g.date, scope:pair[1], program:best.program.name, amount:best.amount, detail:best.detail});
+    });
   });
 
   // Chấm các CT phạm vi "theo đơn" (giá trị đơn / sản phẩm)
   orders.forEach(function(o){
-    var dateStr = String(o.ngayTao||'').slice(0,10);
+    var dateStr = _ddmmyyyyToYmd_(o.ngayTao);
     var giaTri = Number(o.giaTriDon)||0;
     splitMulti_(o.saleBan, ',').forEach(function(name){
       if (!name) return;
       var channel = SALE_CHANNELS[name] || '';
       var best = null;
       BONUS_PROGRAMS.forEach(function(p){
-        if (!_bonusProgramApplies_(p, dateStr, channel)) return;
+        if (!_bonusProgramApplies_(p, dateStr, channel, name)) return;
         if (p.product && p.product.trim()){
           var pq = _bonusProductQty_(o.sanPham, p.product);
           if (pq.matched && pq.qty>0){
@@ -13710,17 +13876,19 @@ function _srRenderE_(d){
   html += '<div class="dash-section-title">a) Doanh thu theo mức đơn hàng'+_srViewToggleHtml('eBucketView')+'</div>';
   if (_srState.eBucketView === 'table'){
     html += '<div class="kpi-grid" style="margin-bottom:16px">' +
-      '<div class="kpi-card" style="border:1.5px solid var(--text)"><div class="kpi-val">'+_srMoney(c.totalRevenueAbove15+c.totalRevenueBelow15)+'</div><div class="kpi-label"><b>Tổng doanh thu</b></div></div>' +
+      '<div class="kpi-card" style="border:1.5px solid var(--text)"><div class="kpi-val">'+_srMoney(c.totalRevenueAbove15+c.totalRevenueBelow15+c.totalRevenueChannel)+'</div><div class="kpi-label"><b>Tổng doanh thu</b></div></div>' +
       '<div class="kpi-card"><div class="kpi-val">'+fmt(c.totalOrdersAbove15)+'</div><div class="kpi-label">Số đơn ≥15tr</div></div>' +
       '<div class="kpi-card"><div class="kpi-val">'+fmt(c.totalOrdersBelow15)+'</div><div class="kpi-label">Số đơn &lt;15tr</div></div>' +
       '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+_srMoney(c.totalRevenueAbove15)+'</div><div class="kpi-label">Doanh thu đơn ≥15tr</div></div>' +
       '<div class="kpi-card"><div class="kpi-val">'+_srMoney(c.totalRevenueBelow15)+'</div><div class="kpi-label">Doanh thu đơn &lt;15tr</div></div>' +
+      (c.totalOrdersChannel ? '<div class="kpi-card"><div class="kpi-val">'+_srMoney(c.totalRevenueChannel)+'</div><div class="kpi-label">DT kênh % riêng ('+fmt(c.totalOrdersChannel)+' đơn)</div></div>' : '') +
       '</div>';
   } else {
     var bucketRows = [
       { name: 'Đơn ≥15tr', value: c.totalRevenueAbove15, orders: c.totalOrdersAbove15 },
       { name: 'Đơn <15tr', value: c.totalRevenueBelow15, orders: c.totalOrdersBelow15 }
     ];
+    if (c.totalOrdersChannel) bucketRows.push({ name: 'Kênh % riêng', value: c.totalRevenueChannel, orders: c.totalOrdersChannel });
     html += _srChartSvg(bucketRows, 'name', 'value', _srState.eBucketView, true, 'orders');
   }
 
@@ -13735,8 +13903,12 @@ function _srRenderE_(d){
       _srColTh_('eSale','name','Sale',_SR_COLTH_ROWSFN_['eSale'],_SR_COLTH_GETTER_['eSale'].name)+'<th style="text-align:right">Số đơn ≥15tr</th><th style="text-align:right">Số đơn &lt;15tr</th>'+
       '<th style="text-align:right">DT ≥15tr</th><th style="text-align:right">DT &lt;15tr</th>'+
       '<th style="text-align:right">% ≥15tr</th><th style="text-align:right">% &lt;15tr</th>'+
+      '<th style="text-align:right">DT kênh riêng</th>'+
       '<th style="text-align:right"><b>Hoa hồng</b></th></tr></thead><tbody>';
     rows.forEach(function(s){
+      var chTitle = s.channelBreakdown && Object.keys(s.channelBreakdown).length
+        ? Object.keys(s.channelBreakdown).map(function(k){ var cb=s.channelBreakdown[k]; return k+': '+_srMoney(cb.revenue)+' × '+cb.rate+'%'; }).join(' | ')
+        : '';
       html += '<tr><td>'+esc(s.name)+'</td>'+
         '<td style="text-align:right">'+fmt(s.ordersAbove15)+'</td>'+
         '<td style="text-align:right">'+fmt(s.ordersBelow15)+'</td>'+
@@ -13744,15 +13916,18 @@ function _srRenderE_(d){
         '<td style="text-align:right">'+_srMoney(s.revenueBelow15)+'</td>'+
         '<td style="text-align:right" title="Nguồn: '+esc(s.sourceAbove15)+'">'+s.rateAbove15+'%</td>'+
         '<td style="text-align:right" title="Nguồn: '+esc(s.sourceBelow15)+'">'+s.rateBelow15+'%</td>'+
+        '<td style="text-align:right"'+(chTitle?(' title="'+esc(chTitle)+'"'):'')+'>'+(s.channelRevenue ? _srMoney(s.channelRevenue) : '—')+'</td>'+
         '<td style="text-align:right"><b>'+_srMoney(s.commission)+'</b></td></tr>';
     });
-    if (!rows.length) html += '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+    if (!rows.length) html += '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
     else html += _srTotalRowHtml_(['Tổng',
       fmt(rows.reduce(function(s,r){return s+(r.ordersAbove15||0);},0)),
       fmt(rows.reduce(function(s,r){return s+(r.ordersBelow15||0);},0)),
       _srMoney(rows.reduce(function(s,r){return s+(r.revenueAbove15||0);},0)),
       _srMoney(rows.reduce(function(s,r){return s+(r.revenueBelow15||0);},0)),
-      '', '', '<b>'+_srMoney(c.totalCommission)+'</b>']);
+      '', '',
+      _srMoney(rows.reduce(function(s,r){return s+(r.channelRevenue||0);},0)),
+      '<b>'+_srMoney(c.totalCommission)+'</b>']);
     html += '</tbody></table>';
     html += '<div style="font-size:11px;color:var(--muted);margin-top:6px">Rê chuột vào % để xem nguồn áp dụng (Cá nhân / Team X / Chưa cài).</div>';
   } else {
@@ -13762,7 +13937,7 @@ function _srRenderE_(d){
 
   // c) Chương trình thưởng — cộng thêm ngoài hoa hồng %, tính theo các chương trình admin đã cài
   var bonus = _computeBonusData_(d.orders || []);
-  html += '<div class="dash-section-title" style="margin-top:18px">c) Chương trình thưởng <span style="font-weight:400;color:var(--muted);font-size:11px">(mỗi đơn/ngày chỉ tính 1 chương trình — chương trình có mức cao nhất)</span></div>';
+  html += '<div class="dash-section-title" style="margin-top:18px">c) Chương trình thưởng <span style="font-weight:400;color:var(--muted);font-size:11px">(mỗi nhóm cơ chế/ngày — số đơn, doanh số, đơn đầu tiên — chỉ tính mức cao nhất; các nhóm KHÁC NHAU trong cùng ngày được cộng dồn)</span></div>';
   if (!BONUS_PROGRAMS.length){
     html += '<div style="color:var(--muted);font-size:12px;padding:10px 0">Chưa có chương trình thưởng nào — bấm "🏆 Chương trình thưởng" ở trên để thêm.</div>';
   } else {
@@ -13773,7 +13948,7 @@ function _srRenderE_(d){
     bonusRows.forEach(function(s, i){
       var rid = 'bn_'+i;
       var expanded = _srState.bonusExpandedRow === rid;
-      html += '<tr><td>'+esc(s.name)+(SALE_CHANNELS[s.name] ? ' <span style="font-size:10px;color:var(--muted)">('+(SALE_CHANNELS[s.name]==='online'?'Online':'Offline')+')</span>' : ' <span style="font-size:10px;color:var(--red)">(chưa phân loại)</span>')+'</td>'+
+      html += '<tr><td>'+esc(s.name)+(SALE_CHANNELS[s.name] ? ' <span style="font-size:10px;color:var(--muted)">('+(SALE_CHANNELS[s.name]==='online'?'Online':(SALE_CHANNELS[s.name]==='probation'?'Thử việc':'Offline'))+')</span>' : ' <span style="font-size:10px;color:var(--red)">(chưa phân loại)</span>')+'</td>'+
         '<td style="text-align:right">'+fmt(s.items.length)+'</td>'+
         '<td style="text-align:right"><b>'+_srMoney(s.total)+'</b></td>'+
         '<td><button class="btn sm" onclick="_srState.bonusExpandedRow='+(expanded?"''":"'"+rid+"'")+';renderSalesReportTab()">'+(expanded?'Ẩn':'Chi tiết')+'</button></td></tr>';
@@ -13810,7 +13985,7 @@ function renderSalesReportTabF_(wrap, subTabs){
   filters += '<span style="color:var(--muted)">→</span>';
   filters += '<input type="date" value="'+esc(_srState.fDateTo)+'" onchange="_srSetField(\'fDateTo\',this.value);_srState.fDateQuick=\'custom\'" title="Đến ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
   if (_srIsAdmin()){
-    filters += _srComboHtml('sr-sale-combo-f', 'fSale', 'saleOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 190);
+    filters += _srComboHtml('sr-sale-combo-f', 'fSale', 'saleBOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 190);
     filters += _srComboHtml('sr-team-combo-f', 'fTeam', 'teamOptions', 'Lọc theo Team', '🔍 Tìm & chọn team...', 190);
   } else if (currentUser.role === 'leader' && (_srState.leaderTeamOptions||[]).length){
     filters += _srComboHtml('sr-sale-combo-f', 'fSale', 'leaderTeamOptions', 'Lọc theo tên (team của bạn)', '🔍 Tìm tên trong team...', 190);
@@ -13820,8 +13995,7 @@ function renderSalesReportTabF_(wrap, subTabs){
       '<div style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)">🔒 '+esc((_srState.fSale||[]).join(', ') || currentUser.name)+' — chỉ xem được KPI của mình</div></div>';
   }
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
-  if (_srIsAdmin()) filters += '<button class="btn sm" onclick="openSaleKpiConfigModal_()">🎯 Cài đặt KPI (bậc / online / commit riêng)</button>';
-  if (_srIsAdmin()) filters += '<button class="btn sm" onclick="openSaleChannelsModal()">🏷️ Phân loại Online/Offline</button>';
+  if (_srIsAdmin()) filters += '<button class="btn sm" onclick="openSaleKpiConfigModal_()">🎯 Cài đặt KPI (bậc / commit riêng)</button>';
   filters += '</div>';
 
   var body = _srState.loading
@@ -13839,64 +14013,145 @@ function _srRenderF_(d){
   _SR_COLTH_GETTER_['fSale'] = { name: function(r){ return r.name; } };
   var rows = _srApplyColFilters_(d.rows||[], 'fSale', _SR_COLTH_GETTER_['fSale']).filter(function(r){ return !_srState.fSaleSearch || r.name.toLowerCase().indexOf(_srState.fSaleSearch.toLowerCase())!==-1; });
 
+  // Sale thuong (khong phai Admin) CHI duoc xem dung dong cua chinh minh — mac dinh moi tai
+  // khoan deu xem duoc tab "Bao cao doanh so" tru khi Admin chu dong gioi han (xem
+  // _tabAllowedForUser), nen neu khong thu hep o day thi tung Sale se thay het doanh thu/bac
+  // cua ca cong ty. Admin van thay day du nhu cu, khong doi gi.
+  var _fIsAdmin = (typeof currentUser!=='undefined' && currentUser && currentUser.role==='admin');
+  var _fSelfView = !_fIsAdmin;
+  if (_fSelfView) {
+    var _fMyNames = (typeof currentUser!=='undefined' && currentUser && currentUser.names && currentUser.names.length)
+      ? currentUser.names : ((typeof currentUser!=='undefined' && currentUser && currentUser.name) ? [currentUser.name] : []);
+    var _fMyNamesLc = _fMyNames.map(function(n){ return String(n).trim().toLowerCase(); });
+    rows = rows.filter(function(r){ return _fMyNamesLc.indexOf(String(r.name).trim().toLowerCase())!==-1; });
+  }
+  function _fTierStatusLabel_(tier){
+    if (!tier) return '';
+    return (tier==='TVF1' || tier==='TVF2') ? '🔰 Đang thử việc' : '✅ Chính thức';
+  }
+  // Tong theo DUNG tap dong dang hien (da loc/thu hep o tren) — KHONG dung d.totalRevenue/
+  // totalTarget/totalPct truc tiep nua, vi 2 gia tri do luon tinh tren TOAN BO cong ty phia
+  // server, se lam lo doanh thu nguoi khac vao the KPI khi 1 Sale thuong dang tu xem minh.
+  var fTotalRevenue = rows.reduce(function(s,r){ return s+r.revenue; }, 0);
+  var fTotalTarget = rows.reduce(function(s,r){ return s+(r.target||0); }, 0);
+  var fTotalPct = fTotalTarget>0 ? Math.round(fTotalRevenue/fTotalTarget*1000)/10 : null;
+  // Commit riêng (SỬA 2026-10-04): chạy SONG SONG với KPI theo bậc, KHÔNG thay thế — tính tổng
+  // Commit/%HT Commit riêng trên CHÍNH tập "rows" đã lọc self-view ở trên (giống hệt cách
+  // fTotalRevenue/fTotalTarget đã làm), tránh lộ số của người khác khi 1 Sale thường tự xem mình.
+  var fTotalCommit = rows.reduce(function(s,r){ return s+(r.commit||0); }, 0);
+  var fTotalPctCommit = fTotalCommit>0 ? Math.round(fTotalRevenue/fTotalCommit*1000)/10 : null;
+
+  var selfBanner = '';
+  if (_fSelfView) {
+    if (!rows.length) {
+      selfBanner = '<div style="padding:10px 14px;background:var(--surface2);border-radius:8px;margin-bottom:10px;color:var(--muted)">Chưa tìm thấy Bậc KPI gắn với tài khoản của bạn — liên hệ quản trị viên để được gán Bậc bắt đầu.</div>';
+    } else {
+      selfBanner = rows.map(function(r){
+        var statusLabel = _fTierStatusLabel_(r.tier);
+        return '<div style="padding:10px 14px;background:var(--surface2);border-radius:8px;margin-bottom:10px">'+
+          '<b style="font-size:13px">'+(statusLabel||'<span style=\'color:var(--hint)\'>Chưa gán bậc</span>')+'</b>'+
+          (r.tier ? ' — Bậc <b>'+esc(r.tier)+'</b>' : '')+
+          '</div>';
+      }).join('');
+    }
+  }
+
+  var tt = cfg.tierTargets || {};
+  var noTierCount = (d.rows||[]).filter(function(r){ return r.nhom==='(chưa gán bậc)'; }).length;
   var html = '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">'+
-    'Mục tiêu: <b>Văn phòng</b> — Bậc 1 = '+_srMoney(cfg.tierTargets && cfg.tierTargets['1'])+', Bậc 2 = '+_srMoney(cfg.tierTargets && cfg.tierTargets['2'])+', Bậc 3 = '+_srMoney(cfg.tierTargets && cfg.tierTargets['3'])+
-    ' · <b>Online</b> — '+_srMoney(cfg.onlineTarget)+
-    ' · Ai có <b>KPI commit riêng</b> thì dùng số đó thay vì bậc/nhóm. Nhóm lấy từ <b>🏷️ Phân loại Online/Offline</b> (Quản lý Team) — cùng nguồn với "🏆 Chương trình thưởng" ở Báo cáo E.'+
-    (d.classifiedCount ? '' : ' <b style="color:#9a3412">Chưa phân loại Sale nào — bấm nút "🏷️ Phân loại Online/Offline" bên dưới để gán.</b>')+
+    'Mục tiêu theo bậc (tự động tăng/giảm hàng tháng theo doanh thu, bắt đầu theo dõi từ <b>'+esc(cfg.trackingStartMonth||'')+'</b>): '+
+    '<b>F1</b>='+_srMoney(tt.F1)+' · <b>F2</b>='+_srMoney(tt.F2)+' · <b>F3</b>='+_srMoney(tt.F3)+
+    ' · <b>O1</b>='+_srMoney(tt.O1)+' · <b>O2</b>='+_srMoney(tt.O2)+' · <b>O3</b>='+_srMoney(tt.O3)+
+    ' · <b>O</b> (không nhảy bậc)='+_srMoney(tt.O)+
+    ' · <b>Thử việc</b>: TVF1='+_srMoney(tt.TVF1)+', TVF2='+_srMoney(tt.TVF2)+' (luôn đúng 1 tháng, tháng sau tự động lên F1)'+
+    ' · Ai có <b>Commit riêng</b> thì xem thêm 2 cột Commit/%HT Commit — chạy SONG SONG với KPI theo bậc (không thay thế).'+
+    (!_fSelfView && noTierCount ? ' <b style="color:#9a3412">'+noTierCount+' Sale chưa được gán Bậc bắt đầu — bấm "🎯 Cài đặt KPI" để gán.</b>' : '')+
     '</div>';
 
+  html += selfBanner;
   html += '<div class="kpi-grid" style="margin-bottom:16px">'+
-    '<div class="kpi-card" style="border:1.5px solid var(--text)"><div class="kpi-val">'+_srMoney(d.totalRevenue)+'</div><div class="kpi-label"><b>Tổng doanh thu</b></div></div>'+
-    '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalTarget)+'</div><div class="kpi-label">Tổng KPI mục tiêu</div></div>'+
-    '<div class="kpi-card" style="border:1.5px solid '+(d.totalPct!==null && d.totalPct>=100 ? '#16a34a' : '#dc2626')+'"><div class="kpi-val" style="color:'+(d.totalPct!==null && d.totalPct>=100 ? '#16a34a' : '#dc2626')+'">'+(d.totalPct===null?'—':d.totalPct+'%')+'</div><div class="kpi-label">% hoàn thành chung</div></div>'+
+    '<div class="kpi-card" style="border:1.5px solid var(--text)"><div class="kpi-val">'+_srMoney(fTotalRevenue)+'</div><div class="kpi-label"><b>'+(_fSelfView?'Doanh thu của bạn':'Tổng doanh thu')+'</b></div></div>'+
+    '<div class="kpi-card"><div class="kpi-val">'+_srMoney(fTotalTarget)+'</div><div class="kpi-label">'+(_fSelfView?'KPI mục tiêu':'Tổng KPI mục tiêu')+'</div></div>'+
+    '<div class="kpi-card" style="border:1.5px solid '+(fTotalPct!==null && fTotalPct>=100 ? '#16a34a' : '#dc2626')+'"><div class="kpi-val" style="color:'+(fTotalPct!==null && fTotalPct>=100 ? '#16a34a' : '#dc2626')+'">'+(fTotalPct===null?'—':fTotalPct+'%')+'</div><div class="kpi-label">% hoàn thành'+(_fSelfView?'':' chung')+'</div></div>'+
+    (fTotalCommit ? '<div class="kpi-card" style="border:1.5px solid '+(fTotalPctCommit!==null && fTotalPctCommit>=100 ? '#16a34a' : '#dc2626')+'"><div class="kpi-val" style="color:'+(fTotalPctCommit!==null && fTotalPctCommit>=100 ? '#16a34a' : '#dc2626')+'">'+(fTotalPctCommit===null?'—':fTotalPctCommit+'%')+'</div><div class="kpi-label">% hoàn thành Commit'+(_fSelfView?'':' chung')+'</div></div>' : '')+
     '</div>';
 
   html += '<div class="dash-section-title">Chi tiết theo Sale'+_srViewToggleHtml('fKpiView')+'</div>';
   html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.fSaleSearch)+'" oninput="_srState.fSaleSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
 
   if (_srState.fKpiView === 'table'){
-    html += '<table class="dash-table"><thead><tr>'+
+    html += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr>'+
       _srColTh_('fSale','name','Sale',_SR_COLTH_ROWSFN_['fSale'],_SR_COLTH_GETTER_['fSale'].name)+'<th>Nhóm</th><th>Bậc</th><th style="text-align:right">Doanh thu</th>'+
-      '<th style="text-align:right">KPI mục tiêu</th><th style="text-align:right">% hoàn thành</th><th>Kết quả</th></tr></thead><tbody>';
+      '<th style="text-align:right">KPI (bậc)</th><th style="text-align:right">%HT KPI</th>'+
+      '<th style="text-align:right">Commit riêng</th><th style="text-align:right">%HT Commit</th>'+
+      '<th>Kết quả</th></tr></thead><tbody>';
     rows.forEach(function(r){
-      var tierLabel = r.tier ? 'Bậc '+r.tier : (r.nhom==='Văn phòng' ? '<span style="color:var(--hint)">chưa gán</span>' : '—');
+      var tierLabel = r.tier ? esc(r.tier)+' <span style="font-size:10.5px;color:var(--muted)">('+_fTierStatusLabel_(r.tier)+')</span>' : '<span style="color:var(--hint)">chưa gán</span>';
       var pctColor = r.pct===null ? 'var(--muted)' : (r.pct>=100 ? '#16a34a' : '#dc2626');
       var resultTxt = r.pct===null ? '<span style="color:var(--hint)">chưa có mục tiêu</span>' : (r.pct>=100 ? '✓ Đạt' : '✗ Chưa đạt');
-      var srcNote = r.source==='override' ? ' <span title="Dùng KPI commit riêng, không theo bậc/nhóm" style="cursor:help">📌</span>' : '';
+      var srcNote = r.commit!==null && r.commit!==undefined ? ' <span title="Có đặt Commit riêng — xem cột Commit/%HT Commit, chạy song song với KPI theo bậc" style="cursor:help">📌</span>' : '';
+      var pctCColor = r.pctCommit===null ? 'var(--muted)' : (r.pctCommit>=100 ? '#16a34a' : '#dc2626');
       html += '<tr><td>'+esc(r.name)+'</td><td>'+esc(r.nhom)+'</td><td>'+tierLabel+srcNote+'</td>'+
         '<td style="text-align:right">'+_srMoney(r.revenue)+'</td>'+
         '<td style="text-align:right">'+(r.target?_srMoney(r.target):'<span style="color:var(--hint)">—</span>')+'</td>'+
         '<td style="text-align:right;font-weight:700;color:'+pctColor+'">'+(r.pct===null?'—':r.pct+'%')+'</td>'+
+        '<td style="text-align:right">'+(r.commit?_srMoney(r.commit):'<span style="color:var(--hint)">—</span>')+'</td>'+
+        '<td style="text-align:right;font-weight:700;color:'+pctCColor+'">'+(r.pctCommit===null?'—':r.pctCommit+'%')+'</td>'+
         '<td style="font-weight:600;color:'+pctColor+'">'+resultTxt+'</td></tr>';
     });
-    if (!rows.length) html += '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
-    else html += _srTotalRowHtml_(['Tổng','','', _srMoney(rows.reduce(function(s,r){return s+r.revenue;},0)), _srMoney(rows.reduce(function(s,r){return s+(r.target||0);},0)), '', '']);
-    html += '</tbody></table>';
+    if (!rows.length) html += '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+    else if (!_fSelfView) html += _srTotalRowHtml_(['Tổng','','', _srMoney(fTotalRevenue), _srMoney(fTotalTarget), '', _srMoney(fTotalCommit), '', '']);
+    html += '</tbody></table></div>';
   } else {
     html += '<div style="font-size:11px;color:var(--hint);margin-bottom:4px">Vẽ theo "Doanh thu"</div>';
     html += _srChartSvg(rows, 'name', 'revenue', _srState.fKpiView, true);
   }
+
+  // ── Lich su Bac theo thang (THEM 2026-10-04, yeu cau Duyen) — backend da tinh san timeline
+  // cho moi Sale (xem _computeSaleTierTimeline_/buildSaleKpiReport_ o gas_v13.js), o day chi ve
+  // thanh bang ngang: 1 cot/thang (d.trackedMonths, tu trackingStartMonth den thang hien tai),
+  // giong dung cach xem T9->T10->T11->... trong file Excel "Theo doi doanh thu". O doi bac so
+  // voi thang ngay truoc duoc to vang de de ra soat, giong Excel. Dung "rows" (da loc self-view
+  // o tren), KHONG dung d.rows truc tiep — tranh 1 Sale thuong tu xem minh lai thay lich su bac
+  // cua nguoi khac.
+  var months = d.trackedMonths || [];
+  var rowsWithTimeline = rows.filter(function(r){ return r.timeline; });
+  if (months.length && rowsWithTimeline.length){
+    function monthLabel(ym){ var p = String(ym).split('-'); return p[1]+'/'+p[0]; }
+    html += '<div class="dash-section-title" style="margin-top:16px">📅 Lịch sử Bậc theo tháng'+
+      '<span style="font-size:11px;color:var(--hint);font-weight:400"> — ô tô vàng = tháng có đổi bậc so với tháng trước</span></div>';
+    html += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Sale</th>'+
+      months.map(function(ym){ return '<th style="text-align:center">'+esc(monthLabel(ym))+'</th>'; }).join('')+
+      '</tr></thead><tbody>';
+    rowsWithTimeline.forEach(function(r){
+      html += '<tr><td>'+esc(r.name)+'</td>';
+      months.forEach(function(ym, i){
+        var tier = r.timeline[ym] || '';
+        var changed = i > 0 && tier && tier !== (r.timeline[months[i-1]] || '');
+        html += '<td style="text-align:center'+(changed ? ';background:#fef9c3;font-weight:700' : '')+'">'+(tier ? esc(tier) : '<span style="color:var(--hint)">—</span>')+'</td>';
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+
   return html;
 }
 
 // ── BÁO CÁO G: ĐƠN BỊ LOẠI (Hủy/Trả lại/Hoàn tiền/Thất bại/Khiếu nại) ──
-// Cùng nguồn "DT TỔNG " và cùng định nghĩa trạng thái bị loại (_isExcludedOrderStatus_ ở backend)
-// như Báo cáo A/C, nhưng CHỈ lấy đúng các đơn đã bị loại đó để xem riêng: bao nhiêu đơn, thuộc
-// sale nào, MKT nào, lý do gì. Số liệu Cọc/Giá trị ở đây CHỈ để tham khảo — KHÔNG tính vào doanh số.
+// Nguồn POS ("dữ liệu đơn", cùng nguồn Báo cáo B/E/F) và cùng định nghĩa trạng thái bị loại
+// (Pos chỉ loại "Đã hoàn" và "Đang hoàn" — _donHasExcludedStatus_ ở backend) như Báo cáo B, nhưng CHỈ lấy đúng các đơn đã bị loại đó để xem
+// riêng: bao nhiêu đơn, thuộc sale nào, MKT nào, lý do gì. COD/Giá trị CHỈ để tham khảo — KHÔNG tính vào doanh số.
 function renderSalesReportTabG_(wrap, subTabs){
   var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
   filters += _quickRangeSelectHtml(_srState.gDateQuick, "_srApplyQuickRange('gDateQuick','gDateFrom','gDateTo',this.value)");
   filters += '<input type="date" value="'+esc(_srState.gDateFrom)+'" onchange="_srSetField(\'gDateFrom\',this.value);_srState.gDateQuick=\'custom\'" title="Từ ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
   filters += '<span style="color:var(--muted)">→</span>';
   filters += '<input type="date" value="'+esc(_srState.gDateTo)+'" onchange="_srSetField(\'gDateTo\',this.value);_srState.gDateQuick=\'custom\'" title="Đến ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
-  filters += '<select onchange="_srSetField(\'gDateField\',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-    '<option value="ngayTao"'+(_srState.gDateField==='ngayTao'?' selected':'')+'>Lọc theo Ngày tạo</option>'+
-    '<option value="thoiGianHT"'+(_srState.gDateField==='thoiGianHT'?' selected':'')+'>Lọc theo Thời gian hoàn thành</option>'+
-    '</select>';
   filters += '<input type="text" value="'+esc(_srState.gSanPham)+'" oninput="_srState.gSanPham=this.value" placeholder="Lọc theo sản phẩm..." style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);width:150px">';
-  filters += _srComboHtml('sr-sale-combo-g', 'gSale', 'saleOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 180);
-  filters += _srComboHtml('sr-kenh-combo-g', 'gKenh', 'kenhOptions', 'Lọc theo Kênh', '🔍 Tìm & chọn kênh...', 170);
+  filters += _srComboHtml('sr-sale-combo-g', 'gSale', 'saleBOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 180);
+  filters += _srComboHtml('sr-nguon-combo-g', 'gNguon', 'nguonOptions', 'Lọc theo Kênh bán', '🔍 Tìm & chọn kênh...', 170);
+  filters += _srComboHtml('sr-mkt-combo-g', 'gMarketer', 'marketerOptions', 'Lọc theo Marketer', '🔍 Tìm & chọn MKT...', 170);
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
   filters += '<button class="btn sm" id="sr-export-sheet-btn" onclick="exportSalesReportToSheet()">📄 Xuất ra Sheet</button>';
   filters += '</div>';
@@ -13914,15 +14169,15 @@ function renderSalesReportTabG_(wrap, subTabs){
       var moneyFmt = function(n){ return (Number(n)||0).toLocaleString('vi-VN') + 'đ'; };
       var html = '<div class="kpi-grid" style="margin-bottom:16px">' +
         '<div class="kpi-card"><div class="kpi-label">Số đơn bị loại</div><div class="kpi-val">'+fmt(d.totalOrders||0)+'</div></div>' +
-        '<div class="kpi-card"><div class="kpi-label">Tổng cọc (tham khảo)</div><div class="kpi-val">'+moneyFmt(d.totalCoc)+'</div></div>' +
+        '<div class="kpi-card"><div class="kpi-label">Tổng COD (tham khảo)</div><div class="kpi-val">'+moneyFmt(d.totalCod)+'</div></div>' +
         '<div class="kpi-card"><div class="kpi-label">Tổng giá trị (tham khảo — KHÔNG tính doanh số)</div><div class="kpi-val">'+moneyFmt(d.totalGiaTri)+'</div></div>' +
       '</div>';
 
       var section = function(title, arr, viewKey, note){
         var h = '<div class="dash-section-title" style="margin-top:16px">'+title+(note?' <span style="font-size:11px;color:var(--muted);font-weight:400">('+note+')</span>':'')+_srViewToggleHtml(viewKey)+'</div>';
         if (_srState[viewKey] === 'table') {
-          h += '<table class="dash-table"><thead><tr><th>Tên</th><th>Số đơn</th><th>Cọc</th><th>Giá trị</th></tr></thead><tbody>';
-          (arr||[]).forEach(function(x){ h += '<tr><td>'+esc(x.name)+'</td><td>'+fmt(x.orders)+'</td><td>'+moneyFmt(x.coc)+'</td><td>'+moneyFmt(x.giaTri)+'</td></tr>'; });
+          h += '<table class="dash-table"><thead><tr><th>Tên</th><th>Số đơn</th><th>COD</th><th>Giá trị</th></tr></thead><tbody>';
+          (arr||[]).forEach(function(x){ h += '<tr><td>'+esc(x.name)+'</td><td>'+fmt(x.orders)+'</td><td>'+moneyFmt(x.cod)+'</td><td>'+moneyFmt(x.giaTri)+'</td></tr>'; });
           if (!(arr||[]).length) h += '<tr><td colspan="4" style="text-align:center;color:var(--muted)">Không có đơn nào khớp bộ lọc</td></tr>';
           h += '</tbody></table>';
         } else {
@@ -13932,13 +14187,13 @@ function renderSalesReportTabG_(wrap, subTabs){
       };
       html += section('Theo lý do (trạng thái đơn)', d.byLyDo, 'gLyDoView');
       html += section('Theo Sale', d.bySale, 'gSaleView', 'mỗi sale trên đơn đều tính 1 đơn, không chia đều như doanh thu');
-      html += section('Theo Kênh bán (Page)', d.byKenh, 'gKenhView');
-      html += section('Theo MKT', d.byMkt, 'gMktView', 'quy đổi qua Kênh→Page→nhóm MKT, giống Báo cáo A');
+      html += section('Theo Kênh bán', d.byNguon, 'gNguonView', 'Kênh bán = Nguồn đơn của Pos');
+      html += section('Theo MKT', d.byMkt, 'gMktView', 'Marketer ghi trên từng đơn, giống Báo cáo B');
 
       html += '<div class="dash-section-title" style="margin-top:16px">Chi tiết đơn bị loại</div>';
-      html += '<table class="dash-table"><thead><tr><th>Ngày tạo</th><th>Kênh</th><th>Sale</th><th>Sản phẩm</th><th>Giá trị đơn</th><th>Trạng thái</th></tr></thead><tbody>';
+      html += '<table class="dash-table"><thead><tr><th>Ngày tạo</th><th>Kênh bán</th><th>Sale</th><th>Sản phẩm</th><th>Giá trị đơn</th><th>Trạng thái</th></tr></thead><tbody>';
       (d.orders||[]).forEach(function(o){
-        html += '<tr><td>'+esc(o.ngayTao)+'</td><td>'+esc(o.kenhBan)+'</td><td>'+esc(o.saleBan)+'</td><td>'+esc(o.sanPham)+'</td><td>'+moneyFmt(o.giaTriDon)+'</td><td>'+esc(o.trangThai)+'</td></tr>';
+        html += '<tr><td>'+esc(o.ngayTao)+'</td><td>'+esc(o.nguonDon)+'</td><td>'+esc(o.saleBan)+'</td><td>'+esc(o.sanPham)+'</td><td>'+moneyFmt(o.giaTriDon)+'</td><td>'+esc(o.trangThai)+'</td></tr>';
       });
       if (!(d.orders||[]).length) html += '<tr><td colspan="6" style="text-align:center;color:var(--muted)">Không có đơn nào khớp bộ lọc</td></tr>';
       html += '</tbody></table>';
@@ -14086,6 +14341,13 @@ async function _srSaveTrialBonusConfig(){
 // ── Modal: Cài đặt KPI (Bậc 1/2/3, KPI Online, gán bậc từng người, KPI commit riêng) ──
 // Dùng lại chính dataF.rows đang có (đã gồm ĐỦ mọi Sale trong SaleDirectory, kể cả 0 doanh thu
 // kỳ này) — không cần gọi thêm action nào để mở modal.
+var SALE_TIER_ORDER_CLIENT_ = ['TVF1','TVF2','F1','F2','F3','O1','O2','O3','O'];
+var SALE_TIER_LABEL_CLIENT_ = {
+  TVF1:'TVF1 — Thử việc 1', TVF2:'TVF2 — Thử việc 2',
+  F1:'F1 — Văn phòng', F2:'F2 — Văn phòng', F3:'F3 — Văn phòng',
+  O1:'O1 — Online (nhảy bậc)', O2:'O2 — Online (nhảy bậc)', O3:'O3 — Online (nhảy bậc)',
+  O:'O — Online (không nhảy bậc)'
+};
 function openSaleKpiConfigModal_(){
   var d = _srState.dataF;
   if (!d || !d.rows){ toast('Chưa tải được danh sách Sale — bấm "Lọc" trước.'); return; }
@@ -14094,20 +14356,18 @@ function openSaleKpiConfigModal_(){
   // nhap trong modal deu nhap theo trieu — neu giu VND tho o day thi truong nao NGUOI DUNG
   // KHONG dong den se bi nhan nham x1.000.000 mot lan nua khi luu (_srSaveKpiConfig_ luon nhan
   // moi truong len x1.000.000, gia dinh state dang o don vi trieu).
+  var tierTargets = {};
+  SALE_TIER_ORDER_CLIENT_.forEach(function(k){ tierTargets[k] = Math.round(((cfg.tierTargets && cfg.tierTargets[k]) || 0)/1000000); });
   _srState.fEditing = {
-    tierTargets: {
-      '1': Math.round(((cfg.tierTargets && cfg.tierTargets['1']) || 0)/1000000),
-      '2': Math.round(((cfg.tierTargets && cfg.tierTargets['2']) || 0)/1000000),
-      '3': Math.round(((cfg.tierTargets && cfg.tierTargets['3']) || 0)/1000000)
-    },
-    onlineTarget: Math.round((cfg.onlineTarget || 0)/1000000),
-    rows: d.rows.map(function(r){ return { name:r.name, nhom:r.nhom, tier:r.tier||'', override: (cfg.overrides && cfg.overrides[r.name]!==undefined) ? Math.round(cfg.overrides[r.name]/1000000) : '' }; })
+    tierTargets: tierTargets,
+    trackingStartMonth: cfg.trackingStartMonth || '2026-09',
+    rows: d.rows.map(function(r){ return { name:r.name, startTier: (cfg.startTier && cfg.startTier[r.name]) || '', override: (cfg.overrides && cfg.overrides[r.name]!==undefined) ? Math.round(cfg.overrides[r.name]/1000000) : '' }; })
   };
   _srRenderKpiConfigModal_();
 }
 function _srKpiEditSetTarget(tier, val){ _srState.fEditing.tierTargets[tier] = val; }
-function _srKpiEditSetOnline(val){ _srState.fEditing.onlineTarget = val; }
-function _srKpiEditSetTier(i, val){ _srState.fEditing.rows[i].tier = val; }
+function _srKpiEditSetStartMonth(val){ _srState.fEditing.trackingStartMonth = val; }
+function _srKpiEditSetStartTier(i, val){ _srState.fEditing.rows[i].startTier = val; }
 function _srKpiEditSetOverride(i, val){ _srState.fEditing.rows[i].override = val; }
 function _srKpiEditSearch(q){
   var body = document.getElementById('sr-kpi-modal-rows');
@@ -14116,29 +14376,21 @@ function _srKpiEditSearch(q){
 function _srKpiConfigRowsHtml_(q){
   var ed = _srState.fEditing;
   var qf = (q||'').toLowerCase();
-  var groups = [['Văn phòng','Văn phòng — chọn Bậc cho từng người'],['Online','Online — mức KPI chung, chỉ cần đặt Commit riêng nếu muốn khác'],['(chưa phân loại)','Chưa phân loại Online/Offline — bấm "🏷️ Phân loại Online/Offline" ở thanh lọc trước, chỉ đặt được Commit riêng ở đây']];
-  var html = '';
-  groups.forEach(function(g){
-    var idxs = []; ed.rows.forEach(function(r,i){ if (r.nhom===g[0] && (!qf || r.name.toLowerCase().indexOf(qf)!==-1)) idxs.push(i); });
-    if (!idxs.length) return;
-    html += '<div style="font-weight:700;font-size:11.5px;margin:10px 0 4px;color:var(--muted)">'+esc(g[1])+' ('+idxs.length+')</div>';
-    html += '<table style="width:100%;border-collapse:collapse;font-size:12px"><tbody>';
-    idxs.forEach(function(i){
-      var r = ed.rows[i];
-      var tierCell = g[0]==='Văn phòng'
-        ? '<select onchange="_srKpiEditSetTier('+i+',this.value)" style="padding:3px 6px;border:1px solid var(--border);border-radius:5px;background:var(--surface)">'+
-            '<option value=""'+(r.tier===''?' selected':'')+'>— chưa gán —</option>'+
-            '<option value="1"'+(r.tier==='1'?' selected':'')+'>Bậc 1</option>'+
-            '<option value="2"'+(r.tier==='2'?' selected':'')+'>Bậc 2</option>'+
-            '<option value="3"'+(r.tier==='3'?' selected':'')+'>Bậc 3</option></select>'
-        : '<span style="color:var(--hint)">—</span>';
-      html += '<tr><td style="padding:3px 8px 3px 0;width:35%">'+esc(r.name)+'</td>'+
-        '<td style="width:30%">'+tierCell+'</td>'+
-        '<td><input type="number" min="0" step="1" placeholder="để trống = mặc định" value="'+esc(r.override)+'" oninput="_srKpiEditSetOverride('+i+',this.value)" style="width:100%;padding:3px 6px;border:1px solid var(--border);border-radius:5px;background:var(--surface)"> <span style="color:var(--hint);font-size:10.5px">triệu commit riêng</span></td></tr>';
-    });
-    html += '</tbody></table>';
+  var idxs = []; ed.rows.forEach(function(r,i){ if (!qf || r.name.toLowerCase().indexOf(qf)!==-1) idxs.push(i); });
+  if (!idxs.length) return '<div style="color:var(--muted);padding:10px 0">Không tìm thấy Sale nào khớp.</div>';
+  var html = '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>'+
+    '<th style="text-align:left;padding:3px 8px 3px 0">Sale</th><th style="text-align:left;width:34%">Bậc bắt đầu</th><th>Commit riêng</th></tr></thead><tbody>';
+  idxs.forEach(function(i){
+    var r = ed.rows[i];
+    var tierCell = '<select onchange="_srKpiEditSetStartTier('+i+',this.value)" style="width:100%;padding:3px 6px;border:1px solid var(--border);border-radius:5px;background:var(--surface)">'+
+        '<option value=""'+(r.startTier===''?' selected':'')+'>— chưa gán —</option>'+
+        SALE_TIER_ORDER_CLIENT_.map(function(t){ return '<option value="'+t+'"'+(r.startTier===t?' selected':'')+'>'+esc(SALE_TIER_LABEL_CLIENT_[t])+'</option>'; }).join('')+
+      '</select>';
+    html += '<tr><td style="padding:3px 8px 3px 0">'+esc(r.name)+'</td>'+
+      '<td>'+tierCell+'</td>'+
+      '<td><input type="number" min="0" step="1" placeholder="để trống = không đặt" value="'+esc(r.override)+'" oninput="_srKpiEditSetOverride('+i+',this.value)" style="width:100%;padding:3px 6px;border:1px solid var(--border);border-radius:5px;background:var(--surface)"> <span style="color:var(--hint);font-size:10.5px">triệu</span></td></tr>';
   });
-  if (!html) html = '<div style="color:var(--muted);padding:10px 0">Không tìm thấy Sale nào khớp.</div>';
+  html += '</tbody></table>';
   return html;
 }
 function _srRenderKpiConfigModal_(){
@@ -14148,15 +14400,20 @@ function _srRenderKpiConfigModal_(){
   var el = document.createElement('div');
   el.id = 'sr-kpi-modal';
   el.className = 'modal-overlay open';
-  el.innerHTML = '<div class="modal-box" style="max-width:640px;max-height:85vh;overflow-y:auto">'+
-    '<div class="modal-title">🎯 Cài đặt KPI theo Sale</div>'+
-    '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Sửa là áp dụng ngay cho mọi kỳ đang xem (không chia theo tháng). Nhập số theo <b>triệu đồng</b> cho gọn.</div>'+
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">'+
-      ['1','2','3'].map(function(t){ return '<div><label style="font-size:11px;color:var(--muted);display:block">Bậc '+t+' (Văn phòng)</label>'+
-        '<input type="number" min="0" step="1" value="'+esc(ed.tierTargets[t])+'" oninput="_srKpiEditSetTarget(\''+t+'\',this.value)" style="width:110px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"> triệu</div>'; }).join('')+
-      '<div><label style="font-size:11px;color:var(--muted);display:block">Online (chung)</label>'+
-        '<input type="number" min="0" step="1" value="'+esc(ed.onlineTarget)+'" oninput="_srKpiEditSetOnline(this.value)" style="width:110px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"> triệu</div>'+
-    '</div>'+
+  var fTrack = ['TVF1','TVF2','F1','F2','F3'], oTrack = ['O1','O2','O3','O'];
+  function targetInput(t){
+    return '<div><label style="font-size:11px;color:var(--muted);display:block">'+t+'</label>'+
+      '<input type="number" min="0" step="1" value="'+esc(ed.tierTargets[t])+'" oninput="_srKpiEditSetTarget(\''+t+'\',this.value)" style="width:90px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"> triệu</div>';
+  }
+  el.innerHTML = '<div class="modal-box" style="max-width:680px;max-height:85vh;overflow-y:auto">'+
+    '<div class="modal-title">🎯 Cài đặt KPI theo Bậc</div>'+
+    '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Mỗi Sale có 1 <b>Bậc bắt đầu</b> tính từ tháng bắt đầu theo dõi bên dưới; bậc các tháng sau <b>tự tính</b> theo quy tắc: 3 tháng liên tiếp TB ≥125% KPI bậc hiện tại (không tháng nào &lt;70%) → lên 1 bậc (tối đa bậc 3); 3 tháng liên tiếp TB &lt;80% KPI bậc hiện tại → xuống 1 bậc. Bậc <b>O</b> không bao giờ đổi. Bậc <b>Thử việc</b> (TVF1/TVF2) luôn đúng 1 tháng rồi tự động lên F1. <b>Commit riêng</b> (nếu đặt) chạy SONG SONG với KPI theo bậc — có cột %HT riêng, không thay thế bậc. Nhập số theo <b>triệu đồng</b> cho gọn.</div>'+
+    '<div style="margin-bottom:10px"><label style="font-size:11px;color:var(--muted);display:block">Tháng bắt đầu theo dõi</label>'+
+      '<input type="month" value="'+esc(ed.trackingStartMonth)+'" onchange="_srKpiEditSetStartMonth(this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"></div>'+
+    '<div style="margin-bottom:6px"><div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:3px">KPI theo Bậc — Văn phòng (F)</div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+fTrack.map(targetInput).join('')+'</div></div>'+
+    '<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)"><div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:3px">KPI theo Bậc — Online (O)</div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+oTrack.map(targetInput).join('')+'</div></div>'+
     '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." oninput="_srKpiEditSearch(this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:100%;margin-bottom:4px">'+
     '<div id="sr-kpi-modal-rows">'+_srKpiConfigRowsHtml_('')+'</div>'+
     '<div style="display:flex;gap:8px;margin-top:14px"><button class="btn primary" onclick="_srSaveKpiConfig_()">💾 Lưu</button><button class="btn secondary" onclick="document.getElementById(\'sr-kpi-modal\').remove()">Hủy</button></div>'+
@@ -14165,13 +14422,10 @@ function _srRenderKpiConfigModal_(){
 }
 async function _srSaveKpiConfig_(){
   var ed = _srState.fEditing;
-  var config = {
-    tierTargets: { '1': (Number(ed.tierTargets['1'])||0)*1000000, '2': (Number(ed.tierTargets['2'])||0)*1000000, '3': (Number(ed.tierTargets['3'])||0)*1000000 },
-    onlineTarget: (Number(ed.onlineTarget)||0)*1000000,
-    tiers: {}, overrides: {}
-  };
+  var config = { tierTargets: {}, trackingStartMonth: ed.trackingStartMonth || '2026-09', startTier: {}, overrides: {} };
+  SALE_TIER_ORDER_CLIENT_.forEach(function(k){ config.tierTargets[k] = (Number(ed.tierTargets[k])||0)*1000000; });
   ed.rows.forEach(function(r){
-    if (r.tier) config.tiers[r.name] = r.tier;
+    if (r.startTier) config.startTier[r.name] = r.startTier;
     if (r.override !== '' && r.override !== null && r.override !== undefined && !isNaN(Number(r.override))) {
       config.overrides[r.name] = Number(r.override)*1000000;
     }
@@ -14275,6 +14529,7 @@ function _renderSaleChannelsModal(){
       '<option value=""'+(cur===''?' selected':'')+'>— Chưa phân loại —</option>'+
       '<option value="online"'+(cur==='online'?' selected':'')+'>🌐 Online</option>'+
       '<option value="offline"'+(cur==='offline'?' selected':'')+'>🏬 Offline</option>'+
+      '<option value="probation"'+(cur==='probation'?' selected':'')+'>🌱 Thử việc (TV)</option>'+
       '</select></td></tr>';
   });
   if (!filtered.length) html += '<tr><td colspan="2" style="text-align:center;color:var(--muted);padding:14px">Không có tên nào khớp</td></tr>';
@@ -14284,6 +14539,63 @@ function _renderSaleChannelsModal(){
 function _setSaleChannel(name, val){
   if (val) SALE_CHANNELS[name] = val; else delete SALE_CHANNELS[name];
   saveSaleChannels();
+}
+
+// ── Modal: % hoa hồng theo KÊNH (Nguồn đơn) — vd "facebook" = 1% cố định, bỏ qua ngưỡng 15tr
+// và % cá nhân/team cho đơn thuộc kênh đó. Admin tự gõ tên Nguồn đơn (so khớp không phân biệt
+// hoa/thường, tự trim) + % muốn áp — để trống % hoặc xoá dòng = bỏ cài, tính như cũ. ──
+var _crNewKey = '';
+function openChannelRatesModal(){
+  if (currentUser.role !== 'admin'){ toast('Chỉ Admin mới cài % hoa hồng theo Kênh.'); return; }
+  _crNewKey = '';
+  _renderChannelRatesModal();
+  var m = document.getElementById('cr-modal');
+  if (m) m.style.display = 'flex';
+}
+function closeChannelRatesModal(){
+  var m = document.getElementById('cr-modal');
+  if (m) m.style.display = 'none';
+}
+function _renderChannelRatesModal(){
+  var body = document.getElementById('cr-body');
+  if (!body) return;
+  var keys = Object.keys(CHANNEL_COMMISSION_RATES).sort(function(a,b){ return a.localeCompare(b,'vi'); });
+  var nguonOptions = (_srState && _srState.nguonOptions) || [];
+  var html = '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Đơn có Nguồn đơn khớp đúng (không phân biệt hoa/thường) 1 trong các tên dưới đây sẽ tính hoa hồng theo % cố định này, bỏ qua ngưỡng 15tr và % cá nhân/team.</div>';
+  html += '<table class="dash-table"><thead><tr><th>Nguồn đơn</th><th style="width:140px">% hoa hồng</th><th style="width:60px"></th></tr></thead><tbody>';
+  keys.forEach(function(k){
+    html += '<tr><td>'+esc(k)+'</td>'+
+      '<td><input type="number" step="0.1" min="0" value="'+esc(String(CHANNEL_COMMISSION_RATES[k]))+'" style="width:90px" onchange="_setChannelRate(\''+esc(k).replace(/'/g,"\\'")+'\',this.value)"></td>'+
+      '<td><button class="btn sm" style="color:var(--red)" onclick="_setChannelRate(\''+esc(k).replace(/'/g,"\\'")+'\',\'\')">✕</button></td></tr>';
+  });
+  if (!keys.length) html += '<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:14px">Chưa cài kênh nào — mọi đơn vẫn tính theo % cá nhân/team như cũ</td></tr>';
+  html += '</tbody></table>';
+  html += '<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center">'+
+    '<input list="cr-known-nguon" id="cr-new-key" placeholder="Tên Nguồn đơn (vd: facebook)" value="'+esc(_crNewKey||'')+'" oninput="_crNewKey=this.value" style="flex:1;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px">'+
+    '<input type="number" step="0.1" min="0" id="cr-new-rate" placeholder="%" style="width:90px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px">'+
+    '<button class="btn sm" onclick="_addChannelRate()">+ Thêm</button>'+
+    '</div>';
+  if (nguonOptions.length) {
+    html += '<datalist id="cr-known-nguon">' + nguonOptions.map(function(n){ return '<option value="'+esc(n)+'">'; }).join('') + '</datalist>';
+  }
+  body.innerHTML = html;
+}
+function _setChannelRate(key, val){
+  if (val === '' || val === null || val === undefined) delete CHANNEL_COMMISSION_RATES[key];
+  else CHANNEL_COMMISSION_RATES[key] = Math.max(0, parseFloat(val)||0);
+  saveChannelCommissionRates();
+  _renderChannelRatesModal();
+}
+function _addChannelRate(){
+  var keyEl = document.getElementById('cr-new-key'), rateEl = document.getElementById('cr-new-rate');
+  var key = ((keyEl ? keyEl.value : _crNewKey) || '').trim().toLowerCase();
+  var rate = rateEl ? parseFloat(rateEl.value) : NaN;
+  if (!key){ toast('Nhập tên kênh (Nguồn đơn) trước đã.'); return; }
+  if (isNaN(rate) || rate < 0){ toast('Nhập % hợp lệ (vd 1 hoặc 0.8).'); return; }
+  CHANNEL_COMMISSION_RATES[key] = rate;
+  _crNewKey = '';
+  saveChannelCommissionRates();
+  _renderChannelRatesModal();
 }
 
 // ── Modal: CHƯƠNG TRÌNH THƯỞNG (CRUD) ──
@@ -14302,14 +14614,24 @@ function closeBonusProgramsModal(){
 function _bpNewProgram(){
   return { id: 'bp_'+Date.now(), name: '', dateFrom:'', dateTo:'',
     audience: {online:false, offline:false}, product:'', extraNote:'', exclusionNote:'',
-    tier: {enabled:false, rows:[]}, revenue: {enabled:false, scope:'order', min:'', max:''}, bonusAmount:'' };
+    tier: {enabled:false, rows:[]}, revenue: {enabled:false, scope:'order', min:'', max:''},
+    firstOrder: {enabled:false, amount:''}, probationDay: {enabled:false, from:'', to:''},
+    bonusAmount:'' };
+}
+// Chuong trinh cu luu tu truoc khi co firstOrder/probationDay se thieu 2 field nay -> bo sung
+// mac dinh de tranh loi truy cap p.firstOrder.enabled tren undefined.
+function _bpNormalize_(p){
+  if (!p.firstOrder) p.firstOrder = {enabled:false, amount:''};
+  if (!p.probationDay) p.probationDay = {enabled:false, from:'', to:''};
+  return p;
 }
 function _renderBonusProgramsModal(){
   var body = document.getElementById('bp-body');
   if (!body) return;
   if (_bpEditingId === null){
     // Danh sách
-    var html = '<button class="btn sm" onclick="_bpEditingId=\'new\';_bpDraft=_bpNewProgram();_renderBonusProgramsModal()">+ Thêm chương trình</button>';
+    var html = '<button class="btn sm" onclick="_bpEditingId=\'new\';_bpDraft=_bpNewProgram();_renderBonusProgramsModal()">+ Thêm chương trình</button> '+
+      '<button class="btn sm secondary" onclick="_bpSeedProbationTemplate_()" title="Tạo sẵn 5 chương trình đúng văn bản \'Cơ chế thưởng kích hoạt Sale mới\' — bạn chỉ cần kiểm tra lại rồi Lưu">🎁 Tạo mẫu: Thưởng Sale thử việc</button>';
     html += '<table class="dash-table" style="margin-top:10px"><thead><tr><th>Chương trình</th><th>Từ — đến</th><th>Đối tượng</th><th>Cơ chế</th><th></th></tr></thead><tbody>';
     BONUS_PROGRAMS.forEach(function(p){
       var aud = (p.audience && p.audience.online && p.audience.offline) ? 'Cả 2' : ((p.audience && p.audience.online) ? 'Online' : ((p.audience && p.audience.offline) ? 'Offline' : 'Tất cả'));
@@ -14317,12 +14639,14 @@ function _renderBonusProgramsModal(){
       if (p.product) mech.push('Sản phẩm ('+esc(p.product)+')');
       if (p.revenue && p.revenue.enabled) mech.push('Doanh thu theo '+(p.revenue.scope==='day'?'ngày':'đơn'));
       if (p.tier && p.tier.enabled) mech.push('Bậc số đơn/ngày');
+      if (p.firstOrder && p.firstOrder.enabled) mech.push('Đơn đầu tiên/ngày');
+      if (p.probationDay && p.probationDay.enabled) mech.push('Ngày thử việc '+(p.probationDay.from||1)+'→'+(p.probationDay.to||'∞'));
       html += '<tr><td><b>'+esc(p.name||'(chưa đặt tên)')+'</b></td>'+
         '<td style="font-size:11.5px">'+esc(p.dateFrom||'…')+' → '+esc(p.dateTo||'không giới hạn')+'</td>'+
         '<td>'+aud+'</td>'+
         '<td style="font-size:11.5px">'+(mech.join(', ')||'<span style="color:var(--red)">chưa cài cơ chế</span>')+'</td>'+
         '<td style="white-space:nowrap">'+
-          '<button class="btn sm" onclick="_bpEditingId=\''+p.id+'\';_bpDraft=JSON.parse(JSON.stringify(BONUS_PROGRAMS.find(function(x){return x.id===\''+p.id+'\';})));_renderBonusProgramsModal()">Sửa</button> '+
+          '<button class="btn sm" onclick="_bpEditingId=\''+p.id+'\';_bpDraft=_bpNormalize_(JSON.parse(JSON.stringify(BONUS_PROGRAMS.find(function(x){return x.id===\''+p.id+'\';}))));_renderBonusProgramsModal()">Sửa</button> '+
           '<button class="btn sm secondary" onclick="_bpDelete(\''+p.id+'\')">Xoá</button></td></tr>';
     });
     if (!BONUS_PROGRAMS.length) html += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Chưa có chương trình thưởng nào</td></tr>';
@@ -14343,7 +14667,7 @@ function _bpEditFormHtml_(p){
       '<span style="font-size:11.5px;color:var(--muted)">đ</span>'+
       '<button class="btn sm secondary" onclick="_bpDraft.tier.rows.splice('+i+',1);_renderBonusProgramsModal()">✕</button></div>';
   }).join('');
-  return '<div style="font-size:11px;color:var(--hint);margin-bottom:10px">Điền các mục cần dùng, bỏ trống mục không áp dụng. Nếu 1 đơn/ngày thoả nhiều điều kiện, hệ thống chỉ tính đúng 1 mức thưởng cao nhất.</div>'+
+  return '<div style="font-size:11px;color:var(--hint);margin-bottom:10px">Điền các mục cần dùng, bỏ trống mục không áp dụng. Trong CÙNG 1 nhóm cơ chế theo ngày (VD nhiều bậc số đơn, hoặc nhiều mốc doanh số) chỉ tính đúng 1 mức cao nhất — nhưng nếu 1 Sale/ngày đạt nhiều NHÓM khác nhau (số đơn/ngày, doanh số/ngày, đơn đầu tiên/ngày) thì được CỘNG DỒN các nhóm với nhau.</div>'+
     '<div class="form-label">1. Tên chương trình (để dễ nhận diện)</div>'+
     '<input type="text" value="'+esc(p.name)+'" oninput="_bpDraft.name=this.value" style="width:100%;margin-bottom:10px" placeholder="VD: Thưởng đơn giá trị cao">'+
 
@@ -14385,6 +14709,22 @@ function _bpEditFormHtml_(p){
     '<div class="form-label">9. Tiền thưởng <span style="font-weight:400;color:var(--muted);font-size:11px">(dùng cho mục 4/7 — mục 6 dùng mức riêng từng bậc ở trên)</span></div>'+
     '<input type="number" min="0" value="'+esc(p.bonusAmount)+'" oninput="_bpDraft.bonusAmount=this.value" style="width:180px;margin-bottom:14px" placeholder="vd 50000">'+
 
+    '<div class="form-label">10. Thưởng đơn ĐẦU TIÊN trong ngày (tick nếu cần)</div>'+
+    '<label style="font-size:12px"><input type="checkbox" '+(p.firstOrder.enabled?'checked':'')+' onchange="_bpDraft.firstOrder.enabled=this.checked;_renderBonusProgramsModal()"> Dùng thưởng cho đơn ĐẦU TIÊN mỗi ngày (theo giờ tạo đơn sớm nhất)</label>'+
+    (p.firstOrder.enabled ? ('<div style="margin:8px 0 14px;display:flex;gap:8px;align-items:center">'+
+      '<span style="font-size:11.5px;color:var(--muted)">Số tiền / đơn đầu tiên:</span>'+
+      '<input type="number" min="0" value="'+esc(p.firstOrder.amount)+'" style="width:160px" onchange="_bpDraft.firstOrder.amount=this.value" placeholder="vd 50000">'+
+      '</div>') : '<div style="margin-bottom:10px"></div>')+
+
+    '<div class="form-label">11. Giới hạn theo ngày thử việc (tick nếu chỉ áp dụng 1 khoảng ngày kể từ "Ngày bắt đầu" riêng của từng Sale)</div>'+
+    '<label style="font-size:12px"><input type="checkbox" '+(p.probationDay.enabled?'checked':'')+' onchange="_bpDraft.probationDay.enabled=this.checked;_renderBonusProgramsModal()"> Chỉ áp dụng trong khoảng ngày thử việc</label>'+
+    (p.probationDay.enabled ? ('<div style="margin:8px 0 4px;display:flex;gap:8px;align-items:center">'+
+      '<span style="font-size:11.5px;color:var(--muted)">Ngày thứ</span>'+
+      '<input type="number" min="1" value="'+esc(p.probationDay.from)+'" style="width:70px" onchange="_bpDraft.probationDay.from=this.value" placeholder="1">'+
+      '<span style="font-size:11.5px;color:var(--muted)">đến ngày thứ (bỏ trống = không giới hạn)</span>'+
+      '<input type="number" min="1" value="'+esc(p.probationDay.to)+'" style="width:70px" onchange="_bpDraft.probationDay.to=this.value" placeholder="30">'+
+      '</div><div style="font-size:10.5px;color:var(--hint);margin-bottom:14px">Tính từ "Ngày bắt đầu" đặt riêng cho từng Sale ở 👤 Quản lý tài khoản (mốc tính thưởng theo ngày thử việc) — Ngày bắt đầu = ngày thứ 1. Sale chưa được đặt Ngày bắt đầu sẽ KHÔNG được tính chương trình có bật mục này.</div>') : '<div style="margin-bottom:10px"></div>')+
+
     '<div style="display:flex;gap:8px">'+
       '<button class="btn" onclick="_bpSave()">💾 Lưu chương trình</button>'+
       '<button class="btn secondary" onclick="_bpEditingId=null;_renderBonusProgramsModal()">Huỷ</button>'+
@@ -14403,6 +14743,38 @@ function _bpDelete(id){
   BONUS_PROGRAMS = BONUS_PROGRAMS.filter(function(x){ return x.id !== id; });
   saveBonusPrograms();
   _renderBonusProgramsModal();
+}
+// Tao san 5 chuong trinh dung theo van ban "CO CHE THUONG KICH HOAT SALE MOI — GIAI DOAN THU
+// VIEC" (11/08/2026 - 31/12/2026): GD1 = ngay 1-3 (don dau tien/ngay, 50k); GD2 = tu ngay 4
+// (bac so don/ngay: 2->30k, 3->50k, 5->100k) + (moc doanh so/ngay: 25tr->30k, 50tr->50k,
+// 80tr->100k, 3 CT rieng vi 1 CT "revenue" chi giu duoc 1 muc — xem _computeBonusData_, cac CT
+// cung nhom "doanh so/ngay" da tu dong chi lay muc CAO NHAT dat duoc). CHI ap dung cho Sale da
+// duoc dat "Ngay bat dau" o Quan ly tai khoan (xem _bonusProgramApplies_).
+function _bpSeedProbationTemplate_(){
+  if (!confirm('Tạo mới 5 chương trình mẫu theo đúng văn bản "Cơ chế thưởng kích hoạt Sale mới" (11/08/2026 - 31/12/2026)? Bạn nên kiểm tra lại từng chương trình (đặc biệt khoảng ngày) trước khi dùng thật. Không ảnh hưởng các chương trình đã có sẵn.')) return;
+  var common = { dateFrom: '2026-08-11', dateTo: '2026-12-31', audience: {online:false, offline:false}, product:'', extraNote:'', exclusionNote:'' };
+  var mk = function(o){ var p = _bpNewProgram(); return Object.assign(p, common, o, {id: 'bp_'+Date.now()+'_'+Math.floor(Math.random()*1000)}); };
+  var seeded = [
+    mk({ name: 'GĐ1 — Đơn đầu tiên trong ngày (ngày 1-3 thử việc)',
+      probationDay: {enabled:true, from:1, to:3},
+      firstOrder: {enabled:true, amount:50000} }),
+    mk({ name: 'GĐ2 — Bậc số đơn/ngày (từ ngày 4 thử việc)',
+      probationDay: {enabled:true, from:4, to:''},
+      tier: {enabled:true, rows: [{count:2,bonus:30000},{count:3,bonus:50000},{count:5,bonus:100000}]} }),
+    mk({ name: 'GĐ2 — Doanh số ≥25 triệu/ngày (từ ngày 4 thử việc)',
+      probationDay: {enabled:true, from:4, to:''},
+      revenue: {enabled:true, scope:'day', min:25000000, max:''}, bonusAmount: 30000 }),
+    mk({ name: 'GĐ2 — Doanh số ≥50 triệu/ngày (từ ngày 4 thử việc)',
+      probationDay: {enabled:true, from:4, to:''},
+      revenue: {enabled:true, scope:'day', min:50000000, max:''}, bonusAmount: 50000 }),
+    mk({ name: 'GĐ2 — Doanh số ≥80 triệu/ngày (từ ngày 4 thử việc)',
+      probationDay: {enabled:true, from:4, to:''},
+      revenue: {enabled:true, scope:'day', min:80000000, max:''}, bonusAmount: 100000 })
+  ];
+  BONUS_PROGRAMS = BONUS_PROGRAMS.concat(seeded);
+  saveBonusPrograms();
+  _renderBonusProgramsModal();
+  toast('✓ Đã tạo 5 chương trình mẫu — nhớ đặt "Ngày bắt đầu" cho từng Sale thử việc ở Quản lý tài khoản.');
 }
 
 function _srPctStr(v){ return (v===null || v===undefined) ? '—' : Math.round(v*10)/10 + '%'; }
@@ -14968,6 +15340,53 @@ switchTab = function(tab, el){
   else if (tab === 'kpipancake') renderKpiPancakeTab();
   else if (tab === 'mktchecklist') renderMktChecklistTab();
   else if (tab === 'dailybrief') renderDailyBriefTab();
+};
+
+// ═══════════════════════════════════════════════════════
+//  CHẾ ĐỘ BÁO CÁO (chụp màn hình gửi sếp): vào tab báo cáo nào thì ẩn header, sidebar lọc KH, thanh
+//  tab và dải số KH; chỉ còn 1 thanh gọn = menu chọn báo cáo + nút "Về màn hình chính".
+//  Chỉ bật/tắt class "rpt-mode" trên <body> (CSS ở khối <style> dưới) nên không đụng gì tới logic
+//  render của từng báo cáo. "Báo cáo ngày" tự mở trang riêng nên không nằm trong chế độ này.
+// ═══════════════════════════════════════════════════════
+var _RPT_MODE_TABS = ['salesreport','pancake','kpipancake','mktchecklist'];
+var _RPT_MODE_LABELS = {
+  salesreport:'📈 Báo cáo doanh số', pancake:'📥 Báo cáo Pancake', kpipancake:'📈 KPI Pancake',
+  mktchecklist:'✅ Checklist MKT', dailybrief:'🎯 Báo cáo ngày'
+};
+function _rptModeBuildBar_(current){
+  var dv = document.getElementById('data-view');
+  if (!dv) return;
+  var bar = document.getElementById('rpt-bar');
+  if (!bar){
+    bar = document.createElement('div');
+    bar.id = 'rpt-bar';
+    dv.insertBefore(bar, dv.firstChild);
+  }
+  var opts = _RPT_MODE_TABS.concat(['dailybrief']).filter(function(id){
+    if (typeof tabVisible !== 'undefined' && tabVisible[id] === false) return false;
+    if (typeof _tabAllowedForUser === 'function' && !_tabAllowedForUser(id)) return false;
+    return true;
+  });
+  bar.innerHTML = '<select id="rpt-mode-sel" onchange="_rptModeGo_(this.value)" title="Chọn báo cáo">'
+    + opts.map(function(id){ return '<option value="'+id+'"'+(id===current?' selected':'')+'>'+_RPT_MODE_LABELS[id]+'</option>'; }).join('')
+    + '</select>'
+    + '<button class="btn sm" onclick="_rptModeBack_()" title="Hiện lại đầy đủ menu, bộ lọc">← Về màn hình chính</button>';
+}
+function _rptModeGo_(id){
+  var el = document.getElementById('v9tab-' + id);
+  switchTab(id, el || document.createElement('div'));
+}
+function _rptModeBack_(){
+  var el = document.querySelector("[data-bar-id='tab-kh']") || document.querySelector('.tab');
+  switchTab('list', el);
+}
+var _v9PrevSwitchTab2 = switchTab;
+switchTab = function(tab, el){
+  if (tab === 'dailybrief' && !_dbStandalone){ _v9PrevSwitchTab2(tab, el); return; } // mo trang rieng, giu nguyen man hinh hien tai
+  _v9PrevSwitchTab2(tab, el);
+  var on = !_dbStandalone && _RPT_MODE_TABS.indexOf(tab) !== -1;
+  document.body.classList.toggle('rpt-mode', on);
+  if (on) _rptModeBuildBar_(tab);
 };
 
 // ═══════════════════════════════════════════════════════
@@ -15592,7 +16011,7 @@ function _acctDetailHtml(a){
     // TAI KHOAN nay CHUA co ten nao xuat hien trong SALE_CHANNELS, vd nhan vien moi chua ban gi).
     var stNames = _acctNamesOf(a);
     var stCur = stNames.map(function(n){ return SALE_CHANNELS[n]; }).filter(Boolean)[0] || a.saleType || '';
-    var stOpts = [['','— Chưa gán —'],['online','Sale online'],['offline','Sale offline']].map(function(o){
+    var stOpts = [['','— Chưa gán —'],['online','Sale online'],['offline','Sale offline'],['probation','Sale thử việc (TV)']].map(function(o){
       return '<option value="'+o[0]+'"'+(stCur===o[0]?' selected':'')+'>'+o[1]+'</option>';
     }).join('');
     saleTypeHtml = '<div style="margin-top:10px;border-top:1px dashed var(--border);padding-top:9px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">'+
@@ -16387,6 +16806,20 @@ function updateSidebarCareFilters() {
   </div>
   <div class="modal-footer" style="flex-shrink:0;display:flex;justify-content:flex-end">
     <button class="btn" onclick="closeSaleChannelsModal()">Đóng</button>
+  </div>
+</div>
+</div>
+
+<!-- ══ MODAL: % hoa hồng theo Kênh ══ -->
+<div class="modal-overlay" id="cr-modal" style="display:none;align-items:flex-start;justify-content:center;padding-top:40px;z-index:700">
+<div class="modal" style="max-width:620px;width:94%;max-height:86vh;display:flex;flex-direction:column">
+  <div class="modal-header" style="flex-shrink:0">
+    <div class="modal-title">📡 % hoa hồng theo Kênh</div>
+    <button class="modal-close" onclick="closeChannelRatesModal()">✕</button>
+  </div>
+  <div class="modal-body" style="overflow:auto;flex:1"><div id="cr-body"></div></div>
+  <div class="modal-footer" style="flex-shrink:0;display:flex;justify-content:flex-end">
+    <button class="btn" onclick="closeChannelRatesModal()">Đóng</button>
   </div>
 </div>
 </div>
