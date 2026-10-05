@@ -3426,7 +3426,15 @@ function applyFilters() {
       // mà không rebuild lại toàn bộ danh sách khách.
       if (dataSrcF === 'assign') {
         const _aIdx = (typeof _assignAllIndex !== 'undefined') ? _assignAllIndex[c.phone] : null;
-        if (!_aIdx || !_aIdx.has(currentUser.name)) return false;
+        if (!_aIdx || !_aIdx.size) return false;
+        // SUA 2026-10-05: truoc day chi so voi currentUser.name (1 ten) nen tai khoan co NHIEU ten (currentUser.names) hoac
+        // Admin (ten 'Admin' khong trung ten CS nao trong AssignData) luon ra 0 du da chia data. Nay so voi MOI ten cua
+        // tai khoan (giong _inUserScope); Admin khong gan ten CS nao thi hien moi KH dang nam trong bat ky dot chia nao.
+        const _myN = (currentUser.names && currentUser.names.length) ? currentUser.names : (currentUser.name ? [currentUser.name] : []);
+        const _isRealCs = _myN.some(n => n && n !== 'Admin');
+        if (_isRealCs || currentUser.role !== 'admin') {
+          if (!_myN.some(n => _aIdx.has(n))) return false;
+        }
       }
     }
 
