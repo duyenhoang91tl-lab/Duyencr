@@ -14460,7 +14460,7 @@ function _renderBonusProgramsModal(){
     // Danh sách
     var html = '<button class="btn sm" onclick="_bpEditingId=\'new\';_bpDraft=_bpNewProgram();_renderBonusProgramsModal()">+ Thêm chương trình</button> '+
       '<button class="btn sm secondary" onclick="_bpSeedProbationTemplate_()" title="Tạo sẵn 5 chương trình đúng văn bản \'Cơ chế thưởng kích hoạt Sale mới\' — bạn chỉ cần kiểm tra lại rồi Lưu">🎁 Tạo mẫu: Thưởng Sale thử việc</button> '+
-      '<button class="btn sm secondary" onclick="_bpSeedOfficialOnlineTemplate_()" title="Tạo sẵn các chương trình đúng bảng \'Thưởng online\' chính thức (Google Sheet Duyên gửi 2026-10) — bạn chỉ cần kiểm tra lại rồi Lưu">🎁 Tạo mẫu: Thưởng Sale chính thức (Online)</button>';
+      '<button class="btn sm secondary" onclick="_bpSeedOfficialOnlineTemplate_()" title="Tạo sẵn các chương trình đúng bảng \'Thưởng online\' (áp dụng cho MỌI Sale chính thức, không riêng Sale online — Google Sheet Duyên gửi 2026-10) — bạn chỉ cần kiểm tra lại rồi Lưu">🎁 Tạo mẫu: Thưởng Sale chính thức</button>';
     html += '<table class="dash-table" style="margin-top:10px"><thead><tr><th>Chương trình</th><th>Từ — đến</th><th>Đối tượng</th><th>Cơ chế</th><th></th></tr></thead><tbody>';
     BONUS_PROGRAMS.forEach(function(p){
       var aud = (p.audience && p.audience.online && p.audience.offline) ? 'Cả 2' : ((p.audience && p.audience.online) ? 'Online' : ((p.audience && p.audience.offline) ? 'Offline' : 'Tất cả'));
@@ -14606,10 +14606,11 @@ function _bpSeedProbationTemplate_(){
   toast('✓ Đã tạo 5 chương trình mẫu — nhớ đặt "Ngày bắt đầu" cho từng Sale thử việc ở Quản lý tài khoản.');
 }
 
-// Theo bảng "Thưởng online" (quy tắc thưởng CHÍNH THỨC) Duyên gửi 2026-10 — mọi dòng trong
-// bảng đều ghi "Đối tượng áp dụng: Sale online" nên audience mặc định {online:true}. Sale đang
-// ở trạng thái "Thử việc (TV)" KHÔNG được tính các CT này (xem fix _bonusProgramApplies_ ở
-// trên) — Sale thử việc dùng mẫu "Thưởng Sale thử việc" riêng.
+// Theo bảng "Thưởng online" (quy tắc thưởng CHÍNH THỨC) Duyên gửi 2026-10. Dù tên file/cột ghi
+// "Sale online", Duyên xác nhận 2026-10: bảng này áp dụng cho MỌI Sale CHÍNH THỨC (cả online lẫn
+// offline) — "online" chỉ nói đến kênh bán, không phải loại nhân viên — nên audience mặc định
+// {online:true, offline:true}. Sale đang ở trạng thái "Thử việc (TV)" KHÔNG được tính các CT này
+// (xem fix _bonusProgramApplies_ ở trên) — Sale thử việc dùng mẫu "Thưởng Sale thử việc" riêng.
 // Vài dòng trong bảng gốc có NHÃN và ĐIỀU KIỆN lệch nhau (vd nhãn "25tr" nhưng điều kiện ghi "từ
 // 20tr") — đã lấy theo cột "Điều kiện áp dụng" (cột chấm tự động), kèm extraNote nhắc kiểm tra
 // lại. Các CT gắn với 1 dòng sản phẩm cụ thể (Tỳ Hưu Thiên Lộc, Tourmaline cao cấp) mà hệ thống
@@ -14618,7 +14619,11 @@ function _bpSeedProbationTemplate_(){
 // (ghi chú tự do, không tự động chấm) đã có sẵn trong hệ thống.
 function _bpSeedOfficialOnlineTemplate_(){
   if (!confirm('Tạo mới các chương trình mẫu theo đúng bảng "Thưởng online" (quy tắc thưởng chính thức, Google Sheet Duyên gửi 2026-10)? Bạn nên kiểm tra lại từng chương trình (đặc biệt 2 mục có nhãn/điều kiện lệch nhau, và 2 mục Tourmaline cao cấp) trước khi dùng thật. Không ảnh hưởng các chương trình đã có sẵn.')) return;
-  var common = { audience: {online:true, offline:false}, product:'', extraNote:'', exclusionNote:'' };
+  // Duyen xac nhan 2026-10: bang nay ap dung cho MOI Sale CHINH THUC (ca online lan offline),
+  // KHONG phai rieng Sale online — "online" trong ten bang/cot chi noi den kenh ban hang, khong
+  // phai loai nhan vien. Chi loai tru Sale dang "Thu viec (TV)" (xem fix channel==='probation'
+  // trong _bonusProgramApplies_ o tren).
+  var common = { audience: {online:true, offline:true}, product:'', extraNote:'', exclusionNote:'' };
   var mk = function(o){ var p = _bpNewProgram(); return Object.assign(p, common, o, {id: 'bp_'+Date.now()+'_'+Math.floor(Math.random()*1000)}); };
   var seeded = [
     mk({ name: 'Đơn từ 10tr (combo 2 sản phẩm)',
