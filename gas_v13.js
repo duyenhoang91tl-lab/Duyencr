@@ -1301,7 +1301,7 @@ function doGet(e) {
                  careStatus: splitCSV_(pB.careStatus), khStatus: splitCSV_(pB.khStatus),
                  zaloStatus: splitCSV_(pB.zaloStatus), nickZalo: pB.nickZalo || '' };
       var cacheB = CacheService.getScriptCache();
-      var cKeyB = 'salesB3_' + JSON.stringify(fB);
+      var cKeyB = 'salesB4_' + JSON.stringify(fB);
       var cachedB = cacheB.get(cKeyB);
       if (cachedB) { try { return jsonOut_(JSON.parse(cachedB)); } catch(ec) {} }
       var resB = buildSalesReportB_(fB);
@@ -1352,7 +1352,7 @@ function doGet(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.7-pos-dong-thieu-ngay' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.8-pos-quay-30-70' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -3114,6 +3114,23 @@ function _resolveGhepDon_(codes, idx, usedBaseRows) {
   return { status: 'ok', total: total, shares: shares, codes: codes, baseRows: picked.length };
 }
 
+// ── DON QUAY HAO NAM CO GAN THE SALE + QUAY NOTE "30/70" (yeu cau Duyen 2026-10-04) ──
+// Don chia quay co 2 dang: (1) DON GHEP — don A cua sale di cung don B cua quay: moi don chi tinh cho ben cua no (don
+// quay khong co the sale nen sale khong duoc tinh; xu ly boi ghep don theo ma bo dem + don khong sale); (2) DON QUAY
+// CO GAN THE SALE (khach do sale mang den, chi 1 don) — quay note "30/70": CHI 30% doanh thu chia cho cac sale tren the
+// (chia deu tiep, vd 3 sale moi nguoi 10%), 70% la cua quay. Don Quay Hao Nam khong gan the sale -> khong co phan sale.
+// Tra ve 0.3 neu dung dang (2), nguoc lai 1.
+var QUAY_SALE_RATIO_ = 0.3;
+function _quaySaleRatio_(nguonDon, ghiChu, hasSale) {
+  if (!hasSale) return 1;
+  // Bo dau truoc khi so (_normTxt_ chi ha chu thuong, khong bo dau) — khop "Quầy Hào Nam" bat ke hoa/thuong/dau.
+  var nguonFold = String(nguonDon || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/\s+/g, ' ').trim();
+  if (nguonFold.indexOf('quay hao nam') === -1) return 1;
+  var s = String(ghiChu || '');
+  if (/(^|[^0-9])30\s*[\/\-:]\s*70(?![0-9])/.test(s) || /(^|[^0-9])70\s*[\/\-:]\s*30(?![0-9])/.test(s)) return QUAY_SALE_RATIO_;
+  return 1;
+}
+
 function buildSalesReportB_(filters) {
   filters = filters || {};
   // Ho tro CA mang (multi-select) LAN chuoi don (tuong thich nguoc) cho ca 3 bo loc.
@@ -3244,6 +3261,12 @@ function buildSalesReportB_(filters) {
       for (var si = 0; si < saleFilterFold.length; si++) { if (salesOnRow.indexOf(saleFilterFold[si]) !== -1) { hit = true; break; } }
       if (!hit) continue;
     }
+    // Don Quay Hao Nam gan the sale + note 30/70 -> chi 30% doanh thu la cua sale (xem _quaySaleRatio_)
+    var hasSaleRow = effRow.ghepShares
+      ? effRow.ghepShares.some(function(x) { return x.name !== '(chưa gán sale)'; })
+      : _donSaleNamesFromThe_(effRow.theSale).length > 0;
+    var qRatio = _quaySaleRatio_(effRow.nguonDon, effRow.ghiChu, hasSaleRow);
+    if (qRatio !== 1) effRow = Object.assign({}, effRow, { saleRatio: qRatio });
     matched.push(effRow);
   }
 
@@ -3275,7 +3298,7 @@ function buildSalesReportB_(filters) {
     var teamsOnOrderB = {};
     for (var si2 = 0; si2 < salesOnOrder.length; si2++) {
       var sName = salesOnOrder[si2];
-      var fr = fracOf(sName);
+      var fr = fracOf(sName) * (m.saleRatio || 1); // saleRatio 0.3 = don Quay 30/70 (phan con lai 70% la cua quay)
       if (!bySale[sName]) bySale[sName] = { orders: 0, giaTri: 0, cod: 0 };
       bySale[sName].orders += 1;
       bySale[sName].giaTri += m.giaTriSauGiam * fr;
@@ -3420,6 +3443,7 @@ function buildSalesReportB_(filters) {
         // goc (de doi chieu); saleShares = ty le chia cho tung sale cua don goc (tong = 1); ghepCodes = ma bo dem da khop.
         giaTriPos: m.ghepShares ? m.giaTriPos : undefined,
         saleShares: m.ghepShares || undefined,
+        saleRatio: m.saleRatio || undefined, // 0.3 = don Quay Hao Nam gan the sale + note 30/70
         ghepCodes: m.ghepCodes || undefined,
         // saleBanValid: danh sach ten sale đã qua _donSaleNamesFromThe_ (loc theo danh sach ten
         // sale THAT, giong het cach bySale o tren tinh) — khac voi theSale (chuoi THO nguyen van

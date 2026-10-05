@@ -2155,7 +2155,8 @@ function _computeCommissionData_(orders) {
     }
     var n = salesList.length;
     salesList.forEach(function(sName){
-      var share = shareMap ? giaTri * shareMap[sName] : giaTri / n;
+      // saleRatio 0.3 = don Quay Hao Nam gan the sale + note 30/70: chi 30% doanh thu chia cho sale (70% la cua quay)
+      var share = (shareMap ? giaTri * shareMap[sName] : giaTri / n) * (Number(m.saleRatio) || 1);
       if (!bySale[sName]) bySale[sName] = { ordersAbove15:0, ordersBelow15:0, revenueAbove15:0, revenueBelow15:0, channelRevenue:0, channelCommission:0, channelBreakdown:{} };
       if (chRate !== null) {
         var kenhKey = String(m.nguonDon||'').trim();
