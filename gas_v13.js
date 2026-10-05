@@ -1965,7 +1965,17 @@ function _donSaleNamesFromThe_(theStr) {
   var tokens = splitMulti_(theStr, ',');
   if (!tokens.length) return [];
   var known = _pancakeKnownSaleNameSet_();
-  var matched = tokens.filter(function(tok) { return known[_normTxt_(tok)]; });
+  // SUA 2026-10-05 (loi lech doanh thu Pos vs ke toan, vd ninhnga99 906.411.333 vs 816.953.667): TRUOC DAY chi giu token
+  // nam trong danh sach "known" (PancakeStats + PancakeNameMap). Sale THAT chua tung duoc nhap vao 2 sheet do (vd
+  // biichnguyen1993, dungnguyen1995, giangnguyen1990, nguyenngo1988, thuydinh95, nonghong88, mainguyen97...) bi BO RA ngay khi
+  // don co >=1 sale khac da biet — don chia 2 nguoi chi con 1 nguoi nhan CA tien (nguoi kia mat phan), nen sale nay bi thieu
+  // (bichnguyen1993 86 don -> 39) va sale di cung bi thua (ninhnga99 +89tr). Fix: ngoai danh sach known, van nhan token
+  // KHONG khoang trang va co CHU SO (ten dang nhap Pancake luon dang "ninhnga99"), con tag/trang thai thuong co khoang trang
+  // ("Chưa đối soát", "Giao không thành") hoac khong co so ("VIP", "Freeship") van bi loai nhu cu.
+  var matched = tokens.filter(function(tok) {
+    if (known[_normTxt_(tok)]) return true;
+    return !/\s/.test(tok) && /\d/.test(tok);
+  });
   if (matched.length) return matched;
   return tokens.filter(function(tok) { return tok && !/\s/.test(tok); });
 }
