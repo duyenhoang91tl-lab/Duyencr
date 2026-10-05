@@ -2030,6 +2030,9 @@ async function saveChannelCommissionRates() {
 function _channelCommissionRate_(kenh){
   if (!kenh) return null;
   var k = String(kenh).trim().toLowerCase();
+  // QUY TAC KE TOAN (file check_doanh_thu, Buoc 3): nguon don CHI co chu "Facebook" = don duoc/my pham ->
+  // MAC DINH chi tinh 1% hoa hong. Admin cai ro % cho "facebook" trong modal thi lay theo cai do.
+  if (k === 'facebook' && !Object.prototype.hasOwnProperty.call(CHANNEL_COMMISSION_RATES, k)) return 1;
   if (!k || !Object.prototype.hasOwnProperty.call(CHANNEL_COMMISSION_RATES, k)) return null;
   var v = CHANNEL_COMMISSION_RATES[k];
   return (v === '' || v === null || v === undefined || isNaN(Number(v))) ? null : Number(v);
@@ -2105,11 +2108,20 @@ function _resolveCommissionRate_(name) {
   var teamInfo = _teamRateForName_(name);
   var hasA = indiv.above15 !== undefined && indiv.above15 !== null && indiv.above15 !== '';
   var hasB = indiv.below15 !== undefined && indiv.below15 !== null && indiv.below15 !== '';
+  // QUY TAC KE TOAN (file check_doanh_thu, Buoc 7): chua cai ca nhan/team thi MAC DINH theo phan loai
+  // Online/Offline cua sale — Online: >=15tr 1,5% / <15tr 1%; Offline: >=15tr 1% / <15tr 0,8%.
+  // Team chi tinh la "da cai" khi % > 0 (ratePct mac dinh 0/0 = chua cai).
+  var tr = teamInfo.rate || {};
+  var teamA = teamInfo.team && Number(tr.above15) > 0, teamB = teamInfo.team && Number(tr.below15) > 0;
+  var chn = SALE_CHANNELS[name];
+  var def = chn === 'online' ? { above15: 1.5, below15: 1, label: 'Mặc định Online' }
+          : chn === 'offline' ? { above15: 1, below15: 0.8, label: 'Mặc định Offline' } : null;
+  function _src(has, teamHas){ return has ? 'Cá nhân' : (teamHas ? 'Team ' + teamInfo.team.name : (def ? def.label : 'Chưa cài')); }
   return {
-    above15: hasA ? Number(indiv.above15) : Number((teamInfo.rate||{}).above15 || 0),
-    below15: hasB ? Number(indiv.below15) : Number((teamInfo.rate||{}).below15 || 0),
-    sourceAbove15: hasA ? 'Cá nhân' : (teamInfo.team ? 'Team ' + teamInfo.team.name : 'Chưa cài'),
-    sourceBelow15: hasB ? 'Cá nhân' : (teamInfo.team ? 'Team ' + teamInfo.team.name : 'Chưa cài')
+    above15: hasA ? Number(indiv.above15) : (teamA ? Number(tr.above15) : (def ? def.above15 : 0)),
+    below15: hasB ? Number(indiv.below15) : (teamB ? Number(tr.below15) : (def ? def.below15 : 0)),
+    sourceAbove15: _src(hasA, teamA),
+    sourceBelow15: _src(hasB, teamB)
   };
 }
 
@@ -14368,7 +14380,7 @@ function _renderChannelRatesModal(){
   if (!body) return;
   var keys = Object.keys(CHANNEL_COMMISSION_RATES).sort(function(a,b){ return a.localeCompare(b,'vi'); });
   var nguonOptions = (_srState && _srState.nguonOptions) || [];
-  var html = '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Đơn có Nguồn đơn khớp đúng (không phân biệt hoa/thường) 1 trong các tên dưới đây sẽ tính hoa hồng theo % cố định này, bỏ qua ngưỡng 15tr và % cá nhân/team.</div>';
+  var html = '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Đơn có Nguồn đơn khớp đúng (không phân biệt hoa/thường) 1 trong các tên dưới đây sẽ tính hoa hồng theo % cố định này, bỏ qua ngưỡng 15tr và % cá nhân/team. Mặc định (khi chưa cài): nguồn chỉ ghi "Facebook" = 1%.</div>';
   html += '<table class="dash-table"><thead><tr><th>Nguồn đơn</th><th style="width:140px">% hoa hồng</th><th style="width:60px"></th></tr></thead><tbody>';
   keys.forEach(function(k){
     html += '<tr><td>'+esc(k)+'</td>'+
