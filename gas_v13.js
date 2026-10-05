@@ -1508,6 +1508,9 @@ var DT_COL_GIATRIDON  = 17;
 var DT_COL_GIATRICHENH= 18;
 var DT_COL_ID         = 19;
 var DT_TONG_WIDTH     = 20; // A:T
+// Sentinel dung thay cho "instanceof Date" khi gia tri tho cua "DT TỔNG " di qua cache (xem
+// _readDTTongRawValuesCached_) — JSON.stringify bien Date thanh chuoi ISO, mat instanceof Date.
+var DT_DATE_SENTINEL_ = '\u0000__DATE__\u0000';
 
 // Chuyen 1 hang tho cua DT TONG thanh object "don hang" (giu ten truong nhu ORDER_HEADERS
 // cu de cac cho khac trong code/frontend it phai sua nhat co the)
@@ -2967,6 +2970,39 @@ function _extractCounterCodes_(text) {
 // Vi cot chua ma bo dem trong Base KHONG duoc ghi trong tai lieu, quet moi o cua moi dong (tru cot O =
 // "san pham" la text go tay — chi dung lam du phong tang 2 khi tang 1 khong ra).
 // Tra ve { exact: {code: [row]}, fuzzy: {code: [row]} } — fuzzy = lech dung phan "/nam" (1 ben co, 1 ben khong).
+// Doc gia tri tho A->T cua "DT TỔNG " — sheet LON NHAT he thong, chua TOAN BO lich su don tu
+// truoc den gio (khong co sel hang) — cache 90s (dung chung pattern voi donChiTiet_v4 o tren).
+// QUAN TRONG — day la fix cho bug "Bao cao E (Hoa hong Pos) bi GAS huy sau 55s" (bao cao
+// 2026-10-05): _readBaseRowsByCounterCodes_ (ham duy nhat goi ham nay) truoc day getValues()
+// LAI TOAN BO sheet nay MOI LAN co report nao can ghep ma bo dem trong ghi chu don Pos — BAT
+// KE nguoi dung da loc khoang ngay hep co nao (vd dung 1 thang), vi ban than viec ghep ma can
+// doi chieu voi TOAN BO lich su Base (ma co the thuoc bat ky thang nao truoc do). Sheet cang
+// nhieu dong (tang dan theo thoi gian) thi lan doc nay cang lau -> giai thich dung kieu loi
+// "thinh thoang bi, cang luc cang hay bi" nguoi dung mo ta, VA giai thich vi sao loc gon 1
+// thang (theo goi y cua banner timeout) KHONG giup ich gi (vi ham nay von da bo qua bo loc
+// ngay). Cache lai giup CAC LAN GOI LIEN TIEP trong 90s (vd thu lai nhieu lan, nhieu bao cao
+// khac nhau cung can ghep ma) dung chung 1 lan doc thay vi doc lai tu dau moi lan.
+function _readDTTongRawValuesCached_() {
+  var cached = _cacheGetBig_('dtTongRawVals_v1');
+  if (cached) { try { return JSON.parse(cached); } catch (eParse) {} }
+  var ss = getDTSS_();
+  var sh = ss.getSheetByName(DT_TONG_SHEET);
+  if (!sh) return [];
+  var last = sh.getLastRow();
+  if (last < 2) return [];
+  var vals = sh.getRange(2, 1, last - 1, DT_TONG_WIDTH).getValues();
+  // Chuan hoa Date -> sentinel NGAY LUC DOC TUOI (khong chi luc doc tu cache) de ca 2 duong
+  // (tuoi/cache) tra ve CUNG 1 dang, vong lap ben duoi chi can kiem tra sentinel, khong can
+  // phan biet "dang doc tu dau".
+  for (var di = 0; di < vals.length; di++) {
+    for (var dj = 0; dj < vals[di].length; dj++) {
+      if (vals[di][dj] instanceof Date) vals[di][dj] = DT_DATE_SENTINEL_;
+    }
+  }
+  try { _cachePutBig_('dtTongRawVals_v1', JSON.stringify(vals), 90); } catch (eCache) {}
+  return vals;
+}
+
 function _readBaseRowsByCounterCodes_(wantedCodes) {
   var res = { exact: {}, fuzzy: {}, tier2: {} };
   var wantedList = Object.keys(wantedCodes);
@@ -2974,12 +3010,8 @@ function _readBaseRowsByCounterCodes_(wantedCodes) {
   var wantedNoYear = {}; // ma khong nam -> [ma day du trong wanted]
   wantedList.forEach(function(c) { var n = _counterCodeNoYear_(c); (wantedNoYear[n] = wantedNoYear[n] || []).push(c); });
 
-  var ss = getDTSS_();
-  var sh = ss.getSheetByName(DT_TONG_SHEET);
-  if (!sh) return res;
-  var last = sh.getLastRow();
-  if (last < 2) return res;
-  var vals = sh.getRange(2, 1, last - 1, DT_TONG_WIDTH).getValues();
+  var vals = _readDTTongRawValuesCached_();
+  if (!vals.length) return res;
   function addHit_(bucket, key, rowObj) {
     var arr = bucket[key] || (bucket[key] = []);
     for (var q = 0; q < arr.length; q++) if (arr[q].rowIndex === rowObj.rowIndex) return; // 1 dong chi tinh 1 lan / ma
@@ -2990,7 +3022,7 @@ function _readBaseRowsByCounterCodes_(wantedCodes) {
     var rowObj = null;
     for (var ci = 0; ci < DT_TONG_WIDTH; ci++) {
       var cell = r[ci];
-      if (cell === '' || cell === null || cell === undefined || cell instanceof Date || typeof cell === 'number') continue;
+      if (cell === '' || cell === null || cell === undefined || cell === DT_DATE_SENTINEL_ || cell instanceof Date || typeof cell === 'number') continue;
       var codes = _extractCounterCodes_(cell);
       if (!codes.length) continue;
       for (var k = 0; k < codes.length; k++) {
