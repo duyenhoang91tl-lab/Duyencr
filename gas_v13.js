@@ -1352,7 +1352,7 @@ function doGet(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.8-pos-quay-30-70' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.9-pos-ghep-fast' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -2958,7 +2958,8 @@ function buildFailedOrderReport_(filters) {
 
 // Ma bo dem: [chu 0-3 ky tu, vd "Bh"] + so + [chu 0-3 ky tu, vd "Q"] + "T" + thang(1-2 so) + ["/" + nam 2-4 so].
 // VD khop: 980T09 | 16QT09/2026 | Bh395T09/2026 | 835T09/2026. Phai dung RIENG (khong dinh chu/so lien truoc/sau).
-var COUNTER_CODE_RE_SRC_ = '(^|[^A-Za-z0-9])([A-Za-z]{0,3}\\d{1,6}[A-Za-z]{0,3}T\\d{1,2}(?:\\/\\d{2,4})?)(?![A-Za-z0-9])';
+var COUNTER_CODE_INNER_ = '[A-Za-z]{0,3}\\d{1,6}[A-Za-z]{0,3}T\\d{1,2}(?:\\/\\d{2,4})?';
+var COUNTER_CODE_RE_SRC_ = '(^|[^A-Za-z0-9])(' + COUNTER_CODE_INNER_ + ')(?![A-Za-z0-9])';
 function _normCounterCode_(c) { return String(c || '').replace(/\s+/g, '').toUpperCase(); }
 function _counterCodeNoYear_(c) { return String(c).replace(/\/\d{2,4}$/, ''); }
 function _counterCodeHasYear_(c) { return /\/\d{2,4}$/.test(String(c)); }
@@ -2976,91 +2977,95 @@ function _extractCounterCodes_(text) {
   return out;
 }
 
-// Doc "DT TỔNG " (Base) 1 LAN va CHI giu cac dong co chua ma bo dem nam trong wantedCodes (set chuan hoa).
-// Vi cot chua ma bo dem trong Base KHONG duoc ghi trong tai lieu, quet moi o cua moi dong (tru cot O =
-// "san pham" la text go tay — chi dung lam du phong tang 2 khi tang 1 khong ra).
-// Tra ve { exact: {code: [row]}, fuzzy: {code: [row]} } — fuzzy = lech dung phan "/nam" (1 ben co, 1 ben khong).
-// Doc gia tri tho A->T cua "DT TỔNG " — sheet LON NHAT he thong, chua TOAN BO lich su don tu
-// truoc den gio (khong co sel hang) — cache 90s (dung chung pattern voi donChiTiet_v4 o tren).
-// QUAN TRONG — day la fix cho bug "Bao cao E (Hoa hong Pos) bi GAS huy sau 55s" (bao cao
-// 2026-10-05): _readBaseRowsByCounterCodes_ (ham duy nhat goi ham nay) truoc day getValues()
-// LAI TOAN BO sheet nay MOI LAN co report nao can ghep ma bo dem trong ghi chu don Pos — BAT
-// KE nguoi dung da loc khoang ngay hep co nao (vd dung 1 thang), vi ban than viec ghep ma can
-// doi chieu voi TOAN BO lich su Base (ma co the thuoc bat ky thang nao truoc do). Sheet cang
-// nhieu dong (tang dan theo thoi gian) thi lan doc nay cang lau -> giai thich dung kieu loi
-// "thinh thoang bi, cang luc cang hay bi" nguoi dung mo ta, VA giai thich vi sao loc gon 1
-// thang (theo goi y cua banner timeout) KHONG giup ich gi (vi ham nay von da bo qua bo loc
-// ngay). Cache lai giup CAC LAN GOI LIEN TIEP trong 90s (vd thu lai nhieu lan, nhieu bao cao
-// khac nhau cung can ghep ma) dung chung 1 lan doc thay vi doc lai tu dau moi lan.
-function _readDTTongRawValuesCached_() {
-  var cached = _cacheGetBig_('dtTongRawVals_v1');
-  if (cached) { try { return JSON.parse(cached); } catch (eParse) {} }
-  var ss = getDTSS_();
-  var sh = ss.getSheetByName(DT_TONG_SHEET);
-  if (!sh) return [];
-  var last = sh.getLastRow();
-  if (last < 2) return [];
-  var vals = sh.getRange(2, 1, last - 1, DT_TONG_WIDTH).getValues();
-  // Chuan hoa Date -> sentinel NGAY LUC DOC TUOI (khong chi luc doc tu cache) de ca 2 duong
-  // (tuoi/cache) tra ve CUNG 1 dang, vong lap ben duoi chi can kiem tra sentinel, khong can
-  // phan biet "dang doc tu dau".
-  for (var di = 0; di < vals.length; di++) {
-    for (var dj = 0; dj < vals[di].length; dj++) {
-      if (vals[di][dj] instanceof Date) vals[di][dj] = DT_DATE_SENTINEL_;
+// Tim CAT chua "ma bo dem" trong "DT TỔNG " (khong co tai lieu ghi ro cot nao). Lay mau ~400 dong CUOI, dem so o
+// khop NGUYEN o la 1 ma (uu tien) hoac co chua 1 ma trong o ngan (<=60 ky tu); chon cot nhieu nhat (>=3). Ket qua
+// luu cache 6 gio (khong tim ra: 10 phut). Tra ve chi so cot (0-based) hoac -1.
+// SUA 2026-10-05: ban dau quet MOI O cua MOI dong bang RegExp moi -> bao cao B qua 55 giay roi bi huy.
+function _detectBaseCounterCol_(sh, last) {
+  var cache = CacheService.getScriptCache();
+  var ck = 'dtCounterCol_v1';
+  try { var c = cache.get(ck); if (c !== null) { var v = parseInt(c, 10); if (!isNaN(v)) return v; } } catch (e0) {}
+  var from = Math.max(2, last - 399);
+  var vals = sh.getRange(from, 1, last - from + 1, DT_TONG_WIDTH).getValues();
+  var full = new RegExp('^' + COUNTER_CODE_INNER_ + '$', 'i');
+  var part = new RegExp(COUNTER_CODE_RE_SRC_, 'i');
+  var fullHits = [], partHits = [];
+  for (var ci = 0; ci < DT_TONG_WIDTH; ci++) { fullHits[ci] = 0; partHits[ci] = 0; }
+  for (var i = 0; i < vals.length; i++) {
+    for (var cj = 0; cj < DT_TONG_WIDTH; cj++) {
+      var cell = vals[i][cj];
+      if (cell === '' || cell === null || cell === undefined || typeof cell === 'number' || cell instanceof Date) continue;
+      var str = String(cell).trim();
+      if (!str || str.length > 60) continue;
+      if (full.test(str)) fullHits[cj]++;
+      else if (part.test(str)) partHits[cj]++;
     }
   }
-  try { _cachePutBig_('dtTongRawVals_v1', JSON.stringify(vals), 90); } catch (eCache) {}
-  return vals;
+  var best = -1, bestN = 2;
+  for (var f = 0; f < DT_TONG_WIDTH; f++) if (fullHits[f] > bestN) { bestN = fullHits[f]; best = f; }
+  if (best < 0) { bestN = 2; for (var g = 0; g < DT_TONG_WIDTH; g++) if (fullHits[g] + partHits[g] > bestN) { bestN = fullHits[g] + partHits[g]; best = g; } }
+  try { cache.put(ck, String(best), best >= 0 ? 21600 : 600); } catch (e1) {}
+  return best;
 }
 
+// Doc "DT TỔNG " (Base) va CHI giu cac dong co ma bo dem nam trong wantedCodes (set chuan hoa).
+// Chi doc 5 CAT can dung (ma bo dem, trang thai, sale, gia tri) thay vi ca 20 cot, va chi chay regex tren o
+// NGAN co dang "..T<so>" (bo qua o dai/so/ngay) -> nhanh hon rat nhieu. Khong xac dinh duoc cot -> colIdx = -1.
+// Tra ve { exact: {code: [row]}, fuzzy: {code: [row]}, colIdx } — fuzzy = lech dung phan "/nam" (1 ben co, 1 ben khong).
 function _readBaseRowsByCounterCodes_(wantedCodes) {
-  var res = { exact: {}, fuzzy: {}, tier2: {} };
+  var res = { exact: {}, fuzzy: {}, colIdx: -1 };
   var wantedList = Object.keys(wantedCodes);
   if (!wantedList.length) return res;
   var wantedNoYear = {}; // ma khong nam -> [ma day du trong wanted]
   wantedList.forEach(function(c) { var n = _counterCodeNoYear_(c); (wantedNoYear[n] = wantedNoYear[n] || []).push(c); });
 
-  var vals = _readDTTongRawValuesCached_();
-  if (!vals.length) return res;
+  var ss = getDTSS_();
+  var sh = ss.getSheetByName(DT_TONG_SHEET);
+  if (!sh) return res;
+  var last = sh.getLastRow();
+  if (last < 2) return res;
+  var colIdx = _detectBaseCounterCol_(sh, last);
+  res.colIdx = colIdx;
+  if (colIdx < 0) return res;
+  var n = last - 1;
+  function col_(ci) { return sh.getRange(2, ci + 1, n, 1).getValues(); }
+  var cCode = col_(colIdx), cTT = col_(DT_COL_TRANGTHAI), cSale = col_(DT_COL_SALEBAN), cGT = col_(DT_COL_GIATRIDON);
+  var re = new RegExp(COUNTER_CODE_RE_SRC_, 'g'), quick = /[Tt]\d/;
   function addHit_(bucket, key, rowObj) {
     var arr = bucket[key] || (bucket[key] = []);
     for (var q = 0; q < arr.length; q++) if (arr[q].rowIndex === rowObj.rowIndex) return; // 1 dong chi tinh 1 lan / ma
     arr.push(rowObj);
   }
-  for (var i = 0; i < vals.length; i++) {
-    var r = vals[i];
-    var rowObj = null;
-    for (var ci = 0; ci < DT_TONG_WIDTH; ci++) {
-      var cell = r[ci];
-      if (cell === '' || cell === null || cell === undefined || cell === DT_DATE_SENTINEL_ || cell instanceof Date || typeof cell === 'number') continue;
-      var codes = _extractCounterCodes_(cell);
-      if (!codes.length) continue;
-      for (var k = 0; k < codes.length; k++) {
-        var bc = codes[k];
-        var isWanted = !!wantedCodes[bc];
-        var fuzzyTargets = [];
-        var bNo = _counterCodeNoYear_(bc);
-        if (wantedNoYear[bNo]) {
-          wantedNoYear[bNo].forEach(function(wc) {
-            if (wc !== bc && (_counterCodeHasYear_(wc) !== _counterCodeHasYear_(bc))) fuzzyTargets.push(wc);
-          });
-        }
-        if (!isWanted && !fuzzyTargets.length) continue;
-        if (!rowObj) {
-          rowObj = {
-            rowIndex: i + 2,
-            trangThai: r[DT_COL_TRANGTHAI],
-            saleBan: r[DT_COL_SALEBAN] ? String(r[DT_COL_SALEBAN]) : '',
-            kenhBan: r[DT_COL_KENHBAN] ? String(r[DT_COL_KENHBAN]).trim() : '',
-            giaTriDon: _normMoney_(r[DT_COL_GIATRIDON]),
-            code: bc
-          };
-        }
-        var bucket = (ci === 14) ? res.tier2 : null; // cot O (san pham, text tu do): chi du phong
-        var key2 = ci === 14 ? 't2|' : '';
-        if (isWanted) addHit_(bucket || res.exact, key2 + bc, rowObj);
-        if (ci !== 14) fuzzyTargets.forEach(function(wc) { addHit_(res.fuzzy, wc, rowObj); }); // tang 2 (cot O) CHI khop chinh xac
+  for (var i = 0; i < n; i++) {
+    var cell = cCode[i][0];
+    if (cell === '' || cell === null || cell === undefined || typeof cell === 'number' || cell instanceof Date) continue;
+    var str = String(cell);
+    if (str.length > 60 || !quick.test(str)) continue;
+    re.lastIndex = 0;
+    var rowObj = null, m;
+    while ((m = re.exec(str)) !== null) {
+      var bc = _normCounterCode_(m[2]);
+      re.lastIndex = m.index + m[1].length + m[2].length;
+      var isWanted = !!wantedCodes[bc];
+      var fuzzyTargets = [];
+      var bNo = _counterCodeNoYear_(bc);
+      if (wantedNoYear[bNo]) {
+        wantedNoYear[bNo].forEach(function(wc) {
+          if (wc !== bc && (_counterCodeHasYear_(wc) !== _counterCodeHasYear_(bc))) fuzzyTargets.push(wc);
+        });
       }
+      if (!isWanted && !fuzzyTargets.length) continue;
+      if (!rowObj) {
+        rowObj = {
+          rowIndex: i + 2,
+          trangThai: cTT[i][0],
+          saleBan: cSale[i][0] ? String(cSale[i][0]) : '',
+          giaTriDon: _normMoney_(cGT[i][0]),
+          code: bc
+        };
+      }
+      if (isWanted) addHit_(res.exact, bc, rowObj);
+      fuzzyTargets.forEach(function(wc) { addHit_(res.fuzzy, wc, rowObj); });
     }
   }
   return res;
@@ -3076,7 +3081,6 @@ function _pickBaseRowsForCode_(code, idx) {
     if (Object.keys(distinct).length === 1) return fz;
     return null; // mo ho (nhieu nam khac nhau) -> khong doan, de rơi ve cach chia Pos + canh bao
   }
-  if (idx.tier2['t2|' + code] && idx.tier2['t2|' + code].length) return idx.tier2['t2|' + code];
   return null;
 }
 
@@ -3231,7 +3235,14 @@ function buildSalesReportB_(filters) {
     codesByRow.push(cds);
     if (cds.length) { anyCodes = true; cds.forEach(function(c) { wantedCodes[c] = true; }); }
   }
-  var baseIdx = anyCodes ? _readBaseRowsByCounterCodes_(wantedCodes) : null;
+  var baseIdx = null;
+  var ghepErr = '', ghepMs = 0;
+  if (anyCodes) {
+    // Loi/khong doc duoc Base -> KHONG lam hong ca bao cao: roi ve cach chia Pos nhu cu va bao trong ghep.loi.
+    var tG0 = Date.now();
+    try { baseIdx = _readBaseRowsByCounterCodes_(wantedCodes); ghepMs = Date.now() - tG0; }
+    catch (eG) { ghepErr = String(eG && eG.message || eG); baseIdx = { exact: {}, fuzzy: {}, colIdx: -2 }; }
+  }
   var usedBaseRows = {};
   var aliasMemoB_ = {};
   var ghepStats = { donCoMa: 0, daGhep: 0, gocBiLoai: 0, khongKhop: [], trungDonGoc: [] };
@@ -3443,7 +3454,7 @@ function buildSalesReportB_(filters) {
     saleCloseByPage: closeSectionsB_.saleCloseByPage,
     trungBinhDon: matched.length ? Math.round(totalGiaTri / matched.length) : 0,
     mismatchRows: mismatchCount, // so dong bi lech so cot giua san pham/ma/so luong — nen kiem tra tay
-    ghep: ghepStats, // thong ke ghep don Pos<->Base: donCoMa, daGhep, khongKhop[], trungDonGoc[] (2 loai sau = chia theo Pos, nen kiem tra tay)
+    ghep: (function(){ ghepStats.cotBase = baseIdx ? baseIdx.colIdx : null; ghepStats.loi = ghepErr; ghepStats.msDocBase = ghepMs; return ghepStats; })(), // thong ke ghep don Pos<->Base: donCoMa, daGhep, khongKhop[], trungDonGoc[] (2 loai sau = chia theo Pos, nen kiem tra tay)
     orders: matched.map(function(m){
       return {
         ngayTaoDon: m.ngayTaoDon, khachHang: m.khachHang, soDienThoai: m.soDienThoai,
