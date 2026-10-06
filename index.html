@@ -4301,8 +4301,8 @@ function renderCareTab(c) {
           </div>
           <div></div>
         </div>
-        <div class="form-label" style="margin-top:6px">📝 Thông tin đơn hàng</div>
-        <textarea class="form-ta" id="cs-chot-note" placeholder="VD: 1 nhẫn Kim Tiền size 12 + 1 lắc tay, ship COD, giao thứ 6..." style="min-height:52px">${esc(ex.note||'')}</textarea>
+        <div class="form-label" style="margin-top:6px">🔖 Mã bộ đếm (mã đơn Base)</div>
+        <input class="form-input" id="cs-chot-code" placeholder="VD: 1296T09/2026 (nhiều đơn: cách nhau bằng dấu +)" value="${esc(ex.code||'')}" autocomplete="off">
       </div>`;
     })()}
     ${_renderCustomFieldInputs(care)}
@@ -15518,13 +15518,13 @@ async function _hPushChot_(mk){
 }
 // Gọi từ saveCare khi Tình trạng CS thuộc nhóm Chốt
 function _hSaveChotFromForm_(phone, cs){
-  var revEl = document.getElementById('cs-chot-rev'), noteEl = document.getElementById('cs-chot-note');
-  if (!revEl && !noteEl) return;
+  var revEl = document.getElementById('cs-chot-rev'), codeEl = document.getElementById('cs-chot-code');
+  if (!revEl && !codeEl) return;
   var rev = parseInt(String(revEl ? revEl.value : '').replace(/[^\d]/g, ''), 10) || 0;
-  var note = noteEl ? noteEl.value.trim() : '';
+  var code = codeEl ? codeEl.value.trim().toUpperCase().replace(/\s+/g, ' ') : '';
   var d = _ymd(new Date()), mk = d.slice(0,7), id = phone + '|' + d, cur = _hChotMonth_(mk);
-  if (!rev && !note && !cur[id]) return;   // chưa nhập gì -> không tạo đơn rỗng
-  cur[id] = { id:id, phone:phone, cs: cs || (currentUser && currentUser.name) || '', date:d, rev:rev, note:note, t:Date.now() };
+  if (!rev && !code && !cur[id]) return;   // chưa nhập gì -> không tạo đơn rỗng
+  cur[id] = { id:id, phone:phone, cs: cs || (currentUser && currentUser.name) || '', date:d, rev:rev, note:(cur[id] && cur[id].note) || '', code:code, t:Date.now() };  // note = ghi chu don cu (giu lai de khong mat du lieu da luu); code = ma bo dem / ma don Base
   saveLS('ome_chot_orders_' + mk, cur);
   clearTimeout(_hChotTimers[mk]);
   _hChotTimers[mk] = setTimeout(function(){ _hPushChot_(mk); }, 700);
