@@ -4837,13 +4837,45 @@ function _initHistExpand(){
 
 // Khối "CSKH-Duyên" ở tab Tổng quan: thông tin khách từ sheet thứ 3 (mỗi dòng 1 khối nếu trùng SĐT).
 // Chỉ hiện trường CÓ giá trị. (Không có CCCD/MST cá nhân — backend không đọc cột đó.)
+// ---- Chi tiet CSKH-Duyen tai LUOI (lazy) -- chi tai khi CS mo ho so 1 khach co trong sheet CSKH-Duyen ----
+// syncFromGS chi keo ban 'lite' {name,tier} (action=cskhDuyenLite) de CRM khong lag voi ~134k dong. Day du 17 truong (dia chi,
+// cong ty, email, ghi chu...) chi lay cho DUNG 1 SDT qua action=lookup (backend findCskhRowsByPhone_ doc index nhe + vai dong).
+var _cskhDetailCache = {};   // phone -> MANG dong day du
+var _cskhDetailState = {};   // phone -> 'loading' | 'done' | 'fail'  (moi SDT chi tai 1 lan/phien, tranh vong lap khi loi)
+function _loadCskhDetailForPhone_(phone) {
+  if (!phone || _cskhDetailState[phone] || !gsUrl) return;
+  if (!(typeof cskhData !== 'undefined' && cskhData && cskhData[phone])) return; // khach khong co trong nguon CSKH-Duyen
+  _cskhDetailState[phone] = 'loading';
+  const sep = gsUrl.indexOf('?') >= 0 ? '&' : '?';
+  fetch(gsUrl + sep + 'action=lookup&phone=' + encodeURIComponent(phone), { redirect: 'follow' })
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      const rows = (j && Array.isArray(j.cskh)) ? j.cskh : [];
+      if (rows.length) { _cskhDetailCache[phone] = rows; _cskhDetailState[phone] = 'done'; }
+      else { _cskhDetailState[phone] = 'fail'; }
+    })
+    .catch(function(err){ _cskhDetailState[phone] = 'fail'; console.warn('cskh detail error:', err && err.message); })
+    .then(function(){
+      // Ve lai tab Tong quan neu CS van dang xem dung khach nay (tab nay chi doc, khong co o nhap de mat)
+      if (currentPhone === phone && currentDpTab === 'info' && !_dpDirty) {
+        const c = allCustomers.find(function(x){ return x.phone === phone; });
+        const body = document.getElementById('dp-body');
+        if (c && body) body.innerHTML = renderInfoTab(c);
+      }
+    });
+}
+
 function _renderCskhBlock_(c) {
-  const rows = c.cskh || [];
-  if (!rows.length) return '';
+  const lite = c.cskh || [];
+  if (!lite.length) return '';
+  const full = _cskhDetailCache[c.phone];
+  const rows = full && full.length ? full : lite;
+  if (!full && !_cskhDetailState[c.phone]) setTimeout(function(){ _loadCskhDetailForPhone_(c.phone); }, 0);
+  const _ckLoading = !full && _cskhDetailState[c.phone] === 'loading';
   const LBL = [['tier','Phân loại'],['staff','NV phụ trách'],['codeOrig','Mã KH (gốc)'],['codeOther','Mã KH khác'],['internal','Đối tượng nội bộ'],
     ['birthday','Ngày sinh'],['gender','Giới tính'],['address','Địa chỉ'],['email','Email'],['company','Công ty'],['taxCompany','MST công ty'],
     ['debt','Công nợ'],['source','Nguồn dữ liệu'],['note','Ghi chú']];
-  return `<div style="margin-top:10px"><div class="dp-stitle">🗂 CSKH-Duyên${rows.length>1?` (${rows.length} dòng trùng SĐT)`:''}</div>` +
+  return `<div style="margin-top:10px"><div class="dp-stitle">🗂 CSKH-Duyên${rows.length>1?` (${rows.length} dòng trùng SĐT)`:''}${_ckLoading?' <span style="font-weight:400;color:var(--hint);font-size:11px">⏳ đang tải chi tiết…</span>':''}</div>` +
     rows.map(r => `<div style="font-size:12px;margin-top:6px;background:var(--surface2);padding:8px;border-radius:6px">` +
       (r.name ? `<div style="font-weight:600;margin-bottom:4px">${esc(r.name)}${r.tier?` <span class="cs-badge">${esc(r.tier)}</span>`:''}</div>` : '') +
       LBL.filter(x => r[x[0]] && !(x[0]==='tier' && r.name)).map(x => `<div style="display:flex;gap:6px;padding:1px 0"><span style="color:var(--muted);min-width:92px">${x[1]}</span><span style="flex:1;word-break:break-word">${esc(r[x[0]])}</span></div>`).join('') +
