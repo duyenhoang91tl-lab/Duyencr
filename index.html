@@ -7921,17 +7921,51 @@ function _advAssignDateFilteredList() {
   });
 }
 
+// ── CACHE TRA CUU NHANH CHO CHIA DATA ─────────────────────────────────────────────────────────
+// NGUYEN NHAN LAG (da sua): sau khi them nguon CSKH-Duyen (~134k KH), moi lan bam BAT KY nut nao trong
+// modal Chia data (renderAssignCreate) / go so luong (_getAssignPool) deu chay cac vong lap BAC HAI tren
+// toan bo danh sach: allCustomers.find(...) cho TUNG SDT, va assignHistory.some(h => h.phones.includes(p))
+// (wasEverAssigned) cho TUNG SDT, cong them dung lai tap CS tu toan bo KH (_buildCsSet_ moi KH) o MOI lan ve.
+// Nay dung Map/Set dung chung, chi dung lai khi allCustomers hoac assignHistory thuc su doi.
+var _asgCache = { custRef:null, custLen:-1, custMap:null, histSig:null, everSet:null, csRef:null, csLen:-1, csDV:-1, csList:null };
+function _assignCustMap(){
+  if (_asgCache.custMap && _asgCache.custRef === allCustomers && _asgCache.custLen === allCustomers.length) return _asgCache.custMap;
+  var m = new Map();
+  for (var i = 0; i < allCustomers.length; i++) m.set(allCustomers[i].phone, allCustomers[i]);
+  _asgCache.custRef = allCustomers; _asgCache.custLen = allCustomers.length; _asgCache.custMap = m;
+  return m;
+}
+function _everAssignedSet(){
+  var sig = (assignHistory || []).map(function(h){ return h.id + ':' + (h.phones ? h.phones.length : 0); }).join(',');
+  if (_asgCache.everSet && _asgCache.histSig === sig) return _asgCache.everSet;
+  var set = new Set();
+  (assignHistory || []).forEach(function(h){ (h.phones || []).forEach(function(p){ set.add(p); }); });
+  _asgCache.histSig = sig; _asgCache.everSet = set;
+  return set;
+}
+function _assignAllCSNames(){
+  // csSet/careCSSet da tinh san trong buildCustomers — khong goi lai _buildCsSet_ cho tung KH moi lan ve modal
+  if (_asgCache.csList && _asgCache.csRef === allCustomers && _asgCache.csLen === allCustomers.length && _asgCache.csDV === _dataVersion) return _asgCache.csList;
+  var names = new Set();
+  for (var i = 0; i < allCustomers.length; i++) {
+    var c = allCustomers[i];
+    if (c.csSet) c.csSet.forEach(function(n){ if (n) names.add(n); });
+    if (c.careCSSet) c.careCSSet.forEach(function(n){ if (n) names.add(n); });
+  }
+  var list = [...names].sort();
+  _asgCache.csRef = allCustomers; _asgCache.csLen = allCustomers.length; _asgCache.csDV = _dataVersion; _asgCache.csList = list;
+  return list;
+}
+
 // ── Helper: get sorted pool based on advAssign settings ──
 function _getAssignPool() {
   let pool = [..._advAssignDateFilteredList()];
   if (_advAssign.sortMode === 'unassigned') {
     pool = pool.filter(p => !wasEverAssigned(p));
-  } else if (_advAssign.sortMode === 'vip') {
-    pool = pool.filter(p => { const c = allCustomers.find(x=>x.phone===p); return c && c.tier === 'VIP'; });
-  } else if (_advAssign.sortMode === 'tt') {
-    pool = pool.filter(p => { const c = allCustomers.find(x=>x.phone===p); return c && c.tier === 'Thân thiết'; });
-  } else if (_advAssign.sortMode === 'tn') {
-    pool = pool.filter(p => { const c = allCustomers.find(x=>x.phone===p); return c && c.tier === 'Tiềm năng'; });
+  } else if (_advAssign.sortMode === 'vip' || _advAssign.sortMode === 'tt' || _advAssign.sortMode === 'tn') {
+    const _tierWant = _advAssign.sortMode === 'vip' ? 'VIP' : (_advAssign.sortMode === 'tt' ? 'Thân thiết' : 'Tiềm năng');
+    const _cm = _assignCustMap();
+    pool = pool.filter(p => { const c = _cm.get(p); return c && c.tier === _tierWant; });
   }
   if (_advAssign.sourceMode === 'count') {
     const n = Math.min(parseInt(_advAssign.customCount) || 0, pool.length);
@@ -8001,9 +8035,7 @@ function renderAssignCreate() {
     _assignFilteredList = window.__omeFiltered.map(function(c){ return c && c.phone; }).filter(Boolean);
     _advAssign.customCount = _assignFilteredList.length;
   }
-  const allCS = [...new Set(allCustomers.flatMap(c => [
-    ..._buildCsSet_(c.orders, c.phone), ...(c.careCSSet||[])
-  ]).filter(Boolean))].sort();
+  const allCS = _assignAllCSNames();
 
   const dateFilteredList = _advAssignDateFilteredList();
   const totalFiltered = dateFilteredList.length;
@@ -8016,13 +8048,14 @@ function renderAssignCreate() {
   const remaining = pool.length - distTotal;
   const selectedCount = isTeamMode ? teamIds.length : csList.length;
 
-  const alreadyAssigned = dateFilteredList.filter(p => wasEverAssigned(p));
-  const neverAssigned = dateFilteredList.filter(p => !wasEverAssigned(p));
-
-  // Count by tier
+  // 1 vong duy nhat (O(N)) thay vi 2 lan filter x wasEverAssigned x allCustomers.find (O(N^2))
+  const _everSet = _everAssignedSet();
+  const _custMap = _assignCustMap();
+  let alreadyAssigned = { length: 0 }, neverAssigned = { length: 0 };
   const tierCount = { VIP:0, 'Thân thiết':0, 'Tiềm năng':0, other:0 };
   dateFilteredList.forEach(p => {
-    const c = allCustomers.find(x=>x.phone===p);
+    if (_everSet.has(p)) alreadyAssigned.length++; else neverAssigned.length++;
+    const c = _custMap.get(p);
     const t = c?.tier || 'other';
     if (tierCount[t] !== undefined) tierCount[t]++; else tierCount.other++;
   });
@@ -8530,7 +8563,7 @@ function doAssignData() { doAssignDataAdvanced(); }
 // CS chăm sóc mới nhất thắng (chia lại sẽ đổi sang CS mới).
 function _applyCareCSToAssigned(entries){
   if (typeof careData === 'undefined' || !entries || !entries.length) return 0;
-  const cmap = (typeof allCustomers !== 'undefined') ? new Map(allCustomers.map(c => [String(c.phone), c])) : null;
+  const cmap = (typeof allCustomers !== 'undefined') ? _assignCustMap() : null;   // dung Map cache, khong dung lai 136k cap moi lan chia
   const updates = [];
   entries.forEach(e => {
     const cs = e.csName || '';
@@ -8545,7 +8578,12 @@ function _applyCareCSToAssigned(entries){
   saveLS('ome_care', careData);
   if (gsUrl && updates.length){
     // 1 lần ghi careCS xuống OrderData cột N cho tất cả SĐT vừa chia
-    fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'setOrderCareCSBatch', updates: updates }) }).catch(function(){});
+    // Chia THEO LO 2000 SDT/request (truoc day 1 request chua toan bo — hang tram nghin SDT — de bi timeout/nghen)
+    (async function(){
+      for (let i = 0; i < updates.length; i += 2000) {
+        try { await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'setOrderCareCSBatch', updates: updates.slice(i, i + 2000) }) }); } catch(e) {}
+      }
+    })();
     // đồng bộ careData.cs lên CareData (theo lô)
     updates.forEach(function(u){ if (typeof queueCareSync === 'function') queueCareSync(u.phone); });
   }
@@ -8555,7 +8593,7 @@ function _applyCareCSToAssigned(entries){
 }
 
 function wasEverAssigned(phone) {
-  return assignHistory.some(h => h.phones.includes(phone));
+  return _everAssignedSet().has(phone);   // O(1) — truoc day quet toan bo lich su chia cho TUNG SDT (O(N^2) khi goi trong vong lap)
 }
 
 function renderAssignHistory() {
@@ -8582,7 +8620,7 @@ function renderAssignHistory() {
       </div>
       <div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:4px">
         ${h.phones.slice(0,8).map(p => {
-          const c = allCustomers.find(x => x.phone === p);
+          const c = _assignCustMap().get(p);
           const isDone = h.donePhones && h.donePhones.includes(p);
           return `<span style="font-size:10px;padding:1px 7px;border-radius:20px;background:${isDone?'var(--green-bg)':'var(--surface2)'};color:${isDone?'var(--green)':'var(--muted)'};border:1px solid ${isDone?'rgba(26,107,69,.2)':'var(--border)'}">
             ${isDone?'✓ ':''} ${c ? esc(c.name) : p}
@@ -8650,7 +8688,7 @@ function renderAssignReport() {
   const custByPhone = new Map();
   for (const h of batches) {
     for (const p of h.phones) {
-      const c = allCustomers.find(x=>x.phone===p);
+      const c = _assignCustMap().get(p);
       if (_rptFilters.tier.size && !(c && _rptFilters.tier.has(c.tier))) continue;
       if (_rptFilters.careStatus.size && !(c && _rptFilters.careStatus.has(c.careStatus||''))) continue;
       if (_rptFilters.khStatus.size && !(c && _rptFilters.khStatus.has(c.khStatus||''))) continue;
@@ -8696,7 +8734,7 @@ function renderAssignReport() {
   const totalKH   = new Set(phoneRows.map(r=>r.phone)).size;
   const totalDone = new Set(phoneRows.filter(r=>r.isDone).map(r=>r.phone)).size;
   const totalChot = new Set(phoneRows.filter(r=>r.careStatus==='Chốt').map(r=>r.phone)).size;
-  const neverAssigned = allCustomers.filter(c=>!wasEverAssigned(c.phone)).length;
+  const neverAssigned = allCustomers.filter(c=>!wasEverAssigned(c.phone)).length;   // wasEverAssigned gio la O(1)
   const totalBatches  = batches.length;
 
   // Build pivot data
@@ -9145,8 +9183,9 @@ function updateMyDataBadge() {
   // Count total undone across all batches
   const allActive = new Set();
   for (const h of assignHistory) {
+    const _doneSet = new Set(h.donePhones || []);   // Set thay vi includes() trong vong lap (O(N^2))
     for (const p of h.phones) {
-      if (!(h.donePhones||[]).includes(p)) allActive.add(p);
+      if (!_doneSet.has(p)) allActive.add(p);
     }
   }
   txt('tb-mydata', fmt(allActive.size));
@@ -9649,7 +9688,7 @@ function _inUserScope(c){
 var _careQueue = new Set();
 var _careWriting = new Set();
 var _careTimer = null;
-function _careRow(phone){
+function _careRow(phone, schedByPhone){
   var care = (typeof careData !== 'undefined' && careData[phone]) || {};
   // CHI dong bo len Sheet cac lich: (1) CS tu tao tay (khong phai auto), HOAC (2) auto nhung DA
   // duoc tac dong (bam Xong/xoa). Lich auto CHUA tac dong la SO LIEU TAM TINH LAI moi lan tai
@@ -9657,8 +9696,9 @@ function _careRow(phone){
   // ky dong bo nao khac cua khach nay (vi ly do hoan toan khong lien quan) se vo tinh ghi de/hoi
   // sinh lai dung lich auto ma Duyen vua xoa tay truc tiep tren CareData Sheet — dung cung dieu
   // kien voi _hasRealCareData() ben tren de 2 cho nhat quan voi nhau.
-  var myScheds = (typeof schedules !== 'undefined' ? schedules : []).filter(function(x){
-    return x.phone === phone && (!x.autoDao || x.done);
+  var _srcScheds = schedByPhone ? (schedByPhone[phone] || []) : (typeof schedules !== 'undefined' ? schedules : []).filter(function(x){ return x.phone === phone; });
+  var myScheds = _srcScheds.filter(function(x){
+    return (!x.autoDao || x.done);
   });
   return {
     phone: phone,
@@ -9721,23 +9761,30 @@ async function flushCareSync(){
   _careQueue.clear();
   // Vẫn "bảo vệ" các SĐT này khỏi bị pull đè cho tới khi GS ghi xong (tránh webapp quay về dữ liệu cũ)
   phones.forEach(function(p){ _careWriting.add(p); });
-  var rows = phones.map(_careRow);
-  try {
-    var r = await fetch(gsUrl, { method:'POST', redirect:'follow',
-      body: JSON.stringify({ action:'saveBatch', rows: rows }) });
-    var txtResp = await r.text();
-    var ok = false;
-    try { ok = !!JSON.parse(txtResp).ok; } catch(e){ ok = false; }
-    if (!ok) throw new Error('saveBatch not supported');
-  } catch(e){
-    // GAS cũ (v4) chưa có saveBatch → fallback: lưu từng phone bằng saveSingle
-    for (var i=0;i<phones.length;i++){
-      try { await pushCareToGS(phones[i]); } catch(_){}
+  // Gom lich theo SDT 1 lan (truoc day _careRow quet toan bo lich cho TUNG SDT => O(SDT x lich), treo may khi chia nhieu KH)
+  var schedByPhone = {};
+  (typeof schedules !== 'undefined' ? schedules : []).forEach(function(x){ (schedByPhone[x.phone] = schedByPhone[x.phone] || []).push(x); });
+  var rows = phones.map(function(p){ return _careRow(p, schedByPhone); });
+  // Gui THEO LO 1000 dong/request (truoc day 1 request khong lo; loi 1 lan la roi vao fallback saveSingle tung SDT = hang chuc nghin request)
+  var CHUNK = 1000;
+  for (var ci = 0; ci < rows.length; ci += CHUNK) {
+    var chunkRows = rows.slice(ci, ci + CHUNK), chunkPhones = phones.slice(ci, ci + CHUNK);
+    try {
+      var r = await fetch(gsUrl, { method:'POST', redirect:'follow',
+        body: JSON.stringify({ action:'saveBatch', rows: chunkRows }) });
+      var txtResp = await r.text();
+      var ok = false;
+      try { ok = !!JSON.parse(txtResp).ok; } catch(e){ ok = false; }
+      if (!ok) throw new Error('saveBatch not supported');
+    } catch(e){
+      // GAS cũ (v4) chưa có saveBatch → fallback: lưu từng phone bằng saveSingle (chỉ cho lô bị lỗi)
+      for (var i=0;i<chunkPhones.length;i++){
+        try { await pushCareToGS(chunkPhones[i]); } catch(_){}
+      }
     }
-  } finally {
-    // Giữ bảo vệ thêm 1 nhịp auto-sync để GSheets kịp ghi & đọc lại đúng (read-after-write)
-    setTimeout(function(){ phones.forEach(function(p){ _careWriting.delete(p); }); }, AUTO_SYNC_MS + 1500);
   }
+  // Giữ bảo vệ thêm 1 nhịp auto-sync để GSheets kịp ghi & đọc lại đúng (read-after-write)
+  setTimeout(function(){ phones.forEach(function(p){ _careWriting.delete(p); }); }, AUTO_SYNC_MS + 1500);
 }
 
 // ═══════════════════════════════════════════════════════
