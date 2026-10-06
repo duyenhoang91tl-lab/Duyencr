@@ -2716,26 +2716,9 @@ function updateGsPill(connected) {
 // ═══════════════════════════════════════════════════════
 //  GS SYNC
 // ═══════════════════════════════════════════════════════
-// ── BO NHO DEM CUA VONG DONG BO NEN (moi 3s) ────────────────────────────────────────────────────
-// NGUYEN NHAN LAG (da sua): moi nhip 3s truoc day LUON parse lai toan bo CareData, duyet het, roi goi
-// saveLS('ome_care'/'ome_sched'/'ome_schedules'). saveLS bi boc o cuoi file de goi _invalidateFilterCache()
-// => MOI 3 GIAY cache bo loc bi xoa va applyFilters loc + sap xep lai ~136k KH, cong them
-// rebuildCareOnCustomers + ~16 lan filter trong updateStats/updateSidebarBadges. Nay: neu text tra ve giong het
-// nhip truoc (khong ai sua gi) thi KHONG parse/ghi/ve lai. Don hang / dữ liệu đơn / CSKH-Duyên cung chi xu ly lai khi
-// noi dung doi; CSKH-Duyên (hang chuc MB) chi keo lai moi 10 phut hoac khi bam Sync thu cong.
-function _isEmptyObj(o){ for (const k in o) return false; return true; }   // O(1) — Object.keys(customerMap) liet ke ~136k khoa moi 3s chi de kiem tra rong
-let _lastCareText = null, _lastOrdersText = null, _lastDonText = null, _lastCkText = null;
-let _cskhPulledAt = 0, _assignPulledAt = 0;
-async function _pullAssignAndBroadcastThrottled(force) {
-  // pullAssignHistory keo TOAN BO AssignData (kem mang SDT cua moi dot chia, co the hang MB) — khong keo moi 3s
-  if (!force && (Date.now() - _assignPulledAt) < 15000) return;
-  _assignPulledAt = Date.now();
-  await pullAssignHistory();
-  if (typeof pullBroadcastHistory === 'function') pullBroadcastHistory().catch(() => {});
-}
 async function syncFromGS(opts) {
   opts = opts || {};
-  const pullOrders = opts.pullOrders !== undefined ? opts.pullOrders : _isEmptyObj(customerMap);
+  const pullOrders = opts.pullOrders !== undefined ? opts.pullOrders : (Object.keys(customerMap).length === 0);
   const isManual = !!opts.manual;
   if (!gsUrl) { if (isManual) toast('Chưa kết nối Google Sheets'); return; }
   if (isManual) { txt('ltext', 'Đang tải từ Google Sheets...'); show('loverlay'); }
@@ -2746,9 +2729,8 @@ async function syncFromGS(opts) {
     const careUrl = gsUrl + sepChar + 'action=customers';
     const careR = await fetch(careUrl, { redirect: 'follow' });
     const careText = await careR.text();
-    const _careSame = (careText === _lastCareText);   // khong ai sua CareData tu nhip truoc
     let d;
-    try { d = _careSame ? {} : JSON.parse(careText); } catch(e) {
+    try { d = JSON.parse(careText); } catch(e) {
       if (isManual) { hide('loverlay'); toast('GAS trả về không phải JSON — kiểm tra quyền triển khai: Anyone'); }
       else { console.warn('Auto-sync: GAS non-JSON'); _autoSyncFailCount = (_autoSyncFailCount||0)+1; if (_autoSyncFailCount>=3) showSyncErrorBanner(); }
       return;
@@ -2771,10 +2753,7 @@ async function syncFromGS(opts) {
       try {
         if (isManual) txt('ltext', 'Đang tải đơn hàng từ Google Sheets...');
         const ordR = await fetch(gsUrl + sepChar + 'action=orders', { redirect: 'follow' });
-        const ordText = await ordR.text();
-        // Chi coi la "khong doi" khi da co khach trong customerMap (sau khi bam xoa du lieu phai nap lai that su)
-        const _ordSame = (ordText === _lastOrdersText) && !_isEmptyObj(customerMap);
-        const ordJson = _ordSame ? { _same: true } : JSON.parse(ordText);
+        const ordJson = await ordR.json();
         if (ordJson && ordJson.errorCount) {
           // Backend doc duoc mot phan don (da bo qua cac dong loi de khong crash toan bo) —
           // PHAI canh bao ro, khong duoc coi so don/KH doc duoc la day du roi am tham rebuild
@@ -2796,7 +2775,6 @@ async function syncFromGS(opts) {
             // (mỗi 3s / mỗi lần mở app) nên trước đây chip này bị lặp lại nhiều lần trên thanh file.
             mergeRows(rows);
             orderCount = rows.length;
-            _lastOrdersText = ordText;
           }
         } else if (ordJson && ordJson.error) {
           console.warn('Orders sync error from GAS:', ordJson.error);
@@ -2825,9 +2803,7 @@ async function syncFromGS(opts) {
       // ── Tập SĐT có trong "dữ liệu đơn" (chỉ để lọc nguồn, không kéo chi tiết) ──
       try {
         const dpR = await fetch(gsUrl + sepChar + 'action=donPhones', { redirect: 'follow' });
-        const dpText = await dpR.text();
-        const dpJson = JSON.parse(dpText);
-        if (dpText !== _lastDonText) { _lastDonText = dpText; _forceFullBuildFromCareLeads = true; }   // dữ liệu đơn doi -> phai build lai (nguon/hang KH)
+        const dpJson = await dpR.json();
         if (dpJson && dpJson.phones) { donPhoneSet = new Set(dpJson.phones); saveLS('ome_don_phones', dpJson.phones); }
         if (dpJson && dpJson.saleByPhone) { donSaleByPhone = dpJson.saleByPhone; saveLS('ome_don_sale_by_phone', dpJson.saleByPhone); }
         if (dpJson && dpJson.lastDateByPhone) { donLastDateByPhone = dpJson.lastDateByPhone; saveLS('ome_don_last_date', dpJson.lastDateByPhone); }
@@ -2839,26 +2815,21 @@ async function syncFromGS(opts) {
       // lên tới ~134k dòng (payload nhiều chục MB + localStorage + duyệt lại mỗi 30s). Chi tiết
       // đầy đủ 1 khách chỉ kéo riêng, LƯỜI (lazy) khi CS thực sự mở hồ sơ khách đó — xem
       // _loadCskhDetailForPhone_ ở renderInfoTab.
-      // CSKH-Duyên gần như khong doi: chi keo lai o lan dau, moi 10 phut, hoac khi bam Sync thu cong
-      if (!_cskhPulledAt || isManual || (Date.now() - _cskhPulledAt) > 600000) try {
+      try {
         const ckR = await fetch(gsUrl + sepChar + 'action=cskhDuyenLite', { redirect: 'follow' });
-        const ckText = await ckR.text();
-        const ckSame = (ckText === _lastCkText);
-        const ckJson = ckSame ? null : JSON.parse(ckText);
-        if (ckSame) { _cskhPulledAt = Date.now(); }
-        else if (ckJson && ckJson.ok) {
-          _lastCkText = ckText; _cskhPulledAt = Date.now(); _forceFullBuildFromCareLeads = true;
+        const ckJson = await ckR.json();
+        if (ckJson && ckJson.ok) {
           const newCk = {};
           (ckJson.rows || []).forEach(function(r){ // r = [phone, name, tier]
             const ph = (typeof normPhone === 'function' ? normPhone(r[0]) : null) || String(r[0] || '');
             if (!ph) return;
             (newCk[ph] = newCk[ph] || []).push({ name: r[1] || '', tier: r[2] || '' }); // MANG cac dong nhe {name,tier}: buildCustomers va _renderCskhBlock_ doc cskhData[ph] nhu MANG dong
           });
+          const known = new Set(allCustomers.map(c => c.phone));
+          for (const ph in newCk) { if (!known.has(ph)) { _forceFullBuildFromCareLeads = true; break; } }
           cskhData = newCk;
           cskhMeta = { found: !!ckJson.found, total: ckJson.total || 0, noPhone: ckJson.noPhone || 0, noPhoneSample: ckJson.noPhoneSample || [] };
-          // Kho ~134k SDT vuot han muc localStorage (~5MB) va stringify mat hang tram ms: chi luu cache neu nho; con lai se keo lai khi mo trang
-          if (Object.keys(newCk).length <= 20000) saveLS('ome_cskh_duyen', cskhData); else { try { localStorage.removeItem('ome_cskh_duyen'); } catch(e){} }
-          saveLS('ome_cskh_duyen_meta', cskhMeta);
+          saveLS('ome_cskh_duyen', cskhData); saveLS('ome_cskh_duyen_meta', cskhMeta);
         }
       } catch(ckErr) { console.warn('cskhDuyenLite fetch error:', ckErr.message); }
     }
@@ -2881,7 +2852,7 @@ async function syncFromGS(opts) {
       if (clJson && clJson.rows) {
         const newLeads = {};
         clJson.rows.forEach(function(r){ if (r.phone) newLeads[r.phone] = { name: r.name||'', note: r.note||'', cs: r.cs||'', createdAt: r.createdAt||'' }; });
-        const knownPhones = _assignCustMap();   // Map cache, khong dung lai Set 136k phan tu moi 3s
+        const knownPhones = new Set(allCustomers.map(c => c.phone));
         for (const ph in newLeads) {
           if (!knownPhones.has(ph)) { _forceFullBuildFromCareLeads = true; break; }
         }
@@ -2890,15 +2861,8 @@ async function syncFromGS(opts) {
       }
     } catch(clErr) { console.warn('careLeads fetch error:', clErr.message); }
 
-    // Khong co gi moi o CareData / don hang / nguon khac -> bo qua toan bo phan parse + ghi localStorage + ve lai ben duoi
-    if (_careSame && !pullOrders && !isManual && !_forceFullBuildFromCareLeads) {
-      await _pullAssignAndBroadcastThrottled(false);
-      return;
-    }
     let count = 0;
     let _dpPhoneChanged = false; // true nếu KH đang mở trong panel chi tiết vừa có dữ liệu mới (vd: từ Zalo AI extension)
-    // Lich hen: gom 1 lan roi loc/them 1 lan (truoc day schedules.filter(...) cho TUNG dong CareData => O(dong x lich))
-    const _schedDrop = new Set(), _schedNew = new Map();
     for (const row of (d.rows || [])) {
       if (!row.phone) continue;
       // Normalize phone từ GS (tránh mất số 0 đầu do Excel/GSheets lưu kiểu số)
@@ -2928,19 +2892,16 @@ async function syncFromGS(opts) {
         try {
           const sc = row.schedules ? JSON.parse(row.schedules) : [];
           // Thay vì chỉ cộng dồn (khiến lịch đã xoá trên Sheet không bao giờ mất khỏi app),
-          // xoá hết lịch cũ của khách này rồi nạp đúng danh sách hiện có từ Sheet (dong cuoi cung cua cung SDT thang).
-          _schedDrop.add(_normPh); _schedDrop.add(_ph2);
-          _schedNew.set(_normPh, sc);
+          // xoá hết lịch cũ của khách này rồi nạp đúng danh sách hiện có từ Sheet.
+          schedules = schedules.filter(s => s.phone !== _normPh && s.phone !== _ph2);
+          for (const it of sc) schedules.push(it);
         } catch(e){}
       }
       count++;
     }
-    if (_schedDrop.size) {
-      schedules = schedules.filter(s => !_schedDrop.has(s.phone));
-      _schedNew.forEach(sc => { for (const it of sc) schedules.push(it); });
-    }
     saveLS('ome_care', careData);
-    if (_schedDrop.size) { saveLS('ome_sched', schedules); saveLS('ome_schedules', schedules); }
+    saveLS('ome_sched', schedules);
+    saveLS('ome_schedules', schedules);
     // Pull cấu hình tình trạng CS (nếu admin đã đồng bộ lên GSheets)
     if (d.careStatus && Array.isArray(d.careStatus) && d.careStatus.length) {
       _applyCareStatusFromGS(d.careStatus);
@@ -2954,13 +2915,13 @@ async function syncFromGS(opts) {
     }
 
     // Pull chiến dịch (sheet AssignData) — robust, tách riêng để luôn chạy dù order lớn
-    await _pullAssignAndBroadcastThrottled(isManual || pullOrders);
+    await pullAssignHistory();
+    if (typeof pullBroadcastHistory === 'function') pullBroadcastHistory().catch(() => {});
 
     applyFilters();
     updateStats();
     updateSidebarBadges();
     updateSchedBadges();
-    _lastCareText = careText;   // da xu ly xong ban nay — nhip sau neu giong het thi bo qua (xem dau ham)
     if (_dpPhoneChanged) _maybeRefreshOpenDp();
     if (isManual) {
       hide('loverlay');
@@ -3329,10 +3290,6 @@ function buildCustomers() {
     const _lpIso = (typeof donLastDateByPhone !== 'undefined' && donLastDateByPhone) ? donLastDateByPhone[c.phone] : '';
     const _lpM = _lpIso ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(_lpIso) : null;
     const lastPosDate = _lpM ? new Date(+_lpM[1], +_lpM[2]-1, +_lpM[3]).getTime() : null;
-    // Ten cua khach o nguon CSKH-Duyen (neu khac ten dang hien thi) — de o tim kiem khop duoc ca ten nay. Chi tao khi co, tranh ton bo nho cho ~134k KH.
-    let cskhNameLower = '';
-    { const _ckR = (typeof cskhData !== 'undefined' && cskhData) ? cskhData[c.phone] : null;
-      if (_ckR) { const _dn = s(displayName).toLowerCase(); const _ex = _ckR.map(r => s(r.name).toLowerCase()).filter(n => n && n !== _dn); if (_ex.length) cskhNameLower = _ex.join('|'); } }
 
     return {
       ...c,
@@ -3360,7 +3317,6 @@ function buildCustomers() {
       ymList,
       dataSrc,
       nameLower: s(displayName).toLowerCase(),
-      cskhNameLower,
     };
   });
   // Compute _lastActionDate for each customer from careData + schedules done
@@ -3557,7 +3513,7 @@ function applyFilters() {
       });
       if (!_matchAnyCS) return false;
     }
-    if (q && !c.nameLower.includes(q) && !c.phone.includes(q) && !(c.cskhNameLower && c.cskhNameLower.includes(q))) return false;
+    if (q && !c.nameLower.includes(q) && !c.phone.includes(q)) return false;
 
     // Lọc theo nguồn dữ liệu (DT tổng / Chăm sóc / Dữ liệu đơn / Chia data) — mặc định "Gộp" = không lọc
     if (dataSrcF !== 'all') {
@@ -6683,7 +6639,7 @@ function exportCSV() {
       if (((c.custom && c.custom[_exCfId]) || '') !== currentCF[_exCfId]) return false;
     }
     if(csFList.length){const cs=_buildCsSet_(c.orders, c.phone);const _aH=(typeof _assignAllIndex!=='undefined')?_assignAllIndex[c.phone]:null;const _match=csFList.some(csF=>_csModeMatch(cs.has(csF), !!(c.careCSSet&&c.careCSSet.has(csF)), _aH?_aH.has(csF):false));if(!_match) return false;}
-    if(q&&!c.name.toLowerCase().includes(q)&&!c.phone.includes(q)&&!(c.cskhNameLower&&c.cskhNameLower.includes(q))) return false;
+    if(q&&!c.name.toLowerCase().includes(q)&&!c.phone.includes(q)) return false;
     return true;
   });
   const BOM='\uFEFF';
@@ -7821,7 +7777,7 @@ async function autoSyncLoop() {
     // "Sync GS" thủ công. Giờ cứ ~10 lần lặp (~30s ở AUTO_SYNC_MS=3000) thì ép kéo lại đầy đủ luôn,
     // không chỉ CareData (trạng thái/ghi chú/hẹn — vốn đã tự cập nhật nhanh mỗi 3s như trước).
     const forceFullPull = (_autoSyncTick % 10 === 0);
-    await syncFromGS({ pullOrders: _isEmptyObj(customerMap) || forceFullPull });
+    await syncFromGS({ pullOrders: Object.keys(customerMap).length === 0 || forceFullPull });
   } catch(e) {
     // BUG (đã sửa): trước đây catch này ghi "// Silent" — MỌI lỗi JS thật xảy ra trong
     // syncFromGS() sau khi fetch đã thành công (vd throw trong buildCustomers()/mergeRows()
@@ -8588,9 +8544,7 @@ function doAssignDataAdvanced() {
   if (typeof _rebuildAssignIndex === 'function') _rebuildAssignIndex();
   try { _applyCareCSToAssigned(entries); } catch(e){ console.warn('applyCareCSToAssigned lỗi:', e); }   // chia data → cập nhật "CS chăm sóc" + ghi OrderData cột N
   entries.forEach(e => logAudit('assign', '', '', `Chia ${e.phones.length} KH → ${e.csName}`));
-  // Chi day CAC DOT MOI (saveAssign tung dot) — truoc day pushAssignHistToGS() ghi de TOAN BO lich su (kem mang SDT cua moi dot)
-  // len sheet moi lan chia: body hang MB va backend clearContents() truoc khi ghi nen loi giua chung la mat lich su tren Sheet.
-  try { if (gsUrl) (async function(){ for (const _e of entries) { await pushAssignToGS(_e); } })(); } catch(e){ console.warn('pushAssignToGS lỗi:', e); }
+  try { if (gsUrl) pushAssignHistToGS(); } catch(e){ console.warn('pushAssignHistToGS lỗi:', e); }  // ghi toàn bộ lịch sử lên sheet (vết bền vững)
 
   const summary = entries.map(e=>`${e.csName}: ${e.phones.length} KH`).join(', ');
   toast(`✓ Đã chia ${cursor} KH → ${summary}`);
@@ -12950,7 +12904,9 @@ var _srState = {
   // G da doi thanh "Chuong trinh thuong Thu viec / Chinh thuc" (2026-10-04): dung nguon don Pos nhu E
   gSaleCustomized: false, gBonusExpanded: '',
   // H — Tong quan data da chia (client-only: assignHistory + careData; so don/doanh thu nhap tay)
-  hDateFrom: '', hDateTo: '', hDateQuick: 'today', hTeam: '', hCs: '', hGroup: 'dayCs'
+  hDateFrom: '', hDateTo: '', hDateQuick: 'today', hTeam: '', hCs: '', hGroup: 'dayCs',
+  // I — Bao cao chia data Renew (CSKH-Duyen)
+  iDateFrom: '', iDateTo: '', iDateQuick: 'custom', iCs: '', iTeam: ''
 };
 // Bao cao F/H mac dinh 'Tháng này' nhung fDateFrom/fDateTo (hay hDateFrom/hDateTo) truoc day de
 // rong -> dropdown hien 'Tháng này' trong khi request khong co ngay nao => backend cong DON CA
@@ -13794,6 +13750,7 @@ function renderSalesReportTab(){
     '<button class="btn '+(_srState.sub==='F'?'secondary':'sm')+'" onclick="_srSetSub(\'F\')">Báo cáo F — KPI Sale</button>' +
     '<button class="btn '+(_srState.sub==='G'?'secondary':'sm')+'" onclick="_srSetSub(\'G\')">Báo cáo G — Thưởng thử việc / chính thức</button>' +
     '<button class="btn '+(_srState.sub==='H'?'secondary':'sm')+'" onclick="_srSetSub(\'H\')">Báo cáo H — Tổng quan data đã chia</button>' +
+    '<button class="btn '+(_srState.sub==='I'?'secondary':'sm')+'" onclick="_srSetSub(\'I\')">Báo cáo I — Chia data Renew</button>' +
     '</div>';
 
   if (_srState.sub === 'C') { renderSalesReportTabC_(wrap, subTabs); return; }
@@ -13802,6 +13759,7 @@ function renderSalesReportTab(){
   if (_srState.sub === 'F') { renderSalesReportTabF_(wrap, subTabs); return; }
   if (_srState.sub === 'G') { renderSalesReportTabG_(wrap, subTabs); return; }
   if (_srState.sub === 'H') { renderSalesReportTabH_(wrap, subTabs); return; }
+  if (_srState.sub === 'I') { renderSalesReportTabI_(wrap, subTabs); return; }
 
   var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
   filters += _quickRangeSelectHtml(_srState.dateQuick, "_srApplyQuickRange('dateQuick','dateFrom','dateTo',this.value)");
@@ -16044,6 +16002,243 @@ function renderSalesReportTabH_(wrap, subTabs){
   filters += '</div>';
   wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + filters + _srRenderH_(d);
 }
+function renderSalesReportTabI_(wrap, subTabs) {
+  // ═══ Báo cáo I — Chia data Renew (nguồn CSKH-Duyên) ═══
+  // KH được chia = assignHistory.phones ∩ cskhData (có trong sheet cskh-duyen)
+  // Metrics: # KH được chia, đã chăm, chốt đơn, DT; tỷ lệ theo CS / Phân loại / Tháng chia
+
+  var sel = 'padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)';
+  var from = _srState.iDateFrom || '', to = _srState.iDateTo || '';
+  var csF = _srState.iCs || '', teamF = _srState.iTeam || '';
+
+  // ── Build renew phone set (SDT có trong cskhData) ──
+  var renewPhones = new Set(typeof cskhData !== 'undefined' ? Object.keys(cskhData) : []);
+
+  // ── Flatten assign history → chỉ lấy phones thuộc Renew ──
+  var scope = _hScopeNames_();
+  var groups = _hGroups_(), gIdx = _hGroupIndex_(groups);
+  var teamNames = (teams||[]).map(function(t){ return t.name || '(chưa đặt tên)'; });
+
+  var csMap = {}; // cs -> { total:Set, done:Set, chot:Set, revenue, g:[], contact, zalo:{}, kh:{}, months:{} }
+  var monthSet = new Set();
+  (typeof assignHistory !== 'undefined' ? assignHistory : []).forEach(function(e) {
+    var d = _hEntryDate_(e.date); if (!d) return;
+    if (from && d < from) return;
+    if (to && d > to) return;
+    var cs = e.csName || '(chưa rõ)';
+    if (scope && scope.indexOf(cs) === -1) return;
+    if (csF && cs !== csF) return;
+    var tm = _teamOf(cs), tn = tm ? (tm.name || '(chưa đặt tên)') : 'Chưa có team';
+    if (teamF && tn !== teamF) return;
+    var mo = d.slice(0, 7); monthSet.add(mo);
+    (e.phones || []).forEach(function(p) {
+      if (!renewPhones.has(p)) return; // chỉ lấy KH Renew
+      var r = csMap[cs] || (csMap[cs] = {
+        cs: cs, team: tn, total: new Set(), done: new Set(), chot: new Set(),
+        revenue: 0, g: groups.map(function(){ return 0; }), other: 0, none: 0,
+        contact: {ok:0,kll:0,none:0}, zalo: {}, kh: {}, months: {}
+      });
+      r.total.add(p);
+      r.months[mo] = (r.months[mo] || new Set()); r.months[mo].add(p);
+      var c = (typeof careData !== 'undefined' && careData[p]) || {}, st = c.status || '';
+      if ((e.donePhones || []).indexOf(p) !== -1) r.done.add(p);
+      if (st === 'Chốt' || (c.khStatus || '') === 'Chốt') r.chot.add(p);
+      r.revenue += (c.revenue || 0);
+      if (!st) { r.none++; r.contact.none++; }
+      else {
+        var gi = gIdx[st];
+        if (gi === undefined) { r.other++; r.contact.ok++; }
+        else { r.g[gi]++; if (groups[gi].noContact) r.contact.kll++; else r.contact.ok++; }
+      }
+      var z = c.zalo || '(chưa rõ)'; r.zalo[z] = (r.zalo[z]||0)+1;
+      var k = c.khStatus || _hAutoKh_(st) || '(chưa có)'; r.kh[k] = (r.kh[k]||0)+1;
+    });
+  });
+
+  var rows = Object.values(csMap);
+  rows.sort(function(a,b){ return b.total.size - a.total.size; });
+
+  // ── KPI tổng ──
+  var allRenewAssigned = new Set(), allDone = new Set(), allChot = new Set(), totalRev = 0;
+  rows.forEach(function(r){
+    r.total.forEach(function(p){ allRenewAssigned.add(p); });
+    r.done.forEach(function(p){ allDone.add(p); });
+    r.chot.forEach(function(p){ allChot.add(p); });
+    totalRev += r.revenue;
+  });
+  var totalRenew = renewPhones.size;
+  var totalAssigned = allRenewAssigned.size;
+  var neverAssigned = Math.max(0, totalRenew - totalAssigned);
+  var pctAssigned = totalRenew ? Math.round(totalAssigned/totalRenew*100) : 0;
+  var pctDone = totalAssigned ? Math.round(allDone.size/totalAssigned*100) : 0;
+  var pctChot = totalAssigned ? Math.round(allChot.size/totalAssigned*100) : 0;
+
+  var maxBar = rows.length ? rows[0].total.size : 1;
+  var months = Array.from(monthSet).sort();
+
+  // ── Pivot: tier ──
+  var tierMap = {}, tierKeys = ['VIP','Thân thiết','Tiềm năng','Chưa bán lại được'];
+  allRenewAssigned.forEach(function(p){
+    var c = (typeof allCustomers !== 'undefined' ? allCustomers : []).find(function(x){ return x.phone===p; });
+    var t = (c&&c.tier)||'—';
+    tierMap[t] = (tierMap[t]||{total:0,done:0,chot:0});
+    tierMap[t].total++;
+    if (allDone.has(p)) tierMap[t].done++;
+    if (allChot.has(p)) tierMap[t].chot++;
+  });
+
+  // ── Filters UI ──
+  var isAdminOrLeader = _srIsAdmin() || (currentUser && currentUser.role === 'leader');
+  var allCSNames = Array.from(new Set((typeof assignHistory!=='undefined'?assignHistory:[]).map(function(h){return h.csName;}))).sort();
+  var filtersHtml = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
+  filtersHtml += _quickRangeSelectHtml(_srState.iDateQuick||'', "_srApplyQuickRange('iDateQuick','iDateFrom','iDateTo',this.value)");
+  filtersHtml += '<input type="date" value="'+esc(from)+'" onchange="_srSetField(\'iDateFrom\',this.value);_srState.iDateQuick=\'custom\';renderSalesReportTab()" title="Từ ngày" style="'+sel+'">';
+  filtersHtml += '<span style="color:var(--muted)">→</span>';
+  filtersHtml += '<input type="date" value="'+esc(to)+'" onchange="_srSetField(\'iDateTo\',this.value);_srState.iDateQuick=\'custom\';renderSalesReportTab()" title="Đến ngày" style="'+sel+'">';
+  if (isAdminOrLeader) {
+    filtersHtml += '<select onchange="_srState.iTeam=this.value;renderSalesReportTab()" style="'+sel+'"><option value="">Tất cả team</option>'+
+      teamNames.map(function(n){ return '<option value="'+esc(n)+'"'+(teamF===n?' selected':'')+'>'+esc(n)+'</option>'; }).join('')+'</select>';
+    filtersHtml += '<select onchange="_srState.iCs=this.value;renderSalesReportTab()" style="'+sel+'"><option value="">Tất cả CS</option>'+
+      allCSNames.map(function(n){ return '<option value="'+esc(n)+'"'+(csF===n?' selected':'')+'>'+esc(n)+'</option>'; }).join('')+'</select>';
+  }
+  filtersHtml += '<button class="btn sm" onclick="exportRenewReport_()">⬇️ Xuất CSV</button>';
+  filtersHtml += '</div>';
+
+  // ── KPI cards ──
+  var kpiHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:8px;margin-bottom:16px">';
+  var kpis = [
+    ['🗂️',totalRenew,'Tổng KH Renew','var(--text)',''],
+    ['📤',totalAssigned,'Đã được chia','var(--blue)',pctAssigned+'% tổng Renew'],
+    ['⬜',neverAssigned,'Chưa chia lần nào','var(--hint)',''],
+    ['✅',allDone.size,'Đã chăm xong','var(--green)',pctDone+'% đã chia'],
+    ['🎯',allChot.size,'Đã chốt','#059669',pctChot+'% đã chia'],
+  ];
+  kpis.forEach(function(k){
+    kpiHtml += '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--rsm);padding:10px 12px">' +
+      '<div style="font-size:20px;font-weight:800;color:'+k[3]+';line-height:1">'+fmt(k[1])+'</div>' +
+      '<div style="font-size:10px;color:var(--muted);margin-top:3px">'+k[0]+' '+esc(k[2])+'</div>' +
+      (k[4]?'<div style="font-size:9px;color:var(--hint);margin-top:1px">'+esc(k[4])+'</div>':'') +
+      '</div>';
+  });
+  kpiHtml += '</div>';
+
+  // ── Bar chart theo CS ──
+  var barHtml = '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--rsm);padding:12px 14px;margin-bottom:14px">';
+  barHtml += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--hint);margin-bottom:12px">📊 KH Renew được chia & kết quả theo CS</div>';
+  if (rows.length === 0) barHtml += '<div style="font-size:12px;color:var(--hint);padding:8px 0">Không có data</div>';
+  rows.forEach(function(r){
+    var tot=r.total.size, don=r.done.size, cho=r.chot.size;
+    var pD=tot?Math.round(don/tot*100):0, pC=tot?Math.round(cho/tot*100):0;
+    barHtml += '<div style="margin-bottom:11px">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">' +
+        '<span style="font-size:12px;font-weight:600">'+esc(r.cs)+'</span>' +
+        '<span style="font-size:11px;color:var(--muted)">'+tot+' KH &nbsp;|&nbsp; <span style="color:var(--green)">✓'+don+' ('+pD+'%)</span> &nbsp;|&nbsp; <span style="color:#059669">🎯'+cho+' ('+pC+'%)</span></span>' +
+      '</div>' +
+      '<div style="position:relative;height:14px;background:var(--surface3);border-radius:4px;overflow:hidden">' +
+        '<div style="position:absolute;top:0;left:0;height:100%;width:'+(tot/maxBar*100)+'%;background:#e0e7ff;border-radius:4px"></div>' +
+        '<div style="position:absolute;top:0;left:0;height:100%;width:'+(tot?don/tot*100:0)+'%;background:var(--green-mid);opacity:.55;border-radius:4px"></div>' +
+        '<div style="position:absolute;top:0;left:0;height:100%;width:'+(tot?cho/tot*100:0)+'%;background:#059669;border-radius:4px"></div>' +
+      '</div>' +
+      '<div style="display:flex;gap:10px;margin-top:2px;font-size:9px;color:var(--hint)"><span style="color:#818cf8">■ Tổng</span><span style="color:var(--green)">■ Đã xong</span><span style="color:#059669">■ Chốt</span></div>' +
+    '</div>';
+  });
+  barHtml += '</div>';
+
+  // ── Tỷ lệ theo Phân loại KH ──
+  var tierHtml = '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--rsm);padding:12px 14px;margin-bottom:14px">';
+  tierHtml += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--hint);margin-bottom:10px">🏅 Phân tích theo Phân loại KH Renew</div>';
+  tierHtml += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px">';
+  var tierColors = {VIP:'#7c3aed','Thân thiết':'#0891b2','Tiềm năng':'#059669','Chưa bán lại được':'var(--muted)'};
+  (tierKeys.concat(Object.keys(tierMap).filter(function(t){ return tierKeys.indexOf(t)===-1; }))).forEach(function(t){
+    var d = tierMap[t]; if (!d) return;
+    var pD2 = d.total ? Math.round(d.done/d.total*100):0;
+    var pC2 = d.total ? Math.round(d.chot/d.total*100):0;
+    var pT = totalAssigned ? Math.round(d.total/totalAssigned*100):0;
+    tierHtml += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rsm);padding:10px 12px">' +
+      '<div style="font-size:11px;font-weight:700;color:'+(tierColors[t]||'var(--text)')+';margin-bottom:6px">'+esc(t)+'</div>' +
+      '<div style="font-size:18px;font-weight:800;line-height:1">'+fmt(d.total)+'</div>' +
+      '<div style="font-size:10px;color:var(--muted);margin-top:2px">'+pT+'% tổng đã chia</div>' +
+      '<div style="margin-top:6px;height:4px;background:var(--surface3);border-radius:2px;overflow:hidden"><div style="height:100%;width:'+pD2+'%;background:var(--green)"></div></div>' +
+      '<div style="font-size:9px;color:var(--hint);margin-top:2px">Đã xong: '+d.done+' ('+pD2+'%) &nbsp;|&nbsp; Chốt: '+d.chot+' ('+pC2+'%)</div>' +
+    '</div>';
+  });
+  tierHtml += '</div></div>';
+
+  // ── Bảng chi tiết theo CS × Tháng ──
+  var tableHtml = '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--rsm);padding:12px 14px;margin-bottom:14px">';
+  tableHtml += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--hint);margin-bottom:10px">📋 Chi tiết CS × Tháng chia</div>';
+  tableHtml += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>CS</th><th>Team</th>';
+  months.forEach(function(m){ tableHtml += '<th style="text-align:right">'+esc(m)+'</th>'; });
+  tableHtml += '<th style="text-align:right">Tổng KH</th><th style="text-align:right">Đã xong</th><th style="text-align:right">Chốt</th><th style="text-align:right">% Xong</th><th style="text-align:right">% Chốt</th></tr></thead><tbody>';
+  rows.forEach(function(r, ri){
+    var tot=r.total.size, don=r.done.size, cho=r.chot.size;
+    tableHtml += '<tr style="border-bottom:1px solid var(--border);'+(ri%2===1?'background:var(--surface2)':'background:var(--surface)')+'">' +
+      '<td style="font-weight:500;white-space:nowrap">'+esc(r.cs)+'</td>' +
+      '<td style="font-size:11px;color:var(--muted)">'+esc(r.team)+'</td>';
+    months.forEach(function(m){
+      var n = r.months[m] ? r.months[m].size : 0;
+      tableHtml += '<td style="text-align:right">'+(n?fmt(n):'<span style="color:var(--hint)">—</span>')+'</td>';
+    });
+    tableHtml += '<td style="text-align:right;font-weight:700">'+fmt(tot)+'</td>' +
+      '<td style="text-align:right;color:var(--green)">'+fmt(don)+'</td>' +
+      '<td style="text-align:right;color:#059669">'+fmt(cho)+'</td>' +
+      '<td style="text-align:right">'+(tot?Math.round(don/tot*100):0)+'%</td>' +
+      '<td style="text-align:right">'+(tot?Math.round(cho/tot*100):0)+'%</td>' +
+    '</tr>';
+  });
+  // Tổng footer
+  tableHtml += '<tr style="font-weight:700;border-top:2px solid var(--border-md);background:var(--surface3)"><td colspan="2">Tổng cộng</td>';
+  months.forEach(function(m){
+    var n = 0; rows.forEach(function(r){ n += r.months[m] ? r.months[m].size : 0; });
+    tableHtml += '<td style="text-align:right">'+fmt(n)+'</td>';
+  });
+  tableHtml += '<td style="text-align:right;color:var(--green)">'+fmt(totalAssigned)+'</td>' +
+    '<td style="text-align:right;color:var(--green)">'+fmt(allDone.size)+'</td>' +
+    '<td style="text-align:right;color:#059669">'+fmt(allChot.size)+'</td>' +
+    '<td style="text-align:right">'+(totalAssigned?Math.round(allDone.size/totalAssigned*100):0)+'%</td>' +
+    '<td style="text-align:right">'+(totalAssigned?Math.round(allChot.size/totalAssigned*100):0)+'%</td>' +
+  '</tr></tbody></table></div></div>';
+
+  wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' +
+    subTabs + filtersHtml + kpiHtml + barHtml + tierHtml + tableHtml;
+}
+
+function exportRenewReport_() {
+  // Export CSV báo cáo I
+  var from = _srState.iDateFrom||'', to = _srState.iDateTo||'', csF = _srState.iCs||'', teamF = _srState.iTeam||'';
+  var renewPhones = new Set(typeof cskhData!=='undefined' ? Object.keys(cskhData) : []);
+  var scope = _hScopeNames_(), groups = _hGroups_(), gIdx = _hGroupIndex_(groups);
+  var csMap = {};
+  (typeof assignHistory!=='undefined'?assignHistory:[]).forEach(function(e){
+    var d=_hEntryDate_(e.date); if(!d) return;
+    if(from&&d<from) return; if(to&&d>to) return;
+    var cs=e.csName||'(chưa rõ)';
+    if(scope&&scope.indexOf(cs)===-1) return;
+    if(csF&&cs!==csF) return;
+    var tm=_teamOf(cs), tn=tm?(tm.name||'(chưa đặt tên)'):'Chưa có team';
+    if(teamF&&tn!==teamF) return;
+    (e.phones||[]).forEach(function(p){
+      if(!renewPhones.has(p)) return;
+      var r=csMap[cs]||(csMap[cs]={cs:cs,team:tn,total:new Set(),done:new Set(),chot:new Set()});
+      r.total.add(p);
+      if((e.donePhones||[]).indexOf(p)!==-1) r.done.add(p);
+      var c=(typeof careData!=='undefined'&&careData[p])||{};
+      if(c.status==='Chốt'||(c.khStatus||'')==='Chốt') r.chot.add(p);
+    });
+  });
+  var q=function(v){ return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; };
+  var head=['CS','Team','Tổng KH Renew','Đã xong','Chốt','% Đã xong','% Chốt'];
+  var lines=[head.map(q).join(',')];
+  Object.values(csMap).forEach(function(r){
+    var tot=r.total.size,don=r.done.size,cho=r.chot.size;
+    lines.push([r.cs,r.team,tot,don,cho,tot?Math.round(don/tot*100)+'%':'0%',tot?Math.round(cho/tot*100)+'%':'0%'].map(q).join(','));
+  });
+  var blob=new Blob(['\ufeff'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='renew-report_'+(from||'')+'_'+(to||'')+'.csv';
+  document.body.appendChild(a); a.click(); setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},500);
+}
+
 function _hExportCsv_(){
   var d = _hBuild_(), g = d.groups, q = function(v){ return '"' + String(v==null?'':v).replace(/"/g,'""') + '"'; };
   var head = ['Team','Ngày','Tên CS','Data được chia'].concat(g.map(function(x){ return x.label; }), ['Chưa CS','Đã liên hệ','Không liên lạc được','Trạng thái Zalo','Trạng thái KH','Số đơn chốt','Doanh thu','TB/đơn']);
