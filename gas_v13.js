@@ -1198,6 +1198,12 @@ function doGet(e) {
     if (action === 'careLeads') return jsonOut_({ rows: readCareLeads_() });
     // ── Nguon "CSKH-Duyên" (sheet thu 3, cung file DT TONG) — CRM gop vao khach theo SDT, xem readCskhDuyen_ ──
     if (action === 'cskhDuyen') { var rowsCk = readCskhDuyen_(); return jsonOut_({ ok: true, found: rowsCk.found, rows: rowsCk.rows, total: rowsCk.total, noPhone: rowsCk.noPhone, noPhoneSample: rowsCk.noPhoneSample, cols: rowsCk.cols }); }
+    // Ban NHE cho FE keo hang loat (xem readCskhDuyenLite_) — FE da goi action nay tu truoc
+    // nhung backend truoc day CHUA CO handler, khien danh sach CSKH-Duyên khong len duoc tren CRM.
+    if (action === 'cskhDuyenLite') {
+      var liteCk = readCskhDuyenLite_();
+      return jsonOut_({ ok: true, found: liteCk.found, rows: liteCk.rows, total: liteCk.total, noPhone: liteCk.noPhone, noPhoneSample: liteCk.noPhoneSample });
+    }
     // ── Tap SDT co trong "dữ liệu đơn" — chi de loc nguon o man hinh chinh (cache 10') ──
     if (action === 'donPhones') {
       var cacheDP = CacheService.getScriptCache();
@@ -2193,6 +2199,14 @@ function _cskhCell_(v) {
   return String(v).replace(/\s+/g, ' ').trim();
 }
 // Tra ve { found, rows:[{phone,name,tier,...}], total, noPhone, noPhoneSample:[ten], cols:{truong:chi so cot} }
+//
+// CANH BAO HIEU NANG (van GIU lai ham nay vi action 'cskhDuyen' du khong con FE nao goi, nhung
+// de phong can cho debug/export sau nay): doc+parse FULL moi truong x TOAN BO dong sheet, voi
+// sheet toi ~134k dong ham nay RAT NANG (hang chuc MB) va cache _cacheGetBig_ gan nhu chac chan
+// THAT BAI AM THAM voi payload lon co nay (CacheService khong du suc chua), nghia la MOI LAN goi
+// deu doc+xu ly lai TU DAU. KHONG duoc goi ham nay cho cac thao tac THUONG XUYEN (vd tra cuu 1
+// khach) — xem findCskhRowsByPhone_ (dung index nhe hon nhieu) va readCskhDuyenLite_ (ban rut
+// gon 3 truong cho FE keo hang loat) ngay duoi day, day moi la 2 duong CHINH dang duoc dung.
 function readCskhDuyen_() {
   var cached = _cacheGetBig_('cskhDuyen_v1');
   if (cached) { try { return JSON.parse(cached); } catch (e) {} }
@@ -2223,10 +2237,103 @@ function readCskhDuyen_() {
   try { _cachePutBig_('cskhDuyen_v1', JSON.stringify(out), 300); } catch (e2) {}
   return out;
 }
+
+// ═══ FIX HIEU NANG (01/10/2026, Duyen bao CRM lag sau khi them sheet CSKH-Duyên len ~134k dong) ═══
+// Nguyen nhan chinh: findCskhRowsByPhone_ (ban CU) goi THANG readCskhDuyen_() — doc+parse FULL
+// 17 truong x TOAN BO ~134k dong MOI LAN tra cuu 1 SDT. Ham nay duoc goi tu action 'lookup',
+// von duoc goi RAT THUONG XUYEN (moi lan CS/extension xem 1 ho so khach) — nen moi lan xem ho so
+// la CRM phai doc lai toan bo sheet khong lo nay, rat cham. Cache _cacheGetBig_ cho ban FULL
+// cung gan nhu chac chan that bai am tham voi payload hang chuc MB nay nen khong co tac dung.
+//
+// Fix: tach rieng 1 INDEX NHE — chi SDT -> so dong (khong keo du lieu 17 truong) — bang cach chi
+// doc 1 COT SDT (thay vi 17 cot) cho TOAN BO sheet 1 lan, cache index nay (nho hon nhieu, de
+// cache thanh cong hon). Tra cuu 1 SDT: tra index de biet SDT nam o (nhung) dong nao, roi CHI
+// doc FULL BE RONG cho DUNG (vai) dong do — khong dong nao khac.
+function _cskhPhoneIndex_() {
+  var cached = _cacheGetBig_('cskhDuyen_idx_v1');
+  if (cached) { try { return JSON.parse(cached); } catch (e) {} }
+  var idx = { phoneCol: -1, map: {} }; // map: SDT -> [so dong 1-based tren sheet, co the >1 neu trung SDT]
+  var sh = _findCskhDuyenSheet_();
+  if (!sh) { try { _cachePutBig_('cskhDuyen_idx_v1', JSON.stringify(idx), 300); } catch (e2) {} return idx; }
+  var last = sh.getLastRow(), width = sh.getLastColumn();
+  if (last < 2 || width < 1) { try { _cachePutBig_('cskhDuyen_idx_v1', JSON.stringify(idx), 300); } catch (e2) {} return idx; }
+  var headerRow = sh.getRange(1, 1, 1, width).getValues()[0];
+  var map0 = _cskhHeaderMap_(headerRow);
+  if (map0.phone === undefined) { try { _cachePutBig_('cskhDuyen_idx_v1', JSON.stringify(idx), 300); } catch (e2) {} return idx; }
+  idx.phoneCol = map0.phone;
+  var phoneVals = sh.getRange(2, map0.phone + 1, last - 1, 1).getValues(); // CHI 1 cot, khong phai 17
+  for (var i = 0; i < phoneVals.length; i++) {
+    var p = normPhone_(phoneVals[i][0]);
+    if (!p || p.length < 8) continue;
+    if (!idx.map[p]) idx.map[p] = [];
+    idx.map[p].push(i + 2); // +2: hang 1 la tieu de, i bat dau tu 0
+  }
+  try { _cachePutBig_('cskhDuyen_idx_v1', JSON.stringify(idx), 300); } catch (e3) {} // co the van qua lon voi sheet SIEU to, nhung du khong cache duoc thi viec doc 1 cot van NHE HON NHIEU so voi doc 17 cot nhu truoc
+  return idx;
+}
+
 function findCskhRowsByPhone_(phone) {
   var p = normPhone_(phone);
   if (!p) return [];
-  try { return readCskhDuyen_().rows.filter(function(r) { return r.phone === p; }); } catch (e) { return []; }
+  try {
+    var idx = _cskhPhoneIndex_();
+    var rowNums = idx.map[p];
+    if (!rowNums || !rowNums.length) return [];
+    var sh = _findCskhDuyenSheet_();
+    if (!sh) return [];
+    var width = sh.getLastColumn();
+    var headerRow = sh.getRange(1, 1, 1, width).getValues()[0];
+    var map = _cskhHeaderMap_(headerRow);
+    var out = [];
+    rowNums.forEach(function(rn) {
+      var r = sh.getRange(rn, 1, 1, width).getValues()[0];
+      var o = {};
+      Object.keys(map).forEach(function(k) { o[k] = _cskhCell_(r[map[k]]); });
+      o.phone = p;
+      out.push(o);
+    });
+    return out;
+  } catch (e) { return []; }
+}
+
+// Ban "NHE" cua CSKH-Duyên — CHI 3 truong (phone,name,tier) thay vi du 17 truong, dung cho FE
+// keo HANG LOAT khi tai trang/poll dinh ky (action=cskhDuyenLite — FE da san sang goi action nay
+// nhung TRUOC DAY CHUA CO handler o backend nen luon loi am tham, khien danh sach CSKH-Duyên
+// khong len duoc tren CRM). Chi tiet day du 1 khach (dia chi/cong ty/no/ghi chu...) CHI lay rieng
+// qua findCskhRowsByPhone_ khi CS thuc su mo ho so khach do (lazy), KHONG keo full 17 truong x
+// toan bo ~134k dong moi lan tai trang/poll nua.
+function readCskhDuyenLite_() {
+  var cached = _cacheGetBig_('cskhDuyen_lite_v1');
+  if (cached) { try { return JSON.parse(cached); } catch (e) {} }
+  var out = { found: false, rows: [], total: 0, noPhone: 0, noPhoneSample: [] };
+  var sh = _findCskhDuyenSheet_();
+  if (!sh) return out;
+  out.found = true;
+  var last = sh.getLastRow(), width = sh.getLastColumn();
+  if (last < 2 || width < 1) return out;
+  var headerRow = sh.getRange(1, 1, 1, width).getValues()[0];
+  var map = _cskhHeaderMap_(headerRow);
+  if (map.phone === undefined && map.name === undefined) return out;
+  var wantedCols = [map.phone, map.name, map.tier].filter(function(x) { return x !== undefined; });
+  if (!wantedCols.length) return out;
+  var minC = Math.min.apply(null, wantedCols), maxC = Math.max.apply(null, wantedCols);
+  var block = sh.getRange(2, minC + 1, last - 1, maxC - minC + 1).getValues();
+  for (var i = 0; i < block.length; i++) {
+    var r = block[i];
+    var nameV = map.name !== undefined ? _cskhCell_(r[map.name - minC]) : '';
+    var rawPhone = map.phone !== undefined ? r[map.phone - minC] : '';
+    var p = normPhone_(rawPhone);
+    if (!p && !nameV) continue;
+    out.total++;
+    if (!p || p.length < 8) {
+      out.noPhone++;
+      if (out.noPhoneSample.length < 20 && nameV) out.noPhoneSample.push(nameV);
+      continue;
+    }
+    out.rows.push([p, nameV, map.tier !== undefined ? _cskhCell_(r[map.tier - minC]) : '']);
+  }
+  try { _cachePutBig_('cskhDuyen_lite_v1', JSON.stringify(out), 300); } catch (e2) {}
+  return out;
 }
 
 function readCareLeads_() {
