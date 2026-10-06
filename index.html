@@ -2805,17 +2805,21 @@ async function syncFromGS(opts) {
         if (dpJson && dpJson.lastDateByPhone) { donLastDateByPhone = dpJson.lastDateByPhone; saveLS('ome_don_last_date', dpJson.lastDateByPhone); }
         if (dpJson && dpJson.orderCountByPhone) { donOrderCountByPhone = dpJson.orderCountByPhone; saveLS('ome_don_order_count', dpJson.orderCountByPhone); }
       } catch(dpErr) { console.warn('donPhones fetch error:', dpErr.message); }
-      // ── Nguồn "CSKH-Duyên" (sheet thứ 3) — nhẹ nên kéo cùng nhịp với dữ liệu đơn (GAS cache 5'), không kéo mỗi 3s ──
+      // ── Nguồn "CSKH-Duyên" (sheet thứ 3, có thể tới hàng trăm nghìn dòng) — CHỈ kéo bản "nhẹ"
+      // [phone,name,tier] mỗi dòng (action=cskhDuyenLite), KHÔNG kéo đủ 17 trường (địa chỉ/công
+      // ty/nợ/email/ghi chú...) mỗi vòng poll nữa — kéo full từng dòng làm CRM lag nặng khi data
+      // lên tới ~134k dòng (payload nhiều chục MB + localStorage + duyệt lại mỗi 30s). Chi tiết
+      // đầy đủ 1 khách chỉ kéo riêng, LƯỜI (lazy) khi CS thực sự mở hồ sơ khách đó — xem
+      // _loadCskhDetailForPhone_ ở renderInfoTab.
       try {
-        const ckR = await fetch(gsUrl + sepChar + 'action=cskhDuyen', { redirect: 'follow' });
+        const ckR = await fetch(gsUrl + sepChar + 'action=cskhDuyenLite', { redirect: 'follow' });
         const ckJson = await ckR.json();
         if (ckJson && ckJson.ok) {
           const newCk = {};
-          (ckJson.rows || []).forEach(function(r){
-            const ph = (typeof normPhone === 'function' ? normPhone(r.phone) : null) || String(r.phone || '');
+          (ckJson.rows || []).forEach(function(r){ // r = [phone, name, tier]
+            const ph = (typeof normPhone === 'function' ? normPhone(r[0]) : null) || String(r[0] || '');
             if (!ph) return;
-            const slim = {}; Object.keys(r).forEach(function(k){ if (k !== 'phone' && r[k] !== '' && r[k] != null) slim[k] = r[k]; }); // bỏ ô trống cho nhẹ localStorage
-            (newCk[ph] = newCk[ph] || []).push(slim);
+            newCk[ph] = { name: r[1] || '', tier: r[2] || '' }; // chi 2 truong nhe — xem _cskhDetailCache cho du lieu day du
           });
           const known = new Set(allCustomers.map(c => c.phone));
           for (const ph in newCk) { if (!known.has(ph)) { _forceFullBuildFromCareLeads = true; break; } }
@@ -2823,7 +2827,7 @@ async function syncFromGS(opts) {
           cskhMeta = { found: !!ckJson.found, total: ckJson.total || 0, noPhone: ckJson.noPhone || 0, noPhoneSample: ckJson.noPhoneSample || [] };
           saveLS('ome_cskh_duyen', cskhData); saveLS('ome_cskh_duyen_meta', cskhMeta);
         }
-      } catch(ckErr) { console.warn('cskhDuyen fetch error:', ckErr.message); }
+      } catch(ckErr) { console.warn('cskhDuyenLite fetch error:', ckErr.message); }
     }
 
     // ── Nguồn "Chăm sóc" (sheet riêng, KH thêm nhanh qua Pancake AI/Zalo AI/nút "+Thêm KH
