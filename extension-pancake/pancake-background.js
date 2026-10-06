@@ -331,7 +331,7 @@ async function handleLookupCustomer(payload) {
   if (data.error) throw new Error(data.error);
 
   const orders = (data.orders || []).slice().sort((a, b) => parseDateSafe(b.date) - parseDateSafe(a.date));
-  return { care: data.care || null, orders };
+  return { care: data.care || null, orders, cskh: data.cskh || [] }; // cskh = dòng của SĐT này ở nguồn "CSKH-Duyên" (GAS lookup)
 }
 
 // Ghi 1 dong care (status/zalo/cs/note/lich hen...) — action:'saveSingle', CUNG action va

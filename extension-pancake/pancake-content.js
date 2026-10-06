@@ -1290,17 +1290,31 @@
     });
   }
 
+  // Khối "CSKH-Duyên" (nguồn dữ liệu thứ 3: khách VIP/SPV) trong thẻ khách — hiện các trường CÓ giá trị.
+  // GAS không trả CCCD/MST cá nhân. Giữ khớp với khối cùng tên ở CRM (index.html: _renderCskhBlock_) và Zalo AI.
+  function _pkCskhHtml_(rows) {
+    if (!rows || !rows.length) return '';
+    const L = [['staff', 'NV phụ trách'], ['codeOrig', 'Mã KH'], ['codeOther', 'Mã KH khác'], ['internal', 'Nội bộ'], ['birthday', 'Sinh nhật'], ['gender', 'Giới tính'],
+      ['address', 'Địa chỉ'], ['email', 'Email'], ['company', 'Công ty'], ['taxCompany', 'MST công ty'], ['debt', 'Công nợ'], ['source', 'Nguồn'], ['note', 'Ghi chú']];
+    return `<div style="margin:6px 0;padding:6px 8px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;font-size:11.5px">` +
+      `<div style="font-weight:700;color:#5b21b6;margin-bottom:2px">🗂 CSKH-Duyên${rows.length > 1 ? ` (${rows.length} dòng trùng SĐT)` : ''}</div>` +
+      rows.map((r) => (r.name ? `<div style="font-weight:600">${escapeHtml(r.name)}${r.tier ? ` <span style="background:#7c3aed;color:#fff;border-radius:8px;padding:0 6px;font-size:10px">${escapeHtml(r.tier)}</span>` : ''}</div>` : (r.tier ? `<div><span style="background:#7c3aed;color:#fff;border-radius:8px;padding:0 6px;font-size:10px">${escapeHtml(r.tier)}</span></div>` : '')) +
+        L.filter((x) => r[x[0]]).map((x) => `<div><span style="color:#6b7280">${x[1]}:</span> ${escapeHtml(r[x[0]])}</div>`).join('')).join('<hr style="border:none;border-top:1px dashed #ddd6fe;margin:4px 0">') +
+      `</div>`;
+  }
+
   function renderCustomerCard(phone, data, opts) {
     const box = panelEl.querySelector("#pk-ai-customer");
     const { care, orders } = data;
+    const cskhRows = data.cskh || [];
     loadCartForCurrentPhone_(); // don hang dang tinh gan theo tung SDT — doi khach thi doi don
 
     const orderPanelName = extractOrderPanelName_();
     _currentOrderPanelName = orderPanelName;
-    const name = orderPanelName || (orders && orders[0] && orders[0].name) || (care && care.name) || phone;
+    const name = orderPanelName || (orders && orders[0] && orders[0].name) || (care && care.name) || (cskhRows[0] && cskhRows[0].name) || phone;
     const totalRevenue = (orders || []).reduce((s, o) => s + (parseFloat(o.revenue) || 0), 0);
     const products = [...new Set((orders || []).map((o) => o.product).filter(Boolean))].slice(0, 4).join(", ");
-    const isNew = !care && (!orders || !orders.length);
+    const isNew = !care && (!orders || !orders.length) && !cskhRows.length; // có ở CSKH-Duyên thì không phải khách lạ
     _pkZaloPhones = Array.isArray(care?.zaloPhones) ? care.zaloPhones.slice() : [];
 
     const optHtml = (opts, val) => opts.map((o) =>
@@ -1324,6 +1338,7 @@
         <div class="pk-ai-new-tag" id="pk-ai-new-tag" style="${isNew ? '' : 'display:none'}">⚠️ Chưa có trong hệ thống Sasum — lưu sẽ tạo mới</div>
         ${chips.length ? `<div class="pk-ai-cust-chips">${chips.map((c) => `<span class="pk-ai-chip">${c}</span>`).join('')}${customFieldChips_(care)}</div>` : (customFieldChips_(care) ? `<div class="pk-ai-cust-chips">${customFieldChips_(care)}</div>` : '')}
         ${products ? `<div class="pk-ai-cust-products">🏷 ${escapeHtml(products)}</div>` : ''}
+        ${blankNew ? '' : _pkCskhHtml_(cskhRows)}
 
         <label class="pk-label-top">Tên khách</label>
         <!-- QUY TẮC (README #9): form này phải khớp form nhập thông tin KH trên CRM (index.html, khối cs-*). CRM đổi gì thì sửa ở đây theo. -->

@@ -959,6 +959,7 @@
       if (d.error) { console.warn('[ZaloAI] Loi lam moi:', d.error); return; }
       const newCare   = d.care || null;
       const newOrders = (d.orders||[]).slice().sort((a,b) => parseDate_(b.date)-parseDate_(a.date));
+      _cskhCache[phone] = d.cskh || [];
       if (!_currentCustData || _currentCustData.phone !== phone) {
         _lookupCache[phone] = {care: newCare, orders: newOrders, ts: Date.now()};
         return;
@@ -979,6 +980,7 @@
       if (d.error) return;
       const newCare   = d.care || null;
       const newOrders = (d.orders||[]).slice().sort((a,b) => parseDate_(b.date)-parseDate_(a.date));
+      _cskhCache[phone] = d.cskh || [];
       if (!_currentCustData || _currentCustData.phone !== phone) {
         // CS da chuyen sang khach khac trong luc cho fetch — van cap nhat cache ngam, khong dong bo UI
         _lookupCache[phone] = {care: newCare, orders: newOrders, ts: Date.now()};
@@ -1067,6 +1069,21 @@
     }).join('');
   }
 
+  // Nguồn dữ liệu thứ 3 "CSKH-Duyên" (khách VIP/SPV): GAS 'lookup' trả thêm d.cskh = các dòng của SĐT này. Lưu riêng theo SĐT
+  // (không nhét vào _lookupCache/_currentCustData để khỏi sửa mọi chỗ dựng cache). Hiện ở thẻ khách; GAS không trả CCCD/MST cá nhân.
+  const _cskhCache = {};
+  function _cskhHtml_(rows) {
+    if (!rows || !rows.length) return '';
+    const L = [['staff','NV phụ trách'],['codeOrig','Mã KH'],['codeOther','Mã KH khác'],['internal','Nội bộ'],['birthday','Sinh nhật'],['gender','Giới tính'],
+      ['address','Địa chỉ'],['email','Email'],['company','Công ty'],['taxCompany','MST công ty'],['debt','Công nợ'],['source','Nguồn'],['note','Ghi chú']];
+    const badge = t => `<span style="background:#7c3aed;color:#fff;border-radius:8px;padding:0 6px;font-size:10px">${escHtml(t)}</span>`;
+    return `<div style="margin:6px 0;padding:6px 8px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;font-size:11.5px">` +
+      `<div style="font-weight:700;color:#5b21b6;margin-bottom:2px">🗂 CSKH-Duyên${rows.length>1?` (${rows.length} dòng trùng SĐT)`:''}</div>` +
+      rows.map(r => (r.name ? `<div style="font-weight:600">${escHtml(r.name)}${r.tier?' '+badge(r.tier):''}</div>` : (r.tier ? `<div>${badge(r.tier)}</div>` : '')) +
+        L.filter(x => r[x[0]]).map(x => `<div><span style="color:#6b7280">${x[1]}:</span> ${escHtml(r[x[0]])}</div>`).join('')
+      ).join('<hr style="border:none;border-top:1px dashed #ddd6fe;margin:4px 0">') + `</div>`;
+  }
+
   async function doLookup() {
     const raw = (document.getElementById('zai-phone-input').value||'').trim();
     if (!raw) { showError('Vui lòng nhập số điện thoại.'); return; }
@@ -1082,7 +1099,7 @@
 
     const hit = _lookupCache[phone];
     if (hit && Date.now() - hit.ts < LOOKUP_TTL) {
-      if (!hit.orders.length && !hit.care) { showNotFoundWithForm_(area, updSec, phone, raw); _syncZaloStatusForOpenChat(phone, false); }
+      if (!hit.orders.length && !hit.care && !(_cskhCache[phone]||[]).length) { showNotFoundWithForm_(area, updSec, phone, raw); _syncZaloStatusForOpenChat(phone, false); }
       else { renderCard_(area, updSec, phone, raw, hit.care, hit.orders); _syncZaloStatusForOpenChat(phone, true); }
       // Hien ngay du lieu cache cho nhanh, nhung LUON kiem tra lai server ngam —
       // tranh truong hop Sasum vua duoc cap nhat (tu appweb hoac may khac) trong
@@ -1104,8 +1121,9 @@
 
       const orders = (d.orders||[]).slice().sort((a,b) => parseDate_(b.date)-parseDate_(a.date));
       _lookupCache[phone] = {care: d.care||null, orders, ts: Date.now()};
+      _cskhCache[phone] = d.cskh || [];
 
-      if (!orders.length && !d.care) {
+      if (!orders.length && !d.care && !_cskhCache[phone].length) {
         showNotFoundWithForm_(area, updSec, phone, raw);
         _syncZaloStatusForOpenChat(phone, false);
       } else {
@@ -1227,7 +1245,8 @@
     }).join('');
   }
   function renderCustCard_(area, phone, raw, care, orders) {
-    const name   = orders.length ? (orders[0].name||raw) : (care&&care.name||raw);
+    const cskhRows = _cskhCache[phone] || [];
+    const name   = orders.length ? (orders[0].name||raw) : (care&&care.name || (cskhRows[0] && cskhRows[0].name) || raw);
     const prods  = [...new Set(orders.map(o=>o.product).filter(Boolean))].join(', ');
     const totRev = orders.reduce((s,o)=>s+(parseFloat(o.revenue)||0),0);
     let expanded = false;
@@ -1246,6 +1265,7 @@
           ${_customFieldChips_zai(care)}
         </div>
         ${care&&care.note ? `<div class="zai-card-note">📝 ${escHtml(_latestNoteText_(care.note))}</div>` : ''}
+        ${_cskhHtml_(cskhRows)}
         <div class="zai-card-orders" id="zai-orders-box"></div>
         ${orders.length > 1 ? `<button type="button" class="zai-btn zai-btn-ghost zai-btn-sm zai-dup-btn" style="margin-top:6px;color:#dc2626" title="Kiểm tra & xóa đơn hàng bị trùng (cùng tháng + doanh thu) của khách này">🗑️ Kiểm tra đơn trùng</button>` : ''}
       </div>`;
@@ -1279,7 +1299,7 @@
     const tagEl = document.getElementById('zai-new-tag');
     if (tagEl) tagEl.style.display = 'none';
     const nameEl = document.getElementById('zai-name-input');
-    if (nameEl) nameEl.value = (orders.length ? orders[0].name : '') || (care && care.name) || '';
+    if (nameEl) nameEl.value = (orders.length ? orders[0].name : '') || (care && care.name) || ((_cskhCache[phone]||[])[0] || {}).name || '';
     document.getElementById('zai-status-sel').value = care&&care.status||'';
     document.getElementById('zai-zalo-sel').value   = care&&care.zalo||'';
     // CS chăm sóc: đồng bộ từ server (care.cs), fallback nếu không có từ server thì dùng _currentCS
