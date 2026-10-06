@@ -7716,7 +7716,9 @@ let _advAssign = {
   selectedTeams: new Set(), // multi select team id — dùng khi selectMode==='team'
   distMode: 'equal',      // 'equal' | 'custom' — áp dụng cho CS (khi selectMode='cs') hoặc Team (khi selectMode='team')
   customDist: {},         // csName|teamId -> count (số KH ở cấp phân phối trên cùng)
-  memberRatio: {},        // teamId -> { tenNhanVien: phanTramTyLe } — tỷ lệ nhận NỘI BỘ trong từng Team
+  memberDistMode: 'pct',  // 'pct' (tỷ lệ %) | 'count' (nhập số lượng cụ thể) — cách chia NỘI BỘ trong từng Team
+  memberRatio: {},        // teamId -> { tenNhanVien: phanTramTyLe } — dùng khi memberDistMode==='pct'
+  memberCount: {},        // teamId -> { tenNhanVien: soLuongKH } — dùng khi memberDistMode==='count'
   label: '',
 };
 
@@ -7736,7 +7738,9 @@ function openAssignModal() {
   _advAssign.customCount = _assignFilteredList.length;
   _advAssign.distMode = 'equal';
   _advAssign.customDist = {};
+  _advAssign.memberDistMode = 'pct';
   _advAssign.memberRatio = {};
+  _advAssign.memberCount = {};
   _advAssign.sortMode = 'default';
   _advAssign.dateFrom = '';
   _advAssign.dateTo = '';
@@ -7843,6 +7847,15 @@ function _computeMemberRatioDist(total, members, ratioMap) {
   const dist = {};
   members.forEach((m, i) => { dist[m] = floors[i]; });
   for (let k = 0; k < remainder && k < order.length; k++) { dist[members[order[k]]]++; }
+  return dist;
+}
+
+// ── Chia 1 lượng KH (đã phân cho 1 Team) cho các thành viên THEO SỐ LƯỢNG CỤ THỂ do admin tự
+// nhập (countMap: { tenNhanVien: soLuong }) — KHÔNG tự chia đều, chỉ đọc đúng số đã nhập (clamp
+// về 0 nếu âm/rỗng). Dùng khi _advAssign.memberDistMode === 'count'.
+function _computeMemberCountDist(members, countMap) {
+  const dist = {};
+  (members || []).forEach(m => { dist[m] = Math.max(0, parseInt((countMap || {})[m]) || 0); });
   return dist;
 }
 
@@ -8103,6 +8116,7 @@ function _advAssignToggleTeam(teamId) {
     _advAssign.selectedTeams.delete(teamId);
     delete _advAssign.customDist[teamId];
     delete _advAssign.memberRatio[teamId];
+    delete _advAssign.memberCount[teamId];
   } else {
     _advAssign.selectedTeams.add(teamId);
   }
@@ -8116,6 +8130,36 @@ function _advAssignSetMemberRatio(el) {
   if (!teamId || !member) return;
   if (!_advAssign.memberRatio[teamId]) _advAssign.memberRatio[teamId] = {};
   _advAssign.memberRatio[teamId][member] = parseFloat(el.value) || 0;
+  _refreshDistPreview();
+}
+
+// Sửa SỐ LƯỢNG KH cụ thể nhận của 1 thành viên trong 1 Team (dùng khi memberDistMode==='count')
+function _advAssignSetMemberCount(el) {
+  const teamId = el.dataset.team, member = el.dataset.member;
+  if (!teamId || !member) return;
+  if (!_advAssign.memberCount[teamId]) _advAssign.memberCount[teamId] = {};
+  _advAssign.memberCount[teamId][member] = Math.max(0, parseInt(el.value) || 0);
+  _refreshDistPreview();
+}
+
+// Tự động chia hết phần KH CÒN LẠI của 1 Team (ở chế độ nhập số lượng cụ thể) cho các thành
+// viên CHƯA được gán hoặc gán 0 — chia đều phần dư, giống _autoFillRemaining nhưng khoanh vùng
+// trong phạm vi 1 Team thay vì toàn bộ danh sách CS/Team.
+function _advAssignAutoFillTeamMembers(teamId) {
+  const team = teams.find(t => t.id === teamId);
+  const members = (team && team.members) || [];
+  if (!members.length) return;
+  const pool = _getAssignPool();
+  const teamDist = _computeDist(pool, [..._advAssign.selectedTeams]);
+  const teamCount = teamDist[teamId] || 0;
+  if (!_advAssign.memberCount[teamId]) _advAssign.memberCount[teamId] = {};
+  const cm = _advAssign.memberCount[teamId];
+  const used = members.reduce((s, m) => s + (parseInt(cm[m]) || 0), 0);
+  const rem = teamCount - used;
+  if (rem <= 0) { toast('Team này đã phân đủ rồi!'); return; }
+  const base = Math.floor(rem / members.length);
+  const extra = rem % members.length;
+  members.forEach((m, i) => { cm[m] = (parseInt(cm[m]) || 0) + base + (i < extra ? 1 : 0); });
   _refreshDistPreview();
 }
 
@@ -8174,9 +8218,17 @@ function _renderTeamDistTable(pool, teamIds) {
     <div style="margin-top:8px"><span class="assign-remaining-badge ok">✓ ${totalPool} KH sẽ được chia cho ${teamIds.length} Team</span></div>`;
   }
 
-  // Tỷ lệ NỘI BỘ từng Team — luôn hiện, bất kể đang Chia đều hay Tuỳ chỉnh ở cấp Team phía trên
+  // Phân phối NỘI BỘ từng Team — luôn hiện, bất kể đang Chia đều hay Tuỳ chỉnh ở cấp Team phía
+  // trên. 2 cách: theo % tỷ lệ (tự tính số KH), hoặc nhập thẳng số lượng cụ thể cho từng người.
+  const isCountMode = _advAssign.memberDistMode === 'count';
   html += '<div style="margin-top:14px;border-top:1px dashed var(--border);padding-top:10px">';
-  html += '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-weight:500">⚖ Tỷ lệ nhận trong từng Team (%, để trống/0 hết = chia đều cho các thành viên):</div>';
+  html += `<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+    <div style="font-size:11px;color:var(--muted);font-weight:500">Chia trong từng Team cho từng thành viên:</div>
+    <div class="assign-mode-row" style="flex:none;width:auto">
+      <div class="assign-mode-btn ${!isCountMode?'active':''}" style="flex:none;padding:4px 10px;font-size:11px" onclick="_advAssign.memberDistMode='pct';renderAssignCreate()">⚖ Theo %</div>
+      <div class="assign-mode-btn ${isCountMode?'active':''}" style="flex:none;padding:4px 10px;font-size:11px" onclick="_advAssign.memberDistMode='count';renderAssignCreate()">🔢 Số lượng cụ thể</div>
+    </div>
+  </div>`;
   teamIds.forEach(tid => {
     const team = teams.find(t=>t.id===tid) || {name:tid, members:[]};
     const members = team.members || [];
@@ -8185,6 +8237,24 @@ function _renderTeamDistTable(pool, teamIds) {
     html += `<div style="font-weight:700;font-size:12px;margin-bottom:4px">${esc(team.name)} <span style="font-weight:400;color:var(--muted)">— ${teamCount} KH</span></div>`;
     if (!members.length) {
       html += `<div style="font-size:11px;color:var(--hint);padding-left:8px">⚠ Team chưa có thành viên — vào "Quản lý Team" để thêm, nếu không data của Team này sẽ không ai nhận.</div>`;
+    } else if (isCountMode) {
+      const countMap = _advAssign.memberCount[tid] || {};
+      members.forEach(m => {
+        const n = parseInt(countMap[m]) || 0;
+        html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;padding-left:8px">
+          <span style="flex:1;font-size:12px">${esc(m)}</span>
+          <input class="assign-dist-input" type="number" min="0" max="${teamCount}" step="1" style="width:64px" value="${n}" data-team="${esc(tid)}" data-member="${esc(m)}" oninput="_advAssignSetMemberCount(this)">
+          <span style="font-size:11px;color:var(--muted)">KH</span>
+        </div>`;
+      });
+      const used = members.reduce((s,m)=> s + (parseInt(countMap[m])||0), 0);
+      const rem = teamCount - used;
+      const remClass = rem === 0 ? 'ok' : rem > 0 ? 'warn' : 'err';
+      const remText = rem === 0 ? `✓ Đã phân đủ ${teamCount} KH` : rem > 0 ? `Còn ${rem} KH chưa phân trong Team này` : `⚠ Vượt quá ${-rem} KH so với ${teamCount} KH của Team`;
+      html += `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-left:8px;margin-top:4px">
+        <span class="assign-remaining-badge ${remClass}">${remText}</span>
+        <button class="btn sm" onclick="_advAssignAutoFillTeamMembers('${esc(tid)}')">🔄 Tự động chia phần còn lại</button>
+      </div>`;
     } else {
       const ratioMap = _advAssign.memberRatio[tid] || {};
       const sumPct = members.reduce((s,m)=> s + Math.max(0, Number(ratioMap[m])||0), 0);
@@ -8237,23 +8307,33 @@ function doAssignDataAdvanced() {
       if (distTotal > pool.length) { toast(`⚠ Tổng phân phối cho Team (${distTotal}) vượt quá số KH có sẵn (${pool.length})`); return; }
       if (distTotal === 0) { toast('Vui lòng nhập số KH cho từng Team'); return; }
     }
+    const isCountMode = _advAssign.memberDistMode === 'count';
     const orderedSet = new Set();
-    teamIds.forEach(teamId => {
+    for (const teamId of teamIds) {
       const team = teams.find(t => t.id === teamId);
       const members = (team && team.members) || [];
       const teamCount = teamDist[teamId] || 0;
-      if (!members.length || teamCount <= 0) return;
-      const ratioMap = _advAssign.memberRatio[teamId] || {};
-      const memberDist = _computeMemberRatioDist(teamCount, members, ratioMap);
+      if (!members.length || teamCount <= 0) continue;
+      let memberDist;
+      if (isCountMode) {
+        memberDist = _computeMemberCountDist(members, _advAssign.memberCount[teamId] || {});
+        const sumN = Object.values(memberDist).reduce((s,v)=>s+v,0);
+        if (sumN > teamCount) {
+          toast(`⚠ Team "${team.name}": tổng số KH đã nhập (${sumN}) vượt quá ${teamCount} KH của Team — sửa lại trước khi chia.`);
+          return;
+        }
+      } else {
+        memberDist = _computeMemberRatioDist(teamCount, members, _advAssign.memberRatio[teamId] || {});
+      }
       members.forEach(m => {
         const n = memberDist[m] || 0;
         if (n <= 0) return;
         finalDist[m] = (finalDist[m] || 0) + n;
         orderedSet.add(m);
       });
-    });
+    }
     orderedNames = [...orderedSet];
-    if (orderedNames.length === 0) { toast('Chưa có thành viên nào được phân KH — kiểm tra lại Team đã chọn/tỷ lệ'); return; }
+    if (orderedNames.length === 0) { toast('Chưa có thành viên nào được phân KH — kiểm tra lại Team đã chọn/tỷ lệ hoặc số lượng'); return; }
   } else {
     const csList = [..._advAssign.selectedCS];
     if (csList.length === 0) { toast('Vui lòng chọn ít nhất 1 CS'); return; }
