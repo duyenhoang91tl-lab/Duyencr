@@ -1326,6 +1326,7 @@
         ${products ? `<div class="pk-ai-cust-products">🏷 ${escapeHtml(products)}</div>` : ''}
 
         <label class="pk-label-top">Tên khách</label>
+        <!-- QUY TẮC (README #9): form này phải khớp form nhập thông tin KH trên CRM (index.html, khối cs-*). CRM đổi gì thì sửa ở đây theo. -->
         <input type="text" id="pk-name-input" class="pk-full-input" placeholder="Tên khách hàng" value="${escapeHtml(name === phone ? '' : name)}" />
 
         <div class="pk-form-row">
