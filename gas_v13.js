@@ -2056,6 +2056,10 @@ function _expandSaleFilterWithPancakeAliases_(names) {
   return out;
 }
 
+// Ten "sale" dac biet co khoang trang tren cot The (khong phai username Pancake) nhung ke toan van tinh la 1 sale rieng — vd
+// "Diệu Tâm DMP" (don Kenh Duoc, thang 9: 2 don / 32.250.000d). Khong them thi bi coi la tag va don roi vao "(chưa gán sale)".
+// Gia tri phai o dang chuan hoa _normTxt_ (chu thuong, giu dau).
+var POS_EXTRA_SALE_NAMES_ = ['diệu tâm dmp'];
 function _donSaleNamesFromThe_(theStr) {
   var tokens = splitMulti_(theStr, ',');
   if (!tokens.length) return [];
@@ -2069,6 +2073,7 @@ function _donSaleNamesFromThe_(theStr) {
   // ("Chưa đối soát", "Giao không thành") hoac khong co so ("VIP", "Freeship") van bi loai nhu cu.
   var matched = tokens.filter(function(tok) {
     if (known[_normTxt_(tok)]) return true;
+    if (POS_EXTRA_SALE_NAMES_.indexOf(_normTxt_(tok)) !== -1) return true;
     return !/\s/.test(tok) && /\d/.test(tok);
   });
   if (matched.length) return matched;
@@ -3281,6 +3286,12 @@ function buildFailedOrderReport_(filters) {
 
 // Ma bo dem: [chu 0-3 ky tu, vd "Bh"] + so + [chu 0-3 ky tu, vd "Q"] + "T" + thang(1-2 so) + ["/" + nam 2-4 so].
 // VD khop: 980T09 | 16QT09/2026 | Bh395T09/2026 | 835T09/2026. Phai dung RIENG (khong dinh chu/so lien truoc/sau).
+// SUA 2026-10-05 theo yeu cau Duyen ("cu tinh sao de khop voi ke toan nhat"): TAT ghep don Pos<->Base. File ke toan (don_check.xlsx)
+// tinh doanh thu Pos THUAN: gia tri = cot "Giá trị đơn hàng sau giảm giá" cua Pos, chia deu cho cac sale tren cot The, KHONG thay
+// bang gia tri/sale cua don goc Base. Do tren file that thang 9: bat ghep lam Sasum lech 18.986.000d (9 don doi gia theo Base,
+// 2 don bi loai vi goc Base da Huy/Hoan) va chia lai sale theo Base lam nhieu sale lech hang tram trieu. Dat true de BAT LAI
+// co che ghep (code ghep van nguyen ven ben duoi). Tat ghep cung khong con doc "DT TỔNG" trong Bao cao B -> nhanh hon.
+var POS_GHEP_BASE_ENABLED_ = false;
 var COUNTER_CODE_INNER_ = '[A-Za-z]{0,3}\\d{1,6}[A-Za-z]{0,3}T\\d{1,2}(?:\\/\\d{2,4})?';
 var COUNTER_CODE_RE_SRC_ = '(^|[^A-Za-z0-9])(' + COUNTER_CODE_INNER_ + ')(?![A-Za-z0-9])';
 function _normCounterCode_(c) { return String(c || '').replace(/\s+/g, '').toUpperCase(); }
@@ -3554,7 +3565,7 @@ function buildSalesReportB_(filters) {
   // GHEP DON POS <-> BASE (cot Q ghi chu): tach ma bo dem tu ghi chu, chi doc "DT TỔNG " khi THUC SU co ma.
   var codesByRow = [], wantedCodes = {}, anyCodes = false;
   for (var pi = 0; pi < pre.length; pi++) {
-    var cds = _extractCounterCodes_(pre[pi].ghiChu);
+    var cds = POS_GHEP_BASE_ENABLED_ ? _extractCounterCodes_(pre[pi].ghiChu) : [];
     codesByRow.push(cds);
     if (cds.length) { anyCodes = true; cds.forEach(function(c) { wantedCodes[c] = true; }); }
   }
