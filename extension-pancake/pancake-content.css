@@ -1223,3 +1223,27 @@
   opacity: .85;
 }
 
+
+
+/* ── 📊 Doanh số & hoa hồng của tôi ── */
+.pk-stats-toolbar { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; margin-bottom: 6px; font-size: 11px; }
+.pk-stats-toolbar select, .pk-stats-toolbar input[type=date] { font-size: 11px; padding: 2px 4px; border: 1px solid #d1d5db; border-radius: 5px; background: #fff; max-width: 118px; }
+.pk-stats-toolbar button { background: #2563eb; color: #fff; border: none; border-radius: 5px; font-size: 11px; padding: 3px 10px; cursor: pointer; }
+.pk-stats-toolbar button:hover { background: #1d4ed8; }
+.pk-stats-range { font-size: 11px; color: #374151; margin-bottom: 6px; }
+.pk-stats-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+.pk-stats-card { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 6px 8px; }
+.pk-stats-card-l { font-size: 10px; color: #6b7280; }
+.pk-stats-card-v { font-size: 14px; font-weight: 700; color: #111827; word-break: break-word; }
+.pk-stats-card-s { font-size: 10px; color: #6b7280; }
+.pk-stats-sec { font-size: 12px; font-weight: 700; margin: 8px 0 4px; color: #111827; }
+.pk-stats-tbl { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 4px; }
+.pk-stats-tbl th { text-align: left; font-weight: 600; color: #6b7280; border-bottom: 1px solid #e5e7eb; padding: 2px 3px; }
+.pk-stats-tbl td { border-bottom: 1px solid #f3f4f6; padding: 3px; vertical-align: top; }
+.pk-stats-total td { font-weight: 700; border-top: 1px solid #d1d5db; }
+.pk-stats-mut { font-size: 10px; color: #6b7280; }
+.pk-stats-note { font-size: 11px; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 6px 8px; margin-top: 4px; }
+.pk-stats-err { color: #b91c1c; background: #fef2f2; border-color: #fecaca; }
+.pk-stats-det { margin: 4px 0; font-size: 11px; }
+.pk-stats-det summary { cursor: pointer; color: #2563eb; }
+.pk-stats-prog { padding: 3px 0; border-bottom: 1px dashed #e5e7eb; }

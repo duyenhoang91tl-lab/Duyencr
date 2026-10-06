@@ -1116,6 +1116,7 @@ body.rpt-mode .app{height:100vh}
         <option value="dt">DT tổng</option>
         <option value="cs">Chăm sóc (KH thêm nhanh)</option>
         <option value="don">Dữ liệu đơn</option>
+        <option value="cskh">CSKH-Duyên (VIP/SPV)</option>
         <option value="assign">Chia data (được chia cho tôi)</option>
       </select>
     </div>
@@ -2001,6 +2002,39 @@ let SALE_CHANNELS = (function(){
   try { var v = loadLS('ome_sale_channels'); return (v && typeof v === 'object') ? v : {}; } catch(e){ return {}; }
 })();
 
+// Danh sach "doi Sale" — truoc chi co 2 nhom co dinh Online/Van phong, gio Admin tu dinh nghia
+// them nhom moi (vd CSKH/Quay...) o modal "🏷️ Phân loại đội Sale". 2 muc mac dinh nay GIU
+// NGUYEN key 'online'/'offline' de khong vo du lieu SALE_CHANNELS/saleType da luu tu truoc.
+let SALE_GROUPS = (function(){
+  try { var v = loadLS('ome_sale_groups'); return (Array.isArray(v) && v.length) ? v : [{key:'online',label:'Online'},{key:'offline',label:'Văn phòng'}]; }
+  catch(e){ return [{key:'online',label:'Online'},{key:'offline',label:'Văn phòng'}]; }
+})();
+function saleGroupLabel(key){ var g = SALE_GROUPS.find(function(x){return x.key===key;}); return g ? g.label : key; }
+async function _syncSaleGroupsFromGAS() {
+  if (!gsUrl) return;
+  try {
+    var r = await fetch(gsUrl + '?action=saleGroups', {redirect:'follow'});
+    var data = await r.json();
+    if (data && data.ok && Array.isArray(data.groups) && data.groups.length) {
+      SALE_GROUPS = data.groups;
+      saveLS('ome_sale_groups', SALE_GROUPS);
+    }
+  } catch(e) { /* giu ban local/mac dinh neu loi mang */ }
+}
+setTimeout(_syncSaleGroupsFromGAS, 0);
+async function saveSaleGroups(list) {
+  SALE_GROUPS = list;
+  saveLS('ome_sale_groups', SALE_GROUPS);
+  if (!gsUrl) { toast('✓ Đã lưu danh sách đội (local)'); return; }
+  try {
+    var r = await fetch(gsUrl, { method:'POST', redirect:'follow',
+      body: JSON.stringify({ action:'saveSaleGroups', groups: list }) });
+    var d = await r.json().catch(function(){ return {}; });
+    if (d && d.ok) toast('✓ Đã lưu danh sách đội lên Google Sheets');
+    else toast('Lưu local ✓ — GSheets: ' + (d.error||'lỗi không rõ'));
+  } catch(e) { toast('✓ Đã lưu local — chưa đồng bộ GSheets: ' + e.message); }
+}
+
 async function _syncSaleChannelsFromGAS() {
   if (!gsUrl) return;
   try {
@@ -2399,6 +2433,14 @@ let careData = loadLS('ome_care') || {};
 // Nguồn "Chăm sóc": KH thêm nhanh (Tên/SĐT/Ghi chú) từ nút "+ Thêm KH/Đơn mới" — lưu ở
 // sheet RIÊNG (không chung CareData, không gộp vào báo cáo A/B/C). Key = phone.
 let careLeads = loadLS('ome_care_leads') || {};
+// Nguồn thứ 3 "CSKH-Duyên" (sheet cùng file DT tổng / dữ liệu đơn): { SĐT: [ {name, tier(VIP/SPV), address, ...} ] }.
+// Khách có cùng SĐT ở DT tổng / dữ liệu đơn / CSKH-Duyên được GỘP thành 1 khách (customerMap theo SĐT) — xem buildCustomers.
+let cskhData = (function(){ // chuan hoa cache localStorage cu: ban 'lite' tung luu {name,tier} (object) -> phai la MANG dong, neu khong .find()/.forEach nem loi va CRM khong dung duoc danh sach KH
+  const raw = loadLS('ome_cskh_duyen') || {}, out = {};
+  Object.keys(raw).forEach(function(ph){ const v = raw[ph]; out[ph] = Array.isArray(v) ? v : (v && typeof v === 'object' ? [v] : []); });
+  return out;
+})();
+let cskhMeta = loadLS('ome_cskh_duyen_meta') || { found: null, total: 0, noPhone: 0 };
 // Tập SĐT có trong sheet "dữ liệu đơn" (nguồn của Báo cáo B) — chỉ dùng để LỌC nguồn ở
 // màn hình chính, không kéo chi tiết sản phẩm vào danh sách khách.
 let donPhoneSet = new Set(loadLS('ome_don_phones') || []);
@@ -2767,6 +2809,29 @@ async function syncFromGS(opts) {
         if (dpJson && dpJson.lastDateByPhone) { donLastDateByPhone = dpJson.lastDateByPhone; saveLS('ome_don_last_date', dpJson.lastDateByPhone); }
         if (dpJson && dpJson.orderCountByPhone) { donOrderCountByPhone = dpJson.orderCountByPhone; saveLS('ome_don_order_count', dpJson.orderCountByPhone); }
       } catch(dpErr) { console.warn('donPhones fetch error:', dpErr.message); }
+      // ── Nguồn "CSKH-Duyên" (sheet thứ 3, có thể tới hàng trăm nghìn dòng) — CHỈ kéo bản "nhẹ"
+      // [phone,name,tier] mỗi dòng (action=cskhDuyenLite), KHÔNG kéo đủ 17 trường (địa chỉ/công
+      // ty/nợ/email/ghi chú...) mỗi vòng poll nữa — kéo full từng dòng làm CRM lag nặng khi data
+      // lên tới ~134k dòng (payload nhiều chục MB + localStorage + duyệt lại mỗi 30s). Chi tiết
+      // đầy đủ 1 khách chỉ kéo riêng, LƯỜI (lazy) khi CS thực sự mở hồ sơ khách đó — xem
+      // _loadCskhDetailForPhone_ ở renderInfoTab.
+      try {
+        const ckR = await fetch(gsUrl + sepChar + 'action=cskhDuyenLite', { redirect: 'follow' });
+        const ckJson = await ckR.json();
+        if (ckJson && ckJson.ok) {
+          const newCk = {};
+          (ckJson.rows || []).forEach(function(r){ // r = [phone, name, tier]
+            const ph = (typeof normPhone === 'function' ? normPhone(r[0]) : null) || String(r[0] || '');
+            if (!ph) return;
+            (newCk[ph] = newCk[ph] || []).push({ name: r[1] || '', tier: r[2] || '' }); // MANG cac dong nhe {name,tier}: buildCustomers va _renderCskhBlock_ doc cskhData[ph] nhu MANG dong
+          });
+          const known = new Set(allCustomers.map(c => c.phone));
+          for (const ph in newCk) { if (!known.has(ph)) { _forceFullBuildFromCareLeads = true; break; } }
+          cskhData = newCk;
+          cskhMeta = { found: !!ckJson.found, total: ckJson.total || 0, noPhone: ckJson.noPhone || 0, noPhoneSample: ckJson.noPhoneSample || [] };
+          saveLS('ome_cskh_duyen', cskhData); saveLS('ome_cskh_duyen_meta', cskhMeta);
+        }
+      } catch(ckErr) { console.warn('cskhDuyenLite fetch error:', ckErr.message); }
     }
 
     // ── Nguồn "Chăm sóc" (sheet riêng, KH thêm nhanh qua Pancake AI/Zalo AI/nút "+Thêm KH
@@ -3150,6 +3215,20 @@ function buildCustomers() {
       };
     });
   }
+  // Tạo sẵn customerMap cho các SĐT chỉ có ở nguồn "CSKH-Duyên" (chưa có đơn nào / chưa có CareData) để CS thấy và
+  // CHIA DATA được; nếu SĐT đã có ở DT tổng / dữ liệu đơn / Chăm sóc thì GIỮ NGUYÊN khách đó (gộp 1 khách theo SĐT).
+  if (typeof cskhData !== 'undefined' && cskhData) {
+    Object.keys(cskhData).forEach(ph => {
+      if (customerMap[ph]) return;
+      const rows = cskhData[ph] || [];
+      const nm = (rows.find(r => r.name) || {}).name || ph; // không có tên → dùng SĐT (vẫn cần hiện để CS chia data / chăm sóc được)
+      customerMap[ph] = {
+        phone: ph, name: nm, orders: [],
+        sources: new Set(), brands: new Set(), _keys: new Set(),
+        _rawStatus: '', _rawZalo: '', _rawNote: ''
+      };
+    });
+  }
   allCustomers = Object.values(customerMap).map(c => {
     const tot = c.orders.length;
     const rev = c.orders.reduce((s,o) => s+(o.revenue||0), 0);
@@ -3180,6 +3259,10 @@ function buildCustomers() {
     // Chưa có tên thật ở đâu cả (CareData lẫn đơn hàng) → tự động đoán từ dòng đầu cột
     // "Sản phẩm" của đơn gần nhất có thông tin hợp lệ, CHỈ để hiển thị (xem hàm ở trên).
     let nameGuessed = false;
+    if (displayName === c.phone && typeof cskhData !== 'undefined' && cskhData && cskhData[c.phone]) {
+      const _ckn = (cskhData[c.phone].find(r => r.name) || {}).name;
+      if (_ckn) displayName = _ckn;
+    }
     if (displayName === c.phone) {
       const guess = _guessNameForPhone(c.orders, c.phone);
       if (guess) { displayName = guess; nameGuessed = true; }
@@ -3200,7 +3283,8 @@ function buildCustomers() {
     const dataSrc = {
       dt:  tot > 0,
       cs:  !!(typeof careLeads !== 'undefined' && careLeads && careLeads[c.phone]),
-      don: !!(typeof donPhoneSet !== 'undefined' && donPhoneSet.has(c.phone))
+      don: !!(typeof donPhoneSet !== 'undefined' && donPhoneSet.has(c.phone)),
+      cskh: !!(typeof cskhData !== 'undefined' && cskhData && cskhData[c.phone])
     };
     // Ngày mua gần nhất theo Pos (timestamp 00:00 local) — null nếu KH chưa có đơn Pos
     const _lpIso = (typeof donLastDateByPhone !== 'undefined' && donLastDateByPhone) ? donLastDateByPhone[c.phone] : '';
@@ -3212,6 +3296,7 @@ function buildCustomers() {
       lastPosDate,
       name: displayName,
       nameGuessed,
+      cskh: (typeof cskhData !== 'undefined' && cskhData && cskhData[c.phone]) || [],   // dòng của khách này ở nguồn CSKH-Duyên (có thể >1 nếu trùng SĐT)
       sources:[...c.sources], brands:[...c.brands].filter(Boolean),
       totalOrders:tot, totalRevenue:rev,
       renewOrders:renewCount, tier,
@@ -3436,6 +3521,7 @@ function applyFilters() {
       if (dataSrcF === 'dt'  && !src.dt)  return false;
       if (dataSrcF === 'cs'  && !src.cs)  return false;
       if (dataSrcF === 'don' && !src.don) return false;
+      if (dataSrcF === 'cskh' && !src.cskh) return false;
       // "Chia data": KH đang nằm trong (các) đợt phân công (sheet AssignData) của CHÍNH tài
       // khoản đang đăng nhập — tra qua _assignAllIndex (phone -> Set<csName>) giống hệt cách
       // bộ lọc CS ở trên đang dùng, không bake vào c.dataSrc vì AssignData có thể được tải/đổi
@@ -4289,6 +4375,7 @@ function renderCareTab(c) {
       </div>
     </div>
     <div id="cs-kh-hint" style="font-size:10.5px;color:var(--muted);margin:-4px 0 8px"></div>
+    <!-- QUY TẮC (README #9): form nhập thông tin KH này đổi gì thì extension-pancake/pancake-content.js (panel pk-) PHẢI đổi theo. -->
     ${(function(){
       var isChot = (typeof _hIsChot_==='function') && _hIsChot_(care.status||c.careStatus||'');
       var ex = (typeof _hChotToday_==='function' && _hChotToday_(c.phone)) || {};
@@ -4301,8 +4388,8 @@ function renderCareTab(c) {
           </div>
           <div></div>
         </div>
-        <div class="form-label" style="margin-top:6px">📝 Thông tin đơn hàng</div>
-        <textarea class="form-ta" id="cs-chot-note" placeholder="VD: 1 nhẫn Kim Tiền size 12 + 1 lắc tay, ship COD, giao thứ 6..." style="min-height:52px">${esc(ex.note||'')}</textarea>
+        <div class="form-label" style="margin-top:6px">🔖 Mã bộ đếm (mã đơn Base)</div>
+        <input class="form-input" id="cs-chot-code" placeholder="VD: 1296T09/2026 (nhiều đơn: cách nhau bằng dấu +)" value="${esc(ex.code||'')}" autocomplete="off">
       </div>`;
     })()}
     ${_renderCustomFieldInputs(care)}
@@ -4748,6 +4835,53 @@ function _initHistExpand(){
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run); else run();
 }
 
+// Khối "CSKH-Duyên" ở tab Tổng quan: thông tin khách từ sheet thứ 3 (mỗi dòng 1 khối nếu trùng SĐT).
+// Chỉ hiện trường CÓ giá trị. (Không có CCCD/MST cá nhân — backend không đọc cột đó.)
+// ---- Chi tiet CSKH-Duyen tai LUOI (lazy) -- chi tai khi CS mo ho so 1 khach co trong sheet CSKH-Duyen ----
+// syncFromGS chi keo ban 'lite' {name,tier} (action=cskhDuyenLite) de CRM khong lag voi ~134k dong. Day du 17 truong (dia chi,
+// cong ty, email, ghi chu...) chi lay cho DUNG 1 SDT qua action=lookup (backend findCskhRowsByPhone_ doc index nhe + vai dong).
+var _cskhDetailCache = {};   // phone -> MANG dong day du
+var _cskhDetailState = {};   // phone -> 'loading' | 'done' | 'fail'  (moi SDT chi tai 1 lan/phien, tranh vong lap khi loi)
+function _loadCskhDetailForPhone_(phone) {
+  if (!phone || _cskhDetailState[phone] || !gsUrl) return;
+  if (!(typeof cskhData !== 'undefined' && cskhData && cskhData[phone])) return; // khach khong co trong nguon CSKH-Duyen
+  _cskhDetailState[phone] = 'loading';
+  const sep = gsUrl.indexOf('?') >= 0 ? '&' : '?';
+  fetch(gsUrl + sep + 'action=lookup&phone=' + encodeURIComponent(phone), { redirect: 'follow' })
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      const rows = (j && Array.isArray(j.cskh)) ? j.cskh : [];
+      if (rows.length) { _cskhDetailCache[phone] = rows; _cskhDetailState[phone] = 'done'; }
+      else { _cskhDetailState[phone] = 'fail'; }
+    })
+    .catch(function(err){ _cskhDetailState[phone] = 'fail'; console.warn('cskh detail error:', err && err.message); })
+    .then(function(){
+      // Ve lai tab Tong quan neu CS van dang xem dung khach nay (tab nay chi doc, khong co o nhap de mat)
+      if (currentPhone === phone && currentDpTab === 'info' && !_dpDirty) {
+        const c = allCustomers.find(function(x){ return x.phone === phone; });
+        const body = document.getElementById('dp-body');
+        if (c && body) body.innerHTML = renderInfoTab(c);
+      }
+    });
+}
+
+function _renderCskhBlock_(c) {
+  const lite = c.cskh || [];
+  if (!lite.length) return '';
+  const full = _cskhDetailCache[c.phone];
+  const rows = full && full.length ? full : lite;
+  if (!full && !_cskhDetailState[c.phone]) setTimeout(function(){ _loadCskhDetailForPhone_(c.phone); }, 0);
+  const _ckLoading = !full && _cskhDetailState[c.phone] === 'loading';
+  const LBL = [['tier','Phân loại'],['staff','NV phụ trách'],['codeOrig','Mã KH (gốc)'],['codeOther','Mã KH khác'],['internal','Đối tượng nội bộ'],
+    ['birthday','Ngày sinh'],['gender','Giới tính'],['address','Địa chỉ'],['email','Email'],['company','Công ty'],['taxCompany','MST công ty'],
+    ['debt','Công nợ'],['source','Nguồn dữ liệu'],['note','Ghi chú']];
+  return `<div style="margin-top:10px"><div class="dp-stitle">🗂 CSKH-Duyên${rows.length>1?` (${rows.length} dòng trùng SĐT)`:''}${_ckLoading?' <span style="font-weight:400;color:var(--hint);font-size:11px">⏳ đang tải chi tiết…</span>':''}</div>` +
+    rows.map(r => `<div style="font-size:12px;margin-top:6px;background:var(--surface2);padding:8px;border-radius:6px">` +
+      (r.name ? `<div style="font-weight:600;margin-bottom:4px">${esc(r.name)}${r.tier?` <span class="cs-badge">${esc(r.tier)}</span>`:''}</div>` : '') +
+      LBL.filter(x => r[x[0]] && !(x[0]==='tier' && r.name)).map(x => `<div style="display:flex;gap:6px;padding:1px 0"><span style="color:var(--muted);min-width:92px">${x[1]}</span><span style="flex:1;word-break:break-word">${esc(r[x[0]])}</span></div>`).join('') +
+      `</div>`).join('') + `</div>`;
+}
+
 function renderInfoTab(c) {
   const lastO = c.orders.reduce((a,b)=>{
     const da=a.date instanceof Date?a.date:new Date(0);
@@ -4779,6 +4913,7 @@ function renderInfoTab(c) {
       <div class="dp-stitle">Sản phẩm đã mua</div>
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${c.brands.map(b=>`<span class="btag" style="font-size:11px;padding:3px 8px">${esc(b)}</span>`).join('')||'<span style="color:var(--hint);font-size:12px">Chưa có</span>'}</div>
     </div>
+    ${_renderCskhBlock_(c)}
     ${care.note?`<div style="margin-top:10px"><div class="dp-stitle">Ghi chú CS</div><div style="font-size:12px;color:var(--muted);margin-top:4px;background:var(--surface2);padding:8px;border-radius:6px">${esc(care.note)}</div></div>`:''}
     <div style="margin-top:10px">
       <div class="dp-stitle">Lịch hẹn sắp tới</div>
@@ -7709,9 +7844,16 @@ let _advAssign = {
   sourceMode: 'filter',   // 'filter' | 'count'
   customCount: 0,
   sortMode: 'default',    // 'default' | 'vip' | 'tt' | 'tn' | 'unassigned'
+  dateFrom: '',           // lọc thêm theo khoảng ngày ĐƠN HÀNG (c.ymList[].ds), để trống = không giới hạn
+  dateTo: '',
+  selectMode: 'cs',       // 'cs' (chọn CS riêng lẻ) | 'team' (chia theo Team, tỷ lệ nội bộ theo %)
   selectedCS: new Set(),  // multi select
-  distMode: 'equal',      // 'equal' | 'custom'
-  customDist: {},         // csName -> count
+  selectedTeams: new Set(), // multi select team id — dùng khi selectMode==='team'
+  distMode: 'equal',      // 'equal' | 'custom' — áp dụng cho CS (khi selectMode='cs') hoặc Team (khi selectMode='team')
+  customDist: {},         // csName|teamId -> count (số KH ở cấp phân phối trên cùng)
+  memberDistMode: 'pct',  // 'pct' (tỷ lệ %) | 'count' (nhập số lượng cụ thể) — cách chia NỘI BỘ trong từng Team
+  memberRatio: {},        // teamId -> { tenNhanVien: phanTramTyLe } — dùng khi memberDistMode==='pct'
+  memberCount: {},        // teamId -> { tenNhanVien: soLuongKH } — dùng khi memberDistMode==='count'
   label: '',
 };
 
@@ -7725,11 +7867,18 @@ function openAssignModal() {
   _assignFilteredList = src.map(function(c){ return c.phone; }).filter(Boolean);
   try { console.log('[ChiaData] window.__omeFiltered =', (window.__omeFiltered||[]).length, '| _lastFilteredObjs =', (typeof _lastFilteredObjs!=='undefined'&&_lastFilteredObjs)?_lastFilteredObjs.length:'n/a', '| → _assignFilteredList =', _assignFilteredList.length); } catch(e){}
   _advAssign.selectedCS = new Set();
+  _advAssign.selectedTeams = new Set();
+  _advAssign.selectMode = 'cs';
   _advAssign.sourceMode = 'filter';
   _advAssign.customCount = _assignFilteredList.length;
   _advAssign.distMode = 'equal';
   _advAssign.customDist = {};
+  _advAssign.memberDistMode = 'pct';
+  _advAssign.memberRatio = {};
+  _advAssign.memberCount = {};
   _advAssign.sortMode = 'default';
+  _advAssign.dateFrom = '';
+  _advAssign.dateTo = '';
   _advAssign.label = '';
   switchAssignTab('create', document.querySelector('.assign-tab'));
   document.getElementById('assign-modal').classList.add('open');
@@ -7754,17 +7903,69 @@ function switchAssignTab(tab, el) {
   }
 }
 
+// ── Lọc thêm theo khoảng ngày ĐƠN HÀNG (để trống dateFrom/dateTo = không lọc) — áp dụng TRƯỚC
+// mọi bước khác (nguồn, ưu tiên lấy, phân phối), dùng cùng field c.ymList[].ds ('YYYY-MM-DD')
+// như bộ lọc chính của bảng Danh sách KH, nhưng tách riêng để không phụ thuộc bộ lọc đang bật
+// trên bảng — admin có thể mở modal rồi tự chọn khoảng ngày khác ngay trong Chia data.
+function _advAssignDateFilteredList() {
+  if (!_advAssign.dateFrom && !_advAssign.dateTo) return _assignFilteredList;
+  return _assignFilteredList.filter(function (p) {
+    var c = customerMap[p];
+    if (!c || !c.ymList) return false;
+    return c.ymList.some(function (o) {
+      if (!o.ds) return false;
+      if (_advAssign.dateFrom && o.ds < _advAssign.dateFrom) return false;
+      if (_advAssign.dateTo && o.ds > _advAssign.dateTo) return false;
+      return true;
+    });
+  });
+}
+
+// ── CACHE TRA CUU NHANH CHO CHIA DATA ─────────────────────────────────────────────────────────
+// NGUYEN NHAN LAG (da sua): sau khi them nguon CSKH-Duyen (~134k KH), moi lan bam BAT KY nut nao trong
+// modal Chia data (renderAssignCreate) / go so luong (_getAssignPool) deu chay cac vong lap BAC HAI tren
+// toan bo danh sach: allCustomers.find(...) cho TUNG SDT, va assignHistory.some(h => h.phones.includes(p))
+// (wasEverAssigned) cho TUNG SDT, cong them dung lai tap CS tu toan bo KH (_buildCsSet_ moi KH) o MOI lan ve.
+// Nay dung Map/Set dung chung, chi dung lai khi allCustomers hoac assignHistory thuc su doi.
+var _asgCache = { custRef:null, custLen:-1, custMap:null, histSig:null, everSet:null, csRef:null, csLen:-1, csDV:-1, csList:null };
+function _assignCustMap(){
+  if (_asgCache.custMap && _asgCache.custRef === allCustomers && _asgCache.custLen === allCustomers.length) return _asgCache.custMap;
+  var m = new Map();
+  for (var i = 0; i < allCustomers.length; i++) m.set(allCustomers[i].phone, allCustomers[i]);
+  _asgCache.custRef = allCustomers; _asgCache.custLen = allCustomers.length; _asgCache.custMap = m;
+  return m;
+}
+function _everAssignedSet(){
+  var sig = (assignHistory || []).map(function(h){ return h.id + ':' + (h.phones ? h.phones.length : 0); }).join(',');
+  if (_asgCache.everSet && _asgCache.histSig === sig) return _asgCache.everSet;
+  var set = new Set();
+  (assignHistory || []).forEach(function(h){ (h.phones || []).forEach(function(p){ set.add(p); }); });
+  _asgCache.histSig = sig; _asgCache.everSet = set;
+  return set;
+}
+function _assignAllCSNames(){
+  // csSet/careCSSet da tinh san trong buildCustomers — khong goi lai _buildCsSet_ cho tung KH moi lan ve modal
+  if (_asgCache.csList && _asgCache.csRef === allCustomers && _asgCache.csLen === allCustomers.length && _asgCache.csDV === _dataVersion) return _asgCache.csList;
+  var names = new Set();
+  for (var i = 0; i < allCustomers.length; i++) {
+    var c = allCustomers[i];
+    if (c.csSet) c.csSet.forEach(function(n){ if (n) names.add(n); });
+    if (c.careCSSet) c.careCSSet.forEach(function(n){ if (n) names.add(n); });
+  }
+  var list = [...names].sort();
+  _asgCache.csRef = allCustomers; _asgCache.csLen = allCustomers.length; _asgCache.csDV = _dataVersion; _asgCache.csList = list;
+  return list;
+}
+
 // ── Helper: get sorted pool based on advAssign settings ──
 function _getAssignPool() {
-  let pool = [..._assignFilteredList];
+  let pool = [..._advAssignDateFilteredList()];
   if (_advAssign.sortMode === 'unassigned') {
     pool = pool.filter(p => !wasEverAssigned(p));
-  } else if (_advAssign.sortMode === 'vip') {
-    pool = pool.filter(p => { const c = allCustomers.find(x=>x.phone===p); return c && c.tier === 'VIP'; });
-  } else if (_advAssign.sortMode === 'tt') {
-    pool = pool.filter(p => { const c = allCustomers.find(x=>x.phone===p); return c && c.tier === 'Thân thiết'; });
-  } else if (_advAssign.sortMode === 'tn') {
-    pool = pool.filter(p => { const c = allCustomers.find(x=>x.phone===p); return c && c.tier === 'Tiềm năng'; });
+  } else if (_advAssign.sortMode === 'vip' || _advAssign.sortMode === 'tt' || _advAssign.sortMode === 'tn') {
+    const _tierWant = _advAssign.sortMode === 'vip' ? 'VIP' : (_advAssign.sortMode === 'tt' ? 'Thân thiết' : 'Tiềm năng');
+    const _cm = _assignCustMap();
+    pool = pool.filter(p => { const c = _cm.get(p); return c && c.tier === _tierWant; });
   }
   if (_advAssign.sourceMode === 'count') {
     const n = Math.min(parseInt(_advAssign.customCount) || 0, pool.length);
@@ -7797,6 +7998,36 @@ function _computeDist(pool, csList) {
   }
 }
 
+// ── Chia 1 lượng KH (đã phân cho 1 Team) cho các thành viên trong Team đó THEO TỶ LỆ % ──
+// ratioMap: { tenNhanVien: phanTram }. Nếu TẤT CẢ đều rỗng/0 (chưa ai thiết lập) → chia đều.
+// Dùng phương pháp "số dư lớn nhất" (largest remainder) để tổng các phần làm tròn luôn khớp
+// đúng total, không bị lệch 1-2 KH do làm tròn từng người riêng lẻ.
+function _computeMemberRatioDist(total, members, ratioMap) {
+  if (!members || !members.length || total <= 0) return {};
+  ratioMap = ratioMap || {};
+  let pcts = members.map(m => Math.max(0, Number(ratioMap[m]) || 0));
+  let sum = pcts.reduce((a, b) => a + b, 0);
+  if (sum <= 0) { pcts = members.map(() => 100 / members.length); sum = 100; }
+  const raw = pcts.map(p => total * p / sum);
+  const floors = raw.map(Math.floor);
+  const used = floors.reduce((a, b) => a + b, 0);
+  let remainder = total - used;
+  const order = raw.map((_, i) => i).sort((a, b) => (raw[b] - floors[b]) - (raw[a] - floors[a]));
+  const dist = {};
+  members.forEach((m, i) => { dist[m] = floors[i]; });
+  for (let k = 0; k < remainder && k < order.length; k++) { dist[members[order[k]]]++; }
+  return dist;
+}
+
+// ── Chia 1 lượng KH (đã phân cho 1 Team) cho các thành viên THEO SỐ LƯỢNG CỤ THỂ do admin tự
+// nhập (countMap: { tenNhanVien: soLuong }) — KHÔNG tự chia đều, chỉ đọc đúng số đã nhập (clamp
+// về 0 nếu âm/rỗng). Dùng khi _advAssign.memberDistMode === 'count'.
+function _computeMemberCountDist(members, countMap) {
+  const dist = {};
+  (members || []).forEach(m => { dist[m] = Math.max(0, parseInt((countMap || {})[m]) || 0); });
+  return dist;
+}
+
 function renderAssignCreate() {
   // TỰ CHỮA: nếu danh sách rỗng nhưng bảng đang hiển thị có KH → lấy lại NGAY từ bảng (nguồn sự thật)
   if ((!_assignFilteredList || !_assignFilteredList.length)
@@ -7804,24 +8035,27 @@ function renderAssignCreate() {
     _assignFilteredList = window.__omeFiltered.map(function(c){ return c && c.phone; }).filter(Boolean);
     _advAssign.customCount = _assignFilteredList.length;
   }
-  const allCS = [...new Set(allCustomers.flatMap(c => [
-    ..._buildCsSet_(c.orders, c.phone), ...(c.careCSSet||[])
-  ]).filter(Boolean))].sort();
+  const allCS = _assignAllCSNames();
 
-  const totalFiltered = _assignFilteredList.length;
+  const dateFilteredList = _advAssignDateFilteredList();
+  const totalFiltered = dateFilteredList.length;
   const pool = _getAssignPool();
+  const isTeamMode = _advAssign.selectMode === 'team';
   const csList = [..._advAssign.selectedCS];
+  const teamIds = [..._advAssign.selectedTeams];
   const dist = _computeDist(pool, csList);
   const distTotal = Object.values(dist).reduce((s,v)=>s+v,0);
   const remaining = pool.length - distTotal;
+  const selectedCount = isTeamMode ? teamIds.length : csList.length;
 
-  const alreadyAssigned = _assignFilteredList.filter(p => wasEverAssigned(p));
-  const neverAssigned = _assignFilteredList.filter(p => !wasEverAssigned(p));
-
-  // Count by tier
+  // 1 vong duy nhat (O(N)) thay vi 2 lan filter x wasEverAssigned x allCustomers.find (O(N^2))
+  const _everSet = _everAssignedSet();
+  const _custMap = _assignCustMap();
+  let alreadyAssigned = { length: 0 }, neverAssigned = { length: 0 };
   const tierCount = { VIP:0, 'Thân thiết':0, 'Tiềm năng':0, other:0 };
-  _assignFilteredList.forEach(p => {
-    const c = allCustomers.find(x=>x.phone===p);
+  dateFilteredList.forEach(p => {
+    if (_everSet.has(p)) alreadyAssigned.length++; else neverAssigned.length++;
+    const c = _custMap.get(p);
     const t = c?.tier || 'other';
     if (tierCount[t] !== undefined) tierCount[t]++; else tierCount.other++;
   });
@@ -7837,7 +8071,15 @@ function renderAssignCreate() {
       <span style="color:var(--tn)">Tiềm năng: ${tierCount['Tiềm năng']}</span><br>
       <span style="color:var(--green)">✓ Chưa chia: <strong>${neverAssigned.length}</strong></span> &nbsp;|&nbsp;
       <span style="color:#92400e">⚠ Đã chia: <strong>${alreadyAssigned.length}</strong></span>
-      ${totalFiltered === 0 ? '<br><span style="color:var(--red)">⚠ Bảng đang lọc ra 0 KH. Hãy vào tab <strong>Danh sách KH</strong> lọc cho ra khách (hoặc xoá bớt bộ lọc cột / ngày / tìm kiếm) rồi mở lại Chia data.</span>' : ''}
+      ${totalFiltered === 0 ? '<br><span style="color:var(--red)">⚠ Không có KH nào khớp (bộ lọc bảng + khoảng ngày bên dưới). Hãy xoá bớt bộ lọc / nới khoảng ngày rồi thử lại.</span>' : ''}
+    </div>
+
+    <div style="font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:500">Khoảng thời gian lấy data <span style="font-weight:400">(theo ngày đơn hàng — để trống = không giới hạn)</span>:</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+      <input type="date" class="assign-input" style="width:auto" value="${esc(_advAssign.dateFrom||'')}" onchange="_advAssign.dateFrom=this.value;renderAssignCreate()" title="Từ ngày">
+      <span style="color:var(--muted)">→</span>
+      <input type="date" class="assign-input" style="width:auto" value="${esc(_advAssign.dateTo||'')}" onchange="_advAssign.dateTo=this.value;renderAssignCreate()" title="Đến ngày">
+      ${(_advAssign.dateFrom || _advAssign.dateTo) ? `<button class="btn sm" onclick="_advAssign.dateFrom='';_advAssign.dateTo='';renderAssignCreate()">✕ Xoá khoảng ngày</button>` : ''}
     </div>
 
     <div style="font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:500">Lấy từ:</div>
@@ -7870,9 +8112,20 @@ function renderAssignCreate() {
     </div>
   </div>
 
-  <!-- STEP 2: CS SELECTION -->
+  <!-- STEP 2: CS / TEAM SELECTION -->
   <div class="assign-section">
-    <div class="assign-section-title">② Chọn CS nhận data <span style="font-size:10px;font-weight:400;color:var(--muted)">(gõ tên để tìm, bấm để chọn — chọn được nhiều CS)</span></div>
+    <div class="assign-section-title">② Chọn nơi nhận data</div>
+    <div class="assign-mode-row" style="margin-bottom:10px">
+      <div class="assign-mode-btn ${!isTeamMode?'active':''}" onclick="_advAssign.selectMode='cs';renderAssignCreate()">
+        👤 CS riêng lẻ <span style="font-size:10px;display:block;font-weight:400;margin-top:2px">Chọn từng người</span>
+      </div>
+      <div class="assign-mode-btn ${isTeamMode?'active':''}" onclick="_advAssign.selectMode='team';renderAssignCreate()">
+        👥 Theo Team <span style="font-size:10px;display:block;font-weight:400;margin-top:2px">Chia tỷ lệ % cho từng người trong Team</span>
+      </div>
+    </div>
+
+    ${!isTeamMode ? `
+    <div style="font-size:10px;font-weight:400;color:var(--muted);margin-bottom:6px">(gõ tên để tìm, bấm để chọn — chọn được nhiều CS)</div>
     <input class="assign-input" id="assign-cs-search" placeholder="🔍 Gõ tên CS để tìm nhanh..." style="width:100%;margin-bottom:8px;box-sizing:border-box"
       oninput="_filterAssignCSChips(this.value)">
     <div class="assign-cs-list" id="assign-cs-chips" style="margin-bottom:8px">
@@ -7886,22 +8139,30 @@ function renderAssignCreate() {
       <button class="btn sm" onclick="_advAssignAddManual(document.getElementById('assign-cs-manual').value);document.getElementById('assign-cs-manual').value=''">Thêm</button>
     </div>
     ${_advAssign.selectedCS.size===0?'<div style="font-size:11px;color:var(--hint);margin-top:6px">⬆ Chọn ít nhất 1 CS</div>':''}
+    ` : `
+    <div style="font-size:10px;font-weight:400;color:var(--muted);margin-bottom:6px">(bấm để chọn Team — chọn được nhiều Team, tỷ lệ % cho từng thành viên nhập ở bước ③ bên dưới)</div>
+    <div class="assign-cs-list" id="assign-team-chips" style="margin-bottom:8px">
+      ${teams.map(t => `<div class="assign-cs-chip-multi ${_advAssign.selectedTeams.has(t.id)?'selected':''}" data-team="${esc(t.id)}" onclick="_advAssignToggleTeam(this.dataset.team)">${esc(t.name)} <span style="opacity:.6">(${(t.members||[]).length})</span></div>`).join('')}
+      ${teams.length===0?'<span style="color:var(--hint);font-size:12px">Chưa có Team nào — vào tab "Quản lý Team" để tạo Team trước.</span>':''}
+    </div>
+    ${_advAssign.selectedTeams.size===0?'<div style="font-size:11px;color:var(--hint);margin-top:6px">⬆ Chọn ít nhất 1 Team</div>':''}
+    `}
   </div>
 
   <!-- STEP 3: DISTRIBUTION -->
-  ${_advAssign.selectedCS.size > 0 ? `
+  ${selectedCount > 0 ? `
   <div class="assign-section">
     <div class="assign-section-title">③ Phân phối data</div>
     <div class="assign-mode-row" style="margin-bottom:10px">
       <div class="assign-mode-btn ${_advAssign.distMode==='equal'?'active':''}" onclick="_advAssign.distMode='equal';renderAssignCreate()">
-        ⚖ Chia đều <span style="font-size:10px;display:block;font-weight:400;margin-top:2px">~${Math.ceil(pool.length/Math.max(_advAssign.selectedCS.size,1))} KH/CS</span>
+        ⚖ Chia đều <span style="font-size:10px;display:block;font-weight:400;margin-top:2px">~${Math.ceil(pool.length/Math.max(selectedCount,1))} KH/${isTeamMode?'Team':'CS'}</span>
       </div>
       <div class="assign-mode-btn ${_advAssign.distMode==='custom'?'active':''}" onclick="_advAssign.distMode='custom';renderAssignCreate()">
-        ✏ Tuỳ chỉnh từng CS <span style="font-size:10px;display:block;font-weight:400;margin-top:2px">Nhập số KH cho mỗi người</span>
+        ✏ Tuỳ chỉnh từng ${isTeamMode?'Team':'CS'} <span style="font-size:10px;display:block;font-weight:400;margin-top:2px">Nhập số KH cho mỗi ${isTeamMode?'team':'người'}</span>
       </div>
     </div>
     <div id="assign-dist-preview">
-      ${_renderDistTable(pool, csList, dist, distTotal, remaining)}
+      ${isTeamMode ? _renderTeamDistTable(pool, teamIds) : _renderDistTable(pool, csList, dist, distTotal, remaining)}
     </div>
   </div>` : ''}
 
@@ -7967,28 +8228,36 @@ function _renderDistTable(pool, csList, dist, distTotal, remaining) {
 
 function _refreshDistPreview() {
   const pool = _getAssignPool();
-  const csList = [..._advAssign.selectedCS];
-  const dist = _computeDist(pool, csList);
-  const distTotal = Object.values(dist).reduce((s,v)=>s+v,0);
-  const remaining = pool.length - distTotal;
   const el = document.getElementById('assign-dist-preview');
-  if (el) el.innerHTML = _renderDistTable(pool, csList, dist, distTotal, remaining);
+  if (!el) return;
+  if (_advAssign.selectMode === 'team') {
+    el.innerHTML = _renderTeamDistTable(pool, [..._advAssign.selectedTeams]);
+  } else {
+    const csList = [..._advAssign.selectedCS];
+    const dist = _computeDist(pool, csList);
+    const distTotal = Object.values(dist).reduce((s,v)=>s+v,0);
+    const remaining = pool.length - distTotal;
+    el.innerHTML = _renderDistTable(pool, csList, dist, distTotal, remaining);
+  }
 }
 
 function renderAssignDistPreview() {
   _refreshDistPreview();
 }
 
+// Dùng chung cho cả 2 chế độ: keyList là csList (chế độ CS) hoặc teamIds (chế độ Team) — hàm
+// _computeDist/customDist không quan tâm ý nghĩa của key, chỉ cần key trùng với key render ra.
 function _autoFillRemaining() {
   const pool = _getAssignPool();
-  const csList = [..._advAssign.selectedCS];
-  const used = csList.reduce((s,cs) => s + (parseInt(_advAssign.customDist[cs])||0), 0);
+  const keyList = _advAssign.selectMode === 'team' ? [..._advAssign.selectedTeams] : [..._advAssign.selectedCS];
+  if (!keyList.length) return;
+  const used = keyList.reduce((s,k) => s + (parseInt(_advAssign.customDist[k])||0), 0);
   const rem = pool.length - used;
   if (rem <= 0) { toast('Đã phân đủ rồi!'); return; }
-  const base = Math.floor(rem / csList.length);
-  const extra = rem % csList.length;
-  csList.forEach((cs, i) => {
-    _advAssign.customDist[cs] = (parseInt(_advAssign.customDist[cs])||0) + base + (i < extra ? 1 : 0);
+  const base = Math.floor(rem / keyList.length);
+  const extra = rem % keyList.length;
+  keyList.forEach((k, i) => {
+    _advAssign.customDist[k] = (parseInt(_advAssign.customDist[k])||0) + base + (i < extra ? 1 : 0);
   });
   _refreshDistPreview();
 }
@@ -8009,6 +8278,175 @@ function _advAssignAddManual(val) {
   _advAssign.selectedCS.add(name);
   renderAssignCreate();
 }
+
+function _advAssignToggleTeam(teamId) {
+  if (_advAssign.selectedTeams.has(teamId)) {
+    _advAssign.selectedTeams.delete(teamId);
+    delete _advAssign.customDist[teamId];
+    delete _advAssign.memberRatio[teamId];
+    delete _advAssign.memberCount[teamId];
+  } else {
+    _advAssign.selectedTeams.add(teamId);
+  }
+  renderAssignCreate();
+}
+
+// Sửa tỷ lệ % nhận data của 1 thành viên trong 1 Team (đọc data-team/data-member thay vì nhúng
+// tên trực tiếp vào chuỗi onclick, tránh lỗi khi tên có dấu nháy/ký tự đặc biệt)
+function _advAssignSetMemberRatio(el) {
+  const teamId = el.dataset.team, member = el.dataset.member;
+  if (!teamId || !member) return;
+  if (!_advAssign.memberRatio[teamId]) _advAssign.memberRatio[teamId] = {};
+  _advAssign.memberRatio[teamId][member] = parseFloat(el.value) || 0;
+  _refreshDistPreview();
+}
+
+// Sửa SỐ LƯỢNG KH cụ thể nhận của 1 thành viên trong 1 Team (dùng khi memberDistMode==='count')
+function _advAssignSetMemberCount(el) {
+  const teamId = el.dataset.team, member = el.dataset.member;
+  if (!teamId || !member) return;
+  if (!_advAssign.memberCount[teamId]) _advAssign.memberCount[teamId] = {};
+  _advAssign.memberCount[teamId][member] = Math.max(0, parseInt(el.value) || 0);
+  _refreshDistPreview();
+}
+
+// Tự động chia hết phần KH CÒN LẠI của 1 Team (ở chế độ nhập số lượng cụ thể) cho các thành
+// viên CHƯA được gán hoặc gán 0 — chia đều phần dư, giống _autoFillRemaining nhưng khoanh vùng
+// trong phạm vi 1 Team thay vì toàn bộ danh sách CS/Team.
+function _advAssignAutoFillTeamMembers(teamId) {
+  const team = teams.find(t => t.id === teamId);
+  const members = (team && team.members) || [];
+  if (!members.length) return;
+  const pool = _getAssignPool();
+  const teamDist = _computeDist(pool, [..._advAssign.selectedTeams]);
+  const teamCount = teamDist[teamId] || 0;
+  if (!_advAssign.memberCount[teamId]) _advAssign.memberCount[teamId] = {};
+  const cm = _advAssign.memberCount[teamId];
+  const used = members.reduce((s, m) => s + (parseInt(cm[m]) || 0), 0);
+  const rem = teamCount - used;
+  if (rem <= 0) { toast('Team này đã phân đủ rồi!'); return; }
+  const base = Math.floor(rem / members.length);
+  const extra = rem % members.length;
+  members.forEach((m, i) => { cm[m] = (parseInt(cm[m]) || 0) + base + (i < extra ? 1 : 0); });
+  _refreshDistPreview();
+}
+
+// Bảng phân phối khi chia THEO TEAM: trước tiên chia pool cho các Team đã chọn (chia đều hoặc
+// tuỳ chỉnh, dùng chung _computeDist/customDist như chế độ CS), sau đó mỗi Team chia tiếp cho
+// thành viên của mình THEO TỶ LỆ % (xem _computeMemberRatioDist).
+function _renderTeamDistTable(pool, teamIds) {
+  if (!teamIds.length) return '<div style="font-size:12px;color:var(--hint)">Chọn ít nhất 1 Team ở trên.</div>';
+  const totalPool = pool.length;
+  const teamDist = _computeDist(pool, teamIds);
+  const distTotal = Object.values(teamDist).reduce((s,v)=>s+v,0);
+  let html = '';
+
+  if (_advAssign.distMode === 'custom') {
+    const rem = totalPool - distTotal;
+    const remClass = rem === 0 ? 'ok' : rem > 0 ? 'warn' : 'err';
+    const remText = rem === 0 ? `✓ Đã phân đủ ${totalPool} KH` : rem > 0 ? `Còn ${rem} KH chưa phân` : `⚠ Vượt quá ${-rem} KH`;
+    html += `
+    <table class="assign-dist-table">
+      <thead><tr><th>Team</th><th style="text-align:center">Số KH</th><th style="min-width:120px">Tỷ lệ</th></tr></thead>
+      <tbody>
+        ${teamIds.map(tid=>{
+          const team = teams.find(t=>t.id===tid) || {name:tid};
+          const n = teamDist[tid]||0;
+          const pct = totalPool > 0 ? Math.round(n/totalPool*100) : 0;
+          return `<tr>
+            <td><strong>${esc(team.name)}</strong></td>
+            <td style="text-align:center"><input class="assign-dist-input" type="number" min="0" max="${totalPool}" value="${n}" data-cs="${esc(tid)}"
+              oninput="_advAssign.customDist[this.dataset.cs]=parseInt(this.value)||0;_refreshDistPreview()"></td>
+            <td><div class="assign-dist-bar"><div class="assign-dist-fill" style="width:${pct}%"></div></div><span style="font-size:10px;color:var(--muted)">${pct}%</span></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    <div style="margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span class="assign-remaining-badge ${remClass}">${remText}</span>
+      <button class="btn sm" onclick="_autoFillRemaining()">🔄 Tự động phân phần còn lại</button>
+    </div>`;
+  } else {
+    html += `
+    <table class="assign-dist-table">
+      <thead><tr><th>Team</th><th style="text-align:right">Số KH nhận</th><th style="min-width:120px">Tỷ lệ</th></tr></thead>
+      <tbody>
+        ${teamIds.map(tid=>{
+          const team = teams.find(t=>t.id===tid) || {name:tid};
+          const n = teamDist[tid]||0;
+          const pct = totalPool > 0 ? Math.round(n/totalPool*100) : 0;
+          return `<tr>
+            <td><strong>${esc(team.name)}</strong></td>
+            <td style="text-align:right;font-weight:700;color:var(--green)">${n}</td>
+            <td><div class="assign-dist-bar"><div class="assign-dist-fill" style="width:${pct}%"></div></div><span style="font-size:10px;color:var(--muted)">${pct}%</span></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    <div style="margin-top:8px"><span class="assign-remaining-badge ok">✓ ${totalPool} KH sẽ được chia cho ${teamIds.length} Team</span></div>`;
+  }
+
+  // Phân phối NỘI BỘ từng Team — luôn hiện, bất kể đang Chia đều hay Tuỳ chỉnh ở cấp Team phía
+  // trên. 2 cách: theo % tỷ lệ (tự tính số KH), hoặc nhập thẳng số lượng cụ thể cho từng người.
+  const isCountMode = _advAssign.memberDistMode === 'count';
+  html += '<div style="margin-top:14px;border-top:1px dashed var(--border);padding-top:10px">';
+  html += `<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+    <div style="font-size:11px;color:var(--muted);font-weight:500">Chia trong từng Team cho từng thành viên:</div>
+    <div class="assign-mode-row" style="flex:none;width:auto">
+      <div class="assign-mode-btn ${!isCountMode?'active':''}" style="flex:none;padding:4px 10px;font-size:11px" onclick="_advAssign.memberDistMode='pct';renderAssignCreate()">⚖ Theo %</div>
+      <div class="assign-mode-btn ${isCountMode?'active':''}" style="flex:none;padding:4px 10px;font-size:11px" onclick="_advAssign.memberDistMode='count';renderAssignCreate()">🔢 Số lượng cụ thể</div>
+    </div>
+  </div>`;
+  teamIds.forEach(tid => {
+    const team = teams.find(t=>t.id===tid) || {name:tid, members:[]};
+    const members = team.members || [];
+    const teamCount = teamDist[tid] || 0;
+    html += `<div style="margin-bottom:10px">`;
+    html += `<div style="font-weight:700;font-size:12px;margin-bottom:4px">${esc(team.name)} <span style="font-weight:400;color:var(--muted)">— ${teamCount} KH</span></div>`;
+    if (!members.length) {
+      html += `<div style="font-size:11px;color:var(--hint);padding-left:8px">⚠ Team chưa có thành viên — vào "Quản lý Team" để thêm, nếu không data của Team này sẽ không ai nhận.</div>`;
+    } else if (isCountMode) {
+      const countMap = _advAssign.memberCount[tid] || {};
+      members.forEach(m => {
+        const n = parseInt(countMap[m]) || 0;
+        html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;padding-left:8px">
+          <span style="flex:1;font-size:12px">${esc(m)}</span>
+          <input class="assign-dist-input" type="number" min="0" max="${teamCount}" step="1" style="width:64px" value="${n}" data-team="${esc(tid)}" data-member="${esc(m)}" oninput="_advAssignSetMemberCount(this)">
+          <span style="font-size:11px;color:var(--muted)">KH</span>
+        </div>`;
+      });
+      const used = members.reduce((s,m)=> s + (parseInt(countMap[m])||0), 0);
+      const rem = teamCount - used;
+      const remClass = rem === 0 ? 'ok' : rem > 0 ? 'warn' : 'err';
+      const remText = rem === 0 ? `✓ Đã phân đủ ${teamCount} KH` : rem > 0 ? `Còn ${rem} KH chưa phân trong Team này` : `⚠ Vượt quá ${-rem} KH so với ${teamCount} KH của Team`;
+      html += `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-left:8px;margin-top:4px">
+        <span class="assign-remaining-badge ${remClass}">${remText}</span>
+        <button class="btn sm" onclick="_advAssignAutoFillTeamMembers('${esc(tid)}')">🔄 Tự động chia phần còn lại</button>
+      </div>`;
+    } else {
+      const ratioMap = _advAssign.memberRatio[tid] || {};
+      const sumPct = members.reduce((s,m)=> s + Math.max(0, Number(ratioMap[m])||0), 0);
+      const usingDefault = sumPct <= 0;
+      const memberDist = _computeMemberRatioDist(teamCount, members, ratioMap);
+      members.forEach(m => {
+        const pctDisplay = usingDefault ? (100/members.length).toFixed(1) : (Number(ratioMap[m])||0);
+        const cnt = memberDist[m] || 0;
+        html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;padding-left:8px">
+          <span style="flex:1;font-size:12px">${esc(m)}</span>
+          <input class="assign-dist-input" type="number" min="0" max="100" step="0.1" style="width:64px" value="${pctDisplay}" data-team="${esc(tid)}" data-member="${esc(m)}" oninput="_advAssignSetMemberRatio(this)">
+          <span style="font-size:11px;color:var(--muted)">%</span>
+          <span style="font-size:12px;font-weight:600;color:var(--green);min-width:54px;text-align:right">${cnt} KH</span>
+        </div>`;
+      });
+      if (!usingDefault && Math.abs(sumPct-100) > 0.5) {
+        html += `<div style="font-size:10px;color:#92400e;padding-left:8px">⚠ Tổng tỷ lệ đang là ${sumPct.toFixed(1)}% (không nhất thiết phải tròn 100% — hệ thống vẫn chia đúng theo tỷ trọng đã nhập).</div>`;
+      }
+    }
+    html += `</div>`;
+  });
+  html += '</div>';
+  return html;
+}
 // Lọc nhanh chip CS theo tên (không render lại modal để giữ ô tìm kiếm)
 function _filterAssignCSChips(q){
   const qf = (typeof _foldVi==='function') ? _foldVi(q||'') : String(q||'').toLowerCase();
@@ -8019,33 +8457,78 @@ function _filterAssignCSChips(q){
 }
 
 function doAssignDataAdvanced() {
-  const csList = [..._advAssign.selectedCS];
-  if (csList.length === 0) { toast('Vui lòng chọn ít nhất 1 CS'); return; }
   const pool = _getAssignPool();
   if (pool.length === 0) { toast('Không có data nào để chia'); return; }
 
-  const dist = _computeDist(pool, csList);
-  if (_advAssign.distMode === 'custom') {
-    const distTotal = Object.values(dist).reduce((s,v)=>s+v,0);
-    if (distTotal > pool.length) { toast(`⚠ Tổng phân phối (${distTotal}) vượt quá số KH có sẵn (${pool.length})`); return; }
-    if (distTotal === 0) { toast('Vui lòng nhập số KH cho từng CS'); return; }
+  // finalDist: tên người nhận (csName, kể cả khi lấy từ thành viên 1 Team) -> số KH cuối cùng.
+  // Dùng Set để gom theo tên duy nhất — phòng trường hợp 1 người xuất hiện ở 2 Team được chọn
+  // cùng lúc, tránh bị cắt pool 2 lần cho cùng 1 người.
+  let finalDist = {};
+  let orderedNames = [];
+
+  if (_advAssign.selectMode === 'team') {
+    const teamIds = [..._advAssign.selectedTeams];
+    if (teamIds.length === 0) { toast('Vui lòng chọn ít nhất 1 Team'); return; }
+    const teamDist = _computeDist(pool, teamIds);
+    if (_advAssign.distMode === 'custom') {
+      const distTotal = Object.values(teamDist).reduce((s,v)=>s+v,0);
+      if (distTotal > pool.length) { toast(`⚠ Tổng phân phối cho Team (${distTotal}) vượt quá số KH có sẵn (${pool.length})`); return; }
+      if (distTotal === 0) { toast('Vui lòng nhập số KH cho từng Team'); return; }
+    }
+    const isCountMode = _advAssign.memberDistMode === 'count';
+    const orderedSet = new Set();
+    for (const teamId of teamIds) {
+      const team = teams.find(t => t.id === teamId);
+      const members = (team && team.members) || [];
+      const teamCount = teamDist[teamId] || 0;
+      if (!members.length || teamCount <= 0) continue;
+      let memberDist;
+      if (isCountMode) {
+        memberDist = _computeMemberCountDist(members, _advAssign.memberCount[teamId] || {});
+        const sumN = Object.values(memberDist).reduce((s,v)=>s+v,0);
+        if (sumN > teamCount) {
+          toast(`⚠ Team "${team.name}": tổng số KH đã nhập (${sumN}) vượt quá ${teamCount} KH của Team — sửa lại trước khi chia.`);
+          return;
+        }
+      } else {
+        memberDist = _computeMemberRatioDist(teamCount, members, _advAssign.memberRatio[teamId] || {});
+      }
+      members.forEach(m => {
+        const n = memberDist[m] || 0;
+        if (n <= 0) return;
+        finalDist[m] = (finalDist[m] || 0) + n;
+        orderedSet.add(m);
+      });
+    }
+    orderedNames = [...orderedSet];
+    if (orderedNames.length === 0) { toast('Chưa có thành viên nào được phân KH — kiểm tra lại Team đã chọn/tỷ lệ hoặc số lượng'); return; }
+  } else {
+    const csList = [..._advAssign.selectedCS];
+    if (csList.length === 0) { toast('Vui lòng chọn ít nhất 1 CS'); return; }
+    finalDist = _computeDist(pool, csList);
+    if (_advAssign.distMode === 'custom') {
+      const distTotal = Object.values(finalDist).reduce((s,v)=>s+v,0);
+      if (distTotal > pool.length) { toast(`⚠ Tổng phân phối (${distTotal}) vượt quá số KH có sẵn (${pool.length})`); return; }
+      if (distTotal === 0) { toast('Vui lòng nhập số KH cho từng CS'); return; }
+    }
+    orderedNames = csList;
   }
 
   const label = (document.getElementById('assign-label')?.value || _advAssign.label || '').trim();
   const now = new Date().toISOString().slice(0,16).replace('T',' ');
 
-  // Shuffle pool (optional) then slice per CS
+  // Cắt pool tuần tự theo thứ tự orderedNames — mỗi người nhận đúng finalDist[tên] KH liên tiếp.
   let cursor = 0;
   const entries = [];
-  csList.forEach(cs => {
-    const n = dist[cs] || 0;
+  orderedNames.forEach(name => {
+    const n = finalDist[name] || 0;
     if (n === 0) return;
     const phones = pool.slice(cursor, cursor + n);
     cursor += n;
     const entry = {
       id: Date.now().toString() + '_' + Math.random().toString(36).slice(2,6),
       date: now,
-      csName: cs,
+      csName: name,
       phones,
       label: label || `Chia ${phones.length} KH`,
       donePhones: []
@@ -8080,7 +8563,7 @@ function doAssignData() { doAssignDataAdvanced(); }
 // CS chăm sóc mới nhất thắng (chia lại sẽ đổi sang CS mới).
 function _applyCareCSToAssigned(entries){
   if (typeof careData === 'undefined' || !entries || !entries.length) return 0;
-  const cmap = (typeof allCustomers !== 'undefined') ? new Map(allCustomers.map(c => [String(c.phone), c])) : null;
+  const cmap = (typeof allCustomers !== 'undefined') ? _assignCustMap() : null;   // dung Map cache, khong dung lai 136k cap moi lan chia
   const updates = [];
   entries.forEach(e => {
     const cs = e.csName || '';
@@ -8095,7 +8578,12 @@ function _applyCareCSToAssigned(entries){
   saveLS('ome_care', careData);
   if (gsUrl && updates.length){
     // 1 lần ghi careCS xuống OrderData cột N cho tất cả SĐT vừa chia
-    fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'setOrderCareCSBatch', updates: updates }) }).catch(function(){});
+    // Chia THEO LO 2000 SDT/request (truoc day 1 request chua toan bo — hang tram nghin SDT — de bi timeout/nghen)
+    (async function(){
+      for (let i = 0; i < updates.length; i += 2000) {
+        try { await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'setOrderCareCSBatch', updates: updates.slice(i, i + 2000) }) }); } catch(e) {}
+      }
+    })();
     // đồng bộ careData.cs lên CareData (theo lô)
     updates.forEach(function(u){ if (typeof queueCareSync === 'function') queueCareSync(u.phone); });
   }
@@ -8105,7 +8593,7 @@ function _applyCareCSToAssigned(entries){
 }
 
 function wasEverAssigned(phone) {
-  return assignHistory.some(h => h.phones.includes(phone));
+  return _everAssignedSet().has(phone);   // O(1) — truoc day quet toan bo lich su chia cho TUNG SDT (O(N^2) khi goi trong vong lap)
 }
 
 function renderAssignHistory() {
@@ -8132,7 +8620,7 @@ function renderAssignHistory() {
       </div>
       <div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:4px">
         ${h.phones.slice(0,8).map(p => {
-          const c = allCustomers.find(x => x.phone === p);
+          const c = _assignCustMap().get(p);
           const isDone = h.donePhones && h.donePhones.includes(p);
           return `<span style="font-size:10px;padding:1px 7px;border-radius:20px;background:${isDone?'var(--green-bg)':'var(--surface2)'};color:${isDone?'var(--green)':'var(--muted)'};border:1px solid ${isDone?'rgba(26,107,69,.2)':'var(--border)'}">
             ${isDone?'✓ ':''} ${c ? esc(c.name) : p}
@@ -8200,7 +8688,7 @@ function renderAssignReport() {
   const custByPhone = new Map();
   for (const h of batches) {
     for (const p of h.phones) {
-      const c = allCustomers.find(x=>x.phone===p);
+      const c = _assignCustMap().get(p);
       if (_rptFilters.tier.size && !(c && _rptFilters.tier.has(c.tier))) continue;
       if (_rptFilters.careStatus.size && !(c && _rptFilters.careStatus.has(c.careStatus||''))) continue;
       if (_rptFilters.khStatus.size && !(c && _rptFilters.khStatus.has(c.khStatus||''))) continue;
@@ -8246,7 +8734,7 @@ function renderAssignReport() {
   const totalKH   = new Set(phoneRows.map(r=>r.phone)).size;
   const totalDone = new Set(phoneRows.filter(r=>r.isDone).map(r=>r.phone)).size;
   const totalChot = new Set(phoneRows.filter(r=>r.careStatus==='Chốt').map(r=>r.phone)).size;
-  const neverAssigned = allCustomers.filter(c=>!wasEverAssigned(c.phone)).length;
+  const neverAssigned = allCustomers.filter(c=>!wasEverAssigned(c.phone)).length;   // wasEverAssigned gio la O(1)
   const totalBatches  = batches.length;
 
   // Build pivot data
@@ -8695,8 +9183,9 @@ function updateMyDataBadge() {
   // Count total undone across all batches
   const allActive = new Set();
   for (const h of assignHistory) {
+    const _doneSet = new Set(h.donePhones || []);   // Set thay vi includes() trong vong lap (O(N^2))
     for (const p of h.phones) {
-      if (!(h.donePhones||[]).includes(p)) allActive.add(p);
+      if (!_doneSet.has(p)) allActive.add(p);
     }
   }
   txt('tb-mydata', fmt(allActive.size));
@@ -9199,7 +9688,7 @@ function _inUserScope(c){
 var _careQueue = new Set();
 var _careWriting = new Set();
 var _careTimer = null;
-function _careRow(phone){
+function _careRow(phone, schedByPhone){
   var care = (typeof careData !== 'undefined' && careData[phone]) || {};
   // CHI dong bo len Sheet cac lich: (1) CS tu tao tay (khong phai auto), HOAC (2) auto nhung DA
   // duoc tac dong (bam Xong/xoa). Lich auto CHUA tac dong la SO LIEU TAM TINH LAI moi lan tai
@@ -9207,8 +9696,9 @@ function _careRow(phone){
   // ky dong bo nao khac cua khach nay (vi ly do hoan toan khong lien quan) se vo tinh ghi de/hoi
   // sinh lai dung lich auto ma Duyen vua xoa tay truc tiep tren CareData Sheet — dung cung dieu
   // kien voi _hasRealCareData() ben tren de 2 cho nhat quan voi nhau.
-  var myScheds = (typeof schedules !== 'undefined' ? schedules : []).filter(function(x){
-    return x.phone === phone && (!x.autoDao || x.done);
+  var _srcScheds = schedByPhone ? (schedByPhone[phone] || []) : (typeof schedules !== 'undefined' ? schedules : []).filter(function(x){ return x.phone === phone; });
+  var myScheds = _srcScheds.filter(function(x){
+    return (!x.autoDao || x.done);
   });
   return {
     phone: phone,
@@ -9271,23 +9761,30 @@ async function flushCareSync(){
   _careQueue.clear();
   // Vẫn "bảo vệ" các SĐT này khỏi bị pull đè cho tới khi GS ghi xong (tránh webapp quay về dữ liệu cũ)
   phones.forEach(function(p){ _careWriting.add(p); });
-  var rows = phones.map(_careRow);
-  try {
-    var r = await fetch(gsUrl, { method:'POST', redirect:'follow',
-      body: JSON.stringify({ action:'saveBatch', rows: rows }) });
-    var txtResp = await r.text();
-    var ok = false;
-    try { ok = !!JSON.parse(txtResp).ok; } catch(e){ ok = false; }
-    if (!ok) throw new Error('saveBatch not supported');
-  } catch(e){
-    // GAS cũ (v4) chưa có saveBatch → fallback: lưu từng phone bằng saveSingle
-    for (var i=0;i<phones.length;i++){
-      try { await pushCareToGS(phones[i]); } catch(_){}
+  // Gom lich theo SDT 1 lan (truoc day _careRow quet toan bo lich cho TUNG SDT => O(SDT x lich), treo may khi chia nhieu KH)
+  var schedByPhone = {};
+  (typeof schedules !== 'undefined' ? schedules : []).forEach(function(x){ (schedByPhone[x.phone] = schedByPhone[x.phone] || []).push(x); });
+  var rows = phones.map(function(p){ return _careRow(p, schedByPhone); });
+  // Gui THEO LO 1000 dong/request (truoc day 1 request khong lo; loi 1 lan la roi vao fallback saveSingle tung SDT = hang chuc nghin request)
+  var CHUNK = 1000;
+  for (var ci = 0; ci < rows.length; ci += CHUNK) {
+    var chunkRows = rows.slice(ci, ci + CHUNK), chunkPhones = phones.slice(ci, ci + CHUNK);
+    try {
+      var r = await fetch(gsUrl, { method:'POST', redirect:'follow',
+        body: JSON.stringify({ action:'saveBatch', rows: chunkRows }) });
+      var txtResp = await r.text();
+      var ok = false;
+      try { ok = !!JSON.parse(txtResp).ok; } catch(e){ ok = false; }
+      if (!ok) throw new Error('saveBatch not supported');
+    } catch(e){
+      // GAS cũ (v4) chưa có saveBatch → fallback: lưu từng phone bằng saveSingle (chỉ cho lô bị lỗi)
+      for (var i=0;i<chunkPhones.length;i++){
+        try { await pushCareToGS(chunkPhones[i]); } catch(_){}
+      }
     }
-  } finally {
-    // Giữ bảo vệ thêm 1 nhịp auto-sync để GSheets kịp ghi & đọc lại đúng (read-after-write)
-    setTimeout(function(){ phones.forEach(function(p){ _careWriting.delete(p); }); }, AUTO_SYNC_MS + 1500);
   }
+  // Giữ bảo vệ thêm 1 nhịp auto-sync để GSheets kịp ghi & đọc lại đúng (read-after-write)
+  setTimeout(function(){ phones.forEach(function(p){ _careWriting.delete(p); }); }, AUTO_SYNC_MS + 1500);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -10069,7 +10566,7 @@ function renderTeamTab(){
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
     '<div class="dash-section-title" style="margin:0">👥 Quản lý Team CS</div>'+
     (isAdmin ? '<div style="display:flex;gap:8px">'+
-        '<button class="btn sm" onclick="openSaleChannelsModal()">🏷️ Phân loại Online/Offline</button>'+
+        '<button class="btn sm" onclick="openSaleChannelsModal()">🏷️ Phân loại đội Sale</button>'+
         '<button class="btn primary" onclick="addTeam()">+ Thêm Team</button></div>'
              : '<span style="color:var(--muted);font-size:12px">Chỉ Admin mới chỉnh sửa được</span>')+
   '</div>';
@@ -13892,7 +14389,7 @@ function renderSalesReportTabE_(wrap, subTabs){
       '<div class="gear-menu-list" id="sr-gear-e" onclick="event.stopPropagation()">'+
         '<div onclick="closeGearMenus();openIndividualRatesModal()">⚙ % hoa hồng cá nhân</div>'+
         '<div onclick="closeGearMenus();openBonusProgramsModal()">🏆 Chương trình thưởng</div>'+
-        '<div onclick="closeGearMenus();openSaleChannelsModal()">🏷️ Phân loại Online/Offline</div>'+
+        '<div onclick="closeGearMenus();openSaleChannelsModal()">🏷️ Phân loại đội Sale</div>'+
         '<div onclick="closeGearMenus();openGoldUnitModal()">💰 Đơn giá vàng (Pancake AI)</div>'+
         '<div onclick="closeGearMenus();openChannelRatesModal()">📡 % hoa hồng theo Kênh</div>'+
       '</div></div>';
@@ -14225,6 +14722,7 @@ function renderSalesReportTabF_(wrap, subTabs){
   }
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
   if (_srIsAdmin()) filters += '<button class="btn sm" onclick="openSaleKpiConfigModal_()">🎯 Cài đặt KPI (bậc / commit riêng)</button>';
+  if (_srIsAdmin()) filters += '<button class="btn sm" onclick="openSaleChannelsModal()">🏷️ Phân loại đội Sale</button>';
   filters += '</div>';
 
   var body = _srState.loading
@@ -14720,27 +15218,59 @@ function closeSaleChannelsModal(){
   if (m) m.style.display = 'none';
 }
 var _scSearch = '';
+var _scGroupsOpen = false;     // dong/mo khoi "Quan ly danh sach doi"
+var _scGroupsDraft = null;     // ban nhap dang sua, null = chua mo
 function _renderSaleChannelsModal(){
   var body = document.getElementById('sc-body');
   if (!body) return;
+  var html = '';
+
+  // ── Khoi quan ly danh sach doi (them/sua/xoa) ──
+  html += '<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:12px;overflow:hidden">'+
+    '<div style="padding:8px 10px;background:var(--surface2);cursor:pointer;font-weight:600;font-size:13px;display:flex;justify-content:space-between;align-items:center" onclick="_scGroupsOpen=!_scGroupsOpen;'+(_scGroupsOpen?'':'_scGroupsDraft=null;')+'_renderSaleChannelsModal()">'+
+      '<span>⚙ Quản lý danh sách đội ('+SALE_GROUPS.length+' đội)</span><span>'+(_scGroupsOpen?'▲':'▼')+'</span></div>';
+  if (_scGroupsOpen){
+    if (!_scGroupsDraft) _scGroupsDraft = SALE_GROUPS.map(function(g){ return {key:g.key, label:g.label}; });
+    html += '<div style="padding:10px">';
+    _scGroupsDraft.forEach(function(g, i){
+      var isDefault = (g.key==='online' || g.key==='offline');
+      html += '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">'+
+        '<input type="text" value="'+esc(g.label)+'" placeholder="Tên đội (vd: CSKH, Quầy...)" oninput="_scGroupsDraft['+i+'].label=this.value" style="flex:1;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px">'+
+        '<code style="font-size:10px;color:var(--muted);min-width:60px">'+esc(g.key)+'</code>'+
+        (isDefault ? '<span style="font-size:10px;color:var(--muted)" title="2 đội mặc định, không xoá được">🔒</span>'
+          : '<button class="btn xs danger" onclick="_scGroupsDraft.splice('+i+',1);_renderSaleChannelsModal()" title="Xoá đội">🗑</button>')+
+        '</div>';
+    });
+    html += '<button class="btn sm secondary" onclick="_scGroupsDraft.push({key:\'g\'+Date.now(),label:\'\'});_renderSaleChannelsModal()">+ Thêm đội mới</button> '+
+      '<button class="btn sm primary" onclick="_scSaveGroups()">💾 Lưu danh sách đội</button>'+
+      '</div>';
+  }
+  html += '</div>';
+
+  // ── Bang phan loai tung Sale, dropdown dong theo SALE_GROUPS ──
   var names = (typeof _allCSNames === 'function' ? _allCSNames() : []).slice().sort(function(a,b){ return a.localeCompare(b,'vi'); });
   var q = (_scSearch||'').toLowerCase();
   var filtered = names.filter(function(n){ return !q || n.toLowerCase().indexOf(q)!==-1; });
-  var html = '<input type="text" placeholder="🔍 Tìm nhanh theo tên..." value="'+esc(_scSearch||'')+'" oninput="_scSearch=this.value;_renderSaleChannelsModal()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:240px;margin-bottom:10px">';
-  html += '<table class="dash-table"><thead><tr><th>Tên</th><th style="width:220px">Phân loại</th></tr></thead><tbody>';
+  html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên..." value="'+esc(_scSearch||'')+'" oninput="_scSearch=this.value;_renderSaleChannelsModal()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:240px;margin-bottom:10px">';
+  html += '<table class="dash-table"><thead><tr><th>Tên</th><th style="width:220px">Đội</th></tr></thead><tbody>';
   filtered.forEach(function(name){
     var cur = SALE_CHANNELS[name] || '';
     html += '<tr><td>'+esc(name)+'</td><td>'+
       '<select onchange="_setSaleChannel(\''+esc(name).replace(/'/g,"\\'")+'\',this.value)" style="width:200px">'+
       '<option value=""'+(cur===''?' selected':'')+'>— Chưa phân loại —</option>'+
-      '<option value="online"'+(cur==='online'?' selected':'')+'>🌐 Online</option>'+
-      '<option value="offline"'+(cur==='offline'?' selected':'')+'>🏬 Offline</option>'+
-      '<option value="probation"'+(cur==='probation'?' selected':'')+'>🌱 Thử việc (TV)</option>'+
+      SALE_GROUPS.map(function(g){ return '<option value="'+esc(g.key)+'"'+(cur===g.key?' selected':'')+'>'+esc(g.label)+'</option>'; }).join('')+
       '</select></td></tr>';
   });
   if (!filtered.length) html += '<tr><td colspan="2" style="text-align:center;color:var(--muted);padding:14px">Không có tên nào khớp</td></tr>';
   html += '</tbody></table>';
   body.innerHTML = html;
+}
+function _scSaveGroups(){
+  var clean = _scGroupsDraft.filter(function(g){ return (g.label||'').trim(); }).map(function(g){ return {key:g.key, label:g.label.trim()}; });
+  if (!clean.length){ toast('Cần ít nhất 1 đội'); return; }
+  _scGroupsDraft = null; _scGroupsOpen = false;
+  saveSaleGroups(clean);
+  _renderSaleChannelsModal();
 }
 function _setSaleChannel(name, val){
   if (val) SALE_CHANNELS[name] = val; else delete SALE_CHANNELS[name];
@@ -15203,13 +15733,13 @@ async function _hPushChot_(mk){
 }
 // Gọi từ saveCare khi Tình trạng CS thuộc nhóm Chốt
 function _hSaveChotFromForm_(phone, cs){
-  var revEl = document.getElementById('cs-chot-rev'), noteEl = document.getElementById('cs-chot-note');
-  if (!revEl && !noteEl) return;
+  var revEl = document.getElementById('cs-chot-rev'), codeEl = document.getElementById('cs-chot-code');
+  if (!revEl && !codeEl) return;
   var rev = parseInt(String(revEl ? revEl.value : '').replace(/[^\d]/g, ''), 10) || 0;
-  var note = noteEl ? noteEl.value.trim() : '';
+  var code = codeEl ? codeEl.value.trim().toUpperCase().replace(/\s+/g, ' ') : '';
   var d = _ymd(new Date()), mk = d.slice(0,7), id = phone + '|' + d, cur = _hChotMonth_(mk);
-  if (!rev && !note && !cur[id]) return;   // chưa nhập gì -> không tạo đơn rỗng
-  cur[id] = { id:id, phone:phone, cs: cs || (currentUser && currentUser.name) || '', date:d, rev:rev, note:note, t:Date.now() };
+  if (!rev && !code && !cur[id]) return;   // chưa nhập gì -> không tạo đơn rỗng
+  cur[id] = { id:id, phone:phone, cs: cs || (currentUser && currentUser.name) || '', date:d, rev:rev, note:(cur[id] && cur[id].note) || '', code:code, t:Date.now() };  // note = ghi chu don cu (giu lai de khong mat du lieu da luu); code = ma bo dem / ma don Base
   saveLS('ome_chot_orders_' + mk, cur);
   clearTimeout(_hChotTimers[mk]);
   _hChotTimers[mk] = setTimeout(function(){ _hPushChot_(mk); }, 700);
@@ -16743,11 +17273,11 @@ function _acctDetailHtml(a){
     // TAI KHOAN nay CHUA co ten nao xuat hien trong SALE_CHANNELS, vd nhan vien moi chua ban gi).
     var stNames = _acctNamesOf(a);
     var stCur = stNames.map(function(n){ return SALE_CHANNELS[n]; }).filter(Boolean)[0] || a.saleType || '';
-    var stOpts = [['','— Chưa gán —'],['online','Sale online'],['offline','Sale offline'],['probation','Sale thử việc (TV)']].map(function(o){
+    var stOpts = [['','— Chưa gán —']].concat(SALE_GROUPS.map(function(g){ return [g.key, g.label]; })).map(function(o){
       return '<option value="'+o[0]+'"'+(stCur===o[0]?' selected':'')+'>'+o[1]+'</option>';
     }).join('');
     saleTypeHtml = '<div style="margin-top:10px;border-top:1px dashed var(--border);padding-top:9px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">'+
-      '<div><div style="font-size:10.5px;color:var(--hint);margin-bottom:2px">Loại Sale (áp dụng chương trình thưởng)</div>'+
+      '<div><div style="font-size:10.5px;color:var(--hint);margin-bottom:2px">Đội (áp dụng chương trình thưởng)</div>'+
         '<select onchange="acctSetSaleType(\''+uk+'\',this.value)" style="font-size:12px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+stOpts+'</select></div>'+
       '<div><div style="font-size:10.5px;color:var(--hint);margin-bottom:2px">Ngày bắt đầu (mốc tính thưởng theo ngày thử việc)</div>'+
         '<input type="date" value="'+esc(a.startDate||'')+'" onchange="acctSetStartDate(\''+uk+'\',this.value)" style="font-size:12px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"></div>'+
@@ -16805,7 +17335,7 @@ function acctSetSaleType(u, val){
   acct.saleType = val || '';
   // Ghi THẲNG vào SALE_CHANNELS cho MỌI tên bí danh của tài khoản này — đây là nguồn DUY NHẤT mà
   // "🏆 Chương trình thưởng" và "Báo cáo F — KPI Sale" đang đọc, để đặt ở đâu (Quản lý tài khoản
-  // hay Quản lý Team > 🏷️ Phân loại Online/Offline) thì mọi báo cáo cũng tính theo đúng 1 kết quả.
+  // hay Quản lý Team > 🏷️ Phân loại đội Sale) thì mọi báo cáo cũng tính theo đúng 1 kết quả.
   _acctNamesOf(acct).forEach(function(n){
     if (!n) return;
     if (val) SALE_CHANNELS[n] = val; else delete SALE_CHANNELS[n];
@@ -17526,7 +18056,7 @@ function updateSidebarCareFilters() {
 <div class="modal-overlay" id="sc-modal" style="display:none;align-items:flex-start;justify-content:center;padding-top:40px;z-index:700">
 <div class="modal" style="max-width:520px;width:94%;max-height:86vh;display:flex;flex-direction:column">
   <div class="modal-header" style="flex-shrink:0">
-    <div class="modal-title">🏷️ Phân loại Sale Online/Offline</div>
+    <div class="modal-title">🏷️ Phân loại đội Sale</div>
     <button class="modal-close" onclick="closeSaleChannelsModal()">✕</button>
   </div>
   <div class="modal-body" style="overflow:auto;flex:1">

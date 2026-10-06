@@ -355,6 +355,7 @@
             <option value="ctkm">🎁 Tra cứu khuyến mãi</option>
             <option value="img">🖼 Tìm ảnh sản phẩm</option>
             <option value="tpl">📚 Mẫu tin nhắn tư vấn</option>
+            <option value="stats">📊 Doanh số & hoa hồng của tôi</option>
           </select>
           <div id="pk-menu-content">
             <div id="pk-rem-body" style="display:none">
@@ -384,6 +385,7 @@
               </div>
               <div id="pk-ctkm-result"></div>
             </div>
+            <div id="pk-stats-body" style="display:none"></div>
             <div id="pk-img-body" style="display:none">
               <input type="text" id="pk-img-q" placeholder="Gõ tên sản phẩm (VD: tỷ hưu, nhẫn, charm) — có thể bỏ trống các mục dưới" autocomplete="off" />
               <div id="pk-img-dyn"></div>
@@ -514,6 +516,7 @@
     const csSel = panelEl.querySelector('#pk-cs-sel');
     csSel.addEventListener('change', () => {
       chrome.storage.sync.set({ csName: csSel.value });
+      if (panelEl.querySelector('#pk-menu-sel')?.value === 'stats') loadStats_(); // đang xem số liệu → tải lại cho CS mới
       loadReminders_();
     });
 
@@ -579,9 +582,11 @@
       panelEl.querySelector("#pk-ctkm-body").style.display = v === "ctkm" ? "block" : "none";
       panelEl.querySelector("#pk-img-body").style.display = v === "img" ? "block" : "none";
       panelEl.querySelector("#pk-tpl-body").style.display = v === "tpl" ? "block" : "none";
+      panelEl.querySelector("#pk-stats-body").style.display = v === "stats" ? "block" : "none";
       if (v === "rem") loadReminders_();
       if (v === "ctkm" && !_ctkmLoadedOnce) { _ctkmLoadedOnce = true; doCtkmSearch_(); } // mo tab la nap luon toan bo CTKM, khoi phai go gi cung thay ngay
       if (v === "img") initImgSearch_();
+      if (v === "stats") initStats_();
       if (v === "tpl" && !_tplLoadedOnce) { _tplLoadedOnce = true; loadMsgTemplates_(); } // mo tab la nap luon toan bo mau, khoi phai go gi cung thay ngay
     });
     panelEl.querySelector("#pk-rem-refresh").addEventListener("click", () => loadReminders_());
@@ -1321,6 +1326,7 @@
         ${products ? `<div class="pk-ai-cust-products">🏷 ${escapeHtml(products)}</div>` : ''}
 
         <label class="pk-label-top">Tên khách</label>
+        <!-- QUY TẮC (README #9): form này phải khớp form nhập thông tin KH trên CRM (index.html, khối cs-*). CRM đổi gì thì sửa ở đây theo. -->
         <input type="text" id="pk-name-input" class="pk-full-input" placeholder="Tên khách hàng" value="${escapeHtml(name === phone ? '' : name)}" />
 
         <div class="pk-form-row">
@@ -1742,6 +1748,135 @@
   function startRemPoll_() {
     if (_remPollTimer) return;
     _remPollTimer = setInterval(loadReminders_, REM_POLL_MS);
+  }
+
+  // ══════════════════════════ SỐ LIỆU CÁ NHÂN CỦA CS (📊 Doanh số & hoa hồng của tôi) ══════════════════════════
+  // Yêu cầu Duyên 2026-10-05: CS xem ngay trong Pancake AI — tổng số đơn, doanh thu, tỷ lệ chốt, hoa hồng (đơn ≥15tr /
+  // <15tr), tổng hoa hồng, chương trình thưởng — với bộ lọc nhanh giống CRM (hôm nay, hôm qua, tuần này, tháng này…
+  // hoặc khoảng ngày tự chọn). Số liệu do GAS (action 'csStats') tính, cùng quy tắc với Báo cáo E ở CRM. CS = ô
+  // "CS đang dùng" ở đầu panel.
+  const _STATS_RANGES_ = [
+    { v: 'today', l: 'Hôm nay' }, { v: 'yesterday', l: 'Hôm qua' }, { v: 'thisWeek', l: 'Tuần này' }, { v: 'lastWeek', l: 'Tuần trước' },
+    { v: 'thisMonth', l: 'Tháng này' }, { v: 'lastMonth', l: 'Tháng trước' }, { v: 'thisQuarter', l: 'Quý này' }, { v: 'lastQuarter', l: 'Quý trước' },
+    { v: 'thisYear', l: 'Năm này' }, { v: 'lastYear', l: 'Năm trước' }, { v: 'custom', l: 'Tuỳ chỉnh…' } // đủ bộ lọc nhanh theo quy ước README mục 2
+  ];
+  let _statsState = { quick: 'thisMonth', from: '', to: '', loading: false, data: null, err: '', req: 0, built: false };
+  function _statsYmd_(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function _statsQuickRange_(key) {
+    const now = new Date(), y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+    const mk = (yy, mm, dd) => new Date(yy, mm, dd);
+    const mondayOf = (dt) => { const dow = dt.getDay(); return mk(dt.getFullYear(), dt.getMonth(), dt.getDate() - (dow === 0 ? 6 : dow - 1)); }; // tuần: thứ 2 → CN (giống CRM)
+    const r = (a, b) => ({ from: _statsYmd_(a), to: _statsYmd_(b) });
+    switch (key) {
+      case 'today': return r(now, now);
+      case 'yesterday': { const y1 = mk(y, m, d - 1); return r(y1, y1); }
+      case 'thisWeek': { const mo = mondayOf(now); return r(mo, mk(mo.getFullYear(), mo.getMonth(), mo.getDate() + 6)); }
+      case 'lastWeek': { const mo = mondayOf(now), ml = mk(mo.getFullYear(), mo.getMonth(), mo.getDate() - 7); return r(ml, mk(ml.getFullYear(), ml.getMonth(), ml.getDate() + 6)); }
+      case 'thisMonth': return r(mk(y, m, 1), mk(y, m + 1, 0));
+      case 'lastMonth': return r(mk(y, m - 1, 1), mk(y, m, 0));
+      case 'thisQuarter': { const q = Math.floor(m / 3); return r(mk(y, q * 3, 1), mk(y, q * 3 + 3, 0)); }
+      case 'lastQuarter': { let q = Math.floor(m / 3) - 1, yy = y; if (q < 0) { q = 3; yy = y - 1; } return r(mk(yy, q * 3, 1), mk(yy, q * 3 + 3, 0)); }
+      case 'thisYear': return r(mk(y, 0, 1), mk(y, 11, 31));
+      case 'lastYear': return r(mk(y - 1, 0, 1), mk(y - 1, 11, 31));
+      default: return null;
+    }
+  }
+  function _statsMoney_(n) { return Math.round(Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.') + 'đ'; }
+  function _statsDmy_(ymd) { const m = String(ymd || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? m[3] + '/' + m[2] + '/' + m[1] : String(ymd || ''); }
+
+  function initStats_() {
+    const body = panelEl?.querySelector('#pk-stats-body');
+    if (!body) return;
+    if (!_statsState.built) {
+      _statsState.built = true;
+      const r0 = _statsQuickRange_(_statsState.quick);
+      _statsState.from = r0.from; _statsState.to = r0.to;
+      body.innerHTML = `
+        <div class="pk-stats-toolbar">
+          <select id="pk-stats-quick">${_STATS_RANGES_.map((o) => `<option value="${o.v}"${o.v === _statsState.quick ? ' selected' : ''}>${o.l}</option>`).join('')}</select>
+          <input type="date" id="pk-stats-from" value="${_statsState.from}" title="Từ ngày" />
+          <span>→</span>
+          <input type="date" id="pk-stats-to" value="${_statsState.to}" title="Đến ngày" />
+          <button type="button" id="pk-stats-go">Xem</button>
+        </div>
+        <div id="pk-stats-result"></div>`;
+      const q = body.querySelector('#pk-stats-quick'), f = body.querySelector('#pk-stats-from'), t = body.querySelector('#pk-stats-to');
+      q.addEventListener('change', () => {
+        _statsState.quick = q.value;
+        if (q.value !== 'custom') { const r = _statsQuickRange_(q.value); f.value = _statsState.from = r.from; t.value = _statsState.to = r.to; loadStats_(); }
+      });
+      f.addEventListener('change', () => { _statsState.from = f.value; _statsState.quick = 'custom'; q.value = 'custom'; });
+      t.addEventListener('change', () => { _statsState.to = t.value; _statsState.quick = 'custom'; q.value = 'custom'; });
+      body.querySelector('#pk-stats-go').addEventListener('click', loadStats_);
+    }
+    loadStats_();
+  }
+
+  function loadStats_() {
+    const cs = (panelEl?.querySelector('#pk-cs-sel')?.value) || settings?.csName || '';
+    const resEl = panelEl?.querySelector('#pk-stats-result');
+    if (!resEl) return;
+    if (!cs) { _statsState.data = null; resEl.innerHTML = '<div class="pk-stats-note">Chọn "CS đang dùng" ở đầu panel để xem số liệu.</div>'; return; }
+    if (!_statsState.from || !_statsState.to) { resEl.innerHTML = '<div class="pk-stats-note">Chọn khoảng ngày rồi bấm Xem.</div>'; return; }
+    if (_statsState.from > _statsState.to) { resEl.innerHTML = '<div class="pk-stats-note pk-stats-err">Ngày bắt đầu phải trước ngày kết thúc.</div>'; return; }
+    const req = ++_statsState.req;
+    _statsState.loading = true;
+    resEl.innerHTML = '<div class="pk-stats-note">⏳ Đang tính số liệu... (khoảng ngày rộng có thể mất tới ~1 phút)</div>';
+    safeSendMessage_({ type: 'GET_CS_STATS', payload: { cs, dateFrom: _statsState.from, dateTo: _statsState.to } }, (resp) => {
+      if (req !== _statsState.req) return; // đã bấm lần khác → bỏ kết quả cũ
+      _statsState.loading = false;
+      if (!resp?.ok) {
+        _statsState.data = null;
+        resEl.innerHTML = `<div class="pk-stats-note pk-stats-err">⚠️ ${escapeHtml(resp?.error || 'Không tải được số liệu. Thử bấm Xem lại.')}</div>`;
+        return;
+      }
+      _statsState.data = resp.data;
+      renderStats_();
+    });
+  }
+
+  function renderStats_() {
+    const resEl = panelEl?.querySelector('#pk-stats-result');
+    const d = _statsState.data;
+    if (!resEl || !d) return;
+    const c = d.commission || {}, b = d.bonus || {};
+    const card = (label, val, sub) => `<div class="pk-stats-card"><div class="pk-stats-card-l">${label}</div><div class="pk-stats-card-v">${val}</div>${sub ? `<div class="pk-stats-card-s">${sub}</div>` : ''}</div>`;
+    let h = `<div class="pk-stats-range">👤 <b>${escapeHtml(d.cs)}</b> · ${_statsDmy_(d.from)} → ${_statsDmy_(d.to)}</div>`;
+    h += '<div class="pk-stats-cards">';
+    h += card('Tổng số đơn', String(d.totalOrders || 0));
+    h += card('Doanh thu', _statsMoney_(d.revenue));
+    h += card('Tỷ lệ chốt', d.closeRate ? d.closeRate.rate + '%' : '—', d.closeRate ? `${d.closeRate.closed} đơn / ${d.closeRate.held} khách` : 'chưa có dữ liệu tương tác');
+    h += card('Tổng hoa hồng', _statsMoney_(c.total), (b.total ? '+ thưởng ' + _statsMoney_(b.total) : ''));
+    h += '</div>';
+
+    // Hoa hồng
+    const thrM = Math.round((c.threshold || 15000000) / 1000000);
+    h += '<div class="pk-stats-sec">💵 Hoa hồng</div><table class="pk-stats-tbl"><thead><tr><th>Loại đơn</th><th>Đơn</th><th>Doanh thu</th><th>%</th><th>Hoa hồng</th></tr></thead><tbody>';
+    h += `<tr><td>Đơn ≥ ${thrM}tr</td><td>${c.ordersAbove15 || 0}</td><td>${_statsMoney_(c.revenueAbove15)}</td><td>${c.rateAbove15 || 0}%</td><td>${_statsMoney_(c.commissionAbove15)}</td></tr>`;
+    h += `<tr><td>Đơn &lt; ${thrM}tr</td><td>${c.ordersBelow15 || 0}</td><td>${_statsMoney_(c.revenueBelow15)}</td><td>${c.rateBelow15 || 0}%</td><td>${_statsMoney_(c.commissionBelow15)}</td></tr>`;
+    if (c.ordersChannel) {
+      const chs = Object.keys(c.channelBreakdown || {}).map((k) => `${escapeHtml(k)} ${c.channelBreakdown[k].rate}%`).join(', ');
+      h += `<tr><td>Kênh có % riêng${chs ? ` <span class="pk-stats-mut">(${chs})</span>` : ''}</td><td>${c.ordersChannel}</td><td>${_statsMoney_(c.revenueChannel)}</td><td>—</td><td>${_statsMoney_(c.commissionChannel)}</td></tr>`;
+    }
+    h += `<tr class="pk-stats-total"><td colspan="4">Tổng hoa hồng</td><td>${_statsMoney_(c.total)}</td></tr></tbody></table>`;
+    h += `<div class="pk-stats-mut">Nguồn %: ${escapeHtml(c.sourceAbove15 || '')}${c.sourceBelow15 && c.sourceBelow15 !== c.sourceAbove15 ? ' / ' + escapeHtml(c.sourceBelow15) : ''}. Doanh thu là phần của bạn (đơn nhiều sale được chia theo đơn gốc / đều).</div>`;
+
+    // Thưởng
+    h += `<div class="pk-stats-sec">🏆 Chương trình thưởng · <b>${_statsMoney_(b.total)}</b></div>`;
+    if ((b.items || []).length) {
+      h += '<details class="pk-stats-det"><summary>Chi tiết thưởng đã đạt (' + b.items.length + ')</summary><table class="pk-stats-tbl"><tbody>' +
+        b.items.map((it) => `<tr><td>${_statsDmy_(it.date)}</td><td>${escapeHtml(it.program)}<div class="pk-stats-mut">${escapeHtml(it.scope)} — ${escapeHtml(it.detail)}</div></td><td>${_statsMoney_(it.amount)}</td></tr>`).join('') +
+        '</tbody></table></details>';
+    } else {
+      h += '<div class="pk-stats-mut">Chưa đạt mức thưởng nào trong khoảng này.</div>';
+    }
+    if ((b.activePrograms || []).length) {
+      h += '<details class="pk-stats-det"><summary>Chương trình đang áp dụng (' + b.activePrograms.length + ')</summary>' +
+        b.activePrograms.map((p) => `<div class="pk-stats-prog"><b>${escapeHtml(p.name)}</b>${p.dateFrom || p.dateTo ? ` <span class="pk-stats-mut">(${p.dateFrom ? _statsDmy_(p.dateFrom) : '…'} → ${p.dateTo ? _statsDmy_(p.dateTo) : '…'})</span>` : ''}<div class="pk-stats-mut">${escapeHtml(p.summary || 'Xem chi tiết ở CRM')}</div></div>`).join('') + '</details>';
+    }
+    h += '<div class="pk-stats-mut" style="margin-top:6px">Số liệu tạm tính theo Pos (đã ghép Base) — đối chiếu kế toán trước khi chi trả. Thưởng theo SP là ước lượng số lượng.</div>';
+    if (d.ghepLoi) h += `<div class="pk-stats-note pk-stats-err">⚠️ Lỗi khi đối chiếu Base (đã chia theo Pos): ${escapeHtml(d.ghepLoi)}</div>`;
+    resEl.innerHTML = h;
   }
 
   function loadReminders_() {
