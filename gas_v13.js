@@ -1150,7 +1150,7 @@ function doGet(e) {
       var cKey = 'lk_' + normPhone_(phone);
       var cached = cache.get(cKey);
       if (cached) { try { return jsonOut_(JSON.parse(cached)); } catch(ec) {} }
-      var res = { ok: true, care: findCareByPhone_(phone), orders: readOrdersByPhone_(phone) };
+      var res = { ok: true, care: findCareByPhone_(phone), orders: readOrdersByPhone_(phone), cskh: findCskhRowsByPhone_(phone) };
       try { cache.put(cKey, JSON.stringify(res), 15); } catch(ec) {}
       return jsonOut_(res);
     }
@@ -1196,6 +1196,8 @@ function doGet(e) {
     if (action === 'saleGroups') return jsonOut_({ ok: true, groups: readSaleGroups_() });
     // ── Nguon "Cham soc" (KH them nhanh, sheet rieng) — khong gop CareData/bao cao A-B-C ──
     if (action === 'careLeads') return jsonOut_({ rows: readCareLeads_() });
+    // ── Nguon "CSKH-Duyên" (sheet thu 3, cung file DT TONG) — CRM gop vao khach theo SDT, xem readCskhDuyen_ ──
+    if (action === 'cskhDuyen') { var rowsCk = readCskhDuyen_(); return jsonOut_({ ok: true, found: rowsCk.found, rows: rowsCk.rows, total: rowsCk.total, noPhone: rowsCk.noPhone, noPhoneSample: rowsCk.noPhoneSample, cols: rowsCk.cols }); }
     // ── Tap SDT co trong "dữ liệu đơn" — chi de loc nguon o man hinh chinh (cache 10') ──
     if (action === 'donPhones') {
       var cacheDP = CacheService.getScriptCache();
@@ -1424,7 +1426,7 @@ function doGet(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.10-cs-stats' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.11-cskh-duyen' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -2136,6 +2138,97 @@ function readDTTong_() {
 }
 
 // ── KH "Chăm sóc" thêm nhanh — sheet RIÊNG, độc lập CareData/DT TỔNG/dữ liệu đơn ──
+// ═══════════════════════════════════════════════════════════════
+//  NGUON "CSKH-Duyên" — sheet thu 3 (cung file voi DT TONG / "dữ liệu đơn"), yeu cau Duyen 2026-10-06:
+//  dua du lieu khach VIP/SPV (CSKH-Duyên) len CRM de CHIA DATA cho CS va CS cham soc; khach co cung SDT o DT TONG,
+//  "dữ liệu đơn" va CSKH-Duyên thi CRM gop thanh 1 khach (gop theo SDT o index.html) co du thong tin tu 3 nguon.
+//  Doc theo TEN TIEU DE cot (khong theo vi tri) nen them/doi thu tu cot khong lam hong. KHONG doc cot
+//  "Mã số thuế/CCCD (theo dữ liệu gốc)" — CCCD la dinh danh ca nhan nhay cam, CS khong can de cham soc.
+//  Dong KHONG co SDT khong the gop theo SDT -> khong dua vao danh sach khach, chi dem trong noPhone de bao.
+// ═══════════════════════════════════════════════════════════════
+var CSKH_DUYEN_SHEET_KEY_ = 'cskh-duyen'; // so khop ten sheet da bo dau/hoa-thuong: "CSKH-Duyên" / "cskh-duyen"
+// Moi truong: [ten truong, [cac cum tu PHAI co mat (nguyen tu) trong tieu de da bo dau]] — xet theo thu tu, cum cu the truoc
+var CSKH_DUYEN_FIELDS_ = [
+  ['taxCompany', ['ma so thue', 'cong ty']],
+  ['company',    ['ten', 'cong ty']],
+  ['codeOrig',   ['ma khach hang', 'goc']],
+  ['codeOther',  ['ma khach hang', 'khac']],
+  ['dupCount',   ['so lan trung']],
+  ['phone',      ['sdt']],
+  ['name',       ['ten khach hang']],
+  ['tier',       ['phan loai']],
+  ['internal',   ['doi tuong noi bo']],
+  ['address',    ['dia chi']],
+  ['birthday',   ['ngay sinh']],
+  ['gender',     ['gioi tinh']],
+  ['debt',       ['cong no']],
+  ['email',      ['email']],
+  ['staff',      ['nhan vien phu trach']],
+  ['source',     ['nguon du lieu']],
+  ['note',       ['ghi chu']]
+];
+function _findCskhDuyenSheet_() {
+  var sheets = getDTSS_().getSheets();
+  for (var i = 0; i < sheets.length; i++) {
+    if (_stripVN_(sheets[i].getName()).replace(/\s+/g, '') === CSKH_DUYEN_SHEET_KEY_) return sheets[i];
+  }
+  return null;
+}
+function _cskhHeaderMap_(headerRow) {
+  var map = {}, used = {};
+  CSKH_DUYEN_FIELDS_.forEach(function(f) {
+    for (var c = 0; c < headerRow.length; c++) {
+      if (used[c]) continue;
+      var h = ' ' + _stripVN_(headerRow[c]).replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
+      if (h.trim() === '') continue;
+      var ok = f[1].every(function(kw) { return h.indexOf(' ' + kw + ' ') !== -1; });
+      if (ok) { map[f[0]] = c; used[c] = true; break; }
+    }
+  });
+  return map;
+}
+function _cskhCell_(v) {
+  if (v === null || v === undefined) return '';
+  if (v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone() || 'Etc/GMT-7', 'dd/MM/yyyy');
+  return String(v).replace(/\s+/g, ' ').trim();
+}
+// Tra ve { found, rows:[{phone,name,tier,...}], total, noPhone, noPhoneSample:[ten], cols:{truong:chi so cot} }
+function readCskhDuyen_() {
+  var cached = _cacheGetBig_('cskhDuyen_v1');
+  if (cached) { try { return JSON.parse(cached); } catch (e) {} }
+  var out = { found: false, rows: [], total: 0, noPhone: 0, noPhoneSample: [], cols: {} };
+  var sh = _findCskhDuyenSheet_();
+  if (!sh) return out;
+  out.found = true;
+  var last = sh.getLastRow(), width = sh.getLastColumn();
+  if (last < 2 || width < 1) return out;
+  var vals = sh.getRange(1, 1, last, width).getValues();
+  var map = _cskhHeaderMap_(vals[0]);
+  out.cols = map;
+  if (map.phone === undefined && map.name === undefined) return out; // khong nhan ra tieu de nao -> khong doan
+  for (var i = 1; i < vals.length; i++) {
+    var r = vals[i], o = {};
+    Object.keys(map).forEach(function(k) { o[k] = _cskhCell_(r[map[k]]); });
+    var raw = map.phone !== undefined ? r[map.phone] : '';
+    o.phone = normPhone_(raw);
+    if (!o.phone && !o.name) continue; // dong trong
+    out.total++;
+    if (!o.phone || o.phone.length < 8) {
+      out.noPhone++;
+      if (out.noPhoneSample.length < 20 && o.name) out.noPhoneSample.push(o.name);
+      continue;
+    }
+    out.rows.push(o);
+  }
+  try { _cachePutBig_('cskhDuyen_v1', JSON.stringify(out), 300); } catch (e2) {}
+  return out;
+}
+function findCskhRowsByPhone_(phone) {
+  var p = normPhone_(phone);
+  if (!p) return [];
+  try { return readCskhDuyen_().rows.filter(function(r) { return r.phone === p; }); } catch (e) { return []; }
+}
+
 function readCareLeads_() {
   var ss = getCrmSS_();
   var sh = ss.getSheetByName(SH_CARE_LEAD);

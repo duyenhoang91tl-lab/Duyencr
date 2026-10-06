@@ -1116,6 +1116,7 @@ body.rpt-mode .app{height:100vh}
         <option value="dt">DT tổng</option>
         <option value="cs">Chăm sóc (KH thêm nhanh)</option>
         <option value="don">Dữ liệu đơn</option>
+        <option value="cskh">CSKH-Duyên (VIP/SPV)</option>
         <option value="assign">Chia data (được chia cho tôi)</option>
       </select>
     </div>
@@ -2432,6 +2433,10 @@ let careData = loadLS('ome_care') || {};
 // Nguồn "Chăm sóc": KH thêm nhanh (Tên/SĐT/Ghi chú) từ nút "+ Thêm KH/Đơn mới" — lưu ở
 // sheet RIÊNG (không chung CareData, không gộp vào báo cáo A/B/C). Key = phone.
 let careLeads = loadLS('ome_care_leads') || {};
+// Nguồn thứ 3 "CSKH-Duyên" (sheet cùng file DT tổng / dữ liệu đơn): { SĐT: [ {name, tier(VIP/SPV), address, ...} ] }.
+// Khách có cùng SĐT ở DT tổng / dữ liệu đơn / CSKH-Duyên được GỘP thành 1 khách (customerMap theo SĐT) — xem buildCustomers.
+let cskhData = loadLS('ome_cskh_duyen') || {};
+let cskhMeta = loadLS('ome_cskh_duyen_meta') || { found: null, total: 0, noPhone: 0 };
 // Tập SĐT có trong sheet "dữ liệu đơn" (nguồn của Báo cáo B) — chỉ dùng để LỌC nguồn ở
 // màn hình chính, không kéo chi tiết sản phẩm vào danh sách khách.
 let donPhoneSet = new Set(loadLS('ome_don_phones') || []);
@@ -2800,6 +2805,25 @@ async function syncFromGS(opts) {
         if (dpJson && dpJson.lastDateByPhone) { donLastDateByPhone = dpJson.lastDateByPhone; saveLS('ome_don_last_date', dpJson.lastDateByPhone); }
         if (dpJson && dpJson.orderCountByPhone) { donOrderCountByPhone = dpJson.orderCountByPhone; saveLS('ome_don_order_count', dpJson.orderCountByPhone); }
       } catch(dpErr) { console.warn('donPhones fetch error:', dpErr.message); }
+      // ── Nguồn "CSKH-Duyên" (sheet thứ 3) — nhẹ nên kéo cùng nhịp với dữ liệu đơn (GAS cache 5'), không kéo mỗi 3s ──
+      try {
+        const ckR = await fetch(gsUrl + sepChar + 'action=cskhDuyen', { redirect: 'follow' });
+        const ckJson = await ckR.json();
+        if (ckJson && ckJson.ok) {
+          const newCk = {};
+          (ckJson.rows || []).forEach(function(r){
+            const ph = (typeof normPhone === 'function' ? normPhone(r.phone) : null) || String(r.phone || '');
+            if (!ph) return;
+            const slim = {}; Object.keys(r).forEach(function(k){ if (k !== 'phone' && r[k] !== '' && r[k] != null) slim[k] = r[k]; }); // bỏ ô trống cho nhẹ localStorage
+            (newCk[ph] = newCk[ph] || []).push(slim);
+          });
+          const known = new Set(allCustomers.map(c => c.phone));
+          for (const ph in newCk) { if (!known.has(ph)) { _forceFullBuildFromCareLeads = true; break; } }
+          cskhData = newCk;
+          cskhMeta = { found: !!ckJson.found, total: ckJson.total || 0, noPhone: ckJson.noPhone || 0, noPhoneSample: ckJson.noPhoneSample || [] };
+          saveLS('ome_cskh_duyen', cskhData); saveLS('ome_cskh_duyen_meta', cskhMeta);
+        }
+      } catch(ckErr) { console.warn('cskhDuyen fetch error:', ckErr.message); }
     }
 
     // ── Nguồn "Chăm sóc" (sheet riêng, KH thêm nhanh qua Pancake AI/Zalo AI/nút "+Thêm KH
@@ -3183,6 +3207,20 @@ function buildCustomers() {
       };
     });
   }
+  // Tạo sẵn customerMap cho các SĐT chỉ có ở nguồn "CSKH-Duyên" (chưa có đơn nào / chưa có CareData) để CS thấy và
+  // CHIA DATA được; nếu SĐT đã có ở DT tổng / dữ liệu đơn / Chăm sóc thì GIỮ NGUYÊN khách đó (gộp 1 khách theo SĐT).
+  if (typeof cskhData !== 'undefined' && cskhData) {
+    Object.keys(cskhData).forEach(ph => {
+      if (customerMap[ph]) return;
+      const rows = cskhData[ph] || [];
+      const nm = (rows.find(r => r.name) || {}).name || ph; // không có tên → dùng SĐT (vẫn cần hiện để CS chia data / chăm sóc được)
+      customerMap[ph] = {
+        phone: ph, name: nm, orders: [],
+        sources: new Set(), brands: new Set(), _keys: new Set(),
+        _rawStatus: '', _rawZalo: '', _rawNote: ''
+      };
+    });
+  }
   allCustomers = Object.values(customerMap).map(c => {
     const tot = c.orders.length;
     const rev = c.orders.reduce((s,o) => s+(o.revenue||0), 0);
@@ -3213,6 +3251,10 @@ function buildCustomers() {
     // Chưa có tên thật ở đâu cả (CareData lẫn đơn hàng) → tự động đoán từ dòng đầu cột
     // "Sản phẩm" của đơn gần nhất có thông tin hợp lệ, CHỈ để hiển thị (xem hàm ở trên).
     let nameGuessed = false;
+    if (displayName === c.phone && typeof cskhData !== 'undefined' && cskhData && cskhData[c.phone]) {
+      const _ckn = (cskhData[c.phone].find(r => r.name) || {}).name;
+      if (_ckn) displayName = _ckn;
+    }
     if (displayName === c.phone) {
       const guess = _guessNameForPhone(c.orders, c.phone);
       if (guess) { displayName = guess; nameGuessed = true; }
@@ -3233,7 +3275,8 @@ function buildCustomers() {
     const dataSrc = {
       dt:  tot > 0,
       cs:  !!(typeof careLeads !== 'undefined' && careLeads && careLeads[c.phone]),
-      don: !!(typeof donPhoneSet !== 'undefined' && donPhoneSet.has(c.phone))
+      don: !!(typeof donPhoneSet !== 'undefined' && donPhoneSet.has(c.phone)),
+      cskh: !!(typeof cskhData !== 'undefined' && cskhData && cskhData[c.phone])
     };
     // Ngày mua gần nhất theo Pos (timestamp 00:00 local) — null nếu KH chưa có đơn Pos
     const _lpIso = (typeof donLastDateByPhone !== 'undefined' && donLastDateByPhone) ? donLastDateByPhone[c.phone] : '';
@@ -3245,6 +3288,7 @@ function buildCustomers() {
       lastPosDate,
       name: displayName,
       nameGuessed,
+      cskh: (typeof cskhData !== 'undefined' && cskhData && cskhData[c.phone]) || [],   // dòng của khách này ở nguồn CSKH-Duyên (có thể >1 nếu trùng SĐT)
       sources:[...c.sources], brands:[...c.brands].filter(Boolean),
       totalOrders:tot, totalRevenue:rev,
       renewOrders:renewCount, tier,
@@ -3469,6 +3513,7 @@ function applyFilters() {
       if (dataSrcF === 'dt'  && !src.dt)  return false;
       if (dataSrcF === 'cs'  && !src.cs)  return false;
       if (dataSrcF === 'don' && !src.don) return false;
+      if (dataSrcF === 'cskh' && !src.cskh) return false;
       // "Chia data": KH đang nằm trong (các) đợt phân công (sheet AssignData) của CHÍNH tài
       // khoản đang đăng nhập — tra qua _assignAllIndex (phone -> Set<csName>) giống hệt cách
       // bộ lọc CS ở trên đang dùng, không bake vào c.dataSrc vì AssignData có thể được tải/đổi
@@ -4782,6 +4827,21 @@ function _initHistExpand(){
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run); else run();
 }
 
+// Khối "CSKH-Duyên" ở tab Tổng quan: thông tin khách từ sheet thứ 3 (mỗi dòng 1 khối nếu trùng SĐT).
+// Chỉ hiện trường CÓ giá trị. (Không có CCCD/MST cá nhân — backend không đọc cột đó.)
+function _renderCskhBlock_(c) {
+  const rows = c.cskh || [];
+  if (!rows.length) return '';
+  const LBL = [['tier','Phân loại'],['staff','NV phụ trách'],['codeOrig','Mã KH (gốc)'],['codeOther','Mã KH khác'],['internal','Đối tượng nội bộ'],
+    ['birthday','Ngày sinh'],['gender','Giới tính'],['address','Địa chỉ'],['email','Email'],['company','Công ty'],['taxCompany','MST công ty'],
+    ['debt','Công nợ'],['source','Nguồn dữ liệu'],['note','Ghi chú']];
+  return `<div style="margin-top:10px"><div class="dp-stitle">🗂 CSKH-Duyên${rows.length>1?` (${rows.length} dòng trùng SĐT)`:''}</div>` +
+    rows.map(r => `<div style="font-size:12px;margin-top:6px;background:var(--surface2);padding:8px;border-radius:6px">` +
+      (r.name ? `<div style="font-weight:600;margin-bottom:4px">${esc(r.name)}${r.tier?` <span class="cs-badge">${esc(r.tier)}</span>`:''}</div>` : '') +
+      LBL.filter(x => r[x[0]] && !(x[0]==='tier' && r.name)).map(x => `<div style="display:flex;gap:6px;padding:1px 0"><span style="color:var(--muted);min-width:92px">${x[1]}</span><span style="flex:1;word-break:break-word">${esc(r[x[0]])}</span></div>`).join('') +
+      `</div>`).join('') + `</div>`;
+}
+
 function renderInfoTab(c) {
   const lastO = c.orders.reduce((a,b)=>{
     const da=a.date instanceof Date?a.date:new Date(0);
@@ -4813,6 +4873,7 @@ function renderInfoTab(c) {
       <div class="dp-stitle">Sản phẩm đã mua</div>
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${c.brands.map(b=>`<span class="btag" style="font-size:11px;padding:3px 8px">${esc(b)}</span>`).join('')||'<span style="color:var(--hint);font-size:12px">Chưa có</span>'}</div>
     </div>
+    ${_renderCskhBlock_(c)}
     ${care.note?`<div style="margin-top:10px"><div class="dp-stitle">Ghi chú CS</div><div style="font-size:12px;color:var(--muted);margin-top:4px;background:var(--surface2);padding:8px;border-radius:6px">${esc(care.note)}</div></div>`:''}
     <div style="margin-top:10px">
       <div class="dp-stitle">Lịch hẹn sắp tới</div>
