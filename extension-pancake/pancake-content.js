@@ -121,11 +121,18 @@
   let _useProducts = false;
   let _stonePref = ''; // '' = mac dinh (cot G) | 'SAPHIA' | 'RUBY' — luu sticky, khoi phai go lai moi lan
   let _ctkmLoadedOnce = false; // mo tab "Tra cuu khuyen mai" lan dau la tu nap toan bo danh sach
+  let _tplLoadedOnce = false; // mo tab "Mau tin nhan tu van" lan dau la tu nap toan bo thu vien
+  let _msgTemplates = []; // cache trong phien lam viec (tai lai khi bam 🔄 hoac mo lai panel)
   let CS_NAMES = [];
-  let NICK_LIST = [];
   let CARE_STATUS_TREE = null; // cay "Tinh trang CS" load dong tu GAS (dong bo voi appweb/Zalo AI)
   let CUSTOM_FIELDS = []; // "truong tu tao" (admin them ben app web chinh) — load dong tu GAS
-  let _currentNick = ''; // Nick Zalo/kenh CS dang dung, sticky (chrome.storage.sync)
+  // SDT Zalo (2026-09): thay the hoan toan "Nick Zalo" rieng cua Pancake — khach tren Pancake
+  // ket ban Zalo bang nhieu SDT/tai khoan khac nhau, khong co dinh 1 Page nen "nick" khong con
+  // dung. Sale tu ghi SDT dang dung de ket ban Zalo voi khach (chon SDT chinh cua khach hoac go
+  // moi). KHAC HOAN TOAN nickZalos (van giu nguyen rieng cho Zalo AI dinh tuyen gui hang loat).
+  let _zaloPhoneFieldLocked = false;
+  let _zaloPhoneSaleCanAdd = true; // mac dinh Sale duoc them, dung yeu cau ban dau
+  let _pkZaloPhones = []; // danh sach SDT Zalo cua khach DANG MO tren form (sua truc tiep tren mang nay)
   let _goldUnitAmount = 350000; // Don gia 1 don vi "vang" (d) — admin cai o CRM (gear Cai dat >
                                  // Don gia vang) hoac o Options cua Pancake AI, luu chung setting
                                  // GAS 'goldUnitAmount' de dong bo toan team. Mac dinh 350k neu chua cai.
@@ -148,7 +155,7 @@
     injectPanel();
     observeConversationChanges();
     loadCsNames_();
-    loadNickList_();
+    loadZaloPhoneSettings_();
     loadGoldUnitAmount_();
     if (!IS_PHONGTHUY) { loadCareStatusTree_(); loadCustomFields_(); } // cay dung chung cho Pancake/Zalo (san pham suc khoe) — khong ap dung cho phong thuy
     loadChatKeyMap_();
@@ -332,11 +339,6 @@
           <label>CS đang dùng</label>
           <select id="pk-cs-sel"></select>
         </div>
-        <div id="pk-ai-nick-row">
-          <label>💬 Nick Zalo</label>
-          <select id="pk-nick-sel"></select>
-          <button id="pk-nick-add" title="Thêm nick mới">＋</button>
-        </div>
         <div id="pk-ai-phone-row">
           <input type="text" id="pk-ai-phone-input" placeholder="SĐT khách (nếu không tự nhận ra)" />
           <button id="pk-ai-phone-btn">Tra cứu</button>
@@ -352,6 +354,7 @@
             <option value="price">💰 Tra cứu bảng giá</option>
             <option value="ctkm">🎁 Tra cứu khuyến mãi</option>
             <option value="img">🖼 Tìm ảnh sản phẩm</option>
+            <option value="tpl">📚 Mẫu tin nhắn tư vấn</option>
           </select>
           <div id="pk-menu-content">
             <div id="pk-rem-body" style="display:none">
@@ -384,6 +387,13 @@
             <div id="pk-img-body" style="display:none">
               <input type="text" id="pk-img-q" placeholder="Gõ tên sản phẩm (VD: tỷ hưu, nhẫn, charm) — có thể bỏ trống các mục dưới" autocomplete="off" />
               <div id="pk-img-dyn"></div>
+            </div>
+            <div id="pk-tpl-body" style="display:none">
+              <div id="pk-tpl-row">
+                <input type="text" id="pk-tpl-q" placeholder="Tìm theo tiêu đề / nội dung / tag..." autocomplete="off" />
+                <button id="pk-tpl-refresh" title="Tải lại từ CRM">🔄</button>
+              </div>
+              <div id="pk-tpl-result"></div>
             </div>
           </div>
         </div>
@@ -507,23 +517,6 @@
       loadReminders_();
     });
 
-    const nickSel = panelEl.querySelector('#pk-nick-sel');
-    nickSel.addEventListener('change', () => {
-      _currentNick = nickSel.value;
-      chrome.storage.sync.set({ currentNick: _currentNick });
-    });
-    panelEl.querySelector('#pk-nick-add').addEventListener('click', () => {
-      const nick = (prompt('Nhập nick Zalo/kênh mới:') || '').trim();
-      if (!nick) return;
-      safeSendMessage_({ type: 'ADD_NICK', payload: { nick } }, (resp) => {
-        NICK_LIST = (resp?.ok && resp.data?.list) ? resp.data.list : NICK_LIST;
-        if (!NICK_LIST.includes(nick)) NICK_LIST.push(nick);
-        _currentNick = nick;
-        chrome.storage.sync.set({ currentNick: nick });
-        renderNickSelect_();
-      });
-    });
-
     panelEl.querySelector("#pk-ai-refresh").addEventListener("click", () => {
       requestSuggestion(true);
     });
@@ -585,9 +578,11 @@
       panelEl.querySelector("#pk-price-body").style.display = v === "price" ? "block" : "none";
       panelEl.querySelector("#pk-ctkm-body").style.display = v === "ctkm" ? "block" : "none";
       panelEl.querySelector("#pk-img-body").style.display = v === "img" ? "block" : "none";
+      panelEl.querySelector("#pk-tpl-body").style.display = v === "tpl" ? "block" : "none";
       if (v === "rem") loadReminders_();
       if (v === "ctkm" && !_ctkmLoadedOnce) { _ctkmLoadedOnce = true; doCtkmSearch_(); } // mo tab la nap luon toan bo CTKM, khoi phai go gi cung thay ngay
       if (v === "img") initImgSearch_();
+      if (v === "tpl" && !_tplLoadedOnce) { _tplLoadedOnce = true; loadMsgTemplates_(); } // mo tab la nap luon toan bo mau, khoi phai go gi cung thay ngay
     });
     panelEl.querySelector("#pk-rem-refresh").addEventListener("click", () => loadReminders_());
     panelEl.querySelector("#pk-price-btn").addEventListener("click", doPriceSearch_);
@@ -598,6 +593,8 @@
     panelEl.querySelector("#pk-ctkm-q").addEventListener("keydown", (e) => {
       if (e.key === "Enter") doCtkmSearch_();
     });
+    panelEl.querySelector("#pk-tpl-refresh").addEventListener("click", () => loadMsgTemplates_());
+    panelEl.querySelector("#pk-tpl-q").addEventListener("input", () => renderMsgTemplateRows_());
     panelEl.querySelectorAll('.pk-price-mode-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         panelEl.querySelectorAll('.pk-price-mode-btn').forEach((b) => b.classList.remove('active'));
@@ -716,24 +713,15 @@
     });
   }
 
-  // Nick Zalo/kênh — dùng chung danh sách (setting 'nickZaloList') với Zalo AI, sticky riêng
-  // theo máy/extension này (chrome.storage.sync của Pancake AI, độc lập với Zalo AI).
-  function loadNickList_() {
-    chrome.storage.sync.get(['currentNick'], (res) => {
-      _currentNick = res.currentNick || '';
-      safeSendMessage_({ type: "GET_NICK_LIST" }, (resp) => {
-        NICK_LIST = (resp?.ok && resp.data) ? resp.data : [];
-        renderNickSelect_();
-      });
+  // 2 co Admin dieu khien truong SDT Zalo (khoa han / cho Sale tu them) — xem chu thich tai
+  // khai bao _zaloPhoneFieldLocked/_zaloPhoneSaleCanAdd o tren.
+  function loadZaloPhoneSettings_() {
+    safeSendMessage_({ type: 'GET_ZALOPHONE_SETTINGS' }, (resp) => {
+      if (resp?.ok && resp.data) {
+        _zaloPhoneFieldLocked = !!resp.data.locked;
+        _zaloPhoneSaleCanAdd = resp.data.saleCanAdd !== false;
+      }
     });
-  }
-
-  function renderNickSelect_() {
-    const sel = panelEl?.querySelector('#pk-nick-sel');
-    if (!sel) return;
-    sel.innerHTML = '<option value="">— Chọn nick —</option>' +
-      NICK_LIST.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
-    sel.value = _currentNick || '';
   }
 
   // Đơn giá 1 đơn vị "vàng" (đ) — admin cài ở CRM (⚙ Cài đặt > Đơn giá vàng, trong Báo cáo
@@ -864,6 +852,63 @@
       const v = care.custom[f.id];
       return v ? `<span class="pk-ai-chip">🏷 ${escapeHtml(f.label)}: ${escapeHtml(v)}</span>` : '';
     }).join('');
+  }
+
+  // ── SDT ZALO: thay the "Nick Zalo" — xem chu thich day du tai khai bao _pkZaloPhones o tren.
+  // Dung chung quy uoc/CSS voi appweb (CARE_HEADERS.zaloPhones trong gas_v13.js). ──
+  function _pkBuildZaloPhoneOptions_(mainPhone, existing) {
+    let opts = '<option value="">— SĐT có sẵn —</option>';
+    if (mainPhone && !(existing || []).includes(mainPhone)) {
+      opts += `<option value="${escapeHtml(mainPhone)}">SĐT chính: ${escapeHtml(mainPhone)}</option>`;
+    }
+    return opts;
+  }
+  function _pkRenderZaloPhoneChips_() {
+    const canEdit = _zaloPhoneSaleCanAdd;
+    if (!_pkZaloPhones.length) return '<span style="font-size:11px;color:#888">Chưa có SĐT nào</span>';
+    return _pkZaloPhones.map((sdt, idx) =>
+      `<span class="zalophone-chip">📱 ${escapeHtml(sdt)}${canEdit ? ` <button class="zp-x" data-idx="${idx}" title="Bỏ SĐT này">✕</button>` : ''}</span>`
+    ).join('');
+  }
+  // Tra ve HTML day du cho 1 khach — tu an/khoa theo 2 co Admin da nap tu loadZaloPhoneSettings_
+  function _pkRenderZaloPhoneField_(mainPhone) {
+    if (_zaloPhoneFieldLocked) return '';
+    const addRow = _zaloPhoneSaleCanAdd
+      ? `<div class="zalophone-select-row">
+           <select id="pk-zalophone-sel">${_pkBuildZaloPhoneOptions_(mainPhone, _pkZaloPhones)}</select>
+           <input type="text" id="pk-zalophone-input" placeholder="...hoặc gõ SĐT khác" inputmode="tel">
+           <button id="pk-zalophone-add" class="zalophone-add-btn" type="button">+ Thêm</button>
+         </div>`
+      : `<div class="zalophone-locked-note">Chỉ Admin được thêm SĐT ở trường này.</div>`;
+    return `<div class="zalophone-field">
+        <div class="zalophone-label"><span class="zalophone-label-text">📱 SĐT Zalo</span></div>
+        ${addRow}
+        <div class="zalophone-chip-row" id="pk-zalophone-chips">${_pkRenderZaloPhoneChips_()}</div>
+      </div>`;
+  }
+  function _pkRefreshZaloPhoneUI_(mainPhone) {
+    const sel = panelEl?.querySelector('#pk-zalophone-sel');
+    if (sel) sel.innerHTML = _pkBuildZaloPhoneOptions_(mainPhone, _pkZaloPhones);
+    const chips = panelEl?.querySelector('#pk-zalophone-chips');
+    if (chips) chips.innerHTML = _pkRenderZaloPhoneChips_();
+  }
+  function addZaloPhoneChip_(mainPhone) {
+    if (!_zaloPhoneSaleCanAdd) return;
+    const selEl = panelEl.querySelector('#pk-zalophone-sel');
+    const inpEl = panelEl.querySelector('#pk-zalophone-input');
+    const raw = (inpEl?.value || '').trim() || (selEl?.value || '');
+    if (!raw) { setStatus('⚠️ Chọn hoặc gõ 1 SĐT trước đã.'); return; }
+    const np = normPhone(raw);
+    if (!/^0[3-9]\d{8}$/.test(np)) { setStatus(`⚠️ SĐT "${raw}" không hợp lệ.`); return; }
+    if (_pkZaloPhones.includes(np)) { setStatus('⚠️ SĐT này đã có trong danh sách.'); return; }
+    _pkZaloPhones.push(np);
+    if (inpEl) inpEl.value = '';
+    _pkRefreshZaloPhoneUI_(mainPhone);
+  }
+  function removeZaloPhoneChip_(idx, mainPhone) {
+    if (!_zaloPhoneSaleCanAdd) return;
+    _pkZaloPhones.splice(idx, 1);
+    _pkRefreshZaloPhoneUI_(mainPhone);
   }
 
   // "Danh bạ ngược" (khoá hội thoại → SĐT) học cục bộ trên máy này — dùng khi CS bấm 🔗
@@ -1251,6 +1296,7 @@
     const totalRevenue = (orders || []).reduce((s, o) => s + (parseFloat(o.revenue) || 0), 0);
     const products = [...new Set((orders || []).map((o) => o.product).filter(Boolean))].slice(0, 4).join(", ");
     const isNew = !care && (!orders || !orders.length);
+    _pkZaloPhones = Array.isArray(care?.zaloPhones) ? care.zaloPhones.slice() : [];
 
     const optHtml = (opts, val) => opts.map((o) =>
       `<option value="${escapeHtml(o)}"${o === (val || '') ? ' selected' : ''}>${o ? escapeHtml(o) : '— Chọn —'}</option>`
@@ -1287,6 +1333,7 @@
             <select id="pk-zalo-sel">${optHtml(ZALO_STATUSES, care?.zalo)}</select>
           </div>
         </div>
+        ${_pkRenderZaloPhoneField_(phone)}
         <div class="pk-form-row">
           <div class="pk-form-col">
             <label>${KHSTATUS_LABEL}</label>
@@ -1335,6 +1382,20 @@
     });
     box.querySelector('#pk-hen-done').addEventListener('click', () => doneAppointment_(currentFormPhone_() || phone));
     box.querySelector('#pk-save-btn').addEventListener('click', () => saveCare_(currentFormPhone_() || phone));
+
+    // SDT Zalo: nut them (chi ton tai khi _zaloPhoneSaleCanAdd=true) + go bo tung chip (uy
+    // thac su kien tren khung chip vi cac nut ✕ duoc ve lai moi lan them/xoa)
+    const zpAddBtn = box.querySelector('#pk-zalophone-add');
+    if (zpAddBtn) zpAddBtn.addEventListener('click', () => addZaloPhoneChip_(currentFormPhone_() || phone));
+    const zpInput = box.querySelector('#pk-zalophone-input');
+    if (zpInput) zpInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); addZaloPhoneChip_(currentFormPhone_() || phone); }
+    });
+    const zpChips = box.querySelector('#pk-zalophone-chips');
+    if (zpChips) zpChips.addEventListener('click', (e) => {
+      const btn = e.target.closest('.zp-x');
+      if (btn) removeZaloPhoneChip_(Number(btn.dataset.idx), currentFormPhone_() || phone);
+    });
 
     // Form thêm mới: khi CS dán xong SĐT hợp lệ thì tự tra ngầm 1 lần để cảnh báo nếu số đã tồn tại
     const newPhoneEl = box.querySelector('#pk-newphone-input');
@@ -1427,11 +1488,6 @@
     const c = _currentCare || {};
     const nameEl = panelEl?.querySelector('#pk-name-input');
     const liveName = nameEl ? nameEl.value.trim() : '';
-    // Ghi nhan nick Zalo/kenh dang dung vao danh sach nick da tung tiep xuc voi khach nay —
-    // giong het cach Zalo AI lam khi luu (them vao nickZalos, khong ghi de mat nick cu).
-    const existingNicks = c.nickZalos || [];
-    const nickZalos = (_currentNick && !existingNicks.includes(_currentNick))
-      ? [...existingNicks, _currentNick] : existingNicks;
     return Object.assign({
       phone,
       status: c.status || '', zalo: c.zalo || '', cs: settings.csName || c.cs || '',
@@ -1442,7 +1498,8 @@
       schedCS: c.schedCS || '', schedCSNote: c.schedCSNote || '',
       schedHen: c.schedHen || '', schedHenNote: c.schedHenNote || '',
       khStatus: c.khStatus || '', birthday: c.birthday || '',
-      nickZalos,
+      nickZalos: c.nickZalos || [], // khong dong vao — rieng cua Zalo AI, Pancake khong sua
+      zaloPhones: _zaloPhoneFieldLocked ? (c.zaloPhones || []) : _pkZaloPhones.slice(),
       custom: c.custom || {},
       name: liveName || _currentOrderPanelName || c.name || ''
     }, overrides || {});
@@ -1489,9 +1546,13 @@
       out[k] = serverCare[k] || localRow[k] || '';
     });
     // Nick Zalo/kenh: hop nhat, khong bao gio lam mat nick cu
-    const svNicks = serverCare.nickZalos || [];
-    const lcNicks = localRow.nickZalos || [];
-    out.nickZalos = [...new Set([...svNicks, ...lcNicks])];
+    // Nick Zalo/kenh: Pancake khong con sua truong nay — giu nguyen y server, phong truong
+    // hop server co cap nhat moi tu Zalo AI sau khi form Pancake nay da mo.
+    out.nickZalos = serverCare.nickZalos || localRow.nickZalos || [];
+    // SDT Zalo: hop nhat, khong bao gio lam mat SDT cu (ca nguoi khac vua them luc minh dang mo form)
+    const svZaloPhones = serverCare.zaloPhones || [];
+    const lcZaloPhones = localRow.zaloPhones || [];
+    out.zaloPhones = [...new Set([...svZaloPhones, ...lcZaloPhones])];
     // CS phu trach: neu khach da co CS cu thi giu, khong cuop quyen phu trach
     out.cs = serverCare.cs || localRow.cs || '';
     const noteRes = _mergeNotesKeepOld_(serverCare.note, localRow.note);
@@ -1879,6 +1940,51 @@
     }).join('');
   }
 
+  // ── MAU TIN NHAN TU VAN KHACH (them 2026-10, theo yeu cau Duyen "crm + pancake ai") — doc
+  // CUNG 1 thu vien voi form them/sua tren CRM (tab Zalo AI) qua action 'messageTemplates'.
+  // Bam vao 1 mau se CHEN THANG vao o tra loi dang mo (dung lai insertReply() co san), khong chi
+  // copy clipboard — nhanh hon cho CS khi dang chat that.
+  function loadMsgTemplates_() {
+    const box = panelEl.querySelector('#pk-tpl-result');
+    box.innerHTML = '<div class="pk-price-loading">Đang tải thư viện mẫu...</div>';
+    safeSendMessage_({ type: 'GET_MESSAGE_TEMPLATES' }, (resp) => {
+      if (!resp?.ok) { box.innerHTML = `<div class="pk-price-loading">Lỗi: ${escapeHtml(resp?.error || 'không rõ')}</div>`; return; }
+      _msgTemplates = resp.data.templates || [];
+      renderMsgTemplateRows_();
+    });
+  }
+
+  function renderMsgTemplateRows_() {
+    const box = panelEl.querySelector('#pk-tpl-result');
+    if (!box) return;
+    const q = _stripVNlocal_((panelEl.querySelector('#pk-tpl-q').value || '').trim().toLowerCase());
+    const rows = _msgTemplates.filter((t) => {
+      if (!q) return true;
+      const hay = _stripVNlocal_(((t.title || '') + ' ' + (t.content || '') + ' ' + (t.tags || '')).toLowerCase());
+      return hay.indexOf(q) >= 0;
+    });
+    if (!rows.length) {
+      box.innerHTML = `<div class="pk-price-loading">${_msgTemplates.length ? 'Không tìm thấy mẫu phù hợp.' : 'Chưa có mẫu nào — vào CRM tab "Zalo AI" để thêm mẫu đầu tiên.'}</div>`;
+      return;
+    }
+    box.innerHTML = rows.map((t) => {
+      const tags = (t.tags || '').split(',').map((s) => s.trim()).filter(Boolean)
+        .map((tg) => `<span class="pk-price-field">#${escapeHtml(tg)}</span>`).join(' ');
+      const preview = t.content.length > 160 ? t.content.slice(0, 160) + '…' : t.content;
+      return `<div class="pk-price-item pk-ai-suggestion-item" data-tid="${escapeHtml(t.id)}" title="Bấm để chèn vào ô trả lời">` +
+        `<div class="pk-ctkm-title">${escapeHtml(t.title)}</div>` +
+        `<div>${escapeHtml(preview)}</div>` +
+        (tags ? `<div style="margin-top:3px">${tags}</div>` : '') +
+        `</div>`;
+    }).join('');
+    box.querySelectorAll('[data-tid]').forEach((el) => {
+      el.addEventListener('click', () => {
+        const t = _msgTemplates.find((x) => x.id === el.dataset.tid);
+        if (t) insertReply(t.content); // dung lai ham co san — tu dong xu ly ca contenteditable lan textarea
+      });
+    });
+  }
+
   // ── TÌM ẢNH SẢN PHẨM (cột "Link ảnh sản phẩm" trong DANH_MUC) — dùng LẠI y hệt logic thu hẹp
   // dần của "Soạn đơn" (Nhóm SP -> Tên SP -> Kiểu/Size -> Chất liệu, đều CÓ THỂ BỎ TRỐNG) để tìm
   // đúng dòng/biến thể trước khi lấy ảnh — thay vì chỉ gõ tên rồi đoán dòng khớp nhất như trước
@@ -1887,7 +1993,7 @@
   let _imgFlatItems = null;   // null = chưa tải; [] = tải rồi nhưng rỗng
   let _imgFlatLoading = false;
   let _imgLiveTimer = null;
-  const _imgBldBlank_ = () => ({ q: '', nhom: '', ten: '', size: '', cl: '', mau: '' });
+  const _imgBldBlank_ = () => ({ q: '', nhom: '', ten: '', size: '', cl: '', cl2: '', mau: '' });
   let _imgBld = _imgBldBlank_();
 
   function initImgSearch_() {
@@ -1972,15 +2078,29 @@
       }
       const poolS = _imgBld.size ? poolT.filter((it) => sizeVal(it) === _imgBld.size) : poolT;
 
-      // 4) Chất liệu (bỏ trống được)
-      const clVal = (it) => it.c || '__none__';
-      const cls = [...new Set(poolS.map(clVal))].sort(_vnSort_);
-      if (_imgBld.cl && cls.indexOf(_imgBld.cl) === -1) _imgBld.cl = '';
+      // 4) Chất liệu (bỏ trống được) — 2 CẤP theo xác nhận Duyên 2026-10-05: 1 ô DANH_MUC nhét nhiều chất liệu
+      // ("1. Aqua xanh biển 2. Citrin: vàng mỡ gà 3. Thạch anh: dâu xanh, dâu hồng 4. Ngọc: Cẩm thạch Type B, lam thủy,
+      // ngọc bích"); chữ đứng TRƯỚC dấu ":" là chất liệu CHA, phần SAU ":" là các mục CON của nó. Dropdown 4 chọn
+      // CHA; chọn xong nếu cha có mục con thì hiện thêm dropdown 4b chọn CON (xem _parseMaterialTree_).
+      const clTree = (it) => { const t = _parseMaterialTree_(it.c); return t.length ? t : [{ parent: '__none__', children: [] }]; };
+      const cls = [...new Set(poolS.reduce((acc, it) => acc.concat(clTree(it).map((n) => n.parent)), []))].sort(_vnSort_);
+      if (_imgBld.cl && cls.indexOf(_imgBld.cl) === -1) { _imgBld.cl = ''; _imgBld.cl2 = ''; }
       if (!_imgBld.cl && cls.length === 1) _imgBld.cl = cls[0];
       if (cls.length > 1 || (cls.length === 1 && cls[0] !== '__none__')) {
         html += row(`Chất liệu (${cls.length})`, `<select id="pkimg-cl"><option value="">— Tất cả — (bỏ trống nếu không chắc)</option>${cls.map((v) => opt(v, v === '__none__' ? '(không ghi)' : v, v === _imgBld.cl)).join('')}</select>`);
       }
-      const poolCl = _imgBld.cl ? poolS.filter((it) => clVal(it) === _imgBld.cl) : poolS;
+      const hasParent = (it) => clTree(it).some((n) => n.parent === _imgBld.cl);
+      let poolCl = _imgBld.cl ? poolS.filter(hasParent) : poolS;
+      // 4b) Mục CON của chất liệu cha đang chọn (chỉ hiện khi có)
+      if (_imgBld.cl) {
+        const kids = [...new Set(poolCl.reduce((acc, it) => acc.concat(clTree(it).filter((n) => n.parent === _imgBld.cl).reduce((a2, n) => a2.concat(n.children), [])), []))].sort(_vnSort_);
+        if (_imgBld.cl2 && kids.indexOf(_imgBld.cl2) === -1) _imgBld.cl2 = '';
+        if (!_imgBld.cl2 && kids.length === 1) _imgBld.cl2 = kids[0];
+        if (kids.length) {
+          html += row(`${escapeHtml(_imgBld.cl === '__none__' ? 'Chi tiết' : _imgBld.cl)} — chi tiết (${kids.length})`, `<select id="pkimg-cl2"><option value="">— Tất cả — (bỏ trống nếu không chắc)</option>${kids.map((v) => opt(v, v, v === _imgBld.cl2)).join('')}</select>`);
+        }
+        if (_imgBld.cl2) poolCl = poolCl.filter((it) => clTree(it).some((n) => n.parent === _imgBld.cl && n.children.indexOf(_imgBld.cl2) !== -1));
+      }
 
       // 5) Màu sắc (CHỈ hiện nếu DANH_MUC có cột "Màu sắc" — không phải hệ thống tự nhận diện
       // màu từ ảnh, chỉ đọc đúng dữ liệu chữ trong sheet, xem _productImgCols_ bên gas_v13.js)
@@ -2004,7 +2124,7 @@
       // 6 ảnh này LÀ KẾT QUẢ CUỐI sau khi đã áp hết các bộ lọc đang chọn ở trên (kể cả khi 1 vài
       // mục cố ý để trống) — không phải bước trung gian còn lọc tiếp ngầm phía sau.
       html += `<div id="pkimg-results">` + toShow.map((it, i) => {
-        const label = [it.t || it.m, it.s, it.c, it.mau].filter(Boolean).join(' · ');
+        const label = [it.t || it.m, it.s, (_imgBld.cl && _imgBld.cl !== '__none__') ? (_imgBld.cl + (_imgBld.cl2 ? ': ' + _imgBld.cl2 : '')) : _parseMaterialTree_(it.c).map((n) => n.parent).join(' / '), it.mau].filter(Boolean).join(' · ');
         return `<div class="pk-price-item">
           <div class="pk-ctkm-title">${escapeHtml(label)}</div>
           <div id="pkimg-slot-${i}">${it.img ? '<div class="pk-price-loading">Đang tải ảnh...</div>' : '<div class="pk-price-loading">Sản phẩm này chưa có link ảnh.</div>'}</div>
@@ -2041,10 +2161,11 @@
 
   function _bindImgBuilder_(dyn) {
     const on = (id, fn) => { const el = dyn.querySelector('#' + id); if (el) el.addEventListener('change', fn); };
-    on('pkimg-nhom', (e) => { _imgBld.nhom = e.target.value; _imgBld.ten = ''; _imgBld.size = ''; _imgBld.cl = ''; _imgBld.mau = ''; renderImgDyn_(); });
-    on('pkimg-ten', (e) => { _imgBld.ten = e.target.value; _imgBld.size = ''; _imgBld.cl = ''; _imgBld.mau = ''; renderImgDyn_(); });
-    on('pkimg-size', (e) => { _imgBld.size = e.target.value; _imgBld.cl = ''; _imgBld.mau = ''; renderImgDyn_(); });
-    on('pkimg-cl', (e) => { _imgBld.cl = e.target.value; _imgBld.mau = ''; renderImgDyn_(); });
+    on('pkimg-nhom', (e) => { _imgBld.nhom = e.target.value; _imgBld.ten = ''; _imgBld.size = ''; _imgBld.cl = ''; _imgBld.cl2 = ''; _imgBld.mau = ''; renderImgDyn_(); });
+    on('pkimg-ten', (e) => { _imgBld.ten = e.target.value; _imgBld.size = ''; _imgBld.cl = ''; _imgBld.cl2 = ''; _imgBld.mau = ''; renderImgDyn_(); });
+    on('pkimg-size', (e) => { _imgBld.size = e.target.value; _imgBld.cl = ''; _imgBld.cl2 = ''; _imgBld.mau = ''; renderImgDyn_(); });
+    on('pkimg-cl', (e) => { _imgBld.cl = e.target.value; _imgBld.cl2 = ''; _imgBld.mau = ''; renderImgDyn_(); });
+    on('pkimg-cl2', (e) => { _imgBld.cl2 = e.target.value; _imgBld.mau = ''; renderImgDyn_(); });
     on('pkimg-mau', (e) => { _imgBld.mau = e.target.value; renderImgDyn_(); });
   }
 
@@ -2077,6 +2198,63 @@
       if (piece) out.push(piece);
     }
     return out.length >= 2 ? out : null;
+  }
+
+  // Phân tích 1 ô "Chất liệu" gồm NHIỀU chất liệu thành CÂY 2 cấp: [{ parent, children: [] }, ...] (bỏ trùng, giữ thứ tự).
+  // Quy tắc (theo xác nhận của Duyên 2026-10-05):
+  //  1) Các nhóm lớn (mỗi nhóm = 1 chất liệu CHA) ngăn bằng: đánh số "1. X 2. Y 3. Z" (xem _parseNumberedList_) — hoặc
+  //     mỗi nhóm 1 dòng / ngăn bằng ";" "|" — và trong mỗi dòng ngăn tiếp bằng " - " (có khoảng trắng 2 bên). Kiểu
+  //     "2 GRANAT ĐỎ - 1 CITRIN - 1NGỌC BÍCH" → 3 chất liệu cha GRANAT ĐỎ / CITRIN / NGỌC BÍCH (số đứng đầu là SỐ
+  //     LƯỢNG, bỏ đi; chỉ bỏ số 1-2 chữ số dính liền chữ cái nên "VÀNG 10K", "BẠC 925" không bị ảnh hưởng).
+  //  2) Trong 1 nhóm, chữ đứng TRƯỚC dấu ":" là CHA; phần SAU ":" là các mục CON, ngăn bằng dấu PHẨY (ngoài ngoặc):
+  //     "Thạch anh: dâu xanh, dâu hồng" → cha "Thạch anh", con ["dâu xanh","dâu hồng"].
+  //     Nhóm KHÔNG có ":" mà có phẩy ngoài ngoặc ("Ngọc bích, lam thủy") → mỗi phần là 1 cha riêng, không có con.
+  //     Dấu phẩy TRONG ngoặc "( Xanh lá, vàng, hồng tím )" được giữ nguyên, không tách.
+  // Ô trống → [].
+  function _splitTopLevel_(str, sepChar) {
+    const out = []; let depth = 0, cur = '';
+    for (const ch of String(str)) {
+      if (ch === '(' || ch === '[') depth++;
+      else if ((ch === ')' || ch === ']') && depth > 0) depth--;
+      if (ch === sepChar && depth === 0) { out.push(cur); cur = ''; } else cur += ch;
+    }
+    out.push(cur);
+    return out;
+  }
+  function _parseMaterialTree_(str) {
+    str = String(str || '').trim();
+    if (!str) return [];
+    const clean = (x) => String(x).replace(/\s+/g, ' ').trim();
+    // Bước 1: các nhóm lớn (mỗi nhóm = 1 cha)
+    let groups = _parseNumberedList_(str);
+    if (!groups) {
+      groups = [];
+      str.split(/\r?\n|;|\|/).forEach((line) => {
+        const parts = line.split(/\s+[-\u2013\u2014]\s+/);
+        if (parts.length >= 2) parts.forEach((x) => groups.push(x.replace(/^\s*\d{1,2}\s*(?=\p{L}{2,})/u, ''))); // bỏ SỐ LƯỢNG đứng đầu
+        else groups.push(line);
+      });
+    }
+    // Bước 2: mỗi nhóm → cha (+ con nếu có ":")
+    const tree = []; const byKey = {};
+    const addNode = (parent, kids) => {
+      parent = clean(parent); if (!parent) return;
+      const k = parent.toLowerCase();
+      let node = byKey[k];
+      if (!node) { node = { parent: parent, children: [] }; byKey[k] = node; tree.push(node); }
+      (kids || []).forEach((c) => { c = clean(c); if (c && node.children.indexOf(c) === -1) node.children.push(c); });
+    };
+    groups.forEach((g) => {
+      g = clean(g).replace(/^\d{1,2}\.\s+/, ''); // ô chỉ có 1 mục đánh số lẻ loi "1. Citrin: ..." → bỏ số thứ tự
+      if (!g) return;
+      const colon = _splitTopLevel_(g, ':');
+      if (colon.length >= 2 && clean(colon[0]) && clean(colon[0]).indexOf(',') === -1) {
+        addNode(colon[0], _splitTopLevel_(colon.slice(1).join(':'), ','));
+      } else {
+        _splitTopLevel_(g, ',').forEach((part) => addNode(part, []));
+      }
+    });
+    return tree;
   }
 
   // ══════════════════════════ SOẠN ĐƠN (gõ tên → lọc → dropdown thu hẹp dần) ══════════════════════════

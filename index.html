@@ -314,6 +314,22 @@ select.srt{padding:4px 8px;border:1px solid var(--border);border-radius:var(--rs
 .nickzalo-chip .nz-x{background:none;border:none;color:#15803d;cursor:pointer;font-size:11px;padding:0 1px;line-height:1;opacity:.7;}
 .nickzalo-chip .nz-x:hover{opacity:1;color:var(--red);}
 
+/* ── SDT ZALO FIELD (thay the Nick Zalo rieng cua Pancake — xem CARE_HEADERS o gas_v13.js) ── */
+.zalophone-field{background:#eff6ff;border:1px solid #93c5fd;border-radius:7px;padding:8px 10px;margin-bottom:2px;}
+.zalophone-label{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;}
+.zalophone-label-text{font-size:11px;font-weight:600;color:#1d4ed8;text-transform:uppercase;letter-spacing:.06em;}
+.zalophone-locked-note{font-size:10px;color:var(--muted);font-style:italic;}
+.zalophone-select-row{display:flex;gap:5px;align-items:center;flex-wrap:wrap;}
+.zalophone-select{flex:1;min-width:110px;padding:5px 8px;border:1px solid #93c5fd;border-radius:var(--rsm);font-size:12px;background:#fff;color:var(--text);outline:none;}
+.zalophone-input{flex:1;min-width:110px;padding:5px 8px;border:1px solid #93c5fd;border-radius:var(--rsm);font-size:12px;background:#fff;color:var(--text);outline:none;}
+.zalophone-select:focus,.zalophone-input:focus{border-color:#1d4ed8;}
+.zalophone-add-btn{background:#1d4ed8;color:#fff;border:none;border-radius:var(--rsm);padding:5px 9px;font-size:11px;cursor:pointer;white-space:nowrap;}
+.zalophone-add-btn:hover{background:#1e40af;}
+.zalophone-chip-row{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;}
+.zalophone-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;font-weight:500;}
+.zalophone-chip .zp-x{background:none;border:none;color:#1d4ed8;cursor:pointer;font-size:11px;padding:0 1px;line-height:1;opacity:.7;}
+.zalophone-chip .zp-x:hover{opacity:1;color:var(--red);}
+
 /* Modal quản lý Nick Zalo */
 .nz-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:700;display:none;align-items:center;justify-content:center;}
 .nz-modal-overlay.open{display:flex;}
@@ -569,7 +585,7 @@ th.col-filtered .th-filter-icon{opacity:1;color:var(--green);}
 .col-cs{width:150px;} .col-carecs{width:140px;} .col-source{width:120px;} .col-note{width:185px;} .col-sched{width:132px;}
 #cs-note-history { max-height: 320px; overflow-y: auto; }
 #cs-note-new { resize: vertical; }
-.col-lastact{width:130px;} .col-tacdong{width:140px;}
+.col-lastpos{width:112px;} .col-lastact{width:130px;} .col-tacdong{width:140px;}
 #main-table td.col-product .btags,#main-table td.col-cs .cs-badge-wrap,#main-table td.col-source .btags{white-space:nowrap;overflow:hidden;flex-wrap:nowrap;}
 #main-table td.col-name .cname{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
@@ -1003,6 +1019,11 @@ body.rpt-mode .app{height:100vh}
   <div id="col-dd-sched-items" style="max-height:200px;overflow-y:auto"></div>
   <div class="col-dd-footer"><button class="col-dd-clear" onclick="clearColFilter('sched')">Xóa lọc</button><button class="col-dd-apply" onclick="applyColFilter('sched')">Áp dụng</button></div>
 </div>
+<!-- COLUMN DROPDOWN: lastpos (ngày mua gần nhất — Pos) -->
+<div class="col-dropdown" id="col-dd-lastpos">
+  <div id="col-dd-lastpos-items" style="max-height:220px;overflow-y:auto"></div>
+  <div class="col-dd-footer"><button class="col-dd-clear" onclick="clearColFilter('lastpos')">Xóa lọc</button><button class="col-dd-apply" onclick="applyColFilter('lastpos')">Áp dụng</button></div>
+</div>
 <!-- COLUMN DROPDOWN: lastact -->
 <div class="col-dropdown" id="col-dd-lastact">
   <div id="col-dd-lastact-items" style="max-height:200px;overflow-y:auto"></div>
@@ -1095,6 +1116,7 @@ body.rpt-mode .app{height:100vh}
         <option value="dt">DT tổng</option>
         <option value="cs">Chăm sóc (KH thêm nhanh)</option>
         <option value="don">Dữ liệu đơn</option>
+        <option value="assign">Chia data (được chia cho tôi)</option>
       </select>
     </div>
     <div class="sb-label">Phân loại KH</div>
@@ -1203,6 +1225,8 @@ body.rpt-mode .app{height:100vh}
             <option value="revenue_desc">Doanh thu cao</option>
             <option value="name_asc">Tên A–Z</option>
             <option value="sched_asc">Lịch sắp tới</option>
+            <option value="lastpos_desc">Ngày mua gần nhất (mới → cũ)</option>
+            <option value="lastpos_asc">Ngày mua gần nhất (cũ → mới)</option>
             <option value="lastact_asc">Tác động lâu nhất</option>
             <option value="lastact_desc">Tác động gần nhất</option>
           </select>
@@ -1349,6 +1373,7 @@ body.rpt-mode .app{height:100vh}
       <!-- COLUMN TOGGLE BAR -->
       <div class="col-toggle-bar" id="col-toggle-bar">
         <span class="ymf-label">📋 Cột hiển thị</span>
+        <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('lastpos',this)"> Ngày mua gần nhất</label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('name',this)"> Khách hàng</label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('tier',this)"> Phân loại</label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('care',this)"> <span id="lbl-fieldcs-coltoggle">Tình trạng CS</span></label>
@@ -1372,6 +1397,7 @@ body.rpt-mode .app{height:100vh}
       <div class="table-wrap">
         <table id="main-table">
           <thead><tr>
+            <th class="filterable col-lastpos" id="th-lastpos" style="min-width:104px" onclick="openColDropdown('lastpos',event)" title="Ngày mua gần nhất theo đơn Pos — nhấn ▼ để lọc"><div class="th-inner">Ngày mua gần nhất <span class="th-filter-icon">▼</span></div></th>
             <th class="filterable col-name" id="th-name" onclick="openColDropdown('name',event)"><div class="th-inner">Khách hàng <span class="th-filter-icon">▼</span></div></th>
             <th class="filterable col-tier" id="th-tier"><div class="th-inner"><span id="tier-label-btn" onclick="openTierTooltip(event)" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px" title="Xem tiêu chí phân loại">Phân loại</span> <span class="th-filter-icon" onclick="openColDropdown('tier',event)" style="cursor:pointer">▼</span></div></th>
             <th class="filterable col-care" id="th-care" onclick="openColDropdown('care',event)"><div class="th-inner"><span id="lbl-fieldcs-th">Tình trạng CS</span> <span class="th-filter-icon">▼</span></div></th>
@@ -1530,6 +1556,29 @@ body.rpt-mode .app{height:100vh}
 
       <!-- Error -->
       <div id="zai-error" style="display:none;color:#dc2626;font-size:12px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:8px 12px"></div>
+
+      <!-- Thu vien mau tin nhan tu van khach (them 2026-10): luu san mau de tra cuu/copy khi nhan tin
+           khach, dong bo dung 1 nguon qua action 'messageTemplates' voi extension Pancake AI. -->
+      <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+          <div class="zai-label" style="margin:0;font-size:13px;font-weight:700">📚 Thư viện mẫu tin nhắn tư vấn</div>
+          <input id="mt-search" class="zai-input" placeholder="Tìm theo tiêu đề / nội dung / tag..." style="flex:1;min-width:180px" oninput="renderMsgTemplateList()">
+          <button class="btn sm primary" onclick="openMsgTemplateForm()">+ Thêm mẫu</button>
+        </div>
+        <div id="mt-form-wrap" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:12px;margin-bottom:10px">
+          <input type="hidden" id="mt-f-id">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+            <input id="mt-f-title" class="zai-input" placeholder="Tiêu đề mẫu (VD: Giữ gìn thành quả)" style="flex:1;min-width:200px">
+            <input id="mt-f-tags" class="zai-input" placeholder="Tag, phân cách bằng dấu phẩy (VD: dong-vien, giu-khach)" style="flex:1;min-width:200px">
+          </div>
+          <textarea id="mt-f-content" class="zai-textarea" placeholder="Nội dung mẫu tin nhắn..." rows="4" style="width:100%;margin-bottom:8px"></textarea>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn sm" onclick="closeMsgTemplateForm()">Hủy</button>
+            <button class="btn sm primary" id="mt-f-save-btn" onclick="saveMsgTemplateUI()">Lưu mẫu</button>
+          </div>
+        </div>
+        <div id="mt-list" style="display:flex;flex-direction:column;gap:8px"></div>
+      </div>
     </div>
 
     <div id="tab-mydata" style="display:none;flex:1;overflow:hidden;flex-direction:column" class="main">
@@ -1927,55 +1976,6 @@ async function _syncIndividualRatesFromGAS() {
 }
 setTimeout(_syncIndividualRatesFromGAS, 0);
 
-// ════════════════════════════════════════════════════════════════════
-//  BAO CAO H — Thuong offline (Sale thu viec)
-//  TRIAL_SALE_BONUS_CONFIG: [{ sale, startDate:'yyyy-mm-dd', endDate:'yyyy-mm-dd'|'', note }]
-//  CREATOR_NAME_ALIAS: { "<ten Nguoi tao ghi tren DT TỔNG>": "<ten Sale ban chuan>" } — dung khi
-//  2 he thong ghi ten khac nhau cho CUNG 1 nguoi (vd 'anhTP1995' -> 'anhtrinh1995').
-// ════════════════════════════════════════════════════════════════════
-let TRIAL_SALE_BONUS_CONFIG = (function(){
-  try { var v = loadLS('ome_trial_sale_bonus'); return Array.isArray(v) ? v : []; } catch(e){ return []; }
-})();
-let CREATOR_NAME_ALIAS = (function(){
-  try { var v = loadLS('ome_creator_name_alias'); return (v && typeof v === 'object') ? v : {}; } catch(e){ return {}; }
-})();
-
-async function _syncTrialBonusConfigFromGAS() {
-  if (!gsUrl) return;
-  try {
-    var r = await fetch(gsUrl + '?action=getSetting&key=trialSaleBonusConfig', {redirect:'follow'});
-    var data = await r.json();
-    if (data && data.value) {
-      var arr = JSON.parse(data.value);
-      if (Array.isArray(arr)) { TRIAL_SALE_BONUS_CONFIG = arr; saveLS('ome_trial_sale_bonus', TRIAL_SALE_BONUS_CONFIG); }
-    }
-    var r2 = await fetch(gsUrl + '?action=getSetting&key=creatorNameAlias', {redirect:'follow'});
-    var data2 = await r2.json();
-    if (data2 && data2.value) {
-      var obj = JSON.parse(data2.value);
-      if (obj && typeof obj === 'object') { CREATOR_NAME_ALIAS = obj; saveLS('ome_creator_name_alias', CREATOR_NAME_ALIAS); }
-    }
-    if (typeof _srState !== 'undefined' && _srState.sub === 'H') renderSalesReportTab();
-  } catch(e) { /* giu ban local neu loi mang/parse */ }
-}
-setTimeout(_syncTrialBonusConfigFromGAS, 0);
-
-async function saveTrialBonusConfig() {
-  saveLS('ome_trial_sale_bonus', TRIAL_SALE_BONUS_CONFIG);
-  saveLS('ome_creator_name_alias', CREATOR_NAME_ALIAS);
-  if (gsUrl) {
-    try {
-      await fetch(gsUrl, { method:'POST', redirect:'follow',
-        body: JSON.stringify({ action:'setSetting', key:'trialSaleBonusConfig', value: JSON.stringify(TRIAL_SALE_BONUS_CONFIG) }) });
-      await fetch(gsUrl, { method:'POST', redirect:'follow',
-        body: JSON.stringify({ action:'setSetting', key:'creatorNameAlias', value: JSON.stringify(CREATOR_NAME_ALIAS) }) });
-      toast('✓ Đã lưu và đồng bộ danh sách Sale thử việc lên Google Sheets');
-    } catch(e) { toast('✓ Đã lưu local — chưa đồng bộ GSheets: ' + e.message); }
-  } else {
-    toast('✓ Đã lưu (local)');
-  }
-}
-
 async function saveIndividualRates() {
   saveLS('ome_individual_rates', INDIVIDUAL_RATES);
   if (gsUrl) {
@@ -2079,6 +2079,9 @@ async function saveChannelCommissionRates() {
 function _channelCommissionRate_(kenh){
   if (!kenh) return null;
   var k = String(kenh).trim().toLowerCase();
+  // QUY TAC KE TOAN (file check_doanh_thu, Buoc 3): nguon don CHI co chu "Facebook" = don duoc/my pham ->
+  // MAC DINH chi tinh 1% hoa hong. Admin cai ro % cho "facebook" trong modal thi lay theo cai do.
+  if (k === 'facebook' && !Object.prototype.hasOwnProperty.call(CHANNEL_COMMISSION_RATES, k)) return 1;
   if (!k || !Object.prototype.hasOwnProperty.call(CHANNEL_COMMISSION_RATES, k)) return null;
   var v = CHANNEL_COMMISSION_RATES[k];
   return (v === '' || v === null || v === undefined || isNaN(Number(v))) ? null : Number(v);
@@ -2154,11 +2157,20 @@ function _resolveCommissionRate_(name) {
   var teamInfo = _teamRateForName_(name);
   var hasA = indiv.above15 !== undefined && indiv.above15 !== null && indiv.above15 !== '';
   var hasB = indiv.below15 !== undefined && indiv.below15 !== null && indiv.below15 !== '';
+  // QUY TAC KE TOAN (file check_doanh_thu, Buoc 7): chua cai ca nhan/team thi MAC DINH theo phan loai
+  // Online/Offline cua sale — Online: >=15tr 1,5% / <15tr 1%; Offline: >=15tr 1% / <15tr 0,8%.
+  // Team chi tinh la "da cai" khi % > 0 (ratePct mac dinh 0/0 = chua cai).
+  var tr = teamInfo.rate || {};
+  var teamA = teamInfo.team && Number(tr.above15) > 0, teamB = teamInfo.team && Number(tr.below15) > 0;
+  var chn = SALE_CHANNELS[name];
+  var def = chn === 'online' ? { above15: 1.5, below15: 1, label: 'Mặc định Online' }
+          : chn === 'offline' ? { above15: 1, below15: 0.8, label: 'Mặc định Offline' } : null;
+  function _src(has, teamHas){ return has ? 'Cá nhân' : (teamHas ? 'Team ' + teamInfo.team.name : (def ? def.label : 'Chưa cài')); }
   return {
-    above15: hasA ? Number(indiv.above15) : Number((teamInfo.rate||{}).above15 || 0),
-    below15: hasB ? Number(indiv.below15) : Number((teamInfo.rate||{}).below15 || 0),
-    sourceAbove15: hasA ? 'Cá nhân' : (teamInfo.team ? 'Team ' + teamInfo.team.name : 'Chưa cài'),
-    sourceBelow15: hasB ? 'Cá nhân' : (teamInfo.team ? 'Team ' + teamInfo.team.name : 'Chưa cài')
+    above15: hasA ? Number(indiv.above15) : (teamA ? Number(tr.above15) : (def ? def.above15 : 0)),
+    below15: hasB ? Number(indiv.below15) : (teamB ? Number(tr.below15) : (def ? def.below15 : 0)),
+    sourceAbove15: _src(hasA, teamA),
+    sourceBelow15: _src(hasB, teamB)
   };
 }
 
@@ -2192,7 +2204,8 @@ function _computeCommissionData_(orders) {
     }
     var n = salesList.length;
     salesList.forEach(function(sName){
-      var share = shareMap ? giaTri * shareMap[sName] : giaTri / n;
+      // saleRatio 0.3 = don Quay Hao Nam gan the sale + note 30/70: chi 30% doanh thu chia cho sale (70% la cua quay)
+      var share = (shareMap ? giaTri * shareMap[sName] : giaTri / n) * (Number(m.saleRatio) || 1);
       if (!bySale[sName]) bySale[sName] = { ordersAbove15:0, ordersBelow15:0, revenueAbove15:0, revenueBelow15:0, channelRevenue:0, channelCommission:0, channelBreakdown:{} };
       if (chRate !== null) {
         var kenhKey = String(m.nguonDon||'').trim();
@@ -2390,6 +2403,7 @@ let careLeads = loadLS('ome_care_leads') || {};
 // màn hình chính, không kéo chi tiết sản phẩm vào danh sách khách.
 let donPhoneSet = new Set(loadLS('ome_don_phones') || []);
 let donSaleByPhone = loadLS('ome_don_sale_by_phone') || {}; // { phone: [ten sale,...] } lay tu "dữ liệu đơn", gop vao csSet de phan quyen CS
+let donLastDateByPhone = loadLS('ome_don_last_date') || {}; // { phone: 'yyyy-mm-dd' } ngay mua gan nhat tu Pos (cot "Ngày mua gần nhất")
 let donOrderCountByPhone = loadLS('ome_don_order_count') || {}; // { phone: so don } lay tu "dữ liệu đơn" — dung de phan loai hang KH (VIP/Than thiet/...)
 let schedules = loadLS('ome_sched') || [];
 let currentPhone = null;
@@ -2507,7 +2521,7 @@ function _customerProductText(c){
 }
 
 // Column filters
-let colFilters = { name: new Set(), tier: new Set(), care: new Set(), zalo: new Set(), product: new Set(), cs: new Set(), careCS: new Set(), source: new Set(), sched: new Set(), lastact: new Set(), tacdong: new Set(), bcstatus: new Set() };
+let colFilters = { name: new Set(), tier: new Set(), care: new Set(), zalo: new Set(), product: new Set(), cs: new Set(), careCS: new Set(), source: new Set(), sched: new Set(), lastact: new Set(), tacdong: new Set(), bcstatus: new Set(), lastpos: new Set() };
 let _colDdActive = null;
 
 // Advanced filters state
@@ -2750,6 +2764,7 @@ async function syncFromGS(opts) {
         const dpJson = await dpR.json();
         if (dpJson && dpJson.phones) { donPhoneSet = new Set(dpJson.phones); saveLS('ome_don_phones', dpJson.phones); }
         if (dpJson && dpJson.saleByPhone) { donSaleByPhone = dpJson.saleByPhone; saveLS('ome_don_sale_by_phone', dpJson.saleByPhone); }
+        if (dpJson && dpJson.lastDateByPhone) { donLastDateByPhone = dpJson.lastDateByPhone; saveLS('ome_don_last_date', dpJson.lastDateByPhone); }
         if (dpJson && dpJson.orderCountByPhone) { donOrderCountByPhone = dpJson.orderCountByPhone; saveLS('ome_don_order_count', dpJson.orderCountByPhone); }
       } catch(dpErr) { console.warn('donPhones fetch error:', dpErr.message); }
     }
@@ -2799,7 +2814,7 @@ async function syncFromGS(opts) {
         schedCS: row.schedCS||'', schedCSNote: row.schedCSNote||'',
         schedHen: row.schedHen||'', schedHenNote: row.schedHenNote||'',
         updated: row.updated||'',
-        khStatus: row.khStatus||'', nickZalos: row.nickZalos||[], birthday: row.birthday||'', tag: row.tag||'',
+        khStatus: row.khStatus||'', nickZalos: row.nickZalos||[], zaloPhones: row.zaloPhones||[], birthday: row.birthday||'', tag: row.tag||'',
         custom: (row.custom && typeof row.custom === 'object') ? row.custom : {}
       };
       // KH này đang được xem trong panel chi tiết (openDp) và vừa có bản ghi mới hơn (vd: CS vừa lưu từ Zalo AI extension)
@@ -2911,6 +2926,7 @@ async function pushCareToGS(phone) {
     schedHen: care.schedHen||'', schedHenNote: care.schedHenNote||'',
     khStatus: care.khStatus||'',
     nickZalos: care.nickZalos||[],
+    zaloPhones: care.zaloPhones||[],
     tag: care.tag||'',
     name: care.name||'',
     custom: care.custom||{}
@@ -3186,9 +3202,14 @@ function buildCustomers() {
       cs:  !!(typeof careLeads !== 'undefined' && careLeads && careLeads[c.phone]),
       don: !!(typeof donPhoneSet !== 'undefined' && donPhoneSet.has(c.phone))
     };
+    // Ngày mua gần nhất theo Pos (timestamp 00:00 local) — null nếu KH chưa có đơn Pos
+    const _lpIso = (typeof donLastDateByPhone !== 'undefined' && donLastDateByPhone) ? donLastDateByPhone[c.phone] : '';
+    const _lpM = _lpIso ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(_lpIso) : null;
+    const lastPosDate = _lpM ? new Date(+_lpM[1], +_lpM[2]-1, +_lpM[3]).getTime() : null;
 
     return {
       ...c,
+      lastPosDate,
       name: displayName,
       nameGuessed,
       sources:[...c.sources], brands:[...c.brands].filter(Boolean),
@@ -3200,6 +3221,7 @@ function buildCustomers() {
       // Giá trị các trường tự tạo (admin thêm) — dùng cho lọc sidebar, cột bảng, badge, xuất Excel
       custom: (care.custom && typeof care.custom === 'object') ? care.custom : {},
       nickZalos: Array.isArray(care.nickZalos) ? care.nickZalos : [],
+      zaloPhones: Array.isArray(care.zaloPhones) ? care.zaloPhones : [],
       careNote: care.note || c._rawNote || '',
       careCS,
       // Tách careCS thành các tên riêng lẻ (đề phòng ai đó gõ tay "A, B" vào ô CS chăm sóc) —
@@ -3408,12 +3430,28 @@ function applyFilters() {
     }
     if (q && !c.nameLower.includes(q) && !c.phone.includes(q)) return false;
 
-    // Lọc theo nguồn dữ liệu (DT tổng / Chăm sóc / Dữ liệu đơn) — mặc định "Gộp" = không lọc
+    // Lọc theo nguồn dữ liệu (DT tổng / Chăm sóc / Dữ liệu đơn / Chia data) — mặc định "Gộp" = không lọc
     if (dataSrcF !== 'all') {
       const src = c.dataSrc || {};
       if (dataSrcF === 'dt'  && !src.dt)  return false;
       if (dataSrcF === 'cs'  && !src.cs)  return false;
       if (dataSrcF === 'don' && !src.don) return false;
+      // "Chia data": KH đang nằm trong (các) đợt phân công (sheet AssignData) của CHÍNH tài
+      // khoản đang đăng nhập — tra qua _assignAllIndex (phone -> Set<csName>) giống hệt cách
+      // bộ lọc CS ở trên đang dùng, không bake vào c.dataSrc vì AssignData có thể được tải/đổi
+      // mà không rebuild lại toàn bộ danh sách khách.
+      if (dataSrcF === 'assign') {
+        const _aIdx = (typeof _assignAllIndex !== 'undefined') ? _assignAllIndex[c.phone] : null;
+        if (!_aIdx || !_aIdx.size) return false;
+        // SUA 2026-10-05: truoc day chi so voi currentUser.name (1 ten) nen tai khoan co NHIEU ten (currentUser.names) hoac
+        // Admin (ten 'Admin' khong trung ten CS nao trong AssignData) luon ra 0 du da chia data. Nay so voi MOI ten cua
+        // tai khoan (giong _inUserScope); Admin khong gan ten CS nao thi hien moi KH dang nam trong bat ky dot chia nao.
+        const _myN = (currentUser.names && currentUser.names.length) ? currentUser.names : (currentUser.name ? [currentUser.name] : []);
+        const _isRealCs = _myN.some(n => n && n !== 'Admin');
+        if (_isRealCs || currentUser.role !== 'admin') {
+          if (!_myN.some(n => _aIdx.has(n))) return false;
+        }
+      }
     }
 
     // Campaign filter (normalize phone để tránh lỗi khoảng trắng/dấu gạch)
@@ -3455,6 +3493,23 @@ function applyFilters() {
         return false;
       });
       if (!matchSched) return false;
+    }
+
+    // Column filter: ngày mua gần nhất (Pos)
+    if (colFilters.lastpos.size > 0) {
+      const lp = c.lastPosDate;
+      const lpDa = lp ? _calendarDaysAgo(lp) : null;
+      const matchLP = [...colFilters.lastpos].some(v => {
+        if (v === 'Chưa có đơn Pos') return !lp;
+        if (!lp) return false;
+        if (v === 'Hôm nay') return lpDa === 0;
+        if (v === '≤ 7 ngày') return lpDa <= 7;
+        if (v === '≤ 30 ngày') return lpDa <= 30;
+        if (v === '≤ 90 ngày') return lpDa <= 90;
+        if (v === '> 90 ngày') return lpDa > 90;
+        return false;
+      });
+      if (!matchLP) return false;
     }
 
     // Column filter: lần tác động (lastact — số ngày trước)
@@ -3586,6 +3641,8 @@ function applyFilters() {
       return _lastActSortDir === -1 ? db - da : da - db;
     });
   } else if (sort==='lastact_asc') list.sort((a,b)=>(a._lastActionDate||0)-(b._lastActionDate||0));
+  else if (sort==='lastpos_desc') list.sort((a,b)=>(b.lastPosDate||0)-(a.lastPosDate||0));
+  else if (sort==='lastpos_asc') list.sort((a,b)=>(a.lastPosDate||Infinity)-(b.lastPosDate||Infinity));
   else if (sort==='lastact_desc') list.sort((a,b)=>(b._lastActionDate||0)-(a._lastActionDate||0));
   else if (sort==='orders_desc') list.sort((a,b)=>b.totalOrders-a.totalOrders);
   else if (sort==='orders_asc') list.sort((a,b)=>a.totalOrders-b.totalOrders);
@@ -3695,7 +3752,17 @@ function _rowHtml(c) {
   } else {
     tacdongHtml = `<span style="color:var(--hint);font-size:11px">—</span>`;
   }
+  const lastPosDisp = (typeof colVisible !== 'undefined' && colVisible.lastpos !== false) ? '' : 'display:none';
+  let lastPosHtml;
+  if (c.lastPosDate) {
+    const _lpDa = _calendarDaysAgo(c.lastPosDate);
+    const _lpCol = _lpDa <= 30 ? 'var(--green)' : _lpDa <= 90 ? 'var(--tn)' : 'var(--hint)';
+    lastPosHtml = `<span style="color:${_lpCol};font-size:12px;font-weight:600;white-space:nowrap" title="${_lpDa === 0 ? 'Hôm nay' : _lpDa + ' ngày trước'} (đơn Pos)">${new Date(c.lastPosDate).toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'})}</span>`;
+  } else {
+    lastPosHtml = '<span style="color:var(--hint);font-size:11px">—</span>';
+  }
   return `<tr data-phone="${esc(c.phone)}" onclick="openDp(this.dataset.phone)">
+    <td class="col-lastpos" style="${lastPosDisp}">${lastPosHtml}</td>
     <td class="col-name"><div class="cname">${esc(c.name)}</div><div class="cphone" style="display:flex;align-items:center;gap:4px">${c.phone}<button data-phone="${esc(c.phone)}" onclick="event.stopPropagation();copyPhone(this.dataset.phone)" title="Copy SĐT" style="background:none;border:none;cursor:pointer;font-size:11px;padding:0 2px;color:var(--hint);line-height:1;opacity:.6" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'">📋</button></div></td>
     <td class="col-tier">${tb}</td>
     <td class="col-care">${cb}${khb ? '<br>'+khb : ''}</td>
@@ -3810,7 +3877,7 @@ function _renderVirtualWindow(force) {
   if (!tbody) return;
   const list = _vt.list;
   if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;padding:32px;color:var(--hint)">Không có kết quả</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:32px;color:var(--hint)">Không có kết quả</td></tr>';
     return;
   }
   const wrap = _vtWrap();
@@ -3828,9 +3895,9 @@ function _renderVirtualWindow(force) {
   const botH = Math.max(0, (total - end) * VT_ROW_H);
 
   // Dùng DocumentFragment + 1 lần ghi innerHTML (batch DOM)
-  let html = `<tr class="vspacer" aria-hidden="true"><td colspan="13" style="height:${topH}px"></td></tr>`;
+  let html = `<tr class="vspacer" aria-hidden="true"><td colspan="14" style="height:${topH}px"></td></tr>`;
   for (let i = start; i < end; i++) html += _rowHtml(list[i]);
-  html += `<tr class="vspacer" aria-hidden="true"><td colspan="13" style="height:${botH}px"></td></tr>`;
+  html += `<tr class="vspacer" aria-hidden="true"><td colspan="14" style="height:${botH}px"></td></tr>`;
   tbody.innerHTML = html;
   reapplyColVisibility();
 }
@@ -4198,7 +4265,7 @@ function renderCareTab(c) {
     <div class="form-row-2">
       <div>
         <div class="form-label">${esc(FIELD_LABEL_CS)}</div>
-        <select class="form-select" id="cs-status">
+        <select class="form-select" id="cs-status" onchange="_hOnCsStatusChange_()">
           ${_buildCareStatusOptions(care.status||c.careStatus||'')}
         </select>
       </div>
@@ -4213,29 +4280,31 @@ function renderCareTab(c) {
     <div class="form-row-2">
       <div>
         <div class="form-label">${esc(FIELD_LABEL_KH)}</div>
-        <select class="form-select" id="cs-kh-status">
+        <select class="form-select" id="cs-kh-status" onchange="this.dataset.manual='1'">
           ${_buildCustStatusOptions(care.khStatus||'')}
         </select>
       </div>
       <div>
-        <div class="nickzalo-field">
-          <div class="nickzalo-label">
-            <span class="nickzalo-label-text">💬 Nick Zalo</span>
-            <button class="nickzalo-manage-btn" data-phone="${esc(c.phone)}" onclick="openNickZaloModal(this.dataset.phone)">⚙ Quản lý danh sách</button>
-          </div>
-          <div class="nickzalo-select-row">
-            <select class="nickzalo-select" id="cs-nickzalo-sel" data-phone="${esc(c.phone)}" onchange="addNickZaloChip(this.dataset.phone,this)">
-              <option value="">— Chọn nick Zalo —</option>
-              ${_buildNickZaloOptions()}
-            </select>
-          </div>
-          <div class="nickzalo-chip-row" id="cs-nickzalo-chips">
-            ${_renderNickZaloChips(care.nickZalos||[], c.phone)}
-          </div>
-          <input type="hidden" id="cs-nickzalo-val" value="${esc(JSON.stringify(care.nickZalos||[]))}">
-        </div>
+        ${_renderZaloPhoneField(care, c)}
       </div>
     </div>
+    <div id="cs-kh-hint" style="font-size:10.5px;color:var(--muted);margin:-4px 0 8px"></div>
+    ${(function(){
+      var isChot = (typeof _hIsChot_==='function') && _hIsChot_(care.status||c.careStatus||'');
+      var ex = (typeof _hChotToday_==='function' && _hChotToday_(c.phone)) || {};
+      return `<div id="cs-chot-box" style="display:${isChot?'block':'none'};margin-bottom:10px;padding:10px;border:1px solid #bbf7d0;background:#f0fdf4;border-radius:8px">
+        <div class="form-label" style="color:var(--green)">🧾 Đơn chốt hôm nay</div>
+        <div class="form-row-2">
+          <div>
+            <div class="form-label">💰 Doanh thu đơn (đ)</div>
+            <input class="form-input" id="cs-chot-rev" inputmode="numeric" placeholder="VD: 3.000.000" value="${ex.rev?Number(ex.rev).toLocaleString('vi-VN'):''}" oninput="_hFmtMoneyInput_(this)">
+          </div>
+          <div></div>
+        </div>
+        <div class="form-label" style="margin-top:6px">📝 Thông tin đơn hàng</div>
+        <textarea class="form-ta" id="cs-chot-note" placeholder="VD: 1 nhẫn Kim Tiền size 12 + 1 lắc tay, ship COD, giao thứ 6..." style="min-height:52px">${esc(ex.note||'')}</textarea>
+      </div>`;
+    })()}
     ${_renderCustomFieldInputs(care)}
     <div class="form-row-2">
       <div>
@@ -4824,10 +4893,11 @@ function saveCare(phone) {
   const newZalo   = document.getElementById('cs-zalo').value;
   const newNote   = document.getElementById('cs-note') ? document.getElementById('cs-note').value : (existing.note||'');
   const newCS     = document.getElementById('cs-assign').value;
-  const newKhStatus = (document.getElementById('cs-kh-status') ? document.getElementById('cs-kh-status').value : '') || existing.khStatus || '';
+  const newKhStatus = (document.getElementById('cs-kh-status') ? document.getElementById('cs-kh-status').value : '') || existing.khStatus || (typeof _hAutoKh_==='function' ? _hAutoKh_(newStatus) : '') || '';
   const newBirthday = (document.getElementById('cs-birthday') ? document.getElementById('cs-birthday').value : '') || existing.birthday || '';
   const newTag = (document.getElementById('cs-tag') ? document.getElementById('cs-tag').value.trim() : '') || existing.tag || '';
   const newNickZalos = (function(){ try { var el=document.getElementById('cs-nickzalo-val'); return el ? JSON.parse(el.value||'[]') : (existing.nickZalos||[]); } catch(e){ return existing.nickZalos||[]; }})();
+  const newZaloPhones = (function(){ try { var el=document.getElementById('cs-zalophone-val'); return el ? JSON.parse(el.value||'[]') : (existing.zaloPhones||[]); } catch(e){ return existing.zaloPhones||[]; }})();
   // Trường tự tạo (admin thêm) — gộp chung 1 object 'custom' để không phải thêm cột mới vào Sheet
   const newCustom = _collectCustomFieldValues(existing.custom);
   // V9 audit: ghi lại thay đổi trạng thái / CS / Zalo
@@ -4842,7 +4912,8 @@ function saveCare(phone) {
     var newV = (newCustom[f.id]) || '';
     if (oldV !== newV) logAudit('status', phone, f.label+': '+(oldV||'(trống)'), f.label+': '+(newV||'(trống)'));
   });
-  careData[phone] = { ...existing, status: newStatus, zalo: newZalo, note: newNote, cs: newCS, khStatus: newKhStatus, birthday: newBirthday, tag: newTag, nickZalos: newNickZalos, custom: newCustom };
+  try { if (typeof _hIsChot_==='function' && _hIsChot_(newStatus)) _hSaveChotFromForm_(phone, newCS); } catch(e){ console.warn('Lưu đơn chốt lỗi:', e); }
+  careData[phone] = { ...existing, status: newStatus, zalo: newZalo, note: newNote, cs: newCS, khStatus: newKhStatus, birthday: newBirthday, tag: newTag, nickZalos: newNickZalos, zaloPhones: newZaloPhones, custom: newCustom };
   _touchCare(phone);
   saveLS('ome_care', careData);
   _invalidateFilterCache();
@@ -5048,12 +5119,9 @@ function openNickZaloModal(phone) {
 function closeNickZaloModal() {
   var ov = document.getElementById('nz-modal-overlay');
   if (ov) ov.classList.remove('open');
-  // Refresh select options in care panel
-  var sel = document.getElementById('cs-nickzalo-sel');
-  if (sel) {
-    var cur = sel.value;
-    sel.innerHTML = '<option value="">— Chọn nick Zalo —</option>' + _buildNickZaloOptions(cur);
-  }
+  // Lam moi dropdown con dung danh sach nay (broadcast compose) — form cham soc khach khong
+  // con o nay nua, da thay bang SDT Zalo (zaloPhones), xem openZaloPhoneSettingsModal/_renderZaloPhoneField.
+  if (typeof _bcLoadNickList === 'function') { try { _bcLoadNickList(); } catch(e){} }
 }
 
 function _renderNickZaloModalList() {
@@ -5108,6 +5176,152 @@ async function deleteNickZaloFromList(idx) {
     await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({action:'setSetting', key:'nickZaloList', value: JSON.stringify(_nickZaloList)}) });
     toast('Đã xóa "' + name + '"');
   } catch(e) { toast('⚠ Xóa cục bộ nhưng lưu máy chủ lỗi: ' + e.message); }
+}
+
+// ═══════════════════════════════════════════════════════
+//  SDT ZALO — SDT khach dang dung de ket ban Zalo (2026-09, thay the "Nick Zalo" rieng cua
+//  Pancake, vi khach tren Pancake ket ban Zalo bang nhieu SDT/tai khoan khac nhau, khong co
+//  dinh 1 Page nen theo doi theo "nick" khong con dung). Moi khach co 1 MANG cac SDT (co the
+//  doi/them theo thoi gian), CS tu go SDT moi hoac chon nhanh SDT chinh cua khach.
+//  Cot luu: zaloPhones trong CareData — KHAC HOAN TOAN nickZalos (van giu nguyen rieng cho
+//  Zalo AI dinh tuyen gui hang loat theo tai khoan doi ngu, khong dong vao o day).
+//  Admin dieu khien qua 2 setting chung (giong nickZaloList): zaloPhoneFieldLocked (khoa han
+//  ca truong) va zaloPhoneSaleCanAdd (Sale co duoc tu them SDT khong, mac dinh CO).
+// ═══════════════════════════════════════════════════════
+let _zaloPhoneFieldLocked = false;
+let _zaloPhoneSaleCanAdd = true; // mac dinh: Sale duoc phep them (dung yeu cau ban dau)
+async function _syncZaloPhoneSettingsFromGAS() {
+  if (!gsUrl) return;
+  try {
+    var r = await fetch(gsUrl + '?action=getSetting&key=zaloPhoneFieldLocked', {redirect:'follow'});
+    var d = await r.json();
+    _zaloPhoneFieldLocked = d && d.value === 'true';
+    var r2 = await fetch(gsUrl + '?action=getSetting&key=zaloPhoneSaleCanAdd', {redirect:'follow'});
+    var d2 = await r2.json();
+    _zaloPhoneSaleCanAdd = !(d2 && d2.value === 'false'); // chi tat khi luu ro rang la 'false'
+  } catch(e) { /* giu mac dinh neu loi mang */ }
+}
+_syncZaloPhoneSettingsFromGAS();
+
+// Co Sale nay duoc them SDT Zalo khong: Admin luon duoc (khong bi khoa boi 2 setting tren)
+function _zaloPhoneCanAdd() {
+  if (typeof _srIsAdmin === 'function' && _srIsAdmin()) return true;
+  return _zaloPhoneSaleCanAdd;
+}
+// Truong co dang bi khoa hoan toan khong (an voi ca Sale lan Admin xem tren form khach —
+// Admin van bat/tat duoc o modal Cai dat): Admin xem duoc khi ho tu mo modal quan ly, nhung
+// tren FORM KHACH thi khoa la an voi tat ca de dung 1 quy tac de hieu.
+function _zaloPhoneFieldVisible() { return !_zaloPhoneFieldLocked; }
+
+function _buildZaloPhoneOptions(mainPhone, existing) {
+  var opts = '<option value="">— SĐT có sẵn —</option>';
+  if (mainPhone && (existing||[]).indexOf(mainPhone) === -1) {
+    opts += '<option value="' + esc(mainPhone) + '">SĐT chính: ' + esc(mainPhone) + '</option>';
+  }
+  return opts;
+}
+function _renderZaloPhoneChips(arr, phone) {
+  var canEdit = _zaloPhoneCanAdd();
+  if (!arr || !arr.length) return '<span style="font-size:11px;color:var(--muted)">Chưa có SĐT nào</span>';
+  return arr.map(function(sdt, idx) {
+    return '<span class="zalophone-chip">📱 ' + esc(sdt) +
+      (canEdit ? '<button class="zp-x" data-phone="' + esc(phone) + '" title="Bỏ SĐT này" onclick="removeZaloPhoneChip(this.dataset.phone,' + idx + ')">✕</button>' : '') +
+      '</span>';
+  }).join('');
+}
+// Khoi HTML day du cho 1 khach (goi tu form cham soc) — tu quyet dinh an/hien theo 2 setting
+function _renderZaloPhoneField(care, c) {
+  var isAdm = (typeof _srIsAdmin === 'function' && _srIsAdmin());
+  if (!_zaloPhoneFieldVisible()) {
+    // Khoa: an het voi Sale; Admin van thay 1 dong gon kem nut Cai dat de tu mo khoa lai duoc
+    if (!isAdm) return '';
+    return '<div class="zalophone-field" style="opacity:.7">' +
+        '<div class="zalophone-label"><span class="zalophone-label-text">📱 SĐT Zalo (đang khoá)</span>' +
+        '<button class="nickzalo-manage-btn" onclick="openZaloPhoneSettingsModal()">⚙ Cài đặt</button></div>' +
+      '</div>';
+  }
+  var arr = care.zaloPhones || [];
+  var canAdd = _zaloPhoneCanAdd();
+  var addRow = canAdd
+    ? ('<div class="zalophone-select-row">' +
+        '<select class="zalophone-select" id="cs-zalophone-sel" data-phone="' + esc(c.phone) + '">' +
+          _buildZaloPhoneOptions(c.phone, arr) +
+        '</select>' +
+        '<input type="text" class="zalophone-input" id="cs-zalophone-input" placeholder="...hoặc gõ SĐT khác" inputmode="tel">' +
+        '<button class="zalophone-add-btn" data-phone="' + esc(c.phone) + '" onclick="addZaloPhoneChip(this.dataset.phone)">+ Thêm</button>' +
+      '</div>')
+    : '<div class="zalophone-locked-note">Chỉ Admin được thêm SĐT ở trường này.</div>';
+  return '<div class="zalophone-field">' +
+      '<div class="zalophone-label"><span class="zalophone-label-text">📱 SĐT Zalo</span>' +
+      (isAdm ? '<button class="nickzalo-manage-btn" onclick="openZaloPhoneSettingsModal()">⚙ Cài đặt</button>' : '') +
+      '</div>' +
+      addRow +
+      '<div class="zalophone-chip-row" id="cs-zalophone-chips">' + _renderZaloPhoneChips(arr, c.phone) + '</div>' +
+      '<input type="hidden" id="cs-zalophone-val" value="' + esc(JSON.stringify(arr)) + '">' +
+    '</div>';
+}
+function addZaloPhoneChip(phone) {
+  if (!_zaloPhoneCanAdd()) { toast('Bạn không có quyền thêm SĐT Zalo.'); return; }
+  var selEl = document.getElementById('cs-zalophone-sel');
+  var inpEl = document.getElementById('cs-zalophone-input');
+  var raw = (inpEl && inpEl.value.trim()) ? inpEl.value.trim() : (selEl ? selEl.value : '');
+  if (!raw) { toast('Chọn hoặc gõ 1 SĐT trước đã.'); return; }
+  var np = normPhone(raw);
+  if (!np) { toast('SĐT "' + raw + '" không hợp lệ.'); return; }
+  var hidEl = document.getElementById('cs-zalophone-val');
+  var arr = []; try { arr = JSON.parse((hidEl && hidEl.value) || '[]'); } catch(e){ arr = []; }
+  if (arr.indexOf(np) >= 0) { toast('SĐT này đã có trong danh sách.'); return; }
+  arr.push(np);
+  if (hidEl) hidEl.value = JSON.stringify(arr);
+  if (inpEl) inpEl.value = '';
+  if (selEl) selEl.innerHTML = _buildZaloPhoneOptions(phone, arr);
+  var chipsEl = document.getElementById('cs-zalophone-chips');
+  if (chipsEl) chipsEl.innerHTML = _renderZaloPhoneChips(arr, phone);
+}
+function removeZaloPhoneChip(phone, idx) {
+  if (!_zaloPhoneCanAdd()) { toast('Bạn không có quyền sửa SĐT Zalo.'); return; }
+  var hidEl = document.getElementById('cs-zalophone-val');
+  var arr = []; try { arr = JSON.parse((hidEl && hidEl.value) || '[]'); } catch(e){ arr = []; }
+  arr.splice(idx, 1);
+  if (hidEl) hidEl.value = JSON.stringify(arr);
+  var selEl = document.getElementById('cs-zalophone-sel');
+  if (selEl) selEl.innerHTML = _buildZaloPhoneOptions(phone, arr);
+  var chipsEl = document.getElementById('cs-zalophone-chips');
+  if (chipsEl) chipsEl.innerHTML = _renderZaloPhoneChips(arr, phone);
+}
+
+// ── Modal Admin: khoa/mo truong SDT Zalo + cho phep Sale them hay khong ──
+function openZaloPhoneSettingsModal() {
+  if (typeof _srIsAdmin === 'function' && !_srIsAdmin()) { toast('Chỉ admin mới cấu hình được mục này.'); return; }
+  var div = document.createElement('div');
+  div.className = 'nz-modal-overlay open';
+  div.innerHTML =
+    '<div class="nz-modal" style="width:380px">' +
+      '<div class="nz-modal-header"><div class="nz-modal-title">📱 Cài đặt SĐT Zalo</div>' +
+      '<button class="close-btn" onclick="this.closest(\'.nz-modal-overlay\').remove()">✕</button></div>' +
+      '<div style="padding:14px 16px;display:flex;flex-direction:column;gap:12px">' +
+        '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">' +
+          '<input type="checkbox" id="zp-set-locked" ' + (_zaloPhoneFieldLocked?'checked':'') + '> Khoá hẳn trường SĐT Zalo (ẩn với mọi người trên form khách)</label>' +
+        '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">' +
+          '<input type="checkbox" id="zp-set-saleadd" ' + (_zaloPhoneSaleCanAdd?'checked':'') + '> Cho phép Sale tự thêm SĐT mới (tắt = chỉ Admin thêm được)</label>' +
+        '<button class="btn primary" style="width:100%;justify-content:center" onclick="_saveZaloPhoneSettings(this)">Lưu</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(div);
+  div.addEventListener('click', function(e){ if (e.target === div) div.remove(); });
+}
+async function _saveZaloPhoneSettings(btn) {
+  var locked = document.getElementById('zp-set-locked').checked;
+  var saleAdd = document.getElementById('zp-set-saleadd').checked;
+  try {
+    await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({action:'setSetting', key:'zaloPhoneFieldLocked', value: locked?'true':'false'}) });
+    await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({action:'setSetting', key:'zaloPhoneSaleCanAdd', value: saleAdd?'true':'false'}) });
+    _zaloPhoneFieldLocked = locked; _zaloPhoneSaleCanAdd = saleAdd;
+    toast('✓ Đã lưu cài đặt SĐT Zalo');
+    btn.closest('.nz-modal-overlay').remove();
+    if (typeof currentPhone !== 'undefined' && currentPhone && typeof renderDpTab === 'function'
+        && typeof currentDpTab !== 'undefined' && currentDpTab === 'care') { try { renderDpTab('care'); } catch(e){} }
+  } catch(e) { toast('❌ Lưu lỗi: ' + e.message); }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -5843,6 +6057,7 @@ function rebuildCareOnCustomers() {
     c.zaloStatus = care.zalo  || c._rawZalo  || '';
     c.khStatus   = care.khStatus || '';
     c.nickZalos  = Array.isArray(care.nickZalos) ? care.nickZalos : [];
+    c.zaloPhones = Array.isArray(care.zaloPhones) ? care.zaloPhones : [];
     c.careNote   = care.note  || c._rawNote  || '';
     c.custom     = (care.custom && typeof care.custom === 'object') ? care.custom : {};
     c.careCS     = care.cs    || _latestOrderCS(c.orders);
@@ -6766,7 +6981,7 @@ function loadLS(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):nu
 function saveLS(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
 
 // Column visibility state
-const _colVisDefault = { name:true, tier:true, care:true, zalo:true, order:true, product:true, cs:true, source:false, note:true, sched:true, lastact:true, tacdong:true, carecs:true, bcstatus:true };
+const _colVisDefault = { lastpos:true, name:true, tier:true, care:true, zalo:true, order:true, product:true, cs:true, source:false, note:true, sched:true, lastact:true, tacdong:true, carecs:true, bcstatus:true };
 const colVisible = Object.assign({}, _colVisDefault, loadLS('ome_col_visible') || {});
 
 function toggleCol(col, cb) {
@@ -7173,6 +7388,7 @@ function renderColDdItems(col, query) {
   else if (col==='careCS') values = [...new Set(allCustomers.flatMap(c=>[...(c.careCSSet||[])]).filter(Boolean))].sort();
   else if (col==='source') values = [...new Set(allCustomers.flatMap(c=>c.sources).filter(Boolean))].sort();
   else if (col==='sched') values = ['Có lịch', 'Không có lịch', ...SCHED_TYPES.map(t=>t.label)];
+  else if (col==='lastpos') values = ['Hôm nay', '≤ 7 ngày', '≤ 30 ngày', '≤ 90 ngày', '> 90 ngày', 'Chưa có đơn Pos'];
   else if (col==='lastact') values = ['Hôm nay', 'Hôm qua', '≤ 3 ngày', '≤ 7 ngày', '≤ 14 ngày', '≤ 30 ngày', '> 30 ngày', 'Chưa tác động', '__custom_range__'];
   else if (col==='tacdong') values = ['Trong 24h', 'Hôm nay', 'Hôm qua', '≤ 3 ngày', '≤ 7 ngày', '> 7 ngày', 'Chưa có'];
   else if (col==='bcstatus') values = ['Đã gửi', 'Gửi lỗi', 'Bỏ qua', 'Chưa gửi', 'Không trong chiến dịch'];
@@ -8789,7 +9005,7 @@ function _filterSignature(){
   ];
   if (typeof colFilters === 'object') {
     parts.push('cf', _setSig(colFilters.name), _setSig(colFilters.tier), _setSig(colFilters.care),
-      _setSig(colFilters.zalo), _setSig(colFilters.product), _setSig(colFilters.source), _setSig(colFilters.cs), _setSig(colFilters.careCS));
+      _setSig(colFilters.zalo), _setSig(colFilters.product), _setSig(colFilters.source), _setSig(colFilters.cs), _setSig(colFilters.careCS), _setSig(colFilters.lastpos));
   }
   if (typeof advFilters === 'object') {
     parts.push('af', _setSig(advFilters.cs), _setSig(advFilters.products), _setSig(advFilters.sources),
@@ -9002,7 +9218,7 @@ function _careRow(phone){
     schedSP: care.schedSP||'', schedSPNote: care.schedSPNote||'',
     schedCS: care.schedCS||'', schedCSNote: care.schedCSNote||'',
     schedHen: care.schedHen||'', schedHenNote: care.schedHenNote||'',
-    khStatus: care.khStatus||'', nickZalos: care.nickZalos||[], birthday: care.birthday||'',
+    khStatus: care.khStatus||'', nickZalos: care.nickZalos||[], zaloPhones: care.zaloPhones||[], birthday: care.birthday||'',
     name: care.name||'',
     custom: care.custom||{}
   };
@@ -9020,6 +9236,7 @@ function _hasRealCareData(phone){
   if ((care.birthday||'').toString().trim()) return true;
   if ((care.name||'').toString().trim())     return true;
   if (Array.isArray(care.nickZalos) && care.nickZalos.length) return true;
+  if (Array.isArray(care.zaloPhones) && care.zaloPhones.length) return true;
   // Trường tự tạo (admin thêm) có giá trị → cũng là dữ liệu CS nhập thật, phải được đồng bộ
   // (nếu thiếu điều kiện này, khách CHỈ điền trường tự tạo sẽ không bao giờ được đẩy lên Sheet)
   if (care.custom && typeof care.custom === 'object') {
@@ -12181,12 +12398,14 @@ var _srState = {
   // F — Ty le hoan thanh KPI theo Sale (Bac Van phong / KPI co dinh Online / KPI commit rieng)
   fDateFrom: '', fDateTo: '', fDateQuick: 'thisMonth', fDateField: 'ngayTao', fSale: [], fTeam: [], dataF: null,
   fSaleSearch: '', fSaleCustomized: false, fKpiView: 'table', fEditing: null,
-  // G — Don bi loai (Huy/Tra lai/Hoan tien/That bai/Khieu nai) — dung chung filter dang voi A
-  gDateFrom: '', gDateTo: '', gDateQuick: 'custom', gSale: [], gNguon: [], gMarketer: [], gSanPham: '',
+  // G — Chuong trinh thuong Thu viec / Chinh thuc (truoc day la "Don bi loai"; action failedOrderReport con trong backend nhung khong con tab nao goi)
+  gDateFrom: '', gDateTo: '', gDateQuick: 'thisMonth', gSale: [], gNguon: [], gMarketer: [], gSanPham: '',
   dataG: null, gSaleSearch: '',
   gSaleView: 'table', gNguonView: 'table', gMktView: 'table', gLyDoView: 'table',
-  // H — Thuong offline (Sale thu viec) — xem buildOfflineBonusReport_ (gas_v13.js)
-  hDateFrom: '', hDateTo: '', hDateQuick: 'thisMonth', dataH: null, hConfigEditing: null
+  // G da doi thanh "Chuong trinh thuong Thu viec / Chinh thuc" (2026-10-04): dung nguon don Pos nhu E
+  gSaleCustomized: false, gBonusExpanded: '',
+  // H — Tong quan data da chia (client-only: assignHistory + careData; so don/doanh thu nhap tay)
+  hDateFrom: '', hDateTo: '', hDateQuick: 'today', hTeam: '', hCs: '', hGroup: 'dayCs'
 };
 // Bao cao F/H mac dinh 'Tháng này' nhung fDateFrom/fDateTo (hay hDateFrom/hDateTo) truoc day de
 // rong -> dropdown hien 'Tháng này' trong khi request khong co ngay nao => backend cong DON CA
@@ -12194,8 +12413,10 @@ var _srState = {
 (function(){
   var r = (typeof _pkQuickRange === 'function') ? _pkQuickRange(_srState.fDateQuick) : null;
   if (r){ _srState.fDateFrom = r.from; _srState.fDateTo = r.to; }
-  var r2 = (typeof _pkQuickRange === 'function') ? _pkQuickRange(_srState.hDateQuick) : null;
-  if (r2){ _srState.hDateFrom = r2.from; _srState.hDateTo = r2.to; }
+  var rG = (typeof _pkQuickRange === 'function') ? _pkQuickRange(_srState.gDateQuick) : null;
+  if (rG){ _srState.gDateFrom = rG.from; _srState.gDateTo = rG.to; }
+  var rH = (typeof _pkQuickRange === 'function') ? _pkQuickRange(_srState.hDateQuick) : null;
+  if (rH){ _srState.hDateFrom = rH.from; _srState.hDateTo = rH.to; }
 })();
 
 function _srMoney(n){ return fmt(Math.round(n||0)) + '₫'; }
@@ -12454,11 +12675,14 @@ function _srEnforceScope(){
       else _srState.eSale = (_srState.eSale||[]).filter(function(n){ return teamNames.indexOf(n)!==-1; });
       if (!_srState.fSaleCustomized) _srState.fSale = teamNames.slice();
       else _srState.fSale = (_srState.fSale||[]).filter(function(n){ return teamNames.indexOf(n)!==-1; });
+      if (!_srState.gSaleCustomized) _srState.gSale = teamNames.slice();
+      else _srState.gSale = (_srState.gSale||[]).filter(function(n){ return teamNames.indexOf(n)!==-1; });
       return;
     }
   }
   _srState.eSale = my.slice();
   _srState.fSale = my.slice();
+  _srState.gSale = my.slice();
 }
 
 // SUA (theo bao cao Duyen: "lọc tháng 7-8-9 load khá lâu nhưng không ra kết quả"): truoc day
@@ -12529,6 +12753,18 @@ async function _srLoadOptions(){
 }
 
 async function _srLoad(){
+  if (_srState.sub === 'H'){
+    // H tinh hoan toan client (assignHistory + careData) — khong goi GAS; chi keo so don/doanh thu nhap tay cua cac thang trong khoang.
+    if (_srState.hDateQuick && _srState.hDateQuick !== 'custom'){
+      var rH2 = _pkQuickRange(_srState.hDateQuick);
+      if (rH2){ _srState.hDateFrom = rH2.from; _srState.hDateTo = rH2.to; }
+    }
+    _srState.loading = false;
+    renderSalesReportTab();
+    _hLoadManual_();
+    _hLoadChot_();
+    return;
+  }
   _srState.loading = true;
   renderSalesReportTab();
   if (_srState.sub === 'A'){
@@ -12588,19 +12824,18 @@ async function _srLoad(){
       sale: (_srState.fSale||[]).join(',')
     });
   } else if (_srState.sub === 'G') {
-    _srState.dataG = await _srFetch('failedOrderReport', {
-      dateFrom: _srState.gDateFrom, dateTo: _srState.gDateTo,
-      sale: (_srState.gSale||[]).join(','), nguon: (_srState.gNguon||[]).join(','), marketer: (_srState.gMarketer||[]).join(','),
-      sanPham: _srState.gSanPham || ''
-    });
-  } else if (_srState.sub === 'H') {
-    if (_srState.hDateQuick && _srState.hDateQuick !== 'custom'){
-      var rH = _pkQuickRange(_srState.hDateQuick);
-      if (rH){ _srState.hDateFrom = rH.from; _srState.hDateTo = rH.to; }
+    // Chuong trinh thuong Thu viec/Chinh thuc: CUNG nguon va cach map field voi Bao cao E (salesReportB/Pos)
+    // de _computeBonusData_ dung chung nguyen ven. Dropdown khong phai 'custom' -> khoang ngay PHAI khop dropdown.
+    if (_srState.gDateQuick && _srState.gDateQuick !== 'custom'){
+      var rGq = _pkQuickRange(_srState.gDateQuick);
+      if (rGq){ _srState.gDateFrom = rGq.from; _srState.gDateTo = rGq.to; }
     }
-    _srState.dataH = await _srFetch('offlineBonusReport', {
-      dateFrom: _srState.hDateFrom, dateTo: _srState.hDateTo
+    var dPosG = await _srFetch('salesReportB', {
+      dateFrom: _srState.gDateFrom, dateTo: _srState.gDateTo,
+      sale: (_srState.gSale||[]).join(',')
     });
+    if (dPosG && dPosG.orders) dPosG.orders = dPosG.orders.map(function(o){ return Object.assign({}, o, { saleBan: (o.saleBanValid !== undefined ? o.saleBanValid : o.theSale), giaTriDon: o.giaTriSauGiam, ngayTao: o.ngayTaoDon }); });
+    _srState.dataG = dPosG;
   }
   _srState.loading = false;
   renderSalesReportTab();
@@ -12845,6 +13080,7 @@ function _srSyncTeamToSale_(teamField){
   });
   _srState[saleField] = union;
   if (saleField === 'eSale') _srState.eSaleCustomized = true;
+  if (saleField === 'gSale') _srState.gSaleCustomized = true;
 }
 function _srComboBuildData(domId){
   var r = _srComboReg[domId]; if (!r) return;
@@ -12896,6 +13132,7 @@ function srComboToggleItem(e, domId, value){
   if (idx !== -1) arr.splice(idx, 1); else arr.push(value);
   _srState[r.field] = arr;
   if (r.field === 'eSale') _srState.eSaleCustomized = true;
+  if (r.field === 'gSale') _srState.gSaleCustomized = true;
   if (_srTeamFieldToSaleField_[r.field]){ _srSyncTeamToSale_(r.field); renderSalesReportTab(); return; }
   var ci = document.getElementById(domId+'-input');
   srComboRender(domId, ci ? ci.value : '');
@@ -12905,6 +13142,7 @@ function srComboRemove(domId, value){
   var r = _srComboReg[domId]; if (!r) return;
   _srState[r.field] = (_srState[r.field] || []).filter(function(v){ return v !== value; });
   if (r.field === 'eSale') _srState.eSaleCustomized = true;
+  if (r.field === 'gSale') _srState.gSaleCustomized = true;
   if (_srTeamFieldToSaleField_[r.field]){ _srSyncTeamToSale_(r.field); renderSalesReportTab(); return; }
   srRenderComboChips(domId);
   var l = document.getElementById(domId+'-list');
@@ -12915,6 +13153,7 @@ function srComboClear(e, domId){
   var r = _srComboReg[domId]; if (!r) return;
   _srState[r.field] = [];
   if (r.field === 'eSale') _srState.eSaleCustomized = true;
+  if (r.field === 'gSale') _srState.gSaleCustomized = true;
   if (_srTeamFieldToSaleField_[r.field]){ renderSalesReportTab(); return; }
   var ci = document.getElementById(domId+'-input'); if (ci) ci.value = '';
   srRenderComboChips(domId);
@@ -13008,8 +13247,8 @@ function renderSalesReportTab(){
     '<button class="btn '+(_srState.sub==='D'?'secondary':'sm')+'" onclick="_srSetSub(\'D\')">Báo cáo D — Sale tự thêm</button>' +
     '<button class="btn '+(_srState.sub==='E'?'secondary':'sm')+'" onclick="_srSetSub(\'E\')">Báo cáo E — Hoa hồng nhân viên Pos</button>' +
     '<button class="btn '+(_srState.sub==='F'?'secondary':'sm')+'" onclick="_srSetSub(\'F\')">Báo cáo F — KPI Sale</button>' +
-    '<button class="btn '+(_srState.sub==='G'?'secondary':'sm')+'" onclick="_srSetSub(\'G\')">Báo cáo G — Đơn bị loại</button>' +
-    '<button class="btn '+(_srState.sub==='H'?'secondary':'sm')+'" onclick="_srSetSub(\'H\')">Báo cáo H — Thưởng offline</button>' +
+    '<button class="btn '+(_srState.sub==='G'?'secondary':'sm')+'" onclick="_srSetSub(\'G\')">Báo cáo G — Thưởng thử việc / chính thức</button>' +
+    '<button class="btn '+(_srState.sub==='H'?'secondary':'sm')+'" onclick="_srSetSub(\'H\')">Báo cáo H — Tổng quan data đã chia</button>' +
     '</div>';
 
   if (_srState.sub === 'C') { renderSalesReportTabC_(wrap, subTabs); return; }
@@ -13364,23 +13603,8 @@ function _srRenderB(d){
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalCod)+'</div><div class="kpi-label">Tổng COD</div></div>' +
     '</div>';
 
-  if (d.mismatchRows){
-    html += '<div style="background:#fef3c7;color:#92400e;padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:14px">' +
-      '⚠️ '+fmt(d.mismatchRows)+' dòng bị lệch số phần tử giữa cột Sản phẩm/Mã sản phẩm/Số lượng — nên kiểm tra tay, số liệu sản phẩm bên dưới có thể thiếu sót ở các dòng này.</div>';
-  }
-
-  // Don Pos GHEP voi Base (ghi chu cot Q co ma bo dem): doanh thu/sale da tinh theo don goc Base (xem backend
-  // buildSalesReportB_). Hien thong ke + canh bao cac don co ma nhung KHONG ghep duoc (van chia theo Pos).
-  if (d.ghep && d.ghep.donCoMa){
-    var gp = d.ghep, gWarn = (gp.khongKhop||[]).length + (gp.trungDonGoc||[]).length;
-    html += '<div style="background:'+(gWarn?'#fef3c7;color:#92400e':'#ecfdf5;color:#065f46')+';padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:14px">' +
-      '🔗 '+fmt(gp.donCoMa)+' đơn Pos có mã bộ đếm trong ghi chú — '+fmt(gp.daGhep)+' đơn đã tính lại theo đơn gốc Base' +
-      (gp.gocBiLoai ? ', '+fmt(gp.gocBiLoai)+' đơn bị loại vì mọi đơn gốc đã Hủy/Hoàn' : '') + '.' +
-      (gWarn ? '<br>⚠️ '+fmt(gWarn)+' đơn KHÔNG ghép được (chia theo Pos, nên kiểm tra tay): ' +
-        (gp.khongKhop||[]).slice(0,5).map(function(x){ return esc(x.ngay)+' – không thấy '+esc((x.maKhongTim||[]).join(', '))+' trong Base'; }).concat(
-         (gp.trungDonGoc||[]).slice(0,5).map(function(x){ return esc(x.ngay)+' – '+esc((x.maCoDon||[]).join(', '))+' đã gắn cho đơn Pos khác'; })).join('; ') : '') +
-      '</div>';
-  }
+  // Da bo 2 dong thong bao vang (lech so phan tu cot San pham/Ma/So luong + thong ke ghep don Pos<->Base) theo yeu cau Duyen 2026-10-05.
+  // Du lieu d.mismatchRows / d.ghep van duoc backend tra ve (dung de debug), chi khong hien tren man hinh nua.
 
   _SR_COLTH_ROWSFN_['bSale'] = function(){ return (_srState.dataB && _srState.dataB.bySale) || []; };
   _SR_COLTH_GETTER_['bSale'] = { name: function(s){ return s.name; } };
@@ -13697,6 +13921,11 @@ function _bonusProgramApplies_(p, dateStr, channel, saleName){
     if (!channel) return false; // sale chưa được phân loại Online/Offline -> CT có giới hạn đối tượng chưa áp dụng
     if (channel === 'online' && !aud.online) return false;
     if (channel === 'offline' && !aud.offline) return false;
+    // CT giới hạn Online/Offline là CT dành cho Sale CHÍNH THỨC — Sale đang ở trạng thái "Thử
+    // việc (TV)" (channel==='probation') không tự động được tính, dù audience không tích rõ cả
+    // 2 ô online/offline để loại riêng mục này. Thưởng cho Sale thử việc dùng cơ chế riêng
+    // ("Giới hạn theo ngày thử việc" bên dưới), không lẫn vào CT chính thức.
+    if (channel === 'probation') return false;
   }
   // Giới hạn theo "ngày thứ mấy kể từ Ngày bắt đầu" của TỪNG Sale (VD chương trình thử việc:
   // Giai đoạn 1 = ngày 1-3, Giai đoạn 2 = từ ngày 4). "Ngày bắt đầu" đặt riêng từng Sale ở
@@ -14063,7 +14292,7 @@ function _srRenderF_(d){
     '<b>F1</b>='+_srMoney(tt.F1)+' · <b>F2</b>='+_srMoney(tt.F2)+' · <b>F3</b>='+_srMoney(tt.F3)+
     ' · <b>O1</b>='+_srMoney(tt.O1)+' · <b>O2</b>='+_srMoney(tt.O2)+' · <b>O3</b>='+_srMoney(tt.O3)+
     ' · <b>O</b> (không nhảy bậc)='+_srMoney(tt.O)+
-    ' · <b>Thử việc</b>: TVF1='+_srMoney(tt.TVF1)+', TVF2='+_srMoney(tt.TVF2)+' (luôn đúng 1 tháng, tháng sau tự động lên F1)'+
+    ' · <b>Thử việc</b>: TVF1='+_srMoney(tt.TVF1)+', TVF2='+_srMoney(tt.TVF2)+' (luôn đúng 1 tháng; tháng sau TVF1→F1, TVF2→F2 — riêng TVF2→F2 phải 2 tháng đầu MỖI tháng đạt ≥100% KPI F2, không đạt thì xuống F1 làm lại)'+
     ' · Ai có <b>Commit riêng</b> thì xem thêm 2 cột Commit/%HT Commit — chạy SONG SONG với KPI theo bậc (không thay thế).'+
     (!_fSelfView && noTierCount ? ' <b style="color:#9a3412">'+noTierCount+' Sale chưa được gán Bậc bắt đầu — bấm "🎯 Cài đặt KPI" để gán.</b>' : '')+
     '</div>';
@@ -14142,200 +14371,177 @@ function _srRenderF_(d){
 // Nguồn POS ("dữ liệu đơn", cùng nguồn Báo cáo B/E/F) và cùng định nghĩa trạng thái bị loại
 // (Pos chỉ loại "Đã hoàn" và "Đang hoàn" — _donHasExcludedStatus_ ở backend) như Báo cáo B, nhưng CHỈ lấy đúng các đơn đã bị loại đó để xem
 // riêng: bao nhiêu đơn, thuộc sale nào, MKT nào, lý do gì. COD/Giá trị CHỈ để tham khảo — KHÔNG tính vào doanh số.
+// ════════════════════════════════════════════════════════════════════
+//  BÁO CÁO G: CHƯƠNG TRÌNH THƯỞNG — THỬ VIỆC & CHÍNH THỨC (thay cho "Đơn bị loại", yêu cầu Duyên 2026-10-04).
+//  Dùng ĐÚNG engine thưởng của Báo cáo E (_computeBonusData_ + BONUS_PROGRAMS, cùng nguồn đơn Pos
+//  action=salesReportB, cùng bản đồ Online/Offline/Thử việc SALE_CHANNELS) — chỉ khác là tách riêng 2 nhóm:
+//   • Thử việc  = Sale được phân loại "Thử việc" (SALE_CHANNELS[name]==='probation'), kèm Ngày bắt đầu + ngày thứ mấy.
+//   • Chính thức = mọi Sale còn lại (Online / Offline / chưa phân loại).
+//  Có xuất CSV (chi tiết từng lượt thưởng / tổng hợp / đơn đã dùng để tính) để kế toán đối chiếu.
+//  Backend action failedOrderReport giữ nguyên (không còn tab nào gọi), chỉ bỏ giao diện.
+// ════════════════════════════════════════════════════════════════════
+function _srGSaleTypeLabel_(name){
+  var c = SALE_CHANNELS[name];
+  return c === 'probation' ? 'Thử việc' : (c === 'online' ? 'Online' : (c === 'offline' ? 'Offline' : 'Chưa phân loại'));
+}
+function _srGDecode_(s){
+  return String(s == null ? '' : s).replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#0?39;/g,"'").replace(/&amp;/g,'&');
+}
+// Tách kết quả _computeBonusData_ thành 2 nhóm + tổng hợp theo chương trình.
+function _srGBuildGroups_(orders){
+  var bonus = _computeBonusData_(orders || []);
+  var g = { tv: { rows: [], total: 0 }, ct: { rows: [], total: 0 }, total: bonus.total, programs: {} };
+  bonus.bySale.forEach(function(r){
+    var isTv = SALE_CHANNELS[r.name] === 'probation';
+    var grp = isTv ? g.tv : g.ct;
+    grp.rows.push(r); grp.total += r.total;
+    r.items.forEach(function(it){
+      var p = g.programs[it.program] || (g.programs[it.program] = { name: it.program, tvCount: 0, tvAmount: 0, ctCount: 0, ctAmount: 0 });
+      if (isTv){ p.tvCount++; p.tvAmount += it.amount; } else { p.ctCount++; p.ctAmount += it.amount; }
+    });
+  });
+  return g;
+}
+function _srRenderG_(d){
+  if (!d) return _srNoDataHtml_();
+  if (d.error) return '<div style="color:#dc2626;text-align:center;padding:30px">Lỗi: '+esc(d.error)+'</div>';
+  if (!BONUS_PROGRAMS.length){
+    return '<div style="color:var(--muted);font-size:12px;padding:14px 0">Chưa có chương trình thưởng nào'+(_srIsAdmin() ? ' — bấm "⚙ Cài đặt → 🏆 Chương trình thưởng" ở trên để thêm.' : '.')+'</div>';
+  }
+  var g = _srGBuildGroups_(d.orders || []);
+  var html = '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Thưởng tính theo đúng các chương trình đã cài ở "🏆 Chương trình thưởng" (cùng cách tính với mục c) của Báo cáo E), '+
+    'trên đơn Pos trong khoảng ngày lọc. <b>Thử việc</b> = Sale phân loại "Thử việc"; <b>Chính thức</b> = Sale Online/Offline/chưa phân loại. '+
+    'Nhóm cơ chế "theo ngày" chỉ lấy mức cao nhất; các nhóm khác nhau cộng dồn.</div>';
+
+  html += '<div class="kpi-grid" style="margin-bottom:16px">'+
+    '<div class="kpi-card" style="border:1.5px solid var(--text)"><div class="kpi-val">'+_srMoney(g.total)+'</div><div class="kpi-label"><b>Tổng thưởng</b></div></div>'+
+    '<div class="kpi-card"><div class="kpi-val">'+_srMoney(g.tv.total)+'</div><div class="kpi-label">Thưởng Thử việc ('+fmt(g.tv.rows.length)+' Sale)</div></div>'+
+    '<div class="kpi-card"><div class="kpi-val">'+_srMoney(g.ct.total)+'</div><div class="kpi-label">Thưởng Chính thức ('+fmt(g.ct.rows.length)+' Sale)</div></div>'+
+    '<div class="kpi-card"><div class="kpi-val">'+fmt((d.orders||[]).length)+'</div><div class="kpi-label">Đơn Pos dùng để tính</div></div>'+
+    '</div>';
+
+  function groupTable(title, key, grp, isTv){
+    var h = '<div class="dash-section-title" style="margin-top:16px">'+title+'</div>';
+    h += '<table class="dash-table"><thead><tr><th>Sale</th>'+(isTv ? '<th>Ngày bắt đầu</th>' : '<th>Loại</th>')+
+      '<th style="text-align:right">Số lượt thưởng</th><th style="text-align:right"><b>Tổng thưởng</b></th><th></th></tr></thead><tbody>';
+    grp.rows.forEach(function(s, i){
+      var rid = key+'_'+i;
+      var expanded = _srState.gBonusExpanded === rid;
+      var sd = isTv ? _saleStartDate_(s.name) : '';
+      h += '<tr><td>'+esc(s.name)+'</td>'+
+        '<td>'+(isTv ? (sd ? esc(sd) : '<span style="color:#9a3412">chưa đặt Ngày bắt đầu</span>') : esc(_srGSaleTypeLabel_(s.name)))+'</td>'+
+        '<td style="text-align:right">'+fmt(s.items.length)+'</td>'+
+        '<td style="text-align:right"><b>'+_srMoney(s.total)+'</b></td>'+
+        '<td><button class="btn sm" onclick="_srState.gBonusExpanded='+(expanded ? "''" : "'"+rid+"'")+';renderSalesReportTab()">'+(expanded ? 'Ẩn' : 'Chi tiết')+'</button></td></tr>';
+      if (expanded){
+        h += '<tr><td colspan="5" style="background:var(--surface2);padding:8px 14px"><table class="dash-table" style="margin:0"><thead><tr><th>Ngày</th>'+(isTv ? '<th>Ngày thứ</th>' : '')+'<th>Phạm vi</th><th>Chương trình</th><th>Chi tiết</th><th style="text-align:right">Thưởng</th></tr></thead><tbody>'+
+          s.items.map(function(it){
+            var dn = (isTv && sd) ? _daysSinceStart_(sd, it.date) : null;
+            return '<tr><td>'+esc(it.date)+'</td>'+(isTv ? '<td>'+(dn === null ? '—' : dn)+'</td>' : '')+'<td>'+esc(it.scope)+'</td><td>'+esc(it.program)+'</td><td style="font-size:11px;color:var(--muted)">'+it.detail+'</td><td style="text-align:right">'+_srMoney(it.amount)+'</td></tr>';
+          }).join('')+'</tbody></table></td></tr>';
+      }
+    });
+    if (!grp.rows.length) h += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Không có thưởng nào phát sinh trong khoảng lọc</td></tr>';
+    else h += _srTotalRowHtml_(['Tổng', '', fmt(grp.rows.reduce(function(s,r){return s+r.items.length;},0)), '<b>'+_srMoney(grp.total)+'</b>', '']);
+    h += '</tbody></table>';
+    return h;
+  }
+  html += groupTable('🌱 Sale Thử việc', 'tv', g.tv, true);
+  html += groupTable('🏅 Sale Chính thức', 'ct', g.ct, false);
+
+  var progs = Object.keys(g.programs).map(function(k){ return g.programs[k]; }).sort(function(a,b){ return (b.tvAmount+b.ctAmount)-(a.tvAmount+a.ctAmount); });
+  html += '<div class="dash-section-title" style="margin-top:16px">Theo chương trình thưởng</div>';
+  html += '<table class="dash-table"><thead><tr><th>Chương trình</th><th style="text-align:right">Lượt (Thử việc)</th><th style="text-align:right">Thưởng (Thử việc)</th><th style="text-align:right">Lượt (Chính thức)</th><th style="text-align:right">Thưởng (Chính thức)</th><th style="text-align:right"><b>Tổng</b></th></tr></thead><tbody>';
+  progs.forEach(function(p){
+    html += '<tr><td>'+esc(p.name)+'</td><td style="text-align:right">'+fmt(p.tvCount)+'</td><td style="text-align:right">'+_srMoney(p.tvAmount)+'</td><td style="text-align:right">'+fmt(p.ctCount)+'</td><td style="text-align:right">'+_srMoney(p.ctAmount)+'</td><td style="text-align:right"><b>'+_srMoney(p.tvAmount+p.ctAmount)+'</b></td></tr>';
+  });
+  if (!progs.length) html += '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px">Chưa có chương trình nào phát sinh thưởng</td></tr>';
+  else html += _srTotalRowHtml_(['Tổng', fmt(progs.reduce(function(s,p){return s+p.tvCount;},0)), _srMoney(g.tv.total), fmt(progs.reduce(function(s,p){return s+p.ctCount;},0)), _srMoney(g.ct.total), '<b>'+_srMoney(g.total)+'</b>']);
+  html += '</tbody></table>';
+  html += '<div style="font-size:11px;color:var(--muted);margin-top:6px">"SL ước tính" ở chương trình theo sản phẩm là ước lượng từ ô mô tả sản phẩm — nên đối chiếu lại bằng file CSV trước khi chi nếu số tiền lớn. Sale chưa phân loại Online/Offline/Thử việc chỉ nhận được các chương trình không giới hạn đối tượng. Sale Thử việc chưa đặt "Ngày bắt đầu" (👤 Quản lý tài khoản) sẽ không nhận các chương trình theo ngày thử việc.</div>';
+  return html;
+}
+
+// ── Xuất CSV (UTF-8 có BOM để Excel đọc đúng tiếng Việt) ──
+function _srGCsvCell_(v){ return '"'+String(v == null ? '' : v).replace(/"/g,'""')+'"'; }
+function _srGDownloadCsv_(filename, rows){
+  var csv = '\uFEFF' + rows.map(function(r){ return r.map(_srGCsvCell_).join(','); }).join('\r\n');
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+function _srGExportCsv_(kind){
+  var d = _srState.dataG;
+  if (!d || !d.orders){ toast('Chưa có dữ liệu — bấm "Lọc" trước.'); return; }
+  var tag = (_srState.gDateFrom || 'tu-dau') + '_' + (_srState.gDateTo || 'den-nay');
+  if (kind === 'orders'){
+    var rows = [['Ngày tạo','Kênh bán (Nguồn đơn)','Sale (đã lọc hợp lệ)','Sản phẩm','Giá trị sau giảm','COD','Marketer','Trạng thái','Ghi chú đơn (cột Q)']];
+    d.orders.forEach(function(o){ rows.push([o.ngayTao, o.nguonDon, o.saleBan, o.sanPham, o.giaTriDon, o.cod, o.marketer, o.trangThai, o.ghiChu]); });
+    _srGDownloadCsv_('don-pos-tinh-thuong_'+tag+'.csv', rows); return;
+  }
+  var g = _srGBuildGroups_(d.orders);
+  if (kind === 'detail'){
+    var det = [['Nhóm','Sale','Loại Sale','Ngày bắt đầu (Thử việc)','Ngày thưởng','Ngày thứ (Thử việc)','Phạm vi','Chương trình','Chi tiết','Mã đơn','Tiền thưởng']];
+    [['Thử việc', g.tv], ['Chính thức', g.ct]].forEach(function(pair){
+      pair[1].rows.forEach(function(s){
+        var sd = pair[0] === 'Thử việc' ? _saleStartDate_(s.name) : '';
+        s.items.forEach(function(it){
+          var dn = sd ? _daysSinceStart_(sd, it.date) : '';
+          det.push([pair[0], s.name, _srGSaleTypeLabel_(s.name), sd, it.date, dn === null ? '' : dn, it.scope, it.program, _srGDecode_(it.detail), it.orderId || '', it.amount]);
+        });
+      });
+    });
+    _srGDownloadCsv_('thuong-chi-tiet_'+tag+'.csv', det); return;
+  }
+  // summary
+  var sum = [['Nhóm','Sale','Loại Sale','Ngày bắt đầu (Thử việc)','Số lượt thưởng','Tổng thưởng']];
+  [['Thử việc', g.tv], ['Chính thức', g.ct]].forEach(function(pair){
+    pair[1].rows.forEach(function(s){ sum.push([pair[0], s.name, _srGSaleTypeLabel_(s.name), pair[0] === 'Thử việc' ? _saleStartDate_(s.name) : '', s.items.length, s.total]); });
+    sum.push([pair[0]+' — TỔNG','','','', pair[1].rows.reduce(function(a,r){return a+r.items.length;},0), pair[1].total]);
+  });
+  sum.push(['TỔNG CHUNG','','','','', g.total]);
+  sum.push([]); sum.push(['Chương trình','Lượt (Thử việc)','Thưởng (Thử việc)','Lượt (Chính thức)','Thưởng (Chính thức)','Tổng']);
+  Object.keys(g.programs).forEach(function(k){ var p = g.programs[k]; sum.push([p.name, p.tvCount, p.tvAmount, p.ctCount, p.ctAmount, p.tvAmount+p.ctAmount]); });
+  _srGDownloadCsv_('thuong-tong-hop_'+tag+'.csv', sum);
+}
+
 function renderSalesReportTabG_(wrap, subTabs){
   var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
   filters += _quickRangeSelectHtml(_srState.gDateQuick, "_srApplyQuickRange('gDateQuick','gDateFrom','gDateTo',this.value)");
   filters += '<input type="date" value="'+esc(_srState.gDateFrom)+'" onchange="_srSetField(\'gDateFrom\',this.value);_srState.gDateQuick=\'custom\'" title="Từ ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
   filters += '<span style="color:var(--muted)">→</span>';
   filters += '<input type="date" value="'+esc(_srState.gDateTo)+'" onchange="_srSetField(\'gDateTo\',this.value);_srState.gDateQuick=\'custom\'" title="Đến ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
-  filters += '<input type="text" value="'+esc(_srState.gSanPham)+'" oninput="_srState.gSanPham=this.value" placeholder="Lọc theo sản phẩm..." style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);width:150px">';
-  filters += _srComboHtml('sr-sale-combo-g', 'gSale', 'saleBOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 180);
-  filters += _srComboHtml('sr-nguon-combo-g', 'gNguon', 'nguonOptions', 'Lọc theo Kênh bán', '🔍 Tìm & chọn kênh...', 170);
-  filters += _srComboHtml('sr-mkt-combo-g', 'gMarketer', 'marketerOptions', 'Lọc theo Marketer', '🔍 Tìm & chọn MKT...', 170);
+  if (_srIsAdmin()){
+    filters += _srComboHtml('sr-sale-combo-g', 'gSale', 'saleBOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 190);
+  } else if (currentUser.role === 'leader' && (_srState.leaderTeamOptions||[]).length){
+    filters += _srComboHtml('sr-sale-combo-g', 'gSale', 'leaderTeamOptions', 'Lọc theo tên (team của bạn)', '🔍 Tìm tên trong team...', 190);
+    filters += '<button class="btn sm" title="Xem lại cả team (bỏ hết lựa chọn riêng)" onclick="_srState.gSale=_srState.leaderTeamOptions.slice();_srState.gSaleCustomized=false;_srApply()">🔄 Cả team</button>';
+  } else {
+    filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Sale</div>'+
+      '<div style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)">🔒 '+esc((_srState.gSale||[]).join(', ') || currentUser.name)+' — chỉ xem được thưởng của mình</div></div>';
+  }
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
-  filters += '<button class="btn sm" id="sr-export-sheet-btn" onclick="exportSalesReportToSheet()">📄 Xuất ra Sheet</button>';
+  filters += '<div class="gear-menu"><button class="btn sm" onclick="_srToggleGearMenu(event,\'sr-gear-g-export\')">⬇️ Xuất CSV</button>'+
+    '<div class="gear-menu-list" id="sr-gear-g-export" onclick="event.stopPropagation()">'+
+      '<div onclick="closeGearMenus();_srGExportCsv_(\'summary\')">📊 Tổng hợp (theo Sale + theo chương trình)</div>'+
+      '<div onclick="closeGearMenus();_srGExportCsv_(\'detail\')">🧾 Chi tiết từng lượt thưởng</div>'+
+      '<div onclick="closeGearMenus();_srGExportCsv_(\'orders\')">📦 Đơn Pos dùng để tính (đối chiếu)</div>'+
+    '</div></div>';
+  if (_srIsAdmin()) filters += '<div class="gear-menu">'+
+      '<button class="btn sm" onclick="_srToggleGearMenu(event,\'sr-gear-g\')">⚙ Cài đặt</button>'+
+      '<div class="gear-menu-list" id="sr-gear-g" onclick="event.stopPropagation()">'+
+        '<div onclick="closeGearMenus();openBonusProgramsModal()">🏆 Chương trình thưởng</div>'+
+        '<div onclick="closeGearMenus();openSaleChannelsModal()">🏷️ Phân loại Online/Offline/Thử việc</div>'+
+      '</div></div>';
   filters += '</div>';
 
-  var body;
-  if (_srState.loading) {
-    body = '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>';
-  } else {
-    var d = _srState.dataG;
-    if (!d) {
-      body = _srNoDataHtml_();
-    } else if (d.error) {
-      body = '<div style="color:#dc2626;text-align:center;padding:30px">Lỗi: '+esc(d.error)+'</div>';
-    } else {
-      var moneyFmt = function(n){ return (Number(n)||0).toLocaleString('vi-VN') + 'đ'; };
-      var html = '<div class="kpi-grid" style="margin-bottom:16px">' +
-        '<div class="kpi-card"><div class="kpi-label">Số đơn bị loại</div><div class="kpi-val">'+fmt(d.totalOrders||0)+'</div></div>' +
-        '<div class="kpi-card"><div class="kpi-label">Tổng COD (tham khảo)</div><div class="kpi-val">'+moneyFmt(d.totalCod)+'</div></div>' +
-        '<div class="kpi-card"><div class="kpi-label">Tổng giá trị (tham khảo — KHÔNG tính doanh số)</div><div class="kpi-val">'+moneyFmt(d.totalGiaTri)+'</div></div>' +
-      '</div>';
+  var body = _srState.loading
+    ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>'
+    : _srRenderG_(_srState.dataG);
 
-      var section = function(title, arr, viewKey, note){
-        var h = '<div class="dash-section-title" style="margin-top:16px">'+title+(note?' <span style="font-size:11px;color:var(--muted);font-weight:400">('+note+')</span>':'')+_srViewToggleHtml(viewKey)+'</div>';
-        if (_srState[viewKey] === 'table') {
-          h += '<table class="dash-table"><thead><tr><th>Tên</th><th>Số đơn</th><th>COD</th><th>Giá trị</th></tr></thead><tbody>';
-          (arr||[]).forEach(function(x){ h += '<tr><td>'+esc(x.name)+'</td><td>'+fmt(x.orders)+'</td><td>'+moneyFmt(x.cod)+'</td><td>'+moneyFmt(x.giaTri)+'</td></tr>'; });
-          if (!(arr||[]).length) h += '<tr><td colspan="4" style="text-align:center;color:var(--muted)">Không có đơn nào khớp bộ lọc</td></tr>';
-          h += '</tbody></table>';
-        } else {
-          h += _srChartSvg(arr||[], 'name', 'orders', _srState[viewKey], false);
-        }
-        return h;
-      };
-      html += section('Theo lý do (trạng thái đơn)', d.byLyDo, 'gLyDoView');
-      html += section('Theo Sale', d.bySale, 'gSaleView', 'mỗi sale trên đơn đều tính 1 đơn, không chia đều như doanh thu');
-      html += section('Theo Kênh bán', d.byNguon, 'gNguonView', 'Kênh bán = Nguồn đơn của Pos');
-      html += section('Theo MKT', d.byMkt, 'gMktView', 'Marketer ghi trên từng đơn, giống Báo cáo B');
-
-      html += '<div class="dash-section-title" style="margin-top:16px">Chi tiết đơn bị loại</div>';
-      html += '<table class="dash-table"><thead><tr><th>Ngày tạo</th><th>Kênh bán</th><th>Sale</th><th>Sản phẩm</th><th>Giá trị đơn</th><th>Trạng thái</th></tr></thead><tbody>';
-      (d.orders||[]).forEach(function(o){
-        html += '<tr><td>'+esc(o.ngayTao)+'</td><td>'+esc(o.nguonDon)+'</td><td>'+esc(o.saleBan)+'</td><td>'+esc(o.sanPham)+'</td><td>'+moneyFmt(o.giaTriDon)+'</td><td>'+esc(o.trangThai)+'</td></tr>';
-      });
-      if (!(d.orders||[]).length) html += '<tr><td colspan="6" style="text-align:center;color:var(--muted)">Không có đơn nào khớp bộ lọc</td></tr>';
-      html += '</tbody></table>';
-      body = html;
-    }
-  }
   wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + filters + body;
-}
-
-// ── Báo cáo H: Thưởng offline (Sale thử việc) ──
-// Quy tắc đầy đủ + lý do thiết kế: xem comment đầu buildOfflineBonusReport_() trong gas_v13.js.
-function renderSalesReportTabH_(wrap, subTabs){
-  var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
-  filters += _quickRangeSelectHtml(_srState.hDateQuick, "_srApplyQuickRange('hDateQuick','hDateFrom','hDateTo',this.value)");
-  filters += '<input type="date" value="'+esc(_srState.hDateFrom)+'" onchange="_srSetField(\'hDateFrom\',this.value);_srState.hDateQuick=\'custom\'" title="Từ ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
-  filters += '<span style="color:var(--muted)">→</span>';
-  filters += '<input type="date" value="'+esc(_srState.hDateTo)+'" onchange="_srSetField(\'hDateTo\',this.value);_srState.hDateQuick=\'custom\'" title="Đến ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
-  filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
-  filters += '<button class="btn sm" onclick="openTrialBonusConfigModal_()">⚙️ Sale thử việc & tên thay thế</button>';
-  filters += '</div>';
-
-  var body;
-  if (_srState.loading) {
-    body = '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>';
-  } else {
-    var d = _srState.dataH;
-    if (!d) { body = _srNoDataHtml_(); }
-    else if (d.error) { body = '<div style="color:#dc2626;text-align:center;padding:30px">Lỗi: '+esc(d.error)+'</div>'; }
-    else {
-      var moneyFmt = function(n){ return (Number(n)||0).toLocaleString('vi-VN') + 'đ'; };
-      if (!(d.trialList||[]).length) {
-        body = '<div style="color:var(--muted);text-align:center;padding:30px">Chưa khai báo Sale thử việc nào — bấm "⚙️ Sale thử việc & tên thay thế" để thêm.</div>';
-      } else {
-        var html = '<div class="dash-section-title" style="margin-top:0">Tổng thưởng theo Sale</div>';
-        html += '<table class="dash-table"><thead><tr><th>Sale</th><th>Tổng thưởng</th></tr></thead><tbody>';
-        (d.tongTheoSale||[]).sort(function(a,b){ return b.tong-a.tong; }).forEach(function(x){
-          html += '<tr><td>'+esc(x.sale)+'</td><td>'+moneyFmt(x.tong)+'</td></tr>';
-        });
-        if (!(d.tongTheoSale||[]).length) html += '<tr><td colspan="2" style="text-align:center;color:var(--muted)">Chưa có ngày nào đạt mốc thưởng trong kỳ lọc</td></tr>';
-        html += '</tbody></table>';
-
-        html += '<div class="dash-section-title" style="margin-top:18px">Chi tiết theo ngày</div>';
-        html += '<table class="dash-table"><thead><tr><th>Ngày</th><th>Sale</th><th>Số đơn (người tạo)</th><th>Doanh thu ngày (đã chia đều)</th><th>Hạng mục đạt</th><th>Tiền thưởng</th></tr></thead><tbody>';
-        (d.results||[]).sort(function(a,b){ return a.ymd<b.ymd?-1:(a.ymd>b.ymd?1:0); }).forEach(function(r){
-          var items = r.items.map(function(it){ return it.label+' ('+moneyFmt(it.amt)+')'; }).join(', ');
-          html += '<tr><td>'+esc(r.ymd)+'</td><td>'+esc(r.sale)+'</td><td>'+fmt(r.soDon)+'</td><td>'+moneyFmt(r.doanhThu)+'</td><td>'+esc(items)+'</td><td>'+moneyFmt(r.tongTien)+'</td></tr>';
-        });
-        if (!(d.results||[]).length) html += '<tr><td colspan="6" style="text-align:center;color:var(--muted)">Không có ngày nào đạt mốc thưởng</td></tr>';
-        html += '</tbody></table>';
-
-        html += '<div class="dash-section-title" style="margin-top:18px">Thưởng đơn giá trị cao (T21/T31)</div>';
-        html += '<table class="dash-table"><thead><tr><th>Ngày</th><th>Mã bộ đếm (Base)</th><th>Sale</th><th>Giá trị đơn</th><th>Hạng mục</th><th>Tiền thưởng</th></tr></thead><tbody>';
-        (d.t21t31||[]).forEach(function(o){
-          html += '<tr><td>'+esc(o.ymd)+'</td><td>'+esc(o.ma)+'</td><td>'+esc(o.sale)+'</td><td>'+moneyFmt(o.giaTriDon)+'</td><td>'+esc(o.label)+'</td><td>'+moneyFmt(o.amt)+'</td></tr>';
-        });
-        if (!(d.t21t31||[]).length) html += '<tr><td colspan="6" style="text-align:center;color:var(--muted)">Không có đơn nào đạt mốc T21/T31 trong kỳ lọc</td></tr>';
-        html += '</tbody></table>';
-
-        html += '<details style="margin-top:18px"><summary class="dash-section-title" style="cursor:pointer;display:inline-block">Đơn bị loại (không tính — bấm để xem)</summary>';
-        html += '<div style="font-size:12px;color:var(--muted);margin:8px 0">Đơn không khớp được với "dữ liệu đơn" (cột ghi chú/mã bộ đếm) hoặc có trạng thái Đã hoàn/Đang hoàn, nên không tính vào thưởng — chỉ hiện đơn của các Sale thử việc đã khai báo.</div>';
-        html += '<table class="dash-table"><thead><tr><th>Ngày</th><th>Mã bộ đếm (Base)</th><th>Người tạo</th><th>Sale bán</th><th>Giá trị</th><th>Lý do loại</th></tr></thead><tbody>';
-        (d.excludedOrders||[]).forEach(function(o){
-          html += '<tr><td>'+esc(o.ymd)+'</td><td>'+esc(o.ma)+'</td><td>'+esc(o.nguoiTao)+'</td><td>'+esc(o.saleBan)+'</td><td>'+moneyFmt(o.giaTri)+'</td><td>'+esc(o.lyDo==='khong_khop_du_lieu_don'?'Không tìm thấy trong dữ liệu đơn (POS)':'Trạng thái Đã hoàn/Đang hoàn')+'</td></tr>';
-        });
-        if (!(d.excludedOrders||[]).length) html += '<tr><td colspan="6" style="text-align:center;color:var(--muted)">Không có đơn nào bị loại</td></tr>';
-        html += '</tbody></table></details>';
-        body = html;
-      }
-    }
-  }
-  wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + filters + body;
-}
-
-// ── Modal: khai báo Sale thử việc (ngày bắt đầu/kết thúc) + tên thay thế (Người tạo ↔ Sale bán) ──
-function openTrialBonusConfigModal_(){
-  _srState.hConfigEditing = {
-    trial: TRIAL_SALE_BONUS_CONFIG.map(function(t){ return Object.assign({}, t); }),
-    alias: Object.keys(CREATOR_NAME_ALIAS).map(function(k){ return { from:k, to:CREATOR_NAME_ALIAS[k] }; })
-  };
-  _srRenderTrialBonusConfigModal_();
-}
-function _srTrialEditSet(i, key, val){ _srState.hConfigEditing.trial[i][key] = val; }
-function _srTrialEditAdd(){ _srState.hConfigEditing.trial.push({ sale:'', startDate:'', endDate:'', note:'' }); _srRenderTrialBonusConfigModal_(); }
-function _srTrialEditRemove(i){ _srState.hConfigEditing.trial.splice(i,1); _srRenderTrialBonusConfigModal_(); }
-function _srAliasEditSet(i, key, val){ _srState.hConfigEditing.alias[i][key] = val; }
-function _srAliasEditAdd(){ _srState.hConfigEditing.alias.push({ from:'', to:'' }); _srRenderTrialBonusConfigModal_(); }
-function _srAliasEditRemove(i){ _srState.hConfigEditing.alias.splice(i,1); _srRenderTrialBonusConfigModal_(); }
-
-function _srRenderTrialBonusConfigModal_(){
-  var ed = _srState.hConfigEditing;
-  var rows = ed.trial.map(function(t,i){
-    return '<tr>' +
-      '<td><input type="text" value="'+esc(t.sale)+'" oninput="_srTrialEditSet('+i+',\'sale\',this.value)" placeholder="username CRM" style="width:120px;padding:4px 6px;border:1px solid var(--border);border-radius:4px"></td>' +
-      '<td><input type="date" value="'+esc(t.startDate)+'" onchange="_srTrialEditSet('+i+',\'startDate\',this.value)" style="padding:4px 6px;border:1px solid var(--border);border-radius:4px"></td>' +
-      '<td><input type="date" value="'+esc(t.endDate)+'" onchange="_srTrialEditSet('+i+',\'endDate\',this.value)" style="padding:4px 6px;border:1px solid var(--border);border-radius:4px" title="Để trống nếu còn đang thử việc"></td>' +
-      '<td><input type="text" value="'+esc(t.note||'')+'" oninput="_srTrialEditSet('+i+',\'note\',this.value)" placeholder="Ghi chú (vd Họ tên thật)" style="width:150px;padding:4px 6px;border:1px solid var(--border);border-radius:4px"></td>' +
-      '<td><button class="btn sm" onclick="_srTrialEditRemove('+i+')">🗑️</button></td>' +
-    '</tr>';
-  }).join('');
-  var aliasRows = ed.alias.map(function(a,i){
-    return '<tr>' +
-      '<td><input type="text" value="'+esc(a.from)+'" oninput="_srAliasEditSet('+i+',\'from\',this.value)" placeholder="Tên trên Người tạo" style="width:140px;padding:4px 6px;border:1px solid var(--border);border-radius:4px"></td>' +
-      '<td><input type="text" value="'+esc(a.to)+'" oninput="_srAliasEditSet('+i+',\'to\',this.value)" placeholder="Tên chuẩn (Sale bán)" style="width:140px;padding:4px 6px;border:1px solid var(--border);border-radius:4px"></td>' +
-      '<td><button class="btn sm" onclick="_srAliasEditRemove('+i+')">🗑️</button></td>' +
-    '</tr>';
-  }).join('');
-
-  var old = document.getElementById('trial-bonus-modal');
-  if (old) old.remove();
-  var el = document.createElement('div');
-  el.id = 'trial-bonus-modal';
-  el.className = 'modal-overlay open';
-  el.onclick = function(ev){ if (ev.target===el) closeTrialBonusConfigModal_(); };
-  el.innerHTML = '<div class="modal-box" style="max-width:720px;max-height:85vh;overflow-y:auto">' +
-      '<div class="modal-title">⚙️ Sale thử việc & tên thay thế</div>' +
-      '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Ngày bắt đầu = ngày bắt đầu chat khách (3 ngày đầu chỉ tính "Đơn đầu", từ ngày thứ 4 mới tính các mốc đơn/ngày và doanh thu/ngày). Để trống Ngày kết thúc nếu còn đang thử việc.</div>' +
-      '<table class="dash-table"><thead><tr><th>Sale (username CRM)</th><th>Ngày bắt đầu</th><th>Ngày kết thúc</th><th>Ghi chú</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>' +
-      '<button class="btn sm" style="margin-top:8px" onclick="_srTrialEditAdd()">+ Thêm Sale thử việc</button>' +
-      '<div class="dash-section-title" style="margin-top:18px">Tên thay thế (khi "Người tạo" trên Base ghi khác tên "Sale bán")</div>' +
-      '<table class="dash-table"><thead><tr><th>Tên trên "Người tạo"</th><th>Tên chuẩn (Sale bán)</th><th></th></tr></thead><tbody>'+aliasRows+'</tbody></table>' +
-      '<button class="btn sm" style="margin-top:8px" onclick="_srAliasEditAdd()">+ Thêm tên thay thế</button>' +
-      '<div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end">' +
-        '<button class="btn" onclick="closeTrialBonusConfigModal_()">Đóng</button>' +
-        '<button class="btn secondary" onclick="_srSaveTrialBonusConfig()">💾 Lưu & đồng bộ</button>' +
-      '</div>' +
-    '</div>';
-  document.body.appendChild(el);
-}
-function closeTrialBonusConfigModal_(){
-  var el = document.getElementById('trial-bonus-modal');
-  if (el) el.remove();
-  _srState.hConfigEditing = null;
-}
-async function _srSaveTrialBonusConfig(){
-  var ed = _srState.hConfigEditing;
-  TRIAL_SALE_BONUS_CONFIG = ed.trial.filter(function(t){ return t.sale && t.startDate; });
-  var aliasObj = {};
-  ed.alias.forEach(function(a){ if (a.from && a.to) aliasObj[a.from] = a.to; });
-  CREATOR_NAME_ALIAS = aliasObj;
-  await saveTrialBonusConfig();
-  closeTrialBonusConfigModal_();
-  _srApply();
 }
 
 // ── Modal: Cài đặt KPI (Bậc 1/2/3, KPI Online, gán bậc từng người, KPI commit riêng) ──
@@ -14407,7 +14613,7 @@ function _srRenderKpiConfigModal_(){
   }
   el.innerHTML = '<div class="modal-box" style="max-width:680px;max-height:85vh;overflow-y:auto">'+
     '<div class="modal-title">🎯 Cài đặt KPI theo Bậc</div>'+
-    '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Mỗi Sale có 1 <b>Bậc bắt đầu</b> tính từ tháng bắt đầu theo dõi bên dưới; bậc các tháng sau <b>tự tính</b> theo quy tắc: 3 tháng liên tiếp TB ≥125% KPI bậc hiện tại (không tháng nào &lt;70%) → lên 1 bậc (tối đa bậc 3); 3 tháng liên tiếp TB &lt;80% KPI bậc hiện tại → xuống 1 bậc. Bậc <b>O</b> không bao giờ đổi. Bậc <b>Thử việc</b> (TVF1/TVF2) luôn đúng 1 tháng rồi tự động lên F1. <b>Commit riêng</b> (nếu đặt) chạy SONG SONG với KPI theo bậc — có cột %HT riêng, không thay thế bậc. Nhập số theo <b>triệu đồng</b> cho gọn.</div>'+
+    '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Mỗi Sale có 1 <b>Bậc bắt đầu</b> tính từ tháng bắt đầu theo dõi bên dưới; bậc các tháng sau <b>tự tính</b> theo quy tắc: 3 tháng liên tiếp TB ≥125% KPI bậc hiện tại (không tháng nào &lt;70%) → lên 1 bậc (tối đa bậc 3); 3 tháng liên tiếp TB &lt;80% KPI bậc hiện tại → xuống 1 bậc. Bậc <b>O</b> không bao giờ đổi. Bậc <b>Thử việc</b> (TVF1/TVF2) luôn đúng 1 tháng; tháng sau TVF1→F1, TVF2→F2. Riêng TVF2→F2: 2 tháng đầu làm F2 phải MỖI tháng đạt ≥100% KPI F2, không đạt (dù chỉ 1 tháng) thì xuống ngay F1 để xét lại từ đầu. <b>Commit riêng</b> (nếu đặt) chạy SONG SONG với KPI theo bậc — có cột %HT riêng, không thay thế bậc. Nhập số theo <b>triệu đồng</b> cho gọn.</div>'+
     '<div style="margin-bottom:10px"><label style="font-size:11px;color:var(--muted);display:block">Tháng bắt đầu theo dõi</label>'+
       '<input type="month" value="'+esc(ed.trackingStartMonth)+'" onchange="_srKpiEditSetStartMonth(this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"></div>'+
     '<div style="margin-bottom:6px"><div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:3px">KPI theo Bậc — Văn phòng (F)</div>'+
@@ -14561,7 +14767,7 @@ function _renderChannelRatesModal(){
   if (!body) return;
   var keys = Object.keys(CHANNEL_COMMISSION_RATES).sort(function(a,b){ return a.localeCompare(b,'vi'); });
   var nguonOptions = (_srState && _srState.nguonOptions) || [];
-  var html = '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Đơn có Nguồn đơn khớp đúng (không phân biệt hoa/thường) 1 trong các tên dưới đây sẽ tính hoa hồng theo % cố định này, bỏ qua ngưỡng 15tr và % cá nhân/team.</div>';
+  var html = '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Đơn có Nguồn đơn khớp đúng (không phân biệt hoa/thường) 1 trong các tên dưới đây sẽ tính hoa hồng theo % cố định này, bỏ qua ngưỡng 15tr và % cá nhân/team. Mặc định (khi chưa cài): nguồn chỉ ghi "Facebook" = 1%.</div>';
   html += '<table class="dash-table"><thead><tr><th>Nguồn đơn</th><th style="width:140px">% hoa hồng</th><th style="width:60px"></th></tr></thead><tbody>';
   keys.forEach(function(k){
     html += '<tr><td>'+esc(k)+'</td>'+
@@ -14631,7 +14837,8 @@ function _renderBonusProgramsModal(){
   if (_bpEditingId === null){
     // Danh sách
     var html = '<button class="btn sm" onclick="_bpEditingId=\'new\';_bpDraft=_bpNewProgram();_renderBonusProgramsModal()">+ Thêm chương trình</button> '+
-      '<button class="btn sm secondary" onclick="_bpSeedProbationTemplate_()" title="Tạo sẵn 5 chương trình đúng văn bản \'Cơ chế thưởng kích hoạt Sale mới\' — bạn chỉ cần kiểm tra lại rồi Lưu">🎁 Tạo mẫu: Thưởng Sale thử việc</button>';
+      '<button class="btn sm secondary" onclick="_bpSeedProbationTemplate_()" title="Tạo sẵn 5 chương trình đúng văn bản \'Cơ chế thưởng kích hoạt Sale mới\' — bạn chỉ cần kiểm tra lại rồi Lưu">🎁 Tạo mẫu: Thưởng Sale thử việc</button> '+
+      '<button class="btn sm secondary" onclick="_bpSeedOfficialOnlineTemplate_()" title="Tạo sẵn các chương trình đúng bảng \'Thưởng online\' (áp dụng cho MỌI Sale chính thức, không riêng Sale online — Google Sheet Duyên gửi 2026-10) — bạn chỉ cần kiểm tra lại rồi Lưu">🎁 Tạo mẫu: Thưởng Sale chính thức</button>';
     html += '<table class="dash-table" style="margin-top:10px"><thead><tr><th>Chương trình</th><th>Từ — đến</th><th>Đối tượng</th><th>Cơ chế</th><th></th></tr></thead><tbody>';
     BONUS_PROGRAMS.forEach(function(p){
       var aud = (p.audience && p.audience.online && p.audience.offline) ? 'Cả 2' : ((p.audience && p.audience.online) ? 'Online' : ((p.audience && p.audience.offline) ? 'Offline' : 'Tất cả'));
@@ -14777,6 +14984,67 @@ function _bpSeedProbationTemplate_(){
   toast('✓ Đã tạo 5 chương trình mẫu — nhớ đặt "Ngày bắt đầu" cho từng Sale thử việc ở Quản lý tài khoản.');
 }
 
+// Theo bảng "Thưởng online" (quy tắc thưởng CHÍNH THỨC) Duyên gửi 2026-10. Dù tên file/cột ghi
+// "Sale online", Duyên xác nhận 2026-10: bảng này áp dụng cho MỌI Sale CHÍNH THỨC (cả online lẫn
+// offline) — "online" chỉ nói đến kênh bán, không phải loại nhân viên — nên audience mặc định
+// {online:true, offline:true}. Sale đang ở trạng thái "Thử việc (TV)" KHÔNG được tính các CT này
+// (xem fix _bonusProgramApplies_ ở trên) — Sale thử việc dùng mẫu "Thưởng Sale thử việc" riêng.
+// Vài dòng trong bảng gốc có NHÃN và ĐIỀU KIỆN lệch nhau (vd nhãn "25tr" nhưng điều kiện ghi "từ
+// 20tr") — đã lấy theo cột "Điều kiện áp dụng" (cột chấm tự động), kèm extraNote nhắc kiểm tra
+// lại. Các CT gắn với 1 dòng sản phẩm cụ thể (Tỳ Hưu Thiên Lộc, Tourmaline cao cấp) mà hệ thống
+// không tách được theo CHẤT LIỆU/sản phẩm CHÍNH XÁC (chỉ khớp theo giá trị đơn hoặc từ khoá tên
+// sản phẩm) đều có ghi chú nhắc kế toán đối chiếu tay trước khi chốt — đúng tinh thần các mục 5/8
+// (ghi chú tự do, không tự động chấm) đã có sẵn trong hệ thống.
+function _bpSeedOfficialOnlineTemplate_(){
+  if (!confirm('Tạo mới các chương trình mẫu theo đúng bảng "Thưởng online" (quy tắc thưởng chính thức, Google Sheet Duyên gửi 2026-10)? Bạn nên kiểm tra lại từng chương trình (đặc biệt 2 mục có nhãn/điều kiện lệch nhau, và 2 mục Tourmaline cao cấp) trước khi dùng thật. Không ảnh hưởng các chương trình đã có sẵn.')) return;
+  // Duyen xac nhan 2026-10: bang nay ap dung cho MOI Sale CHINH THUC (ca online lan offline),
+  // KHONG phai rieng Sale online — "online" trong ten bang/cot chi noi den kenh ban hang, khong
+  // phai loai nhan vien. Chi loai tru Sale dang "Thu viec (TV)" (xem fix channel==='probation'
+  // trong _bonusProgramApplies_ o tren).
+  var common = { audience: {online:true, offline:true}, product:'', extraNote:'', exclusionNote:'' };
+  var mk = function(o){ var p = _bpNewProgram(); return Object.assign(p, common, o, {id: 'bp_'+Date.now()+'_'+Math.floor(Math.random()*1000)}); };
+  var seeded = [
+    mk({ name: 'Đơn từ 10tr (combo 2 sản phẩm)',
+      revenue: {enabled:true, scope:'order', min:10000000, max:''}, bonusAmount: 20000 }),
+    mk({ name: 'Đơn từ 15tr (combo 3 sản phẩm)',
+      revenue: {enabled:true, scope:'order', min:15000000, max:''}, bonusAmount: 30000 }),
+    mk({ name: 'Đơn từ 20tr (combo 4 sản phẩm)',
+      revenue: {enabled:true, scope:'order', min:20000000, max:''}, bonusAmount: 40000 }),
+    mk({ name: 'Bill vòng mix charm — DT từ 20tr',
+      revenue: {enabled:true, scope:'order', min:20000000, max:''}, bonusAmount: 30000,
+      extraNote: 'Nhãn gốc trong bảng ghi "25tr" nhưng cột Điều kiện áp dụng ghi "Doanh thu từ 20tr" — đã lấy theo điều kiện, kiểm tra lại với Duyên nếu không đúng ý.' }),
+    mk({ name: 'Bill vòng mix charm — đơn từ 15tr',
+      revenue: {enabled:true, scope:'order', min:15000000, max:''}, bonusAmount: 20000,
+      extraNote: 'Nhãn gốc trong bảng ghi "50tr" nhưng cột Điều kiện áp dụng ghi "Đơn từ 15tr" — đã lấy theo điều kiện, kiểm tra lại với Duyên nếu không đúng ý.' }),
+    mk({ name: 'Thưởng doanh số/ngày — đạt từ 60tr',
+      revenue: {enabled:true, scope:'day', min:60000000, max:''}, bonusAmount: 50000 }),
+    mk({ name: 'Thưởng doanh số/ngày — đạt từ 100tr',
+      revenue: {enabled:true, scope:'day', min:100000000, max:''}, bonusAmount: 100000 }),
+    mk({ name: 'Tỳ Hưu Thiên Lộc Moon',
+      product: 'Tỳ hưu thiên lộc Moon, Thiên Lộc Moon, THMoon', bonusAmount: 10000,
+      extraNote: 'Cộng thưởng trực tiếp theo số lượng sản phẩm bán ra (nhẫn, vòng cổ, lắc, charm vàng bất kỳ) — Kế toán tự update theo đúng văn bản gốc.',
+      exclusionNote: 'Không áp dụng cho Tỳ Hưu chế tác từ chất liệu Ngọc (Ngọc Lam, Ngọc Bích, Ngọc Cẩm Thạch B), Ruby, Saphire.' }),
+    mk({ name: 'Tỳ Hưu Thiên Lộc Tourmaline (Hồng/Xanh)',
+      product: 'Tourmaline Hồng, Tourmaline Xanh', bonusAmount: 8000 }),
+    mk({ name: 'Tỳ Hưu Thiên Lộc Aquamarine',
+      product: 'Aquamarine', bonusAmount: 8000 }),
+    mk({ name: 'Tourmaline cao cấp — đơn từ 21tr500',
+      dateFrom: '2026-09-21',
+      revenue: {enabled:true, scope:'order', min:21500000, max:''}, bonusAmount: 100000,
+      extraNote: 'Áp dụng cho dòng Tourmaline cao cấp — hệ thống chỉ chấm theo giá trị đơn (chưa tách được theo đúng sản phẩm), kế toán đối chiếu lại sản phẩm trên đơn trước khi chốt.',
+      exclusionNote: 'Không tính thưởng nếu đơn phát sinh huỷ.' }),
+    mk({ name: 'Tourmaline cao cấp — đơn từ 31tr500',
+      dateFrom: '2026-09-21',
+      revenue: {enabled:true, scope:'order', min:31500000, max:''}, bonusAmount: 200000,
+      extraNote: 'Áp dụng cho dòng Tourmaline cao cấp — hệ thống chỉ chấm theo giá trị đơn (chưa tách được theo đúng sản phẩm), kế toán đối chiếu lại sản phẩm trên đơn trước khi chốt.',
+      exclusionNote: 'Không tính thưởng nếu đơn phát sinh huỷ.' })
+  ];
+  BONUS_PROGRAMS = BONUS_PROGRAMS.concat(seeded);
+  saveBonusPrograms();
+  _renderBonusProgramsModal();
+  toast('✓ Đã tạo '+seeded.length+' chương trình mẫu (Thưởng chính thức - Online) — nhớ kiểm tra lại từng mục trước khi dùng thật.');
+}
+
 function _srPctStr(v){ return (v===null || v===undefined) ? '—' : Math.round(v*10)/10 + '%'; }
 function _srGrowthStr(v){
   if (v===null || v===undefined) return '<span style="color:var(--muted)">— (mới)</span>';
@@ -14784,6 +15052,470 @@ function _srGrowthStr(v){
   var color = v>0 ? 'var(--green)' : (v<0 ? 'var(--red)' : 'var(--muted)');
   return '<span style="color:'+color+'">'+sign+Math.round(v*10)/10+'%</span>';
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  BÁO CÁO H — TỔNG QUAN DATA ĐÃ CHIA (theo Ngày × CS, gom theo Team)
+//  Nguồn: assignHistory (sheet AssignData — mỗi lượt chia: ngày, CS, danh sách SĐT) ghép với
+//  careData (tình trạng CS / trạng thái Zalo / trạng thái KH HIỆN TẠI của từng SĐT). Chạy hoàn toàn
+//  phía client — KHÔNG cần action GAS mới (nên không cần deploy lại GAS).
+//  Số đơn chốt + Doanh thu = nhập TAY, lưu theo từng tháng vào Settings (assignReportManual_YYYY-MM)
+//  để cả team cùng thấy, cache thêm ở localStorage.
+// ═══════════════════════════════════════════════════════════════════════════
+var _hManual = {};          // { 'YYYY-MM': { 'YYYY-MM-DD|csName': {o:soDon, r:doanhThu, t:timestamp} } }
+var _hManualLoaded = {};    // { 'YYYY-MM': true } — tháng đã kéo từ Settings
+var _hSaveTimers = {};
+var _hKhMapOverride = loadLS('ome_cs_kh_map') || {};   // { nhómCS(label): giá trị Trạng thái KH } — admin chỉnh tay, ưu tiên hơn tự khớp theo tên
+
+function _hFold_(s){
+  return String(s||'').replace(/^\s*\d+(\.\d+)*\.?\s*/,'')   // bỏ số thứ tự "1." / "1.1 " ở đầu
+    .normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/g,'d').replace(/Đ/g,'d')
+    .toLowerCase().replace(/[^a-z0-9]+/g,'');
+}
+// Ngày của 1 lượt chia -> 'YYYY-MM-DD' ('' nếu không đọc được). Backend có thể trả chuỗi 'YYYY-MM-DD HH:mm'
+// (đúng như lúc tạo) hoặc chuỗi Date của JS nếu Google Sheet tự đổi ô thành kiểu ngày giờ.
+function _hEntryDate_(s){
+  s = String(s||'');
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  var d = new Date(s);
+  return isNaN(d) ? '' : _ymd(d);
+}
+// Các nhóm mẹ 1–6 của Tình trạng CS (đọc động từ CARE_STATUS_TREE — admin sửa cây là báo cáo tự theo).
+function _hGroups_(){
+  var tree = (typeof CARE_STATUS_TREE !== 'undefined' && CARE_STATUS_TREE) ? CARE_STATUS_TREE : [];
+  var numbered = tree.filter(function(n){ return /^\s*[1-6]\s*[.\-)]/.test(n.label||''); });
+  var nodes = numbered.length ? numbered : tree.slice(0, 6);
+  return nodes.map(function(n){
+    var vals = n.children ? n.children.map(function(c){ return c.value; }).filter(Boolean) : (n.value ? [n.value] : []);
+    return { label: n.label || '', values: vals, noContact: _hFold_(n.label).indexOf('khonglienlac') !== -1 };
+  });
+}
+function _hGroupIndex_(groups){
+  var idx = {};
+  groups.forEach(function(g, i){ g.values.forEach(function(v){ idx[v] = i; }); });
+  return idx;
+}
+// Tên gọi khác giữa Tình trạng CS và Trạng thái KH (2 danh sách đặt tên không trùng nhau)
+var _H_ALIAS_ = (function(){
+  var raw = {
+    'Knm/Máy bận':'Không thể kết nối', 'Thuê bao':'Không thể kết nối', 'Không liên lạc được':'Không thể kết nối',
+    'Đặt hộ/Sai số':'Nhận hộ / Sai số', 'Cúp ngang':'Ngang Cúp', 'Ngang Cúp':'Cúp ngang',
+    'Kcnc':'Từ chối', 'Kcnc/Không hiệu quả':'Từ chối', 'Chất lượng sản phẩm':'Từ chối'
+  };
+  var out = {};
+  Object.keys(raw).forEach(function(k){ out[_hFold_(k)] = raw[k]; });
+  return out;
+})();
+// Trạng thái KH GỢI Ý theo Tình trạng CS: (1) admin đã gán tay cho nhóm CS đó -> dùng; (2) khớp theo tên
+// (tên con rồi tên nhóm mẹ, có bảng tên gọi khác ở trên); không khớp được -> '' (để CS tự chọn).
+function _hAutoKh_(status){
+  if (!status) return '';
+  var groups = _hGroups_();
+  var tree = (typeof CARE_STATUS_TREE !== 'undefined' && CARE_STATUS_TREE) ? CARE_STATUS_TREE : [];
+  var leafLabel = '', groupLabel = '';
+  tree.forEach(function(n){
+    if (n.children){ n.children.forEach(function(c){ if (c.value === status){ leafLabel = c.label || c.value; groupLabel = n.label || ''; } }); }
+    else if (n.value === status){ leafLabel = n.label || n.value; groupLabel = n.label || ''; }
+  });
+  if (!leafLabel) leafLabel = status;
+  var ov = _hKhMapOverride[groupLabel];
+  if (ov) return ov;
+  var kh = (typeof CUSTOMER_STATUS_TREE !== 'undefined' && CUSTOMER_STATUS_TREE) ? CUSTOMER_STATUS_TREE : [];
+  function findKh(target){
+    var f = _hFold_(target), res = '';
+    kh.forEach(function(n){
+      if (res) return;
+      if (n.children){
+        n.children.forEach(function(c){ if (!res && c.value && (_hFold_(c.label||c.value) === f)) res = c.value; });
+        if (!res && _hFold_(n.label) === f){
+          var same = n.children.filter(function(c){ return c.value && _hFold_(c.label||c.value) === _hFold_(leafLabel); })[0];
+          res = (same || n.children.filter(function(c){ return c.value; })[0] || {}).value || '';
+        }
+      } else if (n.value && _hFold_(n.label||n.value) === f) res = n.value;
+    });
+    return res;
+  }
+  var cands = [leafLabel, groupLabel];
+  for (var i = 0; i < cands.length; i++){
+    if (!cands[i]) continue;
+    var r = findKh(cands[i]) || (_H_ALIAS_[_hFold_(cands[i])] ? findKh(_H_ALIAS_[_hFold_(cands[i])]) : '');
+    if (r) return r;
+  }
+  return '';
+}
+// Nhãn (con, nhóm mẹ) của 1 Tình trạng CS theo CARE_STATUS_TREE hiện hành
+function _hLabelsOf_(status){
+  var tree = (typeof CARE_STATUS_TREE !== 'undefined' && CARE_STATUS_TREE) ? CARE_STATUS_TREE : [], out = { leaf:'', group:'' };
+  tree.forEach(function(n){
+    if (n.children){ n.children.forEach(function(c){ if (c.value === status){ out.leaf = c.label || c.value; out.group = n.label || ''; } }); }
+    else if (n.value === status){ out.leaf = n.label || n.value; out.group = n.label || ''; }
+  });
+  return out;
+}
+// Tình trạng CS thuộc nhóm "Chốt" (hoặc "Đã chốt") -> form hiện thêm ô Doanh thu đơn + Ghi chú đơn
+function _hIsChot_(status){
+  if (!status) return false;
+  var l = _hLabelsOf_(status), re = /^(da)?chot$/;
+  return re.test(_hFold_(l.group)) || re.test(_hFold_(l.leaf));
+}
+// Form cập nhật CS: đổi Tình trạng CS -> (1) hiện/ẩn khung đơn chốt, (2) Trạng thái KH tự nhảy theo, TRỪ khi CS đã tự chọn tay ô KH trong lần mở form này.
+function _hOnCsStatusChange_(){
+  var st = document.getElementById('cs-status'), kh = document.getElementById('cs-kh-status');
+  if (!st) return;
+  try {
+    var box = document.getElementById('cs-chot-box');
+    if (box) box.style.display = _hIsChot_(st.value) ? 'block' : 'none';
+    if (!kh || kh.dataset.manual === '1') return;
+    var hint = document.getElementById('cs-kh-hint');
+    var v = _hAutoKh_(st.value);
+    if (v && Array.prototype.some.call(kh.options, function(o){ return o.value === v; })){
+      kh.value = v;
+      if (hint) hint.textContent = '↻ Tự nhảy theo Tình trạng CS — bạn vẫn đổi tay được';
+    } else if (hint){
+      hint.textContent = st.value ? 'Chưa có quy tắc tự nhảy cho tình trạng này — chọn tay (Admin có thể gán ở Báo cáo H → ⚙ Trạng thái KH tự nhảy)' : '';
+    }
+  } catch(e){ console.warn('_hOnCsStatusChange_ lỗi:', e); }
+}
+
+// ── Đơn chốt do CS nhập ở form (Doanh thu + Ghi chú đơn) ──
+// Lưu theo tháng vào Settings (chotOrders_YYYY-MM) + cache localStorage; id = SĐT|ngày nên lưu lại cùng ngày là CẬP NHẬT chứ không nhân đôi đơn.
+var _hChot = {};          // { 'YYYY-MM': { id: {id,phone,cs,date,rev,note,t} } }
+var _hChotLoaded = {};
+var _hChotTimers = {};
+function _hChotMonth_(mk){ return _hChot[mk] || (_hChot[mk] = loadLS('ome_chot_orders_' + mk) || {}); }
+function _hChotMerge_(mk, remote){
+  var cur = _hChotMonth_(mk);
+  Object.keys(remote || {}).forEach(function(k){ if (!cur[k] || (remote[k].t || 0) > (cur[k].t || 0)) cur[k] = remote[k]; });
+}
+function _hChotToday_(phone){ var d = _ymd(new Date()); return _hChotMonth_(d.slice(0,7))[phone + '|' + d] || null; }
+function _hFmtMoneyInput_(el){
+  var n = parseInt(String(el.value).replace(/[^\d]/g, ''), 10);
+  el.value = n ? n.toLocaleString('vi-VN') : '';
+}
+async function _hPushChot_(mk){
+  if (!gsUrl) return;
+  try {
+    var r = await fetch(gsUrl + '?action=getSetting&key=chotOrders_' + mk, { redirect:'follow' });
+    var d = await r.json();
+    if (d && d.value) _hChotMerge_(mk, JSON.parse(d.value));
+    saveLS('ome_chot_orders_' + mk, _hChot[mk]);
+    await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'setSetting', key:'chotOrders_' + mk, value: JSON.stringify(_hChot[mk]) }) });
+  } catch(e) { toast('⚠ Đơn chốt đã lưu trên máy — chưa đồng bộ được lên Google Sheet: ' + e.message); }
+}
+// Gọi từ saveCare khi Tình trạng CS thuộc nhóm Chốt
+function _hSaveChotFromForm_(phone, cs){
+  var revEl = document.getElementById('cs-chot-rev'), noteEl = document.getElementById('cs-chot-note');
+  if (!revEl && !noteEl) return;
+  var rev = parseInt(String(revEl ? revEl.value : '').replace(/[^\d]/g, ''), 10) || 0;
+  var note = noteEl ? noteEl.value.trim() : '';
+  var d = _ymd(new Date()), mk = d.slice(0,7), id = phone + '|' + d, cur = _hChotMonth_(mk);
+  if (!rev && !note && !cur[id]) return;   // chưa nhập gì -> không tạo đơn rỗng
+  cur[id] = { id:id, phone:phone, cs: cs || (currentUser && currentUser.name) || '', date:d, rev:rev, note:note, t:Date.now() };
+  saveLS('ome_chot_orders_' + mk, cur);
+  clearTimeout(_hChotTimers[mk]);
+  _hChotTimers[mk] = setTimeout(function(){ _hPushChot_(mk); }, 700);
+  if (typeof _srState !== 'undefined' && _srState.sub === 'H') renderSalesReportTab();
+}
+function _hChotMonthsInRange_(){
+  var from = (_srState.hDateFrom || _ymd(new Date())).slice(0,7), now = _ymd(new Date()).slice(0,7), out = [], y = +from.slice(0,4), m = +from.slice(5,7), n = 0;
+  while ((y + '-' + String(m).padStart(2,'0')) <= now && n++ < 12){ out.push(y + '-' + String(m).padStart(2,'0')); m++; if (m > 12){ m = 1; y++; } }
+  return out;
+}
+async function _hLoadChot_(){
+  var months = _hChotMonthsInRange_(), changed = false;
+  for (var i = 0; i < months.length; i++){
+    var mk = months[i];
+    if (_hChotLoaded[mk]) continue;
+    _hChotLoaded[mk] = true;
+    _hChotMonth_(mk);
+    if (!gsUrl) continue;
+    try {
+      var r = await fetch(gsUrl + '?action=getSetting&key=chotOrders_' + mk, { redirect:'follow' });
+      var d = await r.json();
+      if (d && d.value){ _hChotMerge_(mk, JSON.parse(d.value)); saveLS('ome_chot_orders_' + mk, _hChot[mk]); changed = true; }
+    } catch(e) {}
+  }
+  if (changed && _srState.sub === 'H') renderSalesReportTab();
+}
+
+// ── Số đơn chốt / Doanh thu nhập tay ──
+function _hManualGet_(key){ var m = _hManual[key.slice(0,7)] || {}; return m[key] || { o:0, r:0 }; }
+function _hMonthsInRange_(){
+  var out = [], from = _srState.hDateFrom, to = _srState.hDateTo;
+  if (!from || !to) return [String(from||to||_ymd(new Date())).slice(0,7)];
+  var y = +from.slice(0,4), m = +from.slice(5,7), ey = +to.slice(0,4), em = +to.slice(5,7), n = 0;
+  while ((y < ey || (y === ey && m <= em)) && n++ < 12){
+    out.push(y + '-' + String(m).padStart(2,'0'));
+    m++; if (m > 12){ m = 1; y++; }
+  }
+  return out;
+}
+function _hMergeManual_(mk, remote){
+  var cur = _hManual[mk] || (_hManual[mk] = loadLS('ome_assign_manual_' + mk) || {});
+  Object.keys(remote || {}).forEach(function(k){
+    if (!cur[k] || (remote[k].t || 0) > (cur[k].t || 0)) cur[k] = remote[k];
+  });
+}
+async function _hLoadManual_(){
+  var months = _hMonthsInRange_(), changed = false;
+  for (var i = 0; i < months.length; i++){
+    var mk = months[i];
+    if (_hManualLoaded[mk]) continue;
+    _hManualLoaded[mk] = true;
+    _hMergeManual_(mk, null);
+    if (!gsUrl) continue;
+    try {
+      var r = await fetch(gsUrl + '?action=getSetting&key=assignReportManual_' + mk, { redirect:'follow' });
+      var d = await r.json();
+      if (d && d.value){ _hMergeManual_(mk, JSON.parse(d.value)); saveLS('ome_assign_manual_' + mk, _hManual[mk]); changed = true; }
+    } catch(e) { /* giữ bản local nếu lỗi mạng/parse */ }
+  }
+  if (changed && _srState.sub === 'H') renderSalesReportTab();
+}
+async function _hPushManual_(mk){
+  if (!gsUrl) return;
+  try {
+    // đọc lại bản mới nhất trên Settings rồi gộp theo timestamp từng dòng (tránh đè số của CS khác nhập cùng tháng)
+    var r = await fetch(gsUrl + '?action=getSetting&key=assignReportManual_' + mk, { redirect:'follow' });
+    var d = await r.json();
+    if (d && d.value) _hMergeManual_(mk, JSON.parse(d.value));
+    saveLS('ome_assign_manual_' + mk, _hManual[mk]);
+    await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'setSetting', key:'assignReportManual_' + mk, value: JSON.stringify(_hManual[mk]) }) });
+  } catch(e) { toast('⚠ Đã lưu trên máy — chưa đồng bộ được lên Google Sheet: ' + e.message); }
+}
+function _hSetManual_(key, field, val){
+  // Chi lay chu so: kieu VN dung dau cham/phay lam dau ngan cach hang nghin (9.000.000 = 9 trieu), KHONG phai dau thap phan
+  var n = parseInt(String(val).replace(/[^\d]/g, ''), 10) || 0;
+  var mk = key.slice(0,7);
+  _hManual[mk] = _hManual[mk] || loadLS('ome_assign_manual_' + mk) || {};
+  var e = _hManual[mk][key] || { o:0, r:0 };
+  e[field] = n; e.t = Date.now();
+  _hManual[mk][key] = e;
+  saveLS('ome_assign_manual_' + mk, _hManual[mk]);
+  clearTimeout(_hSaveTimers[mk]);
+  _hSaveTimers[mk] = setTimeout(function(){ _hPushManual_(mk); }, 700);
+  renderSalesReportTab();
+}
+
+// Phạm vi xem: admin = tất cả; trưởng nhóm = cả team; CS thường = chỉ chính mình.
+function _hScopeNames_(){
+  if (_srIsAdmin()) return null;
+  if (currentUser && currentUser.role === 'leader'){
+    var t = _srLeaderTeamNames();
+    if (t.length) return t;
+  }
+  return _srMyNames().concat([currentUser && currentUser.name]).filter(Boolean);
+}
+function _hAddMap_(a, b){ Object.keys(b||{}).forEach(function(k){ a[k] = (a[k]||0) + b[k]; }); }
+function _hBuild_(){
+  var from = _srState.hDateFrom, to = _srState.hDateTo, scope = _hScopeNames_();
+  var teamF = _srState.hTeam || '', csF = _srState.hCs || '', byCs = (_srState.hGroup === 'cs');
+  var groups = _hGroups_(), gIdx = _hGroupIndex_(groups);
+  var map = {}, csSeen = {};
+  (typeof assignHistory !== 'undefined' ? assignHistory : []).forEach(function(e){
+    var d = _hEntryDate_(e.date); if (!d) return;
+    if (from && d < from) return;
+    if (to && d > to) return;
+    var cs = e.csName || '(chưa rõ)';
+    if (scope && scope.indexOf(cs) === -1) return;
+    csSeen[cs] = 1;
+    if (csF && cs !== csF) return;
+    var tm = _teamOf(cs), tn = tm ? (tm.name || '(chưa đặt tên)') : 'Chưa có team';
+    if (teamF && tn !== teamF) return;
+    var key = byCs ? cs : (d + '|' + cs);
+    var r = map[key] || (map[key] = { key:key, date: byCs ? '' : d, cs:cs, team:tn, phones:new Set(), mkeys:{} });
+    (e.phones || []).forEach(function(p){ r.phones.add(p); });
+    r.mkeys[d + '|' + cs] = 1;
+  });
+  var rows = Object.keys(map).map(function(k){ return map[k]; });
+  var chotList = [];
+  Object.keys(_hChot).forEach(function(mk){ Object.keys(_hChot[mk]).forEach(function(id){ chotList.push(_hChot[mk][id]); }); });
+  rows.forEach(function(r){
+    r.total = r.phones.size; r.g = groups.map(function(){ return 0; }); r.other = 0; r.none = 0;
+    r.contact = { ok:0, kll:0, none:0 }; r.zalo = {}; r.kh = {};
+    r.phones.forEach(function(p){
+      var c = (typeof careData !== 'undefined' && careData[p]) || {}, st = c.status || '';
+      if (!st){ r.none++; r.contact.none++; }
+      else {
+        var gi = gIdx[st];
+        if (gi === undefined){ r.other++; r.contact.ok++; }
+        else { r.g[gi]++; if (groups[gi].noContact) r.contact.kll++; else r.contact.ok++; }
+      }
+      var z = c.zalo || '(chưa rõ)'; r.zalo[z] = (r.zalo[z]||0) + 1;
+      var k = c.khStatus || _hAutoKh_(st) || '(chưa có)'; r.kh[k] = (r.kh[k]||0) + 1;
+    });
+    // Don chot CS nhap o form (chi tinh SDT nam trong data da chia cho CHINH CS do, don tao tu ngay chia tro di) + phan bo sung tay
+    r.autoOrders = 0; r.autoRevenue = 0;
+    chotList.forEach(function(e){
+      if (e.cs === r.cs && r.phones.has(e.phone) && (!r.date || e.date >= r.date)){ r.autoOrders++; r.autoRevenue += e.rev || 0; }
+    });
+    r.orders = r.autoOrders; r.revenue = r.autoRevenue;
+    Object.keys(r.mkeys).forEach(function(mk){ var m = _hManualGet_(mk); r.orders += m.o || 0; r.revenue += m.r || 0; });
+  });
+  var teamOrder = {}; (teams||[]).forEach(function(t, i){ teamOrder[t.name || '(chưa đặt tên)'] = i; });
+  rows.sort(function(a, b){
+    var ta = teamOrder[a.team] === undefined ? 999 : teamOrder[a.team], tb = teamOrder[b.team] === undefined ? 999 : teamOrder[b.team];
+    if (ta !== tb) return ta - tb;
+    if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+    return a.cs.localeCompare(b.cs, 'vi');
+  });
+  return { rows: rows, groups: groups, csOptions: Object.keys(csSeen).sort(function(a,b){ return a.localeCompare(b,'vi'); }) };
+}
+function _hSum_(rows, groups){
+  var s = { total:0, g: groups.map(function(){ return 0; }), other:0, none:0, contact:{ ok:0, kll:0, none:0 }, zalo:{}, kh:{}, orders:0, revenue:0 };
+  rows.forEach(function(r){
+    s.total += r.total; s.other += r.other; s.none += r.none; s.orders += r.orders; s.revenue += r.revenue;
+    r.g.forEach(function(v, i){ s.g[i] += v; });
+    s.contact.ok += r.contact.ok; s.contact.kll += r.contact.kll; s.contact.none += r.contact.none;
+    _hAddMap_(s.zalo, r.zalo); _hAddMap_(s.kh, r.kh);
+  });
+  return s;
+}
+function _hChips_(m, color){
+  var ks = Object.keys(m||{}).sort(function(a,b){ return m[b] - m[a]; });
+  if (!ks.length) return '<span style="color:var(--hint)">—</span>';
+  return ks.map(function(k){
+    return '<span style="display:inline-block;margin:1px 3px 1px 0;padding:1px 6px;border-radius:9px;background:'+color+';font-size:10.5px;white-space:nowrap">'+esc(k)+' <b>'+m[k]+'</b></span>';
+  }).join('');
+}
+function _hContactCell_(c){
+  var h = '';
+  h += '<span style="display:inline-block;margin:1px 3px 1px 0;padding:1px 6px;border-radius:9px;background:var(--green-bg);color:var(--green);font-size:10.5px;white-space:nowrap">Đã liên hệ <b>'+c.ok+'</b></span>';
+  h += '<span style="display:inline-block;margin:1px 3px 1px 0;padding:1px 6px;border-radius:9px;background:#fee2e2;color:#b91c1c;font-size:10.5px;white-space:nowrap">Không LL được <b>'+c.kll+'</b></span>';
+  if (c.none) h += '<span style="display:inline-block;margin:1px 3px 1px 0;padding:1px 6px;border-radius:9px;background:var(--surface2);color:var(--muted);font-size:10.5px;white-space:nowrap">Chưa CS <b>'+c.none+'</b></span>';
+  return h;
+}
+function _hMoney_(n){ return (n||0).toLocaleString('vi-VN'); }
+
+function _srRenderH_(d){
+  if (!d.rows.length) return '<div style="color:var(--muted);text-align:center;padding:40px">Không có data nào được chia trong khoảng ngày này (hoặc ngoài phạm vi bạn được xem).</div>';
+  var byCs = (_srState.hGroup === 'cs'), groups = d.groups;
+  var ncol = 3 + groups.length + 1 + 4 + 3;
+  var th = 'style="text-align:right;white-space:nowrap"';
+  var html = '<div style="overflow-x:auto"><table class="dash-table"><thead><tr>'+
+    '<th>Ngày</th><th>Tên CS</th><th '+th+'>Data được chia</th>'+
+    groups.map(function(g){ return '<th '+th+' title="Tình trạng CS — nhóm mẹ">'+esc(g.label)+'</th>'; }).join('')+
+    '<th '+th+' title="Có SĐT chưa có Tình trạng CS (CS chưa chăm sóc)">Chưa CS</th>'+
+    '<th>Tình trạng liên hệ</th><th>Trạng thái Zalo</th><th>Trạng thái KH</th>'+
+    '<th '+th+'>Số đơn chốt <span style="color:var(--hint);font-weight:400">(form + bổ sung tay)</span></th>'+
+    '<th '+th+'>Doanh thu <span style="color:var(--hint);font-weight:400">(form + bổ sung tay)</span></th>'+
+    '<th '+th+'>TB / đơn</th></tr></thead><tbody>';
+  function totalRow(label, s, strong){
+    var bg = strong ? 'background:var(--surface2);' : 'background:#f8fafc;';
+    return '<tr style="font-weight:700;border-top:2px solid var(--border);'+bg+'"><td colspan="2">'+label+'</td>'+
+      '<td style="text-align:right">'+fmt(s.total)+'</td>'+
+      s.g.map(function(v){ return '<td style="text-align:right">'+fmt(v)+'</td>'; }).join('')+
+      '<td style="text-align:right">'+fmt(s.none + s.other)+'</td>'+
+      '<td>'+_hContactCell_(s.contact)+'</td><td>'+_hChips_(s.zalo,'#e0f2fe')+'</td><td>'+_hChips_(s.kh,'#ede9fe')+'</td>'+
+      '<td style="text-align:right">'+fmt(s.orders)+'</td><td style="text-align:right">'+_hMoney_(s.revenue)+'</td>'+
+      '<td style="text-align:right">'+(s.orders ? _hMoney_(Math.round(s.revenue / s.orders)) : '—')+'</td></tr>';
+  }
+  var teamsInOrder = [];
+  d.rows.forEach(function(r){ if (teamsInOrder.indexOf(r.team) === -1) teamsInOrder.push(r.team); });
+  teamsInOrder.forEach(function(tn){
+    var tr = d.rows.filter(function(r){ return r.team === tn; });
+    html += '<tr><td colspan="'+ncol+'" style="background:var(--green-bg);color:var(--green);font-weight:700">👥 Team: '+esc(tn)+'</td></tr>';
+    tr.forEach(function(r){
+      var mk = r.date ? (r.date + '|' + r.cs) : '';
+      var oCell, rCell;
+      if (byCs){ oCell = fmt(r.orders); rCell = _hMoney_(r.revenue); }
+      else {
+        var m = _hManualGet_(mk);
+        var autoNote = function(v){ return v ? '<div style="font-size:10px;color:var(--muted);white-space:nowrap" title="CS nhập ở form chăm sóc khi chọn Chốt">Từ form: '+v+'</div>' : ''; };
+        var inSt = 'text-align:right;padding:3px 6px;border:1px solid var(--border);border-radius:5px;background:var(--surface)';
+        oCell = autoNote(r.autoOrders) + '<input type="text" inputmode="numeric" data-k="'+esc(mk)+'" value="'+(m.o||'')+'" placeholder="0" onchange="_hSetManual_(this.dataset.k,\'o\',this.value)" style="width:60px;'+inSt+'">';
+        rCell = autoNote(r.autoRevenue ? _hMoney_(r.autoRevenue) : 0) + '<input type="text" inputmode="numeric" data-k="'+esc(mk)+'" value="'+(m.r ? _hMoney_(m.r) : '')+'" placeholder="0" onchange="_hSetManual_(this.dataset.k,\'r\',this.value)" style="width:110px;'+inSt+'">';
+      }
+      html += '<tr><td style="white-space:nowrap">'+(r.date ? esc(r.date.split('-').reverse().join('/')) : '—')+'</td><td>'+esc(r.cs)+'</td>'+
+        '<td style="text-align:right;font-weight:600">'+fmt(r.total)+'</td>'+
+        r.g.map(function(v){ return '<td style="text-align:right">'+(v ? fmt(v) : '<span style="color:var(--hint)">0</span>')+'</td>'; }).join('')+
+        '<td style="text-align:right">'+(r.none + r.other ? fmt(r.none + r.other) : '<span style="color:var(--hint)">0</span>')+'</td>'+
+        '<td>'+_hContactCell_(r.contact)+'</td><td>'+_hChips_(r.zalo,'#e0f2fe')+'</td><td>'+_hChips_(r.kh,'#ede9fe')+'</td>'+
+        '<td style="text-align:right">'+oCell+'</td><td style="text-align:right">'+rCell+'</td>'+
+        '<td style="text-align:right">'+(r.orders ? _hMoney_(Math.round(r.revenue / r.orders)) : '—')+'</td></tr>';
+    });
+    if (teamsInOrder.length > 1) html += totalRow('Tổng team ' + esc(tn), _hSum_(tr, groups), false);
+  });
+  html += totalRow('TỔNG CỘNG', _hSum_(d.rows, groups), true);
+  html += '</tbody></table></div>';
+  html += '<div style="margin-top:8px;font-size:11px;color:var(--muted);line-height:1.5">'+
+    'ℹ️ Tình trạng CS / Zalo / Trạng thái KH tính theo <b>trạng thái HIỆN TẠI</b> của từng SĐT trong data đã chia (không phải trạng thái tại ngày chia). '+
+    'Trạng thái KH để trống sẽ tự suy ra từ Tình trạng CS. '+(byCs ? 'Đang gộp theo CS: muốn nhập đơn/doanh thu hãy chuyển sang "Theo ngày × CS".' : 'Số đơn chốt / Doanh thu = đơn CS nhập ở form chăm sóc khi chọn Chốt (hiện "Từ form") + phần bổ sung tay ở ô nhập; tự lưu và đồng bộ cho cả team.')+'</div>';
+  return html;
+}
+function renderSalesReportTabH_(wrap, subTabs){
+  var d = _hBuild_();
+  var sel = 'padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)';
+  var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
+  filters += _quickRangeSelectHtml(_srState.hDateQuick, "_srApplyQuickRange('hDateQuick','hDateFrom','hDateTo',this.value)");
+  filters += '<input type="date" value="'+esc(_srState.hDateFrom)+'" onchange="_srSetField(\'hDateFrom\',this.value);_srState.hDateQuick=\'custom\';_srApply()" title="Từ ngày" style="'+sel+'">';
+  filters += '<span style="color:var(--muted)">→</span>';
+  filters += '<input type="date" value="'+esc(_srState.hDateTo)+'" onchange="_srSetField(\'hDateTo\',this.value);_srState.hDateQuick=\'custom\';_srApply()" title="Đến ngày" style="'+sel+'">';
+  var teamNames = (teams||[]).map(function(t){ return t.name || '(chưa đặt tên)'; });
+  if (_srIsAdmin() || (currentUser && currentUser.role === 'leader')){
+    filters += '<select onchange="_srState.hTeam=this.value;renderSalesReportTab()" style="'+sel+'" title="Lọc theo Team (CSKH / Quầy / Sale...)"><option value="">Tất cả team</option>'+
+      teamNames.concat(['Chưa có team']).map(function(n){ return '<option value="'+esc(n)+'"'+(_srState.hTeam===n?' selected':'')+'>'+esc(n)+'</option>'; }).join('')+'</select>';
+    filters += '<select onchange="_srState.hCs=this.value;renderSalesReportTab()" style="'+sel+'" title="Lọc theo tên CS"><option value="">Tất cả CS</option>'+
+      d.csOptions.map(function(n){ return '<option value="'+esc(n)+'"'+(_srState.hCs===n?' selected':'')+'>'+esc(n)+'</option>'; }).join('')+'</select>';
+  }
+  filters += '<select onchange="_srState.hGroup=this.value;renderSalesReportTab()" style="'+sel+'">'+
+    '<option value="dayCs"'+(_srState.hGroup!=='cs'?' selected':'')+'>Theo ngày × CS</option>'+
+    '<option value="cs"'+(_srState.hGroup==='cs'?' selected':'')+'>Gộp theo CS</option></select>';
+  filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
+  filters += '<button class="btn sm" onclick="_hExportCsv_()">⬇️ Xuất CSV</button>';
+  if (_srIsAdmin()) filters += '<button class="btn sm" onclick="openHKhMapModal_()" title="Gán Trạng thái KH tự nhảy theo từng nhóm Tình trạng CS">⚙ Trạng thái KH tự nhảy</button>';
+  filters += '</div>';
+  wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + filters + _srRenderH_(d);
+}
+function _hExportCsv_(){
+  var d = _hBuild_(), g = d.groups, q = function(v){ return '"' + String(v==null?'':v).replace(/"/g,'""') + '"'; };
+  var head = ['Team','Ngày','Tên CS','Data được chia'].concat(g.map(function(x){ return x.label; }), ['Chưa CS','Đã liên hệ','Không liên lạc được','Trạng thái Zalo','Trạng thái KH','Số đơn chốt','Doanh thu','TB/đơn']);
+  var lines = [head.map(q).join(',')];
+  function fl(m){ return Object.keys(m).map(function(k){ return k + ': ' + m[k]; }).join('; '); }
+  d.rows.forEach(function(r){
+    lines.push([r.team, r.date, r.cs, r.total].concat(r.g, [r.none + r.other, r.contact.ok, r.contact.kll, fl(r.zalo), fl(r.kh), r.orders, r.revenue, r.orders ? Math.round(r.revenue / r.orders) : '']).map(q).join(','));
+  });
+  var blob = new Blob(['﻿' + lines.join('\r\n')], { type:'text/csv;charset=utf-8' });
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'bao-cao-chia-data_' + (_srState.hDateFrom||'') + '_' + (_srState.hDateTo||'') + '.csv';
+  document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+// Modal admin: gán Trạng thái KH cho từng nhóm Tình trạng CS (để trống = tự khớp theo tên)
+function openHKhMapModal_(){
+  var groups = _hGroups_();
+  var old = document.getElementById('h-khmap-modal'); if (old) old.remove();
+  var m = document.createElement('div'); m.id = 'h-khmap-modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;align-items:center;justify-content:center';
+  m.innerHTML = '<div style="background:var(--surface);border-radius:10px;padding:18px;max-width:520px;width:92%;max-height:86vh;overflow:auto">'+
+    '<div style="font-weight:700;margin-bottom:6px">⚙ Trạng thái KH tự nhảy theo Tình trạng CS</div>'+
+    '<div style="font-size:12px;color:var(--muted);margin-bottom:12px">Chọn Trạng thái KH sẽ tự điền khi CS chọn Tình trạng CS thuộc nhóm đó. Để "— Chọn —" = tự khớp theo tên (VD: Chốt → Chốt). CS vẫn tự đổi tay được.</div>'+
+    groups.map(function(g, i){
+      return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><div style="flex:1;font-size:13px">'+esc(g.label)+'</div>'+
+        '<select data-glabel="'+esc(g.label)+'" class="form-select" style="flex:1">'+_buildCustStatusOptions(_hKhMapOverride[g.label]||'')+'</select></div>';
+    }).join('')+
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn sm" onclick="document.getElementById(\'h-khmap-modal\').remove()">Đóng</button>'+
+    '<button class="btn primary sm" onclick="saveHKhMap_()">Lưu</button></div></div>';
+  document.body.appendChild(m);
+}
+async function saveHKhMap_(){
+  var o = {};
+  document.querySelectorAll('#h-khmap-modal select[data-glabel]').forEach(function(s){ if (s.value) o[s.dataset.glabel] = s.value; });
+  _hKhMapOverride = o; saveLS('ome_cs_kh_map', o);
+  var mm = document.getElementById('h-khmap-modal'); if (mm) mm.remove();
+  if (gsUrl){
+    try { await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'setSetting', key:'csKhMap', value: JSON.stringify(o) }) }); toast('✓ Đã lưu và đồng bộ'); }
+    catch(e){ toast('✓ Đã lưu trên máy — chưa đồng bộ GSheets: ' + e.message); }
+  } else toast('✓ Đã lưu (local)');
+  if (_srState.sub === 'H') renderSalesReportTab();
+}
+async function _hSyncKhMap_(){
+  if (!gsUrl) return;
+  try {
+    var r = await fetch(gsUrl + '?action=getSetting&key=csKhMap', { redirect:'follow' });
+    var d = await r.json();
+    if (d && d.value){ var o = JSON.parse(d.value); if (o && typeof o === 'object'){ _hKhMapOverride = o; saveLS('ome_cs_kh_map', o); } }
+  } catch(e) {}
+}
+setTimeout(_hSyncKhMap_, 1500);
 
 function _srRenderCTable(rows, entType, search, searchKey){
   var filtered = rows.filter(function(r){ return !search || r.name.toLowerCase().indexOf(search.toLowerCase())!==-1; });
@@ -17580,8 +18312,125 @@ function _closeTierOnOutside(e) {
     _prevSwitch(tab, el);
     var zp = document.getElementById('tab-zaloai');
     if (zp) zp.style.display = (tab === 'zaloai') ? 'flex' : 'none';
+    if (tab === 'zaloai') loadMsgTemplates();
   };
 })();
+
+// ═══════════════════════════════════════════════════════
+//  THU VIEN MAU TIN NHAN TU VAN KHACH (them 2026-10) — doc/ghi qua action
+//  'messageTemplates'/'saveMessageTemplate'/'deleteMessageTemplate' (gas_v13.js). Cung 1 nguon
+//  du lieu voi extension Pancake AI, nen KHONG cache rieng trong localStorage — luon fetch lai
+//  khi mo tab de thay thay doi tu noi khac (vd extension vua them mau moi).
+// ═══════════════════════════════════════════════════════
+var _msgTemplates = [];
+async function loadMsgTemplates() {
+  var listEl = document.getElementById('mt-list');
+  if (!listEl) return;
+  listEl.innerHTML = '<div style="font-size:12px;color:var(--muted)">Đang tải mẫu...</div>';
+  try {
+    var sep = gsUrl.indexOf('?') >= 0 ? '&' : '?';
+    var r = await fetch(gsUrl + sep + 'action=messageTemplates', { redirect: 'follow' });
+    var d = await r.json();
+    _msgTemplates = (d && d.templates) || [];
+  } catch (e) {
+    listEl.innerHTML = '<div style="font-size:12px;color:#dc2626">Lỗi tải thư viện mẫu, thử lại.</div>';
+    return;
+  }
+  renderMsgTemplateList();
+}
+
+function renderMsgTemplateList() {
+  var listEl = document.getElementById('mt-list');
+  if (!listEl) return;
+  var q = (document.getElementById('mt-search').value || '').trim().toLowerCase();
+  var items = _msgTemplates.filter(function (t) {
+    if (!q) return true;
+    return (t.title || '').toLowerCase().indexOf(q) >= 0 ||
+      (t.content || '').toLowerCase().indexOf(q) >= 0 ||
+      (t.tags || '').toLowerCase().indexOf(q) >= 0;
+  });
+  if (!items.length) {
+    listEl.innerHTML = '<div style="font-size:12px;color:var(--muted)">' + (_msgTemplates.length ? 'Không tìm thấy mẫu phù hợp.' : 'Chưa có mẫu nào — bấm "+ Thêm mẫu" để tạo mẫu đầu tiên.') + '</div>';
+    return;
+  }
+  listEl.innerHTML = items.map(function (t) {
+    var tagsHtml = (t.tags || '').split(',').map(function (tg) { tg = tg.trim(); return tg ? '<span class="zi-chip">#' + esc(tg) + '</span>' : ''; }).join('');
+    return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:10px 12px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px">' +
+        '<div style="font-weight:700;font-size:13px">' + esc(t.title) + '</div>' +
+        '<div style="display:flex;gap:4px;flex-shrink:0">' +
+          '<button class="btn sm" onclick="copyMsgTemplate(\'' + t.id + '\')" title="Copy nội dung">📋 Copy</button>' +
+          '<button class="btn sm" onclick="openMsgTemplateForm(\'' + t.id + '\')" title="Sửa">✏️</button>' +
+          '<button class="btn sm" onclick="deleteMsgTemplateUI(\'' + t.id + '\')" title="Xóa">🗑</button>' +
+        '</div>' +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--text);white-space:pre-wrap;margin-bottom:6px">' + esc(t.content) + '</div>' +
+      (tagsHtml ? '<div class="zi-row">' + tagsHtml + '</div>' : '') +
+    '</div>';
+  }).join('');
+}
+
+function openMsgTemplateForm(id) {
+  var wrap = document.getElementById('mt-form-wrap');
+  var t = id ? _msgTemplates.find(function (x) { return x.id === id; }) : null;
+  document.getElementById('mt-f-id').value = t ? t.id : '';
+  document.getElementById('mt-f-title').value = t ? t.title : '';
+  document.getElementById('mt-f-tags').value = t ? t.tags : '';
+  document.getElementById('mt-f-content').value = t ? t.content : '';
+  wrap.style.display = 'block';
+  document.getElementById('mt-f-title').focus();
+}
+
+function closeMsgTemplateForm() {
+  document.getElementById('mt-form-wrap').style.display = 'none';
+}
+
+async function saveMsgTemplateUI() {
+  var title = (document.getElementById('mt-f-title').value || '').trim();
+  var content = (document.getElementById('mt-f-content').value || '').trim();
+  var tags = (document.getElementById('mt-f-tags').value || '').trim();
+  var id = (document.getElementById('mt-f-id').value || '').trim();
+  if (!title || !content) { alert('Vui lòng nhập tiêu đề và nội dung mẫu.'); return; }
+  var btn = document.getElementById('mt-f-save-btn');
+  btn.disabled = true; btn.textContent = 'Đang lưu...';
+  try {
+    var body = { action: 'saveMessageTemplate', template: {
+      id: id || undefined, title: title, content: content, tags: tags,
+      createdBy: (typeof currentUser !== 'undefined' && currentUser && currentUser.name) || ''
+    } };
+    var r = await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify(body) });
+    var d = await r.json();
+    if (d && d.error) { alert('Lỗi: ' + d.error); return; }
+  } catch (e) { alert('Lỗi kết nối, thử lại.'); return; }
+  finally { btn.disabled = false; btn.textContent = 'Lưu mẫu'; }
+  closeMsgTemplateForm();
+  loadMsgTemplates();
+}
+
+async function deleteMsgTemplateUI(id) {
+  if (!confirm('Xóa mẫu tin nhắn này?')) return;
+  try {
+    var r = await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify({ action: 'deleteMessageTemplate', id: id }) });
+    var d = await r.json();
+    if (d && d.error) { alert('Lỗi: ' + d.error); return; }
+  } catch (e) { alert('Lỗi kết nối, thử lại.'); return; }
+  loadMsgTemplates();
+}
+
+function copyMsgTemplate(id) {
+  var t = _msgTemplates.find(function (x) { return x.id === id; });
+  if (!t) return;
+  navigator.clipboard.writeText(t.content).then(function () {
+    var btns = document.querySelectorAll('#mt-list button');
+    // phan hoi nhanh bang cach doi tam text nut vua bam (tim theo id trong onclick)
+    btns.forEach(function (b) {
+      if (b.getAttribute('onclick') === "copyMsgTemplate('" + id + "')") {
+        var old = b.textContent; b.textContent = '✅ Đã copy';
+        setTimeout(function () { b.textContent = old; }, 1200);
+      }
+    });
+  }).catch(function () { alert('Không copy được, vui lòng copy thủ công.'); });
+}
 
 function zaiTone(btn) {
   document.querySelectorAll('.zai-tone').forEach(function(b){ b.classList.remove('active'); });
@@ -17802,7 +18651,9 @@ function zaiHideError() {
     <label style="font-weight:600;font-size:12px;display:block;margin-bottom:4px;">Nội dung tin nhắn</label>
     <textarea id="bc-compose-msg" rows="5" placeholder="Nội dung tin nhắn gửi cho khách..." style="width:100%;padding:7px 9px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;margin-bottom:10px;box-sizing:border-box;font-family:inherit;resize:vertical;"></textarea>
 
-    <label style="font-weight:600;font-size:12px;display:block;margin-bottom:4px;">Nick Zalo phụ trách (tuỳ chọn — danh sách đồng bộ chung với Zalo AI)</label>
+    <label style="font-weight:600;font-size:12px;display:block;margin-bottom:4px;">Nick Zalo phụ trách (tuỳ chọn — danh sách đồng bộ chung với Zalo AI)
+      <button type="button" class="nickzalo-manage-btn" style="margin-left:6px" onclick="openNickZaloModal()">⚙ Quản lý danh sách</button>
+    </label>
     <select id="bc-compose-nick" style="width:100%;padding:7px 9px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;margin-bottom:10px;box-sizing:border-box;background:#fff;">
       <option value="">— Không chỉ định nick —</option>
     </select>

@@ -157,6 +157,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // 2 co Admin dieu khien truong "SDT Zalo" (khoa han / cho Sale tu them) — dung chung setting
+  // voi appweb (zaloPhoneFieldLocked, zaloPhoneSaleCanAdd), doc 1 lan khi mo panel.
+  if (msg?.type === "GET_ZALOPHONE_SETTINGS") {
+    handleGetZaloPhoneSettings()
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
   // Danh sach khach can nhac hen HOM NAY (doc tu cot 'Hẹn' trong CareData) — action:'reminders',
   // dung chung endpoint voi portal (index.html). Chi doc, khong ghi -> khong dung do voi Zalo AI/portal.
   if (msg?.type === "GET_REMINDERS") {
@@ -275,6 +284,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // action:'getKnowledge', doc/tu tao sheet Menh + CannedResponses rieng, KHONG dung cot CareData.
   if (msg?.type === "GET_KNOWLEDGE") {
     handleGetKnowledge()
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
+  // Thu vien "Mau tin nhan tu van khach" (them 2026-10, theo yeu cau Duyen "crm + pancake ai")
+  // — action:'messageTemplates', dung CHUNG 1 nguon voi form them/sua tren CRM (tab Zalo AI),
+  // doc moi lan mo tab de luon thay ban moi nhat tu noi khac them vao.
+  if (msg?.type === "GET_MESSAGE_TEMPLATES") {
+    handleGetMessageTemplates()
       .then((data) => sendResponse({ ok: true, data }))
       .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
     return true;
@@ -456,6 +475,28 @@ async function handleSetGoldUnit(payload) {
     headers: { "Content-Type": "text/plain" }
   });
   return { amount: n };
+}
+
+// 2 co Admin dieu khien truong "SDT Zalo" (xem CARE_HEADERS trong gas_v13.js) — doc gop 1 lan
+// 2 action:'getSetting' (zaloPhoneFieldLocked, zaloPhoneSaleCanAdd). Mac dinh: khong khoa,
+// Sale duoc them (dung yeu cau ban dau) neu GAS chua tung luu setting nay.
+async function handleGetZaloPhoneSettings() {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) return { locked: false, saleCanAdd: true };
+  const sep = cfg.gasUrl.includes("?") ? "&" : "?";
+  let locked = false, saleCanAdd = true;
+  try {
+    const r1 = await fetch(cfg.gasUrl + sep + "action=getSetting&key=zaloPhoneFieldLocked", { redirect: "follow" });
+    const d1 = await r1.json();
+    locked = d1 && d1.value === "true";
+  } catch (e) { /* giu mac dinh */ }
+  try {
+    const r2 = await fetch(cfg.gasUrl + sep + "action=getSetting&key=zaloPhoneSaleCanAdd", { redirect: "follow" });
+    const d2 = await r2.json();
+    saleCanAdd = !(d2 && d2.value === "false");
+  } catch (e) { /* giu mac dinh */ }
+  return { locked, saleCanAdd };
 }
 
 // Them 1 nick moi vao danh sach dung chung — uu tien action:'addZaloNick' (GAS tu merge vao
@@ -877,4 +918,17 @@ async function handleGetKnowledge() {
   const data = await res.json();
   if (!data.ok) throw new Error(data.error || "Lỗi không rõ");
   return { menhTable: data.menhTable || null, canned: data.canned || [] };
+}
+
+// Thu vien mau tin nhan tu van khach — action:'messageTemplates' (GET, chi doc). Form them/sua/
+// xoa nam ben CRM (tab Zalo AI); extension nay chi hien thi de CS xem/chen nhanh khi chat.
+async function handleGetMessageTemplates() {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+  const sep = cfg.gasUrl.includes("?") ? "&" : "?";
+  const res = await fetch(cfg.gasUrl + sep + "action=messageTemplates", { redirect: "follow" });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return { templates: data.templates || [] };
 }
