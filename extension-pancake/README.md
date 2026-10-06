@@ -107,3 +107,6 @@ mỗi 20 phút, cache y hệt cơ chế mệnh/canned response ở trên).
   **chia sẻ quyền xem** file Report Sale, hệ thống tự dùng danh sách mặc định (chép lại đúng nội
   dung tab tại thời điểm 09/2026) để tính năng không bị gián đoạn. Nếu thấy tên sản phẩm không được
   sửa dù có từ cấm, kiểm tra lại quyền chia sẻ file Report Sale cho tài khoản deploy GAS.
+
+## 📊 Doanh số & hoa hồng của tôi
+Menu "— Chọn mục —" → **📊 Doanh số & hoa hồng của tôi**: CS xem tổng đơn, doanh thu, tỷ lệ chốt, hoa hồng (đơn ≥15tr / <15tr / kênh có % riêng), tổng hoa hồng và chương trình thưởng của **CS đang chọn** ở đầu panel. Bộ lọc nhanh như CRM (Hôm nay … Năm trước + Tuỳ chỉnh). Số liệu do GAS action `csStats` tính (xem README gốc, mục 5–6); extension chỉ gọi qua message `GET_CS_STATS` ở `pancake-background.js`.

@@ -1756,8 +1756,8 @@
   // "CS đang dùng" ở đầu panel.
   const _STATS_RANGES_ = [
     { v: 'today', l: 'Hôm nay' }, { v: 'yesterday', l: 'Hôm qua' }, { v: 'thisWeek', l: 'Tuần này' }, { v: 'lastWeek', l: 'Tuần trước' },
-    { v: 'thisMonth', l: 'Tháng này' }, { v: 'lastMonth', l: 'Tháng trước' }, { v: 'thisQuarter', l: 'Quý này' }, { v: 'thisYear', l: 'Năm này' },
-    { v: 'custom', l: 'Tuỳ chỉnh…' }
+    { v: 'thisMonth', l: 'Tháng này' }, { v: 'lastMonth', l: 'Tháng trước' }, { v: 'thisQuarter', l: 'Quý này' }, { v: 'lastQuarter', l: 'Quý trước' },
+    { v: 'thisYear', l: 'Năm này' }, { v: 'lastYear', l: 'Năm trước' }, { v: 'custom', l: 'Tuỳ chỉnh…' } // đủ bộ lọc nhanh theo quy ước README mục 2
   ];
   let _statsState = { quick: 'thisMonth', from: '', to: '', loading: false, data: null, err: '', req: 0, built: false };
   function _statsYmd_(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
@@ -1774,7 +1774,9 @@
       case 'thisMonth': return r(mk(y, m, 1), mk(y, m + 1, 0));
       case 'lastMonth': return r(mk(y, m - 1, 1), mk(y, m, 0));
       case 'thisQuarter': { const q = Math.floor(m / 3); return r(mk(y, q * 3, 1), mk(y, q * 3 + 3, 0)); }
+      case 'lastQuarter': { let q = Math.floor(m / 3) - 1, yy = y; if (q < 0) { q = 3; yy = y - 1; } return r(mk(yy, q * 3, 1), mk(yy, q * 3 + 3, 0)); }
       case 'thisYear': return r(mk(y, 0, 1), mk(y, 11, 31));
+      case 'lastYear': return r(mk(y - 1, 0, 1), mk(y - 1, 11, 31));
       default: return null;
     }
   }
