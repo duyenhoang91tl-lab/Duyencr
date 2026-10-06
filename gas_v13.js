@@ -3552,7 +3552,13 @@ function buildSalesReportB_(filters) {
   }
   var usedBaseRows = {};
   var aliasMemoB_ = {};
-  var ghepStats = { donCoMa: 0, daGhep: 0, gocBiLoai: 0, khongKhop: [], trungDonGoc: [] };
+  // SUA 2026-10-06: khongKhop[]/trungDonGoc[] CHI giu toi da 30 vi du de tra ve (tranh phinh to
+  // response) — nhung truoc day lay dung .length cua 2 mang nay lam "so don khong ghep duoc" hien
+  // canh bao, nen thang nao co that >30 don loai nay se BI HIEN SAI THANH DUNG 30 (chan tran am
+  // tham). Them 2 bo dem rieng (count) KHONG bi gioi han, tang moi lan bat ke mang vi du co con
+  // cho hay khong — dung 2 bo dem nay moi la so that de hien thi/canh bao, 2 mang [] chi de liet
+  // ke VI DU (toi da 30 dong) phia sau.
+  var ghepStats = { donCoMa: 0, daGhep: 0, gocBiLoai: 0, khongKhop: [], khongKhopCount: 0, trungDonGoc: [], trungDonGocCount: 0 };
   var matched = [];
   for (var pj = 0; pj < pre.length; pj++) {
     var rowP = pre[pj];
@@ -3568,8 +3574,8 @@ function buildSalesReportB_(filters) {
         continue; // moi don goc Base deu Huy/Hoan -> bo don Pos nay khoi bao cao (giong don Pos "Đã hoàn")
       } else {
         var wInfo = { ngay: rowP.ngayTaoDon, sdt: rowP.soDienThoai, ghiChu: String(rowP.ghiChu || '').substring(0, 120), maCoDon: gh.codes, maKhongTim: gh.missing };
-        if (gh.status === 'khongKhop') { if (ghepStats.khongKhop.length < 30) ghepStats.khongKhop.push(wInfo); }
-        else { if (ghepStats.trungDonGoc.length < 30) ghepStats.trungDonGoc.push(wInfo); }
+        if (gh.status === 'khongKhop') { ghepStats.khongKhopCount++; if (ghepStats.khongKhop.length < 30) ghepStats.khongKhop.push(wInfo); }
+        else { ghepStats.trungDonGocCount++; if (ghepStats.trungDonGoc.length < 30) ghepStats.trungDonGoc.push(wInfo); }
       }
     }
     // Loc Sale: don ghep -> theo sale cua don goc Base; don thuong -> theo cot "Thẻ" nhu cu.
@@ -3761,7 +3767,7 @@ function buildSalesReportB_(filters) {
     saleCloseByPage: closeSectionsB_.saleCloseByPage,
     trungBinhDon: matched.length ? Math.round(totalGiaTri / matched.length) : 0,
     mismatchRows: mismatchCount, // so dong bi lech so cot giua san pham/ma/so luong — nen kiem tra tay
-    ghep: (function(){ ghepStats.cotBase = baseIdx ? baseIdx.colIdx : null; ghepStats.loi = ghepErr; ghepStats.msDocBase = ghepMs; return ghepStats; })(), // thong ke ghep don Pos<->Base: donCoMa, daGhep, khongKhop[], trungDonGoc[] (2 loai sau = chia theo Pos, nen kiem tra tay)
+    ghep: (function(){ ghepStats.cotBase = baseIdx ? baseIdx.colIdx : null; ghepStats.loi = ghepErr; ghepStats.msDocBase = ghepMs; return ghepStats; })(), // thong ke ghep don Pos<->Base: donCoMa, daGhep, khongKhopCount/trungDonGocCount (SO THAT, khong gioi han) + khongKhop[]/trungDonGoc[] (toi da 30 VI DU dau tien, dung .xxxCount de hien so luong, KHONG dung .length cua 2 mang nay — da tung bi chan tran am tham o 30)
     orders: matched.map(function(m){
       return {
         ngayTaoDon: m.ngayTaoDon, khachHang: m.khachHang, soDienThoai: m.soDienThoai,
