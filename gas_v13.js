@@ -1021,10 +1021,17 @@ function findCareByPhone_(phone) {
   var sh = ss.getSheetByName(SH_CARE);
   if (!sh || sh.getLastRow() < 2) return null;
   var ph = normPhone_(phone);
-  var vals = sh.getDataRange().getValues();
-  for (var i = 1; i < vals.length; i++) {
-    if (!vals[i][0]) continue;
-    if (normPhone_(vals[i][0]) === ph) return careObjFromRow_(vals[i]);
+  // TOI UU TOC DO (06/10/2026): truoc day doc TOAN BO sheet CareData (getDataRange, moi cot) moi
+  // lan tra cuu 1 SDT. Gio chi doc 1 COT SDT de tim dong dau tien khop, roi doc dung 1 dong do.
+  var last = sh.getLastRow();
+  var phoneCol = sh.getRange(2, 1, last - 1, 1).getValues();
+  for (var i = 0; i < phoneCol.length; i++) {
+    if (!phoneCol[i][0]) continue;
+    if (normPhone_(phoneCol[i][0]) === ph) {
+      var width = Math.max(sh.getLastColumn(), 1);
+      var rowVals = sh.getRange(i + 2, 1, 1, width).getValues()[0];
+      return careObjFromRow_(rowVals);
+    }
   }
   return null;
 }
@@ -1196,7 +1203,7 @@ function doGet(e) {
       var cKey = 'lk_' + normPhone_(phone);
       var cached = cache.get(cKey);
       if (cached) { try { return jsonOut_(JSON.parse(cached)); } catch(ec) {} }
-      var res = { ok: true, care: findCareByPhone_(phone), orders: readOrdersByPhone_(phone), cskh: findCskhRowsByPhone_(phone) };
+      var res = { ok: true, care: findCareByPhone_(phone), orders: readOrdersByPhone_(phone), cskh: findCskhRowsCached_(phone) };
       try { cache.put(cKey, JSON.stringify(res), 15); } catch(ec) {}
       return jsonOut_(res);
     }
@@ -1726,8 +1733,35 @@ function readAllOrders_() {
 
 function readOrdersByPhone_(phone) {
   var ph = normPhone_(phone);
-  var all = readAllOrders_();
-  var out = all.filter(function (o) { return o.phone === ph; });
+  // TOI UU TOC DO (06/10/2026): truoc day goi readAllOrders_() = doc A:T TOAN BO DT TONG roi dung
+  // object cho TUNG dong chi de loc 1 SDT. Gio chi doc cot SDT (cot D) de tim so dong khop, roi
+  // chi doc A:T cua dung cac dong do va dung dtRowToOrder_ y het nhu cu (ket qua giong het).
+  var out = [];
+  if (!ph) return out;
+  var ss = getDTSS_();
+  var sh = ss.getSheetByName(DT_TONG_SHEET);
+  if (!sh) {
+    throw new Error('Khong tim thay sheet "' + DT_TONG_SHEET + '" trong spreadsheet don hang (DT_SS_ID) — kiem tra sheet co bi doi ten/xoa khong, hoac DT_SS_ID co con dung khong.');
+  }
+  var last = sh.getLastRow();
+  if (last < 2) return out;
+  var phoneCol = sh.getRange(2, DT_COL_PHONE + 1, last - 1, 1).getValues();
+  var hits = [];
+  for (var h = 0; h < phoneCol.length; h++) {
+    if (normPhone_(String(phoneCol[h][0] || '')) === ph) hits.push(h + 2);
+  }
+  if (hits.length) {
+    var rowsData = [];
+    if (hits.length <= 12) {
+      for (var q = 0; q < hits.length; q++) rowsData.push(sh.getRange(hits[q], 1, 1, DT_TONG_WIDTH).getValues()[0]);
+    } else {
+      var blk = sh.getRange(hits[0], 1, hits[hits.length - 1] - hits[0] + 1, DT_TONG_WIDTH).getValues();
+      for (var q2 = 0; q2 < hits.length; q2++) rowsData.push(blk[hits[q2] - hits[0]]);
+    }
+    for (var z = 0; z < rowsData.length; z++) {
+      try { out.push(dtRowToOrder_(rowsData[z], hits[z])); } catch (eRow) { Logger.log('readOrdersByPhone_: loi doc dong ' + hits[z] + ': ' + eRow); }
+    }
+  }
   // Khu trung dong GIONG HET (cung ngay+doanh thu+san pham) — giu logic cu, KHONG tu dong
   // xoa o day, chi de UI/extension tu phat hien va hoi xac nhan (xem findDuplicateOrders_)
   var seen = {}, deduped = [];
@@ -2350,6 +2384,25 @@ function findCskhRowsByPhone_(phone) {
     });
     return out;
   } catch (e) { return []; }
+}
+
+// TOI UU TOC DO (06/10/2026): 'lookup' duoc extension goi moi lan chuyen chat + poll 6 giay, cache
+// ket qua tong cua lookup chi 15s -> cu het han la findCskhRowsByPhone_ lai doc CA COT SDT cua sheet
+// CSKH-Duyen (~134k dong; index qua lon nen _cachePutBig_ that bai am tham). Sheet nay gan nhu
+// tinh (danh sach khach VIP), nen cache RIENG theo tung SDT 5 phut — ke ca ket qua RONG (da so
+// khach khong co trong CSKH-Duyen, neu khong cache [] thi van doc lai index moi lan).
+function findCskhRowsCached_(phone) {
+  var p = normPhone_(phone);
+  if (!p) return [];
+  var cache = CacheService.getScriptCache();
+  var key = 'ckr_' + p;
+  try {
+    var hit = cache.get(key);
+    if (hit) return JSON.parse(hit);
+  } catch (e) {}
+  var rows = findCskhRowsByPhone_(phone);
+  try { cache.put(key, JSON.stringify(rows), 300); } catch (e2) {}
+  return rows;
 }
 
 // Ban "NHE" cua CSKH-Duyên — CHI 3 truong (phone,name,tier) thay vi du 17 truong, dung cho FE
