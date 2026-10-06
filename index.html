@@ -2435,7 +2435,11 @@ let careData = loadLS('ome_care') || {};
 let careLeads = loadLS('ome_care_leads') || {};
 // Nguồn thứ 3 "CSKH-Duyên" (sheet cùng file DT tổng / dữ liệu đơn): { SĐT: [ {name, tier(VIP/SPV), address, ...} ] }.
 // Khách có cùng SĐT ở DT tổng / dữ liệu đơn / CSKH-Duyên được GỘP thành 1 khách (customerMap theo SĐT) — xem buildCustomers.
-let cskhData = loadLS('ome_cskh_duyen') || {};
+let cskhData = (function(){ // chuan hoa cache localStorage cu: ban 'lite' tung luu {name,tier} (object) -> phai la MANG dong, neu khong .find()/.forEach nem loi va CRM khong dung duoc danh sach KH
+  const raw = loadLS('ome_cskh_duyen') || {}, out = {};
+  Object.keys(raw).forEach(function(ph){ const v = raw[ph]; out[ph] = Array.isArray(v) ? v : (v && typeof v === 'object' ? [v] : []); });
+  return out;
+})();
 let cskhMeta = loadLS('ome_cskh_duyen_meta') || { found: null, total: 0, noPhone: 0 };
 // Tập SĐT có trong sheet "dữ liệu đơn" (nguồn của Báo cáo B) — chỉ dùng để LỌC nguồn ở
 // màn hình chính, không kéo chi tiết sản phẩm vào danh sách khách.
@@ -2819,7 +2823,7 @@ async function syncFromGS(opts) {
           (ckJson.rows || []).forEach(function(r){ // r = [phone, name, tier]
             const ph = (typeof normPhone === 'function' ? normPhone(r[0]) : null) || String(r[0] || '');
             if (!ph) return;
-            newCk[ph] = { name: r[1] || '', tier: r[2] || '' }; // chi 2 truong nhe — xem _cskhDetailCache cho du lieu day du
+            (newCk[ph] = newCk[ph] || []).push({ name: r[1] || '', tier: r[2] || '' }); // MANG cac dong nhe {name,tier}: buildCustomers va _renderCskhBlock_ doc cskhData[ph] nhu MANG dong
           });
           const known = new Set(allCustomers.map(c => c.phone));
           for (const ph in newCk) { if (!known.has(ph)) { _forceFullBuildFromCareLeads = true; break; } }
