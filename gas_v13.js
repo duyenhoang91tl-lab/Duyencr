@@ -95,7 +95,9 @@ var ORDER_HEADERS  = ['phone','name','date','year','month','cs','source','revenu
 var TEAM_HEADERS   = ['id','name','leader','members','color','channels','ratePct'];
 var AUDIT_HEADERS  = ['timestamp','user','action','phone','oldValue','newValue'];
 var SET_HEADERS    = ['key','value'];
-var ASSIGN_HEADERS = ['id','date','csName','label','phones','donePhones'];
+var ASSIGN_HEADERS = ['id','date','csName','label','phones','donePhones','part'];
+// 1 o Google Sheet toi da 50.000 ky tu; JSON 1 SDT ~13 ky tu => 3000 SDT ~39k. Dot chia lon hon se duoc tach nhieu dong (cot 'part').
+var ASSIGN_CHUNK = 3000;
 var USER_HEADERS   = ['username','passHash','role','name','team','active','names','perms','saleType','startDate'];
 // PK_STATS_HEADERS: 1 dong = 1 "Nhan vien" (ten hien thi tren Pancake) trong 1 Page, 1 ngay —
 // nhap tu file Excel "Thong ke tuong tac" (pages_statistics_engagements) Pancake xuat ra.
@@ -1445,7 +1447,7 @@ function doGet(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.11-cskh-duyen' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.12-assign-chunk' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -6225,42 +6227,75 @@ function readAssign_(sh) {
   var out = [];
   if (!sh || sh.getLastRow() < 2) return out;
   var vals = sh.getDataRange().getValues();
+  // Gop cac dong cung id (dot chia lon bi tach nhieu dong theo cot 'part' — xem assignRowsOf_)
+  var byId = {}, order = [];
   for (var i = 1; i < vals.length; i++) {
     if (!vals[i][0]) continue;
+    var id = String(vals[i][0]);
     var phones = [], donePhones = [];
     try { phones = JSON.parse(vals[i][4]||'[]'); } catch(e) { phones = []; }
     try { donePhones = JSON.parse(vals[i][5]||'[]'); } catch(e) { donePhones = []; }
-    out.push({ id: String(vals[i][0]), date: String(vals[i][1]||''), csName: String(vals[i][2]||''),
-               label: String(vals[i][3]||''), phones: phones, donePhones: donePhones });
+    if (!byId[id]) {
+      byId[id] = { id: id, date: String(vals[i][1]||''), csName: String(vals[i][2]||''),
+                   label: String(vals[i][3]||''), parts: [] };
+      order.push(id);
+    }
+    byId[id].parts.push({ part: Number(vals[i][6]) || 0, phones: phones, donePhones: donePhones });
+  }
+  for (var k = 0; k < order.length; k++) {
+    var e = byId[order[k]];
+    e.parts.sort(function(a, b) { return a.part - b.part; });
+    var ph = [], dn = [];
+    for (var p = 0; p < e.parts.length; p++) { ph = ph.concat(e.parts[p].phones); dn = dn.concat(e.parts[p].donePhones); }
+    out.push({ id: e.id, date: e.date, csName: e.csName, label: e.label, phones: ph, donePhones: dn });
   }
   return out;
+}
+
+// 1 dot chia -> 1..n dong (moi dong <= ASSIGN_CHUNK SDT) de khong vuot 50.000 ky tu/o cua Google Sheets.
+function assignRowsOf_(h) {
+  var phones = h.phones || [], done = h.donePhones || [];
+  var n = Math.max(1, Math.ceil(phones.length / ASSIGN_CHUNK), Math.ceil(done.length / ASSIGN_CHUNK));
+  var rows = [];
+  for (var k = 0; k < n; k++) {
+    rows.push([h.id||'', h.date||'', h.csName||'', h.label||'',
+               JSON.stringify(phones.slice(k * ASSIGN_CHUNK, (k + 1) * ASSIGN_CHUNK)),
+               JSON.stringify(done.slice(k * ASSIGN_CHUNK, (k + 1) * ASSIGN_CHUNK)), k]);
+  }
+  return rows;
 }
 
 function saveAssignEntry_(entry) {
   if (!entry || !entry.id) return jsonOut_({ error: 'no entry.id' });
   var sh = getSheet_(SH_ASSIGN, ASSIGN_HEADERS);
-  var last = sh.getLastRow(); var rowIdx = -1;
+  var last = sh.getLastRow(); var found = [];
   if (last >= 2) {
-    var cell = sh.getRange(2, 1, last-1, 1).createTextFinder(String(entry.id)).matchEntireCell(true).findNext();
-    if (cell) rowIdx = cell.getRow();
+    var cells = sh.getRange(2, 1, last-1, 1).createTextFinder(String(entry.id)).matchEntireCell(true).findAll();
+    for (var c = 0; c < cells.length; c++) found.push(cells[c].getRow());
+    found.sort(function(a, b) { return a - b; });
   }
-  var row = [entry.id||'', entry.date||'', entry.csName||'', entry.label||'',
-             JSON.stringify(entry.phones||[]), JSON.stringify(entry.donePhones||[])];
-  if (rowIdx > 0) sh.getRange(rowIdx, 1, 1, ASSIGN_HEADERS.length).setValues([row]);
-  else sh.appendRow(row);
-  return jsonOut_({ ok: true });
+  var rows = assignRowsOf_(entry);
+  if (found.length === rows.length) {
+    // cung so dong (vd chi cap nhat donePhones): ghi de tai cho, giu nguyen vi tri
+    for (var k = 0; k < rows.length; k++) sh.getRange(found[k], 1, 1, ASSIGN_HEADERS.length).setValues([rows[k]]);
+  } else {
+    for (var d = found.length - 1; d >= 0; d--) sh.deleteRow(found[d]);   // xoa tu duoi len de khong lech chi so
+    sh.getRange(sh.getLastRow() + 1, 1, rows.length, ASSIGN_HEADERS.length).setValues(rows);
+  }
+  return jsonOut_({ ok: true, rows: rows.length });
 }
 
 function saveAssignHistory_(history) {
   if (!history) return jsonOut_({ error: 'no history' });
   var sh = getSheet_(SH_ASSIGN, ASSIGN_HEADERS);
-  sh.clearContents();
+  // DUNG MA TRAN TRUOC, chi clearContents() khi da san sang ghi — truoc day clear xong moi stringify, neu setValues loi
+  // (o > 50.000 ky tu) thi sheet bi xoa trang va MAT lich su chia tren server.
   var matrix = [ASSIGN_HEADERS];
   for (var i = 0; i < history.length; i++) {
-    var h = history[i];
-    matrix.push([h.id||'', h.date||'', h.csName||'', h.label||'',
-                 JSON.stringify(h.phones||[]), JSON.stringify(h.donePhones||[])]);
+    var rs = assignRowsOf_(history[i]);
+    for (var r = 0; r < rs.length; r++) matrix.push(rs[r]);
   }
+  sh.clearContents();
   sh.getRange(1, 1, matrix.length, ASSIGN_HEADERS.length).setValues(matrix);
   return jsonOut_({ ok: true, written: history.length });
 }
