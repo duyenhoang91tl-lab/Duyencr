@@ -3329,6 +3329,10 @@ function buildCustomers() {
     const _lpIso = (typeof donLastDateByPhone !== 'undefined' && donLastDateByPhone) ? donLastDateByPhone[c.phone] : '';
     const _lpM = _lpIso ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(_lpIso) : null;
     const lastPosDate = _lpM ? new Date(+_lpM[1], +_lpM[2]-1, +_lpM[3]).getTime() : null;
+    // Ten cua khach o nguon CSKH-Duyen (neu khac ten dang hien thi) — de o tim kiem khop duoc ca ten nay. Chi tao khi co, tranh ton bo nho cho ~134k KH.
+    let cskhNameLower = '';
+    { const _ckR = (typeof cskhData !== 'undefined' && cskhData) ? cskhData[c.phone] : null;
+      if (_ckR) { const _dn = s(displayName).toLowerCase(); const _ex = _ckR.map(r => s(r.name).toLowerCase()).filter(n => n && n !== _dn); if (_ex.length) cskhNameLower = _ex.join('|'); } }
 
     return {
       ...c,
@@ -3356,6 +3360,7 @@ function buildCustomers() {
       ymList,
       dataSrc,
       nameLower: s(displayName).toLowerCase(),
+      cskhNameLower,
     };
   });
   // Compute _lastActionDate for each customer from careData + schedules done
@@ -3552,7 +3557,7 @@ function applyFilters() {
       });
       if (!_matchAnyCS) return false;
     }
-    if (q && !c.nameLower.includes(q) && !c.phone.includes(q)) return false;
+    if (q && !c.nameLower.includes(q) && !c.phone.includes(q) && !(c.cskhNameLower && c.cskhNameLower.includes(q))) return false;
 
     // Lọc theo nguồn dữ liệu (DT tổng / Chăm sóc / Dữ liệu đơn / Chia data) — mặc định "Gộp" = không lọc
     if (dataSrcF !== 'all') {
@@ -6678,7 +6683,7 @@ function exportCSV() {
       if (((c.custom && c.custom[_exCfId]) || '') !== currentCF[_exCfId]) return false;
     }
     if(csFList.length){const cs=_buildCsSet_(c.orders, c.phone);const _aH=(typeof _assignAllIndex!=='undefined')?_assignAllIndex[c.phone]:null;const _match=csFList.some(csF=>_csModeMatch(cs.has(csF), !!(c.careCSSet&&c.careCSSet.has(csF)), _aH?_aH.has(csF):false));if(!_match) return false;}
-    if(q&&!c.name.toLowerCase().includes(q)&&!c.phone.includes(q)) return false;
+    if(q&&!c.name.toLowerCase().includes(q)&&!c.phone.includes(q)&&!(c.cskhNameLower&&c.cskhNameLower.includes(q))) return false;
     return true;
   });
   const BOM='\uFEFF';

@@ -2318,7 +2318,7 @@ function findCskhRowsByPhone_(phone) {
 // qua findCskhRowsByPhone_ khi CS thuc su mo ho so khach do (lazy), KHONG keo full 17 truong x
 // toan bo ~134k dong moi lan tai trang/poll nua.
 function readCskhDuyenLite_() {
-  var cached = _cacheGetBig_('cskhDuyen_lite_v1');
+  var cached = _cacheGetBig_('cskhDuyen_lite_v2');
   if (cached) { try { return JSON.parse(cached); } catch (e) {} }
   var out = { found: false, rows: [], total: 0, noPhone: 0, noPhoneSample: [] };
   var sh = _findCskhDuyenSheet_();
@@ -2329,7 +2329,8 @@ function readCskhDuyenLite_() {
   var headerRow = sh.getRange(1, 1, 1, width).getValues()[0];
   var map = _cskhHeaderMap_(headerRow);
   if (map.phone === undefined && map.name === undefined) return out;
-  var wantedCols = [map.phone, map.name, map.tier].filter(function(x) { return x !== undefined; });
+  // CHI lay SDT + TEN (de tim kiem/hien thi danh sach). Phan loai/dia chi/... lay luon khi mo ho so (action=cskhDetail).
+  var wantedCols = [map.phone, map.name].filter(function(x) { return x !== undefined; });
   if (!wantedCols.length) return out;
   var minC = Math.min.apply(null, wantedCols), maxC = Math.max.apply(null, wantedCols);
   var block = sh.getRange(2, minC + 1, last - 1, maxC - minC + 1).getValues();
@@ -2345,9 +2346,9 @@ function readCskhDuyenLite_() {
       if (out.noPhoneSample.length < 20 && nameV) out.noPhoneSample.push(nameV);
       continue;
     }
-    out.rows.push([p, nameV, map.tier !== undefined ? _cskhCell_(r[map.tier - minC]) : '']);
+    out.rows.push([p, nameV]);
   }
-  try { _cachePutBig_('cskhDuyen_lite_v1', JSON.stringify(out), 300); } catch (e2) {}
+  try { _cachePutBig_('cskhDuyen_lite_v2', JSON.stringify(out), 300); } catch (e2) {}
   return out;
 }
 
