@@ -7709,9 +7709,14 @@ let _advAssign = {
   sourceMode: 'filter',   // 'filter' | 'count'
   customCount: 0,
   sortMode: 'default',    // 'default' | 'vip' | 'tt' | 'tn' | 'unassigned'
+  dateFrom: '',           // lọc thêm theo khoảng ngày ĐƠN HÀNG (c.ymList[].ds), để trống = không giới hạn
+  dateTo: '',
+  selectMode: 'cs',       // 'cs' (chọn CS riêng lẻ) | 'team' (chia theo Team, tỷ lệ nội bộ theo %)
   selectedCS: new Set(),  // multi select
-  distMode: 'equal',      // 'equal' | 'custom'
-  customDist: {},         // csName -> count
+  selectedTeams: new Set(), // multi select team id — dùng khi selectMode==='team'
+  distMode: 'equal',      // 'equal' | 'custom' — áp dụng cho CS (khi selectMode='cs') hoặc Team (khi selectMode='team')
+  customDist: {},         // csName|teamId -> count (số KH ở cấp phân phối trên cùng)
+  memberRatio: {},        // teamId -> { tenNhanVien: phanTramTyLe } — tỷ lệ nhận NỘI BỘ trong từng Team
   label: '',
 };
 
@@ -7725,11 +7730,16 @@ function openAssignModal() {
   _assignFilteredList = src.map(function(c){ return c.phone; }).filter(Boolean);
   try { console.log('[ChiaData] window.__omeFiltered =', (window.__omeFiltered||[]).length, '| _lastFilteredObjs =', (typeof _lastFilteredObjs!=='undefined'&&_lastFilteredObjs)?_lastFilteredObjs.length:'n/a', '| → _assignFilteredList =', _assignFilteredList.length); } catch(e){}
   _advAssign.selectedCS = new Set();
+  _advAssign.selectedTeams = new Set();
+  _advAssign.selectMode = 'cs';
   _advAssign.sourceMode = 'filter';
   _advAssign.customCount = _assignFilteredList.length;
   _advAssign.distMode = 'equal';
   _advAssign.customDist = {};
+  _advAssign.memberRatio = {};
   _advAssign.sortMode = 'default';
+  _advAssign.dateFrom = '';
+  _advAssign.dateTo = '';
   _advAssign.label = '';
   switchAssignTab('create', document.querySelector('.assign-tab'));
   document.getElementById('assign-modal').classList.add('open');
@@ -7754,9 +7764,27 @@ function switchAssignTab(tab, el) {
   }
 }
 
+// ── Lọc thêm theo khoảng ngày ĐƠN HÀNG (để trống dateFrom/dateTo = không lọc) — áp dụng TRƯỚC
+// mọi bước khác (nguồn, ưu tiên lấy, phân phối), dùng cùng field c.ymList[].ds ('YYYY-MM-DD')
+// như bộ lọc chính của bảng Danh sách KH, nhưng tách riêng để không phụ thuộc bộ lọc đang bật
+// trên bảng — admin có thể mở modal rồi tự chọn khoảng ngày khác ngay trong Chia data.
+function _advAssignDateFilteredList() {
+  if (!_advAssign.dateFrom && !_advAssign.dateTo) return _assignFilteredList;
+  return _assignFilteredList.filter(function (p) {
+    var c = customerMap[p];
+    if (!c || !c.ymList) return false;
+    return c.ymList.some(function (o) {
+      if (!o.ds) return false;
+      if (_advAssign.dateFrom && o.ds < _advAssign.dateFrom) return false;
+      if (_advAssign.dateTo && o.ds > _advAssign.dateTo) return false;
+      return true;
+    });
+  });
+}
+
 // ── Helper: get sorted pool based on advAssign settings ──
 function _getAssignPool() {
-  let pool = [..._assignFilteredList];
+  let pool = [..._advAssignDateFilteredList()];
   if (_advAssign.sortMode === 'unassigned') {
     pool = pool.filter(p => !wasEverAssigned(p));
   } else if (_advAssign.sortMode === 'vip') {
@@ -7797,6 +7825,27 @@ function _computeDist(pool, csList) {
   }
 }
 
+// ── Chia 1 lượng KH (đã phân cho 1 Team) cho các thành viên trong Team đó THEO TỶ LỆ % ──
+// ratioMap: { tenNhanVien: phanTram }. Nếu TẤT CẢ đều rỗng/0 (chưa ai thiết lập) → chia đều.
+// Dùng phương pháp "số dư lớn nhất" (largest remainder) để tổng các phần làm tròn luôn khớp
+// đúng total, không bị lệch 1-2 KH do làm tròn từng người riêng lẻ.
+function _computeMemberRatioDist(total, members, ratioMap) {
+  if (!members || !members.length || total <= 0) return {};
+  ratioMap = ratioMap || {};
+  let pcts = members.map(m => Math.max(0, Number(ratioMap[m]) || 0));
+  let sum = pcts.reduce((a, b) => a + b, 0);
+  if (sum <= 0) { pcts = members.map(() => 100 / members.length); sum = 100; }
+  const raw = pcts.map(p => total * p / sum);
+  const floors = raw.map(Math.floor);
+  const used = floors.reduce((a, b) => a + b, 0);
+  let remainder = total - used;
+  const order = raw.map((_, i) => i).sort((a, b) => (raw[b] - floors[b]) - (raw[a] - floors[a]));
+  const dist = {};
+  members.forEach((m, i) => { dist[m] = floors[i]; });
+  for (let k = 0; k < remainder && k < order.length; k++) { dist[members[order[k]]]++; }
+  return dist;
+}
+
 function renderAssignCreate() {
   // TỰ CHỮA: nếu danh sách rỗng nhưng bảng đang hiển thị có KH → lấy lại NGAY từ bảng (nguồn sự thật)
   if ((!_assignFilteredList || !_assignFilteredList.length)
@@ -7808,19 +7857,23 @@ function renderAssignCreate() {
     ..._buildCsSet_(c.orders, c.phone), ...(c.careCSSet||[])
   ]).filter(Boolean))].sort();
 
-  const totalFiltered = _assignFilteredList.length;
+  const dateFilteredList = _advAssignDateFilteredList();
+  const totalFiltered = dateFilteredList.length;
   const pool = _getAssignPool();
+  const isTeamMode = _advAssign.selectMode === 'team';
   const csList = [..._advAssign.selectedCS];
+  const teamIds = [..._advAssign.selectedTeams];
   const dist = _computeDist(pool, csList);
   const distTotal = Object.values(dist).reduce((s,v)=>s+v,0);
   const remaining = pool.length - distTotal;
+  const selectedCount = isTeamMode ? teamIds.length : csList.length;
 
-  const alreadyAssigned = _assignFilteredList.filter(p => wasEverAssigned(p));
-  const neverAssigned = _assignFilteredList.filter(p => !wasEverAssigned(p));
+  const alreadyAssigned = dateFilteredList.filter(p => wasEverAssigned(p));
+  const neverAssigned = dateFilteredList.filter(p => !wasEverAssigned(p));
 
   // Count by tier
   const tierCount = { VIP:0, 'Thân thiết':0, 'Tiềm năng':0, other:0 };
-  _assignFilteredList.forEach(p => {
+  dateFilteredList.forEach(p => {
     const c = allCustomers.find(x=>x.phone===p);
     const t = c?.tier || 'other';
     if (tierCount[t] !== undefined) tierCount[t]++; else tierCount.other++;
@@ -7837,7 +7890,15 @@ function renderAssignCreate() {
       <span style="color:var(--tn)">Tiềm năng: ${tierCount['Tiềm năng']}</span><br>
       <span style="color:var(--green)">✓ Chưa chia: <strong>${neverAssigned.length}</strong></span> &nbsp;|&nbsp;
       <span style="color:#92400e">⚠ Đã chia: <strong>${alreadyAssigned.length}</strong></span>
-      ${totalFiltered === 0 ? '<br><span style="color:var(--red)">⚠ Bảng đang lọc ra 0 KH. Hãy vào tab <strong>Danh sách KH</strong> lọc cho ra khách (hoặc xoá bớt bộ lọc cột / ngày / tìm kiếm) rồi mở lại Chia data.</span>' : ''}
+      ${totalFiltered === 0 ? '<br><span style="color:var(--red)">⚠ Không có KH nào khớp (bộ lọc bảng + khoảng ngày bên dưới). Hãy xoá bớt bộ lọc / nới khoảng ngày rồi thử lại.</span>' : ''}
+    </div>
+
+    <div style="font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:500">Khoảng thời gian lấy data <span style="font-weight:400">(theo ngày đơn hàng — để trống = không giới hạn)</span>:</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+      <input type="date" class="assign-input" style="width:auto" value="${esc(_advAssign.dateFrom||'')}" onchange="_advAssign.dateFrom=this.value;renderAssignCreate()" title="Từ ngày">
+      <span style="color:var(--muted)">→</span>
+      <input type="date" class="assign-input" style="width:auto" value="${esc(_advAssign.dateTo||'')}" onchange="_advAssign.dateTo=this.value;renderAssignCreate()" title="Đến ngày">
+      ${(_advAssign.dateFrom || _advAssign.dateTo) ? `<button class="btn sm" onclick="_advAssign.dateFrom='';_advAssign.dateTo='';renderAssignCreate()">✕ Xoá khoảng ngày</button>` : ''}
     </div>
 
     <div style="font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:500">Lấy từ:</div>
@@ -7870,9 +7931,20 @@ function renderAssignCreate() {
     </div>
   </div>
 
-  <!-- STEP 2: CS SELECTION -->
+  <!-- STEP 2: CS / TEAM SELECTION -->
   <div class="assign-section">
-    <div class="assign-section-title">② Chọn CS nhận data <span style="font-size:10px;font-weight:400;color:var(--muted)">(gõ tên để tìm, bấm để chọn — chọn được nhiều CS)</span></div>
+    <div class="assign-section-title">② Chọn nơi nhận data</div>
+    <div class="assign-mode-row" style="margin-bottom:10px">
+      <div class="assign-mode-btn ${!isTeamMode?'active':''}" onclick="_advAssign.selectMode='cs';renderAssignCreate()">
+        👤 CS riêng lẻ <span style="font-size:10px;display:block;font-weight:400;margin-top:2px">Chọn từng người</span>
+      </div>
+      <div class="assign-mode-btn ${isTeamMode?'active':''}" onclick="_advAssign.selectMode='team';renderAssignCreate()">
+        👥 Theo Team <span style="font-size:10px;display:block;font-weight:400;margin-top:2px">Chia tỷ lệ % cho từng người trong Team</span>
+      </div>
+    </div>
+
+    ${!isTeamMode ? `
+    <div style="font-size:10px;font-weight:400;color:var(--muted);margin-bottom:6px">(gõ tên để tìm, bấm để chọn — chọn được nhiều CS)</div>
     <input class="assign-input" id="assign-cs-search" placeholder="🔍 Gõ tên CS để tìm nhanh..." style="width:100%;margin-bottom:8px;box-sizing:border-box"
       oninput="_filterAssignCSChips(this.value)">
     <div class="assign-cs-list" id="assign-cs-chips" style="margin-bottom:8px">
@@ -7886,22 +7958,30 @@ function renderAssignCreate() {
       <button class="btn sm" onclick="_advAssignAddManual(document.getElementById('assign-cs-manual').value);document.getElementById('assign-cs-manual').value=''">Thêm</button>
     </div>
     ${_advAssign.selectedCS.size===0?'<div style="font-size:11px;color:var(--hint);margin-top:6px">⬆ Chọn ít nhất 1 CS</div>':''}
+    ` : `
+    <div style="font-size:10px;font-weight:400;color:var(--muted);margin-bottom:6px">(bấm để chọn Team — chọn được nhiều Team, tỷ lệ % cho từng thành viên nhập ở bước ③ bên dưới)</div>
+    <div class="assign-cs-list" id="assign-team-chips" style="margin-bottom:8px">
+      ${teams.map(t => `<div class="assign-cs-chip-multi ${_advAssign.selectedTeams.has(t.id)?'selected':''}" data-team="${esc(t.id)}" onclick="_advAssignToggleTeam(this.dataset.team)">${esc(t.name)} <span style="opacity:.6">(${(t.members||[]).length})</span></div>`).join('')}
+      ${teams.length===0?'<span style="color:var(--hint);font-size:12px">Chưa có Team nào — vào tab "Quản lý Team" để tạo Team trước.</span>':''}
+    </div>
+    ${_advAssign.selectedTeams.size===0?'<div style="font-size:11px;color:var(--hint);margin-top:6px">⬆ Chọn ít nhất 1 Team</div>':''}
+    `}
   </div>
 
   <!-- STEP 3: DISTRIBUTION -->
-  ${_advAssign.selectedCS.size > 0 ? `
+  ${selectedCount > 0 ? `
   <div class="assign-section">
     <div class="assign-section-title">③ Phân phối data</div>
     <div class="assign-mode-row" style="margin-bottom:10px">
       <div class="assign-mode-btn ${_advAssign.distMode==='equal'?'active':''}" onclick="_advAssign.distMode='equal';renderAssignCreate()">
-        ⚖ Chia đều <span style="font-size:10px;display:block;font-weight:400;margin-top:2px">~${Math.ceil(pool.length/Math.max(_advAssign.selectedCS.size,1))} KH/CS</span>
+        ⚖ Chia đều <span style="font-size:10px;display:block;font-weight:400;margin-top:2px">~${Math.ceil(pool.length/Math.max(selectedCount,1))} KH/${isTeamMode?'Team':'CS'}</span>
       </div>
       <div class="assign-mode-btn ${_advAssign.distMode==='custom'?'active':''}" onclick="_advAssign.distMode='custom';renderAssignCreate()">
-        ✏ Tuỳ chỉnh từng CS <span style="font-size:10px;display:block;font-weight:400;margin-top:2px">Nhập số KH cho mỗi người</span>
+        ✏ Tuỳ chỉnh từng ${isTeamMode?'Team':'CS'} <span style="font-size:10px;display:block;font-weight:400;margin-top:2px">Nhập số KH cho mỗi ${isTeamMode?'team':'người'}</span>
       </div>
     </div>
     <div id="assign-dist-preview">
-      ${_renderDistTable(pool, csList, dist, distTotal, remaining)}
+      ${isTeamMode ? _renderTeamDistTable(pool, teamIds) : _renderDistTable(pool, csList, dist, distTotal, remaining)}
     </div>
   </div>` : ''}
 
@@ -7967,28 +8047,36 @@ function _renderDistTable(pool, csList, dist, distTotal, remaining) {
 
 function _refreshDistPreview() {
   const pool = _getAssignPool();
-  const csList = [..._advAssign.selectedCS];
-  const dist = _computeDist(pool, csList);
-  const distTotal = Object.values(dist).reduce((s,v)=>s+v,0);
-  const remaining = pool.length - distTotal;
   const el = document.getElementById('assign-dist-preview');
-  if (el) el.innerHTML = _renderDistTable(pool, csList, dist, distTotal, remaining);
+  if (!el) return;
+  if (_advAssign.selectMode === 'team') {
+    el.innerHTML = _renderTeamDistTable(pool, [..._advAssign.selectedTeams]);
+  } else {
+    const csList = [..._advAssign.selectedCS];
+    const dist = _computeDist(pool, csList);
+    const distTotal = Object.values(dist).reduce((s,v)=>s+v,0);
+    const remaining = pool.length - distTotal;
+    el.innerHTML = _renderDistTable(pool, csList, dist, distTotal, remaining);
+  }
 }
 
 function renderAssignDistPreview() {
   _refreshDistPreview();
 }
 
+// Dùng chung cho cả 2 chế độ: keyList là csList (chế độ CS) hoặc teamIds (chế độ Team) — hàm
+// _computeDist/customDist không quan tâm ý nghĩa của key, chỉ cần key trùng với key render ra.
 function _autoFillRemaining() {
   const pool = _getAssignPool();
-  const csList = [..._advAssign.selectedCS];
-  const used = csList.reduce((s,cs) => s + (parseInt(_advAssign.customDist[cs])||0), 0);
+  const keyList = _advAssign.selectMode === 'team' ? [..._advAssign.selectedTeams] : [..._advAssign.selectedCS];
+  if (!keyList.length) return;
+  const used = keyList.reduce((s,k) => s + (parseInt(_advAssign.customDist[k])||0), 0);
   const rem = pool.length - used;
   if (rem <= 0) { toast('Đã phân đủ rồi!'); return; }
-  const base = Math.floor(rem / csList.length);
-  const extra = rem % csList.length;
-  csList.forEach((cs, i) => {
-    _advAssign.customDist[cs] = (parseInt(_advAssign.customDist[cs])||0) + base + (i < extra ? 1 : 0);
+  const base = Math.floor(rem / keyList.length);
+  const extra = rem % keyList.length;
+  keyList.forEach((k, i) => {
+    _advAssign.customDist[k] = (parseInt(_advAssign.customDist[k])||0) + base + (i < extra ? 1 : 0);
   });
   _refreshDistPreview();
 }
@@ -8009,6 +8097,118 @@ function _advAssignAddManual(val) {
   _advAssign.selectedCS.add(name);
   renderAssignCreate();
 }
+
+function _advAssignToggleTeam(teamId) {
+  if (_advAssign.selectedTeams.has(teamId)) {
+    _advAssign.selectedTeams.delete(teamId);
+    delete _advAssign.customDist[teamId];
+    delete _advAssign.memberRatio[teamId];
+  } else {
+    _advAssign.selectedTeams.add(teamId);
+  }
+  renderAssignCreate();
+}
+
+// Sửa tỷ lệ % nhận data của 1 thành viên trong 1 Team (đọc data-team/data-member thay vì nhúng
+// tên trực tiếp vào chuỗi onclick, tránh lỗi khi tên có dấu nháy/ký tự đặc biệt)
+function _advAssignSetMemberRatio(el) {
+  const teamId = el.dataset.team, member = el.dataset.member;
+  if (!teamId || !member) return;
+  if (!_advAssign.memberRatio[teamId]) _advAssign.memberRatio[teamId] = {};
+  _advAssign.memberRatio[teamId][member] = parseFloat(el.value) || 0;
+  _refreshDistPreview();
+}
+
+// Bảng phân phối khi chia THEO TEAM: trước tiên chia pool cho các Team đã chọn (chia đều hoặc
+// tuỳ chỉnh, dùng chung _computeDist/customDist như chế độ CS), sau đó mỗi Team chia tiếp cho
+// thành viên của mình THEO TỶ LỆ % (xem _computeMemberRatioDist).
+function _renderTeamDistTable(pool, teamIds) {
+  if (!teamIds.length) return '<div style="font-size:12px;color:var(--hint)">Chọn ít nhất 1 Team ở trên.</div>';
+  const totalPool = pool.length;
+  const teamDist = _computeDist(pool, teamIds);
+  const distTotal = Object.values(teamDist).reduce((s,v)=>s+v,0);
+  let html = '';
+
+  if (_advAssign.distMode === 'custom') {
+    const rem = totalPool - distTotal;
+    const remClass = rem === 0 ? 'ok' : rem > 0 ? 'warn' : 'err';
+    const remText = rem === 0 ? `✓ Đã phân đủ ${totalPool} KH` : rem > 0 ? `Còn ${rem} KH chưa phân` : `⚠ Vượt quá ${-rem} KH`;
+    html += `
+    <table class="assign-dist-table">
+      <thead><tr><th>Team</th><th style="text-align:center">Số KH</th><th style="min-width:120px">Tỷ lệ</th></tr></thead>
+      <tbody>
+        ${teamIds.map(tid=>{
+          const team = teams.find(t=>t.id===tid) || {name:tid};
+          const n = teamDist[tid]||0;
+          const pct = totalPool > 0 ? Math.round(n/totalPool*100) : 0;
+          return `<tr>
+            <td><strong>${esc(team.name)}</strong></td>
+            <td style="text-align:center"><input class="assign-dist-input" type="number" min="0" max="${totalPool}" value="${n}" data-cs="${esc(tid)}"
+              oninput="_advAssign.customDist[this.dataset.cs]=parseInt(this.value)||0;_refreshDistPreview()"></td>
+            <td><div class="assign-dist-bar"><div class="assign-dist-fill" style="width:${pct}%"></div></div><span style="font-size:10px;color:var(--muted)">${pct}%</span></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    <div style="margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span class="assign-remaining-badge ${remClass}">${remText}</span>
+      <button class="btn sm" onclick="_autoFillRemaining()">🔄 Tự động phân phần còn lại</button>
+    </div>`;
+  } else {
+    html += `
+    <table class="assign-dist-table">
+      <thead><tr><th>Team</th><th style="text-align:right">Số KH nhận</th><th style="min-width:120px">Tỷ lệ</th></tr></thead>
+      <tbody>
+        ${teamIds.map(tid=>{
+          const team = teams.find(t=>t.id===tid) || {name:tid};
+          const n = teamDist[tid]||0;
+          const pct = totalPool > 0 ? Math.round(n/totalPool*100) : 0;
+          return `<tr>
+            <td><strong>${esc(team.name)}</strong></td>
+            <td style="text-align:right;font-weight:700;color:var(--green)">${n}</td>
+            <td><div class="assign-dist-bar"><div class="assign-dist-fill" style="width:${pct}%"></div></div><span style="font-size:10px;color:var(--muted)">${pct}%</span></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    <div style="margin-top:8px"><span class="assign-remaining-badge ok">✓ ${totalPool} KH sẽ được chia cho ${teamIds.length} Team</span></div>`;
+  }
+
+  // Tỷ lệ NỘI BỘ từng Team — luôn hiện, bất kể đang Chia đều hay Tuỳ chỉnh ở cấp Team phía trên
+  html += '<div style="margin-top:14px;border-top:1px dashed var(--border);padding-top:10px">';
+  html += '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-weight:500">⚖ Tỷ lệ nhận trong từng Team (%, để trống/0 hết = chia đều cho các thành viên):</div>';
+  teamIds.forEach(tid => {
+    const team = teams.find(t=>t.id===tid) || {name:tid, members:[]};
+    const members = team.members || [];
+    const teamCount = teamDist[tid] || 0;
+    html += `<div style="margin-bottom:10px">`;
+    html += `<div style="font-weight:700;font-size:12px;margin-bottom:4px">${esc(team.name)} <span style="font-weight:400;color:var(--muted)">— ${teamCount} KH</span></div>`;
+    if (!members.length) {
+      html += `<div style="font-size:11px;color:var(--hint);padding-left:8px">⚠ Team chưa có thành viên — vào "Quản lý Team" để thêm, nếu không data của Team này sẽ không ai nhận.</div>`;
+    } else {
+      const ratioMap = _advAssign.memberRatio[tid] || {};
+      const sumPct = members.reduce((s,m)=> s + Math.max(0, Number(ratioMap[m])||0), 0);
+      const usingDefault = sumPct <= 0;
+      const memberDist = _computeMemberRatioDist(teamCount, members, ratioMap);
+      members.forEach(m => {
+        const pctDisplay = usingDefault ? (100/members.length).toFixed(1) : (Number(ratioMap[m])||0);
+        const cnt = memberDist[m] || 0;
+        html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;padding-left:8px">
+          <span style="flex:1;font-size:12px">${esc(m)}</span>
+          <input class="assign-dist-input" type="number" min="0" max="100" step="0.1" style="width:64px" value="${pctDisplay}" data-team="${esc(tid)}" data-member="${esc(m)}" oninput="_advAssignSetMemberRatio(this)">
+          <span style="font-size:11px;color:var(--muted)">%</span>
+          <span style="font-size:12px;font-weight:600;color:var(--green);min-width:54px;text-align:right">${cnt} KH</span>
+        </div>`;
+      });
+      if (!usingDefault && Math.abs(sumPct-100) > 0.5) {
+        html += `<div style="font-size:10px;color:#92400e;padding-left:8px">⚠ Tổng tỷ lệ đang là ${sumPct.toFixed(1)}% (không nhất thiết phải tròn 100% — hệ thống vẫn chia đúng theo tỷ trọng đã nhập).</div>`;
+      }
+    }
+    html += `</div>`;
+  });
+  html += '</div>';
+  return html;
+}
 // Lọc nhanh chip CS theo tên (không render lại modal để giữ ô tìm kiếm)
 function _filterAssignCSChips(q){
   const qf = (typeof _foldVi==='function') ? _foldVi(q||'') : String(q||'').toLowerCase();
@@ -8019,33 +8219,68 @@ function _filterAssignCSChips(q){
 }
 
 function doAssignDataAdvanced() {
-  const csList = [..._advAssign.selectedCS];
-  if (csList.length === 0) { toast('Vui lòng chọn ít nhất 1 CS'); return; }
   const pool = _getAssignPool();
   if (pool.length === 0) { toast('Không có data nào để chia'); return; }
 
-  const dist = _computeDist(pool, csList);
-  if (_advAssign.distMode === 'custom') {
-    const distTotal = Object.values(dist).reduce((s,v)=>s+v,0);
-    if (distTotal > pool.length) { toast(`⚠ Tổng phân phối (${distTotal}) vượt quá số KH có sẵn (${pool.length})`); return; }
-    if (distTotal === 0) { toast('Vui lòng nhập số KH cho từng CS'); return; }
+  // finalDist: tên người nhận (csName, kể cả khi lấy từ thành viên 1 Team) -> số KH cuối cùng.
+  // Dùng Set để gom theo tên duy nhất — phòng trường hợp 1 người xuất hiện ở 2 Team được chọn
+  // cùng lúc, tránh bị cắt pool 2 lần cho cùng 1 người.
+  let finalDist = {};
+  let orderedNames = [];
+
+  if (_advAssign.selectMode === 'team') {
+    const teamIds = [..._advAssign.selectedTeams];
+    if (teamIds.length === 0) { toast('Vui lòng chọn ít nhất 1 Team'); return; }
+    const teamDist = _computeDist(pool, teamIds);
+    if (_advAssign.distMode === 'custom') {
+      const distTotal = Object.values(teamDist).reduce((s,v)=>s+v,0);
+      if (distTotal > pool.length) { toast(`⚠ Tổng phân phối cho Team (${distTotal}) vượt quá số KH có sẵn (${pool.length})`); return; }
+      if (distTotal === 0) { toast('Vui lòng nhập số KH cho từng Team'); return; }
+    }
+    const orderedSet = new Set();
+    teamIds.forEach(teamId => {
+      const team = teams.find(t => t.id === teamId);
+      const members = (team && team.members) || [];
+      const teamCount = teamDist[teamId] || 0;
+      if (!members.length || teamCount <= 0) return;
+      const ratioMap = _advAssign.memberRatio[teamId] || {};
+      const memberDist = _computeMemberRatioDist(teamCount, members, ratioMap);
+      members.forEach(m => {
+        const n = memberDist[m] || 0;
+        if (n <= 0) return;
+        finalDist[m] = (finalDist[m] || 0) + n;
+        orderedSet.add(m);
+      });
+    });
+    orderedNames = [...orderedSet];
+    if (orderedNames.length === 0) { toast('Chưa có thành viên nào được phân KH — kiểm tra lại Team đã chọn/tỷ lệ'); return; }
+  } else {
+    const csList = [..._advAssign.selectedCS];
+    if (csList.length === 0) { toast('Vui lòng chọn ít nhất 1 CS'); return; }
+    finalDist = _computeDist(pool, csList);
+    if (_advAssign.distMode === 'custom') {
+      const distTotal = Object.values(finalDist).reduce((s,v)=>s+v,0);
+      if (distTotal > pool.length) { toast(`⚠ Tổng phân phối (${distTotal}) vượt quá số KH có sẵn (${pool.length})`); return; }
+      if (distTotal === 0) { toast('Vui lòng nhập số KH cho từng CS'); return; }
+    }
+    orderedNames = csList;
   }
 
   const label = (document.getElementById('assign-label')?.value || _advAssign.label || '').trim();
   const now = new Date().toISOString().slice(0,16).replace('T',' ');
 
-  // Shuffle pool (optional) then slice per CS
+  // Cắt pool tuần tự theo thứ tự orderedNames — mỗi người nhận đúng finalDist[tên] KH liên tiếp.
   let cursor = 0;
   const entries = [];
-  csList.forEach(cs => {
-    const n = dist[cs] || 0;
+  orderedNames.forEach(name => {
+    const n = finalDist[name] || 0;
     if (n === 0) return;
     const phones = pool.slice(cursor, cursor + n);
     cursor += n;
     const entry = {
       id: Date.now().toString() + '_' + Math.random().toString(36).slice(2,6),
       date: now,
-      csName: cs,
+      csName: name,
       phones,
       label: label || `Chia ${phones.length} KH`,
       donePhones: []
