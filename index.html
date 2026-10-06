@@ -4847,8 +4847,10 @@ function _loadCskhDetailForPhone_(phone) {
   if (!(typeof cskhData !== 'undefined' && cskhData && cskhData[phone])) return; // khach khong co trong nguon CSKH-Duyen
   _cskhDetailState[phone] = 'loading';
   const sep = gsUrl.indexOf('?') >= 0 ? '&' : '?';
-  fetch(gsUrl + sep + 'action=lookup&phone=' + encodeURIComponent(phone), { redirect: 'follow' })
-    .then(function(r){ return r.json(); })
+  const _get = function(action){ return fetch(gsUrl + sep + 'action=' + action + '&phone=' + encodeURIComponent(phone), { redirect: 'follow' }).then(function(r){ return r.json(); }); };
+  // Uu tien action nhe 'cskhDetail'; GAS cu chua deploy (tra {error:'Unknown action'}) -> ha cap ve 'lookup'
+  _get('cskhDetail')
+    .then(function(j){ return (j && j.ok && Array.isArray(j.cskh)) ? j : _get('lookup'); })
     .then(function(j){
       const rows = (j && Array.isArray(j.cskh)) ? j.cskh : [];
       if (rows.length) { _cskhDetailCache[phone] = rows; _cskhDetailState[phone] = 'done'; }

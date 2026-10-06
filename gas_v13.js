@@ -1143,6 +1143,19 @@ function doGet(e) {
     var action = (e && e.parameter && e.parameter.action) ? e.parameter.action : '';
 
     // ── lookup theo phone (ZaloAI extension) ──
+    // cskhDetail: CHI chi tiet CSKH-Duyen cua 1 SDT (Sasum tab Tong quan, lazy khi CS mo ho so).
+    // Nhe hon 'lookup' rat nhieu: KHONG doc CareData/Orders, chi findCskhRowsByPhone_ (index SDT + vai dong). Cache 60s theo SDT.
+    if (action === 'cskhDetail') {
+      var phCk = (e && e.parameter && e.parameter.phone) ? String(e.parameter.phone) : '';
+      if (!phCk) return jsonOut_({ ok: false, error: 'Thieu phone' });
+      var cacheCk = CacheService.getScriptCache();
+      var cKeyCk = 'ckd_' + normPhone_(phCk);
+      var hitCk = cacheCk.get(cKeyCk);
+      if (hitCk) { try { return jsonOut_(JSON.parse(hitCk)); } catch (eh) {} }
+      var resCk = { ok: true, cskh: findCskhRowsByPhone_(phCk) };
+      try { cacheCk.put(cKeyCk, JSON.stringify(resCk), 60); } catch (ep) {}
+      return jsonOut_(resCk);
+    }
     if (action === 'lookup') {
       var phone = (e && e.parameter && e.parameter.phone) ? String(e.parameter.phone) : '';
       if (!phone) return jsonOut_({ error: 'Thieu phone' });
