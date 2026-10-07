@@ -2716,9 +2716,26 @@ function updateGsPill(connected) {
 // ═══════════════════════════════════════════════════════
 //  GS SYNC
 // ═══════════════════════════════════════════════════════
+// ── BO NHO DEM CUA VONG DONG BO NEN (moi 3s) ────────────────────────────────────────────────────
+// NGUYEN NHAN LAG (da sua): moi nhip 3s truoc day LUON parse lai toan bo CareData, duyet het, roi goi
+// saveLS('ome_care'/'ome_sched'/'ome_schedules'). saveLS bi boc o cuoi file de goi _invalidateFilterCache()
+// => MOI 3 GIAY cache bo loc bi xoa va applyFilters loc + sap xep lai ~136k KH, cong them
+// rebuildCareOnCustomers + ~16 lan filter trong updateStats/updateSidebarBadges. Nay: neu text tra ve giong het
+// nhip truoc (khong ai sua gi) thi KHONG parse/ghi/ve lai. Don hang / dữ liệu đơn / CSKH-Duyên cung chi xu ly lai khi
+// noi dung doi; CSKH-Duyên (hang chuc MB) chi keo lai moi 10 phut hoac khi bam Sync thu cong.
+function _isEmptyObj(o){ for (const k in o) return false; return true; }   // O(1) — Object.keys(customerMap) liet ke ~136k khoa moi 3s chi de kiem tra rong
+let _lastCareText = null, _lastOrdersText = null, _lastDonText = null, _lastCkText = null;
+let _cskhPulledAt = 0, _assignPulledAt = 0;
+async function _pullAssignAndBroadcastThrottled(force) {
+  // pullAssignHistory keo TOAN BO AssignData (kem mang SDT cua moi dot chia, co the hang MB) — khong keo moi 3s
+  if (!force && (Date.now() - _assignPulledAt) < 15000) return;
+  _assignPulledAt = Date.now();
+  await pullAssignHistory();
+  if (typeof pullBroadcastHistory === 'function') pullBroadcastHistory().catch(() => {});
+}
 async function syncFromGS(opts) {
   opts = opts || {};
-  const pullOrders = opts.pullOrders !== undefined ? opts.pullOrders : (Object.keys(customerMap).length === 0);
+  const pullOrders = opts.pullOrders !== undefined ? opts.pullOrders : _isEmptyObj(customerMap);
   const isManual = !!opts.manual;
   if (!gsUrl) { if (isManual) toast('Chưa kết nối Google Sheets'); return; }
   if (isManual) { txt('ltext', 'Đang tải từ Google Sheets...'); show('loverlay'); }
@@ -2729,8 +2746,9 @@ async function syncFromGS(opts) {
     const careUrl = gsUrl + sepChar + 'action=customers';
     const careR = await fetch(careUrl, { redirect: 'follow' });
     const careText = await careR.text();
+    const _careSame = (careText === _lastCareText);   // khong ai sua CareData tu nhip truoc
     let d;
-    try { d = JSON.parse(careText); } catch(e) {
+    try { d = _careSame ? {} : JSON.parse(careText); } catch(e) {
       if (isManual) { hide('loverlay'); toast('GAS trả về không phải JSON — kiểm tra quyền triển khai: Anyone'); }
       else { console.warn('Auto-sync: GAS non-JSON'); _autoSyncFailCount = (_autoSyncFailCount||0)+1; if (_autoSyncFailCount>=3) showSyncErrorBanner(); }
       return;
@@ -2753,7 +2771,10 @@ async function syncFromGS(opts) {
       try {
         if (isManual) txt('ltext', 'Đang tải đơn hàng từ Google Sheets...');
         const ordR = await fetch(gsUrl + sepChar + 'action=orders', { redirect: 'follow' });
-        const ordJson = await ordR.json();
+        const ordText = await ordR.text();
+        // Chi coi la "khong doi" khi da co khach trong customerMap (sau khi bam xoa du lieu phai nap lai that su)
+        const _ordSame = (ordText === _lastOrdersText) && !_isEmptyObj(customerMap);
+        const ordJson = _ordSame ? { _same: true } : JSON.parse(ordText);
         if (ordJson && ordJson.errorCount) {
           // Backend doc duoc mot phan don (da bo qua cac dong loi de khong crash toan bo) —
           // PHAI canh bao ro, khong duoc coi so don/KH doc duoc la day du roi am tham rebuild
@@ -2775,6 +2796,7 @@ async function syncFromGS(opts) {
             // (mỗi 3s / mỗi lần mở app) nên trước đây chip này bị lặp lại nhiều lần trên thanh file.
             mergeRows(rows);
             orderCount = rows.length;
+            _lastOrdersText = ordText;
           }
         } else if (ordJson && ordJson.error) {
           console.warn('Orders sync error from GAS:', ordJson.error);
@@ -2803,7 +2825,9 @@ async function syncFromGS(opts) {
       // ── Tập SĐT có trong "dữ liệu đơn" (chỉ để lọc nguồn, không kéo chi tiết) ──
       try {
         const dpR = await fetch(gsUrl + sepChar + 'action=donPhones', { redirect: 'follow' });
-        const dpJson = await dpR.json();
+        const dpText = await dpR.text();
+        const dpJson = JSON.parse(dpText);
+        if (dpText !== _lastDonText) { _lastDonText = dpText; _forceFullBuildFromCareLeads = true; }   // dữ liệu đơn doi -> phai build lai (nguon/hang KH)
         if (dpJson && dpJson.phones) { donPhoneSet = new Set(dpJson.phones); saveLS('ome_don_phones', dpJson.phones); }
         if (dpJson && dpJson.saleByPhone) { donSaleByPhone = dpJson.saleByPhone; saveLS('ome_don_sale_by_phone', dpJson.saleByPhone); }
         if (dpJson && dpJson.lastDateByPhone) { donLastDateByPhone = dpJson.lastDateByPhone; saveLS('ome_don_last_date', dpJson.lastDateByPhone); }
@@ -2815,21 +2839,26 @@ async function syncFromGS(opts) {
       // lên tới ~134k dòng (payload nhiều chục MB + localStorage + duyệt lại mỗi 30s). Chi tiết
       // đầy đủ 1 khách chỉ kéo riêng, LƯỜI (lazy) khi CS thực sự mở hồ sơ khách đó — xem
       // _loadCskhDetailForPhone_ ở renderInfoTab.
-      try {
+      // CSKH-Duyên gần như khong doi: chi keo lai o lan dau, moi 10 phut, hoac khi bam Sync thu cong
+      if (!_cskhPulledAt || isManual || (Date.now() - _cskhPulledAt) > 600000) try {
         const ckR = await fetch(gsUrl + sepChar + 'action=cskhDuyenLite', { redirect: 'follow' });
-        const ckJson = await ckR.json();
-        if (ckJson && ckJson.ok) {
+        const ckText = await ckR.text();
+        const ckSame = (ckText === _lastCkText);
+        const ckJson = ckSame ? null : JSON.parse(ckText);
+        if (ckSame) { _cskhPulledAt = Date.now(); }
+        else if (ckJson && ckJson.ok) {
+          _lastCkText = ckText; _cskhPulledAt = Date.now(); _forceFullBuildFromCareLeads = true;
           const newCk = {};
           (ckJson.rows || []).forEach(function(r){ // r = [phone, name, tier]
             const ph = (typeof normPhone === 'function' ? normPhone(r[0]) : null) || String(r[0] || '');
             if (!ph) return;
             (newCk[ph] = newCk[ph] || []).push({ name: r[1] || '', tier: r[2] || '' }); // MANG cac dong nhe {name,tier}: buildCustomers va _renderCskhBlock_ doc cskhData[ph] nhu MANG dong
           });
-          const known = new Set(allCustomers.map(c => c.phone));
-          for (const ph in newCk) { if (!known.has(ph)) { _forceFullBuildFromCareLeads = true; break; } }
           cskhData = newCk;
           cskhMeta = { found: !!ckJson.found, total: ckJson.total || 0, noPhone: ckJson.noPhone || 0, noPhoneSample: ckJson.noPhoneSample || [] };
-          saveLS('ome_cskh_duyen', cskhData); saveLS('ome_cskh_duyen_meta', cskhMeta);
+          // Kho ~134k SDT vuot han muc localStorage (~5MB) va stringify mat hang tram ms: chi luu cache neu nho; con lai se keo lai khi mo trang
+          if (Object.keys(newCk).length <= 20000) saveLS('ome_cskh_duyen', cskhData); else { try { localStorage.removeItem('ome_cskh_duyen'); } catch(e){} }
+          saveLS('ome_cskh_duyen_meta', cskhMeta);
         }
       } catch(ckErr) { console.warn('cskhDuyenLite fetch error:', ckErr.message); }
     }
@@ -2852,7 +2881,7 @@ async function syncFromGS(opts) {
       if (clJson && clJson.rows) {
         const newLeads = {};
         clJson.rows.forEach(function(r){ if (r.phone) newLeads[r.phone] = { name: r.name||'', note: r.note||'', cs: r.cs||'', createdAt: r.createdAt||'' }; });
-        const knownPhones = new Set(allCustomers.map(c => c.phone));
+        const knownPhones = _assignCustMap();   // Map cache, khong dung lai Set 136k phan tu moi 3s
         for (const ph in newLeads) {
           if (!knownPhones.has(ph)) { _forceFullBuildFromCareLeads = true; break; }
         }
@@ -2861,8 +2890,15 @@ async function syncFromGS(opts) {
       }
     } catch(clErr) { console.warn('careLeads fetch error:', clErr.message); }
 
+    // Khong co gi moi o CareData / don hang / nguon khac -> bo qua toan bo phan parse + ghi localStorage + ve lai ben duoi
+    if (_careSame && !pullOrders && !isManual && !_forceFullBuildFromCareLeads) {
+      await _pullAssignAndBroadcastThrottled(false);
+      return;
+    }
     let count = 0;
     let _dpPhoneChanged = false; // true nếu KH đang mở trong panel chi tiết vừa có dữ liệu mới (vd: từ Zalo AI extension)
+    // Lich hen: gom 1 lan roi loc/them 1 lan (truoc day schedules.filter(...) cho TUNG dong CareData => O(dong x lich))
+    const _schedDrop = new Set(), _schedNew = new Map();
     for (const row of (d.rows || [])) {
       if (!row.phone) continue;
       // Normalize phone từ GS (tránh mất số 0 đầu do Excel/GSheets lưu kiểu số)
@@ -2892,16 +2928,19 @@ async function syncFromGS(opts) {
         try {
           const sc = row.schedules ? JSON.parse(row.schedules) : [];
           // Thay vì chỉ cộng dồn (khiến lịch đã xoá trên Sheet không bao giờ mất khỏi app),
-          // xoá hết lịch cũ của khách này rồi nạp đúng danh sách hiện có từ Sheet.
-          schedules = schedules.filter(s => s.phone !== _normPh && s.phone !== _ph2);
-          for (const it of sc) schedules.push(it);
+          // xoá hết lịch cũ của khách này rồi nạp đúng danh sách hiện có từ Sheet (dong cuoi cung cua cung SDT thang).
+          _schedDrop.add(_normPh); _schedDrop.add(_ph2);
+          _schedNew.set(_normPh, sc);
         } catch(e){}
       }
       count++;
     }
+    if (_schedDrop.size) {
+      schedules = schedules.filter(s => !_schedDrop.has(s.phone));
+      _schedNew.forEach(sc => { for (const it of sc) schedules.push(it); });
+    }
     saveLS('ome_care', careData);
-    saveLS('ome_sched', schedules);
-    saveLS('ome_schedules', schedules);
+    if (_schedDrop.size) { saveLS('ome_sched', schedules); saveLS('ome_schedules', schedules); }
     // Pull cấu hình tình trạng CS (nếu admin đã đồng bộ lên GSheets)
     if (d.careStatus && Array.isArray(d.careStatus) && d.careStatus.length) {
       _applyCareStatusFromGS(d.careStatus);
@@ -2915,13 +2954,13 @@ async function syncFromGS(opts) {
     }
 
     // Pull chiến dịch (sheet AssignData) — robust, tách riêng để luôn chạy dù order lớn
-    await pullAssignHistory();
-    if (typeof pullBroadcastHistory === 'function') pullBroadcastHistory().catch(() => {});
+    await _pullAssignAndBroadcastThrottled(isManual || pullOrders);
 
     applyFilters();
     updateStats();
     updateSidebarBadges();
     updateSchedBadges();
+    _lastCareText = careText;   // da xu ly xong ban nay — nhip sau neu giong het thi bo qua (xem dau ham)
     if (_dpPhoneChanged) _maybeRefreshOpenDp();
     if (isManual) {
       hide('loverlay');
@@ -3290,6 +3329,10 @@ function buildCustomers() {
     const _lpIso = (typeof donLastDateByPhone !== 'undefined' && donLastDateByPhone) ? donLastDateByPhone[c.phone] : '';
     const _lpM = _lpIso ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(_lpIso) : null;
     const lastPosDate = _lpM ? new Date(+_lpM[1], +_lpM[2]-1, +_lpM[3]).getTime() : null;
+    // Ten cua khach o nguon CSKH-Duyen (neu khac ten dang hien thi) — de o tim kiem khop duoc ca ten nay. Chi tao khi co, tranh ton bo nho cho ~134k KH.
+    let cskhNameLower = '';
+    { const _ckR = (typeof cskhData !== 'undefined' && cskhData) ? cskhData[c.phone] : null;
+      if (_ckR) { const _dn = s(displayName).toLowerCase(); const _ex = _ckR.map(r => s(r.name).toLowerCase()).filter(n => n && n !== _dn); if (_ex.length) cskhNameLower = _ex.join('|'); } }
 
     return {
       ...c,
@@ -3317,6 +3360,7 @@ function buildCustomers() {
       ymList,
       dataSrc,
       nameLower: s(displayName).toLowerCase(),
+      cskhNameLower,
     };
   });
   // Compute _lastActionDate for each customer from careData + schedules done
@@ -3513,7 +3557,7 @@ function applyFilters() {
       });
       if (!_matchAnyCS) return false;
     }
-    if (q && !c.nameLower.includes(q) && !c.phone.includes(q)) return false;
+    if (q && !c.nameLower.includes(q) && !c.phone.includes(q) && !(c.cskhNameLower && c.cskhNameLower.includes(q))) return false;
 
     // Lọc theo nguồn dữ liệu (DT tổng / Chăm sóc / Dữ liệu đơn / Chia data) — mặc định "Gộp" = không lọc
     if (dataSrcF !== 'all') {
@@ -6639,7 +6683,7 @@ function exportCSV() {
       if (((c.custom && c.custom[_exCfId]) || '') !== currentCF[_exCfId]) return false;
     }
     if(csFList.length){const cs=_buildCsSet_(c.orders, c.phone);const _aH=(typeof _assignAllIndex!=='undefined')?_assignAllIndex[c.phone]:null;const _match=csFList.some(csF=>_csModeMatch(cs.has(csF), !!(c.careCSSet&&c.careCSSet.has(csF)), _aH?_aH.has(csF):false));if(!_match) return false;}
-    if(q&&!c.name.toLowerCase().includes(q)&&!c.phone.includes(q)) return false;
+    if(q&&!c.name.toLowerCase().includes(q)&&!c.phone.includes(q)&&!(c.cskhNameLower&&c.cskhNameLower.includes(q))) return false;
     return true;
   });
   const BOM='\uFEFF';
@@ -7777,7 +7821,7 @@ async function autoSyncLoop() {
     // "Sync GS" thủ công. Giờ cứ ~10 lần lặp (~30s ở AUTO_SYNC_MS=3000) thì ép kéo lại đầy đủ luôn,
     // không chỉ CareData (trạng thái/ghi chú/hẹn — vốn đã tự cập nhật nhanh mỗi 3s như trước).
     const forceFullPull = (_autoSyncTick % 10 === 0);
-    await syncFromGS({ pullOrders: Object.keys(customerMap).length === 0 || forceFullPull });
+    await syncFromGS({ pullOrders: _isEmptyObj(customerMap) || forceFullPull });
   } catch(e) {
     // BUG (đã sửa): trước đây catch này ghi "// Silent" — MỌI lỗi JS thật xảy ra trong
     // syncFromGS() sau khi fetch đã thành công (vd throw trong buildCustomers()/mergeRows()
@@ -8549,7 +8593,9 @@ function doAssignDataAdvanced() {
   if (typeof _rebuildAssignIndex === 'function') _rebuildAssignIndex();
   try { _applyCareCSToAssigned(entries); } catch(e){ console.warn('applyCareCSToAssigned lỗi:', e); }   // chia data → cập nhật "CS chăm sóc" + ghi OrderData cột N
   entries.forEach(e => logAudit('assign', '', '', `Chia ${e.phones.length} KH → ${e.csName}`));
-  try { if (gsUrl) pushAssignHistToGS(); } catch(e){ console.warn('pushAssignHistToGS lỗi:', e); }  // ghi toàn bộ lịch sử lên sheet (vết bền vững)
+  // Chi day CAC DOT MOI (saveAssign tung dot) — truoc day pushAssignHistToGS() ghi de TOAN BO lich su (kem mang SDT cua moi dot)
+  // len sheet moi lan chia: body hang MB va backend clearContents() truoc khi ghi nen loi giua chung la mat lich su tren Sheet.
+  try { if (gsUrl) (async function(){ for (const _e of entries) { await pushAssignToGS(_e); } })(); } catch(e){ console.warn('pushAssignToGS lỗi:', e); }
 
   const summary = entries.map(e=>`${e.csName}: ${e.phones.length} KH`).join(', ');
   toast(`✓ Đã chia ${cursor} KH → ${summary}`);
