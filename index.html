@@ -4691,6 +4691,7 @@ function renderHistTab(c) {
   const dlDetails   = `<datalist id="hedit-detail-list">${allDetails.map(d=>`<option value="${esc(d)}">`).join('')}</datalist>`;
   const dlSources   = `<datalist id="mo-source-list">${allSources.map(s2=>`<option value="${esc(s2)}">`).join('')}</datalist>`;
   const todayStr    = _ymd(new Date());
+  const _pts = _ptsOfCustomer_(c);
 
   return `<div class="dp-section">${dlBrands}${dlDetails}${dlSources}
     <button class="save-btn" style="margin-bottom:10px" onclick="_toggleAddOrderForm()">+ Thêm đơn hàng</button>
@@ -4727,6 +4728,7 @@ function renderHistTab(c) {
         <button onclick="_toggleAddOrderForm()" style="border:1px solid var(--border);background:var(--surface);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px">Hủy</button>
       </div>
     </div>
+    ${_ptsBoxHtml_(_pts)}
     <div class="dp-stitle">Lịch sử đặt hàng (${sorted.length} đơn — ${fmtVND(c.totalRevenue)} tổng · <span style="color:var(--green)">${c.renewOrders} Renew</span>)</div>
     ${sorted.slice(0,60).map((o,si)=>{
       const isRenew   = RENEW_SOURCES.includes(s(o.source).toLowerCase());
@@ -4757,6 +4759,8 @@ function renderHistTab(c) {
           ${o.status?`<span class="htag">${esc(o.status)}</span>`:''}
           ${o.zalo?`<span class="htag">Zalo: ${esc(o.zalo)}</span>`:''}
           ${o.note?`<span class="htag">📝 ${esc(o.note.substring(0,35))}</span>`:''}
+          ${(_pts.per.get(o)||{}).earn?`<span class="htag" style="background:var(--green-bg);color:var(--green)">🎁 +${_pts.per.get(o).earn} điểm</span>`:''}
+          ${(_pts.per.get(o)||{}).spent?`<span class="htag" style="background:#fee2e2;color:#b91c1c">🎁 −${_pts.per.get(o).spent} điểm</span>`:''}
         </div>
         <div id="${eid}" style="display:none;margin-top:8px;padding:10px;background:var(--surface2);border-radius:6px;border:1px solid var(--border)">
           <div style="font-size:11px;font-weight:700;color:var(--orange,#e8a04a);margin-bottom:6px">✏ Cập nhật đơn gốc</div>
@@ -7214,6 +7218,49 @@ function fmtDate(ds){
   var d = new Date(datePart+'T00:00:00');
   if (isNaN(d)) return String(ds); // vẫn không parse được → hiện nguyên văn thay vì "Invalid Date"
   return d.toLocaleDateString('vi-VN',{weekday:'short',day:'2-digit',month:'2-digit'});
+}
+// ═══════════════════════════════════════════════════════
+//  TÍCH ĐIỂM KH: 1% giá trị đơn (1 điểm = 1.000đ). VD đơn 5.900.000đ -> 59 điểm = 59k.
+//  Điểm TIÊU lấy từ GHI CHÚ ĐƠN: "Tích điểm: tiêu 50k" -> trừ 50 điểm (50k). Còn lại = đã tích - đã tiêu.
+// ═══════════════════════════════════════════════════════
+var PTS_RATE = 0.01, PTS_VALUE = 1000;
+function _ptsFold_(t){ return String(t||'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/g,'d').replace(/Đ/g,'d').toLowerCase(); }
+function _ptsNum_(str){
+  str = String(str||'').replace(/[.,]+$/,'');
+  if (/^\d{1,3}([.,]\d{3})+$/.test(str)) return parseFloat(str.replace(/[.,]/g,''));
+  return parseFloat(str.replace(',', '.')) || 0;
+}
+// Số điểm đã tiêu ghi trong ghi chú đơn (cộng dồn nếu ghi nhiều lần). 50k / 50 điểm / 50.000đ / 50000 đều = 50 điểm.
+function _ptsSpentFromNote_(note){
+  var t = _ptsFold_(note), re = /tich\s*diem\s*[:\-]?\s*(?:(?:tieu|dung|tru|su dung)\s*)?(\d[\d.,]*)\s*(k|nghin|ngan|diem|dd|d|vnd)?(?![a-z])/g, m, sum = 0;
+  while ((m = re.exec(t))){
+    var v = _ptsNum_(m[1]), u = m[2] || '';
+    if (u === 'k' || u === 'nghin' || u === 'ngan' || u === 'diem') sum += v;
+    else sum += v >= 1000 ? v / PTS_VALUE : v;
+  }
+  return Math.round(sum * 100) / 100;
+}
+function _ptsOfCustomer_(c){
+  var earned = 0, spent = 0, per = new Map();
+  (c.orders || []).forEach(function(o){
+    var e = Math.floor((Number(o.revenue) || 0) * PTS_RATE / PTS_VALUE), sp = _ptsSpentFromNote_(o.note);
+    earned += e; spent += sp; per.set(o, { earn: e, spent: sp });
+  });
+  return { earned: earned, spent: spent, left: Math.round((earned - spent) * 100) / 100, per: per };
+}
+function _ptsBoxHtml_(p){
+  var n = function(v){ return (Math.round(v * 100) / 100).toLocaleString('vi-VN'); };
+  var neg = p.left < 0;
+  return '<div style="margin:0 0 12px;padding:10px 12px;border-radius:8px;background:var(--tn-bg,#fff7ed);border:1px solid var(--tn-b,#fed7aa)">' +
+    '<div style="font-size:12px;font-weight:700;margin-bottom:6px">🎁 Tích điểm</div>' +
+    '<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px">' +
+      '<div><div style="color:var(--muted);font-size:10.5px">Đã tích</div><b style="color:var(--green)">+' + n(p.earned) + ' điểm</b></div>' +
+      '<div><div style="color:var(--muted);font-size:10.5px">Đã tiêu</div><b style="color:#b91c1c">−' + n(p.spent) + ' điểm</b></div>' +
+      '<div><div style="color:var(--muted);font-size:10.5px">Còn lại</div><b style="font-size:14px;color:' + (neg ? '#b91c1c' : 'var(--text)') + '">' + n(p.left) + ' điểm</b> <span style="color:var(--muted)">(≈ ' + n(p.left) + 'k)</span></div>' +
+    '</div>' +
+    (neg ? '<div style="margin-top:6px;font-size:11px;color:#b91c1c">⚠ Điểm đã tiêu lớn hơn điểm đã tích — kiểm tra lại ghi chú đơn.</div>' : '') +
+    '<div style="margin-top:6px;font-size:10.5px;color:var(--hint);line-height:1.5">1% giá trị đơn = điểm (1 điểm = 1.000đ). Điểm tiêu lấy từ ghi chú đơn dạng <b>"Tích điểm: tiêu 50k"</b>.</div>' +
+  '</div>';
 }
 function fmtVND(n){
   if(!n) return '0đ';
