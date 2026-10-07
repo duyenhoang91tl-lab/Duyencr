@@ -8114,8 +8114,10 @@ function applyAdvFilters() {
     const el = document.getElementById(id);
     if (el) advFilters[key] = el.value || '';
   }
-  closeAdvModal();
+  // Goi applyFilters() TRUOC khi dong modal — de luc closeAdvModal() lam moi lai "Chia data"
+  // (neu dang mo tu do, xem _advAssignOpenAdvFilter) thi window.__omeFiltered da la ket qua MOI.
   applyFilters();
+  closeAdvModal();
 }
 function clearAdvFilters() {
   advFilters = { cs:new Set(), products:new Set(), sources:new Set(), careStatus:new Set(), zaloStatus:new Set(), custom:{}, yearFrom:'', monthFrom:'', yearTo:'', monthTo:'' };
@@ -8123,7 +8125,22 @@ function clearAdvFilters() {
   openAdvModal(); // rebuild chips
   applyFilters();
 }
-function closeAdvModal() { document.getElementById('adv-modal').classList.remove('open'); }
+function closeAdvModal() {
+  document.getElementById('adv-modal').classList.remove('open');
+  // Neu Loc nang cao duoc mo TU BEN TRONG "Chia data" (xem _advAssignOpenAdvFilter) thi quay lai
+  // modal Chia data va lam moi nguon data theo bo loc vua ap dung/huy, thay vi tro ve man hinh chinh.
+  if (_advAssignReopenAfterFilter) {
+    _advAssignReopenAfterFilter = false;
+    const am = document.getElementById('assign-modal');
+    if (am) am.classList.add('open');
+    if (typeof window.__omeFiltered !== 'undefined' && window.__omeFiltered) {
+      _assignFilteredList = window.__omeFiltered.map(function(c){ return c && c.phone; }).filter(Boolean);
+      _advAssign.customCount = _assignFilteredList.length;
+    }
+    if (typeof renderAssignCreate === 'function') renderAssignCreate();
+  }
+}
+let _advAssignReopenAfterFilter = false; // true = Loc nang cao dang duoc mo tu ben trong modal Chia data
 
 // ── INIT ──
 if (gsUrl) {
@@ -8329,6 +8346,15 @@ function _advAssignToggleSrc(k) {
   if (_advAssign.srcSet.has(k)) _advAssign.srcSet.delete(k); else _advAssign.srcSet.add(k);
   renderAssignCreate();
 }
+// Mo "Lọc nâng cao" (bộ lọc CS/sản phẩm/nguồn/trạng thái CS-Zalo/trường tự tạo...) ngay TỪ BÊN
+// TRONG modal Chia data, khỏi phải đóng Chia data ra ngoài rồi mở lại. Khi đóng Lọc nâng cao
+// (dù Áp dụng hay Đóng) sẽ tự quay lại đây và làm mới "Bộ lọc hiện tại" — xem closeAdvModal().
+function _advAssignOpenAdvFilter() {
+  const am = document.getElementById('assign-modal');
+  if (am) am.classList.remove('open');
+  _advAssignReopenAfterFilter = true;
+  openAdvModal();
+}
 // Khoảng ngày nhanh (Hôm nay, Hôm qua, Tuần này/trước, Tháng này/trước, Quý này/trước, Năm nay/trước). Tuần bắt đầu thứ Hai.
 function _advAssignPreset(key) {
   var pad = function (n) { return String(n).padStart(2, '0'); };
@@ -8504,7 +8530,10 @@ function renderAssignCreate() {
   const html = `
   <!-- STEP 1: SOURCE -->
   <div class="assign-section">
-    <div class="assign-section-title">① Nguồn data</div>
+    <div class="assign-section-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>① Nguồn data</span>
+      <button class="btn sm secondary" onclick="_advAssignOpenAdvFilter()" title="Mở Lọc nâng cao (CS, sản phẩm, nguồn, trạng thái CS/Zalo, trường tự tạo...) để chọn đúng data muốn chia">⚙ Lọc nâng cao${countAdvFilters()>0?` <span class="adv-filter-active-badge">${countAdvFilters()}</span>`:''}</button>
+    </div>
     <div class="assign-preview" style="margin-bottom:10px">
       Bộ lọc hiện tại: <strong>${totalFiltered} KH</strong> &nbsp;|&nbsp;
       <span style="color:var(--vip)">VIP: ${tierCount.VIP}</span> &nbsp;·&nbsp;
