@@ -16543,28 +16543,59 @@ function _hContactCell_(c){
 }
 function _hMoney_(n){ return (n||0).toLocaleString('vi-VN'); }
 
+// ── Chỉ số + tỷ lệ Báo cáo H ──
+// Kết nối = Chốt + Phân vân + Đang liên hệ + Từ chối + Khiếu nại (mọi nhóm TRỪ nhóm "Không liên lạc được").
+// Đã tương tác/đã liên hệ = SĐT đã có Tình trạng CS (không tính "Chưa CS").
+// Zalo phản hồi = "Đã kết bạn"; Zalo đã xin kết bạn/nhắn tin = các trạng thái dưới đây (không tính Chưa kết bạn / không có Zalo).
+var _H_ZALO_REPLY_ = ['Đã kết bạn'];
+var _H_ZALO_ASKED_ = ['Đã kết bạn','Chưa đồng ý','Không nhận tn lạ','Chặn','Hủy kết bạn'];
+function _hMetrics_(x, groups){
+  var ci = -1, pi = -1;
+  groups.forEach(function(g, i){ var f = _hFold_(g.label); if (ci < 0 && f.indexOf('chot') !== -1) ci = i; if (pi < 0 && f.indexOf('phanvan') !== -1) pi = i; });
+  if (ci < 0) ci = 0; if (pi < 0) pi = 1;
+  var m = { chot: x.g[ci] || 0, pv: x.g[pi] || 0, conn: 0, inter: Math.max(0, x.total - x.none), zRep: 0, zAsk: 0 };
+  groups.forEach(function(g, i){ if (!g.noContact) m.conn += x.g[i] || 0; });
+  _H_ZALO_REPLY_.forEach(function(k){ m.zRep += (x.zalo && x.zalo[k]) || 0; });
+  _H_ZALO_ASKED_.forEach(function(k){ m.zAsk += (x.zalo && x.zalo[k]) || 0; });
+  m.rCare = x.total ? m.inter / x.total : null;          // Tỷ lệ chăm sóc = đã tương tác / data được chia
+  m.rClose = m.conn ? x.orders / m.conn : null;          // Tỷ lệ chốt = số đơn chốt / kết nối
+  m.rZalo = m.zAsk ? m.zRep / m.zAsk : null;             // Tỷ lệ Zalo = phản hồi / đã xin kết bạn, nhắn tin
+  m.avg = x.orders ? Math.round(x.revenue / x.orders) : null;   // TB/đơn = doanh thu / số đơn
+  m.rConn = m.inter ? m.conn / m.inter : null;           // Tỷ lệ kết nối = kết nối / đã liên hệ
+  return m;
+}
+function _hPct_(v){ return v == null ? '—' : (Math.round(v * 1000) / 10).toLocaleString('vi-VN') + '%'; }
 function _srRenderH_(d){
   if (!d.rows.length) return '<div style="color:var(--muted);text-align:center;padding:40px">Không có data nào được chia trong khoảng ngày này (hoặc ngoài phạm vi bạn được xem).</div>';
   var byCs = (_srState.hGroup === 'cs'), groups = d.groups;
-  var ncol = 3 + groups.length + 1 + 4 + 3;
+  var ncol = 14;
   var th = 'style="text-align:right;white-space:nowrap"';
   var html = '<div style="overflow-x:auto"><table class="dash-table"><thead><tr>'+
     '<th>Ngày</th><th>Tên CS</th><th '+th+'>Data được chia</th>'+
-    groups.map(function(g){ return '<th '+th+' title="Tình trạng CS — nhóm mẹ">'+esc(g.label)+'</th>'; }).join('')+
-    '<th '+th+' title="Có SĐT chưa có Tình trạng CS (CS chưa chăm sóc)">Chưa CS</th>'+
-    '<th>Tình trạng liên hệ</th><th>Trạng thái Zalo</th><th>Trạng thái KH</th>'+
+    '<th '+th+' title="Số khách có Tình trạng CS = Chốt">Chốt</th>'+
+    '<th '+th+' title="Số khách có Tình trạng CS = Phân vân">Phân vân</th>'+
+    '<th '+th+' title="Chốt + Phân vân + Đang liên hệ + Từ chối + Khiếu nại">Kết nối</th>'+
+    '<th '+th+' title="Số khách Zalo phản hồi (Đã kết bạn)">Zalo phản hồi</th>'+
     '<th '+th+'>Số đơn chốt <span style="color:var(--hint);font-weight:400">(form + bổ sung tay)</span></th>'+
     '<th '+th+'>Doanh thu <span style="color:var(--hint);font-weight:400">(form + bổ sung tay)</span></th>'+
-    '<th '+th+'>TB / đơn</th></tr></thead><tbody>';
+    '<th '+th+' title="Tổng khách đã tương tác / Data được chia">Tỷ lệ chăm sóc</th>'+
+    '<th '+th+' title="Số đơn chốt / Kết nối">Tỷ lệ chốt</th>'+
+    '<th '+th+' title="Zalo phản hồi / Tổng khách đã xin kết bạn, nhắn tin">Tỷ lệ Zalo</th>'+
+    '<th '+th+' title="Doanh thu / Số đơn">TB / đơn</th>'+
+    '<th '+th+' title="Kết nối / Tổng khách đã liên hệ">Tỷ lệ kết nối</th></tr></thead><tbody>';
+  function rateCells(m){
+    return '<td style="text-align:right">'+_hPct_(m.rCare)+'</td><td style="text-align:right">'+_hPct_(m.rClose)+'</td>'+
+      '<td style="text-align:right">'+_hPct_(m.rZalo)+'</td><td style="text-align:right">'+(m.avg == null ? '—' : _hMoney_(m.avg))+'</td>'+
+      '<td style="text-align:right">'+_hPct_(m.rConn)+'</td>';
+  }
   function totalRow(label, s, strong){
-    var bg = strong ? 'background:var(--surface2);' : 'background:#f8fafc;';
+    var bg = strong ? 'background:var(--surface2);' : 'background:#f8fafc;', m = _hMetrics_(s, groups);
     return '<tr style="font-weight:700;border-top:2px solid var(--border);'+bg+'"><td colspan="2">'+label+'</td>'+
       '<td style="text-align:right">'+fmt(s.total)+'</td>'+
-      s.g.map(function(v){ return '<td style="text-align:right">'+fmt(v)+'</td>'; }).join('')+
-      '<td style="text-align:right">'+fmt(s.none + s.other)+'</td>'+
-      '<td>'+_hContactCell_(s.contact)+'</td><td>'+_hChips_(s.zalo,'#e0f2fe')+'</td><td>'+_hChips_(s.kh,'#ede9fe')+'</td>'+
+      '<td style="text-align:right">'+fmt(m.chot)+'</td><td style="text-align:right">'+fmt(m.pv)+'</td><td style="text-align:right">'+fmt(m.conn)+'</td>'+
+      '<td style="text-align:right">'+fmt(m.zRep)+'</td>'+
       '<td style="text-align:right">'+fmt(s.orders)+'</td><td style="text-align:right">'+_hMoney_(s.revenue)+'</td>'+
-      '<td style="text-align:right">'+(s.orders ? _hMoney_(Math.round(s.revenue / s.orders)) : '—')+'</td></tr>';
+      rateCells(m)+'</tr>';
   }
   var teamsInOrder = [];
   d.rows.forEach(function(r){ if (teamsInOrder.indexOf(r.team) === -1) teamsInOrder.push(r.team); });
@@ -16582,21 +16613,21 @@ function _srRenderH_(d){
         oCell = autoNote(r.autoOrders) + '<input type="text" inputmode="numeric" data-k="'+esc(mk)+'" value="'+(m.o||'')+'" placeholder="0" onchange="_hSetManual_(this.dataset.k,\'o\',this.value)" style="width:60px;'+inSt+'">';
         rCell = autoNote(r.autoRevenue ? _hMoney_(r.autoRevenue) : 0) + '<input type="text" inputmode="numeric" data-k="'+esc(mk)+'" value="'+(m.r ? _hMoney_(m.r) : '')+'" placeholder="0" onchange="_hSetManual_(this.dataset.k,\'r\',this.value)" style="width:110px;'+inSt+'">';
       }
+      var rm = _hMetrics_(r, groups), z0 = function(v){ return v ? fmt(v) : '<span style="color:var(--hint)">0</span>'; };
       html += '<tr><td style="white-space:nowrap">'+(r.date ? esc(r.date.split('-').reverse().join('/')) : '—')+'</td><td>'+esc(r.cs)+'</td>'+
         '<td style="text-align:right;font-weight:600">'+fmt(r.total)+'</td>'+
-        r.g.map(function(v){ return '<td style="text-align:right">'+(v ? fmt(v) : '<span style="color:var(--hint)">0</span>')+'</td>'; }).join('')+
-        '<td style="text-align:right">'+(r.none + r.other ? fmt(r.none + r.other) : '<span style="color:var(--hint)">0</span>')+'</td>'+
-        '<td>'+_hContactCell_(r.contact)+'</td><td>'+_hChips_(r.zalo,'#e0f2fe')+'</td><td>'+_hChips_(r.kh,'#ede9fe')+'</td>'+
+        '<td style="text-align:right">'+z0(rm.chot)+'</td><td style="text-align:right">'+z0(rm.pv)+'</td><td style="text-align:right">'+z0(rm.conn)+'</td>'+
+        '<td style="text-align:right">'+z0(rm.zRep)+'</td>'+
         '<td style="text-align:right">'+oCell+'</td><td style="text-align:right">'+rCell+'</td>'+
-        '<td style="text-align:right">'+(r.orders ? _hMoney_(Math.round(r.revenue / r.orders)) : '—')+'</td></tr>';
+        rateCells(rm)+'</tr>';
     });
     if (teamsInOrder.length > 1) html += totalRow('Tổng team ' + esc(tn), _hSum_(tr, groups), false);
   });
   html += totalRow('TỔNG CỘNG', _hSum_(d.rows, groups), true);
   html += '</tbody></table></div>';
   html += '<div style="margin-top:8px;font-size:11px;color:var(--muted);line-height:1.5">'+
-    'ℹ️ Tình trạng CS / Zalo / Trạng thái KH tính theo <b>trạng thái HIỆN TẠI</b> của từng SĐT trong data đã chia (không phải trạng thái tại ngày chia). '+
-    'Trạng thái KH để trống sẽ tự suy ra từ Tình trạng CS. '+(byCs ? 'Đang gộp theo CS: muốn nhập đơn/doanh thu hãy chuyển sang "Theo ngày × CS".' : 'Số đơn chốt / Doanh thu = đơn CS nhập ở form chăm sóc khi chọn Chốt (hiện "Từ form") + phần bổ sung tay ở ô nhập; tự lưu và đồng bộ cho cả team.')+'</div>';
+    'ℹ️ Tình trạng CS / Zalo tính theo <b>trạng thái HIỆN TẠI</b> của từng SĐT trong data đã chia (không phải trạng thái tại ngày chia). '+
+    'Kết nối = Chốt + Phân vân + Đang liên hệ + Từ chối + Khiếu nại. Đã tương tác/đã liên hệ = SĐT đã có Tình trạng CS. Zalo phản hồi = Đã kết bạn; đã xin kết bạn/nhắn tin = Đã kết bạn + Chưa đồng ý + Không nhận tn lạ + Chặn + Hủy kết bạn. '+(byCs ? 'Đang gộp theo CS: muốn nhập đơn/doanh thu hãy chuyển sang "Theo ngày × CS".' : 'Số đơn chốt / Doanh thu = đơn CS nhập ở form chăm sóc khi chọn Chốt (hiện "Từ form") + phần bổ sung tay ở ô nhập; tự lưu và đồng bộ cho cả team.')+'</div>';
   return html;
 }
 function renderSalesReportTabH_(wrap, subTabs){
@@ -16862,11 +16893,11 @@ function exportRenewReport_() {
 
 function _hExportCsv_(){
   var d = _hBuild_(), g = d.groups, q = function(v){ return '"' + String(v==null?'':v).replace(/"/g,'""') + '"'; };
-  var head = ['Team','Ngày','Tên CS','Data được chia'].concat(g.map(function(x){ return x.label; }), ['Chưa CS','Đã liên hệ','Không liên lạc được','Trạng thái Zalo','Trạng thái KH','Số đơn chốt','Doanh thu','TB/đơn']);
+  var head = ['Team','Ngày','Tên CS','Data được chia','Chốt','Phân vân','Kết nối','Zalo phản hồi','Số đơn chốt','Doanh thu','Tỷ lệ chăm sóc','Tỷ lệ chốt','Tỷ lệ Zalo','TB/đơn','Tỷ lệ kết nối'];
   var lines = [head.map(q).join(',')];
-  function fl(m){ return Object.keys(m).map(function(k){ return k + ': ' + m[k]; }).join('; '); }
   d.rows.forEach(function(r){
-    lines.push([r.team, r.date, r.cs, r.total].concat(r.g, [r.none + r.other, r.contact.ok, r.contact.kll, fl(r.zalo), fl(r.kh), r.orders, r.revenue, r.orders ? Math.round(r.revenue / r.orders) : '']).map(q).join(','));
+    var m = _hMetrics_(r, g);
+    lines.push([r.team, r.date, r.cs, r.total, m.chot, m.pv, m.conn, m.zRep, r.orders, r.revenue, _hPct_(m.rCare), _hPct_(m.rClose), _hPct_(m.rZalo), m.avg == null ? '' : m.avg, _hPct_(m.rConn)].map(q).join(','));
   });
   var blob = new Blob(['﻿' + lines.join('\r\n')], { type:'text/csv;charset=utf-8' });
   var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
