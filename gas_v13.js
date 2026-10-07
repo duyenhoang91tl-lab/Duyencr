@@ -9178,4 +9178,4 @@ function chayThuChiaTuDong() {   // CHIA THẬT ngay, không phải chạy thử
 }
 function goTriggerChiaTuDong() {
   Logger.log(removeAutoAssignTrigger_());
-}
+}xcpas
