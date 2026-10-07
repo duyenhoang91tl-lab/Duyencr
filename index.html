@@ -7403,7 +7403,8 @@ function openTabCustomizeModal(){
     { id:'pancake',     label:'📥 Báo cáo Pancake' },
     { id:'kpipancake',  label:'📈 KPI Pancake' },
     { id:'mktchecklist',label:'✅ Checklist MKT' },
-    { id:'dailybrief',  label:'🎯 Báo cáo ngày' }
+    { id:'dailybrief',  label:'🎯 Báo cáo ngày' },
+    { id:'uploaddata',  label:'📤 Up dữ liệu' }
   ];
   var rows = defs.map(function(d){
     return '<label style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--border);cursor:pointer">'+
@@ -7466,7 +7467,8 @@ var _PERM_TAB_DEFS = [
   { id:'pancake',      label:'Báo cáo Pancake' },
   { id:'kpipancake',   label:'KPI Pancake' },
   { id:'mktchecklist', label:'Checklist MKT' },
-  { id:'dailybrief',   label:'Báo cáo ngày' }
+  { id:'dailybrief',   label:'Báo cáo ngày' },
+  { id:'uploaddata',   label:'Up dữ liệu' }
 ];
 // true = tài khoản đang đăng nhập được phép thấy tab id này. perms null/rỗng = KHÔNG giới
 // hạn (mặc định mọi tài khoản mới/cũ đều xem đủ như trước — Admin phải CHỦ ĐỘNG bật giới
@@ -7517,6 +7519,7 @@ var _BAR_ITEM_DEFS = [
   { id:'kpipancake',      label:'KPI Pancake' },
   { id:'mktchecklist',    label:'Checklist MKT' },
   { id:'dailybrief',      label:'Báo cáo ngày' },
+  { id:'uploaddata',      label:'Up dữ liệu' },
   { id:'hdr-hoitham',     label:'Mẫu hỏi thăm' },
   { id:'hdr-tacvu',       label:'Tác vụ' },
   { id:'hdr-carestatus',  label:'Tình trạng CS' },
@@ -18100,19 +18103,266 @@ function _updateNoActionBadge(){
 }
 
 // ═══════════════════════════════════════════════════════
+//  📤 UP DỮ LIỆU — gom 5 loại file up hằng ngày vào 1 chỗ: Base, Pos, Pancake (Thống kê tương tác /
+//  Thống kê nhân viên / Thống kê tag). Chọn hoặc kéo thả NHIỀU file cùng lúc → tự nhận dạng loại theo
+//  nội dung file (tên sheet/tiêu đề cột, không phụ thuộc tên file) → kiểm tra → "Lưu tất cả".
+//  KHÔNG viết lại logic lưu: dùng đúng các hàm sẵn có của từng mục (_impUpload, _pkUploadToCRM,
+//  _pkUploadSdtToCRM, _pkTagSaveToServer) nên nhật ký, xoá cache báo cáo, ghi nhớ tên NV... y như up
+//  ở mục cũ. Các mục up riêng lẻ (Báo cáo doanh số → Nhập dữ liệu, Báo cáo Pancake) vẫn dùng được.
+// ═══════════════════════════════════════════════════════
+var _upState = { items: [], busy: false, seq: 0, nmLoading: false };
+var _UP_KINDS = {
+  pk_eng:   { label: 'Pancake — Thống kê tương tác',                 short: 'Tương tác', admin: false },
+  pk_staff: { label: 'Pancake — Thống kê nhân viên (SĐT / đơn chốt)', short: 'Nhân viên', admin: false },
+  pk_tag:   { label: 'Pancake — Thống kê tag',                        short: 'Tag',       admin: false },
+  base:     { label: 'Base — Danh sách công việc (→ DT TỔNG)',        short: 'Base',      admin: true },
+  pos:      { label: 'Pos — Đơn hàng Pancake POS (→ dữ liệu đơn)',    short: 'Pos',       admin: true }
+};
+var _UP_ORDER = ['pk_eng', 'pk_staff', 'pk_tag', 'base', 'pos'];
+
+// Đọc nhanh (chỉ ~20 dòng đầu mỗi sheet) để đoán loại file. Trả '' nếu không nhận ra.
+function _upSniffKind_(file){
+  return new Promise(function(resolve){
+    var r = new FileReader();
+    r.onload = function(ev){
+      try {
+        var wb = XLSX.read(ev.target.result, { type: 'array', sheetRows: 20 });
+        var names = wb.SheetNames || [];
+        var nfc = function(v){ return String(v == null ? '' : v).normalize('NFC').trim(); };
+        if (names.some(function(n){ return /By user$/i.test(n); })) return resolve('pk_eng');
+        if (names.some(function(n){ return /By staff$/i.test(n); })) return resolve('pk_staff');
+        var isTag = names.some(function(sn){
+          if (!/^\d+$/.test(sn.trim())) return false;      // file tag: sheet tên chỉ gồm số "<pageId>"
+          var a = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '' });
+          for (var i = 0; i < Math.min(a.length, 15); i++){ if (nfc(a[i][0]) === 'ID' && nfc(a[i][1]) === 'name') return true; }
+          return false;
+        });
+        if (isTag) return resolve('pk_tag');
+        var wsB = wb.Sheets['Tất cả'] || wb.Sheets[names[0]];
+        var hB = wsB ? (XLSX.utils.sheet_to_json(wsB, { header: 1, defval: '', raw: false })[0] || []) : [];
+        if (nfc(hB[0]) === 'Ngày tạo') return resolve('base');
+        var wsP = wb.Sheets[names[0]];
+        var hP = wsP ? (XLSX.utils.sheet_to_json(wsP, { header: 1, defval: '', raw: false })[0] || []) : [];
+        if (nfc(hP[1]) === 'Ngày tạo đơn') return resolve('pos');
+        resolve('');
+      } catch (e) { resolve(''); }
+    };
+    r.onerror = function(){ resolve(''); };
+    r.readAsArrayBuffer(file);
+  });
+}
+
+// Đọc đầy đủ file theo loại đã chọn, dùng đúng các hàm đọc file của từng mục.
+async function _upParse_(it){
+  it.warn = ''; it.rows = null; it.msg = '';
+  if (!it.kind){ it.status = 'unknown'; return; }
+  it.status = 'parsing';
+  try {
+    var res;
+    if (it.kind === 'base' || it.kind === 'pos'){ res = await _impParseFile(it.file, it.kind); it.warn = res.warn || ''; }
+    else if (it.kind === 'pk_eng'){ res = await _pkParseFile(it.file); it.warn = (res.warnings || []).join(' | '); }
+    else if (it.kind === 'pk_staff'){ res = await _pkParseSdtFile(it.file); it.warn = (res.warnings || []).join(' | '); }
+    else { res = await _pkParseTagFile(it.file); it.warn = (res.warnings || []).join(' | '); }
+    if (!res.rows || !res.rows.length){
+      it.status = 'error'; it.msg = 'Không đọc được dòng nào theo loại "' + _UP_KINDS[it.kind].short + '" — chọn lại đúng loại ở cột "Loại".';
+      return;
+    }
+    it.rows = res.rows; it.status = 'ready';
+  } catch (e) { it.status = 'error'; it.msg = 'Lỗi đọc file: ' + e.message; }
+}
+
+async function _upAddFiles(fileList){
+  var files = Array.prototype.slice.call(fileList || []);
+  if (!files.length || _upState.busy) return;
+  // đã lưu xong hết lượt trước → bắt đầu danh sách mới
+  if (_upState.items.length && _upState.items.every(function(i){ return i.status === 'done'; })) _upState.items = [];
+  var added = [];
+  files.forEach(function(f){
+    if (!/\.xlsx?$/i.test(f.name)){ toast('⚠️ Bỏ qua "' + f.name + '" — chỉ nhận file .xlsx / .xls'); return; }
+    if (_upState.items.some(function(i){ return i.name === f.name && i.file.size === f.size; })) return; // đã có trong danh sách
+    var it = { id: ++_upState.seq, file: f, name: f.name, kind: '', status: 'parsing', rows: null, warn: '', msg: '' };
+    _upState.items.push(it); added.push(it);
+  });
+  renderUploadDataTab();
+  for (var i = 0; i < added.length; i++){
+    added[i].kind = await _upSniffKind_(added[i].file);
+    await _upParse_(added[i]);
+    renderUploadDataTab();
+  }
+}
+
+async function _upSetKind(id, kind){
+  var it = _upState.items.filter(function(x){ return x.id === id; })[0];
+  if (!it || _upState.busy) return;
+  it.kind = kind; renderUploadDataTab();
+  await _upParse_(it); renderUploadDataTab();
+}
+function _upRemove(id){ if (_upState.busy) return; _upState.items = _upState.items.filter(function(x){ return x.id !== id; }); renderUploadDataTab(); }
+function _upClear(){ if (_upState.busy) return; _upState.items = []; renderUploadDataTab(); }
+
+// Chạy 1 hàm lưu có sẵn nhưng gom thông báo (toast) của nó lại thay vì nháy từng cái; trả về thông báo cuối.
+async function _upRun_(fn){
+  var orig = toast, last = '';
+  toast = function(m){ last = String(m == null ? '' : m); };
+  try { await fn(); } catch (e) { last = '❌ ' + e.message; } finally { toast = orig; }
+  return last;
+}
+function _upClean_(m){ return String(m || '').replace(/^[✓✅❌⚠️\s]+/, '').trim(); }
+
+async function _upSaveItem_(it){
+  it.status = 'saving'; renderUploadDataTab();
+  var k = it.kind, msg = '', ok = false;
+  if (_UP_KINDS[k].admin && !_srIsAdmin()){ it.status = 'error'; it.msg = 'Chỉ Admin được nhập dữ liệu ' + _UP_KINDS[k].short + '.'; return; }
+  if (k === 'base' || k === 'pos'){
+    if (k === 'base'){ _impState.baseRows = it.rows; _impState.baseFileName = it.name; _impState.baseWarn = ''; }
+    else { _impState.posRows = it.rows; _impState.posFileName = it.name; _impState.posWarn = ''; }
+    _impState.result = null;
+    msg = await _upRun_(function(){ return _impUpload(k); });
+    var r = _impState.result; ok = !!(r && r.kind === k);
+    if (ok) it.msg = 'Đã nhập ' + fmt(r.written) + ' dòng mới' + (r.dedupedAfter ? ' · tự loại ' + fmt(r.dedupedAfter) + ' dòng trùng' : '');
+    else { if (k === 'base') _impState.baseRows = null; else _impState.posRows = null; it.msg = _upClean_(msg) || 'Lưu lỗi.'; }
+  } else if (k === 'pk_eng'){
+    _pkState.parsedRows = it.rows; _pkState.parsedUnmapped = [];
+    msg = await _upRun_(_pkUploadToCRM);
+    ok = _pkState.parsedRows.length === 0;     // hàm gốc tự xoá parsedRows khi lưu thành công
+    if (!ok){ _pkState.parsedRows = []; _pkState.parsedUnmapped = []; }
+    it.msg = _upClean_(msg) || (ok ? 'Đã lưu ' + fmt(it.rows.length) + ' dòng.' : 'Lưu lỗi.');
+  } else if (k === 'pk_staff'){
+    _pkState.sdtParsedRows = it.rows;
+    msg = await _upRun_(_pkUploadSdtToCRM);
+    ok = _pkState.sdtParsedRows.length === 0;
+    if (!ok) _pkState.sdtParsedRows = [];
+    it.msg = _upClean_(msg) || (ok ? 'Đã lưu ' + fmt(it.rows.length) + ' dòng.' : 'Lưu lỗi.');
+  }
+  it.status = ok ? 'done' : 'error';
+}
+
+// File tag: gộp TẤT CẢ file tag vào kho tag rồi lưu 1 lần (hàm gốc gửi cả kho lên server).
+async function _upSaveTags_(list){
+  list.forEach(function(it){ it.status = 'saving'; }); renderUploadDataTab();
+  _pkTagLoad();
+  list.forEach(function(it){ _pkTagMerge(it.rows); });
+  _pkTagSave(); _pkTagResetRange();
+  var before = _pkState.tagSavedAt; _pkState.tagSavedAt = '';
+  var msg = await _upRun_(_pkTagSaveToServer);
+  var ok = !!_pkState.tagSavedAt;
+  if (!ok) _pkState.tagSavedAt = before;
+  list.forEach(function(it){ it.status = ok ? 'done' : 'error'; it.msg = _upClean_(msg) || (ok ? 'Đã lưu.' : 'Lưu lỗi.'); });
+}
+
+async function _upSaveAll(){
+  if (_upState.busy) return;
+  if (!gsUrl){ toast('❌ Chưa cấu hình URL Google Apps Script.'); return; }
+  var ready = _upState.items.filter(function(i){ return i.status === 'ready'; });
+  if (!ready.length){ toast('Chưa có file nào sẵn sàng để lưu.'); return; }
+  _upState.busy = true; renderUploadDataTab();
+  // _impUpload vẽ lại tab Báo cáo doanh số → giữ ở sub-tab nhập (nhẹ) để khỏi kích hoạt tải báo cáo nặng; trả lại sau khi xong
+  var prevSub = (typeof _srState !== 'undefined') ? _srState.sub : null;
+  if (typeof _srState !== 'undefined') _srState.sub = 'J';
+  try {
+    for (var oi = 0; oi < _UP_ORDER.length; oi++){
+      var kind = _UP_ORDER[oi];
+      var list = ready.filter(function(i){ return i.kind === kind; });
+      if (!list.length) continue;
+      if (kind === 'pk_tag'){ await _upSaveTags_(list); renderUploadDataTab(); continue; }
+      for (var li = 0; li < list.length; li++){ await _upSaveItem_(list[li]); renderUploadDataTab(); }
+    }
+  } finally {
+    if (typeof _srState !== 'undefined' && prevSub != null) _srState.sub = prevSub;
+    _upState.busy = false; renderUploadDataTab();
+  }
+  var done = ready.filter(function(i){ return i.status === 'done'; }).length;
+  toast(done === ready.length ? '✅ Đã lưu ' + done + '/' + ready.length + ' file lên CRM.' : '⚠️ Lưu được ' + done + '/' + ready.length + ' file — xem dòng lỗi trong bảng.');
+}
+
+function _upDateRange_(rows){
+  var ds = {}; rows.forEach(function(r){ if (r && r.date) ds[r.date] = 1; });
+  var a = Object.keys(ds).sort(); if (!a.length) return '';
+  return a.length === 1 ? a[0] : a[0] + ' → ' + a[a.length - 1] + ' (' + a.length + ' ngày)';
+}
+
+function renderUploadDataTab(){
+  var wrap = document.getElementById('uploaddata-wrap'); if (!wrap) return;
+  // cần bảng khớp tên NV Pancake để cảnh báo tên chưa khớp (không chặn việc lưu)
+  if (!_pkState.nameMapLoaded && !_upState.nmLoading && typeof _pkLoadNameMap === 'function'){
+    _upState.nmLoading = true;
+    Promise.resolve(_pkLoadNameMap()).catch(function(){}).then(function(){ _upState.nmLoading = false; renderUploadDataTab(); });
+  }
+  var items = _upState.items, busy = _upState.busy;
+  var readyN = items.filter(function(i){ return i.status === 'ready'; }).length;
+  var html = '<div class="dash-section-title" style="margin-top:0">📤 Up dữ liệu hằng ngày</div>';
+  html += '<div style="font-size:12.5px;color:var(--muted);margin-bottom:12px">Chọn hoặc <b>kéo thả cùng lúc</b> tất cả file hôm nay (Base, Pos, 3 file Pancake). Hệ thống tự nhận dạng từng file theo nội dung — không cần đặt tên theo quy ước. Kiểm tra bảng bên dưới rồi bấm <b>Lưu tất cả</b>.</div>';
+  html += '<label ondragover="event.preventDefault();this.style.background=\'var(--surface2)\'" ondragleave="this.style.background=\'\'" ondrop="event.preventDefault();this.style.background=\'\';_upAddFiles(event.dataTransfer.files)" '
+    + 'style="display:block;border:2px dashed var(--border-md);border-radius:var(--rmd);padding:22px;text-align:center;cursor:pointer;margin-bottom:12px">'
+    + '<div style="font-size:15px;font-weight:600">📂 Bấm để chọn file (chọn được nhiều file) hoặc kéo thả vào đây</div>'
+    + '<div style="font-size:11.5px;color:var(--muted);margin-top:4px">.xlsx / .xls — Base · Pos · Pancake: Thống kê tương tác · Thống kê nhân viên · Thống kê tag</div>'
+    + '<input type="file" accept=".xlsx,.xls" multiple style="display:none" onchange="_upAddFiles(this.files);this.value=\'\'"></label>';
+  // checklist 5 loại: hôm nay đã có file nào, còn thiếu gì
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">';
+  _UP_ORDER.forEach(function(k){
+    var n = items.filter(function(i){ return i.kind === k && i.status !== 'error'; }).length;
+    var done = items.some(function(i){ return i.kind === k && i.status === 'done'; });
+    html += '<span style="font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--border);background:' + (done ? '#f0fdf4' : n ? 'var(--surface2)' : 'transparent') + ';color:' + (done ? '#166534' : n ? 'var(--text)' : 'var(--muted)') + '">'
+      + (done ? '✓ ' : n ? '● ' : '○ ') + esc(_UP_KINDS[k].short) + (n > 1 ? ' ×' + n : '') + '</span>';
+  });
+  html += '</div>';
+  if (items.length){
+    html += '<table class="dash-table"><thead><tr><th>File</th><th style="min-width:230px">Loại</th><th>Nội dung đọc được</th><th>Trạng thái</th><th></th></tr></thead><tbody>';
+    items.forEach(function(it){
+      var opts = '<option value=""' + (it.kind ? '' : ' selected') + '>— chọn loại file —</option>' + _UP_ORDER.map(function(k){
+        return '<option value="' + k + '"' + (it.kind === k ? ' selected' : '') + '>' + esc(_UP_KINDS[k].label) + '</option>';
+      }).join('');
+      var info = '';
+      if (it.rows){
+        info = '<b>' + fmt(it.rows.length) + '</b> dòng';
+        var dr = (it.kind === 'base' || it.kind === 'pos') ? '' : _upDateRange_(it.rows);
+        if (dr) info += ' · ' + esc(dr);
+        if ((it.kind === 'pk_eng' || it.kind === 'pk_staff') && _pkState.nameMapLoaded){
+          var um = {}; it.rows.forEach(function(r){ if (r.nhanVien && !_pkState.nameMap[r.nhanVien]) um[r.nhanVien] = 1; });
+          var umN = Object.keys(um).length;
+          if (umN) info += '<div style="font-size:11px;color:#9a3412;margin-top:2px" title="' + esc(Object.keys(um).join(', ')) + '">⚠ ' + umN + ' tên NV Pancake chưa khớp Sale CRM (vẫn lưu được; khớp sau ở Báo cáo Pancake → 🔗 Khớp tên)</div>';
+        }
+      }
+      if (it.warn) info += '<div style="font-size:11px;color:#9a3412;margin-top:2px">' + esc(it.warn) + '</div>';
+      var st = { parsing: '⏳ Đang đọc…', ready: '✅ Sẵn sàng', saving: '⏳ Đang lưu…', done: '✓ Đã lưu', error: '❌ Lỗi', unknown: '❓ Chưa nhận ra loại file' }[it.status] || it.status;
+      var stColor = it.status === 'done' ? '#166534' : it.status === 'error' ? 'var(--red)' : it.status === 'unknown' ? '#9a3412' : 'var(--text)';
+      html += '<tr><td style="word-break:break-all">📄 ' + esc(it.name) + '</td>'
+        + '<td><select data-id="' + it.id + '" ' + (busy || it.status === 'saving' || it.status === 'done' ? 'disabled' : '') + ' onchange="_upSetKind(+this.dataset.id,this.value)" style="max-width:100%">' + opts + '</select></td>'
+        + '<td>' + info + '</td>'
+        + '<td style="color:' + stColor + ';font-weight:600">' + st + (it.msg ? '<div style="font-weight:400;font-size:11.5px;margin-top:2px">' + esc(it.msg) + '</div>' : '') + '</td>'
+        + '<td><button class="btn sm secondary" ' + (busy ? 'disabled' : '') + ' onclick="_upRemove(' + it.id + ')" title="Bỏ file này">✕</button></td></tr>';
+    });
+    html += '</tbody></table>';
+    html += '<div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+      + '<button class="btn primary" ' + (busy || !readyN ? 'disabled' : '') + ' onclick="_upSaveAll()">' + (busy ? '⏳ Đang lưu…' : '💾 Lưu tất cả (' + readyN + ' file)') + '</button>'
+      + '<button class="btn sm secondary" ' + (busy ? 'disabled' : '') + ' onclick="_upClear()">Xoá danh sách</button>'
+      + '<span style="font-size:11.5px;color:var(--muted)">Lưu lần lượt từng file; file lỗi không làm hỏng các file còn lại.</span></div>';
+  }
+  html += '<details style="margin-top:20px;font-size:12px;color:var(--muted)"><summary style="cursor:pointer">Lấy file ở đâu?</summary>'
+    + '<ul style="margin:8px 0 0 18px;line-height:1.7">'
+    + '<li><b>Pancake — Thống kê tương tác:</b> Thống kê → Thống kê tương tác → Xuất Excel</li>'
+    + '<li><b>Pancake — Thống kê nhân viên:</b> Thống kê → Thống kê nhân viên → Xuất Excel</li>'
+    + '<li><b>Pancake — Thống kê tag:</b> Thống kê → Thống kê tag → Xuất Excel (nạp nhiều file được, tự gộp)</li>'
+    + '<li><b>Base:</b> file export "Danh sách công việc" (sheet "Tất cả")</li>'
+    + '<li><b>Pos:</b> file export đơn hàng Pancake POS</li></ul></details>';
+  wrap.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════
 var _v9PrevSwitchTab = switchTab;
 var _activeV9Tab = 'list';
 switchTab = function(tab, el){
   if (tab === 'dailybrief' && !_dbStandalone){ _dbOpenStandalone(); return; } // Bao cao ngay = trang rieng
   _v9PrevSwitchTab(tab, el);
   _activeV9Tab = tab;
-  ['dashboard','team','audit','salesreport','pancake','kpipancake','mktchecklist','dailybrief'].forEach(function(name){
+  ['dashboard','team','audit','uploaddata','salesreport','pancake','kpipancake','mktchecklist','dailybrief'].forEach(function(name){
     var panel = document.getElementById('tab-'+name);
     if (panel) panel.style.display = (tab===name) ? 'flex' : 'none';
   });
   if (tab === 'dashboard') renderDashboard();
   else if (tab === 'team') renderTeamTab();
   else if (tab === 'audit') renderAuditTab();
+  else if (tab === 'uploaddata') renderUploadDataTab();
   else if (tab === 'salesreport') renderSalesReportTab();
   else if (tab === 'pancake') renderPancakeTab();
   else if (tab === 'kpipancake') renderKpiPancakeTab();
@@ -18286,7 +18536,8 @@ function _injectV9UI(){
     var defs = [
       { id:'dashboard',   label:'📊 Dashboard' },
       { id:'team',        label:'👥 Quản lý Team' },
-      { id:'audit',       label:'🧾 Nhật ký' }
+      { id:'audit',       label:'🧾 Nhật ký' },
+      { id:'uploaddata',  label:'📤 Up dữ liệu' }
     ];
     defs.filter(function(d){ return tabVisible[d.id] !== false; }).forEach(function(d){
       var div = document.createElement('div');
@@ -18361,6 +18612,7 @@ function _injectV9UI(){
       { id:'tab-dashboard',   inner:'<div class="dash-wrap" id="dash-wrap"></div>' },
       { id:'tab-team',        inner:'<div class="team-wrap" id="team-wrap"></div>' },
       { id:'tab-audit',       inner:'<div class="audit-wrap" id="audit-wrap"></div>' },
+      { id:'tab-uploaddata',  inner:'<div class="dash-wrap" id="uploaddata-wrap"></div>' },
       { id:'tab-salesreport', inner:'<div class="dash-wrap" id="salesreport-wrap"></div>' },
       { id:'tab-pancake',     inner:'<div class="dash-wrap" id="pancake-wrap"></div>' },
       { id:'tab-kpipancake',  inner:'<div class="dash-wrap" id="kpipancake-wrap"></div>' },
