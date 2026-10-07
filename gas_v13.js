@@ -1490,7 +1490,7 @@ function doGet(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.15-order-people' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.16-menh-napam' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -8096,15 +8096,27 @@ function saveTaskComment_(c) {
 var SH_MENH = 'Menh';
 var SH_CANNED = 'CannedResponses';
 
-// Bang tra menh Ngu hanh nap am (chep tu bang CS da doi chieu — chi khop nam 1954-2013,
-// can chuyen gia phong thuy trong cong ty ra soat/bo sung truoc khi dung chinh thuc rong rai hon).
-var MENH_DEFAULT_ROWS = [
-  ['Kim', '1954,1955,1962,1963,1970,1971,1984,1985,1992,1993,2000,2001'],
-  ['Thủy', '1956,1957,1964,1965,1972,1973,1986,1987,1994,1995,2002,2003'],
-  ['Hỏa', '1958,1959,1966,1967,1974,1975,1988,1989,1996,1997,2004,2005'],
-  ['Mộc', '1960,1961,1968,1969,1982,1983,1990,1991,1998,1999,2012,2013'],
-  ['Thổ', '1976,1977,1978,1979,1980,1981,2006,2007,2008,2009,2010,2011']
-];
+// Bang tra menh Ngu hanh nap am — TINH BANG CONG THUC cho 1900-2100 (da doi chieu voi chuoi nap am 60 nam).
+// NGUYEN NHAN GOC da sua: bang cu "chep tu bang CS" chi phu 1954-2013 va SAI 44/60 nam (vd 1995 ghi Thuy, dung la Hoa;
+// 1990 ghi Moc, dung la Tho). Cong thuc: Can (Giap,At=1; Binh,Dinh=2; Mau,Ky=3; Canh,Tan=4; Nham,Quy=5)
+// + Chi (Ty,Suu,Ngo,Mui=0; Dan,Mao,Than,Dau=1; Thin,Ty,Tuat,Hoi=2); tong >5 thi tru 5 -> 1 Kim,2 Thuy,3 Hoa,4 Tho,5 Moc.
+// Tinh theo nam duong lich (sinh truoc Tet thi lay nam truoc).
+function menhFromYear_(y) {
+  y = parseInt(y, 10);
+  if (!y || y < 1900 || y > 2100) return null;
+  var can = Math.floor(((y - 4) % 10) / 2) + 1;
+  var chi = [0,0,1,1,2,2,0,0,1,1,2,2][(y - 4) % 12];
+  var s = can + chi; if (s > 5) s -= 5;
+  return ['', 'Kim', 'Thủy', 'Hỏa', 'Thổ', 'Mộc'][s];
+}
+function buildMenhRows_() {
+  var order = ['Kim', 'Thủy', 'Hỏa', 'Mộc', 'Thổ'], by = {};
+  order.forEach(function (m) { by[m] = []; });
+  for (var y = 1900; y <= 2100; y++) by[menhFromYear_(y)].push(y);
+  return order.map(function (m) { return [m, by[m].join(',')]; });
+}
+var MENH_DEFAULT_ROWS = buildMenhRows_();
+var MENH_SHEET_MARK = 'napam-v2';
 
 // 11 mau canned response (Phan A/B/C file mau Beeftext CS gui) — Nhom | ID | Ten | NoiDung
 var CANNED_DEFAULT_ROWS = [
@@ -8122,7 +8134,12 @@ var CANNED_DEFAULT_ROWS = [
 ];
 
 function ensureMenhSheedSeeded_(sh) {
-  if (sh.getLastRow() < 2) { for (var i = 0; i < MENH_DEFAULT_ROWS.length; i++) sh.appendRow(MENH_DEFAULT_ROWS[i]); }
+  // Sheet "Menh" cu (bang sai) da duoc seed tu truoc -> ghi de 1 lan, danh dau o C1 = 'napam-v2'.
+  if (sh.getLastRow() < 2 || String(sh.getRange(1, 3).getValue()) !== MENH_SHEET_MARK) {
+    if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, Math.max(2, sh.getLastColumn())).clearContent();
+    sh.getRange(2, 1, MENH_DEFAULT_ROWS.length, 2).setValues(MENH_DEFAULT_ROWS);
+    sh.getRange(1, 3).setValue(MENH_SHEET_MARK);
+  }
   return sh;
 }
 function ensureCannedSheetSeeded_(sh) {
@@ -8139,6 +8156,8 @@ function getMessengerKnowledge_() {
     if (!menh) continue;
     menhTable[menh] = String(menhData[r][1] || '').split(',').map(function (s) { return parseInt(s.trim(), 10); }).filter(function (n) { return !isNaN(n); });
   }
+  // Luon dung bang tinh bang cong thuc (khong tin du lieu sheet co the bi sua tay sai) — extension chi can bang day du 1900-2100.
+  MENH_DEFAULT_ROWS.forEach(function (row) { menhTable[row[0]] = row[1].split(',').map(Number); });
 
   var shCanned = ensureCannedSheetSeeded_(getSheet_(SH_CANNED, ['Nhom', 'ID', 'Ten', 'NoiDung']));
   var cannedData = shCanned.getDataRange().getValues();

@@ -29,13 +29,13 @@
     'Chờ gọi tư vấn', 'Đã gọi - đang theo dõi', 'Hẹn gọi lại',
     'Không nghe máy', 'Đã chốt', 'Từ chối', 'Đang khiếu nại', 'Tạm ngừng chăm sóc'
   ];
-  const MENH_TABLE_DEFAULT = {
-    'Kim': [1954,1955,1962,1963,1970,1971,1984,1985,1992,1993,2000,2001],
-    'Thủy': [1956,1957,1964,1965,1972,1973,1986,1987,1994,1995,2002,2003],
-    'Hỏa': [1958,1959,1966,1967,1974,1975,1988,1989,1996,1997,2004,2005],
-    'Mộc': [1960,1961,1968,1969,1982,1983,1990,1991,1998,1999,2012,2013],
-    'Thổ': [1976,1977,1978,1979,1980,1981,2006,2007,2008,2009,2010,2011]
-  };
+  // Bảng mệnh dự phòng: sinh từ công thức nạp âm (menhFromYear, khai báo bên dưới, được hoist) cho 1900–2100.
+  // Bảng cũ gõ tay sai 44/60 năm. Chỉ còn dùng làm giá trị mặc định; tinhMenh_ gọi thẳng công thức.
+  const MENH_TABLE_DEFAULT = (function () {
+    const t = { 'Kim': [], 'Thủy': [], 'Hỏa': [], 'Mộc': [], 'Thổ': [] };
+    for (let y = 1900; y <= 2100; y++) t[menhFromYear(y)].push(y);
+    return t;
+  })();
   const CANNED_DEFAULT_MESSENGER = [
     { id:'menhkim', nhom:'Theo mệnh', label:'Mệnh Kim', text:'Dạ với người mệnh Kim thì màu hợp là màu trắng, vàng, bạc (thuộc hành Kim và Thổ vì Thổ sinh Kim ạ), nên tránh dùng nhiều màu đỏ, hồng, tím (hành Hỏa khắc Kim).\nĐá phong thủy hợp mệnh Kim: đá thạch anh trắng, đá mắt hổ vàng, ngọc trai, đá obsidian đen (Thủy tương sinh).\nBên em hiện có $$ rất phù hợp với mệnh Kim ạ, chị/anh xem qua thử nhé.' },
     { id:'menhmoc', nhom:'Theo mệnh', label:'Mệnh Mộc', text:'Dạ với người mệnh Mộc thì màu hợp là màu xanh lá, xanh dương, đen (hành Mộc và Thủy vì Thủy sinh Mộc ạ), nên tránh dùng nhiều màu trắng, bạc (hành Kim khắc Mộc).\nĐá phong thủy hợp mệnh Mộc: đá aventurine xanh, ngọc bích, đá obsidian đen.\nBên em hiện có $$ rất phù hợp với mệnh Mộc ạ, chị/anh xem qua thử nhé.' },
