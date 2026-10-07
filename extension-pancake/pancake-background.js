@@ -125,9 +125,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg?.type === "SAVE_CARE") {
+    // Xoa cache tra cuu truoc VA sau khi luu: sau khi CS luu, lan tra cuu ke tiep phai thay du lieu moi
+    _lookupCache.clear();
     handleSaveCare(msg.payload)
-      .then((data) => sendResponse({ ok: true, data }))
-      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+      .then((data) => { _lookupCache.clear(); sendResponse({ ok: true, data }); })
+      .catch((err) => { _lookupCache.clear(); sendResponse({ ok: false, error: String(err?.message || err) }); });
     return true;
   }
 
@@ -323,16 +325,38 @@ async function handleLookupCustomer(payload) {
     throw new Error("Không có số điện thoại để tra cứu.");
   }
 
+  // TOI UU TOC DO (06/10/2026): content script goi LOOKUP_CUSTOMER tu 4 cho (tu dong do SDT, mo the khach,
+  // soan don...) nen cung 1 SDT bi tra cuu lap lai lien tuc, moi lan 1 request GAS cham. Cache ngan
+  // han trong service worker (20s) + gop request dang bay cung SDT thanh 1. SAVE_CARE xoa cache.
+  // payload.fresh = true de bo qua cache khi can du lieu moi nhat.
+  const key = cfg.gasUrl + "|" + phone;
+  if (!payload?.fresh) {
+    const hit = _lookupCache.get(key);
+    if (hit && Date.now() - hit.t < LOOKUP_TTL_MS) return hit.data;
+    const flying = _lookupInflight.get(key);
+    if (flying) return flying;
+  }
+
   const sep = cfg.gasUrl.includes("?") ? "&" : "?";
   const url = cfg.gasUrl + sep + "action=lookup&phone=" + encodeURIComponent(phone);
 
-  const res = await fetch(url, { redirect: "follow" });
-  const data = await res.json();
-  if (data.error) throw new Error(data.error);
+  const p = (async () => {
+    const res = await fetch(url, { redirect: "follow" });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
 
-  const orders = (data.orders || []).slice().sort((a, b) => parseDateSafe(b.date) - parseDateSafe(a.date));
-  return { care: data.care || null, orders, cskh: data.cskh || [] }; // cskh = dòng của SĐT này ở nguồn "CSKH-Duyên" (GAS lookup)
+    const orders = (data.orders || []).slice().sort((a, b) => parseDateSafe(b.date) - parseDateSafe(a.date));
+    const out = { care: data.care || null, orders, cskh: data.cskh || [] }; // cskh = dòng của SĐT này ở nguồn "CSKH-Duyên" (GAS lookup)
+    _lookupCache.set(key, { t: Date.now(), data: out });
+    if (_lookupCache.size > 200) _lookupCache.delete(_lookupCache.keys().next().value);
+    return out;
+  })();
+  _lookupInflight.set(key, p);
+  try { return await p; } finally { _lookupInflight.delete(key); }
 }
+const _lookupCache = new Map();    // "gasUrl|phone" -> { t, data }
+const _lookupInflight = new Map(); // "gasUrl|phone" -> Promise (gop request trung)
+const LOOKUP_TTL_MS = 20000;
 
 // Ghi 1 dong care (status/zalo/cs/note/lich hen...) — action:'saveSingle', CUNG action va
 // CUNG shape 'row' voi doSaveStatus() ben Zalo AI (content.js), de ghi dung 19 cot CareData.
