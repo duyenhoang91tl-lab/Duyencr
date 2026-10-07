@@ -4068,10 +4068,14 @@ function buildCsStats_(cs, dateFrom, dateTo) {
   if (dateFrom > dateTo) return { ok: false, error: 'Ngày bắt đầu phải trước ngày kết thúc.' };
 
   // 1) Tên của CS này: tên đang chọn + các tên/bí danh khai báo ở tài khoản (Users.names)
+  // NGUYÊN NHÂN GỐC (đã sửa): ô "CS đang dùng" của Pancake AI lấy USERNAME đăng nhập (vd 'yennth' — xem
+  // handleGetCsNames: u.username || u.name), còn đơn/Base ghi theo TÊN SALE (vd 'yenNTH2004' trong Users.names).
+  // Trước đây chỉ so cs với names + name, KHÔNG so với username → không tìm ra tài khoản → names chỉ còn ['yennth']
+  // → 0 đơn và không đọc được % hoa hồng/kênh/team ("Nguồn %: Chưa cài"). Nay so cả username.
   var names = [cs], user = null;
   try {
     readUsers_(getCrmSS_().getSheetByName(SH_USER)).forEach(function(u) {
-      var all = (u.names || []).concat([u.name]);
+      var all = (u.names || []).concat([u.name, u.username]);
       if (all.some(function(x) { return x && _normTxt_(x) === _normTxt_(cs); })) {
         user = user || u;
         all.forEach(function(x) { if (x && names.indexOf(x) === -1) names.push(x); });
