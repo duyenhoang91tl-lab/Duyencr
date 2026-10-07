@@ -17495,9 +17495,67 @@ function _aaTeamField(tid, f, v){
   if (f === 'on') t.on = !!v; else if (f === 'mode') t.mode = v; else t.val = Math.max(0, Number(v) || 0);
   _aaRerender();
 }
-function _aaMemberMode(tid, m){ _aaCfg.memberMode[tid] = m; _aaRerender(); }
+// ── Chia trong Team theo %: luôn có % mặc định = chia đều, tổng 100%, hiện phần CÒN LẠI ──
+function _aaTeamQuotaOf(tid){
+  var tc = _aaCfg.teams[tid]; if (!tc) return 0;
+  return tc.mode === 'pct' ? Math.round((_aaCfg.dailyTotal || 0) * (Number(tc.val) || 0) / 100) : Math.floor(Number(tc.val) || 0);
+}
+function _aaActiveMembers(tid){
+  var t = teams.find(function(x){ return x.id === tid; }); if (!t) return [];
+  var mc = _aaCfg.members[tid] || {};
+  return _aaMembersOf(t).filter(function(m){ return !mc[m] || mc[m].on !== false; });
+}
+// n phần bằng nhau, tổng ĐÚNG 100 (tính theo phần trăm của 1%, dư dồn cho người đầu) — vd 3 người: 33.34 / 33.33 / 33.33
+function _aaEqualPcts(n){
+  if (n <= 0) return [];
+  var base = Math.floor(10000 / n), rem = 10000 - base * n, out = [];
+  for (var i = 0; i < n; i++) out.push((base + (i < rem ? 1 : 0)) / 100);
+  return out;
+}
+// % đang hiển thị cho từng người đang chia: nếu chưa ai nhập (toàn 0/rỗng) → chia đều
+function _aaShownPcts(tid, active){
+  var mc = _aaCfg.members[tid] || {};
+  var vals = active.map(function(m){ return Number((mc[m] || {}).val) || 0; });
+  return vals.some(function(v){ return v > 0; }) ? vals : _aaEqualPcts(active.length);
+}
+function _aaMemberMode(tid, m){
+  var old = _aaCfg.memberMode[tid] || 'pct';
+  if (old !== m){
+    var active = _aaActiveMembers(tid), mc = _aaCfg.members[tid] = _aaCfg.members[tid] || {};
+    var get = function(n){ return mc[n] = mc[n] || { on:true, val:0 }; };
+    if (m === 'count'){
+      // % hiện tại → số KH tương ứng theo hạn mức của Team (để số "nhảy" đúng, không giữ nguyên 12 thành 12%)
+      var q = _aaSplit(_aaTeamQuotaOf(tid), _aaShownPcts(tid, active));
+      active.forEach(function(n, i){ get(n).val = q[i]; });
+    } else {
+      // số KH hiện tại → % tương ứng (tổng 100); chưa có số nào → xoá để mặc định chia đều
+      var cnt = active.map(function(n){ return Math.max(0, Number((mc[n] || {}).val) || 0); });
+      var sum = cnt.reduce(function(a, b){ return a + b; }, 0);
+      if (sum > 0){
+        var hp = _aaSplit(10000, cnt);   // phần trăm của 1% → tổng đúng 100.00
+        active.forEach(function(n, i){ get(n).val = hp[i] / 100; });
+      } else active.forEach(function(n){ get(n).val = 0; });
+    }
+  }
+  _aaCfg.memberMode[tid] = m; _aaRerender();
+}
+function _aaMembersEqual(tid){
+  var mc = _aaCfg.members[tid] = _aaCfg.members[tid] || {};
+  _aaActiveMembers(tid).forEach(function(n){ (mc[n] = mc[n] || { on:true, val:0 }).val = 0; });   // 0 hết = chia đều
+  _aaRerender();
+}
 function _aaMemberField(tid, name, f, v){
   var mc = _aaCfg.members[tid] = _aaCfg.members[tid] || {};
+  var mm = _aaCfg.memberMode[tid] || 'pct';
+  // Đang hiện % mặc định chia đều mà người dùng bắt đầu sửa 1 ô → GHI các % đều ra cho mọi người trước,
+  // rồi mới áp phần sửa (không thì những người còn lại vẫn "rỗng" = trọng số 0 và mất phần).
+  if (f === 'val' && mm === 'pct'){
+    var active = _aaActiveMembers(tid);
+    if (!active.some(function(n){ return Number((mc[n] || {}).val) > 0; })){
+      var eq = _aaEqualPcts(active.length);
+      active.forEach(function(n, i){ (mc[n] = mc[n] || { on:true, val:0 }).val = eq[i]; });
+    }
+  }
   var o = mc[name] = mc[name] || { on:true, val:0 };
   if (f === 'on') o.on = !!v; else o.val = Math.max(0, Number(v) || 0);
   _aaRerender();
@@ -17548,14 +17606,18 @@ function _aaRatioHtml(kind, tid, name){
   keys.forEach(function(k){
     h += '<label style="font-size:12px">'+esc(lab[k])+' <input type="number" min="0" style="width:64px" value="'+(o.vals[k] != null && o.vals[k] !== 0 ? o.vals[k] : '')+'" placeholder="0" '+da+' data-key="'+k+'" onchange="_aaRatioVal(this)"> '+(pct?'%':'KH')+'</label>';
   });
-  h += '</div><div style="font-size:11px;color:var(--muted);margin-top:4px">'+(sum <= 0 ? 'Chưa nhập → lấy đều mọi mục.' : (pct ? 'Tổng '+sum+'%'+(sum !== 100 ? ' — hệ thống quy về 100%.' : '.') : 'Tổng '+sum+' KH/người — nếu khác hạn mức của người đó, hệ thống quy theo tỷ lệ các số này.'))+
+  h += '</div><div style="font-size:11px;color:var(--muted);margin-top:4px">'+(sum <= 0 ? 'Chưa nhập → lấy đều mọi mục.' : (pct ? 'Tổng '+sum+'%'+(sum === 100 ? ' ✓' : sum < 100 ? ' · <b style="color:#b45309">Còn '+Math.round((100-sum)*100)/100+'% chưa phân</b> — hệ thống quy về 100%.' : ' · <b style="color:var(--red)">Vượt '+Math.round((sum-100)*100)/100+'%</b> — hệ thống quy về 100%.') : 'Tổng '+sum+' KH/người — nếu khác hạn mức của người đó, hệ thống quy theo tỷ lệ các số này.'))+
     ' Mục để trống/0 = không lấy.</div></div>';
   return h;
 }
 function renderAssignAuto(){
   var body = document.getElementById('assign-body'); if (!body) return;
   var cfg = _aaCfg, rc = _aaRecipients(cfg, teams, _aaMembersOf), qmap = {};
-  rc.list.forEach(function(r){ qmap[r.team + '|' + r.name] = r.quota; });
+  // Số "≈ KH/ngày" của từng người tính như thể Team đã bật → đổi % / số KH là thấy số nhảy ngay, kể cả khi Team chưa tích.
+  // (Tổng hạn mức thật ở dưới — totalQ — vẫn chỉ tính Team đã tích.)
+  var cfgUi = Object.assign({}, cfg, { teams: {} });
+  teams.forEach(function(t){ cfgUi.teams[t.id] = Object.assign({ mode:'count', val:0 }, cfg.teams[t.id], { on:true }); });
+  _aaRecipients(cfgUi, teams, _aaMembersOf).list.forEach(function(r){ qmap[r.team + '|' + r.name] = r.quota; });
   var totalQ = rc.list.reduce(function(s,r){ return s + r.quota; }, 0);
   var h = '<div class="assign-section"><div class="assign-section-title">⏰ Lịch chia tự động</div>'+
     '<label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;margin-bottom:10px"><input type="checkbox" '+(cfg.enabled?'checked':'')+' onchange="_aaSet(\'enabled\',this.checked)"> Bật chia tự động mỗi ngày</label>'+
@@ -17598,21 +17660,38 @@ function renderAssignAuto(){
   body.innerHTML = h;
 }
 function _aaTeamDetailHtml(t, members, qmap){
-  var mm = _aaCfg.memberMode[t.id] || 'pct', mc = _aaCfg.members[t.id] || {}, tid = esc(t.id);
+  var mm = _aaCfg.memberMode[t.id] || 'pct', mc = _aaCfg.members[t.id] || {}, tid = esc(t.id), pctMode = mm === 'pct';
+  var active = _aaActiveMembers(t.id), shown = _aaShownPcts(t.id, active), pm = {};
+  active.forEach(function(m, i){ pm[m] = shown[i]; });
   var h = '<div style="padding:6px 0"><div style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><b style="font-size:12px">Chia trong Team:</b>'+
-    '<span class="assign-sort-btn '+(mm==='pct'?'active':'')+'" onclick="_aaMemberMode(\''+tid+'\',\'pct\')">Theo %</span>'+
-    '<span class="assign-sort-btn '+(mm==='count'?'active':'')+'" onclick="_aaMemberMode(\''+tid+'\',\'count\')">Số KH/người/ngày</span></div>';
+    '<span class="assign-sort-btn '+(pctMode?'active':'')+'" onclick="_aaMemberMode(\''+tid+'\',\'pct\')">Theo %</span>'+
+    '<span class="assign-sort-btn '+(!pctMode?'active':'')+'" onclick="_aaMemberMode(\''+tid+'\',\'count\')">Số KH/người/ngày</span></div>';
+  // Thanh cân đối: % → tổng phải 100, hiện phần CÒN LẠI; số KH → so với hạn mức Team
+  var bar;
+  if (pctMode){
+    var sum = Math.round(shown.reduce(function(a, b){ return a + b; }, 0) * 100) / 100, rem = Math.round((100 - sum) * 100) / 100;
+    var cls = rem === 0 ? 'ok' : rem > 0 ? 'warn' : 'err';
+    bar = '<span class="assign-remaining-badge '+cls+'">'+(rem === 0 ? '✓ Đủ 100%' : rem > 0 ? 'Còn '+rem+'% chưa phân' : '⚠ Vượt '+(-rem)+'%')+'</span>'+
+      '<span style="font-size:12px;color:var(--muted)">Tổng '+sum+'%</span>'+
+      '<button class="btn sm" onclick="_aaMembersEqual(\''+tid+'\')">⚖ Chia đều</button>';
+  } else {
+    var tot = active.reduce(function(a, m){ return a + Math.max(0, Math.floor(Number((mc[m] || {}).val) || 0)); }, 0), tq = _aaTeamQuotaOf(t.id), remK = tq - tot;
+    var cls2 = remK === 0 ? 'ok' : remK > 0 ? 'warn' : 'err';
+    bar = '<span class="assign-remaining-badge '+cls2+'">'+(remK === 0 ? '✓ Khớp hạn mức Team' : remK > 0 ? 'Còn '+remK+' KH chưa phân' : '⚠ Vượt '+(-remK)+' KH')+'</span>'+
+      '<span style="font-size:12px;color:var(--muted)">Đã chia '+tot+(tq ? ' / '+tq : '')+' KH/ngày</span>';
+  }
+  h += '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px">'+bar+'</div>';
   h += '<div style="padding-bottom:6px"><b style="font-size:12px">Cả Team (áp dụng cho mọi người trong Team, trừ người có tỷ lệ riêng):</b>'+_aaRatioHtml('src', t.id)+_aaRatioHtml('prio', t.id)+'</div>';
   members.forEach(function(m){
-    var o = mc[m] || { on:true, val:0 }, en = m.replace(/"/g,'&quot;');
+    var o = mc[m] || { on:true, val:0 }, isOn = o.on !== false;
+    var val = pctMode ? (isOn && pm[m] != null ? pm[m] : '') : (o.val || '');
     h += '<div style="border-top:1px solid var(--border,#e5e3dc);padding:6px 0"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
-      '<label style="min-width:150px;font-size:13px"><input type="checkbox" '+(o.on!==false?'checked':'')+' data-m="'+esc(m)+'" onchange="_aaMemberField(\''+tid+'\',this.dataset.m,\'on\',this.checked)"> '+esc(m)+'</label>'+
-      '<input type="number" min="0" style="width:70px" value="'+(o.val||'')+'" placeholder="'+(mm==='pct'?'đều':'0')+'" data-m="'+esc(m)+'" onchange="_aaMemberField(\''+tid+'\',this.dataset.m,\'val\',this.value)"> '+(mm==='pct'?'%':'KH/ngày')+
-      '<b style="font-size:12px;color:var(--green)">≈ '+(o.on!==false ? (qmap[t.id+'|'+m]||0) : 0)+' KH/ngày</b></div>'+
+      '<label style="min-width:150px;font-size:13px"><input type="checkbox" '+(isOn?'checked':'')+' data-m="'+esc(m)+'" onchange="_aaMemberField(\''+tid+'\',this.dataset.m,\'on\',this.checked)"> '+esc(m)+'</label>'+
+      '<input type="number" min="0" step="'+(pctMode?'0.1':'1')+'" style="width:70px" value="'+val+'" placeholder="0" data-m="'+esc(m)+'" onchange="_aaMemberField(\''+tid+'\',this.dataset.m,\'val\',this.value)"> '+(pctMode?'%':'KH/ngày')+
+      '<b style="font-size:12px;color:var(--green)">≈ '+(isOn ? (qmap[t.id+'|'+m]||0) : 0)+' KH/ngày</b></div>'+
       '<div style="margin-left:4px">'+_aaRatioHtml('src', t.id, m)+_aaRatioHtml('prio', t.id, m)+'</div></div>';
   });
-  h += '</div>';
-  return h;
+  return h + '</div>';
 }
 // Xem trước (không ghi gì) — tính trên toàn bộ KH nên bấm mới chạy
 function _aaShowPreview(){
