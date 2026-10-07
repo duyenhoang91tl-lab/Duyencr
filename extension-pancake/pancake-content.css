@@ -1274,3 +1274,14 @@
 }
 #pk-cs-login-ov #pk-cs-login-ok { background: #2563eb; color: #fff; border-color: #2563eb; }
 #pk-cs-login-ov button:disabled { opacity: .6; cursor: default; }
+
+/* Sua goi y AI + Luu de AI hoc (Pancake AI) */
+.pk-ai-sug-wrap { margin-bottom: 8px; }
+.pk-ai-sug-bar { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+.pk-ai-sug-bar button { font-size: 11px; padding: 3px 8px; }
+.pk-ai-sug-ta {
+  width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #93c5fd;
+  border-radius: 6px; font-size: 12px; line-height: 1.4; resize: vertical;
+}
+.pk-ai-sug-save { background: #16a34a !important; color: #fff !important; border-color: #16a34a !important; }
+.pk-ai-sug-save:disabled { opacity: .7; }

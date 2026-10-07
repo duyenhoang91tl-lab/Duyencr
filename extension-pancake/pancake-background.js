@@ -135,6 +135,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   // Xac thuc tai khoan khi CS doi ten sang nguoi khac — mat khau chi gui toi GAS (action
   // 'verifyLogin', kiem tra phia server), KHONG luu o bat ky dau trong extension.
+  // CS sua cau tra loi AI roi bam "Luu de AI hoc" — ghi vao sheet AIContext (type combo_template),
+  // dung CHUNG action saveAIContext + cung loai voi nut "Luu mau" ben Zalo AI.
+  if (msg?.type === "SAVE_AI_EXAMPLE") {
+    handleSaveAiExample(msg.payload)
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
   if (msg?.type === "VERIFY_LOGIN") {
     handleVerifyLogin(msg.payload)
       .then((data) => sendResponse({ ok: true, data }))
@@ -403,6 +412,23 @@ async function handleSaveCare(row) {
     } catch (eLead) { /* khong chan ket qua luu chinh neu buoc nay loi */ }
   }
 
+  return data;
+}
+
+async function handleSaveAiExample(payload) {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+  const content = String(payload?.content || "").trim();
+  if (!content) throw new Error("Câu trả lời trống.");
+  const ctx = ("Khách: " + String(payload?.question || "").slice(0, 200) + (payload?.cs ? " | CS: " + payload.cs : "")).slice(0, 300);
+  const res = await fetch(cfg.gasUrl, {
+    method: "POST",
+    body: JSON.stringify({ action: "saveAIContext", type: "combo_template", content, context: ctx }),
+    headers: { "Content-Type": "text/plain" }
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
   return data;
 }
 

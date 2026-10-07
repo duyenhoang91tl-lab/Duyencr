@@ -3433,15 +3433,79 @@
     if (data.imageSkipped) statusMsg += ` (⚠️ ảnh "${data.imageSkipped.name}" khớp nhưng >3MB nên bị bỏ qua)`;
     setStatus(statusMsg);
     list.forEach((text) => {
+      const wrap = document.createElement("div");
+      wrap.className = "pk-ai-sug-wrap";
       const item = document.createElement("div");
       item.className = "pk-ai-suggestion-item";
       item.innerText = text;
       item.title = "Bấm để chèn vào ô trả lời";
       item.addEventListener("click", () => insertReply(text));
-      box.appendChild(item);
+      const bar = document.createElement("div");
+      bar.className = "pk-ai-sug-bar";
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.className = "pk-btn-outline pk-ai-sug-edit";
+      editBtn.innerText = "✏️ Sửa / huấn luyện AI";
+      editBtn.title = "Sửa lại câu trả lời cho đúng ý, rồi lưu để AI học theo";
+      editBtn.addEventListener("click", () => openSuggestionEditor_(wrap, item, bar, text));
+      bar.appendChild(editBtn);
+      wrap.appendChild(item);
+      wrap.appendChild(bar);
+      box.appendChild(wrap);
     });
 
     renderImageSuggestion(data.image);
+  }
+
+  // Cau khach hoi gan nhat — dung lam "ngu canh" khi luu mau AI hoc (cot context cua sheet AIContext).
+  function lastCustomerText_() {
+    const ms = extractMessages();
+    for (let i = ms.length - 1; i >= 0; i--) if (ms[i].from === "customer") return ms[i].text;
+    return ms.length ? ms[ms.length - 1].text : "";
+  }
+
+  // Sua 1 goi y AI ngay tai cho: chen vao o tra loi, hoac LUU de AI hoc (ghi ve CRM — sheet AIContext,
+  // loai combo_template, lan sau backend dua 5 mau moi nhat vao prompt cho moi CS).
+  function openSuggestionEditor_(wrap, item, bar, text) {
+    item.style.display = "none";
+    bar.style.display = "none";
+    const ed = document.createElement("div");
+    ed.className = "pk-ai-sug-editor";
+    const ta = document.createElement("textarea");
+    ta.className = "pk-ai-sug-ta";
+    ta.value = text;
+    ta.rows = Math.min(10, Math.max(4, Math.ceil(text.length / 40)));
+    const row = document.createElement("div");
+    row.className = "pk-ai-sug-bar";
+    const mk = (label, cls) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "pk-btn-outline " + (cls || ""); b.innerText = label;
+      row.appendChild(b); return b;
+    };
+    const insBtn = mk("Chèn vào ô");
+    const saveBtn = mk("💾 Lưu để AI học", "pk-ai-sug-save");
+    const cancelBtn = mk("Huỷ");
+    ed.appendChild(ta); ed.appendChild(row);
+    wrap.appendChild(ed);
+    ta.focus();
+    insBtn.addEventListener("click", () => insertReply(ta.value));
+    cancelBtn.addEventListener("click", () => { ed.remove(); item.style.display = ""; bar.style.display = ""; });
+    saveBtn.addEventListener("click", () => {
+      const content = ta.value.trim();
+      if (!content) { setStatus("Câu trả lời trống — không lưu."); return; }
+      saveBtn.disabled = true; saveBtn.innerText = "Đang lưu...";
+      safeSendMessage_({ type: "SAVE_AI_EXAMPLE", payload: { content, question: lastCustomerText_(), cs: settings.csName || "" } }, (resp) => {
+        if (resp?.ok) {
+          saveBtn.innerText = "✓ Đã lưu — AI sẽ học";
+          setStatus("Đã lưu mẫu về CRM — các lần gợi ý sau AI sẽ học theo mẫu này.");
+          item.innerText = content; // hien ban da sua o goi y
+          setTimeout(() => { ed.remove(); item.style.display = ""; bar.style.display = ""; }, 1200);
+        } else {
+          saveBtn.disabled = false; saveBtn.innerText = "💾 Lưu để AI học";
+          setStatus("Lỗi lưu mẫu: " + (resp?.error || "không rõ nguyên nhân"));
+        }
+      });
+    });
   }
 
   // Nút "Copy ảnh sản phẩm" — chỉ hiện khi backend tìm thấy 1 ảnh khớp tên trong thư mục

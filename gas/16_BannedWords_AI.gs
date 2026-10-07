@@ -75,7 +75,9 @@ function _buildAISystemPrompt_(userMsg, withProducts) {
   if (withProducts) {
     if (ctx.products.length > 0) parts.push('\n\nSAN PHAM:\n' + ctx.products.slice(0, 12).join('\n'));
     if (ctx.faqs.length > 0)     parts.push('\n\nFAQ:\n'          + ctx.faqs.slice(0, 4).join('\n'));
-    if (ctx.combos.length > 0)   parts.push('\n\nMAU TIN NHAN:\n' + ctx.combos.slice(0, 5).join('\n'));
+    // slice(-5) = 5 mau MOI NHAT (sheet AIContext them dong moi o cuoi). Truoc day slice(0,5) lay 5 mau CU NHAT
+    // nen mau CS vua sua/luu de AI hoc khong bao gio duoc dung khi da co >5 mau.
+    if (ctx.combos.length > 0)   parts.push('\n\nMAU TIN NHAN:\n' + ctx.combos.slice(-5).join('\n'));
     var ext = readExternalProductSheet_(userMsg);
     if (ext) parts.push('\n\nTHONG TIN CHI TIET SAN PHAM / THANH PHAN (nguon: Google Sheet rieng cua team, khop tu khoa trong yeu cau — uu tien dung khi tra loi ve thanh phan/cong dung cu the):\n' + ext);
     var driveKnow = readDriveKnowledgeFolder_(userMsg);
