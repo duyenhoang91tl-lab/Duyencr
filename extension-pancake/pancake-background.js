@@ -133,6 +133,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // Xac thuc tai khoan khi CS doi ten sang nguoi khac — mat khau chi gui toi GAS (action
+  // 'verifyLogin', kiem tra phia server), KHONG luu o bat ky dau trong extension.
+  if (msg?.type === "VERIFY_LOGIN") {
+    handleVerifyLogin(msg.payload)
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
   if (msg?.type === "GET_CS_NAMES") {
     handleGetCsNames()
       .then((data) => sendResponse({ ok: true, data }))
@@ -395,6 +404,20 @@ async function handleSaveCare(row) {
   }
 
   return data;
+}
+
+async function handleVerifyLogin(payload) {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+  const res = await fetch(cfg.gasUrl, {
+    method: "POST",
+    body: JSON.stringify({ action: "verifyLogin", username: payload?.username || "", password: payload?.password || "" }),
+    headers: { "Content-Type": "text/plain" }
+  });
+  const data = await res.json();
+  if (data.error && data.ok === undefined) throw new Error(data.error);
+  return data; // { ok, username, role, name } | { ok:false, error }
 }
 
 // Lay danh sach ten CS — action:'users', dung chung voi Zalo AI (loadCSNames_ trong content.js)

@@ -1250,3 +1250,27 @@
 .pk-stats-det { margin: 4px 0; font-size: 11px; }
 .pk-stats-det summary { cursor: pointer; color: #2563eb; }
 .pk-stats-prog { padding: 3px 0; border-bottom: 1px dashed #e5e7eb; }
+
+
+/* Hop thoai dang nhap khi doi CS (Pancake AI) */
+#pk-cs-login-ov {
+  position: fixed; inset: 0; background: rgba(0,0,0,.45);
+  z-index: 2147483647; display: flex; align-items: center; justify-content: center;
+}
+#pk-cs-login-ov .pk-cs-login-box {
+  background: #fff; border-radius: 10px; padding: 14px; width: 280px; max-width: 90vw;
+  box-shadow: 0 8px 30px rgba(0,0,0,.3); font-size: 12px; color: #111;
+}
+#pk-cs-login-ov .pk-cs-login-title { font-weight: 700; font-size: 13px; margin-bottom: 6px; }
+#pk-cs-login-ov .pk-cs-login-hint { color: #6b7280; margin-bottom: 8px; line-height: 1.4; }
+#pk-cs-login-ov input {
+  width: 100%; box-sizing: border-box; padding: 6px 8px; margin-bottom: 6px;
+  border: 1px solid #ccc; border-radius: 6px; font-size: 12px;
+}
+#pk-cs-login-ov #pk-cs-login-err { color: #dc2626; min-height: 14px; margin-bottom: 6px; }
+#pk-cs-login-ov .pk-cs-login-btns { display: flex; gap: 6px; justify-content: flex-end; }
+#pk-cs-login-ov button {
+  border: 1px solid #ccc; background: #fff; border-radius: 6px; padding: 5px 10px; cursor: pointer; font-size: 12px;
+}
+#pk-cs-login-ov #pk-cs-login-ok { background: #2563eb; color: #fff; border-color: #2563eb; }
+#pk-cs-login-ov button:disabled { opacity: .6; cursor: default; }

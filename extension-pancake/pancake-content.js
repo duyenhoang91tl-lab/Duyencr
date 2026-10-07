@@ -545,10 +545,28 @@
     _initPanelDrag_();
 
     const csSel = panelEl.querySelector('#pk-cs-sel');
-    csSel.addEventListener('change', () => {
-      chrome.storage.sync.set({ csName: csSel.value });
+    // KHOA CS: chon ten lan dau thi tu do (co hop xac nhan); tu lan sau muon doi sang NGUOI KHAC
+    // phai dang nhap dung tai khoan nguoi do (hoac tai khoan Admin) — xem _openCsLoginModal_.
+    // Luu y: day la khoa o giao dien extension (chong chon nham/gia danh), khong phai bao mat tuyet doi.
+    function _applyCs_(name) {
+      settings.csName = name;
+      chrome.storage.sync.set({ csName: name });
+      csSel.value = name;
       if (panelEl.querySelector('#pk-menu-sel')?.value === 'stats') loadStats_(); // đang xem số liệu → tải lại cho CS mới
       loadReminders_();
+    }
+    csSel.addEventListener('change', () => {
+      const target = csSel.value;
+      const prev = settings.csName || '';
+      if (target === prev) return;
+      if (!prev) {
+        if (!target) return;
+        if (!confirm('Bạn chọn "' + target + '" làm CS của máy này.\n\nChỉ chọn được 1 lần. Muốn đổi sang người khác sau này phải đăng nhập tài khoản của người đó (Admin đổi được tất cả).\n\nXác nhận chọn?')) { csSel.value = ''; return; }
+        _applyCs_(target);
+        return;
+      }
+      csSel.value = prev; // da khoa → hien lai CS cu, chi doi khi dang nhap thanh cong
+      if (target) _openCsLoginModal_(target, prev, _applyCs_);
     });
 
     panelEl.querySelector("#pk-ai-refresh").addEventListener("click", () => {
@@ -734,6 +752,59 @@
       });
     });
     panelEl.querySelector("#pk-opener-btn").addEventListener("click", doGenerateOpeners_);
+  }
+
+  // Hop thoai bat dang nhap khi doi CS: duoc doi neu dang nhap dung tai khoan cua CS muon doi sang,
+  // HOAC tai khoan co vai tro admin (admin doi duoc het). Mat khau chi gui di xac thuc, khong luu.
+  function _openCsLoginModal_(target, current, onOk) {
+    const old = document.getElementById('pk-cs-login-ov');
+    if (old) old.remove();
+    const ov = document.createElement('div');
+    ov.id = 'pk-cs-login-ov';
+    ov.innerHTML = `
+      <div class="pk-cs-login-box">
+        <div class="pk-cs-login-title">Đổi CS: ${escapeHtml(current)} → ${escapeHtml(target)}</div>
+        <div class="pk-cs-login-hint">Đăng nhập tài khoản <b>${escapeHtml(target)}</b> để đổi. Admin có thể dùng tài khoản Admin.</div>
+        <input id="pk-cs-login-user" type="text" autocomplete="off" placeholder="Tài khoản">
+        <input id="pk-cs-login-pass" type="password" autocomplete="off" placeholder="Mật khẩu">
+        <div id="pk-cs-login-err"></div>
+        <div class="pk-cs-login-btns">
+          <button id="pk-cs-login-cancel" type="button">Huỷ</button>
+          <button id="pk-cs-login-ok" type="button">Đăng nhập & đổi</button>
+        </div>
+      </div>`;
+    document.body.appendChild(ov);
+    const $ = (id) => ov.querySelector(id);
+    $('#pk-cs-login-user').value = target;
+    const errEl = $('#pk-cs-login-err');
+    const okBtn = $('#pk-cs-login-ok');
+    const close = () => ov.remove();
+    $('#pk-cs-login-cancel').addEventListener('click', close);
+    ov.addEventListener('mousedown', (e) => { if (e.target === ov) close(); });
+    function submit() {
+      const u = $('#pk-cs-login-user').value.trim();
+      const p = $('#pk-cs-login-pass').value;
+      if (!u || !p) { errEl.textContent = 'Nhập đủ tài khoản và mật khẩu.'; return; }
+      okBtn.disabled = true; errEl.textContent = 'Đang kiểm tra...';
+      safeSendMessage_({ type: 'VERIFY_LOGIN', payload: { username: u, password: p } }, (resp) => {
+        okBtn.disabled = false;
+        const d = resp && resp.data;
+        if (!resp || !resp.ok || !d || !d.ok) {
+          errEl.textContent = (resp && resp.error) || (d && d.error) || 'Không xác thực được.';
+          return;
+        }
+        const same = String(d.username || '').trim().toLowerCase() === String(target).trim().toLowerCase();
+        if (!same && d.role !== 'admin') {
+          errEl.textContent = 'Tài khoản này không được đổi sang "' + target + '". Cần tài khoản của "' + target + '" hoặc Admin.';
+          return;
+        }
+        close();
+        onOk(target);
+      });
+    }
+    okBtn.addEventListener('click', submit);
+    $('#pk-cs-login-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+    setTimeout(() => $('#pk-cs-login-pass').focus(), 0);
   }
 
   // ── CS đang dùng (sticky theo máy, lưu chrome.storage.sync) ──
