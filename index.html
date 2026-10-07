@@ -17235,6 +17235,8 @@ var _AA_TIER = { vip:'VIP', tt:'Thân thiết', tn:'Tiềm năng' };
 function _aaDefaultCfg(){
   return {
     enabled:false,
+    runHour:7,                 // giờ (VN) bắt đầu được chia trong ngày — server & trình duyệt chỉ chia khi đã qua giờ này
+    teamMembers:{},            // teamId -> [tên] danh sách thành viên đã gộp 1-người-nhiều-tên, UI lưu sẵn để GAS dùng đúng
     days:[1,2,3,4,5,6],        // 0=CN,1=T2..6=T7 ; ngày không tích → KHÔNG chia
     onlyUnassigned:true,       // chỉ lấy KH chưa từng chia (tránh chia lại đúng KH cũ mỗi ngày)
     dailyTotal:0,              // tổng KH/ngày (dùng khi Team chia theo %)
@@ -17349,17 +17351,30 @@ function _aaToday(d){ d = d || new Date(); var p = function(n){ return String(n)
 // ── Lưu / nạp cấu hình (Settings sheet là nguồn chung cho mọi máy; localStorage là bản đệm) ──
 var _aaCfg = Object.assign(_aaDefaultCfg(), loadLS('ome_auto_assign_cfg') || {});
 var _aaBusy = false;
+// Cấu hình (UI ghi) và TRẠNG THÁI chạy (lastRun/lastResult — chỉ người chạy ghi) lưu 2 key Settings riêng, để lưu cấu hình
+// không bao giờ ghi đè lastRun cũ → tránh server/trình duyệt chia lại lần 2 trong ngày.
+function _aaPostSetting(key, obj){
+  if (!gsUrl) return Promise.resolve();
+  return fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'setSetting', key:key, value: JSON.stringify(obj) }) }).catch(function(e){ console.warn('[AutoAssign] lưu '+key+' lỗi', e); });
+}
 function _aaPersist(){
   saveLS('ome_auto_assign_cfg', _aaCfg);
-  if (!gsUrl) return Promise.resolve();
-  return fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'setSetting', key:'autoAssignCfg', value: JSON.stringify(_aaCfg) }) }).catch(function(e){ console.warn('[AutoAssign] lưu cấu hình lỗi', e); });
+  var out = Object.assign({}, _aaCfg); delete out.lastRun; delete out.lastResult;
+  out.teamMembers = {}; (teams || []).forEach(function(t){ out.teamMembers[t.id] = _aaMembersOf(t); });   // server dùng đúng danh sách người nhận như UI
+  return _aaPostSetting('autoAssignCfg', out);
 }
+function _aaPersistState(by){ return _aaPostSetting('autoAssignState', { lastRun:_aaCfg.lastRun || '', lastResult:_aaCfg.lastResult || null, by:by || 'browser' }); }
 async function _aaPullCfg(){
   if (!gsUrl) return;
   try {
     var r = await fetch(gsUrl + '?action=getSetting&key=autoAssignCfg', { redirect:'follow' });
     var j = await r.json();
-    if (j && j.value) { _aaCfg = Object.assign(_aaDefaultCfg(), JSON.parse(j.value)); saveLS('ome_auto_assign_cfg', _aaCfg); }
+    var keep = { lastRun:_aaCfg.lastRun, lastResult:_aaCfg.lastResult };
+    if (j && j.value) { _aaCfg = Object.assign(_aaDefaultCfg(), JSON.parse(j.value), keep); }
+    var r2 = await fetch(gsUrl + '?action=getSetting&key=autoAssignState', { redirect:'follow' });
+    var j2 = await r2.json();
+    if (j2 && j2.value) { var st = JSON.parse(j2.value); _aaCfg.lastRun = st.lastRun || ''; _aaCfg.lastResult = st.lastResult || null; _aaCfg.lastBy = st.by || ''; }
+    saveLS('ome_auto_assign_cfg', _aaCfg);
   } catch(e) { console.warn('[AutoAssign] nạp cấu hình lỗi', e); }
 }
 function _aaMembersOf(t){ return (typeof _teamMembersList === 'function') ? _teamMembersList(t) : (t.members || []); }
@@ -17393,15 +17408,14 @@ async function _aaRunIfDue(force){
   try {
     await _aaPullCfg();   // lấy bản mới nhất (máy admin khác có thể vừa chạy hôm nay)
     var today = _aaToday();
-    if (!force && (!_aaCfg.enabled || !_aaDayOn(_aaCfg) || _aaCfg.lastRun === today)) return null;
+    if (!force && (!_aaCfg.enabled || !_aaDayOn(_aaCfg) || _aaCfg.lastRun === today || new Date().getHours() < (parseInt(_aaCfg.runHour) || 0))) return null;
     // Đánh dấu ĐÃ CHẠY hôm nay trước khi chia → 2 máy admin cùng mở không chia đôi 2 lần
-    if (!force) { _aaCfg.lastRun = today; await _aaPersist(); }
+    if (!force) { _aaCfg.lastRun = today; await _aaPersistState('browser'); }
     var plan = _aaPreview();
     var entries = _aaCommit(plan, force ? 'Chạy thử' : null);
     var total = entries.reduce(function(s,e){ return s + e.phones.length; }, 0);
-    _aaCfg.lastResult = { date: today, total: total, people: entries.length, short: plan.short, warn: plan.warn, forced: !!force };
-    if (force) _aaCfg.lastRun = _aaCfg.lastRun || '';
-    await _aaPersist();
+    _aaCfg.lastResult = { date: today, total: total, people: entries.length, short: plan.short, warn: plan.warn, forced: !!force, by: 'browser' };
+    await _aaPersistState(force ? 'browser-force' : 'browser');
     if (typeof toast === 'function') toast(total ? '⏰ Chia tự động: ' + total + ' KH → ' + entries.length + ' CS' + (plan.short.length ? ' (có ' + plan.short.length + ' người thiếu data)' : '') : '⏰ Chia tự động: không có KH nào để chia (kiểm tra cấu hình/nguồn)');
     return { plan: plan, total: total };
   } catch(e) { console.warn('[AutoAssign] lỗi', e); return null; }
@@ -17427,8 +17441,8 @@ function _aaScopeObj(kind, tid, name, create){
   return root[tid][name];
 }
 function _aaRerender(){ var b = document.getElementById('assign-body'), st = b ? b.scrollTop : 0; renderAssignAuto(); if (b) b.scrollTop = st; }
-function _aaSet(path, v, rerender){   // path: 'enabled' | 'dailyTotal' | 'onlyUnassigned'
-  _aaCfg[path] = (typeof v === 'boolean') ? v : (path === 'dailyTotal' ? Math.max(0, parseInt(v) || 0) : v);
+function _aaSet(path, v, rerender){   // path: 'enabled' | 'dailyTotal' | 'onlyUnassigned' | 'runHour'
+  _aaCfg[path] = (typeof v === 'boolean') ? v : (path === 'dailyTotal' ? Math.max(0, parseInt(v) || 0) : path === 'runHour' ? Math.min(23, Math.max(0, parseInt(v) || 0)) : v);
   if (rerender !== false) _aaRerender();
   if (path === 'enabled') _aaPersist();
 }
@@ -17490,7 +17504,8 @@ function renderAssignAuto(){
     '<div style="font-size:12px;color:var(--muted);margin-bottom:5px">Chia vào các thứ được tích (ngày bỏ tích = không chia):</div><div class="assign-sort-row">'+
     _AA_DOW.map(function(d){ return '<div class="assign-sort-btn '+((cfg.days||[]).indexOf(parseInt(d[0]))>=0?'active':'')+'" onclick="_aaToggleDay('+d[0]+')">'+d[1]+'</div>'; }).join('')+'</div>'+
     '<label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:10px"><input type="checkbox" '+(cfg.onlyUnassigned?'checked':'')+' onchange="_aaSet(\'onlyUnassigned\',this.checked)"> Chỉ lấy KH <b>chưa chia lần nào</b> (nên bật, nếu không ngày nào cũng có thể chia lại đúng KH cũ)</label>'+
-    '<div style="font-size:11px;color:var(--hint);margin-top:8px">Hệ thống tự chia khi có admin mở CRM vào ngày đó (hoặc tab CRM đang mở qua 0h). Nếu hôm đó không ai mở CRM thì chưa chia, lần mở tiếp theo sẽ chia bù cho ngày đó.</div></div>';
+    '<label style="font-size:12px;display:block;margin-top:10px">Chia từ <input type="number" min="0" max="23" style="width:56px" value="'+(cfg.runHour==null?7:cfg.runHour)+'" onchange="_aaSet(\'runHour\',this.value)"> giờ sáng (giờ VN) — trước giờ này không chia</label>'+
+    '<div style="font-size:11px;color:var(--hint);margin-top:8px">Chạy tự động bằng <b>trigger trên Google Apps Script</b> (không cần mở CRM): admin cài 1 lần — mở Apps Script Editor, chọn hàm <b>installAutoAssignTrigger_</b>, bấm Run. Chưa cài trigger thì hệ thống chỉ chia khi có admin mở CRM vào ngày đó. Sau khi sửa ở đây nhớ bấm <b>💾 Lưu cấu hình</b> (server dùng bản đã lưu).</div></div>';
 
   h += '<div class="assign-section"><div class="assign-section-title">① Chia cho các Team</div>'+
     '<label style="font-size:12px">Tổng KH/ngày (dùng cho Team chia theo %): <input type="number" min="0" style="width:90px" value="'+(cfg.dailyTotal||'')+'" placeholder="0" onchange="_aaSet(\'dailyTotal\',this.value)"></label>';
@@ -17519,7 +17534,7 @@ function renderAssignAuto(){
     '<div style="font-size:11px;color:var(--muted)">Áp dụng cho mọi người, trừ chỗ bạn cài riêng theo Team / từng người (bấm “Chi tiết” ở Team). Mỗi người: hạn mức → chia theo nguồn → mỗi nguồn chia tiếp theo ưu tiên.</div>'+
     _aaRatioHtml('src') + _aaRatioHtml('prio') + '</div>';
   var lr = cfg.lastResult;
-  if (lr) h += '<div class="assign-section"><div class="assign-section-title">Lần chạy gần nhất</div><div style="font-size:12px">'+esc(lr.date)+(lr.forced?' (chạy thử)':'')+': đã chia <b>'+lr.total+' KH</b> cho '+(lr.people||0)+' CS'+
+  if (lr) h += '<div class="assign-section"><div class="assign-section-title">Lần chạy gần nhất</div><div style="font-size:12px">'+esc(lr.date)+(lr.forced?' (chạy thử)':'')+(lr.by?' · bởi '+(lr.by==='server'?'server (trigger)':'trình duyệt'):'')+': đã chia <b>'+lr.total+' KH</b> cho '+(lr.people||0)+' CS'+
     ((lr.short||[]).length ? '<div style="color:var(--red);margin-top:4px">Thiếu data: '+lr.short.map(function(s){ return esc(s.name)+' thiếu '+s.missing; }).join(', ')+'</div>' : '')+'</div></div>';
   h += '<div id="aa-preview"></div>';
   body.innerHTML = h;
