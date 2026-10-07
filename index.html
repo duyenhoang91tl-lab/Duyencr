@@ -2754,6 +2754,52 @@ async function _pullAssignAndBroadcastThrottled(force) {
   await pullAssignHistory();
   if (typeof pullBroadcastHistory === 'function') pullBroadcastHistory().catch(() => {});
 }
+// Kéo nguồn CSKH-Duyên (bản nhẹ [phone,name]) — tách riêng để dùng được cả ở nhịp kéo đơn lẫn nhịp thường.
+// Trả true nếu danh sách vừa được thay mới (cần dựng lại danh sách KH). Lỗi thì GIỮ NGUYÊN dữ liệu cũ và
+// báo rõ trên banner (trước đây chỉ console.warn nên CRM âm thầm chỉ còn vài nghìn khách từ DT TỔNG).
+let _cskhLastTry = 0, _cskhFailCount = 0, _cskhBannerOn = false;
+function _cskhFail_(reason){
+  _cskhFailCount++;
+  console.warn('cskhDuyenLite:', reason);
+  if (_cskhFailCount >= 2) {
+    _cskhBannerOn = true;
+    showSyncErrorBanner('Không tải được nguồn CSKH-Duyên (' + reason + ') — CRM đang chỉ hiện ' + Object.keys(customerMap).length.toLocaleString('vi-VN') + ' khách. Đang tự thử lại; có thể bấm "Sync thủ công".');
+  }
+  return false;
+}
+async function _pullCskhLiteOnce_(isManual){
+  const now = Date.now();
+  if (!isManual) {
+    if (_cskhPulledAt && (now - _cskhPulledAt) <= 600000) return false;   // đã có và còn mới (kéo lại mỗi 10 phút)
+    if (now - _cskhLastTry < 20000) return false;                         // vừa thử xong: giãn cách, không dội backend mỗi 3s
+  }
+  _cskhLastTry = now;
+  try {
+    const sepChar = gsUrl.includes('?') ? '&' : '?';
+    const ckR = await fetch(gsUrl + sepChar + 'action=cskhDuyenLite', { redirect: 'follow' });
+    const ckText = await ckR.text();
+    if (ckText === _lastCkText && !_isEmptyObj(cskhData)) { _cskhPulledAt = Date.now(); _cskhFailCount = 0; return false; }
+    let ckJson;
+    try { ckJson = JSON.parse(ckText); } catch (e) { return _cskhFail_('GAS trả về không phải JSON — có thể quá tải/hết thời gian'); }
+    if (!ckJson || !ckJson.ok) return _cskhFail_((ckJson && ckJson.error) || 'GAS báo lỗi');
+    const newCk = {};
+    (ckJson.rows || []).forEach(function(r){ // r = [phone, name]
+      const ph = (typeof normPhone === 'function' ? normPhone(r[0]) : null) || String(r[0] || '');
+      if (!ph) return;
+      (newCk[ph] = newCk[ph] || []).push({ name: r[1] || '', tier: r[2] || '' }); // MANG cac dong nhe {name,tier}: buildCustomers va _renderCskhBlock_ doc cskhData[ph] nhu MANG dong
+    });
+    // Backend trả 0 dòng trong khi trước đó đã có dữ liệu -> coi là lỗi tạm, KHÔNG xóa danh sách đang có
+    if (_isEmptyObj(newCk) && !_isEmptyObj(cskhData)) return _cskhFail_('nguồn trả về 0 dòng');
+    _lastCkText = ckText; _cskhPulledAt = Date.now(); _cskhFailCount = 0;
+    cskhData = newCk;
+    cskhMeta = { found: !!ckJson.found, total: ckJson.total || 0, noPhone: ckJson.noPhone || 0, noPhoneSample: ckJson.noPhoneSample || [] };
+    // Kho ~134k SDT vuot han muc localStorage (~5MB) va stringify mat hang tram ms: chi luu cache neu nho; con lai se keo lai khi mo trang
+    if (Object.keys(newCk).length <= 20000) saveLS('ome_cskh_duyen', cskhData); else { try { localStorage.removeItem('ome_cskh_duyen'); } catch(e){} }
+    saveLS('ome_cskh_duyen_meta', cskhMeta);
+    if (_cskhBannerOn) { _cskhBannerOn = false; const b = document.getElementById('sync-err-banner'); if (b) b.remove(); }
+    return true;
+  } catch (ckErr) { return _cskhFail_(ckErr.message || 'lỗi mạng'); }
+}
 async function syncFromGS(opts) {
   opts = opts || {};
   const pullOrders = opts.pullOrders !== undefined ? opts.pullOrders : _isEmptyObj(customerMap);
@@ -2871,27 +2917,10 @@ async function syncFromGS(opts) {
       // đầy đủ 1 khách chỉ kéo riêng, LƯỜI (lazy) khi CS thực sự mở hồ sơ khách đó — xem
       // _loadCskhDetailForPhone_ ở renderInfoTab.
       // CSKH-Duyên gần như khong doi: chi keo lai o lan dau, moi 10 phut, hoac khi bam Sync thu cong
-      if (!_cskhPulledAt || isManual || (Date.now() - _cskhPulledAt) > 600000) try {
-        const ckR = await fetch(gsUrl + sepChar + 'action=cskhDuyenLite', { redirect: 'follow' });
-        const ckText = await ckR.text();
-        const ckSame = (ckText === _lastCkText);
-        const ckJson = ckSame ? null : JSON.parse(ckText);
-        if (ckSame) { _cskhPulledAt = Date.now(); }
-        else if (ckJson && ckJson.ok) {
-          _lastCkText = ckText; _cskhPulledAt = Date.now(); _forceFullBuildFromCareLeads = true;
-          const newCk = {};
-          (ckJson.rows || []).forEach(function(r){ // r = [phone, name, tier]
-            const ph = (typeof normPhone === 'function' ? normPhone(r[0]) : null) || String(r[0] || '');
-            if (!ph) return;
-            (newCk[ph] = newCk[ph] || []).push({ name: r[1] || '', tier: r[2] || '' }); // MANG cac dong nhe {name,tier}: buildCustomers va _renderCskhBlock_ doc cskhData[ph] nhu MANG dong
-          });
-          cskhData = newCk;
-          cskhMeta = { found: !!ckJson.found, total: ckJson.total || 0, noPhone: ckJson.noPhone || 0, noPhoneSample: ckJson.noPhoneSample || [] };
-          // Kho ~134k SDT vuot han muc localStorage (~5MB) va stringify mat hang tram ms: chi luu cache neu nho; con lai se keo lai khi mo trang
-          if (Object.keys(newCk).length <= 20000) saveLS('ome_cskh_duyen', cskhData); else { try { localStorage.removeItem('ome_cskh_duyen'); } catch(e){} }
-          saveLS('ome_cskh_duyen_meta', cskhMeta);
-        }
-      } catch(ckErr) { console.warn('cskhDuyenLite fetch error:', ckErr.message); }
+      if (await _pullCskhLiteOnce_(isManual)) _forceFullBuildFromCareLeads = true;
+    } else if (!_cskhPulledAt && _isEmptyObj(cskhData)) {
+      // Lần kéo CSKH-Duyên trước lỗi/chưa xong -> tự thử lại (có giãn cách), KHÔNG chờ tới nhịp kéo đơn tiếp theo
+      if (await _pullCskhLiteOnce_(isManual)) _forceFullBuildFromCareLeads = true;
     }
 
     // ── Nguồn "Chăm sóc" (sheet riêng, KH thêm nhanh qua Pancake AI/Zalo AI/nút "+Thêm KH
