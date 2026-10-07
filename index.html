@@ -580,7 +580,7 @@ th.col-filtered .th-filter-icon{opacity:1;color:var(--green);}
 #main-table th,#main-table td{overflow:hidden;}
 #main-table tbody tr:not(.vspacer){height:58px;}
 .vspacer td{padding:0!important;border:none!important;height:auto;}
-.col-name{width:185px;} .col-tier{width:92px;} .col-care{width:132px;}
+.col-name{width:185px;} .col-tier{width:92px;} .col-hang{width:104px;} .col-care{width:132px;}
 .col-zalo{width:112px;} .col-order{width:118px;} .col-product{width:150px;}
 .col-cs{width:150px;} .col-carecs{width:140px;} .col-source{width:120px;} .col-note{width:185px;} .col-sched{width:132px;}
 #cs-note-history { max-height: 320px; overflow-y: auto; }
@@ -1008,6 +1008,11 @@ body.rpt-mode .app{height:100vh}
   <div id="col-dd-tier-items" style="max-height:200px;overflow-y:auto"></div>
   <div class="col-dd-footer"><button class="col-dd-clear" onclick="clearColFilter('tier')">Xóa lọc</button><button class="col-dd-apply" onclick="applyColFilter('tier')">Áp dụng</button></div>
 </div>
+<div class="col-dropdown" id="col-dd-hang">
+  <input class="col-dd-search" placeholder="Tìm phân hạng..." oninput="renderColDdItems('hang',this.value)">
+  <div id="col-dd-hang-items" style="max-height:200px;overflow-y:auto"></div>
+  <div class="col-dd-footer"><button class="col-dd-clear" onclick="clearColFilter('hang')">Xóa lọc</button><button class="col-dd-apply" onclick="applyColFilter('hang')">Áp dụng</button></div>
+</div>
 <div class="col-dropdown" id="col-dd-care">
   <input class="col-dd-search" placeholder="Tìm tình trạng CS..." oninput="renderColDdItems('care',this.value)">
   <div id="col-dd-care-items" style="max-height:200px;overflow-y:auto"></div>
@@ -1382,6 +1387,7 @@ body.rpt-mode .app{height:100vh}
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('lastpos',this)"> Ngày mua gần nhất</label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('name',this)"> Khách hàng</label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('tier',this)"> Phân loại</label>
+        <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('hang',this)"> Phân hạng KH</label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('care',this)"> <span id="lbl-fieldcs-coltoggle">Tình trạng CS</span></label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('zalo',this)"> Zalo</label>
         <label class="col-toggle-chip"><input type="checkbox" checked onchange="toggleCol('order',this)"> Đơn/DT</label>
@@ -1406,6 +1412,7 @@ body.rpt-mode .app{height:100vh}
             <th class="filterable col-lastpos" id="th-lastpos" style="min-width:104px" title="Nhấn ▼ để lọc · Nhấn ↕ để sắp xếp mới nhất/xa nhất"><div class="th-inner" onclick="openColDropdown('lastpos',event)">Ngày mua gần nhất <span class="th-filter-icon">▼</span></div><span id="lastpos-sort-icon" style="color:var(--hint);cursor:pointer;font-size:11px;margin-left:2px" onclick="event.stopPropagation();toggleLastPosSort()" title="Sắp xếp theo ngày mua gần nhất">↕</span></th>
             <th class="filterable col-name" id="th-name" onclick="openColDropdown('name',event)"><div class="th-inner">Khách hàng <span class="th-filter-icon">▼</span></div></th>
             <th class="filterable col-tier" id="th-tier"><div class="th-inner"><span id="tier-label-btn" onclick="openTierTooltip(event)" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px" title="Xem tiêu chí phân loại">Phân loại</span> <span class="th-filter-icon" onclick="openColDropdown('tier',event)" style="cursor:pointer">▼</span></div></th>
+            <th class="filterable col-hang" id="th-hang" onclick="openColDropdown('hang',event)" title="Phân hạng theo tổng doanh thu: &lt;15tr Khách thường · 15-&lt;30tr Thân thiết · 30-&lt;50tr Vip · ≥50tr Super VVip"><div class="th-inner">Phân hạng KH <span class="th-filter-icon">▼</span></div></th>
             <th class="filterable col-care" id="th-care" onclick="openColDropdown('care',event)"><div class="th-inner"><span id="lbl-fieldcs-th">Tình trạng CS</span> <span class="th-filter-icon">▼</span></div></th>
             <th class="filterable col-zalo" id="th-zalo" onclick="openColDropdown('zalo',event)"><div class="th-inner">Zalo <span class="th-filter-icon">▼</span></div></th>
             <th class="col-order">Đơn / DT</th>
@@ -2568,7 +2575,7 @@ function _customerProductText(c){
 }
 
 // Column filters
-let colFilters = { name: new Set(), tier: new Set(), care: new Set(), zalo: new Set(), product: new Set(), cs: new Set(), careCS: new Set(), source: new Set(), sched: new Set(), lastact: new Set(), tacdong: new Set(), bcstatus: new Set(), lastpos: new Set() };
+let colFilters = { name: new Set(), tier: new Set(), hang: new Set(), care: new Set(), zalo: new Set(), product: new Set(), cs: new Set(), careCS: new Set(), source: new Set(), sched: new Set(), lastact: new Set(), tacdong: new Set(), bcstatus: new Set(), lastpos: new Set() };
 let _colDdActive = null;
 
 // Advanced filters state
@@ -3369,6 +3376,7 @@ function buildCustomers() {
       cskh: (typeof cskhData !== 'undefined' && cskhData && cskhData[c.phone]) || [],   // dòng của khách này ở nguồn CSKH-Duyên (có thể >1 nếu trùng SĐT)
       sources:[...c.sources], brands:[...c.brands].filter(Boolean),
       totalOrders:tot, totalRevenue:rev,
+      hangKey:_hangKeyOf_(rev), hang:HANG_LABEL[_hangKeyOf_(rev)],
       renewOrders:renewCount, tier,
       careStatus: care.status || c._rawStatus || '',
       zaloStatus: care.zalo || c._rawZalo || '',
@@ -3620,6 +3628,7 @@ function applyFilters() {
     // Column filters
     if (colFilters.name.size > 0 && !colFilters.name.has(c.name)) return false;
     if (colFilters.tier.size > 0 && !colFilters.tier.has(c.tier)) return false;
+    if (colFilters.hang.size > 0 && !colFilters.hang.has(c.hang)) return false;
     if (colFilters.care.size > 0 && !colFilters.care.has(c.careStatus || '')) return false;
     if (colFilters.zalo.size > 0 && !colFilters.zalo.has(c.zaloStatus || '')) return false;
     if (colFilters.product.size > 0) {
@@ -3939,6 +3948,7 @@ function _rowHtml(c) {
     <td class="col-lastpos" style="${lastPosDisp}">${lastPosHtml}</td>
     <td class="col-name"><div class="cname">${esc(c.name)}</div><div class="cphone" style="display:flex;align-items:center;gap:4px">${c.phone}<button data-phone="${esc(c.phone)}" onclick="event.stopPropagation();copyPhone(this.dataset.phone)" title="Copy SĐT" style="background:none;border:none;cursor:pointer;font-size:11px;padding:0 2px;color:var(--hint);line-height:1;opacity:.6" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'">📋</button></div></td>
     <td class="col-tier">${tb}</td>
+    <td class="col-hang">${hangBadge(c.hangKey)}</td>
     <td class="col-care">${cb}${khb ? '<br>'+khb : ''}</td>
     <td class="col-zalo">${zb}</td>
     <td class="col-order"><span style="font-weight:600">${c.totalOrders}</span><span style="color:var(--muted);font-size:11px"> / ${fmtVND(c.totalRevenue)}</span></td>
@@ -4051,7 +4061,7 @@ function _renderVirtualWindow(force) {
   if (!tbody) return;
   const list = _vt.list;
   if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:32px;color:var(--hint)">Không có kết quả</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;padding:32px;color:var(--hint)">Không có kết quả</td></tr>';
     return;
   }
   const wrap = _vtWrap();
@@ -4069,9 +4079,9 @@ function _renderVirtualWindow(force) {
   const botH = Math.max(0, (total - end) * VT_ROW_H);
 
   // Dùng DocumentFragment + 1 lần ghi innerHTML (batch DOM)
-  let html = `<tr class="vspacer" aria-hidden="true"><td colspan="14" style="height:${topH}px"></td></tr>`;
+  let html = `<tr class="vspacer" aria-hidden="true"><td colspan="15" style="height:${topH}px"></td></tr>`;
   for (let i = start; i < end; i++) html += _rowHtml(list[i]);
-  html += `<tr class="vspacer" aria-hidden="true"><td colspan="14" style="height:${botH}px"></td></tr>`;
+  html += `<tr class="vspacer" aria-hidden="true"><td colspan="15" style="height:${botH}px"></td></tr>`;
   tbody.innerHTML = html;
   reapplyColVisibility();
 }
@@ -4816,6 +4826,7 @@ async function _histEditSave(phone, orderIdx, eid) {
 
   // Recompute totals
   c.totalRevenue = c.orders.reduce((s,x)=>s+(x.revenue||0),0);
+  c.hangKey = _hangKeyOf_(c.totalRevenue); c.hang = HANG_LABEL[c.hangKey];
   c.brands = new Set(c.orders.map(x=>x.product).filter(Boolean));
   c.renewOrders = c.orders.filter(x=>RENEW_SOURCES.includes(s(x.source).toLowerCase())).length;
 
@@ -4884,6 +4895,7 @@ async function _histDeleteOrder(phone, orderIdx) {
   c.orders.splice(orderIdx, 1);
   c._keys = new Set(c.orders.map(x=>`${phone}_${x.year}_${x.month}_${x.revenue}`));
   c.totalRevenue = c.orders.reduce((s,x)=>s+(x.revenue||0),0);
+  c.hangKey = _hangKeyOf_(c.totalRevenue); c.hang = HANG_LABEL[c.hangKey];
   c.brands = new Set(c.orders.map(x=>x.product).filter(Boolean));
   c.renewOrders = c.orders.filter(x=>RENEW_SOURCES.includes(s(x.source).toLowerCase())).length;
 
@@ -6134,6 +6146,7 @@ async function addManualOrder(phone) {
 
   // Recompute totals
   c.totalRevenue = c.orders.reduce((s,o)=>s+(o.revenue||0),0);
+  c.hangKey = _hangKeyOf_(c.totalRevenue); c.hang = HANG_LABEL[c.hangKey];
   c.totalOrders  = c.orders.length;
   c.brands = new Set(c.orders.map(o=>o.product).filter(Boolean));
   c.renewOrders = c.orders.filter(o=>RENEW_SOURCES.includes(s(o.source).toLowerCase())).length;
@@ -6760,6 +6773,18 @@ function clearData() {
 // ═══════════════════════════════════════════════════════
 //  BADGE HELPERS
 // ═══════════════════════════════════════════════════════
+// ---- PHAN HANG KH theo DOANH THU luy ke (yeu cau Duyen 2026-10-06) ----
+// < 15tr: Khach thuong | 15 -> <30tr: Than thiet | 30 -> <50tr: Vip | >= 50tr: Super VVip
+// (khac cot 'Phan loai' = theo SO DON Pos). Doanh thu = totalRevenue cua KH (tong cac don o DT TONG).
+// GAS auto-assign (_aaLoadCustomers_) dung CUNG nguong -- doi o day thi doi ca _aaHangKey_ trong gas_v13.js.
+var HANG_KEYS = ['thuong','tt','vip','super'];
+var HANG_LABEL = { thuong:'Khách thường', tt:'Thân thiết', vip:'Vip', super:'Super VVip' };
+function _hangKeyOf_(rev){ rev = Number(rev) || 0; return rev >= 50000000 ? 'super' : rev >= 30000000 ? 'vip' : rev >= 15000000 ? 'tt' : 'thuong'; }
+function hangBadge(k){
+  const cls = { thuong:'bo', tt:'bt', vip:'bv', super:'bv' }[k] || 'bo';
+  const st = k === 'super' ? ' style="background:#7c2d12;color:#fde68a;font-weight:700"' : '';
+  return `<span class="badge ${cls}"${st}>${HANG_LABEL[k] || HANG_LABEL.thuong}</span>`;
+}
 function tierBadge(tier) {
   const map={'VIP':'bv','Thân thiết':'bt','Tiềm năng':'bn','Chưa bán lại được':'bo'};
   return `<span class="badge ${map[tier]||'bo'}">${tier}</span>`;
@@ -7206,7 +7231,7 @@ function loadLS(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):nu
 function saveLS(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
 
 // Column visibility state
-const _colVisDefault = { lastpos:true, name:true, tier:true, care:true, zalo:true, order:true, product:true, cs:true, source:false, note:true, sched:true, lastact:true, tacdong:true, carecs:true, bcstatus:true };
+const _colVisDefault = { lastpos:true, name:true, tier:true, hang:true, care:true, zalo:true, order:true, product:true, cs:true, source:false, note:true, sched:true, lastact:true, tacdong:true, carecs:true, bcstatus:true };
 const colVisible = Object.assign({}, _colVisDefault, loadLS('ome_col_visible') || {});
 
 function toggleCol(col, cb) {
@@ -7618,6 +7643,7 @@ function renderColDdItems(col, query) {
   let values;
   if (col==='name') values = [...new Set(allCustomers.map(c=>c.name))].sort((a,b)=>a.localeCompare(b,'vi'));
   else if (col==='tier') values = ['VIP','Thân thiết','Tiềm năng','Chưa bán lại được'];
+  else if (col==='hang') values = HANG_KEYS.map(k=>HANG_LABEL[k]);
   else if (col==='care') values = ['', ...CARE_STATUS];
   else if (col==='zalo') values = ['', ...ZALO_STATUS];
   else if (col==='product') values = ['', ...[...new Set(allCustomers.flatMap(c=>c.brands).filter(Boolean))].sort()];
@@ -7984,7 +8010,7 @@ let _myDataFilter = 'active'; // 'active' | 'done' | 'all'
 let _advAssign = {
   sourceMode: 'filter',   // 'filter' | 'count'
   customCount: 0,
-  sortMode: 'default',    // 'default' | 'vip' | 'tt' | 'tn' | 'unassigned'
+  sortMode: 'default',    // 'default' | 'vip' | 'tt' | 'tn' | 'unassigned' | 'h_thuong' | 'h_tt' | 'h_vip' | 'h_super' (Phan hang KH theo doanh thu)
   dateFrom: '',           // lọc thêm theo khoảng ngày ĐƠN HÀNG (c.ymList[].ds), để trống = không giới hạn
   dateTo: '',
   srcSet: new Set(),      // lọc theo NGUỒN dữ liệu (c.dataSrc: dt|don|cs|cskh) — rỗng = mọi nguồn. Khách chưa có ngày đơn (vd CSKH-Duyên) vẫn được lấy khi đã chọn nguồn
@@ -8150,6 +8176,10 @@ function _getAssignPool() {
   let pool = [..._advAssignDateFilteredList()];
   if (_advAssign.sortMode === 'unassigned') {
     pool = pool.filter(p => !wasEverAssigned(p));
+  } else if (/^h_(thuong|tt|vip|super)$/.test(_advAssign.sortMode)) {
+    const _hangWant = _advAssign.sortMode.slice(2);   // Phan hang KH (doanh thu): lay dung hang duoc chon
+    const _cmH = _assignCustMap();
+    pool = pool.filter(p => { const c = _cmH.get(p); return c && c.hangKey === _hangWant; });
   } else if (_advAssign.sortMode === 'vip' || _advAssign.sortMode === 'tt' || _advAssign.sortMode === 'tn') {
     const _tierWant = _advAssign.sortMode === 'vip' ? 'VIP' : (_advAssign.sortMode === 'tt' ? 'Thân thiết' : 'Tiềm năng');
     const _cm = _assignCustMap();
@@ -8241,6 +8271,7 @@ function renderAssignCreate() {
   const _custMap = _assignCustMap();
   let alreadyAssigned = { length: 0 }, neverAssigned = { length: 0 };
   const tierCount = { VIP:0, 'Thân thiết':0, 'Tiềm năng':0, other:0 };
+  const hangCount = { thuong:0, tt:0, vip:0, super:0 };
   const srcCount = { dt:0, don:0, cs:0, cskh:0 };
   _assignFilteredList.forEach(p => {
     const d = _custMap.get(p)?.dataSrc;
@@ -8251,6 +8282,7 @@ function renderAssignCreate() {
     const c = _custMap.get(p);
     const t = c?.tier || 'other';
     if (tierCount[t] !== undefined) tierCount[t]++; else tierCount.other++;
+    hangCount[(c && c.hangKey) || 'thuong']++;
   });
 
   const html = `
@@ -8262,6 +8294,7 @@ function renderAssignCreate() {
       <span style="color:var(--vip)">VIP: ${tierCount.VIP}</span> &nbsp;·&nbsp;
       <span style="color:var(--tt)">Thân thiết: ${tierCount['Thân thiết']}</span> &nbsp;·&nbsp;
       <span style="color:var(--tn)">Tiềm năng: ${tierCount['Tiềm năng']}</span><br>
+      <span style="color:var(--muted)">Phân hạng KH (doanh thu): ${HANG_KEYS.map(k=>`${HANG_LABEL[k]} ${hangCount[k]}`).join(' &nbsp;·&nbsp; ')}</span><br>
       <span style="color:var(--green)">✓ Chưa chia: <strong>${neverAssigned.length}</strong></span> &nbsp;|&nbsp;
       <span style="color:#92400e">⚠ Đã chia: <strong>${alreadyAssigned.length}</strong></span>
       ${totalFiltered === 0 ? '<br><span style="color:var(--red)">⚠ Không có KH nào khớp (bộ lọc bảng + nguồn + khoảng ngày bên dưới). Hãy xoá bớt bộ lọc / nới khoảng ngày / đổi nguồn rồi thử lại.</span>' : ''}
@@ -8308,7 +8341,11 @@ function renderAssignCreate() {
         ['unassigned','Chưa chia lần nào'],
         ['vip',`VIP (${tierCount.VIP})`],
         ['tt',`Thân thiết (${tierCount['Thân thiết']})`],
-        ['tn',`Tiềm năng (${tierCount['Tiềm năng']})`]
+        ['tn',`Tiềm năng (${tierCount['Tiềm năng']})`],
+        ['h_thuong',`Hạng: Khách thường (${hangCount.thuong})`],
+        ['h_tt',`Hạng: Thân thiết (${hangCount.tt})`],
+        ['h_vip',`Hạng: Vip (${hangCount.vip})`],
+        ['h_super',`Hạng: Super VVip (${hangCount.super})`]
       ].map(([k,l])=>`<div class="assign-sort-btn ${_advAssign.sortMode===k?'active':''}" onclick="_advAssign.sortMode='${k}';renderAssignCreate()">${l}</div>`).join('')}
     </div>
   </div>
@@ -9726,7 +9763,7 @@ function _filterSignature(){
     val('campaign-filter'), chk('no-action-filter')
   ];
   if (typeof colFilters === 'object') {
-    parts.push('cf', _setSig(colFilters.name), _setSig(colFilters.tier), _setSig(colFilters.care),
+    parts.push('cf', _setSig(colFilters.name), _setSig(colFilters.tier), _setSig(colFilters.hang), _setSig(colFilters.care),
       _setSig(colFilters.zalo), _setSig(colFilters.product), _setSig(colFilters.source), _setSig(colFilters.cs), _setSig(colFilters.careCS), _setSig(colFilters.lastpos));
   }
   if (typeof advFilters === 'object') {
@@ -17268,6 +17305,8 @@ var _AA_SRC_LABEL = { dt:'DT tổng', don:'Dữ liệu đơn', cs:'Chăm sóc', 
 var _AA_PRIO_KEYS = ['vip','tt','tn','other'];
 var _AA_PRIO_LABEL = { vip:'VIP', tt:'Thân thiết', tn:'Tiềm năng', other:'Khác (chưa phân hạng)' };
 var _AA_TIER = { vip:'VIP', tt:'Thân thiết', tn:'Tiềm năng' };
+var _AA_HANG_KEYS = ['thuong','tt','vip','super'];
+var _AA_HANG_LABEL = { thuong:'Khách thường', tt:'Thân thiết', vip:'Vip', super:'Super VVip' };   // PHAN HANG KH theo doanh thu (xem _hangKeyOf_ trong index.html)
 
 function _aaDefaultCfg(){
   return {
@@ -17282,8 +17321,9 @@ function _aaDefaultCfg(){
     members:{},                // teamId -> {tenNV: {on, val}}
     src:{ mode:'pct', vals:{} },   // chung; vals rỗng/0 hết = lấy mọi nguồn theo tỷ lệ bằng nhau
     prio:{ mode:'pct', vals:{} },
-    teamSrc:{}, teamPrio:{},   // teamId -> {mode, vals} (ghi đè)
-    memberSrc:{}, memberPrio:{}, // teamId -> {tenNV: {mode, vals}} (ghi đè)
+    hang:{ mode:'pct', vals:{} },   // Phan hang KH: thuong/tt/vip/super (chua cai = khong loc theo hang)
+    teamSrc:{}, teamPrio:{}, teamHang:{},   // teamId -> {mode, vals} (ghi đè)
+    memberSrc:{}, memberPrio:{}, memberHang:{}, // teamId -> {tenNV: {mode, vals}} (ghi đè)
     lastRun:'',                // YYYY-MM-DD ngày đã chạy gần nhất
     lastResult:null
   };
@@ -17304,7 +17344,7 @@ function _aaSplit(total, weights){
 }
 // Lấy tỷ lệ áp dụng cho 1 người: ghi đè người → ghi đè Team → chung
 function _aaRatioFor(cfg, kind, tid, name){
-  var mk = kind === 'src' ? 'memberSrc' : 'memberPrio', tk = kind === 'src' ? 'teamSrc' : 'teamPrio';
+  var mk = { src:'memberSrc', prio:'memberPrio', hang:'memberHang' }[kind], tk = { src:'teamSrc', prio:'teamPrio', hang:'teamHang' }[kind];
   var m = cfg[mk] && cfg[mk][tid] && cfg[mk][tid][name]; if (m) return m;
   var t = cfg[tk] && cfg[tk][tid]; if (t) return t;
   return cfg[kind];
@@ -17335,23 +17375,25 @@ function _aaRecipients(cfg, teamsArr, membersOf){
 }
 // Dựng nhóm ứng viên theo (nguồn, ưu tiên). custs: [{phone,dataSrc,tier}] ; everSet: Set SĐT đã chia từng
 function _aaBuckets(cfg, custs, everSet){
-  var b = {};
-  _AA_SRC_KEYS.forEach(function(s){ b[s] = {}; _AA_PRIO_KEYS.forEach(function(p){ b[s][p] = []; }); });
+  var b = {}, bh = {};   // b[s][p] = [phone] (nhu cu) ; bh['s|p|h'] = [phone] -- them chieu PHAN HANG KH (doanh thu): thuong|tt|vip|super
+  _AA_SRC_KEYS.forEach(function(s){ b[s] = {}; _AA_PRIO_KEYS.forEach(function(p){ b[s][p] = []; _AA_HANG_KEYS.forEach(function(h){ bh[s+'|'+p+'|'+h] = []; }); }); });
   for (var i = 0; i < custs.length; i++){
     var c = custs[i]; if (!c || !c.phone) continue;
     if (cfg.onlyUnassigned && everSet && everSet.has(c.phone)) continue;
     var p = c.tier === 'VIP' ? 'vip' : c.tier === 'Thân thiết' ? 'tt' : c.tier === 'Tiềm năng' ? 'tn' : 'other';
+    var hg = (c.hangKey && _AA_HANG_KEYS.indexOf(c.hangKey) >= 0) ? c.hangKey : 'thuong';
     var d = c.dataSrc || {};
-    for (var j = 0; j < _AA_SRC_KEYS.length; j++){ var s = _AA_SRC_KEYS[j]; if (d[s]) b[s][p].push(c.phone); }
+    for (var j = 0; j < _AA_SRC_KEYS.length; j++){ var s = _AA_SRC_KEYS[j]; if (d[s]) { b[s][p].push(c.phone); bh[s+'|'+p+'|'+hg].push(c.phone); } }
   }
+  b._h = bh;
   return b;
 }
 // Lập kế hoạch 1 ngày. Trả {entries:[{team,teamName,name,phones[]}], short:[{name,missing}], warn:[]}
 function _aaPlan(cfg, teamsArr, membersOf, custs, everSet){
   var rc = _aaRecipients(cfg, teamsArr, membersOf), buckets = _aaBuckets(cfg, custs, everSet);
   var taken = new Set(), ptr = {}, entries = [], short = [];
-  function take(s, p, n, out){           // lấy tối đa n SĐT chưa dùng từ nhóm (s,p)
-    var arr = buckets[s][p], k = s + '|' + p, got = 0, i = ptr[k] || 0;
+  function take(s, p, n, out, h){         // lay toi da n SDT chua dung tu nhom (s,p) [va hang h neu co]
+    var arr = h ? buckets._h[s + '|' + p + '|' + h] : buckets[s][p], k = s + '|' + p + (h ? '|' + h : ''), got = 0, i = ptr[k] || 0;
     while (got < n && i < arr.length){ var ph = arr[i++]; if (!taken.has(ph)) { taken.add(ph); out.push(ph); got++; } }
     ptr[k] = i; return got;
   }
@@ -17359,21 +17401,45 @@ function _aaPlan(cfg, teamsArr, membersOf, custs, everSet){
     var sw = _aaWeights(_aaRatioFor(cfg, 'src', r.team, r.name), _AA_SRC_KEYS);
     var sq = _aaSplit(r.quota, sw), phones = [], miss = 0;
     var pw = _aaWeights(_aaRatioFor(cfg, 'prio', r.team, r.name), _AA_PRIO_KEYS);
-    var leftover = [];                    // phần chưa lấy đủ: [{s,p}] theo thứ tự để bù
-    _AA_SRC_KEYS.forEach(function(s, si){
-      if (!sq[si]) return;
-      var pq = _aaSplit(sq[si], pw);
-      _AA_PRIO_KEYS.forEach(function(p, pi){
-        if (!pq[pi]) return;
-        var got = take(s, p, pq[pi], phones);
-        if (got < pq[pi]) miss += pq[pi] - got;
+    var srcOrder = _AA_SRC_KEYS.map(function(s,i){ return { s:s, w:sw[i] }; }).filter(function(x){ return x.w > 0; })
+      .sort(function(a,b){ return b.w - a.w; }).map(function(x){ return x.s; });
+    var prOrder = _AA_PRIO_KEYS.map(function(p,i){ return { p:p, w:pw[i] }; }).filter(function(x){ return x.w > 0; })
+      .sort(function(a,b){ return b.w - a.w; }).map(function(x){ return x.p; });
+    // Phan hang KH (doanh thu): CHI kich hoat khi co it nhat 1 hang duoc cai > 0 (chua cai = giu nguyen cach chia cu, khong doi hanh vi)
+    var hr = _aaRatioFor(cfg, 'hang', r.team, r.name), hv = (hr && hr.vals) || {};
+    var hangOn = _AA_HANG_KEYS.some(function(k){ return (Number(hv[k]) || 0) > 0; });
+    if (hangOn){
+      // Chia han muc theo HANG truoc (tong moi hang dung ty le), ben trong moi hang van chia theo ty le NGUON roi UU TIEN nhu cu.
+      var hq = _aaSplit(r.quota, _aaWeights(hr, _AA_HANG_KEYS));
+      _AA_HANG_KEYS.forEach(function(h, hi){
+        if (!hq[hi]) return;
+        var m = 0, sqh = _aaSplit(hq[hi], sw);
+        _AA_SRC_KEYS.forEach(function(s, si){
+          if (!sqh[si]) return;
+          var pqh = _aaSplit(sqh[si], pw);
+          _AA_PRIO_KEYS.forEach(function(p, pi){
+            if (!pqh[pi]) return;
+            var g = take(s, p, pqh[pi], phones, h);
+            if (g < pqh[pi]) m += pqh[pi] - g;
+          });
+        });
+        // o (nguon,uu tien) nao thieu dung hang nay -> lay hang do o cac o khac (nguon/uu tien trong so cao truoc)
+        for (var a = 0; a < srcOrder.length && m > 0; a++)
+          for (var c2 = 0; c2 < prOrder.length && m > 0; c2++) m -= take(srcOrder[a], prOrder[c2], m, phones, h);
+        miss += Math.max(0, m);
       });
-    });
-    if (miss > 0){   // bù: cùng nguồn đã chọn trước (theo ưu tiên có trọng số cao), rồi các nguồn còn lại có trọng số > 0
-      var srcOrder = _AA_SRC_KEYS.map(function(s,i){ return { s:s, w:sw[i] }; }).filter(function(x){ return x.w > 0; })
-        .sort(function(a,b){ return b.w - a.w; }).map(function(x){ return x.s; });
-      var prOrder = _AA_PRIO_KEYS.map(function(p,i){ return { p:p, w:pw[i] }; }).filter(function(x){ return x.w > 0; })
-        .sort(function(a,b){ return b.w - a.w; }).map(function(x){ return x.p; });
+    } else {
+      _AA_SRC_KEYS.forEach(function(s, si){
+        if (!sq[si]) return;
+        var pq = _aaSplit(sq[si], pw);
+        _AA_PRIO_KEYS.forEach(function(p, pi){
+          if (!pq[pi]) return;
+          var got = take(s, p, pq[pi], phones);
+          if (got < pq[pi]) miss += pq[pi] - got;
+        });
+      });
+    }
+    if (miss > 0){   // bu: cung nguon da chon truoc (theo uu tien co trong so cao), roi cac nguon con lai co trong so > 0 (bu KHONG phan biet hang)
       for (var a = 0; a < srcOrder.length && miss > 0; a++)
         for (var c2 = 0; c2 < prOrder.length && miss > 0; c2++) miss -= take(srcOrder[a], prOrder[c2], miss, phones);
     }
@@ -17478,7 +17544,7 @@ var _aaRatioTeamOpen = {};   // teamId -> đang mở khối tỷ lệ riêng c�
 var _AA_DOW = [['1','T2'],['2','T3'],['3','T4'],['4','T5'],['5','T6'],['6','T7'],['0','CN']];
 function _aaScopeObj(kind, tid, name, create){
   if (!tid) return _aaCfg[kind];
-  var key = kind === 'src' ? (name ? 'memberSrc' : 'teamSrc') : (name ? 'memberPrio' : 'teamPrio');
+  var key = ({ src:['teamSrc','memberSrc'], prio:['teamPrio','memberPrio'], hang:['teamHang','memberHang'] })[kind][name ? 1 : 0];
   var root = _aaCfg[key] = _aaCfg[key] || {};
   if (!name) { if (!root[tid] && create) root[tid] = { mode:'pct', vals:{} }; return root[tid]; }
   root[tid] = root[tid] || {};
@@ -17577,13 +17643,13 @@ function _aaRatioTeamsHtml(){
     '<div style="font-size:11px;color:var(--muted);margin:2px 0 6px">Bấm tên Team để cài tỷ lệ nguồn / ưu tiên cho cả Team (áp dụng cho mọi người trong Team, trừ người đã cài riêng). Chấm xanh = Team đang có tỷ lệ riêng.</div>'+
     '<div style="display:flex;gap:6px;flex-wrap:wrap">';
   teams.forEach(function(t){
-    var has = !!((cfg.teamSrc && cfg.teamSrc[t.id]) || (cfg.teamPrio && cfg.teamPrio[t.id]));
+    var has = !!((cfg.teamSrc && cfg.teamSrc[t.id]) || (cfg.teamPrio && cfg.teamPrio[t.id]) || (cfg.teamHang && cfg.teamHang[t.id]));
     h += '<span class="assign-sort-btn '+(_aaRatioTeamOpen[t.id]?'active':'')+'" onclick="_aaRatioTeamToggle(\''+esc(t.id)+'\')">'+(has?'<span style="color:var(--green)">●</span> ':'')+esc(t.name)+'</span>';
   });
   h += '</div>';
   teams.forEach(function(t){
     if (!_aaRatioTeamOpen[t.id]) return;
-    h += '<div style="margin-top:8px"><b style="font-size:12px">'+esc(t.name)+'</b>'+_aaRatioHtml('src', t.id)+_aaRatioHtml('prio', t.id)+'</div>';
+    h += '<div style="margin-top:8px"><b style="font-size:12px">'+esc(t.name)+'</b>'+_aaRatioHtml('src', t.id)+_aaRatioHtml('prio', t.id)+_aaRatioHtml('hang', t.id)+'</div>';
   });
   return h + '</div>';
 }
@@ -17593,15 +17659,15 @@ function _aaRatioVal(el){ var o = _aaScopeObj(el.dataset.k, el.dataset.t, el.dat
 function _aaRatioAdd(el){ _aaScopeObj(el.dataset.k, el.dataset.t, el.dataset.n, true); _aaRerender(); }
 function _aaRatioDel(el){
   var k = el.dataset.k, t = el.dataset.t, n = el.dataset.n;
-  var key = k === 'src' ? (n ? 'memberSrc' : 'teamSrc') : (n ? 'memberPrio' : 'teamPrio');
+  var key = ({ src:['teamSrc','memberSrc'], prio:['teamPrio','memberPrio'], hang:['teamHang','memberHang'] })[k][n ? 1 : 0];
   if (n) { if (_aaCfg[key] && _aaCfg[key][t]) delete _aaCfg[key][t][n]; } else if (_aaCfg[key]) delete _aaCfg[key][t];
   _aaRerender();
 }
 // Khối nhập tỷ lệ NGUỒN (kind='src') hoặc ƯU TIÊN (kind='prio'); tid/name rỗng = cài chung
 function _aaRatioHtml(kind, tid, name){
-  var keys = kind === 'src' ? _AA_SRC_KEYS : _AA_PRIO_KEYS, lab = kind === 'src' ? _AA_SRC_LABEL : _AA_PRIO_LABEL;
+  var keys = ({ src:_AA_SRC_KEYS, prio:_AA_PRIO_KEYS, hang:_AA_HANG_KEYS })[kind], lab = ({ src:_AA_SRC_LABEL, prio:_AA_PRIO_LABEL, hang:_AA_HANG_LABEL })[kind];
   var o = _aaScopeObj(kind, tid, name, false), da = 'data-k="'+kind+'" data-t="'+esc(tid||'')+'" data-n="'+esc(name||'')+'"';
-  var title = kind === 'src' ? 'Tỷ lệ theo NGUỒN' : 'Tỷ lệ theo ƯU TIÊN';
+  var title = ({ src:'Tỷ lệ theo NGUỒN', prio:'Tỷ lệ theo ƯU TIÊN', hang:'Tỷ lệ theo PHÂN HẠNG KH (doanh thu)' })[kind];
   if (tid && !o) return '<button class="btn sm" '+da+' onclick="_aaRatioAdd(this)" style="margin:2px 4px 2px 0">＋ '+title+' riêng</button>';
   o = o || { mode:'pct', vals:{} };
   var sum = keys.reduce(function(s,k){ return s + (Number(o.vals[k]) || 0); }, 0), pct = o.mode !== 'count';
@@ -17659,7 +17725,7 @@ function renderAssignAuto(){
   h += '</div>';
   h += '<div class="assign-section"><div class="assign-section-title">② Tỷ lệ chung theo nguồn &amp; ưu tiên</div>'+
     '<div style="font-size:11px;color:var(--muted)">Áp dụng cho mọi người, trừ chỗ bạn cài riêng theo Team / từng người (bấm “Chi tiết” ở Team). Mỗi người: hạn mức → chia theo nguồn → mỗi nguồn chia tiếp theo ưu tiên.</div>'+
-    _aaRatioHtml('src') + _aaRatioHtml('prio') + _aaRatioTeamsHtml() + '</div>';
+    _aaRatioHtml('src') + _aaRatioHtml('prio') + _aaRatioHtml('hang') + _aaRatioTeamsHtml() + '</div>';
   var lr = cfg.lastResult;
   if (lr) h += '<div class="assign-section"><div class="assign-section-title">Lần chạy gần nhất</div><div style="font-size:12px">'+esc(lr.date)+(lr.forced?' (chạy thử)':'')+(lr.by?' · bởi '+(lr.by==='server'?'server (trigger)':'trình duyệt'):'')+': đã chia <b>'+lr.total+' KH</b> cho '+(lr.people||0)+' CS'+
     ((lr.short||[]).length ? '<div style="color:var(--red);margin-top:4px">Thiếu data: '+lr.short.map(function(s){ return esc(s.name)+' thiếu '+s.missing; }).join(', ')+'</div>' : '')+'</div></div>';
@@ -17688,7 +17754,7 @@ function _aaTeamDetailHtml(t, members, qmap){
       '<span style="font-size:12px;color:var(--muted)">Đã chia '+tot+(tq ? ' / '+tq : '')+' KH/ngày</span>';
   }
   h += '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px">'+bar+'</div>';
-  h += '<div style="padding-bottom:6px"><b style="font-size:12px">Cả Team (áp dụng cho mọi người trong Team, trừ người có tỷ lệ riêng):</b>'+_aaRatioHtml('src', t.id)+_aaRatioHtml('prio', t.id)+'</div>';
+  h += '<div style="padding-bottom:6px"><b style="font-size:12px">Cả Team (áp dụng cho mọi người trong Team, trừ người có tỷ lệ riêng):</b>'+_aaRatioHtml('src', t.id)+_aaRatioHtml('prio', t.id)+_aaRatioHtml('hang', t.id)+'</div>';
   members.forEach(function(m){
     var o = mc[m] || { on:true, val:0 }, isOn = o.on !== false;
     var val = pctMode ? (isOn && pm[m] != null ? pm[m] : '') : (o.val || '');
@@ -17696,7 +17762,7 @@ function _aaTeamDetailHtml(t, members, qmap){
       '<label style="min-width:150px;font-size:13px"><input type="checkbox" '+(isOn?'checked':'')+' data-m="'+esc(m)+'" onchange="_aaMemberField(\''+tid+'\',this.dataset.m,\'on\',this.checked)"> '+esc(m)+'</label>'+
       '<input type="number" min="0" step="'+(pctMode?'0.1':'1')+'" style="width:70px" value="'+val+'" placeholder="0" data-m="'+esc(m)+'" onchange="_aaMemberField(\''+tid+'\',this.dataset.m,\'val\',this.value)"> '+(pctMode?'%':'KH/ngày')+
       '<b style="font-size:12px;color:var(--green)">≈ '+(isOn ? (qmap[t.id+'|'+m]||0) : 0)+' KH/ngày</b></div>'+
-      '<div style="margin-left:4px">'+_aaRatioHtml('src', t.id, m)+_aaRatioHtml('prio', t.id, m)+'</div></div>';
+      '<div style="margin-left:4px">'+_aaRatioHtml('src', t.id, m)+_aaRatioHtml('prio', t.id, m)+_aaRatioHtml('hang', t.id, m)+'</div></div>';
   });
   return h + '</div>';
 }

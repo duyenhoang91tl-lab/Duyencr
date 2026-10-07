@@ -8729,6 +8729,8 @@ var _AA_SRC_LABEL = { dt:'DT tổng', don:'Dữ liệu đơn', cs:'Chăm sóc', 
 var _AA_PRIO_KEYS = ['vip','tt','tn','other'];
 var _AA_PRIO_LABEL = { vip:'VIP', tt:'Thân thiết', tn:'Tiềm năng', other:'Khác (chưa phân hạng)' };
 var _AA_TIER = { vip:'VIP', tt:'Thân thiết', tn:'Tiềm năng' };
+var _AA_HANG_KEYS = ['thuong','tt','vip','super'];
+var _AA_HANG_LABEL = { thuong:'Khách thường', tt:'Thân thiết', vip:'Vip', super:'Super VVip' };   // PHAN HANG KH theo doanh thu (xem _hangKeyOf_ trong index.html)
 
 function _aaDefaultCfg(){
   return {
@@ -8741,8 +8743,9 @@ function _aaDefaultCfg(){
     members:{},                // teamId -> {tenNV: {on, val}}
     src:{ mode:'pct', vals:{} },   // chung; vals rỗng/0 hết = lấy mọi nguồn theo tỷ lệ bằng nhau
     prio:{ mode:'pct', vals:{} },
-    teamSrc:{}, teamPrio:{},   // teamId -> {mode, vals} (ghi đè)
-    memberSrc:{}, memberPrio:{}, // teamId -> {tenNV: {mode, vals}} (ghi đè)
+    hang:{ mode:'pct', vals:{} },   // Phan hang KH: thuong/tt/vip/super (chua cai = khong loc theo hang)
+    teamSrc:{}, teamPrio:{}, teamHang:{},   // teamId -> {mode, vals} (ghi đè)
+    memberSrc:{}, memberPrio:{}, memberHang:{}, // teamId -> {tenNV: {mode, vals}} (ghi đè)
     lastRun:'',                // YYYY-MM-DD ngày đã chạy gần nhất
     lastResult:null
   };
@@ -8763,7 +8766,7 @@ function _aaSplit(total, weights){
 }
 // Lấy tỷ lệ áp dụng cho 1 người: ghi đè người → ghi đè Team → chung
 function _aaRatioFor(cfg, kind, tid, name){
-  var mk = kind === 'src' ? 'memberSrc' : 'memberPrio', tk = kind === 'src' ? 'teamSrc' : 'teamPrio';
+  var mk = { src:'memberSrc', prio:'memberPrio', hang:'memberHang' }[kind], tk = { src:'teamSrc', prio:'teamPrio', hang:'teamHang' }[kind];
   var m = cfg[mk] && cfg[mk][tid] && cfg[mk][tid][name]; if (m) return m;
   var t = cfg[tk] && cfg[tk][tid]; if (t) return t;
   return cfg[kind];
@@ -8794,23 +8797,25 @@ function _aaRecipients(cfg, teamsArr, membersOf){
 }
 // Dựng nhóm ứng viên theo (nguồn, ưu tiên). custs: [{phone,dataSrc,tier}] ; everSet: Set SĐT đã chia từng
 function _aaBuckets(cfg, custs, everSet){
-  var b = {};
-  _AA_SRC_KEYS.forEach(function(s){ b[s] = {}; _AA_PRIO_KEYS.forEach(function(p){ b[s][p] = []; }); });
+  var b = {}, bh = {};   // b[s][p] = [phone] (nhu cu) ; bh['s|p|h'] = [phone] -- them chieu PHAN HANG KH (doanh thu): thuong|tt|vip|super
+  _AA_SRC_KEYS.forEach(function(s){ b[s] = {}; _AA_PRIO_KEYS.forEach(function(p){ b[s][p] = []; _AA_HANG_KEYS.forEach(function(h){ bh[s+'|'+p+'|'+h] = []; }); }); });
   for (var i = 0; i < custs.length; i++){
     var c = custs[i]; if (!c || !c.phone) continue;
     if (cfg.onlyUnassigned && everSet && everSet.has(c.phone)) continue;
     var p = c.tier === 'VIP' ? 'vip' : c.tier === 'Thân thiết' ? 'tt' : c.tier === 'Tiềm năng' ? 'tn' : 'other';
+    var hg = (c.hangKey && _AA_HANG_KEYS.indexOf(c.hangKey) >= 0) ? c.hangKey : 'thuong';
     var d = c.dataSrc || {};
-    for (var j = 0; j < _AA_SRC_KEYS.length; j++){ var s = _AA_SRC_KEYS[j]; if (d[s]) b[s][p].push(c.phone); }
+    for (var j = 0; j < _AA_SRC_KEYS.length; j++){ var s = _AA_SRC_KEYS[j]; if (d[s]) { b[s][p].push(c.phone); bh[s+'|'+p+'|'+hg].push(c.phone); } }
   }
+  b._h = bh;
   return b;
 }
 // Lập kế hoạch 1 ngày. Trả {entries:[{team,teamName,name,phones[]}], short:[{name,missing}], warn:[]}
 function _aaPlan(cfg, teamsArr, membersOf, custs, everSet){
   var rc = _aaRecipients(cfg, teamsArr, membersOf), buckets = _aaBuckets(cfg, custs, everSet);
   var taken = new Set(), ptr = {}, entries = [], short = [];
-  function take(s, p, n, out){           // lấy tối đa n SĐT chưa dùng từ nhóm (s,p)
-    var arr = buckets[s][p], k = s + '|' + p, got = 0, i = ptr[k] || 0;
+  function take(s, p, n, out, h){         // lay toi da n SDT chua dung tu nhom (s,p) [va hang h neu co]
+    var arr = h ? buckets._h[s + '|' + p + '|' + h] : buckets[s][p], k = s + '|' + p + (h ? '|' + h : ''), got = 0, i = ptr[k] || 0;
     while (got < n && i < arr.length){ var ph = arr[i++]; if (!taken.has(ph)) { taken.add(ph); out.push(ph); got++; } }
     ptr[k] = i; return got;
   }
@@ -8818,21 +8823,45 @@ function _aaPlan(cfg, teamsArr, membersOf, custs, everSet){
     var sw = _aaWeights(_aaRatioFor(cfg, 'src', r.team, r.name), _AA_SRC_KEYS);
     var sq = _aaSplit(r.quota, sw), phones = [], miss = 0;
     var pw = _aaWeights(_aaRatioFor(cfg, 'prio', r.team, r.name), _AA_PRIO_KEYS);
-    var leftover = [];                    // phần chưa lấy đủ: [{s,p}] theo thứ tự để bù
-    _AA_SRC_KEYS.forEach(function(s, si){
-      if (!sq[si]) return;
-      var pq = _aaSplit(sq[si], pw);
-      _AA_PRIO_KEYS.forEach(function(p, pi){
-        if (!pq[pi]) return;
-        var got = take(s, p, pq[pi], phones);
-        if (got < pq[pi]) miss += pq[pi] - got;
+    var srcOrder = _AA_SRC_KEYS.map(function(s,i){ return { s:s, w:sw[i] }; }).filter(function(x){ return x.w > 0; })
+      .sort(function(a,b){ return b.w - a.w; }).map(function(x){ return x.s; });
+    var prOrder = _AA_PRIO_KEYS.map(function(p,i){ return { p:p, w:pw[i] }; }).filter(function(x){ return x.w > 0; })
+      .sort(function(a,b){ return b.w - a.w; }).map(function(x){ return x.p; });
+    // Phan hang KH (doanh thu): CHI kich hoat khi co it nhat 1 hang duoc cai > 0 (chua cai = giu nguyen cach chia cu, khong doi hanh vi)
+    var hr = _aaRatioFor(cfg, 'hang', r.team, r.name), hv = (hr && hr.vals) || {};
+    var hangOn = _AA_HANG_KEYS.some(function(k){ return (Number(hv[k]) || 0) > 0; });
+    if (hangOn){
+      // Chia han muc theo HANG truoc (tong moi hang dung ty le), ben trong moi hang van chia theo ty le NGUON roi UU TIEN nhu cu.
+      var hq = _aaSplit(r.quota, _aaWeights(hr, _AA_HANG_KEYS));
+      _AA_HANG_KEYS.forEach(function(h, hi){
+        if (!hq[hi]) return;
+        var m = 0, sqh = _aaSplit(hq[hi], sw);
+        _AA_SRC_KEYS.forEach(function(s, si){
+          if (!sqh[si]) return;
+          var pqh = _aaSplit(sqh[si], pw);
+          _AA_PRIO_KEYS.forEach(function(p, pi){
+            if (!pqh[pi]) return;
+            var g = take(s, p, pqh[pi], phones, h);
+            if (g < pqh[pi]) m += pqh[pi] - g;
+          });
+        });
+        // o (nguon,uu tien) nao thieu dung hang nay -> lay hang do o cac o khac (nguon/uu tien trong so cao truoc)
+        for (var a = 0; a < srcOrder.length && m > 0; a++)
+          for (var c2 = 0; c2 < prOrder.length && m > 0; c2++) m -= take(srcOrder[a], prOrder[c2], m, phones, h);
+        miss += Math.max(0, m);
       });
-    });
-    if (miss > 0){   // bù: cùng nguồn đã chọn trước (theo ưu tiên có trọng số cao), rồi các nguồn còn lại có trọng số > 0
-      var srcOrder = _AA_SRC_KEYS.map(function(s,i){ return { s:s, w:sw[i] }; }).filter(function(x){ return x.w > 0; })
-        .sort(function(a,b){ return b.w - a.w; }).map(function(x){ return x.s; });
-      var prOrder = _AA_PRIO_KEYS.map(function(p,i){ return { p:p, w:pw[i] }; }).filter(function(x){ return x.w > 0; })
-        .sort(function(a,b){ return b.w - a.w; }).map(function(x){ return x.p; });
+    } else {
+      _AA_SRC_KEYS.forEach(function(s, si){
+        if (!sq[si]) return;
+        var pq = _aaSplit(sq[si], pw);
+        _AA_PRIO_KEYS.forEach(function(p, pi){
+          if (!pq[pi]) return;
+          var got = take(s, p, pq[pi], phones);
+          if (got < pq[pi]) miss += pq[pi] - got;
+        });
+      });
+    }
+    if (miss > 0){   // bu: cung nguon da chon truoc (theo uu tien co trong so cao), roi cac nguon con lai co trong so > 0 (bu KHONG phan biet hang)
       for (var a = 0; a < srcOrder.length && miss > 0; a++)
         for (var c2 = 0; c2 < prOrder.length && miss > 0; c2++) miss -= take(srcOrder[a], prOrder[c2], miss, phones);
     }
@@ -8848,10 +8877,13 @@ function _aaWriteJson_(key, obj) { setSetting_(key, JSON.stringify(obj)); }
 // Dung lai DUNG nguon/hang nhu buildCustomers (index.html): dt = co don o DT TONG; don = co trong "du lieu don";
 // cs = KH o sheet Cham soc (phai co ten hoac thuoc nguon khac moi tinh la khach); cskh = CSKH-Duyen.
 // Hang: dem so dong "du lieu don": >=10 VIP, >=5 Than thiet, >=2 Tiem nang, con lai Chua ban lai duoc (nhom 'other').
+// Phan hang KH theo doanh thu luy ke: <15tr Khach thuong | 15-<30tr Than thiet | 30-<50tr Vip | >=50tr Super VVip (GIONG _hangKeyOf_ o index.html)
+function _aaHangKey_(rev) { rev = Number(rev) || 0; return rev >= 50000000 ? 'super' : rev >= 30000000 ? 'vip' : rev >= 15000000 ? 'tt' : 'thuong'; }
 function _aaLoadCustomers_() {
   var src = {}, leadName = {};
   function mark(p, k) { if (!p) return; (src[p] = src[p] || {})[k] = true; }
-  readAllOrders_().forEach(function (o) { mark(o.phone, 'dt'); });
+  var revBy = {};   // PHAN HANG KH: tong doanh thu theo SDT tren DT TONG (cung nguon voi c.totalRevenue o index.html)
+  readAllOrders_().forEach(function (o) { mark(o.phone, 'dt'); if (o.phone) revBy[o.phone] = (revBy[o.phone] || 0) + (Number(o.revenue) || 0); });
   readCareLeads_().forEach(function (r) { mark(r.phone, 'cs'); if (r.name) leadName[r.phone] = true; });
   readCskhDuyenLite_().rows.forEach(function (r) { mark(r[0], 'cskh'); });
   readDonPhones_().forEach(function (p) { mark(p, 'don'); });
@@ -8860,7 +8892,7 @@ function _aaLoadCustomers_() {
     var d = src[p];
     if (!(d.dt || d.don || d.cskh || (d.cs && leadName[p]))) return;
     var n = cnt[p] || 0;
-    custs.push({ phone: p, dataSrc: { dt: !!d.dt, don: !!d.don, cs: !!d.cs, cskh: !!d.cskh }, tier: n >= 10 ? 'VIP' : n >= 5 ? 'Thân thiết' : n >= 2 ? 'Tiềm năng' : 'Chưa bán lại được' });
+    custs.push({ phone: p, dataSrc: { dt: !!d.dt, don: !!d.don, cs: !!d.cs, cskh: !!d.cskh }, tier: n >= 10 ? 'VIP' : n >= 5 ? 'Thân thiết' : n >= 2 ? 'Tiềm năng' : 'Chưa bán lại được', hangKey: _aaHangKey_(revBy[p] || 0) });
   });
   var ever = {};
   readAssign_(getCrmSS_().getSheetByName(SH_ASSIGN)).forEach(function (h) { (h.phones || []).forEach(function (p) { ever[p] = true; }); });
@@ -8894,7 +8926,7 @@ function autoAssignRun_(force) {
   try {
     var cfg = _aaReadJson_('autoAssignCfg'); if (!cfg) return { skipped: 'chua co cau hinh' };
     cfg.teams = cfg.teams || {}; cfg.days = cfg.days || []; cfg.members = cfg.members || {}; cfg.memberMode = cfg.memberMode || {};
-    cfg.src = cfg.src || { mode: 'pct', vals: {} }; cfg.prio = cfg.prio || { mode: 'pct', vals: {} };
+    cfg.src = cfg.src || { mode: 'pct', vals: {} }; cfg.prio = cfg.prio || { mode: 'pct', vals: {} }; cfg.hang = cfg.hang || { mode: 'pct', vals: {} };
     var st = _aaReadJson_('autoAssignState') || {};
     var now = new Date(), today = Utilities.formatDate(now, AA_TZ, 'yyyy-MM-dd');
     if (!force) {
