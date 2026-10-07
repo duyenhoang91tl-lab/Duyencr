@@ -13751,6 +13751,7 @@ function renderSalesReportTab(){
     '<button class="btn '+(_srState.sub==='G'?'secondary':'sm')+'" onclick="_srSetSub(\'G\')">Báo cáo G — Thưởng thử việc / chính thức</button>' +
     '<button class="btn '+(_srState.sub==='H'?'secondary':'sm')+'" onclick="_srSetSub(\'H\')">Báo cáo H — Tổng quan data đã chia</button>' +
     '<button class="btn '+(_srState.sub==='I'?'secondary':'sm')+'" onclick="_srSetSub(\'I\')">Báo cáo I — Chia data Renew</button>' +
+    (_srIsAdmin() ? '<button class="btn '+(_srState.sub==='J'?'secondary':'sm')+'" onclick="_srSetSub(\'J\')">📤 Nhập dữ liệu Base/Pos</button>' : '') +
     '</div>';
 
   if (_srState.sub === 'C') { renderSalesReportTabC_(wrap, subTabs); return; }
@@ -13760,6 +13761,7 @@ function renderSalesReportTab(){
   if (_srState.sub === 'G') { renderSalesReportTabG_(wrap, subTabs); return; }
   if (_srState.sub === 'H') { renderSalesReportTabH_(wrap, subTabs); return; }
   if (_srState.sub === 'I') { renderSalesReportTabI_(wrap, subTabs); return; }
+  if (_srState.sub === 'J') { renderSalesReportTabJ_(wrap, subTabs); return; }
 
   var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
   filters += _quickRangeSelectHtml(_srState.dateQuick, "_srApplyQuickRange('dateQuick','dateFrom','dateTo',this.value)");
@@ -14323,6 +14325,125 @@ function renderSalesReportTabC_(wrap, subTabs){
 // ── Báo cáo D: KH "Chăm sóc" thêm nhanh — data RIÊNG (sheet "KH Chăm sóc mới"),
 // không gộp chung báo cáo doanh số A/B/C. Nguồn dữ liệu độc lập, chỉ liên quan tới
 // việc CS ghi nhận khách mới qua nút "+ Thêm KH/Đơn mới".
+// ═══════════════════════════════════════════════════════
+//  BÁO CÁO I: NHẬP DỮ LIỆU BASE/POS TỪ FILE EXPORT (thay vì copy tay vào Google Sheet) — thêm
+//  2026-10-07 theo yêu cầu Duyên. File Base (.xls/.xlsx, export "Tất cả" từ Base platform) khớp
+//  THẲNG HÀNG với cột của sheet "DT TỔNG " (A=Ngày tạo...V=Chi tiết lý do thất bại — xem DT_COL_*
+//  ở gas_v13.js). File Pos (.xlsx, export đơn Pancake) khớp THẲNG HÀNG với "dữ liệu đơn" (A=STT
+//  ...Q=Ghi chú nội bộ). Đọc file bằng SheetJS có sẵn trong trang (client), GỬI NGUYÊN các dòng
+//  (đã bỏ header + cột rỗng cuối) lên backend action 'importSheetRows' — backend ghi nối tiếp vào
+//  đúng sheet rồi tự khử trùng TUYỆT ĐỐI (dùng chung hàm với trigger onChange có sẵn, xem
+//  _autoDedupExactRowsInSheet_ trong gas_v13.js) — không cần copy tay, không lo dán trùng 2 lần.
+// ═══════════════════════════════════════════════════════
+var _impState = { baseRows: null, baseFileName: '', baseWarn: '', posRows: null, posFileName: '', posWarn: '', uploading: false, result: null };
+
+function _impParseFile(file, kind){ // kind: 'base' | 'pos'
+  return new Promise(function(resolve, reject){
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      try {
+        var wb = XLSX.read(ev.target.result, {type:'array'});
+        var sheetName = kind === 'base' ? (wb.SheetNames.indexOf('Tất cả') !== -1 ? 'Tất cả' : wb.SheetNames[0]) : wb.SheetNames[0];
+        var ws = wb.Sheets[sheetName];
+        var aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:false});
+        if (!aoa.length) { resolve({ rows: [], warn: 'File rỗng.' }); return; }
+        var header = aoa[0];
+        // Cắt bỏ các cột header RỖNG ở cuối (cột thừa do file xuất ra, không thuộc dữ liệu thật)
+        var lastCol = header.length - 1;
+        while (lastCol >= 0 && !String(header[lastCol]||'').trim()) lastCol--;
+        var width = lastCol + 1;
+        var warn = '';
+        if (kind === 'base'){
+          if (String(header[0]||'').trim() !== 'Ngày tạo') warn = '⚠️ Cột đầu tiên của file là "'+(header[0]||'(rỗng)')+'" — không phải "Ngày tạo" như file Base chuẩn (sheet "Tất cả"). Kiểm tra lại đúng file chưa trước khi nhập.';
+        } else {
+          if (String(header[1]||'').trim() !== 'Ngày tạo đơn') warn = '⚠️ Cột B của file là "'+(header[1]||'(rỗng)')+'" — không phải "Ngày tạo đơn" như file Pos chuẩn. Kiểm tra lại đúng file chưa trước khi nhập.';
+        }
+        var rows = [];
+        for (var i = 1; i < aoa.length; i++){
+          var row = aoa[i].slice(0, width);
+          while (row.length < width) row.push('');
+          if (row.every(function(v){ return v === '' || v === null || v === undefined; })) continue;
+          rows.push(row);
+        }
+        resolve({ rows: rows, warn: warn });
+      } catch(err){ reject(err); }
+    };
+    reader.onerror = function(){ reject(new Error('Không đọc được file.')); };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+async function _impOnFileSelected(input, kind){
+  var file = input.files && input.files[0];
+  if (!file) return;
+  try {
+    var res = await _impParseFile(file, kind);
+    if (!res.rows.length){ toast('⚠️ Không đọc được dòng dữ liệu nào trong file này.'); return; }
+    if (kind === 'base'){ _impState.baseRows = res.rows; _impState.baseFileName = file.name; _impState.baseWarn = res.warn; }
+    else { _impState.posRows = res.rows; _impState.posFileName = file.name; _impState.posWarn = res.warn; }
+    _impState.result = null;
+    renderSalesReportTab();
+  } catch(e){
+    toast('❌ Lỗi đọc file: ' + e.message);
+  }
+}
+
+async function _impUpload(kind){
+  if (!gsUrl){ toast('❌ Chưa cấu hình URL Google Apps Script.'); return; }
+  var rows = kind === 'base' ? _impState.baseRows : _impState.posRows;
+  if (!rows || !rows.length) return;
+  _impState.uploading = true; renderSalesReportTab();
+  try {
+    var res = await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'importSheetRows', sheet: kind, rows: rows }) });
+    var d = await res.json();
+    if (d.error) throw new Error(d.error);
+    _impState.result = Object.assign({ kind: kind }, d);
+    toast('✓ Đã nhập '+fmt(d.written)+' dòng mới'+(d.dedupedAfter?' (tự loại '+fmt(d.dedupedAfter)+' dòng trùng tuyệt đối)':'')+' vào '+(kind==='base'?'DT TỔNG':'dữ liệu đơn')+'.');
+    logAudit('import_'+kind, '', '', 'Nhập dữ liệu '+(kind==='base'?'Base':'Pos')+' từ file: +'+d.written+' dòng, loại trùng '+(d.dedupedAfter||0));
+    if (kind === 'base'){ _impState.baseRows = null; _impState.baseFileName = ''; _impState.baseWarn = ''; }
+    else { _impState.posRows = null; _impState.posFileName = ''; _impState.posWarn = ''; }
+    var fi = document.getElementById('imp-file-'+kind); if (fi) fi.value = '';
+    // Du lieu goc da doi -> cac bao cao doanh so dang cache tren client (neu co) co the sai lech,
+    // xoa de buoc tai lai tu server khi nguoi dung xem lai cac tab bao cao.
+    _srState.dataA = _srState.dataB = _srState.dataC = _srState.dataE = _srState.dataF = _srState.dataG = _srState.dataH = null;
+  } catch(e){
+    toast('❌ Nhập lỗi: ' + e.message);
+  } finally {
+    _impState.uploading = false; renderSalesReportTab();
+  }
+}
+
+function _impPickCard_(kind, label, hint, sheetTarget){
+  var rows = kind === 'base' ? _impState.baseRows : _impState.posRows;
+  var fname = kind === 'base' ? _impState.baseFileName : _impState.posFileName;
+  var warn = kind === 'base' ? _impState.baseWarn : _impState.posWarn;
+  var html = '<div style="border:1px solid var(--border);border-radius:var(--rsm);padding:14px;flex:1;min-width:280px">';
+  html += '<div style="font-weight:600;margin-bottom:4px">'+label+'</div>';
+  html += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">'+hint+' — sẽ nối tiếp vào sheet <b>"'+esc(sheetTarget)+'"</b>.</div>';
+  html += '<input type="file" id="imp-file-'+kind+'" accept=".xlsx,.xls" onchange="_impOnFileSelected(this,\''+kind+'\')" style="font-size:12px">';
+  if (fname){
+    html += '<div style="margin-top:8px;font-size:12px">📄 '+esc(fname)+' — <b>'+fmt(rows.length)+'</b> dòng đọc được.</div>';
+    if (warn) html += '<div style="margin-top:6px;padding:6px 8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:11.5px;color:#9a3412">'+esc(warn)+'</div>';
+    html += '<button class="btn sm primary" style="margin-top:8px" '+(_impState.uploading?'disabled':'')+' onclick="_impUpload(\''+kind+'\')">'+(_impState.uploading?'Đang nhập...':'💾 Nhập '+fmt(rows.length)+' dòng vào CRM')+'</button>';
+  }
+  var res = _impState.result;
+  if (res && res.kind === kind){
+    html += '<div style="margin-top:8px;padding:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;font-size:12px;color:#166534">✓ Đã thêm <b>'+fmt(res.written)+'</b> dòng mới'+(res.skippedDupInFile?', bỏ qua '+fmt(res.skippedDupInFile)+' dòng trùng ngay trong file':'')+(res.dedupedAfter?', tự động loại '+fmt(res.dedupedAfter)+' dòng trùng tuyệt đối với dữ liệu sẵn có':'')+'.</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderSalesReportTabJ_(wrap, subTabs){
+  if (!_srIsAdmin()){ wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + '<div style="color:var(--muted);padding:20px;text-align:center">🔒 Chỉ Admin được nhập dữ liệu Base/Pos.</div>'; return; }
+  var html = '<div style="font-size:12.5px;color:var(--muted);margin-bottom:14px">Tải lên file export từ Base platform / Pancake POS — hệ thống tự đọc và nối tiếp vào đúng sheet nguồn trên Google Sheet (không cần copy tay), tự loại bỏ các dòng trùng tuyệt đối (giống hệt mọi cột) với dữ liệu đã có sẵn.</div>';
+  html += '<div style="display:flex;gap:14px;flex-wrap:wrap">';
+  html += _impPickCard_('base', '📥 Dữ liệu Base', 'File export "Danh sách công việc" (sheet "Tất cả"), .xls/.xlsx', 'DT TỔNG ');
+  html += _impPickCard_('pos', '📥 Dữ liệu Pos', 'File export đơn hàng (Pancake POS), .xlsx', 'dữ liệu đơn');
+  html += '</div>';
+  wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + html;
+}
+
 function renderSalesReportTabD_(wrap, subTabs){
   var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
   filters += _quickRangeSelectHtml(_srState.dDateQuick, "_srApplyQuickRange('dDateQuick','dDateFrom','dDateTo',this.value)");

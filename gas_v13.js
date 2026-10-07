@@ -4581,6 +4581,8 @@ function doPost(e) {
     if (action === 'saveMktTeams')        return saveMktTeams_(data.teams);
     if (action === 'saveUsers')           return saveUsers_(data.users);
     if (action === 'saveAudit')           return saveAudit_(data.rows);
+    // ── Nhap du lieu Base/Pos tu file export (thay copy tay vao Google Sheet) ──
+    if (action === 'importSheetRows')     return doImportSheetRows_(data.sheet, data.rows);
     // ── Bao cao Pancake ──
     if (action === 'savePancakeStats')    return savePancakeStats_(data.rows);
     if (action === 'savePancakeNameMap')  return savePancakeNameMap_(data.pancakeName, data.saleName);
@@ -5129,7 +5131,13 @@ function onChangeDedupTrigger_(e) {
     _autoDedupLog_(DON_CHITIET_SHEET, resPos.deleted);
     try {
       var cache = CacheService.getScriptCache();
-      if (resPos.deleted) cache.remove('donChiTiet_v3_n'); // force doc lai sheet Pos ngay, khong doi het 90s cache
+      // SUA 2026-10-07: key cache dung truoc day la 'donChiTiet_v3_n' nhung readDonChiTiet_ da doi
+      // sang luu duoi key 'donChiTiet_v4' tu lau (xem _cachePutBig_('donChiTiet_v4',...) o tren) —
+      // xoa nham key cu 'v3_n' khong con ton tai KHONG lam gi ca, nen cache 'v4' van song toi het
+      // 90s TTL du sheet Pos vua bi xoa dong trung, khien bao cao B/E/F/G co the tam thoi van hien
+      // dong da bi xoa. _cacheGetBig_ chi can mat key "<key>_n" la coi nhu cache rong (xem ham do),
+      // nen chi can xoa dung '_n' cua key HIEN TAI 'donChiTiet_v4' la du, khong can xoa tung manh.
+      if (resPos.deleted) cache.remove('donChiTiet_v4_n'); // force doc lai sheet Pos ngay, khong doi het 90s cache
       if (resBase.deleted) cache.remove('srptOptions_v3');
     } catch (ecCache) {}
   } finally {
@@ -5150,6 +5158,66 @@ function installAutoDedupTrigger_() {
   if (existing.length) return 'Trigger "onChangeDedupTrigger_" da ton tai (' + existing.length + '), khong tao them.';
   ScriptApp.newTrigger('onChangeDedupTrigger_').forSpreadsheet(ss).onChange().create();
   return 'Da tao trigger "On change" cho spreadsheet DT_SS_ID (' + ss.getId() + ') thanh cong.';
+}
+
+// ═══ NHAP DU LIEU BASE/POS TU FILE EXPORT (thay copy tay vao Google Sheet) — them 2026-10-07 theo
+// yeu cau Duyen: "tạo 1 mục up data base pos lên CRM, nối tiếp vào 2 sheet [...] base là DT tổng
+// và pos là dữ liệu đơn". Client (index.html, renderSalesReportTabI_/_impUpload) doc file Excel
+// bang SheetJS, GUI NGUYEN mang 2 chieu (header + cot rong thua da bi cat o client) len day qua
+// action 'importSheetRows'. Ham nay CHI ghi noi tiep (append) — khong bao gio ghi de/xoa du lieu
+// cu, an toan voi sheet dang duoc nhan vien thao tac truc tiep hang ngay.
+function doImportSheetRows_(sheetKey, rows) {
+  if (!Array.isArray(rows) || !rows.length) return jsonOut_({ error: 'Không có dòng nào để nhập.' });
+  var sheetName = sheetKey === 'pos' ? DON_CHITIET_SHEET : (sheetKey === 'base' ? DT_TONG_SHEET : '');
+  if (!sheetName) return jsonOut_({ error: 'Tham số sheet không hợp lệ (chỉ nhận "base" hoặc "pos").' });
+  var ss = getDTSS_();
+  var sh = ss.getSheetByName(sheetName);
+  if (!sh) return jsonOut_({ error: 'Không tìm thấy sheet "' + sheetName + '" trong Google Sheet.' });
+
+  var width = 0;
+  for (var i = 0; i < rows.length; i++) {
+    if (!Array.isArray(rows[i])) return jsonOut_({ error: 'Dữ liệu dòng ' + (i + 1) + ' không đúng định dạng (không phải mảng).' });
+    width = Math.max(width, rows[i].length);
+  }
+  if (width < 1 || width > 40) return jsonOut_({ error: 'Số cột dữ liệu không hợp lệ (' + width + ') — kiểm tra lại file.' });
+
+  // Khu trung NGAY TRONG CHINH FILE dang nhap (vd lo xuat 2 lan trung 1 doan ngay) — chi so sanh
+  // gia tri THO (chuoi/so) nhan tu JSON cua client, CHUA lien quan Date object cua Google Sheet
+  // (xem giai thich ky hon o duoi, truoc khi goi _autoDedupExactRowsInSheet_).
+  var toWrite = [], seenInFile = {}, skippedDupInFile = 0;
+  for (var r = 0; r < rows.length; r++) {
+    var row = rows[r].slice(0, width);
+    while (row.length < width) row.push('');
+    if (_rowIsBlank_(row)) continue;
+    var key = JSON.stringify(row);
+    if (seenInFile[key]) { skippedDupInFile++; continue; }
+    seenInFile[key] = true;
+    toWrite.push(row);
+  }
+  if (!toWrite.length) return jsonOut_({ ok: true, written: 0, skippedDupInFile: skippedDupInFile, dedupedAfter: 0 });
+
+  sh.getRange(sh.getLastRow() + 1, 1, toWrite.length, width).setValues(toWrite);
+
+  // Khu trung TUYET DOI voi du lieu DA CO SAN trong sheet: CO Y khong tu so sanh truoc khi ghi —
+  // cac dong moi gui len tu client la gia tri THO tu JSON (vd ngay la chuoi "06/10/2026 23:46"),
+  // trong khi cac dong co san doc qua getValues() co the da la Date object (Google Sheet tu nhan
+  // dang dinh dang ngay) — 2 kieu nay so sanh truc tiep se KHONG BAO GIO khop, lam dedup vo tac
+  // dung voi moi dong co cot ngay. Giai phap: ghi xong RỒI doc lai CA 2 phia tu chinh Sheet qua
+  // _autoDedupExactRowsInSheet_ (dung CHUNG ham + do rong voi trigger onChange co san, xem
+  // onChangeDedupTrigger_ o tren) — luc nay Sheets da tu chuan hoa kieu du lieu cho CA dong cu LAN
+  // dong vua ghi giong het nhau, so sanh moi dung. Dong moi trung voi dong cu se bi xoa, GIU LAI
+  // dong cu (dung dung thu tu uu tien "dong dau tien" cua ham dung chung).
+  var dedupWidth = (sheetName === DON_CHITIET_SHEET) ? DON_CHITIET_WIDTH : DT_TONG_WIDTH;
+  var dedupRes = _autoDedupExactRowsInSheet_(sh, dedupWidth);
+  _autoDedupLog_(sheetName, dedupRes.deleted);
+
+  try {
+    var cache = CacheService.getScriptCache();
+    if (sheetName === DON_CHITIET_SHEET) cache.remove('donChiTiet_v4_n');
+    else cache.removeAll(['srptOptions_v3']);
+  } catch (ec) {}
+
+  return jsonOut_({ ok: true, written: toWrite.length, skippedDupInFile: skippedDupInFile, dedupedAfter: dedupRes.deleted });
 }
 
 // Da ngung ho tro thay toan bo du lieu don hang tu client (truoc day dung khi dong bo
