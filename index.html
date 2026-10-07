@@ -17445,20 +17445,24 @@ async function _aaRunIfDue(force){
   if (!allCustomers || !allCustomers.length) return fail('Dữ liệu khách hàng chưa tải xong — đợi trang tải xong rồi bấm lại.');
   if (!teams || !teams.length) return fail('Chưa có Team nào — tạo ở tab Quản lý Team trước.');
   _aaBusy = true;
+  var stage = 'đọc cấu hình từ server';   // báo đúng bước nào lỗi (trước đây lỗi bị nuốt thành 1 câu chung)
   try {
     await _aaPullCfg();   // lấy bản mới nhất (máy admin khác có thể vừa chạy hôm nay)
     var today = _aaToday();
     if (!force && (!_aaCfg.enabled || !_aaDayOn(_aaCfg) || _aaCfg.lastRun === today || new Date().getHours() < (parseInt(_aaCfg.runHour) || 0))) return null;
     // Đánh dấu ĐÃ CHẠY hôm nay trước khi chia → 2 máy admin cùng mở không chia đôi 2 lần
     if (!force) { _aaCfg.lastRun = today; await _aaPersistState('browser'); }
+    stage = 'lập kế hoạch chia (đọc danh sách KH / Team / tỷ lệ)';
     var plan = _aaPreview();
+    stage = 'ghi lịch sử chia + cập nhật CS';
     var entries = _aaCommit(plan, force ? 'Chạy thử' : null);
+    stage = 'lưu kết quả lần chạy';
     var total = entries.reduce(function(s,e){ return s + e.phones.length; }, 0);
     _aaCfg.lastResult = { date: today, total: total, people: entries.length, short: plan.short, warn: plan.warn, forced: !!force, by: 'browser' };
     await _aaPersistState(force ? 'browser-force' : 'browser');
     if (typeof toast === 'function') toast(total ? '⏰ Chia tự động: ' + total + ' KH → ' + entries.length + ' CS' + (plan.short.length ? ' (có ' + plan.short.length + ' người thiếu data)' : '') : '⏰ Chia tự động: không có KH nào để chia (kiểm tra cấu hình/nguồn)');
     return { plan: plan, total: total, entries: entries, forced: !!force };
-  } catch(e) { console.warn('[AutoAssign] lỗi', e); return fail('Lỗi khi chia: ' + (e && e.message ? e.message : e) + ' (mở Console để xem chi tiết).'); }
+  } catch(e) { console.error('[AutoAssign] lỗi ở bước "' + stage + '"', e); return fail('Lỗi ở bước "' + stage + '": ' + (e && e.message ? e.message : e) + ' (F12 → Console để xem chi tiết).'); }
   finally { _aaBusy = false; }
 }
 // Kiểm tra định kỳ: mở CRM là chạy nếu đến hạn; để tab mở qua nửa đêm vẫn tự chạy sang ngày mới
