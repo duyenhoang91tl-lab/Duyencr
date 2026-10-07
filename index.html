@@ -7981,6 +7981,7 @@ let _advAssign = {
   sortMode: 'default',    // 'default' | 'vip' | 'tt' | 'tn' | 'unassigned'
   dateFrom: '',           // lọc thêm theo khoảng ngày ĐƠN HÀNG (c.ymList[].ds), để trống = không giới hạn
   dateTo: '',
+  srcSet: new Set(),      // lọc theo NGUỒN dữ liệu (c.dataSrc: dt|don|cs|cskh) — rỗng = mọi nguồn. Khách chưa có ngày đơn (vd CSKH-Duyên) vẫn được lấy khi đã chọn nguồn
   selectMode: 'cs',       // 'cs' (chọn CS riêng lẻ) | 'team' (chia theo Team, tỷ lệ nội bộ theo %)
   selectedCS: new Set(),  // multi select
   selectedTeams: new Set(), // multi select team id — dùng khi selectMode==='team'
@@ -8014,6 +8015,7 @@ function openAssignModal() {
   _advAssign.sortMode = 'default';
   _advAssign.dateFrom = '';
   _advAssign.dateTo = '';
+  _advAssign.srcSet = new Set();
   _advAssign.label = '';
   switchAssignTab('create', document.querySelector('.assign-tab'));
   document.getElementById('assign-modal').classList.add('open');
@@ -8043,22 +8045,60 @@ function switchAssignTab(tab, el) {
 // như bộ lọc chính của bảng Danh sách KH, nhưng tách riêng để không phụ thuộc bộ lọc đang bật
 // trên bảng — admin có thể mở modal rồi tự chọn khoảng ngày khác ngay trong Chia data.
 function _advAssignDateFilteredList() {
-  if (!_advAssign.dateFrom && !_advAssign.dateTo) return _assignFilteredList;
-  // NGUYÊN NHÂN GỐC (đã sửa): trước đây tra customerMap[p] — đó là object THÔ (chỉ có orders), KHÔNG có
-  // ymList (ymList chỉ được tính sẵn trên các phần tử allCustomers trong buildCustomers). Nên c.ymList luôn
-  // undefined → return false cho MỌI KH → khoảng ngày nào cũng ra "0 KH". Dùng _assignCustMap() (Map SĐT →
-  // phần tử allCustomers) để lấy đúng ymList.
+  var hasSrc = _advAssign.srcSet && _advAssign.srcSet.size > 0;
+  var hasDate = !!(_advAssign.dateFrom || _advAssign.dateTo);
+  if (!hasSrc && !hasDate) return _assignFilteredList;
+  // NGUYÊN NHÂN GỐC (đã sửa 2026-10-07): trước đây tra customerMap[p] — object THÔ (chỉ có orders), KHÔNG có
+  // ymList (ymList chỉ tính sẵn trên các phần tử allCustomers trong buildCustomers) → luôn undefined → mọi KH bị
+  // loại → khoảng ngày nào cũng ra "0 KH". Dùng _assignCustMap() (Map SĐT → phần tử allCustomers).
   var _cm = _assignCustMap();
   return _assignFilteredList.filter(function (p) {
     var c = _cm.get(p);
-    if (!c || !c.ymList) return false;
-    return c.ymList.some(function (o) {
+    if (!c) return false;
+    if (hasSrc) {
+      var d = c.dataSrc || {}, ok = false;
+      _advAssign.srcSet.forEach(function (k) { if (d[k]) ok = true; });
+      if (!ok) return false;
+    }
+    if (!hasDate) return true;
+    var yl = c.ymList || [];
+    // Khách KHÔNG có ngày đơn nào (vd nguồn CSKH-Duyên): khoảng ngày không áp dụng được → khi đã chọn nguồn
+    // thì cứ chia theo nguồn; chưa chọn nguồn thì vẫn loại như cũ.
+    if (!yl.some(function (o) { return o.ds; })) return hasSrc;
+    return yl.some(function (o) {
       if (!o.ds) return false;
       if (_advAssign.dateFrom && o.ds < _advAssign.dateFrom) return false;
       if (_advAssign.dateTo && o.ds > _advAssign.dateTo) return false;
       return true;
     });
   });
+}
+
+// Chọn / bỏ chọn 1 nguồn dữ liệu trong modal Chia data
+function _advAssignToggleSrc(k) {
+  if (_advAssign.srcSet.has(k)) _advAssign.srcSet.delete(k); else _advAssign.srcSet.add(k);
+  renderAssignCreate();
+}
+// Khoảng ngày nhanh (Hôm nay, Hôm qua, Tuần này/trước, Tháng này/trước, Quý này/trước, Năm nay/trước). Tuần bắt đầu thứ Hai.
+function _advAssignPreset(key) {
+  var pad = function (n) { return String(n).padStart(2, '0'); };
+  var iso = function (d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
+  var t = new Date(); t = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+  var y = t.getFullYear(), m = t.getMonth(), a, b;
+  var dow = (t.getDay() + 6) % 7; // 0 = Thứ Hai
+  if (key === 'today') { a = b = t; }
+  else if (key === 'yesterday') { a = b = new Date(y, m, t.getDate() - 1); }
+  else if (key === 'thisweek') { a = new Date(y, m, t.getDate() - dow); b = new Date(y, m, t.getDate() - dow + 6); }
+  else if (key === 'lastweek') { a = new Date(y, m, t.getDate() - dow - 7); b = new Date(y, m, t.getDate() - dow - 1); }
+  else if (key === 'month') { a = new Date(y, m, 1); b = new Date(y, m + 1, 0); }
+  else if (key === 'lastmonth') { a = new Date(y, m - 1, 1); b = new Date(y, m, 0); }
+  else if (key === 'quarter') { var q = Math.floor(m / 3) * 3; a = new Date(y, q, 1); b = new Date(y, q + 3, 0); }
+  else if (key === 'lastquarter') { var q2 = Math.floor(m / 3) * 3 - 3; a = new Date(y, q2, 1); b = new Date(y, q2 + 3, 0); }
+  else if (key === 'year') { a = new Date(y, 0, 1); b = new Date(y, 11, 31); }
+  else if (key === 'lastyear') { a = new Date(y - 1, 0, 1); b = new Date(y - 1, 11, 31); }
+  else return;
+  _advAssign.dateFrom = iso(a); _advAssign.dateTo = iso(b);
+  renderAssignCreate();
 }
 
 // ── CACHE TRA CUU NHANH CHO CHIA DATA ─────────────────────────────────────────────────────────
@@ -8193,6 +8233,11 @@ function renderAssignCreate() {
   const _custMap = _assignCustMap();
   let alreadyAssigned = { length: 0 }, neverAssigned = { length: 0 };
   const tierCount = { VIP:0, 'Thân thiết':0, 'Tiềm năng':0, other:0 };
+  const srcCount = { dt:0, don:0, cs:0, cskh:0 };
+  _assignFilteredList.forEach(p => {
+    const d = _custMap.get(p)?.dataSrc;
+    if (d) { if (d.dt) srcCount.dt++; if (d.don) srcCount.don++; if (d.cs) srcCount.cs++; if (d.cskh) srcCount.cskh++; }
+  });
   dateFilteredList.forEach(p => {
     if (_everSet.has(p)) alreadyAssigned.length++; else neverAssigned.length++;
     const c = _custMap.get(p);
@@ -8211,10 +8256,18 @@ function renderAssignCreate() {
       <span style="color:var(--tn)">Tiềm năng: ${tierCount['Tiềm năng']}</span><br>
       <span style="color:var(--green)">✓ Chưa chia: <strong>${neverAssigned.length}</strong></span> &nbsp;|&nbsp;
       <span style="color:#92400e">⚠ Đã chia: <strong>${alreadyAssigned.length}</strong></span>
-      ${totalFiltered === 0 ? '<br><span style="color:var(--red)">⚠ Không có KH nào khớp (bộ lọc bảng + khoảng ngày bên dưới). Hãy xoá bớt bộ lọc / nới khoảng ngày rồi thử lại.</span>' : ''}
+      ${totalFiltered === 0 ? '<br><span style="color:var(--red)">⚠ Không có KH nào khớp (bộ lọc bảng + nguồn + khoảng ngày bên dưới). Hãy xoá bớt bộ lọc / nới khoảng ngày / đổi nguồn rồi thử lại.</span>' : ''}
+    </div>
+
+    <div style="font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:500">Nguồn dữ liệu <span style="font-weight:400">(bấm để chọn, chọn được nhiều — không chọn = mọi nguồn; khách chưa có ngày đơn như CSKH-Duyên vẫn lấy theo nguồn)</span>:</div>
+    <div class="assign-sort-row" style="margin-bottom:10px">
+      ${[['dt','DT tổng'],['don','Dữ liệu đơn'],['cs','Chăm sóc'],['cskh','CSKH-Duyên']].map(([k,l])=>`<div class="assign-sort-btn ${_advAssign.srcSet.has(k)?'active':''}" onclick="_advAssignToggleSrc('${k}')">${l} (${srcCount[k]})</div>`).join('')}
     </div>
 
     <div style="font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:500">Khoảng thời gian lấy data <span style="font-weight:400">(theo ngày đơn hàng — để trống = không giới hạn)</span>:</div>
+    <div class="assign-sort-row" style="margin-bottom:6px">
+      ${[['today','Hôm nay'],['yesterday','Hôm qua'],['thisweek','Tuần này'],['lastweek','Tuần trước'],['month','Tháng này'],['lastmonth','Tháng trước'],['quarter','Quý này'],['lastquarter','Quý trước'],['year','Năm nay'],['lastyear','Năm trước']].map(([k,l])=>`<div class="assign-sort-btn" onclick="_advAssignPreset('${k}')">${l}</div>`).join('')}
+    </div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
       <input type="date" class="assign-input" style="width:auto" value="${esc(_advAssign.dateFrom||'')}" onchange="_advAssign.dateFrom=this.value;renderAssignCreate()" title="Từ ngày">
       <span style="color:var(--muted)">→</span>
