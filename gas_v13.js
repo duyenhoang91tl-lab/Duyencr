@@ -8948,3 +8948,12 @@ function removeAutoAssignTrigger_() {
   ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'autoAssignTick_') { ScriptApp.deleteTrigger(t); n++; } });
   return 'Da go ' + n + ' trigger autoAssignTick_.';
 }
+function caiTriggerChiaTuDong() {
+  Logger.log(installAutoAssignTrigger_());
+}
+function chayThuChiaTuDong() {   // CHIA THẬT ngay, không phải chạy thử
+  Logger.log(JSON.stringify(autoAssignRun_(true)));
+}
+function goTriggerChiaTuDong() {
+  Logger.log(removeAutoAssignTrigger_());
+}
