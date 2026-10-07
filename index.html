@@ -1398,7 +1398,7 @@ body.rpt-mode .app{height:100vh}
       <div class="table-wrap">
         <table id="main-table">
           <thead><tr>
-            <th class="filterable col-lastpos" id="th-lastpos" style="min-width:104px" onclick="openColDropdown('lastpos',event)" title="Ngày mua gần nhất theo đơn Pos — nhấn ▼ để lọc"><div class="th-inner">Ngày mua gần nhất <span class="th-filter-icon">▼</span></div></th>
+            <th class="filterable col-lastpos" id="th-lastpos" style="min-width:104px" title="Nhấn ▼ để lọc · Nhấn ↕ để sắp xếp mới nhất/xa nhất"><div class="th-inner" onclick="openColDropdown('lastpos',event)">Ngày mua gần nhất <span class="th-filter-icon">▼</span></div><span id="lastpos-sort-icon" style="color:var(--hint);cursor:pointer;font-size:11px;margin-left:2px" onclick="event.stopPropagation();toggleLastPosSort()" title="Sắp xếp theo ngày mua gần nhất">↕</span></th>
             <th class="filterable col-name" id="th-name" onclick="openColDropdown('name',event)"><div class="th-inner">Khách hàng <span class="th-filter-icon">▼</span></div></th>
             <th class="filterable col-tier" id="th-tier"><div class="th-inner"><span id="tier-label-btn" onclick="openTierTooltip(event)" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px" title="Xem tiêu chí phân loại">Phân loại</span> <span class="th-filter-icon" onclick="openColDropdown('tier',event)" style="cursor:pointer">▼</span></div></th>
             <th class="filterable col-care" id="th-care" onclick="openColDropdown('care',event)"><div class="th-inner"><span id="lbl-fieldcs-th">Tình trạng CS</span> <span class="th-filter-icon">▼</span></div></th>
@@ -3659,6 +3659,14 @@ function applyFilters() {
         if (v === '≤ 30 ngày') return lpDa <= 30;
         if (v === '≤ 90 ngày') return lpDa <= 90;
         if (v === '> 90 ngày') return lpDa > 90;
+        if (v.startsWith('daterange:')) {
+          const parts = v.replace('daterange:','').split('_');
+          const df = parts[0] ? new Date(parts[0]+'T00:00:00').getTime() : null;
+          const dt = parts[1] ? new Date(parts[1]+'T23:59:59').getTime() : null;
+          if (df && lp < df) return false;
+          if (dt && lp > dt) return false;
+          return true;
+        }
         return false;
       });
       if (!matchLP) return false;
@@ -3786,7 +3794,16 @@ function applyFilters() {
     return true;
   });
 
-  if (_lastActSortDir !== 0) {
+  if (_lastPosSortDir !== 0) {
+    // Mua gan nhat: KH chua co don Pos nao (lastPosDate rong) luon xep CUOI du dang sap xep chieu nao.
+    list.sort((a, b) => {
+      const da = a.lastPosDate, db = b.lastPosDate;
+      if (!da && !db) return 0;
+      if (!da) return 1;
+      if (!db) return -1;
+      return _lastPosSortDir === -1 ? db - da : da - db;
+    });
+  } else if (_lastActSortDir !== 0) {
     list.sort((a, b) => {
       const da = a._lastActionDate || 0;
       const db = b._lastActionDate || 0;
@@ -7558,6 +7575,18 @@ function toggleLastActSort() {
   _lastActSortDir = _lastActSortDir === 0 ? -1 : _lastActSortDir === -1 ? 1 : 0;
   const icon = document.getElementById('lastact-sort-icon');
   if (icon) icon.textContent = _lastActSortDir === -1 ? '↓' : _lastActSortDir === 1 ? '↑' : '↕';
+  // Chỉ 1 cột dùng icon ↕ để sắp xếp tại 1 thời điểm — bật cột này thì tắt cột kia, tránh 2
+  // chiều sắp xếp "ngầm" cùng tồn tại gây khó hiểu khi xem danh sách.
+  if (_lastActSortDir !== 0) { _lastPosSortDir = 0; const i2 = document.getElementById('lastpos-sort-icon'); if (i2) i2.textContent = '↕'; }
+  applyFilters();
+}
+
+let _lastPosSortDir = 0; // 0=off, 1=asc(mua lâu nhất trước), -1=desc(mua gần nhất trước)
+function toggleLastPosSort() {
+  _lastPosSortDir = _lastPosSortDir === 0 ? -1 : _lastPosSortDir === -1 ? 1 : 0;
+  const icon = document.getElementById('lastpos-sort-icon');
+  if (icon) icon.textContent = _lastPosSortDir === -1 ? '↓' : _lastPosSortDir === 1 ? '↑' : '↕';
+  if (_lastPosSortDir !== 0) { _lastActSortDir = 0; const i2 = document.getElementById('lastact-sort-icon'); if (i2) i2.textContent = '↕'; }
   applyFilters();
 }
 
@@ -7591,7 +7620,7 @@ function renderColDdItems(col, query) {
   else if (col==='careCS') values = [...new Set(allCustomers.flatMap(c=>[...(c.careCSSet||[])]).filter(Boolean))].sort();
   else if (col==='source') values = [...new Set(allCustomers.flatMap(c=>c.sources).filter(Boolean))].sort();
   else if (col==='sched') values = ['Có lịch', 'Không có lịch', ...SCHED_TYPES.map(t=>t.label)];
-  else if (col==='lastpos') values = ['Hôm nay', '≤ 7 ngày', '≤ 30 ngày', '≤ 90 ngày', '> 90 ngày', 'Chưa có đơn Pos'];
+  else if (col==='lastpos') values = ['Hôm nay', '≤ 7 ngày', '≤ 30 ngày', '≤ 90 ngày', '> 90 ngày', 'Chưa có đơn Pos', '__custom_daterange__'];
   else if (col==='lastact') values = ['Hôm nay', 'Hôm qua', '≤ 3 ngày', '≤ 7 ngày', '≤ 14 ngày', '≤ 30 ngày', '> 30 ngày', 'Chưa tác động', '__custom_range__'];
   else if (col==='tacdong') values = ['Trong 24h', 'Hôm nay', 'Hôm qua', '≤ 3 ngày', '≤ 7 ngày', '> 7 ngày', 'Chưa có'];
   else if (col==='bcstatus') values = ['Đã gửi', 'Gửi lỗi', 'Bỏ qua', 'Chưa gửi', 'Không trong chiến dịch'];
@@ -7622,6 +7651,28 @@ function renderColDdItems(col, query) {
         ${cur ? `<div style="font-size:10px;color:var(--green)">✓ Đang lọc: ${from||'0'} – ${to||'∞'} ngày</div>` : ''}
       </div>`;
     }
+    if (v === '__custom_daterange__') {
+      // Khoảng NGÀY THẬT (không phải số ngày trước) cho "Ngày mua gần nhất" — tự nhiên hơn vì
+      // người dùng hay nghĩ theo mốc lịch (vd "từ 1/9 đến 20/9") khi lọc theo ngày mua.
+      const cur = [...(colFilters[col]||[])].find(x=>x&&x.startsWith('daterange:'));
+      const parts = cur ? cur.replace('daterange:','').split('_') : ['',''];
+      const from = parts[0]||'', to = parts[1]||'';
+      return `<div class="col-dd-item" style="flex-direction:column;align-items:flex-start;gap:4px;padding:6px 10px;border-top:1px solid var(--border)">
+        <span style="font-size:10px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:.06em">Khoảng thời gian tùy chỉnh</span>
+        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+          <span style="font-size:11px;color:var(--muted)">Từ</span>
+          <input type="date" id="lastpos-range-from" value="${from}"
+            style="padding:3px 5px;border:1px solid var(--border);border-radius:4px;font-size:11px;outline:none"
+            onchange="applyLastPosDateRange()">
+          <span style="font-size:11px;color:var(--muted)">đến</span>
+          <input type="date" id="lastpos-range-to" value="${to}"
+            style="padding:3px 5px;border:1px solid var(--border);border-radius:4px;font-size:11px;outline:none"
+            onchange="applyLastPosDateRange()">
+          <button onclick="clearLastPosDateRange()" style="border:none;background:var(--red-bg);color:var(--red);border-radius:4px;font-size:10px;padding:2px 6px;cursor:pointer">Xóa</button>
+        </div>
+        ${cur ? `<div style="font-size:10px;color:var(--green)">✓ Đang lọc: ${from||'…'} – ${to||'…'}</div>` : ''}
+      </div>`;
+    }
     return `<label class="col-dd-item">
       <input type="checkbox" value="${esc(v)}" data-val="${esc(v)}" ${colFilters[col].has(v)?'checked':''} onchange="toggleColFilterVal('${col}',this.dataset.val,this.checked)">
       ${v ? esc(v) : '<span style="color:var(--hint)">— (trống)</span>'}
@@ -7647,6 +7698,22 @@ function applyLastActCustomRange() {
 function clearLastActCustomRange() {
   [...colFilters.lastact].filter(x=>x&&x.startsWith('range:')).forEach(x=>colFilters.lastact.delete(x));
   renderColDdItems('lastact','');
+  applyFilters();
+}
+function applyLastPosDateRange() {
+  var from = document.getElementById('lastpos-range-from');
+  var to   = document.getElementById('lastpos-range-to');
+  var f = from ? from.value.trim() : '';
+  var t = to   ? to.value.trim()   : '';
+  [...colFilters.lastpos].filter(x=>x&&x.startsWith('daterange:')).forEach(x=>colFilters.lastpos.delete(x));
+  if (f !== '' || t !== '') {
+    colFilters.lastpos.add('daterange:'+f+'_'+t);
+  }
+  applyFilters();
+}
+function clearLastPosDateRange() {
+  [...colFilters.lastpos].filter(x=>x&&x.startsWith('daterange:')).forEach(x=>colFilters.lastpos.delete(x));
+  renderColDdItems('lastpos','');
   applyFilters();
 }
 function applyColFilter(col) {
