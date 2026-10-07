@@ -7911,8 +7911,13 @@ function switchAssignTab(tab, el) {
 // trên bảng — admin có thể mở modal rồi tự chọn khoảng ngày khác ngay trong Chia data.
 function _advAssignDateFilteredList() {
   if (!_advAssign.dateFrom && !_advAssign.dateTo) return _assignFilteredList;
+  // NGUYÊN NHÂN GỐC (đã sửa): trước đây tra customerMap[p] — đó là object THÔ (chỉ có orders), KHÔNG có
+  // ymList (ymList chỉ được tính sẵn trên các phần tử allCustomers trong buildCustomers). Nên c.ymList luôn
+  // undefined → return false cho MỌI KH → khoảng ngày nào cũng ra "0 KH". Dùng _assignCustMap() (Map SĐT →
+  // phần tử allCustomers) để lấy đúng ymList.
+  var _cm = _assignCustMap();
   return _assignFilteredList.filter(function (p) {
-    var c = customerMap[p];
+    var c = _cm.get(p);
     if (!c || !c.ymList) return false;
     return c.ymList.some(function (o) {
       if (!o.ds) return false;
