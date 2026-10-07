@@ -46,3 +46,7 @@ team Duyên
 - Sau này sửa 1 phần: chỉ cần dán đè **đúng file chứa phần đó** rồi Deploy lại.
 - **Nguồn chính vẫn là `gas_v13.js`.** Sau mỗi lần sửa `gas_v13.js` chạy `node tools/split-gas.js` để sinh lại `gas/*.gs`; kiểm tra lệch bằng `node tools/split-gas.js --check`.
 - Ô "Đồng bộ mã GAS" trong `index.html` vẫn dùng nội dung đầy đủ của `gas_v13.js` (không đổi).
+
+### Quy tắc sửa backend GAS (để phiên nào cũng biết sửa/dán file nào)
+
+Xem đầy đủ ở `gas/INDEX.md` (bảng "file nào chứa hàm nào", tự sinh). Tóm tắt: sửa `gas_v13.js` → `node tools/split-gas.js` → `git status --short gas/` cho biết **file `.gs` nào đổi** → báo người dùng chỉ cần dán đè đúng các file đó vào Apps Script rồi Deploy lại. Tìm hàm nằm file nào: `node tools/split-gas.js --where <tên hàm>`.
