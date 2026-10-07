@@ -1272,10 +1272,10 @@ function doGet(e) {
     // ── Tap SDT co trong "dữ liệu đơn" — chi de loc nguon o man hinh chinh (cache 10') ──
     if (action === 'donPhones') {
       var cacheDP = CacheService.getScriptCache();
-      var cKeyDP = 'don_phones_v4'; // v4: them lastDateByPhone
+      var cKeyDP = 'don_phones_v5'; // v5: them statsByPhone (n + rev Pos, bo hoan)
       var cachedDP = cacheDP.get(cKeyDP);
       if (cachedDP) { try { return jsonOut_(JSON.parse(cachedDP)); } catch(ec) {} }
-      var resDP = { phones: readDonPhones_(), saleByPhone: getDonSaleByPhone_(), orderCountByPhone: getDonOrderCountByPhone_(), lastDateByPhone: getDonLastDateByPhone_() };
+      var resDP = { phones: readDonPhones_(), saleByPhone: getDonSaleByPhone_(), orderCountByPhone: getDonOrderCountByPhone_(), lastDateByPhone: getDonLastDateByPhone_(), statsByPhone: getDonStatsByPhone_() };
       try { cacheDP.put(cKeyDP, JSON.stringify(resDP), 600); } catch(ec) {}
       return jsonOut_(resDP);
     }
@@ -2544,6 +2544,23 @@ function getDonSaleByPhone_() {
 // Map SDT -> so dong (so don) trong "dữ liệu đơn" — dung de PHAN LOAI HANG KH (VIP/Than
 // thiet/Tiem nang/Chua ban lai duoc) theo tieu chi moi: dem theo SO DONG trong sheet nay,
 // KHONG con dua theo nguon Renew trong DT TONG nhu truoc.
+// Thong ke POS theo SDT: { phone: { n: so don, rev: tong doanh thu sau giam } } -- BO don 'Da hoan'/'Dang hoan' (cung quy tac Bao cao B).
+// Dung cho tong don/tong doanh thu + PHAN HANG KH cua KH da co don Pos (Pos la chuan, bo qua Base). KHONG dung cho Phan loai (van dem n tu getDonOrderCountByPhone_).
+function getDonStatsByPhone_() {
+  var rows = readDonChiTiet_();
+  var map = {};
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    if (_donHasExcludedStatus_(r.trangThai)) continue;
+    var ph = normPhone_(String(r.soDienThoai || ''));
+    if (!ph) continue;
+    var m = map[ph] || (map[ph] = { n: 0, rev: 0 });
+    m.n += 1;
+    m.rev += Number(r.giaTriSauGiam) || 0;
+  }
+  return map;
+}
+
 function getDonOrderCountByPhone_() {
   var rows = readDonChiTiet_();
   var map = {};
@@ -2566,6 +2583,7 @@ function getDonOrdersByPhone_(phone) {
   for (var i = 0; i < rows.length; i++) {
     var r = rows[i];
     if (normPhone_(String(r.soDienThoai || '')) !== ph) continue;
+    if (_donHasExcludedStatus_(r.trangThai)) continue;   // bo don hoan -- khop getDonStatsByPhone_ (tong tren ho so = tong lich su Pos)
     var dt = parseVNDate_(r.ngayTaoDon);
     out.push({
       date: dt ? _vnYmd_(dt) : '',
@@ -9011,7 +9029,8 @@ function _aaHangKey_(rev) { rev = Number(rev) || 0; return rev >= 50000000 ? 'su
 function _aaLoadCustomers_() {
   var src = {}, leadName = {};
   function mark(p, k) { if (!p) return; (src[p] = src[p] || {})[k] = true; }
-  var revBy = {};   // PHAN HANG KH: tong doanh thu theo SDT tren DT TONG (cung nguon voi c.totalRevenue o index.html)
+  var revBy = {};   // PHAN HANG KH: doanh thu theo SDT -- Pos (bo hoan) neu KH co don Pos, khong thi tong DT TONG (cung quy tac c.totalRevenue o index.html)
+  var posStats = getDonStatsByPhone_();
   readAllOrders_().forEach(function (o) { mark(o.phone, 'dt'); if (o.phone) revBy[o.phone] = (revBy[o.phone] || 0) + (Number(o.revenue) || 0); });
   readCareLeads_().forEach(function (r) { mark(r.phone, 'cs'); if (r.name) leadName[r.phone] = true; });
   readCskhDuyenLite_().rows.forEach(function (r) { mark(r[0], 'cskh'); });
@@ -9021,7 +9040,7 @@ function _aaLoadCustomers_() {
     var d = src[p];
     if (!(d.dt || d.don || d.cskh || (d.cs && leadName[p]))) return;
     var n = cnt[p] || 0;
-    custs.push({ phone: p, dataSrc: { dt: !!d.dt, don: !!d.don, cs: !!d.cs, cskh: !!d.cskh }, tier: n >= 10 ? 'VIP' : n >= 5 ? 'Thân thiết' : n >= 2 ? 'Tiềm năng' : 'Chưa bán lại được', hangKey: _aaHangKey_(revBy[p] || 0) });
+    custs.push({ phone: p, dataSrc: { dt: !!d.dt, don: !!d.don, cs: !!d.cs, cskh: !!d.cskh }, tier: n >= 10 ? 'VIP' : n >= 5 ? 'Thân thiết' : n >= 2 ? 'Tiềm năng' : 'Chưa bán lại được', hangKey: _aaHangKey_(posStats[p] ? posStats[p].rev : (revBy[p] || 0)) });
   });
   var ever = {};
   readAssign_(getCrmSS_().getSheetByName(SH_ASSIGN)).forEach(function (h) { (h.phones || []).forEach(function (p) { ever[p] = true; }); });
