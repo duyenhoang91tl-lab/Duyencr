@@ -17185,6 +17185,200 @@ switchAssignTab = function(tab, el){
 };
 
 // ═══════════════════════════════════════════════════════
+//  CHIA DATA TỰ ĐỘNG THEO NGÀY (engine) — phần 1/3
+//  Cấu hình _aaCfg lưu localStorage 'ome_auto_assign_cfg' + Settings 'autoAssignCfg' (dùng chung getSetting/setSetting
+//  sẵn có → KHÔNG cần sửa/deploy lại GAS). Mô hình chia:
+//   1) Mỗi người nhận có HẠN MỨC/ngày: từ số cụ thể của người đó, hoặc % của hạn mức Team (Team = số cụ thể hoặc % của tổng/ngày)
+//   2) Hạn mức người → tách theo tỷ lệ NGUỒN → rồi từng nguồn tách theo tỷ lệ ƯU TIÊN (VIP/Thân thiết/Tiềm năng/Khác)
+//   3) Tỷ lệ nguồn/ưu tiên: cài chung, ghi đè theo Team, ghi đè theo từng người. Mỗi tỷ lệ là {mode:'pct'|'count', vals:{}}
+//   4) Thiếu KH ở 1 nhóm → bù từ nhóm còn lại (cùng nguồn trước, rồi nguồn khác); vẫn thiếu thì báo thiếu.
+// ═══════════════════════════════════════════════════════
+var _AA_SRC_KEYS = ['dt','don','cs','cskh'];
+var _AA_SRC_LABEL = { dt:'DT tổng', don:'Dữ liệu đơn', cs:'Chăm sóc', cskh:'CSKH-Duyên' };
+var _AA_PRIO_KEYS = ['vip','tt','tn','other'];
+var _AA_PRIO_LABEL = { vip:'VIP', tt:'Thân thiết', tn:'Tiềm năng', other:'Khác (chưa phân hạng)' };
+var _AA_TIER = { vip:'VIP', tt:'Thân thiết', tn:'Tiềm năng' };
+
+function _aaDefaultCfg(){
+  return {
+    enabled:false,
+    days:[1,2,3,4,5,6],        // 0=CN,1=T2..6=T7 ; ngày không tích → KHÔNG chia
+    onlyUnassigned:true,       // chỉ lấy KH chưa từng chia (tránh chia lại đúng KH cũ mỗi ngày)
+    dailyTotal:0,              // tổng KH/ngày (dùng khi Team chia theo %)
+    teams:{},                  // teamId -> {on, mode:'count'|'pct', val}
+    memberMode:{},             // teamId -> 'pct'|'count'
+    members:{},                // teamId -> {tenNV: {on, val}}
+    src:{ mode:'pct', vals:{} },   // chung; vals rỗng/0 hết = lấy mọi nguồn theo tỷ lệ bằng nhau
+    prio:{ mode:'pct', vals:{} },
+    teamSrc:{}, teamPrio:{},   // teamId -> {mode, vals} (ghi đè)
+    memberSrc:{}, memberPrio:{}, // teamId -> {tenNV: {mode, vals}} (ghi đè)
+    lastRun:'',                // YYYY-MM-DD ngày đã chạy gần nhất
+    lastResult:null
+  };
+}
+// Largest remainder: chia nguyên `total` theo weights (mảng số ≥0); tổng weights = 0 → chia bằng nhau
+function _aaSplit(total, weights){
+  var n = weights.length, out = new Array(n).fill(0);
+  total = Math.max(0, Math.floor(total) || 0);
+  if (!n || !total) return out;
+  var w = weights.map(function(x){ return Math.max(0, Number(x) || 0); });
+  var sum = w.reduce(function(a,b){ return a+b; }, 0);
+  if (sum <= 0) { w = w.map(function(){ return 1; }); sum = n; }
+  var raw = w.map(function(x){ return total * x / sum; });
+  var fl = raw.map(Math.floor), used = fl.reduce(function(a,b){ return a+b; }, 0);
+  var order = raw.map(function(_,i){ return i; }).sort(function(a,b){ return (raw[b]-fl[b]) - (raw[a]-fl[a]) || a-b; });
+  for (var k = 0; k < total - used; k++) fl[order[k % n]]++;
+  return fl;
+}
+// Lấy tỷ lệ áp dụng cho 1 người: ghi đè người → ghi đè Team → chung
+function _aaRatioFor(cfg, kind, tid, name){
+  var mk = kind === 'src' ? 'memberSrc' : 'memberPrio', tk = kind === 'src' ? 'teamSrc' : 'teamPrio';
+  var m = cfg[mk] && cfg[mk][tid] && cfg[mk][tid][name]; if (m) return m;
+  var t = cfg[tk] && cfg[tk][tid]; if (t) return t;
+  return cfg[kind];
+}
+function _aaWeights(ratio, keys){   // chỉ lấy khoá được cài > 0; nếu chưa cài gì → tất cả khoá bằng nhau
+  var vals = (ratio && ratio.vals) || {};
+  var w = keys.map(function(k){ return Math.max(0, Number(vals[k]) || 0); });
+  if (w.every(function(x){ return x === 0; })) w = keys.map(function(){ return 1; });
+  return w;
+}
+// Danh sách người nhận + hạn mức/ngày. teamsArr = mảng team {id,name,members[],leader}; membersOf(team) → danh sách tên
+function _aaRecipients(cfg, teamsArr, membersOf){
+  var list = [], warn = [];
+  (teamsArr || []).forEach(function(t){
+    var tc = cfg.teams[t.id]; if (!tc || !tc.on) return;
+    var members = membersOf(t); if (!members.length) { warn.push('Team "'+t.name+'" chưa có thành viên'); return; }
+    var mc = (cfg.members && cfg.members[t.id]) || {};
+    var mm = (cfg.memberMode && cfg.memberMode[t.id]) || 'pct';
+    var active = members.filter(function(m){ return !mc[m] || mc[m].on !== false; });   // mặc định tích (chưa cài = có chia)
+    if (!active.length) return;
+    var teamQuota = tc.mode === 'pct' ? Math.round((cfg.dailyTotal || 0) * (Number(tc.val) || 0) / 100) : Math.floor(Number(tc.val) || 0);
+    var q;
+    if (mm === 'count') q = active.map(function(m){ return Math.max(0, Math.floor(Number((mc[m]||{}).val) || 0)); });
+    else q = _aaSplit(teamQuota, active.map(function(m){ return Number((mc[m]||{}).val) || 0; }));
+    active.forEach(function(m, i){ if (q[i] > 0) list.push({ team:t.id, teamName:t.name, name:m, quota:q[i] }); });
+  });
+  return { list:list, warn:warn };
+}
+// Dựng nhóm ứng viên theo (nguồn, ưu tiên). custs: [{phone,dataSrc,tier}] ; everSet: Set SĐT đã chia từng
+function _aaBuckets(cfg, custs, everSet){
+  var b = {};
+  _AA_SRC_KEYS.forEach(function(s){ b[s] = {}; _AA_PRIO_KEYS.forEach(function(p){ b[s][p] = []; }); });
+  for (var i = 0; i < custs.length; i++){
+    var c = custs[i]; if (!c || !c.phone) continue;
+    if (cfg.onlyUnassigned && everSet && everSet.has(c.phone)) continue;
+    var p = c.tier === 'VIP' ? 'vip' : c.tier === 'Thân thiết' ? 'tt' : c.tier === 'Tiềm năng' ? 'tn' : 'other';
+    var d = c.dataSrc || {};
+    for (var j = 0; j < _AA_SRC_KEYS.length; j++){ var s = _AA_SRC_KEYS[j]; if (d[s]) b[s][p].push(c.phone); }
+  }
+  return b;
+}
+// Lập kế hoạch 1 ngày. Trả {entries:[{team,teamName,name,phones[]}], short:[{name,missing}], warn:[]}
+function _aaPlan(cfg, teamsArr, membersOf, custs, everSet){
+  var rc = _aaRecipients(cfg, teamsArr, membersOf), buckets = _aaBuckets(cfg, custs, everSet);
+  var taken = new Set(), ptr = {}, entries = [], short = [];
+  function take(s, p, n, out){           // lấy tối đa n SĐT chưa dùng từ nhóm (s,p)
+    var arr = buckets[s][p], k = s + '|' + p, got = 0, i = ptr[k] || 0;
+    while (got < n && i < arr.length){ var ph = arr[i++]; if (!taken.has(ph)) { taken.add(ph); out.push(ph); got++; } }
+    ptr[k] = i; return got;
+  }
+  rc.list.forEach(function(r){
+    var sw = _aaWeights(_aaRatioFor(cfg, 'src', r.team, r.name), _AA_SRC_KEYS);
+    var sq = _aaSplit(r.quota, sw), phones = [], miss = 0;
+    var pw = _aaWeights(_aaRatioFor(cfg, 'prio', r.team, r.name), _AA_PRIO_KEYS);
+    var leftover = [];                    // phần chưa lấy đủ: [{s,p}] theo thứ tự để bù
+    _AA_SRC_KEYS.forEach(function(s, si){
+      if (!sq[si]) return;
+      var pq = _aaSplit(sq[si], pw);
+      _AA_PRIO_KEYS.forEach(function(p, pi){
+        if (!pq[pi]) return;
+        var got = take(s, p, pq[pi], phones);
+        if (got < pq[pi]) miss += pq[pi] - got;
+      });
+    });
+    if (miss > 0){   // bù: cùng nguồn đã chọn trước (theo ưu tiên có trọng số cao), rồi các nguồn còn lại có trọng số > 0
+      var srcOrder = _AA_SRC_KEYS.map(function(s,i){ return { s:s, w:sw[i] }; }).filter(function(x){ return x.w > 0; })
+        .sort(function(a,b){ return b.w - a.w; }).map(function(x){ return x.s; });
+      var prOrder = _AA_PRIO_KEYS.map(function(p,i){ return { p:p, w:pw[i] }; }).filter(function(x){ return x.w > 0; })
+        .sort(function(a,b){ return b.w - a.w; }).map(function(x){ return x.p; });
+      for (var a = 0; a < srcOrder.length && miss > 0; a++)
+        for (var c2 = 0; c2 < prOrder.length && miss > 0; c2++) miss -= take(srcOrder[a], prOrder[c2], miss, phones);
+    }
+    if (miss > 0) short.push({ name:r.name, team:r.teamName, missing:miss, quota:r.quota });
+    if (phones.length) entries.push({ team:r.teamName, teamId:r.team, name:r.name, phones:phones, quota:r.quota });
+  });
+  return { entries:entries, short:short, warn:rc.warn };
+}
+function _aaDayOn(cfg, d){ d = d || new Date(); return (cfg.days || []).indexOf(d.getDay()) >= 0; }
+function _aaToday(d){ d = d || new Date(); var p = function(n){ return String(n).padStart(2,'0'); }; return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
+
+// ── Lưu / nạp cấu hình (Settings sheet là nguồn chung cho mọi máy; localStorage là bản đệm) ──
+var _aaCfg = Object.assign(_aaDefaultCfg(), loadLS('ome_auto_assign_cfg') || {});
+var _aaBusy = false;
+function _aaPersist(){
+  saveLS('ome_auto_assign_cfg', _aaCfg);
+  if (!gsUrl) return Promise.resolve();
+  return fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'setSetting', key:'autoAssignCfg', value: JSON.stringify(_aaCfg) }) }).catch(function(e){ console.warn('[AutoAssign] lưu cấu hình lỗi', e); });
+}
+async function _aaPullCfg(){
+  if (!gsUrl) return;
+  try {
+    var r = await fetch(gsUrl + '?action=getSetting&key=autoAssignCfg', { redirect:'follow' });
+    var j = await r.json();
+    if (j && j.value) { _aaCfg = Object.assign(_aaDefaultCfg(), JSON.parse(j.value)); saveLS('ome_auto_assign_cfg', _aaCfg); }
+  } catch(e) { console.warn('[AutoAssign] nạp cấu hình lỗi', e); }
+}
+function _aaMembersOf(t){ return (typeof _teamMembersList === 'function') ? _teamMembersList(t) : (t.members || []); }
+// Xem trước kế hoạch hôm nay (KHÔNG ghi gì)
+function _aaPreview(){ return _aaPlan(_aaCfg, teams, _aaMembersOf, allCustomers, _everAssignedSet()); }
+
+// Chạy chia thật: ghi lịch sử + cập nhật CS chăm sóc giống hệt luồng chia thủ công (doAssignDataAdvanced)
+function _aaCommit(plan, tag){
+  var now = new Date().toISOString().slice(0,16).replace('T',' '), dm = _aaToday().slice(8) + '/' + _aaToday().slice(5,7);
+  var entries = plan.entries.map(function(e){
+    var en = { id: Date.now().toString() + '_' + Math.random().toString(36).slice(2,6), date: now, csName: e.name, phones: e.phones,
+      label: (tag || 'Tự động ' + dm) + ' — ' + e.team + ' → ' + e.name + ' (' + e.phones.length + ' KH)', team: e.team, auto: true, donePhones: [] };
+    assignHistory.unshift(en); return en;
+  });
+  if (!entries.length) return entries;
+  saveLS('ome_assign_hist', assignHistory);
+  _invalidateFilterCache();
+  if (typeof _rebuildAssignIndex === 'function') _rebuildAssignIndex();
+  try { _applyCareCSToAssigned(entries); } catch(e){ console.warn('applyCareCSToAssigned lỗi:', e); }
+  entries.forEach(function(e){ logAudit('assign', '', '', 'Tự động ' + e.team + ': ' + e.phones.length + ' KH → ' + e.csName); });
+  try { if (gsUrl) (async function(){ for (var i = 0; i < entries.length; i++) await pushAssignToGS(entries[i]); })(); } catch(e){ console.warn('pushAssignToGS lỗi:', e); }
+  if (typeof updateMyDataBadge === 'function') updateMyDataBadge();
+  return entries;
+}
+// force=true: chạy ngay (nút "Chạy thử hôm nay" — bỏ qua lastRun & công tắc ngày). Tự động: chỉ chạy khi bật + hôm nay được tích + chưa chạy hôm nay.
+async function _aaRunIfDue(force){
+  if (_aaBusy) return null;
+  if (typeof currentUser !== 'undefined' && currentUser && currentUser.role !== 'admin') return null;   // chỉ máy admin mới kích hoạt chia
+  if (!allCustomers || !allCustomers.length || !teams || !teams.length) return null;
+  _aaBusy = true;
+  try {
+    await _aaPullCfg();   // lấy bản mới nhất (máy admin khác có thể vừa chạy hôm nay)
+    var today = _aaToday();
+    if (!force && (!_aaCfg.enabled || !_aaDayOn(_aaCfg) || _aaCfg.lastRun === today)) return null;
+    // Đánh dấu ĐÃ CHẠY hôm nay trước khi chia → 2 máy admin cùng mở không chia đôi 2 lần
+    if (!force) { _aaCfg.lastRun = today; await _aaPersist(); }
+    var plan = _aaPreview();
+    var entries = _aaCommit(plan, force ? 'Chạy thử' : null);
+    var total = entries.reduce(function(s,e){ return s + e.phones.length; }, 0);
+    _aaCfg.lastResult = { date: today, total: total, people: entries.length, short: plan.short, warn: plan.warn, forced: !!force };
+    if (force) _aaCfg.lastRun = _aaCfg.lastRun || '';
+    await _aaPersist();
+    if (typeof toast === 'function') toast(total ? '⏰ Chia tự động: ' + total + ' KH → ' + entries.length + ' CS' + (plan.short.length ? ' (có ' + plan.short.length + ' người thiếu data)' : '') : '⏰ Chia tự động: không có KH nào để chia (kiểm tra cấu hình/nguồn)');
+    return { plan: plan, total: total };
+  } catch(e) { console.warn('[AutoAssign] lỗi', e); return null; }
+  finally { _aaBusy = false; }
+}
+// Kiểm tra định kỳ: mở CRM là chạy nếu đến hạn; để tab mở qua nửa đêm vẫn tự chạy sang ngày mới
+setTimeout(function(){ _aaRunIfDue(false); }, 25000);
+setInterval(function(){ _aaRunIfDue(false); }, 5 * 60 * 1000);
+
+// ═══════════════════════════════════════════════════════
 //  NO-ACTION CHIP trong col-toggle-bar
 // ═══════════════════════════════════════════════════════
 // Hidden checkbox để các hàm cũ (applyFilters đọc #no-action-filter) vẫn dùng được
