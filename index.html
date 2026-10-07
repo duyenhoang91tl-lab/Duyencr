@@ -17438,9 +17438,12 @@ function _aaCommit(plan, tag){
 }
 // force=true: chạy ngay (nút "Chạy thử hôm nay" — bỏ qua lastRun & công tắc ngày). Tự động: chỉ chạy khi bật + hôm nay được tích + chưa chạy hôm nay.
 async function _aaRunIfDue(force){
-  if (_aaBusy) return null;
-  if (typeof currentUser !== 'undefined' && currentUser && currentUser.role !== 'admin') return null;   // chỉ máy admin mới kích hoạt chia
-  if (!allCustomers || !allCustomers.length || !teams || !teams.length) return null;
+  // force (nút Chạy ngay) → trả {error:'lý do cụ thể'} để UI báo đúng; chạy tự động nền vẫn im lặng (null)
+  var fail = function(msg){ return force ? { error: msg } : null; };
+  if (_aaBusy) return fail('Đang có lượt chia khác chạy dở — đợi vài giây rồi bấm lại.');
+  if (typeof currentUser !== 'undefined' && currentUser && currentUser.role !== 'admin') return fail('Chỉ tài khoản admin mới được chia.');
+  if (!allCustomers || !allCustomers.length) return fail('Dữ liệu khách hàng chưa tải xong — đợi trang tải xong rồi bấm lại.');
+  if (!teams || !teams.length) return fail('Chưa có Team nào — tạo ở tab Quản lý Team trước.');
   _aaBusy = true;
   try {
     await _aaPullCfg();   // lấy bản mới nhất (máy admin khác có thể vừa chạy hôm nay)
@@ -17454,8 +17457,8 @@ async function _aaRunIfDue(force){
     _aaCfg.lastResult = { date: today, total: total, people: entries.length, short: plan.short, warn: plan.warn, forced: !!force, by: 'browser' };
     await _aaPersistState(force ? 'browser-force' : 'browser');
     if (typeof toast === 'function') toast(total ? '⏰ Chia tự động: ' + total + ' KH → ' + entries.length + ' CS' + (plan.short.length ? ' (có ' + plan.short.length + ' người thiếu data)' : '') : '⏰ Chia tự động: không có KH nào để chia (kiểm tra cấu hình/nguồn)');
-    return { plan: plan, total: total };
-  } catch(e) { console.warn('[AutoAssign] lỗi', e); return null; }
+    return { plan: plan, total: total, entries: entries, forced: !!force };
+  } catch(e) { console.warn('[AutoAssign] lỗi', e); return fail('Lỗi khi chia: ' + (e && e.message ? e.message : e) + ' (mở Console để xem chi tiết).'); }
   finally { _aaBusy = false; }
 }
 // Kiểm tra định kỳ: mở CRM là chạy nếu đến hạn; để tab mở qua nửa đêm vẫn tự chạy sang ngày mới
@@ -17707,11 +17710,44 @@ function _aaShowPreview(){
   el.innerHTML = h + '</div>';
   el.scrollIntoView({ behavior:'smooth', block:'nearest' });
 }
+// Bảng kết quả HIỆN CỐ ĐỊNH trong tab (toast 2,4s ở góc dưới rất dễ trượt mắt): báo rõ đã chia bao nhiêu KH cho ai,
+// ai thiếu data, và nếu 0 KH thì vì sao. r = kết quả _aaRunIfDue; r.error = lý do không chạy được.
+function _aaShowRunResult(r){
+  var el = document.getElementById('aa-preview'); if (!el) return;
+  var hhmm = new Date().toTimeString().slice(0,5), h;
+  if (r.error){
+    h = '<div class="assign-section" style="border:1px solid #fecaca;background:#fef2f2"><div class="assign-section-title">❌ Chưa chia được ('+hhmm+')</div><div style="font-size:13px">'+esc(r.error)+'</div></div>';
+  } else {
+    var p = r.plan, sh = {}; p.short.forEach(function(x){ sh[x.name] = x.missing; });
+    var ok = r.total > 0;
+    h = '<div class="assign-section" style="border:1px solid '+(ok?'#bbf7d0':'#fed7aa')+';background:'+(ok?'#f0fdf4':'#fff7ed')+'">'+
+      '<div class="assign-section-title">'+(ok ? '✅ Đã chia xong lúc '+hhmm : '⚠ Không chia được KH nào ('+hhmm+')')+'</div>'+
+      '<div style="font-size:14px;margin-bottom:6px"><b>'+r.total+' KH</b> → '+r.entries.length+' CS'+(ok ? ' · đã ghi vào tab <b>Lịch sử chia</b> và đang đồng bộ lên server.' : '')+'</div>';
+    if (p.warn.length) h += '<div style="color:var(--red);font-size:12px;margin-bottom:4px">'+p.warn.map(esc).join('<br>')+'</div>';
+    if (ok){
+      h += '<table class="dash-table"><thead><tr><th>Team</th><th>CS</th><th style="text-align:right">Hạn mức</th><th style="text-align:right">Đã chia</th><th>Ghi chú</th></tr></thead><tbody>'+
+        p.entries.map(function(e){ return '<tr><td>'+esc(e.team)+'</td><td>'+esc(e.name)+'</td><td style="text-align:right">'+e.quota+'</td><td style="text-align:right;font-weight:700">'+e.phones.length+'</td><td style="color:var(--red)">'+(sh[e.name]?'thiếu '+sh[e.name]+' KH (hết data phù hợp)':'')+'</td></tr>'; }).join('')+'</tbody></table>';
+    } else {
+      h += '<div style="font-size:12px;color:var(--muted)">Kiểm tra: Team đã tích chưa · hạn mức &gt; 0 chưa · nguồn/ưu tiên có KH phù hợp không · bật "Chỉ lấy KH chưa chia lần nào" thì có thể đã chia hết KH chưa từng chia.'+(p.short.length ? '<br>Thiếu data: '+p.short.map(function(x){ return esc(x.name)+' thiếu '+x.missing; }).join(', ') : '')+'</div>';
+    }
+    h += '</div>';
+  }
+  el.innerHTML = h;
+  el.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
 async function _aaRunNow(){
   if (!confirm('Chia NGAY theo cấu hình hiện tại?\nViệc này chia thật (ghi lịch sử + đổi CS chăm sóc) và không ảnh hưởng lịch tự động ngày mai.')) return;
-  await _aaPersist();
-  var r = await _aaRunIfDue(true);
-  if (r) _aaRerender(); else toast('Không chạy được (cần quyền admin, đã tải xong dữ liệu và có Team)');
+  var btn = document.getElementById('aa-run-btn'), old = btn ? btn.textContent : '';
+  if (btn){ btn.disabled = true; btn.textContent = '⏳ Đang chia...'; }
+  var pv = document.getElementById('aa-preview'); if (pv) pv.innerHTML = '<div class="assign-section"><div style="font-size:13px">⏳ Đang chia, đợi chút...</div></div>';
+  var r;
+  try { await _aaPersist(); r = await _aaRunIfDue(true); }
+  catch(e){ r = { error: 'Lỗi: ' + (e && e.message ? e.message : e) }; }
+  finally { if (btn){ btn.disabled = false; btn.textContent = old; } }
+  r = r || { error: 'Không chạy được.' };
+  _aaRerender();            // vẽ lại tab (cập nhật "Lần chạy gần nhất") rồi mới ghi bảng kết quả, nếu không sẽ bị xoá
+  _aaShowRunResult(r);
+  toast(r.error ? '❌ ' + r.error : r.total ? '✅ Đã chia ' + r.total + ' KH → ' + r.entries.length + ' CS' : '⚠ Không có KH nào để chia');
 }
 async function _aaSaveNow(){ await _aaPersist(); toast('✓ Đã lưu cấu hình chia tự động'); }
 
@@ -17723,7 +17759,7 @@ switchAssignTab = function(tab, el){
     if (el) el.classList.add('active');
     var f = document.getElementById('assign-footer');
     if (f) f.innerHTML = '<button class="btn" onclick="closeAssignModal()">Đóng</button><button class="btn" onclick="_aaShowPreview()">👁 Xem trước</button>'+
-      '<button class="btn" onclick="_aaRunNow()">▶ Chạy ngay</button><button class="btn primary" onclick="_aaSaveNow()">💾 Lưu cấu hình</button>';
+      '<button class="btn" id="aa-run-btn" onclick="_aaRunNow()">▶ Chạy ngay</button><button class="btn primary" onclick="_aaSaveNow()">💾 Lưu cấu hình</button>';
     _aaPullCfg().then(renderAssignAuto); renderAssignAuto();
     return;
   }
