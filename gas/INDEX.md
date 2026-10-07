@@ -44,7 +44,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `SALE_TIER_ORDER_`, `SALE_TIER_DEFAULT_TARGETS_`, `SALE_TIER_META_`, `SALE_KPI_DEFAULT_CFG_`
 
 ## 09_SalesReportB_POS.gs
-- Hàm: `_normCounterCode_`, `_counterCodeNoYear_`, `_counterCodeHasYear_`, `_extractCounterCodes_`, `_detectBaseCounterCol_`, `_readBaseRowsByCounterCodes_`, `_pickBaseRowsForCode_`, `_resolveGhepDon_`, `_quaySaleRatio_`, `buildSalesReportB_`
+- Hàm: `_normCounterCode_`, `_counterCodeNoYear_`, `_counterCodeHasYear_`, `_extractCounterCodes_`, `_detectBaseCounterCol_`, `_readBaseRowsByCounterCodes_`, `_pickBaseRowsForCode_`, `_resolveGhepDon_`, `_quaySaleRatio_`, `_foldSaleKey_`, `_resolveBonusSale_`, `buildSalesReportB_`
 - Hằng/biến: `POS_GHEP_BASE_ENABLED_`, `COUNTER_CODE_INNER_`, `COUNTER_CODE_RE_SRC_`, `QUAY_SALE_RATIO_`
 
 ## 10_CSStats_KPI_ReportC.gs

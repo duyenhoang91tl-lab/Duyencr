@@ -155,7 +155,13 @@ function buildCsStats_(cs, dateFrom, dateTo) {
     if (!(frac > 0)) return;
     var share = giaTri * frac * (Number(o.saleRatio) || 1);
     totalOrders++; revenue += share;
-    mine.push({ date: _csYmdFromDmy_(o.ngayTaoDon), time: (String(o.ngayTaoDon || '').match(/(\d{1,2}):(\d{2})/) || [''])[0], giaTri: giaTri, sanPham: o.sanPham });
+    // THUONG CHI CHO NGUOI TAO don Base (o.bonusSale, xem _resolveBonusSale_); sale ban cung chi duoc tinh DOANH THU (share).
+    // o.bonusSale === undefined = don khong ghep Base -> giu cach cu (moi sale tren don deu duoc xet thuong).
+    var isBonus = true;
+    if (o.bonusSale !== undefined) {
+      isBonus = String(o.bonusSale || '').split(',').some(function(x) { return x.trim() && myFold[_normTxt_(x)]; });
+    }
+    mine.push({ date: _csYmdFromDmy_(o.ngayTaoDon), time: (String(o.ngayTaoDon || '').match(/(\d{1,2}):(\d{2})/) || [''])[0], giaTri: giaTri, share: share, isBonus: isBonus, sanPham: o.sanPham });
     var chR = channelRate(o.nguonDon);
     if (chR !== null) {
       ordCh++; revCh += share; commCh += share * chR / 100;
@@ -174,8 +180,11 @@ function buildCsStats_(cs, dateFrom, dateTo) {
   mine.forEach(function(o) {
     if (!byDay[o.date]) byDay[o.date] = { date: o.date, revenue: 0, count: 0, first: null };
     var g = byDay[o.date];
-    g.revenue += o.giaTri; g.count++;
-    if (o.time && (g.first === null || o.time < g.first)) g.first = o.time;
+    g.revenue += o.share; // doanh so ngay = phan DOANH THU da chia cua sale (ke ca don khong phai nguoi tao)
+    if (o.isBonus) { // so don + don dau tien trong ngay chi tinh cho don do chinh sale nay TAO
+      g.count++;
+      if (o.time && (g.first === null || o.time < g.first)) g.first = o.time;
+    }
   });
   Object.keys(byDay).forEach(function(k) {
     var g = byDay[k], bestTier = null, bestRev = null, bestFirst = null;
@@ -189,7 +198,7 @@ function buildCsStats_(cs, dateFrom, dateTo) {
           if (amt > 0 && (!bestRev || amt > bestRev.amount)) bestRev = { amount: amt, program: p, detail: 'Doanh số ngày ' + _csMoney_(g.revenue) };
         }
       }
-      if (p.tier && p.tier.enabled && (p.tier.rows || []).length) {
+      if (p.tier && p.tier.enabled && (p.tier.rows || []).length && g.count > 0) {
         var hit = null;
         p.tier.rows.slice().sort(function(a, b) { return Number(a.count) - Number(b.count); }).forEach(function(t) { if (g.count >= Number(t.count)) hit = t; });
         if (hit) {
@@ -197,7 +206,7 @@ function buildCsStats_(cs, dateFrom, dateTo) {
           if (amt2 > 0 && (!bestTier || amt2 > bestTier.amount)) bestTier = { amount: amt2, program: p, detail: 'Đạt ' + g.count + ' đơn/ngày (bậc từ ' + hit.count + ' đơn)' };
         }
       }
-      if (p.firstOrder && p.firstOrder.enabled) {
+      if (p.firstOrder && p.firstOrder.enabled && g.count > 0) {
         var amt3 = Number(p.firstOrder.amount) || 0;
         if (amt3 > 0 && (!bestFirst || amt3 > bestFirst.amount)) bestFirst = { amount: amt3, program: p, detail: 'Đơn đầu tiên trong ngày' + (g.first ? ' (lúc ' + g.first + ')' : '') };
       }
@@ -209,6 +218,7 @@ function buildCsStats_(cs, dateFrom, dateTo) {
     });
   });
   mine.forEach(function(o) {
+    if (!o.isBonus) return; // thuong theo don CHI cho nguoi tao don
     var best = null;
     programs.forEach(function(p) {
       if (!_csBonusApplies_(p, o.date, channel, startYmd)) return;

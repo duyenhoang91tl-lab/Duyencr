@@ -15348,6 +15348,26 @@ function _bonusProductQty_(sanPham, keywordsStr){
   });
   return {matched:matched, qty:totalQty};
 }
+// Tập tên sale ĐƯỢC XÉT THƯỞNG của 1 đơn: đơn Pos đã ghép Base -> chỉ người tạo (o.bonusSale từ backend, có thể rỗng);
+// đơn không ghép Base (o.bonusSale === undefined) -> mọi sale trên đơn như cũ.
+function _bonusNamesOfOrder_(o){
+  var names = (o.bonusSale !== undefined && o.bonusSale !== null) ? splitMulti_(o.bonusSale, ',') : splitMulti_(o.saleBan, ',');
+  var set = {};
+  names.forEach(function(n){ if (n) set[n] = true; });
+  return set;
+}
+// Doanh thu CHIA cho từng sale của 1 đơn — cùng quy ước với _computeCommissionData_ (saleShares nếu đơn ghép Base,
+// ngược lại chia đều theo thẻ sale; saleRatio 0.3 = đơn Quầy 30/70).
+function _orderRevenueShares_(o){
+  var giaTri = Number(o.giaTriDon)||0, ratio = Number(o.saleRatio)||1, out = [];
+  if (o.saleShares && o.saleShares.length){
+    o.saleShares.forEach(function(x){ if (x.name) out.push({name:x.name, share:giaTri*(Number(x.frac)||0)*ratio}); });
+  } else {
+    var list = splitMulti_(o.saleBan, ',').filter(Boolean);
+    list.forEach(function(n){ out.push({name:n, share:giaTri/list.length*ratio}); });
+  }
+  return out;
+}
 function _computeBonusData_(orders){
   orders = orders || [];
   var bySale = {};
@@ -15360,13 +15380,24 @@ function _computeBonusData_(orders){
     var dateStr = _ddmmyyyyToYmd_(o.ngayTao);
     var timeMatch = String(o.ngayTao||'').match(/(\d{1,2}):(\d{2})/);
     var timeStr = timeMatch ? timeMatch[0] : '';
-    splitMulti_(o.saleBan, ',').forEach(function(name){
+    // THƯỞNG CHỈ TÍNH CHO NGƯỜI TẠO ĐƠN BASE (yêu cầu Duyên 07/10/2026): đơn Pos ghép được với Base thì backend trả
+    // o.bonusSale = người tạo (đã kiểm tra là sale; '' = người tạo không phải sale -> không ai nhận thưởng). Sale bán
+    // cùng chỉ được tính DOANH THU (phần chia) — thưởng đã tính cho người tạo rồi. Đơn không ghép Base
+    // (bonusSale === undefined) giữ cách cũ: mọi sale trên đơn đều được xét thưởng.
+    var bonusSet = _bonusNamesOfOrder_(o);
+    var revShares = _orderRevenueShares_(o); // [{name, share}] — doanh thu CHIA theo sale (không phải giá trị đơn nguyên)
+    var perName = {};
+    revShares.forEach(function(x){ perName[x.name] = {share:x.share, bonus:false}; });
+    Object.keys(bonusSet).forEach(function(nm){ if (!perName[nm]) perName[nm] = {share:0, bonus:true}; else perName[nm].bonus = true; });
+    Object.keys(perName).forEach(function(name){
       if (!name) return;
       var key = name+'|'+dateStr;
       if (!bySaleDay[key]) bySaleDay[key] = {name:name, date:dateStr, revenue:0, count:0, firstOrderTime:null};
-      bySaleDay[key].revenue += Number(o.giaTriDon)||0;
-      bySaleDay[key].count++;
-      if (timeStr && (bySaleDay[key].firstOrderTime===null || timeStr < bySaleDay[key].firstOrderTime)) bySaleDay[key].firstOrderTime = timeStr;
+      bySaleDay[key].revenue += perName[name].share;
+      if (perName[name].bonus){
+        bySaleDay[key].count++;
+        if (timeStr && (bySaleDay[key].firstOrderTime===null || timeStr < bySaleDay[key].firstOrderTime)) bySaleDay[key].firstOrderTime = timeStr;
+      }
     });
   });
   Object.keys(bySaleDay).forEach(function(key){
@@ -15384,7 +15415,7 @@ function _computeBonusData_(orders){
           if (amt>0 && (!bestRevDay || amt>bestRevDay.amount)) bestRevDay = {amount:amt, program:p, detail:'Doanh số ngày '+_srMoney(g.revenue)};
         }
       }
-      if (p.tier && p.tier.enabled && (p.tier.rows||[]).length){
+      if (p.tier && p.tier.enabled && (p.tier.rows||[]).length && g.count>0){
         var hit = null;
         p.tier.rows.slice().sort(function(a,b){ return Number(a.count)-Number(b.count); }).forEach(function(t){
           if (g.count >= Number(t.count)) hit = t;
@@ -15394,7 +15425,7 @@ function _computeBonusData_(orders){
           if (amt2>0 && (!bestTier || amt2>bestTier.amount)) bestTier = {amount:amt2, program:p, detail:'Đạt '+g.count+' đơn/ngày (bậc từ '+hit.count+' đơn)'};
         }
       }
-      if (p.firstOrder && p.firstOrder.enabled){
+      if (p.firstOrder && p.firstOrder.enabled && g.count>0){
         var amt3 = Number(p.firstOrder.amount)||0;
         if (amt3>0 && (!bestFirstOrder || amt3>bestFirstOrder.amount)) bestFirstOrder = {amount:amt3, program:p, detail:'Đơn đầu tiên trong ngày'+(g.firstOrderTime?' (lúc '+g.firstOrderTime+')':'')};
       }
@@ -15411,7 +15442,7 @@ function _computeBonusData_(orders){
   orders.forEach(function(o){
     var dateStr = _ddmmyyyyToYmd_(o.ngayTao);
     var giaTri = Number(o.giaTriDon)||0;
-    splitMulti_(o.saleBan, ',').forEach(function(name){
+    Object.keys(_bonusNamesOfOrder_(o)).forEach(function(name){ // chỉ NGƯỜI TẠO đơn (xem ghi chú ở trên)
       if (!name) return;
       var channel = SALE_CHANNELS[name] || '';
       var best = null;
