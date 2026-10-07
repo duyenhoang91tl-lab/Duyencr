@@ -17467,6 +17467,7 @@ setInterval(function(){ _aaRunIfDue(false); }, 5 * 60 * 1000);
 //  CHIA DATA TỰ ĐỘNG — giao diện tab "⏰ Chia tự động" (phần 2/3)
 // ═══════════════════════════════════════════════════════
 var _aaOpen = {};   // teamId -> đang mở chi tiết thành viên
+var _aaRatioTeamOpen = {};   // teamId -> đang mở khối tỷ lệ riêng của Team ở mục ② (chỉ UI)
 var _AA_DOW = [['1','T2'],['2','T3'],['3','T4'],['4','T5'],['5','T6'],['6','T7'],['0','CN']];
 function _aaScopeObj(kind, tid, name, create){
   if (!tid) return _aaCfg[kind];
@@ -17500,6 +17501,26 @@ function _aaMemberField(tid, name, f, v){
   var o = mc[name] = mc[name] || { on:true, val:0 };
   if (f === 'on') o.on = !!v; else o.val = Math.max(0, Number(v) || 0);
   _aaRerender();
+}
+function _aaRatioTeamToggle(tid){ _aaRatioTeamOpen[tid] = !_aaRatioTeamOpen[tid]; _aaRerender(); }
+// Mục ② — cài tỷ lệ NGUỒN + ƯU TIÊN theo TEAM ngay tại đây (không phải mở "Chi tiết" rồi cuộn qua từng
+// thành viên). Cùng dữ liệu teamSrc/teamPrio với khối "Cả Team" trong Chi tiết → _aaRatioFor đọc như cũ.
+function _aaRatioTeamsHtml(){
+  if (!teams.length) return '';
+  var cfg = _aaCfg;
+  var h = '<div style="margin-top:12px;border-top:1px dashed var(--border,#e5e3dc);padding-top:10px"><b style="font-size:12px">Cài riêng theo Team</b>'+
+    '<div style="font-size:11px;color:var(--muted);margin:2px 0 6px">Bấm tên Team để cài tỷ lệ nguồn / ưu tiên cho cả Team (áp dụng cho mọi người trong Team, trừ người đã cài riêng). Chấm xanh = Team đang có tỷ lệ riêng.</div>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap">';
+  teams.forEach(function(t){
+    var has = !!((cfg.teamSrc && cfg.teamSrc[t.id]) || (cfg.teamPrio && cfg.teamPrio[t.id]));
+    h += '<span class="assign-sort-btn '+(_aaRatioTeamOpen[t.id]?'active':'')+'" onclick="_aaRatioTeamToggle(\''+esc(t.id)+'\')">'+(has?'<span style="color:var(--green)">●</span> ':'')+esc(t.name)+'</span>';
+  });
+  h += '</div>';
+  teams.forEach(function(t){
+    if (!_aaRatioTeamOpen[t.id]) return;
+    h += '<div style="margin-top:8px"><b style="font-size:12px">'+esc(t.name)+'</b>'+_aaRatioHtml('src', t.id)+_aaRatioHtml('prio', t.id)+'</div>';
+  });
+  return h + '</div>';
 }
 function _aaOpenToggle(tid){ _aaOpen[tid] = !_aaOpen[tid]; _aaRerender(); }
 function _aaRatioMode(el){ var o = _aaScopeObj(el.dataset.k, el.dataset.t, el.dataset.n, true); o.mode = el.dataset.mode; _aaRerender(); }
@@ -17569,7 +17590,7 @@ function renderAssignAuto(){
   h += '</div>';
   h += '<div class="assign-section"><div class="assign-section-title">② Tỷ lệ chung theo nguồn &amp; ưu tiên</div>'+
     '<div style="font-size:11px;color:var(--muted)">Áp dụng cho mọi người, trừ chỗ bạn cài riêng theo Team / từng người (bấm “Chi tiết” ở Team). Mỗi người: hạn mức → chia theo nguồn → mỗi nguồn chia tiếp theo ưu tiên.</div>'+
-    _aaRatioHtml('src') + _aaRatioHtml('prio') + '</div>';
+    _aaRatioHtml('src') + _aaRatioHtml('prio') + _aaRatioTeamsHtml() + '</div>';
   var lr = cfg.lastResult;
   if (lr) h += '<div class="assign-section"><div class="assign-section-title">Lần chạy gần nhất</div><div style="font-size:12px">'+esc(lr.date)+(lr.forced?' (chạy thử)':'')+(lr.by?' · bởi '+(lr.by==='server'?'server (trigger)':'trình duyệt'):'')+': đã chia <b>'+lr.total+' KH</b> cho '+(lr.people||0)+' CS'+
     ((lr.short||[]).length ? '<div style="color:var(--red);margin-top:4px">Thiếu data: '+lr.short.map(function(s){ return esc(s.name)+' thiếu '+s.missing; }).join(', ')+'</div>' : '')+'</div></div>';
@@ -17581,6 +17602,7 @@ function _aaTeamDetailHtml(t, members, qmap){
   var h = '<div style="padding:6px 0"><div style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><b style="font-size:12px">Chia trong Team:</b>'+
     '<span class="assign-sort-btn '+(mm==='pct'?'active':'')+'" onclick="_aaMemberMode(\''+tid+'\',\'pct\')">Theo %</span>'+
     '<span class="assign-sort-btn '+(mm==='count'?'active':'')+'" onclick="_aaMemberMode(\''+tid+'\',\'count\')">Số KH/người/ngày</span></div>';
+  h += '<div style="padding-bottom:6px"><b style="font-size:12px">Cả Team (áp dụng cho mọi người trong Team, trừ người có tỷ lệ riêng):</b>'+_aaRatioHtml('src', t.id)+_aaRatioHtml('prio', t.id)+'</div>';
   members.forEach(function(m){
     var o = mc[m] || { on:true, val:0 }, en = m.replace(/"/g,'&quot;');
     h += '<div style="border-top:1px solid var(--border,#e5e3dc);padding:6px 0"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
@@ -17589,7 +17611,7 @@ function _aaTeamDetailHtml(t, members, qmap){
       '<b style="font-size:12px;color:var(--green)">≈ '+(o.on!==false ? (qmap[t.id+'|'+m]||0) : 0)+' KH/ngày</b></div>'+
       '<div style="margin-left:4px">'+_aaRatioHtml('src', t.id, m)+_aaRatioHtml('prio', t.id, m)+'</div></div>';
   });
-  h += '<div style="border-top:1px solid var(--border,#e5e3dc);padding-top:6px"><b style="font-size:12px">Cả Team (áp dụng cho mọi người trong Team, trừ người có tỷ lệ riêng):</b>'+_aaRatioHtml('src', t.id)+_aaRatioHtml('prio', t.id)+'</div></div>';
+  h += '</div>';
   return h;
 }
 // Xem trước (không ghi gì) — tính trên toàn bộ KH nên bấm mới chạy
