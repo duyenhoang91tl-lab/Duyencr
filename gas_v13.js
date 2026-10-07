@@ -1183,6 +1183,13 @@ function doGet(e) {
     var action = (e && e.parameter && e.parameter.action) ? e.parameter.action : '';
 
     // ── lookup theo phone (ZaloAI extension) ──
+    // donOrdersByPhone: cac don POS (sheet 'du lieu don') cua 1 SDT -- Sasum dung cho muc "Lich su dat hang": KH da co don Pos thi
+    // chi hien don Pos (Pos la chuan; don len Base cung da co tren Pos), BO QUA don Base. Moi don: ngay ISO, san pham, doanh thu sau giam, nguon...
+    if (action === 'donOrdersByPhone') {
+      var phDo = (e && e.parameter && e.parameter.phone) ? String(e.parameter.phone) : '';
+      if (!phDo) return jsonOut_({ ok: false, error: 'Thieu phone' });
+      return jsonOut_({ ok: true, orders: getDonOrdersByPhone_(phDo) });
+    }
     // cskhDetail: CHI chi tiet CSKH-Duyen cua 1 SDT (Sasum tab Tong quan, lazy khi CS mo ho so).
     // Nhe hon 'lookup' rat nhieu: KHONG doc CareData/Orders, chi findCskhRowsByPhone_ (index SDT + vai dong). Cache 60s theo SDT.
     if (action === 'cskhDetail') {
@@ -2550,6 +2557,34 @@ function getDonOrderCountByPhone_() {
 
 // Ngay mua GAN NHAT (nguon Pos = sheet "dữ liệu đơn") theo SDT -> { phone: 'yyyy-mm-dd' }. Dung cho cot "Ngày mua gần nhất"
 // o Danh sach KH (index.html). Bo qua dong khong parse duoc ngay.
+// Don POS cua 1 SDT (moi nhat truoc). Doc tu readDonChiTiet_ (cache 90s) nen goi lien tiep nhieu KH khong doc lai sheet.
+function getDonOrdersByPhone_(phone) {
+  var ph = normPhone_(String(phone || ''));
+  var out = [];
+  if (!ph) return out;
+  var rows = readDonChiTiet_();
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    if (normPhone_(String(r.soDienThoai || '')) !== ph) continue;
+    var dt = parseVNDate_(r.ngayTaoDon);
+    out.push({
+      date: dt ? _vnYmd_(dt) : '',
+      product: r.sanPham || '',
+      productCode: r.maSanPham || '',
+      qty: r.soLuong || '',
+      revenue: Number(r.giaTriSauGiam) || 0,
+      cod: Number(r.cod) || 0,
+      source: r.nguonDon || '',
+      status: r.trangThai || '',
+      sale: r.theSale || '',
+      marketer: r.marketer || '',
+      note: r.ghiChu || ''
+    });
+  }
+  out.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
+  return out;
+}
+
 function getDonLastDateByPhone_() {
   var rows = readDonChiTiet_();
   var map = {};

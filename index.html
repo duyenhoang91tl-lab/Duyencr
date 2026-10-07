@@ -4712,6 +4712,51 @@ function renderSchedTabHtml(c) {
   </div>`;
 }
 
+// ---- Lich su dat hang: KH da co don POS -> chi hien don Pos, bo qua don Base (yeu cau Duyen 2026-10-06) ----
+// Pos la chuan (don len Base da co tren Pos). Don Pos lay LUOI theo SDT qua action=donOrdersByPhone khi CS mo tab Lich su.
+var _posOrdersCache = {};    // phone -> mang don Pos
+var _posOrdersState = {};    // phone -> 'loading' | 'done' | 'fail'
+function _loadPosOrdersForPhone_(phone) {
+  if (!phone || _posOrdersState[phone] || !gsUrl) return;
+  if (!(typeof donPhoneSet !== 'undefined' && donPhoneSet && donPhoneSet.has(phone))) return;   // KH chua co don Pos -> giu lich su Base
+  _posOrdersState[phone] = 'loading';
+  const sep = gsUrl.indexOf('?') >= 0 ? '&' : '?';
+  fetch(gsUrl + sep + 'action=donOrdersByPhone&phone=' + encodeURIComponent(phone), { redirect: 'follow' })
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      const rows = (j && j.ok && Array.isArray(j.orders)) ? j.orders : [];
+      if (rows.length) { _posOrdersCache[phone] = rows; _posOrdersState[phone] = 'done'; } else { _posOrdersState[phone] = 'fail'; }
+    })
+    .catch(function(err){ _posOrdersState[phone] = 'fail'; console.warn('pos orders error:', err && err.message); })
+    .then(function(){
+      if (currentPhone !== phone || currentDpTab !== 'history') return;
+      // Khong ve lai neu CS dang mo form them/sua don (tranh mat chu dang go)
+      const busy = Array.prototype.some.call(document.querySelectorAll('#add-order-form, [id^="hedit_"]'), function(el){ return el.style.display && el.style.display !== 'none'; });
+      if (busy) return;
+      const c = allCustomers.find(function(x){ return x.phone === phone; });
+      const body = document.getElementById('dp-body');
+      if (c && body) { body.innerHTML = renderHistTab(c); if (typeof _initHistExpand === 'function') _initHistExpand(); }
+    });
+}
+function _renderPosHistoryHtml_(c, rows) {
+  const total = rows.reduce(function(sum, o){ return sum + (Number(o.revenue) || 0); }, 0);
+  const fmtD = function(iso){ const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? (m[3] + '/' + m[2] + '/' + m[1]) : '—'; };
+  return `<div class="dp-stitle">Lịch sử đặt hàng · Pos (${rows.length} đơn — ${fmtVND(total)})</div>
+    <div style="font-size:11px;color:var(--hint);margin:-2px 0 8px">Khách đã có đơn trên Pos nên lịch sử lấy theo Pos (chuẩn); các đơn Base đã nằm trong Pos nên không hiển thị lại.</div>
+    ${rows.slice(0,60).map(function(o){
+      return `<div class="hist-item" style="border-left:3px solid var(--blue,#2563eb);padding-left:8px">
+        <div class="hist-top"><span class="hist-date">${fmtD(o.date)}</span><span class="hist-price">${fmtVND(o.revenue)}</span></div>
+        ${o.product ? `<div class="hist-prod" onclick="_toggleHistProd(this)" title="Bấm để xem đầy đủ sản phẩm">${esc(o.product)}</div>` : ''}
+        <div class="hist-tags">
+          ${o.source ? `<span class="htag">${esc(o.source)}</span>` : ''}
+          ${o.sale ? `<span class="htag">👤 ${esc(o.sale)}</span>` : ''}
+          ${o.status ? `<span class="htag">${esc(o.status)}</span>` : ''}
+          ${o.note ? `<span class="htag">📝 ${esc(String(o.note).substring(0,35))}</span>` : ''}
+        </div></div>`;
+    }).join('')}
+    ${rows.length > 60 ? `<div style="font-size:11px;color:var(--hint);padding:6px 0">… còn ${rows.length - 60} đơn cũ hơn</div>` : ''}`;
+}
+
 function renderHistTab(c) {
   const sorted = [...c.orders].sort((a,b)=>{
     const da=a.date instanceof Date?a.date.getTime():(a.year||0)*10000+(a.month||0)*100;
@@ -4726,6 +4771,10 @@ function renderHistTab(c) {
   const dlSources   = `<datalist id="mo-source-list">${allSources.map(s2=>`<option value="${esc(s2)}">`).join('')}</datalist>`;
   const todayStr    = _ymd(new Date());
   const _pts = _ptsOfCustomer_(c);
+  const _posRows = _posOrdersCache[c.phone];
+  const _posOn = !!(_posRows && _posRows.length);          // da co don Pos tai xong -> thay lich su Base bang lich su Pos
+  if (!_posOn && !_posOrdersState[c.phone]) setTimeout(function(){ _loadPosOrdersForPhone_(c.phone); }, 0);
+  const _posLoading = !_posOn && _posOrdersState[c.phone] === 'loading';
 
   return `<div class="dp-section">${dlBrands}${dlDetails}${dlSources}
     <button class="save-btn" style="margin-bottom:10px" onclick="_toggleAddOrderForm()">+ Thêm đơn hàng</button>
@@ -4763,6 +4812,7 @@ function renderHistTab(c) {
       </div>
     </div>
     ${_ptsBoxHtml_(_pts)}
+    ${_posOn ? _renderPosHistoryHtml_(c, _posRows) : `${_posLoading?'<div style="font-size:11px;color:var(--hint);margin-bottom:4px">⏳ đang kiểm tra đơn Pos…</div>':''}
     <div class="dp-stitle">Lịch sử đặt hàng (${sorted.length} đơn — ${fmtVND(c.totalRevenue)} tổng · <span style="color:var(--green)">${c.renewOrders} Renew</span>)</div>
     ${sorted.slice(0,60).map((o,si)=>{
       const isRenew   = RENEW_SOURCES.includes(s(o.source).toLowerCase());
@@ -4824,7 +4874,7 @@ function renderHistTab(c) {
           </div>
         </div>
       </div>`;
-    }).join('')}
+    }).join('')}`}
   </div>`;
 }
 
