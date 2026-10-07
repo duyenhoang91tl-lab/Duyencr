@@ -1203,7 +1203,7 @@ function doGet(e) {
       var cKey = 'lk_' + normPhone_(phone);
       var cached = cache.get(cKey);
       if (cached) { try { return jsonOut_(JSON.parse(cached)); } catch(ec) {} }
-      var res = { ok: true, care: findCareByPhone_(phone), orders: readOrdersByPhone_(phone), cskh: findCskhRowsCached_(phone) };
+      var res = { ok: true, care: findCareByPhone_(phone), orders: readOrdersByPhone_(phone), cskh: findCskhRowsCached_(phone), don: findDonRowsByPhone_(phone) };
       try { cache.put(cKey, JSON.stringify(res), 15); } catch(ec) {}
       return jsonOut_(res);
     }
@@ -1490,7 +1490,7 @@ function doGet(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.14-auto-assign-trigger' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.15-order-people' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -1670,7 +1670,8 @@ function dtRowToOrder_(row, rowIndex) {
     orderDate: ngayTaoStr || '',
     year: d ? _vnYmdParts_(d).y : '',
     month: d ? _vnYmdParts_(d).mo : '',
-    cs: String(row[DT_COL_SALEBAN] || ''),
+    cs: String(row[DT_COL_SALEBAN] || ''),   // cot "Sale bán" — sale tham gia ban (co the nhieu ten, tach bang dau phay)
+    creator: row[1] ? String(row[1]).trim() : '',   // cot B "Người tạo" cua DT TONG = NGUOI LEN DON (xem readDTTong_ nguoiTao)
     source: row[DT_COL_KENHBAN] ? String(row[DT_COL_KENHBAN]).trim() : '',
     revenue: _normMoney_(row[DT_COL_GIATRIDON]),
     product: String(row[DT_COL_SANPHAM] || ''),       // text tu do, xem luu y o tren
@@ -1729,6 +1730,27 @@ function readAllOrders_() {
   readAllOrders_.lastErrorCount = errCount;
   readAllOrders_.lastErrorSample = firstErr;
   return out;
+}
+
+// Cac don cua 1 SDT trong sheet "dữ liệu đơn" (Base/Pos): ngay, danh sach SALE THAM GIA DON (cot "Thẻ" da loc tag/trang thai bang
+// _donSaleNamesFromThe_), kenh, san pham (cat ngan), gia tri. Dung cho extension (action=lookup -> don). Loi doc sheet khong lam hong lookup.
+function findDonRowsByPhone_(phone) {
+  var ph = normPhone_(phone), out = [];
+  try {
+    var rows = readDonChiTiet_();
+    for (var i = 0; i < rows.length; i++) {
+      if (normPhone_(String(rows[i].soDienThoai || '')) !== ph) continue;
+      out.push({
+        date: String(rows[i].ngayTaoDon || ''),
+        sales: _donSaleNamesFromThe_(rows[i].theSale),
+        source: String(rows[i].nguonDon || ''),
+        product: String(rows[i].sanPham || '').slice(0, 80),
+        value: rows[i].giaTriSauGiam || 0,
+        marketer: String(rows[i].marketer || '')
+      });
+    }
+  } catch (e) { Logger.log('findDonRowsByPhone_: ' + e); }
+  return out.length > 30 ? out.slice(out.length - 30) : out;
 }
 
 function readOrdersByPhone_(phone) {

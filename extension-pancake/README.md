@@ -110,3 +110,6 @@ mỗi 20 phút, cache y hệt cơ chế mệnh/canned response ở trên).
 
 ## 📊 Doanh số & hoa hồng của tôi
 Menu "— Chọn mục —" → **📊 Doanh số & hoa hồng của tôi**: CS xem tổng đơn, doanh thu, tỷ lệ chốt, hoa hồng (đơn ≥15tr / <15tr / kênh có % riêng), tổng hoa hồng và chương trình thưởng của **CS đang chọn** ở đầu panel. Bộ lọc nhanh như CRM (Hôm nay … Năm trước + Tuỳ chỉnh). Số liệu do GAS action `csStats` tính (xem README gốc, mục 5–6); extension chỉ gọi qua message `GET_CS_STATS` ở `pancake-background.js`.
+
+## Khối "Người lên đơn & sale bán" (2026.10.7.1)
+Khi tra SĐT, thẻ khách hiện thêm khối 👥: **Người lên đơn** (cột B "Người tạo" của DT TỔNG → `orders[].creator`), **Sale tham gia bán** (cột "Sale bán" của DT TỔNG → `orders[].cs`, và cột "Thẻ" của "dữ liệu đơn" → `lookup.don[].sales`), kèm 5 đơn gần nhất. Cần GAS ≥ `v13.15-order-people` (kiểm tra `action=count`); GAS cũ thì khối này tự ẩn. Sửa thêm: `parseDateSafe` hiểu ngày `dd/MM/yyyy` (trước đây `Date.parse` đọc nhầm thành tháng/ngày nên đơn "gần nhất" có thể sai). Zalo AI chưa hiện khối này.

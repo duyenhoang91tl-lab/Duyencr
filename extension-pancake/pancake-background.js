@@ -346,7 +346,7 @@ async function handleLookupCustomer(payload) {
     if (data.error) throw new Error(data.error);
 
     const orders = (data.orders || []).slice().sort((a, b) => parseDateSafe(b.date) - parseDateSafe(a.date));
-    const out = { care: data.care || null, orders, cskh: data.cskh || [] }; // cskh = dòng của SĐT này ở nguồn "CSKH-Duyên" (GAS lookup)
+    const out = { care: data.care || null, orders, cskh: data.cskh || [], don: data.don || [] }; // cskh = dòng của SĐT này ở nguồn "CSKH-Duyên" (GAS lookup)
     _lookupCache.set(key, { t: Date.now(), data: out });
     if (_lookupCache.size > 200) _lookupCache.delete(_lookupCache.keys().next().value);
     return out;
@@ -563,6 +563,9 @@ async function handleAddNick(payload) {
 }
 
 function parseDateSafe(d) {
+  // DT TONG tra ngay dang "dd/MM/yyyy [HH:mm]" — Date.parse hieu nham thanh MM/dd (vd 05/10 -> 10 thang 5), nen xu ly dang VN truoc.
+  const m = String(d || "").match(/^\s*(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{1,2}):(\d{2}))?/);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0)).getTime();
   const t = Date.parse(d);
   return isNaN(t) ? 0 : t;
 }

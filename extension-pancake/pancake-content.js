@@ -1334,6 +1334,72 @@
       `</div>`;
   }
 
+  // Khối "Người lên đơn / Sale tham gia bán" trong thẻ khách: gom từ đơn DT TỔNG (cột "Người tạo" = người lên đơn, cột "Sale bán" =
+  // sale tham gia bán) và từ "dữ liệu đơn" (cột "Thẻ" = sale tham gia đơn, GAS lookup trả trong data.don). Tên đếm theo số đơn có mặt.
+  function _pkSplitNames_(s) { return String(s || '').split(/[,;\n]/).map((x) => x.trim()).filter(Boolean); }
+  function _pkOrdTime_(v) {
+    if (!v) return 0;
+    const m = String(v).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (m) return new Date(+m[3], +m[2] - 1, +m[1]).getTime();
+    const t = Date.parse(v);
+    return isNaN(t) ? 0 : t;
+  }
+  function _pkOrdDay_(v) {
+    const t = _pkOrdTime_(v);
+    if (!t) return '';
+    const d = new Date(t);
+    return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+  function _pkTopNames_(rows, pick) {
+    const cnt = new Map();
+    rows.forEach((r) => {
+      const seen = new Set();
+      pick(r).forEach((n) => {
+        const k = n.toLowerCase();
+        if (seen.has(k)) return;
+        seen.add(k);
+        const e = cnt.get(k) || { name: n, n: 0 };
+        e.n++;
+        cnt.set(k, e);
+      });
+    });
+    return [...cnt.values()].sort((a, b) => b.n - a.n)
+      .map((e) => `<b>${escapeHtml(e.name)}</b>${e.n > 1 ? ` <span style="color:#6b7280">×${e.n}</span>` : ''}`).join(', ');
+  }
+  function _pkOrderPeopleHtml_(orders, don) {
+    const rows = [];
+    (orders || []).forEach((o) => {
+      const creator = String(o.creator || '').trim();
+      const sales = _pkSplitNames_(o.cs);
+      if (!creator && !sales.length) return;
+      rows.push({ t: _pkOrdTime_(o.date || o.orderDate), date: o.date || o.orderDate, src: '📦', creator, sales, rev: parseFloat(o.revenue) || 0 });
+    });
+    (don || []).forEach((o) => {
+      const sales = Array.isArray(o.sales) ? o.sales.filter(Boolean) : [];
+      if (!sales.length) return;
+      rows.push({ t: _pkOrdTime_(o.date), date: o.date, src: '🧾', creator: '', sales, rev: parseFloat(o.value) || 0 });
+    });
+    if (!rows.length) return '';
+    rows.sort((a, b) => b.t - a.t);
+    const creators = _pkTopNames_(rows, (r) => (r.creator ? [r.creator] : []));
+    const sales = _pkTopNames_(rows, (r) => r.sales);
+    const recent = rows.slice(0, 5).map((r) => {
+      const day = _pkOrdDay_(r.date);
+      const parts = [];
+      if (r.creator) parts.push(`Lên: ${escapeHtml(r.creator)}`);
+      if (r.sales.length) parts.push(`Bán: ${escapeHtml(r.sales.join(', '))}`);
+      if (r.rev) parts.push(`${Math.round(r.rev / 1000).toLocaleString('vi-VN')}K`);
+      return `<div style="color:#374151">${r.src} ${day ? day + ' · ' : ''}${parts.join(' · ')}</div>`;
+    }).join('');
+    return `<div style="margin:6px 0;padding:6px 8px;background:#ecfeff;border:1px solid #a5f3fc;border-radius:6px;font-size:11.5px">` +
+      `<div style="font-weight:700;color:#0e7490;margin-bottom:2px">👥 Người lên đơn &amp; sale bán</div>` +
+      (creators ? `<div><span style="color:#6b7280">Người lên đơn:</span> ${creators}</div>` : '') +
+      (sales ? `<div><span style="color:#6b7280">Sale tham gia bán:</span> ${sales}</div>` : '') +
+      `<div style="margin-top:3px;font-size:11px">${recent}</div>` +
+      `<div style="margin-top:2px;font-size:10px;color:#9ca3af">📦 đơn DT TỔNG · 🧾 dữ liệu đơn</div>` +
+      `</div>`;
+  }
+
   function renderCustomerCard(phone, data, opts) {
     const box = panelEl.querySelector("#pk-ai-customer");
     const { care, orders } = data;
@@ -1369,6 +1435,7 @@
         <div class="pk-ai-new-tag" id="pk-ai-new-tag" style="${isNew ? '' : 'display:none'}">⚠️ Chưa có trong hệ thống Sasum — lưu sẽ tạo mới</div>
         ${chips.length ? `<div class="pk-ai-cust-chips">${chips.map((c) => `<span class="pk-ai-chip">${c}</span>`).join('')}${customFieldChips_(care)}</div>` : (customFieldChips_(care) ? `<div class="pk-ai-cust-chips">${customFieldChips_(care)}</div>` : '')}
         ${products ? `<div class="pk-ai-cust-products">🏷 ${escapeHtml(products)}</div>` : ''}
+        ${blankNew ? '' : _pkOrderPeopleHtml_(orders, data.don)}
         ${blankNew ? '' : _pkCskhHtml_(cskhRows)}
 
         <label class="pk-label-top">Tên khách</label>
