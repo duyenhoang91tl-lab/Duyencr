@@ -1412,7 +1412,7 @@ body.rpt-mode .app{height:100vh}
             <th class="filterable col-lastpos" id="th-lastpos" style="min-width:104px" title="Nhấn ▼ để lọc · Nhấn ↕ để sắp xếp mới nhất/xa nhất"><div class="th-inner" onclick="openColDropdown('lastpos',event)">Ngày mua gần nhất <span class="th-filter-icon">▼</span></div><span id="lastpos-sort-icon" style="color:var(--hint);cursor:pointer;font-size:11px;margin-left:2px" onclick="event.stopPropagation();toggleLastPosSort()" title="Sắp xếp theo ngày mua gần nhất">↕</span></th>
             <th class="filterable col-name" id="th-name" onclick="openColDropdown('name',event)"><div class="th-inner">Khách hàng <span class="th-filter-icon">▼</span></div></th>
             <th class="filterable col-tier" id="th-tier"><div class="th-inner"><span id="tier-label-btn" onclick="openTierTooltip(event)" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px" title="Xem tiêu chí phân loại">Phân loại</span> <span class="th-filter-icon" onclick="openColDropdown('tier',event)" style="cursor:pointer">▼</span></div></th>
-            <th class="filterable col-hang" id="th-hang" onclick="openColDropdown('hang',event)" title="Phân hạng theo tổng doanh thu: &lt;15tr Khách thường · 15-&lt;30tr Thân thiết · 30-&lt;50tr Vip · ≥50tr Super VVip"><div class="th-inner">Phân hạng KH <span class="th-filter-icon">▼</span></div></th>
+            <th class="filterable col-hang" id="th-hang"><div class="th-inner"><span id="hang-label-btn" onclick="openTierTooltip(event,'hang-tooltip')" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px" title="Xem tiêu chí phân hạng">Phân hạng KH</span> <span class="th-filter-icon" onclick="openColDropdown('hang',event)" style="cursor:pointer">▼</span></div></th>
             <th class="filterable col-care" id="th-care" onclick="openColDropdown('care',event)"><div class="th-inner"><span id="lbl-fieldcs-th">Tình trạng CS</span> <span class="th-filter-icon">▼</span></div></th>
             <th class="filterable col-zalo" id="th-zalo" onclick="openColDropdown('zalo',event)"><div class="th-inner">Zalo <span class="th-filter-icon">▼</span></div></th>
             <th class="col-order">Đơn / DT</th>
@@ -6778,7 +6778,7 @@ function clearData() {
 // (khac cot 'Phan loai' = theo SO DON Pos). Doanh thu = totalRevenue cua KH (tong cac don o DT TONG).
 // GAS auto-assign (_aaLoadCustomers_) dung CUNG nguong -- doi o day thi doi ca _aaHangKey_ trong gas_v13.js.
 var HANG_KEYS = ['thuong','tt','vip','super'];
-var HANG_LABEL = { thuong:'Khách thường', tt:'Thân thiết', vip:'Vip', super:'Super VVip' };
+var HANG_LABEL = { thuong:'Khách thường', tt:'Ưu tiên', vip:'Vip', super:'Super VVip' };
 function _hangKeyOf_(rev){ rev = Number(rev) || 0; return rev >= 50000000 ? 'super' : rev >= 30000000 ? 'vip' : rev >= 15000000 ? 'tt' : 'thuong'; }
 function hangBadge(k){
   const cls = { thuong:'bo', tt:'bt', vip:'bv', super:'bv' }[k] || 'bo';
@@ -8343,7 +8343,7 @@ function renderAssignCreate() {
         ['tt',`Thân thiết (${tierCount['Thân thiết']})`],
         ['tn',`Tiềm năng (${tierCount['Tiềm năng']})`],
         ['h_thuong',`Hạng: Khách thường (${hangCount.thuong})`],
-        ['h_tt',`Hạng: Thân thiết (${hangCount.tt})`],
+        ['h_tt',`Hạng: Ưu tiên (${hangCount.tt})`],
         ['h_vip',`Hạng: Vip (${hangCount.vip})`],
         ['h_super',`Hạng: Super VVip (${hangCount.super})`]
       ].map(([k,l])=>`<div class="assign-sort-btn ${_advAssign.sortMode===k?'active':''}" onclick="_advAssign.sortMode='${k}';renderAssignCreate()">${l}</div>`).join('')}
@@ -17306,7 +17306,7 @@ var _AA_PRIO_KEYS = ['vip','tt','tn','other'];
 var _AA_PRIO_LABEL = { vip:'VIP', tt:'Thân thiết', tn:'Tiềm năng', other:'Khác (chưa phân hạng)' };
 var _AA_TIER = { vip:'VIP', tt:'Thân thiết', tn:'Tiềm năng' };
 var _AA_HANG_KEYS = ['thuong','tt','vip','super'];
-var _AA_HANG_LABEL = { thuong:'Khách thường', tt:'Thân thiết', vip:'Vip', super:'Super VVip' };   // PHAN HANG KH theo doanh thu (xem _hangKeyOf_ trong index.html)
+var _AA_HANG_LABEL = { thuong:'Khách thường', tt:'Ưu tiên', vip:'Vip', super:'Super VVip' };   // PHAN HANG KH theo doanh thu (xem _hangKeyOf_ trong index.html)
 
 function _aaDefaultCfg(){
   return {
@@ -20067,6 +20067,55 @@ function _initKhDragSort(container) {
 </script>
 
 
+<!-- ── HANG TOOLTIP (Phân hạng KH theo doanh thu) ── -->
+<div id="hang-tooltip" style="
+  display:none;position:fixed;z-index:800;
+  background:var(--surface);border:1px solid var(--border-md);
+  border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.18);
+  width:310px;max-width:94vw;font-size:12px;overflow:hidden;
+">
+  <div style="padding:11px 14px 8px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+    <div style="font-size:13px;font-weight:700;color:var(--text)">🏆 Tiêu chí phân hạng KH</div>
+    <button onclick="closeTierTooltip()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--hint);line-height:1;padding:0 2px">&times;</button>
+  </div>
+  <div style="padding:10px 14px 4px;display:flex;flex-direction:column;gap:7px">
+    <div style="display:flex;align-items:flex-start;gap:10px;padding:7px 10px;border-radius:7px;background:#fef3c7;border:1px solid #fcd34d">
+      <span style="font-size:16px;flex-shrink:0;margin-top:1px">💎</span>
+      <div>
+        <div style="font-weight:700;color:#7c2d12;margin-bottom:2px">Super VVip</div>
+        <div style="color:var(--muted);line-height:1.6">Tổng doanh thu <strong>từ 50 triệu</strong> trở lên</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:flex-start;gap:10px;padding:7px 10px;border-radius:7px;background:var(--vip-bg);border:1px solid var(--vip-b)">
+      <span style="font-size:16px;flex-shrink:0;margin-top:1px">👑</span>
+      <div>
+        <div style="font-weight:700;color:var(--vip);margin-bottom:2px">Vip</div>
+        <div style="color:var(--muted);line-height:1.6">Tổng doanh thu <strong>từ 30 – dưới 50 triệu</strong></div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:flex-start;gap:10px;padding:7px 10px;border-radius:7px;background:var(--tt-bg);border:1px solid var(--tt-b)">
+      <span style="font-size:16px;flex-shrink:0;margin-top:1px">⭐</span>
+      <div>
+        <div style="font-weight:700;color:var(--tt);margin-bottom:2px">Ưu tiên</div>
+        <div style="color:var(--muted);line-height:1.6">Tổng doanh thu <strong>từ 15 – dưới 30 triệu</strong></div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:flex-start;gap:10px;padding:7px 10px;border-radius:7px;background:var(--surface2);border:1px solid var(--border)">
+      <span style="font-size:16px;flex-shrink:0;margin-top:1px">🔘</span>
+      <div>
+        <div style="font-weight:700;color:var(--muted);margin-bottom:2px">Khách thường</div>
+        <div style="color:var(--muted);line-height:1.6">Tổng doanh thu <strong>dưới 15 triệu</strong></div>
+      </div>
+    </div>
+  </div>
+  <div style="padding:8px 14px 11px">
+    <div style="font-size:10px;color:var(--hint);background:var(--surface2);border-radius:6px;padding:6px 9px;line-height:1.7">
+      📌 Phân hạng theo <strong>tổng doanh thu lũy kế</strong> của khách (các đơn ở DT TỔNG).<br>
+      Khác với cột <strong>Phân loại</strong> (tính theo số đơn).
+    </div>
+  </div>
+</div>
+
 <!-- ── TIER TOOLTIP ── -->
 <div id="tier-tooltip" style="
   display:none;position:fixed;z-index:800;
@@ -20117,9 +20166,12 @@ function _initKhDragSort(container) {
 </div>
 
 <script>
-function openTierTooltip(e) {
+var _openTipId = 'tier-tooltip';
+function openTierTooltip(e, id) {
   e.stopPropagation();
-  var tt = document.getElementById('tier-tooltip');
+  closeTierTooltip();
+  _openTipId = id || 'tier-tooltip';
+  var tt = document.getElementById(_openTipId);
   if (!tt) return;
 
   // Ẩn trước để đo kích thước thực
@@ -20174,12 +20226,14 @@ function openTierTooltip(e) {
   }, 0);
 }
 function closeTierTooltip() {
-  var tt = document.getElementById('tier-tooltip');
-  if (tt) { tt.style.display = 'none'; tt.style.visibility = ''; }
+  ['tier-tooltip','hang-tooltip'].forEach(function(id){
+    var t = document.getElementById(id);
+    if (t) { t.style.display = 'none'; t.style.visibility = ''; }
+  });
   document.removeEventListener('click', _closeTierOnOutside);
 }
 function _closeTierOnOutside(e) {
-  var tt = document.getElementById('tier-tooltip');
+  var tt = document.getElementById(_openTipId);
   if (tt && !tt.contains(e.target)) { tt.style.display = 'none'; tt.style.visibility = ''; }
 }
 </script>

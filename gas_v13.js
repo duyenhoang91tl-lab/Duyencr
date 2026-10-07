@@ -8730,7 +8730,7 @@ var _AA_PRIO_KEYS = ['vip','tt','tn','other'];
 var _AA_PRIO_LABEL = { vip:'VIP', tt:'Thân thiết', tn:'Tiềm năng', other:'Khác (chưa phân hạng)' };
 var _AA_TIER = { vip:'VIP', tt:'Thân thiết', tn:'Tiềm năng' };
 var _AA_HANG_KEYS = ['thuong','tt','vip','super'];
-var _AA_HANG_LABEL = { thuong:'Khách thường', tt:'Thân thiết', vip:'Vip', super:'Super VVip' };   // PHAN HANG KH theo doanh thu (xem _hangKeyOf_ trong index.html)
+var _AA_HANG_LABEL = { thuong:'Khách thường', tt:'Ưu tiên', vip:'Vip', super:'Super VVip' };   // PHAN HANG KH theo doanh thu (xem _hangKeyOf_ trong index.html)
 
 function _aaDefaultCfg(){
   return {
