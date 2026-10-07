@@ -8923,7 +8923,7 @@ let _rptMetric = 'kh';      // kh | orders | revenue
 let _rptSortCol = 'total';
 let _rptSortDir = -1;
 
-function renderAssignReport() {
+function renderAssignReport(keepBar) {
   // Build filter options from history
   const allCS    = [...new Set(assignHistory.map(h=>h.csName))].sort();
   const allLabels= [...new Set(assignHistory.map(h=>h.label))].sort();
@@ -8931,6 +8931,8 @@ function renderAssignReport() {
   const allSources = [...new Set(allCustomers.flatMap(c=>c.sources||[]).filter(Boolean))].sort();
   const allKhStatus = (typeof _flatCustStatusValues==='function' ? _flatCustStatusValues() : []).filter(Boolean);
 
+  // Luu tuy chon cho combo loc (_rptComboHTML doc tu day, khong tinh lai allSources tren hang chuc nghin KH)
+  _rptComboOpts = { cs: allCS, tier: allTiers, label: allLabels, careStatus: (typeof CARE_STATUS!=='undefined'?CARE_STATUS:[]), khStatus: allKhStatus, zaloStatus: (typeof ZALO_STATUS!=='undefined'?ZALO_STATUS:[]), source: allSources };
   // Apply filters to get working set of batches
   const batches = assignHistory.filter(h => {
     if (_rptFilters.cs.size    && !_rptFilters.cs.has(h.csName)) return false;
@@ -9058,6 +9060,7 @@ function renderAssignReport() {
 
   const rptHtml = `
   <!-- KPI ROW -->
+  <div id="rpt-kpi">
   <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:14px">
     ${[
       ['📋',totalBatches,'Đợt chia','var(--text)'],
@@ -9073,28 +9076,14 @@ function renderAssignReport() {
       </div>`).join('')}
   </div>
 
+  </div>
   <!-- FILTERS + PIVOT CONTROLS -->
-  <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--rsm);padding:10px 12px;margin-bottom:12px">
+  <div id="rpt-filterbar" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--rsm);padding:10px 12px;margin-bottom:12px">
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--hint);margin-bottom:8px">🔽 Bộ lọc báo cáo</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-      <div>
-        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">CS</div>
-        <select multiple style="min-width:110px;max-height:70px;font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);outline:none" id="rpt-cs-sel" onchange="_rptSetFilter('cs',this)">
-          ${allCS.map(v=>`<option value="${esc(v)}" ${_rptFilters.cs.has(v)?'selected':''}>${esc(v)}</option>`).join('')}
-        </select>
-      </div>
-      <div>
-        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Phân loại KH</div>
-        <select multiple style="min-width:120px;max-height:70px;font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);outline:none" id="rpt-tier-sel" onchange="_rptSetFilter('tier',this)">
-          ${allTiers.map(v=>`<option value="${esc(v)}" ${_rptFilters.tier.has(v)?'selected':''}>${esc(v)}</option>`).join('')}
-        </select>
-      </div>
-      <div>
-        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Đợt chia</div>
-        <select multiple style="min-width:120px;max-height:70px;font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);outline:none" id="rpt-label-sel" onchange="_rptSetFilter('label',this)">
-          ${allLabels.map(v=>`<option value="${esc(v)}" ${_rptFilters.label.has(v)?'selected':''}>${esc(v)}</option>`).join('')}
-        </select>
-      </div>
+      ${_rptComboHTML('cs')}
+      ${_rptComboHTML('tier')}
+      ${_rptComboHTML('label')}
       <div>
         <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Khoảng ngày</div>
         ${_quickRangeSelectHtml(_rptFilters.dateQuick, "_rptApplyQuickRange(this.value)")}
@@ -9107,30 +9096,10 @@ function renderAssignReport() {
         <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Đến ngày</div>
         <input type="date" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--rsm);outline:none;background:var(--surface)" value="${_rptFilters.dateTo}" oninput="_rptFilters.dateTo=this.value;_rptFilters.dateQuick='custom';renderAssignReport()">
       </div>
-      <div>
-        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">${esc(FIELD_LABEL_CS)}</div>
-        <select multiple style="min-width:130px;max-height:70px;font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);outline:none" id="rpt-carestatus-sel" onchange="_rptSetFilter('careStatus',this)">
-          ${CARE_STATUS.map(v=>`<option value="${esc(v)}" ${_rptFilters.careStatus.has(v)?'selected':''}>${esc(v)}</option>`).join('')}
-        </select>
-      </div>
-      <div>
-        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">${esc(FIELD_LABEL_KH)}</div>
-        <select multiple style="min-width:150px;max-height:70px;font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);outline:none" id="rpt-khstatus-sel" onchange="_rptSetFilter('khStatus',this)">
-          ${allKhStatus.map(v=>`<option value="${esc(v)}" ${_rptFilters.khStatus.has(v)?'selected':''}>${esc(v)}</option>`).join('')}
-        </select>
-      </div>
-      <div>
-        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Kết bạn Zalo</div>
-        <select multiple style="min-width:120px;max-height:70px;font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);outline:none" id="rpt-zalostatus-sel" onchange="_rptSetFilter('zaloStatus',this)">
-          ${ZALO_STATUS.map(v=>`<option value="${esc(v)}" ${_rptFilters.zaloStatus.has(v)?'selected':''}>${esc(v)}</option>`).join('')}
-        </select>
-      </div>
-      <div>
-        <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Kênh (Nguồn)</div>
-        <select multiple style="min-width:120px;max-height:70px;font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);outline:none" id="rpt-source-sel" onchange="_rptSetFilter('source',this)">
-          ${allSources.map(v=>`<option value="${esc(v)}" ${_rptFilters.source.has(v)?'selected':''}>${esc(v)}</option>`).join('')}
-        </select>
-      </div>
+      ${_rptComboHTML('careStatus')}
+      ${_rptComboHTML('khStatus')}
+      ${_rptComboHTML('zaloStatus')}
+      ${_rptComboHTML('source')}
       <div>
         <div style="font-size:10px;color:var(--hint);margin-bottom:3px">Sản phẩm (cách nhau bằng dấu phẩy)</div>
         <input type="text" placeholder="vd: tỳ hưu, nhẫn 10k" style="min-width:170px;font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--rsm);outline:none;background:var(--surface)" value="${esc([..._rptFilters.product].join(', '))}" oninput="_rptFilterInputChanged('product', this.value, true)">
@@ -9143,6 +9112,7 @@ function renderAssignReport() {
     </div>
   </div>
 
+  <div id="rpt-rest">
   <!-- BAR CHART: KH THEO CS -->
   <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--rsm);padding:10px 12px;margin-bottom:12px">
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--hint);margin-bottom:10px">📊 Data chia & kết quả theo CS</div>
@@ -9244,19 +9214,145 @@ function renderAssignReport() {
       </tfoot>
     </table>
     </div>
+  </div>
   </div>`;
 
+  // Che do keepBar (dung khi tick combo loc): CHI thay KPI + phan ket qua, GIU NGUYEN thanh loc de dropdown dang mo khong bi dong/mat o go tim.
+  if (keepBar === true && document.getElementById('rpt-filterbar')) {
+    const tmp = document.createElement('div'); tmp.innerHTML = rptHtml;
+    let okSwap = true;
+    ['rpt-kpi','rpt-rest'].forEach(id => { const nn = tmp.querySelector('#'+id), cur = document.getElementById(id); if (nn && cur) cur.innerHTML = nn.innerHTML; else okSwap = false; });
+    if (okSwap) return;
+  }
   document.getElementById('assign-body').innerHTML = rptHtml;
   document.getElementById('assign-footer').innerHTML = `
     <button class="btn" onclick="closeAssignModal()">Đóng</button>
     <button class="btn secondary" onclick="exportAssignReport()">📊 Xuất Excel</button>`;
 }
 
-function _rptSetFilter(key, sel) {
-  const vals = [...sel.options].filter(o=>o.selected).map(o=>o.value);
-  _rptFilters[key] = new Set(vals);
-  renderAssignReport();
+// ── Combo loc kieu Excel cho "Bo loc bao cao" (Data chia): dropdown, go de tim, tick nhieu muc,
+//    dong "(Chon tat ca)" cho ket qua dang tim, chip xoa rieng tung muc. Thay cho <select multiple>
+//    luon hien san nhieu dong. Trang thai nam trong _rptFilters[key] (Set) nhu cu nen logic loc khong doi.
+//    Tick KHONG ve lai ca panel (se dong dropdown): chi cap nhat chip + danh sach roi ve lai KPI/ket qua sau 250ms
+//    qua renderAssignReport(true) (giu nguyen thanh loc). ──
+var _rptComboOpts = {};
+var _RPT_COMBO_CFG = {
+  cs:         { id:'rpt-cs-combo',         label:function(){return 'CS';},                 ph:'🔍 Tìm & chọn CS...' },
+  tier:       { id:'rpt-tier-combo',       label:function(){return 'Phân loại KH';},       ph:'🔍 Tìm & chọn phân loại...' },
+  label:      { id:'rpt-label-combo',      label:function(){return 'Đợt chia';},           ph:'🔍 Tìm & chọn đợt chia...' },
+  careStatus: { id:'rpt-carestatus-combo', label:function(){return (typeof FIELD_LABEL_CS!=='undefined' && FIELD_LABEL_CS) || 'Tình trạng CS';}, ph:'🔍 Tìm & chọn...' },
+  khStatus:   { id:'rpt-khstatus-combo',   label:function(){return (typeof FIELD_LABEL_KH!=='undefined' && FIELD_LABEL_KH) || 'Trạng thái KH';}, ph:'🔍 Tìm & chọn...' },
+  zaloStatus: { id:'rpt-zalostatus-combo', label:function(){return 'Kết bạn Zalo';},       ph:'🔍 Tìm & chọn...' },
+  source:     { id:'rpt-source-combo',     label:function(){return 'Kênh (Nguồn)';},       ph:'🔍 Tìm & chọn kênh...' }
+};
+var _rptComboIdx = {}, _rptComboT = null;
+function _rptComboItems_(key){ return (_rptComboOpts[key] || []).filter(function(v){ return v !== '' && v != null; }); }
+function _rptChipHtml_(key, name){
+  return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap" data-name="'+esc(name)+'">'+
+    esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="rptComboRemove(\''+key+'\', this.parentNode.dataset.name)">✕</span></span>';
 }
+function _rptComboHTML(key){
+  var cfg = _RPT_COMBO_CFG[key], sel = [..._rptFilters[key]];
+  return '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label" style="padding:0;margin-bottom:3px">'+esc(cfg.label())+
+    '<span id="'+cfg.id+'-label-count" style="color:var(--green)">'+(sel.length?' ('+sel.length+' đã chọn)':'')+'</span></div>'+
+    '<div class="cs-combo" id="'+cfg.id+'" style="width:160px">'+
+    '<input type="text" id="'+cfg.id+'-input" class="cs-combo-input" placeholder="'+esc(cfg.ph)+'" autocomplete="off" '+
+    'oninput="rptComboFilter(\''+key+'\', this.value)" onfocus="rptComboOpen(\''+key+'\')" onkeydown="rptComboKey(\''+key+'\', event)">'+
+    '<button type="button" class="cs-combo-clear" id="'+cfg.id+'-clear" onclick="rptComboClear(\''+key+'\', event)" style="display:'+(sel.length?'':'none')+'">✕</button>'+
+    '<span class="cs-combo-caret" onclick="rptComboToggle(\''+key+'\', event)">▾</span>'+
+    '<div class="cs-combo-list" id="'+cfg.id+'-list"></div></div>'+
+    '<div id="'+cfg.id+'-chips" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;max-width:200px;max-height:54px;overflow-y:auto">'+
+    sel.map(function(n){ return _rptChipHtml_(key, n); }).join('')+'</div></div>';
+}
+function rptComboRender(key, filter){
+  var cfg = _RPT_COMBO_CFG[key], list = document.getElementById(cfg.id+'-list');
+  if (!list) return;
+  var q = _foldVi(filter||''), sel = _rptFilters[key];
+  var items = _rptComboItems_(key);
+  if (q) items = items.filter(function(v){ return _foldVi(String(v)).indexOf(q) !== -1; });
+  if (!items.length){ list.innerHTML = '<div class="cs-combo-empty">Không tìm thấy</div>'; _rptComboIdx[key] = -1; return; }
+  var allOn = items.every(function(v){ return sel.has(v); });
+  var html = items.length > 1
+    ? '<div class="cs-combo-opt rpt-all" style="border-bottom:1px solid var(--border);font-weight:600" onmousedown="rptComboAll(\''+key+'\', event)"><span>'+(allOn?'☑':'☐')+' (Chọn tất cả'+(q?' kết quả tìm':'')+')</span></div>'
+    : '';
+  html += items.map(function(v){
+    var on = sel.has(v);
+    return '<div class="cs-combo-opt '+(on?'is-sel':'')+'" data-v="'+esc(v)+'" onmousedown="rptComboToggleItem(\''+key+'\', event, this.getAttribute(\'data-v\'))"><span>'+(on?'☑':'☐')+' '+esc(v)+'</span></div>';
+  }).join('');
+  list.innerHTML = html;
+  _rptComboIdx[key] = -1;
+}
+function _rptComboSync_(key){
+  var cfg = _RPT_COMBO_CFG[key], sel = [..._rptFilters[key]];
+  var wrap = document.getElementById(cfg.id+'-chips');
+  if (wrap) wrap.innerHTML = sel.map(function(n){ return _rptChipHtml_(key, n); }).join('');
+  var lbl = document.getElementById(cfg.id+'-label-count'); if (lbl) lbl.textContent = sel.length ? ' ('+sel.length+' đã chọn)' : '';
+  var clr = document.getElementById(cfg.id+'-clear'); if (clr) clr.style.display = sel.length ? '' : 'none';
+  var l = document.getElementById(cfg.id+'-list');
+  if (l && l.classList.contains('open')){ var ci = document.getElementById(cfg.id+'-input'); rptComboRender(key, ci ? ci.value : ''); }
+  clearTimeout(_rptComboT);
+  _rptComboT = setTimeout(function(){ if (document.getElementById('rpt-filterbar')) renderAssignReport(true); }, 250);   // chi ve lai neu thanh loc con tren man hinh (tranh de len tab khac neu CS vua chuyen tab/dong modal)
+}
+function rptComboOpen(key){
+  Object.keys(_RPT_COMBO_CFG).forEach(function(k){ if (k !== key) rptComboClose(k); });
+  var cfg = _RPT_COMBO_CFG[key], ci = document.getElementById(cfg.id+'-input');
+  rptComboRender(key, ci ? ci.value : '');
+  var l = document.getElementById(cfg.id+'-list'); if (l) l.classList.add('open');
+}
+function rptComboClose(key){ var l = document.getElementById(_RPT_COMBO_CFG[key].id+'-list'); if (l) l.classList.remove('open'); }
+function rptComboToggle(key, e){
+  if (e) e.stopPropagation();
+  var cfg = _RPT_COMBO_CFG[key], l = document.getElementById(cfg.id+'-list'); if (!l) return;
+  if (l.classList.contains('open')) rptComboClose(key);
+  else { var ci = document.getElementById(cfg.id+'-input'); if (ci) ci.focus(); rptComboOpen(key); }
+}
+function rptComboFilter(key, v){ rptComboRender(key, v); var l = document.getElementById(_RPT_COMBO_CFG[key].id+'-list'); if (l) l.classList.add('open'); }
+function rptComboToggleItem(key, e, value){
+  if (e && e.preventDefault) e.preventDefault();   // giu focus o o go tim
+  var s = _rptFilters[key];
+  if (s.has(value)) s.delete(value); else s.add(value);
+  _rptComboSync_(key);
+}
+function rptComboAll(key, e){
+  if (e && e.preventDefault) e.preventDefault();
+  var ci = document.getElementById(_RPT_COMBO_CFG[key].id+'-input'), q = _foldVi(ci ? ci.value : '');
+  var items = _rptComboItems_(key).filter(function(v){ return !q || _foldVi(String(v)).indexOf(q) !== -1; });
+  var s = _rptFilters[key], allOn = items.every(function(v){ return s.has(v); });
+  items.forEach(function(v){ if (allOn) s.delete(v); else s.add(v); });
+  _rptComboSync_(key);
+}
+function rptComboRemove(key, value){ _rptFilters[key].delete(value); _rptComboSync_(key); }
+function rptComboClear(key, e){
+  if (e) e.stopPropagation();
+  _rptFilters[key] = new Set();
+  var ci = document.getElementById(_RPT_COMBO_CFG[key].id+'-input'); if (ci) ci.value = '';
+  _rptComboSync_(key);
+}
+function rptComboKey(key, e){
+  var cfg = _RPT_COMBO_CFG[key], list = document.getElementById(cfg.id+'-list');
+  if (!list || !list.classList.contains('open')){ if (e.key === 'ArrowDown') rptComboOpen(key); return; }
+  var opts = [...list.querySelectorAll('.cs-combo-opt[data-v]')];
+  if (e.key === 'Escape'){ rptComboClose(key); return; }
+  if (!opts.length) return;
+  var i = _rptComboIdx[key]; if (i == null) i = -1;
+  if (e.key === 'ArrowDown'){ e.preventDefault(); i = Math.min(i+1, opts.length-1); }
+  else if (e.key === 'ArrowUp'){ e.preventDefault(); i = Math.max(i-1, 0); }
+  else if (e.key === 'Enter'){
+    e.preventDefault();
+    var pick = (i >= 0 && opts[i]) ? opts[i] : (opts.length === 1 ? opts[0] : null);
+    if (pick) rptComboToggleItem(key, e, pick.getAttribute('data-v'));
+    return;
+  } else return;
+  _rptComboIdx[key] = i;
+  opts.forEach(function(o, j){ o.classList.toggle('active', j === i); });
+  if (opts[i]) opts[i].scrollIntoView({block:'nearest'});
+}
+document.addEventListener('click', function(e){
+  Object.keys(_RPT_COMBO_CFG).forEach(function(k){
+    var c = document.getElementById(_RPT_COMBO_CFG[k].id);
+    if (c && !c.contains(e.target)) rptComboClose(k);
+  });
+});
 function _rptApplyQuickRange(key){
   _rptFilters.dateQuick = key;
   if (key !== 'custom'){
