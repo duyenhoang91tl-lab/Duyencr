@@ -1385,7 +1385,7 @@
         <label class="pk-label-top">Ghi chú CS</label>
         <div id="pk-note-history"></div>
         <div class="pk-note-add-row">
-          <input type="text" id="pk-note-new" placeholder="Thêm ghi chú mới..." />
+          <textarea id="pk-note-new" rows="3" placeholder="Thêm ghi chú mới — gợi ý: sản phẩm quan tâm, nhu cầu chính, gu, mua cho ai, điểm đáng nhớ…"></textarea>
           <button id="pk-note-add-btn" class="pk-btn-outline">+</button>
         </div>
         <input type="hidden" id="pk-note-raw" value="${escapeHtml(care?.note || '')}" />
@@ -1399,7 +1399,7 @@
 
     box.querySelector('#pk-note-add-btn').addEventListener('click', addNoteEntry_);
     box.querySelector('#pk-note-new').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') addNoteEntry_();
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addNoteEntry_(); }   // Enter = thêm ghi chú, Shift+Enter = xuống dòng (ô nay là textarea)
     });
     box.querySelector('#pk-hen-done').addEventListener('click', () => doneAppointment_(currentFormPhone_() || phone));
     box.querySelector('#pk-save-btn').addEventListener('click', () => saveCare_(currentFormPhone_() || phone));

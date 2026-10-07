@@ -4596,7 +4596,7 @@ function renderCareTab(c) {
         <span style="font-size:10px;color:var(--muted)">${_parseNotes(care.note||c.careNote||'').length} ghi chú</span>
       </div>
       <div style="display:flex;gap:6px;align-items:flex-start">
-        <textarea class="form-ta" id="cs-note-new" placeholder="Thêm ghi chú mới..." style="min-height:52px;flex:1"></textarea>
+        <textarea class="form-ta" id="cs-note-new" placeholder="Thêm ghi chú mới — gợi ý: sản phẩm quan tâm, nhu cầu chính, gu, mua cho ai, điểm đáng nhớ…" style="min-height:64px;flex:1"></textarea>
         <button data-phone="${esc(c.phone)}" onclick="addNoteEntry(this.dataset.phone)" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px;white-space:nowrap;margin-top:2px">➕ Thêm</button>
       </div>
       <div id="cs-note-history" style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
@@ -22343,7 +22343,7 @@ async function sendTaskComment(){
     </div>
     <div style="margin-bottom:4px">
       <div class="form-label">Ghi chú *</div>
-      <textarea class="form-ta" id="qa-note" style="min-height:70px" placeholder="VD: Khách hỏi mua qua Zalo, hẹn gọi lại chiều mai..."></textarea>
+      <textarea class="form-ta" id="qa-note" style="min-height:70px" placeholder="VD: Khách hỏi mua qua Zalo, hẹn gọi lại chiều mai...&#10;Gợi ý: sản phẩm quan tâm, nhu cầu chính, gu, mua cho ai, điểm đáng nhớ…"></textarea>
     </div>
   </div>
   <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px">

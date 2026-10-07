@@ -377,7 +377,7 @@
     addEl(upd, 'label', {textContent:'Ghi chú CS'});
     const noteWrap = addEl(upd, 'div', {className:'zai-note-wrap'});
     const noteRow  = addEl(noteWrap, 'div', {className:'zai-note-row'});
-    addEl(noteRow, 'textarea', {id:'zai-note-new', placeholder:'Thêm ghi chú mới...', rows:2});
+    addEl(noteRow, 'textarea', {id:'zai-note-new', placeholder:'Thêm ghi chú mới — gợi ý: sản phẩm quan tâm, nhu cầu chính, gu, mua cho ai, điểm đáng nhớ…', rows:3});
     addEl(noteRow, 'button', {className:'zai-btn zai-btn-primary zai-btn-sm', id:'zai-note-add-btn', type:'button', textContent:'+', title:'Thêm ghi chú (Ctrl+Enter)'});
     addEl(noteWrap, 'div', {id:'zai-note-history', className:'zai-note-history'});
     addEl(upd, 'input', {id:'zai-note-raw', type:'hidden'});

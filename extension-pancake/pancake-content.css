@@ -530,8 +530,11 @@
   margin-top: 6px;
 }
 
-.pk-note-add-row input {
+.pk-note-add-row input,
+.pk-note-add-row textarea {
   flex: 1;
+  font-family: inherit;
+  resize: vertical;
   padding: 5px 6px;
   border: 1px solid #ccc;
   border-radius: 6px;
