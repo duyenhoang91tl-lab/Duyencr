@@ -2726,6 +2726,15 @@ function updateGsPill(connected) {
 function _isEmptyObj(o){ for (const k in o) return false; return true; }   // O(1) — Object.keys(customerMap) liet ke ~136k khoa moi 3s chi de kiem tra rong
 let _lastCareText = null, _lastOrdersText = null, _lastDonText = null, _lastCkText = null;
 let _cskhPulledAt = 0, _assignPulledAt = 0;
+// DELTA SYNC CareData: nhip 3s chi xin cac dong co updated > _careSince (server doc 1 cot thay vi ca sheet); keo FULL moi 5 phut
+// (bat dong bo dong bi xoa/sua tay tren Sheet khong co 'updated') va khi bam Sync thu cong / lan dau. Server cu khong biet 'since'
+// se tra FULL -> client tu nhan ra (khong co d.delta) va xu ly nhu truoc.
+let _careSince = '', _careFullAt = 0, _careMaxUpd = '', _careLSTimer = null;
+const CARE_FULL_EVERY_MS = 300000;
+function _persistCareSoon() {   // delta: khong stringify toan bo careData moi nhip; gom ghi sau 20s
+  if (_careLSTimer) return;
+  _careLSTimer = setTimeout(function(){ _careLSTimer = null; saveLS('ome_care', careData); }, 20000);
+}
 async function _pullAssignAndBroadcastThrottled(force) {
   // pullAssignHistory keo TOAN BO AssignData (kem mang SDT cua moi dot chia, co the hang MB) — khong keo moi 3s
   if (!force && (Date.now() - _assignPulledAt) < 15000) return;
@@ -2743,12 +2752,21 @@ async function syncFromGS(opts) {
     // ── Gọi riêng CareData (nhanh) và Orders (chậm hơn) ──
     // Luôn gọi action=customers trước để đảm bảo có rows dù orders lỗi
     const sepChar = gsUrl.includes('?') ? '&' : '?';
-    const careUrl = gsUrl + sepChar + 'action=customers';
+    const _wantCareFull = !_careSince || isManual || (Date.now() - _careFullAt) > CARE_FULL_EVERY_MS;
+    const careUrl = gsUrl + sepChar + 'action=customers' + (_wantCareFull ? '' : '&since=' + encodeURIComponent(_careSince));
     const careR = await fetch(careUrl, { redirect: 'follow' });
     const careText = await careR.text();
-    const _careSame = (careText === _lastCareText);   // khong ai sua CareData tu nhip truoc
+    let _careSame = false, _isDelta = false;   // _careSame: khong ai sua CareData tu nhip truoc
     let d;
-    try { d = _careSame ? {} : JSON.parse(careText); } catch(e) {
+    _careMaxUpd = '';
+    try {
+      if (_wantCareFull) { _careSame = (careText === _lastCareText); d = _careSame ? {} : JSON.parse(careText); }
+      else {
+        d = JSON.parse(careText);
+        if (d && d.delta) { _isDelta = true; _careSame = !(d.rows && d.rows.length); }
+        else { _careSame = (careText === _lastCareText); if (_careSame) d = {}; }   // server cu tra FULL
+      }
+    } catch(e) {
       if (isManual) { hide('loverlay'); toast('GAS trả về không phải JSON — kiểm tra quyền triển khai: Anyone'); }
       else { console.warn('Auto-sync: GAS non-JSON'); _autoSyncFailCount = (_autoSyncFailCount||0)+1; if (_autoSyncFailCount>=3) showSyncErrorBanner(); }
       return;
@@ -2760,6 +2778,7 @@ async function syncFromGS(opts) {
       return;
     }
     d = d || {};
+    if (!_isDelta) _careFullAt = Date.now();
 
     // ── Tải đơn hàng riêng nếu cần ──
     let orderCount = 0;
@@ -2900,6 +2919,7 @@ async function syncFromGS(opts) {
     // Lich hen: gom 1 lan roi loc/them 1 lan (truoc day schedules.filter(...) cho TUNG dong CareData => O(dong x lich))
     const _schedDrop = new Set(), _schedNew = new Map();
     for (const row of (d.rows || [])) {
+      if (row.updated && String(row.updated) > _careMaxUpd) _careMaxUpd = String(row.updated);
       if (!row.phone) continue;
       // Normalize phone từ GS (tránh mất số 0 đầu do Excel/GSheets lưu kiểu số)
       const _normPh = (typeof normPhone === 'function') ? (normPhone(row.phone) || String(row.phone)) : String(row.phone);
@@ -2939,7 +2959,9 @@ async function syncFromGS(opts) {
       schedules = schedules.filter(s => !_schedDrop.has(s.phone));
       _schedNew.forEach(sc => { for (const it of sc) schedules.push(it); });
     }
-    saveLS('ome_care', careData);
+    if (_isDelta) { if (!_careSame) { _invalidateFilterCache(); _persistCareSoon(); } }
+    else if (!_careSame) saveLS('ome_care', careData);
+    if (_careMaxUpd && (!_isDelta || _careMaxUpd > _careSince)) _careSince = _careMaxUpd;
     if (_schedDrop.size) { saveLS('ome_sched', schedules); saveLS('ome_schedules', schedules); }
     // Pull cấu hình tình trạng CS (nếu admin đã đồng bộ lên GSheets)
     if (d.careStatus && Array.isArray(d.careStatus) && d.careStatus.length) {
@@ -2960,7 +2982,7 @@ async function syncFromGS(opts) {
     updateStats();
     updateSidebarBadges();
     updateSchedBadges();
-    _lastCareText = careText;   // da xu ly xong ban nay — nhip sau neu giong het thi bo qua (xem dau ham)
+    if (!_isDelta) _lastCareText = careText;   // da xu ly xong ban FULL nay — nhip sau neu giong het thi bo qua (xem dau ham)
     if (_dpPhoneChanged) _maybeRefreshOpenDp();
     if (isManual) {
       hide('loverlay');
@@ -9818,8 +9840,8 @@ async function flushCareSync(){
   var schedByPhone = {};
   (typeof schedules !== 'undefined' ? schedules : []).forEach(function(x){ (schedByPhone[x.phone] = schedByPhone[x.phone] || []).push(x); });
   var rows = phones.map(function(p){ return _careRow(p, schedByPhone); });
-  // Gui THEO LO 1000 dong/request (truoc day 1 request khong lo; loi 1 lan la roi vao fallback saveSingle tung SDT = hang chuc nghin request)
-  var CHUNK = 1000;
+  // Gui THEO LO 10000 dong/request (truoc day 1 request khong lo; loi 1 lan la roi vao fallback saveSingle tung SDT = hang chuc nghin request)
+  var CHUNK = 10000;   // lo lon: server doc/ghi ca sheet 1 lan/request nen it request thi nhanh hon (lo <=50 dong server chi ghi dung dong can)
   for (var ci = 0; ci < rows.length; ci += CHUNK) {
     var chunkRows = rows.slice(ci, ci + CHUNK), chunkPhones = phones.slice(ci, ci + CHUNK);
     try {

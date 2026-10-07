@@ -985,6 +985,37 @@ function readCare_(sh) {
   return out;
 }
 
+// ── DELTA SYNC CareData (action=customers&since=<ISO>) ─────────────────────────────────────────────
+// NGUYEN NHAN (da sua): moi nhip 3s moi may deu goi action=customers => readCare_ doc FULL CareData (hang chuc/tram nghin dong
+// x 22 cot) roi JSON hoa; cache 'customers_v12' khong bao gio put duoc vi CacheService chi nhan <=100KB/gia tri. Nay chi doc
+// cot 'updated' (1 cot), lay cac dong co updated > since roi doc dung cac dong do. Moi ham ghi CareData deu dong dau 'updated'
+// (careRow_ / syncZaloFriendStatus_). Dong bi XOA (dedupeCare_) hoac sua tay tren Sheet khong co 'updated' se do lan keo FULL
+// dinh ky cua client (5 phut) dong bo. Tra null neu qua nhieu dong/doan roi rac => caller tra FULL nhu cu.
+function readCareDelta_(sh, since) {
+  if (!sh || sh.getLastRow() < 2) return { delta: true, rows: [] };
+  var last = sh.getLastRow();
+  var upd = sh.getRange(2, 15, last - 1, 1).getValues();
+  var idx = [];
+  for (var i = 0; i < upd.length; i++) {
+    var u = upd[i][0];
+    var us = (u instanceof Date) ? u.toISOString() : String(u || '');
+    if (us && us > since) idx.push(i + 2);
+  }
+  if (!idx.length) return { delta: true, rows: [] };
+  var runs = [], a = idx[0], b = idx[0];
+  for (var k = 1; k < idx.length; k++) {
+    if (idx[k] === b + 1) { b = idx[k]; } else { runs.push([a, b]); a = idx[k]; b = idx[k]; }
+  }
+  runs.push([a, b]);
+  if (runs.length > 25 || idx.length > 3000) return null;   // qua nhieu thay doi (may ngung lau) -> keo FULL
+  var rows = [];
+  for (var r = 0; r < runs.length; r++) {
+    var vals = sh.getRange(runs[r][0], 1, runs[r][1] - runs[r][0] + 1, CARE_HEADERS.length).getValues();
+    for (var v = 0; v < vals.length; v++) { if (vals[v][0]) rows.push(careObjFromRow_(vals[v])); }
+  }
+  return { delta: true, rows: rows };
+}
+
 function findCareByPhone_(phone) {
   var ss = getCrmSS_();
   var sh = ss.getSheetByName(SH_CARE);
@@ -1172,6 +1203,11 @@ function doGet(e) {
 
     // ── danh sach KH + trang thai CS (appweb + extension) ──
     if (action === 'customers') {
+      var sinceC = (e && e.parameter && e.parameter.since) ? String(e.parameter.since) : '';
+      if (sinceC) {
+        var dlt = readCareDelta_(ss.getSheetByName(SH_CARE), sinceC);
+        if (dlt) return jsonOut_(dlt);   // chi cac dong doi (khong kem careStatus — client lay o lan keo FULL)
+      }
       var cache2 = CacheService.getScriptCache();
       var cKey2  = 'customers_v12';
       var cached2 = cache2.get(cKey2);
@@ -1447,7 +1483,7 @@ function doGet(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.12-assign-chunk' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.13-care-delta' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -4702,6 +4738,34 @@ function saveSingleCare_(r) {
 
 function saveBatchCare_(rows) {
   var sh = getSheet_(SH_CARE, CARE_HEADERS);
+  // LO NHO (da so voi moi lan CS sua 1-vai KH): truoc day LUON doc ca sheet roi ghi de ca sheet (hang trieu o) chi de luu vai dong.
+  // Nay chi doc cot SDT, doc/ghi dung cac dong can doi, them dong moi bang 1 lan setValues. Lo lon (chia data) giu cach cu: 1 doc + 1 ghi.
+  if (rows.length <= 50) {
+    var Ws = CARE_HEADERS.length, lastS = sh.getLastRow(), idxS = {};
+    if (lastS >= 2) {
+      var colA = sh.getRange(2, 1, lastS - 1, 1).getValues();
+      for (var ci = 0; ci < colA.length; ci++) { if (colA[ci][0]) idxS[normPhone_(String(colA[ci][0]))] = ci + 2; }
+    }
+    var exOf = function(row) { return { khStatus: row[15]||'', nickZalos: row[16]||'[]', birthday: row[17]||'', zaloSetBy: row[18]||'', name: row[19]||'', zaloPhones: row[21]||'[]' }; };
+    var updS = 0, appS = 0, newRowsS = [], newIdxS = {};
+    for (var ks = 0; ks < rows.length; ks++) {
+      var rs = rows[ks]; var keyS = normPhone_(String(rs.phone));
+      if (idxS[keyS] !== undefined) {
+        var exRow = sh.getRange(idxS[keyS], 1, 1, Ws).getValues()[0];
+        mergeExtFields_(rs, exOf(exRow));
+        sh.getRange(idxS[keyS], 1, 1, Ws).setValues([careRow_(rs)]); updS++;
+      } else if (newIdxS[keyS] !== undefined) {
+        mergeExtFields_(rs, exOf(newRowsS[newIdxS[keyS]]));
+        newRowsS[newIdxS[keyS]] = careRow_(rs); updS++;
+      } else {
+        newRowsS.push(careRow_(rs)); newIdxS[keyS] = newRowsS.length - 1; appS++;
+      }
+    }
+    if (newRowsS.length) sh.getRange(lastS + 1, 1, newRowsS.length, Ws).setValues(newRowsS);
+    try { CacheService.getScriptCache().remove('customers_v12'); } catch(ec) {}
+    invalidateLookupCache_(rows.map(function(r){ return r.phone; }));
+    return jsonOut_({ ok: true, updated: updS, appended: appS });
+  }
   var data = sh.getDataRange().getValues();
   var index = {};
   for (var i = 1; i < data.length; i++) { if (data[i][0]) index[normPhone_(String(data[i][0]))] = i; }
