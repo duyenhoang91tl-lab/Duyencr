@@ -7993,6 +7993,7 @@ let _advAssign = {
   selectedTeams: new Set(), // multi select team id — dùng khi selectMode==='team'
   distMode: 'equal',      // 'equal' | 'custom' — áp dụng cho CS (khi selectMode='cs') hoặc Team (khi selectMode='team')
   customDist: {},         // csName|teamId -> count (số KH ở cấp phân phối trên cùng)
+  customPct: {},          // teamId -> % người dùng vừa gõ (chỉ để hiển thị lại đúng số đã gõ; nguồn sự thật vẫn là customDist)
   memberDistMode: 'pct',  // 'pct' (tỷ lệ %) | 'count' (nhập số lượng cụ thể) — cách chia NỘI BỘ trong từng Team
   memberRatio: {},        // teamId -> { tenNhanVien: phanTramTyLe } — dùng khi memberDistMode==='pct'
   memberCount: {},        // teamId -> { tenNhanVien: soLuongKH } — dùng khi memberDistMode==='count'
@@ -8015,6 +8016,7 @@ function openAssignModal() {
   _advAssign.customCount = _assignFilteredList.length;
   _advAssign.distMode = 'equal';
   _advAssign.customDist = {};
+  _advAssign.customPct = {};
   _advAssign.memberDistMode = 'pct';
   _advAssign.memberRatio = {};
   _advAssign.memberCount = {};
@@ -8482,6 +8484,7 @@ function _advAssignToggleTeam(teamId) {
   if (_advAssign.selectedTeams.has(teamId)) {
     _advAssign.selectedTeams.delete(teamId);
     delete _advAssign.customDist[teamId];
+    delete _advAssign.customPct[teamId];
     delete _advAssign.memberRatio[teamId];
     delete _advAssign.memberCount[teamId];
   } else {
@@ -8530,6 +8533,33 @@ function _advAssignAutoFillTeamMembers(teamId) {
   _refreshDistPreview();
 }
 
+// Cột "Tỷ lệ" của bảng Team (chế độ Tuỳ chỉnh) nhập được cả %: số KH = làm tròn xuống(pool × %/100),
+// vẫn lưu vào customDist nên _computeDist và mọi chỗ chia thật không phải đổi gì.
+// Hiển thị lại đúng số % người dùng đã gõ nếu nó còn khớp với số KH; nếu số KH bị sửa/auto-fill
+// thì tính lại % từ số KH (1 chữ số thập phân).
+function _teamPctShown(tid, n, total) {
+  const typed = _advAssign.customPct[tid];
+  if (typed !== undefined && total > 0 && Math.floor(total * typed / 100 + 1e-9) === n) return typed;
+  return total > 0 ? Math.round(n / total * 1000) / 10 : 0;
+}
+// field: 'n' (ô Số KH) hoặc 'p' (ô %). Render lại bảng rồi trả focus + con trỏ về đúng ô đang gõ
+// (không trả focus thì gõ 1 ký tự là mất ô).
+function _teamDistSet(tid, field, raw) {
+  const total = _getAssignPool().length;
+  if (field === 'p') {
+    const p = Math.min(100, Math.max(0, parseFloat(raw) || 0));
+    _advAssign.customPct[tid] = p;
+    _advAssign.customDist[tid] = Math.floor(total * p / 100 + 1e-9); // làm tròn XUỐNG: tổng các team không bao giờ vượt pool; phần dư để nút "Tự động phân phần còn lại" xử lý
+  } else {
+    delete _advAssign.customPct[tid];
+    _advAssign.customDist[tid] = Math.max(0, parseInt(raw) || 0);
+  }
+  _refreshDistPreview();
+  const el = Array.prototype.find.call(document.querySelectorAll('#assign-dist-preview input[data-f]'),
+    i => i.dataset.cs === tid && i.dataset.f === field);
+  if (el) { el.focus(); try { const L = el.value.length; el.setSelectionRange(L, L); } catch (e) {} }
+}
+
 // Bảng phân phối khi chia THEO TEAM: trước tiên chia pool cho các Team đã chọn (chia đều hoặc
 // tuỳ chỉnh, dùng chung _computeDist/customDist như chế độ CS), sau đó mỗi Team chia tiếp cho
 // thành viên của mình THEO TỶ LỆ % (xem _computeMemberRatioDist).
@@ -8554,9 +8584,11 @@ function _renderTeamDistTable(pool, teamIds) {
           const pct = totalPool > 0 ? Math.round(n/totalPool*100) : 0;
           return `<tr>
             <td><strong>${esc(team.name)}</strong></td>
-            <td style="text-align:center"><input class="assign-dist-input" type="number" min="0" max="${totalPool}" value="${n}" data-cs="${esc(tid)}"
-              oninput="_advAssign.customDist[this.dataset.cs]=parseInt(this.value)||0;_refreshDistPreview()"></td>
-            <td><div class="assign-dist-bar"><div class="assign-dist-fill" style="width:${pct}%"></div></div><span style="font-size:10px;color:var(--muted)">${pct}%</span></td>
+            <td style="text-align:center"><input class="assign-dist-input" type="number" min="0" max="${totalPool}" value="${n}" data-cs="${esc(tid)}" data-f="n"
+              oninput="_teamDistSet(this.dataset.cs,'n',this.value)"></td>
+            <td><div style="display:flex;align-items:center;gap:6px"><input class="assign-dist-input" type="number" min="0" max="100" step="0.1" style="width:64px" value="${_teamPctShown(tid,n,totalPool)}" data-cs="${esc(tid)}" data-f="p"
+              oninput="_teamDistSet(this.dataset.cs,'p',this.value)"><span style="font-size:11px;color:var(--muted)">%</span></div>
+              <div class="assign-dist-bar"><div class="assign-dist-fill" style="width:${Math.min(100,pct)}%"></div></div></td>
           </tr>`;
         }).join('')}
       </tbody>
