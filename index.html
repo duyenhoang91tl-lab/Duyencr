@@ -4491,6 +4491,9 @@ function renderCareTab(c) {
           <option value="">— Chọn —</option>
           ${ZALO_STATUS.map(x=>`<option value="${x}" ${(care.zalo||c.zaloStatus)===x?'selected':''}>${x}</option>`).join('')}
         </select>
+        <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;cursor:pointer" title="Tích khi khách đã nhắn lại / tương tác trên Zalo. Báo cáo chia data dùng để tính tỷ lệ phản hồi Zalo / KH đã kết bạn Zalo.">
+          <input type="checkbox" id="cs-zalo-reply" ${((care.custom||c.custom||{}).zaloReply)?'checked':''}> 💬 Phản hồi Zalo
+        </label>
       </div>
     </div>
     <div class="form-row-2">
@@ -5215,6 +5218,11 @@ function deleteNoteEntry(ev, btn, raw, idx) {
 // ═══════════════════════════════════════════════════════
 //  SAVE CARE + SCHEDULES
 // ═══════════════════════════════════════════════════════
+// Cờ "Phản hồi Zalo" (khách đã nhắn lại trên Zalo) lưu trong careData[phone].custom.zaloReply (cột 'custom' JSON có sẵn
+// của CareData → KHÔNG cần thêm cột/sửa GAS; Zalo AI & Pancake AI copy nguyên object custom khi lưu nên không làm mất cờ).
+// Báo cáo chia data: tỷ lệ phản hồi = KH có cờ / KH đã kết bạn Zalo ('Đã kết bạn').
+function _zaloReplyOf(c){ return !!(c && c.custom && c.custom.zaloReply); }
+function _zaloConnectedOf(c){ return !!c && c.zaloStatus === 'Đã kết bạn'; }
 function saveCare(phone) {
   const existing = careData[phone] || {};
   const newStatus = document.getElementById('cs-status').value;
@@ -5230,6 +5238,9 @@ function saveCare(phone) {
   const newZaloPhones = (function(){ try { var el=document.getElementById('cs-zalophone-val'); return el ? JSON.parse(el.value||'[]') : (existing.zaloPhones||[]); } catch(e){ return existing.zaloPhones||[]; }})();
   // Trường tự tạo (admin thêm) — gộp chung 1 object 'custom' để không phải thêm cột mới vào Sheet
   const newCustom = _collectCustomFieldValues(existing.custom);
+  const _zrEl = document.getElementById('cs-zalo-reply');
+  if (_zrEl) { if (_zrEl.checked) newCustom.zaloReply = true; else delete newCustom.zaloReply; }   // bỏ tích = xoá khoá (không lưu false)
+  if (!!(existing.custom||{}).zaloReply !== !!newCustom.zaloReply) logAudit('status', phone, 'Phản hồi Zalo: '+((existing.custom||{}).zaloReply?'Có':'Chưa'), 'Phản hồi Zalo: '+(newCustom.zaloReply?'Có':'Chưa'));
   // V9 audit: ghi lại thay đổi trạng thái / CS / Zalo
   if ((existing.status||'') !== newStatus) logAudit('status', phone, existing.status||'(trống)', newStatus||'(trống)');
   if ((existing.cs||'') !== newCS)         logAudit('cs', phone, existing.cs||'(trống)', newCS||'(trống)');
@@ -5253,6 +5264,7 @@ function saveCare(phone) {
     c.zaloStatus=careData[phone].zalo;
     c.careNote=careData[phone].note;
     c.careCS=careData[phone].cs;
+    c.custom=careData[phone].custom;   // để báo cáo chia data thấy cờ Phản hồi Zalo ngay, không cần tải lại
   }
   updateStats(); updateSidebarBadges();
   // Cập nhật _lastActionDate cho KH vừa lưu
@@ -9252,6 +9264,15 @@ function renderAssignReport(keepBar) {
     if (r.isDone) csBar[r.csName].done.add(r.phone);
     if (r.careStatus==='Chốt') csBar[r.csName].chot.add(r.phone);
   }
+  // Tỷ lệ phản hồi Zalo = KH có cờ phản hồi / KH đã kết bạn Zalo (chỉ tính KH đã kết bạn → luôn ≤ 100%)
+  const _zrConn = new Set(), _zrRep = new Set();
+  for (const r of phoneRows) {
+    if (!_zaloConnectedOf(r.cust)) continue;
+    _zrConn.add(r.phone);
+    if (_zaloReplyOf(r.cust)) _zrRep.add(r.phone);
+    const b = csBar[r.csName]; if (b) { (b.conn = b.conn || new Set()).add(r.phone); if (_zaloReplyOf(r.cust)) (b.rep = b.rep || new Set()).add(r.phone); }
+  }
+  const _zrPct = _zrConn.size ? Math.round(_zrRep.size / _zrConn.size * 1000) / 10 : 0;
   const csBarRows = Object.entries(csBar).sort((a,b)=>b[1].total.size-a[1].total.size);
   const maxBar = csBarRows.length ? csBarRows[0][1].total.size : 1;
 
@@ -9261,7 +9282,7 @@ function renderAssignReport(keepBar) {
   const rptHtml = `
   <!-- KPI ROW -->
   <div id="rpt-kpi">
-  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:14px">
+  <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:14px">
     ${[
       ['📋',totalBatches,'Đợt chia','var(--text)'],
       ['👥',grandTotal,'KH được chia','var(--blue)'],
@@ -9274,6 +9295,11 @@ function renderAssignReport(keepBar) {
         <div style="font-size:10px;color:var(--muted);margin-top:2px">${ic} ${l}</div>
         ${n>0&&l!=='Chưa chia lần nào'?`<div style="font-size:9px;color:var(--hint);margin-top:1px">${grandTotal>0?Math.round(n/grandTotal*100):0}% tổng</div>`:''}
       </div>`).join('')}
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--rsm);padding:9px 10px" title="Phản hồi Zalo / KH đã kết bạn Zalo (trong tập đang lọc). Ô tích 'Phản hồi Zalo' ở chi tiết khách.">
+        <div style="font-size:18px;font-weight:800;color:#0891b2;line-height:1">${_zrPct}%</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">💬 Phản hồi Zalo</div>
+        <div style="font-size:9px;color:var(--hint);margin-top:1px">${_zrRep.size}/${_zrConn.size} KH đã kết bạn</div>
+      </div>
   </div>
 
   </div>
@@ -9324,10 +9350,11 @@ function renderAssignReport(keepBar) {
       const wTotal = tot/maxBar*100;
       const wDone  = tot ? don/tot*100 : 0;
       const wChot  = tot ? cho/tot*100 : 0;
+      const zc = d.conn ? d.conn.size : 0, zr = d.rep ? d.rep.size : 0, zp = zc ? Math.round(zr/zc*100) : 0;
       return `<div style="margin-bottom:10px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
           <span style="font-size:12px;font-weight:600">${esc(cs)}</span>
-          <span style="font-size:11px;color:var(--muted)">${tot} KH &nbsp;|&nbsp; <span style="color:var(--green)">✓${don} (${pctDone}%)</span> &nbsp;|&nbsp; <span style="color:#059669">🎯${cho} (${pctChot}%)</span></span>
+          <span style="font-size:11px;color:var(--muted)">${tot} KH &nbsp;|&nbsp; <span style="color:var(--green)">✓${don} (${pctDone}%)</span> &nbsp;|&nbsp; <span style="color:#059669">🎯${cho} (${pctChot}%)</span> &nbsp;|&nbsp; <span style="color:#0891b2" title="Phản hồi Zalo / KH đã kết bạn Zalo">💬${zr}/${zc} (${zp}%)</span></span>
         </div>
         <div style="position:relative;height:14px;background:var(--surface3);border-radius:4px;overflow:hidden">
           <div style="position:absolute;top:0;left:0;height:100%;width:${wTotal}%;background:#e0e7ff;border-radius:4px"></div>
