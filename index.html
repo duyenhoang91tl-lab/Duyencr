@@ -18028,8 +18028,15 @@ function renderAcctModal(){
   // Universe tên CS = tên có trong dữ liệu + tên đang gán cho tài khoản đang sửa (kể cả tên gõ tay)
   var csNames = (typeof _allCSNames === 'function' ? _allCSNames() : []).slice();
   edNames.forEach(function(n){ if (csNames.indexOf(n) === -1) csNames.push(n); });
-  var nameOpts = csNames.map(function(n){
-    return '<option value="'+esc(n)+'"'+(edNames.indexOf(n) !== -1 ? ' selected' : '')+'>'+esc(n)+'</option>';
+  // Danh sách sale dạng ô TÍCH (có ô gõ tìm) — thay <select multiple> cũ (phải giữ Ctrl rồi click, không gõ tìm được).
+  // Sale đang được gán hiện LÊN ĐẦU cho dễ thấy; ô tích vẫn giữ trạng thái kể cả khi bị ẩn do đang lọc.
+  var csSorted = csNames.filter(function(n){ return edNames.indexOf(n) !== -1; })
+                 .concat(csNames.filter(function(n){ return edNames.indexOf(n) === -1; }));
+  var nameOpts = csSorted.map(function(n){
+    var on = edNames.indexOf(n) !== -1;
+    return '<label class="team-cs-chk'+(on?' on':'')+'" data-nm="'+esc(_vnNorm(n))+'" style="display:flex;align-items:center;gap:6px;padding:4px 8px;cursor:pointer;font-size:12px">'+
+      '<input type="checkbox" class="acct-name-chk" style="width:auto;padding:0;margin:0" data-name="'+esc(n)+'"'+(on?' checked':'')+' onchange="_acctNameChanged(this)">'+
+      '<span>'+esc(n)+'</span></label>';
   }).join('');
 
   var teamOpts = '<option value="">—</option>' + (typeof teams!=='undefined'?teams:[]).map(function(t){
@@ -18085,19 +18092,57 @@ function renderAcctModal(){
         (ed ? 'value="'+esc(ed.username)+'" readonly style="background:var(--surface2);color:var(--muted)"' : '')+'></div>'+
       '<div class="v9-field"><label>Mật khẩu</label><input id="acct-password" type="text" placeholder="'+(ed?'để trống nếu không đổi mật khẩu':'đặt mật khẩu cho tài khoản mới')+'"></div>'+
       '<div class="v9-field"><label>Vai trò</label><select id="acct-role" onchange="_acctRoleChange()">'+roleOpts+'</select></div>'+
-      '<div class="v9-field" id="acct-name-wrap"><label>Sale mà tài khoản này được nhìn thấy (giữ Ctrl/Cmd rồi click để chọn NHIỀU — bỏ chọn là cắt bớt)</label>'+
-        '<select id="acct-name-sel" multiple size="6">'+nameOpts+'</select>'+
+      '<div class="v9-field" id="acct-name-wrap"><label>Sale mà tài khoản này được nhìn thấy (gõ để tìm, tích để chọn NHIỀU — bỏ tích là cắt bớt)</label>'+
+        '<input id="acct-name-search" autocomplete="off" placeholder="🔍 Gõ tên sale để tìm… (Enter = tích dòng đầu tiên)" oninput="_acctNameFilter(this.value)" onkeydown="_acctNameSearchKey(event,this)" style="margin-bottom:6px">'+
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">'+
+          '<span style="font-size:11px;color:var(--muted)">Đang chọn: <b id="acct-name-count">0</b>/'+csSorted.length+'</span>'+
+          '<button type="button" class="team-cs-all" onclick="_acctNamePickVisible(true)">✓ Tích các dòng đang hiện</button>'+
+          '<button type="button" class="team-cs-all" onclick="_acctNamePickVisible(false)">✕ Bỏ tích các dòng đang hiện</button>'+
+        '</div>'+
+        '<div id="acct-name-list" style="max-height:200px;overflow-y:auto;border:1px solid var(--border-md);border-radius:var(--rsm);background:var(--surface)">'+nameOpts+
+          '<div id="acct-name-empty" style="display:none;padding:8px;font-size:11px;color:var(--muted)">Không có sale nào khớp — có thể gõ tên mới ở ô bên dưới.</div></div>'+
         '<input id="acct-name-input" placeholder="…hoặc gõ thêm tên mới, cách nhau bằng dấu phẩy" style="margin-top:6px"></div>'+
       '<div class="v9-field" id="acct-team-wrap" style="display:none"><label>Team (cho Leader)</label><select id="acct-team-sel">'+teamOpts+'</select></div>'+
       '<button class="btn primary" style="width:100%;justify-content:center" onclick="addAccount()">'+(ed?'💾 Lưu thay đổi':'Lưu tài khoản')+'</button>'+
     '</div>';
   _acctRoleChange();
+  _acctNameCount();
 }
-// Gộp danh sách tên CS cho tài khoản: các tên được tick trong <select multiple> + tên gõ tay
+// ── Danh sách sale dạng ô tích trong form tài khoản: lọc (không dấu/hoa thường), đếm, tích hàng loạt ──
+function _acctNameCount(){
+  var n = document.querySelectorAll('#acct-name-list .acct-name-chk:checked').length;
+  var el = document.getElementById('acct-name-count'); if (el) el.textContent = n;
+}
+function _acctNameChanged(cb){
+  var lb = cb.closest('label'); if (lb) lb.classList.toggle('on', cb.checked);
+  _acctNameCount();
+}
+function _acctNameFilter(q){
+  var nq = _vnNorm(q), shown = 0;
+  document.querySelectorAll('#acct-name-list label[data-nm]').forEach(function(l){
+    var ok = !nq || (l.getAttribute('data-nm')||'').indexOf(nq) !== -1;
+    l.style.display = ok ? 'flex' : 'none'; if (ok) shown++;
+  });
+  var em = document.getElementById('acct-name-empty'); if (em) em.style.display = shown ? 'none' : '';
+}
+function _acctNamePickVisible(on){
+  document.querySelectorAll('#acct-name-list label[data-nm]').forEach(function(l){
+    if (l.style.display === 'none') return;
+    var cb = l.querySelector('.acct-name-chk'); if (cb){ cb.checked = on; _acctNameChanged(cb); }
+  });
+}
+function _acctNameSearchKey(ev, inp){
+  if (ev.key !== 'Enter') return;
+  ev.preventDefault();
+  var first = Array.prototype.slice.call(document.querySelectorAll('#acct-name-list label[data-nm]')).filter(function(l){ return l.style.display !== 'none'; })[0];
+  if (!first) return;
+  var cb = first.querySelector('.acct-name-chk'); if (cb){ cb.checked = !cb.checked; _acctNameChanged(cb); }
+  inp.select();   // giữ chữ vừa gõ (bôi đen) để gõ tiếp là thay luôn; xoá thì danh sách đầy đủ hiện lại
+}
+// Gộp danh sách tên CS cho tài khoản: các tên được tick trong danh sách ô tích + tên gõ tay
 // (cách nhau bằng dấu phẩy) — loại trùng (không phân biệt hoa/thường), giữ thứ tự chọn trước.
 function _acctCollectNames(){
-  var sel = document.getElementById('acct-name-sel');
-  var selected = sel ? Array.from(sel.selectedOptions).map(function(o){ return o.value; }) : [];
+  var selected = Array.prototype.slice.call(document.querySelectorAll('#acct-name-list .acct-name-chk:checked')).map(function(o){ return o.getAttribute('data-name'); });
   var typed = ((_aval('acct-name-input')||'')).split(',').map(function(s){ return s.trim(); }).filter(Boolean);
   var out = [], seen = {};
   selected.concat(typed).forEach(function(n){
