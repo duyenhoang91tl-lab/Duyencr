@@ -12025,13 +12025,15 @@ function _pkRenderMapTableHtml(isAdmin){
       cur.forEach(function(c){ if (items.indexOf(c)===-1) items.push(c); }); // giữ cả Sale đã khớp nhưng không còn trong danh sách
       items.sort(function(a,b){ return a.localeCompare(b,'vi'); });
       var boxes = items.map(function(s){
-        return '<label style="display:flex;gap:6px;align-items:center;padding:3px 4px;cursor:pointer;white-space:nowrap"><input type="checkbox" value="'+esc(s)+'"'+(cur.indexOf(s)!==-1?' checked':'')+'> '+esc(s)+'</label>';
+        return '<label class="pk-pick-item" style="display:flex;gap:6px;align-items:center;padding:3px 4px;cursor:pointer;white-space:nowrap"><input type="checkbox" value="'+esc(s)+'"'+(cur.indexOf(s)!==-1?' checked':'')+'> '+esc(s)+'</label>';
       }).join('');
       cell = '<details data-n="'+esc(n)+'"'+(_pkState.mapOpen===n?' open':'')+' ontoggle="_pkMapDetailsToggle(this)" style="position:relative">'+
         '<summary style="cursor:pointer;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);display:inline-block;min-width:180px">'+
           (cur.length ? esc(cur.join(', '))+(cur.length>1?' <span style="color:var(--muted);font-size:11px">('+cur.length+' Sale)</span>':'') : '— Chưa khớp —')+'</summary>'+
-        '<div style="max-height:220px;overflow:auto;margin-top:4px;padding:4px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-          (boxes || '<div style="color:var(--muted);padding:6px">Chưa có danh sách Sale.</div>')+
+        '<div style="max-height:260px;overflow:auto;margin-top:4px;padding:4px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+          '<input type="search" placeholder="🔍 Tìm tên Sale..." oninput="_pkPickFilter(this)" style="position:sticky;top:0;width:100%;box-sizing:border-box;padding:5px 8px;margin-bottom:4px;border:1px solid var(--border);border-radius:6px;background:var(--surface);z-index:1">'+
+          '<div class="pk-pick-list">'+(boxes || '<div style="color:var(--muted);padding:6px">Chưa có danh sách Sale.</div>')+'</div>'+
+          '<div class="pk-pick-empty" style="display:none;color:var(--muted);padding:6px">Không có tên nào khớp.</div>'+
           '<div style="display:flex;justify-content:flex-end;margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">'+
             '<button type="button" class="btn sm primary" onclick="_pkMapSaveClose(this)">💾 Lưu &amp; đóng</button>'+
           '</div>'+
@@ -12043,6 +12045,21 @@ function _pkRenderMapTableHtml(isAdmin){
   });
   html += '</tbody></table>';
   return html;
+}
+
+// Ô tìm dùng chung cho mọi danh sách chọn tên (Sale tick nhiều / Kênh bán chọn 1): chỉ ẨN/HIỆN
+// các .pk-pick-item theo chữ gõ (không vẽ lại → không mất dấu tick đang chọn dở, không mất focus).
+// Bỏ dấu tiếng Việt để gõ "thuy" vẫn ra "Thuý/Thủy".
+function _pkNorm(t){ return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase(); }
+function _pkPickFilter(inp){
+  var q = _pkNorm(inp.value).trim();
+  var box = inp.parentNode, shown = 0;
+  Array.prototype.forEach.call(box.querySelectorAll('.pk-pick-item'), function(el){
+    var ok = !q || _pkNorm(el.textContent).indexOf(q) !== -1;
+    el.style.display = ok ? '' : 'none';
+    if (ok) shown++;
+  });
+  var em = box.querySelector('.pk-pick-empty'); if (em) em.style.display = shown ? 'none' : '';
 }
 
 function _pkMapDetailsToggle(det){
@@ -12091,12 +12108,20 @@ function _pkRenderPageMapTableHtml(isAdmin){
     var label = p.pageName ? p.pageName + ' (' + p.pageId + ')' : p.pageId;
     var cell;
     if (isAdmin){
-      var opts = '<option value="">— Chưa khớp —</option>';
       var list = kenhOpts.slice();
       if (cur && list.indexOf(cur) === -1) list.push(cur); // giu ca gia tri da khop nhung khong con trong danh sach kenh hien tai
       list.sort(function(a,b){ return a.localeCompare(b,'vi'); });
-      list.forEach(function(k){ opts += '<option value="'+esc(k)+'"'+(k===cur?' selected':'')+'>'+esc(k)+'</option>'; });
-      cell = '<select data-pid="'+esc(p.pageId)+'" data-pname="'+esc(p.pageName||'')+'" onchange="_pkSavePageMapInline(this)" style="padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);min-width:200px">'+opts+'</select>';
+      var rname = 'pkpg_'+String(p.pageId).replace(/[^A-Za-z0-9_]/g,'_');
+      var radio = function(v, label){
+        return '<label class="pk-pick-item" style="display:flex;gap:6px;align-items:center;padding:3px 4px;cursor:pointer;white-space:nowrap"><input type="radio" name="'+rname+'" value="'+esc(v)+'"'+(v===cur?' checked':'')+' onchange="_pkPagePick(this)"> '+label+'</label>';
+      };
+      cell = '<details data-pid="'+esc(p.pageId)+'" data-pname="'+esc(p.pageName||'')+'" style="position:relative">'+
+        '<summary style="cursor:pointer;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);display:inline-block;min-width:200px">'+(cur ? esc(cur) : '— Chưa khớp —')+'</summary>'+
+        '<div style="max-height:260px;overflow:auto;margin-top:4px;padding:4px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+          '<input type="search" placeholder="🔍 Tìm Kênh bán..." oninput="_pkPickFilter(this)" style="position:sticky;top:0;width:100%;box-sizing:border-box;padding:5px 8px;margin-bottom:4px;border:1px solid var(--border);border-radius:6px;background:var(--surface);z-index:1">'+
+          radio('', '<i style="color:var(--muted)">— Bỏ khớp —</i>')+list.map(function(k){ return radio(k, esc(k)); }).join('')+
+          '<div class="pk-pick-empty" style="display:none;color:var(--muted);padding:6px">Không có kênh nào khớp.</div>'+
+        '</div></details>';
     } else {
       cell = esc(cur||'—');
     }
@@ -12106,11 +12131,21 @@ function _pkRenderPageMapTableHtml(isAdmin){
   return html;
 }
 
+async function _pkPagePick(radio){
+  var det = radio.closest('details'); if (!det) return;
+  var sel = { value: radio.value, getAttribute: function(k){ return det.getAttribute(k); } };
+  var ok = await _pkSavePageMapInline(sel);
+  if (ok){
+    var sm = det.querySelector('summary'); if (sm) sm.textContent = radio.value || '— Chưa khớp —';
+    det.open = false;
+  }
+}
+
 async function _pkSavePageMapInline(sel){
   var pageId = sel.getAttribute('data-pid');
   var pageName = sel.getAttribute('data-pname');
   var kenhBan = sel.value;
-  if (!gsUrl){ toast('❌ Chưa cấu hình URL Google Apps Script.'); return; }
+  if (!gsUrl){ toast('❌ Chưa cấu hình URL Google Apps Script.'); return false; }
   try {
     var res = await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'savePancakePageMap', pageId:pageId, pageName:pageName, kenhBan:kenhBan }) });
     var d = await res.json();
@@ -12119,8 +12154,10 @@ async function _pkSavePageMapInline(sel){
     logAudit('pancake_page_map','', '', 'Khớp Page "'+pageName+'" ('+pageId+') → Kênh bán "'+(kenhBan||'(bỏ khớp)')+'"');
     toast('✓ Đã khớp Page "'+(pageName||pageId)+'" → "'+(kenhBan||'(bỏ khớp)')+'"');
     _pkState.kpiReport = null; // ket qua Bao cao KPI tong hop cu co the sai -> yeu cau tinh lai
+    return true;
   } catch(e){
     toast('❌ Lỗi khớp Page: ' + e.message);
+    return false;
   }
 }
 
