@@ -29,3 +29,20 @@ team Duyên
 12. **Lịch sử chia (sheet AssignData) lưu theo từng đợt, mỗi đợt tách nhiều dòng (cột `part`, ≤3000 SĐT/dòng)** vì 1 ô Google Sheet tối đa 50.000 ký tự. `readAssign_` tự gộp lại theo `id`. Client chỉ đẩy ĐỢT MỚI (`saveAssign`), không ghi đè cả lịch sử (`saveAssignHistory` chỉ dùng khi xoá đợt). Sửa `gas_v13.js` → cần "Đồng bộ mã GAS" + Triển khai phiên bản mới; kiểm tra bản đang chạy bằng `action=count` (trường `ver` = `v13.13-care-delta` (từ v13.12 trở đi mới có lịch sử chia chia dòng)).
 13. **Đồng bộ CareData theo delta** (`action=customers&since=<ISO>`, `readCareDelta_` trong GAS): nhịp 3 giây chỉ lấy các dòng có `updated > since` (server đọc 1 cột thay vì cả sheet); client (`_careSince`, `_careFullAt`) kéo FULL lại mỗi 5 phút, khi bấm Sync tay và lần đầu — để bắt dòng bị xoá/sửa tay trên Sheet (không có `updated`). **Mọi hàm ghi CareData phải đóng dấu `updated`** (`careRow_` đã làm; code ghi trực tiếp ô thì tự `setValue(new Date().toISOString())` vào cột 15) nếu không client chỉ thấy thay đổi sau ≤5 phút. Server cũ không hiểu `since` sẽ trả FULL → client tự xử lý như trước (tương thích ngược). `saveBatchCare_`: lô ≤50 dòng chỉ đọc cột SĐT + ghi đúng các dòng cần; lô lớn (chia data) vẫn đọc/ghi cả sheet 1 lần nên client gửi lô 10.000 dòng.
 14. **Nhiều phiên cùng sửa repo: LUÔN `git fetch` + rebase/pull bản mới nhất TRƯỚC khi sửa `index.html`, và KHÔNG dán đè cả file từ bản cũ.** Commit `d03c5df` (Báo cáo I) từng vô tình hoàn tác 16 vùng sửa chống lag của các commit trước (vòng sync 3s, tìm kiếm CSKH-Duyên, chia data) vì được tạo từ `index.html` cũ — đã khôi phục. Sau khi rebase/merge, kiểm tra các dấu hiệu: `grep -c "_lastCareText\|_careSince\|_isEmptyObj\|cskhNameLower\|pushAssignToGS(_e)" index.html` phải còn > 0 (xem README #10–#13).
+
+---
+
+## Backend GAS tách nhiều file (`gas/*.gs`)
+
+`gas_v13.js` (~508KB) dán vào 1 file làm Apps Script Editor lag, nên có thêm thư mục `gas/` gồm **20 file `.gs` nhỏ** (14–38KB/file), nối lại **khớp 100%** với `gas_v13.js`.
+
+**Cách dán vào Apps Script Editor (làm 1 lần):**
+1. Mở project → dấu **+** cạnh *Files* → *Script* → đặt tên giống tên file trong `gas/` (không cần đuôi `.gs`, ví dụ `01_Config_Utils`). Tạo đủ 20 file, dán nội dung từng file tương ứng.
+2. Xoá file `Code.gs` cũ (bản 1 file lớn) **sau khi** đã dán đủ 20 file — nếu để cả 2 sẽ bị trùng tên hàm/biến.
+3. Deploy → Manage deployments → chọn đúng deployment → New version → Deploy.
+
+**Lưu ý:**
+- Thứ tự file trong Editor không ảnh hưởng (mọi file dùng chung global scope). Chỉ có 1 chỗ gọi hàm lúc nạp file (`MENH_DEFAULT_ROWS` trong `18_Tasks_Menh_MsgTpl`) và nó nằm cùng file với hàm nó gọi.
+- Sau này sửa 1 phần: chỉ cần dán đè **đúng file chứa phần đó** rồi Deploy lại.
+- **Nguồn chính vẫn là `gas_v13.js`.** Sau mỗi lần sửa `gas_v13.js` chạy `node tools/split-gas.js` để sinh lại `gas/*.gs`; kiểm tra lệch bằng `node tools/split-gas.js --check`.
+- Ô "Đồng bộ mã GAS" trong `index.html` vẫn dùng nội dung đầy đủ của `gas_v13.js` (không đổi).
