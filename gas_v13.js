@@ -4770,6 +4770,8 @@ function doPost(e) {
     if (action === 'saveTaskComment') return saveTaskComment_(data.comment);
     if (action === 'saveCareStatus')      return saveCareStatus_(data.careStatus);
     if (action === 'saveAIContext')        return saveAIContext_(data.type, data.content, data.context);
+    // Xac thuc tai khoan (Pancake AI doi CS) — kiem tra mat khau PHIA SERVER, khong tra passHash ve client
+    if (action === 'verifyLogin')          return verifyLogin_(data.username, data.password);
     if (action === 'ai')                  return callGroqAI_(data);
     // ── BROADCAST: tao/cap nhat 1 chien dich gui tin hang loat ──
     if (action === 'saveBroadcast')        return saveBroadcast_(data.broadcast || data);
@@ -6599,6 +6601,42 @@ function readAIContext_() {
     else if (type === 'combo_template')        result.combos.push(content);
   }
   return result;
+}
+
+// ─── XAC THUC TAI KHOAN (dung cho Pancake AI khi CS doi sang ten nguoi khac) ───────────
+// Cung thuat toan voi _hashPass trong index.html: SHA-256(salt + matkhau) dang hex, salt moi
+// 'CRM-CS-Portal::v9::salt' (co salt cu 'OME-...' de khong khoa tai khoan chua nang cap).
+// Kiem tra o SERVER de extension khong can tai passHash ve may. Chong do mat khau: sai 5 lan
+// trong 10 phut thi khoa tam tai khoan do (CacheService).
+var _PW_SALT_ = 'CRM-CS-Portal::v9::salt';
+var _PW_SALT_OLD_ = 'OME-CS-Portal::v9::salt';
+function _pwHash_(pw, salt) {
+  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, salt + String(pw == null ? '' : pw), Utilities.Charset.UTF_8);
+  return bytes.map(function(b) { var v = (b < 0 ? b + 256 : b).toString(16); return v.length < 2 ? '0' + v : v; }).join('');
+}
+function verifyLogin_(username, password) {
+  var uname = String(username || '').trim().toLowerCase();
+  if (!uname || !password) return jsonOut_({ ok: false, error: 'Nhập đủ tài khoản và mật khẩu.' });
+  var cache = CacheService.getScriptCache();
+  var failKey = 'vlfail_' + uname.replace(/[^a-z0-9]/g, '_').slice(0, 80);
+  var fails = parseInt(cache.get(failKey) || '0', 10) || 0;
+  if (fails >= 5) return jsonOut_({ ok: false, error: 'Sai quá nhiều lần — thử lại sau 10 phút.' });
+  var users = readUsers_(getCrmSS_().getSheetByName(SH_USER));
+  var acct = null;
+  for (var i = 0; i < users.length; i++) {
+    if (String(users[i].username || '').trim().toLowerCase() === uname) { acct = users[i]; break; }
+  }
+  var okPw = false;
+  if (acct && acct.passHash) {
+    okPw = (_pwHash_(password, _PW_SALT_) === acct.passHash) || (_pwHash_(password, _PW_SALT_OLD_) === acct.passHash);
+  }
+  if (!acct || !okPw) {
+    cache.put(failKey, String(fails + 1), 600);
+    return jsonOut_({ ok: false, error: 'Sai tài khoản hoặc mật khẩu.' });
+  }
+  if (acct.active === false) return jsonOut_({ ok: false, error: 'Tài khoản đã bị khoá. Liên hệ quản trị viên.' });
+  cache.remove(failKey);
+  return jsonOut_({ ok: true, username: acct.username, role: acct.role || 'cs', name: acct.name || '' });
 }
 
 function saveAIContext_(type, content, context) {
