@@ -23,7 +23,7 @@
   // lai URL thu cong nua. Neu CS da tung luu URL khac (chrome.storage co gia tri), gia
   // tri da luu luon duoc uu tien; default nay chi ap dung khi cai lan dau/chua tung luu.
   const OLD_SASUM_GAS_URL = 'https://script.google.com/macros/s/AKfycbwPQ4HwD8R1HQFtU0xQslqGgr4HSlgzQlWFZs-8mtVY1CK9kBvwJWsIOzVuj6WM1mg-/exec';
-  const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxyqBM3v7_WdgxbXru8o3Y_GNylTtQ-eeUoJCgwWEXVjHAJxiw7-SRlHXUSjaUR7v3oSQ/exec';
+  const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbx3QT6YIzQ7SQEwQPkljVeEdmTSBQQSxtTp2hTFYOeCKB_K4BHcUTSLi54LlmB9q_E6sQ/exec';
   let GAS_URL = '';
   let _lookupCache = {};
   let _activeTone = 'Thân thiện';

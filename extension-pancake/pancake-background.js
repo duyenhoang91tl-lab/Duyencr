@@ -7,7 +7,7 @@
 const OLD_SASUM_GAS_URL = "https://script.google.com/macros/s/AKfycbwPQ4HwD8R1HQFtU0xQslqGgr4HSlgzQlWFZs-8mtVY1CK9kBvwJWsIOzVuj6WM1mg-/exec";
 
 const DEFAULT_SETTINGS = {
-  gasUrl: "https://script.google.com/macros/s/AKfycbxyqBM3v7_WdgxbXru8o3Y_GNylTtQ-eeUoJCgwWEXVjHAJxiw7-SRlHXUSjaUR7v3oSQ/exec",
+  gasUrl: "https://script.google.com/macros/s/AKfycbx3QT6YIzQ7SQEwQPkljVeEdmTSBQQSxtTp2hTFYOeCKB_K4BHcUTSLi54LlmB9q_E6sQ/exec",
   enabled: true,
   csName: "", // CS đang dùng máy này — ghi vào cột 'cs' khi lưu, giống ô CS sticky bên Zalo AI
   useProducts: false, // tương ứng checkbox "Tra cứu sản phẩm" bên Zalo AI
