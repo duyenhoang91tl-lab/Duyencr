@@ -7956,6 +7956,7 @@ document.addEventListener('visibilitychange', () => {
     <div class="assign-tab active" onclick="switchAssignTab('create',this)">📤 Chia data mới</div>
     <div class="assign-tab" onclick="switchAssignTab('history',this)">📋 Lịch sử chia</div>
     <div class="assign-tab" onclick="switchAssignTab('report',this)">📊 Báo cáo</div>
+    <div class="assign-tab" onclick="switchAssignTab('auto',this)">⏰ Chia tự động</div>
   </div>
   <div class="assign-body" id="assign-body"></div>
   <div class="assign-footer" id="assign-footer">
@@ -17377,6 +17378,172 @@ async function _aaRunIfDue(force){
 // Kiểm tra định kỳ: mở CRM là chạy nếu đến hạn; để tab mở qua nửa đêm vẫn tự chạy sang ngày mới
 setTimeout(function(){ _aaRunIfDue(false); }, 25000);
 setInterval(function(){ _aaRunIfDue(false); }, 5 * 60 * 1000);
+
+
+// ═══════════════════════════════════════════════════════
+//  CHIA DATA TỰ ĐỘNG — giao diện tab "⏰ Chia tự động" (phần 2/3)
+// ═══════════════════════════════════════════════════════
+var _aaOpen = {};   // teamId -> đang mở chi tiết thành viên
+var _AA_DOW = [['1','T2'],['2','T3'],['3','T4'],['4','T5'],['5','T6'],['6','T7'],['0','CN']];
+function _aaScopeObj(kind, tid, name, create){
+  if (!tid) return _aaCfg[kind];
+  var key = kind === 'src' ? (name ? 'memberSrc' : 'teamSrc') : (name ? 'memberPrio' : 'teamPrio');
+  var root = _aaCfg[key] = _aaCfg[key] || {};
+  if (!name) { if (!root[tid] && create) root[tid] = { mode:'pct', vals:{} }; return root[tid]; }
+  root[tid] = root[tid] || {};
+  if (!root[tid][name] && create) root[tid][name] = { mode:'pct', vals:{} };
+  return root[tid][name];
+}
+function _aaRerender(){ var b = document.getElementById('assign-body'), st = b ? b.scrollTop : 0; renderAssignAuto(); if (b) b.scrollTop = st; }
+function _aaSet(path, v, rerender){   // path: 'enabled' | 'dailyTotal' | 'onlyUnassigned'
+  _aaCfg[path] = (typeof v === 'boolean') ? v : (path === 'dailyTotal' ? Math.max(0, parseInt(v) || 0) : v);
+  if (rerender !== false) _aaRerender();
+  if (path === 'enabled') _aaPersist();
+}
+function _aaToggleDay(d){
+  d = parseInt(d); var a = _aaCfg.days || [], i = a.indexOf(d);
+  if (i >= 0) a.splice(i, 1); else a.push(d);
+  _aaCfg.days = a; _aaRerender();
+}
+function _aaTeamCfg(tid){ if (!_aaCfg.teams[tid]) _aaCfg.teams[tid] = { on:false, mode:'count', val:0 }; return _aaCfg.teams[tid]; }
+function _aaTeamField(tid, f, v){
+  var t = _aaTeamCfg(tid);
+  if (f === 'on') t.on = !!v; else if (f === 'mode') t.mode = v; else t.val = Math.max(0, Number(v) || 0);
+  _aaRerender();
+}
+function _aaMemberMode(tid, m){ _aaCfg.memberMode[tid] = m; _aaRerender(); }
+function _aaMemberField(tid, name, f, v){
+  var mc = _aaCfg.members[tid] = _aaCfg.members[tid] || {};
+  var o = mc[name] = mc[name] || { on:true, val:0 };
+  if (f === 'on') o.on = !!v; else o.val = Math.max(0, Number(v) || 0);
+  _aaRerender();
+}
+function _aaOpenToggle(tid){ _aaOpen[tid] = !_aaOpen[tid]; _aaRerender(); }
+function _aaRatioMode(el){ var o = _aaScopeObj(el.dataset.k, el.dataset.t, el.dataset.n, true); o.mode = el.dataset.mode; _aaRerender(); }
+function _aaRatioVal(el){ var o = _aaScopeObj(el.dataset.k, el.dataset.t, el.dataset.n, true); o.vals = o.vals || {}; o.vals[el.dataset.key] = Math.max(0, Number(el.value) || 0); _aaRerender(); }
+function _aaRatioAdd(el){ _aaScopeObj(el.dataset.k, el.dataset.t, el.dataset.n, true); _aaRerender(); }
+function _aaRatioDel(el){
+  var k = el.dataset.k, t = el.dataset.t, n = el.dataset.n;
+  var key = k === 'src' ? (n ? 'memberSrc' : 'teamSrc') : (n ? 'memberPrio' : 'teamPrio');
+  if (n) { if (_aaCfg[key] && _aaCfg[key][t]) delete _aaCfg[key][t][n]; } else if (_aaCfg[key]) delete _aaCfg[key][t];
+  _aaRerender();
+}
+// Khối nhập tỷ lệ NGUỒN (kind='src') hoặc ƯU TIÊN (kind='prio'); tid/name rỗng = cài chung
+function _aaRatioHtml(kind, tid, name){
+  var keys = kind === 'src' ? _AA_SRC_KEYS : _AA_PRIO_KEYS, lab = kind === 'src' ? _AA_SRC_LABEL : _AA_PRIO_LABEL;
+  var o = _aaScopeObj(kind, tid, name, false), da = 'data-k="'+kind+'" data-t="'+esc(tid||'')+'" data-n="'+esc(name||'')+'"';
+  var title = kind === 'src' ? 'Tỷ lệ theo NGUỒN' : 'Tỷ lệ theo ƯU TIÊN';
+  if (tid && !o) return '<button class="btn sm" '+da+' onclick="_aaRatioAdd(this)" style="margin:2px 4px 2px 0">＋ '+title+' riêng</button>';
+  o = o || { mode:'pct', vals:{} };
+  var sum = keys.reduce(function(s,k){ return s + (Number(o.vals[k]) || 0); }, 0), pct = o.mode !== 'count';
+  var h = '<div style="margin:6px 0;padding:8px 10px;background:var(--bg2,#f6f5f2);border-radius:8px"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">'+
+    '<b style="font-size:12px">'+title+(tid ? ' (riêng)' : ' (chung)')+'</b>'+
+    '<span class="assign-sort-btn '+(pct?'active':'')+'" '+da+' data-mode="pct" onclick="_aaRatioMode(this)">%</span>'+
+    '<span class="assign-sort-btn '+(!pct?'active':'')+'" '+da+' data-mode="count" onclick="_aaRatioMode(this)">Số cụ thể</span>'+
+    (tid ? '<button class="btn sm" '+da+' onclick="_aaRatioDel(this)">✕ Bỏ (dùng tỷ lệ chung)</button>' : '')+'</div><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">';
+  keys.forEach(function(k){
+    h += '<label style="font-size:12px">'+esc(lab[k])+' <input type="number" min="0" style="width:64px" value="'+(o.vals[k] != null && o.vals[k] !== 0 ? o.vals[k] : '')+'" placeholder="0" '+da+' data-key="'+k+'" onchange="_aaRatioVal(this)"> '+(pct?'%':'KH')+'</label>';
+  });
+  h += '</div><div style="font-size:11px;color:var(--muted);margin-top:4px">'+(sum <= 0 ? 'Chưa nhập → lấy đều mọi mục.' : (pct ? 'Tổng '+sum+'%'+(sum !== 100 ? ' — hệ thống quy về 100%.' : '.') : 'Tổng '+sum+' KH/người — nếu khác hạn mức của người đó, hệ thống quy theo tỷ lệ các số này.'))+
+    ' Mục để trống/0 = không lấy.</div></div>';
+  return h;
+}
+function renderAssignAuto(){
+  var body = document.getElementById('assign-body'); if (!body) return;
+  var cfg = _aaCfg, rc = _aaRecipients(cfg, teams, _aaMembersOf), qmap = {};
+  rc.list.forEach(function(r){ qmap[r.team + '|' + r.name] = r.quota; });
+  var totalQ = rc.list.reduce(function(s,r){ return s + r.quota; }, 0);
+  var h = '<div class="assign-section"><div class="assign-section-title">⏰ Lịch chia tự động</div>'+
+    '<label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;margin-bottom:10px"><input type="checkbox" '+(cfg.enabled?'checked':'')+' onchange="_aaSet(\'enabled\',this.checked)"> Bật chia tự động mỗi ngày</label>'+
+    '<div style="font-size:12px;color:var(--muted);margin-bottom:5px">Chia vào các thứ được tích (ngày bỏ tích = không chia):</div><div class="assign-sort-row">'+
+    _AA_DOW.map(function(d){ return '<div class="assign-sort-btn '+((cfg.days||[]).indexOf(parseInt(d[0]))>=0?'active':'')+'" onclick="_aaToggleDay('+d[0]+')">'+d[1]+'</div>'; }).join('')+'</div>'+
+    '<label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:10px"><input type="checkbox" '+(cfg.onlyUnassigned?'checked':'')+' onchange="_aaSet(\'onlyUnassigned\',this.checked)"> Chỉ lấy KH <b>chưa chia lần nào</b> (nên bật, nếu không ngày nào cũng có thể chia lại đúng KH cũ)</label>'+
+    '<div style="font-size:11px;color:var(--hint);margin-top:8px">Hệ thống tự chia khi có admin mở CRM vào ngày đó (hoặc tab CRM đang mở qua 0h). Nếu hôm đó không ai mở CRM thì chưa chia, lần mở tiếp theo sẽ chia bù cho ngày đó.</div></div>';
+
+  h += '<div class="assign-section"><div class="assign-section-title">① Chia cho các Team</div>'+
+    '<label style="font-size:12px">Tổng KH/ngày (dùng cho Team chia theo %): <input type="number" min="0" style="width:90px" value="'+(cfg.dailyTotal||'')+'" placeholder="0" onchange="_aaSet(\'dailyTotal\',this.value)"></label>';
+  if (!teams.length) h += '<div style="color:var(--muted);padding:14px;text-align:center">Chưa có Team — tạo ở tab <b>Quản lý Team</b> trước.</div>';
+  else {
+    var pctSum = 0;
+    teams.forEach(function(t){ var c = cfg.teams[t.id]; if (c && c.on && c.mode === 'pct') pctSum += Number(c.val) || 0; });
+    h += '<table class="dash-table" style="margin-top:8px"><thead><tr><th style="width:36px"></th><th>Team</th><th style="width:150px">Cách chia</th><th style="width:100px">Giá trị</th><th style="width:100px;text-align:right">≈ KH/ngày</th><th style="width:90px"></th></tr></thead><tbody>';
+    teams.forEach(function(t){
+      var c = cfg.teams[t.id] || { on:false, mode:'count', val:0 }, members = _aaMembersOf(t);
+      var tq = rc.list.filter(function(r){ return r.team === t.id; }).reduce(function(s,r){ return s + r.quota; }, 0);
+      h += '<tr><td><input type="checkbox" '+(c.on?'checked':'')+' onchange="_aaTeamField(\''+esc(t.id)+'\',\'on\',this.checked)"></td>'+
+        '<td><b>'+esc(t.name)+'</b> <span style="color:var(--muted);font-size:11px">('+members.length+' người)</span></td>'+
+        '<td><select onchange="_aaTeamField(\''+esc(t.id)+'\',\'mode\',this.value)"><option value="count" '+(c.mode!=='pct'?'selected':'')+'>Số KH / ngày</option><option value="pct" '+(c.mode==='pct'?'selected':'')+'>% tổng / ngày</option></select></td>'+
+        '<td><input type="number" min="0" style="width:70px" value="'+(c.val||'')+'" placeholder="0" onchange="_aaTeamField(\''+esc(t.id)+'\',\'val\',this.value)"> '+(c.mode==='pct'?'%':'KH')+'</td>'+
+        '<td style="text-align:right;font-weight:700">'+(c.on?tq:'—')+'</td>'+
+        '<td><button class="btn sm" onclick="_aaOpenToggle(\''+esc(t.id)+'\')">'+(_aaOpen[t.id]?'▴ Thu':'▾ Chi tiết')+'</button></td></tr>';
+      if (_aaOpen[t.id]) h += '<tr><td></td><td colspan="5">'+_aaTeamDetailHtml(t, members, qmap)+'</td></tr>';
+    });
+    h += '</tbody></table>';
+    h += '<div style="font-size:12px;margin-top:6px;color:var(--muted)">Tổng hạn mức mỗi ngày: <b style="color:var(--green)">'+totalQ+' KH</b>'+
+      (pctSum ? ' · Tổng % Team: <b style="color:'+(pctSum>100?'var(--red)':'var(--green)')+'">'+pctSum+'%</b>'+(pctSum>100?' — vượt 100%!':'') : '')+'</div>';
+  }
+  h += '</div>';
+  h += '<div class="assign-section"><div class="assign-section-title">② Tỷ lệ chung theo nguồn &amp; ưu tiên</div>'+
+    '<div style="font-size:11px;color:var(--muted)">Áp dụng cho mọi người, trừ chỗ bạn cài riêng theo Team / từng người (bấm “Chi tiết” ở Team). Mỗi người: hạn mức → chia theo nguồn → mỗi nguồn chia tiếp theo ưu tiên.</div>'+
+    _aaRatioHtml('src') + _aaRatioHtml('prio') + '</div>';
+  var lr = cfg.lastResult;
+  if (lr) h += '<div class="assign-section"><div class="assign-section-title">Lần chạy gần nhất</div><div style="font-size:12px">'+esc(lr.date)+(lr.forced?' (chạy thử)':'')+': đã chia <b>'+lr.total+' KH</b> cho '+(lr.people||0)+' CS'+
+    ((lr.short||[]).length ? '<div style="color:var(--red);margin-top:4px">Thiếu data: '+lr.short.map(function(s){ return esc(s.name)+' thiếu '+s.missing; }).join(', ')+'</div>' : '')+'</div></div>';
+  h += '<div id="aa-preview"></div>';
+  body.innerHTML = h;
+}
+function _aaTeamDetailHtml(t, members, qmap){
+  var mm = _aaCfg.memberMode[t.id] || 'pct', mc = _aaCfg.members[t.id] || {}, tid = esc(t.id);
+  var h = '<div style="padding:6px 0"><div style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><b style="font-size:12px">Chia trong Team:</b>'+
+    '<span class="assign-sort-btn '+(mm==='pct'?'active':'')+'" onclick="_aaMemberMode(\''+tid+'\',\'pct\')">Theo %</span>'+
+    '<span class="assign-sort-btn '+(mm==='count'?'active':'')+'" onclick="_aaMemberMode(\''+tid+'\',\'count\')">Số KH/người/ngày</span></div>';
+  members.forEach(function(m){
+    var o = mc[m] || { on:true, val:0 }, en = m.replace(/"/g,'&quot;');
+    h += '<div style="border-top:1px solid var(--border,#e5e3dc);padding:6px 0"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
+      '<label style="min-width:150px;font-size:13px"><input type="checkbox" '+(o.on!==false?'checked':'')+' data-m="'+esc(m)+'" onchange="_aaMemberField(\''+tid+'\',this.dataset.m,\'on\',this.checked)"> '+esc(m)+'</label>'+
+      '<input type="number" min="0" style="width:70px" value="'+(o.val||'')+'" placeholder="'+(mm==='pct'?'đều':'0')+'" data-m="'+esc(m)+'" onchange="_aaMemberField(\''+tid+'\',this.dataset.m,\'val\',this.value)"> '+(mm==='pct'?'%':'KH/ngày')+
+      '<b style="font-size:12px;color:var(--green)">≈ '+(o.on!==false ? (qmap[t.id+'|'+m]||0) : 0)+' KH/ngày</b></div>'+
+      '<div style="margin-left:4px">'+_aaRatioHtml('src', t.id, m)+_aaRatioHtml('prio', t.id, m)+'</div></div>';
+  });
+  h += '<div style="border-top:1px solid var(--border,#e5e3dc);padding-top:6px"><b style="font-size:12px">Cả Team (áp dụng cho mọi người trong Team, trừ người có tỷ lệ riêng):</b>'+_aaRatioHtml('src', t.id)+_aaRatioHtml('prio', t.id)+'</div></div>';
+  return h;
+}
+// Xem trước (không ghi gì) — tính trên toàn bộ KH nên bấm mới chạy
+function _aaShowPreview(){
+  var el = document.getElementById('aa-preview'); if (!el) return;
+  var p = _aaPreview(), total = p.entries.reduce(function(s,e){ return s + e.phones.length; }, 0);
+  var h = '<div class="assign-section"><div class="assign-section-title">👁 Xem trước (chưa chia thật)</div><div style="font-size:13px;margin-bottom:6px">Nếu chạy bây giờ: <b>'+total+' KH</b> → '+p.entries.length+' CS</div>';
+  if (p.warn.length) h += '<div style="color:var(--red);font-size:12px">'+p.warn.map(esc).join('<br>')+'</div>';
+  if (p.entries.length){
+    var sh = {}; p.short.forEach(function(s){ sh[s.name] = s.missing; });
+    h += '<table class="dash-table"><thead><tr><th>Team</th><th>CS</th><th style="text-align:right">Hạn mức</th><th style="text-align:right">Có data</th><th>Ghi chú</th></tr></thead><tbody>'+
+      p.entries.map(function(e){ return '<tr><td>'+esc(e.team)+'</td><td>'+esc(e.name)+'</td><td style="text-align:right">'+e.quota+'</td><td style="text-align:right;font-weight:700">'+e.phones.length+'</td><td style="color:var(--red)">'+(sh[e.name]?'thiếu '+sh[e.name]:'')+'</td></tr>'; }).join('')+'</tbody></table>';
+  } else h += '<div style="color:var(--muted);font-size:12px">Chưa có ai có hạn mức &gt; 0 hoặc không có KH phù hợp — kiểm tra lại Team đã tích, giá trị, nguồn.</div>';
+  el.innerHTML = h + '</div>';
+  el.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+async function _aaRunNow(){
+  if (!confirm('Chia NGAY theo cấu hình hiện tại?\nViệc này chia thật (ghi lịch sử + đổi CS chăm sóc) và không ảnh hưởng lịch tự động ngày mai.')) return;
+  await _aaPersist();
+  var r = await _aaRunIfDue(true);
+  if (r) _aaRerender(); else toast('Không chạy được (cần quyền admin, đã tải xong dữ liệu và có Team)');
+}
+async function _aaSaveNow(){ await _aaPersist(); toast('✓ Đã lưu cấu hình chia tự động'); }
+
+var _aaPrevSwitchTab = switchAssignTab;
+switchAssignTab = function(tab, el){
+  if (tab === 'auto'){
+    currentAssignTab = 'auto';
+    document.querySelectorAll('.assign-tab').forEach(function(t){ t.classList.remove('active'); });
+    if (el) el.classList.add('active');
+    var f = document.getElementById('assign-footer');
+    if (f) f.innerHTML = '<button class="btn" onclick="closeAssignModal()">Đóng</button><button class="btn" onclick="_aaShowPreview()">👁 Xem trước</button>'+
+      '<button class="btn" onclick="_aaRunNow()">▶ Chạy ngay</button><button class="btn primary" onclick="_aaSaveNow()">💾 Lưu cấu hình</button>';
+    _aaPullCfg().then(renderAssignAuto); renderAssignAuto();
+    return;
+  }
+  _aaPrevSwitchTab(tab, el);
+};
 
 // ═══════════════════════════════════════════════════════
 //  NO-ACTION CHIP trong col-toggle-bar
