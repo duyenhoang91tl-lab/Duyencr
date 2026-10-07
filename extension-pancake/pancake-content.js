@@ -57,12 +57,43 @@
   let _menhTable = MENH_TABLE_DEFAULT;
   let _cannedResponses = CANNED_DEFAULT_MESSENGER;
   let _bannedWords = []; // [{tuCam, thayThe}] doc tu sheet "Luu y tu cam" (file Report Sale) qua getKnowledge
-  function tinhMenh_(namSinhStr) {
-    const n = parseInt(namSinhStr, 10);
-    if (!n || n < 1900 || n > 2100) return null;
-    for (const menh of Object.keys(_menhTable)) if (_menhTable[menh].includes(n)) return menh;
-    return null;
+  // ── Mệnh theo năm sinh (Ngũ hành nạp âm) + màu tương sinh / tương hợp ──
+  // Công thức: Can (Giáp,Ất=1; Bính,Đinh=2; Mậu,Kỷ=3; Canh,Tân=4; Nhâm,Quý=5) + Chi (Tý,Sửu,Ngọ,Mùi=0;
+  // Dần,Mão,Thân,Dậu=1; Thìn,Tỵ,Tuất,Hợi=2); tổng >5 thì trừ 5 → 1 Kim, 2 Thủy, 3 Hỏa, 4 Thổ, 5 Mộc.
+  // Đã đối chiếu đủ 1900–2100 với chuỗi nạp âm 60 năm. Tính theo năm dương lịch (sinh trước Tết thì lấy năm trước).
+  function menhMau_() { return {
+    'Kim':  { sinh: ['Vàng','Nâu'],              hop: ['Trắng'] },
+    'Mộc':  { sinh: ['Đen','Xanh dương'],        hop: ['Xanh lá cây'] },
+    'Thủy': { sinh: ['Trắng'],                   hop: ['Đen','Xanh dương'] },
+    'Hỏa':  { sinh: ['Xanh lá cây'],             hop: ['Đỏ','Hồng','Tím'] },
+    'Thổ':  { sinh: ['Đỏ','Hồng','Tím'],         hop: ['Vàng','Nâu'] }
+  }; }
+  function menhSwatch_() { return { 'Vàng':'#f2c200','Nâu':'#8b5a2b','Trắng':'#ffffff','Đen':'#222222','Xanh dương':'#2563eb','Xanh lá cây':'#16a34a','Đỏ':'#dc2626','Hồng':'#ec4899','Tím':'#7c3aed' }; }
+  function menhFromYear(y) {
+    y = parseInt(y, 10);
+    if (!y || y < 1900 || y > 2100) return null;
+    const can = Math.floor(((y - 4) % 10) / 2) + 1;
+    const chi = [0,0,1,1,2,2,0,0,1,1,2,2][(y - 4) % 12];
+    let s = can + chi; if (s > 5) s -= 5;
+    return ['', 'Kim', 'Thủy', 'Hỏa', 'Thổ', 'Mộc'][s];
   }
+  function menhYearValid(y) { y = String(y == null ? '' : y).trim(); return /^\d{4}$/.test(y) && +y >= 1900 && +y <= new Date().getFullYear(); }
+  function menhBoxHtml(y) {
+    y = String(y == null ? '' : y).trim();
+    if (!y) return '';
+    if (!menhYearValid(y)) return y.length === 4 ? '<span style="color:#dc2626">Năm sinh không hợp lệ</span>' : '';
+    const m = menhFromYear(y), t = menhMau_()[m], sw = menhSwatch_();
+    const chips = (arr) => arr.map((c) => '<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px;white-space:nowrap"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + sw[c] + ';border:1px solid rgba(0,0,0,.3)"></i>' + c + '</span>').join('');
+    return '<div style="font-weight:700;color:#2563eb">Mệnh ' + m + ' <span style="font-weight:400;color:#6b7280">(sinh năm ' + y + ')</span></div>'
+      + '<div><b>Tương sinh:</b> ' + chips(t.sinh) + '</div>'
+      + '<div><b>Tương hợp:</b> ' + chips(t.hop) + '</div>'
+      + '<div style="color:#9ca3af;font-size:10px">Ưu tiên tương sinh trước, sau đó tương hợp; tránh màu tương khắc. Ngọc &amp; Trầm hương không kén mệnh. Tính theo năm dương lịch (sinh trước Tết → lấy năm trước).</div>';
+  }
+  // Giá trị sinh nhật lưu trong cột birthday: "YYYY-MM-DD" (đủ ngày) HOẶC "YYYY" (chỉ năm sinh).
+  function bdayYearOnly_(v) { const s = String(v == null ? '' : v).trim(); return /^\d{4}$/.test(s) ? s : ''; }
+  // tinhMenh_: GIỮ tên cũ cho các nơi gọi; dùng công thức nạp âm (bảng _menhTable cũ từ sheet "Menh" sai 44/60 năm, vd 1995 ghi Thủy
+  // trong khi đúng là Hỏa) — không còn dùng bảng đó để tra mệnh.
+  function tinhMenh_(namSinhStr) { return menhFromYear(namSinhStr); }
   // Tu dong sua ten san pham dinh tu cam khi Sao chep don hang, theo dung sheet "Luu y tu cam" —
   // khop cum dai truoc (vd "túi tiền" truoc "tiền") de khong cat nham chu con lai trong cum.
   // 2 truong hop rieng nguoi dung yeu cau chinh xac (uu tien hon danh sach doc tu sheet, vi cot
@@ -1361,11 +1392,12 @@
             <select id="pk-khstatus-sel">${optHtml(ACTIVE_KHSTATUS_OPTS, care?.khStatus)}</select>
           </div>
           <div class="pk-form-col">
-            <label>Sinh nhật${IS_PHONGTHUY ? ' → Mệnh' : ''}</label>
+            <label>Sinh nhật / năm sinh → Mệnh</label>
             <div style="display:flex;gap:4px;align-items:center">
-              <input type="date" id="pk-birthday" value="${care?.birthday ? toInputDate_(care.birthday) : ''}" style="flex:1" />
-              ${IS_PHONGTHUY ? '<span id="pk-menh-badge" style="font-size:11px;font-weight:700;color:#2563eb;white-space:nowrap"></span>' : ''}
+              <input type="date" id="pk-birthday" value="${bdayYearOnly_(care?.birthday) ? '' : (care?.birthday ? toInputDate_(care.birthday) : '')}" style="flex:1" />
+              <input type="text" id="pk-birthyear" inputmode="numeric" maxlength="4" placeholder="Năm sinh" title="Chưa có ngày sinh đầy đủ thì chỉ nhập năm sinh" value="${bdayYearOnly_(care?.birthday) || (care?.birthday && toInputDate_(care.birthday) ? toInputDate_(care.birthday).slice(0, 4) : '')}" ${(care?.birthday && !bdayYearOnly_(care.birthday)) ? 'readonly' : ''} style="width:84px" />
             </div>
+            <div id="pk-menh-box" style="font-size:11px;line-height:1.5;margin-top:4px"></div>
           </div>
         </div>
 
@@ -1432,10 +1464,11 @@
       newPhoneEl.addEventListener('blur', onPhoneReady);
       newPhoneEl.addEventListener('input', onPhoneReady);
     }
-    if (IS_PHONGTHUY) {
-      const bdayEl = box.querySelector('#pk-birthday');
+    {
+      const bdayEl = box.querySelector('#pk-birthday'), yearEl = box.querySelector('#pk-birthyear');
       bdayEl.addEventListener('input', () => updateMenhBadge_());
       bdayEl.addEventListener('change', () => updateMenhBadge_()); // input type=date: chon qua lich thuong chi ban 'change', khong ban 'input' o 1 so trinh duyet
+      if (yearEl) yearEl.addEventListener('input', () => { const y = yearEl.value.replace(/\D/g, '').slice(0, 4); if (yearEl.value !== y) yearEl.value = y; updateMenhBadge_(); });
       updateMenhBadge_();
     }
   }
@@ -1448,14 +1481,29 @@
     return _currentPhone || '';
   }
 
+  // Hien Mệnh + màu tương sinh/tương hợp theo ô ngày sinh, hoặc chỉ năm sinh khi chưa có ngày đầy đủ.
   function updateMenhBadge_() {
     const inp = panelEl?.querySelector('#pk-birthday');
-    const out = panelEl?.querySelector('#pk-menh-badge');
-    if (!inp || !out) return;
-    const yearMatch = (inp.value || '').match(/\d{4}/);
-    if (!yearMatch) { out.textContent = ''; return; }
-    const menh = tinhMenh_(yearMatch[0]);
-    out.textContent = menh ? ('Mệnh ' + menh) : 'Chưa có DL năm này';
+    const yEl = panelEl?.querySelector('#pk-birthyear');
+    const out = panelEl?.querySelector('#pk-menh-box');
+    if (!inp || !yEl || !out) return;
+    if (inp.value) { yEl.value = inp.value.slice(0, 4); yEl.readOnly = true; } else yEl.readOnly = false;
+    out.innerHTML = menhBoxHtml(yEl.value);
+  }
+  // Đọc/ghi ngày sinh hiệu lực: ngày đầy đủ ("YYYY-MM-DD") hoặc chỉ năm ("YYYY") — cùng cột birthday.
+  function readBirthdayValue_() {
+    const d = panelEl.querySelector('#pk-birthday')?.value || '';
+    if (d) return d;
+    const y = String(panelEl.querySelector('#pk-birthyear')?.value || '').trim();
+    return menhYearValid(y) ? y : '';
+  }
+  function setBirthdayFields_(v) {
+    const dEl = panelEl.querySelector('#pk-birthday'), yEl = panelEl.querySelector('#pk-birthyear');
+    if (!dEl) return;
+    const yo = bdayYearOnly_(v);
+    dEl.value = yo ? '' : (v ? toInputDate_(v) : '');
+    if (yEl) yEl.value = yo;
+    updateMenhBadge_();
   }
 
   function renderNoteHistory_(raw) {
@@ -1628,7 +1676,7 @@
     setVal('#pk-status-sel', row.status);
     setVal('#pk-zalo-sel', row.zalo);
     setVal('#pk-khstatus-sel', row.khStatus);
-    setVal('#pk-birthday', row.birthday ? toInputDate_(row.birthday) : '');
+    setBirthdayFields_(row.birthday);
     setVal('#pk-hen-date', row.schedHen ? toInputDate_(row.schedHen) : '');
     setVal('#pk-hen-note', row.schedHenNote);
     learnChatKeyForPhone_(phone);
@@ -1657,7 +1705,7 @@
       status: panelEl.querySelector('#pk-status-sel').value,
       zalo: panelEl.querySelector('#pk-zalo-sel').value,
       khStatus: panelEl.querySelector('#pk-khstatus-sel').value,
-      birthday: panelEl.querySelector('#pk-birthday').value,
+      birthday: readBirthdayValue_(),
       schedHen: panelEl.querySelector('#pk-hen-date').value,
       schedHenNote: panelEl.querySelector('#pk-hen-note').value.trim(),
       custom: collectCustomFieldValues_(_currentCare?.custom || {}),
@@ -1739,7 +1787,8 @@
     syncSel('#pk-status-sel', 'status');
     syncSel('#pk-zalo-sel', 'zalo');
     syncSel('#pk-khstatus-sel', 'khStatus');
-    syncSel('#pk-birthday', 'birthday');
+    // Ngày sinh/năm sinh: so baseline theo giá trị hiệu lực, chỉ ghi đè nếu CS chưa sửa
+    if (readBirthdayValue_() === String(baseline.birthday || '').trim()) setBirthdayFields_(newCare.birthday || '');
     syncSel('#pk-hen-note', 'schedHenNote');
     syncSel('#pk-name-input', 'name');
     const henEl = panelEl.querySelector('#pk-hen-date');

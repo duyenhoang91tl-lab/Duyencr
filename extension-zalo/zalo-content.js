@@ -373,6 +373,9 @@
     const col5 = addEl(row2, 'div', {className:'zai-field-col'});
     addEl(col5, 'label', {textContent:'🎂 Sinh nhật'});
     addEl(col5, 'input', {id:'zai-birthday', type:'date'});
+    addEl(col5, 'input', {id:'zai-birthyear', type:'text', inputMode:'numeric', maxLength:4, placeholder:'Hoặc chỉ nhập năm sinh (VD 1995)'});
+    addEl(col5, 'div', {id:'zai-menh-box'}).style.cssText = 'font-size:11px;line-height:1.5;margin-top:4px';
+    wireBirthdayFields_();
 
     addEl(upd, 'label', {textContent:'Ghi chú CS'});
     const noteWrap = addEl(upd, 'div', {className:'zai-note-wrap'});
@@ -1309,7 +1312,7 @@
     document.getElementById('zai-hen-date').value   = care&&care.schedHen ? toInputDate_(care.schedHen) : '';
     document.getElementById('zai-hen-note').value   = care&&care.schedHenNote||'';
     document.getElementById('zai-kh-status-sel').value = care&&care.khStatus||'';
-    document.getElementById('zai-birthday').value   = care&&care.birthday||'';
+    setBirthdayFields_(care&&care.birthday||'');
     // Truong tu tao: ve lai select giu dung gia tri da luu cua khach nay
     renderCustomFieldSelects_zai((care && care.custom) || {});
     // Ghi chú CS: đọc dữ liệu (đồng bộ 2 chiều với Sasum, cùng định dạng JSON [{text,user,time}])
@@ -1380,7 +1383,8 @@
     syncField('zai-zalo-sel','zalo');
     syncField('zai-kh-status-sel','khStatus');
     syncField('zai-hen-note','schedHenNote');
-    syncField('zai-birthday','birthday');
+    // Ngày sinh/năm sinh: so với baseline theo giá trị hiệu lực (ngày đầy đủ hoặc chỉ năm), chỉ ghi đè nếu CS chưa sửa
+    if (readBirthdayValue_() === String(baseline.birthday || '').trim()) setBirthdayFields_(c.birthday || '');
     const henDateEl = document.getElementById('zai-hen-date');
     if (henDateEl) {
       const baseHen = baseline.schedHen ? toInputDate_(baseline.schedHen) : '';
@@ -1439,7 +1443,7 @@
     btn.disabled = true; btn.textContent = 'Đang lưu...';
     try {
       const c = care||{};
-      const birthday = document.getElementById('zai-birthday') ? document.getElementById('zai-birthday').value : '';
+      const birthday = readBirthdayValue_();
       const row = {
         phone:_currentCustData.phone, status:status||c.status||'',
         zalo:zalo||c.zalo||'', cs:cs||c.cs||'', note,
@@ -1729,6 +1733,69 @@
     const dt = new Date(ts);
     return ('0'+dt.getDate()).slice(-2)+'/'+('0'+(dt.getMonth()+1)).slice(-2)+'/'+dt.getFullYear();
   }
+  // ── Mệnh theo năm sinh (Ngũ hành nạp âm) + màu tương sinh / tương hợp ──
+  // Công thức: Can (Giáp,Ất=1; Bính,Đinh=2; Mậu,Kỷ=3; Canh,Tân=4; Nhâm,Quý=5) + Chi (Tý,Sửu,Ngọ,Mùi=0;
+  // Dần,Mão,Thân,Dậu=1; Thìn,Tỵ,Tuất,Hợi=2); tổng >5 thì trừ 5 → 1 Kim, 2 Thủy, 3 Hỏa, 4 Thổ, 5 Mộc.
+  // Đã đối chiếu đủ 1900–2100 với chuỗi nạp âm 60 năm. Tính theo năm dương lịch (sinh trước Tết thì lấy năm trước).
+  function menhMau_() { return {
+    'Kim':  { sinh: ['Vàng','Nâu'],              hop: ['Trắng'] },
+    'Mộc':  { sinh: ['Đen','Xanh dương'],        hop: ['Xanh lá cây'] },
+    'Thủy': { sinh: ['Trắng'],                   hop: ['Đen','Xanh dương'] },
+    'Hỏa':  { sinh: ['Xanh lá cây'],             hop: ['Đỏ','Hồng','Tím'] },
+    'Thổ':  { sinh: ['Đỏ','Hồng','Tím'],         hop: ['Vàng','Nâu'] }
+  }; }
+  function menhSwatch_() { return { 'Vàng':'#f2c200','Nâu':'#8b5a2b','Trắng':'#ffffff','Đen':'#222222','Xanh dương':'#2563eb','Xanh lá cây':'#16a34a','Đỏ':'#dc2626','Hồng':'#ec4899','Tím':'#7c3aed' }; }
+  function menhFromYear(y) {
+    y = parseInt(y, 10);
+    if (!y || y < 1900 || y > 2100) return null;
+    const can = Math.floor(((y - 4) % 10) / 2) + 1;
+    const chi = [0,0,1,1,2,2,0,0,1,1,2,2][(y - 4) % 12];
+    let s = can + chi; if (s > 5) s -= 5;
+    return ['', 'Kim', 'Thủy', 'Hỏa', 'Thổ', 'Mộc'][s];
+  }
+  function menhYearValid(y) { y = String(y == null ? '' : y).trim(); return /^\d{4}$/.test(y) && +y >= 1900 && +y <= new Date().getFullYear(); }
+  function menhBoxHtml(y) {
+    y = String(y == null ? '' : y).trim();
+    if (!y) return '';
+    if (!menhYearValid(y)) return y.length === 4 ? '<span style="color:#dc2626">Năm sinh không hợp lệ</span>' : '';
+    const m = menhFromYear(y), t = menhMau_()[m], sw = menhSwatch_();
+    const chips = (arr) => arr.map((c) => '<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px;white-space:nowrap"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + sw[c] + ';border:1px solid rgba(0,0,0,.3)"></i>' + c + '</span>').join('');
+    return '<div style="font-weight:700;color:#2563eb">Mệnh ' + m + ' <span style="font-weight:400;color:#6b7280">(sinh năm ' + y + ')</span></div>'
+      + '<div><b>Tương sinh:</b> ' + chips(t.sinh) + '</div>'
+      + '<div><b>Tương hợp:</b> ' + chips(t.hop) + '</div>'
+      + '<div style="color:#9ca3af;font-size:10px">Ưu tiên tương sinh trước, sau đó tương hợp; tránh màu tương khắc. Ngọc &amp; Trầm hương không kén mệnh. Tính theo năm dương lịch (sinh trước Tết → lấy năm trước).</div>';
+  }
+  // Giá trị sinh nhật lưu trong cột birthday: "YYYY-MM-DD" (đủ ngày) HOẶC "YYYY" (chỉ năm sinh).
+  function bdayYearOnly_(v) { const s = String(v == null ? '' : v).trim(); return /^\d{4}$/.test(s) ? s : ''; }
+
+  // Ngày sinh: ô ngày (zai-birthday) HOẶC chỉ năm (zai-birthyear). Lưu vào cùng cột birthday ("YYYY-MM-DD" hoặc "YYYY").
+  function readBirthdayValue_() {
+    const dEl = document.getElementById('zai-birthday'), yEl = document.getElementById('zai-birthyear');
+    const d = dEl ? dEl.value : '';
+    if (d) return d;
+    const y = yEl ? String(yEl.value || '').trim() : '';
+    return menhYearValid(y) ? y : '';
+  }
+  function refreshMenhBox_() {
+    const dEl = document.getElementById('zai-birthday'), yEl = document.getElementById('zai-birthyear'), box = document.getElementById('zai-menh-box');
+    if (!yEl) return;
+    if (dEl && dEl.value) { yEl.value = dEl.value.slice(0, 4); yEl.readOnly = true; } else yEl.readOnly = false;
+    if (box) box.innerHTML = menhBoxHtml(yEl.value);
+  }
+  function setBirthdayFields_(v) {
+    const dEl = document.getElementById('zai-birthday'), yEl = document.getElementById('zai-birthyear');
+    if (!dEl) return;
+    const yo = bdayYearOnly_(v);
+    dEl.value = yo ? '' : String(v == null ? '' : v);
+    if (yEl) yEl.value = yo;
+    refreshMenhBox_();
+  }
+  function wireBirthdayFields_() {
+    const dEl = document.getElementById('zai-birthday'), yEl = document.getElementById('zai-birthyear');
+    if (dEl) { dEl.addEventListener('input', refreshMenhBox_); dEl.addEventListener('change', refreshMenhBox_); }
+    if (yEl) yEl.addEventListener('input', () => { const y = yEl.value.replace(/\D/g, '').slice(0, 4); if (yEl.value !== y) yEl.value = y; refreshMenhBox_(); });
+  }
+
   function toInputDate_(d) {
     const ts = parseDate_(d); if (!ts) return '';
     const dt = new Date(ts);

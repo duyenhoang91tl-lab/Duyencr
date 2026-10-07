@@ -4526,10 +4526,15 @@ function renderCareTab(c) {
           🎂 Ngày sinh nhật
           ${_bdayUpcomingBadge(care.birthday)}
         </div>
-        <input class="form-input" type="date" id="cs-birthday" value="${care.birthday||''}"
+        <input class="form-input" type="date" id="cs-birthday" value="${bdayYearOnly_(care.birthday) ? '' : (care.birthday||'')}"
                title="Nhắc hẹn sinh nhật hàng năm tự động"
-               data-phone="${esc(c.phone)}" onchange="onBdayChange(this.value,this.dataset.phone)">
-        ${care.birthday ? `<div style="font-size:10px;color:#be185d;margin-top:2px">🔔 Sẽ nhắc mỗi năm vào ngày này</div>` : ''}
+               data-phone="${esc(c.phone)}" onchange="onBdayChange(this.value,this.dataset.phone);_bdayUiSync_()">
+        ${(care.birthday && !bdayYearOnly_(care.birthday)) ? `<div style="font-size:10px;color:#be185d;margin-top:2px">🔔 Sẽ nhắc mỗi năm vào ngày này</div>` : ''}
+        <input class="form-input" type="text" inputmode="numeric" maxlength="4" id="cs-birthyear" placeholder="Hoặc chỉ nhập năm sinh (VD 1995)"
+               value="${esc((bdayYearOnly_(care.birthday) || ((String(care.birthday||'').match(/^(\d{4})-/)||[])[1]) || ''))}"
+               ${(care.birthday && !bdayYearOnly_(care.birthday)) ? 'readonly title="Đã có ngày sinh đầy đủ — xoá ô ngày sinh nếu muốn nhập lại chỉ năm"' : ''}
+               data-phone="${esc(c.phone)}" oninput="onBirthYearInput(this.value,this.dataset.phone)" style="margin-top:4px">
+        <div id="cs-menh-box" style="font-size:11px;line-height:1.5;margin-top:4px">${menhBoxHtml((bdayYearOnly_(care.birthday) || ((String(care.birthday||'').match(/^(\d{4})-/)||[])[1]) || ''))}</div>
       </div>
       <div>
         <div class="form-label">🏷 Nhãn phân loại (tự đặt)</div>
@@ -5164,7 +5169,9 @@ function saveCare(phone) {
   const newNote   = document.getElementById('cs-note') ? document.getElementById('cs-note').value : (existing.note||'');
   const newCS     = document.getElementById('cs-assign').value;
   const newKhStatus = (document.getElementById('cs-kh-status') ? document.getElementById('cs-kh-status').value : '') || existing.khStatus || (typeof _hAutoKh_==='function' ? _hAutoKh_(newStatus) : '') || '';
-  const newBirthday = (document.getElementById('cs-birthday') ? document.getElementById('cs-birthday').value : '') || existing.birthday || '';
+  const newBirthday = (document.getElementById('cs-birthday') ? document.getElementById('cs-birthday').value : '')
+    || ((document.getElementById('cs-birthyear') && menhYearValid(document.getElementById('cs-birthyear').value)) ? document.getElementById('cs-birthyear').value.trim() : '')
+    || existing.birthday || '';
   const newTag = (document.getElementById('cs-tag') ? document.getElementById('cs-tag').value.trim() : '') || existing.tag || '';
   const newNickZalos = (function(){ try { var el=document.getElementById('cs-nickzalo-val'); return el ? JSON.parse(el.value||'[]') : (existing.nickZalos||[]); } catch(e){ return existing.nickZalos||[]; }})();
   const newZaloPhones = (function(){ try { var el=document.getElementById('cs-zalophone-val'); return el ? JSON.parse(el.value||'[]') : (existing.zaloPhones||[]); } catch(e){ return existing.zaloPhones||[]; }})();
@@ -5598,8 +5605,44 @@ async function _saveZaloPhoneSettings(btn) {
 //  BIRTHDAY + CUSTOM REMINDER HELPERS
 // ═══════════════════════════════════════════════════════
 
+// ── Mệnh theo năm sinh (Ngũ hành nạp âm) + màu tương sinh / tương hợp ──
+// Công thức: Can (Giáp,Ất=1; Bính,Đinh=2; Mậu,Kỷ=3; Canh,Tân=4; Nhâm,Quý=5) + Chi (Tý,Sửu,Ngọ,Mùi=0;
+// Dần,Mão,Thân,Dậu=1; Thìn,Tỵ,Tuất,Hợi=2); tổng >5 thì trừ 5 → 1 Kim, 2 Thủy, 3 Hỏa, 4 Thổ, 5 Mộc.
+// Đã đối chiếu đủ 1900–2100 với chuỗi nạp âm 60 năm. Tính theo năm dương lịch (sinh trước Tết thì lấy năm trước).
+function menhMau_() { return {
+  'Kim':  { sinh: ['Vàng','Nâu'],              hop: ['Trắng'] },
+  'Mộc':  { sinh: ['Đen','Xanh dương'],        hop: ['Xanh lá cây'] },
+  'Thủy': { sinh: ['Trắng'],                   hop: ['Đen','Xanh dương'] },
+  'Hỏa':  { sinh: ['Xanh lá cây'],             hop: ['Đỏ','Hồng','Tím'] },
+  'Thổ':  { sinh: ['Đỏ','Hồng','Tím'],         hop: ['Vàng','Nâu'] }
+}; }
+function menhSwatch_() { return { 'Vàng':'#f2c200','Nâu':'#8b5a2b','Trắng':'#ffffff','Đen':'#222222','Xanh dương':'#2563eb','Xanh lá cây':'#16a34a','Đỏ':'#dc2626','Hồng':'#ec4899','Tím':'#7c3aed' }; }
+function menhFromYear(y) {
+  y = parseInt(y, 10);
+  if (!y || y < 1900 || y > 2100) return null;
+  const can = Math.floor(((y - 4) % 10) / 2) + 1;
+  const chi = [0,0,1,1,2,2,0,0,1,1,2,2][(y - 4) % 12];
+  let s = can + chi; if (s > 5) s -= 5;
+  return ['', 'Kim', 'Thủy', 'Hỏa', 'Thổ', 'Mộc'][s];
+}
+function menhYearValid(y) { y = String(y == null ? '' : y).trim(); return /^\d{4}$/.test(y) && +y >= 1900 && +y <= new Date().getFullYear(); }
+function menhBoxHtml(y) {
+  y = String(y == null ? '' : y).trim();
+  if (!y) return '';
+  if (!menhYearValid(y)) return y.length === 4 ? '<span style="color:#dc2626">Năm sinh không hợp lệ</span>' : '';
+  const m = menhFromYear(y), t = menhMau_()[m], sw = menhSwatch_();
+  const chips = (arr) => arr.map((c) => '<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px;white-space:nowrap"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + sw[c] + ';border:1px solid rgba(0,0,0,.3)"></i>' + c + '</span>').join('');
+  return '<div style="font-weight:700;color:#2563eb">Mệnh ' + m + ' <span style="font-weight:400;color:#6b7280">(sinh năm ' + y + ')</span></div>'
+    + '<div><b>Tương sinh:</b> ' + chips(t.sinh) + '</div>'
+    + '<div><b>Tương hợp:</b> ' + chips(t.hop) + '</div>'
+    + '<div style="color:#9ca3af;font-size:10px">Ưu tiên tương sinh trước, sau đó tương hợp; tránh màu tương khắc. Ngọc &amp; Trầm hương không kén mệnh. Tính theo năm dương lịch (sinh trước Tết → lấy năm trước).</div>';
+}
+// Giá trị sinh nhật lưu trong cột birthday: "YYYY-MM-DD" (đủ ngày) HOẶC "YYYY" (chỉ năm sinh).
+function bdayYearOnly_(v) { const s = String(v == null ? '' : v).trim(); return /^\d{4}$/.test(s) ? s : ''; }
+
 function _bdayDaysLeft(bdayStr) {
   if (!bdayStr) return null;
+  bdayStr = String(bdayStr);   // Sheets có thể trả chỉ-năm dạng SỐ (1995) — không có .split
   const today = new Date(); today.setHours(0,0,0,0);
   const parts = bdayStr.split('-');
   if (parts.length < 3) return null;
@@ -5644,8 +5687,30 @@ function onBdayChange(val, phone) {
   toast('🎂 Đã lưu sinh nhật · nhắc hẹn hàng năm đã tạo');
 }
 
+// Ô năm sinh (chỉ năm, khi chưa có ngày tháng năm sinh đầy đủ): tự hiện mệnh + màu tương sinh/tương hợp.
+// Chỉ lưu năm khi ô ngày sinh đang trống (có ngày đầy đủ thì ưu tiên ngày). Không tạo lịch nhắc sinh nhật (thiếu ngày/tháng).
+function onBirthYearInput(val, phone) {
+  const y = String(val || '').replace(/\D/g, '').slice(0, 4);
+  const inp = document.getElementById('cs-birthyear'); if (inp && inp.value !== y) inp.value = y;
+  const box = document.getElementById('cs-menh-box'); if (box) box.innerHTML = menhBoxHtml(y);
+  const dateEl = document.getElementById('cs-birthday');
+  if (!phone || !menhYearValid(y) || (dateEl && dateEl.value)) return;
+  if (!careData[phone]) careData[phone] = {};
+  careData[phone].birthday = y;
+  saveLS('ome_care', careData);
+}
+// Đồng bộ ô năm theo ô ngày: có ngày đầy đủ → năm lấy từ ngày (khoá); xoá ngày → mở lại để nhập chỉ năm.
+function _bdayUiSync_() {
+  const d = document.getElementById('cs-birthday'), yEl = document.getElementById('cs-birthyear');
+  if (!yEl) return;
+  if (d && d.value) { yEl.value = d.value.slice(0, 4); yEl.readOnly = true; }
+  else yEl.readOnly = false;
+  const box = document.getElementById('cs-menh-box'); if (box) box.innerHTML = menhBoxHtml(yEl.value);
+}
+
 function _upsertBirthdaySchedule(phone, bdayStr) {
   if (!bdayStr || !phone) return;
+  bdayStr = String(bdayStr);   // chỉ-năm (VD 1995, có thể là số) → không đủ ngày/tháng, bỏ qua dưới
   const parts = bdayStr.split('-');
   if (parts.length < 3) return;
   const m = parseInt(parts[1],10)-1, d = parseInt(parts[2],10);

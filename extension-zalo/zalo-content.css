@@ -560,3 +560,7 @@ textarea {
 .zai-kb-gen-btn {
   margin-bottom: 6px;
 }
+
+/* Ô năm sinh + khối Mệnh dưới ô Sinh nhật */
+.zai-field-col #zai-birthyear { margin-top: 4px; }
+.zai-field-col #zai-birthyear[readonly] { background: #f3f4f6; color: #6b7280; }
