@@ -1505,7 +1505,7 @@ function doGet(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.17-import-dedup' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.18-pos-ghichu' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -4036,6 +4036,8 @@ function buildSalesReportB_(filters) {
         ngayTaoDon: m.ngayTaoDon, khachHang: m.khachHang, soDienThoai: m.soDienThoai,
         nguonDon: m.nguonDon, theSale: m.theSale, trangThai: m.trangThai, sanPham: m.sanPham, maSanPham: m.maSanPham, soLuong: m.soLuong,
         giaTriSauGiam: m.giaTriSauGiam, cod: m.cod, marketer: m.marketer,
+        // Ghi chu don Pos (cot Q) — CHUA ma don Pos de ke toan doi chieu (xuat Excel Bao cao G dung field nay). Cat 300 ky tu de payload khong phinh.
+        ghiChu: String(m.ghiChu || '').substring(0, 300),
         // Don GHEP voi Base: giaTriSauGiam o tren = tong doanh thu cac don goc Base (da thay gia tri Pos); giaTriPos = gia tri Pos
         // goc (de doi chieu); saleShares = ty le chia cho tung sale cua don goc (tong = 1); ghepCodes = ma bo dem da khop.
         giaTriPos: m.ghepShares ? m.giaTriPos : undefined,

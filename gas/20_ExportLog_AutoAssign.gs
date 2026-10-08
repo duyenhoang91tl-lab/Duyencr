@@ -329,6 +329,7 @@ function _aaPlanCskh(cfg, teamsArr, membersOf, custs, everSet, taken){
 }
 // Ke hoach ca ngay = CSKH (rieng) + POS (tu dt/don/cs). opts: {pos:bool, cskh:bool} (mac dinh ca hai). CSKH lap truoc de han muc CSKH khong bi POS lay mat KH.
 function _aaPlanAll(cfg, teamsArr, membersOf, custs, everSet, opts){
+  custs = (custs || []).filter(function (c) { return c && isValidVnPhone_(c.phone); });   // chi chia SDT di dong VN hop le
   opts = opts || {}; var taken = new Set(), out = { entries:[], short:[], warn:[] };
   if (opts.cskh !== false){
     var k = _aaPlanCskh(cfg, teamsArr, membersOf, custs, everSet, taken);

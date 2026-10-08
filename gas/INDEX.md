@@ -14,7 +14,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 7. Nếu file được sinh ra là file MỚI (chưa có trong Editor) hoặc bị đổi tên: nhắc người dùng tạo/đổi tên file tương ứng trong Editor.
 
 ## 01_Config_Utils.gs
-- Hàm: `getOrderSS_`, `getCrmSS_`, `getSheet_`, `getOrderSheet_`, `jsonOut_`, `getOrderSheetName_`, `normPhone_`, `_stripVN_`, `_detectHeaderRow_`
+- Hàm: `getOrderSS_`, `getCrmSS_`, `getSheet_`, `getOrderSheet_`, `jsonOut_`, `getOrderSheetName_`, `normPhone_`, `isValidVnPhone_`, `_stripVN_`, `_detectHeaderRow_`
 - Hằng/biến: `SH_CARE`, `SH_TEAM`, `SH_MKT_TEAM`, `MKT_TEAM_HEADERS`, `SH_AUDIT`, `SH_SET`, `SH_ASSIGN`, `SH_USER`, `SH_CONTEXT`, `SH_PK_STATS`, `SH_PK_MAP`, `SH_PK_SDT`, `SH_SALE_DIR`, `SH_PK_PAGEMAP`, `SH_PK_TAG`, `ORDER_SS_ID`, `CRM_SS_ID`, `PRICE_SS_ID`, `EXPORT_BASE_SS_ID`, `EXPORT_BASE_GID`, `PRICE_SHEET_NAME`, `CTKM_SHEET_NAME`, `DEFAULT_PRODUCT_SHEET_URL`, `DEFAULT_DRIVE_KNOWLEDGE_FOLDER_URL`, `DEFAULT_DRIVE_PRODUCT_IMAGES_FOLDER_URL`, `ORDER_SHEETS`, `SH_ORDER_DEFAULT`, `CARE_HEADERS`, `ORDER_HEADERS`, `TEAM_HEADERS`, `AUDIT_HEADERS`, `SET_HEADERS`, `ASSIGN_HEADERS`, `ASSIGN_CHUNK`, `USER_HEADERS`, `PK_STATS_HEADERS`, `PK_MAP_HEADERS`, `PK_SDT_STATS_HEADERS`, `PK_PAGEMAP_HEADERS`, `PK_TAG_STATS_HEADERS`, `SH_CARE_LEAD`, `CARE_LEAD_HEADERS`
 
 ## 02_PriceCatalog_CTKM.gs

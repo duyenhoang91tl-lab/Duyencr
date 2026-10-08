@@ -171,6 +171,14 @@ function normPhone_(p) {
   if (s.length === 9 && /^[3-9]/.test(s)) s = '0' + s;
   return s;
 }
+// SDT di dong Viet Nam HOP LE (Chia data tu dong phia server): 10 so, 0 + dau so 03[2-9]|05[2689]|07[06-9]|08[1-9]|09x.
+// Chap nhan 84xxxxxxxxx / thieu so 0 dau (9 so). KHONG nhan so ban, so nuoc ngoai, dau so khong co that. Cung logic isValidVnPhone o index.html.
+function isValidVnPhone_(p) {
+  var s = String(p == null ? '' : p).replace(/[^0-9]/g, '');
+  if (s.length === 11 && s.indexOf('84') === 0) s = '0' + s.substring(2);
+  else if (s.length === 9 && /^[35789]/.test(s)) s = '0' + s;
+  return /^0(?:3[2-9]|5[2689]|7[06-9]|8[1-9]|9\d)\d{7}$/.test(s);
+}
 
 // ─── BANG GIA (Sheet DANH_MUC, file PRICE_SS_ID) ──────────────────────────
 // Bo dau tieng Viet de tim kiem khong phan biet co dau/khong dau, hoa/thuong.
