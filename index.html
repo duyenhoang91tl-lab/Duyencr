@@ -832,6 +832,9 @@ html.db-standalone #dailybrief-wrap{width:100%;max-width:1120px;margin:0 auto}
 .zai-sug-copy:hover{color:var(--green);}
 .zai-loading{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;padding:12px 0;}
 .zai-spinner{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite;}
+/* Tai khoan TEST: an moi nut cau hinh/Google Sheets/ma GAS, chi con Dang xuat */
+body.demo-mode #gs-pill,
+body.demo-mode [data-bar-id^="hdr-"]:not([data-bar-id="hdr-logout"]){display:none!important}
 </style>
 <style>
 /* Chế độ báo cáo: ẩn mọi thứ không thuộc báo cáo để chụp màn hình (xem _RPT_MODE_TABS trong script) */
@@ -2510,6 +2513,35 @@ let currentDpTab = 'care';
 // ── NHÚNG SẴN GS URL Ở ĐÂY — admin điền 1 lần, nhân viên không cần làm gì ──
 const FIXED_GS_URL = 'https://script.google.com/macros/s/AKfycbx3QT6YIzQ7SQEwQPkljVeEdmTSBQQSxtTp2hTFYOeCKB_K4BHcUTSLi54LlmB9q_E6sQ/exec';
 let gsUrl = FIXED_GS_URL || loadLS('ome_gs_url') || '';
+// ── Tai khoan TEST: moi request toi GAS tu dong kem demoToken (server chi cho xem bao cao, cat 5 dong, chan ghi). ──
+// Khong gan token cho action=users (man hinh dang nhap can doc danh sach tai khoan truoc khi co token).
+(function(){
+  var _origFetch = window.fetch.bind(window);
+  window.fetch = function(u, o){
+    try {
+      var tok = localStorage.getItem('ome_demo_token');
+      if (tok && typeof u === 'string' && gsUrl && u.indexOf(gsUrl) === 0 && u.indexOf('action=users') === -1) {
+        if (o && o.method && String(o.method).toUpperCase() === 'POST') {
+          try { var b = JSON.parse(o.body); b.demo = tok; o = Object.assign({}, o, { body: JSON.stringify(b) }); } catch(e1){}
+        } else {
+          u += (u.indexOf('?') > -1 ? '&' : '?') + 'demo=' + encodeURIComponent(tok);
+        }
+      }
+    } catch(e0){}
+    return _origFetch(u, o);
+  };
+})();
+// Khoa quan tri (adminKey) de lay/dong bo ma nguon GAS — hoi 1 lan, nho trong may nay. Tai khoan test khong bao gio duoc hoi.
+function _adminKeyGet(){
+  if (document.body && document.body.classList.contains('demo-mode')) return '';
+  var k = '';
+  try { k = localStorage.getItem('ome_admin_key') || ''; } catch(e){}
+  if (!k){
+    k = (prompt('Nhập khoá quản trị (adminKey trong sheet Settings) để lấy/đồng bộ mã GAS:') || '').trim();
+    if (k) { try { localStorage.setItem('ome_admin_key', k); } catch(e){} }
+  }
+  return k;
+}
 
 // ── Tắt thông báo (toast) liên quan đồng bộ Google Sheets ──
 // Đặt = true nếu muốn bật lại các thông báo "đang đồng bộ / đã đồng bộ".
@@ -2664,6 +2696,7 @@ function mergeRows(rows) {
 //  GS MODAL FUNCTIONS
 // ═══════════════════════════════════════════════════════
 function openGsModal() {
+  if (document.body.classList.contains('demo-mode')) return;
   document.getElementById('gs-url-input').value = gsUrl || '';
   document.getElementById('gs-modal').classList.add('open');
 }
@@ -10588,7 +10621,7 @@ async function flushCareSync(){
 // ═══════════════════════════════════════════════════════
 //  ROLE — "TÔI LÀ AI?"
 // ═══════════════════════════════════════════════════════
-function _roleLabel(r){ return r==='admin'?'Admin':(r==='leader'?'Team Leader':'CS'); }
+function _roleLabel(r){ return r==='admin'?'Admin':(r==='leader'?'Team Leader':(r==='demo'?'Tài khoản test':'CS')); }
 function renderRolePill(){
   var pill = document.getElementById('role-pill');
   if (!pill) return;
@@ -11841,7 +11874,7 @@ async function renderPancakeTab(){
 function _pkRenderAll(){
   var wrap = document.getElementById('pancake-wrap');
   if (!wrap) return;
-  var isAdmin = currentUser.role === 'admin';
+  var isAdmin = currentUser.role === 'admin' || currentUser.role === 'demo';
   var html = '';
 
   html += '<div class="dash-section-title">📥 Nhập báo cáo Pancake hàng ngày</div>';
@@ -14053,7 +14086,7 @@ function _srChartSvg(rows, nameKey, valueKey, type, moneyFmt, ordersKey){
 
 // ── Phan quyen bao cao doanh so: CS thuong CHI xem duoc so lieu cua chinh minh, khong xem
 // duoc ca team. Admin (currentUser.role==='admin') khong bi gioi han gi. ──
-function _srIsAdmin(){ return !(typeof currentUser !== 'undefined' && currentUser && currentUser.role !== 'admin'); }
+function _srIsAdmin(){ return !(typeof currentUser !== 'undefined' && currentUser && currentUser.role !== 'admin' && currentUser.role !== 'demo'); }
 function _srMyNames(){
   return (typeof currentUser !== 'undefined' && currentUser && currentUser.names && currentUser.names.length)
     ? currentUser.names.slice() : [];
@@ -14838,7 +14871,7 @@ function _srCloseRateBarHtml_(rows, searchTerm, unitLabel){
       '<div style="width:'+w+'%;height:100%;background:'+colorFor(r.closeRate)+';border-radius:4px"></div></div>'+
       '<div style="width:104px;font-size:11px;color:var(--muted);white-space:nowrap"><b style="color:var(--text)">'+r.closeRate+'%</b> ('+r.closed+'/'+r.held+')</div></div>';
   }).join('');
-  var isAdmin = currentUser.role === 'admin';
+  var isAdmin = currentUser.role === 'admin' || currentUser.role === 'demo';
   var legend = '<span style="color:#16a34a">■</span> &gt;'+th.green+'% &nbsp;<span style="color:#d97706">■</span> '+th.red+'–'+th.green+'% &nbsp;<span style="color:#dc2626">■</span> &lt;'+th.red+'%';
   var editBtn = isAdmin ? ' &nbsp;<a href="javascript:void(0)" onclick="_srToggleCloseRateEdit(this)" style="font-size:10.5px;color:var(--muted);text-decoration:underline">✎ sửa mốc</a>' : '';
   return '<div style="padding:4px 0 10px">'+
@@ -15846,7 +15879,7 @@ function _srRenderF_(d){
   // khoan deu xem duoc tab "Bao cao doanh so" tru khi Admin chu dong gioi han (xem
   // _tabAllowedForUser), nen neu khong thu hep o day thi tung Sale se thay het doanh thu/bac
   // cua ca cong ty. Admin van thay day du nhu cu, khong doi gi.
-  var _fIsAdmin = (typeof currentUser!=='undefined' && currentUser && currentUser.role==='admin');
+  var _fIsAdmin = (typeof currentUser!=='undefined' && currentUser && (currentUser.role==='admin'||currentUser.role==='demo'));
   var _fSelfView = !_fIsAdmin;
   if (_fSelfView) {
     var _fMyNames = (typeof currentUser!=='undefined' && currentUser && currentUser.names && currentUser.names.length)
@@ -18990,8 +19023,10 @@ async function _fetchGasSource(force){
   if (!gsUrl) return null;
   try {
     var sep = gsUrl.includes('?') ? '&' : '?';
-    var r = await fetch(gsUrl + sep + 'action=getGasSource', { redirect:'follow' });
+    var _ak = _adminKeyGet(); if (!_ak) return null;
+    var r = await fetch(gsUrl + sep + 'action=getGasSource&adminKey=' + encodeURIComponent(_ak), { redirect:'follow' });
     var d = await r.json();
+    if (d && d.error) { try { localStorage.removeItem('ome_admin_key'); } catch(e2){} return null; }
     if (d && d.code) { _gasSrcCache = { code: d.code, updatedAt: d.updatedAt || null }; return _gasSrcCache; }
   } catch(e) { /* mat mang -> tra null, noi goi se bao loi phu hop */ }
   return null;
@@ -19004,6 +19039,7 @@ copyGsCode = async function(){
 };
 var _v9PrevOpenGsModal = openGsModal;
 openGsModal = function(){
+  if (document.body.classList.contains('demo-mode')) return;
   _v9PrevOpenGsModal();
   var prev = document.getElementById('gs-code-preview');
   if (prev && !prev.dataset.v9){
@@ -19031,7 +19067,7 @@ async function syncGasSourceFromTextarea(){
   if (!gsUrl) { toast('⚠ Chưa kết nối Google Sheets.'); return; }
   toast('Đang đồng bộ mã GAS...');
   try {
-    var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'setGasSource', code: code }) });
+    var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'setGasSource', code: code, adminKey: _adminKeyGet() }) });
     var d = await r.json();
     if (d && d.ok) {
       toast('✓ Đã đồng bộ mã GAS (' + d.chunks + ' mảnh, ' + d.length + ' ký tự)');
@@ -19298,6 +19334,13 @@ function _applyAuthIdentity(acct){
   var namesArr = (acct.names && acct.names.length) ? acct.names.slice() : (acct.name ? [acct.name] : []);
   var primaryName = acct.role==='admin' ? 'Admin' : (namesArr[0] || acct.username);
   currentUser = { name: primaryName, names: acct.role==='admin' ? [] : namesArr, role: acct.role || 'cs', team: acct.team || '', perms: (Array.isArray(acct.perms) ? acct.perms : null) };
+  if (acct.role === 'demo') {
+    // Tai khoan test: chi thay cac tab bao cao (khong the nang quyen qua perms). Du lieu chi tiet da bi may chu cat con 5 dong.
+    currentUser.perms = ['salesreport','pancake','kpipancake','mktchecklist','dailybrief'];
+    document.body.classList.add('demo-mode');
+    // Vao thang bao cao doanh so (tab Danh sach KH dang bi an voi tai khoan nay)
+    setTimeout(function(){ try { switchTab('salesreport', document.querySelector('[data-bar-id="reportsgroup"]')); } catch(eS){} }, 400);
+  } else { document.body.classList.remove('demo-mode'); try { localStorage.removeItem('ome_demo_token'); } catch(eT){} }
   saveLS('ome_user', currentUser);
   if (typeof _applyUserTabPermissions === 'function') _applyUserTabPermissions();
   var csFilter = document.getElementById('cs-staff-filter');
@@ -19346,6 +19389,8 @@ async function doLogin(){
   if (!acct){ showErr('Sai tài khoản hoặc mật khẩu.'); return; }
   if (acct.active === false){ showErr('Tài khoản đã bị khoá. Liên hệ quản trị viên.'); return; }
   var h = await _hashPass(p);
+  var _storedHash = acct.passHash;
+  try { localStorage.removeItem('ome_demo_token'); } catch(e){}
   if (h !== acct.passHash) {
     // Tai khoan tao truoc khi doi salt OME -> CRM: thu voi salt cu, dung thi nang cap ngay
     var hOld = await _hashPass(p, _PW_SALT_OLD);
@@ -19355,6 +19400,15 @@ async function doLogin(){
     } else {
       showErr('Sai tài khoản hoặc mật khẩu.'); return;
     }
+  }
+  if (acct.role === 'demo') {
+    // Tai khoan test: xin demoToken tu may chu (chi nhan duoc voi tai khoan role demo dang hoat dong).
+    try {
+      var _dr = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'demoLogin', username: acct.username, passHash: _storedHash }) });
+      var _dd = await _dr.json();
+      if (!_dd || !_dd.ok || !_dd.token){ showErr('Không đăng nhập được tài khoản test: ' + ((_dd && _dd.error) || 'lỗi máy chủ') + '. Báo admin deploy lại GAS bản mới.'); return; }
+      localStorage.setItem('ome_demo_token', _dd.token);
+    } catch(eD){ showErr('Không kết nối được máy chủ để đăng nhập tài khoản test.'); return; }
   }
   _authAccount = { username: acct.username, role: acct.role, name: acct.name, team: acct.team };
   saveLS('ome_auth', _authAccount);
@@ -19370,7 +19424,8 @@ async function doLogin(){
 function doLogout(){
   if (!confirm('Đăng xuất khỏi tài khoản hiện tại?')) return;
   _authAccount = null;
-  try{ localStorage.removeItem('ome_auth'); }catch(e){}
+  try{ localStorage.removeItem('ome_auth'); localStorage.removeItem('ome_demo_token'); }catch(e){}
+  document.body.classList.remove('demo-mode');
   _showLogin();
 }
 function _showLogin(){
@@ -19438,7 +19493,8 @@ async function _authGate(){
       return;
     }
     var sess = _authAccount && _findAccount(_authAccount.username);
-    if (sess && sess.active !== false){
+    var _demoTokMissing = sess && sess.role === 'demo' && !(function(){ try { return localStorage.getItem('ome_demo_token'); } catch(e){ return ''; } })();
+    if (sess && sess.active !== false && !_demoTokMissing){
       _hideLogin();
       _applyAuthIdentity(sess);
     } else {
@@ -19827,7 +19883,7 @@ function renderAcctModal(){
   var edRole  = ed ? (ed.role || 'cs') : '';
   var edNames = ed ? _acctNamesOf(ed) : [];
 
-  var roleOpts = ['admin','leader','cs'].map(function(r){
+  var roleOpts = ['admin','leader','cs','demo'].map(function(r){
     return '<option value="'+r+'"'+(ed && edRole===r ? ' selected' : '')+'>'+_roleLabel(r)+'</option>';
   }).join('');
 

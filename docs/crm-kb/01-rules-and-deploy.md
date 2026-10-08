@@ -17,6 +17,7 @@ Cả 2 extension gọi chung 1 URL GAS.
 ## Đồng bộ mã GAS cho nút "Copy mã GAS" ✅ (đã xác minh 2026-10-08: CHỈ còn 1 cơ chế)
 - `grep -c 'gas-code-v9' index.html` = **0** → khối inline đó ĐÃ XOÁ. KHÔNG còn quy tắc "khối gas-code-v9 phải khớp 100% gas_v13.js" — đừng dò lại, đừng thêm khối đó vào lại.
 - Nút "📋 Copy Apps Script Code" gọi `action=getGasSource` (đọc các chunk trong Settings: `gasSourceChunk_N`, `gasSourceChunkCount`, `gasSourceUpdatedAt`; ghi bởi `action=setGasSource` → `setGasSource_`). Client cache `_gasSrcCache` theo phiên, tự xoá sau khi sync.
+- Từ v13.19: `getGasSource`/`setGasSource` BẮT BUỘC có `adminKey` (= giá trị dòng `adminKey` trong sheet Settings; app hỏi 1 lần/máy, lưu `ome_admin_key`). Chưa đặt dòng đó = không ai lấy/đồng bộ được mã. Tài khoản test (role `demo`): xem `docs/TAI-KHOAN-TEST.md`.
 - Vì vậy sau khi sửa `gas_v13.js` và người dùng đã deploy, BẮT BUỘC nhắc thêm bước (Admin): mở modal Google Sheets trong CRM → "🔄 Đồng bộ mã GAS mới nhất" → dán toàn bộ `gas_v13.js` → "🔄 Đồng bộ". Không làm bước này thì nút Copy vẫn trả mã cũ.
 
 ## 13 quy tắc bắt buộc khi sửa code
