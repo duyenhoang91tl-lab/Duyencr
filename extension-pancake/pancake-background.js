@@ -124,6 +124,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // Lich su don POS cua 1 SDT (GAS action 'donOrdersByPhone' — CUNG nguon voi tab "Lich su don" tren CRM index.html,
+  // _loadPosOrdersForPhone_). Chi goi khi CS bam nut "Lich su don" (khong tai san cho moi khach de khong lam cham tra cuu).
+  if (msg?.type === "POS_ORDERS") {
+    handlePosOrders(msg.payload)
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
   if (msg?.type === "SAVE_CARE") {
     // Xoa cache tra cuu truoc VA sau khi luu: sau khi CS luu, lan tra cuu ke tiep phai thay du lieu moi
     _lookupCache.clear();
@@ -397,6 +406,26 @@ async function handleLookupCustomer(payload) {
   })();
   _lookupInflight.set(key, p);
   try { return await p; } finally { _lookupInflight.delete(key); }
+}
+const _posOrdersCache = new Map(); // "gasUrl|phone" -> { t, orders }
+const POS_ORDERS_TTL_MS = 60000;
+async function handlePosOrders(payload) {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+  const phone = payload?.phone;
+  if (!phone) throw new Error("Không có số điện thoại.");
+  const key = cfg.gasUrl + "|" + phone;
+  const hit = _posOrdersCache.get(key);
+  if (hit && Date.now() - hit.t < POS_ORDERS_TTL_MS) return { orders: hit.orders };
+  const sep = cfg.gasUrl.includes("?") ? "&" : "?";
+  const res = await fetch(cfg.gasUrl + sep + "action=donOrdersByPhone&phone=" + encodeURIComponent(phone), { redirect: "follow" });
+  const data = await res.json();
+  if (!data || data.ok === false || data.error) throw new Error((data && data.error) || "GAS không trả lịch sử đơn Pos.");
+  const orders = Array.isArray(data.orders) ? data.orders : [];
+  _posOrdersCache.set(key, { t: Date.now(), orders });
+  if (_posOrdersCache.size > 100) _posOrdersCache.delete(_posOrdersCache.keys().next().value);
+  return { orders };
 }
 const _lookupCache = new Map();    // "gasUrl|phone" -> { t, data }
 const _lookupInflight = new Map(); // "gasUrl|phone" -> Promise (gop request trung)

@@ -1440,6 +1440,68 @@
     return [...cnt.values()].sort((a, b) => b.n - a.n)
       .map((e) => `<b>${escapeHtml(e.name)}</b>${e.n > 1 ? ` <span style="color:#6b7280">×${e.n}</span>` : ''}`).join(', ');
   }
+  // Khối "Đơn gần nhất": ngày/giá trị, NGUỒN (tính theo POS), SALE BÁN (cột "Sale bán" của đơn DT TỔNG gần nhất)
+  // và SALE ĐƯỢC CHIA (sale tham gia/chia đơn theo POS — cột "Thẻ" của đơn POS gần nhất). Kèm nút "Lịch sử đơn".
+  function _pkLatestOrderHtml_(orders, don) {
+    const latest = (arr, pick) => (arr || []).reduce((best, o) => (!best || _pkOrdTime_(pick(o)) > _pkOrdTime_(pick(best)) ? o : best), null);
+    const dt = latest(orders, (o) => o.date || o.orderDate);
+    const pos = latest(don, (o) => o.date);
+    if (!dt && !pos) return '';
+    const dtSales = dt ? _pkSplitNames_(dt.cs) : [];
+    const posSales = pos && Array.isArray(pos.sales) ? pos.sales.filter(Boolean) : [];
+    const src = (pos && pos.source) || (dt && dt.source) || '';       // nguồn ưu tiên POS, không có mới lấy kênh bán DT TỔNG
+    const date = _pkOrdDay_((pos && pos.date) || (dt && (dt.date || dt.orderDate)));
+    const rev = pos ? (parseFloat(pos.value) || 0) : (dt ? (parseFloat(dt.revenue) || 0) : 0);
+    const row = (label, val) => `<div><span style="color:#6b7280">${label}:</span> ${val ? escapeHtml(val) : '<span style="color:#9ca3af">—</span>'}</div>`;
+    return `<div class="pk-latest-order">` +
+      `<div class="pk-latest-order-head"><b>🧾 Đơn gần nhất${date ? ` · ${date}` : ''}${rev ? ` · ${Math.round(rev / 1000).toLocaleString('vi-VN')}K` : ''}</b>` +
+      `<button type="button" class="pk-hist-btn" id="pk-hist-btn">📜 Lịch sử đơn</button></div>` +
+      row(pos && pos.source ? 'Nguồn (POS)' : 'Nguồn (chưa có đơn Pos)', src) + row('Sale bán', dtSales.join(', ')) + row('Sale được chia', posSales.join(', ')) +
+      `<div id="pk-hist-box" class="pk-hist-box" style="display:none"></div></div>`;
+  }
+  function _pkFmtMoney_(n) { return (Math.round(Number(n) || 0)).toLocaleString('vi-VN') + 'đ'; }
+  function _pkIsoToVn_(iso) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? `${m[3]}/${m[2]}/${m[1]}` : (iso || '—'); }
+  // Lịch sử đơn giống CRM: khách có đơn Pos → lấy theo Pos (chuẩn); chưa có → lấy đơn Base/DT TỔNG
+  function _pkHistHtml_(posRows, baseOrders) {
+    const useBase = !(posRows && posRows.length);
+    const rows = useBase
+      ? (baseOrders || []).slice().sort((a, b) => _pkOrdTime_(b.date || b.orderDate) - _pkOrdTime_(a.date || a.orderDate)).map((o) => ({ date: _pkOrdDay_(o.date || o.orderDate) ? String(o.date || o.orderDate) : '', revenue: o.revenue, product: o.productDetail || o.product, source: o.source, sale: o.cs, status: o.status, note: o.note, base: true }))
+      : posRows;
+    if (!rows.length) return `<div class="pk-hist-empty">Khách chưa có đơn nào.</div>`;
+    const total = rows.reduce((s, o) => s + (Number(o.revenue) || 0), 0);
+    return `<div class="pk-hist-title">Lịch sử đặt hàng${useBase ? '' : ' · Pos'} (${rows.length} đơn — ${_pkFmtMoney_(total)})</div>` +
+      (useBase ? `<div class="pk-hist-note">Khách chưa có đơn trên Pos nên hiển thị đơn Base.</div>` : '') +
+      rows.slice(0, 60).map((o) => `<div class="pk-hist-item${useBase ? '' : ' pos'}">` +
+        `<div class="pk-hist-top"><span>${escapeHtml(o.base ? (o.date || '—') : _pkIsoToVn_(o.date))}</span><b>${_pkFmtMoney_(o.revenue)}</b></div>` +
+        (o.product ? `<div class="pk-hist-prod">${escapeHtml(String(o.product))}</div>` : '') +
+        `<div class="pk-hist-tags">` +
+          (o.source ? `<span>${escapeHtml(o.source)}</span>` : '') +
+          (o.sale ? `<span>👤 ${escapeHtml(o.sale)}</span>` : '') +
+          (o.status ? `<span>${escapeHtml(o.status)}</span>` : '') +
+          (o.note ? `<span>📝 ${escapeHtml(String(o.note).substring(0, 35))}</span>` : '') +
+        `</div></div>`).join('') +
+      (rows.length > 60 ? `<div class="pk-hist-note">… còn ${rows.length - 60} đơn cũ hơn</div>` : '');
+  }
+  function _pkBindHistBtn_(box, phone, baseOrders) {
+    const btn = box.querySelector('#pk-hist-btn'), out = box.querySelector('#pk-hist-box');
+    if (!btn || !out) return;
+    let loaded = false;
+    btn.addEventListener('click', () => {
+      if (out.style.display !== 'none') { out.style.display = 'none'; btn.textContent = '📜 Lịch sử đơn'; return; }
+      out.style.display = 'block'; btn.textContent = '🔼 Ẩn lịch sử đơn';
+      if (loaded) return;
+      out.innerHTML = '<div class="pk-hist-empty">⏳ Đang tải lịch sử đơn…</div>';
+      safeSendMessage_({ type: 'POS_ORDERS', payload: { phone } }, (resp) => {
+        if (!resp?.ok) {
+          // Không tải được Pos → vẫn cho xem đơn Base đã có sẵn, kèm báo lỗi để CS biết
+          out.innerHTML = `<div class="pk-hist-note" style="color:#b91c1c">Không tải được đơn Pos: ${escapeHtml(resp?.error || 'lỗi không rõ')}</div>` + _pkHistHtml_([], baseOrders);
+          return;
+        }
+        loaded = true;
+        out.innerHTML = _pkHistHtml_(resp.data?.orders || [], baseOrders);
+      });
+    });
+  }
   function _pkOrderPeopleHtml_(orders, don) {
     const rows = [];
     (orders || []).forEach((o) => {
@@ -1509,6 +1571,7 @@
         <div class="pk-ai-new-tag" id="pk-ai-new-tag" style="${isNew ? '' : 'display:none'}">⚠️ Chưa có trong hệ thống Sasum — lưu sẽ tạo mới</div>
         ${chips.length ? `<div class="pk-ai-cust-chips">${chips.map((c) => `<span class="pk-ai-chip">${c}</span>`).join('')}${customFieldChips_(care)}</div>` : (customFieldChips_(care) ? `<div class="pk-ai-cust-chips">${customFieldChips_(care)}</div>` : '')}
         ${products ? `<div class="pk-ai-cust-products">🏷 ${escapeHtml(products)}</div>` : ''}
+        ${blankNew ? '' : _pkLatestOrderHtml_(orders, data.don)}
         ${blankNew ? '' : _pkOrderPeopleHtml_(orders, data.don)}
         ${blankNew ? '' : _pkCskhHtml_(cskhRows)}
 
@@ -1571,6 +1634,7 @@
     renderNoteHistory_(care?.note || '');
 
     box.querySelector('#pk-note-add-btn').addEventListener('click', addNoteEntry_);
+    if (!blankNew) _pkBindHistBtn_(box, phone, orders || []);
     box.querySelector('#pk-note-new').addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addNoteEntry_(); }   // Enter = thêm ghi chú, Shift+Enter = xuống dòng (ô nay là textarea)
     });
