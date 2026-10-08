@@ -22,7 +22,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `PRICE_LAST_COL_`, `GIA_COL_MIN_`, `GIA_COL_LIMIT_`, `_PRICE_STOPWORDS_`, `_CTKM_END_KW_`, `_CTKM_START_KW_`, `_CTKM_EXCL_KW_`, `_CTKM_KEYWORDS_`
 
 ## 03_Settings_CareRead.gs
-- Hàm: `getSetting_`, `setGasSource_`, `readSaleGroups_`, `saveSaleGroups_`, `_saleGroupLabel_`, `setSetting_`, `_syncSaleChannelsToUsers_`, `addZaloNick_`, `readCareStatus_`, `careObjFromRow_`, `readCare_`, `readCareDelta_`, `findCareByPhone_`, `careRow_`, `readExistingExtFields_`, `mergeExtFields_`, `_legacyReadOrdersUnused_`, `readTeams_`, `readUsers_`, `_secEq_`, `_adminKeyOk_`, `_isSensitiveSettingKey_`, `_isSensitiveWriteKey_`, `_demoToken_`, `_demoTokenOk_`, `_demoClip_`, `demoLogin_`
+- Hàm: `getSetting_`, `setGasSource_`, `readSaleGroups_`, `saveSaleGroups_`, `_saleGroupLabel_`, `setSetting_`, `_syncSaleChannelsToUsers_`, `addZaloNick_`, `readCareStatus_`, `careObjFromRow_`, `readCare_`, `readCareDelta_`, `findCareByPhone_`, `careRow_`, `readExistingExtFields_`, `mergeExtFields_`, `_legacyReadOrdersUnused_`, `readTeams_`, `readUsers_`, `_secEq_`, `_adminKeyOk_`, `_isSensitiveSettingKey_`, `_isSensitiveWriteKey_`, `_demoToken_`, `_demoTokenOk_`, `_demoSrcOf_`, `_demoClipPerSource_`, `_demoClip_`, `demoLogin_`
 - Hằng/biến: `SALE_GROUPS_DEFAULT_`, `DEMO_MAX_ROWS_`, `DEMO_ALLOWED_GET_`, `DEMO_CLIP_KEYS_`, `DEMO_CLIP_ROWS_ACTIONS_`
 
 ## 04_doGet.gs

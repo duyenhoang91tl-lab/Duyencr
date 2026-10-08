@@ -1234,6 +1234,26 @@ function _demoToken_() {
   return t;
 }
 function _demoTokenOk_(tok) { return _secEq_(tok, getSetting_('demoToken')); }
+// Cat mang dong chi tiet cho tai khoan test: toi da DEMO_MAX_ROWS_ dong CHO MOI NGUON (cot 'source' cua don, hoac 'kenhBan' o cac
+// bao cao). NGUYEN NHAN GOC: truoc day slice(0,5) cat 5 dong DAU CHUNG -> toan bo 5 dong thuong cung 1 nguon (dong dau sheet),
+// nguoi test khong thay duoc cac nguon con lai. Dong khong co nguon (mang dong dang mang [phone,name,tier], lead...) -> 5 dong dau.
+function _demoSrcOf_(it) {
+  if (!it || typeof it !== 'object' || Array.isArray(it)) return null;
+  var v = it.source != null ? it.source : (it.kenhBan != null ? it.kenhBan : it.nguon);
+  return v == null ? null : String(v).trim();
+}
+function _demoClipPerSource_(arr) {
+  var hasSrc = false;
+  for (var i = 0; i < arr.length && !hasSrc; i++) { if (_demoSrcOf_(arr[i]) !== null) hasSrc = true; }
+  if (!hasSrc) return arr.slice(0, DEMO_MAX_ROWS_);
+  var cnt = {}, out = [];
+  for (var j = 0; j < arr.length; j++) {
+    var sv = _demoSrcOf_(arr[j]); if (sv === null) sv = '';
+    cnt[sv] = (cnt[sv] || 0) + 1;
+    if (cnt[sv] <= DEMO_MAX_ROWS_) out.push(arr[j]);
+  }
+  return out;
+}
 function _demoClip_(out, action) {
   var o;
   try { o = JSON.parse(out.getContent()); } catch (e) { return out; }
@@ -1243,7 +1263,7 @@ function _demoClip_(out, action) {
     keys.forEach(function(k) {
       if (Array.isArray(o[k]) && o[k].length > DEMO_MAX_ROWS_) {
         o['_demoTotal_' + k] = o[k].length;
-        o[k] = o[k].slice(0, DEMO_MAX_ROWS_);
+        o[k] = _demoClipPerSource_(o[k]);
       }
     });
     o._demo = true;
@@ -1622,7 +1642,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.20-perf-donphones' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.21-demo-per-source' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
