@@ -30,7 +30,8 @@ const PARTS = [
   ['17_Broadcast_FollowUp', 'var SH_BROADCAST ='],
   ['18_Tasks_Menh_MsgTpl', 'var SH_TASK ='],
   ['19_BannedList_MktChecklist', 'var REPORT_SALE_SS_ID ='],
-  ['20_ExportLog_AutoAssign', 'var EXPORT_LOG_SS_ID =']
+  ['20_ExportLog_AutoAssign', 'var EXPORT_LOG_SS_ID ='],
+  ['21_ArchiveOldOrders', 'var ARCHIVE_SUFFIX_ =']
 ];
 const src = fs.readFileSync(SRC, 'utf8');
 const lines = src.split('\n');

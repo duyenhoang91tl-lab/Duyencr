@@ -250,6 +250,11 @@ function doPostCore_(e) {
     if (action === 'exportSalesReportSheet') return jsonOut_(exportSalesReportToSheet_(data.reportType, data.filters));
     // ── XOA DON TRUNG: xoa cac dong trung da duoc CS/admin xac nhan (danh sach items tra ve tu findDuplicateOrders) ──
     if (action === 'deleteDuplicateOrders') return deleteDuplicateOrders_(data.items);
+    // ── LUU TRU DON CU: chuyen don cu sang sheet *_LƯU TRỮ. Can adminKey; dryRun mac dinh true (xem archiveOldOrders_) ──
+    if (action === 'archiveOrders') {
+      if (!_adminKeyOk_(data.adminKey)) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de luu tru don cu.' });
+      return jsonOut_(archiveOldOrders_({ months: data.months, which: data.which, dryRun: data.dryRun !== false }));
+    }
     if (action === 'replaceOrders')       return replaceOrders_(data.orders, data);
     if (action === 'setOrderCareCS')      return setOrderCareCS_(data.phone, data.careCS);
     if (action === 'setOrderCareCSBatch') return setOrderCareCSBatch_(data.updates);

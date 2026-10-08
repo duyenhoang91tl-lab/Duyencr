@@ -626,7 +626,9 @@ function readDTTong_() {
   if (!sh) return [];
   var last = sh.getLastRow();
   if (last < 2) return [];
+  var _t0 = Date.now();
   var vals = sh.getRange(2, 1, last - 1, 20).getValues();
+  var _tRead = Date.now() - _t0;
   var hiddenSets = _hiddenPageSaleSets_();
   var out = [];
   for (var i = 0; i < vals.length; i++) {
@@ -660,6 +662,9 @@ function readDTTong_() {
       Logger.log('readDTTong_: loi doc dong ' + (i + 2) + ': ' + eRow);
     }
   }
+  // DO HIEU NANG (xem Apps Script -> Executions): so dong, ms doc sheet (getValues) vs ms xu ly lai.
+  // Neu _tRead chiem phan lon -> nghen o Google Sheets (can snapshot/luu tru); neu _tConvert lon -> nghen o code.
+  Logger.log('PERF readDTTong_ rows=' + vals.length + ' kept=' + out.length + ' readMs=' + _tRead + ' convertMs=' + (Date.now() - _t0 - _tRead));
   return out;
 }
 

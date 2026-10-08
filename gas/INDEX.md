@@ -90,3 +90,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hàm: `getExportLogSS_`, `_exportLogGetSheet_`, `_exportLogWriteDays_`, `_dateRangeList_`, `exportDailyReportLogs_`, `chayCaiDatTrigger`, `_aaDefaultCfg`, `_aaSplit`, `_aaRatioFor`, `_aaWeights`, `_aaRecipients`, `_aaBuckets`, `_aaPlan`, `_aaPlanCskh`, `_aaPlanAll`, `_aaReadJson_`, `_aaWriteJson_`, `_aaHangKey_`, `_aaLoadCustomers_`, `_aaSetCareCS_`, `autoAssignRun_`, `autoAssignTick_`, `autoAssignRunNow_`, `installAutoAssignTrigger_`, `removeAutoAssignTrigger_`, `caiTriggerChiaTuDong`, `chayThuChiaTuDong`, `goTriggerChiaTuDong`
 - Hằng/biến: `EXPORT_LOG_SS_ID`, `EXPORT_LOG_SHEETS_`, `AA_TZ`, `_AA_SRC_KEYS`, `_AA_POS_KEYS`, `_AA_SRC_LABEL`, `_AA_PRIO_KEYS`, `_AA_PRIO_LABEL`, `_AA_TIER`, `_AA_HANG_KEYS`, `_AA_HANG_LABEL`
 
+## 21_ArchiveOldOrders.gs
+- Hàm: `_arcYmd_`, `_arcCutoffYmd_`, `_arcMonths_`, `_arcPickRows_`, `_arcSig_`, `_arcSafeCell_`, `_arcLogRow_`, `_arcOneSheet_`, `archiveOldOrders_`
+- Hằng/biến: `ARCHIVE_SUFFIX_`, `ARCHIVE_LOG_SHEET_`, `ARCHIVE_DEFAULT_MONTHS_`, `ARCHIVE_MIN_MONTHS_`, `ARCHIVE_MAX_ROWS_PER_RUN_`, `ARCHIVE_MAX_DELETE_RUNS_`, `ARCHIVE_APPLY_ENABLED_`
+

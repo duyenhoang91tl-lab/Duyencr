@@ -437,6 +437,11 @@ function doGetCore_(e) {
       return jsonOut_(findDuplicateOrders_(fdoPhone));
     }
     if (action === 'dedupeCare') return dedupeCare_();
+    // ── LUU TRU DON CU: xem truoc (dry-run) so dong se chuyen. Can adminKey. &months=6..12 &which=base|pos|both ──
+    if (action === 'archivePreview') {
+      if (!_adminKeyOk_(e && e.parameter ? e.parameter.adminKey : '')) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de xem truoc luu tru don cu.' });
+      return jsonOut_(archiveOldOrders_({ months: e.parameter.months, which: e.parameter.which, dryRun: true }));
+    }
 
     // ── MAU TIN NHAN TU VAN KHACH: danh sach mau (CRM tab ZALO AI va extension Pancake AI dung chung) ──
     if (action === 'messageTemplates') {
