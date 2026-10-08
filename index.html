@@ -17804,6 +17804,7 @@ switchAssignTab = function(tab, el){
 //   4) Thiếu KH ở 1 nhóm → bù từ nhóm còn lại (cùng nguồn trước, rồi nguồn khác); vẫn thiếu thì báo thiếu.
 // ═══════════════════════════════════════════════════════
 var _AA_SRC_KEYS = ['dt','don','cs','cskh'];
+var _AA_POS_KEYS = ['dt','don','cs'];   // nguon POS (chia theo ty le nguon chung). CSKH-Duyen KHONG nam trong ty le nay: chia RIENG (cskhTeams/cskhMembers...)
 var _AA_SRC_LABEL = { dt:'DT tổng', don:'Dữ liệu đơn', cs:'Chăm sóc', cskh:'CSKH-Duyên' };
 var _AA_PRIO_KEYS = ['vip','tt','tn','other'];
 var _AA_PRIO_LABEL = { vip:'VIP', tt:'Thân thiết', tn:'Tiềm năng', other:'Khác (chưa phân hạng)' };
@@ -17827,6 +17828,10 @@ function _aaDefaultCfg(){
     hang:{ mode:'pct', vals:{} },   // Phan hang KH: thuong/tt/vip/super (chua cai = khong loc theo hang)
     teamSrc:{}, teamPrio:{}, teamHang:{},   // teamId -> {mode, vals} (ghi đè)
     memberSrc:{}, memberPrio:{}, memberHang:{}, // teamId -> {tenNV: {mode, vals}} (ghi đè)
+    cskhEnabled:false,         // MUC RIENG: chia data CSKH-Duyen (khong dinh ty le nguon/uu tien/hang cua POS)
+    cskhDays:[1,2,3,4,5,6],
+    cskhTotal:0,               // tong KH CSKH/ngay (dung khi Team chia theo %)
+    cskhTeams:{}, cskhMemberMode:{}, cskhMembers:{},   // cung dang teams/memberMode/members cua POS
     lastRun:'',                // YYYY-MM-DD ngày đã chạy gần nhất
     lastResult:null
   };
@@ -17892,19 +17897,19 @@ function _aaBuckets(cfg, custs, everSet){
   return b;
 }
 // Lập kế hoạch 1 ngày. Trả {entries:[{team,teamName,name,phones[]}], short:[{name,missing}], warn:[]}
-function _aaPlan(cfg, teamsArr, membersOf, custs, everSet){
+function _aaPlan(cfg, teamsArr, membersOf, custs, everSet, taken0){
   var rc = _aaRecipients(cfg, teamsArr, membersOf), buckets = _aaBuckets(cfg, custs, everSet);
-  var taken = new Set(), ptr = {}, entries = [], short = [];
+  var taken = taken0 || new Set(), ptr = {}, entries = [], short = [];
   function take(s, p, n, out, h){         // lay toi da n SDT chua dung tu nhom (s,p) [va hang h neu co]
     var arr = h ? buckets._h[s + '|' + p + '|' + h] : buckets[s][p], k = s + '|' + p + (h ? '|' + h : ''), got = 0, i = ptr[k] || 0;
     while (got < n && i < arr.length){ var ph = arr[i++]; if (!taken.has(ph)) { taken.add(ph); out.push(ph); got++; } }
     ptr[k] = i; return got;
   }
   rc.list.forEach(function(r){
-    var sw = _aaWeights(_aaRatioFor(cfg, 'src', r.team, r.name), _AA_SRC_KEYS);
+    var sw = _aaWeights(_aaRatioFor(cfg, 'src', r.team, r.name), _AA_POS_KEYS);
     var sq = _aaSplit(r.quota, sw), phones = [], miss = 0;
     var pw = _aaWeights(_aaRatioFor(cfg, 'prio', r.team, r.name), _AA_PRIO_KEYS);
-    var srcOrder = _AA_SRC_KEYS.map(function(s,i){ return { s:s, w:sw[i] }; }).filter(function(x){ return x.w > 0; })
+    var srcOrder = _AA_POS_KEYS.map(function(s,i){ return { s:s, w:sw[i] }; }).filter(function(x){ return x.w > 0; })
       .sort(function(a,b){ return b.w - a.w; }).map(function(x){ return x.s; });
     var prOrder = _AA_PRIO_KEYS.map(function(p,i){ return { p:p, w:pw[i] }; }).filter(function(x){ return x.w > 0; })
       .sort(function(a,b){ return b.w - a.w; }).map(function(x){ return x.p; });
@@ -17917,7 +17922,7 @@ function _aaPlan(cfg, teamsArr, membersOf, custs, everSet){
       _AA_HANG_KEYS.forEach(function(h, hi){
         if (!hq[hi]) return;
         var m = 0, sqh = _aaSplit(hq[hi], sw);
-        _AA_SRC_KEYS.forEach(function(s, si){
+        _AA_POS_KEYS.forEach(function(s, si){
           if (!sqh[si]) return;
           var pqh = _aaSplit(sqh[si], pw);
           _AA_PRIO_KEYS.forEach(function(p, pi){
@@ -17932,7 +17937,7 @@ function _aaPlan(cfg, teamsArr, membersOf, custs, everSet){
         miss += Math.max(0, m);
       });
     } else {
-      _AA_SRC_KEYS.forEach(function(s, si){
+      _AA_POS_KEYS.forEach(function(s, si){
         if (!sq[si]) return;
         var pq = _aaSplit(sq[si], pw);
         _AA_PRIO_KEYS.forEach(function(p, pi){
@@ -17951,6 +17956,39 @@ function _aaPlan(cfg, teamsArr, membersOf, custs, everSet){
   });
   return { entries:entries, short:short, warn:rc.warn };
 }
+// CSKH-Duyen chia RIENG: moi nguoi 1 han muc CSKH/ngay (cung kieu Team/thanh vien nhu POS), lay lan luot tu danh sach KH nguon CSKH-Duyen
+// (khong chia theo nguon/uu tien/hang). `taken` dung chung voi POS de 1 SDT khong bi chia 2 lan trong cung 1 ngay.
+function _aaPlanCskh(cfg, teamsArr, membersOf, custs, everSet, taken){
+  var c2 = { teams: cfg.cskhTeams || {}, dailyTotal: cfg.cskhTotal || 0, memberMode: cfg.cskhMemberMode || {}, members: cfg.cskhMembers || {} };
+  var rc = _aaRecipients(c2, teamsArr, membersOf), pool = [], entries = [], short = [], ptr = 0;
+  for (var i = 0; i < custs.length; i++){
+    var c = custs[i]; if (!c || !c.phone || !(c.dataSrc && c.dataSrc.cskh)) continue;
+    if (cfg.onlyUnassigned && everSet && everSet.has(c.phone)) continue;
+    pool.push(c.phone);
+  }
+  rc.list.forEach(function(r){
+    var phones = [];
+    while (phones.length < r.quota && ptr < pool.length){ var ph = pool[ptr++]; if (!taken.has(ph)) { taken.add(ph); phones.push(ph); } }
+    if (phones.length < r.quota) short.push({ name:r.name, team:r.teamName, missing:r.quota - phones.length, quota:r.quota, src:'cskh' });
+    if (phones.length) entries.push({ team:r.teamName, teamId:r.team, name:r.name, phones:phones, quota:r.quota, src:'cskh' });
+  });
+  return { entries:entries, short:short, warn:rc.warn.map(function(w){ return '[CSKH] ' + w; }) };
+}
+// Ke hoach ca ngay = CSKH (rieng) + POS (tu dt/don/cs). opts: {pos:bool, cskh:bool} (mac dinh ca hai). CSKH lap truoc de han muc CSKH khong bi POS lay mat KH.
+function _aaPlanAll(cfg, teamsArr, membersOf, custs, everSet, opts){
+  opts = opts || {}; var taken = new Set(), out = { entries:[], short:[], warn:[] };
+  if (opts.cskh !== false){
+    var k = _aaPlanCskh(cfg, teamsArr, membersOf, custs, everSet, taken);
+    out.entries = out.entries.concat(k.entries); out.short = out.short.concat(k.short); out.warn = out.warn.concat(k.warn);
+  }
+  if (opts.pos !== false){
+    var p = _aaPlan(cfg, teamsArr, membersOf, custs, everSet, taken);
+    p.entries.forEach(function(e){ e.src = 'pos'; }); p.short.forEach(function(x){ x.src = 'pos'; });
+    out.entries = out.entries.concat(p.entries); out.short = out.short.concat(p.short); out.warn = out.warn.concat(p.warn);
+  }
+  return out;
+}
+
 function _aaDayOn(cfg, d){ d = d || new Date(); return (cfg.days || []).indexOf(d.getDay()) >= 0; }
 function _aaToday(d){ d = d || new Date(); var p = function(n){ return String(n).padStart(2,'0'); }; return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
 
@@ -17985,14 +18023,14 @@ async function _aaPullCfg(){
 }
 function _aaMembersOf(t){ return (typeof _teamMembersList === 'function') ? _teamMembersList(t) : (t.members || []); }
 // Xem trước kế hoạch hôm nay (KHÔNG ghi gì)
-function _aaPreview(){ return _aaPlan(_aaCfg, teams, _aaMembersOf, allCustomers, _everAssignedSet()); }
+function _aaPreview(opts){ return _aaPlanAll(_aaCfg, teams, _aaMembersOf, allCustomers, _everAssignedSet(), opts); }
 
 // Chạy chia thật: ghi lịch sử + cập nhật CS chăm sóc giống hệt luồng chia thủ công (doAssignDataAdvanced)
 function _aaCommit(plan, tag){
   var now = new Date().toISOString().slice(0,16).replace('T',' '), dm = _aaToday().slice(8) + '/' + _aaToday().slice(5,7);
   var entries = plan.entries.map(function(e){
     var en = { id: Date.now().toString() + '_' + Math.random().toString(36).slice(2,6), date: now, csName: e.name, phones: e.phones,
-      label: (tag || 'Tự động ' + dm) + ' — ' + e.team + ' → ' + e.name + ' (' + e.phones.length + ' KH)', team: e.team, auto: true, donePhones: [] };
+      label: (tag || 'Tự động ' + dm) + (e.src === 'cskh' ? ' CSKH-Duyên' : '') + ' — ' + e.team + ' → ' + e.name + ' (' + e.phones.length + ' KH)', team: e.team, auto: true, donePhones: [] };
     assignHistory.unshift(en); return en;
   });
   if (!entries.length) return entries;
@@ -18018,11 +18056,12 @@ async function _aaRunIfDue(force){
   try {
     await _aaPullCfg();   // lấy bản mới nhất (máy admin khác có thể vừa chạy hôm nay)
     var today = _aaToday();
-    if (!force && (!_aaCfg.enabled || !_aaDayOn(_aaCfg) || _aaCfg.lastRun === today || new Date().getHours() < (parseInt(_aaCfg.runHour) || 0))) return null;
+    var posOk = !!_aaCfg.enabled && _aaDayOn(_aaCfg), cskhOk = !!_aaCfg.cskhEnabled && (_aaCfg.cskhDays || []).indexOf(new Date().getDay()) >= 0;   // POS và CSKH-Duyên có công tắc + ngày RIÊNG
+    if (!force && ((!posOk && !cskhOk) || _aaCfg.lastRun === today || new Date().getHours() < (parseInt(_aaCfg.runHour) || 0))) return null;
     // Đánh dấu ĐÃ CHẠY hôm nay trước khi chia → 2 máy admin cùng mở không chia đôi 2 lần
     if (!force) { _aaCfg.lastRun = today; await _aaPersistState('browser'); }
     stage = 'lập kế hoạch chia (đọc danh sách KH / Team / tỷ lệ)';
-    var plan = _aaPreview();
+    var plan = _aaPreview(force ? {} : { pos: posOk, cskh: cskhOk });
     stage = 'ghi lịch sử chia + cập nhật CS';
     var entries = _aaCommit(plan, force ? 'Chạy thử' : null);
     stage = 'lưu kết quả lần chạy';
@@ -18056,9 +18095,9 @@ function _aaScopeObj(kind, tid, name, create){
 }
 function _aaRerender(){ var b = document.getElementById('assign-body'), st = b ? b.scrollTop : 0; renderAssignAuto(); if (b) b.scrollTop = st; }
 function _aaSet(path, v, rerender){   // path: 'enabled' | 'dailyTotal' | 'onlyUnassigned' | 'runHour'
-  _aaCfg[path] = (typeof v === 'boolean') ? v : (path === 'dailyTotal' ? Math.max(0, parseInt(v) || 0) : path === 'runHour' ? Math.min(23, Math.max(0, parseInt(v) || 0)) : v);
+  _aaCfg[path] = (typeof v === 'boolean') ? v : ((path === 'dailyTotal' || path === 'cskhTotal') ? Math.max(0, parseInt(v) || 0) : path === 'runHour' ? Math.min(23, Math.max(0, parseInt(v) || 0)) : v);
   if (rerender !== false) _aaRerender();
-  if (path === 'enabled') _aaPersist();
+  if (path === 'enabled' || path === 'cskhEnabled') _aaPersist();
 }
 function _aaToggleDay(d){
   d = parseInt(d); var a = _aaCfg.days || [], i = a.indexOf(d);
@@ -18168,7 +18207,7 @@ function _aaRatioDel(el){
 }
 // Khối nhập tỷ lệ NGUỒN (kind='src') hoặc ƯU TIÊN (kind='prio'); tid/name rỗng = cài chung
 function _aaRatioHtml(kind, tid, name){
-  var keys = ({ src:_AA_SRC_KEYS, prio:_AA_PRIO_KEYS, hang:_AA_HANG_KEYS })[kind], lab = ({ src:_AA_SRC_LABEL, prio:_AA_PRIO_LABEL, hang:_AA_HANG_LABEL })[kind];
+  var keys = ({ src:_AA_POS_KEYS, prio:_AA_PRIO_KEYS, hang:_AA_HANG_KEYS })[kind], lab = ({ src:_AA_SRC_LABEL, prio:_AA_PRIO_LABEL, hang:_AA_HANG_LABEL })[kind];
   var o = _aaScopeObj(kind, tid, name, false), da = 'data-k="'+kind+'" data-t="'+esc(tid||'')+'" data-n="'+esc(name||'')+'"';
   var title = ({ src:'Tỷ lệ theo NGUỒN', prio:'Tỷ lệ theo ƯU TIÊN', hang:'Tỷ lệ theo PHÂN HẠNG KH (doanh thu)' })[kind];
   if (tid && !o) return '<button class="btn sm" '+da+' onclick="_aaRatioAdd(this)" style="margin:2px 4px 2px 0">＋ '+title+' riêng</button>';
@@ -18186,6 +18225,69 @@ function _aaRatioHtml(kind, tid, name){
     ' Mục để trống/0 = không lấy.</div></div>';
   return h;
 }
+// ── MỤC RIÊNG: CSKH-Duyên chia riêng theo ngày (không dính tỷ lệ nguồn/ưu tiên/hạng của POS) ──
+var _aaCkOpen = {};   // teamId -> đang mở chi tiết người nhận CSKH (chỉ UI)
+function _aaCkToggleDay(d){
+  d = parseInt(d); var a = _aaCfg.cskhDays || [], i = a.indexOf(d);
+  if (i >= 0) a.splice(i, 1); else a.push(d);
+  _aaCfg.cskhDays = a; _aaRerender();
+}
+function _aaCkTeamCfg(tid){ _aaCfg.cskhTeams = _aaCfg.cskhTeams || {}; if (!_aaCfg.cskhTeams[tid]) _aaCfg.cskhTeams[tid] = { on:false, mode:'count', val:0 }; return _aaCfg.cskhTeams[tid]; }
+function _aaCkTeamField(tid, f, v){
+  var t = _aaCkTeamCfg(tid);
+  if (f === 'on') t.on = !!v; else if (f === 'mode') t.mode = v; else t.val = Math.max(0, Number(v) || 0);
+  _aaRerender();
+}
+function _aaCkOpenToggle(tid){ _aaCkOpen[tid] = !_aaCkOpen[tid]; _aaRerender(); }
+function _aaCkMemberMode(tid, m){ _aaCfg.cskhMemberMode = _aaCfg.cskhMemberMode || {}; _aaCfg.cskhMemberMode[tid] = m; _aaRerender(); }
+function _aaCkMemberField(tid, name, f, v){
+  _aaCfg.cskhMembers = _aaCfg.cskhMembers || {};
+  var mc = _aaCfg.cskhMembers[tid] = _aaCfg.cskhMembers[tid] || {}, o = mc[name] = mc[name] || { on:true, val:0 };
+  if (f === 'on') o.on = !!v; else o.val = Math.max(0, Number(v) || 0);
+  _aaRerender();
+}
+function _aaCkHtml(){
+  var cfg = _aaCfg, ck = { teams: cfg.cskhTeams || {}, dailyTotal: cfg.cskhTotal || 0, memberMode: cfg.cskhMemberMode || {}, members: cfg.cskhMembers || {} };
+  var rc = _aaRecipients(ck, teams, _aaMembersOf), qmap = {}, totalQ = rc.list.reduce(function(s, r){ return s + r.quota; }, 0);
+  var ckUi = Object.assign({}, ck, { teams: {} });   // ≈ KH/ngày tính như thể Team đã bật (đổi số là thấy nhảy ngay)
+  teams.forEach(function(t){ ckUi.teams[t.id] = Object.assign({ mode:'count', val:0 }, ck.teams[t.id], { on:true }); });
+  _aaRecipients(ckUi, teams, _aaMembersOf).list.forEach(function(r){ qmap[r.team + '|' + r.name] = r.quota; });
+  var nCk = 0; (allCustomers || []).forEach(function(c){ if (c && c.dataSrc && c.dataSrc.cskh) nCk++; });
+  var h = '<div class="assign-section"><div class="assign-section-title">③ Data CSKH-Duyên — chia RIÊNG</div>'+
+    '<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Mục riêng, không dính tỷ lệ nguồn/ưu tiên/hạng ở trên: mỗi người nhận số KH CSKH-Duyên bạn cài dưới đây, lấy lần lượt từ danh sách KH nguồn CSKH-Duyên (hiện có <b>'+nCk+'</b> KH). 1 SĐT không bị chia 2 lần trong cùng 1 ngày (CSKH được chia trước POS).</div>'+
+    '<label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;margin-bottom:10px"><input type="checkbox" '+(cfg.cskhEnabled?'checked':'')+' onchange="_aaSet(\'cskhEnabled\',this.checked)"> Bật chia tự động CSKH-Duyên mỗi ngày</label>'+
+    '<div style="font-size:12px;color:var(--muted);margin-bottom:5px">Chia vào các thứ được tích:</div><div class="assign-sort-row">'+
+    _AA_DOW.map(function(d){ return '<div class="assign-sort-btn '+((cfg.cskhDays||[]).indexOf(parseInt(d[0]))>=0?'active':'')+'" onclick="_aaCkToggleDay('+d[0]+')">'+d[1]+'</div>'; }).join('')+'</div>'+
+    '<label style="font-size:12px;display:block;margin-top:10px">Tổng KH CSKH/ngày (dùng cho Team chia theo %): <input type="number" min="0" style="width:90px" value="'+(cfg.cskhTotal||'')+'" placeholder="0" onchange="_aaSet(\'cskhTotal\',this.value)"></label>';
+  if (!teams.length) return h + '<div style="color:var(--muted);padding:10px;text-align:center">Chưa có Team.</div></div>';
+  h += '<table class="dash-table" style="margin-top:8px"><thead><tr><th style="width:36px"></th><th>Team</th><th style="width:150px">Cách chia</th><th style="width:100px">Giá trị</th><th style="width:100px;text-align:right">≈ KH/ngày</th><th style="width:90px"></th></tr></thead><tbody>';
+  teams.forEach(function(t){
+    var c = (cfg.cskhTeams || {})[t.id] || { on:false, mode:'count', val:0 }, members = _aaMembersOf(t), tid = esc(t.id);
+    var tq = rc.list.filter(function(r){ return r.team === t.id; }).reduce(function(s, r){ return s + r.quota; }, 0);
+    h += '<tr><td><input type="checkbox" '+(c.on?'checked':'')+' onchange="_aaCkTeamField(\''+tid+'\',\'on\',this.checked)"></td>'+
+      '<td><b>'+esc(t.name)+'</b> <span style="color:var(--muted);font-size:11px">('+members.length+' người)</span></td>'+
+      '<td><select onchange="_aaCkTeamField(\''+tid+'\',\'mode\',this.value)"><option value="count" '+(c.mode!=='pct'?'selected':'')+'>Số KH / ngày</option><option value="pct" '+(c.mode==='pct'?'selected':'')+'>% tổng / ngày</option></select></td>'+
+      '<td><input type="number" min="0" style="width:70px" value="'+(c.val||'')+'" placeholder="0" onchange="_aaCkTeamField(\''+tid+'\',\'val\',this.value)"> '+(c.mode==='pct'?'%':'KH')+'</td>'+
+      '<td style="text-align:right;font-weight:700">'+(c.on?tq:'—')+'</td>'+
+      '<td><button class="btn sm" onclick="_aaCkOpenToggle(\''+tid+'\')">'+(_aaCkOpen[t.id]?'▴ Thu':'▾ Chi tiết')+'</button></td></tr>';
+    if (_aaCkOpen[t.id]){
+      var mm = (cfg.cskhMemberMode || {})[t.id] || 'pct', pctMode = mm === 'pct', mc = (cfg.cskhMembers || {})[t.id] || {};
+      var d = '<div style="padding:6px 0"><div style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><b style="font-size:12px">Chia trong Team:</b>'+
+        '<span class="assign-sort-btn '+(pctMode?'active':'')+'" onclick="_aaCkMemberMode(\''+tid+'\',\'pct\')">Theo % (trống = chia đều)</span>'+
+        '<span class="assign-sort-btn '+(!pctMode?'active':'')+'" onclick="_aaCkMemberMode(\''+tid+'\',\'count\')">Số KH/người/ngày</span></div>';
+      members.forEach(function(m){
+        var o = mc[m] || { on:true, val:0 }, isOn = o.on !== false;
+        d += '<div style="border-top:1px solid var(--border,#e5e3dc);padding:6px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
+          '<label style="min-width:150px;font-size:13px"><input type="checkbox" '+(isOn?'checked':'')+' data-m="'+esc(m)+'" onchange="_aaCkMemberField(\''+tid+'\',this.dataset.m,\'on\',this.checked)"> '+esc(m)+'</label>'+
+          '<input type="number" min="0" style="width:70px" value="'+(o.val||'')+'" placeholder="0" data-m="'+esc(m)+'" onchange="_aaCkMemberField(\''+tid+'\',this.dataset.m,\'val\',this.value)"> '+(pctMode?'%':'KH/ngày')+
+          '<b style="font-size:12px;color:var(--green)">≈ '+(isOn ? (qmap[t.id+'|'+m]||0) : 0)+' KH/ngày</b></div>';
+      });
+      h += '<tr><td></td><td colspan="5">'+d+'</div></td></tr>';
+    }
+  });
+  h += '</tbody></table><div style="font-size:12px;margin-top:6px;color:var(--muted)">Tổng hạn mức CSKH mỗi ngày: <b style="color:var(--green)">'+totalQ+' KH</b>'+(rc.warn.length ? ' · <span style="color:var(--red)">'+rc.warn.map(esc).join('; ')+'</span>' : '')+'</div></div>';
+  return h;
+}
 function renderAssignAuto(){
   var body = document.getElementById('assign-body'); if (!body) return;
   var cfg = _aaCfg, rc = _aaRecipients(cfg, teams, _aaMembersOf), qmap = {};
@@ -18196,14 +18298,14 @@ function renderAssignAuto(){
   _aaRecipients(cfgUi, teams, _aaMembersOf).list.forEach(function(r){ qmap[r.team + '|' + r.name] = r.quota; });
   var totalQ = rc.list.reduce(function(s,r){ return s + r.quota; }, 0);
   var h = '<div class="assign-section"><div class="assign-section-title">⏰ Lịch chia tự động</div>'+
-    '<label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;margin-bottom:10px"><input type="checkbox" '+(cfg.enabled?'checked':'')+' onchange="_aaSet(\'enabled\',this.checked)"> Bật chia tự động mỗi ngày</label>'+
+    '<label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;margin-bottom:10px"><input type="checkbox" '+(cfg.enabled?'checked':'')+' onchange="_aaSet(\'enabled\',this.checked)"> Bật chia tự động mỗi ngày <span style="font-weight:400;color:var(--muted)">(nguồn POS: DT tổng, Dữ liệu đơn, Chăm sóc)</span></label>'+
     '<div style="font-size:12px;color:var(--muted);margin-bottom:5px">Chia vào các thứ được tích (ngày bỏ tích = không chia):</div><div class="assign-sort-row">'+
     _AA_DOW.map(function(d){ return '<div class="assign-sort-btn '+((cfg.days||[]).indexOf(parseInt(d[0]))>=0?'active':'')+'" onclick="_aaToggleDay('+d[0]+')">'+d[1]+'</div>'; }).join('')+'</div>'+
     '<label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:10px"><input type="checkbox" '+(cfg.onlyUnassigned?'checked':'')+' onchange="_aaSet(\'onlyUnassigned\',this.checked)"> Chỉ lấy KH <b>chưa chia lần nào</b> (nên bật, nếu không ngày nào cũng có thể chia lại đúng KH cũ)</label>'+
     '<label style="font-size:12px;display:block;margin-top:10px">Chia từ <input type="number" min="0" max="23" style="width:56px" value="'+(cfg.runHour==null?7:cfg.runHour)+'" onchange="_aaSet(\'runHour\',this.value)"> giờ sáng (giờ VN) — trước giờ này không chia</label>'+
     '<div style="font-size:11px;color:var(--hint);margin-top:8px">Chạy tự động bằng <b>trigger trên Google Apps Script</b> (không cần mở CRM): admin cài 1 lần — mở Apps Script Editor, chọn hàm <b>installAutoAssignTrigger_</b>, bấm Run. Chưa cài trigger thì hệ thống chỉ chia khi có admin mở CRM vào ngày đó. Sau khi sửa ở đây nhớ bấm <b>💾 Lưu cấu hình</b> (server dùng bản đã lưu).</div></div>';
 
-  h += '<div class="assign-section"><div class="assign-section-title">① Chia cho các Team</div>'+
+  h += '<div class="assign-section"><div class="assign-section-title">① Chia cho các Team <span style="font-weight:400;font-size:12px;color:var(--muted)">— nguồn POS</span></div>'+
     '<label style="font-size:12px">Tổng KH/ngày (dùng cho Team chia theo %): <input type="number" min="0" style="width:90px" value="'+(cfg.dailyTotal||'')+'" placeholder="0" onchange="_aaSet(\'dailyTotal\',this.value)"></label>';
   if (!teams.length) h += '<div style="color:var(--muted);padding:14px;text-align:center">Chưa có Team — tạo ở tab <b>Quản lý Team</b> trước.</div>';
   else {
@@ -18226,9 +18328,10 @@ function renderAssignAuto(){
       (pctSum ? ' · Tổng % Team: <b style="color:'+(pctSum>100?'var(--red)':'var(--green)')+'">'+pctSum+'%</b>'+(pctSum>100?' — vượt 100%!':'') : '')+'</div>';
   }
   h += '</div>';
-  h += '<div class="assign-section"><div class="assign-section-title">② Tỷ lệ chung theo nguồn &amp; ưu tiên</div>'+
+  h += '<div class="assign-section"><div class="assign-section-title">② Tỷ lệ chung theo nguồn &amp; ưu tiên <span style="font-weight:400;font-size:12px;color:var(--muted)">— chỉ áp dụng nguồn POS</span></div>'+
     '<div style="font-size:11px;color:var(--muted)">Áp dụng cho mọi người, trừ chỗ bạn cài riêng theo Team / từng người (bấm “Chi tiết” ở Team). Mỗi người: hạn mức → chia theo nguồn → mỗi nguồn chia tiếp theo ưu tiên.</div>'+
     _aaRatioHtml('src') + _aaRatioHtml('prio') + _aaRatioHtml('hang') + _aaRatioTeamsHtml() + '</div>';
+  h += _aaCkHtml();
   var lr = cfg.lastResult;
   if (lr) h += '<div class="assign-section"><div class="assign-section-title">Lần chạy gần nhất</div><div style="font-size:12px">'+esc(lr.date)+(lr.forced?' (chạy thử)':'')+(lr.by?' · bởi '+(lr.by==='server'?'server (trigger)':'trình duyệt'):'')+': đã chia <b>'+lr.total+' KH</b> cho '+(lr.people||0)+' CS'+
     ((lr.short||[]).length ? '<div style="color:var(--red);margin-top:4px">Thiếu data: '+lr.short.map(function(s){ return esc(s.name)+' thiếu '+s.missing; }).join(', ')+'</div>' : '')+'</div></div>';
@@ -18276,9 +18379,9 @@ function _aaShowPreview(){
   var h = '<div class="assign-section"><div class="assign-section-title">👁 Xem trước (chưa chia thật)</div><div style="font-size:13px;margin-bottom:6px">Nếu chạy bây giờ: <b>'+total+' KH</b> → '+p.entries.length+' CS</div>';
   if (p.warn.length) h += '<div style="color:var(--red);font-size:12px">'+p.warn.map(esc).join('<br>')+'</div>';
   if (p.entries.length){
-    var sh = {}; p.short.forEach(function(s){ sh[s.name] = s.missing; });
+    var sh = {}; p.short.forEach(function(s){ sh[s.name + '|' + (s.src || 'pos')] = s.missing; });
     h += '<table class="dash-table"><thead><tr><th>Team</th><th>CS</th><th style="text-align:right">Hạn mức</th><th style="text-align:right">Có data</th><th>Ghi chú</th></tr></thead><tbody>'+
-      p.entries.map(function(e){ return '<tr><td>'+esc(e.team)+'</td><td>'+esc(e.name)+'</td><td style="text-align:right">'+e.quota+'</td><td style="text-align:right;font-weight:700">'+e.phones.length+'</td><td style="color:var(--red)">'+(sh[e.name]?'thiếu '+sh[e.name]:'')+'</td></tr>'; }).join('')+'</tbody></table>';
+      p.entries.map(function(e){ return '<tr><td>'+esc(e.team)+(e.src==='cskh'?' <b style="color:#b45309">· CSKH</b>':'')+'</td><td>'+esc(e.name)+'</td><td style="text-align:right">'+e.quota+'</td><td style="text-align:right;font-weight:700">'+e.phones.length+'</td><td style="color:var(--red)">'+(sh[e.name+'|'+(e.src||'pos')]?'thiếu '+sh[e.name+'|'+(e.src||'pos')]:'')+'</td></tr>'; }).join('')+'</tbody></table>';
   } else h += '<div style="color:var(--muted);font-size:12px">Chưa có ai có hạn mức &gt; 0 hoặc không có KH phù hợp — kiểm tra lại Team đã tích, giá trị, nguồn.</div>';
   el.innerHTML = h + '</div>';
   el.scrollIntoView({ behavior:'smooth', block:'nearest' });
@@ -18291,7 +18394,7 @@ function _aaShowRunResult(r){
   if (r.error){
     h = '<div class="assign-section" style="border:1px solid #fecaca;background:#fef2f2"><div class="assign-section-title">❌ Chưa chia được ('+hhmm+')</div><div style="font-size:13px">'+esc(r.error)+'</div></div>';
   } else {
-    var p = r.plan, sh = {}; p.short.forEach(function(x){ sh[x.name] = x.missing; });
+    var p = r.plan, sh = {}; p.short.forEach(function(x){ sh[x.name+'|'+(x.src||'pos')] = x.missing; });
     var ok = r.total > 0;
     h = '<div class="assign-section" style="border:1px solid '+(ok?'#bbf7d0':'#fed7aa')+';background:'+(ok?'#f0fdf4':'#fff7ed')+'">'+
       '<div class="assign-section-title">'+(ok ? '✅ Đã chia xong lúc '+hhmm : '⚠ Không chia được KH nào ('+hhmm+')')+'</div>'+
@@ -18299,7 +18402,7 @@ function _aaShowRunResult(r){
     if (p.warn.length) h += '<div style="color:var(--red);font-size:12px;margin-bottom:4px">'+p.warn.map(esc).join('<br>')+'</div>';
     if (ok){
       h += '<table class="dash-table"><thead><tr><th>Team</th><th>CS</th><th style="text-align:right">Hạn mức</th><th style="text-align:right">Đã chia</th><th>Ghi chú</th></tr></thead><tbody>'+
-        p.entries.map(function(e){ return '<tr><td>'+esc(e.team)+'</td><td>'+esc(e.name)+'</td><td style="text-align:right">'+e.quota+'</td><td style="text-align:right;font-weight:700">'+e.phones.length+'</td><td style="color:var(--red)">'+(sh[e.name]?'thiếu '+sh[e.name]+' KH (hết data phù hợp)':'')+'</td></tr>'; }).join('')+'</tbody></table>';
+        p.entries.map(function(e){ return '<tr><td>'+esc(e.team)+(e.src==='cskh'?' <b style="color:#b45309">· CSKH</b>':'')+'</td><td>'+esc(e.name)+'</td><td style="text-align:right">'+e.quota+'</td><td style="text-align:right;font-weight:700">'+e.phones.length+'</td><td style="color:var(--red)">'+(sh[e.name+'|'+(e.src||'pos')]?'thiếu '+sh[e.name+'|'+(e.src||'pos')]+' KH (hết data phù hợp)':'')+'</td></tr>'; }).join('')+'</tbody></table>';
     } else {
       h += '<div style="font-size:12px;color:var(--muted)">Kiểm tra: Team đã tích chưa · hạn mức &gt; 0 chưa · nguồn/ưu tiên có KH phù hợp không · bật "Chỉ lấy KH chưa chia lần nào" thì có thể đã chia hết KH chưa từng chia.'+(p.short.length ? '<br>Thiếu data: '+p.short.map(function(x){ return esc(x.name)+' thiếu '+x.missing; }).join(', ') : '')+'</div>';
     }
