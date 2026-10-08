@@ -1769,6 +1769,11 @@ function doGetCore_(e) {
       if (!_adminKeyOk_(e && e.parameter ? e.parameter.adminKey : '')) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de xem truoc luu tru don cu.' });
       return jsonOut_(archiveOldOrders_({ months: e.parameter.months, which: e.parameter.which, dryRun: true }));
     }
+    // ── SUPABASE (buoc 2b): kiem tra ket noi. Can adminKey ──
+    if (action === 'sbPing') {
+      if (!_adminKeyOk_(e && e.parameter ? e.parameter.adminKey : '')) return jsonOut_({ error: 'Can khoa quan tri (adminKey) cho thao tac Supabase.' });
+      return jsonOut_(sbPing_());
+    }
 
     // ── MAU TIN NHAN TU VAN KHACH: danh sach mau (CRM tab ZALO AI va extension Pancake AI dung chung) ──
     if (action === 'messageTemplates') {
@@ -9966,3 +9971,25 @@ function sbCareRowToRec_(row) {
   rec.updated_at = (d && !isNaN(d.getTime())) ? d.toISOString() : new Date().toISOString();
   return rec;
 }
+
+// Kiem tra ket noi Supabase (doc 1 dong care_data). KHONG tra key. Dung cho action sbPing va trigger hang ngay.
+function sbPing_() {
+  var cfg = sbCfg_();
+  if (!cfg.ok) return { ok: false, configured: false, error: 'Chua cau hinh SUPABASE_URL / SUPABASE_KEY trong Script Properties.' };
+  var t0 = Date.now();
+  try {
+    sb_('GET', 'care_data?select=phone&limit=1');
+    return { ok: true, configured: true, ms: Date.now() - t0 };
+  } catch (e) { return { ok: false, configured: true, error: String(e && e.message || e) }; }
+}
+
+// Trigger hang ngay: Supabase free tu pause sau 7 ngay khong hoat dong -> goi nhe moi ngay de giu hoat dong.
+// Chay 1 lan thu cong: chon ham caiTriggerSbPing trong Apps Script Editor -> Run (xem log).
+function sbPingTick_() { Logger.log('sbPing ' + JSON.stringify(sbPing_())); }
+function installSbPingTrigger_() {
+  var ex = ScriptApp.getProjectTriggers().filter(function (t) { return t.getHandlerFunction() === 'sbPingTick_'; });
+  if (ex.length) return 'Trigger "sbPingTick_" da ton tai (' + ex.length + '), khong tao them.';
+  ScriptApp.newTrigger('sbPingTick_').timeBased().everyDays(1).create();
+  return 'Da tao trigger sbPingTick_ chay moi ngay (giu Supabase free khong bi pause).';
+}
+function caiTriggerSbPing() { Logger.log(installSbPingTrigger_()); }

@@ -442,6 +442,11 @@ function doGetCore_(e) {
       if (!_adminKeyOk_(e && e.parameter ? e.parameter.adminKey : '')) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de xem truoc luu tru don cu.' });
       return jsonOut_(archiveOldOrders_({ months: e.parameter.months, which: e.parameter.which, dryRun: true }));
     }
+    // ── SUPABASE (buoc 2b): kiem tra ket noi. Can adminKey ──
+    if (action === 'sbPing') {
+      if (!_adminKeyOk_(e && e.parameter ? e.parameter.adminKey : '')) return jsonOut_({ error: 'Can khoa quan tri (adminKey) cho thao tac Supabase.' });
+      return jsonOut_(sbPing_());
+    }
 
     // ── MAU TIN NHAN TU VAN KHACH: danh sach mau (CRM tab ZALO AI va extension Pancake AI dung chung) ──
     if (action === 'messageTemplates') {

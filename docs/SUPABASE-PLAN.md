@@ -14,7 +14,7 @@ chạy thật đang khoá). KHÔNG bật archive chạy thật khi chưa quyết
 - [ ] Bước 1b (Duyên làm tay): tạo project Supabase (free) → SQL Editor → dán `supabase/schema.sql` → Run. Lưu `SUPABASE_URL` và `service_role` key vào Apps Script → Project Settings → Script Properties (`SUPABASE_URL`, `SUPABASE_KEY`). Không gửi key vào chat.
 - [ ] Bước 2 (đang làm, chia mục nhỏ — mỗi mục push riêng; code nằm cuối `gas_v13.js` = file `gas/22_Supabase.gs`):
   - [x] 2a: helper `sbCfg_`/`sb_`/`sbCareRowToRec_` + mốc `22_Supabase` trong `tools/split-gas.js`.
-  - [ ] 2b: `sbPing_` + trigger ping hằng ngày + action `sbPing` (doGet, cần adminKey).
+  - [x] 2b: `sbPing_` + `sbPingTick_`/`installSbPingTrigger_`/`caiTriggerSbPing` + action `sbPing` (doGet, cần adminKey; tài khoản demo bị chặn bởi `DEMO_ALLOWED_GET_`). Cài trigger: chạy hàm `caiTriggerSbPing` 1 lần trong Apps Script Editor.
   - [ ] 2c: `sbBackfillCare_` (lô 500, upsert theo phone, con trỏ resume, dryRun mặc định) + action `sbBackfillCare` (doPost, cần adminKey).
   - [ ] 2d: `sbCompareCare_` + action `sbCompareCare` (doGet, cần adminKey).
   - [ ] 2e: test Node tổng hợp `tools/test-supabase.js` (fetch giả).
