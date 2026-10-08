@@ -7485,6 +7485,15 @@ function normPhone(v){
   if(s.length===9 && /^[35789]/.test(s)) return '0'+s;
   return s.slice(-10)||s;
 }
+// SĐT di động Việt Nam HỢP LỆ (dùng cho Chia data thủ công + tự động): 10 số, 0 + đầu số nhà mạng
+// 03[2-9] | 05[2,6,8,9] | 07[0,6-9] | 08[1-9] | 09x. Chấp nhận dạng 84xxxxxxxxx / +84... / thiếu số 0 đầu (9 số).
+// KHÔNG nhận: số bàn (02x), số nước ngoài, quá ngắn/dài, đầu số không có thật. Cùng logic với isValidVnPhone_ ở gas_v13.js.
+function isValidVnPhone(p){
+  var s = String(p == null ? '' : p).replace(/\D/g, '');
+  if (s.length === 11 && s.indexOf('84') === 0) s = '0' + s.slice(2);
+  else if (s.length === 9 && /^[35789]/.test(s)) s = '0' + s;
+  return /^0(?:3[2-9]|5[2689]|7[06-9]|8[1-9]|9\d)\d{7}$/.test(s);
+}
 function guessProduct(detail){
   if(!detail) return '';
   const map=[
@@ -8436,15 +8445,17 @@ function switchAssignTab(tab, el) {
 // mọi bước khác (nguồn, ưu tiên lấy, phân phối), dùng cùng field c.ymList[].ds ('YYYY-MM-DD')
 // như bộ lọc chính của bảng Danh sách KH, nhưng tách riêng để không phụ thuộc bộ lọc đang bật
 // trên bảng — admin có thể mở modal rồi tự chọn khoảng ngày khác ngay trong Chia data.
+function _advAssignValidBase() { return (_assignFilteredList || []).filter(isValidVnPhone); }   // chỉ SĐT di động VN hợp lệ
 function _advAssignDateFilteredList() {
+  var _base = _advAssignValidBase();
   var hasSrc = _advAssign.srcSet && _advAssign.srcSet.size > 0;
   var hasDate = !!(_advAssign.dateFrom || _advAssign.dateTo);
-  if (!hasSrc && !hasDate) return _assignFilteredList;
+  if (!hasSrc && !hasDate) return _base;
   // NGUYÊN NHÂN GỐC (đã sửa 2026-10-07): trước đây tra customerMap[p] — object THÔ (chỉ có orders), KHÔNG có
   // ymList (ymList chỉ tính sẵn trên các phần tử allCustomers trong buildCustomers) → luôn undefined → mọi KH bị
   // loại → khoảng ngày nào cũng ra "0 KH". Dùng _assignCustMap() (Map SĐT → phần tử allCustomers).
   var _cm = _assignCustMap();
-  return _assignFilteredList.filter(function (p) {
+  return _base.filter(function (p) {
     var c = _cm.get(p);
     if (!c) return false;
     if (hasSrc) {
@@ -8660,7 +8671,7 @@ function renderAssignCreate() {
       <button class="btn sm secondary" onclick="_advAssignOpenAdvFilter()" title="Mở Lọc nâng cao (CS, sản phẩm, nguồn, trạng thái CS/Zalo, trường tự tạo...) để chọn đúng data muốn chia">⚙ Lọc nâng cao${countAdvFilters()>0?` <span class="adv-filter-active-badge">${countAdvFilters()}</span>`:''}</button>
     </div>
     <div class="assign-preview" style="margin-bottom:10px">
-      Bộ lọc hiện tại: <strong>${totalFiltered} KH</strong> &nbsp;|&nbsp;
+      Bộ lọc hiện tại: <strong>${totalFiltered} KH</strong>${(_assignFilteredList.length - _advAssignValidBase().length) > 0 ? ` <span style="color:#92400e;font-size:11px" title="Chỉ chia SĐT di động Việt Nam hợp lệ (10 số, đầu số 03/05/07/08/09)">(đã loại ${_assignFilteredList.length - _advAssignValidBase().length} SĐT không hợp lệ)</span>` : ''} &nbsp;|&nbsp;
       <span style="color:var(--vip)">VIP: ${tierCount.VIP}</span> &nbsp;·&nbsp;
       <span style="color:var(--tt)">Thân thiết: ${tierCount['Thân thiết']}</span> &nbsp;·&nbsp;
       <span style="color:var(--tn)">Tiềm năng: ${tierCount['Tiềm năng']}</span><br>
@@ -18073,6 +18084,7 @@ function _aaPlanCskh(cfg, teamsArr, membersOf, custs, everSet, taken){
 }
 // Ke hoach ca ngay = CSKH (rieng) + POS (tu dt/don/cs). opts: {pos:bool, cskh:bool} (mac dinh ca hai). CSKH lap truoc de han muc CSKH khong bi POS lay mat KH.
 function _aaPlanAll(cfg, teamsArr, membersOf, custs, everSet, opts){
+  custs = (custs || []).filter(function(c){ return c && isValidVnPhone(c.phone); });   // chỉ chia SĐT di động VN hợp lệ
   opts = opts || {}; var taken = new Set(), out = { entries:[], short:[], warn:[] };
   if (opts.cskh !== false){
     var k = _aaPlanCskh(cfg, teamsArr, membersOf, custs, everSet, taken);
