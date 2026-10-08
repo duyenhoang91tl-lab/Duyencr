@@ -2596,7 +2596,11 @@ function mergeRows(rows) {
     if (r.status) c._rawStatus = r.status;
     if (r.zalo) c._rawZalo = r.zalo;
     if (r.note) c._rawNote = r.note;
-    const key = `${ph}_${r.year}_${r.month}_${r.revenue}`;
+    // Khoa dedup: dung ID don (cot ID cua DT TỔNG, on dinh qua cac lan dong bo) neu co. Khoa cu
+    // (phone+nam+thang+so tien) XOA NHAM don thu 2 khi 1 khach co 2 don KHAC NHAU cung thang, cung
+    // dung 1 so tien (hay gap voi san pham gia co dinh, vd 3.300.000) -> Dashboard thieu doanh thu
+    // so voi cac Bao cao doc truc tiep tu Sheet. Khong co ID thi them ngay tao + san pham cho dac thu.
+    const key = r.id ? `${ph}_id${r.id}` : `${ph}_${r.year}_${r.month}_${r.revenue}_${r.orderDate||''}_${r.product||''}`;
     if (!c._keys.has(key)) { c._keys.add(key); c.orders.push(r); }
   }
 }
@@ -9900,6 +9904,12 @@ function saveRole(){
 // Đơn có nằm trong khoảng ngày lọc của Dashboard không (bỏ trống 2 đầu = không lọc).
 // Tính theo NGÀY TẠO đơn (o.orderDate), giống mọi báo cáo khác trong hệ thống (A/B/C/KPI
 // Pancake) — không theo ngày hoàn thành, để khớp với Base và giữa các báo cáo với nhau.
+// Giong _isExcludedOrderStatus_ (gas_v13.js): khop TOAN BO chuoi sau khi bo dau, KHONG khop 'Hoan thanh'.
+var _DASH_EXCLUDED_STATUS = ['huy','da huy','da hoan','dang hoan','dang hoan hang','da hoan hang','hoan hang','hoan tien'];
+function _dashIsExcludedStatus(st){
+  var s = String(st||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').trim();
+  return !!s && _DASH_EXCLUDED_STATUS.indexOf(s) !== -1;
+}
 function _dashOrderInRange(o, dFrom, dTo){
   if (!dFrom && !dTo) return true;
   var dt = _parseFlexDate(o.orderDate) || _parseFlexDate(o.date);
@@ -9934,6 +9944,7 @@ function _computeCSStats(list, dFrom, dTo){
     // dong bo voi quy uoc dang dung o buildSalesReportA_/buildKpiReport_ (gas_v13.js).
     (c.orders||[]).forEach(function(o){
       if (!_dashOrderInRange(o, dFrom, dTo)) return;
+      if (_dashIsExcludedStatus(o.status)) return; // dong bo voi Bao cao A/B: bo don Huy/Da hoan/Dang hoan
       if (!o.cs) return;
       var salesOnOrder = splitMulti_(o.cs, ',');
       if (!salesOnOrder.length) return;
@@ -9956,9 +9967,18 @@ function _revenueByMembersChannels(members, channels){
   var revenue = 0, orders = 0;
   (typeof allCustomers !== 'undefined' ? allCustomers : []).forEach(function(c){
     (c.orders||[]).forEach(function(o){
-      if (!o.cs || !memberSet.has(o.cs)) return;
+      if (!o.cs) return;
+      if (_dashIsExcludedStatus(o.status)) return;
       if (chanSet && !chanSet.has(String(o.source||'').trim())) return;
-      revenue += (+o.revenue||0); orders++;
+      // o.cs co the la "saleA, saleB" -> TACH ra, chi tinh phan cua thanh vien thuoc team nay
+      // (doanh thu chia deu N sale, so don giu nguyen) — truoc day so khop ca chuoi nen don
+      // nhieu sale bi bo sot hoan toan khoi doanh thu Team.
+      var names = splitMulti_(o.cs, ',');
+      if (!names.length) return;
+      var mine = names.filter(function(n){ return memberSet.has(n); }).length;
+      if (!mine) return;
+      revenue += (+o.revenue||0) * mine / names.length;
+      orders++;
     });
   });
   return { revenue: revenue, orders: orders };
@@ -13570,11 +13590,21 @@ function _srSyncTeamToSale_(teamField){
   var selTeams = _srState[teamField] || [];
   if (!selTeams.length) return;
   var union = [];
+  var notFound = [];
   selTeams.forEach(function(tname){
-    var t = (teams||[]).find(function(x){ return (x.name || '(chưa đặt tên)') === tname; });
-    if (!t) return;
+    var want = String(tname||'').trim().toLowerCase();
+    var t = (teams||[]).find(function(x){ return String(x.name || '(chưa đặt tên)').trim().toLowerCase() === want; });
+    if (!t) { notFound.push(tname); return; }
     [t.leader].concat(t.members||[]).filter(Boolean).forEach(function(n){ if (union.indexOf(n)===-1) union.push(n); });
   });
+  // KHONG ghi de bo loc Sale bang mang RONG: backend coi mang Sale rong = KHONG LOC GI (hien het
+  // du lieu) -> user tuong dang loc theo Team ma thuc ra dang xem toan bo. Neu khong khop duoc Team
+  // nao / Team khong co thanh vien nao -> bao ro va giu nguyen lua chon Sale hien co.
+  if (!union.length) {
+    toast('⚠ Không tìm thấy thành viên nào cho Team đã chọn' + (notFound.length ? ' ('+notFound.join(', ')+')' : ' (Team chưa có thành viên)') + ' — bấm "Đồng bộ" để cập nhật danh sách Team rồi thử lại');
+    return;
+  }
+  if (notFound.length) toast('⚠ Không khớp được Team: ' + notFound.join(', ') + ' — kết quả lọc chỉ gồm các Team còn lại');
   _srState[saleField] = union;
   if (saleField === 'eSale') _srState.eSaleCustomized = true;
   if (saleField === 'gSale') _srState.gSaleCustomized = true;
@@ -13733,6 +13763,27 @@ function renderSalesReportTab(){
   }
   _srEnforceScope();
   if (!_srState.optionsLoaded) _srLoadOptions();
+  // `teams` (biến global) CHỈ được đồng bộ lại từ server khi bấm "Đồng bộ" đầy đủ (xem wrap
+  // syncFromGS, opts.manual/opts.pullOrders) — nếu team vừa được đổi tên/tạo mới ở máy/phiên khác,
+  // `teams` trong localStorage ('ome_teams') có thể cũ, khiến _srSyncTeamToSale_ không khớp được
+  // tên Team đã chọn -> am tham tra ve mang rong -> bo loc Sale coi nhu KHONG LOC GI (hien het du
+  // lieu thay vi loc dung Team). Tu dong keo lai 1 lan moi phien khi vao tab Bao cao de giam rui ro.
+  if (!_srState._teamsAutoSynced && gsUrl) {
+    _srState._teamsAutoSynced = true;
+    (async function(){
+      try {
+        var sep = gsUrl.includes('?') ? '&' : '?';
+        var r = await fetch(gsUrl + sep + 'action=teams', { redirect:'follow' });
+        var d = await r.json();
+        if (d && d.teams && d.teams.length) {
+          teams = d.teams;
+          saveLS('ome_teams', teams);
+          _srState.teamOptions = teams.map(function(t){ return t.name || '(chưa đặt tên)'; });
+          if (_srState.sub) renderSalesReportTab();
+        }
+      } catch(e) { /* GAS cu chua ho tro action=teams -> bo qua, giu ban local */ }
+    })();
+  }
   // Danh sách team cho combo "Lọc theo Team" — lấy trực tiếp từ `teams` (tab Quản lý Team), không
   // cần gọi thêm action backend. Đặt tên trùng để tránh 2 team trùng tên gây nhầm khi lọc.
   _srState.teamOptions = (teams||[]).map(function(t){ return t.name || '(chưa đặt tên)'; });
