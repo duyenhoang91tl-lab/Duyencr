@@ -431,6 +431,8 @@ tr:hover td{background:var(--surface2);cursor:pointer;}
 .stat-l{font-size:10px;color:var(--muted);margin-top:2px;}
 .form-row{display:flex;flex-direction:column;gap:3px;margin-bottom:9px;}
 .form-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--hint);}
+.fld-edit-btn{margin-left:6px;border:1px solid var(--border-md);background:var(--surface);color:var(--muted);border-radius:4px;padding:0 5px;font-size:11px;line-height:16px;cursor:pointer;text-transform:none;letter-spacing:0;vertical-align:middle}
+.fld-edit-btn:hover{background:var(--surface2);color:var(--text)}
 select.form-select,input.form-input,textarea.form-ta{width:100%;padding:6px 9px;border:1px solid var(--border);border-radius:var(--rsm);font-size:12px;background:var(--surface);color:var(--text);outline:none;font-family:inherit;}
 select.form-select:focus,input.form-input:focus,textarea.form-ta:focus{border-color:var(--green);}
 textarea.form-ta{resize:vertical;min-height:58px;}
@@ -1891,6 +1893,7 @@ function openGoldUnitModal(){
 // 2 trường này luôn tồn tại vì có cột riêng trong CareData, chỉ đổi được CÁCH GỌI/hiển thị).
 let FIELD_LABEL_CS = loadLS('ome_field_label_cs') || 'Tình trạng CS';
 let FIELD_LABEL_KH = loadLS('ome_field_label_kh') || 'Trạng thái KH';
+let FIELD_LABEL_ZALO = loadLS('ome_field_label_zalo') || 'Kết bạn Zalo';   // sửa trực tiếp ở ô trường (✏ cạnh nhãn) — xem openFieldEditor
 async function _syncFieldLabelsFromGAS() {
   if (!gsUrl) return;
   try {
@@ -1900,6 +1903,12 @@ async function _syncFieldLabelsFromGAS() {
     var r2 = await fetch(gsUrl + '?action=getSetting&key=fieldLabelKH', {redirect:'follow'});
     var d2 = await r2.json();
     if (d2 && d2.value) { FIELD_LABEL_KH = d2.value; saveLS('ome_field_label_kh', FIELD_LABEL_KH); }
+    var r3 = await fetch(gsUrl + '?action=getSetting&key=fieldLabelZalo', {redirect:'follow'});
+    var d3 = await r3.json();
+    if (d3 && d3.value) { FIELD_LABEL_ZALO = d3.value; saveLS('ome_field_label_zalo', FIELD_LABEL_ZALO); }
+    var r4 = await fetch(gsUrl + '?action=getSetting&key=zaloStatusOpts', {redirect:'follow'});
+    var d4 = await r4.json();
+    if (d4 && d4.value) { var arr = JSON.parse(d4.value); if (Array.isArray(arr) && arr.length) { _zaloApplyOpts_(arr); saveLS('ome_zalo_status_opts', ZALO_STATUS.slice()); } }
   } catch(e) {}
   _applyFieldLabels();
 }
@@ -2333,7 +2342,7 @@ function _renderCustomFieldInputs(care) {
   var vals = (care && care.custom) || {};
   var cells = CUSTOM_FIELDS.map(function(f){
     return '<div>'
-      + '<div class="form-label">' + esc(f.label) + '</div>'
+      + '<div class="form-label fld-lbl" data-fld="cf:' + esc(f.id) + '">' + esc(f.label) + _fieldEditBtn('cf:' + f.id) + '</div>'
       + '<select class="form-select" id="cf-' + esc(f.id) + '" data-cfid="' + esc(f.id) + '">'
       + _buildCustomFieldOptions(f, vals[f.id] || '')
       + '</select></div>';
@@ -2442,6 +2451,21 @@ const ZALO_STATUS = [
   'Đã kết bạn','Chưa kết bạn','Chưa đồng ý','Không nhận tn lạ',
   'Chặn','Hủy kết bạn','Không tìm thấy zl','ZL NHD/K có','Zalo ngừng hd'
 ];
+// Danh sách lựa chọn "Kết bạn Zalo" admin sửa được ngay ở ô trường. Luôn giữ 'Đã kết bạn' vì hệ thống dựa vào giá trị này
+// (tỷ lệ phản hồi Zalo / KH đã kết bạn, lọc...). Sửa tại chỗ (mutate) để mọi nơi dùng ZALO_STATUS thấy ngay.
+function _zaloApplyOpts_(arr) {
+  var clean = (arr || []).map(function(x){ return String(x).trim(); }).filter(Boolean);
+  clean = clean.filter(function(x, i){ return clean.indexOf(x) === i; });
+  if (clean.indexOf('Đã kết bạn') === -1) clean.unshift('Đã kết bạn');
+  ZALO_STATUS.length = 0; clean.forEach(function(x){ ZALO_STATUS.push(x); });
+}
+(function(){ var o = loadLS('ome_zalo_status_opts'); if (Array.isArray(o) && o.length) _zaloApplyOpts_(o); })();
+// <option> cho ô Kết bạn Zalo — giữ cả giá trị khách đang có dù đã bị xoá khỏi danh sách (không thì lưu sẽ làm mất giá trị)
+function _zaloOptionsHtml_(cur) {
+  var list = ZALO_STATUS.slice();
+  if (cur && list.indexOf(cur) === -1) list.push(cur);
+  return '<option value="">— Chọn —</option>' + list.map(function(x){ return '<option value="' + esc(x) + '"' + (cur === x ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('');
+}
 const SCHED_TYPES = [
   {key:'goi',     label:'Hẹn gọi',       color:'#2563eb'},
   {key:'sp',      label:'Nhắc SP',        color:'#059669'},
@@ -4585,16 +4609,15 @@ function renderCareTab(c) {
     <div class="dp-stitle">Thông tin chăm sóc</div>
     <div class="form-row-2">
       <div>
-        <div class="form-label">${esc(FIELD_LABEL_CS)}</div>
+        <div class="form-label fld-lbl" data-fld="cs">${esc(FIELD_LABEL_CS)}${_fieldEditBtn('cs')}</div>
         <select class="form-select" id="cs-status" onchange="_hOnCsStatusChange_()">
           ${_buildCareStatusOptions(care.status||c.careStatus||'')}
         </select>
       </div>
       <div>
-        <div class="form-label">Kết bạn Zalo</div>
+        <div class="form-label fld-lbl" data-fld="zalo">${esc(FIELD_LABEL_ZALO)}${_fieldEditBtn('zalo')}</div>
         <select class="form-select" id="cs-zalo">
-          <option value="">— Chọn —</option>
-          ${ZALO_STATUS.map(x=>`<option value="${x}" ${(care.zalo||c.zaloStatus)===x?'selected':''}>${x}</option>`).join('')}
+          ${_zaloOptionsHtml_(care.zalo||c.zaloStatus||'')}
         </select>
         <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;cursor:pointer" title="Tích khi khách đã nhắn lại / tương tác trên Zalo. Báo cáo chia data dùng để tính tỷ lệ phản hồi Zalo / KH đã kết bạn Zalo.">
           <input type="checkbox" id="cs-zalo-reply" ${((care.custom||c.custom||{}).zaloReply)?'checked':''}> 💬 Phản hồi Zalo
@@ -4603,7 +4626,7 @@ function renderCareTab(c) {
     </div>
     <div class="form-row-2">
       <div>
-        <div class="form-label">${esc(FIELD_LABEL_KH)}</div>
+        <div class="form-label fld-lbl" data-fld="kh">${esc(FIELD_LABEL_KH)}${_fieldEditBtn('kh')}</div>
         <select class="form-select" id="cs-kh-status" onchange="this.dataset.manual='1'">
           ${_buildCustStatusOptions(care.khStatus||'')}
         </select>
@@ -19389,6 +19412,96 @@ if (typeof _dbStandalone !== 'undefined' && _dbStandalone){
   }, 250);
 }
 
+// ════════════════════════════════════════════════════════════════════
+//  SỬA TRƯỜNG TRỰC TIẾP NGAY Ở Ô TRƯỜNG (admin) — thay cho 2 nút ✏️ cạnh "Admin" trên header
+// ════════════════════════════════════════════════════════════════════
+// Nút ✏ nằm cạnh nhãn của MỌI trường trong hồ sơ khách (Tình trạng CS, Kết bạn Zalo, Trạng thái KH và các trường tự tạo,
+// kể cả đã tạo từ trước): đổi tên hiển thị + sửa danh sách lựa chọn. Cây lựa chọn mẹ/con của CS / KH / trường tự tạo vẫn
+// sửa ở trình soạn cây có sẵn (nút "Sửa danh sách lựa chọn" mở đúng trường đó); "Kết bạn Zalo" sửa thẳng trong hộp này.
+function _fieldEditBtn(key) {
+  var isAdmin = (typeof _authAccount !== 'undefined' && _authAccount && _authAccount.role === 'admin') || (typeof _bootstrapAdmin !== 'undefined' && _bootstrapAdmin);
+  return isAdmin ? '<button type="button" class="fld-edit-btn" title="Sửa trường này (tên, lựa chọn)" onclick="openFieldEditor(\'' + String(key).replace(/'/g, "\\'") + '\')">✏</button>' : '';
+}
+function _feCfIndex(key) { var id = String(key).slice(3); return CUSTOM_FIELDS.findIndex(function(f){ return f.id === id; }); }
+function _feCurLabel(key) {
+  if (key === 'cs') return FIELD_LABEL_CS;
+  if (key === 'kh') return FIELD_LABEL_KH;
+  if (key === 'zalo') return FIELD_LABEL_ZALO;
+  var i = _feCfIndex(key); return i >= 0 ? CUSTOM_FIELDS[i].label : '';
+}
+function openFieldEditor(key) {
+  var isAdmin = (_authAccount && _authAccount.role === 'admin') || _bootstrapAdmin;
+  if (!isAdmin) { toast('Chỉ admin mới sửa trường.'); return; }
+  if (key.indexOf('cf:') === 0 && _feCfIndex(key) < 0) { toast('Không tìm thấy trường này (có thể đã bị xoá).'); return; }
+  var old = document.getElementById('fld-edit-modal'); if (old) old.remove();
+  var extra = key === 'zalo'
+    ? '<div class="form-label" style="margin:10px 0 4px">Các lựa chọn (mỗi dòng 1 lựa chọn)</div>' +
+      '<textarea id="fe-opts" class="form-ta" rows="9" style="width:100%;box-sizing:border-box">' + esc(ZALO_STATUS.join('\n')) + '</textarea>' +
+      '<div style="font-size:11px;color:var(--hint);margin-top:4px">Lựa chọn <b>"Đã kết bạn"</b> luôn được giữ (hệ thống dùng để tính tỷ lệ phản hồi Zalo) — đừng đổi tên nó. Khách đang có giá trị đã bị xoá vẫn giữ nguyên giá trị đó. Zalo AI / Pancake AI dùng danh sách riêng trong extension.</div>'
+    : '<div style="margin-top:10px"><button type="button" class="btn sm" onclick="_feOpenTree(\'' + key + '\')">⚙ Sửa danh sách lựa chọn (mẹ / con)…</button></div>';
+  var m = document.createElement('div');
+  m.id = 'fld-edit-modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:2000;display:flex;align-items:flex-start;justify-content:center;padding-top:60px';
+  m.innerHTML = '<div style="background:var(--surface);border-radius:10px;padding:16px;width:min(440px,92vw);box-shadow:0 10px 30px rgba(0,0,0,.25)">' +
+    '<div style="font-size:14px;font-weight:700;margin-bottom:10px">✏ Sửa trường</div>' +
+    '<div class="form-label" style="margin-bottom:4px">Tên hiển thị</div>' +
+    '<input id="fe-label" class="form-input" style="width:100%;box-sizing:border-box" value="' + esc(_feCurLabel(key)) + '">' + extra +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">' +
+      '<button type="button" class="btn sm" onclick="document.getElementById(\'fld-edit-modal\').remove()">Hủy</button>' +
+      '<button type="button" class="btn sm primary" id="fe-save" onclick="_feSave(\'' + key + '\')">💾 Lưu</button></div></div>';
+  m.addEventListener('mousedown', function(e){ if (e.target === m) m.remove(); });
+  document.body.appendChild(m);
+  var inp = document.getElementById('fe-label'); if (inp) { inp.focus(); inp.select(); }
+}
+function _feOpenTree(key) {
+  var m = document.getElementById('fld-edit-modal'); if (m) m.remove();
+  if (key === 'cs') openCareStatusModal();
+  else if (key === 'kh') openKhStatusModal();
+  else if (key.indexOf('cf:') === 0) {
+    var i = _feCfIndex(key);
+    openCustomFieldsModal();
+    if (i >= 0) { _cfEditingIdx = i; _renderCfModal(); }
+  }
+}
+async function _fePostSetting(key, value) {
+  if (!gsUrl) return 'local';
+  try {
+    var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'setSetting', key: key, value: value }) });
+    var d = await r.json().catch(function(){ return {}; });
+    return (d && d.error) ? ('lỗi GSheets: ' + d.error) : 'ok';
+  } catch(e) { return 'lỗi mạng: ' + e.message; }
+}
+async function _feSave(key) {
+  var name = (document.getElementById('fe-label').value || '').trim();
+  if (!name) { toast('Tên không được để trống.'); return; }
+  var btn = document.getElementById('fe-save'); if (btn) { btn.disabled = true; btn.textContent = '⏳ Đang lưu...'; }
+  var status = 'ok', domOnly = true;
+  if (key === 'cs' || key === 'kh') {
+    if (key === 'kh') { FIELD_LABEL_KH = name; saveLS('ome_field_label_kh', name); } else { FIELD_LABEL_CS = name; saveLS('ome_field_label_cs', name); }
+    _applyFieldLabels();
+    status = await _fePostSetting(key === 'kh' ? 'fieldLabelKH' : 'fieldLabelCS', name);
+  } else if (key === 'zalo') {
+    var opts = (document.getElementById('fe-opts').value || '').split('\n');
+    FIELD_LABEL_ZALO = name; saveLS('ome_field_label_zalo', name);
+    _zaloApplyOpts_(opts); saveLS('ome_zalo_status_opts', ZALO_STATUS.slice());
+    var sel = document.getElementById('cs-zalo');   // vẽ lại các lựa chọn tại chỗ, giữ giá trị đang chọn (không vẽ lại cả form để khỏi mất chữ CS đang gõ)
+    if (sel) sel.innerHTML = _zaloOptionsHtml_(sel.value);
+    var s1 = await _fePostSetting('fieldLabelZalo', name), s2 = await _fePostSetting('zaloStatusOpts', JSON.stringify(ZALO_STATUS));
+    status = (s1 === 'ok' && s2 === 'ok') ? 'ok' : (s1 === 'local' ? 'local' : (s1 !== 'ok' ? s1 : s2));
+  } else {
+    var i = _feCfIndex(key);
+    if (i >= 0 && CUSTOM_FIELDS[i].label !== name) {
+      _cfDraft = JSON.parse(JSON.stringify(CUSTOM_FIELDS)); _cfDraft[i].label = name;
+      domOnly = false;
+      await saveCustomFields();   // đã tự lưu local + đồng bộ GAS + vẽ lại form chi tiết
+    }
+  }
+  var el = document.querySelector('.fld-lbl[data-fld="' + key + '"]');
+  if (el && el.firstChild && el.firstChild.nodeType === 3) el.firstChild.nodeValue = name;   // đổi chữ nhãn ngay, giữ nguyên nút ✏
+  var m = document.getElementById('fld-edit-modal'); if (m) m.remove();
+  if (domOnly) toast(status === 'ok' ? '✓ Đã lưu và đồng bộ' : status === 'local' ? '✓ Đã lưu (local)' : '✓ Đã lưu local — chưa đồng bộ: ' + status);
+}
+
 // Nút tài khoản / đăng xuất trên header
 function _renderAuthHeader(){
   var hdrR = document.querySelector('.hdr-r'); if (!hdrR) return;
@@ -19405,9 +19518,7 @@ function _renderAuthHeader(){
   var loggedIn = !!_authAccount;
   var html = '';
   if (isAdmin) html += '<button class="btn sm" data-bar-id="hdr-carestatus" data-bar-home="#auth-box" title="Quản lý ' + esc(FIELD_LABEL_CS) + '" onclick="openCareStatusModal()">⚙ ' + esc(FIELD_LABEL_CS) + '</button>';
-  if (isAdmin) html += '<button class="btn sm" style="padding:4px 6px" title="Đổi tên trường này" onclick="renameBuiltinField(\'cs\')">✏️</button>';
   if (isAdmin) html += '<button class="btn sm" data-bar-id="hdr-khstatus" data-bar-home="#auth-box" title="Quản lý ' + esc(FIELD_LABEL_KH) + '" onclick="openKhStatusModal()">⚙ ' + esc(FIELD_LABEL_KH) + '</button>';
-  if (isAdmin) html += '<button class="btn sm" style="padding:4px 6px" title="Đổi tên trường này" onclick="renameBuiltinField(\'kh\')">✏️</button>';
   if (isAdmin) html += '<button class="btn sm" data-bar-id="hdr-customfield" data-bar-home="#auth-box" title="Tự tạo trường lớn mới (ngoài ' + esc(FIELD_LABEL_CS) + ' / ' + esc(FIELD_LABEL_KH) + ')" onclick="openCustomFieldsModal()">➕ Trường tự tạo</button>';
   if (isAdmin) html += '<button class="btn sm" data-bar-id="hdr-account" data-bar-home="#auth-box" title="Quản lý tài khoản đăng nhập" onclick="openAcctModal()">🔑 Tài khoản</button>';
   if (loggedIn) html += '<button class="btn sm" data-bar-id="hdr-logout" data-bar-home="#auth-box" title="Đăng xuất" onclick="doLogout()">⎋ Đăng xuất</button>';
