@@ -447,6 +447,11 @@ function doGetCore_(e) {
       if (!_adminKeyOk_(e && e.parameter ? e.parameter.adminKey : '')) return jsonOut_({ error: 'Can khoa quan tri (adminKey) cho thao tac Supabase.' });
       return jsonOut_(sbPing_());
     }
+    // ── SUPABASE (buoc 2d): doi chieu CareData Sheet vs Supabase (&sample=1..300). Can adminKey ──
+    if (action === 'sbCompareCare') {
+      if (!_adminKeyOk_(e && e.parameter ? e.parameter.adminKey : '')) return jsonOut_({ error: 'Can khoa quan tri (adminKey) cho thao tac Supabase.' });
+      return jsonOut_(sbCompareCare_({ sample: e.parameter.sample }));
+    }
 
     // ── MAU TIN NHAN TU VAN KHACH: danh sach mau (CRM tab ZALO AI va extension Pancake AI dung chung) ──
     if (action === 'messageTemplates') {

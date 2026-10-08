@@ -90,10 +90,12 @@ props.SUPABASE_KEY = k;
 if (run("typeof sbCompareCare_") === 'function') {
   let c = run('sbCompareCare_({sample:200})');
   ok(c.ok && c.sheetDistinctPhones === 1201 && c.supabaseRows === 1201 && c.mismatchCount === 0, 'compare khop: ' + JSON.stringify(c));
-  table.get('0912100010').note = 'SAI';
+  table.get('0912100008').note = 'SAI';   // chi so 8 nam trong mau (buoc nhay 4 khi sample=300)
   c = run('sbCompareCare_({sample:300})'); ok(!c.ok && c.mismatchCount >= 1 && c.mismatches[0].cols.includes('note'), 'phat hien lech truong');
-  table.get('0912100010').note = 'note 10';
+  table.get('0912100008').note = 'note 8';
   table.delete('0912100020'); c = run('sbCompareCare_({sample:300})'); ok(!c.ok && c.supabaseRows === 1200, 'phat hien lech so dong');
   fail = true; c = run('sbCompareCare_({})'); ok(!c.ok && !JSON.stringify(c).includes('SECRETKEY'), 'compare loi HTTP'); fail = false;
+  table.clear(); c = run('sbCompareCare_({sample:50})'); ok(!c.ok && c.supabaseRows === 0 && c.mismatchCount === 50, 'bang Supabase rong: bao thieu, khong ok');
+  console.log('compare section: da chay');
 }
 console.log('ALL TESTS PASSED');

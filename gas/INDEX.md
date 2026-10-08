@@ -95,6 +95,6 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `ARCHIVE_SUFFIX_`, `ARCHIVE_LOG_SHEET_`, `ARCHIVE_DEFAULT_MONTHS_`, `ARCHIVE_MIN_MONTHS_`, `ARCHIVE_MAX_ROWS_PER_RUN_`, `ARCHIVE_MAX_DELETE_RUNS_`, `ARCHIVE_APPLY_ENABLED_`
 
 ## 22_Supabase.gs
-- Hàm: `sbCfg_`, `sb_`, `_sbCell_`, `sbCareRowToRec_`, `sbPing_`, `sbPingTick_`, `installSbPingTrigger_`, `caiTriggerSbPing`, `sbBackfillCare_`
+- Hàm: `sbCfg_`, `sb_`, `_sbCell_`, `sbCareRowToRec_`, `sbPing_`, `sbPingTick_`, `installSbPingTrigger_`, `caiTriggerSbPing`, `sbBackfillCare_`, `_sbHeader_`, `sbCompareCare_`
 - Hằng/biến: `SB_BATCH_`, `SB_TIME_BUDGET_MS_`, `SB_CARE_COLS_`
 

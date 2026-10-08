@@ -131,3 +131,59 @@ function sbBackfillCare_(opts) {
     return { ok: false, error: String(e && e.message || e) };
   } finally { try { lock.releaseLock(); } catch (eL) {} }
 }
+
+function _sbHeader_(headers, name) {
+  var low = String(name).toLowerCase();
+  for (var k in headers) if (String(k).toLowerCase() === low) return headers[k];
+  return '';
+}
+
+// Doi chieu CareData (Sheet) vs care_data (Supabase): (1) so SDT khac nhau tren Sheet == so dong Supabase, (2) so sanh TUNG TRUONG tren
+// mau rai deu cac dong dau tien cua moi SDT. opts.sample (mac dinh 100, toi da 300). ok=true chi khi (1) khop va khong co lech o (2).
+// Day la doi chieu theo mau (khong phai checksum toan bang): muon chac hon thi tang sample hoac chay nhieu lan sau khi backfill xong.
+function sbCompareCare_(opts) {
+  opts = opts || {};
+  var sample = Math.max(1, Math.min(300, parseInt(opts.sample, 10) || 100));
+  try {
+    var sh = getSheet_(SH_CARE, CARE_HEADERS);
+    var last = sh.getLastRow();
+    var rows = Math.max(0, last - 1), distinct = {}, nDistinct = 0, noPhone = 0, picks = [];
+    if (rows) {
+      var col = sh.getRange(2, 1, rows, 1).getValues();
+      for (var i = 0; i < col.length; i++) {
+        var p = normPhone_(_sbCell_(col[i][0]));
+        if (!p) { noPhone++; continue; }
+        if (!distinct[p]) { distinct[p] = i + 2; nDistinct++; }   // dong DAU tien cua moi SDT
+      }
+      var firstRows = []; for (var ph in distinct) firstRows.push(distinct[ph]);
+      firstRows.sort(function (a, b) { return a - b; });
+      var step = Math.max(1, Math.floor(firstRows.length / sample));
+      for (var s = 0; s < firstRows.length && picks.length < sample; s += step) picks.push(firstRows[s]);
+    }
+    // limit=1 + count=exact -> Content-Range "0-0/N" (hoac "*/0" khi bang rong); khong dung header Range de tranh 416 tren bang rong.
+    var res = sb_('GET', 'care_data?select=phone&limit=1', null, { Prefer: 'count=exact' });
+    var cr = String(_sbHeader_(res.headers, 'content-range') || ''), m = cr.match(/\/(\d+)$/);
+    var sbCount = m ? parseInt(m[1], 10) : -1;
+    var checked = 0, mismatches = [];
+    for (var b = 0; b < picks.length; b += 50) {
+      var chunk = picks.slice(b, b + 50), recs = {}, inList = [];
+      for (var c = 0; c < chunk.length; c++) {
+        var rec = sbCareRowToRec_(sh.getRange(chunk[c], 1, 1, CARE_HEADERS.length).getValues()[0]);
+        if (rec) { recs[rec.phone] = rec; inList.push('"' + rec.phone + '"'); }
+      }
+      if (!inList.length) continue;
+      var got = sb_('GET', 'care_data?select=*&phone=in.(' + encodeURIComponent(inList.join(',')) + ')').json || [];
+      var byPhone = {}; got.forEach(function (g) { byPhone[g.phone] = g; });
+      for (var ph2 in recs) {
+        checked++;
+        var g2 = byPhone[ph2];
+        if (!g2) { mismatches.push({ phone: ph2, problem: 'thieu tren Supabase' }); continue; }
+        var diff = [];
+        SB_CARE_COLS_.forEach(function (colName) { if (String(g2[colName] == null ? '' : g2[colName]) !== recs[ph2][colName]) diff.push(colName); });
+        if (diff.length) mismatches.push({ phone: ph2, problem: 'khac cot', cols: diff });
+      }
+    }
+    return { ok: (sbCount === nDistinct && mismatches.length === 0), sheetRows: rows, sheetDistinctPhones: nDistinct, sheetNoPhone: noPhone,
+      supabaseRows: sbCount, sampleChecked: checked, mismatches: mismatches.slice(0, 20), mismatchCount: mismatches.length };
+  } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+}
