@@ -79,7 +79,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `SH_BROADCAST`, `BROADCAST_HEADERS`, `BROADCAST_FOLDER_ID`, `SH_FU_TEMPLATE`, `FU_TEMPLATE_HEADERS`, `SH_FU_LOG`, `FU_LOG_HEADERS`, `SH_ZALO_SCAN`, `ZALO_SCAN_HEADERS`, `FU_CHECKPOINTS`, `FU_START`, `FU_SOURCES`, `PRODUCT_CODE_MAP_`, `_productCodeMapCache_`
 
 ## 18_Tasks_Menh_MsgTpl.gs
-- Hàm: `readTasks_`, `saveTaskEntry_`, `deleteTask_`, `readTaskComments_`, `saveTaskComment_`, `menhFromYear_`, `buildMenhRows_`, `ensureMenhSheedSeeded_`, `ensureCannedSheetSeeded_`, `getMessengerKnowledge_`, `saveCannedResponse_`, `deleteCannedResponse_`, `readMessageTemplates_`, `saveMessageTemplate_`, `deleteMessageTemplate_`
+- Hàm: `readTasks_`, `saveTaskEntry_`, `deleteTask_`, `readTaskComments_`, `saveTaskComment_`, `menhFromYear_`, `buildMenhRows_`, `ensureMenhSheedSeeded_`, `ensureCannedSheetSeeded_`, `getMessengerKnowledge_`, `_aiExId_`, `readAIExamples_`, `saveAIExample_`, `deleteAIExample_`, `saveCannedResponse_`, `deleteCannedResponse_`, `readMessageTemplates_`, `saveMessageTemplate_`, `deleteMessageTemplate_`
 - Hằng/biến: `SH_TASK`, `TASK_HEADERS`, `SH_TASK_COMMENT`, `TASK_COMMENT_HEADERS`, `SH_MENH`, `SH_CANNED`, `MENH_DEFAULT_ROWS`, `MENH_SHEET_MARK`, `CANNED_DEFAULT_ROWS`, `SH_MSG_TPL`, `MSG_TPL_HEADERS`
 
 ## 19_BannedList_MktChecklist.gs

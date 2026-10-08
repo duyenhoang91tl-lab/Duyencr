@@ -1596,6 +1596,17 @@ body.rpt-mode .app{height:100vh}
         </div>
         <div id="mt-list" style="display:flex;flex-direction:column;gap:8px"></div>
       </div>
+
+      <!-- Mau AI da hoc: cac cau tra loi CS da sua + bam "Luu de AI hoc" (Pancake AI / Zalo AI) -> sheet AIContext,
+           AI dua 5 mau MOI NHAT vao prompt. Quan ly o day: xem / sua / xoa mau sai. -->
+      <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+          <div class="zai-label" style="margin:0;font-size:13px;font-weight:700">🧠 Mẫu AI đã học (CS sửa tin rồi lưu)</div>
+          <button class="btn sm" onclick="loadAiExamples()" title="Tải lại">🔄</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px">AI dùng <b>5 mẫu mới nhất</b> ở đây để học cách trả lời. Mẫu sai thì sửa hoặc xoá để AI không học theo.</div>
+        <div id="aiex-list" style="display:flex;flex-direction:column;gap:8px"></div>
+      </div>
     </div>
 
     <div id="tab-mydata" style="display:none;flex:1;overflow:hidden;flex-direction:column" class="main">
@@ -20912,7 +20923,7 @@ function _closeTierOnOutside(e) {
     _prevSwitch(tab, el);
     var zp = document.getElementById('tab-zaloai');
     if (zp) zp.style.display = (tab === 'zaloai') ? 'flex' : 'none';
-    if (tab === 'zaloai') loadMsgTemplates();
+    if (tab === 'zaloai') { loadMsgTemplates(); loadAiExamples(); }
   };
 })();
 
@@ -20922,6 +20933,74 @@ function _closeTierOnOutside(e) {
 //  du lieu voi extension Pancake AI, nen KHONG cache rieng trong localStorage — luon fetch lai
 //  khi mo tab de thay thay doi tu noi khac (vd extension vua them mau moi).
 // ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+//  MAU AI DA HOC (AIContext / combo_template) — actions 'aiExamples' (GET), 'saveAIExample', 'deleteAIExample' (POST)
+// ═══════════════════════════════════════════════════════
+var _aiExamples = [];
+async function loadAiExamples() {
+  var el = document.getElementById('aiex-list');
+  if (!el) return;
+  el.innerHTML = '<div style="font-size:12px;color:var(--muted)">Đang tải...</div>';
+  try {
+    var sep = gsUrl.indexOf('?') >= 0 ? '&' : '?';
+    var r = await fetch(gsUrl + sep + 'action=aiExamples', { redirect: 'follow' });
+    var d = await r.json();
+    _aiExamples = (d && d.examples) || [];
+  } catch (e) {
+    el.innerHTML = '<div style="font-size:12px;color:#dc2626">Lỗi tải mẫu AI đã học, thử lại.</div>';
+    return;
+  }
+  renderAiExamples();
+}
+function renderAiExamples() {
+  var el = document.getElementById('aiex-list');
+  if (!el) return;
+  if (!_aiExamples.length) { el.innerHTML = '<div style="font-size:12px;color:var(--muted)">Chưa có mẫu nào — CS sửa gợi ý AI trên Pancake/Zalo rồi bấm "Lưu để AI học" sẽ hiện ở đây.</div>'; return; }
+  el.innerHTML = _aiExamples.map(function (x, i) {
+    var used = i < 5 ? '<span class="zi-chip" title="Đang được đưa vào prompt AI">đang dùng</span> ' : '';
+    return '<div style="border:1px solid var(--border);border-radius:9px;padding:10px;background:var(--surface)">' +
+      '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:6px;align-items:flex-start">' +
+        '<div style="font-size:11px;color:var(--muted)">' + used + esc(x.context || '') + '</div>' +
+        '<div style="display:flex;gap:4px;flex-shrink:0">' +
+          '<button class="btn sm" onclick="editAiExample(' + i + ')" title="Sửa">✏️</button>' +
+          '<button class="btn sm" onclick="deleteAiExample(' + i + ')" title="Xóa">🗑</button>' +
+        '</div>' +
+      '</div>' +
+      '<div id="aiex-body-' + i + '" style="font-size:12px;white-space:pre-wrap">' + esc(x.content) + '</div>' +
+    '</div>';
+  }).join('');
+}
+function editAiExample(i) {
+  var x = _aiExamples[i], b = document.getElementById('aiex-body-' + i);
+  if (!x || !b) return;
+  b.innerHTML = '<textarea id="aiex-ta-' + i + '" class="zai-textarea" rows="5" style="width:100%;margin-bottom:6px">' + esc(x.content) + '</textarea>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn sm" onclick="renderAiExamples()">Hủy</button>' +
+    '<button class="btn sm primary" onclick="saveAiExample(' + i + ',this)">Lưu</button></div>';
+}
+async function saveAiExample(i, btn) {
+  var x = _aiExamples[i], ta = document.getElementById('aiex-ta-' + i);
+  if (!x || !ta) return;
+  var content = (ta.value || '').trim();
+  if (!content) { alert('Nội dung mẫu không được trống.'); return; }
+  btn.disabled = true; btn.textContent = 'Đang lưu...';
+  try {
+    var r = await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify({ action: 'saveAIExample', id: x.id, content: content }) });
+    var d = await r.json();
+    if (!d || !d.ok) throw new Error((d && d.error) || 'Lưu thất bại');
+    x.content = content; renderAiExamples();
+  } catch (e) { alert('Lỗi lưu mẫu: ' + e.message); btn.disabled = false; btn.textContent = 'Lưu'; }
+}
+async function deleteAiExample(i) {
+  var x = _aiExamples[i];
+  if (!x || !confirm('Xóa mẫu AI đã học này? AI sẽ không học theo mẫu này nữa.')) return;
+  try {
+    var r = await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify({ action: 'deleteAIExample', id: x.id }) });
+    var d = await r.json();
+    if (!d || !d.ok) throw new Error((d && d.error) || 'Xóa thất bại');
+    _aiExamples.splice(i, 1); renderAiExamples();
+  } catch (e) { alert('Lỗi xóa mẫu: ' + e.message); }
+}
+
 var _msgTemplates = [];
 async function loadMsgTemplates() {
   var listEl = document.getElementById('mt-list');

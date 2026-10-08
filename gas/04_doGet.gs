@@ -410,6 +410,11 @@ function doGet(e) {
       return jsonOut_({ templates: readMessageTemplates_() });
     }
 
+    // ── MAU AI DA HOC (sheet AIContext, type combo_template): CRM xem/sua/xoa ──
+    if (action === 'aiExamples') {
+      return jsonOut_({ examples: readAIExamples_() });
+    }
+
     // default — backward compat voi appweb v10
     var resD = { rows: readCare_(ss.getSheetByName(SH_CARE)), orders: [] };
     if (!(e && e.parameter && e.parameter.noOrders)) resD.orders = readAllOrders_();

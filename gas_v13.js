@@ -1586,6 +1586,11 @@ function doGet(e) {
       return jsonOut_({ templates: readMessageTemplates_() });
     }
 
+    // ── MAU AI DA HOC (sheet AIContext, type combo_template): CRM xem/sua/xoa ──
+    if (action === 'aiExamples') {
+      return jsonOut_({ examples: readAIExamples_() });
+    }
+
     // default — backward compat voi appweb v10
     var resD = { rows: readCare_(ss.getSheetByName(SH_CARE)), orders: [] };
     if (!(e && e.parameter && e.parameter.noOrders)) resD.orders = readAllOrders_();
@@ -4855,6 +4860,8 @@ function doPost(e) {
     if (action === 'saveMessageTemplate')   return saveMessageTemplate_(data.template || data);
     if (action === 'deleteMessageTemplate') return deleteMessageTemplate_(data.id);
     if (action === 'saveCannedResponse')    return saveCannedResponse_(data.canned || data);
+    if (action === 'saveAIExample')         return saveAIExample_(data.id, data.content);
+    if (action === 'deleteAIExample')       return deleteAIExample_(data.id);
     if (action === 'deleteCannedResponse')  return deleteCannedResponse_(data.id);
     // ── CHECKLIST MKT: nhap tay theo ngay + muc tieu L1-L4 ──
     if (action === 'saveMktChecklistConfig')  return saveMktChecklistConfig_(data.month, data.config);
@@ -8317,6 +8324,56 @@ function getMessengerKnowledge_() {
     canned.push({ nhom: cannedData[c][0], id: cannedData[c][1], label: cannedData[c][2], text: cannedData[c][3] });
   }
   return { ok: true, menhTable: menhTable, canned: canned, bannedWords: readBannedWords_() };
+}
+
+// ─── MAU AI DA HOC (AIContext, type = combo_template) — do CS bam "Luu de AI hoc" tren Pancake/Zalo ───
+// Dinh danh 1 mau = cot 'created' (ISO, ghi luc luu) — khong dung so dong vi dong co the lech khi co nguoi xoa/chen.
+// Neu Google Sheets tu doi chuoi ISO thanh Date thi chuan hoa lai ve ISO truoc khi so sanh.
+function _aiExId_(v) {
+  if (Object.prototype.toString.call(v) === '[object Date]') return isNaN(v.getTime()) ? '' : v.toISOString();
+  return String(v || '').trim();
+}
+function readAIExamples_() {
+  var sh = getCrmSS_().getSheetByName(SH_CONTEXT);
+  var out = [];
+  if (!sh || sh.getLastRow() < 2) return out;
+  var vals = sh.getDataRange().getValues();
+  for (var i = 1; i < vals.length; i++) {
+    if (String(vals[i][0] || '').trim() !== 'combo_template') continue;
+    var id = _aiExId_(vals[i][3]);
+    if (!id || !String(vals[i][1] || '').trim()) continue;
+    out.push({ id: id, content: String(vals[i][1]), context: String(vals[i][2] || ''), created: id });
+  }
+  out.reverse(); // moi nhat len dau — cung la thu tu backend dua vao prompt (5 mau cuoi)
+  return out;
+}
+function saveAIExample_(id, content) {
+  id = String(id || '').trim(); content = String(content || '').trim();
+  if (!id || !content) return jsonOut_({ error: 'Thieu id hoac noi dung mau' });
+  var sh = getCrmSS_().getSheetByName(SH_CONTEXT);
+  if (!sh) return jsonOut_({ error: 'Chua co du lieu AI da hoc' });
+  var vals = sh.getDataRange().getValues();
+  for (var i = 1; i < vals.length; i++) {
+    if (String(vals[i][0] || '').trim() === 'combo_template' && _aiExId_(vals[i][3]) === id) {
+      sh.getRange(i + 1, 2).setValue(content);
+      return jsonOut_({ ok: true, id: id });
+    }
+  }
+  return jsonOut_({ error: 'Khong tim thay mau (co the da bi xoa)' });
+}
+function deleteAIExample_(id) {
+  id = String(id || '').trim();
+  if (!id) return jsonOut_({ error: 'Thieu id mau can xoa' });
+  var sh = getCrmSS_().getSheetByName(SH_CONTEXT);
+  if (!sh) return jsonOut_({ ok: true });
+  var vals = sh.getDataRange().getValues();
+  for (var i = 1; i < vals.length; i++) {
+    if (String(vals[i][0] || '').trim() === 'combo_template' && _aiExId_(vals[i][3]) === id) {
+      sh.deleteRow(i + 1);
+      return jsonOut_({ ok: true });
+    }
+  }
+  return jsonOut_({ ok: true, note: 'Khong tim thay (co the da bi xoa truoc do)' });
 }
 
 // ─── SUA / THEM / XOA "MAU CO SAN (PHONG THUY)" (sheet CannedResponses: Nhom | ID | Ten | NoiDung) ───
