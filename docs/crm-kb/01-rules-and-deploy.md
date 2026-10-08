@@ -24,7 +24,7 @@ Cả 2 extension gọi chung 1 URL GAS.
 1. Luôn clone repo MỚI NHẤT bằng token người dùng gửi trong tin nhắn đó (không dùng lại token cũ). Đọc kỹ file liên quan (view/grep) trước khi sửa.
 2. Sửa `gas_v13.js` → nhắc deploy thủ công (mục trên).
 3. Sửa JS/CSS extension → nhắc reload extension.
-4. Trước khi commit luôn syntax-check: `node -c` cho file `.js`; với `index.html` check từng khối `<script>` thực thi (bỏ qua `type="text/plain"`) bằng Function constructor trong Node. Không commit code chưa kiểm tra.
+4. Trước khi commit luôn syntax-check: `node -c` cho file `.js`; với client Sasum: `for f in js/*.js; do node -c $f; done` (code client đã tách khỏi `index.html` ra `js/`); khối `<script>` inline còn lại trong `index.html` (nhỏ, <40 dòng) check bằng Function constructor trong Node, bỏ qua `type="text/plain"`. Không commit code chưa kiểm tra.
 5. Push bị "rejected" (nhiều phiên cùng sửa): `git fetch` → `git rebase origin/main` → kiểm tra thay đổi của mình còn nguyên → push lại. KHÔNG force-push.
 6. Commit message phải nêu RÕ NGUYÊN NHÂN GỐC của lỗi, không chỉ liệt kê đã đổi gì.
 7. Sửa hàm dùng chung (vd `_srChartSvg`, `_donSaleNamesFromThe_`, `mergeExtFields_`, `_SRB_COMBO_CFG`...) → grep TOÀN BỘ nơi gọi trước.

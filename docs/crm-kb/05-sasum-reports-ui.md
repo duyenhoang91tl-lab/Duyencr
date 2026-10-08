@@ -1,6 +1,6 @@
-# 05 — Web app Sasum: Báo cáo doanh số A–F (`index.html`, ~22000+ dòng)
+# 05 — Web app Sasum: Báo cáo doanh số A–F (client ở `js/*.js` + `css/*.css`, tra hàm: `js/INDEX.md`)
 
-Phần server của báo cáo nằm ở `gas_v13.js` (xem `02-backend-gas.md`). Sửa `index.html`: syntax-check từng khối `<script>` thực thi (bỏ `type="text/plain"`). Chỉ đọc đúng đoạn liên quan (grep theo tên hàm), file rất lớn.
+Phần server của báo cáo nằm ở `gas_v13.js` (xem `02-backend-gas.md`). Sửa client: tìm hàm bằng `grep -n "function tenHam" js/*.js` (hoặc `js/INDEX.md`), syntax-check `node -c` từng file `js/*.js`. (Trước 2026-10-08 code này nằm inline trong `index.html`; các chỗ KB cũ nhắc "index.html" cho code client nay hiểu là `js/`.)
 
 ## Quy ước bảng
 Mọi bảng breakdown (Theo Sale/Kênh/MKT/Sản phẩm/CS thêm/Nhân viên...) kết thúc bằng 1 dòng "Tổng" in đậm, kẻ trên, dùng chung `_srTotalRowHtml_(cells)`. Cột % (VD %HT KPI báo cáo C) cho dòng tổng tính tỷ lệ có trọng số (Σkết quả ÷ ΣKPI) — KHÔNG cộng dồn % từng dòng.

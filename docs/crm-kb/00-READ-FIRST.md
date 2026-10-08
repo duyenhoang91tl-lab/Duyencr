@@ -13,12 +13,15 @@ Gồm: 1 backend Google Apps Script (`gas_v13.js`) + web app (`index.html`) + 2 
 | Việc cần làm | Đọc file KB | Sửa trong repo |
 |---|---|---|
 | Backend: action GAS, sheet, cột CareData, AI (`callAI_`), Settings, gửi hàng loạt phía server | `02-backend-gas.md` (+ `07-reference-tables.md`) | `gas_v13.js` (root) |
-| Báo cáo doanh số A–F, biểu đồ, bộ lọc, giao diện Sasum | `05-sasum-reports-ui.md` | `index.html` (client) + `gas_v13.js` (các hàm `buildSalesReport*_`) |
+| Báo cáo doanh số A–F, biểu đồ, bộ lọc, giao diện Sasum | `05-sasum-reports-ui.md` | `js/*.js` + `css/*.css` (client, tra hàm ở `js/INDEX.md`; `index.html` chỉ còn khung HTML) + `gas_v13.js` (các hàm `buildSalesReport*_`) |
 | Extension Zalo AI (panel, tra cứu, kết bạn, gửi hàng loạt, quét trạng thái) | `03-extension-zalo.md` | `extension-zalo/zalo-content.js`, `zalo-content.css`, `zalo-options.*`, `zalo-popup.*`, `manifest.json` |
 | Extension Pancake AI (panel, selector DOM, giỏ hàng, Soạn đơn, bảng giá) | `04-extension-pancake.md` | `extension-pancake/pancake-content.js`, `pancake-background.js`, `pancake-content.css`, `pancake-options.*`, `pancake-popup.*`, `manifest.json` |
 | Deploy, commit, push, rebase, quy tắc bắt buộc, checklist | `01-rules-and-deploy.md` | — |
 | Tra bảng nhanh: action GAS, 20 cột CareData, storage key, tiền tố CSS, quyền manifest | `07-reference-tables.md` | — |
 | Báo lỗi lặp lại / dò lịch sử lỗi đã sửa | `06-bug-history.md` | — |
+
+## Web app Sasum đã TÁCH FILE (2026-10-08, chống lag)
+`index.html` (~112KB) chỉ còn khung HTML; CSS ở `css/01..04`, JS ở `js/NN-*.js` (nạp bằng `<script src>` đúng thứ tự cũ). Tra hàm → file: `js/INDEX.md` hoặc `grep -n "function tenHam" js/*.js`. KHÔNG đổi thứ tự thẻ `<script>` trong `index.html`. Chi tiết quy ước (file `fn-*` / `main-*`) ở đầu `js/INDEX.md`.
 
 ## Tuyệt đối không
 - Không sửa thư mục `extension/` (bản gộp cũ, chỉ để tham khảo).
