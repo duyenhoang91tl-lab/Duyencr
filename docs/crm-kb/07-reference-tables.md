@@ -32,6 +32,8 @@
 | addZaloNick | POST | Thêm nick Zalo mới vào danh sách chung |
 | count | GET | Trả field `ver` — đối chiếu bản backend đang chạy thật với code |
 | getGasSource / setGasSource | GET/POST | Đọc/ghi mã GAS (chunk trong Settings) cho nút Copy mã GAS |
+| sbPing / sbCompareCare | GET | Supabase (cần adminKey): kiểm tra kết nối / đối chiếu CareData Sheet vs Supabase (`&sample=1..300`). Code ở cuối `gas_v13.js` = `gas/22_Supabase.gs`; kế hoạch + trạng thái: `docs/SUPABASE-PLAN.md` |
+| sbBackfillCare | POST | Supabase (cần adminKey): đẩy CareData lên theo lô 500, resume bằng con trỏ; `dryRun` mặc định true, `reset:true` chạy lại từ đầu |
 
-## 20 cột CareData (đúng thứ tự, `CARE_HEADERS`)
-phone, status, zalo, cs, note, schedules, schedGoi, schedGoiNote, schedSP, schedSPNote, schedCS, schedCSNote, schedHen, schedHenNote, updated, khStatus, nickZalos, birthday, zaloSetBy, name
+## 22 cột CareData (đúng thứ tự, `CARE_HEADERS`; 2 cột cuối `custom`, `zaloPhones` thêm sau — khớp `supabase/schema.sql`)
+phone, status, zalo, cs, note, schedules, schedGoi, schedGoiNote, schedSP, schedSPNote, schedCS, schedCSNote, schedHen, schedHenNote, updated, khStatus, nickZalos, birthday, zaloSetBy, name, custom, zaloPhones
