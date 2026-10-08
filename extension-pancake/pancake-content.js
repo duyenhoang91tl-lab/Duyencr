@@ -29,13 +29,13 @@
     'Chờ gọi tư vấn', 'Đã gọi - đang theo dõi', 'Hẹn gọi lại',
     'Không nghe máy', 'Đã chốt', 'Từ chối', 'Đang khiếu nại', 'Tạm ngừng chăm sóc'
   ];
-  const MENH_TABLE_DEFAULT = {
-    'Kim': [1954,1955,1962,1963,1970,1971,1984,1985,1992,1993,2000,2001],
-    'Thủy': [1956,1957,1964,1965,1972,1973,1986,1987,1994,1995,2002,2003],
-    'Hỏa': [1958,1959,1966,1967,1974,1975,1988,1989,1996,1997,2004,2005],
-    'Mộc': [1960,1961,1968,1969,1982,1983,1990,1991,1998,1999,2012,2013],
-    'Thổ': [1976,1977,1978,1979,1980,1981,2006,2007,2008,2009,2010,2011]
-  };
+  // Bảng mệnh dự phòng: sinh từ công thức nạp âm (menhFromYear, khai báo bên dưới, được hoist) cho 1900–2100.
+  // Bảng cũ gõ tay sai 44/60 năm. Chỉ còn dùng làm giá trị mặc định; tinhMenh_ gọi thẳng công thức.
+  const MENH_TABLE_DEFAULT = (function () {
+    const t = { 'Kim': [], 'Thủy': [], 'Hỏa': [], 'Mộc': [], 'Thổ': [] };
+    for (let y = 1900; y <= 2100; y++) t[menhFromYear(y)].push(y);
+    return t;
+  })();
   const CANNED_DEFAULT_MESSENGER = [
     { id:'menhkim', nhom:'Theo mệnh', label:'Mệnh Kim', text:'Dạ với người mệnh Kim thì màu hợp là màu trắng, vàng, bạc (thuộc hành Kim và Thổ vì Thổ sinh Kim ạ), nên tránh dùng nhiều màu đỏ, hồng, tím (hành Hỏa khắc Kim).\nĐá phong thủy hợp mệnh Kim: đá thạch anh trắng, đá mắt hổ vàng, ngọc trai, đá obsidian đen (Thủy tương sinh).\nBên em hiện có $$ rất phù hợp với mệnh Kim ạ, chị/anh xem qua thử nhé.' },
     { id:'menhmoc', nhom:'Theo mệnh', label:'Mệnh Mộc', text:'Dạ với người mệnh Mộc thì màu hợp là màu xanh lá, xanh dương, đen (hành Mộc và Thủy vì Thủy sinh Mộc ạ), nên tránh dùng nhiều màu trắng, bạc (hành Kim khắc Mộc).\nĐá phong thủy hợp mệnh Mộc: đá aventurine xanh, ngọc bích, đá obsidian đen.\nBên em hiện có $$ rất phù hợp với mệnh Mộc ạ, chị/anh xem qua thử nhé.' },
@@ -57,12 +57,43 @@
   let _menhTable = MENH_TABLE_DEFAULT;
   let _cannedResponses = CANNED_DEFAULT_MESSENGER;
   let _bannedWords = []; // [{tuCam, thayThe}] doc tu sheet "Luu y tu cam" (file Report Sale) qua getKnowledge
-  function tinhMenh_(namSinhStr) {
-    const n = parseInt(namSinhStr, 10);
-    if (!n || n < 1900 || n > 2100) return null;
-    for (const menh of Object.keys(_menhTable)) if (_menhTable[menh].includes(n)) return menh;
-    return null;
+  // ── Mệnh theo năm sinh (Ngũ hành nạp âm) + màu tương sinh / tương hợp ──
+  // Công thức: Can (Giáp,Ất=1; Bính,Đinh=2; Mậu,Kỷ=3; Canh,Tân=4; Nhâm,Quý=5) + Chi (Tý,Sửu,Ngọ,Mùi=0;
+  // Dần,Mão,Thân,Dậu=1; Thìn,Tỵ,Tuất,Hợi=2); tổng >5 thì trừ 5 → 1 Kim, 2 Thủy, 3 Hỏa, 4 Thổ, 5 Mộc.
+  // Đã đối chiếu đủ 1900–2100 với chuỗi nạp âm 60 năm. Tính theo năm dương lịch (sinh trước Tết thì lấy năm trước).
+  function menhMau_() { return {
+    'Kim':  { sinh: ['Vàng','Nâu'],              hop: ['Trắng'] },
+    'Mộc':  { sinh: ['Đen','Xanh dương'],        hop: ['Xanh lá cây'] },
+    'Thủy': { sinh: ['Trắng'],                   hop: ['Đen','Xanh dương'] },
+    'Hỏa':  { sinh: ['Xanh lá cây'],             hop: ['Đỏ','Hồng','Tím'] },
+    'Thổ':  { sinh: ['Đỏ','Hồng','Tím'],         hop: ['Vàng','Nâu'] }
+  }; }
+  function menhSwatch_() { return { 'Vàng':'#f2c200','Nâu':'#8b5a2b','Trắng':'#ffffff','Đen':'#222222','Xanh dương':'#2563eb','Xanh lá cây':'#16a34a','Đỏ':'#dc2626','Hồng':'#ec4899','Tím':'#7c3aed' }; }
+  function menhFromYear(y) {
+    y = parseInt(y, 10);
+    if (!y || y < 1900 || y > 2100) return null;
+    const can = Math.floor(((y - 4) % 10) / 2) + 1;
+    const chi = [0,0,1,1,2,2,0,0,1,1,2,2][(y - 4) % 12];
+    let s = can + chi; if (s > 5) s -= 5;
+    return ['', 'Kim', 'Thủy', 'Hỏa', 'Thổ', 'Mộc'][s];
   }
+  function menhYearValid(y) { y = String(y == null ? '' : y).trim(); return /^\d{4}$/.test(y) && +y >= 1900 && +y <= new Date().getFullYear(); }
+  function menhBoxHtml(y) {
+    y = String(y == null ? '' : y).trim();
+    if (!y) return '';
+    if (!menhYearValid(y)) return y.length === 4 ? '<span style="color:#dc2626">Năm sinh không hợp lệ</span>' : '';
+    const m = menhFromYear(y), t = menhMau_()[m], sw = menhSwatch_();
+    const chips = (arr) => arr.map((c) => '<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px;white-space:nowrap"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + sw[c] + ';border:1px solid rgba(0,0,0,.3)"></i>' + c + '</span>').join('');
+    return '<div style="font-weight:700;color:#2563eb">Mệnh ' + m + ' <span style="font-weight:400;color:#6b7280">(sinh năm ' + y + ')</span></div>'
+      + '<div><b>Tương sinh:</b> ' + chips(t.sinh) + '</div>'
+      + '<div><b>Tương hợp:</b> ' + chips(t.hop) + '</div>'
+      + '<div style="color:#9ca3af;font-size:10px">Ưu tiên tương sinh trước, sau đó tương hợp; tránh màu tương khắc. Ngọc &amp; Trầm hương không kén mệnh. Tính theo năm dương lịch (sinh trước Tết → lấy năm trước).</div>';
+  }
+  // Giá trị sinh nhật lưu trong cột birthday: "YYYY-MM-DD" (đủ ngày) HOẶC "YYYY" (chỉ năm sinh).
+  function bdayYearOnly_(v) { const s = String(v == null ? '' : v).trim(); return /^\d{4}$/.test(s) ? s : ''; }
+  // tinhMenh_: GIỮ tên cũ cho các nơi gọi; dùng công thức nạp âm (bảng _menhTable cũ từ sheet "Menh" sai 44/60 năm, vd 1995 ghi Thủy
+  // trong khi đúng là Hỏa) — không còn dùng bảng đó để tra mệnh.
+  function tinhMenh_(namSinhStr) { return menhFromYear(namSinhStr); }
   // Tu dong sua ten san pham dinh tu cam khi Sao chep don hang, theo dung sheet "Luu y tu cam" —
   // khop cum dai truoc (vd "túi tiền" truoc "tiền") de khong cat nham chu con lai trong cum.
   // 2 truong hop rieng nguoi dung yeu cau chinh xac (uu tien hon danh sach doc tu sheet, vi cot
@@ -394,7 +425,9 @@
               <div id="pk-tpl-row">
                 <input type="text" id="pk-tpl-q" placeholder="Tìm theo tiêu đề / nội dung / tag..." autocomplete="off" />
                 <button id="pk-tpl-refresh" title="Tải lại từ CRM">🔄</button>
+                <button id="pk-tpl-add" title="Thêm mẫu mới (lưu về CRM)">➕</button>
               </div>
+              <div id="pk-tpl-form"></div>
               <div id="pk-tpl-result"></div>
             </div>
           </div>
@@ -514,10 +547,28 @@
     _initPanelDrag_();
 
     const csSel = panelEl.querySelector('#pk-cs-sel');
-    csSel.addEventListener('change', () => {
-      chrome.storage.sync.set({ csName: csSel.value });
+    // KHOA CS: chon ten lan dau thi tu do (co hop xac nhan); tu lan sau muon doi sang NGUOI KHAC
+    // phai dang nhap dung tai khoan nguoi do (hoac tai khoan Admin) — xem _openCsLoginModal_.
+    // Luu y: day la khoa o giao dien extension (chong chon nham/gia danh), khong phai bao mat tuyet doi.
+    function _applyCs_(name) {
+      settings.csName = name;
+      chrome.storage.sync.set({ csName: name });
+      csSel.value = name;
       if (panelEl.querySelector('#pk-menu-sel')?.value === 'stats') loadStats_(); // đang xem số liệu → tải lại cho CS mới
       loadReminders_();
+    }
+    csSel.addEventListener('change', () => {
+      const target = csSel.value;
+      const prev = settings.csName || '';
+      if (target === prev) return;
+      if (!prev) {
+        if (!target) return;
+        if (!confirm('Bạn chọn "' + target + '" làm CS của máy này.\n\nChỉ chọn được 1 lần. Muốn đổi sang người khác sau này phải đăng nhập tài khoản của người đó (Admin đổi được tất cả).\n\nXác nhận chọn?')) { csSel.value = ''; return; }
+        _applyCs_(target);
+        return;
+      }
+      csSel.value = prev; // da khoa → hien lai CS cu, chi doi khi dang nhap thanh cong
+      if (target) _openCsLoginModal_(target, prev, _applyCs_);
     });
 
     panelEl.querySelector("#pk-ai-refresh").addEventListener("click", () => {
@@ -599,6 +650,7 @@
       if (e.key === "Enter") doCtkmSearch_();
     });
     panelEl.querySelector("#pk-tpl-refresh").addEventListener("click", () => loadMsgTemplates_());
+    panelEl.querySelector("#pk-tpl-add").addEventListener("click", () => openTplForm_(null));
     panelEl.querySelector("#pk-tpl-q").addEventListener("input", () => renderMsgTemplateRows_());
     panelEl.querySelectorAll('.pk-price-mode-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -703,6 +755,59 @@
       });
     });
     panelEl.querySelector("#pk-opener-btn").addEventListener("click", doGenerateOpeners_);
+  }
+
+  // Hop thoai bat dang nhap khi doi CS: duoc doi neu dang nhap dung tai khoan cua CS muon doi sang,
+  // HOAC tai khoan co vai tro admin (admin doi duoc het). Mat khau chi gui di xac thuc, khong luu.
+  function _openCsLoginModal_(target, current, onOk) {
+    const old = document.getElementById('pk-cs-login-ov');
+    if (old) old.remove();
+    const ov = document.createElement('div');
+    ov.id = 'pk-cs-login-ov';
+    ov.innerHTML = `
+      <div class="pk-cs-login-box">
+        <div class="pk-cs-login-title">Đổi CS: ${escapeHtml(current)} → ${escapeHtml(target)}</div>
+        <div class="pk-cs-login-hint">Đăng nhập tài khoản <b>${escapeHtml(target)}</b> để đổi. Admin có thể dùng tài khoản Admin.</div>
+        <input id="pk-cs-login-user" type="text" autocomplete="off" placeholder="Tài khoản">
+        <input id="pk-cs-login-pass" type="password" autocomplete="off" placeholder="Mật khẩu">
+        <div id="pk-cs-login-err"></div>
+        <div class="pk-cs-login-btns">
+          <button id="pk-cs-login-cancel" type="button">Huỷ</button>
+          <button id="pk-cs-login-ok" type="button">Đăng nhập & đổi</button>
+        </div>
+      </div>`;
+    document.body.appendChild(ov);
+    const $ = (id) => ov.querySelector(id);
+    $('#pk-cs-login-user').value = target;
+    const errEl = $('#pk-cs-login-err');
+    const okBtn = $('#pk-cs-login-ok');
+    const close = () => ov.remove();
+    $('#pk-cs-login-cancel').addEventListener('click', close);
+    ov.addEventListener('mousedown', (e) => { if (e.target === ov) close(); });
+    function submit() {
+      const u = $('#pk-cs-login-user').value.trim();
+      const p = $('#pk-cs-login-pass').value;
+      if (!u || !p) { errEl.textContent = 'Nhập đủ tài khoản và mật khẩu.'; return; }
+      okBtn.disabled = true; errEl.textContent = 'Đang kiểm tra...';
+      safeSendMessage_({ type: 'VERIFY_LOGIN', payload: { username: u, password: p } }, (resp) => {
+        okBtn.disabled = false;
+        const d = resp && resp.data;
+        if (!resp || !resp.ok || !d || !d.ok) {
+          errEl.textContent = (resp && resp.error) || (d && d.error) || 'Không xác thực được.';
+          return;
+        }
+        const same = String(d.username || '').trim().toLowerCase() === String(target).trim().toLowerCase();
+        if (!same && d.role !== 'admin') {
+          errEl.textContent = 'Tài khoản này không được đổi sang "' + target + '". Cần tài khoản của "' + target + '" hoặc Admin.';
+          return;
+        }
+        close();
+        onOk(target);
+      });
+    }
+    okBtn.addEventListener('click', submit);
+    $('#pk-cs-login-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+    setTimeout(() => $('#pk-cs-login-pass').focus(), 0);
   }
 
   // ── CS đang dùng (sticky theo máy, lưu chrome.storage.sync) ──
@@ -1290,17 +1395,97 @@
     });
   }
 
+  // Khối "CSKH-Duyên" (nguồn dữ liệu thứ 3: khách VIP/SPV) trong thẻ khách — hiện các trường CÓ giá trị.
+  // GAS không trả CCCD/MST cá nhân. Giữ khớp với khối cùng tên ở CRM (index.html: _renderCskhBlock_) và Zalo AI.
+  function _pkCskhHtml_(rows) {
+    if (!rows || !rows.length) return '';
+    const L = [['staff', 'NV phụ trách'], ['codeOrig', 'Mã KH'], ['codeOther', 'Mã KH khác'], ['internal', 'Nội bộ'], ['birthday', 'Sinh nhật'], ['gender', 'Giới tính'],
+      ['address', 'Địa chỉ'], ['email', 'Email'], ['company', 'Công ty'], ['taxCompany', 'MST công ty'], ['debt', 'Công nợ'], ['source', 'Nguồn'], ['note', 'Ghi chú']];
+    return `<div style="margin:6px 0;padding:6px 8px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;font-size:11.5px">` +
+      `<div style="font-weight:700;color:#5b21b6;margin-bottom:2px">🗂 CSKH-Duyên${rows.length > 1 ? ` (${rows.length} dòng trùng SĐT)` : ''}</div>` +
+      rows.map((r) => (r.name ? `<div style="font-weight:600">${escapeHtml(r.name)}${r.tier ? ` <span style="background:#7c3aed;color:#fff;border-radius:8px;padding:0 6px;font-size:10px">${escapeHtml(r.tier)}</span>` : ''}</div>` : (r.tier ? `<div><span style="background:#7c3aed;color:#fff;border-radius:8px;padding:0 6px;font-size:10px">${escapeHtml(r.tier)}</span></div>` : '')) +
+        L.filter((x) => r[x[0]]).map((x) => `<div><span style="color:#6b7280">${x[1]}:</span> ${escapeHtml(r[x[0]])}</div>`).join('')).join('<hr style="border:none;border-top:1px dashed #ddd6fe;margin:4px 0">') +
+      `</div>`;
+  }
+
+  // Khối "Người lên đơn / Sale tham gia bán" trong thẻ khách: gom từ đơn DT TỔNG (cột "Người tạo" = người lên đơn, cột "Sale bán" =
+  // sale tham gia bán) và từ "dữ liệu đơn" (cột "Thẻ" = sale tham gia đơn, GAS lookup trả trong data.don). Tên đếm theo số đơn có mặt.
+  function _pkSplitNames_(s) { return String(s || '').split(/[,;\n]/).map((x) => x.trim()).filter(Boolean); }
+  function _pkOrdTime_(v) {
+    if (!v) return 0;
+    const m = String(v).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (m) return new Date(+m[3], +m[2] - 1, +m[1]).getTime();
+    const t = Date.parse(v);
+    return isNaN(t) ? 0 : t;
+  }
+  function _pkOrdDay_(v) {
+    const t = _pkOrdTime_(v);
+    if (!t) return '';
+    const d = new Date(t);
+    return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+  function _pkTopNames_(rows, pick) {
+    const cnt = new Map();
+    rows.forEach((r) => {
+      const seen = new Set();
+      pick(r).forEach((n) => {
+        const k = n.toLowerCase();
+        if (seen.has(k)) return;
+        seen.add(k);
+        const e = cnt.get(k) || { name: n, n: 0 };
+        e.n++;
+        cnt.set(k, e);
+      });
+    });
+    return [...cnt.values()].sort((a, b) => b.n - a.n)
+      .map((e) => `<b>${escapeHtml(e.name)}</b>${e.n > 1 ? ` <span style="color:#6b7280">×${e.n}</span>` : ''}`).join(', ');
+  }
+  function _pkOrderPeopleHtml_(orders, don) {
+    const rows = [];
+    (orders || []).forEach((o) => {
+      const creator = String(o.creator || '').trim();
+      const sales = _pkSplitNames_(o.cs);
+      if (!creator && !sales.length) return;
+      rows.push({ t: _pkOrdTime_(o.date || o.orderDate), date: o.date || o.orderDate, src: '📦', creator, sales, rev: parseFloat(o.revenue) || 0 });
+    });
+    (don || []).forEach((o) => {
+      const sales = Array.isArray(o.sales) ? o.sales.filter(Boolean) : [];
+      if (!sales.length) return;
+      rows.push({ t: _pkOrdTime_(o.date), date: o.date, src: '🧾', creator: '', sales, rev: parseFloat(o.value) || 0 });
+    });
+    if (!rows.length) return '';
+    rows.sort((a, b) => b.t - a.t);
+    const creators = _pkTopNames_(rows, (r) => (r.creator ? [r.creator] : []));
+    const sales = _pkTopNames_(rows, (r) => r.sales);
+    const recent = rows.slice(0, 5).map((r) => {
+      const day = _pkOrdDay_(r.date);
+      const parts = [];
+      if (r.creator) parts.push(`Lên: ${escapeHtml(r.creator)}`);
+      if (r.sales.length) parts.push(`Bán: ${escapeHtml(r.sales.join(', '))}`);
+      if (r.rev) parts.push(`${Math.round(r.rev / 1000).toLocaleString('vi-VN')}K`);
+      return `<div style="color:#374151">${r.src} ${day ? day + ' · ' : ''}${parts.join(' · ')}</div>`;
+    }).join('');
+    return `<div style="margin:6px 0;padding:6px 8px;background:#ecfeff;border:1px solid #a5f3fc;border-radius:6px;font-size:11.5px">` +
+      `<div style="font-weight:700;color:#0e7490;margin-bottom:2px">👥 Người lên đơn &amp; sale bán</div>` +
+      (creators ? `<div><span style="color:#6b7280">Người lên đơn:</span> ${creators}</div>` : '') +
+      (sales ? `<div><span style="color:#6b7280">Sale tham gia bán:</span> ${sales}</div>` : '') +
+      `<div style="margin-top:3px;font-size:11px">${recent}</div>` +
+      `<div style="margin-top:2px;font-size:10px;color:#9ca3af">📦 đơn DT TỔNG · 🧾 dữ liệu đơn</div>` +
+      `</div>`;
+  }
+
   function renderCustomerCard(phone, data, opts) {
     const box = panelEl.querySelector("#pk-ai-customer");
     const { care, orders } = data;
+    const cskhRows = data.cskh || [];
     loadCartForCurrentPhone_(); // don hang dang tinh gan theo tung SDT — doi khach thi doi don
 
     const orderPanelName = extractOrderPanelName_();
     _currentOrderPanelName = orderPanelName;
-    const name = orderPanelName || (orders && orders[0] && orders[0].name) || (care && care.name) || phone;
+    const name = orderPanelName || (orders && orders[0] && orders[0].name) || (care && care.name) || (cskhRows[0] && cskhRows[0].name) || phone;
     const totalRevenue = (orders || []).reduce((s, o) => s + (parseFloat(o.revenue) || 0), 0);
     const products = [...new Set((orders || []).map((o) => o.product).filter(Boolean))].slice(0, 4).join(", ");
-    const isNew = !care && (!orders || !orders.length);
+    const isNew = !care && (!orders || !orders.length) && !cskhRows.length; // có ở CSKH-Duyên thì không phải khách lạ
     _pkZaloPhones = Array.isArray(care?.zaloPhones) ? care.zaloPhones.slice() : [];
 
     const optHtml = (opts, val) => opts.map((o) =>
@@ -1324,6 +1509,8 @@
         <div class="pk-ai-new-tag" id="pk-ai-new-tag" style="${isNew ? '' : 'display:none'}">⚠️ Chưa có trong hệ thống Sasum — lưu sẽ tạo mới</div>
         ${chips.length ? `<div class="pk-ai-cust-chips">${chips.map((c) => `<span class="pk-ai-chip">${c}</span>`).join('')}${customFieldChips_(care)}</div>` : (customFieldChips_(care) ? `<div class="pk-ai-cust-chips">${customFieldChips_(care)}</div>` : '')}
         ${products ? `<div class="pk-ai-cust-products">🏷 ${escapeHtml(products)}</div>` : ''}
+        ${blankNew ? '' : _pkOrderPeopleHtml_(orders, data.don)}
+        ${blankNew ? '' : _pkCskhHtml_(cskhRows)}
 
         <label class="pk-label-top">Tên khách</label>
         <!-- QUY TẮC (README #9): form này phải khớp form nhập thông tin KH trên CRM (index.html, khối cs-*). CRM đổi gì thì sửa ở đây theo. -->
@@ -1346,11 +1533,12 @@
             <select id="pk-khstatus-sel">${optHtml(ACTIVE_KHSTATUS_OPTS, care?.khStatus)}</select>
           </div>
           <div class="pk-form-col">
-            <label>Sinh nhật${IS_PHONGTHUY ? ' → Mệnh' : ''}</label>
+            <label>Sinh nhật / năm sinh → Mệnh</label>
             <div style="display:flex;gap:4px;align-items:center">
-              <input type="date" id="pk-birthday" value="${care?.birthday ? toInputDate_(care.birthday) : ''}" style="flex:1" />
-              ${IS_PHONGTHUY ? '<span id="pk-menh-badge" style="font-size:11px;font-weight:700;color:#2563eb;white-space:nowrap"></span>' : ''}
+              <input type="date" id="pk-birthday" value="${bdayYearOnly_(care?.birthday) ? '' : (care?.birthday ? toInputDate_(care.birthday) : '')}" style="flex:1" />
+              <input type="text" id="pk-birthyear" inputmode="numeric" maxlength="4" placeholder="Năm sinh" title="Chưa có ngày sinh đầy đủ thì chỉ nhập năm sinh" value="${bdayYearOnly_(care?.birthday) || (care?.birthday && toInputDate_(care.birthday) ? toInputDate_(care.birthday).slice(0, 4) : '')}" ${(care?.birthday && !bdayYearOnly_(care.birthday)) ? 'readonly' : ''} style="width:84px" />
             </div>
+            <div id="pk-menh-box" style="font-size:11px;line-height:1.5;margin-top:4px"></div>
           </div>
         </div>
 
@@ -1370,7 +1558,7 @@
         <label class="pk-label-top">Ghi chú CS</label>
         <div id="pk-note-history"></div>
         <div class="pk-note-add-row">
-          <input type="text" id="pk-note-new" placeholder="Thêm ghi chú mới..." />
+          <textarea id="pk-note-new" rows="3" placeholder="Thêm ghi chú mới — gợi ý: sản phẩm quan tâm, nhu cầu chính, gu, mua cho ai, điểm đáng nhớ…"></textarea>
           <button id="pk-note-add-btn" class="pk-btn-outline">+</button>
         </div>
         <input type="hidden" id="pk-note-raw" value="${escapeHtml(care?.note || '')}" />
@@ -1384,7 +1572,7 @@
 
     box.querySelector('#pk-note-add-btn').addEventListener('click', addNoteEntry_);
     box.querySelector('#pk-note-new').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') addNoteEntry_();
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addNoteEntry_(); }   // Enter = thêm ghi chú, Shift+Enter = xuống dòng (ô nay là textarea)
     });
     box.querySelector('#pk-hen-done').addEventListener('click', () => doneAppointment_(currentFormPhone_() || phone));
     box.querySelector('#pk-save-btn').addEventListener('click', () => saveCare_(currentFormPhone_() || phone));
@@ -1417,10 +1605,11 @@
       newPhoneEl.addEventListener('blur', onPhoneReady);
       newPhoneEl.addEventListener('input', onPhoneReady);
     }
-    if (IS_PHONGTHUY) {
-      const bdayEl = box.querySelector('#pk-birthday');
+    {
+      const bdayEl = box.querySelector('#pk-birthday'), yearEl = box.querySelector('#pk-birthyear');
       bdayEl.addEventListener('input', () => updateMenhBadge_());
       bdayEl.addEventListener('change', () => updateMenhBadge_()); // input type=date: chon qua lich thuong chi ban 'change', khong ban 'input' o 1 so trinh duyet
+      if (yearEl) yearEl.addEventListener('input', () => { const y = yearEl.value.replace(/\D/g, '').slice(0, 4); if (yearEl.value !== y) yearEl.value = y; updateMenhBadge_(); });
       updateMenhBadge_();
     }
   }
@@ -1433,14 +1622,29 @@
     return _currentPhone || '';
   }
 
+  // Hien Mệnh + màu tương sinh/tương hợp theo ô ngày sinh, hoặc chỉ năm sinh khi chưa có ngày đầy đủ.
   function updateMenhBadge_() {
     const inp = panelEl?.querySelector('#pk-birthday');
-    const out = panelEl?.querySelector('#pk-menh-badge');
-    if (!inp || !out) return;
-    const yearMatch = (inp.value || '').match(/\d{4}/);
-    if (!yearMatch) { out.textContent = ''; return; }
-    const menh = tinhMenh_(yearMatch[0]);
-    out.textContent = menh ? ('Mệnh ' + menh) : 'Chưa có DL năm này';
+    const yEl = panelEl?.querySelector('#pk-birthyear');
+    const out = panelEl?.querySelector('#pk-menh-box');
+    if (!inp || !yEl || !out) return;
+    if (inp.value) { yEl.value = inp.value.slice(0, 4); yEl.readOnly = true; } else yEl.readOnly = false;
+    out.innerHTML = menhBoxHtml(yEl.value);
+  }
+  // Đọc/ghi ngày sinh hiệu lực: ngày đầy đủ ("YYYY-MM-DD") hoặc chỉ năm ("YYYY") — cùng cột birthday.
+  function readBirthdayValue_() {
+    const d = panelEl.querySelector('#pk-birthday')?.value || '';
+    if (d) return d;
+    const y = String(panelEl.querySelector('#pk-birthyear')?.value || '').trim();
+    return menhYearValid(y) ? y : '';
+  }
+  function setBirthdayFields_(v) {
+    const dEl = panelEl.querySelector('#pk-birthday'), yEl = panelEl.querySelector('#pk-birthyear');
+    if (!dEl) return;
+    const yo = bdayYearOnly_(v);
+    dEl.value = yo ? '' : (v ? toInputDate_(v) : '');
+    if (yEl) yEl.value = yo;
+    updateMenhBadge_();
   }
 
   function renderNoteHistory_(raw) {
@@ -1613,7 +1817,7 @@
     setVal('#pk-status-sel', row.status);
     setVal('#pk-zalo-sel', row.zalo);
     setVal('#pk-khstatus-sel', row.khStatus);
-    setVal('#pk-birthday', row.birthday ? toInputDate_(row.birthday) : '');
+    setBirthdayFields_(row.birthday);
     setVal('#pk-hen-date', row.schedHen ? toInputDate_(row.schedHen) : '');
     setVal('#pk-hen-note', row.schedHenNote);
     learnChatKeyForPhone_(phone);
@@ -1642,7 +1846,7 @@
       status: panelEl.querySelector('#pk-status-sel').value,
       zalo: panelEl.querySelector('#pk-zalo-sel').value,
       khStatus: panelEl.querySelector('#pk-khstatus-sel').value,
-      birthday: panelEl.querySelector('#pk-birthday').value,
+      birthday: readBirthdayValue_(),
       schedHen: panelEl.querySelector('#pk-hen-date').value,
       schedHenNote: panelEl.querySelector('#pk-hen-note').value.trim(),
       custom: collectCustomFieldValues_(_currentCare?.custom || {}),
@@ -1724,7 +1928,8 @@
     syncSel('#pk-status-sel', 'status');
     syncSel('#pk-zalo-sel', 'zalo');
     syncSel('#pk-khstatus-sel', 'khStatus');
-    syncSel('#pk-birthday', 'birthday');
+    // Ngày sinh/năm sinh: so baseline theo giá trị hiệu lực, chỉ ghi đè nếu CS chưa sửa
+    if (readBirthdayValue_() === String(baseline.birthday || '').trim()) setBirthdayFields_(newCare.birthday || '');
     syncSel('#pk-hen-note', 'schedHenNote');
     syncSel('#pk-name-input', 'name');
     const henEl = panelEl.querySelector('#pk-hen-date');
@@ -2110,12 +2315,64 @@
         `<div class="pk-ctkm-title">${escapeHtml(t.title)}</div>` +
         `<div>${escapeHtml(preview)}</div>` +
         (tags ? `<div style="margin-top:3px">${tags}</div>` : '') +
+        `<div class="pk-tpl-acts"><button type="button" class="pk-btn-outline" data-eid="${escapeHtml(t.id)}">✏️ Sửa</button>` +
+        `<button type="button" class="pk-btn-outline" data-did="${escapeHtml(t.id)}">🗑 Xoá</button></div>` +
         `</div>`;
     }).join('');
     box.querySelectorAll('[data-tid]').forEach((el) => {
-      el.addEventListener('click', () => {
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return; // bam Sua/Xoa thi khong chen vao o tra loi
         const t = _msgTemplates.find((x) => x.id === el.dataset.tid);
         if (t) insertReply(t.content); // dung lai ham co san — tu dong xu ly ca contenteditable lan textarea
+      });
+    });
+    box.querySelectorAll('[data-eid]').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openTplForm_(_msgTemplates.find((x) => x.id === b.dataset.eid) || null);
+    }));
+    box.querySelectorAll('[data-did]').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const t = _msgTemplates.find((x) => x.id === b.dataset.did);
+      if (!t || !confirm('Xoá mẫu "' + t.title + '"?\n\nMẫu sẽ bị xoá khỏi CRM và mọi máy.')) return;
+      b.disabled = true;
+      safeSendMessage_({ type: 'DELETE_MESSAGE_TEMPLATE', payload: { id: t.id } }, (resp) => {
+        if (resp?.ok) { setStatus('Đã xoá mẫu.'); loadMsgTemplates_(); }
+        else { b.disabled = false; setStatus('Lỗi xoá mẫu: ' + (resp?.error || 'không rõ')); }
+      });
+    }));
+  }
+
+  // Form them/sua mau tin ngay tren Pancake — ghi ve CRM (sheet MessageTemplates) qua GAS. Ai cung sua duoc.
+  function openTplForm_(t) {
+    const host = panelEl.querySelector('#pk-tpl-form');
+    host.innerHTML = `
+      <div class="pk-tpl-form-box">
+        <div class="pk-tpl-form-title">${t ? '✏️ Sửa mẫu' : '➕ Thêm mẫu mới'}</div>
+        <input type="text" id="pk-tpl-f-title" placeholder="Tiêu đề mẫu" autocomplete="off" />
+        <textarea id="pk-tpl-f-content" rows="5" placeholder="Nội dung tin nhắn mẫu"></textarea>
+        <input type="text" id="pk-tpl-f-tags" placeholder="Tag, cách nhau dấu phẩy (VD: chào hỏi, bảo hành)" autocomplete="off" />
+        <div class="pk-ai-sug-bar">
+          <button type="button" class="pk-btn-outline pk-ai-sug-save" id="pk-tpl-f-save">💾 Lưu về CRM</button>
+          <button type="button" class="pk-btn-outline" id="pk-tpl-f-cancel">Huỷ</button>
+        </div>
+      </div>`;
+    const $ = (id) => host.querySelector(id);
+    $('#pk-tpl-f-title').value = t ? t.title : '';
+    $('#pk-tpl-f-content').value = t ? t.content : '';
+    $('#pk-tpl-f-tags').value = t ? (t.tags || '') : '';
+    $('#pk-tpl-f-title').focus();
+    $('#pk-tpl-f-cancel').addEventListener('click', () => { host.innerHTML = ''; });
+    $('#pk-tpl-f-save').addEventListener('click', () => {
+      const title = $('#pk-tpl-f-title').value.trim();
+      const content = $('#pk-tpl-f-content').value.trim();
+      if (!title || !content) { setStatus('Cần nhập đủ tiêu đề và nội dung mẫu.'); return; }
+      const btn = $('#pk-tpl-f-save');
+      btn.disabled = true; btn.innerText = 'Đang lưu...';
+      safeSendMessage_({ type: 'SAVE_MESSAGE_TEMPLATE', payload: {
+        id: t ? t.id : '', title, content, tags: $('#pk-tpl-f-tags').value.trim(), createdBy: settings.csName || ''
+      } }, (resp) => {
+        if (resp?.ok) { host.innerHTML = ''; setStatus(t ? 'Đã cập nhật mẫu — CRM và mọi máy sẽ thấy bản mới.' : 'Đã thêm mẫu mới vào CRM.'); loadMsgTemplates_(); }
+        else { btn.disabled = false; btn.innerText = '💾 Lưu về CRM'; setStatus('Lỗi lưu mẫu: ' + (resp?.error || 'không rõ')); }
       });
     });
   }
@@ -3231,15 +3488,79 @@
     if (data.imageSkipped) statusMsg += ` (⚠️ ảnh "${data.imageSkipped.name}" khớp nhưng >3MB nên bị bỏ qua)`;
     setStatus(statusMsg);
     list.forEach((text) => {
+      const wrap = document.createElement("div");
+      wrap.className = "pk-ai-sug-wrap";
       const item = document.createElement("div");
       item.className = "pk-ai-suggestion-item";
       item.innerText = text;
       item.title = "Bấm để chèn vào ô trả lời";
       item.addEventListener("click", () => insertReply(text));
-      box.appendChild(item);
+      const bar = document.createElement("div");
+      bar.className = "pk-ai-sug-bar";
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.className = "pk-btn-outline pk-ai-sug-edit";
+      editBtn.innerText = "✏️ Sửa / huấn luyện AI";
+      editBtn.title = "Sửa lại câu trả lời cho đúng ý, rồi lưu để AI học theo";
+      editBtn.addEventListener("click", () => openSuggestionEditor_(wrap, item, bar, text));
+      bar.appendChild(editBtn);
+      wrap.appendChild(item);
+      wrap.appendChild(bar);
+      box.appendChild(wrap);
     });
 
     renderImageSuggestion(data.image);
+  }
+
+  // Cau khach hoi gan nhat — dung lam "ngu canh" khi luu mau AI hoc (cot context cua sheet AIContext).
+  function lastCustomerText_() {
+    const ms = extractMessages();
+    for (let i = ms.length - 1; i >= 0; i--) if (ms[i].from === "customer") return ms[i].text;
+    return ms.length ? ms[ms.length - 1].text : "";
+  }
+
+  // Sua 1 goi y AI ngay tai cho: chen vao o tra loi, hoac LUU de AI hoc (ghi ve CRM — sheet AIContext,
+  // loai combo_template, lan sau backend dua 5 mau moi nhat vao prompt cho moi CS).
+  function openSuggestionEditor_(wrap, item, bar, text) {
+    item.style.display = "none";
+    bar.style.display = "none";
+    const ed = document.createElement("div");
+    ed.className = "pk-ai-sug-editor";
+    const ta = document.createElement("textarea");
+    ta.className = "pk-ai-sug-ta";
+    ta.value = text;
+    ta.rows = Math.min(10, Math.max(4, Math.ceil(text.length / 40)));
+    const row = document.createElement("div");
+    row.className = "pk-ai-sug-bar";
+    const mk = (label, cls) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "pk-btn-outline " + (cls || ""); b.innerText = label;
+      row.appendChild(b); return b;
+    };
+    const insBtn = mk("Chèn vào ô");
+    const saveBtn = mk("💾 Lưu để AI học", "pk-ai-sug-save");
+    const cancelBtn = mk("Huỷ");
+    ed.appendChild(ta); ed.appendChild(row);
+    wrap.appendChild(ed);
+    ta.focus();
+    insBtn.addEventListener("click", () => insertReply(ta.value));
+    cancelBtn.addEventListener("click", () => { ed.remove(); item.style.display = ""; bar.style.display = ""; });
+    saveBtn.addEventListener("click", () => {
+      const content = ta.value.trim();
+      if (!content) { setStatus("Câu trả lời trống — không lưu."); return; }
+      saveBtn.disabled = true; saveBtn.innerText = "Đang lưu...";
+      safeSendMessage_({ type: "SAVE_AI_EXAMPLE", payload: { content, question: lastCustomerText_(), cs: settings.csName || "" } }, (resp) => {
+        if (resp?.ok) {
+          saveBtn.innerText = "✓ Đã lưu — AI sẽ học";
+          setStatus("Đã lưu mẫu về CRM — các lần gợi ý sau AI sẽ học theo mẫu này.");
+          item.innerText = content; // hien ban da sua o goi y
+          setTimeout(() => { ed.remove(); item.style.display = ""; bar.style.display = ""; }, 1200);
+        } else {
+          saveBtn.disabled = false; saveBtn.innerText = "💾 Lưu để AI học";
+          setStatus("Lỗi lưu mẫu: " + (resp?.error || "không rõ nguyên nhân"));
+        }
+      });
+    });
   }
 
   // Nút "Copy ảnh sản phẩm" — chỉ hiện khi backend tìm thấy 1 ảnh khớp tên trong thư mục
@@ -3300,17 +3621,69 @@
     if (!box) return;
     const groups = {};
     _cannedResponses.forEach(c => { (groups[c.nhom] = groups[c.nhom] || []).push(c); });
-    box.innerHTML = Object.keys(groups).map(nhom =>
+    box.innerHTML = '<div id="pk-canned-form"></div><div class="pk-tpl-acts"><button type="button" class="pk-btn-outline" id="pk-canned-add">➕ Thêm mẫu có sẵn</button></div>' + Object.keys(groups).map(nhom =>
       `<div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;margin:6px 0 3px">${escapeHtml(nhom)}</div>` +
       groups[nhom].map(c =>
         `<div class="pk-ai-suggestion-item" data-cid="${escapeHtml(c.id)}" title="Bấm để chèn vào ô trả lời — chỗ $$ cần tự điền tay">` +
-        `<b>${escapeHtml(c.label)}</b><br>${escapeHtml(c.text.length > 90 ? c.text.slice(0, 90) + '…' : c.text)}</div>`
+        `<b>${escapeHtml(c.label)}</b><br>${escapeHtml(c.text.length > 90 ? c.text.slice(0, 90) + '…' : c.text)}` +
+        `<div class="pk-tpl-acts"><button type="button" class="pk-btn-outline" data-ceid="${escapeHtml(c.id)}">✏️ Sửa</button>` +
+        `<button type="button" class="pk-btn-outline" data-cdid="${escapeHtml(c.id)}">🗑 Xoá</button></div></div>`
       ).join('')
     ).join('');
     box.querySelectorAll('[data-cid]').forEach(el => {
-      el.addEventListener('click', () => {
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return; // bam Sua/Xoa thi khong chen vao o tra loi
         const c = _cannedResponses.find(x => x.id === el.dataset.cid);
         if (c) insertReply(c.text); // dung lai HAM CO SAN — tu dong xu ly ca contenteditable (Messenger) lan textarea
+      });
+    });
+    box.querySelector('#pk-canned-add').addEventListener('click', () => openCannedForm_(null));
+    box.querySelectorAll('[data-ceid]').forEach(b => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openCannedForm_(_cannedResponses.find(x => x.id === b.dataset.ceid) || null);
+    }));
+    box.querySelectorAll('[data-cdid]').forEach(b => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const c = _cannedResponses.find(x => x.id === b.dataset.cdid);
+      if (!c || !confirm('Xoá mẫu "' + c.label + '"?\n\nMẫu sẽ bị xoá khỏi CRM và mọi máy.')) return;
+      b.disabled = true;
+      safeSendMessage_({ type: 'DELETE_CANNED', payload: { id: c.id } }, (resp) => {
+        if (resp?.ok) { setStatus('Đã xoá mẫu có sẵn.'); _cannedResponses = _cannedResponses.filter(x => x.id !== c.id); loadPhongThuyKnowledge_(); }
+        else { b.disabled = false; setStatus('Lỗi xoá mẫu: ' + (resp?.error || 'không rõ')); }
+      });
+    }));
+  }
+
+  // Form them/sua "Mau co san (phong thuy)" — ghi ve sheet CannedResponses (CRM) qua GAS, ai cung sua duoc.
+  function openCannedForm_(c) {
+    const host = panelEl.querySelector('#pk-canned-form');
+    const groups = Array.from(new Set(_cannedResponses.map(x => x.nhom).filter(Boolean)));
+    host.innerHTML = `
+      <div class="pk-tpl-form-box">
+        <div class="pk-tpl-form-title">${c ? '✏️ Sửa mẫu có sẵn' : '➕ Thêm mẫu có sẵn'}</div>
+        <input type="text" id="pk-cf-nhom" list="pk-cf-groups" placeholder="Nhóm (VD: A. Chào hỏi)" autocomplete="off" />
+        <datalist id="pk-cf-groups">${groups.map(g => `<option value="${escapeHtml(g)}">`).join('')}</datalist>
+        <input type="text" id="pk-cf-label" placeholder="Tên mẫu" autocomplete="off" />
+        <textarea id="pk-cf-text" rows="6" placeholder="Nội dung (chỗ cần tự điền để $$)"></textarea>
+        <div class="pk-ai-sug-bar">
+          <button type="button" class="pk-btn-outline pk-ai-sug-save" id="pk-cf-save">💾 Lưu về CRM</button>
+          <button type="button" class="pk-btn-outline" id="pk-cf-cancel">Huỷ</button>
+        </div>
+      </div>`;
+    const $ = (id) => host.querySelector(id);
+    $('#pk-cf-nhom').value = c ? (c.nhom || '') : '';
+    $('#pk-cf-label').value = c ? c.label : '';
+    $('#pk-cf-text').value = c ? c.text : '';
+    $('#pk-cf-label').focus();
+    $('#pk-cf-cancel').addEventListener('click', () => { host.innerHTML = ''; });
+    $('#pk-cf-save').addEventListener('click', () => {
+      const label = $('#pk-cf-label').value.trim(), text = $('#pk-cf-text').value.trim();
+      if (!label || !text) { setStatus('Cần nhập đủ tên và nội dung mẫu.'); return; }
+      const btn = $('#pk-cf-save');
+      btn.disabled = true; btn.innerText = 'Đang lưu...';
+      safeSendMessage_({ type: 'SAVE_CANNED', payload: { id: c ? c.id : '', nhom: $('#pk-cf-nhom').value.trim(), label, text } }, (resp) => {
+        if (resp?.ok) { host.innerHTML = ''; setStatus('Đã lưu mẫu có sẵn — CRM và mọi máy sẽ thấy bản mới.'); loadPhongThuyKnowledge_(); }
+        else { btn.disabled = false; btn.innerText = '💾 Lưu về CRM'; setStatus('Lỗi lưu mẫu: ' + (resp?.error || 'không rõ')); }
       });
     });
   }

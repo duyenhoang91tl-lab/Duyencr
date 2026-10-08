@@ -530,8 +530,11 @@
   margin-top: 6px;
 }
 
-.pk-note-add-row input {
+.pk-note-add-row input,
+.pk-note-add-row textarea {
   flex: 1;
+  font-family: inherit;
+  resize: vertical;
   padding: 5px 6px;
   border: 1px solid #ccc;
   border-radius: 6px;
@@ -1247,3 +1250,49 @@
 .pk-stats-det { margin: 4px 0; font-size: 11px; }
 .pk-stats-det summary { cursor: pointer; color: #2563eb; }
 .pk-stats-prog { padding: 3px 0; border-bottom: 1px dashed #e5e7eb; }
+
+
+/* Hop thoai dang nhap khi doi CS (Pancake AI) */
+#pk-cs-login-ov {
+  position: fixed; inset: 0; background: rgba(0,0,0,.45);
+  z-index: 2147483647; display: flex; align-items: center; justify-content: center;
+}
+#pk-cs-login-ov .pk-cs-login-box {
+  background: #fff; border-radius: 10px; padding: 14px; width: 280px; max-width: 90vw;
+  box-shadow: 0 8px 30px rgba(0,0,0,.3); font-size: 12px; color: #111;
+}
+#pk-cs-login-ov .pk-cs-login-title { font-weight: 700; font-size: 13px; margin-bottom: 6px; }
+#pk-cs-login-ov .pk-cs-login-hint { color: #6b7280; margin-bottom: 8px; line-height: 1.4; }
+#pk-cs-login-ov input {
+  width: 100%; box-sizing: border-box; padding: 6px 8px; margin-bottom: 6px;
+  border: 1px solid #ccc; border-radius: 6px; font-size: 12px;
+}
+#pk-cs-login-ov #pk-cs-login-err { color: #dc2626; min-height: 14px; margin-bottom: 6px; }
+#pk-cs-login-ov .pk-cs-login-btns { display: flex; gap: 6px; justify-content: flex-end; }
+#pk-cs-login-ov button {
+  border: 1px solid #ccc; background: #fff; border-radius: 6px; padding: 5px 10px; cursor: pointer; font-size: 12px;
+}
+#pk-cs-login-ov #pk-cs-login-ok { background: #2563eb; color: #fff; border-color: #2563eb; }
+#pk-cs-login-ov button:disabled { opacity: .6; cursor: default; }
+
+/* Sua goi y AI + Luu de AI hoc (Pancake AI) */
+.pk-ai-sug-wrap { margin-bottom: 8px; }
+.pk-ai-sug-bar { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+.pk-ai-sug-bar button { font-size: 11px; padding: 3px 8px; }
+.pk-ai-sug-ta {
+  width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #93c5fd;
+  border-radius: 6px; font-size: 12px; line-height: 1.4; resize: vertical;
+}
+.pk-ai-sug-save { background: #16a34a !important; color: #fff !important; border-color: #16a34a !important; }
+.pk-ai-sug-save:disabled { opacity: .7; }
+
+/* Them/sua/xoa mau tin tren Pancake (thu vien mau chung voi CRM) */
+.pk-tpl-acts { display: flex; gap: 6px; margin-top: 5px; }
+.pk-tpl-acts button { font-size: 11px; padding: 2px 8px; }
+.pk-tpl-form-box { border: 1px solid #93c5fd; background: #f8fbff; border-radius: 6px; padding: 8px; margin: 6px 0; }
+.pk-tpl-form-title { font-weight: 700; font-size: 12px; margin-bottom: 6px; }
+.pk-tpl-form-box input, .pk-tpl-form-box textarea {
+  width: 100%; box-sizing: border-box; padding: 5px 8px; margin-bottom: 6px;
+  border: 1px solid #ccc; border-radius: 6px; font-size: 12px; line-height: 1.4; resize: vertical;
+}
+#pk-tpl-add { border: 1px solid #ccc; background: #fff; border-radius: 6px; padding: 4px 8px; cursor: pointer; }

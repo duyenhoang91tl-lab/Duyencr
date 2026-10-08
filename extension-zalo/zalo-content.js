@@ -23,7 +23,7 @@
   // lai URL thu cong nua. Neu CS da tung luu URL khac (chrome.storage co gia tri), gia
   // tri da luu luon duoc uu tien; default nay chi ap dung khi cai lan dau/chua tung luu.
   const OLD_SASUM_GAS_URL = 'https://script.google.com/macros/s/AKfycbwPQ4HwD8R1HQFtU0xQslqGgr4HSlgzQlWFZs-8mtVY1CK9kBvwJWsIOzVuj6WM1mg-/exec';
-  const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxyqBM3v7_WdgxbXru8o3Y_GNylTtQ-eeUoJCgwWEXVjHAJxiw7-SRlHXUSjaUR7v3oSQ/exec';
+  const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbx3QT6YIzQ7SQEwQPkljVeEdmTSBQQSxtTp2hTFYOeCKB_K4BHcUTSLi54LlmB9q_E6sQ/exec';
   let GAS_URL = '';
   let _lookupCache = {};
   let _activeTone = 'Thân thiện';
@@ -373,11 +373,14 @@
     const col5 = addEl(row2, 'div', {className:'zai-field-col'});
     addEl(col5, 'label', {textContent:'🎂 Sinh nhật'});
     addEl(col5, 'input', {id:'zai-birthday', type:'date'});
+    addEl(col5, 'input', {id:'zai-birthyear', type:'text', inputMode:'numeric', maxLength:4, placeholder:'Hoặc chỉ nhập năm sinh (VD 1995)'});
+    addEl(col5, 'div', {id:'zai-menh-box'}).style.cssText = 'font-size:11px;line-height:1.5;margin-top:4px';
+    wireBirthdayFields_();
 
     addEl(upd, 'label', {textContent:'Ghi chú CS'});
     const noteWrap = addEl(upd, 'div', {className:'zai-note-wrap'});
     const noteRow  = addEl(noteWrap, 'div', {className:'zai-note-row'});
-    addEl(noteRow, 'textarea', {id:'zai-note-new', placeholder:'Thêm ghi chú mới...', rows:2});
+    addEl(noteRow, 'textarea', {id:'zai-note-new', placeholder:'Thêm ghi chú mới — gợi ý: sản phẩm quan tâm, nhu cầu chính, gu, mua cho ai, điểm đáng nhớ…', rows:3});
     addEl(noteRow, 'button', {className:'zai-btn zai-btn-primary zai-btn-sm', id:'zai-note-add-btn', type:'button', textContent:'+', title:'Thêm ghi chú (Ctrl+Enter)'});
     addEl(noteWrap, 'div', {id:'zai-note-history', className:'zai-note-history'});
     addEl(upd, 'input', {id:'zai-note-raw', type:'hidden'});
@@ -959,6 +962,7 @@
       if (d.error) { console.warn('[ZaloAI] Loi lam moi:', d.error); return; }
       const newCare   = d.care || null;
       const newOrders = (d.orders||[]).slice().sort((a,b) => parseDate_(b.date)-parseDate_(a.date));
+      _cskhCache[phone] = d.cskh || [];
       if (!_currentCustData || _currentCustData.phone !== phone) {
         _lookupCache[phone] = {care: newCare, orders: newOrders, ts: Date.now()};
         return;
@@ -979,6 +983,7 @@
       if (d.error) return;
       const newCare   = d.care || null;
       const newOrders = (d.orders||[]).slice().sort((a,b) => parseDate_(b.date)-parseDate_(a.date));
+      _cskhCache[phone] = d.cskh || [];
       if (!_currentCustData || _currentCustData.phone !== phone) {
         // CS da chuyen sang khach khac trong luc cho fetch — van cap nhat cache ngam, khong dong bo UI
         _lookupCache[phone] = {care: newCare, orders: newOrders, ts: Date.now()};
@@ -1067,6 +1072,21 @@
     }).join('');
   }
 
+  // Nguồn dữ liệu thứ 3 "CSKH-Duyên" (khách VIP/SPV): GAS 'lookup' trả thêm d.cskh = các dòng của SĐT này. Lưu riêng theo SĐT
+  // (không nhét vào _lookupCache/_currentCustData để khỏi sửa mọi chỗ dựng cache). Hiện ở thẻ khách; GAS không trả CCCD/MST cá nhân.
+  const _cskhCache = {};
+  function _cskhHtml_(rows) {
+    if (!rows || !rows.length) return '';
+    const L = [['staff','NV phụ trách'],['codeOrig','Mã KH'],['codeOther','Mã KH khác'],['internal','Nội bộ'],['birthday','Sinh nhật'],['gender','Giới tính'],
+      ['address','Địa chỉ'],['email','Email'],['company','Công ty'],['taxCompany','MST công ty'],['debt','Công nợ'],['source','Nguồn'],['note','Ghi chú']];
+    const badge = t => `<span style="background:#7c3aed;color:#fff;border-radius:8px;padding:0 6px;font-size:10px">${escHtml(t)}</span>`;
+    return `<div style="margin:6px 0;padding:6px 8px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;font-size:11.5px">` +
+      `<div style="font-weight:700;color:#5b21b6;margin-bottom:2px">🗂 CSKH-Duyên${rows.length>1?` (${rows.length} dòng trùng SĐT)`:''}</div>` +
+      rows.map(r => (r.name ? `<div style="font-weight:600">${escHtml(r.name)}${r.tier?' '+badge(r.tier):''}</div>` : (r.tier ? `<div>${badge(r.tier)}</div>` : '')) +
+        L.filter(x => r[x[0]]).map(x => `<div><span style="color:#6b7280">${x[1]}:</span> ${escHtml(r[x[0]])}</div>`).join('')
+      ).join('<hr style="border:none;border-top:1px dashed #ddd6fe;margin:4px 0">') + `</div>`;
+  }
+
   async function doLookup() {
     const raw = (document.getElementById('zai-phone-input').value||'').trim();
     if (!raw) { showError('Vui lòng nhập số điện thoại.'); return; }
@@ -1082,7 +1102,7 @@
 
     const hit = _lookupCache[phone];
     if (hit && Date.now() - hit.ts < LOOKUP_TTL) {
-      if (!hit.orders.length && !hit.care) { showNotFoundWithForm_(area, updSec, phone, raw); _syncZaloStatusForOpenChat(phone, false); }
+      if (!hit.orders.length && !hit.care && !(_cskhCache[phone]||[]).length) { showNotFoundWithForm_(area, updSec, phone, raw); _syncZaloStatusForOpenChat(phone, false); }
       else { renderCard_(area, updSec, phone, raw, hit.care, hit.orders); _syncZaloStatusForOpenChat(phone, true); }
       // Hien ngay du lieu cache cho nhanh, nhung LUON kiem tra lai server ngam —
       // tranh truong hop Sasum vua duoc cap nhat (tu appweb hoac may khac) trong
@@ -1104,8 +1124,9 @@
 
       const orders = (d.orders||[]).slice().sort((a,b) => parseDate_(b.date)-parseDate_(a.date));
       _lookupCache[phone] = {care: d.care||null, orders, ts: Date.now()};
+      _cskhCache[phone] = d.cskh || [];
 
-      if (!orders.length && !d.care) {
+      if (!orders.length && !d.care && !_cskhCache[phone].length) {
         showNotFoundWithForm_(area, updSec, phone, raw);
         _syncZaloStatusForOpenChat(phone, false);
       } else {
@@ -1227,7 +1248,8 @@
     }).join('');
   }
   function renderCustCard_(area, phone, raw, care, orders) {
-    const name   = orders.length ? (orders[0].name||raw) : (care&&care.name||raw);
+    const cskhRows = _cskhCache[phone] || [];
+    const name   = orders.length ? (orders[0].name||raw) : (care&&care.name || (cskhRows[0] && cskhRows[0].name) || raw);
     const prods  = [...new Set(orders.map(o=>o.product).filter(Boolean))].join(', ');
     const totRev = orders.reduce((s,o)=>s+(parseFloat(o.revenue)||0),0);
     let expanded = false;
@@ -1246,6 +1268,7 @@
           ${_customFieldChips_zai(care)}
         </div>
         ${care&&care.note ? `<div class="zai-card-note">📝 ${escHtml(_latestNoteText_(care.note))}</div>` : ''}
+        ${_cskhHtml_(cskhRows)}
         <div class="zai-card-orders" id="zai-orders-box"></div>
         ${orders.length > 1 ? `<button type="button" class="zai-btn zai-btn-ghost zai-btn-sm zai-dup-btn" style="margin-top:6px;color:#dc2626" title="Kiểm tra & xóa đơn hàng bị trùng (cùng tháng + doanh thu) của khách này">🗑️ Kiểm tra đơn trùng</button>` : ''}
       </div>`;
@@ -1279,7 +1302,7 @@
     const tagEl = document.getElementById('zai-new-tag');
     if (tagEl) tagEl.style.display = 'none';
     const nameEl = document.getElementById('zai-name-input');
-    if (nameEl) nameEl.value = (orders.length ? orders[0].name : '') || (care && care.name) || '';
+    if (nameEl) nameEl.value = (orders.length ? orders[0].name : '') || (care && care.name) || ((_cskhCache[phone]||[])[0] || {}).name || '';
     document.getElementById('zai-status-sel').value = care&&care.status||'';
     document.getElementById('zai-zalo-sel').value   = care&&care.zalo||'';
     // CS chăm sóc: đồng bộ từ server (care.cs), fallback nếu không có từ server thì dùng _currentCS
@@ -1289,7 +1312,7 @@
     document.getElementById('zai-hen-date').value   = care&&care.schedHen ? toInputDate_(care.schedHen) : '';
     document.getElementById('zai-hen-note').value   = care&&care.schedHenNote||'';
     document.getElementById('zai-kh-status-sel').value = care&&care.khStatus||'';
-    document.getElementById('zai-birthday').value   = care&&care.birthday||'';
+    setBirthdayFields_(care&&care.birthday||'');
     // Truong tu tao: ve lai select giu dung gia tri da luu cua khach nay
     renderCustomFieldSelects_zai((care && care.custom) || {});
     // Ghi chú CS: đọc dữ liệu (đồng bộ 2 chiều với Sasum, cùng định dạng JSON [{text,user,time}])
@@ -1360,7 +1383,8 @@
     syncField('zai-zalo-sel','zalo');
     syncField('zai-kh-status-sel','khStatus');
     syncField('zai-hen-note','schedHenNote');
-    syncField('zai-birthday','birthday');
+    // Ngày sinh/năm sinh: so với baseline theo giá trị hiệu lực (ngày đầy đủ hoặc chỉ năm), chỉ ghi đè nếu CS chưa sửa
+    if (readBirthdayValue_() === String(baseline.birthday || '').trim()) setBirthdayFields_(c.birthday || '');
     const henDateEl = document.getElementById('zai-hen-date');
     if (henDateEl) {
       const baseHen = baseline.schedHen ? toInputDate_(baseline.schedHen) : '';
@@ -1419,7 +1443,7 @@
     btn.disabled = true; btn.textContent = 'Đang lưu...';
     try {
       const c = care||{};
-      const birthday = document.getElementById('zai-birthday') ? document.getElementById('zai-birthday').value : '';
+      const birthday = readBirthdayValue_();
       const row = {
         phone:_currentCustData.phone, status:status||c.status||'',
         zalo:zalo||c.zalo||'', cs:cs||c.cs||'', note,
@@ -1709,6 +1733,69 @@
     const dt = new Date(ts);
     return ('0'+dt.getDate()).slice(-2)+'/'+('0'+(dt.getMonth()+1)).slice(-2)+'/'+dt.getFullYear();
   }
+  // ── Mệnh theo năm sinh (Ngũ hành nạp âm) + màu tương sinh / tương hợp ──
+  // Công thức: Can (Giáp,Ất=1; Bính,Đinh=2; Mậu,Kỷ=3; Canh,Tân=4; Nhâm,Quý=5) + Chi (Tý,Sửu,Ngọ,Mùi=0;
+  // Dần,Mão,Thân,Dậu=1; Thìn,Tỵ,Tuất,Hợi=2); tổng >5 thì trừ 5 → 1 Kim, 2 Thủy, 3 Hỏa, 4 Thổ, 5 Mộc.
+  // Đã đối chiếu đủ 1900–2100 với chuỗi nạp âm 60 năm. Tính theo năm dương lịch (sinh trước Tết thì lấy năm trước).
+  function menhMau_() { return {
+    'Kim':  { sinh: ['Vàng','Nâu'],              hop: ['Trắng'] },
+    'Mộc':  { sinh: ['Đen','Xanh dương'],        hop: ['Xanh lá cây'] },
+    'Thủy': { sinh: ['Trắng'],                   hop: ['Đen','Xanh dương'] },
+    'Hỏa':  { sinh: ['Xanh lá cây'],             hop: ['Đỏ','Hồng','Tím'] },
+    'Thổ':  { sinh: ['Đỏ','Hồng','Tím'],         hop: ['Vàng','Nâu'] }
+  }; }
+  function menhSwatch_() { return { 'Vàng':'#f2c200','Nâu':'#8b5a2b','Trắng':'#ffffff','Đen':'#222222','Xanh dương':'#2563eb','Xanh lá cây':'#16a34a','Đỏ':'#dc2626','Hồng':'#ec4899','Tím':'#7c3aed' }; }
+  function menhFromYear(y) {
+    y = parseInt(y, 10);
+    if (!y || y < 1900 || y > 2100) return null;
+    const can = Math.floor(((y - 4) % 10) / 2) + 1;
+    const chi = [0,0,1,1,2,2,0,0,1,1,2,2][(y - 4) % 12];
+    let s = can + chi; if (s > 5) s -= 5;
+    return ['', 'Kim', 'Thủy', 'Hỏa', 'Thổ', 'Mộc'][s];
+  }
+  function menhYearValid(y) { y = String(y == null ? '' : y).trim(); return /^\d{4}$/.test(y) && +y >= 1900 && +y <= new Date().getFullYear(); }
+  function menhBoxHtml(y) {
+    y = String(y == null ? '' : y).trim();
+    if (!y) return '';
+    if (!menhYearValid(y)) return y.length === 4 ? '<span style="color:#dc2626">Năm sinh không hợp lệ</span>' : '';
+    const m = menhFromYear(y), t = menhMau_()[m], sw = menhSwatch_();
+    const chips = (arr) => arr.map((c) => '<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px;white-space:nowrap"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + sw[c] + ';border:1px solid rgba(0,0,0,.3)"></i>' + c + '</span>').join('');
+    return '<div style="font-weight:700;color:#2563eb">Mệnh ' + m + ' <span style="font-weight:400;color:#6b7280">(sinh năm ' + y + ')</span></div>'
+      + '<div><b>Tương sinh:</b> ' + chips(t.sinh) + '</div>'
+      + '<div><b>Tương hợp:</b> ' + chips(t.hop) + '</div>'
+      + '<div style="color:#9ca3af;font-size:10px">Ưu tiên tương sinh trước, sau đó tương hợp; tránh màu tương khắc. Ngọc &amp; Trầm hương không kén mệnh. Tính theo năm dương lịch (sinh trước Tết → lấy năm trước).</div>';
+  }
+  // Giá trị sinh nhật lưu trong cột birthday: "YYYY-MM-DD" (đủ ngày) HOẶC "YYYY" (chỉ năm sinh).
+  function bdayYearOnly_(v) { const s = String(v == null ? '' : v).trim(); return /^\d{4}$/.test(s) ? s : ''; }
+
+  // Ngày sinh: ô ngày (zai-birthday) HOẶC chỉ năm (zai-birthyear). Lưu vào cùng cột birthday ("YYYY-MM-DD" hoặc "YYYY").
+  function readBirthdayValue_() {
+    const dEl = document.getElementById('zai-birthday'), yEl = document.getElementById('zai-birthyear');
+    const d = dEl ? dEl.value : '';
+    if (d) return d;
+    const y = yEl ? String(yEl.value || '').trim() : '';
+    return menhYearValid(y) ? y : '';
+  }
+  function refreshMenhBox_() {
+    const dEl = document.getElementById('zai-birthday'), yEl = document.getElementById('zai-birthyear'), box = document.getElementById('zai-menh-box');
+    if (!yEl) return;
+    if (dEl && dEl.value) { yEl.value = dEl.value.slice(0, 4); yEl.readOnly = true; } else yEl.readOnly = false;
+    if (box) box.innerHTML = menhBoxHtml(yEl.value);
+  }
+  function setBirthdayFields_(v) {
+    const dEl = document.getElementById('zai-birthday'), yEl = document.getElementById('zai-birthyear');
+    if (!dEl) return;
+    const yo = bdayYearOnly_(v);
+    dEl.value = yo ? '' : String(v == null ? '' : v);
+    if (yEl) yEl.value = yo;
+    refreshMenhBox_();
+  }
+  function wireBirthdayFields_() {
+    const dEl = document.getElementById('zai-birthday'), yEl = document.getElementById('zai-birthyear');
+    if (dEl) { dEl.addEventListener('input', refreshMenhBox_); dEl.addEventListener('change', refreshMenhBox_); }
+    if (yEl) yEl.addEventListener('input', () => { const y = yEl.value.replace(/\D/g, '').slice(0, 4); if (yEl.value !== y) yEl.value = y; refreshMenhBox_(); });
+  }
+
   function toInputDate_(d) {
     const ts = parseDate_(d); if (!ts) return '';
     const dt = new Date(ts);

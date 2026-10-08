@@ -7,7 +7,7 @@
 const OLD_SASUM_GAS_URL = "https://script.google.com/macros/s/AKfycbwPQ4HwD8R1HQFtU0xQslqGgr4HSlgzQlWFZs-8mtVY1CK9kBvwJWsIOzVuj6WM1mg-/exec";
 
 const DEFAULT_SETTINGS = {
-  gasUrl: "https://script.google.com/macros/s/AKfycbxyqBM3v7_WdgxbXru8o3Y_GNylTtQ-eeUoJCgwWEXVjHAJxiw7-SRlHXUSjaUR7v3oSQ/exec",
+  gasUrl: "https://script.google.com/macros/s/AKfycbx3QT6YIzQ7SQEwQPkljVeEdmTSBQQSxtTp2hTFYOeCKB_K4BHcUTSLi54LlmB9q_E6sQ/exec",
   enabled: true,
   csName: "", // CS đang dùng máy này — ghi vào cột 'cs' khi lưu, giống ô CS sticky bên Zalo AI
   useProducts: false, // tương ứng checkbox "Tra cứu sản phẩm" bên Zalo AI
@@ -125,7 +125,27 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg?.type === "SAVE_CARE") {
+    // Xoa cache tra cuu truoc VA sau khi luu: sau khi CS luu, lan tra cuu ke tiep phai thay du lieu moi
+    _lookupCache.clear();
     handleSaveCare(msg.payload)
+      .then((data) => { _lookupCache.clear(); sendResponse({ ok: true, data }); })
+      .catch((err) => { _lookupCache.clear(); sendResponse({ ok: false, error: String(err?.message || err) }); });
+    return true;
+  }
+
+  // Xac thuc tai khoan khi CS doi ten sang nguoi khac — mat khau chi gui toi GAS (action
+  // 'verifyLogin', kiem tra phia server), KHONG luu o bat ky dau trong extension.
+  // CS sua cau tra loi AI roi bam "Luu de AI hoc" — ghi vao sheet AIContext (type combo_template),
+  // dung CHUNG action saveAIContext + cung loai voi nut "Luu mau" ben Zalo AI.
+  if (msg?.type === "SAVE_AI_EXAMPLE") {
+    handleSaveAiExample(msg.payload)
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
+  if (msg?.type === "VERIFY_LOGIN") {
+    handleVerifyLogin(msg.payload)
       .then((data) => sendResponse({ ok: true, data }))
       .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
     return true;
@@ -300,6 +320,32 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // Thu vien "Mau tin nhan tu van khach" (them 2026-10, theo yeu cau Duyen "crm + pancake ai")
   // — action:'messageTemplates', dung CHUNG 1 nguon voi form them/sua tren CRM (tab Zalo AI),
   // doc moi lan mo tab de luon thay ban moi nhat tu noi khac them vao.
+  // Them/sua/xoa mau tin NGAY TREN Pancake — dung CHUNG action saveMessageTemplate/deleteMessageTemplate
+  // voi form tren CRM (tab Zalo AI) nen 2 noi tu dong bo ve cung sheet MessageTemplates.
+  // Sua/them/xoa "Mau co san (phong thuy)" (sheet CannedResponses) — xoa cache pkKnowledge de lan sau tai lai ban moi.
+  if (msg?.type === "SAVE_CANNED" || msg?.type === "DELETE_CANNED") {
+    const body = msg.type === "SAVE_CANNED"
+      ? { action: "saveCannedResponse", canned: { id: msg.payload?.id || "", nhom: msg.payload?.nhom || "", label: msg.payload?.label || "", text: msg.payload?.text || "" } }
+      : { action: "deleteCannedResponse", id: msg.payload?.id || "" };
+    _postGas_(body)
+      .then((data) => { chrome.storage.local.remove(["pkKnowledge", "pkKnowledgeTs"]); sendResponse({ ok: true, data }); })
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
+  if (msg?.type === "SAVE_MESSAGE_TEMPLATE") {
+    handleSaveMessageTemplate(msg.payload)
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+  if (msg?.type === "DELETE_MESSAGE_TEMPLATE") {
+    handleDeleteMessageTemplate(msg.payload)
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
   if (msg?.type === "GET_MESSAGE_TEMPLATES") {
     handleGetMessageTemplates()
       .then((data) => sendResponse({ ok: true, data }))
@@ -323,16 +369,38 @@ async function handleLookupCustomer(payload) {
     throw new Error("Không có số điện thoại để tra cứu.");
   }
 
+  // TOI UU TOC DO (06/10/2026): content script goi LOOKUP_CUSTOMER tu 4 cho (tu dong do SDT, mo the khach,
+  // soan don...) nen cung 1 SDT bi tra cuu lap lai lien tuc, moi lan 1 request GAS cham. Cache ngan
+  // han trong service worker (20s) + gop request dang bay cung SDT thanh 1. SAVE_CARE xoa cache.
+  // payload.fresh = true de bo qua cache khi can du lieu moi nhat.
+  const key = cfg.gasUrl + "|" + phone;
+  if (!payload?.fresh) {
+    const hit = _lookupCache.get(key);
+    if (hit && Date.now() - hit.t < LOOKUP_TTL_MS) return hit.data;
+    const flying = _lookupInflight.get(key);
+    if (flying) return flying;
+  }
+
   const sep = cfg.gasUrl.includes("?") ? "&" : "?";
   const url = cfg.gasUrl + sep + "action=lookup&phone=" + encodeURIComponent(phone);
 
-  const res = await fetch(url, { redirect: "follow" });
-  const data = await res.json();
-  if (data.error) throw new Error(data.error);
+  const p = (async () => {
+    const res = await fetch(url, { redirect: "follow" });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
 
-  const orders = (data.orders || []).slice().sort((a, b) => parseDateSafe(b.date) - parseDateSafe(a.date));
-  return { care: data.care || null, orders };
+    const orders = (data.orders || []).slice().sort((a, b) => parseDateSafe(b.date) - parseDateSafe(a.date));
+    const out = { care: data.care || null, orders, cskh: data.cskh || [], don: data.don || [] }; // cskh = dòng của SĐT này ở nguồn "CSKH-Duyên" (GAS lookup)
+    _lookupCache.set(key, { t: Date.now(), data: out });
+    if (_lookupCache.size > 200) _lookupCache.delete(_lookupCache.keys().next().value);
+    return out;
+  })();
+  _lookupInflight.set(key, p);
+  try { return await p; } finally { _lookupInflight.delete(key); }
 }
+const _lookupCache = new Map();    // "gasUrl|phone" -> { t, data }
+const _lookupInflight = new Map(); // "gasUrl|phone" -> Promise (gop request trung)
+const LOOKUP_TTL_MS = 20000;
 
 // Ghi 1 dong care (status/zalo/cs/note/lich hen...) — action:'saveSingle', CUNG action va
 // CUNG shape 'row' voi doSaveStatus() ben Zalo AI (content.js), de ghi dung 19 cot CareData.
@@ -371,6 +439,37 @@ async function handleSaveCare(row) {
   }
 
   return data;
+}
+
+async function handleSaveAiExample(payload) {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+  const content = String(payload?.content || "").trim();
+  if (!content) throw new Error("Câu trả lời trống.");
+  const ctx = ("Khách: " + String(payload?.question || "").slice(0, 200) + (payload?.cs ? " | CS: " + payload.cs : "")).slice(0, 300);
+  const res = await fetch(cfg.gasUrl, {
+    method: "POST",
+    body: JSON.stringify({ action: "saveAIContext", type: "combo_template", content, context: ctx }),
+    headers: { "Content-Type": "text/plain" }
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+async function handleVerifyLogin(payload) {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+  const res = await fetch(cfg.gasUrl, {
+    method: "POST",
+    body: JSON.stringify({ action: "verifyLogin", username: payload?.username || "", password: payload?.password || "" }),
+    headers: { "Content-Type": "text/plain" }
+  });
+  const data = await res.json();
+  if (data.error && data.ok === undefined) throw new Error(data.error);
+  return data; // { ok, username, role, name } | { ok:false, error }
 }
 
 // Lay danh sach ten CS — action:'users', dung chung voi Zalo AI (loadCSNames_ trong content.js)
@@ -539,6 +638,9 @@ async function handleAddNick(payload) {
 }
 
 function parseDateSafe(d) {
+  // DT TONG tra ngay dang "dd/MM/yyyy [HH:mm]" — Date.parse hieu nham thanh MM/dd (vd 05/10 -> 10 thang 5), nen xu ly dang VN truoc.
+  const m = String(d || "").match(/^\s*(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{1,2}):(\d{2}))?/);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0)).getTime();
   const t = Date.parse(d);
   return isNaN(t) ? 0 : t;
 }
@@ -944,6 +1046,24 @@ async function handleGetKnowledge() {
   const data = await res.json();
   if (!data.ok) throw new Error(data.error || "Lỗi không rõ");
   return { menhTable: data.menhTable || null, canned: data.canned || [] };
+}
+
+async function _postGas_(body) {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+  const res = await fetch(cfg.gasUrl, { method: "POST", body: JSON.stringify(body), headers: { "Content-Type": "text/plain" } });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+async function handleSaveMessageTemplate(t) {
+  return _postGas_({ action: "saveMessageTemplate", template: {
+    id: t?.id || "", title: t?.title || "", content: t?.content || "", tags: t?.tags || "", createdBy: t?.createdBy || ""
+  } });
+}
+async function handleDeleteMessageTemplate(p) {
+  return _postGas_({ action: "deleteMessageTemplate", id: p?.id || "" });
 }
 
 // Thu vien mau tin nhan tu van khach — action:'messageTemplates' (GET, chi doc). Form them/sua/

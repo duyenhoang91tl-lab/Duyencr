@@ -1,0 +1,106 @@
+# Tự động đưa backend GAS lên Apps Script mỗi khi push main (không cần dán tay).
+# Cần 2 Secret trong repo: CLASPRC_JSON (nội dung ~/.clasprc.json) và GAS_SCRIPT_ID.
+# Hướng dẫn cài 1 lần: docs/GAS-AUTO-DEPLOY.md
+name: Deploy GAS to Apps Script
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'gas_v13.js'
+      - 'gas/**'
+      - 'tools/split-gas.js'
+      - '.github/workflows/deploy-gas.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-gas
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      # ID deployment Web App đang được extension gọi tới (phần giữa /macros/s/ và /exec).
+      # Giữ nguyên ID để URL không đổi. Muốn đổi: tạo Variable GAS_DEPLOYMENT_ID trong repo.
+      DEPLOYMENT_ID: ${{ vars.GAS_DEPLOYMENT_ID || 'AKfycbxyqBM3v7_WdgxbXru8o3Y_GNylTtQ-eeUoJCgwWEXVjHAJxiw7-SRlHXUSjaUR7v3oSQ' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Kiểm tra secret
+        run: |
+          [ -n "${{ secrets.CLASPRC_JSON }}" ] || { echo "::error::Thiếu secret CLASPRC_JSON (xem docs/GAS-AUTO-DEPLOY.md)"; exit 1; }
+          [ -n "${{ secrets.GAS_SCRIPT_ID }}" ] || { echo "::error::Thiếu secret GAS_SCRIPT_ID"; exit 1; }
+
+      - name: Sinh lại gas/*.gs từ gas_v13.js và đối chiếu
+        run: |
+          node tools/split-gas.js
+          node tools/split-gas.js --check
+
+      - name: Kiểm tra cú pháp từng file .gs
+        run: |
+          mkdir -p /tmp/syn
+          for f in gas/*.gs; do
+            cp "$f" "/tmp/syn/$(basename "$f").js"
+            node --check "/tmp/syn/$(basename "$f").js" || { echo "::error::Lỗi cú pháp trong $f"; exit 1; }
+          done
+          echo "Cú pháp OK: $(ls gas/*.gs | wc -l) file"
+
+      - name: Nạp đăng nhập clasp (tự nhận dạng định dạng file, chỉ in tên khoá, không in giá trị)
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+        run: |
+          # Truyền secret qua biến môi trường (không chèn thẳng vào dòng lệnh) để dấu nháy/xuống dòng trong JSON không làm hỏng file.
+          printf '%s' "$CLASPRC_JSON" > ~/.clasprc.json
+          chmod 600 ~/.clasprc.json
+          # clasp 2.x lưu {"token":{...}}; clasp 3.x lưu {"tokens":{"default":{...}}} — mỗi bản chỉ đọc được định dạng của nó.
+          node -e '
+            const fs = require("fs");
+            let j;
+            try { j = JSON.parse(fs.readFileSync(process.env.HOME + "/.clasprc.json", "utf8")); }
+            catch (e) { console.log("::error::Secret CLASPRC_JSON không phải JSON hợp lệ (dán thiếu/thừa ký tự?). Chạy lại: cat ~/.clasprc.json và dán TOÀN BỘ từ { đến }."); process.exit(1); }
+            console.log("Khoá cấp cao nhất:", Object.keys(j).join(", "));
+            const oldFmt = j.token && j.token.refresh_token;
+            const newFmt = j.tokens && j.tokens.default && (j.tokens.default.refresh_token || j.tokens.default.access_token);
+            if (!oldFmt && !newFmt) {
+              console.log("::error::CLASPRC_JSON không có refresh_token. Đăng nhập lại (clasp login --no-localhost), rồi dán lại TOÀN BỘ nội dung ~/.clasprc.json vào secret.");
+              process.exit(1);
+            }
+            fs.writeFileSync("/tmp/clasp_ver", oldFmt ? "2.4.2" : "latest");
+            console.log("Định dạng đăng nhập:", oldFmt ? "clasp 2.x (token)" : "clasp 3.x (tokens.default)");
+          '
+          npm i -g @google/clasp@"$(cat /tmp/clasp_ver)"
+          clasp --version
+
+      - name: Sao lưu dự án hiện tại và lấy appsscript.json
+        run: |
+          mkdir -p /tmp/pulled && cd /tmp/pulled
+          printf '{"scriptId":"%s","rootDir":"."}' "${{ secrets.GAS_SCRIPT_ID }}" > .clasp.json
+          clasp pull
+          test -f appsscript.json || { echo "::error::Không lấy được appsscript.json"; exit 1; }
+          cp appsscript.json "$GITHUB_WORKSPACE/gas/appsscript.json"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gas-backup-truoc-khi-deploy
+          path: /tmp/pulled
+          retention-days: 7
+
+      - name: Đẩy code lên Apps Script
+        run: |
+          printf '{"scriptId":"%s","rootDir":"gas"}' "${{ secrets.GAS_SCRIPT_ID }}" > .clasp.json
+          clasp push --force
+
+      - name: Cập nhật deployment (giữ nguyên URL)
+        run: |
+          SHORT=$(git rev-parse --short HEAD)
+          clasp deploy --deploymentId "$DEPLOYMENT_ID" --description "auto $SHORT $(date -u +%Y-%m-%dT%H:%MZ)"
+
+      - name: Kiểm tra bản đang chạy
+        run: |
+          sleep 5
+          curl -sL "https://script.google.com/macros/s/${DEPLOYMENT_ID}/exec?action=count" | head -c 400 || true
