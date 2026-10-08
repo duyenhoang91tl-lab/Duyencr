@@ -1285,3 +1285,14 @@
 }
 .pk-ai-sug-save { background: #16a34a !important; color: #fff !important; border-color: #16a34a !important; }
 .pk-ai-sug-save:disabled { opacity: .7; }
+
+/* Them/sua/xoa mau tin tren Pancake (thu vien mau chung voi CRM) */
+.pk-tpl-acts { display: flex; gap: 6px; margin-top: 5px; }
+.pk-tpl-acts button { font-size: 11px; padding: 2px 8px; }
+.pk-tpl-form-box { border: 1px solid #93c5fd; background: #f8fbff; border-radius: 6px; padding: 8px; margin: 6px 0; }
+.pk-tpl-form-title { font-weight: 700; font-size: 12px; margin-bottom: 6px; }
+.pk-tpl-form-box input, .pk-tpl-form-box textarea {
+  width: 100%; box-sizing: border-box; padding: 5px 8px; margin-bottom: 6px;
+  border: 1px solid #ccc; border-radius: 6px; font-size: 12px; line-height: 1.4; resize: vertical;
+}
+#pk-tpl-add { border: 1px solid #ccc; background: #fff; border-radius: 6px; padding: 4px 8px; cursor: pointer; }

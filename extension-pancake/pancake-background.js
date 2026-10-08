@@ -320,6 +320,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // Thu vien "Mau tin nhan tu van khach" (them 2026-10, theo yeu cau Duyen "crm + pancake ai")
   // — action:'messageTemplates', dung CHUNG 1 nguon voi form them/sua tren CRM (tab Zalo AI),
   // doc moi lan mo tab de luon thay ban moi nhat tu noi khac them vao.
+  // Them/sua/xoa mau tin NGAY TREN Pancake — dung CHUNG action saveMessageTemplate/deleteMessageTemplate
+  // voi form tren CRM (tab Zalo AI) nen 2 noi tu dong bo ve cung sheet MessageTemplates.
+  if (msg?.type === "SAVE_MESSAGE_TEMPLATE") {
+    handleSaveMessageTemplate(msg.payload)
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+  if (msg?.type === "DELETE_MESSAGE_TEMPLATE") {
+    handleDeleteMessageTemplate(msg.payload)
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
   if (msg?.type === "GET_MESSAGE_TEMPLATES") {
     handleGetMessageTemplates()
       .then((data) => sendResponse({ ok: true, data }))
@@ -1020,6 +1035,24 @@ async function handleGetKnowledge() {
   const data = await res.json();
   if (!data.ok) throw new Error(data.error || "Lỗi không rõ");
   return { menhTable: data.menhTable || null, canned: data.canned || [] };
+}
+
+async function _postGas_(body) {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+  const res = await fetch(cfg.gasUrl, { method: "POST", body: JSON.stringify(body), headers: { "Content-Type": "text/plain" } });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+async function handleSaveMessageTemplate(t) {
+  return _postGas_({ action: "saveMessageTemplate", template: {
+    id: t?.id || "", title: t?.title || "", content: t?.content || "", tags: t?.tags || "", createdBy: t?.createdBy || ""
+  } });
+}
+async function handleDeleteMessageTemplate(p) {
+  return _postGas_({ action: "deleteMessageTemplate", id: p?.id || "" });
 }
 
 // Thu vien mau tin nhan tu van khach — action:'messageTemplates' (GET, chi doc). Form them/sua/

@@ -425,7 +425,9 @@
               <div id="pk-tpl-row">
                 <input type="text" id="pk-tpl-q" placeholder="Tìm theo tiêu đề / nội dung / tag..." autocomplete="off" />
                 <button id="pk-tpl-refresh" title="Tải lại từ CRM">🔄</button>
+                <button id="pk-tpl-add" title="Thêm mẫu mới (lưu về CRM)">➕</button>
               </div>
+              <div id="pk-tpl-form"></div>
               <div id="pk-tpl-result"></div>
             </div>
           </div>
@@ -648,6 +650,7 @@
       if (e.key === "Enter") doCtkmSearch_();
     });
     panelEl.querySelector("#pk-tpl-refresh").addEventListener("click", () => loadMsgTemplates_());
+    panelEl.querySelector("#pk-tpl-add").addEventListener("click", () => openTplForm_(null));
     panelEl.querySelector("#pk-tpl-q").addEventListener("input", () => renderMsgTemplateRows_());
     panelEl.querySelectorAll('.pk-price-mode-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -2312,12 +2315,64 @@
         `<div class="pk-ctkm-title">${escapeHtml(t.title)}</div>` +
         `<div>${escapeHtml(preview)}</div>` +
         (tags ? `<div style="margin-top:3px">${tags}</div>` : '') +
+        `<div class="pk-tpl-acts"><button type="button" class="pk-btn-outline" data-eid="${escapeHtml(t.id)}">✏️ Sửa</button>` +
+        `<button type="button" class="pk-btn-outline" data-did="${escapeHtml(t.id)}">🗑 Xoá</button></div>` +
         `</div>`;
     }).join('');
     box.querySelectorAll('[data-tid]').forEach((el) => {
-      el.addEventListener('click', () => {
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return; // bam Sua/Xoa thi khong chen vao o tra loi
         const t = _msgTemplates.find((x) => x.id === el.dataset.tid);
         if (t) insertReply(t.content); // dung lai ham co san — tu dong xu ly ca contenteditable lan textarea
+      });
+    });
+    box.querySelectorAll('[data-eid]').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openTplForm_(_msgTemplates.find((x) => x.id === b.dataset.eid) || null);
+    }));
+    box.querySelectorAll('[data-did]').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const t = _msgTemplates.find((x) => x.id === b.dataset.did);
+      if (!t || !confirm('Xoá mẫu "' + t.title + '"?\n\nMẫu sẽ bị xoá khỏi CRM và mọi máy.')) return;
+      b.disabled = true;
+      safeSendMessage_({ type: 'DELETE_MESSAGE_TEMPLATE', payload: { id: t.id } }, (resp) => {
+        if (resp?.ok) { setStatus('Đã xoá mẫu.'); loadMsgTemplates_(); }
+        else { b.disabled = false; setStatus('Lỗi xoá mẫu: ' + (resp?.error || 'không rõ')); }
+      });
+    }));
+  }
+
+  // Form them/sua mau tin ngay tren Pancake — ghi ve CRM (sheet MessageTemplates) qua GAS. Ai cung sua duoc.
+  function openTplForm_(t) {
+    const host = panelEl.querySelector('#pk-tpl-form');
+    host.innerHTML = `
+      <div class="pk-tpl-form-box">
+        <div class="pk-tpl-form-title">${t ? '✏️ Sửa mẫu' : '➕ Thêm mẫu mới'}</div>
+        <input type="text" id="pk-tpl-f-title" placeholder="Tiêu đề mẫu" autocomplete="off" />
+        <textarea id="pk-tpl-f-content" rows="5" placeholder="Nội dung tin nhắn mẫu"></textarea>
+        <input type="text" id="pk-tpl-f-tags" placeholder="Tag, cách nhau dấu phẩy (VD: chào hỏi, bảo hành)" autocomplete="off" />
+        <div class="pk-ai-sug-bar">
+          <button type="button" class="pk-btn-outline pk-ai-sug-save" id="pk-tpl-f-save">💾 Lưu về CRM</button>
+          <button type="button" class="pk-btn-outline" id="pk-tpl-f-cancel">Huỷ</button>
+        </div>
+      </div>`;
+    const $ = (id) => host.querySelector(id);
+    $('#pk-tpl-f-title').value = t ? t.title : '';
+    $('#pk-tpl-f-content').value = t ? t.content : '';
+    $('#pk-tpl-f-tags').value = t ? (t.tags || '') : '';
+    $('#pk-tpl-f-title').focus();
+    $('#pk-tpl-f-cancel').addEventListener('click', () => { host.innerHTML = ''; });
+    $('#pk-tpl-f-save').addEventListener('click', () => {
+      const title = $('#pk-tpl-f-title').value.trim();
+      const content = $('#pk-tpl-f-content').value.trim();
+      if (!title || !content) { setStatus('Cần nhập đủ tiêu đề và nội dung mẫu.'); return; }
+      const btn = $('#pk-tpl-f-save');
+      btn.disabled = true; btn.innerText = 'Đang lưu...';
+      safeSendMessage_({ type: 'SAVE_MESSAGE_TEMPLATE', payload: {
+        id: t ? t.id : '', title, content, tags: $('#pk-tpl-f-tags').value.trim(), createdBy: settings.csName || ''
+      } }, (resp) => {
+        if (resp?.ok) { host.innerHTML = ''; setStatus(t ? 'Đã cập nhật mẫu — CRM và mọi máy sẽ thấy bản mới.' : 'Đã thêm mẫu mới vào CRM.'); loadMsgTemplates_(); }
+        else { btn.disabled = false; btn.innerText = '💾 Lưu về CRM'; setStatus('Lỗi lưu mẫu: ' + (resp?.error || 'không rõ')); }
       });
     });
   }
