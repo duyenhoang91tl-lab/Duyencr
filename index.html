@@ -2774,16 +2774,83 @@ async function _pullAssignAndBroadcastThrottled(force) {
 // Trả true nếu danh sách vừa được thay mới (cần dựng lại danh sách KH). Lỗi thì GIỮ NGUYÊN dữ liệu cũ và
 // báo rõ trên banner (trước đây chỉ console.warn nên CRM âm thầm chỉ còn vài nghìn khách từ DT TỔNG).
 let _cskhLastTry = 0, _cskhFailCount = 0, _cskhBannerOn = false;
+// ── CACHE BỀN (IndexedDB) CHO DỮ LIỆU LỚN: nguồn CSKH-Duyên (~134k SĐT) + đơn hàng DT TỔNG ───────────────────────
+// NGUYÊN NHÂN GỐC lỗi "CRM chỉ hiện vài nghìn / vài chục khách dù data đã ~134k": 2 nguồn này KHÔNG được lưu ở máy
+// (CSKH-Duyên vượt hạn mức localStorage ~5MB; đơn hàng chỉ nằm trong bộ nhớ trang) → mỗi lần mở/F5 trang, CRM chỉ có khách từ
+// "Chăm sóc" (vài chục) cho tới khi GAS trả được action=orders / cskhDuyenLite. Khi GAS trả HTML lỗi (404 / quá tải / hết
+// thời gian — thỉnh thoảng xảy ra lúc nhiều CS cùng mở) thì danh sách kẹt ở số rất nhỏ cho tới lần thử lại thành công.
+// Nay lưu bản kéo gần nhất vào IndexedDB (không giới hạn 5MB): mở trang là có đủ khách ngay, GAS lỗi vẫn giữ nguyên danh
+// sách đầy đủ (có thể cũ vài phút) thay vì tụt về vài chục khách; bản mới từ GAS luôn ghi đè khi kéo được.
+let _cskhIdbTried = false, _cskhFromCache = false, _ordersLoadedNet = false, _ordersCacheUsed = false;
+let _idbConn_ = null;   // dùng chung 1 kết nối cho cả phiên (không mở lại ở mỗi lần đọc/ghi)
+function _idbOpen_() {
+  if (_idbConn_) return _idbConn_;
+  _idbConn_ = new Promise(function (res, rej) {
+    try {
+      const rq = indexedDB.open('ome_cache', 1);
+      rq.onupgradeneeded = function () { rq.result.createObjectStore('kv'); };
+      rq.onsuccess = function () { res(rq.result); };
+      rq.onerror = function () { _idbConn_ = null; rej(rq.error); };
+    } catch (e) { _idbConn_ = null; rej(e); }
+  });
+  return _idbConn_;
+}
+async function _idbGet_(k) {
+  const db = await _idbOpen_();
+  return new Promise(function (res, rej) {
+    const rq = db.transaction('kv', 'readonly').objectStore('kv').get(k);
+    rq.onsuccess = function () { res(rq.result); };
+    rq.onerror = function () { rej(rq.error); };
+  });
+}
+async function _idbSet_(k, v) {
+  const db = await _idbOpen_();
+  return new Promise(function (res, rej) {
+    const tx = db.transaction('kv', 'readwrite');
+    tx.objectStore('kv').put(v, k);
+    tx.oncomplete = function () { res(true); };
+    tx.onerror = function () { rej(tx.error); };
+  });
+}
+// rows = [[phone,name,tier?], ...] (đúng định dạng action=cskhDuyenLite) -> { phone: [{name,tier}] }
+function _cskhMapFromRows_(rows) {
+  const m = {};
+  (rows || []).forEach(function (r) { // r = [phone, name, tier]
+    const ph = (typeof normPhone === 'function' ? normPhone(r[0]) : null) || String(r[0] || '');
+    if (!ph) return;
+    (m[ph] = m[ph] || []).push({ name: r[1] || '', tier: r[2] || '' }); // MANG cac dong nhe {name,tier}: buildCustomers va _renderCskhBlock_ doc cskhData[ph] nhu MANG dong
+  });
+  return m;
+}
+async function _loadCskhFromIdb_() {
+  _cskhIdbTried = true;
+  try {
+    const rec = await _idbGet_('cskh_lite_v1');
+    if (!rec || !rec.rows || !rec.rows.length) return false;
+    if (!_isEmptyObj(cskhData)) return false;   // trong lúc chờ đã có dữ liệu mới từ mạng
+    cskhData = _cskhMapFromRows_(rec.rows);
+    cskhMeta = rec.meta || cskhMeta;
+    _cskhFromCache = true;
+    console.info('CSKH-Duyên: nạp ' + rec.rows.length + ' dòng từ cache máy (IndexedDB)');
+    return true;
+  } catch (e) { return false; }
+}
 function _cskhFail_(reason){
   _cskhFailCount++;
   console.warn('cskhDuyenLite:', reason);
   if (_cskhFailCount >= 2) {
     _cskhBannerOn = true;
-    showSyncErrorBanner('Không tải được nguồn CSKH-Duyên (' + reason + ') — CRM đang chỉ hiện ' + Object.keys(customerMap).length.toLocaleString('vi-VN') + ' khách. Đang tự thử lại; có thể bấm "Sync thủ công".');
+    const _n = Object.keys(customerMap).length.toLocaleString('vi-VN');
+    showSyncErrorBanner(_cskhFromCache
+      ? 'Chưa làm mới được nguồn CSKH-Duyên (' + reason + ') — CRM đang dùng dữ liệu đã lưu ở máy từ lần trước (' + _n + ' khách, có thể cũ vài phút). Đang tự thử lại; có thể bấm "Sync thủ công".'
+      : 'Không tải được nguồn CSKH-Duyên (' + reason + ') — CRM đang chỉ hiện ' + _n + ' khách. Đang tự thử lại; có thể bấm "Sync thủ công".');
   }
   return false;
 }
+
 async function _pullCskhLiteOnce_(isManual){
+  // Lần đầu trong phiên mà chưa có dữ liệu: nạp NGAY từ cache máy (nếu có) để có đủ khách; kéo mới từ GAS ở các nhịp sau
+  if (!_cskhIdbTried && _isEmptyObj(cskhData)) { if (await _loadCskhFromIdb_()) return true; }
   const now = Date.now();
   if (!isManual) {
     if (_cskhPulledAt && (now - _cskhPulledAt) <= 600000) return false;   // đã có và còn mới (kéo lại mỗi 10 phút)
@@ -2798,17 +2865,14 @@ async function _pullCskhLiteOnce_(isManual){
     let ckJson;
     try { ckJson = JSON.parse(ckText); } catch (e) { return _cskhFail_('GAS trả về không phải JSON — có thể quá tải/hết thời gian'); }
     if (!ckJson || !ckJson.ok) return _cskhFail_((ckJson && ckJson.error) || 'GAS báo lỗi');
-    const newCk = {};
-    (ckJson.rows || []).forEach(function(r){ // r = [phone, name]
-      const ph = (typeof normPhone === 'function' ? normPhone(r[0]) : null) || String(r[0] || '');
-      if (!ph) return;
-      (newCk[ph] = newCk[ph] || []).push({ name: r[1] || '', tier: r[2] || '' }); // MANG cac dong nhe {name,tier}: buildCustomers va _renderCskhBlock_ doc cskhData[ph] nhu MANG dong
-    });
+    const newCk = _cskhMapFromRows_(ckJson.rows);
     // Backend trả 0 dòng trong khi trước đó đã có dữ liệu -> coi là lỗi tạm, KHÔNG xóa danh sách đang có
     if (_isEmptyObj(newCk) && !_isEmptyObj(cskhData)) return _cskhFail_('nguồn trả về 0 dòng');
-    _lastCkText = ckText; _cskhPulledAt = Date.now(); _cskhFailCount = 0;
+    _lastCkText = ckText; _cskhPulledAt = Date.now(); _cskhFailCount = 0; _cskhFromCache = false;
     cskhData = newCk;
     cskhMeta = { found: !!ckJson.found, total: ckJson.total || 0, noPhone: ckJson.noPhone || 0, noPhoneSample: ckJson.noPhoneSample || [] };
+    // lưu bản mới nhất vào IndexedDB (nền, không chặn) để lần mở trang sau / lúc GAS lỗi vẫn có đủ khách
+    _idbSet_('cskh_lite_v1', { rows: ckJson.rows || [], meta: cskhMeta, at: Date.now() }).catch(function (e) { console.warn('IndexedDB lưu CSKH lỗi:', e && e.message); });
     // Kho ~134k SDT vuot han muc localStorage (~5MB) va stringify mat hang tram ms: chi luu cache neu nho; con lai se keo lai khi mo trang
     if (Object.keys(newCk).length <= 20000) saveLS('ome_cskh_duyen', cskhData); else { try { localStorage.removeItem('ome_cskh_duyen'); } catch(e){} }
     saveLS('ome_cskh_duyen_meta', cskhMeta);
@@ -2867,7 +2931,18 @@ async function syncFromGS(opts) {
         const ordText = await ordR.text();
         // Chi coi la "khong doi" khi da co khach trong customerMap (sau khi bam xoa du lieu phai nap lai that su)
         const _ordSame = (ordText === _lastOrdersText) && !_isEmptyObj(customerMap);
-        const ordJson = _ordSame ? { _same: true } : JSON.parse(ordText);
+        let ordJson, _ordFromCache = false;
+        if (_ordSame) ordJson = { _same: true };
+        else {
+          try { ordJson = JSON.parse(ordText); }
+          catch (pe) {
+            // GAS trả HTML lỗi (404/quá tải) → nếu phiên này CHƯA kéo được đơn nào từ mạng thì dùng bản đã lưu ở máy,
+            // để CRM không tụt về vài chục khách (xem chú thích "CACHE BỀN" ở trên)
+            const rec = (!_ordersLoadedNet && !_ordersCacheUsed) ? await _idbGet_('orders_v1').catch(function () { return null; }) : null;
+            if (rec && rec.json && rec.json.orders && rec.json.orders.length) { ordJson = rec.json; _ordFromCache = true; }
+            else throw pe;
+          }
+        }
         if (ordJson && ordJson.errorCount) {
           // Backend doc duoc mot phan don (da bo qua cac dong loi de khong crash toan bo) —
           // PHAI canh bao ro, khong duoc coi so don/KH doc duoc la day du roi am tham rebuild
@@ -2889,7 +2964,15 @@ async function syncFromGS(opts) {
             // (mỗi 3s / mỗi lần mở app) nên trước đây chip này bị lặp lại nhiều lần trên thanh file.
             mergeRows(rows);
             orderCount = rows.length;
-            _lastOrdersText = ordText;
+            if (_ordFromCache) {
+              _ordersCacheUsed = true;
+              console.warn('Orders: GAS lỗi — dùng ' + rows.length + ' đơn đã lưu ở máy (IndexedDB)');
+              _autoSyncFailCount = (_autoSyncFailCount || 0) + 1;
+              if (_autoSyncFailCount >= 3) showSyncErrorBanner('Chưa làm mới được đơn hàng từ Google Sheets — CRM đang dùng dữ liệu đã lưu ở máy từ lần trước. Đang tự thử lại; có thể bấm "Sync thủ công".');
+            } else {
+              _lastOrdersText = ordText; _ordersLoadedNet = true; _ordersCacheUsed = false;
+              _idbSet_('orders_v1', { json: ordJson, at: Date.now() }).catch(function (e) { console.warn('IndexedDB lưu đơn lỗi:', e && e.message); });
+            }
           }
         } else if (ordJson && ordJson.error) {
           console.warn('Orders sync error from GAS:', ordJson.error);
@@ -2935,7 +3018,7 @@ async function syncFromGS(opts) {
       // _loadCskhDetailForPhone_ ở renderInfoTab.
       // CSKH-Duyên gần như khong doi: chi keo lai o lan dau, moi 10 phut, hoac khi bam Sync thu cong
       if (await _pullCskhLiteOnce_(isManual)) _forceFullBuildFromCareLeads = true;
-    } else if (!_cskhPulledAt && _isEmptyObj(cskhData)) {
+    } else if (!_cskhPulledAt) {
       // Lần kéo CSKH-Duyên trước lỗi/chưa xong -> tự thử lại (có giãn cách), KHÔNG chờ tới nhịp kéo đơn tiếp theo
       if (await _pullCskhLiteOnce_(isManual)) _forceFullBuildFromCareLeads = true;
     }

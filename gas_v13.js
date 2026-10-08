@@ -2448,6 +2448,28 @@ function findCskhRowsCached_(phone) {
 function readCskhDuyenLite_() {
   var cached = _cacheGetBig_('cskhDuyen_lite_v2');
   if (cached) { try { return JSON.parse(cached); } catch (e) {} }
+  // NGUYÊN NHÂN GỐC (đã sửa) lỗi thỉnh thoảng trả HTML 404/quá tải: khi cache hết hạn, MỌI request đang chờ (nhiều CS mở CRM
+  // cùng lúc + vòng poll) đều tự đọc lại ~134k dòng của sheet CSKH-Duyên song song -> vượt giới hạn thực thi đồng thời của
+  // Apps Script -> lỗi cho cả các action khác (customers, users, assignHistory...). Nay chỉ 1 request dựng lại; các request
+  // còn lại thấy cờ "đang dựng" thì chờ tối đa ~18s rồi lấy kết quả từ cache (không dùng LockService để khỏi chặn các thao tác ghi).
+  var _cacheB = null;
+  try { _cacheB = CacheService.getScriptCache(); } catch (eCb) {}
+  if (_cacheB && _cacheB.get('cskhDuyen_lite_building')) {
+    for (var w = 0; w < 12; w++) {
+      Utilities.sleep(1500);
+      var c2 = _cacheGetBig_('cskhDuyen_lite_v2');
+      if (c2) { try { return JSON.parse(c2); } catch (e3) {} }
+      if (!_cacheB.get('cskhDuyen_lite_building')) break;
+    }
+  }
+  try { if (_cacheB) _cacheB.put('cskhDuyen_lite_building', '1', 60); } catch (eFl) {}
+  try {
+    return _readCskhDuyenLiteBuild_();
+  } finally {
+    try { if (_cacheB) _cacheB.remove('cskhDuyen_lite_building'); } catch (eRm) {}
+  }
+}
+function _readCskhDuyenLiteBuild_() {
   var out = { found: false, rows: [], total: 0, noPhone: 0, noPhoneSample: [] };
   var sh = _findCskhDuyenSheet_();
   if (!sh) return out;
@@ -2476,7 +2498,7 @@ function readCskhDuyenLite_() {
     }
     out.rows.push([p, nameV]);
   }
-  try { _cachePutBig_('cskhDuyen_lite_v2', JSON.stringify(out), 300); } catch (e2) {}
+  try { _cachePutBig_('cskhDuyen_lite_v2', JSON.stringify(out), 600); } catch (e2) {}
   return out;
 }
 
