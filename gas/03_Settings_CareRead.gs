@@ -365,3 +365,82 @@ function readUsers_(sh) {
   return out;
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  KHOA BAO MAT + TAI KHOAN TEST (them 2026-10-08)
+//  - getGasSource/setGasSource (lay/ghi ma nguon GAS): BAT BUOC co khoa quan tri = gia tri key "adminKey"
+//    trong sheet Settings (them 1 dong: key=adminKey, value=chuoi bi mat). Chua dat khoa -> tu choi het.
+//  - getSetting khong tra cac key nhay cam: api* (key AI), geminiKey, gasSource*, adminKey, demoToken.
+//  - setSetting khong cho ghi adminKey/demoToken/gasSource* neu thieu adminKey.
+//  - Tai khoan role "demo": dang nhap qua POST demoLogin -> nhan demoToken. Moi request co token chi duoc goi
+//    cac action xem bao cao trong DEMO_ALLOWED_GET_, cac mang dong chi tiet bi cat con DEMO_MAX_ROWS_ dong,
+//    moi thao tac ghi (POST) bi tu choi.
+//  LUU Y: cac request KHONG co token van chay nhu cu (extension Zalo/Pancake, CS dang dung) — xem docs/TAI-KHOAN-TEST.md.
+// ═══════════════════════════════════════════════════════════════
+var DEMO_MAX_ROWS_ = 5;
+var DEMO_ALLOWED_GET_ = {
+  salesReportA: 1, salesReportB: 1, salesReportC: 1, careLeadReport: 1, saleKpiReport: 1, failedOrderReport: 1,
+  salesReportOptions: 1, kpiReport: 1, mktChecklist: 1, pancakeReport: 1, pancakeSdtReport: 1,
+  pancakePageMap: 1, pancakeNameMap: 1, saleDirectory: 1, saleGroups: 1, teams: 1, mktTeams: 1, getSetting: 1, count: 1,
+  orders: 1, careLeads: 1, cskhDuyenLite: 1
+};
+// Mang dong CHI TIET (don/khach) bi cat con DEMO_MAX_ROWS_. "rows" chi cat o cac action tra danh sach khach/lead
+// (o saleKpiReport "rows" la bang KPI tung sale — khong cat).
+var DEMO_CLIP_KEYS_ = ['orders', 'ordersCur', 'ordersPrev', 'ordersDetail'];
+var DEMO_CLIP_ROWS_ACTIONS_ = { careLeads: 1, careLeadReport: 1, cskhDuyenLite: 1 };
+function _secEq_(a, b) {
+  a = String(a || ''); b = String(b || '');
+  if (!a || !b || a.length !== b.length) return false;
+  var d = 0;
+  for (var i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
+}
+function _adminKeyOk_(k) { return _secEq_(k, getSetting_('adminKey')); }
+function _isSensitiveSettingKey_(key) {
+  var k = String(key || '').trim();
+  return /^api/i.test(k) || /^geminiKey$/i.test(k) || /^gasSource/i.test(k) || k === 'adminKey' || k === 'demoToken';
+}
+function _isSensitiveWriteKey_(key) {
+  var k = String(key || '').trim();
+  return k === 'adminKey' || k === 'demoToken' || /^gasSource/i.test(k);
+}
+function _demoToken_() {
+  var t = getSetting_('demoToken');
+  if (!t) {
+    t = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '');
+    setSetting_('demoToken', t);
+  }
+  return t;
+}
+function _demoTokenOk_(tok) { return _secEq_(tok, getSetting_('demoToken')); }
+function _demoClip_(out, action) {
+  var o;
+  try { o = JSON.parse(out.getContent()); } catch (e) { return out; }
+  if (o && typeof o === 'object' && !Array.isArray(o)) {
+    var keys = DEMO_CLIP_KEYS_.slice();
+    if (DEMO_CLIP_ROWS_ACTIONS_[action]) keys.push('rows');
+    keys.forEach(function(k) {
+      if (Array.isArray(o[k]) && o[k].length > DEMO_MAX_ROWS_) {
+        o['_demoTotal_' + k] = o[k].length;
+        o[k] = o[k].slice(0, DEMO_MAX_ROWS_);
+      }
+    });
+    o._demo = true;
+  }
+  return jsonOut_(o);
+}
+// Dang nhap tai khoan test: kiem tra user role "demo" trong sheet Users (passHash do client gui len).
+function demoLogin_(data) {
+  var uname = String((data && data.username) || '').trim().toLowerCase();
+  var ph = String((data && data.passHash) || '');
+  if (!uname || !ph) return jsonOut_({ ok: false, error: 'Thieu tai khoan/mat khau' });
+  var users = readUsers_(getCrmSS_().getSheetByName(SH_USER));
+  for (var i = 0; i < users.length; i++) {
+    var u = users[i];
+    if (String(u.username).trim().toLowerCase() !== uname) continue;
+    if (u.role !== 'demo' || u.active === false) break;
+    if (_secEq_(u.passHash, ph)) return jsonOut_({ ok: true, token: _demoToken_(), name: u.name || u.username });
+    break;
+  }
+  return jsonOut_({ ok: false, error: 'Sai tai khoan hoac mat khau' });
+}
+

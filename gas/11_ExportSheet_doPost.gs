@@ -217,10 +217,23 @@ function exportSalesReportToSheet_(reportType, filters) {
            sheetUrl: ss.getUrl() + '#gid=' + sh.getSheetId() };
 }
 
+function doPost(e) {
+  if (!e || !e.postData) return jsonOut_({ error: 'No postData' });
+  var d0 = null;
+  try { d0 = JSON.parse(e.postData.contents); } catch (e0) { d0 = null; }
+  if (d0 && typeof d0 === 'object') {
+    if (d0.action === 'demoLogin') return demoLogin_(d0);
+    if (d0.demo) return jsonOut_({ error: 'Tai khoan test chi duoc xem, khong duoc ghi du lieu.' });
+    if (d0.action === 'setGasSource' && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de dong bo ma nguon GAS.' });
+    if (d0.action === 'setSetting' && _isSensitiveWriteKey_(d0.key) && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Khong duoc ghi key nay.' });
+  }
+  return doPostCore_(e);
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  doPost
 // ═══════════════════════════════════════════════════════════════
-function doPost(e) {
+function doPostCore_(e) {
   if (!e || !e.postData) return jsonOut_({ error: 'No postData' });
   try {
     var data = JSON.parse(e.postData.contents);

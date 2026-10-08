@@ -22,11 +22,11 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `PRICE_LAST_COL_`, `GIA_COL_MIN_`, `GIA_COL_LIMIT_`, `_PRICE_STOPWORDS_`, `_CTKM_END_KW_`, `_CTKM_START_KW_`, `_CTKM_EXCL_KW_`, `_CTKM_KEYWORDS_`
 
 ## 03_Settings_CareRead.gs
-- Hàm: `getSetting_`, `setGasSource_`, `readSaleGroups_`, `saveSaleGroups_`, `_saleGroupLabel_`, `setSetting_`, `_syncSaleChannelsToUsers_`, `addZaloNick_`, `readCareStatus_`, `careObjFromRow_`, `readCare_`, `readCareDelta_`, `findCareByPhone_`, `careRow_`, `readExistingExtFields_`, `mergeExtFields_`, `_legacyReadOrdersUnused_`, `readTeams_`, `readUsers_`
-- Hằng/biến: `SALE_GROUPS_DEFAULT_`
+- Hàm: `getSetting_`, `setGasSource_`, `readSaleGroups_`, `saveSaleGroups_`, `_saleGroupLabel_`, `setSetting_`, `_syncSaleChannelsToUsers_`, `addZaloNick_`, `readCareStatus_`, `careObjFromRow_`, `readCare_`, `readCareDelta_`, `findCareByPhone_`, `careRow_`, `readExistingExtFields_`, `mergeExtFields_`, `_legacyReadOrdersUnused_`, `readTeams_`, `readUsers_`, `_secEq_`, `_adminKeyOk_`, `_isSensitiveSettingKey_`, `_isSensitiveWriteKey_`, `_demoToken_`, `_demoTokenOk_`, `_demoClip_`, `demoLogin_`
+- Hằng/biến: `SALE_GROUPS_DEFAULT_`, `DEMO_MAX_ROWS_`, `DEMO_ALLOWED_GET_`, `DEMO_CLIP_KEYS_`, `DEMO_CLIP_ROWS_ACTIONS_`
 
 ## 04_doGet.gs
-- Hàm: `doGet`
+- Hàm: `doGet`, `doGetCore_`
 
 ## 05_Orders_DTTong.gs
 - Hàm: `buildDashboard_`, `dtRowToOrder_`, `readAllOrders_`, `findDonRowsByPhone_`, `readOrdersByPhone_`, `_stripHonorific_`, `_truncateAtAddressOrDigit_`, `_isPlausibleName_`, `_guessNameCandidatesFromOrderText_`, `_parseNameFromOrderText_`, `_guessNameForPhone_`, `previewCustomerNameGuesses_`, `applyCustomerNameGuesses_`, `getDTSS_`, `_dtCellToVnStr_`, `_vnMidnight_`, `_vnYmd_`, `_vnYmdParts_`, `parseVNDate_`, `_dateStrToVnYmd_`, `dateInRange_`, `_isExcludedOrderStatus_`, `_normMoney_`, `splitMulti_`, `_pancakeKnownSaleNameSet_`, `_expandSaleFilterWithPancakeAliases_`, `_donSaleNamesFromThe_`, `_donHasExcludedStatus_`, `_hiddenPageSaleSets_`, `_isDTRowHidden_`, `readDTTong_`
@@ -52,7 +52,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `CS_COMMISSION_THRESHOLD_`, `KPI_SHEET`
 
 ## 11_ExportSheet_doPost.gs
-- Hàm: `exportSalesReportToSheet_`, `doPost`
+- Hàm: `exportSalesReportToSheet_`, `doPost`, `doPostCore_`
 
 ## 12_SaveCare_Orders_Dedupe.gs
 - Hàm: `invalidateLookupCache_`, `saveAllCare_`, `saveSingleCare_`, `saveBatchCare_`, `syncZaloFriendStatus_`, `saveOrders_`, `patchOrder_`, `deleteOrder_`, `normOrderDate_`, `_normTxt_`, `findDuplicateOrders_`, `deleteDuplicateOrders_`, `_rowKeyExact_`, `_rowIsBlank_`, `_autoDedupExactRowsInSheet_`, `_autoDedupLog_`, `onChangeDedupTrigger_`, `installAutoDedupTrigger_`, `_impHm_`, `_impOrderKey_`, `doImportSheetRows_`, `doImportSheetRowsLocked_`, `replaceOrders_`, `setOrderCareCS_`, `setOrderCareCSBatch_`
