@@ -186,6 +186,44 @@ function getMessengerKnowledge_() {
   return { ok: true, menhTable: menhTable, canned: canned, bannedWords: readBannedWords_() };
 }
 
+// ─── SUA / THEM / XOA "MAU CO SAN (PHONG THUY)" (sheet CannedResponses: Nhom | ID | Ten | NoiDung) ───
+// Truoc day chi doc (getMessengerKnowledge_), CS khong sua duoc tren Pancake. Nay Pancake AI goi 2 action nay,
+// ai cung sua duoc. data: {id (co + tim thay = sua; co + khong thay = tao voi id do; khong co = tao id moi), nhom, label, text}.
+// Luu y: neu xoa HET mau thi ensureCannedSheetSeeded_ se nap lai 11 mau mac dinh o lan doc ke tiep.
+function saveCannedResponse_(data) {
+  if (!data || !String(data.label || '').trim() || !String(data.text || '').trim()) {
+    return jsonOut_({ error: 'Thieu ten hoac noi dung mau' });
+  }
+  var sh = getSheet_(SH_CANNED, ['Nhom', 'ID', 'Ten', 'NoiDung']);
+  var nhom = String(data.nhom || '').trim() || 'Khac';
+  var label = String(data.label).trim();
+  var text = String(data.text).trim();
+  var id = String(data.id || '').trim();
+  var vals = sh.getDataRange().getValues();
+  if (id) {
+    for (var i = 1; i < vals.length; i++) {
+      if (String(vals[i][1]) === id) {
+        sh.getRange(i + 1, 1, 1, 4).setValues([[nhom, id, label, text]]);
+        return jsonOut_({ ok: true, id: id });
+      }
+    }
+  } else {
+    id = 'c_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+  }
+  sh.appendRow([nhom, id, label, text]);
+  return jsonOut_({ ok: true, id: id });
+}
+
+function deleteCannedResponse_(id) {
+  if (!id) return jsonOut_({ error: 'Thieu id mau can xoa' });
+  var sh = getSheet_(SH_CANNED, ['Nhom', 'ID', 'Ten', 'NoiDung']);
+  var vals = sh.getDataRange().getValues();
+  for (var i = 1; i < vals.length; i++) {
+    if (String(vals[i][1]) === String(id)) { sh.deleteRow(i + 1); return jsonOut_({ ok: true }); }
+  }
+  return jsonOut_({ ok: true, note: 'Khong tim thay id (co the da bi xoa truoc do)' });
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  MAU TIN NHAN TU VAN KHACH (MessageTemplates) — them 2026-10. KHAC voi SH_CANNED (canned
 //  response co dinh cho extension-messenger/phong thuy, KHONG co form sua): day la thu vien mau

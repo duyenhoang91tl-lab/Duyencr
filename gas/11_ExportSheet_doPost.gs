@@ -298,6 +298,8 @@ function doPost(e) {
     // ── MAU TIN NHAN TU VAN KHACH: them/sua (form tren CRM tab ZALO AI) / xoa 1 mau ──
     if (action === 'saveMessageTemplate')   return saveMessageTemplate_(data.template || data);
     if (action === 'deleteMessageTemplate') return deleteMessageTemplate_(data.id);
+    if (action === 'saveCannedResponse')    return saveCannedResponse_(data.canned || data);
+    if (action === 'deleteCannedResponse')  return deleteCannedResponse_(data.id);
     // ── CHECKLIST MKT: nhap tay theo ngay + muc tieu L1-L4 ──
     if (action === 'saveMktChecklistConfig')  return saveMktChecklistConfig_(data.month, data.config);
     // ── NHAT KY BAO CAO HANG NGAY (Sale/Kenh/MKT/Tag) -> Google Sheet rieng ──

@@ -322,6 +322,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // doc moi lan mo tab de luon thay ban moi nhat tu noi khac them vao.
   // Them/sua/xoa mau tin NGAY TREN Pancake — dung CHUNG action saveMessageTemplate/deleteMessageTemplate
   // voi form tren CRM (tab Zalo AI) nen 2 noi tu dong bo ve cung sheet MessageTemplates.
+  // Sua/them/xoa "Mau co san (phong thuy)" (sheet CannedResponses) — xoa cache pkKnowledge de lan sau tai lai ban moi.
+  if (msg?.type === "SAVE_CANNED" || msg?.type === "DELETE_CANNED") {
+    const body = msg.type === "SAVE_CANNED"
+      ? { action: "saveCannedResponse", canned: { id: msg.payload?.id || "", nhom: msg.payload?.nhom || "", label: msg.payload?.label || "", text: msg.payload?.text || "" } }
+      : { action: "deleteCannedResponse", id: msg.payload?.id || "" };
+    _postGas_(body)
+      .then((data) => { chrome.storage.local.remove(["pkKnowledge", "pkKnowledgeTs"]); sendResponse({ ok: true, data }); })
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
   if (msg?.type === "SAVE_MESSAGE_TEMPLATE") {
     handleSaveMessageTemplate(msg.payload)
       .then((data) => sendResponse({ ok: true, data }))

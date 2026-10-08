@@ -3621,17 +3621,69 @@
     if (!box) return;
     const groups = {};
     _cannedResponses.forEach(c => { (groups[c.nhom] = groups[c.nhom] || []).push(c); });
-    box.innerHTML = Object.keys(groups).map(nhom =>
+    box.innerHTML = '<div id="pk-canned-form"></div><div class="pk-tpl-acts"><button type="button" class="pk-btn-outline" id="pk-canned-add">➕ Thêm mẫu có sẵn</button></div>' + Object.keys(groups).map(nhom =>
       `<div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;margin:6px 0 3px">${escapeHtml(nhom)}</div>` +
       groups[nhom].map(c =>
         `<div class="pk-ai-suggestion-item" data-cid="${escapeHtml(c.id)}" title="Bấm để chèn vào ô trả lời — chỗ $$ cần tự điền tay">` +
-        `<b>${escapeHtml(c.label)}</b><br>${escapeHtml(c.text.length > 90 ? c.text.slice(0, 90) + '…' : c.text)}</div>`
+        `<b>${escapeHtml(c.label)}</b><br>${escapeHtml(c.text.length > 90 ? c.text.slice(0, 90) + '…' : c.text)}` +
+        `<div class="pk-tpl-acts"><button type="button" class="pk-btn-outline" data-ceid="${escapeHtml(c.id)}">✏️ Sửa</button>` +
+        `<button type="button" class="pk-btn-outline" data-cdid="${escapeHtml(c.id)}">🗑 Xoá</button></div></div>`
       ).join('')
     ).join('');
     box.querySelectorAll('[data-cid]').forEach(el => {
-      el.addEventListener('click', () => {
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return; // bam Sua/Xoa thi khong chen vao o tra loi
         const c = _cannedResponses.find(x => x.id === el.dataset.cid);
         if (c) insertReply(c.text); // dung lai HAM CO SAN — tu dong xu ly ca contenteditable (Messenger) lan textarea
+      });
+    });
+    box.querySelector('#pk-canned-add').addEventListener('click', () => openCannedForm_(null));
+    box.querySelectorAll('[data-ceid]').forEach(b => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openCannedForm_(_cannedResponses.find(x => x.id === b.dataset.ceid) || null);
+    }));
+    box.querySelectorAll('[data-cdid]').forEach(b => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const c = _cannedResponses.find(x => x.id === b.dataset.cdid);
+      if (!c || !confirm('Xoá mẫu "' + c.label + '"?\n\nMẫu sẽ bị xoá khỏi CRM và mọi máy.')) return;
+      b.disabled = true;
+      safeSendMessage_({ type: 'DELETE_CANNED', payload: { id: c.id } }, (resp) => {
+        if (resp?.ok) { setStatus('Đã xoá mẫu có sẵn.'); _cannedResponses = _cannedResponses.filter(x => x.id !== c.id); loadPhongThuyKnowledge_(); }
+        else { b.disabled = false; setStatus('Lỗi xoá mẫu: ' + (resp?.error || 'không rõ')); }
+      });
+    }));
+  }
+
+  // Form them/sua "Mau co san (phong thuy)" — ghi ve sheet CannedResponses (CRM) qua GAS, ai cung sua duoc.
+  function openCannedForm_(c) {
+    const host = panelEl.querySelector('#pk-canned-form');
+    const groups = Array.from(new Set(_cannedResponses.map(x => x.nhom).filter(Boolean)));
+    host.innerHTML = `
+      <div class="pk-tpl-form-box">
+        <div class="pk-tpl-form-title">${c ? '✏️ Sửa mẫu có sẵn' : '➕ Thêm mẫu có sẵn'}</div>
+        <input type="text" id="pk-cf-nhom" list="pk-cf-groups" placeholder="Nhóm (VD: A. Chào hỏi)" autocomplete="off" />
+        <datalist id="pk-cf-groups">${groups.map(g => `<option value="${escapeHtml(g)}">`).join('')}</datalist>
+        <input type="text" id="pk-cf-label" placeholder="Tên mẫu" autocomplete="off" />
+        <textarea id="pk-cf-text" rows="6" placeholder="Nội dung (chỗ cần tự điền để $$)"></textarea>
+        <div class="pk-ai-sug-bar">
+          <button type="button" class="pk-btn-outline pk-ai-sug-save" id="pk-cf-save">💾 Lưu về CRM</button>
+          <button type="button" class="pk-btn-outline" id="pk-cf-cancel">Huỷ</button>
+        </div>
+      </div>`;
+    const $ = (id) => host.querySelector(id);
+    $('#pk-cf-nhom').value = c ? (c.nhom || '') : '';
+    $('#pk-cf-label').value = c ? c.label : '';
+    $('#pk-cf-text').value = c ? c.text : '';
+    $('#pk-cf-label').focus();
+    $('#pk-cf-cancel').addEventListener('click', () => { host.innerHTML = ''; });
+    $('#pk-cf-save').addEventListener('click', () => {
+      const label = $('#pk-cf-label').value.trim(), text = $('#pk-cf-text').value.trim();
+      if (!label || !text) { setStatus('Cần nhập đủ tên và nội dung mẫu.'); return; }
+      const btn = $('#pk-cf-save');
+      btn.disabled = true; btn.innerText = 'Đang lưu...';
+      safeSendMessage_({ type: 'SAVE_CANNED', payload: { id: c ? c.id : '', nhom: $('#pk-cf-nhom').value.trim(), label, text } }, (resp) => {
+        if (resp?.ok) { host.innerHTML = ''; setStatus('Đã lưu mẫu có sẵn — CRM và mọi máy sẽ thấy bản mới.'); loadPhongThuyKnowledge_(); }
+        else { btn.disabled = false; btn.innerText = '💾 Lưu về CRM'; setStatus('Lỗi lưu mẫu: ' + (resp?.error || 'không rõ')); }
       });
     });
   }
