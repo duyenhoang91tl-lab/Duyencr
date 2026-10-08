@@ -272,7 +272,7 @@ let advFilters = {
 // off-canvas mobile). Dùng ở màn "Báo cáo doanh số" để nhường chỗ cho biểu đồ khi cần chụp màn
 // hình gửi báo cáo — bấm lại để hiện lại bình thường.
 var _srSidebarHidden = false;
-let _lastCareText = null, _lastOrdersText = null, _lastDonText = null, _lastCkText = null;
+let _lastCareText = null, _lastOrdersText = null, _lastDonText = null, _lastCkText = null, _lastCareLeadsText = null;
 let _cskhPulledAt = 0, _assignPulledAt = 0;
 // DELTA SYNC CareData: nhip 3s chi xin cac dong co updated > _careSince (server doc 1 cot thay vi ca sheet); keo FULL moi 5 phut
 // (bat dong bo dong bi xoa/sua tay tren Sheet khong co 'updated') va khi bam Sync thu cong / lan dau. Server cu khong biet 'since'
@@ -520,8 +520,10 @@ if (gsUrl) {
   if (typeof pullBroadcastHistory === 'function') pullBroadcastHistory().catch(() => {});
 }
 
-// ── AUTO SYNC MỖI 3 GIÂY (chỉ khi tab visible, không spam khi lỗi) ──
-const AUTO_SYNC_MS = 3000;
+// ── AUTO SYNC MỖI 5 GIÂY (chỉ khi tab visible, không spam khi lỗi) ──
+// Tăng 3s -> 5s theo yêu cầu: mỗi tick/tab gọi GAS 2 request (customers + careLeads); giảm ~40% tải khi nhiều CS cùng mở.
+const AUTO_SYNC_MS = 5000;
+const ORDERS_PULL_EVERY_TICKS = 9;   // 9 tick x 5s = 45s kéo lại đơn hàng đầy đủ (khớp TTL cache action=orders ở GAS)
 let _autoSyncTimer = null;
 let _autoSyncRunning = false;
 let _autoSyncTick = 0;

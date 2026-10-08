@@ -271,8 +271,8 @@ function addCareLead_(data) {
 
 // ── Chỉ tra cứu tập SDT co trong "dữ liệu đơn" (Bao cao B) — dung de LOC nguon o
 // man hinh chinh, KHONG keo chi tiet san pham vao danh sach khach ──
-function readDonPhones_() {
-  var rows = readDonChiTiet_();
+function readDonPhones_(rows) {
+  rows = rows || readDonChiTiet_();   // tham so tuy chon: truyen san rows de khong doc lai (xem action donPhones)
   var set = {};
   for (var i = 0; i < rows.length; i++) {
     var ph = normPhone_(String(rows[i].soDienThoai || ''));
@@ -283,8 +283,8 @@ function readDonPhones_() {
 // Map SDT -> mang ten sale tham gia don (cot "Thẻ", tach theo dau phay — 1 don co the nhieu
 // sale). Dung o client de gop vao csSet, dam bao CS dung ten o BAT KY don nao trong
 // "dữ liệu đơn" (du don co nhieu sale) van xem duoc KH do.
-function getDonSaleByPhone_() {
-  var rows = readDonChiTiet_();
+function getDonSaleByPhone_(rows) {
+  rows = rows || readDonChiTiet_();
   var map = {};
   for (var i = 0; i < rows.length; i++) {
     var ph = normPhone_(String(rows[i].soDienThoai || ''));
@@ -304,8 +304,8 @@ function getDonSaleByPhone_() {
 // KHONG con dua theo nguon Renew trong DT TONG nhu truoc.
 // Thong ke POS theo SDT: { phone: { n: so don, rev: tong doanh thu sau giam } } -- BO don 'Da hoan'/'Dang hoan' (cung quy tac Bao cao B).
 // Dung cho tong don/tong doanh thu + PHAN HANG KH cua KH da co don Pos (Pos la chuan, bo qua Base). KHONG dung cho Phan loai (van dem n tu getDonOrderCountByPhone_).
-function getDonStatsByPhone_() {
-  var rows = readDonChiTiet_();
+function getDonStatsByPhone_(rows) {
+  rows = rows || readDonChiTiet_();
   var map = {};
   for (var i = 0; i < rows.length; i++) {
     var r = rows[i];
@@ -319,8 +319,8 @@ function getDonStatsByPhone_() {
   return map;
 }
 
-function getDonOrderCountByPhone_() {
-  var rows = readDonChiTiet_();
+function getDonOrderCountByPhone_(rows) {
+  rows = rows || readDonChiTiet_();
   var map = {};
   for (var i = 0; i < rows.length; i++) {
     var ph = normPhone_(String(rows[i].soDienThoai || ''));
@@ -361,8 +361,8 @@ function getDonOrdersByPhone_(phone) {
   return out;
 }
 
-function getDonLastDateByPhone_() {
-  var rows = readDonChiTiet_();
+function getDonLastDateByPhone_(rows) {
+  rows = rows || readDonChiTiet_();
   var map = {};
   for (var i = 0; i < rows.length; i++) {
     var ph = normPhone_(String(rows[i].soDienThoai || ''));

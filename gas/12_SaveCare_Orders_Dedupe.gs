@@ -273,6 +273,7 @@ function patchOrder_(data) {
   if (data.newRevenue !== undefined) sh.getRange(rowIdx, DT_COL_GIATRIDON + 1).setValue(data.newRevenue);
   if (data.newProduct)               sh.getRange(rowIdx, DT_COL_SANPHAM + 1).setValue(data.newProduct);
   if (data.newDetail)                sh.getRange(rowIdx, DT_COL_PHANLOAI + 1).setValue(data.newDetail);
+  _ordersCacheClear_();
   try { CacheService.getScriptCache().remove('lk_' + normPhone_(String(data.phone))); } catch (ec) {}
   return jsonOut_({ ok: true, updated: true });
 }
@@ -298,6 +299,7 @@ function deleteOrder_(data) {
       if (_normMoney_(r[DT_COL_GIATRIDON]) !== _normMoney_(data.oldRevenue)) continue;
     }
     sh.deleteRow(i + 2);
+    _ordersCacheClear_();
     try { CacheService.getScriptCache().remove('lk_' + normPhone_(String(data.phone))); } catch (ec) {}
     return jsonOut_({ ok: true, deleted: true });
   }
@@ -443,6 +445,7 @@ function deleteDuplicateOrders_(items) {
       deleted++;
     } catch (e) { skipped++; }
   });
+  if (deleted) _ordersCacheClear_();
   try {
     var cache = CacheService.getScriptCache();
     Object.keys(affectedPhones).forEach(function (p) { cache.remove('lk_' + p); });
@@ -520,8 +523,8 @@ function onChangeDedupTrigger_(e) {
       // 90s TTL du sheet Pos vua bi xoa dong trung, khien bao cao B/E/F/G co the tam thoi van hien
       // dong da bi xoa. _cacheGetBig_ chi can mat key "<key>_n" la coi nhu cache rong (xem ham do),
       // nen chi can xoa dung '_n' cua key HIEN TAI 'donChiTiet_v4' la du, khong can xoa tung manh.
-      if (resPos.deleted) cache.remove('donChiTiet_v4_n'); // force doc lai sheet Pos ngay, khong doi het 90s cache
-      if (resBase.deleted) cache.remove('srptOptions_v3');
+      if (resPos.deleted) cache.removeAll(['donChiTiet_v4_n', 'don_phones_v6_n']); // force doc lai sheet Pos ngay, khong doi het 90s cache
+      if (resBase.deleted) cache.removeAll(['srptOptions_v3', 'orders_v1_n']);
     } catch (ecCache) {}
   } finally {
     lock.releaseLock();
@@ -667,8 +670,8 @@ function doImportSheetRowsLocked_(sheetKey, sheetName, sh, rows) {
 
   try {
     var cache = CacheService.getScriptCache();
-    if (sheetName === DON_CHITIET_SHEET) cache.remove('donChiTiet_v4_n');
-    else cache.removeAll(['srptOptions_v3']);
+    if (sheetName === DON_CHITIET_SHEET) cache.removeAll(['donChiTiet_v4_n', 'don_phones_v6_n']);
+    else cache.removeAll(['srptOptions_v3', 'orders_v1_n']);
   } catch (ec) {}
 
   return jsonOut_({ ok: true, written: toWrite.length, skippedDupInFile: skippedDupInFile, skippedExisting: skippedExisting, dedupedAfter: dedupRes.deleted });

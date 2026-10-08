@@ -307,6 +307,11 @@ function _cacheGetBig_(key) {
   } catch (e) { return null; }
 }
 
+// Xoa cache action 'orders' (key 'orders_v1', chi can xoa '_n' — xem _cacheGetBig_). Goi sau MOI thao tac CRM ghi vao DT TONG.
+function _ordersCacheClear_() {
+  try { CacheService.getScriptCache().remove('orders_v1_n'); } catch (e) {}
+}
+
 // ─── NHAN DIEN COT DANH_MUC (KHONG dau, KHONG hardcode vi tri) ──────────────────────
 // readPriceCatalog_ bo o rong cho gon nen dong dau tien co the thieu key -> gop key cua TAT CA
 // cac dong. Nhan dien bang _stripVN_ (bo dau) vi tieu de that co dau ("Giá", "Tên sản phẩm"):
@@ -1332,6 +1337,12 @@ function doGetCore_(e) {
     }
 
     if (action === 'orders') {
+      // TOI UU (v13.20): NGUYEN NHAN GOC cham — action nay doc NGUYEN sheet DT TONG moi lan, khong cache, ma moi tab CRM dang mo
+      // keo no dinh ky -> N CS = N lan doc toan sheet moi chu ky. Nay cache 45s (_cachePutBig_ chia manh, vuot gioi han 100KB/key);
+      // xoa ngay khi CRM ghi DT TONG (patchOrder_/deleteOrder_/deleteDuplicateOrders_/dedup/import). Sua tay tren Sheet: toi da 45s.
+      // KHONG cache khi co dong loi doc (de lan sau thu lai + app tiep tuc canh bao).
+      var _ordCached = _cacheGetBig_('orders_v1');
+      if (_ordCached) { try { return jsonOut_(JSON.parse(_ordCached)); } catch (ecOrd) {} }
       var _ordersOut = readAllOrders_();
       var _ordersResp = { orders: _ordersOut };
       // Neu co dong bi loi khi doc, bao ve ngoai response (khong chi nam trong Logger.log noi
@@ -1339,6 +1350,8 @@ function doGetCore_(e) {
       if (readAllOrders_.lastErrorCount) {
         _ordersResp.errorCount = readAllOrders_.lastErrorCount;
         _ordersResp.errorSample = readAllOrders_.lastErrorSample;
+      } else {
+        try { _cachePutBig_('orders_v1', JSON.stringify(_ordersResp), 45); } catch (ecOrd2) {}
       }
       return jsonOut_(_ordersResp);
     }
@@ -1371,12 +1384,15 @@ function doGetCore_(e) {
     }
     // ── Tap SDT co trong "dữ liệu đơn" — chi de loc nguon o man hinh chinh (cache 10') ──
     if (action === 'donPhones') {
-      var cacheDP = CacheService.getScriptCache();
-      var cKeyDP = 'don_phones_v5'; // v5: them statsByPhone (n + rev Pos, bo hoan)
-      var cachedDP = cacheDP.get(cKeyDP);
+      // TOI UU (v13.20): NGUYEN NHAN GOC cham — (1) goi readDonChiTiet_() NAM LAN (moi ham getDon*_ tu doc lai, tuc 5 lan
+      // JSON.parse mang don lon, hoac 5 lan doc sheet khi cache 'donChiTiet_v4' het han); (2) cache.put 1 key duy nhat bi gioi han
+      // 100KB nen payload nay (5 map theo SDT) gan nhu chac chan THAT BAI AM THAM -> khong bao gio duoc cache. Nay doc 1 LAN roi
+      // truyen rows vao 5 ham, va cache qua _cachePutBig_ (chia manh) TTL 90s bang dung TTL cua 'donChiTiet_v4' (xoa cung luc, xem 'don_phones_v6_n').
+      var cachedDP = _cacheGetBig_('don_phones_v6');
       if (cachedDP) { try { return jsonOut_(JSON.parse(cachedDP)); } catch(ec) {} }
-      var resDP = { phones: readDonPhones_(), saleByPhone: getDonSaleByPhone_(), orderCountByPhone: getDonOrderCountByPhone_(), lastDateByPhone: getDonLastDateByPhone_(), statsByPhone: getDonStatsByPhone_() };
-      try { cacheDP.put(cKeyDP, JSON.stringify(resDP), 600); } catch(ec) {}
+      var rowsDP = readDonChiTiet_();
+      var resDP = { phones: readDonPhones_(rowsDP), saleByPhone: getDonSaleByPhone_(rowsDP), orderCountByPhone: getDonOrderCountByPhone_(rowsDP), lastDateByPhone: getDonLastDateByPhone_(rowsDP), statsByPhone: getDonStatsByPhone_(rowsDP) };
+      try { _cachePutBig_('don_phones_v6', JSON.stringify(resDP), 90); } catch(ec) {}
       return jsonOut_(resDP);
     }
 
@@ -1606,7 +1622,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.19-demo-lock' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.20-perf-donphones' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -2649,8 +2665,8 @@ function addCareLead_(data) {
 
 // ── Chỉ tra cứu tập SDT co trong "dữ liệu đơn" (Bao cao B) — dung de LOC nguon o
 // man hinh chinh, KHONG keo chi tiet san pham vao danh sach khach ──
-function readDonPhones_() {
-  var rows = readDonChiTiet_();
+function readDonPhones_(rows) {
+  rows = rows || readDonChiTiet_();   // tham so tuy chon: truyen san rows de khong doc lai (xem action donPhones)
   var set = {};
   for (var i = 0; i < rows.length; i++) {
     var ph = normPhone_(String(rows[i].soDienThoai || ''));
@@ -2661,8 +2677,8 @@ function readDonPhones_() {
 // Map SDT -> mang ten sale tham gia don (cot "Thẻ", tach theo dau phay — 1 don co the nhieu
 // sale). Dung o client de gop vao csSet, dam bao CS dung ten o BAT KY don nao trong
 // "dữ liệu đơn" (du don co nhieu sale) van xem duoc KH do.
-function getDonSaleByPhone_() {
-  var rows = readDonChiTiet_();
+function getDonSaleByPhone_(rows) {
+  rows = rows || readDonChiTiet_();
   var map = {};
   for (var i = 0; i < rows.length; i++) {
     var ph = normPhone_(String(rows[i].soDienThoai || ''));
@@ -2682,8 +2698,8 @@ function getDonSaleByPhone_() {
 // KHONG con dua theo nguon Renew trong DT TONG nhu truoc.
 // Thong ke POS theo SDT: { phone: { n: so don, rev: tong doanh thu sau giam } } -- BO don 'Da hoan'/'Dang hoan' (cung quy tac Bao cao B).
 // Dung cho tong don/tong doanh thu + PHAN HANG KH cua KH da co don Pos (Pos la chuan, bo qua Base). KHONG dung cho Phan loai (van dem n tu getDonOrderCountByPhone_).
-function getDonStatsByPhone_() {
-  var rows = readDonChiTiet_();
+function getDonStatsByPhone_(rows) {
+  rows = rows || readDonChiTiet_();
   var map = {};
   for (var i = 0; i < rows.length; i++) {
     var r = rows[i];
@@ -2697,8 +2713,8 @@ function getDonStatsByPhone_() {
   return map;
 }
 
-function getDonOrderCountByPhone_() {
-  var rows = readDonChiTiet_();
+function getDonOrderCountByPhone_(rows) {
+  rows = rows || readDonChiTiet_();
   var map = {};
   for (var i = 0; i < rows.length; i++) {
     var ph = normPhone_(String(rows[i].soDienThoai || ''));
@@ -2739,8 +2755,8 @@ function getDonOrdersByPhone_(phone) {
   return out;
 }
 
-function getDonLastDateByPhone_() {
-  var rows = readDonChiTiet_();
+function getDonLastDateByPhone_(rows) {
+  rows = rows || readDonChiTiet_();
   var map = {};
   for (var i = 0; i < rows.length; i++) {
     var ph = normPhone_(String(rows[i].soDienThoai || ''));
@@ -5306,6 +5322,7 @@ function patchOrder_(data) {
   if (data.newRevenue !== undefined) sh.getRange(rowIdx, DT_COL_GIATRIDON + 1).setValue(data.newRevenue);
   if (data.newProduct)               sh.getRange(rowIdx, DT_COL_SANPHAM + 1).setValue(data.newProduct);
   if (data.newDetail)                sh.getRange(rowIdx, DT_COL_PHANLOAI + 1).setValue(data.newDetail);
+  _ordersCacheClear_();
   try { CacheService.getScriptCache().remove('lk_' + normPhone_(String(data.phone))); } catch (ec) {}
   return jsonOut_({ ok: true, updated: true });
 }
@@ -5331,6 +5348,7 @@ function deleteOrder_(data) {
       if (_normMoney_(r[DT_COL_GIATRIDON]) !== _normMoney_(data.oldRevenue)) continue;
     }
     sh.deleteRow(i + 2);
+    _ordersCacheClear_();
     try { CacheService.getScriptCache().remove('lk_' + normPhone_(String(data.phone))); } catch (ec) {}
     return jsonOut_({ ok: true, deleted: true });
   }
@@ -5476,6 +5494,7 @@ function deleteDuplicateOrders_(items) {
       deleted++;
     } catch (e) { skipped++; }
   });
+  if (deleted) _ordersCacheClear_();
   try {
     var cache = CacheService.getScriptCache();
     Object.keys(affectedPhones).forEach(function (p) { cache.remove('lk_' + p); });
@@ -5553,8 +5572,8 @@ function onChangeDedupTrigger_(e) {
       // 90s TTL du sheet Pos vua bi xoa dong trung, khien bao cao B/E/F/G co the tam thoi van hien
       // dong da bi xoa. _cacheGetBig_ chi can mat key "<key>_n" la coi nhu cache rong (xem ham do),
       // nen chi can xoa dung '_n' cua key HIEN TAI 'donChiTiet_v4' la du, khong can xoa tung manh.
-      if (resPos.deleted) cache.remove('donChiTiet_v4_n'); // force doc lai sheet Pos ngay, khong doi het 90s cache
-      if (resBase.deleted) cache.remove('srptOptions_v3');
+      if (resPos.deleted) cache.removeAll(['donChiTiet_v4_n', 'don_phones_v6_n']); // force doc lai sheet Pos ngay, khong doi het 90s cache
+      if (resBase.deleted) cache.removeAll(['srptOptions_v3', 'orders_v1_n']);
     } catch (ecCache) {}
   } finally {
     lock.releaseLock();
@@ -5700,8 +5719,8 @@ function doImportSheetRowsLocked_(sheetKey, sheetName, sh, rows) {
 
   try {
     var cache = CacheService.getScriptCache();
-    if (sheetName === DON_CHITIET_SHEET) cache.remove('donChiTiet_v4_n');
-    else cache.removeAll(['srptOptions_v3']);
+    if (sheetName === DON_CHITIET_SHEET) cache.removeAll(['donChiTiet_v4_n', 'don_phones_v6_n']);
+    else cache.removeAll(['srptOptions_v3', 'orders_v1_n']);
   } catch (ec) {}
 
   return jsonOut_({ ok: true, written: toWrite.length, skippedDupInFile: skippedDupInFile, skippedExisting: skippedExisting, dedupedAfter: dedupRes.deleted });

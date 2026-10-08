@@ -80,6 +80,11 @@ function _cacheGetBig_(key) {
   } catch (e) { return null; }
 }
 
+// Xoa cache action 'orders' (key 'orders_v1', chi can xoa '_n' — xem _cacheGetBig_). Goi sau MOI thao tac CRM ghi vao DT TONG.
+function _ordersCacheClear_() {
+  try { CacheService.getScriptCache().remove('orders_v1_n'); } catch (e) {}
+}
+
 // ─── NHAN DIEN COT DANH_MUC (KHONG dau, KHONG hardcode vi tri) ──────────────────────
 // readPriceCatalog_ bo o rong cho gon nen dong dau tien co the thieu key -> gop key cua TAT CA
 // cac dong. Nhan dien bang _stripVN_ (bo dau) vi tieu de that co dau ("Giá", "Tên sản phẩm"):

@@ -1255,7 +1255,7 @@ async function autoSyncLoop() {
     // vòng lặp này vẫn chạy mỗi 3s. Hệ quả: CS A thêm đơn mới → máy CS B không tự thấy, phải bấm
     // "Sync GS" thủ công. Giờ cứ ~10 lần lặp (~30s ở AUTO_SYNC_MS=3000) thì ép kéo lại đầy đủ luôn,
     // không chỉ CareData (trạng thái/ghi chú/hẹn — vốn đã tự cập nhật nhanh mỗi 3s như trước).
-    const forceFullPull = (_autoSyncTick % 10 === 0);
+    const forceFullPull = (_autoSyncTick % ORDERS_PULL_EVERY_TICKS === 0);
     await syncFromGS({ pullOrders: _isEmptyObj(customerMap) || forceFullPull });
   } catch(e) {
     // BUG (đã sửa): trước đây catch này ghi "// Silent" — MỌI lỗi JS thật xảy ra trong

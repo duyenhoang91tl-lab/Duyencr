@@ -1111,13 +1111,18 @@ async function syncFromGS(opts) {
       try {
         const dpR = await fetch(gsUrl + sepChar + 'action=donPhones', { redirect: 'follow' });
         const dpText = await dpR.text();
-        const dpJson = JSON.parse(dpText);
-        if (dpText !== _lastDonText) { _lastDonText = dpText; _forceFullBuildFromCareLeads = true; }   // dữ liệu đơn doi -> phai build lai (nguon/hang KH)
-        if (dpJson && dpJson.phones) { donPhoneSet = new Set(dpJson.phones); saveLS('ome_don_phones', dpJson.phones); }
-        if (dpJson && dpJson.saleByPhone) { donSaleByPhone = dpJson.saleByPhone; saveLS('ome_don_sale_by_phone', dpJson.saleByPhone); }
-        if (dpJson && dpJson.lastDateByPhone) { donLastDateByPhone = dpJson.lastDateByPhone; saveLS('ome_don_last_date', dpJson.lastDateByPhone); }
-        if (dpJson && dpJson.statsByPhone) { donStatsByPhone = dpJson.statsByPhone; _posStatsOn = Object.keys(donStatsByPhone).length > 0; saveLS('ome_don_stats', dpJson.statsByPhone); }
-        if (dpJson && dpJson.orderCountByPhone) { donOrderCountByPhone = dpJson.orderCountByPhone; saveLS('ome_don_order_count', dpJson.orderCountByPhone); }
+        // NGUYÊN NHÂN GỐC lag định kỳ: trước đây khối này JSON.parse + dựng lại Set + saveLS (JSON.stringify ghi
+        // localStorage, đồng bộ trên luồng chính) 5 map lớn theo SĐT MỖI lần kéo, kể cả khi server trả y hệt lần trước.
+        // Nay chỉ xử lý khi nội dung thật sự đổi (giống cách _lastCareText/_lastOrdersText đã làm).
+        if (dpText !== _lastDonText) {
+          const dpJson = JSON.parse(dpText);   // lỗi parse -> nhảy xuống catch, _lastDonText chưa đổi nên nhịp sau thử lại
+          _lastDonText = dpText; _forceFullBuildFromCareLeads = true;   // dữ liệu đơn doi -> phai build lai (nguon/hang KH)
+          if (dpJson && dpJson.phones) { donPhoneSet = new Set(dpJson.phones); saveLS('ome_don_phones', dpJson.phones); }
+          if (dpJson && dpJson.saleByPhone) { donSaleByPhone = dpJson.saleByPhone; saveLS('ome_don_sale_by_phone', dpJson.saleByPhone); }
+          if (dpJson && dpJson.lastDateByPhone) { donLastDateByPhone = dpJson.lastDateByPhone; saveLS('ome_don_last_date', dpJson.lastDateByPhone); }
+          if (dpJson && dpJson.statsByPhone) { donStatsByPhone = dpJson.statsByPhone; _posStatsOn = Object.keys(donStatsByPhone).length > 0; saveLS('ome_don_stats', dpJson.statsByPhone); }
+          if (dpJson && dpJson.orderCountByPhone) { donOrderCountByPhone = dpJson.orderCountByPhone; saveLS('ome_don_order_count', dpJson.orderCountByPhone); }
+        }
       } catch(dpErr) { console.warn('donPhones fetch error:', dpErr.message); }
       // ── Nguồn "CSKH-Duyên" (sheet thứ 3, có thể tới hàng trăm nghìn dòng) — CHỈ kéo bản "nhẹ"
       // [phone,name,tier] mỗi dòng (action=cskhDuyenLite), KHÔNG kéo đủ 17 trường (địa chỉ/công
@@ -1146,16 +1151,22 @@ async function syncFromGS(opts) {
     // buildCustomers() đầy đủ ngay khi cần, không phụ thuộc orderCount.
     try {
       const clR = await fetch(gsUrl + sepChar + 'action=careLeads', { redirect: 'follow' });
-      const clJson = await clR.json();
-      if (clJson && clJson.rows) {
-        const newLeads = {};
-        clJson.rows.forEach(function(r){ if (r.phone) newLeads[r.phone] = { name: r.name||'', note: r.note||'', cs: r.cs||'', createdAt: r.createdAt||'' }; });
-        const knownPhones = _assignCustMap();   // Map cache, khong dung lai Set 136k phan tu moi 3s
-        for (const ph in newLeads) {
-          if (!knownPhones.has(ph)) { _forceFullBuildFromCareLeads = true; break; }
+      const clText = await clR.text();
+      // NGUYÊN NHÂN GỐC lag nền mỗi tick: trước đây mỗi tick đều parse + dựng lại careLeads + saveLS (ghi localStorage đồng bộ)
+      // + quét _assignCustMap() dù sheet "KH Chăm sóc mới" không đổi. Nay so chuỗi trả về, y hệt lần trước thì bỏ qua.
+      if (clText !== _lastCareLeadsText) {
+        const clJson = JSON.parse(clText);   // lỗi parse -> catch bên dưới (như clR.json() trước đây)
+        if (clJson && clJson.rows) {
+          const newLeads = {};
+          clJson.rows.forEach(function(r){ if (r.phone) newLeads[r.phone] = { name: r.name||'', note: r.note||'', cs: r.cs||'', createdAt: r.createdAt||'' }; });
+          const knownPhones = _assignCustMap();   // Map cache, khong dung lai Set 136k phan tu moi tick
+          for (const ph in newLeads) {
+            if (!knownPhones.has(ph)) { _forceFullBuildFromCareLeads = true; break; }
+          }
+          careLeads = newLeads;
+          saveLS('ome_care_leads', careLeads);
         }
-        careLeads = newLeads;
-        saveLS('ome_care_leads', careLeads);
+        _lastCareLeadsText = clText;   // chỉ đánh dấu "đã xử lý" SAU khi xử lý xong, lỗi giữa chừng thì nhịp sau tự thử lại
       }
     } catch(clErr) { console.warn('careLeads fetch error:', clErr.message); }
 
