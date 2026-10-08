@@ -1,0 +1,6 @@
+/* Chế độ báo cáo: ẩn mọi thứ không thuộc báo cáo để chụp màn hình (xem _RPT_MODE_TABS trong script) */
+#rpt-bar{display:none}
+body.rpt-mode #rpt-bar{display:flex;align-items:center;gap:10px;padding:8px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+#rpt-mode-sel{font-size:13px;font-weight:600;padding:5px 8px;border:1px solid var(--border-md,var(--border));border-radius:6px;background:var(--surface);color:var(--text)}
+body.rpt-mode header,body.rpt-mode .sidebar,body.rpt-mode .sidebar-backdrop,body.rpt-mode .tabs,body.rpt-mode .stats-row,body.rpt-mode #files-bar,body.rpt-mode #sync-banner{display:none !important}
+body.rpt-mode .app{height:100vh}

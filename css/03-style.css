@@ -1,0 +1,5 @@
+.cs-status-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rsm);margin-bottom:4px;background:var(--surface);cursor:default;}
+.cs-status-row:hover{background:var(--surface2);}
+.cs-status-drag{color:var(--hint);cursor:grab;font-size:13px;flex-shrink:0;user-select:none;}
+.cs-status-drag:active{cursor:grabbing;}
+.cs-status-label{font-size:12px;flex:1;}
