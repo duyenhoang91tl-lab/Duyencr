@@ -31,7 +31,8 @@ const PARTS = [
   ['18_Tasks_Menh_MsgTpl', 'var SH_TASK ='],
   ['19_BannedList_MktChecklist', 'var REPORT_SALE_SS_ID ='],
   ['20_ExportLog_AutoAssign', 'var EXPORT_LOG_SS_ID ='],
-  ['21_ArchiveOldOrders', 'var ARCHIVE_SUFFIX_ =']
+  ['21_ArchiveOldOrders', 'var ARCHIVE_SUFFIX_ ='],
+  ['22_Supabase', 'var SB_BATCH_ =']
 ];
 const src = fs.readFileSync(SRC, 'utf8');
 const lines = src.split('\n');

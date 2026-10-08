@@ -12,7 +12,13 @@ chạy thật đang khoá). KHÔNG bật archive chạy thật khi chưa quyết
 ## Lộ trình
 - [x] Bước 1 (phiên này): `supabase/schema.sql` (care_data, dt_tong, don_chi_tiet + index + RLS). CHƯA đụng gas_v13.js.
 - [ ] Bước 1b (Duyên làm tay): tạo project Supabase (free) → SQL Editor → dán `supabase/schema.sql` → Run. Lưu `SUPABASE_URL` và `service_role` key vào Apps Script → Project Settings → Script Properties (`SUPABASE_URL`, `SUPABASE_KEY`). Không gửi key vào chat.
-- [ ] Bước 2: gas_v13.js thêm helper `sb_()` (UrlFetchApp REST) + action `sbPing` + trigger ping hằng ngày + action `sbBackfillCare` (đẩy CareData theo lô 500 dòng, resume được) + `sbCompareCare` (đối chiếu số dòng/checksum).
+- [ ] Bước 2 (đang làm, chia mục nhỏ — mỗi mục push riêng; code nằm cuối `gas_v13.js` = file `gas/22_Supabase.gs`):
+  - [x] 2a: helper `sbCfg_`/`sb_`/`sbCareRowToRec_` + mốc `22_Supabase` trong `tools/split-gas.js`.
+  - [ ] 2b: `sbPing_` + trigger ping hằng ngày + action `sbPing` (doGet, cần adminKey).
+  - [ ] 2c: `sbBackfillCare_` (lô 500, upsert theo phone, con trỏ resume, dryRun mặc định) + action `sbBackfillCare` (doPost, cần adminKey).
+  - [ ] 2d: `sbCompareCare_` + action `sbCompareCare` (doGet, cần adminKey).
+  - [ ] 2e: test Node tổng hợp `tools/test-supabase.js` (fetch giả).
+  - Người dùng làm tay sau khi các mục push: dán đè `gas/22_Supabase.gs` (file MỚI — tạo thêm file trong Editor) + `gas/04_doGet.gs` + `gas/11_ExportSheet_doPost.gs`/file chứa doPost; Deploy bản mới; Đồng bộ mã GAS mới nhất; đặt Script Properties; chạy `sbPing`.
 - [ ] Bước 3: `lookup` + `saveSingleCare_`/`saveBatchCare_` ghi song song; đọc `findCareByPhone_` từ Supabase khi cờ bật. Test bằng Node với fetch giả.
 - [ ] Bước 4: backfill `dt_tong` + `don_chi_tiet`; chuyển `readOrdersByPhone_`, `findDonRowsByPhone_`, `reminders`, `readDTTong_` (lọc theo ngày bằng SQL).
 - [ ] Bước 5: bỏ dual-write khi ổn; Sheets chỉ còn bản xem/backup.

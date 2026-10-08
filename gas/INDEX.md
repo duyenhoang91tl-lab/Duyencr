@@ -94,3 +94,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hàm: `_arcYmd_`, `_arcCutoffYmd_`, `_arcMonths_`, `_arcPickRows_`, `_arcSig_`, `_arcSafeCell_`, `_arcLogRow_`, `_arcOneSheet_`, `archiveOldOrders_`
 - Hằng/biến: `ARCHIVE_SUFFIX_`, `ARCHIVE_LOG_SHEET_`, `ARCHIVE_DEFAULT_MONTHS_`, `ARCHIVE_MIN_MONTHS_`, `ARCHIVE_MAX_ROWS_PER_RUN_`, `ARCHIVE_MAX_DELETE_RUNS_`, `ARCHIVE_APPLY_ENABLED_`
 
+## 22_Supabase.gs
+- Hàm: `sbCfg_`, `sb_`, `_sbCell_`, `sbCareRowToRec_`
+- Hằng/biến: `SB_BATCH_`, `SB_TIME_BUDGET_MS_`, `SB_CARE_COLS_`
+
