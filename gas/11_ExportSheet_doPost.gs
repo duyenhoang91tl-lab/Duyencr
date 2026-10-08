@@ -255,6 +255,11 @@ function doPostCore_(e) {
       if (!_adminKeyOk_(data.adminKey)) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de luu tru don cu.' });
       return jsonOut_(archiveOldOrders_({ months: data.months, which: data.which, dryRun: data.dryRun !== false }));
     }
+    // ── SUPABASE (buoc 2c): day CareData len Supabase theo lo (dryRun mac dinh true, resume bang con tro). Can adminKey ──
+    if (action === 'sbBackfillCare') {
+      if (!_adminKeyOk_(data.adminKey)) return jsonOut_({ error: 'Can khoa quan tri (adminKey) cho thao tac Supabase.' });
+      return jsonOut_(sbBackfillCare_({ dryRun: data.dryRun, reset: data.reset }));
+    }
     if (action === 'replaceOrders')       return replaceOrders_(data.orders, data);
     if (action === 'setOrderCareCS')      return setOrderCareCS_(data.phone, data.careCS);
     if (action === 'setOrderCareCSBatch') return setOrderCareCSBatch_(data.updates);
