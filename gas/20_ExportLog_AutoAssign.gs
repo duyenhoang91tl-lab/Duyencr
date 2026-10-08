@@ -353,8 +353,8 @@ function _aaHangKey_(rev) { rev = Number(rev) || 0; return rev >= 50000000 ? 'su
 function _aaLoadCustomers_() {
   var src = {}, leadName = {};
   function mark(p, k) { if (!p) return; (src[p] = src[p] || {})[k] = true; }
-  var revBy = {};   // PHAN HANG KH: doanh thu theo SDT -- Pos (bo hoan) neu KH co don Pos, khong thi tong DT TONG (cung quy tac c.totalRevenue o index.html)
-  var posStats = getDonStatsByPhone_();
+  var revBy = {};   // PHAN HANG KH: doanh thu theo SDT CHI TINH THEO POS (bo hoan; KH khong co don Pos = 0) -- cung quy tac c.totalRevenue o index.html
+  var posStats = getDonStatsByPhone_(), posOn = Object.keys(posStats).length > 0;   // CHI TINH THEO POS; sheet Pos trong thi tam dung Base
   readAllOrders_().forEach(function (o) { mark(o.phone, 'dt'); if (o.phone) revBy[o.phone] = (revBy[o.phone] || 0) + (Number(o.revenue) || 0); });
   readCareLeads_().forEach(function (r) { mark(r.phone, 'cs'); if (r.name) leadName[r.phone] = true; });
   readCskhDuyenLite_().rows.forEach(function (r) { mark(r[0], 'cskh'); });
@@ -364,7 +364,7 @@ function _aaLoadCustomers_() {
     var d = src[p];
     if (!(d.dt || d.don || d.cskh || (d.cs && leadName[p]))) return;
     var n = cnt[p] || 0;
-    custs.push({ phone: p, dataSrc: { dt: !!d.dt, don: !!d.don, cs: !!d.cs, cskh: !!d.cskh }, tier: n >= 10 ? 'VIP' : n >= 5 ? 'Thân thiết' : n >= 2 ? 'Tiềm năng' : 'Chưa bán lại được', hangKey: _aaHangKey_(posStats[p] ? posStats[p].rev : (revBy[p] || 0)) });
+    custs.push({ phone: p, dataSrc: { dt: !!d.dt, don: !!d.don, cs: !!d.cs, cskh: !!d.cskh }, tier: n >= 10 ? 'VIP' : n >= 5 ? 'Thân thiết' : n >= 2 ? 'Tiềm năng' : 'Chưa bán lại được', hangKey: _aaHangKey_(posOn ? (posStats[p] ? posStats[p].rev : 0) : (revBy[p] || 0)) });
   });
   var ever = {};
   readAssign_(getCrmSS_().getSheetByName(SH_ASSIGN)).forEach(function (h) { (h.phones || []).forEach(function (p) { ever[p] = true; }); });

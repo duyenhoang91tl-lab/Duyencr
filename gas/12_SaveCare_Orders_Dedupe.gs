@@ -549,6 +549,42 @@ function installAutoDedupTrigger_() {
 // bang SheetJS, GUI NGUYEN mang 2 chieu (header + cot rong thua da bi cat o client) len day qua
 // action 'importSheetRows'. Ham nay CHI ghi noi tiep (append) — khong bao gio ghi de/xoa du lieu
 // cu, an toan voi sheet dang duoc nhan vien thao tac truc tiep hang ngay.
+// SUA 2026-10-08 — KHOA KHU TRUNG THEO DON (khong con chi so khop "giong het moi cot").
+// NGUYEN NHAN GOC cua loi "nhap lai file Excel van them don trung -> doanh thu x2": truoc day chi khu
+// trung TUYET DOI (moi cot giong y het, xem _rowKeyExact_). Nhung nhan vien sua tay cac cot ben phai
+// (Giao cho / Giai doan / Trang thai / Ghi chu) tren Sheet, va file export moi cung co the doi gia tri
+// (trang thai don, dinh dang so "1,200,000" vs 1200000, ngay dang chuoi vs Date...) -> cung 1 don
+// nhung KHAC o 1 cot la hoi tiet -> khong bi coi la trung -> ghi them dong thu 2 -> doanh thu x2.
+// Cach moi: tinh KHOA DON da chuan hoa cho dong trong file VA dong da co san trong Sheet, bo qua dong
+// nao khoa da ton tai (khong ghi de/khong xoa dong cu).
+//  - Base (DT TONG): ID don (cot T) neu co; thieu ID thi SDT + ngay tao + thoi gian HT + gia tri don + san pham.
+//  - Pos (du lieu don): khong co cot ID, cot A (STT) doi moi lan export nen BO QUA; dung ngay+gio tao,
+//    SDT, ten khach, san pham, ma SP, so luong, gia tri sau giam, COD.
+function _impHm_(v) {
+  if (Object.prototype.toString.call(v) === '[object Date]') {
+    if (isNaN(v.getTime())) return '';
+    var sh = new Date(v.getTime() + VN_OFFSET_MS);
+    return String(sh.getUTCHours()).padStart(2, '0') + ':' + String(sh.getUTCMinutes()).padStart(2, '0');
+  }
+  var m = String(v == null ? '' : v).trim().match(/\s(\d{1,2}):(\d{2})/);
+  return m ? String(m[1]).padStart(2, '0') + ':' + m[2] : '';
+}
+function _impOrderKey_(sheetKey, row) {
+  if (sheetKey === 'base') {
+    var id = String(row[DT_COL_ID] == null ? '' : row[DT_COL_ID]).trim();
+    if (id) return 'id|' + id;
+    var ph = normPhone_(String(row[DT_COL_PHONE] || ''));
+    if (!ph) return 'x|' + _rowKeyExact_(row);
+    return 'f|' + ph + '|' + normOrderDate_(row[DT_COL_NGAYTAO]) + '|' + normOrderDate_(row[DT_COL_THOIGIANHT]) + '|' +
+      _normMoney_(row[DT_COL_GIATRIDON]) + '|' + _normTxt_(row[DT_COL_SANPHAM]);
+  }
+  var phP = normPhone_(String(row[4] || ''));
+  var nameP = _normTxt_(row[3]), spP = _normTxt_(row[8]);
+  if (!phP && !nameP && !spP) return 'x|' + _rowKeyExact_(row);
+  return 'p|' + normOrderDate_(row[1]) + '|' + _impHm_(row[1]) + '|' + phP + '|' + nameP + '|' + spP + '|' +
+    _normTxt_(row[9]) + '|' + _normTxt_(row[10]) + '|' + _normMoney_(row[11]) + '|' + _normMoney_(row[12]);
+}
+
 function doImportSheetRows_(sheetKey, rows) {
   if (!Array.isArray(rows) || !rows.length) return jsonOut_({ error: 'Không có dòng nào để nhập.' });
   var sheetName = sheetKey === 'pos' ? DON_CHITIET_SHEET : (sheetKey === 'base' ? DT_TONG_SHEET : '');
@@ -557,6 +593,16 @@ function doImportSheetRows_(sheetKey, rows) {
   var sh = ss.getSheetByName(sheetName);
   if (!sh) return jsonOut_({ error: 'Không tìm thấy sheet "' + sheetName + '" trong Google Sheet.' });
 
+  // Khoa: bam "Nhap" 2 lan / 2 admin nhap cung luc khong duoc cung doc-roi-ghi (se cung thay "chua co" -> ghi 2 lan).
+  var impLock = LockService.getScriptLock();
+  if (!impLock.tryLock(25000)) return jsonOut_({ error: 'Hệ thống đang xử lý 1 lần nhập khác — đợi vài giây rồi bấm lại (KHÔNG bấm liên tục).' });
+  try {
+    return doImportSheetRowsLocked_(sheetKey, sheetName, sh, rows);
+  } finally {
+    try { impLock.releaseLock(); } catch (eRel) {}
+  }
+}
+function doImportSheetRowsLocked_(sheetKey, sheetName, sh, rows) {
   var width = 0;
   for (var i = 0; i < rows.length; i++) {
     if (!Array.isArray(rows[i])) return jsonOut_({ error: 'Dữ liệu dòng ' + (i + 1) + ' không đúng định dạng (không phải mảng).' });
@@ -577,7 +623,32 @@ function doImportSheetRows_(sheetKey, rows) {
     seenInFile[key] = true;
     toWrite.push(row);
   }
-  if (!toWrite.length) return jsonOut_({ ok: true, written: 0, skippedDupInFile: skippedDupInFile, dedupedAfter: 0 });
+  // Bo cac dong DON DA CO SAN trong Sheet (theo khoa don chuan hoa — xem _impOrderKey_). Doc lai chinh
+  // Sheet (khong tin cache) trong luc dang giu khoa.
+  var keyW = (sheetKey === 'pos') ? DON_CHITIET_WIDTH : DT_TONG_WIDTH;
+  var existKeys = {};
+  var lastNow = sh.getLastRow();
+  if (lastNow >= 2) {
+    var exVals = sh.getRange(2, 1, lastNow - 1, Math.min(keyW, sh.getMaxColumns())).getValues();
+    for (var e = 0; e < exVals.length; e++) {
+      var er = exVals[e];
+      if (_rowIsBlank_(er)) continue;
+      while (er.length < keyW) er.push('');
+      existKeys[_impOrderKey_(sheetKey, er)] = true;
+    }
+  }
+  var fresh = [], skippedExisting = 0, seenKey = {};
+  for (var w = 0; w < toWrite.length; w++) {
+    var kr = toWrite[w].slice(0);
+    while (kr.length < keyW) kr.push('');
+    var k2 = _impOrderKey_(sheetKey, kr);
+    if (existKeys[k2]) { skippedExisting++; continue; }
+    if (seenKey[k2]) { skippedDupInFile++; continue; }
+    seenKey[k2] = true;
+    fresh.push(toWrite[w]);
+  }
+  toWrite = fresh;
+  if (!toWrite.length) return jsonOut_({ ok: true, written: 0, skippedDupInFile: skippedDupInFile, skippedExisting: skippedExisting, dedupedAfter: 0 });
 
   sh.getRange(sh.getLastRow() + 1, 1, toWrite.length, width).setValues(toWrite);
 
@@ -600,7 +671,7 @@ function doImportSheetRows_(sheetKey, rows) {
     else cache.removeAll(['srptOptions_v3']);
   } catch (ec) {}
 
-  return jsonOut_({ ok: true, written: toWrite.length, skippedDupInFile: skippedDupInFile, dedupedAfter: dedupRes.deleted });
+  return jsonOut_({ ok: true, written: toWrite.length, skippedDupInFile: skippedDupInFile, skippedExisting: skippedExisting, dedupedAfter: dedupRes.deleted });
 }
 
 // Da ngung ho tro thay toan bo du lieu don hang tu client (truoc day dung khi dong bo

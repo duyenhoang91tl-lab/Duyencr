@@ -55,7 +55,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hàm: `exportSalesReportToSheet_`, `doPost`
 
 ## 12_SaveCare_Orders_Dedupe.gs
-- Hàm: `invalidateLookupCache_`, `saveAllCare_`, `saveSingleCare_`, `saveBatchCare_`, `syncZaloFriendStatus_`, `saveOrders_`, `patchOrder_`, `deleteOrder_`, `normOrderDate_`, `_normTxt_`, `findDuplicateOrders_`, `deleteDuplicateOrders_`, `_rowKeyExact_`, `_rowIsBlank_`, `_autoDedupExactRowsInSheet_`, `_autoDedupLog_`, `onChangeDedupTrigger_`, `installAutoDedupTrigger_`, `doImportSheetRows_`, `replaceOrders_`, `setOrderCareCS_`, `setOrderCareCSBatch_`
+- Hàm: `invalidateLookupCache_`, `saveAllCare_`, `saveSingleCare_`, `saveBatchCare_`, `syncZaloFriendStatus_`, `saveOrders_`, `patchOrder_`, `deleteOrder_`, `normOrderDate_`, `_normTxt_`, `findDuplicateOrders_`, `deleteDuplicateOrders_`, `_rowKeyExact_`, `_rowIsBlank_`, `_autoDedupExactRowsInSheet_`, `_autoDedupLog_`, `onChangeDedupTrigger_`, `installAutoDedupTrigger_`, `_impHm_`, `_impOrderKey_`, `doImportSheetRows_`, `doImportSheetRowsLocked_`, `replaceOrders_`, `setOrderCareCS_`, `setOrderCareCSBatch_`
 - Hằng/biến: `SH_AUTO_DEDUP_LOG`, `AUTO_DEDUP_LOG_HEADERS`
 
 ## 13_Teams_Pancake.gs
