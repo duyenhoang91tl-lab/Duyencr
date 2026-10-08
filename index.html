@@ -2158,6 +2158,8 @@ function _channelCommissionRate_(kenh){
 //    audience: {online, offline},    // rỗng cả 2 = áp dụng mọi sale (kể cả sale chưa phân loại)
 //    product,                        // từ khoá sản phẩm (phân tách bởi dấu phẩy), rỗng = mọi sản phẩm
 //                                     // CÓ điền -> thưởng NHÂN theo số lượng sản phẩm khớp bán được
+//    requireProduct,                 // từ khoá BẮT BUỘC có trong ô Sản phẩm của đơn (vd "vòng") thì điều kiện doanh thu THEO ĐƠN mới được tính;
+//                                     // khác "product" ở chỗ KHÔNG nhân số lượng — chỉ là cổng lọc. Rỗng = không lọc.
 //    extraNote, exclusionNote,       // ghi chú tự do — chỉ hiển thị, không tự tính
 //    tier: {enabled, rows:[{count,bonus}]},   // thưởng theo SỐ ĐƠN CHỐT TRONG NGÀY của 1 sale (bậc thang)
 //    revenue: {enabled, scope:'order'|'day', min, max},  // thưởng theo giá trị 1 đơn HOẶC doanh số/ngày
@@ -15578,7 +15580,7 @@ function _computeBonusData_(orders){
             if (amt>0 && (!best || amt>best.amount)) best = {amount:amt, program:p, detail:'SL ước tính: '+pq.qty+' — SP trên đơn: "'+esc(o.sanPham||'')+'"'};
           }
         }
-        if (p.revenue && p.revenue.enabled && p.revenue.scope === 'order'){
+        if (p.revenue && p.revenue.enabled && p.revenue.scope === 'order' && _bonusRequireProductOk_(p, o.sanPham)){
           var min = (p.revenue.min!=='' && p.revenue.min!=null) ? Number(p.revenue.min) : null;
           var max = (p.revenue.max!=='' && p.revenue.max!=null) ? Number(p.revenue.max) : null;
           if ((min===null || giaTri>=min) && (max===null || giaTri<=max)){
@@ -16361,13 +16363,26 @@ function closeBonusProgramsModal(){
 }
 function _bpNewProgram(){
   return { id: 'bp_'+Date.now(), name: '', dateFrom:'', dateTo:'',
-    audience: {online:false, offline:false}, product:'', extraNote:'', exclusionNote:'',
+    audience: {online:false, offline:false}, product:'', requireProduct:'', extraNote:'', exclusionNote:'',
     tier: {enabled:false, rows:[]}, revenue: {enabled:false, scope:'order', min:'', max:''},
     firstOrder: {enabled:false, amount:''}, probationDay: {enabled:false, from:'', to:''},
     bonusAmount:'' };
 }
 // Chuong trinh cu luu tu truoc khi co firstOrder/probationDay se thieu 2 field nay -> bo sung
 // mac dinh de tranh loi truy cap p.firstOrder.enabled tren undefined.
+// Từ khoá sản phẩm BẮT BUỘC của 1 chương trình. CT "Bill vòng mix charm …" lưu từ trước khi có field requireProduct
+// (undefined) vẫn phải chỉ tính đơn có sản phẩm "vòng" (yêu cầu Duyên 07/10/2026) nên dự phòng theo tên CT.
+function _bonusRequireKw_(p){
+  if (p.requireProduct !== undefined && p.requireProduct !== null) return String(p.requireProduct).trim();
+  return /vòng/i.test(String(p.name||'').normalize('NFC')) ? 'vòng' : '';
+}
+// true nếu CT không đòi từ khoá, hoặc ô Sản phẩm của đơn chứa ÍT NHẤT 1 từ khoá (không phân biệt hoa/thường).
+function _bonusRequireProductOk_(p, sanPham){
+  var kws = _bonusRequireKw_(p).split(',').map(function(x){ return x.trim().toLowerCase(); }).filter(Boolean);
+  if (!kws.length) return true;
+  var text = String(sanPham||'').normalize('NFC').toLowerCase();
+  return kws.some(function(k){ return text.indexOf(k.normalize('NFC')) !== -1; });
+}
 function _bpNormalize_(p){
   if (!p.firstOrder) p.firstOrder = {enabled:false, amount:''};
   if (!p.probationDay) p.probationDay = {enabled:false, from:'', to:''};
@@ -16450,7 +16465,10 @@ function _bpEditFormHtml_(p){
       '<div style="margin-top:6px;display:flex;gap:8px;align-items:center">'+
         '<span style="font-size:11.5px;color:var(--muted)">Từ</span><input type="number" min="0" value="'+esc(p.revenue.min)+'" style="width:140px" onchange="_bpDraft.revenue.min=this.value" placeholder="vd 20000000">'+
         '<span style="font-size:11.5px;color:var(--muted)">đến (bỏ trống = trở lên)</span><input type="number" min="0" value="'+esc(p.revenue.max)+'" style="width:140px" onchange="_bpDraft.revenue.max=this.value">'+
-      '</div></div>') : '')+
+      '</div>'+
+      '<div style="margin-top:8px;font-size:11.5px;color:var(--muted)">Chỉ tính khi ô Sản phẩm của đơn có từ khoá (cách nhau dấu phẩy, bỏ trống = không lọc; chỉ áp dụng khi chọn \"Theo 1 đơn\"):</div>'+
+      '<input type="text" value="'+esc(_bonusRequireKw_(p))+'" oninput="_bpDraft.requireProduct=this.value" style="width:100%" placeholder="VD: vòng">'+
+      '</div>') : '')+
 
     '<div class="form-label" style="margin-top:10px">8. Điều kiện loại trừ (ghi chú — chỉ hiển thị, KHÔNG tự động chấm)</div>'+
     '<input type="text" value="'+esc(p.exclusionNote)+'" oninput="_bpDraft.exclusionNote=this.value" style="width:100%;margin-bottom:10px" placeholder="VD: không áp dụng cho chất liệu Ngọc Lam, Ngọc Bích">'+
@@ -16553,9 +16571,11 @@ function _bpSeedOfficialOnlineTemplate_(){
     mk({ name: 'Đơn từ 20tr (combo 4 sản phẩm)',
       revenue: {enabled:true, scope:'order', min:20000000, max:''}, bonusAmount: 40000 }),
     mk({ name: 'Bill vòng mix charm — DT từ 20tr',
+      requireProduct: 'vòng',
       revenue: {enabled:true, scope:'order', min:20000000, max:''}, bonusAmount: 30000,
       extraNote: 'Nhãn gốc trong bảng ghi "25tr" nhưng cột Điều kiện áp dụng ghi "Doanh thu từ 20tr" — đã lấy theo điều kiện, kiểm tra lại với Duyên nếu không đúng ý.' }),
     mk({ name: 'Bill vòng mix charm — đơn từ 15tr',
+      requireProduct: 'vòng',
       revenue: {enabled:true, scope:'order', min:15000000, max:''}, bonusAmount: 20000,
       extraNote: 'Nhãn gốc trong bảng ghi "50tr" nhưng cột Điều kiện áp dụng ghi "Đơn từ 15tr" — đã lấy theo điều kiện, kiểm tra lại với Duyên nếu không đúng ý.' }),
     mk({ name: 'Thưởng doanh số/ngày — đạt từ 60tr',

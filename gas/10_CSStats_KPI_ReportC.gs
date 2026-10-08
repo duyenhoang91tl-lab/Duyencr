@@ -60,6 +60,16 @@ function _csBonusApplies_(p, dateStr, channel, startYmd) {
   }
   return true;
 }
+// Tu khoa san pham BAT BUOC cua 1 CT thuong (port _bonusRequireKw_/_bonusRequireProductOk_ o index.html — sua 1 noi phai sua ca 2).
+// CT "Bill vong mix charm" luu truoc khi co field requireProduct van chi tinh don co san pham "vòng" (yeu cau Duyen 2026-10-07).
+function _csRequireProductOk_(p, sanPham) {
+  var kw = (p.requireProduct !== undefined && p.requireProduct !== null) ? String(p.requireProduct).trim()
+    : (/vòng/i.test(String(p.name || '').normalize('NFC')) ? 'vòng' : '');
+  var kws = kw.split(',').map(function(x) { return x.trim().toLowerCase(); }).filter(Boolean);
+  if (!kws.length) return true;
+  var text = String(sanPham || '').normalize('NFC').toLowerCase();
+  return kws.some(function(k) { return text.indexOf(k.normalize('NFC')) !== -1; });
+}
 function _csMoney_(n) { return Math.round(Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.') + 'đ'; }
 // Mo ta ngan 1 chuong trinh thuong de hien cho CS (khong tu cham — chi doc cac dieu kien co cau truc)
 function _csBonusSummary_(p) {
@@ -229,7 +239,7 @@ function buildCsStats_(cs, dateFrom, dateTo) {
           if (amt > 0 && (!best || amt > best.amount)) best = { amount: amt, program: p, detail: 'SL ước tính: ' + pq.qty + ' — SP: "' + String(o.sanPham || '') + '"' };
         }
       }
-      if (p.revenue && p.revenue.enabled && p.revenue.scope === 'order') {
+      if (p.revenue && p.revenue.enabled && p.revenue.scope === 'order' && _csRequireProductOk_(p, o.sanPham)) {
         var mn = (p.revenue.min !== '' && p.revenue.min != null) ? Number(p.revenue.min) : null;
         var mx = (p.revenue.max !== '' && p.revenue.max != null) ? Number(p.revenue.max) : null;
         if ((mn === null || o.giaTri >= mn) && (mx === null || o.giaTri <= mx)) {
