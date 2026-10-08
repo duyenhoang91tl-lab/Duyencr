@@ -9086,6 +9086,7 @@ function chayCaiDatTrigger() {
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 var AA_TZ = 'Asia/Ho_Chi_Minh';
 var _AA_SRC_KEYS = ['dt','don','cs','cskh'];
+var _AA_POS_KEYS = ['dt','don','cs'];   // nguon POS (chia theo ty le nguon chung). CSKH-Duyen KHONG nam trong ty le nay: chia RIENG (cskhTeams/cskhMembers...)
 var _AA_SRC_LABEL = { dt:'DT tổng', don:'Dữ liệu đơn', cs:'Chăm sóc', cskh:'CSKH-Duyên' };
 var _AA_PRIO_KEYS = ['vip','tt','tn','other'];
 var _AA_PRIO_LABEL = { vip:'VIP', tt:'Thân thiết', tn:'Tiềm năng', other:'Khác (chưa phân hạng)' };
@@ -9107,6 +9108,10 @@ function _aaDefaultCfg(){
     hang:{ mode:'pct', vals:{} },   // Phan hang KH: thuong/tt/vip/super (chua cai = khong loc theo hang)
     teamSrc:{}, teamPrio:{}, teamHang:{},   // teamId -> {mode, vals} (ghi đè)
     memberSrc:{}, memberPrio:{}, memberHang:{}, // teamId -> {tenNV: {mode, vals}} (ghi đè)
+    cskhEnabled:false,         // MUC RIENG: chia data CSKH-Duyen (khong dinh ty le nguon/uu tien/hang cua POS)
+    cskhDays:[1,2,3,4,5,6],
+    cskhTotal:0,               // tong KH CSKH/ngay (dung khi Team chia theo %)
+    cskhTeams:{}, cskhMemberMode:{}, cskhMembers:{},   // cung dang teams/memberMode/members cua POS
     lastRun:'',                // YYYY-MM-DD ngày đã chạy gần nhất
     lastResult:null
   };
@@ -9172,19 +9177,19 @@ function _aaBuckets(cfg, custs, everSet){
   return b;
 }
 // Lập kế hoạch 1 ngày. Trả {entries:[{team,teamName,name,phones[]}], short:[{name,missing}], warn:[]}
-function _aaPlan(cfg, teamsArr, membersOf, custs, everSet){
+function _aaPlan(cfg, teamsArr, membersOf, custs, everSet, taken0){
   var rc = _aaRecipients(cfg, teamsArr, membersOf), buckets = _aaBuckets(cfg, custs, everSet);
-  var taken = new Set(), ptr = {}, entries = [], short = [];
+  var taken = taken0 || new Set(), ptr = {}, entries = [], short = [];
   function take(s, p, n, out, h){         // lay toi da n SDT chua dung tu nhom (s,p) [va hang h neu co]
     var arr = h ? buckets._h[s + '|' + p + '|' + h] : buckets[s][p], k = s + '|' + p + (h ? '|' + h : ''), got = 0, i = ptr[k] || 0;
     while (got < n && i < arr.length){ var ph = arr[i++]; if (!taken.has(ph)) { taken.add(ph); out.push(ph); got++; } }
     ptr[k] = i; return got;
   }
   rc.list.forEach(function(r){
-    var sw = _aaWeights(_aaRatioFor(cfg, 'src', r.team, r.name), _AA_SRC_KEYS);
+    var sw = _aaWeights(_aaRatioFor(cfg, 'src', r.team, r.name), _AA_POS_KEYS);
     var sq = _aaSplit(r.quota, sw), phones = [], miss = 0;
     var pw = _aaWeights(_aaRatioFor(cfg, 'prio', r.team, r.name), _AA_PRIO_KEYS);
-    var srcOrder = _AA_SRC_KEYS.map(function(s,i){ return { s:s, w:sw[i] }; }).filter(function(x){ return x.w > 0; })
+    var srcOrder = _AA_POS_KEYS.map(function(s,i){ return { s:s, w:sw[i] }; }).filter(function(x){ return x.w > 0; })
       .sort(function(a,b){ return b.w - a.w; }).map(function(x){ return x.s; });
     var prOrder = _AA_PRIO_KEYS.map(function(p,i){ return { p:p, w:pw[i] }; }).filter(function(x){ return x.w > 0; })
       .sort(function(a,b){ return b.w - a.w; }).map(function(x){ return x.p; });
@@ -9197,7 +9202,7 @@ function _aaPlan(cfg, teamsArr, membersOf, custs, everSet){
       _AA_HANG_KEYS.forEach(function(h, hi){
         if (!hq[hi]) return;
         var m = 0, sqh = _aaSplit(hq[hi], sw);
-        _AA_SRC_KEYS.forEach(function(s, si){
+        _AA_POS_KEYS.forEach(function(s, si){
           if (!sqh[si]) return;
           var pqh = _aaSplit(sqh[si], pw);
           _AA_PRIO_KEYS.forEach(function(p, pi){
@@ -9212,7 +9217,7 @@ function _aaPlan(cfg, teamsArr, membersOf, custs, everSet){
         miss += Math.max(0, m);
       });
     } else {
-      _AA_SRC_KEYS.forEach(function(s, si){
+      _AA_POS_KEYS.forEach(function(s, si){
         if (!sq[si]) return;
         var pq = _aaSplit(sq[si], pw);
         _AA_PRIO_KEYS.forEach(function(p, pi){
@@ -9230,6 +9235,38 @@ function _aaPlan(cfg, teamsArr, membersOf, custs, everSet){
     if (phones.length) entries.push({ team:r.teamName, teamId:r.team, name:r.name, phones:phones, quota:r.quota });
   });
   return { entries:entries, short:short, warn:rc.warn };
+}
+// CSKH-Duyen chia RIENG: moi nguoi 1 han muc CSKH/ngay (cung kieu Team/thanh vien nhu POS), lay lan luot tu danh sach KH nguon CSKH-Duyen
+// (khong chia theo nguon/uu tien/hang). `taken` dung chung voi POS de 1 SDT khong bi chia 2 lan trong cung 1 ngay.
+function _aaPlanCskh(cfg, teamsArr, membersOf, custs, everSet, taken){
+  var c2 = { teams: cfg.cskhTeams || {}, dailyTotal: cfg.cskhTotal || 0, memberMode: cfg.cskhMemberMode || {}, members: cfg.cskhMembers || {} };
+  var rc = _aaRecipients(c2, teamsArr, membersOf), pool = [], entries = [], short = [], ptr = 0;
+  for (var i = 0; i < custs.length; i++){
+    var c = custs[i]; if (!c || !c.phone || !(c.dataSrc && c.dataSrc.cskh)) continue;
+    if (cfg.onlyUnassigned && everSet && everSet.has(c.phone)) continue;
+    pool.push(c.phone);
+  }
+  rc.list.forEach(function(r){
+    var phones = [];
+    while (phones.length < r.quota && ptr < pool.length){ var ph = pool[ptr++]; if (!taken.has(ph)) { taken.add(ph); phones.push(ph); } }
+    if (phones.length < r.quota) short.push({ name:r.name, team:r.teamName, missing:r.quota - phones.length, quota:r.quota, src:'cskh' });
+    if (phones.length) entries.push({ team:r.teamName, teamId:r.team, name:r.name, phones:phones, quota:r.quota, src:'cskh' });
+  });
+  return { entries:entries, short:short, warn:rc.warn.map(function(w){ return '[CSKH] ' + w; }) };
+}
+// Ke hoach ca ngay = CSKH (rieng) + POS (tu dt/don/cs). opts: {pos:bool, cskh:bool} (mac dinh ca hai). CSKH lap truoc de han muc CSKH khong bi POS lay mat KH.
+function _aaPlanAll(cfg, teamsArr, membersOf, custs, everSet, opts){
+  opts = opts || {}; var taken = new Set(), out = { entries:[], short:[], warn:[] };
+  if (opts.cskh !== false){
+    var k = _aaPlanCskh(cfg, teamsArr, membersOf, custs, everSet, taken);
+    out.entries = out.entries.concat(k.entries); out.short = out.short.concat(k.short); out.warn = out.warn.concat(k.warn);
+  }
+  if (opts.pos !== false){
+    var p = _aaPlan(cfg, teamsArr, membersOf, custs, everSet, taken);
+    p.entries.forEach(function(e){ e.src = 'pos'; }); p.short.forEach(function(x){ x.src = 'pos'; });
+    out.entries = out.entries.concat(p.entries); out.short = out.short.concat(p.short); out.warn = out.warn.concat(p.warn);
+  }
+  return out;
 }
 
 function _aaReadJson_(key) { var raw = getSetting_(key); if (!raw) return null; try { return JSON.parse(raw); } catch (e) { return null; } }
@@ -9288,14 +9325,18 @@ function autoAssignRun_(force) {
   try {
     var cfg = _aaReadJson_('autoAssignCfg'); if (!cfg) return { skipped: 'chua co cau hinh' };
     cfg.teams = cfg.teams || {}; cfg.days = cfg.days || []; cfg.members = cfg.members || {}; cfg.memberMode = cfg.memberMode || {};
+    cfg.cskhTeams = cfg.cskhTeams || {}; cfg.cskhMembers = cfg.cskhMembers || {}; cfg.cskhMemberMode = cfg.cskhMemberMode || {}; cfg.cskhDays = cfg.cskhDays || [1, 2, 3, 4, 5, 6];
     cfg.src = cfg.src || { mode: 'pct', vals: {} }; cfg.prio = cfg.prio || { mode: 'pct', vals: {} }; cfg.hang = cfg.hang || { mode: 'pct', vals: {} };
     var st = _aaReadJson_('autoAssignState') || {};
     var now = new Date(), today = Utilities.formatDate(now, AA_TZ, 'yyyy-MM-dd');
+    var opts = { pos: true, cskh: true };   // force: chay ca 2 muc (muc nao chua tich Team/han muc thi tu khong chia gi)
     if (!force) {
       var hour = parseInt(Utilities.formatDate(now, AA_TZ, 'H'), 10), dow = parseInt(Utilities.formatDate(now, AA_TZ, 'u'), 10) % 7;   // 'u': 1=T2..7=CN -> 0=CN
       var runHour = (cfg.runHour === undefined || cfg.runHour === null || cfg.runHour === '') ? 7 : (parseInt(cfg.runHour, 10) || 0);
-      if (!cfg.enabled) return { skipped: 'dang tat' };
-      if (cfg.days.indexOf(dow) < 0) return { skipped: 'hom nay khong tich chia' };
+      var posOk = !!cfg.enabled && cfg.days.indexOf(dow) >= 0, cskhOk = !!cfg.cskhEnabled && cfg.cskhDays.indexOf(dow) >= 0;   // POS va CSKH-Duyen co cong tac + ngay RIENG
+      if (!cfg.enabled && !cfg.cskhEnabled) return { skipped: 'dang tat' };
+      if (!posOk && !cskhOk) return { skipped: 'hom nay khong tich chia' };
+      opts = { pos: posOk, cskh: cskhOk };
       if (hour < runHour) return { skipped: 'chua den gio (' + runHour + 'h)' };
       if (st.lastRun === today) return { skipped: 'hom nay da chia' };
       st.lastRun = today; st.by = 'server'; st.startedAt = now.toISOString();
@@ -9311,11 +9352,11 @@ function autoAssignRun_(force) {
     };
     var u = _aaLoadCustomers_();
     var everSet = { has: function (p) { return !!u.ever[p]; } };
-    var plan = _aaPlan(cfg, teams, membersOf, u.custs, everSet);
+    var plan = _aaPlanAll(cfg, teams, membersOf, u.custs, everSet, opts);
     var dm = today.slice(8) + '/' + today.slice(5, 7), nowStr = now.toISOString().slice(0, 16).replace('T', ' '), careMap = {}, total = 0;
     plan.entries.forEach(function (e) {
       var en = { id: now.getTime() + '_' + Math.random().toString(36).slice(2, 6), date: nowStr, csName: e.name, phones: e.phones, donePhones: [],
-        label: (force ? 'Chạy thử' : 'Tự động ' + dm) + ' — ' + e.team + ' → ' + e.name + ' (' + e.phones.length + ' KH)', team: e.team, auto: true };
+        label: (force ? 'Chạy thử' : 'Tự động ' + dm) + (e.src === 'cskh' ? ' CSKH-Duyên' : '') + ' — ' + e.team + ' → ' + e.name + ' (' + e.phones.length + ' KH)', team: e.team, auto: true };
       saveAssignEntry_(en);
       e.phones.forEach(function (p) { careMap[p] = e.name; });
       total += e.phones.length;
