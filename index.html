@@ -16072,39 +16072,87 @@ function _srGDownloadCsv_(filename, rows){
   document.body.appendChild(a); a.click();
   setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
+// Dựng dữ liệu xuất dùng chung cho CSV và Excel (1 nguồn → 2 định dạng không thể lệch nhau).
+function _srGBuildExport_(d){
+  var ordersHead = ['Ngày tạo','Kênh bán (Nguồn đơn)','Sale (đã lọc hợp lệ)','Sản phẩm','Giá trị sau giảm','COD','Marketer','Trạng thái','Ghi chú đơn (cột Q)'];
+  var orders = [ordersHead];
+  d.orders.forEach(function(o){ orders.push([o.ngayTao, o.nguonDon, o.saleBan, o.sanPham, o.giaTriDon, o.cod, o.marketer, o.trangThai, o.ghiChu]); });
+  var g = _srGBuildGroups_(d.orders);
+  var detail = [['Nhóm','Sale','Loại Sale','Ngày bắt đầu (Thử việc)','Ngày thưởng','Ngày thứ (Thử việc)','Phạm vi','Chương trình','Chi tiết','Mã đơn','Tiền thưởng']];
+  [['Thử việc', g.tv], ['Chính thức', g.ct]].forEach(function(pair){
+    pair[1].rows.forEach(function(s){
+      var sd = pair[0] === 'Thử việc' ? _saleStartDate_(s.name) : '';
+      s.items.forEach(function(it){
+        var dn = sd ? _daysSinceStart_(sd, it.date) : '';
+        detail.push([pair[0], s.name, _srGSaleTypeLabel_(s.name), sd, it.date, dn === null ? '' : dn, it.scope, it.program, _srGDecode_(it.detail), it.orderId || '', it.amount]);
+      });
+    });
+  });
+  var summary = [['Nhóm','Sale','Loại Sale','Ngày bắt đầu (Thử việc)','Số lượt thưởng','Tổng thưởng']];
+  [['Thử việc', g.tv], ['Chính thức', g.ct]].forEach(function(pair){
+    pair[1].rows.forEach(function(s){ summary.push([pair[0], s.name, _srGSaleTypeLabel_(s.name), pair[0] === 'Thử việc' ? _saleStartDate_(s.name) : '', s.items.length, s.total]); });
+    summary.push([pair[0]+' — TỔNG','','','', pair[1].rows.reduce(function(a,r){return a+r.items.length;},0), pair[1].total]);
+  });
+  summary.push(['TỔNG CHUNG','','','','', g.total]);
+  var programs = [['Chương trình','Lượt (Thử việc)','Thưởng (Thử việc)','Lượt (Chính thức)','Thưởng (Chính thức)','Tổng']];
+  Object.keys(g.programs).forEach(function(k){ var p = g.programs[k]; programs.push([p.name, p.tvCount, p.tvAmount, p.ctCount, p.ctAmount, p.tvAmount+p.ctAmount]); });
+  return { orders: orders, detail: detail, summary: summary, programs: programs, groups: g };
+}
 function _srGExportCsv_(kind){
   var d = _srState.dataG;
   if (!d || !d.orders){ toast('Chưa có dữ liệu — bấm "Lọc" trước.'); return; }
   var tag = (_srState.gDateFrom || 'tu-dau') + '_' + (_srState.gDateTo || 'den-nay');
-  if (kind === 'orders'){
-    var rows = [['Ngày tạo','Kênh bán (Nguồn đơn)','Sale (đã lọc hợp lệ)','Sản phẩm','Giá trị sau giảm','COD','Marketer','Trạng thái','Ghi chú đơn (cột Q)']];
-    d.orders.forEach(function(o){ rows.push([o.ngayTao, o.nguonDon, o.saleBan, o.sanPham, o.giaTriDon, o.cod, o.marketer, o.trangThai, o.ghiChu]); });
-    _srGDownloadCsv_('don-pos-tinh-thuong_'+tag+'.csv', rows); return;
-  }
-  var g = _srGBuildGroups_(d.orders);
-  if (kind === 'detail'){
-    var det = [['Nhóm','Sale','Loại Sale','Ngày bắt đầu (Thử việc)','Ngày thưởng','Ngày thứ (Thử việc)','Phạm vi','Chương trình','Chi tiết','Mã đơn','Tiền thưởng']];
-    [['Thử việc', g.tv], ['Chính thức', g.ct]].forEach(function(pair){
-      pair[1].rows.forEach(function(s){
-        var sd = pair[0] === 'Thử việc' ? _saleStartDate_(s.name) : '';
-        s.items.forEach(function(it){
-          var dn = sd ? _daysSinceStart_(sd, it.date) : '';
-          det.push([pair[0], s.name, _srGSaleTypeLabel_(s.name), sd, it.date, dn === null ? '' : dn, it.scope, it.program, _srGDecode_(it.detail), it.orderId || '', it.amount]);
-        });
-      });
-    });
-    _srGDownloadCsv_('thuong-chi-tiet_'+tag+'.csv', det); return;
-  }
-  // summary
-  var sum = [['Nhóm','Sale','Loại Sale','Ngày bắt đầu (Thử việc)','Số lượt thưởng','Tổng thưởng']];
-  [['Thử việc', g.tv], ['Chính thức', g.ct]].forEach(function(pair){
-    pair[1].rows.forEach(function(s){ sum.push([pair[0], s.name, _srGSaleTypeLabel_(s.name), pair[0] === 'Thử việc' ? _saleStartDate_(s.name) : '', s.items.length, s.total]); });
-    sum.push([pair[0]+' — TỔNG','','','', pair[1].rows.reduce(function(a,r){return a+r.items.length;},0), pair[1].total]);
-  });
-  sum.push(['TỔNG CHUNG','','','','', g.total]);
-  sum.push([]); sum.push(['Chương trình','Lượt (Thử việc)','Thưởng (Thử việc)','Lượt (Chính thức)','Thưởng (Chính thức)','Tổng']);
-  Object.keys(g.programs).forEach(function(k){ var p = g.programs[k]; sum.push([p.name, p.tvCount, p.tvAmount, p.ctCount, p.ctAmount, p.tvAmount+p.ctAmount]); });
+  var x = _srGBuildExport_(d);
+  if (kind === 'orders'){ _srGDownloadCsv_('don-pos-tinh-thuong_'+tag+'.csv', x.orders); return; }
+  if (kind === 'detail'){ _srGDownloadCsv_('thuong-chi-tiet_'+tag+'.csv', x.detail); return; }
+  var sum = x.summary.slice(); sum.push([]);
+  x.programs.forEach(function(r){ sum.push(r); });
   _srGDownloadCsv_('thuong-tong-hop_'+tag+'.csv', sum);
+}
+// Xuất Excel (.xlsx) 1 file 3 sheet để gửi kế toán đối chiếu với Pos: Tổng hợp / Chi tiết lượt thưởng (có Mã đơn) / Đơn Pos dùng để tính.
+// Số tiền là SỐ THẬT (định dạng #,##0) để kế toán cộng/lọc/đối chiếu được ngay, không phải chuỗi.
+function _srGNum_(v){
+  if (typeof v === 'number') return v;
+  var t = String(v == null ? '' : v).trim();
+  return /^-?\d+(\.\d+)?$/.test(t) ? Number(t) : v;
+}
+function _srGSheet_(rows){
+  rows = rows.map(function(r){ return r.map(_srGNum_); });
+  var ws = XLSX.utils.aoa_to_sheet(rows);
+  var widths = [];
+  rows.forEach(function(r){ r.forEach(function(c, i){ var l = String(c == null ? '' : c).length; if (!widths[i] || l > widths[i]) widths[i] = l; }); });
+  ws['!cols'] = widths.map(function(w){ return { wch: Math.max(8, Math.min(50, w + 2)) }; });
+  Object.keys(ws).forEach(function(k){ if (k[0] !== '!' && ws[k].t === 'n') ws[k].z = '#,##0'; });
+  return ws;
+}
+function _srGExportXlsx_(){
+  var d = _srState.dataG;
+  if (!d || !d.orders){ toast('Chưa có dữ liệu — bấm "Lọc" trước.'); return; }
+  if (typeof XLSX === 'undefined'){ toast('Chưa tải được thư viện Excel — kiểm tra mạng rồi thử lại.'); return; }
+  var x = _srGBuildExport_(d), g = x.groups;
+  var from = _srState.gDateFrom || '', to = _srState.gDateTo || '';
+  var sel = (_srState.gSale || []);
+  var head = [
+    ['BÁO CÁO THƯỞNG SALE — ĐỐI CHIẾU THEO POS'],
+    ['Kỳ báo cáo', (from || 'từ đầu') + ' → ' + (to || 'đến nay')],
+    ['Sale', sel.length ? sel.join(', ') : 'Tất cả'],
+    ['Ngày xuất', _ymd(new Date())],
+    ['Người xuất', (typeof currentUser !== 'undefined' && currentUser && currentUser.name) || ''],
+    ['Số đơn Pos dùng để tính', d.orders.length],
+    ['Tổng thưởng', g.total],
+    []
+  ];
+  var sumRows = head.concat(x.summary, [[]], x.programs);
+  // Dòng tổng cho sheet đơn Pos (để kế toán đối chiếu nhanh với tổng trên Pos)
+  var ord = x.orders.slice(), n = d.orders.length;
+  var sumCol = function(k){ return d.orders.reduce(function(a,o){ var v = _srGNum_(o[k]); return a + (typeof v === 'number' ? v : 0); }, 0); };
+  ord.push(['TỔNG ('+n+' đơn)','','','', sumCol('giaTriDon'), sumCol('cod'),'','','']);
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, _srGSheet_(sumRows), 'Tổng hợp');
+  XLSX.utils.book_append_sheet(wb, _srGSheet_(x.detail), 'Chi tiết lượt thưởng');
+  XLSX.utils.book_append_sheet(wb, _srGSheet_(ord), 'Đơn Pos đối chiếu');
+  XLSX.writeFile(wb, 'BaoCao_Thuong_' + (from || 'tu-dau') + '_' + (to || 'den-nay') + '.xlsx');
+  toast('📗 Đã xuất Excel 3 sheet — gửi kế toán đối chiếu');
 }
 
 function renderSalesReportTabG_(wrap, subTabs){
@@ -16123,8 +16171,9 @@ function renderSalesReportTabG_(wrap, subTabs){
       '<div style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)">🔒 '+esc((_srState.gSale||[]).join(', ') || currentUser.name)+' — chỉ xem được thưởng của mình</div></div>';
   }
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
-  filters += '<div class="gear-menu"><button class="btn sm" onclick="_srToggleGearMenu(event,\'sr-gear-g-export\')">⬇️ Xuất CSV</button>'+
+  filters += '<div class="gear-menu"><button class="btn sm" onclick="_srToggleGearMenu(event,\'sr-gear-g-export\')">⬇️ Xuất Excel / CSV</button>'+
     '<div class="gear-menu-list" id="sr-gear-g-export" onclick="event.stopPropagation()">'+
+      '<div onclick="closeGearMenus();_srGExportXlsx_()"><b>📗 Excel đầy đủ (gửi kế toán) — 3 sheet</b></div>'+
       '<div onclick="closeGearMenus();_srGExportCsv_(\'summary\')">📊 Tổng hợp (theo Sale + theo chương trình)</div>'+
       '<div onclick="closeGearMenus();_srGExportCsv_(\'detail\')">🧾 Chi tiết từng lượt thưởng</div>'+
       '<div onclick="closeGearMenus();_srGExportCsv_(\'orders\')">📦 Đơn Pos dùng để tính (đối chiếu)</div>'+
