@@ -21,13 +21,15 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
+      # ID deployment Web App CRM đang gọi (= FIXED_GS_URL trong js/06-main-renew-sources.js). PHẢI khớp, nếu không deploy đi nhầm chỗ.
+      # (ID cũ AKfycbxyqBM3v7_... KHÔNG phải URL CRM dùng.) Đã từng nhắc: extension Zalo/Pancake còn dùng deployment khác.
       # ID deployment Web App đang được extension gọi tới (phần giữa /macros/s/ và /exec).
       # Giữ nguyên ID để URL không đổi. Muốn đổi: tạo Variable GAS_DEPLOYMENT_ID trong repo.
-      DEPLOYMENT_ID: ${{ vars.GAS_DEPLOYMENT_ID || 'AKfycbxyqBM3v7_WdgxbXru8o3Y_GNylTtQ-eeUoJCgwWEXVjHAJxiw7-SRlHXUSjaUR7v3oSQ' }}
+      DEPLOYMENT_ID: ${{ vars.GAS_DEPLOYMENT_ID || 'AKfycbx3QT6YIzQ7SQEwQPkljVeEdmTSBQQSxtTp2hTFYOeCKB_K4BHcUTSLi54LlmB9q_E6sQ' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 20
 
@@ -84,7 +86,7 @@ jobs:
           test -f appsscript.json || { echo "::error::Không lấy được appsscript.json"; exit 1; }
           cp appsscript.json "$GITHUB_WORKSPACE/gas/appsscript.json"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: gas-backup-truoc-khi-deploy
           path: /tmp/pulled
