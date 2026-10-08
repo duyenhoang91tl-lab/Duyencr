@@ -1523,7 +1523,10 @@
       const creator = String(o.creator || '').trim();
       const sales = _pkSplitNames_(o.cs);
       if (!creator && !sales.length) return;
-      rows.push({ t: _pkOrdTime_(o.date || o.orderDate), date: o.date || o.orderDate, src: '📦', creator, sales, rev: parseFloat(o.revenue) || 0 });
+      // Doanh thu CHỈ tính khi đơn có trên POS ("dữ liệu đơn") — đơn Base (📦) ở đây dùng để lấy
+      // "Người lên đơn"/Sale tham gia, KHÔNG dùng o.revenue của Base làm doanh thu hiển thị (theo
+      // đúng quy tắc Doanh thu/Tổng đơn/Phân hạng KH chỉ tính theo POS, xem gas_v13.js 06/10/2026).
+      rows.push({ t: _pkOrdTime_(o.date || o.orderDate), date: o.date || o.orderDate, src: '📦', creator, sales, rev: 0 });
     });
     (don || []).forEach((o) => {
       const sales = Array.isArray(o.sales) ? o.sales.filter(Boolean) : [];
@@ -1547,7 +1550,7 @@
       (creators ? `<div><span style="color:#6b7280">Người lên đơn:</span> ${creators}</div>` : '') +
       (sales ? `<div><span style="color:#6b7280">Sale tham gia bán:</span> ${sales}</div>` : '') +
       `<div style="margin-top:3px;font-size:11px">${recent}</div>` +
-      `<div style="margin-top:2px;font-size:10px;color:#9ca3af">📦 đơn DT TỔNG · 🧾 dữ liệu đơn</div>` +
+      `<div style="margin-top:2px;font-size:10px;color:#9ca3af">📦 đơn DT TỔNG (chưa tính doanh thu) · 🧾 dữ liệu đơn (doanh thu)</div>` +
       `</div>`;
   }
 
