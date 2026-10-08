@@ -565,9 +565,8 @@ function buildSalesReportB_(filters) {
         // thuong) phai dung field nay (khong dung theSale truc tiep) de khop CHINH XAC voi cach
         // ke toan tinh — xem _computeCommissionData_/_computeBonusData_ o index.html.
         saleBanValid: m.ghepShares ? m.ghepShares.map(function(x){ return x.name; }).join(',') : _donSaleNamesFromThe_(m.theSale).join(','),
-        // THUONG chi tinh cho NGUOI TAO don Base (xem _resolveBonusSale_). Chi co khi don Pos ghep duoc voi Base (undefined = don
-        // khong co ma bo dem -> giu cach cu: thuong theo saleBanValid). '' = nguoi tao khong phai sale -> khong ai nhan thuong.
-        bonusSale: m.ghepShares ? (m.bonusSale || '') : undefined,
+        // (thuong nay chia deu cho moi sale tren don — bonusSale/nguoi tao khong con dung de tinh thuong)
+        bonusSale: undefined,
         nguoiTaoBase: m.ghepCreators ? m.ghepCreators.join(',') : undefined
       };
     })

@@ -125,12 +125,12 @@ function _bonusProductQty_(sanPham, keywordsStr){
   });
   return {matched:matched, qty:totalQty};
 }
-// Tập tên sale ĐƯỢC XÉT THƯỞNG của 1 đơn: đơn Pos đã ghép Base -> chỉ người tạo (o.bonusSale từ backend, có thể rỗng);
-// đơn không ghép Base (o.bonusSale === undefined) -> mọi sale trên đơn như cũ.
+// Tập tên sale THAM GIA đơn (đều được xét thưởng). Quy tắc hiện hành (Duyên 08/10/2026): đơn đạt quy tắc thưởng thì TIỀN THƯỞNG
+// CHIA ĐỀU cho các sale tham gia (VD 2 sale cùng bán nhẫn Tour 21tr5 được 100.000 → mỗi người 50.000). Người tạo đơn Base
+// không còn là điều kiện (quy tắc "chỉ người tạo" 07/10 đã thay thế).
 function _bonusNamesOfOrder_(o){
-  var names = (o.bonusSale !== undefined && o.bonusSale !== null) ? splitMulti_(o.bonusSale, ',') : splitMulti_(o.saleBan, ',');
   var set = {};
-  names.forEach(function(n){ if (n) set[n] = true; });
+  splitMulti_(o.saleBan, ',').forEach(function(n){ if (n) set[n] = true; });
   return set;
 }
 // Doanh thu CHIA cho từng sale của 1 đơn — cùng quy ước với _computeCommissionData_ (saleShares nếu đơn ghép Base,
@@ -157,10 +157,7 @@ function _computeBonusData_(orders){
     var dateStr = _ddmmyyyyToYmd_(o.ngayTao);
     var timeMatch = String(o.ngayTao||'').match(/(\d{1,2}):(\d{2})/);
     var timeStr = timeMatch ? timeMatch[0] : '';
-    // THƯỞNG CHỈ TÍNH CHO NGƯỜI TẠO ĐƠN BASE (yêu cầu Duyên 07/10/2026): đơn Pos ghép được với Base thì backend trả
-    // o.bonusSale = người tạo (đã kiểm tra là sale; '' = người tạo không phải sale -> không ai nhận thưởng). Sale bán
-    // cùng chỉ được tính DOANH THU (phần chia) — thưởng đã tính cho người tạo rồi. Đơn không ghép Base
-    // (bonusSale === undefined) giữ cách cũ: mọi sale trên đơn đều được xét thưởng.
+    // Mọi sale tham gia đều tính số đơn/đơn đầu tiên trong ngày; doanh thu ngày dùng phần CHIA của từng sale.
     var bonusSet = _bonusNamesOfOrder_(o);
     var revShares = _orderRevenueShares_(o); // [{name, share}] — doanh thu CHIA theo sale (không phải giá trị đơn nguyên)
     var perName = {};
@@ -219,7 +216,8 @@ function _computeBonusData_(orders){
   orders.forEach(function(o){
     var dateStr = _ddmmyyyyToYmd_(o.ngayTao);
     var giaTri = Number(o.giaTriDon)||0;
-    Object.keys(_bonusNamesOfOrder_(o)).forEach(function(name){ // chỉ NGƯỜI TẠO đơn (xem ghi chú ở trên)
+    var orderNames = Object.keys(_bonusNamesOfOrder_(o)).filter(Boolean), nParts = orderNames.length || 1;
+    orderNames.forEach(function(name){ // mọi sale tham gia; tiền thưởng chia đều nParts
       if (!name) return;
       var channel = SALE_CHANNELS[name] || '';
       var best = null;
@@ -243,8 +241,9 @@ function _computeBonusData_(orders){
       });
       if (best){
         var rec = ensure(name);
-        rec.total += best.amount;
-        rec.items.push({date:dateStr, scope:'Theo đơn', program:best.program.name, amount:best.amount, detail:best.detail, orderId:o.id, maDonPos:String(o.ghiChu||'')});
+        var part = Math.round(best.amount / nParts); // chia đều cho các sale tham gia
+        rec.total += part;
+        rec.items.push({date:dateStr, scope:'Theo đơn', program:best.program.name, amount:part, detail:best.detail+(nParts>1 ? ' — thưởng '+_srMoney(best.amount)+' chia đều '+nParts+' sale' : ''), orderId:o.id, maDonPos:String(o.ghiChu||'')});
       }
     });
   });

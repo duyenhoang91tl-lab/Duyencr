@@ -4226,9 +4226,8 @@ function buildSalesReportB_(filters) {
         // thuong) phai dung field nay (khong dung theSale truc tiep) de khop CHINH XAC voi cach
         // ke toan tinh — xem _computeCommissionData_/_computeBonusData_ o index.html.
         saleBanValid: m.ghepShares ? m.ghepShares.map(function(x){ return x.name; }).join(',') : _donSaleNamesFromThe_(m.theSale).join(','),
-        // THUONG chi tinh cho NGUOI TAO don Base (xem _resolveBonusSale_). Chi co khi don Pos ghep duoc voi Base (undefined = don
-        // khong co ma bo dem -> giu cach cu: thuong theo saleBanValid). '' = nguoi tao khong phai sale -> khong ai nhan thuong.
-        bonusSale: m.ghepShares ? (m.bonusSale || '') : undefined,
+        // (thuong nay chia deu cho moi sale tren don — bonusSale/nguoi tao khong con dung de tinh thuong)
+        bonusSale: undefined,
         nguoiTaoBase: m.ghepCreators ? m.ghepCreators.join(',') : undefined
       };
     })
@@ -4402,13 +4401,11 @@ function buildCsStats_(cs, dateFrom, dateTo) {
     if (!(frac > 0)) return;
     var share = giaTri * frac * (Number(o.saleRatio) || 1);
     totalOrders++; revenue += share;
-    // THUONG CHI CHO NGUOI TAO don Base (o.bonusSale, xem _resolveBonusSale_); sale ban cung chi duoc tinh DOANH THU (share).
-    // o.bonusSale === undefined = don khong ghep Base -> giu cach cu (moi sale tren don deu duoc xet thuong).
-    var isBonus = true;
-    if (o.bonusSale !== undefined) {
-      isBonus = String(o.bonusSale || '').split(',').some(function(x) { return x.trim() && myFold[_normTxt_(x)]; });
-    }
-    mine.push({ date: _csYmdFromDmy_(o.ngayTaoDon), time: (String(o.ngayTaoDon || '').match(/(\d{1,2}):(\d{2})/) || [''])[0], giaTri: giaTri, share: share, isBonus: isBonus, sanPham: o.sanPham });
+    // THUONG THEO DON: don dat quy tac thi TIEN THUONG CHIA DEU cho cac sale tham gia (yeu cau Duyen 2026-10-08; thay cho
+    // quy tac "chi nguoi tao" 2026-10-07). nSales = so sale tren don; moi nguoi nhan best.amount / nSales.
+    var nSales = (o.saleShares && o.saleShares.length) ? o.saleShares.length
+      : (String(o.saleBanValid || '').split(',').map(function(x) { return x.trim(); }).filter(Boolean).length || 1);
+    mine.push({ date: _csYmdFromDmy_(o.ngayTaoDon), time: (String(o.ngayTaoDon || '').match(/(\d{1,2}):(\d{2})/) || [''])[0], giaTri: giaTri, share: share, nSales: nSales, sanPham: o.sanPham });
     var chR = channelRate(o.nguonDon);
     if (chR !== null) {
       ordCh++; revCh += share; commCh += share * chR / 100;
@@ -4428,10 +4425,8 @@ function buildCsStats_(cs, dateFrom, dateTo) {
     if (!byDay[o.date]) byDay[o.date] = { date: o.date, revenue: 0, count: 0, first: null };
     var g = byDay[o.date];
     g.revenue += o.share; // doanh so ngay = phan DOANH THU da chia cua sale (ke ca don khong phai nguoi tao)
-    if (o.isBonus) { // so don + don dau tien trong ngay chi tinh cho don do chinh sale nay TAO
-      g.count++;
-      if (o.time && (g.first === null || o.time < g.first)) g.first = o.time;
-    }
+    g.count++;
+    if (o.time && (g.first === null || o.time < g.first)) g.first = o.time;
   });
   Object.keys(byDay).forEach(function(k) {
     var g = byDay[k], bestTier = null, bestRev = null, bestFirst = null;
@@ -4465,7 +4460,6 @@ function buildCsStats_(cs, dateFrom, dateTo) {
     });
   });
   mine.forEach(function(o) {
-    if (!o.isBonus) return; // thuong theo don CHI cho nguoi tao don
     var best = null;
     programs.forEach(function(p) {
       if (!_csBonusApplies_(p, o.date, channel, startYmd)) return;
@@ -4485,7 +4479,11 @@ function buildCsStats_(cs, dateFrom, dateTo) {
         }
       }
     });
-    if (best) { bonusTotal += best.amount; bonusItems.push({ date: o.date, scope: 'Theo đơn', program: best.program.name, amount: best.amount, detail: best.detail }); }
+    if (best) {
+      var n = o.nSales > 1 ? o.nSales : 1, part = Math.round(best.amount / n); // chia deu cho sale tham gia
+      bonusTotal += part;
+      bonusItems.push({ date: o.date, scope: 'Theo đơn', program: best.program.name, amount: part, detail: best.detail + (n > 1 ? ' — thưởng ' + _csMoney_(best.amount) + ' chia đều ' + n + ' sale' : '') });
+    }
   });
   bonusItems.sort(function(a, b) { return String(a.date).localeCompare(String(b.date)); });
 
