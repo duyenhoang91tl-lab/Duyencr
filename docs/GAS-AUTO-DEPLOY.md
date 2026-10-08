@@ -35,3 +35,9 @@ Actions → Deploy GAS to Apps Script → Run workflow. Job xanh là xong; bư�
 - Trigger hẹn giờ (`installAutoAssignTrigger_`, `chayCaiDatTrigger`) tạo trong Apps Script vẫn giữ nguyên, không bị xoá khi đẩy code.
 - Hết hạn đăng nhập (hiếm, khi đổi mật khẩu Google/thu hồi quyền): làm lại Bước 2–3.
 - Chỉ sửa `gas_v13.js` (nguồn chính). `gas/*.gs` do `node tools/split-gas.js` sinh ra, CI cũng tự sinh lại.
+
+## Xử lý lỗi thường gặp
+
+- **"Could not read API credentials. Are you logged in globally?"** (bước `clasp pull`): secret `CLASPRC_JSON` sai định dạng/thiếu. Workflow nay tự kiểm tra và báo rõ ở bước "Nạp đăng nhập clasp": JSON hỏng (dán thiếu), thiếu `refresh_token` (cần `clasp login` lại), hoặc tự chọn đúng bản clasp cho file của clasp 2.x (`token`) hay 3.x (`tokens.default`). Dán lại TOÀN BỘ `cat ~/.clasprc.json` (từ `{` đến `}`) nếu bước này báo lỗi.
+- Phải bật **Google Apps Script API** tại https://script.google.com/home/usersettings bằng đúng tài khoản đã `clasp login`.
+- `GAS_SCRIPT_ID` là **Script ID** (Project Settings của dự án Apps Script), không phải ID deployment.

@@ -50,11 +50,31 @@ jobs:
           done
           echo "Cú pháp OK: $(ls gas/*.gs | wc -l) file"
 
-      - name: Cài clasp và nạp đăng nhập
+      - name: Nạp đăng nhập clasp (tự nhận dạng định dạng file, chỉ in tên khoá, không in giá trị)
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
         run: |
-          npm i -g @google/clasp@2.4.2
-          printf '%s' '${{ secrets.CLASPRC_JSON }}' > ~/.clasprc.json
+          # Truyền secret qua biến môi trường (không chèn thẳng vào dòng lệnh) để dấu nháy/xuống dòng trong JSON không làm hỏng file.
+          printf '%s' "$CLASPRC_JSON" > ~/.clasprc.json
           chmod 600 ~/.clasprc.json
+          # clasp 2.x lưu {"token":{...}}; clasp 3.x lưu {"tokens":{"default":{...}}} — mỗi bản chỉ đọc được định dạng của nó.
+          node -e '
+            const fs = require("fs");
+            let j;
+            try { j = JSON.parse(fs.readFileSync(process.env.HOME + "/.clasprc.json", "utf8")); }
+            catch (e) { console.log("::error::Secret CLASPRC_JSON không phải JSON hợp lệ (dán thiếu/thừa ký tự?). Chạy lại: cat ~/.clasprc.json và dán TOÀN BỘ từ { đến }."); process.exit(1); }
+            console.log("Khoá cấp cao nhất:", Object.keys(j).join(", "));
+            const oldFmt = j.token && j.token.refresh_token;
+            const newFmt = j.tokens && j.tokens.default && (j.tokens.default.refresh_token || j.tokens.default.access_token);
+            if (!oldFmt && !newFmt) {
+              console.log("::error::CLASPRC_JSON không có refresh_token. Đăng nhập lại (clasp login --no-localhost), rồi dán lại TOÀN BỘ nội dung ~/.clasprc.json vào secret.");
+              process.exit(1);
+            }
+            fs.writeFileSync("/tmp/clasp_ver", oldFmt ? "2.4.2" : "latest");
+            console.log("Định dạng đăng nhập:", oldFmt ? "clasp 2.x (token)" : "clasp 3.x (tokens.default)");
+          '
+          npm i -g @google/clasp@"$(cat /tmp/clasp_ver)"
+          clasp --version
 
       - name: Sao lưu dự án hiện tại và lấy appsscript.json
         run: |
