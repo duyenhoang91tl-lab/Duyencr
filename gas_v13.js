@@ -1254,6 +1254,44 @@ function _demoClipPerSource_(arr) {
   }
   return out;
 }
+// CHE SDT cho tai khoan test (v13.22). NGUYEN NHAN GOC: truoc day tai khoan test chi bi cat so dong, SDT khach van hien DAY DU
+// (ca tren man hinh lan trong file tai ve CSV/XLSX vi client dung chinh du lieu API de xuat file) -> lo so dien thoai that cho nguoi ngoai.
+// Nay che 4 SO CUOI ngay tai may chu (sau khi cat dong, truoc khi tra ve) nen moi noi hien/tai deu da bi che, khong the lay lai tu client.
+// Che theo GIA TRI (9-12 chu so) chu khong theo ten key, vi key nhu sdtMangVe/soDonChot la SO DEM, khong phai SDT.
+// Giu nguyen dang chu so (4 so cuoi -> 0000) de client van parse/loc duoc; so dang number van la number.
+var DEMO_PHONE_KEY_RE_ = /phone|sdt|sodienthoai|dienthoai/i;
+var DEMO_NOTE_KEY_RE_ = /note|ghichu|noidung|message|content/i;   // truong van ban tu do: che SDT nam trong cau chu
+function _demoMaskPhone_(v) {
+  var s = String(v), d = s.replace(/\D/g, '');
+  if (d.length < 9 || d.length > 12) return v;
+  var left = 4, a = s.split('');
+  for (var i = a.length - 1; i >= 0 && left > 0; i--) { if (/\d/.test(a[i])) { a[i] = '0'; left--; } }
+  var r = a.join('');
+  return typeof v === 'number' ? Number(r) : r;
+}
+function _demoMaskText_(t) {
+  return String(t).replace(/(^|[^\d])(0\d{9}|84\d{9})(?!\d)/g, function(m, pre, ph) { return pre + _demoMaskPhone_(ph); });
+}
+var DEMO_PHONE_STR_RE_ = /^\+?\d[\d .\-]{7,14}\d$/;
+function _demoMaskDeep_(node) {
+  if (Array.isArray(node)) {
+    for (var i = 0; i < node.length; i++) {
+      var it = node[i];
+      if (it && typeof it === 'object') _demoMaskDeep_(it);
+      else if (typeof it === 'string' && DEMO_PHONE_STR_RE_.test(it.trim())) node[i] = _demoMaskPhone_(it);   // dong dang mang [sdt, ten]
+    }
+    return node;
+  }
+  if (!node || typeof node !== 'object') return node;
+  Object.keys(node).forEach(function(k) {
+    var v = node[k];
+    if (v && typeof v === 'object') { _demoMaskDeep_(v); return; }
+    if (typeof v !== 'string' && typeof v !== 'number') return;
+    if (DEMO_PHONE_KEY_RE_.test(k)) node[k] = _demoMaskPhone_(v);
+    else if (typeof v === 'string' && DEMO_NOTE_KEY_RE_.test(k)) node[k] = _demoMaskText_(v);
+  });
+  return node;
+}
 function _demoClip_(out, action) {
   var o;
   try { o = JSON.parse(out.getContent()); } catch (e) { return out; }
@@ -1268,6 +1306,7 @@ function _demoClip_(out, action) {
     });
     o._demo = true;
   }
+  _demoMaskDeep_(o);
   return jsonOut_(o);
 }
 // Dang nhap tai khoan test: kiem tra user role "demo" trong sheet Users (passHash do client gui len).
@@ -1642,7 +1681,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.21-demo-per-source' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.22-demo-mask-phone' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──

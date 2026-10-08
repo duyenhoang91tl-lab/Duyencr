@@ -15,6 +15,7 @@ nhưng **dòng dữ liệu chi tiết (đơn / khách / lead) chỉ thấy tối
 - Đăng nhập test gọi `demoLogin` → máy chủ cấp `demoToken` (lưu ở Settings key `demoToken`, tự sinh).
 - Mọi request kèm token chỉ được gọi các action xem báo cáo (danh sách `DEMO_ALLOWED_GET_` trong `gas_v13.js`);
   các mảng `orders / ordersCur / ordersPrev / ordersDetail` bị cắt còn tối đa 5 dòng mỗi nguồn (hàm `_demoClipPerSource_`; `rows` ở `careLeads`, `careLeadReport`, `cskhDuyenLite` cũng qua hàm này); mọi POST bị chặn.
+- **Che SĐT (v13.22):** mọi phản hồi cho tài khoản test đều bị che **4 số cuối SĐT → 0000** ngay tại máy chủ (hàm `_demoMaskDeep_` trong `_demoClip_`; cả SĐT nằm trong cột `note`/`ghichu`/`noidung`/`message`/`content`). Vì che ở máy chủ nên file CSV/XLSX tài khoản test tải về cũng chỉ chứa SĐT đã che. Che theo GIÁ TRỊ (9–12 chữ số), không theo tên key, để không phá các số đếm như `sdtMangVe`.
 - Đổi token (thu hồi mọi phiên test): xoá dòng `demoToken` trong Settings.
 - `getSetting` không trả các key `api*`, `geminiKey`, `gasSource*`, `adminKey`, `demoToken`.
 
