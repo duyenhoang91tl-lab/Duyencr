@@ -2475,7 +2475,8 @@ let cskhMeta = loadLS('ome_cskh_duyen_meta') || { found: null, total: 0, noPhone
 let donPhoneSet = new Set(loadLS('ome_don_phones') || []);
 let donSaleByPhone = loadLS('ome_don_sale_by_phone') || {}; // { phone: [ten sale,...] } lay tu "dữ liệu đơn", gop vao csSet de phan quyen CS
 let donLastDateByPhone = loadLS('ome_don_last_date') || {}; // { phone: 'yyyy-mm-dd' } ngay mua gan nhat tu Pos (cot "Ngày mua gần nhất")
-let donStatsByPhone = loadLS('ome_don_stats') || {};   // { phone: {n, rev} } tong don + doanh thu POS (bo hoan) -- KH co don Pos thi tinh tong theo Pos, bo qua Base
+let donStatsByPhone = loadLS('ome_don_stats') || {};
+let _posStatsOn = Object.keys(donStatsByPhone).length > 0;   // true = da co thong ke Pos -> DOANH THU/TONG DON CHI TINH THEO POS (KH khong co don Pos = 0); false (GAS cu chua deploy) -> tam dung Base   // { phone: {n, rev} } tong don + doanh thu POS (bo hoan) -- KH co don Pos thi tinh tong theo Pos, bo qua Base
 let donOrderCountByPhone = loadLS('ome_don_order_count') || {}; // { phone: so don } lay tu "dữ liệu đơn" — dung de phan loai hang KH (VIP/Than thiet/...)
 let schedules = loadLS('ome_sched') || [];
 let currentPhone = null;
@@ -3009,7 +3010,7 @@ async function syncFromGS(opts) {
         if (dpJson && dpJson.phones) { donPhoneSet = new Set(dpJson.phones); saveLS('ome_don_phones', dpJson.phones); }
         if (dpJson && dpJson.saleByPhone) { donSaleByPhone = dpJson.saleByPhone; saveLS('ome_don_sale_by_phone', dpJson.saleByPhone); }
         if (dpJson && dpJson.lastDateByPhone) { donLastDateByPhone = dpJson.lastDateByPhone; saveLS('ome_don_last_date', dpJson.lastDateByPhone); }
-        if (dpJson && dpJson.statsByPhone) { donStatsByPhone = dpJson.statsByPhone; saveLS('ome_don_stats', dpJson.statsByPhone); }
+        if (dpJson && dpJson.statsByPhone) { donStatsByPhone = dpJson.statsByPhone; _posStatsOn = Object.keys(donStatsByPhone).length > 0; saveLS('ome_don_stats', dpJson.statsByPhone); }
         if (dpJson && dpJson.orderCountByPhone) { donOrderCountByPhone = dpJson.orderCountByPhone; saveLS('ome_don_order_count', dpJson.orderCountByPhone); }
       } catch(dpErr) { console.warn('donPhones fetch error:', dpErr.message); }
       // ── Nguồn "CSKH-Duyên" (sheet thứ 3, có thể tới hàng trăm nghìn dòng) — CHỈ kéo bản "nhẹ"
@@ -7038,7 +7039,7 @@ function clearData() {
 // ═══════════════════════════════════════════════════════
 // ---- PHAN HANG KH theo DOANH THU luy ke (yeu cau Duyen 2026-10-06) ----
 // < 15tr: Khach thuong | 15 -> <30tr: Than thiet | 30 -> <50tr: Vip | >= 50tr: Super VVip
-// (khac cot 'Phan loai' = theo SO DON Pos). Doanh thu = c.totalRevenue = POS (bo don hoan) neu KH co don Pos, khong thi tong don Base (xem _custRev_).
+// (khac cot 'Phan loai' = theo SO DON Pos). Doanh thu = c.totalRevenue = CHI THEO POS (bo don hoan; KH khong co don Pos = 0) -- xem _custRev_.
 // GAS auto-assign (_aaLoadCustomers_) dung CUNG nguong -- doi o day thi doi ca _aaHangKey_ trong gas_v13.js.
 var HANG_KEYS = ['thuong','tt','vip','super'];
 var HANG_LABEL = { thuong:'Khách thường', tt:'Ưu tiên', vip:'Vip', super:'Super VVip' };
@@ -7048,9 +7049,10 @@ function hangBadge(k){
   const st = k === 'super' ? ' style="background:#7c2d12;color:#fde68a;font-weight:700"' : '';
   return `<span class="badge ${cls}"${st}>${HANG_LABEL[k] || HANG_LABEL.thuong}</span>`;
 }
-// Tong doanh thu / tong don cua KH: co thong ke POS thi lay POS (bo qua Base vi don Base da co tren Pos), khong thi cong don Base.
-function _custRev_(c){ const ps = (typeof donStatsByPhone !== 'undefined' && donStatsByPhone) ? donStatsByPhone[c.phone] : null; return ps ? (Number(ps.rev) || 0) : c.orders.reduce((s,o)=>s+(o.revenue||0),0); }
-function _custOrderCount_(c){ const ps = (typeof donStatsByPhone !== 'undefined' && donStatsByPhone) ? donStatsByPhone[c.phone] : null; return ps ? (Number(ps.n) || 0) : c.orders.length; }
+// Tong doanh thu / tong don cua KH: CHI TINH THEO POS (yeu cau Duyen: 'doanh thu chi tinh duy nhat tren Pos') -- bo don hoan; KH khong co don Pos = 0.
+// Chi khi GAS chua tra thong ke Pos (chua deploy ban moi / sheet Pos trong) moi tam dung tong don Base de man hinh khong ve 0 het.
+function _custRev_(c){ if (!_posStatsOn) return c.orders.reduce((s,o)=>s+(o.revenue||0),0); const ps = donStatsByPhone[c.phone]; return ps ? (Number(ps.rev) || 0) : 0; }
+function _custOrderCount_(c){ if (!_posStatsOn) return c.orders.length; const ps = donStatsByPhone[c.phone]; return ps ? (Number(ps.n) || 0) : 0; }
 function tierBadge(tier) {
   const map={'VIP':'bv','Thân thiết':'bt','Tiềm năng':'bn','Chưa bán lại được':'bo'};
   return `<span class="badge ${map[tier]||'bo'}">${tier}</span>`;
@@ -20985,7 +20987,7 @@ function _initKhDragSort(container) {
   </div>
   <div style="padding:8px 14px 11px">
     <div style="font-size:10px;color:var(--hint);background:var(--surface2);border-radius:6px;padding:6px 9px;line-height:1.7">
-      📌 Phân hạng theo <strong>tổng doanh thu lũy kế</strong> của khách (theo <strong>đơn Pos</strong> nếu khách đã có đơn Pos — bỏ qua Base; chưa có Pos thì theo đơn Base ở DT TỔNG; không tính đơn hoàn).<br>
+      📌 Phân hạng theo <strong>tổng doanh thu lũy kế</strong> của khách (<strong>chỉ tính theo đơn Pos</strong>, không tính đơn hoàn; khách chưa có đơn Pos = Khách thường).<br>
       Khác với cột <strong>Phân loại</strong> (tính theo số đơn).
     </div>
   </div>
