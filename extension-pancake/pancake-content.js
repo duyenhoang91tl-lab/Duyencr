@@ -387,6 +387,7 @@
             <option value="img">🖼 Tìm ảnh sản phẩm</option>
             <option value="tpl">📚 Mẫu tin nhắn tư vấn</option>
             <option value="stats">📊 Doanh số & hoa hồng của tôi</option>
+            <option value="assign">📋 Data được chia (0)</option>
           </select>
           <div id="pk-menu-content">
             <div id="pk-rem-body" style="display:none">
@@ -417,6 +418,17 @@
               <div id="pk-ctkm-result"></div>
             </div>
             <div id="pk-stats-body" style="display:none"></div>
+            <div id="pk-assign-body" style="display:none">
+              <div id="pk-assign-toolbar">
+                <div id="pk-assign-tabs" style="display:flex;gap:6px;margin-bottom:6px">
+                  <button type="button" class="pk-assign-filter-btn active" data-f="active">Chưa gọi</button>
+                  <button type="button" class="pk-assign-filter-btn" data-f="done">Đã gọi</button>
+                  <button type="button" class="pk-assign-filter-btn" data-f="all">Tất cả</button>
+                </div>
+                <button id="pk-assign-refresh" title="Tải lại">🔄 Tải lại</button>
+              </div>
+              <div id="pk-assign-list"></div>
+            </div>
             <div id="pk-img-body" style="display:none">
               <input type="text" id="pk-img-q" placeholder="Gõ tên sản phẩm (VD: tỷ hưu, nhẫn, charm) — có thể bỏ trống các mục dưới" autocomplete="off" />
               <div id="pk-img-dyn"></div>
@@ -555,6 +567,7 @@
       chrome.storage.sync.set({ csName: name });
       csSel.value = name;
       if (panelEl.querySelector('#pk-menu-sel')?.value === 'stats') loadStats_(); // đang xem số liệu → tải lại cho CS mới
+      if (panelEl.querySelector('#pk-menu-sel')?.value === 'assign') loadAssignedData_(); // đang xem data được chia → tải lại cho CS mới
       loadReminders_();
     }
     csSel.addEventListener('change', () => {
@@ -634,11 +647,13 @@
       panelEl.querySelector("#pk-img-body").style.display = v === "img" ? "block" : "none";
       panelEl.querySelector("#pk-tpl-body").style.display = v === "tpl" ? "block" : "none";
       panelEl.querySelector("#pk-stats-body").style.display = v === "stats" ? "block" : "none";
+      panelEl.querySelector("#pk-assign-body").style.display = v === "assign" ? "block" : "none";
       if (v === "rem") loadReminders_();
       if (v === "ctkm" && !_ctkmLoadedOnce) { _ctkmLoadedOnce = true; doCtkmSearch_(); } // mo tab la nap luon toan bo CTKM, khoi phai go gi cung thay ngay
       if (v === "img") initImgSearch_();
       if (v === "stats") initStats_();
       if (v === "tpl" && !_tplLoadedOnce) { _tplLoadedOnce = true; loadMsgTemplates_(); } // mo tab la nap luon toan bo mau, khoi phai go gi cung thay ngay
+      if (v === "assign") initAssignTab_();
     });
     panelEl.querySelector("#pk-rem-refresh").addEventListener("click", () => loadReminders_());
     panelEl.querySelector("#pk-price-btn").addEventListener("click", doPriceSearch_);
@@ -2206,6 +2221,136 @@
         setStatus('Nhớ tự mở đúng đoạn chat của ' + r.phone + ' trên Pancake trước khi bấm gợi ý để chèn.');
       }
     );
+  }
+
+  // ── DATA ĐƯỢC CHIA (các đợt "Chia data" trên CRM) ──
+  // Mo phong lai dung logic renderMyDataTab()/toggleMyDataDone() ben index.html: gom tat ca cac dot
+  // (batch) chia cho CS nay thanh 1 phoneMap (phone -> {batches, batchIds, isDone}), loc theo tab.
+  let _assignState = { filter: 'active', loading: false, assignHistory: [], built: false };
+
+  function initAssignTab_() {
+    const body = panelEl?.querySelector('#pk-assign-body');
+    if (!body) return;
+    if (!_assignState.built) {
+      _assignState.built = true;
+      panelEl.querySelectorAll('.pk-assign-filter-btn').forEach((b) => {
+        b.addEventListener('click', () => {
+          _assignState.filter = b.dataset.f;
+          panelEl.querySelectorAll('.pk-assign-filter-btn').forEach((x) => x.classList.toggle('active', x === b));
+          renderAssignedList_();
+        });
+      });
+      panelEl.querySelector('#pk-assign-refresh').addEventListener('click', () => loadAssignedData_());
+    }
+    loadAssignedData_();
+  }
+
+  function loadAssignedData_() {
+    const cs = (panelEl?.querySelector('#pk-cs-sel')?.value) || settings?.csName || '';
+    const listEl = panelEl?.querySelector('#pk-assign-list');
+    if (!cs) {
+      if (listEl) listEl.innerHTML = '<div class="pk-rem-empty">Chọn "CS đang dùng" ở đầu panel để xem data được chia.</div>';
+      return;
+    }
+    _assignState.loading = true;
+    if (listEl) listEl.innerHTML = '<div class="pk-rem-empty">⏳ Đang tải...</div>';
+    safeSendMessage_({ type: 'GET_ASSIGNED_DATA', payload: { cs } }, (resp) => {
+      _assignState.loading = false;
+      if (!resp?.ok) {
+        if (listEl) listEl.innerHTML = '<div class="pk-rem-empty">Lỗi tải data: ' + escapeHtml(resp?.error || 'không rõ') + '</div>';
+        return;
+      }
+      _assignState.assignHistory = resp.data.assignHistory || [];
+      renderAssignedList_();
+    });
+  }
+
+  // Gom tat ca cac batch (da duoc server loc theo dung csName nay) thanh 1 phoneMap, giong het
+  // renderMyDataTab() ben index.html de hanh vi "da goi xong"/"con lai" nhat quan giua CRM va Pancake AI.
+  function _buildAssignPhoneMap_() {
+    const phoneMap = {};
+    for (const h of _assignState.assignHistory) {
+      const label = h.label || (h.date || '').slice(0, 10);
+      const donePhones = h.donePhones || [];
+      for (const p of (h.phones || [])) {
+        if (!phoneMap[p]) phoneMap[p] = { batches: [], batchIds: [], isDone: false };
+        phoneMap[p].batches.push(label);
+        phoneMap[p].batchIds.push(h.id);
+        if (donePhones.includes(p)) phoneMap[p].isDone = true;
+      }
+    }
+    return phoneMap;
+  }
+
+  function renderAssignedList_() {
+    const listEl = panelEl?.querySelector('#pk-assign-list');
+    const menuSel = panelEl?.querySelector('#pk-menu-sel');
+    if (!listEl) return;
+    const phoneMap = _buildAssignPhoneMap_();
+    const phones = Object.keys(phoneMap);
+    const doneCount = phones.filter((p) => phoneMap[p].isDone).length;
+    if (menuSel) {
+      const opt = [...menuSel.options].find((o) => o.value === 'assign');
+      if (opt) opt.textContent = '📋 Data được chia (' + (phones.length - doneCount) + ')';
+    }
+    let displayPhones = _assignState.filter === 'done' ? phones.filter((p) => phoneMap[p].isDone)
+      : _assignState.filter === 'active' ? phones.filter((p) => !phoneMap[p].isDone) : phones;
+    if (!phones.length) {
+      listEl.innerHTML = '<div class="pk-rem-empty">Chưa có data nào được chia cho bạn.</div>';
+      return;
+    }
+    if (!displayPhones.length) {
+      listEl.innerHTML = '<div class="pk-rem-empty">Không có SĐT nào trong mục này.</div>';
+      return;
+    }
+    listEl.innerHTML = displayPhones.map((p) => {
+      const info = phoneMap[p];
+      const batchLabels = [...new Set(info.batches)].join(', ');
+      return `
+      <div class="pk-rem-item">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" class="pk-assign-check" data-phone="${escapeHtml(p)}" ${info.isDone ? 'checked' : ''} />
+          <div style="flex:1;min-width:0;${info.isDone ? 'opacity:.6;text-decoration:line-through' : ''}">
+            <div class="pk-rem-phone">${escapeHtml(p)}</div>
+            <div style="font-size:10px;color:var(--hint,#888)">${escapeHtml(batchLabels)}</div>
+          </div>
+        </label>
+        <div class="pk-rem-actions">
+          <button class="pk-btn-outline pk-assign-lookup" data-phone="${escapeHtml(p)}">🔎 Xem</button>
+        </div>
+      </div>`;
+    }).join('');
+    listEl.querySelectorAll('.pk-assign-lookup').forEach((b) => {
+      b.addEventListener('click', () => {
+        const phone = b.dataset.phone;
+        panelEl.querySelector('#pk-ai-phone-input').value = phone;
+        lookupByPhone(phone);
+      });
+    });
+    listEl.querySelectorAll('.pk-assign-check').forEach((chk) => {
+      chk.addEventListener('change', () => {
+        const phone = chk.dataset.phone;
+        const done = chk.checked;
+        const cs = (panelEl?.querySelector('#pk-cs-sel')?.value) || settings?.csName || '';
+        chk.disabled = true;
+        safeSendMessage_({ type: 'TOGGLE_ASSIGN_DONE', payload: { cs, phone, done } }, (resp) => {
+          chk.disabled = false;
+          if (!resp?.ok) {
+            chk.checked = !done; // rollback neu loi
+            setStatus('Lỗi cập nhật: ' + (resp?.error || 'không rõ'));
+            return;
+          }
+          // Cap nhat lac quan ngay trong state cuc bo (khong doi tai lai server) de UI muot.
+          for (const h of _assignState.assignHistory) {
+            if (!(h.phones || []).includes(phone)) continue;
+            if (!h.donePhones) h.donePhones = [];
+            if (done && !h.donePhones.includes(phone)) h.donePhones.push(phone);
+            else if (!done) h.donePhones = h.donePhones.filter((x) => x !== phone);
+          }
+          renderAssignedList_();
+        });
+      });
+    });
   }
 
   // ── TRA CỨU BẢNG GIÁ (Sheet DANH_MUC) ──

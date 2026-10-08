@@ -63,7 +63,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `_pkStatsRowsMemoCache_`, `_pkReportMemoCache_`, `PK_STATUS_CODES_`, `SALE_DIR_HEADERS`
 
 ## 14_KpiReport_Users_Assign.gs
-- Hàm: `buildKpiReport_`, `saveUsers_`, `saveAudit_`, `saveCareStatus_`, `readAssign_`, `assignRowsOf_`, `saveAssignEntry_`, `saveAssignHistory_`, `readAIContext_`, `_pwHash_`, `verifyLogin_`, `saveAIContext_`
+- Hàm: `buildKpiReport_`, `saveUsers_`, `saveAudit_`, `saveCareStatus_`, `readAssign_`, `assignRowsOf_`, `saveAssignEntry_`, `toggleAssignDone_`, `saveAssignHistory_`, `readAIContext_`, `_pwHash_`, `verifyLogin_`, `saveAIContext_`
 - Hằng/biến: `_PW_SALT_`, `_PW_SALT_OLD_`
 
 ## 15_ProductSheets_Drive.gs

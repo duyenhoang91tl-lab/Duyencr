@@ -212,6 +212,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // Danh sach SDT duoc chia cho 1 CS (cac dot "Chia data" tren CRM) — action:'assign' (GET, chi
+  // doc), loc san theo ?csName= o phia server de nhe. Dung cho muc "📋 Data được chia" trong panel.
+  if (msg?.type === "GET_ASSIGNED_DATA") {
+    handleGetAssignedData(msg.payload)
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
+  // Tich/bo tich "Da goi xong" cho 1 SDT trong muc "Data được chia" — action:'toggleAssignDone'
+  // (POST, ghi). Server tu tim dung (cac) dot chia cua CS nay co chua SDT nay de cap nhat.
+  if (msg?.type === "TOGGLE_ASSIGN_DONE") {
+    handleToggleAssignDone(msg.payload)
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
   // Soan tin follow-up chu dong cho 1 khach trong danh sach nhac hen (khac voi FETCH_SUGGESTION
   // la tra loi tin khach nhan toi) — dung chung action:'ai' nhung prompt khac.
   if (msg?.type === "FETCH_FOLLOWUP_SUGGESTION") {
@@ -940,6 +958,41 @@ async function handleGetCsStats(payload) {
   if (data.error) throw new Error(data.error);
   if (data.ok === false) throw new Error("Không tính được số liệu.");
   return data;
+}
+
+// Danh sach SDT duoc chia cho 1 CS (cac dot "Chia data" tren CRM) — action:'assign' (GET, chi doc).
+// Loc san theo csName o phia server (xem gas_v13.js) de nhe, khong phai tai toan bo assignHistory.
+async function handleGetAssignedData(payload) {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+  const cs = payload?.cs || cfg.csName || "";
+  if (!cs) throw new Error("Chưa chọn CS.");
+  const sep = cfg.gasUrl.includes("?") ? "&" : "?";
+  const url = cfg.gasUrl + sep + "action=assign&csName=" + encodeURIComponent(cs);
+  const res = await fetch(url, { redirect: "follow" });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return { assignHistory: data.assignHistory || [] };
+}
+
+// Tich/bo tich "Da goi xong" cho 1 SDT trong muc "Data duoc chia" — action:'toggleAssignDone' (POST, ghi).
+// Server tu tim dung (cac) dot chia cua CS nay co chua SDT nay de cap nhat (xem toggleAssignDone_ trong gas_v13.js).
+async function handleToggleAssignDone(payload) {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+  const cs = payload?.cs || cfg.csName || "";
+  const phone = payload?.phone || "";
+  if (!cs || !phone) throw new Error("Thiếu CS hoặc số điện thoại.");
+  const res = await fetch(cfg.gasUrl, {
+    method: "POST",
+    body: JSON.stringify({ action: "toggleAssignDone", csName: cs, phone, done: !!payload?.done }),
+    headers: { "Content-Type": "text/plain" }
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return { changed: data.changed || 0 };
 }
 
 // Soan tin follow-up chu dong cho 1 khach (khac voi tra loi tin khach nhan toi) — cung action:'ai'.

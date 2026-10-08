@@ -307,7 +307,16 @@ function doGet(e) {
       return jsonOut_(buildCareLeadReport_(fD));
     }
 
-    if (action === 'assign')    return jsonOut_({ assignHistory: readAssign_(ss.getSheetByName(SH_ASSIGN)) });
+    // SUA 2026-10-08: them loc tuy chon theo ?csName= — dung cho Pancake AI (muc "Data duoc chia",
+    // xem renderAssignTab_ trong pancake-content.js) de CHI tai ve cac dot chia CUA DUNG 1 CS thay
+    // vi toan bo assignHistory (co the rat nang khi nhieu CS/nhieu dot chia cong lai). Khong truyen
+    // csName (CRM van goi nhu cu) -> tra ve DAY DU nhu truoc, khong doi hanh vi cu.
+    if (action === 'assign') {
+      var allAssignH_ = readAssign_(ss.getSheetByName(SH_ASSIGN));
+      var csFilterA_ = (e.parameter && e.parameter.csName) ? String(e.parameter.csName).trim() : '';
+      if (csFilterA_) allAssignH_ = allAssignH_.filter(function(h) { return h.csName === csFilterA_; });
+      return jsonOut_({ assignHistory: allAssignH_ });
+    }
     if (action === 'tasks')     return jsonOut_({ tasks: readTasks_(ss.getSheetByName(SH_TASK)) });
 
     // ── Danh sach binh luan cua 1 cong viec (tab "Thao luan") ──

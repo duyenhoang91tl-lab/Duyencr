@@ -263,6 +263,8 @@ function doPost(e) {
     if (action === 'addZaloNick')         return addZaloNick_(data.nick);
     if (action === 'saveAssign')          return saveAssignEntry_(data.entry);
     if (action === 'saveAssignHistory')   return saveAssignHistory_(data.history);
+    // Pancake AI tich "Da goi xong" cho 1 SDT trong muc "Data duoc chia" — xem toggleAssignDone_.
+    if (action === 'toggleAssignDone')    return toggleAssignDone_(data.csName, data.phone, !!data.done);
     if (action === 'saveTask')  return saveTaskEntry_(data.task);
     if (action === 'deleteTask') return deleteTask_(data.id);
     // ── Binh luan/thao luan trong 1 cong viec (Task) — tab "Thao luan" tren UI ──

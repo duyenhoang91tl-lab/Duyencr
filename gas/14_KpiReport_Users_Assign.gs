@@ -394,6 +394,37 @@ function saveAssignEntry_(entry) {
   return jsonOut_({ ok: true, rows: rows.length });
 }
 
+// Danh dau 1 SDT la "da goi xong"/"chua goi" trong TAT CA cac dot chia cua dung 1 CS — dung cho
+// Pancake AI (muc "Data duoc chia", xem renderAssignTab_/toggleAssignPhoneDone_ trong
+// pancake-content.js) de CS tich xong ngay tai Pancake, khong can mo CRM. CHI ghi de dung (cac)
+// dong cua (cac) dot chia bi doi qua saveAssignEntry_ (an toan hon saveAssignHistory_ — khong xoa
+// trang roi ghi lai CA sheet, tranh dam vao CS khac dang luu cung luc). Dung LockService vi 1 CS co
+// the tich lien tuc nhieu SDT gan nhau (2 request ghi cung 1 dot chia de dam vao nhau neu khong khoa).
+function toggleAssignDone_(csName, phone, done) {
+  csName = String(csName || '').trim();
+  phone = String(phone || '').trim();
+  if (!csName || !phone) return jsonOut_({ error: 'Thiếu csName hoặc phone.' });
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) return jsonOut_({ error: 'Đang có thao tác khác ghi dữ liệu chia, thử lại sau vài giây.' });
+  try {
+    var sh = getSheet_(SH_ASSIGN, ASSIGN_HEADERS);
+    var history = readAssign_(sh);
+    var touched = [];
+    for (var i = 0; i < history.length; i++) {
+      var h = history[i];
+      if (h.csName !== csName || (h.phones || []).indexOf(phone) === -1) continue;
+      h.donePhones = h.donePhones || [];
+      var idx = h.donePhones.indexOf(phone);
+      if (done && idx === -1) { h.donePhones.push(phone); touched.push(h); }
+      else if (!done && idx !== -1) { h.donePhones.splice(idx, 1); touched.push(h); }
+    }
+    for (var k = 0; k < touched.length; k++) saveAssignEntry_(touched[k]); // ghi tung dot bi doi, giu nguyen cac dot khac
+    return jsonOut_({ ok: true, changed: touched.length });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function saveAssignHistory_(history) {
   if (!history) return jsonOut_({ error: 'no history' });
   var sh = getSheet_(SH_ASSIGN, ASSIGN_HEADERS);

@@ -1119,6 +1119,19 @@
 }
 .pk-price-mode-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; font-weight: 600; }
 
+/* ── Data được chia: 3 tab lọc "Chưa gọi" / "Đã gọi" / "Tất cả" ── */
+.pk-assign-filter-btn {
+  flex: 1;
+  font-size: 11.5px;
+  padding: 5px 6px;
+  border: 1px solid #93c5fd;
+  border-radius: 6px;
+  background: #fff;
+  color: #1e40af;
+  cursor: pointer;
+}
+.pk-assign-filter-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; font-weight: 600; }
+
 /* ── Soạn đơn: gõ tên → dropdown thu hẹp dần ── */
 #pk-price-builder-mode { font-size: 11.5px; }
 .pk-builder-row { margin-bottom: 6px; }
