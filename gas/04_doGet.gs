@@ -64,7 +64,8 @@ function doGetCore_(e) {
       var cKey2  = 'customers_v12';
       var cached2 = cache2.get(cKey2);
       if (cached2) { try { return jsonOut_(JSON.parse(cached2)); } catch(ec) {} }
-      var res2 = { rows: readCare_(ss.getSheetByName(SH_CARE)), careStatus: readCareStatus_(ss) };
+      var sbAllRows = sbReadCareAll_();   // Supabase buoc 4e-2; undefined = doc Sheets nhu cu
+      var res2 = { rows: sbAllRows !== undefined ? sbAllRows : readCare_(ss.getSheetByName(SH_CARE)), careStatus: readCareStatus_(ss) };
       try { cache2.put(cKey2, JSON.stringify(res2), 300); } catch(ec) {}
       return jsonOut_(res2);
     }

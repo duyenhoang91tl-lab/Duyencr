@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Test Node (fetch gia, sheet gia) cho BUOC 4e cua docs/SUPABASE-PLAN.md: action 'customers' doc tu Supabase sau co bat-tat.
-//   4e-1 delta (sbReadCareDelta_)  [4e-2 FULL se them sau]
+//   4e-1 delta (sbReadCareDelta_), 4e-2 FULL (sbReadCareAll_)
 // Chay: node tools/test-supabase-carelist.js -> "ALL CARE LIST TESTS PASSED". Khong goi mang that.
 // So KET QUA (JSON) giua duong Sheets (readCareDelta_/readCare_) va duong Supabase, roi ep tung dieu kien fallback.
 const fs = require('fs'), vm = require('vm'), path = require('path');
@@ -69,6 +69,12 @@ ok(care.size === 2500, 'care_data gia co 2500 SDT: ' + care.size);
 const gets = () => net.gets;
 const sheetDelta = since => run('readCareDelta_(__sh, "' + since + '")');
 
+// ===== 4e-2 FULL: giong het Sheets =====
+const fullSheet = byPhone(normSheet(run('readCare_(__sh)')));
+{ const g0 = gets(); const fullSb = run('sbReadCareAll_()');
+  ok(fullSb && gets() > g0, 'FULL doc Supabase'); ok(fullSb.length === 2500, 'FULL du 2500 (3 trang song song)');
+  ok(J(byPhone(fullSb)) === J(fullSheet), 'FULL giong het Sheets (JSON)'); }
+
 // ===== 4e-1 DELTA: giong het Sheets, nhieu moc since =====
 const sample = run('readCare_(__sh)');
 ok(sample.length === 2500 && sample.some(o => o.phone[0] !== '0'), 'du lieu test co o SDT dang so thieu 0');
@@ -104,6 +110,22 @@ net.fails = true; { const g = gets(); ok(run(D) === undefined, 'DELTA HTTP 500 -
 { const f0 = ctx.UrlFetchApp.fetch; ctx.UrlFetchApp.fetch = (u, o) => { const r = f0(u, o); props.SB_DIRTY_CARE = '["0910000001"]'; return r; };
   ok(run(D) === undefined, 'dirty xuat hien giua luc tai -> undefined'); ctx.UrlFetchApp.fetch = f0; restore(); }
 
+const F = 'sbReadCareAll_()', FF = 'SB_CARE_FULL_READ';
+undefNoNet('FULL tat', () => delete props[FF], F);
+undefNoNet('FULL SB_MODE=write', () => props.SB_MODE = 'write', F);
+undefNoNet('FULL STALE', () => props.SB_STALE = 'x', F);
+undefNoNet('FULL co SDT dirty', () => props.SB_DIRTY_CARE = '["0910000001"]', F);
+undefNoNet('FULL thieu URL', () => delete props.SUPABASE_URL, F);
+net.fails = true; { const g = gets(); ok(run(F) === undefined, 'FULL HTTP 500 -> undefined'); ok(gets() > g, 'FULL da thu goi'); } net.fails = false;
+{ const f0 = ctx.UrlFetchApp.fetch; ctx.UrlFetchApp.fetch = (u, o) => { const r = f0(u, o); props.SB_DIRTY_CARE = '["0910000001"]'; return r; };
+  ok(run(F) === undefined, 'FULL: dirty xuat hien giua luc tai -> undefined'); ctx.UrlFetchApp.fetch = f0; restore(); }
+// cong tac nay khong anh huong cong tac kia
+delete props[FF]; ok(run(D) !== undefined, 'tat FULL khong tat DELTA'); restore();
+delete props[DF]; ok(run(F) !== undefined, 'tat DELTA khong tat FULL'); restore();
+// lech so dong (dem noi 2501 nhung chi co 2500) -> Sheets; Supabase co nhieu hon dem -> cung lech
+net.countLie = 1; ok(run(F) === undefined, 'FULL lech so dong -> Sheets'); net.countLie = 0;
+ok(run(F) !== undefined, 'het lech lai doc Supabase');
+
 // ===== bat / tat =====
 delete props[DF];
 vm.runInContext('sbCompareCare_ = function () { return { ok: false }; }', ctx);
@@ -113,9 +135,10 @@ props.SB_MODE = 'write'; en = run('sbCareListEnable_("SB_CARE_DELTA_READ")'); ok
 props.SB_STALE = 'x'; en = run('sbCareListEnable_("SB_CARE_DELTA_READ")'); ok(!en.ok && /STALE/.test(en.error), 'STALE -> khong bat'); delete props.SB_STALE;
 props.SB_DIRTY_CARE = '["0910000001"]'; en = run('sbCareListEnable_("SB_CARE_DELTA_READ")'); ok(!en.ok && /dirty/.test(en.error), 'dirty -> khong bat'); delete props.SB_DIRTY_CARE;
 en = run('sbCareListEnable_("SB_CARE_DELTA_READ")'); ok(en.ok && props[DF] === 'on' && en.careListRead.deltaReadsSupabaseNow, 'bat DELTA');
-run('sbCareListDisable_("SB_CARE_DELTA_READ")'); ok(!props[DF], 'tat DELTA');
+en = run('sbCareListEnable_("SB_CARE_FULL_READ")'); ok(en.ok && props[FF] === 'on' && en.careListRead.fullReadsSupabaseNow, 'bat FULL');
+run('sbCareListDisable_("SB_CARE_DELTA_READ")'); ok(!props[DF] && props[FF] === 'on', 'tat DELTA rieng');
 props[DF] = 'on'; props.SB_ORD_READ = 'on';
-const m = run('sbSetMode_("off", false)'); ok(m.ok && !props[DF] && !props.SB_ORD_READ, 'sbSetMode off tat sach cac cong tac doc');
-ok(typeof ctx.sbKHDeltaBat === 'function' && typeof ctx.sbKHDeltaTat === 'function', 'co ham chay tay khong gach duoi');
+const m = run('sbSetMode_("off", false)'); ok(m.ok && !props[DF] && !props[FF] && !props.SB_ORD_READ, 'sbSetMode off tat sach cac cong tac doc');
+ok(typeof ctx.sbKHDeltaBat === 'function' && typeof ctx.sbKHDeltaTat === 'function' && typeof ctx.sbKHFullBat === 'function' && typeof ctx.sbKHFullTat === 'function', 'co ham chay tay khong gach duoi');
 ok(!JSON.stringify(run('sbCareListStatus_()')).includes('SECRETKEY'), 'status khong lo key');
 console.log('ALL CARE LIST TESTS PASSED');

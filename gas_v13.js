@@ -1430,7 +1430,8 @@ function doGetCore_(e) {
       var cKey2  = 'customers_v12';
       var cached2 = cache2.get(cKey2);
       if (cached2) { try { return jsonOut_(JSON.parse(cached2)); } catch(ec) {} }
-      var res2 = { rows: readCare_(ss.getSheetByName(SH_CARE)), careStatus: readCareStatus_(ss) };
+      var sbAllRows = sbReadCareAll_();   // Supabase buoc 4e-2; undefined = doc Sheets nhu cu
+      var res2 = { rows: sbAllRows !== undefined ? sbAllRows : readCare_(ss.getSheetByName(SH_CARE)), careStatus: readCareStatus_(ss) };
       try { cache2.put(cKey2, JSON.stringify(res2), 300); } catch(ec) {}
       return jsonOut_(res2);
     }
@@ -10430,7 +10431,7 @@ function sbSetMode_(mode, clearStale) {
     return { ok: false, error: 'Supabase dang STALE (' + sbStaleInfo_() + '). Backfill lai (reset:true) + sbCompareCare ok:true roi goi lai voi clearStale:true.' };
   }
   if (clear) pr.deleteProperty('SB_STALE');
-  if (mode === 'off') { pr.deleteProperty('SB_ORD_READ'); pr.deleteProperty('SB_CARE_DELTA_READ'); }   // 4c: rollback = ve Sheets hoan toan (ca doc don hang)
+  if (mode === 'off') { pr.deleteProperty('SB_ORD_READ'); pr.deleteProperty('SB_CARE_DELTA_READ'); pr.deleteProperty('SB_CARE_FULL_READ'); }   // 4c: rollback = ve Sheets hoan toan (ca doc don hang)
   pr.setProperty('SB_MODE', mode);
   return sbStatus_();
 }
@@ -11166,6 +11167,26 @@ function _sbCareListGate_(flagKey) {
   } catch (e) { return false; }
 }
 
+// 4e-2. Tra mang careObj (tat ca SDT) | undefined (doc Sheets). Dem truoc (count=exact) roi tai song song; lech so dong -> Sheets.
+function sbReadCareAll_() {
+  try {
+    if (!_sbCareListGate_('SB_CARE_FULL_READ')) return undefined;
+    var res = sb_('GET', 'care_data?select=phone&limit=1', null, { Prefer: 'count=exact' });
+    var m = String(_sbHeader_(res.headers, 'content-range') || '').match(/\/(\d+)$/);
+    if (!m) return undefined;
+    var total = parseInt(m[1], 10);
+    var recs = _sbGetAllRows_('care_data?select=*&order=phone.asc', total);
+    if (recs.length !== total) { Logger.log('sbReadCareAll_: lech so dong (tai ' + recs.length + ' vs dem ' + total + ') — doc Sheets thay the'); return undefined; }
+    if (!_sbCareListGate_('SB_CARE_FULL_READ')) return undefined;   // trong luc tai co dirty/STALE/tat -> bo, doc Sheets
+    var out = [];
+    for (var i = 0; i < recs.length; i++) if (recs[i].phone) out.push(sbRecToCareObj_(recs[i]));
+    return out;
+  } catch (e) {
+    try { Logger.log('sbReadCareAll_ loi (doc Sheets thay the): ' + String(e && e.message || e)); } catch (el) {}
+    return undefined;
+  }
+}
+
 // 4e-1. Tra { delta:true, rows } | null (qua nhieu -> keo FULL) | undefined (doc Sheets).
 function sbReadCareDelta_(since) {
   try {
@@ -11190,7 +11211,8 @@ function sbReadCareDelta_(since) {
 
 function sbCareListStatus_() {
   var pr = PropertiesService.getScriptProperties();
-  return { deltaOn: String(pr.getProperty('SB_CARE_DELTA_READ') || '') === 'on', deltaReadsSupabaseNow: _sbCareListGate_('SB_CARE_DELTA_READ') };
+  return { deltaOn: String(pr.getProperty('SB_CARE_DELTA_READ') || '') === 'on', fullOn: String(pr.getProperty('SB_CARE_FULL_READ') || '') === 'on',
+    deltaReadsSupabaseNow: _sbCareListGate_('SB_CARE_DELTA_READ'), fullReadsSupabaseNow: _sbCareListGate_('SB_CARE_FULL_READ') };
 }
 // Bat 1 muc (flagKey = 'SB_CARE_DELTA_READ' | 'SB_CARE_FULL_READ'). Chi bat khi SB_MODE=read, khong STALE, khong dirty, doi chieu CareData ok:true.
 function sbCareListEnable_(flagKey) {
@@ -11206,6 +11228,9 @@ function sbCareListEnable_(flagKey) {
 function sbCareListDisable_(flagKey) { PropertiesService.getScriptProperties().deleteProperty(flagKey); return { ok: true, careListRead: sbCareListStatus_() }; }
 
 // ── CHAY TAY TU APPS SCRIPT EDITOR (buoc 4e) — chon ten ham o o "Run", bam Run, xem "Execution log". ──
-//  Dieu kien truoc: sbBatDocSupabase da chay (SB_MODE=read) va sbXemTrangThai khong STALE/dirty. Ve nhu cu: sbKHDeltaTat (hoac sbTatSupabase tat het).
+//  Dieu kien truoc: sbBatDocSupabase da chay (SB_MODE=read) va sbXemTrangThai khong STALE/dirty. Nen bat DELTA truoc, theo doi, roi moi bat FULL.
+//  Ve nhu cu: sbKHDeltaTat / sbKHFullTat (hoac sbTatSupabase tat het).
 function sbKHDeltaBat() { Logger.log(JSON.stringify(sbCareListEnable_('SB_CARE_DELTA_READ'), null, 2)); }
 function sbKHDeltaTat() { Logger.log(JSON.stringify(sbCareListDisable_('SB_CARE_DELTA_READ'), null, 2)); }
+function sbKHFullBat()  { Logger.log(JSON.stringify(sbCareListEnable_('SB_CARE_FULL_READ'), null, 2)); }
+function sbKHFullTat()  { Logger.log(JSON.stringify(sbCareListDisable_('SB_CARE_FULL_READ'), null, 2)); }
