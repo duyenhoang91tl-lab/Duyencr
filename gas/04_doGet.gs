@@ -360,31 +360,7 @@ function doGetCore_(e) {
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
     if (action === 'reminders') {
       var csFilter = (e && e.parameter && e.parameter.cs) ? String(e.parameter.cs) : '';
-      var shR = ss.getSheetByName(SH_CARE);
-      if (!shR || shR.getLastRow() < 2) return jsonOut_({ reminders: [] });
-      var valsR = shR.getDataRange().getValues();
-      var today = new Date(); today.setHours(0,0,0,0);
-      var reminders = [], seenR = {};
-      for (var ri = 1; ri < valsR.length; ri++) {
-        if (!valsR[ri][0]) continue;
-        var rcs = String(valsR[ri][3]||'').trim();
-        if (csFilter && rcs !== csFilter) continue;
-        var rhen = valsR[ri][12];
-        if (!rhen) continue;
-        var rdate = new Date(rhen); rdate.setHours(0,0,0,0);
-        // CHỈ hẹn TRONG NGÀY hôm nay (không lấy quá hạn) — extension chỉ nhắc lịch của ngày
-        if (rdate.getTime() !== today.getTime()) continue;
-        // Gộp trùng: mỗi SĐT chỉ 1 nhắc (tránh nhân bản do CareData có dòng trùng)
-        var npR = normPhone_(String(valsR[ri][0]));
-        if (seenR[npR]) continue;
-        seenR[npR] = true;
-        reminders.push({
-          phone: String(valsR[ri][0]), schedHen: String(rhen),
-          schedHenNote: String(valsR[ri][13]||''), cs: rcs,
-          status: String(valsR[ri][1]||''), zalo: String(valsR[ri][2]||''), overdue: false
-        });
-      }
-      return jsonOut_({ reminders: reminders });
+      return jsonOut_({ reminders: readRemindersToday_(csFilter) });
     }
 
     // ── lay 1 setting (ZaloAI extension: careStatus, nickZaloList) ──

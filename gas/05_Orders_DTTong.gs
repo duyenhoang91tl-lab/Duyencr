@@ -145,7 +145,8 @@ function readAllOrders_() {
 function findDonRowsByPhone_(phone) {
   var ph = normPhone_(phone), out = [];
   try {
-    var rows = readDonChiTiet_();
+    var sbRows = ph ? sbReadDonByPhone_(ph) : undefined;   // Supabase buoc 4c; undefined = doc Sheets nhu cu
+    var rows = sbRows !== undefined ? sbRows : readDonChiTiet_();
     for (var i = 0; i < rows.length; i++) {
       if (normPhone_(String(rows[i].soDienThoai || '')) !== ph) continue;
       out.push({
@@ -162,6 +163,25 @@ function findDonRowsByPhone_(phone) {
 }
 
 function readOrdersByPhone_(phone) {
+  var ph0 = normPhone_(phone);
+  if (ph0) {
+    var sbo = sbReadOrdersByPhone_(ph0);   // Supabase buoc 4c; undefined = doc Sheets nhu cu
+    if (sbo !== undefined) return _dedupeSameOrders_(sbo);
+  }
+  return _readOrdersByPhoneSheets_(phone);
+}
+
+// Khu trung dong GIONG HET (cung ngay+doanh thu+san pham) — dung chung cho duong doc Sheets va Supabase.
+function _dedupeSameOrders_(out) {
+  var seen = {}, deduped = [];
+  for (var k = 0; k < out.length; k++) {
+    var key = String(out[k].date) + '|' + String(out[k].revenue) + '|' + String(out[k].product);
+    if (!seen[key]) { seen[key] = true; deduped.push(out[k]); }
+  }
+  return deduped;
+}
+
+function _readOrdersByPhoneSheets_(phone) {
   var ph = normPhone_(phone);
   // TOI UU TOC DO (06/10/2026): truoc day goi readAllOrders_() = doc A:T TOAN BO DT TONG roi dung
   // object cho TUNG dong chi de loc 1 SDT. Gio chi doc cot SDT (cot D) de tim so dong khop, roi
@@ -194,12 +214,7 @@ function readOrdersByPhone_(phone) {
   }
   // Khu trung dong GIONG HET (cung ngay+doanh thu+san pham) — giu logic cu, KHONG tu dong
   // xoa o day, chi de UI/extension tu phat hien va hoi xac nhan (xem findDuplicateOrders_)
-  var seen = {}, deduped = [];
-  for (var k = 0; k < out.length; k++) {
-    var key = String(out[k].date) + '|' + String(out[k].revenue) + '|' + String(out[k].product);
-    if (!seen[key]) { seen[key] = true; deduped.push(out[k]); }
-  }
-  return deduped;
+  return _dedupeSameOrders_(out);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -622,13 +637,20 @@ function _isDTRowHidden_(kenhBan, saleBan, sets) {
 }
 
 function readDTTong_() {
-  var ss = getDTSS_();
-  var sh = ss.getSheetByName(DT_TONG_SHEET);
-  if (!sh) return [];
-  var last = sh.getLastRow();
-  if (last < 2) return [];
   var _t0 = Date.now();
-  var vals = sh.getRange(2, 1, last - 1, 20).getValues();
+  var vals, rowNums = null;
+  // Supabase buoc 4c: khi cho phep (SB_ORD_READ=on, ban sao dong bo moi, khong dirty) doc dt_tong thay vi quet ca sheet.
+  // undefined = phai doc Sheets nhu cu. Ca 2 nguon di qua CUNG 1 vong lap chuyen doi ben duoi (khong co ban logic thu hai).
+  var sbd = sbReadDTTongVals_();
+  if (sbd !== undefined) { vals = sbd.vals; rowNums = sbd.rowNums; }
+  else {
+    var ss = getDTSS_();
+    var sh = ss.getSheetByName(DT_TONG_SHEET);
+    if (!sh) return [];
+    var last = sh.getLastRow();
+    if (last < 2) return [];
+    vals = sh.getRange(2, 1, last - 1, 20).getValues();
+  }
   var _tRead = Date.now() - _t0;
   var hiddenSets = _hiddenPageSaleSets_();
   var out = [];
@@ -660,12 +682,12 @@ function readDTTong_() {
         id:             r[19]
       });
     } catch (eRow) {
-      Logger.log('readDTTong_: loi doc dong ' + (i + 2) + ': ' + eRow);
+      Logger.log('readDTTong_: loi doc dong ' + (rowNums ? rowNums[i] : i + 2) + ': ' + eRow);
     }
   }
   // DO HIEU NANG (xem Apps Script -> Executions): so dong, ms doc sheet (getValues) vs ms xu ly lai.
   // Neu _tRead chiem phan lon -> nghen o Google Sheets (can snapshot/luu tru); neu _tConvert lon -> nghen o code.
-  Logger.log('PERF readDTTong_ rows=' + vals.length + ' kept=' + out.length + ' readMs=' + _tRead + ' convertMs=' + (Date.now() - _t0 - _tRead));
+  Logger.log('PERF readDTTong_ src=' + (sbd !== undefined ? 'supabase' : 'sheets') + ' rows=' + vals.length + ' kept=' + out.length + ' readMs=' + _tRead + ' convertMs=' + (Date.now() - _t0 - _tRead));
   return out;
 }
 

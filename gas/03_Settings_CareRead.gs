@@ -207,6 +207,43 @@ function readCareDelta_(sh, since) {
   return { delta: true, rows: rows };
 }
 
+// Lich hen CHAM SOC cua HOM NAY (khong lay qua han) tu CareData. Tach tu action 'reminders' (4c) de doc duoc Supabase hoac Sheets.
+// Cung 1 ham chuyen doi (_remindersFromRows_) cho ca 2 nguon. Khac nhau duy nhat: thu tu ket qua tu Supabase = theo SDT (Sheets: theo thu tu dong).
+function readRemindersToday_(csFilter) {
+  var sbRows = sbReadRemindersRows_();   // undefined = doc Sheets nhu cu
+  if (sbRows !== undefined) return _remindersFromRows_(sbRows, csFilter);
+  var ss = getCrmSS_();
+  var shR = ss.getSheetByName(SH_CARE);
+  if (!shR || shR.getLastRow() < 2) return [];
+  return _remindersFromRows_(shR.getDataRange().getValues().slice(1), csFilter);
+}
+// rows: mang dong CareData (cot 0 SDT, 1 status, 2 zalo, 3 cs, 12 schedHen, 13 schedHenNote) — KHONG gom dong tieu de.
+function _remindersFromRows_(rows, csFilter) {
+  var today = new Date(); today.setHours(0,0,0,0);
+  var reminders = [], seenR = {};
+  for (var ri = 0; ri < rows.length; ri++) {
+    var rw = rows[ri];
+    if (!rw[0]) continue;
+    var rcs = String(rw[3]||'').trim();
+    if (csFilter && rcs !== csFilter) continue;
+    var rhen = rw[12];
+    if (!rhen) continue;
+    var rdate = new Date(rhen); rdate.setHours(0,0,0,0);
+    // CHỈ hẹn TRONG NGÀY hôm nay (không lấy quá hạn) — extension chỉ nhắc lịch của ngày
+    if (rdate.getTime() !== today.getTime()) continue;
+    // Gộp trùng: mỗi SĐT chỉ 1 nhắc (tránh nhân bản do CareData có dòng trùng)
+    var npR = normPhone_(String(rw[0]));
+    if (seenR[npR]) continue;
+    seenR[npR] = true;
+    reminders.push({
+      phone: String(rw[0]), schedHen: String(rhen),
+      schedHenNote: String(rw[13]||''), cs: rcs,
+      status: String(rw[1]||''), zalo: String(rw[2]||''), overdue: false
+    });
+  }
+  return reminders;
+}
+
 function findCareByPhone_(phone) {
   var sbc = sbReadCare_(phone);   // che do 'read': doc Supabase; undefined = phai doc Sheets nhu cu (xem khoi SUPABASE cuoi file)
   if (sbc !== undefined) return sbc;

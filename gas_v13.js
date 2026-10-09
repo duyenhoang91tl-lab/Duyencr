@@ -1029,6 +1029,43 @@ function readCareDelta_(sh, since) {
   return { delta: true, rows: rows };
 }
 
+// Lich hen CHAM SOC cua HOM NAY (khong lay qua han) tu CareData. Tach tu action 'reminders' (4c) de doc duoc Supabase hoac Sheets.
+// Cung 1 ham chuyen doi (_remindersFromRows_) cho ca 2 nguon. Khac nhau duy nhat: thu tu ket qua tu Supabase = theo SDT (Sheets: theo thu tu dong).
+function readRemindersToday_(csFilter) {
+  var sbRows = sbReadRemindersRows_();   // undefined = doc Sheets nhu cu
+  if (sbRows !== undefined) return _remindersFromRows_(sbRows, csFilter);
+  var ss = getCrmSS_();
+  var shR = ss.getSheetByName(SH_CARE);
+  if (!shR || shR.getLastRow() < 2) return [];
+  return _remindersFromRows_(shR.getDataRange().getValues().slice(1), csFilter);
+}
+// rows: mang dong CareData (cot 0 SDT, 1 status, 2 zalo, 3 cs, 12 schedHen, 13 schedHenNote) — KHONG gom dong tieu de.
+function _remindersFromRows_(rows, csFilter) {
+  var today = new Date(); today.setHours(0,0,0,0);
+  var reminders = [], seenR = {};
+  for (var ri = 0; ri < rows.length; ri++) {
+    var rw = rows[ri];
+    if (!rw[0]) continue;
+    var rcs = String(rw[3]||'').trim();
+    if (csFilter && rcs !== csFilter) continue;
+    var rhen = rw[12];
+    if (!rhen) continue;
+    var rdate = new Date(rhen); rdate.setHours(0,0,0,0);
+    // CHỈ hẹn TRONG NGÀY hôm nay (không lấy quá hạn) — extension chỉ nhắc lịch của ngày
+    if (rdate.getTime() !== today.getTime()) continue;
+    // Gộp trùng: mỗi SĐT chỉ 1 nhắc (tránh nhân bản do CareData có dòng trùng)
+    var npR = normPhone_(String(rw[0]));
+    if (seenR[npR]) continue;
+    seenR[npR] = true;
+    reminders.push({
+      phone: String(rw[0]), schedHen: String(rhen),
+      schedHenNote: String(rw[13]||''), cs: rcs,
+      status: String(rw[1]||''), zalo: String(rw[2]||''), overdue: false
+    });
+  }
+  return reminders;
+}
+
 function findCareByPhone_(phone) {
   var sbc = sbReadCare_(phone);   // che do 'read': doc Supabase; undefined = phai doc Sheets nhu cu (xem khoi SUPABASE cuoi file)
   if (sbc !== undefined) return sbc;
@@ -1689,31 +1726,7 @@ function doGetCore_(e) {
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
     if (action === 'reminders') {
       var csFilter = (e && e.parameter && e.parameter.cs) ? String(e.parameter.cs) : '';
-      var shR = ss.getSheetByName(SH_CARE);
-      if (!shR || shR.getLastRow() < 2) return jsonOut_({ reminders: [] });
-      var valsR = shR.getDataRange().getValues();
-      var today = new Date(); today.setHours(0,0,0,0);
-      var reminders = [], seenR = {};
-      for (var ri = 1; ri < valsR.length; ri++) {
-        if (!valsR[ri][0]) continue;
-        var rcs = String(valsR[ri][3]||'').trim();
-        if (csFilter && rcs !== csFilter) continue;
-        var rhen = valsR[ri][12];
-        if (!rhen) continue;
-        var rdate = new Date(rhen); rdate.setHours(0,0,0,0);
-        // CHỈ hẹn TRONG NGÀY hôm nay (không lấy quá hạn) — extension chỉ nhắc lịch của ngày
-        if (rdate.getTime() !== today.getTime()) continue;
-        // Gộp trùng: mỗi SĐT chỉ 1 nhắc (tránh nhân bản do CareData có dòng trùng)
-        var npR = normPhone_(String(valsR[ri][0]));
-        if (seenR[npR]) continue;
-        seenR[npR] = true;
-        reminders.push({
-          phone: String(valsR[ri][0]), schedHen: String(rhen),
-          schedHenNote: String(valsR[ri][13]||''), cs: rcs,
-          status: String(valsR[ri][1]||''), zalo: String(valsR[ri][2]||''), overdue: false
-        });
-      }
-      return jsonOut_({ reminders: reminders });
+      return jsonOut_({ reminders: readRemindersToday_(csFilter) });
     }
 
     // ── lay 1 setting (ZaloAI extension: careStatus, nickZaloList) ──
@@ -1955,7 +1968,8 @@ function readAllOrders_() {
 function findDonRowsByPhone_(phone) {
   var ph = normPhone_(phone), out = [];
   try {
-    var rows = readDonChiTiet_();
+    var sbRows = ph ? sbReadDonByPhone_(ph) : undefined;   // Supabase buoc 4c; undefined = doc Sheets nhu cu
+    var rows = sbRows !== undefined ? sbRows : readDonChiTiet_();
     for (var i = 0; i < rows.length; i++) {
       if (normPhone_(String(rows[i].soDienThoai || '')) !== ph) continue;
       out.push({
@@ -1972,6 +1986,25 @@ function findDonRowsByPhone_(phone) {
 }
 
 function readOrdersByPhone_(phone) {
+  var ph0 = normPhone_(phone);
+  if (ph0) {
+    var sbo = sbReadOrdersByPhone_(ph0);   // Supabase buoc 4c; undefined = doc Sheets nhu cu
+    if (sbo !== undefined) return _dedupeSameOrders_(sbo);
+  }
+  return _readOrdersByPhoneSheets_(phone);
+}
+
+// Khu trung dong GIONG HET (cung ngay+doanh thu+san pham) — dung chung cho duong doc Sheets va Supabase.
+function _dedupeSameOrders_(out) {
+  var seen = {}, deduped = [];
+  for (var k = 0; k < out.length; k++) {
+    var key = String(out[k].date) + '|' + String(out[k].revenue) + '|' + String(out[k].product);
+    if (!seen[key]) { seen[key] = true; deduped.push(out[k]); }
+  }
+  return deduped;
+}
+
+function _readOrdersByPhoneSheets_(phone) {
   var ph = normPhone_(phone);
   // TOI UU TOC DO (06/10/2026): truoc day goi readAllOrders_() = doc A:T TOAN BO DT TONG roi dung
   // object cho TUNG dong chi de loc 1 SDT. Gio chi doc cot SDT (cot D) de tim so dong khop, roi
@@ -2004,12 +2037,7 @@ function readOrdersByPhone_(phone) {
   }
   // Khu trung dong GIONG HET (cung ngay+doanh thu+san pham) — giu logic cu, KHONG tu dong
   // xoa o day, chi de UI/extension tu phat hien va hoi xac nhan (xem findDuplicateOrders_)
-  var seen = {}, deduped = [];
-  for (var k = 0; k < out.length; k++) {
-    var key = String(out[k].date) + '|' + String(out[k].revenue) + '|' + String(out[k].product);
-    if (!seen[key]) { seen[key] = true; deduped.push(out[k]); }
-  }
-  return deduped;
+  return _dedupeSameOrders_(out);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2432,13 +2460,20 @@ function _isDTRowHidden_(kenhBan, saleBan, sets) {
 }
 
 function readDTTong_() {
-  var ss = getDTSS_();
-  var sh = ss.getSheetByName(DT_TONG_SHEET);
-  if (!sh) return [];
-  var last = sh.getLastRow();
-  if (last < 2) return [];
   var _t0 = Date.now();
-  var vals = sh.getRange(2, 1, last - 1, 20).getValues();
+  var vals, rowNums = null;
+  // Supabase buoc 4c: khi cho phep (SB_ORD_READ=on, ban sao dong bo moi, khong dirty) doc dt_tong thay vi quet ca sheet.
+  // undefined = phai doc Sheets nhu cu. Ca 2 nguon di qua CUNG 1 vong lap chuyen doi ben duoi (khong co ban logic thu hai).
+  var sbd = sbReadDTTongVals_();
+  if (sbd !== undefined) { vals = sbd.vals; rowNums = sbd.rowNums; }
+  else {
+    var ss = getDTSS_();
+    var sh = ss.getSheetByName(DT_TONG_SHEET);
+    if (!sh) return [];
+    var last = sh.getLastRow();
+    if (last < 2) return [];
+    vals = sh.getRange(2, 1, last - 1, 20).getValues();
+  }
   var _tRead = Date.now() - _t0;
   var hiddenSets = _hiddenPageSaleSets_();
   var out = [];
@@ -2470,12 +2505,12 @@ function readDTTong_() {
         id:             r[19]
       });
     } catch (eRow) {
-      Logger.log('readDTTong_: loi doc dong ' + (i + 2) + ': ' + eRow);
+      Logger.log('readDTTong_: loi doc dong ' + (rowNums ? rowNums[i] : i + 2) + ': ' + eRow);
     }
   }
   // DO HIEU NANG (xem Apps Script -> Executions): so dong, ms doc sheet (getValues) vs ms xu ly lai.
   // Neu _tRead chiem phan lon -> nghen o Google Sheets (can snapshot/luu tru); neu _tConvert lon -> nghen o code.
-  Logger.log('PERF readDTTong_ rows=' + vals.length + ' kept=' + out.length + ' readMs=' + _tRead + ' convertMs=' + (Date.now() - _t0 - _tRead));
+  Logger.log('PERF readDTTong_ src=' + (sbd !== undefined ? 'supabase' : 'sheets') + ' rows=' + vals.length + ' kept=' + out.length + ' readMs=' + _tRead + ' convertMs=' + (Date.now() - _t0 - _tRead));
   return out;
 }
 
@@ -10394,6 +10429,7 @@ function sbSetMode_(mode, clearStale) {
     return { ok: false, error: 'Supabase dang STALE (' + sbStaleInfo_() + '). Backfill lai (reset:true) + sbCompareCare ok:true roi goi lai voi clearStale:true.' };
   }
   if (clear) pr.deleteProperty('SB_STALE');
+  if (mode === 'off') pr.deleteProperty('SB_ORD_READ');   // 4c: rollback = ve Sheets hoan toan (ca doc don hang)
   pr.setProperty('SB_MODE', mode);
   return sbStatus_();
 }
@@ -10893,7 +10929,7 @@ function sbOrdersStatus_() {
     return { syncedAt: x.syncedAt ? new Date(x.syncedAt).toISOString() : null, ageMin: x.syncedAt ? Math.round((now - x.syncedAt) / 60000) : null,
       rows: x.rows == null ? null : x.rows, lastRow: x.last == null ? null : x.last, dirtySinceSync: !!(d && (!x.syncedAt || d > x.syncedAt)), lastError: x.err || null };
   };
-  return { ok: true, dt: info('dt', 'SB_DT_DIRTY'), don: info('don', 'SB_DON_DIRTY') };
+  return { ok: true, orderRead: sbOrdReadStatus_(), dt: info('dt', 'SB_DT_DIRTY'), don: info('don', 'SB_DON_DIRTY') };
 }
 
 // ── CHAY TAY TU APPS SCRIPT EDITOR (buoc 4b) ──
@@ -10906,3 +10942,199 @@ function sbDonHangDongBoLai() { _sbLogSync_(sbOrdersSync_({ fresh: true })); }  
 function sbDonHangCaiTrigger() { Logger.log(installSbOrdersTrigger_()); }
 function sbDonHangGoTrigger() { Logger.log(removeSbOrdersTrigger_()); }
 function sbDonHangTrangThai() { Logger.log(JSON.stringify(sbOrdersStatus_(), null, 2)); }
+
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//  SUPABASE — BUOC 4c/5: DOC don hang / lich hen tu Supabase (MAC DINH TAT; moi ham tu fallback ve Sheets).
+//  Cac ham doc: readOrdersByPhone_ (dt_tong theo SDT), findDonRowsByPhone_ (don_chi_tiet theo SDT), readDTTong_ (ca bang dt_tong),
+//  reminders (care_data). JSON tra ve GIU NGUYEN: don hang di qua dung dtRowToOrder_ / vong lap readDTTong_ / vong lap findDonRowsByPhone_
+//  voi mang dong dung lai tu cot raw (sbRawToRow_) — khong co ban logic chuyen doi thu hai.
+//  Cong tac RIENG cho don hang: Script Property SB_ORD_READ = 'on' (bat bang sbDonHangBatDoc, tat bang sbDonHangTatDoc; sbTatSupabase
+//  cung tat luon). Lich hen (reminders) dung cong tac cu SB_MODE='read' cua CareData.
+//  Doc Supabase chi khi TAT CA dieu kien dung (sai 1 cai -> undefined = doc Sheets nhu cu), xem _sbOrdReadGate_:
+//   - SB_ORD_READ = on va da cau hinh URL/key;  - lan dong bo HOAN CHINH gan nhat cua bang do (SB_ORD_STATE.<dt|don>.syncedAt) khong qua
+//     SB_ORD_MAX_AGE_MS_ (trigger 10 phut/lan => qua 30 phut = trigger chet => tu ve Sheets);
+//   - khong co co dirty (SB_DT_DIRTY / SB_DON_DIRTY: CRM da ghi Sheet ma chua dong bo lai);  - khong co lan dong bo dang chay (SB_ORD_RUNNING
+//     con han: dang xoa-roi-ghi lai tung khoi nen Supabase tam thieu dong);  - Supabase khong loi.
+//  readDTTong_ doc CA bang nen con doi chieu SO DONG voi SB_ORD_STATE.dt.rows (so dong lan dong bo cuoi); lech => doc Sheets.
+//  Luu y: doc theo SDT KHONG co fallback "khong tim thay thi doc Sheets" (khach chua co don la chuyen thuong, fallback se mat het loi ich toc do);
+//  an toan dua vao cac dieu kien tren. Sua TAY ngoai CRM tren Sheet chi len Supabase o tick ke tiep (toi da ~10 phut) — doc nhu da ghi o 4b.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+var SB_ORD_MAX_AGE_MS_ = 30 * 60 * 1000;   // du lieu Supabase cu toi da (tinh tu luc BAT DAU lan dong bo hoan chinh cuoi) moi duoc doc don hang
+var SB_PAGE_ = 1000;                        // PostgREST tra toi da 1000 dong/lan mac dinh
+var SB_PAR_ = 10;                           // so trang tai song song trong 1 lan UrlFetchApp.fetchAll
+
+function sbOrdReadOn_() {
+  try { return String(PropertiesService.getScriptProperties().getProperty('SB_ORD_READ') || '').toLowerCase() === 'on'; } catch (e) { return false; }
+}
+
+// Tra object { syncedAt, rows, ... } cua bang ('dt'|'don') neu DUOC PHEP doc Supabase luc nay, nguoc lai null. Khong bao gio nem loi.
+function _sbOrdReadGate_(which) {
+  try {
+    var pr = PropertiesService.getScriptProperties().getProperties();
+    if (String(pr.SB_ORD_READ || '').toLowerCase() !== 'on' || !sbCfg_().ok) return null;
+    var st = {};
+    try { st = JSON.parse(pr.SB_ORD_STATE || '{}') || {}; } catch (e0) { st = {}; }
+    var x = st[which === 'don' ? 'don' : 'dt'];
+    if (!x || !x.syncedAt || Date.now() - x.syncedAt > SB_ORD_MAX_AGE_MS_) return null;
+    if (pr[which === 'don' ? 'SB_DON_DIRTY' : 'SB_DT_DIRTY']) return null;
+    var run = parseInt(pr.SB_ORD_RUNNING || '0', 10);
+    if (run && Date.now() - run < SB_ORD_RUN_TTL_MS_) return null;
+    return x;
+  } catch (e) { return null; }
+}
+
+// Tai nhieu trang song song (biet truoc so dong ky vong). basePath da co dau '?' va cac tham so loc/order. Tra mang dong; nem loi neu HTTP loi.
+function _sbGetAllRows_(basePath, expected) {
+  var cfg = sbCfg_(), headers = { apikey: cfg.key, Authorization: 'Bearer ' + cfg.key };
+  var pages = Math.ceil(expected / SB_PAGE_) + 1;   // +1 trang du de bat truong hop Supabase co NHIEU dong hon ky vong (se lech so dong -> ve Sheets)
+  var out = [];
+  for (var p0 = 0; p0 < pages; p0 += SB_PAR_) {
+    var reqs = [];
+    for (var p = p0; p < Math.min(pages, p0 + SB_PAR_); p++) {
+      reqs.push({ url: cfg.url + '/rest/v1/' + basePath + '&limit=' + SB_PAGE_ + '&offset=' + (p * SB_PAGE_), method: 'get', headers: headers, muteHttpExceptions: true });
+    }
+    var rs = UrlFetchApp.fetchAll(reqs);
+    for (var i = 0; i < rs.length; i++) {
+      var code = rs[i].getResponseCode(), text = rs[i].getContentText() || '';
+      if (code >= 300) throw new Error('Supabase HTTP ' + code + ' (GET ' + String(basePath).split('?')[0] + '): ' + text.slice(0, 300));
+      var a = JSON.parse(text || '[]');
+      if (!Array.isArray(a)) throw new Error('Supabase tra du lieu khong phai mang (' + String(basePath).split('?')[0] + ')');
+      for (var j = 0; j < a.length; j++) out.push(a[j]);
+    }
+  }
+  return out;
+}
+
+// Tai lan luot tung trang cho den khi het (khi KHONG biet truoc so dong, vd care_data).
+function _sbGetPagesSeq_(basePath) {
+  var out = [], off = 0;
+  for (var guard = 0; guard < 500; guard++) {
+    var a = sb_('GET', basePath + '&limit=' + SB_PAGE_ + '&offset=' + off).json;
+    if (!Array.isArray(a)) throw new Error('Supabase tra du lieu khong phai mang (' + String(basePath).split('?')[0] + ')');
+    for (var j = 0; j < a.length; j++) out.push(a[j]);
+    if (a.length < SB_PAGE_) return out;
+    off += SB_PAGE_;
+  }
+  throw new Error('Qua nhieu trang (' + String(basePath).split('?')[0] + ')');
+}
+
+// readDTTong_: tra { vals (mang dong 20 o nhu getValues), rowNums (src_row cua tung dong) } hoac UNDEFINED = doc Sheets nhu cu.
+function sbReadDTTongVals_() {
+  try {
+    var g = _sbOrdReadGate_('dt');
+    if (!g || g.rows == null) return undefined;
+    var rows = _sbGetAllRows_('dt_tong?select=src_row,raw&archived=eq.false&order=src_row.asc', g.rows);
+    if (rows.length !== g.rows) { Logger.log('sbReadDTTongVals_: lech so dong (Supabase ' + rows.length + ' vs dong bo cuoi ' + g.rows + ') — doc Sheets thay the'); return undefined; }
+    if (!_sbOrdReadGate_('dt')) return undefined;   // trong luc tai co dong bo/ghi xen vao -> bo, doc Sheets
+    var vals = [], nums = [];
+    for (var i = 0; i < rows.length; i++) { vals.push(sbRawToRow_(rows[i].raw, DT_TONG_WIDTH)); nums.push(rows[i].src_row); }
+    return { vals: vals, rowNums: nums };
+  } catch (e) {
+    try { Logger.log('sbReadDTTongVals_ loi (doc Sheets thay the): ' + String(e && e.message || e)); } catch (el) {}
+    return undefined;
+  }
+}
+
+// readOrdersByPhone_: tra mang order (dtRowToOrder_) theo thu tu dong, hoac UNDEFINED = doc Sheets nhu cu. ph da qua normPhone_.
+function sbReadOrdersByPhone_(ph) {
+  try {
+    if (!_sbOrdReadGate_('dt')) return undefined;
+    var rows = sb_('GET', 'dt_tong?select=src_row,raw&archived=eq.false&phone=eq.' + encodeURIComponent(ph) + '&order=src_row.asc&limit=' + SB_PAGE_).json;
+    if (!Array.isArray(rows)) return undefined;
+    if (!_sbOrdReadGate_('dt')) return undefined;
+    var out = [];
+    for (var i = 0; i < rows.length; i++) {
+      try { out.push(dtRowToOrder_(sbRawToRow_(rows[i].raw, DT_TONG_WIDTH), rows[i].src_row)); }
+      catch (eRow) { Logger.log('sbReadOrdersByPhone_: loi doc dong ' + rows[i].src_row + ': ' + eRow); }
+    }
+    return out;
+  } catch (e) {
+    try { Logger.log('sbReadOrdersByPhone_ loi (doc Sheets thay the): ' + String(e && e.message || e)); } catch (el) {}
+    return undefined;
+  }
+}
+
+// findDonRowsByPhone_: tra mang object cung HINH voi readDonChiTiet_ (chi cac truong findDonRowsByPhone_ dung), hoac UNDEFINED = doc Sheets.
+// Dung cot da chuyen doi san luc dong bo (ngay_tao_don da ke thua ngay dong tren — khong the dung lai tu raw cua rieng dong nay).
+function sbReadDonByPhone_(ph) {
+  try {
+    if (!_sbOrdReadGate_('don')) return undefined;
+    var rows = sb_('GET', 'don_chi_tiet?select=src_row,ngay_tao_don,phone,nguon_don,the_sale,san_pham,marketer,gia_tri_sau_giam&archived=eq.false&phone=eq.' +
+      encodeURIComponent(ph) + '&order=src_row.asc&limit=' + SB_PAGE_).json;
+    if (!Array.isArray(rows)) return undefined;
+    if (!_sbOrdReadGate_('don')) return undefined;
+    return rows.map(function (g) {
+      return { ngayTaoDon: g.ngay_tao_don == null ? '' : g.ngay_tao_don, soDienThoai: g.phone, nguonDon: g.nguon_don || '', theSale: g.the_sale || '',
+        sanPham: g.san_pham || '', marketer: g.marketer || '', giaTriSauGiam: Number(g.gia_tri_sau_giam) || 0 };
+    });
+  } catch (e) {
+    try { Logger.log('sbReadDonByPhone_ loi (doc Sheets thay the): ' + String(e && e.message || e)); } catch (el) {}
+    return undefined;
+  }
+}
+
+// O ngay trong care_data duoc luu bang _sbCell_ (Date -> ISO 'Z'). Dua nguoc ve Date de String(rhen) cua action reminders ra DUNG dinh dang
+// nhu doc tu Sheets; chuoi khac (nguoi go tay) giu nguyen.
+function _sbCareTextToCell_(t) {
+  var s = String(t == null ? '' : t);
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(s)) { var d = new Date(s); if (!isNaN(d.getTime())) return d; }
+  return s;
+}
+
+// reminders: tra mang dong kieu CareData (chi cac cot 0-3, 12, 13 co nghia) hoac UNDEFINED = doc Sheets. Can SB_MODE='read', khong STALE, KHONG co
+// SDT dirty nao (dirty = Sheets moi hon Supabase cho SDT do; lich hen cua no co the sai -> doc Sheets cho chac, het dirty bang sbSuaSDTLoi).
+// KHONG loc cs o phia server vi Sheets so sanh sau khi trim(); _remindersFromRows_ loc y nhu cu. SDT tra ve la SDT chuan hoa (Sheets: o goc).
+function sbReadRemindersRows_() {
+  try {
+    var pr = PropertiesService.getScriptProperties().getProperties();
+    if (String(pr.SB_MODE || '').toLowerCase() !== 'read' || pr.SB_STALE || !sbCfg_().ok) return undefined;
+    var dirty = [];
+    try { dirty = JSON.parse(pr.SB_DIRTY_CARE || '[]'); } catch (e0) { dirty = []; }
+    if (dirty.length) return undefined;
+    var recs = _sbGetPagesSeq_('care_data?select=phone,status,zalo,cs,sched_hen,sched_hen_note&sched_hen=neq.&order=phone.asc');
+    var again = PropertiesService.getScriptProperties().getProperties();
+    if (again.SB_STALE || String(again.SB_MODE || '').toLowerCase() !== 'read' || (again.SB_DIRTY_CARE && again.SB_DIRTY_CARE !== '[]')) return undefined;
+    return recs.map(function (g) {
+      var row = [g.phone, g.status || '', g.zalo || '', g.cs || '', '', '', '', '', '', '', '', '', _sbCareTextToCell_(g.sched_hen), g.sched_hen_note || ''];
+      return row;
+    });
+  } catch (e) {
+    try { Logger.log('sbReadRemindersRows_ loi (doc Sheets thay the): ' + String(e && e.message || e)); } catch (el) {}
+    return undefined;
+  }
+}
+
+function sbOrdReadStatus_() {
+  var on = sbOrdReadOn_(), now = Date.now(), pr = PropertiesService.getScriptProperties(), s = _sbOrdState_(pr);
+  var one = function (w) { var g = _sbOrdReadGate_(w), x = s[w] || {}; return { readsSupabaseNow: !!g, ageMin: x.syncedAt ? Math.round((now - x.syncedAt) / 60000) : null }; };
+  return { on: on, maxAgeMin: Math.round(SB_ORD_MAX_AGE_MS_ / 60000), dt: one('dt'), don: one('don') };
+}
+
+// Bat doc don hang tu Supabase. Chi bat khi: da cau hinh, ca 2 bang da dong bo hoan chinh it nhat 1 lan va con moi, doi chieu 2 bang ok:true.
+function sbOrdReadEnable_() {
+  if (!sbCfg_().ok) return { ok: false, error: 'Chua cau hinh SUPABASE_URL / SUPABASE_KEY trong Script Properties.' };
+  var st = sbOrdersStatus_(), why = [];
+  ['dt', 'don'].forEach(function (w) {
+    var x = st[w];
+    if (x.syncedAt == null) why.push(w + ': chua tung dong bo xong (chay sbDonHangDongBo)');
+    else if (x.ageMin > SB_ORD_MAX_AGE_MS_ / 60000) why.push(w + ': du lieu dong bo da ' + x.ageMin + ' phut (> ' + (SB_ORD_MAX_AGE_MS_ / 60000) + ') — chay lai sbDonHangDongBo / cai trigger');
+    if (x.dirtySinceSync) why.push(w + ': CRM da ghi Sheet sau lan dong bo cuoi — chay sbDonHangDongBo roi thu lai');
+  });
+  if (why.length) return { ok: false, error: why.join('; ') };
+  var cdt = sbCompareDT_({ sample: 300 }), cdon = sbCompareDon_({ sample: 300 });
+  if (!cdt.ok || !cdon.ok) return { ok: false, error: 'Doi chieu chua khop', dt: cdt, don: cdon };
+  PropertiesService.getScriptProperties().setProperty('SB_ORD_READ', 'on');
+  var hasTrigger = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'sbOrdersTick_'; });
+  return { ok: true, orderRead: sbOrdReadStatus_(), warning: hasTrigger ? null : 'Chua co trigger dong bo (sbDonHangCaiTrigger) — sau ' + (SB_ORD_MAX_AGE_MS_ / 60000) + ' phut se tu quay ve doc Sheets.' };
+}
+function sbOrdReadDisable_() {
+  PropertiesService.getScriptProperties().deleteProperty('SB_ORD_READ');
+  return { ok: true, orderRead: sbOrdReadStatus_() };
+}
+
+// ── CHAY TAY TU APPS SCRIPT EDITOR (buoc 4c) — chon ten ham o o "Run", bam Run, xem "Execution log". Khong can adminKey / URL. ──
+//  Dieu kien truoc: 4b xong (sbDonHangDongBo XONG + sbDonHangCaiTrigger). Bat: sbDonHangBatDoc (tu tu choi neu chua dong bo/doi chieu khong khop).
+//  Theo doi: sbDonHangTrangThai (muc orderRead). Ve nhu cu: sbDonHangTatDoc (hoac sbTatSupabase). Lich hen: dung cong tac cu sbBatDocSupabase.
+function sbDonHangBatDoc() { Logger.log(JSON.stringify(sbOrdReadEnable_(), null, 2)); }
+function sbDonHangTatDoc() { Logger.log(JSON.stringify(sbOrdReadDisable_(), null, 2)); }
