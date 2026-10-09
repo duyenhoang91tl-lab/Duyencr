@@ -376,23 +376,12 @@ function getDonLastDateByPhone_(rows) {
   return map;
 }
 
-// ── Doc toan bo sheet "dữ liệu đơn" thanh mang object ──
-// Doc sheet "dữ liệu đơn" (nguon Bao cao B — Pos), co CACHE ngan (90s) vi day la sheet lon
-// (hang nghin dong) chi de DOC (CRM khong bao gio ghi vao sheet nay — du lieu vao tu Base/Pos
-// dong bo rieng), nen cache ngan giup Bao cao B/thay doi bo loc khong phai doc lai toan bo
-// sheet moi lan bam Loc — tang toc ro ret ma van cap nhat du lieu moi trong vong <=90s.
-function readDonChiTiet_() {
-  var cached = _cacheGetBig_('donChiTiet_v4'); // v4: giu dong thieu ngay/khach co ma bo dem o cot Q + ke thua ngay
-  if (cached) { try { return JSON.parse(cached); } catch (eParse) {} }
-
-  var ss = getDTSS_();
-  var sh = ss.getSheetByName(DON_CHITIET_SHEET);
-  if (!sh) return [];
-  var last = sh.getLastRow();
-  if (last < 2) return [];
-  var vals = sh.getRange(2, 1, last - 1, Math.min(DON_CHITIET_WIDTH, sh.getMaxColumns())).getValues();
-  var out = [];
-  var lastNgayTaoDon = ''; // ngay cua dong co ngay gan nhat phia tren — de dong thieu ngay van loc duoc theo ky
+// Chuyen cac dong tho cua "dữ liệu đơn" thanh object don (TACH TU readDonChiTiet_ 2026-10-09 de Supabase backfill/doc dung CHUNG 1 logic —
+// khong duoc co 2 ban logic lech nhau). vals = mang dong (getValues, bat dau tu so dong firstRow, 1-based); lastNgay = ngay ke thua tu dong
+// co ngay gan nhat TRUOC lo nay ('' o lo dau). Tra { items:[{srcRow, obj}], lastNgay } — dong bi bo (rong/dong Tong) khong co trong items.
+function _donConvertRows_(vals, firstRow, lastNgay) {
+  var items = [];
+  var lastNgayTaoDon = (lastNgay === undefined || lastNgay === null) ? '' : lastNgay; // ngay cua dong co ngay gan nhat phia tren — de dong thieu ngay van loc duoc theo ky
   for (var i = 0; i < vals.length; i++) {
     var r = vals[i];
     // SUA 2026-10-04 theo yeu cau Duyen: dong KHONG co ngay va KHONG co ten khach van la don THAT neu cot Q
@@ -425,7 +414,7 @@ function readDonChiTiet_() {
     // ngay khi co bo loc ngay va doanh thu bi mat am tham).
     if (ngayTaoDon === '' || ngayTaoDon === null || ngayTaoDon === undefined) ngayTaoDon = lastNgayTaoDon;
     else lastNgayTaoDon = ngayTaoDon;
-    out.push({
+    items.push({ srcRow: firstRow + i, obj: {
       ngayTaoDon:    ngayTaoDon,
       khachHang:     r[3],
       soDienThoai:   r[4],
@@ -439,8 +428,28 @@ function readDonChiTiet_() {
       cod:           _normMoney_(r[12]),
       marketer:      r[13] ? String(r[13]).trim() : '',
       ghiChu:        r[DON_COL_GHICHU] ? String(r[DON_COL_GHICHU]) : '' // cot Q — ghi chu don ("Ghép cùng đơn" + ma bo dem)
-    });
+    } });
   }
+  return { items: items, lastNgay: lastNgayTaoDon };
+}
+
+// ── Doc toan bo sheet "dữ liệu đơn" thanh mang object ──
+// Doc sheet "dữ liệu đơn" (nguon Bao cao B — Pos), co CACHE ngan (90s) vi day la sheet lon
+// (hang nghin dong) chi de DOC (CRM khong bao gio ghi vao sheet nay — du lieu vao tu Base/Pos
+// dong bo rieng), nen cache ngan giup Bao cao B/thay doi bo loc khong phai doc lai toan bo
+// sheet moi lan bam Loc — tang toc ro ret ma van cap nhat du lieu moi trong vong <=90s.
+function readDonChiTiet_() {
+  var cached = _cacheGetBig_('donChiTiet_v4'); // v4: giu dong thieu ngay/khach co ma bo dem o cot Q + ke thua ngay
+  if (cached) { try { return JSON.parse(cached); } catch (eParse) {} }
+
+  var ss = getDTSS_();
+  var sh = ss.getSheetByName(DON_CHITIET_SHEET);
+  if (!sh) return [];
+  var last = sh.getLastRow();
+  if (last < 2) return [];
+  var vals = sh.getRange(2, 1, last - 1, Math.min(DON_CHITIET_WIDTH, sh.getMaxColumns())).getValues();
+  var conv = _donConvertRows_(vals, 2, '');
+  var out = conv.items.map(function (it) { return it.obj; });
   try { _cachePutBig_('donChiTiet_v4', JSON.stringify(out), 90); } catch (eCache) {}
   return out;
 }
