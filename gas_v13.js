@@ -3884,16 +3884,17 @@ function _resolveGhepDon_(codes, idx, usedBaseRows) {
 // NGUYEN NHAN GOC cua loi: buildSalesReportB_ coi moi dong "dữ liệu đơn" la 1 don doc lap.
 // Chi nhan dang khi sau ma co "/<nam>/<so>" (nam 2-4 so, so thu tu 1-2 so); ma khong co "/so" o cuoi (vd "254T10/2026") khong bi gop.
 var TACH_DON_RE_SRC_ = '(^|[^A-Za-z0-9])([A-Za-z]{0,3}\\d{1,6}[A-Za-z]{0,3}T\\d{1,2})\\/(\\d{2,4})\\/(\\d{1,2})(?![A-Za-z0-9])';
-// Tra ve ma goc chuan hoa (vd "254T10/2026") neu ghi chu co dang tach, nguoc lai ''. Chi lay ma dau tien trong ghi chu.
-function _tachDonKey_(ghiChu) {
-  if (ghiChu === null || ghiChu === undefined || ghiChu === '') return '';
+// Tra ve { key: ma goc chuan hoa (vd "254T10/2026"), n: so thu tu phan tach } neu ghi chu co dang tach, nguoc lai null. Chi lay ma dau tien.
+function _tachDonParse_(ghiChu) {
+  if (ghiChu === null || ghiChu === undefined || ghiChu === '') return null;
   var str = String(ghiChu);
-  if (str.indexOf('/') === -1) return ''; // loc nhanh: khong co dau "/" thi chac chan khong phai ma tach
+  if (str.indexOf('/') === -1) return null; // loc nhanh: khong co dau "/" thi chac chan khong phai ma tach
   var m = new RegExp(TACH_DON_RE_SRC_, 'i').exec(str);
-  if (!m) return '';
+  if (!m) return null;
   var yr = m[3]; if (yr.length === 2) yr = '20' + yr; // "254T10/26/1" == "254T10/2026/1"
-  return (m[2] + '/' + yr).replace(/\s+/g, '').toUpperCase();
+  return { key: (m[2] + '/' + yr).replace(/\s+/g, '').toUpperCase(), n: parseInt(m[4], 10) };
 }
+function _tachDonKey_(ghiChu) { var t = _tachDonParse_(ghiChu); return t ? t.key : ''; }
 // Gop cac dong Pos cung ma goc thanh 1 dong. Dong da Huy/Hoan (_donHasExcludedStatus_) KHONG tham gia gop va giu nguyen de bo loc
 // o buildSalesReportB_ loai nhu cu (-> phan tach da hoan khong duoc cong vao doanh thu). Dong gop: ngay = ngay som nhat cac phan,
 // giaTriSauGiam/cod = tong, the sale = hop (bo trung), san pham/ma/so luong noi theo thu tu (giu dung dau phan cach moi cot),
@@ -3902,9 +3903,15 @@ function _mergeTachDon_(rows) {
   var out = [], groups = {};
   for (var i = 0; i < rows.length; i++) {
     var r = rows[i];
-    var key = _donHasExcludedStatus_(r.trangThai) ? '' : _tachDonKey_(r.ghiChu);
-    if (!key) { out.push(r); continue; }
-    if (!groups[key]) { groups[key] = { pos: out.length, parts: [] }; out.push(null); }
+    var tp = _donHasExcludedStatus_(r.trangThai) ? null : _tachDonParse_(r.ghiChu);
+    if (!tp) { out.push(r); continue; }
+    var key = tp.key;
+    if (!groups[key]) { groups[key] = { pos: out.length, parts: [], seen: {} }; out.push(null); }
+    // LOAI TRUNG do import lap (yeu cau Duyen 2026-10-09): cung ma goc + cung so thu tu + cung SDT/ngay/gia tri/san pham = dong lap -> chi giu 1.
+    // Khac noi dung (cung "/1" nhung gia tri/SDT khac) thi KHONG coi la lap (giu ca hai, tranh mat doanh thu).
+    var sig = [tp.n, normPhone_(r.soDienThoai), r.ngayTaoDon, Number(r.giaTriSauGiam) || 0, r.maSanPham || r.sanPham || ''].join('|');
+    if (groups[key].seen[sig]) continue;
+    groups[key].seen[sig] = true;
     groups[key].parts.push(r);
   }
   Object.keys(groups).forEach(function(k) {
