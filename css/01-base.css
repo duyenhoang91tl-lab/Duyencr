@@ -827,3 +827,6 @@ html.db-standalone #dailybrief-wrap{width:100%;max-width:1120px;margin:0 auto}
 /* Tai khoan TEST: an moi nut cau hinh/Google Sheets/ma GAS, chi con Dang xuat */
 body.demo-mode #gs-pill,
 body.demo-mode [data-bar-id^="hdr-"]:not([data-bar-id="hdr-logout"]){display:none!important}
+/* Da co GitHub Actions tu deploy GAS + FIXED_GS_URL cung codebase -> an o/nut "Ket noi Google Sheets" (pill + moi nut openGsModal, ke ca nut sinh dong trong JS). Xoa 2 dong duoi de hien lai. */
+#gs-pill,
+[onclick*="openGsModal"]{display:none!important}
