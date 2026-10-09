@@ -34,6 +34,7 @@
 | getGasSource / setGasSource | GET/POST | Đọc/ghi mã GAS (chunk trong Settings) cho nút Copy mã GAS |
 | sbPing / sbCompareCare | GET | Supabase (cần adminKey): kiểm tra kết nối / đối chiếu CareData Sheet vs Supabase (`&sample=1..300`). Code ở cuối `gas_v13.js` = `gas/22_Supabase.gs`; kế hoạch + trạng thái: `docs/SUPABASE-PLAN.md` |
 | sbBackfillCare | POST | Supabase (cần adminKey): đẩy CareData lên theo lô 500, resume bằng con trỏ; `dryRun` mặc định true, `reset:true` chạy lại từ đầu |
+| (chạy tay trong Editor) | — | Supabase, không cần adminKey: `sbKiemTraKetNoi`, `sbBatGhiSongSong`, `sbBackfillThu`/`sbBackfillThat`/`sbBackfillTuDau`, `sbDoiChieu`, `sbBatDocSupabase`, `sbTatSupabase`, `sbSuaSDTLoi`, `sbXemTrangThai` (xem `docs/SUPABASE-PLAN.md`) |
 | sbStatus | GET | Supabase (cần adminKey): chế độ `SB_MODE` (off/write/read), cờ STALE, số SĐT dirty |
 | sbSetMode / sbResyncCare | POST | Supabase (cần adminKey): đổi chế độ off/write/read (`read` bị từ chối khi STALE trừ `clearStale:true`) / sửa các SĐT dirty (mirror lỗi) |
 

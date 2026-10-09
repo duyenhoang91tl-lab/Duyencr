@@ -95,6 +95,6 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `ARCHIVE_SUFFIX_`, `ARCHIVE_LOG_SHEET_`, `ARCHIVE_DEFAULT_MONTHS_`, `ARCHIVE_MIN_MONTHS_`, `ARCHIVE_MAX_ROWS_PER_RUN_`, `ARCHIVE_MAX_DELETE_RUNS_`, `ARCHIVE_APPLY_ENABLED_`
 
 ## 22_Supabase.gs
-- Hàm: `sbCfg_`, `sb_`, `_sbCell_`, `sbCareRowToRec_`, `sbPing_`, `sbPingTick_`, `installSbPingTrigger_`, `caiTriggerSbPing`, `sbBackfillCare_`, `_sbHeader_`, `sbCompareCare_`, `sbMode_`, `sbWriteOn_`, `sbStaleInfo_`, `sbMarkStale_`, `sbDirtyList_`, `sbMarkDirty_`, `_sbInList_`, `_sbUniqByPhone_`, `sbRowsToRecs_`, `sbMirrorCare_`, `sbPatchCare_`, `sbResyncCare_`, `sbStatus_`, `sbSetMode_`, `sbReadSheetRows_`, `sbMirrorSheetRows_`, `sbRecToCareObj_`, `sbReadCare_`
+- Hàm: `sbCfg_`, `sb_`, `_sbCell_`, `sbCareRowToRec_`, `sbPing_`, `sbPingTick_`, `installSbPingTrigger_`, `caiTriggerSbPing`, `sbBackfillCare_`, `_sbHeader_`, `sbCompareCare_`, `sbMode_`, `sbWriteOn_`, `sbStaleInfo_`, `sbMarkStale_`, `sbDirtyList_`, `sbMarkDirty_`, `_sbInList_`, `_sbUniqByPhone_`, `sbRowsToRecs_`, `sbMirrorCare_`, `sbPatchCare_`, `sbResyncCare_`, `sbStatus_`, `sbSetMode_`, `sbReadSheetRows_`, `sbMirrorSheetRows_`, `sbRecToCareObj_`, `sbReadCare_`, `sbXemTrangThai`, `sbKiemTraKetNoi`, `sbBatGhiSongSong`, `sbBackfillThu`, `sbBackfillThat`, `sbBackfillTuDau`, `sbDoiChieu`, `sbSuaSDTLoi`, `sbTatSupabase`, `sbBatDocSupabase`
 - Hằng/biến: `SB_BATCH_`, `SB_TIME_BUDGET_MS_`, `SB_CARE_COLS_`, `SB_MIRROR_MAX_`, `SB_DIRTY_MAX_`, `SB_READ_FALLBACK_ON_MISS_`
 

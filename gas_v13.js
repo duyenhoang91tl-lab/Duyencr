@@ -10384,3 +10384,29 @@ function sbReadCare_(phone) {
     return undefined;
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//  CHAY TAY TU APPS SCRIPT EDITOR — khong can adminKey / URL. Chon ten ham o o "Run" phia tren, bam Run, xem ket qua o "Execution log".
+//  (Cac action sbSetMode / sbBackfillCare... la action cua web app, KHONG hien trong o Run vi ten ham ket thuc bang dau gach duoi.)
+//  Thu tu bat: 1) runDedupeCare  2) sbKiemTraKetNoi  3) sbBatGhiSongSong  4) sbBackfillThat (bam lai den khi log bao XONG)
+//              5) sbDoiChieu (phai ok:true)  6) sbBatDocSupabase.   Ve nhu cu bat cu luc nao: sbTatSupabase.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+function sbXemTrangThai() { Logger.log(JSON.stringify(sbStatus_(), null, 2)); }
+function sbKiemTraKetNoi() { Logger.log(JSON.stringify(sbPing_(), null, 2)); }
+function sbBatGhiSongSong() { Logger.log(JSON.stringify(sbSetMode_('write', false), null, 2)); }
+function sbBackfillThu() { Logger.log(JSON.stringify(sbBackfillCare_({ dryRun: true }), null, 2)); }
+function sbBackfillThat() {
+  var r = sbBackfillCare_({ dryRun: false });
+  Logger.log(JSON.stringify(r, null, 2));
+  Logger.log(!r.ok ? 'LOI — xem "error" o tren.' : (r.done ? 'XONG. Chay tiep sbDoiChieu.' : 'CHUA HET — bam Run lai sbBackfillThat de chay tiep (con tro duoc nho).'));
+}
+function sbBackfillTuDau() { Logger.log(JSON.stringify(sbBackfillCare_({ dryRun: false, reset: true }), null, 2)); }
+function sbDoiChieu() { Logger.log(JSON.stringify(sbCompareCare_({ sample: 300 }), null, 2)); }
+function sbSuaSDTLoi() { Logger.log(JSON.stringify(sbResyncCare_(), null, 2)); }
+function sbTatSupabase() { Logger.log(JSON.stringify(sbSetMode_('off', false), null, 2)); }
+// Chi bat doc tu Supabase khi doi chieu ok:true (tu dong xoa co STALE). Khong ok -> KHONG bat, log ly do.
+function sbBatDocSupabase() {
+  var c = sbCompareCare_({ sample: 300 });
+  if (!c.ok) { Logger.log('KHONG BAT: doi chieu chua khop. ' + JSON.stringify(c, null, 2)); return; }
+  Logger.log(JSON.stringify(sbSetMode_('read', true), null, 2));
+}

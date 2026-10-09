@@ -24,12 +24,12 @@ const sheet = {
 };
 
 // ---- Supabase gia ----
-const table = new Map(); const props = { SUPABASE_URL: 'https://x.supabase.co', SUPABASE_KEY: 'SECRETKEY' };
+const logs = []; const table = new Map(); const props = { SUPABASE_URL: 'https://x.supabase.co', SUPABASE_KEY: 'SECRETKEY' };
 const net = { posts: 0, patches: 0, deletes: 0, gets: 0, failWrite: false, failGet: false };
 const R = (code, body, h) => ({ getResponseCode: () => code, getContentText: () => body, getAllHeaders: () => h || {} });
 const inList = v => v.replace(/^in\.\(/, '').replace(/\)$/, '').split(',').map(x => x.replace(/"/g, ''));
 const ctx = {
-  Logger: { log() {} },
+  Logger: { log(m) { logs.push(String(m)); } },
   PropertiesService: { getScriptProperties: () => ({ getProperty: k => props[k] ?? null, setProperty: (k, v) => props[k] = v, deleteProperty: k => delete props[k], getProperties: () => Object.assign({}, props) }) },
   LockService: { getScriptLock: () => ({ tryLock: () => true, waitLock() {}, releaseLock() {} }) },
   CacheService: { getScriptCache: () => ({ remove() {}, removeAll() {}, get: () => null, put() {} }) },
@@ -98,6 +98,12 @@ ok(net.patches === 2 && net.posts === 1, '_aaSetCareCS_: 2 nhom PATCH + 1 POST m
 // doi chieu tong the sau chuoi ghi
 let c = call('sbCompareCare_', { sample: 300 }); ok(c.ok && c.mismatchCount === 0, 'compare sau dual-write: ' + JSON.stringify(c));
 
+// ===== ham chay tay tu Editor =====
+logs.length = 0; table.get('0912100001').note = 'LECH'; run('sbBatDocSupabase()');
+ok(call('sbMode_') === 'write' && logs.join('\n').includes('KHONG BAT'), 'sbBatDocSupabase phai TU CHOI khi doi chieu lech'); table.set('0912100001', sheetRec('0912100001'));
+logs.length = 0; run('sbBatDocSupabase()'); ok(call('sbMode_') === 'read', 'sbBatDocSupabase bat read khi ok:true: ' + logs.join('|'));
+call('sbSetMode_', 'write'); logs.length = 0; run('sbXemTrangThai()'); ok(logs.join('').includes('"mode": "write"'), 'sbXemTrangThai log'); run('sbKiemTraKetNoi()'); ok(logs.join('').includes('"ok": true'), 'sbKiemTraKetNoi log');
+run('sbBackfillThu()'); run('sbBackfillThat()'); ok(logs.join('\n').includes('XONG'), 'sbBackfillThat bao XONG'); run('sbDoiChieu()'); run('sbSuaSDTLoi()'); run('sbTatSupabase()'); ok(call('sbMode_') === 'off', 'sbTatSupabase'); call('sbSetMode_', 'write');
 // ===== 3c: lookup doc Supabase =====
 const sheetLookup = p => { props.SB_MODE = 'off'; const o = JSON.stringify(call('findCareByPhone_', p)); props.SB_MODE = 'read'; return o; };
 r = call('sbSetMode_', 'read'); ok(r.ok && r.mode === 'read', 'set read');
