@@ -604,6 +604,7 @@ function sbBackfillOrders_(which, opts) {
     if (wantReset && !dryRun) {
       sb_('DELETE', def.table + '?src_row=gte.0', null, { Prefer: 'return=minimal' });   // xoa sach — dong cu o vi tri cu se khong con ton tai sai cho
       pr.deleteProperty(def.cursorKey);
+      pr.deleteProperty(def.which === 'dt' ? 'SB_DT_DIGESTS' : 'SB_DON_DIGESTS');   // bang vua xoa sach: dau van tay dong bo (4b) cu khong con dung
     }
     var cur = (wantReset && dryRun) ? { row: 2, st: null } : _sbGetCursor_(pr, def.cursorKey);
     var cursor = cur.row, st = cur.st;
@@ -720,3 +721,148 @@ function sbMarkOrdersDirty_(which, why) {
     PropertiesService.getScriptProperties().setProperty(which === 'don' ? 'SB_DON_DIRTY' : 'SB_DT_DIRTY', String(Date.now()));
   } catch (e) { try { Logger.log('sbMarkOrdersDirty_ (' + why + ') loi: ' + String(e && e.message || e)); } catch (el) {} }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//  SUPABASE — BUOC 4b/5 (muc 2): DONG BO DINH KY (trigger) "DT TỔNG " -> dt_tong, "dữ liệu đơn" -> don_chi_tiet.
+//  Vi sao khong chi dong bo "dong moi": nhan vien sua o trong dong cu (doi trang thai, gia tri...) va xoa/chen dong ngoai CRM — chi so sanh
+//  dong moi se bo sot. Cach lam: moi lan chay doc TOAN BO sheet 1 lan (trigger chay nen, khong anh huong nguoi dung), dung CHINH logic backfill
+//  chuyen ra recs, chia thanh khoi SB_ORD_BLOCK_ dong theo src_row, tinh "dau van tay" (hash 32-bit cua JSON recs) tung khoi, so voi
+//  dau van tay luu o Script Property (SB_DT_DIGESTS / SB_DON_DIGESTS). Khoi nao khac -> XOA khoang src_row cua khoi tren Supabase roi POST lai
+//  (xoa-roi-ghi de dong thoi xu ly ca truong hop id doi o cung src_row). Chen/xoa dong lam doi khoi phia sau -> tu day lai phan do.
+//  Dau van tay chi luu SAU khi khoi ghi thanh cong => loi giua chung thi lan sau tu chay tiep. Het thoi gian (SB_TIME_BUDGET_MS_ chia doi cho 2 bang)
+//  thi dung, lan sau chay tiep (complete:false).
+//  Moc "da dong bo xong lan cuoi" luu o SB_ORD_STATE (syncedAt = luc BAT DAU lan chay hoan chinh, de buoc 4c biet do cu toi da bao lau). Moc dirty
+//  (4b-1) chi duoc xoa khi syncedAt > moc dirty. Khong dung khoa Script Lock lau (se chan CS luu du lieu) — dung co SB_ORD_RUNNING (het han sau 6 phut).
+//  Nang luc: dau van tay luu trong 1 Script Property (gioi han ~9KB) -> toi da ~1000 khoi = ~200.000 dong/sheet; vuot thi bao loi ro rang.
+//  Chay 1 lan trong Editor: sbDonHangCaiTrigger (moi 10 phut), go: sbDonHangGoTrigger. Xem tinh trang: sbDonHangTrangThai.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+var SB_ORD_BLOCK_ = 200;
+var SB_ORD_MAX_BLOCKS_ = 1000;
+var SB_ORD_RUN_TTL_MS_ = 6 * 60 * 1000;
+var SB_ORD_TICK_MINUTES_ = 10;
+
+function _sbHash32_(str) {   // FNV-1a 32 bit -> base36
+  var h = 0x811c9dc5;
+  for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  return h.toString(36);
+}
+
+// Dat co "dang chay" (het han SB_ORD_RUN_TTL_MS_). Tra true neu lay duoc. Chi giu Script Lock vai ms de kiem-roi-dat.
+function _sbOrdRunAcquire_(pr) {
+  var lock = LockService.getScriptLock(), got = false;
+  try { got = lock.tryLock(3000); } catch (e) { got = false; }
+  if (!got) return false;
+  try {
+    var t = parseInt(pr.getProperty('SB_ORD_RUNNING') || '0', 10);
+    if (t && Date.now() - t < SB_ORD_RUN_TTL_MS_) return false;
+    pr.setProperty('SB_ORD_RUNNING', String(Date.now()));
+    return true;
+  } finally { try { lock.releaseLock(); } catch (e2) {} }
+}
+function _sbOrdState_(pr) { var s = {}; try { s = JSON.parse(pr.getProperty('SB_ORD_STATE') || '{}') || {}; } catch (e) { s = {}; } return s; }
+
+// Dong bo 1 bang. opts: { budgetMs, fresh (xoa sach bang Supabase + dau van tay roi day lai tat ca) }. KHONG nem loi ra ngoai.
+function sbSyncOrders_(which, opts) {
+  opts = opts || {};
+  var def = _sbOrderDef_(which), digestKey = which === 'dt' ? 'SB_DT_DIGESTS' : 'SB_DON_DIGESTS', dirtyKey = which === 'dt' ? 'SB_DT_DIRTY' : 'SB_DON_DIRTY';
+  if (!sbCfg_().ok) return { ok: false, table: def.table, error: 'Chua cau hinh SUPABASE_URL / SUPABASE_KEY trong Script Properties.' };
+  var pr = PropertiesService.getScriptProperties();
+  var own = !opts.noAcquire;
+  if (own && !_sbOrdRunAcquire_(pr)) return { ok: true, skipped: true, table: def.table, note: 'Dang co lan dong bo khac chay — bo qua.' };
+  var t0 = Date.now(), budget = opts.budgetMs || SB_TIME_BUDGET_MS_, B = SB_ORD_BLOCK_, st = null, err = '';
+  var out = { ok: false, table: def.table, complete: false, changedBlocks: 0, pushedRows: 0 };
+  try {
+    var sh = _sbOpenOrderSheet_(def), last = sh.getLastRow(), width = def.width(sh);
+    if (opts.fresh) { sb_('DELETE', def.table + '?src_row=gte.0', null, { Prefer: 'return=minimal' }); pr.deleteProperty(digestKey); }
+    var recs = [];
+    for (var row = 2; row <= last; row += SB_BATCH_) {
+      var n = Math.min(SB_BATCH_, last - row + 1);
+      var res = def.convert(sh.getRange(row, 1, n, width).getValues(), row, st);
+      st = res.st;
+      for (var q = 0; q < res.recs.length; q++) recs.push(res.recs[q]);
+    }
+    var nBlocks = last >= 2 ? Math.ceil((last - 1) / B) : 0;
+    if (nBlocks > SB_ORD_MAX_BLOCKS_) throw new Error('Sheet qua lon (' + nBlocks + ' khoi > ' + SB_ORD_MAX_BLOCKS_ + ') cho Script Property dau van tay — can doi cach luu.');
+    var byBlock = [], i;
+    for (i = 0; i < nBlocks; i++) byBlock.push([]);
+    recs.forEach(function (r) { byBlock[Math.floor((r.src_row - 2) / B)].push(r); });
+    var fresh = byBlock.map(function (b) { return _sbHash32_(JSON.stringify(b)); });
+    var raw = pr.getProperty(digestKey), stored = raw ? raw.split(',') : [];
+    var shrank = stored.length > nBlocks;
+    stored.length = Math.min(stored.length, nBlocks);
+    for (i = 0; i < nBlocks; i++) {
+      if (stored[i] === fresh[i]) continue;
+      if (out.changedBlocks > 0 && Date.now() - t0 >= budget) { out.timeUp = true; break; }
+      var lo = 2 + i * B, hi = lo + B - 1;
+      sb_('DELETE', def.table + '?src_row=gte.' + lo + '&src_row=lte.' + hi, null, { Prefer: 'return=minimal' });
+      if (byBlock[i].length) sb_('POST', def.table + '?on_conflict=' + def.conflict, byBlock[i], { Prefer: 'resolution=merge-duplicates,return=minimal' });
+      while (stored.length < i) stored.push('');   // khoi truoc chua co dau van tay (khong xay ra khi chay tuan tu) — de trong
+      stored[i] = fresh[i];
+      pr.setProperty(digestKey, stored.join(','));
+      out.changedBlocks++; out.pushedRows += byBlock[i].length;
+    }
+    var complete = !out.timeUp;
+    if (complete) {
+      if (shrank || !raw) sb_('DELETE', def.table + '?src_row=gt.' + (last >= 2 ? last : 1), null, { Prefer: 'return=minimal' });   // sheet ngan di (hoac lan dau, chua co dau van tay): bo dong thua phia duoi
+      pr.setProperty(digestKey, stored.join(','));
+      var state = _sbOrdState_(pr);
+      state[which] = { syncedAt: t0, last: last, blocks: nBlocks, rows: recs.length };
+      pr.setProperty('SB_ORD_STATE', JSON.stringify(state));
+      var dirty = parseInt(pr.getProperty(dirtyKey) || '0', 10);
+      if (dirty && dirty <= t0) pr.deleteProperty(dirtyKey);   // lan doc nay BAT DAU sau moc dirty nen da co moi thay doi cua CRM
+    }
+    out.ok = true; out.complete = complete; out.blocks = nBlocks; out.lastRow = last; out.rows = recs.length; out.ms = Date.now() - t0;
+    return out;
+  } catch (e) {
+    err = String(e && e.message || e);
+    try { var s2 = _sbOrdState_(pr); s2[which] = Object.assign({}, s2[which] || {}, { err: err, errAt: Date.now() }); pr.setProperty('SB_ORD_STATE', JSON.stringify(s2)); } catch (e2) {}
+    out.error = err; out.ms = Date.now() - t0;
+    return out;
+  } finally { if (own) { try { pr.deleteProperty('SB_ORD_RUNNING'); } catch (e3) {} } }
+}
+
+// Dong bo CA 2 bang trong 1 lan (dung chung co chay, ngan sach thoi gian chia doi). Ham cua trigger.
+function sbOrdersSync_(opts) {
+  opts = opts || {};
+  var pr = PropertiesService.getScriptProperties();
+  if (!sbCfg_().ok) return { ok: false, error: 'Chua cau hinh SUPABASE_URL / SUPABASE_KEY trong Script Properties.' };
+  if (!_sbOrdRunAcquire_(pr)) return { ok: true, skipped: true, note: 'Dang co lan dong bo khac chay — bo qua.' };
+  try {
+    var half = Math.floor(SB_TIME_BUDGET_MS_ / 2);
+    var dt = sbSyncOrders_('dt', { budgetMs: half, noAcquire: true, fresh: opts.fresh });
+    var don = sbSyncOrders_('don', { budgetMs: half, noAcquire: true, fresh: opts.fresh });
+    return { ok: !!(dt.ok && don.ok), complete: !!(dt.complete && don.complete), dt: dt, don: don };
+  } finally { try { pr.deleteProperty('SB_ORD_RUNNING'); } catch (e) {} }
+}
+function sbOrdersTick_() { try { Logger.log('sbOrdersTick ' + JSON.stringify(sbOrdersSync_())); } catch (e) { Logger.log('sbOrdersTick loi: ' + e); } }
+function installSbOrdersTrigger_() {
+  var ex = ScriptApp.getProjectTriggers().filter(function (t) { return t.getHandlerFunction() === 'sbOrdersTick_'; });
+  if (ex.length) return 'Trigger "sbOrdersTick_" da ton tai (' + ex.length + '), khong tao them.';
+  ScriptApp.newTrigger('sbOrdersTick_').timeBased().everyMinutes(SB_ORD_TICK_MINUTES_).create();
+  return 'Da tao trigger sbOrdersTick_ chay moi ' + SB_ORD_TICK_MINUTES_ + ' phut.';
+}
+function removeSbOrdersTrigger_() {
+  var n = 0;
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'sbOrdersTick_') { ScriptApp.deleteTrigger(t); n++; } });
+  return 'Da go ' + n + ' trigger sbOrdersTick_.';
+}
+function sbOrdersStatus_() {
+  var pr = PropertiesService.getScriptProperties(), s = _sbOrdState_(pr), now = Date.now();
+  var info = function (w, dk) {
+    var x = s[w] || {}, d = parseInt(pr.getProperty(dk) || '0', 10);
+    return { syncedAt: x.syncedAt ? new Date(x.syncedAt).toISOString() : null, ageMin: x.syncedAt ? Math.round((now - x.syncedAt) / 60000) : null,
+      rows: x.rows == null ? null : x.rows, lastRow: x.last == null ? null : x.last, dirtySinceSync: !!(d && (!x.syncedAt || d > x.syncedAt)), lastError: x.err || null };
+  };
+  return { ok: true, dt: info('dt', 'SB_DT_DIRTY'), don: info('don', 'SB_DON_DIRTY') };
+}
+
+// ── CHAY TAY TU APPS SCRIPT EDITOR (buoc 4b) ──
+function _sbLogSync_(r) {
+  Logger.log(JSON.stringify(r, null, 2));
+  Logger.log(!r.ok ? 'LOI — xem "error" o tren.' : (r.skipped ? 'DANG CO LAN KHAC CHAY — thu lai sau it phut.' : (r.complete ? 'XONG — Supabase khop Sheet tai thoi diem doc.' : 'CHUA HET — bam Run lai.')));
+}
+function sbDonHangDongBo() { _sbLogSync_(sbOrdersSync_()); }
+function sbDonHangDongBoLai() { _sbLogSync_(sbOrdersSync_({ fresh: true })); }   // xoa sach 2 bang Supabase roi day lai tat ca (dung khi nghi Supabase bi sua tay / lech)
+function sbDonHangCaiTrigger() { Logger.log(installSbOrdersTrigger_()); }
+function sbDonHangGoTrigger() { Logger.log(removeSbOrdersTrigger_()); }
+function sbDonHangTrangThai() { Logger.log(JSON.stringify(sbOrdersStatus_(), null, 2)); }

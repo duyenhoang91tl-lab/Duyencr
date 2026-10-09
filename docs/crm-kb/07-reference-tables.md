@@ -35,6 +35,7 @@
 | sbPing / sbCompareCare | GET | Supabase (cần adminKey): kiểm tra kết nối / đối chiếu CareData Sheet vs Supabase (`&sample=1..300`). Code ở cuối `gas_v13.js` = `gas/22_Supabase.gs`; kế hoạch + trạng thái: `docs/SUPABASE-PLAN.md` |
 | sbBackfillCare | POST | Supabase (cần adminKey): đẩy CareData lên theo lô 500, resume bằng con trỏ; `dryRun` mặc định true, `reset:true` chạy lại từ đầu |
 | (chạy tay) sbDonHang* | — | Supabase bước 4a, KHÔNG phải action web: chạy trong Apps Script Editor. `sbDonHangThuDT`/`DayDT`/`DayLaiTuDauDT`/`DoiChieuDT` cho `DT TỔNG ` → `dt_tong`; `...Don` cho `dữ liệu đơn` → `don_chi_tiet`. Chi tiết: `docs/SUPABASE-PLAN.md` |
+| (chạy tay) sbDonHangDongBo / DongBoLai / CaiTrigger / GoTrigger / TrangThai | — | Supabase bước 4b, KHÔNG phải action web: đồng bộ định kỳ 2 sheet đơn hàng sang `dt_tong` / `don_chi_tiet` bằng dấu vân tay khối 200 dòng; trigger `sbOrdersTick_` mỗi 10 phút. Chi tiết: `docs/SUPABASE-PLAN.md` |
 | (chạy tay trong Editor) | — | Supabase, không cần adminKey: `sbKiemTraKetNoi`, `sbBatGhiSongSong`, `sbBackfillThu`/`sbBackfillThat`/`sbBackfillTuDau`, `sbDoiChieu`, `sbBatDocSupabase`, `sbTatSupabase`, `sbSuaSDTLoi`, `sbXemTrangThai` (xem `docs/SUPABASE-PLAN.md`) |
 | sbStatus | GET | Supabase (cần adminKey): chế độ `SB_MODE` (off/write/read), cờ STALE, số SĐT dirty |
 | sbSetMode / sbResyncCare | POST | Supabase (cần adminKey): đổi chế độ off/write/read (`read` bị từ chối khi STALE trừ `clearStale:true`) / sửa các SĐT dirty (mirror lỗi) |

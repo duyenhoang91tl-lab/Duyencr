@@ -64,13 +64,20 @@ const ctx = {
   Logger: { log() {} },
   PropertiesService: { getScriptProperties: () => ({ getProperty: k => props[k] ?? null, setProperty: (k, v) => props[k] = v, deleteProperty: k => delete props[k] }) },
   LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock() {} }) },
+  ScriptApp: (() => { const tr = []; return { getProjectTriggers: () => tr.slice(), deleteTrigger: x => tr.splice(tr.indexOf(x), 1),
+    newTrigger: fn => ({ timeBased: () => ({ everyMinutes: m => ({ create: () => tr.push({ getHandlerFunction: () => fn, minutes: m }) }) }) }) }; })(),
   getDTSS_: () => ({ getSheetByName: n => sheets[n] ? mkSheet(sheets[n]) : null }),
   UrlFetchApp: { fetch(url, o) {
     if (o.headers.apikey !== 'SECRETKEY') throw new Error('thieu key');
     if (failAll) return R(500, 'boom');
     const u = new URL(url), t = u.pathname.split('/').pop(), tb = tables[t];
     if (!tb) return R(404, 'khong co bang ' + t);
-    if (o.method === 'DELETE') { deletes++; tb.clear(); return R(204, ''); }
+    if (o.method === 'DELETE') {
+      deletes++;
+      const fl = u.searchParams.getAll('src_row').map(x => x.split('.'));
+      for (const [k, r] of [...tb]) if (fl.every(([op, v]) => op === 'gte' ? r.src_row >= +v : op === 'lte' ? r.src_row <= +v : op === 'gt' ? r.src_row > +v : false)) tb.delete(k);
+      return R(204, '');
+    }
     if (o.method === 'POST') {
       postNo++; if (failPostNo && postNo === failPostNo) return R(500, 'boom o lo ' + postNo);
       const a = JSON.parse(o.payload), seen = new Set(), keys0 = Object.keys(a[0]).join();
@@ -182,4 +189,65 @@ run("sbMarkOrdersDirty_('don', 'test')"); ok(Number(props.SB_DON_DIRTY) > 0, 'di
 // moi duong ghi cua CRM phai goi sbMarkOrdersDirty_ (kiem tra tinh tren ma nguon: ham -> phai co loi goi trong than ham)
 [['patchOrder_', "'dt'"], ['deleteOrder_', "'dt'"], ['deleteDuplicateOrders_', "'dt'"], ['doImportSheetRowsLocked_', "'don'"], ['onChangeDedupTrigger_', "'don'"], ['archiveOldOrders_', "'don'"]]
   .forEach(([fn, arg]) => ok(fnSrc(fn).includes('sbMarkOrdersDirty_(') && fnSrc(fn).includes(arg), fn + ' phai goi sbMarkOrdersDirty_'));
+
+// ===== 4b-2: dong bo dinh ky bang dau van tay khoi =====
+tables.dt_tong.clear(); tables.don_chi_tiet.clear();
+['SB_DT_DIGESTS', 'SB_DON_DIGESTS', 'SB_ORD_STATE', 'SB_DT_CURSOR', 'SB_DON_CURSOR', 'SB_DT_DIRTY', 'SB_DON_DIRTY'].forEach(k => delete props[k]);
+// khi Sheet con co ban cu thua o Supabase (ghost) lan dau van phai don
+tables.dt_tong.set('GHOST|99999', { id: 'GHOST', src_row: 99999, archived: false });
+let sy = run("sbSyncOrders_('dt')");
+ok(sy.ok && sy.complete && sy.changedBlocks === 6 && sy.rows === 1100 && tables.dt_tong.size === 1100 && !tables.dt_tong.has('GHOST|99999'), 'lan dau: day het + don ghost: ' + JSON.stringify(sy));
+ok(props.SB_ORD_RUNNING === undefined, 'co dang chay duoc go sau khi xong');
+ok(run("sbCompareDT_({sample:300})").ok, 'dt khop sau dong bo lan dau');
+let p0 = postNo, d0 = deletes;
+sy = run("sbSyncOrders_('dt')"); ok(sy.ok && sy.complete && sy.changedBlocks === 0 && postNo === p0 && deletes === d0, 'khong doi gi -> KHONG goi Supabase them: ' + JSON.stringify(sy));
+// sua 1 o trong dong cu -> chi 1 khoi
+sheets['DT TỔNG '].rows[300][7] = 'DA DOI TRANG THAI';
+p0 = postNo; sy = run("sbSyncOrders_('dt')");
+ok(sy.changedBlocks === 1 && sy.pushedRows <= 200 && postNo === p0 + 1, 'sua 1 o -> day lai dung 1 khoi: ' + JSON.stringify(sy));
+ok([...tables.dt_tong.values()].some(r => r.src_row === 301 && r.trang_thai === 'DA DOI TRANG THAI'), 'gia tri moi da len Supabase');
+// xoa 1 dong o dau -> moi khoi sau do lech -> day lai; ket qua van khop
+sheets['DT TỔNG '].rows.splice(5, 1);
+sy = run("sbSyncOrders_('dt')"); ok(sy.complete && sy.changedBlocks === 6 && run("sbCompareDT_({sample:300})").ok, 'xoa dong -> day lai cac khoi lech, khop: ' + JSON.stringify(sy));
+// them dong cuoi
+for (let i = 0; i < 450; i++) { const r = new Array(20).fill(''); r[3] = '0977' + String(100000 + i); r[17] = 1000; r[19] = 'NEW' + i; sheets['DT TỔNG '].rows.push(r); }
+sy = run("sbSyncOrders_('dt')"); ok(sy.complete && sy.rows === 1549 && run("sbCompareDT_({sample:300})").ok && tables.dt_tong.size === 1549, 'them 450 dong cuoi: ' + JSON.stringify(sy));
+// Sheet ngan di nhieu khoi -> dong thua o Supabase bi xoa
+sheets['DT TỔNG '].rows.length = 400;
+sy = run("sbSyncOrders_('dt')"); ok(sy.complete && tables.dt_tong.size === 399 && run("sbCompareDT_({sample:300})").ok, 'sheet ngan di -> don dong thua: size ' + tables.dt_tong.size + ' ' + JSON.stringify(sy));
+// het thoi gian: moi lan 1 khoi, dau van tay luu tien do; chua complete thi KHONG cap nhat syncedAt
+for (let i = 0; i < 700; i++) { const r = new Array(20).fill(''); r[3] = '0966' + String(100000 + i); r[17] = 5; r[19] = 'T' + i; sheets['DT TỔNG '].rows.push(r); }
+const before = JSON.parse(props.SB_ORD_STATE).dt.syncedAt;
+sy = run("sbSyncOrders_('dt', {budgetMs: -1})"); ok(sy.ok && !sy.complete && sy.timeUp && sy.changedBlocks === 1, 'het gio: 1 khoi/lan: ' + JSON.stringify(sy));
+ok(JSON.parse(props.SB_ORD_STATE).dt.syncedAt === before, 'chua xong thi syncedAt khong doi');
+let loops = 0; do { sy = run("sbSyncOrders_('dt', {budgetMs: -1})"); loops++; ok(loops < 20, 'resume lap vo han'); } while (!sy.complete);
+ok(run("sbCompareDT_({sample:300})").ok && JSON.parse(props.SB_ORD_STATE).dt.syncedAt > before, 'resume xong: khop + syncedAt moi');
+// loi POST giua chung: tien do khoi truoc con, loi duoc ghi vao state, lan sau tu chay tiep va xoa loi
+sheets['DT TỔNG '].rows[10][14] = 'sua A'; sheets['DT TỔNG '].rows[500][14] = 'sua B'; sheets['DT TỔNG '].rows[900][14] = 'sua C';
+postNo = 0; failPostNo = 2; sy = run("sbSyncOrders_('dt')");
+ok(!sy.ok && sy.error.includes('HTTP 500') && !JSON.stringify(sy).includes('SECRETKEY') && JSON.parse(props.SB_ORD_STATE).dt.err, 'loi giua chung duoc bao: ' + JSON.stringify(sy));
+failPostNo = 0; sy = run("sbSyncOrders_('dt')"); ok(sy.ok && sy.complete && run("sbCompareDT_({sample:300})").ok && !JSON.parse(props.SB_ORD_STATE).dt.err, 'chay tiep sau loi: khop va xoa loi');
+// dirty: chi xoa khi lan doc BAT DAU SAU moc dirty
+props.SB_DT_DIRTY = String(Date.now() - 5); run("sbSyncOrders_('dt')"); ok(props.SB_DT_DIRTY === undefined, 'dirty cu hon lan dong bo -> xoa');
+props.SB_DT_DIRTY = String(Date.now() + 3600000); run("sbSyncOrders_('dt')"); ok(props.SB_DT_DIRTY !== undefined, 'dirty moi hon lan doc -> giu');
+delete props.SB_DT_DIRTY;
+// co dang chay: bo qua; co het han: chay binh thuong
+props.SB_ORD_RUNNING = String(Date.now()); sy = run("sbSyncOrders_('dt')"); ok(sy.ok && sy.skipped, 'co dang chay -> bo qua'); ok(props.SB_ORD_RUNNING !== undefined, 'bo qua thi KHONG xoa co cua lan khac');
+props.SB_ORD_RUNNING = String(Date.now() - 7 * 60 * 1000); sy = run("sbSyncOrders_('dt')"); ok(sy.ok && !sy.skipped && props.SB_ORD_RUNNING === undefined, 'co het han -> chay');
+// chua cau hinh
+const k2 = props.SUPABASE_KEY; delete props.SUPABASE_KEY; sy = run("sbSyncOrders_('dt')"); ok(!sy.ok && sy.error.includes('Chua cau hinh'), 'chua cau hinh'); props.SUPABASE_KEY = k2;
+
+// ===== dong bo don_chi_tiet (ke thua ngay) + ca 2 bang + fresh + trigger =====
+sheets['dữ liệu đơn'].rows[5][1] = D(2026, 9, 9);    // doi ngay dong 5 -> cac dong thieu ngay ke thua tu no phai doi theo
+const both = run('sbOrdersSync_()');
+ok(both.ok && both.complete && both.dt.complete && both.don.complete && both.don.rows === 1099, 'dong bo ca 2 bang: ' + JSON.stringify(both));
+ok(run("sbCompareDon_({sample:300})").ok && run("sbCompareDT_({sample:300})").ok, 'ca 2 bang khop');
+ok([...tables.don_chi_tiet.values()].find(r => r.src_row === 7).ngay_tao_d === '2026-09-09', 'ngay ke thua doi theo dong tren: ' + [...tables.don_chi_tiet.values()].find(r => r.src_row === 7).ngay_tao_d);
+let d1 = deletes; const f = run('sbOrdersSync_({fresh:true})');
+ok(f.ok && f.complete && deletes >= d1 + 2 && tables.don_chi_tiet.size === 1099 && run("sbCompareDon_({sample:300})").ok, 'fresh: xoa sach + day lai, khop');
+const stt = run('sbOrdersStatus_()'); ok(stt.ok && stt.dt.rows === tables.dt_tong.size && stt.dt.ageMin === 0 && stt.don.rows === 1099 && stt.dt.dirtySinceSync === false, 'trang thai: ' + JSON.stringify(stt));
+props.SB_DON_DIRTY = String(Date.now() + 60000); ok(run('sbOrdersStatus_()').don.dirtySinceSync === true, 'trang thai bao dirty');
+ok(run('installSbOrdersTrigger_()').includes('10 phut') && run('installSbOrdersTrigger_()').includes('da ton tai') && run('removeSbOrdersTrigger_()').includes('1'), 'trigger: cai 1 lan, khong nhan doi, go duoc');
+// 4a reset phai xoa dau van tay (bang vua xoa sach)
+ok(props.SB_DT_DIGESTS, 'dang co dau van tay'); run('sbBackfillDT_({dryRun:false,reset:true})'); ok(props.SB_DT_DIGESTS === undefined, 'reset backfill xoa dau van tay dong bo');
 console.log('ALL ORDER BACKFILL TESTS PASSED');
