@@ -1,0 +1,9 @@
+# Cau hinh mau cho Wrangler (neu Duyen/nguoi ho tro deploy bang dong lenh). Deploy bang Dashboard Cloudflare thi KHONG can file nay.
+name = "duyen-crm-cache"
+main = "worker.mjs"
+compatibility_date = "2026-10-01"
+
+[vars]
+# URL /exec cua Google Apps Script Web App (Deploy > Manage deployments > Web app URL). Dien tren Dashboard hoac sua o day.
+GAS_URL = ""
+# DISABLED = "1"   # bat de Worker chi chuyen tiep, khong cache (cong tac tat nhanh)
