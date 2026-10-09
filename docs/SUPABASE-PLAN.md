@@ -54,10 +54,31 @@ chạy thật đang khoá). KHÔNG bật archive chạy thật khi chưa quyết
     - [x] **4e-2 FULL** (`action=customers` không `since`, ~5 phút/lần; kết quả còn được cache 300 giây như cũ): `sbReadCareAll_`, công tắc `SB_CARE_FULL_READ=on` (bật `sbKHFullBat`, tắt `sbKHFullTat`). Cùng cổng với delta; đếm trước (`count=exact`) rồi tải song song, **lệch số dòng → đọc Sheets**; cổng kiểm lại SAU khi tải. `careStatus` vẫn đọc từ Sheets. Nên bật SAU khi delta chạy ổn vài ngày. Dán đè `gas_v13.js` (hoặc `gas/04_doGet.gs` + `gas/22_Supabase.gs`) → Deploy bản mới.
     - **Giới hạn bổ sung của 4e:** (a) dòng vừa ghi Sheet nhưng chưa mirror kịp sang Supabase (vài trăm ms) có thể lọt khỏi đúng 1 nhịp delta — lần kéo FULL 5 phút tự sửa; (b) nếu Sheet còn ô SĐT dạng SỐ thiếu số 0 (Supabase trả SĐT chuẩn hoá `0…`, Sheets trả ô gốc), nên bật DELTA và FULL cùng một lúc để client không nhận 2 dạng khác nhau cho cùng 1 khách; (c) thứ tự SĐT trong kết quả theo SĐT, client gộp theo SĐT nên không ảnh hưởng.
     - [ ] 4e-3 (nếu cần): các báo cáo còn dùng `readCare_` (đọc lại từng chỗ gọi trước khi quyết định; `readCare_` hiện giữ nguyên Sheets).
-- [ ] Bước 5: bỏ dual-write khi ổn; Sheets chỉ còn bản xem/backup.
+- [ ] Bước 5: bỏ dual-write khi ổn; Sheets chỉ còn bản xem/backup. **CHƯA nên làm** — chia mục nhỏ, xem mục "Bước 5 — điều kiện & thứ tự" bên dưới:
+  - [x] 5a: `sbSanSangBuoc5` (chạy tay, CHỈ ĐỌC): kiểm 13 điều kiện tự động + luôn kèm danh sách việc thủ công. Test: `node tools/test-supabase-step5.js`. Các công tắc đọc (`SB_ORD_READ`, `SB_CARE_DELTA_READ`, `SB_CARE_FULL_READ`) giờ ghi thêm mốc `<tên>_AT` lúc bật (xoá lúc tắt) để tính "đã bật đủ 7 ngày"; công tắc đã bật từ trước bản này chưa có mốc → tắt rồi bật lại.
+  - [x] 5b: thiết kế (mục bên dưới).
+  - [ ] 5c: thực hiện từng giai đoạn B → C → D bên dưới — CHỈ sau khi Duyên chạy thật 4a–4e, `sbSanSangBuoc5` đạt, các mục thủ công xong và Duyên đồng ý. Chưa có dòng code nào bỏ dual-write.
 
 ## Lưu ý kỹ thuật
 - Supabase REST giới hạn kích thước request; backfill theo lô ≤ 500 dòng, `Prefer: resolution=merge-duplicates` (upsert theo khoá chính).
 - Apps Script giới hạn 6 phút/lần chạy → backfill phải có con trỏ resume (Script Properties) và gọi lặp.
 - `phone` phải qua `normPhone_` trước khi ghi (giữ số 0 đầu; không để Sheets/JSON đổi thành số).
 - Sau mỗi lần sửa gas_v13.js: `node tools/split-gas.js` + `--check`; CI deploy-gas.yml tự deploy nếu đã cài secret (xem `docs/GAS-AUTO-DEPLOY.md`), nếu chưa thì dán đè thủ công các file `gas/*.gs` đổi.
+
+## Bước 5 — điều kiện & thứ tự bỏ dual-write (thiết kế, CHƯA thực hiện)
+
+**Vì sao chưa làm được ngay.** Hiện Sheets vẫn là nguồn thật và Supabase chỉ là bản sao đọc nhanh có cổng an toàn:
+- CareData chỉ lên Supabase qua **ghi song song** của CRM; không có đồng bộ định kỳ như đơn hàng (4b). Cổng an toàn của 4c/4e (cờ dirty/STALE) cũng do chính dual-write đặt. Gỡ dual-write → Supabase cũ dần mà cổng không còn bắt được.
+- Đường ghi ngoài CRM (tool Base/Pos đẩy đơn vào Sheet, nhân viên sửa tay) chỉ được đơn hàng bắt lại ở tick 4b; CareData không có.
+- Các báo cáo/dashboard nội bộ vẫn đọc Sheets (4e-3 chưa làm).
+- Quy tắc nghiệp vụ: DT Tổng quản lý trực tiếp trên Google Sheets (`saveOrders` cố ý tắt). Đổi nguồn thật của đơn hàng là quyết định của Duyên.
+
+**Cổng vào bước 5** (tất cả phải đúng): (1) Duyên đã chạy thật 4a→4e và `sbDoiChieu` / `sbDonHangDoiChieu*` đều `ok:true`; (2) `sbSanSangBuoc5` báo `autoOk:true` (gồm: mode `read`, không STALE/dirty, đối chiếu khớp, đồng bộ đơn hàng mới + trigger sống, 3 công tắc đọc đã bật ≥ 7 ngày liên tục); (3) mọi mục `manual` của hàm đó đã xử lý; (4) đã thử ROLLBACK thật (`sbTatSupabase` → CRM chạy đúng từ Sheets) và đã thử khôi phục Supabase từ bản sao lưu; (5) Duyên đồng ý bằng văn bản trong chat.
+
+**Thứ tự đề xuất** (mỗi giai đoạn có công tắc riêng, mặc định TẮT, rollback = tắt công tắc, push riêng từng mục, không bỏ giai đoạn):
+- **A. Hiện tại:** dual-write + đọc Supabase có cổng. Chạy `sbSanSangBuoc5` hằng tuần, theo dõi log PERF và `careListRead` / `orderRead` trong `sbXemTrangThai` / `sbDonHangTrangThai`.
+- **B. Lưới an toàn cho CareData:** thêm đồng bộ định kỳ Sheet → Supabase cho CareData (khung giống 4b: băm khối, chỉ đẩy khối đổi, `SB_CARE_STATE`, trigger). Khi có B, ghi tay/import trên Sheet cũng lên Supabase, và cổng đọc có thể dựa vào tuổi dữ liệu thay vì chỉ dựa dirty.
+- **C. Đảo chiều từng đường ghi, bắt đầu từ CareData:** ghi Supabase TRƯỚC (nguồn thật), Sheets chỉ là bản sao ghi sau (hoặc theo trigger). Bắt đầu với `saveSingle` / `syncZaloFriendStatus` / `addCareLead` vì không dính tiền. Đơn hàng để SAU CÙNG và chỉ khi Duyên đổi quy tắc "DT Tổng quản lý trên Sheets"; tool Base/Pos phải đổi đường đẩy đơn hoặc giữ tick 4b theo chiều Sheet → Supabase.
+- **D. Gỡ dual-write theo chiều cũ:** chỉ sau khi báo cáo/dashboard đã đọc Supabase (làm 4e-3) và đã chạy C đủ lâu. Giữ Sheets thành bản xem/backup có trigger xuất định kỳ từ Supabase; KHÔNG xoá dữ liệu cũ trên Sheets cho tới khi có sao lưu Supabase đã thử khôi phục thật.
+
+**Quyết định cần Duyên (chặn 5c):** (a) Supabase có trở thành nguồn thật không, hay Sheets vẫn là nguồn thật vĩnh viễn; (b) hướng archive (`docs/ARCHIVE-PLAN.md`) hay Supabase — hai hướng chồng chéo; (c) người chịu trách nhiệm sao lưu/khôi phục Supabase (gói free có giới hạn sao lưu) và cách xuất định kỳ.

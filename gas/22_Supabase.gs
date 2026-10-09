@@ -354,7 +354,7 @@ function sbSetMode_(mode, clearStale) {
     return { ok: false, error: 'Supabase dang STALE (' + sbStaleInfo_() + '). Backfill lai (reset:true) + sbCompareCare ok:true roi goi lai voi clearStale:true.' };
   }
   if (clear) pr.deleteProperty('SB_STALE');
-  if (mode === 'off') { pr.deleteProperty('SB_ORD_READ'); pr.deleteProperty('SB_CARE_DELTA_READ'); pr.deleteProperty('SB_CARE_FULL_READ'); }   // 4c: rollback = ve Sheets hoan toan (ca doc don hang)
+  if (mode === 'off') { _sbSetReadOff_(pr, 'SB_ORD_READ'); _sbSetReadOff_(pr, 'SB_CARE_DELTA_READ'); _sbSetReadOff_(pr, 'SB_CARE_FULL_READ'); }   // 4c: rollback = ve Sheets hoan toan (ca doc don hang)
   pr.setProperty('SB_MODE', mode);
   return sbStatus_();
 }
@@ -1049,12 +1049,12 @@ function sbOrdReadEnable_() {
   if (why.length) return { ok: false, error: why.join('; ') };
   var cdt = sbCompareDT_({ sample: 300 }), cdon = sbCompareDon_({ sample: 300 });
   if (!cdt.ok || !cdon.ok) return { ok: false, error: 'Doi chieu chua khop', dt: cdt, don: cdon };
-  PropertiesService.getScriptProperties().setProperty('SB_ORD_READ', 'on');
+  _sbSetReadOn_(PropertiesService.getScriptProperties(), 'SB_ORD_READ');
   var hasTrigger = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'sbOrdersTick_'; });
   return { ok: true, orderRead: sbOrdReadStatus_(), warning: hasTrigger ? null : 'Chua co trigger dong bo (sbDonHangCaiTrigger) — sau ' + (SB_ORD_MAX_AGE_MS_ / 60000) + ' phut se tu quay ve doc Sheets.' };
 }
 function sbOrdReadDisable_() {
-  PropertiesService.getScriptProperties().deleteProperty('SB_ORD_READ');
+  _sbSetReadOff_(PropertiesService.getScriptProperties(), 'SB_ORD_READ');
   return { ok: true, orderRead: sbOrdReadStatus_() };
 }
 
@@ -1145,10 +1145,10 @@ function sbCareListEnable_(flagKey) {
   if (sbDirtyList_().length) return { ok: false, error: 'Con ' + sbDirtyList_().length + ' SDT dirty — chay sbSuaSDTLoi roi thu lai.' };
   var c = sbCompareCare_({ sample: 300 });
   if (!c.ok) return { ok: false, error: 'Doi chieu CareData chua khop', compare: c };
-  PropertiesService.getScriptProperties().setProperty(flagKey, 'on');
+  _sbSetReadOn_(PropertiesService.getScriptProperties(), flagKey);
   return { ok: true, careListRead: sbCareListStatus_() };
 }
-function sbCareListDisable_(flagKey) { PropertiesService.getScriptProperties().deleteProperty(flagKey); return { ok: true, careListRead: sbCareListStatus_() }; }
+function sbCareListDisable_(flagKey) { _sbSetReadOff_(PropertiesService.getScriptProperties(), flagKey); return { ok: true, careListRead: sbCareListStatus_() }; }
 
 // ── CHAY TAY TU APPS SCRIPT EDITOR (buoc 4e) — chon ten ham o o "Run", bam Run, xem "Execution log". ──
 //  Dieu kien truoc: sbBatDocSupabase da chay (SB_MODE=read) va sbXemTrangThai khong STALE/dirty. Nen bat DELTA truoc, theo doi, roi moi bat FULL.
@@ -1157,3 +1157,79 @@ function sbKHDeltaBat() { Logger.log(JSON.stringify(sbCareListEnable_('SB_CARE_D
 function sbKHDeltaTat() { Logger.log(JSON.stringify(sbCareListDisable_('SB_CARE_DELTA_READ'), null, 2)); }
 function sbKHFullBat()  { Logger.log(JSON.stringify(sbCareListEnable_('SB_CARE_FULL_READ'), null, 2)); }
 function sbKHFullTat()  { Logger.log(JSON.stringify(sbCareListDisable_('SB_CARE_FULL_READ'), null, 2)); }
+
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//  SUPABASE — BUOC 5a/5: KIEM TRA SAN SANG truoc khi bo dual-write. CHI DOC: khong doi cong tac, khong ghi du lieu, khong tu bo dual-write.
+//  Chay tay: sbSanSangBuoc5 (Apps Script Editor > Run > xem Execution log). Ket qua: autoOk=true chi nghia la CAC DIEU KIEN TU DONG DAT;
+//  danh sach "manual" (viec phai lam / quyet dinh cua nguoi) luon di kem — bo dual-write chi khi ca 2 deu xong. Thiet ke: docs/SUPABASE-PLAN.md muc "Buoc 5".
+//  Moc thoi gian bat doc: moi cong tac doc (SB_ORD_READ, SB_CARE_DELTA_READ, SB_CARE_FULL_READ) co them Script Property <ten>_AT (ms) ghi LUC BAT
+//  (_sbSetReadOn_) va xoa khi tat — de tinh "da bat du lau" (SB_SOAK_DAYS_). Cong tac bat truoc ban nay chua co moc -> phai tat roi bat lai.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+var SB_SOAK_DAYS_ = 7;   // phai bat doc lien tuc it nhat chung nay ngay moi coi la "da chay thu du lau"
+
+function _sbSetReadOn_(pr, key) {
+  pr.setProperty(key, 'on');
+  if (!pr.getProperty(key + '_AT')) pr.setProperty(key + '_AT', String(Date.now()));   // giu moc dau tien neu bat lai khi dang bat
+}
+function _sbSetReadOff_(pr, key) { pr.deleteProperty(key); pr.deleteProperty(key + '_AT'); }
+
+var SB_STEP5_MANUAL_ = [
+  'CareData CHUA co dong bo dinh ky Sheet -> Supabase (don hang co: 4b). Neu bo ghi song song, moi lan ghi CareData (CS luu, import, sua tay) khong len Supabase nua; cong an toan (dirty) cung dua vao dual-write. Can thiet ke duong ghi chinh vao Supabase truoc.',
+  'Duong ghi NGOAI CRM: tool Base/Pos day don vao Sheet va nhan vien sua TAY tren Sheet — chi len Supabase o tick 4b (don hang), CareData khong co.',
+  'Bao cao/dashboard noi bo van doc readCare_/readAllOrders_ tu Sheets (4e-3 chua lam): neu Sheets ngung cap nhat thi bao cao cu dan.',
+  'Quy tac nghiep vu: DT Tong duoc quan ly truc tiep tren Google Sheets (saveOrders co y tat). Chuyen nguon that cua don hang sang Supabase la quyet dinh cua Duyen, khong phai ky thuat.',
+  'Chua co quy trinh sao luu/khoi phuc Supabase (xuat dinh ky + thu khoi phuc that) va chua quyet huong archive (docs/ARCHIVE-PLAN.md) chong cheo voi Supabase.',
+  'Chua thu ROLLBACK that tren du lieu that: tat het cong tac doc bang sbTatSupabase roi kiem tra CRM van chay dung tu Sheets.'
+];
+
+function sbSanSangBuoc5_(opts) {
+  opts = opts || {};
+  var sample = Math.max(1, Math.min(300, parseInt(opts.sample, 10) || 200));
+  var checks = [];
+  var add = function (name, ok, detail) { checks.push({ name: name, ok: !!ok, detail: detail || '' }); };
+  var safe = function (fn) { try { return fn(); } catch (e) { return { ok: false, error: String(e && e.message || e) }; } };
+  var cfg = sbCfg_().ok;
+  add('Da cau hinh SUPABASE_URL / SUPABASE_KEY', cfg, cfg ? '' : 'Thieu trong Script Properties');
+  if (cfg) {
+    var pr = PropertiesService.getScriptProperties(), now = Date.now();
+    add("CareData dang o che do 'read'", sbMode_() === 'read', "hien dang '" + sbMode_() + "'");
+    var stale = sbStaleInfo_(); add('Supabase khong STALE', !stale, stale || '');
+    var dirty = sbDirtyList_(); add('Khong co SDT dirty (CareData)', dirty.length === 0, dirty.length ? dirty.length + ' SDT dirty (chay sbSuaSDTLoi)' : '');
+    var cc = safe(function () { return sbCompareCare_({ sample: sample }); });
+    add('Doi chieu CareData khop (mau ' + sample + ')', cc.ok === true, cc.ok === true ? '' : JSON.stringify(cc).slice(0, 300));
+    var os = safe(function () { return sbOrdersStatus_(); });
+    ['dt', 'don'].forEach(function (w) {
+      var x = (os && os[w]) || {}, bad = [];
+      if (x.syncedAt == null) bad.push('chua dong bo xong lan nao');
+      else if (x.ageMin > SB_ORD_MAX_AGE_MS_ / 60000) bad.push('du lieu dong bo da ' + x.ageMin + ' phut');
+      if (x.dirtySinceSync) bad.push('CRM da ghi sau lan dong bo cuoi');
+      if (x.lastError) bad.push('loi gan nhat: ' + String(x.lastError).slice(0, 120));
+      add('Don hang (' + w + '): dong bo moi, khong dirty, khong loi', bad.length === 0, bad.join('; '));
+      var cmp = safe(function () { return sbCompareOrders_(w, { sample: sample }); });
+      add('Doi chieu don hang (' + w + ') khop (mau ' + sample + ')', cmp.ok === true, cmp.ok === true ? '' : JSON.stringify(cmp).slice(0, 300));
+    });
+    var hasTick = false; try { hasTick = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'sbOrdersTick_'; }); } catch (eT) {}
+    add('Trigger dong bo don hang (sbOrdersTick_) dang chay', hasTick, hasTick ? '' : 'Chay sbDonHangCaiTrigger');
+    [['SB_ORD_READ', 'Doc don hang tu Supabase'], ['SB_CARE_DELTA_READ', 'Doc khach (delta) tu Supabase'], ['SB_CARE_FULL_READ', 'Doc khach (FULL) tu Supabase']].forEach(function (c) {
+      var on = String(pr.getProperty(c[0]) || '').toLowerCase() === 'on', at = parseInt(pr.getProperty(c[0] + '_AT') || '0', 10);
+      var days = at ? Math.floor((now - at) / 86400000) : null, ok = on && at > 0 && days >= SB_SOAK_DAYS_, d = '';
+      if (!on) d = 'dang TAT';
+      else if (!at) d = 'chua co moc thoi gian bat (bat truoc ban nay) — tat roi bat lai de tinh';
+      else if (days < SB_SOAK_DAYS_) d = 'moi bat ' + days + ' ngay, can >= ' + SB_SOAK_DAYS_;
+      add(c[1] + ' da bat >= ' + SB_SOAK_DAYS_ + ' ngay', ok, d);
+    });
+  }
+  var failing = checks.filter(function (c) { return !c.ok; }).map(function (c) { return c.name; });
+  var autoOk = failing.length === 0;
+  return { ok: true, autoOk: autoOk, failing: failing, checks: checks, manual: SB_STEP5_MANUAL_.slice(),
+    verdict: autoOk ? 'Cac dieu kien TU DONG da dat. Van con ' + SB_STEP5_MANUAL_.length + ' muc thu cong (manual) — CHI bo dual-write khi tat ca da xong va Duyen dong y.'
+      : 'CHUA nen bo dual-write: ' + failing.length + ' dieu kien tu dong chua dat. Khong co gi bi doi.' };
+}
+
+// CHAY TAY (buoc 5a): chi doc/ghi log, khong doi gi. Muc "manual" luon phai doc.
+function sbSanSangBuoc5() {
+  var r = sbSanSangBuoc5_();
+  Logger.log(JSON.stringify(r, null, 2));
+  Logger.log(r.verdict);
+}
