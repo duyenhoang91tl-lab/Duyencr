@@ -56,7 +56,8 @@ function doGetCore_(e) {
     if (action === 'customers') {
       var sinceC = (e && e.parameter && e.parameter.since) ? String(e.parameter.since) : '';
       if (sinceC) {
-        var dlt = readCareDelta_(ss.getSheetByName(SH_CARE), sinceC);
+        var sbDlt = sbReadCareDelta_(sinceC);   // Supabase buoc 4e-1; undefined = doc Sheets nhu cu, null = qua nhieu thay doi -> keo FULL
+        var dlt = sbDlt !== undefined ? sbDlt : readCareDelta_(ss.getSheetByName(SH_CARE), sinceC);
         if (dlt) return jsonOut_(dlt);   // chi cac dong doi (khong kem careStatus — client lay o lan keo FULL)
       }
       var cache2 = CacheService.getScriptCache();

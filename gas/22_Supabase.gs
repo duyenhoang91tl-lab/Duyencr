@@ -354,7 +354,7 @@ function sbSetMode_(mode, clearStale) {
     return { ok: false, error: 'Supabase dang STALE (' + sbStaleInfo_() + '). Backfill lai (reset:true) + sbCompareCare ok:true roi goi lai voi clearStale:true.' };
   }
   if (clear) pr.deleteProperty('SB_STALE');
-  if (mode === 'off') pr.deleteProperty('SB_ORD_READ');   // 4c: rollback = ve Sheets hoan toan (ca doc don hang)
+  if (mode === 'off') { pr.deleteProperty('SB_ORD_READ'); pr.deleteProperty('SB_CARE_DELTA_READ'); }   // 4c: rollback = ve Sheets hoan toan (ca doc don hang)
   pr.setProperty('SB_MODE', mode);
   return sbStatus_();
 }
@@ -433,7 +433,7 @@ function sbReadCare_(phone) {
 //  Thu tu bat: 1) runDedupeCare  2) sbKiemTraKetNoi  3) sbBatGhiSongSong  4) sbBackfillThat (bam lai den khi log bao XONG)
 //              5) sbDoiChieu (phai ok:true)  6) sbBatDocSupabase.   Ve nhu cu bat cu luc nao: sbTatSupabase.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
-function sbXemTrangThai() { Logger.log(JSON.stringify(sbStatus_(), null, 2)); }
+function sbXemTrangThai() { Logger.log(JSON.stringify(Object.assign(sbStatus_(), { careListRead: sbCareListStatus_() }), null, 2)); }
 function sbKiemTraKetNoi() { Logger.log(JSON.stringify(sbPing_(), null, 2)); }
 function sbBatGhiSongSong() { Logger.log(JSON.stringify(sbSetMode_('write', false), null, 2)); }
 function sbBackfillThu() { Logger.log(JSON.stringify(sbBackfillCare_({ dryRun: true }), null, 2)); }
@@ -1063,3 +1063,73 @@ function sbOrdReadDisable_() {
 //  Theo doi: sbDonHangTrangThai (muc orderRead). Ve nhu cu: sbDonHangTatDoc (hoac sbTatSupabase). Lich hen: dung cong tac cu sbBatDocSupabase.
 function sbDonHangBatDoc() { Logger.log(JSON.stringify(sbOrdReadEnable_(), null, 2)); }
 function sbDonHangTatDoc() { Logger.log(JSON.stringify(sbOrdReadDisable_(), null, 2)); }
+
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//  SUPABASE — BUOC 4e/5: DOC DANH SACH KHACH (CareData) cua action 'customers' tu Supabase (MAC DINH TAT; fallback Sheets).
+//   4e-1  delta (action=customers&since=...): client goi moi ~3 giay/may  -> sbReadCareDelta_   (cong tac SB_CARE_DELTA_READ=on)
+//   4e-2  FULL  (action=customers khong since): client keo moi ~5 phut    -> sbReadCareAll_     (cong tac SB_CARE_FULL_READ=on)
+//  Dieu kien chung (sai 1 cai -> undefined = doc Sheets nhu cu): SB_MODE=read (cong tac CareData cu, da doi chieu sbDoiChieu ok) + khong STALE +
+//  KHONG co SDT dirty nao (dirty = Sheet moi hon Supabase) + cong tac rieng cua muc do = on + da cau hinh URL/key + Supabase khong loi.
+//  Delta: truy van Supabase theo updated_at >= since-1h (cot timestamptz) roi LOC LAI bang dung quy tac Sheets (chuoi updated > since) nen ket qua
+//  giong het; > 3000 dong -> null (client keo FULL, y nhu readCareDelta_). Chi doi action 'customers'; readCare_ cho bao cao/dashboard noi bo van doc Sheets.
+//  Gioi han da biet: (1) dong bi mirror tre vai tram ms sau khi ghi Sheet co the lo mot nhip delta — lan keo FULL (5 phut) tu sua; (2) sua TAY tren Sheet
+//  khong co updated => khong vao delta (giong Sheets) va chi vao Supabase khi backfill lai; (3) SDT trung nhieu dong chi con 1 ban (xu ly truoc bang
+//  runDedupeCare); (4) SDT tra ve la SDT chuan hoa (Sheets: o goc, vd so thieu 0) — client gop theo SDT chuan hoa nen khong anh huong.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+var SB_CARE_DELTA_MAX_ = 3000;   // = nguong idx.length cua readCareDelta_
+
+function _sbCareListGate_(flagKey) {
+  try {
+    var pr = PropertiesService.getScriptProperties().getProperties();
+    if (String(pr.SB_MODE || '').toLowerCase() !== 'read' || pr.SB_STALE || !sbCfg_().ok) return false;
+    if (String(pr[flagKey] || '').toLowerCase() !== 'on') return false;
+    var dirty = [];
+    try { dirty = JSON.parse(pr.SB_DIRTY_CARE || '[]'); } catch (e0) { dirty = []; }
+    return dirty.length === 0;
+  } catch (e) { return false; }
+}
+
+// 4e-1. Tra { delta:true, rows } | null (qua nhieu -> keo FULL) | undefined (doc Sheets).
+function sbReadCareDelta_(since) {
+  try {
+    if (!_sbCareListGate_('SB_CARE_DELTA_READ')) return undefined;
+    var t = new Date(since);
+    if (isNaN(t.getTime())) return undefined;
+    var lo = new Date(t.getTime() - 3600000).toISOString();
+    var recs = _sbGetPagesSeq_('care_data?select=*&updated_at=gte.' + encodeURIComponent(lo) + '&order=phone.asc');
+    if (!_sbCareListGate_('SB_CARE_DELTA_READ')) return undefined;   // trong luc tai co dirty/STALE/tat -> bo, doc Sheets
+    var rows = [];
+    for (var i = 0; i < recs.length; i++) {
+      var us = String(recs[i].updated || '');
+      if (us && us > since && recs[i].phone) rows.push(recs[i]);   // CUNG quy tac voi readCareDelta_
+    }
+    if (rows.length > SB_CARE_DELTA_MAX_) return null;
+    return { delta: true, rows: rows.map(sbRecToCareObj_) };
+  } catch (e) {
+    try { Logger.log('sbReadCareDelta_ loi (doc Sheets thay the): ' + String(e && e.message || e)); } catch (el) {}
+    return undefined;
+  }
+}
+
+function sbCareListStatus_() {
+  var pr = PropertiesService.getScriptProperties();
+  return { deltaOn: String(pr.getProperty('SB_CARE_DELTA_READ') || '') === 'on', deltaReadsSupabaseNow: _sbCareListGate_('SB_CARE_DELTA_READ') };
+}
+// Bat 1 muc (flagKey = 'SB_CARE_DELTA_READ' | 'SB_CARE_FULL_READ'). Chi bat khi SB_MODE=read, khong STALE, khong dirty, doi chieu CareData ok:true.
+function sbCareListEnable_(flagKey) {
+  if (!sbCfg_().ok) return { ok: false, error: 'Chua cau hinh SUPABASE_URL / SUPABASE_KEY trong Script Properties.' };
+  if (sbMode_() !== 'read') return { ok: false, error: "Phai bat doc CareData truoc (sbBatDocSupabase -> SB_MODE=read), hien dang '" + sbMode_() + "'." };
+  if (sbStaleInfo_()) return { ok: false, error: 'Supabase dang STALE (' + sbStaleInfo_() + ').' };
+  if (sbDirtyList_().length) return { ok: false, error: 'Con ' + sbDirtyList_().length + ' SDT dirty — chay sbSuaSDTLoi roi thu lai.' };
+  var c = sbCompareCare_({ sample: 300 });
+  if (!c.ok) return { ok: false, error: 'Doi chieu CareData chua khop', compare: c };
+  PropertiesService.getScriptProperties().setProperty(flagKey, 'on');
+  return { ok: true, careListRead: sbCareListStatus_() };
+}
+function sbCareListDisable_(flagKey) { PropertiesService.getScriptProperties().deleteProperty(flagKey); return { ok: true, careListRead: sbCareListStatus_() }; }
+
+// ── CHAY TAY TU APPS SCRIPT EDITOR (buoc 4e) — chon ten ham o o "Run", bam Run, xem "Execution log". ──
+//  Dieu kien truoc: sbBatDocSupabase da chay (SB_MODE=read) va sbXemTrangThai khong STALE/dirty. Ve nhu cu: sbKHDeltaTat (hoac sbTatSupabase tat het).
+function sbKHDeltaBat() { Logger.log(JSON.stringify(sbCareListEnable_('SB_CARE_DELTA_READ'), null, 2)); }
+function sbKHDeltaTat() { Logger.log(JSON.stringify(sbCareListDisable_('SB_CARE_DELTA_READ'), null, 2)); }
