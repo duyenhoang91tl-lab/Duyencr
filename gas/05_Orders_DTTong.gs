@@ -329,7 +329,7 @@ function applyCustomerNameGuesses_(items) {
       if (vals[i][0]) index[normPhone_(String(vals[i][0]))] = { rowNum: i + 2, name: vals[i][19] || '' };
     }
   }
-  var updated = 0, appended = 0, skipped = 0;
+  var updated = 0, appended = 0, skipped = 0, touchedRows = [];
   var newRows = [];
   for (var k = 0; k < items.length; k++) {
     var it = items[k];
@@ -340,7 +340,7 @@ function applyCustomerNameGuesses_(items) {
     if (ex) {
       if (ex.name) { skipped++; continue; }
       sh.getRange(ex.rowNum, 20).setValue(name);
-      updated++;
+      updated++; touchedRows.push(ex.rowNum);
     } else {
       newRows.push(careRow_({ phone: phone, name: name }));
       appended++;
@@ -348,6 +348,7 @@ function applyCustomerNameGuesses_(items) {
   }
   if (newRows.length) sh.getRange(sh.getLastRow() + 1, 1, newRows.length, CARE_HEADERS.length).setValues(newRows);
   try { CacheService.getScriptCache().remove('customers_v12'); } catch (ec) {}
+  sbMirrorSheetRows_(sh, touchedRows, newRows, 'applyCustomerNameGuesses_');
   return jsonOut_({ ok: true, updated: updated, appended: appended, skipped: skipped });
 }
 

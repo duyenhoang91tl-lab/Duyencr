@@ -428,6 +428,7 @@ function dedupeCare_() {
   sh.clearContents();
   sh.getRange(1, 1, out.length, W).setValues(out);
   try { CacheService.getScriptCache().remove('customers_v12'); } catch(ec) {}
+  if (sbMode_() !== 'off') sbMarkStale_('dedupeCare_ xoa/sap xep lai dong CareData');   // dong GIU LAI co the khac dong da backfill
   return jsonOut_({ ok: true, removed: removed, kept: out.length - 1 });
 }
 

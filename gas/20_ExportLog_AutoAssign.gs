@@ -390,6 +390,12 @@ function _aaSetCareCS_(map) {
   if (newRows.length) sh.getRange(sh.getLastRow() + 1, 1, newRows.length, W).setValues(newRows);
   try { CacheService.getScriptCache().remove('customers_v12'); } catch (e) {}
   try { invalidateLookupCache_(phones); } catch (e2) {}
+  if (sbWriteOn_()) {   // dong da co: chi doi cs + updated -> PATCH theo nhom CS; dong moi: upsert ca dong
+    var byCs = {};
+    phones.forEach(function (p) { if (idx[p] !== undefined) (byCs[map[p]] = byCs[map[p]] || []).push(p); });
+    Object.keys(byCs).forEach(function (csName) { sbPatchCare_(byCs[csName], { cs: csName, updated: iso, updated_at: iso }, '_aaSetCareCS_'); });
+    sbMirrorCare_(sbRowsToRecs_(newRows), '_aaSetCareCS_');
+  }
   return phones.length;
 }
 // force=true: chay ngay bat ke lich (dung de thu tu Editor). Trigger goi autoAssignTick_ (force=false).

@@ -354,7 +354,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.22-demo-mask-phone' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.23-supabase-dualwrite' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -446,6 +446,11 @@ function doGetCore_(e) {
     if (action === 'sbPing') {
       if (!_adminKeyOk_(e && e.parameter ? e.parameter.adminKey : '')) return jsonOut_({ error: 'Can khoa quan tri (adminKey) cho thao tac Supabase.' });
       return jsonOut_(sbPing_());
+    }
+    // ── SUPABASE (buoc 3a): xem che do / STALE / danh sach dirty. Can adminKey ──
+    if (action === 'sbStatus') {
+      if (!_adminKeyOk_(e && e.parameter ? e.parameter.adminKey : '')) return jsonOut_({ error: 'Can khoa quan tri (adminKey) cho thao tac Supabase.' });
+      return jsonOut_(sbStatus_());
     }
     // ── SUPABASE (buoc 2d): doi chieu CareData Sheet vs Supabase (&sample=1..300). Can adminKey ──
     if (action === 'sbCompareCare') {

@@ -260,6 +260,11 @@ function doPostCore_(e) {
       if (!_adminKeyOk_(data.adminKey)) return jsonOut_({ error: 'Can khoa quan tri (adminKey) cho thao tac Supabase.' });
       return jsonOut_(sbBackfillCare_({ dryRun: data.dryRun, reset: data.reset }));
     }
+    // ── SUPABASE (buoc 3a): doi che do off/write/read; sua cac SDT dirty. Can adminKey ──
+    if (action === 'sbSetMode' || action === 'sbResyncCare') {
+      if (!_adminKeyOk_(data.adminKey)) return jsonOut_({ error: 'Can khoa quan tri (adminKey) cho thao tac Supabase.' });
+      return jsonOut_(action === 'sbSetMode' ? sbSetMode_(data.mode, data.clearStale) : sbResyncCare_());
+    }
     if (action === 'replaceOrders')       return replaceOrders_(data.orders, data);
     if (action === 'setOrderCareCS')      return setOrderCareCS_(data.phone, data.careCS);
     if (action === 'setOrderCareCSBatch') return setOrderCareCSBatch_(data.updates);

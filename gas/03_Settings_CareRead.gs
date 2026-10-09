@@ -208,6 +208,8 @@ function readCareDelta_(sh, since) {
 }
 
 function findCareByPhone_(phone) {
+  var sbc = sbReadCare_(phone);   // che do 'read': doc Supabase; undefined = phai doc Sheets nhu cu (xem khoi SUPABASE cuoi file)
+  if (sbc !== undefined) return sbc;
   var ss = getCrmSS_();
   var sh = ss.getSheetByName(SH_CARE);
   if (!sh || sh.getLastRow() < 2) return null;

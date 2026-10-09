@@ -26,12 +26,13 @@ function saveAllCare_(rows) {
   sh.getRange(1, 1, matrix.length, CARE_HEADERS.length).setValues(matrix);
   try { CacheService.getScriptCache().remove('customers_v12'); } catch(ec) {}
   invalidateLookupCache_(phones);
+  if (sbMode_() !== 'off') sbMarkStale_('saveAllCare_ ghi de ca sheet CareData');   // Supabase se lech dien rong -> khong doc Supabase cho den khi backfill lai
   return jsonOut_({ ok: true, written: rows.length });
 }
 
 function saveSingleCare_(r) {
   var sh = getSheet_(SH_CARE, CARE_HEADERS);
-  var last = sh.getLastRow(); var rowIdx = -1;
+  var last = sh.getLastRow(); var rowIdx = -1; var rowW;
   var npR = normPhone_(String(r.phone));
   if (last >= 2) {
     var colP = sh.getRange(2, 1, last-1, 1).getValues();
@@ -43,15 +44,18 @@ function saveSingleCare_(r) {
     // Doc du lieu hien tai de bao toan truong mo rong neu incoming khong co
     var existRow = sh.getRange(rowIdx, 1, 1, CARE_HEADERS.length).getValues()[0];
     mergeExtFields_(r, { khStatus: existRow[15]||'', nickZalos: existRow[16]||'[]', birthday: existRow[17]||'', zaloSetBy: existRow[18]||'', name: existRow[19]||'', zaloPhones: existRow[21]||'[]' });
-    sh.getRange(rowIdx, 1, 1, CARE_HEADERS.length).setValues([careRow_(r)]);
+    rowW = careRow_(r);
+    sh.getRange(rowIdx, 1, 1, CARE_HEADERS.length).setValues([rowW]);
   } else {
-    sh.appendRow(careRow_(r));
+    rowW = careRow_(r);
+    sh.appendRow(rowW);
   }
   try {
     var cache = CacheService.getScriptCache();
     cache.remove('customers_v12');
     cache.remove('lk_' + normPhone_(String(r.phone)));
   } catch(ec) {}
+  sbMirrorCare_(sbRowsToRecs_([rowW]), 'saveSingleCare_');   // Sheets da ghi xong; mirror loi KHONG lam hong thao tac luu
   return jsonOut_({ ok: true, found: rowIdx > 0 });
 }
 
@@ -66,13 +70,13 @@ function saveBatchCare_(rows) {
       for (var ci = 0; ci < colA.length; ci++) { if (colA[ci][0]) idxS[normPhone_(String(colA[ci][0]))] = ci + 2; }
     }
     var exOf = function(row) { return { khStatus: row[15]||'', nickZalos: row[16]||'[]', birthday: row[17]||'', zaloSetBy: row[18]||'', name: row[19]||'', zaloPhones: row[21]||'[]' }; };
-    var updS = 0, appS = 0, newRowsS = [], newIdxS = {};
+    var updS = 0, appS = 0, newRowsS = [], newIdxS = {}, mirS = [];
     for (var ks = 0; ks < rows.length; ks++) {
       var rs = rows[ks]; var keyS = normPhone_(String(rs.phone));
       if (idxS[keyS] !== undefined) {
         var exRow = sh.getRange(idxS[keyS], 1, 1, Ws).getValues()[0];
         mergeExtFields_(rs, exOf(exRow));
-        sh.getRange(idxS[keyS], 1, 1, Ws).setValues([careRow_(rs)]); updS++;
+        var rowU = careRow_(rs); sh.getRange(idxS[keyS], 1, 1, Ws).setValues([rowU]); updS++; mirS.push(rowU);
       } else if (newIdxS[keyS] !== undefined) {
         mergeExtFields_(rs, exOf(newRowsS[newIdxS[keyS]]));
         newRowsS[newIdxS[keyS]] = careRow_(rs); updS++;
@@ -83,6 +87,7 @@ function saveBatchCare_(rows) {
     if (newRowsS.length) sh.getRange(lastS + 1, 1, newRowsS.length, Ws).setValues(newRowsS);
     try { CacheService.getScriptCache().remove('customers_v12'); } catch(ec) {}
     invalidateLookupCache_(rows.map(function(r){ return r.phone; }));
+    sbMirrorCare_(sbRowsToRecs_(mirS.concat(newRowsS)), 'saveBatchCare_');
     return jsonOut_({ ok: true, updated: updS, appended: appS });
   }
   var data = sh.getDataRange().getValues();
@@ -108,6 +113,11 @@ function saveBatchCare_(rows) {
   sh.getRange(1, 1, data.length, Wb).setValues(data);
   try { CacheService.getScriptCache().remove('customers_v12'); } catch(ec) {}
   invalidateLookupCache_(rows.map(function(r){ return r.phone; }));
+  if (sbWriteOn_()) {
+    var mirB = [];
+    for (var mk = 0; mk < rows.length; mk++) { var ixm = index[normPhone_(String(rows[mk].phone))]; if (ixm !== undefined) mirB.push(data[ixm]); }
+    sbMirrorCare_(sbRowsToRecs_(mirB), 'saveBatchCare_(lo lon)');
+  }
   return jsonOut_({ ok: true, updated: updated, appended: appended });
 }
 
@@ -168,7 +178,7 @@ function syncZaloFriendStatus_(rows, dryRun) {
   var lock = LockService.getScriptLock();
   try { lock.waitLock(20000); } catch (eLock) { /* tiep tuc, chap nhan rui ro hiem gap trung dong moi */ }
 
-  var updated = 0, appended = 0;
+  var updated = 0, appended = 0, touchedRows = [];
   var now = new Date().toISOString();
   var newRows = [];
   for (var k = 0; k < rows.length; k++) {
@@ -210,7 +220,7 @@ function syncZaloFriendStatus_(rows, dryRun) {
         sh.getRange(rowNum, 17).setValue(JSON.stringify(nz));
       }
       sh.getRange(rowNum, 19).setValue(setBy);
-      updated++;
+      updated++; touchedRows.push(rowNum);
     } else {
       var newRow = careRow_({ phone: phone, zalo: zaloStatus, nickZalos: nick ? [nick] : [], zaloSetBy: setBy });
       if (newRow.length > W) newRow = newRow.slice(0, W);
@@ -228,6 +238,7 @@ function syncZaloFriendStatus_(rows, dryRun) {
   try { lock.releaseLock(); } catch (eu) {}
   try { CacheService.getScriptCache().remove('customers_v12'); } catch (ec) {}
   invalidateLookupCache_(rows.map(function (r) { return r.phone; }));
+  sbMirrorSheetRows_(sh, touchedRows, newRows, 'syncZaloFriendStatus_');
   return jsonOut_({ ok: true, updated: updated, appended: appended });
 }
 

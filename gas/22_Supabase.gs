@@ -187,3 +187,241 @@ function sbCompareCare_(opts) {
       supabaseRows: sbCount, sampleChecked: checked, mismatches: mismatches.slice(0, 20), mismatchCount: mismatches.length };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//  SUPABASE — BUOC 3/5: GHI SONG SONG (dual-write) CareData + DOC lookup tu Supabase (3a: ha tang; 3b: noi vao cac ham ghi; 3c: lookup)
+//  Che do luu o Script Property SB_MODE (KHONG dung Settings sheet: getSetting_ doc ca sheet Settings, co ca cac manh ma GAS rat lon,
+//  qua nang cho duong luu cua CS):  'off' (mac dinh, khong lam gi) | 'write' (ghi Sheets roi mirror sang Supabase, van DOC Sheets) |
+//  'read' (nhu 'write' + lookup doc Supabase). Doi bang action POST sbSetMode (adminKey). Rollback = sbSetMode mode:'off'.
+//  NGUYEN TAC: Sheets van la nguon that. Mirror loi KHONG BAO GIO lam hong thao tac luu — chi ghi log + danh dau:
+//    - SB_DIRTY_CARE: danh sach SDT mirror loi (toi da SB_DIRTY_MAX_). lookup cac SDT nay van doc Sheets. Sua bang action sbResyncCare.
+//    - SB_STALE: Supabase co the LECH dien rong (ghi de ca sheet, dedupe, qua nhieu dong, khong khoa duoc...). Dang STALE thi lookup KHONG
+//      doc Supabase. Go bang: backfill lai (reset:true) + sbCompareCare ok:true roi sbSetMode mode:'read' clearStale:true.
+//  Thu tu bat an toan: sbSetMode 'write' -> sbBackfillCare (dryRun:false, lap den done) -> sbCompareCare ok:true -> sbSetMode 'read' clearStale:true.
+//  Biet truoc: SDT trung nhieu dong tren Sheet (chay dedupeCare TRUOC khi backfill) va sua tay truc tiep tren Sheet KHONG duoc mirror
+//  (khong co onEdit) -> sbCompareCare se lo ra.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+var SB_MIRROR_MAX_ = 2000;          // toi da so dong cho 1 lan mirror (= 4 lo SB_BATCH_); vuot -> danh dau STALE thay vi ghi
+var SB_DIRTY_MAX_ = 300;            // toi da so SDT trong danh sach dirty (Script Property gioi han ~9KB); vuot -> STALE
+var SB_READ_FALLBACK_ON_MISS_ = true; // lookup o che do 'read': Supabase khong co SDT -> doc them Sheets cho chac (dat false khi da tin Supabase)
+
+function sbMode_() {
+  var m = '';
+  try { m = String(PropertiesService.getScriptProperties().getProperty('SB_MODE') || '').toLowerCase(); } catch (e) {}
+  return (m === 'write' || m === 'read') ? m : 'off';
+}
+// Co can mirror ghi sang Supabase khong (che do != off VA da cau hinh URL/key).
+function sbWriteOn_() { return sbMode_() !== 'off' && sbCfg_().ok; }
+
+function sbStaleInfo_() { try { return PropertiesService.getScriptProperties().getProperty('SB_STALE') || ''; } catch (e) { return ''; } }
+function sbMarkStale_(why) {
+  try { PropertiesService.getScriptProperties().setProperty('SB_STALE', new Date().toISOString() + ' ' + String(why || '').slice(0, 200)); } catch (e) {}
+}
+function sbDirtyList_() {
+  var a = [];
+  try { a = JSON.parse(PropertiesService.getScriptProperties().getProperty('SB_DIRTY_CARE') || '[]'); } catch (e) { a = []; }
+  return Array.isArray(a) ? a : [];
+}
+// Them SDT vao danh sach dirty (can khoa de tranh 2 luot ghi de nhau). Khong khoa duoc -> danh dau STALE (an toan hon la mat dau).
+function sbMarkDirty_(phones, why) {
+  var lock = LockService.getScriptLock(), got = false;
+  try { got = lock.tryLock(3000); } catch (e) { got = false; }
+  try {
+    if (!got) { sbMarkStale_('khong khoa duoc de ghi dirty: ' + why); return; }
+    var set = {};
+    sbDirtyList_().forEach(function (p) { set[p] = 1; });
+    (phones || []).forEach(function (p) { if (p) set[p] = 1; });
+    var list = Object.keys(set);
+    if (list.length > SB_DIRTY_MAX_) { sbMarkStale_('qua nhieu dong dirty (' + list.length + '): ' + why); return; }
+    PropertiesService.getScriptProperties().setProperty('SB_DIRTY_CARE', JSON.stringify(list));
+  } finally { if (got) { try { lock.releaseLock(); } catch (e2) {} } }
+}
+
+function _sbInList_(phones) {
+  return encodeURIComponent(phones.map(function (p) { return '"' + p + '"'; }).join(','));
+}
+// Moi SDT 1 rec: rec SAU CUNG thang (dung noi dung vua ghi), giu thu tu xuat hien dau tien.
+function _sbUniqByPhone_(recs) {
+  var m = {}, order = [];
+  (recs || []).forEach(function (r) { if (!r || !r.phone) return; if (m[r.phone] === undefined) order.push(r.phone); m[r.phone] = r; });
+  return order.map(function (p) { return m[p]; });
+}
+// Cac dong sheet (mang 22 o) -> mang rec Supabase (bo dong khong co SDT).
+function sbRowsToRecs_(rows) {
+  var out = [];
+  (rows || []).forEach(function (r) { var rec = sbCareRowToRec_(r); if (rec) out.push(rec); });
+  return out;
+}
+
+// Mirror cac rec DAY DU (22 cot) sang care_data. KHONG BAO GIO nem loi ra ngoai. Tra true neu da ghi / khong can ghi.
+// Phai goi SAU KHI da ghi Sheets xong (va sau khi nha khoa script neu ham ghi dang giu khoa).
+function sbMirrorCare_(recs, why) {
+  try {
+    if (!recs || !recs.length || !sbWriteOn_()) return true;
+    recs = _sbUniqByPhone_(recs);
+    if (recs.length > SB_MIRROR_MAX_) { sbMarkStale_('mirror ' + recs.length + ' dong > ' + SB_MIRROR_MAX_ + ' (' + why + ')'); return false; }
+    for (var i = 0; i < recs.length; i += SB_BATCH_) {
+      var chunk = recs.slice(i, i + SB_BATCH_);
+      try {
+        sb_('POST', 'care_data?on_conflict=phone', chunk, { Prefer: 'resolution=merge-duplicates,return=minimal' });
+      } catch (e) {
+        sbMarkDirty_(recs.slice(i).map(function (r) { return r.phone; }), why);
+        try { Logger.log('sbMirrorCare_ (' + why + ') loi: ' + String(e && e.message || e)); } catch (el) {}
+        return false;
+      }
+    }
+    return true;
+  } catch (e0) {
+    try { sbMarkStale_('sbMirrorCare_ ngoai le (' + why + '): ' + String(e0 && e0.message || e0)); } catch (e1) {}
+    return false;
+  }
+}
+
+// Cap nhat 1 so TRUONG cho cac dong DA CO tren Supabase (PATCH; dong chua co thi bi bo qua, KHONG tao dong thieu cot nhu upsert mot phan).
+// Dung cho ham chi doi vai cot tren nhieu dong (vd _aaSetCareCS_: cs + updated). Khong nem loi ra ngoai.
+function sbPatchCare_(phones, fields, why) {
+  try {
+    if (!phones || !phones.length || !sbWriteOn_()) return true;
+    for (var i = 0; i < phones.length; i += 100) {
+      var chunk = phones.slice(i, i + 100);
+      try {
+        sb_('PATCH', 'care_data?phone=in.(' + _sbInList_(chunk) + ')', fields, { Prefer: 'return=minimal' });
+      } catch (e) {
+        sbMarkDirty_(phones.slice(i), why);
+        try { Logger.log('sbPatchCare_ (' + why + ') loi: ' + String(e && e.message || e)); } catch (el) {}
+        return false;
+      }
+    }
+    return true;
+  } catch (e0) {
+    try { sbMarkStale_('sbPatchCare_ ngoai le (' + why + '): ' + String(e0 && e0.message || e0)); } catch (e1) {}
+    return false;
+  }
+}
+
+// Sua cac SDT dirty: doc lai DONG DAU cua tung SDT tu Sheets va upsert len Supabase; SDT khong con tren Sheets -> xoa khoi Supabase.
+function sbResyncCare_() {
+  var cfg = sbCfg_();
+  if (!cfg.ok) return { ok: false, error: 'Chua cau hinh SUPABASE_URL / SUPABASE_KEY trong Script Properties.' };
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) return { ok: false, error: 'Dang co lan backfill/ghi khac chay — thu lai sau.' };
+  try {
+    var dirty = sbDirtyList_();
+    var out = { ok: true, dirtyBefore: dirty.length, resynced: 0, removed: 0, stale: sbStaleInfo_() || null };
+    if (!dirty.length) return out;
+    var want = {}; dirty.forEach(function (p) { want[p] = 1; });
+    var sh = getSheet_(SH_CARE, CARE_HEADERS), last = sh.getLastRow(), rowOf = {};
+    if (last >= 2) {
+      var colA = sh.getRange(2, 1, last - 1, 1).getValues();
+      for (var i = 0; i < colA.length; i++) {
+        var p = normPhone_(_sbCell_(colA[i][0]));
+        if (p && want[p] && rowOf[p] === undefined) rowOf[p] = i + 2;
+      }
+    }
+    var recs = [], gone = [];
+    dirty.forEach(function (ph) {
+      if (rowOf[ph] === undefined) { gone.push(ph); return; }
+      var rec = sbCareRowToRec_(sh.getRange(rowOf[ph], 1, 1, CARE_HEADERS.length).getValues()[0]);
+      if (rec) recs.push(rec); else gone.push(ph);
+    });
+    for (var b = 0; b < recs.length; b += SB_BATCH_) {
+      sb_('POST', 'care_data?on_conflict=phone', recs.slice(b, b + SB_BATCH_), { Prefer: 'resolution=merge-duplicates,return=minimal' });
+    }
+    for (var g = 0; g < gone.length; g += 100) {
+      sb_('DELETE', 'care_data?phone=in.(' + _sbInList_(gone.slice(g, g + 100)) + ')', null, { Prefer: 'return=minimal' });
+    }
+    PropertiesService.getScriptProperties().deleteProperty('SB_DIRTY_CARE');   // dang giu khoa nen khong co ai them dirty xen vao
+    out.resynced = recs.length; out.removed = gone.length;
+    return out;
+  } catch (e) {
+    return { ok: false, error: String(e && e.message || e) };
+  } finally { try { lock.releaseLock(); } catch (eL) {} }
+}
+
+function sbStatus_() {
+  var dirty = sbDirtyList_();
+  return { ok: true, mode: sbMode_(), configured: sbCfg_().ok, stale: sbStaleInfo_() || null, dirtyCount: dirty.length, dirtySample: dirty.slice(0, 10) };
+}
+
+// Doi che do. mode: 'off' | 'write' | 'read'. 'read' khi dang STALE bi tu choi tru khi clearStale:true (nguoi dung xac nhan da backfill + compare ok).
+function sbSetMode_(mode, clearStale) {
+  mode = String(mode || '').toLowerCase();
+  if (mode !== 'off' && mode !== 'write' && mode !== 'read') return { ok: false, error: "mode phai la 'off', 'write' hoac 'read'." };
+  if (mode !== 'off' && !sbCfg_().ok) return { ok: false, error: 'Chua cau hinh SUPABASE_URL / SUPABASE_KEY trong Script Properties.' };
+  var pr = PropertiesService.getScriptProperties();
+  var clear = (clearStale === true || clearStale === 'true');
+  if (mode === 'read' && sbStaleInfo_() && !clear) {
+    return { ok: false, error: 'Supabase dang STALE (' + sbStaleInfo_() + '). Backfill lai (reset:true) + sbCompareCare ok:true roi goi lai voi clearStale:true.' };
+  }
+  if (clear) pr.deleteProperty('SB_STALE');
+  pr.setProperty('SB_MODE', mode);
+  return sbStatus_();
+}
+
+// Doc cac dong sheet CareData theo SO DONG (1-based) -> mang dong 22 o. Gom cac dong lien nhau thanh 1 lan doc; qua phan tan thi doc 1 doan
+// bao ca (toi da 20000 dong). Tra null neu khong doc duoc gon (caller danh dau STALE).
+function sbReadSheetRows_(sh, rowNums) {
+  var W = CARE_HEADERS.length, nums = rowNums.slice().sort(function (a, b) { return a - b; }), runs = [], i = 0;
+  while (i < nums.length) {
+    var j = i;
+    while (j + 1 < nums.length && nums[j + 1] <= nums[j] + 1) j++;
+    runs.push([nums[i], nums[j]]); i = j + 1;
+  }
+  var out = [], k;
+  if (runs.length > 40) {
+    var lo = nums[0], hi = nums[nums.length - 1];
+    if (hi - lo + 1 > 20000) return null;
+    var span = sh.getRange(lo, 1, hi - lo + 1, W).getValues(), seen = {};
+    for (k = 0; k < nums.length; k++) { if (!seen[nums[k]]) { seen[nums[k]] = 1; out.push(span[nums[k] - lo]); } }
+    return out;
+  }
+  for (k = 0; k < runs.length; k++) {
+    var vals = sh.getRange(runs[k][0], 1, runs[k][1] - runs[k][0] + 1, W).getValues();
+    for (var v = 0; v < vals.length; v++) out.push(vals[v]);
+  }
+  return out;
+}
+
+// Mirror cac dong VUA GHI tren Sheet: rowNums = dong da sua (doc lai tu Sheet de lay dung noi dung), newRows = dong moi (mang 22 o).
+function sbMirrorSheetRows_(sh, rowNums, newRows, why) {
+  try {
+    if (!sbWriteOn_()) return true;
+    var rows = [];
+    if (rowNums && rowNums.length) {
+      rows = sbReadSheetRows_(sh, rowNums);
+      if (rows === null) { sbMarkStale_('khong doc gon duoc ' + rowNums.length + ' dong de mirror (' + why + ')'); return false; }
+    }
+    return sbMirrorCare_(sbRowsToRecs_(rows.concat(newRows || [])), why);
+  } catch (e) {
+    try { sbMarkStale_('sbMirrorSheetRows_ ngoai le (' + why + '): ' + String(e && e.message || e)); } catch (e2) {}
+    return false;
+  }
+}
+
+// Object cot Supabase -> object care (cung dinh dang findCareByPhone_ cu, de KHONG phai sua 2 extension / index.html).
+function sbRecToCareObj_(g) {
+  var row = [];
+  for (var i = 0; i < SB_CARE_COLS_.length; i++) row.push(g[SB_CARE_COLS_[i]] == null ? '' : g[SB_CARE_COLS_[i]]);
+  return careObjFromRow_(row);
+}
+
+// 3c: tra cuu 1 SDT tu Supabase. Tra UNDEFINED = "hay doc Sheets nhu cu" khi: khong o che do 'read', dang STALE, SDT dang dirty,
+// Supabase loi, hoac Supabase khong co SDT do (SB_READ_FALLBACK_ON_MISS_). Tra object care khi tim thay.
+function sbReadCare_(phone) {
+  try {
+    var pr = PropertiesService.getScriptProperties().getProperties();
+    if (String(pr.SB_MODE || '').toLowerCase() !== 'read' || pr.SB_STALE || !sbCfg_().ok) return undefined;
+    var ph = normPhone_(phone);
+    if (!ph) return undefined;
+    var dirty = [];
+    try { dirty = JSON.parse(pr.SB_DIRTY_CARE || '[]'); } catch (e0) { dirty = []; }
+    if (dirty.indexOf(ph) !== -1) return undefined;
+    var res = sb_('GET', 'care_data?select=*&phone=eq.' + encodeURIComponent(ph) + '&limit=1');
+    var g = res.json && res.json[0];
+    if (!g) return SB_READ_FALLBACK_ON_MISS_ ? undefined : null;
+    return sbRecToCareObj_(g);
+  } catch (e) {
+    try { Logger.log('sbReadCare_ loi (doc Sheets thay the): ' + String(e && e.message || e)); } catch (el) {}
+    return undefined;
+  }
+}
