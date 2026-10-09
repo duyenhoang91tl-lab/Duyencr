@@ -285,6 +285,7 @@ function patchOrder_(data) {
   if (data.newProduct)               sh.getRange(rowIdx, DT_COL_SANPHAM + 1).setValue(data.newProduct);
   if (data.newDetail)                sh.getRange(rowIdx, DT_COL_PHANLOAI + 1).setValue(data.newDetail);
   _ordersCacheClear_();
+  sbMarkOrdersDirty_('dt', 'patchOrder');   // Supabase buoc 4b: ban sao dt_tong dang cu cho toi lan dong bo ke tiep
   try { CacheService.getScriptCache().remove('lk_' + normPhone_(String(data.phone))); } catch (ec) {}
   return jsonOut_({ ok: true, updated: true });
 }
@@ -311,6 +312,7 @@ function deleteOrder_(data) {
     }
     sh.deleteRow(i + 2);
     _ordersCacheClear_();
+    sbMarkOrdersDirty_('dt', 'deleteOrder');   // xoa dong lam lech src_row cac dong sau
     try { CacheService.getScriptCache().remove('lk_' + normPhone_(String(data.phone))); } catch (ec) {}
     return jsonOut_({ ok: true, deleted: true });
   }
@@ -456,7 +458,7 @@ function deleteDuplicateOrders_(items) {
       deleted++;
     } catch (e) { skipped++; }
   });
-  if (deleted) _ordersCacheClear_();
+  if (deleted) { _ordersCacheClear_(); sbMarkOrdersDirty_('dt', 'deleteDuplicateOrders'); }
   try {
     var cache = CacheService.getScriptCache();
     Object.keys(affectedPhones).forEach(function (p) { cache.remove('lk_' + p); });
@@ -526,6 +528,8 @@ function onChangeDedupTrigger_(e) {
     _autoDedupLog_(DT_TONG_SHEET, resBase.deleted);
     var resPos = _autoDedupExactRowsInSheet_(ss.getSheetByName(DON_CHITIET_SHEET), DON_CHITIET_WIDTH);
     _autoDedupLog_(DON_CHITIET_SHEET, resPos.deleted);
+    if (resBase.deleted) sbMarkOrdersDirty_('dt', 'autoDedup');   // Supabase buoc 4b
+    if (resPos.deleted) sbMarkOrdersDirty_('don', 'autoDedup');
     try {
       var cache = CacheService.getScriptCache();
       // SUA 2026-10-07: key cache dung truoc day la 'donChiTiet_v3_n' nhung readDonChiTiet_ da doi
@@ -678,6 +682,7 @@ function doImportSheetRowsLocked_(sheetKey, sheetName, sh, rows) {
   var dedupWidth = (sheetName === DON_CHITIET_SHEET) ? DON_CHITIET_WIDTH : DT_TONG_WIDTH;
   var dedupRes = _autoDedupExactRowsInSheet_(sh, dedupWidth);
   _autoDedupLog_(sheetName, dedupRes.deleted);
+  sbMarkOrdersDirty_(sheetName === DON_CHITIET_SHEET ? 'don' : 'dt', 'import');   // Supabase buoc 4b
 
   try {
     var cache = CacheService.getScriptCache();

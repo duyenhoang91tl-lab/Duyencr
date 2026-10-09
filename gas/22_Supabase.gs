@@ -704,3 +704,19 @@ function sbDonHangThuDon() { _sbLogBackfill_(sbBackfillDon_({ dryRun: true })); 
 function sbDonHangDayDon() { _sbLogBackfill_(sbBackfillDon_({ dryRun: false })); }
 function sbDonHangDayLaiTuDauDon() { _sbLogBackfill_(sbBackfillDon_({ dryRun: false, reset: true })); }
 function sbDonHangDoiChieuDon() { Logger.log(JSON.stringify(sbCompareDon_({ sample: 300 }), null, 2)); }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//  SUPABASE — BUOC 4b/5 (muc 1): DANH DAU "ban sao don hang tren Supabase dang cu".
+//  Ai ghi vao 2 sheet (kiem tra bang grep, 2026-10-09):
+//   - "DT TỔNG ": CRM ghi qua patchOrder_ (sua o), deleteOrder_ / deleteDuplicateOrders_ (xoa dong), doImportSheetRows_ (them dong), tu dong xoa
+//     dong trung (_autoDedupExactRowsInSheet_ qua onChangeDedupTrigger_) va luu tru (archiveOldOrders_, dang khoa). Ngoai CRM: nhan vien sua tay,
+//     tool Base day don vao -> CRM KHONG biet => chi tick dong bo dinh ky (sbOrdersTick_) moi bat duoc.
+//   - "dữ liệu đơn": CRM chi them (doImportSheetRows_) / xoa dong trung tu dong / luu tru; du lieu chinh vao tu Base/Pos ben ngoai.
+//  Moi duong ghi cua CRM goi sbMarkOrdersDirty_ SAU KHI ghi Sheet xong: luu moc thoi gian vao Script Property SB_DT_DIRTY / SB_DON_DIRTY.
+//  Nguoi doc Supabase (4c) thay moc nay => doc Sheets nhu cu cho toi khi 1 lan dong bo BAT DAU SAU moc do chay xong (sbSyncOrders_ xoa moc).
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+function sbMarkOrdersDirty_(which, why) {
+  try {
+    PropertiesService.getScriptProperties().setProperty(which === 'don' ? 'SB_DON_DIRTY' : 'SB_DT_DIRTY', String(Date.now()));
+  } catch (e) { try { Logger.log('sbMarkOrdersDirty_ (' + why + ') loi: ' + String(e && e.message || e)); } catch (el) {} }
+}

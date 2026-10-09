@@ -175,4 +175,11 @@ const key = props.SUPABASE_KEY; delete props.SUPABASE_KEY;
 r = run('sbBackfillDT_({})'); ok(!r.ok && r.error.includes('Chua cau hinh'), 'chua cau hinh'); props.SUPABASE_KEY = key;
 const keep = sheets['dữ liệu đơn']; delete sheets['dữ liệu đơn'];
 r = run('sbBackfillDon_({})'); ok(!r.ok && r.error.includes('Khong tim thay sheet'), 'thieu sheet bao loi ro rang, khong im lang: ' + JSON.stringify(r)); sheets['dữ liệu đơn'] = keep;
+
+// ===== 4b: danh dau "dirty" khi CRM ghi don hang =====
+run("sbMarkOrdersDirty_('dt', 'test')"); ok(Number(props.SB_DT_DIRTY) > 0 && props.SB_DON_DIRTY === undefined, 'dirty dt chi dat SB_DT_DIRTY');
+run("sbMarkOrdersDirty_('don', 'test')"); ok(Number(props.SB_DON_DIRTY) > 0, 'dirty don dat SB_DON_DIRTY');
+// moi duong ghi cua CRM phai goi sbMarkOrdersDirty_ (kiem tra tinh tren ma nguon: ham -> phai co loi goi trong than ham)
+[['patchOrder_', "'dt'"], ['deleteOrder_', "'dt'"], ['deleteDuplicateOrders_', "'dt'"], ['doImportSheetRowsLocked_', "'don'"], ['onChangeDedupTrigger_', "'don'"], ['archiveOldOrders_', "'don'"]]
+  .forEach(([fn, arg]) => ok(fnSrc(fn).includes('sbMarkOrdersDirty_(') && fnSrc(fn).includes(arg), fn + ' phai goi sbMarkOrdersDirty_'));
 console.log('ALL ORDER BACKFILL TESTS PASSED');

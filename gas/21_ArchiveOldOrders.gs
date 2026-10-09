@@ -176,6 +176,7 @@ function archiveOldOrders_(opts) {
     if (which === 'both' || which === 'pos')  out.sheets.push(_arcOneSheet_(ss, DON_CHITIET_SHEET, 'pos', cutoff, months, apply));
     if (apply) {
       setSetting_('archiveBoundaryYmd', String(cutoff));
+      sbMarkOrdersDirty_('dt', 'archive'); sbMarkOrdersDirty_('don', 'archive');   // Supabase buoc 4b: archive xoa dong khoi Sheet
       try {
         var cache = CacheService.getScriptCache();
         cache.removeAll(['srptOptions_v3', 'orders_v1_n', 'donChiTiet_v4_n', 'don_phones_v6_n']);
