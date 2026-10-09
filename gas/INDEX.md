@@ -44,8 +44,8 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `SALE_TIER_ORDER_`, `SALE_TIER_DEFAULT_TARGETS_`, `SALE_TIER_META_`, `SALE_KPI_DEFAULT_CFG_`
 
 ## 09_SalesReportB_POS.gs
-- Hàm: `_normCounterCode_`, `_counterCodeNoYear_`, `_counterCodeHasYear_`, `_extractCounterCodes_`, `_detectBaseCounterCol_`, `_readBaseRowsByCounterCodes_`, `_pickBaseRowsForCode_`, `_resolveGhepDon_`, `_quaySaleRatio_`, `_foldSaleKey_`, `_resolveBonusSale_`, `buildSalesReportB_`
-- Hằng/biến: `POS_GHEP_BASE_ENABLED_`, `COUNTER_CODE_INNER_`, `COUNTER_CODE_RE_SRC_`, `QUAY_SALE_RATIO_`
+- Hàm: `_normCounterCode_`, `_counterCodeNoYear_`, `_counterCodeHasYear_`, `_extractCounterCodes_`, `_detectBaseCounterCol_`, `_readBaseRowsByCounterCodes_`, `_pickBaseRowsForCode_`, `_resolveGhepDon_`, `_tachDonKey_`, `_mergeTachDon_`, `_quaySaleRatio_`, `_foldSaleKey_`, `_resolveBonusSale_`, `buildSalesReportB_`
+- Hằng/biến: `POS_GHEP_BASE_ENABLED_`, `COUNTER_CODE_INNER_`, `COUNTER_CODE_RE_SRC_`, `TACH_DON_RE_SRC_`, `QUAY_SALE_RATIO_`
 
 ## 10_CSStats_KPI_ReportC.gs
 - Hàm: `_csJsonSetting_`, `_csYmdFromDmy_`, `_csDaysSinceStart_`, `_csBonusProductQty_`, `_csBonusApplies_`, `_csRequireProductOk_`, `_csMoney_`, `_csBonusSummary_`, `buildCsStats_`, `ensureKPISheet_`, `readKPITargets_`, `getKPI_`, `_getMonday_`, `_isoWeekRange_`, `_isoWeekKey_`, `_monthRange_`, `_monthKey_`, `_quarterRange_`, `_yearRange_`, `_yearKey_`, `_quarterKey_`, `_ymdLocal_`, `_labelVN_`, `_resolvePeriods_`, `buildSalesReportC_`, `buildCareLeadReport_`

@@ -3876,6 +3876,63 @@ function _resolveGhepDon_(codes, idx, usedBaseRows) {
   return { status: 'ok', total: total, shares: shares, codes: codes, baseRows: picked.length, creators: creators };
 }
 
+// ── DON POS TACH (yeu cau Duyen 2026-10-09) ──
+// Don goc tren Base co ma bo dem dang "254T10/2026". Khi len Pos ma phai TACH thanh nhieu don (vd 2 don giao 2 dia chi), ghi chu noi bo
+// (cot Q) cua tung don Pos co dang "254T10/2026/1 TACH ..." , "254T10/2026/2 TACH ..." (ma goc + "/" + so thu tu phan tach).
+// QUY TAC: cac don Pos cung ma goc la MOT don duy nhat — doanh thu = tong cac phan (vd 9.000.000 + 8.540.000 = 17.540.000), dem 1 don,
+// nen CS van la 1 don >=15tr de tinh hoa hong (truoc day tach thanh 2 don <15tr -> tinh sai muc hoa hong va dem 2 don).
+// NGUYEN NHAN GOC cua loi: buildSalesReportB_ coi moi dong "dữ liệu đơn" la 1 don doc lap.
+// Chi nhan dang khi sau ma co "/<nam>/<so>" (nam 2-4 so, so thu tu 1-2 so); ma khong co "/so" o cuoi (vd "254T10/2026") khong bi gop.
+var TACH_DON_RE_SRC_ = '(^|[^A-Za-z0-9])([A-Za-z]{0,3}\\d{1,6}[A-Za-z]{0,3}T\\d{1,2})\\/(\\d{2,4})\\/(\\d{1,2})(?![A-Za-z0-9])';
+// Tra ve ma goc chuan hoa (vd "254T10/2026") neu ghi chu co dang tach, nguoc lai ''. Chi lay ma dau tien trong ghi chu.
+function _tachDonKey_(ghiChu) {
+  if (ghiChu === null || ghiChu === undefined || ghiChu === '') return '';
+  var str = String(ghiChu);
+  if (str.indexOf('/') === -1) return ''; // loc nhanh: khong co dau "/" thi chac chan khong phai ma tach
+  var m = new RegExp(TACH_DON_RE_SRC_, 'i').exec(str);
+  if (!m) return '';
+  var yr = m[3]; if (yr.length === 2) yr = '20' + yr; // "254T10/26/1" == "254T10/2026/1"
+  return (m[2] + '/' + yr).replace(/\s+/g, '').toUpperCase();
+}
+// Gop cac dong Pos cung ma goc thanh 1 dong. Dong da Huy/Hoan (_donHasExcludedStatus_) KHONG tham gia gop va giu nguyen de bo loc
+// o buildSalesReportB_ loai nhu cu (-> phan tach da hoan khong duoc cong vao doanh thu). Dong gop: ngay = ngay som nhat cac phan,
+// giaTriSauGiam/cod = tong, the sale = hop (bo trung), san pham/ma/so luong noi theo thu tu (giu dung dau phan cach moi cot),
+// them tachKey / tachSoDon / tachGiaTri[] de doi chieu. Nhom chi co 1 dong giu nguyen dong goc (khong them truong nao).
+function _mergeTachDon_(rows) {
+  var out = [], groups = {};
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    var key = _donHasExcludedStatus_(r.trangThai) ? '' : _tachDonKey_(r.ghiChu);
+    if (!key) { out.push(r); continue; }
+    if (!groups[key]) { groups[key] = { pos: out.length, parts: [] }; out.push(null); }
+    groups[key].parts.push(r);
+  }
+  Object.keys(groups).forEach(function(k) {
+    var g = groups[k], parts = g.parts;
+    if (parts.length === 1) { out[g.pos] = parts[0]; return; }
+    var m = Object.assign({}, parts[0]);
+    var total = 0, cod = 0, vals = [], sales = [], seenSale = {}, sp = [], ma = [], sl = [], notes = [], seenNote = {};
+    var best = null, bestT = null;
+    parts.forEach(function(p) {
+      total += Number(p.giaTriSauGiam) || 0; cod += Number(p.cod) || 0; vals.push(Number(p.giaTriSauGiam) || 0);
+      String(p.theSale || '').split(',').forEach(function(x) { x = x.trim(); var f = _normTxt_(x); if (x && !seenSale[f]) { seenSale[f] = true; sales.push(x); } });
+      if (p.sanPham) sp.push(String(p.sanPham)); if (p.maSanPham) ma.push(String(p.maSanPham)); if (p.soLuong) sl.push(String(p.soLuong));
+      var nt = String(p.ghiChu || '').trim(); if (nt && !seenNote[nt]) { seenNote[nt] = true; notes.push(nt); }
+      if (!m.nguonDon && p.nguonDon) m.nguonDon = p.nguonDon;
+      if (!m.marketer && p.marketer) m.marketer = p.marketer;
+      var d = parseVNDate_(p.ngayTaoDon), t = d ? d.getTime() : NaN;
+      if (!isNaN(t) && (bestT === null || t < bestT)) { bestT = t; best = p.ngayTaoDon; }
+    });
+    m.giaTriSauGiam = total; m.cod = cod; m.theSale = sales.join(', ');
+    m.sanPham = sp.join(', '); m.maSanPham = ma.join(';'); m.soLuong = sl.join(', ');
+    m.ghiChu = notes.join(' | ');
+    if (best !== null) m.ngayTaoDon = best;
+    m.tachKey = k; m.tachSoDon = parts.length; m.tachGiaTri = vals;
+    out[g.pos] = m;
+  });
+  return out;
+}
+
 // ── DON QUAY HAO NAM CO GAN THE SALE + QUAY NOTE "30/70" (yeu cau Duyen 2026-10-04) ──
 // Don chia quay co 2 dang: (1) DON GHEP — don A cua sale di cung don B cua quay: moi don chi tinh cho ben cua no (don
 // quay khong co the sale nen sale khong duoc tinh; xu ly boi ghep don theo ma bo dem + don khong sale); (2) DON QUAY
@@ -3981,7 +4038,7 @@ function buildSalesReportB_(filters) {
   var needCare = careStatusArr.length || khStatusArr.length || zaloStatusArr.length || nickZaloTerm;
   var careMap = needCare ? _careMapByPhone_() : null;
 
-  var rows = readDonChiTiet_();
+  var rows = _mergeTachDon_(readDonChiTiet_()); // gop don Pos TACH (ghi chu "<ma>/2026/1", "/2") thanh 1 don truoc khi loc — xem _mergeTachDon_
   // VONG 1: loc theo ngay/trang thai/nguon/marketer/san pham/CRM (KHONG loc Sale o day — Sale phai xet SAU khi
   // ghep don Base, vi don ghep chia theo sale cua don goc Base chu khong theo cot "Thẻ" cua Pos).
   var pre = [];
@@ -4257,6 +4314,8 @@ function buildSalesReportB_(filters) {
         saleShares: m.ghepShares || undefined,
         saleRatio: m.saleRatio || undefined, // 0.3 = don Quay Hao Nam gan the sale + note 30/70
         ghepCodes: m.ghepCodes || undefined,
+        // Don Pos TACH da gop (xem _mergeTachDon_): tachKey = ma goc, tachSoDon = so phan, tachGiaTri = gia tri tung phan; giaTriSauGiam o tren = TONG cac phan.
+        tachKey: m.tachKey || undefined, tachSoDon: m.tachSoDon || undefined, tachGiaTri: m.tachGiaTri || undefined,
         // saleBanValid: danh sach ten sale đã qua _donSaleNamesFromThe_ (loc theo danh sach ten
         // sale THAT, giong het cach bySale o tren tinh) — khac voi theSale (chuoi THO nguyen van
         // cot "Thẻ", co the dinh ghi chu/ten sai chinh ta). Bao cao E (Hoa hong + Chuong trinh
