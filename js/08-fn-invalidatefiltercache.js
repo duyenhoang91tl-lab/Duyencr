@@ -238,6 +238,7 @@ function _careRow(phone, schedByPhone){
     schedHen: care.schedHen||'', schedHenNote: care.schedHenNote||'',
     khStatus: care.khStatus||'', nickZalos: care.nickZalos||[], zaloPhones: care.zaloPhones||[], birthday: care.birthday||'',
     name: care.name||'',
+    tag: care.tag,   // dong bo hang loat cung phai gui tag, neu khong custom.tag cu trong care.custom se de len nhan vua sua
     custom: care.custom||{}
   };
 }

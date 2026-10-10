@@ -1629,6 +1629,9 @@
           </div>
         </div>
 
+        <label class="pk-label-top">🏷 Nhãn phân loại (tự đặt)</label>
+        <input type="text" id="pk-tag" class="pk-full-input" placeholder="VD: VIP, Khách sỉ, Combo A..." title="Nhãn tự do để lọc khi tạo chiến dịch — cùng nhãn với CRM, không liên quan tag của Zalo" value="${escapeHtml(care?.tag || '')}" />
+
         <div class="pk-form-row">
           <div class="pk-form-col">
             <label>Ngày hẹn</label>
@@ -1826,6 +1829,7 @@
       nickZalos: c.nickZalos || [], // khong dong vao — rieng cua Zalo AI, Pancake khong sua
       zaloPhones: _zaloPhoneFieldLocked ? (c.zaloPhones || []) : _pkZaloPhones.slice(),
       custom: c.custom || {},
+      tag: c.tag, // undefined = khong gui (GAS giu nhan hien co); GAS luu nhan o custom.tag
       name: liveName || _currentOrderPanelName || c.name || ''
     }, overrides || {});
   }
@@ -1880,6 +1884,7 @@
     out.zaloPhones = [...new Set([...svZaloPhones, ...lcZaloPhones])];
     // CS phu trach: neu khach da co CS cu thi giu, khong cuop quyen phu trach
     out.cs = serverCare.cs || localRow.cs || '';
+    out.tag = serverCare.tag || localRow.tag || ''; // nhan da co tren server thi giu, sale chi duoc dien khi dang trong
     // Phản hồi Zalo: luồng chỉ-thêm không được làm mất cờ server đã tích
     if (serverCare.custom && serverCare.custom.zaloReply) out.custom = Object.assign({}, out.custom || {}, { zaloReply: true });
     const noteRes = _mergeNotesKeepOld_(serverCare.note, localRow.note);
@@ -1937,6 +1942,7 @@
     setBirthdayFields_(row.birthday);
     setVal('#pk-hen-date', row.schedHen ? toInputDate_(row.schedHen) : '');
     setVal('#pk-hen-note', row.schedHenNote);
+    setVal('#pk-tag', row.tag);
     learnChatKeyForPhone_(phone);
   }
 
@@ -1966,6 +1972,7 @@
       birthday: readBirthdayValue_(),
       schedHen: panelEl.querySelector('#pk-hen-date').value,
       schedHenNote: panelEl.querySelector('#pk-hen-note').value.trim(),
+      tag: (panelEl.querySelector('#pk-tag')?.value || '').trim(),
       custom: collectCustomFieldValues_(_currentCare?.custom || {}),
       note: rawEl ? rawEl.value : (_currentCare?.note || '')
     });
@@ -1981,6 +1988,7 @@
       _currentPhone = phone;
       _lastServerCare = Object.assign({}, row);
       _pkAssignCacheUpdate_(phone, row); // dòng tương ứng trong "Data được chia" cập nhật theo
+      _pkAssignAutoDone_(phone);
       const nameSpan = panelEl.querySelector('.pk-ai-cust-name');
       if (nameSpan && row.name) nameSpan.innerHTML = `${escapeHtml(row.name)} <span class="pk-ai-cust-phone">${phone}</span>`;
       // Lưu xong thì không còn là "khách mới" nữa: ẩn cảnh báo và khoá ô SĐT lại (tránh CS vô
@@ -2092,7 +2100,7 @@
     safeSendMessage_({ type: 'LOOKUP_CUSTOMER', payload: { phone } }, (resp) => {
       if (!resp?.ok || _currentPhone !== phone) return;
       const newCare = resp.data.care || {};
-      const CMP = ['status','zalo','cs','note','schedHen','schedHenNote','khStatus','birthday','name'];
+      const CMP = ['status','zalo','cs','note','schedHen','schedHenNote','khStatus','birthday','name','tag'];
       const base = _lastServerCare || {};
       const changedFields = CMP.filter((k) => (base[k] || '') !== (newCare[k] || ''));
       if (!changedFields.length) return;
@@ -2116,6 +2124,7 @@
     if (readBirthdayValue_() === String(baseline.birthday || '').trim()) setBirthdayFields_(newCare.birthday || '');
     syncSel('#pk-hen-note', 'schedHenNote');
     syncSel('#pk-name-input', 'name');
+    syncSel('#pk-tag', 'tag');
     const zrEl = panelEl.querySelector('#pk-zalo-reply');
     if (zrEl && zrEl.checked === !!(baseline.custom && baseline.custom.zaloReply)) zrEl.checked = !!(newCare.custom && newCare.custom.zaloReply);
     const henEl = panelEl.querySelector('#pk-hen-date');
@@ -2343,7 +2352,7 @@
   function _pkAssignInfoOf_(care, orders) {
     care = care || {};
     return { name: care.name || (orders && orders[0] && orders[0].name) || '', status: care.status || '',
-      schedHen: care.schedHen || '', zaloReply: !!(care.custom && care.custom.zaloReply), orders: (orders || []).length };
+      schedHen: care.schedHen || '', zaloReply: !!(care.custom && care.custom.zaloReply), tag: care.tag || '', orders: (orders || []).length };
   }
   function _pkAssignInfoHtml_(phone) {
     const i = _assignInfo[phone];
@@ -2358,6 +2367,7 @@
       out.push(`<span class="pk-assign-chip${cls}">📅 ${escapeHtml(fmtDate_(i.schedHen))}${cls === ' pk-assign-chip-late' ? ' quá hạn' : (cls ? ' hôm nay' : '')}</span>`);
     }
     if (i.zaloReply) out.push('<span class="pk-assign-chip">💬 đã phản hồi</span>');
+    if (i.tag) out.push(`<span class="pk-assign-chip">🏷 ${escapeHtml(i.tag)}</span>`);
     if (!i.name && !i.status && !i.schedHen && !i.orders) out.push('<span class="pk-assign-chip pk-assign-chip-mut">chưa có hồ sơ</span>');
     return out.join(' ');
   }
@@ -2368,6 +2378,23 @@
     const d = new Date(i.schedHen); d.setHours(0, 0, 0, 0);
     const t = new Date(); t.setHours(0, 0, 0, 0);
     return d <= t ? 0 : 1;
+  }
+  // Sale Lưu xong khách trong "Data được chia" = đã tác động/gọi → tự tick "Đã gọi" (bỏ tick tay được nếu cần).
+  // Chỉ chạy khi danh sách đã tải (đã mở tab Data được chia) và SĐT thuộc 1 đợt chia của CS này, chưa tick.
+  function _pkAssignAutoDone_(phone) {
+    const info = _buildAssignPhoneMap_()[phone];
+    if (!info || info.isDone) return;
+    const cs = (panelEl?.querySelector('#pk-cs-sel')?.value) || settings?.csName || '';
+    safeSendMessage_({ type: 'TOGGLE_ASSIGN_DONE', payload: { cs, phone, done: true } }, (resp) => {
+      if (!resp?.ok) { setStatus('✓ Đã lưu — nhưng chưa tự tick "Đã gọi" được (' + (resp?.error || 'lỗi') + '), tick tay giúp mình.'); return; }
+      for (const h of _assignState.assignHistory) {
+        if (!(h.phones || []).includes(phone)) continue;
+        if (!h.donePhones) h.donePhones = [];
+        if (!h.donePhones.includes(phone)) h.donePhones.push(phone);
+      }
+      renderAssignedList_(true);
+      setStatus('✓ Đã lưu vào Sasum · đã tự tick "Đã gọi" trong Data được chia.');
+    });
   }
   function _pkAssignCacheUpdate_(phone, care) { // gọi sau khi sale Lưu → dòng trong danh sách cập nhật theo
     if (!phone || !_assignInfo[phone]) return;

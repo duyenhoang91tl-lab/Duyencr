@@ -49,7 +49,7 @@ async function pushCareToGS(phone) {
     khStatus: care.khStatus||'',
     nickZalos: care.nickZalos||[],
     zaloPhones: care.zaloPhones||[],
-    tag: care.tag||'',
+    tag: care.tag,   // undefined = khong gui (GAS giu custom.tag hien co); '' = xoa nhan (nhan luu o custom.tag, xem careRow_)
     name: care.name||'',
     custom: care.custom||{}
   };
