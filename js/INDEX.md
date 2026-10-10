@@ -41,3 +41,11 @@ Code client của `index.html` (trước đây inline, ~1.4MB) đã tách ra `cs
 - `28-fn-bonusdetail.js`: tab K "Chi tiết thưởng" — `renderSalesReportTabK_`, `_bdFlag`, `_bdSlot`, `_bdRev`, `_bdSyncFromGAS`
 
 - `js/29-sidenav.js` + `css/05-sidenav.css`: menu tác vụ dọc bên trái (ngăn kéo ẩn mặc định, nút ☰ Menu ở header; tái dùng khối `.tabs` nên giữ nguyên data-bar-id/quyền/demo-mode; chọn mục xong tự ẩn).
+
+## Quy ước menu (cập nhật 10/10/2026)
+- MỘT nơi duy nhất chứa tính năng: menu trái `js/29-sidenav.js`. `GROUPS` = nhóm mẹ + thứ tự; `ACTS` = mục hành động (gọi lại đúng hàm mở modal cũ, `admin:true` = chỉ admin thấy). Thêm tính năng mới → thêm vào ACTS + GROUPS, KHÔNG thêm nút mới vào header/toolbar.
+- Đã bỏ vì trùng: nút header (Tác vụ, Mẫu hỏi thăm, Tình trạng CS, Trạng thái KH, Trường tự tạo, Tài khoản), dropdown "Tác vụ" ở toolbar, "☰ Menu" cũ + tab ⚙ tuỳ chỉnh (`#v9tab-customize` còn trong DOM nhưng ẩn — `_injectV9UI` dùng nó chống chèn 2 lần, đừng xoá).
+- Cố ý GIỮ nút theo ngữ cảnh trên màn hình: "Thêm KH / Đơn mới", "Xuất CSV" (toolbar danh sách), "+ Tạo công việc" (tab Công việc). Header chỉ còn: ☰ Menu, trạng thái đồng bộ, pill Google Sheets, Đăng xuất.
+- Nhãn "Tình trạng CS"/"Trạng thái KH" lấy từ `FIELD_LABEL_CS/KH` (admin đổi tên được) — đừng ghi cứng.
+- ID tab (`data-bar-id`) giữ nguyên vì phân quyền theo tab (`_PERM_TAB_DEFS`) dựa vào chúng.
+- Chưa làm (cần duyệt vì đổi hành vi): gộp tab "Quá hạn" vào "Lịch chăm sóc" (bộ lọc), đối chiếu "Dashboard" với "Báo cáo ngày", bỏ "Đẩy dữ liệu" nếu "Đồng bộ 2 chiều" đã đủ.
