@@ -9747,6 +9747,11 @@ function _aaPlanCskh(cfg, teamsArr, membersOf, custs, everSet, taken){
   });
   return { entries:entries, short:short, warn:rc.warn.map(function(w){ return '[CSKH] ' + w; }) };
 }
+// Khoang NGAY DON cho chia tu dong (cfg.dateFrom/dateTo 'YYYY-MM-DD'). CHI ap cho POS/Base; CSKH-Duyen chia rieng, khong loc ngay. GIONG _aaDateOk o index/js.
+function _aaDateOk_(cfg, c) {
+  if (!cfg.dateFrom && !cfg.dateTo) return true;
+  return (c.ds || []).some(function (d) { return d && (!cfg.dateFrom || d >= cfg.dateFrom) && (!cfg.dateTo || d <= cfg.dateTo); });
+}
 // Ke hoach ca ngay = CSKH (rieng) + POS (tu dt/don/cs). opts: {pos:bool, cskh:bool} (mac dinh ca hai). CSKH lap truoc de han muc CSKH khong bi POS lay mat KH.
 function _aaPlanAll(cfg, teamsArr, membersOf, custs, everSet, opts){
   custs = (custs || []).filter(function (c) { return c && isValidVnPhone_(c.phone); });   // chi chia SDT di dong VN hop le
@@ -9756,7 +9761,7 @@ function _aaPlanAll(cfg, teamsArr, membersOf, custs, everSet, opts){
     out.entries = out.entries.concat(k.entries); out.short = out.short.concat(k.short); out.warn = out.warn.concat(k.warn);
   }
   if (opts.pos !== false){
-    var p = _aaPlan(cfg, teamsArr, membersOf, custs, everSet, taken);
+    var p = _aaPlan(cfg, teamsArr, membersOf, (cfg.dateFrom || cfg.dateTo) ? custs.filter(function (c) { return _aaDateOk_(cfg, c); }) : custs, everSet, taken);
     p.entries.forEach(function(e){ e.src = 'pos'; }); p.short.forEach(function(x){ x.src = 'pos'; });
     out.entries = out.entries.concat(p.entries); out.short = out.short.concat(p.short); out.warn = out.warn.concat(p.warn);
   }
@@ -9776,7 +9781,11 @@ function _aaLoadCustomers_() {
   function mark(p, k) { if (!p) return; (src[p] = src[p] || {})[k] = true; }
   var revBy = {};   // PHAN HANG KH: doanh thu theo SDT CHI TINH THEO POS (bo hoan; KH khong co don Pos = 0) -- cung quy tac c.totalRevenue o index.html
   var posStats = getDonStatsByPhone_(), posOn = Object.keys(posStats).length > 0;   // CHI TINH THEO POS; sheet Pos trong thi tam dung Base
-  readAllOrders_().forEach(function (o) { mark(o.phone, 'dt'); if (o.phone) revBy[o.phone] = (revBy[o.phone] || 0) + (Number(o.revenue) || 0); });
+  var dsBy = {};   // ngay don (YYYY-MM-DD) theo SDT tu DT TONG — dung loc khoang ngay (cfg.dateFrom/dateTo), cung nguon ymList[].ds o client
+  readAllOrders_().forEach(function (o) {
+    mark(o.phone, 'dt'); if (o.phone) revBy[o.phone] = (revBy[o.phone] || 0) + (Number(o.revenue) || 0);
+    if (o.phone && o.date) { var _dd = parseVNDate_(o.date), _iso = _dd ? _vnYmd_(_dd) : ''; if (_iso) { var _a = dsBy[o.phone] = dsBy[o.phone] || []; if (_a.indexOf(_iso) < 0) _a.push(_iso); } }
+  });
   readCareLeads_().forEach(function (r) { mark(r.phone, 'cs'); if (r.name) leadName[r.phone] = true; });
   readCskhDuyenLite_().rows.forEach(function (r) { mark(r[0], 'cskh'); });
   readDonPhones_().forEach(function (p) { mark(p, 'don'); });
@@ -9785,7 +9794,7 @@ function _aaLoadCustomers_() {
     var d = src[p];
     if (!(d.dt || d.don || d.cskh || (d.cs && leadName[p]))) return;
     var n = cnt[p] || 0;
-    custs.push({ phone: p, dataSrc: { dt: !!d.dt, don: !!d.don, cs: !!d.cs, cskh: !!d.cskh }, tier: n >= 10 ? 'VIP' : n >= 5 ? 'Thân thiết' : n >= 2 ? 'Tiềm năng' : 'Chưa bán lại được', hangKey: _aaHangKey_(posOn ? (posStats[p] ? posStats[p].rev : 0) : (revBy[p] || 0)) });
+    custs.push({ phone: p, dataSrc: { dt: !!d.dt, don: !!d.don, cs: !!d.cs, cskh: !!d.cskh }, tier: n >= 10 ? 'VIP' : n >= 5 ? 'Thân thiết' : n >= 2 ? 'Tiềm năng' : 'Chưa bán lại được', hangKey: _aaHangKey_(posOn ? (posStats[p] ? posStats[p].rev : 0) : (revBy[p] || 0)), ds: dsBy[p] || [] });
   });
   var ever = {};
   readAssign_(getCrmSS_().getSheetByName(SH_ASSIGN)).forEach(function (h) { (h.phones || []).forEach(function (p) { ever[p] = true; }); });

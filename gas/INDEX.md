@@ -87,7 +87,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `REPORT_SALE_SS_ID`, `BANNED_WORDS_SHEET_NAME`, `BANNED_WORDS_FALLBACK`, `MKT_DEFAULT_CFG_`, `MKT_MIN_TAGS_`
 
 ## 20_ExportLog_AutoAssign.gs
-- Hàm: `getExportLogSS_`, `_exportLogGetSheet_`, `_exportLogWriteDays_`, `_dateRangeList_`, `exportDailyReportLogs_`, `chayCaiDatTrigger`, `_aaDefaultCfg`, `_aaSplit`, `_aaRatioFor`, `_aaWeights`, `_aaRecipients`, `_aaBuckets`, `_aaPlan`, `_aaPlanCskh`, `_aaPlanAll`, `_aaReadJson_`, `_aaWriteJson_`, `_aaHangKey_`, `_aaLoadCustomers_`, `_aaSetCareCS_`, `autoAssignRun_`, `autoAssignTick_`, `autoAssignRunNow_`, `installAutoAssignTrigger_`, `removeAutoAssignTrigger_`, `caiTriggerChiaTuDong`, `chayThuChiaTuDong`, `goTriggerChiaTuDong`
+- Hàm: `getExportLogSS_`, `_exportLogGetSheet_`, `_exportLogWriteDays_`, `_dateRangeList_`, `exportDailyReportLogs_`, `chayCaiDatTrigger`, `_aaDefaultCfg`, `_aaSplit`, `_aaRatioFor`, `_aaWeights`, `_aaRecipients`, `_aaBuckets`, `_aaPlan`, `_aaPlanCskh`, `_aaDateOk_`, `_aaPlanAll`, `_aaReadJson_`, `_aaWriteJson_`, `_aaHangKey_`, `_aaLoadCustomers_`, `_aaSetCareCS_`, `autoAssignRun_`, `autoAssignTick_`, `autoAssignRunNow_`, `installAutoAssignTrigger_`, `removeAutoAssignTrigger_`, `caiTriggerChiaTuDong`, `chayThuChiaTuDong`, `goTriggerChiaTuDong`
 - Hằng/biến: `EXPORT_LOG_SS_ID`, `EXPORT_LOG_SHEETS_`, `AA_TZ`, `_AA_SRC_KEYS`, `_AA_POS_KEYS`, `_AA_SRC_LABEL`, `_AA_PRIO_KEYS`, `_AA_PRIO_LABEL`, `_AA_TIER`, `_AA_HANG_KEYS`, `_AA_HANG_LABEL`
 
 ## 21_ArchiveOldOrders.gs

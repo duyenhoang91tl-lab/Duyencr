@@ -136,6 +136,13 @@ function _aaPlanCskh(cfg, teamsArr, membersOf, custs, everSet, taken){
   });
   return { entries:entries, short:short, warn:rc.warn.map(function(w){ return '[CSKH] ' + w; }) };
 }
+// Khoang NGAY DON cho chia tu dong (cfg.dateFrom/dateTo 'YYYY-MM-DD', de trong = khong gioi han). CHI ap cho POS/Base (dt/don/cs); CSKH-Duyen chia
+// rieng va khong co ngay don nen khong loc theo ngay. KH POS khong co ngay don nao thi bi loai khi da dat khoang ngay (khong doan duoc thang). GIONG ban server (_aaDateOk_).
+function _aaDateOk(cfg, c){
+  if (!cfg.dateFrom && !cfg.dateTo) return true;
+  var ds = c.ds || (c.ymList || []).map(function(o){ return o.ds; });
+  return ds.some(function(d){ return d && (!cfg.dateFrom || d >= cfg.dateFrom) && (!cfg.dateTo || d <= cfg.dateTo); });
+}
 // Ke hoach ca ngay = CSKH (rieng) + POS (tu dt/don/cs). opts: {pos:bool, cskh:bool} (mac dinh ca hai). CSKH lap truoc de han muc CSKH khong bi POS lay mat KH.
 function _aaPlanAll(cfg, teamsArr, membersOf, custs, everSet, opts){
   custs = (custs || []).filter(function(c){ return c && isValidVnPhone(c.phone); });   // chỉ chia SĐT di động VN hợp lệ
@@ -145,7 +152,7 @@ function _aaPlanAll(cfg, teamsArr, membersOf, custs, everSet, opts){
     out.entries = out.entries.concat(k.entries); out.short = out.short.concat(k.short); out.warn = out.warn.concat(k.warn);
   }
   if (opts.pos !== false){
-    var p = _aaPlan(cfg, teamsArr, membersOf, custs, everSet, taken);
+    var p = _aaPlan(cfg, teamsArr, membersOf, (cfg.dateFrom || cfg.dateTo) ? custs.filter(function(c){ return _aaDateOk(cfg, c); }) : custs, everSet, taken);
     p.entries.forEach(function(e){ e.src = 'pos'; }); p.short.forEach(function(x){ x.src = 'pos'; });
     out.entries = out.entries.concat(p.entries); out.short = out.short.concat(p.short); out.warn = out.warn.concat(p.warn);
   }
@@ -448,6 +455,7 @@ function renderAssignAuto(){
     '<label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;margin-bottom:10px"><input type="checkbox" '+(cfg.enabled?'checked':'')+' onchange="_aaSet(\'enabled\',this.checked)"> Bật chia tự động mỗi ngày <span style="font-weight:400;color:var(--muted)">(nguồn POS: DT tổng, Dữ liệu đơn, Chăm sóc)</span></label>'+
     '<div style="font-size:12px;color:var(--muted);margin-bottom:5px">Chia vào các thứ được tích (ngày bỏ tích = không chia):</div><div class="assign-sort-row">'+
     _AA_DOW.map(function(d){ return '<div class="assign-sort-btn '+((cfg.days||[]).indexOf(parseInt(d[0]))>=0?'active':'')+'" onclick="_aaToggleDay('+d[0]+')">'+d[1]+'</div>'; }).join('')+'</div>'+
+    '<div style="font-size:12px;margin-top:10px">Chỉ lấy KH POS/Base có <b>ngày đơn</b> từ <input type="date" value="'+esc(cfg.dateFrom||'')+'" onchange="_aaSet(\'dateFrom\',this.value)"> đến <input type="date" value="'+esc(cfg.dateTo||'')+'" onchange="_aaSet(\'dateTo\',this.value)"> '+((cfg.dateFrom||cfg.dateTo)?'<button class="btn sm" onclick="_aaSet(\'dateFrom\',\'\',false);_aaSet(\'dateTo\',\'\')">✕ Bỏ</button>':'')+'<div style="font-size:11px;color:var(--muted);margin-top:3px">Ví dụ chia khách tháng 9: 01/09 → 30/09. Để trống = không giới hạn. Chỉ áp cho nguồn POS/Base (DT tổng, Dữ liệu đơn, Chăm sóc); CSKH-Duyên chia riêng ở mục ③ và không có ngày đơn.</div></div>'+
     '<label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:10px"><input type="checkbox" '+(cfg.onlyUnassigned?'checked':'')+' onchange="_aaSet(\'onlyUnassigned\',this.checked)"> Chỉ lấy KH <b>chưa chia lần nào</b> (nên bật, nếu không ngày nào cũng có thể chia lại đúng KH cũ)</label>'+
     '<label style="font-size:12px;display:block;margin-top:10px">Chia từ <input type="number" min="0" max="23" style="width:56px" value="'+(cfg.runHour==null?7:cfg.runHour)+'" onchange="_aaSet(\'runHour\',this.value)"> giờ sáng (giờ VN) — trước giờ này không chia</label>'+
     '<div style="font-size:11px;color:var(--hint);margin-top:8px">Chạy tự động bằng <b>trigger trên Google Apps Script</b> (không cần mở CRM): admin cài 1 lần — mở Apps Script Editor, chọn hàm <b>installAutoAssignTrigger_</b>, bấm Run. Chưa cài trigger thì hệ thống chỉ chia khi có admin mở CRM vào ngày đó. Sau khi sửa ở đây nhớ bấm <b>💾 Lưu cấu hình</b> (server dùng bản đã lưu).</div></div>';

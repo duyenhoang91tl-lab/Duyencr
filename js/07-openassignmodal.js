@@ -102,7 +102,9 @@ function _advAssignDateFilteredList() {
     var yl = c.ymList || [];
     // Khách KHÔNG có ngày đơn nào (vd nguồn CSKH-Duyên): khoảng ngày không áp dụng được → khi đã chọn nguồn
     // thì cứ chia theo nguồn; chưa chọn nguồn thì vẫn loại như cũ.
-    if (!yl.some(function (o) { return o.ds; })) return hasSrc;
+    // NGUYEN NHAN GOC (da sua 2026-10-10): truoc day KH POS (dt/don/cs) KHONG co ngay don van lot qua khi da chon nguon -> chia "khach thang 9" bi lan khach khong ro ngay.
+    // Nay chi KH thuoc nguon CSKH-Duyen (khong co ngay don) moi duoc miễn loc ngay, va chi khi CSKH nam trong nguon da chon.
+    if (!yl.some(function (o) { return o.ds; })) return hasSrc && _advAssign.srcSet.has('cskh') && !!(c.dataSrc && c.dataSrc.cskh);
     return yl.some(function (o) {
       if (!o.ds) return false;
       if (_advAssign.dateFrom && o.ds < _advAssign.dateFrom) return false;
@@ -113,6 +115,13 @@ function _advAssignDateFilteredList() {
 }
 
 // Chọn / bỏ chọn 1 nguồn dữ liệu trong modal Chia data
+// Chien dich: 1 = POS/Base (DT tong + Du lieu don + Cham soc), 2 = CSKH-Duyen (rieng). Bam lai de bo chon.
+function _advAssignCampaign(key) {
+  var want = key === 'pos' ? ['dt', 'don', 'cs'] : ['cskh'];
+  var cur = _advAssign.srcSet, same = cur.size === want.length && want.every(function (k) { return cur.has(k); });
+  _advAssign.srcSet = same ? new Set() : new Set(want);
+  renderAssignCreate();
+}
 function _advAssignToggleSrc(k) {
   if (_advAssign.srcSet.has(k)) _advAssign.srcSet.delete(k); else _advAssign.srcSet.add(k);
   renderAssignCreate();
@@ -316,6 +325,11 @@ function renderAssignCreate() {
       ${totalFiltered === 0 ? '<br><span style="color:var(--red)">⚠ Không có KH nào khớp (bộ lọc bảng + nguồn + khoảng ngày bên dưới). Hãy xoá bớt bộ lọc / nới khoảng ngày / đổi nguồn rồi thử lại.</span>' : ''}
     </div>
 
+    <div style="font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:500">Chiến dịch <span style="font-weight:400">(chọn nhanh nguồn; chia lần lượt từng chiến dịch):</span></div>
+    <div class="assign-sort-row" style="margin-bottom:10px">
+      <div class="assign-sort-btn ${(_advAssign.srcSet.size===3&&['dt','don','cs'].every(k=>_advAssign.srcSet.has(k)))?'active':''}" onclick="_advAssignCampaign('pos')">① POS / Base (DT tổng + Dữ liệu đơn + Chăm sóc)</div>
+      <div class="assign-sort-btn ${(_advAssign.srcSet.size===1&&_advAssign.srcSet.has('cskh'))?'active':''}" onclick="_advAssignCampaign('cskh')">② CSKH-Duyên — chiến dịch riêng (${srcCount.cskh})</div>
+    </div>
     <div style="font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:500">Nguồn dữ liệu <span style="font-weight:400">(bấm để chọn, chọn được nhiều — không chọn = mọi nguồn; khách chưa có ngày đơn như CSKH-Duyên vẫn lấy theo nguồn)</span>:</div>
     <div class="assign-sort-row" style="margin-bottom:10px">
       ${[['dt','DT tổng'],['don','Dữ liệu đơn'],['cs','Chăm sóc'],['cskh','CSKH-Duyên']].map(([k,l])=>`<div class="assign-sort-btn ${_advAssign.srcSet.has(k)?'active':''}" onclick="_advAssignToggleSrc('${k}')">${l} (${srcCount[k]})</div>`).join('')}
