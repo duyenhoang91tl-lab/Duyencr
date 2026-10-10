@@ -967,6 +967,9 @@
       const el = panelEl?.querySelector('#pk-cf-' + f.id);
       if (el) out[f.id] = el.value || '';
     });
+    // Cờ "Phản hồi Zalo": lưu chung object custom (key zaloReply) với CRM — bỏ tích = xoá khoá, không lưu false.
+    const zr = panelEl?.querySelector('#pk-zalo-reply');
+    if (zr) { if (zr.checked) out.zaloReply = true; else delete out.zaloReply; }
     return out;
   }
 
@@ -1605,6 +1608,9 @@
           <div class="pk-form-col">
             <label>Trạng thái Zalo</label>
             <select id="pk-zalo-sel">${optHtml(ZALO_STATUSES, care?.zalo)}</select>
+            <label class="pk-zalo-reply-lbl" title="Tích khi khách đã nhắn lại / tương tác trên Zalo (cùng cờ với ô Phản hồi Zalo bên CRM — báo cáo chia data dùng để tính tỷ lệ phản hồi).">
+              <input type="checkbox" id="pk-zalo-reply" ${(care?.custom && care.custom.zaloReply) ? 'checked' : ''} /> 💬 Phản hồi Zalo
+            </label>
           </div>
         </div>
         ${_pkRenderZaloPhoneField_(phone)}
@@ -1847,6 +1853,8 @@
     out.zaloPhones = [...new Set([...svZaloPhones, ...lcZaloPhones])];
     // CS phu trach: neu khach da co CS cu thi giu, khong cuop quyen phu trach
     out.cs = serverCare.cs || localRow.cs || '';
+    // Phản hồi Zalo: luồng chỉ-thêm không được làm mất cờ server đã tích
+    if (serverCare.custom && serverCare.custom.zaloReply) out.custom = Object.assign({}, out.custom || {}, { zaloReply: true });
     const noteRes = _mergeNotesKeepOld_(serverCare.note, localRow.note);
     out.note = noteRes.merged;
     return { row: out, kept, addedNotes: noteRes.addedCount };
@@ -2014,6 +2022,8 @@
     if (readBirthdayValue_() === String(baseline.birthday || '').trim()) setBirthdayFields_(newCare.birthday || '');
     syncSel('#pk-hen-note', 'schedHenNote');
     syncSel('#pk-name-input', 'name');
+    const zrEl = panelEl.querySelector('#pk-zalo-reply');
+    if (zrEl && zrEl.checked === !!(baseline.custom && baseline.custom.zaloReply)) zrEl.checked = !!(newCare.custom && newCare.custom.zaloReply);
     const henEl = panelEl.querySelector('#pk-hen-date');
     if (henEl) {
       const baseHen = baseline.schedHen ? toInputDate_(baseline.schedHen) : '';
