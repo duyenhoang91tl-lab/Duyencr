@@ -181,14 +181,19 @@ function _inUserScope(c){
   var myNames = (currentUser.names && currentUser.names.length) ? currentUser.names : (currentUser.name ? [currentUser.name] : []);
   if (!myNames.length) return false;
   if (currentUser.role === 'cs'){
+    // Duong nong (goi cho tung khach trong 136k): vong for thay .some(closure) + khong cap phat.
     // Thuộc phạm vi nếu: là CS chăm sóc (careCS), được chia campaign, HOẶC là CS phụ trách đơn
     // (order-level seller, o.cs) — thêm chiều này để hỗ trợ đơn "chia nhiều sale": mỗi sale trong
     // đó đều xem được đơn có tên mình, dù không phải người chăm sóc chính của khách.
     var holder = _heldBy(c);
     if (myNames.indexOf(holder) !== -1) return true;
-    var allH = _allHoldersOf(c);
-    if (myNames.some(function(n){ return allH.has(n); })) return true;
-    if (c.csSet && myNames.some(function(n){ return c.csSet.has(n); })) return true;
+    // TOI UU 2026-10-10: khong tao new Set() cho tung khach (truoc day _allHoldersOf(c) cap phat 1 Set x 136k khach x 2 luot/lan doi CS -> lag o tai khoan CS/leader). Tra thang careCSSet + _assignAllIndex.
+    var _cs1 = c.careCSSet, _ix1 = (typeof _assignAllIndex !== 'undefined') ? _assignAllIndex[c.phone] : null;
+    for (var _i1 = 0; _i1 < myNames.length; _i1++) {
+      var _n1 = myNames[_i1];
+      if ((_cs1 && _cs1.has(_n1)) || (_ix1 && _ix1.has(_n1))) return true;
+    }
+    if (c.csSet) { for (var _j1 = 0; _j1 < myNames.length; _j1++) { if (c.csSet.has(myNames[_j1])) return true; } }
     return false;
   }
   if (currentUser.role === 'leader'){
@@ -201,8 +206,9 @@ function _inUserScope(c){
     var teamSet = _teamMemberSet(team);
     if (teamSet.has(holder2)) return true;
     // Kiểm tra toàn bộ chiến dịch cho leader
-    var allH2 = _allHoldersOf(c);
-    for (var m of allH2) { if (teamSet.has(m)) return true; }
+    if (c.careCSSet) { for (var m1 of c.careCSSet) { if (teamSet.has(m1)) return true; } }
+    var _ix2 = (typeof _assignAllIndex !== 'undefined') ? _assignAllIndex[c.phone] : null;
+    if (_ix2) { for (var m2 of _ix2) { if (teamSet.has(m2)) return true; } }
     // + CS phụ trách đơn (order-level seller) của bất kỳ thành viên nào trong team
     if (c.csSet) { for (var s2 of c.csSet) { if (teamSet.has(s2)) return true; } }
     return false;

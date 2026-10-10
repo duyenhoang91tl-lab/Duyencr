@@ -273,7 +273,7 @@ function _dueReminders(){
     if (mine === false) continue;                 // lịch của tài khoản khác → ẩn
     if (dism[id] === today) continue;             // đã tắt hôm nay
     var c = (typeof customerMap!=='undefined' && customerMap[x.phone]) ||
-            (typeof allCustomers!=='undefined' ? allCustomers.find(function(k){return k.phone===x.phone;}) : null);
+            (typeof _customerByPhone==='function' ? _customerByPhone(x.phone) : null);
     // Lịch cũ chưa gắn người đặt (mine === null) → giữ logic phân quyền theo vai trò như trước
     if (mine === null && c && typeof _inUserScope==='function' && !_inUserScope(c)) continue;
     out.push({ id:id, phone:x.phone, type:x.type, date:x.date, note:x.note||'', name: c?c.name:x.phone, schedId: x.id, owner: x.owner||'', ownerUser: x.ownerUser||'', customLabel: x.customLabel||'' });
@@ -292,8 +292,13 @@ function _dueReminders(){
       var ph = phones[pi];
       var care = careData[ph];
       if (!care) continue;
+      // TOI UU 2026-10-10: kiem tra NGAY DEN HAN truoc, chi khi co lich den han moi tra khach + phan quyen.
+      // Truoc day moi SDT trong careData deu goi allCustomers.find (O(136k)) + _inUserScope -> renderReminderPanel (chay sau MOI applyFilters) rat nang.
+      var _anyDue = false;
+      for (var _fj=0;_fj<careFieldMap.length;_fj++){ var _dd = care[careFieldMap[_fj].field]; if (_dd && _dd <= today){ _anyDue = true; break; } }
+      if (!_anyDue) continue;
       var cc = (typeof customerMap!=='undefined' && customerMap[ph]) ||
-               (typeof allCustomers!=='undefined' ? allCustomers.find(function(k){return k.phone===ph;}) : null);
+               (typeof _customerByPhone==='function' ? _customerByPhone(ph) : null);
       if (cc && typeof _inUserScope==='function' && !_inUserScope(cc)) continue;
       for (var fi=0;fi<careFieldMap.length;fi++){
         var fm = careFieldMap[fi];
