@@ -236,12 +236,12 @@ const GAS_URL_DIRECT = 'https://script.google.com/macros/s/AKfycbx3QT6YIzQ7SQEwQ
 // TAM LUI 2026-10-10: Worker tra loi 520 (CRM khong tai duoc du lieu) -> goi thang Apps Script. Bat lai Worker: dat FIXED_GS_URL = WORKER_URL sau khi kiem tra Cloudflare (Metrics / han muc 100.000 request/ngay).
 const WORKER_URL = 'https://royal-brook-6cec.duyenhoang91-tl.workers.dev'; // Worker cache (cloudflare/worker.mjs)
 // Mac dinh goi THANG Apps Script. Thu Worker tren 1 may (khong anh huong may khac): mo CRM voi ?worker=1 (nho trong may do); ?worker=0 de tat.
-let FIXED_GS_URL = GAS_URL_DIRECT;
+let FIXED_GS_URL = WORKER_URL; // BAT LAI Worker mac dinh (2026-10-10) de kiem tra lai sau khi Cloudflare da them bien GAS_URL; ?worker=0 -> goi thang Apps Script tren may do
 try {
   const _wp = new URLSearchParams(location.search).get('worker');
-  if (_wp === '1') localStorage.setItem('ome_use_worker', '1');
-  else if (_wp === '0') localStorage.removeItem('ome_use_worker');
-  if (localStorage.getItem('ome_use_worker') === '1') FIXED_GS_URL = WORKER_URL;
+  if (_wp === '0') localStorage.setItem('ome_use_worker', '0');
+  else if (_wp === '1') localStorage.removeItem('ome_use_worker');
+  if (localStorage.getItem('ome_use_worker') === '0') FIXED_GS_URL = GAS_URL_DIRECT;
 } catch (e) { /* localStorage bi chan -> giu goi thang */ }
 let gsUrl = FIXED_GS_URL || loadLS('ome_gs_url') || '';
 // ── Tai khoan TEST: moi request toi GAS tu dong kem demoToken (server chi cho xem bao cao, cat 5 dong, chan ghi). ──
