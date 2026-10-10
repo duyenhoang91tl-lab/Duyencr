@@ -260,6 +260,7 @@ function doGetCore_(e) {
       try { cacheA.put(cKeyA, JSON.stringify(resA), 120); } catch(ec) {}
       return jsonOut_(resA);
     }
+    if (action === 'teamAnalysis') return teamAnalysis_(e.parameter || {});
     if (action === 'saleKpiReport') {
       var pF = e.parameter || {};
       var fF = { dateFrom: pF.dateFrom || '', dateTo: pF.dateTo || '',

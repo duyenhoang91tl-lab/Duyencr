@@ -1654,6 +1654,7 @@ function doGetCore_(e) {
       try { cacheA.put(cKeyA, JSON.stringify(resA), 120); } catch(ec) {}
       return jsonOut_(resA);
     }
+    if (action === 'teamAnalysis') return teamAnalysis_(e.parameter || {});
     if (action === 'saleKpiReport') {
       var pF = e.parameter || {};
       var fF = { dateFrom: pF.dateFrom || '', dateTo: pF.dateTo || '',
@@ -7689,6 +7690,169 @@ function readExternalProductSheet_(query) {
 function callGroqAI_(data) { return callAI_(data); } // alias tuong thich cu
 
 // ═══════════════════════════════════════════════════════════════
+//  AI PHAN TICH TOAN TEAM (v13.23) — action GET teamAnalysis
+//  Gom so lieu tung nguoi tu CAC BAO CAO DA CO (KPI Sale / Pancake KPI / don that bai / CS them KH moi),
+//  CHAM DIEM + XEP LOAI bang quy tac CO DINH (on dinh, giai thich duoc) roi nho AI viet nhan xet. AI loi/thieu key van ra bang
+//  day du (nhan xet dung quy tac). Khong gui SDT khach cho AI — chi gui ten nhan vien + chi so tong hop.
+//  Chi admin/leader dung duoc (client an menu; tai khoan test khong nam trong DEMO_ALLOWED_GET_).
+// ═══════════════════════════════════════════════════════════════
+function _taNum_(v) { v = Number(v); return isFinite(v) ? v : 0; }
+function _taClamp_(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
+function _taMedian_(arr) {
+  var a = arr.slice().sort(function(x, y) { return x - y; });
+  if (!a.length) return 0;
+  var m = Math.floor(a.length / 2);
+  return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+}
+function buildTeamMetrics_(from, to) {
+  var warnings = [], people = {};
+  function P(name) {
+    var k = _normTxt_(name); if (!k) return null;
+    if (!people[k]) people[k] = { name: String(name).trim(), nhom: '', tier: '', revenue: 0, orders: 0, target: 0, pct: null, commit: 0, pctCommit: null,
+      tongTT: 0, sdtMangVe: 0, tyLeChot: null, failedOrders: 0, careLeads: 0 };
+    return people[k];
+  }
+  try {
+    var k1 = buildSaleKpiReport_({ dateFrom: from, dateTo: to, dateField: 'ngayTao', sale: [], kenh: [], sanPham: '', byCreator: false });
+    (k1.rows || []).forEach(function(r) {
+      var p = P(r.name); if (!p) return;
+      p.nhom = r.nhomChung || r.nhom || ''; p.tier = r.tier || '';
+      p.revenue = _taNum_(r.revenue); p.orders = _taNum_(r.orders);
+      p.target = _taNum_(r.target); p.pct = (r.pct === null || r.pct === undefined) ? null : _taNum_(r.pct);
+      p.commit = _taNum_(r.commit); p.pctCommit = (r.pctCommit === null || r.pctCommit === undefined) ? null : _taNum_(r.pctCommit);
+    });
+  } catch (e1) { warnings.push('Không đọc được KPI Sale: ' + e1.message); }
+  try {
+    var k2 = buildKpiReport_(from, to, []);
+    (k2.bySale || []).forEach(function(r) {
+      var p = P(r.name); if (!p) return;
+      p.tongTT = _taNum_(r.tongTT); p.sdtMangVe = _taNum_(r.sdtMangVe);
+      p.tyLeChot = p.tongTT ? _taNum_(r.tyLeChot) : null;
+      if (!p.orders && r.donHang) { p.orders = _taNum_(r.donHang); p.revenue = _taNum_(r.doanhThu); }
+    });
+  } catch (e2) { warnings.push('Không đọc được KPI Pancake: ' + e2.message); }
+  try {
+    var k3 = buildFailedOrderReport_({ dateFrom: from, dateTo: to, sale: [], nguon: [], marketer: [], sanPham: '' });
+    (k3.bySale || []).forEach(function(r) { var p = P(r.name); if (p) p.failedOrders = _taNum_(r.orders); });
+  } catch (e3) { warnings.push('Không đọc được báo cáo đơn thất bại: ' + e3.message); }
+  try {
+    var k4 = buildCareLeadReport_({ dateFrom: from, dateTo: to, cs: [] });
+    (k4.byCS || []).forEach(function(r) { var p = P(r.name); if (p) p.careLeads = _taNum_(r.count); });
+  } catch (e4) { warnings.push('Không đọc được báo cáo CS thêm KH: ' + e4.message); }
+  return { list: Object.keys(people).map(function(k) { return people[k]; }), warnings: warnings };
+}
+// Cham diem 0-100 + xep loai. Diem = trung binh co trong so cua cac thanh phan CO DU LIEU (khong phat nguoi thieu 1 nguon so lieu).
+function scoreTeam_(list) {
+  var act = list.filter(function(p) { return p.orders > 0 || p.tongTT > 0 || p.failedOrders > 0 || p.careLeads > 0 || p.revenue > 0; });
+  var closeVals = act.filter(function(p) { return p.tongTT >= 10 && p.tyLeChot !== null; }).map(function(p) { return p.tyLeChot; });
+  var medClose = _taMedian_(closeVals);
+  var totOrders = 0, totFailed = 0, totRev = 0;
+  act.forEach(function(p) { totOrders += p.orders; totFailed += p.failedOrders; totRev += p.revenue; });
+  var teamFail = (totOrders + totFailed) ? totFailed / (totOrders + totFailed) : 0;
+  var byRev = act.slice().sort(function(a, b) { return b.revenue - a.revenue; });
+  byRev.forEach(function(p, i) { p._revPct = byRev.length > 1 ? (byRev.length - 1 - i) / (byRev.length - 1) * 100 : 100; });
+  act.forEach(function(p) {
+    var comps = [], strengths = [], issues = [];
+    p.failRate = (p.orders + p.failedOrders) ? p.failedOrders / (p.orders + p.failedOrders) : null;
+    if (p.pct !== null) {
+      comps.push({ w: 45, v: _taClamp_(p.pct, 0, 120) / 120 * 100 });
+      if (p.pct >= 100) strengths.push('Đạt ' + p.pct + '% KPI');
+      else if (p.pct < 70) issues.push('Mới đạt ' + p.pct + '% KPI');
+    }
+    if (p.revenue > 0 || p.orders > 0) {
+      comps.push({ w: 20, v: p._revPct });
+      if (p._revPct >= 75 && byRev.length >= 4) strengths.push('Doanh thu thuộc nhóm đứng đầu team');
+      else if (p._revPct <= 25 && byRev.length >= 4) issues.push('Doanh thu thuộc nhóm thấp nhất team');
+    }
+    if (p.tongTT >= 10 && p.tyLeChot !== null && medClose > 0) {
+      comps.push({ w: 20, v: _taClamp_(p.tyLeChot / (medClose * 1.5) * 100, 0, 100) });
+      if (p.tyLeChot >= medClose * 1.2) strengths.push('Tỷ lệ chốt ' + p.tyLeChot + '% cao hơn mức giữa team (' + Math.round(medClose * 10) / 10 + '%)');
+      else if (p.tyLeChot < medClose * 0.7) issues.push('Tỷ lệ chốt ' + p.tyLeChot + '% thấp hơn mức giữa team (' + Math.round(medClose * 10) / 10 + '%)');
+    }
+    if (p.failRate !== null && (p.orders + p.failedOrders) >= 5) {
+      comps.push({ w: 15, v: _taClamp_(100 - p.failRate * 100 * 2.5, 0, 100) });
+      if (p.failedOrders >= 3 && p.failRate > Math.max(teamFail * 1.5, 0.1)) issues.push(p.failedOrders + ' đơn thất bại (' + Math.round(p.failRate * 1000) / 10 + '% so với mức chung ' + Math.round(teamFail * 1000) / 10 + '%)');
+      else if (p.failRate <= teamFail * 0.5 && p.orders >= 5) strengths.push('Ít đơn thất bại');
+    }
+    var wSum = comps.reduce(function(s, c) { return s + c.w; }, 0);
+    p.score = wSum ? Math.round(comps.reduce(function(s, c) { return s + c.w * c.v; }, 0) / wSum) : null;
+    p.enough = comps.length >= 2 || (p.pct !== null);
+    p.rating = !p.enough || p.score === null ? 'chuadu' : (p.score >= 70 ? 'tot' : (p.score >= 45 ? 'trungbinh' : 'kem'));
+    if (p.rating === 'chuadu') { p.score = null; strengths = []; issues = []; }   // it so lieu -> khong ket luan hay/do, tranh nhan xet gay hieu nham
+    p.strengths = strengths; p.issues = issues;
+    p.comment = p.rating === 'chuadu' ? 'Chưa đủ số liệu trong kỳ này để đánh giá (ít đơn / chưa có KPI hoặc dữ liệu Pancake).' : ((strengths.concat(issues)).join('; ') || 'Chưa có điểm nổi bật hay điểm yếu rõ ràng trong kỳ này.');
+    delete p._revPct;
+  });
+  var order = { tot: 0, trungbinh: 1, kem: 2, chuadu: 3 };
+  act.sort(function(a, b) { return (order[a.rating] - order[b.rating]) || ((b.score || 0) - (a.score || 0)) || (b.revenue - a.revenue); });
+  return { people: act, team: { soNguoi: act.length, totalRevenue: Math.round(totRev), totalOrders: totOrders, totalFailed: totFailed, tyLeThatBai: Math.round(teamFail * 1000) / 10, tyLeChotGiuaTeam: Math.round(medClose * 10) / 10,
+    tot: act.filter(function(p) { return p.rating === 'tot'; }).length, trungbinh: act.filter(function(p) { return p.rating === 'trungbinh'; }).length,
+    kem: act.filter(function(p) { return p.rating === 'kem'; }).length, chuadu: act.filter(function(p) { return p.rating === 'chuadu'; }).length } };
+}
+// Goi AI da nha cung cap, tra ve chuoi JSON (parse tai _taParseJson_). Gioi han token cao hon callAI_ (400) vi bang nhieu nguoi.
+function _taCallAI_(sys, userMsg) {
+  var providers = [
+    { name: 'Groq',       key: getSetting_('apiGroq') || getSetting_('geminiKey'), fn: _aiOpenAICompat_, url: 'https://api.groq.com/openai/v1/chat/completions', model: 'openai/gpt-oss-120b' },
+    { name: 'Cerebras',   key: getSetting_('apiCerebras'),                         fn: _aiOpenAICompat_, url: 'https://api.cerebras.ai/v1/chat/completions',    model: 'gpt-oss-120b' },
+    { name: 'Gemini',     key: getSetting_('apiGemini'),                           fn: _aiGemini_,       model: 'gemini-flash-latest' }
+  ];
+  var errors = [], any = false;
+  for (var i = 0; i < providers.length; i++) {
+    var pv = providers[i]; if (!pv.key) continue; any = true;
+    pv.maxTokens = 6000; pv.temperature = 0.3;
+    var r = pv.fn(pv, sys, userMsg);
+    if (r.ok && r.text) return { ok: true, text: r.text, provider: pv.name };
+    errors.push(pv.name + ': ' + (r.error || 'tra loi rong'));
+  }
+  return { ok: false, error: any ? errors.join(' | ') : 'Chưa cấu hình key AI (Settings: apiGroq / apiCerebras / apiGemini).' };
+}
+function _taParseJson_(t) {
+  var s = String(t || '').replace(/```json|```/gi, '').trim();
+  var a = s.indexOf('{'), b = s.lastIndexOf('}');
+  if (a < 0 || b <= a) return null;
+  try { return JSON.parse(s.substring(a, b + 1)); } catch (e) { return null; }
+}
+function teamAnalysis_(p) {
+  var today = _vnYmd_(new Date());
+  var from = p.from || p.dateFrom || (today.substring(0, 8) + '01'), to = p.to || p.dateTo || today;
+  if (from > to) return jsonOut_({ ok: false, error: 'Khoảng ngày bị ngược (từ ' + from + ' sau đến ' + to + ').' });
+  var wantAI = p.ai !== '0', cacheKey = 'teamAI_v1_' + from + '_' + to, cache = CacheService.getScriptCache();
+  if (wantAI && p.refresh !== '1') {
+    var hit = cache.get(cacheKey);
+    if (hit) { try { var o = JSON.parse(hit); o.cached = true; return jsonOut_(o); } catch (eh) {} }
+  }
+  var m = buildTeamMetrics_(from, to), sc = scoreTeam_(m.list);
+  var out = { ok: true, from: from, to: to, generatedAt: Utilities.formatDate(new Date(), 'Asia/Ho_Chi_Minh', 'dd/MM/yyyy HH:mm'), team: sc.team, people: sc.people,
+    overview: '', highlights: [], risks: [], aiProvider: '', aiError: '', warnings: m.warnings,
+    note: 'Điểm = trung bình có trọng số: %KPI (45) + doanh thu so với team (20) + tỷ lệ chốt so với mức giữa team (20) + chất lượng đơn (15; tỷ lệ thất bại = đơn thất bại ÷ (đơn + đơn thất bại)). Thành phần thiếu số liệu thì bỏ qua, không trừ điểm. Từ 70 là "Làm tốt", 45–69 "Trung bình", dưới 45 "Cần cải thiện".' };
+  if (!sc.people.length) { out.overview = 'Không có số liệu của nhân viên nào trong khoảng ngày này.'; return jsonOut_(out); }
+  if (wantAI) {
+    var slim = sc.people.slice(0, 40).map(function(x) { return { ten: x.name, nhom: x.nhom, doanhThu: Math.round(x.revenue), soDon: x.orders, kpiPct: x.pct, tyLeChotPct: x.tyLeChot, soTinNhan: x.tongTT,
+      donThatBai: x.failedOrders, khThemMoi: x.careLeads, diem: x.score, xepLoai: x.rating, diemManh: x.strengths, diemYeu: x.issues }; });
+    var sys = 'Bạn là chuyên viên phân tích vận hành bán hàng cho một doanh nghiệp bán trang sức phong thủy. Trả lời bằng TIẾNG VIỆT, chỉ dùng số liệu được cung cấp, không bịa số, không đổi xếp loại đã tính. ' +
+      'Giọng điệu thẳng thắn nhưng công bằng, nêu việc cụ thể cần làm. Chỉ trả về MỘT đối tượng JSON, không kèm văn bản hay markdown khác.';
+    var user = 'Kỳ phân tích: ' + from + ' → ' + to + '. Tổng quan team: ' + JSON.stringify(sc.team) + '.\nDữ liệu từng người (xepLoai: tot=làm tốt, trungbinh, kem=cần cải thiện, chuadu=chưa đủ dữ liệu):\n' + JSON.stringify(slim) +
+      '\nTrả về JSON đúng dạng: {"overview":"3-5 câu tổng quan hiệu quả team","highlights":["2-4 điểm tốt của team"],"risks":["2-4 rủi ro/điểm cần xử lý"],"people":[{"name":"đúng tên như dữ liệu","comment":"1-2 câu nhận xét vì sao làm tốt/chưa tốt","action":"1 việc cụ thể nên làm tiếp"}]}';
+    var ai = _taCallAI_(sys, user);
+    if (ai.ok) {
+      var j = _taParseJson_(ai.text);
+      if (j) {
+        out.overview = String(j.overview || ''); out.highlights = Array.isArray(j.highlights) ? j.highlights.slice(0, 6).map(String) : []; out.risks = Array.isArray(j.risks) ? j.risks.slice(0, 6).map(String) : [];
+        var byName = {}; (Array.isArray(j.people) ? j.people : []).forEach(function(x) { if (x && x.name) byName[_normTxt_(x.name)] = x; });
+        out.people.forEach(function(x) { var a = byName[_normTxt_(x.name)]; if (a) { if (a.comment) x.comment = String(a.comment); x.action = a.action ? String(a.action) : ''; } });
+        out.aiProvider = ai.provider;
+        try { cache.put(cacheKey, JSON.stringify(out), 600); } catch (ec) {}
+      } else { out.aiError = 'AI trả về không đúng định dạng JSON — đang hiển thị nhận xét theo quy tắc.'; }
+    } else { out.aiError = ai.error; }
+  }
+  if (!out.overview) {
+    var t = sc.team;
+    out.overview = 'Kỳ ' + from + ' → ' + to + ': ' + t.soNguoi + ' nhân viên có số liệu, ' + t.tot + ' làm tốt, ' + t.trungbinh + ' trung bình, ' + t.kem + ' cần cải thiện, ' + t.chuadu + ' chưa đủ dữ liệu. (Nhận xét tự động theo quy tắc, chưa có phần AI viết.)';
+  }
+  return jsonOut_(out);
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  KIEN THUC TU THU MUC DRIVE (PDF / Google Doc / Google Sheet)
 // ═══════════════════════════════════════════════════════════════
 // Cau hinh: setSetting_('driveKnowledgeFolderUrl', <link thu muc Drive>) — thu muc phai
@@ -8198,7 +8362,7 @@ function _aiOpenAICompat_(prov, sys, userMsg) {
       payload: JSON.stringify({
         model: prov.model,
         messages: [ { role: 'system', content: sys }, { role: 'user', content: userMsg } ],
-        temperature: 0.7, max_tokens: 400
+        temperature: (prov.temperature != null ? prov.temperature : 0.7), max_tokens: (prov.maxTokens || 400)
       }),
       muteHttpExceptions: true
     });
@@ -8219,7 +8383,7 @@ function _aiGemini_(prov, sys, userMsg) {
       payload: JSON.stringify({
         systemInstruction: { parts: [ { text: sys } ] },
         contents: [ { role: 'user', parts: [ { text: userMsg } ] } ],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 400 }
+        generationConfig: { temperature: (prov.temperature != null ? prov.temperature : 0.7), maxOutputTokens: (prov.maxTokens || 400) }
       }),
       muteHttpExceptions: true
     });
