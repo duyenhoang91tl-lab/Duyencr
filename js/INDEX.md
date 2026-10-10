@@ -39,7 +39,7 @@ Code client của `index.html` (trước đây inline, ~1.4MB) đã tách ra `cs
 
 - `27-fn-bonuscore.js`: `_bcOrderInfo_`, `_bcGuess_`, `_bcMinProducts_`, `_bcIsVongProgram_` (lõi đếm SP thưởng; bản sao trong gas_v13.js)
 - `28-fn-bonusdetail.js`: tab K "Chi tiết thưởng" — `renderSalesReportTabK_`, `_bdFlag`, `_bdSlot`, `_bdRev`, `_bdSyncFromGAS`
-- `29-fn-todaytasks.js`: nhắc việc hôm nay cho CS — `ttFetch`, `_ttCards`, `_ttCardHtml` (thẻ trong khung nhắc hẹn; backend gas/23_TodayTasks.gs)
+- `30-fn-todaytasks.js`: nhắc việc hôm nay cho CS — `ttFetch`, `_ttCards`, `_ttCardHtml` (thẻ trong khung nhắc hẹn; backend gas/23_TodayTasks.gs)
 
 - `31-fn-orgoverview.js`: tab "🏠 Tổng quan" = MÀN HÌNH ĐẦU SAU ĐĂNG NHẬP (tự `switchTab('overview')` khi data-view hiện, trừ tài khoản test) + modal "🪪 Hồ sơ nhân sự" — `_ovLoad`, `_ovScope` (phạm vi xem theo vai trò), `_ovRender`, `openEmployeeProfile`, `_ovAskAI`; gọi GAS `action=orgOverview`.
 - `30-fn-teamanalysis.js`: modal "🤖 AI phân tích team" (menu Báo cáo, admin) — `openTeamAnalysisModal`, `runTeamAnalysis`, `_taRender`, `_taSetFilter`, `_taRange`; gọi GAS `action=teamAnalysis`.
