@@ -40,6 +40,7 @@
 | (chạy tay) sbKHDeltaBat / sbKHDeltaTat / sbKHFullBat / sbKHFullTat | — | Supabase bước 4e, KHÔNG phải action web: bật/tắt đọc danh sách khách của action `customers` (delta `since` và FULL) từ Supabase qua `SB_CARE_DELTA_READ` / `SB_CARE_FULL_READ` (mặc định TẮT, cần `SB_MODE=read`; tự fallback Sheets khi STALE/dirty/lỗi). Chi tiết: `docs/SUPABASE-PLAN.md` |
 | (chạy tay) sbSanSangBuoc5 | — | Supabase bước 5a, KHÔNG phải action web, CHỈ ĐỌC: kiểm 13 điều kiện tự động trước khi bỏ dual-write (mode read, STALE/dirty, đối chiếu, đồng bộ đơn hàng + trigger, 3 công tắc đọc đã bật ≥ 7 ngày qua mốc `<tên>_AT`) và luôn in kèm danh sách việc thủ công. Không đổi gì. Thiết kế bước 5: `docs/SUPABASE-PLAN.md` |
 | (chạy tay trong Editor) | — | Supabase, không cần adminKey: `sbKiemTraKetNoi`, `sbBatGhiSongSong`, `sbBackfillThu`/`sbBackfillThat`/`sbBackfillTuDau`, `sbDoiChieu`, `sbBatDocSupabase`, `sbTatSupabase`, `sbSuaSDTLoi`, `sbXemTrangThai` (xem `docs/SUPABASE-PLAN.md`) |
+| ntlReport | GET | Bảo mật bước 3 (cần adminKey): đếm request dữ liệu theo ngày/action/nguồn (`src`)/có-không token để biết ai còn gọi trần trước khi bắt buộc token. Cũng chạy tay `xemLogKhongToken` trong Editor. Chi tiết: `docs/SECURITY-PLAN.md` |
 | sbStatus | GET | Supabase (cần adminKey): chế độ `SB_MODE` (off/write/read), cờ STALE, số SĐT dirty |
 | sbSetMode / sbResyncCare | POST | Supabase (cần adminKey): đổi chế độ off/write/read (`read` bị từ chối khi STALE trừ `clearStale:true`) / sửa các SĐT dirty (mirror lỗi) |
 

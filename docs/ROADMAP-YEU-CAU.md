@@ -22,6 +22,13 @@ Mỗi phiên làm xong 1 mục nhỏ thì push ngay, tick `[x]` ở đây và gh
 - Mọi thay đổi cấu hình (hạng, mốc, chiến dịch, ngưỡng) ghi AuditLog (giờ, người, giá trị cũ/mới).
 - Key AI/token chỉ ở phía server.
 
+## C0. Quyết định Duyên đã chốt (2026-10-11)
+- **Q1:** dữ liệu mới → **Supabase** (bảng mới tạo trong Supabase; bước 5 Supabase vẫn chờ Duyên đồng ý riêng).
+- **Q2:** hạng **giữ trọn đời**; "điểm tiêu" cài đặt **theo từng năm** — *cần Duyên giải thích rõ "điểm tiêu" là gì (điểm tích luỹ theo năm? ngưỡng chi tiêu từng năm?) trước khi làm P1a*.
+- **Q5:** trạng thái thất bại trên Base = **hủy/hoàn**. **Q6:** **renew = bán lại** (một định nghĩa, một hàm).
+- **Q8:** tin Zalo lấy từ **extension Zalo AI hiện tại**; Zalo đang tích hợp trực tiếp vào Pancake; tổng đài **ccall có API** (cần xin tài liệu API/khoá).
+- Còn mở: Q3 (mốc khi mua lại giữa chừng), Q4 (nguồn đơn áp mốc), Q7 (mục tiêu KPI theo công ty/team/sale), Q9 (kênh gửi tóm tắt).
+
 ## C. Quyết định cần Duyên chốt TRƯỚC khi làm phần tương ứng
 | # | Câu hỏi | Chặn phần |
 |---|---|---|
@@ -37,7 +44,7 @@ Mỗi phiên làm xong 1 mục nhỏ thì push ngay, tick `[x]` ở đây và gh
 
 ## D. Các giai đoạn (mỗi mục nhỏ push riêng, có công tắc/rollback)
 ### P0 — Nền tảng (làm trước, chặn phần còn lại)
-- [ ] 0a Phát token phiên khi đăng nhập (HMAC, hết hạn), mọi request dữ liệu kèm token; backend tính `role` + phạm vi (admin/ceo/tp: tất cả hoặc theo cấu hình; leader: theo team; sale: khách mình phụ trách/chăm sóc). Bật bằng cờ, mặc định chế độ "ghi log không chặn" 1 tuần → rồi mới chặn. Extension gửi token (cả Zalo AI và Pancake AI).
+- [~] 0a (phiên khác đã làm bước 1+2 = webLogin + token HMAC, xem `docs/SECURITY-PLAN.md`; bước 3 log không token đã xong; CÒN bước 3b gắn `src`/token ở client+extension và bước 4 bắt buộc token + lọc theo vai trò) Phát token phiên khi đăng nhập (HMAC, hết hạn), mọi request dữ liệu kèm token; backend tính `role` + phạm vi (admin/ceo/tp: tất cả hoặc theo cấu hình; leader: theo team; sale: khách mình phụ trách/chăm sóc). Bật bằng cờ, mặc định chế độ "ghi log không chặn" 1 tuần → rồi mới chặn. Extension gửi token (cả Zalo AI và Pancake AI).
 - [ ] 0b Thêm vai trò `ceo`, `tp`; admin bật/tắt tab theo người đã có (`perms`) → thêm kiểm ở backend.
 - [ ] 0c `scopeOf_(user)` dùng chung cho mọi action mới (báo cáo, hồ sơ sale, chiến dịch, AI tóm tắt).
 - [ ] 0d Hàm chỉ số dùng chung (`metrics`): doanh thu Pos, số đơn, hủy/hoàn, renew, bán lại; có test Node đối chiếu 1 tuần mẫu (sai lệch 0).

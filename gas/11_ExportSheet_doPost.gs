@@ -229,6 +229,7 @@ function doPost(e) {
     if (d0.action === 'setGasSource' && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de dong bo ma nguon GAS.' });
     if (d0.action === 'setSetting' && _isSensitiveWriteKey_(d0.key) && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Khong duoc ghi key nay.' });
   }
+  if (d0 && typeof d0 === 'object') _ntlNote_('POST', d0.action, d0.token, d0.src);
   return doPostCore_(e);
 }
 

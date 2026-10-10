@@ -1500,9 +1500,64 @@ function webLogin_(d) {
   return jsonOut_(out);
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  BUOC 3 KE HOACH BAO MAT (them 2026-10-11): GHI LOG request du lieu khong co token hop le — CHUA CHAN gi.
+//  Nguyen nhan goc can lam: truoc khi bat buoc token (buoc 4) phai biet nguoi goi nao (web, extension Zalo, extension Pancake,
+//  Worker...) con goi tran; bat buoc ngay se lam hong extension. Dem theo ngay + action + nguon (tham so `src`, mac dinh '?')
+//  + co/khong token. Luu o CacheService (TTL toi da 6 gio, cap nhat moi lan ghi) nen KHONG cham duong luu cua CS (khong khoa, khong ghi sheet);
+//  dem gan dung khi nhieu request cung luc. Xem: GET action=ntlReport&adminKey=... hoac chay ham xemLogKhongToken trong Editor.
+// ═══════════════════════════════════════════════════════════════
+var NTL_ACTIONS_ = {
+  customers:1, lookup:1, donOrdersByPhone:1, cskhDetail:1, reminders:1, tasks:1, taskComments:1,
+  save:1, saveSingle:1, saveBatch:1, syncZaloFriendStatus:1, addCareLead:1, applyCustomerNameGuesses:1, dedupeCare:1,
+  saveOrders:1, patchOrder:1, deleteOrder:1, deleteDuplicateOrders:1, replaceOrders:1, importSheetRows:1, archiveOrders:1,
+  setOrderCareCS:1, setOrderCareCSBatch:1, saveAssign:1, saveAssignHistory:1, toggleAssignDone:1,
+  saveTask:1, deleteTask:1, saveTaskComment:1, saveTeams:1, saveMktTeams:1, saveSaleGroups:1, saveCareStatus:1,
+  broadcastMark:1, saveBroadcast:1, broadcastCancel:1, broadcastSetStatus:1, saveFollowUpTemplates:1, saveAudit:1
+};
+function _ntlKey_() { return 'ntl_' + Utilities.formatDate(new Date(), 'GMT+7', 'yyyyMMdd'); }
+// Ghi 1 request vao bo dem. method: 'GET'|'POST'. Moi loi bi nuot — log KHONG BAO GIO duoc lam hong request that.
+function _ntlNote_(method, action, token, src) {
+  try {
+    action = String(action || '');
+    if (!NTL_ACTIONS_[action]) return;
+    var tokOk = !!(token && _sessVerify_(token));
+    var cache = CacheService.getScriptCache();
+    var key = _ntlKey_(), raw = cache.get(key), m = {};
+    if (raw) { try { m = JSON.parse(raw) || {}; } catch (e0) { m = {}; } }
+    var sc = String(src || '?').replace(/[^A-Za-z0-9_\-]/g, '').slice(0, 16) || '?';
+    var k = method + ' ' + action + ' | src=' + sc + ' | ' + (tokOk ? 'token' : 'NO-TOKEN');
+    m[k] = (m[k] || 0) + 1;
+    if (Object.keys(m).length > 200) return;   // chan phinh to bat thuong (vd ai do gui action/src ngau nhien)
+    cache.put(key, JSON.stringify(m), 21600);
+  } catch (e) {}
+}
+// Tra {date, rows:[{k, n}], noTokenTotal, tokenTotal} — sap xep NO-TOKEN truoc, nhieu nhat truoc.
+function _ntlReport_() {
+  var raw = CacheService.getScriptCache().get(_ntlKey_()), m = {};
+  if (raw) { try { m = JSON.parse(raw) || {}; } catch (e0) { m = {}; } }
+  var rows = Object.keys(m).map(function (k) { return { k: k, n: m[k] }; });
+  rows.sort(function (a, b) {
+    var an = a.k.indexOf('NO-TOKEN') >= 0 ? 0 : 1, bn = b.k.indexOf('NO-TOKEN') >= 0 ? 0 : 1;
+    return an !== bn ? an - bn : b.n - a.n;
+  });
+  var noTok = 0, tok = 0;
+  rows.forEach(function (r) { if (r.k.indexOf('NO-TOKEN') >= 0) noTok += r.n; else tok += r.n; });
+  return { ok: true, date: _ntlKey_().slice(4), noTokenTotal: noTok, tokenTotal: tok, rows: rows,
+    note: 'Dem gan dung, luu o cache toi da 6 gio (ngung 6 gio thi bat dau dem lai). src=? nghia la nguoi goi chua gui tham so src.' };
+}
+// Chay tay trong Apps Script Editor (khong can adminKey): xem Execution log.
+function xemLogKhongToken() {
+  var r = _ntlReport_();
+  Logger.log('Ngay ' + r.date + ': KHONG token=' + r.noTokenTotal + ', co token=' + r.tokenTotal);
+  r.rows.slice(0, 60).forEach(function (x) { Logger.log(x.n + '  ' + x.k); });
+  return r;
+}
+
 function doGet(e) {
   var p = (e && e.parameter) || {};
   var action = p.action || '';
+  if (action === 'ntlReport') return _adminKeyOk_(p.adminKey) ? jsonOut_(_ntlReport_()) : jsonOut_({ error: 'Can khoa quan tri (adminKey).' });
   if (action === 'getSetting' && _isSensitiveSettingKey_(p.key)) return jsonOut_({ value: null });
   if (action === 'getGasSource' && !_adminKeyOk_(p.adminKey)) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de lay ma nguon GAS.' });
   if (p.demo) {
@@ -1510,6 +1565,7 @@ function doGet(e) {
     if (DEMO_ALLOWED_GET_[action] !== 1) return jsonOut_({ error: 'Tai khoan test khong duoc phep thao tac nay.' });
     return _demoClip_(doGetCore_(e), action);
   }
+  _ntlNote_('GET', action, p.token, p.src);
   return doGetCore_(e);
 }
 
@@ -1869,7 +1925,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.25-auth-session' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.26-auth-log-notoken' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -5568,6 +5624,7 @@ function doPost(e) {
     if (d0.action === 'setGasSource' && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de dong bo ma nguon GAS.' });
     if (d0.action === 'setSetting' && _isSensitiveWriteKey_(d0.key) && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Khong duoc ghi key nay.' });
   }
+  if (d0 && typeof d0 === 'object') _ntlNote_('POST', d0.action, d0.token, d0.src);
   return doPostCore_(e);
 }
 

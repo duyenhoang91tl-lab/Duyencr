@@ -9,8 +9,11 @@ Cập nhật 2026-10-11. Nguyên nhân gốc: trước đây `action=users` tr�
 - Client: `doLogin` gọi webLogin; token lưu `ome_sess_token`/`ome_sess_exp`; phiên cũ (không có token) bị buộc đăng nhập lại 1 lần.
 - `verifyLogin` (extension Pancake) giữ nguyên hình dạng trả về; salt cũ OME được nâng lên salt mới ngay ở server.
 
-## Bước 3 — CHƯA LÀM: ghi log request không token
-Thêm log (sheet hoặc Script Properties, có giới hạn dòng) cho các action đọc/ghi dữ liệu khách/đơn khi không có token hợp lệ: `customers, lookup, saveSingle, saveBatch, deleteOrder, deleteDuplicateOrders, replaceOrders, patchOrder, setOrderCareCS...`. Mục tiêu: biết extension/nơi nào còn gọi trần trước khi bắt buộc token.
+## Bước 3 — ĐÃ LÀM (gas v13.26-auth-log-notoken): ghi log request không token, CHƯA chặn gì
+- `doGet`/`doPost` gọi `_ntlNote_(method, action, token, src)` cho 39 action dữ liệu (`NTL_ACTIONS_`: customers, lookup, reminders, tasks, save*, patchOrder, deleteOrder, replaceOrders, setOrderCareCS*, broadcast*...). Tài khoản demo không đi qua log.
+- Đếm theo ngày + `method action | src=… | token/NO-TOKEN` ở CacheService (TTL tối đa 6 giờ, không khoá, không ghi sheet → không làm chậm đường lưu của CS; đếm gần đúng khi nhiều request đồng thời; tối đa 200 khoá/ngày; mọi lỗi bị nuốt).
+- Xem kết quả: `GET action=ntlReport&adminKey=…` hoặc chạy hàm `xemLogKhongToken` trong Apps Script Editor (xem Execution log). NO-TOKEN xếp trước.
+- Nguồn gọi nhận diện qua tham số `src` (mặc định `?`). **Việc tiếp (bước 3b, nhỏ):** web client gửi `src=web` + `token`; extension Zalo gửi `src=zalo`, Pancake gửi `src=pancake`, Worker Cloudflare `src=worker` — để bước 4 biết nơi nào còn gọi trần. Test: `node tools/test-ntl.js`.
 
 ## Bước 4 — CHƯA LÀM: bắt buộc token + lọc theo vai trò ở server
 - Client: gắn `token` vào mọi request tới GAS (hàm `window.fetch` bọc ở `js/06-main-renew-sources.js`). Lưu ý Worker Cloudflare đang cache GET theo URL → thêm `token` vào `NO_CACHE_PARAMS` hoặc chuẩn hoá cache key bỏ `token` nhưng vẫn xác thực ở Worker.
