@@ -383,6 +383,8 @@ function doGetCore_(e) {
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
+    // ── NHAC VIEC HOM NAY (don Base ket giai doan > N gio). names = ten sale cua CS cach nhau '|' (rong = tat ca) ──
+    if (action === 'todayTasks') return jsonOut_(ttTodayTasks_(e && e.parameter ? e.parameter.names : ''));
     if (action === 'reminders') {
       var csFilter = (e && e.parameter && e.parameter.cs) ? String(e.parameter.cs) : '';
       return jsonOut_({ reminders: readRemindersToday_(csFilter) });

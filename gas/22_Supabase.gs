@@ -1539,3 +1539,4 @@ function buildStoreCaseReport_(filters) {
     note: 'Nguồn đơn: Pos ("dữ liệu đơn", cùng nguồn Báo cáo B). Doanh thu chia = giá trị sau giảm giá × ' + Math.round(share * 100) + '% (nhiều Sale chia đều); Sale đã có thẻ trên đơn Pos được coi là đơn trùng (bỏ qua).'
   };
 }
+

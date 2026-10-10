@@ -394,7 +394,8 @@ function renderReminderPanel(){
   if (!wrap) return;
   var reminders = _dueReminders();
   var alerts = _chiaDataAlerts();
-  var total = reminders.length + alerts.length;
+  var tts = (typeof _ttCards === 'function') ? _ttCards() : [];   // nhắc việc hôm nay (js/29): đơn Base kẹt giai đoạn
+  var total = reminders.length + alerts.length + tts.length;
   if (total === 0){ wrap.style.display='none'; if(bell) bell.style.display='none'; return; }
   if (!_reminderPanelOpen){
     wrap.style.display='none';
@@ -415,6 +416,7 @@ function renderReminderPanel(){
       '<div class="rp-note">'+al.count+' khách · '+(al.date||'').slice(0,10)+'</div></div>'+
       '<button class="rp-dismiss" title="Tắt" onclick="event.stopPropagation();_dismissChiaAlert(\''+al.id+'\')">✕</button></div>';
   }
+  for (var tq=0;tq<tts.length;tq++) html += _ttCardHtml(tts[tq]);
   for (var r=0;r<reminders.length;r++){
     var rm = reminders[r];
     var over = rm.date < _remDateStr();
