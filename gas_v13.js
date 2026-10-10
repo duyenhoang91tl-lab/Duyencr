@@ -2843,6 +2843,11 @@ function xoaSdtKhongPhaiVN_(opts) {
       var vals = tg.sh.getRange(2, 1, last - 1, width).getValues();
       var bad = _xoaSdtScan_(vals, tg.col);
       info.invalid = bad.length;
+      if (tg.key === 'CSKH-Duyen') {   // chi DEM so SDT hop le bi lap nhieu dong (khong xoa — dong lap co the khac ten/phan loai); de Duyen tu quyet dinh
+        var seenP = {}, dupRows = 0;
+        for (var d = 0; d < vals.length; d++) { var np = normPhone_(String(vals[d][tg.col] || '')); if (!np || !isValidVnPhone_(np)) continue; if (seenP[np]) dupRows++; else seenP[np] = 1; }
+        info.duplicateRowsKeptNotDeleted = dupRows;
+      }
       for (var s = 0; s < bad.length && s < 10; s++) info.sample.push(String(vals[bad[s]][tg.col]));
       if (dry || !bad.length) return;
       if (!bk) { bk = getCrmSS_().getSheetByName('XoaSDT_Backup') || getCrmSS_().insertSheet('XoaSDT_Backup'); if (bk.getLastRow() === 0) bk.appendRow(['Thoi gian', 'Sheet', 'SDT', 'Du lieu dong (JSON)']); }
@@ -2876,6 +2881,13 @@ function xoaSdtKhongPhaiVN_(opts) {
   finally { try { if (lock) lock.releaseLock(); } catch (e2) {} }
 }
 // Chay tay tu Editor (chon ten ham o o Run, xem Execution log): xoaSdtLoiThu (CHI DEM, khong xoa) -> xoaSdtLoiThat (xoa that, lap den khi XONG).
+// Rieng sheet CSKH-Duyen (~134k dong): xoaSdtLoiCskhThu (CHI DEM) -> xoaSdtLoiCskhThat (xoa that, bam lai den khi XONG; moi lan toi da ~4 phut).
+function xoaSdtLoiCskhThu() { Logger.log(JSON.stringify(xoaSdtKhongPhaiVN_({ dryRun: true, sheets: ['cskh'] }), null, 2)); }
+function xoaSdtLoiCskhThat() {
+  var r = xoaSdtKhongPhaiVN_({ dryRun: false, sheets: ['cskh'] });
+  Logger.log(JSON.stringify(r, null, 2));
+  Logger.log(!r.ok ? 'LOI — xem "error".' : (r.done ? 'XONG. Dong da xoa luu o sheet XoaSDT_Backup (CRM).' : 'CHUA HET — bam Run lai xoaSdtLoiCskhThat.'));
+}
 function xoaSdtLoiThu() { Logger.log(JSON.stringify(xoaSdtKhongPhaiVN_({ dryRun: true }), null, 2)); }
 function xoaSdtLoiThat() {
   var r = xoaSdtKhongPhaiVN_({ dryRun: false });
