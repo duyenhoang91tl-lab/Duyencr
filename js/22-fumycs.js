@@ -121,17 +121,5 @@ async function saveFuTpls(){
 
 // Nút mở modal trên header
 setTimeout(function(){
-  var hdrR = document.querySelector('.hdr-r');
-  if (hdrR && !document.getElementById('futpl-open-btn')){
-    var b = document.createElement('button');
-    b.id = 'futpl-open-btn';
-    b.className = 'btn sm';
-    b.setAttribute('data-bar-id', 'hdr-hoitham');
-    b.setAttribute('data-bar-home', '.hdr-r');
-    b.textContent = '📨 Mẫu hỏi thăm';
-    b.title = 'Mẫu tin nhắn hỏi thăm tự động theo mốc 7/14/30/60 ngày';
-    b.onclick = openFuTplModal;
-    hdrR.insertBefore(b, hdrR.firstChild);
-  }
   if (typeof _applyBarCustomization === 'function') _applyBarCustomization();
 }, 400);

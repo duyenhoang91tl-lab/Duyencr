@@ -37,7 +37,7 @@
     { k:'nv',  t:'🧑‍💼 Thông tin nhân viên',  ids:['tab-task','act:newtask','audit'] },
     { k:'tm',  t:'👥 Cài đặt team',         ids:['team','act:acct'] },
     { k:'cs',  t:'🔀 Cài đặt chia số',      ids:['act:assign','act:autoassign','act:assignhist'] },
-    { k:'up',  t:'📤 Up data',              ids:['uploaddata','act:sync','act:push','act:fullsync','act:dup'] },
+    { k:'up',  t:'📤 Up data',              ids:['uploaddata','act:upload','act:sync','act:push','act:fullsync','act:dup'] },
     { k:'tv',  t:'🧰 Tác vụ',               ids:['tab-zaloai','act:bc','act:bct','act:bcstat','act:futpl','act:bday'] },
     { k:'st',  t:'⚙ Settings',              ids:['act:cstatus','act:khstatus','act:cfield','act:barcust','act:clear'] }
   ];
@@ -50,6 +50,7 @@
     assign:     { t:'👥 Chia data', f:'openAssignModal', admin:true },
     autoassign: { t:'⏰ Chia tự động', f:'openAssignModal', tab:'auto', admin:true },
     assignhist: { t:'📋 Lịch sử chia', f:'openAssignModal', tab:'history', admin:true },
+    upload:     { t:'📂 Tải file Excel', click:'fi' },
     sync:       { t:'↓ Sync GS', f:'syncFromGS', arg:{pullOrders:true,manual:true} },
     push:       { t:'📤 Đẩy dữ liệu', f:'pushOrdersToGS', admin:true },
     fullsync:   { t:'🔁 Đồng bộ 2 chiều', f:'fullSyncOrdersToGS', admin:true },
@@ -59,8 +60,8 @@
     bcstat:     { t:'📊 TK chiến dịch', f:'openBcStatModal' },
     futpl:      { t:'📨 Mẫu hỏi thăm tự động', f:'openFuTplModal' },
     bday:       { t:'🎂 Mẫu sinh nhật', f:'openBdayTplModal' },
-    cstatus:    { t:'⚙ Tình trạng chăm sóc', f:'openCareStatusModal', admin:true },
-    khstatus:   { t:'⚙ Trạng thái KH', f:'openKhStatusModal', admin:true },
+    cstatus:    { t:function(){ return '⚙ ' + (typeof FIELD_LABEL_CS!=='undefined'?FIELD_LABEL_CS:'Tình trạng chăm sóc'); }, f:'openCareStatusModal', admin:true },
+    khstatus:   { t:function(){ return '⚙ ' + (typeof FIELD_LABEL_KH!=='undefined'?FIELD_LABEL_KH:'Trạng thái KH'); }, f:'openKhStatusModal', admin:true },
     cfield:     { t:'➕ Trường tự tạo', f:'openCustomFieldsModal', admin:true },
     barcust:    { t:'🧩 Tuỳ chỉnh thanh menu', f:'openBarCustomizeModal' },
     clear:      { t:'🧹 Xóa data trên máy', f:'clearData', admin:true }
@@ -69,6 +70,7 @@
   function runAct(k){
     var a = ACTS[k]; if (!a) return;
     setOpen(false);
+    if (a.click) { var inp = document.getElementById(a.click); if (inp) inp.click(); return; }
     try {
       var fn = window[a.f];
       if (typeof fn !== 'function') { if (typeof toast==='function') toast('Chức năng chưa sẵn sàng'); return; }
@@ -101,10 +103,11 @@
     Object.keys(ACTS).forEach(function(k){
       var el = t.querySelector('.sn-act[data-act="'+k+'"]');
       if (!el){
-        el = document.createElement('div'); el.className = 'sn-act'; el.setAttribute('data-act', k); el.textContent = ACTS[k].t;
+        el = document.createElement('div'); el.className = 'sn-act'; el.setAttribute('data-act', k); el.textContent = (typeof ACTS[k].t==='function' ? ACTS[k].t() : ACTS[k].t);
         el.addEventListener('click', function(e){ e.stopPropagation(); runAct(k); });
         t.appendChild(el);
       }
+      if (typeof ACTS[k].t==='function') { var _nl = ACTS[k].t(); if (el.textContent !== _nl) el.textContent = _nl; } // chỉ gán khi đổi, tránh MutationObserver gọi layout lặp
       var r = gOf('act:'+k), g = GROUPS[r.g];
       el.setAttribute('data-sn-g', g.k);
       el.style.order = String(r.g*100 + 1 + r.j);

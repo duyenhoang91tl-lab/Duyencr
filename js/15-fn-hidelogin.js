@@ -163,10 +163,6 @@ function _renderAuthHeader(){
   var isAdmin = (_authAccount && _authAccount.role === 'admin') || _bootstrapAdmin;
   var loggedIn = !!_authAccount;
   var html = '';
-  if (isAdmin) html += '<button class="btn sm" data-bar-id="hdr-carestatus" data-bar-home="#auth-box" title="Quản lý ' + esc(FIELD_LABEL_CS) + '" onclick="openCareStatusModal()">⚙ ' + esc(FIELD_LABEL_CS) + '</button>';
-  if (isAdmin) html += '<button class="btn sm" data-bar-id="hdr-khstatus" data-bar-home="#auth-box" title="Quản lý ' + esc(FIELD_LABEL_KH) + '" onclick="openKhStatusModal()">⚙ ' + esc(FIELD_LABEL_KH) + '</button>';
-  if (isAdmin) html += '<button class="btn sm" data-bar-id="hdr-customfield" data-bar-home="#auth-box" title="Tự tạo trường lớn mới (ngoài ' + esc(FIELD_LABEL_CS) + ' / ' + esc(FIELD_LABEL_KH) + ')" onclick="openCustomFieldsModal()">➕ Trường tự tạo</button>';
-  if (isAdmin) html += '<button class="btn sm" data-bar-id="hdr-account" data-bar-home="#auth-box" title="Quản lý tài khoản đăng nhập" onclick="openAcctModal()">🔑 Tài khoản</button>';
   if (loggedIn) html += '<button class="btn sm" data-bar-id="hdr-logout" data-bar-home="#auth-box" title="Đăng xuất" onclick="doLogout()">⎋ Đăng xuất</button>';
   box.innerHTML = html;
   if (typeof _applyBarCustomization === 'function') _applyBarCustomization();
