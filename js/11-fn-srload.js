@@ -313,6 +313,20 @@ function _srSyncTeamToSale_(teamField){
     toast('⚠ Không tìm thấy thành viên nào cho Team đã chọn' + (notFound.length ? ' ('+notFound.join(', ')+')' : ' (Team chưa có thành viên)') + ' — bấm "Đồng bộ" để cập nhật danh sách Team rồi thử lại');
     return;
   }
+  if (saleField === 'eSale' && (_srState.saleBOptions||[]).length){
+    // Báo cáo E dùng nguồn Pos: tên Sale PHẢI trùng tên trong cột "Thẻ" của "dữ liệu đơn". Tên trong Team mà Pos không có
+    // (hoặc ghi khác) làm bộ lọc ra 0 đơn → doanh thu 0đ. Chỉ giữ tên có thật, báo rõ tên không khớp để sửa ở "Quản lý Team".
+    var _fold = function(x){ return String(x||'').trim().toLowerCase(); };
+    var _canon = {}; _srState.saleBOptions.forEach(function(n){ _canon[_fold(n)] = n; });
+    var _kept = [], _missing = [];
+    union.forEach(function(n){ var c = _canon[_fold(n)]; if (c !== undefined) { if (_kept.indexOf(c) === -1) _kept.push(c); } else _missing.push(n); });
+    if (_missing.length) toast('⚠ ' + _missing.length + ' tên trong Team không có trong cột Thẻ của Pos (bỏ qua): ' + _missing.slice(0,6).join(', ') + (_missing.length>6?'...':''));
+    if (!_kept.length){
+      toast('⚠ Không tên nào trong Team khớp cột Thẻ của Pos — giữ nguyên bộ lọc Sale hiện tại. Sửa tên trong "Quản lý Team" cho đúng tên Pos.');
+      return;
+    }
+    union = _kept;
+  }
   if (notFound.length) toast('⚠ Không khớp được Team: ' + notFound.join(', ') + ' — kết quả lọc chỉ gồm các Team còn lại');
   _srState[saleField] = union;
   if (saleField === 'eSale') _srState.eSaleCustomized = true;
@@ -417,7 +431,7 @@ function srComboKey(e, domId){
   if (idx>=0 && opts[idx]) opts[idx].scrollIntoView({block:'nearest'});
 }
 // Render san 1 combo hoan chinh (nhan/o tim/chip) — goi lai trong renderSalesReportTab moi lan ve.
-function _srComboHtml(domId, field, optKey, label, placeholder, widthPx){
+function _srComboHtml(domId, field, optKey, label, placeholder, widthPx, hideChips){
   _srComboInit(domId, field, optKey);
   var selArr = _srState[field] || [];
   return '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">'+esc(label)+(selArr.length?' <span style="color:var(--green)">('+selArr.length+' đã chọn)</span>':'')+'</div>'+
@@ -428,7 +442,7 @@ function _srComboHtml(domId, field, optKey, label, placeholder, widthPx){
     '<span class="cs-combo-caret" onclick="srComboToggle(event,\''+domId+'\')">▾</span>'+
     '<div class="cs-combo-list" id="'+domId+'-list"></div>'+
     '</div>'+
-    '<div id="'+domId+'-chips" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;max-width:210px">'+
+    '<div id="'+domId+'-chips" style="display:'+(hideChips?'none':'flex')+';flex-wrap:wrap;gap:4px;margin-top:4px;max-width:210px">'+
     selArr.map(function(name){
       return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap" data-name="'+esc(name)+'">'+
         esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srComboRemove(\''+domId+'\',this.parentNode.dataset.name)">✕</span></span>';

@@ -9,10 +9,10 @@ function renderSalesReportTabE_(wrap, subTabs){
   filters += '<span style="color:var(--muted)">→</span>';
   filters += '<input type="date" value="'+esc(_srState.eDateTo)+'" onchange="_srSetField(\'eDateTo\',this.value);_srState.eDateQuick=\'custom\'" title="Đến ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
   if (_srIsAdmin()){
-    filters += _srComboHtml('sr-sale-combo-e', 'eSale', 'saleBOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 190);
-    filters += _srComboHtml('sr-team-combo-e', 'eTeam', 'teamOptions', 'Lọc theo Team', '🔍 Tìm & chọn team...', 190);
+    filters += _srComboHtml('sr-sale-combo-e', 'eSale', 'saleBOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 190, true);
+    filters += _srComboHtml('sr-team-combo-e', 'eTeam', 'teamOptions', 'Lọc theo Team', '🔍 Tìm & chọn team...', 190, true);
   } else if (currentUser.role === 'leader' && (_srState.leaderTeamOptions||[]).length){
-    filters += _srComboHtml('sr-sale-combo-e', 'eSale', 'leaderTeamOptions', 'Lọc theo tên (team của bạn)', '🔍 Tìm tên trong team...', 190);
+    filters += _srComboHtml('sr-sale-combo-e', 'eSale', 'leaderTeamOptions', 'Lọc theo tên (team của bạn)', '🔍 Tìm tên trong team...', 190, true);
     filters += '<button class="btn sm" title="Xem lại hoa hồng của cả team (bỏ hết lựa chọn riêng)" onclick="_srState.eSale=_srState.leaderTeamOptions.slice();_srState.eSaleCustomized=false;_srApply()">🔄 Cả team</button>';
   } else {
     filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Sale</div>'+
