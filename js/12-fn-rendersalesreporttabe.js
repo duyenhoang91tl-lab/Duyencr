@@ -48,7 +48,7 @@ function renderSalesReportTabE_(wrap, subTabs){
 function _bonusProgramApplies_(p, dateStr, channel, saleName){
   if (p.dateFrom && dateStr && dateStr < p.dateFrom) return false;
   if (p.dateTo && dateStr && dateStr > p.dateTo) return false;
-  var aud = p.audience || {};
+  var aud = (p.sources && p.sources.length) ? {} : (p.audience || {});   // CT theo NGUỒN áp dụng chung Online + Offline (bỏ qua ô đối tượng)
   if (aud.online || aud.offline){
     if (!channel) return false; // sale chưa được phân loại Online/Offline -> CT có giới hạn đối tượng chưa áp dụng
     if (channel === 'online' && !aud.online) return false;
@@ -145,6 +145,38 @@ function _orderRevenueShares_(o){
   }
   return out;
 }
+// ── Thưởng theo NGUỒN đơn + theo SẢN PHẨM (mã) — thêm 2026-10-10 theo yêu cầu Duyên ──
+// p.sources = [tên nguồn đơn] : chương trình CHỈ tính các đơn có "Nguồn đơn" nằm trong danh sách (không phân biệt hoa/thường), áp dụng CHUNG
+//   Online + Offline (không xét audience). Cơ chế tính (bậc số đơn/ngày, doanh số, đơn đầu tiên, tiền thưởng) tạo như mọi chương trình khác;
+//   các mốc "theo ngày" chỉ cộng dồn các đơn thuộc nguồn đã chọn.
+// p.prodRules = {enabled, items:[{code,name,amount}]} : thưởng theo TỪNG sản phẩm (khớp theo MÃ ở cột Mã sản phẩm, ghép vị trí với cột Số lượng):
+//   mỗi đơn được amount × số lượng của từng mã đã tích. Các chương trình sản phẩm KHÔNG ghi đè nhau (cộng dồn, mỗi chương trình 1 dòng).
+function _bonusNormSrc_(v){ return String(v==null?'':v).trim().toLowerCase(); }
+function _bonusSourceOk_(p, nguonDon){
+  var list = (p && p.sources) || [];
+  if (!list.length) return true;
+  var s = _bonusNormSrc_(nguonDon);
+  return list.some(function(x){ return _bonusNormSrc_(x) === s; });
+}
+// Gom theo MÃ: [{code, qty}] từ cột Mã sản phẩm (';') ghép vị trí với Số lượng (',') — cùng quy ước buildSalesReportB_ ở GAS.
+function _bonusOrderProductQtys_(o){
+  var codes = splitMulti_(o.maSanPham, ';'), qtys = splitMulti_(o.soLuong, ','), out = {};
+  codes.forEach(function(c, i){
+    c = String(c||'').trim(); if (!c) return;
+    var q = Number(String(qtys[i]||'0').replace(',', '.')) || 0;
+    var k = c.toLowerCase(); out[k] = (out[k] || 0) + q;
+  });
+  return out;
+}
+function _bonusAggSources_(g, sources){
+  var agg = {name:g.name, date:g.date, revenue:0, count:0, firstOrderTime:null};
+  (sources||[]).forEach(function(sn){
+    var x = g.bySrc && g.bySrc[_bonusNormSrc_(sn)]; if (!x) return;
+    agg.revenue += x.revenue; agg.count += x.count;
+    if (x.firstOrderTime && (agg.firstOrderTime===null || x.firstOrderTime < agg.firstOrderTime)) agg.firstOrderTime = x.firstOrderTime;
+  });
+  return agg;
+}
 function _computeBonusData_(orders){
   orders = orders || [];
   var bySale = {};
@@ -166,11 +198,13 @@ function _computeBonusData_(orders){
     Object.keys(perName).forEach(function(name){
       if (!name) return;
       var key = name+'|'+dateStr;
-      if (!bySaleDay[key]) bySaleDay[key] = {name:name, date:dateStr, revenue:0, count:0, firstOrderTime:null};
-      bySaleDay[key].revenue += perName[name].share;
+      if (!bySaleDay[key]) bySaleDay[key] = {name:name, date:dateStr, revenue:0, count:0, firstOrderTime:null, bySrc:{}};
+      var _sk = _bonusNormSrc_(o.nguonDon), _sg = bySaleDay[key].bySrc[_sk] || (bySaleDay[key].bySrc[_sk] = {revenue:0, count:0, firstOrderTime:null});   // cộng riêng theo NGUỒN cho CT có p.sources
+      bySaleDay[key].revenue += perName[name].share; _sg.revenue += perName[name].share;
       if (perName[name].bonus){
-        bySaleDay[key].count++;
+        bySaleDay[key].count++; _sg.count++;
         if (timeStr && (bySaleDay[key].firstOrderTime===null || timeStr < bySaleDay[key].firstOrderTime)) bySaleDay[key].firstOrderTime = timeStr;
+        if (timeStr && (_sg.firstOrderTime===null || timeStr < _sg.firstOrderTime)) _sg.firstOrderTime = timeStr;
       }
     });
   });
@@ -181,27 +215,30 @@ function _computeBonusData_(orders){
     var bestTier = null, bestRevDay = null, bestFirstOrder = null;
     BONUS_PROGRAMS.forEach(function(p){
       if (!_bonusProgramApplies_(p, g.date, channel, g.name)) return;
+      var gs = (p.sources && p.sources.length) ? _bonusAggSources_(g, p.sources) : g;   // CT theo nguồn: chỉ cộng đơn thuộc nguồn đã chọn
+      if (p.sources && p.sources.length && gs.count === 0 && gs.revenue === 0) return;   // ngày không có đơn nào thuộc nguồn đã chọn
+      var srcTxt = (p.sources && p.sources.length) ? ' [nguồn: '+p.sources.join(', ')+']' : '';
       if (p.revenue && p.revenue.enabled && p.revenue.scope === 'day'){
         var min = (p.revenue.min!=='' && p.revenue.min!=null) ? Number(p.revenue.min) : null;
         var max = (p.revenue.max!=='' && p.revenue.max!=null) ? Number(p.revenue.max) : null;
-        if ((min===null || g.revenue>=min) && (max===null || g.revenue<=max)){
+        if ((min===null || gs.revenue>=min) && (max===null || gs.revenue<=max)){
           var amt = Number(p.bonusAmount)||0;
-          if (amt>0 && (!bestRevDay || amt>bestRevDay.amount)) bestRevDay = {amount:amt, program:p, detail:'Doanh số ngày '+_srMoney(g.revenue)};
+          if (amt>0 && (!bestRevDay || amt>bestRevDay.amount)) bestRevDay = {amount:amt, program:p, detail:'Doanh số ngày '+_srMoney(gs.revenue)+srcTxt};
         }
       }
-      if (p.tier && p.tier.enabled && (p.tier.rows||[]).length && g.count>0){
+      if (p.tier && p.tier.enabled && (p.tier.rows||[]).length && gs.count>0){
         var hit = null;
         p.tier.rows.slice().sort(function(a,b){ return Number(a.count)-Number(b.count); }).forEach(function(t){
-          if (g.count >= Number(t.count)) hit = t;
+          if (gs.count >= Number(t.count)) hit = t;
         });
         if (hit){
           var amt2 = Number(hit.bonus)||0;
-          if (amt2>0 && (!bestTier || amt2>bestTier.amount)) bestTier = {amount:amt2, program:p, detail:'Đạt '+g.count+' đơn/ngày (bậc từ '+hit.count+' đơn)'};
+          if (amt2>0 && (!bestTier || amt2>bestTier.amount)) bestTier = {amount:amt2, program:p, detail:'Đạt '+gs.count+' đơn/ngày (bậc từ '+hit.count+' đơn)'+srcTxt};
         }
       }
-      if (p.firstOrder && p.firstOrder.enabled && g.count>0){
+      if (p.firstOrder && p.firstOrder.enabled && gs.count>0){
         var amt3 = Number(p.firstOrder.amount)||0;
-        if (amt3>0 && (!bestFirstOrder || amt3>bestFirstOrder.amount)) bestFirstOrder = {amount:amt3, program:p, detail:'Đơn đầu tiên trong ngày'+(g.firstOrderTime?' (lúc '+g.firstOrderTime+')':'')};
+        if (amt3>0 && (!bestFirstOrder || amt3>bestFirstOrder.amount)) bestFirstOrder = {amount:amt3, program:p, detail:'Đơn đầu tiên trong ngày'+(gs.firstOrderTime?' (lúc '+gs.firstOrderTime+')':'')+srcTxt};
       }
     });
     [[bestTier,'Theo ngày (số đơn)'], [bestRevDay,'Theo ngày (doanh số)'], [bestFirstOrder,'Theo ngày (đơn đầu tiên)']].forEach(function(pair){
@@ -221,8 +258,18 @@ function _computeBonusData_(orders){
       if (!name) return;
       var channel = SALE_CHANNELS[name] || '';
       var best = null;
+      var extra = [];   // CT thưởng theo SẢN PHẨM (mã): cộng dồn, không tranh "best" với CT khác
       BONUS_PROGRAMS.forEach(function(p){
         if (!_bonusProgramApplies_(p, dateStr, channel, name)) return;
+        if (!_bonusSourceOk_(p, o.nguonDon)) return;   // CT theo nguồn: bỏ đơn ngoài danh sách nguồn
+        if (p.prodRules && p.prodRules.enabled && (p.prodRules.items||[]).length){
+          var pq2 = _bonusOrderProductQtys_(o), tot = 0, parts = [];
+          p.prodRules.items.forEach(function(it){
+            var q = pq2[_bonusNormSrc_(it.code)] || 0, a = Number(it.amount)||0;
+            if (q>0 && a>0){ tot += a*q; parts.push((it.name||it.code)+' ×'+q); }
+          });
+          if (tot>0) extra.push({amount:tot, program:p, detail:'Sản phẩm: '+esc(parts.join('; '))});
+        }
         if (p.product && p.product.trim()){
           var pq = _bonusProductQty_(o.sanPham, p.product);
           if (pq.matched && pq.qty>0){
@@ -238,6 +285,11 @@ function _computeBonusData_(orders){
             if (amt2>0 && (!best || amt2>best.amount)) best = {amount:amt2, program:p, detail:'Giá trị đơn '+_srMoney(giaTri)};
           }
         }
+      });
+      extra.forEach(function(ex){
+        var recX = ensure(name), partX = Math.round(ex.amount / nParts);
+        recX.total += partX;
+        recX.items.push({date:dateStr, scope:'Theo sản phẩm', program:ex.program.name, amount:partX, detail:ex.detail+(nParts>1 ? ' — thưởng '+_srMoney(ex.amount)+' chia đều '+nParts+' sale' : ''), orderId:o.id, maDonPos:String(o.ghiChu||'')});
       });
       if (best){
         var rec = ensure(name);
@@ -1044,6 +1096,7 @@ function _bpNewProgram(){
     audience: {online:false, offline:false}, product:'', requireProduct:'', extraNote:'', exclusionNote:'',
     tier: {enabled:false, rows:[]}, revenue: {enabled:false, scope:'order', min:'', max:''},
     firstOrder: {enabled:false, amount:''}, probationDay: {enabled:false, from:'', to:''},
+    sources: [], prodRules: {enabled:false, items:[]},
     bonusAmount:'' };
 }
 // Chuong trinh cu luu tu truoc khi co firstOrder/probationDay se thieu 2 field nay -> bo sung
@@ -1064,6 +1117,9 @@ function _bonusRequireProductOk_(p, sanPham){
 function _bpNormalize_(p){
   if (!p.firstOrder) p.firstOrder = {enabled:false, amount:''};
   if (!p.probationDay) p.probationDay = {enabled:false, from:'', to:''};
+  if (!Array.isArray(p.sources)) p.sources = [];
+  if (!p.prodRules) p.prodRules = {enabled:false, items:[]};
+  if (!Array.isArray(p.prodRules.items)) p.prodRules.items = [];
   return p;
 }
 function _renderBonusProgramsModal(){
@@ -1079,6 +1135,8 @@ function _renderBonusProgramsModal(){
       var aud = (p.audience && p.audience.online && p.audience.offline) ? 'Cả 2' : ((p.audience && p.audience.online) ? 'Online' : ((p.audience && p.audience.offline) ? 'Offline' : 'Tất cả'));
       var mech = [];
       if (p.product) mech.push('Sản phẩm ('+esc(p.product)+')');
+      if (p.prodRules && p.prodRules.enabled && (p.prodRules.items||[]).length) mech.push('Thưởng theo sản phẩm ('+p.prodRules.items.length+' mã)');
+      if (p.sources && p.sources.length) mech.push('Theo nguồn: '+esc(p.sources.join(', '))+' (Online + Offline)');
       if (p.revenue && p.revenue.enabled) mech.push('Doanh thu theo '+(p.revenue.scope==='day'?'ngày':'đơn'));
       if (p.tier && p.tier.enabled) mech.push('Bậc số đơn/ngày');
       if (p.firstOrder && p.firstOrder.enabled) mech.push('Đơn đầu tiên/ngày');
@@ -1125,6 +1183,9 @@ function _bpEditFormHtml_(p){
 
     '<div class="form-label">4. Sản phẩm áp dụng (từ khoá, cách nhau dấu phẩy — bỏ trống = mọi sản phẩm; nếu điền, thưởng sẽ NHÂN theo số lượng sản phẩm khớp bán được)</div>'+
     '<input type="text" value="'+esc(p.product)+'" oninput="_bpDraft.product=this.value" style="width:100%;margin-bottom:10px" placeholder="VD: Tỳ hưu, Tourmaline">'+
+
+    _bpProdSectionHtml_(p)+
+    _bpSrcSectionHtml_(p)+
 
     '<div class="form-label">5. Điều kiện áp dụng thêm (ghi chú — chỉ hiển thị để kế toán đối chiếu, KHÔNG tự động chấm)</div>'+
     '<input type="text" value="'+esc(p.extraNote)+'" oninput="_bpDraft.extraNote=this.value" style="width:100%;margin-bottom:10px" placeholder="VD: chỉ áp dụng đơn có bill chuyển khoản">'+
@@ -1173,6 +1234,110 @@ function _bpEditFormHtml_(p){
       '<button class="btn" onclick="_bpSave()">💾 Lưu chương trình</button>'+
       '<button class="btn secondary" onclick="_bpEditingId=null;_renderBonusProgramsModal()">Huỷ</button>'+
     '</div>';
+}
+// ── Mục 4b: THƯỞNG THEO SẢN PHẨM (tìm tên/mã → tích → nhập tiền thưởng từng sản phẩm) ──
+var _bpProducts = null, _bpProdLoading = false, _bpProdErr = '', _bpProdQuery = '', _bpSrcQuery = '';
+function _bpNorm_(t){ return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').toLowerCase().trim(); }
+async function _bpLoadProducts_(force){
+  if (_bpProdLoading) return;
+  if (_bpProducts && !force) return;
+  if (!gsUrl){ _bpProdErr = 'Chưa kết nối Google Apps Script.'; return; }
+  _bpProdLoading = true; _bpProdErr = '';
+  _bpProdRefresh_();
+  try {
+    var r = await fetch(gsUrl + (gsUrl.indexOf('?')>-1?'&':'?') + 'action=donProducts', {redirect:'follow'});
+    var j = await r.json();
+    if (j && j.ok && Array.isArray(j.products)) _bpProducts = j.products;
+    else _bpProdErr = (j && j.error) || 'GAS chưa có action donProducts — deploy lại bản GAS mới nhất.';
+  } catch(e){ _bpProdErr = 'Không tải được danh sách sản phẩm (' + (e && e.message || e) + ').'; }
+  _bpProdLoading = false;
+  _bpProdRefresh_();
+}
+function _bpProdSectionHtml_(p){
+  var on = !!(p.prodRules && p.prodRules.enabled);
+  var h = '<div class="form-label">4b. Thưởng theo SẢN PHẨM <span style="font-weight:400;color:var(--muted);font-size:11px">(khớp theo MÃ sản phẩm × số lượng trên đơn — mỗi sản phẩm 1 mức thưởng riêng)</span></div>'+
+    '<label style="font-size:12px"><input type="checkbox" '+(on?'checked':'')+' onchange="_bpDraft.prodRules.enabled=this.checked;_renderBonusProgramsModal();if(this.checked)_bpLoadProducts_()"> Dùng thưởng theo từng sản phẩm</label>';
+  if (on){
+    h += '<div style="margin:8px 0 12px">'+
+      '<input type="text" id="bp-prod-q" value="'+esc(_bpProdQuery)+'" placeholder="🔍 Gõ tên hoặc mã sản phẩm để tìm..." oninput="_bpProdQuery=this.value;_bpProdRefresh_()" style="width:100%;margin-bottom:6px">'+
+      '<div id="bp-prod-list" style="max-height:210px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:6px;margin-bottom:8px">'+_bpProdListHtml_()+'</div>'+
+      '<div style="font-size:11.5px;font-weight:600;margin-bottom:4px">Sản phẩm được thưởng (điền tiền thưởng cho 1 sản phẩm):</div>'+
+      '<div id="bp-prod-sel">'+_bpProdSelHtml_()+'</div></div>';
+    if (!_bpProducts && !_bpProdLoading) setTimeout(_bpLoadProducts_, 0);
+  }
+  return h;
+}
+function _bpProdListHtml_(){
+  if (_bpProdLoading) return '<div style="color:var(--muted);font-size:12px;padding:6px">Đang tải danh sách sản phẩm…</div>';
+  if (_bpProdErr) return '<div style="color:#b91c1c;font-size:12px;padding:6px">⚠ '+esc(_bpProdErr)+' <button class="btn sm" onclick="_bpLoadProducts_(true)">Thử lại</button></div>';
+  if (!_bpProducts) return '<div style="color:var(--muted);font-size:12px;padding:6px">Chưa tải danh sách.</div>';
+  var q = _bpNorm_(_bpProdQuery), picked = {};
+  (_bpDraft.prodRules.items||[]).forEach(function(it){ picked[String(it.code).toLowerCase()] = true; });
+  var list = _bpProducts.filter(function(x){ return !q || _bpNorm_(x.name).indexOf(q) !== -1 || _bpNorm_(x.code).indexOf(q) !== -1; });
+  var total = list.length; list = list.slice(0, 60);
+  if (!list.length) return '<div style="color:var(--muted);font-size:12px;padding:6px">Không có sản phẩm khớp "'+esc(_bpProdQuery)+'".</div>';
+  return list.map(function(x){
+    return '<label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;padding:3px 2px;cursor:pointer"><input type="checkbox" data-code="'+esc(x.code)+'" '+(picked[String(x.code).toLowerCase()]?'checked':'')+' onchange="_bpProdToggle(this.dataset.code,this.checked)">'+
+      '<span><b>'+esc(x.name||'(chưa rõ tên)')+'</b> <span style="color:var(--muted)">— mã '+esc(x.code)+' · đã bán '+esc(String(Math.round(x.qty*10)/10))+'</span></span></label>';
+  }).join('') + (total > 60 ? '<div style="color:var(--hint);font-size:11px;padding:4px">Còn '+(total-60)+' sản phẩm khác — gõ thêm từ khoá để thu hẹp.</div>' : '');
+}
+function _bpProdSelHtml_(){
+  var items = _bpDraft.prodRules.items || [];
+  if (!items.length) return '<div style="color:var(--muted);font-size:12px">Chưa tích sản phẩm nào.</div>';
+  return items.map(function(it, i){
+    return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:5px;font-size:12px">'+
+      '<span style="flex:1"><b>'+esc(it.name||it.code)+'</b> <span style="color:var(--muted)">(mã '+esc(it.code)+')</span></span>'+
+      '<input type="number" min="0" value="'+esc(it.amount)+'" placeholder="tiền thưởng/sản phẩm" style="width:150px" onchange="_bpDraft.prodRules.items['+i+'].amount=this.value"> <span style="color:var(--muted)">đ</span>'+
+      '<button class="btn sm secondary" onclick="_bpProdToggle(\''+esc(String(it.code)).replace(/'/g,"\\'")+'\',false)">✕</button></div>';
+  }).join('');
+}
+function _bpProdRefresh_(){
+  var a = document.getElementById('bp-prod-list'), b = document.getElementById('bp-prod-sel');
+  if (a) a.innerHTML = _bpProdListHtml_();
+  if (b) b.innerHTML = _bpProdSelHtml_();
+}
+function _bpProdToggle(code, on){
+  var items = _bpDraft.prodRules.items = _bpDraft.prodRules.items || [];
+  var idx = items.findIndex(function(x){ return String(x.code).toLowerCase() === String(code).toLowerCase(); });
+  if (on && idx === -1){
+    var meta = (_bpProducts||[]).find(function(x){ return String(x.code).toLowerCase() === String(code).toLowerCase(); });
+    items.push({code:code, name:(meta && meta.name) || '', amount:''});
+  } else if (!on && idx !== -1) items.splice(idx, 1);
+  _bpProdRefresh_();
+}
+// ── Mục 4c: THƯỞNG THEO NGUỒN đơn (chung Online + Offline) ──
+function _bpSrcSectionHtml_(p){
+  var h = '<div class="form-label">4c. Thưởng theo NGUỒN đơn <span style="font-weight:400;color:var(--muted);font-size:11px">(tích nguồn → chương trình CHỈ tính đơn thuộc các nguồn này, áp dụng CHUNG Online + Offline; cơ chế tính tạo ở các mục 6–10 như thường)</span></div>'+
+    '<input type="text" id="bp-src-q" value="'+esc(_bpSrcQuery)+'" placeholder="🔍 Gõ để tìm nguồn..." oninput="_bpSrcQuery=this.value;_bpSrcRefresh_()" style="width:100%;margin-bottom:6px">'+
+    '<div id="bp-src-list" style="max-height:150px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:6px;margin-bottom:6px">'+_bpSrcListHtml_()+'</div>'+
+    '<div id="bp-src-sel" style="font-size:12px;margin-bottom:12px">'+_bpSrcSelHtml_()+'</div>';
+  if (!(_srState && _srState.nguonOptions && _srState.nguonOptions.length) && typeof _srLoadOptions === 'function' && !_srState.optionsLoaded) setTimeout(function(){ _srLoadOptions().then(_bpSrcRefresh_).catch(function(){}); }, 0);
+  return h;
+}
+function _bpSrcListHtml_(){
+  var opts = (_srState && _srState.nguonOptions) || [], q = _bpNorm_(_bpSrcQuery);
+  var picked = {}; (_bpDraft.sources||[]).forEach(function(x){ picked[_bonusNormSrc_(x)] = true; });
+  var list = opts.filter(function(n){ return !q || _bpNorm_(n).indexOf(q) !== -1; });
+  if (!opts.length) return '<div style="color:var(--muted);font-size:12px;padding:6px">Đang tải danh sách nguồn… (hoặc mở Báo cáo doanh số rồi mở lại).</div>';
+  if (!list.length) return '<div style="color:var(--muted);font-size:12px;padding:6px">Không có nguồn khớp.</div>';
+  return list.map(function(n){
+    return '<label style="display:inline-flex;gap:5px;align-items:center;font-size:12px;margin:2px 10px 2px 0;cursor:pointer"><input type="checkbox" data-src="'+esc(n)+'" '+(picked[_bonusNormSrc_(n)]?'checked':'')+' onchange="_bpSrcToggle(this.dataset.src,this.checked)"> '+esc(n)+'</label>';
+  }).join('');
+}
+function _bpSrcSelHtml_(){
+  var s = _bpDraft.sources || [];
+  return s.length ? ('Đã chọn '+s.length+' nguồn: <b>'+esc(s.join(', '))+'</b> — áp dụng chung Online + Offline.') : '<span style="color:var(--muted)">Chưa chọn nguồn = chương trình không giới hạn theo nguồn.</span>';
+}
+function _bpSrcRefresh_(){
+  var a = document.getElementById('bp-src-list'), b = document.getElementById('bp-src-sel');
+  if (a) a.innerHTML = _bpSrcListHtml_();
+  if (b) b.innerHTML = _bpSrcSelHtml_();
+}
+function _bpSrcToggle(name, on){
+  var s = _bpDraft.sources = _bpDraft.sources || [];
+  var idx = s.findIndex(function(x){ return _bonusNormSrc_(x) === _bonusNormSrc_(name); });
+  if (on && idx === -1) s.push(name); else if (!on && idx !== -1) s.splice(idx, 1);
+  _bpSrcRefresh_();
 }
 function _bpSave(){
   if (!_bpDraft.name || !_bpDraft.name.trim()){ toast('Vui lòng đặt tên chương trình.'); return; }

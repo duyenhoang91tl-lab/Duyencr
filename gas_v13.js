@@ -1490,6 +1490,14 @@ function doGetCore_(e) {
       return jsonOut_({ ok: true, found: liteCk.found, rows: liteCk.rows, total: liteCk.total, noPhone: liteCk.noPhone, noPhoneSample: liteCk.noPhoneSample });
     }
     // ── Tap SDT co trong "dữ liệu đơn" — chi de loc nguon o man hinh chinh (cache 10') ──
+    // Danh sach san pham (ma + ten) trong "du lieu don" cho o tim/tick san pham cua Chuong trinh thuong (cache 10').
+    if (action === 'donProducts') {
+      var cachedDPr = _cacheGetBig_('don_products_v1');
+      if (cachedDPr) { try { return jsonOut_(JSON.parse(cachedDPr)); } catch (ecP) {} }
+      var resDPr = { ok: true, products: buildDonProducts_() };
+      try { _cachePutBig_('don_products_v1', JSON.stringify(resDPr), 600); } catch (ecP2) {}
+      return jsonOut_(resDPr);
+    }
     if (action === 'donPhones') {
       // TOI UU (v13.20): NGUYEN NHAN GOC cham — (1) goi readDonChiTiet_() NAM LAN (moi ham getDon*_ tu doc lai, tuc 5 lan
       // JSON.parse mang don lon, hoac 5 lan doc sheet khi cache 'donChiTiet_v4' het han); (2) cache.put 1 key duy nhat bi gioi han
@@ -2975,6 +2983,34 @@ function getDonOrdersByPhone_(phone) {
     });
   }
   out.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
+  return out;
+}
+
+// Danh sach SAN PHAM (ma + ten) co trong "du lieu don" — nguon cho o tim/tick san pham cua Chuong trinh thuong (js/12 modal "Chuong trinh thuong").
+// 3 cot dung 3 dau phan cach KHAC NHAU (xem buildSalesReportB_): ten ',' | ma ';' | so luong ','; ghep theo VI TRI. Ten chi lay khi dong khop so luong
+// ten = so luong ma (dong lech cot thi ten khong chac khop ma -> bo qua ten, van ghi nhan ma). Tra [{code,name,n(so dong don),qty}] sap theo qty giam dan.
+function buildDonProducts_(rows) {
+  rows = rows || readDonChiTiet_();
+  var by = {};
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    if (_donHasExcludedStatus_(r.trangThai)) continue;
+    var codes = splitMulti_(r.maSanPham, ';'), names = splitMulti_(r.sanPham, ','), qtys = splitMulti_(r.soLuong, ',');
+    if (!codes.length) continue;
+    var aligned = names.length === codes.length;
+    for (var k = 0; k < codes.length; k++) {
+      var code = String(codes[k] || '').trim(); if (!code) continue;
+      var key = code.toLowerCase(), o = by[key] || (by[key] = { code: code, name: '', n: 0, qty: 0, nameVotes: {} });
+      o.n++; o.qty += Number(String(qtys[k] || '0').replace(',', '.')) || 0;
+      if (aligned && names[k]) { var nm = String(names[k]).trim(); o.nameVotes[nm] = (o.nameVotes[nm] || 0) + 1; }
+    }
+  }
+  var out = Object.keys(by).map(function (key) {
+    var o = by[key], best = '', bc = 0;
+    Object.keys(o.nameVotes).forEach(function (nm) { if (o.nameVotes[nm] > bc) { bc = o.nameVotes[nm]; best = nm; } });
+    return { code: o.code, name: best, n: o.n, qty: o.qty };
+  });
+  out.sort(function (a, b) { return b.qty - a.qty; });
   return out;
 }
 

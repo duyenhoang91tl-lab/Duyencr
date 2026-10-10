@@ -453,6 +453,34 @@ function getDonOrdersByPhone_(phone) {
   return out;
 }
 
+// Danh sach SAN PHAM (ma + ten) co trong "du lieu don" — nguon cho o tim/tick san pham cua Chuong trinh thuong (js/12 modal "Chuong trinh thuong").
+// 3 cot dung 3 dau phan cach KHAC NHAU (xem buildSalesReportB_): ten ',' | ma ';' | so luong ','; ghep theo VI TRI. Ten chi lay khi dong khop so luong
+// ten = so luong ma (dong lech cot thi ten khong chac khop ma -> bo qua ten, van ghi nhan ma). Tra [{code,name,n(so dong don),qty}] sap theo qty giam dan.
+function buildDonProducts_(rows) {
+  rows = rows || readDonChiTiet_();
+  var by = {};
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    if (_donHasExcludedStatus_(r.trangThai)) continue;
+    var codes = splitMulti_(r.maSanPham, ';'), names = splitMulti_(r.sanPham, ','), qtys = splitMulti_(r.soLuong, ',');
+    if (!codes.length) continue;
+    var aligned = names.length === codes.length;
+    for (var k = 0; k < codes.length; k++) {
+      var code = String(codes[k] || '').trim(); if (!code) continue;
+      var key = code.toLowerCase(), o = by[key] || (by[key] = { code: code, name: '', n: 0, qty: 0, nameVotes: {} });
+      o.n++; o.qty += Number(String(qtys[k] || '0').replace(',', '.')) || 0;
+      if (aligned && names[k]) { var nm = String(names[k]).trim(); o.nameVotes[nm] = (o.nameVotes[nm] || 0) + 1; }
+    }
+  }
+  var out = Object.keys(by).map(function (key) {
+    var o = by[key], best = '', bc = 0;
+    Object.keys(o.nameVotes).forEach(function (nm) { if (o.nameVotes[nm] > bc) { bc = o.nameVotes[nm]; best = nm; } });
+    return { code: o.code, name: best, n: o.n, qty: o.qty };
+  });
+  out.sort(function (a, b) { return b.qty - a.qty; });
+  return out;
+}
+
 function getDonLastDateByPhone_(rows) {
   rows = rows || readDonChiTiet_();
   var map = {};

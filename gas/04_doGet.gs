@@ -117,6 +117,14 @@ function doGetCore_(e) {
       return jsonOut_({ ok: true, found: liteCk.found, rows: liteCk.rows, total: liteCk.total, noPhone: liteCk.noPhone, noPhoneSample: liteCk.noPhoneSample });
     }
     // ── Tap SDT co trong "dữ liệu đơn" — chi de loc nguon o man hinh chinh (cache 10') ──
+    // Danh sach san pham (ma + ten) trong "du lieu don" cho o tim/tick san pham cua Chuong trinh thuong (cache 10').
+    if (action === 'donProducts') {
+      var cachedDPr = _cacheGetBig_('don_products_v1');
+      if (cachedDPr) { try { return jsonOut_(JSON.parse(cachedDPr)); } catch (ecP) {} }
+      var resDPr = { ok: true, products: buildDonProducts_() };
+      try { _cachePutBig_('don_products_v1', JSON.stringify(resDPr), 600); } catch (ecP2) {}
+      return jsonOut_(resDPr);
+    }
     if (action === 'donPhones') {
       // TOI UU (v13.20): NGUYEN NHAN GOC cham — (1) goi readDonChiTiet_() NAM LAN (moi ham getDon*_ tu doc lai, tuc 5 lan
       // JSON.parse mang don lon, hoac 5 lan doc sheet khi cache 'donChiTiet_v4' het han); (2) cache.put 1 key duy nhat bi gioi han
