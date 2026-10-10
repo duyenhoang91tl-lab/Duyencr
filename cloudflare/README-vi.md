@@ -6,10 +6,11 @@ Worker đứng **trước** Google Apps Script, chỉ cache các action **đọc
 - **Có cache** (xem bảng `TTL_SEC` trong `worker.mjs`): `customers` FULL (15 giây), `orders` (15 giây), báo cáo/nhóm/team (60 giây), danh mục giá/khuyến mãi (120 giây).
 - **Không bao giờ cache:** mọi POST và action ghi; `lookup`, `reminders`, `users`, `getSetting`, `assign`…; `customers&since=…` (delta); mọi request có `demo` hoặc `adminKey`; phản hồi lỗi / không phải JSON / > 8 MB.
 - **Hệ quả:** sau khi CS lưu, người khác có thể thấy bản cũ tối đa bằng thời hạn cache của action đó (delta không cache nên thay đổi khách vẫn tới nhanh).
-- **SWR (giảm lag, 2026-10-10):** bản cache vừa hết hạn thì Worker trả NGAY bản cũ (`x-crm-cache: SWR`) và làm mới ở nền; cửa sổ SWR = TTL × 4 (orders/customers tối đa 60 giây cũ, báo cáo 240 giây, bảng giá 480 giây). Quá cửa sổ thì chờ bản mới như cũ. Nhiều request cùng khóa cùng lúc được gộp thành 1 lần gọi GAS (trong 1 isolate Worker). **Đổi `worker.mjs` thì phải dán lại vào Worker bên Cloudflare** (Edit code → Deploy), push GitHub không tự cập nhật.
+- **SWR (giảm lag, 2026-10-10):** bản cache vừa hết hạn thì Worker trả NGAY bản cũ (`x-crm-cache: SWR`) và làm mới ở nền; cửa sổ SWR = TTL × 4 (orders/customers tối đa 60 giây cũ, báo cáo 240 giây, bảng giá 480 giây). Quá cửa sổ thì chờ bản mới như cũ. Nhiều request cùng khóa cùng lúc được gộp thành 1 lần gọi GAS (trong 1 isolate Worker). **Đổi `worker.mjs` rồi push `main` thì GitHub tự deploy lên Cloudflare** (workflow `deploy-worker.yml`, cài 1 lần theo `docs/CLOUDFLARE-SUPABASE-AUTO-DEPLOY.md`). Chưa cài secret thì vẫn phải dán tay như bước 2 bên dưới. Đã bật tự deploy thì đừng sửa code trực tiếp trên Dashboard — lần deploy sau sẽ ghi đè.
 - **GAS sập:** nếu còn bản cache ≤ 10 phút thì Worker trả bản cũ (`x-crm-cache: STALE`) thay vì báo lỗi.
 
 ## Cài đặt (làm tay, ~10 phút, không cần dòng lệnh)
+Các bước 1–3 chỉ làm **1 lần** để tạo Worker và đặt `GAS_URL`. Sau đó cấu hình tự deploy (`docs/CLOUDFLARE-SUPABASE-AUTO-DEPLOY.md`) thì bước 2 (dán code) không phải làm lại nữa.
 1. Đăng ký tài khoản Cloudflare (miễn phí) → **Workers & Pages** → **Create** → **Create Worker** → đặt tên (vd `duyen-crm-cache`) → **Deploy** (bản mẫu).
 2. Vào Worker vừa tạo → **Edit code** → xoá hết → dán toàn bộ nội dung `cloudflare/worker.mjs` → **Deploy**.
 3. **Settings → Variables and Secrets → Add** → loại *Text*: tên `GAS_URL`, giá trị = URL `/exec` của Web App (Apps Script → Deploy → Manage deployments → *Web app URL*) → **Deploy**.

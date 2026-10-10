@@ -11,7 +11,7 @@ chạy thật đang khoá). KHÔNG bật archive chạy thật khi chưa quyết
 
 ## Lộ trình
 - [x] Bước 1 (phiên này): `supabase/schema.sql` (care_data, dt_tong, don_chi_tiet + index + RLS). CHƯA đụng gas_v13.js.
-- [ ] Bước 1b (Duyên làm tay): tạo project Supabase (free) → SQL Editor → dán `supabase/schema.sql` → Run. Lưu `SUPABASE_URL` và `service_role` key vào Apps Script → Project Settings → Script Properties (`SUPABASE_URL`, `SUPABASE_KEY`). Không gửi key vào chat.
+- [ ] Bước 1b (Duyên làm tay; từ 2026-10-11 phần "dán schema.sql" có thể giao cho CI `deploy-supabase.yml` — xem `docs/CLOUDFLARE-SUPABASE-AUTO-DEPLOY.md`): tạo project Supabase (free) → SQL Editor → dán `supabase/schema.sql` → Run. Lưu `SUPABASE_URL` và `service_role` key vào Apps Script → Project Settings → Script Properties (`SUPABASE_URL`, `SUPABASE_KEY`). Không gửi key vào chat.
 - [x] Bước 2 (xong phần code; còn việc tay của Duyên bên dưới, chia mục nhỏ — mỗi mục push riêng; code nằm cuối `gas_v13.js` = file `gas/22_Supabase.gs`):
   - [x] 2a: helper `sbCfg_`/`sb_`/`sbCareRowToRec_` + mốc `22_Supabase` trong `tools/split-gas.js`.
   - [x] 2b: `sbPing_` + `sbPingTick_`/`installSbPingTrigger_`/`caiTriggerSbPing` + action `sbPing` (doGet, cần adminKey; tài khoản demo bị chặn bởi `DEMO_ALLOWED_GET_`). Cài trigger: chạy hàm `caiTriggerSbPing` 1 lần trong Apps Script Editor.
@@ -64,6 +64,7 @@ chạy thật đang khoá). KHÔNG bật archive chạy thật khi chưa quyết
 - Apps Script giới hạn 6 phút/lần chạy → backfill phải có con trỏ resume (Script Properties) và gọi lặp.
 - `phone` phải qua `normPhone_` trước khi ghi (giữ số 0 đầu; không để Sheets/JSON đổi thành số).
 - Sau mỗi lần sửa gas_v13.js: `node tools/split-gas.js` + `--check`; CI deploy-gas.yml tự deploy nếu đã cài secret (xem `docs/GAS-AUTO-DEPLOY.md`), nếu chưa thì dán đè thủ công các file `gas/*.gs` đổi.
+- Sau mỗi lần sửa `supabase/schema.sql`: CI `deploy-supabase.yml` tự áp lên Supabase nếu đã có secret `SUPABASE_DB_URL` (chuỗi Session pooler; xem `docs/CLOUDFLARE-SUPABASE-AUTO-DEPLOY.md`). File phải idempotent và không chứa drop/truncate/delete (CI chặn). Chưa cài secret thì dán tay vào SQL Editor như cũ. Sửa schema thẳng trên Supabase sẽ lệch với repo.
 
 ## Bước 5 — điều kiện & thứ tự bỏ dual-write (thiết kế, CHƯA thực hiện)
 
