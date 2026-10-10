@@ -30,6 +30,8 @@ const SWR_FACTOR = 4;
 const _inflight = new Map();   // khoa cache -> Promise lam moi dang chay (gop nhieu request cung luc thanh 1 lan goi GAS, trong cung isolate)
 const MAX_CACHE_BYTES = 8 * 1024 * 1024;
 const NO_CACHE_PARAMS = ['demo', 'adminKey'];
+// Tham so KHONG dua vao khoa cache (van chuyen tiep cho GAS): web client gan token phien + src cho moi request (buoc 3b bao mat) -> neu dua vao khoa thi moi nguoi 1 cache rieng, mat tac dung cache dung chung.
+const KEY_IGNORE_PARAMS = ['token', 'src'];
 
 function cors(res) {
   const h = new Headers(res.headers);
@@ -57,7 +59,7 @@ export function cachePolicy(method, params) {
 }
 export function cacheKeyUrl(requestUrl) {
   const u = new URL(requestUrl);
-  const pairs = []; u.searchParams.forEach((v, k) => pairs.push([k, v]));
+  const pairs = []; u.searchParams.forEach((v, k) => { if (KEY_IGNORE_PARAMS.indexOf(k) === -1) pairs.push([k, v]); });
   pairs.sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0));
   const k = new URL(u.origin + u.pathname); pairs.forEach(p => k.searchParams.append(p[0], p[1]));
   return k.toString();
@@ -90,6 +92,8 @@ export async function handle(request, env, ctx) {
   if (!gas) return cors(jsonRes({ error: 'Worker chua cau hinh bien GAS_URL.' }, 500));
   const url = new URL(request.url);
   const originUrl = new URL(gas); url.searchParams.forEach((v, k) => originUrl.searchParams.append(k, v));
+  // Nguoi goi chua gan src (GET) -> danh dau 'worker' de log khong-token o GAS biet request di qua Worker (buoc 3b).
+  if (request.method === 'GET' && !originUrl.searchParams.has('src')) originUrl.searchParams.set('src', 'worker');
   const policy = (env.DISABLED === '1' || env.DISABLED === 1) ? { why: 'disabled' } : cachePolicy(request.method, url.searchParams);
   if (!policy.ttl) return passThrough(request, originUrl.toString(), 'BYPASS:' + policy.why);
 

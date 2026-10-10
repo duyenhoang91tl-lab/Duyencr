@@ -37,12 +37,13 @@ const W = 'https://crm.example.workers.dev/';
   ok(P('GET', 'action=toString').why === 'action' && P('GET', 'action=__proto__').why === 'action' && P('GET', 'action=constructor').why === 'action', 'khong bi qua mat khau prototype');
   ok(mod.cacheKeyUrl(W + '?b=2&a=1&action=orders') === mod.cacheKeyUrl(W + '?action=orders&a=1&b=2'), 'khoa cache khong phu thuoc thu tu tham so');
   ok(mod.cacheKeyUrl(W + '?action=orders&x=1') !== mod.cacheKeyUrl(W + '?action=orders&x=2'), 'khac tham so = khac khoa');
+  ok(mod.cacheKeyUrl(W + '?action=orders&token=A&src=web') === mod.cacheKeyUrl(W + '?action=orders&src=zalo&token=B') && mod.cacheKeyUrl(W + '?action=orders&token=A') === mod.cacheKeyUrl(W + '?action=orders'), 'token/src KHONG nam trong khoa cache (cache dung chung)');
   ok(mod.isGoodJson('{"rows":[]}') && mod.isGoodJson('[1,2]') && !mod.isGoodJson('{"error":"x"}') && !mod.isGoodJson('<html>') && !mod.isGoodJson('') && !mod.isGoodJson('"str"') && !mod.isGoodJson('null'), 'isGoodJson');
 
   // ===== cache MISS -> HIT -> het han -> MISS =====
   reset(); let r = await go('action=orders');
   ok(r.status === 200 && r.headers.get('x-crm-cache') === 'MISS' && calls.length === 1 && putCount === 1, 'lan 1 MISS, goi GAS 1 lan, luu cache');
-  ok(calls[0].url === GAS + '?action=orders' && calls[0].init.redirect === 'follow', 'goi dung URL GAS + theo redirect: ' + calls[0].url);
+  ok(calls[0].url === GAS + '?action=orders&src=worker' && calls[0].init.redirect === 'follow', 'goi dung URL GAS + theo redirect: ' + calls[0].url);
   ok(r.headers.get('access-control-allow-origin') === '*' && /x-crm-cache/.test(r.headers.get('access-control-expose-headers')), 'co CORS');
   const first = await r.text();
   now += 5000; r = await go('action=orders'); ok(r.headers.get('x-crm-cache') === 'HIT' && calls.length === 1 && (await r.text()) === first, 'sau 5s: HIT, khong goi GAS, noi dung y het');
@@ -64,7 +65,11 @@ const W = 'https://crm.example.workers.dev/';
   reset(); await go('action=salesReportA&from=2026-10-01&to=2026-10-08'); r = await go('to=2026-10-08&action=salesReportA&from=2026-10-01'); ok(r.headers.get('x-crm-cache') === 'HIT' && calls.length === 1, 'doi thu tu tham so van HIT');
   r = await go('action=salesReportA&from=2026-10-01&to=2026-10-09'); ok(r.headers.get('x-crm-cache') === 'MISS' && calls.length === 2, 'khoang ngay khac = muc khac');
   // origin nhan DUNG thu tu/tham so goc
-  ok(calls[1].url === GAS + '?action=salesReportA&from=2026-10-01&to=2026-10-09', 'tham so chuyen tiep nguyen ven');
+  ok(calls[1].url === GAS + '?action=salesReportA&from=2026-10-01&to=2026-10-09&src=worker', 'tham so chuyen tiep nguyen ven');
+  // Buoc 3b: token/src cua tung nguoi KHONG chia nho cache; van chuyen tiep nguyen ven cho GAS; src san co khong bi ghi de
+  reset(); await go('action=orders&src=web&token=AAA'); r = await go('action=orders&src=web&token=BBB');
+  ok(r.headers.get('x-crm-cache') === 'HIT' && calls.length === 1, 'hai nguoi khac token cung dung 1 cache');
+  ok(calls[0].url === GAS + '?action=orders&src=web&token=AAA', 'GAS nhan nguyen src + token cua nguoi goi: ' + calls[0].url);
 
   // ===== chuyen thang (khong cache) =====
   reset();

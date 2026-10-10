@@ -25,6 +25,25 @@
   const OLD_SASUM_GAS_URL = 'https://script.google.com/macros/s/AKfycbwPQ4HwD8R1HQFtU0xQslqGgr4HSlgzQlWFZs-8mtVY1CK9kBvwJWsIOzVuj6WM1mg-/exec';
   const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbx3QT6YIzQ7SQEwQPkljVeEdmTSBQQSxtTp2hTFYOeCKB_K4BHcUTSLi54LlmB9q_E6sQ/exec';
   let GAS_URL = '';
+  // Buoc 3b bao mat (2026-10-11): moi request toi GAS kem src=zalo de GAS ghi log "request khong token" biet nguon goi. Khong doi hanh vi nao khac.
+  (function () {
+    const _origFetch = window.fetch.bind(window);
+    window.fetch = function (u, o) {
+      try {
+        if (typeof u === 'string' && GAS_URL && u.indexOf(GAS_URL) === 0) {
+          if (o && o.method && String(o.method).toUpperCase() === 'POST') {
+            if (typeof o.body === 'string' && o.body.charAt(0) === '{') {
+              const rest = o.body.slice(1);
+              o = Object.assign({}, o, { body: '{"src":"zalo"' + (/^\s*\}/.test(rest) ? '' : ',') + rest });
+            }
+          } else if (!/[?&]src=/.test(u)) {
+            u += (u.indexOf('?') > -1 ? '&' : '?') + 'src=zalo';
+          }
+        }
+      } catch (e) {}
+      return _origFetch(u, o);
+    };
+  })();
   let _lookupCache = {};
   let _activeTone = 'Thân thiện';
   let _currentPhone = '';

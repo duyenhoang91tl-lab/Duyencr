@@ -244,18 +244,35 @@ try {
   if (localStorage.getItem('ome_use_worker') === '0') FIXED_GS_URL = GAS_URL_DIRECT;
 } catch (e) { /* localStorage bi chan -> giu goi thang */ }
 let gsUrl = FIXED_GS_URL || loadLS('ome_gs_url') || '';
-// ── Tai khoan TEST: moi request toi GAS tu dong kem demoToken (server chi cho xem bao cao, cat 5 dong, chan ghi). ──
-// Khong gan token cho action=users (man hinh dang nhap can doc danh sach tai khoan truoc khi co token).
+// ── Moi request toi GAS (buoc 3b bao mat, 2026-10-11): kem src=web + token phien (neu da dang nhap) de GAS ghi log "request khong token"
+// (xem docs/SECURITY-PLAN.md). Chua chan gi: GAS van chay nhu cu neu thieu token.
+// ── Tai khoan TEST: moi request kem demoToken (server chi cho xem bao cao, cat 5 dong, chan ghi).
+// Khong gan demoToken cho action=users (man hinh dang nhap can doc danh sach tai khoan truoc khi co token).
 (function(){
   var _origFetch = window.fetch.bind(window);
+  // Chen khoa vao dau JSON bang noi chuoi (khong JSON.parse/stringify lai: body co the vai MB, vd replaceOrders). Hop le vi body luon bat dau bang "{".
+  function _injectBody(body, extra) {
+    if (typeof body !== 'string' || body.charAt(0) !== '{') return body;
+    var rest = body.slice(1);
+    return '{' + extra + (/^\s*\}/.test(rest) ? '' : ',') + rest;
+  }
   window.fetch = function(u, o){
     try {
-      var tok = localStorage.getItem('ome_demo_token');
-      if (tok && typeof u === 'string' && gsUrl && u.indexOf(gsUrl) === 0 && u.indexOf('action=users') === -1) {
+      if (typeof u === 'string' && gsUrl && u.indexOf(gsUrl) === 0) {
+        var tok = localStorage.getItem('ome_demo_token');
+        var st = localStorage.getItem('ome_sess_token');
         if (o && o.method && String(o.method).toUpperCase() === 'POST') {
-          try { var b = JSON.parse(o.body); b.demo = tok; o = Object.assign({}, o, { body: JSON.stringify(b) }); } catch(e1){}
+          if (tok) {
+            try { var b = JSON.parse(o.body); b.demo = tok; o = Object.assign({}, o, { body: JSON.stringify(b) }); } catch(e1){}
+          }
+          var ex = '"src":"web"' + (st ? ',"token":' + JSON.stringify(st) : '');
+          o = Object.assign({}, o, { body: _injectBody(o.body, ex) });   // khoa da co trong body (vd saveUsers.token) se thang vi nam sau
         } else {
-          u += (u.indexOf('?') > -1 ? '&' : '?') + 'demo=' + encodeURIComponent(tok);
+          var add = [];
+          if (tok && u.indexOf('action=users') === -1) add.push('demo=' + encodeURIComponent(tok));
+          if (!/[?&]src=/.test(u)) add.push('src=web');
+          if (st && !/[?&]token=/.test(u)) add.push('token=' + encodeURIComponent(st));
+          if (add.length) u += (u.indexOf('?') > -1 ? '&' : '?') + add.join('&');
         }
       }
     } catch(e0){}

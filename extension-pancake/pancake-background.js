@@ -4,6 +4,28 @@
 // riêng, mọi request (trừ khi CS cấu hình "AI cá nhân" — xem callAI_ dưới) đi qua 1 Web App
 // GAS: POST { action:'ai', prompt, withProducts }.
 
+// Buoc 3b bao mat (2026-10-11): moi request toi GAS/Worker kem src=pancake de GAS ghi log "request khong token" biet nguon goi.
+// Chi dong vao URL Google Apps Script / Cloudflare Worker (khong dong vao API Pancake). Khong doi hanh vi nao khac.
+(function () {
+  const _origFetch = self.fetch.bind(self);
+  const GAS_HOST_RE = /^https:\/\/(script\.google\.com|script\.googleusercontent\.com|[^/]*\.workers\.dev)\//;
+  self.fetch = function (u, o) {
+    try {
+      if (typeof u === "string" && GAS_HOST_RE.test(u)) {
+        if (o && o.method && String(o.method).toUpperCase() === "POST") {
+          if (typeof o.body === "string" && o.body.charAt(0) === "{") {
+            const rest = o.body.slice(1);
+            o = Object.assign({}, o, { body: '{"src":"pancake"' + (/^\s*\}/.test(rest) ? "" : ",") + rest });
+          }
+        } else if (!/[?&]src=/.test(u)) {
+          u += (u.indexOf("?") > -1 ? "&" : "?") + "src=pancake";
+        }
+      }
+    } catch (e) {}
+    return _origFetch(u, o);
+  };
+})();
+
 const OLD_SASUM_GAS_URL = "https://script.google.com/macros/s/AKfycbwPQ4HwD8R1HQFtU0xQslqGgr4HSlgzQlWFZs-8mtVY1CK9kBvwJWsIOzVuj6WM1mg-/exec";
 
 const DEFAULT_SETTINGS = {
