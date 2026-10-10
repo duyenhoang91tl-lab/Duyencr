@@ -119,8 +119,11 @@
       el.style.order = String(r.g*100 + 1 + r.j);
       if (el.classList.contains('active')) activeG = g.k;
       var hid = el.style.display === 'none';
+      // "Quá hạn" đã gộp vào màn "Lịch chăm sóc" (công tắc Theo tuần | Quá hạn) -> ẩn mục riêng, TRỪ khi tài khoản chỉ được cấp quyền Quá hạn mà không có Lịch chăm sóc
+      var _mergedOver = (id === 'tab-overdue') && (typeof _tabAllowedForUser !== 'function' || _tabAllowedForUser('tab-schedule'));
+      if (_mergedOver) hid = true;
       if (!hid) cnt[g.k] = (cnt[g.k]||0) + 1;
-      el.classList.toggle('sn-hide', !!closed[g.k]);
+      el.classList.toggle('sn-hide', !!closed[g.k] || _mergedOver);
     });
     GROUPS.forEach(function(g){
       var h = t.querySelector('.sn-gh[data-k="'+g.k+'"]');

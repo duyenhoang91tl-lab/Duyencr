@@ -584,7 +584,7 @@
     <!-- SCHEDULE TAB -->
     <div id="tab-schedule" style="display:none;flex:1;overflow:hidden;flex-direction:column" class="main">
       <div class="toolbar">
-        <span class="rcount">Lịch chăm sóc — <strong id="sched-date-label"></strong></span>
+        <div class="sched-seg" style="display:inline-flex;gap:4px;margin-right:8px"><button class="btn sm primary" onclick="schedSeg('schedule')">📅 Theo tuần</button><button class="btn sm" onclick="schedSeg('overdue')">⚠ Quá hạn <span class="tab-badge" id="sched-over-cnt" style="background:#fee2e2;color:#991b1b">0</span></button></div><span class="rcount">Lịch chăm sóc — <strong id="sched-date-label"></strong></span>
         <div class="tl-l">
           <button class="btn sm" onclick="schedNav(-1)">← Tuần trước</button>
           <button class="btn sm" onclick="schedNav(0)" style="font-weight:500">Tuần này</button>
@@ -596,7 +596,7 @@
 
     <!-- OVERDUE TAB -->
     <div id="tab-overdue" style="display:none;flex:1;overflow:hidden;flex-direction:column" class="main">
-      <div class="toolbar"><span class="rcount">Các lịch đã <strong>quá hạn</strong> chưa xử lý</span></div>
+      <div class="toolbar"><div class="sched-seg" style="display:inline-flex;gap:4px;margin-right:8px"><button class="btn sm" onclick="schedSeg('schedule')">📅 Theo tuần</button><button class="btn sm primary" onclick="schedSeg('overdue')">⚠ Quá hạn <span class="tab-badge" id="sched-over-cnt2" style="background:#fee2e2;color:#991b1b">0</span></button></div><span class="rcount">Các lịch đã <strong>quá hạn</strong> chưa xử lý</span></div>
       <div class="sched-grid" id="overdue-grid"></div>
     </div>
 

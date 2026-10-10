@@ -107,6 +107,7 @@ function updateSchedBadges() {
   txt('s-over', fmt(overCt));
   txt('tb-sched', fmt(schedules.filter(x=>!x.done).length));
   txt('tb-over', fmt(overCt));
+  txt('sched-over-cnt', fmt(overCt)); txt('sched-over-cnt2', fmt(overCt)); // công tắc Quá hạn trong màn Lịch chăm sóc
 }
 
 function _maybeRefreshOpenDp() {

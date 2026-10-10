@@ -1192,12 +1192,24 @@ function renderScheduleTab() {
   grid.innerHTML = html;
 }
 
+// Công tắc "Theo tuần | Quá hạn" trong màn Lịch chăm sóc (gộp mục menu "Quá hạn" vào "Lịch chăm sóc").
+// Vẫn dùng đúng switchTab + 2 khung cũ (#tab-schedule/#tab-overdue) nên badge, markDone, phân quyền không đổi;
+// chỉ giữ highlight ở "Lịch chăm sóc" để menu trái hiện đúng đang ở mục nào.
+function schedSeg(which) {
+  var sch = document.querySelector('[data-bar-id="tab-schedule"]'), ov = document.querySelector('[data-bar-id="tab-overdue"]');
+  if (which === 'overdue') {
+    switchTab('overdue', ov || sch);
+    if (sch && ov) { ov.classList.remove('active'); sch.classList.add('active'); }
+  } else if (sch) switchTab('schedule', sch);
+}
+
 function renderOverdueTab() {
   const today = _ymd(new Date());
   const _ovFl = _csFilterList();   // đọc DOM 1 lần, không đọc lại cho từng lịch quá hạn
   const items = schedules.filter(x => x.date < today && !x.done && _schedCsFilter(x, _ovFl)).sort((a,b)=>a.date.localeCompare(b.date));
   txt('tb-over', fmt(items.length));
   txt('s-over', fmt(items.length));
+  txt('sched-over-cnt', fmt(items.length)); txt('sched-over-cnt2', fmt(items.length));
   const grid = document.getElementById('overdue-grid');
   if (!items.length) { grid.innerHTML='<div style="padding:40px;text-align:center;color:var(--hint);font-size:12px">Không có lịch quá hạn 🎉</div>'; return; }
   const byDate = {};
