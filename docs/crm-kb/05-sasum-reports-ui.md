@@ -20,3 +20,10 @@ Dùng chung `_srRenderCTable` (client). Xem thêm quy ước dòng Tổng ở tr
 
 ## UI chung
 Design token `:root`, wrapper cuộn ngang bảng rộng, dropdown "⚙ Cài đặt" admin: xem cuối `01-rules-and-deploy.md`.
+
+## AI phân tích team (v13.23) — `js/30-fn-teamanalysis.js` + `teamAnalysis_` (gas_v13.js)
+- Menu trái → 📊 Báo cáo → "🤖 AI phân tích team" (chỉ admin). Chọn khoảng ngày → bảng xếp loại từng người + tổng quan/điểm tốt/rủi ro.
+- Server gom 4 báo cáo có sẵn theo tên chuẩn hoá (`_normTxt_`): `buildSaleKpiReport_` (doanh thu, đơn, %KPI), `buildKpiReport_` (tin nhắn, tỷ lệ chốt Pancake), `buildFailedOrderReport_` (đơn thất bại), `buildCareLeadReport_` (CS thêm KH).
+- Điểm 0–100 do QUY TẮC (`scoreTeam_`): %KPI 45 + doanh thu so với team 20 + tỷ lệ chốt so với mức giữa team 20 + chất lượng đơn 15; thành phần thiếu số liệu bị bỏ qua (không trừ điểm). ≥70 Làm tốt, 45–69 Trung bình, <45 Cần cải thiện, <2 thành phần = Chưa đủ dữ liệu. AI (`_taCallAI_`: Groq→Cerebras→Gemini) CHỈ viết nhận xét/việc cần làm, KHÔNG đổi xếp loại; AI lỗi/thiếu key vẫn ra bảng đầy đủ (nhận xét theo quy tắc). Không gửi SĐT khách cho AI.
+- Kết quả có AI cache 10 phút theo khoảng ngày (`teamAI_v1_*`); nút "↻ Làm mới" = `&refresh=1`. Đổi trọng số/ngưỡng → sửa `scoreTeam_` rồi đổi key cache (`v1`→`v2`).
+- Chưa rõ: "đơn thất bại" có nằm trong "số đơn" của KPI Sale không — hiện tính tỷ lệ thất bại = thất bại ÷ (đơn + thất bại).
