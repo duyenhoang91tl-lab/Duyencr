@@ -1019,7 +1019,7 @@ function _injectV9UI(){
     gear.className = 'tab';
     gear.id = 'v9tab-customize';
     gear.title = 'Tuỳ chỉnh thanh menu — kéo mục vào/ra ☰ Menu theo ý bạn';
-    gear.style.cssText = 'flex-shrink:0;opacity:.6';
+    gear.style.cssText = 'flex-shrink:0;opacity:.6;display:none'; // ẩn: tuỳ chỉnh thanh menu cũ đã được thay bằng menu trái; giữ phần tử vì _injectV9UI dùng #v9tab-customize để chống chèn 2 lần
     gear.innerHTML = '⚙';
     gear.setAttribute('onclick', 'openBarCustomizeModal()');
     tabsBar.appendChild(gear);

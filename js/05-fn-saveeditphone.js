@@ -824,7 +824,7 @@ function _ensureBarMenuBtn(){
   if (!hdrR) return null;
   var wrap = document.createElement('div');
   wrap.id = 'bar-menu-wrap';
-  wrap.style.cssText = 'position:relative;display:inline-flex';
+  wrap.style.cssText = 'position:relative;display:none'; // ẩn: thay bằng menu trái (js/29-sidenav.js)
   wrap.innerHTML = '<button class="btn sm" id="bar-menu-btn" title="Các mục bạn đã kéo vào đây" onclick="_toggleBarMenuDropdown()">☰ Menu</button>' +
     '<div id="bar-menu-list" style="display:none;position:absolute;top:110%;right:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--rmd);box-shadow:0 8px 24px rgba(0,0,0,.15);min-width:190px;z-index:950;padding:6px;"></div>';
   hdrR.appendChild(wrap);
@@ -876,7 +876,9 @@ function _applyBarCustomization(){
   var count = 0;
   Object.keys(byId).forEach(function(id){
     var el = byId[id][0];
-    var inMenu = _barMenuItems.indexOf(id) !== -1;
+    // Đã có menu trái (js/29-sidenav.js) chứa MỌI mục nên bỏ cơ chế kéo vào "☰ Menu" cũ: luôn trả mục về chỗ gốc,
+    // kể cả với tài khoản từng cấu hình _barMenuItems (cũ/kéo từ GAS) để không có tab nào bị giấu mất.
+    var inMenu = false;
     if (inMenu) {
       if (el.parentNode !== list) list.appendChild(el);
       count++;

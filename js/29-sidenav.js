@@ -39,7 +39,7 @@
     { k:'cs',  t:'🔀 Cài đặt chia số',      ids:['act:assign','act:autoassign','act:assignhist'] },
     { k:'tm',  t:'👥 Cài đặt team',         ids:['team','act:acct'] },
     { k:'up',  t:'📤 Up data',              ids:['uploaddata','act:upload','act:sync','act:push','act:fullsync','act:dup'] },
-    { k:'st',  t:'⚙ Settings',              ids:['act:cstatus','act:khstatus','act:cfield','audit','act:barcust','act:clear'] }
+    { k:'st',  t:'⚙ Settings',              ids:['act:cstatus','act:khstatus','act:cfield','audit','act:clear'] }
   ];
   // Mục "hành động" (mở modal có sẵn, không phải tab). admin:true = chỉ tài khoản admin thấy.
   var ACTS = {
@@ -60,7 +60,6 @@
     cstatus:    { t:function(){ return '⚙ ' + (typeof FIELD_LABEL_CS!=='undefined'?FIELD_LABEL_CS:'Tình trạng chăm sóc'); }, f:'openCareStatusModal', admin:true },
     khstatus:   { t:function(){ return '⚙ ' + (typeof FIELD_LABEL_KH!=='undefined'?FIELD_LABEL_KH:'Trạng thái KH'); }, f:'openKhStatusModal', admin:true },
     cfield:     { t:'➕ Trường tự tạo', f:'openCustomFieldsModal', admin:true },
-    barcust:    { t:'🧩 Tuỳ chỉnh thanh menu', f:'openBarCustomizeModal' },
     clear:      { t:'🧹 Xóa data trên máy', f:'clearData', admin:true }
   };
   function isAdm(){ try { return (typeof _authAccount!=='undefined' && _authAccount && _authAccount.role==='admin') || (typeof _bootstrapAdmin!=='undefined' && _bootstrapAdmin); } catch(e){ return false; } }
