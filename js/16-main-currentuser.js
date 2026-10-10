@@ -708,7 +708,7 @@ if (typeof syncFromGS === 'function'){
 
 window.addEventListener('load', function(){
   // chạy sau cùng để chắc chắn mọi DOM/biến đã sẵn sàng
-  setTimeout(function(){ _injectV9UI(); _renderAuthHeader(); _authGate(); if (typeof startReminderChecks==='function') startReminderChecks(); if (typeof startAutoSync==='function') startAutoSync(); if (typeof _checkAndRenewBdaySchedules==='function') _checkAndRenewBdaySchedules(); if (typeof checkDataDaoRenewSchedules==='function') checkDataDaoRenewSchedules(); if (typeof reapplyColVisibility==='function') reapplyColVisibility(); if (typeof _applyBarCustomization==='function') _applyBarCustomization(); if (typeof _pullBarMenuForAccount==='function') _pullBarMenuForAccount(); if (typeof _applyUserTabPermissions==='function') _applyUserTabPermissions(); }, 0);
+  setTimeout(function(){ _injectV9UI(); _renderAuthHeader(); _authGate(); if (typeof startReminderChecks==='function') startReminderChecks(); if (typeof startAutoSync==='function') startAutoSync(); if (typeof _checkAndRenewBdaySchedules==='function') _checkAndRenewBdaySchedules(); if (typeof checkDataDaoRenewSchedules==='function') checkDataDaoRenewSchedules(); if (typeof reapplyColVisibility==='function') reapplyColVisibility(); if (typeof _applyBarCustomization==='function') _applyBarCustomization(); if (typeof _applyUserTabPermissions==='function') _applyUserTabPermissions(); }, 0);
 });
 
 // ═══════════════════════════════════════════════════════

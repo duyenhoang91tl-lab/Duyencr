@@ -790,57 +790,6 @@ function _applyUserTabPermissions(){
   }
 }
 
-function _barMenuAcctKey(){
-  var u = (typeof _authAccount !== 'undefined' && _authAccount && _authAccount.username) ? String(_authAccount.username).trim().toLowerCase() : '';
-  return u ? ('barMenuItems::' + u) : '';
-}
-async function _pullBarMenuForAccount(){
-  var key = _barMenuAcctKey();
-  if (!key || !gsUrl) return;
-  try {
-    var sep = gsUrl.includes('?') ? '&' : '?';
-    var r = await fetch(gsUrl + sep + 'action=getSetting&key=' + encodeURIComponent(key), {redirect:'follow'});
-    var d = await r.json();
-    if (d && d.value) {
-      var saved = null;
-      try { saved = JSON.parse(d.value); } catch(e) { saved = null; }
-      if (Array.isArray(saved)) { _barMenuItems = saved; saveLS('ome_bar_menu_items', _barMenuItems); _applyBarCustomization(); }
-    }
-  } catch(e) { console.warn('_pullBarMenuForAccount lỗi:', e.message); }
-}
-function _pushBarMenuForAccount(){
-  var key = _barMenuAcctKey();
-  if (!key || !gsUrl) return;
-  fetch(gsUrl, { method:'POST', redirect:'follow',
-    body: JSON.stringify({ action:'setSetting', key: key, value: JSON.stringify(_barMenuItems) }) }).catch(function(){});
-}
-
-// Tạo (nếu chưa có) nút "☰ Menu" + khung sổ xuống dùng chung cho cả 2 thanh, trả về
-// phần tử khung chứa (nơi các mục bị kéo vào sẽ được appendChild tới).
-function _ensureBarMenuBtn(){
-  var existing = document.getElementById('bar-menu-list');
-  if (existing) return existing;
-  var hdrR = document.querySelector('.hdr-r');
-  if (!hdrR) return null;
-  var wrap = document.createElement('div');
-  wrap.id = 'bar-menu-wrap';
-  wrap.style.cssText = 'position:relative;display:none'; // ẩn: thay bằng menu trái (js/29-sidenav.js)
-  wrap.innerHTML = '<button class="btn sm" id="bar-menu-btn" title="Các mục bạn đã kéo vào đây" onclick="_toggleBarMenuDropdown()">☰ Menu</button>' +
-    '<div id="bar-menu-list" style="display:none;position:absolute;top:110%;right:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--rmd);box-shadow:0 8px 24px rgba(0,0,0,.15);min-width:190px;z-index:950;padding:6px;"></div>';
-  hdrR.appendChild(wrap);
-  document.addEventListener('click', function(e){
-    var list = document.getElementById('bar-menu-list'), btn = document.getElementById('bar-menu-btn');
-    if (!list || !btn || list.style.display==='none') return;
-    if (e.target===btn || btn.contains(e.target) || list.contains(e.target)) return;
-    list.style.display = 'none';
-  });
-  return document.getElementById('bar-menu-list');
-}
-function _toggleBarMenuDropdown(){
-  var list = document.getElementById('bar-menu-list');
-  if (list) list.style.display = (list.style.display === 'none') ? 'block' : 'none';
-}
-
 // Đặt 1 phần tử [data-bar-id] về đúng "nhà" của nó: có data-bar-after thì chèn NGAY SAU phần
 // tử được trỏ tới (vd luôn nằm cạnh "Lịch chăm sóc" dù kéo ra/vào ☰ Menu bao nhiêu lần); không
 // có/không tìm thấy thì mới appendChild vào data-bar-home như cơ chế cũ.
@@ -853,93 +802,16 @@ function _barPlaceHome(el){
   if (home) home.appendChild(el);
 }
 
-// Di chuyển đúng các phần tử [data-bar-id] đang nằm trong _barMenuItems vào khung "☰ Menu",
-// và trả các phần tử KHÔNG còn trong danh sách về lại thanh gốc (data-bar-home). Một số nơi
-// (VD header) render lại toàn bộ bằng innerHTML mỗi lần đổi trạng thái đăng nhập → có thể tạo
-// ra 1 bản MỚI trùng id với bản đang nằm trong menu; hàm này dọn trùng trước khi sắp xếp.
+// Menu trái (js/29-sidenav.js) đã chứa MỌI mục nên cơ chế "kéo mục vào ☰ Menu" cũ (_barMenuItems, _BAR_ITEM_DEFS,
+// openBarCustomizeModal, key GAS barMenuItems::<user>) đã gỡ. Hàm này chỉ còn dọn các phần tử [data-bar-id] bị trùng
+// (VD header render lại bằng innerHTML) — giữ lại vì js/15, js/16, js/22 vẫn gọi.
 function _applyBarCustomization(){
-  var list = _ensureBarMenuBtn();
-  if (!list) return;
-  var byId = {};
+  var seen = {};
   document.querySelectorAll('[data-bar-id]').forEach(function(el){
     var id = el.getAttribute('data-bar-id');
-    (byId[id] = byId[id] || []).push(el);
+    if (seen[id]) el.remove(); else seen[id] = true;
   });
-  Object.keys(byId).forEach(function(id){
-    var els = byId[id];
-    if (els.length <= 1) return;
-    var keep = els.filter(function(el){ return el.parentNode !== list; })[0] || els[els.length - 1];
-    els.forEach(function(el){ if (el !== keep) el.remove(); });
-    byId[id] = [keep];
-  });
-  var btn = document.getElementById('bar-menu-btn');
-  var count = 0;
-  Object.keys(byId).forEach(function(id){
-    var el = byId[id][0];
-    // Đã có menu trái (js/29-sidenav.js) chứa MỌI mục nên bỏ cơ chế kéo vào "☰ Menu" cũ: luôn trả mục về chỗ gốc,
-    // kể cả với tài khoản từng cấu hình _barMenuItems (cũ/kéo từ GAS) để không có tab nào bị giấu mất.
-    var inMenu = false;
-    if (inMenu) {
-      if (el.parentNode !== list) list.appendChild(el);
-      count++;
-    } else if (el.parentNode === list) {
-      _barPlaceHome(el);
-      if (el.parentNode === list) list.removeChild(el); // khong tim duoc noi de ve -> danh phai bo khoi menu de khoi mat tich
-    }
-  });
-  if (btn) btn.style.display = count ? '' : 'none';
 }
-
-function openBarCustomizeModal(){
-  var shown  = _BAR_ITEM_DEFS.filter(function(d){ return _barMenuItems.indexOf(d.id) === -1; });
-  var inMenu = _BAR_ITEM_DEFS.filter(function(d){ return _barMenuItems.indexOf(d.id) !== -1; });
-  function rowHtml(d){
-    return '<div class="bar-drag-item" draggable="true" data-id="'+d.id+'" ondragstart="_barDragStart(event)" '+
-      'style="padding:7px 10px;margin:3px 0;border:1px solid var(--border);border-radius:8px;background:var(--surface2);cursor:grab;font-size:12.5px;">'+esc(d.label)+'</div>';
-  }
-  var box = document.createElement('div');
-  box.id = 'bar-customize-overlay';
-  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:2900;display:flex;align-items:center;justify-content:center';
-  box.innerHTML = '<div style="background:var(--surface);border-radius:var(--rlg);padding:18px 20px;width:560px;max-width:94vw;max-height:85vh;overflow:auto">'+
-    '<div style="font-weight:700;font-size:15px;margin-bottom:4px">☰ Tuỳ chỉnh thanh menu</div>'+
-    '<div style="font-size:11px;color:var(--muted);margin-bottom:12px">Kéo mục từ bên trái sang phải để đưa vào "☰ Menu" — kéo ngược lại để đưa ra thanh gốc. Chỉ áp dụng cho tài khoản của riêng bạn.</div>'+
-    '<div style="display:flex;gap:12px">'+
-      '<div style="flex:1;min-width:0">'+
-        '<div style="font-weight:600;font-size:12px;margin-bottom:6px;color:var(--muted)">Đang hiển thị trên thanh</div>'+
-        '<div id="bar-col-shown" ondragover="event.preventDefault()" ondrop="_barDrop(event,false)" style="min-height:280px;border:1px dashed var(--border);border-radius:10px;padding:6px;">'+shown.map(rowHtml).join('')+'</div>'+
-      '</div>'+
-      '<div style="flex:1;min-width:0">'+
-        '<div style="font-weight:600;font-size:12px;margin-bottom:6px;color:var(--muted)">Trong "☰ Menu"</div>'+
-        '<div id="bar-col-menu" ondragover="event.preventDefault()" ondrop="_barDrop(event,true)" style="min-height:280px;border:1px dashed var(--border);border-radius:10px;padding:6px;">'+inMenu.map(rowHtml).join('')+'</div>'+
-      '</div>'+
-    '</div>'+
-    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'+
-      '<button class="btn" onclick="document.getElementById(\'bar-customize-overlay\').remove()">Huỷ</button>'+
-      '<button class="btn primary" onclick="_saveBarCustomize_()">Lưu & tải lại</button>'+
-    '</div></div>';
-  box.addEventListener('click', function(e){ if (e.target===box) box.remove(); });
-  document.body.appendChild(box);
-}
-function _barDragStart(e){ _barDragId = e.target.getAttribute('data-id'); e.dataTransfer.effectAllowed = 'move'; }
-function _barDrop(e, toMenu){
-  e.preventDefault();
-  if (!_barDragId) return;
-  var idx = _barMenuItems.indexOf(_barDragId);
-  if (toMenu && idx === -1) _barMenuItems.push(_barDragId);
-  if (!toMenu && idx !== -1) _barMenuItems.splice(idx, 1);
-  _barDragId = null;
-  var overlay = document.getElementById('bar-customize-overlay');
-  if (overlay) overlay.remove();
-  openBarCustomizeModal(); // vẽ lại 2 cột theo trạng thái mới, không cần tải lại trang
-}
-function _saveBarCustomize_(){
-  saveLS('ome_bar_menu_items', _barMenuItems);
-  _pushBarMenuForAccount();
-  var overlay = document.getElementById('bar-customize-overlay');
-  if (overlay) overlay.remove();
-  _applyBarCustomization();
-}
-
 
 function toggleLastActSort() {
   _lastActSortDir = _lastActSortDir === 0 ? -1 : _lastActSortDir === -1 ? 1 : 0;

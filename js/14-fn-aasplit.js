@@ -939,7 +939,7 @@ async function syncGasSourceFromTextarea(){
 //  INJECT UI (tabs + panels + role pill) — chạy khi load
 // ═══════════════════════════════════════════════════════
 // Mở/đóng dropdown "📊 Báo cáo ▾" gom 4 tab báo cáo — cùng kiểu click-để-mở/click-ra-ngoài-để-đóng
-// như nút "☰ Menu" đã có (_toggleBarMenuDropdown ở trên), viết riêng vì khác điểm neo/nội dung.
+// (cơ chế dropdown riêng, không dùng chung với menu nào khác).
 function _toggleReportsGroupDropdown(e){
   if (e) e.stopPropagation();
   var list = document.getElementById('reportsgroup-list');
@@ -948,9 +948,10 @@ function _toggleReportsGroupDropdown(e){
 }
 
 function _injectV9UI(){
-  if (document.getElementById('v9tab-customize')) return; // tránh chèn 2 lần (nút ⚙ luôn được thêm dù tab nào bị ẩn)
+  if (window._v9UIInjected) return; // tránh chèn 2 lần (cờ chỉ bật khi đã có thanh tab, giống hành vi cũ dùng nút ⚙)
   var tabsBar = document.querySelector('.tabs');
   if (tabsBar){
+    window._v9UIInjected = true;
     var defs = [
       { id:'dashboard',   label:'📊 Dashboard' },
       { id:'team',        label:'👥 Quản lý Team' },
@@ -1015,14 +1016,6 @@ function _injectV9UI(){
         list.style.display = 'none';
       });
     }
-    var gear = document.createElement('div');
-    gear.className = 'tab';
-    gear.id = 'v9tab-customize';
-    gear.title = 'Tuỳ chỉnh thanh menu — kéo mục vào/ra ☰ Menu theo ý bạn';
-    gear.style.cssText = 'flex-shrink:0;opacity:.6;display:none'; // ẩn: tuỳ chỉnh thanh menu cũ đã được thay bằng menu trái; giữ phần tử vì _injectV9UI dùng #v9tab-customize để chống chèn 2 lần
-    gear.innerHTML = '⚙';
-    gear.setAttribute('onclick', 'openBarCustomizeModal()');
-    tabsBar.appendChild(gear);
   }
   var dataView = document.getElementById('data-view');
   if (dataView){

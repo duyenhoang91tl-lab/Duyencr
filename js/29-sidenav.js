@@ -149,7 +149,6 @@
       var tab = e.target.closest && e.target.closest('#data-view .tabs .tab');
       if (!tab) return;
       if (tab.id === 'v9tab-reportsgroup' && !e.target.closest('#reportsgroup-list')) return;
-      if (tab.id === 'v9tab-customize') { setOpen(false); return; }
       var gk = tab.getAttribute('data-sn-g'); if (gk && closed[gk]) { closed[gk] = false; try{localStorage.setItem('sn_closed', JSON.stringify(closed));}catch(x){} }
       setTimeout(function(){ setOpen(false); refreshLabel(); layout(); }, 0);
     });

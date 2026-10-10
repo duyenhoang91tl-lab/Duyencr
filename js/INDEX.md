@@ -46,7 +46,7 @@ Code client của `index.html` (trước đây inline, ~1.4MB) đã tách ra `cs
 
 ## Quy ước menu (cập nhật 10/10/2026)
 - MỘT nơi duy nhất chứa tính năng: menu trái `js/29-sidenav.js`. `GROUPS` = nhóm mẹ + thứ tự; `ACTS` = mục hành động (gọi lại đúng hàm mở modal cũ, `admin:true` = chỉ admin thấy). Thêm tính năng mới → thêm vào ACTS + GROUPS, KHÔNG thêm nút mới vào header/toolbar.
-- Đã bỏ vì trùng: nút header (Tác vụ, Mẫu hỏi thăm, Tình trạng CS, Trạng thái KH, Trường tự tạo, Tài khoản), dropdown "Tác vụ" ở toolbar, "☰ Menu" cũ + tab ⚙ tuỳ chỉnh (`#v9tab-customize` còn trong DOM nhưng ẩn — `_injectV9UI` dùng nó chống chèn 2 lần, đừng xoá).
+- Đã bỏ vì trùng: nút header (Tác vụ, Mẫu hỏi thăm, Tình trạng CS, Trạng thái KH, Trường tự tạo, Tài khoản), dropdown "Tác vụ" ở toolbar, "☰ Menu" cũ + tab ⚙ tuỳ chỉnh — ĐÃ XOÁ HẲN code (`openBarCustomizeModal`, `_BAR_ITEM_DEFS`, `_barMenuItems`, đồng bộ key GAS `barMenuItems::<user>` — key này còn nằm trong sheet Settings, vô hại). `_applyBarCustomization` chỉ còn dọn `[data-bar-id]` trùng; `_injectV9UI` chống chèn 2 lần bằng cờ `window._v9UIInjected`.
 - Cố ý GIỮ nút theo ngữ cảnh trên màn hình: "Thêm KH / Đơn mới", "Xuất CSV" (toolbar danh sách), "+ Tạo công việc" (tab Công việc). Header chỉ còn: ☰ Menu, trạng thái đồng bộ, pill Google Sheets, Đăng xuất.
 - Nhãn "Tình trạng CS"/"Trạng thái KH" lấy từ `FIELD_LABEL_CS/KH` (admin đổi tên được) — đừng ghi cứng.
 - ID tab (`data-bar-id`) giữ nguyên vì phân quyền theo tab (`_PERM_TAB_DEFS`) dựa vào chúng.

@@ -454,23 +454,6 @@ const colVisible = Object.assign({}, _colVisDefault, loadLS('ome_col_visible') |
 const _tabVisDefault = { dashboard:true, team:true, audit:true, salesreport:true, pancake:true, kpipancake:true };
 const tabVisible = Object.assign({}, _tabVisDefault, loadLS('ome_tab_visible') || {});
 // ═══════════════════════════════════════════════════════
-//  TUỲ CHỈNH THANH MENU (kéo-thả mục vào/ra "☰ Menu") — thay cho cơ chế tick ẩn/hiện
-//  cũ ở trên (chỉ có Bật/Tắt, không có "menu"). Giờ MỌI mục ở cả 2 thanh (header phải +
-//  thanh tab) đều kéo được vào 1 nút "☰ Menu" dùng chung — kéo ra thì mục về lại đúng
-//  thanh gốc của nó (data-bar-home), không mất chức năng gì cả. Lưu riêng theo từng
-//  tài khoản đăng nhập, giống hệt cơ chế tabVisible ở trên.
-var _barMenuItems = []; // mảng id (không cần giữ thứ tự) đang nằm TRONG "☰ Menu"
-(function _barMenuMigrate(){
-  var saved = loadLS('ome_bar_menu_items');
-  if (Array.isArray(saved)) { _barMenuItems = saved; return; }
-  // Chưa từng dùng tính năng mới → chuyển tiếp 1 lần từ tabVisible cũ: tab nào đang
-  // TẮT thì coi như đang nằm trong menu, để không mất cấu hình cũ của người dùng.
-  var legacy = loadLS('ome_tab_visible') || {};
-  _barMenuItems = Object.keys(legacy).filter(function(k){ return legacy[k] === false; });
-  saveLS('ome_bar_menu_items', _barMenuItems);
-})();
-
-// ═══════════════════════════════════════════════════════
 //  PHÂN QUYỀN XEM MENU (Admin gán qua modal "🔑 Tài khoản") — khác với "☰ Menu" ở trên
 //  (đó là NGƯỜI DÙNG tự sắp xếp thẩm mỹ cho mình). Đây là ADMIN khoá cứng: nhân viên
 //  KHÔNG tự bật lại được các mục bị giới hạn, kể cả qua thao tác client.
@@ -492,33 +475,6 @@ var _PERM_TAB_DEFS = [
   { id:'dailybrief',   label:'Báo cáo ngày' },
   { id:'uploaddata',   label:'Up dữ liệu' }
 ];
-var _BAR_ITEM_DEFS = [
-  { id:'tab-kh',          label:'Danh sách KH' },
-  { id:'tab-schedule',    label:'Lịch chăm sóc' },
-  { id:'reportsgroup',    label:'📊 Báo cáo (gộp Doanh số/Pancake/KPI/Checklist)' },
-  { id:'tab-overdue',     label:'Quá hạn' },
-  { id:'tab-mydata',      label:'Data của tôi' },
-  { id:'tab-zaloai',      label:'Zalo AI' },
-  { id:'tab-task',        label:'Công việc' },
-  { id:'dashboard',       label:'Dashboard' },
-  { id:'team',            label:'Quản lý Team' },
-  { id:'audit',           label:'Nhật ký' },
-  { id:'salesreport',     label:'Báo cáo doanh số' },
-  { id:'pancake',         label:'Báo cáo Pancake' },
-  { id:'kpipancake',      label:'KPI Pancake' },
-  { id:'mktchecklist',    label:'Checklist MKT' },
-  { id:'dailybrief',      label:'Báo cáo ngày' },
-  { id:'uploaddata',      label:'Up dữ liệu' },
-  { id:'hdr-hoitham',     label:'Mẫu hỏi thăm' },
-  { id:'hdr-tacvu',       label:'Tác vụ' },
-  { id:'hdr-carestatus',  label:'Tình trạng CS' },
-  { id:'hdr-khstatus',    label:'Trạng thái KH' },
-  { id:'hdr-customfield', label:'Trường tự tạo' },
-  { id:'hdr-account',     label:'Tài khoản' },
-  { id:'hdr-logout',      label:'Đăng xuất' }
-];
-
-var _barDragId = null;
 let _lastActSortDir = 0; // 0=off, 1=asc(oldest first), -1=desc(newest first)
 let _lastPosSortDir = 0; // 0=off, 1=asc(mua lâu nhất trước), -1=desc(mua gần nhất trước)
 document.addEventListener('click', e=>{
