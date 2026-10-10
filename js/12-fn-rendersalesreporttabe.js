@@ -652,6 +652,7 @@ function _srRenderG_(d){
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(g.ct.total)+'</div><div class="kpi-label">Thưởng Chính thức ('+fmt(g.ct.rows.length)+' Sale)</div></div>'+
     '<div class="kpi-card"><div class="kpi-val">'+fmt((d.orders||[]).length)+'</div><div class="kpi-label">Đơn Pos dùng để tính</div></div>'+
     '</div>';
+  html += '<div style="margin-bottom:14px"><button class="btn sm" onclick="_srSetSub(\'K\')">📋 Chi tiết đơn thưởng (đếm sản phẩm)</button></div>';
 
   function groupTable(title, key, grp, isTv){
     var h = '<div class="dash-section-title" style="margin-top:16px">'+title+'</div>';

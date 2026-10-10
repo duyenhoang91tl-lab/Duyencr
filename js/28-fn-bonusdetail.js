@@ -128,11 +128,7 @@ function _bdRenderBody_(d){
   });
   _bdState.rows = list;
   var nReview = all.filter(function(x){ return x.info.needReview; }).length, nUnc = all.filter(function(x){ return x.info.unconfirmed; }).length;
-  var html = '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;line-height:1.6">'+
-    'Chỉ liệt kê <b>đơn gốc</b> (ghi chú Pos là mã bộ đếm sale dạng <code>17T10/2026</code>, có trên Base và Pos). '+
-    '<b>Vòng chuỗi + charm mix = 1 sản phẩm</b>; charm bi vàng, quà, dịch vụ không tính; charm đứng riêng (vd mặt cổ) là sản phẩm riêng. '+
-    'Tích <b>Vòng chuỗi / Charm mix</b> hoặc chọn <b>SP 1, 2… / Không tính / Quà</b> rồi bấm <b>✔</b> để lưu theo <b>mã sản phẩm</b> — các đơn sau tự áp dụng. '+
-    '"SP 1/2…" và "Doanh thu dòng" chỉ lưu cho riêng đơn đó. Dòng <i>(tự đoán)</i> là hệ thống đang đoán, chưa được xác nhận.</div>';
+  var html = '';
   html += '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">'+
     '<input type="text" placeholder="🔍 Tìm mã đếm / sale / mã SP..." value="'+esc(_bdState.search)+'" oninput="_bdState.search=this.value;_bdState.limit=120;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:230px">'+
     '<label style="font-size:12px"><input type="checkbox" '+(_bdState.onlyReview?'checked':'')+' onchange="_bdState.onlyReview=this.checked;_bdState.limit=120;renderSalesReportTab()"> Chỉ đơn cần kiểm tra / chưa xác nhận</label>'+
@@ -166,5 +162,6 @@ function _bdRenderBody_(d){
 }
 function renderSalesReportTabK_(wrap, subTabs){
   var body = _srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _bdRenderBody_(_srState.dataG);
-  wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + _srGFiltersHtml_() + body;
+  wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + _srGFiltersHtml_() +
+    '<div style="margin-bottom:10px"><button class="btn sm" onclick="_srSetSub(\'G\')">← Về báo cáo thưởng</button></div>' + body;
 }

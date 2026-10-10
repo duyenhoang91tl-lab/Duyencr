@@ -512,10 +512,9 @@ function renderSalesReportTab(){
     '<button class="btn '+(_srState.sub==='D'?'secondary':'sm')+'" onclick="_srSetSub(\'D\')">Báo cáo D — Sale tự thêm</button>' +
     '<button class="btn '+(_srState.sub==='E'?'secondary':'sm')+'" onclick="_srSetSub(\'E\')">Báo cáo E — Hoa hồng nhân viên Pos</button>' +
     '<button class="btn '+(_srState.sub==='F'?'secondary':'sm')+'" onclick="_srSetSub(\'F\')">Báo cáo F — KPI Sale</button>' +
-    '<button class="btn '+(_srState.sub==='G'?'secondary':'sm')+'" onclick="_srSetSub(\'G\')">Báo cáo G — Thưởng thử việc / chính thức</button>' +
+    '<button class="btn '+((_srState.sub==='G'||_srState.sub==='K')?'secondary':'sm')+'" onclick="_srSetSub(\'G\')">Báo cáo G — Thưởng thử việc / chính thức</button>' +
     '<button class="btn '+(_srState.sub==='H'?'secondary':'sm')+'" onclick="_srSetSub(\'H\')">Báo cáo H — Tổng quan data đã chia</button>' +
     '<button class="btn '+(_srState.sub==='I'?'secondary':'sm')+'" onclick="_srSetSub(\'I\')">Báo cáo I — Chia data Renew</button>' +
-    '<button class="btn '+(_srState.sub==='K'?'secondary':'sm')+'" onclick="_srSetSub(\'K\')">Chi tiết thưởng (đếm sản phẩm)</button>' +
     (_srIsAdmin() ? '<button class="btn '+(_srState.sub==='J'?'secondary':'sm')+'" onclick="_srSetSub(\'J\')">📤 Nhập dữ liệu Base/Pos</button>' : '') +
     '</div>';
 
