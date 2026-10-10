@@ -28,3 +28,6 @@ body.rpt-mode #sn-toggle,html.db-standalone #sn-toggle{display:none!important;}
 #data-view .tabs #reportsgroup-list .tab{font-size:13px;color:var(--muted);}
 #data-view .tabs #reportsgroup-list .tab.active{color:var(--green);}
 #data-view .tabs #v9tab-customize{opacity:.6;order:999;}
+#data-view .tabs .sn-act{display:flex;align-items:center;padding:8px 12px 8px 22px;margin:0;border-left:3px solid transparent;border-radius:6px;font-size:13px;color:var(--muted);cursor:pointer;}
+#data-view .tabs .sn-act:hover{background:var(--surface2);color:var(--text);}
+#data-view .tabs .sn-act.sn-hide{display:none!important;}

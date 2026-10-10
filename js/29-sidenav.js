@@ -32,17 +32,60 @@
   }
   // Nhóm menu mẹ -> các mục con (theo data-bar-id). Mục chưa khai báo vẫn hiện, dồn vào nhóm "Khác".
   var GROUPS = [
-    { k:'kh',  t:'👤 Khách hàng', ids:['tab-kh','tab-schedule','tab-overdue','tab-mydata'] },
-    { k:'rp',  t:'📊 Báo cáo',    ids:['salesreport','pancake','kpipancake','mktchecklist','dailybrief','dashboard'] },
-    { k:'nv',  t:'👥 Nhân viên',  ids:['team','audit','tab-task'] },
-    { k:'ct',  t:'🛠 Công cụ',    ids:['tab-zaloai','uploaddata'] }
+    { k:'kh',  t:'👤 Thông tin khách hàng', ids:['tab-kh','tab-schedule','tab-overdue','tab-mydata','act:quickadd','act:export'] },
+    { k:'rp',  t:'📊 Báo cáo',              ids:['salesreport','pancake','kpipancake','mktchecklist','dailybrief','dashboard'] },
+    { k:'nv',  t:'🧑‍💼 Thông tin nhân viên',  ids:['tab-task','act:newtask','audit'] },
+    { k:'tm',  t:'👥 Cài đặt team',         ids:['team','act:acct'] },
+    { k:'cs',  t:'🔀 Cài đặt chia số',      ids:['act:assign','act:autoassign','act:assignhist'] },
+    { k:'up',  t:'📤 Up data',              ids:['uploaddata','act:sync','act:push','act:fullsync','act:dup'] },
+    { k:'tv',  t:'🧰 Tác vụ',               ids:['tab-zaloai','act:bc','act:bct','act:bcstat','act:futpl','act:bday'] },
+    { k:'st',  t:'⚙ Settings',              ids:['act:cstatus','act:khstatus','act:cfield','act:barcust','act:clear'] }
   ];
+  // Mục "hành động" (mở modal có sẵn, không phải tab). admin:true = chỉ tài khoản admin thấy.
+  var ACTS = {
+    quickadd:   { t:'➕ Thêm KH / Đơn mới', f:'openQuickAddModal' },
+    export:     { t:'⬇ Xuất CSV', f:'exportCSV' },
+    newtask:    { t:'🗂️ Tạo công việc', f:'openTaskModal' },
+    acct:       { t:'🔑 Tài khoản đăng nhập', f:'openAcctModal', admin:true },
+    assign:     { t:'👥 Chia data', f:'openAssignModal', admin:true },
+    autoassign: { t:'⏰ Chia tự động', f:'openAssignModal', tab:'auto', admin:true },
+    assignhist: { t:'📋 Lịch sử chia', f:'openAssignModal', tab:'history', admin:true },
+    sync:       { t:'↓ Sync GS', f:'syncFromGS', arg:{pullOrders:true,manual:true} },
+    push:       { t:'📤 Đẩy dữ liệu', f:'pushOrdersToGS', admin:true },
+    fullsync:   { t:'🔁 Đồng bộ 2 chiều', f:'fullSyncOrdersToGS', admin:true },
+    dup:        { t:'🗑️ Đơn trùng', f:'openDupOrdersModal', admin:true },
+    bc:         { t:'📣 Chiến dịch từ danh sách lọc', f:'openBroadcastFromCurrentFilter' },
+    bct:        { t:'🎯 Chiến dịch theo sản phẩm', f:'openBctModal' },
+    bcstat:     { t:'📊 TK chiến dịch', f:'openBcStatModal' },
+    futpl:      { t:'📨 Mẫu hỏi thăm tự động', f:'openFuTplModal' },
+    bday:       { t:'🎂 Mẫu sinh nhật', f:'openBdayTplModal' },
+    cstatus:    { t:'⚙ Tình trạng chăm sóc', f:'openCareStatusModal', admin:true },
+    khstatus:   { t:'⚙ Trạng thái KH', f:'openKhStatusModal', admin:true },
+    cfield:     { t:'➕ Trường tự tạo', f:'openCustomFieldsModal', admin:true },
+    barcust:    { t:'🧩 Tuỳ chỉnh thanh menu', f:'openBarCustomizeModal' },
+    clear:      { t:'🧹 Xóa data trên máy', f:'clearData', admin:true }
+  };
+  function isAdm(){ try { return (typeof _authAccount!=='undefined' && _authAccount && _authAccount.role==='admin') || (typeof _bootstrapAdmin!=='undefined' && _bootstrapAdmin); } catch(e){ return false; } }
+  function runAct(k){
+    var a = ACTS[k]; if (!a) return;
+    setOpen(false);
+    try {
+      var fn = window[a.f];
+      if (typeof fn !== 'function') { if (typeof toast==='function') toast('Chức năng chưa sẵn sàng'); return; }
+      fn(a.arg);
+      if (a.tab && typeof switchAssignTab === 'function') {
+        var tabs = document.querySelectorAll('#assign-modal .assign-tab'), idx = {create:0,history:1,report:2,auto:3}[a.tab];
+        switchAssignTab(a.tab, tabs[idx]);
+      }
+    } catch(e){ console.warn('sidenav act', k, e); if (typeof toast==='function') toast('Lỗi mở: ' + e.message); }
+  }
   var closed = {};
   try { closed = JSON.parse(localStorage.getItem('sn_closed') || '{}') || {}; } catch(e){ closed = {}; }
   function gOf(id){ for (var i=0;i<GROUPS.length;i++){ var j=GROUPS[i].ids.indexOf(id); if(j>=0) return {g:i,j:j}; } return {g:GROUPS.length-1,j:50}; }
   function layout(){
     var t = tabsEl(); if (!t) return;
     var activeG = null;
+    var _a = t.querySelector('.tab.active[data-bar-id]'); if (_a) activeG = GROUPS[gOf(_a.getAttribute('data-bar-id')).g].k;
     GROUPS.forEach(function(g,gi){
       var h = t.querySelector('.sn-gh[data-k="'+g.k+'"]');
       if (!h){
@@ -54,6 +97,21 @@
       h.style.order = String(gi*100);
     });
     var cnt = {};
+    var demo = document.body.classList.contains('demo-mode') || (typeof currentUser!=='undefined' && currentUser && currentUser.role==='demo');
+    Object.keys(ACTS).forEach(function(k){
+      var el = t.querySelector('.sn-act[data-act="'+k+'"]');
+      if (!el){
+        el = document.createElement('div'); el.className = 'sn-act'; el.setAttribute('data-act', k); el.textContent = ACTS[k].t;
+        el.addEventListener('click', function(e){ e.stopPropagation(); runAct(k); });
+        t.appendChild(el);
+      }
+      var r = gOf('act:'+k), g = GROUPS[r.g];
+      el.setAttribute('data-sn-g', g.k);
+      el.style.order = String(r.g*100 + 1 + r.j);
+      var ok = !demo && (!ACTS[k].admin || isAdm());
+      if (ok) cnt[g.k] = (cnt[g.k]||0) + 1;
+      el.classList.toggle('sn-hide', !ok || (!!closed[g.k]));
+    });
     t.querySelectorAll('.tab[data-bar-id]').forEach(function(el){
       var id = el.getAttribute('data-bar-id');
       if (id === 'reportsgroup') return;
@@ -63,12 +121,12 @@
       if (el.classList.contains('active')) activeG = g.k;
       var hid = el.style.display === 'none';
       if (!hid) cnt[g.k] = (cnt[g.k]||0) + 1;
-      el.classList.toggle('sn-hide', !!closed[g.k] && g.k !== activeG);
+      el.classList.toggle('sn-hide', !!closed[g.k]);
     });
     GROUPS.forEach(function(g){
       var h = t.querySelector('.sn-gh[data-k="'+g.k+'"]');
       h.style.display = cnt[g.k] ? '' : 'none';          // nhóm rỗng (do phân quyền) -> ẩn luôn tiêu đề
-      h.classList.toggle('sn-closed', !!closed[g.k] && g.k !== activeG);
+      h.classList.toggle('sn-closed', !!closed[g.k]);
     });
   }
   function init(){
@@ -90,7 +148,8 @@
       if (!tab) return;
       if (tab.id === 'v9tab-reportsgroup' && !e.target.closest('#reportsgroup-list')) return;
       if (tab.id === 'v9tab-customize') { setOpen(false); return; }
-      setTimeout(function(){ setOpen(false); refreshLabel(); }, 0);
+      var gk = tab.getAttribute('data-sn-g'); if (gk && closed[gk]) { closed[gk] = false; try{localStorage.setItem('sn_closed', JSON.stringify(closed));}catch(x){} }
+      setTimeout(function(){ setOpen(false); refreshLabel(); layout(); }, 0);
     });
     document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && isOpen()) setOpen(false); });
     new MutationObserver(syncVisible).observe(dv, { attributes:true, attributeFilter:['style'] });
