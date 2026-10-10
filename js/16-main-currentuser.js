@@ -317,6 +317,7 @@ var _srState = {
   fDateFrom: '', fDateTo: '', fDateQuick: 'thisMonth', fDateField: 'ngayTao', fSale: [], fTeam: [], dataF: null,
   fSaleSearch: '', fSaleCustomized: false, fKpiView: 'table', fEditing: null,
   // G — Chuong trinh thuong Thu viec / Chinh thuc (truoc day la "Don bi loai"; action failedOrderReport con trong backend nhung khong con tab nao goi)
+  lDateFrom: '', lDateTo: '', lDateQuick: 'thisMonth', lSale: [], lSaleCustomized: false, lSearch: '', dataL: null,
   gDateFrom: '', gDateTo: '', gDateQuick: 'thisMonth', gSale: [], gNguon: [], gMarketer: [], gSanPham: '',
   dataG: null, gSaleSearch: '',
   gSaleView: 'table', gNguonView: 'table', gMktView: 'table', gLyDoView: 'table',
@@ -335,6 +336,8 @@ var _srState = {
   if (r){ _srState.fDateFrom = r.from; _srState.fDateTo = r.to; }
   var rG = (typeof _pkQuickRange === 'function') ? _pkQuickRange(_srState.gDateQuick) : null;
   if (rG){ _srState.gDateFrom = rG.from; _srState.gDateTo = rG.to; }
+  var rL = (typeof _pkQuickRange === 'function') ? _pkQuickRange(_srState.lDateQuick) : null;
+  if (rL){ _srState.lDateFrom = rL.from; _srState.lDateTo = rL.to; }
   var rH = (typeof _pkQuickRange === 'function') ? _pkQuickRange(_srState.hDateQuick) : null;
   if (rH){ _srState.hDateFrom = rH.from; _srState.hDateTo = rH.to; }
 })();

@@ -1129,6 +1129,7 @@ function _srEnforceScope(){
       else _srState.eSale = (_srState.eSale||[]).filter(function(n){ return teamNames.indexOf(n)!==-1; });
       if (!_srState.fSaleCustomized) _srState.fSale = teamNames.slice();
       else _srState.fSale = (_srState.fSale||[]).filter(function(n){ return teamNames.indexOf(n)!==-1; });
+      _srState.lSale = teamNames.slice(); // Bao cao L: Leader xem ca team (khong thu hep rieng)
       if (!_srState.gSaleCustomized) _srState.gSale = teamNames.slice();
       else _srState.gSale = (_srState.gSale||[]).filter(function(n){ return teamNames.indexOf(n)!==-1; });
       return;
@@ -1137,6 +1138,7 @@ function _srEnforceScope(){
   _srState.eSale = my.slice();
   _srState.fSale = my.slice();
   _srState.gSale = my.slice();
+  _srState.lSale = my.slice();
 }
 
 // SUA (theo bao cao Duyen: "lọc tháng 7-8-9 load khá lâu nhưng không ra kết quả"): truoc day
