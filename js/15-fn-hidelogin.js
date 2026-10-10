@@ -44,7 +44,9 @@ async function _authGate(){
     }
     var sess = _authAccount && _findAccount(_authAccount.username);
     var _demoTokMissing = sess && sess.role === 'demo' && !(function(){ try { return localStorage.getItem('ome_demo_token'); } catch(e){ return ''; } })();
-    if (sess && sess.active !== false && !_demoTokMissing){
+    // Phien cu (dang nhap TRUOC ban co token may chu) hoac token het han -> bat dang nhap lai 1 lan de lay token.
+    var _sessOk = (function(){ try { return !!localStorage.getItem('ome_sess_token') && Number(localStorage.getItem('ome_sess_exp') || 0) > Date.now(); } catch(e){ return false; } })();
+    if (sess && sess.active !== false && !_demoTokMissing && _sessOk){
       _hideLogin();
       _applyAuthIdentity(sess);
     } else {
@@ -537,9 +539,9 @@ async function addAccount(){
   }
   var existing = _findAccount(u);
   if (!p && !existing){ toast('Đặt mật khẩu cho tài khoản mới.'); return; }
-  var passHash = existing ? existing.passHash : '';
-  if (p) passHash = await _hashPass(p);
-  var rec = { username: u, passHash: passHash, role: role, name: name, names: namesArr, team: team, active: existing ? existing.active !== false : true };
+  // Mat khau (neu co) di theo truong tam _setPw -> pushUsers gui cho may chu tu bam; client KHONG con giu passHash.
+  var rec = { username: u, role: role, name: name, names: namesArr, team: team, active: existing ? existing.active !== false : true };
+  if (p) rec._setPw = p;
   if (existing){ for (var i=0;i<accounts.length;i++){ if (String(accounts[i].username).toLowerCase()===String(existing.username).toLowerCase()){ accounts[i]=rec; break; } } }
   else accounts.push(rec);
   var res = await pushUsers();
@@ -572,8 +574,9 @@ async function resetPassword(u){
   var np = prompt('Mật khẩu mới cho tài khoản "'+u+'":');
   if (np === null) return;
   if (!String(np).trim()){ toast('Mật khẩu trống.'); return; }
-  acct.passHash = await _hashPass(np);
-  pushUsers();
+  acct._setPw = np;   // may chu tu bam (pushUsers xoa truong tam sau khi gui)
+  var _rp = await pushUsers();
+  if (_rp && _rp.error){ toast('Lỗi đổi mật khẩu: ' + _rp.error); return; }
   if (typeof logAudit === 'function') logAudit('account','', u, 'Đổi mật khẩu');
   toast('✓ Đã đổi mật khẩu cho ' + u);
 }

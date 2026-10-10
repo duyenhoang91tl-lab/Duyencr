@@ -1392,6 +1392,114 @@ function demoLogin_(data) {
   return jsonOut_({ ok: false, error: 'Sai tai khoan hoac mat khau' });
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  PHIEN DANG NHAP MAY CHU (them 2026-10-11) — buoc 1+2 cua ke hoach bao mat
+//  Truoc day: trinh duyet tai ca danh sach tai khoan KEM passHash (action=users khong can xac thuc) roi tu so hash,
+//  va saveUsers ai goi cung duoc -> ai biet URL GAS cung doc duoc hash / tu tao admin.
+//  Nay: (1) POST webLogin kiem tra mat khau O SERVER, tra token ky HMAC (het han SESS_TTL_MS_); (2) action=users KHONG BAO GIO tra passHash,
+//  chi tra danh sach rut gon neu khong co token hop le (extension Zalo/Pancake chi can username/name/active); (3) saveUsers bat buoc token admin
+//  (tru khi sheet Users dang trong = tao admin dau tien). Mat khau moi gui dang van ban qua HTTPS trong truong setPassword, server tu bam.
+//  Bi mat ky token nam trong Script Properties (sessSecret), KHONG nam trong sheet Settings (CRM doc duoc).
+// ═══════════════════════════════════════════════════════════════
+var SESS_TTL_MS_ = 7 * 24 * 3600 * 1000;
+function _sessSecret_() {
+  var props = PropertiesService.getScriptProperties();
+  var sec = props.getProperty('sessSecret');
+  if (!sec) { sec = Utilities.getUuid() + Utilities.getUuid() + Utilities.getUuid(); props.setProperty('sessSecret', sec); }
+  return sec;
+}
+function _sessSign_(b64) {
+  return Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(b64, _sessSecret_()));
+}
+function _sessIssue_(acct) {
+  var payload = { u: String(acct.username || ''), e: Date.now() + SESS_TTL_MS_ };
+  var b64 = Utilities.base64EncodeWebSafe(JSON.stringify(payload));
+  return b64 + '.' + _sessSign_(b64);
+}
+function _sessVerify_(tok) {
+  tok = String(tok || '');
+  var i = tok.indexOf('.');
+  if (i < 1) return null;
+  var b64 = tok.slice(0, i), sig = tok.slice(i + 1);
+  if (!_secEq_(sig, _sessSign_(b64))) return null;
+  var p = null;
+  try { p = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(b64)).getDataAsString()); } catch (e) { return null; }
+  if (!p || !p.u || !p.e || p.e < Date.now()) return null;
+  return p;
+}
+// Tra tai khoan THAT trong sheet Users (vai tro/active doc truc tiep, khong tin payload) hoac null neu token sai/het han/tai khoan bi khoa.
+function _sessUser_(tok) {
+  var p = _sessVerify_(tok);
+  if (!p) return null;
+  var users = readUsers_(getCrmSS_().getSheetByName(SH_USER));
+  var un = String(p.u).trim().toLowerCase();
+  for (var i = 0; i < users.length; i++) {
+    if (String(users[i].username || '').trim().toLowerCase() === un) return users[i].active === false ? null : users[i];
+  }
+  return null;
+}
+// Chi tra cac truong an toan. full=true (co token hop le) them perms/saleType/startDate. KHONG BAO GIO co passHash.
+function _usersForClient_(users, full) {
+  return (users || []).map(function(u) {
+    var o = { username: u.username, name: u.name, names: u.names, team: u.team, role: u.role, active: u.active };
+    if (full) { o.perms = u.perms; o.saleType = u.saleType; o.startDate = u.startDate; o.hasPass = !!u.passHash; }
+    return o;
+  });
+}
+function _usersWriteAuth_(tok) {
+  var existing = readUsers_(getCrmSS_().getSheetByName(SH_USER));
+  if (!existing.length) return { ok: true, bootstrap: true };   // chua co tai khoan nao: cho tao admin dau tien
+  var su = _sessUser_(tok);
+  if (!su) return { ok: false, error: 'Phien dang nhap het han hoac chua dang nhap — dang nhap lai roi thu lai.' };
+  if (su.role !== 'admin') return { ok: false, error: 'Chi admin moi duoc sua tai khoan.' };
+  return { ok: true };
+}
+function _upgradePwHash_(username, newHash) {
+  try {
+    var sh = getCrmSS_().getSheetByName(SH_USER);
+    if (!sh || sh.getLastRow() < 2) return;
+    var col = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
+    var un = String(username || '').trim().toLowerCase();
+    for (var i = 0; i < col.length; i++) {
+      if (String(col[i][0]).trim().toLowerCase() === un) { sh.getRange(i + 2, 2).setValue(newHash); return; }
+    }
+  } catch (e) {}
+}
+// Dung chung cho verifyLogin_ (extension) va webLogin_ (web). Tra {acct} hoac {error}.
+function _checkLogin_(username, password) {
+  var uname = String(username || '').trim().toLowerCase();
+  if (!uname || !password) return { error: 'Nhập đủ tài khoản và mật khẩu.' };
+  var cache = CacheService.getScriptCache();
+  var failKey = 'vlfail_' + uname.replace(/[^a-z0-9]/g, '_').slice(0, 80);
+  var fails = parseInt(cache.get(failKey) || '0', 10) || 0;
+  if (fails >= 5) return { error: 'Sai quá nhiều lần — thử lại sau 10 phút.' };
+  var users = readUsers_(getCrmSS_().getSheetByName(SH_USER));
+  var acct = null;
+  for (var i = 0; i < users.length; i++) {
+    if (String(users[i].username || '').trim().toLowerCase() === uname) { acct = users[i]; break; }
+  }
+  var okPw = false, usedOld = false;
+  if (acct && acct.passHash) {
+    okPw = _secEq_(_pwHash_(password, _PW_SALT_), acct.passHash);
+    if (!okPw && _secEq_(_pwHash_(password, _PW_SALT_OLD_), acct.passHash)) { okPw = true; usedOld = true; }
+  }
+  if (!acct || !okPw) {
+    cache.put(failKey, String(fails + 1), 600);
+    return { error: 'Sai tài khoản hoặc mật khẩu.' };
+  }
+  if (acct.active === false) return { error: 'Tài khoản đã bị khoá. Liên hệ quản trị viên.' };
+  cache.remove(failKey);
+  if (usedOld) _upgradePwHash_(acct.username, _pwHash_(password, _PW_SALT_));   // nang salt cu -> moi (truoc day client tu lam)
+  return { acct: acct };
+}
+function webLogin_(d) {
+  var r = _checkLogin_(d && d.username, d && d.password);
+  if (r.error) return jsonOut_({ ok: false, error: r.error });
+  var out = { ok: true, token: _sessIssue_(r.acct), expiresInMs: SESS_TTL_MS_, user: _usersForClient_([r.acct], true)[0] };
+  if (r.acct.role === 'demo') out.demoToken = _demoToken_();   // tai khoan test: client van can demoToken nhu cu
+  return jsonOut_(out);
+}
+
 function doGet(e) {
   var p = (e && e.parameter) || {};
   var action = p.action || '';
@@ -1485,7 +1593,8 @@ function doGetCore_(e) {
     }
     if (action === 'teams')     return jsonOut_({ teams: readTeams_(ss.getSheetByName(SH_TEAM)) });
     if (action === 'mktTeams')  return jsonOut_({ teams: readMktTeams_() });
-    if (action === 'users')     return jsonOut_({ users: readUsers_(ss.getSheetByName(SH_USER)) });
+    // KHONG tra passHash (2026-10-11). Co token hop le -> du truong (perms...); khong token -> rut gon cho extension.
+    if (action === 'users')     return jsonOut_({ users: _usersForClient_(readUsers_(ss.getSheetByName(SH_USER)), !!_sessUser_(e && e.parameter && e.parameter.token)) });
     // ── Bao cao Pancake (nhap tu file Excel "Thong ke tuong tac") ──
     if (action === 'pancakeNameMap') return jsonOut_({ map: readPancakeMap_(), allNames: pancakeAllNames_() });
     if (action === 'pancakeReport')  return jsonOut_(buildPancakeReport_(e.parameter.from, e.parameter.to, e.parameter.split));
@@ -1760,7 +1869,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.23-supabase-dualwrite' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.25-auth-session' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -5453,7 +5562,9 @@ function doPost(e) {
   try { d0 = JSON.parse(e.postData.contents); } catch (e0) { d0 = null; }
   if (d0 && typeof d0 === 'object') {
     if (d0.action === 'demoLogin') return demoLogin_(d0);
+    if (d0.action === 'webLogin') return webLogin_(d0);
     if (d0.demo) return jsonOut_({ error: 'Tai khoan test chi duoc xem, khong duoc ghi du lieu.' });
+    if (d0.action === 'saveUsers') { var _ua = _usersWriteAuth_(d0.token); if (!_ua.ok) return jsonOut_({ error: _ua.error, code: 'AUTH' }); }
     if (d0.action === 'setGasSource' && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de dong bo ma nguon GAS.' });
     if (d0.action === 'setSetting' && _isSensitiveWriteKey_(d0.key) && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Khong duoc ghi key nay.' });
   }
@@ -7317,12 +7428,19 @@ function saveUsers_(users) {
   for (var a = 0; a < users.length; a++) { if (users[a] && users[a].role === 'admin') adminCount++; }
   if (users.length > 0 && adminCount === 0) return jsonOut_({ error: 'TU_CHOI: Phai con it nhat 1 tai khoan Admin.' });
   var sh = getSheet_(SH_USER, USER_HEADERS);
+  // Hash KHONG con den tu client (action=users khong tra passHash nua): giu hash dang luu theo username; chi doi khi co setPassword (server tu bam).
+  var oldHash = {};
+  readUsers_(sh).forEach(function(x) { oldHash[String(x.username || '').trim().toLowerCase()] = x.passHash || ''; });
   sh.clearContents();
   var matrix = [USER_HEADERS];
   for (var i = 0; i < users.length; i++) {
     var u = users[i];
+    var uk = String(u.username || '').trim().toLowerCase();
+    var ph = oldHash[uk] || '';
+    if (u.setPassword) ph = _pwHash_(String(u.setPassword), _PW_SALT_);
+    else if (!ph && /^[0-9a-f]{64}$/.test(String(u.passHash || ''))) ph = String(u.passHash);   // tuong thich: tai khoan MOI tu client cu da bam san
     var namesArr = (u.names && u.names.length) ? u.names : (u.name ? [u.name] : []);
-    matrix.push([String(u.username||''), String(u.passHash||''), u.role||'cs',
+    matrix.push([String(u.username||''), ph, u.role||'cs',
                  namesArr[0]||u.name||'', u.team||'', (u.active===false?false:true),
                  JSON.stringify(namesArr),
                  (Array.isArray(u.perms) ? JSON.stringify(u.perms) : ''),
@@ -7499,28 +7617,9 @@ function _pwHash_(pw, salt) {
   return bytes.map(function(b) { var v = (b < 0 ? b + 256 : b).toString(16); return v.length < 2 ? '0' + v : v; }).join('');
 }
 function verifyLogin_(username, password) {
-  var uname = String(username || '').trim().toLowerCase();
-  if (!uname || !password) return jsonOut_({ ok: false, error: 'Nhập đủ tài khoản và mật khẩu.' });
-  var cache = CacheService.getScriptCache();
-  var failKey = 'vlfail_' + uname.replace(/[^a-z0-9]/g, '_').slice(0, 80);
-  var fails = parseInt(cache.get(failKey) || '0', 10) || 0;
-  if (fails >= 5) return jsonOut_({ ok: false, error: 'Sai quá nhiều lần — thử lại sau 10 phút.' });
-  var users = readUsers_(getCrmSS_().getSheetByName(SH_USER));
-  var acct = null;
-  for (var i = 0; i < users.length; i++) {
-    if (String(users[i].username || '').trim().toLowerCase() === uname) { acct = users[i]; break; }
-  }
-  var okPw = false;
-  if (acct && acct.passHash) {
-    okPw = (_pwHash_(password, _PW_SALT_) === acct.passHash) || (_pwHash_(password, _PW_SALT_OLD_) === acct.passHash);
-  }
-  if (!acct || !okPw) {
-    cache.put(failKey, String(fails + 1), 600);
-    return jsonOut_({ ok: false, error: 'Sai tài khoản hoặc mật khẩu.' });
-  }
-  if (acct.active === false) return jsonOut_({ ok: false, error: 'Tài khoản đã bị khoá. Liên hệ quản trị viên.' });
-  cache.remove(failKey);
-  return jsonOut_({ ok: true, username: acct.username, role: acct.role || 'cs', name: acct.name || '' });
+  var r = _checkLogin_(username, password);
+  if (r.error) return jsonOut_({ ok: false, error: r.error });
+  return jsonOut_({ ok: true, username: r.acct.username, role: r.acct.role || 'cs', name: r.acct.name || '' });
 }
 
 function saveAIContext_(type, content, context) {

@@ -299,12 +299,19 @@ function saveUsers_(users) {
   for (var a = 0; a < users.length; a++) { if (users[a] && users[a].role === 'admin') adminCount++; }
   if (users.length > 0 && adminCount === 0) return jsonOut_({ error: 'TU_CHOI: Phai con it nhat 1 tai khoan Admin.' });
   var sh = getSheet_(SH_USER, USER_HEADERS);
+  // Hash KHONG con den tu client (action=users khong tra passHash nua): giu hash dang luu theo username; chi doi khi co setPassword (server tu bam).
+  var oldHash = {};
+  readUsers_(sh).forEach(function(x) { oldHash[String(x.username || '').trim().toLowerCase()] = x.passHash || ''; });
   sh.clearContents();
   var matrix = [USER_HEADERS];
   for (var i = 0; i < users.length; i++) {
     var u = users[i];
+    var uk = String(u.username || '').trim().toLowerCase();
+    var ph = oldHash[uk] || '';
+    if (u.setPassword) ph = _pwHash_(String(u.setPassword), _PW_SALT_);
+    else if (!ph && /^[0-9a-f]{64}$/.test(String(u.passHash || ''))) ph = String(u.passHash);   // tuong thich: tai khoan MOI tu client cu da bam san
     var namesArr = (u.names && u.names.length) ? u.names : (u.name ? [u.name] : []);
-    matrix.push([String(u.username||''), String(u.passHash||''), u.role||'cs',
+    matrix.push([String(u.username||''), ph, u.role||'cs',
                  namesArr[0]||u.name||'', u.team||'', (u.active===false?false:true),
                  JSON.stringify(namesArr),
                  (Array.isArray(u.perms) ? JSON.stringify(u.perms) : ''),
@@ -481,28 +488,9 @@ function _pwHash_(pw, salt) {
   return bytes.map(function(b) { var v = (b < 0 ? b + 256 : b).toString(16); return v.length < 2 ? '0' + v : v; }).join('');
 }
 function verifyLogin_(username, password) {
-  var uname = String(username || '').trim().toLowerCase();
-  if (!uname || !password) return jsonOut_({ ok: false, error: 'Nhập đủ tài khoản và mật khẩu.' });
-  var cache = CacheService.getScriptCache();
-  var failKey = 'vlfail_' + uname.replace(/[^a-z0-9]/g, '_').slice(0, 80);
-  var fails = parseInt(cache.get(failKey) || '0', 10) || 0;
-  if (fails >= 5) return jsonOut_({ ok: false, error: 'Sai quá nhiều lần — thử lại sau 10 phút.' });
-  var users = readUsers_(getCrmSS_().getSheetByName(SH_USER));
-  var acct = null;
-  for (var i = 0; i < users.length; i++) {
-    if (String(users[i].username || '').trim().toLowerCase() === uname) { acct = users[i]; break; }
-  }
-  var okPw = false;
-  if (acct && acct.passHash) {
-    okPw = (_pwHash_(password, _PW_SALT_) === acct.passHash) || (_pwHash_(password, _PW_SALT_OLD_) === acct.passHash);
-  }
-  if (!acct || !okPw) {
-    cache.put(failKey, String(fails + 1), 600);
-    return jsonOut_({ ok: false, error: 'Sai tài khoản hoặc mật khẩu.' });
-  }
-  if (acct.active === false) return jsonOut_({ ok: false, error: 'Tài khoản đã bị khoá. Liên hệ quản trị viên.' });
-  cache.remove(failKey);
-  return jsonOut_({ ok: true, username: acct.username, role: acct.role || 'cs', name: acct.name || '' });
+  var r = _checkLogin_(username, password);
+  if (r.error) return jsonOut_({ ok: false, error: r.error });
+  return jsonOut_({ ok: true, username: r.acct.username, role: r.acct.role || 'cs', name: r.acct.name || '' });
 }
 
 function saveAIContext_(type, content, context) {
