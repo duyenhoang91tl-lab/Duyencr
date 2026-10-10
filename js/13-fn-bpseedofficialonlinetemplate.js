@@ -817,9 +817,11 @@ function splitSaleNames_(s){ return (s||'').split(',').map(function(x){return x.
 function _srMiniOrderTable(orders){
   if (!orders.length) return '<div style="color:var(--muted);font-size:11px">Không có đơn</div>';
   var html = '<table class="dash-table" style="font-size:11px"><thead><tr><th>Ngày tạo</th><th>Kênh</th><th>Sale</th><th style="text-align:right">Giá trị</th></tr></thead><tbody>';
-  orders.forEach(function(o){
+  var miniCap_ = 300; // đơn của 1 bucket hiếm khi vượt; vượt thì báo thay vì vẽ hết
+  orders.slice(0, miniCap_).forEach(function(o){
     html += '<tr><td>'+esc(String(o.ngayTao))+'</td><td>'+esc(o.kenhBan)+'</td><td>'+esc(o.saleBan)+'</td><td style="text-align:right">'+_srMoney(o.giaTriDon)+'</td></tr>';
   });
+  if (orders.length > miniCap_) html += '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:8px">… còn '+(orders.length-miniCap_)+' đơn nữa (chỉ hiện '+miniCap_+' đơn đầu)</td></tr>';
   html += '</tbody></table>';
   return html;
 }

@@ -59,7 +59,8 @@ function renderTaskTables(){
 
   var tbM = document.getElementById('task-manage-tbody');
   if (tbM){
-    tbM.innerHTML = filtered.map(function(t){
+    var tKey_ = 'taskManage', tShow_ = Math.min(filtered.length, _moreRowsLimit_(tKey_));
+    tbM.innerHTML = filtered.slice(0, tShow_).map(function(t){
       var overdue = _taskIsOverdue(t);
       return '<tr style="cursor:pointer" onclick="openTaskDetailModal(\''+t.id+'\')">'+
         '<td style="padding:8px;border-bottom:1px solid var(--border)">'+esc(t.title)+
@@ -75,6 +76,7 @@ function renderTaskTables(){
           '<span style="cursor:pointer" title="Xóa" onclick="deleteTaskUI(\''+t.id+'\')">🗑️</span></td>'+
       '</tr>';
     }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">Không có công việc nào'+(allTasks.length?' khớp bộ lọc':' — bấm "+ Tạo công việc" để bắt đầu')+'</td></tr>';
+    tbM.innerHTML += _moreRowsBtn_(tKey_, tShow_, filtered.length, 6, 'renderTaskTables');
   }
 
   var tbT = document.getElementById('task-track-tbody');

@@ -1196,6 +1196,19 @@ function renderSalesReportTabJ_(wrap, subTabs){
   wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + html;
 }
 
+// ── "XEM THÊM" CHO BẢNG DÀI (tránh vẽ hàng nghìn <tr> một lúc làm đứng trình duyệt) ──
+// Chỉ vẽ _MORE_ROWS_PAGE_ dòng đầu, bấm "Xem thêm" để vẽ tiếp. Bảng khách hàng chính ở tab Danh sách ĐÃ cuộn ảo riêng
+// (renderTable/_renderVirtualWindow) nên không dùng cái này; helper này cho các bảng chi tiết khác.
+var _MORE_ROWS_PAGE_ = 200, _moreRows_ = {};
+function _moreRowsLimit_(key){ return _moreRows_[key] || _MORE_ROWS_PAGE_; }
+function _moreRowsBtn_(key, shown, total, cols, rerenderFn){
+  if (shown >= total) return '';
+  return '<tr><td colspan="'+cols+'" style="text-align:center;padding:10px"><button class="btn sm secondary" onclick="_moreRowsShow_(\''+key+'\','+total+',\''+rerenderFn+'\')">Xem thêm '+Math.min(_MORE_ROWS_PAGE_, total-shown)+' dòng (đang hiện '+shown+'/'+total+')</button></td></tr>';
+}
+function _moreRowsShow_(key, total, rerenderFn){
+  _moreRows_[key] = Math.min(total, _moreRowsLimit_(key) + _MORE_ROWS_PAGE_);
+  if (typeof window[rerenderFn] === 'function') window[rerenderFn]();
+}
 function renderSalesReportTabD_(wrap, subTabs){
   var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
   filters += _quickRangeSelectHtml(_srState.dDateQuick, "_srApplyQuickRange('dDateQuick','dDateFrom','dDateTo',this.value)");
@@ -1229,12 +1242,14 @@ function renderSalesReportTabD_(wrap, subTabs){
       }
       html += '<div class="dash-section-title" style="margin-top:16px">Chi tiết khách thêm mới</div>';
       html += '<table class="dash-table"><thead><tr><th>SĐT</th><th>Tên khách</th><th>Ghi chú mới nhất</th><th>CS thêm</th><th>Ngày thêm</th></tr></thead><tbody>';
-      (d.rows||[]).forEach(function(r){
+      var dKey_ = 'dRows|'+(d.total||0), dAll_ = d.rows||[], dShow_ = Math.min(dAll_.length, _moreRowsLimit_(dKey_));
+      dAll_.slice(0, dShow_).forEach(function(r){
         var latestNote = r.note || '';
         try { var arr = JSON.parse(r.note||'[]'); if (Array.isArray(arr) && arr.length) latestNote = arr[0].text || ''; } catch(eN){}
         html += '<tr><td>'+esc(r.phone)+'</td><td><a href="javascript:void(0)" onclick="openDp(\''+esc(r.phone)+'\')">'+esc(r.name)+'</a></td><td>'+esc(latestNote)+'</td><td>'+esc(r.cs)+'</td><td>'+esc(String(r.createdAt||'').slice(0,16).replace('T',' '))+'</td></tr>';
       });
-      if (!(d.rows||[]).length) html += '<tr><td colspan="5" style="text-align:center;color:var(--muted)">Không có dữ liệu</td></tr>';
+      if (!dAll_.length) html += '<tr><td colspan="5" style="text-align:center;color:var(--muted)">Không có dữ liệu</td></tr>';
+      else html += _moreRowsBtn_(dKey_, dShow_, dAll_.length, 5, 'renderSalesReportTab');
       html += '</tbody></table>';
       body = html;
     }
