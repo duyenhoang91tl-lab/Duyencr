@@ -1640,6 +1640,21 @@
         </div>
         <input type="text" id="pk-hen-note" class="pk-full-input" placeholder="Ghi chú lịch hẹn" value="${escapeHtml(care?.schedHenNote || '')}" />
 
+        <div class="pk-remind-box">
+          <div class="pk-remind-title">📅 Lịch nhắc hẹn nhanh <span>CS tự đặt loại &amp; ngày</span></div>
+          <div class="pk-form-row">
+            <div class="pk-form-col"><select id="pk-remind-type">${PK_SCHED_TYPES.map((t) => `<option value="${t.key}">${t.label}</option>`).join('')}<option value="__custom__">✏️ Tự nhập...</option></select></div>
+            <div class="pk-form-col"><input type="text" id="pk-remind-label" placeholder="Loại nhắc hẹn (vd: Tư vấn, Chốt đơn...)" /></div>
+          </div>
+          <div class="pk-form-row">
+            <div class="pk-form-col"><input type="date" id="pk-remind-date" value="${toInputDate_(new Date())}" /></div>
+            <div class="pk-form-col"><label class="pk-remind-auto"><input type="checkbox" id="pk-remind-auto" /> ⚡ Tự động sau 1 tháng</label></div>
+          </div>
+          <input type="text" id="pk-remind-note" class="pk-full-input" placeholder="Nội dung nhắc..." />
+          <button id="pk-remind-add" class="pk-btn-outline" type="button">+ Thêm lịch nhắc hẹn</button>
+          <div id="pk-remind-list">${_pkRemindListHtml_(care?.schedules)}</div>
+        </div>
+
         <div id="pk-cf-wrap"></div>
 
         <label class="pk-label-top">Ghi chú CS</label>
@@ -1663,6 +1678,18 @@
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addNoteEntry_(); }   // Enter = thêm ghi chú, Shift+Enter = xuống dòng (ô nay là textarea)
     });
     box.querySelector('#pk-hen-done').addEventListener('click', () => doneAppointment_(currentFormPhone_() || phone));
+    box.querySelector('#pk-remind-add').addEventListener('click', () => addQuickRemind_(currentFormPhone_() || phone));
+    box.querySelector('#pk-remind-auto').addEventListener('change', (e) => {
+      const d = box.querySelector('#pk-remind-date');
+      if (e.target.checked) {
+        // +1 tháng nhưng KHÔNG tràn tháng (31/10 → 30/11, không phải 01/12): chốt ngày cuối tháng sau nếu thiếu ngày.
+        const n = new Date(), day = n.getDate();
+        const t = new Date(n.getFullYear(), n.getMonth() + 1, 1);
+        t.setDate(Math.min(day, new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate()));
+        d.value = toInputDate_(t);
+      }
+      else d.value = toInputDate_(new Date());
+    });
     box.querySelector('#pk-save-btn').addEventListener('click', () => saveCare_(currentFormPhone_() || phone));
 
     // SDT Zalo: nut them (chi ton tai khi _zaloPhoneSaleCanAdd=true) + go bo tung chip (uy
@@ -1964,6 +1991,72 @@
       // Ghi nhớ liên kết đoạn chat đang mở với SĐT này -> lần sau vào lại tự nhận diện luôn
       learnChatKeyForPhone_(phone);
       setStatus('✓ Đã lưu vào Sasum.' + (isNewCustomer ? ' (KH mới — nguồn Chăm sóc)' : ''));
+    });
+  }
+
+  // ── LỊCH NHẮC HẸN NHANH (cùng cấu trúc với addCustomRemind() bên CRM, js/04-fn-synczalophonesettingsfromgas.js) ──
+  // Mỗi lịch = 1 object {id,phone,type,customLabel,date,note,done,owner,ownerUser} trong mảng JSON ở cột
+  // 'schedules' của CareData. Danh sách loại lấy từ SCHED_TYPES của CRM (js/06), bỏ 'birthday' (CRM tự tạo từ ngày sinh).
+  const PK_SCHED_TYPES = [
+    { key: 'goi', label: 'Hẹn gọi' }, { key: 'sp', label: 'Nhắc SP' }, { key: 'cs', label: 'Chăm sóc' },
+    { key: 'hen', label: 'Hẹn mua lại' }, { key: 'notify', label: 'Thông báo' }, { key: 'custom', label: 'Tùy chỉnh' }
+  ];
+  function _pkParseScheds_(raw) {
+    if (Array.isArray(raw)) return raw;
+    try { const a = JSON.parse(raw || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+  }
+  function _pkRemindListHtml_(raw) {
+    const pending = _pkParseScheds_(raw).filter((x) => x && !x.done && x.type !== 'birthday' && x.date)
+      .sort((a, b) => String(a.date).localeCompare(String(b.date))).slice(0, 5);
+    if (!pending.length) return '';
+    return pending.map((x) => {
+      const lbl = x.customLabel || (PK_SCHED_TYPES.find((t) => t.key === x.type) || {}).label || 'Nhắc hẹn';
+      return `<div class="pk-remind-item">📌 ${escapeHtml(fmtDate_(x.date))} · <b>${escapeHtml(lbl)}</b>${x.note && x.note !== lbl ? ' — ' + escapeHtml(x.note) : ''}</div>`;
+    }).join('');
+  }
+  function addQuickRemind_(phone) {
+    phone = normPhone(phone);
+    if (!/^0[3-9]\d{8}$/.test(phone)) { setStatus('SĐT chưa hợp lệ — nhập SĐT khách trước khi thêm lịch nhắc.'); return; }
+    const sel = panelEl.querySelector('#pk-remind-type').value;
+    const typeText = (panelEl.querySelector('#pk-remind-label').value || '').trim();
+    const date = panelEl.querySelector('#pk-remind-date').value;
+    const note = (panelEl.querySelector('#pk-remind-note').value || '').trim();
+    if (!date) { setStatus('Vui lòng chọn ngày nhắc hẹn.'); return; }
+    const typeKey = sel === '__custom__' ? 'custom' : sel;
+    const labelFinal = typeText || (PK_SCHED_TYPES.find((t) => t.key === typeKey) || {}).label || 'Nhắc hẹn';
+    const btn = panelEl.querySelector('#pk-remind-add');
+    if (btn) btn.disabled = true;
+    // Đọc lại bản MỚI NHẤT trên server rồi mới nối thêm: tránh ghi đè lịch CRM/Zalo AI vừa thêm trong lúc form đang mở.
+    safeSendMessage_({ type: 'LOOKUP_CUSTOMER', payload: { phone } }, (lk) => {
+      if (!lk?.ok) { if (btn) btn.disabled = false; setStatus('Chưa đọc được dữ liệu khách để thêm lịch — thử lại.'); return; }
+      const serverCare = lk.data.care || null;
+      if (!serverCare && !(lk.data.orders || []).length) {
+        if (btn) btn.disabled = false;
+        setStatus('Khách này chưa có trong Sasum — bấm "Lưu vào Sasum" trước rồi mới thêm lịch nhắc.');
+        return;
+      }
+      const arr = _pkParseScheds_(serverCare ? serverCare.schedules : '');
+      arr.push({
+        id: Date.now() + '_pk' + Math.random().toString(36).slice(2),
+        phone, type: typeKey, customLabel: typeText || null,
+        date, note: note || labelFinal, done: false,
+        owner: settings.csName || '', ownerUser: ''
+      });
+      _currentCare = Object.assign({}, serverCare || {});
+      _currentPhone = phone;
+      const row = _buildRow(phone, { schedules: JSON.stringify(arr) });
+      safeSendMessage_({ type: 'SAVE_CARE', payload: row }, (resp) => {
+        if (btn) btn.disabled = false;
+        if (!resp?.ok) { setStatus('Thêm lịch thất bại: ' + (resp?.error || 'lỗi không rõ')); return; }
+        _currentCare = Object.assign({}, _currentCare, { schedules: row.schedules });
+        _lastServerCare = Object.assign({}, _currentCare);
+        const listEl = panelEl.querySelector('#pk-remind-list');
+        if (listEl) listEl.innerHTML = _pkRemindListHtml_(row.schedules);
+        const ni = panelEl.querySelector('#pk-remind-note'); if (ni) ni.value = '';
+        const li = panelEl.querySelector('#pk-remind-label'); if (li) li.value = '';
+        const ac = panelEl.querySelector('#pk-remind-auto'); if (ac) ac.checked = false;
+        setStatus('✓ Đã thêm lịch "' + labelFinal + '" · ' + fmtDate_(date) + ' (đã đồng bộ lên CRM).');
+      });
     });
   }
 

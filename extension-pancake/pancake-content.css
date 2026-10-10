@@ -1329,3 +1329,10 @@
 /* Ô tick "Phản hồi Zalo" dưới Trạng thái Zalo (cờ custom.zaloReply, cùng CRM) */
 .pk-zalo-reply-lbl { display:flex; align-items:center; gap:5px; margin-top:5px; font-size:12px; font-weight:400; cursor:pointer; }
 .pk-zalo-reply-lbl input { margin:0; }
+
+/* Lịch nhắc hẹn nhanh (ghi cột schedules, cùng CRM) */
+.pk-remind-box { margin:8px 0; padding:8px; border:1px solid #bfdbfe; background:#eff6ff; border-radius:8px; display:flex; flex-direction:column; gap:6px; }
+.pk-remind-title { font-size:12px; font-weight:700; color:#1d4ed8; display:flex; justify-content:space-between; align-items:center; }
+.pk-remind-title span { font-size:10px; font-weight:400; color:#64748b; }
+.pk-remind-auto { display:flex; align-items:center; gap:4px; font-size:11px; cursor:pointer; }
+.pk-remind-item { font-size:11px; color:#334155; padding:2px 0; }
