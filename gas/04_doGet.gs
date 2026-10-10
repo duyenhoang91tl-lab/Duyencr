@@ -374,6 +374,10 @@ function doGetCore_(e) {
     }
 
     // ── lay 1 setting (ZaloAI extension: careStatus, nickZaloList) ──
+    if (action === 'getSettings') {   // nhieu key 1 lan: ?keys=a,b,c  -> { values: {a:..., b:...} }
+      var skeys = (e && e.parameter && e.parameter.keys) ? String(e.parameter.keys).split(',') : [];
+      return jsonOut_({ values: getSettingsMulti_(skeys.slice(0, 30)) });
+    }
     if (action === 'getSetting') {
       var skey = (e && e.parameter && e.parameter.key) ? String(e.parameter.key) : '';
       return jsonOut_({ value: getSetting_(skey) });

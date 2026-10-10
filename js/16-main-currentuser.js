@@ -539,7 +539,7 @@ switchAssignTab = function(tab, el){
     if (el) el.classList.add('active');
     var f = document.getElementById('assign-footer');
     if (f) f.innerHTML = '<button class="btn" onclick="closeAssignModal()">Đóng</button><button class="btn" onclick="_aaShowPreview()">👁 Xem trước</button>'+
-      '<button class="btn" id="aa-run-btn" onclick="_aaRunNow()">▶ Chạy ngay</button><button class="btn primary" onclick="_aaSaveNow()">💾 Lưu cấu hình</button>';
+      '<button class="btn" id="aa-run-btn" onclick="_aaRunNow()">▶ Chạy ngay</button><button class="btn primary" id="aa-save-btn" onclick="_aaSaveNow()">💾 Lưu cấu hình</button>';
     _aaPullCfg().then(renderAssignAuto); renderAssignAuto();
     return;
   }

@@ -77,7 +77,7 @@ function _readBaseRowsByCounterCodes_(wantedCodes) {
   if (colIdx < 0) return res;
   var n = last - 1;
   function col_(ci) { return sh.getRange(2, ci + 1, n, 1).getValues(); }
-  var cCode = col_(colIdx), cTT = col_(DT_COL_TRANGTHAI), cSale = col_(DT_COL_SALEBAN), cGT = col_(DT_COL_GIATRIDON), cCreator = col_(1); // cot B "Người tạo" cua DT TONG = NGUOI LEN DON (dung de tinh THUONG, xem _resolveGhepDon_)
+  var cCode = col_(colIdx), cTT = col_(DT_COL_TRANGTHAI), cSale = col_(DT_COL_SALEBAN), cGT = col_(DT_COL_GIATRIDON), cCreator = col_(1), cNgay = col_(DT_COL_NGAYTAO); // cot B "Người tạo" cua DT TONG = NGUOI LEN DON (dung de tinh THUONG, xem _resolveGhepDon_)
   var re = new RegExp(COUNTER_CODE_RE_SRC_, 'g'), quick = /[Tt]\d/;
   function addHit_(bucket, key, rowObj) {
     var arr = bucket[key] || (bucket[key] = []);
@@ -109,6 +109,7 @@ function _readBaseRowsByCounterCodes_(wantedCodes) {
           trangThai: cTT[i][0],
           saleBan: cSale[i][0] ? String(cSale[i][0]) : '',
           creator: cCreator[i][0] ? String(cCreator[i][0]).trim() : '',
+          ngayTao: cNgay[i][0], // NGAY TAO DON tren Base (doanh thu NGAY / thuong tinh theo ngay nay, khong theo ngay Pos)
           giaTriDon: _normMoney_(cGT[i][0]),
           code: bc
         };
@@ -155,12 +156,14 @@ function _resolveGhepDon_(codes, idx, usedBaseRows) {
   for (var u = 0; u < picked.length; u++) {
     if (usedBaseRows[picked[u].rowIndex]) return { status: 'trungDonGoc', codes: codes, missing: [] };
   }
-  var total = 0, shareAmt = {}, names = [], liveRows = 0, creators = [], seenCreator = {};
+  var total = 0, shareAmt = {}, names = [], liveRows = 0, creators = [], seenCreator = {}, baseYmd = '';
   for (var b = 0; b < picked.length; b++) {
     var br = picked[b];
     usedBaseRows[br.rowIndex] = true;
     if (_isExcludedOrderStatus_(br.trangThai)) continue; // don goc da Huy/Hoan (theo dinh nghia Base) -> khong tinh
     liveRows++;
+    var bDt = parseVNDate_(br.ngayTao), bYmd = bDt ? _vnYmd_(bDt) : '';
+    if (bYmd && (!baseYmd || bYmd < baseYmd)) baseYmd = bYmd;
     if (br.creator && !seenCreator[_normTxt_(br.creator)]) { seenCreator[_normTxt_(br.creator)] = true; creators.push(br.creator); }
     var rv = Number(br.giaTriDon) || 0;
     var sales = String(br.saleBan || '').split(',').map(function(x) { return x.trim(); }).filter(Boolean);
@@ -175,7 +178,19 @@ function _resolveGhepDon_(codes, idx, usedBaseRows) {
   if (!liveRows) return { status: 'gocBiLoai', codes: codes, missing: [] };
   var shares = [];
   names.forEach(function(sn) { shares.push({ name: sn, frac: total > 0 ? shareAmt[sn] / total : 1 / names.length }); });
-  return { status: 'ok', total: total, shares: shares, codes: codes, baseRows: picked.length, creators: creators };
+  return { status: 'ok', total: total, shares: shares, codes: codes, baseRows: picked.length, creators: creators, baseNgayTao: baseYmd };
+}
+
+
+// Don GOC cua sale (yeu cau Duyen 2026-10-10): dong dau cua ghi chu Pos CHI la ma bo dem sach (vd "17T10/2026", "NG5T10/2026") — khong co
+// hau to "/1 TACH", "(THEM)", "(hd)", "BH...", "+ ma khac". Ma do phai nam trong ghepCodes (da khop dong Base) thi moi la don goc co tren Base + Pos.
+function _isOriginalCounterNote_(ghiChu, ghepCodes) {
+  var first = String(ghiChu || '').split(/[\r\n]/)[0].trim();
+  if (!first) return false;
+  var m = /^([A-Za-z]{0,3}\d{1,6}[A-Za-z]{0,3}T\d{1,2}\/\d{2,4})$/.exec(first);
+  if (!m) return false;
+  var c = _normCounterCode_(m[1]);
+  return (ghepCodes || []).some(function(x) { return _counterCodeNoYear_(x) === _counterCodeNoYear_(c); });
 }
 
 // ── DON POS TACH (yeu cau Duyen 2026-10-09) ──
@@ -410,7 +425,7 @@ function buildSalesReportB_(filters) {
         _donSaleNamesFromThe_(rowP.theSale).forEach(function(nm) { if (candSales.indexOf(nm) === -1) candSales.push(nm); });
         var bonusList = _resolveBonusSale_(gh.creators, candSales, aliasMemoB_);
         effRow = Object.assign({}, rowP, { giaTriPos: rowP.giaTriSauGiam, giaTriSauGiam: gh.total, ghepShares: gh.shares, ghepCodes: gh.codes,
-          ghepCreators: gh.creators || [], bonusSale: bonusList.join(',') }); // bonusSale = '' -> nguoi tao khong phai sale -> khong ai nhan thuong
+          ghepCreators: gh.creators || [], baseNgayTao: gh.baseNgayTao || '', bonusSale: bonusList.join(',') }); // bonusSale = '' -> nguoi tao khong phai sale -> khong ai nhan thuong
       } else if (gh.status === 'gocBiLoai') {
         ghepStats.gocBiLoai++;
         continue; // moi don goc Base deu Huy/Hoan -> bo don Pos nay khoi bao cao (giong don Pos "Đã hoàn")
@@ -633,7 +648,11 @@ function buildSalesReportB_(filters) {
         saleBanValid: m.ghepShares ? m.ghepShares.map(function(x){ return x.name; }).join(',') : _donSaleNamesFromThe_(m.theSale).join(','),
         // (thuong nay chia deu cho moi sale tren don — bonusSale/nguoi tao khong con dung de tinh thuong)
         bonusSale: undefined,
-        nguoiTaoBase: m.ghepCreators ? m.ghepCreators.join(',') : undefined
+        nguoiTaoBase: m.ghepCreators ? m.ghepCreators.join(',') : undefined,
+        // THUONG (yeu cau Duyen 2026-10-10): baseNgayTao = ngay tao don tren BASE (YYYY-MM-DD) — doanh thu NGAY tinh theo ngay nay;
+        // donGoc = true CHI KHI ghi chu Pos co ma bo dem GOC cua sale (dang 17T10/2026, khong hau to tach/them/hd/BH) VA don da ghep duoc voi Base.
+        baseNgayTao: m.baseNgayTao || undefined,
+        donGoc: (m.ghepShares && _isOriginalCounterNote_(m.ghiChu, m.ghepCodes)) ? true : undefined
       };
     })
   };

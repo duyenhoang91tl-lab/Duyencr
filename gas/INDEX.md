@@ -22,7 +22,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `PRICE_LAST_COL_`, `GIA_COL_MIN_`, `GIA_COL_LIMIT_`, `_PRICE_STOPWORDS_`, `_CTKM_END_KW_`, `_CTKM_START_KW_`, `_CTKM_EXCL_KW_`, `_CTKM_KEYWORDS_`
 
 ## 03_Settings_CareRead.gs
-- Hàm: `getSetting_`, `setGasSource_`, `readSaleGroups_`, `saveSaleGroups_`, `_saleGroupLabel_`, `setSetting_`, `_syncSaleChannelsToUsers_`, `addZaloNick_`, `readCareStatus_`, `careObjFromRow_`, `readCare_`, `readCareDelta_`, `readRemindersToday_`, `_remindersFromRows_`, `findCareByPhone_`, `careRow_`, `readExistingExtFields_`, `mergeExtFields_`, `_legacyReadOrdersUnused_`, `readTeams_`, `readUsers_`, `_secEq_`, `_adminKeyOk_`, `_isSensitiveSettingKey_`, `_isSensitiveWriteKey_`, `_demoToken_`, `_demoTokenOk_`, `_demoSrcOf_`, `_demoClipPerSource_`, `_demoMaskPhone_`, `_demoMaskText_`, `_demoMaskDeep_`, `_demoClip_`, `demoLogin_`
+- Hàm: `getSetting_`, `getSettingsMulti_`, `setGasSource_`, `readSaleGroups_`, `saveSaleGroups_`, `_saleGroupLabel_`, `setSetting_`, `_syncSaleChannelsToUsers_`, `addZaloNick_`, `readCareStatus_`, `careObjFromRow_`, `readCare_`, `readCareDelta_`, `readRemindersToday_`, `_remindersFromRows_`, `findCareByPhone_`, `careRow_`, `readExistingExtFields_`, `mergeExtFields_`, `_legacyReadOrdersUnused_`, `readTeams_`, `readUsers_`, `_secEq_`, `_adminKeyOk_`, `_isSensitiveSettingKey_`, `_isSensitiveWriteKey_`, `_demoToken_`, `_demoTokenOk_`, `_demoSrcOf_`, `_demoClipPerSource_`, `_demoMaskPhone_`, `_demoMaskText_`, `_demoMaskDeep_`, `_demoClip_`, `demoLogin_`
 - Hằng/biến: `SALE_GROUPS_DEFAULT_`, `DEMO_MAX_ROWS_`, `DEMO_ALLOWED_GET_`, `DEMO_CLIP_KEYS_`, `DEMO_CLIP_ROWS_ACTIONS_`, `DEMO_PHONE_KEY_RE_`, `DEMO_NOTE_KEY_RE_`, `DEMO_PHONE_STR_RE_`
 
 ## 04_doGet.gs
@@ -44,12 +44,12 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `SALE_TIER_ORDER_`, `SALE_TIER_DEFAULT_TARGETS_`, `SALE_TIER_META_`, `SALE_KPI_DEFAULT_CFG_`
 
 ## 09_SalesReportB_POS.gs
-- Hàm: `_normCounterCode_`, `_counterCodeNoYear_`, `_counterCodeHasYear_`, `_extractCounterCodes_`, `_detectBaseCounterCol_`, `_readBaseRowsByCounterCodes_`, `_pickBaseRowsForCode_`, `_resolveGhepDon_`, `_tachDonParse_`, `_tachDonKey_`, `_mergeTachDon_`, `_quaySaleRatio_`, `_foldSaleKey_`, `_resolveBonusSale_`, `buildSalesReportB_`
+- Hàm: `_normCounterCode_`, `_counterCodeNoYear_`, `_counterCodeHasYear_`, `_extractCounterCodes_`, `_detectBaseCounterCol_`, `_readBaseRowsByCounterCodes_`, `_pickBaseRowsForCode_`, `_resolveGhepDon_`, `_isOriginalCounterNote_`, `_tachDonParse_`, `_tachDonKey_`, `_mergeTachDon_`, `_quaySaleRatio_`, `_foldSaleKey_`, `_resolveBonusSale_`, `buildSalesReportB_`
 - Hằng/biến: `POS_GHEP_BASE_ENABLED_`, `COUNTER_CODE_INNER_`, `COUNTER_CODE_RE_SRC_`, `TACH_DON_RE_SRC_`, `QUAY_SALE_RATIO_`
 
 ## 10_CSStats_KPI_ReportC.gs
-- Hàm: `_csJsonSetting_`, `_csYmdFromDmy_`, `_csDaysSinceStart_`, `_csBonusProductQty_`, `_csBonusApplies_`, `_csRequireProductOk_`, `_csMoney_`, `_csBonusSummary_`, `buildCsStats_`, `ensureKPISheet_`, `readKPITargets_`, `getKPI_`, `_getMonday_`, `_isoWeekRange_`, `_isoWeekKey_`, `_monthRange_`, `_monthKey_`, `_quarterRange_`, `_yearRange_`, `_yearKey_`, `_quarterKey_`, `_ymdLocal_`, `_labelVN_`, `_resolvePeriods_`, `buildSalesReportC_`, `buildCareLeadReport_`
-- Hằng/biến: `CS_COMMISSION_THRESHOLD_`, `KPI_SHEET`
+- Hàm: `_csJsonSetting_`, `_csYmdFromDmy_`, `_csDaysSinceStart_`, `_csBonusProductQty_`, `_csBonusApplies_`, `_csRequireProductOk_`, `_csMoney_`, `_csBonusSummary_`, `_bcFold_`, `_bcCounterOf_`, `_bcGuess_`, `_bcLineCls_`, `_bcOrderLines_`, `_bcOrderInfo_`, `_bcMinProducts_`, `_bcIsVongProgram_`, `_bcRequireKw_`, `buildCsStats_`, `ensureKPISheet_`, `readKPITargets_`, `getKPI_`, `_getMonday_`, `_isoWeekRange_`, `_isoWeekKey_`, `_monthRange_`, `_monthKey_`, `_quarterRange_`, `_yearRange_`, `_yearKey_`, `_quarterKey_`, `_ymdLocal_`, `_labelVN_`, `_resolvePeriods_`, `buildSalesReportC_`, `buildCareLeadReport_`
+- Hằng/biến: `CS_COMMISSION_THRESHOLD_`, `BONUS_PRODUCT_MAP`, `KPI_SHEET`
 
 ## 11_ExportSheet_doPost.gs
 - Hàm: `exportSalesReportToSheet_`, `doPost`, `doPostCore_`

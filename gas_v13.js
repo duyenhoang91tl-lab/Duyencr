@@ -821,22 +821,43 @@ function readCTKMPromotions_(query) {
 }
 
 // ─── SETTINGS (1 signature duy nhat) ──────────────────────────
+// TOI UU (2026-10-10, Duyen bao luu cau hinh chia data cham): NGUYEN NHAN GOC — ban cu getDataRange().getValues() doc CA sheet Settings
+// (gom cac manh ma GAS gasSourceChunk_* moi o toi 45.000 ky tu, tong ~330KB) cho MOI lan getSetting_ — ma ham nay duoc goi o moi
+// getSetting/adminKey/demoToken/autoAssign... Nay chi doc COT A (ten key) roi doc dung 1 o gia tri cua key can lay.
+// Khop key giu nguyen: .trim() o CA 2 ve (copy-paste API key hay dinh khoang trang/xuong dong; thieu trim se bao "Invalid API Key"), lay dong DAU khop.
 function getSetting_(key) {
   var ss = getCrmSS_();
   var sh = ss.getSheetByName(SH_SET);
-  if (!sh || sh.getLastRow() < 2) return null;
-  var vals = sh.getDataRange().getValues();
-  for (var i = 1; i < vals.length; i++) {
-    // .trim() o CA 2 ve: copy-paste API key rat hay dinh khoang trang/xuong dong o cuoi,
-    // ma ky tu do lot vao header Authorization se lam request hong -> bao "Invalid API Key"
-    // du key go dung. Truoc day khong trim nen loi nay rat kho doan ra.
-    if (String(vals[i][0]).trim() === key) {
-      var v = vals[i][1];
+  if (!sh) return null;
+  var last = sh.getLastRow();
+  if (last < 2) return null;
+  var keys = sh.getRange(2, 1, last - 1, 1).getValues();
+  for (var i = 0; i < keys.length; i++) {
+    if (String(keys[i][0]).trim() === key) {
+      var v = sh.getRange(i + 2, 2).getValue();
       if (v === '' || v === null || v === undefined) return null;
       return String(v).trim() || null;
     }
   }
   return null;
+}
+// Lay NHIEU key trong 1 lan goi (doc cot A 1 lan) — dung cho FE can nhieu key cung luc (vd cau hinh + trang thai chia tu dong). Bo key nhay cam.
+function getSettingsMulti_(keyList) {
+  var out = {}, want = {}, any = false;
+  (keyList || []).forEach(function (k) { k = String(k || '').trim(); if (k && !_isSensitiveSettingKey_(k)) { want[k] = true; any = true; out[k] = null; } });
+  if (!any) return out;
+  var sh = getCrmSS_().getSheetByName(SH_SET);
+  if (!sh || sh.getLastRow() < 2) return out;
+  var last = sh.getLastRow(), keys = sh.getRange(2, 1, last - 1, 1).getValues(), seen = {};
+  for (var i = 0; i < keys.length; i++) {
+    var k = String(keys[i][0]).trim();
+    if (want[k] && !seen[k]) {
+      seen[k] = true;
+      var v = sh.getRange(i + 2, 2).getValue();
+      out[k] = (v === '' || v === null || v === undefined) ? null : (String(v).trim() || null);
+    }
+  }
+  return out;
 }
 // Chia gas_v13.js thanh nhieu manh <=45.000 ky tu, ghi qua setSetting_ (gasSourceChunk_0, _1,...).
 // Neu ban moi it manh hon ban truoc, xoa het cac key manh du (gasSourceChunk_N tro len) de khong
@@ -1747,6 +1768,10 @@ function doGetCore_(e) {
     }
 
     // ── lay 1 setting (ZaloAI extension: careStatus, nickZaloList) ──
+    if (action === 'getSettings') {   // nhieu key 1 lan: ?keys=a,b,c  -> { values: {a:..., b:...} }
+      var skeys = (e && e.parameter && e.parameter.keys) ? String(e.parameter.keys).split(',') : [];
+      return jsonOut_({ values: getSettingsMulti_(skeys.slice(0, 30)) });
+    }
     if (action === 'getSetting') {
       var skey = (e && e.parameter && e.parameter.key) ? String(e.parameter.key) : '';
       return jsonOut_({ value: getSetting_(skey) });

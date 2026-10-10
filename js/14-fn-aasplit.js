@@ -164,27 +164,46 @@ function _aaToday(d){ d = d || new Date(); var p = function(n){ return String(n)
 
 // Cấu hình (UI ghi) và TRẠNG THÁI chạy (lastRun/lastResult — chỉ người chạy ghi) lưu 2 key Settings riêng, để lưu cấu hình
 // không bao giờ ghi đè lastRun cũ → tránh server/trình duyệt chia lại lần 2 trong ngày.
-function _aaPostSetting(key, obj){
-  if (!gsUrl) return Promise.resolve();
-  return fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'setSetting', key:key, value: JSON.stringify(obj) }) }).catch(function(e){ console.warn('[AutoAssign] lưu '+key+' lỗi', e); });
+// Ghi 1 key Settings. Trả true/false (không ném lỗi). Thử lại 1 lần khi mạng/GAS lỗi tạm thời (Apps Script hay timeout lần đầu khi "ngủ").
+async function _aaPostSetting(key, obj){
+  if (!gsUrl) return true;
+  var body = JSON.stringify({ action:'setSetting', key:key, value: JSON.stringify(obj) });
+  for (var attempt = 0; attempt < 2; attempt++){
+    try {
+      var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: body });
+      var j = null; try { j = await r.json(); } catch(e0){}
+      if (j && j.ok) return true;
+      console.warn('[AutoAssign] lưu '+key+' không thành công', j);
+    } catch(e){ console.warn('[AutoAssign] lưu '+key+' lỗi', e); }
+  }
+  return false;
 }
+var _aaDirty = false, _aaSaving = null, _aaSavePending = false;   // _aaDirty: có chỉnh sửa CHƯA lưu lên server (chặn việc nạp cấu hình cũ từ server ghi đè)
 function _aaPersist(){
-  saveLS('ome_auto_assign_cfg', _aaCfg);
+  saveLS('ome_auto_assign_cfg', _aaCfg);   // lưu máy NGAY (đồng bộ) — không chờ mạng
   var out = Object.assign({}, _aaCfg); delete out.lastRun; delete out.lastResult;
   out.teamMembers = {}; (teams || []).forEach(function(t){ out.teamMembers[t.id] = _aaMembersOf(t); });   // server dùng đúng danh sách người nhận như UI
-  return _aaPostSetting('autoAssignCfg', out);
+  var p = _aaPostSetting('autoAssignCfg', out);
+  return p.then(function(ok){ if (ok) _aaDirty = false; return ok; });
 }
 function _aaPersistState(by){ return _aaPostSetting('autoAssignState', { lastRun:_aaCfg.lastRun || '', lastResult:_aaCfg.lastResult || null, by:by || 'browser' }); }
 async function _aaPullCfg(){
   if (!gsUrl) return;
   try {
-    var r = await fetch(gsUrl + '?action=getSetting&key=autoAssignCfg', { redirect:'follow' });
+    // 1 lần gọi lấy cả cấu hình + trạng thái (action getSettings). GAS bản cũ chưa có action này -> lùi về 2 lần gọi getSetting như trước.
+    var sep = gsUrl.indexOf('?') > -1 ? '&' : '?', cfgRaw = null, stRaw = null;
+    var r = await fetch(gsUrl + sep + 'action=getSettings&keys=autoAssignCfg,autoAssignState', { redirect:'follow' });
     var j = await r.json();
+    if (j && j.values) { cfgRaw = j.values.autoAssignCfg; stRaw = j.values.autoAssignState; }
+    else {
+      var ra = await fetch(gsUrl + sep + 'action=getSetting&key=autoAssignCfg', { redirect:'follow' }), ja = await ra.json();
+      var rb = await fetch(gsUrl + sep + 'action=getSetting&key=autoAssignState', { redirect:'follow' }), jb = await rb.json();
+      cfgRaw = ja && ja.value; stRaw = jb && jb.value;
+    }
     var keep = { lastRun:_aaCfg.lastRun, lastResult:_aaCfg.lastResult };
-    if (j && j.value) { _aaCfg = Object.assign(_aaDefaultCfg(), JSON.parse(j.value), keep); }
-    var r2 = await fetch(gsUrl + '?action=getSetting&key=autoAssignState', { redirect:'follow' });
-    var j2 = await r2.json();
-    if (j2 && j2.value) { var st = JSON.parse(j2.value); _aaCfg.lastRun = st.lastRun || ''; _aaCfg.lastResult = st.lastResult || null; _aaCfg.lastBy = st.by || ''; }
+    // Đang có chỉnh sửa chưa lưu -> KHÔNG ghi đè bằng bản cũ từ server (trước đây lần nạp chậm xong sau khi bạn đã sửa sẽ xoá mất thay đổi vừa nhập).
+    if (cfgRaw && !_aaDirty) { _aaCfg = Object.assign(_aaDefaultCfg(), JSON.parse(cfgRaw), keep); }
+    if (stRaw) { var st = JSON.parse(stRaw); _aaCfg.lastRun = st.lastRun || ''; _aaCfg.lastResult = st.lastResult || null; _aaCfg.lastBy = st.by || ''; }
     saveLS('ome_auto_assign_cfg', _aaCfg);
   } catch(e) { console.warn('[AutoAssign] nạp cấu hình lỗi', e); }
 }
@@ -249,7 +268,7 @@ function _aaScopeObj(kind, tid, name, create){
   if (!root[tid][name] && create) root[tid][name] = { mode:'pct', vals:{} };
   return root[tid][name];
 }
-function _aaRerender(){ var b = document.getElementById('assign-body'), st = b ? b.scrollTop : 0; renderAssignAuto(); if (b) b.scrollTop = st; }
+function _aaRerender(){ _aaDirty = true; var b = document.getElementById('assign-body'), st = b ? b.scrollTop : 0; renderAssignAuto(); if (b) b.scrollTop = st; }
 function _aaSet(path, v, rerender){   // path: 'enabled' | 'dailyTotal' | 'onlyUnassigned' | 'runHour'
   _aaCfg[path] = (typeof v === 'boolean') ? v : ((path === 'dailyTotal' || path === 'cskhTotal') ? Math.max(0, parseInt(v) || 0) : path === 'runHour' ? Math.min(23, Math.max(0, parseInt(v) || 0)) : v);
   if (rerender !== false) _aaRerender();
@@ -577,10 +596,23 @@ async function _aaRunNow(){
   finally { if (btn){ btn.disabled = false; btn.textContent = old; } }
   r = r || { error: 'Không chạy được.' };
   _aaRerender();            // vẽ lại tab (cập nhật "Lần chạy gần nhất") rồi mới ghi bảng kết quả, nếu không sẽ bị xoá
+  _aaDirty = false;         // vẽ lại sau khi chạy không phải là chỉnh sửa mới
   _aaShowRunResult(r);
   toast(r.error ? '❌ ' + r.error : r.total ? '✅ Đã chia ' + r.total + ' KH → ' + r.entries.length + ' CS' : '⚠ Không có KH nào để chia');
 }
-async function _aaSaveNow(){ await _aaPersist(); toast('✓ Đã lưu cấu hình chia tự động'); }
+// Lưu KHÔNG chặn giao diện: máy lưu ngay, nút báo "Đang lưu…" rồi "✓ Đã lưu"/"⚠ Lỗi" khi server trả lời; bấm liên tiếp thì gộp thành 1 lần lưu cuối.
+function _aaSaveBtn_(txt, dis){ var b = document.getElementById('aa-save-btn'); if (b){ b.textContent = txt; b.disabled = !!dis; } }
+async function _aaSaveNow(){
+  if (_aaSaving){ _aaSavePending = true; toast('⏳ Đang lưu — sẽ lưu lại bản mới nhất ngay sau đó'); return; }
+  _aaSaveBtn_('⏳ Đang lưu…', true);
+  toast('⏳ Đang lưu cấu hình…');
+  _aaSaving = _aaPersist();
+  var ok = false;
+  try { ok = await _aaSaving; } finally { _aaSaving = null; }
+  if (_aaSavePending){ _aaSavePending = false; _aaSaveBtn_('💾 Lưu cấu hình', false); return _aaSaveNow(); }
+  _aaSaveBtn_(ok ? '💾 Lưu cấu hình' : '💾 Lưu lại', false);
+  toast(ok ? '✓ Đã lưu cấu hình chia tự động' : '⚠ Máy đã lưu nhưng chưa lên được server — bấm "Lưu lại"');
+}
 
 function toggleNoActionChip(e){
   if (e) e.preventDefault();
