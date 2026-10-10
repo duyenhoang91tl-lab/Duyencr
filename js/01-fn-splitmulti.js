@@ -921,6 +921,16 @@ async function _idbSet_(k, v) {
     tx.onerror = function () { rej(tx.error); };
   });
 }
+// Tài khoản test: KHÔNG đọc/ghi cache máy (IndexedDB/localStorage) của CSKH-Duyên + đơn — cache có thể chứa DỮ LIỆU ĐẦY ĐỦ do admin/CS
+// đã đăng nhập trước đó trên cùng trình duyệt (lộ hết khách dù server chỉ trả 5 dòng), và 5 dòng của test cũng không được ghi đè cache của họ.
+function _isDemoSession_() { try { return !!(document.body && document.body.classList.contains('demo-mode')) || !!localStorage.getItem('ome_demo_token'); } catch (e) { return false; } }
+async function _idbDel_(k) {
+  const db = await _idbOpen_();
+  return new Promise(function (res) {
+    const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').delete(k);
+    tx.oncomplete = function () { res(true); }; tx.onerror = function () { res(false); };
+  });
+}
 // rows = [[phone,name,tier?], ...] (đúng định dạng action=cskhDuyenLite) -> { phone: [{name,tier}] }
 function _cskhMapFromRows_(rows) {
   const m = {};
@@ -933,6 +943,7 @@ function _cskhMapFromRows_(rows) {
 }
 async function _loadCskhFromIdb_() {
   _cskhIdbTried = true;
+  if (_isDemoSession_()) return false;
   try {
     const rec = await _idbGet_('cskh_lite_v1');
     if (!rec || !rec.rows || !rec.rows.length) return false;
@@ -981,10 +992,12 @@ async function _pullCskhLiteOnce_(isManual){
     cskhData = newCk;
     cskhMeta = { found: !!ckJson.found, total: ckJson.total || 0, noPhone: ckJson.noPhone || 0, noPhoneSample: ckJson.noPhoneSample || [] };
     // lưu bản mới nhất vào IndexedDB (nền, không chặn) để lần mở trang sau / lúc GAS lỗi vẫn có đủ khách
-    _idbSet_('cskh_lite_v1', { rows: ckJson.rows || [], meta: cskhMeta, at: Date.now() }).catch(function (e) { console.warn('IndexedDB lưu CSKH lỗi:', e && e.message); });
+    if (!_isDemoSession_()) _idbSet_('cskh_lite_v1', { rows: ckJson.rows || [], meta: cskhMeta, at: Date.now() }).catch(function (e) { console.warn('IndexedDB lưu CSKH lỗi:', e && e.message); });
     // Kho ~134k SDT vuot han muc localStorage (~5MB) va stringify mat hang tram ms: chi luu cache neu nho; con lai se keo lai khi mo trang
-    if (Object.keys(newCk).length <= 20000) saveLS('ome_cskh_duyen', cskhData); else { try { localStorage.removeItem('ome_cskh_duyen'); } catch(e){} }
-    saveLS('ome_cskh_duyen_meta', cskhMeta);
+    if (!_isDemoSession_()) {
+      if (Object.keys(newCk).length <= 20000) saveLS('ome_cskh_duyen', cskhData); else { try { localStorage.removeItem('ome_cskh_duyen'); } catch(e){} }
+      saveLS('ome_cskh_duyen_meta', cskhMeta);
+    }
     if (_cskhBannerOn) { _cskhBannerOn = false; const b = document.getElementById('sync-err-banner'); if (b) b.remove(); }
     return true;
   } catch (ckErr) { return _cskhFail_(ckErr.message || 'lỗi mạng'); }
@@ -1047,7 +1060,7 @@ async function syncFromGS(opts) {
           catch (pe) {
             // GAS trả HTML lỗi (404/quá tải) → nếu phiên này CHƯA kéo được đơn nào từ mạng thì dùng bản đã lưu ở máy,
             // để CRM không tụt về vài chục khách (xem chú thích "CACHE BỀN" ở trên)
-            const rec = (!_ordersLoadedNet && !_ordersCacheUsed) ? await _idbGet_('orders_v1').catch(function () { return null; }) : null;
+            const rec = (!_ordersLoadedNet && !_ordersCacheUsed && !_isDemoSession_()) ? await _idbGet_('orders_v1').catch(function () { return null; }) : null;
             if (rec && rec.json && rec.json.orders && rec.json.orders.length) { ordJson = rec.json; _ordFromCache = true; }
             else throw pe;
           }
@@ -1080,7 +1093,7 @@ async function syncFromGS(opts) {
               if (_autoSyncFailCount >= 3) showSyncErrorBanner('Chưa làm mới được đơn hàng từ Google Sheets — CRM đang dùng dữ liệu đã lưu ở máy từ lần trước. Đang tự thử lại; có thể bấm "Sync thủ công".');
             } else {
               _lastOrdersText = ordText; _ordersLoadedNet = true; _ordersCacheUsed = false;
-              _idbSet_('orders_v1', { json: ordJson, at: Date.now() }).catch(function (e) { console.warn('IndexedDB lưu đơn lỗi:', e && e.message); });
+              if (!_isDemoSession_()) _idbSet_('orders_v1', { json: ordJson, at: Date.now() }).catch(function (e) { console.warn('IndexedDB lưu đơn lỗi:', e && e.message); });
             }
           }
         } else if (ordJson && ordJson.error) {

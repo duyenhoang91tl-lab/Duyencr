@@ -1343,6 +1343,13 @@ function _demoClip_(out, action) {
         o[k] = _demoClipPerSource_(o[k]);
       }
     });
+    // NGUYEN NHAN GOC (nguon CSKH-Duyen): cskhDuyenLite tra kem total/noPhone (so that ~134k) va noPhoneSample (toi da 20 TEN khach that,
+    // khong che) — cat 5 dong 'rows' nhung cac truong nay van lo du lieu that cho tai khoan test. Nay chi con dung 5 dong da cat.
+    if (action === 'cskhDuyenLite' || action === 'cskhDuyen') {
+      var _nCk = Array.isArray(o.rows) ? o.rows.length : 0;
+      delete o._demoTotal_rows;
+      o.total = _nCk; o.noPhone = 0; o.noPhoneSample = [];
+    }
     o._demo = true;
   }
   _demoMaskDeep_(o);
