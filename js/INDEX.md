@@ -39,3 +39,5 @@ Code client của `index.html` (trước đây inline, ~1.4MB) đã tách ra `cs
 
 - `27-fn-bonuscore.js`: `_bcOrderInfo_`, `_bcGuess_`, `_bcMinProducts_`, `_bcIsVongProgram_` (lõi đếm SP thưởng; bản sao trong gas_v13.js)
 - `28-fn-bonusdetail.js`: tab K "Chi tiết thưởng" — `renderSalesReportTabK_`, `_bdFlag`, `_bdSlot`, `_bdRev`, `_bdSyncFromGAS`
+
+- `js/29-sidenav.js` + `css/05-sidenav.css`: menu tác vụ dọc bên trái (ngăn kéo ẩn mặc định, nút ☰ Menu ở header; tái dùng khối `.tabs` nên giữ nguyên data-bar-id/quyền/demo-mode; chọn mục xong tự ẩn).

@@ -1,0 +1,23 @@
+/* ── MENU TÁC VỤ DỌC BÊN TRÁI (ẩn mặc định, bấm ☰ mới hiện) ──
+   Tái dùng nguyên khối .tabs (giữ mọi data-bar-id, quyền, demo-mode, switchTab) nên chỉ đổi
+   cách hiển thị: ngăn kéo cố định bên trái, vùng nội dung (#data-view) chiếm toàn bộ bề ngang. */
+#sn-toggle{display:none;align-items:center;gap:5px;flex-shrink:0;height:32px;padding:0 11px;border:1px solid var(--border-md);border-radius:var(--rsm);background:var(--surface);color:var(--text);font-size:12.5px;font-weight:500;cursor:pointer;white-space:nowrap;}
+#sn-toggle:hover{background:var(--surface2);}
+#sn-toggle.sn-on{display:inline-flex;}
+#sn-toggle .sn-cur{color:var(--green);max-width:150px;overflow:hidden;text-overflow:ellipsis;}
+body.rpt-mode #sn-toggle,html.db-standalone #sn-toggle{display:none!important;}
+#sn-backdrop{display:none;position:fixed;top:50px;left:0;right:0;bottom:0;background:rgba(0,0,0,.35);z-index:590;}
+#sn-backdrop.show{display:block;}
+#data-view .tabs{position:fixed!important;top:50px;left:0;bottom:0;width:240px;max-width:86vw;z-index:600;flex-direction:column!important;flex-wrap:nowrap!important;align-items:stretch;padding:10px 8px!important;gap:2px;border-bottom:none;border-right:1px solid var(--border);box-shadow:6px 0 28px rgba(0,0,0,.18);overflow-y:auto;transform:translateX(-105%);visibility:hidden;transition:transform .18s ease,visibility 0s linear .18s;}
+#data-view .tabs.sn-open{transform:none;visibility:visible;transition:transform .18s ease;}
+#data-view .tabs .tab,#data-view .tabs.mobile-tabs-open .tab{display:flex!important;align-items:center;flex:none!important;width:100%;box-sizing:border-box;padding:9px 12px;margin:0;border:none;border-left:3px solid transparent;border-radius:6px;white-space:normal;font-size:13px;}
+#data-view .tabs .tab:hover{background:var(--surface2);}
+#data-view .tabs .tab.active{background:var(--green-bg);border-left-color:var(--green);color:var(--green);}
+#data-view .tabs .tab-badge{margin-left:auto;}
+#data-view .tabs .tabs-mobile-toggle{display:none!important;}
+/* nhóm "📊 Báo cáo ▾" và "☰ Menu": xổ ngay trong ngăn kéo thay vì nổi đè lên */
+#data-view .tabs #reportsgroup-list{position:static!important;box-shadow:none!important;border:none!important;min-width:0!important;padding:4px 0 0 10px!important;flex-direction:column;}
+#data-view .tabs #v9tab-reportsgroup{flex-wrap:wrap;}
+#data-view .tabs #v9tab-reportsgroup>#reportsgroup-list{width:100%;}
+#data-view .tabs #reportsgroup-list .tab{display:block!important;border-left:3px solid transparent;}
+#data-view .tabs #v9tab-customize{opacity:.6;margin-top:auto;}
