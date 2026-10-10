@@ -1,0 +1,113 @@
+# Tự động áp supabase/schema.sql lên database Supabase mỗi khi push main có đổi supabase/** (không cần dán vào SQL Editor).
+# Cần 1 Secret trong repo: SUPABASE_DB_URL (chuỗi kết nối Postgres kiểu "Session pooler", có mật khẩu).
+# Hướng dẫn cài 1 lần: docs/CLOUDFLARE-SUPABASE-AUTO-DEPLOY.md
+#
+# QUY ƯỚC: supabase/schema.sql PHẢI idempotent (create ... if not exists, add column if not exists...) vì file được chạy lại mỗi lần push.
+# Đây là DỮ LIỆU THẬT của CRM nên có 3 lớp an toàn: (1) chặn lệnh phá dữ liệu, (2) chạy thử 2 lần trên Postgres tạm,
+# (3) áp lên Supabase trong 1 transaction (lỗi giữa chừng thì không đổi gì) rồi kiểm tra RLS còn bật.
+name: Deploy Supabase schema
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/**'
+      - '.github/workflows/deploy-supabase.yml'
+  workflow_dispatch:
+    inputs:
+      allow_destructive:
+        description: 'Cho phép drop table/column, truncate, delete from trong supabase/*.sql (chỉ bật khi chắc chắn đã sao lưu)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-supabase
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  ALLOW_DESTRUCTIVE: ${{ github.event.inputs.allow_destructive }}
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Chặn lệnh phá dữ liệu
+        run: |
+          test -f supabase/schema.sql || { echo "::error::Không thấy supabase/schema.sql"; exit 1; }
+          # Bỏ dòng chú thích (--) trước khi dò để lời giải thích trong file không gây báo động giả.
+          hits=$(cat supabase/*.sql | grep -vE '^[[:space:]]*--' | grep -inE '\b(drop[[:space:]]+(table|column|schema|database)|truncate|delete[[:space:]]+from)\b' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            if [ "$ALLOW_DESTRUCTIVE" = "true" ]; then
+              echo "::warning::Có lệnh phá dữ liệu nhưng đã được cho phép (allow_destructive=true)."
+            else
+              echo "::error::supabase/*.sql có lệnh xoá dữ liệu/cấu trúc (xem các dòng ở trên). Workflow từ chối tự chạy. Nếu chủ ý: sao lưu Supabase trước, rồi Actions → Deploy Supabase schema → Run workflow → tick allow_destructive."
+              exit 1
+            fi
+          fi
+
+      - name: Chạy schema.sql 2 lần trên Postgres tạm (kiểm cú pháp + idempotent)
+        env:
+          PGHOST: localhost
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          for i in 1 2; do
+            echo "--- lần $i ---"
+            psql -v ON_ERROR_STOP=1 --single-transaction -f supabase/schema.sql
+          done
+          echo "Bảng đã tạo:"
+          psql -At -c "select relname || ' rls=' || relrowsecurity from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relkind = 'r' order by 1"
+
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Kiểm tra secret
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          [ -n "$SUPABASE_DB_URL" ] || { echo "::error::Thiếu secret SUPABASE_DB_URL (xem docs/CLOUDFLARE-SUPABASE-AUTO-DEPLOY.md)"; exit 1; }
+          case "$SUPABASE_DB_URL" in
+            postgres://*|postgresql://*) ;;
+            *) echo "::error::SUPABASE_DB_URL phải bắt đầu bằng postgresql:// (chuỗi kết nối Postgres, không phải URL https://xxx.supabase.co)"; exit 1 ;;
+          esac
+          case "$SUPABASE_DB_URL" in
+            *'[YOUR-PASSWORD]'*) echo "::error::SUPABASE_DB_URL còn chữ [YOUR-PASSWORD] — thay bằng mật khẩu database thật (mã hoá ký tự đặc biệt, xem docs)"; exit 1 ;;
+          esac
+          case "$SUPABASE_DB_URL" in
+            *'@db.'*'.supabase.co'*) echo "::warning::Đây có vẻ là kết nối trực tiếp (db.<ref>.supabase.co) — chỉ có IPv6, GitHub runner thường không nối được. Nếu lỗi kết nối: dùng chuỗi Session pooler." ;;
+          esac
+
+      - name: Áp supabase/schema.sql lên Supabase (1 transaction)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 --single-transaction -f supabase/schema.sql
+
+      - name: Kiểm tra 3 bảng CRM tồn tại và RLS còn bật
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          n=$(psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -At -c "select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relkind = 'r' and c.relname in ('care_data','dt_tong','don_chi_tiet') and c.relrowsecurity")
+          echo "Số bảng CRM có RLS bật: $n / 3"
+          [ "$n" = "3" ] || { echo "::error::Thiếu bảng hoặc RLS không bật trên care_data/dt_tong/don_chi_tiet — kiểm tra ngay trong Supabase"; exit 1; }
