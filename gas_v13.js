@@ -4618,6 +4618,109 @@ function _csBonusSummary_(p) {
   return parts.join(' · ');
 }
 
+// ═══════════ BONUS CORE (BẢN SAO NGUYÊN VĂN của js/27-fn-bonuscore.js — sửa 1 nơi PHẢI sửa cả 2 nơi) ═══════════
+// GAS: map/ovr KHÔNG lấy từ localStorage — buildCsStats_ đọc Settings 'bonusProductMap' / 'bonusOrderOvr' rồi truyền vào _bcOrderInfo_(o, map, ovr).
+var BONUS_PRODUCT_MAP = {}, BONUS_ORDER_OVR = {};
+function _bcFold_(s){ return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/g,'d').replace(/Đ/g,'d').toLowerCase().replace(/\s+/g,' ').trim(); }
+// Mã bộ đếm sạch từ dòng đầu ghi chú Pos (vd "17T10/2026") — rỗng nếu không phải dạng đơn gốc.
+function _bcCounterOf_(ghiChu){
+  var first = String(ghiChu == null ? '' : ghiChu).split(/[\r\n]/)[0].trim();
+  var m = /^([A-Za-z]{0,3}\d{1,6}[A-Za-z]{0,3}T\d{1,2}\/\d{2,4})$/.exec(first);
+  return m ? m[1].replace(/\s+/g,'').toUpperCase() : '';
+}
+// Đoán loại dòng khi CHƯA có trong map. Trả {cls:'vong'|'charm'|'skip'|'gift'|'prod'}.
+function _bcGuess_(code, name){
+  var c = _bcFold_(code), n = _bcFold_(name), t = n + ' ' + c;
+  if (/bi vang|(^|[-\s])bv($|[-\s])|cv10k-bv/.test(t)) return 'skip';
+  if (/^qua |^qhts|^la bo de|^la-bd|^cb-|combo|qua tang|hop qua|bao hanh|chi phi/.test(t)) return 'gift';
+  if (/^(vong tay|vong ngoc|hat( |$))|^hd-|^hdd|^vt|vtnl/.test(n || c) || (!n && /^(hd|vt)/.test(c))) return 'vong';
+  if (/^day thep|^dich vu|^nguyen vat lieu|^ttv |^them tien|^ship|^phi |^pkd/.test(n || c) || (!n && /^(dtcd|ttv|nvl-|pkd)/.test(c))) return 'skip';
+  if (/cuon |ngu dieu/.test(t)) return 'vong';
+  if (/^charm|^c[a-z]{1,4}-/.test(n === '' ? c : n)) return 'charm';
+  return 'prod';
+}
+function _bcLineCls_(code, name, map){
+  var e = map && map[String(code||'').toLowerCase()];
+  if (e){
+    if (e.skip) return {cls:'skip', auto:false};
+    if (e.gift) return {cls:'gift', auto:false};
+    if (e.vong) return {cls:'vong', auto:false};
+    if (e.charm) return {cls:'charm', auto:false};
+    return {cls:'prod', auto:false};
+  }
+  return {cls:_bcGuess_(code, name), auto:true};
+}
+// Tách dòng sản phẩm của 1 đơn Pos: mã ';' ghép vị trí với SL ',' (tên ',' chỉ dùng khi số tên = số mã).
+function _bcOrderLines_(o){
+  var codes = String(o.maSanPham||'').split(';').map(function(x){ return x.trim(); });
+  var qtys = String(o.soLuong||'').split(',').map(function(x){ return x.trim(); });
+  var names = String(o.sanPham||'').split(',').map(function(x){ return x.trim(); });
+  var aligned = names.length === codes.length;
+  var out = [];
+  codes.forEach(function(c, i){
+    if (!c) return;
+    var q = Number(String(qtys[i]||'1').replace(',', '.'));
+    if (!isFinite(q) || q <= 0) q = 1;
+    if (q > 50) q = 1;   // dữ liệu lệch cột (vd "2001") → coi là 1, đơn nằm trong danh sách "cần kiểm tra"
+    out.push({ code:c, name: aligned ? names[i] : '', qty:q, qtyOdd: Number(String(qtys[i]||'1').replace(',', '.')) > 50 });
+  });
+  return out;
+}
+// Thông tin đếm của 1 đơn. map/ovr mặc định lấy từ biến toàn cục.
+function _bcOrderInfo_(o, map, ovr){
+  map = map || BONUS_PRODUCT_MAP; ovr = ovr || BONUS_ORDER_OVR;
+  var counter = _bcCounterOf_(o.ghiChu);
+  var total = Number(o.giaTriDon != null ? o.giaTriDon : o.giaTriSauGiam) || 0;
+  var lines = _bcOrderLines_(o), reasons = [];
+  lines.forEach(function(l){
+    var k = (counter ? counter + '|' : '') + l.code.toLowerCase();
+    var ov = (counter && ovr && ovr[k]) || {};
+    var cl = _bcLineCls_(l.code, l.name, map);
+    l.cls = cl.cls; l.auto = cl.auto; l.slot = ov.slot || '';
+    if (l.slot === 'skip') l.cls = 'skip'; else if (l.slot === 'gift') l.cls = 'gift';
+    l.rev = (ov.rev !== undefined && ov.rev !== '' && ov.rev !== null) ? Number(ov.rev) : null;
+  });
+  var hasVong = lines.some(function(l){ return l.cls === 'vong'; });
+  lines.forEach(function(l){ if (l.cls === 'charm' && !hasVong) l.cls = 'prod'; });   // charm đứng riêng = sản phẩm riêng
+  var vongLines = lines.filter(function(l){ return l.cls === 'vong' || l.cls === 'charm'; });
+  var prodLines = lines.filter(function(l){ return l.cls === 'prod'; });
+  var slots = {}, nProd = 0;
+  prodLines.forEach(function(l){
+    if (/^[0-9]+$/.test(String(l.slot||''))){ if (!slots[l.slot]){ slots[l.slot] = true; nProd += 1; } }
+    else nProd += l.qty;
+  });
+  var nProducts = (hasVong ? 1 : 0) + nProd;
+  var vongRev = null;
+  if (hasVong){
+    if (!prodLines.length) vongRev = total;
+    else if (prodLines.every(function(l){ return l.rev !== null; })) vongRev = total - prodLines.reduce(function(s,l){ return s + l.rev; }, 0);
+    else if (total >= 15000000) reasons.push('Đơn vòng ≥15tr có sản phẩm khác — nhập doanh thu từng dòng ở tab "Chi tiết thưởng" để tính mốc 15tr phần vòng + charm mix.');
+  }
+  var unconfirmed = lines.filter(function(l){ return l.auto; }).length;   // số dòng còn ĐOÁN TỰ ĐỘNG (chưa lưu trong BONUS_PRODUCT_MAP) — chỉ để hiển thị ở tab, không chặn tính thưởng
+  if (lines.some(function(l){ return l.qtyOdd; })) reasons.push('Số lượng bất thường (lệch cột) — kiểm tra lại.');
+  if (!lines.length) reasons.push('Đơn không có mã sản phẩm.');
+  return { counter:counter, total:total, lines:lines, hasVong:hasVong, nProducts:nProducts, vongRev:vongRev, needReview:reasons.length>0, reasons:reasons, unconfirmed:unconfirmed };
+}
+// Số sản phẩm tối thiểu của CT "Đơn từ Xtr (combo N sản phẩm)" — field p.minProducts, thiếu thì đọc từ TÊN CT.
+function _bcMinProducts_(p){
+  if (p.minProducts !== undefined && p.minProducts !== null && p.minProducts !== '') return Number(p.minProducts) || 0;
+  var m = /combo\s*(\d+)\s*s[aả]n\s*ph[aẩ]m/i.exec(String(p.name||'').normalize('NFC'));
+  return m ? Number(m[1]) : 0;
+}
+// CT "Bill vòng mix charm": tính trên PHẦN VÒNG + CHARM MIX (không phải cả đơn).
+function _bcIsVongProgram_(p){
+  if (p.vongScope !== undefined && p.vongScope !== null) return !!p.vongScope;
+  return /v[oò]ng\s*mix\s*charm/i.test(String(p.name||'').normalize('NFC'));
+}
+// CT "Tourmaline cao cấp": đơn phải CÓ nhẫn Tourmaline (Duyên 2026-10-10). Field p.requireProduct (nếu đã đặt) thắng.
+function _bcRequireKw_(p){
+  if (p.requireProduct !== undefined && p.requireProduct !== null) return String(p.requireProduct).trim();
+  var nm = String(p.name||'').normalize('NFC');
+  if (/tourmaline cao cấp/i.test(nm)) return 'nhẫn tour';
+  return /vòng/i.test(nm) ? 'vòng' : '';
+}
+// ═══════════ HẾT BONUS CORE ═══════════
+
 function buildCsStats_(cs, dateFrom, dateTo) {
   cs = String(cs || '').trim();
   if (!cs) return { ok: false, error: 'Thiếu tên CS.' };
@@ -4655,6 +4758,8 @@ function buildCsStats_(cs, dateFrom, dateTo) {
   var channel = pick(_csJsonSetting_('saleChannels', {})) || '';
   var chRates = _csJsonSetting_('channelCommissionRates', {});
   var programs = _csJsonSetting_('bonusPrograms', []); if (!Array.isArray(programs)) programs = [];
+  var prodMap = _csJsonSetting_('bonusProductMap', {}), orderOvr = _csJsonSetting_('bonusOrderOvr', {}); // dem san pham / vong chuoi / charm mix (tab "Chi tiet thuong")
+  var hasGocField = (rep.orders || []).some(function(x) { return !!x.baseNgayTao; }); // backend cu/khong ghep Base -> giu cach cu
   var teamRate = null, teamName = '';
   try {
     readTeams_(getCrmSS_().getSheetByName(SH_TEAM)).forEach(function(t) {
@@ -4699,7 +4804,9 @@ function buildCsStats_(cs, dateFrom, dateTo) {
     // quy tac "chi nguoi tao" 2026-10-07). nSales = so sale tren don; moi nguoi nhan best.amount / nSales.
     var nSales = (o.saleShares && o.saleShares.length) ? o.saleShares.length
       : (String(o.saleBanValid || '').split(',').map(function(x) { return x.trim(); }).filter(Boolean).length || 1);
-    mine.push({ date: _csYmdFromDmy_(o.ngayTaoDon), time: (String(o.ngayTaoDon || '').match(/(\d{1,2}):(\d{2})/) || [''])[0], giaTri: giaTri, share: share, nSales: nSales, sanPham: o.sanPham });
+    var bInfo = _bcOrderInfo_(Object.assign({}, o, { giaTriDon: giaTri }), prodMap, orderOvr);
+    mine.push({ date: o.baseNgayTao || _csYmdFromDmy_(o.ngayTaoDon), time: (String(o.ngayTaoDon || '').match(/(\d{1,2}):(\d{2})/) || [''])[0], giaTri: giaTri, share: share, nSales: nSales, sanPham: o.sanPham,
+      goc: !hasGocField || !!o.donGoc, info: bInfo });
     var chR = channelRate(o.nguonDon);
     if (chR !== null) {
       ordCh++; revCh += share; commCh += share * chR / 100;
@@ -4718,7 +4825,7 @@ function buildCsStats_(cs, dateFrom, dateTo) {
   mine.forEach(function(o) {
     if (!byDay[o.date]) byDay[o.date] = { date: o.date, revenue: 0, count: 0, first: null };
     var g = byDay[o.date];
-    g.revenue += o.share; // doanh so ngay = phan DOANH THU da chia cua sale (ke ca don khong phai nguoi tao)
+    if (o.goc) g.revenue += o.share; // doanh so ngay = phan DOANH THU da chia cua sale, CHI don goc (ma bo dem sach, co tren Base+Pos), theo ngay tao Base
     g.count++;
     if (o.time && (g.first === null || o.time < g.first)) g.first = o.time;
   });
@@ -4764,12 +4871,22 @@ function buildCsStats_(cs, dateFrom, dateTo) {
           if (amt > 0 && (!best || amt > best.amount)) best = { amount: amt, program: p, detail: 'SL ước tính: ' + pq.qty + ' — SP: "' + String(o.sanPham || '') + '"' };
         }
       }
-      if (p.revenue && p.revenue.enabled && p.revenue.scope === 'order' && _csRequireProductOk_(p, o.sanPham)) {
+      if (p.revenue && p.revenue.enabled && p.revenue.scope === 'order') {
         var mn = (p.revenue.min !== '' && p.revenue.min != null) ? Number(p.revenue.min) : null;
         var mx = (p.revenue.max !== '' && p.revenue.max != null) ? Number(p.revenue.max) : null;
-        if ((mn === null || o.giaTri >= mn) && (mx === null || o.giaTri <= mx)) {
+        var isVongP = _bcIsVongProgram_(p), minSP = _bcMinProducts_(p), measured = o.giaTri, dtl = 'Giá trị đơn ' + _csMoney_(o.giaTri), okP = true;
+        if (isVongP) { // Bill vong mix charm: moc tinh tren PHAN VONG + CHARM MIX (port y het js/12 _computeBonusData_)
+          okP = o.info.hasVong && o.info.vongRev !== null;
+          measured = o.info.vongRev; dtl = 'Phần vòng + charm mix ' + _csMoney_(o.info.vongRev || 0) + ' (đơn ' + _csMoney_(o.giaTri) + ')';
+        } else {
+          okP = _csRequireProductOk_(p, o.sanPham);
+          var rk = _bcRequireKw_(p);
+          if (rk && p.requireProduct === undefined) okP = _csRequireProductOk_({ requireProduct: rk }, o.sanPham);
+          if (minSP > 0) { okP = okP && o.info.nProducts >= minSP; dtl += ' — ' + o.info.nProducts + ' sản phẩm'; }
+        }
+        if (okP && (mn === null || measured >= mn) && (mx === null || measured <= mx)) {
           var amt2 = Number(p.bonusAmount) || 0;
-          if (amt2 > 0 && (!best || amt2 > best.amount)) best = { amount: amt2, program: p, detail: 'Giá trị đơn ' + _csMoney_(o.giaTri) };
+          if (amt2 > 0 && (!best || amt2 > best.amount)) best = { amount: amt2, program: p, detail: dtl };
         }
       }
     });
