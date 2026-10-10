@@ -1132,12 +1132,35 @@ function _findAccount(username){
   return null;
 }
 
+// Tai khoan TEST: don sach du lieu DAY DU con trong trinh duyet roi tai lai trang 1 lan (moi lan dang nhap).
+// NGUYEN NHAN GOC (nguon CSKH-Duyen / danh sach KH van day du): luc dang o man hinh dang nhap CHUA co demoToken, nen vong dong bo luc
+// mo trang goi GAS khong kem token -> may chu tra DAY DU (~134k SDT) vao bo nho (allCustomers/customerMap/cskhData) va cache may
+// (localStorage + IndexedDB). Dang nhap test xong chi xoa cskhData, KHONG dung lai allCustomers/customerMap -> danh sach day du van hien.
+// Sua: xoa cache du lieu, roi reload; sau reload demoToken da nam trong localStorage nen MOI request deu kem token (may chu cat 5 dong/nguon, che SDT).
+var _DEMO_PURGE_LS_ = ['ome_care', 'ome_care_leads', 'ome_cskh_duyen', 'ome_cskh_duyen_meta', 'ome_don_last_date', 'ome_don_order_count', 'ome_don_phones', 'ome_don_sale_by_phone', 'ome_don_stats'];
+function _demoPurgeLS_() { try { _DEMO_PURGE_LS_.forEach(function(k){ localStorage.removeItem(k); }); } catch(e){} }
+function _demoPurgeAndReload_() {
+  try {
+    var tok = localStorage.getItem('ome_demo_token') || '';
+    if (!tok || sessionStorage.getItem('ome_demo_clean') === tok) return false;   // da don + reload cho phien dang nhap nay
+    sessionStorage.setItem('ome_demo_clean', tok);
+    _demoPurgeLS_();
+    window.addEventListener('pagehide', _demoPurgeLS_);   // xoa lai sat luc roi trang (de phong vong dong bo dang chay ghi cache chen vao)
+    var ps = [];
+    try { if (typeof _idbDel_ === 'function') { ps.push(_idbDel_('cskh_lite_v1')); ps.push(_idbDel_('orders_v1')); } } catch(eI){}
+    var go = function(){ location.reload(); };
+    Promise.all(ps.map(function(pr){ return Promise.resolve(pr).catch(function(){}); })).then(go, go);
+    return true;
+  } catch(e) { return false; }
+}
+
 // Đặt currentUser theo tài khoản đăng nhập + áp dụng phạm vi xem
 function _applyAuthIdentity(acct){
   _bootstrapAdmin = false;
   var namesArr = (acct.names && acct.names.length) ? acct.names.slice() : (acct.name ? [acct.name] : []);
   var primaryName = acct.role==='admin' ? 'Admin' : (namesArr[0] || acct.username);
   currentUser = { name: primaryName, names: acct.role==='admin' ? [] : namesArr, role: acct.role || 'cs', team: acct.team || '', perms: (Array.isArray(acct.perms) ? acct.perms : null) };
+  if (acct.role === 'demo' && _demoPurgeAndReload_()) return;   // don cache day du + tai lai trang (xem _demoPurgeAndReload_)
   if (acct.role === 'demo') {
     // Tai khoan test: chi thay cac tab bao cao (khong the nang quyen qua perms). Du lieu chi tiet da bi may chu cat con 5 dong.
     currentUser.perms = ['salesreport','pancake','kpipancake','mktchecklist','dailybrief'];
@@ -1231,7 +1254,7 @@ async function doLogin(){
 function doLogout(){
   if (!confirm('Đăng xuất khỏi tài khoản hiện tại?')) return;
   _authAccount = null;
-  try{ localStorage.removeItem('ome_auth'); localStorage.removeItem('ome_demo_token'); }catch(e){}
+  try{ localStorage.removeItem('ome_auth'); localStorage.removeItem('ome_demo_token'); sessionStorage.removeItem('ome_demo_clean'); }catch(e){}
   document.body.classList.remove('demo-mode');
   _showLogin();
 }

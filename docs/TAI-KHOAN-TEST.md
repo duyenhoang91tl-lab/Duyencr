@@ -23,3 +23,7 @@ nhưng **dòng dữ liệu chi tiết (đơn / khách / lead) chỉ thấy tối
 - Request KHÔNG có token vẫn chạy như cũ (để extension Zalo/Pancake và CS đang dùng không bị hỏng). Người cố tình bỏ token và gọi thẳng link GAS vẫn lấy được dữ liệu như hiện nay. Muốn chặn kín phải bắt mọi request có mã (cần sửa 2 extension) — làm đợt riêng.
 - Action `users` vẫn trả danh sách tài khoản kèm `passHash` (CRM đăng nhập kiểm tra ở trình duyệt) — chưa đổi trong đợt này.
 - Báo cáo E (hoa hồng/thưởng) và Báo cáo H tính ở trình duyệt từ danh sách đơn/khách → với tài khoản test chỉ tính trên các dòng đã cắt (5 dòng/nguồn) nên số không đầy đủ (H còn cần action `assign` chưa mở cho test). Các báo cáo tính ở máy chủ (A, B, C, D, F, G, Pancake, KPI, Checklist) vẫn đủ số tổng.
+
+## Đăng nhập test: dọn cache + tải lại trang 1 lần (2026-10-10)
+Lúc đang ở màn hình đăng nhập CHƯA có `demoToken`, vòng đồng bộ lúc mở trang gọi GAS không kèm token → máy chủ trả ĐẦY ĐỦ (~134k SĐT CSKH-Duyên) vào bộ nhớ trang (`allCustomers`/`customerMap`/`cskhData`) và cache máy. Trước đây đăng nhập test chỉ xoá `cskhData` nên danh sách đầy đủ vẫn hiện. Nay `_demoPurgeAndReload_` (js/14-fn-aasplit.js) xoá cache dữ liệu (localStorage `ome_care*`, `ome_cskh_duyen*`, `ome_don_*`; IndexedDB `cskh_lite_v1`, `orders_v1`) rồi reload 1 lần mỗi phiên đăng nhập (cờ sessionStorage `ome_demo_clean` = token; xoá khi đăng xuất). Sau reload token đã có sẵn trong localStorage nên mọi request đều kèm token → máy chủ cắt 5 dòng/nguồn + che SĐT.
+
