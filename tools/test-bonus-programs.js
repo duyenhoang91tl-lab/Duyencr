@@ -5,9 +5,10 @@ const R = p => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
 const j12 = R('js/12-fn-rendersalesreporttabe.js'), g = R('gas_v13.js'), j01 = R('js/01-fn-splitmulti.js'), j05 = R('js/05-fn-saveeditphone.js');
 const fn = (src, n) => { const i = src.indexOf('\nfunction ' + n + '('); if (i < 0) throw new Error('khong thay ' + n); return src.slice(i + 1, src.indexOf('\n}\n', i) + 3); };
 const ok = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1); } };
-const ctx = { SALE_CHANNELS: { An: 'online', Binh: 'offline' }, BONUS_PROGRAMS: [], _srMoney: n => String(n), accounts: [], _acctNamesOf: () => [] };
+const j27 = R('js/27-fn-bonuscore.js');
+const ctx = { loadLS: () => null, SALE_CHANNELS: { An: 'online', Binh: 'offline' }, BONUS_PROGRAMS: [], _srMoney: n => String(n), accounts: [], _acctNamesOf: () => [] };
 vm.createContext(ctx);
-vm.runInContext(fn(j05, 'esc') + fn(j01, 'splitMulti_') + ['_bonusProgramApplies_', '_ddmmyyyyToYmd_', '_daysSinceStart_', '_saleStartDate_', '_bonusProductQty_', '_bonusNamesOfOrder_', '_orderRevenueShares_',
+vm.runInContext(j27 + '\n' + fn(j05, 'esc') + fn(j01, 'splitMulti_') + ['_bonusProgramApplies_', '_ddmmyyyyToYmd_', '_daysSinceStart_', '_saleStartDate_', '_bonusProductQty_', '_bonusNamesOfOrder_', '_orderRevenueShares_',
   '_bonusNormSrc_', '_bonusSourceOk_', '_bonusOrderProductQtys_', '_bonusAggSources_', '_bonusRequireKw_', '_bonusRequireProductOk_', '_computeBonusData_'].map(n => fn(j12, n)).join('\n'), ctx);
 const calc = (progs, orders) => { ctx.P = progs; ctx.O = orders; return JSON.parse(vm.runInContext('BONUS_PROGRAMS = P; JSON.stringify(_computeBonusData_(O))', ctx)); };
 const base = { dateFrom: '', dateTo: '', audience: { online: false, offline: false }, product: '', requireProduct: '', tier: { enabled: false, rows: [] }, revenue: { enabled: false, scope: 'order', min: '', max: '' }, firstOrder: { enabled: false, amount: '' }, probationDay: { enabled: false }, bonusAmount: '' };
