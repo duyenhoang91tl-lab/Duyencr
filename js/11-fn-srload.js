@@ -69,7 +69,7 @@ async function _srLoad(){
       dateFrom: _srState.fDateFrom, dateTo: _srState.fDateTo,
       sale: (_srState.fSale||[]).join(',')
     });
-  } else if (_srState.sub === 'G') {
+  } else if (_srState.sub === 'G' || _srState.sub === 'K') {
     // Chuong trinh thuong Thu viec/Chinh thuc: CUNG nguon va cach map field voi Bao cao E (salesReportB/Pos)
     // de _computeBonusData_ dung chung nguyen ven. Dropdown khong phai 'custom' -> khoang ngay PHAI khop dropdown.
     if (_srState.gDateQuick && _srState.gDateQuick !== 'custom'){
@@ -515,6 +515,7 @@ function renderSalesReportTab(){
     '<button class="btn '+(_srState.sub==='G'?'secondary':'sm')+'" onclick="_srSetSub(\'G\')">Báo cáo G — Thưởng thử việc / chính thức</button>' +
     '<button class="btn '+(_srState.sub==='H'?'secondary':'sm')+'" onclick="_srSetSub(\'H\')">Báo cáo H — Tổng quan data đã chia</button>' +
     '<button class="btn '+(_srState.sub==='I'?'secondary':'sm')+'" onclick="_srSetSub(\'I\')">Báo cáo I — Chia data Renew</button>' +
+    '<button class="btn '+(_srState.sub==='K'?'secondary':'sm')+'" onclick="_srSetSub(\'K\')">Chi tiết thưởng (đếm sản phẩm)</button>' +
     (_srIsAdmin() ? '<button class="btn '+(_srState.sub==='J'?'secondary':'sm')+'" onclick="_srSetSub(\'J\')">📤 Nhập dữ liệu Base/Pos</button>' : '') +
     '</div>';
 
@@ -526,6 +527,7 @@ function renderSalesReportTab(){
   if (_srState.sub === 'H') { renderSalesReportTabH_(wrap, subTabs); return; }
   if (_srState.sub === 'I') { renderSalesReportTabI_(wrap, subTabs); return; }
   if (_srState.sub === 'J') { renderSalesReportTabJ_(wrap, subTabs); return; }
+  if (_srState.sub === 'K') { renderSalesReportTabK_(wrap, subTabs); return; }
 
   var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
   filters += _quickRangeSelectHtml(_srState.dateQuick, "_srApplyQuickRange('dateQuick','dateFrom','dateTo',this.value)");

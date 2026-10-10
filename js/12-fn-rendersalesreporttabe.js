@@ -788,7 +788,7 @@ function _srGExportXlsx_(){
   toast('📗 Đã xuất Excel 3 sheet — gửi kế toán đối chiếu');
 }
 
-function renderSalesReportTabG_(wrap, subTabs){
+function _srGFiltersHtml_(){
   var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
   filters += _quickRangeSelectHtml(_srState.gDateQuick, "_srApplyQuickRange('gDateQuick','gDateFrom','gDateTo',this.value)");
   filters += '<input type="date" value="'+esc(_srState.gDateFrom)+'" onchange="_srSetField(\'gDateFrom\',this.value);_srState.gDateQuick=\'custom\'" title="Từ ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
@@ -819,6 +819,10 @@ function renderSalesReportTabG_(wrap, subTabs){
       '</div></div>';
   filters += '</div>';
 
+  return filters;
+}
+function renderSalesReportTabG_(wrap, subTabs){
+  var filters = _srGFiltersHtml_();
   var body = _srState.loading
     ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>'
     : _srRenderG_(_srState.dataG);
