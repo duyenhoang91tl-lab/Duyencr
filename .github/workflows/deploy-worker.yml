@@ -1,0 +1,90 @@
+# Tự động đưa Cloudflare Worker (cloudflare/worker.mjs) lên Cloudflare mỗi khi push main có đổi cloudflare/** (không cần dán tay).
+# Cần 2 Secret trong repo: CLOUDFLARE_API_TOKEN và CLOUDFLARE_ACCOUNT_ID.
+# Hướng dẫn cài 1 lần: docs/CLOUDFLARE-SUPABASE-AUTO-DEPLOY.md
+name: Deploy Cloudflare Worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cloudflare/**'
+      - 'tools/test-cloudflare-worker.js'
+      - '.github/workflows/deploy-worker.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-worker
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      # Phải trùng tên Worker đang chạy trên Cloudflare (cloudflare/wrangler.toml). Đổi bằng Variable CF_WORKER_NAME trong repo.
+      WORKER_NAME: ${{ vars.CF_WORKER_NAME || 'duyen-crm-cache' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+
+      - name: Kiểm tra secret
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          [ -n "$CLOUDFLARE_API_TOKEN" ] || { echo "::error::Thiếu secret CLOUDFLARE_API_TOKEN (xem docs/CLOUDFLARE-SUPABASE-AUTO-DEPLOY.md)"; exit 1; }
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || { echo "::error::Thiếu secret CLOUDFLARE_ACCOUNT_ID"; exit 1; }
+
+      - name: Kiểm tra cú pháp và chạy test Worker
+        run: |
+          node --check cloudflare/worker.mjs
+          node tools/test-cloudflare-worker.js
+
+      - name: Kiểm tra Worker đích đã tồn tại (tránh vô tình tạo Worker mới có GAS_URL rỗng)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ALLOW_CREATE: ${{ vars.CF_ALLOW_CREATE }}
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$WORKER_NAME/settings")
+          echo "Cloudflare trả mã $code cho Worker '$WORKER_NAME'"
+          case "$code" in
+            200) ;;
+            401|403) echo "::error::API token sai hoặc thiếu quyền Workers Scripts:Edit / sai Account ID (mã $code)"; exit 1 ;;
+            404)
+              if [ "$ALLOW_CREATE" = "1" ]; then
+                echo "::warning::Worker '$WORKER_NAME' chưa có — sẽ tạo mới (CF_ALLOW_CREATE=1). Nhớ đặt biến GAS_URL cho Worker này."
+              else
+                echo "::error::Không thấy Worker tên '$WORKER_NAME' trong tài khoản Cloudflare. Nếu Worker thật tên khác: tạo Variable CF_WORKER_NAME trong repo. Nếu muốn tạo mới: tạo Variable CF_ALLOW_CREATE = 1."
+                exit 1
+              fi ;;
+            *) echo "::error::Cloudflare API trả mã bất thường $code"; exit 1 ;;
+          esac
+
+      - name: Deploy Worker (giữ nguyên biến/secret đặt trên Dashboard)
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: cloudflare
+          wranglerVersion: '4'
+          # --keep-vars: KHÔNG xoá/ghi đè GAS_URL, DISABLED... đang đặt trên Dashboard. Nếu repo có Variable GAS_URL thì truyền thêm vào.
+          command: deploy --name ${{ env.WORKER_NAME }} --keep-vars ${{ vars.GAS_URL && format('--var GAS_URL:{0}', vars.GAS_URL) || '' }}
+
+      - name: Kiểm tra Worker đang chạy
+        env:
+          URL: ${{ steps.deploy.outputs.deployment-url }}
+        run: |
+          if [ -z "$URL" ]; then echo "::warning::Không lấy được URL Worker từ kết quả deploy — bỏ qua bước kiểm tra, hãy tự mở thử ?action=count"; exit 0; fi
+          sleep 5
+          out=$(curl -sL --max-time 60 "${URL%/}/?action=count" || true)
+          echo "${out:0:300}"
+          echo "$out" | grep -q '"ver"' || { echo "::error::Worker đã deploy nhưng ?action=count không trả về trường ver — kiểm tra biến GAS_URL của Worker trên Cloudflare"; exit 1; }

@@ -1,9 +1,14 @@
-# Cau hinh mau cho Wrangler (neu Duyen/nguoi ho tro deploy bang dong lenh). Deploy bang Dashboard Cloudflare thi KHONG can file nay.
+# Cau hinh Wrangler cho Worker cache. Duoc dung boi .github/workflows/deploy-worker.yml (tu deploy khi push main doi cloudflare/**).
+# Huong dan cai 1 lan: docs/CLOUDFLARE-SUPABASE-AUTO-DEPLOY.md
+#
+# Ten Worker PHAI trung ten Worker dang chay tren Cloudflare, neu khac thi deploy se tao 1 Worker MOI (workflow chan truong hop nay).
+# Muon doi ten ma khong sua file: tao Variable CF_WORKER_NAME trong repo GitHub (workflow ghi de bang gia tri do).
 name = "duyen-crm-cache"
 main = "worker.mjs"
 compatibility_date = "2026-10-01"
 
-[vars]
-# URL /exec cua Google Apps Script Web App (Deploy > Manage deployments > Web app URL). Dien tren Dashboard hoac sua o day.
-GAS_URL = ""
-# DISABLED = "1"   # bat de Worker chi chuyen tiep, khong cache (cong tac tat nhanh)
+# KHONG khai bao [vars] o day. NGUYEN NHAN GOC: truoc day co `GAS_URL = ""` — Wrangler coi gia tri trong file la nguon su that
+# va GHI DE bien GAS_URL that dang dat tren Dashboard bang chuoi rong => Worker mat dia chi Apps Script, CRM dung.
+# Workflow deploy bang `--keep-vars` nen GAS_URL (va DISABLED neu co) dat tren Cloudflare Dashboard duoc giu nguyen sau moi lan deploy.
+# Muon GAS_URL do GitHub quan ly: tao Variable GAS_URL trong repo, workflow se truyen vao bang --var.
+# Bat/tat cache nhanh: them bien DISABLED = 1 tren Dashboard (Worker chi chuyen tiep, khong cache).
