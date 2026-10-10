@@ -567,13 +567,15 @@ function applyFilters() {
       // Lọc theo (các) CS đang chọn + ĐÚNG chế độ (Phụ trách / Chăm sóc / Cả hai)
       // Multi: khớp nếu khách thuộc về BẤT KỲ CS nào trong danh sách đã chọn (OR)
       const _allH = (typeof _assignAllIndex !== 'undefined') ? _assignAllIndex[c.phone] : null;
-      const _matchAnyCS = csFList.some(csF => {
+      let _matchAnyCS = false;
+      for (let _k = 0; _k < csFList.length; _k++) {   // vòng for thay .some(closure): không cấp phát hàm cho từng khách trong 136k khách
+        const csF = csFList[_k];
         const _inOrders = c.csSet.has(csF);
         const _inCare   = !!(c.careCSSet && c.careCSSet.has(csF));
         // Tra cứu O(1) qua _assignAllIndex: KH có trong chiến dịch nào của CS không (chỉ tính ở chế độ "Cả hai")
         const _inAssign = _allH ? _allH.has(csF) : false;
-        return _csModeMatch(_inOrders, _inCare, _inAssign);
-      });
+        if (_csModeMatch(_inOrders, _inCare, _inAssign)) { _matchAnyCS = true; break; }
+      }
       if (!_matchAnyCS) return false;
     }
     if (q && !c.nameLower.includes(q) && !c.phone.includes(q) && !(c.cskhNameLower && c.cskhNameLower.includes(q))) return false;
@@ -1076,13 +1078,13 @@ function schedNav(dir) {
 function _schedResponsibleCS(it) {
   const care = (typeof careData !== 'undefined' && careData[it.phone]) || {};
   if (care.cs) return care.cs;
-  const c = allCustomers.find(x => x.phone === it.phone);
+  const c = _customerByPhone(it.phone);
   if (c && (c.careCS || c.cs)) return c.careCS || c.cs;
   return it.owner || it.ownerUser || '';
 }
-function _schedCsFilter(it) {
-  // Đọc filter từ DOM (currentCS không bao giờ được cập nhật)
-  let filterList = _csFilterList();
+function _schedCsFilter(it, _preList) {
+  // Đọc filter từ DOM (currentCS không bao giờ được cập nhật). _preList: nơi gọi đã đọc sẵn 1 lần cho cả vòng lặp.
+  let filterList = _preList ? _preList.slice() : _csFilterList();
   // Khi đăng nhập role=cs mà chưa chọn filter → tự dùng (các) tên CS đăng nhập
   if (!filterList.length && typeof currentUser !== 'undefined' && currentUser && currentUser.role === 'cs') {
     filterList = (currentUser.names && currentUser.names.length) ? currentUser.names.slice() : (currentUser.name ? [currentUser.name] : []);
@@ -1137,6 +1139,7 @@ function _schedToggleDay(dayStr) {
 }
 
 function renderScheduleTab() {
+  const _schedFl = _csFilterList();   // đọc DOM 1 lần/lượt vẽ, không đọc lại cho từng lịch hẹn
   const base = new Date(); base.setHours(0,0,0,0);
   const todayStr = _ymd(base);
   const grid = document.getElementById('sched-grid');
@@ -1150,7 +1153,7 @@ function renderScheduleTab() {
   for (let d=0; d<7; d++) {
     const day = new Date(base); day.setDate(base.getDate() + schedOffset*7 + d);
     const dayStr = _ymd(day);
-    const items = schedules.filter(x => x.date===dayStr && !x.done && _schedCsFilter(x));
+    const items = schedules.filter(x => x.date===dayStr && !x.done && _schedCsFilter(x, _schedFl));
     const isToday = dayStr === todayStr;
     const isOpen = _schedOpenDay === dayStr;
     const dayName = day.toLocaleDateString('vi-VN',{weekday:'long',day:'2-digit',month:'2-digit'});
@@ -1169,7 +1172,7 @@ function renderScheduleTab() {
         html += `<div style="padding:12px 16px;color:var(--hint);font-size:12px;text-align:center">Không có lịch hẹn trong ngày này</div>`;
       } else {
         for (const it of items) {
-          const c = allCustomers.find(x=>x.phone===it.phone);
+          const c = _customerByPhone(it.phone);
           const st = SCHED_TYPES.find(x=>x.key===it.type)||SCHED_TYPES[0];
           const _nsh = _schedNoteShort(it);
           html += `<div class="sched-item" data-phone="${esc(it.phone)}" onclick="openDp(this.dataset.phone)">
@@ -1191,7 +1194,8 @@ function renderScheduleTab() {
 
 function renderOverdueTab() {
   const today = _ymd(new Date());
-  const items = schedules.filter(x => x.date < today && !x.done && _schedCsFilter(x)).sort((a,b)=>a.date.localeCompare(b.date));
+  const _ovFl = _csFilterList();   // đọc DOM 1 lần, không đọc lại cho từng lịch quá hạn
+  const items = schedules.filter(x => x.date < today && !x.done && _schedCsFilter(x, _ovFl)).sort((a,b)=>a.date.localeCompare(b.date));
   txt('tb-over', fmt(items.length));
   txt('s-over', fmt(items.length));
   const grid = document.getElementById('overdue-grid');
@@ -1202,7 +1206,7 @@ function renderOverdueTab() {
   for (const [date, its] of Object.entries(byDate)) {
     html += `<div class="sched-day"><div class="sched-day-hdr" style="background:var(--red-bg)"><div class="sched-day-title" style="color:var(--red)">${fmtDate(date)}</div><div class="sched-day-sub" style="color:var(--red)">${its.length} quá hạn</div></div>`;
     for (const it of its) {
-      const c = allCustomers.find(x=>x.phone===it.phone);
+      const c = _customerByPhone(it.phone);
       const st = SCHED_TYPES.find(x=>x.key===it.type)||SCHED_TYPES[0];
       const _nsh2 = _schedNoteShort(it);
       html += `<div class="sched-item sched-overdue" data-phone="${esc(it.phone)}" onclick="openDp(this.dataset.phone)">

@@ -920,27 +920,38 @@ function rebuildCareOnCustomers() {
 
 function updateStats() {
   const base = scopedCustomers();
-  const vip=base.filter(c=>c.tier==='VIP').length;
-  const tt=base.filter(c=>c.tier==='Thân thiết').length;
-  const tn=base.filter(c=>c.tier==='Tiềm năng').length;
+  // 1 lượt duyệt thay vì 4 lượt .filter (tier)
+  let vip=0, tt=0, tn=0, other=0;
+  for (let i=0;i<base.length;i++){
+    const t = base[i].tier;
+    if (t==='VIP') vip++; else if (t==='Thân thiết') tt++; else if (t==='Tiềm năng') tn++; else if (t==='Chưa bán lại được') other++;
+  }
   txt('s-total',fmt(base.length)); txt('s-vip',fmt(vip)); txt('s-tt',fmt(tt)); txt('s-tn',fmt(tn));
   txt('b-all',fmt(base.length)); txt('b-vip',fmt(vip)); txt('b-tt',fmt(tt)); txt('b-tn',fmt(tn));
-  txt('b-other',fmt(base.filter(c=>c.tier==='Chưa bán lại được').length));
+  txt('b-other',fmt(other));
 }
 function updateSidebarBadges() {
   const base = scopedCustomers();
-  const cnt = f => base.filter(f).length;
+  // 1 lượt duyệt đếm tất cả (trước đây ~12 + 4 lượt .filter trên 136k khách)
+  const careCnt = Object.create(null);
+  let kb=0, ckb=0, cdy=0, blk=0;
+  for (let i=0;i<base.length;i++){
+    const c = base[i];
+    careCnt[c.careStatus] = (careCnt[c.careStatus]||0) + 1;
+    const z = c.zaloStatus;
+    if (z==='Đã kết bạn') kb++; else if (z==='Chưa kết bạn') ckb++; else if (z==='Chưa đồng ý') cdy++; else if (z==='Chặn' || z==='Hủy kết bạn') blk++;
+  }
   // Badge "Tất cả"
   txt('bc-all', fmt(base.length));
   // Dynamic badges cho từng tình trạng trong CARE_STATUS
   CARE_STATUS.forEach(function(st, i) {
-    txt('bc-cs-' + i, fmt(cnt(c => c.careStatus === st)));
+    txt('bc-cs-' + i, fmt(careCnt[st] || 0));
   });
   // Zalo badges (cố định)
-  txt('bz-kb',fmt(cnt(c=>c.zaloStatus==='Đã kết bạn')));
-  txt('bz-ckb',fmt(cnt(c=>c.zaloStatus==='Chưa kết bạn')));
-  txt('bz-cdy',fmt(cnt(c=>c.zaloStatus==='Chưa đồng ý')));
-  txt('bz-block',fmt(cnt(c=>['Chặn','Hủy kết bạn'].includes(c.zaloStatus))));
+  txt('bz-kb',fmt(kb));
+  txt('bz-ckb',fmt(ckb));
+  txt('bz-cdy',fmt(cdy));
+  txt('bz-block',fmt(blk));
 }
 function setCFFilter(fieldId, val, el) {
   if (!val || val === 'all') delete currentCF[fieldId];

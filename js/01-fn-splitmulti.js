@@ -702,8 +702,10 @@ function _csModeMatch(inSeller, inCare, inAssign){
   if (_csFilterMode === 'care')   return !!inCare;            // chỉ CS chăm sóc (người đang chăm)
   return !!(inSeller || inCare || inAssign);                  // 'both': phụ trách HOẶC chăm sóc HOẶC được chia
 }
-function _inCSScope(c){
-  const list = _csFilterList();
+function _inCSScope(c, _preList){
+  // _preList: danh sách CS đã đọc SẴN 1 lần bởi nơi gọi (vòng lặp 136k khách). TRƯỚC ĐÂY mỗi khách đều gọi lại
+  // _csFilterList() = đọc DOM <select multiple>.selectedOptions -> nhân với 136k khách x 3-4 lần/lượt đổi CS = rất lag.
+  const list = _preList || _csFilterList();
   if (!list.length) return true;
   // Multi: khách khớp phạm vi nếu thuộc về BẤT KỲ CS nào trong danh sách đã chọn (OR)
   const allH = (typeof _assignAllIndex !== 'undefined') ? _assignAllIndex[c.phone] : null;
@@ -715,10 +717,37 @@ function _inCSScope(c){
   });
 }
 // Tập KH dùng để đếm cho sidebar/stats: theo vai trò + theo CS đang chọn ở dropdown
+// Memo: updateStats + updateSidebarBadges + updateBrandList (+ openAdvModal) cùng gọi hàm này khi đổi CS -> trước đây
+// quét lại 136k khách 3-4 lần. Nay tính 1 lần, dùng lại cho tới khi dữ liệu/phạm vi đổi (_dataVersion tăng qua
+// _invalidateFilterCache), hoặc CS đã chọn / chế độ lọc / tài khoản / danh sách KH / chỉ mục chia data đổi.
+var _scopedMemo = { key: null, list: null, arr: null, idx: null };
 function scopedCustomers(){
-  return (typeof allCustomers !== 'undefined' ? allCustomers : []).filter(c =>
-    (typeof _inUserScope === 'function' ? _inUserScope(c) : true) && _inCSScope(c)
-  );
+  const all = (typeof allCustomers !== 'undefined' ? allCustomers : []);
+  const csl = _csFilterList();
+  const u = (typeof currentUser !== 'undefined' && currentUser) ? currentUser : {};
+  const key = [(typeof _dataVersion !== 'undefined' ? _dataVersion : 0), all.length, _csFilterMode, csl.join('|'),
+    u.role || '', u.name || '', u.team || '', (u.names || []).join(',')].join('#');
+  const idx = (typeof _assignAllIndex !== 'undefined') ? _assignAllIndex : null;
+  if (_scopedMemo.list && _scopedMemo.key === key && _scopedMemo.arr === all && _scopedMemo.idx === idx) return _scopedMemo.list;
+  const hasScope = (typeof _inUserScope === 'function');
+  const out = [];
+  for (let i = 0; i < all.length; i++) {
+    const c = all[i];
+    if ((hasScope ? _inUserScope(c) : true) && _inCSScope(c, csl)) out.push(c);
+  }
+  _scopedMemo = { key: key, list: out, arr: all, idx: idx };
+  return out;
+}
+// Tra khách theo SĐT O(1) (thay cho allCustomers.find(...) O(N) bị gọi cho TỪNG lịch hẹn ở tab Lịch/Quá hạn).
+var _cbpArr = null, _cbpLen = -1, _cbpMap = null;
+function _customerByPhone(phone){
+  const all = (typeof allCustomers !== 'undefined' ? allCustomers : []);
+  if (_cbpArr !== all || _cbpLen !== all.length || !_cbpMap) {
+    _cbpMap = new Map();
+    for (let i = 0; i < all.length; i++) { const p = all[i].phone; if (!_cbpMap.has(p)) _cbpMap.set(p, all[i]); }
+    _cbpArr = all; _cbpLen = all.length;
+  }
+  return _cbpMap.get(phone);
 }
 // Bỏ dấu tiếng Việt để tìm theo tên gõ vào
 function _foldVi(str){
