@@ -1980,6 +1980,7 @@
       _currentCare = row;
       _currentPhone = phone;
       _lastServerCare = Object.assign({}, row);
+      _pkAssignCacheUpdate_(phone, row); // dòng tương ứng trong "Data được chia" cập nhật theo
       const nameSpan = panelEl.querySelector('.pk-ai-cust-name');
       if (nameSpan && row.name) nameSpan.innerHTML = `${escapeHtml(row.name)} <span class="pk-ai-cust-phone">${phone}</span>`;
       // Lưu xong thì không còn là "khách mới" nữa: ẩn cảnh báo và khoá ô SĐT lại (tránh CS vô
@@ -2334,6 +2335,71 @@
   // (batch) chia cho CS nay thanh 1 phoneMap (phone -> {batches, batchIds, isDone}), loc theo tab.
   let _assignState = { filter: 'active', loading: false, assignHistory: [], built: false };
 
+  // Thông tin chăm sóc từng SĐT trong danh sách (tên, trạng thái CS, ngày hẹn, phản hồi Zalo) — tra cứu lười,
+  // cache theo phiên để list hiện đủ thông tin "ai cần gọi" mà KHÔNG phải sửa GAS (dùng lại action lookup).
+  const _assignInfo = {};      // phone -> { name, status, schedHen, zaloReply, orders }
+  let _assignEnrichRun = 0;    // đổi số này = huỷ lượt tra cứu cũ (khi tải lại/đổi CS)
+  const PK_ASSIGN_ENRICH_MAX = 40, PK_ASSIGN_CONCURRENCY = 3;
+  function _pkAssignInfoOf_(care, orders) {
+    care = care || {};
+    return { name: care.name || (orders && orders[0] && orders[0].name) || '', status: care.status || '',
+      schedHen: care.schedHen || '', zaloReply: !!(care.custom && care.custom.zaloReply), orders: (orders || []).length };
+  }
+  function _pkAssignInfoHtml_(phone) {
+    const i = _assignInfo[phone];
+    if (!i) return '<span class="pk-assign-chip pk-assign-chip-mut">…</span>';
+    const out = [];
+    if (i.name) out.push(`<b>${escapeHtml(i.name)}</b>`);
+    if (i.status) out.push(`<span class="pk-assign-chip">${escapeHtml(i.status)}</span>`);
+    if (i.schedHen) {
+      const d = new Date(i.schedHen); d.setHours(0, 0, 0, 0);
+      const t = new Date(); t.setHours(0, 0, 0, 0);
+      const cls = d < t ? ' pk-assign-chip-late' : (d.getTime() === t.getTime() ? ' pk-assign-chip-today' : '');
+      out.push(`<span class="pk-assign-chip${cls}">📅 ${escapeHtml(fmtDate_(i.schedHen))}${cls === ' pk-assign-chip-late' ? ' quá hạn' : (cls ? ' hôm nay' : '')}</span>`);
+    }
+    if (i.zaloReply) out.push('<span class="pk-assign-chip">💬 đã phản hồi</span>');
+    if (!i.name && !i.status && !i.schedHen && !i.orders) out.push('<span class="pk-assign-chip pk-assign-chip-mut">chưa có hồ sơ</span>');
+    return out.join(' ');
+  }
+  // Cần gọi gấp = có ngày hẹn hôm nay hoặc quá hạn → xếp lên đầu (chỉ ảnh hưởng thứ tự hiển thị)
+  function _pkAssignUrgent_(phone) {
+    const i = _assignInfo[phone];
+    if (!i || !i.schedHen) return 1;
+    const d = new Date(i.schedHen); d.setHours(0, 0, 0, 0);
+    const t = new Date(); t.setHours(0, 0, 0, 0);
+    return d <= t ? 0 : 1;
+  }
+  function _pkAssignCacheUpdate_(phone, care) { // gọi sau khi sale Lưu → dòng trong danh sách cập nhật theo
+    if (!phone || !_assignInfo[phone]) return;
+    _assignInfo[phone] = _pkAssignInfoOf_(care, _currentOrders);
+    const el = panelEl?.querySelector(`.pk-assign-info[data-phone="${phone}"]`);
+    if (el) el.innerHTML = _pkAssignInfoHtml_(phone);
+  }
+  function _enrichAssigned_(phones) {
+    const run = ++_assignEnrichRun;
+    const queue = phones.filter((p) => !_assignInfo[p]).slice(0, PK_ASSIGN_ENRICH_MAX);
+    if (!queue.length) return;
+    let active = 0, finished = 0;
+    const pump = () => {
+      while (active < PK_ASSIGN_CONCURRENCY && queue.length) {
+        const phone = queue.shift();
+        active++;
+        safeSendMessage_({ type: 'LOOKUP_CUSTOMER', payload: { phone } }, (resp) => {
+          active--; finished++;
+          if (run !== _assignEnrichRun) return;
+          if (resp?.ok) {
+            _assignInfo[phone] = _pkAssignInfoOf_(resp.data.care, resp.data.orders);
+            const el = panelEl?.querySelector(`.pk-assign-info[data-phone="${phone}"]`);
+            if (el) el.innerHTML = _pkAssignInfoHtml_(phone);
+          }
+          if (queue.length) pump();
+          else if (active === 0) renderAssignedList_(true); // xong hết → vẽ lại 1 lần theo thứ tự ưu tiên
+        });
+      }
+    };
+    pump();
+  }
+
   function initAssignTab_() {
     const body = panelEl?.querySelector('#pk-assign-body');
     if (!body) return;
@@ -2367,6 +2433,7 @@
         return;
       }
       _assignState.assignHistory = resp.data.assignHistory || [];
+      Object.keys(_assignInfo).forEach((k) => delete _assignInfo[k]); // tải lại = lấy hồ sơ mới
       renderAssignedList_();
     });
   }
@@ -2388,7 +2455,7 @@
     return phoneMap;
   }
 
-  function renderAssignedList_() {
+  function renderAssignedList_(skipEnrich) {
     const listEl = panelEl?.querySelector('#pk-assign-list');
     const menuSel = panelEl?.querySelector('#pk-menu-sel');
     if (!listEl) return;
@@ -2409,6 +2476,11 @@
       listEl.innerHTML = '<div class="pk-rem-empty">Không có SĐT nào trong mục này.</div>';
       return;
     }
+    // Khách có hẹn hôm nay/quá hạn lên đầu (sort ổn định: giữ nguyên thứ tự gốc trong cùng nhóm)
+    if (_assignState.filter === 'active') {
+      displayPhones = displayPhones.map((p, i) => ({ p, i, u: _pkAssignUrgent_(p) }))
+        .sort((a, b) => (a.u - b.u) || (a.i - b.i)).map((x) => x.p);
+    }
     listEl.innerHTML = displayPhones.map((p) => {
       const info = phoneMap[p];
       const batchLabels = [...new Set(info.batches)].join(', ');
@@ -2418,6 +2490,7 @@
           <input type="checkbox" class="pk-assign-check" data-phone="${escapeHtml(p)}" ${info.isDone ? 'checked' : ''} />
           <div style="flex:1;min-width:0;${info.isDone ? 'opacity:.6;text-decoration:line-through' : ''}">
             <div class="pk-rem-phone">${escapeHtml(p)}</div>
+            <div class="pk-assign-info" data-phone="${escapeHtml(p)}">${_pkAssignInfoHtml_(p)}</div>
             <div style="font-size:10px;color:var(--hint,#888)">${escapeHtml(batchLabels)}</div>
           </div>
         </label>
@@ -2431,6 +2504,9 @@
         const phone = b.dataset.phone;
         panelEl.querySelector('#pk-ai-phone-input').value = phone;
         lookupByPhone(phone);
+        // Form chăm sóc nằm phía trên danh sách → cuộn tới để sale thấy ngay, sửa rồi Lưu lên CRM
+        const cardBox = panelEl.querySelector('#pk-ai-customer');
+        if (cardBox && cardBox.scrollIntoView) cardBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
     });
     listEl.querySelectorAll('.pk-assign-check').forEach((chk) => {
@@ -2453,10 +2529,11 @@
             if (done && !h.donePhones.includes(phone)) h.donePhones.push(phone);
             else if (!done) h.donePhones = h.donePhones.filter((x) => x !== phone);
           }
-          renderAssignedList_();
+          renderAssignedList_(true);
         });
       });
     });
+    if (!skipEnrich) _enrichAssigned_(displayPhones);
   }
 
   // ── TRA CỨU BẢNG GIÁ (Sheet DANH_MUC) ──

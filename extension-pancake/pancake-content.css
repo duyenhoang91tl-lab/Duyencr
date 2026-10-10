@@ -1336,3 +1336,10 @@
 .pk-remind-title span { font-size:10px; font-weight:400; color:#64748b; }
 .pk-remind-auto { display:flex; align-items:center; gap:4px; font-size:11px; cursor:pointer; }
 .pk-remind-item { font-size:11px; color:#334155; padding:2px 0; }
+
+/* Data được chia: hàng thông tin chăm sóc từng khách */
+.pk-assign-info { display:flex; flex-wrap:wrap; gap:4px; align-items:center; font-size:11px; margin:2px 0; }
+.pk-assign-chip { background:#e0e7ff; color:#3730a3; border-radius:10px; padding:1px 7px; font-size:10.5px; }
+.pk-assign-chip-mut { background:#f1f5f9; color:#94a3b8; }
+.pk-assign-chip-today { background:#fef3c7; color:#92400e; font-weight:700; }
+.pk-assign-chip-late { background:#fee2e2; color:#b91c1c; font-weight:700; }
