@@ -185,13 +185,17 @@ function _computeBonusData_(orders){
   // Gom theo (sale, ngày) để chấm các CT phạm vi "theo ngày" — kèm giờ:phút của đơn SỚM NHẤT
   // trong ngày (dùng cho CT "Đơn đầu tiên trong ngày").
   var bySaleDay = {};
+  // THƯỞNG 2026-10-10: ngày tính thưởng = NGÀY TẠO ĐƠN TRÊN BASE (o.baseNgayTao); doanh thu NGÀY chỉ lấy ĐƠN GỐC (ghi chú Pos là mã bộ đếm sạch
+  // dạng 17T10/2026, đã ghép Base). Backend cũ chưa trả baseNgayTao/donGoc → giữ cách cũ (tránh doanh thu ngày = 0 khi chưa deploy GAS).
+  var _hasGocField = orders.some(function(o){ return !!o.baseNgayTao; });
+  function _bonusYmd_(o){ return o.baseNgayTao || _ddmmyyyyToYmd_(o.ngayTao); }
   orders.forEach(function(o){
-    var dateStr = _ddmmyyyyToYmd_(o.ngayTao);
+    var dateStr = _bonusYmd_(o);
     var timeMatch = String(o.ngayTao||'').match(/(\d{1,2}):(\d{2})/);
     var timeStr = timeMatch ? timeMatch[0] : '';
     // Mọi sale tham gia đều tính số đơn/đơn đầu tiên trong ngày; doanh thu ngày dùng phần CHIA của từng sale.
     var bonusSet = _bonusNamesOfOrder_(o);
-    var revShares = _orderRevenueShares_(o); // [{name, share}] — doanh thu CHIA theo sale (không phải giá trị đơn nguyên)
+    var revShares = (_hasGocField && !o.donGoc) ? [] : _orderRevenueShares_(o); // [{name, share}] — doanh thu CHIA theo sale; đơn KHÔNG phải đơn gốc: không cộng vào doanh thu ngày
     var perName = {};
     revShares.forEach(function(x){ perName[x.name] = {share:x.share, bonus:false}; });
     Object.keys(bonusSet).forEach(function(nm){ if (!perName[nm]) perName[nm] = {share:0, bonus:true}; else perName[nm].bonus = true; });
@@ -250,9 +254,12 @@ function _computeBonusData_(orders){
   });
 
   // Chấm các CT phạm vi "theo đơn" (giá trị đơn / sản phẩm)
+  var review = [];   // đơn cần kiểm tra tay (mã SP chưa xác nhận, đơn vòng thiếu doanh thu dòng...) — hiện ở tab "Chi tiết thưởng"
   orders.forEach(function(o){
-    var dateStr = _ddmmyyyyToYmd_(o.ngayTao);
+    var dateStr = _bonusYmd_(o);
     var giaTri = Number(o.giaTriDon)||0;
+    var binfo = _bcOrderInfo_(o);   // đếm sản phẩm + phần vòng/charm mix (27-fn-bonuscore.js)
+    if (binfo.needReview && (!_hasGocField || o.donGoc)) review.push({ date:dateStr, counter:binfo.counter, ghiChu:String(o.ghiChu||''), reasons:binfo.reasons, sale:String(o.saleBan||'') });
     var orderNames = Object.keys(_bonusNamesOfOrder_(o)).filter(Boolean), nParts = orderNames.length || 1;
     orderNames.forEach(function(name){ // mọi sale tham gia; tiền thưởng chia đều nParts
       if (!name) return;
@@ -277,12 +284,23 @@ function _computeBonusData_(orders){
             if (amt>0 && (!best || amt>best.amount)) best = {amount:amt, program:p, detail:'SL ước tính: '+pq.qty+' — SP trên đơn: "'+esc(o.sanPham||'')+'"'};
           }
         }
-        if (p.revenue && p.revenue.enabled && p.revenue.scope === 'order' && _bonusRequireProductOk_(p, o.sanPham)){
+        if (p.revenue && p.revenue.enabled && p.revenue.scope === 'order'){
           var min = (p.revenue.min!=='' && p.revenue.min!=null) ? Number(p.revenue.min) : null;
           var max = (p.revenue.max!=='' && p.revenue.max!=null) ? Number(p.revenue.max) : null;
-          if ((min===null || giaTri>=min) && (max===null || giaTri<=max)){
+          var isVongP = _bcIsVongProgram_(p), minSP = _bcMinProducts_(p), measured = giaTri, dtl = 'Giá trị đơn '+_srMoney(giaTri);
+          var okP = true;
+          if (isVongP){   // Bill vòng mix charm: mốc tính trên PHẦN VÒNG + CHARM MIX, đơn phải là đơn vòng
+            okP = binfo.hasVong && binfo.vongRev !== null;
+            measured = binfo.vongRev; dtl = 'Phần vòng + charm mix '+_srMoney(binfo.vongRev||0)+' (đơn '+_srMoney(giaTri)+')';
+          } else {
+            okP = _bonusRequireProductOk_(p, o.sanPham);
+            var rk = _bcRequireKw_(p);
+            if (rk && p.requireProduct === undefined) okP = _bonusRequireProductOk_({requireProduct: rk}, o.sanPham);
+            if (minSP > 0){ okP = okP && binfo.nProducts >= minSP; dtl += ' — '+binfo.nProducts+' sản phẩm'; }
+          }
+          if (okP && (min===null || measured>=min) && (max===null || measured<=max)){
             var amt2 = Number(p.bonusAmount)||0;
-            if (amt2>0 && (!best || amt2>best.amount)) best = {amount:amt2, program:p, detail:'Giá trị đơn '+_srMoney(giaTri)};
+            if (amt2>0 && (!best || amt2>best.amount)) best = {amount:amt2, program:p, detail:dtl};
           }
         }
       });
@@ -305,7 +323,7 @@ function _computeBonusData_(orders){
     r.items.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
     return {name:name, total:r.total, items:r.items};
   }).sort(function(a,b){ return b.total-a.total; });
-  return {bySale: rows, total: rows.reduce(function(s,r){ return s+r.total; },0)};
+  return {bySale: rows, total: rows.reduce(function(s,r){ return s+r.total; },0), review: review};
 }
 
 function _srRenderE_(d){
