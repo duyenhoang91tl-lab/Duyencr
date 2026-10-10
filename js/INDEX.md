@@ -48,4 +48,4 @@ Code client của `index.html` (trước đây inline, ~1.4MB) đã tách ra `cs
 - Cố ý GIỮ nút theo ngữ cảnh trên màn hình: "Thêm KH / Đơn mới", "Xuất CSV" (toolbar danh sách), "+ Tạo công việc" (tab Công việc). Header chỉ còn: ☰ Menu, trạng thái đồng bộ, pill Google Sheets, Đăng xuất.
 - Nhãn "Tình trạng CS"/"Trạng thái KH" lấy từ `FIELD_LABEL_CS/KH` (admin đổi tên được) — đừng ghi cứng.
 - ID tab (`data-bar-id`) giữ nguyên vì phân quyền theo tab (`_PERM_TAB_DEFS`) dựa vào chúng.
-- Chưa làm (cần duyệt vì đổi hành vi): gộp tab "Quá hạn" vào "Lịch chăm sóc" (bộ lọc), đối chiếu "Dashboard" với "Báo cáo ngày", bỏ "Đẩy dữ liệu" nếu "Đồng bộ 2 chiều" đã đủ.
+- Đã gộp/đối chiếu (10/10): tab "Quá hạn" gộp vào "Lịch chăm sóc" qua công tắc `schedSeg()` (vẫn giữ 2 khung + ID `tab-overdue` cho phân quyền; menu trái ẩn mục Quá hạn trừ khi tài khoản chỉ có quyền Quá hạn). Bỏ mục "Đẩy dữ liệu" khỏi menu vì `fullSyncOrdersToGS()` = `syncFromGS` + `pushOrdersToGS()` (hàm vẫn còn, được gọi từ đồng bộ 2 chiều). "Dashboard" (thống kê khách) và "Báo cáo ngày" (KPI sale + checklist MKT theo ngày, từ server) KHÔNG trùng — giữ cả hai.

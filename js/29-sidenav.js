@@ -38,7 +38,7 @@
     { k:'rp',  t:'📊 Báo cáo',              ids:['salesreport','pancake','kpipancake','mktchecklist','dailybrief','dashboard'] },
     { k:'cs',  t:'🔀 Cài đặt chia số',      ids:['act:assign','act:autoassign','act:assignhist'] },
     { k:'tm',  t:'👥 Cài đặt team',         ids:['team','act:acct'] },
-    { k:'up',  t:'📤 Up data',              ids:['uploaddata','act:upload','act:sync','act:push','act:fullsync','act:dup'] },
+    { k:'up',  t:'📤 Up data',              ids:['uploaddata','act:upload','act:sync','act:fullsync','act:dup'] },
     { k:'st',  t:'⚙ Settings',              ids:['act:cstatus','act:khstatus','act:cfield','audit','act:clear'] }
   ];
   // Mục "hành động" (mở modal có sẵn, không phải tab). admin:true = chỉ tài khoản admin thấy.
@@ -49,8 +49,7 @@
     assignhist: { t:'📋 Lịch sử chia', f:'openAssignModal', tab:'history', admin:true },
     upload:     { t:'📂 Tải file Excel', click:'fi' },
     sync:       { t:'↓ Sync GS', f:'syncFromGS', arg:{pullOrders:true,manual:true} },
-    push:       { t:'📤 Đẩy dữ liệu', f:'pushOrdersToGS', admin:true },
-    fullsync:   { t:'🔁 Đồng bộ 2 chiều', f:'fullSyncOrdersToGS', admin:true },
+    fullsync:   { t:'🔁 Đồng bộ 2 chiều (tải + đẩy)', f:'fullSyncOrdersToGS', admin:true },
     dup:        { t:'🗑️ Đơn trùng', f:'openDupOrdersModal', admin:true },
     bc:         { t:'📣 Chiến dịch từ danh sách lọc', f:'openBroadcastFromCurrentFilter' },
     bct:        { t:'🎯 Chiến dịch theo sản phẩm', f:'openBctModal' },
