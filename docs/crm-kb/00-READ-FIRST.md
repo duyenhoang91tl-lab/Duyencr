@@ -19,6 +19,7 @@ Gồm: 1 backend Google Apps Script (`gas_v13.js`) + web app (`index.html`) + 2 
 | Deploy, commit, push, rebase, quy tắc bắt buộc, checklist | `01-rules-and-deploy.md` | — |
 | Tra bảng nhanh: action GAS, 20 cột CareData, storage key, tiền tố CSS, quyền manifest | `07-reference-tables.md` | — |
 | Báo lỗi lặp lại / dò lịch sử lỗi đã sửa | `06-bug-history.md` | — |
+| Lộ trình thực hiện file yêu cầu CRM (8 mục: mốc sau mua, resale, hạng, AI tóm tắt, hồ sơ sale, hộp thư chung, quy trình đơn) | `docs/ROADMAP-YEU-CAU.md` | — |
 
 ## Web app Sasum đã TÁCH FILE (2026-10-08, chống lag)
 `index.html` (~112KB) chỉ còn khung HTML; CSS ở `css/01..04`, JS ở `js/NN-*.js` (nạp bằng `<script src>` đúng thứ tự cũ). Tra hàm → file: `js/INDEX.md` hoặc `grep -n "function tenHam" js/*.js`. KHÔNG đổi thứ tự thẻ `<script>` trong `index.html`. Chi tiết quy ước (file `fn-*` / `main-*`) ở đầu `js/INDEX.md`.
