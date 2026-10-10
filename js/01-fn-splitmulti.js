@@ -786,12 +786,16 @@ function _srToggleSidebar(){
   if (app) app.classList.toggle('sr-sidebar-hidden', _srSidebarHidden);
   renderSalesReportTab();
 }
+// Backend hợp lệ: Web App Apps Script trực tiếp, hoặc Cloudflare Worker đứng trước nó (cloudflare/README-vi.md).
+function _isValidBackendUrl_(u) {
+  return /^https:\/\/script\.google\.com\//.test(u) || /^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)*\.workers\.dev(\/|\?|$)/i.test(u);
+}
 function saveGsUrl() {
   const raw = document.getElementById('gs-url-input').value;
   const url = raw.replace(/[\s​ ﻿]+/g, '').trim();
   document.getElementById('gs-url-input').value = url;
   if (!url) { gsStatus('Vui lòng nhập URL Web App', 'err'); return; }
-  if (!url.startsWith('https://script.google.com')) {
+  if (!_isValidBackendUrl_(url)) {
     gsStatus('URL không hợp lệ — URL bạn nhập: ' + url.substring(0,80), 'err'); return;
   }
   gsUrl = url;
@@ -807,10 +811,10 @@ async function testGsConnection() {
   const url = raw.replace(/[\s\u200b\u00a0\ufeff]+/g, '').trim();
   document.getElementById('gs-url-input').value = url;
   if (!url) { gsStatus('Nhập URL trước', 'err'); return; }
-  if (!url.startsWith('https://script.google.com')) {
-    gsStatus('❌ URL sai định dạng. Phải bắt đầu bằng https://script.google.com/macros/s/...', 'err'); return;
+  if (!_isValidBackendUrl_(url)) {
+    gsStatus('❌ URL sai định dạng. Phải bắt đầu bằng https://script.google.com/macros/s/... hoặc https://<tên>.workers.dev', 'err'); return;
   }
-  if (!url.includes('/exec')) {
+  if (url.startsWith('https://script.google.com') && !url.includes('/exec')) {
     gsStatus('❌ URL thiếu /exec ở cuối. Hãy copy đúng "Web app URL" từ Apps Script.', 'err'); return;
   }
   gsStatus('⏳ Đang kiểm tra kết nối...', 'loading');

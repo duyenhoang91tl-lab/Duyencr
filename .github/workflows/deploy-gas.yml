@@ -21,7 +21,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      # ID deployment Web App CRM đang gọi (= FIXED_GS_URL trong js/06-main-renew-sources.js). PHẢI khớp, nếu không deploy đi nhầm chỗ.
+      # ID deployment Web App CRM đang gọi (= GAS_URL_DIRECT trong js/06-main-renew-sources.js; FIXED_GS_URL của web CRM nay là URL Cloudflare Worker, Worker chuyển tiếp tới deployment này qua biến GAS_URL). PHẢI khớp, nếu không deploy đi nhầm chỗ.
       # (ID cũ AKfycbxyqBM3v7_... KHÔNG phải URL CRM dùng.) Đã từng nhắc: extension Zalo/Pancake còn dùng deployment khác.
       # ID deployment Web App đang được extension gọi tới (phần giữa /macros/s/ và /exec).
       # Giữ nguyên ID để URL không đổi. Muốn đổi: tạo Variable GAS_DEPLOYMENT_ID trong repo.

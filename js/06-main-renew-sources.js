@@ -230,7 +230,10 @@ let currentTier = 'all', currentCare = 'all', currentZalo = 'all', currentBrand 
 let schedOffset = 0;
 let currentDpTab = 'care';
 // ── NHÚNG SẴN GS URL Ở ĐÂY — admin điền 1 lần, nhân viên không cần làm gì ──
-const FIXED_GS_URL = 'https://script.google.com/macros/s/AKfycbx3QT6YIzQ7SQEwQPkljVeEdmTSBQQSxtTp2hTFYOeCKB_K4BHcUTSLi54LlmB9q_E6sQ/exec';
+// Backend CRM web đi qua Cloudflare Worker (cache các action đọc, chuyển tiếp mọi thứ còn lại tới Apps Script; xem cloudflare/README-vi.md).
+// LÙI LẠI khi Worker lỗi/quá hạn mức: đổi dòng dưới về URL Apps Script cũ ngay phía dưới (GAS_URL_DIRECT) rồi push.
+const GAS_URL_DIRECT = 'https://script.google.com/macros/s/AKfycbx3QT6YIzQ7SQEwQPkljVeEdmTSBQQSxtTp2hTFYOeCKB_K4BHcUTSLi54LlmB9q_E6sQ/exec';
+const FIXED_GS_URL = 'https://duyencr.duyenhoang91-tl.workers.dev';
 let gsUrl = FIXED_GS_URL || loadLS('ome_gs_url') || '';
 // ── Tai khoan TEST: moi request toi GAS tu dong kem demoToken (server chi cho xem bao cao, cat 5 dong, chan ghi). ──
 // Khong gan token cho action=users (man hinh dang nhap can doc danh sach tai khoan truoc khi co token).
