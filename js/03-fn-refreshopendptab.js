@@ -428,7 +428,9 @@ function renderSchedTabHtml(c) {
 
 function _loadPosOrdersForPhone_(phone) {
   if (!phone || _posOrdersState[phone] || !gsUrl) return;
-  if (!(typeof donPhoneSet !== 'undefined' && donPhoneSet && donPhoneSet.has(phone))) return;   // KH chua co don Pos -> giu lich su Base
+  // Chi bo qua khi danh sach SDT co don Pos DA tai (khong rong) ma SDT nay khong nam trong do. Danh sach RONG (chua tai/cache cu) thi van
+  // phai thu tai don Pos — truoc day rong => khong bao gio goi => lich su luon hien don Base thay vi don Pos (yeu cau Duyen 2026-10-11).
+  if (typeof donPhoneSet !== 'undefined' && donPhoneSet && donPhoneSet.size > 0 && !donPhoneSet.has(phone)) return;   // KH chua co don Pos -> giu lich su Base
   _posOrdersState[phone] = 'loading';
   const sep = gsUrl.indexOf('?') >= 0 ? '&' : '?';
   fetch(gsUrl + sep + 'action=donOrdersByPhone&phone=' + encodeURIComponent(phone), { redirect: 'follow' })
@@ -522,7 +524,7 @@ function renderHistTab(c) {
       </div>
     </div>
     ${_ptsBoxHtml_(_pts)}
-    ${_posOn ? _renderPosHistoryHtml_(c, _posRows) : `${_posLoading?'<div style="font-size:11px;color:var(--hint);margin-bottom:4px">⏳ đang kiểm tra đơn Pos…</div>':''}
+    ${_posOn ? _renderPosHistoryHtml_(c, _posRows) : `${_posLoading?'<div style="font-size:11px;color:var(--hint);margin-bottom:4px">⏳ đang kiểm tra đơn Pos…</div>':'<div style="font-size:11px;color:var(--hint);margin-bottom:4px">ℹ️ Khách chưa có đơn trên Pos — đang hiển thị lịch sử có trong hệ thống.</div>'}
     <div class="dp-stitle">Lịch sử đặt hàng (${sorted.length} đơn — ${fmtVND(c.orders.reduce((a,x)=>a+(x.revenue||0),0))} tổng · <span style="color:var(--green)">${c.renewOrders} Renew</span>)</div>
     ${sorted.slice(0,60).map((o,si)=>{
       const isRenew   = RENEW_SOURCES.includes(s(o.source).toLowerCase());
