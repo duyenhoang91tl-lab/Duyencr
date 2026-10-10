@@ -46,8 +46,20 @@ const W = 'https://crm.example.workers.dev/';
   ok(r.headers.get('access-control-allow-origin') === '*' && /x-crm-cache/.test(r.headers.get('access-control-expose-headers')), 'co CORS');
   const first = await r.text();
   now += 5000; r = await go('action=orders'); ok(r.headers.get('x-crm-cache') === 'HIT' && calls.length === 1 && (await r.text()) === first, 'sau 5s: HIT, khong goi GAS, noi dung y het');
-  now += 11000; r = await go('action=orders'); ok(r.headers.get('x-crm-cache') === 'MISS' && calls.length === 2, 'sau 16s (> 15s): lay moi');
-  ok(JSON.parse(await r.text()).n === 2 && JSON.parse(first).n === 1, 'noi dung la ban moi (n=2), khac ban dau (n=1)');
+  now += 11000; r = await go('action=orders'); ok(r.headers.get('x-crm-cache') === 'SWR' && calls.length === 2, 'sau 16s (> 15s, trong cua so SWR 60s): tra NGAY ban cu + lam moi nen');
+  ok(JSON.parse(await r.text()).n === 1, 'SWR tra ban cu (n=1) ngay lap tuc');
+  r = await go('action=orders'); ok(r.headers.get('x-crm-cache') === 'HIT' && calls.length === 2 && JSON.parse(await r.text()).n === 2, 'lan sau: HIT voi ban moi da lam xong o nen (n=2), khong goi GAS them');
+  reset(); await go('action=orders'); now += 100000; r = await go('action=orders'); ok(r.headers.get('x-crm-cache') === 'MISS' && calls.length === 2, 'qua cua so SWR (100s > 60s): cho ban moi nhu cu');
+  // gop request cung luc: 5 request cung khoa luc het han -> chi 1 lan goi GAS them
+  reset(); await go('action=orders'); now += 20000; originFn = () => ({ status: 200, body: { ok: true, n: 99 } });
+  const rs = await Promise.all([1, 2, 3, 4, 5].map(() => worker.fetch(req('action=orders'), env, ctx))); await Promise.all(pending.splice(0));
+  ok(rs.every(q => q.headers.get('x-crm-cache') === 'SWR') && calls.length === 2, 'het han + 5 request cung luc: tat ca SWR, GAS chi bi goi them 1 lan (gop): ' + calls.length);
+  reset(); originFn = () => ({ status: 200, body: { ok: true, n: 7 } });
+  const ms = await Promise.all([1, 2, 3].map(() => worker.fetch(req('action=salesReportB'), env, ctx))); await Promise.all(pending.splice(0));
+  ok(calls.length === 1 && ms.every(q => q.status === 200), 'MISS cung luc 3 request: gop 1 lan goi GAS');
+  for (const q of ms) ok(JSON.parse(await q.text()).n === 7, 'moi nguoi goi doc duoc body day du');
+  // SWR + GAS loi o nen: van tra ban cu, khong nem loi
+  reset(); await go('action=orders'); now += 20000; originFn = () => ({ throw: true }); r = await go('action=orders'); ok(r.headers.get('x-crm-cache') === 'SWR' && r.status === 200, 'SWR + lam moi nen loi: van tra ban cu 200');
   // tham so khac thu tu van trung cache
   reset(); await go('action=salesReportA&from=2026-10-01&to=2026-10-08'); r = await go('to=2026-10-08&action=salesReportA&from=2026-10-01'); ok(r.headers.get('x-crm-cache') === 'HIT' && calls.length === 1, 'doi thu tu tham so van HIT');
   r = await go('action=salesReportA&from=2026-10-01&to=2026-10-09'); ok(r.headers.get('x-crm-cache') === 'MISS' && calls.length === 2, 'khoang ngay khac = muc khac');
@@ -78,7 +90,7 @@ const W = 'https://crm.example.workers.dev/';
   r = await go('action=orders'); ok(putCount === 0 && (await r.text()).length === big.length, 'phan hoi > 8MB khong cache nhung van tra du');
 
   // ===== stale-if-error =====
-  reset(); await go('action=orders'); now += 30000;   // het han (15s) nhung con trong 600s
+  reset(); await go('action=orders'); now += 90000;   // het han (15s) + qua cua so SWR (60s) nhung con trong 600s
   originFn = () => ({ throw: true }); r = await go('action=orders'); ok(r.headers.get('x-crm-cache') === 'STALE' && r.status === 200, 'GAS sap + con ban cu -> tra STALE');
   originFn = () => ({ status: 200, body: { error: 'quota' } }); r = await go('action=orders'); ok(r.headers.get('x-crm-cache') === 'STALE', 'GAS tra loi + con ban cu -> STALE');
   now += 700000; originFn = () => ({ throw: true }); r = await go('action=orders'); ok(r.status === 502 && JSON.parse(await r.text()).error, 'ban cu qua 10 phut -> 502 co thong bao');

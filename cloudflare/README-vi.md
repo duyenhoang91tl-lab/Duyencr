@@ -6,6 +6,7 @@ Worker đứng **trước** Google Apps Script, chỉ cache các action **đọc
 - **Có cache** (xem bảng `TTL_SEC` trong `worker.mjs`): `customers` FULL (15 giây), `orders` (15 giây), báo cáo/nhóm/team (60 giây), danh mục giá/khuyến mãi (120 giây).
 - **Không bao giờ cache:** mọi POST và action ghi; `lookup`, `reminders`, `users`, `getSetting`, `assign`…; `customers&since=…` (delta); mọi request có `demo` hoặc `adminKey`; phản hồi lỗi / không phải JSON / > 8 MB.
 - **Hệ quả:** sau khi CS lưu, người khác có thể thấy bản cũ tối đa bằng thời hạn cache của action đó (delta không cache nên thay đổi khách vẫn tới nhanh).
+- **SWR (giảm lag, 2026-10-10):** bản cache vừa hết hạn thì Worker trả NGAY bản cũ (`x-crm-cache: SWR`) và làm mới ở nền; cửa sổ SWR = TTL × 4 (orders/customers tối đa 60 giây cũ, báo cáo 240 giây, bảng giá 480 giây). Quá cửa sổ thì chờ bản mới như cũ. Nhiều request cùng khóa cùng lúc được gộp thành 1 lần gọi GAS (trong 1 isolate Worker). **Đổi `worker.mjs` thì phải dán lại vào Worker bên Cloudflare** (Edit code → Deploy), push GitHub không tự cập nhật.
 - **GAS sập:** nếu còn bản cache ≤ 10 phút thì Worker trả bản cũ (`x-crm-cache: STALE`) thay vì báo lỗi.
 
 ## Cài đặt (làm tay, ~10 phút, không cần dòng lệnh)

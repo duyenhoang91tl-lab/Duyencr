@@ -10,7 +10,7 @@
 //  - Khong bao gio cache phan hoi loi ({"error":...}) hoac khong phai JSON, hoac > MAX_CACHE_BYTES.
 //  - Origin loi / sap: neu con ban cu (<= STALE_MAX_SEC) thi tra ban cu (x-crm-cache: STALE) thay vi bao loi.
 //  - Khoa cache = URL goc + tham so da SAP XEP (moi tham so deu nam trong khoa: khac tham so = khac muc cache).
-// Gioi han biet: nhieu request cung luc luc het han van cung goi GAS 1 lan moi request (chua gop). Goi free: 100.000 request/ngay (tinh ca request trung cache).
+// SWR (2026-10-10): ban het han thi tra ngay + lam moi nen; request cung luc cung khoa duoc gop thanh 1 lan goi GAS (trong 1 isolate Worker). Goi free: 100.000 request/ngay (tinh ca request trung cache).
 const TTL_SEC = {
   // doc chung, doi thuong xuyen — cache ngan
   customers: 15, orders: 15, careLeads: 15, cskhDuyenLite: 15,
@@ -23,6 +23,11 @@ const TTL_SEC = {
   priceCatalogFlat: 120, priceCatalogTree: 120, ctkmCatalog: 120
 };
 const STALE_MAX_SEC = 600;
+// STALE-WHILE-REVALIDATE (2026-10-10, giam lag): ban cache vua het han thi tra NGAY ban cu (x-crm-cache: SWR) va lam moi o nen,
+// thay vi bat nguoi dung cho GAS (vai giay -> hang chuc giay voi bao cao/orders/cskhDuyenLite lon). Cua so SWR = ttl x SWR_FACTOR
+// (toi da STALE_MAX_SEC): orders/customers 15s -> toi da 60s cu; bao cao 60s -> 240s; bang gia 120s -> 480s. Qua cua so thi cho ban moi nhu cu.
+const SWR_FACTOR = 4;
+const _inflight = new Map();   // khoa cache -> Promise lam moi dang chay (gop nhieu request cung luc thanh 1 lan goi GAS, trong cung isolate)
 const MAX_CACHE_BYTES = 8 * 1024 * 1024;
 const NO_CACHE_PARAMS = ['demo', 'adminKey'];
 
@@ -88,29 +93,52 @@ export async function handle(request, env, ctx) {
   const policy = (env.DISABLED === '1' || env.DISABLED === 1) ? { why: 'disabled' } : cachePolicy(request.method, url.searchParams);
   if (!policy.ttl) return passThrough(request, originUrl.toString(), 'BYPASS:' + policy.why);
 
-  const cache = caches.default, key = new Request(cacheKeyUrl(request.url), { method: 'GET' });
+  const cache = caches.default, keyUrl = cacheKeyUrl(request.url), key = new Request(keyUrl, { method: 'GET' });
   const now = Date.now(); let stale = null;
+  const swrMs = Math.min(STALE_MAX_SEC, policy.ttl * SWR_FACTOR) * 1000;
   const hit = await cache.match(key);
   if (hit) {
     const at = parseInt(hit.headers.get('x-crm-at') || '0', 10);
     if (at && now - at < policy.ttl * 1000) return cors(mark(hit, 'HIT'));
+    if (at && now - at < swrMs) {
+      // het han nhung con trong cua so SWR: tra ngay ban cu, lam moi o nen (gop request trung khoa)
+      const bg = refresh(cache, key, keyUrl, originUrl.toString(), policy.ttl, now);
+      if (ctx && ctx.waitUntil) ctx.waitUntil(bg.catch(() => {}));
+      return cors(mark(hit, 'SWR'));
+    }
     if (at && now - at < STALE_MAX_SEC * 1000) stale = hit;
   }
   try {
-    const r = await fetch(originUrl.toString(), { redirect: 'follow' });
-    const text = await r.text();
-    if (r.ok && isGoodJson(text)) {
-      const res = new Response(text, { status: 200, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'public, max-age=' + (policy.ttl + STALE_MAX_SEC), 'x-crm-at': String(now) } });
-      const put = cache.put(key, res.clone());
-      if (ctx && ctx.waitUntil) ctx.waitUntil(put); else await put;
-      return cors(mark(res, 'MISS'));
-    }
+    const out = await refresh(cache, key, keyUrl, originUrl.toString(), policy.ttl, now, ctx);
+    if (out.good) return cors(mark(new Response(out.text, { status: 200, headers: out.headers }), 'MISS'));   // Response moi cho MOI nguoi goi (body chi doc 1 lan)
     if (stale) return cors(mark(stale, 'STALE'));
-    return cors(mark(new Response(text, { status: r.status, headers: { 'content-type': r.headers.get('content-type') || 'application/json; charset=utf-8' } }), 'BYPASS:not-cacheable'));
+    return cors(mark(new Response(out.text, { status: out.status, headers: { 'content-type': out.ct || 'application/json; charset=utf-8' } }), 'BYPASS:not-cacheable'));
   } catch (e) {
     if (stale) return cors(mark(stale, 'STALE'));
     return cors(jsonRes({ error: 'Khong ket noi duoc GAS: ' + String(e && e.message || e) }, 502));
   }
+}
+
+// Goi GAS 1 lan va luu cache neu phan hoi tot. Trung khoa dang chay thi dung lai cung Promise (khong goi GAS them).
+// Tra { good, text, headers } (da luu cache) hoac { text, status, ct } (khong cache duoc). Nem loi neu khong ket noi duoc.
+function refresh(cache, key, keyUrl, originUrl, ttl, now, ctx) {
+  let p = _inflight.get(keyUrl);
+  if (p) return p;
+  p = (async () => {
+    const r = await fetch(originUrl, { redirect: 'follow' });
+    const text = await r.text();
+    if (r.ok && isGoodJson(text)) {
+      const res = new Response(text, { status: 200, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'public, max-age=' + (ttl + STALE_MAX_SEC), 'x-crm-at': String(now) } });
+      const put = cache.put(key, res.clone());
+      if (ctx && ctx.waitUntil) ctx.waitUntil(put); else await put;
+      return { good: true, text, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'public, max-age=' + (ttl + STALE_MAX_SEC), 'x-crm-at': String(now) } };
+    }
+    return { text, status: r.status, ct: r.headers.get('content-type') };
+  })();
+  _inflight.set(keyUrl, p);
+  const done = () => { if (_inflight.get(keyUrl) === p) _inflight.delete(keyUrl); };
+  p.then(done, done);
+  return p;
 }
 
 export default { fetch: (request, env, ctx) => handle(request, env, ctx) };
