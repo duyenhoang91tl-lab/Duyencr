@@ -32,20 +32,17 @@
   }
   // Nhóm menu mẹ -> các mục con (theo data-bar-id). Mục chưa khai báo vẫn hiện, dồn vào nhóm "Khác".
   var GROUPS = [
-    { k:'kh',  t:'👤 Thông tin khách hàng', ids:['tab-kh','tab-schedule','tab-overdue','tab-mydata','act:quickadd','act:export'] },
-    { k:'rp',  t:'📊 Báo cáo',              ids:['salesreport','pancake','kpipancake','mktchecklist','dailybrief','dashboard'] },
-    { k:'nv',  t:'🧑‍💼 Thông tin nhân viên',  ids:['tab-task','act:newtask','audit'] },
-    { k:'tm',  t:'👥 Cài đặt team',         ids:['team','act:acct'] },
-    { k:'cs',  t:'🔀 Cài đặt chia số',      ids:['act:assign','act:autoassign','act:assignhist'] },
-    { k:'up',  t:'📤 Up data',              ids:['uploaddata','act:upload','act:sync','act:push','act:fullsync','act:dup'] },
+    { k:'kh',  t:'👤 Thông tin khách hàng', ids:['tab-kh','tab-schedule','tab-overdue','tab-mydata'] },
     { k:'tv',  t:'🧰 Tác vụ',               ids:['tab-zaloai','act:bc','act:bct','act:bcstat','act:futpl','act:bday'] },
-    { k:'st',  t:'⚙ Settings',              ids:['act:cstatus','act:khstatus','act:cfield','act:barcust','act:clear'] }
+    { k:'nv',  t:'🧑‍💼 Thông tin nhân viên',  ids:['tab-task'] },
+    { k:'rp',  t:'📊 Báo cáo',              ids:['salesreport','pancake','kpipancake','mktchecklist','dailybrief','dashboard'] },
+    { k:'cs',  t:'🔀 Cài đặt chia số',      ids:['act:assign','act:autoassign','act:assignhist'] },
+    { k:'tm',  t:'👥 Cài đặt team',         ids:['team','act:acct'] },
+    { k:'up',  t:'📤 Up data',              ids:['uploaddata','act:upload','act:sync','act:push','act:fullsync','act:dup'] },
+    { k:'st',  t:'⚙ Settings',              ids:['act:cstatus','act:khstatus','act:cfield','audit','act:barcust','act:clear'] }
   ];
   // Mục "hành động" (mở modal có sẵn, không phải tab). admin:true = chỉ tài khoản admin thấy.
   var ACTS = {
-    quickadd:   { t:'➕ Thêm KH / Đơn mới', f:'openQuickAddModal' },
-    export:     { t:'⬇ Xuất CSV', f:'exportCSV' },
-    newtask:    { t:'🗂️ Tạo công việc', f:'openTaskModal' },
     acct:       { t:'🔑 Tài khoản đăng nhập', f:'openAcctModal', admin:true },
     assign:     { t:'👥 Chia data', f:'openAssignModal', admin:true },
     autoassign: { t:'⏰ Chia tự động', f:'openAssignModal', tab:'auto', admin:true },

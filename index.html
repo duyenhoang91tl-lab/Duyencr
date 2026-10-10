@@ -428,27 +428,6 @@
           <button class="btn sm" id="adv-filter-btn" onclick="openAdvModal()" title="Bộ lọc nâng cao">
             ⚙ Lọc nâng cao
           </button>
-          <!-- Gom toàn bộ tác vụ (chia data / chiến dịch / công việc) vào 1 menu mẹ, đặt ngay
-               cạnh "Lọc nâng cao" cho thanh công cụ gọn, dễ nhìn. -->
-          <div class="tacvu-wrap" id="tacvu-wrap">
-            <button class="btn sm secondary" id="tacvu-btn" onclick="toggleTacVuMenu(event)" title="Các tác vụ: chia data, chiến dịch bắn, hỏi thăm/sinh nhật tự động, tạo công việc">
-              🧰 Tác vụ ▾
-            </button>
-            <div class="tacvu-menu" id="tacvu-menu">
-              <div class="tacvu-group-label">Chia data & công việc</div>
-              <button class="tacvu-item" onclick="runTacVu(openAssignModal)" title="Chia data đang lọc cho CS">👥 Chia data</button>
-              <button class="tacvu-item" onclick="runTacVu(openTaskModal)" title="Tạo công việc mới">🗂️ Tạo công việc</button>
-              <div class="tacvu-sep"></div>
-              <div class="tacvu-group-label">Chiến dịch bắn</div>
-              <button class="tacvu-item" onclick="runTacVu(openBroadcastFromCurrentFilter)" title="Tạo chiến dịch bắn trực tiếp từ danh sách đang lọc (CS, sản phẩm, nguồn, trạng thái, ngày mua...) — không cần qua Chia data">📢 Tạo chiến dịch bắn</button>
-              <button class="tacvu-item" onclick="runTacVu(openBctModal)" title="Lọc khách theo sản phẩm chi tiết / số đơn / thời gian mua / nguồn / phân loại rồi soạn tin bắn">🎯 CD theo điều kiện</button>
-              <button class="tacvu-item" onclick="runTacVu(openBcStatModal)" title="Tình trạng chiến dịch + số khách đã gửi theo CS">📊 TK chiến dịch</button>
-              <div class="tacvu-sep"></div>
-              <div class="tacvu-group-label">Tự động hằng ngày</div>
-              <button class="tacvu-item" onclick="runTacVu(openFuTplModal)" title="Mẫu tin hỏi thăm tự động theo mốc ngày sau mua — máy tự tạo chiến dịch mỗi sáng">📨 Hỏi thăm tự động</button>
-              <button class="tacvu-item" onclick="runTacVu(openBdayTplModal)" title="Mẫu tin chúc mừng sinh nhật — máy tự tạo chiến dịch mỗi sáng cho khách sinh nhật hôm đó">🎂 Sinh nhật tự động</button>
-            </div>
-          </div>
         </div>
         <button class="btn sm" onclick="exportCSV()">
           <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
