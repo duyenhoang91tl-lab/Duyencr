@@ -354,6 +354,7 @@ function buildSalesReportB_(filters) {
     return UNASSIGNED_TEAM;
   }
   var byTeamSale = {}; // ten team -> { orders, giaTri, cod }
+  var bySaleDay = {};  // CHI khi filters.withDaily (v13.24, ho so nhan su): ten sale -> { 'YYYY-MM-DD': [soDon, giaTri] } — cung quy uoc chia fr nhu bySale
   var byNguon = {};    // nguon don -> { orders, giaTri, cod } — tuong duong "Theo Kenh ban" cua Bao cao A
   var byMktObj = {};   // ten Marketer (co san tren tung dong, khong can suy ra qua Page) -> { orders, giaTri, cod }
   var UNASSIGNED_MKT = '(chưa gán MKT)';
@@ -494,6 +495,7 @@ function buildSalesReportB_(filters) {
       bySale[sName].orders += 1;
       bySale[sName].giaTri += m.giaTriSauGiam * fr;
       bySale[sName].cod += m.cod * fr;
+      if (filters.withDaily) { var ddB = _vnYmd_(parseVNDate_(m.ngayTaoDon)); if (ddB) { var sdB = bySaleDay[sName] || (bySaleDay[sName] = {}); var cB = sdB[ddB] || (sdB[ddB] = [0, 0]); cB[0] += 1; cB[1] += m.giaTriSauGiam * fr; } }
 
       // Theo Team Sale — cung quy uoc chia nhu bySale; so don theo Team dem 1 lan cho moi
       // TEAM KHAC NHAU xuat hien tren don (tranh cong trung khi 2 sale cung team dung 1 don).
@@ -614,6 +616,7 @@ function buildSalesReportB_(filters) {
     totalCod: totalCod,
     products: productArr,
     bySale: bySaleArr,
+    bySaleDay: filters.withDaily ? bySaleDay : undefined,
     byTeamSale: byTeamSaleArr,
     byNguon: byNguonArr,
     byMkt: byMktArrB,

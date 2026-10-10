@@ -67,7 +67,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `_PW_SALT_`, `_PW_SALT_OLD_`
 
 ## 15_ProductSheets_Drive.gs
-- Hàm: `_psheetNoAccent_`, `_careMapByPhone_`, `_pMatchAny_`, `_foldTermsCSV_`, `_productSheetIndexForTab_`, `readFaqSheet_`, `readExternalProductSheet_`, `callGroqAI_`, `_taNum_`, `_taClamp_`, `_taMedian_`, `buildTeamMetrics_`, `scoreTeam_`, `_taCallAI_`, `_taParseJson_`, `teamAnalysis_`, `_driveFolderIdFromUrl_`, `_chunkText_`, `_driveKnowFullTextCacheKey_`, `_cacheDriveKnowFullText_`, `_extractPdfText_`, `_driveKnowChunkText_`, `_driveKnowledgeFileIndex_`, `readDriveKnowledgeFolder_`, `_driveImageIndex_`, `_driveImageFromLink_`, `findProductSheetImage_`, `findDriveProductImage_`, `_driveImageBase64_`
+- Hàm: `_psheetNoAccent_`, `_careMapByPhone_`, `_pMatchAny_`, `_foldTermsCSV_`, `_productSheetIndexForTab_`, `readFaqSheet_`, `readExternalProductSheet_`, `callGroqAI_`, `_taNum_`, `_taClamp_`, `_taMedian_`, `buildTeamMetrics_`, `scoreTeam_`, `_taCallAI_`, `_taParseJson_`, `teamAnalysis_`, `_orgAgg_`, `orgOverview_`, `_driveFolderIdFromUrl_`, `_chunkText_`, `_driveKnowFullTextCacheKey_`, `_cacheDriveKnowFullText_`, `_extractPdfText_`, `_driveKnowChunkText_`, `_driveKnowledgeFileIndex_`, `readDriveKnowledgeFolder_`, `_driveImageIndex_`, `_driveImageFromLink_`, `findProductSheetImage_`, `findDriveProductImage_`, `_driveImageBase64_`
 - Hằng/biến: `_PSHEET_STOPWORDS_`, `_DRIVE_IMG_MAX_BYTES_`
 
 ## 16_BannedWords_AI.gs

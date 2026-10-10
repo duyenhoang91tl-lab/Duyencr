@@ -261,6 +261,7 @@ function doGetCore_(e) {
       return jsonOut_(resA);
     }
     if (action === 'teamAnalysis') return teamAnalysis_(e.parameter || {});
+    if (action === 'orgOverview') return orgOverview_(e.parameter || {});
     if (action === 'saleKpiReport') {
       var pF = e.parameter || {};
       var fF = { dateFrom: pF.dateFrom || '', dateTo: pF.dateTo || '',
