@@ -59,10 +59,19 @@ console.log('ALL BONUS TESTS PASSED');
 // --- ve thu form modal (khong loi, co muc 4b/4c) ---
 const uctx = { esc: s => String(s == null ? '' : s), _srState: { nguonOptions: ['facebook', 'zalo'], optionsLoaded: true }, gsUrl: '', setTimeout: () => 0, document: { getElementById: () => null }, _bpDraft: null, BONUS_PROGRAMS: [] };
 vm.createContext(uctx);
-vm.runInContext(['_bonusNormSrc_', '_bonusRequireKw_', '_bpNewProgram', '_bpNormalize_', '_bpProdSectionHtml_', '_bpProdListHtml_', '_bpProdSelHtml_', '_bpSrcSectionHtml_', '_bpSrcListHtml_', '_bpSrcSelHtml_', '_bpNorm_', '_bpProdRefresh_', '_bpSrcRefresh_', '_bpProdToggle', '_bpSrcToggle'].map(n => fn(j12, n)).join('\n') +
-  '\nvar _bpProducts=[{code:"SP1",name:"Tỳ hưu",qty:5}], _bpProdLoading=false,_bpProdErr="",_bpProdQuery="",_bpSrcQuery="";_bpDraft=_bpNormalize_(_bpNewProgram());_bpDraft.prodRules.enabled=true;', uctx);
+vm.runInContext(['_bonusNormSrc_', '_bonusRequireKw_', '_bpNewProgram', '_bpNormalize_', '_bpProdSectionHtml_', '_bpProdListHtml_', '_bpProdSelHtml_', '_bpSrcSectionHtml_', '_bpSrcListHtml_', '_bpSrcSelHtml_', '_bpNorm_', '_bpFacetHtml_', '_bpFilteredProducts_', '_bpProdPickAll', '_bpPickAllHtml_', '_bpFacetToggle', '_bpProdRefresh_', '_bpSrcRefresh_', '_bpProdToggle', '_bpSrcToggle'].map(n => fn(j12, n)).join('\n') +
+  '\nfunction _bpLoadFacets_(){}function _bpLoadProducts_(){}var _bpFacets=null,_bpFacetLoading=false,_bpSizeSel=[],_bpMatSel=[];var _bpProducts=[{code:"SP1",name:"Tỳ hưu Tourmaline 10mm",qty:5},{code:"SP2",name:"Tỳ hưu Thạch anh 12mm",qty:4},{code:"SP3",name:"Nhẫn bạc",qty:1}], _bpProdLoading=false,_bpProdErr="",_bpProdQuery="",_bpSrcQuery="";_bpDraft=_bpNormalize_(_bpNewProgram());_bpDraft.prodRules.enabled=true;', uctx);
 const html = vm.runInContext('_bpProdSectionHtml_(_bpDraft)+_bpSrcSectionHtml_(_bpDraft)', uctx);
 ok(/Tỳ hưu/.test(html) && /facebook/.test(html) && /4b\./.test(html) && /4c\./.test(html), 'form render');
 vm.runInContext('_bpProdToggle("SP1",true);_bpSrcToggle("zalo",true);', uctx);
 ok(vm.runInContext('_bpDraft.prodRules.items.length===1&&_bpDraft.sources[0]==="zalo"', uctx), 'toggle');
+vm.runInContext('_bpDraft.prodRules.items=[];_bpProdQuery="ty huu"', uctx);
+ok(vm.runInContext('_bpFilteredProducts_().length', uctx) === 2, 'tim khong dau');
+vm.runInContext('_bpFacets={sizes:["10mm","12mm"],mats:["Tourmaline","Thạch anh"]};_bpMatSel=["Tourmaline"]', uctx);
+ok(vm.runInContext('_bpFilteredProducts_().length', uctx) === 1, 'loc chat lieu');
+vm.runInContext('_bpMatSel=[];_bpSizeSel=["12mm"]', uctx);
+ok(vm.runInContext('_bpFilteredProducts_()[0].code', uctx) === 'SP2', 'loc size');
+vm.runInContext('_bpSizeSel=[];_bpProdPickAll()', uctx);
+ok(vm.runInContext('_bpDraft.prodRules.items.length', uctx) === 2, 'tich tat ca ket qua');
+ok(/Lọc thêm theo Size/.test(vm.runInContext('_bpFacetHtml_()', uctx)), 'facet html');
 console.log('FORM OK');

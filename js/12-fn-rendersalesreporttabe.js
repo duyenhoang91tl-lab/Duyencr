@@ -1237,6 +1237,65 @@ function _bpEditFormHtml_(p){
 }
 // ── Mục 4b: THƯỞNG THEO SẢN PHẨM (tìm tên/mã → tích → nhập tiền thưởng từng sản phẩm) ──
 var _bpProducts = null, _bpProdLoading = false, _bpProdErr = '', _bpProdQuery = '', _bpSrcQuery = '';
+// Lọc TÙY CHỌN theo Size / Chất liệu khi tìm sản phẩm (bỏ qua = không lọc). Tuỳ chọn lấy từ bảng giá (priceCatalogFlat); so khớp với TÊN sản phẩm trên đơn (không dấu).
+var _bpFacets = null, _bpFacetLoading = false, _bpSizeSel = [], _bpMatSel = [];
+async function _bpLoadFacets_(){
+  if (_bpFacets || _bpFacetLoading || !gsUrl) return;
+  _bpFacetLoading = true;
+  try {
+    var r = await fetch(gsUrl + (gsUrl.indexOf('?')>-1?'&':'?') + 'action=priceCatalogFlat', {redirect:'follow'});
+    var j = await r.json(), sz = {}, mt = {};
+    ((j && j.items) || []).forEach(function(it){
+      if (it.s && it.s !== '(mặc định)') sz[it.s] = (sz[it.s]||0)+1;
+      if (it.c) mt[it.c] = (mt[it.c]||0)+1;
+    });
+    var top = function(o){ return Object.keys(o).sort(function(a,b){ return o[b]-o[a] || a.localeCompare(b); }).slice(0, 40); };
+    _bpFacets = { sizes: top(sz), mats: top(mt) };
+  } catch(e){ _bpFacets = { sizes: [], mats: [] }; }
+  _bpFacetLoading = false;
+  _bpProdRefresh_();
+}
+function _bpFacetToggle(kind, v, on){
+  var arr = kind === 'size' ? _bpSizeSel : _bpMatSel, i = arr.indexOf(v);
+  if (on && i === -1) arr.push(v); else if (!on && i !== -1) arr.splice(i, 1);
+  _bpProdRefresh_();
+}
+function _bpFacetHtml_(){
+  if (!_bpFacets) return '';
+  if (!_bpFacets.sizes.length && !_bpFacets.mats.length) return '';
+  var chips = function(kind, list, sel){
+    return list.map(function(v){
+      return '<label style="display:inline-flex;gap:4px;align-items:center;font-size:11.5px;margin:2px 8px 2px 0;cursor:pointer"><input type="checkbox" data-v="'+esc(v)+'" '+(sel.indexOf(v)!==-1?'checked':'')+' onchange="_bpFacetToggle(\''+kind+'\',this.dataset.v,this.checked)"> '+esc(v)+'</label>';
+    }).join('');
+  };
+  var n = _bpSizeSel.length + _bpMatSel.length;
+  return '<details style="margin-bottom:6px"'+(n?' open':'')+'><summary style="font-size:11.5px;cursor:pointer;color:var(--muted)">Lọc thêm theo Size / Chất liệu (không bắt buộc'+(n?' — đang lọc '+n+' mục':'')+')</summary>'+
+    (_bpFacets.sizes.length ? '<div style="font-size:11px;font-weight:600;margin-top:4px">Size</div>'+chips('size', _bpFacets.sizes, _bpSizeSel) : '')+
+    (_bpFacets.mats.length ? '<div style="font-size:11px;font-weight:600;margin-top:4px">Chất liệu</div>'+chips('mat', _bpFacets.mats, _bpMatSel) : '')+
+    (n ? '<button class="btn sm" style="margin-top:4px" onclick="_bpSizeSel=[];_bpMatSel=[];_bpProdRefresh_()">✕ Bỏ lọc size/chất liệu</button>' : '')+'</details>';
+}
+// Danh sách sản phẩm đã lọc theo từ khoá + size + chất liệu (mỗi nhóm: chỉ cần khớp ÍT NHẤT 1 mục đã tích; nhóm không tích = bỏ qua).
+function _bpFilteredProducts_(){
+  var q = _bpNorm_(_bpProdQuery);
+  var sz = _bpSizeSel.map(_bpNorm_), mt = _bpMatSel.map(_bpNorm_);
+  return (_bpProducts||[]).filter(function(x){
+    var nm = _bpNorm_(x.name);
+    if (q && nm.indexOf(q) === -1 && _bpNorm_(x.code).indexOf(q) === -1) return false;
+    if (sz.length && !sz.some(function(t){ return t && nm.indexOf(t) !== -1; })) return false;
+    if (mt.length && !mt.some(function(t){ return t && nm.indexOf(t) !== -1; })) return false;
+    return true;
+  });
+}
+function _bpProdPickAll(){
+  var list = _bpFilteredProducts_();
+  if (!list.length) return;
+  if (list.length > 50 && !confirm('Tích tất cả '+list.length+' sản phẩm đang hiển thị?')) return;
+  var items = _bpDraft.prodRules.items = _bpDraft.prodRules.items || [];
+  list.forEach(function(x){
+    if (!items.some(function(it){ return String(it.code).toLowerCase() === String(x.code).toLowerCase(); })) items.push({code:x.code, name:x.name||'', amount:''});
+  });
+  _bpProdRefresh_();
+}
 function _bpNorm_(t){ return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').toLowerCase().trim(); }
 async function _bpLoadProducts_(force){
   if (_bpProdLoading) return;
@@ -1260,10 +1319,13 @@ function _bpProdSectionHtml_(p){
   if (on){
     h += '<div style="margin:8px 0 12px">'+
       '<input type="text" id="bp-prod-q" value="'+esc(_bpProdQuery)+'" placeholder="🔍 Gõ tên hoặc mã sản phẩm để tìm..." oninput="_bpProdQuery=this.value;_bpProdRefresh_()" style="width:100%;margin-bottom:6px">'+
+      '<div id="bp-prod-facets">'+_bpFacetHtml_()+'</div>'+
       '<div id="bp-prod-list" style="max-height:210px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:6px;margin-bottom:8px">'+_bpProdListHtml_()+'</div>'+
+      '<div id="bp-prod-pickall" style="margin-bottom:8px">'+_bpPickAllHtml_()+'</div>'+
       '<div style="font-size:11.5px;font-weight:600;margin-bottom:4px">Sản phẩm được thưởng (điền tiền thưởng cho 1 sản phẩm):</div>'+
       '<div id="bp-prod-sel">'+_bpProdSelHtml_()+'</div></div>';
     if (!_bpProducts && !_bpProdLoading) setTimeout(_bpLoadProducts_, 0);
+    if (!_bpFacets) setTimeout(_bpLoadFacets_, 0);
   }
   return h;
 }
@@ -1271,9 +1333,9 @@ function _bpProdListHtml_(){
   if (_bpProdLoading) return '<div style="color:var(--muted);font-size:12px;padding:6px">Đang tải danh sách sản phẩm…</div>';
   if (_bpProdErr) return '<div style="color:#b91c1c;font-size:12px;padding:6px">⚠ '+esc(_bpProdErr)+' <button class="btn sm" onclick="_bpLoadProducts_(true)">Thử lại</button></div>';
   if (!_bpProducts) return '<div style="color:var(--muted);font-size:12px;padding:6px">Chưa tải danh sách.</div>';
-  var q = _bpNorm_(_bpProdQuery), picked = {};
+  var picked = {};
   (_bpDraft.prodRules.items||[]).forEach(function(it){ picked[String(it.code).toLowerCase()] = true; });
-  var list = _bpProducts.filter(function(x){ return !q || _bpNorm_(x.name).indexOf(q) !== -1 || _bpNorm_(x.code).indexOf(q) !== -1; });
+  var list = _bpFilteredProducts_();
   var total = list.length; list = list.slice(0, 60);
   if (!list.length) return '<div style="color:var(--muted);font-size:12px;padding:6px">Không có sản phẩm khớp "'+esc(_bpProdQuery)+'".</div>';
   return list.map(function(x){
@@ -1291,10 +1353,17 @@ function _bpProdSelHtml_(){
       '<button class="btn sm secondary" onclick="_bpProdToggle(\''+esc(String(it.code)).replace(/'/g,"\\'")+'\',false)">✕</button></div>';
   }).join('');
 }
+function _bpPickAllHtml_(){
+  if (!_bpProducts) return '';
+  var n = _bpFilteredProducts_().length;
+  return n ? '<button class="btn sm secondary" onclick="_bpProdPickAll()">☑ Tích tất cả '+n+' sản phẩm đang hiển thị</button>' : '';
+}
 function _bpProdRefresh_(){
-  var a = document.getElementById('bp-prod-list'), b = document.getElementById('bp-prod-sel');
+  var a = document.getElementById('bp-prod-list'), b = document.getElementById('bp-prod-sel'), c = document.getElementById('bp-prod-facets'), d = document.getElementById('bp-prod-pickall');
   if (a) a.innerHTML = _bpProdListHtml_();
   if (b) b.innerHTML = _bpProdSelHtml_();
+  if (c) c.innerHTML = _bpFacetHtml_();
+  if (d) d.innerHTML = _bpPickAllHtml_();
 }
 function _bpProdToggle(code, on){
   var items = _bpDraft.prodRules.items = _bpDraft.prodRules.items || [];
