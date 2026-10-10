@@ -33,8 +33,8 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `DT_SS_ID`, `DT_TONG_SHEET`, `DON_CHITIET_SHEET`, `DON_CHITIET_WIDTH`, `DON_COL_GHICHU`, `DT_COL_NGAYTAO`, `DT_COL_GIAOCHO`, `DT_COL_PHONE`, `DT_COL_GIAIDOAN`, `DT_COL_TRANGTHAI`, `DT_COL_THOIGIANHT`, `DT_COL_KENHBAN`, `DT_COL_SALEBAN`, `DT_COL_SANPHAM`, `DT_COL_PHANLOAI`, `DT_COL_GIATRICOC`, `DT_COL_GIATRIDON`, `DT_COL_GIATRICHENH`, `DT_COL_ID`, `DT_TONG_WIDTH`, `DT_DATE_SENTINEL_`, `NAME_ADDR_KEYWORDS_RE_`, `NAME_MERGE_LABEL_RE_`, `NAME_ALLOWED_CHARS_RE_`, `VN_OFFSET_MS`, `EXCLUDED_ORDER_STATUSES_`, `__pancakeKnownSaleSet_`, `POS_EXTRA_SALE_NAMES_`, `POS_EXCLUDED_ORDER_STATUSES_`
 
 ## 06_CSKH_CareLeads_Don.gs
-- Hàm: `_findCskhDuyenSheet_`, `_cskhHeaderMap_`, `_cskhCell_`, `readCskhDuyen_`, `_cskhPhoneIndex_`, `findCskhRowsByPhone_`, `findCskhRowsCached_`, `readCskhDuyenLite_`, `_readCskhDuyenLiteBuild_`, `readCareLeads_`, `addCareLead_`, `readDonPhones_`, `getDonSaleByPhone_`, `getDonStatsByPhone_`, `getDonOrderCountByPhone_`, `getDonOrdersByPhone_`, `getDonLastDateByPhone_`, `_donConvertRows_`, `readDonChiTiet_`, `_sheetByGid_`
-- Hằng/biến: `CSKH_DUYEN_SHEET_KEY_`, `CSKH_DUYEN_FIELDS_`
+- Hàm: `_findCskhDuyenSheet_`, `_cskhHeaderMap_`, `_cskhCell_`, `readCskhDuyen_`, `_cskhPhoneIndex_`, `findCskhRowsByPhone_`, `findCskhRowsCached_`, `readCskhDuyenLite_`, `_readCskhDuyenLiteBuild_`, `_xoaSdtScan_`, `_xoaSdtRuns_`, `xoaSdtKhongPhaiVN_`, `xoaSdtLoiThu`, `xoaSdtLoiThat`, `readCareLeads_`, `addCareLead_`, `readDonPhones_`, `getDonSaleByPhone_`, `getDonStatsByPhone_`, `getDonOrderCountByPhone_`, `getDonOrdersByPhone_`, `getDonLastDateByPhone_`, `_donConvertRows_`, `readDonChiTiet_`, `_sheetByGid_`
+- Hằng/biến: `CSKH_DUYEN_SHEET_KEY_`, `CSKH_DUYEN_FIELDS_`, `XOA_SDT_BUDGET_MS_`
 
 ## 07_SalesReportA.gs
 - Hàm: `getSalesReportOptions_`, `_dtIsExchangeOrder_`, `_dtOrderRevenue_`, `_srCloseRateSections_`, `_extractPageIdFromNguonDon_`, `_extractPageNameFromNguonDon_`, `buildSalesReportA_`

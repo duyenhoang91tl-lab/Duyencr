@@ -2758,6 +2758,98 @@ function _readCskhDuyenLiteBuild_() {
   return out;
 }
 
+// ═══ XOA HAN SDT KHONG PHAI DI DONG VIET NAM (them 2026-10-10 theo yeu cau Duyen: "xoa luon") ═══
+// Pham vi = 3 sheet DANH SACH KHACH: CareData, "KH Cham soc moi", CSKH-Duyen. KHONG dong vao DT TONG / "du lieu don" (xoa don = mat doanh thu bao cao);
+// dry-run se chi DEM so don co SDT la de Duyen tu quyet. Chi xoa dong co SDT khong hop le (isValidVnPhone_) VA co it nhat 1 chu so; o SDT trong/chu thuan
+// (khong co so) giu nguyen. MOI dong bi xoa duoc luu truoc vao sheet "XoaSDT_Backup" (thoi gian | sheet | SDT | JSON ca dong) de khoi phuc duoc.
+// Xoa tung KHOI dong lien tiep tu duoi len; het ngan sach thoi gian thi tra done:false -> chay lai (tinh lai tu dau, khong trung lap vi dong da xoa khong con).
+var XOA_SDT_BUDGET_MS_ = 240000;
+function _xoaSdtScan_(vals, phoneCol) {   // vals: mang 2 chieu tu dong 2; tra mang chi so (0-based theo vals) can xoa
+  var bad = [];
+  for (var i = 0; i < vals.length; i++) {
+    var raw = vals[i][phoneCol];
+    if (raw === '' || raw === null || raw === undefined) continue;
+    if (!/\d/.test(String(raw))) continue;
+    if (!isValidVnPhone_(raw)) bad.push(i);
+  }
+  return bad;
+}
+function _xoaSdtRuns_(bad) {   // [[start,end],...] cac khoi lien tiep (chi so 0-based)
+  var runs = [];
+  for (var i = 0; i < bad.length; i++) {
+    if (runs.length && bad[i] === runs[runs.length - 1][1] + 1) runs[runs.length - 1][1] = bad[i];
+    else runs.push([bad[i], bad[i]]);
+  }
+  return runs;
+}
+function xoaSdtKhongPhaiVN_(opts) {
+  opts = opts || {};
+  var dry = !(opts.dryRun === false || opts.dryRun === 'false');
+  var which = opts.sheets || ['care', 'leads', 'cskh'];
+  var t0 = new Date().getTime(), res = { ok: true, dryRun: dry, done: true, sheets: {}, orders: {} };
+  var lock = null;
+  try {
+    if (!dry) { lock = LockService.getScriptLock(); if (!lock.tryLock(30000)) return { ok: false, error: 'Dang co thao tac luu khac, thu lai sau it phut.' }; }
+    var targets = [];
+    if (which.indexOf('care') >= 0) { var shC = getSheet_(SH_CARE, CARE_HEADERS); targets.push({ key: 'CareData', sh: shC, col: 0 }); }
+    if (which.indexOf('leads') >= 0) { var shL = getSheet_(SH_CARE_LEAD, CARE_LEAD_HEADERS); targets.push({ key: SH_CARE_LEAD, sh: shL, col: 0 }); }
+    if (which.indexOf('cskh') >= 0) {
+      var shK = _findCskhDuyenSheet_();
+      if (shK && shK.getLastRow() >= 2) {
+        var mapK = _cskhHeaderMap_(shK.getRange(1, 1, 1, shK.getLastColumn()).getValues()[0]);
+        if (mapK.phone !== undefined) targets.push({ key: 'CSKH-Duyen', sh: shK, col: mapK.phone });
+        else res.sheets['CSKH-Duyen'] = { skipped: 'khong nhan ra cot SDT' };
+      }
+    }
+    var bk = null, backupRows = 0;
+    targets.forEach(function (tg) {
+      var last = tg.sh.getLastRow(), info = { total: Math.max(0, last - 1), invalid: 0, deleted: 0, sample: [] };
+      res.sheets[tg.key] = info;
+      if (last < 2) return;
+      var width = tg.sh.getLastColumn();
+      var vals = tg.sh.getRange(2, 1, last - 1, width).getValues();
+      var bad = _xoaSdtScan_(vals, tg.col);
+      info.invalid = bad.length;
+      for (var s = 0; s < bad.length && s < 10; s++) info.sample.push(String(vals[bad[s]][tg.col]));
+      if (dry || !bad.length) return;
+      if (!bk) { bk = getCrmSS_().getSheetByName('XoaSDT_Backup') || getCrmSS_().insertSheet('XoaSDT_Backup'); if (bk.getLastRow() === 0) bk.appendRow(['Thoi gian', 'Sheet', 'SDT', 'Du lieu dong (JSON)']); }
+      var runs = _xoaSdtRuns_(bad), stamp = new Date().toISOString();
+      for (var r = runs.length - 1; r >= 0; r--) {
+        if (new Date().getTime() - t0 > XOA_SDT_BUDGET_MS_) { res.done = false; break; }
+        var a = runs[r][0], b = runs[r][1], rowsOut = [];
+        for (var k = a; k <= b; k++) {
+          var jr = JSON.stringify(vals[k].map(function (v) { return v instanceof Date ? v.toISOString() : v; }));
+          rowsOut.push([stamp, tg.key, String(vals[k][tg.col]), jr.length > 49000 ? jr.slice(0, 49000) : jr]);
+        }
+        bk.getRange(bk.getLastRow() + 1, 1, rowsOut.length, 4).setValues(rowsOut);   // LUU TRUOC khi xoa
+        tg.sh.deleteRows(a + 2, b - a + 1);
+        info.deleted += b - a + 1;
+      }
+    });
+    if (!dry) {
+      var cache = CacheService.getScriptCache();
+      ['customers_v12', 'cskhDuyen_v1_n', 'cskhDuyen_idx_v1_n', 'cskhDuyen_lite_v2_n'].forEach(function (k) { try { cache.remove(k); } catch (e) {} });
+      if (res.sheets.CareData && res.sheets.CareData.deleted) sbMarkStale_('xoaSdtKhongPhaiVN');   // Supabase care_data con dong cu -> khong doc Supabase cho toi khi backfill lai
+    }
+    // DT TONG / du lieu don: CHI DEM (khong xoa)
+    try {
+      var bo = 0; readAllOrders_().forEach(function (o) { if (o.phone && !isValidVnPhone_(o.phone)) bo++; });
+      res.orders = { dtTongDonSdtKhongHopLe: bo, ghiChu: 'KHONG xoa don (mat doanh thu). Neu muon xoa, bao Claude de lam rieng kem sao luu.' };
+    } catch (eo) { res.orders = { error: String(eo && eo.message || eo) }; }
+    res.ms = new Date().getTime() - t0;
+    if (!dry && !res.done) res.hint = 'Chua het (het ngan sach thoi gian) — chay lai xoaSdtLoiThat.';
+    return res;
+  } catch (e) { return { ok: false, error: String(e && e.message || e), partial: res }; }
+  finally { try { if (lock) lock.releaseLock(); } catch (e2) {} }
+}
+// Chay tay tu Editor (chon ten ham o o Run, xem Execution log): xoaSdtLoiThu (CHI DEM, khong xoa) -> xoaSdtLoiThat (xoa that, lap den khi XONG).
+function xoaSdtLoiThu() { Logger.log(JSON.stringify(xoaSdtKhongPhaiVN_({ dryRun: true }), null, 2)); }
+function xoaSdtLoiThat() {
+  var r = xoaSdtKhongPhaiVN_({ dryRun: false });
+  Logger.log(JSON.stringify(r, null, 2));
+  Logger.log(!r.ok ? 'LOI — xem "error".' : (r.done ? 'XONG. Dong da xoa luu o sheet XoaSDT_Backup (CRM) — can thi khoi phuc tu do.' : 'CHUA HET — bam Run lai xoaSdtLoiThat.'));
+}
+
 function readCareLeads_() {
   var ss = getCrmSS_();
   var sh = ss.getSheetByName(SH_CARE_LEAD);
@@ -9752,18 +9844,18 @@ function _aaDateOk_(cfg, c) {
   if (!cfg.dateFrom && !cfg.dateTo) return true;
   return (c.ds || []).some(function (d) { return d && (!cfg.dateFrom || d >= cfg.dateFrom) && (!cfg.dateTo || d <= cfg.dateTo); });
 }
-// Ke hoach ca ngay = CSKH (rieng) + POS (tu dt/don/cs). opts: {pos:bool, cskh:bool} (mac dinh ca hai). CSKH lap truoc de han muc CSKH khong bi POS lay mat KH.
+// Ke hoach ca ngay = CSKH (rieng) + POS (tu dt/don/cs). opts: {pos:bool, cskh:bool} (mac dinh ca hai). CHIEN DICH 1 = POS/Base chay TRUOC (theo yeu cau Duyen 2026-10-10), roi toi CSKH-Duyen (rieng): KH co ca 2 nguon thuoc ve POS/Base.
 function _aaPlanAll(cfg, teamsArr, membersOf, custs, everSet, opts){
   custs = (custs || []).filter(function (c) { return c && isValidVnPhone_(c.phone); });   // chi chia SDT di dong VN hop le
   opts = opts || {}; var taken = new Set(), out = { entries:[], short:[], warn:[] };
-  if (opts.cskh !== false){
-    var k = _aaPlanCskh(cfg, teamsArr, membersOf, custs, everSet, taken);
-    out.entries = out.entries.concat(k.entries); out.short = out.short.concat(k.short); out.warn = out.warn.concat(k.warn);
-  }
   if (opts.pos !== false){
     var p = _aaPlan(cfg, teamsArr, membersOf, (cfg.dateFrom || cfg.dateTo) ? custs.filter(function (c) { return _aaDateOk_(cfg, c); }) : custs, everSet, taken);
     p.entries.forEach(function(e){ e.src = 'pos'; }); p.short.forEach(function(x){ x.src = 'pos'; });
     out.entries = out.entries.concat(p.entries); out.short = out.short.concat(p.short); out.warn = out.warn.concat(p.warn);
+  }
+  if (opts.cskh !== false){
+    var k = _aaPlanCskh(cfg, teamsArr, membersOf, custs, everSet, taken);
+    out.entries = out.entries.concat(k.entries); out.short = out.short.concat(k.short); out.warn = out.warn.concat(k.warn);
   }
   return out;
 }

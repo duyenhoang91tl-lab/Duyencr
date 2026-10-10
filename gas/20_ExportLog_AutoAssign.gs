@@ -332,18 +332,18 @@ function _aaDateOk_(cfg, c) {
   if (!cfg.dateFrom && !cfg.dateTo) return true;
   return (c.ds || []).some(function (d) { return d && (!cfg.dateFrom || d >= cfg.dateFrom) && (!cfg.dateTo || d <= cfg.dateTo); });
 }
-// Ke hoach ca ngay = CSKH (rieng) + POS (tu dt/don/cs). opts: {pos:bool, cskh:bool} (mac dinh ca hai). CSKH lap truoc de han muc CSKH khong bi POS lay mat KH.
+// Ke hoach ca ngay = CSKH (rieng) + POS (tu dt/don/cs). opts: {pos:bool, cskh:bool} (mac dinh ca hai). CHIEN DICH 1 = POS/Base chay TRUOC (theo yeu cau Duyen 2026-10-10), roi toi CSKH-Duyen (rieng): KH co ca 2 nguon thuoc ve POS/Base.
 function _aaPlanAll(cfg, teamsArr, membersOf, custs, everSet, opts){
   custs = (custs || []).filter(function (c) { return c && isValidVnPhone_(c.phone); });   // chi chia SDT di dong VN hop le
   opts = opts || {}; var taken = new Set(), out = { entries:[], short:[], warn:[] };
-  if (opts.cskh !== false){
-    var k = _aaPlanCskh(cfg, teamsArr, membersOf, custs, everSet, taken);
-    out.entries = out.entries.concat(k.entries); out.short = out.short.concat(k.short); out.warn = out.warn.concat(k.warn);
-  }
   if (opts.pos !== false){
     var p = _aaPlan(cfg, teamsArr, membersOf, (cfg.dateFrom || cfg.dateTo) ? custs.filter(function (c) { return _aaDateOk_(cfg, c); }) : custs, everSet, taken);
     p.entries.forEach(function(e){ e.src = 'pos'; }); p.short.forEach(function(x){ x.src = 'pos'; });
     out.entries = out.entries.concat(p.entries); out.short = out.short.concat(p.short); out.warn = out.warn.concat(p.warn);
+  }
+  if (opts.cskh !== false){
+    var k = _aaPlanCskh(cfg, teamsArr, membersOf, custs, everSet, taken);
+    out.entries = out.entries.concat(k.entries); out.short = out.short.concat(k.short); out.warn = out.warn.concat(k.warn);
   }
   return out;
 }
