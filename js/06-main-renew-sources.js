@@ -233,7 +233,9 @@ let currentDpTab = 'care';
 // Backend CRM web đi qua Cloudflare Worker (cache các action đọc, chuyển tiếp mọi thứ còn lại tới Apps Script; xem cloudflare/README-vi.md).
 // LÙI LẠI khi Worker lỗi/quá hạn mức: đổi dòng dưới về URL Apps Script cũ ngay phía dưới (GAS_URL_DIRECT) rồi push.
 const GAS_URL_DIRECT = 'https://script.google.com/macros/s/AKfycbx3QT6YIzQ7SQEwQPkljVeEdmTSBQQSxtTp2hTFYOeCKB_K4BHcUTSLi54LlmB9q_E6sQ/exec';
-const FIXED_GS_URL = 'https://royal-brook-6cec.duyenhoang91-tl.workers.dev'; // Worker cache (cloudflare/worker.mjs). LUI: doi ve GAS_URL_DIRECT
+// TAM LUI 2026-10-10: Worker tra loi 520 (CRM khong tai duoc du lieu) -> goi thang Apps Script. Bat lai Worker: dat FIXED_GS_URL = WORKER_URL sau khi kiem tra Cloudflare (Metrics / han muc 100.000 request/ngay).
+const WORKER_URL = 'https://royal-brook-6cec.duyenhoang91-tl.workers.dev'; // Worker cache (cloudflare/worker.mjs)
+const FIXED_GS_URL = GAS_URL_DIRECT;
 let gsUrl = FIXED_GS_URL || loadLS('ome_gs_url') || '';
 // ── Tai khoan TEST: moi request toi GAS tu dong kem demoToken (server chi cho xem bao cao, cat 5 dong, chan ghi). ──
 // Khong gan token cho action=users (man hinh dang nhap can doc danh sach tai khoan truoc khi co token).
