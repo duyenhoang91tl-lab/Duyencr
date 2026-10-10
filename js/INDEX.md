@@ -36,3 +36,6 @@ Code client của `index.html` (trước đây inline, ~1.4MB) đã tách ra `cs
 - `24-openbctmodal.js` (136 dòng, 7 hàm): `openBctModal`, `_bctOrderDate`, `_bctCodeKws`, `_bctApplyQuickRange`, `_bctCollectPhones`, `bctPreview`, `bctContinue`
 - `25-openbcstatmodal.js` (189 dòng, 8 hàm): `openBcStatModal`, `_bcstatCsBreakdown`, `_bcOrderDateMs`, `_bcComputeStats`, `_bcKpi`, `bcstatToggle`, `renderBcStat`, `exportBcStatReport`
 - `26-loadtasks.js` (446 dòng, 29 hàm): `loadTasks`, `_taskIsOverdue`, `setTaskScope`, `setTaskStatusFilter`, `renderTaskTables`, `_taskStatusBadge`, `switchTaskSubTab`, …, `renderTaskComments`, `_taskCmAddImages`, `_renderTaskCmPendingImages`, `_taskCmRemoveImage`, `sendTaskComment`
+
+- `27-fn-bonuscore.js`: `_bcOrderInfo_`, `_bcGuess_`, `_bcMinProducts_`, `_bcIsVongProgram_` (lõi đếm SP thưởng; bản sao trong gas_v13.js)
+- `28-fn-bonusdetail.js`: tab K "Chi tiết thưởng" — `renderSalesReportTabK_`, `_bdFlag`, `_bdSlot`, `_bdRev`, `_bdSyncFromGAS`

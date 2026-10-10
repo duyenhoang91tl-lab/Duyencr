@@ -313,7 +313,7 @@ function _computeBonusData_(orders){
         var rec = ensure(name);
         var part = Math.round(best.amount / nParts); // chia đều cho các sale tham gia
         rec.total += part;
-        rec.items.push({date:dateStr, scope:'Theo đơn', program:best.program.name, amount:part, detail:best.detail+(nParts>1 ? ' — thưởng '+_srMoney(best.amount)+' chia đều '+nParts+' sale' : ''), orderId:o.id, maDonPos:String(o.ghiChu||'')});
+        rec.items.push({date:dateStr, scope:'Theo đơn', program:best.program.name, amount:part, detail:best.detail+(nParts>1 ? ' — thưởng '+_srMoney(best.amount)+' chia đều '+nParts+' sale' : ''), orderId:o.id, maDonPos:String(o.ghiChu||''), counter:binfo.counter, nSP:binfo.nProducts, vongRev:binfo.vongRev});
       }
     });
   });
@@ -711,13 +711,13 @@ function _srGBuildExport_(d){
   var orders = [ordersHead];
   d.orders.forEach(function(o){ orders.push([o.ngayTao, o.ghiChu || '', o.nguonDon, o.saleBan, o.sanPham, o.giaTriDon, o.cod, o.marketer, o.trangThai]); });
   var g = _srGBuildGroups_(d.orders);
-  var detail = [['Nhóm','Sale','Loại Sale','Ngày bắt đầu (Thử việc)','Ngày thưởng','Ngày thứ (Thử việc)','Phạm vi','Chương trình','Chi tiết','Mã đơn Pos (ghi chú đơn)','Tiền thưởng']];
+  var detail = [['Nhóm','Sale','Loại Sale','Ngày bắt đầu (Thử việc)','Ngày thưởng (ngày tạo đơn Base)','Ngày thứ (Thử việc)','Phạm vi','Chương trình','Chi tiết','Mã đơn Pos (ghi chú đơn)','Tiền thưởng','Mã bộ đếm','Số sản phẩm','DT phần vòng + charm mix']];
   [['Thử việc', g.tv], ['Chính thức', g.ct]].forEach(function(pair){
     pair[1].rows.forEach(function(s){
       var sd = pair[0] === 'Thử việc' ? _saleStartDate_(s.name) : '';
       s.items.forEach(function(it){
         var dn = sd ? _daysSinceStart_(sd, it.date) : '';
-        detail.push([pair[0], s.name, _srGSaleTypeLabel_(s.name), sd, it.date, dn === null ? '' : dn, it.scope, it.program, _srGDecode_(it.detail), it.maDonPos || it.orderId || '', it.amount]);
+        detail.push([pair[0], s.name, _srGSaleTypeLabel_(s.name), sd, it.date, dn === null ? '' : dn, it.scope, it.program, _srGDecode_(it.detail), it.maDonPos || it.orderId || '', it.amount, it.counter || '', it.nSP != null ? it.nSP : '', (it.vongRev != null ? it.vongRev : '')]);
       });
     });
   });
