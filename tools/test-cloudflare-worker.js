@@ -141,6 +141,12 @@ const W = 'https://crm.example.workers.dev/';
   reset(); originFn = () => ({ status: 201, body: '' }); await wh('?key=' + WK, post('123')); row = JSON.parse(calls[0].init.body); ok(row.payload._value === 123, 'JSON khong phai object duoc boc lai');
   reset(); originFn = () => ({ status: 500, body: { message: 'bi mat: ' + SBKEY } }); r = await wh('?key=' + WK, post(ev)); const t502 = await r.text();
   ok(r.status === 502 && t502.indexOf(SBKEY) === -1 && t502.indexOf(WK) === -1, 'Supabase loi -> 502, khong lo khoa/noi dung loi');
+  // Lan ghi dau bi tu choi nhung lan 2 (dang an toan) duoc -> 200, giu NGUYEN van ban + ly do loi (khong mat tin, biet nguyen nhan)
+  reset(); let nIns = 0; originFn = () => (++nIns === 1 ? { status: 400, body: { message: 'unsupported Unicode escape \\u0000' } } : { status: 201, body: '' });
+  r = await wh('?key=' + WK, post('{"a":"x\\u0000y"}')); ok(r.status === 200 && JSON.parse(await r.text()).stored === 'fallback' && calls.length === 2, 'ghi lan 1 loi, lan 2 (fallback) duoc -> 200');
+  let fb = JSON.parse(calls[1].init.body); ok(fb.event_type === '_fallback' && fb.payload._first_status === 400 && /Unicode/.test(fb.payload._first_error) && fb.payload._raw_text.indexOf('\u0000') === -1, 'fallback luu ly do loi + van ban da bo NUL');
+  reset(); originFn = () => ({ status: 400, body: { message: 'loi cot page_id' } }); r = await wh('?key=' + WK, post(ev)); dj = JSON.parse(await r.text());
+  ok(r.status === 502 && dj.status === 400 && /page_id/.test(dj.detail) && calls.length === 2, 'ca 2 lan loi -> 502 kem ma + thong bao (de chan doan)');
   reset(); originFn = () => ({ throw: true }); r = await wh('?key=' + WK, post(ev)); ok(r.status === 502, 'mat mang toi Supabase -> 502');
   reset(); r = await wh('?key=' + WK, post('x'.repeat(1024 * 1024 + 1))); ok(r.status === 413 && calls.length === 0, 'payload > 1MB -> 413, khong ghi');
   reset(); r = await wh('?key=' + WK, { method: 'PUT', body: '{}' }); ok(r.status === 405 && calls.length === 0, 'PUT -> 405');

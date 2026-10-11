@@ -156,18 +156,25 @@ async function pancakeWebhook(request, env) {
   let payload; try { payload = JSON.parse(text); } catch (e) { payload = { _non_json: text.slice(0, 20000) }; }
   if (payload === null || typeof payload !== 'object') payload = { _value: payload };
   const ex = pkExtract(payload);
-  try {
-    const r = await fetch(String(env.SUPABASE_URL).replace(/\/+$/, '') + '/rest/v1/pk_webhook_raw', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', apikey: env.SUPABASE_SERVICE_KEY, authorization: 'Bearer ' + env.SUPABASE_SERVICE_KEY, prefer: 'return=minimal' },
-      body: JSON.stringify({ page_id: ex.page_id, event_type: ex.event_type, payload: payload })
-    });
-    // Loi ghi DB -> tra 502 (khong 200) de neu Pancake co co che gui lai thi khong mat tin. Khong lo noi dung loi/khoa ra ngoai.
-    if (!r.ok) return pkJson({ error: 'Supabase tu choi ghi.', status: r.status }, 502);
-  } catch (e) {
-    return pkJson({ error: 'Khong ket noi duoc Supabase.' }, 502);
-  }
-  return pkJson({ ok: true }, 200);
+  // Ghi 1 dong vao pk_webhook_raw; tra {ok,status,detail}. NGUYEN NHAN GOC them ham: Pancake chi hien 'Endpoint phan hoi: 502' khi luu URL,
+  // nen phai (1) luu lai ly do that vao DB (dong _fallback) va (2) thu lai bang dang an toan hon truoc khi tra 502.
+  const sbInsert = async (row) => {
+    try {
+      const r = await fetch(String(env.SUPABASE_URL).replace(/\/+$/, '') + '/rest/v1/pk_webhook_raw', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', apikey: env.SUPABASE_SERVICE_KEY, authorization: 'Bearer ' + env.SUPABASE_SERVICE_KEY, prefer: 'return=minimal' },
+        body: JSON.stringify(row)
+      });
+      return { ok: r.ok, status: r.status, detail: r.ok ? '' : String(await r.text()).split(String(env.SUPABASE_SERVICE_KEY)).join('***').split(String(env.PANCAKE_WEBHOOK_KEY)).join('***').slice(0, 300) };
+    } catch (e) { return { ok: false, status: 0, detail: 'Khong ket noi duoc Supabase' }; }
+  };
+  const r1 = await sbInsert({ page_id: ex.page_id, event_type: ex.event_type, payload: payload });
+  if (r1.ok) return pkJson({ ok: true }, 200);
+  // Lan 1 loi (vd ky tu NUL \u0000 trong JSON bi jsonb tu choi, hoac dang payload la): luu NGUYEN van ban tho, bo NUL, kem ly do loi -> khong mat tin va biet nguyen nhan.
+  const r2 = await sbInsert({ page_id: '', event_type: '_fallback', payload: { _raw_text: text.replace(/\u0000/g, '').slice(0, 20000), _first_status: r1.status, _first_error: r1.detail, _page_id: ex.page_id, _event_type: ex.event_type } });
+  if (r2.ok) return pkJson({ ok: true, stored: 'fallback' }, 200);
+  // Loi ghi DB -> tra 502 (khong 200) de neu Pancake co co che gui lai thi khong mat tin. Kem ma + thong bao loi PostgREST (khong chua khoa).
+  return pkJson({ error: 'Supabase tu choi ghi.', status: r1.status, detail: r1.detail }, 502);
 }
 
 export async function handle(request, env, ctx) {
