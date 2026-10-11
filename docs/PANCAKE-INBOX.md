@@ -7,7 +7,8 @@ Apps Script không nhận realtime tốt nên không đứng giữa luồng này
 ## Trạng thái
 - [x] **Bước 1 (code xong, 2026-10-12):** bảng `pk_webhook_raw` (supabase/schema.sql mục 7) + route `/pancake-webhook` trong `cloudflare/worker.mjs` (test: `node tools/test-cloudflare-worker.js`). Ghi NGUYÊN payload thô, chưa tách tin nhắn.
 - [ ] **Bước 1b (Duyên làm tay, xem dưới):** đặt 3 biến trên Cloudflare, dán URL webhook vào Pancake, gửi thử 1 tin, xem dòng đầu tiên trong bảng.
-- [ ] **Bước 2:** nhìn mẫu payload thật → thiết kế bảng `pk_conversations`, `pk_messages` (khoá theo id tin của Pancake để không trùng) + hàm tách từ `pk_webhook_raw`; gắn khách theo SĐT (`normPhone_`).
+- [x] **Bước 2 (code xong 2026-10-12, CHỜ XÁC NHẬN bằng payload thật):** `supabase/schema.sql` mục 8: `pk_conversations`, `pk_messages` (khoá = `message.mid`, không trùng), hàm `pk_ingest_raw` + trigger tự tách mỗi dòng `pk_webhook_raw` mới. Lỗi tách KHÔNG làm hỏng ghi thô (ghi vào cột `process_error`). Hiện tách theo dạng Messenger `entry[].messaging[]`; payload dạng khác (vd event `conversation`) vẫn lưu thô, chưa ra tin → xem mẫu thật rồi mở rộng hàm. Id hội thoại tạm = `<page_id>_<id khách>`. SĐT khách (`customer_phone`) chưa điền. Test: `python3 tools/test-pk-ingest.py` (cần `pip install pgserver`).
+- Bảo mật: mục 8 gỡ policy `using (true)` từng tạo tay (cho anon key đọc/ghi hết tin + SĐT). Bảng bật RLS KHÔNG policy.
 - [ ] **Bước 3:** job kéo lịch sử cũ qua API (chia lô, có con trỏ để chạy tiếp khi bị ngắt, giãn cách để không dính giới hạn tốc độ).
 - [ ] **Bước 4:** khung chat trong CRM (đọc từ Supabase qua GAS/Worker, hiện trong hồ sơ khách 360°).
 - [ ] **Bước 5 (sau):** gửi tin từ CRM (Pancake có API gửi inbox).

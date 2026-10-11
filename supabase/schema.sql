@@ -117,3 +117,116 @@ create table if not exists pk_webhook_raw (
 create index if not exists pk_webhook_raw_received_idx on pk_webhook_raw (received_at);
 create index if not exists pk_webhook_raw_page_idx     on pk_webhook_raw (page_id, received_at);
 alter table pk_webhook_raw enable row level security;
+
+-- 8) pk_conversations / pk_messages — tách tin nhắn từ pk_webhook_raw (docs/PANCAKE-INBOX.md, bước 2).
+--    Giữ cột `raw` (JSON gốc) để nếu cách tách sai thì tách lại được, không mất dữ liệu.
+--    NGUYÊN NHÂN GỐC thiết kế "trigger nuốt lỗi": ghi webhook thô là việc QUAN TRỌNG NHẤT (mất tin = mất vĩnh viễn);
+--    tách tin là việc phụ, sai cấu trúc payload không được làm hỏng việc ghi thô -> lỗi tách chỉ ghi vào process_error.
+--    CHƯA RÕ định dạng thật của Pancake (tài liệu không mô tả): hiện tách theo dạng Messenger entry[].messaging[]
+--    (sender/recipient/message.mid/text/timestamp). Payload khác dạng -> processed_at rỗng, xem process_error/raw rồi mở rộng hàm.
+alter table pk_webhook_raw add column if not exists processed_at  timestamptz;
+alter table pk_webhook_raw add column if not exists process_error text default '';
+
+create table if not exists pk_conversations (
+  id               text primary key,          -- tạm = <page_id>_<id khách>; đổi sang id hội thoại Pancake khi có mẫu thật
+  page_id          text default '',
+  raw              jsonb,
+  updated_at       timestamptz default now()
+);
+alter table pk_conversations add column if not exists customer_id      text default '';
+alter table pk_conversations add column if not exists customer_name    text default '';
+alter table pk_conversations add column if not exists customer_phone   text default '';  -- sẽ điền ở bước gắn khách theo SĐT (normPhone_)
+alter table pk_conversations add column if not exists last_message_at  timestamptz;
+alter table pk_conversations add column if not exists last_text        text default '';
+create index if not exists pk_conversations_page_idx on pk_conversations (page_id, last_message_at desc);
+create index if not exists pk_conversations_phone_idx on pk_conversations (customer_phone);
+
+create table if not exists pk_messages (
+  id              text primary key,           -- message.mid của Pancake/Facebook (khoá chống trùng)
+  conversation_id text references pk_conversations(id) on delete cascade,
+  raw             jsonb,
+  inserted_at     timestamptz default now()
+);
+alter table pk_messages add column if not exists page_id     text default '';
+alter table pk_messages add column if not exists sender_id   text default '';
+alter table pk_messages add column if not exists sender_name text default '';
+alter table pk_messages add column if not exists direction   text default '';   -- 'in' = khách nhắn, 'out' = page/sale trả lời
+alter table pk_messages add column if not exists text        text default '';
+alter table pk_messages add column if not exists sent_at     timestamptz;
+create index if not exists pk_messages_conv_idx on pk_messages (conversation_id, sent_at);
+
+alter table pk_conversations enable row level security;
+alter table pk_messages      enable row level security;
+-- Gỡ policy "using (true)" từng tạo tay: nó cho mọi người có anon key đọc/ghi hết tin nhắn + SĐT khách.
+drop policy if exists "Enable all access for pk_webhook_raw"   on pk_webhook_raw;
+drop policy if exists "Enable all access for pk_conversations" on pk_conversations;
+drop policy if exists "Enable all access for pk_messages"      on pk_messages;
+
+create or replace function pk_ingest_raw(p_id bigint) returns int language plpgsql as $$
+declare
+  r record; ent jsonb; ev jsonb;
+  v_page text; v_mid text; v_sender text; v_recip text; v_echo boolean; v_dir text;
+  v_cust text; v_name text; v_conv text; v_text text; v_ms text; v_ts timestamptz;
+  v_n int := 0; v_rc int;
+begin
+  select * into r from pk_webhook_raw where id = p_id;
+  if not found then return 0; end if;
+  for ent in select e from jsonb_array_elements(case when jsonb_typeof(r.payload->'entry') = 'array' then r.payload->'entry' else '[]'::jsonb end) e loop
+    for ev in select m from jsonb_array_elements(case when jsonb_typeof(ent->'messaging') = 'array' then ent->'messaging' else '[]'::jsonb end) m loop
+      v_mid := ev #>> '{message,mid}';
+      if v_mid is null or v_mid = '' then continue; end if;      -- sự kiện không phải tin nhắn (đã đọc, postback...) -> bỏ qua
+      v_page   := coalesce(nullif(r.payload->>'page_id',''), nullif(ent->>'id',''), nullif(r.page_id,''), '');
+      v_sender := coalesce(ev #>> '{sender,id}', '');
+      v_recip  := coalesce(ev #>> '{recipient,id}', '');
+      v_echo   := (ev #>> '{message,is_echo}') = 'true' or (v_sender <> '' and v_sender = v_page);
+      v_dir    := case when v_echo then 'out' else 'in' end;
+      v_cust   := case when v_echo then v_recip else v_sender end;
+      v_name   := coalesce(case when v_echo then ev #>> '{recipient,name}' else ev #>> '{sender,name}' end, '');
+      if v_cust = '' then continue; end if;
+      v_conv   := v_page || '_' || v_cust;
+      v_text   := coalesce(ev #>> '{message,text}', '');
+      v_ms     := coalesce(ev->>'timestamp', ent->>'time', '');
+      v_ts     := case when v_ms ~ '^[0-9]{10,13}$' then to_timestamp(v_ms::numeric / case when length(v_ms) >= 13 then 1000.0 else 1.0 end) else r.received_at end;
+      insert into pk_conversations (id, page_id, customer_id, customer_name, last_message_at, last_text, raw, updated_at)
+        values (v_conv, v_page, v_cust, v_name, v_ts, v_text, ev, now())
+        on conflict (id) do update set
+          customer_name   = coalesce(nullif(excluded.customer_name,''), pk_conversations.customer_name),
+          last_text       = case when pk_conversations.last_message_at is null or excluded.last_message_at >= pk_conversations.last_message_at then excluded.last_text else pk_conversations.last_text end,
+          last_message_at = greatest(pk_conversations.last_message_at, excluded.last_message_at),
+          updated_at      = now();
+      insert into pk_messages (id, conversation_id, page_id, sender_id, sender_name, direction, text, sent_at, raw)
+        values (v_mid, v_conv, v_page, v_sender, coalesce(ev #>> '{sender,name}',''), v_dir, v_text, v_ts, ev)
+        on conflict (id) do nothing;
+      get diagnostics v_rc = row_count;
+      v_n := v_n + v_rc;
+    end loop;
+  end loop;
+  return v_n;
+end $$;
+
+create or replace function pk_webhook_raw_after_insert() returns trigger language plpgsql as $$
+begin
+  begin
+    perform pk_ingest_raw(new.id);
+    update pk_webhook_raw set processed_at = now(), process_error = '' where id = new.id;
+  exception when others then
+    update pk_webhook_raw set process_error = left(sqlerrm, 500) where id = new.id;
+  end;
+  return null;
+end $$;
+drop trigger if exists pk_webhook_raw_ingest on pk_webhook_raw;
+create trigger pk_webhook_raw_ingest after insert on pk_webhook_raw for each row execute function pk_webhook_raw_after_insert();
+
+-- Hàm chỉ để Worker/service_role dùng; không cho anon/authenticated gọi qua REST (rpc).
+revoke all on function pk_ingest_raw(bigint) from public;
+revoke all on function pk_webhook_raw_after_insert() from public;
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    revoke all on function pk_ingest_raw(bigint) from anon;
+    revoke all on function pk_webhook_raw_after_insert() from anon;
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    revoke all on function pk_ingest_raw(bigint) from authenticated;
+    revoke all on function pk_webhook_raw_after_insert() from authenticated;
+  end if;
+end $$;
