@@ -1001,13 +1001,16 @@ function _srChartSvg(rows, nameKey, valueKey, type, moneyFmt, ordersKey){
   if (!data.length) return '<div style="color:var(--muted);text-align:center;padding:30px">Không có dữ liệu để vẽ biểu đồ</div>';
   data.sort(function(a,b){ return b.value-a.value; });
   var fmtVal = function(v){ return moneyFmt ? _srMoney(v) : fmt(v); };
+  // Giao diện PRO (?ui=pro): bảng màu + ô số màu + thanh cột bo tròn (css/06-pro.css, js/34-pro-charts.js). Tắt ui-pro → đầu ra GIỐNG HỆT bản cũ.
+  var _pro = (typeof document !== 'undefined') && document.documentElement.classList.contains('ui-pro') && typeof _PRO_CHART_COLORS !== 'undefined';
+  var _col = function(i){ return _pro ? _PRO_CHART_COLORS[i % _PRO_CHART_COLORS.length] : _SR_CHART_COLORS[i % _SR_CHART_COLORS.length]; };
   var total = data.reduce(function(s,d){ return s+d.value; }, 0);
   // Tong so don + TB don (chi tinh khi bang co cot dem don — vd cot "orders") — hien thanh 1
   // thanh KPI gon phia tren bieu do, canh nhau tren 1 hang de chup man hinh gui bao cao duoc
   // ngay, khong phai crop/ghep nhieu anh: Tong so don | Tong tien | TB don.
   var totalOrders = ordersKey ? data.reduce(function(s,d){ return s+d.orders; }, 0) : 0;
   var avgOrder = totalOrders ? total/totalOrders : 0;
-  var summaryStrip = ordersKey ? (
+  var summaryStrip = (ordersKey && _pro) ? _proKpiStrip_(totalOrders, total, avgOrder, moneyFmt) : ordersKey ? (
     '<div style="display:flex;gap:28px;flex-wrap:wrap;margin-bottom:14px;padding:12px 18px;background:var(--surface2);border-radius:10px;border:1px solid var(--border)">'+
       '<div><div style="font-size:10.5px;color:var(--muted);font-weight:700;letter-spacing:.3px">📦 TỔNG SỐ ĐƠN</div><div style="font-size:19px;font-weight:800;margin-top:2px">'+fmt(totalOrders)+'</div></div>'+
       '<div><div style="font-size:10.5px;color:var(--muted);font-weight:700;letter-spacing:.3px">'+(moneyFmt?'💰 TỔNG DOANH THU':'💰 TỔNG SỐ LƯỢNG')+'</div><div style="font-size:19px;font-weight:800;margin-top:2px;color:var(--green)">'+fmtVal(total)+'</div></div>'+
@@ -1020,7 +1023,7 @@ function _srChartSvg(rows, nameKey, valueKey, type, moneyFmt, ordersKey){
     // cắt đôi 1 dòng giữa 2 cột. Bỏ ellipsis/max-width cũ (từng làm cụt tên) — để 1 dòng, tên dài
     // vẫn hiện đủ, cột tự rộng theo layout multi-column bên dưới thay vì cắt bớt chữ.
     return '<div style="display:flex;align-items:center;gap:8px;font-size:11.5px;margin-bottom:6px;break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid">'+
-      '<span style="width:10px;height:10px;border-radius:2px;background:'+_SR_CHART_COLORS[i%_SR_CHART_COLORS.length]+';flex:none;display:inline-block"></span>'+
+      '<span style="width:10px;height:10px;border-radius:2px;background:'+_col(i)+';flex:none;display:inline-block"></span>'+
       '<span style="white-space:nowrap">'+esc(d.name)+'</span>'+
       '<span style="color:var(--muted);white-space:nowrap;margin-left:auto;padding-left:8px">'+fmtVal(d.value)+' ('+pct.toFixed(1)+'%)</span></div>';
   }).join('');
@@ -1034,7 +1037,7 @@ function _srChartSvg(rows, nameKey, valueKey, type, moneyFmt, ordersKey){
       var endAngle = angle+sweep;
       var x2 = cx + r*Math.cos(endAngle*Math.PI/180), y2 = cy + r*Math.sin(endAngle*Math.PI/180);
       var large = sweep>180?1:0;
-      var color = _SR_CHART_COLORS[i%_SR_CHART_COLORS.length];
+      var color = _col(i);
       if (frac>=0.9999){
         paths += '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="'+color+'"><title>'+esc(d.name)+': '+fmtVal(d.value)+'</title></circle>';
       } else {
@@ -1083,12 +1086,12 @@ function _srChartSvg(rows, nameKey, valueKey, type, moneyFmt, ordersKey){
     var w = maxV ? (d.value/maxV*100) : 0;
     return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'+
       '<div style="width:130px;font-size:11.5px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(d.name)+'">'+esc(d.name)+'</div>'+
-      '<div style="flex:1;background:var(--surface2);border-radius:4px;overflow:hidden;height:16px">'+
-      '<div style="width:'+w.toFixed(1)+'%;height:100%;background:'+_SR_CHART_COLORS[i%_SR_CHART_COLORS.length]+'"></div></div>'+
+      '<div style="flex:1;background:var(--surface2);border-radius:'+(_pro?'7px':'4px')+';overflow:hidden;height:'+(_pro?'14px':'16px')+'">'+
+      '<div style="width:'+w.toFixed(1)+'%;height:100%;'+(_pro?'border-radius:7px;':'')+'background:'+_col(i)+'"></div></div>'+
       '<div style="width:120px;font-size:11px;color:var(--muted)">'+fmtVal(d.value)+'</div></div>';
   }).join('');
   return '<div style="padding:10px 0;max-height:480px;overflow-y:auto">'+
-    (summaryStrip || '<div style="font-weight:700;font-size:13px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)">Tổng: '+fmtVal(total)+'</div>')+
+    (summaryStrip || (_pro ? _proTotalTile_(total, moneyFmt) : '<div style="font-weight:700;font-size:13px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)">Tổng: '+fmtVal(total)+'</div>'))+
     barsHtml+'</div>';
 }
 
