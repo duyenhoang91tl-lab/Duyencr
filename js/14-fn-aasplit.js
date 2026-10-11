@@ -1063,7 +1063,7 @@ function _injectV9UI(){
   renderRolePill();
   _rebuildAssignIndex();
   // nếu user đã set vai trò CS từ trước → khoá bộ lọc CS
-  if (currentUser.role === 'cs'){
+  if (currentUser.role === 'cs' || currentUser.role === 'manager'){
     var csFilter = document.getElementById('cs-staff-filter');
     if (csFilter){
       var myNamesBoot = (currentUser.names && currentUser.names.length) ? currentUser.names : (currentUser.name?[currentUser.name]:[]);
@@ -1174,7 +1174,7 @@ function _applyAuthIdentity(acct){
   if (typeof _applyUserTabPermissions === 'function') _applyUserTabPermissions();
   var csFilter = document.getElementById('cs-staff-filter');
   if (csFilter){
-    if (currentUser.role === 'cs' && currentUser.names.length){
+    if ((currentUser.role === 'cs' || currentUser.role === 'manager') && currentUser.names.length){
       // Thêm option cho từng tên (nếu chưa có trong <select>), rồi khoá bộ lọc chọn SẴN tất cả
       // tên của tài khoản này — tận dụng đúng hạ tầng multi-select "Lọc theo CS" đã có.
       currentUser.names.forEach(function(n){

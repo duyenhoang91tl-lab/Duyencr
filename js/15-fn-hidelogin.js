@@ -184,6 +184,8 @@ function _acctRoleChange(){
   var nameWrap = document.getElementById('acct-name-wrap'), teamWrap = document.getElementById('acct-team-wrap');
   if (nameWrap) nameWrap.style.display = (role==='admin') ? 'none' : '';
   if (teamWrap) teamWrap.style.display = (role==='leader') ? '' : 'none';
+  var deptWrap = document.getElementById('acct-dept-wrap');
+  if (deptWrap) deptWrap.style.display = (role==='manager') ? '' : 'none';
 }
 function _acctKey(u){ return String(u == null ? '' : u).trim().toLowerCase(); }
 
@@ -237,6 +239,10 @@ function _acctDetailHtml(a){
   }).join('') : '<span style="font-size:12px;color:var(--red)">Chưa gán sale nào — tài khoản này sẽ không thấy dữ liệu.</span>';
 
   var teamNote = '';
+  if (a.role === 'manager'){
+    var dl = String(a.team||'').split(',').map(function(k){ k=k.trim(); return k ? (typeof saleGroupLabel==='function' ? saleGroupLabel(k) : k) : ''; }).filter(Boolean);
+    teamNote = '<div style="margin-top:8px;font-size:11px;color:var(--muted);border-top:1px dashed var(--border);padding-top:7px">🏢 Phòng phụ trách: <b>'+(dl.length ? esc(dl.join(', ')) : '—')+'</b> — xem nhân viên &amp; leader của các phòng này ở màn Tổng quan / Hồ sơ nhân sự. Các màn dữ liệu khách/báo cáo khác chỉ theo danh sách sale được gán ở trên.</div>';
+  }
   if (a.role === 'leader'){
     var tm = (typeof teams !== 'undefined' ? teams : []).filter(function(t){ return t.name === a.team; })[0];
     var mem = tm ? [].concat(tm.leader ? [tm.leader] : [], tm.members || []).filter(Boolean) : [];
@@ -391,7 +397,7 @@ function renderAcctModal(){
   var edRole  = ed ? (ed.role || 'cs') : '';
   var edNames = ed ? _acctNamesOf(ed) : [];
 
-  var roleOpts = ['admin','leader','cs','demo'].map(function(r){
+  var roleOpts = ['admin','manager','leader','cs','demo'].map(function(r){
     return '<option value="'+r+'"'+(ed && edRole===r ? ' selected' : '')+'>'+_roleLabel(r)+'</option>';
   }).join('');
 
@@ -413,9 +419,14 @@ function renderAcctModal(){
     return '<option value="'+esc(t.name)+'"'+(ed && ed.team===t.name ? ' selected' : '')+'>'+esc(t.name)+'</option>';
   }).join('');
 
+  var edDepts = (ed && edRole==='manager') ? String(ed.team||'').split(',').map(function(x){ return x.trim(); }).filter(Boolean) : [];
+  var deptOpts = (typeof SALE_GROUPS!=='undefined'?SALE_GROUPS:[]).map(function(g){
+    return '<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox" class="acct-dept-chk" style="width:auto;padding:0;margin:0" data-key="'+esc(g.key)+'"'+(edDepts.indexOf(g.key)!==-1?' checked':'')+'>'+esc(g.label)+'</label>';
+  }).join('') || '<span style="font-size:12px;color:var(--muted)">Chưa có phòng/đội nào (tạo ở "Phân loại đội Sale").</span>';
+
   var list = accounts.length ? accounts.map(function(a){
-    var badgeCls = a.role==='admin' ? 'vip-bg' : (a.role==='leader' ? 'blue-bg' : 'green-bg');
-    var badgeCol = a.role==='admin' ? 'var(--vip)' : (a.role==='leader' ? 'var(--blue)' : 'var(--green)');
+    var badgeCls = a.role==='admin' ? 'vip-bg' : ((a.role==='leader'||a.role==='manager') ? 'blue-bg' : 'green-bg');
+    var badgeCol = a.role==='admin' ? 'var(--vip)' : ((a.role==='leader'||a.role==='manager') ? 'var(--blue)' : 'var(--green)');
     var namesArr = _acctNamesOf(a);
     var namesDisp = namesArr.join(', ');
     var uk = esc(a.username);
@@ -472,6 +483,7 @@ function renderAcctModal(){
         '<div id="acct-name-list" style="max-height:200px;overflow-y:auto;border:1px solid var(--border-md);border-radius:var(--rsm);background:var(--surface)">'+nameOpts+
           '<div id="acct-name-empty" style="display:none;padding:8px;font-size:11px;color:var(--muted)">Không có sale nào khớp — có thể gõ tên mới ở ô bên dưới.</div></div>'+
         '<input id="acct-name-input" placeholder="…hoặc gõ thêm tên mới, cách nhau bằng dấu phẩy" style="margin-top:6px"></div>'+
+      '<div class="v9-field" id="acct-dept-wrap" style="display:none"><label>Phòng phụ trách (cho Quản lý — xem được nhân viên &amp; leader của các phòng được tích ở màn Tổng quan / Hồ sơ nhân sự)</label><div style="display:flex;gap:12px;flex-wrap:wrap">'+deptOpts+'</div></div>'+
       '<div class="v9-field" id="acct-team-wrap" style="display:none"><label>Team (cho Leader)</label><select id="acct-team-sel">'+teamOpts+'</select></div>'+
       '<button class="btn primary" style="width:100%;justify-content:center" onclick="addAccount()">'+(ed?'💾 Lưu thay đổi':'Lưu tài khoản')+'</button>'+
     '</div>';
@@ -531,7 +543,11 @@ async function addAccount(){
   if (!u){ toast('Nhập tên tài khoản.'); return; }
   if (/\s/.test(u)){ toast('Tên tài khoản không nên có dấu cách.'); return; }
   if (role === 'admin'){ name = name || 'Admin'; namesArr = ['Admin']; team = ''; }
-  if (role !== 'admin' && !namesArr.length){ toast('Chọn hoặc nhập ít nhất 1 Tên CS cho tài khoản này.'); return; }
+  if (role === 'manager'){   // Quan ly: phong phu trach luu o cot team (key phong, cach nhau dau phay); ten sale la TUY CHON
+    team = Array.prototype.slice.call(document.querySelectorAll('.acct-dept-chk:checked')).map(function(o){ return o.getAttribute('data-key'); }).join(',');
+    if (!team){ toast('Chọn ít nhất 1 phòng phụ trách cho tài khoản Quản lý.'); return; }
+  }
+  if (role !== 'admin' && role !== 'manager' && !namesArr.length){ toast('Chọn hoặc nhập ít nhất 1 Tên CS cho tài khoản này.'); return; }
   if (role === 'cs'){
     var t = null;
     for (var ni=0; ni<namesArr.length && !t; ni++){ t = (typeof _teamOf==='function' ? _teamOf(namesArr[ni]) : null); }

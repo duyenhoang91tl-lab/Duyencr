@@ -1086,7 +1086,7 @@ function _schedCsFilter(it, _preList) {
   // Đọc filter từ DOM (currentCS không bao giờ được cập nhật). _preList: nơi gọi đã đọc sẵn 1 lần cho cả vòng lặp.
   let filterList = _preList ? _preList.slice() : _csFilterList();
   // Khi đăng nhập role=cs mà chưa chọn filter → tự dùng (các) tên CS đăng nhập
-  if (!filterList.length && typeof currentUser !== 'undefined' && currentUser && currentUser.role === 'cs') {
+  if (!filterList.length && typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'cs' || currentUser.role === 'manager')) {
     filterList = (currentUser.names && currentUser.names.length) ? currentUser.names.slice() : (currentUser.name ? [currentUser.name] : []);
   }
   if (!filterList.length) return true;
