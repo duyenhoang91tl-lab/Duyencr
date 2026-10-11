@@ -52,3 +52,4 @@ Code client của `index.html` (trước đây inline, ~1.4MB) đã tách ra `cs
 - Nhãn "Tình trạng CS"/"Trạng thái KH" lấy từ `FIELD_LABEL_CS/KH` (admin đổi tên được) — đừng ghi cứng.
 - ID tab (`data-bar-id`) giữ nguyên vì phân quyền theo tab (`_PERM_TAB_DEFS`) dựa vào chúng.
 - Đã gộp/đối chiếu (10/10): tab "Quá hạn" gộp vào "Lịch chăm sóc" qua công tắc `schedSeg()` (vẫn giữ 2 khung + ID `tab-overdue` cho phân quyền; menu trái ẩn mục Quá hạn trừ khi tài khoản chỉ có quyền Quá hạn). Bỏ mục "Đẩy dữ liệu" khỏi menu vì `fullSyncOrdersToGS()` = `syncFromGS` + `pushOrdersToGS()` (hàm vẫn còn, được gọi từ đồng bộ 2 chiều). "Dashboard" (thống kê khách) và "Báo cáo ngày" (KPI sale + checklist MKT theo ngày, từ server) KHÔNG trùng — giữ cả hai.
+- `js/32-fn-furesult.js`: P2c — hộp chọn kết quả (đã liên hệ/không nghe máy/từ chối/hẹn lại) khi bấm Xong việc lịch CS tự động; bọc `markDone` của js/03.

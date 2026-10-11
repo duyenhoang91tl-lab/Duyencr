@@ -60,7 +60,7 @@ Mỗi phiên làm xong 1 mục nhỏ thì push ngay, tick `[x]` ở đây và gh
 ### P2 — Việc chăm sóc theo mốc (mục 3)
 - [~] 2a (xong: `fuStart`/`fuSources` trong Settings + ô chỉnh trong modal "Mẫu tin hỏi thăm" (admin, js/22-fumycs.js `saveFuCfg`); xong thêm: bật/tắt từng mốc (Settings `fuOffDays`, ô tích trong modal); xong thêm: mốc D0 (ngày mua, nhập 0 ở cột Mốc); CÒN: cấu hình mốc theo nhóm SP/SALE) Bảng cấu hình mốc (D, D3, D7, D14, 30, 60, 90 ngày): nội dung, kênh, theo sản phẩm/nhóm, theo SALE; admin sửa không cần code. Bỏ ghi cứng `FU_CHECKPOINTS`/`FU_START`/`fuSourceAllowed_`.
 - [~] 2b (xong: lịch CS tự động `checkDataDaoRenewSchedules` giờ theo cấu hình mốc/công tắc/fuStart/fuSources, test `tools/test-fu-sched.js`; CÒN: bỏ qua đơn hoàn/hủy/khách chặn, 1 việc/khách/lần quét, việc theo mốc cho SALE (không chỉ CS), không phụ thuộc trình duyệt) Sinh VIỆC trong Lịch chăm sóc (loại gọi/sản phẩm/chăm sóc/hẹn) cho SALE đang chăm sóc; chống trùng khoá `sđt|đơn|mốc`; bỏ qua đơn hoàn/hủy, khách chặn, Zalo ngừng hoạt động; mỗi lần quét 1 việc/khách.
-- [ ] 2c Kết quả khi đánh dấu xong: đã liên hệ / không nghe máy / từ chối / hẹn lại; quá hạn sang tab Quá hạn.
+- [~] 2c (xong: hỏi kết quả khi Xong việc theo mốc — js/32-fn-furesult.js, ghi Nhật ký + `ome_fu_results` trên máy, Hẹn lại tạo việc mới; CÒN: đẩy kết quả lên server (Supabase) để báo cáo toàn team ở 2e, việc quá hạn có nhãn riêng) Kết quả khi đánh dấu xong: đã liên hệ / không nghe máy / từ chối / hẹn lại; quá hạn sang tab Quá hạn.
 - [ ] 2d Tin soạn sẵn từ mẫu, SALE duyệt rồi gửi qua Zalo AI/Pancake AI (không tự gửi).
 - [ ] 2e Báo cáo theo mốc: đúng hạn / trễ / bỏ qua, theo SALE và ngày. Test chạy 2 lần liên tiếp không tạo trùng.
 
