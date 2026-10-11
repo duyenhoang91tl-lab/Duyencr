@@ -44,6 +44,7 @@ async function openFuTplModal(){
   }
   _buildFuCsFilter();
   renderFuTplTable();
+  _loadFuCfg();
 }
 function closeFuTplModal(){ document.getElementById('futpl-modal').classList.remove('open'); }
 
@@ -123,3 +124,40 @@ async function saveFuTpls(){
 setTimeout(function(){
   if (typeof _applyBarCustomization === 'function') _applyBarCustomization();
 }, 400);
+
+// ── P2a: admin chỉnh phạm vi quét hỏi thăm (Settings fuStart / fuSources) ──
+// Backend (_fuConfig_) đọc 2 khoá này; rỗng/sai -> mặc định cũ nên lưu rỗng = quay về như trước.
+function _fuDateToIso_(raw){
+  raw = String(raw || '').trim(); var m = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) return m[1] + '-' + ('0'+m[2]).slice(-2) + '-' + ('0'+m[3]).slice(-2);
+  m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  return m ? m[3] + '-' + ('0'+m[2]).slice(-2) + '-' + ('0'+m[1]).slice(-2) : '';
+}
+async function _loadFuCfg(){
+  var box = document.getElementById('futpl-cfg'); if (!box) return;
+  if (!_fuIsAdmin()) { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  try {
+    var sep = gsUrl.indexOf('?') > -1 ? '&' : '?';
+    var r = await fetch(gsUrl + sep + 'action=getSettings&keys=fuStart,fuSources', { redirect:'follow' });
+    var v = ((await r.json()) || {}).values || {};
+    document.getElementById('fucfg-start').value = _fuDateToIso_(v.fuStart);
+    document.getElementById('fucfg-sources').value = String(v.fuSources || '');
+  } catch(e) { document.getElementById('fucfg-status').textContent = 'Không tải được cấu hình: ' + e.message; }
+}
+async function saveFuCfg(){
+  var st = document.getElementById('fucfg-status');
+  var start = document.getElementById('fucfg-start').value.trim();
+  var srcs = document.getElementById('fucfg-sources').value.split(',').map(function(x){ return x.trim().toLowerCase(); }).filter(Boolean).join(',');
+  if (start && (start < '2020-01-01' || isNaN(new Date(start).getTime()))) { st.style.color = '#dc2626'; st.textContent = 'Ngày bắt đầu không hợp lệ (phải từ 2020).'; return; }
+  st.style.color = '#6b7280'; st.textContent = 'Đang lưu...';
+  try {
+    async function put(key, value){
+      var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'setSetting', key:key, value:value }) });
+      var j = await r.json(); if (j && j.error) throw new Error(j.error);
+    }
+    await put('fuStart', start);
+    await put('fuSources', srcs);
+    st.style.color = '#00b14f'; st.textContent = '✓ Đã lưu — áp dụng từ lần quét kế tiếp' + (start || srcs ? '' : ' (đang dùng mặc định)');
+  } catch(e) { st.style.color = '#dc2626'; st.textContent = 'Lỗi lưu: ' + e.message; }
+}

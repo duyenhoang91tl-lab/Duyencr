@@ -1262,6 +1262,16 @@
     <datalist id="futpl-days-hint"><option value="7"><option value="14"><option value="30"><option value="60"><option value="90"></datalist>
   </div>
   <div class="modal-body" style="max-height:60vh;overflow-y:auto">
+    <div id="futpl-cfg" style="display:none;border:1px solid #e5e7eb;background:#f9fafb;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px">
+      <div style="font-weight:600;margin-bottom:6px">⚙ Phạm vi quét hỏi thăm (chỉ admin)</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+        <label>Khách mua từ ngày: <input type="date" id="fucfg-start" style="padding:4px 6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px"></label>
+        <label style="flex:1;min-width:260px">Nguồn đơn được hỏi thăm: <input type="text" id="fucfg-sources" placeholder="landipage,landing,messenger,mess,web" style="width:100%;padding:4px 6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px"></label>
+        <button onclick="saveFuCfg()" style="padding:5px 12px;border:1px solid #00b14f;background:#f0fdf4;color:#166534;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">💾 Lưu phạm vi</button>
+      </div>
+      <div style="color:#6b7280;margin-top:5px">Nguồn: các từ khoá cách nhau dấu phẩy, khớp chứa-chuỗi, không phân biệt hoa thường (vd thêm <code>renew</code>). Để trống = mặc định như cũ (từ 05/2026; landipage/messenger/web). Áp dụng từ lần quét kế tiếp.</div>
+      <div id="fucfg-status" style="margin-top:4px;color:#00b14f"></div>
+    </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
       <label style="font-size:12px;font-weight:600">Xem theo CS:</label>
       <select id="futpl-cs-filter" style="padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px" onchange="renderFuTplTable()"></select>
