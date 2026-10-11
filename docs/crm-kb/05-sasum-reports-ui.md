@@ -45,3 +45,6 @@ Tab "Chăm sóc" của panel (`renderCareTab`, js/03-fn-refreshopendptab.js) có
 ## F5 không mất chỗ (2026-10-11)
 `js/40-main-restorenav.js` + khung `#boot-splash` đầu `<body>` (index.html, tự gỡ sau 20s phòng script lỗi). Vị trí lưu ở hash `#v=<data-bar-id mục menu>&c=<SĐT>` + sessionStorage `ome_nav_v1`; đăng xuất (`doLogout`) xoá cả hai. Khôi phục bằng cách `.click()` đúng tab (nên tôn trọng quyền: tab bị ẩn thì bỏ qua) rồi `openDp(SĐT)` khi `allCustomers` đã có khách đó; chờ tối đa 60s. CHƯA nhớ: bộ lọc Danh sách KH, vị trí cuộn, báo cáo con (A–F) đang xem, mục đang mở trong hồ sơ khách.
 
+## Chat Pancake trong hồ sơ khách (2026-10-12)
+Tab "💬 Chat" (tab thứ 5 của `.dp-tabs`, `data-tab="chat"`; `_order` trong `renderDpTab` có thêm `'chat'` — highlight tab theo THỨ TỰ nên tab mới phải ở cuối). Logic `js/41-fn-pkchat.js`, backend GAS `gas/25_PancakeChat.gs`, bảng Supabase `pk_conversations`/`pk_messages` (webhook ghi). Chi tiết + việc cần làm tay (deploy GAS, Script properties `PANCAKE_PAGE_TOKENS`): `docs/PANCAKE-INBOX.md`.
+

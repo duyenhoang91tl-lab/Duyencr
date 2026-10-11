@@ -157,15 +157,17 @@ function renderDpTab(tab) {
   if (typeof _dpAutoFlush_ === 'function') _dpAutoFlush_(false);
   currentDpTab = tab;
   _dpDirty = false;
+  if (typeof _pkcStop === 'function') _pkcStop();
   const c = allCustomers.find(x=>x.phone===currentPhone);
   const body = document.getElementById('dp-body');
   if (!c || !body) return;
   if (tab==='care') body.innerHTML = renderCareTab(c);
   else if (tab==='schedule') body.innerHTML = renderSchedTabHtml(c);
   else if (tab==='history') { body.innerHTML = renderHistTab(c); _initHistExpand(); }
+  else if (tab==='chat' && typeof renderPkChatTab === 'function') body.innerHTML = renderPkChatTab(c);
   else body.innerHTML = renderInfoTab(c);
   // Đồng bộ highlight tab (KH mới luôn render lại đúng nội dung, không còn dính dữ liệu KH trước)
-  const _order = ['care','schedule','history','info'];
+  const _order = ['care','schedule','history','info','chat'];
   document.querySelectorAll('.dp-tab').forEach((t,i)=>t.classList.toggle('active', _order[i]===tab));
 }
 
@@ -175,12 +177,14 @@ function switchDpTab(tab, el) {
   _dpDirty = false;
   document.querySelectorAll('.dp-tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
+  if (typeof _pkcStop === 'function') _pkcStop();
   const c = allCustomers.find(x=>x.phone===currentPhone);
   if (!c) return;
   const body = document.getElementById('dp-body');
   if (tab==='care') body.innerHTML = renderCareTab(c);
   else if (tab==='schedule') body.innerHTML = renderSchedTabHtml(c);
   else if (tab==='history') { body.innerHTML = renderHistTab(c); _initHistExpand(); }
+  else if (tab==='chat' && typeof renderPkChatTab === 'function') body.innerHTML = renderPkChatTab(c);
   else body.innerHTML = renderInfoTab(c);
 }
 
