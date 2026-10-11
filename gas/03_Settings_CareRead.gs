@@ -772,6 +772,79 @@ function xemKhoaExtension() {
 function doiKhoaZalo() { _extKeyRotate_('zalo'); return xemKhoaExtension(); }
 function doiKhoaPancake() { _extKeyRotate_('pancake'); return xemKhoaExtension(); }
 
+// ═══════════════════════════════════════════════════════════════
+//  BUOC 4b — BAT BUOC XAC THUC (MAC DINH TAT: chua bat thi hanh vi y het truoc, chi ghi log)
+//  Pham vi: cac action DU LIEU trong NTL_ACTIONS_ (khach/don/nhac hen/giao viec/...). Request duoc qua neu:
+//    (a) co token phien web hop le (ky HMAC, chua het han), HOAC
+//    (b) co khoa extension hop le VA action nam trong EXT_ALLOWED_ cua extension do (rut tu code extension: Zalo/Pancake chi goi cac action nay), HOAC
+//    (c) cong tac cua NGUON do (theo `src` tu khai) dang TAT.
+//  Cong tac theo nguon: web | zalo | pancake | other (src la/thieu/worker). Bat tung nguon khi log sach; loi thi tat lai ngay, KHONG can deploy lai.
+//  LUU Y: `src` do client tu khai nen chi chan duoc nguon da bat; bao ve that chi co khi bat DU CA 4 (other = ke gia src la / khong src).
+//  Chay trong Apps Script Editor (xem Execution log): xemTrangThaiChan, batChanWeb/tatChanWeb, batChanZalo/tatChanZalo,
+//  batChanPancake/tatChanPancake, batChanKhac/tatChanKhac. Cong tac co hieu luc sau toi da ~20 giay (bo nho dem).
+//  CHUA lam (buoc 4c): han che theo VAI TRO (token hop le = moi vai tro deu goi duoc moi action), loc du lieu khach theo CS o server,
+//  va cac action KHONG nam trong NTL_ACTIONS_ (assign, setSetting, saveCannedResponse...).
+// ═══════════════════════════════════════════════════════════════
+var EXT_ALLOWED_ = {
+  zalo: { addCareLead: 1, broadcastMark: 1, customers: 1, deleteDuplicateOrders: 1, lookup: 1, reminders: 1, saveSingle: 1, syncZaloFriendStatus: 1 },
+  pancake: { addCareLead: 1, customers: 1, donOrdersByPhone: 1, lookup: 1, reminders: 1, saveSingle: 1, toggleAssignDone: 1 }
+};
+var ENF_SOURCES_ = ['web', 'zalo', 'pancake', 'other'];
+function _enfModes_() {
+  var cache = CacheService.getScriptCache(), raw = null;
+  try { raw = cache.get('enf_modes'); } catch (e) {}
+  if (raw === null || raw === undefined) {
+    raw = PropertiesService.getScriptProperties().getProperty('enforceModes') || '{}';
+    try { cache.put('enf_modes', raw, 20); } catch (e) {}
+  }
+  var o = {}; try { o = JSON.parse(raw) || {}; } catch (e) { o = {}; }
+  var m = {}; ENF_SOURCES_.forEach(function (k) { m[k] = o[k] === 1 || o[k] === true; });
+  return m;
+}
+function _enfSet_(src, on) {
+  if (ENF_SOURCES_.indexOf(src) < 0) throw new Error('Nguon khong hop le: ' + src);
+  var props = PropertiesService.getScriptProperties(), o = {};
+  try { o = JSON.parse(props.getProperty('enforceModes') || '{}') || {}; } catch (e) { o = {}; }
+  o[src] = on ? 1 : 0;
+  props.setProperty('enforceModes', JSON.stringify(o));
+  try { CacheService.getScriptCache().remove('enf_modes'); } catch (e) {}
+  return xemTrangThaiChan();
+}
+function _srcBucket_(src) {
+  src = String(src || '').toLowerCase();
+  return (src === 'web' || src === 'zalo' || src === 'pancake') ? src : 'other';
+}
+// null = cho qua; object = tu choi (tra nguyen cho client).
+function _enforceCheck_(action, token, ek, src) {
+  if (!NTL_ACTIONS_[action]) return null;
+  var m = _enfModes_();
+  if (!m.web && !m.zalo && !m.pancake && !m.other) return null;
+  if (token && _sessVerify_(token)) return null;
+  var who = _extKeyWho_(ek);
+  if (who === 'zalo' || who === 'pancake') {
+    if (!m[who]) return null;
+    return EXT_ALLOWED_[who][action] === 1 ? null : { error: 'Khoa extension nay khong duoc phep thao tac "' + action + '".', code: 'FORBIDDEN' };
+  }
+  if (!m[_srcBucket_(src)]) return null;
+  return { error: 'Can dang nhap lai (token het han/chua co) hoac khoa extension hop le.', code: 'AUTH' };
+}
+function xemTrangThaiChan() {
+  var m = _enfModes_();
+  ENF_SOURCES_.forEach(function (k) { Logger.log('Chan nguon ' + k + ': ' + (m[k] ? 'DANG BAT' : 'tat')); });
+  Logger.log('Chay batChanWeb/batChanZalo/batChanPancake/batChanKhac de bat, tatChan... de tat. Nen bat theo thu tu web -> zalo -> pancake -> khac.');
+  return m;
+}
+function batChanWeb() { return _enfSet_('web', true); }
+function tatChanWeb() { return _enfSet_('web', false); }
+function batChanZalo() { return _enfSet_('zalo', true); }
+function tatChanZalo() { return _enfSet_('zalo', false); }
+function batChanPancake() { return _enfSet_('pancake', true); }
+function tatChanPancake() { return _enfSet_('pancake', false); }
+function batChanKhac() { return _enfSet_('other', true); }
+function tatChanKhac() { return _enfSet_('other', false); }
+// Bi mat ky token phien — dan vao bien Secret SESS_SECRET cua Cloudflare Worker de Worker chi phuc vu cache cho token hop le. KHONG dan vao chat/repo.
+function xemBiMatPhien() { Logger.log('SESS_SECRET = ' + _sessSecret_()); }
+
 function _ntlNote_(method, action, token, src, ek) {
   try {
     action = String(action || '');

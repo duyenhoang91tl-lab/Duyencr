@@ -261,6 +261,14 @@ let gsUrl = FIXED_GS_URL || loadLS('ome_gs_url') || '';
       if (typeof u === 'string' && gsUrl && u.indexOf(gsUrl) === 0) {
         var tok = localStorage.getItem('ome_demo_token');
         var st = localStorage.getItem('ome_sess_token');
+        // Token phien het han (7 ngay): khi GAS bat chan xac thuc, moi request se bi tu choi -> dua nguoi dung ve man hinh dang nhap 1 lan thay vi bao loi chung chung.
+        if (st && !tok) {
+          var _ex = Number(localStorage.getItem('ome_sess_exp') || 0);
+          if (_ex && _ex < Date.now()) {
+            localStorage.removeItem('ome_sess_token'); localStorage.removeItem('ome_sess_exp'); st = '';
+            if (!window._sessExpiredShown && typeof _showLogin === 'function') { window._sessExpiredShown = true; try { _showLogin(); if (typeof toast === 'function') toast('Phiên đăng nhập đã hết hạn — đăng nhập lại nhé.'); } catch(eX){} }
+          }
+        }
         if (o && o.method && String(o.method).toUpperCase() === 'POST') {
           if (tok) {
             try { var b = JSON.parse(o.body); b.demo = tok; o = Object.assign({}, o, { body: JSON.stringify(b) }); } catch(e1){}

@@ -24,13 +24,25 @@ Test: `node tools/test-cloudflare-worker.js`, `node tools/test-ntl.js`.
 - `ntlReport` giờ có nhãn: `token` (web) | `key-zalo` / `key-pancake` (khoá đúng — tin vào KHOÁ chứ không tin `src` tự khai) | `NO-TOKEN(key-sai)` | `NO-TOKEN`; thêm `keyTotal`. Worker bỏ `ek` khỏi khoá cache.
 - Test: `node tools/test-ntl.js` (case khoá), `node tools/test-cloudflare-worker.js`.
 
-## Bước 4b — CHƯA LÀM: BẮT BUỘC (chỉ làm khi log sạch)
-Điều kiện: sau khi dán khoá vào MỌI máy CS, `ntlReport` không còn `NO-TOKEN` (kể cả `key-sai`) cho `src=zalo|pancake` trong ≥2 ngày làm việc. Khi đó:
-- GAS từ chối action dữ liệu nếu không có token hợp lệ HOẶC khoá extension hợp lệ; extension chỉ được dùng danh sách action cho phép (rút ra từ `ntlReport`: lookup, saveSingle, reminders, ai, priceSearch, getSetting... — KHÔNG gồm deleteOrder/replaceOrders/saveUsers/deleteDuplicateOrders… trừ khi extension thật sự gọi).
-- Web: token phiên (đã gửi sẵn). Lọc `customers`/`lookup` theo vai trò cs/leader ở server.
-- Token hiện nằm trên query của GET (Apps Script không đọc được header) → cân nhắc chuyển action nhạy cảm sang POST, hoặc xác thực HMAC ở Worker trước khi trả cache.
-- Khoá dùng chung cả extension: lộ khoá = ai cũng gọi được các action được phép → đổi khoá bằng `doiKhoa*` rồi phát khoá mới. Nếu cần biết CS nào gọi → nâng lên khoá riêng từng CS.
+## Bước 4b — ĐÃ VIẾT CODE (gas v13.28-auth-enforce-switch), MẶC ĐỊNH TẮT
+Deploy lên không đổi hành vi nào. Bật chặn bằng công tắc theo nguồn (`web`, `zalo`, `pancake`, `other` = src lạ/thiếu/worker), chạy trong Apps Script Editor (xem Execution log): `xemTrangThaiChan`, `batChanWeb`/`tatChanWeb`, `batChanZalo`/`tatChanZalo`, `batChanPancake`/`tatChanPancake`, `batChanKhac`/`tatChanKhac`. Công tắc lưu Script Properties (`enforceModes`), có hiệu lực ≤20 giây, KHÔNG cần deploy lại để bật/tắt.
+- **Phạm vi:** 42 action dữ liệu trong `NTL_ACTIONS_`. Request được qua nếu (a) token phiên web hợp lệ, hoặc (b) khoá extension hợp lệ VÀ action nằm trong `EXT_ALLOWED_` của extension đó (Zalo: addCareLead, broadcastMark, customers, deleteDuplicateOrders, lookup, reminders, saveSingle, syncZaloFriendStatus; Pancake: addCareLead, customers, donOrdersByPhone, lookup, reminders, saveSingle, toggleAssignDone — rút từ code extension, `tools/test-enforce.js` tự đối chiếu), hoặc (c) công tắc của nguồn đó đang tắt.
+- **Worker (đường vòng qua cache):** nếu đặt Secret `SESS_SECRET` (= kết quả hàm `xemBiMatPhien` trong GAS) thì Worker chỉ phục vụ/ghi cache cho request có token phiên hợp lệ; còn lại chuyển thẳng GAS (`x-crm-cache: BYPASS:no-valid-token`) để GAS quyết định. KHÔNG đặt `SESS_SECRET` = Worker hoạt động như cũ. Nếu bật chặn ở GAS mà quên đặt `SESS_SECRET` thì ai gọi qua Worker vẫn đọc được dữ liệu đã cache → phải đặt trước khi bật `web`.
+- **Web:** token hết hạn (7 ngày) → `fetch` bọc xoá token và hiện màn hình đăng nhập.
+- **Thứ tự bật gợi ý (mỗi bước theo dõi `ntlReport` + hỏi CS vài giờ; lỗi → chạy `tatChan...` tương ứng):**
+  1. Điều kiện: đã dán khoá vào MỌI máy CS; log ≥2 ngày làm việc không còn `NO-TOKEN` cho `src=zalo|pancake` và `src=web`; đã đặt `SESS_SECRET` trên Worker.
+  2. Thử trên 1 máy (cửa sổ ẩn danh, đăng nhập mới) rồi `batChanWeb` → tải CRM, lọc, lưu chăm sóc, tạo/xoá đơn thử.
+  3. `batChanZalo`, `batChanPancake` → mở từng extension: tra khách, lưu chăm sóc, nhắc hẹn.
+  4. `batChanKhac` CUỐI CÙNG — đây mới là bước chặn kẻ giả `src`; trước đó ai khai `src` của nguồn chưa bật vẫn qua được.
+- **Điểm có thể gãy (kiểm tra khi thử):** request web gọi dữ liệu TRƯỚC khi đăng nhập (nếu có sẽ bị chặn và hiện lỗi); máy CS chưa dán khoá/chưa reload extension; extension gọi action chưa có trong `EXT_ALLOWED_` (báo `FORBIDDEN` kèm tên action → thêm vào `EXT_ALLOWED_`).
+- Test: `node tools/test-enforce.js`, `node tools/test-ntl.js`, `node tools/test-cloudflare-worker.js`.
 
+## Bước 4c — CHƯA LÀM (các lỗ hổng còn lại sau 4b)
+- Token hợp lệ = MỌI vai trò gọi được MỌI action đã theo dõi (CS vẫn xoá đơn / ghi đè đơn được nếu gọi thẳng API). Cần gắn vai trò vào token (`r`) và bảng "action → vai trò được phép", sau khi xác nhận với client từng nút ai được dùng.
+- Dữ liệu khách chưa lọc theo CS ở server: CS có token vẫn lấy được toàn bộ `customers`/`lookup` bằng cách gọi API trực tiếp (hiện chỉ lọc ở `_inUserScope` phía trình duyệt).
+- Các action KHÔNG nằm trong `NTL_ACTIONS_` vẫn mở: `assign` (GET), `setSetting`/`getSetting` khoá thường, `saveCannedResponse`, `saveMessageTemplate`, `deleteMessageTemplate`, `saveAIContext`, `csStats`, `findDuplicateOrders`, `addZaloNick`... Cần rà từng cái rồi thêm vào `NTL_ACTIONS_` (+ `EXT_ALLOWED_` nếu extension dùng).
+- Token nằm trên query string của GET (Apps Script không đọc được header) → lộ trong log/lịch sử; cân nhắc chuyển action nhạy cảm sang POST. Token hợp lệ chỉ kiểm HMAC, không đọc sheet nên tài khoản bị khoá vẫn dùng được token cũ tới hết hạn (≤7 ngày); đổi `sessSecret` trong Script Properties = đăng xuất toàn bộ.
+- Khoá extension dùng chung cả extension: lộ khoá = ai cũng gọi được các action cho phép → `doiKhoaZalo`/`doiKhoaPancake` rồi phát khoá mới; nếu cần biết CS nào gọi → khoá riêng từng CS.
 
 ## Việc thủ công sau mỗi lần sửa
 Deploy lại GAS (dán `gas_v13.js` hoặc nút "Đồng bộ mã GAS mới nhất", rồi Deploy → New version) — nếu GAS cũ thì đăng nhập web báo "Máy chủ chưa hỗ trợ đăng nhập mới". Nên đổi mật khẩu các tài khoản yếu (hash cũ đã từng công khai) và cân nhắc để repo private.

@@ -10,6 +10,8 @@ function doGet(e) {
     return _demoClip_(doGetCore_(e), action);
   }
   _ntlNote_('GET', action, p.token, p.src, p.ek);
+  var _denG = _enforceCheck_(action, p.token, p.ek, p.src);
+  if (_denG) return jsonOut_(_denG);
   return doGetCore_(e);
 }
 

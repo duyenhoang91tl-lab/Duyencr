@@ -140,6 +140,29 @@ const W = 'https://crm.example.workers.dev/';
   reset(); r = await wh('?key=' + WK, post('x'.repeat(1024 * 1024 + 1))); ok(r.status === 413 && calls.length === 0, 'payload > 1MB -> 413, khong ghi');
   reset(); r = await wh('?key=' + WK, { method: 'PUT', body: '{}' }); ok(r.status === 405 && calls.length === 0, 'PUT -> 405');
   reset(); r = await worker.fetch(req('action=orders'), env, ctx); await Promise.all(pending.splice(0)); ok(r.headers.get('x-crm-cache') === 'MISS' && calls.length === 1 && calls[0].url.indexOf(GAS) === 0, 'route cu (cache GAS) khong bi anh huong');
+  // ===== BUOC 4b: SESS_SECRET -> Worker chi phuc vu cache cho token phien hop le =====
+  {
+    const nodeCrypto = require('crypto'), SEC = 'bi-mat-phien';
+    const b64w = b => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(/\//g, '_');   // y het GAS base64EncodeWebSafe (giu dau =)
+    const mkTok = (u, e) => { const b = b64w(JSON.stringify({ u: u, e: e })); return b + '.' + b64w(nodeCrypto.createHmac('sha256', SEC).update(b).digest()); };
+    const goodT = mkTok('duyen', Date.now() + 1e6), expT = mkTok('duyen', Date.now() - 1), vnT = mkTok('Nguyễn Văn Ạ', Date.now() + 1e6);
+    ok(await mod.verifySessToken(goodT, SEC) && await mod.verifySessToken(vnT, SEC), 'token dung (ke ca ten co dau)');
+    ok(!(await mod.verifySessToken(expT, SEC)) && !(await mod.verifySessToken(goodT.slice(0, -3) + 'AAA', SEC)) && !(await mod.verifySessToken(goodT, 'sai-bi-mat')) && !(await mod.verifySessToken('', SEC)) && !(await mod.verifySessToken('abc', SEC)) && !(await mod.verifySessToken(goodT, '')), 'het han / sua chu ky / sai bi mat / rong / rac deu bi tu choi');
+    const senv = { GAS_URL: GAS, SESS_SECRET: SEC };
+    reset(); r = await go('action=orders&token=' + goodT, undefined, senv); ok(r.headers.get('x-crm-cache') === 'MISS' && putCount === 1, 'token hop le -> cache binh thuong');
+    r = await go('action=orders&token=' + goodT, undefined, senv); ok(r.headers.get('x-crm-cache') === 'HIT' && calls.length === 1, 'token hop le -> HIT');
+    // nguoi khong co token / token gia / het han KHONG duoc an cache cua nguoi khac, va khong ghi cache
+    for (const [name, qs] of [['khong token', 'action=orders'], ['token gia', 'action=orders&token=abc.def'], ['token het han', 'action=orders&token=' + expT]]) {
+      const before = calls.length; r = await go(qs, undefined, senv);
+      ok(r.headers.get('x-crm-cache') === 'BYPASS:no-valid-token' && calls.length === before + 1 && calls[calls.length - 1].url.indexOf(GAS) === 0, name + ' -> chuyen thang GAS, khong an cache');
+    }
+    reset(); await go('action=orders', undefined, senv); await go('action=orders', undefined, senv); ok(putCount === 0 && calls.length === 2, 'request khong token khong bao gio ghi cache');
+    // GAS tu choi -> loi duoc tra nguyen, khong cache
+    reset(); originFn = () => ({ status: 200, body: { error: 'Can dang nhap lai', code: 'AUTH' } }); r = await go('action=orders', undefined, senv);
+    ok(JSON.parse(await r.text()).code === 'AUTH' && putCount === 0, 'loi AUTH cua GAS duoc chuyen nguyen ve client');
+    // KHONG cau hinh SESS_SECRET -> hanh vi cu y het (khong can token)
+    reset(); r = await go('action=orders', undefined, env); ok(r.headers.get('x-crm-cache') === 'MISS' && putCount === 1, 'khong co SESS_SECRET -> nhu cu');
+  }
   console.log('ALL CLOUDFLARE WORKER TESTS PASSED');
 })().catch(e => { console.error('LOI:', e); process.exit(1); });
 function J(x) { return JSON.stringify(x); }

@@ -111,6 +111,24 @@ export function pkExtract(p) {
   const pick = (...vals) => { for (const v of vals) if (v != null && typeof v !== 'object' && String(v) !== '') return String(v).slice(0, 100); return ''; };
   return { page_id: pick(o.page_id, d.page_id, c.page_id), event_type: pick(o.event_type, o.type, d.event_type) };
 }
+// BUOC 4b bao mat: xac thuc token phien (cung dinh dang GAS _sessIssue_: base64url(JSON{u,e}) + '.' + base64url(HMAC-SHA256)) bang bi mat chung SESS_SECRET.
+// Dung de Worker KHONG phuc vu cache cho nguoi khong co token hop le (neu khong, bat chan o GAS van bi vong qua cache cua Worker).
+export async function verifySessToken(tok, secret) {
+  try {
+    tok = String(tok || ''); const i = tok.indexOf('.');
+    if (i < 1 || !secret) return false;
+    const b64 = tok.slice(0, i), sig = tok.slice(i + 1);
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey('raw', enc.encode(String(secret)), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    const mac = new Uint8Array(await crypto.subtle.sign('HMAC', key, enc.encode(b64)));
+    let bin = ''; for (const b of mac) bin += String.fromCharCode(b);
+    const want = btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    if (!pkSafeEqual(sig.replace(/=+$/, ''), want)) return false;
+    const raw = atob(b64.replace(/-/g, '+').replace(/_/g, '/'));
+    const p = JSON.parse(new TextDecoder().decode(Uint8Array.from(raw, c => c.charCodeAt(0))));
+    return !!(p && p.u && p.e && p.e > Date.now());
+  } catch (e) { return false; }
+}
 async function pancakeWebhook(request, env) {
   if (!env.PANCAKE_WEBHOOK_KEY) return pkJson({ error: 'Chua cau hinh PANCAKE_WEBHOOK_KEY.' }, 503);
   const url = new URL(request.url);
@@ -149,6 +167,9 @@ export async function handle(request, env, ctx) {
   if (request.method === 'GET' && !originUrl.searchParams.has('src')) originUrl.searchParams.set('src', 'worker');
   const policy = (env.DISABLED === '1' || env.DISABLED === 1) ? { why: 'disabled' } : cachePolicy(request.method, url.searchParams);
   if (!policy.ttl) return passThrough(request, originUrl.toString(), 'BYPASS:' + policy.why);
+
+  // Da cau hinh SESS_SECRET: chi phuc vu/ghi cache cho request co token phien HOP LE. Con lai chuyen thang GAS (GAS quyet dinh co cho qua khong) va KHONG cache.
+  if (env.SESS_SECRET && !(await verifySessToken(url.searchParams.get('token'), env.SESS_SECRET))) return passThrough(request, originUrl.toString(), 'BYPASS:no-valid-token');
 
   const cache = caches.default, keyUrl = cacheKeyUrl(request.url), key = new Request(keyUrl, { method: 'GET' });
   const now = Date.now(); let stale = null;
