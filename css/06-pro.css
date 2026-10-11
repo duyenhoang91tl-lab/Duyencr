@@ -1,6 +1,6 @@
 /* ── GIAO DIỆN "PRO" (lấy cảm hứng Creatio) — P0: nền thiết kế, CHƯA đổi chức năng ──
-   Chỉ có hiệu lực khi <html class="ui-pro"> (bật bằng ?ui=pro, tắt bằng ?ui=classic; nhớ trong localStorage 'ui_mode').
-   Mọi selector PHẢI bắt đầu bằng html.ui-pro để bản cũ không bị ảnh hưởng.
+   Giao diện pro là MẶC ĐỊNH: <html class="ui-pro"> gắn cứng trong index.html (đã bỏ công tắc ?ui=pro/?ui=classic và localStorage 'ui_mode').
+   Mọi selector PHẢI bắt đầu bằng html.ui-pro (làm "không gian tên", tránh đụng CSS cũ).
    Các lớp tiện ích dưới đây (pro-*) là "viên gạch" để P1 (trang chủ), P2 (hồ sơ 360°), P3 (báo cáo) dùng lại. */
 html.ui-pro{
   --pro-ink:#1b1740; --pro-purple:#4a2c8f; --pro-purple2:#6b3fb5; --pro-line:#e6e3ee; --pro-soft:#f5f3fa;
@@ -61,3 +61,26 @@ html.ui-pro #dp-pro .pro-grid{margin-bottom:8px;grid-template-columns:repeat(3,m
 html.ui-pro #dp-pro .pro-next{margin-bottom:6px;padding:8px 10px;}
 html.ui-pro #dp-pro .pro-tl{max-height:220px;overflow-y:auto;}
 html.ui-pro #dp-pro .pro-tl-d>summary{list-style:revert;}
+
+/* ── P0b: "DA" HEADER + NGĂN KÉO MENU (giao diện pro là mặc định, không còn công tắc) ──
+   Chỉ đổi màu/bo góc, không đổi bố cục. Pill vai trò (.role-pill) và pill Google Sheets giữ nền sáng nên vẫn rõ trên nền tím. */
+html.ui-pro body{background:var(--pro-soft);}
+html.ui-pro header{background:linear-gradient(120deg,var(--pro-ink) 0%,var(--pro-purple) 55%,var(--pro-purple2) 100%);border-bottom:none;color:#fff;box-shadow:0 2px 10px rgba(27,23,64,.28);}
+html.ui-pro .logo{color:#fff;}
+html.ui-pro .logo .logo-mark{background:rgba(255,255,255,.2);}
+html.ui-pro .logo span{color:rgba(255,255,255,.7)!important;}   /* số phiên bản: HTML đang gán màu xanh lá inline */
+html.ui-pro header .fstatus{color:rgba(255,255,255,.78);}
+html.ui-pro header .mobile-menu-btn{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.3);color:#fff;}
+html.ui-pro header .btn,html.ui-pro #sn-toggle{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.3);color:#fff;}
+html.ui-pro header .btn:hover,html.ui-pro #sn-toggle:hover,html.ui-pro header .mobile-menu-btn:hover{background:rgba(255,255,255,.26);color:#fff;}
+html.ui-pro header .btn.primary{background:#fff;border-color:#fff;color:var(--pro-purple);}
+html.ui-pro #sn-toggle .sn-cur{color:#fff;opacity:.85;}
+html.ui-pro header input,html.ui-pro header select{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.3);color:#fff;}
+html.ui-pro header input::placeholder{color:rgba(255,255,255,.7);}
+html.ui-pro header select option{background:#fff;color:#18170f;}
+/* ngăn kéo menu trái (☰): nền tím đậm, chữ sáng, mục đang chọn = nền sáng mờ + vạch trắng */
+html.ui-pro #data-view .tabs{background:linear-gradient(180deg,var(--pro-ink) 0%,var(--pro-purple) 70%,#5a3598 100%);border-right:none;box-shadow:6px 0 26px rgba(20,12,60,.38);}
+html.ui-pro #data-view .tabs .tab,html.ui-pro #data-view .tabs .sn-act,html.ui-pro #data-view .tabs #reportsgroup-list .tab{color:rgba(255,255,255,.88);}
+html.ui-pro #data-view .tabs .tab:hover,html.ui-pro #data-view .tabs .sn-act:hover,html.ui-pro #data-view .tabs .sn-gh:hover{background:rgba(255,255,255,.12);color:#fff;}
+html.ui-pro #data-view .tabs .tab.active,html.ui-pro #data-view .tabs #reportsgroup-list .tab.active{background:rgba(255,255,255,.2);border-left-color:#fff;color:#fff;}
+html.ui-pro #data-view .tabs .sn-gh{color:rgba(255,255,255,.6);}

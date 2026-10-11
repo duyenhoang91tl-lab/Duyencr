@@ -1,4 +1,4 @@
-/* GIAO DIỆN PRO — P2: Hồ sơ khách 360° (chỉ chạy khi <html class="ui-pro">, bật bằng ?ui=pro).
+/* GIAO DIỆN PRO — P2: Hồ sơ khách 360° (chạy khi <html class="ui-pro"> — nay luôn có sẵn trong index.html; giữ kiểm tra này như lớp bảo vệ).
    Bước 1: thanh giai đoạn (từ CARE_STATUS_TREE) + ô số (ngày từ đơn cuối, số đơn, doanh thu).
    Không sửa openDp/renderDpTab gốc: chỉ bọc lại và chèn khối #dp-pro giữa .dp-hdr và .dp-tabs. */
 
