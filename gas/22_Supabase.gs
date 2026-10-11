@@ -960,6 +960,154 @@ function sbKHDongBoLai() { _sbLogSync_(sbSyncCare_({ fresh: true })); }   // bo 
 function sbKHCaiTrigger() { Logger.log(installSbCareTrigger_()); }
 function sbKHGoTrigger()  { Logger.log(removeSbCareTrigger_()); }
 function sbKHTrangThaiDongBo() { Logger.log(JSON.stringify(sbCareSyncStatus_(), null, 2)); }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//  KHO / TON KHO (Supabase: kho, ton_kho, ton_kho_log + ham SQL ton_kho_set/adjust/import trong supabase/schema.sql muc 7).
+//  CRM thay Pos lam noi cap nhat ton that. Quyen (kiem o SERVER bang token phien, KHONG tin client):
+//   - XEM: moi tai khoan dang nhap.   - Tao/sua/tat kho + gan leader/thanh vien: CHI admin.
+//   - Sua ton / nguong / nhap file: admin, hoac leader / thanh vien (username) cua DUNG kho do.
+//  Sua tay gui kem `ver` da thay; ai sua truoc -> nguoi sau nhan conflict (khong ghi de). Moi thay doi ghi ton_kho_log.
+//  Tru ton tu dong khi co don: KHONG co action cong khai (tranh ai cung tru duoc) — dung khoAdjust_ ben trong luc luu don.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+var KHO_MAX_IMPORT_ = 2000;
+var KHO_MAX_LIST_ = 1000;
+function _khoLow_(s) { return String(s == null ? '' : s).trim().toLowerCase(); }
+function _khoAuth_(tok) {
+  var u = _sessUser_(tok);
+  return u ? { ok: true, user: u } : { ok: false, error: 'Can dang nhap.', code: 'AUTH' };
+}
+function _khoIsAdmin_(u) { return !!u && u.role === 'admin'; }
+function _khoMembers_(k) { var m = k && k.members; if (typeof m === 'string') { try { m = JSON.parse(m); } catch (e) { m = []; } } return Array.isArray(m) ? m : []; }
+function _khoCanEdit_(u, k) {
+  if (!u || !k) return false;
+  if (_khoIsAdmin_(u)) return true;
+  var un = _khoLow_(u.username);
+  if (!un) return false;
+  if (_khoLow_(k.leader) === un) return true;
+  var ms = _khoMembers_(k);
+  for (var i = 0; i < ms.length; i++) if (_khoLow_(ms[i]) === un) return true;
+  return false;
+}
+function _khoOut_(k, u) { return { id: k.id, ten: k.ten, leader: k.leader || '', members: _khoMembers_(k), active: k.active !== false, canEdit: _khoCanEdit_(u, k) }; }
+function _khoGet_(id) {
+  id = String(id || '').trim();
+  if (!id) return null;
+  var r = sb_('GET', 'kho?id=eq.' + encodeURIComponent(id) + '&select=*&limit=1');
+  return (r.json && r.json[0]) || null;
+}
+function _khoCfgErr_() { return sbCfg_().ok ? null : { ok: false, error: 'Chua cau hinh Supabase (SUPABASE_URL / SUPABASE_KEY).' }; }
+function _khoSafe_(fn) { try { return fn(); } catch (e) { return { ok: false, error: String(e && e.message || e) }; } }
+
+function khoList_(tok) {
+  var a = _khoAuth_(tok); if (!a.ok) return a;
+  return _khoCfgErr_() || _khoSafe_(function () {
+    var r = sb_('GET', 'kho?select=*&order=ten.asc'), admin = _khoIsAdmin_(a.user), out = [];
+    (r.json || []).forEach(function (k) { if (k.active !== false || admin) out.push(_khoOut_(k, a.user)); });
+    return { ok: true, isAdmin: admin, kho: out };
+  });
+}
+// d.kho = { id?, ten, leader, members[], active }. Chi admin. Khong id -> tao moi.
+function khoSave_(d) {
+  var a = _khoAuth_(d && d.token); if (!a.ok) return a;
+  if (!_khoIsAdmin_(a.user)) return { ok: false, error: 'Chi admin moi duoc tao/sua kho.' };
+  var k = (d && d.kho) || {}, ten = String(k.ten || '').trim();
+  if (!ten) return { ok: false, error: 'Thieu ten kho.' };
+  var seen = {}, members = [];
+  (Array.isArray(k.members) ? k.members : []).forEach(function (m) { var x = String(m || '').trim(), l = x.toLowerCase(); if (x && !seen[l]) { seen[l] = 1; members.push(x); } });
+  var rec = { ten: ten, leader: String(k.leader || '').trim(), members: members, active: k.active !== false };
+  return _khoCfgErr_() || _khoSafe_(function () {
+    var id = String(k.id || '').trim();
+    if (id) {
+      if (!_khoGet_(id)) return { ok: false, error: 'Khong tim thay kho.' };
+      sb_('PATCH', 'kho?id=eq.' + encodeURIComponent(id), rec, { Prefer: 'return=minimal' });
+    } else {
+      id = 'kho_' + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36);
+      rec.id = id;
+      sb_('POST', 'kho', rec, { Prefer: 'return=minimal' });
+    }
+    return { ok: true, kho: _khoOut_(_khoGet_(id), a.user) };
+  });
+}
+// p: { token, kho, q, low ('1' chi hang sap het), limit, offset }
+function tonKhoList_(p) {
+  var a = _khoAuth_(p && p.token); if (!a.ok) return a;
+  return _khoCfgErr_() || _khoSafe_(function () {
+    var k = _khoGet_(p.kho);
+    if (!k || (k.active === false && !_khoIsAdmin_(a.user))) return { ok: false, error: 'Khong tim thay kho.' };
+    var limit = Math.max(1, Math.min(KHO_MAX_LIST_, parseInt(p.limit, 10) || 200)), offset = Math.max(0, parseInt(p.offset, 10) || 0);
+    var path = 'ton_kho?select=ma_hang,ten_hang,ton,nguong,ver,updated_by,updated_at&kho_id=eq.' + encodeURIComponent(k.id);
+    var q = String(p.q || '').replace(/[,()*%\\"]/g, ' ').trim();
+    if (q) path += '&or=(ma_hang.ilike.*' + encodeURIComponent(q) + '*,ten_hang.ilike.*' + encodeURIComponent(q) + '*)';
+    path += '&order=ma_hang.asc&limit=' + limit + '&offset=' + offset;
+    var r = sb_('GET', path, null, { Prefer: 'count=exact' });
+    var cr = String(_sbHeader_(r.headers || {}, 'Content-Range') || ''), m = cr.match(/\/(\d+)$/);
+    var rows = r.json || [];
+    var low = String(p.low || '') === '1';
+    if (low) rows = rows.filter(function (x) { return Number(x.nguong) > 0 && Number(x.ton) <= Number(x.nguong); });
+    return { ok: true, kho: _khoOut_(k, a.user), rows: rows, total: m ? parseInt(m[1], 10) : rows.length, offset: offset, limit: limit };
+  });
+}
+// d: { token, kho, ma, ten, ton, ver, lyDo }  ver = phien ban dong da thay (0 / thieu = tao dong moi)
+function tonKhoSet_(d) {
+  var a = _khoAuth_(d && d.token); if (!a.ok) return a;
+  return _khoCfgErr_() || _khoSafe_(function () {
+    var k = _khoGet_(d.kho);
+    if (!k || k.active === false) return { ok: false, error: 'Khong tim thay kho.' };
+    if (!_khoCanEdit_(a.user, k)) return { ok: false, error: 'Ban khong co quyen sua ton cua kho nay.', code: 'FORBIDDEN' };
+    var ton = Number(d.ton);
+    if (d.ton === '' || d.ton === null || d.ton === undefined || !isFinite(ton)) return { ok: false, error: 'So luong khong hop le.' };
+    var r = sb_('POST', 'rpc/ton_kho_set', { p_kho: k.id, p_ma: String(d.ma || ''), p_ten: String(d.ten || ''), p_ton: ton,
+      p_ver: d.ver == null || d.ver === '' ? 0 : parseInt(d.ver, 10) || 0, p_by: a.user.username, p_ly_do: String(d.lyDo || ''), p_loai: 'sua' });
+    return r.json || { ok: false, error: 'Supabase khong tra ket qua.' };
+  });
+}
+// d: { token, kho, ma, nguong } — dat nguong canh bao sap het (0 = tat)
+function tonKhoNguong_(d) {
+  var a = _khoAuth_(d && d.token); if (!a.ok) return a;
+  return _khoCfgErr_() || _khoSafe_(function () {
+    var k = _khoGet_(d.kho);
+    if (!k || k.active === false) return { ok: false, error: 'Khong tim thay kho.' };
+    if (!_khoCanEdit_(a.user, k)) return { ok: false, error: 'Ban khong co quyen sua kho nay.', code: 'FORBIDDEN' };
+    var ng = Number(d.nguong);
+    if (!isFinite(ng) || ng < 0) return { ok: false, error: 'Nguong khong hop le.' };
+    var r = sb_('PATCH', 'ton_kho?kho_id=eq.' + encodeURIComponent(k.id) + '&ma_hang=eq.' + encodeURIComponent(String(d.ma || '')), { nguong: ng }, { Prefer: 'return=representation' });
+    return (r.json && r.json.length) ? { ok: true, row: r.json[0] } : { ok: false, error: 'Khong tim thay ma hang.' };
+  });
+}
+// d: { token, kho, rows:[{ma,ten,ton}], lyDo } — nhap hang loat (vd file Excel Pos "Tong hop ton kho"): GHI DE ton theo (kho, ma hang)
+function tonKhoImport_(d) {
+  var a = _khoAuth_(d && d.token); if (!a.ok) return a;
+  return _khoCfgErr_() || _khoSafe_(function () {
+    var k = _khoGet_(d.kho);
+    if (!k || k.active === false) return { ok: false, error: 'Khong tim thay kho.' };
+    if (!_khoCanEdit_(a.user, k)) return { ok: false, error: 'Ban khong co quyen nhap ton cua kho nay.', code: 'FORBIDDEN' };
+    var rows = Array.isArray(d.rows) ? d.rows : [];
+    if (!rows.length) return { ok: false, error: 'File khong co dong nao.' };
+    if (rows.length > KHO_MAX_IMPORT_) return { ok: false, error: 'Toi da ' + KHO_MAX_IMPORT_ + ' dong moi lan nhap (file co ' + rows.length + ').' };
+    var clean = rows.map(function (x) { return { ma: String((x && x.ma) || ''), ten: String((x && x.ten) || ''), ton: x && x.ton }; });
+    var r = sb_('POST', 'rpc/ton_kho_import', { p_kho: k.id, p_rows: clean, p_by: a.user.username, p_ly_do: String(d.lyDo || 'Nhap file') });
+    return r.json || { ok: false, error: 'Supabase khong tra ket qua.' };
+  });
+}
+// p: { token, kho, ma?, limit } — nhat ky thay doi (moi nguoi dang nhap xem duoc)
+function tonKhoLog_(p) {
+  var a = _khoAuth_(p && p.token); if (!a.ok) return a;
+  return _khoCfgErr_() || _khoSafe_(function () {
+    var k = _khoGet_(p.kho);
+    if (!k) return { ok: false, error: 'Khong tim thay kho.' };
+    var limit = Math.max(1, Math.min(200, parseInt(p.limit, 10) || 50));
+    var path = 'ton_kho_log?select=ma_hang,truoc,sau,loai,ly_do,ref,by_user,at&kho_id=eq.' + encodeURIComponent(k.id);
+    if (p.ma) path += '&ma_hang=eq.' + encodeURIComponent(String(p.ma));
+    path += '&order=at.desc,id.desc&limit=' + limit;
+    return { ok: true, log: sb_('GET', path).json || [] };
+  });
+}
+// NOI BO (khong co action): cong/tru ton nguyen tu. Dung khi luu don: khoAdjust_('kho_x','MA1',-2,'trang','don','DH123'). ref chong tru 2 lan.
+function khoAdjust_(khoId, ma, delta, by, loai, ref, lyDo, allowNeg) {
+  var r = sb_('POST', 'rpc/ton_kho_adjust', { p_kho: String(khoId), p_ma: String(ma), p_delta: Number(delta), p_by: String(by || ''),
+    p_loai: loai || 'don', p_ref: String(ref || ''), p_ly_do: String(lyDo || ''), p_allow_negative: allowNeg !== false });
+  return r.json || { ok: false, error: 'Supabase khong tra ket qua.' };
+}
 function sbDonHangDongBo() { _sbLogSync_(sbOrdersSync_()); }
 function sbDonHangDongBoLai() { _sbLogSync_(sbOrdersSync_({ fresh: true })); }   // xoa sach 2 bang Supabase roi day lai tat ca (dung khi nghi Supabase bi sua tay / lech)
 function sbDonHangCaiTrigger() { Logger.log(installSbOrdersTrigger_()); }
