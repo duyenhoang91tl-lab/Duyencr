@@ -16,7 +16,14 @@ Mọi CSS mới nằm trong `css/06-pro.css`, mọi selector bắt đầu `html.
   - [x] 3a: kiểm kê lọc ngày. Báo cáo A–L, KPI Pancake, Dashboard ĐÃ đủ preset (dùng `_quickRangeSelectHtml` + `_PK_QUICK_RANGES` ở js/16, hàm tính `_pkQuickRange` ở js/10). THIẾU 2 chỗ → đã bổ sung: "AI phân tích team" (`_taQuick`) và "Tổng quan" (`_ovQuick`, tự tải lại). Giữ nút "7 ngày". Test: `node tools/test-quick-range-presets.js` (trích hàm thật, giả ngày CN 11/10/2026 và 15/01/2026). Không đụng được `_dbRender` (xem 1 ngày) và `_fuResultAsk` (chọn ngày hẹn, không phải bộ lọc).
   - [x] 3b+3c: `_srChartSvg` (js/10) có nhánh `html.ui-pro`: 3 ô số màu (Tổng số đơn / Tổng DT / TB đơn) thay dải KPI cũ khi có `ordersKey`; không có `ordersKey` (bar) → 1 ô "Tổng"; pie không `ordersKey` giữ TỔNG ở giữa donut; bảng màu pro + thanh cột bo tròn. Hàm phụ nằm ở `js/34-pro-charts.js` (`_PRO_CHART_COLORS`, `_proKpiStrip_`, `_proTotalTile_`). KHÔNG đổi chữ ký hàm → 19 nơi gọi (js/10, 11, 12, 13) không phải sửa. Tắt ui-pro → đầu ra giống hệt bản cũ. Test: `BASE_REF=<commit trước P3b> node tools/test-ui-pro-charts.js` (so sánh với bản gốc).
   - Chưa làm (tuỳ chọn): đưa kiểu pro vào các bảng/thanh lọc khác của báo cáo A–L (hiện chỉ biểu đồ + ô số); chưa xem thử trên trình duyệt thật.
-- [ ] **P4 — Dock phải + trợ lý AI**: hỏi đáp về khách/doanh số; thanh tab hồ sơ đang mở.
+- [x] **P4 — Dock phải + trợ lý AI + thanh tab hồ sơ** (`js/38-pro-dock.js`, CSS cuối `css/06-pro.css`; test `tools/test-ui-pro-dock.js` + `tools/test-crm-ask.js`):
+  - Thanh tab dưới cùng: bọc `openDp`/`closeDp`, nhớ tối đa 8 khách trong `sessionStorage['pro_tabs']`, bấm tên = mở lại, × = đóng (đóng tab đang mở thì đóng luôn hồ sơ). Chừa 84px bên phải cho chuông nhắc hẹn (`.reminder-bell`).
+  - Dock phải (`#pro-dock`, nút 🤖; màn ≤900px thành nút tròn góc phải dưới, trên chuông) mở panel `#pro-ai`: 2 chế độ "Khách đang mở" / "Doanh số".
+  - Backend: `callAI_` (gas_v13.js, **v13.32-crm-ask**) có nhánh `data.crmAsk` → prompt hệ thống riêng `_crmAskSystemPrompt_` (chỉ dùng NGỮ CẢNH, không bịa số), KHÔNG kéo kiến thức sản phẩm/ảnh, giới hạn 9000 ký tự; luồng CS cũ giữ nguyên. Web gọi `POST {action:'ai', crmAsk:true, prompt}` (không header lạ, tránh preflight CORS).
+  - Quyền riêng tư: ngữ cảnh dựng ở web từ số liệu người dùng ĐƯỢC xem (khách đã mở; doanh số qua `_ovScope` theo vai trò) và ẨN SĐT (`proScrub_`: cả trong tên/ghi chú/lịch/câu hỏi). AI chỉ gợi ý, không ghi dữ liệu.
+  - Doanh số cần đã tải màn 🏠 Tổng quan (dùng `_ov.data`); chưa tải thì panel hướng dẫn, không gọi AI.
+  - `proProfileData_(c)` (js/33) là hàm gom dữ liệu 1 khách dùng chung cho hồ sơ 360° và trợ lý.
+  - Chưa làm (tuỳ chọn): lưu lịch sử chat, hỏi đáp có quyền ghi (đặt lịch/ghi chú bằng AI), cache câu trả lời. Chưa xem thử trên trình duyệt thật (đã smoke test bằng jsdom, không commit vì cần cài jsdom).
 
 ## Ràng buộc
 Phân quyền (admin/quản lý/leader/CS) quyết định tab hiển thị. Chưa lưu: mục tiêu doanh số, số cuộc gọi (chờ phần kết quả cuộc gọi của phiên khác). Không sửa `extension/`. Không đổi thứ tự thẻ `<script>`.

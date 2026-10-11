@@ -2,7 +2,7 @@
 const fs=require('fs');let bad=0;const ok=(c,m)=>{if(!c){bad++;console.log('FAIL',m)}else console.log('ok  ',m)};
 const css=fs.readFileSync('css/06-pro.css','utf8').replace(/\/\*[\s\S]*?\*\//g,'');
 ok((css.match(/{/g)||[]).length===(css.match(/}/g)||[]).length,'ngoặc {} cân');
-const rules=css.split('}').map(r=>r.split('{')[0].trim()).filter(Boolean);
+const rules=css.replace(/@media[^{]*\{/g,'').split('}').map(r=>r.split('{')[0].trim()).filter(Boolean);
 const un=rules.filter(r=>r.split(',').some(s=>!s.trim().startsWith('html.ui-pro')));
 ok(un.length===0,'mọi selector bắt đầu bằng html.ui-pro'+(un.length?' — lỗi: '+un.join(' | '):''));
 const html=fs.readFileSync('index.html','utf8');

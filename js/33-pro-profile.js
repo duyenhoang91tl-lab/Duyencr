@@ -76,6 +76,20 @@ function proTimelineHtml_(items, total){
     + items.map(function(it){ return '<li class="'+it.kind+'"><span class="t-when">'+proEsc_(it.when)+'</span>'+proEsc_(it.title)+'</li>'; }).join('') + '</ul></details>';
 }
 
+// Gom dữ liệu 1 khách (dùng cho hồ sơ 360° và trợ lý AI): care, số đơn (ưu tiên Pos), đơn, ghi chú, lịch hẹn của khách, loại lịch
+function proProfileData_(c){
+  var care = careData[c.phone] || {};
+  var ps = (typeof donStatsByPhone!=='undefined') ? donStatsByPhone[c.phone] : null;
+  var nOrd = (_posStatsOn && ps) ? (Number(ps.n)||0) : (c.orders||[]).length;
+  var types = (typeof SCHED_TYPES!=='undefined') ? SCHED_TYPES : [];
+  var mine = (typeof schedules!=='undefined' ? schedules : []).filter(function(x){ return x.phone===c.phone; })
+    .map(function(x){ var t = types.find(function(y){ return y.key===x.type; }); return Object.assign({}, x, { typeLabel: t && t.label }); });
+  var pos = (typeof _posOrdersCache!=='undefined') ? _posOrdersCache[c.phone] : null;
+  var orders = (pos && pos.length) ? pos : (c.orders||[]);
+  var notes = (typeof _parseNotes==='function') ? _parseNotes(care.note||c.careNote||'') : [];
+  return { care: care, nOrd: nOrd, types: types, mine: mine, orders: orders, notes: notes };
+}
+
 // ── Gắn vào giao diện ──
 function proRenderProfile_(){
   var host = document.getElementById('dp-pro');
@@ -88,17 +102,9 @@ function proRenderProfile_(){
     var tabs = document.querySelector('#dp .dp-tabs'); if (!tabs) return;
     tabs.parentNode.insertBefore(host, tabs);
   }
-  var care = careData[c.phone] || {};
-  var ps = (typeof donStatsByPhone!=='undefined') ? donStatsByPhone[c.phone] : null;
-  var nOrd = (_posStatsOn && ps) ? (Number(ps.n)||0) : (c.orders||[]).length;
+  var D = proProfileData_(c), care = D.care, nOrd = D.nOrd, types = D.types, mine = D.mine;
   var wasOpen = !!(host.querySelector('details.pro-tl-d') && host.querySelector('details.pro-tl-d').open);
-  var types = (typeof SCHED_TYPES!=='undefined') ? SCHED_TYPES : [];
-  var mine = (typeof schedules!=='undefined' ? schedules : []).filter(function(x){ return x.phone===c.phone; })
-    .map(function(x){ var t = types.find(function(y){ return y.key===x.type; }); return Object.assign({}, x, { typeLabel: t && t.label }); });
-  var pos = (typeof _posOrdersCache!=='undefined') ? _posOrdersCache[c.phone] : null;
-  var orders = (pos && pos.length) ? pos : (c.orders||[]);
-  var notes = (typeof _parseNotes==='function') ? _parseNotes(care.note||c.careNote||'') : [];
-  var tl = proTimeline_(notes, mine, orders, 30), tlTotal = notes.length + mine.length + orders.length;
+  var tl = proTimeline_(D.notes, mine, D.orders, 30), tlTotal = D.notes.length + mine.length + D.orders.length;
   host.innerHTML = proStageHtml_(proStageModel_(CARE_STATUS_TREE, care.status||c.careStatus||''))
                  + proKpiHtml_(proDaysSinceLastOrder_(c.orders, new Date()), nOrd, _custRev_(c))
                  + proNextHtml_(proNextActions_(mine, c.phone, _ymd(new Date()), types, 3))
@@ -111,4 +117,4 @@ function proRenderProfile_(){
   if (typeof openDp==='function'){ var _o = openDp; openDp = function(p){ var r = _o.apply(this, arguments); try{ proRenderProfile_(); }catch(e){ console.warn('[ui-pro]',e); } return r; }; }
   if (typeof renderDpTab==='function'){ var _r = renderDpTab; renderDpTab = function(t){ var r = _r.apply(this, arguments); try{ proRenderProfile_(); }catch(e){ console.warn('[ui-pro]',e); } return r; }; }
 })();
-if (typeof module!=='undefined') module.exports = { proNoteTs_, proNextActions_, proNextHtml_, proTimeline_, proTimelineHtml_, proStageModel_, proDaysSinceLastOrder_, proKpiHtml_, proStageHtml_ };
+if (typeof module!=='undefined') module.exports = { proProfileData_, proNoteTs_, proNextActions_, proNextHtml_, proTimeline_, proTimelineHtml_, proStageModel_, proDaysSinceLastOrder_, proKpiHtml_, proStageHtml_ };
