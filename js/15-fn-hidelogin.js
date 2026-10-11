@@ -420,9 +420,9 @@ function renderAcctModal(){
   }).join('');
 
   var edDepts = (ed && edRole==='manager') ? String(ed.team||'').split(',').map(function(x){ return x.trim(); }).filter(Boolean) : [];
-  var deptOpts = (typeof SALE_GROUPS!=='undefined'?SALE_GROUPS:[]).map(function(g){
+  var deptOpts = (typeof DEPT_LIST!=='undefined'?DEPT_LIST:[]).map(function(g){
     return '<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox" class="acct-dept-chk" style="width:auto;padding:0;margin:0" data-key="'+esc(g.key)+'"'+(edDepts.indexOf(g.key)!==-1?' checked':'')+'>'+esc(g.label)+'</label>';
-  }).join('') || '<span style="font-size:12px;color:var(--muted)">Chưa có phòng/đội nào (tạo ở "Phân loại đội Sale").</span>';
+  }).join('') || '<span style="font-size:12px;color:var(--muted)">Chưa có phòng nào (cài đặt ở Tổng quan → ⚙ Cài đặt phòng).</span>';
 
   var list = accounts.length ? accounts.map(function(a){
     var badgeCls = a.role==='admin' ? 'vip-bg' : ((a.role==='leader'||a.role==='manager') ? 'blue-bg' : 'green-bg');

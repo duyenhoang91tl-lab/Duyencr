@@ -349,11 +349,57 @@ function _orgAgg_(plist, days) {
     failRate: (a.orders + a.failed) ? Math.round(a.failed / (a.orders + a.failed) * 1000) / 10 : 0,
     tot: a.tot, trungbinh: a.trungbinh, kem: a.kem, chuadu: a.chuadu, avgScore: a.scoreN ? Math.round(a.scoreSum / a.scoreN) : null };
 }
+// ── PHONG BAN (yeu cau Duyen 2026-10-11): TACH RIENG khoi 'doi' Online/Van phong/Thu viec (SALE_GROUPS) de gan phong KHONG anh huong
+//    doi tuong Chuong trinh thuong. Luu o Settings: deptList = [{key,label}], saleDepts = {tenNguoi: keyPhong}.
+var DEPT_LIST_DEFAULT_ = [
+  { key: 'marketing', label: 'Marketing' }, { key: 'sale', label: 'Sale' }, { key: 'cuahang', label: 'Cửa hàng' },
+  { key: 'sanxuat', label: 'Sản xuất' }, { key: 'thanhpham', label: 'Thành phẩm' }, { key: 'nguon', label: 'Nguồn' },
+  { key: 'ketoan', label: 'Kế toán' }, { key: 'hr', label: 'HR' }, { key: 'media', label: 'Media' }
+];
+function readDeptList_() {
+  try {
+    var raw = getSetting_('deptList');
+    if (raw) {
+      var arr = JSON.parse(raw);
+      if (Array.isArray(arr) && arr.length) return arr.filter(function(g) { return g && g.key; }).map(function(g) { return { key: String(g.key), label: String(g.label || g.key) }; });
+    }
+  } catch (e) {}
+  return JSON.parse(JSON.stringify(DEPT_LIST_DEFAULT_));
+}
+// raw: {ten: key} dung nguyen de tra client; byNorm: {tenChuanHoa: {name,key}} de khop ten khong phan biet hoa/thuong/dau
+function readSaleDepts_() {
+  var out = { raw: {}, byNorm: {} };
+  try {
+    var raw = getSetting_('saleDepts');
+    if (raw) {
+      var o = JSON.parse(raw);
+      if (o && typeof o === 'object') Object.keys(o).forEach(function(n) {
+        var k = _normTxt_(n);
+        if (k && o[n]) { out.raw[n] = String(o[n]); out.byNorm[k] = { name: String(n).trim(), key: String(o[n]) }; }
+      });
+    }
+  } catch (e) {}
+  return out;
+}
+// Gan phong cho tung nguoi theo saleDepts (nguoi nao chua gan = '(chua phan phong)'); nguoi CHI co trong saleDepts (ke toan, HR...)
+// ma chua co so lieu thi them vao danh sach voi so lieu 0 de dem dau nguoi cua phong.
+function _orgApplyDepts_(people, byKey, sd, deptList, UNK) {
+  var lbl = {}; deptList.forEach(function(g) { lbl[g.key] = g.label; });
+  Object.keys(sd.byNorm).forEach(function(k) {
+    if (byKey[k]) return;
+    byKey[k] = { name: sd.byNorm[k].name, nhom: '', tier: '', deptKey: '', dept: '', revenue: 0, orders: 0, target: 0, pct: null, tongTT: 0, sdtMangVe: 0, tyLeChot: null, failedOrders: 0, careLeads: 0, score: null, rating: 'chuadu', strengths: [], issues: [], comment: 'Chưa có số liệu trong kỳ này.' };
+    people.push(byKey[k]);
+  });
+  people.forEach(function(x) {
+    var dm = sd.byNorm[_normTxt_(x.name)];
+    if (dm && lbl[dm.key]) { x.deptKey = dm.key; x.dept = lbl[dm.key]; } else { x.deptKey = ''; x.dept = UNK; }
+  });
+}
 function orgOverview_(p) {
   var today = _vnYmd_(new Date());
   var from = p.from || p.dateFrom || (today.substring(0, 8) + '01'), to = p.to || p.dateTo || today;
   if (from > to) return jsonOut_({ ok: false, error: 'Khoảng ngày bị ngược (từ ' + from + ' sau đến ' + to + ').' });
-  var cacheKey = 'orgOv_v1_' + from + '_' + to;
+  var cacheKey = 'orgOv_v2_' + from + '_' + to;
   if (p.refresh !== '1') {
     var hit = _cacheGetBig_(cacheKey);
     if (hit) { try { var o = JSON.parse(hit); o.cached = true; return jsonOut_(o); } catch (eh) {} }
@@ -385,9 +431,10 @@ function orgOverview_(p) {
     if (_normTxt_(t.leader)) (leaderOf[_normTxt_(t.leader)] = leaderOf[_normTxt_(t.leader)] || []).push(t.name);
   });
   var UNK = '(chưa phân phòng)';
+  var deptList = readDeptList_(), saleDeptsCfg = readSaleDepts_();
+  _orgApplyDepts_(people, byKey, saleDeptsCfg, deptList, UNK);   // phong = cai dat rieng (deptList/saleDepts), KHONG dung doi Online/Offline
   people.forEach(function(x) {
     var k = _normTxt_(x.name);
-    x.dept = x.dept || ''; x.deptKey = x.deptKey || ''; if (!x.deptKey) x.dept = UNK;
     x.ordersPerDay = Math.round(x.orders / days * 10) / 10;
     x.aov = x.orders ? Math.round(x.revenue / x.orders) : 0;
     x.teams = teamsOf[k] || []; x.leaderOf = leaderOf[k] || []; x.isLeader = x.leaderOf.length > 0;
@@ -408,6 +455,7 @@ function orgOverview_(p) {
   });
   var dmap = {};
   people.forEach(function(x) { var k = x.deptKey || '_none'; (dmap[k] = dmap[k] || { key: x.deptKey || '', label: x.dept, list: [] }).list.push(x); });
+  deptList.forEach(function(g) { if (!dmap[g.key]) dmap[g.key] = { key: g.key, label: g.label, list: [] }; });   // hien du cac phong ke ca phong chua co ai
   var deptOut = Object.keys(dmap).map(function(k) {
     var g = dmap[k], o = _orgAgg_(g.list, days);
     o.key = g.key; o.label = g.label;
@@ -419,8 +467,8 @@ function orgOverview_(p) {
   var order = { tot: 0, trungbinh: 1, kem: 2, chuadu: 3 };
   people.sort(function(a, b) { return (order[a.rating] - order[b.rating]) || ((b.score || 0) - (a.score || 0)) || (b.revenue - a.revenue); });
   var out = { ok: true, from: from, to: to, days: days, generatedAt: Utilities.formatDate(new Date(), 'Asia/Ho_Chi_Minh', 'dd/MM/yyyy HH:mm'),
-    company: _orgAgg_(people, days), depts: deptOut, teams: teamOut, people: people, dailySkipped: dailySkipped, warnings: warnings,
-    note: 'Phòng = nhóm Sale đã phân loại ở "Phân loại đội Sale". Một người thuộc nhiều team thì được tính ở cả các team đó (tổng các team có thể lớn hơn tổng phòng/công ty). Đơn/ngày = số đơn ÷ số ngày trong kỳ (tính đến hôm nay). Điểm & xếp loại: xem quy tắc ở "AI phân tích team".' };
+    company: _orgAgg_(people, days), depts: deptOut, teams: teamOut, people: people, deptList: deptList, saleDepts: saleDeptsCfg.raw, dailySkipped: dailySkipped, warnings: warnings,
+    note: 'Phòng = cài đặt riêng ở nút “Cài đặt phòng” (không liên quan Online/Văn phòng/Thử việc và không ảnh hưởng thưởng). Một người thuộc nhiều team thì được tính ở cả các team đó (tổng các team có thể lớn hơn tổng phòng/công ty). Đơn/ngày = số đơn ÷ số ngày trong kỳ (tính đến hôm nay). Điểm & xếp loại: xem quy tắc ở "AI phân tích team".' };
   try { _cachePutBig_(cacheKey, JSON.stringify(out), 300); } catch (ec) {}
   return jsonOut_(out);
 }
