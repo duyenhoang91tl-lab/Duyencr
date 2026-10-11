@@ -31,7 +31,7 @@ const _inflight = new Map();   // khoa cache -> Promise lam moi dang chay (gop n
 const MAX_CACHE_BYTES = 8 * 1024 * 1024;
 const NO_CACHE_PARAMS = ['demo', 'adminKey'];
 // Tham so KHONG dua vao khoa cache (van chuyen tiep cho GAS): web client gan token phien + src cho moi request (buoc 3b bao mat) -> neu dua vao khoa thi moi nguoi 1 cache rieng, mat tac dung cache dung chung.
-const KEY_IGNORE_PARAMS = ['token', 'src'];
+const KEY_IGNORE_PARAMS = ['token', 'src', 'ek'];
 
 function cors(res) {
   const h = new Headers(res.headers);

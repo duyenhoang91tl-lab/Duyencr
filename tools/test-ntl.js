@@ -8,18 +8,19 @@ const ok = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1); }
 const mapSrc = src.slice(src.indexOf('var NTL_ACTIONS_ ='), src.indexOf('function _ntlKey_'));
 const secret = 'test-secret';
 const b64u = b => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(/\//g, '_');
-let store = {}, failCache = false;
+let store = {}, failCache = false, props = {};
 const ctx = {
   CacheService: { getScriptCache: () => ({
     get: k => { if (failCache) throw new Error('cache down'); return store[k] ?? null; },
     put: (k, v) => { if (failCache) throw new Error('cache down'); store[k] = v; } }) },
-  Utilities: { formatDate: () => '20261011', base64EncodeWebSafe: x => b64u(x), base64DecodeWebSafe: x => Buffer.from(x.replace(/-/g, '+').replace(/_/g, '/'), 'base64'),
+  Utilities: { getUuid: () => crypto.randomUUID(), formatDate: () => '20261011', base64EncodeWebSafe: x => b64u(x), base64DecodeWebSafe: x => Buffer.from(x.replace(/-/g, '+').replace(/_/g, '/'), 'base64'),
     computeHmacSha256Signature: (m, k) => crypto.createHmac('sha256', k).update(m).digest(), newBlob: b => ({ getDataAsString: () => b.toString() }) },
-  Logger: { log() {} }, jsonOut_: o => o
+  Logger: { log() {} }, jsonOut_: o => o,
+  PropertiesService: { getScriptProperties: () => ({ getProperty: k => props[k] ?? null, setProperty: (k, v) => { props[k] = v; } }) }
 };
 vm.createContext(ctx);
 // _sessVerify_ that, nhung bi mat lay tu bien test (khong dung Script Properties)
-vm.runInContext(mapSrc + '\n' + fn('_ntlKey_') + fn('_secEq_') + fn('_ntlNote_') + fn('_ntlReport_') +
+vm.runInContext(mapSrc + '\n' + fn('_ntlKey_') + fn('_secEq_') + 'var EXT_KEY_NAMES_ = ["zalo", "pancake"];' + fn('_extKeys_') + fn('_extKeyNew_') + fn('_extKeyEnsure_') + fn('_extKeyRotate_') + fn('_extKeyWho_') + fn('xemKhoaExtension') + fn('_ntlNote_') + fn('_ntlReport_') +
   `var _sessSecret_ = function(){ return ${JSON.stringify(secret)}; };\n` + fn('_sessSign_') + fn('_sessVerify_'), ctx);
 const mk = (u, e) => { const b = b64u(JSON.stringify({ u, e })); return b + '.' + b64u(crypto.createHmac('sha256', secret).update(b).digest()); };
 const good = mk('duyen', Date.now() + 1e6), expired = mk('duyen', Date.now() - 1);
@@ -58,9 +59,32 @@ failCache = false; store = { ntl_20261011: '{hong' };
 ctx._ntlNote_('GET', 'customers', '', 'web');
 ok(ctx._ntlReport_().noTokenTotal === 1, 'cache hong thi dem lai tu 1');
 // 7) doGet/doPost that su goi _ntlNote_ (khong bi bo sot khi sua sau nay)
-ok(/_ntlNote_\('GET', action, p\.token, p\.src\);\s*\n\s*return doGetCore_\(e\);/.test(src), 'doGet phai goi _ntlNote_ truoc doGetCore_');
-ok(/_ntlNote_\('POST', d0\.action, d0\.token, d0\.src\)/.test(src), 'doPost phai goi _ntlNote_');
+ok(/_ntlNote_\('GET', action, p\.token, p\.src, p\.ek\);\s*\n\s*return doGetCore_\(e\);/.test(src), 'doGet phai goi _ntlNote_ truoc doGetCore_');
+ok(/_ntlNote_\('POST', d0\.action, d0\.token, d0\.src, d0\.ek\)/.test(src), 'doPost phai goi _ntlNote_');
 ok(!/_ntlNote_\('GET'[^\n]*\n[^\n]*_demoClip_/.test(src), 'tai khoan demo khong duoc di qua log');
+
+// 9) KHOA API EXTENSION (buoc 4a, chi ghi log)
+store = {}; props = {};
+const ks = ctx.xemKhoaExtension();
+ok(/^ek_[0-9a-f]{44}$/.test(ks.zalo) && /^ek_[0-9a-f]{44}$/.test(ks.pancake) && ks.zalo !== ks.pancake, 'sinh khoa rieng cho tung extension: ' + ks.zalo);
+ok(ctx.xemKhoaExtension().zalo === ks.zalo, 'chay lai KHONG doi khoa da co');
+ctx._ntlNote_('GET', 'lookup', '', 'zalo', ks.zalo);
+ctx._ntlNote_('GET', 'lookup', '', 'zalo', ks.pancake);          // khoa pancake nhung khai src=zalo -> tin vao KHOA, khong tin src
+ctx._ntlNote_('GET', 'lookup', '', 'zalo', 'ek_saisaisai');
+ctx._ntlNote_('GET', 'lookup', '', 'zalo', '');
+ctx._ntlNote_('GET', 'lookup', good, 'web', 'ek_saisaisai');     // co token hop le -> la token, bo qua ek
+r = ctx._ntlReport_();
+ok(get('GET lookup | src=zalo | key-zalo') === 1 && get('GET lookup | src=zalo | key-pancake') === 1, 'khoa dung -> key-<ten>');
+ok(get('GET lookup | src=zalo | NO-TOKEN(key-sai)') === 1 && get('GET lookup | src=zalo | NO-TOKEN') === 1, 'khoa sai / khong khoa tach rieng');
+ok(get('GET lookup | src=web | token') === 1, 'token thang ek');
+ok(r.keyTotal === 2 && r.noTokenTotal === 2 && r.tokenTotal === 1, 'tong key/notoken/token: ' + r.keyTotal + '/' + r.noTokenTotal + '/' + r.tokenTotal);
+// doi khoa: khoa cu het hieu luc, khoa cua extension kia giu nguyen
+const old = ks.zalo; const ks2 = ctx._extKeyRotate_('zalo');
+ok(ks2.zalo !== old && ks2.pancake === ks.pancake, 'doi khoa zalo khong dong vao pancake');
+ok(ctx._extKeyWho_(old) === 'sai' && ctx._extKeyWho_(ks2.zalo) === 'zalo', 'khoa cu bi vo hieu');
+let thr = false; try { ctx._extKeyRotate_('hack'); } catch (e) { thr = true; } ok(thr, 'ten extension la bi tu choi');
+// khoa tuyet doi khong lo qua log
+ok(JSON.stringify(store).indexOf(ks.zalo) < 0 && JSON.stringify(store).indexOf('ek_') < 0, 'khoa KHONG duoc xuat hien trong log');
 // 8) moi action trong danh sach theo doi la action that (grep doGetCore_/doPostCore_)
 const names = Object.keys(JSON.parse(JSON.stringify(vm.runInContext('NTL_ACTIONS_', ctx))));
 const missing = names.filter(a => src.indexOf("action === '" + a + "'") < 0);

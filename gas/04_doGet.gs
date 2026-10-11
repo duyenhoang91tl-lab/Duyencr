@@ -9,7 +9,7 @@ function doGet(e) {
     if (DEMO_ALLOWED_GET_[action] !== 1) return jsonOut_({ error: 'Tai khoan test khong duoc phep thao tac nay.' });
     return _demoClip_(doGetCore_(e), action);
   }
-  _ntlNote_('GET', action, p.token, p.src);
+  _ntlNote_('GET', action, p.token, p.src, p.ek);
   return doGetCore_(e);
 }
 
@@ -379,7 +379,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.26-auth-log-notoken' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.27-auth-extkey-log' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──

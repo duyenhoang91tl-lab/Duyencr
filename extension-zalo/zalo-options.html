@@ -26,6 +26,10 @@
   <label>URL Web App GAS</label>
   <input type="text" id="gasUrl" placeholder="https://script.google.com/macros/s/.../exec" />
 
+  <label>Khóa truy cập CRM (do admin cấp)</label>
+  <input type="password" id="extKey" placeholder="ek_..." autocomplete="off" />
+  <div class="hint">Khóa riêng của extension Zalo, admin lấy trong Apps Script (hàm <code>xemKhoaExtension</code>). Không chia sẻ khóa này ra ngoài đội.</div>
+
   <button id="save">Lưu cài đặt</button>
   <span id="saved"></span>
 

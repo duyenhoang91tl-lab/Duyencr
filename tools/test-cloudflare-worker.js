@@ -67,6 +67,8 @@ const W = 'https://crm.example.workers.dev/';
   // origin nhan DUNG thu tu/tham so goc
   ok(calls[1].url === GAS + '?action=salesReportA&from=2026-10-01&to=2026-10-09&src=worker', 'tham so chuyen tiep nguyen ven');
   // Buoc 3b: token/src cua tung nguoi KHONG chia nho cache; van chuyen tiep nguyen ven cho GAS; src san co khong bi ghi de
+  reset(); await go('action=orders&src=web&token=AAA&ek=X1'); r = await go('action=orders&src=zalo&ek=X2');
+  ok(r.headers.get('x-crm-cache') === 'HIT' && calls.length === 1, 'ek (khoa extension) khong chia nho cache');
   reset(); await go('action=orders&src=web&token=AAA'); r = await go('action=orders&src=web&token=BBB');
   ok(r.headers.get('x-crm-cache') === 'HIT' && calls.length === 1, 'hai nguoi khac token cung dung 1 cache');
   ok(calls[0].url === GAS + '?action=orders&src=web&token=AAA', 'GAS nhan nguyen src + token cua nguoi goi: ' + calls[0].url);

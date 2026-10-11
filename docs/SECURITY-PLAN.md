@@ -17,10 +17,20 @@ Cập nhật 2026-10-11. Nguyên nhân gốc: trước đây `action=users` tr�
 **Sau 1–2 ngày:** xem `ntlReport` (hoặc chạy `xemLogKhongToken`): web phải toàn `token`; nếu còn `NO-TOKEN` với `src=web` → có đường gọi chưa đi qua `fetch` bọc (vd `<img>`/`navigator.sendBeacon`); `src=zalo`/`pancake` NO-TOKEN là bình thường tới khi xong cơ chế xác thực extension (bước 4).
 Test: `node tools/test-cloudflare-worker.js`, `node tools/test-ntl.js`.
 
-## Bước 4 — CHƯA LÀM: bắt buộc token + lọc theo vai trò ở server
-- Client: gắn `token` vào mọi request tới GAS (hàm `window.fetch` bọc ở `js/06-main-renew-sources.js`). Lưu ý Worker Cloudflare đang cache GET theo URL → thêm `token` vào `NO_CACHE_PARAMS` hoặc chuẩn hoá cache key bỏ `token` nhưng vẫn xác thực ở Worker.
-- Extension Zalo/Pancake: cần cơ chế xác thực riêng (khoá API cho extension hoặc `verifyLogin` → token) trước khi bắt buộc.
-- Role cs/leader: lọc `customers`/`lookup` ở server theo tên CS của tài khoản (hiện chỉ lọc ở `_inUserScope` phía trình duyệt).
+## Bước 4a — ĐÃ LÀM (gas v13.27-auth-extkey-log): khoá API riêng cho extension, CHỈ GHI LOG
+- Mỗi extension 1 khoá (`zalo`, `pancake`) trong Script Properties (`extApiKeys`) — KHÔNG để trong sheet Settings, KHÔNG để trong code (repo public).
+- **Lấy/đổi khoá:** chạy `xemKhoaExtension` (tự sinh nếu chưa có), `doiKhoaZalo`, `doiKhoaPancake` trong Apps Script Editor → xem Execution log. Dán khoá vào trang Cài đặt của đúng extension, ô "Khóa truy cập CRM" (lưu `chrome.storage.local['ome_ext_key']`, không đồng bộ).
+- Extension gửi khoá qua tham số **`ek`** (GET) / trường **`"ek"`** (POST). Không dùng tên `key` vì `getSetting&key=` / `setSetting.key` đã dùng.
+- `ntlReport` giờ có nhãn: `token` (web) | `key-zalo` / `key-pancake` (khoá đúng — tin vào KHOÁ chứ không tin `src` tự khai) | `NO-TOKEN(key-sai)` | `NO-TOKEN`; thêm `keyTotal`. Worker bỏ `ek` khỏi khoá cache.
+- Test: `node tools/test-ntl.js` (case khoá), `node tools/test-cloudflare-worker.js`.
+
+## Bước 4b — CHƯA LÀM: BẮT BUỘC (chỉ làm khi log sạch)
+Điều kiện: sau khi dán khoá vào MỌI máy CS, `ntlReport` không còn `NO-TOKEN` (kể cả `key-sai`) cho `src=zalo|pancake` trong ≥2 ngày làm việc. Khi đó:
+- GAS từ chối action dữ liệu nếu không có token hợp lệ HOẶC khoá extension hợp lệ; extension chỉ được dùng danh sách action cho phép (rút ra từ `ntlReport`: lookup, saveSingle, reminders, ai, priceSearch, getSetting... — KHÔNG gồm deleteOrder/replaceOrders/saveUsers/deleteDuplicateOrders… trừ khi extension thật sự gọi).
+- Web: token phiên (đã gửi sẵn). Lọc `customers`/`lookup` theo vai trò cs/leader ở server.
+- Token hiện nằm trên query của GET (Apps Script không đọc được header) → cân nhắc chuyển action nhạy cảm sang POST, hoặc xác thực HMAC ở Worker trước khi trả cache.
+- Khoá dùng chung cả extension: lộ khoá = ai cũng gọi được các action được phép → đổi khoá bằng `doiKhoa*` rồi phát khoá mới. Nếu cần biết CS nào gọi → nâng lên khoá riêng từng CS.
+
 
 ## Việc thủ công sau mỗi lần sửa
 Deploy lại GAS (dán `gas_v13.js` hoặc nút "Đồng bộ mã GAS mới nhất", rồi Deploy → New version) — nếu GAS cũ thì đăng nhập web báo "Máy chủ chưa hỗ trợ đăng nhập mới". Nên đổi mật khẩu các tài khoản yếu (hash cũ đã từng công khai) và cân nhắc để repo private.

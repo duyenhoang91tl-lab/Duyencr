@@ -4,25 +4,36 @@
 // riêng, mọi request (trừ khi CS cấu hình "AI cá nhân" — xem callAI_ dưới) đi qua 1 Web App
 // GAS: POST { action:'ai', prompt, withProducts }.
 
-// Buoc 3b bao mat (2026-10-11): moi request toi GAS/Worker kem src=pancake de GAS ghi log "request khong token" biet nguon goi.
-// Chi dong vao URL Google Apps Script / Cloudflare Worker (khong dong vao API Pancake). Khong doi hanh vi nao khac.
+// Buoc 3b/4a bao mat (2026-10-11): moi request toi GAS/Worker kem src=pancake + khoa extension `ek` (nhap o trang Cai dat, luu
+// chrome.storage.local 'ome_ext_key' — KHONG dung storage.sync de khoa khong tu dong bo giua cac may) de GAS ghi log biet nguon goi.
+// Chi dong vao URL Google Apps Script / Cloudflare Worker (khong dong vao API Pancake). Hien CHUA chan gi. Khong dung ten `key` vi getSetting&key=... da dung.
 (function () {
   const _origFetch = self.fetch.bind(self);
   const GAS_HOST_RE = /^https:\/\/(script\.google\.com|script\.googleusercontent\.com|[^/]*\.workers\.dev)\//;
+  let EXT_KEY = "";
+  // Service worker MV3 co the vua khoi dong lai: cho doc khoa xong roi moi goi (chi voi URL GAS), tranh request dau tien mat khoa.
+  const keyReady = new Promise((res) => {
+    try { chrome.storage.local.get(["ome_ext_key"], (r) => { EXT_KEY = (r && r.ome_ext_key) || ""; res(); }); } catch (e) { res(); }
+  });
+  try { chrome.storage.onChanged.addListener((c, area) => { if (area === "local" && c.ome_ext_key) EXT_KEY = c.ome_ext_key.newValue || ""; }); } catch (e) {}
   self.fetch = function (u, o) {
-    try {
-      if (typeof u === "string" && GAS_HOST_RE.test(u)) {
+    if (typeof u !== "string" || !GAS_HOST_RE.test(u)) return _origFetch(u, o);
+    return keyReady.then(() => {
+      try {
         if (o && o.method && String(o.method).toUpperCase() === "POST") {
           if (typeof o.body === "string" && o.body.charAt(0) === "{") {
             const rest = o.body.slice(1);
-            o = Object.assign({}, o, { body: '{"src":"pancake"' + (/^\s*\}/.test(rest) ? "" : ",") + rest });
+            o = Object.assign({}, o, { body: '{"src":"pancake"' + (EXT_KEY ? ',"ek":' + JSON.stringify(EXT_KEY) : "") + (/^\s*\}/.test(rest) ? "" : ",") + rest });
           }
-        } else if (!/[?&]src=/.test(u)) {
-          u += (u.indexOf("?") > -1 ? "&" : "?") + "src=pancake";
+        } else {
+          const add = [];
+          if (!/[?&]src=/.test(u)) add.push("src=pancake");
+          if (EXT_KEY && !/[?&]ek=/.test(u)) add.push("ek=" + encodeURIComponent(EXT_KEY));
+          if (add.length) u += (u.indexOf("?") > -1 ? "&" : "?") + add.join("&");
         }
-      }
-    } catch (e) {}
-    return _origFetch(u, o);
+      } catch (e) {}
+      return _origFetch(u, o);
+    });
   };
 })();
 

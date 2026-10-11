@@ -695,16 +695,61 @@ var NTL_ACTIONS_ = {
 };
 function _ntlKey_() { return 'ntl_' + Utilities.formatDate(new Date(), 'GMT+7', 'yyyyMMdd'); }
 // Ghi 1 request vao bo dem. method: 'GET'|'POST'. Moi loi bi nuot — log KHONG BAO GIO duoc lam hong request that.
-function _ntlNote_(method, action, token, src) {
+// ═══════════════════════════════════════════════════════════════
+//  KHOA API CHO EXTENSION (buoc 4a — CHI GHI LOG, chua chan gi). Moi extension (zalo, pancake) 1 khoa, luu trong Script Properties
+//  ('extApiKeys', KHONG nam trong sheet Settings vi CRM doc duoc sheet do; repo public nen khoa tuyet doi khong nam trong code extension).
+//  Extension gui khoa qua tham so `ek` (GET) / truong "ek" (POST). KHONG dung ten `key` vi getSetting&key=... / setSetting.key da dung ten nay.
+//  Lay/doi khoa: chay xemKhoaExtension / doiKhoaZalo / doiKhoaPancake trong Apps Script Editor (xem Execution log), roi dan vao
+//  trang Cai dat cua tung extension. Muc dich: biet extension nao da co khoa truoc khi BAT BUOC (buoc 4b).
+// ═══════════════════════════════════════════════════════════════
+var EXT_KEY_NAMES_ = ['zalo', 'pancake'];
+function _extKeys_() {
+  try { return JSON.parse(PropertiesService.getScriptProperties().getProperty('extApiKeys') || '{}') || {}; } catch (e) { return {}; }
+}
+function _extKeyNew_() { return 'ek_' + Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '').slice(0, 12); }
+function _extKeyEnsure_() {
+  var ks = _extKeys_(), ch = false;
+  EXT_KEY_NAMES_.forEach(function (n) { if (!ks[n]) { ks[n] = _extKeyNew_(); ch = true; } });
+  if (ch) PropertiesService.getScriptProperties().setProperty('extApiKeys', JSON.stringify(ks));
+  return ks;
+}
+function _extKeyRotate_(which) {
+  var ks = _extKeyEnsure_();
+  if (EXT_KEY_NAMES_.indexOf(which) < 0) throw new Error('Ten extension khong hop le: ' + which);
+  ks[which] = _extKeyNew_();
+  PropertiesService.getScriptProperties().setProperty('extApiKeys', JSON.stringify(ks));
+  return ks;
+}
+// '' = khong gui khoa; 'sai' = gui nhung khong khop khoa nao; 'zalo' / 'pancake' = khop khoa cua extension do (so sanh hang thoi gian).
+function _extKeyWho_(ek) {
+  ek = String(ek || '');
+  if (!ek) return '';
+  var ks = _extKeys_();
+  for (var i = 0; i < EXT_KEY_NAMES_.length; i++) { if (ks[EXT_KEY_NAMES_[i]] && _secEq_(ek, ks[EXT_KEY_NAMES_[i]])) return EXT_KEY_NAMES_[i]; }
+  return 'sai';
+}
+function xemKhoaExtension() {
+  var ks = _extKeyEnsure_();
+  Logger.log('Khoa Duyen AI - Zalo   : ' + ks.zalo);
+  Logger.log('Khoa Duyen AI - Pancake: ' + ks.pancake);
+  Logger.log('Dan tung khoa vao trang Cai dat (Options) cua dung extension, o "Khoa truy cap CRM". Doi khoa: chay doiKhoaZalo / doiKhoaPancake.');
+  return ks;
+}
+function doiKhoaZalo() { _extKeyRotate_('zalo'); return xemKhoaExtension(); }
+function doiKhoaPancake() { _extKeyRotate_('pancake'); return xemKhoaExtension(); }
+
+function _ntlNote_(method, action, token, src, ek) {
   try {
     action = String(action || '');
     if (!NTL_ACTIONS_[action]) return;
     var tokOk = !!(token && _sessVerify_(token));
+    var who = tokOk ? '' : _extKeyWho_(ek);
     var cache = CacheService.getScriptCache();
     var key = _ntlKey_(), raw = cache.get(key), m = {};
     if (raw) { try { m = JSON.parse(raw) || {}; } catch (e0) { m = {}; } }
     var sc = String(src || '?').replace(/[^A-Za-z0-9_\-]/g, '').slice(0, 16) || '?';
-    var k = method + ' ' + action + ' | src=' + sc + ' | ' + (tokOk ? 'token' : 'NO-TOKEN');
+    var lbl = tokOk ? 'token' : (who && who !== 'sai' ? 'key-' + who : 'NO-TOKEN' + (who === 'sai' ? '(key-sai)' : ''));
+    var k = method + ' ' + action + ' | src=' + sc + ' | ' + lbl;
     m[k] = (m[k] || 0) + 1;
     if (Object.keys(m).length > 200) return;   // chan phinh to bat thuong (vd ai do gui action/src ngau nhien)
     cache.put(key, JSON.stringify(m), 21600);
@@ -719,9 +764,9 @@ function _ntlReport_() {
     var an = a.k.indexOf('NO-TOKEN') >= 0 ? 0 : 1, bn = b.k.indexOf('NO-TOKEN') >= 0 ? 0 : 1;
     return an !== bn ? an - bn : b.n - a.n;
   });
-  var noTok = 0, tok = 0;
-  rows.forEach(function (r) { if (r.k.indexOf('NO-TOKEN') >= 0) noTok += r.n; else tok += r.n; });
-  return { ok: true, date: _ntlKey_().slice(4), noTokenTotal: noTok, tokenTotal: tok, rows: rows,
+  var noTok = 0, tok = 0, keyed = 0;
+  rows.forEach(function (r) { if (r.k.indexOf('NO-TOKEN') >= 0) noTok += r.n; else if (r.k.indexOf('| key-') >= 0) keyed += r.n; else tok += r.n; });
+  return { ok: true, date: _ntlKey_().slice(4), noTokenTotal: noTok, tokenTotal: tok, keyTotal: keyed, rows: rows,
     note: 'Dem gan dung, luu o cache toi da 6 gio (ngung 6 gio thi bat dau dem lai). src=? nghia la nguoi goi chua gui tham so src.' };
 }
 // Chay tay trong Apps Script Editor (khong can adminKey): xem Execution log.
