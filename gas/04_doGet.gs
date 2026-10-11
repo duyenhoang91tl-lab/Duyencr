@@ -382,6 +382,9 @@ function doGetCore_(e) {
       tasksOut_.forEach(function (t) { t.pendingReq = pendMap_[t.id] || []; });
       return jsonOut_({ tasks: tasksOut_ });
     }
+    // ── Chat Pancake trong CRM (doc tu Supabase) ──
+    if (action === 'pkChat')     return pkChat_(e);
+    if (action === 'pkChatFind') return pkChatFind_(e);
     if (action === 'notifications') {
       var _gu = _sessUser_(e && e.parameter && e.parameter.token);
       if (!_gu) return jsonOut_({ error: 'Can dang nhap.', code: 'AUTH' });
@@ -401,7 +404,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.33-notify' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.34-pkchat' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──

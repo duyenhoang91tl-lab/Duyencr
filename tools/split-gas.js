@@ -34,7 +34,8 @@ const PARTS = [
   ['21_ArchiveOldOrders', 'var ARCHIVE_SUFFIX_ ='],
   ['22_Supabase', 'var SB_BATCH_ ='],
   ['23_TodayTasks', 'var TT_TRACK_SHEET_ ='],
-  ['24_TonKho', 'var SH_KHO =']
+  ['24_TonKho', 'var SH_KHO ='],
+  ['25_PancakeChat', 'var PK_CHAT_SECTION_ =']
 ];
 const src = fs.readFileSync(SRC, 'utf8');
 const lines = src.split('\n');

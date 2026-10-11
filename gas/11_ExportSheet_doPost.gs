@@ -311,6 +311,9 @@ function doPostCore_(e) {
     // ── Binh luan/thao luan trong 1 cong viec (Task) — tab "Thao luan" tren UI ──
     if (action === 'saveTaskComment') return saveTaskComment_(data.comment);
     // ── Thong bao @tag: danh dau da doc / tao thong bao cho ghi chu khach (comment+task tu tao ngay trong saveTaskComment_/saveTaskEntry_) ──
+    // ── Chat Pancake trong CRM: gan hoi thoai voi SDT khach, gui tin tra loi ──
+    if (action === 'pkChatLink') return pkChatLink_(data);
+    if (action === 'pkChatSend') return pkChatSend_(data);
     if (action === 'notifRead') { var _nu = _sessUser_(data.token); if (!_nu) return jsonOut_({ error: 'Can dang nhap.', code: 'AUTH' }); return jsonOut_(markNotifRead_(_nu.username, data.ids, !!data.all)); }
     if (action === 'notifMention') {
       var _nm = _sessUser_(data.token); if (!_nm) return jsonOut_({ error: 'Can dang nhap.', code: 'AUTH' });

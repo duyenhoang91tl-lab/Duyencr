@@ -106,3 +106,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hàm: `_khoJsonArr_`, `_khoUnames_`, `_khoFromRow_`, `readKho_`, `_khoById_`, `_khoLevel_`, `_khoAllows_`, `_tonkhoCode_`, `_tonkhoKey_`, `_khoNum_`, `_khoNowIso_`, `_khoNewId_`, `_khoAuth_`, `_khoWithLock_`, `_khoGate_`, `_tonkhoItemFromRow_`, `_tonkhoItemToRow_`, `readTonKho_`, `_tonkhoLoad_`, `_tonkhoLog_`, `readTonKhoLog_`, `khoSave_`, `tonKhoSet_`, `tonKhoAdjust_`, `tonKhoItemSave_`, `tonKhoItemDelete_`, `tonKhoImport_`
 - Hằng/biến: `SH_KHO`, `KHO_HEADERS`, `SH_TONKHO`, `TONKHO_HEADERS`, `SH_TONKHO_LOG`, `TONKHO_LOG_HEADERS`, `TONKHO_IMPORT_MAX_`
 
+## 25_PancakeChat.gs
+- Hàm: `_pkAuth_`, `_pkEnc_`, `_pkInList_`, `_pkAtts_`, `_pkConvOut_`, `pkChat_`, `pkChatFind_`, `pkChatLink_`, `_pkPageToken_`, `pkChatSend_`
+- Hằng/biến: `PK_CHAT_SECTION_`, `PK_CONV_COLS_`
+
