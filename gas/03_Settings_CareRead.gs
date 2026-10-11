@@ -181,6 +181,8 @@ function careObjFromRow_(row) {
     // Gia tri cac "truong tu tao" admin them (xem CUSTOM_FIELDS ben index.html) — luu gop 1 cot
     // JSON de khong phai them cot moi moi lan admin tao them truong.
     custom:       (function(v){ try { var o = JSON.parse(v||'{}'); return (o && typeof o === 'object') ? o : {}; } catch(e) { return {}; } })(row[20]),
+    // Nhan phan loai (tu dat) — luu o custom.tag (khong them cot moi), lop ra thanh truong 'tag' de CRM (js/01) doc nhu cu.
+    tag:          (function(v){ try { var o = JSON.parse(v||'{}'); return (o && typeof o === 'object' && o.tag) ? String(o.tag) : ''; } catch(e) { return ''; } })(row[20]),
     // SDT khach dung de ket ban Zalo (mang chuoi, CS tu them) — xem chu thich tai CARE_HEADERS
     zaloPhones:   (function(v){ try { var a = JSON.parse(v||'[]'); return Array.isArray(a) ? a : []; } catch(e) { return []; } })(row[21])
   };
@@ -238,29 +240,55 @@ function readRemindersToday_(csFilter) {
   if (!shR || shR.getLastRow() < 2) return [];
   return _remindersFromRows_(shR.getDataRange().getValues().slice(1), csFilter);
 }
-// rows: mang dong CareData (cot 0 SDT, 1 status, 2 zalo, 3 cs, 12 schedHen, 13 schedHenNote) — KHONG gom dong tieu de.
+// rows: mang dong CareData (cot 0 SDT, 1 status, 2 zalo, 3 cs, 5 schedules(JSON), 12 schedHen, 13 schedHenNote) — KHONG gom dong tieu de.
+// LUU Y: duong Supabase (sbReadRemindersRows_) chi select sched_hen nen KHONG kem schedules (cot 5 rong) — lich nhac nhanh chua vao nhac khi SB_MODE=read.
 function _remindersFromRows_(rows, csFilter) {
   var today = new Date(); today.setHours(0,0,0,0);
-  var reminders = [], seenR = {};
+  // Ngay hom nay dang YYYY-MM-DD (gio dia phuong) de loc nhanh cot schedules truoc khi JSON.parse (ham nay chay moi ~5 phut/may).
+  var todayYmd = today.getFullYear() + '-' + ('0' + (today.getMonth()+1)).slice(-2) + '-' + ('0' + today.getDate()).slice(-2);
+  var reminders = [], byPhone = {};
   for (var ri = 0; ri < rows.length; ri++) {
     var rw = rows[ri];
     if (!rw[0]) continue;
     var rcs = String(rw[3]||'').trim();
     if (csFilter && rcs !== csFilter) continue;
-    var rhen = rw[12];
-    if (!rhen) continue;
-    var rdate = new Date(rhen); rdate.setHours(0,0,0,0);
-    // CHỈ hẹn TRONG NGÀY hôm nay (không lấy quá hạn) — extension chỉ nhắc lịch của ngày
-    if (rdate.getTime() !== today.getTime()) continue;
-    // Gộp trùng: mỗi SĐT chỉ 1 nhắc (tránh nhân bản do CareData có dòng trùng)
     var npR = normPhone_(String(rw[0]));
-    if (seenR[npR]) continue;
-    seenR[npR] = true;
-    reminders.push({
-      phone: String(rw[0]), schedHen: String(rhen),
-      schedHenNote: String(rw[13]||''), cs: rcs,
+    // (1) Hen chinh (cot schedHen) — CHI hen TRONG NGAY hom nay (khong lay qua han), nhu cu.
+    var rhen = rw[12];
+    var hasHen = false;
+    if (rhen) {
+      var rdate = new Date(rhen); rdate.setHours(0,0,0,0);
+      hasHen = (rdate.getTime() === today.getTime());
+    }
+    // (2) Lich nhac nhanh (cot schedules, JSON: CRM/Pancake AI them) co ngay = hom nay, chua xong, khong phai sinh nhat tu dong.
+    var schedNotes = [];
+    var rsch = rw[5];
+    if (rsch && typeof rsch === 'string' && rsch.indexOf(todayYmd) !== -1) {
+      try {
+        var sa = JSON.parse(rsch);
+        if (Array.isArray(sa)) sa.forEach(function(x) {
+          if (!x || x.done || x.type === 'birthday' || !x.date) return;
+          if (String(x.date).slice(0, 10) !== todayYmd) return;
+          schedNotes.push(String(x.note || x.customLabel || ''));
+        });
+      } catch (eS) {}
+    }
+    if (!hasHen && !schedNotes.length) continue;
+    // Gop trung: moi SDT chi 1 nhac (tranh nhan ban do CareData co dong trung) — dong trung chi duoc BO SUNG ghi chu, khong tao nhac moi.
+    var note = (hasHen ? String(rw[13]||'') : '');
+    var cur = byPhone[npR];
+    if (cur) {
+      schedNotes.forEach(function(n) { if (n && cur.schedHenNote.indexOf(n) === -1) cur.schedHenNote += (cur.schedHenNote ? ' · ' : '') + n; });
+      continue;
+    }
+    var allNotes = [note].concat(schedNotes).filter(function(n, i, a) { return n && a.indexOf(n) === i; }).join(' · ');
+    cur = {
+      phone: String(rw[0]), schedHen: hasHen ? String(rhen) : todayYmd,
+      schedHenNote: allNotes, cs: rcs,
       status: String(rw[1]||''), zalo: String(rw[2]||''), overdue: false
-    });
+    };
+    byPhone[npR] = cur;
+    reminders.push(cur);
   }
   return reminders;
 }
@@ -296,6 +324,12 @@ function careRow_(r) {
   var cust = r.custom;
   if (typeof cust === 'string') { try { cust = JSON.parse(cust||'{}'); } catch(e) { cust = {}; } }
   if (!cust || typeof cust !== 'object') cust = {};
+  // Nhan phan loai (tu dat): client gui 'tag' rieng (CRM) HOAC nam san trong custom.tag (Pancake/Zalo copy nguyen custom).
+  // r.tag === undefined -> giu nguyen custom.tag client gui; r.tag la chuoi (ke ca rong) -> la gia tri moi (rong = xoa nhan).
+  if (r.tag !== undefined && r.tag !== null) {
+    var tg = String(r.tag).trim();
+    if (tg) cust.tag = tg; else delete cust.tag;
+  }
   var zp = r.zaloPhones;
   if (!Array.isArray(zp)) { try { zp = JSON.parse(zp||'[]'); } catch(e) { zp = []; } }
   return [
