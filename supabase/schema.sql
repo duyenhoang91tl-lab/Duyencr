@@ -169,13 +169,15 @@ drop policy if exists "Enable all access for pk_messages"      on pk_messages;
 
 create or replace function pk_ingest_raw(p_id bigint) returns int language plpgsql as $$
 declare
-  r record; ent jsonb; ev jsonb;
+  r pk_webhook_raw; ent jsonb; ev jsonb;
   v_page text; v_mid text; v_sender text; v_recip text; v_echo boolean; v_dir text;
   v_cust text; v_name text; v_conv text; v_text text; v_ms text; v_ts timestamptz;
   v_n int := 0; v_rc int;
 begin
   select * into r from pk_webhook_raw where id = p_id;
   if not found then return 0; end if;
+  -- Dạng THẬT của Pancake (đã xác nhận bằng payload 2026-10-12): {data:{message,conversation,post}, page_id, event_type, timestamp}
+  if jsonb_typeof(r.payload) = 'object' and r.payload ? 'data' then return pk_ingest_pancake(r); end if;
   for ent in select e from jsonb_array_elements(case when jsonb_typeof(r.payload->'entry') = 'array' then r.payload->'entry' else '[]'::jsonb end) e loop
     for ev in select m from jsonb_array_elements(case when jsonb_typeof(ent->'messaging') = 'array' then ent->'messaging' else '[]'::jsonb end) m loop
       v_mid := ev #>> '{message,mid}';
@@ -233,5 +235,144 @@ do $$ begin
   if exists (select 1 from pg_roles where rolname = 'authenticated') then
     revoke all on function pk_ingest_raw(bigint) from authenticated;
     revoke all on function pk_webhook_raw_after_insert() from authenticated;
+  end if;
+end $$;
+
+-- 9) Tách payload THẬT của Pancake (docs/PANCAKE-INBOX.md, bước 2b). Đã xác nhận bằng payload thật 2026-10-12:
+--    {data:{message:{id,from:{id,name},message(HTML),original_message,conversation_id,inserted_at(UTC, không có múi giờ),phone_info[],attachments[]},
+--           conversation:{id,from:{id,name},tags[],assignee_ids[uuid],customer_id(uuid Pancake),snippet,seen,is_replied,version}, post}, page_id, event_type, timestamp}
+--    event_type: 'messaging' (có message + conversation), 'conversation' (đổi thẻ/người phụ trách/đã đọc), 'post' (bài đăng/bình luận: BỎ QUA ở bước này).
+--    Hướng tin: from.id = page_id -> 'out' (page/sale trả lời HOẶC tin hệ thống như "X đã trả lời một quảng cáo"), còn lại 'in' (khách).
+--    NGUYÊN NHÂN GỐC cần cột version: sự kiện 'messaging' kèm bản conversation CŨ (không có version, assignee khác), sự kiện 'conversation' mới hơn
+--    mới là nguồn đúng cho thẻ/người phụ trách -> chỉ cho ghi đè khi version >= version đang có, tránh webhook đến sai thứ tự làm lùi dữ liệu.
+alter table pk_conversations add column if not exists psid         text default '';
+alter table pk_conversations add column if not exists snippet      text default '';
+alter table pk_conversations add column if not exists tags         jsonb default '[]'::jsonb;
+alter table pk_conversations add column if not exists assignee_ids text[] default '{}';
+alter table pk_conversations add column if not exists seen         boolean default false;
+alter table pk_conversations add column if not exists is_replied   boolean default false;
+alter table pk_conversations add column if not exists conv_type    text default '';
+alter table pk_conversations add column if not exists version      int;
+create index if not exists pk_conversations_assignee_idx on pk_conversations using gin (assignee_ids);
+
+-- Chuẩn hoá SĐT VN về dạng 0xxxxxxxxx (cùng dạng normPhone_ ở GAS); sai dạng -> chuỗi rỗng.
+create or replace function pk_norm_phone(p text) returns text language sql immutable as $$
+  select case
+    when d ~ '^0[0-9]{9}$' then d
+    when d ~ '^84[0-9]{9}$' then '0' || substr(d, 3)
+    else '' end
+  from (select regexp_replace(coalesce(p, ''), '[^0-9]', '', 'g') as d) x
+$$;
+
+create or replace function pk_ingest_pancake(r pk_webhook_raw) returns int language plpgsql as $$
+declare
+  d jsonb := r.payload -> 'data';
+  v_evt text := coalesce(nullif(r.payload->>'event_type', ''), r.event_type, '');
+  v_page text := coalesce(nullif(r.payload->>'page_id', ''), nullif(r.page_id, ''), '');
+  c jsonb; m jsonb;
+  v_conv text; v_psid text; v_cname text; v_cid text; v_snip text; v_ver int;
+  v_tags jsonb; v_ass text[]; v_seen boolean; v_rep boolean; v_type text;
+  v_mid text; v_from text; v_dir text; v_text text; v_ins text; v_ts timestamptz; v_phone text; v_pi jsonb;
+  v_n int := 0;
+begin
+  if d is null or jsonb_typeof(d) <> 'object' then return 0; end if;
+  if v_evt not in ('messaging', 'conversation') then return 0; end if;   -- 'post' (bình luận/bài đăng) để bước sau
+  c := case when jsonb_typeof(d->'conversation') = 'object' then d->'conversation' end;
+  m := case when jsonb_typeof(d->'message') = 'object' then d->'message' end;
+  v_conv := coalesce(nullif(c->>'id', ''), nullif(m->>'conversation_id', ''), '');
+  if v_conv = '' then return 0; end if;
+  if v_page = '' then v_page := coalesce(m->>'page_id', ''); end if;
+
+  v_psid  := coalesce(c #>> '{from,id}', '');
+  v_cname := coalesce(c #>> '{from,name}', '');
+  v_cid   := coalesce(c->>'customer_id', '');
+  v_snip  := coalesce(c->>'snippet', '');
+  v_ver   := case when (c->>'version') ~ '^[0-9]+$' then (c->>'version')::int end;
+  v_tags  := case when jsonb_typeof(c->'tags') = 'array' then c->'tags' else '[]'::jsonb end;
+  v_ass   := case when jsonb_typeof(c->'assignee_ids') = 'array' then array(select jsonb_array_elements_text(c->'assignee_ids')) else '{}'::text[] end;
+  v_seen  := coalesce((c->>'seen') = 'true', false);
+  v_rep   := coalesce((c->>'is_replied') = 'true', false);
+  v_type  := coalesce(c->>'type', '');
+
+  v_mid := coalesce(m->>'id', '');
+  if v_evt = 'messaging' and v_mid <> '' then
+    v_from := coalesce(m #>> '{from,id}', '');
+    v_dir  := case when v_from <> '' and v_from = v_page then 'out' else 'in' end;
+    v_text := coalesce(nullif(m->>'original_message', ''), regexp_replace(coalesce(m->>'message', ''), '<[^>]*>', '', 'g'), '');
+    v_ins  := coalesce(m->>'inserted_at', '');
+    v_ts   := case when v_ins ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T' then (v_ins::timestamp) at time zone 'UTC' else r.received_at end;   -- Pancake trả giờ UTC không kèm múi giờ
+    if v_cname = '' and v_dir = 'in' then v_cname := coalesce(m #>> '{from,name}', ''); end if;
+    -- SĐT khách: chỉ lấy từ tin KHÁCH nhắn (tránh nhầm SĐT của page/sale): phone_info (nếu có) rồi đến số gõ trong tin.
+    v_phone := '';
+    if v_dir = 'in' then
+      v_pi := case when jsonb_typeof(m->'phone_info') = 'array' then m->'phone_info' else '[]'::jsonb end;
+      select coalesce(max(pk_norm_phone(case when jsonb_typeof(e) = 'string' then e #>> '{}' else coalesce(e->>'phone_number', e->>'phone', e->>'captured', '') end)), '')
+        into v_phone from jsonb_array_elements(v_pi) e;
+      if v_phone = '' then
+        v_phone := pk_norm_phone(substring(regexp_replace(v_text, '[ .\-]', '', 'g') from '(?:^|[^0-9])((?:\+?84|0)[35789][0-9]{8})(?:$|[^0-9])'));
+      end if;
+    end if;
+  end if;
+
+  insert into pk_conversations (id, page_id, psid, customer_id, customer_name, customer_phone, snippet, tags, assignee_ids, seen, is_replied, conv_type, version,
+                                last_message_at, last_text, raw, updated_at)
+    values (v_conv, v_page, v_psid, v_cid, v_cname, coalesce(v_phone, ''), v_snip, v_tags, v_ass, v_seen, v_rep, v_type, v_ver,
+            v_ts, case when v_mid <> '' then coalesce(v_text, '') else '' end, d, now())
+    on conflict (id) do update set
+      page_id        = coalesce(nullif(excluded.page_id, ''), pk_conversations.page_id),
+      psid           = coalesce(nullif(excluded.psid, ''), pk_conversations.psid),
+      customer_id    = coalesce(nullif(excluded.customer_id, ''), pk_conversations.customer_id),
+      customer_name  = coalesce(nullif(excluded.customer_name, ''), pk_conversations.customer_name),
+      customer_phone = coalesce(nullif(pk_conversations.customer_phone, ''), nullif(excluded.customer_phone, ''), ''),
+      snippet        = coalesce(nullif(excluded.snippet, ''), pk_conversations.snippet),
+      conv_type      = coalesce(nullif(excluded.conv_type, ''), pk_conversations.conv_type),
+      tags           = case when v_evt = 'conversation' and coalesce(excluded.version, 0) >= coalesce(pk_conversations.version, 0) then excluded.tags else pk_conversations.tags end,
+      assignee_ids   = case when v_evt = 'conversation' and coalesce(excluded.version, 0) >= coalesce(pk_conversations.version, 0) then excluded.assignee_ids else pk_conversations.assignee_ids end,
+      seen           = case when v_evt = 'conversation' and coalesce(excluded.version, 0) >= coalesce(pk_conversations.version, 0) then excluded.seen else pk_conversations.seen end,
+      is_replied     = case when v_evt = 'conversation' and coalesce(excluded.version, 0) >= coalesce(pk_conversations.version, 0) then excluded.is_replied else pk_conversations.is_replied end,
+      version        = greatest(excluded.version, pk_conversations.version),
+      last_text      = case when excluded.last_message_at is not null and (pk_conversations.last_message_at is null or excluded.last_message_at >= pk_conversations.last_message_at) then excluded.last_text else pk_conversations.last_text end,
+      last_message_at = greatest(pk_conversations.last_message_at, excluded.last_message_at),
+      updated_at     = now();
+  v_n := 1;
+
+  if v_evt = 'messaging' and v_mid <> '' then
+    insert into pk_messages (id, conversation_id, page_id, sender_id, sender_name, direction, text, sent_at, raw)
+      values (v_mid, v_conv, v_page, v_from, coalesce(m #>> '{from,name}', ''), v_dir, v_text, v_ts, m)
+      on conflict (id) do update set text = excluded.text, raw = excluded.raw;   -- Pancake gửi lại khi tin sửa/xoá: cập nhật, không nhân đôi
+    v_n := v_n + 1;
+  end if;
+  return v_n;
+end $$;
+
+-- Tách lại các dòng thô đã có (vd sau khi sửa hàm tách). An toàn chạy lại nhiều lần: select pk_reprocess_raw();
+create or replace function pk_reprocess_raw(p_from bigint default 0) returns int language plpgsql as $$
+declare x record; n int := 0;
+begin
+  for x in select id from pk_webhook_raw where id >= p_from order by id loop
+    begin
+      perform pk_ingest_raw(x.id);
+      update pk_webhook_raw set processed_at = now(), process_error = '' where id = x.id;
+      n := n + 1;
+    exception when others then
+      update pk_webhook_raw set process_error = left(sqlerrm, 500) where id = x.id;
+    end;
+  end loop;
+  return n;
+end $$;
+
+revoke all on function pk_ingest_pancake(pk_webhook_raw) from public;
+revoke all on function pk_reprocess_raw(bigint) from public;
+revoke all on function pk_norm_phone(text) from public;
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    revoke all on function pk_ingest_pancake(pk_webhook_raw) from anon;
+    revoke all on function pk_reprocess_raw(bigint) from anon;
+    revoke all on function pk_norm_phone(text) from anon;
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    revoke all on function pk_ingest_pancake(pk_webhook_raw) from authenticated;
+    revoke all on function pk_reprocess_raw(bigint) from authenticated;
+    revoke all on function pk_norm_phone(text) from authenticated;
   end if;
 end $$;
