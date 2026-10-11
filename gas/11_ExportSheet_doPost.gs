@@ -300,6 +300,11 @@ function doPostCore_(e) {
     if (action === 'deleteTask') return deleteTask_(data.id);
     // ── Binh luan/thao luan trong 1 cong viec (Task) — tab "Thao luan" tren UI ──
     if (action === 'saveTaskComment') return saveTaskComment_(data.comment);
+    // ── Quy trinh cong viec: loai quy trinh + giai doan, chuyen tiep, yeu cau/duyet ──
+    if (action === 'saveTaskFlow')        return saveTaskFlow_(data.flow);
+    if (action === 'deleteTaskFlow')      return deleteTaskFlow_(data.id);
+    if (action === 'taskAdvance')         return taskAdvance_(data);
+    if (action === 'taskRequestDecide')   return taskRequestDecide_(data);
     if (action === 'saveCareStatus')      return saveCareStatus_(data.careStatus);
     if (action === 'saveAIContext')        return saveAIContext_(data.type, data.content, data.context);
     // Xac thuc tai khoan (Pancake AI doi CS) — kiem tra mat khau PHIA SERVER, khong tra passHash ve client

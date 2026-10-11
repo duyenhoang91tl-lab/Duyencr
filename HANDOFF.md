@@ -20,3 +20,26 @@ Mọi CSS mới nằm trong `css/06-pro.css`, mọi selector bắt đầu `html.
 
 ## Ràng buộc
 Phân quyền (admin/quản lý/leader/CS) quyết định tab hiển thị. Chưa lưu: mục tiêu doanh số, số cuộc gọi (chờ phần kết quả cuộc gọi của phiên khác). Không sửa `extension/`. Không đổi thứ tự thẻ `<script>`.
+
+
+---
+
+# HANDOFF — Công việc kiểu Base (quy trình + giai đoạn + thảo luận)  [bắt đầu 2026-10-11]
+
+Yêu cầu của Duyên: tab Công việc có nhiều LOẠI quy trình, mỗi loại có các GIAI ĐOẠN riêng; mỗi giai đoạn có người phụ trách; thảo luận dưới công việc (tag @người, gửi tệp); giai đoạn đánh dấu "cần duyệt" thì chuyển tiếp phải gửi request → người duyệt Chấp nhận/Từ chối; ai nhận bước nào thì xong bấm "Chuyển tiếp". Tham chiếu: ảnh chụp Base (Tổng quan: thanh giai đoạn, tiến độ từng giai đoạn + người thực hiện; Thảo luận; Tài liệu đính kèm).
+
+## Mô hình dữ liệu (GAS, sheet tự tạo)
+- `TaskFlows` (id,name,stages JSON `[{id,name,approval}]`) — tự seed 2 mẫu (Hoàn tiền/chi tiền, Xử lý đơn hàng) khi rỗng. `approval=true` = rời giai đoạn này phải được người duyệt chấp nhận.
+- `Tasks` thêm cột cuối: flowId, stageIdx (== số giai đoạn nghĩa là đã xong), stageAssignees {stageId:[tên]}, stageApprovers {stageId:[tên]}, stageLog [{stageId,startedAt,doneAt,by,approvedBy}], mentions. Server tự giữ flowId/stageIdx/stageLog khi sửa task (client không ghi đè được).
+- `TaskComments` thêm cột: files [{name,url,mime,size}], mentions [tên], kind (comment|system|request), refId (id request).
+- `TaskRequests` (id,taskId,fromStageId,toStageId,requestedBy,approvers,status pending|approved|rejected,decidedBy,decidedAt,note,createdAt).
+- Action: GET `taskFlows`, `taskRequests?taskId=`, `tasks` (kèm `pendingReq` từng task); POST `saveTaskFlow`, `deleteTaskFlow`, `taskAdvance {taskId,by,note}`, `taskRequestDecide {requestId,by,decision:'approve'|'reject',note}`. Test: `node tools/test-task-flow.js`.
+- Quyền hiện tại kiểm theo TÊN client gửi (cùng mức bảo mật các action task cũ). Admin chưa có đường "ép chuyển". Nếu cần chặt hơn → gắn session token (xem `_sessUser_`).
+
+## Tiến độ
+- [x] M1 — Backend GAS: quy trình/giai đoạn, chuyển tiếp, request/duyệt, comment có files/mentions/system (đã test Node).
+- [ ] M2 — Client: gọi `taskFlows`; modal Tạo công việc chọn Loại quy trình + gán người phụ trách (và người duyệt) từng giai đoạn. File: `js/26-loadtasks.js`, HTML modal `task-modal-overlay` trong `index.html`.
+- [ ] M3 — Client: modal chi tiết hiện thanh giai đoạn (giai đoạn hiện tại, thời gian từng bước từ stageLog, người thực hiện) + nút "Chuyển tiếp ➜" (chỉ người phụ trách bước hiện tại thấy) + khung "Yêu cầu chờ duyệt" có nút Chấp nhận/Từ chối.
+- [ ] M4 — Thảo luận: render dòng hệ thống/request, đính kèm TỆP bất kỳ (PDF/Word/Excel… không chỉ ảnh; upload qua `uploadBroadcastImg` đã nhận mọi mime, kiểm tra giới hạn kích thước), tag @tên (gợi ý khi gõ @), tab "Tài liệu đính kèm" gom ảnh/tệp từ mô tả + thảo luận.
+- [ ] M5 — Quản lý loại quy trình (thêm/sửa/xóa giai đoạn, bật "cần duyệt") qua menu ⚙; bộ lọc "Chờ tôi xử lý / Chờ tôi duyệt / Tôi được tag"; huy hiệu số việc chờ tôi ở tab.
+- [ ] M6 — Thông báo khi được tag/giao bước/có yêu cầu duyệt (hiện chưa có hạ tầng thông báo; tối thiểu: badge + danh sách "Được tag" lấy từ cột mentions).

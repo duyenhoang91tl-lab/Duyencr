@@ -369,7 +369,16 @@ function doGetCore_(e) {
       if (csFilterA_) allAssignH_ = allAssignH_.filter(function(h) { return h.csName === csFilterA_; });
       return jsonOut_({ assignHistory: allAssignH_ });
     }
-    if (action === 'tasks')     return jsonOut_({ tasks: readTasks_(ss.getSheetByName(SH_TASK)) });
+    if (action === 'tasks') {
+      var tasksOut_ = readTasks_(ss.getSheetByName(SH_TASK));
+      // Gan yeu cau DANG CHO DUYET vao tung task (de UI hien "cho duyet" + loc viec cho toi duyet)
+      var pendMap_ = {};
+      readTaskRequests_('', true).forEach(function (q) { (pendMap_[q.taskId] = pendMap_[q.taskId] || []).push(q); });
+      tasksOut_.forEach(function (t) { t.pendingReq = pendMap_[t.id] || []; });
+      return jsonOut_({ tasks: tasksOut_ });
+    }
+    if (action === 'taskFlows')    return jsonOut_({ flows: readTaskFlows_() });
+    if (action === 'taskRequests') return jsonOut_({ requests: readTaskRequests_((e && e.parameter && e.parameter.taskId) || '', false) });
 
     // ── Danh sach binh luan cua 1 cong viec (tab "Thao luan") ──
     if (action === 'taskComments') {
