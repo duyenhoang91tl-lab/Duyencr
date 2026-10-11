@@ -985,7 +985,6 @@ function _mktTeamsHtml_(){
   var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin:26px 0 8px">'+
     '<div class="dash-section-title" style="margin:0">📣 Nhóm MKT (chọn Page cho từng MKT)</div>'+
     (isAdmin ? '<button class="btn primary" onclick="_mktAddTeam()">+ Thêm MKT</button>' : '')+'</div>';
-  h += '<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Mỗi Page thường thuộc 1 MKT. Nếu 1 Page chạy chung nhiều MKT, tick Page đó ở từng MKT rồi nhập <b>tỷ lệ</b> (vd 1 và 1 = chia đôi 50/50; 2 và 1 = 67/33) — đơn/doanh thu/tương tác của Page sẽ chia theo tỷ lệ này. Page chưa tick ở MKT nào sẽ gom vào "(chưa gán MKT)". Áp dụng cho Báo cáo KPI, Báo cáo doanh số (TB đơn theo MKT) và Checklist MKT.</div>';
   if (!mktTeams.length){
     h += '<div style="color:var(--muted);padding:18px;text-align:center;border:1px dashed var(--border);border-radius:var(--rsm)">Chưa có nhóm MKT nào.'+(isAdmin?' Bấm “+ Thêm MKT”.':'')+'</div>';
     return h;
