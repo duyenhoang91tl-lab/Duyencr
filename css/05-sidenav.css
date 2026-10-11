@@ -31,3 +31,11 @@ body.rpt-mode #sn-toggle,html.db-standalone #sn-toggle{display:none!important;}
 #data-view .tabs .sn-act{display:flex;align-items:center;padding:8px 12px 8px 22px;margin:0;border-left:3px solid transparent;border-radius:6px;font-size:13px;color:var(--muted);cursor:pointer;}
 #data-view .tabs .sn-act:hover{background:var(--surface2);color:var(--text);}
 #data-view .tabs .sn-act.sn-hide{display:none!important;}
+
+/* Kết quả tìm theo MÃ ĐƠN dưới ô search */
+#ord-search-res{position:absolute;left:0;right:0;top:100%;z-index:700;margin-top:2px;background:var(--surface);border:1px solid var(--border);border-radius:var(--rmd);box-shadow:0 8px 24px rgba(0,0,0,.15);max-height:320px;overflow-y:auto;min-width:260px;}
+#ord-search-res .ors-h{padding:6px 10px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border);}
+#ord-search-res .ors-i{padding:7px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--border);}
+#ord-search-res .ors-i:hover{background:var(--surface2);}
+#ord-search-res .ors-i b{color:var(--green);}
+#ord-search-res .ors-s{color:var(--muted);font-size:11px;}

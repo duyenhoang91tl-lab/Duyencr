@@ -121,6 +121,9 @@ function doGetCore_(e) {
     }
     // ── Tap SDT co trong "dữ liệu đơn" — chi de loc nguon o man hinh chinh (cache 10') ──
     // Danh sach san pham (ma + ten) trong "du lieu don" cho o tim/tick san pham cua Chuong trinh thuong (cache 10').
+    if (action === 'searchOrder') {   // tim theo ma don -> { ok, results:[{src,code,phone,date,product,revenue,note}] }
+      return jsonOut_({ ok: true, results: searchOrderCode_(e && e.parameter && e.parameter.q) });
+    }
     if (action === 'donProducts') {
       var cachedDPr = _cacheGetBig_('don_products_v1');
       if (cachedDPr) { try { return jsonOut_(JSON.parse(cachedDPr)); } catch (ecP) {} }

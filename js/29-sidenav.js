@@ -164,3 +164,50 @@
   // _injectV9UI thêm tab muộn -> cập nhật lại nhãn
   setTimeout(function(){ try{ var t=document.querySelector('#data-view .tabs'); if(t) t.dispatchEvent(new Event('x')); }catch(e){} refreshLabel(); }, 1200);
 })();
+
+// ═══════════════════════════════════════════════════════
+//  TÌM THEO MÃ ĐƠN — ô search chính (#search-input). Gõ >=4 ký tự có chữ/số (không phải SĐT thuần)
+//  -> hỏi GAS action=searchOrder (ID đơn DT TỔNG + ghi chú đơn Pos) -> xổ danh sách; bấm 1 dòng thì
+//  điền SĐT vào ô search để lọc đúng khách đó. Tên/SĐT vẫn lọc như cũ.
+// ═══════════════════════════════════════════════════════
+var _ordSearchTimer = null, _ordSearchSeq = 0;
+function _ordSearchSoon(){
+  clearTimeout(_ordSearchTimer);
+  var inp = document.getElementById('search-input'), box = document.getElementById('ord-search-res');
+  if (!inp || !box) return;
+  var q = String(inp.value || '').trim();
+  if (q.length < 4 || /^\d{9,11}$/.test(q) || !/\d/.test(q) || typeof gsUrl === 'undefined' || !gsUrl) { box.style.display = 'none'; return; }
+  _ordSearchTimer = setTimeout(function(){ _ordSearchRun(q); }, 500);
+}
+async function _ordSearchRun(q){
+  var box = document.getElementById('ord-search-res'); if (!box) return;
+  var seq = ++_ordSearchSeq;
+  box.style.display = 'block'; box.innerHTML = '<div class="ors-h">Đang tìm mã đơn "' + esc(q) + '"…</div>';
+  try {
+    var sep = gsUrl.indexOf('?') > -1 ? '&' : '?';
+    var r = await fetch(gsUrl + sep + 'action=searchOrder&q=' + encodeURIComponent(q), { redirect:'follow' });
+    var j = await r.json();
+    if (seq !== _ordSearchSeq) return;
+    if (j && j.error) { box.innerHTML = '<div class="ors-h">' + esc(j.error) + '</div>'; return; }
+    var rs = (j && j.results) || [];
+    if (!rs.length) { box.innerHTML = '<div class="ors-h">Không có đơn nào khớp mã "' + esc(q) + '" (nếu vừa sửa GAS: nhớ deploy lại)</div>'; return; }
+    window.__ordSearchRes = rs;
+    box.innerHTML = '<div class="ors-h">' + rs.length + ' đơn khớp mã — bấm để mở khách</div>' + rs.map(function(o,i){
+      var nm = (typeof customerMap !== 'undefined' && customerMap[o.phone]) ? customerMap[o.phone].name : '';
+      return '<div class="ors-i" onclick="_ordSearchPick(' + i + ')"><b>' + esc(o.code) + '</b> · ' + esc(o.phone || '?') + (nm ? ' · ' + esc(nm) : '') +
+        '<div class="ors-s">' + esc(o.src) + (o.date ? ' · ' + esc(o.date) : '') + (o.product ? ' · ' + esc(o.product) : '') + '</div></div>';
+    }).join('');
+  } catch(e){ if (seq === _ordSearchSeq) box.innerHTML = '<div class="ors-h">Lỗi tìm mã đơn: ' + esc(e.message) + '</div>'; }
+}
+function _ordSearchPick(i){
+  var o = (window.__ordSearchRes || [])[i], inp = document.getElementById('search-input'), box = document.getElementById('ord-search-res');
+  if (box) box.style.display = 'none';
+  if (!o || !o.phone || !inp) return;
+  inp.value = o.phone;
+  if (typeof applyFilters === 'function') applyFilters();
+  if (typeof openDp === 'function' && typeof customerMap !== 'undefined' && customerMap[o.phone]) { try { openDp(o.phone); } catch(e){} }
+}
+document.addEventListener('click', function(e){
+  var box = document.getElementById('ord-search-res');
+  if (box && box.style.display !== 'none' && !e.target.closest('.search-wrap')) box.style.display = 'none';
+});

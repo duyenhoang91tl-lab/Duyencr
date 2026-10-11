@@ -1677,6 +1677,9 @@ function doGetCore_(e) {
     }
     // ── Tap SDT co trong "dữ liệu đơn" — chi de loc nguon o man hinh chinh (cache 10') ──
     // Danh sach san pham (ma + ten) trong "du lieu don" cho o tim/tick san pham cua Chuong trinh thuong (cache 10').
+    if (action === 'searchOrder') {   // tim theo ma don -> { ok, results:[{src,code,phone,date,product,revenue,note}] }
+      return jsonOut_({ ok: true, results: searchOrderCode_(e && e.parameter && e.parameter.q) });
+    }
     if (action === 'donProducts') {
       var cachedDPr = _cacheGetBig_('don_products_v1');
       if (cachedDPr) { try { return jsonOut_(JSON.parse(cachedDPr)); } catch (ecP) {} }
@@ -3200,6 +3203,42 @@ function getDonOrdersByPhone_(phone) {
 // Danh sach SAN PHAM (ma + ten) co trong "du lieu don" — nguon cho o tim/tick san pham cua Chuong trinh thuong (js/12 modal "Chuong trinh thuong").
 // 3 cot dung 3 dau phan cach KHAC NHAU (xem buildSalesReportB_): ten ',' | ma ';' | so luong ','; ghep theo VI TRI. Ten chi lay khi dong khop so luong
 // ten = so luong ma (dong lech cot thi ten khong chac khop ma -> bo qua ten, van ghi nhan ma). Tra [{code,name,n(so dong don),qty}] sap theo qty giam dan.
+// Tim don theo MA DON: (1) cot ID cua DT TONG, (2) ghi chu don Pos (cot Q "du lieu don" — chua ma don Pos).
+// Khop theo chuoi con, khong phan biet hoa/thuong; tra toi da 30 don kem SDT de CRM nhay toi khach.
+function searchOrderCode_(q) {
+  q = String(q || '').trim().toLowerCase();
+  var out = [];
+  if (q.length < 3) return out;
+  var seen = {};
+  function push(o) {
+    var k = o.phone + '|' + o.code + '|' + o.src;
+    if (seen[k] || out.length >= 30) return;
+    seen[k] = 1; out.push(o);
+  }
+  try {
+    var all = readAllOrders_();
+    for (var i = 0; i < all.length && out.length < 30; i++) {
+      var id = String(all[i].id || '');
+      if (id && id.toLowerCase().indexOf(q) !== -1) {
+        push({ src: 'DT TỔNG', code: id, phone: all[i].phone || '', date: all[i].orderDate || all[i].date || '',
+               product: String(all[i].product || '').slice(0, 80), revenue: all[i].revenue || 0, note: '' });
+      }
+    }
+  } catch (e1) { Logger.log('searchOrderCode_ DT: ' + e1); }
+  try {
+    var rows = readDonChiTiet_();
+    for (var j = 0; j < rows.length && out.length < 30; j++) {
+      var gc = String(rows[j].ghiChu || '');
+      if (gc && gc.toLowerCase().indexOf(q) !== -1) {
+        push({ src: 'Dữ liệu đơn', code: gc.split(/[\r\n]/)[0].slice(0, 60), phone: normPhone_(String(rows[j].soDienThoai || '')),
+               date: String(rows[j].ngayTaoDon || ''), product: String(rows[j].sanPham || '').slice(0, 80),
+               revenue: rows[j].giaTriSauGiam || 0, note: gc.slice(0, 120) });
+      }
+    }
+  } catch (e2) { Logger.log('searchOrderCode_ don: ' + e2); }
+  return out;
+}
+
 function buildDonProducts_(rows) {
   rows = rows || readDonChiTiet_();
   var by = {};

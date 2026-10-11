@@ -268,7 +268,8 @@
   <div class="sb-top">
     <div class="search-wrap">
       <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-      <input id="search-input" placeholder="Tên, số điện thoại..." oninput="debouncedApplyFilters()">
+      <input id="search-input" placeholder="Tên, SĐT, mã đơn..." oninput="debouncedApplyFilters();_ordSearchSoon()">
+      <div id="ord-search-res" style="display:none"></div>
     </div>
     <!-- CS Filter (gõ tên để tìm, không cần cuộn) -->
     <div class="cs-filter-wrap">
