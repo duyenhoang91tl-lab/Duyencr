@@ -135,6 +135,20 @@ async function pancakeWebhook(request, env) {
   if (!pkSafeEqual(url.searchParams.get('key'), env.PANCAKE_WEBHOOK_KEY)) return pkJson({ error: 'Sai khoa.' }, 401);
   const missing = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY'].filter(k => !env[k]);
   if (missing.length) return pkJson({ error: 'Chua cau hinh: ' + missing.join(', ') }, 503);
+  // Chan doan (them 2026-10-12): GET ...&diag=1 thu GHI 1 dong that vao pk_webhook_raw va tra nguyen nhan Supabase (da qua khoa ?key=).
+  // NGUYEN NHAN GOC: Pancake giau noi dung loi khi luu URL webhook, con POST that chi tra 502 chung chung -> khong biet sai URL Supabase,
+  // sai khoa service_role hay thieu cot. Chan doan tra ma tinh trang + thong bao loi cua PostgREST (khong gom khoa).
+  if (request.method === 'GET' && url.searchParams.get('diag') === '1') {
+    try {
+      const r = await fetch(String(env.SUPABASE_URL).replace(/\/+$/, '') + '/rest/v1/pk_webhook_raw', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', apikey: env.SUPABASE_SERVICE_KEY, authorization: 'Bearer ' + env.SUPABASE_SERVICE_KEY, prefer: 'return=minimal' },
+        body: JSON.stringify({ page_id: '', event_type: 'diag', payload: { _diag: true } })
+      });
+      const t = r.ok ? '' : String(await r.text()).slice(0, 300);
+      return pkJson({ ok: r.ok, supabase_status: r.status, detail: t }, r.ok ? 200 : 502);
+    } catch (e) { return pkJson({ ok: false, error: 'Khong ket noi duoc Supabase (kiem tra SUPABASE_URL).' }, 502); }
+  }
   if (request.method === 'GET') return pkJson({ ok: true, service: 'pancake-webhook', ready: true }, 200);   // mo bang trinh duyet de thu
   if (request.method !== 'POST') return pkJson({ error: 'Chi nhan POST.' }, 405);
   const text = await request.text();
