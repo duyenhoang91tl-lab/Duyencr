@@ -84,3 +84,25 @@ html.ui-pro #data-view .tabs .tab,html.ui-pro #data-view .tabs .sn-act,html.ui-p
 html.ui-pro #data-view .tabs .tab:hover,html.ui-pro #data-view .tabs .sn-act:hover,html.ui-pro #data-view .tabs .sn-gh:hover{background:rgba(255,255,255,.12);color:#fff;}
 html.ui-pro #data-view .tabs .tab.active,html.ui-pro #data-view .tabs #reportsgroup-list .tab.active{background:rgba(255,255,255,.2);border-left-color:#fff;color:#fff;}
 html.ui-pro #data-view .tabs .sn-gh{color:rgba(255,255,255,.6);}
+
+/* ── P1: Trang chủ (khối #pro-home chèn đầu màn Tổng quan, js/36-pro-home.js) ── */
+html.ui-pro .pro-home{display:grid;gap:12px;margin-bottom:16px;}
+html.ui-pro .pro-home .pro-row{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));}
+html.ui-pro .pro-muted{font-size:11.5px;font-weight:400;color:var(--muted);}
+html.ui-pro .pro-gauges{display:flex;gap:10px;justify-content:space-around;align-items:flex-start;}
+html.ui-pro .pro-gauge{flex:1;min-width:110px;text-align:center;}
+html.ui-pro .pro-gauge svg{width:100%;max-width:170px;height:auto;display:block;margin:0 auto;}
+html.ui-pro .pro-gauge text.g-v{font-size:21px;}
+html.ui-pro .pro-gauge .g-fg.warn{stroke:var(--pro-orange2);}
+html.ui-pro .pro-gauge .g-fg.bad{stroke:var(--pro-red);}
+html.ui-pro .pro-gauge-l{font-size:12px;font-weight:600;color:var(--muted);margin-top:2px;}
+html.ui-pro .pro-gauge-s{font-size:11px;color:var(--hint);}
+html.ui-pro .pro-foot{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:10px;padding-top:8px;border-top:1px solid var(--pro-line);font-size:12px;color:var(--muted);}
+html.ui-pro .pro-next.bad .n-pct{color:var(--pro-red);}
+html.ui-pro .pro-next .n-act{white-space:nowrap;}
+html.ui-pro .pro-bar-row{display:grid;grid-template-columns:minmax(90px,170px) 1fr minmax(88px,auto);gap:8px;align-items:center;margin:6px 0;font-size:12px;}
+html.ui-pro .pro-bar-lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+html.ui-pro .pro-bar{height:10px;border-radius:99px;background:var(--pro-soft);overflow:hidden;}
+html.ui-pro .pro-bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--pro-blue2),var(--pro-blue));}
+html.ui-pro .pro-bar-n{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;}
+html.ui-pro .pro-hide-old{display:none!important;}
