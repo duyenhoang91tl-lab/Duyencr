@@ -82,7 +82,7 @@ function _ovEnsurePanel(){
       '<input type="date" id="ov-from" class="ymf-date"><span style="color:var(--muted)">→</span><input type="date" id="ov-to" class="ymf-date">' +
       '<button class="btn" onclick="_ovRange(\'week\');_ovLoad(false)">7 ngày</button>' + _quickRangeSelectHtml('custom', "_ovQuick(this.value)") + '' +
       '<button class="btn primary" onclick="_ovLoad(false)">Xem</button><button class="btn" onclick="_ovLoad(true)" title="Tính lại, bỏ kết quả lưu tạm 5 phút">↻</button></div>' +
-      '<div id="ov-body" style="font-size:13px;color:var(--muted)">⏳ Đang tải…</div></div>';
+      '<div id="hm-chips" style="margin-bottom:12px"></div><div id="ov-body" style="font-size:13px;color:var(--muted)">⏳ Đang tải…</div></div>';
     dv.appendChild(p); _ovRange('month');
     if (!document.getElementById('ov-style')) { var st = document.createElement('style'); st.id = 'ov-style';
       st.textContent = 'body.ov-mode .stats-row,body.ov-mode .sidebar,body.ov-mode .sidebar-backdrop,body.ov-mode #files-bar,body.ov-mode #sync-banner{display:none!important}' +
@@ -119,7 +119,7 @@ async function _ovLoad(refresh){
     body.innerHTML = '<div style="color:var(--red)">Không tải được tổng quan: ' + esc(msg) + '<br><span style="color:var(--muted)">Nếu báo “Unknown action”: chưa deploy bản GAS mới (v13.24 trở lên).</span></div>';
   } finally { if (timer) clearTimeout(timer); _ov.busy = false; }
 }
-function renderOverviewTab(){ _ovEnsurePanel(); if (_ov.data && _ov.key === ((document.getElementById('ov-from') || {}).value + '|' + (document.getElementById('ov-to') || {}).value)) _ovRender(); else _ovLoad(false); }
+function renderOverviewTab(){ _ovEnsurePanel(); try { hmRenderChips(); } catch(e){} if (_ov.data && _ov.key === ((document.getElementById('ov-from') || {}).value + '|' + (document.getElementById('ov-to') || {}).value)) _ovRender(); else _ovLoad(false); }
 
 // ── Vẽ màn hình ──
 function _ovPctBar(p){ if (p === null || p === undefined) return '<span style="color:var(--muted)">—</span>'; var c = p >= 100 ? 'var(--green)' : (p >= 70 ? 'var(--tn)' : 'var(--red)');

@@ -27,18 +27,18 @@ Mỗi phiên làm xong 1 mục nhỏ thì push ngay, tick `[x]`, ghi "việc c�
 
 ## 3. Thứ tự làm (mỗi bước nhỏ, push riêng)
 - [ ] **B0 – nền (đã lên kế hoạch ở tài liệu khác):** phân quyền backend, Supabase. Các màn dưới đọc đúng phạm vi người xem, nên B0 càng sớm càng tốt nhưng KHÔNG chặn B1–B2 (chỉ đọc dữ liệu đã lọc ở client như hiện nay).
-- [ ] **B1 – Màn "Hôm nay" (Tổng quan mới, gộp):** thanh lọc + 4 thẻ số + 4 chip + Phân bổ giai đoạn + Nguồn khách. Nguồn dữ liệu: `todayTasks`, `reminders`, `orgOverview_`, `buildSalesReportB_`. Một action GAS `homeSummary` tính ở backend (không kéo cả đơn về). Cần deploy GAS. *Việc nhỏ đầu tiên nên làm:* 4 chip (đã có đủ dữ liệu: việc hôm nay, quá hạn, đến hạn tái mua = `FollowUp`, thiếu hoạt động = khách không có ghi chú/đơn trong N ngày).
+- [~] **B1 – Màn "Hôm nay" (Tổng quan mới, gộp)** — *ĐÃ XONG bước 1: 4 chip ở đầu Tổng quan (`js/36-fn-homechips.js`, tính ở client, không cần deploy GAS; ngưỡng tạm ở localStorage `ome_hm_cfg`). CÒN: thanh lọc (nhóm/phụ trách/nguồn), 4 thẻ số, Phân bổ giai đoạn, Nguồn khách, action GAS `homeSummary`; định nghĩa "thiếu hoạt động" hiện = có trạng thái chăm sóc + care.updated cũ ≥ 7 ngày (khách chưa có `updated` không tính) — cần Duyên xác nhận.* Kế hoạch gốc: thanh lọc + 4 thẻ số + 4 chip + Phân bổ giai đoạn + Nguồn khách. Nguồn dữ liệu: `todayTasks`, `reminders`, `orgOverview_`, `buildSalesReportB_`. Một action GAS `homeSummary` tính ở backend (không kéo cả đơn về). Cần deploy GAS. *Việc nhỏ đầu tiên nên làm:* 4 chip (đã có đủ dữ liệu: việc hôm nay, quá hạn, đến hạn tái mua = `FollowUp`, thiếu hoạt động = khách không có ghi chú/đơn trong N ngày).
 - [ ] **B2 – Trang Cấu hình tập trung:** ngưỡng (`ttStageHours`, hạn liên hệ lần đầu, chu kỳ tái mua, cảnh báo không hoạt động, mốc hỏi thăm 3/14 ngày, bật/tắt chăm sóc định kỳ) lưu Settings + AuditLog; hiện "lần chạy tự động gần nhất". Nút dẫn tới Phòng ban (có rồi), Tài khoản, Nhật ký.
 - [ ] **B3 – Khách hàng:** tab Tiềm năng/Đã mua (đã mua = có đơn Pos), cờ **cho phép quảng bá** (cột mới CareData; `broadcast`/`bct`/`runFollowUpScan_` phải bỏ khách không đồng ý), kênh ưu tiên, ngày dự kiến tái mua (= lần mua gần nhất + chu kỳ), tùy chỉnh cột (lưu localStorage), phân trang.
 - [ ] **B4 – Chăm sóc & tái mua gộp 1 màn:** khách đến hạn (hẹn gọi, hỏi thăm sau bán, tái mua), Xuất CSV, tôn trọng cờ quảng bá.
 - [ ] **B5 – Bảng Kanban:** làm trước cho **giai đoạn đơn Base** (Tiếp nhận đơn → … → Đóng hàng; đã có dữ liệu giờ vào giai đoạn) và/hoặc theo `khStatus` của khách. Thực thể "cơ hội" riêng (giá trị dự kiến, xác suất) làm sau, lưu Supabase (Q1).
 - [ ] **B6 – Phụ:** Trung tâm Thông báo, Chế độ tối, Hướng dẫn sử dụng, trang Nhật ký lỗi (từ AuditLog), thẻ người dùng trong menu.
 
-## 4. Cần Duyên chốt (chưa làm các mục này khi chưa có câu trả lời)
-1. **Kanban** theo cái gì: (a) giai đoạn đơn Base, (b) trạng thái khách `khStatus`, (c) "cơ hội" mới có giá trị dự kiến/xác suất?
-2. Có thêm cờ **"khách không nhận quảng bá"** và bắt mọi chiến dịch bỏ khách đó? (clip làm vậy; ảnh hưởng 3 chỗ gửi hàng loạt)
-3. Giữ menu hiện tại và chỉ thêm mục thiếu, hay đổi hẳn theo nhóm menu của clip?
-4. Thứ tự ưu tiên B1–B6 có đúng ý không.
+## 4. Duyên đã chốt (2026-10-11)
+1. **Kanban theo giai đoạn đơn Base** (Tiếp nhận đơn → … → Đóng hàng) — làm B5 theo hướng này; thực thể "cơ hội" riêng để sau.
+2. **Có cờ "khách không nhận quảng bá"** và mọi chiến dịch/hỏi thăm tự động phải bỏ khách đó (B3 + sửa `broadcast`, `bct`, `runFollowUpScan_`).
+3. **Giữ menu hiện tại, chỉ thêm mục thiếu** và chỉnh giao diện gọn/thông minh hơn (không đổi hẳn nhóm menu).
+4. Thứ tự B1–B6 như trên.
 
 ## 5. Không sao chép
 Dữ liệu mẫu, tên "CustomerCare CRM", lọc "Doanh nghiệp" (CRM này không có khái niệm doanh nghiệp khách), giá trị cơ hội "dự kiến" nếu không có nguồn số thật. Thẻ "Giá trị chốt" phải ghi rõ không phải doanh thu kế toán (doanh thu vẫn theo báo cáo Pos/Base).
