@@ -241,7 +241,7 @@ function readRemindersToday_(csFilter) {
   return _remindersFromRows_(shR.getDataRange().getValues().slice(1), csFilter);
 }
 // rows: mang dong CareData (cot 0 SDT, 1 status, 2 zalo, 3 cs, 5 schedules(JSON), 12 schedHen, 13 schedHenNote) — KHONG gom dong tieu de.
-// LUU Y: duong Supabase (sbReadRemindersRows_) chi select sched_hen nen KHONG kem schedules (cot 5 rong) — lich nhac nhanh chua vao nhac khi SB_MODE=read.
+// Duong Supabase (sbReadRemindersRows_) cung kem cot schedules (query ilike theo ngay hom nay) nen lich nhac nhanh van vao nhac khi SB_MODE=read.
 function _remindersFromRows_(rows, csFilter) {
   var today = new Date(); today.setHours(0,0,0,0);
   // Ngay hom nay dang YYYY-MM-DD (gio dia phuong) de loc nhanh cot schedules truoc khi JSON.parse (ham nay chay moi ~5 phut/may).

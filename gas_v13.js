@@ -1063,7 +1063,7 @@ function readRemindersToday_(csFilter) {
   return _remindersFromRows_(shR.getDataRange().getValues().slice(1), csFilter);
 }
 // rows: mang dong CareData (cot 0 SDT, 1 status, 2 zalo, 3 cs, 5 schedules(JSON), 12 schedHen, 13 schedHenNote) — KHONG gom dong tieu de.
-// LUU Y: duong Supabase (sbReadRemindersRows_) chi select sched_hen nen KHONG kem schedules (cot 5 rong) — lich nhac nhanh chua vao nhac khi SB_MODE=read.
+// Duong Supabase (sbReadRemindersRows_) cung kem cot schedules (query ilike theo ngay hom nay) nen lich nhac nhanh van vao nhac khi SB_MODE=read.
 function _remindersFromRows_(rows, csFilter) {
   var today = new Date(); today.setHours(0,0,0,0);
   // Ngay hom nay dang YYYY-MM-DD (gio dia phuong) de loc nhanh cot schedules truoc khi JSON.parse (ham nay chay moi ~5 phut/may).
@@ -2014,7 +2014,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.29-tag-custom-reminders-schedules' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.30-reminders-schedules-supabase' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -11981,7 +11981,7 @@ function _sbCareTextToCell_(t) {
   return s;
 }
 
-// reminders: tra mang dong kieu CareData (chi cac cot 0-3, 12, 13 co nghia) hoac UNDEFINED = doc Sheets. Can SB_MODE='read', khong STALE, KHONG co
+// reminders: tra mang dong kieu CareData (chi cac cot 0-3, 5, 12, 13 co nghia) hoac UNDEFINED = doc Sheets. Can SB_MODE='read', khong STALE, KHONG co
 // SDT dirty nao (dirty = Sheets moi hon Supabase cho SDT do; lich hen cua no co the sai -> doc Sheets cho chac, het dirty bang sbSuaSDTLoi).
 // KHONG loc cs o phia server vi Sheets so sanh sau khi trim(); _remindersFromRows_ loc y nhu cu. SDT tra ve la SDT chuan hoa (Sheets: o goc).
 function sbReadRemindersRows_() {
@@ -11992,12 +11992,23 @@ function sbReadRemindersRows_() {
     try { dirty = JSON.parse(pr.SB_DIRTY_CARE || '[]'); } catch (e0) { dirty = []; }
     if (dirty.length) return undefined;
     var recs = _sbGetPagesSeq_('care_data?select=phone,status,zalo,cs,sched_hen,sched_hen_note&sched_hen=neq.&order=phone.asc');
+    // Lich nhac nhanh (cot schedules, JSON): chi lay dong co chua chuoi ngay HOM NAY (cung cach loc nhanh voi _remindersFromRows_), query rieng
+    // de khong doi cau query cu. Gop theo SDT: dong da co o tren thi bo sung cot 5, chua co thi them dong moi (chi cot 0-3, 5 co nghia).
+    var tdy = new Date(), tY = tdy.getFullYear() + '-' + ('0' + (tdy.getMonth() + 1)).slice(-2) + '-' + ('0' + tdy.getDate()).slice(-2);
+    var recS = _sbGetPagesSeq_('care_data?select=phone,status,zalo,cs,schedules&schedules=ilike.*' + tY + '*&order=phone.asc');
     var again = PropertiesService.getScriptProperties().getProperties();
     if (again.SB_STALE || String(again.SB_MODE || '').toLowerCase() !== 'read' || (again.SB_DIRTY_CARE && again.SB_DIRTY_CARE !== '[]')) return undefined;
-    return recs.map(function (g) {
-      var row = [g.phone, g.status || '', g.zalo || '', g.cs || '', '', '', '', '', '', '', '', '', _sbCareTextToCell_(g.sched_hen), g.sched_hen_note || ''];
-      return row;
+    var rows = recs.map(function (g) {
+      return [g.phone, g.status || '', g.zalo || '', g.cs || '', '', '', '', '', '', '', '', '', _sbCareTextToCell_(g.sched_hen), g.sched_hen_note || ''];
     });
+    var byPh = {};
+    rows.forEach(function (r, i) { byPh[r[0]] = i; });
+    recS.forEach(function (g) {
+      if (byPh[g.phone] !== undefined) { rows[byPh[g.phone]][5] = g.schedules || ''; return; }
+      byPh[g.phone] = rows.length;
+      rows.push([g.phone, g.status || '', g.zalo || '', g.cs || '', '', g.schedules || '', '', '', '', '', '', '', '', '']);
+    });
+    return rows;
   } catch (e) {
     try { Logger.log('sbReadRemindersRows_ loi (doc Sheets thay the): ' + String(e && e.message || e)); } catch (el) {}
     return undefined;

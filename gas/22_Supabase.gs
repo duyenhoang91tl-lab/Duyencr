@@ -1007,7 +1007,7 @@ function _sbCareTextToCell_(t) {
   return s;
 }
 
-// reminders: tra mang dong kieu CareData (chi cac cot 0-3, 12, 13 co nghia) hoac UNDEFINED = doc Sheets. Can SB_MODE='read', khong STALE, KHONG co
+// reminders: tra mang dong kieu CareData (chi cac cot 0-3, 5, 12, 13 co nghia) hoac UNDEFINED = doc Sheets. Can SB_MODE='read', khong STALE, KHONG co
 // SDT dirty nao (dirty = Sheets moi hon Supabase cho SDT do; lich hen cua no co the sai -> doc Sheets cho chac, het dirty bang sbSuaSDTLoi).
 // KHONG loc cs o phia server vi Sheets so sanh sau khi trim(); _remindersFromRows_ loc y nhu cu. SDT tra ve la SDT chuan hoa (Sheets: o goc).
 function sbReadRemindersRows_() {
@@ -1018,12 +1018,23 @@ function sbReadRemindersRows_() {
     try { dirty = JSON.parse(pr.SB_DIRTY_CARE || '[]'); } catch (e0) { dirty = []; }
     if (dirty.length) return undefined;
     var recs = _sbGetPagesSeq_('care_data?select=phone,status,zalo,cs,sched_hen,sched_hen_note&sched_hen=neq.&order=phone.asc');
+    // Lich nhac nhanh (cot schedules, JSON): chi lay dong co chua chuoi ngay HOM NAY (cung cach loc nhanh voi _remindersFromRows_), query rieng
+    // de khong doi cau query cu. Gop theo SDT: dong da co o tren thi bo sung cot 5, chua co thi them dong moi (chi cot 0-3, 5 co nghia).
+    var tdy = new Date(), tY = tdy.getFullYear() + '-' + ('0' + (tdy.getMonth() + 1)).slice(-2) + '-' + ('0' + tdy.getDate()).slice(-2);
+    var recS = _sbGetPagesSeq_('care_data?select=phone,status,zalo,cs,schedules&schedules=ilike.*' + tY + '*&order=phone.asc');
     var again = PropertiesService.getScriptProperties().getProperties();
     if (again.SB_STALE || String(again.SB_MODE || '').toLowerCase() !== 'read' || (again.SB_DIRTY_CARE && again.SB_DIRTY_CARE !== '[]')) return undefined;
-    return recs.map(function (g) {
-      var row = [g.phone, g.status || '', g.zalo || '', g.cs || '', '', '', '', '', '', '', '', '', _sbCareTextToCell_(g.sched_hen), g.sched_hen_note || ''];
-      return row;
+    var rows = recs.map(function (g) {
+      return [g.phone, g.status || '', g.zalo || '', g.cs || '', '', '', '', '', '', '', '', '', _sbCareTextToCell_(g.sched_hen), g.sched_hen_note || ''];
     });
+    var byPh = {};
+    rows.forEach(function (r, i) { byPh[r[0]] = i; });
+    recS.forEach(function (g) {
+      if (byPh[g.phone] !== undefined) { rows[byPh[g.phone]][5] = g.schedules || ''; return; }
+      byPh[g.phone] = rows.length;
+      rows.push([g.phone, g.status || '', g.zalo || '', g.cs || '', '', g.schedules || '', '', '', '', '', '', '', '', '']);
+    });
+    return rows;
   } catch (e) {
     try { Logger.log('sbReadRemindersRows_ loi (doc Sheets thay the): ' + String(e && e.message || e)); } catch (el) {}
     return undefined;
