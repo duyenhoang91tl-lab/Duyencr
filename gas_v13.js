@@ -2017,7 +2017,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.30-reminders-schedules-supabase' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.31-pos-metrics' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -7981,6 +7981,126 @@ function readExternalProductSheet_(query) {
 }
 
 function callGroqAI_(data) { return callAI_(data); } // alias tuong thich cu
+
+// ═══════════════════════════════════════════════════════════════
+//  CHI SO POS DUNG CHUNG (P0d cua docs/ROADMAP-YEU-CAU.md) — posMetrics_
+//  MOT cho tinh cac chi so cua nguon Pos ("dữ liệu đơn") cho moi man moi (tong quan, ho so sale, AI tom tat, chien dich):
+//  doanh thu, so don, don huy/hoan, ty le huy/hoan, don BAN LAI (renew). KHONG tinh lai logic: doanh thu + so don lay NGUYEN tu
+//  buildSalesReportB_ (da loc "Đã hoàn"/"Đang hoàn", gop don tach, chia sale), huy/hoan lay NGUYEN tu buildFailedOrderReport_ (Bao cao G)
+//  -> so tren man moi KHONG THE lech Bao cao B/G. Chi phan "ban lai" la moi (tinh tren chinh danh sach don cua B).
+//  Dinh nghia (Duyen chot 2026-10-11, Q5/Q6):
+//   - Huy/hoan = don Pos co cot "Trạng thái" la "Đã hoàn"/"Đang hoàn" (_donHasExcludedStatus_). Ty le = huy/hoan ÷ (don tinh doanh thu + huy/hoan).
+//   - Ban lai (renew; "renew" va "bán lại" la MOT khai niem) = don tinh doanh thu ma KHACH (SDT chuan hoa) da co it nhat 1 don Pos hop le
+//     (khong bi loai) o NGAY TRUOC do. Don cung ngay voi don dau tien cua khach van la don MOI. Don khong co SDT -> khong xep loai duoc
+//     (dem rieng o unknownPhoneOrders, khong tinh vao ty le). Lich su doc tu CA sheet "dữ liệu đơn" (khong chi trong ky loc).
+//     CHUA CHOT (Q6): neu Duyen muon "renew" tinh theo NGUON don thay vi theo lich su khach thi chi can sua _posIsResale_.
+//   - Moi sale: don dem 1 cho MOI sale tren don, doanh thu chia dung ty le nhu Bao cao B (chia deu / ghep Base / quay 30-70).
+//   - Chi so khong co du lieu -> null (khong tra 0) de man hinh hien "chua co du lieu".
+//  Luu y: neu sau nay bat luu tru don cu (ARCHIVE_APPLY_ENABLED_), lich su ban lai phai doc them sheet luu tru (docs/ARCHIVE-PLAN.md buoc 2).
+// ═══════════════════════════════════════════════════════════════
+function _posEarliestValidDayByPhone_() {
+  var rows = readDonChiTiet_(), first = {};
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    if (_donHasExcludedStatus_(r.trangThai)) continue;
+    var ph = normPhone_(r.soDienThoai); if (!ph) continue;
+    var d = _vnYmd_(parseVNDate_(r.ngayTaoDon)); if (!d) continue;
+    if (first[ph] === undefined || d < first[ph]) first[ph] = d;
+  }
+  return first;
+}
+// 1 don (phan tu cua buildSalesReportB_().orders) co phai don BAN LAI khong. true/false; null = khong xep loai duoc (thieu SDT hoac ngay).
+function _posIsResale_(order, firstDayByPhone) {
+  var ph = normPhone_(order.soDienThoai); if (!ph) return null;
+  var d = _vnYmd_(parseVNDate_(order.ngayTaoDon)); if (!d) return null;
+  var f = firstDayByPhone[ph];
+  return f !== undefined && f < d;
+}
+// Ty le chia cua 1 don cho tung sale — GIONG HET vong lap bySale trong buildSalesReportB_ (ghep Base -> frac; thuong -> chia deu; quay 30/70 -> x saleRatio).
+function _posSaleFractions_(order) {
+  var out = [], ratio = order.saleRatio || 1, names;
+  if (order.saleShares && order.saleShares.length) {
+    order.saleShares.forEach(function(x) { out.push({ name: x.name, frac: x.frac * ratio }); });
+    return out;
+  }
+  names = String(order.saleBanValid || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+  names.forEach(function(n) { out.push({ name: n, frac: ratio / names.length }); });
+  return out;
+}
+// opts: { from, to ('YYYY-MM-DD'), sale[], nguon[], marketer[], sanPham } — cung bo loc voi Bao cao B/G.
+function posMetrics_(opts) {
+  opts = opts || {};
+  var today = _vnYmd_(new Date());
+  var from = opts.from || opts.dateFrom || (today.substring(0, 8) + '01'), to = opts.to || opts.dateTo || today;
+  var warnings = [];
+  var f = { dateFrom: from, dateTo: to, sale: opts.sale || [], nguon: opts.nguon || [], marketer: opts.marketer || [], sanPham: opts.sanPham || '', careStatus: [], khStatus: [], zaloStatus: [], nickZalo: '' };
+  var out = { ok: true, source: 'pos', from: from, to: to, total: null, bySale: [], byDay: [], resale: null, warnings: warnings };
+  var rb = null, rg = null;
+  try { rb = buildSalesReportB_(f); } catch (e1) { warnings.push('Không đọc được doanh thu Pos: ' + e1.message); }
+  try { rg = buildFailedOrderReport_(f); } catch (e2) { warnings.push('Không đọc được đơn hủy/hoàn Pos: ' + e2.message); }
+  if (!rb && !rg) { out.ok = false; return out; }
+
+  var bySale = {};
+  function S(name) { return bySale[name] || (bySale[name] = { name: name, orders: 0, revenue: 0, failedOrders: 0, failedValue: 0, resaleOrders: 0, resaleRevenue: 0 }); }
+  var byDay = {};
+  function Dy(d) { return byDay[d] || (byDay[d] = { day: d, orders: 0, revenue: 0, failedOrders: 0, failedValue: 0, resaleOrders: 0 }); }
+
+  if (rb) {
+    (rb.bySale || []).forEach(function(r) { var s = S(r.name); s.orders = r.orders; s.revenue = r.giaTri; });
+    (rb.orders || []).forEach(function(o) { var d = _vnYmd_(parseVNDate_(o.ngayTaoDon)); if (!d) return; var y = Dy(d); y.orders += 1; y.revenue += Number(o.giaTriSauGiam) || 0; });
+  }
+  if (rg) {
+    (rg.bySale || []).forEach(function(r) { var s = S(r.name); s.failedOrders = r.orders; s.failedValue = r.giaTri; });
+    (rg.orders || []).forEach(function(o) { var d = _vnYmd_(parseVNDate_(o.ngayTao)); if (!d) return; var y = Dy(d); y.failedOrders += 1; y.failedValue += Number(o.giaTriDon) || 0; });
+  }
+
+  // BAN LAI (renew) — chi tinh tren cac don da qua bo loc cua Bao cao B
+  var resale = null;
+  if (rb) {
+    try {
+      var first = _posEarliestValidDayByPhone_();
+      resale = { orders: 0, revenue: 0, newOrders: 0, newRevenue: 0, unknownPhoneOrders: 0, unknownPhoneRevenue: 0, rate: null };
+      (rb.orders || []).forEach(function(o) {
+        var v = Number(o.giaTriSauGiam) || 0, isR = _posIsResale_(o, first), d = _vnYmd_(parseVNDate_(o.ngayTaoDon));
+        if (isR === null) { resale.unknownPhoneOrders += 1; resale.unknownPhoneRevenue += v; return; }
+        if (isR) { resale.orders += 1; resale.revenue += v; if (d) Dy(d).resaleOrders += 1; } else { resale.newOrders += 1; resale.newRevenue += v; }
+        if (isR) _posSaleFractions_(o).forEach(function(sf) { var s = S(sf.name); s.resaleOrders += 1; s.resaleRevenue += v * sf.frac; });
+      });
+      var classified = resale.orders + resale.newOrders;
+      resale.rate = classified ? Math.round(resale.orders / classified * 1000) / 10 : null;
+    } catch (e3) { warnings.push('Không tính được đơn bán lại: ' + e3.message); resale = null; }
+  }
+  if (typeof ARCHIVE_APPLY_ENABLED_ !== 'undefined' && ARCHIVE_APPLY_ENABLED_) warnings.push('Đã bật lưu trữ đơn cũ: lịch sử khách để tính "bán lại" có thể thiếu (xem docs/ARCHIVE-PLAN.md bước 2).');
+
+  var revenue = rb ? rb.totalGiaTri : null, orders = rb ? rb.totalOrders : null;
+  var failed = rg ? rg.totalOrders : null, failedValue = rg ? rg.totalGiaTri : null;
+  out.total = {
+    revenue: revenue, orders: orders, aov: orders ? Math.round(revenue / orders) : null,
+    failedOrders: failed, failedValue: failedValue,
+    failRate: (orders !== null && failed !== null && (orders + failed)) ? Math.round(failed / (orders + failed) * 1000) / 10 : null
+  };
+  out.resale = resale;
+  out.bySale = Object.keys(bySale).map(function(k) {
+    var s = bySale[k], n = s.orders + s.failedOrders;
+    s.aov = s.orders ? Math.round(s.revenue / s.orders) : null;
+    s.failRate = n ? Math.round(s.failedOrders / n * 1000) / 10 : null;
+    return s;
+  }).sort(function(a, b) { return b.revenue - a.revenue; });
+  out.byDay = Object.keys(byDay).sort().map(function(k) { return byDay[k]; });
+  return out;
+}
+// Chay tay trong Apps Script Editor (chon ten ham o o "Run" -> Run -> xem "Execution log"): chi so Pos thang nay + doi chieu voi Bao cao B/G.
+function xemChiSoPos() {
+  var today = _vnYmd_(new Date()), from = today.substring(0, 8) + '01';
+  var m = posMetrics_({ from: from, to: today });
+  var f = { dateFrom: from, dateTo: today, sale: [], nguon: [], marketer: [], sanPham: '', careStatus: [], khStatus: [], zaloStatus: [], nickZalo: '' };
+  var b = buildSalesReportB_(f), g = buildFailedOrderReport_(f);
+  var khop = m.total.orders === b.totalOrders && m.total.revenue === b.totalGiaTri && m.total.failedOrders === g.totalOrders;
+  Logger.log('Kỳ ' + from + ' → ' + today + ' | doanh thu Pos ' + m.total.revenue + ' | ' + m.total.orders + ' đơn | hủy/hoàn ' + m.total.failedOrders + ' đơn (' + m.total.failRate + '%) | bán lại ' + (m.resale ? m.resale.orders + ' đơn (' + m.resale.rate + '%)' : 'chưa có dữ liệu'));
+  Logger.log('Đối chiếu với Báo cáo B/G: ' + (khop ? 'KHỚP' : 'LỆCH — B: ' + b.totalOrders + ' đơn / ' + b.totalGiaTri + ', G: ' + g.totalOrders + ' đơn'));
+  if (m.warnings.length) Logger.log('Cảnh báo: ' + m.warnings.join(' | '));
+  return m;
+}
 
 // ═══════════════════════════════════════════════════════════════
 //  AI PHAN TICH TOAN TEAM (v13.23) — action GET teamAnalysis
