@@ -51,3 +51,9 @@ html.ui-pro .pro-next .n-act{margin-left:auto;flex:none;color:var(--pro-blue);cu
 html.ui-pro .pro-gauge text.g-v{font-size:26px;font-weight:600;fill:var(--pro-ink);}
 html.ui-pro .pro-gauge .g-bg{stroke:var(--pro-line);}
 html.ui-pro .pro-gauge .g-fg{stroke:var(--pro-green2);}
+/* P2: khối hồ sơ khách 360° chèn trong #dp (giữa .dp-hdr và .dp-tabs) */
+html.ui-pro #dp-pro{padding:10px 14px 4px;border-bottom:1px solid var(--pro-line);background:var(--surface);}
+html.ui-pro #dp-pro .pro-stage>li{flex:0 0 auto;min-width:96px;}
+html.ui-pro #dp-pro .pro-kpi{min-height:70px;padding:9px 12px;}
+html.ui-pro #dp-pro .pro-kpi .k-v{font-size:26px;}
+html.ui-pro #dp-pro .pro-grid{margin-bottom:8px;grid-template-columns:repeat(3,minmax(0,1fr));}
