@@ -255,7 +255,22 @@ function _remLoadDismissed(){ try { return JSON.parse(localStorage.getItem('ome_
 function _remSaveDismissed(d){ try { localStorage.setItem('ome_dismissed_remind', JSON.stringify(d)); } catch(e){} }
 function _dismissReminder(id){ var d=_remLoadDismissed(); d[id]=_remDateStr(); _remSaveDismissed(d); renderReminderPanel(); }
 function _dismissChiaAlert(id){ var d=_remLoadDismissed(); d[id]='off'; _remSaveDismissed(d); renderReminderPanel(); }
-function dismissAllReminders(){ var d=_remLoadDismissed(); _dueReminders().forEach(function(r){ d[r.id]=_remDateStr(); }); _remSaveDismissed(d); renderReminderPanel(); }
+// Việc cần làm (js/34: đơn Base kẹt giai đoạn) hiện trong khung nhắc hẹn, TRỪ thẻ đã bấm "Tắt hết" hôm nay. Không đổi _ttCards() vì Trang chủ (js/36) và chip (js/36-homechips) vẫn cần số thật.
+function _remVisibleTts(){
+  if (typeof _ttCards !== 'function') return [];
+  var today = _remDateStr(), dism = _remLoadDismissed();
+  return _ttCards().filter(function(t){ return dism['tt:'+t.key] !== today; });
+}
+// "Tắt hết hôm nay": phải tắt MỌI loại thẻ đang hiện trong khung (lịch hẹn + Được chia data + Việc cần làm). Trước đây chỉ tắt lịch hẹn nên bấm xong
+// vẫn còn thẻ Được chia data/Việc cần làm → khung không đóng ("bấm tắt hết mà không tắt được"). Tắt TẠM trong ngày (mai hiện lại);
+// khác với ✕ riêng từng thẻ Được chia data (tắt luôn, 'off').
+function dismissAllReminders(){
+  var d = _remLoadDismissed(), today = _remDateStr();
+  _dueReminders().forEach(function(r){ d[r.id] = today; });
+  _chiaDataAlerts().forEach(function(a){ d[a.id] = today; });
+  _remVisibleTts().forEach(function(t){ d['tt:'+t.key] = today; });
+  _remSaveDismissed(d); renderReminderPanel();
+}
 function toggleReminderPanel(){ _reminderPanelOpen = !_reminderPanelOpen; renderReminderPanel(); }
 
 // ── Người đặt lịch hẹn (theo tài khoản đăng nhập) ─────────────────
@@ -414,7 +429,7 @@ function _chiaDataAlerts(){
     var h = assignHistory[i];
     if (!h || h.csName !== me) continue;
     var id = 'a:' + h.id;
-    if (dism[id] === 'off') continue;
+    if (dism[id] === 'off' || dism[id] === _remDateStr()) continue;   // 'off' = ✕ riêng (tắt luôn); ngày hôm nay = đã bấm "Tắt hết"
     out.push({ id:id, label: h.label || ('Chia '+((h.phones&&h.phones.length)||0)+' KH'), count: (h.phones&&h.phones.length)||0, date: h.date||'' });
   }
   return out.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); }).slice(0,3);
@@ -427,7 +442,7 @@ function renderReminderPanel(){
   if (!wrap) return;
   var reminders = _dueReminders();
   var alerts = _chiaDataAlerts();
-  var tts = (typeof _ttCards === 'function') ? _ttCards() : [];   // nhắc việc hôm nay (js/34): đơn Base kẹt giai đoạn
+  var tts = _remVisibleTts();   // nhắc việc hôm nay (js/34): đơn Base kẹt giai đoạn (trừ thẻ đã "Tắt hết" hôm nay)
   var total = reminders.length + alerts.length + tts.length;
   if (total === 0){ wrap.style.display='none'; if(bell) bell.style.display='none'; return; }
   if (!_reminderPanelOpen){
