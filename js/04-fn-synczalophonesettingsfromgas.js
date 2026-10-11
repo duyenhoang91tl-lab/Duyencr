@@ -896,7 +896,7 @@ async function addManualOrder(phone) {
       let d2; try { d2=JSON.parse(txt); } catch(e){ d2={}; }
       hide('loverlay');
       if (d2.error) toast('Lỗi GSheets: '+d2.error);
-      else toast('✓ Đã thêm đơn hàng' + (d2.written?` · Synced GSheets`:''));
+      else toast('✓ Đã thêm đơn hàng');
     } catch(e) { hide('loverlay'); toast('Lỗi kết nối GSheets'); }
   } else {
     toast('✓ Đã thêm đơn hàng (chưa cấu hình GSheets)');
@@ -1301,7 +1301,7 @@ function openEditPhone(oldPhone) {
       </div>
       <div style="padding:16px 18px">
         <div style="font-size:11px;color:var(--hint);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Tên khách hàng</div>
-        <input id="edit-name-input" class="form-input" type="text" placeholder="${esc(autoName && autoName !== oldPhone ? 'Tên tự nhận diện: ' + autoName : 'Nhập tên khách hàng...')}" value="${esc(curName)}"
+        <input id="edit-name-input" class="form-input" type="text" placeholder="${esc(autoName && autoName !== oldPhone ? 'Tên tự nhận diện: ' + autoName : 'Nhập tên khách hàng...')}" value="${esc(curName)}" data-old-phone="${esc(oldPhone)}" onkeydown="if(event.key==='Enter') saveEditPhone(this.dataset.oldPhone)"
           style="width:100%;margin-bottom:14px;font-size:14px">
         <div style="font-size:11px;color:var(--hint);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">SĐT hiện tại</div>
         <div style="font-size:14px;font-weight:600;font-family:monospace;color:var(--text);margin-bottom:14px;padding:6px 10px;background:var(--surface2);border-radius:var(--rsm)">${esc(oldPhone)}</div>
@@ -1312,7 +1312,7 @@ function openEditPhone(oldPhone) {
         <div id="edit-phone-err" style="font-size:11px;color:var(--red);margin-bottom:8px;display:none"></div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
           <button class="btn" onclick="document.getElementById('edit-phone-modal').remove()">Huỷ</button>
-          <button class="btn primary" data-old-phone="${esc(oldPhone)}" onclick="saveEditPhone(this.dataset.oldPhone)">💾 Lưu${gsUrl ? ' + Sync GSheets' : ''}</button>
+          <button class="btn primary" data-old-phone="${esc(oldPhone)}" onclick="saveEditPhone(this.dataset.oldPhone)">✓ Xác nhận</button>
         </div>
       </div>
     </div>`;

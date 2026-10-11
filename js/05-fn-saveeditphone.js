@@ -20,7 +20,7 @@ async function saveEditPhone(oldPhone) {
       saveLS('ome_care', careData);
       _invalidateFilterCache();
       buildCustomers();
-      if (gsUrl) { syncToast('✓ Đã lưu tên → đang đồng bộ GSheets...'); await pushCareToGS(oldPhone); }
+      if (gsUrl) { syncToast('✓ Đã lưu tên'); await pushCareToGS(oldPhone); }
       toast('✓ Đã lưu tên khách hàng');
       openDp(oldPhone);
     }
@@ -77,7 +77,7 @@ async function saveEditPhone(oldPhone) {
 
   // 7. Sync lên Google Sheets
   if (gsUrl) {
-    syncToast('✓ Đã đổi SĐT → đang đồng bộ GSheets...');
+    syncToast('✓ Đã đổi SĐT');
     // Push care với số mới (tạo dòng mới)
     await pushCareToGS(newPhone);
     // Xoá dòng cũ trên GS bằng cách push 1 dòng rỗng/marker

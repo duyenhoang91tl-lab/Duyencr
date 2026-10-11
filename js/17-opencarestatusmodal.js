@@ -14,7 +14,7 @@ function openCareStatusModal() {
   var m = document.getElementById('care-status-modal');
   if (m) m.style.display = 'flex';
   var btn = document.getElementById('cs-save-btn');
-  if (btn) btn.textContent = '💾 Lưu' + (gsUrl ? ' + Sync GSheets' : '');
+  if (btn) btn.textContent = '💾 Lưu';
 }
 function closeCareStatusModal() {
   var m = document.getElementById('care-status-modal');

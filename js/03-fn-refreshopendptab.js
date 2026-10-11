@@ -524,7 +524,7 @@ function renderHistTab(c) {
         <input type="checkbox" id="mo-auto-sched"> Tự động thêm lịch chăm sóc (+7, +14 ngày, +1, +2 tháng)
       </label>
       <div style="display:flex;gap:6px">
-        <button class="save-btn" style="flex:1;padding:6px" data-phone="${esc(c.phone)}" onclick="addManualOrder(this.dataset.phone)">💾 Lưu đơn hàng</button>
+        <button class="save-btn" style="flex:1;padding:6px" data-phone="${esc(c.phone)}" onclick="addManualOrder(this.dataset.phone)">✓ Thêm đơn hàng</button>
         <button onclick="_toggleAddOrderForm()" style="border:1px solid var(--border);background:var(--surface);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px">Hủy</button>
       </div>
     </div>
@@ -585,7 +585,7 @@ function renderHistTab(c) {
           </div>
           <div style="display:flex;gap:6px">
             <button class="save-btn" style="flex:1;background:var(--orange,#e8a04a);border-color:var(--orange,#e8a04a);padding:6px"
-              data-phone="${esc(c.phone)}" onclick="_histEditSave(this.dataset.phone,${realIdx},'${eid}')">💾 Lưu cập nhật</button>
+              data-phone="${esc(c.phone)}" onclick="_histEditSave(this.dataset.phone,${realIdx},'${eid}')">✓ Cập nhật</button>
             <button onclick="_histEditToggle('${eid}')"
               style="border:1px solid var(--border);background:var(--surface);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px">Hủy</button>
           </div>
@@ -653,7 +653,7 @@ async function _histEditSave(phone, orderIdx, eid) {
       let d2; try { d2=JSON.parse(txt); } catch(e){ d2={}; }
       hide('loverlay');
       if (d2.error) toast('Lỗi GSheets: '+d2.error);
-      else toast('✓ Đã cập nhật đơn' + (d2.updated ? ' · Synced GSheets' : ' (GSheets không tìm thấy dòng, đã thêm mới)'));
+      else toast('✓ Đã cập nhật đơn' + (d2.updated ? '' : ' (GSheets không tìm thấy dòng, đã thêm mới)'));
     } catch(e) { hide('loverlay'); toast('Lỗi kết nối GSheets'); }
   } else {
     toast('✓ Đã cập nhật đơn (chưa cấu hình GSheets)');

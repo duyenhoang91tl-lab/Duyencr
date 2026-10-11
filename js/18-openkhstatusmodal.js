@@ -15,7 +15,7 @@ function openKhStatusModal() {
   if (m) m.style.display = 'flex';
   // Update save button label
   var btn = document.getElementById('khs-save-btn');
-  if (btn) btn.textContent = '💾 Lưu' + (gsUrl ? ' + Sync GSheets' : '');
+  if (btn) btn.textContent = '💾 Lưu';
 }
 
 function closeKhStatusModal() {
