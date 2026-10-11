@@ -5,11 +5,17 @@ function buildDashboard_() {
   for (var i = 0; i < care.length; i++) {
     if (care[i].zalo === 'Da ket ban' || care[i].zalo === 'Đã kết bạn') friend++;
   }
+  var validOrders = 0;
   for (var j = 0; j < orders.length; j++) {
+    // Bo don "Thất bại" (cot H, nguon Base) khoi tong doanh thu/so don/so khach — cung quy tac
+    // voi Bao cao A/C/KPI Pancake/Checklist MKT, truoc day ham nay cong het ca don that bai nen
+    // tong doanh thu o dashboard cao hon cac bao cao con lai.
+    if (_isExcludedOrderStatus_(orders[j].status)) continue;
     phones[orders[j].phone] = true;
     revenue += Number(orders[j].revenue) || 0;
+    validOrders++;
   }
-  return { totalCustomers: Object.keys(phones).length, totalOrders: orders.length,
+  return { totalCustomers: Object.keys(phones).length, totalOrders: validOrders,
            totalRevenue: revenue, careRows: care.length, zaloFriends: friend };
 }
 
@@ -479,15 +485,13 @@ function dateInRange_(dt, fromStr, toStr) {
   return true;
 }
 
-// Loai don khoi doanh so/so don theo dung 1 nguon DUY NHAT: cot "Trang thai don" (DT TONG:
-// cot H; Bao cao B/POS: token khong-khoang-trang... KHONG, token CO khoang trang trong cot
-// "Thẻ" — xem _donHasExcludedStatus_). KHONG suy dien them tu "Giai doan"/nguon khac.
-// Theo xac nhan cua Duyen (24/09/2026): cot nay CHI TUNG xuat hien dung 6 gia tri can loai —
-// Da hoan, Dang hoan, Dang hoan hang, Da hoan hang, Hoan hang, Hoan tien — so sanh KHOP TOAN
-// BO chuoi (khong phai substring) de tuyet doi khong dung nham cac trang thai khac (vd "Hoan
-// thanh" la don TOT, khong duoc loai). Neu sau nay Pancake/Base sinh them trang thai moi cung
-// nghia "hoan/huy" thi them dung vao mang duoi day, khong doan mo rong bang regex.
-var EXCLUDED_ORDER_STATUSES_ = ['huy', 'da huy', 'da hoan', 'dang hoan', 'dang hoan hang', 'da hoan hang', 'hoan hang', 'hoan tien']; // 'huy'/'da huy' them 2026-09-30 theo xac nhan cua Duyen (rieng cot Trạng thái cua Bao cao B/POS co gia tri nay)
+// Loai don khoi doanh so/so don cho cac BAO CAO TINH TREN BASE (DT TONG, cot H "Trạng thái") —
+// THEO XAC NHAN CUOI CUNG CUA DUYEN (2026-10): CHI loai DUY NHAT trang thai "Thất bại", khop
+// TOAN BO chuoi (khong phai substring) de tuyet doi khong dung nham cac trang thai khac. KHONG
+// con loai Huy/Hoan hang/Hoan tien... nhu ban truoc — thay doi nay AP DUNG CHO MOI bao cao doc
+// tu Base (A, C, KPI Pancake, Checklist MKT, Dashboard...). Rieng Bao cao B/POS dung quy tac
+// RIENG o POS_EXCLUDED_ORDER_STATUSES_ ben duoi (khac cot, khac gia tri).
+var EXCLUDED_ORDER_STATUSES_ = ['that bai'];
 function _isExcludedOrderStatus_(trangThai) {
   var s = _stripVN_(trangThai).trim();
   if (!s) return false;
@@ -601,12 +605,11 @@ function _donSaleNamesFromThe_(theStr) {
 // thai nua — chi dung de tach ten sale chia doanh thu (xem _donSaleNamesFromThe_ o tren).
 // (Ban than sheet cung da duoc Duyen xoa het cac dong Huy/Hoan/Dang hoan thu cong; ham nay
 // van giu de an toan cho du lieu phat sinh sau nay.)
-// SUA 2026-10-03 theo xac nhan cua Duyen: POS (sheet "dữ liệu đơn") CHI loai 2 trang thai "Đã hoàn"
-// va "Đang hoàn" (khop TOAN BO chuoi, khong dau/khong phan biet hoa-thuong). TRUOC DAY Pos dung chung
-// EXCLUDED_ORDER_STATUSES_ voi Base (con loai them Huy/Hoan hang/Hoan tien...) nen khac dinh nghia
-// thuc te cua Pos. Danh sach Base (EXCLUDED_ORDER_STATUSES_) GIU NGUYEN, chi anh huong DT TONG.
-// Ham nay CHI duoc goi boi Bao cao B (+E/F doc qua B) va G — khong dung cho Base.
-var POS_EXCLUDED_ORDER_STATUSES_ = ['da hoan', 'dang hoan'];
+// SUA 2026-10 theo xac nhan CUOI CUNG cua Duyen: POS (sheet "dữ liệu đơn", cot "Trạng thái đơn")
+// loai DUNG 3 trang thai "Hủy đơn", "Hoàn đơn", "Đang hoàn" (khop TOAN BO chuoi, khong dau/khong
+// phan biet hoa-thuong) — KHAC HOAN TOAN quy tac cua Base (chi "Thất bại", xem EXCLUDED_ORDER_STATUSES_
+// o tren). Ham nay CHI duoc goi boi Bao cao B (+E che do Pos, F, G) — khong dung cho Base.
+var POS_EXCLUDED_ORDER_STATUSES_ = ['huy don', 'hoan don', 'dang hoan'];
 function _donHasExcludedStatus_(trangThaiCol) {
   var s = _stripVN_(trangThaiCol).trim();
   if (!s) return false;

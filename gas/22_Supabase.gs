@@ -1283,9 +1283,11 @@ function _sbSetReadOn_(pr, key) {
 }
 function _sbSetReadOff_(pr, key) { pr.deleteProperty(key); pr.deleteProperty(key + '_AT'); }
 
+// CareData: toi da tuoi du lieu dong bo dinh ky (Buoc B) duoc coi la "moi" = 3 chu ky trigger (giong SB_ORD_MAX_AGE_MS_ cua don hang).
+var SB_CARE_MAX_AGE_MS_ = 3 * SB_CARE_SYNC_TICK_MINUTES_ * 60000;
 var SB_STEP5_MANUAL_ = [
-  'CareData CHUA co dong bo dinh ky Sheet -> Supabase (don hang co: 4b). Neu bo ghi song song, moi lan ghi CareData (CS luu, import, sua tay) khong len Supabase nua; cong an toan (dirty) cung dua vao dual-write. Can thiet ke duong ghi chinh vao Supabase truoc.',
-  'Duong ghi NGOAI CRM: tool Base/Pos day don vao Sheet va nhan vien sua TAY tren Sheet — chi len Supabase o tick 4b (don hang), CareData khong co.',
+  'CareData da co dong bo dinh ky Sheet -> Supabase (Buoc B, sbSyncCare_) nhung CHI upsert: dong bi XOA tren Sheet (dedupe, xoa tay) KHONG bi xoa tren Supabase. Neu bo ghi song song, moi lan CS luu van chi len Supabase qua tick (tre toi da ~10 phut) va cong an toan (dirty) khong con. Can thiet ke duong ghi chinh vao Supabase (Buoc C) + dong bo xoa truoc.',
+  'Duong ghi NGOAI CRM: tool Base/Pos day don vao Sheet va nhan vien sua TAY tren Sheet — len Supabase o tick dinh ky (don hang 4b, CareData Buoc B; toi da ~10 phut); dong BI XOA tren Sheet cua CareData thi khong.',
   'Bao cao/dashboard noi bo van doc readCare_/readAllOrders_ tu Sheets (4e-3 chua lam): neu Sheets ngung cap nhat thi bao cao cu dan.',
   'Quy tac nghiep vu: DT Tong duoc quan ly truc tiep tren Google Sheets (saveOrders co y tat). Chuyen nguon that cua don hang sang Supabase la quyet dinh cua Duyen, khong phai ky thuat.',
   'Chua co quy trinh sao luu/khoi phuc Supabase (xuat dinh ky + thu khoi phuc that) va chua quyet huong archive (docs/ARCHIVE-PLAN.md) chong cheo voi Supabase.',
@@ -1320,6 +1322,17 @@ function sbSanSangBuoc5_(opts) {
     });
     var hasTick = false; try { hasTick = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'sbOrdersTick_'; }); } catch (eT) {}
     add('Trigger dong bo don hang (sbOrdersTick_) dang chay', hasTick, hasTick ? '' : 'Chay sbDonHangCaiTrigger');
+    // Buoc B: dong bo dinh ky CareData — luoi an toan cho sua tay/import tren Sheet (ghi song song khong bat duoc)
+    var cs = safe(function () { return sbCareSyncStatus_(); }), badC = [];
+    if (cs.ok === false) badC.push('khong doc duoc trang thai: ' + String(cs.error || '').slice(0, 120));
+    else {
+      if (cs.syncedAt == null) badC.push('chua dong bo xong lan nao (chay sbKHDongBo)');
+      else if (cs.ageMin > SB_CARE_MAX_AGE_MS_ / 60000) badC.push('du lieu dong bo da ' + cs.ageMin + ' phut (toi da ' + SB_CARE_MAX_AGE_MS_ / 60000 + ')');
+      if (cs.lastError) badC.push('loi gan nhat: ' + String(cs.lastError).slice(0, 120));
+    }
+    add('CareData: dong bo dinh ky (Buoc B) moi, khong loi', badC.length === 0, badC.join('; '));
+    var careTick = cs && cs.triggerOn === true;
+    add('Trigger dong bo CareData (sbCareTick_) dang chay', careTick, careTick ? '' : 'Chay sbKHCaiTrigger');
     [['SB_ORD_READ', 'Doc don hang tu Supabase'], ['SB_CARE_DELTA_READ', 'Doc khach (delta) tu Supabase'], ['SB_CARE_FULL_READ', 'Doc khach (FULL) tu Supabase']].forEach(function (c) {
       var on = String(pr.getProperty(c[0]) || '').toLowerCase() === 'on', at = parseInt(pr.getProperty(c[0] + '_AT') || '0', 10);
       var days = at ? Math.floor((now - at) / 86400000) : null, ok = on && at > 0 && days >= SB_SOAK_DAYS_, d = '';

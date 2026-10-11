@@ -5,7 +5,11 @@
 // bang gia tri/sale cua don goc Base. Do tren file that thang 9: bat ghep lam Sasum lech 18.986.000d (9 don doi gia theo Base,
 // 2 don bi loai vi goc Base da Huy/Hoan) va chia lai sale theo Base lam nhieu sale lech hang tram trieu. Dat true de BAT LAI
 // co che ghep (code ghep van nguyen ven ben duoi). Tat ghep cung khong con doc "DT TỔNG" trong Bao cao B -> nhanh hon.
-var POS_GHEP_BASE_ENABLED_ = false;
+// SUA 2026-10 theo QUY TAC CHOT CUA DUYEN (5 diem): BAT LAI ghep Pos<->Base nhung CHI cho don Pos co TU 2 MA DON TRO LEN
+// (don ghep). Don Pos co 0-1 ma van tinh THUAN theo Pos nhu file ke toan (khong con thay gia tri/sale bang don goc Base) —
+// day chinh la nguyen nhan lech 18.986.000d truoc kia (ghep ca don 1 ma). Don goc Base chi bi loai khi 'Thất bại' (cot H).
+var POS_GHEP_BASE_ENABLED_ = true;
+var POS_GHEP_MIN_CODES_ = 2;
 var COUNTER_CODE_INNER_ = '[A-Za-z]{0,3}\\d{1,6}[A-Za-z]{0,3}T\\d{1,2}(?:\\/\\d{2,4})?';
 var COUNTER_CODE_RE_SRC_ = '(^|[^A-Za-z0-9])(' + COUNTER_CODE_INNER_ + ')(?![A-Za-z0-9])';
 function _normCounterCode_(c) { return String(c || '').replace(/\s+/g, '').toUpperCase(); }
@@ -266,11 +270,11 @@ function _mergeTachDon_(rows) {
 var QUAY_SALE_RATIO_ = 0.3;
 function _quaySaleRatio_(nguonDon, ghiChu, hasSale) {
   if (!hasSale) return 1;
-  // Bo dau truoc khi so (_normTxt_ chi ha chu thuong, khong bo dau) — khop "Quầy Hào Nam" bat ke hoa/thuong/dau.
+  // QUY TAC CHOT 2026-10 (Duyen): don Pos NGUON CUA HANG (Quay Hao Nam / Cua hang) co gan the sale => chia 30/70,
+  // 30% la phan cua sale (chia deu tiep cho cac sale tham gia), 70% la cua quay. KHONG con bat buoc ghi chu
+  // phai ghi '30/70' nhu ban truoc. Bo dau truoc khi so de khop bat ke hoa/thuong/dau.
   var nguonFold = String(nguonDon || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/\s+/g, ' ').trim();
-  if (nguonFold.indexOf('quay hao nam') === -1) return 1;
-  var s = String(ghiChu || '');
-  if (/(^|[^0-9])30\s*[\/\-:]\s*70(?![0-9])/.test(s) || /(^|[^0-9])70\s*[\/\-:]\s*30(?![0-9])/.test(s)) return QUAY_SALE_RATIO_;
+  if (nguonFold.indexOf('quay hao nam') !== -1 || nguonFold.indexOf('cua hang') !== -1) return QUAY_SALE_RATIO_;
   return 1;
 }
 
@@ -480,6 +484,7 @@ function buildSalesReportB_(filters) {
   var codesByRow = [], wantedCodes = {}, anyCodes = false;
   for (var pi = 0; pi < pre.length; pi++) {
     var cds = POS_GHEP_BASE_ENABLED_ ? _extractCounterCodes_(pre[pi].ghiChu) : [];
+    if (cds.length < POS_GHEP_MIN_CODES_) cds = []; // chi don ghep (>=2 ma) moi check nguoc Base; 1 ma -> tinh thuan Pos
     codesByRow.push(cds);
     if (cds.length) { anyCodes = true; cds.forEach(function(c) { wantedCodes[c] = true; }); }
   }
