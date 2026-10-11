@@ -459,6 +459,7 @@ const tabVisible = Object.assign({}, _tabVisDefault, loadLS('ome_tab_visible') |
 //  KHÔNG tự bật lại được các mục bị giới hạn, kể cả qua thao tác client.
 // ═══════════════════════════════════════════════════════
 var _PERM_TAB_DEFS = [
+  { id:'overview',     label:'Tổng quan' },
   { id:'tab-kh',       label:'Danh sách KH' },
   { id:'tab-schedule', label:'Lịch chăm sóc' },
   { id:'tab-overdue',  label:'Quá hạn' },
