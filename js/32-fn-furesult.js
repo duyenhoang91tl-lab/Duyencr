@@ -16,6 +16,64 @@ markDone = function(id){
   if (!it || !it.autoDao) return _fuMarkDoneOrig(id);
   _fuResultAsk(it);
 };
+// ── P2d: tin gợi ý từ MẪU hỏi thăm cho SALE duyệt/sửa rồi tự gửi (KHÔNG tự gửi) ──
+var _fuTplCache = null;
+async function _fuLoadTpls(){
+  if (_fuTplCache) return _fuTplCache;
+  try {
+    var sep = gsUrl.indexOf('?') > -1 ? '&' : '?';
+    var r = await fetch(gsUrl + sep + 'action=followUpTemplates', { redirect:'follow' });
+    _fuTplCache = ((await r.json()) || {}).list || [];
+  } catch(e) { _fuTplCache = []; }
+  return _fuTplCache;
+}
+// Số ngày của mốc suy ra từ id việc: dao_<sđt>_<ngày đơn>_<7|14|0|m1|m2>
+function _fuDaysOfSched(it){
+  var m = String(it.id || '').match(/_(m?\d+)$/); if (!m) return null;
+  return m[1] === 'm1' ? 30 : m[1] === 'm2' ? 60 : parseInt(m[1], 10);
+}
+// Chọn mẫu: cùng số ngày; mẫu riêng của CS phụ trách > mẫu chung; mã SP khớp > '*'. Mẫu của CS khác bị loại.
+function _fuPickTpl(list, days, csOwn, productText){
+  var best = null, bs = -1, pt = (typeof _foldVi === 'function' ? _foldVi(String(productText || '')) : String(productText || '')).toUpperCase();
+  (list || []).forEach(function(t){
+    if (parseInt(t.days, 10) !== days || !String(t.template || '').trim()) return;
+    var tcs = String(t.cs || '').toLowerCase();
+    if (tcs && tcs !== csOwn) return;
+    var codes = String(t.productCode || '*').toUpperCase().split(',').map(function(x){ return x.trim(); }).filter(Boolean);
+    var codeHit = codes.some(function(c){ return c !== '*' && pt.indexOf(c) !== -1; });
+    var star = codes.indexOf('*') !== -1 || !codes.length;
+    if (!codeHit && !star) return;
+    var sc = (tcs ? 2 : 0) + (codeHit ? 1 : 0);
+    if (sc > bs) { bs = sc; best = t; }
+  });
+  return best;
+}
+function _fuRender(tpl, ctx){
+  return String(tpl).replace(/\{name\}/g, ctx.name || 'bạn').replace(/\{phone\}/g, ctx.phone || '')
+    .replace(/\{days\}/g, String(ctx.days != null ? ctx.days : '')).replace(/\{product\}/g, ctx.product || '');
+}
+async function _fuFillSuggest(it, ov){
+  var box = ov.querySelector('#fu-sug'); if (!box || typeof gsUrl === 'undefined' || !gsUrl) return;
+  var days = _fuDaysOfSched(it); if (days == null) return;
+  var c = (typeof customerMap !== 'undefined' && customerMap) ? customerMap[it.phone] : null;
+  var care = (typeof careData !== 'undefined' && careData && careData[it.phone]) || {};
+  var last = c && c.orders && c.orders.length ? c.orders[c.orders.length - 1] : null;
+  var product = last ? ((last.product || '') + ' ' + (last.productDetail || '')).trim() : '';
+  var list = await _fuLoadTpls();
+  if (!document.body.contains(ov)) return;
+  var t = _fuPickTpl(list, days, String(care.cs || '').toLowerCase(), product);
+  if (!t) { box.innerHTML = '<div style="font-size:11px;color:var(--muted)">Chưa có mẫu tin cho mốc ' + days + ' ngày (thêm ở "Mẫu tin hỏi thăm tự động").</div>'; return; }
+  var msg = _fuRender(t.template, { name: c ? c.name : '', phone: it.phone, days: days, product: product });
+  box.innerHTML = '<div style="font-size:12px;font-weight:600;margin-bottom:4px">💬 Tin gợi ý (sửa được, bạn tự gửi)</div>' +
+    '<textarea id="fu-sug-ta" rows="4" style="width:100%;padding:6px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;resize:vertical">' + esc(msg) + '</textarea>' +
+    '<div style="display:flex;gap:8px;margin-top:6px"><button class="btn sm" id="fu-sug-copy">📋 Sao chép</button>' +
+    '<a class="btn sm" target="_blank" rel="noopener" href="https://zalo.me/' + encodeURIComponent(it.phone) + '" style="text-decoration:none">💬 Mở Zalo</a></div>';
+  ov.querySelector('#fu-sug-copy').onclick = function(){
+    var v = ov.querySelector('#fu-sug-ta').value;
+    (navigator.clipboard ? navigator.clipboard.writeText(v) : Promise.reject()).then(function(){ if (typeof toast === 'function') toast('✓ Đã sao chép tin'); },
+      function(){ var ta = ov.querySelector('#fu-sug-ta'); ta.select(); try { document.execCommand('copy'); } catch(e){} });
+  };
+}
 function _fuResultAsk(it){
   var old = document.getElementById('fu-result-ov'); if (old) old.remove();
   var tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
@@ -23,6 +81,7 @@ function _fuResultAsk(it){
   ov.id = 'fu-result-ov';
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3000;display:flex;align-items:center;justify-content:center';
   ov.innerHTML = '<div style="background:var(--surface);border-radius:12px;padding:16px 18px;width:min(380px,92vw);box-shadow:0 12px 40px rgba(0,0,0,.25)">' +
+    '<div id="fu-sug" style="margin-bottom:12px"></div>' +
     '<div style="font-weight:600;margin-bottom:4px">Kết quả chăm sóc</div>' +
     '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">' + esc(it.phone) + ' · ' + esc(it.note || '') + '</div>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
@@ -31,6 +90,7 @@ function _fuResultAsk(it){
     '<button class="btn sm primary" id="fu-res-ok">Xác nhận</button></div>' +
     '<div style="text-align:right;margin-top:10px"><button class="btn sm" id="fu-res-cancel">Huỷ</button></div></div>';
   document.body.appendChild(ov);
+  _fuFillSuggest(it, ov);
   ov.addEventListener('click', function(e){ if (e.target === ov) ov.remove(); });
   ov.querySelector('#fu-res-cancel').onclick = function(){ ov.remove(); };
   [].forEach.call(ov.querySelectorAll('button[data-k]'), function(b){
@@ -66,4 +126,10 @@ function _fuResultDone(it, k, newDate){
   var ov = document.getElementById('fu-result-ov'); if (ov) ov.remove();
   _fuMarkDoneOrig(it.id);
   if (k === 'resched' && typeof renderScheduleTab === 'function') { renderScheduleTab(); if (typeof renderOverdueTab === 'function') renderOverdueTab(); if (typeof updateSchedBadges === 'function') updateSchedBadges(); }
+}
+
+// Nút 💬 trên dòng việc: mở cùng hộp (tin gợi ý + chọn kết quả) mà chưa đóng việc
+function _fuSuggestOpen(id){
+  var it = (typeof schedules !== 'undefined' ? schedules : []).find(function(x){ return x.id === id; });
+  if (it) _fuResultAsk(it);
 }

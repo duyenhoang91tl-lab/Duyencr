@@ -1182,7 +1182,7 @@ function renderScheduleTab() {
             <div class="sched-phone">${it.phone}</div>
             ${_schedCsTag(it)}
             <div class="sched-note">${esc(_nsh)}</div>
-            <button onclick="event.stopPropagation();markDone('${it.id}')" style="background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:2px 7px;font-size:10px;cursor:pointer;color:var(--muted);white-space:nowrap;margin-left:auto">✓ Xong</button>
+            ${it.autoDao?`<button onclick="event.stopPropagation();_fuSuggestOpen('${it.id}')" title="Tin gợi ý từ mẫu + ghi kết quả" style="background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:2px 6px;font-size:10px;cursor:pointer;color:var(--muted);margin-left:auto">💬</button>`:''}<button onclick="event.stopPropagation();markDone('${it.id}')" style="background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:2px 7px;font-size:10px;cursor:pointer;color:var(--muted);white-space:nowrap;margin-left:${it.autoDao?'4px':'auto'}">✓ Xong</button>
           </div>`;
         }
       }
@@ -1228,7 +1228,7 @@ function renderOverdueTab() {
         <div class="sched-phone">${it.phone}</div>
         ${_schedCsTag(it)}
         <div class="sched-note">${esc(_nsh2)}</div>
-        <button onclick="event.stopPropagation();markDone('${it.id}')" style="background:var(--red-bg);border:1px solid var(--red-b);border-radius:3px;padding:2px 7px;font-size:10px;cursor:pointer;color:var(--red);white-space:nowrap;margin-left:auto">✓ Xong</button>
+        ${it.autoDao?`<button onclick="event.stopPropagation();_fuSuggestOpen('${it.id}')" title="Tin gợi ý từ mẫu + ghi kết quả" style="background:var(--red-bg);border:1px solid var(--red-b);border-radius:3px;padding:2px 6px;font-size:10px;cursor:pointer;color:var(--red);margin-left:auto">💬</button>`:''}<button onclick="event.stopPropagation();markDone('${it.id}')" style="background:var(--red-bg);border:1px solid var(--red-b);border-radius:3px;padding:2px 7px;font-size:10px;cursor:pointer;color:var(--red);white-space:nowrap;margin-left:${it.autoDao?'4px':'auto'}">✓ Xong</button>
       </div>`;
     }
     html += `</div>`;
