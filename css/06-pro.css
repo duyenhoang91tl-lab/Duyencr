@@ -57,3 +57,7 @@ html.ui-pro #dp-pro .pro-stage>li{flex:0 0 auto;min-width:96px;}
 html.ui-pro #dp-pro .pro-kpi{min-height:70px;padding:9px 12px;}
 html.ui-pro #dp-pro .pro-kpi .k-v{font-size:26px;}
 html.ui-pro #dp-pro .pro-grid{margin-bottom:8px;grid-template-columns:repeat(3,minmax(0,1fr));}
+/* P2b/P2c: khung Việc tiếp theo + dòng thời gian trong #dp-pro (timeline cuộn riêng để không đẩy form xuống) */
+html.ui-pro #dp-pro .pro-next{margin-bottom:6px;padding:8px 10px;}
+html.ui-pro #dp-pro .pro-tl{max-height:220px;overflow-y:auto;}
+html.ui-pro #dp-pro .pro-tl-d>summary{list-style:revert;}
