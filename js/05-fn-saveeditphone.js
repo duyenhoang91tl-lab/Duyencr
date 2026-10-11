@@ -115,7 +115,38 @@ function switchTab(tab, el) {
   if (tab==='schedule') renderScheduleTab();
   if (tab==='overdue') renderOverdueTab();
   if (tab==='task') loadTasks();
+  if (typeof _lovSync_ === 'function') _lovSync_();
 }
+
+// ── Thanh "Tổng quan & tác vụ" của tab Danh sách KH (xem css/01-base.css, khối .lov-bar) ──
+// Mở/đóng được nhớ trong localStorage 'ome_list_ov_open' ('1' mở, '0' đóng). Chưa chọn lần nào: màn hình hẹp (<=900px) thu gọn, màn rộng mở sẵn.
+function _lovIsOpen_() {
+  var v = null; try { v = localStorage.getItem('ome_list_ov_open'); } catch (e) {}
+  if (v === '1') return true;
+  if (v === '0') return false;
+  return !(window.matchMedia && window.matchMedia('(max-width: 900px)').matches);
+}
+function _lovSync_() {
+  var list = document.getElementById('tab-list');
+  var onList = !!list && list.style.display !== 'none';
+  document.body.classList.toggle('lov-on-list', onList);
+  document.body.classList.toggle('lov-open', _lovIsOpen_());
+  _lovSum_();
+}
+function _lovSum_() {
+  var rc = document.getElementById('result-count'), sm = document.getElementById('lov-sum');
+  if (sm) sm.textContent = rc && rc.textContent ? rc.textContent + ' khách hàng' : '';
+}
+function toggleListOverview() {
+  var open = !_lovIsOpen_();
+  try { localStorage.setItem('ome_list_ov_open', open ? '1' : '0'); } catch (e) {}
+  _lovSync_();
+}
+document.addEventListener('DOMContentLoaded', function () {
+  _lovSync_();
+  var rc = document.getElementById('result-count');
+  if (rc && window.MutationObserver) new MutationObserver(_lovSum_).observe(rc, { childList: true, characterData: true, subtree: true });
+});
 
 // ═══════════════════════════════════════════════════════
 //  EXPORT + CLEAR

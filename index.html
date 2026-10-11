@@ -387,6 +387,13 @@
       })();
     </script>
 
+     <!-- THANH TỔNG QUAN (Danh sách KH): bấm để mở/đóng 6 ô thống kê + thanh tác vụ (sắp xếp, chiến dịch, Thêm KH, Xuất CSV) -->
+     <div class="lov-bar" id="lov-bar" onclick="toggleListOverview()" role="button" title="Bấm để xem/ẩn tổng quan và các tác vụ">
+       <span class="lov-t">📊 Tổng quan &amp; tác vụ</span>
+       <span class="lov-sum" id="lov-sum"></span>
+       <span class="lov-arrow" id="lov-arrow">▾</span>
+     </div>
+
     <!-- STATS -->
     <div class="stats-row">
       <div class="sc"><div class="sc-n" id="s-total" style="color:var(--text)">0</div><div class="sc-l">KH hợp lệ</div></div>
@@ -425,9 +432,6 @@
           </select>
           <button class="btn sm primary" id="quick-add-btn" onclick="openQuickAddModal()" title="Thêm khách hàng mới hoặc ghi nhận đơn mới — chỉ cần Tên, SĐT, Ghi chú, các thông tin khác (sản phẩm, doanh thu...) điền sau trong trang chi tiết khách">
             ➕ Thêm KH / Đơn mới
-          </button>
-          <button class="btn sm" id="adv-filter-btn" onclick="openAdvModal()" title="Bộ lọc nâng cao">
-            ⚙ Lọc nâng cao
           </button>
         </div>
         <button class="btn sm" onclick="exportCSV()">
@@ -529,6 +533,9 @@
           <option value="22">22:00</option>
           <option value="23">23:00</option>
         </select>
+         <button class="btn sm" id="adv-filter-btn" onclick="openAdvModal()" title="Bộ lọc nâng cao">
+           ⚙ Lọc nâng cao
+         </button>
         <span style="font-size:10px;color:var(--hint);margin-left:4px" id="ymf-count-label"></span>
       </div>
 
