@@ -20,6 +20,7 @@ Gồm: 1 backend Google Apps Script (`gas_v13.js`) + web app (`index.html`) + 2 
 | Tra bảng nhanh: action GAS, 20 cột CareData, storage key, tiền tố CSS, quyền manifest | `07-reference-tables.md` | — |
 | Báo lỗi lặp lại / dò lịch sử lỗi đã sửa | `06-bug-history.md` | — |
 | Bảo mật backend: đăng nhập server/token, việc còn lại (bước 3-4) | `docs/SECURITY-PLAN.md` | — |
+| Chuyển HẲN sang Supabase (kế hoạch 6 giai đoạn, đã được Duyên đồng ý 2026-10-11) | `docs/MIGRATE-SUPABASE-FULL.md` (+ `docs/SUPABASE-PLAN.md`) | `gas_v13.js` (khối Supabase), `cloudflare/worker.mjs`, `supabase/schema.sql` |
 | Lộ trình thực hiện file yêu cầu CRM (8 mục: mốc sau mua, resale, hạng, AI tóm tắt, hồ sơ sale, hộp thư chung, quy trình đơn) | `docs/ROADMAP-YEU-CAU.md` | — |
 
 ## Web app Sasum đã TÁCH FILE (2026-10-08, chống lag)
