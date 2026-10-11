@@ -1,0 +1,9 @@
+# Cloudflare Worker (chế độ Static Assets) phục vụ BẢN NÉN của web CRM (thư mục dist/, tạo bởi tools/build-dist.js).
+# Worker NÀY KHÁC Worker cache API (cloudflare/wrangler.toml, tên duyen-crm-cache). Không đụng nhau.
+# Được deploy tự động bởi .github/workflows/deploy-web.yml (cần secret CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID — dùng chung với Worker cache).
+# Đổi tên Worker mà không sửa file: tạo Variable CF_WEB_NAME trong repo GitHub.
+name = "duyen-crm-web"
+compatibility_date = "2026-10-01"
+
+[assets]
+directory = "../dist"

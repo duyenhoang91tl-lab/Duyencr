@@ -1,0 +1,76 @@
+# Nén JS/CSS (tools/build-dist.js) rồi đưa web CRM lên Cloudflare (Worker Static Assets, tên duyen-crm-web) mỗi khi push main đổi web.
+# Bản gốc trên GitHub Pages vẫn chạy song song (không bị đụng). Chưa có secret Cloudflare -> bỏ qua bước deploy (không báo đỏ).
+# Hướng dẫn: cloudflare-web/README-vi.md
+name: Deploy web nén lên Cloudflare
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'js/**'
+      - 'css/**'
+      - 'tools/build-dist.js'
+      - 'tools/test-dist-equivalence.js'
+      - 'cloudflare-web/**'
+      - '.github/workflows/deploy-web.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-web
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      WEB_NAME: ${{ vars.CF_WEB_NAME || 'duyen-crm-web' }}
+      HAS_CF: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+
+      - name: Cài công cụ nén và kiểm thử
+        run: npm i --no-save terser@5 clean-css@5 jsdom@24
+
+      - name: Nén JS/CSS vào dist/
+        run: node tools/build-dist.js
+
+      - name: Kiểm tra cú pháp từng file đã nén
+        run: for f in dist/js/*.js; do node --check "$f" || exit 1; done
+
+      - name: So sánh bản nén với bản gốc (cùng biến/hàm toàn cục, cùng lỗi chạy)
+        run: node tools/test-dist-equivalence.js
+
+      - name: Deploy lên Cloudflare
+        if: env.HAS_CF == 'true'
+        id: deploy
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: cloudflare-web
+          wranglerVersion: '4'
+          command: deploy --name ${{ env.WEB_NAME }}
+
+      - name: Kiểm tra trang đang chạy
+        if: env.HAS_CF == 'true'
+        env:
+          URL: ${{ steps.deploy.outputs.deployment-url }}
+        run: |
+          if [ -z "$URL" ]; then echo "::warning::Không lấy được URL từ kết quả deploy — hãy tự mở thử."; exit 0; fi
+          sleep 5
+          curl -sL --max-time 60 "${URL%/}/" | grep -q 'boot-splash' || { echo "::error::Trang đã deploy nhưng không thấy nội dung CRM"; exit 1; }
+          echo "OK: $URL"
+
+      - name: Chưa cài secret Cloudflare
+        if: env.HAS_CF != 'true'
+        run: echo "::warning::Thiếu secret CLOUDFLARE_API_TOKEN/CLOUDFLARE_ACCOUNT_ID — đã nén và kiểm thử xong nhưng CHƯA deploy (xem cloudflare-web/README-vi.md)."
