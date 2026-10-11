@@ -1343,3 +1343,12 @@
 .pk-assign-chip-mut { background:#f1f5f9; color:#94a3b8; }
 .pk-assign-chip-today { background:#fef3c7; color:#92400e; font-weight:700; }
 .pk-assign-chip-late { background:#fee2e2; color:#b91c1c; font-weight:700; }
+
+/* Gợi ý hành động tiếp theo (NBA) + đề xuất ngày hẹn */
+.pk-nba-box { margin:8px 0; padding:8px; border:1px solid #fde68a; background:#fffbeb; border-radius:8px; }
+.pk-nba-title { font-size:11px; font-weight:700; color:#92400e; margin-bottom:3px; }
+.pk-nba-urgent { font-size:12px; font-weight:700; color:#b91c1c; margin-bottom:2px; }
+.pk-nba-act { font-size:13px; font-weight:700; color:#1f2937; }
+.pk-nba-why { font-size:11px; color:#64748b; margin:2px 0 5px; }
+.pk-nba-btns { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+#pk-nba-msg textarea { width:100%; box-sizing:border-box; margin-top:6px; font-size:12px; }
