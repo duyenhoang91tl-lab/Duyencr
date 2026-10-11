@@ -29,3 +29,6 @@ Các bước 1–3 chỉ làm **1 lần** để tạo Worker và đặt `GAS_URL
 - Nhiều request cùng lúc khi cache vừa hết hạn đều gọi GAS (chưa gộp).
 - `customers&since=…` (delta ~3 giây/lần) không cache được nên phần tải nặng nhất vẫn đi vào GAS; muốn giảm nữa cần tăng chu kỳ poll ở client hoặc đọc Supabase trực tiếp (bước sau).
 - Test: `node tools/test-cloudflare-worker.js`.
+
+## Khi đổi tên / URL Worker
+Địa chỉ Worker nằm CỨNG trong code web: `WORKER_URL` ở `js/06-main-renew-sources.js`. Đổi tên Worker mà quên đổi dòng này thì máy nào không bật `?worker=0` sẽ báo "Không kết nối được máy chủ" (xảy ra 11/10/2026 khi đổi `royal-brook-6cec` → `duyen-crm-cache`). Màn đăng nhập (`doLogin`, `js/14`) có đường lùi: Worker lỗi thì tự thử thẳng Apps Script (`GAS_URL_DIRECT`) trong phiên đó; các request khác chưa có đường lùi tự động.

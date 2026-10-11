@@ -1217,11 +1217,24 @@ async function doLogin(){
   if (!gsUrl){ showErr('Chưa kết nối máy chủ Google Sheets nên không đăng nhập được.'); return; }
   try { localStorage.removeItem('ome_demo_token'); localStorage.removeItem('ome_sess_token'); localStorage.removeItem('ome_sess_exp'); } catch(e){}
   // DANG NHAP O MAY CHU (2026-10-11): trinh duyet khong con tai passHash de tu so nua. Server kiem tra mat khau, tra token + ho so (khong co hash).
-  var d = null;
-  try {
-    var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'webLogin', username: u, password: p }) });
-    d = await r.json();
-  } catch(eN){ showErr('Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.'); return; }
+  // NGUYEN NHAN GOC loi "khong ket noi" tren dien thoai (2026-10-11): Worker doi ten/URL nhung WORKER_URL trong code van tro Worker cu -> may nao khong bat ?worker=0
+  // deu loi, ma moi loi fetch HOAC loi doc JSON (trang loi HTML cua Worker/GAS) deu bi bao nhu "mat mang". Nay: dang nhap thu qua gsUrl, loi thi THU LAI thang Apps Script
+  // (dang nhap la thao tac doc/kiem tra, thu lai an toan) va bao dung loai loi.
+  var d = null, lastErr = '';
+  var urls = [gsUrl]; if (typeof GAS_URL_DIRECT !== 'undefined' && GAS_URL_DIRECT && GAS_URL_DIRECT !== gsUrl) urls.push(GAS_URL_DIRECT);
+  for (var ui = 0; ui < urls.length && !d; ui++){
+    try {
+      var r = await fetch(urls[ui], { method:'POST', redirect:'follow', body: JSON.stringify({ action:'webLogin', username: u, password: p }) });
+      var txt = await r.text();
+      try { d = JSON.parse(txt); }
+      catch(eJ){ lastErr = 'parse'; d = null; continue; }   // trang loi HTML (Worker/GAS) -> thu duong du phong
+      if (ui > 0){ gsUrl = urls[ui]; try { toast('⚠ Worker đang lỗi — tạm dùng đường dự phòng (Apps Script trực tiếp).'); } catch(eT){} }   // chi trong phien nay, KHONG ghi nho: Worker song lai thi tu dung lai
+    } catch(eN){ lastErr = 'net'; d = null; }
+  }
+  if (!d){
+    showErr(lastErr === 'parse' ? 'Máy chủ trả về dữ liệu không đọc được (Worker hoặc Apps Script đang lỗi). Thử lại sau ít phút hoặc báo admin.' : 'Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.');
+    return;
+  }
   if (!d || !d.ok || !d.token || !d.user){
     if (d && d.ok === false && d.error) showErr(d.error);
     else showErr('Máy chủ chưa hỗ trợ đăng nhập mới — báo admin deploy lại GAS bản mới (v13.25-auth-session) rồi thử lại.');
