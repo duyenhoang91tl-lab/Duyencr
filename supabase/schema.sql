@@ -124,6 +124,11 @@ alter table pk_webhook_raw enable row level security;
 --    tách tin là việc phụ, sai cấu trúc payload không được làm hỏng việc ghi thô -> lỗi tách chỉ ghi vào process_error.
 --    CHƯA RÕ định dạng thật của Pancake (tài liệu không mô tả): hiện tách theo dạng Messenger entry[].messaging[]
 --    (sender/recipient/message.mid/text/timestamp). Payload khác dạng -> processed_at rỗng, xem process_error/raw rồi mở rộng hàm.
+-- Bảng pk_webhook_raw từng bị tạo TAY bản thiếu cột (chỉ id/payload/created_at) nên `create table if not exists` ở mục 7 không bổ sung được
+-- -> Worker ghi page_id/event_type bị Supabase từ chối (400) -> webhook trả 502 và MẤT TIN. Bổ sung cột ở đây (idempotent, không đụng dữ liệu cũ).
+alter table pk_webhook_raw add column if not exists received_at timestamptz not null default now();
+alter table pk_webhook_raw add column if not exists page_id     text default '';
+alter table pk_webhook_raw add column if not exists event_type  text default '';
 alter table pk_webhook_raw add column if not exists processed_at  timestamptz;
 alter table pk_webhook_raw add column if not exists process_error text default '';
 
