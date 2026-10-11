@@ -1,0 +1,53 @@
+/* ── GIAO DIỆN "PRO" (lấy cảm hứng Creatio) — P0: nền thiết kế, CHƯA đổi chức năng ──
+   Chỉ có hiệu lực khi <html class="ui-pro"> (bật bằng ?ui=pro, tắt bằng ?ui=classic; nhớ trong localStorage 'ui_mode').
+   Mọi selector PHẢI bắt đầu bằng html.ui-pro để bản cũ không bị ảnh hưởng.
+   Các lớp tiện ích dưới đây (pro-*) là "viên gạch" để P1 (trang chủ), P2 (hồ sơ 360°), P3 (báo cáo) dùng lại. */
+html.ui-pro{
+  --pro-ink:#1b1740; --pro-purple:#4a2c8f; --pro-purple2:#6b3fb5; --pro-line:#e6e3ee; --pro-soft:#f5f3fa;
+  --pro-blue:#1d4ed8; --pro-blue2:#3b82f6; --pro-green:#2e8b2e; --pro-green2:#4caf50; --pro-orange:#e8731a; --pro-orange2:#f59e42;
+  --pro-red:#d93025; --pro-grey:#c9c6d1;
+  --pro-r:10px; --pro-shadow:0 1px 2px rgba(27,23,64,.06),0 4px 14px rgba(27,23,64,.07);
+}
+/* Thẻ nội dung */
+html.ui-pro .pro-card{background:var(--surface);border:1px solid var(--pro-line);border-radius:var(--pro-r);box-shadow:var(--pro-shadow);padding:14px 16px;}
+html.ui-pro .pro-card-h{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:14px;font-weight:600;color:var(--pro-ink);}
+html.ui-pro .pro-card-h .pro-sp{margin-left:auto;}
+html.ui-pro .pro-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));}
+/* Ô số màu (KPI tile) */
+html.ui-pro .pro-kpi{position:relative;border-radius:var(--pro-r);padding:12px 14px;color:#fff;min-height:84px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:var(--pro-shadow);}
+html.ui-pro .pro-kpi .k-l{font-size:12.5px;opacity:.92;}
+html.ui-pro .pro-kpi .k-v{font-size:30px;font-weight:600;line-height:1.1;letter-spacing:-.01em;}
+html.ui-pro .pro-kpi .k-s{font-size:11.5px;opacity:.85;}
+html.ui-pro .pro-kpi.blue{background:linear-gradient(135deg,var(--pro-blue),var(--pro-blue2));}
+html.ui-pro .pro-kpi.green{background:linear-gradient(135deg,var(--pro-green),var(--pro-green2));}
+html.ui-pro .pro-kpi.orange{background:linear-gradient(135deg,var(--pro-orange),var(--pro-orange2));}
+html.ui-pro .pro-kpi.purple{background:linear-gradient(135deg,var(--pro-purple),var(--pro-purple2));}
+html.ui-pro .pro-kpi.red{background:linear-gradient(135deg,#b3261e,var(--pro-red));}
+/* Chip / tag */
+html.ui-pro .pro-chip{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 10px;border-radius:999px;background:var(--blue-bg);color:var(--blue);font-size:12px;white-space:nowrap;}
+html.ui-pro .pro-chip.warn{background:var(--tn-bg);color:var(--tn);}
+html.ui-pro .pro-chip.bad{background:var(--red-bg);color:var(--red);}
+html.ui-pro .pro-chip.ok{background:var(--green-bg);color:var(--green);}
+/* Thanh giai đoạn dạng mũi tên (giai đoạn đã qua = xanh lá, hiện tại = xanh đậm, chưa tới = xám) */
+html.ui-pro .pro-stage{display:flex;overflow-x:auto;gap:0;margin:0 0 12px;padding:0;list-style:none;}
+html.ui-pro .pro-stage>li{position:relative;flex:1 0 110px;height:34px;line-height:34px;padding:0 18px 0 24px;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#555;background:var(--pro-grey);clip-path:polygon(0 0,calc(100% - 14px) 0,100% 50%,calc(100% - 14px) 100%,0 100%,14px 50%);margin-left:-8px;}
+html.ui-pro .pro-stage>li:first-child{margin-left:0;padding-left:14px;clip-path:polygon(0 0,calc(100% - 14px) 0,100% 50%,calc(100% - 14px) 100%,0 100%);}
+html.ui-pro .pro-stage>li.done{background:var(--pro-green);color:#fff;}
+html.ui-pro .pro-stage>li.cur{background:var(--pro-blue);color:#fff;font-weight:600;}
+/* Dòng thời gian (ghi chú / lịch hẹn / đơn hàng) */
+html.ui-pro .pro-tl{position:relative;margin:0;padding:0 0 0 22px;list-style:none;}
+html.ui-pro .pro-tl::before{content:"";position:absolute;left:7px;top:4px;bottom:4px;width:2px;background:var(--pro-line);}
+html.ui-pro .pro-tl>li{position:relative;padding:0 0 12px;font-size:13px;}
+html.ui-pro .pro-tl>li::before{content:"";position:absolute;left:-20px;top:3px;width:12px;height:12px;border-radius:50%;background:var(--pro-purple2);border:2px solid var(--surface);box-shadow:0 0 0 1px var(--pro-line);}
+html.ui-pro .pro-tl>li.note::before{background:var(--pro-blue2);}
+html.ui-pro .pro-tl>li.sched::before{background:var(--pro-orange2);}
+html.ui-pro .pro-tl>li.order::before{background:var(--pro-green2);}
+html.ui-pro .pro-tl .t-when{display:block;font-size:11.5px;color:var(--muted);}
+/* Khung "Việc tiếp theo" / Khuyến nghị */
+html.ui-pro .pro-next{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:var(--pro-r);background:var(--pro-soft);margin-bottom:8px;font-size:13px;}
+html.ui-pro .pro-next .n-pct{flex:none;min-width:44px;font-weight:600;color:var(--pro-green);}
+html.ui-pro .pro-next .n-act{margin-left:auto;flex:none;color:var(--pro-blue);cursor:pointer;font-weight:500;}
+/* Số liệu lớn trong đồng hồ tròn (SVG vẽ ở P1, class dùng chung) */
+html.ui-pro .pro-gauge text.g-v{font-size:26px;font-weight:600;fill:var(--pro-ink);}
+html.ui-pro .pro-gauge .g-bg{stroke:var(--pro-line);}
+html.ui-pro .pro-gauge .g-fg{stroke:var(--pro-green2);}

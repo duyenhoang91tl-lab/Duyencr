@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Duyên CRM 10.55.22.8.26</title>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>/* Công tắc giao diện PRO: ?ui=pro bật, ?ui=classic tắt (nhớ trong localStorage). Mặc định = bản cũ. */
+(function(){try{var q=new URLSearchParams(location.search).get('ui');if(q==='pro'||q==='classic')localStorage.setItem('ui_mode',q);if(localStorage.getItem('ui_mode')==='pro')document.documentElement.classList.add('ui-pro');}catch(e){}})();
+</script>
 <link rel="stylesheet" href="css/01-base.css">
 <link rel="stylesheet" href="css/02-style.css">
 </head>
@@ -1096,6 +1099,7 @@
 
 <link rel="stylesheet" href="css/04-style.css">
 <link rel="stylesheet" href="css/05-sidenav.css">
+<link rel="stylesheet" href="css/06-pro.css">
 
 <script src="js/18-openkhstatusmodal.js"></script>
 
