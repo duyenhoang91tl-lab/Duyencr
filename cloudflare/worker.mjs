@@ -86,8 +86,61 @@ async function passThrough(request, originUrl, note) {
   }
 }
 
+// ═══ WEBHOOK PANCAKE -> SUPABASE (them 2026-10-12, docs/PANCAKE-INBOX.md buoc 1) ═══
+// Pancake goi POST {worker}/pancake-webhook?key=<PANCAKE_WEBHOOK_KEY> moi khi co su kien (tin nhan moi...). Worker ghi NGUYEN payload
+// vao bang Supabase pk_webhook_raw (chua tach tin nhan). NGUYEN NHAN ghi tho truoc: tai lieu Pancake khong mo ta dinh dang webhook,
+// nen phai xem mau that roi moi thiet ke bang hoi thoai/tin nhan (buoc 2) — khong doan cau truc roi lam mat du lieu.
+// Bien moi truong (dat tren Cloudflare Dashboard, loai Secret): PANCAKE_WEBHOOK_KEY, SUPABASE_URL, SUPABASE_SERVICE_KEY.
+// Route nay KHONG dung GAS_URL, KHONG cache, KHONG co CORS (chi may chu Pancake goi). Tinh vao han muc 100.000 request/ngay cua Worker.
+const PK_WEBHOOK_PATH = '/pancake-webhook';
+const PK_MAX_BODY = 1024 * 1024;
+const pkJson = (obj, status) => new Response(JSON.stringify(obj), { status: status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } });
+// So sanh chuoi khong ro ri do dai/vi tri khac nhau (tranh do khoa tung ky tu qua thoi gian phan hoi).
+export function pkSafeEqual(a, b) {
+  a = String(a == null ? '' : a); b = String(b == null ? '' : b);
+  let diff = a.length ^ b.length;
+  const n = Math.max(a.length, b.length);
+  for (let i = 0; i < n; i++) diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  return diff === 0;
+}
+// Lay page_id / event_type CHI de loc nhanh (vai cho thuong gap, co the rong). Sai/thieu khong sao vi payload tho van duoc luu day du.
+export function pkExtract(p) {
+  const o = (p && typeof p === 'object' && !Array.isArray(p)) ? p : {};
+  const d = (o.data && typeof o.data === 'object') ? o.data : {};
+  const c = (d.conversation && typeof d.conversation === 'object') ? d.conversation : {};
+  const pick = (...vals) => { for (const v of vals) if (v != null && typeof v !== 'object' && String(v) !== '') return String(v).slice(0, 100); return ''; };
+  return { page_id: pick(o.page_id, d.page_id, c.page_id), event_type: pick(o.event_type, o.type, d.event_type) };
+}
+async function pancakeWebhook(request, env) {
+  if (!env.PANCAKE_WEBHOOK_KEY) return pkJson({ error: 'Chua cau hinh PANCAKE_WEBHOOK_KEY.' }, 503);
+  const url = new URL(request.url);
+  if (!pkSafeEqual(url.searchParams.get('key'), env.PANCAKE_WEBHOOK_KEY)) return pkJson({ error: 'Sai khoa.' }, 401);
+  const missing = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY'].filter(k => !env[k]);
+  if (missing.length) return pkJson({ error: 'Chua cau hinh: ' + missing.join(', ') }, 503);
+  if (request.method === 'GET') return pkJson({ ok: true, service: 'pancake-webhook', ready: true }, 200);   // mo bang trinh duyet de thu
+  if (request.method !== 'POST') return pkJson({ error: 'Chi nhan POST.' }, 405);
+  const text = await request.text();
+  if (text.length > PK_MAX_BODY) return pkJson({ error: 'Payload qua lon.' }, 413);
+  let payload; try { payload = JSON.parse(text); } catch (e) { payload = { _non_json: text.slice(0, 20000) }; }
+  if (payload === null || typeof payload !== 'object') payload = { _value: payload };
+  const ex = pkExtract(payload);
+  try {
+    const r = await fetch(String(env.SUPABASE_URL).replace(/\/+$/, '') + '/rest/v1/pk_webhook_raw', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', apikey: env.SUPABASE_SERVICE_KEY, authorization: 'Bearer ' + env.SUPABASE_SERVICE_KEY, prefer: 'return=minimal' },
+      body: JSON.stringify({ page_id: ex.page_id, event_type: ex.event_type, payload: payload })
+    });
+    // Loi ghi DB -> tra 502 (khong 200) de neu Pancake co co che gui lai thi khong mat tin. Khong lo noi dung loi/khoa ra ngoai.
+    if (!r.ok) return pkJson({ error: 'Supabase tu choi ghi.', status: r.status }, 502);
+  } catch (e) {
+    return pkJson({ error: 'Khong ket noi duoc Supabase.' }, 502);
+  }
+  return pkJson({ ok: true }, 200);
+}
+
 export async function handle(request, env, ctx) {
   if (request.method === 'OPTIONS') return cors(new Response(null, { status: 204 }));
+  if (new URL(request.url).pathname === PK_WEBHOOK_PATH) return pancakeWebhook(request, env || {});
   const gas = env && env.GAS_URL;
   if (!gas) return cors(jsonRes({ error: 'Worker chua cau hinh bien GAS_URL.' }, 500));
   const url = new URL(request.url);

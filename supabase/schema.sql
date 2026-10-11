@@ -101,3 +101,19 @@ create table if not exists fu_results (
 create index if not exists fu_results_due_idx  on fu_results (due);
 create index if not exists fu_results_user_idx on fu_results (by_user);
 alter table fu_results enable row level security;
+
+-- 7) pk_webhook_raw — nhật ký THÔ webhook Pancake (docs/PANCAKE-INBOX.md, bước 1).
+--    Cloudflare Worker (route /pancake-webhook) ghi NGUYÊN payload Pancake gửi tới, chưa tách tin nhắn.
+--    Lý do ghi thô trước: tài liệu Pancake không mô tả định dạng webhook, nên phải nhìn mẫu thật rồi mới thiết kế
+--    bảng hội thoại/tin nhắn (bước 2) — không đoán cấu trúc rồi mất dữ liệu vì sai cột.
+--    page_id/event_type chỉ để lọc nhanh (lấy tạm từ vài chỗ thường gặp, có thể rỗng); sự thật nằm ở payload.
+create table if not exists pk_webhook_raw (
+  id          bigint generated always as identity primary key,
+  received_at timestamptz not null default now(),
+  page_id     text default '',
+  event_type  text default '',
+  payload     jsonb not null
+);
+create index if not exists pk_webhook_raw_received_idx on pk_webhook_raw (received_at);
+create index if not exists pk_webhook_raw_page_idx     on pk_webhook_raw (page_id, received_at);
+alter table pk_webhook_raw enable row level security;

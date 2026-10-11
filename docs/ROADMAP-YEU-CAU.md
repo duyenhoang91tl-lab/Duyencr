@@ -95,6 +95,7 @@ Mỗi phiên làm xong 1 mục nhỏ thì push ngay, tick `[x]` ở đây và gh
 
 ### P7 — Hộp thư chung Zalo + Pancake (mục 2) — dự án lớn, cần Q8
 - [ ] 7a Khảo sát khả thi + chọn kiến trúc (Apps Script không làm realtime được → cần Cloudflare Worker `cloudflare/` + Supabase). Pancake: API + webhook chính thức. Zalo: chọn đường (extension đẩy tin về — mong manh, rủi ro điều khoản; Zalo OA — chỉ khách của OA).
+- [~] 7a/7b đang làm theo `docs/PANCAKE-INBOX.md` (2026-10-12): bước 1 code xong (bảng `pk_webhook_raw` + route Worker `/pancake-webhook`), chờ Duyên cài biến Cloudflare + khai webhook + gửi mẫu payload thật để làm bước 2 (bảng hội thoại/tin nhắn).
 - [ ] 7b Pancake trước: danh sách hội thoại + khung chat + gửi tin trong CRM, gắn khách theo SĐT.
 - [ ] 7c Zalo theo đường đã chọn; 7d nhật ký tin/cuộc gọi cho hồ sơ sale.
 

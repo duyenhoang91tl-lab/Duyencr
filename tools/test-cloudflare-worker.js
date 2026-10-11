@@ -108,6 +108,38 @@ const W = 'https://crm.example.workers.dev/';
   r = await worker.fetch(req('action=orders'), {}, ctx); ok(r.status === 500 && /GAS_URL/.test(await r.text()), 'thieu GAS_URL -> bao ro');
   reset(); r = await go('action=orders', undefined, { GAS_URL: GAS, DISABLED: '1' }); ok(r.headers.get('x-crm-cache') === 'BYPASS:disabled' && putCount === 0, 'DISABLED=1 -> chi chuyen tiep');
   r = await go('action=orders', undefined, { GAS_URL: GAS, DISABLED: '1' }); ok(calls.length === 2, 'DISABLED luon goi GAS');
+  // ===== webhook Pancake -> Supabase (/pancake-webhook) =====
+  const SB = 'https://abc.supabase.co', SBKEY = 'service-role-secret', WK = 'khoa-bi-mat-123';
+  const wenv = { PANCAKE_WEBHOOK_KEY: WK, SUPABASE_URL: SB + '/', SUPABASE_SERVICE_KEY: SBKEY };   // CO Y khong co GAS_URL: route nay khong duoc phu thuoc GAS
+  const wh = async (qs, init, e) => { const r = await worker.fetch(new Request('https://crm.example.workers.dev/pancake-webhook' + qs, init), e || wenv, ctx); await Promise.all(pending.splice(0)); return r; };
+  const post = body => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: typeof body === 'string' ? body : JSON.stringify(body) });
+  ok(mod.pkSafeEqual('abc', 'abc') && !mod.pkSafeEqual('abc', 'abd') && !mod.pkSafeEqual('abc', 'abcd') && !mod.pkSafeEqual('', 'x') && !mod.pkSafeEqual(null, 'x') && mod.pkSafeEqual(null, ''), 'pkSafeEqual');
+  let ex = mod.pkExtract({ page_id: 'P1', event_type: 'messaging' }); ok(ex.page_id === 'P1' && ex.event_type === 'messaging', 'pkExtract tang tren cung');
+  ex = mod.pkExtract({ data: { conversation: { page_id: 77 } }, type: 'x' }); ok(ex.page_id === '77' && ex.event_type === 'x', 'pkExtract tu data.conversation + type');
+  ex = mod.pkExtract({ page_id: { a: 1 } }); ok(ex.page_id === '' && mod.pkExtract(null).page_id === '' && mod.pkExtract([1]).event_type === '', 'pkExtract an toan voi du lieu la');
+  reset(); r = await wh('?key=' + WK, undefined, { SUPABASE_URL: SB, SUPABASE_SERVICE_KEY: SBKEY });
+  ok(r.status === 503 && calls.length === 0, 'thieu PANCAKE_WEBHOOK_KEY -> 503, khong goi gi');
+  reset(); r = await wh('?key=sai', post({ a: 1 })); ok(r.status === 401 && calls.length === 0, 'sai khoa -> 401, KHONG ghi Supabase');
+  r = await wh('', post({ a: 1 })); ok(r.status === 401 && calls.length === 0, 'khong co khoa -> 401');
+  reset(); r = await wh('?key=' + WK, undefined, { PANCAKE_WEBHOOK_KEY: WK, SUPABASE_URL: SB });
+  ok(r.status === 503 && /SUPABASE_SERVICE_KEY/.test(await r.text()) && calls.length === 0, 'thieu khoa Supabase -> 503 neu dung ten bien');
+  reset(); r = await wh('?key=' + WK); ok(r.status === 200 && JSON.parse(await r.text()).ready === true && calls.length === 0, 'GET dung khoa -> ready, khong ghi gi');
+  reset(); originFn = () => ({ status: 201, body: '' });
+  const ev = { event_type: 'messaging', page_id: 'P9', data: { message: { id: 'm1', message: 'xin chao' } } };
+  r = await wh('?key=' + WK, post(ev)); ok(r.status === 200 && JSON.parse(await r.text()).ok === true, 'POST dung khoa -> 200');
+  ok(calls.length === 1 && calls[0].url === SB + '/rest/v1/pk_webhook_raw' && calls[0].init.method === 'POST', 'ghi dung bang pk_webhook_raw (bo dau / cuoi URL): ' + calls[0].url);
+  ok(calls[0].init.headers.apikey === SBKEY && calls[0].init.headers.authorization === 'Bearer ' + SBKEY && calls[0].init.headers.prefer === 'return=minimal', 'gui khoa service_role dung header');
+  let row = JSON.parse(calls[0].init.body); ok(row.page_id === 'P9' && row.event_type === 'messaging' && J(row.payload) === J(ev), 'luu NGUYEN payload + page_id/event_type de loc');
+  ok(!calls.some(c => c.url.indexOf(GAS) === 0), 'khong goi GAS');
+  reset(); originFn = () => ({ status: 201, body: '' }); await wh('?key=' + WK, post('khong phai json {{')); row = JSON.parse(calls[0].init.body);
+  ok(row.payload._non_json === 'khong phai json {{', 'body khong phai JSON van luu (khong mat du lieu)');
+  reset(); originFn = () => ({ status: 201, body: '' }); await wh('?key=' + WK, post('123')); row = JSON.parse(calls[0].init.body); ok(row.payload._value === 123, 'JSON khong phai object duoc boc lai');
+  reset(); originFn = () => ({ status: 500, body: { message: 'bi mat: ' + SBKEY } }); r = await wh('?key=' + WK, post(ev)); const t502 = await r.text();
+  ok(r.status === 502 && t502.indexOf(SBKEY) === -1 && t502.indexOf(WK) === -1, 'Supabase loi -> 502, khong lo khoa/noi dung loi');
+  reset(); originFn = () => ({ throw: true }); r = await wh('?key=' + WK, post(ev)); ok(r.status === 502, 'mat mang toi Supabase -> 502');
+  reset(); r = await wh('?key=' + WK, post('x'.repeat(1024 * 1024 + 1))); ok(r.status === 413 && calls.length === 0, 'payload > 1MB -> 413, khong ghi');
+  reset(); r = await wh('?key=' + WK, { method: 'PUT', body: '{}' }); ok(r.status === 405 && calls.length === 0, 'PUT -> 405');
+  reset(); r = await worker.fetch(req('action=orders'), env, ctx); await Promise.all(pending.splice(0)); ok(r.headers.get('x-crm-cache') === 'MISS' && calls.length === 1 && calls[0].url.indexOf(GAS) === 0, 'route cu (cache GAS) khong bi anh huong');
   console.log('ALL CLOUDFLARE WORKER TESTS PASSED');
 })().catch(e => { console.error('LOI:', e); process.exit(1); });
 function J(x) { return JSON.stringify(x); }
