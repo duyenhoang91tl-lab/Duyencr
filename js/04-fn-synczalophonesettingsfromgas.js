@@ -434,7 +434,13 @@ function checkDataDaoRenewSchedules() {
 
   allCustomers.forEach(function(c) {
     if (daoExclude[c.phone]) return; // Khách đã bị bỏ lịch auto
+    // P2b: khách Zalo đã chặn / ngừng hoạt động -> không sinh việc mốc (khớp lộ trình, quy tắc hỏi thăm)
+    var _zs = String(c.zaloStatus || (careData && careData[c.phone] && careData[c.phone].zalo) || '');
+    if (_zs === 'Chặn' || _zs === 'Zalo ngừng hd') return;
     c.orders.forEach(function(o) {
+      // P2b: đơn hoàn / hủy không phải khách thật sự mua -> không hỏi thăm (trùng danh sách loại của Pos: da hoan, dang hoan, huy)
+      var _st = (typeof _foldVi === 'function' ? _foldVi(String(o.status || '')) : String(o.status || '')).toLowerCase().trim();
+      if (_st === 'da hoan' || _st === 'dang hoan' || _st === 'huy' || _st === 'da huy') return;
       var isDao  = _isDataDaoRenew(o.source);
       var isLead = EXTRA_SRC ? _fuSrcMatch(o.source, EXTRA_SRC) : _isNewLeadSource(o.source);
       if (!isDao && !isLead) return;
@@ -484,6 +490,8 @@ function checkDataDaoRenewSchedules() {
         if (_daoDeleted[autoId]) return;
         var exists = schedules.find(function(x){ return x.id === autoId; });
         if (exists) return;
+        // P2b: 1 việc/khách/ngày — nhiều đơn rơi cùng 1 ngày mốc thì chỉ tạo 1 việc (tránh nhắc trùng 1 khách)
+        if (schedules.some(function(x){ return x.autoDao && !x.done && x.phone === c.phone && x.date === targetDate; })) return;
 
         schedules.push(Object.assign({
           id:       autoId,

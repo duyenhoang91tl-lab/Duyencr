@@ -181,6 +181,7 @@ async function openFuReport(){
     '<select id="fu-rp-preset" style="padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:12px">' +
     '<option value="today">Hôm nay</option><option value="yesterday">Hôm qua</option><option value="week" selected>Tuần này</option><option value="lastweek">Tuần trước</option>' +
     '<option value="month">Tháng này</option><option value="lastmonth">Tháng trước</option><option value="quarter">Quý này</option><option value="year">Năm nay</option></select>' +
+    '<select id="fu-rp-ms" style="padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:12px"><option value="">Mọi mốc</option><option value="0">Ngày mua</option><option value="3">3 ngày</option><option value="7">7 ngày</option><option value="14">14 ngày</option><option value="30">30 ngày</option><option value="60">60 ngày</option><option value="90">90 ngày</option></select>' +
     '<button class="btn sm" id="fu-rp-close">Đóng</button></div>' +
     '<div id="fu-rp-body" style="font-size:12px">Đang tải...</div></div>';
   document.body.appendChild(ov);
@@ -188,6 +189,7 @@ async function openFuReport(){
   ov.querySelector('#fu-rp-close').onclick = function(){ ov.remove(); };
   var sel = ov.querySelector('#fu-rp-preset');
   sel.onchange = function(){ _fuReportLoad(sel.value); };
+  ov.querySelector('#fu-rp-ms').onchange = function(){ _fuReportLoad(sel.value); };
   _fuReportLoad(sel.value);
 }
 async function _fuReportLoad(preset){
@@ -203,6 +205,8 @@ async function _fuReportLoad(preset){
   var admin = (typeof _fuIsAdmin === 'function') ? _fuIsAdmin() : false;
   var me = (typeof currentUser !== 'undefined' && currentUser && currentUser.name) || '';
   if (!admin) rows = rows.filter(function(r){ return r.byUser === me; });
+  var msSel = document.getElementById('fu-rp-ms'), ms = msSel ? msSel.value : '';
+  if (ms !== '') rows = rows.filter(function(r){ return String(r.milestone) === ms; });
   var by = {};
   rows.forEach(function(r){
     var u = r.byUser || '(không rõ)', o = by[u] || (by[u] = { n:0, ontime:0, late:0, contacted:0, nopick:0, refused:0, resched:0 });
