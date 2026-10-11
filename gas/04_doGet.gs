@@ -268,6 +268,13 @@ function doGetCore_(e) {
     }
     if (action === 'teamAnalysis') return teamAnalysis_(e.parameter || {});
     if (action === 'orgOverview') return orgOverview_(e.parameter || {});
+    if (action === 'storeCaseReport') {
+      var pK = e.parameter || {};
+      return jsonOut_(buildStoreCaseReport_({
+        dateFrom: pK.dateFrom || '', dateTo: pK.dateTo || '', pct: pK.pct || '',
+        sale: pK.sale ? pK.sale.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : []
+      }));
+    }
     if (action === 'saleKpiReport') {
       var pF = e.parameter || {};
       var fF = { dateFrom: pF.dateFrom || '', dateTo: pF.dateTo || '',
