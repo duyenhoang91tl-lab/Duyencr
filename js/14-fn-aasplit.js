@@ -1266,6 +1266,7 @@ function doLogout(){
   _showLogin();
 }
 function _showLogin(){
+  if (window._splashOff) window._splashOff();
   var ov = document.getElementById('login-overlay'); if (!ov) return;
   var ld = document.getElementById('login-loading'); if (ld) ld.style.display = 'none';
   var f = document.getElementById('login-form'); if (f) f.style.display = '';

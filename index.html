@@ -4,11 +4,22 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Duyên CRM 10.55.22.8.26</title>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<style>
+/* Màn hình chờ hiện NGAY khi mở trang (trước khi tải xong ~1,6MB JS) — tắt bằng window._splashOff() khi form đăng nhập/app đã sẵn sàng */
+#boot-splash{position:fixed;inset:0;z-index:2999;background:linear-gradient(135deg,#0e3a2b,#16553c 60%,#0e3a2b);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#fff;font:600 15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;transition:opacity .2s}
+#boot-splash i{width:34px;height:34px;border:3px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:bootspin .8s linear infinite}
+#boot-splash small{font-weight:400;opacity:.75;font-size:12px}
+@keyframes bootspin{to{transform:rotate(360deg)}}
+</style>
 <link rel="stylesheet" href="css/01-base.css">
 <link rel="stylesheet" href="css/02-style.css">
 </head>
 <body>
+<div id="boot-splash"><i></i><span>Đang mở CRM…</span><small>Lần đầu có thể mất vài giây</small></div>
+<script>window._splashOff=function(){var e=document.getElementById('boot-splash');if(!e)return;e.style.opacity='0';setTimeout(function(){if(e.parentNode)e.parentNode.removeChild(e)},220)};setTimeout(window._splashOff,20000);
+/* Thư viện Excel (~1MB) nạp SAU khi trang đã load xong để không chặn form đăng nhập; chỉ dùng khi bấm nhập/xuất file */
+window.addEventListener('load',function(){var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.async=true;document.head.appendChild(s)});</script>
 
 <div class="loading-overlay" id="loverlay">
   <div class="spinner"></div>

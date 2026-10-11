@@ -1,4 +1,4 @@
-function _hideLogin(){ var ov = document.getElementById('login-overlay'); if (ov) ov.classList.remove('show'); }
+function _hideLogin(){ if (window._splashOff) window._splashOff(); var ov = document.getElementById('login-overlay'); if (ov) ov.classList.remove('show'); }
 
 // Cổng đăng nhập khi mở app
 async function _authGate(){
@@ -10,6 +10,7 @@ async function _authGate(){
       var f = document.getElementById('login-form'); if (f) f.style.display = 'none';
       ov.classList.add('show');
     }
+    if (window._splashOff) window._splashOff();
 
     // Tải tài khoản mới nhất từ GSheets — có timeout 7s
     var pullOk = false;
