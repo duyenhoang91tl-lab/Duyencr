@@ -355,7 +355,33 @@ function _aaWriteJson_(key, obj) { setSetting_(key, JSON.stringify(obj)); }
 // cs = KH o sheet Cham soc (phai co ten hoac thuoc nguon khac moi tinh la khach); cskh = CSKH-Duyen.
 // Hang: dem so dong "du lieu don": >=10 VIP, >=5 Than thiet, >=2 Tiem nang, con lai Chua ban lai duoc (nhom 'other').
 // Phan hang KH theo doanh thu luy ke: <15tr Khach thuong | 15-<30tr Than thiet | 30-<50tr Vip | >=50tr Super VVip (GIONG _hangKeyOf_ o index.html)
-function _aaHangKey_(rev) { rev = Number(rev) || 0; return rev >= 50000000 ? 'super' : rev >= 30000000 ? 'vip' : rev >= 15000000 ? 'tt' : 'thuong'; }
+// Hang KH (P1a/1b): nguong + ten doc tu Settings 'tierConfig' = [{key,label,min}] (4 key co dinh thuong<tt<vip<super);
+// chua cau hinh/sai -> mac dinh cu 0/15tr/30tr/50tr. PHAI khop _hangKeyOf_ trong js/05 (client).
+var _TIER_DEFAULT_ = [{ key: 'thuong', label: 'Khách thường', min: 0 }, { key: 'tt', label: 'Ưu tiên', min: 15000000 }, { key: 'vip', label: 'Vip', min: 30000000 }, { key: 'super', label: 'Super VVip', min: 50000000 }];
+function _tierCfgNormalize_(raw) {
+  var arr = raw; if (typeof raw === 'string') { try { arr = JSON.parse(raw); } catch (e) { return null; } }
+  if (!Array.isArray(arr) || arr.length !== 4) return null;
+  var out = [], prev = -1;
+  for (var i = 0; i < 4; i++) {
+    var d = _TIER_DEFAULT_[i], x = arr.filter(function (t) { return t && t.key === d.key; })[0];
+    if (!x) return null;
+    var min = i === 0 ? 0 : Number(x.min);
+    if (!isFinite(min) || min <= prev) return null;     // nguong phai tang dan
+    out.push({ key: d.key, label: String(x.label || d.label).trim().slice(0, 30) || d.label, min: min }); prev = min;
+  }
+  return out;
+}
+var _tierCfgMemo_ = null;
+function _tierCfg_() {
+  if (_tierCfgMemo_) return _tierCfgMemo_;
+  var c = null; try { c = _tierCfgNormalize_(getSetting_('tierConfig')); } catch (e) {}
+  return (_tierCfgMemo_ = c || _TIER_DEFAULT_);
+}
+function _aaHangKey_(rev) {
+  rev = Number(rev) || 0; var cfg = _tierCfg_();
+  for (var i = cfg.length - 1; i >= 0; i--) if (rev >= cfg[i].min) return cfg[i].key;
+  return 'thuong';
+}
 function _aaLoadCustomers_() {
   var src = {}, leadName = {};
   function mark(p, k) { if (!p) return; (src[p] = src[p] || {})[k] = true; }

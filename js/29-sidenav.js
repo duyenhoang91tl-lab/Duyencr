@@ -40,7 +40,7 @@
     { k:'cs',  t:'🔀 Cài đặt chia số',      ids:['act:assign','act:autoassign','act:assignhist'] },
     { k:'tm',  t:'👥 Cài đặt team',         ids:['team','act:acct'] },
     { k:'up',  t:'📤 Up data',              ids:['uploaddata','act:upload','act:sync','act:fullsync','act:dup'] },
-    { k:'st',  t:'⚙ Settings',              ids:['config','act:cstatus','act:khstatus','act:cfield','audit','act:clear'] }
+    { k:'st',  t:'⚙ Settings',              ids:['config','act:cstatus','act:khstatus','act:cfield','act:tier','audit','act:clear'] }
   ];
   // Mục "hành động" (mở modal có sẵn, không phải tab). admin:true = chỉ tài khoản admin thấy.
   var ACTS = {
@@ -61,6 +61,7 @@
     bday:       { t:'🎂 Mẫu sinh nhật', f:'openBdayTplModal' },
     cstatus:    { t:function(){ return '⚙ ' + (typeof FIELD_LABEL_CS!=='undefined'?FIELD_LABEL_CS:'Tình trạng chăm sóc'); }, f:'openCareStatusModal', admin:true },
     khstatus:   { t:function(){ return '⚙ ' + (typeof FIELD_LABEL_KH!=='undefined'?FIELD_LABEL_KH:'Trạng thái KH'); }, f:'openKhStatusModal', admin:true },
+    tier:       { t:'🏅 Cấu hình hạng KH', f:'openTierConfig', admin:true },
     cfield:     { t:'➕ Trường tự tạo', f:'openCustomFieldsModal', admin:true },
     clear:      { t:'🧹 Xóa data trên máy', f:'clearData', admin:true }
   };

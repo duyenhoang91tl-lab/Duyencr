@@ -55,8 +55,8 @@ Mỗi phiên làm xong 1 mục nhỏ thì push ngay, tick `[x]` ở đây và gh
 - [ ] 0e Mở rộng AuditLog cho thay đổi cấu hình.
 
 ### P1 — Hạng thành viên (mục 5)
-- [ ] 1a Cấu hình hạng trong Settings (`tierConfig`: tên, màu, ngưỡng doanh thu/số đơn, kỳ tính) + modal admin.
-- [ ] 1b Một hàm `tierOf_` backend; thay 3 chỗ ghi cứng (grep toàn bộ nơi gọi trước, quy tắc 7); client đọc cấu hình.
+- [~] 1a (xong phần cốt lõi: `tierConfig` + modal admin "🏅 Cấu hình hạng KH" js/33-fn-tierconfig.js, đổi TÊN + NGƯỠNG 4 hạng cố định; CÒN: màu, thêm/bớt hạng, kỳ tính/"điểm tiêu" theo năm — chờ Duyên giải thích Q2) Cấu hình hạng trong Settings (`tierConfig`: tên, màu, ngưỡng doanh thu/số đơn, kỳ tính) + modal admin.
+- [~] 1b (xong: `_aaHangKey_` GAS + `_hangKeyOf_` client cùng đọc cấu hình, test tools/test-tier.js; CÒN: tierOf_ gộp `tierBadge` VIP/Thân thiết/Tiềm năng — hệ 2 theo SỐ ĐƠN chưa gộp, chờ Q2) Một hàm `tierOf_` backend; thay 3 chỗ ghi cứng (grep toàn bộ nơi gọi trước, quy tắc 7); client đọc cấu hình.
 - [ ] 1c Lịch sử đổi hạng (ngày, từ→đến, đơn nào) + việc chúc mừng cho SALE khi lên hạng (dùng cơ chế việc ở P2).
 - [ ] 1d Huy hiệu ở Danh sách KH/hồ sơ/bộ lọc/báo cáo; thống kê theo hạng; "sắp lên/sắp rớt hạng".
 - [ ] 1e Quyền lợi theo hạng (admin khai) → chiến dịch chọn đối tượng theo hạng.

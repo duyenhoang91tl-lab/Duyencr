@@ -192,7 +192,9 @@ function clearData() {
   txt('fstatus','Chưa có dữ liệu');
 }
 
-function _hangKeyOf_(rev){ rev = Number(rev) || 0; return rev >= 50000000 ? 'super' : rev >= 30000000 ? 'vip' : rev >= 15000000 ? 'tt' : 'thuong'; }
+// Ngưỡng hạng KH: mặc định 0/15tr/30tr/50tr; admin đổi được (Settings 'tierConfig', xem js/33-fn-tierconfig.js). PHẢI khớp _aaHangKey_ ở GAS.
+var _TIER_MIN = { thuong:0, tt:15000000, vip:30000000, super:50000000 };
+function _hangKeyOf_(rev){ rev = Number(rev) || 0; return rev >= _TIER_MIN.super ? 'super' : rev >= _TIER_MIN.vip ? 'vip' : rev >= _TIER_MIN.tt ? 'tt' : 'thuong'; }
 function hangBadge(k){
   const cls = { thuong:'bo', tt:'bt', vip:'bv', super:'bv' }[k] || 'bo';
   const st = k === 'super' ? ' style="background:#7c2d12;color:#fde68a;font-weight:700"' : '';
