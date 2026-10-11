@@ -349,18 +349,80 @@ function _addDateDays(dateStr, days) {
 // lịch hẹn/nhắc hẹn "ma" không liên quan gì tới dữ liệu CRM mới. Giờ mỗi lần chạy, hàm sẽ tính
 // lại tập ID hợp lệ THEO QUY TẮC HIỆN TẠI rồi dọn sạch mọi mốc auto (autoDao=true, chưa done)
 // không còn nằm trong tập đó — không đụng tới lịch CS tự đặt tay hay các mốc đã done.
+// ── P2b: mốc lịch CS tự động theo CẤU HÌNH (cùng nguồn với quét hỏi thăm của GAS) ──
+// Lấy: ngày mốc từ bảng mẫu tin (followUpTemplates.checkpoints), trừ mốc admin tắt (fuOffDays),
+// ngày bắt đầu fuStart, nguồn đơn fuSources. Chưa tải được / chưa cấu hình -> null = giữ hành vi cũ.
+var _fuCfgState = { loaded:false, loading:false, cfg:null };
+function _fuClientCfgGet(){
+  if (!_fuCfgState.loaded && !_fuCfgState.loading) _fuClientCfgLoad();
+  return _fuCfgState.cfg;
+}
+function _fuIso_(raw){
+  raw = String(raw || '').trim(); var m = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) return m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2);
+  m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  return m ? m[3]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[1]).slice(-2) : '';
+}
+function _fuSrcMatch(src, list){
+  var t = String(src || '').toLowerCase();
+  return !!t && list.some(function(k){ return t.indexOf(k) !== -1; });
+}
+// days -> mốc: 30 và 60 giữ dạng tháng (id cũ 'm1'/'m2') để không tạo trùng với mốc đã làm xong
+function _fuMilestonesFromCfg(cfg){
+  var days = (cfg.days && cfg.days.length ? cfg.days : [7,14,30,60]).filter(function(d){ return !cfg.off[d]; });
+  return days.map(function(d){
+    if (d === 30) return { months:1, label:'CS +1 tháng' };
+    if (d === 60) return { months:2, label:'CS +2 tháng' };
+    return { days:d, label: d === 0 ? 'CS ngày mua' : 'CS +' + d + ' ngày' };
+  });
+}
+async function _fuClientCfgLoad(){
+  if (typeof gsUrl === 'undefined' || !gsUrl) return;
+  _fuCfgState.loading = true;
+  try {
+    var sep = gsUrl.indexOf('?') > -1 ? '&' : '?';
+    var rs = await Promise.all([
+      fetch(gsUrl + sep + 'action=followUpTemplates', { redirect:'follow' }).then(function(r){ return r.json(); }),
+      fetch(gsUrl + sep + 'action=getSettings&keys=fuStart,fuSources,fuOffDays', { redirect:'follow' }).then(function(r){ return r.json(); })
+    ]);
+    var v = (rs[1] && rs[1].values) || {};
+    var off = {};
+    String(v.fuOffDays || '').split(',').forEach(function(x){ var n = parseInt(x,10); if (n >= 0) off[n] = true; });
+    var hasTpl = rs[0] && Array.isArray(rs[0].list) && rs[0].list.length;
+    var cfg = {
+      days: hasTpl ? (rs[0].checkpoints || []).map(Number) : [],
+      off: off,
+      start: _fuIso_(v.fuStart) >= '2020-01-01' ? _fuIso_(v.fuStart) : '',
+      sources: String(v.fuSources || '').split(',').map(function(x){ return x.trim().toLowerCase(); }).filter(Boolean)
+    };
+    var changed = JSON.stringify(cfg) !== JSON.stringify(_fuCfgState.cfg);
+    _fuCfgState.cfg = (cfg.days.length || Object.keys(off).length || cfg.start || cfg.sources.length) ? cfg : null;
+    _fuCfgState.loaded = true;
+    if (changed && _fuCfgState.cfg) { try { checkDataDaoRenewSchedules(); } catch(e){} }
+  } catch(e) { console.warn('_fuClientCfgLoad', e); _fuCfgState.loaded = true; }
+  _fuCfgState.loading = false;
+}
+
 function checkDataDaoRenewSchedules() {
   var now = new Date();
   var curYear = now.getFullYear();
   var curMonth = now.getMonth() + 1;
 
-  // Các mốc nhắc: [{offset_days, offset_months, label}]
+  // Các mốc nhắc: [{days | months, label}] — mặc định 7/14 ngày + 1/2 tháng như cũ; nếu admin đã cấu hình
+  // (bảng mẫu tin hỏi thăm + công tắc từng mốc fuOffDays + fuStart/fuSources) thì theo cấu hình đó (P2b).
+  var cfg = _fuClientCfgGet();
   var MILESTONES = [
     { days: 7,  label: 'CS +7 ngày' },
     { days: 14, label: 'CS +14 ngày' },
     { months: 1, label: 'CS +1 tháng' },
     { months: 2, label: 'CS +2 tháng' },
   ];
+  var START_ISO = '2026-05-01', EXTRA_SRC = null;
+  if (cfg) {
+    MILESTONES = _fuMilestonesFromCfg(cfg);
+    if (cfg.start) START_ISO = cfg.start;
+    if (cfg.sources && cfg.sources.length) EXTRA_SRC = cfg.sources;
+  }
 
   if (typeof allCustomers === 'undefined') return;
 
@@ -372,7 +434,7 @@ function checkDataDaoRenewSchedules() {
     if (daoExclude[c.phone]) return; // Khách đã bị bỏ lịch auto
     c.orders.forEach(function(o) {
       var isDao  = _isDataDaoRenew(o.source);
-      var isLead = _isNewLeadSource(o.source);
+      var isLead = EXTRA_SRC ? _fuSrcMatch(o.source, EXTRA_SRC) : _isNewLeadSource(o.source);
       if (!isDao && !isLead) return;
 
       // Chuẩn hoá năm/tháng của đơn
@@ -402,7 +464,7 @@ function checkDataDaoRenewSchedules() {
         if (!(oYear === 2026 && oMonth === 6)) return;
       } else {
         // landipage/messenger/capture/web: áp dụng từ tháng 5/2026 trở đi
-        if (baseDate < '2026-05-01') return;
+        if (baseDate < START_ISO) return;
       }
 
       var srcTag = isDao ? ' (Data Đảo)' : '';
@@ -410,10 +472,10 @@ function checkDataDaoRenewSchedules() {
       MILESTONES.forEach(function(m) {
         var targetDate = m.months
           ? _addDateMonths(baseDate, m.months)
-          : _addDateDays(baseDate, m.days);
+          : (m.days ? _addDateDays(baseDate, m.days) : baseDate);
 
         // ID duy nhất theo phone + ngày đơn + mốc → tránh tạo trùng
-        var autoId = 'dao_' + c.phone + '_' + baseDate + '_' + (m.days||('m'+m.months));
+        var autoId = 'dao_' + c.phone + '_' + baseDate + '_' + (m.days != null ? m.days : ('m'+m.months));
         validAutoIds[autoId] = true; // hợp lệ theo quy tắc hiện tại — giữ lại khi dọn rác
 
         // Đã bị CS xóa tay → không tạo lại

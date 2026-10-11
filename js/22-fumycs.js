@@ -175,6 +175,8 @@ async function saveFuCfg(){
     var offs = [].slice.call(document.querySelectorAll('#fucfg-days input[data-fuday]')).filter(function(x){ return !x.checked; }).map(function(x){ return x.getAttribute('data-fuday'); }).join(',');
     await put('fuOffDays', offs);
     window._fuOffDays = offs ? offs.split(',').map(Number) : [];
+    // Lịch CS tự động trên máy này dùng lại cấu hình mới ngay (máy khác: lần mở web kế tiếp)
+    try { if (typeof _fuCfgState !== 'undefined') { _fuCfgState.loaded = false; _fuCfgState.loading = false; } if (typeof checkDataDaoRenewSchedules === 'function') checkDataDaoRenewSchedules(); } catch(e2) {}
     st.style.color = '#00b14f'; st.textContent = '✓ Đã lưu — áp dụng từ lần quét kế tiếp' + (offs ? ' (đang tắt mốc: ' + offs + ' ngày)' : '');
   } catch(e) { st.style.color = '#dc2626'; st.textContent = 'Lỗi lưu: ' + e.message; }
 }
