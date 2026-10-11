@@ -46,3 +46,7 @@
 
 ## 22 cột CareData (đúng thứ tự, `CARE_HEADERS`; 2 cột cuối `custom`, `zaloPhones` thêm sau — khớp `supabase/schema.sql`)
 phone, status, zalo, cs, note, schedules, schedGoi, schedGoiNote, schedSP, schedSPNote, schedCS, schedCSNote, schedHen, schedHenNote, updated, khStatus, nickZalos, birthday, zaloSetBy, name, custom, zaloPhones
+
+## Settings key của quét hỏi thăm (gas v13.28)
+- `fuStart` = `yyyy-MM-dd` hoặc `dd/MM/yyyy`: khách mua từ ngày này trở đi mới được hỏi thăm (rỗng/sai/ngày không tồn tại/<2020 → mặc định 01/05/2026).
+- `fuSources` = từ khoá nguồn đơn cách nhau dấu phẩy (khớp chứa-chuỗi, không phân biệt hoa thường), vd `landipage,messenger,web,renew` (rỗng → mặc định landipage,landing,messenger,mess,web). Test: `node tools/test-fu-config.js`.

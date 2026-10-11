@@ -209,13 +209,34 @@ var FU_START = new Date(2026, 4, 1); // thang 5/2026 (thang tinh tu 0)
 // Chi hoi tham khach den tu cac nguon nay (so khop chua-chuoi, khong phan biet hoa thuong).
 // Don hang nguon khac (KH Renew, Data Dao...) KHONG gui hoi tham tu dong.
 var FU_SOURCES = ['landipage', 'landing', 'messenger', 'mess', 'web'];
-function fuSourceAllowed_(source) {
+function fuSourceAllowed_(source, list) {
   var sl = String(source || '').toLowerCase();
   if (!sl) return false;
-  for (var i = 0; i < FU_SOURCES.length; i++) {
-    if (sl.indexOf(FU_SOURCES[i]) !== -1) return true;
+  list = list || FU_SOURCES;
+  for (var i = 0; i < list.length; i++) {
+    if (sl.indexOf(list[i]) !== -1) return true;
   }
   return false;
+}
+// CAU HINH quet hoi tham (them 2026-10-11, P2a lo trinh): ngay bat dau + nguon don CHINH DUOC trong sheet Settings thay vi sua code.
+//   fuStart   = 'yyyy-MM-dd' hoac 'dd/MM/yyyy' (khach mua tu ngay nay tro di moi duoc hoi tham). Rong/sai/<2020 -> mac dinh FU_START.
+//   fuSources = cac tu khoa nguon don, cach nhau dau phay (vd 'landipage,messenger,web,renew'; khop chua-chuoi, khong phan biet hoa thuong). Rong -> mac dinh FU_SOURCES.
+// Mac dinh GIONG HET hanh vi cu, nen khong doi gi cho den khi co nguoi dat. Loi doc Settings -> dung mac dinh.
+function _fuConfig_() {
+  var cfg = { start: FU_START, sources: FU_SOURCES.slice() };
+  try {
+    var raw = String(getSetting_('fuStart') || '').trim(), m = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/), y, mo, dd;
+    if (m) { y = Number(m[1]); mo = Number(m[2]); dd = Number(m[3]); }
+    else { m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/); if (m) { dd = Number(m[1]); mo = Number(m[2]); y = Number(m[3]); } }
+    if (m && y >= 2020) {
+      var dt = _vnMidnight_(y, mo, dd);
+      // doi chieu nguoc: ngay khong ton tai (31/02) bi Date tu cuon sang 03/03 -> bo, dung mac dinh
+      if (!isNaN(dt.getTime()) && _vnYmd_(dt) === y + '-' + String(mo).padStart(2, '0') + '-' + String(dd).padStart(2, '0')) cfg.start = dt;
+    }
+    var src = String(getSetting_('fuSources') || '').split(',').map(function (x) { return x.trim().toLowerCase(); }).filter(Boolean);
+    if (src.length) cfg.sources = src;
+  } catch (e) {}
+  return cfg;
 }
 
 // Bang quy doi ten/viet tat san pham -> ma san pham chuan (dung chung cho
@@ -460,6 +481,7 @@ function runFollowUpScan_() {
   var templates = readFollowUpTemplates_();
   var doneKeys = readFollowUpLogKeys_();
   var today = new Date(); today.setHours(0, 0, 0, 0);
+  var fuCfg = _fuConfig_();
 
   // Moc ngay lay DONG tu bang mau tin (CS dat tuy y: 7, 14, 30, 60, 90...).
   // Neu bang mau trong -> dung bo moc mac dinh FU_CHECKPOINTS.
@@ -491,7 +513,7 @@ function runFollowUpScan_() {
     var d = parseVNDate_(orderDate); // ho tro ca Date that lan chuoi 'dd/MM/yyyy...' (readAllOrders_ tra ve chuoi)
     if (!d || isNaN(d)) return;
     d.setHours(0, 0, 0, 0);
-    if (d < FU_START) return; // chi hoi tham khach mua tu 5/2026 tro di
+    if (d < fuCfg.start) return; // chi hoi tham khach mua tu ngay fuStart (mac dinh 5/2026) tro di
     var daysSince = Math.round((today - d) / 86400000);
     if (!fuDaysSet[daysSince]) return;
     var np = normPhone_(phone);
@@ -521,7 +543,7 @@ function runFollowUpScan_() {
   for (var i = 0; i < orders.length; i++) {
     var o = orders[i];
     if (o.phone) phonesWithOrders[normPhone_(o.phone)] = true;
-    if (!fuSourceAllowed_(o.source)) continue; // chi nguon landipage / messenger / web
+    if (!fuSourceAllowed_(o.source, fuCfg.sources)) continue; // chi nguon trong fuSources (mac dinh landipage / messenger / web)
     tryAdd(o.phone, o.date, o.product || o.productDetail, o.name, 'order');
   }
 

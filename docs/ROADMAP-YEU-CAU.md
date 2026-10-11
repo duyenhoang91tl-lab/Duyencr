@@ -7,7 +7,7 @@ Mỗi phiên làm xong 1 mục nhỏ thì push ngay, tick `[x]` ở đây và gh
 1. **Phân quyền CHƯA chặn ở backend.** `verifyLogin_` chỉ trả `role/name`, không phát token; `doGetCore_` các action `lookup`, `customers`, `tasks`... không kiểm người gọi. Lọc phạm vi (`_inUserScope`, `_inCSScope`) nằm ở client. Yêu cầu mục 2.2/8 ("chặn ở backend") chưa đạt → việc nền số 1.
 2. **Vai trò:** yêu cầu 5 vai trò (admin, CEO, trưởng phòng, leader, sale). Code thấy rõ admin / cs / leader / demo; `ceo`, `tp` chưa có xử lý riêng. `USER_HEADERS` đã có `saleType`, `startDate` (dùng được cho hồ sơ sale).
 3. **Hạng:** 2 hệ ghi cứng ở 3 nơi: backend `_AA_TIER`/`_AA_HANG_LABEL` + khối ~dòng 10348–10369 (`gas_v13.js`), client `_hangKeyOf_` (`js/05-fn-saveeditphone.js`), `tierBadge`. Comment dòng ~10349 ghi "15–30tr = Thân thiết" nhưng nhãn là "Ưu tiên" → lệch tên, cần chốt khi gộp.
-4. **Mốc sau mua:** `FU_CHECKPOINTS=[7,14,30,60]`, `FU_START=5/2026` và `fuSourceAllowed_` (landipage/messenger/web) ghi cứng; `runFollowUpScan_` chỉ tạo broadcast chờ duyệt, KHÔNG tạo việc trong Lịch chăm sóc. Đã có: log chống trùng (`FollowUpLog` khoá `sđt|ngày|mốc`), 1 khách 1 tin/lần quét, chia theo CS.
+4. **Mốc sau mua:** các mốc ngày thực ra đã LẤY ĐỘNG từ bảng mẫu tin (`FollowUpTemplates`, khoá `mã SP|số ngày`); `FU_CHECKPOINTS=[7,14,30,60]` chỉ là dự phòng khi bảng mẫu trống (đính chính: bản đầu của tài liệu này ghi nhầm là ghi cứng). Thêm D3/D90 = thêm mẫu tin cho mốc đó; mốc D0 (`d>0`) hiện bị bỏ qua. `FU_START` (5/2026) và danh sách nguồn đơn từng ghi cứng → nay chỉnh qua Settings `fuStart`/`fuSources` (gas v13.28). `runFollowUpScan_` vẫn chỉ tạo broadcast chờ duyệt, KHÔNG tạo việc trong Lịch chăm sóc. Đã có: log chống trùng (`FollowUpLog` khoá `sđt|ngày|mốc`), 1 khách 1 tin/lần quét, chia theo CS.
 5. **Công việc (tasks):** `TASK_HEADERS` chỉ có title/description/csAssigned/deadline/status/... — chưa có quy trình 8 bước, chưa có quyền theo bước, xác nhận kế toán, thông báo. Có bình luận kèm ảnh (`TASK_COMMENT_HEADERS`).
 6. **AI tóm tắt:** đã có nền `teamAnalysis_`/`scoreTeam_`/`orgOverview_` (v13.23–24) + modal `js/30-fn-teamanalysis.js`. Cần nâng cấp, không làm từ đầu.
 7. **Chiến dịch:** có `broadcast` (4 kịch bản, 200/ngày/máy), `bct` (theo sản phẩm), thống kê gửi. Chưa có thực thể "chiến dịch resale" (thời điểm, ưu đãi, đo doanh thu).
@@ -58,7 +58,7 @@ Mỗi phiên làm xong 1 mục nhỏ thì push ngay, tick `[x]` ở đây và gh
 - [ ] 1e Quyền lợi theo hạng (admin khai) → chiến dịch chọn đối tượng theo hạng.
 
 ### P2 — Việc chăm sóc theo mốc (mục 3)
-- [ ] 2a Bảng cấu hình mốc (D, D3, D7, D14, 30, 60, 90 ngày): nội dung, kênh, theo sản phẩm/nhóm, theo SALE; admin sửa không cần code. Bỏ ghi cứng `FU_CHECKPOINTS`/`FU_START`/`fuSourceAllowed_`.
+- [~] 2a (xong phần: `fuStart`/`fuSources` trong Settings; CÒN: bật mốc D0, bật/tắt từng mốc + màn admin sửa, theo nhóm SP/SALE) Bảng cấu hình mốc (D, D3, D7, D14, 30, 60, 90 ngày): nội dung, kênh, theo sản phẩm/nhóm, theo SALE; admin sửa không cần code. Bỏ ghi cứng `FU_CHECKPOINTS`/`FU_START`/`fuSourceAllowed_`.
 - [ ] 2b Sinh VIỆC trong Lịch chăm sóc (loại gọi/sản phẩm/chăm sóc/hẹn) cho SALE đang chăm sóc; chống trùng khoá `sđt|đơn|mốc`; bỏ qua đơn hoàn/hủy, khách chặn, Zalo ngừng hoạt động; mỗi lần quét 1 việc/khách.
 - [ ] 2c Kết quả khi đánh dấu xong: đã liên hệ / không nghe máy / từ chối / hẹn lại; quá hạn sang tab Quá hạn.
 - [ ] 2d Tin soạn sẵn từ mẫu, SALE duyệt rồi gửi qua Zalo AI/Pancake AI (không tự gửi).
