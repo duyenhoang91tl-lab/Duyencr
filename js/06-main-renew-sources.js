@@ -496,6 +496,17 @@ const _advChipCache = { cs: [] };
 let _advAssignReopenAfterFilter = false; // true = Loc nang cao dang duoc mo tu ben trong modal Chia data
 
 // ── INIT ──
+// Vòng xoay "Đang tải dữ liệu…" (html.ev-boot, xem index.html) tắt khi lần đồng bộ ĐẦU TIÊN kết thúc (thành công hay lỗi);
+// chưa kết nối Google Sheets thì không có gì để chờ -> tắt ngay để hiện màn "Tải file Excel" thật.
+if (gsUrl) {
+  (function(){
+    var _origSync = syncFromGS, _first = true;
+    syncFromGS = async function(){
+      try { return await _origSync.apply(this, arguments); }
+      finally { if (_first) { _first = false; if (window._evBootDone) window._evBootDone(); } }
+    };
+  })();
+} else if (window._evBootDone) { window._evBootDone(); }
 if (gsUrl) {
   updateGsPill(true);
   show('syncbtn');

@@ -11,13 +11,20 @@
 #boot-splash i{width:34px;height:34px;border:3px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:bootspin .8s linear infinite}
 #boot-splash small{font-weight:400;opacity:.75;font-size:12px}
 @keyframes bootspin{to{transform:rotate(360deg)}}
+/* Màn "Tải file Excel để bắt đầu" chỉ là màn rỗng THẬT; trong lúc đang tải dữ liệu lần đầu (html.ev-boot) thay bằng vòng tròn xoay */
+.ev-spin{display:none;flex-direction:column;align-items:center;gap:12px;color:#4a2c8f;font:500 13px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.ev-spin i{width:40px;height:40px;border:4px solid rgba(74,44,143,.18);border-top-color:#4a2c8f;border-radius:50%;animation:bootspin .8s linear infinite}
+html.ev-boot #empty-view>*:not(.ev-spin){display:none!important}
+html.ev-boot #empty-view .ev-spin{display:flex}
 </style>
 <link rel="stylesheet" href="css/01-base.css">
 <link rel="stylesheet" href="css/02-style.css">
 </head>
 <body>
 <div id="boot-splash"><i></i><span>Đang mở CRM…</span><small>Lần đầu có thể mất vài giây</small></div>
-<script>window._splashOff=function(){var e=document.getElementById('boot-splash');if(!e)return;e.style.opacity='0';setTimeout(function(){if(e.parentNode)e.parentNode.removeChild(e)},220)};setTimeout(window._splashOff,20000);
+<script>document.documentElement.classList.add('ev-boot');
+window._evBootDone=function(){document.documentElement.classList.remove('ev-boot')};setTimeout(window._evBootDone,20000);
+window._splashOff=function(){var e=document.getElementById('boot-splash');if(!e)return;e.style.opacity='0';setTimeout(function(){if(e.parentNode)e.parentNode.removeChild(e)},220)};setTimeout(window._splashOff,20000);
 /* Thư viện Excel (~1MB) nạp SAU khi trang đã load xong để không chặn form đăng nhập; chỉ dùng khi bấm nhập/xuất file */
 window.addEventListener('load',function(){var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.async=true;document.head.appendChild(s)});</script>
 
@@ -348,6 +355,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 <div class="main">
   <!-- EMPTY -->
   <div id="empty-view" class="empty-state">
+    <div class="ev-spin"><i></i><span>Đang tải dữ liệu…</span></div>
     <div class="empty-icon"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
     <div class="empty-title">Tải file Excel để bắt đầu</div>
     <div class="empty-sub">Hỗ trợ nhiều file đồng thời. Chỉ lọc 4 nguồn hợp lệ và phân loại tự động.</div>
