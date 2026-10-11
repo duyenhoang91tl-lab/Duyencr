@@ -15,13 +15,14 @@ Nguyên tắc: mỗi giai đoạn có công tắc riêng, mặc định TẮT; r
 - Dữ liệu tải về bất cứ lúc nào: pg_dump / xuất CSV / REST.
 
 ## Giai đoạn 0 — Đo trước khi làm
-- [ ] Chạy `sbStatus` xem dung lượng thật (`dt_tong` nặng nhất); quyết định có cần archive để dưới ~400 MB.
-- [ ] Bật `caiTriggerSbPing`, CI `deploy-supabase.yml`.
+- [x] Đo dung lượng (2026-10-11, Supabase Dashboard → Free plan usage): DB 52/500 MB; dữ liệu thật ~25 MB (`don_chi_tiet` 10.180 dòng 14 MB, `dt_tong` 2.936 dòng 10 MB, `care_data` 2.428 dòng 592 kB). KHÔNG cần archive. LƯU Ý: `sbStatus` KHÔNG trả dung lượng DB (chỉ mode/stale/dirty) — xem dung lượng ở Dashboard hoặc SQL `select pg_size_pretty(pg_database_size(current_database()));`. Quy mô thật là ~2.400 khách (không phải 136k).
+- [ ] Bật `caiTriggerSbPing`, CI `deploy-supabase.yml` (chưa xác nhận).
 ## Giai đoạn 1 — Dữ liệu khớp 100%
-- [ ] Backfill lại; `sbCompareCare` / `sbDonHangDoiChieu*` đều `ok:true`.
+- [x] Đối chiếu 2026-10-11 đều ok:true, mismatchCount 0 (mẫu 300): `care_data` 2.428=2.428, `dt_tong` 2.936=2.936, `don_chi_tiet` 10.180=10.180.
 - [ ] Index theo `phone`, `cs`, ngày đơn (qua `supabase/schema.sql`, idempotent).
 - [ ] Bước B: đồng bộ định kỳ Sheet → Supabase cho CareData.
-- [ ] Bật 3 công tắc đọc; `sbSanSangBuoc5` `autoOk:true` liên tục ≥ 7 ngày.
+- [ ] Bật 3 công tắc đọc; `sbSanSangBuoc5` `autoOk:true` liên tục ≥ 7 ngày. Kết quả `sbSanSangBuoc5` 2026-10-11 21:51: autoOk=false, 4 điều kiện chưa đạt: (a) SB_MODE đang 'write' chứ chưa 'read'; (b)(c)(d) công tắc đọc đơn hàng / khách delta / khách FULL mới bật 1 ngày, cần ≥ 7. Các điều kiện dữ liệu (không stale, không dirty, đối chiếu 3 bảng, trigger `sbOrdersTick_`) đều đạt. Việc cần làm: chạy `sbXemTrangThai` xem vì sao mode về 'write' trong khi công tắc đọc đã bật, rồi `sbBatDocSupabase` (chỉ bật khi đối chiếu ok; rollback = `sbTatSupabase`); chạy lại `sbSanSangBuoc5` sau ≥ 7 ngày liên tục.
+- Các mục "manual" của `sbSanSangBuoc5` còn mở: CareData chưa có đồng bộ định kỳ Sheet→Supabase (bước B); tool Base/Pos + sửa tay Sheet chỉ lên Supabase qua tick 4b; báo cáo vẫn đọc Sheets (4e-3); chưa có quy trình sao lưu/khôi phục; chưa thử ROLLBACK thật.
 ## Giai đoạn 2 — Worker làm cổng + sao lưu miễn phí
 - [ ] Worker kiểm token HMAC, chặn request không token (xem `ntlReport`), token sang header, rate-limit.
 - [ ] Worker đọc thẳng Supabase cho `lookup`/`customers`/`orders`; GAS là đường dự phòng.
@@ -40,4 +41,4 @@ Nguyên tắc: mỗi giai đoạn có công tắc riêng, mặc định TẮT; r
 
 ## Rủi ro cần nhớ
 SĐT luôn qua `normPhone_`; backfill lô ≤500, GAS 6 phút/lần; nhiều phiên cùng sửa repo → rebase, không force-push; sửa `gas_v13.js` → `node tools/split-gas.js` + `--check`, deploy GAS lại, báo đúng các `gas/*.gs` đổi; sửa web → reload; sửa extension → reload ở chrome://extensions.
-Việc tiếp theo (cho phiên sau): Giai đoạn 0 — Duyên gửi kết quả `sbStatus`.
+Việc tiếp theo (cho phiên sau): GĐ1 — (1) xác minh/đặt SB_MODE='read' rồi để đủ ≥ 7 ngày; (2) thêm index vào `supabase/schema.sql`; (3) thiết kế bước B (đồng bộ định kỳ CareData Sheet→Supabase) — đây là điều kiện bắt buộc trước khi bỏ dual-write.
