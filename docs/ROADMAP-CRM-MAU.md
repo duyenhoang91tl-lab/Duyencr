@@ -1,0 +1,44 @@
+# Kế hoạch đưa các mục của "CRM mẫu" (clip 2026-10-11) vào CRM Thu Hiền
+
+Nguồn: clip quay màn hình điện thoại 2 phút (app "CustomerCare CRM", dữ liệu demo, ~120 khách / 40 cơ hội). Tài liệu = đối chiếu từng màn trong clip với code hiện có + thứ tự làm.
+Mỗi phiên làm xong 1 mục nhỏ thì push ngay, tick `[x]`, ghi "việc cần làm tiếp" (quy tắc 12). Liên quan: `docs/ROADMAP-YEU-CAU.md` (8 yêu cầu của Duyên — phân quyền backend, hạng, mốc sau mua, task 8 bước...), `docs/SUPABASE-PLAN.md`, `docs/SECURITY-PLAN.md`.
+
+## 1. Các mục trong clip
+- **Menu trượt:** Thông báo · Tổng quan · Khách hàng · Cơ hội bán hàng · Công việc · Chăm sóc & tái mua | QUẢN LÝ: Báo cáo · Nhập dữ liệu · Cấu hình · Vai trò & quyền hạn | Hướng dẫn sử dụng · Chế độ tối · thẻ người dùng.
+- **Tổng quan:** bộ lọc (từ/đến ngày, nhóm, người phụ trách, nguồn khách); 4 thẻ số (Khách mới trong kỳ · Cơ hội đang mở + giá trị dự kiến · Giá trị chốt trong kỳ · Tỷ lệ chốt, có ghi chú "giá trị chốt ≠ doanh thu kế toán"); 4 chip (Việc hôm nay · Việc quá hạn · Khách đến hạn tái mua · Cơ hội thiếu hoạt động); Phân bổ giai đoạn (có link mở bảng); Nguồn khách (link xem báo cáo).
+- **Cơ hội bán hàng = bảng Kanban** theo giai đoạn: Mới → Đang tư vấn → Đã gửi đề xuất → Đang thương lượng → Thành công / Thất bại. Thẻ: tên cơ hội, giá trị, khách, người phụ trách, "x giờ trước", biểu tượng (@, tài liệu, việc, bình luận). Lọc Doanh nghiệp / Trạng thái / Xác suất; nút "Cài đặt bảng theo giai đoạn"; nút "+ Tạo".
+- **Khách hàng:** 2 tab (Khách tiềm năng / Khách đã mua); tìm kiếm + lọc (nhóm, người phụ trách, nguồn, trạng thái); Xuất CSV; "Tùy chỉnh danh sách"; phân trang 10/trang; cột Khách hàng · Điện thoại · Trạng thái · Phụ trách (+nhóm) · Nguồn · Liên hệ tiếp theo. Chi tiết khách: Ưu tiên, Kênh ưu tiên (Zalo), Nhãn phân loại, Lần mua gần nhất, Dự kiến tái mua, **Quảng bá (cho phép theo nhu cầu)**, Lịch sử chăm sóc (kết quả + ghi chú + hẹn tiếp theo), Công việc liên quan.
+- **Công việc:** danh sách việc gắn khách, nút Hoàn thành.
+- **Chăm sóc & tái mua:** khách đến lịch chăm lại / tái mua theo cấu hình, **tôn trọng khách không nhận quảng bá**; Xuất CSV.
+- **Cấu hình:** Mốc nhắc việc (liên hệ lần đầu 24 giờ · chu kỳ tái mua mặc định 30 ngày · cảnh báo không hoạt động 7 ngày · lần chạy tự động gần nhất — chạy trên máy chủ); Lịch chăm sóc sau bán (hỏi thăm sau 3 ngày, 14 ngày); Chăm sóc định kỳ (bật/tắt); nút Vai trò & quyền hạn · Người dùng & quyền xuất dữ liệu · Phòng ban & nhóm · Thiết lập hệ thống · Nhật ký lỗi; bảng người dùng (phòng ban, nhóm, vai trò CEO/Trưởng phòng/Nhân viên kinh doanh, quyền xuất).
+
+## 2. Đối chiếu với CRM hiện tại
+| Mục trong clip | Hiện có | Còn thiếu |
+|---|---|---|
+| Menu trượt | `js/29-sidenav.js` (nhóm Tổng quan / Khách / Tác vụ / Nhân viên / Báo cáo / Chia số / Team / Up data / Settings) | Mục Thông báo, Chế độ tối, Hướng dẫn sử dụng, thẻ người dùng |
+| Tổng quan | `orgOverview_` + `js/31` (công ty/phòng/team/người), nhắc hẹn `renderReminderPanel`, `todayTasks` (đơn Base kẹt giai đoạn) | Thanh lọc (nhóm/phụ trách/nguồn), 4 thẻ + 4 chip gộp 1 màn "hôm nay", Phân bổ giai đoạn, Nguồn khách |
+| Cơ hội/Kanban | Không có thực thể cơ hội. Có `khStatus` (trạng thái KH), giai đoạn Base (`DT TỔNG ` cột G, đã theo dõi giờ vào giai đoạn ở `gas/23_TodayTasks.gs`) | Bảng Kanban, cài đặt giai đoạn, kéo thả |
+| Khách hàng | CareData 22 cột, lọc, lịch sử đơn Pos, lịch sử chăm sóc | Tách tab Tiềm năng/Đã mua, cờ "cho phép quảng bá", kênh ưu tiên, dự kiến tái mua, tùy chỉnh cột, phân trang chuẩn |
+| Công việc | Tab Tasks (`TASK_HEADERS`) | Gắn khách/cơ hội, việc tự sinh theo quy tắc, đếm quá hạn |
+| Chăm sóc & tái mua | Lịch hẹn (`reminders`), mẫu hỏi thăm (`FollowUpTemplates`, `runFollowUpScan_`), chiến dịch `broadcast` | 1 màn gộp; chu kỳ tái mua theo SP/mặc định; chặn quảng bá với khách không đồng ý |
+| Báo cáo / Nhập dữ liệu | Báo cáo A–K, upload Excel, Sync GS | (đã có, mạnh hơn clip) |
+| Cấu hình | Rải rác (Settings sheet, các modal) | Trang "Cấu hình" tập trung cho mốc/ngưỡng, nhật ký lỗi |
+| Vai trò, Phòng ban | Vai trò admin/manager/leader/cs (thiếu CEO, trưởng phòng — xem ROADMAP-YEU-CAU A.2); phòng ban vừa làm (`js/35`) | Phân quyền chặn ở backend (`SECURITY-PLAN`), quyền xuất dữ liệu |
+
+## 3. Thứ tự làm (mỗi bước nhỏ, push riêng)
+- [ ] **B0 – nền (đã lên kế hoạch ở tài liệu khác):** phân quyền backend, Supabase. Các màn dưới đọc đúng phạm vi người xem, nên B0 càng sớm càng tốt nhưng KHÔNG chặn B1–B2 (chỉ đọc dữ liệu đã lọc ở client như hiện nay).
+- [ ] **B1 – Màn "Hôm nay" (Tổng quan mới, gộp):** thanh lọc + 4 thẻ số + 4 chip + Phân bổ giai đoạn + Nguồn khách. Nguồn dữ liệu: `todayTasks`, `reminders`, `orgOverview_`, `buildSalesReportB_`. Một action GAS `homeSummary` tính ở backend (không kéo cả đơn về). Cần deploy GAS. *Việc nhỏ đầu tiên nên làm:* 4 chip (đã có đủ dữ liệu: việc hôm nay, quá hạn, đến hạn tái mua = `FollowUp`, thiếu hoạt động = khách không có ghi chú/đơn trong N ngày).
+- [ ] **B2 – Trang Cấu hình tập trung:** ngưỡng (`ttStageHours`, hạn liên hệ lần đầu, chu kỳ tái mua, cảnh báo không hoạt động, mốc hỏi thăm 3/14 ngày, bật/tắt chăm sóc định kỳ) lưu Settings + AuditLog; hiện "lần chạy tự động gần nhất". Nút dẫn tới Phòng ban (có rồi), Tài khoản, Nhật ký.
+- [ ] **B3 – Khách hàng:** tab Tiềm năng/Đã mua (đã mua = có đơn Pos), cờ **cho phép quảng bá** (cột mới CareData; `broadcast`/`bct`/`runFollowUpScan_` phải bỏ khách không đồng ý), kênh ưu tiên, ngày dự kiến tái mua (= lần mua gần nhất + chu kỳ), tùy chỉnh cột (lưu localStorage), phân trang.
+- [ ] **B4 – Chăm sóc & tái mua gộp 1 màn:** khách đến hạn (hẹn gọi, hỏi thăm sau bán, tái mua), Xuất CSV, tôn trọng cờ quảng bá.
+- [ ] **B5 – Bảng Kanban:** làm trước cho **giai đoạn đơn Base** (Tiếp nhận đơn → … → Đóng hàng; đã có dữ liệu giờ vào giai đoạn) và/hoặc theo `khStatus` của khách. Thực thể "cơ hội" riêng (giá trị dự kiến, xác suất) làm sau, lưu Supabase (Q1).
+- [ ] **B6 – Phụ:** Trung tâm Thông báo, Chế độ tối, Hướng dẫn sử dụng, trang Nhật ký lỗi (từ AuditLog), thẻ người dùng trong menu.
+
+## 4. Cần Duyên chốt (chưa làm các mục này khi chưa có câu trả lời)
+1. **Kanban** theo cái gì: (a) giai đoạn đơn Base, (b) trạng thái khách `khStatus`, (c) "cơ hội" mới có giá trị dự kiến/xác suất?
+2. Có thêm cờ **"khách không nhận quảng bá"** và bắt mọi chiến dịch bỏ khách đó? (clip làm vậy; ảnh hưởng 3 chỗ gửi hàng loạt)
+3. Giữ menu hiện tại và chỉ thêm mục thiếu, hay đổi hẳn theo nhóm menu của clip?
+4. Thứ tự ưu tiên B1–B6 có đúng ý không.
+
+## 5. Không sao chép
+Dữ liệu mẫu, tên "CustomerCare CRM", lọc "Doanh nghiệp" (CRM này không có khái niệm doanh nghiệp khách), giá trị cơ hội "dự kiến" nếu không có nguồn số thật. Thẻ "Giá trị chốt" phải ghi rõ không phải doanh thu kế toán (doanh thu vẫn theo báo cáo Pos/Base).

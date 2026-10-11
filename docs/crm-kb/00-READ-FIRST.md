@@ -43,3 +43,5 @@ Gồm: 1 backend Google Apps Script (`gas_v13.js`) + web app (`index.html`) + 2 
 ## Quy tắc giữ KB gọn
 - Mỗi file KB giữ dưới ~150 dòng. Quá dài → tách thêm file mới và thêm 1 dòng vào bảng định tuyến ở trên.
 - Mỗi thông tin chỉ nằm ở 1 file (tránh lệch nhau).
+
+- Kế hoạch đưa các mục của CRM mẫu (clip 2026-10-11) vào CRM: `docs/ROADMAP-CRM-MAU.md` (B1–B6, việc cần Duyên chốt ở mục 4).
