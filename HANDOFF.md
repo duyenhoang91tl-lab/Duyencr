@@ -5,7 +5,7 @@ Mọi CSS mới nằm trong `css/06-pro.css`, mọi selector bắt đầu `html.
 
 ## Tiến độ
 - [x] **P0 — Nền thiết kế**: `css/06-pro.css` (pro-card, pro-kpi, pro-chip, pro-stage, pro-tl, pro-next, pro-gauge) + **P0b**: da header gradient tím + ngăn kéo menu ☰ tím (chỉ đổi màu, không đổi bố cục). Công tắc `?ui=pro` đã gỡ — pro luôn bật.
-- [ ] **P1 — Trang chủ**: đồng hồ doanh số/tỷ lệ chốt (dùng csStats), phễu theo tình trạng CS, thẻ Khuyến nghị (luật gợi ý từ Pancake). Chỉ vẽ SỐ TỔNG HỢP (~136k khách, không vẽ danh sách). Cần thêm ô cài mục tiêu doanh số (chưa có nơi lưu → dùng setSetting/getSetting).
+- [x] **P1 — Trang chủ** (phiên khác làm: `js/36-pro-home.js`, commit da9392a, test `tools/test-ui-pro-home.js`; kiểm tra lại phần ô cài mục tiêu doanh số nếu cần): đồng hồ doanh số/tỷ lệ chốt (dùng csStats), phễu theo tình trạng CS, thẻ Khuyến nghị (luật gợi ý từ Pancake). Chỉ vẽ SỐ TỔNG HỢP (~136k khách, không vẽ danh sách). Cần thêm ô cài mục tiêu doanh số (chưa có nơi lưu → dùng setSetting/getSetting).
 - [x] **P2 — Hồ sơ khách 360°** (file `js/33-pro-profile.js`, test `node tools/test-ui-pro-profile.js`):
   - [x] 2a: thanh giai đoạn (cây Tình trạng CS, CHỈ tô giai đoạn hiện tại, không tô "đã qua" vì cây CS không phải phễu tuyến tính) + 3 ô số (ngày từ đơn cuối / số đơn / doanh thu). Chèn khối `#dp-pro` giữa `.dp-hdr` và `.dp-tabs` bằng cách bọc `openDp` + `renderDpTab` (không sửa hàm gốc).
   - [x] 2b: khung "Việc tiếp theo" = tối đa 3 lịch CHƯA xong của khách (quá hạn → hôm nay → sắp tới), nút "Xem/+ Đặt lịch" chuyển sang tab Lịch hẹn. Nguồn: biến toàn cục `schedules` (không dùng cột schedGoi/SP/CS/Hen của careData).
@@ -43,3 +43,5 @@ Yêu cầu của Duyên: tab Công việc có nhiều LOẠI quy trình, mỗi l
 - [ ] M4 — Thảo luận: render dòng hệ thống/request, đính kèm TỆP bất kỳ (PDF/Word/Excel… không chỉ ảnh; upload qua `uploadBroadcastImg` đã nhận mọi mime, kiểm tra giới hạn kích thước), tag @tên (gợi ý khi gõ @), tab "Tài liệu đính kèm" gom ảnh/tệp từ mô tả + thảo luận.
 - [ ] M5 — Quản lý loại quy trình (thêm/sửa/xóa giai đoạn, bật "cần duyệt") qua menu ⚙; bộ lọc "Chờ tôi xử lý / Chờ tôi duyệt / Tôi được tag"; huy hiệu số việc chờ tôi ở tab.
 - [ ] M6 — Thông báo khi được tag/giao bước/có yêu cầu duyệt (hiện chưa có hạ tầng thông báo; tối thiểu: badge + danh sách "Được tag" lấy từ cột mentions).
+
+> Lưu ý trùng tên: `proEsc_` được định nghĩa ở CẢ `js/33-pro-profile.js` lẫn `js/36-pro-home.js` (hàm toàn cục, file nạp sau thắng — bản 36 escape thêm dấu `'`, tương thích bản 33). Nếu sửa, gom về 1 chỗ.
