@@ -181,6 +181,8 @@ function careObjFromRow_(row) {
     // Gia tri cac "truong tu tao" admin them (xem CUSTOM_FIELDS ben index.html) — luu gop 1 cot
     // JSON de khong phai them cot moi moi lan admin tao them truong.
     custom:       (function(v){ try { var o = JSON.parse(v||'{}'); return (o && typeof o === 'object') ? o : {}; } catch(e) { return {}; } })(row[20]),
+    // Nhan phan loai (tu dat) — luu o custom.tag (khong them cot moi), lop ra thanh truong 'tag' de CRM (js/01) doc nhu cu.
+    tag:          (function(v){ try { var o = JSON.parse(v||'{}'); return (o && typeof o === 'object' && o.tag) ? String(o.tag) : ''; } catch(e) { return ''; } })(row[20]),
     // SDT khach dung de ket ban Zalo (mang chuoi, CS tu them) — xem chu thich tai CARE_HEADERS
     zaloPhones:   (function(v){ try { var a = JSON.parse(v||'[]'); return Array.isArray(a) ? a : []; } catch(e) { return []; } })(row[21])
   };
@@ -238,29 +240,55 @@ function readRemindersToday_(csFilter) {
   if (!shR || shR.getLastRow() < 2) return [];
   return _remindersFromRows_(shR.getDataRange().getValues().slice(1), csFilter);
 }
-// rows: mang dong CareData (cot 0 SDT, 1 status, 2 zalo, 3 cs, 12 schedHen, 13 schedHenNote) — KHONG gom dong tieu de.
+// rows: mang dong CareData (cot 0 SDT, 1 status, 2 zalo, 3 cs, 5 schedules(JSON), 12 schedHen, 13 schedHenNote) — KHONG gom dong tieu de.
+// Duong Supabase (sbReadRemindersRows_) cung kem cot schedules (query ilike theo ngay hom nay) nen lich nhac nhanh van vao nhac khi SB_MODE=read.
 function _remindersFromRows_(rows, csFilter) {
   var today = new Date(); today.setHours(0,0,0,0);
-  var reminders = [], seenR = {};
+  // Ngay hom nay dang YYYY-MM-DD (gio dia phuong) de loc nhanh cot schedules truoc khi JSON.parse (ham nay chay moi ~5 phut/may).
+  var todayYmd = today.getFullYear() + '-' + ('0' + (today.getMonth()+1)).slice(-2) + '-' + ('0' + today.getDate()).slice(-2);
+  var reminders = [], byPhone = {};
   for (var ri = 0; ri < rows.length; ri++) {
     var rw = rows[ri];
     if (!rw[0]) continue;
     var rcs = String(rw[3]||'').trim();
     if (csFilter && rcs !== csFilter) continue;
-    var rhen = rw[12];
-    if (!rhen) continue;
-    var rdate = new Date(rhen); rdate.setHours(0,0,0,0);
-    // CHỈ hẹn TRONG NGÀY hôm nay (không lấy quá hạn) — extension chỉ nhắc lịch của ngày
-    if (rdate.getTime() !== today.getTime()) continue;
-    // Gộp trùng: mỗi SĐT chỉ 1 nhắc (tránh nhân bản do CareData có dòng trùng)
     var npR = normPhone_(String(rw[0]));
-    if (seenR[npR]) continue;
-    seenR[npR] = true;
-    reminders.push({
-      phone: String(rw[0]), schedHen: String(rhen),
-      schedHenNote: String(rw[13]||''), cs: rcs,
+    // (1) Hen chinh (cot schedHen) — CHI hen TRONG NGAY hom nay (khong lay qua han), nhu cu.
+    var rhen = rw[12];
+    var hasHen = false;
+    if (rhen) {
+      var rdate = new Date(rhen); rdate.setHours(0,0,0,0);
+      hasHen = (rdate.getTime() === today.getTime());
+    }
+    // (2) Lich nhac nhanh (cot schedules, JSON: CRM/Pancake AI them) co ngay = hom nay, chua xong, khong phai sinh nhat tu dong.
+    var schedNotes = [];
+    var rsch = rw[5];
+    if (rsch && typeof rsch === 'string' && rsch.indexOf(todayYmd) !== -1) {
+      try {
+        var sa = JSON.parse(rsch);
+        if (Array.isArray(sa)) sa.forEach(function(x) {
+          if (!x || x.done || x.type === 'birthday' || !x.date) return;
+          if (String(x.date).slice(0, 10) !== todayYmd) return;
+          schedNotes.push(String(x.note || x.customLabel || ''));
+        });
+      } catch (eS) {}
+    }
+    if (!hasHen && !schedNotes.length) continue;
+    // Gop trung: moi SDT chi 1 nhac (tranh nhan ban do CareData co dong trung) — dong trung chi duoc BO SUNG ghi chu, khong tao nhac moi.
+    var note = (hasHen ? String(rw[13]||'') : '');
+    var cur = byPhone[npR];
+    if (cur) {
+      schedNotes.forEach(function(n) { if (n && cur.schedHenNote.indexOf(n) === -1) cur.schedHenNote += (cur.schedHenNote ? ' · ' : '') + n; });
+      continue;
+    }
+    var allNotes = [note].concat(schedNotes).filter(function(n, i, a) { return n && a.indexOf(n) === i; }).join(' · ');
+    cur = {
+      phone: String(rw[0]), schedHen: hasHen ? String(rhen) : todayYmd,
+      schedHenNote: allNotes, cs: rcs,
       status: String(rw[1]||''), zalo: String(rw[2]||''), overdue: false
-    });
+    };
+    byPhone[npR] = cur;
+    reminders.push(cur);
   }
   return reminders;
 }
@@ -296,6 +324,12 @@ function careRow_(r) {
   var cust = r.custom;
   if (typeof cust === 'string') { try { cust = JSON.parse(cust||'{}'); } catch(e) { cust = {}; } }
   if (!cust || typeof cust !== 'object') cust = {};
+  // Nhan phan loai (tu dat): client gui 'tag' rieng (CRM) HOAC nam san trong custom.tag (Pancake/Zalo copy nguyen custom).
+  // r.tag === undefined -> giu nguyen custom.tag client gui; r.tag la chuoi (ke ca rong) -> la gia tri moi (rong = xoa nhan).
+  if (r.tag !== undefined && r.tag !== null) {
+    var tg = String(r.tag).trim();
+    if (tg) cust.tag = tg; else delete cust.tag;
+  }
   var zp = r.zaloPhones;
   if (!Array.isArray(zp)) { try { zp = JSON.parse(zp||'[]'); } catch(e) { zp = []; } }
   return [
@@ -568,5 +602,212 @@ function demoLogin_(data) {
     break;
   }
   return jsonOut_({ ok: false, error: 'Sai tai khoan hoac mat khau' });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PHIEN DANG NHAP MAY CHU (them 2026-10-11) — buoc 1+2 cua ke hoach bao mat
+//  Truoc day: trinh duyet tai ca danh sach tai khoan KEM passHash (action=users khong can xac thuc) roi tu so hash,
+//  va saveUsers ai goi cung duoc -> ai biet URL GAS cung doc duoc hash / tu tao admin.
+//  Nay: (1) POST webLogin kiem tra mat khau O SERVER, tra token ky HMAC (het han SESS_TTL_MS_); (2) action=users KHONG BAO GIO tra passHash,
+//  chi tra danh sach rut gon neu khong co token hop le (extension Zalo/Pancake chi can username/name/active); (3) saveUsers bat buoc token admin
+//  (tru khi sheet Users dang trong = tao admin dau tien). Mat khau moi gui dang van ban qua HTTPS trong truong setPassword, server tu bam.
+//  Bi mat ky token nam trong Script Properties (sessSecret), KHONG nam trong sheet Settings (CRM doc duoc).
+// ═══════════════════════════════════════════════════════════════
+var SESS_TTL_MS_ = 7 * 24 * 3600 * 1000;
+function _sessSecret_() {
+  var props = PropertiesService.getScriptProperties();
+  var sec = props.getProperty('sessSecret');
+  if (!sec) { sec = Utilities.getUuid() + Utilities.getUuid() + Utilities.getUuid(); props.setProperty('sessSecret', sec); }
+  return sec;
+}
+function _sessSign_(b64) {
+  return Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(b64, _sessSecret_()));
+}
+function _sessIssue_(acct) {
+  var payload = { u: String(acct.username || ''), e: Date.now() + SESS_TTL_MS_ };
+  var b64 = Utilities.base64EncodeWebSafe(JSON.stringify(payload));
+  return b64 + '.' + _sessSign_(b64);
+}
+function _sessVerify_(tok) {
+  tok = String(tok || '');
+  var i = tok.indexOf('.');
+  if (i < 1) return null;
+  var b64 = tok.slice(0, i), sig = tok.slice(i + 1);
+  if (!_secEq_(sig, _sessSign_(b64))) return null;
+  var p = null;
+  try { p = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(b64)).getDataAsString()); } catch (e) { return null; }
+  if (!p || !p.u || !p.e || p.e < Date.now()) return null;
+  return p;
+}
+// Tra tai khoan THAT trong sheet Users (vai tro/active doc truc tiep, khong tin payload) hoac null neu token sai/het han/tai khoan bi khoa.
+function _sessUser_(tok) {
+  var p = _sessVerify_(tok);
+  if (!p) return null;
+  var users = readUsers_(getCrmSS_().getSheetByName(SH_USER));
+  var un = String(p.u).trim().toLowerCase();
+  for (var i = 0; i < users.length; i++) {
+    if (String(users[i].username || '').trim().toLowerCase() === un) return users[i].active === false ? null : users[i];
+  }
+  return null;
+}
+// Chi tra cac truong an toan. full=true (co token hop le) them perms/saleType/startDate. KHONG BAO GIO co passHash.
+function _usersForClient_(users, full) {
+  return (users || []).map(function(u) {
+    var o = { username: u.username, name: u.name, names: u.names, team: u.team, role: u.role, active: u.active };
+    if (full) { o.perms = u.perms; o.saleType = u.saleType; o.startDate = u.startDate; o.hasPass = !!u.passHash; }
+    return o;
+  });
+}
+function _usersWriteAuth_(tok) {
+  var existing = readUsers_(getCrmSS_().getSheetByName(SH_USER));
+  if (!existing.length) return { ok: true, bootstrap: true };   // chua co tai khoan nao: cho tao admin dau tien
+  var su = _sessUser_(tok);
+  if (!su) return { ok: false, error: 'Phien dang nhap het han hoac chua dang nhap — dang nhap lai roi thu lai.' };
+  if (su.role !== 'admin') return { ok: false, error: 'Chi admin moi duoc sua tai khoan.' };
+  return { ok: true };
+}
+function _upgradePwHash_(username, newHash) {
+  try {
+    var sh = getCrmSS_().getSheetByName(SH_USER);
+    if (!sh || sh.getLastRow() < 2) return;
+    var col = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
+    var un = String(username || '').trim().toLowerCase();
+    for (var i = 0; i < col.length; i++) {
+      if (String(col[i][0]).trim().toLowerCase() === un) { sh.getRange(i + 2, 2).setValue(newHash); return; }
+    }
+  } catch (e) {}
+}
+// Dung chung cho verifyLogin_ (extension) va webLogin_ (web). Tra {acct} hoac {error}.
+function _checkLogin_(username, password) {
+  var uname = String(username || '').trim().toLowerCase();
+  if (!uname || !password) return { error: 'Nhập đủ tài khoản và mật khẩu.' };
+  var cache = CacheService.getScriptCache();
+  var failKey = 'vlfail_' + uname.replace(/[^a-z0-9]/g, '_').slice(0, 80);
+  var fails = parseInt(cache.get(failKey) || '0', 10) || 0;
+  if (fails >= 5) return { error: 'Sai quá nhiều lần — thử lại sau 10 phút.' };
+  var users = readUsers_(getCrmSS_().getSheetByName(SH_USER));
+  var acct = null;
+  for (var i = 0; i < users.length; i++) {
+    if (String(users[i].username || '').trim().toLowerCase() === uname) { acct = users[i]; break; }
+  }
+  var okPw = false, usedOld = false;
+  if (acct && acct.passHash) {
+    okPw = _secEq_(_pwHash_(password, _PW_SALT_), acct.passHash);
+    if (!okPw && _secEq_(_pwHash_(password, _PW_SALT_OLD_), acct.passHash)) { okPw = true; usedOld = true; }
+  }
+  if (!acct || !okPw) {
+    cache.put(failKey, String(fails + 1), 600);
+    return { error: 'Sai tài khoản hoặc mật khẩu.' };
+  }
+  if (acct.active === false) return { error: 'Tài khoản đã bị khoá. Liên hệ quản trị viên.' };
+  cache.remove(failKey);
+  if (usedOld) _upgradePwHash_(acct.username, _pwHash_(password, _PW_SALT_));   // nang salt cu -> moi (truoc day client tu lam)
+  return { acct: acct };
+}
+function webLogin_(d) {
+  var r = _checkLogin_(d && d.username, d && d.password);
+  if (r.error) return jsonOut_({ ok: false, error: r.error });
+  var out = { ok: true, token: _sessIssue_(r.acct), expiresInMs: SESS_TTL_MS_, user: _usersForClient_([r.acct], true)[0] };
+  if (r.acct.role === 'demo') out.demoToken = _demoToken_();   // tai khoan test: client van can demoToken nhu cu
+  return jsonOut_(out);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BUOC 3 KE HOACH BAO MAT (them 2026-10-11): GHI LOG request du lieu khong co token hop le — CHUA CHAN gi.
+//  Nguyen nhan goc can lam: truoc khi bat buoc token (buoc 4) phai biet nguoi goi nao (web, extension Zalo, extension Pancake,
+//  Worker...) con goi tran; bat buoc ngay se lam hong extension. Dem theo ngay + action + nguon (tham so `src`, mac dinh '?')
+//  + co/khong token. Luu o CacheService (TTL toi da 6 gio, cap nhat moi lan ghi) nen KHONG cham duong luu cua CS (khong khoa, khong ghi sheet);
+//  dem gan dung khi nhieu request cung luc. Xem: GET action=ntlReport&adminKey=... hoac chay ham xemLogKhongToken trong Editor.
+// ═══════════════════════════════════════════════════════════════
+var NTL_ACTIONS_ = {
+  customers:1, lookup:1, donOrdersByPhone:1, cskhDetail:1, reminders:1, tasks:1, taskComments:1,
+  save:1, saveSingle:1, saveBatch:1, syncZaloFriendStatus:1, addCareLead:1, applyCustomerNameGuesses:1, dedupeCare:1,
+  saveOrders:1, patchOrder:1, deleteOrder:1, deleteDuplicateOrders:1, replaceOrders:1, importSheetRows:1, archiveOrders:1,
+  setOrderCareCS:1, setOrderCareCSBatch:1, saveAssign:1, saveAssignHistory:1, toggleAssignDone:1,
+  saveTask:1, deleteTask:1, saveTaskComment:1, saveTeams:1, saveMktTeams:1, saveSaleGroups:1, saveCareStatus:1,
+  broadcastMark:1, saveBroadcast:1, broadcastCancel:1, broadcastSetStatus:1, saveFollowUpTemplates:1, saveAudit:1
+};
+function _ntlKey_() { return 'ntl_' + Utilities.formatDate(new Date(), 'GMT+7', 'yyyyMMdd'); }
+// Ghi 1 request vao bo dem. method: 'GET'|'POST'. Moi loi bi nuot — log KHONG BAO GIO duoc lam hong request that.
+// ═══════════════════════════════════════════════════════════════
+//  KHOA API CHO EXTENSION (buoc 4a — CHI GHI LOG, chua chan gi). Moi extension (zalo, pancake) 1 khoa, luu trong Script Properties
+//  ('extApiKeys', KHONG nam trong sheet Settings vi CRM doc duoc sheet do; repo public nen khoa tuyet doi khong nam trong code extension).
+//  Extension gui khoa qua tham so `ek` (GET) / truong "ek" (POST). KHONG dung ten `key` vi getSetting&key=... / setSetting.key da dung ten nay.
+//  Lay/doi khoa: chay xemKhoaExtension / doiKhoaZalo / doiKhoaPancake trong Apps Script Editor (xem Execution log), roi dan vao
+//  trang Cai dat cua tung extension. Muc dich: biet extension nao da co khoa truoc khi BAT BUOC (buoc 4b).
+// ═══════════════════════════════════════════════════════════════
+var EXT_KEY_NAMES_ = ['zalo', 'pancake'];
+function _extKeys_() {
+  try { return JSON.parse(PropertiesService.getScriptProperties().getProperty('extApiKeys') || '{}') || {}; } catch (e) { return {}; }
+}
+function _extKeyNew_() { return 'ek_' + Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '').slice(0, 12); }
+function _extKeyEnsure_() {
+  var ks = _extKeys_(), ch = false;
+  EXT_KEY_NAMES_.forEach(function (n) { if (!ks[n]) { ks[n] = _extKeyNew_(); ch = true; } });
+  if (ch) PropertiesService.getScriptProperties().setProperty('extApiKeys', JSON.stringify(ks));
+  return ks;
+}
+function _extKeyRotate_(which) {
+  var ks = _extKeyEnsure_();
+  if (EXT_KEY_NAMES_.indexOf(which) < 0) throw new Error('Ten extension khong hop le: ' + which);
+  ks[which] = _extKeyNew_();
+  PropertiesService.getScriptProperties().setProperty('extApiKeys', JSON.stringify(ks));
+  return ks;
+}
+// '' = khong gui khoa; 'sai' = gui nhung khong khop khoa nao; 'zalo' / 'pancake' = khop khoa cua extension do (so sanh hang thoi gian).
+function _extKeyWho_(ek) {
+  ek = String(ek || '');
+  if (!ek) return '';
+  var ks = _extKeys_();
+  for (var i = 0; i < EXT_KEY_NAMES_.length; i++) { if (ks[EXT_KEY_NAMES_[i]] && _secEq_(ek, ks[EXT_KEY_NAMES_[i]])) return EXT_KEY_NAMES_[i]; }
+  return 'sai';
+}
+function xemKhoaExtension() {
+  var ks = _extKeyEnsure_();
+  Logger.log('Khoa Duyen AI - Zalo   : ' + ks.zalo);
+  Logger.log('Khoa Duyen AI - Pancake: ' + ks.pancake);
+  Logger.log('Dan tung khoa vao trang Cai dat (Options) cua dung extension, o "Khoa truy cap CRM". Doi khoa: chay doiKhoaZalo / doiKhoaPancake.');
+  return ks;
+}
+function doiKhoaZalo() { _extKeyRotate_('zalo'); return xemKhoaExtension(); }
+function doiKhoaPancake() { _extKeyRotate_('pancake'); return xemKhoaExtension(); }
+
+function _ntlNote_(method, action, token, src, ek) {
+  try {
+    action = String(action || '');
+    if (!NTL_ACTIONS_[action]) return;
+    var tokOk = !!(token && _sessVerify_(token));
+    var who = tokOk ? '' : _extKeyWho_(ek);
+    var cache = CacheService.getScriptCache();
+    var key = _ntlKey_(), raw = cache.get(key), m = {};
+    if (raw) { try { m = JSON.parse(raw) || {}; } catch (e0) { m = {}; } }
+    var sc = String(src || '?').replace(/[^A-Za-z0-9_\-]/g, '').slice(0, 16) || '?';
+    var lbl = tokOk ? 'token' : (who && who !== 'sai' ? 'key-' + who : 'NO-TOKEN' + (who === 'sai' ? '(key-sai)' : ''));
+    var k = method + ' ' + action + ' | src=' + sc + ' | ' + lbl;
+    m[k] = (m[k] || 0) + 1;
+    if (Object.keys(m).length > 200) return;   // chan phinh to bat thuong (vd ai do gui action/src ngau nhien)
+    cache.put(key, JSON.stringify(m), 21600);
+  } catch (e) {}
+}
+// Tra {date, rows:[{k, n}], noTokenTotal, tokenTotal} — sap xep NO-TOKEN truoc, nhieu nhat truoc.
+function _ntlReport_() {
+  var raw = CacheService.getScriptCache().get(_ntlKey_()), m = {};
+  if (raw) { try { m = JSON.parse(raw) || {}; } catch (e0) { m = {}; } }
+  var rows = Object.keys(m).map(function (k) { return { k: k, n: m[k] }; });
+  rows.sort(function (a, b) {
+    var an = a.k.indexOf('NO-TOKEN') >= 0 ? 0 : 1, bn = b.k.indexOf('NO-TOKEN') >= 0 ? 0 : 1;
+    return an !== bn ? an - bn : b.n - a.n;
+  });
+  var noTok = 0, tok = 0, keyed = 0;
+  rows.forEach(function (r) { if (r.k.indexOf('NO-TOKEN') >= 0) noTok += r.n; else if (r.k.indexOf('| key-') >= 0) keyed += r.n; else tok += r.n; });
+  return { ok: true, date: _ntlKey_().slice(4), noTokenTotal: noTok, tokenTotal: tok, keyTotal: keyed, rows: rows,
+    note: 'Dem gan dung, luu o cache toi da 6 gio (ngung 6 gio thi bat dau dem lai). src=? nghia la nguoi goi chua gui tham so src.' };
+}
+// Chay tay trong Apps Script Editor (khong can adminKey): xem Execution log.
+function xemLogKhongToken() {
+  var r = _ntlReport_();
+  Logger.log('Ngay ' + r.date + ': KHONG token=' + r.noTokenTotal + ', co token=' + r.tokenTotal);
+  r.rows.slice(0, 60).forEach(function (x) { Logger.log(x.n + '  ' + x.k); });
+  return r;
 }
 

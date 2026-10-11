@@ -21,3 +21,10 @@ Header (tiêu đề + thu gọn) → dòng tra cứu SĐT → thẻ thông tin k
 
 ## Storage & quyền
 Xem `07-reference-tables.md` (storage.sync cho DEFAULT_SETTINGS; giỏ hàng ở storage.local; host_permissions).
+
+## Form chăm sóc ↔ CRM (2026-10-10) — Pancake phải khớp form CRM (README #9)
+- Dữ liệu "mềm" nằm trong cột `custom` (JSON), KHÔNG có cột riêng: `custom.zaloReply` (ô 💬 Phản hồi Zalo, tick=true / bỏ tick=xoá khoá) và `custom.tag` (🏷 Nhãn phân loại; client gửi field `tag`, GAS `careRow_` ghi vào `custom.tag`, `careObjFromRow_` lộ ra `tag`; `tag` undefined = không đổi, chuỗi rỗng = xoá nhãn).
+- 📅 Lịch nhắc hẹn nhanh: `addQuickRemind_` đọc lại bản mới nhất từ server rồi NỐI object `{id,phone,type,customLabel,date,note,done,owner,ownerUser}` vào mảng JSON cột `schedules` (cùng cấu trúc `addCustomRemind` của CRM). GAS `_remindersFromRows_` đọc cả `schedules` (hôm nay, chưa xong, không phải birthday) vào "Nhắc hẹn hôm nay"; đường Supabase `sbReadRemindersRows_` (SB_MODE=read) cũng kèm `schedules` bằng query thứ 2 `schedules=ilike.*YYYY-MM-DD*` rồi gộp theo SĐT (gas v13.30).
+- 📋 Data được chia: mỗi dòng tra lười `LOOKUP_CUSTOMER` (tối đa 40 SĐT, 3 luồng) để hiện tên/trạng thái/ngày hẹn/nhãn; khách hẹn hôm nay/quá hạn xếp đầu tab "Chưa gọi"; Lưu khách thuộc đợt chia → tự `TOGGLE_ASSIGN_DONE`.
+- 💡 Gợi ý tiếp theo (Pancake AI, 2026-10): `_pkComputeNba_` + bảng `_NBA_RULES_` (đầu khối "GỢI Ý HÀNH ĐỘNG TIẾP THEO") quyết định hành động + số ngày hẹn theo TRẠNG THÁI CS (khớp chữ không dấu, nên cũng chạy với trạng thái phong thủy/cây động; trạng thái lạ → mặc định "Gọi và cập nhật trạng thái", +1 ngày). Muốn đổi nhịp chăm sóc chỉ sửa `days`/`PK_NBA_REBUY_DAYS` (30 ngày). Chỉ ĐỀ XUẤT: chip "📅 Đặt hẹn" chỉ điền ô Ngày hẹn, sale tự bấm Lưu. "✍️ Soạn tin gợi ý" dùng lại `FETCH_OPENER` với `angleInstr` riêng từng luật (không đổi GAS). Cập nhật trực tiếp khi đổi trạng thái/ngày hẹn/Zalo trên form.
+

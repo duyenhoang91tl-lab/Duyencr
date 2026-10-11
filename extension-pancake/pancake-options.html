@@ -27,6 +27,11 @@
     rồi phát hành bản cập nhật — mọi máy cài extension sẽ tự dùng URL mới, không ai phải tự sửa cài đặt.
   </div>
 
+  <label>Khóa truy cập CRM (do admin cấp) — <small>khác với "API Key" của AI bên dưới</small></label>
+  <input type="password" id="crmExtKey" placeholder="ek_..." autocomplete="off" />
+  <button id="saveCrmExtKey" type="button">Lưu khóa CRM</button> <span id="crmExtKeySaved"></span>
+  <div class="hint">Khóa riêng của extension Pancake, admin lấy trong Apps Script (hàm <code>xemKhoaExtension</code>). Chỉ lưu trên máy này, không đồng bộ qua tài khoản Google.</div>
+
   <div class="checkbox-row">
     <input type="checkbox" id="useProducts" />
     <span>🔍 Tra cứu sản phẩm (nạp dữ liệu Google Sheet sản phẩm/FAQ khi soạn gợi ý — giống checkbox bên Zalo AI)</span>

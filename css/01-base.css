@@ -830,3 +830,26 @@ body.demo-mode [data-bar-id^="hdr-"]:not([data-bar-id="hdr-logout"]){display:non
 /* Da co GitHub Actions tu deploy GAS + FIXED_GS_URL cung codebase -> an o/nut "Ket noi Google Sheets" (pill + moi nut openGsModal, ke ca nut sinh dong trong JS). Xoa 2 dong duoi de hien lai. */
 #gs-pill,
 [onclick*="openGsModal"]{display:none!important}
+
+/* ── Danh sách KH: thanh "Tổng quan & tác vụ" thu gọn (yêu cầu Duyên 2026-10-11) ──
+   Mặc định thu gọn trên màn hình hẹp (điện thoại dọc): chỉ còn thanh này + bộ lọc + bảng khách hàng cho dễ nhìn phần chăm sóc.
+   Bấm thanh để hiện 6 ô thống kê + thanh tác vụ như cũ. Chỉ hiện ở tab Danh sách KH (class lov-on-list do _lovSync_ đặt). */
+.lov-bar{display:none;align-items:center;gap:8px;padding:7px 14px;background:var(--surface);border-bottom:1px solid var(--border);cursor:pointer;flex-shrink:0;font-size:13px;font-weight:600;color:var(--text);user-select:none;}
+body.lov-on-list .lov-bar{display:flex;}
+.lov-bar .lov-sum{flex:1;font-weight:400;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.lov-bar .lov-arrow{transition:transform .15s;color:var(--muted);}
+body.lov-open .lov-bar .lov-arrow{transform:rotate(180deg);}
+body.lov-on-list:not(.lov-open) .stats-row,body.lov-on-list:not(.lov-open) #tab-list > .toolbar{display:none !important;}
+
+body.ov-mode .lov-bar,body.rpt-mode .lov-bar{display:none !important;}
+
+/* ── Panel chi tiết KH: menu gập + tự lưu (2026-10-11) ── */
+.dp-acc > .dp-acc-h{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;margin-bottom:0;}
+.dp-acc.open > .dp-acc-h{margin-bottom:8px;}
+.dp-acc:not(.open) > :not(.dp-acc-h){display:none !important;}
+.dp-acc .dp-acc-arrow{transition:transform .15s;color:var(--muted);}
+.dp-acc.open .dp-acc-arrow{transform:rotate(180deg);}
+.dp-acc .dp-acc-cnt{display:inline-block;min-width:16px;padding:0 5px;border-radius:9px;background:var(--blue);color:#fff;font-size:10px;font-weight:700;text-align:center;line-height:16px;margin-left:4px;}
+.dp-autosave{font-size:11px;color:var(--muted);text-align:right;margin-top:6px;}
+.dp-autosave.warn{color:#b45309;font-weight:600;text-align:left;}
+

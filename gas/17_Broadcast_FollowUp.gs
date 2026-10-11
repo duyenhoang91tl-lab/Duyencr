@@ -209,13 +209,36 @@ var FU_START = new Date(2026, 4, 1); // thang 5/2026 (thang tinh tu 0)
 // Chi hoi tham khach den tu cac nguon nay (so khop chua-chuoi, khong phan biet hoa thuong).
 // Don hang nguon khac (KH Renew, Data Dao...) KHONG gui hoi tham tu dong.
 var FU_SOURCES = ['landipage', 'landing', 'messenger', 'mess', 'web'];
-function fuSourceAllowed_(source) {
+function fuSourceAllowed_(source, list) {
   var sl = String(source || '').toLowerCase();
   if (!sl) return false;
-  for (var i = 0; i < FU_SOURCES.length; i++) {
-    if (sl.indexOf(FU_SOURCES[i]) !== -1) return true;
+  list = list || FU_SOURCES;
+  for (var i = 0; i < list.length; i++) {
+    if (sl.indexOf(list[i]) !== -1) return true;
   }
   return false;
+}
+// CAU HINH quet hoi tham (them 2026-10-11, P2a lo trinh): ngay bat dau + nguon don CHINH DUOC trong sheet Settings thay vi sua code.
+//   fuStart   = 'yyyy-MM-dd' hoac 'dd/MM/yyyy' (khach mua tu ngay nay tro di moi duoc hoi tham). Rong/sai/<2020 -> mac dinh FU_START.
+//   fuSources = cac tu khoa nguon don, cach nhau dau phay (vd 'landipage,messenger,web,renew'; khop chua-chuoi, khong phan biet hoa thuong). Rong -> mac dinh FU_SOURCES.
+// Mac dinh GIONG HET hanh vi cu, nen khong doi gi cho den khi co nguoi dat. Loi doc Settings -> dung mac dinh.
+function _fuConfig_() {
+  var cfg = { start: FU_START, sources: FU_SOURCES.slice(), offDays: {} };
+  try {
+    var raw = String(getSetting_('fuStart') || '').trim(), m = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/), y, mo, dd;
+    if (m) { y = Number(m[1]); mo = Number(m[2]); dd = Number(m[3]); }
+    else { m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/); if (m) { dd = Number(m[1]); mo = Number(m[2]); y = Number(m[3]); } }
+    if (m && y >= 2020) {
+      var dt = _vnMidnight_(y, mo, dd);
+      // doi chieu nguoc: ngay khong ton tai (31/02) bi Date tu cuon sang 03/03 -> bo, dung mac dinh
+      if (!isNaN(dt.getTime()) && _vnYmd_(dt) === y + '-' + String(mo).padStart(2, '0') + '-' + String(dd).padStart(2, '0')) cfg.start = dt;
+    }
+    var src = String(getSetting_('fuSources') || '').split(',').map(function (x) { return x.trim().toLowerCase(); }).filter(Boolean);
+    if (src.length) cfg.sources = src;
+    // fuOffDays = cac MOC (so ngay) TAM TAT, cach nhau dau phay (vd '14,60'): mau tin van giu, chi khong quet moc do. Rong = bat het.
+    String(getSetting_('fuOffDays') || '').split(',').forEach(function (x) { var n = parseInt(x, 10); if (n >= 0) cfg.offDays[n] = true; });
+  } catch (e) {}
+  return cfg;
 }
 
 // Bang quy doi ten/viet tat san pham -> ma san pham chuan (dung chung cho
@@ -362,6 +385,72 @@ function renderFollowUpTemplate_(tpl, ctx) {
     .replace(/\{product\}/g, ctx.product || '');
 }
 
+// ══════════════════════════════════════════════════════
+//  P2e — KET QUA viec cham soc theo moc (ghi khi SALE bam Xong, xem hop ket qua js/32-fn-furesult.js)
+//  Luu Supabase bang fu_results (Q1: du lieu moi -> Supabase) khi da cau hinh; chua co/loi -> sheet 'FuResults'
+//  (khong mat du lieu). Doc: gop ca hai theo id. Chong trung theo id viec (on_conflict / kiem cot A).
+// ══════════════════════════════════════════════════════
+var SH_FU_RESULTS = 'FuResults';
+var FU_RESULT_HEADERS = ['id', 'phone', 'due', 'doneAt', 'result', 'byUser', 'note', 'redo', 'milestone'];
+var FU_RESULT_KEYS_ = { contacted: 1, nopick: 1, refused: 1, resched: 1 };
+
+function _fuResultClean_(r) {
+  r = r || {};
+  var id = String(r.id || '').slice(0, 120), res = String(r.result || '');
+  if (!id || !FU_RESULT_KEYS_[res]) return null;
+  var ymd = function (x) { x = String(x || '').trim(); return /^\d{4}-\d{2}-\d{2}$/.test(x) ? x : ''; };
+  var m = id.match(/_(m?\d+)$/), ms = m ? (m[1] === 'm1' ? 30 : m[1] === 'm2' ? 60 : parseInt(m[1], 10)) : null;
+  var done = new Date(String(r.doneAt || ''));
+  return { id: id, phone: normPhone_(String(r.phone || '')), due: ymd(r.due), doneAt: isNaN(done.getTime()) ? new Date().toISOString() : done.toISOString(),
+           result: res, byUser: String(r.by || r.byUser || '').slice(0, 80), note: String(r.note || '').slice(0, 200), redo: ymd(r.redo), milestone: ms };
+}
+
+function saveFuResults_(list) {
+  if (!Array.isArray(list)) return jsonOut_({ error: 'results phai la mang' });
+  var rows = [], seen = {};
+  list.slice(0, 200).forEach(function (r) { var c = _fuResultClean_(r); if (c && !seen[c.id]) { seen[c.id] = 1; rows.push(c); } });
+  if (!rows.length) return jsonOut_({ ok: true, written: 0, store: 'none' });
+  if (sbCfg_().ok && sbWriteOn_()) {
+    try {
+      var recs = rows.map(function (c) {
+        return { id: c.id, phone: c.phone, due: c.due || null, done_at: c.doneAt, result: c.result, by_user: c.byUser, note: c.note, redo: c.redo || null, milestone: c.milestone };
+      });
+      sb_('POST', 'fu_results?on_conflict=id', recs, { Prefer: 'resolution=merge-duplicates,return=minimal' });
+      return jsonOut_({ ok: true, written: rows.length, store: 'supabase' });
+    } catch (e) { Logger.log('saveFuResults_ supabase loi -> ghi sheet: ' + e); }
+  }
+  var sh = getSheet_(SH_FU_RESULTS, FU_RESULT_HEADERS), last = sh.getLastRow(), have = {};
+  if (last >= 2) sh.getRange(2, 1, last - 1, 1).getValues().forEach(function (r) { have[String(r[0])] = 1; });
+  var out = rows.filter(function (c) { return !have[c.id]; }).map(function (c) { return [c.id, c.phone, c.due, c.doneAt, c.result, c.byUser, c.note, c.redo, c.milestone == null ? '' : c.milestone]; });
+  if (out.length) sh.getRange(last + 1, 1, out.length, FU_RESULT_HEADERS.length).setValues(out);
+  return jsonOut_({ ok: true, written: out.length, store: 'sheet' });
+}
+
+// Doc ket qua trong khoang ngay den han [from,to] (yyyy-MM-dd). Gop Supabase + sheet, khu trung theo id.
+function readFuResults_(from, to) {
+  var map = {}, ymd = function (x) { x = String(x || '').trim(); return /^\d{4}-\d{2}-\d{2}$/.test(x) ? x : ''; };
+  from = ymd(from); to = ymd(to);
+  if (sbCfg_().ok) {
+    try {
+      var q = 'fu_results?select=*&order=done_at.desc&limit=5000' + (from ? '&due=gte.' + from : '') + (to ? '&due=lte.' + to : '');
+      (sb_('GET', q).json || []).forEach(function (r) {
+        map[r.id] = { id: r.id, phone: r.phone || '', due: r.due || '', doneAt: r.done_at || '', result: r.result || '', byUser: r.by_user || '', note: r.note || '', redo: r.redo || '', milestone: r.milestone };
+      });
+    } catch (e) { Logger.log('readFuResults_ supabase: ' + e); }
+  }
+  try {
+    var sh = getCrmSS_().getSheetByName(SH_FU_RESULTS);
+    if (sh && sh.getLastRow() >= 2) {
+      sh.getRange(2, 1, sh.getLastRow() - 1, FU_RESULT_HEADERS.length).getValues().forEach(function (r) {
+        var due = String(r[2] || '');
+        if ((from && due < from) || (to && due > to) || map[String(r[0])]) return;
+        map[String(r[0])] = { id: String(r[0]), phone: String(r[1] || ''), due: due, doneAt: String(r[3] || ''), result: String(r[4] || ''), byUser: String(r[5] || ''), note: String(r[6] || ''), redo: String(r[7] || ''), milestone: r[8] === '' ? null : Number(r[8]) };
+      });
+    }
+  } catch (e2) { Logger.log('readFuResults_ sheet: ' + e2); }
+  return Object.keys(map).map(function (k) { return map[k]; });
+}
+
 function readFollowUpLogKeys_() {
   var sh = getSheet_(SH_FU_LOG, FU_LOG_HEADERS);
   var last = sh.getLastRow();
@@ -460,17 +549,20 @@ function runFollowUpScan_() {
   var templates = readFollowUpTemplates_();
   var doneKeys = readFollowUpLogKeys_();
   var today = new Date(); today.setHours(0, 0, 0, 0);
+  var fuCfg = _fuConfig_();
 
   // Moc ngay lay DONG tu bang mau tin (CS dat tuy y: 7, 14, 30, 60, 90...).
   // Neu bang mau trong -> dung bo moc mac dinh FU_CHECKPOINTS.
   var fuDaysSet = {};
   Object.keys(templates).forEach(function (k) {
     var d = parseInt(k.split('|')[1], 10);
-    if (d > 0) fuDaysSet[d] = true;
+    if (d >= 0) fuDaysSet[d] = true;   // 0 = moc D0 (ngay mua, hoi tham/cam on ngay khi chot don)
   });
   if (!Object.keys(fuDaysSet).length) {
     for (var fci = 0; fci < FU_CHECKPOINTS.length; fci++) fuDaysSet[FU_CHECKPOINTS[fci]] = true;
   }
+  // Moc bi admin tat (Settings fuOffDays) -> bo khoi tap moc se quet
+  Object.keys(fuCfg.offDays || {}).forEach(function (od) { delete fuDaysSet[od]; });
 
   // Doc CareData 1 lan: phone -> { cs phu trach, cac nick Zalo da ket ban }
   var careMap = {};
@@ -491,7 +583,7 @@ function runFollowUpScan_() {
     var d = parseVNDate_(orderDate); // ho tro ca Date that lan chuoi 'dd/MM/yyyy...' (readAllOrders_ tra ve chuoi)
     if (!d || isNaN(d)) return;
     d.setHours(0, 0, 0, 0);
-    if (d < FU_START) return; // chi hoi tham khach mua tu 5/2026 tro di
+    if (d < fuCfg.start) return; // chi hoi tham khach mua tu ngay fuStart (mac dinh 5/2026) tro di
     var daysSince = Math.round((today - d) / 86400000);
     if (!fuDaysSet[daysSince]) return;
     var np = normPhone_(phone);
@@ -521,7 +613,7 @@ function runFollowUpScan_() {
   for (var i = 0; i < orders.length; i++) {
     var o = orders[i];
     if (o.phone) phonesWithOrders[normPhone_(o.phone)] = true;
-    if (!fuSourceAllowed_(o.source)) continue; // chi nguon landipage / messenger / web
+    if (!fuSourceAllowed_(o.source, fuCfg.sources)) continue; // chi nguon trong fuSources (mac dinh landipage / messenger / web)
     tryAdd(o.phone, o.date, o.product || o.productDetail, o.name, 'order');
   }
 

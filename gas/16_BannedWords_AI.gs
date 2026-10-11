@@ -120,7 +120,7 @@ function _aiOpenAICompat_(prov, sys, userMsg) {
       payload: JSON.stringify({
         model: prov.model,
         messages: [ { role: 'system', content: sys }, { role: 'user', content: userMsg } ],
-        temperature: 0.7, max_tokens: 400
+        temperature: (prov.temperature != null ? prov.temperature : 0.7), max_tokens: (prov.maxTokens || 400)
       }),
       muteHttpExceptions: true
     });
@@ -141,7 +141,7 @@ function _aiGemini_(prov, sys, userMsg) {
       payload: JSON.stringify({
         systemInstruction: { parts: [ { text: sys } ] },
         contents: [ { role: 'user', parts: [ { text: userMsg } ] } ],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 400 }
+        generationConfig: { temperature: (prov.temperature != null ? prov.temperature : 0.7), maxOutputTokens: (prov.maxTokens || 400) }
       }),
       muteHttpExceptions: true
     });

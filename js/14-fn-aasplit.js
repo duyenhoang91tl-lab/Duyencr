@@ -939,7 +939,7 @@ async function syncGasSourceFromTextarea(){
 //  INJECT UI (tabs + panels + role pill) — chạy khi load
 // ═══════════════════════════════════════════════════════
 // Mở/đóng dropdown "📊 Báo cáo ▾" gom 4 tab báo cáo — cùng kiểu click-để-mở/click-ra-ngoài-để-đóng
-// như nút "☰ Menu" đã có (_toggleBarMenuDropdown ở trên), viết riêng vì khác điểm neo/nội dung.
+// (cơ chế dropdown riêng, không dùng chung với menu nào khác).
 function _toggleReportsGroupDropdown(e){
   if (e) e.stopPropagation();
   var list = document.getElementById('reportsgroup-list');
@@ -948,9 +948,10 @@ function _toggleReportsGroupDropdown(e){
 }
 
 function _injectV9UI(){
-  if (document.getElementById('v9tab-customize')) return; // tránh chèn 2 lần (nút ⚙ luôn được thêm dù tab nào bị ẩn)
+  if (window._v9UIInjected) return; // tránh chèn 2 lần (cờ chỉ bật khi đã có thanh tab, giống hành vi cũ dùng nút ⚙)
   var tabsBar = document.querySelector('.tabs');
   if (tabsBar){
+    window._v9UIInjected = true;
     var defs = [
       { id:'dashboard',   label:'📊 Dashboard' },
       { id:'team',        label:'👥 Quản lý Team' },
@@ -1015,14 +1016,6 @@ function _injectV9UI(){
         list.style.display = 'none';
       });
     }
-    var gear = document.createElement('div');
-    gear.className = 'tab';
-    gear.id = 'v9tab-customize';
-    gear.title = 'Tuỳ chỉnh thanh menu — kéo mục vào/ra ☰ Menu theo ý bạn';
-    gear.style.cssText = 'flex-shrink:0;opacity:.6';
-    gear.innerHTML = '⚙';
-    gear.setAttribute('onclick', 'openBarCustomizeModal()');
-    tabsBar.appendChild(gear);
   }
   var dataView = document.getElementById('data-view');
   if (dataView){
@@ -1070,7 +1063,7 @@ function _injectV9UI(){
   renderRolePill();
   _rebuildAssignIndex();
   // nếu user đã set vai trò CS từ trước → khoá bộ lọc CS
-  if (currentUser.role === 'cs'){
+  if (currentUser.role === 'cs' || currentUser.role === 'manager'){
     var csFilter = document.getElementById('cs-staff-filter');
     if (csFilter){
       var myNamesBoot = (currentUser.names && currentUser.names.length) ? currentUser.names : (currentUser.name?[currentUser.name]:[]);
@@ -1113,7 +1106,9 @@ async function pullUsers(){
     var sep = gsUrl.includes('?') ? '&' : '?';
     var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
     var timer = controller ? setTimeout(function(){ controller.abort(); }, 15000) : null;
-    var r = await fetch(gsUrl + sep + 'action=users', { redirect:'follow', signal: controller ? controller.signal : undefined });
+    // Co token phien (dang nhap tu may chu) -> may chu tra du truong (perms...). KHONG BAO GIO co passHash (da bo khoi action=users 2026-10-11).
+    var _tk = ''; try { _tk = localStorage.getItem('ome_sess_token') || ''; } catch(eT){}
+    var r = await fetch(gsUrl + sep + 'action=users' + (_tk ? '&token=' + encodeURIComponent(_tk) : ''), { redirect:'follow', signal: controller ? controller.signal : undefined });
     if (timer) clearTimeout(timer);
     var d = await r.json();
     if (d && Array.isArray(d.users)){ accounts = d.users; saveLS('ome_accounts', accounts); return true; }
@@ -1121,9 +1116,13 @@ async function pullUsers(){
   return false;
 }
 function pushUsers(){
+  // Mat khau moi di kem trong truong tam _setPw (van ban, qua HTTPS) -> may chu tu bam; gui xong xoa de KHONG luu mat khau vao localStorage.
+  var payload = accounts.map(function(a){ var o = Object.assign({}, a); if (a._setPw) o.setPassword = a._setPw; delete o._setPw; delete o.passHash; return o; });
+  accounts.forEach(function(a){ delete a._setPw; });
   saveLS('ome_accounts', accounts);
   if (!gsUrl) return Promise.resolve({ ok:true, local:true });
-  return fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'saveUsers', users: accounts }) })
+  var tk = ''; try { tk = localStorage.getItem('ome_sess_token') || ''; } catch(eT){}
+  return fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'saveUsers', token: tk, users: payload }) })
     .then(function(r){ return r.json(); }).catch(function(){ return { error:'network' }; });
 }
 function _findAccount(username){
@@ -1175,7 +1174,7 @@ function _applyAuthIdentity(acct){
   if (typeof _applyUserTabPermissions === 'function') _applyUserTabPermissions();
   var csFilter = document.getElementById('cs-staff-filter');
   if (csFilter){
-    if (currentUser.role === 'cs' && currentUser.names.length){
+    if ((currentUser.role === 'cs' || currentUser.role === 'manager') && currentUser.names.length){
       // Thêm option cho từng tên (nếu chưa có trong <select>), rồi khoá bộ lọc chọn SẴN tất cả
       // tên của tài khoản này — tận dụng đúng hạ tầng multi-select "Lọc theo CS" đã có.
       currentUser.names.forEach(function(n){
@@ -1215,31 +1214,38 @@ async function doLogin(){
   function showErr(m){ if (errEl){ errEl.textContent = m; errEl.style.display=''; } }
   var u = (_aval('login-user')||'').trim(), p = _aval('login-pass');
   if (!u || !p){ showErr('Nhập đủ tài khoản và mật khẩu.'); return; }
-  var acct = _findAccount(u);
-  if (!acct){ showErr('Sai tài khoản hoặc mật khẩu.'); return; }
-  if (acct.active === false){ showErr('Tài khoản đã bị khoá. Liên hệ quản trị viên.'); return; }
-  var h = await _hashPass(p);
-  var _storedHash = acct.passHash;
-  try { localStorage.removeItem('ome_demo_token'); } catch(e){}
-  if (h !== acct.passHash) {
-    // Tai khoan tao truoc khi doi salt OME -> CRM: thu voi salt cu, dung thi nang cap ngay
-    var hOld = await _hashPass(p, _PW_SALT_OLD);
-    if (hOld === acct.passHash) {
-      acct.passHash = h;
-      pushUsers().catch(function(){});
-    } else {
-      showErr('Sai tài khoản hoặc mật khẩu.'); return;
-    }
-  }
-  if (acct.role === 'demo') {
-    // Tai khoan test: xin demoToken tu may chu (chi nhan duoc voi tai khoan role demo dang hoat dong).
+  if (!gsUrl){ showErr('Chưa kết nối máy chủ Google Sheets nên không đăng nhập được.'); return; }
+  try { localStorage.removeItem('ome_demo_token'); localStorage.removeItem('ome_sess_token'); localStorage.removeItem('ome_sess_exp'); } catch(e){}
+  // DANG NHAP O MAY CHU (2026-10-11): trinh duyet khong con tai passHash de tu so nua. Server kiem tra mat khau, tra token + ho so (khong co hash).
+  // NGUYEN NHAN GOC loi "khong ket noi" tren dien thoai (2026-10-11): Worker doi ten/URL nhung WORKER_URL trong code van tro Worker cu -> may nao khong bat ?worker=0
+  // deu loi, ma moi loi fetch HOAC loi doc JSON (trang loi HTML cua Worker/GAS) deu bi bao nhu "mat mang". Nay: dang nhap thu qua gsUrl, loi thi THU LAI thang Apps Script
+  // (dang nhap la thao tac doc/kiem tra, thu lai an toan) va bao dung loai loi.
+  var d = null, lastErr = '';
+  var urls = [gsUrl]; if (typeof GAS_URL_DIRECT !== 'undefined' && GAS_URL_DIRECT && GAS_URL_DIRECT !== gsUrl) urls.push(GAS_URL_DIRECT);
+  for (var ui = 0; ui < urls.length && !d; ui++){
     try {
-      var _dr = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'demoLogin', username: acct.username, passHash: _storedHash }) });
-      var _dd = await _dr.json();
-      if (!_dd || !_dd.ok || !_dd.token){ showErr('Không đăng nhập được tài khoản test: ' + ((_dd && _dd.error) || 'lỗi máy chủ') + '. Báo admin deploy lại GAS bản mới.'); return; }
-      localStorage.setItem('ome_demo_token', _dd.token);
-    } catch(eD){ showErr('Không kết nối được máy chủ để đăng nhập tài khoản test.'); return; }
+      var r = await fetch(urls[ui], { method:'POST', redirect:'follow', body: JSON.stringify({ action:'webLogin', username: u, password: p }) });
+      var txt = await r.text();
+      try { d = JSON.parse(txt); }
+      catch(eJ){ lastErr = 'parse'; d = null; continue; }   // trang loi HTML (Worker/GAS) -> thu duong du phong
+      if (ui > 0){ gsUrl = urls[ui]; try { toast('⚠ Worker đang lỗi — tạm dùng đường dự phòng (Apps Script trực tiếp).'); } catch(eT){} }   // chi trong phien nay, KHONG ghi nho: Worker song lai thi tu dung lai
+    } catch(eN){ lastErr = 'net'; d = null; }
   }
+  if (!d){
+    showErr(lastErr === 'parse' ? 'Máy chủ trả về dữ liệu không đọc được (Worker hoặc Apps Script đang lỗi). Thử lại sau ít phút hoặc báo admin.' : 'Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.');
+    return;
+  }
+  if (!d || !d.ok || !d.token || !d.user){
+    if (d && d.ok === false && d.error) showErr(d.error);
+    else showErr('Máy chủ chưa hỗ trợ đăng nhập mới — báo admin deploy lại GAS bản mới (v13.25-auth-session) rồi thử lại.');
+    return;
+  }
+  var acct = d.user;
+  try {
+    localStorage.setItem('ome_sess_token', d.token);
+    localStorage.setItem('ome_sess_exp', String(Date.now() + (Number(d.expiresInMs) || 6*24*3600*1000)));
+    if (d.demoToken) localStorage.setItem('ome_demo_token', d.demoToken);
+  } catch(eS){}
   _authAccount = { username: acct.username, role: acct.role, name: acct.name, team: acct.team };
   saveLS('ome_auth', _authAccount);
   // Nho ten tai khoan vua dang nhap de lan sau (ke ca sau khi dang xuat / dong trinh duyet)
@@ -1247,6 +1253,7 @@ async function doLogin(){
   try { localStorage.setItem('ome_last_user', acct.username); } catch(e){}
   if (errEl) errEl.style.display = 'none';
   var pEl = document.getElementById('login-pass'); if (pEl) pEl.value = '';
+  try { await pullUsers(); } catch(eP){}   // co token -> danh sach tai khoan day du (perms...) cho modal Tai khoan / _findAccount
   _hideLogin();
   _applyAuthIdentity(acct);
   if (typeof toast === 'function') toast('✓ Xin chào ' + (acct.name || acct.username) + ' (' + _roleLabel(acct.role) + ')');
@@ -1254,7 +1261,7 @@ async function doLogin(){
 function doLogout(){
   if (!confirm('Đăng xuất khỏi tài khoản hiện tại?')) return;
   _authAccount = null;
-  try{ localStorage.removeItem('ome_auth'); localStorage.removeItem('ome_demo_token'); sessionStorage.removeItem('ome_demo_clean'); }catch(e){}
+  try{ localStorage.removeItem('ome_auth'); localStorage.removeItem('ome_demo_token'); localStorage.removeItem('ome_sess_token'); localStorage.removeItem('ome_sess_exp'); sessionStorage.removeItem('ome_demo_clean'); }catch(e){}
   document.body.classList.remove('demo-mode');
   _showLogin();
 }

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="vi" class="ui-pro">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -257,7 +257,6 @@
       <span class="gs-dot off" id="gs-dot"></span>
       <span id="gs-pill-txt">Google Sheets</span>
     </div>
-    <button class="btn sm" data-bar-id="hdr-tacvu" data-bar-home=".hdr-r" onclick="openSettingsModal()" title="Tác vụ dữ liệu: Tải Excel, Sync, Đẩy dữ liệu, Đồng bộ 2 chiều, Đơn trùng, Xóa data">⚙️ Tác vụ</button>
     <input type="file" id="fi" accept=".xlsx,.xls" multiple onchange="handleFiles(event)">
   </div>
 </header>
@@ -269,7 +268,8 @@
   <div class="sb-top">
     <div class="search-wrap">
       <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-      <input id="search-input" placeholder="Tên, số điện thoại..." oninput="debouncedApplyFilters()">
+      <input id="search-input" placeholder="Tên, SĐT, mã đơn..." oninput="debouncedApplyFilters();_ordSearchSoon()">
+      <div id="ord-search-res" style="display:none"></div>
     </div>
     <!-- CS Filter (gõ tên để tìm, không cần cuộn) -->
     <div class="cs-filter-wrap">
@@ -387,6 +387,13 @@
       })();
     </script>
 
+     <!-- THANH TỔNG QUAN (Danh sách KH): bấm để mở/đóng 6 ô thống kê + thanh tác vụ (sắp xếp, chiến dịch, Thêm KH, Xuất CSV) -->
+     <div class="lov-bar" id="lov-bar" onclick="toggleListOverview()" role="button" title="Bấm để xem/ẩn tổng quan và các tác vụ">
+       <span class="lov-t">📊 Tổng quan &amp; tác vụ</span>
+       <span class="lov-sum" id="lov-sum"></span>
+       <span class="lov-arrow" id="lov-arrow">▾</span>
+     </div>
+
     <!-- STATS -->
     <div class="stats-row">
       <div class="sc"><div class="sc-n" id="s-total" style="color:var(--text)">0</div><div class="sc-l">KH hợp lệ</div></div>
@@ -426,30 +433,6 @@
           <button class="btn sm primary" id="quick-add-btn" onclick="openQuickAddModal()" title="Thêm khách hàng mới hoặc ghi nhận đơn mới — chỉ cần Tên, SĐT, Ghi chú, các thông tin khác (sản phẩm, doanh thu...) điền sau trong trang chi tiết khách">
             ➕ Thêm KH / Đơn mới
           </button>
-          <button class="btn sm" id="adv-filter-btn" onclick="openAdvModal()" title="Bộ lọc nâng cao">
-            ⚙ Lọc nâng cao
-          </button>
-          <!-- Gom toàn bộ tác vụ (chia data / chiến dịch / công việc) vào 1 menu mẹ, đặt ngay
-               cạnh "Lọc nâng cao" cho thanh công cụ gọn, dễ nhìn. -->
-          <div class="tacvu-wrap" id="tacvu-wrap">
-            <button class="btn sm secondary" id="tacvu-btn" onclick="toggleTacVuMenu(event)" title="Các tác vụ: chia data, chiến dịch bắn, hỏi thăm/sinh nhật tự động, tạo công việc">
-              🧰 Tác vụ ▾
-            </button>
-            <div class="tacvu-menu" id="tacvu-menu">
-              <div class="tacvu-group-label">Chia data & công việc</div>
-              <button class="tacvu-item" onclick="runTacVu(openAssignModal)" title="Chia data đang lọc cho CS">👥 Chia data</button>
-              <button class="tacvu-item" onclick="runTacVu(openTaskModal)" title="Tạo công việc mới">🗂️ Tạo công việc</button>
-              <div class="tacvu-sep"></div>
-              <div class="tacvu-group-label">Chiến dịch bắn</div>
-              <button class="tacvu-item" onclick="runTacVu(openBroadcastFromCurrentFilter)" title="Tạo chiến dịch bắn trực tiếp từ danh sách đang lọc (CS, sản phẩm, nguồn, trạng thái, ngày mua...) — không cần qua Chia data">📢 Tạo chiến dịch bắn</button>
-              <button class="tacvu-item" onclick="runTacVu(openBctModal)" title="Lọc khách theo sản phẩm chi tiết / số đơn / thời gian mua / nguồn / phân loại rồi soạn tin bắn">🎯 CD theo điều kiện</button>
-              <button class="tacvu-item" onclick="runTacVu(openBcStatModal)" title="Tình trạng chiến dịch + số khách đã gửi theo CS">📊 TK chiến dịch</button>
-              <div class="tacvu-sep"></div>
-              <div class="tacvu-group-label">Tự động hằng ngày</div>
-              <button class="tacvu-item" onclick="runTacVu(openFuTplModal)" title="Mẫu tin hỏi thăm tự động theo mốc ngày sau mua — máy tự tạo chiến dịch mỗi sáng">📨 Hỏi thăm tự động</button>
-              <button class="tacvu-item" onclick="runTacVu(openBdayTplModal)" title="Mẫu tin chúc mừng sinh nhật — máy tự tạo chiến dịch mỗi sáng cho khách sinh nhật hôm đó">🎂 Sinh nhật tự động</button>
-            </div>
-          </div>
         </div>
         <button class="btn sm" onclick="exportCSV()">
           <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
@@ -550,6 +533,9 @@
           <option value="22">22:00</option>
           <option value="23">23:00</option>
         </select>
+         <button class="btn sm" id="adv-filter-btn" onclick="openAdvModal()" title="Bộ lọc nâng cao">
+           ⚙ Lọc nâng cao
+         </button>
         <span style="font-size:10px;color:var(--hint);margin-left:4px" id="ymf-count-label"></span>
       </div>
 
@@ -606,7 +592,7 @@
     <!-- SCHEDULE TAB -->
     <div id="tab-schedule" style="display:none;flex:1;overflow:hidden;flex-direction:column" class="main">
       <div class="toolbar">
-        <span class="rcount">Lịch chăm sóc — <strong id="sched-date-label"></strong></span>
+        <div class="sched-seg" style="display:inline-flex;gap:4px;margin-right:8px"><button class="btn sm primary" onclick="schedSeg('schedule')">📅 Theo tuần</button><button class="btn sm" onclick="schedSeg('overdue')">⚠ Quá hạn <span class="tab-badge" id="sched-over-cnt" style="background:#fee2e2;color:#991b1b">0</span></button></div><span class="rcount">Lịch chăm sóc — <strong id="sched-date-label"></strong></span>
         <div class="tl-l">
           <button class="btn sm" onclick="schedNav(-1)">← Tuần trước</button>
           <button class="btn sm" onclick="schedNav(0)" style="font-weight:500">Tuần này</button>
@@ -618,7 +604,7 @@
 
     <!-- OVERDUE TAB -->
     <div id="tab-overdue" style="display:none;flex:1;overflow:hidden;flex-direction:column" class="main">
-      <div class="toolbar"><span class="rcount">Các lịch đã <strong>quá hạn</strong> chưa xử lý</span></div>
+      <div class="toolbar"><div class="sched-seg" style="display:inline-flex;gap:4px;margin-right:8px"><button class="btn sm" onclick="schedSeg('schedule')">📅 Theo tuần</button><button class="btn sm primary" onclick="schedSeg('overdue')">⚠ Quá hạn <span class="tab-badge" id="sched-over-cnt2" style="background:#fee2e2;color:#991b1b">0</span></button></div><span class="rcount">Các lịch đã <strong>quá hạn</strong> chưa xử lý</span></div>
       <div class="sched-grid" id="overdue-grid"></div>
     </div>
 
@@ -1117,6 +1103,7 @@
 
 <link rel="stylesheet" href="css/04-style.css">
 <link rel="stylesheet" href="css/05-sidenav.css">
+<link rel="stylesheet" href="css/06-pro.css">
 
 <script src="js/18-openkhstatusmodal.js"></script>
 
@@ -1280,9 +1267,20 @@
   <div class="modal-hdr">
     <div class="modal-title">📨 Mẫu tin hỏi thăm tự động</div>
     <div class="modal-sub">Mỗi CS có thể tạo mẫu riêng — hệ thống ưu tiên mẫu của CS phụ trách khách, không có thì dùng mẫu chung (CS để trống). Mốc = số ngày sau khi mua, đặt tùy ý (7, 14, 30, 60, 90...). Mã SP: dùng mã chuẩn hóa (HH, CF, TEA...), nhiều mã cùng 1 mẫu thì cách nhau dấu phẩy (VD: CF,TEA), * = mọi sản phẩm. Placeholder: {name} {product} {days} {phone}</div>
-    <datalist id="futpl-days-hint"><option value="7"><option value="14"><option value="30"><option value="60"><option value="90"></datalist>
+    <datalist id="futpl-days-hint"><option value="0"><option value="7"><option value="14"><option value="30"><option value="60"><option value="90"></datalist>
   </div>
   <div class="modal-body" style="max-height:60vh;overflow-y:auto">
+    <div id="futpl-cfg" style="display:none;border:1px solid #e5e7eb;background:#f9fafb;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px">
+      <div style="font-weight:600;margin-bottom:6px">⚙ Phạm vi quét hỏi thăm (chỉ admin)</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+        <label>Khách mua từ ngày: <input type="date" id="fucfg-start" style="padding:4px 6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px"></label>
+        <label style="flex:1;min-width:260px">Nguồn đơn được hỏi thăm: <input type="text" id="fucfg-sources" placeholder="landipage,landing,messenger,mess,web" style="width:100%;padding:4px 6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px"></label>
+        <button onclick="saveFuCfg()" style="padding:5px 12px;border:1px solid #00b14f;background:#f0fdf4;color:#166534;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">💾 Lưu phạm vi</button>
+      </div>
+      <div style="margin-top:8px"><b>Bật/tắt từng mốc</b> (bỏ tích = tạm tắt, mẫu tin vẫn giữ): <span id="fucfg-days" style="display:inline-flex;flex-wrap:wrap;gap:10px;margin-left:6px"></span></div>
+      <div style="color:#6b7280;margin-top:5px">Nguồn: các từ khoá cách nhau dấu phẩy, khớp chứa-chuỗi, không phân biệt hoa thường (vd thêm <code>renew</code>). Để trống = mặc định như cũ (từ 05/2026; landipage/messenger/web). Áp dụng từ lần quét kế tiếp.</div>
+      <div id="fucfg-status" style="margin-top:4px;color:#00b14f"></div>
+    </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
       <label style="font-size:12px;font-weight:600">Xem theo CS:</label>
       <select id="futpl-cs-filter" style="padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px" onchange="renderFuTplTable()"></select>
@@ -1579,7 +1577,17 @@ function openBcLogModal(phone){
 <script src="js/26-loadtasks.js"></script>
 <script src="js/27-fn-bonuscore.js"></script>
 <script src="js/28-fn-bonusdetail.js"></script>
+<script src="js/34-fn-todaytasks.js"></script>
+<script src="js/35-fn-deptsettings.js"></script>
+<script src="js/36-fn-homechips.js"></script>
+<script src="js/37-fn-configpage.js"></script>
+<script src="js/30-fn-teamanalysis.js"></script>
 <script src="js/29-sidenav.js"></script>
+<script src="js/31-fn-orgoverview.js"></script>
+<script src="js/32-fn-furesult.js"></script>
+<script src="js/33-fn-tierconfig.js"></script>
+<script src="js/33-pro-profile.js"></script>
+<script src="js/36-pro-home.js"></script>
 
 
 <div class="modal-overlay" id="quick-add-modal" style="display:none;align-items:flex-start;justify-content:center;padding-top:60px;z-index:800">

@@ -1596,6 +1596,8 @@
         ${blankNew ? '' : _pkOrderPeopleHtml_(orders, data.don)}
         ${blankNew ? '' : _pkCskhHtml_(cskhRows)}
 
+        ${blankNew ? '' : '<div id="pk-nba-box" class="pk-nba-box"><div id="pk-nba-main"></div><div id="pk-nba-msg"></div></div>'}
+
         <label class="pk-label-top">Tên khách</label>
         <!-- QUY TẮC (README #9): form này phải khớp form nhập thông tin KH trên CRM (index.html, khối cs-*). CRM đổi gì thì sửa ở đây theo. -->
         <input type="text" id="pk-name-input" class="pk-full-input" placeholder="Tên khách hàng" value="${escapeHtml(name === phone ? '' : name)}" />
@@ -1628,6 +1630,9 @@
             <div id="pk-menh-box" style="font-size:11px;line-height:1.5;margin-top:4px"></div>
           </div>
         </div>
+
+        <label class="pk-label-top">🏷 Nhãn phân loại (tự đặt)</label>
+        <input type="text" id="pk-tag" class="pk-full-input" placeholder="VD: VIP, Khách sỉ, Combo A..." title="Nhãn tự do để lọc khi tạo chiến dịch — cùng nhãn với CRM, không liên quan tag của Zalo" value="${escapeHtml(care?.tag || '')}" />
 
         <div class="pk-form-row">
           <div class="pk-form-col">
@@ -1671,6 +1676,12 @@
 
     renderCustomFieldSelects_(box.querySelector('#pk-cf-wrap'), care?.custom || {});
     renderNoteHistory_(care?.note || '');
+    // Gợi ý hành động tiếp theo: cập nhật trực tiếp khi sale đổi trạng thái/ngày hẹn/Zalo (không cần Lưu mới thấy)
+    ['#pk-status-sel', '#pk-hen-date', '#pk-zalo-sel', '#pk-zalo-reply'].forEach((id) => {
+      const el = box.querySelector(id);
+      if (el) el.addEventListener('change', refreshNba_);
+    });
+    _nbaMsgReq++; refreshNba_();
 
     box.querySelector('#pk-note-add-btn').addEventListener('click', addNoteEntry_);
     if (!blankNew) _pkBindHistBtn_(box, phone, orders || []);
@@ -1731,6 +1742,121 @@
 
   // SĐT đang áp dụng cho form: ưu tiên ô SĐT trong form thêm mới (nếu đang mở), sau đó tới
   // SĐT của khách vừa tra cứu.
+  // ═══ GỢI Ý HÀNH ĐỘNG TIẾP THEO + ĐỀ XUẤT NGÀY HẸN (2026-10) ═══
+  // Luật cố định (không gọi AI để quyết định "làm gì" → nhanh, không tốn quota, dễ giải thích cho CS); AI chỉ dùng để SOẠN TIN
+  // (qua FETCH_OPENER có sẵn, truyền angleInstr riêng cho từng tình huống). Mọi ngưỡng ngày nằm ở bảng _NBA_RULES_ ngay dưới —
+  // muốn đổi nhịp chăm sóc chỉ sửa số 'days'. Chỉ ĐỀ XUẤT: không tự lưu gì, sale bấm chip mới điền ngày hẹn rồi tự bấm Lưu.
+  const PK_NBA_REBUY_DAYS = 30; // đơn gần nhất cách >= ngần này ngày và khách "đang sd" → gợi ý mua lại (ước lượng chung, chỉnh theo thực tế bán hàng)
+  const _NBA_RULES_ = [
+    { re: /khong nghe may|knm|may ban|cup ngang|thue bao|khong lien lac/, act: 'Gọi lại — lần trước chưa liên lạc được', days: 1,
+      angle: 'Lần trước chưa liên lạc được với khách (không nghe máy/máy bận). Viết 1 tin nhắn ngắn, lịch sự cho khách biết mình đã gọi và hỏi khung giờ khách tiện nghe máy, KHÔNG chào bán ngay.' },
+    { re: /hen goi lai/, act: 'Gọi lại đúng hẹn khách đã dặn', days: 3,
+      angle: 'Khách đã dặn gọi lại sau. Nhắc nhẹ nội dung trao đổi lần trước và hỏi khách giờ có tiện nói chuyện không.' },
+    { re: /phan van|tiem nang|dang theo doi/, act: 'Tháo gỡ băn khoăn và gợi mở chốt đơn', days: 2,
+      angle: 'Khách đang phân vân. Giải đáp 1 băn khoăn thường gặp (hiệu quả, cách dùng hoặc giá) và gợi mở bước tiếp theo, không gây áp lực.' },
+    { re: /chua su dung|chua dung/, act: 'Hỏi khách đã dùng sản phẩm chưa', days: 3,
+      angle: 'Khách đã mua nhưng chưa dùng. Hỏi thăm nhẹ nhàng và nhắc cách dùng đúng để khách thấy hiệu quả.' },
+    { re: /dang su dung|dang sd/, act: 'Hỏi thăm trải nghiệm sau khi dùng', days: 7, rebuy: true,
+      angle: 'Hỏi thăm cảm nhận/trải nghiệm của khách khi đang dùng sản phẩm, thể hiện quan tâm chân thành.' },
+    { re: /tam ngung|tam dung/, act: 'Hỏi lý do tạm ngưng, gợi ý dùng lại', days: 7,
+      angle: 'Khách đang tạm ngưng dùng. Hỏi thăm lý do một cách tế nhị và gợi ý khách có thể dùng lại khi thuận tiện.' },
+    { re: /khieu nai/, act: 'Xử lý khiếu nại trước — không chào bán', days: 1,
+      angle: 'Khách đang có khiếu nại. Xin lỗi chân thành về sự bất tiện, xác nhận đã ghi nhận và cam kết phản hồi sớm. TUYỆT ĐỐI không chào bán.' },
+    { re: /tu choi|kcnc|khong hieu qua|dat ho|sai so/, act: 'Không cần chăm sóc chủ động', days: null, skip: true, angle: '' },
+    { re: /\bbau\b/, act: 'Khách đang bầu — xem ghi chú, tư vấn thận trọng', days: 14,
+      angle: 'Khách đang mang thai. Hỏi thăm sức khoẻ nhẹ nhàng, không chào bán sản phẩm khi chưa chắc phù hợp.' },
+    { re: /chot/, act: 'Chăm sóc sau bán — hỏi đã nhận hàng chưa', days: 5,
+      angle: 'Khách vừa chốt đơn. Hỏi đã nhận hàng chưa, cách dùng có rõ không, và cảm ơn khách đã tin tưởng.' },
+    { re: /chua lien he|cho goi tu van|^$/, act: 'Liên hệ lần đầu', days: 1,
+      angle: 'Đây là lần liên hệ đầu tiên. Chào hỏi thân thiện, giới thiệu ngắn gọn bản thân và hỏi nhu cầu của khách.' }
+  ];
+  function _nbaFold_(x) { return _stripVNlocal_(String(x || '').normalize('NFC')).replace(/\s+/g, ' ').trim(); }
+  function _nbaDayDiff_(a, b) { const x = new Date(a), y = new Date(b); x.setHours(0, 0, 0, 0); y.setHours(0, 0, 0, 0); return Math.round((x - y) / 86400000); }
+  function _nbaAddDays_(base, n) { const d = new Date(base); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + n); return d; }
+  // ctx: { status, schedHen, zaloStatus, zaloReply, lastOrderDate, orders } → { act, urgent, reasons[], days, apptDate, angle, skip, hasFutureAppt }
+  function _pkComputeNba_(ctx, today) {
+    today = today || new Date();
+    const st = _nbaFold_(ctx.status);
+    const rule = _NBA_RULES_.find((r) => r.re.test(st)) || { act: 'Gọi và cập nhật trạng thái', days: 1, angle: 'Viết tin nhắn hỏi thăm ngắn gọn, thân thiện để mở lại cuộc trò chuyện với khách.' };
+    const out = { act: rule.act, urgent: '', reasons: [], days: rule.days, angle: rule.angle, skip: !!rule.skip, apptDate: null, hasFutureAppt: false };
+    const lastDays = ctx.lastOrderDate ? _nbaDayDiff_(today, ctx.lastOrderDate) : null;
+    if (rule.rebuy && lastDays !== null && lastDays >= PK_NBA_REBUY_DAYS) {
+      out.act = 'Gợi ý mua lại — đơn gần nhất đã ' + lastDays + ' ngày';
+      out.days = 2;
+      out.angle = 'Khách đang dùng sản phẩm và đơn gần nhất đã khá lâu. Hỏi cảm nhận khi dùng, rồi nhẹ nhàng gợi ý bổ sung/mua lại, nêu ưu đãi nếu có.';
+    }
+    if (ctx.status) out.reasons.push('Trạng thái: ' + ctx.status);
+    if (lastDays !== null) out.reasons.push('Đơn gần nhất cách ' + lastDays + ' ngày' + (ctx.orders > 1 ? ' (' + ctx.orders + ' đơn)' : ''));
+    else if (!ctx.orders) out.reasons.push('Chưa có đơn nào');
+    if (ctx.schedHen) {
+      const d = _nbaDayDiff_(today, ctx.schedHen);
+      if (!isNaN(d)) {
+        if (d > 0) out.urgent = 'Hẹn quá hạn ' + d + ' ngày — gọi ngay';
+        else if (d === 0) out.urgent = 'Hẹn hôm nay — gọi ngay';
+        else { out.hasFutureAppt = true; out.reasons.push('Đã có hẹn sau ' + (-d) + ' ngày'); }
+      }
+    }
+    const z = _nbaFold_(ctx.zaloStatus);
+    if (/chua ket ban/.test(z)) out.reasons.push('Chưa kết bạn Zalo — nên gửi lời mời kết bạn');
+    else if (/da ket ban/.test(z) && !ctx.zaloReply) out.reasons.push('Đã kết bạn Zalo nhưng khách chưa phản hồi — nhắn Zalo song song với gọi');
+    if (out.days !== null && !out.skip) out.apptDate = _nbaAddDays_(today, out.days);
+    return out;
+  }
+  let _nbaCur = null, _nbaMsgReq = 0;
+  function _nbaLiveCtx_() {
+    const care = _currentCare || {};
+    const val = (id, fallback) => { const el = panelEl.querySelector(id); return el ? el.value : (fallback || ''); };
+    const zr = panelEl.querySelector('#pk-zalo-reply');
+    let last = null;
+    (_currentOrders || []).forEach((o) => { const t = o && o.date ? new Date(o.date).getTime() : NaN; if (!isNaN(t) && (last === null || t > last)) last = t; });
+    return {
+      status: val('#pk-status-sel', care.status), schedHen: val('#pk-hen-date', care.schedHen),
+      zaloStatus: val('#pk-zalo-sel', care.zalo),
+      zaloReply: zr ? zr.checked : !!(care.custom && care.custom.zaloReply),
+      lastOrderDate: last === null ? null : new Date(last), orders: (_currentOrders || []).length
+    };
+  }
+  function refreshNba_() {
+    const main = panelEl?.querySelector('#pk-nba-main');
+    if (!main) return;
+    const nba = _nbaCur = _pkComputeNba_(_nbaLiveCtx_());
+    let h = '<div class="pk-nba-title">💡 Gợi ý tiếp theo</div>';
+    if (nba.urgent) h += `<div class="pk-nba-urgent">⏰ ${escapeHtml(nba.urgent)}</div>`;
+    h += `<div class="pk-nba-act">${escapeHtml(nba.act)}</div>`;
+    if (nba.reasons.length) h += `<div class="pk-nba-why">${nba.reasons.map(escapeHtml).join(' · ')}</div>`;
+    h += '<div class="pk-nba-btns">';
+    if (nba.apptDate && !nba.hasFutureAppt) {
+      h += `<button type="button" class="pk-btn-outline" id="pk-nba-appt" data-date="${toInputDate_(nba.apptDate)}">📅 Đặt hẹn ${escapeHtml(fmtDate_(nba.apptDate))} (+${nba.days} ngày)</button>`;
+    }
+    if (nba.angle) h += '<button type="button" class="pk-btn-outline" id="pk-nba-msg-btn">✍️ Soạn tin gợi ý</button>';
+    h += '</div>';
+    main.innerHTML = h;
+    const ap = main.querySelector('#pk-nba-appt');
+    if (ap) ap.addEventListener('click', () => {
+      const d = panelEl.querySelector('#pk-hen-date'), n = panelEl.querySelector('#pk-hen-note');
+      if (d) d.value = ap.dataset.date;
+      if (n && !n.value.trim()) n.value = nba.act.replace(/ —.*$/, '');
+      setStatus('📅 Đã điền ngày hẹn ' + fmtDate_(ap.dataset.date) + ' — kiểm tra rồi bấm "Lưu vào Sasum".');
+      refreshNba_();
+    });
+    const mb = main.querySelector('#pk-nba-msg-btn');
+    if (mb) mb.addEventListener('click', genNbaMessage_);
+  }
+  function genNbaMessage_() {
+    const box = panelEl.querySelector('#pk-nba-msg');
+    if (!box || !_nbaCur || !_nbaCur.angle) return;
+    const phone = _currentPhone, req = ++_nbaMsgReq;
+    box.innerHTML = '<div class="pk-ai-cust-loading">AI đang soạn tin...</div>';
+    safeSendMessage_({ type: 'FETCH_OPENER', payload: { custLines: buildCustLines(), tone: _activeTone, angleInstr: _nbaCur.angle, withProducts: _useProducts, stonePref: _stonePref } }, (resp) => {
+      if (req !== _nbaMsgReq || phone !== _currentPhone) return; // đã đổi khách/bấm lại → bỏ kết quả cũ
+      if (!resp?.ok) { box.innerHTML = `<div class="pk-ai-cust-loading">Lỗi: ${escapeHtml(resp?.error || 'không rõ')}</div>`; return; }
+      box.innerHTML = '<textarea id="pk-nba-ta" rows="4"></textarea><div class="pk-nba-btns"><button type="button" class="pk-btn-outline" id="pk-nba-insert">📥 Chèn vào ô trả lời</button><button type="button" class="pk-btn-outline" id="pk-nba-redo">🔄 Soạn lại</button></div>';
+      box.querySelector('#pk-nba-ta').value = resp.data.suggestion || '';
+      box.querySelector('#pk-nba-insert').addEventListener('click', () => insertReply(box.querySelector('#pk-nba-ta').value));
+      box.querySelector('#pk-nba-redo').addEventListener('click', genNbaMessage_);
+    });
+  }
+
   function currentFormPhone_() {
     const el = panelEl?.querySelector('#pk-newphone-input');
     if (el) return normPhone(el.value);
@@ -1826,6 +1952,7 @@
       nickZalos: c.nickZalos || [], // khong dong vao — rieng cua Zalo AI, Pancake khong sua
       zaloPhones: _zaloPhoneFieldLocked ? (c.zaloPhones || []) : _pkZaloPhones.slice(),
       custom: c.custom || {},
+      tag: c.tag, // undefined = khong gui (GAS giu nhan hien co); GAS luu nhan o custom.tag
       name: liveName || _currentOrderPanelName || c.name || ''
     }, overrides || {});
   }
@@ -1880,6 +2007,7 @@
     out.zaloPhones = [...new Set([...svZaloPhones, ...lcZaloPhones])];
     // CS phu trach: neu khach da co CS cu thi giu, khong cuop quyen phu trach
     out.cs = serverCare.cs || localRow.cs || '';
+    out.tag = serverCare.tag || localRow.tag || ''; // nhan da co tren server thi giu, sale chi duoc dien khi dang trong
     // Phản hồi Zalo: luồng chỉ-thêm không được làm mất cờ server đã tích
     if (serverCare.custom && serverCare.custom.zaloReply) out.custom = Object.assign({}, out.custom || {}, { zaloReply: true });
     const noteRes = _mergeNotesKeepOld_(serverCare.note, localRow.note);
@@ -1937,6 +2065,7 @@
     setBirthdayFields_(row.birthday);
     setVal('#pk-hen-date', row.schedHen ? toInputDate_(row.schedHen) : '');
     setVal('#pk-hen-note', row.schedHenNote);
+    setVal('#pk-tag', row.tag);
     learnChatKeyForPhone_(phone);
   }
 
@@ -1966,6 +2095,7 @@
       birthday: readBirthdayValue_(),
       schedHen: panelEl.querySelector('#pk-hen-date').value,
       schedHenNote: panelEl.querySelector('#pk-hen-note').value.trim(),
+      tag: (panelEl.querySelector('#pk-tag')?.value || '').trim(),
       custom: collectCustomFieldValues_(_currentCare?.custom || {}),
       note: rawEl ? rawEl.value : (_currentCare?.note || '')
     });
@@ -1981,6 +2111,8 @@
       _currentPhone = phone;
       _lastServerCare = Object.assign({}, row);
       _pkAssignCacheUpdate_(phone, row); // dòng tương ứng trong "Data được chia" cập nhật theo
+      _pkAssignAutoDone_(phone);
+      refreshNba_();
       const nameSpan = panelEl.querySelector('.pk-ai-cust-name');
       if (nameSpan && row.name) nameSpan.innerHTML = `${escapeHtml(row.name)} <span class="pk-ai-cust-phone">${phone}</span>`;
       // Lưu xong thì không còn là "khách mới" nữa: ẩn cảnh báo và khoá ô SĐT lại (tránh CS vô
@@ -2092,7 +2224,7 @@
     safeSendMessage_({ type: 'LOOKUP_CUSTOMER', payload: { phone } }, (resp) => {
       if (!resp?.ok || _currentPhone !== phone) return;
       const newCare = resp.data.care || {};
-      const CMP = ['status','zalo','cs','note','schedHen','schedHenNote','khStatus','birthday','name'];
+      const CMP = ['status','zalo','cs','note','schedHen','schedHenNote','khStatus','birthday','name','tag'];
       const base = _lastServerCare || {};
       const changedFields = CMP.filter((k) => (base[k] || '') !== (newCare[k] || ''));
       if (!changedFields.length) return;
@@ -2116,6 +2248,7 @@
     if (readBirthdayValue_() === String(baseline.birthday || '').trim()) setBirthdayFields_(newCare.birthday || '');
     syncSel('#pk-hen-note', 'schedHenNote');
     syncSel('#pk-name-input', 'name');
+    syncSel('#pk-tag', 'tag');
     const zrEl = panelEl.querySelector('#pk-zalo-reply');
     if (zrEl && zrEl.checked === !!(baseline.custom && baseline.custom.zaloReply)) zrEl.checked = !!(newCare.custom && newCare.custom.zaloReply);
     const henEl = panelEl.querySelector('#pk-hen-date');
@@ -2130,6 +2263,7 @@
     }
     _currentCare = newCare;
     _lastServerCare = Object.assign({}, newCare);
+    refreshNba_();
     setStatus('🔄 Vừa đồng bộ dữ liệu mới từ Sasum.');
   }
 
@@ -2343,7 +2477,7 @@
   function _pkAssignInfoOf_(care, orders) {
     care = care || {};
     return { name: care.name || (orders && orders[0] && orders[0].name) || '', status: care.status || '',
-      schedHen: care.schedHen || '', zaloReply: !!(care.custom && care.custom.zaloReply), orders: (orders || []).length };
+      schedHen: care.schedHen || '', zaloReply: !!(care.custom && care.custom.zaloReply), tag: care.tag || '', orders: (orders || []).length };
   }
   function _pkAssignInfoHtml_(phone) {
     const i = _assignInfo[phone];
@@ -2358,6 +2492,7 @@
       out.push(`<span class="pk-assign-chip${cls}">📅 ${escapeHtml(fmtDate_(i.schedHen))}${cls === ' pk-assign-chip-late' ? ' quá hạn' : (cls ? ' hôm nay' : '')}</span>`);
     }
     if (i.zaloReply) out.push('<span class="pk-assign-chip">💬 đã phản hồi</span>');
+    if (i.tag) out.push(`<span class="pk-assign-chip">🏷 ${escapeHtml(i.tag)}</span>`);
     if (!i.name && !i.status && !i.schedHen && !i.orders) out.push('<span class="pk-assign-chip pk-assign-chip-mut">chưa có hồ sơ</span>');
     return out.join(' ');
   }
@@ -2368,6 +2503,23 @@
     const d = new Date(i.schedHen); d.setHours(0, 0, 0, 0);
     const t = new Date(); t.setHours(0, 0, 0, 0);
     return d <= t ? 0 : 1;
+  }
+  // Sale Lưu xong khách trong "Data được chia" = đã tác động/gọi → tự tick "Đã gọi" (bỏ tick tay được nếu cần).
+  // Chỉ chạy khi danh sách đã tải (đã mở tab Data được chia) và SĐT thuộc 1 đợt chia của CS này, chưa tick.
+  function _pkAssignAutoDone_(phone) {
+    const info = _buildAssignPhoneMap_()[phone];
+    if (!info || info.isDone) return;
+    const cs = (panelEl?.querySelector('#pk-cs-sel')?.value) || settings?.csName || '';
+    safeSendMessage_({ type: 'TOGGLE_ASSIGN_DONE', payload: { cs, phone, done: true } }, (resp) => {
+      if (!resp?.ok) { setStatus('✓ Đã lưu — nhưng chưa tự tick "Đã gọi" được (' + (resp?.error || 'lỗi') + '), tick tay giúp mình.'); return; }
+      for (const h of _assignState.assignHistory) {
+        if (!(h.phones || []).includes(phone)) continue;
+        if (!h.donePhones) h.donePhones = [];
+        if (!h.donePhones.includes(phone)) h.donePhones.push(phone);
+      }
+      renderAssignedList_(true);
+      setStatus('✓ Đã lưu vào Sasum · đã tự tick "Đã gọi" trong Data được chia.');
+    });
   }
   function _pkAssignCacheUpdate_(phone, care) { // gọi sau khi sale Lưu → dòng trong danh sách cập nhật theo
     if (!phone || !_assignInfo[phone]) return;

@@ -451,9 +451,7 @@ function renderSalesReportTabH_(wrap, subTabs){
   var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
   // Báo cáo H: bỏ tiêu đề + dải nút tab A–H cho gọn (bảng H rộng, cần chỗ). Để vẫn chuyển được sang
   // báo cáo khác mà không bị kẹt ở H (menu trên cùng chỉ đổi giữa các tab lớn), thay bằng 1 ô chọn nhỏ.
-  var _subNames = {A:'A — Base',B:'B — Pos',C:'C — So sánh kỳ Base',D:'D — Sale tự thêm',E:'E — Hoa hồng nhân viên Pos',F:'F — KPI Sale',G:'G — Thưởng thử việc / chính thức',H:'H — Tổng quan data đã chia'};
-  filters += '<select onchange="_srSetSub(this.value)" style="'+sel+';font-weight:600" title="Chuyển sang báo cáo khác">'+
-    Object.keys(_subNames).map(function(k){ return '<option value="'+k+'"'+(k==='H'?' selected':'')+'>Báo cáo '+_subNames[k]+'</option>'; }).join('')+'</select>';
+  filters += _srSubSelectHtml_();
   filters += _quickRangeSelectHtml(_srState.hDateQuick, "_srApplyQuickRange('hDateQuick','hDateFrom','hDateTo',this.value)");
   filters += '<input type="date" value="'+esc(_srState.hDateFrom)+'" onchange="_srSetField(\'hDateFrom\',this.value);_srState.hDateQuick=\'custom\';_srApply()" title="Từ ngày" style="'+sel+'">';
   filters += '<span style="color:var(--muted)">→</span>';

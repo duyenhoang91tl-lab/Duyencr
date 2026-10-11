@@ -6,7 +6,7 @@
 //  Cả 2 lưu local (ome_bonus_prodmap / ome_bonus_orderovr) + Settings GAS (bonusProductMap / bonusOrderOvr) qua getSetting/setSetting.
 //  Lõi đếm: js/27-fn-bonuscore.js (bản sao trong gas_v13.js — khối "BONUS CORE").
 // ════════════════════════════════════════════════════════════════════
-var _bdState = { onlyReview:false, limit:120, search:'', rows:[] };
+var _bdState = { onlyReview:false, limit:120, search:'', sale:'', rows:[] };
 
 async function _bdSyncFromGAS(){
   if (typeof gsUrl === 'undefined' || !gsUrl) return;
@@ -123,16 +123,13 @@ function _bdRenderBody_(d){
   var q = _bcFold_(_bdState.search);
   var list = all.filter(function(x){
     if (_bdState.onlyReview && !(x.info.needReview || x.info.unconfirmed)) return false;
+    if (_bdState.sale && String(x.sale||'').split(',').map(function(t){ return _bcFold_(t.trim()); }).indexOf(_bcFold_(_bdState.sale)) === -1) return false;
     if (q && _bcFold_(x.info.counter + ' ' + x.sale + ' ' + x.info.lines.map(function(l){ return l.code + ' ' + l.name; }).join(' ')).indexOf(q) === -1) return false;
     return true;
   });
   _bdState.rows = list;
   var nReview = all.filter(function(x){ return x.info.needReview; }).length, nUnc = all.filter(function(x){ return x.info.unconfirmed; }).length;
-  var html = '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;line-height:1.6">'+
-    'Chỉ liệt kê <b>đơn gốc</b> (ghi chú Pos là mã bộ đếm sale dạng <code>17T10/2026</code>, có trên Base và Pos). '+
-    '<b>Vòng chuỗi + charm mix = 1 sản phẩm</b>; charm bi vàng, quà, dịch vụ không tính; charm đứng riêng (vd mặt cổ) là sản phẩm riêng. '+
-    'Tích <b>Vòng chuỗi / Charm mix</b> hoặc chọn <b>SP 1, 2… / Không tính / Quà</b> rồi bấm <b>✔</b> để lưu theo <b>mã sản phẩm</b> — các đơn sau tự áp dụng. '+
-    '"SP 1/2…" và "Doanh thu dòng" chỉ lưu cho riêng đơn đó. Dòng <i>(tự đoán)</i> là hệ thống đang đoán, chưa được xác nhận.</div>';
+  var html = _bdState.sale ? '<div style="margin-bottom:10px;font-size:12.5px">Đang xem đơn của sale <b>'+esc(_bdState.sale)+'</b> <button class="btn sm" onclick="_bdState.sale=\'\';_bdState.limit=120;renderSalesReportTab()">Xem tất cả sale</button></div>' : '';
   html += '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">'+
     '<input type="text" placeholder="🔍 Tìm mã đếm / sale / mã SP..." value="'+esc(_bdState.search)+'" oninput="_bdState.search=this.value;_bdState.limit=120;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:230px">'+
     '<label style="font-size:12px"><input type="checkbox" '+(_bdState.onlyReview?'checked':'')+' onchange="_bdState.onlyReview=this.checked;_bdState.limit=120;renderSalesReportTab()"> Chỉ đơn cần kiểm tra / chưa xác nhận</label>'+
@@ -143,7 +140,7 @@ function _bdRenderBody_(d){
   var stt = 0, shown = 0;
   for (var i = 0; i < list.length && shown < _bdState.limit; i++, shown++){
     var x = list[i], c = x.info.counter;
-    html += '<tr style="background:var(--surface2)"><td colspan="12"><b>'+esc(c)+'</b> · '+esc(x.date)+' · '+esc(x.sale)+' · DT đơn <b>'+_srMoney(x.info.total)+'</b> · <b>'+x.info.nProducts+' sản phẩm</b>'+
+    html += '<tr style="background:var(--surface2);cursor:pointer" title="Bấm xem thông tin đơn" data-counter="'+esc(c)+'" onclick="_bdOpenOrder(this.dataset.counter)"><td colspan="12"><b>'+esc(c)+'</b> · '+esc(x.date)+' · '+esc(x.sale)+' · DT đơn <b>'+_srMoney(x.info.total)+'</b> · <b>'+x.info.nProducts+' sản phẩm</b>'+
       (x.info.hasVong ? ' · phần vòng + charm mix: <b>'+(x.info.vongRev === null ? '—' : _srMoney(x.info.vongRev))+'</b>' : '')+
       (x.info.reasons.length ? ' <span style="color:#9a3412">⚠ '+esc(x.info.reasons.join(' / '))+'</span>' : '')+'</td></tr>';
     x.info.lines.forEach(function(l){
@@ -166,5 +163,55 @@ function _bdRenderBody_(d){
 }
 function renderSalesReportTabK_(wrap, subTabs){
   var body = _srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _bdRenderBody_(_srState.dataG);
-  wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + _srGFiltersHtml_() + body;
+  wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + _srGFiltersHtml_() +
+    '<div style="margin-bottom:10px"><button class="btn sm" onclick="_srSetSub(\'G\')">← Về báo cáo thưởng</button></div>' + body;
 }
+
+// ── Từ Báo cáo G: bấm "Chi tiết" của 1 sale → màn hình chi tiết đơn thưởng (K) lọc theo sale đó ──
+function _bdOpenForSale(name){
+  _bdState.sale = String(name || ''); _bdState.search = ''; _bdState.onlyReview = false; _bdState.limit = 120;
+  _srSetSub('K');
+}
+
+// ── Popup thông tin 1 đơn (bấm tiêu đề đơn ở màn K, hoặc 1 lượt thưởng "theo đơn" ở báo cáo G) ──
+function _bdFindOrder_(counter){
+  var all = _bdBuild_(_srState.dataG), k = String(counter || '');
+  for (var i = 0; i < all.length; i++){ if (all[i].info.counter === k) return all[i]; }
+  return null;
+}
+function _bdOrderModalHtml_(x){
+  var o = x.o || {}, info = x.info || {};
+  function row(label, val){ return val === '' || val == null ? '' : '<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px dashed var(--border)"><div style="width:118px;flex-shrink:0;color:var(--muted)">'+label+'</div><div style="flex:1;min-width:0;word-break:break-word">'+val+'</div></div>'; }
+  var phone = String(o.soDienThoai || '').trim();
+  var lines = (info.lines || []).map(function(l){
+    return '<div style="padding:4px 0;border-top:1px dashed var(--border)"><b>'+esc(l.code || '')+'</b>'+(l.name ? ' — '+esc(l.name) : '')+' · SL '+fmt(l.qty)+(l.rev != null ? ' · '+_srMoney(l.rev) : '')+' · <span style="color:var(--muted)">'+esc(_BD_CLS_LABEL[l.cls] || '')+'</span></div>';
+  }).join('');
+  return '<div style="font-size:13px;line-height:1.5">'+
+    row('Mã bộ đếm', '<b>'+esc(info.counter)+'</b>')+
+    row('Ngày lên đơn (Base)', esc(x.date || ''))+
+    row('Ngày tạo đơn Pos', esc(o.ngayTaoDon || ''))+
+    row('Khách hàng', esc(o.khachHang || '')+(phone ? ' · '+esc(phone) : ''))+
+    row('Sale', esc(x.sale || ''))+
+    row('Nguồn đơn', esc(o.nguonDon || ''))+
+    row('Trạng thái', esc(o.trangThai || ''))+
+    row('Doanh thu đơn', '<b>'+_srMoney(info.total)+'</b> · '+info.nProducts+' sản phẩm'+(info.hasVong ? ' · phần vòng + charm mix: '+(info.vongRev === null ? '—' : _srMoney(info.vongRev)) : ''))+
+    row('Sản phẩm', lines)+
+    row('Ghi chú đơn', esc(o.ghiChu || ''))+
+    (info.reasons && info.reasons.length ? row('Cần kiểm tra', '<span style="color:#9a3412">⚠ '+esc(info.reasons.join(' / '))+'</span>') : '')+
+    '</div>'+
+    (phone && typeof openDp === 'function' ? '<div style="margin-top:12px"><button class="btn sm" data-phone="'+esc(phone)+'" onclick="_bdCloseOrder();openDp(this.dataset.phone)">👤 Mở hồ sơ khách</button></div>' : '');
+}
+function _bdOpenOrder(counter){
+  var x = _bdFindOrder_(counter);
+  if (!x){ toast('Không tìm thấy đơn ' + counter + ' trong dữ liệu đang tải — bấm "Lọc" rồi thử lại.'); return; }
+  _bdCloseOrder();
+  var m = document.createElement('div');
+  m.id = 'bd-order-modal';
+  m.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:14px';
+  m.onclick = function(e){ if (e.target === m) _bdCloseOrder(); };
+  m.innerHTML = '<div style="background:var(--surface,#fff);color:var(--text,#111);border-radius:12px;max-width:520px;width:100%;max-height:86vh;overflow:auto;padding:16px 18px;box-shadow:0 10px 40px rgba(0,0,0,.3)">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b style="font-size:15px">📦 Thông tin đơn '+esc(counter)+'</b><button class="btn sm" onclick="_bdCloseOrder()">✕ Đóng</button></div>'+
+    _bdOrderModalHtml_(x)+'</div>';
+  document.body.appendChild(m);
+}
+function _bdCloseOrder(){ var m = document.getElementById('bd-order-modal'); if (m) m.remove(); }

@@ -234,7 +234,7 @@ let currentDpTab = 'care';
 // LÙI LẠI khi Worker lỗi/quá hạn mức: đổi dòng dưới về URL Apps Script cũ ngay phía dưới (GAS_URL_DIRECT) rồi push.
 const GAS_URL_DIRECT = 'https://script.google.com/macros/s/AKfycbx3QT6YIzQ7SQEwQPkljVeEdmTSBQQSxtTp2hTFYOeCKB_K4BHcUTSLi54LlmB9q_E6sQ/exec';
 // TAM LUI 2026-10-10: Worker tra loi 520 (CRM khong tai duoc du lieu) -> goi thang Apps Script. Bat lai Worker: dat FIXED_GS_URL = WORKER_URL sau khi kiem tra Cloudflare (Metrics / han muc 100.000 request/ngay).
-const WORKER_URL = 'https://royal-brook-6cec.duyenhoang91-tl.workers.dev'; // Worker cache (cloudflare/worker.mjs)
+const WORKER_URL = 'https://duyen-crm-cache.duyenhoang91-tl.workers.dev'; // Worker cache (cloudflare/worker.mjs)
 // Mac dinh goi THANG Apps Script. Thu Worker tren 1 may (khong anh huong may khac): mo CRM voi ?worker=1 (nho trong may do); ?worker=0 de tat.
 let FIXED_GS_URL = WORKER_URL; // BAT LAI Worker mac dinh (2026-10-10) de kiem tra lai sau khi Cloudflare da them bien GAS_URL; ?worker=0 -> goi thang Apps Script tren may do
 try {
@@ -244,18 +244,35 @@ try {
   if (localStorage.getItem('ome_use_worker') === '0') FIXED_GS_URL = GAS_URL_DIRECT;
 } catch (e) { /* localStorage bi chan -> giu goi thang */ }
 let gsUrl = FIXED_GS_URL || loadLS('ome_gs_url') || '';
-// ── Tai khoan TEST: moi request toi GAS tu dong kem demoToken (server chi cho xem bao cao, cat 5 dong, chan ghi). ──
-// Khong gan token cho action=users (man hinh dang nhap can doc danh sach tai khoan truoc khi co token).
+// ── Moi request toi GAS (buoc 3b bao mat, 2026-10-11): kem src=web + token phien (neu da dang nhap) de GAS ghi log "request khong token"
+// (xem docs/SECURITY-PLAN.md). Chua chan gi: GAS van chay nhu cu neu thieu token.
+// ── Tai khoan TEST: moi request kem demoToken (server chi cho xem bao cao, cat 5 dong, chan ghi).
+// Khong gan demoToken cho action=users (man hinh dang nhap can doc danh sach tai khoan truoc khi co token).
 (function(){
   var _origFetch = window.fetch.bind(window);
+  // Chen khoa vao dau JSON bang noi chuoi (khong JSON.parse/stringify lai: body co the vai MB, vd replaceOrders). Hop le vi body luon bat dau bang "{".
+  function _injectBody(body, extra) {
+    if (typeof body !== 'string' || body.charAt(0) !== '{') return body;
+    var rest = body.slice(1);
+    return '{' + extra + (/^\s*\}/.test(rest) ? '' : ',') + rest;
+  }
   window.fetch = function(u, o){
     try {
-      var tok = localStorage.getItem('ome_demo_token');
-      if (tok && typeof u === 'string' && gsUrl && u.indexOf(gsUrl) === 0 && u.indexOf('action=users') === -1) {
+      if (typeof u === 'string' && gsUrl && u.indexOf(gsUrl) === 0) {
+        var tok = localStorage.getItem('ome_demo_token');
+        var st = localStorage.getItem('ome_sess_token');
         if (o && o.method && String(o.method).toUpperCase() === 'POST') {
-          try { var b = JSON.parse(o.body); b.demo = tok; o = Object.assign({}, o, { body: JSON.stringify(b) }); } catch(e1){}
+          if (tok) {
+            try { var b = JSON.parse(o.body); b.demo = tok; o = Object.assign({}, o, { body: JSON.stringify(b) }); } catch(e1){}
+          }
+          var ex = '"src":"web"' + (st ? ',"token":' + JSON.stringify(st) : '');
+          o = Object.assign({}, o, { body: _injectBody(o.body, ex) });   // khoa da co trong body (vd saveUsers.token) se thang vi nam sau
         } else {
-          u += (u.indexOf('?') > -1 ? '&' : '?') + 'demo=' + encodeURIComponent(tok);
+          var add = [];
+          if (tok && u.indexOf('action=users') === -1) add.push('demo=' + encodeURIComponent(tok));
+          if (!/[?&]src=/.test(u)) add.push('src=web');
+          if (st && !/[?&]token=/.test(u)) add.push('token=' + encodeURIComponent(st));
+          if (add.length) u += (u.indexOf('?') > -1 ? '&' : '?') + add.join('&');
         }
       }
     } catch(e0){}
@@ -437,28 +454,12 @@ const colVisible = Object.assign({}, _colVisDefault, loadLS('ome_col_visible') |
 const _tabVisDefault = { dashboard:true, team:true, audit:true, salesreport:true, pancake:true, kpipancake:true };
 const tabVisible = Object.assign({}, _tabVisDefault, loadLS('ome_tab_visible') || {});
 // ═══════════════════════════════════════════════════════
-//  TUỲ CHỈNH THANH MENU (kéo-thả mục vào/ra "☰ Menu") — thay cho cơ chế tick ẩn/hiện
-//  cũ ở trên (chỉ có Bật/Tắt, không có "menu"). Giờ MỌI mục ở cả 2 thanh (header phải +
-//  thanh tab) đều kéo được vào 1 nút "☰ Menu" dùng chung — kéo ra thì mục về lại đúng
-//  thanh gốc của nó (data-bar-home), không mất chức năng gì cả. Lưu riêng theo từng
-//  tài khoản đăng nhập, giống hệt cơ chế tabVisible ở trên.
-var _barMenuItems = []; // mảng id (không cần giữ thứ tự) đang nằm TRONG "☰ Menu"
-(function _barMenuMigrate(){
-  var saved = loadLS('ome_bar_menu_items');
-  if (Array.isArray(saved)) { _barMenuItems = saved; return; }
-  // Chưa từng dùng tính năng mới → chuyển tiếp 1 lần từ tabVisible cũ: tab nào đang
-  // TẮT thì coi như đang nằm trong menu, để không mất cấu hình cũ của người dùng.
-  var legacy = loadLS('ome_tab_visible') || {};
-  _barMenuItems = Object.keys(legacy).filter(function(k){ return legacy[k] === false; });
-  saveLS('ome_bar_menu_items', _barMenuItems);
-})();
-
-// ═══════════════════════════════════════════════════════
 //  PHÂN QUYỀN XEM MENU (Admin gán qua modal "🔑 Tài khoản") — khác với "☰ Menu" ở trên
 //  (đó là NGƯỜI DÙNG tự sắp xếp thẩm mỹ cho mình). Đây là ADMIN khoá cứng: nhân viên
 //  KHÔNG tự bật lại được các mục bị giới hạn, kể cả qua thao tác client.
 // ═══════════════════════════════════════════════════════
 var _PERM_TAB_DEFS = [
+  { id:'overview',     label:'Tổng quan' },
   { id:'tab-kh',       label:'Danh sách KH' },
   { id:'tab-schedule', label:'Lịch chăm sóc' },
   { id:'tab-overdue',  label:'Quá hạn' },
@@ -475,33 +476,6 @@ var _PERM_TAB_DEFS = [
   { id:'dailybrief',   label:'Báo cáo ngày' },
   { id:'uploaddata',   label:'Up dữ liệu' }
 ];
-var _BAR_ITEM_DEFS = [
-  { id:'tab-kh',          label:'Danh sách KH' },
-  { id:'tab-schedule',    label:'Lịch chăm sóc' },
-  { id:'reportsgroup',    label:'📊 Báo cáo (gộp Doanh số/Pancake/KPI/Checklist)' },
-  { id:'tab-overdue',     label:'Quá hạn' },
-  { id:'tab-mydata',      label:'Data của tôi' },
-  { id:'tab-zaloai',      label:'Zalo AI' },
-  { id:'tab-task',        label:'Công việc' },
-  { id:'dashboard',       label:'Dashboard' },
-  { id:'team',            label:'Quản lý Team' },
-  { id:'audit',           label:'Nhật ký' },
-  { id:'salesreport',     label:'Báo cáo doanh số' },
-  { id:'pancake',         label:'Báo cáo Pancake' },
-  { id:'kpipancake',      label:'KPI Pancake' },
-  { id:'mktchecklist',    label:'Checklist MKT' },
-  { id:'dailybrief',      label:'Báo cáo ngày' },
-  { id:'uploaddata',      label:'Up dữ liệu' },
-  { id:'hdr-hoitham',     label:'Mẫu hỏi thăm' },
-  { id:'hdr-tacvu',       label:'Tác vụ' },
-  { id:'hdr-carestatus',  label:'Tình trạng CS' },
-  { id:'hdr-khstatus',    label:'Trạng thái KH' },
-  { id:'hdr-customfield', label:'Trường tự tạo' },
-  { id:'hdr-account',     label:'Tài khoản' },
-  { id:'hdr-logout',      label:'Đăng xuất' }
-];
-
-var _barDragId = null;
 let _lastActSortDir = 0; // 0=off, 1=asc(oldest first), -1=desc(newest first)
 let _lastPosSortDir = 0; // 0=off, 1=asc(mua lâu nhất trước), -1=desc(mua gần nhất trước)
 document.addEventListener('click', e=>{

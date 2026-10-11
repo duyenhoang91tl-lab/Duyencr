@@ -85,3 +85,19 @@ alter table dt_tong      enable row level security;
 alter table don_chi_tiet enable row level security;
 
 -- 5) Chống Supabase free tự pause sau 7 ngày không hoạt động: GAS trigger hằng ngày gọi 1 select nhỏ (bước 2).
+
+-- 6) fu_results — kết quả việc chăm sóc theo mốc (P2e, docs/ROADMAP-YEU-CAU.md). Khoá = id việc (vd dao_<sđt>_<ngày đơn>_<mốc>).
+create table if not exists fu_results (
+  id         text primary key,
+  phone      text,
+  due        date,                              -- ngày đến hạn của việc
+  done_at    timestamptz not null default now(),
+  result     text not null,                     -- contacted | nopick | refused | resched
+  by_user    text default '',
+  note       text default '',
+  redo       date,                              -- ngày hẹn lại (khi result = resched)
+  milestone  integer                            -- số ngày của mốc (0 = ngày mua, 30, 60...)
+);
+create index if not exists fu_results_due_idx  on fu_results (due);
+create index if not exists fu_results_user_idx on fu_results (by_user);
+alter table fu_results enable row level security;

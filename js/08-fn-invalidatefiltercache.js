@@ -180,7 +180,7 @@ function _inUserScope(c){
   // danh) — currentUser.names là mảng; currentUser.name (đơn) chỉ còn để tương thích ngược.
   var myNames = (currentUser.names && currentUser.names.length) ? currentUser.names : (currentUser.name ? [currentUser.name] : []);
   if (!myNames.length) return false;
-  if (currentUser.role === 'cs'){
+  if (currentUser.role === 'cs' || currentUser.role === 'manager'){   // manager: pham vi = cac ten Admin gan cho tai khoan (nhu CS), khong tu nhin toan bo
     // Duong nong (goi cho tung khach trong 136k): vong for thay .some(closure) + khong cap phat.
     // Thuộc phạm vi nếu: là CS chăm sóc (careCS), được chia campaign, HOẶC là CS phụ trách đơn
     // (order-level seller, o.cs) — thêm chiều này để hỗ trợ đơn "chia nhiều sale": mỗi sale trong
@@ -238,6 +238,7 @@ function _careRow(phone, schedByPhone){
     schedHen: care.schedHen||'', schedHenNote: care.schedHenNote||'',
     khStatus: care.khStatus||'', nickZalos: care.nickZalos||[], zaloPhones: care.zaloPhones||[], birthday: care.birthday||'',
     name: care.name||'',
+    tag: care.tag,   // dong bo hang loat cung phai gui tag, neu khong custom.tag cu trong care.custom se de len nhan vua sua
     custom: care.custom||{}
   };
 }
@@ -318,11 +319,11 @@ async function flushCareSync(){
 // ═══════════════════════════════════════════════════════
 //  ROLE — "TÔI LÀ AI?"
 // ═══════════════════════════════════════════════════════
-function _roleLabel(r){ return r==='admin'?'Admin':(r==='leader'?'Team Leader':(r==='demo'?'Tài khoản test':'CS')); }
+function _roleLabel(r){ return r==='admin'?'Admin':(r==='manager'?'Quản lý':(r==='leader'?'Team Leader':(r==='demo'?'Tài khoản test':'CS'))); }
 function renderRolePill(){
   var pill = document.getElementById('role-pill');
   if (!pill) return;
-  var cls = currentUser.role==='admin' ? 'admin' : (currentUser.role==='leader' ? 'leader' : 'cs');
+  var cls = currentUser.role==='admin' ? 'admin' : ((currentUser.role==='leader' || currentUser.role==='manager') ? 'leader' : 'cs');
   var namesForPill = (currentUser.names && currentUser.names.length) ? currentUser.names : (currentUser.name?[currentUser.name]:[]);
   var extra = currentUser.role==='admin' ? '' : (' · ' + esc(namesForPill.join(', ')));
   pill.className = 'role-pill ' + cls;
@@ -839,7 +840,7 @@ function renderDashboard(){
   if (currentUser.role!=='admin'){
     var myNamesDash = (currentUser.names && currentUser.names.length) ? currentUser.names : (currentUser.name?[currentUser.name]:[]);
     csArr=csArr.filter(function(s){
-      if(currentUser.role==='cs') return myNamesDash.indexOf(s.name) !== -1;
+      if(currentUser.role==='cs' || currentUser.role==='manager') return myNamesDash.indexOf(s.name) !== -1;
       var team=null;for(var i=0;i<teams.length;i++){if(myNamesDash.indexOf(teams[i].leader)!==-1||teams[i].name===currentUser.team){team=teams[i];break;}}
       var ms=_teamMemberSet(team);return ms.has(s.name);
     });

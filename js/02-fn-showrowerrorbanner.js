@@ -49,7 +49,7 @@ async function pushCareToGS(phone) {
     khStatus: care.khStatus||'',
     nickZalos: care.nickZalos||[],
     zaloPhones: care.zaloPhones||[],
-    tag: care.tag||'',
+    tag: care.tag,   // undefined = khong gui (GAS giu custom.tag hien co); '' = xoa nhan (nhan luu o custom.tag, xem careRow_)
     name: care.name||'',
     custom: care.custom||{}
   };
@@ -1086,7 +1086,7 @@ function _schedCsFilter(it, _preList) {
   // Đọc filter từ DOM (currentCS không bao giờ được cập nhật). _preList: nơi gọi đã đọc sẵn 1 lần cho cả vòng lặp.
   let filterList = _preList ? _preList.slice() : _csFilterList();
   // Khi đăng nhập role=cs mà chưa chọn filter → tự dùng (các) tên CS đăng nhập
-  if (!filterList.length && typeof currentUser !== 'undefined' && currentUser && currentUser.role === 'cs') {
+  if (!filterList.length && typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'cs' || currentUser.role === 'manager')) {
     filterList = (currentUser.names && currentUser.names.length) ? currentUser.names.slice() : (currentUser.name ? [currentUser.name] : []);
   }
   if (!filterList.length) return true;
@@ -1182,7 +1182,7 @@ function renderScheduleTab() {
             <div class="sched-phone">${it.phone}</div>
             ${_schedCsTag(it)}
             <div class="sched-note">${esc(_nsh)}</div>
-            <button onclick="event.stopPropagation();markDone('${it.id}')" style="background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:2px 7px;font-size:10px;cursor:pointer;color:var(--muted);white-space:nowrap;margin-left:auto">✓ Xong</button>
+            ${it.autoDao?`<button onclick="event.stopPropagation();_fuSuggestOpen('${it.id}')" title="Tin gợi ý từ mẫu + ghi kết quả" style="background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:2px 6px;font-size:10px;cursor:pointer;color:var(--muted);margin-left:auto">💬</button>`:''}<button onclick="event.stopPropagation();markDone('${it.id}')" style="background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:2px 7px;font-size:10px;cursor:pointer;color:var(--muted);white-space:nowrap;margin-left:${it.autoDao?'4px':'auto'}">✓ Xong</button>
           </div>`;
         }
       }
@@ -1192,12 +1192,24 @@ function renderScheduleTab() {
   grid.innerHTML = html;
 }
 
+// Công tắc "Theo tuần | Quá hạn" trong màn Lịch chăm sóc (gộp mục menu "Quá hạn" vào "Lịch chăm sóc").
+// Vẫn dùng đúng switchTab + 2 khung cũ (#tab-schedule/#tab-overdue) nên badge, markDone, phân quyền không đổi;
+// chỉ giữ highlight ở "Lịch chăm sóc" để menu trái hiện đúng đang ở mục nào.
+function schedSeg(which) {
+  var sch = document.querySelector('[data-bar-id="tab-schedule"]'), ov = document.querySelector('[data-bar-id="tab-overdue"]');
+  if (which === 'overdue') {
+    switchTab('overdue', ov || sch);
+    if (sch && ov) { ov.classList.remove('active'); sch.classList.add('active'); }
+  } else if (sch) switchTab('schedule', sch);
+}
+
 function renderOverdueTab() {
   const today = _ymd(new Date());
   const _ovFl = _csFilterList();   // đọc DOM 1 lần, không đọc lại cho từng lịch quá hạn
   const items = schedules.filter(x => x.date < today && !x.done && _schedCsFilter(x, _ovFl)).sort((a,b)=>a.date.localeCompare(b.date));
   txt('tb-over', fmt(items.length));
   txt('s-over', fmt(items.length));
+  txt('sched-over-cnt', fmt(items.length)); txt('sched-over-cnt2', fmt(items.length));
   const grid = document.getElementById('overdue-grid');
   if (!items.length) { grid.innerHTML='<div style="padding:40px;text-align:center;color:var(--hint);font-size:12px">Không có lịch quá hạn 🎉</div>'; return; }
   const byDate = {};
@@ -1216,7 +1228,7 @@ function renderOverdueTab() {
         <div class="sched-phone">${it.phone}</div>
         ${_schedCsTag(it)}
         <div class="sched-note">${esc(_nsh2)}</div>
-        <button onclick="event.stopPropagation();markDone('${it.id}')" style="background:var(--red-bg);border:1px solid var(--red-b);border-radius:3px;padding:2px 7px;font-size:10px;cursor:pointer;color:var(--red);white-space:nowrap;margin-left:auto">✓ Xong</button>
+        ${it.autoDao?`<button onclick="event.stopPropagation();_fuSuggestOpen('${it.id}')" title="Tin gợi ý từ mẫu + ghi kết quả" style="background:var(--red-bg);border:1px solid var(--red-b);border-radius:3px;padding:2px 6px;font-size:10px;cursor:pointer;color:var(--red);margin-left:auto">💬</button>`:''}<button onclick="event.stopPropagation();markDone('${it.id}')" style="background:var(--red-bg);border:1px solid var(--red-b);border-radius:3px;padding:2px 7px;font-size:10px;cursor:pointer;color:var(--red);white-space:nowrap;margin-left:${it.autoDao?'4px':'auto'}">✓ Xong</button>
       </div>`;
     }
     html += `</div>`;

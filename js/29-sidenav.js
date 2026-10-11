@@ -32,43 +32,44 @@
   }
   // Nhóm menu mẹ -> các mục con (theo data-bar-id). Mục chưa khai báo vẫn hiện, dồn vào nhóm "Khác".
   var GROUPS = [
-    { k:'kh',  t:'👤 Thông tin khách hàng', ids:['tab-kh','tab-schedule','tab-overdue','tab-mydata','act:quickadd','act:export'] },
-    { k:'rp',  t:'📊 Báo cáo',              ids:['salesreport','pancake','kpipancake','mktchecklist','dailybrief','dashboard'] },
-    { k:'nv',  t:'🧑‍💼 Thông tin nhân viên',  ids:['tab-task','act:newtask','audit'] },
-    { k:'tm',  t:'👥 Cài đặt team',         ids:['team','act:acct'] },
-    { k:'cs',  t:'🔀 Cài đặt chia số',      ids:['act:assign','act:autoassign','act:assignhist'] },
-    { k:'up',  t:'📤 Up data',              ids:['uploaddata','act:sync','act:push','act:fullsync','act:dup'] },
+    { k:'ov',  t:'🏠 Tổng quan',           ids:['overview'] },
+    { k:'kh',  t:'👤 Thông tin khách hàng', ids:['tab-kh','tab-schedule','tab-overdue','tab-mydata'] },
     { k:'tv',  t:'🧰 Tác vụ',               ids:['tab-zaloai','act:bc','act:bct','act:bcstat','act:futpl','act:bday'] },
-    { k:'st',  t:'⚙ Settings',              ids:['act:cstatus','act:khstatus','act:cfield','act:barcust','act:clear'] }
+    { k:'nv',  t:'🧑‍💼 Thông tin nhân viên',  ids:['tab-task'] },
+    { k:'rp',  t:'📊 Báo cáo',              ids:['salesreport','pancake','kpipancake','mktchecklist','dailybrief','dashboard','act:fureport','act:teamai'] },
+    { k:'cs',  t:'🔀 Cài đặt chia số',      ids:['act:assign','act:autoassign','act:assignhist'] },
+    { k:'tm',  t:'👥 Cài đặt team',         ids:['team','act:acct'] },
+    { k:'up',  t:'📤 Up data',              ids:['uploaddata','act:upload','act:sync','act:fullsync','act:dup'] },
+    { k:'st',  t:'⚙ Settings',              ids:['config','act:cstatus','act:khstatus','act:cfield','act:tier','audit','act:clear'] }
   ];
   // Mục "hành động" (mở modal có sẵn, không phải tab). admin:true = chỉ tài khoản admin thấy.
   var ACTS = {
-    quickadd:   { t:'➕ Thêm KH / Đơn mới', f:'openQuickAddModal' },
-    export:     { t:'⬇ Xuất CSV', f:'exportCSV' },
-    newtask:    { t:'🗂️ Tạo công việc', f:'openTaskModal' },
     acct:       { t:'🔑 Tài khoản đăng nhập', f:'openAcctModal', admin:true },
     assign:     { t:'👥 Chia data', f:'openAssignModal', admin:true },
     autoassign: { t:'⏰ Chia tự động', f:'openAssignModal', tab:'auto', admin:true },
     assignhist: { t:'📋 Lịch sử chia', f:'openAssignModal', tab:'history', admin:true },
+    upload:     { t:'📂 Tải file Excel', click:'fi' },
     sync:       { t:'↓ Sync GS', f:'syncFromGS', arg:{pullOrders:true,manual:true} },
-    push:       { t:'📤 Đẩy dữ liệu', f:'pushOrdersToGS', admin:true },
-    fullsync:   { t:'🔁 Đồng bộ 2 chiều', f:'fullSyncOrdersToGS', admin:true },
+    fullsync:   { t:'🔁 Đồng bộ 2 chiều (tải + đẩy)', f:'fullSyncOrdersToGS', admin:true },
     dup:        { t:'🗑️ Đơn trùng', f:'openDupOrdersModal', admin:true },
     bc:         { t:'📣 Chiến dịch từ danh sách lọc', f:'openBroadcastFromCurrentFilter' },
     bct:        { t:'🎯 Chiến dịch theo sản phẩm', f:'openBctModal' },
+    teamai:     { t:'🤖 AI phân tích team', f:'openTeamAnalysisModal', admin:true },
     bcstat:     { t:'📊 TK chiến dịch', f:'openBcStatModal' },
     futpl:      { t:'📨 Mẫu hỏi thăm tự động', f:'openFuTplModal' },
+    fureport:   { t:'📞 Chăm sóc theo mốc', f:'openFuReport' },
     bday:       { t:'🎂 Mẫu sinh nhật', f:'openBdayTplModal' },
-    cstatus:    { t:'⚙ Tình trạng chăm sóc', f:'openCareStatusModal', admin:true },
-    khstatus:   { t:'⚙ Trạng thái KH', f:'openKhStatusModal', admin:true },
+    cstatus:    { t:function(){ return '⚙ ' + (typeof FIELD_LABEL_CS!=='undefined'?FIELD_LABEL_CS:'Tình trạng chăm sóc'); }, f:'openCareStatusModal', admin:true },
+    khstatus:   { t:function(){ return '⚙ ' + (typeof FIELD_LABEL_KH!=='undefined'?FIELD_LABEL_KH:'Trạng thái KH'); }, f:'openKhStatusModal', admin:true },
+    tier:       { t:'🏅 Cấu hình hạng KH', f:'openTierConfig', admin:true },
     cfield:     { t:'➕ Trường tự tạo', f:'openCustomFieldsModal', admin:true },
-    barcust:    { t:'🧩 Tuỳ chỉnh thanh menu', f:'openBarCustomizeModal' },
     clear:      { t:'🧹 Xóa data trên máy', f:'clearData', admin:true }
   };
   function isAdm(){ try { return (typeof _authAccount!=='undefined' && _authAccount && _authAccount.role==='admin') || (typeof _bootstrapAdmin!=='undefined' && _bootstrapAdmin); } catch(e){ return false; } }
   function runAct(k){
     var a = ACTS[k]; if (!a) return;
     setOpen(false);
+    if (a.click) { var inp = document.getElementById(a.click); if (inp) inp.click(); return; }
     try {
       var fn = window[a.f];
       if (typeof fn !== 'function') { if (typeof toast==='function') toast('Chức năng chưa sẵn sàng'); return; }
@@ -101,10 +102,11 @@
     Object.keys(ACTS).forEach(function(k){
       var el = t.querySelector('.sn-act[data-act="'+k+'"]');
       if (!el){
-        el = document.createElement('div'); el.className = 'sn-act'; el.setAttribute('data-act', k); el.textContent = ACTS[k].t;
+        el = document.createElement('div'); el.className = 'sn-act'; el.setAttribute('data-act', k); el.textContent = (typeof ACTS[k].t==='function' ? ACTS[k].t() : ACTS[k].t);
         el.addEventListener('click', function(e){ e.stopPropagation(); runAct(k); });
         t.appendChild(el);
       }
+      if (typeof ACTS[k].t==='function') { var _nl = ACTS[k].t(); if (el.textContent !== _nl) el.textContent = _nl; } // chỉ gán khi đổi, tránh MutationObserver gọi layout lặp
       var r = gOf('act:'+k), g = GROUPS[r.g];
       el.setAttribute('data-sn-g', g.k);
       el.style.order = String(r.g*100 + 1 + r.j);
@@ -120,8 +122,11 @@
       el.style.order = String(r.g*100 + 1 + r.j);
       if (el.classList.contains('active')) activeG = g.k;
       var hid = el.style.display === 'none';
+      // "Quá hạn" đã gộp vào màn "Lịch chăm sóc" (công tắc Theo tuần | Quá hạn) -> ẩn mục riêng, TRỪ khi tài khoản chỉ được cấp quyền Quá hạn mà không có Lịch chăm sóc
+      var _mergedOver = (id === 'tab-overdue') && (typeof _tabAllowedForUser !== 'function' || _tabAllowedForUser('tab-schedule'));
+      if (_mergedOver) hid = true;
       if (!hid) cnt[g.k] = (cnt[g.k]||0) + 1;
-      el.classList.toggle('sn-hide', !!closed[g.k]);
+      el.classList.toggle('sn-hide', !!closed[g.k] || _mergedOver);
     });
     GROUPS.forEach(function(g){
       var h = t.querySelector('.sn-gh[data-k="'+g.k+'"]');
@@ -147,7 +152,6 @@
       var tab = e.target.closest && e.target.closest('#data-view .tabs .tab');
       if (!tab) return;
       if (tab.id === 'v9tab-reportsgroup' && !e.target.closest('#reportsgroup-list')) return;
-      if (tab.id === 'v9tab-customize') { setOpen(false); return; }
       var gk = tab.getAttribute('data-sn-g'); if (gk && closed[gk]) { closed[gk] = false; try{localStorage.setItem('sn_closed', JSON.stringify(closed));}catch(x){} }
       setTimeout(function(){ setOpen(false); refreshLabel(); layout(); }, 0);
     });
@@ -162,3 +166,50 @@
   // _injectV9UI thêm tab muộn -> cập nhật lại nhãn
   setTimeout(function(){ try{ var t=document.querySelector('#data-view .tabs'); if(t) t.dispatchEvent(new Event('x')); }catch(e){} refreshLabel(); }, 1200);
 })();
+
+// ═══════════════════════════════════════════════════════
+//  TÌM THEO MÃ ĐƠN — ô search chính (#search-input). Gõ >=4 ký tự có chữ/số (không phải SĐT thuần)
+//  -> hỏi GAS action=searchOrder (ID đơn DT TỔNG + ghi chú đơn Pos) -> xổ danh sách; bấm 1 dòng thì
+//  điền SĐT vào ô search để lọc đúng khách đó. Tên/SĐT vẫn lọc như cũ.
+// ═══════════════════════════════════════════════════════
+var _ordSearchTimer = null, _ordSearchSeq = 0;
+function _ordSearchSoon(){
+  clearTimeout(_ordSearchTimer);
+  var inp = document.getElementById('search-input'), box = document.getElementById('ord-search-res');
+  if (!inp || !box) return;
+  var q = String(inp.value || '').trim();
+  if (q.length < 4 || /^\d{9,11}$/.test(q) || !/\d/.test(q) || typeof gsUrl === 'undefined' || !gsUrl) { box.style.display = 'none'; return; }
+  _ordSearchTimer = setTimeout(function(){ _ordSearchRun(q); }, 500);
+}
+async function _ordSearchRun(q){
+  var box = document.getElementById('ord-search-res'); if (!box) return;
+  var seq = ++_ordSearchSeq;
+  box.style.display = 'block'; box.innerHTML = '<div class="ors-h">Đang tìm mã đơn "' + esc(q) + '"…</div>';
+  try {
+    var sep = gsUrl.indexOf('?') > -1 ? '&' : '?';
+    var r = await fetch(gsUrl + sep + 'action=searchOrder&q=' + encodeURIComponent(q), { redirect:'follow' });
+    var j = await r.json();
+    if (seq !== _ordSearchSeq) return;
+    if (j && j.error) { box.innerHTML = '<div class="ors-h">' + esc(j.error) + '</div>'; return; }
+    var rs = (j && j.results) || [];
+    if (!rs.length) { box.innerHTML = '<div class="ors-h">Không có đơn nào khớp mã "' + esc(q) + '" (nếu vừa sửa GAS: nhớ deploy lại)</div>'; return; }
+    window.__ordSearchRes = rs;
+    box.innerHTML = '<div class="ors-h">' + rs.length + ' đơn khớp mã — bấm để mở khách</div>' + rs.map(function(o,i){
+      var nm = (typeof customerMap !== 'undefined' && customerMap[o.phone]) ? customerMap[o.phone].name : '';
+      return '<div class="ors-i" onclick="_ordSearchPick(' + i + ')"><b>' + esc(o.code) + '</b> · ' + esc(o.phone || '?') + (nm ? ' · ' + esc(nm) : '') +
+        '<div class="ors-s">' + esc(o.src) + (o.date ? ' · ' + esc(o.date) : '') + (o.product ? ' · ' + esc(o.product) : '') + '</div></div>';
+    }).join('');
+  } catch(e){ if (seq === _ordSearchSeq) box.innerHTML = '<div class="ors-h">Lỗi tìm mã đơn: ' + esc(e.message) + '</div>'; }
+}
+function _ordSearchPick(i){
+  var o = (window.__ordSearchRes || [])[i], inp = document.getElementById('search-input'), box = document.getElementById('ord-search-res');
+  if (box) box.style.display = 'none';
+  if (!o || !o.phone || !inp) return;
+  inp.value = o.phone;
+  if (typeof applyFilters === 'function') applyFilters();
+  if (typeof openDp === 'function' && typeof customerMap !== 'undefined' && customerMap[o.phone]) { try { openDp(o.phone); } catch(e){} }
+}
+document.addEventListener('click', function(e){
+  var box = document.getElementById('ord-search-res');
+  if (box && box.style.display !== 'none' && !e.target.closest('.search-wrap')) box.style.display = 'none';
+});

@@ -1,5 +1,5 @@
 // Mo phong var-hoisting cua khoi script goc (da tach file): khai bao truoc cac bien var dung o cac file sau.
-var _srSidebarHidden, _posOrdersCache, _posOrdersState, _cskhDetailCache, _cskhDetailState, DATA_DAO_SOURCES, NEW_LEAD_SOURCES, AUTO_HEN_TAG, HANG_KEYS, HANG_LABEL, VN_OFFSET_MS_, NAME_ADDR_KEYWORDS_RE, NAME_MERGE_LABEL_RE, NAME_ALLOWED_CHARS_RE, PTS_RATE, PTS_VALUE, _barMenuItems, _PERM_TAB_DEFS, _BAR_ITEM_DEFS, _barDragId;
+var _srSidebarHidden, _posOrdersCache, _posOrdersState, _cskhDetailCache, _cskhDetailState, DATA_DAO_SOURCES, NEW_LEAD_SOURCES, AUTO_HEN_TAG, HANG_KEYS, HANG_LABEL, VN_OFFSET_MS_, NAME_ADDR_KEYWORDS_RE, NAME_MERGE_LABEL_RE, NAME_ALLOWED_CHARS_RE, PTS_RATE, PTS_VALUE, _PERM_TAB_DEFS;
 
 // ═══════════════════════════════════════════════════════
 //  CONSTANTS

@@ -652,6 +652,7 @@ function _srRenderG_(d){
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(g.ct.total)+'</div><div class="kpi-label">Thưởng Chính thức ('+fmt(g.ct.rows.length)+' Sale)</div></div>'+
     '<div class="kpi-card"><div class="kpi-val">'+fmt((d.orders||[]).length)+'</div><div class="kpi-label">Đơn Pos dùng để tính</div></div>'+
     '</div>';
+  html += '<div style="margin-bottom:14px"><button class="btn sm" onclick="_srSetSub(\'K\')">📋 Chi tiết đơn thưởng (đếm sản phẩm)</button></div>';
 
   function groupTable(title, key, grp, isTv){
     var h = '<div class="dash-section-title" style="margin-top:16px">'+title+'</div>';
@@ -665,12 +666,12 @@ function _srRenderG_(d){
         '<td>'+(isTv ? (sd ? esc(sd) : '<span style="color:#9a3412">chưa đặt Ngày bắt đầu</span>') : esc(_srGSaleTypeLabel_(s.name)))+'</td>'+
         '<td style="text-align:right">'+fmt(s.items.length)+'</td>'+
         '<td style="text-align:right"><b>'+_srMoney(s.total)+'</b></td>'+
-        '<td><button class="btn sm" onclick="_srState.gBonusExpanded='+(expanded ? "''" : "'"+rid+"'")+';renderSalesReportTab()">'+(expanded ? 'Ẩn' : 'Chi tiết')+'</button></td></tr>';
+        '<td style="white-space:nowrap"><button class="btn sm" data-sale="'+esc(s.name)+'" onclick="_bdOpenForSale(this.dataset.sale)" title="Xem danh sách đơn của sale này">Chi tiết</button> <button class="btn sm" onclick="_srState.gBonusExpanded='+(expanded ? "''" : "'"+rid+"'")+';renderSalesReportTab()" title="Các lượt thưởng">'+(expanded ? 'Ẩn' : 'Lượt thưởng')+'</button></td></tr>';
       if (expanded){
         h += '<tr><td colspan="5" style="background:var(--surface2);padding:8px 14px"><table class="dash-table" style="margin:0"><thead><tr><th>Ngày</th>'+(isTv ? '<th>Ngày thứ</th>' : '')+'<th>Phạm vi</th><th>Chương trình</th><th>Chi tiết</th><th style="text-align:right">Thưởng</th></tr></thead><tbody>'+
           s.items.map(function(it){
             var dn = (isTv && sd) ? _daysSinceStart_(sd, it.date) : null;
-            return '<tr><td>'+esc(it.date)+'</td>'+(isTv ? '<td>'+(dn === null ? '—' : dn)+'</td>' : '')+'<td>'+esc(it.scope)+'</td><td>'+esc(it.program)+'</td><td style="font-size:11px;color:var(--muted)">'+it.detail+'</td><td style="text-align:right">'+_srMoney(it.amount)+'</td></tr>';
+            return '<tr'+(it.counter ? ' style="cursor:pointer" title="Bấm xem thông tin đơn" data-counter="'+esc(it.counter)+'" onclick="_bdOpenOrder(this.dataset.counter)"' : '')+'><td>'+esc(it.date)+'</td>'+(isTv ? '<td>'+(dn === null ? '—' : dn)+'</td>' : '')+'<td>'+esc(it.scope)+'</td><td>'+esc(it.program)+'</td><td style="font-size:11px;color:var(--muted)">'+it.detail+'</td><td style="text-align:right">'+_srMoney(it.amount)+'</td></tr>';
           }).join('')+'</tbody></table></td></tr>';
       }
     });

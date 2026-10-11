@@ -44,6 +44,7 @@ async function openFuTplModal(){
   }
   _buildFuCsFilter();
   renderFuTplTable();
+  _loadFuCfg();
 }
 function closeFuTplModal(){ document.getElementById('futpl-modal').classList.remove('open'); }
 
@@ -88,7 +89,7 @@ function renderFuTplTable(){
       var dis = locked ? ' disabled style="opacity:.55"' : '';
       return '<tr style="border-bottom:1px solid #f3f4f6;vertical-align:top">'+
         '<td style="padding:4px"><input value="'+esc(t.productCode)+'" placeholder="* / CF,TEA" title="Mã chuẩn hóa; nhiều mã cách nhau dấu phẩy (CF,TEA); * = mọi SP" onchange="_fuTplList['+i+'].productCode=this.value.trim().toUpperCase()||\'*\'"'+dis+' style="width:100%;padding:4px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;text-transform:uppercase"></td>'+
-        '<td style="padding:4px"><input type="number" min="1" max="365" list="futpl-days-hint" value="'+esc(t.days)+'" onchange="_fuTplList['+i+'].days=String(parseInt(this.value,10)||7)"'+dis+' title="Số ngày sau khi mua (tùy ý: 7, 14, 30, 60, 90...)" style="width:100%;padding:4px;border:1px solid #d1d5db;border-radius:5px;font-size:12px"></td>'+
+        '<td style="padding:4px"><input type="number" min="0" max="365" list="futpl-days-hint" value="'+esc(t.days)+'" onchange="_fuTplList['+i+'].days=String(isNaN(parseInt(this.value,10))?7:Math.max(0,parseInt(this.value,10)))"'+dis+' title="Số ngày sau khi mua (tùy ý: 7, 14, 30, 60, 90...)" style="width:100%;padding:4px;border:1px solid #d1d5db;border-radius:5px;font-size:12px"></td>'+
         '<td style="padding:4px"><input value="'+esc(t.cs)+'" placeholder="(chung)" onchange="_fuTplList['+i+'].cs=this.value.trim().toLowerCase()"'+(canEditAll?'':' disabled style="opacity:.55"')+' style="width:100%;padding:4px;border:1px solid #d1d5db;border-radius:5px;font-size:12px"></td>'+
         '<td style="padding:4px"><textarea rows="2" onchange="_fuTplList['+i+'].template=this.value"'+dis+' style="width:100%;padding:4px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;resize:vertical;font-family:inherit">'+esc(t.template)+'</textarea></td>'+
         '<td style="padding:4px">'+(locked?'':'<button onclick="_fuTplList.splice('+i+',1);renderFuTplTable()" title="Xóa" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:14px">✕</button>')+'</td>'+
@@ -121,17 +122,61 @@ async function saveFuTpls(){
 
 // Nút mở modal trên header
 setTimeout(function(){
-  var hdrR = document.querySelector('.hdr-r');
-  if (hdrR && !document.getElementById('futpl-open-btn')){
-    var b = document.createElement('button');
-    b.id = 'futpl-open-btn';
-    b.className = 'btn sm';
-    b.setAttribute('data-bar-id', 'hdr-hoitham');
-    b.setAttribute('data-bar-home', '.hdr-r');
-    b.textContent = '📨 Mẫu hỏi thăm';
-    b.title = 'Mẫu tin nhắn hỏi thăm tự động theo mốc 7/14/30/60 ngày';
-    b.onclick = openFuTplModal;
-    hdrR.insertBefore(b, hdrR.firstChild);
-  }
   if (typeof _applyBarCustomization === 'function') _applyBarCustomization();
 }, 400);
+
+// ── P2a: admin chỉnh phạm vi quét hỏi thăm (Settings fuStart / fuSources) ──
+// Backend (_fuConfig_) đọc 2 khoá này; rỗng/sai -> mặc định cũ nên lưu rỗng = quay về như trước.
+function _fuDateToIso_(raw){
+  raw = String(raw || '').trim(); var m = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) return m[1] + '-' + ('0'+m[2]).slice(-2) + '-' + ('0'+m[3]).slice(-2);
+  m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  return m ? m[3] + '-' + ('0'+m[2]).slice(-2) + '-' + ('0'+m[1]).slice(-2) : '';
+}
+async function _loadFuCfg(){
+  var box = document.getElementById('futpl-cfg'); if (!box) return;
+  if (!_fuIsAdmin()) { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  try {
+    var sep = gsUrl.indexOf('?') > -1 ? '&' : '?';
+    var r = await fetch(gsUrl + sep + 'action=getSettings&keys=fuStart,fuSources,fuOffDays', { redirect:'follow' });
+    var v = ((await r.json()) || {}).values || {};
+    document.getElementById('fucfg-start').value = _fuDateToIso_(v.fuStart);
+    document.getElementById('fucfg-sources').value = String(v.fuSources || '');
+    window._fuOffDays = String(v.fuOffDays || '').split(',').map(function(x){ return parseInt(x,10); }).filter(function(n){ return n >= 0; });
+    renderFuDays();
+  } catch(e) { document.getElementById('fucfg-status').textContent = 'Không tải được cấu hình: ' + e.message; }
+}
+// Danh sách mốc = các mốc có trong bảng mẫu (nếu trống thì 4 mốc mặc định 7/14/30/60 như backend)
+function renderFuDays(){
+  var box = document.getElementById('fucfg-days'); if (!box) return;
+  var set = {};
+  (_fuTplList || []).forEach(function(t){ var d = parseInt(t.days,10); if (d >= 0) set[d] = true; });
+  if (!Object.keys(set).length) [7,14,30,60].forEach(function(d){ set[d] = true; });
+  (window._fuOffDays || []).forEach(function(d){ set[d] = true; });   // mốc đang tắt mà không còn mẫu vẫn hiện để bật lại
+  var off = window._fuOffDays || [];
+  box.innerHTML = Object.keys(set).map(Number).sort(function(a,b){return a-b;}).map(function(d){
+    return '<label style="cursor:pointer"><input type="checkbox" data-fuday="'+d+'" '+(off.indexOf(d) === -1 ? 'checked' : '')+'> '+(d === 0 ? '0 (ngày mua)' : d+' ngày')+'</label>';
+  }).join('');
+}
+async function saveFuCfg(){
+  var st = document.getElementById('fucfg-status');
+  var start = document.getElementById('fucfg-start').value.trim();
+  var srcs = document.getElementById('fucfg-sources').value.split(',').map(function(x){ return x.trim().toLowerCase(); }).filter(Boolean).join(',');
+  if (start && (start < '2020-01-01' || isNaN(new Date(start).getTime()))) { st.style.color = '#dc2626'; st.textContent = 'Ngày bắt đầu không hợp lệ (phải từ 2020).'; return; }
+  st.style.color = '#6b7280'; st.textContent = 'Đang lưu...';
+  try {
+    async function put(key, value){
+      var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'setSetting', key:key, value:value }) });
+      var j = await r.json(); if (j && j.error) throw new Error(j.error);
+    }
+    await put('fuStart', start);
+    await put('fuSources', srcs);
+    var offs = [].slice.call(document.querySelectorAll('#fucfg-days input[data-fuday]')).filter(function(x){ return !x.checked; }).map(function(x){ return x.getAttribute('data-fuday'); }).join(',');
+    await put('fuOffDays', offs);
+    window._fuOffDays = offs ? offs.split(',').map(Number) : [];
+    // Lịch CS tự động trên máy này dùng lại cấu hình mới ngay (máy khác: lần mở web kế tiếp)
+    try { if (typeof _fuCfgState !== 'undefined') { _fuCfgState.loaded = false; _fuCfgState.loading = false; } if (typeof checkDataDaoRenewSchedules === 'function') checkDataDaoRenewSchedules(); } catch(e2) {}
+    st.style.color = '#00b14f'; st.textContent = '✓ Đã lưu — áp dụng từ lần quét kế tiếp' + (offs ? ' (đang tắt mốc: ' + offs + ' ngày)' : '');
+  } catch(e) { st.style.color = '#dc2626'; st.textContent = 'Lỗi lưu: ' + e.message; }
+}

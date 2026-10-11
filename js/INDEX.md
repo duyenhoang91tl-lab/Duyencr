@@ -39,5 +39,23 @@ Code client của `index.html` (trước đây inline, ~1.4MB) đã tách ra `cs
 
 - `27-fn-bonuscore.js`: `_bcOrderInfo_`, `_bcGuess_`, `_bcMinProducts_`, `_bcIsVongProgram_` (lõi đếm SP thưởng; bản sao trong gas_v13.js)
 - `28-fn-bonusdetail.js`: tab K "Chi tiết thưởng" — `renderSalesReportTabK_`, `_bdFlag`, `_bdSlot`, `_bdRev`, `_bdSyncFromGAS`
+- `37-fn-configpage.js`: trang ⚙ Cấu hình tập trung (B2) — ngưỡng ttStageHours/hmCycle/hmIdle lưu Settings + AuditLog, lần chạy tự động gần nhất, lối tắt
+- `36-fn-homechips.js`: 4 chip Hôm nay ở Tổng quan (B1 ROADMAP-CRM-MAU) — `hmCompute`, `hmRenderChips`, `hmOpenList`
+- `35-fn-deptsettings.js`: cài đặt phòng ban (tách riêng đội Online/Offline) — `openDeptSettings`, `_dpSave`, `DEPT_LIST`; GAS readDeptList_/readSaleDepts_/_orgApplyDepts_
+- `34-fn-todaytasks.js`: nhắc việc hôm nay cho CS — `ttFetch`, `_ttCards`, `_ttCardHtml` (thẻ trong khung nhắc hẹn; backend gas/23_TodayTasks.gs)
+
+- `31-fn-orgoverview.js`: tab "🏠 Tổng quan" = MÀN HÌNH ĐẦU SAU ĐĂNG NHẬP (tự `switchTab('overview')` khi data-view hiện, trừ tài khoản test) + modal "🪪 Hồ sơ nhân sự" — `_ovLoad`, `_ovScope` (phạm vi xem theo vai trò), `_ovRender`, `openEmployeeProfile`, `_ovAskAI`; gọi GAS `action=orgOverview`.
+- `30-fn-teamanalysis.js`: modal "🤖 AI phân tích team" (menu Báo cáo, admin) — `openTeamAnalysisModal`, `runTeamAnalysis`, `_taRender`, `_taSetFilter`, `_taRange`; gọi GAS `action=teamAnalysis`.
 
 - `js/29-sidenav.js` + `css/05-sidenav.css`: menu tác vụ dọc bên trái (ngăn kéo ẩn mặc định, nút ☰ Menu ở header; tái dùng khối `.tabs` nên giữ nguyên data-bar-id/quyền/demo-mode; chọn mục xong tự ẩn).
+
+## Quy ước menu (cập nhật 10/10/2026)
+- MỘT nơi duy nhất chứa tính năng: menu trái `js/29-sidenav.js`. `GROUPS` = nhóm mẹ + thứ tự; `ACTS` = mục hành động (gọi lại đúng hàm mở modal cũ, `admin:true` = chỉ admin thấy). Thêm tính năng mới → thêm vào ACTS + GROUPS, KHÔNG thêm nút mới vào header/toolbar.
+- Đã bỏ vì trùng: nút header (Tác vụ, Mẫu hỏi thăm, Tình trạng CS, Trạng thái KH, Trường tự tạo, Tài khoản), dropdown "Tác vụ" ở toolbar, "☰ Menu" cũ + tab ⚙ tuỳ chỉnh — ĐÃ XOÁ HẲN code (`openBarCustomizeModal`, `_BAR_ITEM_DEFS`, `_barMenuItems`, đồng bộ key GAS `barMenuItems::<user>` — key này còn nằm trong sheet Settings, vô hại). `_applyBarCustomization` chỉ còn dọn `[data-bar-id]` trùng; `_injectV9UI` chống chèn 2 lần bằng cờ `window._v9UIInjected`.
+- Cố ý GIỮ nút theo ngữ cảnh trên màn hình: "Thêm KH / Đơn mới", "Xuất CSV" (toolbar danh sách), "+ Tạo công việc" (tab Công việc). Header chỉ còn: ☰ Menu, trạng thái đồng bộ, pill Google Sheets, Đăng xuất.
+- Nhãn "Tình trạng CS"/"Trạng thái KH" lấy từ `FIELD_LABEL_CS/KH` (admin đổi tên được) — đừng ghi cứng.
+- ID tab (`data-bar-id`) giữ nguyên vì phân quyền theo tab (`_PERM_TAB_DEFS`) dựa vào chúng.
+- Đã gộp/đối chiếu (10/10): tab "Quá hạn" gộp vào "Lịch chăm sóc" qua công tắc `schedSeg()` (vẫn giữ 2 khung + ID `tab-overdue` cho phân quyền; menu trái ẩn mục Quá hạn trừ khi tài khoản chỉ có quyền Quá hạn). Bỏ mục "Đẩy dữ liệu" khỏi menu vì `fullSyncOrdersToGS()` = `syncFromGS` + `pushOrdersToGS()` (hàm vẫn còn, được gọi từ đồng bộ 2 chiều). "Dashboard" (thống kê khách) và "Báo cáo ngày" (KPI sale + checklist MKT theo ngày, từ server) KHÔNG trùng — giữ cả hai.
+- `js/32-fn-furesult.js`: P2c — hộp chọn kết quả (đã liên hệ/không nghe máy/từ chối/hẹn lại) khi bấm Xong việc lịch CS tự động; bọc `markDone` của js/03.
+- `33-pro-profile.js`: giao diện PRO — hồ sơ khách 360° (`proStageModel_`, `proDaysSinceLastOrder_`, `proKpiHtml_`, `proStageHtml_`, `proRenderProfile_`; bọc `openDp`/`renderDpTab`, chỉ chạy khi `html.ui-pro`)
+- `36-pro-home.js`: giao diện PRO — P1 Trang chủ (`proGaugeHtml_`, `proStatusBarsHtml_`, `proRecoItems_`, `proRecoHtml_`, `proHomeHtml_`, `proHomeRender_`). Bọc `_ovRender` (js/31) để chèn khối `#pro-home` ĐẦU màn "🏠 Tổng quan": 2 đồng hồ (% KPI = `target/pct` có sẵn trong orgOverview, tỷ lệ chốt), 4 ô số, Khuyến nghị (`_dueReminders` quá hạn/hôm nay + `_ttCards` đơn Base kẹt), phân bố tình trạng CS (`scopedCustomers`, chỉ đếm tổng hợp). Ẩn hàng ô số cũ trùng (`.pro-hide-old`); chế độ CS "self" giữ nguyên hồ sơ cá nhân. Test: `tools/test-ui-pro-home.js`.

@@ -1,6 +1,7 @@
 function doGet(e) {
   var p = (e && e.parameter) || {};
   var action = p.action || '';
+  if (action === 'ntlReport') return _adminKeyOk_(p.adminKey) ? jsonOut_(_ntlReport_()) : jsonOut_({ error: 'Can khoa quan tri (adminKey).' });
   if (action === 'getSetting' && _isSensitiveSettingKey_(p.key)) return jsonOut_({ value: null });
   if (action === 'getGasSource' && !_adminKeyOk_(p.adminKey)) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de lay ma nguon GAS.' });
   if (p.demo) {
@@ -8,6 +9,7 @@ function doGet(e) {
     if (DEMO_ALLOWED_GET_[action] !== 1) return jsonOut_({ error: 'Tai khoan test khong duoc phep thao tac nay.' });
     return _demoClip_(doGetCore_(e), action);
   }
+  _ntlNote_('GET', action, p.token, p.src, p.ek);
   return doGetCore_(e);
 }
 
@@ -91,7 +93,8 @@ function doGetCore_(e) {
     }
     if (action === 'teams')     return jsonOut_({ teams: readTeams_(ss.getSheetByName(SH_TEAM)) });
     if (action === 'mktTeams')  return jsonOut_({ teams: readMktTeams_() });
-    if (action === 'users')     return jsonOut_({ users: readUsers_(ss.getSheetByName(SH_USER)) });
+    // KHONG tra passHash (2026-10-11). Co token hop le -> du truong (perms...); khong token -> rut gon cho extension.
+    if (action === 'users')     return jsonOut_({ users: _usersForClient_(readUsers_(ss.getSheetByName(SH_USER)), !!_sessUser_(e && e.parameter && e.parameter.token)) });
     // ── Bao cao Pancake (nhap tu file Excel "Thong ke tuong tac") ──
     if (action === 'pancakeNameMap') return jsonOut_({ map: readPancakeMap_(), allNames: pancakeAllNames_() });
     if (action === 'pancakeReport')  return jsonOut_(buildPancakeReport_(e.parameter.from, e.parameter.to, e.parameter.split));
@@ -118,6 +121,12 @@ function doGetCore_(e) {
     }
     // ── Tap SDT co trong "dữ liệu đơn" — chi de loc nguon o man hinh chinh (cache 10') ──
     // Danh sach san pham (ma + ten) trong "du lieu don" cho o tim/tick san pham cua Chuong trinh thuong (cache 10').
+    if (action === 'fuResults') {   // ket qua viec cham soc theo moc: ?from=yyyy-MM-dd&to=yyyy-MM-dd
+      return jsonOut_({ ok: true, results: readFuResults_(e && e.parameter && e.parameter.from, e && e.parameter && e.parameter.to) });
+    }
+    if (action === 'searchOrder') {   // tim theo ma don -> { ok, results:[{src,code,phone,date,product,revenue,note}] }
+      return jsonOut_({ ok: true, results: searchOrderCode_(e && e.parameter && e.parameter.q) });
+    }
     if (action === 'donProducts') {
       var cachedDPr = _cacheGetBig_('don_products_v1');
       if (cachedDPr) { try { return jsonOut_(JSON.parse(cachedDPr)); } catch (ecP) {} }
@@ -260,6 +269,15 @@ function doGetCore_(e) {
       try { cacheA.put(cKeyA, JSON.stringify(resA), 120); } catch(ec) {}
       return jsonOut_(resA);
     }
+    if (action === 'teamAnalysis') return teamAnalysis_(e.parameter || {});
+    if (action === 'orgOverview') return orgOverview_(e.parameter || {});
+    if (action === 'storeCaseReport') {
+      var pK = e.parameter || {};
+      return jsonOut_(buildStoreCaseReport_({
+        dateFrom: pK.dateFrom || '', dateTo: pK.dateTo || '', pct: pK.pct || '',
+        sale: pK.sale ? pK.sale.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : []
+      }));
+    }
     if (action === 'saleKpiReport') {
       var pF = e.parameter || {};
       var fF = { dateFrom: pF.dateFrom || '', dateTo: pF.dateTo || '',
@@ -364,10 +382,12 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.23-supabase-dualwrite' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.31-pos-metrics' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
+    // ── NHAC VIEC HOM NAY (don Base ket giai doan > N gio). names = ten sale cua CS cach nhau '|' (rong = tat ca) ──
+    if (action === 'todayTasks') return jsonOut_(ttTodayTasks_(e && e.parameter ? e.parameter.names : ''));
     if (action === 'reminders') {
       var csFilter = (e && e.parameter && e.parameter.cs) ? String(e.parameter.cs) : '';
       return jsonOut_({ reminders: readRemindersToday_(csFilter) });
@@ -409,7 +429,7 @@ function doGetCore_(e) {
     if (action === 'followUpTemplates') {
       var fuTpls = readFollowUpTemplates_();
       var fuDays = {};
-      Object.keys(fuTpls).forEach(function (k) { var dd = parseInt(k.split('|')[1], 10); if (dd > 0) fuDays[dd] = true; });
+      Object.keys(fuTpls).forEach(function (k) { var dd = parseInt(k.split('|')[1], 10); if (dd >= 0) fuDays[dd] = true; });
       var fuDayList = Object.keys(fuDays).map(Number).sort(function(a,b){return a-b;});
       return jsonOut_({ templates: fuTpls, list: listFollowUpTemplates_(), checkpoints: fuDayList.length ? fuDayList : FU_CHECKPOINTS });
     }

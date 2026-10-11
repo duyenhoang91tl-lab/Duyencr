@@ -19,6 +19,9 @@ Gồm: 1 backend Google Apps Script (`gas_v13.js`) + web app (`index.html`) + 2 
 | Deploy, commit, push, rebase, quy tắc bắt buộc, checklist | `01-rules-and-deploy.md` | — |
 | Tra bảng nhanh: action GAS, 20 cột CareData, storage key, tiền tố CSS, quyền manifest | `07-reference-tables.md` | — |
 | Báo lỗi lặp lại / dò lịch sử lỗi đã sửa | `06-bug-history.md` | — |
+| Bảo mật backend: đăng nhập server/token, việc còn lại (bước 3-4) | `docs/SECURITY-PLAN.md` | — |
+| Chuyển HẲN sang Supabase (kế hoạch 6 giai đoạn, đã được Duyên đồng ý 2026-10-11) | `docs/MIGRATE-SUPABASE-FULL.md` (+ `docs/SUPABASE-PLAN.md`) | `gas_v13.js` (khối Supabase), `cloudflare/worker.mjs`, `supabase/schema.sql` |
+| Lộ trình thực hiện file yêu cầu CRM (8 mục: mốc sau mua, resale, hạng, AI tóm tắt, hồ sơ sale, hộp thư chung, quy trình đơn) | `docs/ROADMAP-YEU-CAU.md` | — |
 
 ## Web app Sasum đã TÁCH FILE (2026-10-08, chống lag)
 `index.html` (~112KB) chỉ còn khung HTML; CSS ở `css/01..04`, JS ở `js/NN-*.js` (nạp bằng `<script src>` đúng thứ tự cũ). Tra hàm → file: `js/INDEX.md` hoặc `grep -n "function tenHam" js/*.js`. KHÔNG đổi thứ tự thẻ `<script>` trong `index.html`. Chi tiết quy ước (file `fn-*` / `main-*`) ở đầu `js/INDEX.md`.
@@ -34,9 +37,11 @@ Gồm: 1 backend Google Apps Script (`gas_v13.js`) + web app (`index.html`) + 2 
 1. Clone repo MỚI NHẤT bằng token trong tin nhắn hiện tại → đọc đúng phần code liên quan.
 2. Sửa nhỏ, từng mục → syntax-check → commit (nêu NGUYÊN NHÂN GỐC) → push ngay từng mục nhỏ.
 3. Mỗi lần push: ghi rõ "đã làm gì / việc cần làm tiếp" trong commit message (và/hoặc file `HANDOFF.md` ở root repo) để phiên khác tiếp tục được ngay.
-4. Báo người dùng các bước thủ công còn lại (deploy GAS / reload extension / đồng bộ mã GAS) — xem `01-rules-and-deploy.md`. Lưu ý: "đồng bộ mã GAS" nay CHỈ là bấm "🔄 Đồng bộ mã GAS mới nhất" trong modal Google Sheets (nút Copy đọc `action=getGasSource`); khối `gas-code-v9` trong `index.html` đã xoá (grep = 0), không cần đồng bộ khớp 100% nữa.
+4. Báo người dùng chỉ những bước thủ công THỰC SỰ còn lại: reload extension, Ctrl+F5 web, hàm cần chạy tay trong Apps Script. KHÔNG nhắc deploy GAS / Worker / Supabase / đồng bộ mã (đã tự động bằng GitHub Actions từ 2026-10-11) — xem `01-rules-and-deploy.md`.
 5. Phát hiện quy ước/lỗi mới đáng nhớ → đề xuất cập nhật đúng file KB tương ứng (không nhét vào file nào cũng được).
 
 ## Quy tắc giữ KB gọn
 - Mỗi file KB giữ dưới ~150 dòng. Quá dài → tách thêm file mới và thêm 1 dòng vào bảng định tuyến ở trên.
 - Mỗi thông tin chỉ nằm ở 1 file (tránh lệch nhau).
+
+- Kế hoạch đưa các mục của CRM mẫu (clip 2026-10-11) vào CRM: `docs/ROADMAP-CRM-MAU.md` (B1–B6, việc cần Duyên chốt ở mục 4).

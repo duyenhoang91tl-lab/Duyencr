@@ -182,3 +182,16 @@ function resetToDefault() {
     }
   });
 }
+
+// Khoa truy cap CRM (buoc 4a bao mat): luu rieng o storage.local (KHONG sync) — khong dinh toi save()/load() cua cai dat khac.
+document.addEventListener("DOMContentLoaded", () => {
+  chrome.storage.local.get(["ome_ext_key"], (r) => { document.getElementById("crmExtKey").value = (r && r.ome_ext_key) || ""; });
+});
+document.getElementById("saveCrmExtKey").addEventListener("click", () => {
+  const v = document.getElementById("crmExtKey").value.trim();
+  chrome.storage.local.set({ ome_ext_key: v }, () => {
+    const el = document.getElementById("crmExtKeySaved");
+    el.textContent = "Đã lưu ✔";
+    setTimeout(() => { el.textContent = ""; }, 2000);
+  });
+});
