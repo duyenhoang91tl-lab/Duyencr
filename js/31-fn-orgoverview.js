@@ -66,6 +66,12 @@ function _ovRange(kind){
   var a = document.getElementById('ov-from'), b = document.getElementById('ov-to');
   if (a && b) { a.value = _ymd(f); b.value = _ymd(t); }
 }
+// Lọc nhanh đủ mốc (Hôm nay…Năm trước) dùng chung _pkQuickRange; chọn xong tự tải số liệu
+function _ovQuick(key){
+  var r = _pkQuickRange(key); if (!r) return;
+  var a = document.getElementById('ov-from'), b = document.getElementById('ov-to');
+  if (a && b){ a.value = r.from; b.value = r.to; _ovLoad(false); }
+}
 function _ovEnsurePanel(){
   var dv = document.getElementById('data-view'); if (!dv) return null;
   var p = document.getElementById('tab-overview');
@@ -74,7 +80,7 @@ function _ovEnsurePanel(){
     p.innerHTML = '<div class="dash-wrap" id="overview-wrap"><div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">' +
       '<div style="font-size:18px;font-weight:700;flex:1;min-width:220px">🏠 Tổng quan kết quả kinh doanh <span id="ov-scope" style="font-size:12px;font-weight:500;color:var(--muted)"></span></div>' +
       '<input type="date" id="ov-from" class="ymf-date"><span style="color:var(--muted)">→</span><input type="date" id="ov-to" class="ymf-date">' +
-      '<button class="btn" onclick="_ovRange(\'week\');_ovLoad(false)">7 ngày</button><button class="btn" onclick="_ovRange(\'month\');_ovLoad(false)">Tháng này</button><button class="btn" onclick="_ovRange(\'lastmonth\');_ovLoad(false)">Tháng trước</button>' +
+      '<button class="btn" onclick="_ovRange(\'week\');_ovLoad(false)">7 ngày</button>' + _quickRangeSelectHtml('custom', "_ovQuick(this.value)") + '' +
       '<button class="btn primary" onclick="_ovLoad(false)">Xem</button><button class="btn" onclick="_ovLoad(true)" title="Tính lại, bỏ kết quả lưu tạm 5 phút">↻</button></div>' +
       '<div id="ov-body" style="font-size:13px;color:var(--muted)">⏳ Đang tải…</div></div>';
     dv.appendChild(p); _ovRange('month');

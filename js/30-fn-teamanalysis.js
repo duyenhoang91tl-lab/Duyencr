@@ -17,6 +17,11 @@ function _taRange(kind){
   document.getElementById('ta-from').value = _ymd(f);
   document.getElementById('ta-to').value = _ymd(t);
 }
+// Lọc nhanh đủ mốc (Hôm nay…Năm trước) dùng chung _pkQuickRange; 'custom' = giữ nguyên ô ngày đang chọn
+function _taQuick(key){
+  var r = _pkQuickRange(key); if (!r) return;
+  document.getElementById('ta-from').value = r.from; document.getElementById('ta-to').value = r.to;
+}
 function openTeamAnalysisModal(){
   var el = document.getElementById('ta-modal');
   if (!el) {
@@ -29,7 +34,7 @@ function openTeamAnalysisModal(){
         '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">' +
           '<label style="font-size:12px;color:var(--muted)">Từ</label><input type="date" id="ta-from" class="ymf-date">' +
           '<label style="font-size:12px;color:var(--muted)">Đến</label><input type="date" id="ta-to" class="ymf-date">' +
-          '<button class="btn" onclick="_taRange(\'week\')">7 ngày</button><button class="btn" onclick="_taRange(\'month\')">Tháng này</button><button class="btn" onclick="_taRange(\'lastmonth\')">Tháng trước</button>' +
+          '<button class="btn" onclick="_taRange(\'week\')">7 ngày</button>' + _quickRangeSelectHtml('custom', "_taQuick(this.value)") + '' +
           '<button class="btn primary" id="ta-run" onclick="runTeamAnalysis(false)">🤖 Phân tích</button>' +
           '<button class="btn" onclick="runTeamAnalysis(true)" title="Bỏ kết quả lưu tạm 10 phút, gọi AI viết lại">↻ Làm mới</button>' +
         '</div>' +
