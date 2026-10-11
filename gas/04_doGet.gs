@@ -380,9 +380,6 @@ function doGetCore_(e) {
       tasksOut_.forEach(function (t) { t.pendingReq = pendMap_[t.id] || []; });
       return jsonOut_({ tasks: tasksOut_ });
     }
-    if (action === 'khoList')   return jsonOut_(khoList_(e && e.parameter && e.parameter.token));
-    if (action === 'tonKho')    return jsonOut_(tonKhoList_(e.parameter || {}));
-    if (action === 'tonKhoLog') return jsonOut_(tonKhoLog_(e.parameter || {}));
     if (action === 'notifications') {
       var _gu = _sessUser_(e && e.parameter && e.parameter.token);
       if (!_gu) return jsonOut_({ error: 'Can dang nhap.', code: 'AUTH' });

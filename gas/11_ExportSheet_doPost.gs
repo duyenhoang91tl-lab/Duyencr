@@ -306,11 +306,6 @@ function doPostCore_(e) {
     if (action === 'deleteTask') return deleteTask_(data.id);
     // ── Binh luan/thao luan trong 1 cong viec (Task) — tab "Thao luan" tren UI ──
     if (action === 'saveTaskComment') return saveTaskComment_(data.comment);
-    // ── KHO / TON KHO (Supabase; quyen kiem o server bang token phien) ──
-    if (action === 'khoSave')       return jsonOut_(khoSave_(data));
-    if (action === 'tonKhoSet')     return jsonOut_(tonKhoSet_(data));
-    if (action === 'tonKhoNguong')  return jsonOut_(tonKhoNguong_(data));
-    if (action === 'tonKhoImport')  return jsonOut_(tonKhoImport_(data));
     // ── Thong bao @tag: danh dau da doc / tao thong bao cho ghi chu khach (comment+task tu tao ngay trong saveTaskComment_/saveTaskEntry_) ──
     if (action === 'notifRead') { var _nu = _sessUser_(data.token); if (!_nu) return jsonOut_({ error: 'Can dang nhap.', code: 'AUTH' }); return jsonOut_(markNotifRead_(_nu.username, data.ids, !!data.all)); }
     if (action === 'notifMention') {
