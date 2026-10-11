@@ -139,11 +139,25 @@ async function _loadFuCfg(){
   box.style.display = 'block';
   try {
     var sep = gsUrl.indexOf('?') > -1 ? '&' : '?';
-    var r = await fetch(gsUrl + sep + 'action=getSettings&keys=fuStart,fuSources', { redirect:'follow' });
+    var r = await fetch(gsUrl + sep + 'action=getSettings&keys=fuStart,fuSources,fuOffDays', { redirect:'follow' });
     var v = ((await r.json()) || {}).values || {};
     document.getElementById('fucfg-start').value = _fuDateToIso_(v.fuStart);
     document.getElementById('fucfg-sources').value = String(v.fuSources || '');
+    window._fuOffDays = String(v.fuOffDays || '').split(',').map(function(x){ return parseInt(x,10); }).filter(function(n){ return n > 0; });
+    renderFuDays();
   } catch(e) { document.getElementById('fucfg-status').textContent = 'Không tải được cấu hình: ' + e.message; }
+}
+// Danh sách mốc = các mốc có trong bảng mẫu (nếu trống thì 4 mốc mặc định 7/14/30/60 như backend)
+function renderFuDays(){
+  var box = document.getElementById('fucfg-days'); if (!box) return;
+  var set = {};
+  (_fuTplList || []).forEach(function(t){ var d = parseInt(t.days,10); if (d > 0) set[d] = true; });
+  if (!Object.keys(set).length) [7,14,30,60].forEach(function(d){ set[d] = true; });
+  (window._fuOffDays || []).forEach(function(d){ set[d] = true; });   // mốc đang tắt mà không còn mẫu vẫn hiện để bật lại
+  var off = window._fuOffDays || [];
+  box.innerHTML = Object.keys(set).map(Number).sort(function(a,b){return a-b;}).map(function(d){
+    return '<label style="cursor:pointer"><input type="checkbox" data-fuday="'+d+'" '+(off.indexOf(d) === -1 ? 'checked' : '')+'> '+d+' ngày</label>';
+  }).join('');
 }
 async function saveFuCfg(){
   var st = document.getElementById('fucfg-status');
@@ -158,6 +172,9 @@ async function saveFuCfg(){
     }
     await put('fuStart', start);
     await put('fuSources', srcs);
-    st.style.color = '#00b14f'; st.textContent = '✓ Đã lưu — áp dụng từ lần quét kế tiếp' + (start || srcs ? '' : ' (đang dùng mặc định)');
+    var offs = [].slice.call(document.querySelectorAll('#fucfg-days input[data-fuday]')).filter(function(x){ return !x.checked; }).map(function(x){ return x.getAttribute('data-fuday'); }).join(',');
+    await put('fuOffDays', offs);
+    window._fuOffDays = offs ? offs.split(',').map(Number) : [];
+    st.style.color = '#00b14f'; st.textContent = '✓ Đã lưu — áp dụng từ lần quét kế tiếp' + (offs ? ' (đang tắt mốc: ' + offs + ' ngày)' : '');
   } catch(e) { st.style.color = '#dc2626'; st.textContent = 'Lỗi lưu: ' + e.message; }
 }

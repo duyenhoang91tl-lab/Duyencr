@@ -223,7 +223,7 @@ function fuSourceAllowed_(source, list) {
 //   fuSources = cac tu khoa nguon don, cach nhau dau phay (vd 'landipage,messenger,web,renew'; khop chua-chuoi, khong phan biet hoa thuong). Rong -> mac dinh FU_SOURCES.
 // Mac dinh GIONG HET hanh vi cu, nen khong doi gi cho den khi co nguoi dat. Loi doc Settings -> dung mac dinh.
 function _fuConfig_() {
-  var cfg = { start: FU_START, sources: FU_SOURCES.slice() };
+  var cfg = { start: FU_START, sources: FU_SOURCES.slice(), offDays: {} };
   try {
     var raw = String(getSetting_('fuStart') || '').trim(), m = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/), y, mo, dd;
     if (m) { y = Number(m[1]); mo = Number(m[2]); dd = Number(m[3]); }
@@ -235,6 +235,8 @@ function _fuConfig_() {
     }
     var src = String(getSetting_('fuSources') || '').split(',').map(function (x) { return x.trim().toLowerCase(); }).filter(Boolean);
     if (src.length) cfg.sources = src;
+    // fuOffDays = cac MOC (so ngay) TAM TAT, cach nhau dau phay (vd '14,60'): mau tin van giu, chi khong quet moc do. Rong = bat het.
+    String(getSetting_('fuOffDays') || '').split(',').forEach(function (x) { var n = parseInt(x, 10); if (n > 0) cfg.offDays[n] = true; });
   } catch (e) {}
   return cfg;
 }
@@ -493,6 +495,8 @@ function runFollowUpScan_() {
   if (!Object.keys(fuDaysSet).length) {
     for (var fci = 0; fci < FU_CHECKPOINTS.length; fci++) fuDaysSet[FU_CHECKPOINTS[fci]] = true;
   }
+  // Moc bi admin tat (Settings fuOffDays) -> bo khoi tap moc se quet
+  Object.keys(fuCfg.offDays || {}).forEach(function (od) { delete fuDaysSet[od]; });
 
   // Doc CareData 1 lan: phone -> { cs phu trach, cac nick Zalo da ket ban }
   var careMap = {};
