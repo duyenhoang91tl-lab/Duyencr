@@ -131,6 +131,7 @@ function _maybeRefreshOpenDp() {
 }
 
 function openDp(phone) {
+  if (typeof _dpAutoFlush_ === 'function') _dpAutoFlush_(true);   // lưu nốt KH đang mở (nếu còn thay đổi chờ lưu) TRƯỚC khi đổi sang KH khác
   currentPhone = phone;
   _dpDirty = false;
   const _hint = document.getElementById('dp-refresh-hint'); if (_hint) _hint.remove();
@@ -153,6 +154,7 @@ function openDp(phone) {
 }
 
 function renderDpTab(tab) {
+  if (typeof _dpAutoFlush_ === 'function') _dpAutoFlush_(false);
   currentDpTab = tab;
   _dpDirty = false;
   const c = allCustomers.find(x=>x.phone===currentPhone);
@@ -168,6 +170,7 @@ function renderDpTab(tab) {
 }
 
 function switchDpTab(tab, el) {
+  if (typeof _dpAutoFlush_ === 'function') _dpAutoFlush_(false);
   currentDpTab = tab;
   _dpDirty = false;
   document.querySelectorAll('.dp-tab').forEach(t=>t.classList.remove('active'));
@@ -185,8 +188,10 @@ function renderCareTab(c) {
   const care = careData[c.phone] || {};
   const allCS = [...new Set(allCustomers.flatMap(x=>x.orders.map(o=>o.cs)).filter(Boolean))].sort();
   const today = _ymd(new Date());
-  return `<div class="dp-section">
-    <div class="dp-stitle">Thông tin chăm sóc</div>
+  // MENU gập (yêu cầu Duyên 2026-10-11): "Thông tin chăm sóc" + "Lịch chăm sóc nhanh" là 2 mục của 1 menu, chỉ mở 1 mục một lúc (dpAccToggle)
+  const _schedCnt = [care.schedGoi, care.schedSP, care.schedCS, care.schedHen].filter(Boolean).length;
+  return `<div class="dp-section dp-acc ${_dpAccOpen==='care'?'open':''}" data-acc="care">
+    <div class="dp-stitle dp-acc-h" onclick="dpAccToggle(this)"><span>👤 Thông tin chăm sóc</span><span class="dp-acc-arrow">▾</span></div>
     <div class="form-row-2">
       <div>
         <div class="form-label fld-lbl" data-fld="cs">${esc(FIELD_LABEL_CS)}${_fieldEditBtn('cs')}</div>
@@ -323,10 +328,11 @@ function renderCareTab(c) {
       </div>
       <input type="hidden" id="cs-note" value="${esc(care.note||c.careNote||'')}">
     </div>
-    <button class="save-btn" data-phone="${esc(c.phone)}" onclick="saveCare(this.dataset.phone)">💾 Lưu tình trạng ${gsUrl?'+ Sync GSheets':''}</button>
+    <div class="dp-autosave" title="Hệ thống tự lưu và tự đồng bộ — không cần bấm nút">✓ Tự động lưu</div>
+    <button class="save-btn" id="cs-save-btn" style="display:none" data-phone="${esc(c.phone)}" onclick="_dpConfirmChotSave_(this.dataset.phone)">✅ Xác nhận lưu trạng thái chốt</button>
   </div>
-  <div class="dp-section">
-    <div class="dp-stitle">📅 Lịch chăm sóc nhanh</div>
+  <div class="dp-section dp-acc ${_dpAccOpen==='sched'?'open':''}" data-acc="sched">
+    <div class="dp-stitle dp-acc-h" onclick="dpAccToggle(this)"><span>📅 Lịch chăm sóc nhanh${_schedCnt?` <span class="dp-acc-cnt">${_schedCnt}</span>`:''}</span><span class="dp-acc-arrow">▾</span></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
       <div style="background:var(--blue-bg);border:1px solid var(--blue-b);border-radius:7px;padding:8px">
         <div class="form-label" style="color:var(--blue);margin-bottom:4px">📞 Hẹn gọi</div>
@@ -349,7 +355,7 @@ function renderCareTab(c) {
         <input class="form-input" style="margin-top:4px" id="sched-hen-note" placeholder="Sản phẩm / lý do..." value="${esc(care.schedHenNote||'')}">
       </div>
     </div>
-    <button class="save-btn" style="background:var(--blue);border-color:var(--blue)" data-phone="${esc(c.phone)}" onclick="saveCareSchedules(this.dataset.phone)">💾 Lưu lịch hẹn ${gsUrl?'+ Sync GSheets':''}</button>
+    <div class="dp-autosave" title="Hệ thống tự lưu và tự đồng bộ — không cần bấm nút">✓ Tự động lưu</div>
   </div>
   ${(()=>{
     const daoOrders = c.orders.filter(o => _isDataDaoRenew(o.source));
@@ -922,7 +928,8 @@ function deleteNoteEntry(ev, btn, raw, idx) {
 // Báo cáo chia data: tỷ lệ phản hồi = KH có cờ / KH đã kết bạn Zalo ('Đã kết bạn').
 function _zaloReplyOf(c){ return !!(c && c.custom && c.custom.zaloReply); }
 function _zaloConnectedOf(c){ return !!c && c.zaloStatus === 'Đã kết bạn'; }
-function saveCare(phone) {
+function saveCare(phone, opts) {
+  const _quiet = !!(opts && opts.quiet);   // tự lưu: không toast, không vẽ lại danh sách ngay (dồn lại khi đóng panel)
   const existing = careData[phone] || {};
   const newStatus = document.getElementById('cs-status').value;
   const newZalo   = document.getElementById('cs-zalo').value;
@@ -970,7 +977,7 @@ function saveCare(phone) {
   const _now = Date.now();
   const _cUpdated = allCustomers.find(x=>x.phone===phone);
   if (_cUpdated) _cUpdated._lastActionDate = _now;
-  applyFilters();
+  if (_quiet) _dpAutoRefilter = true; else applyFilters();
   document.getElementById('dp-meta').innerHTML = `
     <span class="cphone" id="dp-phone-display">${phone}</span>
     <button data-phone="${esc(phone)}" onclick="copyPhone(this.dataset.phone)" title="Copy số điện thoại" style="background:none;border:1px solid var(--border-md);border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px;color:var(--muted);line-height:1.4" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">📋</button>
@@ -979,8 +986,9 @@ function saveCare(phone) {
     ${careBadge(careData[phone].status)}
     ${zaloBadge(careData[phone].zalo)}
     ${custStatusBadge(careData[phone].khStatus)}${cfBadges(phone)}`;
-  if (gsUrl) { queueCareSync(phone); toast('✓ Đã lưu'); }
-  else toast('✓ Đã lưu tình trạng (local)');
+  if (gsUrl) { queueCareSync(phone); if (!_quiet) toast('✓ Đã lưu'); }
+  else if (!_quiet) toast('✓ Đã lưu tình trạng (local)');
+  _dpAutoMark_('✓ Đã lưu ' + _dpHm_());
   // Ghi tên CS chăm sóc xuống OrderData cột N (chỉ khi CS chăm sóc thay đổi)
   if (gsUrl && (existing.cs||'') !== (newCS||'')) pushOrderCareCS(phone, newCS);
 }
@@ -1025,6 +1033,7 @@ function csAssignPick(e, v){
   var sel = document.getElementById('cs-assign'); if (sel) sel.value = v;
   var inp = document.getElementById('cs-assign-input'); if (inp) inp.value = v;
   csAssignClose();
+  if (sel) sel.dispatchEvent(new Event('change', { bubbles: true }));   // để tự lưu nhận ra đã đổi CS
 }
 function csAssignSyncInput(){
   var sel = document.getElementById('cs-assign'), inp = document.getElementById('cs-assign-input');
@@ -1099,6 +1108,7 @@ function addNickZaloChip(phone, sel) {
   if (chipsEl) chipsEl.innerHTML = _renderNickZaloChips(arr, phone);
   // Reset select
   if (sel) sel.value = '';
+  if (typeof _dpAutoSaveSoon_ === 'function') _dpAutoSaveSoon_('care', 400);
 }
 
 function removeNickZaloChip(phone, idx) {
@@ -1109,6 +1119,7 @@ function removeNickZaloChip(phone, idx) {
   if (hidEl) hidEl.value = JSON.stringify(arr);
   var chipsEl = document.getElementById('cs-nickzalo-chips');
   if (chipsEl) chipsEl.innerHTML = _renderNickZaloChips(arr, phone);
+  if (typeof _dpAutoSaveSoon_ === 'function') _dpAutoSaveSoon_('care', 400);
 }
 
 // ── Modal quản lý danh sách Nick Zalo ──
@@ -1211,3 +1222,75 @@ async function deleteNickZaloFromList(idx) {
   } catch(e) { toast('⚠ Xóa cục bộ nhưng lưu máy chủ lỗi: ' + e.message); }
 }
 
+
+
+// ═══════════════════════════════════════════════════════
+//  MENU GẬP + TỰ ĐỘNG LƯU của panel chi tiết KH (yêu cầu Duyên 2026-10-11)
+//  NGUYÊN NHÂN GỐC: 2 khối (Thông tin chăm sóc + Lịch chăm sóc nhanh) luôn mở chiếm hết màn hình điện thoại và phải bấm
+//  2 nút "Lưu ... + Sync GSheets" — nút chỉ lưu local rồi tự xếp hàng gửi GAS (queueCareSync), nhãn "Sync GSheets" gây hiểu nhầm là phải đồng bộ tay.
+//  Giờ: gập mở bằng dpAccToggle (1 mục mở một lúc); sửa xong ~1 giây thì tự gọi lại đúng saveCare / saveCareSchedules (cùng đường ghi cũ).
+//  Riêng đổi sang trạng thái "chốt" (tạo đơn chốt) KHÔNG tự lưu — phải bấm "Xác nhận lưu trạng thái chốt".
+// ═══════════════════════════════════════════════════════
+var _dpAccOpen = 'care';          // mục đang mở của menu ('care' | 'sched' | '' = đóng hết)
+var _dpAutoTimer = null, _dpAutoPhone = '', _dpAutoPending = {}, _dpAutoRefilter = false;
+function dpAccToggle(h) {
+  var sec = h && h.closest ? h.closest('.dp-acc') : null; if (!sec) return;
+  var willOpen = !sec.classList.contains('open');
+  document.querySelectorAll('#dp-body .dp-acc').forEach(function (x) { x.classList.remove('open'); });
+  if (willOpen) { sec.classList.add('open'); _dpAccOpen = sec.getAttribute('data-acc') || ''; } else _dpAccOpen = '';
+}
+function _dpHm_() { var d = new Date(); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
+function _dpAutoMark_(msg, warn) {
+  document.querySelectorAll('#dp-body .dp-autosave').forEach(function (el) { el.textContent = msg; el.classList.toggle('warn', !!warn); });
+}
+function _dpAutoSaveSoon_(kind, delay) {
+  if (!currentPhone || !kind) return;
+  if (_dpAutoPhone && _dpAutoPhone !== currentPhone) _dpAutoFlush_(false);
+  _dpAutoPhone = currentPhone; _dpAutoPending[kind] = true;
+  _dpAutoMark_('⏳ Đang chờ lưu…');
+  if (_dpAutoTimer) clearTimeout(_dpAutoTimer);
+  _dpAutoTimer = setTimeout(function () { _dpAutoFlush_(false); }, delay || 1000);
+}
+// finish=true (đóng panel / mở KH khác): sau khi lưu mới vẽ lại danh sách 1 lần nếu có đổi (tránh vẽ lại 130k dòng sau mỗi lần tự lưu)
+function _dpAutoFlush_(finish) {
+  if (_dpAutoTimer) { clearTimeout(_dpAutoTimer); _dpAutoTimer = null; }
+  var ph = _dpAutoPhone, pend = _dpAutoPending; _dpAutoPending = {};
+  if (ph && (pend.care || pend.sched)) {
+    try {
+      if (pend.care && document.getElementById('cs-status')) {
+        var ex = careData[ph] || {}, st = document.getElementById('cs-status').value;
+        var becomingChot = (typeof _hIsChot_ === 'function') && _hIsChot_(st) && (ex.status || '') !== st;
+        if (becomingChot) {
+          var b = document.getElementById('cs-save-btn'); if (b) b.style.display = '';
+          _dpAutoMark_('⚠ Trạng thái chốt chưa lưu — bấm "Xác nhận lưu trạng thái chốt"', true);
+        } else {
+          var b2 = document.getElementById('cs-save-btn'); if (b2) b2.style.display = 'none';
+          saveCare(ph, { quiet: true });
+        }
+      }
+      if (pend.sched && document.getElementById('sched-goi-date')) saveCareSchedules(ph, { quiet: true });
+    } catch (e) { console.warn('Tự lưu lỗi:', e); _dpAutoMark_('⚠ Tự lưu lỗi — thử lại hoặc tải lại trang', true); }
+  }
+  if (finish && _dpAutoRefilter) { _dpAutoRefilter = false; try { applyFilters(); } catch (e) {} }
+}
+function _dpConfirmChotSave_(phone) {
+  saveCare(phone);   // lưu thường (có toast) — tạo đơn chốt như cũ
+  var b = document.getElementById('cs-save-btn'); if (b) b.style.display = 'none';
+}
+(function _initDpAutoSave_() {
+  function wire() {
+    var body = document.getElementById('dp-body'); if (!body || body._autoSaveWired) return; body._autoSaveWired = true;
+    var SKIP = { 'cs-note-new': 1, 'cs-assign-input': 1, 'cs-tag': 1 };   // ô ghi chú mới (nút Thêm), ô gõ tìm CS (chọn mới tính), nhãn (onTagChange tự lưu)
+    function onEdit(ev) {
+      var t = ev.target; if (!t || !t.closest) return;
+      var sec = t.closest('.dp-acc'); if (!sec) return;
+      var id = t.id || '';
+      if (SKIP[id] || id.indexOf('remind-') === 0 || id.indexOf('cs-zalophone-') === 0) return;
+      _dpAutoSaveSoon_(sec.getAttribute('data-acc'), ev.type === 'change' ? 500 : 1200);
+    }
+    body.addEventListener('input', onEdit); body.addEventListener('change', onEdit);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire); else wire();
+  document.addEventListener('visibilitychange', function () { if (document.hidden) _dpAutoFlush_(false); });
+  window.addEventListener('pagehide', function () { _dpAutoFlush_(false); });
+})();

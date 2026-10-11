@@ -83,6 +83,7 @@ function addZaloPhoneChip(phone) {
   if (selEl) selEl.innerHTML = _buildZaloPhoneOptions(phone, arr);
   var chipsEl = document.getElementById('cs-zalophone-chips');
   if (chipsEl) chipsEl.innerHTML = _renderZaloPhoneChips(arr, phone);
+  if (typeof _dpAutoSaveSoon_ === 'function') _dpAutoSaveSoon_('care', 400);
 }
 function removeZaloPhoneChip(phone, idx) {
   if (!_zaloPhoneCanAdd()) { toast('Bạn không có quyền sửa SĐT Zalo.'); return; }
@@ -94,6 +95,7 @@ function removeZaloPhoneChip(phone, idx) {
   if (selEl) selEl.innerHTML = _buildZaloPhoneOptions(phone, arr);
   var chipsEl = document.getElementById('cs-zalophone-chips');
   if (chipsEl) chipsEl.innerHTML = _renderZaloPhoneChips(arr, phone);
+  if (typeof _dpAutoSaveSoon_ === 'function') _dpAutoSaveSoon_('care', 400);
 }
 
 // ── Modal Admin: khoa/mo truong SDT Zalo + cho phep Sale them hay khong ──
@@ -622,8 +624,11 @@ function addCustomRemind(phone) {
   toast('✓ Đã thêm lịch "' + labelFinal + '" · ' + date);
 }
 
-function saveCareSchedules(phone) {
+function saveCareSchedules(phone, opts) {
+  const _quiet = !!(opts && opts.quiet);   // tự lưu: không toast; không đổi gì thì bỏ qua (khỏi ghi nhật ký/gửi máy chủ thừa)
   const existing = careData[phone] || {};
+  const _schedSig = function (o) { return JSON.stringify([o.schedGoi, o.schedGoiNote, o.schedSP, o.schedSPNote, o.schedCS, o.schedCSNote, o.schedHen, o.schedHenNote].map(function (x) { return x || ''; })); };
+  const _before = _schedSig(existing);
   careData[phone] = {
     ...existing,
     schedGoi: document.getElementById('sched-goi-date')?.value || '',
@@ -651,6 +656,7 @@ function saveCareSchedules(phone) {
       schedules.push(Object.assign({id:Date.now()+'_'+f.type, phone, type:f.type, date:d, note:careData[phone][f.noteKey]||'', done:false}, _remOwnerStamp()));
     }
   }
+  if (_quiet && _schedSig(careData[phone]) === _before) { if (typeof _dpAutoMark_ === 'function') _dpAutoMark_('✓ Đã lưu ' + _dpHm_()); return; }
   saveLS('ome_care', careData);
   saveLS('ome_schedules', schedules);
   saveLS('ome_sched', schedules);
@@ -659,8 +665,9 @@ function saveCareSchedules(phone) {
   updateSchedBadges();
   // Cập nhật ngay panel "Nhắc hẹn" (không chờ chu kỳ làm mới 60s)
   if (typeof renderReminderPanel === 'function') renderReminderPanel();
-  if (gsUrl) { queueCareSync(phone); toast('✓ Đã lưu lịch hẹn'); }
-  else toast('✓ Đã lưu lịch hẹn (local)');
+  if (gsUrl) { queueCareSync(phone); if (!_quiet) toast('✓ Đã lưu lịch hẹn'); }
+  else if (!_quiet) toast('✓ Đã lưu lịch hẹn (local)');
+  if (typeof _dpAutoMark_ === 'function') _dpAutoMark_('✓ Đã lưu ' + _dpHm_());
 }
 
 
@@ -958,8 +965,10 @@ function delSched(id) {
 }
 
 function closeDp(e) {
-  if (!e || e.target===document.getElementById('dp-overlay'))
+  if (!e || e.target===document.getElementById('dp-overlay')) {
+    if (typeof _dpAutoFlush_ === 'function') _dpAutoFlush_(true);   // lưu nốt thay đổi chờ lưu rồi vẽ lại danh sách 1 lần
     document.getElementById('dp-overlay').classList.remove('open');
+  }
 }
 
 // ═══════════════════════════════════════════════════════

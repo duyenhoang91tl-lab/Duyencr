@@ -842,3 +842,14 @@ body.lov-open .lov-bar .lov-arrow{transform:rotate(180deg);}
 body.lov-on-list:not(.lov-open) .stats-row,body.lov-on-list:not(.lov-open) #tab-list > .toolbar{display:none !important;}
 
 body.ov-mode .lov-bar,body.rpt-mode .lov-bar{display:none !important;}
+
+/* ── Panel chi tiết KH: menu gập + tự lưu (2026-10-11) ── */
+.dp-acc > .dp-acc-h{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;margin-bottom:0;}
+.dp-acc.open > .dp-acc-h{margin-bottom:8px;}
+.dp-acc:not(.open) > :not(.dp-acc-h){display:none !important;}
+.dp-acc .dp-acc-arrow{transition:transform .15s;color:var(--muted);}
+.dp-acc.open .dp-acc-arrow{transform:rotate(180deg);}
+.dp-acc .dp-acc-cnt{display:inline-block;min-width:16px;padding:0 5px;border-radius:9px;background:var(--blue);color:#fff;font-size:10px;font-weight:700;text-align:center;line-height:16px;margin-left:4px;}
+.dp-autosave{font-size:11px;color:var(--muted);text-align:right;margin-top:6px;}
+.dp-autosave.warn{color:#b45309;font-weight:600;text-align:left;}
+
