@@ -1,12 +1,13 @@
 # 01 — Quy tắc bắt buộc & Deploy
 
-## Deploy — quan trọng nhất
-`gas_v13.js` chạy như Google Apps Script Web App. `git push` lên GitHub KHÔNG tự deploy bản đang chạy thật (nguyên nhân phổ biến nhất của "code đúng nhưng chưa chạy thật").
-
-**Sau khi sửa `gas_v13.js`, LUÔN nhắc người dùng:**
-1. Mở Apps Script Editor → dán đè toàn bộ `gas_v13.js` mới.
-2. Deploy → Manage deployments → chọn ĐÚNG deployment có URL extension đang gọi → ✏️ Edit → "New version" → Deploy.
-3. Đồng bộ mã cho nút "📋 Copy Apps Script Code" bằng "🔄 Đồng bộ mã GAS mới nhất" (xem mục dưới).
+## Deploy — ĐÃ TỰ ĐỘNG (chốt 2026-10-11, Duyên xác nhận): KHÔNG nhắc deploy nữa
+Push `main` là GitHub Actions tự đưa lên chỗ chạy thật (xem tab Actions; chi tiết: `docs/GAS-AUTO-DEPLOY.md`, `docs/CLOUDFLARE-SUPABASE-AUTO-DEPLOY.md`):
+- `gas_v13.js` / `gas/**` → workflow `deploy-gas.yml` (clasp, đúng deployment, URL không đổi).
+- `cloudflare/**` → `deploy-worker.yml` (Cloudflare Worker).
+- `supabase/**` → `deploy-supabase.yml` (áp `supabase/schema.sql`; file PHẢI idempotent).
+**Vì vậy KHÔNG nhắc Duyên:** dán code vào Apps Script, Manage deployments → New version, dán `worker.mjs`, chạy SQL trong Supabase, hay bấm "🔄 Đồng bộ mã GAS mới nhất" (nút Copy mã GAS chỉ là đường dự phòng thủ công; không ai còn dán tay). Chỉ cần: push → nói "đã đẩy, workflow tự deploy" + nếu đổi web thì "Ctrl+F5". Chỉ nhắc khi workflow ĐỎ/không chạy (xem Actions) — khi đó mới hướng dẫn xử lý.
+Vẫn phải nhắc những việc workflow KHÔNG làm được: chạy hàm cần bấm tay trong Apps Script Editor (vd `xemKhoaExtension`, backfill/đối chiếu Supabase, `xoaSdtLoiThat`), đổi Script Properties, **reload extension** trong `chrome://extensions` khi sửa extension.
+Sau khi sửa `gas_v13.js` vẫn PHẢI chạy `node tools/split-gas.js` rồi `--check` (workflow cũng tự sinh lại, nhưng commit phải khớp).
 
 **Sau khi sửa JS/CSS của extension:** nhắc reload extension trong `chrome://extensions` (không cần deploy riêng).
 
@@ -18,11 +19,11 @@ Cả 2 extension gọi chung 1 URL GAS.
 - `grep -c 'gas-code-v9' index.html` = **0** → khối inline đó ĐÃ XOÁ. KHÔNG còn quy tắc "khối gas-code-v9 phải khớp 100% gas_v13.js" — đừng dò lại, đừng thêm khối đó vào lại.
 - Nút "📋 Copy Apps Script Code" gọi `action=getGasSource` (đọc các chunk trong Settings: `gasSourceChunk_N`, `gasSourceChunkCount`, `gasSourceUpdatedAt`; ghi bởi `action=setGasSource` → `setGasSource_`). Client cache `_gasSrcCache` theo phiên, tự xoá sau khi sync.
 - Từ v13.19: `getGasSource`/`setGasSource` BẮT BUỘC có `adminKey` (= giá trị dòng `adminKey` trong sheet Settings; app hỏi 1 lần/máy, lưu `ome_admin_key`). Chưa đặt dòng đó = không ai lấy/đồng bộ được mã. Tài khoản test (role `demo`): xem `docs/TAI-KHOAN-TEST.md`.
-- Vì vậy sau khi sửa `gas_v13.js` và người dùng đã deploy, BẮT BUỘC nhắc thêm bước (Admin): mở modal Google Sheets trong CRM → "🔄 Đồng bộ mã GAS mới nhất" → dán toàn bộ `gas_v13.js` → "🔄 Đồng bộ". Không làm bước này thì nút Copy vẫn trả mã cũ.
+- (Từ 2026-10-11 deploy tự động nên KHÔNG còn bắt buộc nhắc bước này; chỉ cần khi Duyên chủ động muốn nút Copy trả mã mới.)
 
 ## 13 quy tắc bắt buộc khi sửa code
 1. Luôn clone repo MỚI NHẤT bằng token người dùng gửi trong tin nhắn đó (không dùng lại token cũ). Đọc kỹ file liên quan (view/grep) trước khi sửa.
-2. Sửa `gas_v13.js` → nhắc deploy thủ công (mục trên).
+2. Sửa `gas_v13.js` → chạy `split-gas` + `--check`, push; deploy TỰ ĐỘNG, KHÔNG nhắc deploy/đồng bộ mã (mục trên).
 3. Sửa JS/CSS extension → nhắc reload extension.
 4. Trước khi commit luôn syntax-check: `node -c` cho file `.js`; với client Sasum: `for f in js/*.js; do node -c $f; done` (code client đã tách khỏi `index.html` ra `js/`); khối `<script>` inline còn lại trong `index.html` (nhỏ, <40 dòng) check bằng Function constructor trong Node, bỏ qua `type="text/plain"`. Không commit code chưa kiểm tra.
 5. Push bị "rejected" (nhiều phiên cùng sửa): `git fetch` → `git rebase origin/main` → kiểm tra thay đổi của mình còn nguyên → push lại. KHÔNG force-push.
@@ -33,12 +34,12 @@ Cả 2 extension gọi chung 1 URL GAS.
 10. Token GitHub người dùng dán: chỉ dùng cho đúng thao tác, KHÔNG lưu đâu cả. Thấy dán nhiều lần → nhắc nhẹ nên revoke/tạo token mới.
 11. Phát hiện quy ước/lỗi mới đáng nhớ → đề xuất cập nhật đúng file KB.
 12. Làm xong phần nào push ngay phần đó (từng mục nhỏ) kèm việc cần làm tiếp, để phiên khác tiếp tục được.
-13. Sửa `gas_v13.js` → nhắc 2 việc: (a) deploy lại GAS; (b) bước "🔄 Đồng bộ mã GAS mới nhất" trong modal Google Sheets (mục trên). Không còn khối `gas-code-v9` để đồng bộ trong `index.html`.
+13. (Đã thay 2026-10-11) Sửa `gas_v13.js`/`cloudflare/`/`supabase/` → KHÔNG nhắc deploy GAS / Worker / Supabase / đồng bộ mã: đã tự động qua GitHub Actions. Chỉ báo "workflow tự deploy" + Ctrl+F5 nếu đổi web; chỉ nhắc khi workflow đỏ hoặc cần chạy hàm tay. Không còn khối `gas-code-v9`.
 
 ## Checklist trước khi báo "đã xong"
 1. Đã grep hết mọi nơi gọi hàm vừa sửa chưa?
 2. Đã test bằng ví dụ thật (không chỉ đọc code suy luận) chưa?
-3. Cần nhắc deploy lại GAS không?
+3. (Deploy GAS/Worker/Supabase tự động — KHÔNG nhắc.) Workflow có đỏ không (tab Actions)?
 4. Cần nhắc reload extension không?
 5. Thay đổi ảnh hưởng cả 2 extension hay chỉ 1 (nhiều hàm dùng chung backend)?
 6. Đã push + ghi "việc cần làm tiếp" chưa?
@@ -49,4 +50,4 @@ Cả 2 extension gọi chung 1 URL GAS.
 - Nút cài đặt admin của tab báo cáo gom vào 1 dropdown "⚙ Cài đặt" (`.gear-menu`/`.gear-menu-list` + `_srToggleGearMenu()`/`closeGearMenus()`), đã áp cho Báo cáo E — theo mẫu này nếu thêm chỗ khác.
 
 ## Instruction của Project (rule 13)
-Rule 13 trong Instruction của Project nên ghi đúng như trên: "Sau khi sửa gas_v13.js: nhắc deploy lại GAS VÀ nhắc bước 'Đồng bộ mã GAS mới nhất' trong modal Google Sheets." (Không còn nhánh 'khối gas-code-v9'.)
+Instruction của Project (rule 2 và 13) cần SỬA cho khớp: "Deploy GAS/Worker/Supabase đã tự động qua GitHub Actions — không nhắc deploy/đồng bộ mã nữa; chỉ nhắc reload extension, Ctrl+F5 web, hoặc hàm cần chạy tay." (Claude không sửa được Instruction — Duyên cập nhật ở Project settings.)
