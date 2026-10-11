@@ -16,6 +16,13 @@ const ctx = { SpreadsheetApp: svc(), CacheService: svc(), PropertiesService: svc
 vm.createContext(ctx);
 vm.runInContext(src, ctx, { filename: 'gas_v13.js' });
 
+// ---- Quy tac loai don cua POS (Duyen xac nhan 10/2026, commit 711bd52 + 7c8504e): CHI loai 'Hủy đơn', 'Hoàn đơn', 'Đang hoàn' (khop CA chuoi,
+// khong dau, khong phan biet hoa/thuong). Truoc do test dung 'Đã hoàn' (quy tac cu) nen sau khi doi quy tac don H bi tinh -> 10 don thay vi 9.
+const excl = t => vm.runInContext('_donHasExcludedStatus_(' + JSON.stringify(t) + ')', ctx);
+ok(excl('Hủy đơn') && excl('Hoàn đơn') && excl('Đang hoàn'), 'POS loai dung 3 trang thai: Huy don, Hoan don, Dang hoan');
+ok(excl('HOÀN ĐƠN') && excl('  hoan don '), 'khop khong dau/khong phan biet hoa-thuong, bo khoang trang');
+ok(!excl('Hoàn thành') && !excl('') && !excl('Đã hoàn') && !excl('Đã hủy'), 'trang thai khac (Hoan thanh, rong, Da hoan, Da huy) KHONG bi loai — theo dung quy tac 3 trang thai');
+
 // ---- du lieu gia cho phan DOC sheet (ghi de sau khi nap) ----
 let DON = [];
 vm.runInContext(`
@@ -38,9 +45,9 @@ const row = (ngay, phone, the, trangThai, gia, extra) => Object.assign({ ngayTao
 // ===== Bo du lieu 1: dap an biet truoc =====
 // Ky loc: 2026-10-05 .. 2026-10-10.   (khach cu = co don hop le TRUOC ngay cua don dang xet)
 setDon([
-  // lich su (ngoai ky): khach 0901 mua 01/09 (hop le), khach 0902 chi co don "Đã hoàn" 02/09 (KHONG tinh la da mua), khach 0903 mua 20/09
+  // lich su (ngoai ky): khach 0901 mua 01/09 (hop le), khach 0902 chi co don "Hoàn đơn" 02/09 (KHONG tinh la da mua), khach 0903 mua 20/09
   row('01/09/2026', '0901111111', 'anhNP1999', 'Hoàn thành', 1000000),
-  row('02/09/2026', '0902222222', 'anhNP1999', 'Đã hoàn', 500000),
+  row('02/09/2026', '0902222222', 'anhNP1999', 'Hoàn đơn', 500000),
   row('20/09/2026', '0903333333', 'dungnguyen1995', 'Hoàn thành', 700000),
   // trong ky
   row('05/10/2026', '0901111111', 'anhNP1999', 'Hoàn thành', 2000000),                      // A: khach cu (01/09) -> BAN LAI, 1 sale
@@ -50,7 +57,7 @@ setDon([
   row('09/10/2026', '0905555555', 'dungnguyen1995', 'Hoàn thành', 500000),                  // E: khach moi
   row('09/10/2026', '0905555555', 'dungnguyen1995', 'Hoàn thành', 600000),                  // F: CUNG NGAY voi don dau -> van la khach MOI (khong tinh ban lai)
   row('07/10/2026', '', 'anhNP1999', 'Hoàn thành', 800000),                                 // G: khong co SDT -> khong xep loai
-  row('07/10/2026', '0906666666', 'anhNP1999', 'Đã hoàn', 900000),                          // H: don hoan trong ky
+  row('07/10/2026', '0906666666', 'anhNP1999', 'Hoàn đơn', 900000),                         // H: don hoan trong ky
   row('10/10/2026', '0907777777', 'dungnguyen1995', 'Đang hoàn', 400000),                   // I: dang hoan trong ky
   row('10/10/2026', '0903333333', 'dungnguyen1995', 'Hoàn thành', 1500000),                 // J: khach cu (20/09) -> BAN LAI
   // don tach: 2 phan cung ma, gop thanh 1 don 06/10, khach 0908 chua mua truoc -> MOI
