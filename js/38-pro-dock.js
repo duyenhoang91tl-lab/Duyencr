@@ -73,6 +73,94 @@ var PRO_AI_SUGGEST = {
   sales: ['Tóm tắt doanh số kỳ này', 'Ai cần hỗ trợ nhất và vì sao?', 'Điểm đáng chú ý nhất là gì?']
 };
 
+
+// ── Trả lời THÔ theo quy tắc (không gọi AI, không cần key) ──
+// PRO_AI_ENGINE: 'rule' = tự tóm tắt từ số liệu (mặc định, số luôn đúng); 'ai' = gọi GAS action=ai + crmAsk (cần key AI trong Settings).
+var PRO_AI_ENGINE = 'rule';
+function proNorm_(t){ return String(t==null?'':t).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'d').toLowerCase(); }
+function proIntent_(mode, q){
+  var n = proNorm_(q);
+  if (mode==='customer'){
+    if (/tin nhan|nhan tin|soan|noi gi|zalo|tin mau/.test(n)) return 'message';
+    if (/lam gi|tiep theo|\bviec\b|\bnen\b|uu tien|cham soc|hanh dong/.test(n)) return 'next';
+    if (/tom tat|tong quan|thong tin|tinh hinh|khach nay/.test(n)) return 'summary';
+    return '';
+  }
+  if (/ho tro|ai can|\byeu\b|\bkem\b|thap|keo|chua dat/.test(n)) return 'support';
+  if (/dang chu y|noi bat|bat thuong|chu y|nhan xet|diem /.test(n+' ')) return 'notable';
+  if (/tom tat|tong quan|ky nay|tinh hinh|doanh so|doanh thu/.test(n)) return 'summary';
+  return '';
+}
+var PRO_RULE_HELP = 'Chế độ trả lời thô (theo quy tắc, không dùng AI) chưa hiểu câu này. Hãy bấm một gợi ý bên dưới.';
+function proRuleCustomer_(intent, c, D, days, rev, now){
+  now = now || new Date();
+  var name = c.name || 'Khách', today = proYmdOf_(now);
+  var pend = proNextActions_(D.mine, c.phone, today, D.types, 100), over = pend.filter(function(x){ return x.state==='over'; }), td = pend.filter(function(x){ return x.state==='today'; });
+  var status = (D.care && D.care.status) || c.careStatus || '';
+  var hasDays = days!==null && days!==undefined;
+  var lastNote = (D.notes||[]).filter(function(n){ return n && n.text; });
+  lastNote = lastNote.length ? lastNote[0] : null;
+  if (intent==='summary'){
+    var L = [name+(c.tier?' (hạng '+c.tier+')':'')+' · tình trạng CS: '+(status||'chưa gán')+'.'];
+    L.push((D.nOrd||0)>0 ? 'Đã mua '+D.nOrd+' đơn, tổng '+proMoney_(rev)+(hasDays?'; đơn gần nhất cách '+days+' ngày.':'.') : 'Chưa có đơn nào.');
+    L.push(pend.length ? 'Lịch chưa xong: '+pend.length+(over.length?' ('+over.length+' quá hạn)':'')+'; gần nhất '+proDmy_(pend[0].date).slice(0,5)+' — '+pend[0].label+'.' : 'Chưa có lịch hẹn nào đang chờ.');
+    if (lastNote) L.push('Ghi chú gần nhất: '+String(lastNote.text).replace(/\s+/g,' ').slice(0,140));
+    return L.join('\n');
+  }
+  if (intent==='next'){
+    var B = [];
+    if (over.length) B.push('Xử lý lịch QUÁ HẠN trước: '+over[0].label+' ngày '+proDmy_(over[0].date).slice(0,5)+(over.length>1?' (+'+(over.length-1)+' lịch quá hạn khác)':'')+'.');
+    if (td.length) B.push('Có lịch HÔM NAY: '+td[0].label+(td[0].note?' — '+String(td[0].note).slice(0,60):'')+'.');
+    if ((D.nOrd||0)===0) B.push('Chưa có đơn nào → ưu tiên tư vấn và chốt đơn đầu tiên.');
+    else if (hasDays && days>180) B.push('Đã '+days+' ngày chưa mua lại → nhắn/gọi hỏi nhu cầu, cân nhắc ưu đãi mua lại.');
+    else if (hasDays && days>90) B.push('Đã '+days+' ngày kể từ đơn cuối, sắp nguội → hỏi thăm sớm.');
+    if (!pend.length && (D.nOrd||0)>0) B.push('Chưa có lịch hẹn nào → đặt lịch nhắc mua lại/chăm sóc.');
+    if (!status) B.push('Chưa gán tình trạng CS → cập nhật sau khi liên hệ.');
+    return B.length ? B.slice(0,3).map(function(x){ return '• '+x; }).join('\n') : '• Chưa thấy việc gấp: không có lịch quá hạn, khách mua gần đây. Có thể hỏi thăm nhẹ sau vài ngày.';
+  }
+  if (intent==='message'){
+    var msg = (D.nOrd||0)===0 ? name+' ơi, em nhắn lại để hỗ trợ mình thêm về sản phẩm mình đang quan tâm ạ. Mình còn băn khoăn điểm nào để em giải đáp nhé?'
+      : (hasDays && days>=30) ? name+' ơi, em hỏi thăm mình dùng sản phẩm đã '+days+' ngày rồi, mình thấy thế nào ạ? Nếu mình cần dùng tiếp, em hỗ trợ ưu đãi mua lại cho mình nhé.'
+      : name+' ơi, mình dùng sản phẩm được mấy hôm rồi, mình thấy hiệu quả thế nào ạ? Có gì cần em hỗ trợ cứ nhắn em nhé.';
+    return 'Tin nhắn mẫu:\n"'+msg+'"\n(Mẫu theo số liệu — hãy chỉnh theo cuộc trò chuyện thực tế trước khi gửi.)';
+  }
+  return PRO_RULE_HELP;
+}
+function proRuleSales_(intent, s, d){
+  var c = s.company||{}, money = proMoney_, pc = function(v){ return v===null||v===undefined ? '—' : v+'%'; };
+  var people = (s.people||[]).slice().sort(function(a,b){ return (b.revenue||0)-(a.revenue||0); });
+  if (intent==='summary'){
+    var top = people.slice(0,3).map(function(p,i){ return (i+1)+'. '+p.name+' ('+money(p.revenue)+')'; }).join(' · ');
+    return [(s.label||'')+' · '+d.from+' → '+d.to+':', 'Doanh thu '+money(c.revenue)+' · '+(c.orders||0)+' đơn · TB/đơn '+money(c.aov)+'.',
+      '%KPI '+pc(c.pct)+' · tỷ lệ chốt '+pc(c.tyLeChot)+' · đơn thất bại '+(c.failed||0)+'.',
+      'Xếp loại: tốt '+(c.tot||0)+' · trung bình '+(c.trungbinh||0)+' · cần cải thiện '+(c.kem||0)+' · chưa đủ dữ liệu '+(c.chuadu||0)+'.'].concat(top?['Top: '+top]:[]).join('\n');
+  }
+  if (intent==='support'){
+    var low = people.filter(function(p){ return p.rating==='kem' || (p.pct!==null && p.pct!==undefined && p.pct<70); })
+      .sort(function(a,b){ var x = a.pct===null||a.pct===undefined?999:a.pct, y = b.pct===null||b.pct===undefined?999:b.pct; return x-y; }).slice(0,5);
+    if (!low.length) return 'Không ai đang dưới ngưỡng (xếp "cần cải thiện" hoặc %KPI dưới 70%) trong phạm vi này.'+((c.chuadu||0)?'\nCó '+c.chuadu+' người chưa đủ dữ liệu để đánh giá.':'');
+    return 'Cần hỗ trợ trước (xếp "cần cải thiện" hoặc %KPI dưới 70%):\n'+low.map(function(p){ return '• '+p.name+': '+money(p.revenue)+' · %KPI '+pc(p.pct)+' · chốt '+pc(p.tyLeChot)+' · thất bại '+(p.failedOrders||0); }).join('\n')+((c.chuadu||0)?'\n(+'+c.chuadu+' người chưa đủ dữ liệu)':'');
+  }
+  if (intent==='notable'){
+    var B = [], k = c.pct;
+    if (k!==null && k!==undefined) B.push(k>=100 ? 'Cả phạm vi đã ĐẠT KPI ('+k+'%).' : k>=70 ? 'KPI đang '+k+'% — gần đạt, còn thiếu '+(Math.round((100-k)*10)/10)+' điểm %.' : 'KPI mới '+k+'% — thấp, cần đẩy mạnh.');
+    if (people.length){ B.push('Dẫn đầu doanh thu: '+people[0].name+' ('+money(people[0].revenue)+').');
+      var total = people.reduce(function(a,p){ return a+(p.revenue||0); },0);
+      if (people.length>2 && total>0 && people[0].revenue/total>0.4) B.push('Doanh thu tập trung: '+people[0].name+' chiếm '+Math.round(people[0].revenue/total*100)+'% — phụ thuộc nhiều vào 1 người.');
+      var f = people.slice().sort(function(a,b){ return (b.failedOrders||0)-(a.failedOrders||0); })[0];
+      if (f && (f.failedOrders||0)>0) B.push('Nhiều đơn thất bại nhất: '+f.name+' ('+f.failedOrders+' đơn).'); }
+    if (c.tyLeChot!==null && c.tyLeChot!==undefined) B.push('Tỷ lệ chốt chung '+c.tyLeChot+'%.');
+    return B.length ? B.slice(0,4).map(function(x){ return '• '+x; }).join('\n') : 'Chưa đủ số liệu để nêu điểm đáng chú ý.';
+  }
+  return PRO_RULE_HELP;
+}
+function proRuleAnswer_(mode, question, X){
+  var intent = proIntent_(mode, question);
+  if (!intent) return PRO_RULE_HELP;
+  return mode==='customer' ? proRuleCustomer_(intent, X.c, X.D, X.days, X.rev, X.now) : proRuleSales_(intent, X.s, X.d);
+}
+function proAiNote_(){ return PRO_AI_ENGINE==='rule' ? 'Trả lời THÔ theo quy tắc từ số liệu hệ thống (không dùng AI, không cần key, không gửi dữ liệu đi đâu). Bấm gợi ý bên dưới.' : 'AI chỉ thấy số liệu bạn được phép xem, đã ẩn SĐT. Chỉ là gợi ý — hãy đối chiếu trước khi dùng.'; }
+
 // ── Giao diện (chỉ khi html.ui-pro) ──
 var _proDock = { tabs:[], mode:'', log:[], busy:false };
 function proDockOn_(){ return typeof document!=='undefined' && document.documentElement.classList.contains('ui-pro'); }
@@ -109,7 +197,7 @@ function proDockEnsure_(){
   var p = document.createElement('div'); p.id = 'pro-ai';
   p.innerHTML = '<div class="pro-ai-h"><b>🤖 Trợ lý AI</b><span class="pro-sp"></span><button type="button" data-ai="close" aria-label="Đóng">×</button></div>'
     + '<div class="pro-ai-modes"><button type="button" data-mode="customer">👤 Khách đang mở</button><button type="button" data-mode="sales">📊 Doanh số</button></div>'
-    + '<div class="pro-ai-note">AI chỉ thấy số liệu bạn được phép xem, đã ẩn SĐT. Chỉ là gợi ý — hãy đối chiếu trước khi dùng.</div>'
+    + '<div class="pro-ai-note">'+proEsc_(proAiNote_())+'</div>'
     + '<div class="pro-ai-log" id="pro-ai-log"></div><div class="pro-ai-sug" id="pro-ai-sug"></div>'
     + '<div class="pro-ai-in"><textarea id="pro-ai-q" rows="2" maxlength="600" placeholder="Hỏi về khách hoặc doanh số…"></textarea><button type="button" id="pro-ai-send" class="btn primary">Gửi</button></div>';
   document.body.appendChild(p);
@@ -145,17 +233,23 @@ function proAiContext_(){
   if (_proDock.mode==='customer'){
     var c = (typeof allCustomers!=='undefined' && typeof currentPhone!=='undefined') ? allCustomers.find(function(x){ return x.phone===currentPhone; }) : null;
     if (!c) return { error:'Chưa mở khách nào — mở hồ sơ một khách rồi hỏi lại.' };
-    return { text: proCustomerContext_(c, proProfileData_(c), proDaysSinceLastOrder_(c.orders, new Date()), _custRev_(c), new Date()) };
+    var D = proProfileData_(c), days = proDaysSinceLastOrder_(c.orders, new Date()), rev = _custRev_(c), now = new Date();
+    return { text: proCustomerContext_(c, D, days, rev, now), raw: { c:c, D:D, days:days, rev:rev, now:now } };
   }
   var d = (typeof _ov!=='undefined' && _ov) ? _ov.data : null;
   if (!d || typeof _ovScope!=='function') return { error:'Chưa có số liệu doanh số — mở màn 🏠 Tổng quan để tải trước, rồi hỏi lại.' };
-  return { text: proSalesContext_(_ovScope(d), d) };
+  var sc = _ovScope(d);
+  return { text: proSalesContext_(sc, d), raw: { s:sc, d:d } };
 }
 async function proAiSend_(){
   if (_proDock.busy) return;
   var q = document.getElementById('pro-ai-q'), question = (q.value||'').trim(); if (!question) return;
   var ctx = proAiContext_();
   if (ctx.error){ _proDock.log.push({ role:'bot', text:ctx.error }); proAiLogRender_(); return; }
+  if (PRO_AI_ENGINE==='rule'){
+    _proDock.log.push({ role:'user', text:question }); q.value = '';
+    _proDock.log.push({ role:'bot', text:proRuleAnswer_(_proDock.mode, question, ctx.raw), provider:'Quy tắc (không dùng AI)' }); proAiLogRender_(); return;
+  }
   _proDock.log.push({ role:'user', text:question }); q.value = ''; _proDock.busy = true;
   _proDock.log.push({ role:'bot', text:'⏳ Đang hỏi AI…' }); proAiLogRender_();
   var hist = _proDock.log.slice(0,-2).filter(function(m){ return m.text.indexOf('⏳')!==0; });
@@ -170,4 +264,4 @@ async function proAiSend_(){
   var init = function(){ try { proTabsLoad_(); proDockEnsure_(); proTabsRender_(); } catch(e){ console.warn('[ui-pro]',e); } };
   if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
-if (typeof module!=='undefined') module.exports = { proTabsAdd_, proTabsRemove_, proScrub_, proClip_, proCustomerContext_, proSalesContext_, proAskPrompt_, proAskRequest_, proAnswerHtml_ };
+if (typeof module!=='undefined') module.exports = { proIntent_, proRuleCustomer_, proRuleSales_, proRuleAnswer_, proNorm_, proTabsAdd_, proTabsRemove_, proScrub_, proClip_, proCustomerContext_, proSalesContext_, proAskPrompt_, proAskRequest_, proAnswerHtml_ };

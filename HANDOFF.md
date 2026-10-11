@@ -23,6 +23,8 @@ Mọi CSS mới nằm trong `css/06-pro.css`, mọi selector bắt đầu `html.
   - Quyền riêng tư: ngữ cảnh dựng ở web từ số liệu người dùng ĐƯỢC xem (khách đã mở; doanh số qua `_ovScope` theo vai trò) và ẨN SĐT (`proScrub_`: cả trong tên/ghi chú/lịch/câu hỏi). AI chỉ gợi ý, không ghi dữ liệu.
   - Doanh số cần đã tải màn 🏠 Tổng quan (dùng `_ov.data`); chưa tải thì panel hướng dẫn, không gọi AI.
   - `proProfileData_(c)` (js/33) là hàm gom dữ liệu 1 khách dùng chung cho hồ sơ 360° và trợ lý.
+  - **P4b — Engine "trả lời thô" (MẶC ĐỊNH, không cần key AI)**: `PRO_AI_ENGINE = 'rule'` (js/38). `proIntent_` nhận ý định từ câu hỏi (bỏ dấu + regex), `proRuleCustomer_` (tóm tắt / việc tiếp theo / tin nhắn mẫu) và `proRuleSales_` (tóm tắt / ai cần hỗ trợ / điểm đáng chú ý) tự viết câu từ số liệu — số luôn đúng, không gọi mạng, không gửi dữ liệu đi. Câu ngoài mẫu → báo chưa hiểu, mời bấm gợi ý. Đặt `PRO_AI_ENGINE = 'ai'` để dùng lại nhánh AI (cần key trong Settings, gas v13.32).
+  - **Việc tiếp theo (đã chốt với Duyên)**: làm chế độ DỰ PHÒNG — dùng AI khi có key, tự rơi về engine quy tắc khi chưa có key/AI lỗi (hiện chưa nối; chỉ cần gọi `proRuleAnswer_` khi `proAskRequest_` trả `ok:false`).
   - Chưa làm (tuỳ chọn): lưu lịch sử chat, hỏi đáp có quyền ghi (đặt lịch/ghi chú bằng AI), cache câu trả lời. Chưa xem thử trên trình duyệt thật (đã smoke test bằng jsdom, không commit vì cần cài jsdom).
 
 ## Ràng buộc
