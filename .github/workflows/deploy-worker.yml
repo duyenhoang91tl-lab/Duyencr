@@ -19,6 +19,10 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # Chạy mọi action JavaScript bằng Node 24 (Node 20 sắp bị GitHub bỏ). wrangler-action đã lên v4 (node24) nên biến này chỉ là lớp bảo hiểm.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -70,7 +74,7 @@ jobs:
 
       - name: Deploy Worker (giữ nguyên biến/secret đặt trên Dashboard)
         id: deploy
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
