@@ -110,8 +110,10 @@ function _fuResultDone(it, k, newDate){
   var label = _FU_RESULTS.filter(function(r){ return r.k === k; })[0].t.replace(/^\S+\s/, '');
   try {
     var logs = loadLS('ome_fu_results') || [];
-    logs.push({ id: it.id, phone: it.phone, due: it.date, doneAt: new Date().toISOString(), result: k,
-                by: (typeof currentUser !== 'undefined' && currentUser && currentUser.name) || '', note: it.note || '', redo: newDate || '' });
+    var entry = { id: it.id, phone: it.phone, due: it.date, doneAt: new Date().toISOString(), result: k,
+                by: (typeof currentUser !== 'undefined' && currentUser && currentUser.name) || '', note: it.note || '', redo: newDate || '' };
+    logs.push(entry);
+    _fuQueueResult(entry);
     if (logs.length > 3000) logs = logs.slice(-3000);
     saveLS('ome_fu_results', logs);
   } catch(e){}
@@ -132,4 +134,88 @@ function _fuResultDone(it, k, newDate){
 function _fuSuggestOpen(id){
   var it = (typeof schedules !== 'undefined' ? schedules : []).find(function(x){ return x.id === id; });
   if (it) _fuResultAsk(it);
+}
+
+// ── P2e: đẩy kết quả lên server (Supabase fu_results / sheet FuResults) + báo cáo đúng hạn/trễ ──
+function _fuQueueResult(entry){
+  try { var q = loadLS('ome_fu_pending') || []; q.push(entry); saveLS('ome_fu_pending', q.slice(-500)); } catch(e){}
+  _fuFlushResults();
+}
+async function _fuFlushResults(){
+  if (typeof gsUrl === 'undefined' || !gsUrl || _fuFlushResults._busy) return;
+  var q = loadLS('ome_fu_pending') || []; if (!q.length) return;
+  _fuFlushResults._busy = true;
+  try {
+    var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'saveFuResults', results: q.slice(0, 200) }) });
+    var j = await r.json();
+    if (j && j.ok) { var left = (loadLS('ome_fu_pending') || []).filter(function(x){ return q.slice(0,200).every(function(y){ return y.id !== x.id; }); }); saveLS('ome_fu_pending', left); }
+  } catch(e) { console.warn('_fuFlushResults', e); }
+  _fuFlushResults._busy = false;
+}
+setTimeout(_fuFlushResults, 4000);   // thử gửi lại các kết quả còn tồn (lần trước mất mạng)
+
+function _fuVnDay(iso){ var t = new Date(iso).getTime(); return isNaN(t) ? '' : new Date(t + 7*3600*1000).toISOString().slice(0,10); }
+function _fuRange(preset){
+  var n = new Date(Date.now() + 7*3600*1000), y = n.getUTCFullYear(), m = n.getUTCMonth(), d = n.getUTCDate(), dow = (n.getUTCDay() + 6) % 7;
+  function iso(dt){ return dt.toISOString().slice(0,10); }
+  function U(yy,mm,dd){ return new Date(Date.UTC(yy,mm,dd)); }
+  var today = U(y,m,d);
+  switch (preset) {
+    case 'yesterday': var yd = U(y,m,d-1); return [iso(yd), iso(yd)];
+    case 'week': return [iso(U(y,m,d-dow)), iso(today)];
+    case 'lastweek': return [iso(U(y,m,d-dow-7)), iso(U(y,m,d-dow-1))];
+    case 'month': return [iso(U(y,m,1)), iso(today)];
+    case 'lastmonth': return [iso(U(y,m-1,1)), iso(U(y,m,0))];
+    case 'quarter': return [iso(U(y,Math.floor(m/3)*3,1)), iso(today)];
+    case 'year': return [iso(U(y,0,1)), iso(today)];
+    default: return [iso(today), iso(today)];
+  }
+}
+async function openFuReport(){
+  var old = document.getElementById('fu-report-ov'); if (old) old.remove();
+  var ov = document.createElement('div');
+  ov.id = 'fu-report-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3000;display:flex;align-items:center;justify-content:center';
+  ov.innerHTML = '<div style="background:var(--surface);border-radius:12px;padding:16px 18px;width:min(760px,95vw);max-height:88vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.25)">' +
+    '<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><b style="flex:1">📞 Báo cáo chăm sóc theo mốc</b>' +
+    '<select id="fu-rp-preset" style="padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:12px">' +
+    '<option value="today">Hôm nay</option><option value="yesterday">Hôm qua</option><option value="week" selected>Tuần này</option><option value="lastweek">Tuần trước</option>' +
+    '<option value="month">Tháng này</option><option value="lastmonth">Tháng trước</option><option value="quarter">Quý này</option><option value="year">Năm nay</option></select>' +
+    '<button class="btn sm" id="fu-rp-close">Đóng</button></div>' +
+    '<div id="fu-rp-body" style="font-size:12px">Đang tải...</div></div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click', function(e){ if (e.target === ov) ov.remove(); });
+  ov.querySelector('#fu-rp-close').onclick = function(){ ov.remove(); };
+  var sel = ov.querySelector('#fu-rp-preset');
+  sel.onchange = function(){ _fuReportLoad(sel.value); };
+  _fuReportLoad(sel.value);
+}
+async function _fuReportLoad(preset){
+  var body = document.getElementById('fu-rp-body'); if (!body) return;
+  body.textContent = 'Đang tải...';
+  var rg = _fuRange(preset), rows = [];
+  try {
+    var sep = gsUrl.indexOf('?') > -1 ? '&' : '?';
+    var j = await (await fetch(gsUrl + sep + 'action=fuResults&from=' + rg[0] + '&to=' + rg[1], { redirect:'follow' })).json();
+    if (j && j.error) { body.textContent = j.error; return; }
+    rows = (j && j.results) || [];
+  } catch(e) { body.textContent = 'Lỗi tải: ' + e.message; return; }
+  var admin = (typeof _fuIsAdmin === 'function') ? _fuIsAdmin() : false;
+  var me = (typeof currentUser !== 'undefined' && currentUser && currentUser.name) || '';
+  if (!admin) rows = rows.filter(function(r){ return r.byUser === me; });
+  var by = {};
+  rows.forEach(function(r){
+    var u = r.byUser || '(không rõ)', o = by[u] || (by[u] = { n:0, ontime:0, late:0, contacted:0, nopick:0, refused:0, resched:0 });
+    o.n++; o[r.result] = (o[r.result] || 0) + 1;
+    var dd = _fuVnDay(r.doneAt); if (dd && r.due) { if (dd <= r.due) o.ontime++; else o.late++; }
+  });
+  var names = Object.keys(by).sort(function(a,b){ return by[b].n - by[a].n; });
+  if (!names.length) { body.innerHTML = '<div style="color:var(--muted)">Chưa có kết quả nào trong kỳ ' + rg[0] + ' → ' + rg[1] + ' (tính theo ngày đến hạn của việc).</div>'; return; }
+  var tot = { n:0, ontime:0, late:0, contacted:0, nopick:0, refused:0, resched:0 };
+  var tr = names.map(function(u){ var o = by[u]; Object.keys(tot).forEach(function(k){ tot[k] += o[k] || 0; });
+    return '<tr><td>' + esc(u) + '</td><td>' + o.n + '</td><td style="color:var(--green)">' + o.ontime + '</td><td style="color:var(--red)">' + o.late + '</td><td>' + (o.contacted||0) + '</td><td>' + (o.nopick||0) + '</td><td>' + (o.refused||0) + '</td><td>' + (o.resched||0) + '</td></tr>'; }).join('');
+  body.innerHTML = '<div style="color:var(--muted);margin-bottom:6px">Kỳ ' + rg[0] + ' → ' + rg[1] + ' (theo ngày đến hạn) · "Đúng hạn" = bấm Xong trong ngày đến hạn hoặc sớm hơn. Việc bị bỏ qua (chưa bấm Xong) chưa tính ở đây.</div>' +
+    '<table class="fu-rp" style="width:100%;border-collapse:collapse;text-align:center"><tr style="background:var(--surface2)"><th style="text-align:left;padding:5px">Người làm</th><th>Đã xong</th><th>Đúng hạn</th><th>Trễ</th><th>Đã liên hệ</th><th>Không nghe</th><th>Từ chối</th><th>Hẹn lại</th></tr>' +
+    tr + '<tr style="font-weight:700;border-top:1px solid var(--border)"><td style="text-align:left;padding:5px">Tổng</td><td>' + tot.n + '</td><td>' + tot.ontime + '</td><td>' + tot.late + '</td><td>' + tot.contacted + '</td><td>' + tot.nopick + '</td><td>' + tot.refused + '</td><td>' + tot.resched + '</td></tr></table>' +
+    '<style>.fu-rp td,.fu-rp th{padding:5px;border-bottom:1px solid var(--border)}.fu-rp td:first-child{text-align:left}</style>';
 }

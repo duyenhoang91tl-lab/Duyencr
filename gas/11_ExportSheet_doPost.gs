@@ -325,6 +325,7 @@ function doPostCore_(e) {
     if (action === 'dedupeCare')           return dedupeCare_();
     // ── HOI THAM TU DONG: luu bang mau tin (UI Sasum) ──
     if (action === 'saveFollowUpTemplates') return saveFollowUpTemplates_(data.templates);
+    if (action === 'saveFuResults')         return saveFuResults_(data.results);
     // ── MESSENGER/PHONG THUY AI: doc bang tra menh + mau canned response (Sheet Menh/CannedResponses,
     //    tu tao voi du lieu mac dinh neu chua co). Them 2026-09, KHONG dung chung sheet/cot voi CareData. ──
     if (action === 'getKnowledge') return jsonOut_(getMessengerKnowledge_());

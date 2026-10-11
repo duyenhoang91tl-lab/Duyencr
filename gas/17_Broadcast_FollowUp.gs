@@ -385,6 +385,72 @@ function renderFollowUpTemplate_(tpl, ctx) {
     .replace(/\{product\}/g, ctx.product || '');
 }
 
+// ══════════════════════════════════════════════════════
+//  P2e — KET QUA viec cham soc theo moc (ghi khi SALE bam Xong, xem hop ket qua js/32-fn-furesult.js)
+//  Luu Supabase bang fu_results (Q1: du lieu moi -> Supabase) khi da cau hinh; chua co/loi -> sheet 'FuResults'
+//  (khong mat du lieu). Doc: gop ca hai theo id. Chong trung theo id viec (on_conflict / kiem cot A).
+// ══════════════════════════════════════════════════════
+var SH_FU_RESULTS = 'FuResults';
+var FU_RESULT_HEADERS = ['id', 'phone', 'due', 'doneAt', 'result', 'byUser', 'note', 'redo', 'milestone'];
+var FU_RESULT_KEYS_ = { contacted: 1, nopick: 1, refused: 1, resched: 1 };
+
+function _fuResultClean_(r) {
+  r = r || {};
+  var id = String(r.id || '').slice(0, 120), res = String(r.result || '');
+  if (!id || !FU_RESULT_KEYS_[res]) return null;
+  var ymd = function (x) { x = String(x || '').trim(); return /^\d{4}-\d{2}-\d{2}$/.test(x) ? x : ''; };
+  var m = id.match(/_(m?\d+)$/), ms = m ? (m[1] === 'm1' ? 30 : m[1] === 'm2' ? 60 : parseInt(m[1], 10)) : null;
+  var done = new Date(String(r.doneAt || ''));
+  return { id: id, phone: normPhone_(String(r.phone || '')), due: ymd(r.due), doneAt: isNaN(done.getTime()) ? new Date().toISOString() : done.toISOString(),
+           result: res, byUser: String(r.by || r.byUser || '').slice(0, 80), note: String(r.note || '').slice(0, 200), redo: ymd(r.redo), milestone: ms };
+}
+
+function saveFuResults_(list) {
+  if (!Array.isArray(list)) return jsonOut_({ error: 'results phai la mang' });
+  var rows = [], seen = {};
+  list.slice(0, 200).forEach(function (r) { var c = _fuResultClean_(r); if (c && !seen[c.id]) { seen[c.id] = 1; rows.push(c); } });
+  if (!rows.length) return jsonOut_({ ok: true, written: 0, store: 'none' });
+  if (sbCfg_().ok && sbWriteOn_()) {
+    try {
+      var recs = rows.map(function (c) {
+        return { id: c.id, phone: c.phone, due: c.due || null, done_at: c.doneAt, result: c.result, by_user: c.byUser, note: c.note, redo: c.redo || null, milestone: c.milestone };
+      });
+      sb_('POST', 'fu_results?on_conflict=id', recs, { Prefer: 'resolution=merge-duplicates,return=minimal' });
+      return jsonOut_({ ok: true, written: rows.length, store: 'supabase' });
+    } catch (e) { Logger.log('saveFuResults_ supabase loi -> ghi sheet: ' + e); }
+  }
+  var sh = getSheet_(SH_FU_RESULTS, FU_RESULT_HEADERS), last = sh.getLastRow(), have = {};
+  if (last >= 2) sh.getRange(2, 1, last - 1, 1).getValues().forEach(function (r) { have[String(r[0])] = 1; });
+  var out = rows.filter(function (c) { return !have[c.id]; }).map(function (c) { return [c.id, c.phone, c.due, c.doneAt, c.result, c.byUser, c.note, c.redo, c.milestone == null ? '' : c.milestone]; });
+  if (out.length) sh.getRange(last + 1, 1, out.length, FU_RESULT_HEADERS.length).setValues(out);
+  return jsonOut_({ ok: true, written: out.length, store: 'sheet' });
+}
+
+// Doc ket qua trong khoang ngay den han [from,to] (yyyy-MM-dd). Gop Supabase + sheet, khu trung theo id.
+function readFuResults_(from, to) {
+  var map = {}, ymd = function (x) { x = String(x || '').trim(); return /^\d{4}-\d{2}-\d{2}$/.test(x) ? x : ''; };
+  from = ymd(from); to = ymd(to);
+  if (sbCfg_().ok) {
+    try {
+      var q = 'fu_results?select=*&order=done_at.desc&limit=5000' + (from ? '&due=gte.' + from : '') + (to ? '&due=lte.' + to : '');
+      (sb_('GET', q).json || []).forEach(function (r) {
+        map[r.id] = { id: r.id, phone: r.phone || '', due: r.due || '', doneAt: r.done_at || '', result: r.result || '', byUser: r.by_user || '', note: r.note || '', redo: r.redo || '', milestone: r.milestone };
+      });
+    } catch (e) { Logger.log('readFuResults_ supabase: ' + e); }
+  }
+  try {
+    var sh = getCrmSS_().getSheetByName(SH_FU_RESULTS);
+    if (sh && sh.getLastRow() >= 2) {
+      sh.getRange(2, 1, sh.getLastRow() - 1, FU_RESULT_HEADERS.length).getValues().forEach(function (r) {
+        var due = String(r[2] || '');
+        if ((from && due < from) || (to && due > to) || map[String(r[0])]) return;
+        map[String(r[0])] = { id: String(r[0]), phone: String(r[1] || ''), due: due, doneAt: String(r[3] || ''), result: String(r[4] || ''), byUser: String(r[5] || ''), note: String(r[6] || ''), redo: String(r[7] || ''), milestone: r[8] === '' ? null : Number(r[8]) };
+      });
+    }
+  } catch (e2) { Logger.log('readFuResults_ sheet: ' + e2); }
+  return Object.keys(map).map(function (k) { return map[k]; });
+}
+
 function readFollowUpLogKeys_() {
   var sh = getSheet_(SH_FU_LOG, FU_LOG_HEADERS);
   var last = sh.getLastRow();

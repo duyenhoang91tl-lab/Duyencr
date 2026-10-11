@@ -121,6 +121,9 @@ function doGetCore_(e) {
     }
     // ── Tap SDT co trong "dữ liệu đơn" — chi de loc nguon o man hinh chinh (cache 10') ──
     // Danh sach san pham (ma + ten) trong "du lieu don" cho o tim/tick san pham cua Chuong trinh thuong (cache 10').
+    if (action === 'fuResults') {   // ket qua viec cham soc theo moc: ?from=yyyy-MM-dd&to=yyyy-MM-dd
+      return jsonOut_({ ok: true, results: readFuResults_(e && e.parameter && e.parameter.from, e && e.parameter && e.parameter.to) });
+    }
     if (action === 'searchOrder') {   // tim theo ma don -> { ok, results:[{src,code,phone,date,product,revenue,note}] }
       return jsonOut_({ ok: true, results: searchOrderCode_(e && e.parameter && e.parameter.q) });
     }
