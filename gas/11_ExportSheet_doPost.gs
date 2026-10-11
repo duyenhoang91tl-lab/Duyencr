@@ -246,6 +246,7 @@ function doPostCore_(e) {
   try {
     var data = JSON.parse(e.postData.contents);
     var action = data.action;
+    if (CHAT_POST_ACTIONS_[action] === 1) return chatDoPost_(action, data);   // chat noi bo
     if (action === 'save')                return saveAllCare_(data.rows);
     if (action === 'saveSingle')          return saveSingleCare_(data.row);
     if (action === 'saveBatch')           return saveBatchCare_(data.rows);
