@@ -933,13 +933,15 @@ function _schedEditToggle(eid) {
   if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
-function _schedEditSave(id, eid, phone) {
+function _schedEditSave(id, eid, phone, opts) {
+  const quiet = !!(opts && opts.quiet), vals = opts && opts.vals;   // quiet = tự lưu: không toast, không vẽ lại tab (giữ ô đang gõ)
   const it = schedules.find(x => x.id === id);
-  if (!it) { toast('Không tìm thấy lịch'); return; }
-  const newType = document.getElementById(eid + '_type')?.value || it.type;
-  const newDate = document.getElementById(eid + '_date')?.value || it.date;
-  const newNote = (document.getElementById(eid + '_note')?.value || '').trim();
-  if (!newDate) { toast('Vui lòng chọn ngày'); return; }
+  if (!it) { if (!quiet) toast('Không tìm thấy lịch'); return; }
+  const newType = vals ? vals.type : (document.getElementById(eid + '_type')?.value || it.type);
+  const newDate = vals ? vals.date : (document.getElementById(eid + '_date')?.value || it.date);
+  const newNote = vals ? vals.note : (document.getElementById(eid + '_note')?.value || '').trim();
+  if (!newDate) { if (!quiet) toast('Vui lòng chọn ngày'); return; }
+  if (quiet && it.type === newType && it.date === newDate && (it.note || '') === newNote) return;   // không đổi gì → khỏi ghi nhật ký/đồng bộ
   it.type = newType;
   it.date = newDate;
   it.note = newNote;
@@ -948,9 +950,31 @@ function _schedEditSave(id, eid, phone) {
   if (gsUrl) queueCareSync(phone);
   updateSchedBadges();
   if (typeof renderReminderPanel === 'function') renderReminderPanel();
+  if (quiet) {   // chỉ cập nhật dòng tóm tắt, tab vẽ lại khi bấm "Xong"
+    const row = document.getElementById('sm_' + eid), st = SCHED_TYPES.find(x => x.key === newType) || SCHED_TYPES[0];
+    if (row) {
+      const t = row.querySelector('.sm-type'), d = row.querySelector('.sm-date'), n = row.querySelector('.sm-note'), dot = row.querySelector('.sm-dot');
+      if (t) t.textContent = it.customLabel || st.label; if (d) d.textContent = fmtDate(newDate); if (n) n.textContent = newNote || '—'; if (dot) dot.style.background = st.color;
+    }
+    return;
+  }
   const c = allCustomers.find(x => x.phone === phone);
   if (c) document.getElementById('dp-body').innerHTML = renderSchedTabHtml(c);
   toast('✓ Đã cập nhật lịch hẹn');
+}
+// Tự lưu khi sửa lịch cũ: đổi loại/ngày = lưu ngay; gõ nội dung = lưu sau ~0,7 giây (đọc giá trị NGAY lúc gõ để đóng panel giữa chừng vẫn không mất)
+var _schedEditTimers_ = {};
+function _schedEditAuto_(id, eid, phone, immediate) {
+  const vals = { type: document.getElementById(eid + '_type')?.value, date: document.getElementById(eid + '_date')?.value, note: (document.getElementById(eid + '_note')?.value || '').trim() };
+  if (_schedEditTimers_[eid]) clearTimeout(_schedEditTimers_[eid].t);
+  const run = function () { delete _schedEditTimers_[eid]; _schedEditSave(id, eid, phone, { quiet: true, vals: vals }); };
+  if (immediate) { run(); return; }
+  _schedEditTimers_[eid] = { t: setTimeout(run, 700), run: run };
+}
+function _schedEditDone_(id, eid, phone) {
+  const p = _schedEditTimers_[eid]; if (p) { clearTimeout(p.t); p.run(); }
+  const c = allCustomers.find(x => x.phone === phone);
+  if (c) document.getElementById('dp-body').innerHTML = renderSchedTabHtml(c);
 }
 
 function delSched(id) {

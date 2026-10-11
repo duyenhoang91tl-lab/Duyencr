@@ -320,8 +320,8 @@ function renderCareTab(c) {
         <span style="font-size:10px;color:var(--muted)">${_parseNotes(care.note||c.careNote||'').length} ghi chú</span>
       </div>
       <div style="display:flex;gap:6px;align-items:flex-start">
-        <textarea class="form-ta" id="cs-note-new" placeholder="Thêm ghi chú mới — gợi ý: sản phẩm quan tâm, nhu cầu chính, gu, mua cho ai, điểm đáng nhớ…" style="min-height:64px;flex:1"></textarea>
-        <button data-phone="${esc(c.phone)}" onclick="addNoteEntry(this.dataset.phone)" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px;white-space:nowrap;margin-top:2px">➕ Thêm</button>
+        <textarea class="form-ta" id="cs-note-new" placeholder="Thêm ghi chú mới — gợi ý: sản phẩm quan tâm, nhu cầu chính, gu, mua cho ai, điểm đáng nhớ… (Enter để thêm · Shift+Enter xuống dòng)" onkeydown="_dpEnterKey_(event,'note')" oninput="_dpEnterInput_(event,'note')" style="min-height:64px;flex:1"></textarea>
+        <button class="dp-enter-btn" title="Thêm ghi chú (Enter)" onclick="_dpEnterRun_('note')">↵</button>
       </div>
       <div id="cs-note-history" style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
         ${_renderNoteHistory(care.note||c.careNote||'')}
@@ -391,9 +391,9 @@ function renderSchedTabHtml(c) {
       </div>
     </div>
     <div class="form-row">
-      <textarea class="form-ta" id="new-snote" placeholder="Nội dung nhắc nhở..." style="min-height:48px"></textarea>
+      <textarea class="form-ta" id="new-snote" placeholder="Nội dung nhắc nhở… (Enter để thêm lịch · Shift+Enter xuống dòng)" onkeydown="_dpEnterKey_(event,'sched')" oninput="_dpEnterInput_(event,'sched')" style="min-height:48px"></textarea>
     </div>
-    <button class="save-btn" style="margin-bottom:14px" data-phone="${esc(c.phone)}" onclick="addSched(this.dataset.phone)">+ Thêm lịch hẹn</button>
+    <div style="margin-bottom:14px;text-align:right"><button class="dp-enter-btn" title="Thêm lịch hẹn (Enter)" onclick="_dpEnterRun_('sched')">↵ Thêm lịch</button></div>
     <div class="dp-stitle">Lịch đang chờ (${upcoming.length})</div>
     ${upcoming.length ? upcoming.map(it=>{
       const st=SCHED_TYPES.find(x=>x.key===it.type)||SCHED_TYPES[0];
@@ -411,19 +411,18 @@ function renderSchedTabHtml(c) {
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:5px">
             <div>
               <div class="form-label">Loại lịch</div>
-              <select class="form-select" id="${eid}_type">
+              <select class="form-select" id="${eid}_type" onchange="_schedEditAuto_('${it.id}','${eid}','${esc(c.phone)}',true)">
                 ${SCHED_TYPES.map(t=>`<option value="${t.key}"${t.key===it.type?' selected':''}>${t.label}</option>`).join('')}
               </select>
             </div>
             <div>
               <div class="form-label">Ngày hẹn</div>
-              <input class="form-input" type="date" id="${eid}_date" value="${it.date}">
+              <input class="form-input" type="date" id="${eid}_date" value="${it.date}" onchange="_schedEditAuto_('${it.id}','${eid}','${esc(c.phone)}',true)">
             </div>
           </div>
-          <textarea class="form-ta" id="${eid}_note" style="min-height:38px;margin-bottom:6px" placeholder="Nội dung nhắc...">${esc(it.note||'')}</textarea>
+          <textarea class="form-ta" id="${eid}_note" style="min-height:38px;margin-bottom:6px" placeholder="Nội dung nhắc… (tự lưu)" oninput="_schedEditAuto_('${it.id}','${eid}','${esc(c.phone)}',false)" onblur="_schedEditAuto_('${it.id}','${eid}','${esc(c.phone)}',true)">${esc(it.note||'')}</textarea>
           <div style="display:flex;gap:5px">
-            <button class="save-btn" style="flex:1;padding:5px" data-phone="${esc(c.phone)}" onclick="_schedEditSave('${it.id}','${eid}',this.dataset.phone)">💾 Lưu</button>
-            <button onclick="_schedEditToggle('${eid}')" style="border:1px solid var(--border);background:var(--surface);border-radius:5px;padding:5px 10px;cursor:pointer;font-size:11px">Hủy</button>
+            <button data-phone="${esc(c.phone)}" onclick="_schedEditDone_('${it.id}','${eid}',this.dataset.phone)" style="flex:1;border:1px solid var(--border);background:var(--surface);border-radius:5px;padding:5px 10px;cursor:pointer;font-size:11px">✓ Xong</button>
           </div>
         </div>
       </div>`;
@@ -878,6 +877,27 @@ function _fmtNoteTime(d) {
   const yy = d.getFullYear();
   return `${h}:${m} ${dd}/${mm}/${yy}`;
 }
+// ENTER = THÊM (yêu cầu Duyên 2026-10-11): Enter thêm ghi chú / lịch hẹn, Shift+Enter xuống dòng. Bàn phím điện thoại (Gboard + gõ Telex) hay báo keyCode 229
+// và không có Shift → ngoài keydown còn bắt thêm sự kiện input kiểu "insertLineBreak"; cờ _shiftEnter để Shift+Enter trên máy tính KHÔNG bị tính là gửi.
+function _dpEnterKey_(ev, kind) {
+  if (ev.key !== 'Enter') return;
+  if (ev.shiftKey) { ev.target._shiftEnter = true; return; }
+  if (ev.isComposing || ev.keyCode === 229) return;   // đang gõ dấu tiếng Việt: để sự kiện input xử lý
+  ev.preventDefault(); _dpEnterRun_(kind);
+}
+function _dpEnterInput_(ev, kind) {
+  if (ev.inputType !== 'insertLineBreak') return;
+  if (ev.target._shiftEnter) { ev.target._shiftEnter = false; return; }
+  _dpEnterRun_(kind);
+}
+function _dpEnterRun_(kind) {
+  var ph = currentPhone; if (!ph) return;
+  if (kind === 'note') { addNoteEntry(ph); return; }
+  var n = document.getElementById('new-snote');
+  if (!n || !n.value.trim()) { toast('Gõ nội dung nhắc rồi bấm Enter để thêm lịch'); return; }
+  addSched(ph);
+  var n2 = document.getElementById('new-snote'); if (n2) n2.focus();
+}
 function addNoteEntry(phone) {
   const inp = document.getElementById('cs-note-new');
   const text = (inp ? inp.value : '').trim();
@@ -895,8 +915,9 @@ function addNoteEntry(phone) {
   // update count in label
   const lbl = document.querySelector('#cs-note-history')?.closest('.form-row')?.querySelector('.form-label span:last-child');
   if (lbl) lbl.textContent = arr.length + ' ghi chú';
-  // Auto-save
-  saveCare(phone);
+  // Lưu ngầm (đẩy GAS qua queueCareSync): không toast "Đã lưu"; ghi chú hiện ngay ở lịch sử bên dưới
+  saveCare(phone, { quiet: true });
+  if (inp) inp.focus();
 }
 function deleteNoteEntry(ev, btn, raw, idx) {
   ev.stopPropagation();
@@ -917,7 +938,7 @@ function deleteNoteEntry(ev, btn, raw, idx) {
   if (hiddenEl) hiddenEl.value = newRaw;
   const hist = document.getElementById('cs-note-history');
   if (hist) hist.innerHTML = _renderNoteHistory(newRaw);
-  saveCare(phone);
+  saveCare(phone, { quiet: true });
 }
 
 // ═══════════════════════════════════════════════════════
