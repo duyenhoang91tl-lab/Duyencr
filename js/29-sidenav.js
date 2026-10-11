@@ -32,7 +32,7 @@
   }
   // Nhóm menu mẹ -> các mục con (theo data-bar-id). Mục chưa khai báo vẫn hiện, dồn vào nhóm "Khác".
   var GROUPS = [
-    { k:'ov',  t:'🏠 Tổng quan',           ids:['overview'] },
+    { k:'ov',  t:'🏠 Tổng quan',           ids:['act:notif','overview'] },
     { k:'kh',  t:'👤 Thông tin khách hàng', ids:['tab-kh','tab-schedule','tab-overdue','tab-mydata'] },
     { k:'tv',  t:'🧰 Tác vụ',               ids:['tab-zaloai','act:bc','act:bct','act:bcstat','act:futpl','act:bday'] },
     { k:'nv',  t:'🧑‍💼 Thông tin nhân viên',  ids:['tab-task'] },
@@ -44,6 +44,7 @@
   ];
   // Mục "hành động" (mở modal có sẵn, không phải tab). admin:true = chỉ tài khoản admin thấy.
   var ACTS = {
+    notif:      { t:function(){ return (typeof _ntLabel==='function') ? _ntLabel() : '🔔 Thông báo'; }, f:'openNotifModal' },
     acct:       { t:'🔑 Tài khoản đăng nhập', f:'openAcctModal', admin:true },
     assign:     { t:'👥 Chia data', f:'openAssignModal', admin:true },
     autoassign: { t:'⏰ Chia tự động', f:'openAssignModal', tab:'auto', admin:true },

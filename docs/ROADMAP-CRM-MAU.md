@@ -32,7 +32,7 @@ Mỗi phiên làm xong 1 mục nhỏ thì push ngay, tick `[x]`, ghi "việc c�
 - [ ] **B3 – Khách hàng:** tab Tiềm năng/Đã mua (đã mua = có đơn Pos), cờ **cho phép quảng bá** (cột mới CareData; `broadcast`/`bct`/`runFollowUpScan_` phải bỏ khách không đồng ý), kênh ưu tiên, ngày dự kiến tái mua (= lần mua gần nhất + chu kỳ), tùy chỉnh cột (lưu localStorage), phân trang.
 - [ ] **B4 – Chăm sóc & tái mua gộp 1 màn:** khách đến hạn (hẹn gọi, hỏi thăm sau bán, tái mua), Xuất CSV, tôn trọng cờ quảng bá.
 - [ ] **B5 – Bảng Kanban:** làm trước cho **giai đoạn đơn Base** (Tiếp nhận đơn → … → Đóng hàng; đã có dữ liệu giờ vào giai đoạn) và/hoặc theo `khStatus` của khách. Thực thể "cơ hội" riêng (giá trị dự kiến, xác suất) làm sau, lưu Supabase (Q1).
-- [ ] **B6 – Phụ:** Trung tâm Thông báo, Chế độ tối, Hướng dẫn sử dụng, trang Nhật ký lỗi (từ AuditLog), thẻ người dùng trong menu.
+- [~] **B6 – Phụ:** *ĐÃ XONG Thông báo @tag (2026-10-11): sheet `Notifications`, GET `notifications`, POST `notifRead`/`notifMention` (gas_v13 v13.33), tự tạo thông báo khi lưu bình luận/công việc (`saveTaskComment_`/`saveTaskEntry_`), ghi chú khách gọi `notifMention` từ `addNoteEntry`; UI `js/39-fn-notify.js` (mục 🔔 trong nhóm Tổng quan, chấm số trên ☰, hỏi lại mỗi 60 giây, bấm mở khách/công việc, gõ @ gợi ý tên). Test: `tools/test-notify.js`, `tools/test-notify-ui.js`. CHƯA: @ trong ghi chú lịch hẹn (`new-snote`) và ghi chú gõ từ extension Zalo/Pancake; chuyển Notifications sang Supabase cùng đợt bảng mới; thông báo đẩy ngoài CRM.* Còn lại: Chế độ tối, Hướng dẫn sử dụng, trang Nhật ký lỗi (từ AuditLog), thẻ người dùng trong menu.
 
 ## 4. Duyên đã chốt (2026-10-11)
 1. **Kanban theo giai đoạn đơn Base** (Tiếp nhận đơn → … → Đóng hàng) — làm B5 theo hướng này; thực thể "cơ hội" riêng để sau.

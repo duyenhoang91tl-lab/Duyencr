@@ -917,6 +917,7 @@ function addNoteEntry(phone) {
   if (lbl) lbl.textContent = arr.length + ' ghi chú';
   // Lưu ngầm (đẩy GAS qua queueCareSync): không toast "Đã lưu"; ghi chú hiện ngay ở lịch sử bên dưới
   saveCare(phone, { quiet: true });
+  if (typeof ntNoteMention === 'function') ntNoteMention(phone, text);   // @tag trong ghi chú -> thông báo (js/39-fn-notify.js)
   if (inp) inp.focus();
 }
 function deleteNoteEntry(ev, btn, raw, idx) {
