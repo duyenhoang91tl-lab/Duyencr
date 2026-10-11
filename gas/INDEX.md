@@ -102,3 +102,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hàm: `_ttFold_`, `_ttParseVn_`, `_ttSkipSet_`, `_ttBuildRows_`, `ttTrackStages_`, `ttChayNgay`, `ttCaiTrigger`, `_ttStuckFromRows_`, `ttTodayTasks_`
 - Hằng/biến: `TT_TRACK_SHEET_`, `TT_TRACK_HEADERS_`, `TT_DEFAULT_HOURS_`, `TT_LOOKBACK_DAYS_`, `TT_REFRESH_MIN_`
 
+## 24_TonKho.gs
+- Hàm: `_khoJsonArr_`, `_khoUnames_`, `_khoFromRow_`, `readKho_`, `_khoById_`, `_khoLevel_`, `_khoAllows_`, `_tonkhoCode_`, `_tonkhoKey_`, `_khoNum_`, `_khoNowIso_`, `_khoNewId_`, `_khoAuth_`, `_khoWithLock_`, `_khoGate_`, `_tonkhoItemFromRow_`, `_tonkhoItemToRow_`, `readTonKho_`, `_tonkhoLoad_`, `_tonkhoLog_`, `readTonKhoLog_`, `khoSave_`, `tonKhoSet_`, `tonKhoAdjust_`, `tonKhoItemSave_`, `tonKhoItemDelete_`, `tonKhoImport_`
+- Hằng/biến: `SH_KHO`, `KHO_HEADERS`, `SH_TONKHO`, `TONKHO_HEADERS`, `SH_TONKHO_LOG`, `TONKHO_LOG_HEADERS`, `TONKHO_IMPORT_MAX_`
+

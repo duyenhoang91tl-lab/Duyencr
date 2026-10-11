@@ -93,6 +93,9 @@ function doGetCore_(e) {
     }
     if (action === 'teams')     return jsonOut_({ teams: readTeams_(ss.getSheetByName(SH_TEAM)) });
     if (action === 'mktTeams')  return jsonOut_({ teams: readMktTeams_() });
+    if (action === 'khoList')   return jsonOut_({ kho: readKho_() });
+    if (action === 'tonKho')    return jsonOut_({ items: readTonKho_((e && e.parameter && e.parameter.khoId) || '') });
+    if (action === 'tonKhoLog') return jsonOut_({ log: readTonKhoLog_((e && e.parameter) || {}) });
     // KHONG tra passHash (2026-10-11). Co token hop le -> du truong (perms...); khong token -> rut gon cho extension.
     if (action === 'users')     return jsonOut_({ users: _usersForClient_(readUsers_(ss.getSheetByName(SH_USER)), !!_sessUser_(e && e.parameter && e.parameter.token)) });
     // ── Bao cao Pancake (nhap tu file Excel "Thong ke tuong tac") ──

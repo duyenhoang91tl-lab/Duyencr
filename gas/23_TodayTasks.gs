@@ -112,3 +112,5 @@ function ttTodayTasks_(namesCsv) {
   return { ok: true, generatedAt: nowMs, trackedAt: Number(getSetting_('ttLastTrackedMs')) || 0, hours: hours,
     tasks: [{ key: 'stuckStage', title: 'Đơn Base kẹt giai đoạn quá ' + hours + ' giờ — vào kiểm tra', count: stuck.length, items: stuck.slice(0, 100) }] };
 }
+
+

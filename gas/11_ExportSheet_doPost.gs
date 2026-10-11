@@ -272,6 +272,12 @@ function doPostCore_(e) {
     if (action === 'setOrderCareCS')      return setOrderCareCS_(data.phone, data.careCS);
     if (action === 'setOrderCareCSBatch') return setOrderCareCSBatch_(data.updates);
     if (action === 'saveTeams')           return saveTeams_(data.teams);
+    if (action === 'khoSave')             return khoSave_(data);
+    if (action === 'tonKhoSet')           return tonKhoSet_(data);
+    if (action === 'tonKhoAdjust')        return tonKhoAdjust_(data);
+    if (action === 'tonKhoItemSave')      return tonKhoItemSave_(data);
+    if (action === 'tonKhoItemDelete')    return tonKhoItemDelete_(data);
+    if (action === 'tonKhoImport')        return tonKhoImport_(data);
     if (action === 'saveMktTeams')        return saveMktTeams_(data.teams);
     if (action === 'saveUsers')           return saveUsers_(data.users);
     if (action === 'saveAudit')           return saveAudit_(data.rows);

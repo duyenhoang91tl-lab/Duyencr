@@ -33,7 +33,8 @@ const PARTS = [
   ['20_ExportLog_AutoAssign', 'var EXPORT_LOG_SS_ID ='],
   ['21_ArchiveOldOrders', 'var ARCHIVE_SUFFIX_ ='],
   ['22_Supabase', 'var SB_BATCH_ ='],
-  ['23_TodayTasks', 'var TT_TRACK_SHEET_ =']
+  ['23_TodayTasks', 'var TT_TRACK_SHEET_ ='],
+  ['24_TonKho', 'var SH_KHO =']
 ];
 const src = fs.readFileSync(SRC, 'utf8');
 const lines = src.split('\n');
