@@ -92,7 +92,7 @@
       var h = t.querySelector('.sn-gh[data-k="'+g.k+'"]');
       if (!h){
         h = document.createElement('div'); h.className = 'sn-gh'; h.setAttribute('data-k', g.k);
-        h.innerHTML = '<span>'+g.t+'</span><span class="sn-car">▼</span>';
+        h.innerHTML = '<span>'+g.t+'</span><span class="sn-car" aria-hidden="true"></span>'; // dấu +/− vẽ bằng CSS (không dùng ký tự mũi tên)
         h.addEventListener('click', function(e){ e.stopPropagation(); closed[g.k] = !closed[g.k]; try{localStorage.setItem('sn_closed', JSON.stringify(closed));}catch(x){} layout(); });
         t.appendChild(h);
       }

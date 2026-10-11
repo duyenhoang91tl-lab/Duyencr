@@ -137,3 +137,18 @@ html.ui-pro #pro-ai .pro-ai-sug{display:flex;flex-wrap:wrap;gap:6px;padding:4px 
 html.ui-pro #pro-ai .pro-ai-sug .pro-chip{border:0;cursor:pointer;height:auto;padding:5px 10px;white-space:normal;text-align:left;}
 html.ui-pro #pro-ai .pro-ai-in{display:flex;gap:8px;padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--pro-line);}
 html.ui-pro #pro-ai .pro-ai-in textarea{flex:1;resize:none;border:1px solid var(--pro-line);border-radius:8px;padding:7px 9px;font:inherit;font-size:13px;}
+
+/* ── Menu trái dạng THANH NGANG: nhóm = thanh to; bấm mở ra các thanh nhỏ thụt vào bên dưới. Dấu +/− vẽ bằng CSS (.sn-car), không còn mũi tên ▼ ── */
+html.ui-pro #data-view .tabs .sn-gh{margin-top:8px;padding:12px 14px;border-radius:10px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.18);color:#fff;font-size:12.5px;font-weight:700;letter-spacing:.04em;transition:background .15s;}
+html.ui-pro #data-view .tabs .sn-gh:hover{background:rgba(255,255,255,.22);}
+html.ui-pro #data-view .tabs .sn-gh.sn-closed{background:rgba(255,255,255,.08);}
+html.ui-pro #data-view .tabs .sn-gh .sn-car{position:relative;flex:none;width:12px;height:12px;margin-left:10px;font-size:0;transform:none;}
+html.ui-pro #data-view .tabs .sn-gh .sn-car::before,html.ui-pro #data-view .tabs .sn-gh .sn-car::after{content:"";position:absolute;left:50%;top:50%;background:#fff;border-radius:2px;transition:transform .18s ease;}
+html.ui-pro #data-view .tabs .sn-gh .sn-car::before{width:12px;height:2px;margin:-1px 0 0 -6px;}
+html.ui-pro #data-view .tabs .sn-gh .sn-car::after{width:2px;height:12px;margin:-6px 0 0 -1px;transform:scaleY(0);}
+html.ui-pro #data-view .tabs .sn-gh.sn-closed .sn-car::after{transform:scaleY(1);}
+html.ui-pro #data-view .tabs .tab[data-sn-g],html.ui-pro #data-view .tabs .sn-act{width:calc(100% - 14px);margin:0 0 0 14px;padding:9px 12px;border-radius:8px;border-left:3px solid transparent;background:rgba(255,255,255,.05);font-size:12.5px;}
+html.ui-pro #data-view .tabs .tab[data-sn-g]:not(.sn-hide),html.ui-pro #data-view .tabs .sn-act:not(.sn-hide){animation:snIn .18s ease;}
+html.ui-pro #data-view .tabs .tab[data-sn-g]:hover,html.ui-pro #data-view .tabs .sn-act:hover{background:rgba(255,255,255,.14);}
+html.ui-pro #data-view .tabs .tab[data-sn-g].active{background:rgba(255,255,255,.22);}
+@keyframes snIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
