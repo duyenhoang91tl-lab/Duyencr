@@ -26,7 +26,10 @@ Nguyên tắc: mỗi giai đoạn có công tắc riêng, mặc định TẮT; r
 ## Giai đoạn 2 — Worker làm cổng + sao lưu miễn phí
 - [ ] Worker kiểm token HMAC, chặn request không token (xem `ntlReport`), token sang header, rate-limit.
 - [ ] Worker đọc thẳng Supabase cho `lookup`/`customers`/`orders`; GAS là đường dự phòng.
-- [ ] Trigger GAS xuất bản sao định kỳ Supabase → Google Drive (KHÔNG để file sao lưu trong repo public). Thử khôi phục thật 1 lần.
+- [x] Sao lưu Supabase → Google Drive (code xong, CHƯA bật trigger): `sbBackup_` đọc cả 3 bảng (kể cả dòng archived), mỗi bảng 1 file `<bảng>_<yyyy-MM-dd_HHmm>.json.gz` trong thư mục Drive riêng "CRM Supabase Backup" (rất riêng tư — chứa dữ liệu khách, KHÔNG chia sẻ, KHÔNG đưa vào repo); ghi xong ĐỌC LẠI file kiểm tra số dòng rồi mới xoá bản cũ (giữ 7 bản/bảng, bản cũ vào thùng rác); hết giờ giữa chừng thì lần sau tiếp tục; không dùng Script Lock (không chặn CS lưu). Test: `node tools/test-supabase-backup.js`. `sbSanSangBuoc5` thêm 2 check (17 check): bản sao lưu đầy đủ gần nhất ≤ 36 giờ + trigger `sbBackupTick_`.
+  - **Việc tay của Duyên:** `sbSaoLuuSupabase` (lặp tới XONG; lần đầu Google sẽ hỏi cấp quyền Drive) → mở Drive xem thư mục + 3 file → `sbSaoLuuCaiTrigger` (hằng ngày ~2h sáng) → `sbSaoLuuTrangThai`. Gỡ: `sbSaoLuuGoTrigger`.
+  - **Khôi phục:** `sbKhoiPhucThu` (CHỈ ĐỌC: xem file mới nhất + số dòng, không ghi) → khi thật sự mất/hỏng dữ liệu: `sbKhoiPhucThatCare` / `sbKhoiPhucThatDT` / `sbKhoiPhucThatDon` (upsert lại từng lô 500, có con trỏ resume). Khoi phục GHI ĐÈ giá trị hiện có bằng bản sao lưu và KHÔNG xoá dòng thừa. Còn lại: Duyên thử khôi phục thật 1 lần trên dữ liệu thật (nên làm trên project Supabase test, hoặc chỉ làm khi cần thật sự).
+  - Giới hạn: đọc theo OFFSET nên nếu CRM ghi lúc đang sao lưu thì số dòng có thể lệch nhẹ (có cảnh báo `warn`); mỗi bảng phải đọc xong trong ~4 phút (hiện ~25 MB nên dư sức; bảng lớn hơn nhiều thì cần đổi cách phân trang).
 ## Giai đoạn 3 — Frontend mới (làm dần, không viết lại một lần)
 - [ ] Thêm Vite (build) vào repo; giữ `js/*.js` cũ chạy song song; KHÔNG đổi thứ tự thẻ `<script>` của bản cũ cho tới khi cắt hẳn.
 - [ ] Chuyển host sang Cloudflare Pages (preview deploy theo nhánh).

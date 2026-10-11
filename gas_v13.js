@@ -13051,7 +13051,7 @@ var SB_STEP5_MANUAL_ = [
   'Duong ghi NGOAI CRM: tool Base/Pos day don vao Sheet va nhan vien sua TAY tren Sheet — len Supabase o tick dinh ky (don hang 4b, CareData Buoc B; toi da ~10 phut); dong BI XOA tren Sheet cua CareData thi khong.',
   'Bao cao/dashboard noi bo van doc readCare_/readAllOrders_ tu Sheets (4e-3 chua lam): neu Sheets ngung cap nhat thi bao cao cu dan.',
   'Quy tac nghiep vu: DT Tong duoc quan ly truc tiep tren Google Sheets (saveOrders co y tat). Chuyen nguon that cua don hang sang Supabase la quyet dinh cua Duyen, khong phai ky thuat.',
-  'Chua co quy trinh sao luu/khoi phuc Supabase (xuat dinh ky + thu khoi phuc that) va chua quyet huong archive (docs/ARCHIVE-PLAN.md) chong cheo voi Supabase.',
+  'Da co sao luu Supabase ra Drive (sbBackup_, hang ngay) nhung CHUA thu KHOI PHUC that (sbKhoiPhuc*) va chua quyet huong archive (docs/ARCHIVE-PLAN.md) chong cheo voi Supabase.',
   'Chua thu ROLLBACK that tren du lieu that: tat het cong tac doc bang sbTatSupabase roi kiem tra CRM van chay dung tu Sheets.'
 ];
 
@@ -13094,6 +13094,17 @@ function sbSanSangBuoc5_(opts) {
     add('CareData: dong bo dinh ky (Buoc B) moi, khong loi', badC.length === 0, badC.join('; '));
     var careTick = cs && cs.triggerOn === true;
     add('Trigger dong bo CareData (sbCareTick_) dang chay', careTick, careTick ? '' : 'Chay sbKHCaiTrigger');
+    // Sao luu Supabase ra Drive (Free khong co backup tu dong): ban gan nhat phai moi + trigger hang ngay phai song
+    var bk = safe(function () { return sbBackupStatus_(); }), badB = [];
+    if (bk.ok === false) badB.push('khong doc duoc trang thai: ' + String(bk.error || '').slice(0, 120));
+    else {
+      if (bk.lastOkAt == null) badB.push('chua co ban sao luu day du nao (chay sbSaoLuuSupabase)');
+      else if (bk.ageHours > SB_BACKUP_MAX_AGE_MS_ / 3600000) badB.push('ban gan nhat da ' + bk.ageHours + ' gio (toi da ' + SB_BACKUP_MAX_AGE_MS_ / 3600000 + ')');
+      if (bk.lastError) badB.push('loi gan nhat: ' + String(bk.lastError).slice(0, 120));
+    }
+    add('Sao luu Supabase ra Drive: ban gan nhat moi, khong loi', badB.length === 0, badB.join('; '));
+    var bkTick = bk && bk.triggerOn === true;
+    add('Trigger sao luu Supabase (sbBackupTick_) dang chay', bkTick, bkTick ? '' : 'Chay sbSaoLuuCaiTrigger');
     [['SB_ORD_READ', 'Doc don hang tu Supabase'], ['SB_CARE_DELTA_READ', 'Doc khach (delta) tu Supabase'], ['SB_CARE_FULL_READ', 'Doc khach (FULL) tu Supabase']].forEach(function (c) {
       var on = String(pr.getProperty(c[0]) || '').toLowerCase() === 'on', at = parseInt(pr.getProperty(c[0] + '_AT') || '0', 10);
       var days = at ? Math.floor((now - at) / 86400000) : null, ok = on && at > 0 && days >= SB_SOAK_DAYS_, d = '';
@@ -13116,6 +13127,167 @@ function sbSanSangBuoc5() {
   Logger.log(JSON.stringify(r, null, 2));
   Logger.log(r.verdict);
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//  SUPABASE — SAO LUU RA GOOGLE DRIVE (docs/MIGRATE-SUPABASE-FULL.md, giai doan 2): Supabase Free KHONG co sao luu hang ngay.
+//  Moi lan chay: doc TOAN BO 3 bang (care_data, dt_tong, don_chi_tiet; ke ca dong archived) phan trang 1000 dong, moi bang 1 file
+//  `<bang>_<yyyy-MM-dd_HHmm>.json.gz` trong thu muc Drive RIENG "CRM Supabase Backup" (rieng tu — chua du lieu khach, KHONG chia se,
+//  KHONG dua vao repo). Ghi xong DOC LAI file de kiem tra (so dong) roi moi xoa ban cu (giu SB_BACKUP_KEEP_ ban moi nhat moi bang).
+//  Chay het 3 bang moi tinh la "xong"; het gio giua chung thi lan sau tiep tuc (SB_BACKUP_STATE). Khong dung Script Lock (khong chan CS luu):
+//  dung co SB_BACKUP_RUNNING (het han sau 8 phut). Doc theo OFFSET nen neu CRM ghi trong luc sao luu, so dong co the lech nhe — co canh bao `warn`.
+//  KHOI PHUC (sbRestoreBackup_): chi UPSERT lai cac dong trong file (khong xoa dong thua), mac dinh chay thu (dryRun). Khoi phuc se GHI DE
+//  gia tri moi hon bang gia tri cua ban sao luu — chi dung khi du lieu Supabase hong/mat; sau do chay sbKHDongBoLai de Sheet -> Supabase neu can.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+var SB_BACKUP_TABLES_ = [
+  { t: 'care_data', order: 'phone.asc', key: ['phone'] },
+  { t: 'dt_tong', order: 'id.asc,src_row.asc', key: ['id', 'src_row'] },
+  { t: 'don_chi_tiet', order: 'src_row.asc', key: ['src_row'] }
+];
+var SB_BACKUP_PAGE_ = 1000;                    // dong/trang (PostgREST mac dinh toi da 1000)
+var SB_BACKUP_KEEP_ = 7;                       // so ban giu lai moi bang
+var SB_BACKUP_FOLDER_NAME_ = 'CRM Supabase Backup';
+var SB_BACKUP_MAX_AGE_MS_ = 36 * 3600 * 1000;  // ban sao luu day du gan nhat qua 36 gio = cu (sbSanSangBuoc5)
+var SB_BACKUP_RUN_TTL_MS_ = 8 * 60 * 1000;
+var SB_BACKUP_STALE_RUN_MS_ = 20 * 3600 * 1000; // dot do dang tu hom truoc thi bo, bat dau dot moi
+
+function _sbBackupState_(pr) { var s = {}; try { s = JSON.parse(pr.getProperty('SB_BACKUP_STATE') || '{}') || {}; } catch (e) { s = {}; } return s; }
+function _sbBackupStamp_() {   // yyyy-MM-dd_HHmm theo gio VN (+7 co dinh, khong phu thuoc Time Zone cua du an)
+  var d = new Date(Date.now() + VN_OFFSET_MS), p2 = function (n) { return (n < 10 ? '0' : '') + n; };
+  return d.getUTCFullYear() + '-' + p2(d.getUTCMonth() + 1) + '-' + p2(d.getUTCDate()) + '_' + p2(d.getUTCHours()) + p2(d.getUTCMinutes());
+}
+function _sbBackupFolder_() {
+  var pr = PropertiesService.getScriptProperties(), id = pr.getProperty('SB_BACKUP_FOLDER_ID');
+  if (id) { try { return DriveApp.getFolderById(id); } catch (e) {} }
+  var it = DriveApp.getFoldersByName(SB_BACKUP_FOLDER_NAME_), f = it.hasNext() ? it.next() : DriveApp.createFolder(SB_BACKUP_FOLDER_NAME_);
+  pr.setProperty('SB_BACKUP_FOLDER_ID', f.getId());
+  return f;
+}
+function _sbBackupFiles_(folder, table) {   // cac file sao luu cua 1 bang, MOI NHAT truoc
+  var out = [], it = folder.getFiles(), pre = table + '_';
+  while (it.hasNext()) { var f = it.next(), n = String(f.getName()); if (n.indexOf(pre) === 0 && /\.json\.gz$/.test(n)) out.push(f); }
+  out.sort(function (a, b) { return a.getName() < b.getName() ? 1 : (a.getName() > b.getName() ? -1 : 0); });
+  return out;
+}
+function _sbBackupFetchTable_(spec, deadline) {
+  var rows = [], seen = {}, total = -1, off = 0, dup = 0;
+  for (;;) {
+    var res = sb_('GET', spec.t + '?select=*&order=' + spec.order + '&limit=' + SB_BACKUP_PAGE_ + '&offset=' + off, null, off === 0 ? { Prefer: 'count=exact' } : null);
+    if (off === 0) { var m = String(_sbHeader_(res.headers, 'content-range') || '').match(/\/(\d+)$/); total = m ? parseInt(m[1], 10) : -1; }
+    var arr = res.json;
+    if (!Array.isArray(arr)) throw new Error('Phan hoi ' + spec.t + ' khong phai mang');
+    for (var i = 0; i < arr.length; i++) {
+      var k = spec.key.map(function (c) { return String(arr[i][c]); }).join('|');
+      if (seen[k]) { dup++; continue; }
+      seen[k] = 1; rows.push(arr[i]);
+    }
+    if (arr.length < SB_BACKUP_PAGE_) break;
+    off += SB_BACKUP_PAGE_;
+    if (Date.now() > deadline) throw new Error('Het gio khi doc ' + spec.t + ' (da ' + rows.length + ' dong) — chay lai');
+  }
+  return { rows: rows, total: total, dup: dup };
+}
+// opts: { fresh (bo dot dang do, bat dau dot moi) }. KHONG nem loi ra ngoai. Tra { ok, complete, tables:{<bang>:{name,id,rows,total,bytes,at,warn}}, error? }
+function sbBackup_(opts) {
+  opts = opts || {};
+  var out = { ok: false, complete: false, tables: {} };
+  if (!sbCfg_().ok) { out.error = 'Chua cau hinh SUPABASE_URL / SUPABASE_KEY trong Script Properties.'; return out; }
+  var pr = PropertiesService.getScriptProperties(), t0 = Date.now(), running = parseInt(pr.getProperty('SB_BACKUP_RUNNING') || '0', 10);
+  if (running && t0 - running < SB_BACKUP_RUN_TTL_MS_) { out.ok = true; out.skipped = true; return out; }
+  pr.setProperty('SB_BACKUP_RUNNING', String(t0));
+  var deadline = t0 + SB_TIME_BUDGET_MS_;
+  try {
+    var st = _sbBackupState_(pr), run = st.run;
+    if (!run || run.complete || opts.fresh || t0 - run.startedAt > SB_BACKUP_STALE_RUN_MS_) run = { stamp: _sbBackupStamp_(), startedAt: t0, done: {}, complete: false };
+    var folder = _sbBackupFolder_();
+    for (var i = 0; i < SB_BACKUP_TABLES_.length; i++) {
+      var spec = SB_BACKUP_TABLES_[i];
+      if (run.done[spec.t]) continue;
+      if (Object.keys(out.tables).length && Date.now() >= deadline) { out.timeUp = true; break; }
+      var data = _sbBackupFetchTable_(spec, deadline), n = data.rows.length, name = spec.t + '_' + run.stamp + '.json.gz';
+      var payload = JSON.stringify({ table: spec.t, takenAt: new Date().toISOString(), count: n, total: data.total, rows: data.rows });
+      var gz = Utilities.gzip(Utilities.newBlob(payload, 'application/json', spec.t + '_' + run.stamp + '.json'), name);
+      var file = folder.createFile(gz);
+      var back = null; try { back = JSON.parse(Utilities.ungzip(file.getBlob()).getDataAsString()); } catch (eV) {}
+      if (!back || back.count !== n || !Array.isArray(back.rows) || back.rows.length !== n) { try { file.setTrashed(true); } catch (eT) {} throw new Error('Doc lai file ' + name + ' de kiem tra: KHONG khop — da xoa file loi, ban cu giu nguyen.'); }
+      var info = { name: name, id: file.getId(), rows: n, total: data.total, bytes: gz.getBytes().length, at: new Date().toISOString(), warn: '' };
+      if (data.total >= 0 && data.total !== n) info.warn = 'so dong doc (' + n + ') khac so dem (' + data.total + ') — du lieu doi trong luc sao luu, nen chay lai neu can ban chinh xac';
+      run.done[spec.t] = info; out.tables[spec.t] = info; st.run = run;
+      pr.setProperty('SB_BACKUP_STATE', JSON.stringify(st));   // luu ngay sau MOI bang (het gio giua chung van giu phan da xong)
+      var old = _sbBackupFiles_(folder, spec.t);                // chi xoa ban cu SAU khi ban moi da doc lai OK
+      for (var k = SB_BACKUP_KEEP_; k < old.length; k++) { try { old[k].setTrashed(true); } catch (eD) {} }
+    }
+    run.complete = SB_BACKUP_TABLES_.every(function (sp) { return !!run.done[sp.t]; });
+    st.run = run;
+    if (run.complete) { st.lastOkAt = t0; st.last = run.done; st.err = ''; st.errAt = 0; }
+    pr.setProperty('SB_BACKUP_STATE', JSON.stringify(st));
+    out.ok = true; out.complete = run.complete; out.ms = Date.now() - t0;
+    return out;
+  } catch (e) {
+    out.error = String(e && e.message || e); out.ms = Date.now() - t0;
+    try { var s2 = _sbBackupState_(pr); s2.err = out.error; s2.errAt = Date.now(); pr.setProperty('SB_BACKUP_STATE', JSON.stringify(s2)); } catch (e2) {}
+    return out;
+  } finally { try { pr.deleteProperty('SB_BACKUP_RUNNING'); } catch (eF) {} }
+}
+function sbBackupTick_() { try { Logger.log('sbBackupTick ' + JSON.stringify(sbBackup_())); } catch (e) { Logger.log('sbBackupTick loi: ' + e); } }
+function installSbBackupTrigger_() {
+  var ex = ScriptApp.getProjectTriggers().filter(function (t) { return t.getHandlerFunction() === 'sbBackupTick_'; });
+  if (ex.length) return 'Trigger "sbBackupTick_" da ton tai (' + ex.length + '), khong tao them.';
+  ScriptApp.newTrigger('sbBackupTick_').timeBased().everyDays(1).atHour(2).create();
+  return 'Da tao trigger sbBackupTick_ chay moi ngay (khoang 2h sang).';
+}
+function removeSbBackupTrigger_() {
+  var n = 0;
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'sbBackupTick_') { ScriptApp.deleteTrigger(t); n++; } });
+  return 'Da go ' + n + ' trigger sbBackupTick_.';
+}
+function sbBackupStatus_() {
+  var pr = PropertiesService.getScriptProperties(), s = _sbBackupState_(pr), has = false;
+  try { has = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'sbBackupTick_'; }); } catch (e) {}
+  var files = {}; Object.keys(s.last || {}).forEach(function (t) { var x = s.last[t]; files[t] = { name: x.name, rows: x.rows, bytes: x.bytes, warn: x.warn || '' }; });
+  return { ok: true, triggerOn: has, lastOkAt: s.lastOkAt ? new Date(s.lastOkAt).toISOString() : null, ageHours: s.lastOkAt ? Math.round((Date.now() - s.lastOkAt) / 360000) / 10 : null,
+    lastError: s.err || null, running: !!(s.run && !s.run.complete), files: files, folderId: pr.getProperty('SB_BACKUP_FOLDER_ID') || null };
+}
+// opts: { table: 'care_data'|'dt_tong'|'don_chi_tiet', fileId (mac dinh: ban MOI NHAT), dryRun (mac dinh TRUE), reset }. Upsert tung lo 500, con tro SB_RESTORE_<bang>.
+function sbRestoreBackup_(opts) {
+  opts = opts || {};
+  var dryRun = opts.dryRun !== false && opts.dryRun !== 'false';
+  var spec = SB_BACKUP_TABLES_.filter(function (x) { return x.t === opts.table; })[0];
+  if (!spec) return { ok: false, error: 'table phai la care_data | dt_tong | don_chi_tiet' };
+  if (!sbCfg_().ok) return { ok: false, error: 'Chua cau hinh SUPABASE_URL / SUPABASE_KEY trong Script Properties.' };
+  var pr = PropertiesService.getScriptProperties(), curKey = 'SB_RESTORE_' + spec.t.toUpperCase();
+  try {
+    var file = opts.fileId ? DriveApp.getFileById(opts.fileId) : (_sbBackupFiles_(_sbBackupFolder_(), spec.t)[0] || null);
+    if (!file) return { ok: false, error: 'Khong co file sao luu nao cho ' + spec.t + ' (chay sbSaoLuuSupabase truoc).' };
+    var back = JSON.parse(Utilities.ungzip(file.getBlob()).getDataAsString());
+    if (!back || back.table !== spec.t || !Array.isArray(back.rows)) return { ok: false, error: 'File ' + file.getName() + ' khong phai ban sao luu cua ' + spec.t };
+    var cur = -1; try { var m = String(_sbHeader_(sb_('GET', spec.t + '?select=' + spec.key[0] + '&limit=1', null, { Prefer: 'count=exact' }).headers, 'content-range') || '').match(/\/(\d+)$/); cur = m ? parseInt(m[1], 10) : -1; } catch (eC) {}
+    var res = { ok: true, dryRun: dryRun, table: spec.t, file: file.getName(), takenAt: back.takenAt, backupRows: back.rows.length, supabaseRowsNow: cur };
+    if (dryRun) { res.hint = 'Chay thu (chua ghi). Khoi phuc that se GHI DE dong hien co bang gia tri cua ban sao luu; khong xoa dong thua.'; return res; }
+    if (opts.reset === true || opts.reset === 'true') pr.deleteProperty(curKey);
+    var c = {}; try { c = JSON.parse(pr.getProperty(curKey) || '{}') || {}; } catch (eP) { c = {}; }
+    var i = (c.file === file.getName() && c.i > 0) ? c.i : 0, t0 = Date.now(), batches = 0;
+    while (i < back.rows.length && (batches === 0 || Date.now() - t0 < SB_TIME_BUDGET_MS_)) {
+      sb_('POST', spec.t + '?on_conflict=' + spec.key.join(','), back.rows.slice(i, i + SB_BATCH_), { Prefer: 'resolution=merge-duplicates,return=minimal' });
+      i += SB_BATCH_; batches++;
+      pr.setProperty(curKey, JSON.stringify({ file: file.getName(), i: Math.min(i, back.rows.length) }));
+    }
+    res.done = i >= back.rows.length; res.restored = Math.min(i, back.rows.length);
+    if (res.done) pr.deleteProperty(curKey);
+    res.hint = res.done ? 'XONG khoi phuc ' + spec.t + '. Chay sbDoiChieu / sbSanSangBuoc5 de kiem tra.' : 'CHUA HET — chay lai de tiep tuc.';
+    return res;
+  } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+}
+// ── CHAY TAY TU APPS SCRIPT EDITOR (sao luu) ──
+function sbSaoLuuSupabase() { var r = sbBackup_(); Logger.log(JSON.stringify(r, null, 2)); Logger.log(!r.ok ? 'LOI — xem "error".' : (r.skipped ? 'DANG CO LAN KHAC CHAY — thu lai sau it phut.' : (r.complete ? 'XONG — 3 bang da sao luu vao Drive, thu muc "' + SB_BACKUP_FOLDER_NAME_ + '".' : 'CHUA HET — bam Run lai.'))); }
+function sbSaoLuuLai() { var r = sbBackup_({ fresh: true }); Logger.log(JSON.stringify(r, null, 2)); }   // bo dot dang do, sao luu moi tu dau
+function sbSaoLuuCaiTrigger() { Logger.log(installSbBackupTrigger_()); }
+function sbSaoLuuGoTrigger() { Logger.log(removeSbBackupTrigger_()); }
+function sbSaoLuuTrangThai() { Logger.log(JSON.stringify(sbBackupStatus_(), null, 2)); }
+function _sbLogRestore_(r) { Logger.log(JSON.stringify(r, null, 2)); }
+function sbKhoiPhucThu() { SB_BACKUP_TABLES_.forEach(function (sp) { _sbLogRestore_(sbRestoreBackup_({ table: sp.t, dryRun: true })); }); }   // CHI DOC: xem file + so dong, KHONG ghi
+function sbKhoiPhucThatCare() { _sbLogRestore_(sbRestoreBackup_({ table: 'care_data', dryRun: false })); }          // GHI DE care_data bang ban sao luu moi nhat
+function sbKhoiPhucThatDT() { _sbLogRestore_(sbRestoreBackup_({ table: 'dt_tong', dryRun: false })); }
+function sbKhoiPhucThatDon() { _sbLogRestore_(sbRestoreBackup_({ table: 'don_chi_tiet', dryRun: false })); }
 
 
 // ═══════════════════════════════════════════════════════════════

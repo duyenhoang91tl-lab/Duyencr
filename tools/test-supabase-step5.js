@@ -22,7 +22,8 @@ function good() {
   Object.assign(props, { SUPABASE_URL: 'https://x.supabase.co/', SUPABASE_KEY: 'SECRETKEY', SB_MODE: 'read',
     SB_ORD_STATE: JSON.stringify({ dt: { syncedAt: Date.now() - 5 * 60000, rows: 10, last: 11 }, don: { syncedAt: Date.now() - 5 * 60000, rows: 10, last: 11 } }),
     SB_ORD_READ: 'on', SB_ORD_READ_AT: String(Date.now() - 8 * DAY), SB_CARE_DELTA_READ: 'on', SB_CARE_DELTA_READ_AT: String(Date.now() - 9 * DAY), SB_CARE_FULL_READ: 'on', SB_CARE_FULL_READ_AT: String(Date.now() - 7 * DAY - 60000) });
-  triggers.push({ getHandlerFunction: () => 'sbOrdersTick_' }); triggers.push({ getHandlerFunction: () => 'sbCareTick_' });
+  triggers.push({ getHandlerFunction: () => 'sbOrdersTick_' }); triggers.push({ getHandlerFunction: () => 'sbCareTick_' }); triggers.push({ getHandlerFunction: () => 'sbBackupTick_' });
+  props.SB_BACKUP_STATE = JSON.stringify({ lastOkAt: Date.now() - 3 * 3600000, last: { care_data: { name: 'care_data_x.json.gz', rows: 10, bytes: 1 } } });
   props.SB_CARE_SYNC_STATE = JSON.stringify({ syncedAt: Date.now() - 4 * 60000, last: 100, blocks: 1 });
   ctx.__cmp.care = { ok: true }; ctx.__cmp.dt = { ok: true }; ctx.__cmp.don = { ok: true }; ctx.__cmp.throwDon = false;
 }
@@ -35,7 +36,7 @@ let r = check(); ok(!r.autoOk && r.checks.length === 1 && /CHUA nen/.test(r.verd
 
 // ===== tat ca dat =====
 good(); const before = JSON.stringify(props); writes = 0; r = check();
-ok(r.autoOk && r.failing.length === 0 && r.checks.length === 15, 'tat ca dat (15 check): ' + r.checks.length + ' ' + failsOf(r));
+ok(r.autoOk && r.failing.length === 0 && r.checks.length === 17, 'tat ca dat (17 check): ' + r.checks.length + ' ' + failsOf(r));
 ok(r.manual.length === 6 && /manual/.test(r.verdict) && /Duyen dong y/.test(r.verdict), 'autoOk van kem muc manual + can Duyen dong y');
 ok(writes === 0 && JSON.stringify(props) === before, 'CHI DOC: khong ghi/xoa Script Property nao');
 ok(!JSON.stringify(r).includes('SECRETKEY'), 'ket qua khong lo key');
@@ -62,6 +63,11 @@ breaks('CareData chua dong bo lan nao', () => delete props.SB_CARE_SYNC_STATE, /
 breaks('CareData dong bo cu 31 phut', () => props.SB_CARE_SYNC_STATE = JSON.stringify({ syncedAt: Date.now() - 31 * 60000, last: 100, blocks: 1 }), /CareData: dong bo dinh ky/);
 breaks('CareData dong bo bao loi', () => props.SB_CARE_SYNC_STATE = JSON.stringify({ syncedAt: Date.now() - 60000, last: 100, blocks: 1, err: 'HTTP 500' }), /CareData: dong bo dinh ky/);
 breaks('mat trigger sbCareTick_ (chi mat trigger CareData)', () => { const i = triggers.findIndex(t => t.getHandlerFunction() === 'sbCareTick_'); triggers.splice(i, 1); }, /Trigger dong bo CareData/);
+breaks('chua co ban sao luu nao', () => delete props.SB_BACKUP_STATE, /Sao luu Supabase ra Drive/);
+breaks('ban sao luu cu 37 gio', () => props.SB_BACKUP_STATE = JSON.stringify({ lastOkAt: Date.now() - 37 * 3600000 }), /Sao luu Supabase ra Drive/);
+breaks('sao luu bao loi', () => props.SB_BACKUP_STATE = JSON.stringify({ lastOkAt: Date.now() - 3600000, err: 'HTTP 500' }), /Sao luu Supabase ra Drive/);
+breaks('mat trigger sao luu (chi trigger sao luu)', () => { const i = triggers.findIndex(t => t.getHandlerFunction() === 'sbBackupTick_'); triggers.splice(i, 1); }, /Trigger sao luu/);
+{ good(); props.SB_BACKUP_STATE = JSON.stringify({ lastOkAt: Date.now() - 35 * 3600000 }); ok(check().autoOk, 'sao luu 35 gio van coi la moi'); }
 { good(); props.SB_CARE_SYNC_STATE = JSON.stringify({ syncedAt: Date.now() - 29 * 60000, last: 100, blocks: 1 }); ok(check().autoOk, 'CareData 29 phut van coi la moi'); }
 breaks('doc don hang dang tat', () => { delete props.SB_ORD_READ; delete props.SB_ORD_READ_AT; }, /Doc don hang/);
 breaks('delta moi bat 6 ngay', () => props.SB_CARE_DELTA_READ_AT = String(Date.now() - 6 * DAY), /delta/);
