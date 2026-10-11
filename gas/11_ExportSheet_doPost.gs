@@ -300,6 +300,13 @@ function doPostCore_(e) {
     if (action === 'deleteTask') return deleteTask_(data.id);
     // ── Binh luan/thao luan trong 1 cong viec (Task) — tab "Thao luan" tren UI ──
     if (action === 'saveTaskComment') return saveTaskComment_(data.comment);
+    // ── Thong bao @tag: danh dau da doc / tao thong bao cho ghi chu khach (comment+task tu tao ngay trong saveTaskComment_/saveTaskEntry_) ──
+    if (action === 'notifRead') { var _nu = _sessUser_(data.token); if (!_nu) return jsonOut_({ error: 'Can dang nhap.', code: 'AUTH' }); return jsonOut_(markNotifRead_(_nu.username, data.ids, !!data.all)); }
+    if (action === 'notifMention') {
+      var _nm = _sessUser_(data.token); if (!_nm) return jsonOut_({ error: 'Can dang nhap.', code: 'AUTH' });
+      var _nk = String(data.kind || 'note'); if (_nk !== 'note') return jsonOut_({ error: 'kind khong hop le' });
+      return jsonOut_({ ok: true, sent: _notifyMentions_({ text: data.text, from: _nm.name || _nm.username, fromUser: _nm.username, kind: 'note', refType: 'customer', refId: data.phone }) });
+    }
     // ── Quy trinh cong viec: loai quy trinh + giai doan, chuyen tiep, yeu cau/duyet ──
     if (action === 'saveTaskFlow')        return saveTaskFlow_(data.flow);
     if (action === 'deleteTaskFlow')      return deleteTaskFlow_(data.id);

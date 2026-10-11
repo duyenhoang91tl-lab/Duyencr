@@ -13,5 +13,5 @@ r=run({prompt:'x'.repeat(9000),crmAsk:true});ok(r.out.ok,'crmAsk: đúng 9000 k�
 r=run({prompt:'khách hỏi giá'});ok(r.cap.sys==='CS-PROMPT'&&r.cap.csArgs[0]==='khách hỏi giá'&&r.cap.csArgs[1]===false,'KHÔNG crmAsk: luồng CS cũ giữ nguyên (dùng _buildAISystemPrompt_)');
 r=run({prompt:'a',withProducts:true});ok(r.cap.csArgs[1]===true,'KHÔNG crmAsk: withProducts vẫn truyền như cũ');
 r=run({});ok(r.out.error==='Thieu noi dung','thiếu prompt vẫn báo như cũ');
-ok(/ver: 'v13\.32-crm-ask'/.test(src),'action=count trả ver v13.32-crm-ask (để đối chiếu bản đang chạy)');
+ok(/ver: 'v13\.\d+-[a-z-]+'/.test(src),'action=count trả ver v13.xx (để đối chiếu bản đang chạy)');
 process.exit(bad?1:0);

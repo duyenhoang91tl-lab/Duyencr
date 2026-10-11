@@ -1546,7 +1546,7 @@ var NTL_ACTIONS_ = {
   save:1, saveSingle:1, saveBatch:1, syncZaloFriendStatus:1, addCareLead:1, applyCustomerNameGuesses:1, dedupeCare:1,
   saveOrders:1, patchOrder:1, deleteOrder:1, deleteDuplicateOrders:1, replaceOrders:1, importSheetRows:1, archiveOrders:1,
   setOrderCareCS:1, setOrderCareCSBatch:1, saveAssign:1, saveAssignHistory:1, toggleAssignDone:1,
-  saveTask:1, deleteTask:1, saveTaskComment:1, saveTeams:1, saveMktTeams:1, saveSaleGroups:1, saveCareStatus:1,
+  saveTask:1, deleteTask:1, saveTaskComment:1, notifications:1, notifRead:1, notifMention:1, saveTeams:1, saveMktTeams:1, saveSaleGroups:1, saveCareStatus:1,
   broadcastMark:1, saveBroadcast:1, broadcastCancel:1, broadcastSetStatus:1, saveFollowUpTemplates:1, saveAudit:1
 };
 function _ntlKey_() { return 'ntl_' + Utilities.formatDate(new Date(), 'GMT+7', 'yyyyMMdd'); }
@@ -2012,6 +2012,11 @@ function doGetCore_(e) {
       tasksOut_.forEach(function (t) { t.pendingReq = pendMap_[t.id] || []; });
       return jsonOut_({ tasks: tasksOut_ });
     }
+    if (action === 'notifications') {
+      var _gu = _sessUser_(e && e.parameter && e.parameter.token);
+      if (!_gu) return jsonOut_({ error: 'Can dang nhap.', code: 'AUTH' });
+      return jsonOut_(readNotifications_(_gu.username));
+    }
     if (action === 'taskFlows')    return jsonOut_({ flows: readTaskFlows_() });
     if (action === 'taskRequests') return jsonOut_({ requests: readTaskRequests_((e && e.parameter && e.parameter.taskId) || '', false) });
 
@@ -2026,7 +2031,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.32-crm-ask' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.33-notify' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -5971,6 +5976,13 @@ function doPostCore_(e) {
     if (action === 'deleteTask') return deleteTask_(data.id);
     // ── Binh luan/thao luan trong 1 cong viec (Task) — tab "Thao luan" tren UI ──
     if (action === 'saveTaskComment') return saveTaskComment_(data.comment);
+    // ── Thong bao @tag: danh dau da doc / tao thong bao cho ghi chu khach (comment+task tu tao ngay trong saveTaskComment_/saveTaskEntry_) ──
+    if (action === 'notifRead') { var _nu = _sessUser_(data.token); if (!_nu) return jsonOut_({ error: 'Can dang nhap.', code: 'AUTH' }); return jsonOut_(markNotifRead_(_nu.username, data.ids, !!data.all)); }
+    if (action === 'notifMention') {
+      var _nm = _sessUser_(data.token); if (!_nm) return jsonOut_({ error: 'Can dang nhap.', code: 'AUTH' });
+      var _nk = String(data.kind || 'note'); if (_nk !== 'note') return jsonOut_({ error: 'kind khong hop le' });
+      return jsonOut_({ ok: true, sent: _notifyMentions_({ text: data.text, from: _nm.name || _nm.username, fromUser: _nm.username, kind: 'note', refType: 'customer', refId: data.phone }) });
+    }
     // ── Quy trinh cong viec: loai quy trinh + giai doan, chuyen tiep, yeu cau/duyet ──
     if (action === 'saveTaskFlow')        return saveTaskFlow_(data.flow);
     if (action === 'deleteTaskFlow')      return deleteTaskFlow_(data.id);
@@ -10031,6 +10043,8 @@ function saveTaskEntry_(t) {
   }
   if (found) sh.getRange(found.rowIdx, 1, 1, TASK_HEADERS.length).setValues([_taskToRow_(rec)]);
   else sh.appendRow(_taskToRow_(rec));
+  _notifyMentions_({ text: (rec.title || '') + ' ' + (rec.description || ''), skipText: old ? ((old.title || '') + ' ' + (old.description || '')) : '',
+                     from: t.by || rec.createdBy, kind: 'task', refType: 'task', refId: id });
   if (!old && rec.flowId) _taskSysComment_(id, rec.createdBy, 'đã tạo công việc, bắt đầu giai đoạn "' + _taskFlowById_(rec.flowId).stages[0].name + '"', 'system', '');
   return jsonOut_({ ok: true, id: id });
 }
@@ -10078,6 +10092,90 @@ function readTaskComments_(sh, taskId) {
   return out;
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  THONG BAO @TAG (them 2026-10-11): ai @ten ai do trong ghi chu khach / binh luan / cong viec thi nguoi do thay thong bao o menu "Thong bao",
+//  bam vao thi mo dung man hinh (khach / cong viec + binh luan). Luu sheet 'Notifications' (khoi luong nho; chuyen Supabase sau cung luc cac bang moi khac).
+//  Nguoi nhan = tai khoan (username) khop @<name | 1 trong names | username>, khong phan biet hoa thuong, ten dai uu tien truoc ("@Ha My" khong bao nham "@Ha").
+//  Hang loi bi nuot: tao thong bao KHONG BAO GIO lam hong viec luu ghi chu/binh luan/cong viec that.
+// ═══════════════════════════════════════════════════════════════
+var SH_NOTIF = 'Notifications';
+var NOTIF_HEADERS = ['id', 'toUser', 'fromUser', 'kind', 'refType', 'refId', 'refId2', 'text', 'createdAt', 'readAt'];
+function _notifIsWordCh_(ch) { return !!ch && /[0-9A-Za-zÀ-ỹ_]/.test(ch); }
+// Tra mang username bi tag trong text. users = readUsers_(); chi tai khoan active.
+function _notifParseMentions_(text, users) {
+  text = String(text || '');
+  if (text.indexOf('@') < 0) return [];
+  var cand = [];
+  (users || []).forEach(function (u) {
+    if (u.active === false) return;
+    var al = {};
+    [u.name, u.username].concat(u.names || []).forEach(function (n) { n = String(n || '').trim(); if (n) al[n.toLowerCase()] = 1; });
+    Object.keys(al).forEach(function (a) { cand.push({ a: a, un: String(u.username) }); });
+  });
+  cand.sort(function (x, y) { return y.a.length - x.a.length; });
+  var low = text.toLowerCase(), hit = {};
+  cand.forEach(function (c) {
+    var from = 0, p;
+    while ((p = low.indexOf('@' + c.a, from)) >= 0) {
+      var end = p + 1 + c.a.length;
+      if (!_notifIsWordCh_(low.charAt(end)) && (p === 0 || !_notifIsWordCh_(low.charAt(p - 1)))) {
+        hit[c.un] = 1;
+        low = low.slice(0, p) + new Array(end - p + 1).join(' ') + low.slice(end);   // che doan da khop de ten ngan hon khong khop lai
+      }
+      from = end;
+    }
+  });
+  return Object.keys(hit);
+}
+// opts: {text, from (ten hien thi), fromUser (username, de khong tu bao minh), kind: note|comment|task, refType: customer|task, refId, refId2, skipText (text cu: chi bao nguoi MOI duoc tag)}
+function _notifyMentions_(opts) {
+  try {
+    var users = readUsers_(getCrmSS_().getSheetByName(SH_USER));
+    var tos = _notifParseMentions_(opts.text, users);
+    if (opts.skipText) { var had = {}; _notifParseMentions_(opts.skipText, users).forEach(function (x) { had[x] = 1; }); tos = tos.filter(function (x) { return !had[x]; }); }
+    // khong tu bao chinh minh: bo tai khoan nao co ten/bi danh/username trung nguoi gui
+    var me = {};
+    [opts.from, opts.fromUser].forEach(function (n) { n = String(n || '').trim().toLowerCase(); if (n) me[n] = 1; });
+    var selfUn = {};
+    users.forEach(function (u) { [u.name, u.username].concat(u.names || []).forEach(function (n) { if (me[String(n || '').trim().toLowerCase()]) selfUn[String(u.username)] = 1; }); });
+    tos = tos.filter(function (x) { return !selfUn[x]; });
+    if (!tos.length) return 0;
+    var sh = getSheet_(SH_NOTIF, NOTIF_HEADERS), now = new Date().toISOString();
+    var snip = String(opts.text || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+    var rows = tos.map(function (to, i) {
+      return ['nt_' + Date.now() + '_' + i + '_' + Math.floor(Math.random() * 1000), to, opts.from || opts.fromUser || '', opts.kind || '',
+              opts.refType || '', String(opts.refId || ''), String(opts.refId2 || ''), snip, now, ''];
+    });
+    sh.getRange(sh.getLastRow() + 1, 1, rows.length, NOTIF_HEADERS.length).setValues(rows);
+    return rows.length;
+  } catch (e) { return 0; }
+}
+// Thong bao cua 1 tai khoan: moi nhat truoc, toi da 100; unread = tong chua doc (ca ngoai 100 dong dau).
+function readNotifications_(username) {
+  var sh = getCrmSS_().getSheetByName(SH_NOTIF), out = [], unread = 0;
+  if (!sh || sh.getLastRow() < 2) return { ok: true, items: out, unread: 0 };
+  var v = sh.getDataRange().getValues(), un = String(username || '').toLowerCase();
+  for (var i = v.length - 1; i >= 1; i--) {
+    if (!v[i][0] || String(v[i][1]).toLowerCase() !== un) continue;
+    var rd = !!v[i][9];
+    if (!rd) unread++;
+    if (out.length < 100) out.push({ id: v[i][0], from: v[i][2], kind: v[i][3], refType: v[i][4], refId: String(v[i][5]), refId2: String(v[i][6]),
+      text: v[i][7], createdAt: v[i][8] instanceof Date ? v[i][8].toISOString() : String(v[i][8]), read: rd });
+  }
+  return { ok: true, items: out, unread: unread };
+}
+// ids = mang id; hoac all=true. Chi dong cua chinh username do.
+function markNotifRead_(username, ids, all) {
+  var sh = getCrmSS_().getSheetByName(SH_NOTIF);
+  if (!sh || sh.getLastRow() < 2) return { ok: true, marked: 0 };
+  var v = sh.getDataRange().getValues(), un = String(username || '').toLowerCase(), want = {}, n = 0, now = new Date().toISOString();
+  (ids || []).forEach(function (x) { want[String(x)] = 1; });
+  for (var i = 1; i < v.length; i++) {
+    if (!v[i][0] || v[i][9] || String(v[i][1]).toLowerCase() !== un) continue;
+    if (all || want[String(v[i][0])]) { sh.getRange(i + 1, 10).setValue(now); n++; }
+  }
+  return { ok: true, marked: n };
+}
 function saveTaskComment_(c) {
   if (!c || !c.taskId) return jsonOut_({ error: 'Thieu taskId' });
   if (!String(c.content || '').trim() && !(c.images || []).length && !(c.files || []).length) {
@@ -10089,6 +10187,7 @@ function saveTaskComment_(c) {
   sh.appendRow([id, String(c.taskId), c.author || 'Ẩn danh', c.content || '',
                 JSON.stringify(c.images || []), now,
                 JSON.stringify(c.files || []), JSON.stringify(c.mentions || []), 'comment', '']);
+  _notifyMentions_({ text: c.content, from: c.author, kind: 'comment', refType: 'task', refId: c.taskId, refId2: id });
   return jsonOut_({ ok: true, id: id });
 }
 
