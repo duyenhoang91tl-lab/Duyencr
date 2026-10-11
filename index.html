@@ -28,6 +28,14 @@ window._splashOff=function(){var e=document.getElementById('boot-splash');if(!e)
 /* Thư viện Excel (~1MB) nạp SAU khi trang đã load xong để không chặn form đăng nhập; chỉ dùng khi bấm nhập/xuất file */
 window.addEventListener('load',function(){var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.async=true;document.head.appendChild(s)});</script>
 
+<!-- KHUNG CHỜ khi F5: che khung trắng cho tới khi có form đăng nhập hoặc có dữ liệu (js/40-main-restorenav.js gỡ; tự gỡ sau 20s nếu script lỗi) -->
+<div id="boot-splash" style="position:fixed;inset:0;z-index:99999;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;font:14px system-ui,sans-serif;color:#555;transition:opacity .25s">
+  <div style="width:30px;height:30px;border:3px solid #e5e7eb;border-top-color:#1a6b45;border-radius:50%;animation:bootspin .8s linear infinite"></div>
+  <div>Đang mở lại CRM…</div>
+</div>
+<style>@keyframes bootspin{to{transform:rotate(360deg)}}</style>
+<script>setTimeout(function(){var s=document.getElementById('boot-splash');if(s)s.remove();},20000);</script>
+
 <div class="loading-overlay" id="loverlay">
   <div class="spinner"></div>
   <div class="loading-text" id="ltext">Đang xử lý...</div>
@@ -1610,6 +1618,7 @@ function openBcLogModal(phone){
 <script src="js/36-pro-home.js"></script>
 <script src="js/38-pro-dock.js"></script>
 <script src="js/39-fn-notify.js"></script>
+<script src="js/40-main-restorenav.js"></script>
 
 
 <div class="modal-overlay" id="quick-add-modal" style="display:none;align-items:flex-start;justify-content:center;padding-top:60px;z-index:800">
