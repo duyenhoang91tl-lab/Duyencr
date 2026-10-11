@@ -394,7 +394,7 @@ function renderReminderPanel(){
   if (!wrap) return;
   var reminders = _dueReminders();
   var alerts = _chiaDataAlerts();
-  var tts = (typeof _ttCards === 'function') ? _ttCards() : [];   // nhắc việc hôm nay (js/29): đơn Base kẹt giai đoạn
+  var tts = (typeof _ttCards === 'function') ? _ttCards() : [];   // nhắc việc hôm nay (js/34): đơn Base kẹt giai đoạn
   var total = reminders.length + alerts.length + tts.length;
   if (total === 0){ wrap.style.display='none'; if(bell) bell.style.display='none'; return; }
   if (!_reminderPanelOpen){
