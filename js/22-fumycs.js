@@ -89,7 +89,7 @@ function renderFuTplTable(){
       var dis = locked ? ' disabled style="opacity:.55"' : '';
       return '<tr style="border-bottom:1px solid #f3f4f6;vertical-align:top">'+
         '<td style="padding:4px"><input value="'+esc(t.productCode)+'" placeholder="* / CF,TEA" title="Mã chuẩn hóa; nhiều mã cách nhau dấu phẩy (CF,TEA); * = mọi SP" onchange="_fuTplList['+i+'].productCode=this.value.trim().toUpperCase()||\'*\'"'+dis+' style="width:100%;padding:4px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;text-transform:uppercase"></td>'+
-        '<td style="padding:4px"><input type="number" min="1" max="365" list="futpl-days-hint" value="'+esc(t.days)+'" onchange="_fuTplList['+i+'].days=String(parseInt(this.value,10)||7)"'+dis+' title="Số ngày sau khi mua (tùy ý: 7, 14, 30, 60, 90...)" style="width:100%;padding:4px;border:1px solid #d1d5db;border-radius:5px;font-size:12px"></td>'+
+        '<td style="padding:4px"><input type="number" min="0" max="365" list="futpl-days-hint" value="'+esc(t.days)+'" onchange="_fuTplList['+i+'].days=String(isNaN(parseInt(this.value,10))?7:Math.max(0,parseInt(this.value,10)))"'+dis+' title="Số ngày sau khi mua (tùy ý: 7, 14, 30, 60, 90...)" style="width:100%;padding:4px;border:1px solid #d1d5db;border-radius:5px;font-size:12px"></td>'+
         '<td style="padding:4px"><input value="'+esc(t.cs)+'" placeholder="(chung)" onchange="_fuTplList['+i+'].cs=this.value.trim().toLowerCase()"'+(canEditAll?'':' disabled style="opacity:.55"')+' style="width:100%;padding:4px;border:1px solid #d1d5db;border-radius:5px;font-size:12px"></td>'+
         '<td style="padding:4px"><textarea rows="2" onchange="_fuTplList['+i+'].template=this.value"'+dis+' style="width:100%;padding:4px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;resize:vertical;font-family:inherit">'+esc(t.template)+'</textarea></td>'+
         '<td style="padding:4px">'+(locked?'':'<button onclick="_fuTplList.splice('+i+',1);renderFuTplTable()" title="Xóa" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:14px">✕</button>')+'</td>'+
@@ -143,7 +143,7 @@ async function _loadFuCfg(){
     var v = ((await r.json()) || {}).values || {};
     document.getElementById('fucfg-start').value = _fuDateToIso_(v.fuStart);
     document.getElementById('fucfg-sources').value = String(v.fuSources || '');
-    window._fuOffDays = String(v.fuOffDays || '').split(',').map(function(x){ return parseInt(x,10); }).filter(function(n){ return n > 0; });
+    window._fuOffDays = String(v.fuOffDays || '').split(',').map(function(x){ return parseInt(x,10); }).filter(function(n){ return n >= 0; });
     renderFuDays();
   } catch(e) { document.getElementById('fucfg-status').textContent = 'Không tải được cấu hình: ' + e.message; }
 }
@@ -151,12 +151,12 @@ async function _loadFuCfg(){
 function renderFuDays(){
   var box = document.getElementById('fucfg-days'); if (!box) return;
   var set = {};
-  (_fuTplList || []).forEach(function(t){ var d = parseInt(t.days,10); if (d > 0) set[d] = true; });
+  (_fuTplList || []).forEach(function(t){ var d = parseInt(t.days,10); if (d >= 0) set[d] = true; });
   if (!Object.keys(set).length) [7,14,30,60].forEach(function(d){ set[d] = true; });
   (window._fuOffDays || []).forEach(function(d){ set[d] = true; });   // mốc đang tắt mà không còn mẫu vẫn hiện để bật lại
   var off = window._fuOffDays || [];
   box.innerHTML = Object.keys(set).map(Number).sort(function(a,b){return a-b;}).map(function(d){
-    return '<label style="cursor:pointer"><input type="checkbox" data-fuday="'+d+'" '+(off.indexOf(d) === -1 ? 'checked' : '')+'> '+d+' ngày</label>';
+    return '<label style="cursor:pointer"><input type="checkbox" data-fuday="'+d+'" '+(off.indexOf(d) === -1 ? 'checked' : '')+'> '+(d === 0 ? '0 (ngày mua)' : d+' ngày')+'</label>';
   }).join('');
 }
 async function saveFuCfg(){

@@ -236,7 +236,7 @@ function _fuConfig_() {
     var src = String(getSetting_('fuSources') || '').split(',').map(function (x) { return x.trim().toLowerCase(); }).filter(Boolean);
     if (src.length) cfg.sources = src;
     // fuOffDays = cac MOC (so ngay) TAM TAT, cach nhau dau phay (vd '14,60'): mau tin van giu, chi khong quet moc do. Rong = bat het.
-    String(getSetting_('fuOffDays') || '').split(',').forEach(function (x) { var n = parseInt(x, 10); if (n > 0) cfg.offDays[n] = true; });
+    String(getSetting_('fuOffDays') || '').split(',').forEach(function (x) { var n = parseInt(x, 10); if (n >= 0) cfg.offDays[n] = true; });
   } catch (e) {}
   return cfg;
 }
@@ -490,7 +490,7 @@ function runFollowUpScan_() {
   var fuDaysSet = {};
   Object.keys(templates).forEach(function (k) {
     var d = parseInt(k.split('|')[1], 10);
-    if (d > 0) fuDaysSet[d] = true;
+    if (d >= 0) fuDaysSet[d] = true;   // 0 = moc D0 (ngay mua, hoi tham/cam on ngay khi chot don)
   });
   if (!Object.keys(fuDaysSet).length) {
     for (var fci = 0; fci < FU_CHECKPOINTS.length; fci++) fuDaysSet[FU_CHECKPOINTS[fci]] = true;

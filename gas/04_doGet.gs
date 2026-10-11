@@ -424,7 +424,7 @@ function doGetCore_(e) {
     if (action === 'followUpTemplates') {
       var fuTpls = readFollowUpTemplates_();
       var fuDays = {};
-      Object.keys(fuTpls).forEach(function (k) { var dd = parseInt(k.split('|')[1], 10); if (dd > 0) fuDays[dd] = true; });
+      Object.keys(fuTpls).forEach(function (k) { var dd = parseInt(k.split('|')[1], 10); if (dd >= 0) fuDays[dd] = true; });
       var fuDayList = Object.keys(fuDays).map(Number).sort(function(a,b){return a-b;});
       return jsonOut_({ templates: fuTpls, list: listFollowUpTemplates_(), checkpoints: fuDayList.length ? fuDayList : FU_CHECKPOINTS });
     }

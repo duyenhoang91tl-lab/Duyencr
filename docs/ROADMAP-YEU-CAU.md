@@ -58,7 +58,7 @@ Mỗi phiên làm xong 1 mục nhỏ thì push ngay, tick `[x]` ở đây và gh
 - [ ] 1e Quyền lợi theo hạng (admin khai) → chiến dịch chọn đối tượng theo hạng.
 
 ### P2 — Việc chăm sóc theo mốc (mục 3)
-- [~] 2a (xong: `fuStart`/`fuSources` trong Settings + ô chỉnh trong modal "Mẫu tin hỏi thăm" (admin, js/22-fumycs.js `saveFuCfg`); xong thêm: bật/tắt từng mốc (Settings `fuOffDays`, ô tích trong modal); CÒN: bật mốc D0, theo nhóm SP/SALE) Bảng cấu hình mốc (D, D3, D7, D14, 30, 60, 90 ngày): nội dung, kênh, theo sản phẩm/nhóm, theo SALE; admin sửa không cần code. Bỏ ghi cứng `FU_CHECKPOINTS`/`FU_START`/`fuSourceAllowed_`.
+- [~] 2a (xong: `fuStart`/`fuSources` trong Settings + ô chỉnh trong modal "Mẫu tin hỏi thăm" (admin, js/22-fumycs.js `saveFuCfg`); xong thêm: bật/tắt từng mốc (Settings `fuOffDays`, ô tích trong modal); xong thêm: mốc D0 (ngày mua, nhập 0 ở cột Mốc); CÒN: cấu hình mốc theo nhóm SP/SALE) Bảng cấu hình mốc (D, D3, D7, D14, 30, 60, 90 ngày): nội dung, kênh, theo sản phẩm/nhóm, theo SALE; admin sửa không cần code. Bỏ ghi cứng `FU_CHECKPOINTS`/`FU_START`/`fuSourceAllowed_`.
 - [ ] 2b Sinh VIỆC trong Lịch chăm sóc (loại gọi/sản phẩm/chăm sóc/hẹn) cho SALE đang chăm sóc; chống trùng khoá `sđt|đơn|mốc`; bỏ qua đơn hoàn/hủy, khách chặn, Zalo ngừng hoạt động; mỗi lần quét 1 việc/khách.
 - [ ] 2c Kết quả khi đánh dấu xong: đã liên hệ / không nghe máy / từ chối / hẹn lại; quá hạn sang tab Quá hạn.
 - [ ] 2d Tin soạn sẵn từ mẫu, SALE duyệt rồi gửi qua Zalo AI/Pancake AI (không tự gửi).
