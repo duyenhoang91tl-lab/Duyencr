@@ -395,6 +395,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
       <div class="tab" data-bar-id="tab-mydata" data-bar-home=".tabs" onclick="switchTab('mydata',this)">📋 Data của tôi <span class="tab-badge" id="tb-mydata">0</span></div>
       <div class="tab" data-bar-id="tab-zaloai" data-bar-home=".tabs" onclick="switchTab('zaloai',this)">🤖 Zalo AI</div>
       <div class="tab" data-bar-id="tab-chat" data-bar-home=".tabs" onclick="switchTab('chat',this)">💬 Chat</div>
+      <div class="tab" data-bar-id="tab-teamchat" data-bar-home=".tabs" onclick="switchTab('teamchat',this)">💬 Chat nội bộ <span class="tab-badge" id="tb-teamchat" style="display:none">0</span></div>
       <div class="tab" data-bar-id="tab-task" data-bar-home=".tabs" onclick="switchTab('task',this)">🗂️ Công việc <span class="tab-badge" id="tb-task">0</span></div>
       <div class="tabs-mobile-toggle" onclick="event.stopPropagation();this.closest('.tabs').classList.toggle('mobile-tabs-open')">☰ Mục ▾</div>
     </div>
@@ -1153,6 +1154,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 <link rel="stylesheet" href="css/04-style.css">
 <link rel="stylesheet" href="css/05-sidenav.css">
 <link rel="stylesheet" href="css/06-pro.css">
+<link rel="stylesheet" href="css/07-teamchat.css">
 
 <script src="js/18-openkhstatusmodal.js"></script>
 
@@ -1642,6 +1644,7 @@ function openBcLogModal(phone){
 <script src="js/39-fn-notify.js"></script>
 <script src="js/41-fn-pkchat.js"></script>
 <script src="js/42-fn-socialchat.js"></script>
+<script src="js/43-teamchat.js"></script>
 <script src="js/40-main-restorenav.js"></script>
 <script src="js/43-fn-viewstate.js"></script>
 

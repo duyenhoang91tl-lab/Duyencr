@@ -65,3 +65,8 @@ Code client của `index.html` (trước đây inline, ~1.4MB) đã tách ra `cs
 - `43-fn-viewstate.js`: F5 giữ BỘ LỌC + VỊ TRÍ CUỘN + TAB HỒ SƠ KHÁCH (bổ sung cho 40): sessionStorage `ome_view_v1` (ô tìm kiếm, sắp xếp, nguồn dữ liệu, năm/tháng/giờ/ngày, chiến dịch, chưa tác động, lọc CS, chip Hạng/Tình trạng/Zalo, `scrollTop` của `_vtWrap()`, `currentDpTab`). Khôi phục sau khi dữ liệu hiện + 1,5s; bỏ qua nếu người dùng đã tự đổi lọc; không ghi đè khi đang khôi phục.
 - `41-fn-pkchat.js`: tab 💬 Chat Pancake trong panel chi tiết khách (`renderPkChatTab`, `pkcLoad` poll 6s, `pkcSend`, `pkcFind`/`pkcLink` gắn hội thoại theo SĐT). Gọi GAS `pkChat`/`pkChatFind`/`pkChatLink`/`pkChatSend` (gas/25_PancakeChat.gs). Test: `tools/test-pk-chat-ui.js`.
 - js/42-fn-socialchat.js: Social > Chat (hộp thư Pancake chung; GAS pkChatInbox/pkChatConv). Menu 'Hồ sơ' = gộp KH + nhân viên (js/29).
+
+## Chat nội bộ (11/10/2026)
+- `js/43-teamchat.js` + `css/07-teamchat.css`: tab 💬 Chat (id `tab-teamchat`, nhóm "Social" ở menu trái (cạnh "Chat (Social)" = hộp thư Pancake — 2 tính năng KHÁC NHAU)). Backend `gas/26_Chat.gs`. Chi tiết, quy ước bảo mật, giới hạn: `docs/CHAT-NOI-BO.md`.
+- Mọi request kèm token phiên (`ome_sess_token`); không dùng được với tài khoản demo. KHÔNG tin tên người gửi từ client.
+- Test: `node tools/test-chat.js` (backend) và `python3 tools/test-chat-e2e.py` (giao diện + backend).

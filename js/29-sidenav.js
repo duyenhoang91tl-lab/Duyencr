@@ -35,7 +35,7 @@
   var GROUPS = [
     { k:'ov',  t:'🏠 Tổng quan',           ids:['act:notif','overview'] },
     { k:'kh',  t:'👤 Hồ sơ',                ids:['tab-kh','tab-schedule','tab-overdue','tab-mydata','tab-task'] },   // gộp hồ sơ khách hàng + hồ sơ nhân viên
-    { k:'sc',  t:'💬 Social',               ids:['tab-chat'] },
+    { k:'sc',  t:'💬 Social',               ids:['tab-chat','tab-teamchat'] },
     { k:'tv',  t:'🧰 Tác vụ',               ids:['tab-zaloai','act:bc','act:bct','act:bcstat','act:futpl','act:bday'] },
     { k:'rp',  t:'📊 Báo cáo',              ids:['salesreport','pancake','kpipancake','mktchecklist','dailybrief','dashboard','act:fureport','act:teamai'] },
     { k:'cs',  t:'🔀 Cài đặt chia số',      ids:['act:assign','act:autoassign','act:assignhist'] },

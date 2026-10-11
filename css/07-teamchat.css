@@ -1,0 +1,78 @@
+/* CHAT NOI BO (js/31-chat.js). Dung bien mau cua css/01-base.css. */
+#tab-teamchat{padding:0}
+.tc-wrap{display:flex;flex:1;min-height:0;height:100%;background:var(--surface);border-top:1px solid var(--border)}
+.tc-side{width:240px;flex-shrink:0;border-right:1px solid var(--border);display:flex;flex-direction:column;background:var(--surface2);min-height:0}
+.tc-side-h{padding:12px 14px;font-weight:700;font-size:14px;border-bottom:1px solid var(--border)}
+.tc-chlist{flex:1;overflow-y:auto;padding:6px}
+.tc-sec{font-size:11px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:.04em;padding:10px 8px 4px}
+.tc-ch{display:flex;align-items:center;gap:7px;padding:8px 10px;border-radius:var(--rsm);cursor:pointer;font-size:13px;color:var(--text)}
+.tc-ch:hover{background:var(--surface3)}
+.tc-ch.on{background:var(--green-bg);color:var(--green);font-weight:600}
+.tc-ch.has .tc-ch-n{font-weight:700}
+.tc-ch-i{width:18px;text-align:center;flex-shrink:0;opacity:.85}
+.tc-ch-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tc-ch-b{background:var(--green-mid);color:#fff;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;flex-shrink:0}
+.tc-ch-b.men{background:var(--red)}
+.tc-side-f{padding:8px;border-top:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap}
+.tc-main{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}
+.tc-head{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);min-height:48px}
+.tc-title{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.3}
+.tc-sub{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tc-back{display:none}
+.tc-msgs{flex:1;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;min-height:0}
+.tc-empty{margin:auto;color:var(--hint);font-size:13px;text-align:center;padding:20px}
+.tc-more{text-align:center;padding:4px 0 10px}
+.tc-day{display:flex;justify-content:center;margin:12px 0 6px}
+.tc-day span{background:var(--surface2);color:var(--muted);font-size:11px;padding:2px 10px;border-radius:10px}
+.tc-msg{display:flex;gap:9px;padding:2px 6px;border-radius:var(--rsm);position:relative}
+.tc-msg:not(.grp){margin-top:8px}
+.tc-msg:hover,.tc-msg.sel{background:var(--surface2)}
+.tc-msg.mine .tc-who b{color:var(--green)}
+.tc-msg.men{background:var(--tn-bg)}
+.tc-msg.tmp{opacity:.55}
+.tc-av{width:32px;height:32px;border-radius:50%;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.tc-av.ph{visibility:hidden;height:1px}
+.tc-av.sm{width:22px;height:22px;font-size:9px}
+.tc-bd{min-width:0;flex:1}
+.tc-who{font-size:12px;line-height:1.4}
+.tc-who span{color:var(--hint);margin-left:7px;font-size:11px}
+.tc-tx{font-size:13.5px;word-break:break-word;overflow-wrap:anywhere}
+.tc-tx a{color:var(--blue);text-decoration:underline}
+.tc-mention{background:var(--blue-bg);color:var(--blue);border-radius:3px;padding:0 2px}
+.tc-mention.me{background:var(--tn-bg);color:var(--tn);font-weight:600}
+.tc-quote{font-size:12px;color:var(--muted);border-left:3px solid var(--border-strong);padding:1px 8px;margin:2px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tc-st{font-size:11px;color:var(--hint);align-self:flex-end}
+.tc-acts{display:none;position:absolute;right:6px;top:-12px;background:var(--surface);border:1px solid var(--border-md);border-radius:var(--rsm);box-shadow:var(--shadow-md)}
+.tc-msg:hover .tc-acts,.tc-msg.sel .tc-acts{display:flex}
+.tc-acts button{background:none;border:0;padding:3px 8px;cursor:pointer;font-size:13px}
+.tc-acts button:hover{background:var(--surface2)}
+.tc-reply{padding:6px 14px;font-size:12px;background:var(--surface2);border-top:1px solid var(--border);color:var(--muted)}
+.tc-comp{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--border);align-items:flex-end}
+.tc-comp textarea{flex:1;resize:none;border:1px solid var(--border-md);border-radius:var(--r);padding:8px 10px;font:inherit;font-size:13.5px;max-height:120px;background:var(--surface);color:var(--text)}
+.tc-ov{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3000;display:flex;align-items:center;justify-content:center;padding:14px}
+.tc-box{background:var(--surface);border-radius:var(--rlg);padding:16px;width:420px;max-width:100%;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow-md);display:flex;flex-direction:column;gap:8px}
+.tc-box h3{font-size:15px;margin-bottom:2px}
+.tc-box input[type=text],.tc-box input:not([type]),.tc-usearch{width:100%;border:1px solid var(--border-md);border-radius:var(--rsm);padding:7px 9px;font:inherit;font-size:13px}
+.tc-opt{font-size:12.5px;display:flex;gap:6px;align-items:center}
+.tc-ulist{max-height:240px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--rsm)}
+.tc-urow{display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;font-size:13px}
+.tc-urow:hover{background:var(--surface2)}
+.tc-urow small{margin-left:auto;color:var(--hint);font-size:11px}
+.tc-mlist{display:flex;flex-wrap:wrap;gap:5px}
+.tc-chip{background:var(--surface2);border-radius:12px;padding:2px 10px;font-size:12px}
+.tc-bf{display:flex;gap:8px;justify-content:flex-end;margin-top:6px;align-items:center}
+/* banner "deploy GAS" cua app co dinh o goc duoi-phai, che mat nut Gui cua chat -> an khi dang o tab Chat */
+body.tc-on #deploy-guide-banner{display:none!important}
+/* cham do tren nut ☰ Menu khi co tin chua doc */
+#sn-toggle.tc-unread{position:relative}
+#sn-toggle.tc-unread::after{content:'';position:absolute;top:3px;right:3px;width:9px;height:9px;border-radius:50%;background:var(--red);border:2px solid var(--surface)}
+/* dien thoai: hien 1 cot (danh sach kenh HOAC hoi thoai) */
+@media (max-width:720px){
+  .tc-side{width:100%;border-right:0}
+  .tc-main{display:none}
+  .tc-wrap.mob-conv .tc-side{display:none}
+  .tc-wrap.mob-conv .tc-main{display:flex}
+  .tc-back{display:inline-flex}
+  .tc-acts{display:none}
+  .tc-msg.sel .tc-acts{display:flex}
+}
