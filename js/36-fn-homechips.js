@@ -42,6 +42,17 @@ function hmCompute(now){
   out.idle.sort(function(a, b){ return b.key - a.key; });
   return out;
 }
+// Đồng bộ ngưỡng từ Settings (admin đặt ở trang Cấu hình js/37) → localStorage 'ome_hm_cfg' → _hmCfg(); chạy lúc mở app + mỗi 15 phút
+async function hmSyncCfg(){
+  if (typeof gsUrl === 'undefined' || !gsUrl) return;
+  try {
+    var r = await fetch(gsUrl + (gsUrl.indexOf('?') < 0 ? '?' : '&') + 'action=getSettings&keys=hmCycle,hmIdle', { redirect:'follow' });
+    var v = ((await r.json()) || {}).values || {}, cur = _hmCfg();
+    var n = { cycle: parseInt(v.hmCycle, 10) || cur.cycle, idle: parseInt(v.hmIdle, 10) || cur.idle };
+    if (n.cycle !== cur.cycle || n.idle !== cur.idle){ localStorage.setItem('ome_hm_cfg', JSON.stringify(n)); hmRenderChips(); }
+  } catch(e){}
+}
+setTimeout(hmSyncCfg, 6000); setInterval(hmSyncCfg, 15 * 60 * 1000);
 var _hmLast = null;
 function hmRenderChips(){
   var el = document.getElementById('hm-chips'); if (!el) return;

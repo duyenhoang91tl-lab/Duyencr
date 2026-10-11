@@ -39,6 +39,7 @@ Code client của `index.html` (trước đây inline, ~1.4MB) đã tách ra `cs
 
 - `27-fn-bonuscore.js`: `_bcOrderInfo_`, `_bcGuess_`, `_bcMinProducts_`, `_bcIsVongProgram_` (lõi đếm SP thưởng; bản sao trong gas_v13.js)
 - `28-fn-bonusdetail.js`: tab K "Chi tiết thưởng" — `renderSalesReportTabK_`, `_bdFlag`, `_bdSlot`, `_bdRev`, `_bdSyncFromGAS`
+- `37-fn-configpage.js`: trang ⚙ Cấu hình tập trung (B2) — ngưỡng ttStageHours/hmCycle/hmIdle lưu Settings + AuditLog, lần chạy tự động gần nhất, lối tắt
 - `36-fn-homechips.js`: 4 chip Hôm nay ở Tổng quan (B1 ROADMAP-CRM-MAU) — `hmCompute`, `hmRenderChips`, `hmOpenList`
 - `35-fn-deptsettings.js`: cài đặt phòng ban (tách riêng đội Online/Offline) — `openDeptSettings`, `_dpSave`, `DEPT_LIST`; GAS readDeptList_/readSaleDepts_/_orgApplyDepts_
 - `34-fn-todaytasks.js`: nhắc việc hôm nay cho CS — `ttFetch`, `_ttCards`, `_ttCardHtml` (thẻ trong khung nhắc hẹn; backend gas/23_TodayTasks.gs)
