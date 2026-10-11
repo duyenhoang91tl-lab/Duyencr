@@ -989,19 +989,14 @@ function openSaleChannelsModal(){
   var m = document.getElementById('sc-modal');
   if (m) m.style.display = 'flex';
 }
-var _scDirty = false, _scPending = null;   // da doi doi/phong -> dong modal thi tai lai man Tong quan (js/31 _ovAfterRoomChange)
 function closeSaleChannelsModal(){
   var m = document.getElementById('sc-modal');
   if (m) m.style.display = 'none';
-  if (_scDirty){
-    _scDirty = false;
-    Promise.resolve(_scPending).then(function(){ if (typeof _ovAfterRoomChange === 'function') _ovAfterRoomChange(); });
-  }
 }
 function _renderSaleChannelsModal(){
   var body = document.getElementById('sc-body');
   if (!body) return;
-  var html = '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;line-height:1.5">🏢 <b>Phòng trên màn Tổng quan = đội ở đây.</b> Tạo phòng ở khối “Quản lý danh sách đội”, rồi chọn phòng cho từng người (hoặc gán cả team một lần).<br><span style="color:#9a3412">⚠ Đội này cũng là Online / Văn phòng / Thử việc dùng để áp Chương trình thưởng — đổi đội của một sale sẽ đổi luôn đối tượng thưởng của sale đó.</span></div>';
+  var html = '';
 
   // ── Khoi quan ly danh sach doi (them/sua/xoa) ──
   html += '<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:12px;overflow:hidden">'+
@@ -1025,17 +1020,6 @@ function _renderSaleChannelsModal(){
   }
   html += '</div>';
 
-  // ── Gan nhanh ca team vao 1 phong (chi khi man Tong quan da tai du lieu team) ──
-  var _ovTeams = (typeof _ov !== 'undefined' && _ov && _ov.data && _ov.data.teams) ? _ov.data.teams : [];
-  if (_ovTeams.length){
-    html += '<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:12px;padding:8px 10px"><div style="font-weight:600;font-size:13px;margin-bottom:6px">👥 Gán nhanh cả team vào phòng</div>'+
-      '<table class="dash-table"><thead><tr><th>Team</th><th style="width:60px">Người</th><th style="width:170px">Gán vào phòng</th></tr></thead><tbody>'+
-      _ovTeams.map(function(t, i){
-        return '<tr><td>'+esc(t.name)+'</td><td>'+((t.members||[]).length)+'</td><td><select onchange="_scAssignTeam('+i+',this.value);this.value=\'\'" style="width:160px"><option value="">— chọn phòng —</option>'+
-          SALE_GROUPS.map(function(g){ return '<option value="'+esc(g.key)+'">'+esc(g.label)+'</option>'; }).join('')+'<option value="__none__">(bỏ phân loại)</option></select></td></tr>';
-      }).join('')+'</tbody></table></div>';
-  }
-
   // ── Bang phan loai tung Sale, dropdown dong theo SALE_GROUPS ──
   var names = (typeof _allCSNames === 'function' ? _allCSNames() : []).slice().sort(function(a,b){ return a.localeCompare(b,'vi'); });
   var q = (_scSearch||'').toLowerCase();
@@ -1054,27 +1038,16 @@ function _renderSaleChannelsModal(){
   html += '</tbody></table>';
   body.innerHTML = html;
 }
-function _scAssignTeam(i, key){
-  if (!key) return;
-  var t = (typeof _ov !== 'undefined' && _ov && _ov.data && _ov.data.teams) ? _ov.data.teams[i] : null;
-  if (!t || !(t.members || []).length){ toast('Team chưa có thành viên'); return; }
-  var g = SALE_GROUPS.find(function(x){ return x.key === key; });
-  var label = key === '__none__' ? 'bỏ phân loại' : ('phòng "' + (g ? g.label : key) + '"');
-  if (!confirm('Gán ' + t.members.length + ' người của team "' + t.name + '" vào ' + label + '?\n(Việc này cũng đổi đối tượng Chương trình thưởng của họ.)')) return;
-  t.members.forEach(function(n){ if (key === '__none__') delete SALE_CHANNELS[n]; else SALE_CHANNELS[n] = key; });
-  _scDirty = true; _scPending = saveSaleChannels();
-  _renderSaleChannelsModal();
-}
 function _scSaveGroups(){
   var clean = _scGroupsDraft.filter(function(g){ return (g.label||'').trim(); }).map(function(g){ return {key:g.key, label:g.label.trim()}; });
   if (!clean.length){ toast('Cần ít nhất 1 đội'); return; }
   _scGroupsDraft = null; _scGroupsOpen = false;
-  _scDirty = true; _scPending = saveSaleGroups(clean);
+  saveSaleGroups(clean);
   _renderSaleChannelsModal();
 }
 function _setSaleChannel(name, val){
   if (val) SALE_CHANNELS[name] = val; else delete SALE_CHANNELS[name];
-  _scDirty = true; _scPending = saveSaleChannels();
+  saveSaleChannels();
 }
 
 function openChannelRatesModal(){

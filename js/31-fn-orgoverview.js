@@ -124,8 +124,6 @@ function renderOverviewTab(){ _ovEnsurePanel(); if (_ov.data && _ov.key === ((do
 function _ovPctBar(p){ if (p === null || p === undefined) return '<span style="color:var(--muted)">—</span>'; var c = p >= 100 ? 'var(--green)' : (p >= 70 ? 'var(--tn)' : 'var(--red)');
   return '<div style="min-width:70px"><b style="color:' + c + '">' + p + '%</b><div style="height:4px;background:var(--surface2);border-radius:3px;margin-top:2px"><div style="height:4px;width:' + Math.min(100, p) + '%;background:' + c + ';border-radius:3px"></div></div></div>'; }
 function _ovRatingCounts(a){ return '<span style="color:var(--green)">' + (a.tot || 0) + ' tốt</span> · <span style="color:var(--tn)">' + (a.trungbinh || 0) + ' TB</span> · <span style="color:var(--red)">' + (a.kem || 0) + ' kém</span>' + (a.chuadu ? ' · <span style="color:var(--muted)">' + a.chuadu + ' ít dữ liệu</span>' : ''); }
-// Sau khi admin đổi phòng/đội (đóng modal js/12) → bỏ cache + tải lại số liệu tổng quan
-function _ovAfterRoomChange(){ if (!document.getElementById('ov-body')) return; _ov.mem = {}; _ovLoad(true); }
 function _ovSetDept(k){ _ov.dept = (_ov.dept === k) ? '' : k; _ov.team = ''; _ovRender(); }
 function _ovSetTeam(n){ _ov.team = (_ov.team === n) ? '' : n; _ovRender(); }
 function _ovSetQ(v){ _ov.q = v; _ovRenderPeople(); var i = document.getElementById('ov-q'); if (i) { i.focus(); try { i.setSelectionRange(v.length, v.length); } catch (e) {} } }
@@ -167,7 +165,7 @@ function _ovRender(){
   ].map(function(x){ return '<div class="ov-card"><div class="n">' + x[1] + '</div><div class="l">' + x[0] + '</div></div>'; }).join('') +
     '<div class="ov-card" style="flex:2;min-width:240px"><div class="l">Đánh giá nhân sự</div><div style="margin-top:4px;font-size:13px">' + _ovRatingCounts(c) + '</div></div></div>';
   if (s.depts.length) {
-    h += '<div style="font-weight:700;margin:4px 0 6px">🏢 Theo phòng ' + (_ovIsAdmin() ? '<button class="btn sm" style="margin-left:8px;font-weight:400" onclick="openSaleChannelsModal()">⚙ Cài đặt phòng</button>' : '') + '</div><div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px">' + s.depts.map(function(x){
+    h += '<div style="font-weight:700;margin:4px 0 6px">🏢 Theo phòng</div><div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px">' + s.depts.map(function(x){
       var k = x.key || '_none';
       return '<div class="ov-card ov-dept' + (_ov.dept === k ? ' on' : '') + '" data-k="' + esc(k) + '" onclick="_ovSetDept(this.dataset.k)" style="min-width:230px"><div style="font-weight:700">' + esc(x.label) + '</div>' +
         '<div style="display:flex;gap:14px;margin:6px 0;flex-wrap:wrap"><div><div class="n" style="font-size:17px">' + _ovMoney(x.revenue) + '</div><div class="l">doanh thu</div></div><div><div class="n" style="font-size:17px">' + x.ordersPerDay + '</div><div class="l">đơn/ngày</div></div><div><div class="n" style="font-size:17px">' + x.soNguoi + '</div><div class="l">nhân sự</div></div></div>' +
