@@ -74,7 +74,7 @@ var _careTimer = null;
 // Tính theo NGÀY TẠO đơn (o.orderDate), giống mọi báo cáo khác trong hệ thống (A/B/C/KPI
 // Pancake) — không theo ngày hoàn thành, để khớp với Base và giữa các báo cáo với nhau.
 // Giong _isExcludedOrderStatus_ (gas_v13.js): khop TOAN BO chuoi sau khi bo dau, KHONG khop 'Hoan thanh'.
-var _DASH_EXCLUDED_STATUS = ['huy','da huy','da hoan','dang hoan','dang hoan hang','da hoan hang','hoan hang','hoan tien'];
+var _DASH_EXCLUDED_STATUS = ['that bai']; // Base (DT TONG cot H): CHI loai 'Thất bại' — xac nhan cua Duyen 2026-10, dong bo EXCLUDED_ORDER_STATUSES_ trong gas_v13.js
 // ═══════════════════════════════════════════════════════
 //  DASHBOARD PIVOT — drag-drop widgets + saved templates
 // ═══════════════════════════════════════════════════════
