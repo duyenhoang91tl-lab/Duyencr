@@ -122,3 +122,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hàm: `_profClean_`, `_profFindUser_`, `_profNames_`, `_profRead_`, `_profMetrics_`, `_profFold_`, `_profScope_`, `_profRank_`, `_profMonthRange_`, `profileGet_`, `profileSave_`, `staffOverview_`
 - Hằng/biến: `SH_PROFILE`, `PROFILE_HEADERS`
 
+## 29_MediaLib.gs
+- Hàm: `_mlibUser_`, `_mlibSheet_`, `_mlibFolder_`, `_mlibUrl_`, `_mlibClean_`, `_mlibDriveId_`, `_mlibRow_`, `_mlibAppend_`, `mlibList_`, `mlibUpload_`, `mlibAddDrive_`, `mlibSaveTpl_`, `mlibDelete_`, `mlibDoGet_`, `mlibDoPost_`
+- Hằng/biến: `SH_MLIB_`, `MLIB_HEADERS_`, `MLIB_TYPES_`, `MLIB_MAX_BYTES_`, `MLIB_GET_ACTIONS_`, `MLIB_POST_ACTIONS_`
+

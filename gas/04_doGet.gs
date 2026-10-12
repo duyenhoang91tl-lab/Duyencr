@@ -9,6 +9,7 @@ function doGet(e) {
     if (DEMO_ALLOWED_GET_[action] !== 1) return jsonOut_({ error: 'Tai khoan test khong duoc phep thao tac nay.' });
     return _demoClip_(doGetCore_(e), action);
   }
+  if (MLIB_GET_ACTIONS_[action] === 1) return mlibDoGet_(action, p);   // thu vien anh/ghi am/mau tin: tu kiem token
   if (CHAT_GET_ACTIONS_[action] === 1) return chatDoGet_(action, p);   // chat noi bo: tu kiem token, khong qua doGetCore_
   _ntlNote_('GET', action, p.token, p.src, p.ek);
   var _denG = _enforceCheck_(action, p.token, p.ek, p.src);

@@ -38,7 +38,8 @@ const PARTS = [
   ['25_PancakeChat', 'var PK_CHAT_SECTION_ ='],
   ['26_Chat', 'var SH_CHAT_CH_ ='],
   ['27_PancakeHistory', 'var PK_HIST_SECTION_ ='],
-  ['28_StaffProfile', 'var SH_PROFILE =']
+  ['28_StaffProfile', 'var SH_PROFILE ='],
+  ['29_MediaLib', 'var SH_MLIB_ =']
 ];
 const src = fs.readFileSync(SRC, 'utf8');
 const lines = src.split('\n');
