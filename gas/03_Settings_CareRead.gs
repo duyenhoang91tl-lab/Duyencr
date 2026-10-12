@@ -769,7 +769,7 @@ var NTL_ACTIONS_ = {
   save:1, saveSingle:1, saveBatch:1, syncZaloFriendStatus:1, addCareLead:1, applyCustomerNameGuesses:1, dedupeCare:1,
   saveOrders:1, patchOrder:1, deleteOrder:1, deleteDuplicateOrders:1, replaceOrders:1, importSheetRows:1, archiveOrders:1,
   setOrderCareCS:1, setOrderCareCSBatch:1, saveAssign:1, saveAssignHistory:1, toggleAssignDone:1,
-  saveTask:1, deleteTask:1, saveTaskComment:1, notifications:1, notifRead:1, notifMention:1, saveTeams:1, saveMktTeams:1, saveSaleGroups:1, saveCareStatus:1,
+  saveTask:1, deleteTask:1, saveTaskComment:1, taskFlows:1, taskRequests:1, saveTaskFlow:1, deleteTaskFlow:1, taskAdvance:1, taskRequestDecide:1, notifications:1, notifRead:1, notifMention:1, saveTeams:1, saveMktTeams:1, saveSaleGroups:1, saveCareStatus:1,
   broadcastMark:1, saveBroadcast:1, broadcastCancel:1, broadcastSetStatus:1, saveFollowUpTemplates:1, saveAudit:1
 };
 function _ntlKey_() { return 'ntl_' + Utilities.formatDate(new Date(), 'GMT+7', 'yyyyMMdd'); }

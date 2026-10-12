@@ -97,7 +97,14 @@ function saveTaskEntry_(t) {
   else sh.appendRow(_taskToRow_(rec));
   _notifyMentions_({ text: (rec.title || '') + ' ' + (rec.description || ''), skipText: old ? ((old.title || '') + ' ' + (old.description || '')) : '',
                      from: t.by || rec.createdBy, kind: 'task', refType: 'task', refId: id });
-  if (!old && rec.flowId) _taskSysComment_(id, rec.createdBy, 'đã tạo công việc, bắt đầu giai đoạn "' + _taskFlowById_(rec.flowId).stages[0].name + '"', 'system', '');
+  if (!old && rec.flowId) {
+    var flow0_ = _taskFlowById_(rec.flowId), st0_ = flow0_.stages[0];
+    _taskSysComment_(id, rec.createdBy, 'đã tạo công việc, bắt đầu giai đoạn "' + st0_.name + '"', 'system', '');
+    _notifyTaskEvent_((rec.stageAssignees || {})[st0_.id] || [], { name: rec.createdBy, aliases: [rec.createdBy] }, 'task_assign', rec,
+                      'giao bạn xử lý giai đoạn "' + st0_.name + '" của việc "' + rec.title + '"');
+  } else if (!old && (rec.csAssigned || []).length) {
+    _notifyTaskEvent_(rec.csAssigned, { name: rec.createdBy, aliases: [rec.createdBy] }, 'task_assign', rec, 'giao bạn công việc "' + rec.title + '"');
+  }
   return jsonOut_({ ok: true, id: id });
 }
 
@@ -236,11 +243,83 @@ function saveTaskComment_(c) {
   var sh = getSheet_(SH_TASK_COMMENT, TASK_COMMENT_HEADERS);
   var id = 'tc_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
   var now = new Date().toISOString();
+  // Nguoi duoc tag do SERVER tinh (cung bo phan tich voi thong bao @tag: khop ten hien thi / ten dang nhap) -> ten hien thi,
+  // hop voi c.mentions client gui. Luu vao comment + gop vao Tasks.mentions (de loc "Toi duoc tag" khong phai quet TaskComments).
+  var tagNames = _taskMentionNames_(c.content, c.mentions);
   sh.appendRow([id, String(c.taskId), c.author || 'Ẩn danh', c.content || '',
                 JSON.stringify(c.images || []), now,
-                JSON.stringify(c.files || []), JSON.stringify(c.mentions || []), 'comment', '']);
+                JSON.stringify(c.files || []), JSON.stringify(tagNames), 'comment', '']);
   _notifyMentions_({ text: c.content, from: c.author, kind: 'comment', refType: 'task', refId: c.taskId, refId2: id });
+  if (tagNames.length) {
+    try {
+      var shT = getSheet_(SH_TASK, TASK_HEADERS), ft = _taskFind_(shT, c.taskId);
+      if (ft) {
+        var merged = (ft.task.mentions || []).slice();
+        tagNames.forEach(function (n) { if (merged.indexOf(n) < 0) merged.push(n); });
+        if (merged.length !== (ft.task.mentions || []).length) shT.getRange(ft.rowIdx, 18).setValue(JSON.stringify(merged));
+      }
+    } catch (e) { /* loi gop mentions khong duoc lam hong viec luu binh luan */ }
+  }
   return jsonOut_({ ok: true, id: id });
+}
+
+// ── Danh tinh nguoi thao tac + ten hien thi nguoi duoc tag (dung chung cho quy trinh cong viec) ──
+// Co token phien hop le -> lay nguoi THAT tu sheet Users (khong tin truong `by` client gui, chong gia danh);
+// khong co token (client cu / extension) -> tam dung `by` (chua bat buoc xac thuc: xem docs/SECURITY-PLAN.md).
+function _taskActor_(p) {
+  var su = null;
+  try { su = (p && p.token) ? _sessUser_(p.token) : null; } catch (e) { su = null; }
+  if (su) {
+    var al = [su.name, su.username].filter(function (x) { return x; }).map(String);
+    return { name: String(su.name || su.username), aliases: al, username: String(su.username || ''), verified: true };
+  }
+  var by = String((p && p.by) || '').trim();
+  return by ? { name: by, aliases: [by], username: '', verified: false } : null;
+}
+function _taskInList_(list, actor) {
+  if (!actor) return false;
+  var low = {}; actor.aliases.forEach(function (a) { low[String(a).trim().toLowerCase()] = 1; });
+  return (list || []).some(function (n) { return !!low[String(n || '').trim().toLowerCase()]; });
+}
+// text + mentions client gui -> mang TEN HIEN THI duy nhat (server tin bo phan tich cua no, gop them client de khong mat tag cu)
+function _taskMentionNames_(text, clientMentions) {
+  var out = [];
+  try {
+    var users = readUsers_(getCrmSS_().getSheetByName(SH_USER));
+    var byUn = {}; users.forEach(function (u) { byUn[String(u.username)] = u; });
+    _notifParseMentions_(text, users).forEach(function (un) { var u = byUn[un]; var n = u ? String(u.name || u.username) : un; if (out.indexOf(n) < 0) out.push(n); });
+  } catch (e) { /* bo qua */ }
+  (clientMentions || []).forEach(function (n) { n = String(n || '').trim(); if (n && out.indexOf(n) < 0) out.push(n); });
+  return out;
+}
+
+// ── THONG BAO SU KIEN QUY TRINH (M6): ghi vao sheet Notifications co san (cung kenh voi thong bao @tag; client js/39-fn-notify.js hien) ──
+// names = TEN HIEN THI nguoi nhan (assignees luu theo ten) -> doi sang username qua sheet Users. Khong bao chinh nguoi thao tac.
+// kind: task_assign | task_turn | task_request | task_decision | task_done. Loi bi nuot — thong bao KHONG BAO GIO lam hong thao tac that.
+function _notifyTaskEvent_(names, actor, kind, task, text) {
+  try {
+    var users = readUsers_(getCrmSS_().getSheetByName(SH_USER)), tos = {}, order = [];
+    var self = actor || { aliases: [] };
+    (names || []).forEach(function (n) {
+      var key = String(n || '').trim().toLowerCase(); if (!key) return;
+      users.forEach(function (u) {
+        if (u.active === false) return;
+        var al = [u.name, u.username].concat(u.names || []).map(function (x) { return String(x || '').trim().toLowerCase(); });
+        if (al.indexOf(key) < 0) return;
+        if (_taskInList_([u.name, u.username], self)) return;   // khong tu bao minh
+        if (!tos[u.username]) { tos[u.username] = 1; order.push(String(u.username)); }
+      });
+    });
+    if (!order.length) return 0;
+    var sh = getSheet_(SH_NOTIF, NOTIF_HEADERS), now = new Date().toISOString();
+    var snip = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+    var rows = order.map(function (to, i) {
+      return ['nt_' + Date.now() + '_' + i + '_' + Math.floor(Math.random() * 1000), to, (actor && actor.name) || 'Hệ thống', kind,
+              'task', String(task.id), '', snip, now, ''];
+    });
+    sh.getRange(sh.getLastRow() + 1, 1, rows.length, NOTIF_HEADERS.length).setValues(rows);
+    return rows.length;
+  } catch (e) { return 0; }
 }
 
 // Dong thong bao he thong trong luong thao luan (chuyen buoc, gui/duyet yeu cau...). kind: system | request
@@ -305,7 +384,18 @@ function saveTaskFlow_(f) {
     seen[sid] = 1;
     return { id: sid, name: String(x.name).trim(), approval: !!x.approval };
   });
-  readTaskFlows_(); // dam bao sheet + mau da khoi tao
+  var flowsNow_ = readTaskFlows_(); // dam bao sheet + mau da khoi tao
+  // Viec dang chay luu stageIdx THEO THU TU -> neu quy trinh dang co viec dung thi CAM chen/xoa/doi thu tu giai doan
+  // (se lam lech tien do, hoac mo lai viec da hoan thanh). Chi cho doi ten + co "can duyet". Muon doi cau truc: nhan ban.
+  if (f.id) {
+    var oldFlow_ = null; flowsNow_.forEach(function (x) { if (x.id === String(f.id)) oldFlow_ = x; });
+    if (oldFlow_) {
+      var usedN_ = readTasks_(getSheet_(SH_TASK, TASK_HEADERS)).filter(function (t) { return t.flowId === String(f.id); }).length;
+      var oldIds_ = oldFlow_.stages.map(function (x) { return x.id; }).join('|');
+      var newIds_ = stages.map(function (x) { return x.id; }).join('|');
+      if (usedN_ && oldIds_ !== newIds_) return jsonOut_({ error: 'Co ' + usedN_ + ' cong viec dang dung quy trinh nay — chi duoc doi ten giai doan / co "can duyet". Muon doi cau truc hay nhan ban thanh quy trinh moi.' });
+    }
+  }
   var sh = getSheet_(SH_TASK_FLOW, TASK_FLOW_HEADERS);
   var id = f.id || ('flow_' + Date.now() + '_' + Math.floor(Math.random() * 1000));
   var row = [id, String(f.name).trim(), JSON.stringify(stages), f.createdBy || '', new Date().toISOString()];
@@ -348,7 +438,7 @@ function readTaskRequests_(taskId, onlyPending) {
 }
 
 // Dua task sang giai doan ke tiep (hoac Hoan thanh neu dang o buoc cuoi). Goi SAU khi da kiem tra quyen/duyet.
-function _taskDoAdvance_(sh, found, flow, by, note, approvedBy) {
+function _taskDoAdvance_(sh, found, flow, by, note, approvedBy, actor) {
   var t = found.task, now = new Date().toISOString();
   var cur = flow.stages[t.stageIdx];
   var log = t.stageLog || [];
@@ -371,12 +461,20 @@ function _taskDoAdvance_(sh, found, flow, by, note, approvedBy) {
   t.stageLog = log; t.updatedAt = now;
   sh.getRange(found.rowIdx, 1, 1, TASK_HEADERS.length).setValues([_taskToRow_(t)]);
   _taskSysComment_(t.id, by, msg, 'system', '');
+  actor = actor || { name: by, aliases: [by] };
+  if (t.stageIdx >= flow.stages.length) {
+    _notifyTaskEvent_([t.createdBy], actor, 'task_done', t, 'công việc "' + t.title + '" đã HOÀN THÀNH');
+  } else {
+    var nx2 = flow.stages[t.stageIdx];
+    _notifyTaskEvent_((t.stageAssignees || {})[nx2.id] || [], actor, 'task_turn', t, 'đã chuyển tiếp — đến lượt bạn xử lý giai đoạn "' + nx2.name + '" của việc "' + t.title + '"');
+  }
   return t;
 }
 
-// Nguoi phu trach buoc hien tai bam "Chuyen tiep".
+// Nguoi phu trach buoc hien tai bam "Chuyen tiep". Danh tinh: token phien (neu co) > truong `by`.
 function taskAdvance_(p) {
-  if (!p || !p.taskId || !p.by) return jsonOut_({ error: 'Thieu taskId/by' });
+  var actor = _taskActor_(p);
+  if (!p || !p.taskId || !actor) return jsonOut_({ error: 'Thieu taskId/by' });
   var lock = LockService.getScriptLock();
   try { lock.waitLock(15000); } catch (e) { return jsonOut_({ error: 'He thong ban, thu lai' }); }
   try {
@@ -390,7 +488,7 @@ function taskAdvance_(p) {
     if (t.stageIdx >= flow.stages.length) return jsonOut_({ error: 'Cong viec da hoan thanh' });
     var cur = flow.stages[t.stageIdx];
     var assignees = (t.stageAssignees || {})[cur.id] || [];
-    if (assignees.indexOf(p.by) < 0 && p.by !== t.createdBy) {
+    if (!_taskInList_(assignees, actor) && !_taskInList_([t.createdBy], actor)) {
       return jsonOut_({ error: 'Ban khong phai nguoi phu trach giai doan "' + cur.name + '"' });
     }
     if (readTaskRequests_(t.id, true).length) return jsonOut_({ error: 'Dang cho nguoi duyet — chua the chuyen tiep' });
@@ -398,23 +496,25 @@ function taskAdvance_(p) {
     if (cur.approval) {
       var apr = (t.stageApprovers || {})[cur.id] || [];
       if (!apr.length && !isLast) apr = (t.stageAssignees || {})[flow.stages[t.stageIdx + 1].id] || [];
-      apr = apr.filter(function (n) { return n !== p.by; });
+      apr = apr.filter(function (n) { return !_taskInList_([n], actor); });
       if (!apr.length) return jsonOut_({ error: 'Giai doan "' + cur.name + '" can nguoi duyet nhung chua chon ai (hoac chi co chinh ban)' });
       var rsh = getSheet_(SH_TASK_REQ, TASK_REQ_HEADERS);
       var rid = 'rq_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
       var to = isLast ? '' : flow.stages[t.stageIdx + 1].id;
-      rsh.appendRow([rid, t.id, cur.id, to, p.by, JSON.stringify(apr), 'pending', '', '', p.note || '', new Date().toISOString()]);
-      _taskSysComment_(t.id, p.by, 'gửi YÊU CẦU DUYỆT để rời giai đoạn "' + cur.name + '" — chờ: ' + apr.join(', ') + (p.note ? '. Ghi chú: ' + p.note : ''), 'request', rid);
+      rsh.appendRow([rid, t.id, cur.id, to, actor.name, JSON.stringify(apr), 'pending', '', '', p.note || '', new Date().toISOString()]);
+      _taskSysComment_(t.id, actor.name, 'gửi YÊU CẦU DUYỆT để rời giai đoạn "' + cur.name + '" — chờ: ' + apr.join(', ') + (p.note ? '. Ghi chú: ' + p.note : ''), 'request', rid);
+      _notifyTaskEvent_(apr, actor, 'task_request', t, 'xin bạn duyệt chuyển tiếp giai đoạn "' + cur.name + '" của việc "' + t.title + '"' + (p.note ? ' — ' + p.note : ''));
       return jsonOut_({ ok: true, pending: true, requestId: rid });
     }
-    var nt = _taskDoAdvance_(sh, found, flow, p.by, p.note || '', '');
+    var nt = _taskDoAdvance_(sh, found, flow, actor.name, p.note || '', '', actor);
     return jsonOut_({ ok: true, stageIdx: nt.stageIdx, status: nt.status });
   } finally { lock.releaseLock(); }
 }
 
 // Nguoi duyet Chap nhan / Tu choi 1 yeu cau chuyen buoc.
 function taskRequestDecide_(p) {
-  if (!p || !p.requestId || !p.by) return jsonOut_({ error: 'Thieu requestId/by' });
+  var actor = _taskActor_(p);
+  if (!p || !p.requestId || !actor) return jsonOut_({ error: 'Thieu requestId/by' });
   var approve = (p.decision === 'approve');
   var lock = LockService.getScriptLock();
   try { lock.waitLock(15000); } catch (e) { return jsonOut_({ error: 'He thong ban, thu lai' }); }
@@ -428,20 +528,23 @@ function taskRequestDecide_(p) {
     var r = rsh.getRange(rowIdx, 1, 1, TASK_REQ_HEADERS.length).getValues()[0];
     if (String(r[6]) !== 'pending') return jsonOut_({ error: 'Yeu cau da duoc xu ly truoc do' });
     var approvers = _taskJson_(r[5], []);
-    if (approvers.indexOf(p.by) < 0) return jsonOut_({ error: 'Ban khong nam trong danh sach nguoi duyet' });
+    if (!_taskInList_(approvers, actor)) return jsonOut_({ error: 'Ban khong nam trong danh sach nguoi duyet' });
     var now = new Date().toISOString();
-    rsh.getRange(rowIdx, 7, 1, 4).setValues([[approve ? 'approved' : 'rejected', p.by, now, p.note || String(r[9] || '')]]);
+    rsh.getRange(rowIdx, 7, 1, 4).setValues([[approve ? 'approved' : 'rejected', actor.name, now, p.note || String(r[9] || '')]]);
     var sh = getSheet_(SH_TASK, TASK_HEADERS);
     var found = _taskFind_(sh, String(r[1]));
     if (!found) return jsonOut_({ ok: true });
+    var requester = String(r[4]);
     if (!approve) {
-      _taskSysComment_(found.task.id, p.by, 'TỪ CHỐI yêu cầu chuyển tiếp' + (p.note ? ': ' + p.note : '') + ' — giai đoạn hiện tại giữ nguyên', 'system', String(r[0]));
+      _taskSysComment_(found.task.id, actor.name, 'TỪ CHỐI yêu cầu chuyển tiếp' + (p.note ? ': ' + p.note : '') + ' — giai đoạn hiện tại giữ nguyên', 'system', String(r[0]));
+      _notifyTaskEvent_([requester], actor, 'task_decision', found.task, 'đã TỪ CHỐI yêu cầu chuyển tiếp việc "' + found.task.title + '"' + (p.note ? ': ' + p.note : ''));
       return jsonOut_({ ok: true, rejected: true });
     }
     var flow = _taskFlowById_(found.task.flowId);
     if (!flow || found.task.stageIdx >= flow.stages.length) return jsonOut_({ ok: true });
     if (flow.stages[found.task.stageIdx].id !== String(r[2])) return jsonOut_({ error: 'Cong viec da doi giai doan, yeu cau khong con hieu luc' });
-    var nt = _taskDoAdvance_(sh, found, flow, String(r[4]), '', p.by);
+    _notifyTaskEvent_([requester], actor, 'task_decision', found.task, 'đã CHẤP NHẬN yêu cầu chuyển tiếp việc "' + found.task.title + '"');
+    var nt = _taskDoAdvance_(sh, found, flow, requester, '', actor.name, actor);
     return jsonOut_({ ok: true, stageIdx: nt.stageIdx, status: nt.status });
   } finally { lock.releaseLock(); }
 }
