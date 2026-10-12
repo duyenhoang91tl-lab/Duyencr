@@ -100,7 +100,7 @@
     var t = $('sn-toggle'); if (t) t.classList.toggle('tc-unread', n > 0);
     if (!S.title0) S.title0 = document.title.replace(/^\(\d+\+?\)\s*/, '');
     document.title = (n ? '(' + (n > 99 ? '99+' : n) + ') ' : '') + S.title0;
-    renderSide();
+    renderSide(); miniRenderAll();
   }
 
   // ───────────── du lieu: kenh + tin nhan ─────────────
@@ -117,7 +117,7 @@
     S.me = r.me; S.users = r.users || []; S.chans = r.channels || []; S.chver = r.chver;
     if (!chById(S.active) && !S.pendingDm) S.active = 'general';
     if (S.pendingDm && !chById(S.pendingDm.id)) S.chans.push(S.pendingDm);
-    renderSide(); renderHead();
+    renderSide(); renderHead(); miniSync(); miniRenderAll();
     return r;
   }
   async function loadHistory(ch, before) {
@@ -159,16 +159,18 @@
     S.last = Math.max(S.last, r.last || 0);
     if (needCh) await reloadChannels();
     if (S.dver === -1) S.dver = r.dver;
-    else if (r.dver !== S.dver) { S.dver = r.dver; if (S.started) await reloadActive(); }
+    else if (r.dver !== S.dver) { S.dver = r.dver; if (S.started) { await reloadActive(); miniReloadAll(); } }
     if (S.firstPoll) {                       // lan dau tren may nay: coi tin hien co la da doc, tranh bao hang tram tin chua doc
       S.firstPoll = false;
       if (!S.lrLoaded) { S.chans.forEach(function (c) { var a = S.msgs[c.id] || [], mx = 0; a.forEach(function (x) { if (x.id > mx) mx = x.id; }); if (mx) S.lastRead[c.id] = mx; }); saveLR(); }
     } else {
       var viewing = S.panelOn && !document.hidden;
-      var theirs = fresh.filter(function (m) { return m.u !== S.me.username && !(viewing && m.c === S.active); });
+      var theirs = fresh.filter(function (m) { return m.u !== S.me.username && !(viewing && m.c === S.active) && !miniViewing(m.c); });
       if (theirs.length) { var t = theirs[theirs.length - 1], c = chById(t.c); say('💬 ' + t.n + (c && c.type !== 'dm' ? ' (' + chName(c) + ')' : '') + ': ' + t.t.slice(0, 60)); }
     }
     if (S.panelOn && fresh.some(function (m) { return m.c === S.active; })) { renderMsgs(); if (!document.hidden) markRead(S.active); }
+    S.mini.wins.forEach(function (w) { if (fresh.some(function (m) { return m.c === w.id; })) miniRenderWin(w, false); });
+    miniMarkVisible();
     renderBadges();
   }
   async function start() {
@@ -180,8 +182,9 @@
     S.authFail = false; S.started = true; S.firstPoll = true; S.last = 0; S.dver = -1;
     loadLR();
     await tick();
+    miniRestore();   // sau tick dau (de moc 'da doc' lan dau tren may duoc dat truoc khi cua so nho tu danh dau da doc)
   }
-  function stop() { S.started = false; clearTimeout(S.timer); S.me = null; S.pendingDm = null; S.active = 'general'; S.reply = null; S.chans = []; S.msgs = {}; S.last = 0; S.chver = -1; renderBadges(); }
+  function stop() { miniReset(); S.started = false; clearTimeout(S.timer); S.me = null; S.pendingDm = null; S.active = 'general'; S.reply = null; S.chans = []; S.msgs = {}; S.last = 0; S.chver = -1; renderBadges(); }
 
   // ───────────── giao dien ─────────────
   function ensurePanel() {
@@ -342,7 +345,7 @@
     });
     q.addEventListener('input', draw); draw();
   }
-  window.tcNewDm = function () {
+  window.tcNewDm = function (toMini) {
     if (!S.me) return;
     var sel = [], ov = modal('<h3>✉ Nhắn riêng</h3><input class="tc-usearch" placeholder="Tìm tên / team…"><div class="tc-ulist"></div>' +
       '<div class="tc-bf"><button class="btn" data-x>Huỷ</button><button class="btn primary" data-ok>Mở chat</button></div>');
@@ -352,10 +355,10 @@
       if (!sel.length) { say('Chọn 1 người để nhắn'); return; }
       var id = dmId(S.me.username, sel[0]);
       if (!chById(id)) { S.pendingDm = { id: id, name: '', type: 'dm', desc: '', members: [S.me.username, sel[0]], canManage: false, pending: true }; S.chans.push(S.pendingDm); }
-      ov.remove(); tcSelect(id);
+      ov.remove(); if (toMini === true) miniOpen(id); else tcSelect(id);
     };
   };
-  window.tcNewChannel = function () {
+  window.tcNewChannel = function (toMini) {
     if (!S.me) return;
     var sel = [], isAdmin = S.me.role === 'admin';
     var ov = modal('<h3>＋ Tạo nhóm / kênh</h3><input id="tc-nm" maxlength="40" placeholder="Tên nhóm (tối đa 40 ký tự)"><input id="tc-ds" maxlength="200" placeholder="Mô tả (không bắt buộc)">' +
@@ -373,7 +376,7 @@
       this.disabled = true;
       var r = await apiPost('chatCreateChannel', { name: name, type: type, desc: ov.querySelector('#tc-ds').value.trim(), members: sel });
       if (!r.ok) { say(r.error || 'Không tạo được'); this.disabled = false; return; }
-      ov.remove(); await reloadChannels(); tcSelect(r.channel.id);
+      ov.remove(); await reloadChannels(); if (toMini === true) miniOpen(r.channel.id); else tcSelect(r.channel.id);
     };
   };
   window.tcManage = function () {
@@ -401,6 +404,200 @@
     };
   };
 
+  // ───────────── cua so chat nho (dock goc duoi phai, kieu Zalo/Pancake) ─────────────
+  // 1 danh sach kenh (thu gon/mo) + toi da 3 cua so hoi thoai nho, dung CHUNG du lieu S.msgs / poll / da-doc voi tab Chat day du.
+  // Chi hien khi dang o tab khac (o tab Chat da co khung day du). Trang thai (mo/thu gon) nho theo may: localStorage ome_chat_mini_<user>.
+  // Moi chuoi nguoi dung di qua esc()/textContent; id kenh chi nam trong thuoc tinh data-ch (khong vao chuoi JS).
+  var MINI_W = 340, MINI_MAX = 3;
+  S.mini = { listOpen: false, wins: [], q: '' };
+  function miniKey() { return 'ome_chat_mini_' + (S.me ? S.me.username : ''); }
+  function miniSave() {
+    try { localStorage.setItem(miniKey(), JSON.stringify({ l: S.mini.listOpen ? 1 : 0, w: S.mini.wins.map(function (w) { return [w.id, w.min ? 1 : 0]; }) })); } catch (e) {}
+  }
+  function miniMax() { var room = (window.innerWidth || 1200) - 76 - 290 - 20; return Math.max(1, Math.min(MINI_MAX, Math.floor(room / (MINI_W + 10)))); }
+  function miniWin(id) { for (var i = 0; i < S.mini.wins.length; i++) if (S.mini.wins[i].id === id) return S.mini.wins[i]; return null; }
+  function miniViewing(ch) { var w = miniWin(ch); return !!w && !w.min && !S.panelOn && !document.hidden; }
+  function miniMarkVisible() { S.mini.wins.forEach(function (w) { if (miniViewing(w.id)) markRead(w.id); }); }
+
+  function miniDock() {
+    var d = $('tc-mini'); if (d) return d;
+    d = document.createElement('div'); d.id = 'tc-mini'; d.className = 'off';
+    d.innerHTML = '<div class="tcm-list" id="tcm-list">' +
+      '<div class="tcm-lh" data-act="list"><span>💬 Chat nội bộ</span><span class="tcm-nb" id="tcm-lbadge" style="display:none">0</span><span class="tcm-sp"></span>' +
+        '<button data-act="newdm" title="Nhắn riêng">✉</button><button data-act="newch" title="Tạo nhóm">＋</button></div>' +
+      '<div class="tcm-lp"><input class="tcm-q" placeholder="Tìm kênh / người…"><div class="tcm-lbody" id="tcm-lbody"></div></div></div>';
+    document.body.appendChild(d);
+    d.addEventListener('click', miniClick);
+    d.addEventListener('keydown', function (e) {
+      if (e.target.tagName !== 'TEXTAREA' || e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+      var el = e.target.closest('.tcm-win'), w = el ? miniWin(el.getAttribute('data-ch')) : null;
+      if (w) { e.preventDefault(); miniSend(w); }
+    });
+    d.addEventListener('input', function (e) {
+      var t = e.target;
+      if (t.classList.contains('tcm-q')) { S.mini.q = t.value; miniRenderListBody(); }
+      else if (t.tagName === 'TEXTAREA') { t.style.height = 'auto'; t.style.height = Math.min(90, t.scrollHeight) + 'px'; }
+    });
+    return d;
+  }
+  function miniClick(e) {
+    var a = e.target.closest ? e.target.closest('[data-act]') : null; if (!a) return;
+    var act = a.getAttribute('data-act'), win = a.closest('.tcm-win'), ch = a.getAttribute('data-ch') || (win ? win.getAttribute('data-ch') : ''), w = ch ? miniWin(ch) : null;
+    if (act === 'list') { S.mini.listOpen = !S.mini.listOpen; miniSave(); miniRenderAll(); if (S.mini.listOpen) { var q = $('tc-mini').querySelector('.tcm-q'); if (q) q.focus(); } }
+    else if (act === 'newdm') { e.stopPropagation(); tcNewDm(true); }
+    else if (act === 'newch') { e.stopPropagation(); tcNewChannel(true); }
+    else if (act === 'open') miniOpen(ch);
+    else if (act === 'wmin' && w) { w.min = !w.min; miniSave(); miniRenderWin(w, true); if (!w.min) { miniMarkVisible(); var ta = w.el.querySelector('textarea'); if (ta) ta.focus(); } else renderBadges(); }
+    else if (act === 'wclose' && w) miniClose(ch);
+    else if (act === 'wsend' && w) miniSend(w);
+    else if (act === 'older' && w) { var arr = (S.msgs[ch] || []).filter(function (m) { return !m.tmp; }); if (arr.length) loadHistory(ch, arr[0].id).then(function () { w.sig = ''; miniRenderWin(w); }); }
+    else if (act === 'wfull' && w) {
+      miniClose(ch);
+      var tabEl = document.querySelector('.tab[data-bar-id="tab-teamchat"]');
+      if (typeof switchTab === 'function') { switchTab('teamchat', tabEl); setTimeout(function () { tcSelect(ch); }, 0); }
+    }
+  }
+  function miniBuildWin(w) {
+    var el = document.createElement('div'); el.className = 'tcm-win'; el.setAttribute('data-ch', w.id);
+    el.innerHTML = '<div class="tcm-wh" data-act="wmin"><span class="tcm-wt"></span><span class="tcm-nb" style="display:none"></span><span class="tcm-sp"></span>' +
+      '<button data-act="wfull" title="Mở trong tab Chat nội bộ">⤢</button><button data-act="wmin" title="Thu gọn / mở">–</button><button data-act="wclose" title="Đóng">×</button></div>' +
+      '<div class="tcm-wb"><div class="tcm-msgs"></div><div class="tcm-comp"><textarea rows="1" maxlength="' + MAX_LEN + '" placeholder="Nhập tin nhắn…"></textarea>' +
+      '<button data-act="wsend" title="Gửi">➤</button></div></div>';
+    return el;
+  }
+  function miniSync() {
+    var d = miniDock();
+    S.mini.wins = S.mini.wins.filter(function (w) { var ok = !!chById(w.id); if (!ok && w.el) w.el.remove(); return ok; });
+    S.mini.wins.forEach(function (w) { if (!w.el) w.el = miniBuildWin(w); d.appendChild(w.el); });
+  }
+  function miniRenderListBody() {
+    var box = $('tcm-lbody'); if (!box || !S.me) return;
+    var q = (S.mini.q || '').toLowerCase(), list = S.chans.filter(function (c) { return !q || chName(c).toLowerCase().indexOf(q) !== -1; });
+    list.sort(function (a, b) { return lastTs(b.id) - lastTs(a.id) || chName(a).localeCompare(chName(b)); });
+    var h = '';
+    list.forEach(function (c) {
+      var n = unread(c.id), arr = S.msgs[c.id] || [], last = arr.length ? arr[arr.length - 1] : null;
+      var prev = last ? (last.u === S.me.username ? 'Bạn' : last.n) + ': ' + last.t.slice(0, 40) : (c.desc || '');
+      h += '<div class="tcm-it' + (n ? ' has' : '') + '" data-act="open" data-ch="' + esc(c.id) + '">' +
+        '<div class="tc-av" style="background:' + colorOf(c.id) + '">' + esc(c.type === 'dm' ? initials(chName(c)) : chIcon(c)) + '</div>' +
+        '<div class="tcm-im"><div class="tcm-in">' + esc(chName(c)) + '</div><div class="tcm-ip">' + esc(prev) + '</div></div>' +
+        (n ? '<span class="tcm-nb' + (unreadMention(c.id) ? ' men' : '') + '">' + (n > 99 ? '99+' : n) + '</span>' : '') + '</div>';
+    });
+    box.innerHTML = h || '<div class="tc-empty">Không có kênh nào khớp.</div>';
+  }
+  function miniMsgsHtml(ch) {
+    var a = S.msgs[ch] || [], h = '', lastDay = '', lastU = '', lastT = 0;
+    if (S.more[ch]) h += '<div class="tc-more"><button class="btn sm" data-act="older">Xem tin cũ hơn</button></div>';
+    if (!a.length) h += '<div class="tc-empty">Chưa có tin nhắn nào 👋</div>';
+    a.forEach(function (m) {
+      var dk = dayKey(m.ts || Date.now());
+      if (dk !== lastDay) { h += '<div class="tc-day"><span>' + dayLabel(m.ts || Date.now()) + '</span></div>'; lastDay = dk; lastU = ''; }
+      var mine = m.u === S.me.username, grp = (m.u === lastU && (m.ts - lastT) < 300000);
+      h += '<div class="tc-msg' + (mine ? ' mine' : '') + (grp ? ' grp' : '') + (m.tmp ? ' tmp' : '') + (mentionsMe(m) && !mine ? ' men' : '') + '">' +
+        (grp ? '<div class="tc-av ph"></div>' : '<div class="tc-av" style="background:' + colorOf(m.u) + '">' + esc(initials(m.n)) + '</div>') +
+        '<div class="tc-bd">' + (grp ? '' : '<div class="tc-who"><b>' + esc(m.n) + '</b><span>' + hhmm(m.ts) + '</span></div>') +
+        '<div class="tc-tx">' + fmtText(m.t) + '</div></div>' + (m.tmp ? '<div class="tc-st">đang gửi…</div>' : '') + '</div>';
+      lastU = m.u; lastT = m.ts;
+    });
+    return h;
+  }
+  function miniRenderWin(w, stick) {
+    var el = w.el; if (!el || !S.me) return;
+    var c = chById(w.id), n = unread(w.id), nb = el.querySelector('.tcm-wh .tcm-nb');
+    el.querySelector('.tcm-wt').textContent = c ? chIcon(c) + ' ' + chName(c) : '…';
+    nb.textContent = n > 99 ? '99+' : n; nb.style.display = (n && w.min) ? '' : 'none'; nb.classList.toggle('men', unreadMention(w.id));
+    el.classList.toggle('min', !!w.min);
+    if (w.min) return;
+    var a = S.msgs[w.id] || [], sig = a.length + '|' + (a.length ? a[a.length - 1].id : '') + '|' + (S.more[w.id] ? 1 : 0) + '|' + S.authFail;
+    if (sig === w.sig && !stick) return;
+    w.sig = sig;
+    var box = el.querySelector('.tcm-msgs'), near = box.scrollHeight - box.scrollTop - box.clientHeight < 70, prevH = box.scrollHeight, prevT = box.scrollTop;
+    box.innerHTML = S.authFail ? '<div class="tc-empty">Phiên đăng nhập đã hết hạn — đăng nhập lại để dùng chat.</div>' : miniMsgsHtml(w.id);
+    if (stick || near) box.scrollTop = box.scrollHeight; else box.scrollTop = prevT + (box.scrollHeight - prevH);
+  }
+  function miniRenderAll() {
+    var d = $('tc-mini'); if (!d) { if (!S.me) return; d = miniDock(); }
+    var show = !!S.me && !S.panelOn && !S.authFail;
+    d.classList.toggle('off', !show);
+    if (!show) return;
+    var lst = $('tcm-list'), b = $('tcm-lbadge'), n = totalUnread();
+    lst.classList.toggle('open', !!S.mini.listOpen);
+    b.textContent = n > 99 ? '99+' : n; b.style.display = n ? '' : 'none';
+    if (S.mini.listOpen) miniRenderListBody();
+    S.mini.wins.forEach(function (w) { miniRenderWin(w); });
+  }
+  function miniOpen(id) {
+    if (!S.me || !chById(id)) return;
+    var w = miniWin(id);
+    if (w) w.min = false;
+    else {
+      w = { id: id, min: false, el: null, sending: false, sig: '' };
+      S.mini.wins.unshift(w);
+      while (S.mini.wins.length > miniMax()) { var old = S.mini.wins.pop(); if (old.el) old.el.remove(); }
+    }
+    miniSave(); miniSync(); miniRenderAll(); miniRenderWin(w, true);
+    var ta = w.el && w.el.querySelector('textarea'); if (ta) ta.focus();
+    if (!S.msgs[id] || !S.msgs[id].length) loadHistory(id).then(function () { miniRenderWin(w, true); miniMarkVisible(); });
+    else miniMarkVisible();
+  }
+  function miniClose(id) {
+    var w = miniWin(id); if (!w) return;
+    if (w.el) w.el.remove();
+    S.mini.wins = S.mini.wins.filter(function (x) { return x !== w; });
+    miniSave(); renderBadges();
+  }
+  function miniReset() {
+    S.mini.wins.forEach(function (w) { if (w.el) w.el.remove(); });
+    S.mini.wins = []; S.mini.q = '';
+    var d = $('tc-mini'); if (d) d.classList.add('off');
+  }
+  function miniRestore() {
+    var raw = null; try { raw = JSON.parse(localStorage.getItem(miniKey()) || 'null'); } catch (e) {}
+    miniReset();
+    S.mini.listOpen = !!(raw && raw.l);
+    if (raw && raw.w) raw.w.slice(0, miniMax()).forEach(function (x) { if (chById(x[0])) S.mini.wins.push({ id: x[0], min: !!x[1], el: null, sending: false, sig: '' }); });
+    miniSync(); miniRenderAll();
+    S.mini.wins.forEach(function (w) {
+      if (!S.msgs[w.id] || !S.msgs[w.id].length) loadHistory(w.id).then(function () { miniRenderWin(w, true); miniMarkVisible(); });
+      else { miniRenderWin(w, true); }
+    });
+    miniMarkVisible();
+  }
+  function miniReloadAll() {   // tin bi xoa (dver doi): nap lai lich su cac cua so dang mo (kenh dang xem o tab Chat do reloadActive lo)
+    S.mini.wins.forEach(function (w) {
+      if (w.id === S.active && S.panelOn) return;
+      S.msgs[w.id] = (S.msgs[w.id] || []).filter(function (m) { return m.tmp; });
+      loadHistory(w.id).then(function () { miniRenderWin(w, true); });
+    });
+  }
+  async function miniSend(w) {
+    var ta = w.el && w.el.querySelector('textarea'); if (!ta || w.sending || !S.me) return;
+    var text = ta.value.trim(); if (!text) return;
+    if (text.length > MAX_LEN) { say('Tin nhắn quá dài (tối đa ' + MAX_LEN + ' ký tự)'); return; }
+    var ch = w.id; w.sending = true;
+    var tmp = { id: 't' + Date.now(), c: ch, u: S.me.username, n: S.me.name, t: text, ts: Date.now(), r: '', tmp: true };
+    (S.msgs[ch] || (S.msgs[ch] = [])).push(tmp);
+    ta.value = ''; ta.style.height = 'auto'; miniRenderWin(w, true);
+    var r = await apiPost('chatSend', { channel: ch, text: text, replyTo: '' });
+    S.msgs[ch] = (S.msgs[ch] || []).filter(function (m) { return m !== tmp; });
+    if (r.ok) {
+      addMsg(r.msg); S.last = Math.max(S.last, r.last || 0);
+      if (S.pendingDm && S.pendingDm.id === ch) { S.pendingDm = null; await reloadChannels(); }
+      markRead(ch);
+    } else {
+      if (r.code === 'AUTH') S.authFail = true;
+      say(r.error || 'Gửi không được, thử lại'); if (!ta.value) ta.value = text;
+    }
+    w.sending = false; miniRenderWin(w, true);
+    if (S.panelOn && S.active === ch) renderMsgs(true);
+    renderSide(); renderBadges();
+  }
+  window.addEventListener('resize', function () {
+    var mx = miniMax(); if (S.mini.wins.length <= mx) return;
+    while (S.mini.wins.length > mx) { var old = S.mini.wins.pop(); if (old.el) old.el.remove(); }
+    miniSave();
+  });
+
   // ───────────── gan vao app ─────────────
   function enter() {
     ensurePanel(); S.panelOn = true;
@@ -418,11 +615,12 @@
     _prevSwitch(tab, el);
     var p = $('tab-teamchat');
     S.panelOn = (tab === 'teamchat');
-    document.body.classList.toggle('tc-on', tab === 'teamchat');   // CSS: an banner deploy (co dinh goc duoi phai) de khong che nut Gui
+    document.body.classList.toggle('tc-on', tab === 'teamchat');
+    miniRenderAll(); if (tab !== 'teamchat') miniMarkVisible();   // CSS: an banner deploy (co dinh goc duoi phai) de khong che nut Gui
     if (tab === 'teamchat') { ensurePanel(); p = $('tab-teamchat'); if (p) p.style.display = 'flex'; enter(); }
     else if (p) p.style.display = 'none';
   };
-  document.addEventListener('visibilitychange', function () { if (!document.hidden && S.started) { clearTimeout(S.timer); tick(); if (S.panelOn) markRead(S.active); } });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && S.started) { clearTimeout(S.timer); tick(); if (S.panelOn) markRead(S.active); miniMarkVisible(); } });
   // Tu khoi dong sau khi dang nhap (de huy hieu chua doc chay ca khi chua mo tab Chat); dung lai khi dang xuat.
   setInterval(function () {
     var has = !!tok() && !!gs();

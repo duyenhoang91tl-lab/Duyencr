@@ -87,3 +87,14 @@ Yêu cầu của Duyên: tab Công việc có nhiều LOẠI quy trình, mỗi l
 - Báo cáo A và B nay dùng MỘT thanh `.srb-bar`: chọn báo cáo · khoảng ngày · 🔎 Bộ lọc · Lọc · 🧰 Tác vụ (trong menu có "Ẩn/Hiện bộ lọc KH"); bỏ hàng tiêu đề thừa. Dòng tóm tắt bộ lọc xuống hàng dưới thanh. Non-admin có chip 🔒 tên.
 - Menu lọc có chế độ theo báo cáo (`_srbMenuCats_`): A = Sale, Team, Kênh, Sản phẩm, Tính theo ngày (chọn 1: Ngày tạo / Thời gian hoàn thành), Tính theo người tạo đơn (công tắc, tải lại ngay như checkbox cũ). Thêm kiểu mục `radio` và `toggle`. Đổi báo cáo → menu tự đóng.
 - Báo cáo C–L chưa đổi thanh lọc (vẫn ô riêng); gear-menu của chúng đã hết lỗi bung sẵn nhờ sửa CSS.
+
+---
+
+# HANDOFF — Cua so chat nho (mini chat dock)  [2026-10-12]
+
+Yeu cau cua Duyen: Chat noi bo hien thi duoc o cua so chat nho o goc duoi phai (giong Zalo/Pancake) de vua lam viec o tab khac vua nhan tin.
+- [x] `js/43-teamchat.js` (khoi "cua so chat nho") + `css/07-teamchat.css` (cuoi file, tien to `tcm-`/`#tc-mini`): thanh "💬 Chat nội bộ" (huy hieu chua doc) bam mo danh sach kenh (tim kiem, xem truoc tin cuoi, ✉ Nhan rieng, ＋ Tao nhom), bam kenh mo cua so hoi thoai nho (toi da 3 cua so, it hon tren man hep): tieu de bam de thu gon, ⤢ mo trong tab Chat day du, × dong, Enter gui / Shift+Enter xuong dong. Thu gon + tin moi -> huy hieu do tren tieu de.
+- Dung CHUNG du lieu `S.msgs`, vong poll `chatPoll`, trang thai da doc `ome_chat_lr_<user>` voi tab Chat day du => KHONG them API/GAS moi (khong can deploy GAS). Trang thai mo/thu gon nho theo may: localStorage `ome_chat_mini_<user>`.
+- Chi hien khi dang o tab khac (o tab Chat da co khung day du); an tren dien thoai (<=720px). Dat `right:76px;bottom:38px` de khong de len chuong nhac hen (css/01-base) / dock AI / thanh tab ho so (css/06-pro).
+- Test: `node tools/test-chat-mini.js` (can jsdom, mat ~20s vi cho poll 12s; thieu jsdom thi tu bo qua).
+- Chua lam / chua thu tren trinh duyet that: tra loi (↩) va xoa tin trong cua so nho (van dung duoc o tab Chat day du); keo tha vi tri cua so; am thanh/nhay tieu de khi co tin moi (hien chi co toast san co + huy hieu).

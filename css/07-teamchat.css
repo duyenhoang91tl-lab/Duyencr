@@ -79,3 +79,43 @@ body.tc-on #stats-row,body.tc-on #files-bar{display:none!important}
   .tc-acts{display:none}
   .tc-msg.sel .tc-acts{display:flex}
 }
+
+/* CUA SO CHAT NHO (dock goc duoi phai, kieu Zalo/Pancake): danh sach kenh + toi da 3 cua so hoi thoai. JS: khoi "cua so chat nho" trong js/43-teamchat.js.
+   Dat o bottom:38px (tren thanh tab ho so #pro-tabbar) va right:76px (chua cho chuong nhac hen + dock AI). An o tab Chat day du va tren dien thoai. */
+#tc-mini{position:fixed;right:76px;bottom:38px;z-index:320;display:flex;flex-direction:row-reverse;align-items:flex-end;gap:10px;pointer-events:none}
+#tc-mini.off{display:none}
+#tc-mini>*{pointer-events:auto}
+.tcm-list,.tcm-win{background:var(--surface);border:1px solid var(--border-md);border-bottom:0;border-radius:10px 10px 0 0;box-shadow:var(--shadow-md);display:flex;flex-direction:column;overflow:hidden}
+.tcm-list{width:280px}
+.tcm-win{width:330px;height:430px}
+.tcm-win.min{height:auto}
+.tcm-lh,.tcm-wh{display:flex;align-items:center;gap:8px;height:40px;padding:0 8px 0 12px;color:#fff;font-weight:700;font-size:13.5px;cursor:pointer;flex-shrink:0;user-select:none}
+.tcm-lh{background:var(--green)}
+.tcm-wh{background:var(--text)}
+.tcm-lh button,.tcm-wh button{background:none;border:0;color:inherit;opacity:.85;cursor:pointer;font-size:16px;line-height:1;padding:4px 6px;border-radius:4px}
+.tcm-lh button:hover,.tcm-wh button:hover{opacity:1;background:rgba(255,255,255,.18)}
+.tcm-sp{flex:1}
+.tcm-wt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.tcm-nb{background:var(--green-mid);color:#fff;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;flex-shrink:0}
+.tcm-lh .tcm-nb,.tcm-wh .tcm-nb{background:var(--red)}
+.tcm-nb.men{background:var(--red)}
+.tcm-lp{display:none;flex-direction:column;height:380px;min-height:0}
+.tcm-list.open .tcm-lp{display:flex}
+.tcm-q{margin:8px;border:1px solid var(--border-md);border-radius:var(--rsm);padding:6px 9px;font:inherit;font-size:13px;background:var(--surface);color:var(--text)}
+.tcm-lbody{flex:1;overflow-y:auto;min-height:0}
+.tcm-it{display:flex;gap:9px;align-items:center;padding:8px 12px;cursor:pointer}
+.tcm-it:hover{background:var(--surface2)}
+.tcm-it.has .tcm-in{font-weight:700}
+.tcm-im{flex:1;min-width:0}
+.tcm-in{font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tcm-ip{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tcm-wb{display:flex;flex-direction:column;flex:1;min-height:0}
+.tcm-win.min .tcm-wb{display:none}
+.tcm-msgs{flex:1;overflow-y:auto;padding:8px 10px;display:flex;flex-direction:column;min-height:0}
+.tcm-msgs .tc-msg{padding:2px}
+.tcm-msgs .tc-av{width:28px;height:28px;font-size:11px}
+.tcm-msgs .tc-tx{font-size:13px}
+.tcm-comp{display:flex;gap:6px;padding:8px;border-top:1px solid var(--border);align-items:flex-end;flex-shrink:0}
+.tcm-comp textarea{flex:1;resize:none;border:1px solid var(--border-md);border-radius:var(--r);padding:6px 9px;font:inherit;font-size:13px;max-height:90px;background:var(--surface);color:var(--text)}
+.tcm-comp button{border:0;background:var(--green);color:#fff;border-radius:var(--r);width:34px;height:32px;cursor:pointer;font-size:14px}
+@media (max-width:720px){#tc-mini{display:none!important}}
