@@ -603,6 +603,8 @@ switchTab = function(tab, el){
   if (tab === 'dailybrief' && !_dbStandalone){ _dbOpenStandalone(); return; } // Bao cao ngay = trang rieng
   _v9PrevSwitchTab(tab, el);
   _activeV9Tab = tab;
+  // Tab quản trị (Team, Nhật ký) không dùng bộ lọc KH → ẩn sidebar để không bị kẹt màn bên trái (nhất là điện thoại)
+  document.body.classList.toggle('no-kh-sidebar', tab === 'team' || tab === 'audit');
   ['dashboard','team','audit','uploaddata','salesreport','pancake','kpipancake','mktchecklist','dailybrief'].forEach(function(name){
     var panel = document.getElementById('tab-'+name);
     if (panel) panel.style.display = (tab===name) ? 'flex' : 'none';

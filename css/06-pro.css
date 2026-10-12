@@ -152,3 +152,9 @@ html.ui-pro #data-view .tabs .tab[data-sn-g]:not(.sn-hide),html.ui-pro #data-vie
 html.ui-pro #data-view .tabs .tab[data-sn-g]:hover,html.ui-pro #data-view .tabs .sn-act:hover{background:rgba(255,255,255,.14);}
 html.ui-pro #data-view .tabs .tab[data-sn-g].active{background:rgba(255,255,255,.22);}
 @keyframes snIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+
+/* ── Nền xanh lá pastel đậm→nhạt dần (sidebar lọc KH + tab Quản lý Team) ── */
+html.ui-pro .sidebar{background:linear-gradient(180deg,#7fbf93 0%,#a9d8b6 28%,#d3ecd9 62%,#eef8f0 100%);border-right-color:#8cc59d;}
+html.ui-pro #tab-team{background:linear-gradient(180deg,#a9d8b6 0%,#d3ecd9 30%,#eef8f0 65%,#f7fbf8 100%);}
+/* Tab Team/Nhật ký: ẩn sidebar lọc KH */
+body.no-kh-sidebar .sidebar,body.no-kh-sidebar .sidebar-backdrop{display:none!important;}
