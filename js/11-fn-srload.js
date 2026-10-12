@@ -598,9 +598,14 @@ function renderSalesReportTab(){
       '</div>';
   }
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
-  filters += '<button class="btn sm" onclick="exportSalesReport()">📊 Xuất Excel</button>';
-  if (_srIsAdmin()) filters += '<button class="btn sm" id="sr-export-sheet-btn" title="'+(_srState.sub==='A' ? 'Ghi đè vào ĐÚNG 1 tab cố định (BC_A_Base) — không tạo tab mới mỗi lần xuất' : 'Tạo 1 tab mới có timestamp, giữ lại lịch sử các lần xuất trước')+'" onclick="exportSalesReportToSheet()">'+(_srState.sub==='A' ? '📌 Cập nhật Sheet Base' : '📄 Xuất ra Sheet')+'</button>';
-  if (_srIsAdmin()) filters += '<button class="btn sm secondary" onclick="_srToggleHiddenPanel()" title="Chọn Page/kênh và Sale không thuộc phạm vi quản lý để ẩn khỏi mọi báo cáo chung">👁 Ẩn/Hiện Page &amp; Sale</button>';
+  // Gom Xuất Excel / Cập nhật Sheet / Ẩn-Hiện Page & Sale vào 1 menu "🧰 Tác vụ" cho gọn (mẫu .gear-menu)
+  filters += '<div class="gear-menu"><button class="btn sm" onclick="_srToggleGearMenu(event,\'sr-gear-ab\')">🧰 Tác vụ ▾</button>'+
+    '<div class="gear-menu-list" id="sr-gear-ab" onclick="event.stopPropagation()">'+
+      '<div onclick="closeGearMenus();exportSalesReport()">📊 Xuất Excel</div>'+
+      (_srIsAdmin() ? '<div id="sr-export-sheet-btn" title="'+(_srState.sub==='A' ? 'Ghi đè vào ĐÚNG 1 tab cố định (BC_A_Base) — không tạo tab mới mỗi lần xuất' : 'Tạo 1 tab mới có timestamp, giữ lại lịch sử các lần xuất trước')+'" onclick="closeGearMenus();exportSalesReportToSheet()">'+(_srState.sub==='A' ? '📌 Cập nhật Sheet Base' : '📄 Xuất ra Sheet')+'</div>' : '')+
+      (_srIsAdmin() ? '<div onclick="closeGearMenus();_srToggleHiddenPanel()" title="Chọn Page/kênh và Sale không thuộc phạm vi quản lý để ẩn khỏi mọi báo cáo chung">👁 Ẩn/Hiện Page &amp; Sale</div>' : '')+
+      '<div onclick="closeGearMenus();_srToggleSidebar()">'+(_srSidebarHidden ? '📂 Hiện bộ lọc KH' : '📁 Ẩn bộ lọc KH — chụp màn hình')+'</div>'+
+    '</div></div>';
   filters += '</div>';
 
   var body = '';
