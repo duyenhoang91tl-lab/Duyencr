@@ -32,6 +32,10 @@ JSDOM.fromFile(path.join(__dirname, '..', 'index.html'), { runScripts: 'dangerou
     ok(D.querySelector('.sn-act[data-act="profile"]'), 'menu co muc Ho so nhan vien');
     w.openProfileModal(); await wait(300);
     const ov = D.getElementById('sp-overlay'); ok(ov && ov.classList.contains('open'), 'hop thoai mo');
+    ok(D.querySelector('#sp-overlay > .sp-box.sp-box') && D.querySelector('.sp-layout > .sp-colL #sp-fullName') && D.querySelector('.sp-layout > .sp-colR .sp-card'), 'bo cuc man day du: ho so o cot trai, ket qua o cot phai');
+    ok(/Quay lại/.test(D.getElementById('sp-close').textContent), 'nut ← Quay lai');
+    ok(D.documentElement.classList.contains('sp-lock'), 'khoa cuon trang nen khi man day du mo');
+    ok(!D.querySelector('.sp-overlay .sp-box').style.maxWidth && /position:fixed;inset:0/.test(require('fs').readFileSync(path.join(__dirname, '..', 'css', '09-profile.css'), 'utf8')) && !/width:min\(620px/.test(require('fs').readFileSync(path.join(__dirname, '..', 'css', '09-profile.css'), 'utf8')), 'CSS: phu kin cua so, khong con hop 620px');
     ok(!D.getElementById('sp-pick'), 'nhan vien thuong khong co o chon nhan vien');
     ok(w.__xss !== 1 && !D.querySelector('#sp-body img'), 'ho ten co HTML bi escape (khong XSS)');
     ok(D.getElementById('sp-fullName').value.indexOf('<img') === 0, 'o ho ten giu nguyen chuoi text');
@@ -64,6 +68,10 @@ JSDOM.fromFile(path.join(__dirname, '..', 'index.html'), { runScripts: 'dangerou
     const q = D.getElementById('sp-quick'); q.value = 'lastMonth'; q.dispatchEvent(new w.Event('change', { bubbles: true })); await wait(300);
     ok(calls.filter(c => /staffOverview/.test(c.url)).length === n0 + 1, 'doi ky -> goi lai staffOverview');
     ok(/from=\d{4}-\d{2}-01&to=\d{4}-\d{2}-\d{2}/.test(calls[calls.length - 1].url), 'tham so ngay dung dinh dang');
+    D.getElementById('sp-close').click();
+    ok(!D.getElementById('sp-overlay').classList.contains('open') && !D.documentElement.classList.contains('sp-lock'), '← Quay lai dong man hinh va mo khoa cuon trang');
+    w.openProfileModal(); await wait(100);
+    ok(D.getElementById('sp-overlay').classList.contains('open') && D.documentElement.classList.contains('sp-lock'), 'mo lai duoc');
     console.log('ALL STAFF PROFILE UI TESTS PASSED'); w.close();
   }, 3500);
 });

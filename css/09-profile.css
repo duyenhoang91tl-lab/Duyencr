@@ -1,10 +1,10 @@
-/* Hồ sơ nhân viên (js/47-staff-profile.js) */
-.sp-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:700;display:none;align-items:flex-start;justify-content:center;padding:4vh 8px 0;}
+/* Hồ sơ nhân viên (js/47-staff-profile.js) — MÀN HÌNH ĐẦY ĐỦ (phủ kín cửa sổ, nút ← Quay lại); màn rộng chia 2 cột: hồ sơ | kết quả làm việc */
+.sp-overlay{position:fixed;inset:0;background:var(--bg,#f6f5f3);z-index:700;display:none;}
 .sp-overlay.open{display:flex;}
-.sp-box{width:min(620px,100%);max-height:92vh;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border-md);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.25);overflow:hidden;}
-.sp-head{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border);font-size:15px;}
+.sp-box{width:100%;height:100%;display:flex;flex-direction:column;background:var(--bg,#f6f5f3);overflow:hidden;}
+.sp-head{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--border);font-size:16px;flex:none;}
 .sp-sp{flex:1;}
-.sp-body{padding:14px;overflow:auto;-webkit-overflow-scrolling:touch;}
+.sp-body{flex:1;min-height:0;padding:16px max(12px,calc((100% - 1240px)/2)) 32px;overflow:auto;-webkit-overflow-scrolling:touch;}
 .sp-row{margin-bottom:12px;}
 .sp-lb{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:10px 0 4px;}
 .sp-in{width:100%;box-sizing:border-box;padding:9px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);font-size:14px;color:inherit;}
@@ -30,3 +30,14 @@
 .sp-err{padding:12px;border-radius:8px;background:#fef2f2;color:#991b1b;font-size:13px;}
 .sp-load{display:flex;align-items:center;gap:10px;padding:18px 4px;color:var(--muted);font-size:13px;}
 .sp-spin{width:22px;height:22px;border:3px solid rgba(74,44,143,.18);border-top-color:#4a2c8f;border-radius:50%;animation:bootspin .8s linear infinite;}
+html.sp-lock{overflow:hidden;}
+.sp-layout{display:block;}
+.sp-colL,.sp-colR{min-width:0;}
+.sp-colL{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:6px 16px 16px;}
+.sp-colR .sp-sec{margin-top:0;padding-top:0;border-top:0;}
+@media(max-width:899px){.sp-colR{margin-top:16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;}}
+@media(min-width:900px){
+  .sp-layout{display:grid;grid-template-columns:minmax(300px,380px) minmax(0,1fr);gap:20px;align-items:start;}
+  .sp-colR{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;}
+}
+@media(min-width:1180px){.sp-grid{grid-template-columns:repeat(4,minmax(0,1fr));}}
