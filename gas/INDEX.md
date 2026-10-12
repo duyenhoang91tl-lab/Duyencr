@@ -114,3 +114,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hàm: `_chatAuthErr_`, `_chatUser_`, `_chatNum_`, `_chatLastId_`, `_chatVer_`, `_chatBump_`, `_chatSafeCell_`, `_chatMsgSheet_`, `_chatChSheet_`, `_chatCustomChannels_`, `_chatActiveUsers_`, `_chatAccess_`, `_chatListFor_`, `_chatRec_`, `_chatRingGet_`, `_chatRingPut_`, `_chatTail_`, `_chatSince_`, `chatChannels_`, `chatPoll_`, `chatHistory_`, `chatSend_`, `chatDelete_`, `_chatCleanMembers_`, `chatCreateChannel_`, `chatUpdateChannel_`, `chatDoGet_`, `chatDoPost_`
 - Hằng/biến: `SH_CHAT_CH_`, `CHAT_CH_HEADERS_`, `SH_CHAT_MSG_`, `CHAT_MSG_HEADERS_`, `CHAT_MAX_TEXT_`, `CHAT_RING_MAX_`, `CHAT_RATE_MS_`, `CHAT_TAIL_ROWS_`, `CHAT_MAX_MEMBERS_`, `CHAT_GET_ACTIONS_`, `CHAT_POST_ACTIONS_`
 
+## 27_PancakeHistory.gs
+- Hàm: `_pkAllPageTokens_`, `_pkIso_`, `_pkPlain_`, `_pkPhoneOfMsg_`, `_pkMapMsg_`, `_pkMapConv_`, `_pkFetchJson_`, `_pkInsertIgnore_`, `_pkFetchMsgs_`, `_pkHistState_`, `_pkHistSave_`, `pkHistSync_`, `pkLichSuThu`, `pkLichSuChay`, `pkLichSuXemTrangThai`, `pkLichSuLamLai`, `pkLichSuTick_`, `pkLichSuCaiTrigger`, `removePkLichSuTrigger_`
+- Hằng/biến: `PK_HIST_SECTION_`
+
