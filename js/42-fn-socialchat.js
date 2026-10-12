@@ -13,6 +13,7 @@ function renderSocialChatTab() {
       + '<div class="sc-main" id="sc-main"><div class="sc-head" id="sc-head"></div><div class="pkc-msgs sc-msgs" id="sc-msgs"><div class="pkc-note">Chọn một hội thoại bên trái.</div></div>'
       + '<div class="pkc-status" id="sc-status"></div>'
       + '<div class="pkc-compose" id="sc-compose" style="display:none"><button class="btn sm" type="button" title="Gợi ý tin nhắn theo sản phẩm" onclick="tplChatToggle(\'sc-compose\',\'sc-input\')">💡</button><textarea id="sc-input" rows="2" placeholder="Nhập tin trả lời… (Ctrl+Enter để gửi)" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key===\'Enter\'){event.preventDefault();scSend();}"></textarea><button class="save-btn pkc-send" id="sc-send" onclick="scSend()">Gửi</button></div></div>';
+    w.insertAdjacentHTML('beforeend', '<div class="sc-info" id="sc-info"><div class="pkc-note">Chọn một hội thoại để xem thông tin khách.</div></div>');   // cột Thông tin khách kiểu Pancake (js/48)
   }
   _scStop(); scLoadList();
   _sc.timer = setInterval(function () { if (!_scOpen()) { _scStop(); return; } if (!document.hidden) { scLoadList(); if (_sc.active) scLoadMsgs(false); } }, 8000);
@@ -43,9 +44,10 @@ function _scRenderList() {
   var el = document.getElementById('sc-convs'); if (!el) return;
   el.innerHTML = _sc.convs.length ? _sc.convs.map(function (c) {
     return '<div class="sc-conv' + (c.id === _sc.active ? ' on' : '') + (c.seen === false ? ' unseen' : '') + '" data-id="' + _pkcEsc(c.id) + '" onclick="scPick(this.getAttribute(\'data-id\'))">'
+      + '<div class="sc-av">' + _pkcEsc(typeof proInitials_ === 'function' ? proInitials_(c.name) : '?') + '</div><div class="sc-conv-body">'
       + '<div class="sc-conv-n"><b>' + _pkcEsc(c.name || 'Khách Pancake') + '</b><span>' + _pkcEsc(_scAgo(c.lastAt)) + '</span></div>'
       + (c.phone ? '<div class="sc-conv-p">' + _pkcEsc(c.phone) + '</div>' : '')
-      + '<div class="sc-conv-t">' + _pkcEsc(c.lastText || '') + '</div></div>';
+      + '<div class="sc-conv-t">' + _pkcEsc(c.lastText || '') + '</div></div>' + (c.seen === false ? '<i class="sc-dot"></i>' : '') + '</div>';
   }).join('') : '<div class="pkc-note">Không có hội thoại nào.</div>';
 }
 function scPick(id) {
@@ -55,11 +57,14 @@ function scPick(id) {
   if (h) h.innerHTML = '<button class="btn sm sc-back" onclick="scBack()">←</button><b>' + _pkcEsc(c.name || 'Khách Pancake') + '</b>' + (c.phone ? ' <span class="pkc-ph">' + _pkcEsc(c.phone) + '</span> <button class="btn sm" onclick="scOpenProfile()">👤 Mở hồ sơ</button>' : ' <span class="pkc-ph">chưa gắn SĐT</span>');
   var cp = document.getElementById('sc-compose'); if (cp) cp.style.display = (c.type === 'COMMENT') ? 'none' : '';
   var box = document.getElementById('sc-main'); if (box) box.classList.add('has-conv');
+  if (typeof proChatInfoRender_ === 'function') { try { proChatInfoRender_(c); } catch (e) { console.warn('[ui-pro] chat info', e); } }
   scLoadMsgs(true);
 }
 function scBack() { var box = document.getElementById('sc-main'); if (box) box.classList.remove('has-conv'); }
 function scOpenProfile() {
   var c = _sc.convs.filter(function (x) { return x.id === _sc.active; })[0]; if (!c || !c.phone) return;
+  var cu = (typeof proChatFindCustomer_ === 'function') ? proChatFindCustomer_(c.phone) : null;
+  if (cu && typeof openDp === 'function') { document.getElementById('dp-overlay').classList.add('open'); openDp(cu.phone); return; }   // có khách: mở thẳng panel hồ sơ
   var tl = document.querySelector('#data-view .tabs [onclick*="switchTab(\'list\'"]'); if (tl) tl.click();
   var si = document.getElementById('search-input'); if (si) { si.value = c.phone; si.dispatchEvent(new Event('input', { bubbles: true })); }
 }
