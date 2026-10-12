@@ -6,7 +6,9 @@ const calls=[],props={},users={u1:{username:'u1',role:'cs'},d1:{username:'d1',ro
 let sbReply=()=>({json:[]}), fetchReply=()=>({code:200,body:'{"success":true,"id":"m_1"}'});
 const ctx={jsonOut_:o=>o,Logger:{log(){}},
  _sessUser_:t=>users[t]||null,
- sb_:(m,p,b,h)=>{calls.push({m,p,b,h});return sbReply(m,p,b)},
+ // UrlFetchApp that nem 'Invalid argument: <url>' neu URL co ky tu khong hop le (> < " khoang trang { } | \ ^ `). Mock cu khong kiem tra nen
+ // loi `raw->attachments` (ky tu > chua ma hoa) lot qua test va chi no tren may that (12/10/2026).
+ sb_:(m,p,b,h)=>{if(/[<>"\s{}|\\^`]/.test(String(p)))throw new Error('Invalid argument: https://x.supabase.co/rest/v1/'+p);calls.push({m,p,b,h});return sbReply(m,p,b)},
  PropertiesService:{getScriptProperties:()=>({getProperty:k=>props[k]??null})},
  UrlFetchApp:{fetch:(u,o)=>{calls.push({fetch:u,o});const r=fetchReply();return{getResponseCode:()=>r.code,getContentText:()=>r.body}}},
  encodeURIComponent,Date,JSON,RegExp,Array,String,Object,Number};

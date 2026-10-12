@@ -5,6 +5,9 @@
 //    PANCAKE_PAGE_TOKENS = {"<page_id>":"<page_access_token>", ...}  (hoac PANCAKE_PAGE_TOKEN_<page_id>, hoac PANCAKE_PAGE_TOKEN cho 1 page)
 //    PANCAKE_USER_TOKEN  = token tai khoan Pancake (tuy chon; neu co thi gui bang endpoint /api/v1 co trong tai lieu chinh thuc)
 // ═══════════════════════════════════════════════════════
+// LUU Y URL Supabase: UrlFetchApp.fetch NEM 'Invalid argument: <url>' neu URL chua ky tu '>' (hoac < " khoang trang { } | ^) chua ma hoa.
+// NGUYEN NHAN GOC loi 'Doc tin nhan loi: Invalid argument' (12/10/2026): select dung 'attachments:raw->attachments' co '>' tran. Phai viet 'raw-%3Eattachments'.
+// Mo hinh 'toan tu JSON' cua PostgREST (->, ->>) trong select luon phai ma hoa. tools/test-pk-chat-gas.js co mock bat ky tu loi nay.
 var PK_CHAT_SECTION_ = 1;
 function _pkAuth_(token) {
   var su = _sessUser_(token);
@@ -40,7 +43,7 @@ function pkChat_(e) {
     var out = { ok: true, phone: phone, conversations: cv.map(_pkConvOut_), messages: [], serverTime: new Date().toISOString() };
     if (!cv.length) return jsonOut_(out);
     var after = /^\d{4}-\d{2}-\d{2}T[\d:.+\-Z]+$/.test(String(p.after || '')) ? String(p.after) : '';
-    var q = 'pk_messages?select=id,conversation_id,direction,text,sent_at,sender_name,attachments:raw->attachments&conversation_id=' + _pkEnc_(_pkInList_(cv.map(function (c) { return c.id; })))
+    var q = 'pk_messages?select=id,conversation_id,direction,text,sent_at,sender_name,attachments:raw-%3Eattachments&conversation_id=' + _pkEnc_(_pkInList_(cv.map(function (c) { return c.id; })))
           + (after ? '&sent_at=gt.' + _pkEnc_(after) : '') + '&order=sent_at.desc.nullslast&limit=' + (after ? 100 : 150);
     var ms = sb_('GET', q).json || [];
     out.messages = ms.reverse().map(function (m) {
@@ -72,7 +75,7 @@ function pkChatConv_(e) {
   if (!conv) return jsonOut_({ error: 'Thieu conv.' });
   try {
     var after = /^\d{4}-\d{2}-\d{2}T[\d:.+\-Z]+$/.test(String(p.after || '')) ? String(p.after) : '';
-    var q = 'pk_messages?select=id,conversation_id,direction,text,sent_at,sender_name,attachments:raw->attachments&conversation_id=eq.' + _pkEnc_(conv)
+    var q = 'pk_messages?select=id,conversation_id,direction,text,sent_at,sender_name,attachments:raw-%3Eattachments&conversation_id=eq.' + _pkEnc_(conv)
           + (after ? '&sent_at=gt.' + _pkEnc_(after) : '') + '&order=sent_at.desc.nullslast&limit=' + (after ? 100 : 150);
     var ms = sb_('GET', q).json || [];
     return jsonOut_({ ok: true, messages: ms.reverse().map(function (m) {
