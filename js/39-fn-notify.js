@@ -122,7 +122,7 @@ function ntNoteMention(phone, text){
 }
 
 // ── Gợi ý @tên ──
-var _NT_FIELDS = { 'cs-note-new':1, 'task-cm-input':1, 'task-f-title':1, 'task-f-desc':1 };
+var _NT_FIELDS = { 'cs-note-new':1, 'new-snote':1, 'task-cm-input':1, 'task-f-title':1, 'task-f-desc':1 };
 var _ntSug = { el:null, list:[], idx:0, start:-1 };
 function _ntNames(){
   var out = [], seen = {};

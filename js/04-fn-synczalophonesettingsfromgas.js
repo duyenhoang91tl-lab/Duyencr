@@ -921,6 +921,7 @@ function addSched(phone) {
   _touchCare(phone); saveLS('ome_care', careData);
   logAudit('sched', phone, '', `Thêm lịch "${schedTypeLabel(type)}" · ${date}`);
   if (gsUrl) queueCareSync(phone);
+  if (typeof ntNoteMention === 'function') ntNoteMention(phone, note);   // @tag trong ghi chú lịch hẹn -> thông báo (js/39-fn-notify.js)
   updateSchedBadges();
   if (typeof renderReminderPanel === 'function') renderReminderPanel();
   const c = allCustomers.find(x=>x.phone===phone);
