@@ -74,3 +74,10 @@ Yêu cầu của Duyên: tab Công việc có nhiều LOẠI quy trình, mỗi l
 - [x] Danh sách hội thoại có avatar chữ cái + chấm cam khi chưa đọc; bong bóng chat kiểu Pancake (nền be, tin khách trắng bên trái, tin mình xanh nhạt bên phải, nhãn ngày dạng viên thuốc) — CSS `html.ui-pro` nên áp cả cho tab 💬 Chat trong hồ sơ khách.
 - Test: `tools/test-ui-pro-chatinfo.js` (15 ca, jsdom: cần `npm i jsdom` hoặc NODE_PATH). `tools/test-dist-equivalence.js` lỗi từ trước vì thiếu `dist/index.html`.
 - [ ] **5b (chưa làm)**: ô "Nhập ghi chú (Enter để gửi)" trong cột phải như Pancake — `addNoteEntry`/`saveCare` đang đọc thẳng DOM của panel hồ sơ (`#cs-note`...) nên cần tách hàm lưu ghi chú khỏi DOM trước. Cũng chưa có: thẻ tag Pancake (L1…, S7…) và ảnh đại diện thật trong danh sách (backend `pkChatInbox` chưa trả); thanh lọc "Lọc theo" kiểu Pancake.
+
+
+## Báo cáo B — MỘT menu lọc nhiều cấp (yêu cầu Duyên 12/10/2026)
+- [x] Thay 9 ô lọc rời của Báo cáo B (Sale, Team, Nguồn đơn, Marketer, Sản phẩm, Tình trạng CS, Trạng thái KH, Kết bạn Zalo, Nick Zalo) bằng nút **🔎 Bộ lọc**. Bấm ra → chọn MỤC → tick MỤC CON; riêng Tình trạng CS / Trạng thái KH (dạng cây) → chọn NHÓM (ô ☑/◪/☐ chọn cả nhóm, bấm tên để mở) → mục con. Dòng tóm tắt cạnh nút ("Nguồn đơn (2) · Tình trạng CS (3)") + "✕ Xoá lọc".
+- Code: khối `_srbMenu*` trong `js/13` (ngay sau `_srbComboHTML`), gọi từ `renderSalesReportTab` (js/11, nhánh Báo cáo B); CSS `.srb-m-*` cuối `css/01-base.css`. KHÔNG đổi state key (bSale, bTeam, bNguon, bMarketer, bCareStatus, bKhStatus, bZaloStatus, bSanPham, bNickZalo) nên `_srLoad`/xuất Excel/phân quyền giữ nguyên; non-admin vẫn không thấy Sale/Team (khung 🔒 giữ nguyên). Chọn Team vẫn tự điền Sale (`_srSyncTeamToSale_`) và vẽ lại, menu giữ mở. Nút "Lọc" vẫn là nơi áp dụng.
+- Bộ combo cũ (`_srbComboHTML`, `srbCombo*`) giữ lại trong js/13 nhưng không còn được gọi. Báo cáo A/C/D/E/F/L... CHƯA đổi (vẫn các ô combo riêng) — làm tiếp nếu Duyên muốn gộp cho các báo cáo đó.
+- Test: `node tools/test-srb-filter-menu.js` (jsdom, 23 ca). Chưa xem thử trên trình duyệt thật.

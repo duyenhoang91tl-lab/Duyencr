@@ -597,24 +597,13 @@ function renderSalesReportTab(){
       '<input type="checkbox" '+(_srState.byCreator?'checked':'')+' onchange="_srState.byCreator=this.checked;_srApply()">'+
       'Tính theo người tạo đơn</label>';
   } else {
-    if (_srIsAdmin()){
-      filters += _srbComboHTML('sale');
-      filters += _srbComboHTML('team');
-    } else {
+    if (!_srIsAdmin()){
       filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Sale</div>'+
         '<div style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)">🔒 '+esc((_srState.bSale||[]).join(', ') || currentUser.name)+' — chỉ xem được báo cáo của mình</div></div>';
     }
-    filters += _srbComboHTML('nguon');
-    filters += _srbComboHTML('mkt');
-    filters += '<div><div style="font-size:10px;color:var(--hint);margin-bottom:2px">Sản phẩm (cách nhau bằng dấu phẩy)</div>'+
-      '<input type="text" value="'+esc(_srState.bSanPham||'')+'" onchange="_srSetField(\'bSanPham\',this.value)" placeholder="vd: tỳ hưu, nhẫn 10k" style="min-width:170px;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-      '</div>';
-    filters += _srbComboHTML('cs');
-    filters += _srbComboHTML('kh');
-    filters += _srbComboHTML('zalo');
-    filters += '<div><div style="font-size:10px;color:var(--hint);margin-bottom:2px">Nick Zalo</div>'+
-      '<input type="text" value="'+esc(_srState.bNickZalo||'')+'" onchange="_srSetField(\'bNickZalo\',this.value)" placeholder="Tìm nick..." style="min-width:100px;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-      '</div>';
+    // MỘT menu lọc duy nhất (Sale/Team/Nguồn đơn/Marketer/Sản phẩm/Tình trạng CS/Trạng thái KH/Kết bạn Zalo/Nick Zalo)
+    // — chọn mục → mục con → (CS/KH) nhóm → mục con. Xem _srbMenuHTML_ ở js/13.
+    filters += _srbMenuHTML_();
   }
   filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
   // Gom Xuất Excel / Cập nhật Sheet / Ẩn-Hiện Page & Sale vào 1 menu "🧰 Tác vụ" cho gọn (mẫu .gear-menu)
