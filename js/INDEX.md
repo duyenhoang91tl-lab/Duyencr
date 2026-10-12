@@ -73,3 +73,4 @@ Code client của `index.html` (trước đây inline, ~1.4MB) đã tách ra `cs
 
 - `44-fn-taskflow.js`: Công việc kiểu Base — quy trình/giai đoạn: `loadTaskFlows`, chọn quy trình khi tạo việc (`_tfInit/_tfCollect/_tfValidate`), modal chi tiết (`_tfStageModel`, `_tfDetailHtml`, `_tfAdvance`, `_tfDecide`), thảo luận có tệp (ghi đè `renderTaskComments`/`sendTaskComment`/`switchTaskDetailTab` của js/26). Gợi ý @ + thông báo: js/39-fn-notify.js. Backend GAS `taskFlows/taskAdvance/taskRequestDecide`.
 - `45-fn-taskflow-admin.js`: màn quản lý quy trình (`openTaskFlowManager`, `_tfm*`; menu trái `act:taskflow` admin) + bộ lọc việc cần tôi (`_tfScopeMatch`, `_tfCounts`, bọc `renderTaskTables`). Test: `tools/test-task-flow-client.js`.
+- `46-fn-kho.js`: `openKhoModal`, `tkLoadKho`, `tkLoadItems`, `tkEditDlg`, `tkItemDlg`, `tkImportDlg` (đọc Excel Pos qua `_tkParseSheet`), `tkHistDlg`, `tkManageDlg` — mục Tồn kho (backend: gas_v13.js khối KHO; CSS `css/08-kho.css`)

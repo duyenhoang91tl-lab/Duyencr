@@ -36,6 +36,7 @@
     { k:'ov',  t:'🏠 Tổng quan',           ids:['act:notif','overview'] },
     { k:'kh',  t:'👤 Hồ sơ',                ids:['tab-kh','tab-schedule','tab-overdue','tab-mydata','tab-task'] },   // gộp hồ sơ khách hàng + hồ sơ nhân viên
     { k:'sc',  t:'💬 Social',               ids:['tab-chat','tab-teamchat'] },
+    { k:'kho', t:'📦 Kho',                 ids:['act:kho'] },
     { k:'tv',  t:'🧰 Tác vụ',               ids:['tab-zaloai','act:bc','act:bct','act:bcstat','act:futpl','act:bday'] },
     { k:'rp',  t:'📊 Báo cáo',              ids:['salesreport','pancake','kpipancake','mktchecklist','dailybrief','dashboard','act:fureport','act:teamai'] },
     { k:'cs',  t:'🔀 Cài đặt chia số',      ids:['act:assign','act:autoassign','act:assignhist'] },
@@ -46,6 +47,7 @@
   // Mục "hành động" (mở modal có sẵn, không phải tab). admin:true = chỉ tài khoản admin thấy.
   var ACTS = {
     notif:      { t:function(){ return (typeof _ntLabel==='function') ? _ntLabel() : '🔔 Thông báo'; }, f:'openNotifModal' },
+    kho:        { t:'📦 Tồn kho', f:'openKhoModal' },
     acct:       { t:'🔑 Tài khoản đăng nhập', f:'openAcctModal', admin:true },
     taskflow:   { t:'🧩 Quy trình công việc', f:'openTaskFlowManager', admin:true },
     assign:     { t:'👥 Chia data', f:'openAssignModal', admin:true },
