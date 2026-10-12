@@ -756,19 +756,38 @@ window.addEventListener('load',function(){var s=document.createElement('script')
       <!-- Error -->
       <div id="zai-error" style="display:none;color:#dc2626;font-size:12px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:8px 12px"></div>
 
-      <!-- Thu vien mau tin nhan tu van khach (them 2026-10): luu san mau de tra cuu/copy khi nhan tin
-           khach, dong bo dung 1 nguon qua action 'messageTemplates' voi extension Pancake AI. -->
+      <!-- Thu vien mau tin nhan tu van khach (2026-10; 2026-10-12 them san pham/chu de + co che DUYET): admin/quan ly cai san mau theo san pham
+           hoac noi dung hoi thoai, nhan vien de xuat mau moi (cho quan ly duyet), dong bo 1 nguon qua action 'messageTemplates' voi extension Pancake AI. -->
       <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
-          <div class="zai-label" style="margin:0;font-size:13px;font-weight:700">📚 Thư viện mẫu tin nhắn tư vấn</div>
-          <input id="mt-search" class="zai-input" placeholder="Tìm theo tiêu đề / nội dung / tag..." style="flex:1;min-width:180px" oninput="renderMsgTemplateList()">
+          <div class="zai-label" style="margin:0;font-size:13px;font-weight:700">💬 Gợi ý tin nhắn</div>
+          <span style="font-size:11px;color:var(--muted)">Gõ tên sản phẩm → chọn mẫu đã duyệt → Copy dán vào chat</span>
+        </div>
+        <div id="mt-suggest" style="margin-bottom:16px"></div>
+
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;border-top:1px dashed var(--border);padding-top:12px">
+          <div class="zai-label" style="margin:0;font-size:13px;font-weight:700">📚 Quản lý mẫu tin nhắn</div>
+          <button id="mt-pending-badge" class="btn sm" style="display:none;background:#fef3c7;color:#92400e" onclick="mtShowPending()" title="Lọc các mẫu đang chờ duyệt"></button>
+          <select id="mt-status-filter" class="assign-input" onchange="renderMsgTemplateList()" style="font-size:12px;padding:4px 8px">
+            <option value="">Tất cả trạng thái</option>
+            <option value="pending">⏳ Chờ duyệt</option>
+            <option value="approved">✅ Đã duyệt</option>
+            <option value="rejected">❌ Bị từ chối</option>
+            <option value="mine">Của tôi</option>
+          </select>
+          <input id="mt-search" class="zai-input" placeholder="Tìm theo sản phẩm / chủ đề / tag / nội dung..." style="flex:1;min-width:180px" oninput="renderMsgTemplateList()">
           <button class="btn sm primary" onclick="openMsgTemplateForm()">+ Thêm mẫu</button>
         </div>
         <div id="mt-form-wrap" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:12px;margin-bottom:10px">
           <input type="hidden" id="mt-f-id">
+          <div id="mt-form-hint" style="font-size:11px;color:var(--muted);margin-bottom:8px"></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-            <input id="mt-f-title" class="zai-input" placeholder="Tiêu đề mẫu (VD: Giữ gìn thành quả)" style="flex:1;min-width:200px">
-            <input id="mt-f-tags" class="zai-input" placeholder="Tag, phân cách bằng dấu phẩy (VD: dong-vien, giu-khach)" style="flex:1;min-width:200px">
+            <input id="mt-f-title" class="zai-input" placeholder="Tiêu đề mẫu (VD: Báo giá nhẫn vàng)" style="flex:1;min-width:200px">
+            <input id="mt-f-product" class="zai-input" placeholder="📦 Sản phẩm áp dụng, cách nhau dấu phẩy (VD: Nhẫn vàng 9999, Lắc tay)" style="flex:1;min-width:200px">
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+            <input id="mt-f-topic" class="zai-input" placeholder="💬 Nội dung hội thoại / tình huống (VD: Khách hỏi giá, Khách phân vân)" style="flex:1;min-width:200px">
+            <input id="mt-f-tags" class="zai-input" placeholder="Tag, phân cách bằng dấu phẩy (VD: giu-khach, bao-hanh)" style="flex:1;min-width:200px">
           </div>
           <textarea id="mt-f-content" class="zai-textarea" placeholder="Nội dung mẫu tin nhắn..." rows="4" style="width:100%;margin-bottom:8px"></textarea>
           <div style="display:flex;gap:8px;justify-content:flex-end">

@@ -494,7 +494,9 @@ function doGetCore_(e) {
 
     // ── MAU TIN NHAN TU VAN KHACH: danh sach mau (CRM tab ZALO AI va extension Pancake AI dung chung) ──
     if (action === 'messageTemplates') {
-      return jsonOut_({ templates: readMessageTemplates_() });
+      var _tc = _tplCaller_(e.parameter.token, e.parameter.ek, e.parameter.by);
+      var _tl = readMessageTemplates_(_tc);
+      return jsonOut_({ templates: _tl, canApprove: !!_tc.priv, pendingCount: _tc.priv ? _tl.filter(function (t) { return t.status === 'pending'; }).length : 0 });
     }
 
     // ── MAU AI DA HOC (sheet AIContext, type combo_template): CRM xem/sua/xoa ──

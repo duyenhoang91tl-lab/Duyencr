@@ -355,8 +355,9 @@ function doPostCore_(e) {
     //    tu tao voi du lieu mac dinh neu chua co). Them 2026-09, KHONG dung chung sheet/cot voi CareData. ──
     if (action === 'getKnowledge') return jsonOut_(getMessengerKnowledge_());
     // ── MAU TIN NHAN TU VAN KHACH: them/sua (form tren CRM tab ZALO AI) / xoa 1 mau ──
-    if (action === 'saveMessageTemplate')   return saveMessageTemplate_(data.template || data);
-    if (action === 'deleteMessageTemplate') return deleteMessageTemplate_(data.id);
+    if (action === 'saveMessageTemplate')   return saveMessageTemplate_(data.template || data, _tplCaller_(data.token, data.ek, (data.template || data).createdBy));
+    if (action === 'deleteMessageTemplate') return deleteMessageTemplate_(data.id, _tplCaller_(data.token, data.ek, data.createdBy));
+    if (action === 'approveMessageTemplate') return approveMessageTemplate_(data.id, data.decision, data.reason, _tplCaller_(data.token, data.ek, ''));
     if (action === 'saveCannedResponse')    return saveCannedResponse_(data.canned || data);
     if (action === 'saveAIExample')         return saveAIExample_(data.id, data.content);
     if (action === 'deleteAIExample')       return deleteAIExample_(data.id);

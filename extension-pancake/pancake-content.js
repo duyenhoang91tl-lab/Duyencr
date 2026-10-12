@@ -435,9 +435,9 @@
             </div>
             <div id="pk-tpl-body" style="display:none">
               <div id="pk-tpl-row">
-                <input type="text" id="pk-tpl-q" placeholder="Tìm theo tiêu đề / nội dung / tag..." autocomplete="off" />
+                <input type="text" id="pk-tpl-q" placeholder="🔎 Gõ tên sản phẩm / nội dung hội thoại để gợi ý tin nhắn..." autocomplete="off" />
                 <button id="pk-tpl-refresh" title="Tải lại từ CRM">🔄</button>
-                <button id="pk-tpl-add" title="Thêm mẫu mới (lưu về CRM)">➕</button>
+                <button id="pk-tpl-add" title="Đề xuất mẫu mới (chờ quản lý duyệt)">➕</button>
               </div>
               <div id="pk-tpl-form"></div>
               <div id="pk-tpl-result"></div>
@@ -2838,38 +2838,78 @@
     });
   }
 
+  // Xep hang: san pham 5 (khop nguyen 1 san pham +3), chu de 3, tag 3, tieu de 2, noi dung 1; moi tu khoa phai khop it nhat 1 truong. Y het CRM (tplSearch).
+  function rankMsgTemplates_(list, query) {
+    const words = _stripVNlocal_((query || '').trim().toLowerCase()).split(/\s+/).filter(Boolean);
+    const out = [];
+    list.forEach((t, idx) => {
+      const f = { product: _stripVNlocal_((t.product || '').toLowerCase()), topic: _stripVNlocal_((t.topic || '').toLowerCase()), tags: _stripVNlocal_((t.tags || '').toLowerCase()),
+        title: _stripVNlocal_((t.title || '').toLowerCase()), content: _stripVNlocal_((t.content || '').toLowerCase()) };
+      const parts = String(t.product || '').split(/[,;|\n]/).map((x) => _stripVNlocal_(x.toLowerCase()).trim()).filter(Boolean);
+      let score = 0, all = true;
+      for (const w of words) {
+        let hit = 0;
+        if (f.product.indexOf(w) >= 0) hit = Math.max(hit, 5);
+        if (f.topic.indexOf(w) >= 0) hit = Math.max(hit, 3);
+        if (f.tags.indexOf(w) >= 0) hit = Math.max(hit, 3);
+        if (f.title.indexOf(w) >= 0) hit = Math.max(hit, 2);
+        if (f.content.indexOf(w) >= 0) hit = Math.max(hit, 1);
+        if (!hit) { all = false; break; }
+        score += hit;
+      }
+      if (!all) return;
+      if (words.length && parts.indexOf(words.join(' ')) >= 0) score += 3;
+      out.push({ t, score, idx });
+    });
+    out.sort((a, b) => (b.score - a.score) || (a.idx - b.idx));
+    return out.map((x) => x.t);
+  }
+
+  // Mau cua CHINH MINH chua duoc duyet (server chi tra loai nay cho dung ten CS da khai) -> hien trang thai, duoc sua/xoa.
+  function isMyOpenTpl_(t) {
+    const me = String(settings.csName || '').trim().toLowerCase();
+    return !!me && t.status && t.status !== 'approved' && String(t.createdBy || '').trim().toLowerCase() === me;
+  }
+
   function renderMsgTemplateRows_() {
     const box = panelEl.querySelector('#pk-tpl-result');
     if (!box) return;
-    const q = _stripVNlocal_((panelEl.querySelector('#pk-tpl-q').value || '').trim().toLowerCase());
-    const rows = _msgTemplates.filter((t) => {
-      if (!q) return true;
-      const hay = _stripVNlocal_(((t.title || '') + ' ' + (t.content || '') + ' ' + (t.tags || '')).toLowerCase());
-      return hay.indexOf(q) >= 0;
-    });
+    const rows = rankMsgTemplates_(_msgTemplates, panelEl.querySelector('#pk-tpl-q').value || '').slice(0, 40);
     if (!rows.length) {
-      box.innerHTML = `<div class="pk-price-loading">${_msgTemplates.length ? 'Không tìm thấy mẫu phù hợp.' : 'Chưa có mẫu nào — vào CRM tab "Zalo AI" để thêm mẫu đầu tiên.'}</div>`;
+      box.innerHTML = `<div class="pk-price-loading">${_msgTemplates.length ? 'Không tìm thấy mẫu phù hợp. Thử tên sản phẩm ngắn hơn, hoặc bấm ➕ để đề xuất mẫu mới.' : 'Chưa có mẫu nào được duyệt — admin/quản lý thêm mẫu trên CRM (tab "Zalo AI"), hoặc bấm ➕ để đề xuất.'}</div>`;
       return;
     }
     box.innerHTML = rows.map((t) => {
-      const tags = (t.tags || '').split(',').map((s) => s.trim()).filter(Boolean)
-        .map((tg) => `<span class="pk-price-field">#${escapeHtml(tg)}</span>`).join(' ');
+      const chips = String(t.product || '').split(/[,;|\n]/).map((x) => x.trim()).filter(Boolean).map((p) => `<span class="pk-price-field">📦 ${escapeHtml(p)}</span>`).join(' ')
+        + (t.topic ? ` <span class="pk-price-field">💬 ${escapeHtml(t.topic)}</span>` : '')
+        + String(t.tags || '').split(',').map((x) => x.trim()).filter(Boolean).map((tg) => ` <span class="pk-price-field">#${escapeHtml(tg)}</span>`).join('');
       const preview = t.content.length > 160 ? t.content.slice(0, 160) + '…' : t.content;
+      const mine = isMyOpenTpl_(t);
+      const badge = !mine ? '' : (t.status === 'rejected'
+        ? `<div style="color:#991b1b;font-size:11px">❌ Bị từ chối${t.rejectReason ? ': ' + escapeHtml(t.rejectReason) : ''} — sửa lại để gửi duyệt lại</div>`
+        : '<div style="color:#92400e;font-size:11px">⏳ Chờ quản lý duyệt — chưa dùng được cho người khác</div>');
       return `<div class="pk-price-item pk-ai-suggestion-item" data-tid="${escapeHtml(t.id)}" title="Bấm để chèn vào ô trả lời">` +
-        `<div class="pk-ctkm-title">${escapeHtml(t.title)}</div>` +
+        `<div class="pk-ctkm-title">${escapeHtml(t.title)}</div>` + badge +
         `<div>${escapeHtml(preview)}</div>` +
-        (tags ? `<div style="margin-top:3px">${tags}</div>` : '') +
-        `<div class="pk-tpl-acts"><button type="button" class="pk-btn-outline" data-eid="${escapeHtml(t.id)}">✏️ Sửa</button>` +
-        `<button type="button" class="pk-btn-outline" data-did="${escapeHtml(t.id)}">🗑 Xoá</button></div>` +
-        `</div>`;
+        (chips ? `<div style="margin-top:3px">${chips}</div>` : '') +
+        `<div class="pk-tpl-acts"><button type="button" class="pk-btn-outline" data-cid="${escapeHtml(t.id)}">📋 Copy</button>` +
+        (mine ? `<button type="button" class="pk-btn-outline" data-eid="${escapeHtml(t.id)}">✏️ Sửa</button><button type="button" class="pk-btn-outline" data-did="${escapeHtml(t.id)}">🗑 Xoá</button>` : '') +
+        `</div></div>`;
     }).join('');
     box.querySelectorAll('[data-tid]').forEach((el) => {
       el.addEventListener('click', (e) => {
-        if (e.target.closest('button')) return; // bam Sua/Xoa thi khong chen vao o tra loi
+        if (e.target.closest('button')) return; // bam nut thi khong chen vao o tra loi
         const t = _msgTemplates.find((x) => x.id === el.dataset.tid);
         if (t) insertReply(t.content); // dung lai ham co san — tu dong xu ly ca contenteditable lan textarea
       });
     });
+    box.querySelectorAll('[data-cid]').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const t = _msgTemplates.find((x) => x.id === b.dataset.cid);
+      if (!t) return;
+      const done = () => { const old = b.textContent; b.textContent = '✅ Đã copy'; setTimeout(() => { b.textContent = old; }, 1200); };
+      navigator.clipboard.writeText(t.content).then(done).catch(() => setStatus('Không copy được — bấm vào thẻ để chèn thẳng vào ô trả lời.'));
+    }));
     box.querySelectorAll('[data-eid]').forEach((b) => b.addEventListener('click', (e) => {
       e.stopPropagation();
       openTplForm_(_msgTemplates.find((x) => x.id === b.dataset.eid) || null);
@@ -2877,31 +2917,38 @@
     box.querySelectorAll('[data-did]').forEach((b) => b.addEventListener('click', (e) => {
       e.stopPropagation();
       const t = _msgTemplates.find((x) => x.id === b.dataset.did);
-      if (!t || !confirm('Xoá mẫu "' + t.title + '"?\n\nMẫu sẽ bị xoá khỏi CRM và mọi máy.')) return;
+      if (!t || !confirm('Xoá mẫu đề xuất "' + t.title + '"?')) return;
       b.disabled = true;
-      safeSendMessage_({ type: 'DELETE_MESSAGE_TEMPLATE', payload: { id: t.id } }, (resp) => {
+      safeSendMessage_({ type: 'DELETE_MESSAGE_TEMPLATE', payload: { id: t.id, createdBy: settings.csName || '' } }, (resp) => {
         if (resp?.ok) { setStatus('Đã xoá mẫu.'); loadMsgTemplates_(); }
         else { b.disabled = false; setStatus('Lỗi xoá mẫu: ' + (resp?.error || 'không rõ')); }
       });
     }));
   }
 
-  // Form them/sua mau tin ngay tren Pancake — ghi ve CRM (sheet MessageTemplates) qua GAS. Ai cung sua duoc.
+  // Form DE XUAT mau tin ngay tren Pancake. Mau moi o trang thai "cho duyet" — chi dung duoc cho nguoi khac sau khi admin/quan ly duyet tren CRM.
+  // Extension khong co tai khoan dang nhap nen KHONG duyet/sua mau da duyet tai day (server cung chan).
   function openTplForm_(t) {
     const host = panelEl.querySelector('#pk-tpl-form');
+    if (!settings.csName) { setStatus('Chọn tên CS của bạn trước (ô tên CS ở trên) để đề xuất mẫu.'); return; }
     host.innerHTML = `
       <div class="pk-tpl-form-box">
-        <div class="pk-tpl-form-title">${t ? '✏️ Sửa mẫu' : '➕ Thêm mẫu mới'}</div>
+        <div class="pk-tpl-form-title">${t ? '✏️ Sửa mẫu đề xuất' : '➕ Đề xuất mẫu mới'}</div>
+        <div style="font-size:11px;color:#6b7280;margin-bottom:4px">Mẫu sẽ ở trạng thái "Chờ duyệt" cho đến khi quản lý duyệt trên CRM.</div>
         <input type="text" id="pk-tpl-f-title" placeholder="Tiêu đề mẫu" autocomplete="off" />
+        <input type="text" id="pk-tpl-f-product" placeholder="📦 Sản phẩm áp dụng, cách nhau dấu phẩy (VD: Nhẫn vàng, Lắc tay)" autocomplete="off" />
+        <input type="text" id="pk-tpl-f-topic" placeholder="💬 Nội dung hội thoại / tình huống (VD: Khách hỏi giá)" autocomplete="off" />
         <textarea id="pk-tpl-f-content" rows="5" placeholder="Nội dung tin nhắn mẫu"></textarea>
         <input type="text" id="pk-tpl-f-tags" placeholder="Tag, cách nhau dấu phẩy (VD: chào hỏi, bảo hành)" autocomplete="off" />
         <div class="pk-ai-sug-bar">
-          <button type="button" class="pk-btn-outline pk-ai-sug-save" id="pk-tpl-f-save">💾 Lưu về CRM</button>
+          <button type="button" class="pk-btn-outline pk-ai-sug-save" id="pk-tpl-f-save">📨 Gửi đề xuất</button>
           <button type="button" class="pk-btn-outline" id="pk-tpl-f-cancel">Huỷ</button>
         </div>
       </div>`;
     const $ = (id) => host.querySelector(id);
     $('#pk-tpl-f-title').value = t ? t.title : '';
+    $('#pk-tpl-f-product').value = t ? (t.product || '') : '';
+    $('#pk-tpl-f-topic').value = t ? (t.topic || '') : '';
     $('#pk-tpl-f-content').value = t ? t.content : '';
     $('#pk-tpl-f-tags').value = t ? (t.tags || '') : '';
     $('#pk-tpl-f-title').focus();
@@ -2911,12 +2958,13 @@
       const content = $('#pk-tpl-f-content').value.trim();
       if (!title || !content) { setStatus('Cần nhập đủ tiêu đề và nội dung mẫu.'); return; }
       const btn = $('#pk-tpl-f-save');
-      btn.disabled = true; btn.innerText = 'Đang lưu...';
+      btn.disabled = true; btn.innerText = 'Đang gửi...';
       safeSendMessage_({ type: 'SAVE_MESSAGE_TEMPLATE', payload: {
-        id: t ? t.id : '', title, content, tags: $('#pk-tpl-f-tags').value.trim(), createdBy: settings.csName || ''
+        id: t ? t.id : '', title, content, tags: $('#pk-tpl-f-tags').value.trim(),
+        product: $('#pk-tpl-f-product').value.trim(), topic: $('#pk-tpl-f-topic').value.trim(), createdBy: settings.csName || ''
       } }, (resp) => {
-        if (resp?.ok) { host.innerHTML = ''; setStatus(t ? 'Đã cập nhật mẫu — CRM và mọi máy sẽ thấy bản mới.' : 'Đã thêm mẫu mới vào CRM.'); loadMsgTemplates_(); }
-        else { btn.disabled = false; btn.innerText = '💾 Lưu về CRM'; setStatus('Lỗi lưu mẫu: ' + (resp?.error || 'không rõ')); }
+        if (resp?.ok) { host.innerHTML = ''; setStatus('Đã gửi đề xuất — quản lý duyệt xong mẫu mới dùng được cho mọi người.'); loadMsgTemplates_(); }
+        else { btn.disabled = false; btn.innerText = '📨 Gửi đề xuất'; setStatus('Lỗi gửi đề xuất: ' + (resp?.error || 'không rõ')); }
       });
     });
   }

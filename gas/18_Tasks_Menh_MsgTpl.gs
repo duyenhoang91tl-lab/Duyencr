@@ -623,73 +623,138 @@ function deleteCannedResponse_(id) {
 //  Sheet rieng, KHONG dung chung cot voi CareData/AIContext/CannedResponses.
 // ═══════════════════════════════════════════════════════════════
 var SH_MSG_TPL = 'MessageTemplates';
-var MSG_TPL_HEADERS = ['id', 'title', 'content', 'tags', 'createdBy', 'createdAt', 'updatedAt'];
+// 2026-10-12: them product (san pham, nhieu san pham cach nhau dau phay/;), topic (noi dung hoi thoai / tinh huong), status
+// (approved | pending | rejected) + nguoi duyet. Hang CU (khong co status) coi la 'approved' de mau dang dung khong bi mat.
+// getSheet_ tu bo sung cac cot header con thieu o cuoi sheet cu, KHONG dung toi du lieu san co.
+var MSG_TPL_HEADERS = ['id', 'title', 'content', 'tags', 'createdBy', 'createdAt', 'updatedAt', 'product', 'topic', 'status', 'approvedBy', 'approvedAt', 'rejectReason'];
+// Ai duoc duyet / sua / xoa MAU DA DUYET / tao mau thang o trang thai da duyet. Doi danh sach nay neu muon them vai tro (vd 'leader').
+var MSG_TPL_APPROVER_ROLES_ = ['admin', 'manager'];
+var MSG_TPL_STATUS_ = { approved: 1, pending: 1, rejected: 1 };
 
-function readMessageTemplates_() {
+// Danh tinh nguoi goi: token phien web (that, doc vai tro tu sheet Users) > khoa extension (chi biet la extension, TEN tu khai) > an danh.
+// Nhan vien (khong phai admin/manager) chi duoc DE XUAT mau (status=pending); chi admin/manager moi duyet duoc.
+function _tplCaller_(token, ek, nameHint) {
+  var c = { role: 'anon', name: '', priv: false, via: 'none' };
+  var su = null;
+  try { su = token ? _sessUser_(token) : null; } catch (e) { su = null; }
+  if (su) {
+    c.role = String(su.role || 'cs'); c.name = String(su.name || su.username || '').trim();
+    c.priv = MSG_TPL_APPROVER_ROLES_.indexOf(c.role) >= 0; c.via = 'web';
+    return c;
+  }
+  var who = _extKeyWho_(ek);
+  c.via = (who === 'zalo' || who === 'pancake') ? 'ext' : 'none';
+  c.role = c.via === 'ext' ? 'ext' : 'anon';
+  c.name = String(nameHint || '').trim().slice(0, 60);
+  return c;
+}
+function _tplRowToObj_(row) {
+  var st = String(row[9] || '').toLowerCase();
+  if (!MSG_TPL_STATUS_[st]) st = 'approved';
+  return {
+    id: String(row[0]), title: String(row[1] || ''), content: String(row[2] || ''), tags: String(row[3] || ''),
+    createdBy: String(row[4] || ''), createdAt: row[5] || '', updatedAt: row[6] || '',
+    product: String(row[7] || ''), topic: String(row[8] || ''), status: st,
+    approvedBy: String(row[10] || ''), approvedAt: row[11] || '', rejectReason: String(row[12] || '')
+  };
+}
+function _tplOwns_(t, c) { return !!(c && c.name) && String(t.createdBy || '').trim().toLowerCase() === c.name.toLowerCase(); }
+
+// caller: admin/manager thay TAT CA; nguoi khac chi thay mau DA DUYET + mau cua CHINH MINH (dang cho duyet / bi tu choi). Khong truyen caller = chi mau da duyet.
+function readMessageTemplates_(caller) {
+  caller = caller || { priv: false, name: '' };
   var sh = getSheet_(SH_MSG_TPL, MSG_TPL_HEADERS);
   var vals = sh.getDataRange().getValues();
   var out = [];
   for (var i = 1; i < vals.length; i++) {
     var row = vals[i];
     if (!row[0]) continue; // bo dong trong (id rong)
-    out.push({
-      id: String(row[0]),
-      title: String(row[1] || ''),
-      content: String(row[2] || ''),
-      tags: String(row[3] || ''),
-      createdBy: String(row[4] || ''),
-      createdAt: row[5] || '',
-      updatedAt: row[6] || ''
-    });
+    var t = _tplRowToObj_(row);
+    if (caller.priv || t.status === 'approved' || _tplOwns_(t, caller)) out.push(t);
   }
-  // Moi nhat len dau cho de tim trong form. Dung getTime() (khong dung String(Date)) vi
-  // Date.toString() chi chinh xac den giay va thu tu "Thu, Thang..." khong sap xep dung theo
-  // thoi gian thuc -> 2 mau luu cung giay se bi sap xep SAI thu tu neu so sanh chuoi.
+  // Moi nhat len dau. Dung getTime() (khong dung String(Date)) vi Date.toString() chi chinh xac den giay va
+  // khong sap xep dung theo thoi gian thuc -> 2 mau luu cung giay se bi sap xep SAI thu tu neu so sanh chuoi.
   function tplTime_(t) { var d = t.updatedAt || t.createdAt; var ms = d ? new Date(d).getTime() : 0; return isNaN(ms) ? 0 : ms; }
   out.sort(function (a, b) { return tplTime_(b) - tplTime_(a); });
   return out;
 }
 
-// data: {id (co thi la sua, khong co/khong tim thay thi tao moi), title, content, tags, createdBy}
-function saveMessageTemplate_(data) {
+// data: {id, title, content, tags, product, topic, createdBy}. Admin/manager: luu la 'approved' (admin cai san mau); nhan vien: tao moi -> 'pending',
+// chi sua duoc mau CUA MINH chua duoc duyet (sua xong quay lai 'pending'); mau da duyet chi admin/manager sua.
+function saveMessageTemplate_(data, caller) {
+  caller = caller || { priv: false, name: '', via: 'none' };
   if (!data || !String(data.title || '').trim() || !String(data.content || '').trim()) {
     return jsonOut_({ error: 'Thieu tieu de hoac noi dung mau tin' });
   }
+  var title = String(data.title).trim().slice(0, 200);
+  var content = String(data.content).trim().slice(0, 4000);
+  var tags = String(data.tags || '').trim().slice(0, 300);
+  var product = String(data.product || '').trim().slice(0, 300);
+  var topic = String(data.topic || '').trim().slice(0, 200);
+  // Tai khoan web: nguoi tao = ten that trong token (khong tin client). Extension: ten tu khai.
+  var author = caller.via === 'web' ? caller.name : (caller.name || String(data.createdBy || '').trim().slice(0, 60));
   var sh = getSheet_(SH_MSG_TPL, MSG_TPL_HEADERS);
   var vals = sh.getDataRange().getValues();
   var now = new Date();
-  var title = String(data.title).trim();
-  var content = String(data.content).trim();
-  var tags = String(data.tags || '').trim();
-  var createdBy = String(data.createdBy || '').trim();
 
   if (data.id) {
     for (var i = 1; i < vals.length; i++) {
-      if (String(vals[i][0]) === String(data.id)) {
-        sh.getRange(i + 1, 2, 1, 6).setValues([[title, content, tags, vals[i][4] || createdBy, vals[i][5] || now, now]]);
-        return jsonOut_({ ok: true, id: String(data.id) });
+      if (String(vals[i][0]) !== String(data.id)) continue;
+      var cur = _tplRowToObj_(vals[i]);
+      if (caller.priv) {
+        sh.getRange(i + 1, 2, 1, 3).setValues([[title, content, tags]]);
+        sh.getRange(i + 1, 5).setValue(cur.createdBy || author);
+        sh.getRange(i + 1, 7, 1, 4).setValues([[now, product, topic, cur.status]]);
+        return jsonOut_({ ok: true, id: cur.id, status: cur.status });
       }
+      if (cur.status === 'approved' || !_tplOwns_(cur, caller)) {
+        return jsonOut_({ error: 'Chi admin/quan ly moi duoc sua mau da duyet. Hay tao mau moi de de xuat.', code: 'FORBIDDEN' });
+      }
+      sh.getRange(i + 1, 2, 1, 3).setValues([[title, content, tags]]);
+      sh.getRange(i + 1, 7, 1, 4).setValues([[now, product, topic, 'pending']]);
+      sh.getRange(i + 1, 11, 1, 3).setValues([['', '', '']]);
+      return jsonOut_({ ok: true, id: cur.id, status: 'pending' });
     }
-    // co id truyen len nhung khong tim thay dong -> coi nhu tao moi voi id do (vd dong bo tu client)
-    sh.appendRow([String(data.id), title, content, tags, createdBy, now, now]);
-    return jsonOut_({ ok: true, id: String(data.id) });
   }
-
-  var newId = 'mt_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-  sh.appendRow([newId, title, content, tags, createdBy, now, now]);
-  return jsonOut_({ ok: true, id: newId });
+  // Tao moi. Chi admin/quan ly moi duoc tu dat id (dong bo cu); nguoi khac luon nhan id moi (khong chiem id).
+  var newId = (caller.priv && data.id) ? String(data.id) : 'mt_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+  var status = caller.priv ? 'approved' : 'pending';
+  sh.appendRow([newId, title, content, tags, author, now, now, product, topic, status, caller.priv ? author : '', caller.priv ? now : '', '']);
+  return jsonOut_({ ok: true, id: newId, status: status });
 }
 
-function deleteMessageTemplate_(id) {
+function deleteMessageTemplate_(id, caller) {
+  caller = caller || { priv: false, name: '' };
   if (!id) return jsonOut_({ error: 'Thieu id mau tin can xoa' });
   var sh = getSheet_(SH_MSG_TPL, MSG_TPL_HEADERS);
   var vals = sh.getDataRange().getValues();
   for (var i = 1; i < vals.length; i++) {
     if (String(vals[i][0]) === String(id)) {
+      var cur = _tplRowToObj_(vals[i]);
+      if (!caller.priv && (cur.status === 'approved' || !_tplOwns_(cur, caller))) {
+        return jsonOut_({ error: 'Chi admin/quan ly moi duoc xoa mau da duyet (nhan vien chi xoa duoc mau cua minh chua duyet).', code: 'FORBIDDEN' });
+      }
       sh.deleteRow(i + 1);
       return jsonOut_({ ok: true });
     }
   }
   return jsonOut_({ ok: true, note: 'Khong tim thay id (co the da bi xoa truoc do)' });
+}
+
+// decision: 'approve' | 'reject'. CHI admin/quan ly (theo vai tro that trong sheet Users, qua token phien).
+function approveMessageTemplate_(id, decision, reason, caller) {
+  if (!caller || !caller.priv) return jsonOut_({ error: 'Chi admin / quan ly moi duoc duyet mau tin.', code: 'FORBIDDEN' });
+  decision = String(decision || '').toLowerCase();
+  if (decision !== 'approve' && decision !== 'reject') return jsonOut_({ error: 'decision phai la approve hoac reject' });
+  if (!id) return jsonOut_({ error: 'Thieu id mau tin' });
+  var sh = getSheet_(SH_MSG_TPL, MSG_TPL_HEADERS);
+  var vals = sh.getDataRange().getValues();
+  for (var i = 1; i < vals.length; i++) {
+    if (String(vals[i][0]) !== String(id)) continue;
+    var st = decision === 'approve' ? 'approved' : 'rejected';
+    sh.getRange(i + 1, 10, 1, 4).setValues([[st, caller.name, new Date(), decision === 'reject' ? String(reason || '').trim().slice(0, 300) : '']]);
+    return jsonOut_({ ok: true, id: String(id), status: st });
+  }
+  return jsonOut_({ error: 'Khong tim thay mau tin' });
 }
 

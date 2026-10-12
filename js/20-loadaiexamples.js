@@ -14,7 +14,7 @@
     _prevSwitch(tab, el);
     var zp = document.getElementById('tab-zaloai');
     if (zp) zp.style.display = (tab === 'zaloai') ? 'flex' : 'none';
-    if (tab === 'zaloai') { loadMsgTemplates(); loadAiExamples(); }
+    if (tab === 'zaloai') { var _sg = document.getElementById('mt-suggest'); if (_sg && !_sg.getAttribute('data-mounted')) { _sg.setAttribute('data-mounted', '1'); tplSuggestMount(_sg); } loadMsgTemplates(); loadAiExamples(); }
   };
 })();
 
@@ -93,6 +93,8 @@ async function deleteAiExample(i) {
 }
 
 var _msgTemplates = [];
+var _msgTplCanApprove = false;   // server quyet dinh (vai tro that trong sheet Users qua token), KHONG tin currentUser phia trinh duyet
+var _msgTplPending = 0;
 async function loadMsgTemplates() {
   var listEl = document.getElementById('mt-list');
   if (!listEl) return;
@@ -102,40 +104,157 @@ async function loadMsgTemplates() {
     var r = await fetch(gsUrl + sep + 'action=messageTemplates', { redirect: 'follow' });
     var d = await r.json();
     _msgTemplates = (d && d.templates) || [];
+    _msgTplCanApprove = !!(d && d.canApprove);
+    _msgTplPending = (d && d.pendingCount) || 0;
   } catch (e) {
     listEl.innerHTML = '<div style="font-size:12px;color:#dc2626">Lỗi tải thư viện mẫu, thử lại.</div>';
     return;
   }
+  _tplUpdateBadge();
   renderMsgTemplateList();
+  _tplSuggestRefreshAll();
 }
 
-function renderMsgTemplateList() {
-  var listEl = document.getElementById('mt-list');
-  if (!listEl) return;
-  var q = (document.getElementById('mt-search').value || '').trim().toLowerCase();
-  var items = _msgTemplates.filter(function (t) {
-    if (!q) return true;
-    return (t.title || '').toLowerCase().indexOf(q) >= 0 ||
-      (t.content || '').toLowerCase().indexOf(q) >= 0 ||
-      (t.tags || '').toLowerCase().indexOf(q) >= 0;
+// ── Dung chung cho: o goi y theo san pham (CRM) va khung chat Pancake trong CRM (sap co) ──
+function _tplFold(s) { return (typeof _foldVi === 'function') ? _foldVi(s) : String(s || '').toLowerCase(); }
+function _tplMine(t) { var me = (typeof currentUser !== 'undefined' && currentUser && (currentUser.name || currentUser.username)) || ''; return !!me && String(t.createdBy || '').trim().toLowerCase() === String(me).trim().toLowerCase(); }
+function _tplCanEdit(t) { return _msgTplCanApprove || (t.status !== 'approved' && _tplMine(t)); }
+// Tim theo san pham / chu de hoi thoai / tag / tieu de / noi dung (bo dau, khong phan biet hoa thuong). Moi tu phai khop it nhat 1 truong;
+// diem: san pham 5 (khop nguyen 1 san pham +3), chu de 3, tag 3, tieu de 2, noi dung 1. Khong co tu khoa -> tra het (moi nhat truoc).
+function tplSearch(list, query, topic) {
+  var words = _tplFold(query).split(/\s+/).filter(Boolean);
+  var topicF = _tplFold(topic || '');
+  var out = [];
+  list.forEach(function (t, idx) {
+    if (topicF && _tplFold(t.topic) !== topicF) return;
+    var f = { product: _tplFold(t.product), topic: _tplFold(t.topic), tags: _tplFold(t.tags), title: _tplFold(t.title), content: _tplFold(t.content) };
+    var prodParts = String(t.product || '').split(/[,;|\n]/).map(function (x) { return _tplFold(x).trim(); }).filter(Boolean);
+    var score = 0, okAll = true;
+    for (var i = 0; i < words.length && okAll; i++) {
+      var w = words[i], hit = 0;
+      if (f.product.indexOf(w) >= 0) hit = Math.max(hit, 5);
+      if (f.topic.indexOf(w) >= 0) hit = Math.max(hit, 3);
+      if (f.tags.indexOf(w) >= 0) hit = Math.max(hit, 3);
+      if (f.title.indexOf(w) >= 0) hit = Math.max(hit, 2);
+      if (f.content.indexOf(w) >= 0) hit = Math.max(hit, 1);
+      if (!hit) okAll = false; else score += hit;
+    }
+    if (!okAll) return;
+    var qf = words.join(' ');
+    if (qf && prodParts.indexOf(qf) >= 0) score += 3;
+    out.push({ t: t, score: score, idx: idx });
   });
-  if (!items.length) {
-    listEl.innerHTML = '<div style="font-size:12px;color:var(--muted)">' + (_msgTemplates.length ? 'Không tìm thấy mẫu phù hợp.' : 'Chưa có mẫu nào — bấm "+ Thêm mẫu" để tạo mẫu đầu tiên.') + '</div>';
-    return;
-  }
-  listEl.innerHTML = items.map(function (t) {
-    var tagsHtml = (t.tags || '').split(',').map(function (tg) { tg = tg.trim(); return tg ? '<span class="zi-chip">#' + esc(tg) + '</span>' : ''; }).join('');
+  out.sort(function (a, b) { return (b.score - a.score) || (a.idx - b.idx); });   // idx nho = moi hon (server da sap moi nhat truoc)
+  return out.map(function (x) { return x.t; });
+}
+function _tplChips(t) {
+  var h = '';
+  String(t.product || '').split(/[,;|\n]/).map(function (x) { return x.trim(); }).filter(Boolean).forEach(function (p) { h += '<span class="zi-chip" style="background:#fef3c7;color:#92400e" title="Sản phẩm">📦 ' + esc(p) + '</span>'; });
+  if (t.topic) h += '<span class="zi-chip" style="background:#dbeafe;color:#1e40af" title="Nội dung hội thoại">💬 ' + esc(t.topic) + '</span>';
+  String(t.tags || '').split(',').forEach(function (tg) { tg = tg.trim(); if (tg) h += '<span class="zi-chip">#' + esc(tg) + '</span>'; });
+  return h;
+}
+function _tplCopyText(text, btn) {
+  var done = function () { if (btn) { var old = btn.getAttribute('data-old') || btn.textContent; btn.setAttribute('data-old', old); btn.textContent = '✅ Đã copy'; setTimeout(function () { btn.textContent = old; }, 1200); } };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(function () { _tplCopyFallback(text, done); });
+  else _tplCopyFallback(text, done);
+}
+function _tplCopyFallback(text, done) {
+  try { var ta = document.createElement('textarea'); ta.value = text; ta.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); done(); }
+  catch (e) { alert('Không copy được, vui lòng copy thủ công.'); }
+}
+
+// O GOI Y TIN NHAN: nhan vien go ten san pham (hoac noi dung hoi thoai) -> danh sach mau DA DUYET lien quan, bam Copy de dan vao chat.
+// Dung lai o khung chat Pancake trong CRM: tplSuggestMount(hostEl, { onPick: function(t){ chenVaoOTraLoi(t.content); } }) — khong phu thuoc giao dien khac.
+var _tplSuggestHosts = [];
+function tplSuggestMount(host, opts) {
+  if (!host) return;
+  opts = opts || {};
+  var st = { host: host, q: '', topic: '', onPick: opts.onPick || null };
+  host.innerHTML = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">' +
+      '<input class="zai-input tpl-sg-q" placeholder="🔎 Gõ tên sản phẩm hoặc nội dung hội thoại (VD: nhẫn vàng, khách hỏi giá)..." style="flex:1;min-width:220px" autocomplete="off">' +
+    '</div>' +
+    '<div class="tpl-sg-topics zi-row" style="margin-bottom:8px"></div>' +
+    '<div class="tpl-sg-res" style="display:flex;flex-direction:column;gap:8px"></div>';
+  host.querySelector('.tpl-sg-q').addEventListener('input', function (e) { st.q = e.target.value; _tplSuggestRender(st); });
+  _tplSuggestHosts.push(st);
+  _tplSuggestRender(st);
+  return st;
+}
+function _tplSuggestRefreshAll() { _tplSuggestHosts = _tplSuggestHosts.filter(function (st) { return document.body.contains(st.host); }); _tplSuggestHosts.forEach(_tplSuggestRender); }
+function _tplSuggestRender(st) {
+  var approved = _msgTemplates.filter(function (t) { return t.status === 'approved'; });
+  var topicsEl = st.host.querySelector('.tpl-sg-topics'), resEl = st.host.querySelector('.tpl-sg-res');
+  var topics = []; approved.forEach(function (t) { if (t.topic && topics.indexOf(t.topic) < 0) topics.push(t.topic); });
+  topicsEl.innerHTML = topics.slice(0, 12).map(function (tp, i) {
+    var on = st.topic && _tplFold(st.topic) === _tplFold(tp);
+    return '<button class="btn sm" data-ti="' + i + '" style="' + (on ? 'background:#1e40af;color:#fff' : '') + '">💬 ' + esc(tp) + '</button>';
+  }).join('');
+  topicsEl.querySelectorAll('button').forEach(function (b) {
+    b.onclick = function () { var tp = topics[+b.getAttribute('data-ti')]; st.topic = (st.topic && _tplFold(st.topic) === _tplFold(tp)) ? '' : tp; _tplSuggestRender(st); };
+  });
+  var items = tplSearch(approved, st.q, st.topic);
+  if (!approved.length) { resEl.innerHTML = '<div style="font-size:12px;color:var(--muted)">Chưa có mẫu nào được duyệt — admin/quản lý thêm mẫu hoặc duyệt mẫu nhân viên đề xuất ở mục "Quản lý mẫu" bên dưới.</div>'; return; }
+  if (!items.length) { resEl.innerHTML = '<div style="font-size:12px;color:var(--muted)">Không có mẫu nào khớp' + (st.q ? ' "' + esc(st.q) + '"' : '') + '. Thử gõ tên sản phẩm ngắn hơn, hoặc đề xuất mẫu mới bằng nút "+ Thêm mẫu".</div>'; return; }
+  var shown = items.slice(0, 20);
+  resEl.innerHTML = shown.map(function (t, i) {
     return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:10px 12px">' +
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px">' +
         '<div style="font-weight:700;font-size:13px">' + esc(t.title) + '</div>' +
-        '<div style="display:flex;gap:4px;flex-shrink:0">' +
-          '<button class="btn sm" onclick="copyMsgTemplate(\'' + t.id + '\')" title="Copy nội dung">📋 Copy</button>' +
-          '<button class="btn sm" onclick="openMsgTemplateForm(\'' + t.id + '\')" title="Sửa">✏️</button>' +
-          '<button class="btn sm" onclick="deleteMsgTemplateUI(\'' + t.id + '\')" title="Xóa">🗑</button>' +
-        '</div>' +
+        '<button class="btn sm primary" data-ci="' + i + '" style="flex-shrink:0">📋 Copy</button>' +
+      '</div>' +
+      '<div style="font-size:12px;white-space:pre-wrap;margin-bottom:6px">' + esc(t.content) + '</div>' +
+      '<div class="zi-row">' + _tplChips(t) + '</div></div>';
+  }).join('') + (items.length > shown.length ? '<div style="font-size:11px;color:var(--muted)">Còn ' + (items.length - shown.length) + ' mẫu nữa — gõ thêm từ khoá để thu hẹp.</div>' : '');
+  resEl.querySelectorAll('button[data-ci]').forEach(function (b) {
+    b.onclick = function () { var t = shown[+b.getAttribute('data-ci')]; if (st.onPick) st.onPick(t, b); else _tplCopyText(t.content, b); };
+  });
+}
+
+function _tplUpdateBadge() {
+  var el = document.getElementById('mt-pending-badge');
+  if (!el) return;
+  if (_msgTplCanApprove && _msgTplPending > 0) { el.style.display = ''; el.textContent = '⏳ ' + _msgTplPending + ' mẫu chờ duyệt'; }
+  else el.style.display = 'none';
+  var hint = document.getElementById('mt-form-hint');
+  if (hint) hint.textContent = _msgTplCanApprove ? 'Bạn là admin/quản lý: mẫu lưu xong dùng được ngay.' : 'Mẫu bạn thêm sẽ ở trạng thái "Chờ duyệt" — chỉ dùng được sau khi quản lý duyệt.';
+}
+function mtShowPending() { var sel = document.getElementById('mt-status-filter'); if (sel) { sel.value = 'pending'; renderMsgTemplateList(); } }
+
+var _MT_STATUS = {
+  approved: '<span class="zi-chip" style="background:#dcfce7;color:#166534">✅ Đã duyệt</span>',
+  pending: '<span class="zi-chip" style="background:#fef3c7;color:#92400e">⏳ Chờ duyệt</span>',
+  rejected: '<span class="zi-chip" style="background:#fee2e2;color:#991b1b">❌ Bị từ chối</span>'
+};
+function renderMsgTemplateList() {
+  var listEl = document.getElementById('mt-list');
+  if (!listEl) return;
+  var q = (document.getElementById('mt-search').value || '').trim();
+  var stF = (document.getElementById('mt-status-filter') || {}).value || '';
+  var base = _msgTemplates.filter(function (t) {
+    if (stF === 'mine') return _tplMine(t);
+    return !stF || t.status === stF;
+  });
+  var items = q ? tplSearch(base, q, '') : base;
+  if (!items.length) {
+    listEl.innerHTML = '<div style="font-size:12px;color:var(--muted)">' + (_msgTemplates.length ? 'Không có mẫu phù hợp bộ lọc.' : 'Chưa có mẫu nào — bấm "+ Thêm mẫu" để tạo mẫu đầu tiên.') + '</div>';
+    return;
+  }
+  listEl.innerHTML = items.map(function (t) {
+    var acts = '<button class="btn sm" onclick="copyMsgTemplate(\'' + t.id + '\')" title="Copy nội dung">📋 Copy</button>';
+    if (_msgTplCanApprove && t.status !== 'approved') acts += '<button class="btn sm primary" onclick="approveMsgTemplateUI(\'' + t.id + '\',\'approve\')" title="Duyệt mẫu">✅ Duyệt</button>';
+    if (_msgTplCanApprove && t.status === 'pending') acts += '<button class="btn sm" onclick="approveMsgTemplateUI(\'' + t.id + '\',\'reject\')" title="Từ chối">❌ Từ chối</button>';
+    if (_tplCanEdit(t)) acts += '<button class="btn sm" onclick="openMsgTemplateForm(\'' + t.id + '\')" title="Sửa">✏️</button><button class="btn sm" onclick="deleteMsgTemplateUI(\'' + t.id + '\')" title="Xóa">🗑</button>';
+    var meta = '<div style="font-size:11px;color:var(--muted);margin-top:4px">Người tạo: ' + esc(t.createdBy || '—') +
+      (t.status === 'approved' && t.approvedBy ? ' · Duyệt bởi: ' + esc(t.approvedBy) : '') + '</div>' +
+      (t.status === 'rejected' && t.rejectReason ? '<div style="font-size:11px;color:#991b1b;margin-top:2px">Lý do từ chối: ' + esc(t.rejectReason) + ' — sửa lại rồi lưu để gửi duyệt lại.</div>' : '');
+    return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:10px 12px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px">' +
+        '<div style="font-weight:700;font-size:13px">' + esc(t.title) + ' ' + (_MT_STATUS[t.status] || '') + '</div>' +
+        '<div style="display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">' + acts + '</div>' +
       '</div>' +
       '<div style="font-size:12px;color:var(--text);white-space:pre-wrap;margin-bottom:6px">' + esc(t.content) + '</div>' +
-      (tagsHtml ? '<div class="zi-row">' + tagsHtml + '</div>' : '') +
+      '<div class="zi-row">' + _tplChips(t) + '</div>' + meta +
     '</div>';
   }).join('');
 }
@@ -145,8 +264,11 @@ function openMsgTemplateForm(id) {
   var t = id ? _msgTemplates.find(function (x) { return x.id === id; }) : null;
   document.getElementById('mt-f-id').value = t ? t.id : '';
   document.getElementById('mt-f-title').value = t ? t.title : '';
+  document.getElementById('mt-f-product').value = t ? (t.product || '') : '';
+  document.getElementById('mt-f-topic').value = t ? (t.topic || '') : '';
   document.getElementById('mt-f-tags').value = t ? t.tags : '';
   document.getElementById('mt-f-content').value = t ? t.content : '';
+  _tplUpdateBadge();
   wrap.style.display = 'block';
   document.getElementById('mt-f-title').focus();
 }
@@ -159,28 +281,48 @@ async function saveMsgTemplateUI() {
   var title = (document.getElementById('mt-f-title').value || '').trim();
   var content = (document.getElementById('mt-f-content').value || '').trim();
   var tags = (document.getElementById('mt-f-tags').value || '').trim();
+  var product = (document.getElementById('mt-f-product').value || '').trim();
+  var topic = (document.getElementById('mt-f-topic').value || '').trim();
   var id = (document.getElementById('mt-f-id').value || '').trim();
   if (!title || !content) { alert('Vui lòng nhập tiêu đề và nội dung mẫu.'); return; }
   var btn = document.getElementById('mt-f-save-btn');
   btn.disabled = true; btn.textContent = 'Đang lưu...';
+  var d = null;
   try {
     var body = { action: 'saveMessageTemplate', template: {
-      id: id || undefined, title: title, content: content, tags: tags,
+      id: id || undefined, title: title, content: content, tags: tags, product: product, topic: topic,
       createdBy: (typeof currentUser !== 'undefined' && currentUser && currentUser.name) || ''
     } };
     var r = await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify(body) });
-    var d = await r.json();
+    d = await r.json();
     if (d && d.error) { alert('Lỗi: ' + d.error); return; }
   } catch (e) { alert('Lỗi kết nối, thử lại.'); return; }
   finally { btn.disabled = false; btn.textContent = 'Lưu mẫu'; }
   closeMsgTemplateForm();
+  if (d && d.status === 'pending') toast('✓ Đã gửi mẫu — chờ quản lý duyệt mới dùng được');
+  else toast('✓ Đã lưu mẫu');
+  loadMsgTemplates();
+}
+
+async function approveMsgTemplateUI(id, decision) {
+  var reason = '';
+  if (decision === 'reject') {
+    reason = prompt('Lý do từ chối (nhân viên sẽ thấy để sửa lại):', '');
+    if (reason === null) return;
+  }
+  try {
+    var r = await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify({ action: 'approveMessageTemplate', id: id, decision: decision, reason: reason }) });
+    var d = await r.json();
+    if (d && d.error) { alert('Lỗi: ' + d.error); return; }
+  } catch (e) { alert('Lỗi kết nối, thử lại.'); return; }
+  toast(decision === 'approve' ? '✓ Đã duyệt — nhân viên dùng được ngay' : '✓ Đã từ chối mẫu');
   loadMsgTemplates();
 }
 
 async function deleteMsgTemplateUI(id) {
   if (!confirm('Xóa mẫu tin nhắn này?')) return;
   try {
-    var r = await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify({ action: 'deleteMessageTemplate', id: id }) });
+    var r = await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify({ action: 'deleteMessageTemplate', id: id, createdBy: (typeof currentUser !== 'undefined' && currentUser && currentUser.name) || '' }) });
     var d = await r.json();
     if (d && d.error) { alert('Lỗi: ' + d.error); return; }
   } catch (e) { alert('Lỗi kết nối, thử lại.'); return; }
@@ -190,16 +332,9 @@ async function deleteMsgTemplateUI(id) {
 function copyMsgTemplate(id) {
   var t = _msgTemplates.find(function (x) { return x.id === id; });
   if (!t) return;
-  navigator.clipboard.writeText(t.content).then(function () {
-    var btns = document.querySelectorAll('#mt-list button');
-    // phan hoi nhanh bang cach doi tam text nut vua bam (tim theo id trong onclick)
-    btns.forEach(function (b) {
-      if (b.getAttribute('onclick') === "copyMsgTemplate('" + id + "')") {
-        var old = b.textContent; b.textContent = '✅ Đã copy';
-        setTimeout(function () { b.textContent = old; }, 1200);
-      }
-    });
-  }).catch(function () { alert('Không copy được, vui lòng copy thủ công.'); });
+  var btn = null;
+  document.querySelectorAll('#mt-list button').forEach(function (b) { if (b.getAttribute('onclick') === "copyMsgTemplate('" + id + "')") btn = b; });
+  _tplCopyText(t.content, btn);
 }
 
 function zaiTone(btn) {

@@ -1174,11 +1174,13 @@ async function _postGas_(body) {
 }
 async function handleSaveMessageTemplate(t) {
   return _postGas_({ action: "saveMessageTemplate", template: {
-    id: t?.id || "", title: t?.title || "", content: t?.content || "", tags: t?.tags || "", createdBy: t?.createdBy || ""
+    id: t?.id || "", title: t?.title || "", content: t?.content || "", tags: t?.tags || "",
+    product: t?.product || "", topic: t?.topic || "", createdBy: t?.createdBy || ""
   } });
 }
 async function handleDeleteMessageTemplate(p) {
-  return _postGas_({ action: "deleteMessageTemplate", id: p?.id || "" });
+  // createdBy: server chi cho xoa mau CHUA DUYET cua chinh nguoi do (mau da duyet chi admin/quan ly xoa tren CRM).
+  return _postGas_({ action: "deleteMessageTemplate", id: p?.id || "", createdBy: p?.createdBy || "" });
 }
 
 // Thu vien mau tin nhan tu van khach — action:'messageTemplates' (GET, chi doc). Form them/sua/
@@ -1188,7 +1190,8 @@ async function handleGetMessageTemplates() {
   const cfg = { ...DEFAULT_SETTINGS, ...settings };
   if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
   const sep = cfg.gasUrl.includes("?") ? "&" : "?";
-  const res = await fetch(cfg.gasUrl + sep + "action=messageTemplates", { redirect: "follow" });
+  // by=<ten CS>: de CS thay them cac mau CUA MINH dang cho duyet / bi tu choi (server van chi tra mau DA DUYET cua nguoi khac).
+  const res = await fetch(cfg.gasUrl + sep + "action=messageTemplates&by=" + encodeURIComponent(cfg.csName || ""), { redirect: "follow" });
   const data = await res.json();
   if (data.error) throw new Error(data.error);
   return { templates: data.templates || [] };
