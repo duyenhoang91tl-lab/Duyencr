@@ -13,9 +13,10 @@ const ctx = { Logger: { log() {} },
 vm.createContext(ctx); vm.runInContext(code, ctx);
 const run = c => vm.runInContext(c, ctx);
 const calls = { compare: 0 };
-ctx.__cmp = { care: { ok: true }, dt: { ok: true }, don: { ok: true }, throwDon: false };
+ctx.__cmp = { care: { ok: true }, dt: { ok: true }, don: { ok: true }, throwDon: false, prune: { ok: true, extra: 0 } };
 vm.runInContext(`
   sbCompareCare_ = function () { __calls.compare++; return __cmp.care; };
+  sbPruneCare_ = function (o) { __calls.prune = (__calls.prune || 0) + 1; if (!o || o.dryRun !== true) throw new Error('sbSanSangBuoc5_ PHAI goi dry-run'); return __cmp.prune; };
   sbCompareOrders_ = function (w) { __calls.compare++; if (w === 'don' && __cmp.throwDon) throw new Error('boom'); return __cmp[w]; };`, Object.assign(ctx, { __calls: calls }));
 function good() {
   Object.keys(props).forEach(k => delete props[k]); triggers.length = 0;
@@ -25,7 +26,7 @@ function good() {
   triggers.push({ getHandlerFunction: () => 'sbOrdersTick_' }); triggers.push({ getHandlerFunction: () => 'sbCareTick_' }); triggers.push({ getHandlerFunction: () => 'sbBackupTick_' });
   props.SB_BACKUP_STATE = JSON.stringify({ lastOkAt: Date.now() - 3 * 3600000, last: { care_data: { name: 'care_data_x.json.gz', rows: 10, bytes: 1 } } });
   props.SB_CARE_SYNC_STATE = JSON.stringify({ syncedAt: Date.now() - 4 * 60000, last: 100, blocks: 1 });
-  ctx.__cmp.care = { ok: true }; ctx.__cmp.dt = { ok: true }; ctx.__cmp.don = { ok: true }; ctx.__cmp.throwDon = false;
+  ctx.__cmp.care = { ok: true }; ctx.__cmp.dt = { ok: true }; ctx.__cmp.don = { ok: true }; ctx.__cmp.throwDon = false; ctx.__cmp.prune = { ok: true, extra: 0 };
 }
 const check = () => run('sbSanSangBuoc5_()');
 const failsOf = r => r.failing.join(' | ');
@@ -36,7 +37,7 @@ let r = check(); ok(!r.autoOk && r.checks.length === 1 && /CHUA nen/.test(r.verd
 
 // ===== tat ca dat =====
 good(); const before = JSON.stringify(props); writes = 0; r = check();
-ok(r.autoOk && r.failing.length === 0 && r.checks.length === 17, 'tat ca dat (17 check): ' + r.checks.length + ' ' + failsOf(r));
+ok(r.autoOk && r.failing.length === 0 && r.checks.length === 18, 'tat ca dat (18 check): ' + r.checks.length + ' ' + failsOf(r));
 ok(r.manual.length === 6 && /manual/.test(r.verdict) && /Duyen dong y/.test(r.verdict), 'autoOk van kem muc manual + can Duyen dong y');
 ok(writes === 0 && JSON.stringify(props) === before, 'CHI DOC: khong ghi/xoa Script Property nao');
 ok(!JSON.stringify(r).includes('SECRETKEY'), 'ket qua khong lo key');
@@ -63,6 +64,8 @@ breaks('CareData chua dong bo lan nao', () => delete props.SB_CARE_SYNC_STATE, /
 breaks('CareData dong bo cu 31 phut', () => props.SB_CARE_SYNC_STATE = JSON.stringify({ syncedAt: Date.now() - 31 * 60000, last: 100, blocks: 1 }), /CareData: dong bo dinh ky/);
 breaks('CareData dong bo bao loi', () => props.SB_CARE_SYNC_STATE = JSON.stringify({ syncedAt: Date.now() - 60000, last: 100, blocks: 1, err: 'HTTP 500' }), /CareData: dong bo dinh ky/);
 breaks('mat trigger sbCareTick_ (chi mat trigger CareData)', () => { const i = triggers.findIndex(t => t.getHandlerFunction() === 'sbCareTick_'); triggers.splice(i, 1); }, /Trigger dong bo CareData/);
+breaks('con dong thua tren Supabase', () => ctx.__cmp.prune = { ok: true, extra: 3, sample: ['0811', '0812'] }, /khong con dong thua/);
+breaks('khong kiem tra duoc dong thua', () => ctx.__cmp.prune = { ok: false, error: 'HTTP 500' }, /khong con dong thua/);
 breaks('chua co ban sao luu nao', () => delete props.SB_BACKUP_STATE, /Sao luu Supabase ra Drive/);
 breaks('ban sao luu cu 37 gio', () => props.SB_BACKUP_STATE = JSON.stringify({ lastOkAt: Date.now() - 37 * 3600000 }), /Sao luu Supabase ra Drive/);
 breaks('sao luu bao loi', () => props.SB_BACKUP_STATE = JSON.stringify({ lastOkAt: Date.now() - 3600000, err: 'HTTP 500' }), /Sao luu Supabase ra Drive/);

@@ -1286,8 +1286,8 @@ function _sbSetReadOff_(pr, key) { pr.deleteProperty(key); pr.deleteProperty(key
 // CareData: toi da tuoi du lieu dong bo dinh ky (Buoc B) duoc coi la "moi" = 3 chu ky trigger (giong SB_ORD_MAX_AGE_MS_ cua don hang).
 var SB_CARE_MAX_AGE_MS_ = 3 * SB_CARE_SYNC_TICK_MINUTES_ * 60000;
 var SB_STEP5_MANUAL_ = [
-  'CareData da co dong bo dinh ky Sheet -> Supabase (Buoc B, sbSyncCare_) nhung CHI upsert: dong bi XOA tren Sheet (dedupe, xoa tay) KHONG bi xoa tren Supabase. Neu bo ghi song song, moi lan CS luu van chi len Supabase qua tick (tre toi da ~10 phut) va cong an toan (dirty) khong con. Can thiet ke duong ghi chinh vao Supabase (Buoc C) + dong bo xoa truoc.',
-  'Duong ghi NGOAI CRM: tool Base/Pos day don vao Sheet va nhan vien sua TAY tren Sheet — len Supabase o tick dinh ky (don hang 4b, CareData Buoc B; toi da ~10 phut); dong BI XOA tren Sheet cua CareData thi khong.',
+  'CareData da co dong bo dinh ky Sheet -> Supabase (Buoc B, sbSyncCare_) nhung CHI upsert: dong bi XOA tren Sheet (dedupe, xoa tay) KHONG tu xoa tren Supabase — phai chay tay sbXoaDongThuaThu / sbXoaDongThuaThat (co check theo doi). Neu bo ghi song song, moi lan CS luu van chi len Supabase qua tick (tre toi da ~10 phut) va cong an toan (dirty) khong con. Can thiet ke duong ghi chinh vao Supabase (Buoc C) + dong bo xoa truoc.',
+  'Duong ghi NGOAI CRM: tool Base/Pos day don vao Sheet va nhan vien sua TAY tren Sheet — len Supabase o tick dinh ky (don hang 4b, CareData Buoc B; toi da ~10 phut); dong BI XOA tren Sheet cua CareData chi mat khoi Supabase khi chay tay sbXoaDongThuaThat.',
   'Bao cao/dashboard noi bo van doc readCare_/readAllOrders_ tu Sheets (4e-3 chua lam): neu Sheets ngung cap nhat thi bao cao cu dan.',
   'Quy tac nghiep vu: DT Tong duoc quan ly truc tiep tren Google Sheets (saveOrders co y tat). Chuyen nguon that cua don hang sang Supabase la quyet dinh cua Duyen, khong phai ky thuat.',
   'Da co sao luu Supabase ra Drive (sbBackup_, hang ngay) nhung CHUA thu KHOI PHUC that (sbKhoiPhuc*) va chua quyet huong archive (docs/ARCHIVE-PLAN.md) chong cheo voi Supabase.',
@@ -1344,6 +1344,10 @@ function sbSanSangBuoc5_(opts) {
     add('Sao luu Supabase ra Drive: ban gan nhat moi, khong loi', badB.length === 0, badB.join('; '));
     var bkTick = bk && bk.triggerOn === true;
     add('Trigger sao luu Supabase (sbBackupTick_) dang chay', bkTick, bkTick ? '' : 'Chay sbSaoLuuCaiTrigger');
+    // Dong DA XOA khoi Sheet nhung con tren Supabase (Buoc B chi upsert): dry-run, khong xoa gi
+    var pc = safe(function () { return sbPruneCare_({ dryRun: true }); });
+    var pcOk = pc.ok === true && pc.extra === 0;
+    add('CareData: khong con dong thua tren Supabase (da xoa khoi Sheet)', pcOk, pcOk ? '' : (pc.ok === false ? 'khong kiem tra duoc: ' + String(pc.error || '').slice(0, 120) : pc.extra + ' SDT thua (vd ' + (pc.sample || []).slice(0, 3).join(', ') + ') — chay sbXoaDongThuaThu roi sbXoaDongThuaThat'));
     [['SB_ORD_READ', 'Doc don hang tu Supabase'], ['SB_CARE_DELTA_READ', 'Doc khach (delta) tu Supabase'], ['SB_CARE_FULL_READ', 'Doc khach (FULL) tu Supabase']].forEach(function (c) {
       var on = String(pr.getProperty(c[0]) || '').toLowerCase() === 'on', at = parseInt(pr.getProperty(c[0] + '_AT') || '0', 10);
       var days = at ? Math.floor((now - at) / 86400000) : null, ok = on && at > 0 && days >= SB_SOAK_DAYS_, d = '';
@@ -1527,6 +1531,90 @@ function sbKhoiPhucThu() { SB_BACKUP_TABLES_.forEach(function (sp) { _sbLogResto
 function sbKhoiPhucThatCare() { _sbLogRestore_(sbRestoreBackup_({ table: 'care_data', dryRun: false })); }          // GHI DE care_data bang ban sao luu moi nhat
 function sbKhoiPhucThatDT() { _sbLogRestore_(sbRestoreBackup_({ table: 'dt_tong', dryRun: false })); }
 function sbKhoiPhucThatDon() { _sbLogRestore_(sbRestoreBackup_({ table: 'don_chi_tiet', dryRun: false })); }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//  SUPABASE — DONG BO XOA dong CareData (Buoc B chi UPSERT nen dong bi xoa khoi Sheet — dedupe/xoa tay — van con tren Supabase va
+//  cong doc se tiep tuc hien khach da xoa). sbPruneCare_ so KHOA SDT: Supabase co ma Sheet khong con => xoa khoi Supabase.
+//  An toan (xoa du lieu THAT, nen nhieu lop): (1) MAC DINH CHAY THU (dryRun); (2) doc Supabase TRUOC roi moi doc Sheet — dong CRM vua them
+//  (Sheet ghi truoc, mirror sau) luon co mat o Sheet, khong bi coi la thua; (3) bo qua dong cap nhat trong SB_PRUNE_GRACE_MS_ gan day;
+//  (4) tu choi neu Sheet khong co SDT nao; (5) tu choi neu so dong thua > max(SB_PRUNE_MAX_ABS_, SB_PRUNE_MAX_PCT_ x tong) (bao ve khi Sheet bi
+//  loi/xoa nham nhieu) — vuot thi dung va bao, KHONG xoa; (6) chi xoa that khi co ban SAO LUU day du <= SB_BACKUP_MAX_AGE_MS_;
+//  (7) luu ban sao day du cac dong sap xoa ra Drive (pruned_care_data_*.json.gz, doc lai kiem tra) TRUOC khi xoa. KHONG tu chay (khong trigger).
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+var SB_PRUNE_MAX_ABS_ = 20;
+var SB_PRUNE_MAX_PCT_ = 0.02;
+var SB_PRUNE_GRACE_MS_ = 60 * 60000;
+var SB_PRUNE_CHUNK_ = 100;
+function _sbCareKeys_() {   // [{phone, updated_at}] cua TOAN BO care_data (phan trang 1000)
+  var out = [], off = 0;
+  for (;;) {
+    var arr = sb_('GET', 'care_data?select=phone,updated_at&order=phone.asc&limit=1000&offset=' + off).json;
+    if (!Array.isArray(arr)) throw new Error('Phan hoi care_data khong phai mang');
+    out = out.concat(arr);
+    if (arr.length < 1000) break;
+    off += 1000;
+  }
+  return out;
+}
+// opts: { dryRun (mac dinh TRUE), max (ghi de nguong, so dong) }. Khong nem loi. Tra { ok, dryRun, extra, sample, graced, maxAllowed, refused?, deleted?, backupFile? }
+function sbPruneCare_(opts) {
+  opts = opts || {};
+  var dryRun = opts.dryRun !== false && opts.dryRun !== 'false';
+  var out = { ok: false, dryRun: dryRun };
+  if (!sbCfg_().ok) { out.error = 'Chua cau hinh SUPABASE_URL / SUPABASE_KEY trong Script Properties.'; return out; }
+  try {
+    var sbRows = _sbCareKeys_();   // 1) Supabase TRUOC ...
+    var sh = getSheet_(SH_CARE, CARE_HEADERS), last = sh.getLastRow(), on = {}, nSheet = 0;
+    if (last >= 2) {                 // 2) ... roi moi toi Sheet
+      var col = sh.getRange(2, 1, last - 1, 1).getValues();
+      for (var i = 0; i < col.length; i++) { var p = normPhone_(_sbCell_(col[i][0])); if (p && !on[p]) { on[p] = 1; nSheet++; } }
+    }
+    out.supabaseRows = sbRows.length; out.sheetPhones = nSheet;
+    if (!nSheet) { out.ok = true; out.refused = 'Sheet CareData khong co SDT nao — khong xoa gi.'; out.extra = null; return out; }
+    var now = Date.now(), cand = [], graced = 0;
+    sbRows.forEach(function (r) {
+      if (on[r.phone]) return;
+      var t = Date.parse(r.updated_at);
+      if (t && now - t < SB_PRUNE_GRACE_MS_) { graced++; return; }
+      if (!/^\d+$/.test(String(r.phone))) return;   // khoa la so — khong dung ky tu la trong bo loc xoa
+      cand.push(String(r.phone));
+    });
+    var maxAllowed = opts.max != null ? Math.max(0, parseInt(opts.max, 10) || 0) : Math.max(SB_PRUNE_MAX_ABS_, Math.ceil(sbRows.length * SB_PRUNE_MAX_PCT_));
+    out.extra = cand.length; out.sample = cand.slice(0, 10); out.graced = graced; out.maxAllowed = maxAllowed;
+    var bk = sbBackupStatus_(); out.backupAgeHours = bk.ageHours; out.backupOk = bk.lastOkAt != null && bk.ageHours <= SB_BACKUP_MAX_AGE_MS_ / 3600000;
+    out.ok = true;
+    if (!cand.length) { out.hint = 'Khong co dong thua.'; return out; }
+    if (cand.length > maxAllowed) { out.refused = 'So dong thua (' + cand.length + ') vuot nguong an toan (' + maxAllowed + ') — DUNG, khong xoa. Kiem tra Sheet CareData co bi mat/xoa nham khong; neu dung that su, goi lai voi max lon hon.'; return out; }
+    if (dryRun) { out.hint = 'Chay thu (chua xoa). Goi sbXoaDongThuaThat (can ban sao luu <= ' + SB_BACKUP_MAX_AGE_MS_ / 3600000 + ' gio).'; return out; }
+    if (!out.backupOk) { out.refused = 'Chua co ban sao luu day du <= ' + SB_BACKUP_MAX_AGE_MS_ / 3600000 + ' gio (chay sbSaoLuuSupabase truoc) — khong xoa.'; return out; }
+    // (7) luu ban sao day du cac dong sap xoa, doc lai kiem tra, ROI MOI xoa
+    var full = [];
+    for (var a = 0; a < cand.length; a += SB_PRUNE_CHUNK_) {
+      var got = sb_('GET', 'care_data?select=*&phone=in.(' + cand.slice(a, a + SB_PRUNE_CHUNK_).join(',') + ')').json;
+      if (!Array.isArray(got)) throw new Error('Phan hoi khong phai mang khi luu ban sao');
+      full = full.concat(got);
+    }
+    var name = 'pruned_care_data_' + _sbBackupStamp_() + '.json.gz';
+    var gz = Utilities.gzip(Utilities.newBlob(JSON.stringify({ table: 'care_data', pruned: true, takenAt: new Date().toISOString(), count: full.length, rows: full }), 'application/json', name.replace(/\.gz$/, '')), name);
+    var file = _sbBackupFolder_().createFile(gz), back = null;
+    try { back = JSON.parse(Utilities.ungzip(file.getBlob()).getDataAsString()); } catch (eV) {}
+    if (!back || back.count !== full.length || !Array.isArray(back.rows) || back.rows.length !== full.length) { try { file.setTrashed(true); } catch (eT) {} throw new Error('Doc lai file ban sao ' + name + ' KHONG khop — chua xoa gi.'); }
+    out.backupFile = name; out.backupRows = full.length;
+    var del = 0;
+    for (var b = 0; b < cand.length; b += SB_PRUNE_CHUNK_) {
+      var chunk = cand.slice(b, b + SB_PRUNE_CHUNK_);
+      sb_('DELETE', 'care_data?phone=in.(' + chunk.join(',') + ')', null, { Prefer: 'return=minimal' });
+      del += chunk.length;
+    }
+    out.deleted = del; out.hint = 'Da xoa ' + del + ' dong thua khoi Supabase (ban sao: ' + name + ').';
+    try { PropertiesService.getScriptProperties().setProperty('SB_CARE_PRUNE_STATE', JSON.stringify({ at: now, deleted: del, file: name })); } catch (eS) {}
+    try { CacheService.getScriptCache().remove('customers_v12'); } catch (eC) {}
+    try { invalidateLookupCache_(cand); } catch (eL) {}
+    return out;
+  } catch (e) { out.ok = false; out.error = String(e && e.message || e); return out; }
+}
+function sbXoaDongThuaThu() { var r = sbPruneCare_({ dryRun: true }); Logger.log(JSON.stringify(r, null, 2)); Logger.log(r.refused || r.hint || r.error || ''); }   // CHI DOC
+function sbXoaDongThuaThat() { var r = sbPruneCare_({ dryRun: false }); Logger.log(JSON.stringify(r, null, 2)); Logger.log(r.refused || r.hint || r.error || ''); }
 
 
 // ═══════════════════════════════════════════════════════════════
