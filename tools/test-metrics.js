@@ -161,7 +161,7 @@ vm.runInContext(`
   buildSalesReportB_ = function(f) { __CALLS__.B++; return __origB__(f); };
   buildFailedOrderReport_ = function(f) { __CALLS__.G++; return __origG__(f); };
   buildSaleKpiReport_ = function() { return { rows: [{ name: 'anhNP1999', revenue: 5000000, orders: 2, target: 10000000, pct: 50, nhom: 'Online' }, { name: 'dungnguyen1995', revenue: 2000000, orders: 1, target: 4000000, pct: 50, nhom: 'Online' }] }; };
-  buildKpiReport_ = function() { return { bySale: [] }; };
+  buildKpiReport_ = function() { return { bySale: [{ name: 'chiPancake', tongTT: 20, sdtMangVe: 5, tyLeChot: 25, donHang: 3, doanhThu: 9000000 }] }; };
   buildCareLeadReport_ = function() { return { byCS: [] }; };
   jsonOut_ = function(o) { return o; };
   _cacheGetBig_ = function() { return null; }; _cachePutBig_ = function() {};
@@ -179,6 +179,8 @@ const ov = vm.runInContext('JSON.parse(JSON.stringify(orgOverview_({ from: "2026
 ok(ov.ok, 'orgOverview_ chay duoc');
 const calls = vm.runInContext('__CALLS__', ctx);
 eq(calls.B, 1, 'orgOverview_ (ky ngan, co daily) doc B dung 1 lan'); eq(calls.G, 1, 'orgOverview_ doc G dung 1 lan (truoc day: B 1 + G 1, khong tang)');
+const pp = ov.people.find(x => x.name === 'chiPancake');
+ok(pp && pp.orders === 0 && pp.revenue === 0 && pp.tongTT === 20, 'nguoi chi co don/doanh thu o Pancake: KHONG lay doanh thu Pancake (chi Pos), van giu chi so hoi thoai');
 const pa = ov.people.find(x => x.name === 'anhNP1999');
 ok(pa && pa.daily && pa.daily.length >= 1, 'daily tung nguoi van co (lay tu posMetrics_.bySaleDay)');
 eq(pa.revenue, 5000000, 'doanh thu van tu KPI Sale (Base), khong bi doi sang Pos');

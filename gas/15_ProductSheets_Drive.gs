@@ -324,7 +324,7 @@ function buildTeamMetrics_(from, to, pos) {
       var p = P(r.name); if (!p) return;
       p.tongTT = _taNum_(r.tongTT); p.sdtMangVe = _taNum_(r.sdtMangVe);
       p.tyLeChot = p.tongTT ? _taNum_(r.tyLeChot) : null;
-      if (!p.orders && r.donHang) { p.orders = _taNum_(r.donHang); p.revenue = _taNum_(r.doanhThu); }
+      // KHONG con lay doanh thu/so don tu Pancake khi Pos chua co (Duyen chot 2026-10-12: bao cao tinh tu Pos; Base chi check nguoc cho don GHEP/TACH, viec do nam trong buildSalesReportB_). Pancake chi cho chi so hoi thoai (tongTT/sdtMangVe/tyLeChot).
     });
   } catch (e2) { warnings.push('Không đọc được KPI Pancake: ' + e2.message); }
   if (pos && pos.total && pos.total.failedOrders !== null && pos.total.failedOrders !== undefined) {
