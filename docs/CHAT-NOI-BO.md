@@ -31,7 +31,7 @@ Tab **💬 Chat nội bộ** trong menu trái (nhóm "Social", cạnh "Chat (Soc
 - `python3 tools/test-chat-e2e.py` — giao diện thật ↔ code GAS thật, 20 kiểm tra (cần Playwright, ~2 phút).
 
 ## Deploy
-1. Đẩy lên `main` → CI deploy GAS (hoặc dán `gas_v13.js` vào Apps Script → Deploy → New version). Kiểm tra `?action=count` ra `ver: v13.36-chat`.
+1. Đẩy lên `main` → CI deploy GAS (hoặc dán `gas_v13.js` vào Apps Script → Deploy → New version). Kiểm tra `?action=count` ra `ver: v13.38-chat`.
 2. Ctrl+F5 trên web (GitHub Pages cache). Sheet `Chat_Kenh`/`Chat_TinNhan` tự tạo khi có tin đầu tiên.
 3. Không cần reload extension (chat chỉ có trên web Sasum).
 
