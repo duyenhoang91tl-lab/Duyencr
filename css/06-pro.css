@@ -65,7 +65,7 @@ html.ui-pro #dp-pro .pro-tl-d>summary{list-style:revert;}
 /* ── P0b: "DA" HEADER + NGĂN KÉO MENU (giao diện pro là mặc định, không còn công tắc) ──
    Chỉ đổi màu/bo góc, không đổi bố cục. Pill vai trò (.role-pill) và pill Google Sheets giữ nền sáng nên vẫn rõ trên nền tím. */
 html.ui-pro body{background:var(--pro-soft);}
-html.ui-pro header{background:linear-gradient(120deg,var(--pro-ink) 0%,var(--pro-purple) 55%,var(--pro-purple2) 100%);border-bottom:none;color:#fff;box-shadow:0 2px 10px rgba(27,23,64,.28);}
+html.ui-pro header{background:linear-gradient(120deg,#14532d 0%,#2b7a4b 50%,#58a977 100%);border-bottom:none;color:#fff;box-shadow:0 2px 10px rgba(20,83,45,.28);}
 html.ui-pro .logo{color:#fff;}
 html.ui-pro .logo .logo-mark{background:rgba(255,255,255,.2);}
 html.ui-pro .logo span{color:rgba(255,255,255,.7)!important;}   /* số phiên bản: HTML đang gán màu xanh lá inline */
@@ -73,7 +73,7 @@ html.ui-pro header .fstatus{color:rgba(255,255,255,.78);}
 html.ui-pro header .mobile-menu-btn{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.3);color:#fff;}
 html.ui-pro header .btn,html.ui-pro #sn-toggle{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.3);color:#fff;}
 html.ui-pro header .btn:hover,html.ui-pro #sn-toggle:hover,html.ui-pro header .mobile-menu-btn:hover{background:rgba(255,255,255,.26);color:#fff;}
-html.ui-pro header .btn.primary{background:#fff;border-color:#fff;color:var(--pro-purple);}
+html.ui-pro header .btn.primary{background:#fff;border-color:#fff;color:#14532d;}
 html.ui-pro #sn-toggle .sn-cur{color:#fff;opacity:.85;}
 html.ui-pro header input,html.ui-pro header select{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.3);color:#fff;}
 html.ui-pro header input::placeholder{color:rgba(255,255,255,.7);}
