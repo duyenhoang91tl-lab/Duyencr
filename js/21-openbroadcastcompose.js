@@ -185,7 +185,7 @@ async function submitBroadcastCompose() {
     if (!d2.ok) throw new Error(d2.error || 'Lưu thất bại');
 
     errEl.style.display = 'none';
-    toast('✅ Đã tạo chiến dịch gửi hàng loạt — mở extension Zalo AI để bắt đầu gửi');
+    toast('✅ Đã tạo chiến dịch gửi hàng loạt — mở extension Zalo AI để bắt đầu gửi' + (d2.skippedNoPromo ? ' (đã bỏ ' + d2.skippedNoPromo + ' khách KHÔNG NHẬN QUẢNG BÁ)' : ''));
     closeBroadcastCompose();
   } catch (e) {
     errBox.textContent = 'Lỗi: ' + e.message;

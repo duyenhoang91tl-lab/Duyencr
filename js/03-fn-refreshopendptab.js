@@ -211,6 +211,9 @@ function renderCareTab(c) {
         <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;cursor:pointer" title="Tích khi khách đã nhắn lại / tương tác trên Zalo. Báo cáo chia data dùng để tính tỷ lệ phản hồi Zalo / KH đã kết bạn Zalo.">
           <input type="checkbox" id="cs-zalo-reply" ${((care.custom||c.custom||{}).zaloReply)?'checked':''}> 💬 Phản hồi Zalo
         </label>
+        <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;cursor:pointer;color:#b91c1c" title="Tích khi khách yêu cầu không nhận tin quảng bá. Mọi chiến dịch gửi hàng loạt và hỏi thăm tự động sẽ BỎ khách này (chặn ở máy chủ).">
+          <input type="checkbox" id="cs-nopromo" ${((care.custom||c.custom||{}).noPromo)?'checked':''}> 🚫 Không nhận quảng bá
+        </label>
       </div>
     </div>
     <div class="form-row-2">
@@ -972,6 +975,9 @@ function saveCare(phone, opts) {
   const newCustom = _collectCustomFieldValues(existing.custom);
   const _zrEl = document.getElementById('cs-zalo-reply');
   if (_zrEl) { if (_zrEl.checked) newCustom.zaloReply = true; else delete newCustom.zaloReply; }   // bỏ tích = xoá khoá (không lưu false)
+  const _npEl = document.getElementById('cs-nopromo');
+  if (_npEl) { if (_npEl.checked) newCustom.noPromo = true; else delete newCustom.noPromo; }   // bỏ tích = xoá khoá
+  if (!!(existing.custom||{}).noPromo !== !!newCustom.noPromo) logAudit('status', phone, 'Quảng bá: '+((existing.custom||{}).noPromo?'Không nhận':'Nhận'), 'Quảng bá: '+(newCustom.noPromo?'Không nhận':'Nhận'));
   if (!!(existing.custom||{}).zaloReply !== !!newCustom.zaloReply) logAudit('status', phone, 'Phản hồi Zalo: '+((existing.custom||{}).zaloReply?'Có':'Chưa'), 'Phản hồi Zalo: '+(newCustom.zaloReply?'Có':'Chưa'));
   // V9 audit: ghi lại thay đổi trạng thái / CS / Zalo
   if ((existing.status||'') !== newStatus) logAudit('status', phone, existing.status||'(trống)', newStatus||'(trống)');

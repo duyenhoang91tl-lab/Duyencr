@@ -75,7 +75,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `BANNED_WORDS_SS_ID`, `BANNED_WORDS_GID`
 
 ## 17_Broadcast_FollowUp.gs
-- Hàm: `getBroadcastSheet_`, `readBroadcasts_`, `saveBroadcast_`, `broadcastMark_`, `broadcastQueueForCS_`, `uploadBroadcastImage_`, `broadcastSetStatus_`, `broadcastCancel_`, `fuSourceAllowed_`, `_fuConfig_`, `readProductCodeMapFromSheet_`, `getProductCodeMap_`, `productCodeFromText_`, `readFollowUpTemplates_`, `listFollowUpTemplates_`, `saveFollowUpTemplates_`, `renderFollowUpTemplate_`, `_fuResultClean_`, `saveFuResults_`, `readFuResults_`, `readFollowUpLogKeys_`, `appendFollowUpLogRows_`, `readZaloScanByPhone_`, `dedupeCare_`, `runDedupeCare`, `saveZaloScan_`, `runFollowUpScan_`, `runFollowUpScanTrigger`
+- Hàm: `getBroadcastSheet_`, `readBroadcasts_`, `_noPromoSet_`, `_dropNoPromoPhones_`, `saveBroadcast_`, `broadcastMark_`, `broadcastQueueForCS_`, `uploadBroadcastImage_`, `broadcastSetStatus_`, `broadcastCancel_`, `fuSourceAllowed_`, `_fuConfig_`, `readProductCodeMapFromSheet_`, `getProductCodeMap_`, `productCodeFromText_`, `readFollowUpTemplates_`, `listFollowUpTemplates_`, `saveFollowUpTemplates_`, `renderFollowUpTemplate_`, `_fuResultClean_`, `saveFuResults_`, `readFuResults_`, `readFollowUpLogKeys_`, `appendFollowUpLogRows_`, `readZaloScanByPhone_`, `dedupeCare_`, `runDedupeCare`, `saveZaloScan_`, `runFollowUpScan_`, `runFollowUpScanTrigger`
 - Hằng/biến: `SH_BROADCAST`, `BROADCAST_HEADERS`, `BROADCAST_FOLDER_ID`, `SH_FU_TEMPLATE`, `FU_TEMPLATE_HEADERS`, `SH_FU_LOG`, `FU_LOG_HEADERS`, `SH_ZALO_SCAN`, `ZALO_SCAN_HEADERS`, `FU_CHECKPOINTS`, `FU_START`, `FU_SOURCES`, `PRODUCT_CODE_MAP_`, `_productCodeMapCache_`, `SH_FU_RESULTS`, `FU_RESULT_HEADERS`, `FU_RESULT_KEYS_`
 
 ## 18_Tasks_Menh_MsgTpl.gs

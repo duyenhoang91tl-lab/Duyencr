@@ -41,8 +41,37 @@ function readBroadcasts_() {
 }
 
 // Tao moi hoac cap nhat 1 chien dich (giu nguyen sentJson neu da co, tru khi truyen kem)
+// ── CO "KHONG NHAN QUANG BA" (Duyen chot 2026-10-11, ROADMAP-CRM-MAU B3): luu o CareData.custom.noPromo (cot custom JSON co san,
+//    cung cach co 'Phan hoi Zalo' custom.zaloReply -> khong them cot, khong doi schema Supabase). Moi chien dich gui hang loat
+//    (broadcast tay, theo san pham, hoi tham sau mua tu dong) deu di qua saveBroadcast_ / runFollowUpScan_ nen CHAN O DAY (may chu),
+//    client co sua hay dung ban cu cung khong gui duoc cho khach da tich.
+function _noPromoSet_() {
+  var set = {};
+  try {
+    var rows = readCare_(getCrmSS_().getSheetByName(SH_CARE));
+    for (var i = 0; i < rows.length; i++) {
+      var c = rows[i].custom;
+      if (c && c.noPromo) { var p = normPhone_(rows[i].phone); if (p) set[p] = true; }
+    }
+  } catch (e) { Logger.log('_noPromoSet_: ' + e); }
+  return set;
+}
+function _dropNoPromoPhones_(b) {
+  var np = _noPromoSet_(), kept = [], skipped = 0;
+  (b.phones || []).forEach(function(p) { if (np[normPhone_(p)]) skipped++; else kept.push(p); });
+  if (skipped) {
+    b.phones = kept;
+    ['perPhoneMsg', 'perPhoneNick'].forEach(function(f) {
+      if (!b[f] || typeof b[f] !== 'object') return;
+      Object.keys(b[f]).forEach(function(k) { if (np[normPhone_(k)]) delete b[f][k]; });
+    });
+  }
+  return skipped;
+}
 function saveBroadcast_(b) {
   if (!b || !b.phones || !b.phones.length) return jsonOut_({ ok: false, error: 'Thieu danh sach SDT' });
+  var skippedNoPromo = _dropNoPromoPhones_(b);
+  if (!b.phones.length) return jsonOut_({ ok: false, error: 'Tat ca ' + skippedNoPromo + ' khach da chon deu danh dau KHONG NHAN QUANG BA — khong tao chien dich.', skippedNoPromo: skippedNoPromo });
   var sh = getBroadcastSheet_();
   var id = b.id || ('bc_' + Date.now());
   var last = sh.getLastRow();
@@ -72,7 +101,7 @@ function saveBroadcast_(b) {
   ];
   if (foundRow > 0) sh.getRange(foundRow, 1, 1, row.length).setValues([row]);
   else sh.appendRow(row);
-  return jsonOut_({ ok: true, id: id });
+  return jsonOut_({ ok: true, id: id, skippedNoPromo: skippedNoPromo });
 }
 
 // Danh dau 1 SDT la da gui / loi / bo qua trong 1 chien dich cu the
@@ -571,7 +600,8 @@ function runFollowUpScan_() {
     var cr = careRows[ci];
     careMap[normPhone_(cr.phone)] = {
       cs: String(cr.cs || '').trim(),
-      nicks: Array.isArray(cr.nickZalos) ? cr.nickZalos : []
+      nicks: Array.isArray(cr.nickZalos) ? cr.nickZalos : [],
+      noPromo: !!(cr.custom && cr.custom.noPromo)
     };
   }
 
@@ -588,6 +618,7 @@ function runFollowUpScan_() {
     if (!fuDaysSet[daysSince]) return;
     var np = normPhone_(phone);
     if (!np || matchedPhones[np]) return; // 1 KH chi nhan 1 tin moi lan chay, tranh spam neu khop nhieu don
+    if (careMap[np] && careMap[np].noPromo) return;   // khach danh dau KHONG NHAN QUANG BA
 
     var orderKey = _vnYmd_(d) || String(orderDate);
     var logKey = np + '|' + orderKey + '|' + daysSince;
