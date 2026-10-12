@@ -274,6 +274,7 @@ switchTab = function(tab, el){
 };
 function _ovAutoLand(){
   if (_ov.landed || !currentUser || currentUser.role === 'demo') return;
+  try { if (/[#&]v=/.test(location.hash) || (JSON.parse(sessionStorage.getItem('ome_nav_v1') || '{}') || {}).v) return; } catch (e) {}   // F5: để js/40 trả về đúng mục đã nhớ, không nhảy vào Tổng quan
   if (typeof _tabAllowedForUser === 'function' && !_tabAllowedForUser('overview')) return;
   var tries = 0, iv = setInterval(function(){
     tries++;
