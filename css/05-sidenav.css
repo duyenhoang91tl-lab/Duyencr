@@ -63,3 +63,5 @@ body.rpt-mode #sn-toggle,html.db-standalone #sn-toggle{display:none!important;}
 #qs-wrap.sn-on{display:block;}
 #qs-input{width:100%;height:32px;box-sizing:border-box;padding:0 10px;border:1px solid rgba(255,255,255,.35);border-radius:var(--rsm);background:rgba(255,255,255,.95);color:#222;font-size:12.5px;outline:none;}
 body.rpt-mode #qs-wrap,html.db-standalone #qs-wrap{display:none!important;}
+/* Hiệu ứng trượt nhẹ khi mở nhóm menu (dùng ở css/06-pro.css) */
+@keyframes snIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}

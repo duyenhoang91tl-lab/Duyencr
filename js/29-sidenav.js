@@ -34,7 +34,7 @@
   // Nhóm menu mẹ -> các mục con (theo data-bar-id). Mục chưa khai báo vẫn hiện, dồn vào nhóm "Khác".
   var GROUPS = [
     { k:'ov',  t:'🏠 Tổng quan',           ids:['act:notif','overview'] },
-    { k:'kh',  t:'👤 Hồ sơ',                ids:['tab-kh','tab-schedule','tab-overdue','tab-mydata','tab-task'] },   // gộp hồ sơ khách hàng + hồ sơ nhân viên
+    { k:'kh',  t:'👤 Hồ sơ',                ids:['tab-kh','tab-schedule','tab-overdue','tab-mydata','tab-task','act:profile'] },   // gộp hồ sơ khách hàng + hồ sơ nhân viên
     { k:'sc',  t:'💬 Social',               ids:['tab-chat','tab-teamchat'] },
     { k:'kho', t:'📦 Kho',                 ids:['act:kho'] },
     { k:'tv',  t:'🧰 Tác vụ',               ids:['tab-zaloai','act:bc','act:bct','act:bcstat','act:futpl','act:bday'] },
@@ -48,6 +48,7 @@
   var ACTS = {
     notif:      { t:function(){ return (typeof _ntLabel==='function') ? _ntLabel() : '🔔 Thông báo'; }, f:'openNotifModal' },
     kho:        { t:'📦 Tồn kho', f:'openKhoModal' },
+    profile:    { t:'🪪 Hồ sơ nhân viên', f:'openProfileModal' },
     acct:       { t:'🔑 Tài khoản đăng nhập', f:'openAcctModal', admin:true },
     taskflow:   { t:'🧩 Quy trình công việc', f:'openTaskFlowManager', admin:true },
     assign:     { t:'👥 Chia data', f:'openAssignModal', admin:true },

@@ -166,6 +166,7 @@ function _renderAuthHeader(){
   var isAdmin = (_authAccount && _authAccount.role === 'admin') || _bootstrapAdmin;
   var loggedIn = !!_authAccount;
   var html = '';
+  if (loggedIn) html += '<button class="btn sm" title="Hồ sơ nhân viên" aria-label="Hồ sơ nhân viên" onclick="openProfileModal()">🪪</button>';
   if (loggedIn) html += '<button class="btn sm" data-bar-id="hdr-logout" data-bar-home="#auth-box" title="Đăng xuất" onclick="doLogout()">⎋ Đăng xuất</button>';
   box.innerHTML = html;
   if (typeof _applyBarCustomization === 'function') _applyBarCustomization();
