@@ -2159,7 +2159,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.36-audit-cfg' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.37-org-pos' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -8355,11 +8355,14 @@ function posMetrics_(opts) {
   var today = _vnYmd_(new Date());
   var from = opts.from || opts.dateFrom || (today.substring(0, 8) + '01'), to = opts.to || opts.dateTo || today;
   var warnings = [];
-  var f = { dateFrom: from, dateTo: to, sale: opts.sale || [], nguon: opts.nguon || [], marketer: opts.marketer || [], sanPham: opts.sanPham || '', careStatus: [], khStatus: [], zaloStatus: [], nickZalo: '' };
+  var f = { dateFrom: from, dateTo: to, sale: opts.sale || [], nguon: opts.nguon || [], marketer: opts.marketer || [], sanPham: opts.sanPham || '', careStatus: [], khStatus: [], zaloStatus: [], nickZalo: '', withDaily: !!opts.withDaily };
+  // opts.parts (mac dinh du 3): ['revenue','failed','resale'] — man chi can 1 phan (vd tong quan chi can huy/hoan) thi khong phai doc/tinh phan kia.
+  var want = { revenue: true, failed: true, resale: true };
+  if (Array.isArray(opts.parts)) { want = {}; opts.parts.forEach(function(x) { want[x] = true; }); }
   var out = { ok: true, source: 'pos', from: from, to: to, total: null, bySale: [], byDay: [], resale: null, warnings: warnings };
   var rb = null, rg = null;
-  try { rb = buildSalesReportB_(f); } catch (e1) { warnings.push('Không đọc được doanh thu Pos: ' + e1.message); }
-  try { rg = buildFailedOrderReport_(f); } catch (e2) { warnings.push('Không đọc được đơn hủy/hoàn Pos: ' + e2.message); }
+  if (want.revenue || want.resale) try { rb = buildSalesReportB_(f); } catch (e1) { warnings.push('Không đọc được doanh thu Pos: ' + e1.message); }
+  if (want.failed) try { rg = buildFailedOrderReport_(f); } catch (e2) { warnings.push('Không đọc được đơn hủy/hoàn Pos: ' + e2.message); }
   if (!rb && !rg) { out.ok = false; return out; }
 
   var bySale = {};
@@ -8378,7 +8381,7 @@ function posMetrics_(opts) {
 
   // BAN LAI (renew) — chi tinh tren cac don da qua bo loc cua Bao cao B
   var resale = null;
-  if (rb) {
+  if (rb && want.resale) {
     try {
       var first = _posEarliestValidDayByPhone_();
       resale = { orders: 0, revenue: 0, newOrders: 0, newRevenue: 0, unknownPhoneOrders: 0, unknownPhoneRevenue: 0, rate: null };
@@ -8402,6 +8405,7 @@ function posMetrics_(opts) {
     failRate: (orders !== null && failed !== null && (orders + failed)) ? Math.round(failed / (orders + failed) * 1000) / 10 : null
   };
   out.resale = resale;
+  if (opts.withDaily && rb) out.bySaleDay = rb.bySaleDay || {};   // {ten sale: {YYYY-MM-DD: [so don, doanh thu]}} — nguyen tu Bao cao B
   out.bySale = Object.keys(bySale).map(function(k) {
     var s = bySale[k], n = s.orders + s.failedOrders;
     s.aov = s.orders ? Math.round(s.revenue / s.orders) : null;
@@ -8439,7 +8443,8 @@ function _taMedian_(arr) {
   var m = Math.floor(a.length / 2);
   return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
 }
-function buildTeamMetrics_(from, to) {
+// pos (tuy chon) = ket qua posMetrics_ da co san: lay don huy/hoan tu do (cung so voi Bao cao G) thay vi goi G lan nua.
+function buildTeamMetrics_(from, to, pos) {
   var warnings = [], people = {};
   function P(name) {
     var k = _normTxt_(name); if (!k) return null;
@@ -8467,7 +8472,9 @@ function buildTeamMetrics_(from, to) {
       if (!p.orders && r.donHang) { p.orders = _taNum_(r.donHang); p.revenue = _taNum_(r.doanhThu); }
     });
   } catch (e2) { warnings.push('Không đọc được KPI Pancake: ' + e2.message); }
-  try {
+  if (pos && pos.total && pos.total.failedOrders !== null && pos.total.failedOrders !== undefined) {
+    (pos.bySale || []).forEach(function(r) { if (!r.failedOrders) return; var p = P(r.name); if (p) p.failedOrders = _taNum_(r.failedOrders); });   // chi nguoi CO don huy/hoan, giong G (khong tao them nguoi chi co doanh thu)
+  } else try {
     var k3 = buildFailedOrderReport_({ dateFrom: from, dateTo: to, sale: [], nguon: [], marketer: [], sanPham: '' });
     (k3.bySale || []).forEach(function(r) { var p = P(r.name); if (p) p.failedOrders = _taNum_(r.orders); });
   } catch (e3) { warnings.push('Không đọc được báo cáo đơn thất bại: ' + e3.message); }
@@ -8671,16 +8678,18 @@ function orgOverview_(p) {
   }
   var effTo = to > today ? today : to;
   var days = Math.max(1, Math.round((Date.parse(effTo + 'T00:00:00Z') - Date.parse(from + 'T00:00:00Z')) / 86400000) + 1);
-  var m = buildTeamMetrics_(from, to), sc = scoreTeam_(m.list), warnings = m.warnings.slice();
+  // Chi so Pos (don huy/hoan + don theo ngay tung nguoi) lay qua posMetrics_ DUNG CHUNG (P0d) — 1 lan doc Pos thay vi tu goi B/G rieng. Doanh thu/so don/KPI van tu KPI Sale (Base), KHONG doi.
+  var dailySkipped = days > 93, daily = {}, posWarn = [];
+  var pos = null;
+  try { pos = posMetrics_({ from: from, to: to, parts: dailySkipped ? ['failed'] : ['revenue', 'failed'], withDaily: !dailySkipped }); } catch (eP) { posWarn.push('Không đọc được chỉ số Pos: ' + eP.message); }
+  if (pos) posWarn = posWarn.concat(pos.warnings || []);
+  var m = buildTeamMetrics_(from, to, pos && pos.ok ? pos : null), sc = scoreTeam_(m.list), warnings = m.warnings.concat(posWarn);
   var people = sc.people, byKey = {};
   people.forEach(function(x) { byKey[_normTxt_(x.name)] = x; });
   // Don theo ngay tung nguoi (chi khi ky <= 93 ngay de payload gon)
-  var dailySkipped = days > 93, daily = {};
   if (!dailySkipped) {
-    try {
-      var rb = buildSalesReportB_({ dateFrom: from, dateTo: to, sale: [], nguon: [], marketer: [], sanPham: '', careStatus: [], khStatus: [], zaloStatus: [], nickZalo: '', withDaily: true });
-      Object.keys(rb.bySaleDay || {}).forEach(function(nm) { daily[_normTxt_(nm)] = rb.bySaleDay[nm]; });
-    } catch (eD) { warnings.push('Không đọc được đơn theo ngày: ' + eD.message); dailySkipped = true; }
+    if (pos && pos.bySaleDay) Object.keys(pos.bySaleDay).forEach(function(nm) { daily[_normTxt_(nm)] = pos.bySaleDay[nm]; });
+    else { warnings.push('Không đọc được đơn theo ngày.'); dailySkipped = true; }
   }
   // Team + thanh vien (ke ca nguoi chua co so lieu -> hien o "Chua du du lieu" de quan ly thay)
   var teams = [];

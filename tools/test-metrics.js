@@ -146,4 +146,47 @@ setDon([row('06/10/2026', '0911111111', 'anhNP1999', 'Hoàn thành', 1000000)]);
 vm.runInContext('ARCHIVE_APPLY_ENABLED_ = true;', ctx);
 ok(ctx.posMetrics_(F).warnings.some(w => /lưu trữ/.test(w)), 'bat luu tru -> co canh bao lich su ban lai co the thieu');
 
+// ===== (8) P0d buoc migrate: orgOverview_/buildTeamMetrics_ dung posMetrics_ — SO KHONG DOI, khong doc Pos nhieu hon truoc =====
+vm.runInContext('ARCHIVE_APPLY_ENABLED_ = false;', ctx);
+setDon([
+  row('05/10/2026', '0901111111', 'anhNP1999', 'Hoàn thành', 2000000),
+  row('06/10/2026', '0904444444', 'anhNP1999, dungnguyen1995', 'Hoàn thành', 4000000),
+  row('07/10/2026', '0905555555', 'dungnguyen1995', 'Đã hoàn', 900000),
+  row('08/10/2026', '0906666666', 'anhNP1999', 'Hoàn đơn', 300000),
+  row('08/10/2026', '0907777777', 'cuong2000', 'Hủy đơn', 700000),      // chi co don huy/hoan, khong co doanh thu / KPI
+]);
+vm.runInContext(`
+  var __CALLS__ = { B: 0, G: 0 };
+  var __origB__ = buildSalesReportB_, __origG__ = buildFailedOrderReport_;
+  buildSalesReportB_ = function(f) { __CALLS__.B++; return __origB__(f); };
+  buildFailedOrderReport_ = function(f) { __CALLS__.G++; return __origG__(f); };
+  buildSaleKpiReport_ = function() { return { rows: [{ name: 'anhNP1999', revenue: 5000000, orders: 2, target: 10000000, pct: 50, nhom: 'Online' }, { name: 'dungnguyen1995', revenue: 2000000, orders: 1, target: 4000000, pct: 50, nhom: 'Online' }] }; };
+  buildKpiReport_ = function() { return { bySale: [] }; };
+  buildCareLeadReport_ = function() { return { byCS: [] }; };
+  jsonOut_ = function(o) { return o; };
+  _cacheGetBig_ = function() { return null; }; _cachePutBig_ = function() {};
+  readDeptList_ = function() { return []; }; readSaleDepts_ = function() { return { raw: {}, byNorm: {} }; };
+`, ctx);
+const norm = list => JSON.stringify(list.map(p => [p.name, p.revenue, p.orders, p.failedOrders, p.careLeads]).sort());
+const old = vm.runInContext('buildTeamMetrics_("2026-10-05","2026-10-10")', ctx);                 // khong truyen pos = duong cu (goi G)
+const posAll = vm.runInContext('posMetrics_({ from: "2026-10-05", to: "2026-10-10", parts: ["failed"] })', ctx);
+const neu = vm.runInContext('buildTeamMetrics_("2026-10-05","2026-10-10", ' + JSON.stringify(posAll) + ')', ctx);
+eq(norm(neu.list), norm(old.list), 'buildTeamMetrics_ co pos = KHONG pos (so huy/hoan tung nguoi khong doi, ke ca nguoi chi co don huy)');
+ok(neu.list.some(p => p.name === 'cuong2000' && p.failedOrders === 1), 'nguoi chi co don huy/hoan van duoc them vao danh sach');
+ok(!neu.list.some(p => p.name === 'cuong2000' && p.revenue > 0), 'khong gan nham doanh thu Pos cho nguoi do');
+vm.runInContext('__CALLS__ = { B: 0, G: 0 };', ctx);
+const ov = vm.runInContext('JSON.parse(JSON.stringify(orgOverview_({ from: "2026-10-05", to: "2026-10-10", refresh: "1" })))', ctx);
+ok(ov.ok, 'orgOverview_ chay duoc');
+const calls = vm.runInContext('__CALLS__', ctx);
+eq(calls.B, 1, 'orgOverview_ (ky ngan, co daily) doc B dung 1 lan'); eq(calls.G, 1, 'orgOverview_ doc G dung 1 lan (truoc day: B 1 + G 1, khong tang)');
+const pa = ov.people.find(x => x.name === 'anhNP1999');
+ok(pa && pa.daily && pa.daily.length >= 1, 'daily tung nguoi van co (lay tu posMetrics_.bySaleDay)');
+eq(pa.revenue, 5000000, 'doanh thu van tu KPI Sale (Base), khong bi doi sang Pos');
+eq(ov.people.find(x => x.name === 'dungnguyen1995').failedOrders, 1, 'dungnguyen1995: 1 don Da hoan');
+vm.runInContext('__CALLS__ = { B: 0, G: 0 };', ctx);
+const ov2 = vm.runInContext('JSON.parse(JSON.stringify(orgOverview_({ from: "2026-01-01", to: "2026-10-10", refresh: "1" })))', ctx);
+ok(ov2.dailySkipped === true, 'ky > 93 ngay: bo daily nhu cu');
+const c2 = vm.runInContext('__CALLS__', ctx);
+eq(c2.B, 0, 'ky dai: KHONG doc B (chi can huy/hoan)'); eq(c2.G, 1, 'ky dai: doc G 1 lan');
+
 console.log('ALL METRICS TESTS PASSED');
