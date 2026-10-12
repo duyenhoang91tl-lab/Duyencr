@@ -230,6 +230,7 @@ function doPost(e) {
     if (d0.action === 'setSetting' && _isSensitiveWriteKey_(d0.key) && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Khong duoc ghi key nay.' });
   }
   if (d0 && typeof d0 === 'object') {
+    _AUDIT_TOKEN_ = String(d0.token || '');
     _ntlNote_('POST', d0.action, d0.token, d0.src, d0.ek);
     var _denP = _enforceCheck_(d0.action, d0.token, d0.ek, d0.src);
     if (_denP) return jsonOut_(_denP);

@@ -839,6 +839,7 @@ function _auditActClass(a){
   return ({status:'status', cs:'cs', assign:'assign', sched:'sched', del:'del', team:'team'})[a] || 'status';
 }
 function _auditActLabel(a){
+  if (String(a).indexOf('config:') === 0) return '⚙ ' + esc(String(a).slice(7).replace(/^setting:/, ''));   // đổi cấu hình (gas_v13 0e): config:setting:<khóa> / config:users / config:teams
   return ({status:'Trạng thái', cs:'Đổi CS', assign:'Chia data', sched:'Lịch CS', del:'Xoá', team:'Team'})[a] || a;
 }
 function renderAuditTab(){

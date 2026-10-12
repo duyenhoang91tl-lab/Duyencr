@@ -91,6 +91,46 @@ function _saleGroupLabel_(key, groups) {
   return g ? g.label : '';
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  NHAT KY THAY DOI CAU HINH (0e, 2026-10-12): moi lan doi cai dat, tai khoan, team... ghi 1 dong vao AuditLog
+//  (action 'config:<ten>', user = nguoi doi theo token phien, oldValue/newValue = truoc/sau). Nguyen nhan goc can lam: truoc day AuditLog
+//  chi ghi thao tac tren KHACH tu client, con cau hinh (hang, trang thai, nhom sale, tai khoan, team...) doi xong khong ai biet ai doi/doi gi.
+//  Khoa nhay cam (API key, adminKey) chi ghi "da doi", KHONG ghi gia tri. Khoa may tu cap nhat (gasSource*, ttLastTrackedMs, autoAssignState...)
+//  khong ghi de khong day nhat ky. Loi ghi nhat ky bi nuot — khong bao gio lam hong thao tac luu that.
+// ═══════════════════════════════════════════════════════════════
+var _AUDIT_TOKEN_ = '';
+var AUDIT_SKIP_SETTING_ = /^(gasSource|ttLastTrackedMs$|demoToken$|chotOrders_|assignReportManual_|autoAssignState$)/;
+function _auditClip_(v) { v = String(v == null ? '' : v); return v.length > 1500 ? v.slice(0, 1500) + '…(+' + (v.length - 1500) + ' ký tự)' : v; }
+function _auditActor_() {
+  try { var p = _sessVerify_(_AUDIT_TOKEN_); if (p && p.u) return String(p.u); } catch (e) {}
+  return _AUDIT_TOKEN_ ? '(token hết hạn)' : '(không token)';
+}
+// rows: [[what, oldValue, newValue], ...]
+function _auditCfg_(rows) {
+  try {
+    if (!rows || !rows.length) return;
+    var who = _auditActor_(), now = new Date().toISOString();
+    var m = rows.slice(0, 40).map(function (r) { return [now, who, 'config:' + r[0], '', _auditClip_(r[1]), _auditClip_(r[2])]; });
+    var sh = getSheet_(SH_AUDIT, AUDIT_HEADERS);
+    sh.getRange(sh.getLastRow() + 1, 1, m.length, AUDIT_HEADERS.length).setValues(m);
+  } catch (e) {}
+}
+// oldMap/newMap: {khoa: chuoi_dac_trung}. Moi muc them / xoa / doi thanh 1 dong.
+function _auditDiffRows_(what, oldMap, newMap) {
+  var out = [];
+  Object.keys(newMap).forEach(function (k) {
+    if (!(k in oldMap)) out.push([what, '', k + ': ' + newMap[k]]);
+    else if (oldMap[k] !== newMap[k]) out.push([what, k + ': ' + oldMap[k], k + ': ' + newMap[k]]);
+  });
+  Object.keys(oldMap).forEach(function (k) { if (!(k in newMap)) out.push([what, k + ': ' + oldMap[k], '(đã xóa)']); });
+  return out;
+}
+function _auditUserSig_(u) {
+  return 'vai trò ' + (u.role || 'cs') + ', ' + (u.active === false ? 'KHÓA' : 'hoạt động') + ', team ' + (u.team || '-') +
+    ', tên [' + ((u.names && u.names.length) ? u.names : (u.name ? [u.name] : [])).join('/') + ']' +
+    ', quyền tab ' + (Array.isArray(u.perms) ? '[' + u.perms.join(',') + ']' : 'không giới hạn') +
+    (u.saleType ? ', loại ' + u.saleType : '');
+}
 function setSetting_(key, value) {
   var sh = getSheet_(SH_SET, SET_HEADERS);
   var last = sh.getLastRow(); var rowIdx = -1;
@@ -98,8 +138,13 @@ function setSetting_(key, value) {
     var cell = sh.getRange(2, 1, last-1, 1).createTextFinder(String(key)).matchEntireCell(true).findNext();
     if (cell) rowIdx = cell.getRow();
   }
+  var _oldSet = rowIdx > 0 ? sh.getRange(rowIdx, 2).getValue() : '';
   if (rowIdx > 0) sh.getRange(rowIdx, 2).setValue(value);
   else sh.appendRow([key, value]);
+  if (!AUDIT_SKIP_SETTING_.test(String(key)) && String(_oldSet) !== String(value == null ? '' : value)) {
+    if (_isSensitiveSettingKey_(key)) _auditCfg_([['setting:' + key, '', '(đã đổi — ẩn giá trị)']]);
+    else _auditCfg_([['setting:' + key, _oldSet, value]]);
+  }
   // "🏷️ Phân loại Online/Offline" (Quan ly Team) ghi vao day — dong bo luon sang truong saleType
   // cua tai khoan dang nhap trung ten, de PHAN LOAI NAY AP DUNG CA CHO DANG NHAP (theo yeu cau
   // Duyen 2026-09: 1 nguon phan loai Online/Offline dung chung MOI NOI, ke ca tai khoan dang nhap),

@@ -711,3 +711,6 @@ function setOrderCareCSBatch_(updates) {
   return jsonOut_({ ok: false, updated: 0, error: 'Tinh nang gan careCS rieng cho tung don khong con duoc ho tro sau khi chuyen sang DT TONG (khong co cot luu). CS phu trach chung 1 khach van dung binh thuong o CareData.' });
 }
 
+// ─── TEAMS / USERS / AUDIT ─────────────────────────────────────
+function _auditTeamSig_(t) { return (t.name || '') + ' | trưởng ' + (t.leader || '-') + ' | ' + (t.members || []).length + ' thành viên [' + (t.members || []).join(', ') + ']'; }
+function _auditTeamMap_(list) { var o = {}; (list || []).forEach(function (t) { if (t) o[String(t.id || t.name || '?')] = _auditTeamSig_(t); }); return o; }

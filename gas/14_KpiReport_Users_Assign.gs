@@ -301,7 +301,10 @@ function saveUsers_(users) {
   var sh = getSheet_(SH_USER, USER_HEADERS);
   // Hash KHONG con den tu client (action=users khong tra passHash nua): giu hash dang luu theo username; chi doi khi co setPassword (server tu bam).
   var oldHash = {};
-  readUsers_(sh).forEach(function(x) { oldHash[String(x.username || '').trim().toLowerCase()] = x.passHash || ''; });
+  var _oldUsers = readUsers_(sh), _oUM = {}, _nUM = {};
+  _oldUsers.forEach(function(x) { oldHash[String(x.username || '').trim().toLowerCase()] = x.passHash || ''; _oUM[String(x.username)] = _auditUserSig_(x); });
+  users.forEach(function(x) { if (x && x.username) { var sg = _auditUserSig_(x); if (x.setPassword) sg += ', ĐỔI MẬT KHẨU'; _nUM[String(x.username)] = sg; } });
+  var _uAudit = _auditDiffRows_('users', _oUM, _nUM);
   sh.clearContents();
   var matrix = [USER_HEADERS];
   for (var i = 0; i < users.length; i++) {
@@ -318,6 +321,7 @@ function saveUsers_(users) {
                  u.saleType||'', u.startDate||'']);
   }
   sh.getRange(1, 1, matrix.length, USER_HEADERS.length).setValues(matrix);
+  _auditCfg_(_uAudit);
   return jsonOut_({ ok: true, written: users.length });
 }
 

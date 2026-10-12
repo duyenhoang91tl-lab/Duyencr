@@ -1,6 +1,6 @@
-// ─── TEAMS / USERS / AUDIT ─────────────────────────────────────
 function saveTeams_(teams) {
   var sh = getSheet_(SH_TEAM, TEAM_HEADERS);
+  var _tAudit = []; try { _tAudit = _auditDiffRows_('teams', _auditTeamMap_(readTeams_(sh)), _auditTeamMap_(teams)); } catch (eA) {}
   sh.clearContents();
   var matrix = [TEAM_HEADERS];
   for (var i = 0; i < teams.length; i++) {
@@ -9,6 +9,7 @@ function saveTeams_(teams) {
     matrix.push([t.id||'', t.name||'', t.leader||'', JSON.stringify(t.members||[]), t.color||'', JSON.stringify(t.channels||[]), JSON.stringify(ratePct)]);
   }
   sh.getRange(1, 1, matrix.length, TEAM_HEADERS.length).setValues(matrix);
+  _auditCfg_(_tAudit);
   return jsonOut_({ ok: true, written: teams.length });
 }
 

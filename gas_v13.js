@@ -913,6 +913,46 @@ function _saleGroupLabel_(key, groups) {
   return g ? g.label : '';
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  NHAT KY THAY DOI CAU HINH (0e, 2026-10-12): moi lan doi cai dat, tai khoan, team... ghi 1 dong vao AuditLog
+//  (action 'config:<ten>', user = nguoi doi theo token phien, oldValue/newValue = truoc/sau). Nguyen nhan goc can lam: truoc day AuditLog
+//  chi ghi thao tac tren KHACH tu client, con cau hinh (hang, trang thai, nhom sale, tai khoan, team...) doi xong khong ai biet ai doi/doi gi.
+//  Khoa nhay cam (API key, adminKey) chi ghi "da doi", KHONG ghi gia tri. Khoa may tu cap nhat (gasSource*, ttLastTrackedMs, autoAssignState...)
+//  khong ghi de khong day nhat ky. Loi ghi nhat ky bi nuot — khong bao gio lam hong thao tac luu that.
+// ═══════════════════════════════════════════════════════════════
+var _AUDIT_TOKEN_ = '';
+var AUDIT_SKIP_SETTING_ = /^(gasSource|ttLastTrackedMs$|demoToken$|chotOrders_|assignReportManual_|autoAssignState$)/;
+function _auditClip_(v) { v = String(v == null ? '' : v); return v.length > 1500 ? v.slice(0, 1500) + '…(+' + (v.length - 1500) + ' ký tự)' : v; }
+function _auditActor_() {
+  try { var p = _sessVerify_(_AUDIT_TOKEN_); if (p && p.u) return String(p.u); } catch (e) {}
+  return _AUDIT_TOKEN_ ? '(token hết hạn)' : '(không token)';
+}
+// rows: [[what, oldValue, newValue], ...]
+function _auditCfg_(rows) {
+  try {
+    if (!rows || !rows.length) return;
+    var who = _auditActor_(), now = new Date().toISOString();
+    var m = rows.slice(0, 40).map(function (r) { return [now, who, 'config:' + r[0], '', _auditClip_(r[1]), _auditClip_(r[2])]; });
+    var sh = getSheet_(SH_AUDIT, AUDIT_HEADERS);
+    sh.getRange(sh.getLastRow() + 1, 1, m.length, AUDIT_HEADERS.length).setValues(m);
+  } catch (e) {}
+}
+// oldMap/newMap: {khoa: chuoi_dac_trung}. Moi muc them / xoa / doi thanh 1 dong.
+function _auditDiffRows_(what, oldMap, newMap) {
+  var out = [];
+  Object.keys(newMap).forEach(function (k) {
+    if (!(k in oldMap)) out.push([what, '', k + ': ' + newMap[k]]);
+    else if (oldMap[k] !== newMap[k]) out.push([what, k + ': ' + oldMap[k], k + ': ' + newMap[k]]);
+  });
+  Object.keys(oldMap).forEach(function (k) { if (!(k in newMap)) out.push([what, k + ': ' + oldMap[k], '(đã xóa)']); });
+  return out;
+}
+function _auditUserSig_(u) {
+  return 'vai trò ' + (u.role || 'cs') + ', ' + (u.active === false ? 'KHÓA' : 'hoạt động') + ', team ' + (u.team || '-') +
+    ', tên [' + ((u.names && u.names.length) ? u.names : (u.name ? [u.name] : [])).join('/') + ']' +
+    ', quyền tab ' + (Array.isArray(u.perms) ? '[' + u.perms.join(',') + ']' : 'không giới hạn') +
+    (u.saleType ? ', loại ' + u.saleType : '');
+}
 function setSetting_(key, value) {
   var sh = getSheet_(SH_SET, SET_HEADERS);
   var last = sh.getLastRow(); var rowIdx = -1;
@@ -920,8 +960,13 @@ function setSetting_(key, value) {
     var cell = sh.getRange(2, 1, last-1, 1).createTextFinder(String(key)).matchEntireCell(true).findNext();
     if (cell) rowIdx = cell.getRow();
   }
+  var _oldSet = rowIdx > 0 ? sh.getRange(rowIdx, 2).getValue() : '';
   if (rowIdx > 0) sh.getRange(rowIdx, 2).setValue(value);
   else sh.appendRow([key, value]);
+  if (!AUDIT_SKIP_SETTING_.test(String(key)) && String(_oldSet) !== String(value == null ? '' : value)) {
+    if (_isSensitiveSettingKey_(key)) _auditCfg_([['setting:' + key, '', '(đã đổi — ẩn giá trị)']]);
+    else _auditCfg_([['setting:' + key, _oldSet, value]]);
+  }
   // "🏷️ Phân loại Online/Offline" (Quan ly Team) ghi vao day — dong bo luon sang truong saleType
   // cua tai khoan dang nhap trung ten, de PHAN LOAI NAY AP DUNG CA CHO DANG NHAP (theo yeu cau
   // Duyen 2026-09: 1 nguon phan loai Online/Offline dung chung MOI NOI, ke ca tai khoan dang nhap),
@@ -2114,7 +2159,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.35-pos-da-hoan' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.36-audit-cfg' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -5999,6 +6044,7 @@ function doPost(e) {
     if (d0.action === 'setSetting' && _isSensitiveWriteKey_(d0.key) && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Khong duoc ghi key nay.' });
   }
   if (d0 && typeof d0 === 'object') {
+    _AUDIT_TOKEN_ = String(d0.token || '');
     _ntlNote_('POST', d0.action, d0.token, d0.src, d0.ek);
     var _denP = _enforceCheck_(d0.action, d0.token, d0.ek, d0.src);
     if (_denP) return jsonOut_(_denP);
@@ -6855,8 +6901,11 @@ function setOrderCareCSBatch_(updates) {
 }
 
 // ─── TEAMS / USERS / AUDIT ─────────────────────────────────────
+function _auditTeamSig_(t) { return (t.name || '') + ' | trưởng ' + (t.leader || '-') + ' | ' + (t.members || []).length + ' thành viên [' + (t.members || []).join(', ') + ']'; }
+function _auditTeamMap_(list) { var o = {}; (list || []).forEach(function (t) { if (t) o[String(t.id || t.name || '?')] = _auditTeamSig_(t); }); return o; }
 function saveTeams_(teams) {
   var sh = getSheet_(SH_TEAM, TEAM_HEADERS);
+  var _tAudit = []; try { _tAudit = _auditDiffRows_('teams', _auditTeamMap_(readTeams_(sh)), _auditTeamMap_(teams)); } catch (eA) {}
   sh.clearContents();
   var matrix = [TEAM_HEADERS];
   for (var i = 0; i < teams.length; i++) {
@@ -6865,6 +6914,7 @@ function saveTeams_(teams) {
     matrix.push([t.id||'', t.name||'', t.leader||'', JSON.stringify(t.members||[]), t.color||'', JSON.stringify(t.channels||[]), JSON.stringify(ratePct)]);
   }
   sh.getRange(1, 1, matrix.length, TEAM_HEADERS.length).setValues(matrix);
+  _auditCfg_(_tAudit);
   return jsonOut_({ ok: true, written: teams.length });
 }
 
@@ -7888,7 +7938,10 @@ function saveUsers_(users) {
   var sh = getSheet_(SH_USER, USER_HEADERS);
   // Hash KHONG con den tu client (action=users khong tra passHash nua): giu hash dang luu theo username; chi doi khi co setPassword (server tu bam).
   var oldHash = {};
-  readUsers_(sh).forEach(function(x) { oldHash[String(x.username || '').trim().toLowerCase()] = x.passHash || ''; });
+  var _oldUsers = readUsers_(sh), _oUM = {}, _nUM = {};
+  _oldUsers.forEach(function(x) { oldHash[String(x.username || '').trim().toLowerCase()] = x.passHash || ''; _oUM[String(x.username)] = _auditUserSig_(x); });
+  users.forEach(function(x) { if (x && x.username) { var sg = _auditUserSig_(x); if (x.setPassword) sg += ', ĐỔI MẬT KHẨU'; _nUM[String(x.username)] = sg; } });
+  var _uAudit = _auditDiffRows_('users', _oUM, _nUM);
   sh.clearContents();
   var matrix = [USER_HEADERS];
   for (var i = 0; i < users.length; i++) {
@@ -7905,6 +7958,7 @@ function saveUsers_(users) {
                  u.saleType||'', u.startDate||'']);
   }
   sh.getRange(1, 1, matrix.length, USER_HEADERS.length).setValues(matrix);
+  _auditCfg_(_uAudit);
   return jsonOut_({ ok: true, written: users.length });
 }
 
