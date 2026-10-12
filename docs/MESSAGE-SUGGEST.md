@@ -22,9 +22,7 @@ Bỏ dấu, không phân biệt hoa thường; mỗi từ phải khớp ít nh�
 ## Dùng ở đâu
 - **CRM → tab Zalo AI:** mục "💬 Gợi ý tin nhắn" (tìm + chip chủ đề + nút Copy) và "📚 Quản lý mẫu" (lọc trạng thái, nút ✅ Duyệt / ❌ Từ chối cho admin/quản lý, huy hiệu "n mẫu chờ duyệt").
 - **Pancake AI (panel mẫu tin):** ô tìm theo sản phẩm/hội thoại, bấm thẻ để **chèn thẳng** vào ô trả lời, hoặc 📋 Copy; ➕ để đề xuất mẫu (cần chọn tên CS trước); không duyệt/sửa mẫu đã duyệt tại extension (duyệt chỉ ở CRM).
-- **Khung chat Pancake trong CRM (hộp thư Pancake, `docs/PANCAKE-INBOX.md` bước 4 — CHƯA có):** gắn bằng 1 dòng, không viết lại:
-  `tplSuggestMount(document.getElementById('khung-goi-y'), { onPick: function (t) { chenVaoOTraLoi(t.content); } });`
-  rồi gọi `loadMsgTemplates()` một lần khi mở khung chat. Có thể điền sẵn từ khoá theo sản phẩm khách đang hỏi bằng cách đặt giá trị cho ô `.tpl-sg-q` rồi bắn sự kiện `input`.
+- **Khung chat Pancake trong CRM (đã có nút 💡):** cả **Social > Chat** (`js/42-fn-socialchat.js`) và chat trong **hồ sơ khách** (`js/41-fn-pkchat.js`) có nút 💡 cạnh ô soạn tin. Bấm → ô gợi ý hiện ngay trên ô soạn (gõ sản phẩm / bấm chip chủ đề) → bấm "↳ Chèn" để đưa mẫu vào ô trả lời. **Không tự gửi**: nhân viên đọc lại rồi bấm Gửi. Chèn tiếp lần nữa thì cách một dòng trống. Cơ chế dùng chung: `tplChatToggle(composeId, textareaId)` trong `js/20-loadaiexamples.js` — thêm khung chat mới chỉ cần 1 nút `onclick="tplChatToggle('id-khung-soan','id-textarea')"`. Dữ liệu mẫu tự tải khi mở lần đầu (và tải lại nếu cũ hơn 60 giây).
 
 ## Việc thủ công sau khi cập nhật
 1. Deploy lại GAS (v13.29-msgtpl-approval). Sheet tự thêm cột mới, mẫu cũ giữ nguyên và coi như đã duyệt.
@@ -33,9 +31,9 @@ Bỏ dấu, không phân biệt hoa thường; mỗi từ phải khớp ít nh�
 4. Admin/quản lý đăng nhập CRM → tab Zalo AI → thêm mẫu theo sản phẩm; hoặc duyệt các mẫu nhân viên gửi.
 
 ## Test
-`node tools/test-msgtpl.js` (ma trận quyền, chuyển trạng thái, mẫu cũ, chiếm id, cắt độ dài), thuật toán tìm được kiểm riêng cho CRM và extension. Chưa kiểm trên GAS/Chrome thật.
+`node tools/test-msgtpl.js` (ma trận quyền, chuyển trạng thái, mẫu cũ, chiếm id, cắt độ dài), thuật toán tìm được kiểm riêng cho CRM và extension, luồng "bấm 💡 → gõ sản phẩm → chèn vào ô trả lời" kiểm trên DOM giả lập (jsdom, gồm cả chống chèn mã HTML trong nội dung mẫu). Chưa kiểm trên GAS/Chrome thật.
 
 ## Chưa làm / lưu ý
 - `saveMessageTemplate`, `deleteMessageTemplate`, `approveMessageTemplate`, `messageTemplates` chưa nằm trong `NTL_ACTIONS_` (không bị công tắc chặn xác thực) nhưng đã tự kiểm quyền bên trong.
 - Extension không có tài khoản đăng nhập nên "tên CS" tự khai: có thể khai tên người khác để xem/sửa mẫu CHỜ DUYỆT của người đó (không thấy được mẫu đã duyệt nào ngoài quyền). Muốn chặt hơn → cho extension đăng nhập CRM (bước sau của kế hoạch bảo mật).
-- Chưa đếm lượt dùng mẫu / xếp mẫu hay dùng lên đầu; chưa gợi ý tự động theo sản phẩm khách đang hỏi trong khung chat (cần hộp thư Pancake bước 2–4).
+- Chưa đếm lượt dùng mẫu / xếp mẫu hay dùng lên đầu; chưa tự điền sẵn sản phẩm khách đang hỏi vào ô tìm (hiện nhân viên tự gõ tên sản phẩm).

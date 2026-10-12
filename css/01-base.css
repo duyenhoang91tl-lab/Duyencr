@@ -899,3 +899,6 @@ body.demo-mode .dp-tab[data-tab="chat"]{display:none !important;}
   #chat-wrap:has(.sc-main.has-conv) .sc-list{display:none;}
 }
 .sc-back{display:none;} @media (max-width:760px){.sc-back{display:inline-flex;}}
+/* Gợi ý tin nhắn trong khung chat (js/20 tplChatToggle): ô gợi ý nằm ngay trên ô soạn tin, cuộn riêng */
+.tpl-chat-panel{max-height:42vh;overflow-y:auto;padding:8px;border-top:1px solid var(--border);background:var(--surface2);}
+.tpl-chat-panel .zai-input{width:100%;}

@@ -20,6 +20,7 @@ function renderPkChatTab(c) {
     + '<div class="pkc-msgs" id="pkc-msgs"><div class="pkc-note">Đang tải tin nhắn…</div></div>'
     + '<div class="pkc-status" id="pkc-status"></div>'
     + '<div class="pkc-compose" id="pkc-compose">'
+    +   '<button class="btn sm" type="button" title="Gợi ý tin nhắn theo sản phẩm" onclick="tplChatToggle(\'pkc-compose\',\'pkc-input\')">💡</button>'
     +   '<textarea id="pkc-input" rows="2" placeholder="Nhập tin trả lời… (Ctrl+Enter để gửi)" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key===\'Enter\'){event.preventDefault();pkcSend();}"></textarea>'
     +   '<button class="save-btn pkc-send" id="pkc-send" onclick="pkcSend()">Gửi</button>'
     + '</div>'

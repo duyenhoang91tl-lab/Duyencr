@@ -95,10 +95,10 @@ async function deleteAiExample(i) {
 var _msgTemplates = [];
 var _msgTplCanApprove = false;   // server quyet dinh (vai tro that trong sheet Users qua token), KHONG tin currentUser phia trinh duyet
 var _msgTplPending = 0;
+var _msgTplLoadedAt = 0;
 async function loadMsgTemplates() {
-  var listEl = document.getElementById('mt-list');
-  if (!listEl) return;
-  listEl.innerHTML = '<div style="font-size:12px;color:var(--muted)">Đang tải mẫu...</div>';
+  var listEl = document.getElementById('mt-list');   // co the khong co (khi goi tu khung chat) -> van tai du lieu, chi bo qua phan ve danh sach quan ly
+  if (listEl) listEl.innerHTML = '<div style="font-size:12px;color:var(--muted)">Đang tải mẫu...</div>';
   try {
     var sep = gsUrl.indexOf('?') >= 0 ? '&' : '?';
     var r = await fetch(gsUrl + sep + 'action=messageTemplates', { redirect: 'follow' });
@@ -106,8 +106,9 @@ async function loadMsgTemplates() {
     _msgTemplates = (d && d.templates) || [];
     _msgTplCanApprove = !!(d && d.canApprove);
     _msgTplPending = (d && d.pendingCount) || 0;
+    _msgTplLoadedAt = Date.now();
   } catch (e) {
-    listEl.innerHTML = '<div style="font-size:12px;color:#dc2626">Lỗi tải thư viện mẫu, thử lại.</div>';
+    if (listEl) listEl.innerHTML = '<div style="font-size:12px;color:#dc2626">Lỗi tải thư viện mẫu, thử lại.</div>';
     return;
   }
   _tplUpdateBadge();
@@ -170,7 +171,7 @@ var _tplSuggestHosts = [];
 function tplSuggestMount(host, opts) {
   if (!host) return;
   opts = opts || {};
-  var st = { host: host, q: '', topic: '', onPick: opts.onPick || null };
+  var st = { host: host, q: '', topic: '', onPick: opts.onPick || null, pickLabel: opts.pickLabel || '📋 Copy' };
   host.innerHTML = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">' +
       '<input class="zai-input tpl-sg-q" placeholder="🔎 Gõ tên sản phẩm hoặc nội dung hội thoại (VD: nhẫn vàng, khách hỏi giá)..." style="flex:1;min-width:220px" autocomplete="off">' +
     '</div>' +
@@ -201,7 +202,7 @@ function _tplSuggestRender(st) {
     return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:10px 12px">' +
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px">' +
         '<div style="font-weight:700;font-size:13px">' + esc(t.title) + '</div>' +
-        '<button class="btn sm primary" data-ci="' + i + '" style="flex-shrink:0">📋 Copy</button>' +
+        '<button class="btn sm primary" data-ci="' + i + '" style="flex-shrink:0">' + esc(st.pickLabel) + '</button>' +
       '</div>' +
       '<div style="font-size:12px;white-space:pre-wrap;margin-bottom:6px">' + esc(t.content) + '</div>' +
       '<div class="zi-row">' + _tplChips(t) + '</div></div>';
@@ -209,6 +210,31 @@ function _tplSuggestRender(st) {
   resEl.querySelectorAll('button[data-ci]').forEach(function (b) {
     b.onclick = function () { var t = shown[+b.getAttribute('data-ci')]; if (st.onPick) st.onPick(t, b); else _tplCopyText(t.content, b); };
   });
+}
+
+// ── GOI Y TIN NHAN TRONG KHUNG CHAT (Social > Chat va chat trong ho so khach): nut 💡 canh o soan tin; bam -> hien o goi y ngay tren o soan,
+// chon mau -> CHEN vao o tra loi (khong tu gui, nhan vien doc lai roi bam Gui). Nhan vien go ten san pham de loc.
+function _tplInsertIntoTextarea(ta, text) {
+  var cur = String(ta.value || '');
+  ta.value = cur.trim() ? cur.replace(/\s+$/, '') + '\n\n' + text : text;
+  return ta.value;
+}
+function tplChatToggle(composeId, textareaId) {
+  var comp = document.getElementById(composeId), ta = document.getElementById(textareaId);
+  if (!comp || !ta) return;
+  var pid = 'tpl-chat-panel-' + composeId, panel = document.getElementById(pid);
+  if (panel) { panel.style.display = panel.style.display === 'none' ? '' : 'none'; if (panel.style.display !== 'none') { var q0 = panel.querySelector('.tpl-sg-q'); if (q0) q0.focus(); } return; }
+  panel = document.createElement('div');
+  panel.id = pid; panel.className = 'tpl-chat-panel';
+  comp.parentNode.insertBefore(panel, comp);
+  tplSuggestMount(panel, { pickLabel: '↳ Chèn', onPick: function (t) {
+    _tplInsertIntoTextarea(ta, t.content);
+    ta.focus();
+    try { ta.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {}
+    if (typeof toast === 'function') toast('✓ Đã chèn mẫu — đọc lại rồi bấm Gửi');
+  } });
+  var q = panel.querySelector('.tpl-sg-q'); if (q) q.focus();
+  if (!_msgTplLoadedAt || Date.now() - _msgTplLoadedAt > 60000) loadMsgTemplates();   // du lieu cu qua 60s -> tai lai (mau moi duoc duyet)
 }
 
 function _tplUpdateBadge() {
@@ -228,7 +254,7 @@ var _MT_STATUS = {
 };
 function renderMsgTemplateList() {
   var listEl = document.getElementById('mt-list');
-  if (!listEl) return;
+  if (!listEl || !document.getElementById('mt-search')) return;
   var q = (document.getElementById('mt-search').value || '').trim();
   var stF = (document.getElementById('mt-status-filter') || {}).value || '';
   var base = _msgTemplates.filter(function (t) {
