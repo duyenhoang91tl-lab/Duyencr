@@ -49,6 +49,37 @@ function pkChat_(e) {
     return jsonOut_(out);
   } catch (err) { return jsonOut_({ error: 'Doc chat loi: ' + String(err && err.message || err).slice(0, 200) }); }
 }
+// GET pkChatInbox: hop thu chung — cac hoi thoai moi nhat (q = loc theo ten/SDT, rong = tat ca). Man hinh Social > Chat.
+function pkChatInbox_(e) {
+  var p = (e && e.parameter) || {};
+  var a = _pkAuth_(p.token); if (a.err) return a.err;
+  var q = String(p.q || '').replace(/[*,()"\\]/g, ' ').trim();
+  try {
+    var filter = '';
+    if (q.length >= 2) {
+      var digits = q.replace(/\D/g, '');
+      filter = '&' + ((digits.length >= 6 && digits.length >= q.length - 2) ? 'customer_phone=like.' + _pkEnc_('*' + digits + '*') : 'customer_name=ilike.' + _pkEnc_('*' + q + '*'));
+    }
+    var cv = sb_('GET', 'pk_conversations?select=' + PK_CONV_COLS_ + filter + '&order=last_message_at.desc.nullslast&limit=60').json || [];
+    return jsonOut_({ ok: true, conversations: cv.map(_pkConvOut_), serverTime: new Date().toISOString() });
+  } catch (err) { return jsonOut_({ error: 'Doc hop thu loi: ' + String(err && err.message || err).slice(0, 200) }); }
+}
+// GET pkChatConv: tin nhan cua 1 hoi thoai theo convId (after=<ISO> chi lay tin moi hon moc do).
+function pkChatConv_(e) {
+  var p = (e && e.parameter) || {};
+  var a = _pkAuth_(p.token); if (a.err) return a.err;
+  var conv = String(p.conv || '');
+  if (!conv) return jsonOut_({ error: 'Thieu conv.' });
+  try {
+    var after = /^\d{4}-\d{2}-\d{2}T[\d:.+\-Z]+$/.test(String(p.after || '')) ? String(p.after) : '';
+    var q = 'pk_messages?select=id,conversation_id,direction,text,sent_at,sender_name,attachments:raw->attachments&conversation_id=eq.' + _pkEnc_(conv)
+          + (after ? '&sent_at=gt.' + _pkEnc_(after) : '') + '&order=sent_at.desc.nullslast&limit=' + (after ? 100 : 150);
+    var ms = sb_('GET', q).json || [];
+    return jsonOut_({ ok: true, messages: ms.reverse().map(function (m) {
+      return { id: m.id, c: m.conversation_id, dir: m.direction === 'out' ? 'out' : 'in', text: String(m.text || ''), at: m.sent_at || '', from: m.sender_name || '', att: _pkAtts_(m.attachments) };
+    }), serverTime: new Date().toISOString() });
+  } catch (err) { return jsonOut_({ error: 'Doc tin nhan loi: ' + String(err && err.message || err).slice(0, 200) }); }
+}
 // GET pkChatFind: tim hoi thoai (theo ten khach Pancake hoac SDT) de gan cho khach — cho truong hop webhook chua tu bat duoc SDT.
 function pkChatFind_(e) {
   var p = (e && e.parameter) || {};

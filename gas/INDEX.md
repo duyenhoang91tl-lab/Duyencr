@@ -107,6 +107,6 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `SH_KHO`, `KHO_HEADERS`, `SH_TONKHO`, `TONKHO_HEADERS`, `SH_TONKHO_LOG`, `TONKHO_LOG_HEADERS`, `TONKHO_IMPORT_MAX_`
 
 ## 25_PancakeChat.gs
-- Hàm: `_pkAuth_`, `_pkEnc_`, `_pkInList_`, `_pkAtts_`, `_pkConvOut_`, `pkChat_`, `pkChatFind_`, `pkChatLink_`, `_pkPageToken_`, `pkChatSend_`
+- Hàm: `_pkAuth_`, `_pkEnc_`, `_pkInList_`, `_pkAtts_`, `_pkConvOut_`, `pkChat_`, `pkChatInbox_`, `pkChatConv_`, `pkChatFind_`, `pkChatLink_`, `_pkPageToken_`, `pkChatSend_`
 - Hằng/biến: `PK_CHAT_SECTION_`, `PK_CONV_COLS_`
 

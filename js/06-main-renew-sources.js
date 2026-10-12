@@ -473,6 +473,7 @@ var _PERM_TAB_DEFS = [
   { id:'tab-overdue',  label:'Quá hạn' },
   { id:'tab-mydata',   label:'Data của tôi' },
   { id:'tab-zaloai',   label:'Zalo AI' },
+  { id:'tab-chat',     label:'Chat (Social)' },
   { id:'tab-task',     label:'Công việc' },
   { id:'dashboard',    label:'Dashboard' },
   { id:'team',         label:'Quản lý Team' },

@@ -879,3 +879,23 @@ body.demo-mode .dp-tab[data-tab="chat"]{display:none !important;}
 .pkc-hit{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;}
 .pkc-hit-t{color:var(--muted);font-size:11px;max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;} .pkc-ph{color:#b45309;font-size:11px;}
 .dp-tabs{overflow-x:auto;} .dp-tab{white-space:nowrap;}
+
+/* ── Social > Chat (hộp thư chung, js/42-fn-socialchat.js) ── */
+#chat-wrap{gap:0;background:var(--surface);}
+.sc-list{width:300px;flex-shrink:0;border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0;}
+.sc-find{padding:8px;border-bottom:1px solid var(--border);} .sc-find input{width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid var(--border);border-radius:8px;font-size:13px;}
+.sc-convs{flex:1;overflow-y:auto;}
+.sc-conv{padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;font-size:12px;}
+.sc-conv:hover{background:var(--surface2);} .sc-conv.on{background:#dcf4e5;}
+.sc-conv.unseen .sc-conv-t{font-weight:700;color:var(--text);}
+.sc-conv-n{display:flex;justify-content:space-between;gap:6px;} .sc-conv-n span{color:var(--muted);font-size:11px;white-space:nowrap;}
+.sc-conv-p{color:#b45309;font-size:11px;} .sc-conv-t{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sc-main{flex:1;display:flex;flex-direction:column;gap:8px;padding:10px 14px;min-width:0;min-height:0;}
+.sc-head{display:flex;align-items:center;gap:8px;font-size:14px;min-height:28px;}
+.sc-msgs{flex:1;max-height:none;}
+@media (max-width:760px){
+  #chat-wrap{flex-direction:column;} .sc-list{width:auto;flex:1;border-right:0;}
+  .sc-main{display:none;} .sc-main.has-conv{display:flex;flex:1;}
+  #chat-wrap:has(.sc-main.has-conv) .sc-list{display:none;}
+}
+.sc-back{display:none;} @media (max-width:760px){.sc-back{display:inline-flex;}}

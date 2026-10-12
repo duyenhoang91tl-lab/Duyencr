@@ -605,7 +605,7 @@ switchTab = function(tab, el){
   _activeV9Tab = tab;
   // Bộ lọc KH (sidebar) chỉ dành cho tab Danh sách KH → các tab khác ẩn đi để không bị kẹt màn bên trái (nhất là điện thoại)
   document.body.classList.toggle('no-kh-sidebar', tab !== 'list');
-  ['dashboard','team','audit','uploaddata','salesreport','pancake','kpipancake','mktchecklist','dailybrief'].forEach(function(name){
+  ['dashboard','team','audit','uploaddata','salesreport','pancake','kpipancake','mktchecklist','dailybrief','chat'].forEach(function(name){
     var panel = document.getElementById('tab-'+name);
     if (panel) panel.style.display = (tab===name) ? 'flex' : 'none';
   });
@@ -618,6 +618,7 @@ switchTab = function(tab, el){
   else if (tab === 'kpipancake') renderKpiPancakeTab();
   else if (tab === 'mktchecklist') renderMktChecklistTab();
   else if (tab === 'dailybrief') renderDailyBriefTab();
+  else if (tab === 'chat' && typeof renderSocialChatTab === 'function') renderSocialChatTab();
 };
 
 // ═══════════════════════════════════════════════════════

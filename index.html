@@ -394,6 +394,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
       <div class="tab" data-bar-id="tab-overdue" data-bar-home=".tabs" onclick="switchTab('overdue',this)">Quá hạn <span class="tab-badge" id="tb-over" style="background:#fee2e2;color:#991b1b">0</span></div>
       <div class="tab" data-bar-id="tab-mydata" data-bar-home=".tabs" onclick="switchTab('mydata',this)">📋 Data của tôi <span class="tab-badge" id="tb-mydata">0</span></div>
       <div class="tab" data-bar-id="tab-zaloai" data-bar-home=".tabs" onclick="switchTab('zaloai',this)">🤖 Zalo AI</div>
+      <div class="tab" data-bar-id="tab-chat" data-bar-home=".tabs" onclick="switchTab('chat',this)">💬 Chat</div>
       <div class="tab" data-bar-id="tab-task" data-bar-home=".tabs" onclick="switchTab('task',this)">🗂️ Công việc <span class="tab-badge" id="tb-task">0</span></div>
       <div class="tabs-mobile-toggle" onclick="event.stopPropagation();this.closest('.tabs').classList.toggle('mobile-tabs-open')">☰ Mục ▾</div>
     </div>
@@ -790,6 +791,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
       </div>
     </div>
 
+    <div id="tab-chat" style="display:none;flex:1;overflow:hidden;flex-direction:column" class="main"><div id="chat-wrap" style="flex:1;overflow:hidden;display:flex"></div></div>
     <div id="tab-mydata" style="display:none;flex:1;overflow:hidden;flex-direction:column" class="main">
       <div class="toolbar">
         <div class="tl-l">
@@ -1620,6 +1622,7 @@ function openBcLogModal(phone){
 <script src="js/38-pro-dock.js"></script>
 <script src="js/39-fn-notify.js"></script>
 <script src="js/41-fn-pkchat.js"></script>
+<script src="js/42-fn-socialchat.js"></script>
 <script src="js/40-main-restorenav.js"></script>
 
 

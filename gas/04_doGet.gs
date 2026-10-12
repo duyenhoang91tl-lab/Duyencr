@@ -385,6 +385,8 @@ function doGetCore_(e) {
     // ── Chat Pancake trong CRM (doc tu Supabase) ──
     if (action === 'pkChat')     return pkChat_(e);
     if (action === 'pkChatFind') return pkChatFind_(e);
+    if (action === 'pkChatInbox') return pkChatInbox_(e);
+    if (action === 'pkChatConv') return pkChatConv_(e);
     if (action === 'notifications') {
       var _gu = _sessUser_(e && e.parameter && e.parameter.token);
       if (!_gu) return jsonOut_({ error: 'Can dang nhap.', code: 'AUTH' });
