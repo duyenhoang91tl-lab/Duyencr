@@ -118,3 +118,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hàm: `_pkAllPageTokens_`, `_pkIso_`, `_pkPlain_`, `_pkPhoneOfMsg_`, `_pkMapMsg_`, `_pkMapConv_`, `_pkFetchJson_`, `_pkInsertIgnore_`, `_pkFetchMsgs_`, `_pkHistState_`, `_pkHistSave_`, `pkHistSync_`, `pkLichSuThu`, `pkLichSuChay`, `pkLichSuXemTrangThai`, `pkLichSuLamLai`, `pkLichSuTick_`, `pkLichSuCaiTrigger`, `removePkLichSuTrigger_`
 - Hằng/biến: `PK_HIST_SECTION_`
 
+## 28_StaffProfile.gs
+- Hàm: `_profClean_`, `_profFindUser_`, `_profNames_`, `_profRead_`, `_profMetrics_`, `_profFold_`, `_profScope_`, `_profRank_`, `_profMonthRange_`, `profileGet_`, `profileSave_`, `staffOverview_`
+- Hằng/biến: `SH_PROFILE`, `PROFILE_HEADERS`
+

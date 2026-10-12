@@ -393,6 +393,8 @@ function doGetCore_(e) {
       if (!_gu) return jsonOut_({ error: 'Can dang nhap.', code: 'AUTH' });
       return jsonOut_(readNotifications_(_gu.username));
     }
+    if (action === 'profileGet')    return jsonOut_(profileGet_((e && e.parameter) || {}));
+    if (action === 'staffOverview') return jsonOut_(staffOverview_((e && e.parameter) || {}));
     if (action === 'taskFlows')    return jsonOut_({ flows: readTaskFlows_() });
     if (action === 'taskRequests') return jsonOut_({ requests: readTaskRequests_((e && e.parameter && e.parameter.taskId) || '', false) });
 

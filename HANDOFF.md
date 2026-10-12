@@ -59,3 +59,11 @@ Yêu cầu của Duyên: tab Công việc có nhiều LOẠI quy trình, mỗi l
 - Thông báo chỉ hiện khi người nhận mở CRM (poll 60 giây, chấm số trên nút ☰) — chưa có push/Zalo.
 - SỰ CỐ 2026-10-12: 5 commit client M2–M5b đã push lần đầu (c2f12d5, 55b7acd, 19acd75, 65c702a, a1f7a2b) biến mất khỏi main (ghi đè lịch sử bởi phiên khác) → đã dựng lại trong commit này. Nếu thấy mất lần nữa: kiểm `git log --oneline | grep "kieu Base"`; tuyệt đối không force-push.
 - Test: `node tools/test-task-flow.js` (backend, 47 ca) · `node tools/test-task-flow-client.js` (client + hiển thị thông báo). `tools/test-ui-pro.js` đang FAIL sẵn từ trước (selector `body.no-kh-sidebar` trong css/06-pro.css của phiên khác) — không liên quan.
+> Lưu ý trùng tên: `proEsc_` được định nghĩa ở CẢ `js/33-pro-profile.js` lẫn `js/36-pro-home.js` (hàm toàn cục, file nạp sau thắng — bản 36 escape thêm dấu `'`, tương thích bản 33). Nếu sửa, gom về 1 chỗ.
+
+
+## Hồ sơ nhân viên (yêu cầu Duyên 12/10/2026) — đang làm
+- [x] B1 backend (gas_v13.js, file gas/27_StaffProfile.gs): sheet `StaffProfiles` (tự tạo), action `profileGet` (GET), `profileSave` (POST), `staffOverview` (GET); đều đối chiếu token phiên. Nhân viên tự sửa hồ sơ mình, admin sửa hộ; admin xem tất cả, leader xem thành viên team mình, quản lý xem người thuộc phòng (nhóm KPI Sale) mình phụ trách. Test: `node tools/test-staff-profile.js`.
+- `staffOverview` trả: totalOrders, revenue, commission, bonus (buildCsStats_), closeRatePancake + phoneConnectRate = SĐT mang về ÷ tổng hội thoại Pancake (buildTeamMetrics_), rankTeam/rankDept xếp theo doanh thu (posMetrics_). Số khách đang giữ / đã kết bạn / tỷ lệ chốt trên khách giữ do CLIENT tính từ `allCustomers`.
+- [ ] B2 client: hộp thoại "Hồ sơ nhân viên" (menu nhóm Hồ sơ + nút ở header): form 4 trường + tổng quan kết quả theo kỳ; chọn nhân viên (admin/quản lý/leader) theo phạm vi.
+- [ ] B3 xác nhận với Duyên: định nghĩa "tỷ lệ chốt trên khách đang giữ" (đang dùng: số đơn trong kỳ ÷ số khách đang giữ) và "tỷ lệ kết nối điện thoại" (SĐT mang về ÷ hội thoại Pancake).
