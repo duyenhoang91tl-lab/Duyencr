@@ -46,6 +46,9 @@ function _ntAgo(iso){
   var d = Math.floor(h / 24); if (d < 30) return d + ' ngày trước';
   return new Date(t).toLocaleDateString('vi-VN');
 }
+// Sự kiện quy trình công việc: kind = task_assign | task_turn | task_request | task_decision | task_done (js/44-fn-taskflow.js, GAS _notifyTaskEvent_)
+function _ntIsTaskEvt(it){ return String((it && it.kind) || '').indexOf('task_') === 0; }
+function _ntTaskIcon(it){ return ({ task_assign:'📌', task_turn:'➡️', task_request:'✋', task_decision:'⚖️', task_done:'🏁' })[it.kind] || '🔔'; }
 function _ntWhere(it){
   if (it.kind === 'note') return 'trong ghi chú khách ' + (it.refId || '');
   if (it.kind === 'comment') return 'trong bình luận công việc';
@@ -73,8 +76,10 @@ function _ntRender(){
   if (!_ntItems.length) { box.innerHTML = '<div class="nt-empty">Chưa có thông báo nào. Khi ai đó gõ @tên của bạn trong ghi chú, bình luận hay công việc, thông báo sẽ hiện ở đây.</div>'; return; }
   box.innerHTML = _ntItems.map(function(it){
     return '<div class="nt-it' + (it.read ? '' : ' unread') + '" data-id="' + esc(it.id) + '">' +
-      '<div class="nt-t"><b>' + esc(it.from || 'Ai đó') + '</b> đã nhắc bạn ' + esc(_ntWhere(it)) + '</div>' +
-      '<div class="nt-s">' + esc(it.text || '') + '</div><div class="nt-d">' + esc(_ntAgo(it.createdAt)) + '</div></div>';
+      (_ntIsTaskEvt(it)
+        ? '<div class="nt-t">' + _ntTaskIcon(it) + ' <b>' + esc(it.from || 'Hệ thống') + '</b> ' + esc(it.text || '') + '</div>'     // sự kiện quy trình công việc (GAS _notifyTaskEvent_): text là câu đầy đủ
+        : '<div class="nt-t"><b>' + esc(it.from || 'Ai đó') + '</b> đã nhắc bạn ' + esc(_ntWhere(it)) + '</div><div class="nt-s">' + esc(it.text || '') + '</div>') +
+      '<div class="nt-d">' + esc(_ntAgo(it.createdAt)) + '</div></div>';
   }).join('');
 }
 function openNotifModal(){

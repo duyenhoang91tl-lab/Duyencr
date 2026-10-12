@@ -41,12 +41,13 @@
     { k:'cs',  t:'🔀 Cài đặt chia số',      ids:['act:assign','act:autoassign','act:assignhist'] },
     { k:'tm',  t:'👥 Cài đặt team',         ids:['team','act:acct'] },
     { k:'up',  t:'📤 Up data',              ids:['uploaddata','act:upload','act:sync','act:fullsync','act:dup'] },
-    { k:'st',  t:'⚙ Settings',              ids:['config','act:cstatus','act:khstatus','act:cfield','act:tier','audit','act:clear'] }
+    { k:'st',  t:'⚙ Settings',              ids:['config','act:cstatus','act:khstatus','act:cfield','act:tier','audit','act:clear','act:taskflow'] }
   ];
   // Mục "hành động" (mở modal có sẵn, không phải tab). admin:true = chỉ tài khoản admin thấy.
   var ACTS = {
     notif:      { t:function(){ return (typeof _ntLabel==='function') ? _ntLabel() : '🔔 Thông báo'; }, f:'openNotifModal' },
     acct:       { t:'🔑 Tài khoản đăng nhập', f:'openAcctModal', admin:true },
+    taskflow:   { t:'🧩 Quy trình công việc', f:'openTaskFlowManager', admin:true },
     assign:     { t:'👥 Chia data', f:'openAssignModal', admin:true },
     autoassign: { t:'⏰ Chia tự động', f:'openAssignModal', tab:'auto', admin:true },
     assignhist: { t:'📋 Lịch sử chia', f:'openAssignModal', tab:'history', admin:true },

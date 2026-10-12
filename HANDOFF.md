@@ -45,12 +45,17 @@ Yêu cầu của Duyên: tab Công việc có nhiều LOẠI quy trình, mỗi l
 - Action: GET `taskFlows`, `taskRequests?taskId=`, `tasks` (kèm `pendingReq` từng task); POST `saveTaskFlow`, `deleteTaskFlow`, `taskAdvance {taskId,by,note}`, `taskRequestDecide {requestId,by,decision:'approve'|'reject',note}`. Test: `node tools/test-task-flow.js`.
 - Quyền hiện tại kiểm theo TÊN client gửi (cùng mức bảo mật các action task cũ). Admin chưa có đường "ép chuyển". Nếu cần chặt hơn → gắn session token (xem `_sessUser_`).
 
-## Tiến độ
-- [x] M1 — Backend GAS: quy trình/giai đoạn, chuyển tiếp, request/duyệt, comment có files/mentions/system (đã test Node).
-- [ ] M2 — Client: gọi `taskFlows`; modal Tạo công việc chọn Loại quy trình + gán người phụ trách (và người duyệt) từng giai đoạn. File: `js/26-loadtasks.js`, HTML modal `task-modal-overlay` trong `index.html`.
-- [ ] M3 — Client: modal chi tiết hiện thanh giai đoạn (giai đoạn hiện tại, thời gian từng bước từ stageLog, người thực hiện) + nút "Chuyển tiếp ➜" (chỉ người phụ trách bước hiện tại thấy) + khung "Yêu cầu chờ duyệt" có nút Chấp nhận/Từ chối.
-- [ ] M4 — Thảo luận: render dòng hệ thống/request, đính kèm TỆP bất kỳ (PDF/Word/Excel… không chỉ ảnh; upload qua `uploadBroadcastImg` đã nhận mọi mime, kiểm tra giới hạn kích thước), tag @tên (gợi ý khi gõ @), tab "Tài liệu đính kèm" gom ảnh/tệp từ mô tả + thảo luận.
-- [ ] M5 — Quản lý loại quy trình (thêm/sửa/xóa giai đoạn, bật "cần duyệt") qua menu ⚙; bộ lọc "Chờ tôi xử lý / Chờ tôi duyệt / Tôi được tag"; huy hiệu số việc chờ tôi ở tab.
-- [ ] M6 — Thông báo khi được tag/giao bước/có yêu cầu duyệt (hiện chưa có hạ tầng thông báo; tối thiểu: badge + danh sách "Được tag" lấy từ cột mentions).
+## Tiến độ (cập nhật 2026-10-12)
+- [x] M1 — Backend GAS: quy trình/giai đoạn, chuyển tiếp, request/duyệt, comment có files/mentions/system.
+- [x] M2 — `js/44-fn-taskflow.js`: chọn Loại công việc khi tạo/sửa (`#task-f-flow`), gán người thực hiện/người duyệt từng giai đoạn, `_tfValidate`, `_tfCollect` (ghép vào `saveTaskFromModal` js/26). Chọn quy trình → ẩn Team/user cũ + ô Trạng thái; sửa việc đã có quy trình → khoá đổi quy trình.
+- [x] M3 — Modal chi tiết (`#task-detail-flow`): thanh giai đoạn, thẻ giai đoạn hiện tại + nút Chuyển tiếp/Gửi yêu cầu duyệt, hộp yêu cầu chờ duyệt (Chấp nhận/Từ chối), timeline giờ thực tế, nhãn giai đoạn trong danh sách (`_tfListBadge`). Mô hình thuần `_tfStageModel`.
+- [x] M4 — Thảo luận: dòng hệ thống/yêu cầu, gửi TỆP BẤT KỲ ≤10MB (qua `uploadBroadcastImg`, lưu cùng thư mục Drive `BROADCAST_FOLDER_ID`; tệp không phải ảnh mở bằng link `drive.google.com/file/d/ID/view`), tab "Tài liệu đính kèm". Gõ `@` gợi ý + thông báo @tag do `js/39-fn-notify.js` (phiên khác) lo — KHÔNG làm gợi ý riêng.
+- [x] M5 — Backend: `saveTaskFlow_` CHẶN chèn/xoá/đổi thứ tự giai đoạn khi quy trình đang có việc dùng (việc lưu `stageIdx` theo thứ tự; thêm bước sẽ mở lại việc đã hoàn thành) — chỉ đổi tên + cờ "cần duyệt", muốn đổi cấu trúc phải NHÂN BẢN. Client `js/45-fn-taskflow-admin.js`: màn quản lý (menu trái nhóm Settings ➜ 🧩 Quy trình công việc, admin), tab lọc `⏳ Chờ tôi xử lý / ✔ Chờ tôi duyệt / @ Tôi được tag` + số đếm (`_tfScopeMatch`, hook trong `renderTaskTables` js/26).
+- [x] M6 — Thông báo sự kiện quy trình qua kênh CÓ SẴN (sheet `Notifications`, client `js/39-fn-notify.js`): GAS `_notifyTaskEvent_` ghi kind `task_assign` (giao việc/giai đoạn đầu), `task_turn` (đến lượt bạn), `task_request` (xin duyệt), `task_decision` (kết quả duyệt), `task_done` (hoàn thành → người tạo). Người nhận đổi từ tên hiển thị → username qua sheet Users; không tự báo mình; lỗi thông báo bị nuốt. Bấm thông báo mở đúng việc (`_ntOpenTask`). `Tasks.mentions` do server tính từ `@tên` (cùng bộ phân tích thông báo @tag).
+- [x] Bảo mật: `taskAdvance_`/`taskRequestDecide_` lấy người thao tác từ token phiên (`_taskActor_` → `_sessUser_`), không tin trường `by` khi có token; không token (client cũ) tạm dùng `by`. Khi SECURITY-PLAN bước 4 bắt buộc token thì bỏ nhánh `by`.
 
-> Lưu ý trùng tên: `proEsc_` được định nghĩa ở CẢ `js/33-pro-profile.js` lẫn `js/36-pro-home.js` (hàm toàn cục, file nạp sau thắng — bản 36 escape thêm dấu `'`, tương thích bản 33). Nếu sửa, gom về 1 chỗ.
+## Việc còn lại / lưu ý
+- CHƯA thử trên trình duyệt thật: upload tệp lên Drive, chuỗi tạo việc → chuyển tiếp → duyệt, hiển thị thông báo quy trình. Admin chưa có nút "ép chuyển".
+- Thông báo chỉ hiện khi người nhận mở CRM (poll 60 giây, chấm số trên nút ☰) — chưa có push/Zalo.
+- SỰ CỐ 2026-10-12: 5 commit client M2–M5b đã push lần đầu (c2f12d5, 55b7acd, 19acd75, 65c702a, a1f7a2b) biến mất khỏi main (ghi đè lịch sử bởi phiên khác) → đã dựng lại trong commit này. Nếu thấy mất lần nữa: kiểm `git log --oneline | grep "kieu Base"`; tuyệt đối không force-push.
+- Test: `node tools/test-task-flow.js` (backend, 47 ca) · `node tools/test-task-flow-client.js` (client + hiển thị thông báo). `tools/test-ui-pro.js` đang FAIL sẵn từ trước (selector `body.no-kh-sidebar` trong css/06-pro.css của phiên khác) — không liên quan.

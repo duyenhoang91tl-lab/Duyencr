@@ -652,6 +652,9 @@ window.addEventListener('load',function(){var s=document.createElement('script')
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">
       <div class="assign-tabs" style="border:none;background:transparent" id="task-scope-tabs">
         <div class="assign-tab active" data-scope="mine" onclick="setTaskScope('mine',this)">Giao cho tôi</div>
+        <div class="assign-tab" data-scope="waitMe" onclick="setTaskScope('waitMe',this)">⏳ Chờ tôi xử lý</div>
+        <div class="assign-tab" data-scope="approveMe" onclick="setTaskScope('approveMe',this)">✔ Chờ tôi duyệt</div>
+        <div class="assign-tab" data-scope="taggedMe" onclick="setTaskScope('taggedMe',this)">@ Tôi được tag</div>
         <div class="assign-tab" data-scope="createdByMe" onclick="setTaskScope('createdByMe',this)">Tạo bởi tôi</div>
         <div class="assign-tab" data-scope="all" onclick="setTaskScope('all',this)">Tất cả</div>
       </div>
@@ -1529,6 +1532,14 @@ function openBcLogModal(phone){
         </div>
       </div>
       <div class="assign-form-row" style="align-items:flex-start">
+        <div class="assign-form-label" style="padding-top:6px">Loại công việc</div>
+        <div style="flex:1">
+          <select id="task-f-flow" class="assign-input" style="width:100%" onchange="_tfOnFlowChange()"></select>
+          <div class="task-form-hint">Chọn quy trình để công việc đi qua từng giai đoạn, mỗi giai đoạn có người phụ trách riêng</div>
+        </div>
+      </div>
+      <div id="task-f-flow-stages" style="display:none"></div>
+      <div class="assign-form-row" style="align-items:flex-start">
         <div class="assign-form-label" style="padding-top:6px">Mô tả</div>
         <div style="flex:1">
           <textarea id="task-f-desc" class="assign-input" style="width:100%;min-height:60px" placeholder="Mô tả chi tiết công việc (không bắt buộc)"></textarea>
@@ -1566,12 +1577,14 @@ function openBcLogModal(phone){
           <textarea id="task-f-result" class="assign-input" style="width:100%;min-height:44px" placeholder="Kết quả công việc (điền khi đang làm / hoàn thành)"></textarea>
         </div>
       </div>
+      <div id="task-f-legacy-assign">
       <div class="assign-section-title" style="margin-top:6px">① Chọn Team tham gia</div>
       <input type="text" id="task-f-team-search" placeholder="🔍 Gõ tìm nhanh tên Team..." oninput="_taskRenderTeamChips(this.value)" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;margin-bottom:6px">
       <div class="assign-cs-list" id="task-f-team"></div>
       <div class="assign-section-title">② Chọn user tham gia (trong Team đã chọn)</div>
       <input type="text" id="task-f-cs-search" placeholder="🔍 Gõ tìm nhanh tên user..." oninput="_taskRenderUserChips(this.value)" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;margin-bottom:6px">
       <div class="assign-cs-list" id="task-f-cs"></div>
+      </div>
       <div id="task-f-perm-note" style="display:none;color:var(--hint);font-size:11px;margin-top:4px">🔒 Chỉ Admin mới có thể chọn/đổi người tham gia. Bạn vẫn tạo/sửa được các thông tin khác của công việc.</div>
     </div>
     <div class="assign-footer">
@@ -1598,10 +1611,12 @@ function openBcLogModal(phone){
     <div style="display:flex;border-bottom:1px solid var(--border);flex-shrink:0">
       <div class="task-detail-tab active" id="task-detail-tab-overview" onclick="switchTaskDetailTab('overview')">Tổng quan</div>
       <div class="task-detail-tab" id="task-detail-tab-discuss" onclick="switchTaskDetailTab('discuss')">Thảo luận <span id="task-detail-cm-count"></span></div>
+      <div class="task-detail-tab" id="task-detail-tab-files" onclick="switchTaskDetailTab('files')">Tài liệu đính kèm <span id="task-detail-files-count"></span></div>
     </div>
 
     <!-- TỔNG QUAN -->
     <div class="assign-body" id="task-detail-view-overview">
+      <div id="task-detail-flow"></div>
       <div class="assign-section-title">Mô tả</div>
       <div id="task-detail-desc" style="font-size:12.5px;color:var(--text);margin-bottom:14px;white-space:pre-wrap">—</div>
       <div id="task-detail-images" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"></div>
@@ -1613,12 +1628,15 @@ function openBcLogModal(phone){
     <div class="assign-body" id="task-detail-view-discuss" style="display:none">
       <div id="task-cm-list"></div>
     </div>
+    <div class="assign-body" id="task-detail-view-files" style="display:none">
+      <div id="task-detail-files-list"></div>
+    </div>
     <div class="assign-footer" id="task-cm-footer" style="display:none;flex-direction:column;align-items:stretch;gap:6px">
       <div id="task-cm-pending-images" style="display:flex;gap:6px;flex-wrap:wrap"></div>
       <div style="display:flex;gap:8px;align-items:flex-end">
         <textarea id="task-cm-input" class="assign-input" style="flex:1;min-height:36px" placeholder="Viết thảo luận..."></textarea>
-        <input type="file" id="task-cm-img-input" accept="image/*" multiple style="display:none" onchange="_taskCmAddImages(this.files)">
-        <button type="button" class="btn secondary sm" onclick="document.getElementById('task-cm-img-input').click()" title="Đính kèm ảnh">📎</button>
+        <input type="file" id="task-cm-img-input" multiple style="display:none" onchange="_taskCmAddImages(this.files);this.value=''">
+        <button type="button" class="btn secondary sm" onclick="document.getElementById('task-cm-img-input').click()" title="Đính kèm ảnh/tệp (≤10MB)">📎</button>
         <button type="button" class="btn primary sm" onclick="sendTaskComment()">Gửi</button>
       </div>
     </div>
@@ -1626,6 +1644,8 @@ function openBcLogModal(phone){
 </div>
 
 <script src="js/26-loadtasks.js"></script>
+<script src="js/44-fn-taskflow.js"></script>
+<script src="js/45-fn-taskflow-admin.js"></script>
 <script src="js/27-fn-bonuscore.js"></script>
 <script src="js/28-fn-bonusdetail.js"></script>
 <script src="js/34-fn-todaytasks.js"></script>

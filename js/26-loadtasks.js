@@ -46,6 +46,7 @@ function renderTaskTables(){
   var q = (document.getElementById('task-search') ? document.getElementById('task-search').value : '').trim().toLowerCase();
 
   var filtered = allTasks.filter(function(t){
+    if (typeof _tfScopeMatch === 'function'){ var sm_ = _tfScopeMatch(t, _taskScope, myName); if (sm_ === false) return false; }  // Chờ tôi xử lý/duyệt/được tag (js/45)
     if (_taskScope === 'mine' && myName && (t.csAssigned||[]).indexOf(myName) === -1) return false;
     if (_taskScope === 'createdByMe' && myName && t.createdBy !== myName) return false;
     if (_taskStatusFilter === 'overdue' && !_taskIsOverdue(t)) return false;
@@ -64,7 +65,7 @@ function renderTaskTables(){
       var overdue = _taskIsOverdue(t);
       return '<tr style="cursor:pointer" onclick="openTaskDetailModal(\''+t.id+'\')">'+
         '<td style="padding:8px;border-bottom:1px solid var(--border)">'+esc(t.title)+
-          (overdue ? ' <span class="assign-badge-pill has-assign">Quá hạn</span>' : '')+'</td>'+
+          (overdue ? ' <span class="assign-badge-pill has-assign">Quá hạn</span>' : '')+(typeof _tfListBadge === 'function' ? _tfListBadge(t) : '')+'</td>'+
         '<td style="padding:8px;border-bottom:1px solid var(--border);color:var(--muted)">'+(esc(t.result||'') || '—')+'</td>'+
         '<td style="padding:8px;border-bottom:1px solid var(--border)">'+
           (t.csAssigned||[]).map(function(n){ return '<span class="assign-badge-pill">'+esc(n)+'</span>'; }).join('') +
@@ -299,6 +300,8 @@ async function saveTaskFromModal(){
   var title = document.getElementById('task-f-title').value.trim();
   if (!title){ alert('Nhập tên công việc'); return; }
   if (!gsUrl){ alert('Chưa kết nối Google Sheets'); return; }
+  var tfErr_ = (typeof _tfValidate === 'function') ? _tfValidate() : '';   // quy trình: mỗi giai đoạn cần người thực hiện
+  if (tfErr_){ alert(tfErr_); return; }
   var saveBtn = document.querySelector('#task-modal-overlay .assign-footer .btn.primary');
   if (saveBtn){ saveBtn.disabled = true; saveBtn.textContent = 'Đang lưu...'; }
   try{
@@ -315,6 +318,7 @@ async function saveTaskFromModal(){
       teamsAssigned: Array.from(_taskSelectedTeams),
       createdBy: (typeof currentUser !== 'undefined' && currentUser && currentUser.name) || ''
     };
+    if (typeof _tfCollect === 'function'){ var tf_ = _tfCollect(); for (var k_ in tf_) task[k_] = tf_[k_]; }  // flowId + người phụ trách từng giai đoạn
     var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'saveTask', task: task }) });
     var d = await r.json();
     if (d && d.error){ alert('Lỗi: '+d.error); return; }

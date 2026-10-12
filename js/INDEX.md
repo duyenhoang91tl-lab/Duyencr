@@ -70,3 +70,6 @@ Code client của `index.html` (trước đây inline, ~1.4MB) đã tách ra `cs
 - `js/43-teamchat.js` + `css/07-teamchat.css`: tab 💬 Chat (id `tab-teamchat`, nhóm "Social" ở menu trái (cạnh "Chat (Social)" = hộp thư Pancake — 2 tính năng KHÁC NHAU)). Backend `gas/26_Chat.gs`. Chi tiết, quy ước bảo mật, giới hạn: `docs/CHAT-NOI-BO.md`.
 - Mọi request kèm token phiên (`ome_sess_token`); không dùng được với tài khoản demo. KHÔNG tin tên người gửi từ client.
 - Test: `node tools/test-chat.js` (backend) và `python3 tools/test-chat-e2e.py` (giao diện + backend).
+
+- `44-fn-taskflow.js`: Công việc kiểu Base — quy trình/giai đoạn: `loadTaskFlows`, chọn quy trình khi tạo việc (`_tfInit/_tfCollect/_tfValidate`), modal chi tiết (`_tfStageModel`, `_tfDetailHtml`, `_tfAdvance`, `_tfDecide`), thảo luận có tệp (ghi đè `renderTaskComments`/`sendTaskComment`/`switchTaskDetailTab` của js/26). Gợi ý @ + thông báo: js/39-fn-notify.js. Backend GAS `taskFlows/taskAdvance/taskRequestDecide`.
+- `45-fn-taskflow-admin.js`: màn quản lý quy trình (`openTaskFlowManager`, `_tfm*`; menu trái `act:taskflow` admin) + bộ lọc việc cần tôi (`_tfScopeMatch`, `_tfCounts`, bọc `renderTaskTables`). Test: `tools/test-task-flow-client.js`.
