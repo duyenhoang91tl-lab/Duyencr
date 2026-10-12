@@ -1029,23 +1029,38 @@ function _srbComboHTML(key){
 var _srbMenu = { open:false, cat:null, q:'', exp:{} };
 
 function _srbMenuCats_(){
-  var cfg = _SRB_COMBO_CFG, cats = [];
-  function flat(key, label, icon, ph){
+  var cfg = _SRB_COMBO_CFG, cats = [], isA = (_srState.sub === 'A');
+  function flat(key, label, icon, ph, stateKey, optFn){
+    cats.push({ key:key, label:label, icon:icon, type:'flat', stateKey:stateKey, ph:ph, opts:optFn });
+  }
+  function flatB(key, label, icon, ph){
     var c = cfg[key];
-    cats.push({ key:key, label:label, icon:icon, type:'flat', stateKey:c.stateKey, ph:ph,
-      opts:function(){ return (c.getOptions ? c.getOptions() : (_srState[c.optKey]||[])) || []; } });
+    flat(key, label, icon, ph, c.stateKey, function(){ return (c.getOptions ? c.getOptions() : (_srState[c.optKey]||[])) || []; });
+  }
+  if (isA){   // Báo cáo A — Base: Sale, Team, Kênh, Sản phẩm, kiểu ngày, cách tính
+    if (_srIsAdmin()){
+      flat('sale', 'Sale', '👤', 'Tìm sale...', 'sale', function(){ return _srState.saleOptions || []; });
+      flat('team', 'Team', '👥', 'Tìm team...', 'team', function(){ return _srState.teamOptions || []; });
+    }
+    flat('kenh', 'Kênh', '🛒', 'Tìm kênh...', 'kenh', function(){ return _srState.kenhOptions || []; });
+    cats.push({ key:'aSanPham', label:'Sản phẩm', icon:'💍', type:'text', stateKey:'aSanPham', ph:'vd: tỳ hưu, nhẫn 10k', hint:'Nhiều sản phẩm cách nhau bằng dấu phẩy' });
+    cats.push({ key:'dateField', label:'Tính theo ngày', icon:'📅', type:'radio', stateKey:'dateField', def:'ngayTao',
+      options:[['ngayTao','Ngày tạo'],['thoiGianHT','Thời gian hoàn thành']] });
+    cats.push({ key:'byCreator', label:'Tính theo người tạo đơn', icon:'🧾', type:'toggle', stateKey:'byCreator', apply:true,
+      hint:'Bật: mỗi đơn tính toàn bộ doanh thu cho người tạo đơn (không chia đều cho các sale đứng tên).' });
+    return cats;
   }
   if (_srIsAdmin()){
-    flat('sale', 'Sale', '👤', 'Tìm sale...');
-    flat('team', 'Team', '👥', 'Tìm team...');
+    flatB('sale', 'Sale', '👤', 'Tìm sale...');
+    flatB('team', 'Team', '👥', 'Tìm team...');
   }
-  flat('nguon', 'Nguồn đơn', '🛒', 'Tìm nguồn...');
-  flat('mkt', 'Marketer', '📣', 'Tìm marketer...');
+  flatB('nguon', 'Nguồn đơn', '🛒', 'Tìm nguồn...');
+  flatB('mkt', 'Marketer', '📣', 'Tìm marketer...');
   cats.push({ key:'cs', label:(cfg.cs.getLabel ? cfg.cs.getLabel() : 'Tình trạng CS'), icon:'🩺', type:'tree', stateKey:'bCareStatus', ph:'Tìm tình trạng...',
     tree:function(){ return (typeof CARE_STATUS_TREE !== 'undefined' && CARE_STATUS_TREE) ? CARE_STATUS_TREE : []; } });
   cats.push({ key:'kh', label:(cfg.kh.getLabel ? cfg.kh.getLabel() : 'Trạng thái KH'), icon:'🏷️', type:'tree', stateKey:'bKhStatus', ph:'Tìm trạng thái...',
     tree:function(){ return (typeof CUSTOMER_STATUS_TREE !== 'undefined' && CUSTOMER_STATUS_TREE) ? CUSTOMER_STATUS_TREE : []; } });
-  flat('zalo', 'Kết bạn Zalo', '💬', 'Tìm trạng thái Zalo...');
+  flatB('zalo', 'Kết bạn Zalo', '💬', 'Tìm trạng thái Zalo...');
   cats.push({ key:'sanpham', label:'Sản phẩm', icon:'💍', type:'text', stateKey:'bSanPham', ph:'vd: tỳ hưu, nhẫn 10k', hint:'Nhiều sản phẩm cách nhau bằng dấu phẩy' });
   cats.push({ key:'nickzalo', label:'Nick Zalo', icon:'🔖', type:'text', stateKey:'bNickZalo', ph:'Tìm nick...', hint:'Gõ một phần tên nick Zalo' });
   return cats;
@@ -1065,18 +1080,29 @@ function _srbNodeAt_(tree, path){
 function _srbMenuCount_(cat){
   var v = _srState[cat.stateKey];
   if (cat.type === 'text') return String(v||'').trim() ? 1 : 0;
+  if (cat.type === 'radio') return (v && v !== cat.def) ? 1 : 0;
+  if (cat.type === 'toggle') return v ? 1 : 0;
   return (v || []).length;
 }
+function _srbMenuReset_(c){ _srState[c.stateKey] = (c.type === 'text') ? '' : (c.type === 'radio' ? c.def : (c.type === 'toggle' ? false : [])); }
 function _srbMenuTotal_(){ return _srbMenuCats_().reduce(function(s,c){ return s + _srbMenuCount_(c); }, 0); }
 function _srbMenuSummary_(){
   return _srbMenuCats_().filter(function(c){ return _srbMenuCount_(c) > 0; }).map(function(c){
-    return esc(c.label) + (c.type === 'text' ? '' : ' (' + _srbMenuCount_(c) + ')');
+    if (c.type === 'radio'){ var o = c.options.filter(function(x){ return x[0] === _srState[c.stateKey]; })[0]; return esc(c.label) + ': ' + esc(o ? o[1] : ''); }
+    return esc(c.label) + ((c.type === 'text' || c.type === 'toggle') ? '' : ' (' + _srbMenuCount_(c) + ')');
   }).join(' · ');
 }
 
 // Danh sách ở cấp 2 (mục phẳng) hoặc cấp 2+3 (cây: nhóm → mục con)
 function _srbMenuListHtml_(cat){
   var q = _foldVi(_srbMenu.q || ''), sel = _srState[cat.stateKey] || [];
+  if (cat.type === 'radio'){
+    return cat.options.map(function(o){
+      var on = _srState[cat.stateKey] === o[0];
+      return '<div class="srb-m-opt' + (on ? ' on' : '') + '" data-k="' + cat.key + '" data-v="' + esc(o[0]) + '" onclick="srbMenuRadio(this)">' +
+        '<span class="srb-m-chk">' + (on ? '◉' : '○') + '</span><span class="srb-m-t">' + esc(o[1]) + '</span></div>';
+    }).join('');
+  }
   if (cat.type === 'flat'){
     var items = (cat.opts() || []).filter(function(v){ return !q || _foldVi(v).indexOf(q) !== -1; });
     if (!items.length) return '<div class="srb-m-empty">' + (q ? 'Không tìm thấy' : 'Chưa có dữ liệu (đang tải…)') + '</div>';
@@ -1120,6 +1146,8 @@ function _srbMenuPanelHtml_(){
   if (!cat){
     var rows = _srbMenuCats_().map(function(c){
       var n = _srbMenuCount_(c);
+      if (c.type === 'toggle') return '<div class="srb-m-cat" data-k="' + c.key + '" onclick="srbMenuToggleBool(this.getAttribute(\'data-k\'))" title="' + esc(c.hint || '') + '">' +
+        '<span class="srb-m-ic">' + c.icon + '</span><span class="srb-m-t">' + esc(c.label) + '</span><span class="srb-m-chk">' + (n ? '☑' : '☐') + '</span></div>';
       return '<div class="srb-m-cat" data-k="' + c.key + '" onclick="srbMenuOpenCat(this.getAttribute(\'data-k\'))">' +
         '<span class="srb-m-ic">' + c.icon + '</span><span class="srb-m-t">' + esc(c.label) + '</span>' +
         (n ? '<span class="srb-m-badge">' + (c.type === 'text' ? '✓' : n) + '</span>' : '') + '<span class="srb-m-car">›</span></div>';
@@ -1129,6 +1157,7 @@ function _srbMenuPanelHtml_(){
   var n = _srbMenuCount_(cat);
   var head = '<div class="srb-m-head"><a href="javascript:void(0)" onclick="srbMenuBack()">‹ Bộ lọc</a><b>' + esc(cat.label) + '</b>' +
     (n ? '<a href="javascript:void(0)" onclick="srbMenuClearCat(\'' + cat.key + '\')">Bỏ chọn</a>' : '<span></span>') + '</div>';
+  if (cat.type === 'radio') return head + '<div class="srb-m-list" id="srb-menu-list">' + _srbMenuListHtml_(cat) + '</div>';
   if (cat.type === 'text'){
     return head + '<div class="srb-m-textwrap"><input type="text" id="srb-menu-text" value="' + esc(_srState[cat.stateKey] || '') + '" placeholder="' + esc(cat.ph) + '" ' +
       'oninput="srbMenuText(\'' + cat.key + '\', this.value)" autocomplete="off"><div class="srb-m-hint">' + esc(cat.hint || '') + '</div></div>';
@@ -1138,6 +1167,8 @@ function _srbMenuPanelHtml_(){
     '<div class="srb-m-list" id="srb-menu-list">' + _srbMenuListHtml_(cat) + '</div>';
 }
 function _srbMenuHTML_(){
+  var mode = (_srState.sub === 'A') ? 'A' : 'B';
+  if (_srbMenu.mode !== mode){ _srbMenu.mode = mode; _srbMenu.open = false; _srbMenu.cat = null; _srbMenu.q = ''; _srbMenu.exp = {}; }
   var total = _srbMenuTotal_();
   return '<div class="srb-menu" id="srb-menu">' +
     '<button type="button" class="btn sm" id="srb-menu-btn" onclick="srbMenuToggle(event)">🔎 Bộ lọc <span id="srb-menu-n">' + (total ? '(' + total + ')' : '') + '</span> ▾</button>' +
@@ -1215,15 +1246,26 @@ function srbMenuExpand(el){
   var cat = _srbMenuCat_(el.getAttribute('data-k')), l = document.getElementById('srb-menu-list');
   if (cat && l) l.innerHTML = _srbMenuListHtml_(cat);
 }
+function srbMenuRadio(el){
+  var cat = _srbMenuCat_(el.getAttribute('data-k')); if (!cat) return;
+  _srState[cat.stateKey] = el.getAttribute('data-v');
+  _srbMenuPaint_(); _srbMenuRefresh_();
+}
+function srbMenuToggleBool(key){
+  var cat = _srbMenuCat_(key); if (!cat) return;
+  _srState[cat.stateKey] = !_srState[cat.stateKey];
+  if (cat.apply){ _srbMenu.open = false; _srApply(); return; }   // đổi cách tính → tải lại ngay như checkbox cũ
+  _srbMenuPaint_(); _srbMenuRefresh_();
+}
 function srbMenuText(key, v){ var cat = _srbMenuCat_(key); if (!cat) return; _srState[cat.stateKey] = v; _srbMenuRefresh_(); }
 function srbMenuClearCat(key){
   var cat = _srbMenuCat_(key); if (!cat) return;
-  _srState[cat.stateKey] = (cat.type === 'text') ? '' : [];
+  _srbMenuReset_(cat);
   if (_srTeamFieldToSaleField_[cat.stateKey]){ renderSalesReportTab(); return; }
   _srbMenuPaint_(); _srbMenuRefresh_();
 }
 function srbMenuClearAll(){
-  _srbMenuCats_().forEach(function(c){ _srState[c.stateKey] = (c.type === 'text') ? '' : []; });
+  _srbMenuCats_().forEach(_srbMenuReset_);
   _srbMenu.cat = null; _srbMenu.q = '';
   renderSalesReportTab();
 }

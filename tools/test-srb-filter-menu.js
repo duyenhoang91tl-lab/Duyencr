@@ -99,7 +99,33 @@ ok(st==='[[],[],[],[],[],[],[],"",""]'&&$('srb-menu-n').textContent==='','"Xoá 
 w.__admin=false;w.eval('_srbMenu.open=false');paint();click($('srb-menu-btn'));
 cats=QA('.srb-m-cat .srb-m-t').map(x=>x.textContent);
 ok(cats.join('|')==='Nguồn đơn|Marketer|Tình trạng CS|Trạng thái KH|Kết bạn Zalo|Sản phẩm|Nick Zalo','không phải admin → ẩn Sale & Team (giữ phân quyền)');
+// 11b) Báo cáo A: menu riêng (Sale, Team, Kênh, Sản phẩm, Tính theo ngày [chọn 1], Tính theo người tạo đơn [bật/tắt])
+w.eval(`_srState.sub='A';_srState.sale=[];_srState.team=[];_srState.kenh=[];_srState.aSanPham='';_srState.dateField='ngayTao';_srState.byCreator=false;
+ _srState.saleOptions=['An','Bình'];_srState.kenhOptions=['Fanpage','Shopee'];window.__admin=true;var _applied=0;var _srApply=function(){_applied++};
+ _srTeamFieldToSaleField_.team='sale';`);
+paint();w.eval('_srbMenu.open=false');paint();click($('srb-menu-btn'));
+cats=QA('.srb-m-cat .srb-m-t').map(x=>x.textContent);
+ok(cats.join('|')==='Sale|Team|Kênh|Sản phẩm|Tính theo ngày|Tính theo người tạo đơn','Báo cáo A: 6 mục (Sale, Team, Kênh, Sản phẩm, Tính theo ngày, Tính theo người tạo đơn)');
+click(QA('.srb-m-cat').find(x=>x.textContent.includes('Kênh')));
+click(QA('.srb-m-opt').find(x=>x.textContent.includes('Shopee')));
+ok(w.eval('_srState.kenh').join()==='Shopee'&&$('srb-menu-sum').textContent==='Kênh (1)','A: tick kênh Shopee → state kenh');
+click(Q('.srb-m-head a'));click(QA('.srb-m-cat').find(x=>x.textContent.includes('Tính theo ngày')));
+ok(QA('.srb-m-opt').length===2&&QA('.srb-m-opt.on')[0].textContent.includes('Ngày tạo')&&QA('.srb-m-opt.on .srb-m-chk')[0].textContent==='◉','A: "Tính theo ngày" chọn 1 (mặc định Ngày tạo ◉)');
+click(QA('.srb-m-opt').find(x=>x.textContent.includes('Thời gian hoàn thành')));
+ok(w.eval('_srState.dateField')==='thoiGianHT'&&$('srb-menu-sum').textContent.includes('Tính theo ngày: Thời gian hoàn thành'),'A: chọn Thời gian hoàn thành → state dateField + tóm tắt');
+click(Q('.srb-m-head a'));
+const tg=QA('.srb-m-cat').find(x=>x.textContent.includes('người tạo đơn'));
+ok(tg.querySelector('.srb-m-chk').textContent==='☐'&&!tg.querySelector('.srb-m-car'),'A: "người tạo đơn" là công tắc ☐ (không có mũi tên cấp con)');
+click(tg);
+ok(w.eval('_srState.byCreator')===true&&w.eval('_applied')===1,'A: bật công tắc → byCreator=true và tải lại ngay (_srApply) như checkbox cũ');
+w.eval('_srbMenu.open=true;_srbMenu.cat=null');paint();click(QA('.srb-m-head a').find(x=>x.textContent==='Xoá tất cả'));
+ok(w.eval('JSON.stringify([_srState.kenh,_srState.dateField,_srState.byCreator,_srState.aSanPham])')==='[[],"ngayTao",false,""]','A: "Xoá tất cả" → kênh rỗng, kiểu ngày về mặc định, công tắc tắt');
+w.eval("_srState.sub='B'");paint();
+ok(w.eval('_srbMenu.mode')==='B'&&w.eval('_srbMenu.open')===false,'đổi sang báo cáo B → menu tự đóng, đổi bộ mục');
 // 12) Wiring: js/11 gọi menu mới, không còn gọi 9 ô cũ cho báo cáo B
 const bBlock=j11.slice(j11.indexOf("filters += '<div class=\"cs-filter-wrap\" style=\"margin-bottom:0\"><div class=\"cs-filter-label\">Sale</div>'+\n        '<div style=\"padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)\">🔒 '+esc((_srState.bSale"));
+const css=fs.readFileSync(path.join(__dirname,'..','css','01-base.css'),'utf8');
+ok(/\.gear-menu-list\{display:none;/.test(css),'CSS: menu Tác vụ (.gear-menu-list) mặc định ẨN — hết lỗi bung sẵn');
+ok(j11.includes('class="srb-bar"')&&!j11.includes('var titleRow'),'Báo cáo A/B: 1 thanh gọn (srb-bar), bỏ hàng tiêu đề thừa');
 ok(j11.includes('_srbMenuHTML_()')&&!/_srbComboHTML\('/.test(j11),'renderSalesReportTab (js/11) dùng _srbMenuHTML_(), không còn _srbComboHTML(...)');
 console.log(bad?('\n'+bad+' FAIL'):'\nALL PASS');process.exit(bad?1:0);

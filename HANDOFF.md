@@ -81,3 +81,9 @@ Yêu cầu của Duyên: tab Công việc có nhiều LOẠI quy trình, mỗi l
 - Code: khối `_srbMenu*` trong `js/13` (ngay sau `_srbComboHTML`), gọi từ `renderSalesReportTab` (js/11, nhánh Báo cáo B); CSS `.srb-m-*` cuối `css/01-base.css`. KHÔNG đổi state key (bSale, bTeam, bNguon, bMarketer, bCareStatus, bKhStatus, bZaloStatus, bSanPham, bNickZalo) nên `_srLoad`/xuất Excel/phân quyền giữ nguyên; non-admin vẫn không thấy Sale/Team (khung 🔒 giữ nguyên). Chọn Team vẫn tự điền Sale (`_srSyncTeamToSale_`) và vẽ lại, menu giữ mở. Nút "Lọc" vẫn là nơi áp dụng.
 - Bộ combo cũ (`_srbComboHTML`, `srbCombo*`) giữ lại trong js/13 nhưng không còn được gọi. Báo cáo A/C/D/E/F/L... CHƯA đổi (vẫn các ô combo riêng) — làm tiếp nếu Duyên muốn gộp cho các báo cáo đó.
 - Test: `node tools/test-srb-filter-menu.js` (jsdom, 23 ca). Chưa xem thử trên trình duyệt thật.
+
+### Cập nhật (12/10/2026, đợt 2) — thanh công cụ gọn Báo cáo A/B + sửa lỗi menu "Tác vụ"
+- LỖI GỐC: `.gear-menu-list` (css/01-base.css) thiếu `display:none` mặc định nên menu Tác vụ/Xuất Excel luôn bung sẵn ở mọi báo cáo (JS chỉ bật `style.display='block'`). Đã thêm `display:none`.
+- Báo cáo A và B nay dùng MỘT thanh `.srb-bar`: chọn báo cáo · khoảng ngày · 🔎 Bộ lọc · Lọc · 🧰 Tác vụ (trong menu có "Ẩn/Hiện bộ lọc KH"); bỏ hàng tiêu đề thừa. Dòng tóm tắt bộ lọc xuống hàng dưới thanh. Non-admin có chip 🔒 tên.
+- Menu lọc có chế độ theo báo cáo (`_srbMenuCats_`): A = Sale, Team, Kênh, Sản phẩm, Tính theo ngày (chọn 1: Ngày tạo / Thời gian hoàn thành), Tính theo người tạo đơn (công tắc, tải lại ngay như checkbox cũ). Thêm kiểu mục `radio` và `toggle`. Đổi báo cáo → menu tự đóng.
+- Báo cáo C–L chưa đổi thanh lọc (vẫn ô riêng); gear-menu của chúng đã hết lỗi bung sẵn nhờ sửa CSS.
