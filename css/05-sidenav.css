@@ -57,3 +57,9 @@ body.rpt-mode #sn-toggle,html.db-standalone #sn-toggle{display:none!important;}
 .nt-sug{position:fixed;z-index:800;display:none;background:var(--surface);border:1px solid var(--border-md);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.22);padding:4px;}
 .nt-sg{padding:6px 10px;border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);}
 .nt-sg.on,.nt-sg:hover{background:var(--surface2);}
+
+/* Ô tìm nhanh trên header (cạnh nút Menu) — hiện ở mọi màn của data-view */
+#qs-wrap{display:none;flex:1 1 150px;max-width:300px;min-width:110px;}
+#qs-wrap.sn-on{display:block;}
+#qs-input{width:100%;height:32px;box-sizing:border-box;padding:0 10px;border:1px solid rgba(255,255,255,.35);border-radius:var(--rsm);background:rgba(255,255,255,.95);color:#222;font-size:12.5px;outline:none;}
+body.rpt-mode #qs-wrap,html.db-standalone #qs-wrap{display:none!important;}

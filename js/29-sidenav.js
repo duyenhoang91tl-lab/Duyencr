@@ -28,6 +28,7 @@
     var b = btn(), dv = document.getElementById('data-view'); if (!b || !dv) return;
     var show = dv.style.display !== 'none';
     b.classList.toggle('sn-on', show);
+    var q = document.getElementById('qs-wrap'); if (q) q.classList.toggle('sn-on', show);
     if (!show) setOpen(false);
   }
   // Nhóm menu mẹ -> các mục con (theo data-bar-id). Mục chưa khai báo vẫn hiện, dồn vào nhóm "Khác".
@@ -143,6 +144,20 @@
     b.id = 'sn-toggle'; b.type = 'button'; b.title = 'Mở/đóng menu tác vụ';
     b.addEventListener('click', function(e){ e.stopPropagation(); setOpen(!isOpen()); });
     hdr.insertBefore(b, hdr.firstChild);
+    // Ô tìm nhanh cạnh nút Menu: dùng được ở MỌI màn; gõ xong tự chuyển về "Danh sách KH" và lọc theo từ khoá
+    var qw = document.createElement('div'); qw.id = 'qs-wrap';
+    qw.innerHTML = '<input id="qs-input" type="search" placeholder="🔍 Tìm nhanh: tên, SĐT, mã đơn..." autocomplete="off">';
+    hdr.insertBefore(qw, b.nextSibling);
+    var qt;
+    qw.firstChild.addEventListener('input', function(){
+      var v = this.value; clearTimeout(qt);
+      qt = setTimeout(function(){
+        var si = document.getElementById('search-input'); if (!si) return;
+        var tl = document.querySelector('#data-view .tabs [onclick*="switchTab(\'list\'"]');
+        if (v && tl && !tl.classList.contains('active')) tl.click();
+        si.value = v; si.dispatchEvent(new Event('input', {bubbles:true}));
+      }, 350);
+    });
     var back = document.createElement('div');
     back.id = 'sn-backdrop';
     back.addEventListener('click', function(){ setOpen(false); });
