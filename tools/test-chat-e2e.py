@@ -38,9 +38,10 @@ def open_user(b, user, vw=1280):
     pg.add_init_script("localStorage.setItem('ome_sess_token','%s')"%user)
     pg.goto('http://127.0.0.1:8768/index.html'); pg.wait_for_timeout(2200)
     pg.evaluate("document.getElementById('data-view').style.display='flex';document.getElementById('empty-view')&&(document.getElementById('empty-view').style.display='none');var lo=document.getElementById('login-overlay');if(lo)lo.remove();gsUrl='http://127.0.0.1:8800/exec';")
+    pg.evaluate("setInterval(function(){var b=document.getElementById('boot-splash');if(b)b.remove()},200)")   # man hinh khoi dong cua app che chuot trong test
     return pg
 def open_chat(pg):
-    pg.evaluate("switchTab('teamchat', document.querySelector('[data-bar-id=tab-teamchat]'))"); pg.wait_for_selector('#tc-chlist .tc-ch',timeout=9000)
+    pg.evaluate("document.querySelector('[data-bar-id=tab-teamchat]').click()")   # bam dung muc menu nhu nguoi dung (menu trai tu dong dong); pg.wait_for_selector('#tc-chlist .tc-ch',timeout=9000)
 
 with sync_playwright() as p:
     b=p.chromium.launch()
@@ -93,13 +94,18 @@ with sync_playwright() as p:
     ok(True,'an xoa tin cua minh -> bien mat')
     bi.evaluate("tcSelect('general')"); bi.wait_for_function("document.querySelectorAll('#tc-msgs .tc-msg').length===0",timeout=20000)
     ok(True,'binh cung het thay tin da xoa (dver)')
-    # dien thoai
+    # dien thoai (menu trai cua app mo/dong bang class, nen cho dieu kien thay vi kiem tra tuc thi)
     m=open_user(b,'an',vw=390); open_chat(m)
+    m.wait_for_timeout(1200)
     ok(m.evaluate("getComputedStyle(document.querySelector('.tc-main')).display")=='none', 'dien thoai: luc dau chi hien danh sach kenh')
-    m.click('#tc-chlist .tc-ch >> nth=0', force=True)
-    ok(m.evaluate("getComputedStyle(document.querySelector('.tc-main')).display")=='flex', 'dien thoai: bam kenh -> hien hoi thoai')
-    m.click('.tc-back', force=True)
-    ok(m.evaluate("getComputedStyle(document.querySelector('.tc-side')).display")!='none', 'dien thoai: nut ← quay lai danh sach')
+    m.evaluate("document.querySelector('#tc-chlist .tc-ch').click()")
+    try:
+        m.wait_for_function("getComputedStyle(document.querySelector('.tc-main')).display==='flex'",timeout=4000); ok(True,'dien thoai: bam kenh -> hien hoi thoai')
+    except Exception: ok(False,'dien thoai: bam kenh -> hien hoi thoai')
+    m.evaluate("document.querySelector('.tc-back').click()")
+    try:
+        m.wait_for_function("getComputedStyle(document.querySelector('.tc-side')).display!=='none'",timeout=4000); ok(True,'dien thoai: nut ← quay lai danh sach')
+    except Exception: ok(False,'dien thoai: nut ← quay lai danh sach')
     b.close()
 srv.kill()
 bad=[m for c,m in res if not c]
