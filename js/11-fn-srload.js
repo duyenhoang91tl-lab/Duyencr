@@ -51,6 +51,24 @@ async function _srLoad(){
       dateFrom: _srState.eDateFrom, dateTo: _srState.eDateTo,
       sale: (_srState.eSale||[]).join(',')
     });
+    // Lọc Sale ra 0 đơn: gần như chắc chắn do tên đã chọn (từ Team) KHÔNG trùng tên trong cột "Thẻ" của Pos.
+    // Thay vì để 0đ không rõ lý do, tải lại không lọc Sale, hiển thị tất cả và báo rõ tên Sale thật trong Pos.
+    _srState.eMismatch = null;
+    var _saleSelE = _srState.eSale || [];
+    if (_saleSelE.length && dPos && !(dPos.orders && dPos.orders.length)) {
+      var dAllE = await _srFetch('salesReportB', { dateFrom: _srState.eDateFrom, dateTo: _srState.eDateTo, sale: '' });
+      if (dAllE && dAllE.orders && dAllE.orders.length) {
+        var cntE = {};
+        dAllE.orders.forEach(function(o){
+          String(o.saleBanValid !== undefined ? o.saleBanValid : (o.theSale || '')).split(',').forEach(function(x){ x = x.trim(); if (x) cntE[x] = (cntE[x] || 0) + 1; });
+        });
+        _srState.eMismatch = {
+          total: dAllE.orders.length, selected: _saleSelE.slice(),
+          tokens: Object.keys(cntE).sort(function(a, b){ return cntE[b] - cntE[a]; }).slice(0, 40).map(function(k){ return k + ' (' + cntE[k] + ')'; })
+        };
+        dPos = dAllE;
+      }
+    }
     // QUAN TRONG: phai map ca ngayTaoDon -> ngayTao (don Pos KHONG co san field "ngayTao") —
     // thieu dong nay thi moi bo loc theo ngay/ngay thu viec cua _computeBonusData_ se LUON
     // rong vi o.ngayTao undefined o moi don Pos, du da map dung saleBan/giaTriDon. Dung
@@ -453,6 +471,7 @@ function srComboKey(e, domId){
 }
 // Render san 1 combo hoan chinh (nhan/o tim/chip) — goi lai trong renderSalesReportTab moi lan ve.
 function _srComboHtml(domId, field, optKey, label, placeholder, widthPx, hideChips){
+  if (hideChips === undefined) hideChips = true;   // chip tên đã chọn không hiện ngoài ô — chỉ tick trong danh sách thả xuống
   _srComboInit(domId, field, optKey);
   var selArr = _srState[field] || [];
   return '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">'+esc(label)+(selArr.length?' <span style="color:var(--green)">('+selArr.length+' đã chọn)</span>':'')+'</div>'+
@@ -559,7 +578,7 @@ function renderSalesReportTab(){
         '<span class="cs-combo-caret" onclick="srSaleComboToggle(event)">▾</span>'+
         '<div class="cs-combo-list" id="sr-sale-combo-list"></div>'+
         '</div>'+
-        '<div id="sr-sale-chips" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;max-width:220px">'+
+        '<div id="sr-sale-chips" style="display:none;flex-wrap:wrap;gap:4px;margin-top:4px;max-width:220px">'+
         (_srState.sale||[]).map(function(name){
           return '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--green-bg);color:var(--green);border-radius:10px;padding:2px 6px 2px 8px;font-size:10.5px;white-space:nowrap" data-name="'+esc(name)+'">'+
             esc(name)+'<span style="cursor:pointer;font-weight:700" onclick="srSaleComboRemove(this.parentNode.dataset.name)">✕</span></span>';

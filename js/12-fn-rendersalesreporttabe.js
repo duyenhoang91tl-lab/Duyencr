@@ -32,7 +32,7 @@ function renderSalesReportTabE_(wrap, subTabs){
 
   var body = _srState.loading
     ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>'
-    : _srRenderE_(_srState.dataE);
+    : _srEMismatchBanner_() + _srRenderE_(_srState.dataE);
 
   wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + filters + body;
 }
@@ -326,6 +326,15 @@ function _computeBonusData_(orders){
   return {bySale: rows, total: rows.reduce(function(s,r){ return s+r.total; },0), review: review};
 }
 
+// Cảnh báo khi bộ lọc Sale (thường do chọn Team) không trùng tên nào trong cột "Thẻ" của Pos → đang hiển thị TẤT CẢ sale.
+function _srEMismatchBanner_(){
+  var m = _srState.eMismatch;
+  if (!m) return '';
+  return '<div style="background:#fff7ed;border:1px solid #fdba74;color:#9a3412;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;line-height:1.5">'+
+    '<b>⚠ Không đơn Pos nào khớp ' + m.selected.length + ' tên Sale đang chọn</b> (kỳ này có ' + m.total + ' đơn). Đang hiển thị <b>TẤT CẢ sale</b> để bạn không bị 0đ. '+
+    'Nguyên nhân thường gặp: tên trong "Quản lý Team" khác tên ghi ở cột Thẻ của Pos. Sửa tên trong Team cho trùng một trong các tên Pos sau:<br>'+
+    '<span style="color:#7c2d12">' + m.tokens.map(function(x){ return esc(x); }).join(' · ') + '</span></div>';
+}
 function _srRenderE_(d){
   if (!d) return _srNoDataHtml_();
   var c = _computeCommissionData_(d.orders || []);
