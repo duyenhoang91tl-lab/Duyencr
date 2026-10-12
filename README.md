@@ -2,7 +2,7 @@ Dự án Duyên AI CRM (Sasum) — repo duyenhoang91tl-lab/Duyencr. BẮT BUỘC
 Trước khi làm gì, đọc crm-kb/00-READ-FIRST.md." Dòng này đảm bảo ai sửa cũng phải đọc chỉ dẫn
 
 ## Quy tắc tính doanh thu & loại đơn (Duyên chốt 10/2026 — mọi báo cáo phải tuân thủ)
-1. **Pos** ("dữ liệu đơn", cột *Trạng thái đơn*): loại **Hủy đơn / Hoàn đơn / Đang hoàn** (`POS_EXCLUDED_ORDER_STATUSES_`).
+1. **Pos** ("dữ liệu đơn", cột *Trạng thái đơn*): loại **Hủy đơn / Hoàn đơn / Đã hoàn / Đang hoàn** (`POS_EXCLUDED_ORDER_STATUSES_`).
 2. **Đơn ghép** = ghi chú Pos có **từ 2 mã bộ đếm trở lên** → check ngược Base: đơn nào của ai thì doanh thu tính cho người đó, chia đều những người tham gia theo từng đơn (`POS_GHEP_BASE_ENABLED_`, `POS_GHEP_MIN_CODES_`). Đơn Pos 0–1 mã tính thuần theo Pos.
 3. Pos **nguồn cửa hàng** (Quầy Hào Nam / Cửa hàng) có gắn thẻ sale → chia **30/70**: 30% của sale (chia đều tiếp cho các sale tham gia), 70% của quầy (`_quaySaleRatio_`).
 4. **Base** (DT TỔNG, cột H *Trạng thái*): chỉ loại **"Thất bại"** (`EXCLUDED_ORDER_STATUSES_`; Dashboard dùng `_DASH_EXCLUDED_STATUS` cùng quy tắc). Cũng dùng làm điều kiện khi check ngược đơn ghép.

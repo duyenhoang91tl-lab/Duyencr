@@ -2112,7 +2112,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.34-pkchat' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.35-pos-da-hoan' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -2827,10 +2827,10 @@ function _donSaleNamesFromThe_(theStr) {
 // (Ban than sheet cung da duoc Duyen xoa het cac dong Huy/Hoan/Dang hoan thu cong; ham nay
 // van giu de an toan cho du lieu phat sinh sau nay.)
 // SUA 2026-10 theo xac nhan CUOI CUNG cua Duyen: POS (sheet "dữ liệu đơn", cot "Trạng thái đơn")
-// loai DUNG 3 trang thai "Hủy đơn", "Hoàn đơn", "Đang hoàn" (khop TOAN BO chuoi, khong dau/khong
-// phan biet hoa-thuong) — KHAC HOAN TOAN quy tac cua Base (chi "Thất bại", xem EXCLUDED_ORDER_STATUSES_
+// loai DUNG 4 trang thai "Hủy đơn", "Hoàn đơn", "Đã hoàn", "Đang hoàn" (khop TOAN BO chuoi, khong dau/khong
+// phan biet hoa-thuong; 'Đã hoàn' duoc Duyen xac nhan bo sung 2026-10-12 — ban 711bd52 lo bo mat) — KHAC HOAN TOAN quy tac cua Base (chi "Thất bại", xem EXCLUDED_ORDER_STATUSES_
 // o tren). Ham nay CHI duoc goi boi Bao cao B (+E che do Pos, F, G) — khong dung cho Base.
-var POS_EXCLUDED_ORDER_STATUSES_ = ['huy don', 'hoan don', 'dang hoan'];
+var POS_EXCLUDED_ORDER_STATUSES_ = ['huy don', 'hoan don', 'da hoan', 'dang hoan'];
 function _donHasExcludedStatus_(trangThaiCol) {
   var s = _stripVN_(trangThaiCol).trim();
   if (!s) return false;
