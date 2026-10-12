@@ -132,11 +132,12 @@ function broadcastQueueForCS_(csName) {
     return st === 'active' || st === 'paused';
   });
   // CS cham soc tung khach (CareData) -> extension chi gui khach cua CS dang chon
-  var csMap = {};
+  var csMap = {}, noPromoQ = {};   // noPromoQ: khach tich KHONG NHAN QUANG BA SAU khi chien dich da tao van bi bo khoi hang doi
   try {
     var careRowsQ = readCare_(getCrmSS_().getSheetByName(SH_CARE));
     for (var cqi = 0; cqi < careRowsQ.length; cqi++) {
       csMap[normPhone_(careRowsQ[cqi].phone)] = String(careRowsQ[cqi].cs || '').trim().toLowerCase();
+      if (careRowsQ[cqi].custom && careRowsQ[cqi].custom.noPromo) noPromoQ[normPhone_(careRowsQ[cqi].phone)] = true;
     }
   } catch (e) {}
   var out = [];
@@ -147,6 +148,7 @@ function broadcastQueueForCS_(csName) {
     }
     var pending = (b.phones || []).filter(function (p) {
       var np = normPhone_(p);
+      if (noPromoQ[np]) return false;
       return !b.sent || !b.sent[np];
     });
     if (pending.length) {
