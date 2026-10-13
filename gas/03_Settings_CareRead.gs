@@ -1008,6 +1008,52 @@ function batChanPancake() { return _enfSet_('pancake', true); }
 function tatChanPancake() { return _enfSet_('pancake', false); }
 function batChanKhac() { return _enfSet_('other', true); }
 function tatChanKhac() { return _enfSet_('other', false); }
+// ═══════════════════════════════════════════════════════════════
+//  BUOC 4c-1 (v13.46): CHI CHU SO HUU (admin Duyent) moi duoc SUA/XOA don o backend.
+//  Nguyen nhan goc: token hop le = moi vai tro goi duoc moi action, nen CS goi thang API van xoa/sua duoc don du UI da an nut.
+//  Danh sach chu so huu luu Script Properties 'ownerUsers' (mang username, KHONG nam trong sheet/code). Chua cai -> du phong = moi tai khoan role admin
+//  (khong doi hanh vi cu). Cai: chay datChuSoHuu('ten_dang_nhap') trong Editor; xem: xemChuSoHuu. Chi chan khi co token hop le
+//  (token thieu/het han do cong tac 4b xu ly) va KHONG chan khoa extension (extension dung `ek`, xem EXT_ALLOWED_).
+// ═══════════════════════════════════════════════════════════════
+var OWNER_ONLY_ACTIONS_ = { patchOrder: 1, deleteOrder: 1, deleteDuplicateOrders: 1, replaceOrders: 1, importSheetRows: 1, dedupeCare: 1 };
+function _ownerUsers_() {
+  var a = [];
+  try { a = JSON.parse(PropertiesService.getScriptProperties().getProperty('ownerUsers') || '[]') || []; } catch (e) { a = []; }
+  return a.map(function (x) { return String(x || '').trim().toLowerCase(); }).filter(Boolean);
+}
+function _isOwner_(user) {
+  if (!user) return false;
+  var owners = _ownerUsers_();
+  if (!owners.length) return user.role === 'admin';
+  return owners.indexOf(String(user.username || '').trim().toLowerCase()) !== -1;
+}
+function _ownerGate_(action, token) {
+  if (!OWNER_ONLY_ACTIONS_[action] || !token) return null;
+  try {
+    var u = _sessUser_(token);
+    if (u && !_isOwner_(u)) return { error: 'Chi quan tri vien chinh moi duoc sua/xoa don hang.', code: 'FORBIDDEN', action: action };
+  } catch (e) {}
+  return null;
+}
+function datChuSoHuu(username) {
+  var un = String(username || '').trim().toLowerCase();
+  if (!un) throw new Error('Nhap ten dang nhap: datChuSoHuu("ten_dang_nhap")');
+  var a = _ownerUsers_(); if (a.indexOf(un) < 0) a.push(un);
+  PropertiesService.getScriptProperties().setProperty('ownerUsers', JSON.stringify(a));
+  return xemChuSoHuu();
+}
+function xoaChuSoHuu(username) {
+  var un = String(username || '').trim().toLowerCase();
+  var a = _ownerUsers_().filter(function (x) { return x !== un; });
+  PropertiesService.getScriptProperties().setProperty('ownerUsers', JSON.stringify(a));
+  return xemChuSoHuu();
+}
+function xemChuSoHuu() {
+  var a = _ownerUsers_();
+  Logger.log(a.length ? 'Chu so huu (duoc sua/xoa don): ' + a.join(', ') : 'Chua cai chu so huu -> du phong: moi tai khoan role admin duoc sua/xoa don. Chay datChuSoHuu("ten_dang_nhap") de gioi han.');
+  return a;
+}
+
 // Bi mat ky token phien — dan vao bien Secret SESS_SECRET cua Cloudflare Worker de Worker chi phuc vu cache cho token hop le. KHONG dan vao chat/repo.
 function xemBiMatPhien() { Logger.log('SESS_SECRET = ' + _sessSecret_()); }
 

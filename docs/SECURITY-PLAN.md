@@ -46,3 +46,15 @@ Deploy lên không đổi hành vi nào. Bật chặn bằng công tắc theo ng
 
 ## Việc thủ công sau mỗi lần sửa
 Deploy lại GAS (dán `gas_v13.js` hoặc nút "Đồng bộ mã GAS mới nhất", rồi Deploy → New version) — nếu GAS cũ thì đăng nhập web báo "Máy chủ chưa hỗ trợ đăng nhập mới". Nên đổi mật khẩu các tài khoản yếu (hash cũ đã từng công khai) và cân nhắc để repo private.
+
+## Buoc 4c-1 - LAM (gas v13.46-owner-gate, 2026-10-13): CHI CHU SO HUU moi duoc SUA/XOA don
+- Nguyen nhan goc: token hop le = moi vai tro goi duoc moi action nen CS goi thang API van xoa/sua duoc don du UI da an nut. Them `_ownerGate_` (doGet + doPost, sau `_enforceCheck_`/`_featureGate_`) chan `OWNER_ONLY_ACTIONS_` = patchOrder, deleteOrder, deleteDuplicateOrders, replaceOrders, importSheetRows, dedupeCare voi token cua nguoi KHONG phai chu so huu (tra `FORBIDDEN`).
+- Chu so huu: Script Properties `ownerUsers` (mang username). Chay `datChuSoHuu("ten_dang_nhap")` (them), `xoaChuSoHuu`, `xemChuSoHuu` trong Apps Script Editor. CHUA cai -> du phong = moi tai khoan role admin (khong doi hanh vi cu, an toan khi deploy).
+- Chi chan khi co token hop le; thieu/het han token do cong tac 4b xu ly. Khoa extension (`ek`) KHONG qua gate nay.
+- Test: `node tools/test-roles.js` (phan 4c-1).
+
+## Viec tiep (4c-2, 4c-3) - CHUA LAM
+- [ ] **Quyet dinh can xac nhan:** extension Zalo dang goi `deleteDuplicateOrders` (zalo-content.js:1057, 1361) bang khoa `ek` va `EXT_ALLOWED_.zalo` cho phep -> CS van xoa don trung duoc qua extension. Neu muon chi Duyent xoa: bo `deleteDuplicateOrders` khoi `EXT_ALLOWED_.zalo` + an nut trong extension (can reload extension).
+- [ ] 4c-2: loc `customers`/`lookup`/`donOrdersByPhone`/`reminders` THEO CS o server (CS chi nhan khach cua minh theo logic `_inUserScope` o js/08-fn-invalidatefiltercache.js: careCS, assign, hoac CS phu trach don o.cs; ai co quyen khac thi theo vai tro/bo phan). Luu y Worker cache: action nay phai khoa cache theo user (them vao `GATED_ACTIONS` o cloudflare/worker.mjs).
+- [ ] 4c-3: dua cac action dang mo vao kiem soat: assign (GET), setSetting/getSetting khoa thuong, saveCannedResponse, saveMessageTemplate, deleteMessageTemplate, saveAIContext, csStats, findDuplicateOrders, addZaloNick.
+- [ ] Sau khi xong: bat cong tac chan 4b theo thu tu trong "Buoc 4b" (can bat thi 4c-1 moi het ke ho khi gui khong token).

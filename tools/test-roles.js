@@ -89,4 +89,27 @@ ctx._sessUser_=()=>{throw new Error('x');};ok(run('_featureGate_','salesReportA'
 ctx._sessUser_=t=>USERS[t]||null;
 setCfg({roles:[],deptPerms:{online:['tab-kh']}});
 ok(run('_featureGate_','salesReportA','tokCs')===null,'bo phan khong khop nguoi dung -> khong chan');
+// ===== BUOC 4c-1: chi chu so huu moi duoc sua/xoa don o backend =====
+{
+  let PROPS={};
+  ctx.PropertiesService={getScriptProperties:()=>({getProperty:k=>PROPS[k]===undefined?null:PROPS[k],setProperty:(k,v)=>{PROPS[k]=v;}})};
+  const US={tokD:{username:'Duyent',role:'admin'},tokA2:{username:'admin2',role:'admin'},tokC:{username:'cs1',role:'cs'},tokL:{username:'ld',role:'leader'}};
+  ctx._sessUser_=t=>US[t]||null;
+  // chua cai chu so huu -> du phong role admin
+  ok(run('_ownerGate_','deleteOrder','tokD')===null&&run('_ownerGate_','deleteOrder','tokA2')===null,'chua cai owner: moi admin duoc xoa don (nhu cu)');
+  ok(run('_ownerGate_','deleteOrder','tokC').code==='FORBIDDEN'&&run('_ownerGate_','patchOrder','tokL').code==='FORBIDDEN','CS / leader goi thang deleteOrder/patchOrder -> FORBIDDEN');
+  // cai owner = duyent (khong phan biet hoa thuong)
+  run('datChuSoHuu','Duyent');
+  ok(run('_ownerGate_','replaceOrders','tokD')===null,'owner duyent duoc sua/xoa');
+  ok(run('_ownerGate_','deleteDuplicateOrders','tokA2').code==='FORBIDDEN','admin khac KHONG phai owner -> bi chan');
+  for(const a of ['patchOrder','deleteOrder','deleteDuplicateOrders','replaceOrders','importSheetRows','dedupeCare']) ok(run('_ownerGate_',a,'tokC').code==='FORBIDDEN',a+' bi chan voi CS');
+  // action thuong cua CS khong bi chan
+  for(const a of ['saveSingle','customers','lookup','addCareLead','setOrderCareCS','saveTask','reminders']) ok(run('_ownerGate_',a,'tokC')===null,a+' van chay binh thuong voi CS');
+  ok(run('_ownerGate_','deleteOrder','')===null&&run('_ownerGate_','deleteOrder','tokSai')===null,'khong token / token sai: de cong tac 4b xu ly (khong chan o day)');
+  // doGet/doPost that su goi gate
+  ok(/_ownerGate_\(action, p\.token\)/.test(src)&&/_ownerGate_\(d0\.action, d0\.token\)/.test(src),'doGet va doPost deu goi _ownerGate_');
+  run('xoaChuSoHuu','duyent');
+  ok(run('_ownerGate_','deleteOrder','tokA2')===null,'xoa owner -> quay lai du phong role admin');
+}
+
 console.log(fail?'\nFAILED '+fail:'\nALL ROLES TESTS PASSED');process.exit(fail?1:0);

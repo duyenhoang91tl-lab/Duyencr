@@ -234,6 +234,8 @@ function doPost(e) {
     _ntlNote_('POST', d0.action, d0.token, d0.src, d0.ek);
     var _denP = _enforceCheck_(d0.action, d0.token, d0.ek, d0.src);
     if (_denP) return jsonOut_(_denP);
+    var _ownP = _ownerGate_(d0.action, d0.token);
+    if (_ownP) return jsonOut_(_ownP);
   }
   return doPostCore_(e);
 }

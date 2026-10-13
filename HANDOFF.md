@@ -118,3 +118,8 @@ Yeu cau cua Duyen: Chat noi bo hien thi duoc o cua so chat nho o goc duoi phai (
 
 - [x] B3 (12/10/2026, Duyên chốt công thức): tỷ lệ chốt Pancake = số đơn có NGƯỜI TẠO là sale trên Base (DT TỔNG cột B, trừ "Thất bại", chỉ ngày sale có dữ liệu Pancake) ÷ tổng tương tác Pancake (`_profCreatorOrders_`). KHÁC công thức của báo cáo KPI Pancake (đơn theo sale bán ÷ tongTT) — hỏi Duyên có muốn thống nhất không.
 - Chốt trong ngày (khách mới) = dhKhMoi ÷ khMoi; chốt khách cũ = dhKhCu ÷ khCu (cột "đơn hàng KH mới/cũ" của file Pancake theo từng nhân viên). Duyên muốn đếm theo TAG L5/L5.1/L5.2 và L9/L9.1/L9.2 nhưng PancakeTagStats chỉ có theo Page (không theo sale) nên chưa làm được đúng tag — đang dùng số đơn Pancake ghi nhận, giao diện có ghi chú. Cần hỏi Duyên: chấp nhận hay muốn đếm theo Page/team.
+
+## Phan quyen du lieu o backend - bao mat 4c (2026-10-13)
+- [x] 4c-1 gas v13.46-owner-gate: chi chu so huu (`ownerUsers`, mac dinh = role admin) moi sua/xoa don o backend. Chi tiet + viec tiep: docs/SECURITY-PLAN.md muc "Buoc 4c-1".
+- [ ] Can nguoi dung: cho biet username admin "Duyent" de chay `datChuSoHuu`; xac nhan co bo `deleteDuplicateOrders` khoi extension Zalo khong.
+- [ ] Tiep theo: 4c-2 (loc khach theo CS o server) roi 4c-3 (action dang mo).
