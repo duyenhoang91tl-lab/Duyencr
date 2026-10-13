@@ -10,6 +10,7 @@ function doGet(e) {
     return _demoClip_(doGetCore_(e), action);
   }
   if (MLIB_GET_ACTIONS_[action] === 1) return mlibDoGet_(action, p);   // thu vien anh/ghi am/mau tin: tu kiem token
+  if (KHD_GET_ACTIONS_[action] === 1) return khdDoGet_(p);   // thao luan khach (noi bo): tu kiem token
   if (CHAT_GET_ACTIONS_[action] === 1) return chatDoGet_(action, p);   // chat noi bo: tu kiem token, khong qua doGetCore_
   _ntlNote_('GET', action, p.token, p.src, p.ek);
   var _denG = _enforceCheck_(action, p.token, p.ek, p.src);
@@ -415,7 +416,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.42-roles' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.43-kh-discuss' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──

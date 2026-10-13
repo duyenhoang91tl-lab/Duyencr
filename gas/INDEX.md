@@ -126,3 +126,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hàm: `_mlibUser_`, `_mlibSheet_`, `_mlibFolder_`, `_mlibUrl_`, `_mlibClean_`, `_mlibDriveId_`, `_mlibRow_`, `_mlibAppend_`, `mlibList_`, `mlibUpload_`, `mlibAddDrive_`, `mlibSaveTpl_`, `mlibDelete_`, `mlibDoGet_`, `mlibDoPost_`
 - Hằng/biến: `SH_MLIB_`, `MLIB_HEADERS_`, `MLIB_TYPES_`, `MLIB_MAX_BYTES_`, `MLIB_GET_ACTIONS_`, `MLIB_POST_ACTIONS_`
 
+## 30_KhDiscuss.gs
+- Hàm: `_khdPhone_`, `_khdSheet_`, `_khdMsg_`, `khdList_`, `khdSend_`, `khdDelete_`, `khdDoGet_`, `khdDoPost_`
+- Hằng/biến: `SH_KHD_`, `KHD_HEADERS_`, `KHD_MAX_TEXT_`, `KHD_LIMIT_`, `KHD_TAIL_ROWS_`, `KHD_RATE_MS_`, `KHD_GET_ACTIONS_`, `KHD_POST_ACTIONS_`
+
