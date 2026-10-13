@@ -647,6 +647,43 @@
   background: #eff6ff;
 }
 
+#pk-price-ai {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+  color: #0f172a;
+}
+
+.pk-price-ai-txt {
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+
+.pk-price-ai-foot, .pk-price-ai-sg {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #1e3a8a;
+}
+
+.pk-price-ai-err {
+  color: #b91c1c;
+  font-size: 12px;
+}
+
+.pk-price-ai-copy, .pk-price-ai-chip {
+  margin-left: 4px;
+  padding: 2px 8px;
+  border: 1px solid #2563eb;
+  background: #fff;
+  color: #2563eb;
+  border-radius: 12px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
 #pk-price-result {
   max-height: 200px;
   overflow-y: auto;

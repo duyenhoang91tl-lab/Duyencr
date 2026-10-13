@@ -403,7 +403,9 @@
                 <div id="pk-price-row">
                   <input type="text" id="pk-price-q" placeholder="Tên sản phẩm, kiểu/size..." />
                   <button id="pk-price-btn">Tìm</button>
+                  <button id="pk-price-ai-btn" type="button" title="Hỏi AI về giá — trả lời văn ngắn (giá lấy từ bảng giá)">🤖 Hỏi AI</button>
                 </div>
+                <div id="pk-price-ai" style="display:none"></div>
                 <div id="pk-price-result"></div>
               </div>
               <div id="pk-price-builder-mode" style="display:none">
@@ -657,6 +659,7 @@
     });
     panelEl.querySelector("#pk-rem-refresh").addEventListener("click", () => loadReminders_());
     panelEl.querySelector("#pk-price-btn").addEventListener("click", doPriceSearch_);
+    panelEl.querySelector("#pk-price-ai-btn").addEventListener("click", askPriceAi_);
     panelEl.querySelector("#pk-price-q").addEventListener("keydown", (e) => {
       if (e.key === "Enter") doPriceSearch_();
     });
@@ -2704,6 +2707,37 @@
   }
 
   let _lastPriceRows = []; let _lastPriceQ = '';
+
+  // ── HỎI AI VỀ GIÁ (văn ngắn): GAS action 'priceQa' — giá lấy từ bảng giá DANH_MUC, AI chỉ diễn đạt lại ngắn gọn ──
+  let _priceAiSeq = 0;
+  function askPriceAi_() {
+    const q = (panelEl.querySelector('#pk-price-q').value || '').trim();
+    const box = panelEl.querySelector('#pk-price-ai');
+    box.style.display = '';
+    if (!q) { box.innerHTML = '<div class="pk-price-loading">Gõ câu hỏi về giá trước (vd: giá nhẫn bạc trơn size 12).</div>'; return; }
+    const seq = ++_priceAiSeq;
+    box.innerHTML = '<div class="pk-price-loading">🤖 Đang hỏi AI…</div>';
+    safeSendMessage_({ type: 'ASK_PRICE', payload: { q } }, (resp) => {
+      if (seq !== _priceAiSeq) return;   // đã hỏi câu khác trong lúc chờ
+      if (!resp?.ok) { box.innerHTML = `<div class="pk-price-ai-err">⚠ ${escapeHtml(resp?.error || 'không rõ')}</div>`; return; }
+      const d = resp.data || {};
+      if (!d.found) {
+        const sg = (d.suggestions || []).slice(0, 8);
+        box.innerHTML = '<div class="pk-price-ai-txt">Chưa tìm thấy sản phẩm khớp rõ trong bảng giá. Gõ rõ TÊN sản phẩm (kèm chất liệu / size nếu có).</div>' +
+          (sg.length ? '<div class="pk-price-ai-sg">Có thể bạn muốn hỏi: ' + sg.map((x) => `<button type="button" class="pk-price-ai-chip" data-s="${escapeHtml(x)}">${escapeHtml(x)}</button>`).join(' ') + '</div>' : '');
+        box.querySelectorAll('.pk-price-ai-chip').forEach((b) => b.addEventListener('click', () => {
+          panelEl.querySelector('#pk-price-q').value = b.getAttribute('data-s') || ''; askPriceAi_();
+        }));
+        return;
+      }
+      box.innerHTML = `<div class="pk-price-ai-txt">${escapeHtml(d.text)}</div>` +
+        `<div class="pk-price-ai-foot">Giá lấy từ bảng giá DANH_MUC${d.provider ? ' · AI: ' + escapeHtml(d.provider) : ''}${d.aiError ? ' · ⚠ AI đang lỗi nên hiện danh sách giá gốc' : ''} <button type="button" class="pk-price-ai-copy">📋 Copy</button></div>`;
+      const cp = box.querySelector('.pk-price-ai-copy');
+      cp.addEventListener('click', () => {
+        try { navigator.clipboard.writeText(d.text).then(() => { cp.textContent = '✓ Đã copy'; }).catch(() => { cp.textContent = 'Không copy được'; }); } catch (e) { cp.textContent = 'Không copy được'; }
+      });
+    });
+  }
 
   function doPriceSearch_() {
     const q = (panelEl.querySelector('#pk-price-q').value || '').trim();

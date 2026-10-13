@@ -337,6 +337,7 @@ function doPostCore_(e) {
     // Xac thuc tai khoan (Pancake AI doi CS) — kiem tra mat khau PHIA SERVER, khong tra passHash ve client
     if (action === 'verifyLogin')          return verifyLogin_(data.username, data.password);
     if (action === 'ai')                  return callGroqAI_(data);
+    if (action === 'priceQa')             return jsonOut_(priceQa_(data.q || data.prompt));   // Pancake AI: nhan vien hoi gia, tra loi van ngan
     // ── BROADCAST: tao/cap nhat 1 chien dich gui tin hang loat ──
     if (action === 'saveBroadcast')        return saveBroadcast_(data.broadcast || data);
     // ── BROADCAST: danh dau 1 SDT da gui/loi/bo qua trong 1 chien dich ──

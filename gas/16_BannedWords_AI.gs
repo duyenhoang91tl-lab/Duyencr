@@ -91,6 +91,32 @@ function priceAsk_(q) {
   }
   return { ok: true, found: false, suggestions: names };
 }
+// Prompt he thong cho cau hoi GIA cua NHAN VIEN (Pancake AI "Hoi AI"): van ngan, CHI dung bang gia that, cam bia.
+function _priceQaSystemPrompt_(q) {
+  var info = '';
+  try { info = _priceVariantsForPrompt_(String(q || '')); } catch (e) {}
+  return 'Ban la tro ly ban hang noi bo cua team, tra loi NHAN VIEN SALE ve gia san pham. Tieng Viet, than thien, VAN NGAN: toi da 3 cau (khoang 60 tu), khong tieu de, khong danh so, khong giai thich them. ' +
+    'Neu co NHIEU lua chon chat lieu/size thi moi lua chon 1 dong ngan (chat lieu - size - gia), roi hoi nhan vien khach chon loai nao.' +
+    '\n\nBANG GIA CHINH THUC (nguon: Sheet DANH_MUC cua team — CHI dung so lieu trong day, TUYET DOI KHONG bia gia hay suy ra gia khac):\n' + String(info).slice(0, 3500) +
+    '\n\nQUY TAC: Gia trong bang tinh bang NGHIN VND (vd 2.310 = 2.310.000d) — hay quy ra dong cho de hieu. ' +
+    'Bang da duoc loc san theo loai da (SAPHIA/RUBY) neu cau hoi co nhac; neu khong nhac thi chi la gia MAC DINH, cu the vay ma bao, khong hoi lai ve loai da. ' +
+    'Neu cau hoi chua noi ro chat lieu/size thi liet ke DU cac truong hop trong bang, khong tu chon 1 muc.';
+}
+// POST action=priceQa { q } — nhan vien hoi gia, tra loi VAN NGAN. Gia luon lay tu bang gia (priceAsk_). Chi goi AI khi TIM THAY san pham (khong
+// ton token / khong co co hoi bia gia khi khong co du lieu). AI loi (het quota/429...) -> tra danh sach gia CHINH XAC thay vi bao loi.
+function priceQa_(q) {
+  var base = priceAsk_(q);
+  if (!base.ok) return base;
+  if (!base.found) return { ok: true, found: false, suggestions: base.suggestions || [], text: '' };
+  var fallback = 'Giá theo bảng giá (nghìn đồng — vd 2.310 = 2.310.000đ):\n' + base.text;
+  try {
+    var o = JSON.parse(callAI_({ prompt: String(q).replace(/\s+/g, ' ').trim().slice(0, 200), priceQa: true }).getContent());
+    if (o && o.ok && o.text) return { ok: true, found: true, text: String(o.text).trim(), provider: o.provider || '', base: base.text, unit: base.unit };
+    return { ok: true, found: true, text: fallback, aiError: String((o && o.error) || 'AI khong tra loi').slice(0, 300), base: base.text, unit: base.unit };
+  } catch (e) {
+    return { ok: true, found: true, text: fallback, aiError: String(e && e.message || e).slice(0, 300), base: base.text, unit: base.unit };
+  }
+}
 // Khoi bang gia noi them vao prompt he thong cua tro ly (crmAsk) khi client bao withPrices — de AI (engine 'ai') cung chi dung so lieu that.
 function _crmAskPriceBlock_(q) {
   var info = '';
@@ -208,8 +234,9 @@ function callAI_(data) {
   if (!userMsg) return jsonOut_({ error: 'Thieu noi dung' });
   var isCrmAsk = !!data.crmAsk;
   if (isCrmAsk && userMsg.length > 9000) return jsonOut_({ error: 'Cau hoi + ngu canh qua dai (toi da 9000 ky tu)' });
-  var withProducts = isCrmAsk ? false : !!data.withProducts;
-  var sys = isCrmAsk ? _crmAskSystemPrompt_() : _buildAISystemPrompt_(userMsg, withProducts);
+  var withProducts = (isCrmAsk || data.priceQa) ? false : !!data.withProducts;
+  var isPriceQa = !isCrmAsk && !!data.priceQa;   // nhan vien hoi gia (Pancake AI): prompt rieng, van ngan, chi dung bang gia that
+  var sys = isCrmAsk ? _crmAskSystemPrompt_() : (isPriceQa ? _priceQaSystemPrompt_(userMsg) : _buildAISystemPrompt_(userMsg, withProducts));
   if (isCrmAsk && data.withPrices) sys += _crmAskPriceBlock_(data.priceQuery || '');   // hoi gia: kem bang gia that (khong bia)
 
   // LUU Y (2026-09-13): llama-3.3-70b-versatile bi Groq NGUNG HO TRO tu 16/8/2026

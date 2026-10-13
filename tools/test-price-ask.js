@@ -61,6 +61,28 @@ let g = e.out(e.run("doGet({parameter:{action:'priceAsk', q:'giá nhẫn bạc t
 ok(g.ok && g.found && /450/.test(g.text), 'doGet action=priceAsk: ' + JSON.stringify(g).slice(0, 200));
 g = e.out(e.run("doGet({parameter:{action:'priceAsk'}})")); ok(g.ok === false && /Thieu/.test(g.error), 'doGet thieu q');
 
+// ── priceQa_ (Pancake AI "Hoi AI": van ngan) ──
+e = makeEnv(); let aiCalls = 0, aiMode = 'ok';
+e.ctx._aiOpenAICompat_ = (pv, sys, msg) => { aiCalls++; e.sys = sys; e.msg = msg; if (aiMode === 'throw') throw new Error('mat mang'); return aiMode === 'ok' ? { ok: true, text: 'Nhẫn Bạc Trơn size 12 giá 450.000đ ạ.' } : { ok: false, error: '429 rate limit' }; };
+r = e.run("priceQa_('giá nhẫn bạc trơn')");
+ok(r.ok && r.found && r.text === 'Nhẫn Bạc Trơn size 12 giá 450.000đ ạ.' && r.provider === 'Groq' && /450/.test(r.base) && !r.aiError && aiCalls === 1, 'tim thay -> AI tra loi van ngan: ' + JSON.stringify(r));
+ok(/toi da 3 cau/.test(e.sys) && /BANG GIA CHINH THUC/.test(e.sys) && /450/.test(e.sys) && /KHONG bia gia/.test(e.sys) && !/SAN PHAM:|QUY TRINH CSKH|MAU TIN NHAN/.test(e.sys) && e.msg === 'giá nhẫn bạc trơn', 'prompt rieng: van ngan + bang gia that + cam bia; KHONG keo kien thuc/FAQ cua luong tra loi khach');
+aiCalls = 0; r = e.run("priceQa_('giá xe máy')"); ok(r.ok && !r.found && r.suggestions.length === 0 && aiCalls === 0, 'khong co san pham -> KHONG goi AI (khong ton token, khong co hoi bia)');
+aiCalls = 0; r = e.run("priceQa_('giá nhẫn')"); ok(r.ok && !r.found && r.suggestions[0] === 'Nhẫn Bạc Trơn' && aiCalls === 0, 'chi 1 tu khoa -> goi y ten, khong goi AI');
+aiMode = 'err'; r = e.run("priceQa_('giá nhẫn bạc trơn')");
+ok(r.ok && r.found && /450/.test(r.text) && /nghìn đồng/.test(r.text) && /429/.test(r.aiError), 'AI loi (429) -> tra DANH SACH GIA CHINH XAC thay vi bao loi: ' + JSON.stringify(r).slice(0, 250));
+aiMode = 'throw'; r = e.run("priceQa_('giá nhẫn bạc trơn')"); ok(r.ok && r.found && /450/.test(r.text) && /mat mang/.test(r.aiError), 'AI nem loi -> van tra gia chinh xac');
+r = e.run("priceQa_('  ')"); ok(!r.ok && /Thieu/.test(r.error), 'q rong');
+e = makeEnv({ cat: [] }); r = e.run("priceQa_('giá nhẫn bạc trơn')"); ok(!r.ok && /rong|chua doc/.test(r.error), 'bang gia rong -> bao ro');
+e = makeEnv(); e.props = { apiGroq: '' }; e.ctx.getSetting_ = k => ''; r = e.run("priceQa_('giá nhẫn bạc trơn')");
+ok(r.ok && r.found && /450/.test(r.text) && /API Key/.test(r.aiError), 'chua co API key nao -> van tra bang gia, noi ro vi sao AI khong chay');
+// route doPost
+e = makeEnv(); e.ctx._aiOpenAICompat_ = () => ({ ok: true, text: 'ngan' });
+let po = e.out(e.run("doPost({postData:{contents: JSON.stringify({action:'priceQa', q:'giá nhẫn bạc trơn'})}})"));
+ok(po.ok && po.found && po.text === 'ngan', 'doPost action=priceQa: ' + JSON.stringify(po).slice(0, 200));
+// luong tra loi KHACH khong doi (khong co co priceQa)
+e.sys = null; e.out(e.run("callAI_({prompt:'khách hỏi giá nhẫn bạc trơn', withProducts:false})")); ok(!/toi da 3 cau/.test(e.sys || ''), 'callAI_ khach binh thuong khong dung prompt priceQa');
+
 // ───────────────── CLIENT ─────────────────
 const els = {}; const el = id => els[id] || (els[id] = { id, value: '', innerHTML: '', placeholder: '', scrollTop: 0, classList: { toggle() {}, contains: () => false, add() {}, remove() {} }, querySelectorAll: () => [] });
 const fetches = []; let fetchImpl = async () => ({ json: async () => ({ ok: true, found: true, text: 'SẢN PHẨM: X\n- Chất liệu: Bạc | Giá bán: 450', unit: 'nghin' }) });

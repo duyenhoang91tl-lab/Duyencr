@@ -141,6 +141,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // Nhan vien hoi AI ve gia -> tra loi van ngan (xem handleAskPrice)
+  if (msg?.type === "ASK_PRICE") {
+    handleAskPrice(msg.payload)
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
   // Soan 1 trong 3 "cau mo dau" chu dong (goc nhin khac nhau) — giong het OPENER_ANGLES ben
   // Zalo AI. Dung khi CS muon chu dong nhan truoc cho khach (khong phai tra loi tin khach gui).
   if (msg?.type === "FETCH_OPENER") {
@@ -1058,6 +1066,27 @@ async function handleGetPrice(payload) {
   const data = await res.json();
   if (data.error) throw new Error(data.error);
   return { rows: data.rows || [], total: data.total || 0 };
+}
+
+// Hoi AI ve GIA (van ngan) — GAS action:'priceQa' (POST). Gia luon lay tu bang gia DANH_MUC (backend), AI chi dien dat lai ngan gon;
+// khong tim thay san pham thi backend KHONG goi AI (tra goi y ten); AI loi thi backend tra danh sach gia chinh xac (aiError). Luon di qua GAS
+// (can doc Sheet gia) — KHONG dung AI rieng cua CS (aiProvider/aiApiKey) vi AI rieng khong co du lieu gia.
+async function handleAskPrice(payload) {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+  const q = String(payload?.q || "").trim().slice(0, 200);
+  if (!q) throw new Error("Thiếu câu hỏi.");
+  let data;
+  try {
+    const res = await fetch(cfg.gasUrl, { method: "POST", body: JSON.stringify({ action: "priceQa", q }), headers: { "Content-Type": "text/plain" } });
+    data = await res.json();
+  } catch (e) { throw new Error("Không gọi được GAS: " + e.message); }
+  if (!data || data.ok === false || data.error) {
+    const err = String((data && (data.error || data.message)) || "Lỗi GAS không rõ");
+    throw new Error(/unknown action|priceQa/i.test(err) ? err + " (GAS chưa lên bản có 'Hỏi AI về giá' — chờ deploy xong rồi thử lại)" : err);
+  }
+  return { found: !!data.found, text: data.text || "", provider: data.provider || "", aiError: data.aiError || "", suggestions: Array.isArray(data.suggestions) ? data.suggestions : [] };
 }
 
 // Tra cuu CTKM theo tu khoa — action:'ctkmSearch' (GET, chi doc). Cung co che voi
