@@ -15,3 +15,7 @@ Chạy trên `chat.zalo.me`. File: `zalo-content.js` (~2800 dòng), `zalo-conten
 
 ## Storage & quyền
 Xem `07-reference-tables.md` (key `ome_*` trong storage.local; quyền manifest).
+
+## 💰 Tìm sản phẩm & tin nhắn gợi ý (2026-10-13) — dùng được KHÔNG cần API key
+Khung `#zai-price-wrap` (trước là "Tra cứu bảng giá"): gõ tên sản phẩm + **Tìm** (hoặc Enter) → `doPriceSearchZai_` chạy SONG SONG `action=priceSearch` (DANH_MUC) và `action=messageTemplates` (thư viện mẫu tin nhắn, cùng nguồn với CRM tab Zalo AI và Pancake AI; chỉ lấy mẫu `status==='approved'`, cache 60 giây). `renderPriceRowsZai_(rows, q, tpls)`: mỗi dòng sản phẩm kèm tối đa 3 mẫu có "sản phẩm áp dụng" (≥3 ký tự, so không dấu) xuất hiện trong chữ của dòng; mẫu khớp từ khoá nhưng chưa gắn sản phẩm nào (VD chủ đề "khách hỏi giá") hiện ở mục "💬 Tin nhắn gợi ý". Xếp hạng y hệt CRM `tplSearch` (sản phẩm 5, chủ đề 3, tag 3, tiêu đề 2, nội dung 1; mọi từ phải khớp ≥1 trường). Mỗi mẫu có **↳ Dán vào ô chat** (`fillZaloInput_`: chỉ ĐIỀN bằng `insertText`, KHÔNG bấm Gửi — CS đọc lại rồi tự gửi; không thấy ô chat thì copy clipboard) và **📋 Copy**. Lỗi tải mẫu không làm hỏng danh sách sản phẩm.
+Khi `✨ Tạo gợi ý phản hồi` lỗi (chưa có key / hết lượt 429 / lỗi mạng) → `_zaiAiFallbackHint_` hiện nhắc + nút "🔎 Tìm sản phẩm & tin nhắn mẫu" (điền sẵn ô tìm bằng ô ngữ cảnh rồi tìm luôn). Test: `node tools/test-zalo-tpl-suggest.js` (cần jsdom). Pancake AI đã có tab "Mẫu tin nhắn" + "Tra cứu bảng giá" riêng (CHƯA gộp thành 1 nút Tìm như Zalo).
