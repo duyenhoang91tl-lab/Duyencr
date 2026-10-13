@@ -2837,6 +2837,52 @@ function _pancakeKnownSaleNameSet_() {
 // khong bao gio khop. PancakeNameMap da co san anh xa 2 chieu nay (dung cho Bao cao tuong tac/SDT
 // Pancake) — tai su dung de MO RONG moi ten trong bo loc thanh ca chinh no LAN cac username
 // Pancake da tung khop voi ten do, truoc khi dem so sanh voi "Thẻ".
+// Tên Sale của CÙNG 1 NGƯỜI (tài khoản gắn nhiều tên, vd thuthuy95 + thuthuy1995): fold tên → mọi tên cùng người.
+// Nguồn: cột "names" của sheet Users (admin gắn trong 🔑 Tài khoản). Dùng để bộ lọc Sale/Team và bảng "Theo Team" của
+// mọi báo cáo nhận ra các tên khác nhau của 1 người (Base ghi tên này, Pos ghi tên kia) thay vì coi là 2 người.
+function _userAliasGroups_() {
+  var map = {};
+  try {
+    readUsers_(getCrmSS_().getSheetByName(SH_USER)).forEach(function(u) {
+      var all = [];
+      (u.names || []).concat([u.name]).forEach(function(n) { n = String(n || '').trim(); if (n && all.indexOf(n) === -1) all.push(n); });
+      if (all.length < 2) return;
+      all.forEach(function(n) {
+        var k = _normTxt_(n), cur = map[k] || [];
+        all.forEach(function(x) { if (cur.indexOf(x) === -1) cur.push(x); });
+        map[k] = cur;
+      });
+    });
+  } catch (e) {}
+  return map;
+}
+// Trả hàm (tên sale bất kỳ) → tên Team; tìm theo chính tên đó, rồi theo MỌI tên khác của cùng người, rồi theo bảng khớp tên Pancake.
+// Thành viên Team gồm cả leader (giống tab Quản lý Team). Không tìm ra → unassigned.
+function _makeTeamResolver_(unassigned) {
+  var teamFold = {};
+  readTeams_(getCrmSS_().getSheetByName(SH_TEAM)).forEach(function(t) {
+    [t.leader].concat(t.members || []).forEach(function(u) { if (u) teamFold[_normTxt_(u)] = t.name; });
+  });
+  var groups = _userAliasGroups_();
+  var pk = readPancakeMap_(), pkFold = {};
+  Object.keys(pk).forEach(function(n) { pkFold[_normTxt_(n)] = pk[n]; });
+  return function(raw) {
+    var f = _normTxt_(raw);
+    if (teamFold[f]) return teamFold[f];
+    var al = groups[f] || [];
+    for (var i = 0; i < al.length; i++) { var t1 = teamFold[_normTxt_(al[i])]; if (t1) return t1; }
+    var mapped = pkFold[f];
+    if (mapped) {
+      var cands = String(mapped).split('|').map(function(x) { return x.trim(); }).filter(Boolean);
+      for (var j = 0; j < cands.length; j++) {
+        var t2 = teamFold[_normTxt_(cands[j])]; if (t2) return t2;
+        var al2 = groups[_normTxt_(cands[j])] || [];
+        for (var k = 0; k < al2.length; k++) { var t3 = teamFold[_normTxt_(al2[k])]; if (t3) return t3; }
+      }
+    }
+    return unassigned;
+  };
+}
 function _expandSaleFilterWithPancakeAliases_(names) {
   if (!names || !names.length) return names;
   var map = readPancakeMap_(); // pancakeName -> saleName (co the "saleA|saleB")
@@ -2846,6 +2892,12 @@ function _expandSaleFilterWithPancakeAliases_(names) {
   Object.keys(map).forEach(function(pancakeName) {
     var saleNames = String(map[pancakeName] || '').split('|').map(function(s){ return s.trim(); }).filter(Boolean);
     if (saleNames.some(function(sn) { return foldIn[_normTxt_(sn)]; })) out.push(pancakeName);
+  });
+  // Thêm mọi tên khác của cùng 1 người (tài khoản nhiều tên) — cả tên vừa chọn lẫn tên Pancake vừa thêm ở trên.
+  var _grp = _userAliasGroups_(), _seenF = {};
+  out.forEach(function(n) { _seenF[_normTxt_(n)] = true; });
+  out.slice().forEach(function(n) {
+    (_grp[_normTxt_(n)] || []).forEach(function(a) { var k = _normTxt_(a); if (!_seenF[k]) { _seenF[k] = true; out.push(a); } });
   });
   return out;
 }
@@ -3846,6 +3898,8 @@ function buildSalesReportA_(filters) {
   // nua, ma tinh TRON VEN cho DUNG 1 nguoi — lay tu cot "Người tạo" that su cua DT TONG (khac
   // voi "Sale bán", co the co nhieu ten). Bo tich (mac dinh): giu nguyen cach chia deu cu.
   var byCreator = !!filters.byCreator;
+  // Bộ lọc Sale: mở rộng sang mọi tên cùng 1 người (tài khoản nhiều tên) + tên Pancake, so không phân biệt hoa/thường.
+  var saleFilterFoldA = _expandSaleFilterWithPancakeAliases_(saleFilterArr).map(_normTxt_);
 
   var rows = readDTTong_();
   var matched = [];
@@ -3856,7 +3910,7 @@ function buildSalesReportA_(filters) {
     if (_isExcludedOrderStatus_(row.trangThai)) continue; // bo don Huy/Tra lai/Hoan tien/Thai bai/Khieu nai (Quy che thu lao Sale)
     if (kenhFilterArr.length && kenhFilterArr.indexOf(row.kenhBan) === -1) continue;
     var salesOnOrder = splitMulti_(row.saleBan, ',');
-    if (saleFilterArr.length && !salesOnOrder.some(function(s){ return saleFilterArr.indexOf(s) !== -1; })) continue;
+    if (saleFilterFoldA.length && !salesOnOrder.some(function(s){ return saleFilterFoldA.indexOf(_normTxt_(s)) !== -1; })) continue;
     if (!_pMatchAny_(row.sanPham, sanPhamTerms)) continue;
     matched.push(row);
   }
@@ -3868,11 +3922,8 @@ function buildSalesReportA_(filters) {
   var UNASSIGNED = '(chưa gán sale)';
 
   // Team Sale: sale -> ten team (readTeams_ dung chung voi tab "Quan ly Team")
-  var saleTeamMap = {}; // ten sale (username) -> ten team
-  readTeams_(getCrmSS_().getSheetByName(SH_TEAM)).forEach(function(t) {
-    (t.members || []).forEach(function(u) { saleTeamMap[u] = t.name; });
-  });
   var UNASSIGNED_TEAM = '(chưa có Team)';
+  var _teamOfA_ = _makeTeamResolver_(UNASSIGNED_TEAM);   // theo NGƯỜI: tên này hoặc bất kỳ tên nào cùng tài khoản nằm trong Team
   var byTeamSale = {};
 
   for (var j = 0; j < matched.length; j++) {
@@ -3900,7 +3951,7 @@ function buildSalesReportA_(filters) {
       bySale[creatorName].coc += m.giaTriCoc;
       bySale[creatorName].giaTri += revenue;
 
-      var creatorTeam = saleTeamMap[creatorName] || UNASSIGNED_TEAM;
+      var creatorTeam = _teamOfA_(creatorName);
       if (!byTeamSale[creatorTeam]) byTeamSale[creatorTeam] = { orders: 0, coc: 0, giaTri: 0 };
       byTeamSale[creatorTeam].orders += 1;
       byTeamSale[creatorTeam].coc += m.giaTriCoc;
@@ -3919,7 +3970,7 @@ function buildSalesReportA_(filters) {
         bySale[sName].coc += m.giaTriCoc / n;       // tien: chia deu cho N sale
         bySale[sName].giaTri += revenue / n;
 
-        var tName = saleTeamMap[sName] || UNASSIGNED_TEAM;
+        var tName = _teamOfA_(sName);
         if (!byTeamSale[tName]) byTeamSale[tName] = { orders: 0, coc: 0, giaTri: 0 };
         byTeamSale[tName].coc += m.giaTriCoc / n;
         byTeamSale[tName].giaTri += revenue / n;
@@ -4775,32 +4826,7 @@ function buildSalesReportB_(filters) {
   // Kenh/Page" (can khop PancakePageMap) cho Bao cao B — phan nay co chu dinh BO QUA, xem ghi
   // chu o cuoi ham.
   var UNASSIGNED_TEAM = '(chưa có Team)';
-  var saleTeamMap = {}; // ten sale (username) -> ten team — dung chung voi tab "Quan ly Team"
-  readTeams_(getCrmSS_().getSheetByName(SH_TEAM)).forEach(function(t) {
-    (t.members || []).forEach(function(u) { saleTeamMap[u] = t.name; });
-  });
-  // Khop fold-insensitive (giong _expandSaleFilterWithPancakeAliases_/_normTxt_ da dung o bo
-  // loc Team phia tren) + tra qua readPancakeMap_ khi ten tren "Thẻ" la username Pancake (vd
-  // "ninhnga99") khac voi ten chuan trong Team (vd "Ngà") — neu khong se rot het vao "(chưa có
-  // Team)" oan du ho da duoc gan Team day du, dung HET nguyen nhan ma commit fix loc Team vua nêu.
-  var saleTeamMapFold_ = {};
-  Object.keys(saleTeamMap).forEach(function(u) { saleTeamMapFold_[_normTxt_(u)] = saleTeamMap[u]; });
-  var pancakeMapB_ = readPancakeMap_(); // pancakeName -> "saleA|saleB"
-  var pancakeMapFoldB_ = {};
-  Object.keys(pancakeMapB_).forEach(function(pn) { pancakeMapFoldB_[_normTxt_(pn)] = pancakeMapB_[pn]; });
-  function _resolveTeamForSaleB_(rawName) {
-    var fold = _normTxt_(rawName);
-    if (saleTeamMapFold_[fold]) return saleTeamMapFold_[fold];
-    var mapped = pancakeMapFoldB_[fold];
-    if (mapped) {
-      var cands = String(mapped).split('|').map(function(s){ return s.trim(); }).filter(Boolean);
-      for (var ci = 0; ci < cands.length; ci++) {
-        var t = saleTeamMapFold_[_normTxt_(cands[ci])];
-        if (t) return t;
-      }
-    }
-    return UNASSIGNED_TEAM;
-  }
+  var _resolveTeamForSaleB_ = _makeTeamResolver_(UNASSIGNED_TEAM);   // theo NGƯỜI (nhiều tên) + bảng khớp tên Pancake
   var byTeamSale = {}; // ten team -> { orders, giaTri, cod }
   var bySaleDay = {};  // CHI khi filters.withDaily (v13.24, ho so nhan su): ten sale -> { 'YYYY-MM-DD': [soDon, giaTri] } — cung quy uoc chia fr nhu bySale
   var byNguon = {};    // nguon don -> { orders, giaTri, cod } — tuong duong "Theo Kenh ban" cua Bao cao A
@@ -5717,6 +5743,7 @@ function buildSalesReportC_(filters) {
   var kpiMap = readKPITargets_();
   var UNASSIGNED = '(chưa gán sale)';
   var saleFilterArr = Array.isArray(filters.sale) ? filters.sale.filter(function(s){return s;}) : [];
+  var saleFilterFoldC = _expandSaleFilterWithPancakeAliases_(saleFilterArr).map(_normTxt_);
   var kenhFilterArr = Array.isArray(filters.kenh) ? filters.kenh.filter(function(s){return s;}) : [];
   var sanPhamTerms = _foldTermsCSV_(filters.sanPham);
   // Giong het quy uoc "Tinh theo nguoi tao don" cua buildSalesReportA_: tich thi tinh TRON VEN
@@ -5737,7 +5764,7 @@ function buildSalesReportC_(filters) {
       if (_isExcludedOrderStatus_(row.trangThai)) continue; // bo don Huy/Tra lai/Hoan tien/Thai bai/Khieu nai (Quy che thu lao Sale)
       if (kenhFilterArr.length && kenhFilterArr.indexOf(row.kenhBan) === -1) continue;
       var salesOnRow = splitMulti_(row.saleBan, ',');
-      if (saleFilterArr.length && !salesOnRow.some(function(s){ return saleFilterArr.indexOf(s) !== -1; })) continue;
+      if (saleFilterFoldC.length && !salesOnRow.some(function(s){ return saleFilterFoldC.indexOf(_normTxt_(s)) !== -1; })) continue;
       if (!_pMatchAny_(row.sanPham, sanPhamTerms)) continue;
       matchedOrders.push(row);
       var kName = row.kenhBan || '(chưa có kênh)';

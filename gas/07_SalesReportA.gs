@@ -238,6 +238,8 @@ function buildSalesReportA_(filters) {
   // nua, ma tinh TRON VEN cho DUNG 1 nguoi — lay tu cot "Người tạo" that su cua DT TONG (khac
   // voi "Sale bán", co the co nhieu ten). Bo tich (mac dinh): giu nguyen cach chia deu cu.
   var byCreator = !!filters.byCreator;
+  // Bộ lọc Sale: mở rộng sang mọi tên cùng 1 người (tài khoản nhiều tên) + tên Pancake, so không phân biệt hoa/thường.
+  var saleFilterFoldA = _expandSaleFilterWithPancakeAliases_(saleFilterArr).map(_normTxt_);
 
   var rows = readDTTong_();
   var matched = [];
@@ -248,7 +250,7 @@ function buildSalesReportA_(filters) {
     if (_isExcludedOrderStatus_(row.trangThai)) continue; // bo don Huy/Tra lai/Hoan tien/Thai bai/Khieu nai (Quy che thu lao Sale)
     if (kenhFilterArr.length && kenhFilterArr.indexOf(row.kenhBan) === -1) continue;
     var salesOnOrder = splitMulti_(row.saleBan, ',');
-    if (saleFilterArr.length && !salesOnOrder.some(function(s){ return saleFilterArr.indexOf(s) !== -1; })) continue;
+    if (saleFilterFoldA.length && !salesOnOrder.some(function(s){ return saleFilterFoldA.indexOf(_normTxt_(s)) !== -1; })) continue;
     if (!_pMatchAny_(row.sanPham, sanPhamTerms)) continue;
     matched.push(row);
   }
@@ -260,11 +262,8 @@ function buildSalesReportA_(filters) {
   var UNASSIGNED = '(chưa gán sale)';
 
   // Team Sale: sale -> ten team (readTeams_ dung chung voi tab "Quan ly Team")
-  var saleTeamMap = {}; // ten sale (username) -> ten team
-  readTeams_(getCrmSS_().getSheetByName(SH_TEAM)).forEach(function(t) {
-    (t.members || []).forEach(function(u) { saleTeamMap[u] = t.name; });
-  });
   var UNASSIGNED_TEAM = '(chưa có Team)';
+  var _teamOfA_ = _makeTeamResolver_(UNASSIGNED_TEAM);   // theo NGƯỜI: tên này hoặc bất kỳ tên nào cùng tài khoản nằm trong Team
   var byTeamSale = {};
 
   for (var j = 0; j < matched.length; j++) {
@@ -292,7 +291,7 @@ function buildSalesReportA_(filters) {
       bySale[creatorName].coc += m.giaTriCoc;
       bySale[creatorName].giaTri += revenue;
 
-      var creatorTeam = saleTeamMap[creatorName] || UNASSIGNED_TEAM;
+      var creatorTeam = _teamOfA_(creatorName);
       if (!byTeamSale[creatorTeam]) byTeamSale[creatorTeam] = { orders: 0, coc: 0, giaTri: 0 };
       byTeamSale[creatorTeam].orders += 1;
       byTeamSale[creatorTeam].coc += m.giaTriCoc;
@@ -311,7 +310,7 @@ function buildSalesReportA_(filters) {
         bySale[sName].coc += m.giaTriCoc / n;       // tien: chia deu cho N sale
         bySale[sName].giaTri += revenue / n;
 
-        var tName = saleTeamMap[sName] || UNASSIGNED_TEAM;
+        var tName = _teamOfA_(sName);
         if (!byTeamSale[tName]) byTeamSale[tName] = { orders: 0, coc: 0, giaTri: 0 };
         byTeamSale[tName].coc += m.giaTriCoc / n;
         byTeamSale[tName].giaTri += revenue / n;

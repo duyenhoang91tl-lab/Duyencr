@@ -418,32 +418,7 @@ function buildSalesReportB_(filters) {
   // Kenh/Page" (can khop PancakePageMap) cho Bao cao B — phan nay co chu dinh BO QUA, xem ghi
   // chu o cuoi ham.
   var UNASSIGNED_TEAM = '(chưa có Team)';
-  var saleTeamMap = {}; // ten sale (username) -> ten team — dung chung voi tab "Quan ly Team"
-  readTeams_(getCrmSS_().getSheetByName(SH_TEAM)).forEach(function(t) {
-    (t.members || []).forEach(function(u) { saleTeamMap[u] = t.name; });
-  });
-  // Khop fold-insensitive (giong _expandSaleFilterWithPancakeAliases_/_normTxt_ da dung o bo
-  // loc Team phia tren) + tra qua readPancakeMap_ khi ten tren "Thẻ" la username Pancake (vd
-  // "ninhnga99") khac voi ten chuan trong Team (vd "Ngà") — neu khong se rot het vao "(chưa có
-  // Team)" oan du ho da duoc gan Team day du, dung HET nguyen nhan ma commit fix loc Team vua nêu.
-  var saleTeamMapFold_ = {};
-  Object.keys(saleTeamMap).forEach(function(u) { saleTeamMapFold_[_normTxt_(u)] = saleTeamMap[u]; });
-  var pancakeMapB_ = readPancakeMap_(); // pancakeName -> "saleA|saleB"
-  var pancakeMapFoldB_ = {};
-  Object.keys(pancakeMapB_).forEach(function(pn) { pancakeMapFoldB_[_normTxt_(pn)] = pancakeMapB_[pn]; });
-  function _resolveTeamForSaleB_(rawName) {
-    var fold = _normTxt_(rawName);
-    if (saleTeamMapFold_[fold]) return saleTeamMapFold_[fold];
-    var mapped = pancakeMapFoldB_[fold];
-    if (mapped) {
-      var cands = String(mapped).split('|').map(function(s){ return s.trim(); }).filter(Boolean);
-      for (var ci = 0; ci < cands.length; ci++) {
-        var t = saleTeamMapFold_[_normTxt_(cands[ci])];
-        if (t) return t;
-      }
-    }
-    return UNASSIGNED_TEAM;
-  }
+  var _resolveTeamForSaleB_ = _makeTeamResolver_(UNASSIGNED_TEAM);   // theo NGƯỜI (nhiều tên) + bảng khớp tên Pancake
   var byTeamSale = {}; // ten team -> { orders, giaTri, cod }
   var bySaleDay = {};  // CHI khi filters.withDaily (v13.24, ho so nhan su): ten sale -> { 'YYYY-MM-DD': [soDon, giaTri] } — cung quy uoc chia fr nhu bySale
   var byNguon = {};    // nguon don -> { orders, giaTri, cod } — tuong duong "Theo Kenh ban" cua Bao cao A

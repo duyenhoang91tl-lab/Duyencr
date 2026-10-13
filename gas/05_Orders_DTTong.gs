@@ -563,6 +563,52 @@ function _pancakeKnownSaleNameSet_() {
 // khong bao gio khop. PancakeNameMap da co san anh xa 2 chieu nay (dung cho Bao cao tuong tac/SDT
 // Pancake) — tai su dung de MO RONG moi ten trong bo loc thanh ca chinh no LAN cac username
 // Pancake da tung khop voi ten do, truoc khi dem so sanh voi "Thẻ".
+// Tên Sale của CÙNG 1 NGƯỜI (tài khoản gắn nhiều tên, vd thuthuy95 + thuthuy1995): fold tên → mọi tên cùng người.
+// Nguồn: cột "names" của sheet Users (admin gắn trong 🔑 Tài khoản). Dùng để bộ lọc Sale/Team và bảng "Theo Team" của
+// mọi báo cáo nhận ra các tên khác nhau của 1 người (Base ghi tên này, Pos ghi tên kia) thay vì coi là 2 người.
+function _userAliasGroups_() {
+  var map = {};
+  try {
+    readUsers_(getCrmSS_().getSheetByName(SH_USER)).forEach(function(u) {
+      var all = [];
+      (u.names || []).concat([u.name]).forEach(function(n) { n = String(n || '').trim(); if (n && all.indexOf(n) === -1) all.push(n); });
+      if (all.length < 2) return;
+      all.forEach(function(n) {
+        var k = _normTxt_(n), cur = map[k] || [];
+        all.forEach(function(x) { if (cur.indexOf(x) === -1) cur.push(x); });
+        map[k] = cur;
+      });
+    });
+  } catch (e) {}
+  return map;
+}
+// Trả hàm (tên sale bất kỳ) → tên Team; tìm theo chính tên đó, rồi theo MỌI tên khác của cùng người, rồi theo bảng khớp tên Pancake.
+// Thành viên Team gồm cả leader (giống tab Quản lý Team). Không tìm ra → unassigned.
+function _makeTeamResolver_(unassigned) {
+  var teamFold = {};
+  readTeams_(getCrmSS_().getSheetByName(SH_TEAM)).forEach(function(t) {
+    [t.leader].concat(t.members || []).forEach(function(u) { if (u) teamFold[_normTxt_(u)] = t.name; });
+  });
+  var groups = _userAliasGroups_();
+  var pk = readPancakeMap_(), pkFold = {};
+  Object.keys(pk).forEach(function(n) { pkFold[_normTxt_(n)] = pk[n]; });
+  return function(raw) {
+    var f = _normTxt_(raw);
+    if (teamFold[f]) return teamFold[f];
+    var al = groups[f] || [];
+    for (var i = 0; i < al.length; i++) { var t1 = teamFold[_normTxt_(al[i])]; if (t1) return t1; }
+    var mapped = pkFold[f];
+    if (mapped) {
+      var cands = String(mapped).split('|').map(function(x) { return x.trim(); }).filter(Boolean);
+      for (var j = 0; j < cands.length; j++) {
+        var t2 = teamFold[_normTxt_(cands[j])]; if (t2) return t2;
+        var al2 = groups[_normTxt_(cands[j])] || [];
+        for (var k = 0; k < al2.length; k++) { var t3 = teamFold[_normTxt_(al2[k])]; if (t3) return t3; }
+      }
+    }
+    return unassigned;
+  };
+}
 function _expandSaleFilterWithPancakeAliases_(names) {
   if (!names || !names.length) return names;
   var map = readPancakeMap_(); // pancakeName -> saleName (co the "saleA|saleB")
@@ -572,6 +618,12 @@ function _expandSaleFilterWithPancakeAliases_(names) {
   Object.keys(map).forEach(function(pancakeName) {
     var saleNames = String(map[pancakeName] || '').split('|').map(function(s){ return s.trim(); }).filter(Boolean);
     if (saleNames.some(function(sn) { return foldIn[_normTxt_(sn)]; })) out.push(pancakeName);
+  });
+  // Thêm mọi tên khác của cùng 1 người (tài khoản nhiều tên) — cả tên vừa chọn lẫn tên Pancake vừa thêm ở trên.
+  var _grp = _userAliasGroups_(), _seenF = {};
+  out.forEach(function(n) { _seenF[_normTxt_(n)] = true; });
+  out.slice().forEach(function(n) {
+    (_grp[_normTxt_(n)] || []).forEach(function(a) { var k = _normTxt_(a); if (!_seenF[k]) { _seenF[k] = true; out.push(a); } });
   });
   return out;
 }

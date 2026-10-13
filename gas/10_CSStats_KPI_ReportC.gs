@@ -557,6 +557,7 @@ function buildSalesReportC_(filters) {
   var kpiMap = readKPITargets_();
   var UNASSIGNED = '(chưa gán sale)';
   var saleFilterArr = Array.isArray(filters.sale) ? filters.sale.filter(function(s){return s;}) : [];
+  var saleFilterFoldC = _expandSaleFilterWithPancakeAliases_(saleFilterArr).map(_normTxt_);
   var kenhFilterArr = Array.isArray(filters.kenh) ? filters.kenh.filter(function(s){return s;}) : [];
   var sanPhamTerms = _foldTermsCSV_(filters.sanPham);
   // Giong het quy uoc "Tinh theo nguoi tao don" cua buildSalesReportA_: tich thi tinh TRON VEN
@@ -577,7 +578,7 @@ function buildSalesReportC_(filters) {
       if (_isExcludedOrderStatus_(row.trangThai)) continue; // bo don Huy/Tra lai/Hoan tien/Thai bai/Khieu nai (Quy che thu lao Sale)
       if (kenhFilterArr.length && kenhFilterArr.indexOf(row.kenhBan) === -1) continue;
       var salesOnRow = splitMulti_(row.saleBan, ',');
-      if (saleFilterArr.length && !salesOnRow.some(function(s){ return saleFilterArr.indexOf(s) !== -1; })) continue;
+      if (saleFilterFoldC.length && !salesOnRow.some(function(s){ return saleFilterFoldC.indexOf(_normTxt_(s)) !== -1; })) continue;
       if (!_pMatchAny_(row.sanPham, sanPhamTerms)) continue;
       matchedOrders.push(row);
       var kName = row.kenhBan || '(chưa có kênh)';
