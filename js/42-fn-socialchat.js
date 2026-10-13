@@ -17,6 +17,7 @@ function renderSocialChatTab() {
   }
   _scStop(); scLoadList();
   _sc.timer = setInterval(function () { if (!_scOpen()) { _scStop(); return; } if (!document.hidden) { scLoadList(); if (_sc.active) scLoadMsgs(false); } }, 8000);
+  if (_sc.active) scDockSync(); else if (window._scDocked) _scUndock();   // vào lại tab: hiện đúng hồ sơ của hội thoại đang chọn, chưa chọn thì không để hồ sơ cũ treo ở đó
 }
 var _scQT;
 function _scQSoon() { clearTimeout(_scQT); _scQT = setTimeout(function () { _sc.q = ((document.getElementById('sc-q') || {}).value || '').trim(); scLoadList(); }, 350); }
@@ -59,11 +60,45 @@ function scPick(id) {
   var box = document.getElementById('sc-main'); if (box) box.classList.add('has-conv');
   if (typeof proChatInfoRender_ === 'function') { try { proChatInfoRender_(c); } catch (e) { console.warn('[ui-pro] chat info', e); } }
   scLoadMsgs(true);
+  scDockSync();   // hồ sơ khách (cùng SĐT) hiện bên phải như Pancake
 }
 function scBack() { var box = document.getElementById('sc-main'); if (box) box.classList.remove('has-conv'); }
+// ── Hồ sơ khách GẮN cạnh khung chat (giống cột "Thông tin" của Pancake): dùng lại ĐÚNG ngăn #dp của Danh sách KH (cùng tab Chăm sóc / Lịch hẹn / Lịch sử đơn / Tổng quan,
+// cùng lưu tự động) bằng cách chuyển #dp vào #sc-dock thay vì viết hồ sơ thứ hai. Màn hình hẹp (<1000px) hoặc khách chưa có trong CRM -> không gắn.
+function _scDockFits() { return window.innerWidth >= 1000; }
+function _scUndock() {
+  var dock = document.getElementById('sc-dock'), dp = document.getElementById('dp'), ov = document.getElementById('dp-overlay');
+  window._scDocked = false;
+  if (dock) dock.classList.remove('on');
+  var tc = document.getElementById('tab-chat'); if (tc) tc.classList.remove('sc-docked');   // hiện lại cột tóm tắt #sc-info
+  if (dp && ov && dp.parentNode !== ov) ov.appendChild(dp);
+  if (ov) ov.classList.remove('open');
+}
+function scDockSync() {
+  var c = _sc.convs.filter(function (x) { return x.id === _sc.active; })[0];
+  var phone = c && c.phone;
+  var cust = !phone ? null : (typeof proChatFindCustomer_ === 'function' ? proChatFindCustomer_(phone)
+    : (typeof allCustomers !== 'undefined' ? (allCustomers.find(function (x) { return x.phone === phone; }) || null) : null));
+  var known = !!cust;
+  if (cust) phone = cust.phone;   // dung SĐT đúng định dạng trong CRM (openDp tìm theo SĐT chính xác)
+  if (!known || !_scDockFits()) { if (window._scDocked) { if (typeof _dpAutoFlush_ === 'function') _dpAutoFlush_(true); _scUndock(); } return false; }
+  if (window._scDocked && currentPhone === phone) return true;   // đã đang hiện đúng khách này (tránh vẽ lại, giữ ô đang nhập dở)
+  var dock = document.getElementById('sc-dock'), dp = document.getElementById('dp');
+  if (!dock || !dp) return false;
+  window._scDockOpening = true;
+  try {
+    if (dp.parentNode !== dock) dock.appendChild(dp);
+    dock.classList.add('on'); window._scDocked = true;
+    var tc = document.getElementById('tab-chat'); if (tc) tc.classList.add('sc-docked');   // ẩn cột tóm tắt #sc-info (hồ sơ đầy đủ đã hiện)
+    openDp(phone);
+  } finally { window._scDockOpening = false; }
+  return true;
+}
 function scOpenProfile() {
   var c = _sc.convs.filter(function (x) { return x.id === _sc.active; })[0]; if (!c || !c.phone) return;
-  var cu = (typeof proChatFindCustomer_ === 'function') ? proChatFindCustomer_(c.phone) : null;
+  if (scDockSync()) return;   // gắn cạnh chat (mở lại nếu vừa bấm ✕)
+  // Không gắn được (màn hình hẹp): mở hồ sơ dạng ngăn trượt nếu có khách; khách chưa có trong CRM thì nhảy sang Danh sách KH tìm theo SĐT
+  var cu = (typeof proChatFindCustomer_ === 'function') ? proChatFindCustomer_(c.phone) : null;   // chuẩn hoá SĐT (js/48)
   if (cu && typeof openDp === 'function') { document.getElementById('dp-overlay').classList.add('open'); openDp(cu.phone); return; }   // có khách: mở thẳng panel hồ sơ
   var tl = document.querySelector('#data-view .tabs [onclick*="switchTab(\'list\'"]'); if (tl) tl.click();
   var si = document.getElementById('search-input'); if (si) { si.value = c.phone; si.dispatchEvent(new Event('input', { bubbles: true })); }

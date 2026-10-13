@@ -53,3 +53,11 @@ Nhắn 1 tin vào page từ tài khoản cá nhân, đợi vài giây, vào Supa
 - Lỗi ghi Supabase trả 502 (không phải 200) để Pancake (nếu có cơ chế gửi lại) không mất tin.
 - Không đụng `gas_v13.js` ở bước này nên KHÔNG cần deploy lại GAS. Worker tự deploy khi push `main` đổi `cloudflare/**` (workflow `deploy-worker.yml`); chưa có workflow thì dán tay `cloudflare/worker.mjs` vào Edit code.
 - `page_access_token` chưa dùng ở bước 1 (chỉ cần cho bước 3 kéo lịch sử); cất sẵn, không dán vào chat/repo.
+
+## Hồ sơ khách cạnh khung chat (Social > Chat) — 2026-10-12
+Chọn 1 hội thoại → bên phải hiện hồ sơ khách (cùng SĐT) như cột "Thông tin" của Pancake, **dùng lại đúng ngăn hồ sơ của Danh sách KH** (`#dp`: tab Chăm sóc / Lịch hẹn / Lịch sử đơn / Tổng quan, tự lưu) bằng cách chuyển `#dp` vào cột `#sc-dock` (`js/42-fn-socialchat.js`: `scDockSync`, `_scUndock`). Chat đã ở giữa nên tab "💬 Chat" của hồ sơ bị ẩn trong chế độ này.
+- Hội thoại không có SĐT / khách chưa có trong CRM / màn hình <1000px → không gắn; nút "👤 Mở hồ sơ" quay về cách cũ (nhảy sang Danh sách KH, tìm theo SĐT).
+- Nút ✕ của hồ sơ = lưu nốt rồi gỡ cột, chat chiếm lại toàn bộ chiều rộng; bấm "👤 Mở hồ sơ" để hiện lại.
+- Mở hồ sơ từ Danh sách KH thì ngăn tự trả về dạng trượt từ phải như cũ (`openDp` gọi `_scUndock`).
+- Hồ sơ gắn cạnh chat tự cập nhật khi dữ liệu thay đổi (`_maybeRefreshOpenDp` tính cả `_scDocked`).
+- Test: jsdom, dùng `openDp`/`closeDp`/code gắn thật (18 ca). Chưa kiểm trên trình duyệt thật.

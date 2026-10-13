@@ -998,6 +998,10 @@ function delSched(id) {
 }
 
 function closeDp(e) {
+  if (window._scDocked && !e && typeof _scUndock === 'function') {   // nút ✕ khi hồ sơ đang gắn cạnh chat: lưu nốt rồi gỡ ngăn, chat chiếm lại toàn bộ chiều rộng
+    if (typeof _dpAutoFlush_ === 'function') _dpAutoFlush_(true);
+    _scUndock(); return;
+  }
   if (!e || e.target===document.getElementById('dp-overlay')) {
     if (typeof _dpAutoFlush_ === 'function') _dpAutoFlush_(true);   // lưu nốt thay đổi chờ lưu rồi vẽ lại danh sách 1 lần
     document.getElementById('dp-overlay').classList.remove('open');

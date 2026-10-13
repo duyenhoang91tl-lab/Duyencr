@@ -112,7 +112,7 @@ function updateSchedBadges() {
 
 function _maybeRefreshOpenDp() {
   const ov = document.getElementById('dp-overlay');
-  if (!ov || !ov.classList.contains('open') || !currentPhone) return;
+  if (!ov || !(ov.classList.contains('open') || window._scDocked) || !currentPhone) return;   // _scDocked: hồ sơ gắn cạnh chat Social cũng phải tự cập nhật khi dữ liệu đổi
   if (_dpDirty) {
     // Đang gõ dở → không ghi đè, chỉ báo nhẹ để người dùng chủ động tải lại
     const body = document.getElementById('dp-body');
@@ -131,6 +131,8 @@ function _maybeRefreshOpenDp() {
 }
 
 function openDp(phone) {
+  // Mở hồ sơ từ nơi khác (Danh sách KH...) khi ngăn đang gắn cạnh khung chat Social > Chat -> trả ngăn về dạng trượt từ phải trước (js/42 _scUndock).
+  if (window._scDocked && !window._scDockOpening && typeof _scUndock === 'function') _scUndock();
   if (typeof _dpAutoFlush_ === 'function') _dpAutoFlush_(true);   // lưu nốt KH đang mở (nếu còn thay đổi chờ lưu) TRƯỚC khi đổi sang KH khác
   currentPhone = phone;
   _dpDirty = false;
@@ -150,7 +152,7 @@ function openDp(phone) {
     ${zaloBadge(c.zaloStatus)}
     ${custStatusBadge((careData[c.phone]||{}).khStatus||'')}${cfBadges(c.phone)}`;
   renderDpTab('care');
-  document.getElementById('dp-overlay').classList.add('open');
+  if (!window._scDockOpening) document.getElementById('dp-overlay').classList.add('open');   // gắn cạnh chat thì không bật lớp phủ mờ
 }
 
 function renderDpTab(tab) {
