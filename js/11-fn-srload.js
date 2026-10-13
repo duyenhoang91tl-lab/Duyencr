@@ -979,7 +979,58 @@ function _srRenderB(d){
       html += _srChartSvg(productRows, 'name', 'soLuong', _srState.bProductView, false);
     }
   }
+  html += _srPosMonthPanelHtml_();
   return html;
+}
+
+// ── CHOT THANG POS + TRU HOAN/HUY THANG TRUOC (quy tac 5, Duyen 10/2026) — chi Admin ──
+// Chua chot thang truoc thi KHONG tru gi: cac bao cao giu nguyen. Xem ghi chu o closePosMonth_/posMonthAdjust_ (gas_v13.js).
+function _srPosMonthPanelHtml_(){
+  if (!_srIsAdmin()) return '';
+  var now = new Date();
+  var cur = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  var pd = new Date(now.getFullYear(), now.getMonth()-1, 1);
+  var prev = pd.getFullYear()+'-'+String(pd.getMonth()+1).padStart(2,'0');
+  var st = 'padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)';
+  return '<div class="dash-section-title" style="margin-top:22px">🔒 Chốt tháng Pos &amp; trừ hoàn/hủy tháng trước</div>'+
+    '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Doanh thu Pos tháng M = doanh thu trong tháng − phần hoàn/hủy phát sinh của tháng M-1 <b>sau khi đã chốt</b>. '+
+    'Làm vào ngày mùng 1, sau khi cập nhật đủ dữ liệu tháng trước: bấm <b>Chốt tháng</b> để lưu mốc; những đơn tháng đó bị hoàn/hủy về sau sẽ tự được trừ vào tháng kế tiếp. Chưa chốt thì chưa trừ gì.</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">'+
+      '<span style="font-size:12px">Chốt tháng:</span><input type="month" id="sr-posm-close" value="'+prev+'" style="'+st+'">'+
+      '<button class="btn sm" onclick="_srPosMonthClose_()">🔒 Chốt tháng này làm mốc</button>'+
+      '<span style="color:var(--border-md)">|</span>'+
+      '<span style="font-size:12px">Xem doanh thu tháng:</span><input type="month" id="sr-posm-view" value="'+cur+'" style="'+st+'">'+
+      '<button class="btn sm secondary" onclick="_srPosMonthLoad_()">📉 Xem sau khi trừ hoàn/hủy</button>'+
+    '</div><div id="sr-posm-result"></div>';
+}
+async function _srPosMonthClose_(force){
+  var month = (document.getElementById('sr-posm-close')||{}).value;
+  if (!month){ toast('Chọn tháng cần chốt'); return; }
+  if (!force && !confirm('Chốt doanh thu Pos tháng '+month+' làm mốc?\n\nChỉ nên chốt khi đã cập nhật ĐỦ dữ liệu tháng này. Sau khi chốt, đơn tháng '+month+' bị hoàn/hủy về sau sẽ bị trừ vào doanh thu tháng kế tiếp.')) return;
+  try {
+    var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'closePosMonth', month: month, force: !!force }) });
+    var d = await r.json();
+    if (d && d.needForce){ if (confirm(d.error+'\n\nGhi đè mốc cũ?')) return _srPosMonthClose_(true); return; }
+    if (!d || !d.ok){ toast('❌ '+((d&&d.error)||'Chốt thất bại')); return; }
+    toast('✓ Đã chốt tháng '+d.month+' — tổng '+_srMoney(d.total)+' ('+d.saleCount+' sale)');
+  } catch(e){ toast('❌ Lỗi: '+e.message); }
+}
+async function _srPosMonthLoad_(){
+  var month = (document.getElementById('sr-posm-view')||{}).value;
+  var box = document.getElementById('sr-posm-result'); if (!box) return;
+  box.innerHTML = '<div style="color:var(--muted);padding:8px">Đang tính...</div>';
+  var d = await _srFetch('posMonthAdjust', { month: month });
+  if (!d || !d.ok){ box.innerHTML = '<div style="color:#dc2626;padding:8px">Không tải được: '+esc((d&&d.error)||_srState.lastFetchError||'lỗi không rõ')+'</div>'; return; }
+  var html = '';
+  if (!d.applied) html += '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:8px 10px;margin-bottom:8px;font-size:12px">⚠ '+esc(d.reason)+'</div>';
+  else html += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Đã trừ phần hoàn/hủy của tháng <b>'+esc(d.prevMonth)+'</b> (mốc chốt '+esc(d.closedAt)+'). Tổng doanh thu '+esc(d.month)+': <b>'+_srMoney(d.total)+'</b> − '+_srMoney(d.totalDeduction)+' = <b>'+_srMoney(d.totalNet)+'</b></div>';
+  html += '<table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">Doanh thu tháng '+esc(d.month)+'</th><th style="text-align:right">Trừ hoàn/hủy '+esc(d.prevMonth)+'</th><th style="text-align:right">Sau trừ</th></tr></thead><tbody>';
+  (d.rows||[]).forEach(function(r){
+    html += '<tr><td>'+esc(r.name)+'</td><td style="text-align:right">'+_srMoney(r.revenue)+'</td><td style="text-align:right;color:'+(r.deduction?'#dc2626':'var(--muted)')+'">'+(r.deduction?((r.deduction>0?'−':'+')+_srMoney(Math.abs(r.deduction))):'—')+'</td><td style="text-align:right;font-weight:700">'+_srMoney(r.net)+'</td></tr>';
+  });
+  if (!(d.rows||[]).length) html += '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:12px">Không có dữ liệu</td></tr>';
+  html += '</tbody></table>';
+  box.innerHTML = html;
 }
 
 // ── BAO CAO C: SO SANH THEO KY (tuan/thang/quy/tuy chinh) ──
