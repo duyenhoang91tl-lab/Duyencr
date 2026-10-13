@@ -54,8 +54,11 @@ html.ui-pro .pro-gauge .g-fg{stroke:var(--pro-green2);}
 /* P2: khối hồ sơ khách 360° chèn trong #dp (giữa .dp-hdr và .dp-tabs) */
 html.ui-pro #dp-pro{padding:10px 14px 4px;border-bottom:1px solid var(--pro-line);background:var(--surface);}
 html.ui-pro #dp-pro .pro-stage>li{flex:0 0 auto;min-width:96px;}
-html.ui-pro #dp-pro .pro-kpi{min-height:70px;padding:9px 12px;}
-html.ui-pro #dp-pro .pro-kpi .k-v{font-size:26px;}
+/* 3 thẻ Ngày từ đơn cuối / Số đơn / Doanh thu trong hồ sơ khách: thu nhỏ theo yêu cầu Duyên 2026-10-12 */
+html.ui-pro #dp-pro .pro-kpi{min-height:46px;padding:6px 10px;border-radius:10px;}
+html.ui-pro #dp-pro .pro-kpi .k-l{font-size:11px;}
+html.ui-pro #dp-pro .pro-kpi .k-v{font-size:18px;}
+html.ui-pro #dp-pro .pro-kpi .k-s{font-size:10px;line-height:1;}
 html.ui-pro #dp-pro .pro-grid{margin-bottom:8px;grid-template-columns:repeat(3,minmax(0,1fr));}
 /* P2b/P2c: khung Việc tiếp theo + dòng thời gian trong #dp-pro (timeline cuộn riêng để không đẩy form xuống) */
 html.ui-pro #dp-pro .pro-next{margin-bottom:6px;padding:8px 10px;}

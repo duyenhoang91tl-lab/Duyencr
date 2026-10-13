@@ -24,7 +24,7 @@ function proKpiHtml_(days, nOrders, rev){
   return '<div class="pro-grid">'
    + '<div class="pro-kpi '+dCls+'"><span class="k-l">Ngày từ đơn cuối</span><span class="k-v">'+(days===null?'—':f(days))+'</span></div>'
    + '<div class="pro-kpi blue"><span class="k-l">Số đơn</span><span class="k-v">'+f(nOrders)+'</span></div>'
-   + '<div class="pro-kpi purple"><span class="k-l">Doanh thu</span><span class="k-v" style="font-size:22px">'+f(rev)+'</span><span class="k-s">đ</span></div>'
+   + '<div class="pro-kpi purple"><span class="k-l">Doanh thu</span><span class="k-v">'+f(rev)+'</span><span class="k-s">đ</span></div>'
    + '</div>';
 }
 function proStageHtml_(model){
