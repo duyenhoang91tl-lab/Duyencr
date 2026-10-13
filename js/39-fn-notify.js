@@ -51,6 +51,7 @@ function _ntIsTaskEvt(it){ return String((it && it.kind) || '').indexOf('task_')
 function _ntTaskIcon(it){ return ({ task_assign:'📌', task_turn:'➡️', task_request:'✋', task_decision:'⚖️', task_done:'🏁' })[it.kind] || '🔔'; }
 function _ntWhere(it){
   if (it.kind === 'note') return 'trong ghi chú khách ' + (it.refId || '');
+  if (it.kind === 'khthread') return 'trong thảo luận về khách ' + (it.refId || '');
   if (it.kind === 'comment') return 'trong bình luận công việc';
   return 'trong công việc';
 }
@@ -102,6 +103,7 @@ function ntOpenItem(id){
       if (typeof openDp !== 'function') { toast('Chưa mở được khách'); return; }
       if (typeof customerMap !== 'undefined' && !customerMap[it.refId]) toast('Không thấy khách ' + it.refId + ' trong danh sách đang tải');
       openDp(it.refId);
+      if (it.kind === 'khthread') { var dt = document.querySelector('#dp .dp-tab[data-tab="discuss"]'); if (dt && typeof switchDpTab === 'function') switchDpTab('discuss', dt); }   // mở thẳng tab Thảo luận
     } else if (it.refType === 'task') {
       _ntOpenTask(it.refId, it.kind === 'comment');
     }
@@ -127,7 +129,7 @@ function ntNoteMention(phone, text){
 }
 
 // ── Gợi ý @tên ──
-var _NT_FIELDS = { 'cs-note-new':1, 'new-snote':1, 'task-cm-input':1, 'task-f-title':1, 'task-f-desc':1 };
+var _NT_FIELDS = { 'khd-input':1, 'khd-input-sc':1, 'sc-note-new':1, 'cs-note-new':1, 'new-snote':1, 'task-cm-input':1, 'task-f-title':1, 'task-f-desc':1 };
 var _ntSug = { el:null, list:[], idx:0, start:-1 };
 function _ntNames(){
   var out = [], seen = {};
@@ -156,6 +158,7 @@ function _ntUpdateSug(el){
   var b = _ntSugBox(), r = el.getBoundingClientRect();
   b.innerHTML = list.map(function(n,i){ return '<div class="nt-sg' + (i ? '' : ' on') + '" data-i="' + i + '">@' + esc(n) + '</div>'; }).join('');
   b.style.left = Math.max(4, r.left) + 'px'; b.style.top = (r.bottom + 2) + 'px'; b.style.minWidth = Math.min(r.width, 260) + 'px'; b.style.display = 'block';
+  if (r.bottom + b.offsetHeight + 8 > window.innerHeight) b.style.top = Math.max(4, r.top - b.offsetHeight - 2) + 'px';   // ô nhập sát đáy màn hình → mở gợi ý lên phía trên
 }
 function _ntPick(i){
   var el = _ntSug.el, n = _ntSug.list[i]; if (!el || !n) return;

@@ -9,7 +9,7 @@ w.eval('var gsUrl="https://gs.example/exec"; var _activeV9Tab="chat"; var careDa
 w.allCustomers=[{phone:'0934230669',name:'Mến Hoàng',tier:'Vàng',orders:[{date:new w.Date(Date.now()-5*86400000),revenue:3000000,product:'Combo A'}]}];
 w.fetch=async(u,o)=>{log.push({u,o});const r=u.includes('pkChatInbox')?{conversations:CONVS}:u.includes('pkChatConv')?{messages:[{id:'m1',c:'C1',dir:'in',text:'Xin giá',at:iso,att:[]},{id:'m2',c:'C1',dir:'out',text:'Dạ vâng',at:iso,att:[]}]}:{};return {json:async()=>r}};
 const opened=[];w.openDp=p=>opened.push(p);w.toast=()=>{};
-w.eval(src('33-pro-profile.js'));w.eval(src('41-fn-pkchat.js'));w.eval(src('42-fn-socialchat.js'));w.eval(src('48-pro-chatinfo.js'));
+w.eval(src('33-pro-profile.js'));w.eval(src('41-fn-pkchat.js'));w.eval(src('42-fn-socialchat.js'));w.eval(src('48-pro-chatinfo.js'));w.eval(src('49-pro-discuss.js'));
 const $=id=>w.document.getElementById(id),sleep=ms=>new Promise(r=>setTimeout(r,ms));
 // — hàm thuần —
 ok(w.proPhoneNorm_('+84 934.230.669')==='0934230669'&&w.proPhoneNorm_('84934230669')==='0934230669'&&w.proPhoneNorm_('0934 230 669')==='0934230669'&&w.proPhoneNorm_('934230669')==='0934230669'&&w.proPhoneNorm_('')==='','chuẩn hoá SĐT: +84 / 84 / có cách / thiếu số 0 / rỗng');

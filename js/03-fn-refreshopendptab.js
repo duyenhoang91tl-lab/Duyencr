@@ -167,9 +167,10 @@ function renderDpTab(tab) {
   else if (tab==='schedule') body.innerHTML = renderSchedTabHtml(c);
   else if (tab==='history') { body.innerHTML = renderHistTab(c); _initHistExpand(); }
   else if (tab==='chat' && typeof renderPkChatTab === 'function') body.innerHTML = renderPkChatTab(c);
+  else if (tab==='discuss' && typeof renderKhdTab === 'function') body.innerHTML = renderKhdTab(c);   // thảo luận nội bộ (js/49)
   else body.innerHTML = renderInfoTab(c);
   // Đồng bộ highlight tab (KH mới luôn render lại đúng nội dung, không còn dính dữ liệu KH trước)
-  const _order = ['care','schedule','history','info','chat'];
+  const _order = ['care','schedule','history','info','chat','discuss'];
   document.querySelectorAll('.dp-tab').forEach((t,i)=>t.classList.toggle('active', _order[i]===tab));
 }
 
@@ -187,6 +188,7 @@ function switchDpTab(tab, el) {
   else if (tab==='schedule') body.innerHTML = renderSchedTabHtml(c);
   else if (tab==='history') { body.innerHTML = renderHistTab(c); _initHistExpand(); }
   else if (tab==='chat' && typeof renderPkChatTab === 'function') body.innerHTML = renderPkChatTab(c);
+  else if (tab==='discuss' && typeof renderKhdTab === 'function') body.innerHTML = renderKhdTab(c);   // thảo luận nội bộ (js/49)
   else body.innerHTML = renderInfoTab(c);
 }
 

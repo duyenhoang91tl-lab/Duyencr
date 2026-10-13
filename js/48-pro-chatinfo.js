@@ -34,13 +34,33 @@ function proChatFindCustomer_(phone){
   var n = proPhoneNorm_(phone); if (!n || typeof allCustomers==='undefined') return null;
   return allCustomers.find(function(x){ return proPhoneNorm_(x.phone)===n; }) || null;
 }
+var proScTab_ = 'info';   // tab đang chọn ở cột phải: 'info' | 'discuss' (giữ nguyên khi đổi hội thoại)
 function proChatInfoRender_(conv){
   var el = document.getElementById('sc-info'); if (!el) return;
-  if (!conv){ el.innerHTML = '<div class="pkc-note">Chọn một hội thoại để xem thông tin khách.</div>'; return; }
-  var c = proChatFindCustomer_(conv.phone), P = null;
+  if (!conv){ if (typeof khdStop_==='function') khdStop_('sc'); el.innerHTML = '<div class="pkc-note">Chọn một hội thoại để xem thông tin khách.</div>'; return; }
+  var c = proChatFindCustomer_(conv.phone), P = null, phone = proPhoneNorm_(conv.phone);
   if (c){ var D = proProfileData_(c); P = { D:D, days:proDaysSinceLastOrder_(c.orders,new Date()), rev:_custRev_(c), tree:(typeof CARE_STATUS_TREE!=='undefined'?CARE_STATUS_TREE:[]), now:new Date() }; }
-  el.innerHTML = proChatInfoHtml_(conv, c, P);
+  var noteBox = c ? '<div class="sc-note"><textarea id="sc-note-new" rows="2" maxlength="1500" placeholder="Nhập ghi chú (Enter để lưu, @ để tag)…"></textarea></div>' : '';
+  var discuss = phone ? (typeof khdBoxHtml_==='function' ? khdBoxHtml_('sc','khd-input-sc') : '') : '<div class="pkc-note">Hội thoại chưa gắn SĐT nên chưa có thảo luận. Gắn SĐT cho hội thoại trước.</div>';
+  el.innerHTML = '<div class="sc-tabs"><button type="button" data-sct="info">Thông tin</button><button type="button" data-sct="discuss">🗨 Thảo luận</button></div>'
+    + '<div id="sc-pane-info">'+noteBox+proChatInfoHtml_(conv, c, P)+'</div><div id="sc-pane-discuss">'+discuss+'</div>';
+  var show = function(tab){
+    proScTab_ = tab;
+    el.querySelectorAll('[data-sct]').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-sct')===tab); });
+    document.getElementById('sc-pane-info').style.display = tab==='info' ? '' : 'none';
+    document.getElementById('sc-pane-discuss').style.display = tab==='discuss' ? '' : 'none';
+    if (tab==='discuss' && phone && typeof khdMount_==='function') khdMount_('sc', phone); else if (typeof khdStop_==='function') khdStop_('sc');
+  };
+  el.querySelectorAll('[data-sct]').forEach(function(b){ b.onclick = function(){ show(b.getAttribute('data-sct')); }; });
   var btn = el.querySelector('[data-sc-open]');
   if (btn) btn.onclick = function(){ if (typeof openDp==='function'){ document.getElementById('dp-overlay').classList.add('open'); openDp(btn.getAttribute('data-sc-open')); } };
+  var nb = document.getElementById('sc-note-new');
+  if (nb) nb.onkeydown = function(e){
+    if (e.key!=='Enter' || e.shiftKey || e.defaultPrevented) return;
+    var sb = document.getElementById('nt-sug'); if (sb && sb.style.display==='block') return;   // đang chọn gợi ý @
+    e.preventDefault(); var txt = nb.value.trim(); if (!txt) return;
+    if (typeof proNoteAdd_==='function' && proNoteAdd_(c.phone, txt)){ nb.value = ''; if (typeof toast==='function') toast('✓ Đã lưu ghi chú'); proChatInfoRender_(conv); }
+  };
+  show(proScTab_);
 }
 if (typeof module!=='undefined') module.exports = { proPhoneNorm_, proInitials_, proChatInfoHtml_ };
