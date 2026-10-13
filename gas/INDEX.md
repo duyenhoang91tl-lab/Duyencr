@@ -71,7 +71,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `_PSHEET_STOPWORDS_`, `DEPT_LIST_DEFAULT_`, `_DRIVE_IMG_MAX_BYTES_`
 
 ## 16_BannedWords_AI.gs
-- Hàm: `readBannedWordsList_`, `_bannedWordsPromptBlock_`, `_buildAISystemPrompt_`, `_aiOpenAICompat_`, `_aiGemini_`, `_crmAskSystemPrompt_`, `callAI_`, `_maskKey_`, `diagApiKeys`, `testScript`
+- Hàm: `readBannedWordsList_`, `_bannedWordsPromptBlock_`, `_priceCatalogRowsCached_`, `priceAsk_`, `_crmAskPriceBlock_`, `_buildAISystemPrompt_`, `_aiOpenAICompat_`, `_aiGemini_`, `_crmAskSystemPrompt_`, `callAI_`, `_maskKey_`, `diagApiKeys`, `testScript`
 - Hằng/biến: `BANNED_WORDS_SS_ID`, `BANNED_WORDS_GID`
 
 ## 17_Broadcast_FollowUp.gs

@@ -59,6 +59,46 @@ function _bannedWordsPromptBlock_() {
     '\n\nNếu cần diễn đạt ý liên quan, dùng từ ngữ thay thế phù hợp (xem gợi ý "→" ở trên nếu có), KHÔNG dùng nguyên văn từ cấm dưới bất kỳ hình thức nào.';
 }
 
+// ─── HOI GIA SAN PHAM (tro ly AI noi bo — js/38-pro-dock.js, che do "Gia san pham") ───────────────────────────────────────────
+// Gia lay TRUC TIEP tu bang gia DANH_MUC (cung nguon voi priceSearch / "Soan don"): KHONG de AI tu nghi ra gia. Tai su dung
+// _priceVariantsForPrompt_ (bo tu thua "gia/bao nhieu/...", cham diem tren cot TEN, gom du bien the chat lieu/size, loc SAPHIA/RUBY).
+function _priceCatalogRowsCached_() {
+  var rows = null, cache = null;
+  try { cache = CacheService.getScriptCache(); var c = cache.get('price_catalog_v4'); if (c) { try { rows = JSON.parse(c); } catch (e) {} } } catch (e0) {}
+  if (!rows) { rows = readPriceCatalog_(); try { if (cache) cache.put('price_catalog_v4', JSON.stringify(rows), 600); } catch (e1) {} }
+  return rows || [];
+}
+// GET action=priceAsk&q=<cau hoi>. Tra { ok, found:true, text, unit } | { ok, found:false, suggestions:[ten san pham gan dung] } | { ok:false, error }.
+function priceAsk_(q) {
+  q = String(q || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+  if (!q) return { ok: false, error: 'Thieu cau hoi (q)' };
+  var rows;
+  try { rows = _priceCatalogRowsCached_(); } catch (e) { return { ok: false, error: 'Khong doc duoc bang gia (DANH_MUC): ' + String(e && e.message || e) }; }
+  if (!rows.length) return { ok: false, error: 'Bang gia (DANH_MUC) dang rong hoac chua doc duoc.' };
+  var info = '';
+  try { info = _priceVariantsForPrompt_(q); } catch (e2) { return { ok: false, error: 'Loi tra gia: ' + String(e2 && e2.message || e2) }; }
+  if (info) return { ok: true, found: true, text: info, unit: 'nghin dong (vd 2.310 = 2.310.000d)' };
+  // Khong khop du de bao gia chinh xac -> goi y ten san pham gan dung de nguoi dung hoi lai cu the hon
+  var toks = _stripVN_(q).replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(function (w) { return w.length >= 2 && _PRICE_STOPWORDS_.indexOf(w) === -1; });
+  var names = [], seen = {};
+  if (toks.length) {
+    var hits = searchPriceCatalog_(rows, toks.join(' '));
+    for (var i = 0; i < hits.length && names.length < 8; i++) {
+      var f = _priceFieldPick_(hits[i], ['ten san pham', 'ten thuong mai']);
+      var nm = f && f.val ? String(f.val).trim() : '', key = _stripVN_(nm);
+      if (nm && !seen[key]) { seen[key] = 1; names.push(nm); }
+    }
+  }
+  return { ok: true, found: false, suggestions: names };
+}
+// Khoi bang gia noi them vao prompt he thong cua tro ly (crmAsk) khi client bao withPrices — de AI (engine 'ai') cung chi dung so lieu that.
+function _crmAskPriceBlock_(q) {
+  var info = '';
+  try { info = _priceVariantsForPrompt_(String(q || '')); } catch (e) {}
+  if (!info) return '\n\nBANG GIA: KHONG tim thay san pham nao khop cau hoi trong bang gia DANH_MUC. Neu nhan vien hoi gia thi noi ro "chua tim thay trong bang gia", TUYET DOI KHONG tu bia gia.';
+  return '\n\nBANG GIA CHINH THUC (nguon: Sheet DANH_MUC cua team — khi tra loi cau hoi ve gia CHI dung so lieu trong day, TUYET DOI KHONG bia gia; gia tinh bang NGHIN VND, vd 2.310 = 2.310.000d, hay quy ra dong cho de hieu; neu cau hoi khong noi ro chat lieu/size thi liet ke DU cac lua chon):\n' + String(info).slice(0, 3500);
+}
+
 // ─── Prompt he thong: kien thuc san pham CHI nap khi CS bat "Tra cuu san pham" ───
 function _buildAISystemPrompt_(userMsg, withProducts) {
   var ctx = readAIContext_();
@@ -170,6 +210,7 @@ function callAI_(data) {
   if (isCrmAsk && userMsg.length > 9000) return jsonOut_({ error: 'Cau hoi + ngu canh qua dai (toi da 9000 ky tu)' });
   var withProducts = isCrmAsk ? false : !!data.withProducts;
   var sys = isCrmAsk ? _crmAskSystemPrompt_() : _buildAISystemPrompt_(userMsg, withProducts);
+  if (isCrmAsk && data.withPrices) sys += _crmAskPriceBlock_(data.priceQuery || '');   // hoi gia: kem bang gia that (khong bia)
 
   // LUU Y (2026-09-13): llama-3.3-70b-versatile bi Groq NGUNG HO TRO tu 16/8/2026
   // (model_decommissioned) va gemini-2.0-flash bi Google NGUNG HO TRO tu 1/6/2026

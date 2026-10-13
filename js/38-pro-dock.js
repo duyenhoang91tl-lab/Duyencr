@@ -68,9 +68,34 @@ async function proAskRequest_(gsUrl, prompt, fetchFn, timeoutMs){
   finally { if (timer) clearTimeout(timer); }
 }
 function proAnswerHtml_(t){ return proEsc_(t).replace(/\n/g,'<br>'); }
+// ── HỎI GIÁ SẢN PHẨM: tra TRỰC TIẾP bảng giá DANH_MUC qua GAS action=priceAsk (không để AI tự nghĩ giá) ──
+// Câu hỏi giá: có từ "giá"/"bảng giá"/"đơn giá"/"bao nhiêu tiền"/"nhiêu tiền" (so sánh không dấu).
+function proPriceIntent_(q){ return /\bgia\b|bang gia|don gia|bao nhieu tien|nhieu tien/.test(proNorm_(q)); }
+async function proPriceRequest_(gsUrl, question, fetchFn, timeoutMs)
+{
+  if (!gsUrl) return { ok:false, error:'Chưa kết nối Google Sheets (chưa có link GAS).' };
+  var ac = (typeof AbortController!=='undefined') ? new AbortController() : null, timer = ac ? setTimeout(function(){ ac.abort(); }, timeoutMs||30000) : null;
+  try {
+    var url = gsUrl + (String(gsUrl).indexOf('?')>=0 ? '&' : '?') + 'action=priceAsk&q=' + encodeURIComponent(String(question||'').slice(0,200));
+    var r = await fetchFn(url, { method:'GET', redirect:'follow', signal: ac ? ac.signal : undefined });
+    var d = await r.json();
+    if (d && d.ok) return { ok:true, found:!!d.found, text:String(d.text||''), unit:d.unit||'', suggestions:Array.isArray(d.suggestions)?d.suggestions:[] };
+    var err = (d && (d.error||d.message)) || 'Không tra được bảng giá';
+    if (/unknown action|priceAsk/i.test(err)) err += ' (backend GAS có thể chưa lên bản có tra giá — xem tab Actions của repo)';
+    return { ok:false, error:String(err) };
+  } catch(e){ return { ok:false, error: e && e.name==='AbortError' ? 'Quá thời gian chờ — thử lại.' : String(e&&e.message||e) }; }
+  finally { if (timer) clearTimeout(timer); }
+}
+function proPriceFormat_(r){
+  if (!r || !r.ok) return '⚠ ' + ((r && r.error) || 'Không tra được bảng giá');
+  if (r.found) return 'Giá theo BẢNG GIÁ (DANH_MUC), đơn vị nghìn đồng — ví dụ 2.310 = 2.310.000đ:\n' + r.text;
+  var sg = (r.suggestions||[]).slice(0,8);
+  return 'Chưa tìm thấy sản phẩm khớp rõ trong bảng giá.' + (sg.length ? '\nCó thể bạn muốn hỏi:\n' + sg.map(function(x){ return '• '+x; }).join('\n') : '') + '\nHãy gõ rõ TÊN sản phẩm (kèm chất liệu / size / SAPHIA / RUBY nếu có).';
+}
 var PRO_AI_SUGGEST = {
   customer: ['Tóm tắt khách này', 'Nên làm gì tiếp với khách này?', 'Gợi ý tin nhắn chăm sóc'],
-  sales: ['Tóm tắt doanh số kỳ này', 'Ai cần hỗ trợ nhất và vì sao?', 'Điểm đáng chú ý nhất là gì?']
+  sales: ['Tóm tắt doanh số kỳ này', 'Ai cần hỗ trợ nhất và vì sao?', 'Điểm đáng chú ý nhất là gì?'],
+  price: []
 };
 
 
@@ -196,7 +221,7 @@ function proDockEnsure_(){
   dock.querySelector('#pro-dock-ai').onclick = function(){ proAiToggle_(); };
   var p = document.createElement('div'); p.id = 'pro-ai';
   p.innerHTML = '<div class="pro-ai-h"><b>🤖 Trợ lý AI</b><span class="pro-sp"></span><button type="button" data-ai="close" aria-label="Đóng">×</button></div>'
-    + '<div class="pro-ai-modes"><button type="button" data-mode="customer">👤 Khách đang mở</button><button type="button" data-mode="sales">📊 Doanh số</button></div>'
+    + '<div class="pro-ai-modes"><button type="button" data-mode="customer">👤 Khách đang mở</button><button type="button" data-mode="sales">📊 Doanh số</button><button type="button" data-mode="price">💰 Giá sản phẩm</button></div>'
     + '<div class="pro-ai-note">'+proEsc_(proAiNote_())+'</div>'
     + '<div class="pro-ai-log" id="pro-ai-log"></div><div class="pro-ai-sug" id="pro-ai-sug"></div>'
     + '<div class="pro-ai-in"><textarea id="pro-ai-q" rows="2" maxlength="600" placeholder="Hỏi về khách hoặc doanh số…"></textarea><button type="button" id="pro-ai-send" class="btn primary">Gửi</button></div>';
@@ -219,12 +244,13 @@ function proAiMode_(m){
   if (m !== _proDock.mode){ _proDock.mode = m; _proDock.log = []; }
   var p = document.getElementById('pro-ai'); if (!p) return;
   p.querySelectorAll('[data-mode]').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-mode')===m); });
+  var qIn = document.getElementById('pro-ai-q'); if (qIn) qIn.placeholder = m==='price' ? 'Hỏi giá sản phẩm… (vd: giá + tên sản phẩm)' : 'Hỏi về khách hoặc doanh số…';
   document.getElementById('pro-ai-sug').innerHTML = PRO_AI_SUGGEST[m].map(function(x){ return '<button type="button" class="pro-chip" data-sug="'+proEsc_(x)+'">'+proEsc_(x)+'</button>'; }).join('');
   proAiLogRender_();
 }
 function proAiLogRender_(){
   var el = document.getElementById('pro-ai-log'); if (!el) return;
-  var hint = _proDock.mode==='customer' ? 'Hỏi về khách đang mở trong hồ sơ ('+proEsc_((function(){ try { var c = allCustomers.find(function(x){ return x.phone===currentPhone; }); return c ? c.name : 'chưa mở khách nào'; } catch(e){ return 'chưa mở khách nào'; } })())+').' : 'Hỏi về doanh số theo phạm vi bạn được xem (dữ liệu màn 🏠 Tổng quan).';
+  var hint = _proDock.mode==='price' ? 'Gõ tên sản phẩm để tra giá trong bảng giá (có thể kèm chất liệu, size, SAPHIA/RUBY). Giá lấy trực tiếp từ DANH_MUC, không do AI tự nghĩ.' : _proDock.mode==='customer' ? 'Hỏi về khách đang mở trong hồ sơ ('+proEsc_((function(){ try { var c = allCustomers.find(function(x){ return x.phone===currentPhone; }); return c ? c.name : 'chưa mở khách nào'; } catch(e){ return 'chưa mở khách nào'; } })())+').' : 'Hỏi về doanh số theo phạm vi bạn được xem (dữ liệu màn 🏠 Tổng quan).';
   el.innerHTML = (_proDock.log.length ? '' : '<div class="pro-ai-hint">'+hint+'</div>') + _proDock.log.map(function(m){
     return '<div class="pro-ai-m '+m.role+'">'+proAnswerHtml_(m.text)+(m.provider?'<div class="pro-ai-by">AI: '+proEsc_(m.provider)+'</div>':'')+'</div>'; }).join('');
   el.scrollTop = el.scrollHeight;
@@ -244,6 +270,14 @@ function proAiContext_(){
 async function proAiSend_(){
   if (_proDock.busy) return;
   var q = document.getElementById('pro-ai-q'), question = (q.value||'').trim(); if (!question) return;
+  // Hỏi GIÁ: ở chế độ 💰, hoặc câu có từ "giá" mà các chế độ khác "chưa hiểu" → tra thẳng bảng giá (không cần mở khách/Tổng quan)
+  if (_proDock.mode==='price' || (proPriceIntent_(question) && !proIntent_(_proDock.mode, question))){
+    _proDock.log.push({ role:'user', text:question }); q.value = ''; _proDock.busy = true;
+    _proDock.log.push({ role:'bot', text:'⏳ Đang tra bảng giá…' }); proAiLogRender_();
+    var pr = await proPriceRequest_(typeof gsUrl!=='undefined' ? gsUrl : '', proScrub_(question), fetch);
+    _proDock.log.pop(); _proDock.log.push({ role:'bot', text:proPriceFormat_(pr), provider:'Bảng giá DANH_MUC (tra trực tiếp, không dùng AI)' });
+    _proDock.busy = false; proAiLogRender_(); return;
+  }
   var ctx = proAiContext_();
   if (ctx.error){ _proDock.log.push({ role:'bot', text:ctx.error }); proAiLogRender_(); return; }
   if (PRO_AI_ENGINE==='rule'){
@@ -264,4 +298,4 @@ async function proAiSend_(){
   var init = function(){ try { proTabsLoad_(); proDockEnsure_(); proTabsRender_(); } catch(e){ console.warn('[ui-pro]',e); } };
   if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
-if (typeof module!=='undefined') module.exports = { proIntent_, proRuleCustomer_, proRuleSales_, proRuleAnswer_, proNorm_, proTabsAdd_, proTabsRemove_, proScrub_, proClip_, proCustomerContext_, proSalesContext_, proAskPrompt_, proAskRequest_, proAnswerHtml_ };
+if (typeof module!=='undefined') module.exports = { proIntent_, proRuleCustomer_, proRuleSales_, proRuleAnswer_, proNorm_, proTabsAdd_, proTabsRemove_, proScrub_, proClip_, proCustomerContext_, proSalesContext_, proAskPrompt_, proAskRequest_, proAnswerHtml_, proPriceIntent_, proPriceRequest_, proPriceFormat_ };
