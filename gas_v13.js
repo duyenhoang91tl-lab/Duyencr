@@ -1700,7 +1700,7 @@ var NTL_ACTIONS_ = {
   save:1, saveSingle:1, saveBatch:1, syncZaloFriendStatus:1, addCareLead:1, applyCustomerNameGuesses:1, dedupeCare:1,
   saveOrders:1, patchOrder:1, deleteOrder:1, deleteDuplicateOrders:1, replaceOrders:1, importSheetRows:1, archiveOrders:1,
   setOrderCareCS:1, setOrderCareCSBatch:1, saveAssign:1, saveAssignHistory:1, toggleAssignDone:1,
-  saveTask:1, deleteTask:1, saveTaskComment:1, taskFlows:1, taskRequests:1, saveTaskFlow:1, deleteTaskFlow:1, taskAdvance:1, taskRequestDecide:1, notifications:1, notifRead:1, notifMention:1, roleConfig:1, saveRoleConfig:1, saveTeams:1, saveMktTeams:1, saveSaleGroups:1, saveCareStatus:1,
+  saveTask:1, deleteTask:1, saveTaskComment:1, taskFlows:1, taskRequests:1, saveTaskFlow:1, deleteTaskFlow:1, taskAdvance:1, taskRequestDecide:1, taskReassign:1, notifications:1, notifRead:1, notifMention:1, roleConfig:1, saveRoleConfig:1, saveTeams:1, saveMktTeams:1, saveSaleGroups:1, saveCareStatus:1,
   broadcastMark:1, saveBroadcast:1, broadcastCancel:1, broadcastSetStatus:1, saveFollowUpTemplates:1, saveAudit:1
 };
 function _ntlKey_() { return 'ntl_' + Utilities.formatDate(new Date(), 'GMT+7', 'yyyyMMdd'); }
@@ -6292,6 +6292,7 @@ function doPostCore_(e) {
     if (action === 'deleteTaskFlow')      return deleteTaskFlow_(data.id);
     if (action === 'taskAdvance')         return taskAdvance_(data);
     if (action === 'taskRequestDecide')   return taskRequestDecide_(data);
+    if (action === 'taskReassign')        return taskReassign_(data);
     if (action === 'saveCareStatus')      return saveCareStatus_(data.careStatus);
     if (action === 'saveAIContext')        return saveAIContext_(data.type, data.content, data.context);
     // Xac thuc tai khoan (Pancake AI doi CS) — kiem tra mat khau PHIA SERVER, khong tra passHash ve client
@@ -10615,10 +10616,22 @@ function _taskActor_(p) {
   try { su = (p && p.token) ? _sessUser_(p.token) : null; } catch (e) { su = null; }
   if (su) {
     var al = [su.name, su.username].filter(function (x) { return x; }).map(String);
-    return { name: String(su.name || su.username), aliases: al, username: String(su.username || ''), verified: true };
+    return { name: String(su.name || su.username), aliases: al, username: String(su.username || ''), verified: true, role: String(su.role || '') };
   }
   var by = String((p && p.by) || '').trim();
-  return by ? { name: by, aliases: [by], username: '', verified: false } : null;
+  return by ? { name: by, aliases: [by], username: '', verified: false, role: '' } : null;
+}
+// Admin ep chuyen tiep: HUY moi yeu cau duyet dang cho cua viec (status=cancelled) de viec khong ket
+function _taskCancelPending_(taskId, actor) {
+  var rsh = getSheet_(SH_TASK_REQ, TASK_REQ_HEADERS), last = rsh.getLastRow(), n = 0;
+  if (last < 2) return 0;
+  var v = rsh.getRange(2, 1, last - 1, TASK_REQ_HEADERS.length).getValues();
+  for (var i = 0; i < v.length; i++) {
+    if (String(v[i][1]) === String(taskId) && String(v[i][6]) === 'pending') {
+      rsh.getRange(i + 2, 7, 1, 4).setValues([['cancelled', actor.name, new Date().toISOString(), 'Admin ép chuyển']]); n++;
+    }
+  }
+  return n;
 }
 function _taskInList_(list, actor) {
   if (!actor) return false;
@@ -10832,6 +10845,13 @@ function taskAdvance_(p) {
     if (t.stageIdx >= flow.stages.length) return jsonOut_({ error: 'Cong viec da hoan thanh' });
     var cur = flow.stages[t.stageIdx];
     var assignees = (t.stageAssignees || {})[cur.id] || [];
+    // ADMIN EP CHUYEN: chi khi co token phien that cua admin (khong tin co `force`/`by` tu client): bo qua quyen phu trach + buoc duyet
+    if (p.force) {
+      if (!(actor.verified && actor.role === 'admin')) return jsonOut_({ error: 'Chi admin (dang dang nhap) moi duoc ep chuyen tiep' });
+      var cancelled = _taskCancelPending_(t.id, actor);
+      var ntF = _taskDoAdvance_(sh, found, flow, actor.name, 'ADMIN ÉP CHUYỂN' + (cancelled ? ' (đã hủy ' + cancelled + ' yêu cầu duyệt đang chờ)' : '') + (p.note ? '. ' + p.note : ''), '', actor);
+      return jsonOut_({ ok: true, forced: true, stageIdx: ntF.stageIdx, status: ntF.status });
+    }
     if (!_taskInList_(assignees, actor) && !_taskInList_([t.createdBy], actor)) {
       return jsonOut_({ error: 'Ban khong phai nguoi phu trach giai doan "' + cur.name + '"' });
     }
@@ -10852,6 +10872,73 @@ function taskAdvance_(p) {
     }
     var nt = _taskDoAdvance_(sh, found, flow, actor.name, p.note || '', '', actor);
     return jsonOut_({ ok: true, stageIdx: nt.stageIdx, status: nt.status });
+  } finally { lock.releaseLock(); }
+}
+
+// DOI NGUOI PHU TRACH (assignees) va/hoac NGUOI DUYET (approvers) cua 1 giai doan CHUA XONG (nguoi nghi/qua tai).
+// Quyen: admin (token that) | nguoi tao viec | nguoi dang phu trach giai doan HIEN TAI. Giai doan da xong khong doi (giu lich su).
+// Neu giai doan hien tai dang co YEU CAU DUYET cho -> cap nhat luon danh sach nguoi duyet cua yeu cau do (khong de viec ket
+// vi nguoi duyet cu nghi). Nguoi MOI duoc thong bao.
+function taskReassign_(p) {
+  var actor = _taskActor_(p);
+  if (!p || !p.taskId || !p.stageId || !actor) return jsonOut_({ error: 'Thieu taskId/stageId' });
+  var hasAs = Array.isArray(p.assignees), hasAp = Array.isArray(p.approvers);
+  if (!hasAs && !hasAp) return jsonOut_({ error: 'Thieu danh sach nguoi' });
+  function clean(a) { var o = []; (a || []).forEach(function (n) { n = String(n || '').trim(); if (n && o.indexOf(n) < 0) o.push(n); }); return o; }
+  var names = hasAs ? clean(p.assignees) : null, aps = hasAp ? clean(p.approvers) : null;
+  if (hasAs && !names.length) return jsonOut_({ error: 'Giai doan can it nhat 1 nguoi phu trach' });
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(15000); } catch (e) { return jsonOut_({ error: 'He thong ban, thu lai' }); }
+  try {
+    var sh = getSheet_(SH_TASK, TASK_HEADERS);
+    var found = _taskFind_(sh, p.taskId);
+    if (!found) return jsonOut_({ error: 'Khong tim thay cong viec' });
+    var t = found.task, flow = t.flowId ? _taskFlowById_(t.flowId) : null;
+    if (!flow) return jsonOut_({ error: 'Cong viec khong co quy trinh' });
+    var idx = -1; flow.stages.forEach(function (x, i) { if (x.id === String(p.stageId)) idx = i; });
+    if (idx < 0) return jsonOut_({ error: 'Khong tim thay giai doan' });
+    if (idx < t.stageIdx || t.stageIdx >= flow.stages.length) return jsonOut_({ error: 'Giai doan nay da xong, khong doi nguoi duoc' });
+    var st = flow.stages[idx], curStage = flow.stages[t.stageIdx];
+    if (hasAp && !st.approval) return jsonOut_({ error: 'Giai doan "' + st.name + '" khong can nguoi duyet' });
+    var isAdmin = actor.verified && actor.role === 'admin';
+    if (!isAdmin && !_taskInList_([t.createdBy], actor) && !_taskInList_((t.stageAssignees || {})[curStage.id] || [], actor)) {
+      return jsonOut_({ error: 'Chi admin, nguoi tao viec hoac nguoi dang phu trach moi duoc doi nguoi phu trach' });
+    }
+    t.stageAssignees = t.stageAssignees || {}; t.stageApprovers = t.stageApprovers || {};
+    var oldNames = t.stageAssignees[st.id] || [], oldAps = t.stageApprovers[st.id] || [];
+    if (hasAs) t.stageAssignees[st.id] = names;
+    // yeu cau duyet DANG CHO cua giai doan nay -> doi nguoi duyet cua yeu cau (tinh truoc khi ghi bat ky thu gi)
+    var pend = null, effAps = null;
+    if (hasAp && idx === t.stageIdx) {
+      readTaskRequests_(t.id, true).forEach(function (q) { if (q.fromStageId === st.id) pend = q; });
+      if (pend) {
+        effAps = aps.slice();
+        if (!effAps.length && idx < flow.stages.length - 1) effAps = (t.stageAssignees[flow.stages[idx + 1].id] || []).slice();
+        effAps = effAps.filter(function (n) { return String(n).toLowerCase() !== String(pend.requestedBy).toLowerCase(); });
+        if (!effAps.length) return jsonOut_({ error: 'Dang co yeu cau cho duyet — phai co it nhat 1 nguoi duyet (khac nguoi gui)' });
+      }
+    }
+    if (hasAp) t.stageApprovers[st.id] = aps;
+    var all = {}; Object.keys(t.stageAssignees).forEach(function (k) { (t.stageAssignees[k] || []).forEach(function (n) { all[n] = 1; }); });
+    t.csAssigned = Object.keys(all); t.updatedAt = new Date().toISOString();
+    sh.getRange(found.rowIdx, 1, 1, TASK_HEADERS.length).setValues([_taskToRow_(t)]);
+    var parts = [];
+    if (hasAs) parts.push('người phụ trách: ' + (oldNames.join(', ') || '—') + ' → ' + names.join(', '));
+    if (hasAp) parts.push('người duyệt: ' + (oldAps.join(', ') || '—') + ' → ' + (aps.join(', ') || '—'));
+    _taskSysComment_(t.id, actor.name, 'đổi ' + parts.join('; ') + ' (giai đoạn "' + st.name + '")', 'system', '');
+    if (hasAs) {
+      var added = names.filter(function (n) { return oldNames.indexOf(n) < 0; });
+      _notifyTaskEvent_(added, actor, idx === t.stageIdx ? 'task_turn' : 'task_assign', t,
+        (idx === t.stageIdx ? 'giao bạn xử lý ngay giai đoạn "' : 'giao bạn phụ trách giai đoạn "') + st.name + '" của việc "' + t.title + '"');
+    }
+    if (pend) {
+      var rsh = getSheet_(SH_TASK_REQ, TASK_REQ_HEADERS), lr = rsh.getLastRow();
+      var cell = lr >= 2 ? rsh.getRange(2, 1, lr - 1, 1).createTextFinder(String(pend.id)).matchEntireCell(true).findNext() : null;
+      if (cell) rsh.getRange(cell.getRow(), 6).setValue(JSON.stringify(effAps));
+      var addedAp = effAps.filter(function (n) { return (pend.approvers || []).indexOf(n) < 0; });
+      _notifyTaskEvent_(addedAp, actor, 'task_request', t, 'xin bạn duyệt chuyển tiếp giai đoạn "' + st.name + '" của việc "' + t.title + '" (đổi người duyệt)');
+    }
+    return jsonOut_({ ok: true, assignees: t.stageAssignees[st.id], approvers: t.stageApprovers[st.id] || [] });
   } finally { lock.releaseLock(); }
 }
 

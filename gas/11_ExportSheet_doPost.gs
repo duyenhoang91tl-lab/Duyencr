@@ -331,6 +331,7 @@ function doPostCore_(e) {
     if (action === 'deleteTaskFlow')      return deleteTaskFlow_(data.id);
     if (action === 'taskAdvance')         return taskAdvance_(data);
     if (action === 'taskRequestDecide')   return taskRequestDecide_(data);
+    if (action === 'taskReassign')        return taskReassign_(data);
     if (action === 'saveCareStatus')      return saveCareStatus_(data.careStatus);
     if (action === 'saveAIContext')        return saveAIContext_(data.type, data.content, data.context);
     // Xac thuc tai khoan (Pancake AI doi CS) — kiem tra mat khau PHIA SERVER, khong tra passHash ve client
