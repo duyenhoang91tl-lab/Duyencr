@@ -975,3 +975,5 @@ body.demo-mode .dp-tab[data-tab="chat"]{display:none !important;}
 @media (max-width:1100px){ .sc-dock{width:380px;} }
 /* Khi hồ sơ đầy đủ đã gắn cạnh chat thì ẩn cột tóm tắt "Thông tin khách" (js/48) để không có 2 cột bên phải */
 .sc-docked #sc-info{display:none;}
+.srb-pct{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);}
+.srb-pct input{width:60px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);}

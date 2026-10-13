@@ -3,38 +3,13 @@
 // gọi action riêng ở backend. Tự phân loại đơn ≥15tr/<15tr và tính hoa hồng ở client qua
 // _computeCommissionData_() (đã định nghĩa cùng _resolveCommissionRate_/INDIVIDUAL_RATES ở trên).
 function renderSalesReportTabE_(wrap, subTabs){
-  var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
-  filters += _quickRangeSelectHtml(_srState.eDateQuick, "_srApplyQuickRange('eDateQuick','eDateFrom','eDateTo',this.value)");
-  filters += '<input type="date" value="'+esc(_srState.eDateFrom)+'" onchange="_srSetField(\'eDateFrom\',this.value);_srState.eDateQuick=\'custom\'" title="Từ ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
-  filters += '<span style="color:var(--muted)">→</span>';
-  filters += '<input type="date" value="'+esc(_srState.eDateTo)+'" onchange="_srSetField(\'eDateTo\',this.value);_srState.eDateQuick=\'custom\'" title="Đến ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
-  if (_srIsAdmin()){
-    filters += _srComboHtml('sr-sale-combo-e', 'eSale', 'saleBOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 190, true);
-    filters += _srComboHtml('sr-team-combo-e', 'eTeam', 'teamOptions', 'Lọc theo Team', '🔍 Tìm & chọn team...', 190, true);
-  } else if (currentUser.role === 'leader' && (_srState.leaderTeamOptions||[]).length){
-    filters += _srComboHtml('sr-sale-combo-e', 'eSale', 'leaderTeamOptions', 'Lọc theo tên (team của bạn)', '🔍 Tìm tên trong team...', 190, true);
-    filters += '<button class="btn sm" title="Xem lại hoa hồng của cả team (bỏ hết lựa chọn riêng)" onclick="_srState.eSale=_srState.leaderTeamOptions.slice();_srState.eSaleCustomized=false;_srApply()">🔄 Cả team</button>';
-  } else {
-    filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Sale</div>'+
-      '<div style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)">🔒 '+esc((_srState.eSale||[]).join(', ') || currentUser.name)+' — chỉ xem được hoa hồng của mình</div></div>';
-  }
-  filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
-  if (_srIsAdmin()) filters += '<div class="gear-menu">'+
-      '<button class="btn sm" onclick="_srToggleGearMenu(event,\'sr-gear-e\')">⚙ Cài đặt</button>'+
-      '<div class="gear-menu-list" id="sr-gear-e" onclick="event.stopPropagation()">'+
-        '<div onclick="closeGearMenus();openIndividualRatesModal()">⚙ % hoa hồng cá nhân</div>'+
-        '<div onclick="closeGearMenus();openBonusProgramsModal()">🏆 Chương trình thưởng</div>'+
-        '<div onclick="closeGearMenus();openSaleChannelsModal()">🏷️ Phân loại đội Sale</div>'+
-        '<div onclick="closeGearMenus();openGoldUnitModal()">💰 Đơn giá vàng (Pancake AI)</div>'+
-        '<div onclick="closeGearMenus();openChannelRatesModal()">📡 % hoa hồng theo Kênh</div>'+
-      '</div></div>';
-  filters += '</div>';
+  var filters = _srBarHtml_();
 
   var body = _srState.loading
     ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>'
     : _srEMismatchBanner_() + _srRenderE_(_srState.dataE);
 
-  wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + filters + body;
+  wrap.innerHTML = filters + body;
 }
 
 // ── Tính CHƯƠNG TRÌNH THƯỞNG cho các đơn đang lọc (dùng CHUNG d.orders với phần hoa hồng ở trên) ──
@@ -449,31 +424,13 @@ function _srRenderE_(d){
 //  tháng — sửa là áp dụng ngay, giống hệt cơ chế "% hoa hồng cá nhân" đã có.
 // ════════════════════════════════════════════════════════════════════
 function renderSalesReportTabF_(wrap, subTabs){
-  var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
-  filters += _quickRangeSelectHtml(_srState.fDateQuick, "_srApplyQuickRange('fDateQuick','fDateFrom','fDateTo',this.value)");
-  filters += '<input type="date" value="'+esc(_srState.fDateFrom)+'" onchange="_srSetField(\'fDateFrom\',this.value);_srState.fDateQuick=\'custom\'" title="Từ ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
-  filters += '<span style="color:var(--muted)">→</span>';
-  filters += '<input type="date" value="'+esc(_srState.fDateTo)+'" onchange="_srSetField(\'fDateTo\',this.value);_srState.fDateQuick=\'custom\'" title="Đến ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
-  if (_srIsAdmin()){
-    filters += _srComboHtml('sr-sale-combo-f', 'fSale', 'saleBOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 190);
-    filters += _srComboHtml('sr-team-combo-f', 'fTeam', 'teamOptions', 'Lọc theo Team', '🔍 Tìm & chọn team...', 190);
-  } else if (currentUser.role === 'leader' && (_srState.leaderTeamOptions||[]).length){
-    filters += _srComboHtml('sr-sale-combo-f', 'fSale', 'leaderTeamOptions', 'Lọc theo tên (team của bạn)', '🔍 Tìm tên trong team...', 190);
-    filters += '<button class="btn sm" title="Xem lại KPI của cả team (bỏ hết lựa chọn riêng)" onclick="_srState.fSale=_srState.leaderTeamOptions.slice();_srState.fSaleCustomized=false;_srApply()">🔄 Cả team</button>';
-  } else {
-    filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Sale</div>'+
-      '<div style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)">🔒 '+esc((_srState.fSale||[]).join(', ') || currentUser.name)+' — chỉ xem được KPI của mình</div></div>';
-  }
-  filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
-  if (_srIsAdmin()) filters += '<button class="btn sm" onclick="openSaleKpiConfigModal_()">🎯 Cài đặt KPI (bậc / commit riêng)</button>';
-  if (_srIsAdmin()) filters += '<button class="btn sm" onclick="openSaleChannelsModal()">🏷️ Phân loại đội Sale</button>';
-  filters += '</div>';
+  var filters = _srBarHtml_();
 
   var body = _srState.loading
     ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>'
     : _srRenderF_(_srState.dataF);
 
-  wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + filters + body;
+  wrap.innerHTML = filters + body;
 }
 
 function _srRenderF_(d){
@@ -799,37 +756,7 @@ function _srGExportXlsx_(){
 }
 
 function _srGFiltersHtml_(){
-  var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
-  filters += _quickRangeSelectHtml(_srState.gDateQuick, "_srApplyQuickRange('gDateQuick','gDateFrom','gDateTo',this.value)");
-  filters += '<input type="date" value="'+esc(_srState.gDateFrom)+'" onchange="_srSetField(\'gDateFrom\',this.value);_srState.gDateQuick=\'custom\'" title="Từ ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
-  filters += '<span style="color:var(--muted)">→</span>';
-  filters += '<input type="date" value="'+esc(_srState.gDateTo)+'" onchange="_srSetField(\'gDateTo\',this.value);_srState.gDateQuick=\'custom\'" title="Đến ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
-  if (_srIsAdmin()){
-    filters += _srComboHtml('sr-sale-combo-g', 'gSale', 'saleBOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 190);
-  } else if (currentUser.role === 'leader' && (_srState.leaderTeamOptions||[]).length){
-    filters += _srComboHtml('sr-sale-combo-g', 'gSale', 'leaderTeamOptions', 'Lọc theo tên (team của bạn)', '🔍 Tìm tên trong team...', 190);
-    filters += '<button class="btn sm" title="Xem lại cả team (bỏ hết lựa chọn riêng)" onclick="_srState.gSale=_srState.leaderTeamOptions.slice();_srState.gSaleCustomized=false;_srApply()">🔄 Cả team</button>';
-  } else {
-    filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Sale</div>'+
-      '<div style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)">🔒 '+esc((_srState.gSale||[]).join(', ') || currentUser.name)+' — chỉ xem được thưởng của mình</div></div>';
-  }
-  filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
-  filters += '<div class="gear-menu"><button class="btn sm" onclick="_srToggleGearMenu(event,\'sr-gear-g-export\')">⬇️ Xuất Excel / CSV</button>'+
-    '<div class="gear-menu-list" id="sr-gear-g-export" onclick="event.stopPropagation()">'+
-      '<div onclick="closeGearMenus();_srGExportXlsx_()"><b>📗 Excel đầy đủ (gửi kế toán) — 3 sheet</b></div>'+
-      '<div onclick="closeGearMenus();_srGExportCsv_(\'summary\')">📊 Tổng hợp (theo Sale + theo chương trình)</div>'+
-      '<div onclick="closeGearMenus();_srGExportCsv_(\'detail\')">🧾 Chi tiết từng lượt thưởng</div>'+
-      '<div onclick="closeGearMenus();_srGExportCsv_(\'orders\')">📦 Đơn Pos dùng để tính (đối chiếu)</div>'+
-    '</div></div>';
-  if (_srIsAdmin()) filters += '<div class="gear-menu">'+
-      '<button class="btn sm" onclick="_srToggleGearMenu(event,\'sr-gear-g\')">⚙ Cài đặt</button>'+
-      '<div class="gear-menu-list" id="sr-gear-g" onclick="event.stopPropagation()">'+
-        '<div onclick="closeGearMenus();openBonusProgramsModal()">🏆 Chương trình thưởng</div>'+
-        '<div onclick="closeGearMenus();openSaleChannelsModal()">🏷️ Phân loại Online/Offline/Thử việc</div>'+
-      '</div></div>';
-  filters += '</div>';
-
-  return filters;
+  return _srBarHtml_();
 }
 function renderSalesReportTabG_(wrap, subTabs){
   var filters = _srGFiltersHtml_();
@@ -837,7 +764,7 @@ function renderSalesReportTabG_(wrap, subTabs){
     ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>'
     : _srRenderG_(_srState.dataG);
 
-  wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + filters + body;
+  wrap.innerHTML = filters + body;
 }
 
 function openSaleKpiConfigModal_(){

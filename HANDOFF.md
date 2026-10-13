@@ -98,3 +98,11 @@ Yeu cau cua Duyen: Chat noi bo hien thi duoc o cua so chat nho o goc duoi phai (
 - Chi hien khi dang o tab khac (o tab Chat da co khung day du); an tren dien thoai (<=720px). Dat `right:76px;bottom:38px` de khong de len chuong nhac hen (css/01-base) / dock AI / thanh tab ho so (css/06-pro).
 - Test: `node tools/test-chat-mini.js` (can jsdom, mat ~20s vi cho poll 12s; thieu jsdom thi tu bo qua).
 - Chua lam / chua thu tren trinh duyet that: tra loi (↩) va xoa tin trong cua so nho (van dung duoc o tab Chat day du); keo tha vi tri cua so; am thanh/nhay tieu de khi co tin moi (hien chi co toast san co + huy hieu).
+
+### Cập nhật (13/10/2026, đợt 3) — MỌI báo cáo A–L dùng thanh gọn + menu lọc
+- `_srBarHtml_()` (js/13) dựng thanh dùng chung: ô chọn báo cáo · ngày (nhanh + từ/đến) · 🔎 Bộ lọc · Lọc · 🧰 Tác vụ. Cấu hình từng báo cáo nằm ở `_srbMenuCats_()` (mục lọc, theo `_srState.sub`) và `_srbSubCfg_()` (khoá ngày, tác vụ, phần phụ như "🔄 Cả team", ô "Tỷ lệ chia" của L).
+- Đã chuyển: A, B, C (giữ khối Tuần/Tháng/Quý/Năm/Tuỳ chỉnh 2 khoảng ngày), D, E, F, G (+K dùng chung `_srGFiltersHtml_`), H, I, L. Bỏ hàng tiêu đề + dải chọn báo cáo cũ (J = nhập dữ liệu chưa đổi).
+- Kiểu mục menu: `flat` (tick nhiều), `tree` (nhóm→con), `text`, `radio` (chọn 1; `render:true` = vẽ lại ngay, dùng cho Team/CS/Cách nhóm của H và I vì lọc phía client), `toggle` (công tắc; `apply:true` = tải lại).
+- Tác vụ gom các nút cũ: xuất Excel/CSV/Sheet, cài đặt (hoa hồng cá nhân, chương trình thưởng, phân loại đội, KPI, đơn giá vàng…), Ẩn/Hiện bộ lọc KH. Item "Xuất ra Sheet" giữ id `sr-export-sheet-btn`.
+- Phân quyền giữ nguyên: CS thường chỉ có chip 🔒 + Tác vụ tối thiểu; leader ở E/F/G có mục "Tên (team của bạn)" + nút Cả team.
+- Test: `node tools/test-srb-filter-menu.js` (~70 ca). Chưa xem thử trên trình duyệt thật.

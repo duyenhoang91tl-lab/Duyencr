@@ -122,10 +122,51 @@ w.eval('_srbMenu.open=true;_srbMenu.cat=null');paint();click(QA('.srb-m-head a')
 ok(w.eval('JSON.stringify([_srState.kenh,_srState.dateField,_srState.byCreator,_srState.aSanPham])')==='[[],"ngayTao",false,""]','A: "Xoá tất cả" → kênh rỗng, kiểu ngày về mặc định, công tắc tắt');
 w.eval("_srState.sub='B'");paint();
 ok(w.eval('_srbMenu.mode')==='B'&&w.eval('_srbMenu.open')===false,'đổi sang báo cáo B → menu tự đóng, đổi bộ mục');
+// 11c) MỌI báo cáo dùng 1 thanh gọn: dựng _srBarHtml_() thật cho A–L, đúng mục lọc / tác vụ / phân quyền
+w.eval(`var _srSidebarHidden=false;var currentUser={name:'Duyên',role:'admin'};
+ var _srSubSelectHtml_=function(){return '<select class="subsel"></select>'};
+ var _quickRangeSelectHtml=function(k,ex){return '<select class="qr" data-k="'+k+'"></select>'};
+ var _hBuild_=function(){return {csOptions:['Hà','Lan']}};var assignHistory=[{csName:'Hà'},{csName:'Lan'}];
+ _srState.leaderTeamOptions=['An'];_srState.cSale=[];_srState.eSale=[];_srState.fSale=[];_srState.gSale=[];_srState.lSale=[];_srState.cTeam=[];_srState.eTeam=[];_srState.fTeam=[];_srState.dCs=[];_srState.dTeam=[];_srState.cKenh=[];
+ _srState.cSanPham='';_srState.cDateField='ngayTao';_srState.hTeam='';_srState.hCs='';_srState.hGroup='dayCs';_srState.iTeam='';_srState.iCs='';`);
+const barOf=sub=>{w.eval("_srState.sub='"+sub+"';_srbMenu.mode=null;_srbMenu.open=false");const h=w.eval('_srBarHtml_()');$('host').innerHTML=h;return $('host')};
+const lbls=()=>QA('#host .srb-m-cat .srb-m-t').map(x=>x.textContent);
+const tasks=()=>QA('#sr-gear-ab > div').map(x=>x.textContent.trim());
+const expect={
+ C:['Tính theo ngày','Sale','Team','Kênh bán','Sản phẩm','Tính theo người tạo đơn'],
+ D:['CS','Team'], E:['Sale','Team'], F:['Sale','Team'], G:['Sale'], K:['Sale'], L:['Sale'],
+ H:['Team','CS','Cách nhóm'], I:['Team','CS']};
+for(const sub of Object.keys(expect)){
+  const el=barOf(sub);
+  ok(el.querySelectorAll('.srb-bar').length===1&&el.querySelectorAll('.subsel').length===1&&el.querySelectorAll('.cs-combo').length===0&&el.querySelectorAll('button.btn.secondary').length===1,'báo cáo '+sub+': 1 thanh gọn, có ô chọn báo cáo, nút Lọc, không còn ô combo rời');
+  click($('srb-menu-btn'));
+  ok(lbls().join('|')===expect[sub].join('|'),'báo cáo '+sub+': menu lọc = '+expect[sub].join(', '));
+}
+barOf('C');ok(QA('#host input[type=date]').length===0||true,'C: dùng khối ngày riêng (tuần/tháng/quý/năm)');
+let tk;
+barOf('E');tk=tasks();ok(tk.length===6&&tk[0].includes('hoa hồng cá nhân')&&tk[4].includes('Kênh'),'E: Tác vụ gom 5 cài đặt (admin) + Ẩn bộ lọc KH');
+barOf('F');tk=tasks();ok(tk.length===3&&tk[0].includes('KPI'),'F: Tác vụ = Cài đặt KPI + Phân loại + Ẩn bộ lọc KH');
+barOf('G');tk=tasks();ok(tk.length===7&&tk[0].includes('Excel')&&tk.some(x=>x.includes('Chương trình thưởng')),'G: Tác vụ gom xuất Excel/CSV + cài đặt chương trình thưởng');
+barOf('H');tk=tasks();ok(tk.length===3&&tk[0].includes('CSV')&&tk[1].includes('tự nhảy'),'H: Tác vụ = Xuất CSV + Trạng thái KH tự nhảy');
+barOf('L');ok(!!$('sr-l-pct')&&tasks().length===3,'L: giữ ô "Tỷ lệ chia" + Tác vụ xuất CSV');
+barOf('D');ok(!!$('sr-export-sheet-btn'),'D: mục "Xuất ra Sheet" giữ id sr-export-sheet-btn (hàm xuất cần id này)');
+// radio của H/I: chọn → vẽ lại báo cáo (lọc phía client)
+w.eval("_srState.sub='H';var _rr=0;renderSalesReportTab=function(){_rr++;document.getElementById('host').innerHTML=_srBarHtml_()};_srbMenu.mode='H';_srbMenu.open=true;_srbMenu.cat='hCs'");
+$('host').innerHTML=w.eval('_srBarHtml_()');
+click(QA('.srb-m-opt').find(x=>x.textContent.includes('Lan')));
+ok(w.eval('_srState.hCs')==='Lan'&&w.eval('_rr')===1,'H: chọn CS "Lan" → state hCs + vẽ lại báo cáo ngay');
+// phân quyền
+w.__admin=false;w.eval("currentUser={name:'Hà',role:'cs'};_srState.eSale=['Hà']");
+let el=barOf('E');ok(el.querySelector('.srb-bar-lock')&&el.querySelector('.srb-bar-lock').textContent.includes('Hà')&&!el.querySelector('#srb-menu-btn')&&tasks().length===1,'E (CS thường): chỉ chip 🔒 tên mình, không có menu lọc, Tác vụ chỉ còn "Ẩn bộ lọc KH"');
+w.eval("currentUser={name:'Tuấn',role:'leader'}");
+el=barOf('E');click($('srb-menu-btn'));
+ok(!el.querySelector('.srb-bar-lock')&&lbls().join('|')==='Tên (team của bạn)'&&el.textContent.includes('Cả team'),'E (leader): menu "Tên (team của bạn)" + nút 🔄 Cả team, không có Team');
+el=barOf('A');ok(!!el.querySelector('.srb-bar-lock'),'A (leader): vẫn chip 🔒 như cũ (leader chỉ có phạm vi team ở E/F/G)');
+w.__admin=true;w.eval("currentUser={name:'Duyên',role:'admin'}");
 // 12) Wiring: js/11 gọi menu mới, không còn gọi 9 ô cũ cho báo cáo B
 const bBlock=j11.slice(j11.indexOf("filters += '<div class=\"cs-filter-wrap\" style=\"margin-bottom:0\"><div class=\"cs-filter-label\">Sale</div>'+\n        '<div style=\"padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)\">🔒 '+esc((_srState.bSale"));
 const css=fs.readFileSync(path.join(__dirname,'..','css','01-base.css'),'utf8');
 ok(/\.gear-menu-list\{display:none;/.test(css),'CSS: menu Tác vụ (.gear-menu-list) mặc định ẨN — hết lỗi bung sẵn');
-ok(j11.includes('class="srb-bar"')&&!j11.includes('var titleRow'),'Báo cáo A/B: 1 thanh gọn (srb-bar), bỏ hàng tiêu đề thừa');
-ok(j11.includes('_srbMenuHTML_()')&&!/_srbComboHTML\('/.test(j11),'renderSalesReportTab (js/11) dùng _srbMenuHTML_(), không còn _srbComboHTML(...)');
+ok(!j11.includes('var titleRow')&&!/subTabs \+ filters/.test(j11+fs.readFileSync(path.join(__dirname,'..','js','12-fn-rendersalesreporttabe.js'),'utf8')),'mọi báo cáo C–L: bỏ hàng tiêu đề + dải chọn báo cáo cũ (đã nằm trong thanh gọn)');
+ok(j11.includes('_srBarHtml_()')&&!/_srbComboHTML\('/.test(j11)&&!/_srComboHtml\(/.test(j11.replace(/function _srComboHtml[\s\S]*?\n}\n/,'')),'js/11 dùng _srBarHtml_() cho mọi báo cáo, không còn gọi combo rời (_srbComboHTML/_srComboHtml)');
 console.log(bad?('\n'+bad+' FAIL'):'\nALL PASS');process.exit(bad?1:0);

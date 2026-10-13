@@ -163,7 +163,7 @@ function _bdRenderBody_(d){
 }
 function renderSalesReportTabK_(wrap, subTabs){
   var body = _srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _bdRenderBody_(_srState.dataG);
-  wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + _srGFiltersHtml_() +
+  wrap.innerHTML = _srGFiltersHtml_() +
     '<div style="margin-bottom:10px"><button class="btn sm" onclick="_srSetSub(\'G\')">← Về báo cáo thưởng</button></div>' + body;
 }
 

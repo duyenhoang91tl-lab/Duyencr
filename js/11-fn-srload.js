@@ -558,30 +558,7 @@ function renderSalesReportTab(){
   if (_srState.sub === 'L') { renderSalesReportTabL_(wrap, subTabs); return; }
   if (_srState.sub === 'K') { renderSalesReportTabK_(wrap, subTabs); return; }
 
-  // THANH CÔNG CỤ GỌN (Báo cáo A/B): chọn báo cáo · khoảng ngày · 🔎 Bộ lọc (menu nhiều cấp) · Lọc · 🧰 Tác vụ — trên 1 hàng, tự xuống dòng khi màn hẹp.
-  var bar = '<div class="srb-bar">';
-  bar += _srSubSelectHtml_();
-  bar += _quickRangeSelectHtml(_srState.dateQuick, "_srApplyQuickRange('dateQuick','dateFrom','dateTo',this.value)");
-  bar += '<input type="date" value="'+esc(_srState.dateFrom)+'" onchange="_srSetField(\'dateFrom\',this.value);_srState.dateQuick=\'custom\'" title="Từ ngày">';
-  bar += '<span class="srb-bar-arrow">→</span>';
-  bar += '<input type="date" value="'+esc(_srState.dateTo)+'" onchange="_srSetField(\'dateTo\',this.value);_srState.dateQuick=\'custom\'" title="Đến ngày">';
-  if (!_srIsAdmin()){
-    var _lockNames = ((_srState.sub === 'A' ? _srState.sale : _srState.bSale) || []).join(', ') || currentUser.name;
-    bar += '<span class="srb-bar-lock" title="Bạn chỉ xem được báo cáo của mình">🔒 '+esc(_lockNames)+'</span>';
-  }
-  // MỘT menu lọc duy nhất: A = Sale/Team/Kênh/Sản phẩm/Tính theo ngày/Tính theo người tạo đơn;
-  // B = Sale/Team/Nguồn đơn/Marketer/Sản phẩm/Tình trạng CS/Trạng thái KH/Kết bạn Zalo/Nick Zalo. Xem _srbMenuHTML_ ở js/13.
-  bar += _srbMenuHTML_();
-  bar += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
-  // Tác vụ (Xuất Excel / Cập nhật Sheet / Ẩn-Hiện Page & Sale / Ẩn bộ lọc KH) — menu thả xuống dùng .gear-menu
-  bar += '<div class="gear-menu"><button class="btn sm" onclick="_srToggleGearMenu(event,\'sr-gear-ab\')">🧰 Tác vụ ▾</button>'+
-    '<div class="gear-menu-list" id="sr-gear-ab" onclick="event.stopPropagation()">'+
-      '<div onclick="closeGearMenus();exportSalesReport()">📊 Xuất Excel</div>'+
-      (_srIsAdmin() ? '<div id="sr-export-sheet-btn" title="'+(_srState.sub==='A' ? 'Ghi đè vào ĐÚNG 1 tab cố định (BC_A_Base) — không tạo tab mới mỗi lần xuất' : 'Tạo 1 tab mới có timestamp, giữ lại lịch sử các lần xuất trước')+'" onclick="closeGearMenus();exportSalesReportToSheet()">'+(_srState.sub==='A' ? '📌 Cập nhật Sheet Base' : '📄 Xuất ra Sheet')+'</div>' : '')+
-      (_srIsAdmin() ? '<div onclick="closeGearMenus();_srToggleHiddenPanel()" title="Chọn Page/kênh và Sale không thuộc phạm vi quản lý để ẩn khỏi mọi báo cáo chung">👁 Ẩn/Hiện Page &amp; Sale</div>' : '')+
-      '<div onclick="closeGearMenus();_srToggleSidebar()">'+(_srSidebarHidden ? '📂 Hiện bộ lọc KH' : '📁 Ẩn bộ lọc KH — chụp màn hình')+'</div>'+
-    '</div></div>';
-  bar += '</div>';
+  var bar = _srBarHtml_();
 
   var body = '';
   var hiddenPanelHtml = (_srIsAdmin() && _srState.hiddenPanelOpen) ? _srHiddenPageSaleHtml() : '';
@@ -1014,7 +991,7 @@ function _srApplyQuickC(which, key){
 }
 function renderSalesReportTabC_(wrap, subTabs){
   var pt = _srState.cPeriodType;
-  var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
+  var filters = '';
   filters += '<select onchange="_srState.cPeriodType=this.value;renderSalesReportTab()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
     '<option value="week"'+(pt==='week'?' selected':'')+'>Theo Tuần (Thứ 2 → CN)</option>'+
     '<option value="month"'+(pt==='month'?' selected':'')+'>Theo Tháng</option>'+
@@ -1046,31 +1023,10 @@ function renderSalesReportTabC_(wrap, subTabs){
       '<span style="color:var(--muted)">→</span>'+
       '<input type="date" value="'+esc(_srState.cCustomPrevTo)+'" onchange="_srState.cCustomPrevTo=this.value" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
   }
-  filters += '<select onchange="_srState.cDateField=this.value" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-    '<option value="ngayTao"'+(_srState.cDateField==='ngayTao'?' selected':'')+'>Lọc theo Ngày tạo</option>'+
-    '<option value="thoiGianHT"'+(_srState.cDateField==='thoiGianHT'?' selected':'')+'>Lọc theo Thời gian hoàn thành</option>'+
-    '</select>';
-  if (_srIsAdmin()){
-    filters += _srComboHtml('sr-sale-combo-c', 'cSale', 'saleOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 170);
-    filters += _srComboHtml('sr-team-combo-c', 'cTeam', 'teamOptions', 'Lọc theo Team', '🔍 Tìm & chọn team...', 190);
-  } else {
-    filters += '<div class="cs-filter-wrap" style="margin-bottom:0"><div class="cs-filter-label">Sale</div>'+
-      '<div style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)">🔒 '+esc((_srState.cSale||[]).join(', ') || currentUser.name)+' — chỉ xem được báo cáo của mình</div></div>';
-  }
-  filters += _srComboHtml('sr-kenh-combo-c', 'cKenh', 'kenhOptions', 'Lọc theo Kênh bán', '🔍 Tìm & chọn kênh bán...', 170);
-  filters += '<div><div style="font-size:10px;color:var(--hint);margin-bottom:2px">Sản phẩm (cách nhau bằng dấu phẩy)</div>'+
-    '<input type="text" value="'+esc(_srState.cSanPham||'')+'" onchange="_srSetField(\'cSanPham\',this.value)" placeholder="vd: tỳ hưu, nhẫn 10k" style="min-width:170px;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-    '</div>';
-  filters += '<label style="display:flex;align-items:center;gap:5px;padding:5px 9px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;cursor:pointer" title="Tích: mỗi đơn tính TOÀN BỘ kết quả cho đúng 1 người — người được ghi trong cột \'Người tạo\' của DT TỔNG (không phải \'Sale bán\'). Bỏ tích: chia đều cho tất cả sale đứng tên trên đơn (mặc định). Dùng chung 1 lựa chọn với Báo cáo A.">'+
-    '<input type="checkbox" '+(_srState.byCreator?'checked':'')+' onchange="_srState.byCreator=this.checked;_srApply()">'+
-    'Tính theo người tạo đơn</label>';
-  filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
-  filters += '<button class="btn sm" onclick="exportSalesReportC()">📊 Xuất Excel</button>';
-  if (_srIsAdmin()) filters += '<button class="btn sm" id="sr-export-sheet-btn" onclick="exportSalesReportToSheet()">📄 Xuất ra Sheet</button>';
-  filters += '</div>';
+  filters = _srBarHtml_(filters);
 
   var body = _srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _srRenderC(_srState.dataC);
-  wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + filters + body;
+  wrap.innerHTML = filters + body;
 }
 
 function _impParseFile(file, kind){ // kind: 'base' | 'pos'
@@ -1195,16 +1151,7 @@ function _moreRowsShow_(key, total, rerenderFn){
   if (typeof window[rerenderFn] === 'function') window[rerenderFn]();
 }
 function renderSalesReportTabD_(wrap, subTabs){
-  var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
-  filters += _quickRangeSelectHtml(_srState.dDateQuick, "_srApplyQuickRange('dDateQuick','dDateFrom','dDateTo',this.value)");
-  filters += '<input type="date" value="'+esc(_srState.dDateFrom)+'" onchange="_srState.dDateFrom=this.value;_srState.dDateQuick=\'custom\'" title="Từ ngày thêm" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
-  filters += '<span style="color:var(--muted)">→</span>';
-  filters += '<input type="date" value="'+esc(_srState.dDateTo)+'" onchange="_srState.dDateTo=this.value;_srState.dDateQuick=\'custom\'" title="Đến ngày thêm" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
-  filters += _srComboHtml('sr-cs-combo-d', 'dCs', 'saleOptions', 'Lọc theo CS', '🔍 Tìm & chọn CS...', 190);
-  filters += _srComboHtml('sr-team-combo-d', 'dTeam', 'teamOptions', 'Lọc theo Team', '🔍 Tìm & chọn team...', 190);
-  filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
-  filters += '<button class="btn sm" id="sr-export-sheet-btn" onclick="exportSalesReportToSheet()">📄 Xuất ra Sheet</button>';
-  filters += '</div>';
+  var filters = _srBarHtml_();
 
   var body;
   if (_srState.loading) {
@@ -1239,7 +1186,7 @@ function renderSalesReportTabD_(wrap, subTabs){
       body = html;
     }
   }
-  wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + filters + body;
+  wrap.innerHTML = filters + body;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1350,26 +1297,9 @@ async function _srLSavePct_(){
   } catch(e){ toast('❌ Lỗi lưu: '+e.message); }
 }
 function renderSalesReportTabL_(wrap, subTabs){
-  var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
-  filters += _quickRangeSelectHtml(_srState.lDateQuick, "_srApplyQuickRange('lDateQuick','lDateFrom','lDateTo',this.value)");
-  filters += '<input type="date" value="'+esc(_srState.lDateFrom)+'" onchange="_srSetField(\'lDateFrom\',this.value);_srState.lDateQuick=\'custom\'" title="Từ ngày (ngày khách qua cửa hàng)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
-  filters += '<span style="color:var(--muted)">→</span>';
-  filters += '<input type="date" value="'+esc(_srState.lDateTo)+'" onchange="_srSetField(\'lDateTo\',this.value);_srState.lDateQuick=\'custom\'" title="Đến ngày" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">';
-  if (_srIsAdmin()){
-    filters += _srComboHtml('sr-sale-combo-l', 'lSale', 'saleBOptions', 'Lọc theo Sale', '🔍 Tìm & chọn sale...', 190);
-  } else {
-    filters += '<div style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted)">🔒 '+esc((_srState.lSale||[]).join(', ') || currentUser.name)+' — chỉ xem khách của mình</div>';
-  }
-  filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
-  filters += '<div class="gear-menu"><button class="btn sm" onclick="_srToggleGearMenu(event,\'sr-gear-l-export\')">⬇️ Xuất CSV</button>'+
-    '<div class="gear-menu-list" id="sr-gear-l-export" onclick="event.stopPropagation()">'+
-      '<div onclick="closeGearMenus();_srLExportCsv_(\'detail\')">🧾 Chi tiết từng đơn (kèm mã bộ đếm + dòng Pos — đối chiếu kế toán)</div>'+
-      '<div onclick="closeGearMenus();_srLExportCsv_(\'summary\')">📊 Tổng hợp theo Sale</div>'+
-    '</div></div>';
-  if (_srIsAdmin()) filters += '<span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--muted)">Tỷ lệ chia <input id="sr-l-pct" type="number" min="1" max="100" step="0.5" value="'+esc((_srState.dataL && _srState.dataL.sharePct) || 30)+'" style="width:60px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">%<button class="btn sm" onclick="_srLSavePct_()">Lưu</button></span>';
-  filters += '</div>';
+  var filters = _srBarHtml_();
   var body = _srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _srRenderL_(_srState.dataL);
-  wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + filters + body;
+  wrap.innerHTML = filters + body;
 }
 function _srLExportCsv_(kind){
   var d = _srState.dataL;
