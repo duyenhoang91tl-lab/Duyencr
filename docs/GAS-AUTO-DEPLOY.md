@@ -41,3 +41,15 @@ Actions → Deploy GAS to Apps Script → Run workflow. Job xanh là xong; bư�
 - **"Could not read API credentials. Are you logged in globally?"** (bước `clasp pull`): secret `CLASPRC_JSON` sai định dạng/thiếu. Workflow nay tự kiểm tra và báo rõ ở bước "Nạp đăng nhập clasp": JSON hỏng (dán thiếu), thiếu `refresh_token` (cần `clasp login` lại), hoặc tự chọn đúng bản clasp cho file của clasp 2.x (`token`) hay 3.x (`tokens.default`). Dán lại TOÀN BỘ `cat ~/.clasprc.json` (từ `{` đến `}`) nếu bước này báo lỗi.
 - Phải bật **Google Apps Script API** tại https://script.google.com/home/usersettings bằng đúng tài khoản đã `clasp login`.
 - `GAS_SCRIPT_ID` là **Script ID** (Project Settings của dự án Apps Script), không phải ID deployment.
+
+## Lỗi "Script has reached the limit of 200 versions" (2026-10-12)
+**Nguyên nhân gốc:** mỗi lần `clasp deploy` tạo 1 *phiên bản* mới; Apps Script cho tối đa **200 phiên bản/dự án** và **API không có lệnh xoá phiên bản** (chỉ xoá tay trên giao diện) nên CI không tự dọn được. Code vẫn được đẩy lên (`clasp push`) nhưng **deployment không được cập nhật** → CRM chạy bản cũ dù "code đúng" trên GitHub.
+
+**Cách gỡ (làm tay 1 lần, ~2 phút):** script.google.com → mở dự án → menu trái **Lịch sử dự án / Project history** → tick các phiên bản CŨ (giữ khoảng 20 bản mới nhất, và không xoá bản đang gắn với deployment) → **Xoá**. Rồi trong GitHub → Actions → "Deploy GAS to Apps Script" → **Re-run jobs** (hoặc Run workflow).
+
+**CI đã được sửa để đỡ tốn phiên bản + báo sớm (workflow `deploy-gas.yml`, `tools/gas-same-as-live.py`):**
+- Bước "So với bản đang chạy": kéo code của phiên bản mà deployment đang chạy rồi so với `gas/*.gs`; **giống hệt thì bỏ qua push + deploy** (các lần chỉ sửa workflow/`split-gas.js`, hoặc chạy lại không tốn thêm phiên bản). Không đọc được/không chắc → cứ deploy (an toàn).
+- Đếm số phiên bản: ≥150 hiện cảnh báo vàng, ≥190 hiện lỗi đỏ nhắc dọn trước khi đầy (đếm bằng `clasp versions`, chỉ mang tính nhắc).
+- Khi vẫn đầy 200: lỗi hiện tiếng Việt kèm cách xử lý ngay trong trang Actions.
+- Mẹo giảm số phiên bản về lâu dài: gom nhiều thay đổi GAS vào ít lần push (mỗi push đụng `gas_v13.js` = 1 phiên bản), vì nhiều phiên cùng sửa repo.
+

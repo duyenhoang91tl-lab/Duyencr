@@ -92,17 +92,50 @@ jobs:
           path: /tmp/pulled
           retention-days: 7
 
+      # Mỗi lần deploy tạo 1 PHIÊN BẢN mới; Apps Script chỉ cho tối đa 200 phiên bản/dự án và API KHÔNG xoá được phiên bản (chỉ xoá tay trên giao diện).
+      # Nên: (1) bỏ qua deploy nếu code y hệt bản deployment đang chạy; (2) cảnh báo sớm khi sắp đầy. Mọi lỗi ở bước so sánh => cứ deploy (an toàn).
+      - name: So với bản đang chạy và đếm số phiên bản (tránh deploy thừa, báo sớm khi sắp đủ 200)
+        id: cmp
+        run: |
+          printf '{"scriptId":"%s","rootDir":"gas"}' "${{ secrets.GAS_SCRIPT_ID }}" > .clasp.json
+          echo "same=false" >> "$GITHUB_OUTPUT"
+          N=$(clasp versions 2>/dev/null | head -1 | grep -oE '^[0-9]+' || true)
+          if [ -n "$N" ]; then
+            echo "Số phiên bản hiện có: $N / 200"
+            if [ "$N" -ge 190 ]; then echo "::error title=Apps Script sắp/đã đủ 200 phiên bản ($N)::Vào script.google.com → dự án → Lịch sử dự án (Project history) → chọn các phiên bản CŨ (giữ khoảng 20 bản mới nhất) → Xoá. Nếu không, lần deploy sau sẽ lỗi."; 
+            elif [ "$N" -ge 150 ]; then echo "::warning title=Apps Script đã có $N/200 phiên bản::Nên dọn các phiên bản cũ trong Lịch sử dự án (Project history) trước khi đầy."; fi
+          fi
+          DEP=$(clasp deployments 2>/dev/null | grep -F "$DEPLOYMENT_ID" | grep -oE '@[0-9]+' | head -1 | tr -d '@' || true)
+          if [ -n "$DEP" ]; then
+            echo "Deployment đang chạy phiên bản @$DEP"
+            rm -rf /tmp/live && mkdir -p /tmp/live && ( cd /tmp/live && printf '{"scriptId":"%s","rootDir":"."}' "${{ secrets.GAS_SCRIPT_ID }}" > .clasp.json && clasp pull --versionNumber "$DEP" >/dev/null 2>&1 ) || true
+            if python3 tools/gas-same-as-live.py gas /tmp/live; then echo "same=true" >> "$GITHUB_OUTPUT"; echo "Code giống hệt bản đang chạy => bỏ qua deploy (không tốn thêm phiên bản)."; fi
+          else
+            echo "Không đọc được phiên bản của deployment => cứ deploy."
+          fi
+
       - name: Đẩy code lên Apps Script
+        if: steps.cmp.outputs.same != 'true'
         run: |
           printf '{"scriptId":"%s","rootDir":"gas"}' "${{ secrets.GAS_SCRIPT_ID }}" > .clasp.json
           clasp push --force
 
       - name: Cập nhật deployment (giữ nguyên URL)
+        if: steps.cmp.outputs.same != 'true'
         run: |
           SHORT=$(git rev-parse --short HEAD)
-          clasp deploy --deploymentId "$DEPLOYMENT_ID" --description "auto $SHORT $(date -u +%Y-%m-%dT%H:%MZ)"
+          set +e
+          OUT=$(clasp deploy --deploymentId "$DEPLOYMENT_ID" --description "auto $SHORT $(date -u +%Y-%m-%dT%H:%MZ)" 2>&1); RC=$?
+          echo "$OUT"
+          if [ $RC -ne 0 ]; then
+            if echo "$OUT" | grep -q "limit of 200 versions"; then
+              echo "::error title=Apps Script đã đủ 200 phiên bản::Code đã được đẩy lên nhưng deployment CHƯA cập nhật. Vào script.google.com → dự án → Lịch sử dự án (Project history) → chọn các phiên bản CŨ (giữ ~20 bản mới nhất) → Xoá, rồi bấm Re-run jobs (hoặc Run workflow)."
+            fi
+            exit $RC
+          fi
 
       - name: Kiểm tra bản đang chạy
+        if: steps.cmp.outputs.same != 'true'
         run: |
           sleep 5
           curl -sL "https://script.google.com/macros/s/${DEPLOYMENT_ID}/exec?action=count" | head -c 400 || true
