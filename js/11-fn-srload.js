@@ -352,16 +352,18 @@ function _srSyncTeamToSale_(teamField){
     toast('⚠ Không tìm thấy thành viên nào cho Team đã chọn' + (notFound.length ? ' ('+notFound.join(', ')+')' : ' (Team chưa có thành viên)') + ' — bấm "Đồng bộ" để cập nhật danh sách Team rồi thử lại');
     return;
   }
-  if (saleField === 'eSale' && (_srState.saleBOptions||[]).length){
-    // Báo cáo E dùng nguồn Pos: tên Sale PHẢI trùng tên trong cột "Thẻ" của "dữ liệu đơn". Tên trong Team mà Pos không có
-    // (hoặc ghi khác) làm bộ lọc ra 0 đơn → doanh thu 0đ. Chỉ giữ tên có thật, báo rõ tên không khớp để sửa ở "Quản lý Team".
-    var _fold = function(x){ return String(x||'').trim().toLowerCase(); };
-    var _canon = {}; _srState.saleBOptions.forEach(function(n){ _canon[_fold(n)] = n; });
+  // Mọi báo cáo đều lọc Sale theo tên CHÍNH XÁC trong dữ liệu nguồn (KPI/Pos). Tên trong Team ghi khác
+  // (hoa/thường, dấu, khoảng trắng) hoặc không có trong nguồn → bộ lọc ra 0 đơn → doanh thu 0đ.
+  // Nên với MỌI báo cáo: đổi tên Team sang đúng tên trong danh sách Sale của báo cáo đó, bỏ tên không có thật và báo rõ.
+  var _srcOpts = (saleField === 'eSale' || saleField === 'fSale' || saleField === 'bSale') ? (_srState.saleBOptions||[]) : (_srState.saleOptions||[]);
+  if (_srcOpts.length){
+    var _fold = function(x){ return String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/gi,'d').replace(/\s+/g,' ').trim().toLowerCase(); };
+    var _canon = {}; _srcOpts.forEach(function(n){ _canon[_fold(n)] = n; });
     var _kept = [], _missing = [];
     union.forEach(function(n){ var c = _canon[_fold(n)]; if (c !== undefined) { if (_kept.indexOf(c) === -1) _kept.push(c); } else _missing.push(n); });
-    if (_missing.length) toast('⚠ ' + _missing.length + ' tên trong Team không có trong cột Thẻ của Pos (bỏ qua): ' + _missing.slice(0,6).join(', ') + (_missing.length>6?'...':''));
+    if (_missing.length) toast('⚠ ' + _missing.length + ' tên trong Team không có trong dữ liệu báo cáo (bỏ qua): ' + _missing.slice(0,6).join(', ') + (_missing.length>6?'...':''));
     if (!_kept.length){
-      toast('⚠ Không tên nào trong Team khớp cột Thẻ của Pos — giữ nguyên bộ lọc Sale hiện tại. Sửa tên trong "Quản lý Team" cho đúng tên Pos.');
+      toast('⚠ Không tên nào trong Team khớp tên Sale của báo cáo — giữ nguyên bộ lọc Sale hiện tại. Sửa tên trong "Quản lý Team" cho đúng tên trong báo cáo.');
       return;
     }
     union = _kept;
