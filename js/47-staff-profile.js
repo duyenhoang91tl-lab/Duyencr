@@ -117,11 +117,14 @@
         card('🎁', 'Thưởng', money(o.bonus), 'theo chương trình thưởng') +
         card('👥', 'Khách đang giữ', fmt(cs.held), cs.total ? 'trong danh sách KH đã tải' : 'chưa tải danh sách KH') +
         card('💬', 'Đã kết bạn Zalo', fmt(cs.friends), cs.held ? pct(cs.friends / cs.held * 100) + ' khách đang giữ' : 'chưa có khách') +
-        card('🎯', 'Tỷ lệ chốt (Pancake)', pct(o.closeRatePancake), o.pancakeConversations ? 'trên ' + fmt(o.pancakeConversations) + ' hội thoại' : 'chưa có dữ liệu Pancake') +
+        card('🎯', 'Tỷ lệ chốt (Pancake)', pct(o.closeRatePancake), o.pancakeConversations ? fmt(o.creatorOrders || 0) + ' đơn do sale tạo trên Base ÷ ' + fmt(o.pancakeConversations) + ' tương tác Pancake' : 'chưa có dữ liệu Pancake') +
+        card('🌅', 'Chốt trong ngày (khách mới)', pct(o.closeRateNewDay), o.interactionsNew ? fmt(o.ordersNewCustomer || 0) + ' đơn ÷ ' + fmt(o.interactionsNew) + ' tương tác khách mới' : 'chưa có dữ liệu khách mới') +
+        card('🔁', 'Chốt đơn hôm trước (khách cũ)', pct(o.closeRateOldCustomer), o.interactionsOld ? fmt(o.ordersOldCustomer || 0) + ' đơn ÷ ' + fmt(o.interactionsOld) + ' tương tác khách cũ' : 'chưa có dữ liệu khách cũ') +
         card('📈', 'Chốt / khách đang giữ', pct(closeHeld), cs.held ? fmt(o.totalOrders || 0) + ' đơn ÷ ' + fmt(cs.held) + ' khách' : 'chưa có khách đang giữ') +
         card('📞', 'Kết nối điện thoại', pct(o.phoneConnectRate), o.pancakeConversations ? fmt(o.phoneCollected || 0) + ' SĐT ÷ ' + fmt(o.pancakeConversations) + ' hội thoại' : 'chưa có dữ liệu Pancake') +
         rankCard('🏆', 'Xếp hạng team', o.rankTeam, 'chưa thuộc team nào') +
         rankCard('🏅', 'Xếp hạng phòng KD', o.rankDept, 'chưa thuộc phòng nào') + '</div>';
+      h += '<div class="sp-mu sp-wn">Chốt trong ngày / khách cũ tính theo số đơn Pancake ghi nhận cho khách mới / khách cũ của từng nhân viên (tag L5, L5.1, L5.2, L9… chỉ thống kê theo Page nên chưa tách được theo người).</div>';
       if (o.warnings && o.warnings.length) h += '<div class="sp-mu sp-wn">⚠ ' + o.warnings.map(e).join(' · ') + '</div>';
     }
     h += '</div>';

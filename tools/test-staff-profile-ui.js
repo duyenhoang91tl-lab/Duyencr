@@ -7,8 +7,8 @@ const ok = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1); }
 const calls = [];
 const PROFILE = { ok: true, username: 'saleA', accountName: 'Anh', role: 'cs', team: 'Team 1', names: ['anhNP1999', 'saleA'], canEdit: true,
   profile: { fullName: '<img src=x onerror=window.__xss=1>', phone: '0911222333', email: 'a@x.vn', facebook: 'https://facebook.com/anh', updatedAt: '2026-10-12T01:00:00.000Z' } };
-const OV = { ok: true, username: 'saleA', names: ['anhNP1999'], totalOrders: 12, revenue: 5000000, commission: 150000, bonus: 40000, closeRatePancake: 10, phoneConnectRate: 30,
-  pancakeConversations: 200, phoneCollected: 60, rankTeam: { name: 'Team 1', rank: 2, of: 3 }, rankDept: null, warnings: [] };
+const OV = { ok: true, username: 'saleA', names: ['anhNP1999'], totalOrders: 12, revenue: 5000000, commission: 150000, bonus: 40000, closeRatePancake: 1, creatorOrders: 2, closeRateNewDay: 10, ordersNewCustomer: 12, interactionsNew: 120, closeRateOldCustomer: 10, ordersOldCustomer: 8, interactionsOld: 80,
+  phoneConnectRate: 30, pancakeConversations: 200, phoneCollected: 60, rankTeam: { name: 'Team 1', rank: 2, of: 3 }, rankDept: null, warnings: [] };
 function fakeFetch(url, o) {
   calls.push({ url: String(url), body: o && o.body });
   let out = { ok: false, error: 'khong biet' };
@@ -41,12 +41,12 @@ JSDOM.fromFile(path.join(__dirname, '..', 'index.html'), { runScripts: 'dangerou
     ok(D.getElementById('sp-fullName').value.indexOf('<img') === 0, 'o ho ten giu nguyen chuoi text');
     ok(!D.getElementById('sp-phone').disabled, 'nhan vien sua duoc ho so minh');
     const cards = [...D.querySelectorAll('.sp-card')].map(c => c.textContent);
-    ok(cards.length === 11, 'du 11 the so lieu, co ' + cards.length);
+    ok(cards.length === 13, 'du 13 the so lieu, co ' + cards.length);
     const has = (lbl, val) => ok(cards.some(t => t.indexOf(lbl) >= 0 && t.indexOf(val) >= 0), 'the "' + lbl + '" phai chua "' + val + '" — ' + JSON.stringify(cards.filter(t => t.indexOf(lbl) >= 0)));
     has('Tổng số đơn', '12'); has('Tổng doanh thu', '5.000.000đ'); has('Hoa hồng', '150.000đ'); has('Thưởng', '40.000đ');
     has('Khách đang giữ', '3');                       // 2 khach (careCSSet) + 1 khach (careCS khong phan biet hoa/thuong); khach cua nguoi khac khong tinh
     has('Đã kết bạn Zalo', '2');                      // khach 1 va 4
-    has('Tỷ lệ chốt (Pancake)', '10%'); has('Chốt / khách đang giữ', '400%'); has('Kết nối điện thoại', '30%');
+    has('Tỷ lệ chốt (Pancake)', '1%'); has('Tỷ lệ chốt (Pancake)', '2 đơn do sale tạo'); has('Chốt trong ngày (khách mới)', '10%'); has('Chốt trong ngày (khách mới)', '12 đơn ÷ 120'); has('Chốt đơn hôm trước (khách cũ)', '10%'); has('Chốt đơn hôm trước (khách cũ)', '8 đơn ÷ 80'); has('Chốt / khách đang giữ', '400%'); has('Kết nối điện thoại', '30%');
     has('Xếp hạng team', '2'); has('Xếp hạng phòng KD', '—');   // chua thuoc phong -> hien — (khong hien 0)
     // luu
     D.getElementById('sp-fullName').value = 'Nguyễn Anh'; D.getElementById('sp-facebook').value = 'facebook.com/anh';

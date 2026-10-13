@@ -55,21 +55,42 @@ vm.runInContext(`
   readTeams_ = function() { return [{ name: 'Team 1', leader: 'lanLeader', members: ['anhNP1999', 'dungnguyen1995'] }]; };
   _expandSaleFilterWithPancakeAliases_ = function(a) { return a; };
   posMetrics_ = function() { return { ok: true, bySale: [{ name: 'anhNP1999', revenue: 5000000 }, { name: 'dungnguyen1995', revenue: 8000000 }, { name: 'thuNH1986', revenue: 2000000 }, { name: 'lanLeader', revenue: 1000000 }] }; };
-  buildTeamMetrics_ = function() { return { warnings: [], list: [
-    { name: 'anhNP1999', dept: 'Phòng KD 1', deptKey: 'KD1', revenue: 5000000, tongTT: 200, sdtMangVe: 60, tyLeChot: 10 },
-    { name: 'dungnguyen1995', dept: 'Phòng KD 1', deptKey: 'KD1', revenue: 8000000, tongTT: 100, sdtMangVe: 20, tyLeChot: 20 },
-    { name: 'thuNH1986', dept: 'Phòng KD 2', deptKey: 'KD2', revenue: 2000000, tongTT: 50, sdtMangVe: 10, tyLeChot: 4 },
-    { name: 'lanLeader', dept: 'Phòng KD 1', deptKey: 'KD1', revenue: 1000000, tongTT: 0, sdtMangVe: 0, tyLeChot: null } ] }; };
-  buildCsStats_ = function(cs) { return { ok: true, names: [cs === 'saleA' ? 'anhNP1999' : cs === 'saleB' ? 'dungnguyen1995' : cs], totalOrders: 12, revenue: 5000000, commission: { total: 150000 }, bonus: { total: 40000 }, closeRate: null, ghepLoi: '' }; };
+  buildPancakeReport_ = function() { return { byCS: [
+    { name: 'anhNP1999', khCu: 80, khMoi: 120, tongTT: 200, dhKhCu: 8, dhKhMoi: 12 },
+    { name: 'dungnguyen1995', khCu: 40, khMoi: 60, tongTT: 100, dhKhCu: 4, dhKhMoi: 9 },
+    { name: 'thuNH1986', khCu: 10, khMoi: 40, tongTT: 50, dhKhCu: 0, dhKhMoi: 2 } ] }; };
+  buildPancakeSdtReport_ = function() { return { byCS: [{ name: 'anhNP1999', sdtMangVe: 60 }, { name: 'dungnguyen1995', sdtMangVe: 20 }, { name: 'thuNH1986', sdtMangVe: 10 }] }; };
+  buildSaleKpiReport_ = function() { return { rows: [
+    { name: 'anhNP1999', nhomChungKey: 'KD1', nhomChung: 'Phòng KD 1', revenue: 5000000 },
+    { name: 'dungnguyen1995', nhomChungKey: 'KD1', nhomChung: 'Phòng KD 1', revenue: 8000000 },
+    { name: 'thuNH1986', nhomChungKey: 'KD2', nhomChung: 'Phòng KD 2', revenue: 2000000 },
+    { name: 'lanLeader', nhomChungKey: 'KD1', nhomChung: 'Phòng KD 1', revenue: 1000000 } ] }; };
+  // Ngay sale anhNP1999 co du lieu Pancake: 05 va 06/10 (07/10 KHONG co)
+  _pkTrackedDatesByPageAndSale_ = function() { return { datesBySale: { anhNP1999: { '2026-10-05': true, '2026-10-06': true }, dungnguyen1995: { '2026-10-05': true } } }; };
+  readAllOrders_ = function() { return [
+    { orderDate: '05/10/2026 09:00', creator: 'anhNP1999', status: 'Hoàn thành' },     // tinh
+    { orderDate: '06/10/2026', creator: 'ANHNP1999', status: 'Đã giao' },              // tinh (khong phan biet hoa/thuong)
+    { orderDate: '06/10/2026', creator: 'anhNP1999', status: 'Thất bại' },             // loai: don that bai
+    { orderDate: '07/10/2026', creator: 'anhNP1999', status: 'Hoàn thành' },           // loai: ngay khong co du lieu Pancake
+    { orderDate: '05/10/2026', creator: 'mktPhuong', status: 'Hoàn thành' },           // loai: nguoi tao khong phai sale nay
+    { orderDate: '05/10/2026', creator: 'dungnguyen1995', status: 'Hoàn thành' },
+    { orderDate: '30/09/2026', creator: 'anhNP1999', status: 'Hoàn thành' } ]; };      // loai: ngoai ky
+  buildCsStats_ = function(cs) { return { ok: true, names: [cs === 'saleA' ? 'anhNP1999' : cs === 'saleB' ? 'dungnguyen1995' : cs === 'saleC' ? 'thuNH1986' : cs], totalOrders: 12, revenue: 5000000, commission: { total: 150000 }, bonus: { total: 40000 }, closeRate: null, ghepLoi: '' }; };
 `, ctx);
 const ov = (viewer, user) => run('staffOverview_({ token: ' + JSON.stringify(viewer) + ', username: ' + JSON.stringify(user) + ', from: "2026-10-01", to: "2026-10-12" })');
 
-let o = ov('saleA', 'saleA');
+let closedB; let o = ov('saleA', 'saleA');
 ok(o.ok, 'nhan vien xem so lieu cua chinh minh'); eq(o.totalOrders, 12, 'tong don'); eq(o.revenue, 5000000, 'doanh thu'); eq(o.commission, 150000, 'hoa hong'); eq(o.bonus, 40000, 'thuong');
-eq(o.closeRatePancake, 10, 'ty le chot Pancake'); eq(o.phoneConnectRate, 30, 'ty le ket noi SDT = 60/200'); eq(o.pancakeConversations, 200, 'so hoi thoai');
+eq(o.creatorOrders, 2, 'don co nguoi tao la sale: chi 05 va 06/10 hop le (loai that bai, ngay khong co Pancake, nguoi tao khac, ngoai ky)');
+eq(o.closeRatePancake, 1, 'ty le chot Pancake = 2 don / 200 tuong tac = 1%');
+eq(o.closeRateNewDay, 10, 'chot trong ngay (khach moi) = 12 don / 120 tuong tac khach moi'); eq(o.ordersNewCustomer, 12, 'so don khach moi'); eq(o.interactionsNew, 120, 'tuong tac khach moi');
+eq(o.closeRateOldCustomer, 10, 'chot khach cu = 8 don / 80 tuong tac khach cu'); eq(o.ordersOldCustomer, 8, 'so don khach cu'); eq(o.interactionsOld, 80, 'tuong tac khach cu');
+eq(o.phoneConnectRate, 30, 'ty le ket noi SDT = 60/200'); eq(o.pancakeConversations, 200, 'so hoi thoai');
 eq(o.rankTeam, { name: 'Team 1', rank: 2, of: 3 }, 'hang trong Team 1: A(5tr) sau B(8tr), truoc leader(1tr) -> 2/3');
 eq(o.rankDept, { name: 'Phòng KD 1', rank: 2, of: 3 }, 'hang trong phong KD1 (A, B, leader) = 2/3');
 o = ov('saleB', 'saleB'); eq(o.rankTeam.rank, 1, 'B doanh thu cao nhat team'); eq(o.rankDept.rank, 1, 'B hang 1 phong');
+closedB = o; eq(closedB.creatorOrders, 1, 'sale B: 1 don (ngay 05/10)'); eq(closedB.closeRatePancake, 1, 'B: 1/100 = 1%');
+o = ov('saleC', 'saleC'); eq(o.closeRatePancake, 0, 'sale co Pancake nhung 0 don -> 0%'); eq(o.closeRateOldCustomer, 0, 'khach cu 0 don / 10 tuong tac = 0%');
 ok(ov('saleA', 'saleB').code === 'FORBIDDEN', 'sale khong xem duoc so lieu nguoi khac');
 ok(ov('lead1', 'saleA').ok, 'leader xem duoc thanh vien team minh');
 ok(ov('lead1', 'saleC').code === 'FORBIDDEN', 'leader khong xem duoc nguoi ngoai team');
