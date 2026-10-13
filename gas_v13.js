@@ -1525,6 +1525,115 @@ function _usersForClient_(users, full) {
     return o;
   });
 }
+// ═══════════════════════════════════════════════════════════════
+//  PHAN QUYEN THEO VAI TRO + BO PHAN (0b/0c, 2026-10-13) — admin cai o trang "Phan quyen" (js/40-fn-rolesettings.js).
+//  Nguyen nhan goc can lam: truoc day chi co 4 vai tro cung (admin/manager/leader/cs) + "perms" tung tai khoan; khong co CEO / truong phong,
+//  khong co cach noi "bo phan nao duoc xem hang muc nao", va moi kiem tra quyen nam o client (de bi qua mat).
+//  Mo hinh: moi VAI TRO co "base" = cach cat pham vi DU LIEU da co san (admin: tat ca + quan tri | viewer: xem toan cong ty, khong quan tri |
+//  manager: theo phong phu trach | leader: theo team | cs: chi du lieu cua minh) — nen code cu (so sanh role === 'leader'...) KHONG phai sua, chi doi
+//  role -> base qua _roleBase_. Quyen XEM HANG MUC (feature id: id tab nhu 'salesreport', hoac 'act:<ten>' cho tac vu) khai theo vai tro va theo bo phan:
+//  perms = null (hoac thieu) = KHONG gioi han (mac dinh, nen chua cai gi thi moi thu nhu cu); perms = [..] = chi cac muc do.
+//  Quyen cuoi cung = (quyen rieng cua tai khoan neu admin da gioi han tab) HOAC (quyen vai tro VA quyen bo phan).
+//  Luu o Settings 'roleConfig' (JSON) — ghi qua action saveRoleConfig (chi admin; setSetting_ tu ghi AuditLog).
+// ═══════════════════════════════════════════════════════════════
+var ROLE_BUILTIN_ = [
+  { key: 'admin',   label: 'Admin',           base: 'admin',   locked: true, desc: 'Toàn quyền hệ thống: tài khoản, cài đặt, mọi dữ liệu.' },
+  { key: 'ceo',     label: 'CEO / Giám đốc',  base: 'viewer',  desc: 'Xem toàn bộ dữ liệu công ty, không có quyền quản trị tài khoản.' },
+  { key: 'tp',      label: 'Trưởng phòng',    base: 'manager', desc: 'Xem dữ liệu của các phòng được giao phụ trách.' },
+  { key: 'manager', label: 'Quản lý',         base: 'manager', desc: 'Xem dữ liệu của các phòng/sale được giao phụ trách.' },
+  { key: 'leader',  label: 'Trưởng team',     base: 'leader',  desc: 'Xem dữ liệu của cả team mình làm trưởng.' },
+  { key: 'cs',      label: 'Nhân viên',       base: 'cs',      desc: 'Chỉ thấy dữ liệu của chính mình.' },
+  { key: 'demo',    label: 'Tài khoản test',  base: 'cs',      locked: true, hidden: true, desc: 'Chỉ xem báo cáo mẫu.' }
+];
+var ROLE_BASES_ = { admin: 1, viewer: 1, manager: 1, leader: 1, cs: 1 };
+function _roleStrList_(a, max) {
+  if (!Array.isArray(a)) return null;
+  var seen = {}, out = [];
+  a.forEach(function (x) { x = String(x || '').trim().slice(0, 60); if (x && !seen[x] && out.length < (max || 200)) { seen[x] = 1; out.push(x); } });
+  return out;
+}
+// Chuan hoa cau hinh tu client/Settings: sai kieu -> bo, khong bao gio nem loi. Admin luon perms=null (khong tu khoa minh).
+function _roleCfgNormalize_(raw) {
+  var cfg = { v: 1, roles: [], deptPerms: {} };
+  if (!raw || typeof raw !== 'object') return cfg;
+  var builtinKeys = {}; ROLE_BUILTIN_.forEach(function (r) { builtinKeys[r.key] = r; });
+  var seen = {};
+  (Array.isArray(raw.roles) ? raw.roles : []).slice(0, 40).forEach(function (r) {
+    if (!r) return;
+    var key = String(r.key || '').trim().toLowerCase();
+    if (!/^[a-z0-9_]{2,24}$/.test(key) || seen[key]) return;
+    seen[key] = 1;
+    var b = builtinKeys[key];
+    var o = { key: key, label: String(r.label || (b && b.label) || key).trim().slice(0, 40) || key,
+              desc: String(r.desc == null ? '' : r.desc).trim().slice(0, 200), perms: _roleStrList_(r.perms) };
+    if (b) { o.base = b.base; o.builtin = true; if (b.locked) { o.label = b.label; o.perms = null; } }
+    else { o.base = ROLE_BASES_[r.base] && r.base !== 'admin' ? r.base : 'cs'; }
+    if (key === 'admin') o.perms = null;
+    cfg.roles.push(o);
+  });
+  var dp = raw.deptPerms && typeof raw.deptPerms === 'object' ? raw.deptPerms : {};
+  Object.keys(dp).slice(0, 80).forEach(function (k) {
+    var kk = String(k).trim().slice(0, 40); if (!kk) return;
+    var l = _roleStrList_(dp[k]);
+    if (l) cfg.deptPerms[kk] = l;
+  });
+  return cfg;
+}
+function readRoleConfig_() {
+  var raw = null;
+  try { raw = JSON.parse(getSetting_('roleConfig') || 'null'); } catch (e) { raw = null; }
+  return _roleCfgNormalize_(raw);
+}
+// Vai tro da gop (built-in + tuy chinh). key la -> coi nhu nhan vien (base cs), khong gioi han.
+function _roleResolve_(key, cfg) {
+  key = String(key || 'cs').trim().toLowerCase();
+  cfg = cfg || readRoleConfig_();
+  var ov = null; cfg.roles.forEach(function (r) { if (r.key === key) ov = r; });
+  var b = null; ROLE_BUILTIN_.forEach(function (r) { if (r.key === key) b = r; });
+  if (ov) return { key: key, label: ov.label, base: b ? b.base : ov.base, desc: ov.desc, perms: ov.perms, builtin: !!b };
+  if (b) return { key: key, label: b.label, base: b.base, desc: b.desc, perms: null, builtin: true };
+  return { key: key, label: key, base: 'cs', desc: '', perms: null, builtin: false };
+}
+function _roleBase_(key) { return _roleResolve_(key).base; }
+// Phong cua 1 tai khoan: manager/truong phong -> cot team (key phong, cach nhau dau phay); nguoi khac -> saleDepts theo ten.
+function _userDeptKeys_(u) {
+  var out = {}, base = _roleBase_(u.role);
+  if (base === 'manager') String(u.team || '').split(',').forEach(function (k) { k = String(k).trim(); if (k) out[k] = 1; });
+  var sd = readSaleDepts_();
+  var names = (u.names && u.names.length) ? u.names : (u.name ? [u.name] : []);
+  names.forEach(function (n) { var h = sd.byNorm[_normTxt_(n)]; if (h && h.key) out[h.key] = 1; });
+  return Object.keys(out);
+}
+// user = ban ghi tu readUsers_. fid = id hang muc. Mac dinh cho phep (perms null).
+function _featureAllowed_(user, fid, cfg) {
+  if (!user) return false;
+  if (user.role === 'admin') return true;
+  cfg = cfg || readRoleConfig_();
+  if (String(fid).indexOf('act:') !== 0 && Array.isArray(user.perms) && user.perms.length) return user.perms.indexOf(fid) !== -1;   // gioi han tab rieng cua tai khoan (co san tu truoc)
+  var r = _roleResolve_(user.role, cfg);
+  if (Array.isArray(r.perms) && r.perms.indexOf(fid) === -1) return false;
+  var dk = _userDeptKeys_(user);
+  if (!dk.length) return true;
+  var ok = false;
+  dk.forEach(function (k) { var p = cfg.deptPerms[k]; if (!Array.isArray(p) || p.indexOf(fid) !== -1) ok = true; });
+  return ok;
+}
+// Goi cho client: cau hinh day du cho admin; nguoi khac chi nhan phan cua minh (khong lo quyen cua nguoi khac).
+function roleConfigForClient_(user) {
+  var cfg = readRoleConfig_(), r = _roleResolve_(user.role, cfg), dk = _userDeptKeys_(user), dp = {};
+  dk.forEach(function (k) { dp[k] = Array.isArray(cfg.deptPerms[k]) ? cfg.deptPerms[k] : null; });
+  var out = { ok: true, builtin: ROLE_BUILTIN_, access: { role: user.role, base: r.base, label: r.label, rolePerms: r.perms, deptKeys: dk, deptPerms: dp } };
+  if (user.role === 'admin') out.config = cfg;
+  return out;
+}
+function saveRoleConfig_(cfg, tok) {
+  var su = _sessUser_(tok);
+  if (!su || su.role !== 'admin') return jsonOut_({ error: 'Chi admin moi duoc sua phan quyen.', code: 'AUTH' });
+  var n = _roleCfgNormalize_(cfg);
+  var r = setSetting_('roleConfig', JSON.stringify(n));
+  return jsonOut_({ ok: true, config: n });
+}
+
 function _usersWriteAuth_(tok) {
   var existing = readUsers_(getCrmSS_().getSheetByName(SH_USER));
   if (!existing.length) return { ok: true, bootstrap: true };   // chua co tai khoan nao: cho tao admin dau tien
@@ -1591,7 +1700,7 @@ var NTL_ACTIONS_ = {
   save:1, saveSingle:1, saveBatch:1, syncZaloFriendStatus:1, addCareLead:1, applyCustomerNameGuesses:1, dedupeCare:1,
   saveOrders:1, patchOrder:1, deleteOrder:1, deleteDuplicateOrders:1, replaceOrders:1, importSheetRows:1, archiveOrders:1,
   setOrderCareCS:1, setOrderCareCSBatch:1, saveAssign:1, saveAssignHistory:1, toggleAssignDone:1,
-  saveTask:1, deleteTask:1, saveTaskComment:1, taskFlows:1, taskRequests:1, saveTaskFlow:1, deleteTaskFlow:1, taskAdvance:1, taskRequestDecide:1, notifications:1, notifRead:1, notifMention:1, saveTeams:1, saveMktTeams:1, saveSaleGroups:1, saveCareStatus:1,
+  saveTask:1, deleteTask:1, saveTaskComment:1, taskFlows:1, taskRequests:1, saveTaskFlow:1, deleteTaskFlow:1, taskAdvance:1, taskRequestDecide:1, notifications:1, notifRead:1, notifMention:1, roleConfig:1, saveRoleConfig:1, saveTeams:1, saveMktTeams:1, saveSaleGroups:1, saveCareStatus:1,
   broadcastMark:1, saveBroadcast:1, broadcastCancel:1, broadcastSetStatus:1, saveFollowUpTemplates:1, saveAudit:1
 };
 function _ntlKey_() { return 'ntl_' + Utilities.formatDate(new Date(), 'GMT+7', 'yyyyMMdd'); }
@@ -2142,6 +2251,11 @@ function doGetCore_(e) {
     if (action === 'pkChatFind') return pkChatFind_(e);
     if (action === 'pkChatInbox') return pkChatInbox_(e);
     if (action === 'pkChatConv') return pkChatConv_(e);
+    if (action === 'roleConfig') {
+      var _ru = _sessUser_(e && e.parameter && e.parameter.token);
+      if (!_ru) return jsonOut_({ error: 'Can dang nhap.', code: 'AUTH' });
+      return jsonOut_(roleConfigForClient_(_ru));
+    }
     if (action === 'notifications') {
       var _gu = _sessUser_(e && e.parameter && e.parameter.token);
       if (!_gu) return jsonOut_({ error: 'Can dang nhap.', code: 'AUTH' });
@@ -2163,7 +2277,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.41-pkstaff' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.42-roles' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -6163,6 +6277,7 @@ function doPostCore_(e) {
     if (action === 'pkChatLink') return pkChatLink_(data);
     if (action === 'pkChatSend') return pkChatSend_(data);
     if (action === 'profileSave') return profileSave_(data);
+    if (action === 'saveRoleConfig') return saveRoleConfig_(data.config, data.token);
     if (action === 'notifRead') { var _nu = _sessUser_(data.token); if (!_nu) return jsonOut_({ error: 'Can dang nhap.', code: 'AUTH' }); return jsonOut_(markNotifRead_(_nu.username, data.ids, !!data.all)); }
     if (action === 'notifMention') {
       var _nm = _sessUser_(data.token); if (!_nm) return jsonOut_({ error: 'Can dang nhap.', code: 'AUTH' });
@@ -15197,9 +15312,10 @@ function _profFold_(names) {
 // viewer co duoc xem target khong? admin: tat ca; chinh minh; leader: thanh vien team minh lam leader; quan ly: nguoi thuoc phong (nhom KPI) minh phu trach.
 function _profScope_(viewer, target, M) {
   if (String(viewer.username).toLowerCase() === String(target.username).toLowerCase()) return true;
-  if (viewer.role === 'admin') return true;
+  var vBase = _roleBase_(viewer.role);
+  if (viewer.role === 'admin' || vBase === 'viewer') return true;   // CEO/Giam doc (base viewer): xem toan cong ty
   var tf = _profFold_(_profNames_(target));
-  if (viewer.role === 'leader') {
+  if (vBase === 'leader') {
     var vNames = {}; _profNames_(viewer).forEach(function(n) { vNames[_normTxt_(n)] = true; });
     var ok = false;
     readTeams_(getCrmSS_().getSheetByName(SH_TEAM)).forEach(function(t) {
@@ -15211,7 +15327,7 @@ function _profScope_(viewer, target, M) {
     });
     return ok;
   }
-  if (viewer.role === 'manager') {
+  if (vBase === 'manager') {
     var depts = {}; String(viewer.team || '').split(',').forEach(function(k) { k = _normTxt_(k); if (k) depts[k] = true; });
     var rows = (M && M.list || []).filter(function(p) { return tf[_normTxt_(p.name)] && p.deptKey; });
     for (var j = 0; j < rows.length; j++) if (depts[_normTxt_(rows[j].deptKey)]) return true;
@@ -15243,7 +15359,7 @@ function profileGet_(p) {
   var self = String(viewer.username).toLowerCase() === String(target.username).toLowerCase();
   if (!self && viewer.role !== 'admin') {
     var r = _profMonthRange_(p);
-    if (!_profScope_(viewer, target, viewer.role === 'manager' ? _profMetrics_(r.from, r.to) : null)) return { ok: false, error: 'Bạn không có quyền xem hồ sơ này.', code: 'FORBIDDEN' };
+    if (!_profScope_(viewer, target, _roleBase_(viewer.role) === 'manager' ? _profMetrics_(r.from, r.to) : null)) return { ok: false, error: 'Bạn không có quyền xem hồ sơ này.', code: 'FORBIDDEN' };
   }
   return { ok: true, username: target.username, accountName: target.name || '', role: target.role || '', team: target.team || '', names: _profNames_(target),
            profile: _profRead_(target.username), canEdit: self || viewer.role === 'admin' };

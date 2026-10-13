@@ -75,9 +75,10 @@ function _profFold_(names) {
 // viewer co duoc xem target khong? admin: tat ca; chinh minh; leader: thanh vien team minh lam leader; quan ly: nguoi thuoc phong (nhom KPI) minh phu trach.
 function _profScope_(viewer, target, M) {
   if (String(viewer.username).toLowerCase() === String(target.username).toLowerCase()) return true;
-  if (viewer.role === 'admin') return true;
+  var vBase = _roleBase_(viewer.role);
+  if (viewer.role === 'admin' || vBase === 'viewer') return true;   // CEO/Giam doc (base viewer): xem toan cong ty
   var tf = _profFold_(_profNames_(target));
-  if (viewer.role === 'leader') {
+  if (vBase === 'leader') {
     var vNames = {}; _profNames_(viewer).forEach(function(n) { vNames[_normTxt_(n)] = true; });
     var ok = false;
     readTeams_(getCrmSS_().getSheetByName(SH_TEAM)).forEach(function(t) {
@@ -89,7 +90,7 @@ function _profScope_(viewer, target, M) {
     });
     return ok;
   }
-  if (viewer.role === 'manager') {
+  if (vBase === 'manager') {
     var depts = {}; String(viewer.team || '').split(',').forEach(function(k) { k = _normTxt_(k); if (k) depts[k] = true; });
     var rows = (M && M.list || []).filter(function(p) { return tf[_normTxt_(p.name)] && p.deptKey; });
     for (var j = 0; j < rows.length; j++) if (depts[_normTxt_(rows[j].deptKey)]) return true;
@@ -121,7 +122,7 @@ function profileGet_(p) {
   var self = String(viewer.username).toLowerCase() === String(target.username).toLowerCase();
   if (!self && viewer.role !== 'admin') {
     var r = _profMonthRange_(p);
-    if (!_profScope_(viewer, target, viewer.role === 'manager' ? _profMetrics_(r.from, r.to) : null)) return { ok: false, error: 'Bạn không có quyền xem hồ sơ này.', code: 'FORBIDDEN' };
+    if (!_profScope_(viewer, target, _roleBase_(viewer.role) === 'manager' ? _profMetrics_(r.from, r.to) : null)) return { ok: false, error: 'Bạn không có quyền xem hồ sơ này.', code: 'FORBIDDEN' };
   }
   return { ok: true, username: target.username, accountName: target.name || '', role: target.role || '', team: target.team || '', names: _profNames_(target),
            profile: _profRead_(target.username), canEdit: self || viewer.role === 'admin' };
