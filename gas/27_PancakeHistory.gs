@@ -128,6 +128,40 @@ function pkLichSuChay() { Logger.log(JSON.stringify(pkHistSync_({}), null, 2)); 
 function pkLichSuXemTrangThai() { Logger.log(JSON.stringify({ state: _pkHistState_(), pages: Object.keys(_pkAllPageTokens_()) }, null, 2)); }
 function pkLichSuLamLai() { PropertiesService.getScriptProperties().deleteProperty('PK_HIST_STATE'); Logger.log('Da xoa con tro: lan chay sau keo lai tu dau (khong tao tin trung vi ignore-duplicates).'); }
 function pkLichSuTick_() { try { var r = pkHistSync_({}); Logger.log('pkLichSuTick done=' + r.done + ' convs=' + r.convs + ' msgs=' + r.msgs + ' err=' + (r.errors || []).length); if (r.done && r.ok) removePkLichSuTrigger_(); } catch (e) { Logger.log('pkLichSuTick loi: ' + e); } }
+// ── NHAN VIEN PANCAKE: id (uuid trong assignee_ids) -> ten. GET /api/public_api/v1/pages/{page}/users. Dang tra ve CHUA xac nhan -> doc khoan dung
+//    (mang nam o users/data/chinh no; id = id|user_id; ten = name|full_name|fb_name). pkNhanVienThu: chay thu KHONG ghi, in 2 nguoi dau de doi chieu.
+//    pkNhanVienDongBo: ghi bang pk_staff (upsert theo id). Token nhu chat/lich su: PANCAKE_PAGE_TOKENS.
+function _pkUserList_(j) {
+  if (Array.isArray(j)) return j;
+  var k = ['users', 'data', 'page_users', 'items'];
+  for (var i = 0; i < k.length; i++) { var v = j && j[k[i]]; if (Array.isArray(v)) return v; if (v && Array.isArray(v.users)) return v.users; }
+  return [];
+}
+function _pkMapStaff_(u, pageId) {
+  var o = (u && typeof u.user === 'object' && u.user) ? u.user : (u || {});
+  var id = String(o.id || o.user_id || u.id || u.user_id || ''), name = String(o.name || o.full_name || o.fb_name || o.display_name || u.name || '').trim();
+  return id ? { id: id, name: name, page_id: String(pageId), raw: u, updated_at: new Date().toISOString() } : null;
+}
+function pkStaffSync_(opts) {
+  opts = opts || {};
+  var toks = _pkAllPageTokens_(), pages = Object.keys(toks), res = { pages: pages.length, staff: 0, errors: [], sample: [] }, rows = {};
+  if (!pages.length) { res.errors.push('Chua co token Pancake (PANCAKE_PAGE_TOKENS).'); return res; }
+  pages.forEach(function (pg) {
+    try {
+      var j = _pkFetchJson_('https://pages.fm/api/public_api/v1/pages/' + _pkEnc_(pg) + '/users?page_access_token=' + _pkEnc_(toks[pg]));
+      _pkUserList_(j).forEach(function (u) { var r = _pkMapStaff_(u, pg); if (r) { if (!r.name && rows[r.id] && rows[r.id].name) r.name = rows[r.id].name; rows[r.id] = r; } });
+      if (opts.dryRun && res.sample.length < 2) res.sample.push({ page: pg, keys: Object.keys(j || {}), first: _pkUserList_(j).slice(0, 2) });
+    } catch (e) { res.errors.push(pg + ': ' + String(e && e.message || e).slice(0, 200)); }
+  });
+  var list = Object.keys(rows).map(function (k) { return rows[k]; });
+  res.staff = list.length; res.noName = list.filter(function (r) { return !r.name; }).length;
+  if (!opts.dryRun && list.length) {
+    for (var i = 0; i < list.length; i += 200) sb_('POST', 'pk_staff?on_conflict=id', list.slice(i, i + 200), { Prefer: 'resolution=merge-duplicates,return=minimal' });
+  }
+  return res;
+}
+function pkNhanVienThu() { Logger.log(JSON.stringify(pkStaffSync_({ dryRun: true }), null, 2)); }
+function pkNhanVienDongBo() { Logger.log(JSON.stringify(pkStaffSync_({}), null, 2)); }
 function pkLichSuCaiTrigger() {
   removePkLichSuTrigger_();
   ScriptApp.newTrigger('pkLichSuTick_').timeBased().everyMinutes(10).create();

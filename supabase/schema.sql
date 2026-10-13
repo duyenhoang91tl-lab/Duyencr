@@ -376,3 +376,15 @@ do $$ begin
     revoke all on function pk_norm_phone(text) from authenticated;
   end if;
 end $$;
+
+-- 10) pk_staff — nhân viên Pancake (id uuid trong pk_conversations.assignee_ids -> tên). Do GAS pkNhanVienDongBo ghi (service_role).
+--     NGUYÊN NHÂN GỐC: webhook/API chỉ trả mã nhân viên (uuid), không kèm tên nên khung chat không hiện được "sale nào phụ trách".
+--     Khung chat vẫn chạy bình thường khi bảng này trống/chưa tạo (GAS bắt lỗi, trả danh sách tên rỗng).
+create table if not exists pk_staff (
+  id         text primary key,
+  name       text default '',
+  page_id    text default '',
+  raw        jsonb,
+  updated_at timestamptz default now()
+);
+alter table pk_staff enable row level security;   -- bật RLS, KHÔNG policy: chỉ service_role đọc/ghi (có tên + dữ liệu nhân viên)

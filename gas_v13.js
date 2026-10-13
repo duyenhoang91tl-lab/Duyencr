@@ -2163,7 +2163,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.40-pkhist' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.41-pkstaff' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -14500,11 +14500,22 @@ function _pkAtts_(arr) {
   });
   return out;
 }
-function _pkConvOut_(c) {
-  return { id: c.id, pageId: c.page_id || '', name: c.customer_name || '', phone: c.customer_phone || '', lastAt: c.last_message_at || '',
-           lastText: String(c.last_text || c.snippet || '').slice(0, 140), seen: c.seen !== false, replied: !!c.is_replied, type: c.conv_type || '' };
+// Ten nhan vien Pancake (bang pk_staff, do pkNhanVienDongBo dong bo). NGUYEN NHAN GOC them: hoi thoai chi luu assignee_ids (uuid Pancake) nen
+// khong hien duoc ten sale. LOI doc bang (chua tao / chua dong bo) KHONG duoc lam hong khung chat -> tra {} va chat van chay.
+function _pkStaffNames_() {
+  try {
+    var rows = sb_('GET', 'pk_staff?select=id,name&limit=1000').json || [], m = {};
+    rows.forEach(function (r) { if (r && r.id) m[String(r.id)] = String(r.name || ''); });
+    return m;
+  } catch (e) { return {}; }
 }
-var PK_CONV_COLS_ = 'id,page_id,customer_name,customer_phone,last_message_at,last_text,snippet,seen,is_replied,conv_type';
+function _pkConvOut_(c, names) {
+  var ids = Array.isArray(c.assignee_ids) ? c.assignee_ids.map(String) : [], nm = names || {};
+  return { id: c.id, pageId: c.page_id || '', name: c.customer_name || '', phone: c.customer_phone || '', lastAt: c.last_message_at || '',
+           lastText: String(c.last_text || c.snippet || '').slice(0, 140), seen: c.seen !== false, replied: !!c.is_replied, type: c.conv_type || '',
+           assigneeIds: ids, assignees: ids.map(function (i) { return nm[i] || ''; }).filter(Boolean) };
+}
+var PK_CONV_COLS_ = 'id,page_id,customer_name,customer_phone,last_message_at,last_text,snippet,seen,is_replied,conv_type,assignee_ids';
 // GET pkChat: cac hoi thoai gan voi SDT + tin nhan (moi nhat cuoi). after=<ISO> chi lay tin moi hon moc do (poll nhe).
 function pkChat_(e) {
   var p = (e && e.parameter) || {};
@@ -14512,8 +14523,9 @@ function pkChat_(e) {
   var phone = normPhone_(p.phone);
   if (phone.length < 9) return jsonOut_({ error: 'SDT khong hop le.' });
   try {
+    var _names = _pkStaffNames_();
     var cv = sb_('GET', 'pk_conversations?select=' + PK_CONV_COLS_ + '&customer_phone=eq.' + _pkEnc_(phone) + '&order=last_message_at.desc.nullslast&limit=8').json || [];
-    var out = { ok: true, phone: phone, conversations: cv.map(_pkConvOut_), messages: [], serverTime: new Date().toISOString() };
+    var out = { ok: true, phone: phone, conversations: cv.map(function (c) { return _pkConvOut_(c, _names); }), messages: [], serverTime: new Date().toISOString() };
     if (!cv.length) return jsonOut_(out);
     var after = /^\d{4}-\d{2}-\d{2}T[\d:.+\-Z]+$/.test(String(p.after || '')) ? String(p.after) : '';
     var q = 'pk_messages?select=id,conversation_id,direction,text,sent_at,sender_name,attachments:raw-%3Eattachments&conversation_id=' + _pkEnc_(_pkInList_(cv.map(function (c) { return c.id; })))
@@ -14536,8 +14548,9 @@ function pkChatInbox_(e) {
       var digits = q.replace(/\D/g, '');
       filter = '&' + ((digits.length >= 6 && digits.length >= q.length - 2) ? 'customer_phone=like.' + _pkEnc_('*' + digits + '*') : 'customer_name=ilike.' + _pkEnc_('*' + q + '*'));
     }
+    var _names = _pkStaffNames_();
     var cv = sb_('GET', 'pk_conversations?select=' + PK_CONV_COLS_ + filter + '&order=last_message_at.desc.nullslast&limit=60').json || [];
-    return jsonOut_({ ok: true, conversations: cv.map(_pkConvOut_), serverTime: new Date().toISOString() });
+    return jsonOut_({ ok: true, conversations: cv.map(function (c) { return _pkConvOut_(c, _names); }), serverTime: new Date().toISOString() });
   } catch (err) { return jsonOut_({ error: 'Doc hop thu loi: ' + String(err && err.message || err).slice(0, 200) }); }
 }
 // GET pkChatConv: tin nhan cua 1 hoi thoai theo convId (after=<ISO> chi lay tin moi hon moc do).
@@ -14565,8 +14578,9 @@ function pkChatFind_(e) {
   try {
     var digits = q.replace(/\D/g, '');
     var filter = (digits.length >= 6 && digits.length >= q.length - 2) ? 'customer_phone=like.' + _pkEnc_('*' + digits + '*') : 'customer_name=ilike.' + _pkEnc_('*' + q + '*');
+    var _names = _pkStaffNames_();
     var cv = sb_('GET', 'pk_conversations?select=' + PK_CONV_COLS_ + '&' + filter + '&order=last_message_at.desc.nullslast&limit=15').json || [];
-    return jsonOut_({ ok: true, conversations: cv.map(_pkConvOut_) });
+    return jsonOut_({ ok: true, conversations: cv.map(function (c) { return _pkConvOut_(c, _names); }) });
   } catch (err) { return jsonOut_({ error: 'Tim hoi thoai loi: ' + String(err && err.message || err).slice(0, 200) }); }
 }
 // POST pkChatLink {convId, phone}: gan hoi thoai voi SDT khach (phone rong = bo gan).
@@ -15066,6 +15080,40 @@ function pkLichSuChay() { Logger.log(JSON.stringify(pkHistSync_({}), null, 2)); 
 function pkLichSuXemTrangThai() { Logger.log(JSON.stringify({ state: _pkHistState_(), pages: Object.keys(_pkAllPageTokens_()) }, null, 2)); }
 function pkLichSuLamLai() { PropertiesService.getScriptProperties().deleteProperty('PK_HIST_STATE'); Logger.log('Da xoa con tro: lan chay sau keo lai tu dau (khong tao tin trung vi ignore-duplicates).'); }
 function pkLichSuTick_() { try { var r = pkHistSync_({}); Logger.log('pkLichSuTick done=' + r.done + ' convs=' + r.convs + ' msgs=' + r.msgs + ' err=' + (r.errors || []).length); if (r.done && r.ok) removePkLichSuTrigger_(); } catch (e) { Logger.log('pkLichSuTick loi: ' + e); } }
+// ── NHAN VIEN PANCAKE: id (uuid trong assignee_ids) -> ten. GET /api/public_api/v1/pages/{page}/users. Dang tra ve CHUA xac nhan -> doc khoan dung
+//    (mang nam o users/data/chinh no; id = id|user_id; ten = name|full_name|fb_name). pkNhanVienThu: chay thu KHONG ghi, in 2 nguoi dau de doi chieu.
+//    pkNhanVienDongBo: ghi bang pk_staff (upsert theo id). Token nhu chat/lich su: PANCAKE_PAGE_TOKENS.
+function _pkUserList_(j) {
+  if (Array.isArray(j)) return j;
+  var k = ['users', 'data', 'page_users', 'items'];
+  for (var i = 0; i < k.length; i++) { var v = j && j[k[i]]; if (Array.isArray(v)) return v; if (v && Array.isArray(v.users)) return v.users; }
+  return [];
+}
+function _pkMapStaff_(u, pageId) {
+  var o = (u && typeof u.user === 'object' && u.user) ? u.user : (u || {});
+  var id = String(o.id || o.user_id || u.id || u.user_id || ''), name = String(o.name || o.full_name || o.fb_name || o.display_name || u.name || '').trim();
+  return id ? { id: id, name: name, page_id: String(pageId), raw: u, updated_at: new Date().toISOString() } : null;
+}
+function pkStaffSync_(opts) {
+  opts = opts || {};
+  var toks = _pkAllPageTokens_(), pages = Object.keys(toks), res = { pages: pages.length, staff: 0, errors: [], sample: [] }, rows = {};
+  if (!pages.length) { res.errors.push('Chua co token Pancake (PANCAKE_PAGE_TOKENS).'); return res; }
+  pages.forEach(function (pg) {
+    try {
+      var j = _pkFetchJson_('https://pages.fm/api/public_api/v1/pages/' + _pkEnc_(pg) + '/users?page_access_token=' + _pkEnc_(toks[pg]));
+      _pkUserList_(j).forEach(function (u) { var r = _pkMapStaff_(u, pg); if (r) { if (!r.name && rows[r.id] && rows[r.id].name) r.name = rows[r.id].name; rows[r.id] = r; } });
+      if (opts.dryRun && res.sample.length < 2) res.sample.push({ page: pg, keys: Object.keys(j || {}), first: _pkUserList_(j).slice(0, 2) });
+    } catch (e) { res.errors.push(pg + ': ' + String(e && e.message || e).slice(0, 200)); }
+  });
+  var list = Object.keys(rows).map(function (k) { return rows[k]; });
+  res.staff = list.length; res.noName = list.filter(function (r) { return !r.name; }).length;
+  if (!opts.dryRun && list.length) {
+    for (var i = 0; i < list.length; i += 200) sb_('POST', 'pk_staff?on_conflict=id', list.slice(i, i + 200), { Prefer: 'resolution=merge-duplicates,return=minimal' });
+  }
+  return res;
+}
+function pkNhanVienThu() { Logger.log(JSON.stringify(pkStaffSync_({ dryRun: true }), null, 2)); }
+function pkNhanVienDongBo() { Logger.log(JSON.stringify(pkStaffSync_({}), null, 2)); }
 function pkLichSuCaiTrigger() {
   removePkLichSuTrigger_();
   ScriptApp.newTrigger('pkLichSuTick_').timeBased().everyMinutes(10).create();

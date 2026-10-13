@@ -107,7 +107,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `SH_KHO`, `KHO_HEADERS`, `SH_TONKHO`, `TONKHO_HEADERS`, `SH_TONKHO_LOG`, `TONKHO_LOG_HEADERS`, `TONKHO_IMPORT_MAX_`
 
 ## 25_PancakeChat.gs
-- Hàm: `_pkAuth_`, `_pkEnc_`, `_pkInList_`, `_pkAtts_`, `_pkConvOut_`, `pkChat_`, `pkChatInbox_`, `pkChatConv_`, `pkChatFind_`, `pkChatLink_`, `_pkPageToken_`, `pkChatSend_`
+- Hàm: `_pkAuth_`, `_pkEnc_`, `_pkInList_`, `_pkAtts_`, `_pkStaffNames_`, `_pkConvOut_`, `pkChat_`, `pkChatInbox_`, `pkChatConv_`, `pkChatFind_`, `pkChatLink_`, `_pkPageToken_`, `pkChatSend_`
 - Hằng/biến: `PK_CHAT_SECTION_`, `PK_CONV_COLS_`
 
 ## 26_Chat.gs
@@ -115,7 +115,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `SH_CHAT_CH_`, `CHAT_CH_HEADERS_`, `SH_CHAT_MSG_`, `CHAT_MSG_HEADERS_`, `CHAT_MAX_TEXT_`, `CHAT_RING_MAX_`, `CHAT_RATE_MS_`, `CHAT_TAIL_ROWS_`, `CHAT_MAX_MEMBERS_`, `CHAT_GET_ACTIONS_`, `CHAT_POST_ACTIONS_`
 
 ## 27_PancakeHistory.gs
-- Hàm: `_pkAllPageTokens_`, `_pkIso_`, `_pkPlain_`, `_pkPhoneOfMsg_`, `_pkMapMsg_`, `_pkMapConv_`, `_pkFetchJson_`, `_pkInsertIgnore_`, `_pkFetchMsgs_`, `_pkHistState_`, `_pkHistSave_`, `pkHistSync_`, `pkLichSuThu`, `pkLichSuChay`, `pkLichSuXemTrangThai`, `pkLichSuLamLai`, `pkLichSuTick_`, `pkLichSuCaiTrigger`, `removePkLichSuTrigger_`
+- Hàm: `_pkAllPageTokens_`, `_pkIso_`, `_pkPlain_`, `_pkPhoneOfMsg_`, `_pkMapMsg_`, `_pkMapConv_`, `_pkFetchJson_`, `_pkInsertIgnore_`, `_pkFetchMsgs_`, `_pkHistState_`, `_pkHistSave_`, `pkHistSync_`, `pkLichSuThu`, `pkLichSuChay`, `pkLichSuXemTrangThai`, `pkLichSuLamLai`, `pkLichSuTick_`, `_pkUserList_`, `_pkMapStaff_`, `pkStaffSync_`, `pkNhanVienThu`, `pkNhanVienDongBo`, `pkLichSuCaiTrigger`, `removePkLichSuTrigger_`
 - Hằng/biến: `PK_HIST_SECTION_`
 
 ## 28_StaffProfile.gs

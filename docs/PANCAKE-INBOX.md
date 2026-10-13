@@ -61,3 +61,5 @@ Chọn 1 hội thoại → bên phải hiện hồ sơ khách (cùng SĐT) như 
 - Mở hồ sơ từ Danh sách KH thì ngăn tự trả về dạng trượt từ phải như cũ (`openDp` gọi `_scUndock`).
 - Hồ sơ gắn cạnh chat tự cập nhật khi dữ liệu thay đổi (`_maybeRefreshOpenDp` tính cả `_scDocked`).
 - Test: jsdom, dùng `openDp`/`closeDp`/code gắn thật (18 ca). Chưa kiểm trên trình duyệt thật.
+
+- [x] **Bước 6a — tên nhân viên (code xong 2026-10-13, CHƯA kiểm với API thật):** `supabase/schema.sql` mục 10 (`pk_staff`), GAS `pkNhanVienThu` (chạy thử, KHÔNG ghi, in mẫu `users`) và `pkNhanVienDongBo` (ghi `pk_staff`); `pkChat/pkChatInbox/pkChatFind` trả thêm `assignees` (tên) + `assigneeIds`. Dạng JSON của `GET /api/public_api/v1/pages/{page}/users` CHƯA xác nhận → code đọc khoan dung (mảng ở `users`/`data`/chính nó; id = `id|user_id`; tên = `name|full_name|fb_name`). Việc cần làm: deploy GAS (`ver` = `v13.41-pkstaff`), chạy `pkNhanVienThu`, đối chiếu Log; đúng thì chạy `pkNhanVienDongBo`. Giao diện CHƯA hiện tên sale (chỉ backend trả sẵn) — làm sau khi tên về đúng. Test: `node tools/test-pk-staff-gas.js`.
