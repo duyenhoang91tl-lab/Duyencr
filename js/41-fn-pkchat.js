@@ -11,12 +11,33 @@ function _pkcHm(iso) { var d = new Date(iso); if (isNaN(d)) return ''; return ('
 function _pkcDay(iso) { var d = new Date(iso); if (isNaN(d)) return ''; return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear(); }
 function _pkcStop() { if (_pkc.timer) { clearInterval(_pkc.timer); _pkc.timer = null; } }
 
+// NGUOI GUI + GIO + THE nhu Pancake (2026-10-12). Dung chung cho tab Chat trong ho so khach (file nay) va man Chat chung (js/42).
+// Duoi moi tin: TEN NGUOI GUI · GIO (re chuot xem du ngay gio giay). Tin cua nhan vien: ten nhan vien (CRM hoac Pancake), khong co thi ten page; tin khach: ten khach.
+function _pkcFull(iso) { var d = new Date(iso); if (isNaN(d)) return ''; return _pkcDay(iso) + ' ' + _pkcHm(iso) + ':' + ('0' + d.getSeconds()).slice(-2); }
+function _pkcMeName() { try { return (currentUser && (currentUser.name || currentUser.username)) || 'Bạn'; } catch (e) { return 'Bạn'; } }
+function _pkcMetaHtml(m, conv) {
+  var who = m.tmp ? _pkcMeName() : (m.dir === 'out' ? (m.staff || m.from || '') : (m.from || (conv && conv.name) || ''));
+  return '<div class="pkc-t" title="' + _pkcEsc(_pkcFull(m.at)) + '">' + (who ? '<b>' + _pkcEsc(who) + '</b> · ' : '') + _pkcHm(m.at)
+    + (m.crm || m.tmp ? ' <span class="pkc-crm" title="Gửi từ CRM">CRM</span>' : '') + (m.tmp ? ' ✓' : '') + '</div>';
+}
+function _pkcTagsHtml(tags, max) {
+  tags = tags || []; if (!tags.length) return ''; max = max || tags.length;
+  var h = tags.slice(0, max).map(function (t) { var c = /^#[0-9a-fA-F]{3,8}$/.test(t.c || '') ? t.c : ''; return '<span class="pkc-tag"' + (c ? ' style="background:' + c + '"' : '') + '>' + _pkcEsc(t.t) + '</span>'; }).join('');
+  if (tags.length > max) h += '<span class="pkc-tag more" title="' + _pkcEsc(tags.slice(max).map(function (t) { return t.t; }).join(', ')) + '">+' + (tags.length - max) + '</span>';
+  return h;
+}
+function _pkcMetaRow(conv) {   // the + nguoi xu ly cua hoi thoai
+  if (!conv) return ''; var h = _pkcTagsHtml(conv.tags);
+  if (conv.assignees && conv.assignees.length) h += '<span class="pkc-ass" title="Người xử lý trên Pancake">👤 ' + _pkcEsc(conv.assignees.join(', ')) + '</span>';
+  return h;
+}
 function renderPkChatTab(c) {
   _pkcStop();
   _pkc = { phone: c.phone, convs: [], msgs: {}, active: '', after: '', timer: null, loading: false, firstLoad: true, err: '', sending: false, tick: 0, okAt: '' };
   setTimeout(function () { if (_pkc.phone === c.phone && document.getElementById('pkc-root')) { pkcLoad(true); _pkc.timer = setInterval(_pkcTick, 6000); } }, 0);
   return '<div id="pkc-root" class="pkc" data-phone="' + _pkcEsc(c.phone) + '">'
     + '<div class="pkc-convs" id="pkc-convs"></div>'
+     + '<div class="pkc-meta" id="pkc-meta"></div>'
     + '<div class="pkc-msgs" id="pkc-msgs"><div class="pkc-note">Đang tải tin nhắn…</div></div>'
     + '<div class="pkc-status" id="pkc-status"></div>'
     + '<div class="pkc-compose" id="pkc-compose">'
@@ -68,7 +89,8 @@ function _pkcRender(forceBottom) {
     return '<span class="pkc-chip' + (c.id === P.active ? ' on' : '') + '" onclick="pkcPick(this.getAttribute(\'data-id\'))" data-id="' + _pkcEsc(c.id) + '">' + _pkcEsc(c.name || 'Khách Pancake') + (c.lastAt ? ' · ' + _pkcDay(c.lastAt).slice(0, 5) : '') + '</span>';
   }).join('') : '';
   var near = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
-  var comp = document.getElementById('pkc-compose'), lk = document.getElementById('pkc-link');
+  var comp = document.getElementById('pkc-compose'), lk = document.getElementById('pkc-link'), mt = document.getElementById('pkc-meta');
+  if (mt) mt.innerHTML = _pkcMetaRow(P.convs.filter(function (c) { return c.id === P.active; })[0]);
   if (!P.active) {
     box.innerHTML = '<div class="pkc-note">Chưa có hội thoại Pancake nào gắn với SĐT này.<br>Nếu khách đã nhắn Pancake, bấm "Gắn hội thoại" bên dưới, tìm theo tên trên Pancake rồi gắn.</div>';
     if (comp) comp.style.display = 'none'; if (lk) lk.open = true; _pkcStatus(); return;
@@ -85,7 +107,7 @@ function _pkcRender(forceBottom) {
   var html = '', lastDay = '';
   list.forEach(function (m) {
     var d = _pkcDay(m.at); if (d && d !== lastDay) { lastDay = d; html += '<div class="pkc-day">' + d + '</div>'; }
-    html += '<div class="pkc-m ' + (m.dir === 'out' ? 'out' : 'in') + '"><div class="pkc-b">' + _pkcEsc(m.text).replace(/\n/g, '<br>') + _pkcAttHtml(m.att) + '</div><div class="pkc-t">' + _pkcHm(m.at) + (m.tmp ? ' ✓' : '') + '</div></div>';
+    html += '<div class="pkc-m ' + (m.dir === 'out' ? 'out' : 'in') + '"><div class="pkc-b">' + _pkcEsc(m.text).replace(/\n/g, '<br>') + _pkcAttHtml(m.att) + '</div>' + _pkcMetaHtml(m, conv) + '</div>';
   });
   box.innerHTML = html || '<div class="pkc-note">Hội thoại chưa có tin nhắn nào được lưu (tin cũ trước khi cài webhook chưa kéo về).</div>';
   if (forceBottom || near) box.scrollTop = box.scrollHeight;

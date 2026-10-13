@@ -158,6 +158,7 @@ alter table pk_messages add column if not exists sender_name text default '';
 alter table pk_messages add column if not exists direction   text default '';   -- 'in' = khách nhắn, 'out' = page/sale trả lời
 alter table pk_messages add column if not exists text        text default '';
 alter table pk_messages add column if not exists sent_at     timestamptz;
+alter table pk_messages add column if not exists crm_user    text default '';    -- tên nhân viên CRM đã gửi tin này từ CRM (Pancake chỉ biết token page); webhook vọng lại KHÔNG ghi đè cột này
 create index if not exists pk_messages_conv_idx on pk_messages (conversation_id, sent_at);
 
 alter table pk_conversations enable row level security;

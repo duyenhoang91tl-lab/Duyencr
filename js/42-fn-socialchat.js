@@ -48,14 +48,18 @@ function _scRenderList() {
       + '<div class="sc-av">' + _pkcEsc(typeof proInitials_ === 'function' ? proInitials_(c.name) : '?') + '</div><div class="sc-conv-body">'
       + '<div class="sc-conv-n"><b>' + _pkcEsc(c.name || 'Khách Pancake') + '</b><span>' + _pkcEsc(_scAgo(c.lastAt)) + '</span></div>'
       + (c.phone ? '<div class="sc-conv-p">' + _pkcEsc(c.phone) + '</div>' : '')
-      + '<div class="sc-conv-t">' + _pkcEsc(c.lastText || '') + '</div></div>' + (c.seen === false ? '<i class="sc-dot"></i>' : '') + '</div>';
+      + '<div class="sc-conv-t">' + _pkcEsc(c.lastText || '') + '</div>'
+      + (c.tags && c.tags.length ? '<div class="sc-conv-g">' + _pkcTagsHtml(c.tags, 3) + '</div>' : '')
+      + (c.seen === false ? '<i class="sc-dot"></i>' : '') + '</div>';
   }).join('') : '<div class="pkc-note">Không có hội thoại nào.</div>';
+  var hm = document.getElementById('sc-head-m');
+  if (hm) hm.innerHTML = _pkcMetaRow(_sc.convs.filter(function (x) { return x.id === _sc.active; })[0]);
 }
 function scPick(id) {
   _sc.active = id; _scRenderList();
   var c = _sc.convs.filter(function (x) { return x.id === id; })[0] || {};
   var h = document.getElementById('sc-head');
-  if (h) h.innerHTML = '<button class="btn sm sc-back" onclick="scBack()">←</button><b>' + _pkcEsc(c.name || 'Khách Pancake') + '</b>' + (c.phone ? ' <span class="pkc-ph">' + _pkcEsc(c.phone) + '</span> <button class="btn sm" onclick="scOpenProfile()">👤 Mở hồ sơ</button>' : ' <span class="pkc-ph">chưa gắn SĐT</span>');
+  if (h) h.innerHTML = '<button class="btn sm sc-back" onclick="scBack()">←</button><b>' + _pkcEsc(c.name || 'Khách Pancake') + '</b>' + (c.phone ? ' <span class="pkc-ph">' + _pkcEsc(c.phone) + '</span> <button class="btn sm" onclick="scOpenProfile()">👤 Mở hồ sơ</button>' : ' <span class="pkc-ph">chưa gắn SĐT</span>') + '<div class="sc-head-m" id="sc-head-m">' + _pkcMetaRow(c) + '</div>';
   var cp = document.getElementById('sc-compose'); if (cp) cp.style.display = (c.type === 'COMMENT') ? 'none' : '';
   var box = document.getElementById('sc-main'); if (box) box.classList.add('has-conv');
   if (typeof proChatInfoRender_ === 'function') { try { proChatInfoRender_(c); } catch (e) { console.warn('[ui-pro] chat info', e); } }
@@ -122,10 +126,11 @@ function _scRenderMsgs(forceBottom) {
   var real = list.filter(function (m) { return !m.tmp; });
   list = list.filter(function (m) { return !m.tmp || !real.some(function (r) { return r.dir === 'out' && r.text.trim() === m.text.trim() && new Date(r.at) >= new Date(m.at) - 30000; }); });
   list.sort(function (a, b) { return String(a.at) < String(b.at) ? -1 : String(a.at) > String(b.at) ? 1 : 0; });
+  var conv = _sc.convs.filter(function (x) { return x.id === _sc.active; })[0] || {};
   var html = '', lastDay = '';
   list.forEach(function (m) {
     var d = _pkcDay(m.at); if (d && d !== lastDay) { lastDay = d; html += '<div class="pkc-day">' + d + '</div>'; }
-    html += '<div class="pkc-m ' + (m.dir === 'out' ? 'out' : 'in') + '"><div class="pkc-b">' + _pkcEsc(m.text).replace(/\n/g, '<br>') + _pkcAttHtml(m.att) + '</div><div class="pkc-t">' + _pkcHm(m.at) + (m.tmp ? ' ✓' : '') + '</div></div>';
+    html += '<div class="pkc-m ' + (m.dir === 'out' ? 'out' : 'in') + '"><div class="pkc-b">' + _pkcEsc(m.text).replace(/\n/g, '<br>') + _pkcAttHtml(m.att) + '</div>' + _pkcMetaHtml(m, conv) + '</div>';
   });
   box.innerHTML = html || '<div class="pkc-note">Hội thoại chưa có tin nhắn nào được lưu.</div>';
   if (forceBottom || near) box.scrollTop = box.scrollHeight;
