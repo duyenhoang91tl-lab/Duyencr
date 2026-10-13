@@ -286,6 +286,11 @@ function doPostCore_(e) {
     if (action === 'tonKhoItemSave')      return tonKhoItemSave_(data);
     if (action === 'tonKhoItemDelete')    return tonKhoItemDelete_(data);
     if (action === 'tonKhoImport')        return tonKhoImport_(data);
+    if (action === 'khoComboSave')        return khoComboSave_(data);
+    if (action === 'tonKhoTruDonCauHinh') return tonKhoTruDonCauHinh_(data);
+    if (action === 'tonKhoTruDonXemTruoc') return tonKhoTruDonXemTruoc_(data);
+    if (action === 'tonKhoTruDonChay')    return tonKhoTruDonChay_(data);
+    if (action === 'tonKhoTruDonHoanTay') return tonKhoTruDonHoanTay_(data);
     if (action === 'saveMktTeams')        return saveMktTeams_(data.teams);
     if (action === 'saveUsers')           return saveUsers_(data.users);
     if (action === 'saveAudit')           return saveAudit_(data.rows);
