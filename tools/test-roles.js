@@ -74,4 +74,19 @@ ok(r.ok&&SAVED[0]==='roleConfig'&&JSON.parse(SETTINGS.roleConfig).roles.find(x=>
 // _profScope_: viewer (CEO) xem moi nguoi
 ok(run('_profScope_',U('ceo'),{username:'x',name:'X',names:['X']},null)===true,'CEO xem ho so moi nguoi');
 ok(run('_profScope_',U('cs'),{username:'x',name:'X',names:['X']},null)===false,'nhan vien khong xem ho so nguoi khac');
+// ===== buoc 3: chan o backend =====
+USERS.tokCs={username:'cs1',role:'cs',names:['Hà']};USERS.tokOld={username:'o',role:'cs',perms:['salesreport']};USERS.tokCeo={username:'c',role:'ceo'};
+SETTINGS={};
+ok(run('_featureGate_','salesReportA','tokCs')===null,'chua cai gi: khong chan');
+setCfg({roles:[{key:'cs',perms:['tab-kh']}]});
+let g=run('_featureGate_','salesReportA','tokCs');ok(g&&g.code==='FORBIDDEN'&&g.feature==='salesreport','vai tro cs bi gioi han -> FORBIDDEN');
+ok(run('_featureGate_','orgOverview','tokCs').feature==='overview'&&run('_featureGate_','audit','tokCs').feature==='audit','map action -> hang muc (overview, audit)');
+ok(run('_featureGate_','lookup','tokCs')===null,'action khong co trong bang -> cho qua');
+ok(run('_featureGate_','salesReportA','')===null&&run('_featureGate_','salesReportA','tokSai')===null,'khong token / token la -> cho qua (do _enforceCheck_ lo)');
+ok(run('_featureGate_','salesReportA','tokA')===null&&run('_featureGate_','salesReportA','tokCeo')===null,'admin & vai tro chua gioi han -> cho qua');
+setCfg({roles:[]});ok(run('_featureGate_','salesReportA','tokOld')===null&&run('_featureGate_','orgOverview','tokOld')===null,'tai khoan co perms rieng (cu) khong bi gate backend chan nham (skipUserPerms)');setCfg({roles:[{key:'cs',perms:['tab-kh']}]});
+ctx._sessUser_=()=>{throw new Error('x');};ok(run('_featureGate_','salesReportA','tokCs')===null,'loi khi tra user -> nuot, khong chan');
+ctx._sessUser_=t=>USERS[t]||null;
+setCfg({roles:[],deptPerms:{online:['tab-kh']}});
+ok(run('_featureGate_','salesReportA','tokCs')===null,'bo phan khong khop nguoi dung -> khong chan');
 console.log(fail?'\nFAILED '+fail:'\nALL ROLES TESTS PASSED');process.exit(fail?1:0);

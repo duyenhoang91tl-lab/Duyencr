@@ -15,6 +15,8 @@ function doGet(e) {
   _ntlNote_('GET', action, p.token, p.src, p.ek);
   var _denG = _enforceCheck_(action, p.token, p.ek, p.src);
   if (_denG) return jsonOut_(_denG);
+  var _gateErr = _featureGate_(action, p.token);
+  if (_gateErr) return jsonOut_(_gateErr);
   return doGetCore_(e);
 }
 
@@ -419,7 +421,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.44-pkmeta' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.45-roles-gate' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──

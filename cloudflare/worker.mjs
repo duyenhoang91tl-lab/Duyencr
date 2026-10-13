@@ -22,6 +22,17 @@ const TTL_SEC = {
   // danh muc gia / khuyen mai — it doi
   priceCatalogFlat: 120, priceCatalogTree: 120, ctkmCatalog: 120
 };
+// Action GAS chan theo phan quyen (vai tro/bo phan) -> KHONG duoc dung chung cache giua cac nguoi (neu khong nguoi bi chan van doc duoc ban cache cua nguoi khac).
+// Khoa cache them user trong token; khong co SESS_SECRET (khong xac thuc duoc token) thi khong cache.
+export const GATED_ACTIONS = ['salesReportA', 'salesReportB', 'salesReportC', 'saleKpiReport', 'failedOrderReport', 'careLeadReport', 'kpiReport', 'mktChecklist', 'pancakeReport', 'pancakeSdtReport'];
+export function tokenUser(tok) {
+  try {
+    tok = String(tok || ''); const i = tok.indexOf('.'); if (i < 1) return '';
+    const raw = atob(tok.slice(0, i).replace(/-/g, '+').replace(/_/g, '/'));
+    const p = JSON.parse(new TextDecoder().decode(Uint8Array.from(raw, c => c.charCodeAt(0))));
+    return p && p.u ? String(p.u) : '';
+  } catch (e) { return ''; }
+}
 const STALE_MAX_SEC = 600;
 // STALE-WHILE-REVALIDATE (2026-10-10, giam lag): ban cache vua het han thi tra NGAY ban cu (x-crm-cache: SWR) va lam moi o nen,
 // thay vi bat nguoi dung cho GAS (vai giay -> hang chuc giay voi bao cao/orders/cskhDuyenLite lon). Cua so SWR = ttl x SWR_FACTOR
@@ -192,7 +203,13 @@ export async function handle(request, env, ctx) {
   // Da cau hinh SESS_SECRET: chi phuc vu/ghi cache cho request co token phien HOP LE. Con lai chuyen thang GAS (GAS quyet dinh co cho qua khong) va KHONG cache.
   if (env.SESS_SECRET && !(await verifySessToken(url.searchParams.get('token'), env.SESS_SECRET))) return passThrough(request, originUrl.toString(), 'BYPASS:no-valid-token');
 
-  const cache = caches.default, keyUrl = cacheKeyUrl(request.url), key = new Request(keyUrl, { method: 'GET' });
+  let keyUrl = cacheKeyUrl(request.url);
+  if (GATED_ACTIONS.indexOf(url.searchParams.get('action') || '') !== -1) {
+    const who = env.SESS_SECRET ? tokenUser(url.searchParams.get('token')) : '';
+    if (!who) return passThrough(request, originUrl.toString(), 'BYPASS:gated-no-user');
+    keyUrl += (keyUrl.indexOf('?') === -1 ? '?' : '&') + '_u=' + encodeURIComponent(who);
+  }
+  const cache = caches.default, key = new Request(keyUrl, { method: 'GET' });
   const now = Date.now(); let stale = null;
   const swrMs = Math.min(STALE_MAX_SEC, policy.ttl * SWR_FACTOR) * 1000;
   const hit = await cache.match(key);

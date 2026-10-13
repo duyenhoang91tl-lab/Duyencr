@@ -1605,18 +1605,30 @@ function _userDeptKeys_(u) {
   return Object.keys(out);
 }
 // user = ban ghi tu readUsers_. fid = id hang muc. Mac dinh cho phep (perms null).
-function _featureAllowed_(user, fid, cfg) {
+function _featureAllowed_(user, fid, cfg, skipUserPerms) {
   if (!user) return false;
   if (user.role === 'admin') return true;
   cfg = cfg || readRoleConfig_();
-  if (String(fid).indexOf('act:') !== 0 && Array.isArray(user.perms) && user.perms.length) return user.perms.indexOf(fid) !== -1;   // gioi han tab rieng cua tai khoan (co san tu truoc)
+  if (!skipUserPerms && String(fid).indexOf('act:') !== 0 && Array.isArray(user.perms) && user.perms.length) return user.perms.indexOf(fid) !== -1;   // gioi han tab rieng cua tai khoan (co san tu truoc)
   var r = _roleResolve_(user.role, cfg);
   if (Array.isArray(r.perms) && r.perms.indexOf(fid) === -1) return false;
+  if (!Object.keys(cfg.deptPerms || {}).length) return true;
   var dk = _userDeptKeys_(user);
   if (!dk.length) return true;
   var ok = false;
   dk.forEach(function (k) { var p = cfg.deptPerms[k]; if (!Array.isArray(p) || p.indexOf(fid) !== -1) ok = true; });
   return ok;
+}
+// Chan o backend: action bao cao -> hang muc. Chi chan khi co token hop le va admin da gioi han.
+var ACTION_FEATURE_ = { salesReportA:'salesreport', salesReportB:'salesreport', salesReportC:'salesreport', saleKpiReport:'salesreport', failedOrderReport:'salesreport', careLeadReport:'salesreport', kpiReport:'kpipancake', pancakeReport:'pancake', pancakeSdtReport:'pancake', mktChecklist:'mktchecklist', orgOverview:'overview', teamAnalysis:'overview', audit:'audit' };
+function _featureGate_(action, token) {
+  var f = ACTION_FEATURE_[action];
+  if (!f || !token) return null;
+  try {
+    var u = _sessUser_(token);
+    if (u && !_featureAllowed_(u, f, null, true)) return { error: 'Ban khong co quyen xem muc nay (Admin chua cap cho vai tro/bo phan cua ban).', code: 'FORBIDDEN', feature: f };
+  } catch (e) {}
+  return null;
 }
 // Goi cho client: cau hinh day du cho admin; nguoi khac chi nhan phan cua minh (khong lo quyen cua nguoi khac).
 function roleConfigForClient_(user) {
@@ -1877,6 +1889,8 @@ function doGet(e) {
   _ntlNote_('GET', action, p.token, p.src, p.ek);
   var _denG = _enforceCheck_(action, p.token, p.ek, p.src);
   if (_denG) return jsonOut_(_denG);
+  var _gateErr = _featureGate_(action, p.token);
+  if (_gateErr) return jsonOut_(_gateErr);
   return doGetCore_(e);
 }
 
@@ -2281,7 +2295,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.44-pkmeta' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.45-roles-gate' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──

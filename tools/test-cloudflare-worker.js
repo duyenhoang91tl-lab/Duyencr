@@ -56,16 +56,16 @@ const W = 'https://crm.example.workers.dev/';
   const rs = await Promise.all([1, 2, 3, 4, 5].map(() => worker.fetch(req('action=orders'), env, ctx))); await Promise.all(pending.splice(0));
   ok(rs.every(q => q.headers.get('x-crm-cache') === 'SWR') && calls.length === 2, 'het han + 5 request cung luc: tat ca SWR, GAS chi bi goi them 1 lan (gop): ' + calls.length);
   reset(); originFn = () => ({ status: 200, body: { ok: true, n: 7 } });
-  const ms = await Promise.all([1, 2, 3].map(() => worker.fetch(req('action=salesReportB'), env, ctx))); await Promise.all(pending.splice(0));
+  const ms = await Promise.all([1, 2, 3].map(() => worker.fetch(req('action=salesReportOptions'), env, ctx))); await Promise.all(pending.splice(0));
   ok(calls.length === 1 && ms.every(q => q.status === 200), 'MISS cung luc 3 request: gop 1 lan goi GAS');
   for (const q of ms) ok(JSON.parse(await q.text()).n === 7, 'moi nguoi goi doc duoc body day du');
   // SWR + GAS loi o nen: van tra ban cu, khong nem loi
   reset(); await go('action=orders'); now += 20000; originFn = () => ({ throw: true }); r = await go('action=orders'); ok(r.headers.get('x-crm-cache') === 'SWR' && r.status === 200, 'SWR + lam moi nen loi: van tra ban cu 200');
   // tham so khac thu tu van trung cache
-  reset(); await go('action=salesReportA&from=2026-10-01&to=2026-10-08'); r = await go('to=2026-10-08&action=salesReportA&from=2026-10-01'); ok(r.headers.get('x-crm-cache') === 'HIT' && calls.length === 1, 'doi thu tu tham so van HIT');
-  r = await go('action=salesReportA&from=2026-10-01&to=2026-10-09'); ok(r.headers.get('x-crm-cache') === 'MISS' && calls.length === 2, 'khoang ngay khac = muc khac');
+  reset(); await go('action=salesReportOptions&from=2026-10-01&to=2026-10-08'); r = await go('to=2026-10-08&action=salesReportOptions&from=2026-10-01'); ok(r.headers.get('x-crm-cache') === 'HIT' && calls.length === 1, 'doi thu tu tham so van HIT');
+  r = await go('action=salesReportOptions&from=2026-10-01&to=2026-10-09'); ok(r.headers.get('x-crm-cache') === 'MISS' && calls.length === 2, 'khoang ngay khac = muc khac');
   // origin nhan DUNG thu tu/tham so goc
-  ok(calls[1].url === GAS + '?action=salesReportA&from=2026-10-01&to=2026-10-09&src=worker', 'tham so chuyen tiep nguyen ven');
+  ok(calls[1].url === GAS + '?action=salesReportOptions&from=2026-10-01&to=2026-10-09&src=worker', 'tham so chuyen tiep nguyen ven');
   // Buoc 3b: token/src cua tung nguoi KHONG chia nho cache; van chuyen tiep nguyen ven cho GAS; src san co khong bi ghi de
   reset(); await go('action=orders&src=web&token=AAA&ek=X1'); r = await go('action=orders&src=zalo&ek=X2');
   ok(r.headers.get('x-crm-cache') === 'HIT' && calls.length === 1, 'ek (khoa extension) khong chia nho cache');
@@ -171,6 +171,16 @@ const W = 'https://crm.example.workers.dev/';
     // GAS tu choi -> loi duoc tra nguyen, khong cache
     reset(); originFn = () => ({ status: 200, body: { error: 'Can dang nhap lai', code: 'AUTH' } }); r = await go('action=orders', undefined, senv);
     ok(JSON.parse(await r.text()).code === 'AUTH' && putCount === 0, 'loi AUTH cua GAS duoc chuyen nguyen ve client');
+    // Action bi chan theo phan quyen: cache RIENG tung nguoi; khong xac thuc duoc user thi khong cache
+    {
+      const t2 = mkTok('hoa', Date.now() + 1e6);
+      ok(mod.tokenUser(goodT) === 'duyen' && mod.tokenUser(vnT) === 'Nguyễn Văn Ạ' && mod.tokenUser('abc') === '', 'tokenUser doc dung user (ke ca co dau)');
+      reset(); await go('action=salesReportA&from=1&to=2&token=' + goodT, undefined, senv);
+      r = await go('action=salesReportA&from=1&to=2&token=' + goodT, undefined, senv); ok(r.headers.get('x-crm-cache') === 'HIT' && calls.length === 1, 'bao cao bi chan: cung nguoi -> HIT');
+      r = await go('action=salesReportA&from=1&to=2&token=' + t2, undefined, senv); ok(r.headers.get('x-crm-cache') === 'MISS' && calls.length === 2, 'bao cao bi chan: nguoi khac KHONG an cache cua nguoi truoc');
+      reset(); r = await go('action=salesReportA&from=1&to=2&token=' + goodT, undefined, env); ok(r.headers.get('x-crm-cache') === 'BYPASS:gated-no-user' && putCount === 0, 'khong co SESS_SECRET: bao cao bi chan khong cache');
+      reset(); await go('action=orders&token=' + goodT, undefined, senv); r = await go('action=orders&token=' + t2, undefined, senv); ok(r.headers.get('x-crm-cache') === 'HIT', 'action khong bi chan van dung chung cache');
+    }
     // KHONG cau hinh SESS_SECRET -> hanh vi cu y het (khong can token)
     reset(); r = await go('action=orders', undefined, env); ok(r.headers.get('x-crm-cache') === 'MISS' && putCount === 1, 'khong co SESS_SECRET -> nhu cu');
   }
