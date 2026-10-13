@@ -1119,7 +1119,7 @@ function setCSFilterMode(mode, el){
 // ── Khi đổi CS ở "Lọc theo CS": toàn bộ sidebar + stats + danh sách + lọc nâng cao theo CS đó ──
 function onCSFilterChange(){
   // Xem trọn bộ KH của CS được chọn → reset các bộ lọc con
-  currentTier='all'; currentCare='all'; currentZalo='all'; currentBrand='all'; currentCF={};
+  currentTier='all'; currentCare='all'; currentZalo='all'; currentBrand='all'; currentCF={}; if (typeof resetBuyFilter === 'function') resetBuyFilter();
   document.querySelectorAll('.fi').forEach((b,i)=>{ b.classList.remove('active'); if(i===0)b.classList.add('active'); });
   if (typeof resetSubFilters==='function') resetSubFilters();
   if (typeof _invalidateFilterCache==='function') _invalidateFilterCache();

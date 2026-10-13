@@ -328,6 +328,12 @@ window.addEventListener('load',function(){var s=document.createElement('script')
         <option value="assign">Chia data (được chia cho tôi)</option>
       </select>
     </div>
+    <div class="sb-label">Loại khách</div>
+    <div class="fgroup" id="buy-filters" style="display:flex;gap:6px;margin-bottom:8px">
+      <button class="fi active" data-buy="all" onclick="setBuy('all')" style="flex:1;justify-content:center"><span>Tất cả</span></button>
+      <button class="fi" data-buy="lead" onclick="setBuy('lead')" style="flex:1;justify-content:center" title="Khách chưa có đơn nào (khách tiềm năng)"><span>Chưa mua</span></button>
+      <button class="fi" data-buy="bought" onclick="setBuy('bought')" style="flex:1;justify-content:center" title="Khách đã có ít nhất 1 đơn"><span>Đã mua</span></button>
+    </div>
     <div class="sb-label">Phân loại KH</div>
     <div class="fgroup">
       <button class="fi active" onclick="setTier('all',this)"><div class="fleft"><span>Tất cả</span></div><span class="fbadge" id="b-all">0</span></button>
@@ -1654,6 +1660,7 @@ function openBcLogModal(phone){
 <script src="js/35-fn-deptsettings.js"></script>
 <script src="js/36-fn-homechips.js"></script>
 <script src="js/37-fn-configpage.js"></script>
+<script src="js/39-fn-buyfilter.js"></script>
 <script src="js/30-fn-teamanalysis.js"></script>
 <script src="js/29-sidenav.js"></script>
 <script src="js/31-fn-orgoverview.js"></script>

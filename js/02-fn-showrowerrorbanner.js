@@ -554,6 +554,7 @@ function applyFilters() {
   let list = allCustomers.filter(c => {
     if (!_inUserScope(c)) return false;            // V9: phân quyền theo vai trò
     if (currentTier !== 'all' && c.tier !== currentTier) return false;
+    if (typeof currentBuy !== 'undefined' && currentBuy !== 'all' && (currentBuy === 'bought') !== _isBoughtCustomer(c)) return false;   // Loại khách (js/39)
     if (currentCare !== 'all' && c.careStatus !== currentCare) return false;
     if (currentZalo !== 'all') {
       if (currentZalo === 'block') { if (!['Chặn','Hủy kết bạn'].includes(c.zaloStatus)) return false; }
