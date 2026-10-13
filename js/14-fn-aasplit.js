@@ -1158,7 +1158,7 @@ function _applyAuthIdentity(acct){
   _bootstrapAdmin = false;
   var namesArr = (acct.names && acct.names.length) ? acct.names.slice() : (acct.name ? [acct.name] : []);
   var primaryName = acct.role==='admin' ? 'Admin' : (namesArr[0] || acct.username);
-  currentUser = { name: primaryName, names: acct.role==='admin' ? [] : namesArr, role: acct.role || 'cs', team: acct.team || '', perms: (Array.isArray(acct.perms) ? acct.perms : null) };
+  currentUser = { name: primaryName, names: (acct.role==='admin' || _roleBaseOf(acct.role)==='viewer') ? [] : namesArr, role: _roleBaseOf(acct.role || 'cs'), roleKey: acct.role || 'cs', team: acct.team || '', perms: (Array.isArray(acct.perms) ? acct.perms : null) };
   if (acct.role === 'demo' && _demoPurgeAndReload_()) return;   // don cache day du + tai lai trang (xem _demoPurgeAndReload_)
   if (acct.role === 'demo') {
     // Tai khoan test: chi thay cac tab bao cao (khong the nang quyen qua perms). Du lieu chi tiet da bi may chu cat con 5 dong.

@@ -42,10 +42,11 @@
     { k:'cs',  t:'🔀 Cài đặt chia số',      ids:['act:assign','act:autoassign','act:assignhist'] },
     { k:'tm',  t:'👥 Cài đặt team',         ids:['team','act:acct'] },
     { k:'up',  t:'📤 Up data',              ids:['uploaddata','act:upload','act:sync','act:fullsync','act:dup'] },
-    { k:'st',  t:'⚙ Settings',              ids:['config','act:cstatus','act:khstatus','act:cfield','act:tier','audit','act:clear','act:taskflow'] }
+    { k:'st',  t:'⚙ Settings',              ids:['act:roles','config','act:cstatus','act:khstatus','act:cfield','act:tier','audit','act:clear','act:taskflow'] }
   ];
   // Mục "hành động" (mở modal có sẵn, không phải tab). admin:true = chỉ tài khoản admin thấy.
   var ACTS = {
+    roles:      { t:'🛡 Phân quyền', f:'openRoleSettings', admin:true },
     notif:      { t:function(){ return (typeof _ntLabel==='function') ? _ntLabel() : '🔔 Thông báo'; }, f:'openNotifModal' },
     kho:        { t:'📦 Tồn kho', f:'openKhoModal' },
     profile:    { t:'🪪 Hồ sơ nhân viên', f:'openProfileModal' },
@@ -71,6 +72,7 @@
     cfield:     { t:'➕ Trường tự tạo', f:'openCustomFieldsModal', admin:true },
     clear:      { t:'🧹 Xóa data trên máy', f:'clearData', admin:true }
   };
+  window._SN_GROUPS = GROUPS; window._SN_ACTS = ACTS;   // cho trang Phân quyền (js/40-fn-rolesettings.js) liệt kê hạng mục
   function isAdm(){ try { return (typeof _authAccount!=='undefined' && _authAccount && _authAccount.role==='admin') || (typeof _bootstrapAdmin!=='undefined' && _bootstrapAdmin); } catch(e){ return false; } }
   function runAct(k){
     var a = ACTS[k]; if (!a) return;
@@ -116,7 +118,7 @@
       var r = gOf('act:'+k), g = GROUPS[r.g];
       el.setAttribute('data-sn-g', g.k);
       el.style.order = String(r.g*100 + 1 + r.j);
-      var ok = !demo && (!ACTS[k].admin || isAdm());
+      var ok = !demo && (!ACTS[k].admin || isAdm()) && (isAdm() || ACTS[k].admin || typeof _featAllowed !== 'function' || _featAllowed('act:' + k));   // phân quyền theo vai trò/bộ phận (js/40)
       if (ok) cnt[g.k] = (cnt[g.k]||0) + 1;
       el.classList.toggle('sn-hide', !ok || (!!closed[g.k]));
     });
@@ -179,6 +181,7 @@
     new MutationObserver(syncVisible).observe(dv, { attributes:true, attributeFilter:['style'] });
     var t = tabsEl();
     if (t) new MutationObserver(refreshLabel).observe(t, { subtree:true, attributes:true, attributeFilter:['class'] });
+    window._snLayout = layout;   // js/40-fn-rolesettings.js gọi lại khi quyền đổi
     layout(); refreshLabel(); syncVisible();
     if (t) new MutationObserver(function(m){ if (m.some(function(x){return !x.target.classList||!x.target.classList.contains('sn-gh');}) ) { clearTimeout(init._lt); init._lt=setTimeout(layout,30); } }).observe(t, { childList:true, subtree:true, attributes:true, attributeFilter:['class','style'] });
   }

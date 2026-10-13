@@ -812,7 +812,7 @@ function _saveTabCustomize_(){
 // hạn thì mới thu hẹp lại).
 function _tabAllowedForUser(id){
   if (!currentUser || currentUser.role === 'admin') return true;
-  if (!currentUser.perms || !currentUser.perms.length) return true;
+  if (!currentUser.perms || !currentUser.perms.length) return (typeof _featAllowed === 'function') ? _featAllowed(id) : true;   // phân quyền theo vai trò + bộ phận (js/40-fn-rolesettings.js)
   return currentUser.perms.indexOf(id) !== -1;
 }
 // Ẩn hẳn (display:none) các tab bị Admin giới hạn — chạy sau khi currentUser.perms đã có
