@@ -48,6 +48,7 @@ function _scRenderList() {
       + '<div class="sc-av">' + _pkcEsc(typeof proInitials_ === 'function' ? proInitials_(c.name) : '?') + '</div><div class="sc-conv-body">'
       + '<div class="sc-conv-n"><b>' + _pkcEsc(c.name || 'Khách Pancake') + '</b><span>' + _pkcEsc(_scAgo(c.lastAt)) + '</span></div>'
       + (c.phone ? '<div class="sc-conv-p">' + _pkcEsc(c.phone) + '</div>' : '')
+      + (c.assignees && c.assignees.length ? '<div class="sc-conv-s">\ud83d\udc64 ' + _pkcEsc(c.assignees.join(', ')) + '</div>' : '')   // ten sale phu trach (pk_staff); chua co ten -> khong hien, KHONG lo uuid
       + '<div class="sc-conv-t">' + _pkcEsc(c.lastText || '') + '</div>'
       + (c.tags && c.tags.length ? '<div class="sc-conv-g">' + _pkcTagsHtml(c.tags, 3) + '</div>' : '')
       + (c.seen === false ? '<i class="sc-dot"></i>' : '') + '</div>';

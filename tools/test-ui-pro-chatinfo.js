@@ -4,7 +4,7 @@ const src=f=>fs.readFileSync(path.join(__dirname,'..','js',f),'utf8');
 const dom=new JSDOM('<!doctype html><html class="ui-pro"><body><div id="dp-overlay"></div><div id="tab-chat" style="display:block"><div id="chat-wrap"></div></div></body></html>',{runScripts:'outside-only',pretendToBeVisual:true});
 const w=dom.window,log=[];
 const iso=new Date().toISOString();
-const CONVS=[{id:'C1',name:'Mến Hoàng',phone:'+84 934 230 669',lastText:'Ukie em',lastAt:iso,seen:false,type:'INBOX'},{id:'C2',name:'Khách lạ',phone:'',lastText:'hi',lastAt:iso,seen:true,type:'INBOX'},{id:'C3',name:'Chị Ba',phone:'0999888777',lastText:'ok',lastAt:iso,seen:true,type:'INBOX'}];
+const CONVS=[{id:'C1',assignees:['Lan Sale','Minh CS'],name:'Mến Hoàng',phone:'+84 934 230 669',lastText:'Ukie em',lastAt:iso,seen:false,type:'INBOX'},{id:'C2',name:'Khách lạ',phone:'',lastText:'hi',lastAt:iso,seen:true,type:'INBOX'},{id:'C3',name:'Chị Ba',phone:'0999888777',lastText:'ok',lastAt:iso,seen:true,type:'INBOX'}];
 w.eval('var gsUrl="https://gs.example/exec"; var _activeV9Tab="chat"; var careData={"0934230669":{status:"Chốt",zalo:"Đã kết bạn",khStatus:"KH cũ",cs:"Hà",birthday:"1990-05-02",note:"[]",custom:{tag:"VIP"}}}; var currentPhone=""; var _posStatsOn=false; var donStatsByPhone={}; var schedules=[]; var SCHED_TYPES=[{key:"goi",label:"Hẹn gọi"}]; var CARE_STATUS_TREE=[{label:"Chốt",value:"Chốt"},{label:"Phân vân",value:"Phân vân"}]; function _custRev_(c){return 3000000;} function _ymd(d){return d.toISOString().slice(0,10);}');
 w.allCustomers=[{phone:'0934230669',name:'Mến Hoàng',tier:'Vàng',orders:[{date:new w.Date(Date.now()-5*86400000),revenue:3000000,product:'Combo A'}]}];
 w.fetch=async(u,o)=>{log.push({u,o});const r=u.includes('pkChatInbox')?{conversations:CONVS}:u.includes('pkChatConv')?{messages:[{id:'m1',c:'C1',dir:'in',text:'Xin giá',at:iso,att:[]},{id:'m2',c:'C1',dir:'out',text:'Dạ vâng',at:iso,att:[]}]}:{};return {json:async()=>r}};
@@ -20,6 +20,7 @@ ok(w.proInitials_('Mến Hoàng')==='MH'&&w.proInitials_('An')==='A'&&w.proIniti
  ok(kids.join()==='sc-list-first'.replace('sc-list-first',kids.join())&&kids.length===3&&kids[2]==='sc-info'&&$('chat-wrap').children[0].className==='sc-list'&&$('chat-wrap').children[1].id==='sc-main','3 cột: danh sách | hội thoại | thông tin khách');
  const rows=[...w.document.querySelectorAll('.sc-conv')];
  ok(rows.length===3&&rows[0].querySelector('.sc-av').textContent==='MH'&&rows[0].querySelector('.sc-dot')&&!rows[1].querySelector('.sc-dot'),'danh sách: avatar chữ cái + chấm cam khi CHƯA ĐỌC (chỉ hội thoại chưa đọc)');
+ ok(!!rows[0].querySelector('.sc-conv-s')&&rows[0].querySelector('.sc-conv-s').textContent.indexOf('Lan Sale, Minh CS')>=0&&!rows[1].querySelector('.sc-conv-s'),'danh sách: hiện TÊN sale phụ trách; hội thoại chưa có tên thì không hiện dòng (không lộ uuid)');
  ok($('sc-info').textContent.includes('Chọn một hội thoại'),'chưa chọn → gợi ý chọn hội thoại');
  w.scPick('C1');await sleep(30);
  const h=$('sc-info').innerHTML;
