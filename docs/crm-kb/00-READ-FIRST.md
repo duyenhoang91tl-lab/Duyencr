@@ -7,7 +7,7 @@ Gồm: 1 backend Google Apps Script (`gas_v13.js`) + web app (`index.html`) + 2 
 1. Đọc file này xong → CHỈ mở thêm đúng 1–2 file theo bảng định tuyến bên dưới. KHÔNG đọc hết mọi file.
 2. Chỉ đọc đúng phần code liên quan trong repo (grep/view theo hàm), không đọc nguyên file lớn.
 3. Đừng hỏi lại người dùng những gì đã có trong các file KB này.
-4. Luôn đọc `01-rules-and-deploy.md` trước khi commit/push hoặc khi sửa `gas_v13.js`.
+4. Luôn đọc `01-rules-and-deploy.md` (đặc biệt mục **QUY TẮC GIT: merge-only**) trước khi commit/push hoặc khi sửa `gas_v13.js`.
 
 ## Bảng định tuyến: sửa gì → đọc file KB nào → sửa file nào trong repo
 | Việc cần làm | Đọc file KB | Sửa trong repo |
@@ -16,7 +16,7 @@ Gồm: 1 backend Google Apps Script (`gas_v13.js`) + web app (`index.html`) + 2 
 | Báo cáo doanh số A–F, biểu đồ, bộ lọc, giao diện Sasum | `05-sasum-reports-ui.md` | `js/*.js` + `css/*.css` (client, tra hàm ở `js/INDEX.md`; `index.html` chỉ còn khung HTML) + `gas_v13.js` (các hàm `buildSalesReport*_`) |
 | Extension Zalo AI (panel, tra cứu, kết bạn, gửi hàng loạt, quét trạng thái) | `03-extension-zalo.md` | `extension-zalo/zalo-content.js`, `zalo-content.css`, `zalo-options.*`, `zalo-popup.*`, `manifest.json` |
 | Extension Pancake AI (panel, selector DOM, giỏ hàng, Soạn đơn, bảng giá) | `04-extension-pancake.md` | `extension-pancake/pancake-content.js`, `pancake-background.js`, `pancake-content.css`, `pancake-options.*`, `pancake-popup.*`, `manifest.json` |
-| Deploy, commit, push, rebase, quy tắc bắt buộc, checklist | `01-rules-and-deploy.md` | — |
+| Deploy, commit, push (MERGE-ONLY, cấm force/reset), quy tắc bắt buộc, checklist | `01-rules-and-deploy.md` | — |
 | Tra bảng nhanh: action GAS, 20 cột CareData, storage key, tiền tố CSS, quyền manifest | `07-reference-tables.md` | — |
 | Báo lỗi lặp lại / dò lịch sử lỗi đã sửa | `06-bug-history.md` | — |
 | Bảo mật backend: đăng nhập server/token, việc còn lại (bước 3-4) | `docs/SECURITY-PLAN.md` | — |
@@ -29,7 +29,7 @@ Gồm: 1 backend Google Apps Script (`gas_v13.js`) + web app (`index.html`) + 2 
 ## Tuyệt đối không
 - Không sửa thư mục `extension/` (bản gộp cũ, chỉ để tham khảo).
 - Không lưu Personal Access Token vào file/memory/tài liệu nào. Token mỗi tin nhắn chỉ dùng cho đúng thao tác đó.
-- Không force-push.
+- **Không force-push, không `reset --hard` rồi push, không `rebase`/`amend` commit đã push. Push bị rejected ⇒ BẮT BUỘC `git merge origin/main` rồi push thường** (dùng `TK=… bash tools/safe-push.sh`). Đã có sự cố mất 7 commit vì ghi đè lịch sử `main` (2026-10-12) — chi tiết ở `01-rules-and-deploy.md` mục "QUY TẮC GIT".
 - Không commit khi chưa syntax-check.
 - Không dò lại chuyện `gas-code-v9` / "2 cơ chế đồng bộ mã GAS": đã xác minh 2026-10-08 chỉ còn cơ chế `getGasSource`/`setGasSource` (chi tiết ở `01-rules-and-deploy.md`).
 
