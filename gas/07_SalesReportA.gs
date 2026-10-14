@@ -68,7 +68,8 @@ function _srCloseRateSections_(normRows, filters) {
   var saleCloseRate = [];
   var closeFrom = '';
   if (hasAnyPkData) {
-    var closeOrdersBySale = {};
+    var personKey = _salePersonKeyFn_();   // cung 1 nguoi nhieu ten (base/pos) -> 1 dong, khong tach doi
+    var closeOrdersBySale = {}, orderDisp = {};
     for (var ci = 0; ci < normRows.length; ci++) {
       var mc = normRows[ci];
       var mcDt = parseVNDate_(mc.dateStr);
@@ -78,17 +79,23 @@ function _srCloseRateSections_(normRows, filters) {
       if (!closeFrom || mcYmd < closeFrom) closeFrom = mcYmd;
       var salesOnOrderC = splitMulti_(mc.saleBanRaw, ',');
       if (!salesOnOrderC.length) salesOnOrderC = [UNASSIGNED];
-      salesOnOrderC.forEach(function(sn) { closeOrdersBySale[sn] = (closeOrdersBySale[sn] || 0) + 1; });
+      salesOnOrderC.forEach(function(sn) {
+        var pk = personKey(sn);
+        closeOrdersBySale[pk] = (closeOrdersBySale[pk] || 0) + 1;
+        if (!orderDisp[pk]) orderDisp[pk] = sn;
+      });
     }
     var pInt2 = buildPancakeReport_(filters.dateFrom, filters.dateTo, 'equal');
-    var closeCanon = {};
-    var closeKey = function(n) { var ck = _normTxt_(n); if (!closeCanon[ck]) closeCanon[ck] = n; return ck; };
     var closeAgg = {};
-    pInt2.byCS.forEach(function(r) { var k = closeKey(r.name); closeAgg[k] = { name: closeCanon[k], tongTT: r.tongTT || 0, orders: 0 }; });
-    Object.keys(closeOrdersBySale).forEach(function(sn) {
-      var k = closeKey(sn);
-      if (!closeAgg[k]) closeAgg[k] = { name: closeCanon[k], tongTT: 0, orders: 0 };
-      closeAgg[k].orders += closeOrdersBySale[sn];
+    // Tuong tac (Pancake) di truoc: ten hien thi uu tien ten phia Pancake; nhieu dong cung nguoi thi CONG DON tongTT (khong ghi de).
+    pInt2.byCS.forEach(function(r) {
+      var k = personKey(r.name);
+      if (!closeAgg[k]) closeAgg[k] = { name: r.name, tongTT: 0, orders: 0 };
+      closeAgg[k].tongTT += r.tongTT || 0;
+    });
+    Object.keys(closeOrdersBySale).forEach(function(k) {
+      if (!closeAgg[k]) closeAgg[k] = { name: orderDisp[k], tongTT: 0, orders: 0 };
+      closeAgg[k].orders += closeOrdersBySale[k];
     });
     saleCloseRate = Object.keys(closeAgg).map(function(k) {
       var r = closeAgg[k];
@@ -130,6 +137,7 @@ function _srCloseRateSections_(normRows, filters) {
   var saleCloseByPage = { pages: [], rows: [] };
   if (hasAnyPkData) {
     var mapSaleK = readPancakeMap_();
+    var personKeyP = _salePersonKeyFn_(), pgDisp = {}; // khoa 'cung 1 nguoi' + ten hien thi (Pancake di truoc)
     var pageInfoByKenh = {};
     var ttBySaleKenh = {};
     var vPk = _pkStatsRowsMemo_();
@@ -146,7 +154,8 @@ function _srCloseRateSections_(normRows, filters) {
         var salesPk = String(mapSaleK[nhanVienPk] || '').split('|').map(function(x){return x.trim();}).filter(function(x){return x;});
         if (!salesPk.length) salesPk = [nhanVienPk];
         salesPk.forEach(function(spn) {
-          var key = spn + '|||' + kenhPk;
+          var pkS = personKeyP(spn); if (!pgDisp[pkS]) pgDisp[pkS] = spn;
+          var key = pkS + '|||' + kenhPk;
           ttBySaleKenh[key] = (ttBySaleKenh[key] || 0) + ttPk;
         });
       }
@@ -162,17 +171,16 @@ function _srCloseRateSections_(normRows, filters) {
       var salesOnP = splitMulti_(mcp.saleBanRaw, ',');
       if (!salesOnP.length) salesOnP = [UNASSIGNED];
       salesOnP.forEach(function(spn2) {
-        var key2 = spn2 + '|||' + kenhP;
+        var pkS2 = personKeyP(spn2); if (!pgDisp[pkS2]) pgDisp[pkS2] = spn2;
+        var key2 = pkS2 + '|||' + kenhP;
         closedBySaleKenh[key2] = (closedBySaleKenh[key2] || 0) + 1;
       });
     }
     var pagesList = Object.keys(pageInfoByKenh).map(function(k){ return pageInfoByKenh[k]; })
       .sort(function(a,b){ return a.pageName.localeCompare(b.pageName,'vi'); });
-    var byPageSaleCanon = {}, byPageSaleKey = function(n){ var ck=_normTxt_(n); if(!byPageSaleCanon[ck]) byPageSaleCanon[ck]=n; return ck; };
     var rowsMap = {};
-    function ensureRow(sn) {
-      var k = byPageSaleKey(sn);
-      if (!rowsMap[k]) rowsMap[k] = { name: byPageSaleCanon[k], perPage: {}, totalHeld: 0, totalClosed: 0 };
+    function ensureRow(k) { // k da la khoa 'cung 1 nguoi' (xem personKeyP o tren)
+      if (!rowsMap[k]) rowsMap[k] = { name: pgDisp[k] || k, perPage: {}, totalHeld: 0, totalClosed: 0 };
       return rowsMap[k];
     }
     Object.keys(ttBySaleKenh).forEach(function(key) {

@@ -2610,7 +2610,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.50-kh-access' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.51-closerate-person-fold' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -3320,6 +3320,48 @@ function _userAliasGroups_() {
     }
   } catch (e2) {}
   return map;
+}
+// Tra ham (ten sale bat ky) -> KHOA "cung 1 nguoi" (chuoi da chuan hoa): moi ten cua CUNG 1 nguoi cho cung 1 khoa.
+// Dung cho Ty le chot (don dem theo ten Sale tren POS, tuong tac lay theo ten Sale Pancake — 2 ten co the KHAC nhau
+// du cung 1 nguoi, vd base 'thuydinh1995' vs pos 'thuydinh95'). Hop nhat TAT CA nguon lien ket da co:
+//  (1) cot 'names' sheet Users + Settings 'salePersonTags' (qua _userAliasGroups_);
+//  (2) SaleDirectory: ma Sale / ten Facebook / user Base / the tag Pancake cua cung 1 dong;
+//  (3) PancakeNameMap: ten Pancake -> DUNG 1 ten Sale. Dong gan 'saleA|saleB' (1 ten Pancake chia nhieu Sale) BO QUA,
+//      vi noi qua ten Pancake se gop nham 2 NGUOI KHAC NHAU thanh 1.
+// Union-find, goc = khoa nho nhat theo thu tu chu cai -> ket qua on dinh, khong phu thuoc thu tu doc sheet.
+function _salePersonKeyFn_() {
+  var parent = {};
+  function find(x) {
+    var r = x;
+    while (parent[r] !== undefined && parent[r] !== r) r = parent[r];
+    while (x !== r && parent[x] !== undefined) { var nx = parent[x]; parent[x] = r; x = nx; }
+    return r;
+  }
+  function union(a, b) {
+    a = _normTxt_(a); b = _normTxt_(b);
+    if (!a || !b) return;
+    var ra = find(a), rb = find(b);
+    if (ra === rb) return;
+    if (ra < rb) parent[rb] = ra; else parent[ra] = rb;
+  }
+  function unionAll(arr) { for (var i = 1; i < arr.length; i++) union(arr[0], arr[i]); }
+  try {
+    var groups = _userAliasGroups_();
+    Object.keys(groups).forEach(function(k) { unionAll(groups[k] || []); });
+  } catch (e1) {}
+  try {
+    (readSaleDirectory_().list || []).forEach(function(rec) {
+      unionAll([rec.maSale, rec.code, rec.tenFacebook, rec.userBase, rec.tenTagPancake].filter(Boolean));
+    });
+  } catch (e2) {}
+  try {
+    var pkMap = readPancakeMap_();
+    Object.keys(pkMap).forEach(function(pn) {
+      var t = String(pkMap[pn] || '').split('|').map(function(x) { return x.trim(); }).filter(Boolean);
+      if (t.length === 1) union(pn, t[0]);
+    });
+  } catch (e3) {}
+  return function(name) { return find(_normTxt_(name)); };
 }
 // Trả hàm (tên sale bất kỳ) → tên Team; tìm theo chính tên đó, rồi theo MỌI tên khác của cùng người, rồi theo bảng khớp tên Pancake.
 // Thành viên Team gồm cả leader (giống tab Quản lý Team). Không tìm ra → unassigned.
@@ -4222,7 +4264,8 @@ function _srCloseRateSections_(normRows, filters) {
   var saleCloseRate = [];
   var closeFrom = '';
   if (hasAnyPkData) {
-    var closeOrdersBySale = {};
+    var personKey = _salePersonKeyFn_();   // cung 1 nguoi nhieu ten (base/pos) -> 1 dong, khong tach doi
+    var closeOrdersBySale = {}, orderDisp = {};
     for (var ci = 0; ci < normRows.length; ci++) {
       var mc = normRows[ci];
       var mcDt = parseVNDate_(mc.dateStr);
@@ -4232,17 +4275,23 @@ function _srCloseRateSections_(normRows, filters) {
       if (!closeFrom || mcYmd < closeFrom) closeFrom = mcYmd;
       var salesOnOrderC = splitMulti_(mc.saleBanRaw, ',');
       if (!salesOnOrderC.length) salesOnOrderC = [UNASSIGNED];
-      salesOnOrderC.forEach(function(sn) { closeOrdersBySale[sn] = (closeOrdersBySale[sn] || 0) + 1; });
+      salesOnOrderC.forEach(function(sn) {
+        var pk = personKey(sn);
+        closeOrdersBySale[pk] = (closeOrdersBySale[pk] || 0) + 1;
+        if (!orderDisp[pk]) orderDisp[pk] = sn;
+      });
     }
     var pInt2 = buildPancakeReport_(filters.dateFrom, filters.dateTo, 'equal');
-    var closeCanon = {};
-    var closeKey = function(n) { var ck = _normTxt_(n); if (!closeCanon[ck]) closeCanon[ck] = n; return ck; };
     var closeAgg = {};
-    pInt2.byCS.forEach(function(r) { var k = closeKey(r.name); closeAgg[k] = { name: closeCanon[k], tongTT: r.tongTT || 0, orders: 0 }; });
-    Object.keys(closeOrdersBySale).forEach(function(sn) {
-      var k = closeKey(sn);
-      if (!closeAgg[k]) closeAgg[k] = { name: closeCanon[k], tongTT: 0, orders: 0 };
-      closeAgg[k].orders += closeOrdersBySale[sn];
+    // Tuong tac (Pancake) di truoc: ten hien thi uu tien ten phia Pancake; nhieu dong cung nguoi thi CONG DON tongTT (khong ghi de).
+    pInt2.byCS.forEach(function(r) {
+      var k = personKey(r.name);
+      if (!closeAgg[k]) closeAgg[k] = { name: r.name, tongTT: 0, orders: 0 };
+      closeAgg[k].tongTT += r.tongTT || 0;
+    });
+    Object.keys(closeOrdersBySale).forEach(function(k) {
+      if (!closeAgg[k]) closeAgg[k] = { name: orderDisp[k], tongTT: 0, orders: 0 };
+      closeAgg[k].orders += closeOrdersBySale[k];
     });
     saleCloseRate = Object.keys(closeAgg).map(function(k) {
       var r = closeAgg[k];
@@ -4284,6 +4333,7 @@ function _srCloseRateSections_(normRows, filters) {
   var saleCloseByPage = { pages: [], rows: [] };
   if (hasAnyPkData) {
     var mapSaleK = readPancakeMap_();
+    var personKeyP = _salePersonKeyFn_(), pgDisp = {}; // khoa 'cung 1 nguoi' + ten hien thi (Pancake di truoc)
     var pageInfoByKenh = {};
     var ttBySaleKenh = {};
     var vPk = _pkStatsRowsMemo_();
@@ -4300,7 +4350,8 @@ function _srCloseRateSections_(normRows, filters) {
         var salesPk = String(mapSaleK[nhanVienPk] || '').split('|').map(function(x){return x.trim();}).filter(function(x){return x;});
         if (!salesPk.length) salesPk = [nhanVienPk];
         salesPk.forEach(function(spn) {
-          var key = spn + '|||' + kenhPk;
+          var pkS = personKeyP(spn); if (!pgDisp[pkS]) pgDisp[pkS] = spn;
+          var key = pkS + '|||' + kenhPk;
           ttBySaleKenh[key] = (ttBySaleKenh[key] || 0) + ttPk;
         });
       }
@@ -4316,17 +4367,16 @@ function _srCloseRateSections_(normRows, filters) {
       var salesOnP = splitMulti_(mcp.saleBanRaw, ',');
       if (!salesOnP.length) salesOnP = [UNASSIGNED];
       salesOnP.forEach(function(spn2) {
-        var key2 = spn2 + '|||' + kenhP;
+        var pkS2 = personKeyP(spn2); if (!pgDisp[pkS2]) pgDisp[pkS2] = spn2;
+        var key2 = pkS2 + '|||' + kenhP;
         closedBySaleKenh[key2] = (closedBySaleKenh[key2] || 0) + 1;
       });
     }
     var pagesList = Object.keys(pageInfoByKenh).map(function(k){ return pageInfoByKenh[k]; })
       .sort(function(a,b){ return a.pageName.localeCompare(b.pageName,'vi'); });
-    var byPageSaleCanon = {}, byPageSaleKey = function(n){ var ck=_normTxt_(n); if(!byPageSaleCanon[ck]) byPageSaleCanon[ck]=n; return ck; };
     var rowsMap = {};
-    function ensureRow(sn) {
-      var k = byPageSaleKey(sn);
-      if (!rowsMap[k]) rowsMap[k] = { name: byPageSaleCanon[k], perPage: {}, totalHeld: 0, totalClosed: 0 };
+    function ensureRow(k) { // k da la khoa 'cung 1 nguoi' (xem personKeyP o tren)
+      if (!rowsMap[k]) rowsMap[k] = { name: pgDisp[k] || k, perPage: {}, totalHeld: 0, totalClosed: 0 };
       return rowsMap[k];
     }
     Object.keys(ttBySaleKenh).forEach(function(key) {

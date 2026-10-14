@@ -599,6 +599,48 @@ function _userAliasGroups_() {
   } catch (e2) {}
   return map;
 }
+// Tra ham (ten sale bat ky) -> KHOA "cung 1 nguoi" (chuoi da chuan hoa): moi ten cua CUNG 1 nguoi cho cung 1 khoa.
+// Dung cho Ty le chot (don dem theo ten Sale tren POS, tuong tac lay theo ten Sale Pancake — 2 ten co the KHAC nhau
+// du cung 1 nguoi, vd base 'thuydinh1995' vs pos 'thuydinh95'). Hop nhat TAT CA nguon lien ket da co:
+//  (1) cot 'names' sheet Users + Settings 'salePersonTags' (qua _userAliasGroups_);
+//  (2) SaleDirectory: ma Sale / ten Facebook / user Base / the tag Pancake cua cung 1 dong;
+//  (3) PancakeNameMap: ten Pancake -> DUNG 1 ten Sale. Dong gan 'saleA|saleB' (1 ten Pancake chia nhieu Sale) BO QUA,
+//      vi noi qua ten Pancake se gop nham 2 NGUOI KHAC NHAU thanh 1.
+// Union-find, goc = khoa nho nhat theo thu tu chu cai -> ket qua on dinh, khong phu thuoc thu tu doc sheet.
+function _salePersonKeyFn_() {
+  var parent = {};
+  function find(x) {
+    var r = x;
+    while (parent[r] !== undefined && parent[r] !== r) r = parent[r];
+    while (x !== r && parent[x] !== undefined) { var nx = parent[x]; parent[x] = r; x = nx; }
+    return r;
+  }
+  function union(a, b) {
+    a = _normTxt_(a); b = _normTxt_(b);
+    if (!a || !b) return;
+    var ra = find(a), rb = find(b);
+    if (ra === rb) return;
+    if (ra < rb) parent[rb] = ra; else parent[ra] = rb;
+  }
+  function unionAll(arr) { for (var i = 1; i < arr.length; i++) union(arr[0], arr[i]); }
+  try {
+    var groups = _userAliasGroups_();
+    Object.keys(groups).forEach(function(k) { unionAll(groups[k] || []); });
+  } catch (e1) {}
+  try {
+    (readSaleDirectory_().list || []).forEach(function(rec) {
+      unionAll([rec.maSale, rec.code, rec.tenFacebook, rec.userBase, rec.tenTagPancake].filter(Boolean));
+    });
+  } catch (e2) {}
+  try {
+    var pkMap = readPancakeMap_();
+    Object.keys(pkMap).forEach(function(pn) {
+      var t = String(pkMap[pn] || '').split('|').map(function(x) { return x.trim(); }).filter(Boolean);
+      if (t.length === 1) union(pn, t[0]);
+    });
+  } catch (e3) {}
+  return function(name) { return find(_normTxt_(name)); };
+}
 // Trả hàm (tên sale bất kỳ) → tên Team; tìm theo chính tên đó, rồi theo MỌI tên khác của cùng người, rồi theo bảng khớp tên Pancake.
 // Thành viên Team gồm cả leader (giống tab Quản lý Team). Không tìm ra → unassigned.
 function _makeTeamResolver_(unassigned) {
