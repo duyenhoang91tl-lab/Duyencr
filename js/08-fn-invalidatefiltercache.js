@@ -1109,6 +1109,7 @@ function renderTeamTab(){
       var label = esc(g.names[0]) + (multi ? ' <span style="color:var(--muted);font-size:11px">+ '+g.names.slice(1).map(esc).join(', ')+'</span>' : '');
       html += '<span class="member-chip'+(isLeader?' leader':'')+'"'+(multi?' title="Cùng 1 người (nhiều tên): '+esc(g.names.join(', '))+'"':'')+'>'+(isLeader?'★ ':'')+label+
         (isAdmin ? ' <span class="chip-x" data-name="'+esc(m)+'" title="'+(isLeader?'Bỏ làm leader sẽ vẫn còn là thành viên':(multi?'Xoá người này (cả '+g.names.length+' tên) khỏi team':'Xoá khỏi team'))+'" onclick="removeTeamMember(\''+t.id+'\',this.dataset.name)">✕</span>' : '')+
+        (isAdmin ? ' <span class="chip-tag" data-name="'+esc(m)+'" title="Thẻ của người này (tên trong Base/Pos)" style="cursor:pointer" onclick="openPersonTagsModal(this.dataset.name)">🏷️</span>' : '')+
         (isAdmin && !isLeader ? ' <span class="chip-star" data-name="'+esc(m)+'" title="Đặt làm leader" onclick="setTeamLeader(\''+t.id+'\',this.dataset.name)">★</span>' : '')+
       '</span>';
     });

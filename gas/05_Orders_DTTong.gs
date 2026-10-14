@@ -580,6 +580,23 @@ function _userAliasGroups_() {
       });
     });
   } catch (e) {}
+  // Thẻ do admin gán trong Quản lý Team (Settings 'salePersonTags' = { "<tên chính>": ["thẻ", ...] }): cùng 1 người.
+  try {
+    var rawTags = getSetting_('salePersonTags');
+    if (rawTags) {
+      var tagObj = JSON.parse(rawTags) || {};
+      Object.keys(tagObj).forEach(function(primary) {
+        var uniq = [];
+        [primary].concat(Array.isArray(tagObj[primary]) ? tagObj[primary] : []).forEach(function(x) { x = String(x || '').trim(); if (x && uniq.indexOf(x) === -1) uniq.push(x); });
+        if (uniq.length < 2) return;
+        uniq.forEach(function(n) {
+          var k = _normTxt_(n), cur = map[k] || [];
+          uniq.forEach(function(x) { if (cur.indexOf(x) === -1) cur.push(x); });
+          map[k] = cur;
+        });
+      });
+    }
+  } catch (e2) {}
   return map;
 }
 // Trả hàm (tên sale bất kỳ) → tên Team; tìm theo chính tên đó, rồi theo MỌI tên khác của cùng người, rồi theo bảng khớp tên Pancake.

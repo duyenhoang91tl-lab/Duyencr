@@ -343,7 +343,7 @@ function _srSyncTeamToSale_(teamField){
     var want = String(tname||'').trim().toLowerCase();
     var t = (teams||[]).find(function(x){ return String(x.name || '(chưa đặt tên)').trim().toLowerCase() === want; });
     if (!t) { notFound.push(tname); return; }
-    [t.leader].concat(t.members||[]).filter(Boolean).forEach(function(n){ if (union.indexOf(n)===-1) union.push(n); });
+    [t.leader].concat(t.members||[]).filter(Boolean).forEach(function(n){ (_personAliases(n) || [n]).concat([n]).forEach(function(a){ if (a && union.indexOf(a)===-1) union.push(a); }); });   // gồm mọi thẻ/tên cùng người
   });
   // KHONG ghi de bo loc Sale bang mang RONG: backend coi mang Sale rong = KHONG LOC GI (hien het
   // du lieu) -> user tuong dang loc theo Team ma thuc ra dang xem toan bo. Neu khong khop duoc Team
