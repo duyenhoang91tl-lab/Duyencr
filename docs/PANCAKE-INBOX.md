@@ -23,6 +23,19 @@ Apps Script không nhận realtime tốt nên không đứng giữa luồng này
 - Tin gửi từ CRM tạm (chưa vọng lại) hiện tên người đang đăng nhập + `CRM ✓`.
 - Test: `node tools/test-pk-chat-gas.js` (40 ca), `NODE_PATH=<jsdom> node tools/test-pk-chat-meta.js` (16 ca), `test-pk-chat-ui.js` (18 ca).
 
+## Gắn/gỡ thẻ từ CRM + "Ai đã chat" (2026-10-13, GAS `v13.53-pk-tags`) — giống Pancake
+**Thẻ (tag).** Hướng Pancake → CRM đã có từ trước (webhook sự kiện `conversation` cập nhật cột `tags`). Mới thêm hướng CRM → Pancake bằng API chính thức (đã đối chiếu tài liệu `docs.pancake.vn/vi/developers/api-reference`): `POST /api/public_api/v1/pages/{page}/conversations/{conv}/tags?page_access_token=…` body `{action:'add'|'remove', tag_id:'<mã>'}` → `{success, data:[mã thẻ sau khi cập nhật]}`.
+- **Thanh thẻ** nằm ngay trên ô soạn tin, ở cả **Social > Chat** (`#sc-tags`) và tab **Chat trong hồ sơ khách** (`#pkc-tags`): thẻ đang gắn (bấm để gỡ) + nút "＋ Gắn thẻ" mở bảng chọn thẻ của page (tên + màu lấy từ Pancake, có ô tìm không dấu, nút 🔄 tải lại khi vừa tạo thẻ mới trên Pancake). Bấm 1 thẻ = gắn/gỡ.
+- **Hiện ngay** (lạc quan), lỗi thì trả lại thẻ cũ và báo; bấm đôi bị bỏ qua. Sau khi Pancake nhận, GAS ghi luôn `tags` mới vào Supabase; kết quả vừa gắn được giữ 20 giây (`_pkTagOv`) để lần poll 6–8 giây không làm thẻ nhảy lại thẻ cũ.
+- **GAS:** `GET pkChatTags?pageId=|conv=[&refresh=1]` (danh sách thẻ của page, cache 6 giờ như cũ), `POST pkChatTag {convId, tagId, op}` (cần đăng nhập, trừ tài khoản test; mọi vai trò đăng nhập gắn/gỡ được, giống xem/gửi tin hiện nay; Pancake tự lưu lịch sử gắn/gỡ). Mã thẻ không nằm trong danh sách thẻ của page bị từ chối trước khi gọi Pancake; lỗi Pancake trả về không lộ token.
+**Ai đã chat.**
+- Dưới mỗi tin vẫn là `TÊN NGƯỜI GỬI · GIỜ` (đã có). Mới: dòng **"✍️ Đã chat: Le Ninh 2 · Lan 1"** dưới tiêu đề khung chat (nhân viên đã trả lời + số tin, tính từ các tin đang tải: tên nhân viên CRM hoặc nhân viên Pancake `raw.from.admin_name`; tin chỉ có tên page không tính là người). Tính ở trình duyệt từ dữ liệu đã tải, không tốn thêm lượt gọi server.
+- **KHÔNG làm** dòng "↩ nhân viên trả lời gần nhất" ở danh sách hội thoại: cần thêm 1 truy vấn Supabase mỗi lần poll, vi phạm trần UrlFetch 20.000/ngày (sự cố "urlfetch quá nhiều lần/ngày", cache 15 giây của hộp thư, `tools/test-pk-staff-gas.js` canh đúng việc này). Muốn có: thêm cột `last_staff` vào `pk_conversations` và ghi khi nhận tin `out` (trigger `pk_ingest_raw` + `_pkMarkCrmSender_`) để danh sách chỉ đọc cột, không tốn truy vấn.
+- **CHƯA xác nhận với dữ liệu thật:** webhook có gửi tên nhân viên cho tin trả lời từ app Pancake hay không. Nếu tin nhân viên vẫn hiện tên page: chạy hàm **`pkXemNguoiChat`** trong Apps Script Editor, xem Execution log để thấy trường chứa tên nhân viên, rồi gửi lại để sửa `_pkMsgOut_`.
+**Cần làm tay:** deploy lại GAS; đã đặt `PANCAKE_PAGE_TOKENS` (chung với gửi tin) — token page cần quyền gắn thẻ; Ctrl+F5 CRM.
+**Chưa làm:** dòng "↩ trả lời gần nhất" ở danh sách (xem trên), phân công nhân viên (`/assign`) từ CRM, tạo/xoá thẻ mới (chỉ gắn/gỡ thẻ có sẵn), thông báo thẻ đổi tức thì khi người khác gắn trên Pancake (phụ thuộc webhook `conversation`).
+**Test:** `node tools/test-pk-chat-tags.js` (GAS), `NODE_PATH=<jsdom> node tools/test-pk-chat-tagbar.js` (giao diện, 35 ca).
+
 ## Bước 1b — cài đặt, làm 1 lần
 
 ### A. Đợi Supabase có bảng mới

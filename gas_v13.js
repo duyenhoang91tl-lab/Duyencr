@@ -2584,6 +2584,7 @@ function doGetCore_(e) {
     if (action === 'pkChatFind') return pkChatFind_(e);
     if (action === 'pkChatInbox') return pkChatInbox_(e);
     if (action === 'pkChatConv') return pkChatConv_(e);
+    if (action === 'pkChatTags') return pkChatTags_(e);
     if (action === 'roleConfig') {
       var _ru = _sessUser_(e && e.parameter && e.parameter.token);
       if (!_ru) return jsonOut_({ error: 'Can dang nhap.', code: 'AUTH' });
@@ -2610,7 +2611,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.52-closerate-orphan-fold' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.53-pk-tags' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -6744,6 +6745,7 @@ function doPostCore_(e) {
     // ── Chat Pancake trong CRM: gan hoi thoai voi SDT khach, gui tin tra loi ──
     if (action === 'pkChatLink') return pkChatLink_(data);
     if (action === 'pkChatSend') return pkChatSend_(data);
+    if (action === 'pkChatTag') return pkChatTag_(data);
     if (action === 'profileSave') return profileSave_(data);
     if (action === 'saveRoleConfig') return saveRoleConfig_(data.config, data.token);
     if (action === 'notifRead') { var _nu = _sessUser_(data.token); if (!_nu) return jsonOut_({ error: 'Can dang nhap.', code: 'AUTH' }); return jsonOut_(markNotifRead_(_nu.username, data.ids, !!data.all)); }
@@ -15752,7 +15754,8 @@ function pkChatInbox_(e) {
     if (hit) return jsonOut_(hit);
     var _names = _pkStaffNames_();
     var cv = sb_('GET', 'pk_conversations?select=' + PK_CONV_COLS_ + filter + '&order=last_message_at.desc.nullslast&limit=60').json || [];
-    var res = { ok: true, conversations: cv.map(function (c) { return _pkConvOut_(c, _names); }), serverTime: new Date().toISOString() };
+    var list = cv.map(function (c) { return _pkConvOut_(c, _names); });
+    var res = { ok: true, conversations: list, serverTime: new Date().toISOString() };
     _pkCachePut_(ck, res, 15);
     return jsonOut_(res);
   } catch (err) { return jsonOut_({ error: 'Doc hop thu loi: ' + String(err && err.message || err).slice(0, 200) }); }
@@ -15826,6 +15829,80 @@ function pkChatSend_(data) {
     _pkMarkCrmSender_((j && j.id) || '', convId, page, text, String(a.user.name || a.user.username || ''));   // tin hien ten nhan vien CRM da gui
     return jsonOut_({ ok: true, id: (j && j.id) || '' });
   } catch (err) { return jsonOut_({ error: 'Gui tin loi: ' + String(err && err.message || err).slice(0, 200) }); }
+}
+
+// ═══ GAN / GO THE (TAG) TU CRM nhu Pancake + NGUOI DA CHAT (2026-10-13) ═══
+// Pancake -> CRM: the cua hoi thoai den qua webhook (su kien 'conversation' cap nhat cot tags). CRM -> Pancake: tai lieu chinh thuc
+//   POST /api/public_api/v1/pages/{page}/conversations/{conv}/tags?page_access_token=...  body {action:'add'|'remove', tag_id:'<ma so>'}
+//   -> {success:true, data:[ma the sau khi cap nhat]}. Ngay sau khi Pancake nhan, ghi luon `tags` moi vao Supabase de man hinh CRM hien ngay (webhook vong lai
+//   sau do se ghi cung gia tri; su kien cu den tre co version nho hon bi bo qua nhu cu). Token page nam o Script Properties nhu pkChatSend.
+function _pkTagsForget_(page) {
+  try { delete _pkMemo_['pkTags_' + page]; } catch (e) {}
+  try { CacheService.getScriptCache().remove('pkTags_' + page); } catch (e) {}
+}
+function _pkConvRow_(convId) {
+  var rows = sb_('GET', 'pk_conversations?select=id,page_id,conv_type,tags&id=eq.' + _pkEnc_(convId) + '&limit=1').json || [];
+  return rows[0] || null;
+}
+function _pkTagCatalog_(page) {   // [{id,t,c}] theo ma so tang dan (bo ma khong phai so)
+  var map = _pkTagMap_(page), out = [];
+  Object.keys(map).forEach(function (k) { if (map[k] && map[k].t && isFinite(Number(k))) out.push({ id: k, t: map[k].t, c: map[k].c }); });
+  out.sort(function (a, b) { return Number(a.id) - Number(b.id); });
+  return out;
+}
+// GET pkChatTags?pageId=<page>|conv=<convId>[&refresh=1]: danh sach the cua page (ten + mau) de chon khi gan the.
+function pkChatTags_(e) {
+  var p = (e && e.parameter) || {};
+  var a = _pkAuth_(p.token); if (a.err) return a.err;
+  try {
+    var page = String(p.pageId || '');
+    if (!page && p.conv) { var c = _pkConvRow_(String(p.conv)); page = c ? String(c.page_id || '') : ''; }
+    if (!page) return jsonOut_({ error: 'Thieu pageId.' });
+    if (!_pkPageToken_(page)) return jsonOut_({ error: 'Chua cai token Pancake cho page ' + page + ' (Script properties > PANCAKE_PAGE_TOKENS).' });
+    if (String(p.refresh || '') === '1') _pkTagsForget_(page);   // vua tao/doi ten the tren Pancake -> bo cache 6 gio
+    return jsonOut_({ ok: true, pageId: page, tags: _pkTagCatalog_(page) });
+  } catch (err) { return jsonOut_({ error: 'Doc danh sach the loi: ' + String(err && err.message || err).slice(0, 200) }); }
+}
+// POST pkChatTag {convId, tagId, op:'add'|'remove'}: gan/go 1 the. Moi tai khoan dang nhap (tru test) deu gan/go duoc (giong viec xem/gui tin hien nay);
+// Pancake tu luu lich su gan/go the (tag_histories) theo tai khoan cua token page.
+function pkChatTag_(data) {
+  var a = _pkAuth_(data && data.token); if (a.err) return a.err;
+  var convId = String((data && data.convId) || ''), tagId = String(data && data.tagId !== undefined && data.tagId !== null ? data.tagId : '').trim(), op = String((data && data.op) || '').toLowerCase();
+  if (!convId) return jsonOut_({ error: 'Thieu convId.' });
+  if (!/^-?\d{1,9}$/.test(tagId)) return jsonOut_({ error: 'Ma the khong hop le.' });
+  if (op !== 'add' && op !== 'remove') return jsonOut_({ error: 'op phai la add hoac remove.' });
+  try {
+    var conv = _pkConvRow_(convId);
+    if (!conv) return jsonOut_({ error: 'Khong tim thay hoi thoai.' });
+    var page = String(conv.page_id || ''); if (!page) return jsonOut_({ error: 'Hoi thoai chua co page_id.' });
+    var tok = _pkPageToken_(page);
+    if (!tok) return jsonOut_({ error: 'Chua cai token Pancake cho page ' + page + '. Vao Apps Script > Project Settings > Script properties, them PANCAKE_PAGE_TOKENS = {"' + page + '":"<page_access_token>"}.' });
+    var map = _pkTagMap_(page);
+    if (Object.keys(map).length && !map[tagId]) return jsonOut_({ error: 'The khong con tren page nay (co the vua bi xoa tren Pancake) - bam tai lai danh sach the roi thu lai.' });
+    var url = 'https://pages.fm/api/public_api/v1/pages/' + _pkEnc_(page) + '/conversations/' + _pkEnc_(convId) + '/tags?page_access_token=' + _pkEnc_(tok);
+    var res = UrlFetchApp.fetch(url, { method: 'post', contentType: 'application/json', payload: JSON.stringify({ action: op, tag_id: tagId }), muteHttpExceptions: true });
+    var code = res.getResponseCode(), body = res.getContentText() || '', j = null;
+    try { j = JSON.parse(body); } catch (eJ) {}
+    if (code >= 300 || (j && j.success === false)) return jsonOut_({ error: 'Pancake tu choi (HTTP ' + code + '): ' + body.slice(0, 240).split(tok).join('***') });
+    var ids = (j && Array.isArray(j.data)) ? j.data : null;
+    if (!ids) {   // Pancake khong tra danh sach the sau khi cap nhat -> tu tinh tu the hien co
+      var cur = (Array.isArray(conv.tags) ? conv.tags : []).map(function (x) { return (x && typeof x === 'object') ? x.id : x; });
+      ids = op === 'add' ? (cur.map(String).indexOf(tagId) >= 0 ? cur : cur.concat([Number(tagId)])) : cur.filter(function (x) { return String(x) !== tagId; });
+    }
+    try { sb_('PATCH', 'pk_conversations?id=eq.' + _pkEnc_(convId), { tags: ids }); }   // hien ngay tren CRM; loi thi webhook se bu
+    catch (eS) { Logger.log('pkChatTag PATCH: ' + String(eS && eS.message || eS).slice(0, 160)); }
+    Logger.log('pkChatTag ' + a.user.username + ' ' + convId + ' ' + op + ' ' + tagId);
+    return jsonOut_({ ok: true, tags: _pkTagsOut_(ids, map), ids: ids });
+  } catch (err) { return jsonOut_({ error: 'Gan the loi: ' + String(err && err.message || err).slice(0, 200) }); }
+}
+// (Khong tinh 'nguoi tra loi gan nhat' cho tung hoi thoai o DANH SACH: can them 1 truy van Supabase/lan poll, vi pham tran UrlFetch 20.000/ngay — xem NGUYEN NHAN
+//  GOC o pkChatInbox_. 'Da chat' + ten nguoi gui duoi tung tin tinh o client tu cac tin da tai, khong ton luot goi nao.)
+// Chay trong Apps Script Editor khi muon biet Pancake gui TEN NHAN VIEN o truong nao cua tin 'out' (neu CRM chua hien ten nguoi chat tren Pancake):
+// ghi vao Execution log phan raw.from cua 5 tin nhan vien gan nhat.
+function pkXemNguoiChat() {
+  var rows = sb_('GET', 'pk_messages?select=id,conversation_id,sent_at,fromraw:raw-%3Efrom&direction=eq.out&order=sent_at.desc.nullslast&limit=40').json || [], n = 0;
+  rows.forEach(function (r) { if (n >= 5) return; var f = r.fromraw; if (f && typeof f === 'object') { n++; Logger.log(r.sent_at + ' ' + r.id + ' from=' + JSON.stringify(f).slice(0, 400)); } });
+  if (!n) Logger.log('Chua co tin nhan vien nao co truong from trong pk_messages.raw');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════

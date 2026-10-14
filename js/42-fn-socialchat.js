@@ -10,8 +10,9 @@ function renderSocialChatTab() {
   var w = document.getElementById('chat-wrap'); if (!w) return;
   if (!w.firstChild) {
     w.innerHTML = '<div class="sc-list"><div class="sc-find"><input id="sc-q" type="search" placeholder="🔍 Tìm hội thoại: tên hoặc SĐT…" oninput="_scQSoon()"></div><div id="sc-convs" class="sc-convs"></div></div>'
-      + '<div class="sc-main" id="sc-main"><div class="sc-head" id="sc-head"></div><div class="pkc-msgs sc-msgs" id="sc-msgs"><div class="pkc-note">Chọn một hội thoại bên trái.</div></div>'
+      + '<div class="sc-main" id="sc-main"><div class="sc-head" id="sc-head"></div><div class="pkc-who" id="sc-who"></div><div class="pkc-msgs sc-msgs" id="sc-msgs"><div class="pkc-note">Chọn một hội thoại bên trái.</div></div>'
       + '<div class="pkc-status" id="sc-status"></div>'
+      + '<div class="pkt-bar" id="sc-tags" style="display:none"></div>'
       + '<div class="pkc-compose" id="sc-compose" style="display:none"><button class="btn sm" type="button" title="Gợi ý tin nhắn theo sản phẩm" onclick="tplChatToggle(\'sc-compose\',\'sc-input\')">💡</button><textarea id="sc-input" rows="2" placeholder="Nhập tin trả lời… (Ctrl+Enter để gửi)" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key===\'Enter\'){event.preventDefault();scSend();}"></textarea><button class="save-btn pkc-send" id="sc-send" onclick="scSend()">Gửi</button></div></div>';
     w.insertAdjacentHTML('beforeend', '<div class="sc-info" id="sc-info"><div class="pkc-note">Chọn một hội thoại để xem thông tin khách.</div></div>');   // cột Thông tin khách kiểu Pancake (js/48)
   }
@@ -57,7 +58,7 @@ async function scLoadList() {
   try {
     var j = await (await fetch(_pkcUrl('action=pkChatInbox' + (_sc.q ? '&q=' + encodeURIComponent(_sc.q) : '')), { redirect: 'follow' })).json();
     if (!j || j.error) { _sc.err = (j && j.error) || 'Không tải được hộp thư.'; _scStatus(); return; }
-    _sc.err = ''; _sc.okAt = _pkcHm(new Date().toISOString()); _sc.convs = j.conversations || [];
+    _sc.err = ''; _sc.okAt = _pkcHm(new Date().toISOString()); _sc.convs = j.conversations || []; _pkTagApplyOv(_sc.convs);
     _scRenderList(); _scStatus();
   } catch (e) { _sc.err = 'Không kết nối được máy chủ.'; _scStatus(); }
   finally { _sc.loading = false; }
@@ -76,6 +77,7 @@ function _scRenderList() {
   }).join('') : '<div class="pkc-note">Không có hội thoại nào.</div>';
   var hm = document.getElementById('sc-head-m');
   if (hm) hm.innerHTML = _pkcMetaRow(_sc.convs.filter(function (x) { return x.id === _sc.active; })[0]);
+  pkTagBarRender('sc-tags');
 }
 function scPick(id) {
   _sc.active = id; _scRenderList();
@@ -83,6 +85,7 @@ function scPick(id) {
   var h = document.getElementById('sc-head');
   if (h) h.innerHTML = '<button class="btn sm sc-back" onclick="scBack()">←</button><b>' + _pkcEsc(c.name || 'Khách Pancake') + '</b>' + (c.phone ? ' <span class="pkc-ph">' + _pkcEsc(c.phone) + '</span> <button class="btn sm" onclick="scOpenProfile()">👤 Mở hồ sơ</button>' : ' <span class="pkc-ph">chưa gắn SĐT</span>') + '<div class="sc-head-m" id="sc-head-m">' + _pkcMetaRow(c) + '</div>';
   var cp = document.getElementById('sc-compose'); if (cp) cp.style.display = (c.type === 'COMMENT') ? 'none' : '';
+  var wh0 = document.getElementById('sc-who'); if (wh0) wh0.innerHTML = '';
   var box = document.getElementById('sc-main'); if (box) box.classList.add('has-conv');
   if (typeof proChatInfoRender_ === 'function') { try { proChatInfoRender_(c); } catch (e) { console.warn('[ui-pro] chat info', e); } }
   scLoadMsgs(true);
@@ -155,6 +158,7 @@ function _scRenderMsgs(forceBottom) {
     html += '<div class="pkc-m ' + (m.dir === 'out' ? 'out' : 'in') + '"><div class="pkc-b">' + _pkcEsc(m.text).replace(/\n/g, '<br>') + _pkcAttHtml(m.att) + '</div>' + _pkcMetaHtml(m, conv) + '</div>';
   });
   box.innerHTML = html || '<div class="pkc-note">Hội thoại chưa có tin nhắn nào được lưu.</div>';
+  var wh = document.getElementById('sc-who'); if (wh) wh.innerHTML = _pkcWhoHtml(_sc.msgs[_sc.active]);
   if (forceBottom || near) box.scrollTop = box.scrollHeight;
   _scStatus();
 }
