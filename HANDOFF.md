@@ -136,3 +136,9 @@ Yeu cau cua Duyen: Chat noi bo hien thi duoc o cua so chat nho o goc duoi phai (
 - Lưu ý XCT theo nhóm Sale: khớp ngày Pancake theo TÊN người tạo; nếu tên người tạo trên Base khác tên sale đã khớp trong PancakeNameMap thì ra 0 — cần kiểm tra với dữ liệu thật.
 - [x] 4c-2a gas v13.47-scope-gate: loc pham vi khach theo CS cho lookup/donOrdersByPhone/cskhDetail, cong tac `scopeMode` off|log|enforce (MAC DINH off). Chi tiet: docs/SECURITY-PLAN.md "Buoc 4c-2a".
 - [ ] Can Duyen: chay `datChuSoHuu` (username Duyent), roi `datPhamVi('log')`; xem `xemLogPhamVi` sau 2-3 ngay roi moi `enforce`. Tiep: 4c-2b (customers/reminders/orders + leader).
+
+### 14/10/2026 — Social > Chat: danh sách trống không rõ lý do
+- Triệu chứng (Duyên chụp màn hình tablet): màn Chat chỉ có ô tìm, danh sách hội thoại trống. Màn hẹp (<900px) ẩn khung chat bên phải nên dòng trạng thái lỗi (`#sc-status`, nằm trong khung đó) không ai thấy.
+- Đã sửa phía client (js/42 `_scListErr`/`_scErrHint`, css `.sc-lerr`): lỗi tải danh sách hiện NGAY TRÊN danh sách + gợi ý + nút ↻ Thử lại; hết lỗi thì tự ẩn. Test: `node tools/test-sc-list-error.js`.
+- NGUYÊN NHÂN GỐC phía máy chủ CHƯA xác minh được (phiên này không gọi được GAS/Worker). Nghi nhất: hết hạn mức UrlFetch/ngày của Apps Script (xem commit cde3f71, f244445: reset ~14h VN; cần DEPLOY LẠI GAS v13.48+ để có cache 15s; có thể bật Worker đọc thẳng Supabase `PK_NATIVE=1` sau khi chạy pkDanhMucDongBo). Sau khi tải lại trang, khung đỏ sẽ nói đúng lỗi máy chủ trả về.
+- `tools/test-pk-chat-gas.js` đang FAIL 1 ca ("nguoi xu ly: co ten trong pk_staff...") từ commit cache `_pkStaffNames_` của phiên khác — chưa đụng.
