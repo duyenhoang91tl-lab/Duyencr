@@ -3153,7 +3153,36 @@ function _expandSaleFilterWithPancakeAliases_(names) {
   out.slice().forEach(function(n) {
     (_grp[_normTxt_(n)] || []).forEach(function(a) { var k = _normTxt_(a); if (!_seenF[k]) { _seenF[k] = true; out.push(a); } });
   });
-  return out;
+  // SUA 2026-10-14 (yeu cau Duyen): loc theo Team van ra 0 doanh thu voi nhung Sale CHUA tung duoc
+  // khop tay o PancakeNameMap va CHUA duoc gan "nhieu ten" o sheet Users (2 nguon tren) — trong khi
+  // sheet SaleDirectory ("🗂️ Quản lý tài khoản") da luu SAN ca 4 ten cua 1 nhan vien (ma Sale, ten
+  // Facebook, user Base, the tag Pancake) ngay luc tao tai khoan, la nguon CHUAN nhat nhung truoc
+  // gio bi bo qua hoan toan o ham nay. The chon Team tra ra ten Facebook/username, con cot "Thẻ"
+  // cua Pos lai ghi the tag Pancake (vd "ninhnga99") -> khong co doan duoi day thi 2 ten nay khong
+  // bao gio khop nhau. Fix: voi MOI dong SaleDirectory, neu BAT KY ten nao dang co trong bo loc (ke
+  // ca cac ten vua duoc PancakeNameMap/Users mo rong o tren) khop 1 trong 4 bien the cua dong do thi
+  // them CA 4 bien the con lai vao bo loc.
+  try {
+    var dirList = readSaleDirectory_().list || [];
+    var curFold = {};
+    out.forEach(function(n) { curFold[_normTxt_(n)] = true; });
+    for (var di = 0; di < dirList.length; di++) {
+      var rec = dirList[di];
+      var variants = [rec.maSale, rec.code, rec.tenFacebook, rec.userBase, rec.tenTagPancake].filter(Boolean);
+      var hit = false;
+      for (var vi = 0; vi < variants.length; vi++) { if (curFold[_normTxt_(variants[vi])]) { hit = true; break; } }
+      if (hit) { for (var vj = 0; vj < variants.length; vj++) out.push(variants[vj]); }
+    }
+  } catch (eDir) {}
+  // Khu trung (ten lap do bi nhieu nguon cung them) — giu nguyen thu tu xuat hien dau tien.
+  var seenOut = {}, dedup = [];
+  for (var oi = 0; oi < out.length; oi++) {
+    var key = _normTxt_(out[oi]);
+    if (key && seenOut[key]) continue;
+    if (key) seenOut[key] = true;
+    dedup.push(out[oi]);
+  }
+  return dedup;
 }
 
 // Ten "sale" dac biet co khoang trang tren cot The (khong phai username Pancake) nhung ke toan van tinh la 1 sale rieng — vd
@@ -7362,15 +7391,22 @@ function readPancakeMapCI_() {
   return { map: map, mapCI: mapCI };
 }
 
+// Memo trong PHAM VI 1 LAN THUC THI (1 request doGet/doPost) — tranh doc lai sheet PancakeNameMap
+// nhieu lan khi _expandSaleFilterWithPancakeAliases_ duoc goi lap lai cho tung ten/don (xem cac noi
+// goi readPancakeMap_ ben duoi). GAS khoi tao lai bien global cho MOI request nen khong lo du lieu cu.
+var _pancakeMapMemo_ = null;
 function readPancakeMap_() {
+  if (_pancakeMapMemo_) return _pancakeMapMemo_;
   var sh = getSheet_(SH_PK_MAP, PK_MAP_HEADERS);
   var out = {};
-  if (sh.getLastRow() < 2) return out;
-  var v = sh.getRange(2, 1, sh.getLastRow() - 1, PK_MAP_HEADERS.length).getValues();
-  for (var i = 0; i < v.length; i++) {
-    if (!v[i][0]) continue;
-    out[String(v[i][0])] = String(v[i][1] || '');
+  if (sh.getLastRow() >= 2) {
+    var v = sh.getRange(2, 1, sh.getLastRow() - 1, PK_MAP_HEADERS.length).getValues();
+    for (var i = 0; i < v.length; i++) {
+      if (!v[i][0]) continue;
+      out[String(v[i][0])] = String(v[i][1] || '');
+    }
   }
+  _pancakeMapMemo_ = out;
   return out;
 }
 
@@ -7853,10 +7889,15 @@ function saveSaleDirectory_(rows) {
   return jsonOut_({ ok: true, written: rows.length });
 }
 
+// Memo trong PHAM VI 1 LAN THUC THI — cung ly do/an toan nhu _pancakeMapMemo_ o readPancakeMap_
+// (ham nay se duoc goi THEM trong _expandSaleFilterWithPancakeAliases_, co the lap lai nhieu lan
+// cho tung ten/don trong 1 bao cao).
+var _saleDirMemo_ = null;
 function readSaleDirectory_() {
+  if (_saleDirMemo_) return _saleDirMemo_;
   var sh = getSheet_(SH_SALE_DIR, SALE_DIR_HEADERS);
   var list = [], byName = {};
-  if (sh.getLastRow() < 2) return { list: list, byName: byName };
+  if (sh.getLastRow() < 2) { _saleDirMemo_ = { list: list, byName: byName }; return _saleDirMemo_; }
   // Doc chung 1 nguon Van phong/Online voi Bao cao E/F ("🏷️ Phân loại Online/Offline", setting
   // 'saleChannels') THEO YEU CAU DUYEN 2026-09 (ap dung dong bo cho MOI bao cao, ke ca tai khoan
   // dang nhap qua _syncSaleChannelsToUsers_ trong setSetting_) — chi fallback ve tag Pancake S#/O#
@@ -7892,7 +7933,8 @@ function readSaleDirectory_() {
       if (k) byName[_normTxt_(k)] = rec;
     });
   }
-  return { list: list, byName: byName };
+  _saleDirMemo_ = { list: list, byName: byName };
+  return _saleDirMemo_;
 }
 
 // Xac dinh cac NGAY (trong khoang from-to) THUC SU co du lieu tuong tac Pancake (sheet

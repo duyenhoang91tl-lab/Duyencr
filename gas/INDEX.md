@@ -60,7 +60,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 
 ## 13_Teams_Pancake.gs
 - Hàm: `saveTeams_`, `readMktTeams_`, `saveMktTeams_`, `_mktPageWeights_`, `_mktKenhWeights_`, `savePancakeStats_`, `readPancakeMapCI_`, `readPancakeMap_`, `pancakeAllNames_`, `savePancakeNameMap_`, `_pkStatsRowsMemo_`, `buildPancakeReport_`, `savePancakeSdtStats_`, `buildPancakeSdtReport_`, `readPancakePageMap_`, `readPancakePageMapByName_`, `pancakeAllPages_`, `savePancakePageMap_`, `classifyPancakeTag_`, `savePancakeTagStats_`, `buildPancakeTagReport_`, `_tagFunnelRates_`, `_pkSheetDateSpan_`, `saveSaleDirectory_`, `readSaleDirectory_`, `_pkTrackedDatesByPageAndSale_`, `_sumOrdersOnDates_`
-- Hằng/biến: `_pkStatsRowsMemoCache_`, `_pkReportMemoCache_`, `PK_STATUS_CODES_`, `SALE_DIR_HEADERS`
+- Hằng/biến: `_pancakeMapMemo_`, `_pkStatsRowsMemoCache_`, `_pkReportMemoCache_`, `PK_STATUS_CODES_`, `SALE_DIR_HEADERS`, `_saleDirMemo_`
 
 ## 14_KpiReport_Users_Assign.gs
 - Hàm: `buildKpiReport_`, `saveUsers_`, `saveAudit_`, `saveCareStatus_`, `readAssign_`, `assignRowsOf_`, `saveAssignEntry_`, `toggleAssignDone_`, `saveAssignHistory_`, `readAIContext_`, `_pwHash_`, `verifyLogin_`, `saveAIContext_`
