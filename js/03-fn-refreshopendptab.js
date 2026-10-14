@@ -218,6 +218,9 @@ function renderCareTab(c) {
         <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;cursor:pointer;color:#b91c1c" title="Tích khi khách yêu cầu không nhận tin quảng bá. Mọi chiến dịch gửi hàng loạt và hỏi thăm tự động sẽ BỎ khách này (chặn ở máy chủ).">
           <input type="checkbox" id="cs-nopromo" ${((care.custom||c.custom||{}).noPromo)?'checked':''}> 🚫 Không nhận quảng bá
         </label>
+        <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px">⭐ Kênh ưu tiên
+          <select id="cs-prefchannel" style="padding:3px 6px;border:1px solid var(--border);border-radius:6px"><option value="">— chưa chọn —</option>${(typeof PRO_PREF_CHANNELS!=='undefined'?PRO_PREF_CHANNELS:[]).map(x=>`<option value="${x.v}" ${((care.custom||c.custom||{}).prefChannel===x.v)?'selected':''}>${x.t}</option>`).join('')}</select>
+        </label>
       </div>
     </div>
     <div class="form-row-2">
@@ -981,6 +984,9 @@ function saveCare(phone, opts) {
   if (_zrEl) { if (_zrEl.checked) newCustom.zaloReply = true; else delete newCustom.zaloReply; }   // bỏ tích = xoá khoá (không lưu false)
   const _npEl = document.getElementById('cs-nopromo');
   if (_npEl) { if (_npEl.checked) newCustom.noPromo = true; else delete newCustom.noPromo; }   // bỏ tích = xoá khoá
+  const _pcEl = document.getElementById('cs-prefchannel');
+  if (_pcEl) { if (_pcEl.value) newCustom.prefChannel = _pcEl.value; else delete newCustom.prefChannel; }
+  if (((existing.custom||{}).prefChannel||'') !== (newCustom.prefChannel||'')) logAudit('status', phone, 'Kênh ưu tiên: '+((existing.custom||{}).prefChannel||'—'), 'Kênh ưu tiên: '+(newCustom.prefChannel||'—'));
   if (!!(existing.custom||{}).noPromo !== !!newCustom.noPromo) logAudit('status', phone, 'Quảng bá: '+((existing.custom||{}).noPromo?'Không nhận':'Nhận'), 'Quảng bá: '+(newCustom.noPromo?'Không nhận':'Nhận'));
   if (!!(existing.custom||{}).zaloReply !== !!newCustom.zaloReply) logAudit('status', phone, 'Phản hồi Zalo: '+((existing.custom||{}).zaloReply?'Có':'Chưa'), 'Phản hồi Zalo: '+(newCustom.zaloReply?'Có':'Chưa'));
   // V9 audit: ghi lại thay đổi trạng thái / CS / Zalo

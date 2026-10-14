@@ -48,3 +48,6 @@ Tab "Chăm sóc" của panel (`renderCareTab`, js/03-fn-refreshopendptab.js) có
 ## Chat Pancake trong hồ sơ khách (2026-10-12)
 Tab "💬 Chat" (tab thứ 5 của `.dp-tabs`, `data-tab="chat"`; `_order` trong `renderDpTab` có thêm `'chat'` — highlight tab theo THỨ TỰ nên tab mới phải ở cuối). Logic `js/41-fn-pkchat.js`, backend GAS `gas/25_PancakeChat.gs`, bảng Supabase `pk_conversations`/`pk_messages` (webhook ghi). Chi tiết + việc cần làm tay (deploy GAS, Script properties `PANCAKE_PAGE_TOKENS`): `docs/PANCAKE-INBOX.md`.
 
+## Chat nội bộ nhỏ (#tc-mini) và Trợ lý AI (#pro-ai) không đè nhau (2026-10-14)
+Cả hai nằm góc dưới phải, cùng `z-index:320`. Khi AI mở, `proAiToggle_` (js/38-pro-dock.js) bật class `html.pro-ai-open`; css/07-teamchat.css dịch `#tc-mini` sang trái đúng bằng bề rộng AI qua biến dùng chung `--pro-ai-w` (khai báo ở css/06-pro.css, `#pro-ai{width:var(--pro-ai-w)}`), cắt phần thừa từ bên trái (danh sách kênh ở cạnh phải luôn còn); màn <1100px chỉ giữ danh sách kênh, các cửa sổ hội thoại tạm ẩn rồi hiện lại khi đóng AI. Muốn đổi bề rộng AI thì chỉ sửa `--pro-ai-w`. Thêm panel nổi mới ở góc dưới phải thì làm tương tự (class trên `html` + dịch `#tc-mini`), đừng đặt thêm `z-index` ngang nhau.
+

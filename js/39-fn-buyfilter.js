@@ -19,3 +19,9 @@ function setBuy(v){
   if (typeof applyFilters === 'function') applyFilters();
 }
 function resetBuyFilter(){ currentBuy = 'all'; _buySyncUi(); }
+
+// Huy hiệu 🚫 cạnh tên khách ở danh sách (khách tích 'Không nhận quảng bá' — xem js/03, chặn gửi hàng loạt ở máy chủ)
+function _noPromoBadge_(phone){
+  var cr = (typeof careData !== 'undefined' && careData) ? careData[phone] : null;
+  return (cr && cr.custom && cr.custom.noPromo) ? ' <span title="Không nhận quảng bá" style="color:#b91c1c;font-size:11px">🚫</span>' : '';
+}

@@ -50,12 +50,24 @@ assert row == '{B-new}|VIP|t|109|Khach Test|%s|%s|0912345678' % (CUST, PSID), 'c
 msgs = run("select id||','||direction||','||sent_at at time zone 'UTC' from pk_messages order by sent_at", True).split('\n')
 assert msgs == ['m_sys1,out,2026-10-11 20:24:23', 'm_cus1,in,2026-10-11 20:30:00', 'm_out1,out,2026-10-11 20:31:00'], msgs
 assert run("select last_text from pk_conversations", True).startswith('Dạ em goi'), 'last_text phai la tin moi nhat'
+# 8) MAU THAT 2026-10-13 (da an danh): khach nhan co SDT -> phone_info la MANG OBJECT {captured, phone_number, status...}; tags la MANG MA SO NGUYEN [109] (khong phai object)
+CONV2 = PAGE + '_3000000000000003'
+real = {"data": {"post": None, "message": {"id": "m_real1", "from": {"id": "3000000000000003", "name": "Khach Hai", "page_customer_id": "x"}, "type": "INBOX",
+        "message": "<div>Sdt test <Copy key='9' text='0378996789'><span class='phone-tag'>0378996789</span></Copy></div>", "page_id": PAGE, "has_phone": True,
+        "phone_info": [{"m_id": "m_real1", "length": 10, "offset": 9, "status": 2, "captured": "0378996789", "phone_number": "0378996789"}],
+        "attachments": [], "inserted_at": "2026-10-13T16:49:36.000000", "original_message": "Sdt test 0378996789", "conversation_id": CONV2},
+        "conversation": {"id": CONV2, "from": {"id": "3000000000000003", "name": "Khach Hai"}, "seen": False, "tags": [109], "type": "INBOX", "snippet": "Sdt test 0378996789",
+        "is_replied": False, "customer_id": "bbbbbbbb-0000-0000-0000-000000000002", "assignee_ids": ["58c72913-aaaa"]}}, "page_id": PAGE, "timestamp": 1791910181, "event_type": "messaging"}
+ins(real)
+r = run("select customer_phone||'|'||tags::text||'|'||assignee_ids::text||'|'||snippet from pk_conversations where id = '%s'" % CONV2, True)
+assert r == '0378996789|[109]|{58c72913-aaaa}|Sdt test 0378996789', 'mau that: ' + r
+assert run("select direction||'|'||text from pk_messages where id = 'm_real1'", True) == 'in|Sdt test 0378996789', 'tin khach co SDT sai huong/noi dung'
 # phone_info co gia tri -> uu tien phone_info, dang +84
 ins({"data": {"post": None, "message": msg("m_cus2", PSID, "alo", "2026-10-11T21:00:00.000000", ["+84 901 234 567"]), "conversation": conv(["A-old"])}, "page_id": PAGE, "timestamp": 1791752000, "event_type": "messaging"})
-assert run("select customer_phone from pk_conversations", True) == '0912345678', 'SDT da co khong bi ghi de'
+assert run("select customer_phone from pk_conversations where id = '%s'" % CONV, True) == '0912345678', 'SDT da co khong bi ghi de'
 # tach lai toan bo: idempotent, khong nhan doi
-assert int(run("select pk_reprocess_raw()", True)) >= 8
-assert run("select count(*) from pk_messages", True) == '4' and run("select count(*) from pk_conversations", True) == '1', 'reprocess lam nhan doi'
+assert int(run("select pk_reprocess_raw()", True)) >= 9
+assert run("select count(*) from pk_messages", True) == '5' and run("select count(*) from pk_conversations", True) == '2', 'reprocess lam nhan doi'
 # anon khong duoc goi ham (neu role ton tai trong DB that); o day chi kiem tra RLS bat + khong policy
 assert run("select count(*) from pg_policies where tablename like 'pk_%'", True) == '0', 'khong duoc co policy'
 assert run("select bool_and(relrowsecurity) from pg_class where relname in ('pk_webhook_raw','pk_conversations','pk_messages')", True) == 't', 'RLS phai bat'

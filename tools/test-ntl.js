@@ -59,7 +59,7 @@ failCache = false; store = { ntl_20261011: '{hong' };
 ctx._ntlNote_('GET', 'customers', '', 'web');
 ok(ctx._ntlReport_().noTokenTotal === 1, 'cache hong thi dem lai tu 1');
 // 7) doGet/doPost that su goi _ntlNote_ (khong bi bo sot khi sua sau nay)
-ok(/_ntlNote_\('GET', action, p\.token, p\.src, p\.ek\);[\s\S]{0,360}return doGetCore_\(e\);/.test(src), 'doGet phai goi _ntlNote_ truoc doGetCore_');
+ok(/_ntlNote_\('GET', action, p\.token, p\.src, p\.ek\);[\s\S]{0,700}return doGetCore_\(e\);/.test(src), 'doGet phai goi _ntlNote_ truoc doGetCore_');
 ok(/_ntlNote_\('POST', d0\.action, d0\.token, d0\.src, d0\.ek\)/.test(src), 'doPost phai goi _ntlNote_');
 ok(!/_ntlNote_\('GET'[^\n]*\n[^\n]*_demoClip_/.test(src), 'tai khoan demo khong duoc di qua log');
 

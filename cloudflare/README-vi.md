@@ -32,3 +32,8 @@ Các bước 1–3 chỉ làm **1 lần** để tạo Worker và đặt `GAS_URL
 
 ## Khi đổi tên / URL Worker
 Địa chỉ Worker nằm CỨNG trong code web: `WORKER_URL` ở `js/06-main-renew-sources.js`. Đổi tên Worker mà quên đổi dòng này thì máy nào không bật `?worker=0` sẽ báo "Không kết nối được máy chủ" (xảy ra 11/10/2026 khi đổi `royal-brook-6cec` → `duyen-crm-cache`). Màn đăng nhập (`doLogin`, `js/14`) có đường lùi: Worker lỗi thì tự thử thẳng Apps Script (`GAS_URL_DIRECT`) trong phiên đó; các request khác chưa có đường lùi tự động.
+
+
+## Hộp thư Pancake đọc thẳng từ Worker (tuỳ chọn, mặc định tắt)
+Thêm biến (Settings → Variables and Secrets): `PK_NATIVE` = `1` để bật; `PK_DENY_USERS` = tên đăng nhập tài khoản test/demo, cách nhau dấu phẩy.
+Cần đã có `SESS_SECRET`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`. Tắt lại = xoá `PK_NATIVE` hoặc đặt khác `1` (quay về đọc qua Apps Script). Chi tiết: `docs/PANCAKE-INBOX.md` bước 7.
