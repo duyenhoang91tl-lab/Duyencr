@@ -253,6 +253,7 @@ var _mktState = (function(){
     loaded: false, loading: false,
     quick: 'thisMonth', from: r ? r.from : '', to: r ? r.to : '',
     report: null,
+    showExtra: (function(){ try { return localStorage.getItem('mkt_show_extra') === '1'; } catch(e){ return false; } })(), // tuỳ chọn xem thêm 3 chỉ số bổ sung (XCT/XL5/XL9)
     cfgDraft: null // khi != null: đang sửa mục tiêu/mẫu số, giữ bản nháp { L1:{target,denom}, ... } (target dạng %)
   };
 })();

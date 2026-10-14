@@ -84,7 +84,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 
 ## 19_BannedList_MktChecklist.gs
 - Hàm: `readBannedWords_`, `_mktMonthOf_`, `readMktConfigAll_`, `mktConfigForMonth_`, `_mktCleanCfgEntry_`, `_mktCheckPass_`, `saveMktChecklistConfig_`, `_mktTagNum_`, `_mktTagRows_`, `buildMktChecklistReport_`
-- Hằng/biến: `REPORT_SALE_SS_ID`, `BANNED_WORDS_SHEET_NAME`, `BANNED_WORDS_FALLBACK`, `MKT_DEFAULT_CFG_`, `MKT_MIN_TAGS_`
+- Hằng/biến: `REPORT_SALE_SS_ID`, `BANNED_WORDS_SHEET_NAME`, `BANNED_WORDS_FALLBACK`, `MKT_DEFAULT_CFG_`, `MKT_EXTRA_CODES_`, `MKT_EXTRA_DEFAULT_`, `MKT_EXTRA_TAGS_`, `MKT_MIN_TAGS_`
 
 ## 20_ExportLog_AutoAssign.gs
 - Hàm: `getExportLogSS_`, `_exportLogGetSheet_`, `_exportLogWriteDays_`, `_dateRangeList_`, `exportDailyReportLogs_`, `chayCaiDatTrigger`, `_aaDefaultCfg`, `_aaSplit`, `_aaRatioFor`, `_aaWeights`, `_aaRecipients`, `_aaBuckets`, `_aaPlan`, `_aaPlanCskh`, `_aaDateOk_`, `_aaPlanAll`, `_aaReadJson_`, `_aaWriteJson_`, `_tierCfgNormalize_`, `_tierCfg_`, `_aaHangKey_`, `_aaLoadCustomers_`, `_aaSetCareCS_`, `autoAssignRun_`, `autoAssignTick_`, `autoAssignRunNow_`, `installAutoAssignTrigger_`, `removeAutoAssignTrigger_`, `caiTriggerChiaTuDong`, `chayThuChiaTuDong`, `goTriggerChiaTuDong`
