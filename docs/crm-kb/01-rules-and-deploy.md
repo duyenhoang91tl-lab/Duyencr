@@ -21,7 +21,7 @@ Cả 2 extension gọi chung 1 URL GAS.
 - Từ v13.19: `getGasSource`/`setGasSource` BẮT BUỘC có `adminKey` (= giá trị dòng `adminKey` trong sheet Settings; app hỏi 1 lần/máy, lưu `ome_admin_key`). Chưa đặt dòng đó = không ai lấy/đồng bộ được mã. Tài khoản test (role `demo`): xem `docs/TAI-KHOAN-TEST.md`.
 - (Từ 2026-10-11 deploy tự động nên KHÔNG còn bắt buộc nhắc bước này; chỉ cần khi Duyên chủ động muốn nút Copy trả mã mới.)
 
-## 13 quy tắc bắt buộc khi sửa code
+## 14 quy tắc bắt buộc khi sửa code
 1. Luôn clone repo MỚI NHẤT bằng token người dùng gửi trong tin nhắn đó (không dùng lại token cũ). Đọc kỹ file liên quan (view/grep) trước khi sửa.
 2. Sửa `gas_v13.js` → chạy `split-gas` + `--check`, push; deploy TỰ ĐỘNG, KHÔNG nhắc deploy/đồng bộ mã (mục trên).
 3. Sửa JS/CSS extension → nhắc reload extension.
@@ -34,6 +34,7 @@ Cả 2 extension gọi chung 1 URL GAS.
 10. Token GitHub người dùng dán: chỉ dùng cho đúng thao tác, KHÔNG lưu đâu cả. Thấy dán nhiều lần → nhắc nhẹ nên revoke/tạo token mới.
 11. Phát hiện quy ước/lỗi mới đáng nhớ → đề xuất cập nhật đúng file KB.
 12. Làm xong phần nào push ngay phần đó (từng mục nhỏ) kèm việc cần làm tiếp, để phiên khác tiếp tục được.
+14. **QUY TẮC SONG SONG (2026-10-13):** tính năng có ở Pancake AI thì Zalo AI cũng phải có và ngược lại — làm cho CẢ 2 extension trong cùng lần làm, cùng backend GAS, cùng câu chữ; đặc thù nền tảng thì ghi lý do vào `tools/ext-parity-allow.json`. Chạy `node tools/check-ext-parity.js` trước khi báo xong. Chi tiết + danh sách còn lệch: `08-extension-parity.md`.
 13. (Đã thay 2026-10-11) Sửa `gas_v13.js`/`cloudflare/`/`supabase/` → KHÔNG nhắc deploy GAS / Worker / Supabase / đồng bộ mã: đã tự động qua GitHub Actions. Chỉ báo "workflow tự deploy" + Ctrl+F5 nếu đổi web; chỉ nhắc khi workflow đỏ hoặc cần chạy hàm tay. Không còn khối `gas-code-v9`.
 
 ## Checklist trước khi báo "đã xong"
@@ -41,7 +42,7 @@ Cả 2 extension gọi chung 1 URL GAS.
 2. Đã test bằng ví dụ thật (không chỉ đọc code suy luận) chưa?
 3. (Deploy GAS/Worker/Supabase tự động — KHÔNG nhắc.) Workflow có đỏ không (tab Actions)?
 4. Cần nhắc reload extension không?
-5. Thay đổi ảnh hưởng cả 2 extension hay chỉ 1 (nhiều hàm dùng chung backend)?
+5. Thay đổi ảnh hưởng cả 2 extension hay chỉ 1 (nhiều hàm dùng chung backend)? Nếu là tính năng của 1 extension: đã làm cho extension còn lại chưa (quy tắc 14) và `node tools/check-ext-parity.js` đã OK chưa?
 6. Đã push + ghi "việc cần làm tiếp" chưa?
 
 ## Quy ước UI chung (index.html)
@@ -49,5 +50,7 @@ Cả 2 extension gọi chung 1 URL GAS.
 - Bảng rộng (`.dash-table`/`.audit-table`) tự có wrapper cuộn ngang trên màn nhỏ qua MutationObserver cuối trang.
 - Nút cài đặt admin của tab báo cáo gom vào 1 dropdown "⚙ Cài đặt" (`.gear-menu`/`.gear-menu-list` + `_srToggleGearMenu()`/`closeGearMenus()`), đã áp cho Báo cáo E — theo mẫu này nếu thêm chỗ khác.
 
-## Instruction của Project (rule 13)
+## Instruction của Project (rule 13 + 14)
 Instruction của Project (rule 2 và 13) cần SỬA cho khớp: "Deploy GAS/Worker/Supabase đã tự động qua GitHub Actions — không nhắc deploy/đồng bộ mã nữa; chỉ nhắc reload extension, Ctrl+F5 web, hoặc hàm cần chạy tay." (Claude không sửa được Instruction — Duyên cập nhật ở Project settings.)
+
+**Thêm vào Instruction của Project (quy tắc 14, Duyên dán vào Project settings):** "14. QUY TẮC SONG SONG: tính năng nào có ở Pancake AI thì Zalo AI cũng phải có và ngược lại — khi thêm/sửa tính năng cho 1 extension phải làm luôn cho extension còn lại trong cùng lần làm (cùng backend GAS, cùng câu chữ). Tính năng đặc thù nền tảng thì ghi lý do vào tools/ext-parity-allow.json. Trước khi báo xong chạy `node tools/check-ext-parity.js`. Chi tiết: docs/crm-kb/08-extension-parity.md."

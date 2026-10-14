@@ -17,6 +17,7 @@ Gồm: 1 backend Google Apps Script (`gas_v13.js`) + web app (`index.html`) + 2 
 | Extension Zalo AI (panel, tra cứu, kết bạn, gửi hàng loạt, quét trạng thái) | `03-extension-zalo.md` | `extension-zalo/zalo-content.js`, `zalo-content.css`, `zalo-options.*`, `zalo-popup.*`, `manifest.json` |
 | Extension Pancake AI (panel, selector DOM, giỏ hàng, Soạn đơn, bảng giá) | `04-extension-pancake.md` | `extension-pancake/pancake-content.js`, `pancake-background.js`, `pancake-content.css`, `pancake-options.*`, `pancake-popup.*`, `manifest.json` |
 | Deploy, commit, push, rebase, quy tắc bắt buộc, checklist | `01-rules-and-deploy.md` | — |
+| Thêm/sửa tính năng cho Zalo AI hoặc Pancake AI (QUY TẮC SONG SONG: bên này có thì bên kia cũng có) | `08-extension-parity.md` | cả `extension-zalo/*` VÀ `extension-pancake/*` + `tools/ext-parity-allow.json` |
 | Tra bảng nhanh: action GAS, 20 cột CareData, storage key, tiền tố CSS, quyền manifest | `07-reference-tables.md` | — |
 | Báo lỗi lặp lại / dò lịch sử lỗi đã sửa | `06-bug-history.md` | — |
 | Bảo mật backend: đăng nhập server/token, việc còn lại (bước 3-4) | `docs/SECURITY-PLAN.md` | — |

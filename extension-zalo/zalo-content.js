@@ -304,6 +304,9 @@
     addEl(priceRow, 'input', {id:'zai-price-q', type:'text', placeholder:'Tên sản phẩm, kiểu/size... (Enter hoặc Tìm)',
       style:'flex:1;padding:5px 8px;border:1px solid #bfdbfe;border-radius:6px;font-size:12px;box-sizing:border-box;'});
     addEl(priceRow, 'button', {className:'zai-btn zai-btn-primary zai-btn-sm', id:'zai-price-btn', textContent:'Tìm'});
+    addEl(priceRow, 'button', {className:'zai-btn zai-btn-secondary zai-btn-sm', id:'zai-price-ai-btn', type:'button',
+      title:'Hỏi AI về giá — trả lời văn ngắn (giá lấy từ bảng giá)', textContent:'🤖 Hỏi AI'});
+    addEl(priceWrap, 'div', {id:'zai-price-ai', style:'display:none;'});
     addEl(priceWrap, 'div', {id:'zai-price-result', style:'max-height:340px;overflow-y:auto;'});
 
     body.appendChild(Object.assign(document.createElement('hr'), {className:'zai-div'}));
@@ -430,6 +433,7 @@
     saveBtn.addEventListener('click', saveConfig);
     document.getElementById('zai-lookup-btn').addEventListener('click', doLookup);
     document.getElementById('zai-price-btn').addEventListener('click', doPriceSearchZai_);
+    document.getElementById('zai-price-ai-btn').addEventListener('click', askPriceAiZai_);
     document.getElementById('zai-price-q').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') doPriceSearchZai_();
     });
@@ -1086,6 +1090,53 @@
     } catch (e) {
       box.innerHTML = '<div style="color:#1e3a8a;font-size:11.5px;font-style:italic;padding:4px 0">Lỗi kết nối: ' + escHtml(e.message) + '</div>';
     }
+  }
+
+  // ── HOI AI VE GIA (van ngan) — y het nut "🤖 Hoi AI" cua Pancake AI (quy tac: tinh nang co o Pancake AI thi Zalo AI cung co) ──
+  // GAS action 'priceQa' (POST): gia luon lay tu bang gia DANH_MUC o backend, AI chi dien dat lai ngan gon (toi da ~3 cau). Khong tim thay san pham ->
+  // backend KHONG goi AI (tra goi y ten); AI loi -> backend tra danh sach gia chinh xac (aiError). Luon qua GAS (can doc Sheet gia).
+  let _zaiPriceAiSeq = 0;
+  async function askPriceAiZai_() {
+    const q = (document.getElementById('zai-price-q').value || '').trim();
+    const box = document.getElementById('zai-price-ai');
+    box.style.display = '';
+    const note = (t, cls) => '<div class="' + (cls || 'zai-price-ai-txt') + '">' + escHtml(t) + '</div>';
+    if (!GAS_URL) { box.innerHTML = note('Chưa cài đặt URL GAS. Nhấn ⚙.'); return; }
+    if (!q) { box.innerHTML = note('Gõ câu hỏi về giá trước (vd: giá nhẫn bạc trơn size 12).'); return; }
+    const seq = ++_zaiPriceAiSeq;
+    box.innerHTML = note('🤖 Đang hỏi AI…');
+    let d;
+    try {
+      const res = await fetch(GAS_URL, {method:'POST', body:JSON.stringify({action:'priceQa', q}), headers:{'Content-Type':'text/plain'}});
+      d = await res.json();
+    } catch (e) { if (seq === _zaiPriceAiSeq) box.innerHTML = note('⚠ Không gọi được GAS: ' + e.message, 'zai-price-ai-err'); return; }
+    if (seq !== _zaiPriceAiSeq) return;   // da hoi cau khac trong luc cho
+    if (!d || d.ok === false || d.error) {
+      const err = String((d && (d.error || d.message)) || 'Lỗi GAS không rõ');
+      box.innerHTML = note('⚠ ' + (/unknown action|priceQa/i.test(err) ? err + " (GAS chưa lên bản có 'Hỏi AI về giá' — chờ deploy xong rồi thử lại)" : err), 'zai-price-ai-err');
+      return;
+    }
+    if (!d.found) {
+      box.innerHTML = note('Chưa tìm thấy sản phẩm khớp rõ trong bảng giá. Gõ rõ TÊN sản phẩm (kèm chất liệu / size nếu có).');
+      const sg = (d.suggestions || []).slice(0, 8);
+      if (sg.length) {
+        const wrap = document.createElement('div'); wrap.className = 'zai-price-ai-foot'; wrap.appendChild(document.createTextNode('Có thể bạn muốn hỏi: '));
+        sg.forEach((x) => {   // DOM thay vi innerHTML: escHtml cua Zalo khong escape dau nhay, ten san pham di vao thuoc tinh se hong
+          const b = document.createElement('button'); b.type = 'button'; b.className = 'zai-price-ai-chip'; b.textContent = x;
+          b.addEventListener('click', () => { document.getElementById('zai-price-q').value = x; askPriceAiZai_(); });
+          wrap.appendChild(b); wrap.appendChild(document.createTextNode(' '));
+        });
+        box.appendChild(wrap);
+      }
+      return;
+    }
+    box.innerHTML = note(d.text || '') +
+      '<div class="zai-price-ai-foot">Giá lấy từ bảng giá DANH_MUC' + (d.provider ? ' · AI: ' + escHtml(d.provider) : '') + (d.aiError ? ' · ⚠ AI đang lỗi nên hiện danh sách giá gốc' : '') + ' </div>';
+    const cp = document.createElement('button'); cp.type = 'button'; cp.className = 'zai-price-ai-chip'; cp.textContent = '📋 Copy';
+    cp.addEventListener('click', () => {
+      try { navigator.clipboard.writeText(d.text || '').then(() => { cp.textContent = '✓ Đã copy'; }).catch(() => { cp.textContent = 'Không copy được'; }); } catch (e) { cp.textContent = 'Không copy được'; }
+    });
+    box.lastChild.appendChild(cp);
   }
 
   // ── GOI Y TIN NHAN THEO SAN PHAM (khong can API key): ghep thu vien mau tin DA DUYET (sheet MessageTemplates — cung nguon voi CRM/Pancake AI)
