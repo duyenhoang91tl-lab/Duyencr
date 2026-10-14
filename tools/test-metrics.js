@@ -35,6 +35,7 @@ vm.runInContext(`
   readPancakePageMap_ = function() { return {}; };
   readPancakePageMapByName_ = function() { return {}; };
   _pancakeKnownSaleNameSet_ = function() { return {}; };
+  _srCloseRateSectionsFromBase_ = function() { return { saleCloseRate: [], closeFrom: '', kenhCloseRate: [], saleCloseByPage: [] }; }; // B tinh ty le chot tu Base (doc sheet/Pancake) — khong thuoc chi so nay
   _srCloseRateSections_ = function() { return { saleCloseRate: [], closeFrom: '', kenhCloseRate: [], saleCloseByPage: [] }; }; // ty le chot doc sheet Pancake, khong thuoc chi so nay
   var ARCHIVE_APPLY_ENABLED_ = false;
 `, ctx);
