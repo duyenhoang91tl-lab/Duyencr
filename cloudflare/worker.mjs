@@ -24,7 +24,7 @@ const TTL_SEC = {
 };
 // Action GAS chan theo phan quyen (vai tro/bo phan) -> KHONG duoc dung chung cache giua cac nguoi (neu khong nguoi bi chan van doc duoc ban cache cua nguoi khac).
 // Khoa cache them user trong token; khong co SESS_SECRET (khong xac thuc duoc token) thi khong cache.
-export const GATED_ACTIONS = ['salesReportA', 'salesReportB', 'salesReportC', 'saleKpiReport', 'failedOrderReport', 'careLeadReport', 'kpiReport', 'mktChecklist', 'pancakeReport', 'pancakeSdtReport'];
+export const GATED_ACTIONS = ['salesReportA', 'salesReportB', 'salesReportC', 'saleKpiReport', 'failedOrderReport', 'careLeadReport', 'kpiReport', 'mktChecklist', 'pancakeReport', 'pancakeSdtReport', 'customers', 'orders', 'careLeads'];
 export function tokenUser(tok) {
   try {
     tok = String(tok || ''); const i = tok.indexOf('.'); if (i < 1) return '';

@@ -2043,6 +2043,102 @@ function xemLogPhamVi() {
   return r;
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  BUOC 4c-2b (v13.48): LOC DANH SACH THEO PHAM VI o server: customers, orders, careLeads, reminders.
+//  Nguyen nhan goc: 4c-2a moi chan tra cuu tung SDT; cac action tra CA DANH SACH van tra toan bo khach/don cho moi token (client loc sau o _inUserScope).
+//  Dung cung cong tac scopeMode (off|log|enforce) va cung tieu chi 4c-2a, mo rong cho LEADER: pham vi = ten leader + thanh vien team (teams.leader/members, hoac team trung user.team).
+//  CS/manager: tap ten = names duoc gan. Mot SDT thuoc pham vi neu BAT KY ten nao so huu SDT do (careCS, Sale ban cua don, du lieu don, careLeads, AssignData) nam trong tap ten.
+//  log = chi dem "se bi loc bao nhieu", tra du lieu nguyen ven; enforce = loc that. admin/viewer/ceo/... khong loc. Chi khi co token hop le (extension dung ek khong qua day).
+//  Tap SDT thuoc pham vi cache 60s moi nguoi (_cachePutBig_). Worker: customers/orders/careLeads vao GATED_ACTIONS de cache khoa theo user.
+// ═══════════════════════════════════════════════════════════════
+var SCOPE_LIST_ACTIONS_ = { customers: 1, orders: 1, careLeads: 1, reminders: 1 };
+function _scopeAllowedNames_(user) {   // null = khong gioi han; object ten->1 = gioi han
+  if (!user) return null;
+  var role = String(user.role || '');
+  if (role !== 'cs' && role !== 'manager' && role !== 'leader') return null;
+  var mine = (user.names && user.names.length) ? user.names : (user.name ? [user.name] : []);
+  var out = {};
+  mine.forEach(function (n) { n = String(n || '').trim(); if (n) out[n] = 1; });
+  if (role === 'leader') {
+    try {
+      readTeams_(getCrmSS_().getSheetByName(SH_TEAM)).forEach(function (t) {
+        if (out[String(t.leader || '').trim()] || (user.team && String(t.name || '') === String(user.team))) {
+          if (t.leader) out[String(t.leader).trim()] = 1;
+          (t.members || []).forEach(function (m) { m = String(m || '').trim(); if (m) out[m] = 1; });
+        }
+      });
+    } catch (e) {}
+  }
+  return out;
+}
+function _scopeHit_(str, allowed) {
+  var a = String(str || '').split(',');
+  for (var i = 0; i < a.length; i++) { var n = a[i].trim(); if (n && allowed[n]) return true; }
+  return false;
+}
+// Tap SDT (da chuan hoa) thuoc pham vi cua `allowed`; cache 60s theo username.
+function _scopePhoneSet_(user, allowed) {
+  var ckey = 'scope_ps_' + String(user.username || '').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 40);
+  var cached = null; try { cached = _cacheGetBig_(ckey); } catch (e) {}
+  if (cached) { try { var arr0 = JSON.parse(cached); var o0 = {}; arr0.forEach(function (x) { o0[x] = 1; }); return o0; } catch (e2) {} }
+  var set = {};
+  function add(ph) { var k = normPhone_(String(ph || '')); if (k) set[k] = 1; }
+  try {
+    var careRows = sbReadCareAll_();
+    if (careRows === undefined) careRows = readCare_(getCrmSS_().getSheetByName(SH_CARE));
+    (careRows || []).forEach(function (r) { if (_scopeHit_(r.cs, allowed)) add(r.phone); });
+  } catch (e3) { Logger.log('_scopePhoneSet_ care: ' + e3); }
+  try {
+    var oc = _cacheGetBig_('orders_v1'), ords = null;
+    if (oc) { try { ords = (JSON.parse(oc) || {}).orders; } catch (e4) {} }
+    if (!ords) ords = readAllOrders_();
+    (ords || []).forEach(function (o) { if (o && _scopeHit_(o.cs, allowed)) add(o.phone); });
+  } catch (e5) { Logger.log('_scopePhoneSet_ orders: ' + e5); }
+  try {
+    readDonChiTiet_().forEach(function (r) {
+      var sl = _donSaleNamesFromThe_(r.theSale) || [];
+      for (var i = 0; i < sl.length; i++) { if (allowed[String(sl[i] || '').trim()]) { add(r.soDienThoai); break; } }
+    });
+  } catch (e6) { Logger.log('_scopePhoneSet_ don: ' + e6); }
+  try { readCareLeads_().forEach(function (r) { if (_scopeHit_(r.cs, allowed)) add(r.phone); }); } catch (e7) {}
+  try {
+    var ai = _scopeAssignIndex_();
+    Object.keys(ai).forEach(function (ph) { for (var i = 0; i < ai[ph].length; i++) { if (allowed[ai[ph][i]]) { set[ph] = 1; break; } } });
+  } catch (e8) {}
+  try { _cachePutBig_(ckey, JSON.stringify(Object.keys(set)), 60); } catch (e9) {}
+  return set;
+}
+// Loc obj theo action. Tra {obj, total, kept}. Chi dong vao mang du lieu, giu nguyen cac truong khac (careStatus, errorCount...).
+function _scopeFilterObj_(action, obj, phoneSet) {
+  var key = action === 'orders' ? 'orders' : (action === 'reminders' ? 'reminders' : 'rows');
+  if (!obj || !Array.isArray(obj[key])) return { obj: obj, total: 0, kept: 0 };
+  var arr = obj[key], kept = arr.filter(function (x) { return phoneSet[normPhone_(String((x && x.phone) || ''))]; });
+  var copy = {}; Object.keys(obj).forEach(function (k) { copy[k] = obj[k]; });
+  copy[key] = kept;
+  return { obj: copy, total: arr.length, kept: kept.length };
+}
+// Goi tu doGet. Tra null = khong lien quan (off / khong gioi han / loi) -> doGet tu chay doGetCore_ nhu cu.
+function _scopeListServe_(action, p, e) {
+  if (!SCOPE_LIST_ACTIONS_[action] || !p.token) return null;
+  var mode = _scopeMode_();
+  if (mode === 'off') return null;
+  var user, allowed, resp, obj;
+  try {
+    user = _sessUser_(p.token);
+    allowed = _scopeAllowedNames_(user);
+    if (!allowed) return null;
+    resp = doGetCore_(e);
+    obj = JSON.parse(resp.getContent());
+  } catch (e1) { return null; }
+  try {
+    if (!Object.keys(allowed).length) { var phs0 = {}; } else { phs0 = _scopePhoneSet_(user, allowed); }
+    var f = _scopeFilterObj_(action, obj, phs0);
+    _scopeNote_(user, action, '', 'LIST ' + (mode === 'enforce' ? 'filtered' : 'would-filter') + ' ' + (f.total - f.kept) + '/' + f.total);
+    if (mode === 'enforce') return jsonOut_(f.obj);
+  } catch (e2) { Logger.log('_scopeListServe_: ' + e2); }
+  return resp;
+}
+
 // Bi mat ky token phien — dan vao bien Secret SESS_SECRET cua Cloudflare Worker de Worker chi phuc vu cache cho token hop le. KHONG dan vao chat/repo.
 function xemBiMatPhien() { Logger.log('SESS_SECRET = ' + _sessSecret_()); }
 
@@ -2108,6 +2204,7 @@ function doGet(e) {
   if (_ownErr) return jsonOut_(_ownErr);
   var _scpErr = _scopeGate_(action, p.token, p.phone);
   if (_scpErr) return jsonOut_(_scpErr);
+  if (SCOPE_LIST_ACTIONS_[action] && p.token) { var _scpL = _scopeListServe_(action, p, e); if (_scpL) return _scpL; }
   return doGetCore_(e);
 }
 

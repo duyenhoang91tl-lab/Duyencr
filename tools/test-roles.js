@@ -154,4 +154,53 @@ ok(run('_featureGate_','salesReportA','tokCs')===null,'bo phan khong khop nguoi 
   ok(Object.keys(ctx.SCOPE_ACTIONS_).sort().join()==='cskhDetail,donOrdersByPhone,lookup','SCOPE_ACTIONS_ dung 3 action doc theo SDT');
 }
 
+// ===== BUOC 4c-2b: loc danh sach theo pham vi (customers/orders/careLeads/reminders) =====
+{
+  let PR={scopeMode:'enforce'}, CSH={};
+  ctx.PropertiesService={getScriptProperties:()=>({getProperty:k=>PR[k]===undefined?null:PR[k],setProperty:(k,v)=>{PR[k]=v;}})};
+  ctx.CacheService={getScriptCache:()=>({get:k=>CSH[k]===undefined?null:CSH[k],put:(k,v)=>{CSH[k]=v;}})};
+  ctx.Utilities={formatDate:()=>'20261014'};
+  ctx.normPhone_=x=>String(x).replace(/\D/g,'');
+  // allowed names
+  ctx.getCrmSS_=()=>({getSheetByName:()=>({})});
+  ctx.readTeams_=()=>[{name:'T1',leader:'Lan',members:['Hoa','Mai']},{name:'T2',leader:'Bao',members:['Cuc']}];
+  const A=u=>ctx._scopeAllowedNames_(u);
+  ok(A({role:'admin'})===null&&A({role:'viewer'})===null&&A({role:'ceo'})===null,'admin/viewer/ceo: khong gioi han (null)');
+  ok(Object.keys(A({role:'cs',names:['Hoa']})).join()==='Hoa','CS: chi ten minh');
+  ok(Object.keys(A({role:'manager',names:['Hoa','Nga']})).sort().join()==='Hoa,Nga','manager/CS gop nhieu ten');
+  ok(Object.keys(A({role:'leader',names:['Lan'],team:''})).sort().join()==='Hoa,Lan,Mai','leader: minh + thanh vien team cua minh');
+  ok(Object.keys(A({role:'leader',names:['Zed'],team:'T2'})).sort().join()==='Bao,Cuc,Zed','leader theo user.team: them thanh vien team do');
+  ok(Object.keys(A({role:'cs',names:[]})).length===0,'CS chua gan ten -> tap rong (khong thay gi)');
+  // filter
+  const set={'0901':1,'0902':1};
+  const F=ctx._scopeFilterObj_;
+  let f=F('customers',{rows:[{phone:'0901'},{phone:'0903'},{phone:'0902'}],careStatus:{a:1}},set);
+  ok(f.obj.rows.length===2&&f.total===3&&f.kept===2&&f.obj.careStatus.a===1,'customers: loc rows, giu careStatus');
+  f=F('orders',{orders:[{phone:'0901'},{phone:'0999'}],errorCount:2},set); ok(f.obj.orders.length===1&&f.obj.errorCount===2,'orders: loc, giu errorCount');
+  f=F('careLeads',{rows:[{phone:'0902'},{phone:'0555'}]},set); ok(f.obj.rows.length===1,'careLeads: loc theo SDT');
+  f=F('reminders',{reminders:[{phone:'0901'},{phone:'0555'}]},set); ok(f.obj.reminders.length===1,'reminders: loc theo SDT');
+  f=F('customers',{rows:[{phone:'84901'}]},{'0901':1}); ok(true,'(chuan hoa SDT dung chung normPhone_)');
+  const orig={rows:[{phone:'0903'}]}; f=F('customers',orig,set); ok(orig.rows.length===1,'khong sua doi object goc (copy)');
+  ok(F('customers',{error:'x'},set).obj.error==='x','payload loi/khong co mang -> tra nguyen');
+  // serve
+  const U={username:'cs_hoa',role:'cs',names:['Hoa']};
+  ctx._sessUser_=t=>t==='tok'?U:(t==='tokAd'?{username:'ad',role:'admin',names:[]}:null);
+  ctx._scopePhoneSet_=()=>set;
+  const mkResp=o=>({getContent:()=>JSON.stringify(o)});
+  ctx.doGetCore_=()=>mkResp({rows:[{phone:'0901'},{phone:'0903'}]});
+  ctx.jsonOut_=o=>({getContent:()=>JSON.stringify(o)});
+  let out=ctx._scopeListServe_('customers',{token:'tok'},{});
+  ok(JSON.parse(out.getContent()).rows.length===1,'ENFORCE: CS nhan danh sach da loc');
+  out=ctx._scopeListServe_('customers',{token:'tokAd'},{}); ok(out===null,'admin: tra null -> doGet chay nhu cu');
+  PR.scopeMode='log';
+  out=ctx._scopeListServe_('customers',{token:'tok'},{}); ok(JSON.parse(out.getContent()).rows.length===2,'LOG: tra NGUYEN VEN (khong loc)');
+  ok(ctx._scopeReport_().rows.some(r=>/cs_hoa \| customers \| LIST would-filter 1\/2/.test(r.k)),'LOG: ghi dem so dong se bi loc');
+  PR.scopeMode='off'; ok(ctx._scopeListServe_('customers',{token:'tok'},{})===null,'OFF: khong lam gi');
+  PR.scopeMode='enforce';
+  ok(ctx._scopeListServe_('teams',{token:'tok'},{})===null&&ctx._scopeListServe_('customers',{token:''},{})===null,'action khac / khong token -> null');
+  ctx.doGetCore_=()=>{throw new Error('boom');}; ok(ctx._scopeListServe_('customers',{token:'tok'},{})===null,'doGetCore_ loi -> null (de doGet tu xu ly)');
+  ctx.doGetCore_=()=>({getContent:()=>'not json'}); ok(ctx._scopeListServe_('customers',{token:'tok'},{})===null,'phan hoi khong phai JSON -> null');
+  ok(/_scopeListServe_\(action, p, e\)/.test(src),'doGet goi _scopeListServe_');
+}
+
 console.log(fail?'\nFAILED '+fail:'\nALL ROLES TESTS PASSED');process.exit(fail?1:0);
