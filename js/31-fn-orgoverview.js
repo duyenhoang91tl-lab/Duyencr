@@ -154,6 +154,7 @@ function _ovRenderPeople(){
 }
 function _ovRender(){
   var d = _ov.data, body = document.getElementById('ov-body'); if (!d || !body) return;
+  try { if (typeof hsRender === 'function') hsRender(); } catch(e){}   // js/42: 4 thẻ + phân bổ giai đoạn + nguồn khách (theo cùng bộ lọc)
   var s = _ovScope(d), c = s.company || {}, h = '';
   var sc = document.getElementById('ov-scope'); if (sc) sc.textContent = '· ' + s.label + ' · ' + d.from + ' → ' + d.to + ' (' + d.days + ' ngày)' + (d.cached ? ' · lưu tạm' : '');
   if (s.mode === 'self') {

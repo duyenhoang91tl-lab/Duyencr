@@ -62,6 +62,7 @@ function hmRenderChips(){
       'border:1px solid ' + (red && n ? '#fca5a5' : 'var(--border)') + ';background:' + (red && n ? '#fef2f2' : 'var(--surface)') + ';color:' + (red && n ? '#b91c1c' : 'var(--text)') + '">' +
       icon + ' <b>' + n + '</b> ' + label + '</button>';
   }
+  if (!document.getElementById('hs-summary')) el.insertAdjacentHTML('afterend', '<div id="hs-summary" style="margin-bottom:6px"></div>');
   el.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px">' +
     chip('today', '📅', 'Việc hôm nay', r.today.length, false) + chip('overdue', '⚠️', 'Việc quá hạn', r.overdue.length, true) +
     chip('rebuy', '🔄', 'Khách đến hạn tái mua', r.rebuy.length, false) + chip('idle', '📉', 'Cơ hội thiếu hoạt động', r.idle.length, false) + '</div>';
