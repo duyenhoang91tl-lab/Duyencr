@@ -238,6 +238,7 @@ function proAiToggle_(force){
   var p = document.getElementById('pro-ai'); if (!p) return;
   var open = typeof force==='boolean' ? force : !p.classList.contains('open');
   p.classList.toggle('open', open);
+  document.documentElement.classList.toggle('pro-ai-open', open);   // để khối Chat nội bộ nhỏ (#tc-mini) nhường chỗ, không đè lên ô nhập của AI (css/07-teamchat.css)
   if (open){ var dpOpen = document.getElementById('dp-overlay') && document.getElementById('dp-overlay').classList.contains('open'); proAiMode_(_proDock.mode || (dpOpen ? 'customer' : 'sales')); }
 }
 function proAiMode_(m){
