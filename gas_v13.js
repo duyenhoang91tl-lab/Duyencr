@@ -2513,7 +2513,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.48-pkquota' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.49-pknative' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -16102,6 +16102,32 @@ function pkStaffSync_(opts) {
 }
 function pkNhanVienThu() { Logger.log(JSON.stringify(pkStaffSync_({ dryRun: true }), null, 2)); }
 function pkNhanVienDongBo() { Logger.log(JSON.stringify(pkStaffSync_({}), null, 2)); }
+// ── DANH MUC THE + NHAN VIEN -> Supabase (pk_tags, pk_staff) de WORKER doc thang (khong goi Pancake moi lan poll). Chi ~2 luot UrlFetch/page moi lan chay.
+//    pkDanhMucDongBo: chay tay 1 lan. pkDanhMucCaiTrigger: tu dong 6 gio/lan (xoa trigger cu cung ham truoc khi cai -> khong trung lap).
+function pkTagSync_(opts) {
+  opts = opts || {};
+  var toks = _pkAllPageTokens_(), pages = Object.keys(toks), res = { pages: pages.length, tags: 0, errors: [] }, rows = [];
+  pages.forEach(function (pg) {
+    try {
+      var j = _pkFetchJson_('https://pages.fm/api/public_api/v1/pages/' + _pkEnc_(pg) + '/tags?page_access_token=' + _pkEnc_(toks[pg]));
+      (j && Array.isArray(j.tags) ? j.tags : (Array.isArray(j) ? j : [])).forEach(function (t) {
+        if (!t || t.id === undefined || t.id === null) return;
+        rows.push({ id: String(pg) + ':' + String(t.id), page_id: String(pg), tag_id: String(t.id), text: String(t.text || t.name || ''),
+                    color: /^#[0-9a-fA-F]{3,8}$/.test(String(t.color || '')) ? String(t.color) : '', raw: t, updated_at: new Date().toISOString() });
+      });
+    } catch (e) { res.errors.push(pg + ': ' + String(e && e.message || e).slice(0, 200)); }
+  });
+  res.tags = rows.length;
+  if (!opts.dryRun && rows.length) for (var i = 0; i < rows.length; i += 200) sb_('POST', 'pk_tags?on_conflict=id', rows.slice(i, i + 200), { Prefer: 'resolution=merge-duplicates,return=minimal' });
+  return res;
+}
+function pkDanhMucDongBo() { Logger.log(JSON.stringify({ staff: pkStaffSync_({}), tags: pkTagSync_({}) }, null, 2)); }
+function pkDanhMucTick_() { try { pkStaffSync_({}); pkTagSync_({}); } catch (e) { Logger.log('pkDanhMucTick loi: ' + e); } }
+function pkDanhMucCaiTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'pkDanhMucTick_') ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('pkDanhMucTick_').timeBased().everyHours(6).create();
+  Logger.log('Da cai pkDanhMucTick_ 6 gio/lan.');
+}
 function pkLichSuCaiTrigger() {
   removePkLichSuTrigger_();
   ScriptApp.newTrigger('pkLichSuTick_').timeBased().everyMinutes(10).create();

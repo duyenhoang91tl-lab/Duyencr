@@ -184,6 +184,66 @@ const W = 'https://crm.example.workers.dev/';
     // KHONG cau hinh SESS_SECRET -> hanh vi cu y het (khong can token)
     reset(); r = await go('action=orders', undefined, env); ok(r.headers.get('x-crm-cache') === 'MISS' && putCount === 1, 'khong co SESS_SECRET -> nhu cu');
   }
+  // ===== HOP THU PANCAKE DOC THANG TU WORKER (PK_NATIVE) =====
+  {
+    const nodeCrypto = require('crypto'), SEC = 'bi-mat-phien', SB = 'https://sb.example.supabase.co';
+    const b64w = b => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(/\//g, '_');
+    const mkTok = (u, e) => { const b = b64w(JSON.stringify({ u: u, e: e })); return b + '.' + b64w(nodeCrypto.createHmac('sha256', SEC).update(b).digest()); };
+    const T = mkTok('lan', Date.now() + 1e6), TX = mkTok('lan', Date.now() - 1), TD = mkTok('Demo1', Date.now() + 1e6);
+    const nenv = { GAS_URL: GAS, SESS_SECRET: SEC, SUPABASE_URL: SB + '/', SUPABASE_SERVICE_KEY: 'svc-key', PK_NATIVE: '1', PK_DENY_USERS: 'demo1, test2' };
+    const sb = url => calls.filter(c => c.url.indexOf(SB) === 0), gasCalls = () => calls.filter(c => c.url.indexOf(GAS) === 0);
+    let failSb = false, crmCol = false;
+    const route = (url) => {
+      if (url.indexOf(SB) !== 0) return { status: 200, body: { ok: true, via: 'gas' } };
+      if (failSb) return { throw: true };
+      if (url.indexOf('/pk_staff') > -1) return { status: 200, body: [{ id: 'u-1', name: 'Lan Sale' }] };
+      if (url.indexOf('/pk_tags') > -1) return { status: 200, body: [{ page_id: 'P1', tag_id: 109, text: 'VIP', color: '#ff0000' }] };
+      if (url.indexOf('/pk_conversations') > -1) return { status: 200, body: [{ id: 'P1_C1', page_id: 'P1', customer_name: 'Khach A', customer_phone: '0378996789', last_message_at: '2026-10-13T16:49:36+00:00', last_text: 'Sdt test', seen: false, is_replied: false, conv_type: 'INBOX', tags: [109, 999], assignee_ids: ['u-1', 'u-x'] }] };
+      if (url.indexOf('/pk_messages') > -1) {
+        if (url.indexOf('crm_user') > -1 && !crmCol) return { status: 400, body: { message: 'column crm_user does not exist' } };
+        return { status: 200, body: [{ id: 'm2', conversation_id: 'P1_C1', direction: 'out', text: 'Da em', sent_at: '2026-10-13T16:50:00+00:00', sender_name: 'Page', fromraw: { admin_name: 'Lan' }, attachments: [{ url: 'https://x/img.png', type: 'image' }, { url: 'javascript:1' }] },
+                                       { id: 'm1', conversation_id: 'P1_C1', direction: 'in', text: 'Sdt test', sent_at: '2026-10-13T16:49:36+00:00', sender_name: 'Khach A', fromraw: { id: '1' }, attachments: [] }] };
+      }
+      return { status: 404, body: {} };
+    };
+    const arm = () => { reset(); mod.pkMemoClear(); failSb = false; originFn = route; };
+    const nat = async (qs, e) => go(qs, undefined, e || nenv);
+
+    arm(); let r = await nat('action=pkChatInbox&token=' + T);
+    let j = JSON.parse(await r.text());
+    ok(r.headers.get('x-crm-cache') === 'NATIVE' && gasCalls().length === 0 && j.ok && j.conversations.length === 1, 'PK_NATIVE: doc thang Supabase, KHONG goi GAS');
+    ok(j.conversations[0].tags.length === 1 && j.conversations[0].tags[0].t === 'VIP' && j.conversations[0].tags[0].c === '#ff0000', 'ma so the 109 -> ten + mau; ma khong co trong danh muc (999) bi bo');
+    ok(j.conversations[0].assignees.join() === 'Lan Sale' && j.conversations[0].assigneeIds.length === 2 && j.conversations[0].phone === '0378996789', 'ten nhan vien tu pk_staff, id chua biet khong lo ra ten');
+    ok(sb().every(c => c.init.headers && c.init.headers.apikey === 'svc-key' && /Bearer svc-key/.test(c.init.headers.authorization)) && sb().some(c => c.url.indexOf(SB + '/rest/v1/pk_conversations?select=') === 0), 'goi Supabase dung URL (bo / cuoi) + khoa service');
+    const n1 = sb().length; now += 3000; r = await nat('action=pkChatInbox&token=' + T);
+    ok(sb().length === n1 && r.headers.get('x-crm-cache') === 'NATIVE', 'poll lai trong 10s: khong goi Supabase them (bo nho tam)');
+    now += 11000; await nat('action=pkChatInbox&token=' + T); ok(sb().length > n1, 'qua 10s: doc lai Supabase');
+    // khong du dieu kien -> chuyen GAS nhu cu
+    arm(); r = await nat('action=pkChatInbox&token=' + T, Object.assign({}, nenv, { PK_NATIVE: '' })); ok(gasCalls().length === 1 && sb().length === 0, 'PK_NATIVE tat (mac dinh) -> GAS nhu cu');
+    arm(); await nat('action=pkChatInbox', nenv); ok(gasCalls().length === 1 && sb().length === 0, 'khong co token -> GAS (GAS tra "Can dang nhap")');
+    arm(); await nat('action=pkChatInbox&token=' + TX, nenv); ok(gasCalls().length === 1 && sb().length === 0, 'token het han -> GAS');
+    arm(); await nat('action=pkChatInbox&token=' + T.slice(0, -3) + 'abc', nenv); ok(gasCalls().length === 1 && sb().length === 0, 'chu ky sai -> GAS');
+    arm(); await nat('action=pkChatInbox&token=' + TD, nenv); ok(gasCalls().length === 1 && sb().length === 0, 'tai khoan trong PK_DENY_USERS (khong phan biet hoa thuong) -> GAS tu choi dung vai tro');
+    arm(); await nat('action=pkChatInbox&token=' + T, Object.assign({}, nenv, { SUPABASE_SERVICE_KEY: '' })); ok(gasCalls().length === 1 && sb().length === 0, 'thieu khoa Supabase -> GAS');
+    arm(); failSb = true; r = await nat('action=pkChatInbox&token=' + T); ok(gasCalls().length === 1 && r.status === 200, 'Supabase loi/mat mang -> du phong GAS, khong tra trang loi');
+    arm(); r = await nat('action=orders&token=' + T); ok(r.headers.get('x-crm-cache') !== 'NATIVE' && sb().length === 0, 'action khac khong bi anh huong');
+    arm(); r = await go('action=pkChatInbox&token=' + T, { method: 'POST', body: '{}' }, nenv); ok(sb().length === 0, 'POST khong di vao nhanh doc truc tiep');
+    // tim kiem + bao ve tham so
+    arm(); await nat('action=pkChatInbox&token=' + T + '&q=' + encodeURIComponent('0378 996"789*')); ok(sb().some(c => c.url.indexOf('customer_phone=like.') > -1 && c.url.indexOf('customer_phone=like.*0378996789*') > -1), 'tim theo SDT -> customer_phone=like, ky tu dac biet bi bo');
+    arm(); await nat('action=pkChatInbox&token=' + T + '&q=' + encodeURIComponent('Nguy(n,*')); const cu = sb().find(c => c.url.indexOf('pk_conversations') > -1).url; ok(/customer_name=ilike\.\*Nguy/.test(cu) && !/[(]n/.test(decodeURIComponent(cu.split('customer_name=')[1].split('&')[0])), 'tim theo ten -> ilike, bo ( , * " \\');
+    arm(); r = await nat('action=pkChatFind&token=' + T + '&q=a'); j = JSON.parse(await r.text()); ok(j.error === 'Nhap it nhat 2 ky tu de tim.' && sb().length === 0, 'tim <2 ky tu -> bao loi giong GAS, khong goi Supabase');
+    // doc tin nhan theo SDT: lam phang crm_user chua co cot -> thu lai
+    arm(); r = await nat('action=pkChat&token=' + T + '&phone=' + encodeURIComponent('+84 378 996 789')); j = JSON.parse(await r.text());
+    ok(j.ok && j.phone === '0378996789' && j.conversations.length === 1 && j.messages.length === 2, 'pkChat theo SDT (+84...) -> chuan hoa 0378996789');
+    ok(j.messages[0].id === 'm1' && j.messages[1].id === 'm2' && j.messages[1].dir === 'out' && j.messages[1].staff === 'Lan' && j.messages[1].att.length === 1 && j.messages[1].att[0].url === 'https://x/img.png', 'tin xep tu cu den moi; ten nhan vien tu fromraw; chi giu dinh kem http(s)');
+    ok(sb().some(c => c.url.indexOf('crm_user') > -1) && sb().filter(c => c.url.indexOf('pk_messages') > -1).length === 2, 'cot crm_user chua co -> tu thu lai khong cot do (giong GAS)');
+    ok(sb().some(c => c.url.indexOf('customer_phone=eq.0378996789') > -1) && sb().some(c => decodeURIComponent(c.url).indexOf('conversation_id=in.("P1_C1")') > -1), 'loc dung theo SDT va theo danh sach hoi thoai');
+    arm(); r = await nat('action=pkChat&token=' + T + '&phone=123'); j = JSON.parse(await r.text()); ok(j.error === 'SDT khong hop le.' && sb().length === 0, 'SDT ngan -> bao loi giong GAS');
+    arm(); crmCol = true; r = await nat('action=pkChatConv&token=' + T + '&conv=P1_C1&after=2026-10-13T16:49:36.000Z'); j = JSON.parse(await r.text());
+    ok(j.ok && j.messages.length === 2 && sb().some(c => decodeURIComponent(c.url).indexOf('sent_at=gt.2026-10-13T16:49:36.000Z') > -1 && c.url.indexOf('limit=100') > -1), 'pkChatConv + after: chi tin moi hon, limit 100');
+    arm(); await nat('action=pkChatConv&token=' + T + '&conv=x&after=2026-10-13;drop'); ok(sb().every(c => c.url.indexOf('sent_at=gt') === -1), 'tham so after sai dinh dang bi bo (chong chen loc)');
+    arm(); r = await nat('action=pkChatConv&token=' + T); ok(JSON.parse(await r.text()).error === 'Thieu conv.', 'thieu conv -> bao loi giong GAS');
+  }
   console.log('ALL CLOUDFLARE WORKER TESTS PASSED');
 })().catch(e => { console.error('LOI:', e); process.exit(1); });
 function J(x) { return JSON.stringify(x); }
