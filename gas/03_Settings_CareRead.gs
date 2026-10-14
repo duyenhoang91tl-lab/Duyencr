@@ -1114,7 +1114,7 @@ function xemChuSoHuu() {
 //  BUOC 4c-2a (v13.47): PHAM VI KHACH THEO CS o server cho tra cuu TUNG SDT (lookup, donOrdersByPhone, cskhDetail).
 //  Nguyen nhan goc: web chi loc "khach cua toi" o client (_inUserScope), con token hop le goi thang ?action=lookup&phone=... lay duoc ho so BAT KY khach nao.
 //  Logic khop client: CS/manager thuoc pham vi neu ten minh nam trong careCS (CareData.cs) / CS phu trach don (DT TONG "Sale ban") / sale trong du lieu don /
-//  careLeads.cs / AssignData (da chia). admin + vai tro khac (viewer, ceo...) -> khong gioi han (nhu client). LEADER: chua kiem o server (phai biet team) -> 'unchecked', cho qua.
+//  careLeads.cs / AssignData (da chia). admin + vai tro khac (viewer, ceo...) -> khong gioi han (nhu client). LEADER (4c-2c): ten minh + thanh vien team (_scopeAllowedNames_).
 //  Cong tac Script Properties 'scopeMode': off (mac dinh, khong lam gi) | log (chi ghi dem ai lay khach NGOAI pham vi, KHONG chan) | enforce (chan FORBIDDEN).
 //  Chi chay khi co token hop le (extension dung khoa ek -> khong qua day; xem SECURITY-PLAN). Lenh trong Editor: datPhamVi('log'|'enforce'|'off'), xemPhamVi, xemLogPhamVi.
 // ═══════════════════════════════════════════════════════════════
@@ -1163,10 +1163,9 @@ function _scopeVerdict_(user, phone, namesFn) {
   if (!user) return null;
   var role = String(user.role || '');
   if (role === 'admin') return true;
-  if (role === 'leader') return null;
-  if (role !== 'cs' && role !== 'manager') return true;   // viewer/ceo/... : client khong gioi han
-  var mine = (user.names && user.names.length) ? user.names : (user.name ? [user.name] : []);
-  mine = mine.map(function (n) { return String(n || '').trim(); }).filter(Boolean);
+  if (role !== 'cs' && role !== 'manager' && role !== 'leader') return true;   // viewer/ceo/... : client khong gioi han
+  var allowed = _scopeAllowedNames_(user) || {};   // cs/manager = ten minh; leader = ten minh + thanh vien team (4c-2c)
+  var mine = Object.keys(allowed);
   if (!mine.length) return false;
   var have = (namesFn || _scopeNamesForPhone_)(phone);
   for (var i = 0; i < mine.length; i++) { if (have[mine[i]]) return true; }
@@ -1229,7 +1228,8 @@ function xemLogPhamVi() {
 //  log = chi dem "se bi loc bao nhieu", tra du lieu nguyen ven; enforce = loc that. admin/viewer/ceo/... khong loc. Chi khi co token hop le (extension dung ek khong qua day).
 //  Tap SDT thuoc pham vi cache 60s moi nguoi (_cachePutBig_). Worker: customers/orders/careLeads vao GATED_ACTIONS de cache khoa theo user.
 // ═══════════════════════════════════════════════════════════════
-var SCOPE_LIST_ACTIONS_ = { customers: 1, orders: 1, careLeads: 1, reminders: 1 };
+var SCOPE_LIST_ACTIONS_ = { customers: 1, orders: 1, careLeads: 1, reminders: 1, cskhDuyenLite: 1, cskhDuyen: 1, searchOrder: 1 };   // 4c-2c them 3 action cuoi
+var SCOPE_LIST_KEY_ = { orders: 'orders', reminders: 'reminders', searchOrder: 'results' };   // mac dinh mang = 'rows'
 function _scopeAllowedNames_(user) {   // null = khong gioi han; object ten->1 = gioi han
   if (!user) return null;
   var role = String(user.role || '');
@@ -1288,7 +1288,7 @@ function _scopePhoneSet_(user, allowed) {
 }
 // Loc obj theo action. Tra {obj, total, kept}. Chi dong vao mang du lieu, giu nguyen cac truong khac (careStatus, errorCount...).
 function _scopeFilterObj_(action, obj, phoneSet) {
-  var key = action === 'orders' ? 'orders' : (action === 'reminders' ? 'reminders' : 'rows');
+  var key = SCOPE_LIST_KEY_[action] || 'rows';
   if (!obj || !Array.isArray(obj[key])) return { obj: obj, total: 0, kept: 0 };
   var arr = obj[key], kept = arr.filter(function (x) { return phoneSet[normPhone_(String((x && x.phone) || ''))]; });
   var copy = {}; Object.keys(obj).forEach(function (k) { copy[k] = obj[k]; });

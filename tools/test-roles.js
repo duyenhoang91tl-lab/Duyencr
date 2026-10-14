@@ -126,7 +126,13 @@ ok(run('_featureGate_','salesReportA','tokCs')===null,'bo phan khong khop nguoi 
   ok(ctx._scopeVerdict_(mk('cs',[]),'0901',own(H))===false,'CS chua gan ten -> khong thay khach nao (nhu client)');
   ok(ctx._scopeVerdict_(mk('admin',[]),'0901',own(H))===true,'admin xem tat ca');
   ok(ctx._scopeVerdict_(mk('viewer',[]),'0901',own(H))===true&&ctx._scopeVerdict_(mk('ceo',[]),'0901',own(H))===true,'viewer/ceo khong gioi han (nhu client)');
-  ok(ctx._scopeVerdict_(mk('leader',['Mai']),'0901',own(H))===null,'leader: chua kiem o server -> null (cho qua)');
+  ctx.getCrmSS_=()=>({getSheetByName:()=>({})});
+  ctx.readTeams_=()=>[{name:'T1',leader:'Lan',members:['Hoa','Mai']},{name:'T2',leader:'Bao',members:['Cuc']}];
+  ok(ctx._scopeVerdict_(mk('leader',['Lan']),'0901',own({'Hoa':1}))===true,'leader: khach cua THANH VIEN team -> trong pham vi (4c-2c)');
+  ok(ctx._scopeVerdict_(mk('leader',['Lan']),'0901',own({'Cuc':1}))===false,'leader: khach cua team KHAC -> NGOAI pham vi');
+  ok(ctx._scopeVerdict_(mk('leader',['Lan']),'0901',own({'Lan':1}))===true,'leader: khach cua chinh minh -> trong pham vi');
+  ok(ctx._scopeVerdict_({username:'l2',role:'leader',names:[],team:'T2'},'0901',own({'Cuc':1}))===true,'leader theo user.team khi chua gan ten -> thay khach thanh vien team do');
+  ok(ctx._scopeVerdict_({username:'l3',role:'leader',names:[]},'0901',own({'Cuc':1}))===false,'leader khong ten, khong team -> khong thay gi');
   // gate theo che do
   const U1={username:'cs_mai',role:'cs',names:['Mai']};
   ctx._sessUser_=t=>t==='tokMai'?U1:null;
@@ -182,6 +188,10 @@ ok(run('_featureGate_','salesReportA','tokCs')===null,'bo phan khong khop nguoi 
   f=F('customers',{rows:[{phone:'84901'}]},{'0901':1}); ok(true,'(chuan hoa SDT dung chung normPhone_)');
   const orig={rows:[{phone:'0903'}]}; f=F('customers',orig,set); ok(orig.rows.length===1,'khong sua doi object goc (copy)');
   ok(F('customers',{error:'x'},set).obj.error==='x','payload loi/khong co mang -> tra nguyen');
+  // 4c-2c: cskhDuyenLite / cskhDuyen (rows) va searchOrder (results)
+  for(const act of ['cskhDuyenLite','cskhDuyen']){ f=F(act,{ok:true,rows:[{phone:'0901'},{phone:'0555'}],total:2},set); ok(f.obj.rows.length===1&&f.obj.total===2&&f.obj.ok===true,act+': loc rows theo SDT, giu cac truong khac'); }
+  f=F('searchOrder',{ok:true,results:[{phone:'0901',code:'A'},{phone:'0555',code:'B'}]},set); ok(f.obj.results.length===1&&f.obj.results[0].code==='A','searchOrder: loc results theo SDT');
+  ok(['cskhDuyenLite','cskhDuyen','searchOrder'].every(a=>ctx.SCOPE_LIST_ACTIONS_[a]===1),'SCOPE_LIST_ACTIONS_ co 3 action 4c-2c');
   // serve
   const U={username:'cs_hoa',role:'cs',names:['Hoa']};
   ctx._sessUser_=t=>t==='tok'?U:(t==='tokAd'?{username:'ad',role:'admin',names:[]}:null);

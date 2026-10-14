@@ -41,6 +41,8 @@ const W = 'https://crm.example.workers.dev/';
   ok(mod.isGoodJson('{"rows":[]}') && mod.isGoodJson('[1,2]') && !mod.isGoodJson('{"error":"x"}') && !mod.isGoodJson('<html>') && !mod.isGoodJson('') && !mod.isGoodJson('"str"') && !mod.isGoodJson('null'), 'isGoodJson');
 
   // ===== cache MISS -> HIT -> het han -> MISS =====
+  // cskhDuyenLite nay thuoc GATED_ACTIONS (4c-2c): tam go no khoi danh sach de kiem hanh vi cache CHUNG (khong khoa user), khoi phuc o cuoi phan nay.
+  const _gIdx = mod.GATED_ACTIONS.indexOf('cskhDuyenLite'); if (_gIdx !== -1) mod.GATED_ACTIONS.splice(_gIdx, 1);
   reset(); let r = await go('action=cskhDuyenLite');
   ok(r.status === 200 && r.headers.get('x-crm-cache') === 'MISS' && calls.length === 1 && putCount === 1, 'lan 1 MISS, goi GAS 1 lan, luu cache');
   ok(calls[0].url === GAS + '?action=cskhDuyenLite&src=worker' && calls[0].init.redirect === 'follow', 'goi dung URL GAS + theo redirect: ' + calls[0].url);
@@ -191,6 +193,13 @@ const W = 'https://crm.example.workers.dev/';
     }
     // KHONG cau hinh SESS_SECRET -> hanh vi cu y het (khong can token)
     reset(); r = await go('action=cskhDuyenLite', undefined, env); ok(r.headers.get('x-crm-cache') === 'MISS' && putCount === 1, 'khong co SESS_SECRET -> nhu cu');
+    // 4c-2c: khoi phuc cskhDuyenLite vao GATED_ACTIONS (da go tam o dau phan cache chung) va kiem cache khoa theo user
+    mod.GATED_ACTIONS.push('cskhDuyenLite');
+    const t2c = mkTok('hoa', Date.now() + 1e6);
+    ok(mod.GATED_ACTIONS.indexOf('cskhDuyenLite') !== -1, 'cskhDuyenLite nam trong GATED_ACTIONS');
+    reset(); await go('action=cskhDuyenLite&token=' + goodT, undefined, senv);
+    r = await go('action=cskhDuyenLite&token=' + goodT, undefined, senv); ok(r.headers.get('x-crm-cache') === 'HIT' && calls.length === 1, 'cskhDuyenLite: cung nguoi -> HIT');
+    r = await go('action=cskhDuyenLite&token=' + t2c, undefined, senv); ok(r.headers.get('x-crm-cache') === 'MISS' && calls.length === 2, 'cskhDuyenLite: nguoi khac KHONG an cache cua nguoi truoc');
   }
   // ===== HOP THU PANCAKE DOC THANG TU WORKER (PK_NATIVE) =====
   {

@@ -81,6 +81,13 @@ Deploy lại GAS (dán `gas_v13.js` hoặc nút "Đồng bộ mã GAS mới nh�
 - **Bat:** giu `scopeMode=log` vai ngay -> `xemLogPhamVi` xem dong `LIST would-filter` va `OUT`; kiem tra CS hop le khong bi mat khach (so khach "would-filter" ~ so khach khong thuoc ho) -> `datPhamVi('enforce')`. Loi -> `datPhamVi('off')` hieu luc ngay.
 
 ## Viec tiep sau 4c-2b - CHUA LAM
-- [ ] 4c-2c: leader cho tra cuu tung SDT (`_scopeVerdict_` dung `_scopeAllowedNames_`); loc `cskhDuyenLite`/`cskhDuyen`, `donSaleByPhone`, `searchOrder`.
+- [x] 4c-2c (LAM, xem duoi): leader cho tra cuu tung SDT; loc `cskhDuyenLite`/`cskhDuyen`/`searchOrder`. (`donSaleByPhone` KHONG phai action server - chi la bien client.)
 - [ ] 4c-3: action dang mo (assign GET, setSetting/getSetting khoa thuong, saveCannedResponse, saveMessageTemplate, deleteMessageTemplate, saveAIContext, csStats, findDuplicateOrders, addZaloNick).
 - [ ] Extension ek: quyet dinh co bo deleteDuplicateOrders khoi EXT_ALLOWED_.zalo khong; xem xet gan khoa ek theo nguoi.
+
+## Buoc 4c-2c - LAM (gas v13.49-scope-cskh, 2026-10-14)
+- Nguyen nhan goc: leader o 4c-2a bi de 'unchecked' (cho qua) nen leader van tra cuu duoc khach cua team khac; cskhDuyenLite/cskhDuyen/searchOrder tra du lieu khach (kem SDT) ma khong loc.
+- `_scopeVerdict_` dung chung `_scopeAllowedNames_` cho CS/manager/leader (leader = ten minh + thanh vien team, hoac team trung user.team). Them cskhDuyenLite, cskhDuyen (mang `rows`) va searchOrder (mang `results`) vao `SCOPE_LIST_ACTIONS_` (`SCOPE_LIST_KEY_` ghi ten mang).
+- Worker: `cskhDuyenLite` (cache chung 15s) vao `GATED_ACTIONS` de khoa theo user. Test Worker: phan cache chung tam go `cskhDuyenLite` khoi danh sach roi khoi phuc de test rieng.
+- Con ho: `noPhone`/`noPhoneSample` cua cskhDuyen* (dong khong co SDT) van tra nguyen; extension `ek` van thay het.
+- Bat/tat van la `scopeMode` (off|log|enforce) nhu 4c-2a/2b; khong can doi quy trinh.
