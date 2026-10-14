@@ -224,3 +224,4 @@ html.ui-pro .khd-hint,html.ui-pro .khd-err{font-size:12.5px;color:var(--muted);t
 html.ui-pro .khd-err{color:var(--pro-red);}
 html.ui-pro .khd-in{display:flex;gap:8px;padding:8px;border-top:1px solid var(--pro-line);}
 html.ui-pro .khd-in textarea{flex:1;resize:none;border:1px solid var(--pro-line);border-radius:10px;padding:7px 10px;font:inherit;font-size:13px;}
+html.ui-pro .khd-lock{font-size:12.5px;color:var(--pro-ink);text-align:center;padding:18px 12px;background:#fff7e6;border:1px dashed var(--pro-orange);border-radius:10px;margin:6px;line-height:1.5;}

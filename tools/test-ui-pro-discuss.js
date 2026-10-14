@@ -10,12 +10,13 @@ w.eval('var gsUrl="https://gs.example/exec"; var currentUser={name:"Hà",role:"c
 const s03=src('03-fn-refreshopendptab.js');w.eval(['_parseNotes','_notesToStr','_fmtNoteTime'].map(n=>fn(s03,n)).join('\n'));
 w.allCustomers=[{phone:'0934230669',name:'Mến Hoàng',tier:'Vàng',orders:[]}];
 const toasts=[];w.toast=m=>toasts.push(m);w.confirm=()=>true;w.openDp=()=>{};
-let sendFail=false;
+let sendFail=false,forbid=false,skipNames=[];
 w.fetch=async(u,o)=>{const body=o&&o.body?JSON.parse(o.body):null;reqs.push({u,body,method:o&&o.method||'GET'});let r={};
  if(u.includes('pkChatInbox'))r={conversations:[{id:'C1',name:'Mến Hoàng',phone:'+84 934 230 669',lastText:'x',lastAt:iso(1),seen:true,type:'INBOX'},{id:'C2',name:'Không SĐT',phone:'',lastText:'y',lastAt:iso(2),seen:true,type:'INBOX'}]};
  else if(u.includes('pkChatConv'))r={messages:[]};
+ else if(forbid&&(u.includes('action=khDiscuss&')||(body&&body.action==='khDiscussSend'))){r={ok:false,code:'FORBIDDEN',error:'Chi nguoi dang nhan khach nay tren Pancake hoac nguoi duoc phan quyen moi xem'}}
  else if(u.includes('action=khDiscuss&')){const m=/after=([^&]*)/.exec(u);const after=m?decodeURIComponent(m[1]):'';r={ok:true,phone:'0934230669',me:'ha',messages:SERVER.filter(x=>!after||x.ts>after),now:iso(0)}}
- else if(body&&body.action==='khDiscussSend'){r=sendFail?{ok:false,error:'Gui qua nhanh'}:(()=>{const mm={id:'k'+(SERVER.length+1),author:'Hà',authorUser:'ha',text:body.text,mentions:[],ts:iso(0)};SERVER.push(mm);return {ok:true,message:mm}})()}
+ else if(body&&body.action==='khDiscussSend'){r=sendFail?{ok:false,error:'Gui qua nhanh'}:(()=>{const mm={id:'k'+(SERVER.length+1),author:'Hà',authorUser:'ha',text:body.text,mentions:[],ts:iso(0)};SERVER.push(mm);return {ok:true,skipped:skipNames,message:mm}})()}
  else if(body&&body.action==='khDiscussDelete'){SERVER=SERVER.filter(x=>x.id!==body.id);r={ok:true,id:body.id}}
  return {json:async()=>r}};
 for(const f of ['33-pro-profile.js','41-fn-pkchat.js','42-fn-socialchat.js','48-pro-chatinfo.js','49-pro-discuss.js'])w.eval(src(f));
@@ -61,6 +62,23 @@ ok(/^\d\d:\d\d \d\d\/\d\d$/.test(w.khdFmtTime_(new Date().toISOString()))&&w.khd
  w.localStorage.removeItem('ome_sess_token');host.innerHTML=w.renderKhdTab({phone:'0934230669'});reqs.length=0;await sleep(30);
  ok(reqs.length===0&&host.textContent.includes('đăng nhập')&&$('khd-input').disabled,'chưa đăng nhập/tài khoản demo → báo rõ, khoá ô nhập, không gọi mạng');
  w.localStorage.setItem('ome_sess_token','TOK');host.innerHTML='';
+
+ // — QUYỀN XEM: bị chặn → khoá hộp —
+ host.innerHTML=w.renderKhdTab({phone:'0911111111'});w.eval("_khd.dp&&_khd.dp.timer&&clearInterval(_khd.dp.timer)");
+ forbid=true;host.innerHTML=w.renderKhdTab({phone:'0911111111'});reqs.length=0;await sleep(40);
+ ok(host.querySelector('.khd-lock')&&host.textContent.includes('🔒')&&host.textContent.includes('Pancake'),'bị chặn (FORBIDDEN): hiện ổ khoá + lý do (người nhận Pancake / được phân quyền)');
+ ok($('khd-input').disabled&&host.querySelector('[data-khd-send]').disabled&&!host.querySelector('.khd-m'),'bị chặn: khoá ô nhập + nút Gửi, không hiện tin nào');
+ const nReq=reqs.length;await w.khdPoll_('dp',false);await w.khdPoll_('dp',false);ok(reqs.length===nReq||!w.eval('_khd.dp&&_khd.dp.timer'),'bị chặn: ngừng poll định kỳ (không hỏi server liên tục)');
+ forbid=false;host.innerHTML=w.renderKhdTab({phone:'0911111111'});await sleep(40);
+ ok(!host.querySelector('.khd-lock')&&$('khd-input').disabled===false,'được cấp quyền lại (mở lại tab): dùng bình thường');
+ // gửi bị từ chối giữa chừng (mất quyền) → khoá
+ forbid=true;$('khd-input').value='thử gửi';host.querySelector('[data-khd-send]').click();await sleep(30);forbid=false;
+ ok(host.querySelector('.khd-lock')&&toasts.some(t=>t.includes('Pancake')),'gửi bị chặn giữa chừng: khoá hộp + báo lỗi');
+ // tag người không có quyền → cảnh báo
+ host.innerHTML=w.renderKhdTab({phone:'0911111111'});await sleep(40);skipNames=['Lan','Trưởng Hai'];
+ $('khd-input').value='nhờ @lan';host.querySelector('[data-khd-send]').click();await sleep(30);
+ ok(toasts.some(t=>t.includes('Lan, Trưởng Hai')&&t.includes('không có quyền')),'tag người không có quyền: báo cho người gửi biết ai KHÔNG nhận được thông báo');
+ skipNames=[];host.innerHTML='';
  // — Social > Chat: cột phải có 2 tab —
  w.renderSocialChatTab();await sleep(60);w.scPick('C1');await sleep(30);
  const info=$('sc-info');ok(info.querySelectorAll('[data-sct]').length===2&&info.querySelector('[data-sct="info"]').classList.contains('on')&&$('sc-pane-discuss').style.display==='none','cột phải: 2 tab Thông tin | Thảo luận, mặc định Thông tin');
