@@ -45,7 +45,7 @@ function _scListErr() {
 function _scStatus() {
   _scListErr();
   var el = document.getElementById('sc-status'); if (!el) return;
-  el.className = 'pkc-status' + (_sc.err ? ' err' : ''); el.textContent = _sc.err || (_sc.okAt ? 'Cập nhật lúc ' + _sc.okAt : '');
+  el.className = 'pkc-status' + (_sc.err ? ' err' : ''); el.textContent = _sc.err || (_sc.okAt ? 'Cập nhật lúc ' + _sc.okAt + _pkcVerText(_sc.gv) : '');
 }
 function _scAgo(iso) {
   var d = new Date(iso); if (isNaN(d)) return '';
@@ -58,7 +58,7 @@ async function scLoadList() {
   try {
     var j = await (await fetch(_pkcUrl('action=pkChatInbox' + (_sc.q ? '&q=' + encodeURIComponent(_sc.q) : '')), { redirect: 'follow' })).json();
     if (!j || j.error) { _sc.err = (j && j.error) || 'Không tải được hộp thư.'; _scStatus(); return; }
-    _sc.err = ''; _sc.okAt = _pkcHm(new Date().toISOString()); _sc.convs = j.conversations || []; _pkTagApplyOv(_sc.convs);
+    _sc.err = ''; _sc.okAt = _pkcHm(new Date().toISOString()); _sc.gv = j.gv || ''; _sc.convs = j.conversations || []; _pkTagApplyOv(_sc.convs);
     _scRenderList(); _scStatus();
   } catch (e) { _sc.err = 'Không kết nối được máy chủ.'; _scStatus(); }
   finally { _sc.loading = false; }
@@ -83,13 +83,41 @@ function scPick(id) {
   _sc.active = id; _scRenderList();
   var c = _sc.convs.filter(function (x) { return x.id === id; })[0] || {};
   var h = document.getElementById('sc-head');
-  if (h) h.innerHTML = '<button class="btn sm sc-back" onclick="scBack()">←</button><b>' + _pkcEsc(c.name || 'Khách Pancake') + '</b>' + (c.phone ? ' <span class="pkc-ph">' + _pkcEsc(c.phone) + '</span> <button class="btn sm" onclick="scOpenProfile()">👤 Mở hồ sơ</button>' : ' <span class="pkc-ph">chưa gắn SĐT</span>') + '<div class="sc-head-m" id="sc-head-m">' + _pkcMetaRow(c) + '</div>';
+  if (h) h.innerHTML = '<button class="btn sm sc-back" onclick="scBack()">←</button><b>' + _pkcEsc(c.name || 'Khách Pancake') + '</b>' + (c.phone ? ' <span class="pkc-ph">' + _pkcEsc(c.phone) + '</span> <button class="btn sm" onclick="scOpenProfile()">👤 Mở hồ sơ</button>' : ' <span class="pkc-ph">chưa gắn SĐT</span>') + (typeof _ovIsAdmin === 'function' && _ovIsAdmin() ? ' <button class="btn sm" onclick="scDiag()" title="Chẩn đoán thẻ / tên nhân viên (chỉ admin)">🔍 Chẩn đoán</button>' : '') + '<div class="sc-head-m" id="sc-head-m">' + _pkcMetaRow(c) + '</div>';
   var cp = document.getElementById('sc-compose'); if (cp) cp.style.display = (c.type === 'COMMENT') ? 'none' : '';
   var wh0 = document.getElementById('sc-who'); if (wh0) wh0.innerHTML = '';
   var box = document.getElementById('sc-main'); if (box) box.classList.add('has-conv');
   if (typeof proChatInfoRender_ === 'function') { try { proChatInfoRender_(c); } catch (e) { console.warn('[ui-pro] chat info', e); } }
   scLoadMsgs(true);
   scDockSync();   // hồ sơ khách (cùng SĐT) hiện bên phải như Pancake
+}
+// 🔍 CHAN DOAN (admin): lay du lieu THAT cua hoi thoai dang mo (the luu trong Supabase, ket qua API tags/users cua Pancake, khoa raw.from, last_sent_by) de biet vi sao chua hien the / ten nhan vien.
+// Khong chua token, noi dung tin bi bo. Bam "Sao chép" roi dan lai cho nguoi ho tro.
+function _scDiagBox(txt) {
+  var el = document.getElementById('sc-diag');
+  if (!el) {
+    el = document.createElement('div'); el.id = 'sc-diag';
+    el.style.cssText = 'position:fixed;inset:0;z-index:3000;background:rgba(20,20,10,.5);display:flex;align-items:center;justify-content:center;padding:14px';
+    el.innerHTML = '<div style="background:var(--surface);border-radius:12px;width:min(720px,100%);max-height:92vh;display:flex;flex-direction:column;padding:14px 16px;gap:8px;box-shadow:var(--shadow-md)">'
+      + '<div style="display:flex;align-items:center;gap:8px"><b style="flex:1">🔍 Chẩn đoán hội thoại Pancake</b><button class="btn sm" id="sc-diag-copy">Sao chép</button><button class="btn sm" id="sc-diag-x">Đóng</button></div>'
+      + '<textarea id="sc-diag-t" readonly style="flex:1;min-height:320px;font:12px/1.4 monospace;width:100%;box-sizing:border-box"></textarea></div>';
+    document.body.appendChild(el);
+    el.addEventListener('mousedown', function (e) { if (e.target === el) el.style.display = 'none'; });
+    document.getElementById('sc-diag-x').onclick = function () { el.style.display = 'none'; };
+    document.getElementById('sc-diag-copy').onclick = function () {
+      var t = document.getElementById('sc-diag-t'); t.select();
+      try { if (navigator.clipboard) navigator.clipboard.writeText(t.value); else document.execCommand('copy'); if (typeof toast === 'function') toast('Đã sao chép'); } catch (e) {}
+    };
+  }
+  el.style.display = 'flex'; document.getElementById('sc-diag-t').value = txt;
+}
+async function scDiag() {
+  var id = _sc.active; if (!id) return;
+  _scDiagBox('⏳ Đang lấy dữ liệu chẩn đoán…');
+  try {
+    var j = await (await fetch(_pkcUrl('action=pkChatDiag&conv=' + encodeURIComponent(id)), { redirect: 'follow' })).json();
+    _scDiagBox(JSON.stringify(Object.assign({ ui: PKC_UI_VER, webGv: _sc.gv || '(GAS cũ)' }, j), null, 2));
+  } catch (e) { _scDiagBox('Lỗi: ' + (e && e.message || e)); }
 }
 function scBack() { var box = document.getElementById('sc-main'); if (box) box.classList.remove('has-conv'); }
 // ── Hồ sơ khách GẮN cạnh khung chat (giống cột "Thông tin" của Pancake): dùng lại ĐÚNG ngăn #dp của Danh sách KH (cùng tab Chăm sóc / Lịch hẹn / Lịch sử đơn / Tổng quan,

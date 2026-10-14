@@ -15,8 +15,11 @@ function _pkcStop() { if (_pkc.timer) { clearInterval(_pkc.timer); _pkc.timer = 
 // Duoi moi tin: TEN NGUOI GUI · GIO (re chuot xem du ngay gio giay). Tin cua nhan vien: ten nhan vien (CRM hoac Pancake), khong co thi ten page; tin khach: ten khach.
 function _pkcFull(iso) { var d = new Date(iso); if (isNaN(d)) return ''; return _pkcDay(iso) + ' ' + _pkcHm(iso) + ':' + ('0' + d.getSeconds()).slice(-2); }
 function _pkcMeName() { try { return (currentUser && (currentUser.name || currentUser.username)) || 'Bạn'; } catch (e) { return 'Bạn'; } }
+var PKC_UI_VER = '2026-10-12.3';   // hien o dong trang thai de biet trinh duyet dang chay ban giao dien nao
+function _pkcVerText(gv) { return ' · giao diện ' + PKC_UI_VER + (gv ? ' · GAS ' + gv : ' · ⚠ GAS CŨ (chưa deploy lại — thiếu thẻ/tên nhân viên)'); }
 function _pkcMetaHtml(m, conv) {
-  var who = m.tmp ? _pkcMeName() : (m.dir === 'out' ? (m.staff || m.from || '') : (m.from || (conv && conv.name) || ''));
+  // LUON co ten: tin nhan vien = ten nhan vien (CRM/Pancake) > ten page > "Nhân viên"; tin khach = ten khach > ten hoi thoai > "Khách"
+  var who = m.tmp ? _pkcMeName() : (m.dir === 'out' ? (m.staff || m.from || 'Nhân viên') : (m.from || (conv && conv.name) || 'Khách'));
   return '<div class="pkc-t" title="' + _pkcEsc(_pkcFull(m.at)) + '">' + (who ? '<b>' + _pkcEsc(who) + '</b> · ' : '') + _pkcHm(m.at)
     + (m.crm || m.tmp ? ' <span class="pkc-crm" title="Gửi từ CRM">CRM</span>' : '') + (m.tmp ? ' ✓' : '') + '</div>';
 }
@@ -28,6 +31,7 @@ function _pkcTagsHtml(tags, max) {
 }
 function _pkcMetaRow(conv) {   // the + nguoi xu ly cua hoi thoai
   if (!conv) return ''; var h = _pkcTagsHtml(conv.tags);
+  if (!h && conv.tagN > 0) h += '<span class="pkc-warn" title="Hội thoại có ' + conv.tagN + ' thẻ nhưng GAS chưa lấy được tên thẻ: kiểm tra đã deploy GAS bản mới, PANCAKE_PAGE_TOKENS, hoặc admin bấm 🔍 Chẩn đoán">⚠ ' + conv.tagN + ' thẻ (chưa lấy được tên thẻ)</span>';
   if (conv.assignees && conv.assignees.length) h += '<span class="pkc-ass" title="Người xử lý trên Pancake">👤 ' + _pkcEsc(conv.assignees.join(', ')) + '</span>';
   return h;
 }
@@ -174,7 +178,7 @@ async function pkcLoad(full) {
     var j = await r.json();
     if (_pkc.phone !== ph) return;   // đã chuyển sang khách khác
     if (!j || j.error) { P.err = (j && j.error) || 'Không tải được chat.'; _pkcStatus(); return; }
-    P.err = ''; P.okAt = _pkcHm(new Date().toISOString());
+    P.err = ''; P.okAt = _pkcHm(new Date().toISOString()); P.gv = j.gv || '';
     P.convs = j.conversations || []; _pkTagApplyOv(P.convs);
     if (full) P.msgs = {};
     (j.messages || []).forEach(function (m) { (P.msgs[m.c] = P.msgs[m.c] || {})[m.id] = m; if (m.at && (!P.after || m.at > P.after)) P.after = m.at; });
@@ -186,7 +190,7 @@ async function pkcLoad(full) {
 function _pkcStatus() {
   var el = document.getElementById('pkc-status'); if (!el) return;
   el.className = 'pkc-status' + (_pkc.err ? ' err' : '');
-  el.textContent = _pkc.err || (_pkc.okAt ? 'Cập nhật lúc ' + _pkc.okAt : '');
+  el.textContent = _pkc.err || (_pkc.okAt ? 'Cập nhật lúc ' + _pkc.okAt + _pkcVerText(_pkc.gv) : '');
 }
 function _pkcAttHtml(att) {
   return (att || []).map(function (a) {

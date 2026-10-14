@@ -14,7 +14,8 @@ const ctx={jsonOut_:o=>o,Logger:{log(){}},
  CacheService:{getScriptCache:()=>({get:k=>cache[k]??null,put:(k,v)=>{cache[k]=v}})},
  encodeURIComponent,Date,JSON,RegExp,Array,String,Object,Number};
 vm.createContext(ctx);vm.runInContext(np+sec,ctx);
-const cq=()=>calls.filter(c=>c.p===undefined||!/^pk_staff/.test(String(c.p)));   // bo qua truy van pk_staff (ten nhan vien) de chi so khong lech
+const cq=()=>calls.filter(c=>c.p===undefined||!/^pk_staff/.test(String(c.p)));
+const mq=()=>cq().filter(c=>/^pk_messages/.test(String(c.p)));   // chi cac truy van doc tin nhan   // bo qua truy van pk_staff (ten nhan vien) de chi so khong lech
 const t=(n,v)=>console.log((v?'OK  ':'FAIL'),n);
 (async()=>{
  t('khong token -> AUTH',ctx.pkChat_({parameter:{phone:'0900000001'}}).code==='AUTH');
@@ -80,6 +81,7 @@ const t=(n,v)=>console.log((v?'OK  ':'FAIL'),n);
   t('the/nhan vien duoc cache: goi lai khong goi them Pancake',apiCalls.length===n1 && n1===2);
   t('goi dung endpoint tags + users cua page',apiCalls.some(u=>u.startsWith('https://pages.fm/api/public_api/v1/pages/P1/tags?page_access_token=TOK123'))&&apiCalls.some(u=>u.includes('/pages/P1/users?')));
   // thu tu uu tien ten nguoi xu ly: bang pk_staff (pkNhanVienDongBo) truoc, API users cua Pancake la du phong
+  for(const k in cache)delete cache[k];for(const k in ctx._pkMemo_)delete ctx._pkMemo_[k];   // hop thu co cache 15s (phien khac): xoa de khong nhan ket qua cu
   sbReply=(m,p)=>p.startsWith('pk_conversations')?{json:[convRow]}:(p.startsWith('pk_staff')?{json:[{id:'u-uuid-1',name:'Le Ninh (pk_staff)'}]}:{json:[]});
   rr=ctx.pkChatInbox_({parameter:{token:'u1',q:''}});
   t('nguoi xu ly: co ten trong pk_staff thi dung (uu tien hon API); uuid con lai khong ten -> bo',rr.conversations[0].assignees.join()==='Le Ninh (pk_staff)'&&rr.conversations[0].assigneeIds.length===2);
@@ -101,11 +103,11 @@ const t=(n,v)=>console.log((v?'OK  ':'FAIL'),n);
   t('tin gui tu CRM: hien ten nhan vien CRM (uu tien cao nhat) + co co crm',byId.m3.staff==='Duyen'&&byId.m3.crm===true);
   t('tin gui tu app Pancake: lay ten nhan vien tu raw.from.admin_name',byId.m2.staff==='Le Ninh'&&byId.m2.crm===false);
   t('tin khach: khong co staff (khong lot admin_name/crm_user cua nguoi khac), from = ten khach',byId.m1.staff===''&&byId.m1.from==='Men Hoang'&&byId.m1.crm===false);
-  t('truy van tin chon crm_user + raw->from da ma hoa (khong co ky tu > tran)',cq()[0].p.includes('crm_user')&&cq()[0].p.includes('fromraw:raw-%3Efrom'));
+  t('truy van tin chon crm_user + raw->from da ma hoa (khong co ky tu > tran)',mq()[0].p.includes('crm_user')&&mq()[0].p.includes('fromraw:raw-%3Efrom'));
   // cot crm_user chua co (schema chua deploy) -> doc lai khong co cot do
   calls.length=0;sbReply=(m,p)=>{ if(p.includes('crm_user'))throw new Error('Supabase HTTP 400 (GET pk_messages): column pk_messages.crm_user does not exist'); return {json:mrows.map(x=>{const y=Object.assign({},x);delete y.crm_user;return y})}};
   rr=ctx.pkChatConv_({parameter:{token:'u1',conv:'P1_U1'}});
-  t('chua co cot crm_user: tu doc lai khong loi, van co ten nhan vien Pancake',rr.ok&&rr.messages.length===3&&rr.messages.find(m=>m.id==='m2').staff==='Le Ninh'&&cq().length===2&&!cq()[1].p.includes('crm_user'));
+  t('chua co cot crm_user: tu doc lai khong loi, van co ten nhan vien Pancake',rr.ok&&rr.messages.length===3&&rr.messages.find(m=>m.id==='m2').staff==='Le Ninh'&&mq().length===2&&!mq()[1].p.includes('crm_user'));
   // gui tu CRM -> ghi ten nhan vien CRM
   sbReply=()=>({json:[{id:'P1_U1',page_id:'P1',conv_type:'INBOX'}]});
   ctx.UrlFetchApp.fetch=(u,o)=>({getResponseCode:()=>200,getContentText:()=>'{"success":true,"id":"m_77"}'});
@@ -120,4 +122,62 @@ const t=(n,v)=>console.log((v?'OK  ':'FAIL'),n);
   sbReply=(m,p,b)=>{ if(m==='PATCH')throw new Error('Supabase HTTP 400'); return {json:[{id:'P1_U1',page_id:'P1',conv_type:'INBOX'}]}};
   rr=ctx.pkChatSend_({token:'u1',convId:'P1_U1',text:'Chao chi'});
   t('gui tu CRM: ghi ten loi -> van bao gui thanh cong (best-effort)',rr.ok===true);
+
+  { const src=require('fs').readFileSync(require('path').join(__dirname,'..','gas_v13.js'),'utf8'); const mv=src.match(/var PK_GAS_VER_ = '([^']+)'/), cv=src.match(/ver: '(v13\.\d+-[a-z0-9-]+)' \}\);   \/\/ PHAI la chuoi viet thang/);
+    t('action=count tra CHUOI VIET THANG va bang PK_GAS_VER_ (client doi chieu gv, test-crm-ask doc chuoi nay)',!!mv&&!!cv&&mv[1]===cv[1]); }
+  // ── gv (nhan phien ban GAS), tagN, last_sent_by, chan doan ──
+  for(const k in cache)delete cache[k];for(const k in ctx._pkMemo_)delete ctx._pkMemo_[k];
+  props.PANCAKE_PAGE_TOKENS='{"P1":"TOK123"}';
+  const convGv=Object.assign({},convRow,{lsb:{admin_id:'1',admin_name:'Le Ninh'}});
+  const mm=[{id:'o2',conversation_id:'P1_U1',direction:'out',text:'moi nhat',sent_at:'2026-10-12T05:00:00Z',sender_name:'Page',crm_user:'',fromraw:{id:'P1',name:'Page'},attachments:null},
+    {id:'i1',conversation_id:'P1_U1',direction:'in',text:'khach',sent_at:'2026-10-12T04:00:00Z',sender_name:'Khach',crm_user:'',fromraw:{id:'U1'},attachments:null},
+    {id:'o1',conversation_id:'P1_U1',direction:'out',text:'cu',sent_at:'2026-10-12T03:00:00Z',sender_name:'Page',crm_user:'',fromraw:{id:'P1',name:'Page'},attachments:null}];
+  sbReply=(m,p)=>p.startsWith('pk_conversations')?{json:[convGv]}:(p.startsWith('pk_messages')?{json:mm.slice()}:{json:[]});   // moi lan goi la ban sao moi (that: JSON moi), vi reverse() dao mang tai cho
+  rr=ctx.pkChatConv_({parameter:{token:'u1',conv:'P1_U1'}});
+  t('pkChatConv tra gv (GAS moi) de client biet da deploy',rr.gv==='v13.54-pkstaff');
+  const byI=Object.fromEntries(rr.messages.map(m=>[m.id,m]));
+  t('last_sent_by -> dien ten cho tin out MOI NHAT khi raw.from khong co ten',byI.o2.staff==='Le Ninh');
+  t('last_sent_by KHONG gan cho tin out cu hon (khong the biet ai gui) va khong gan cho tin khach',byI.o1.staff===''&&byI.i1.staff==='');
+  mm[0].crm_user='Duyen';rr=ctx.pkChatConv_({parameter:{token:'u1',conv:'P1_U1'}});
+  t('ten nhan vien CRM duoc uu tien hon last_sent_by',rr.messages.find(m=>m.id==='o2').staff==='Duyen');mm[0].crm_user='';
+  rr=ctx.pkChatInbox_({parameter:{token:'u1',q:''}});
+  t('pkChatInbox tra gv + tagN (so the da luu)',rr.gv==='v13.54-pkstaff'&&rr.conversations[0].tagN===4);
+  t('truy van hoi thoai lay last_sent_by da ma hoa',cq().some(c=>/pk_conversations/.test(c.p)&&c.p.includes('lsb:raw-%3Econversation-%3Elast_sent_by')));
+  // chan doan: chi admin
+  users.u1.role='cs';rr=ctx.pkChatDiag_({parameter:{token:'u1',conv:'P1_U1'}});
+  t('chan doan: khong phai admin -> tu choi',!!rr.error&&!rr.ok);
+  users.u1.role='admin';
+  ctx.UrlFetchApp.fetch=(u,o)=>{let b='{}',code=200;if(/\/tags\?/.test(u))b=JSON.stringify({tags:[{id:26,text:'L1',color:'#009344'}]});if(/\/users\?/.test(u)){b='unauthorized';code=401}return{getResponseCode:()=>code,getContentText:()=>b}};
+  mm[0].raw={from:{id:'P1',name:'Page',admin_name:'Le Ninh'},message:'NOI DUNG KHONG DUOC LO',page_id:'P1',inserted_at:'2026-10-12T05:00:00'};
+  sbReply=(m,p)=>p.startsWith('pk_conversations')?{json:[convGv]}:(p.startsWith('pk_messages')?{json:mm.map(x=>Object.assign({},x))}:{json:[]});
+  rr=ctx.pkChatDiag_({parameter:{token:'u1',conv:'P1_U1'}});
+  t('chan doan (admin): co the luu, ket qua API tags/users (ma 401 hien ro), last_sent_by',rr.ok&&JSON.stringify(rr.tagsStored)==='[26,28,-99,1]'&&rr.tagsApi.ok&&rr.tagsApi.n===1&&rr.usersApi.ok===false&&rr.usersApi.code===401&&rr.lastSentBy.admin_name==='Le Ninh');
+  t('chan doan: khoa raw.from cua tin gan nhat + noi dung tin KHONG bi lo + khong lo token',rr.messages[0].from.admin_name==='Le Ninh'&&rr.messages[0].rawKeys.includes('from')&&!JSON.stringify(rr).includes('NOI DUNG KHONG DUOC LO')&&!JSON.stringify(rr).includes('TOK123'));
+
+  // ── last_sent_by tu API Pancake (API cong khai khong co ten theo TUNG tin) + luu lai ──
+  for(const k in cache)delete cache[k];for(const k in ctx._pkMemo_)delete ctx._pkMemo_[k];
+  const fcalls=[];
+  ctx.UrlFetchApp.fetch=(u)=>{fcalls.push(u);let b='{}';if(/v2\/pages\/P1\/conversations/.test(u))b=JSON.stringify({success:true,conversations:[{id:'P1_U1',last_sent_by:{admin_id:'9',admin_name:'Lan Anh',id:'P1',name:'Page'}},{id:'P1_U9',last_sent_by:{id:'P1',name:'Page'}}]});return{getResponseCode:()=>200,getContentText:()=>b}};
+  const wr=[];
+  const mk=crm=>mm.map(x=>Object.assign({},x,{crm_user:x.id==='o2'?crm:'',fromraw:{id:'P1',name:'Page'}}));
+  let crmVal='';
+  sbReply=(m,p,b)=>{ if(m==='PATCH'){wr.push({p,b});return{json:[]};} return p.startsWith('pk_conversations')?{json:[Object.assign({},convGv,{lsb:null})]}:{json:mk(crmVal)}};
+  rr=ctx.pkChatConv_({parameter:{token:'u1',conv:'P1_U1'}});
+  const bb=Object.fromEntries(rr.messages.map(m=>[m.id,m]));
+  t('API last_sent_by: gan ten nhan vien cho tin out MOI NHAT (khong co trong webhook)',bb.o2.staff==='Lan Anh'&&bb.o1.staff===''&&bb.i1.staff==='');
+  t('API goi dung: v2 conversations cua page + page_access_token + type=INBOX',fcalls.length===1&&fcalls[0].includes('/v2/pages/P1/conversations?page_access_token=TOK123&type=INBOX'));
+  t('da LUU staff_name cho tin do (PATCH chi khi chua co ten, khong de len ten da biet)',wr.length===1&&wr[0].p.includes('id=eq.o2')&&wr[0].p.includes('staff_name.is.null')&&wr[0].b.staff_name==='Lan Anh');
+  ctx.pkChatConv_({parameter:{token:'u1',conv:'P1_U1'}});
+  t('cache 60s: goi lai KHONG goi them API Pancake',fcalls.length===1);
+  wr.length=0;crmVal='Duyen';rr=ctx.pkChatConv_({parameter:{token:'u1',conv:'P1_U1'}});
+  t('tin gui tu CRM: giu ten CRM, KHONG ghi staff_name tu last_sent_by',rr.messages.find(m=>m.id==='o2').staff==='Duyen'&&wr.length===0);
+  crmVal='';for(const k in cache)delete cache[k];for(const k in ctx._pkMemo_)delete ctx._pkMemo_[k];
+  ctx.UrlFetchApp.fetch=()=>({getResponseCode:()=>500,getContentText:()=>'oops'});wr.length=0;
+  rr=ctx.pkChatConv_({parameter:{token:'u1',conv:'P1_U1'}});
+  t('API Pancake loi: khong hong chat, tin out hien ten page',rr.ok&&rr.messages.find(m=>m.id==='o2').staff==='');
+  sbReply=(m,p,b)=>{ if(m==='PATCH')throw new Error('column staff_name does not exist'); return p.startsWith('pk_conversations')?{json:[Object.assign({},convGv,{lsb:null})]}:{json:mk('')}};
+  ctx.UrlFetchApp.fetch=(u)=>({getResponseCode:()=>200,getContentText:()=>JSON.stringify({success:true,conversations:[{id:'P1_U1',last_sent_by:{admin_name:'Lan Anh'}}]})});
+  for(const k in cache)delete cache[k];for(const k in ctx._pkMemo_)delete ctx._pkMemo_[k];
+  rr=ctx.pkChatConv_({parameter:{token:'u1',conv:'P1_U1'}});
+  t('chua co cot staff_name (schema chua deploy): van hien ten, khong loi',rr.ok&&rr.messages.find(m=>m.id==='o2').staff==='Lan Anh');
 })();

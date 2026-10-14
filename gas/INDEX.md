@@ -107,8 +107,8 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `SH_KHO`, `KHO_HEADERS`, `SH_TONKHO`, `TONKHO_HEADERS`, `SH_TONKHO_LOG`, `TONKHO_LOG_HEADERS`, `TONKHO_IMPORT_MAX_`, `SH_KHOCOMBO`, `KHOCOMBO_HEADERS`, `SH_KHOCFG`, `KHOCFG_HEADERS`, `SH_TKD`, `TKD_HEADERS`, `TKD_MAX_QTY_`, `TKD_BATCH_`, `TKD_SYSTEM_USER_`
 
 ## 25_PancakeChat.gs
-- Hàm: `_pkAuth_`, `_pkEnc_`, `_pkInList_`, `_pkAtts_`, `_pkCacheGet_`, `_pkCachePut_`, `_pkApiGet_`, `_pkTagMap_`, `_pkUserMap_`, `_pkTagsOut_`, `_pkStaffNames_`, `_pkConvOut_`, `_pkMsgOut_`, `_pkMsgs_`, `_pkMarkCrmSender_`, `pkChat_`, `pkChatInbox_`, `pkChatConv_`, `pkChatFind_`, `pkChatLink_`, `_pkPageToken_`, `pkChatSend_`, `_pkTagsForget_`, `_pkConvRow_`, `_pkTagCatalog_`, `pkChatTags_`, `pkChatTag_`, `pkXemNguoiChat`
-- Hằng/biến: `PK_CHAT_SECTION_`, `_pkMemo_`, `PK_CONV_COLS_`
+- Hàm: `_pkAuth_`, `_pkEnc_`, `_pkInList_`, `_pkAtts_`, `_pkCacheGet_`, `_pkCachePut_`, `_pkApiGet_`, `_pkTagMap_`, `_pkUserMap_`, `_pkTagsOut_`, `_pkStaffNames_`, `_pkConvOut_`, `_pkMsgOut_`, `_pkLastSentMap_`, `_pkLsbName_`, `_pkApplyLsb_`, `_pkSaveStaff_`, `_pkMsgs_`, `_pkMarkCrmSender_`, `pkChat_`, `pkChatInbox_`, `pkChatConv_`, `pkChatDiag_`, `pkChatFind_`, `pkChatLink_`, `_pkPageToken_`, `pkChatSend_`, `_pkTagsForget_`, `_pkConvRow_`, `_pkTagCatalog_`, `pkChatTags_`, `pkChatTag_`, `pkXemNguoiChat`
+- Hằng/biến: `PK_CHAT_SECTION_`, `PK_GAS_VER_`, `_pkMemo_`, `PK_CONV_COLS_`
 
 ## 26_Chat.gs
 - Hàm: `_chatAuthErr_`, `_chatUser_`, `_chatNum_`, `_chatLastId_`, `_chatVer_`, `_chatBump_`, `_chatSafeCell_`, `_chatMsgSheet_`, `_chatChSheet_`, `_chatCustomChannels_`, `_chatActiveUsers_`, `_chatAccess_`, `_chatListFor_`, `_chatRec_`, `_chatRingGet_`, `_chatRingPut_`, `_chatTail_`, `_chatSince_`, `chatChannels_`, `chatPoll_`, `chatHistory_`, `chatSend_`, `chatDelete_`, `_chatCleanMembers_`, `chatCreateChannel_`, `chatUpdateChannel_`, `chatDoGet_`, `chatDoPost_`
