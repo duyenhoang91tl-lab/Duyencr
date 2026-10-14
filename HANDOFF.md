@@ -127,5 +127,12 @@ Yeu cau cua Duyen: Chat noi bo hien thi duoc o cua so chat nho o goc duoi phai (
 - [x] 4c-1 gas v13.46-owner-gate: chi chu so huu (`ownerUsers`, mac dinh = role admin) moi sua/xoa don o backend. Chi tiet + viec tiep: docs/SECURITY-PLAN.md muc "Buoc 4c-1".
 - [ ] Can nguoi dung: cho biet username admin "Duyent" de chay `datChuSoHuu`; xac nhan co bo `deleteDuplicateOrders` khoi extension Zalo khong.
 - [ ] Tiep theo: 4c-2 (loc khach theo CS o server) roi 4c-3 (action dang mo).
+
+## Checklist MKT — 3 chỉ số bổ sung TUỲ CHỌN (Duyên 12/10/2026)
+- Duyên: 3 công thức mới CHỈ để xem thêm/tuỳ chọn ở Checklist MKT; **báo cáo KPI Pancake giữ nguyên công thức cũ** (không đổi buildKpiReport_/_tagFunnelRates_).
+- [x] Backend `buildMktChecklistReport_`: trả thêm `extra` (tổng + từng Team MKT + từng nhóm Sale) và `config.XCT/XL5/XL9`. XCT = đơn có người tạo (DT TỔNG cột B) là sale trong danh sách Sale ÷ tổng tương tác (chỉ ngày/kênh có Pancake); XL5 = (L5+L5.1+L5.2) ÷ tương tác KH mới; XL9 = (L9+L9.1+L9.2) ÷ tương tác KH cũ (tag theo Page nên nhóm Sale chỉ có XCT). Mục tiêu/toán tử/mẫu số sửa được như L1..L9 (lưu `mktChecklistConfig`, khoá XCT/XL5/XL9, mặc định chưa đặt mục tiêu). Test: `node tools/test-mkt-extra.js`.
+- [x] Client (js/10-fn-pkkpipct.js, js/16-main-currentuser.js): ô "➕ Xem thêm chỉ số bổ sung" (nhớ ở localStorage `mkt_show_extra`), thêm dòng vào bảng chính + bảng Team MKT/Team Sale + form sửa mục tiêu. Test: `node tools/test-mkt-extra-ui.js`.
+- Hồ sơ nhân viên (staffOverview) vẫn tính riêng theo công thức Duyên đưa trước đó (tỷ lệ chốt Pancake = đơn người tạo là sale ÷ tương tác; chốt trong ngày/khách cũ tạm dùng cột đơn hàng KH mới/cũ của file Pancake theo nhân viên vì tag chỉ theo Page) — hỏi Duyên có muốn hồ sơ cũng dùng đúng tag theo Page/team hay giữ.
+- Lưu ý XCT theo nhóm Sale: khớp ngày Pancake theo TÊN người tạo; nếu tên người tạo trên Base khác tên sale đã khớp trong PancakeNameMap thì ra 0 — cần kiểm tra với dữ liệu thật.
 - [x] 4c-2a gas v13.47-scope-gate: loc pham vi khach theo CS cho lookup/donOrdersByPhone/cskhDetail, cong tac `scopeMode` off|log|enforce (MAC DINH off). Chi tiet: docs/SECURITY-PLAN.md "Buoc 4c-2a".
 - [ ] Can Duyen: chay `datChuSoHuu` (username Duyent), roi `datPhamVi('log')`; xem `xemLogPhamVi` sau 2-3 ngay roi moi `enforce`. Tiep: 4c-2b (customers/reminders/orders + leader).
