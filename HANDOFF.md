@@ -1,3 +1,6 @@
+# ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
+Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
+
 # HANDOFF — Giao diện PRO (kiểu Creatio)
 
 Giao diện pro là MẶC ĐỊNH — `<html class="ui-pro">` gắn cứng trong index.html; ĐÃ BỎ công tắc `?ui=pro`/`?ui=classic` và localStorage `ui_mode` (không còn bản cũ để quay lại).
@@ -130,3 +133,5 @@ Yeu cau cua Duyen: Chat noi bo hien thi duoc o cua so chat nho o goc duoi phai (
 - [x] Client (js/10-fn-pkkpipct.js, js/16-main-currentuser.js): ô "➕ Xem thêm chỉ số bổ sung" (nhớ ở localStorage `mkt_show_extra`), thêm dòng vào bảng chính + bảng Team MKT/Team Sale + form sửa mục tiêu. Test: `node tools/test-mkt-extra-ui.js`.
 - Hồ sơ nhân viên (staffOverview) vẫn tính riêng theo công thức Duyên đưa trước đó (tỷ lệ chốt Pancake = đơn người tạo là sale ÷ tương tác; chốt trong ngày/khách cũ tạm dùng cột đơn hàng KH mới/cũ của file Pancake theo nhân viên vì tag chỉ theo Page) — hỏi Duyên có muốn hồ sơ cũng dùng đúng tag theo Page/team hay giữ.
 - Lưu ý XCT theo nhóm Sale: khớp ngày Pancake theo TÊN người tạo; nếu tên người tạo trên Base khác tên sale đã khớp trong PancakeNameMap thì ra 0 — cần kiểm tra với dữ liệu thật.
+- [x] 4c-2a gas v13.47-scope-gate: loc pham vi khach theo CS cho lookup/donOrdersByPhone/cskhDetail, cong tac `scopeMode` off|log|enforce (MAC DINH off). Chi tiet: docs/SECURITY-PLAN.md "Buoc 4c-2a".
+- [ ] Can Duyen: chay `datChuSoHuu` (username Duyent), roi `datPhamVi('log')`; xem `xemLogPhamVi` sau 2-3 ngay roi moi `enforce`. Tiep: 4c-2b (customers/reminders/orders + leader).

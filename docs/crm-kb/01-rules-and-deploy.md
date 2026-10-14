@@ -1,5 +1,25 @@
 # 01 — Quy tắc bắt buộc & Deploy
 
+## ⛔ QUY TẮC GIT — BẮT BUỘC MERGE, CẤM RESET / FORCE-PUSH (chốt 2026-10-12, Duyên yêu cầu)
+**Lý do (sự cố có thật):** nhiều phiên cùng sửa repo; ngày 2026-10-12 có phiên ghi đè lịch sử `main` ≥2 lần làm BIẾN MẤT 7 commit đã push (c2f12d5, 55b7acd, 19acd75, 65c702a, a1f7a2b, 9702f21, 329b261) — GitHub báo "không tìm thấy" SHA, tức mất hẳn. Công sức nhiều phiên phải làm lại.
+
+**CẤM TUYỆT ĐỐI — ai chỉnh sửa (người hay AI) đều không được:**
+- `git push --force`, `--force-with-lease`, `-f`, hoặc refspec bắt đầu bằng `+` (vd `git push origin +main`).
+- `git reset --hard` (hoặc `--soft/--mixed`) về một commit cũ / về `origin/main` rồi push; xoá nhánh `main` hoặc tạo lại nhánh rồi push đè.
+- `git rebase` rồi push (kể cả rebase commit chưa push), `git commit --amend`, `git filter-branch`/`filter-repo`, `git checkout --orphan`, squash-đè commit ĐÃ push.
+- "Clone mới rồi chép file đè lên" thay cho merge (làm mất thay đổi của phiên khác).
+- Xoá `.git` hoặc `rm -rf` repo cục bộ khi còn commit chưa push (đã từng làm mất việc).
+
+**BẮT BUỘC làm đúng quy trình này mỗi lần push:**
+1. Commit xong → chạy `TK=<token của tin nhắn này> bash tools/safe-push.sh` (script làm đúng các bước dưới, khuyến nghị dùng).
+2. Làm tay (nếu không dùng script): `git fetch origin` → nếu `origin/main` có commit mới thì **`git merge origin/main`** (hoặc `git pull --no-rebase`) → gặp xung đột thì mở file, **GIỮ thay đổi của CẢ HAI bên**, `git add`, `git commit` → chạy lại syntax-check/test → `git push` THƯỜNG (không cờ force).
+3. Push bị "rejected" ⇒ nghĩa là có người push xen vào ⇒ quay lại bước 2 (merge tiếp). Không bao giờ "giải quyết" bằng force.
+4. SAU khi push phải xác minh commit thật sự nằm trên remote: `git fetch origin && git merge-base --is-ancestor HEAD origin/main && echo OK` (script tự làm). Nếu không OK ⇒ DỪNG, báo người dùng, không force-push.
+5. Thấy commit của mình/người khác biến mất khỏi `main`: DỪNG, không "sửa" bằng force. Lấy lại từ `git reflog` / nhánh sao lưu (`backup/*`) / bản clone còn trong máy, rồi **merge** hoặc `cherry-pick` lên `main` như commit mới; ghi sự cố vào `HANDOFF.md`.
+6. Muốn thử nghiệm nguy hiểm → làm trên NHÁNH RIÊNG (`git checkout -b thu-nghiem`), không đụng `main`.
+
+**Khoá cứng ở phía GitHub (Duyên làm 1 lần, cần quyền admin repo — AI không tự đổi cài đặt):** GitHub → repo → Settings → Branches → Add branch ruleset/protection cho `main` → bật **"Block force pushes"** (không cho push đè) và **"Restrict deletions"**. Khi bật, force-push sẽ bị GitHub từ chối dù ai làm, kể cả quên quy tắc này.
+
 ## Deploy — ĐÃ TỰ ĐỘNG (chốt 2026-10-11, Duyên xác nhận): KHÔNG nhắc deploy nữa
 Push `main` là GitHub Actions tự đưa lên chỗ chạy thật (xem tab Actions; chi tiết: `docs/GAS-AUTO-DEPLOY.md`, `docs/CLOUDFLARE-SUPABASE-AUTO-DEPLOY.md`):
 - `gas_v13.js` / `gas/**` → workflow `deploy-gas.yml` (clasp, đúng deployment, URL không đổi).
@@ -21,12 +41,12 @@ Cả 2 extension gọi chung 1 URL GAS.
 - Từ v13.19: `getGasSource`/`setGasSource` BẮT BUỘC có `adminKey` (= giá trị dòng `adminKey` trong sheet Settings; app hỏi 1 lần/máy, lưu `ome_admin_key`). Chưa đặt dòng đó = không ai lấy/đồng bộ được mã. Tài khoản test (role `demo`): xem `docs/TAI-KHOAN-TEST.md`.
 - (Từ 2026-10-11 deploy tự động nên KHÔNG còn bắt buộc nhắc bước này; chỉ cần khi Duyên chủ động muốn nút Copy trả mã mới.)
 
-## 13 quy tắc bắt buộc khi sửa code
+## 14 quy tắc bắt buộc khi sửa code (quy tắc 5 = merge-only, xem mục QUY TẮC GIT ở đầu file; quy tắc 14 = chỉ sửa theo yêu cầu mới nhất)
 1. Luôn clone repo MỚI NHẤT bằng token người dùng gửi trong tin nhắn đó (không dùng lại token cũ). Đọc kỹ file liên quan (view/grep) trước khi sửa.
 2. Sửa `gas_v13.js` → chạy `split-gas` + `--check`, push; deploy TỰ ĐỘNG, KHÔNG nhắc deploy/đồng bộ mã (mục trên).
 3. Sửa JS/CSS extension → nhắc reload extension.
 4. Trước khi commit luôn syntax-check: `node -c` cho file `.js`; với client Sasum: `for f in js/*.js; do node -c $f; done` (code client đã tách khỏi `index.html` ra `js/`); khối `<script>` inline còn lại trong `index.html` (nhỏ, <40 dòng) check bằng Function constructor trong Node, bỏ qua `type="text/plain"`. Không commit code chưa kiểm tra.
-5. Push bị "rejected" (nhiều phiên cùng sửa): `git fetch` → `git rebase origin/main` → kiểm tra thay đổi của mình còn nguyên → push lại. KHÔNG force-push.
+5. Push bị "rejected" (nhiều phiên cùng sửa): `git fetch` → **`git merge origin/main`** (BẮT BUỘC merge — CẤM rebase / reset / force-push, xem mục "QUY TẮC GIT" ở đầu file) → kiểm tra thay đổi của mình còn nguyên → push lại. Dùng `tools/safe-push.sh` để làm đúng quy trình.
 6. Commit message phải nêu RÕ NGUYÊN NHÂN GỐC của lỗi, không chỉ liệt kê đã đổi gì.
 7. Sửa hàm dùng chung (vd `_srChartSvg`, `_donSaleNamesFromThe_`, `mergeExtFields_`, `_SRB_COMBO_CFG`...) → grep TOÀN BỘ nơi gọi trước.
 8. Trước khi kết luận "không có lỗi": test bằng ví dụ thực tế người dùng đưa (mô phỏng logic bằng Node), không chỉ đọc code.
@@ -35,6 +55,7 @@ Cả 2 extension gọi chung 1 URL GAS.
 11. Phát hiện quy ước/lỗi mới đáng nhớ → đề xuất cập nhật đúng file KB.
 12. Làm xong phần nào push ngay phần đó (từng mục nhỏ) kèm việc cần làm tiếp, để phiên khác tiếp tục được.
 13. (Đã thay 2026-10-11) Sửa `gas_v13.js`/`cloudflare/`/`supabase/` → KHÔNG nhắc deploy GAS / Worker / Supabase / đồng bộ mã: đã tự động qua GitHub Actions. Chỉ báo "workflow tự deploy" + Ctrl+F5 nếu đổi web; chỉ nhắc khi workflow đỏ hoặc cần chạy hàm tay. Không còn khối `gas-code-v9`.
+14. **CHỈ SỬA THEO YÊU CẦU MỚI NHẤT của Duyên (chốt 2026-10-14, Duyên yêu cầu).** Làm đúng và đủ việc Duyên vừa nhờ; KHÔNG tự sửa / dọn / đổi tên / refactor / đổi hành vi / xoá các mục cũ (tính năng, màn hình, hàm, cấu hình đã có) dù thấy chưa đẹp. Chỉ chỉnh mục cũ khi Duyên báo xoá hoặc chỉnh và việc đó liên quan trực tiếp tới mục cũ đó; khi đó chỉ đụng đúng phần được nêu. Nếu cần sửa nhỏ ở mục cũ để yêu cầu mới chạy được (vd thêm 1 dòng gọi hàm) thì giữ tối thiểu và nói rõ trong tin trả lời. Phát hiện lỗi hoặc việc đáng sửa ở mục cũ ngoài phạm vi: chỉ BÁO ngắn gọn cho Duyên quyết định, KHÔNG tự sửa. Thay đổi lớn ngoài yêu cầu (vd đổi cấu trúc, đổi tên file) phải hỏi trước.
 
 ## Checklist trước khi báo "đã xong"
 1. Đã grep hết mọi nơi gọi hàm vừa sửa chưa?
@@ -50,4 +71,4 @@ Cả 2 extension gọi chung 1 URL GAS.
 - Nút cài đặt admin của tab báo cáo gom vào 1 dropdown "⚙ Cài đặt" (`.gear-menu`/`.gear-menu-list` + `_srToggleGearMenu()`/`closeGearMenus()`), đã áp cho Báo cáo E — theo mẫu này nếu thêm chỗ khác.
 
 ## Instruction của Project (rule 13)
-Instruction của Project (rule 2 và 13) cần SỬA cho khớp: "Deploy GAS/Worker/Supabase đã tự động qua GitHub Actions — không nhắc deploy/đồng bộ mã nữa; chỉ nhắc reload extension, Ctrl+F5 web, hoặc hàm cần chạy tay." (Claude không sửa được Instruction — Duyên cập nhật ở Project settings.)
+Instruction của Project (rule 2 và 13) cần SỬA cho khớp: "Deploy GAS/Worker/Supabase đã tự động qua GitHub Actions — không nhắc deploy/đồng bộ mã nữa; chỉ nhắc reload extension, Ctrl+F5 web, hoặc hàm cần chạy tay." (Claude không sửa được Instruction — Duyên cập nhật ở Project settings.) Nên thêm vào Instruction của Project quy tắc 14: "Chỉ sửa theo yêu cầu mới nhất; chỉ chỉnh mục cũ khi Duyên báo xoá/chỉnh liên quan."

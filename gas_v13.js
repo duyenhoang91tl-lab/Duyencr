@@ -874,6 +874,62 @@ function setGasSource_(code) {
   setSetting_('gasSourceUpdatedAt', new Date().toISOString());
   return jsonOut_({ ok: true, chunks: chunks.length, length: code.length });
 }
+// ─── CHOT THANG POS + TRU HOAN/HUY THANG TRUOC (quy tac 5 cua Duyen, 10/2026) ───
+// Doanh thu Pos thang M = doanh thu trong thang M − phan hoan/huy cua thang M-1. CHI tien hanh khi Duyen bam
+// "Chot thang" (vao ngay mung 1 sau khi cap nhat du du lieu thang truoc) — chua chot thi KHONG tru gi ca,
+// cac bao cao giu nguyen. Cach lam: luc chot, luu "anh chup" doanh thu Pos tung sale cua thang M-1 (da loai
+// hoan/huy hien co + chia ghep/30-70 dung quy tac). Don thang M-1 bi hoan/huy SAU luc chot lam doanh thu
+// tinh lai nho di; khoan chenh (anh chup − tinh lai hien tai) chinh la so tru vao thang M, chia ve dung sale
+// vi dung chung cach tinh/chia cua Bao cao B (khong can ngay thay doi trang thai). Luu o setting 'posMonthSnapshots'.
+function _ymAdd_(ym, delta) {
+  var p = String(ym).split('-'), y = +p[0], m = +p[1] - 1 + delta;
+  y += Math.floor(m / 12); m = ((m % 12) + 12) % 12;
+  return y + '-' + ('0' + (m + 1)).slice(-2);
+}
+function _posRevenueBySale_(ym) {
+  var a = buildSalesReportB_({ dateFrom: _ymFirstDay_(ym), dateTo: _ymLastDay_(ym) });
+  var out = {};
+  (a.bySale || []).forEach(function(s) { out[s.name] = Number(s.giaTri) || 0; });
+  return { bySale: out, total: Number(a.totalGiaTri) || 0 };
+}
+function _readPosSnapshots_() {
+  try { var raw = getSetting_('posMonthSnapshots'); if (raw) { var o = JSON.parse(raw); if (o && typeof o === 'object') return o; } } catch (e) {}
+  return {};
+}
+function closePosMonth_(month, force) {
+  if (!/^\d{4}-\d{2}$/.test(String(month || ''))) return { ok: false, error: 'Tháng không hợp lệ (cần dạng YYYY-MM)' };
+  if (month >= _todayYm_()) return { ok: false, error: 'Chỉ chốt được tháng đã qua (tháng ' + month + ' chưa kết thúc). Chốt vào ngày mùng 1 sau khi đã cập nhật đủ dữ liệu tháng đó.' };
+  var snaps = _readPosSnapshots_();
+  if (snaps[month] && !force) return { ok: false, needForce: true, closedAt: snaps[month].closedAt, error: 'Tháng ' + month + ' đã chốt lúc ' + snaps[month].closedAt + '. Chốt lại sẽ GHI ĐÈ mốc cũ (và làm đổi số trừ hoàn/hủy).' };
+  var cur = _posRevenueBySale_(month);
+  snaps[month] = { closedAt: _vnYmd_(new Date()), total: cur.total, bySale: cur.bySale };
+  setSetting_('posMonthSnapshots', JSON.stringify(snaps));
+  return { ok: true, month: month, closedAt: snaps[month].closedAt, total: cur.total, saleCount: Object.keys(cur.bySale).length };
+}
+function posMonthAdjust_(month) {
+  if (!/^\d{4}-\d{2}$/.test(String(month || ''))) month = _todayYm_();
+  var prev = _ymAdd_(month, -1);
+  var snaps = _readPosSnapshots_();
+  var cur = _posRevenueBySale_(month);
+  var closedMonths = Object.keys(snaps).sort();
+  var snap = snaps[prev];
+  if (!snap) {
+    return { ok: true, month: month, prevMonth: prev, applied: false, closedMonths: closedMonths, total: cur.total,
+      reason: 'Chưa chốt tháng ' + prev + ' nên chưa trừ hoàn/hủy tháng trước (bấm "Chốt tháng" cho ' + prev + ' vào ngày mùng 1, sau khi cập nhật đủ dữ liệu).',
+      rows: Object.keys(cur.bySale).map(function(n) { return { name: n, revenue: cur.bySale[n], deduction: 0, net: cur.bySale[n] }; }).sort(function(a, b) { return b.net - a.net; }) };
+  }
+  var now = _posRevenueBySale_(prev); // doanh thu thang truoc tinh lai theo du lieu HIEN TAI (da loai don hoan/huy phat sinh sau luc chot)
+  var names = {}; Object.keys(cur.bySale).forEach(function(n) { names[n] = 1; }); Object.keys(snap.bySale || {}).forEach(function(n) { names[n] = 1; });
+  var rows = Object.keys(names).map(function(n) {
+    var deduction = (Number(snap.bySale[n]) || 0) - (Number(now.bySale[n]) || 0);
+    var revenue = Number(cur.bySale[n]) || 0;
+    return { name: n, revenue: revenue, deduction: deduction, net: revenue - deduction };
+  }).filter(function(r) { return r.revenue || r.deduction; }).sort(function(a, b) { return b.net - a.net; });
+  var totalDed = rows.reduce(function(s, r) { return s + r.deduction; }, 0);
+  return { ok: true, month: month, prevMonth: prev, applied: true, closedAt: snap.closedAt, closedMonths: closedMonths,
+    total: cur.total, totalDeduction: totalDed, totalNet: cur.total - totalDed, rows: rows };
+}
+
 // ─── NHOM SALE (truoc chi co 2 nhom co dinh Online/Van phong, gio Admin tu dinh nghia them nhom
 // moi vd CSKH/Quay...) — luu trong setting 'saleGroups' = [{key,label}]. 'online'/'offline' la 2
 // key MAC DINH giu nguyen de KHONG vo du lieu cu (saleChannels/saleType dang dung dung 2 key nay).
@@ -1876,6 +1932,117 @@ function xemChuSoHuu() {
   return a;
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  BUOC 4c-2a (v13.47): PHAM VI KHACH THEO CS o server cho tra cuu TUNG SDT (lookup, donOrdersByPhone, cskhDetail).
+//  Nguyen nhan goc: web chi loc "khach cua toi" o client (_inUserScope), con token hop le goi thang ?action=lookup&phone=... lay duoc ho so BAT KY khach nao.
+//  Logic khop client: CS/manager thuoc pham vi neu ten minh nam trong careCS (CareData.cs) / CS phu trach don (DT TONG "Sale ban") / sale trong du lieu don /
+//  careLeads.cs / AssignData (da chia). admin + vai tro khac (viewer, ceo...) -> khong gioi han (nhu client). LEADER: chua kiem o server (phai biet team) -> 'unchecked', cho qua.
+//  Cong tac Script Properties 'scopeMode': off (mac dinh, khong lam gi) | log (chi ghi dem ai lay khach NGOAI pham vi, KHONG chan) | enforce (chan FORBIDDEN).
+//  Chi chay khi co token hop le (extension dung khoa ek -> khong qua day; xem SECURITY-PLAN). Lenh trong Editor: datPhamVi('log'|'enforce'|'off'), xemPhamVi, xemLogPhamVi.
+// ═══════════════════════════════════════════════════════════════
+var SCOPE_ACTIONS_ = { lookup: 1, donOrdersByPhone: 1, cskhDetail: 1 };
+function _scopeMode_() {
+  var v = '';
+  try { v = PropertiesService.getScriptProperties().getProperty('scopeMode') || ''; } catch (e) {}
+  return (v === 'enforce' || v === 'log') ? v : 'off';
+}
+function _scopeSplit_(str, out) {
+  String(str || '').split(',').forEach(function (n) { n = n.trim(); if (n) out[n] = 1; });
+}
+// phone -> [csName] tu AssignData (cache 120s, chia manh vi sheet lon).
+function _scopeAssignIndex_() {
+  var raw = null;
+  try { raw = _cacheGetBig_('scope_asg_v1'); } catch (e) {}
+  if (raw) { try { return JSON.parse(raw) || {}; } catch (e2) {} }
+  var idx = {};
+  try {
+    readAssign_(getCrmSS_().getSheetByName(SH_ASSIGN)).forEach(function (en) {
+      var nm = String(en.csName || '').trim(); if (!nm) return;
+      (en.phones || []).forEach(function (ph) {
+        var k = normPhone_(String(ph)); if (!k) return;
+        if (!idx[k]) idx[k] = [];
+        if (idx[k].indexOf(nm) < 0) idx[k].push(nm);
+      });
+    });
+  } catch (e3) { Logger.log('_scopeAssignIndex_: ' + e3); }
+  try { _cachePutBig_('scope_asg_v1', JSON.stringify(idx), 120); } catch (e4) {}
+  return idx;
+}
+// Tap ten CS "so huu" 1 SDT (object ten->1). Chi doc dung 1 SDT nhu action lookup.
+function _scopeNamesForPhone_(phone) {
+  var ph = normPhone_(String(phone || '')), names = {};
+  if (!ph) return names;
+  var care = null; try { care = findCareByPhone_(phone); } catch (e) {}
+  if (care) _scopeSplit_(care.cs, names);
+  try { readOrdersByPhone_(phone).forEach(function (o) { _scopeSplit_(o && o.cs, names); }); } catch (e1) {}
+  try { findDonRowsByPhone_(phone).forEach(function (r) { (r.sales || []).forEach(function (n) { n = String(n || '').trim(); if (n) names[n] = 1; }); }); } catch (e2) {}
+  try { readCareLeads_().forEach(function (r) { if (r.phone === ph) _scopeSplit_(r.cs, names); }); } catch (e3) {}
+  var ai = _scopeAssignIndex_(); (ai[ph] || []).forEach(function (n) { names[n] = 1; });
+  return names;
+}
+// true = trong pham vi | false = NGOAI pham vi | null = khong kiem duoc (leader) -> cho qua.
+function _scopeVerdict_(user, phone, namesFn) {
+  if (!user) return null;
+  var role = String(user.role || '');
+  if (role === 'admin') return true;
+  if (role === 'leader') return null;
+  if (role !== 'cs' && role !== 'manager') return true;   // viewer/ceo/... : client khong gioi han
+  var mine = (user.names && user.names.length) ? user.names : (user.name ? [user.name] : []);
+  mine = mine.map(function (n) { return String(n || '').trim(); }).filter(Boolean);
+  if (!mine.length) return false;
+  var have = (namesFn || _scopeNamesForPhone_)(phone);
+  for (var i = 0; i < mine.length; i++) { if (have[mine[i]]) return true; }
+  return false;
+}
+function _scopeKey_() { return 'scp_' + Utilities.formatDate(new Date(), 'GMT+7', 'yyyyMMdd'); }
+function _scopeNote_(user, action, phone, verdict) {
+  try {
+    var cache = CacheService.getScriptCache(), key = _scopeKey_(), raw = cache.get(key), m = {};
+    if (raw) { try { m = JSON.parse(raw) || {}; } catch (e0) { m = {}; } }
+    var k = String(user.username || '?') + ' | ' + action + ' | ' + verdict;
+    m[k] = (m[k] || 0) + 1;
+    if (verdict === 'OUT') {
+      var ph = String(phone || ''), smp = m._s || [];
+      if (smp.length < 20) { smp.push(String(user.username || '?') + ':***' + ph.slice(-3)); m._s = smp; }
+    }
+    if (Object.keys(m).length > 200) return;
+    cache.put(key, JSON.stringify(m), 21600);
+  } catch (e) {}
+}
+function _scopeGate_(action, token, phone) {
+  if (!SCOPE_ACTIONS_[action] || !token || !phone) return null;
+  var mode = _scopeMode_();
+  if (mode === 'off') return null;
+  try {
+    var u = _sessUser_(token);
+    if (!u) return null;
+    var v = _scopeVerdict_(u, phone);
+    _scopeNote_(u, action, phone, v === true ? 'in' : (v === false ? 'OUT' : 'unchecked'));
+    if (v === false && mode === 'enforce') return { error: 'Khach nay khong thuoc pham vi cua ban.', code: 'FORBIDDEN', action: action };
+  } catch (e) {}
+  return null;
+}
+function _scopeReport_() {
+  var raw = CacheService.getScriptCache().get(_scopeKey_()), m = {};
+  if (raw) { try { m = JSON.parse(raw) || {}; } catch (e0) { m = {}; } }
+  var rows = Object.keys(m).filter(function (k) { return k !== '_s'; }).map(function (k) { return { k: k, n: m[k] }; });
+  rows.sort(function (a, b) { var ao = a.k.indexOf('| OUT') >= 0 ? 0 : 1, bo = b.k.indexOf('| OUT') >= 0 ? 0 : 1; return ao !== bo ? ao - bo : b.n - a.n; });
+  return { ok: true, mode: _scopeMode_(), rows: rows, outSamples: m._s || [] };
+}
+function datPhamVi(mode) {
+  if (mode !== 'off' && mode !== 'log' && mode !== 'enforce') throw new Error('datPhamVi("off" | "log" | "enforce")');
+  PropertiesService.getScriptProperties().setProperty('scopeMode', mode);
+  return xemPhamVi();
+}
+function xemPhamVi() { var m = _scopeMode_(); Logger.log('Che do pham vi khach (lookup/donOrdersByPhone/cskhDetail): ' + m + '. Bat theo thu tu off -> log (xem xemLogPhamVi vai ngay) -> enforce.'); return m; }
+function xemLogPhamVi() {
+  var r = _scopeReport_();
+  Logger.log('Che do: ' + r.mode);
+  r.rows.forEach(function (x) { Logger.log(x.n + '  ' + x.k); });
+  Logger.log('Mau SDT NGOAI pham vi (che SDT): ' + r.outSamples.join(', '));
+  return r;
+}
+
 // Bi mat ky token phien — dan vao bien Secret SESS_SECRET cua Cloudflare Worker de Worker chi phuc vu cache cho token hop le. KHONG dan vao chat/repo.
 function xemBiMatPhien() { Logger.log('SESS_SECRET = ' + _sessSecret_()); }
 
@@ -1939,6 +2106,8 @@ function doGet(e) {
   if (_gateErr) return jsonOut_(_gateErr);
   var _ownErr = _ownerGate_(action, p.token);
   if (_ownErr) return jsonOut_(_ownErr);
+  var _scpErr = _scopeGate_(action, p.token, p.phone);
+  if (_scpErr) return jsonOut_(_scpErr);
   return doGetCore_(e);
 }
 
@@ -2043,6 +2212,7 @@ function doGetCore_(e) {
     }
     if (action === 'saleDirectory') return jsonOut_(readSaleDirectory_());
     if (action === 'saleGroups') return jsonOut_({ ok: true, groups: readSaleGroups_() });
+    if (action === 'posMonthAdjust') return jsonOut_(posMonthAdjust_(e.parameter.month));
     // ── Nguon "Cham soc" (KH them nhanh, sheet rieng) — khong gop CareData/bao cao A-B-C ──
     if (action === 'careLeads') return jsonOut_({ rows: readCareLeads_() });
     // ── Nguon "CSKH-Duyên" (sheet thu 3, cung file DT TONG) — CRM gop vao khach theo SDT, xem readCskhDuyen_ ──
@@ -2343,12 +2513,13 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.46-owner-gate' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.49-pknative' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
     // ── NHAC VIEC HOM NAY (don Base ket giai doan > N gio). names = ten sale cua CS cach nhau '|' (rong = tat ca) ──
     if (action === 'todayTasks') return jsonOut_(ttTodayTasks_(e && e.parameter ? e.parameter.names : ''));
+    if (action === 'stageBoard') return jsonOut_(ttStageBoard_(e && e.parameter ? e.parameter.names : ''));   // Bang Kanban don Base theo giai doan (B5)
     if (action === 'reminders') {
       var csFilter = (e && e.parameter && e.parameter.cs) ? String(e.parameter.cs) : '';
       return jsonOut_({ reminders: readRemindersToday_(csFilter) });
@@ -3034,6 +3205,23 @@ function _userAliasGroups_() {
       });
     });
   } catch (e) {}
+  // Thẻ do admin gán trong Quản lý Team (Settings 'salePersonTags' = { "<tên chính>": ["thẻ", ...] }): cùng 1 người.
+  try {
+    var rawTags = getSetting_('salePersonTags');
+    if (rawTags) {
+      var tagObj = JSON.parse(rawTags) || {};
+      Object.keys(tagObj).forEach(function(primary) {
+        var uniq = [];
+        [primary].concat(Array.isArray(tagObj[primary]) ? tagObj[primary] : []).forEach(function(x) { x = String(x || '').trim(); if (x && uniq.indexOf(x) === -1) uniq.push(x); });
+        if (uniq.length < 2) return;
+        uniq.forEach(function(n) {
+          var k = _normTxt_(n), cur = map[k] || [];
+          uniq.forEach(function(x) { if (cur.indexOf(x) === -1) cur.push(x); });
+          map[k] = cur;
+        });
+      });
+    }
+  } catch (e2) {}
   return map;
 }
 // Trả hàm (tên sale bất kỳ) → tên Team; tìm theo chính tên đó, rồi theo MỌI tên khác của cùng người, rồi theo bảng khớp tên Pancake.
@@ -3079,7 +3267,36 @@ function _expandSaleFilterWithPancakeAliases_(names) {
   out.slice().forEach(function(n) {
     (_grp[_normTxt_(n)] || []).forEach(function(a) { var k = _normTxt_(a); if (!_seenF[k]) { _seenF[k] = true; out.push(a); } });
   });
-  return out;
+  // SUA 2026-10-14 (yeu cau Duyen): loc theo Team van ra 0 doanh thu voi nhung Sale CHUA tung duoc
+  // khop tay o PancakeNameMap va CHUA duoc gan "nhieu ten" o sheet Users (2 nguon tren) — trong khi
+  // sheet SaleDirectory ("🗂️ Quản lý tài khoản") da luu SAN ca 4 ten cua 1 nhan vien (ma Sale, ten
+  // Facebook, user Base, the tag Pancake) ngay luc tao tai khoan, la nguon CHUAN nhat nhung truoc
+  // gio bi bo qua hoan toan o ham nay. The chon Team tra ra ten Facebook/username, con cot "Thẻ"
+  // cua Pos lai ghi the tag Pancake (vd "ninhnga99") -> khong co doan duoi day thi 2 ten nay khong
+  // bao gio khop nhau. Fix: voi MOI dong SaleDirectory, neu BAT KY ten nao dang co trong bo loc (ke
+  // ca cac ten vua duoc PancakeNameMap/Users mo rong o tren) khop 1 trong 4 bien the cua dong do thi
+  // them CA 4 bien the con lai vao bo loc.
+  try {
+    var dirList = readSaleDirectory_().list || [];
+    var curFold = {};
+    out.forEach(function(n) { curFold[_normTxt_(n)] = true; });
+    for (var di = 0; di < dirList.length; di++) {
+      var rec = dirList[di];
+      var variants = [rec.maSale, rec.code, rec.tenFacebook, rec.userBase, rec.tenTagPancake].filter(Boolean);
+      var hit = false;
+      for (var vi = 0; vi < variants.length; vi++) { if (curFold[_normTxt_(variants[vi])]) { hit = true; break; } }
+      if (hit) { for (var vj = 0; vj < variants.length; vj++) out.push(variants[vj]); }
+    }
+  } catch (eDir) {}
+  // Khu trung (ten lap do bi nhieu nguon cung them) — giu nguyen thu tu xuat hien dau tien.
+  var seenOut = {}, dedup = [];
+  for (var oi = 0; oi < out.length; oi++) {
+    var key = _normTxt_(out[oi]);
+    if (key && seenOut[key]) continue;
+    if (key) seenOut[key] = true;
+    dedup.push(out[oi]);
+  }
+  return dedup;
 }
 
 // Ten "sale" dac biet co khoang trang tren cot The (khong phai username Pancake) nhung ke toan van tinh la 1 sale rieng — vd
@@ -6332,6 +6549,7 @@ function doPostCore_(e) {
     if (action === 'savePancakePageMap')  return savePancakePageMap_(data.pageId, data.pageName, data.kenhBan);
     if (action === 'setSetting')          return setSetting_(data.key, data.value);
     if (action === 'saveSaleGroups')      return saveSaleGroups_(data.groups);
+    if (action === 'closePosMonth')       return jsonOut_(closePosMonth_(data.month, data.force));
     // ── Dong bo lai ma nguon gas_v13.js cho nut "Copy Apps Script Code" (xem getGasSource, doGet)
     // — chia thanh cac manh <=45.000 ky tu (o tinh Sheet gioi han 50.000), xoa manh cu thua neu
     // ban moi it manh hon ban truoc, roi ghi "gasSourceUpdatedAt" de UI hien luc dong bo gan nhat.
@@ -7287,15 +7505,22 @@ function readPancakeMapCI_() {
   return { map: map, mapCI: mapCI };
 }
 
+// Memo trong PHAM VI 1 LAN THUC THI (1 request doGet/doPost) — tranh doc lai sheet PancakeNameMap
+// nhieu lan khi _expandSaleFilterWithPancakeAliases_ duoc goi lap lai cho tung ten/don (xem cac noi
+// goi readPancakeMap_ ben duoi). GAS khoi tao lai bien global cho MOI request nen khong lo du lieu cu.
+var _pancakeMapMemo_ = null;
 function readPancakeMap_() {
+  if (_pancakeMapMemo_) return _pancakeMapMemo_;
   var sh = getSheet_(SH_PK_MAP, PK_MAP_HEADERS);
   var out = {};
-  if (sh.getLastRow() < 2) return out;
-  var v = sh.getRange(2, 1, sh.getLastRow() - 1, PK_MAP_HEADERS.length).getValues();
-  for (var i = 0; i < v.length; i++) {
-    if (!v[i][0]) continue;
-    out[String(v[i][0])] = String(v[i][1] || '');
+  if (sh.getLastRow() >= 2) {
+    var v = sh.getRange(2, 1, sh.getLastRow() - 1, PK_MAP_HEADERS.length).getValues();
+    for (var i = 0; i < v.length; i++) {
+      if (!v[i][0]) continue;
+      out[String(v[i][0])] = String(v[i][1] || '');
+    }
   }
+  _pancakeMapMemo_ = out;
   return out;
 }
 
@@ -7778,10 +8003,15 @@ function saveSaleDirectory_(rows) {
   return jsonOut_({ ok: true, written: rows.length });
 }
 
+// Memo trong PHAM VI 1 LAN THUC THI — cung ly do/an toan nhu _pancakeMapMemo_ o readPancakeMap_
+// (ham nay se duoc goi THEM trong _expandSaleFilterWithPancakeAliases_, co the lap lai nhieu lan
+// cho tung ten/don trong 1 bao cao).
+var _saleDirMemo_ = null;
 function readSaleDirectory_() {
+  if (_saleDirMemo_) return _saleDirMemo_;
   var sh = getSheet_(SH_SALE_DIR, SALE_DIR_HEADERS);
   var list = [], byName = {};
-  if (sh.getLastRow() < 2) return { list: list, byName: byName };
+  if (sh.getLastRow() < 2) { _saleDirMemo_ = { list: list, byName: byName }; return _saleDirMemo_; }
   // Doc chung 1 nguon Van phong/Online voi Bao cao E/F ("🏷️ Phân loại Online/Offline", setting
   // 'saleChannels') THEO YEU CAU DUYEN 2026-09 (ap dung dong bo cho MOI bao cao, ke ca tai khoan
   // dang nhap qua _syncSaleChannelsToUsers_ trong setSetting_) — chi fallback ve tag Pancake S#/O#
@@ -7817,7 +8047,8 @@ function readSaleDirectory_() {
       if (k) byName[_normTxt_(k)] = rec;
     });
   }
-  return { list: list, byName: byName };
+  _saleDirMemo_ = { list: list, byName: byName };
+  return _saleDirMemo_;
 }
 
 // Xac dinh cac NGAY (trong khoang from-to) THUC SU co du lieu tuong tac Pancake (sheet
@@ -14497,7 +14728,7 @@ function _ttBuildRows_(orders, prevRows, nowMs, skip) {
     seen[id] = true;
     var created = _ttParseVn_(o.ngayTao);
     if (created && created < cutoff) return;
-    if (_isExcludedOrderStatus_(o.trangThai)) return;
+    if (_isExcludedOrderStatus_(o.trangThai)) return;   // chi loai trang thai 'Thất bại' (EXCLUDED_ORDER_STATUSES_ — nguon duy nhat); don huy/hoan KHAC 'Thất bại' van duoc theo doi
     if (skip[_ttFold_(stage)]) return;           // da toi giai doan cuoi (Dong hang) -> khong nhac nua
     var p = prev[id], since;
     if (p && _ttFold_(p[1]) === _ttFold_(stage)) { since = _ttParseVn_(p[2]) || (p[2] && p[2].getTime ? p[2].getTime() : 0) || nowMs; }
@@ -14564,6 +14795,57 @@ function ttTodayTasks_(namesCsv) {
   var stuck = _ttStuckFromRows_(rows, namesCsv, hours, nowMs);
   return { ok: true, generatedAt: nowMs, trackedAt: Number(getSetting_('ttLastTrackedMs')) || 0, hours: hours,
     tasks: [{ key: 'stuckStage', title: 'Đơn Base kẹt giai đoạn quá ' + hours + ' giờ — vào kiểm tra', count: stuck.length, items: stuck.slice(0, 100) }] };
+}
+
+// ── B5 (ROADMAP-CRM-MAU): BANG KANBAN DON THEO GIAI DOAN BASE — chi doc, giai doan do Base quyet dinh (khong keo tha duoc).
+//    Moi cot = 1 giai doan (Tiep nhan don → ... → Dong hang); the = don Base gom id, san pham, gia tri, sale, nguoi dang xu ly (giaoCho),
+//    gio o giai doan (tu sheet theo doi o tren; null neu chua theo doi). Cot 'Dong hang' (cuoi) chi lay don 7 ngay gan nhat.
+var TT_STAGE_ORDER_ = ['Tiếp nhận đơn', 'Tạo đơn POS', 'Phân loại đơn', 'Phòng sản xuất', 'Kho thành phẩm', 'Đóng hàng'];
+var TT_BOARD_DONE_DAYS_ = 7;
+var TT_BOARD_CAP_ = 80;
+function _ttBoardBuild_(orders, trackRows, namesCsv, nowMs, hours, skip) {
+  var since = {};
+  trackRows.forEach(function(r) {
+    if (r[0] === '' || r[0] == null) return;
+    var t = r[2] && r[2].getTime ? r[2].getTime() : _ttParseVn_(r[2]);
+    if (t) since[String(r[0])] = { stage: _ttFold_(r[1]), t: t };
+  });
+  var want = {}, hasWant = false;
+  String(namesCsv || '').split('|').forEach(function(x) { var k = _normTxt_(x); if (k) { want[k] = true; hasWant = true; } });
+  var order = TT_STAGE_ORDER_.map(_ttFold_), cols = {}, seq = [], seen = {};
+  var lookback = nowMs - TT_LOOKBACK_DAYS_ * 86400000, doneFrom = nowMs - TT_BOARD_DONE_DAYS_ * 86400000;
+  orders.forEach(function(o) {
+    var id = String(o.id == null ? '' : o.id).trim(), stage = String(o.giaiDoan == null ? '' : o.giaiDoan).trim();
+    if (!id || !stage || seen[id]) return;
+    seen[id] = true;
+    if (_isExcludedOrderStatus_(o.trangThai)) return;
+    var created = _ttParseVn_(o.ngayTao), fold = _ttFold_(stage), isDone = !!skip[fold];
+    if (isDone) { var doneAt = _ttParseVn_(o.thoiGianHT) || created; if (!doneAt || doneAt < doneFrom) return; }
+    else if (created && created < lookback) return;
+    if (hasWant && !String(o.saleBan || '').split(',').some(function(t) { return want[_normTxt_(t)]; })) return;
+    var sc = since[id], h = (sc && sc.stage === fold) ? Math.floor((nowMs - sc.t) / 3600000) : null;
+    var col = cols[fold];
+    if (!col) { col = cols[fold] = { name: stage, items: [] }; seq.push(fold); }
+    col.items.push({ id: id, hours: h, stuck: !isDone && h !== null && h >= hours, sale: String(o.saleBan || ''), giaoCho: String(o.giaoCho == null ? '' : o.giaoCho).trim(),
+      sanPham: String(o.sanPham == null ? '' : o.sanPham).trim().slice(0, 120), value: Number(o.giaTriDon) || 0, ngayTao: String(o.ngayTao || '') });
+  });
+  // cot theo thu tu Base, cot la (giai doan khac) xep sau; cot Base chua co don van hien de du quy trinh
+  var out = [];
+  TT_STAGE_ORDER_.forEach(function(name, i) { var f = order[i]; out.push(cols[f] || { name: name, items: [] }); });
+  seq.forEach(function(f) { if (order.indexOf(f) === -1) out.push(cols[f]); });
+  return out.map(function(c) {
+    c.items.sort(function(a, b) { return (b.stuck - a.stuck) || ((b.hours || -1) - (a.hours || -1)); });
+    return { name: c.name, count: c.items.length, stuck: c.items.filter(function(x) { return x.stuck; }).length, items: c.items.slice(0, TT_BOARD_CAP_) };
+  });
+}
+function ttStageBoard_(namesCsv) {
+  var hours = parseFloat(getSetting_('ttStageHours')) || TT_DEFAULT_HOURS_, nowMs = Date.now();
+  var lastMs = Number(getSetting_('ttLastTrackedMs')) || 0;
+  if (nowMs - lastMs > TT_REFRESH_MIN_ * 60000) { try { ttTrackStages_(); } catch (e) { Logger.log('ttTrackStages_: ' + e); } }
+  var sh = getSheet_(TT_TRACK_SHEET_, TT_TRACK_HEADERS_), last = sh.getLastRow();
+  var rows = last >= 2 ? sh.getRange(2, 1, last - 1, TT_TRACK_HEADERS_.length).getValues() : [];
+  var stages = _ttBoardBuild_(readDTTong_(), rows, namesCsv, nowMs, hours, _ttSkipSet_());
+  return { ok: true, hours: hours, generatedAt: nowMs, trackedAt: Number(getSetting_('ttLastTrackedMs')) || 0, stages: stages };
 }
 
 
@@ -15217,11 +15499,14 @@ function _pkTagsOut_(raw, tmap) {
 // Ten nhan vien Pancake (bang pk_staff, do pkNhanVienDongBo dong bo). NGUYEN NHAN GOC them: hoi thoai chi luu assignee_ids (uuid Pancake) nen
 // khong hien duoc ten sale. LOI doc bang (chua tao / chua dong bo) KHONG duoc lam hong khung chat -> tra {} va chat van chay.
 function _pkStaffNames_() {
+  // Cache 6 gio (rong thi 10 phut): ham nay nam trong MOI lan poll hop thu -> neu moi lan lai goi Supabase thi ton 1 luot UrlFetch/poll.
+  var hit = _pkCacheGet_('pkStaffAll_'); if (hit) return hit;
+  var m = {};
   try {
-    var rows = sb_('GET', 'pk_staff?select=id,name&limit=1000').json || [], m = {};
-    rows.forEach(function (r) { if (r && r.id) m[String(r.id)] = String(r.name || ''); });
-    return m;
-  } catch (e) { return {}; }
+    (sb_('GET', 'pk_staff?select=id,name&limit=1000').json || []).forEach(function (r) { if (r && r.id) m[String(r.id)] = String(r.name || ''); });
+  } catch (e) { m = {}; }
+  _pkCachePut_('pkStaffAll_', m, Object.keys(m).length ? 21600 : 600);
+  return m;
 }
 function _pkConvOut_(c, names) {
   // assignees: ten tu bang pk_staff (pkNhanVienDongBo) truoc; thieu ten moi hoi API users cua Pancake (cache 6 gio). tags: ma so -> {ten, mau} (API tags cua page).
@@ -15284,9 +15569,15 @@ function pkChatInbox_(e) {
       var digits = q.replace(/\D/g, '');
       filter = '&' + ((digits.length >= 6 && digits.length >= q.length - 2) ? 'customer_phone=like.' + _pkEnc_('*' + digits + '*') : 'customer_name=ilike.' + _pkEnc_('*' + q + '*'));
     }
+    // NGUYEN NHAN GOC loi 'urlfetch qua nhieu lan/ngay': moi tab poll 8s -> moi lan >=2 UrlFetch (Supabase + ten NV) x nhieu tab x ca ngay vuot han muc
+    // (20.000/ngay tai khoan thuong). Danh sach hoi thoai giong nhau cho moi nguoi dung (khong loc theo nguoi) -> cache 15s DUNG CHUNG: bao nhieu tab cung chi ~4 luot/phut.
+    var ck = 'pkInbox_' + encodeURIComponent(q).slice(0, 80), hit = _pkCacheGet_(ck);
+    if (hit) return jsonOut_(hit);
     var _names = _pkStaffNames_();
     var cv = sb_('GET', 'pk_conversations?select=' + PK_CONV_COLS_ + filter + '&order=last_message_at.desc.nullslast&limit=60').json || [];
-    return jsonOut_({ ok: true, conversations: cv.map(function (c) { return _pkConvOut_(c, _names); }), serverTime: new Date().toISOString() });
+    var res = { ok: true, conversations: cv.map(function (c) { return _pkConvOut_(c, _names); }), serverTime: new Date().toISOString() };
+    _pkCachePut_(ck, res, 15);
+    return jsonOut_(res);
   } catch (err) { return jsonOut_({ error: 'Doc hop thu loi: ' + String(err && err.message || err).slice(0, 200) }); }
 }
 // GET pkChatConv: tin nhan cua 1 hoi thoai theo convId (after=<ISO> chi lay tin moi hon moc do).
@@ -15848,6 +16139,32 @@ function pkStaffSync_(opts) {
 }
 function pkNhanVienThu() { Logger.log(JSON.stringify(pkStaffSync_({ dryRun: true }), null, 2)); }
 function pkNhanVienDongBo() { Logger.log(JSON.stringify(pkStaffSync_({}), null, 2)); }
+// ── DANH MUC THE + NHAN VIEN -> Supabase (pk_tags, pk_staff) de WORKER doc thang (khong goi Pancake moi lan poll). Chi ~2 luot UrlFetch/page moi lan chay.
+//    pkDanhMucDongBo: chay tay 1 lan. pkDanhMucCaiTrigger: tu dong 6 gio/lan (xoa trigger cu cung ham truoc khi cai -> khong trung lap).
+function pkTagSync_(opts) {
+  opts = opts || {};
+  var toks = _pkAllPageTokens_(), pages = Object.keys(toks), res = { pages: pages.length, tags: 0, errors: [] }, rows = [];
+  pages.forEach(function (pg) {
+    try {
+      var j = _pkFetchJson_('https://pages.fm/api/public_api/v1/pages/' + _pkEnc_(pg) + '/tags?page_access_token=' + _pkEnc_(toks[pg]));
+      (j && Array.isArray(j.tags) ? j.tags : (Array.isArray(j) ? j : [])).forEach(function (t) {
+        if (!t || t.id === undefined || t.id === null) return;
+        rows.push({ id: String(pg) + ':' + String(t.id), page_id: String(pg), tag_id: String(t.id), text: String(t.text || t.name || ''),
+                    color: /^#[0-9a-fA-F]{3,8}$/.test(String(t.color || '')) ? String(t.color) : '', raw: t, updated_at: new Date().toISOString() });
+      });
+    } catch (e) { res.errors.push(pg + ': ' + String(e && e.message || e).slice(0, 200)); }
+  });
+  res.tags = rows.length;
+  if (!opts.dryRun && rows.length) for (var i = 0; i < rows.length; i += 200) sb_('POST', 'pk_tags?on_conflict=id', rows.slice(i, i + 200), { Prefer: 'resolution=merge-duplicates,return=minimal' });
+  return res;
+}
+function pkDanhMucDongBo() { Logger.log(JSON.stringify({ staff: pkStaffSync_({}), tags: pkTagSync_({}) }, null, 2)); }
+function pkDanhMucTick_() { try { pkStaffSync_({}); pkTagSync_({}); } catch (e) { Logger.log('pkDanhMucTick loi: ' + e); } }
+function pkDanhMucCaiTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'pkDanhMucTick_') ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('pkDanhMucTick_').timeBased().everyHours(6).create();
+  Logger.log('Da cai pkDanhMucTick_ 6 gio/lan.');
+}
 function pkLichSuCaiTrigger() {
   removePkLichSuTrigger_();
   ScriptApp.newTrigger('pkLichSuTick_').timeBased().everyMinutes(10).create();

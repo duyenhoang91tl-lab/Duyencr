@@ -16,7 +16,7 @@ function renderSocialChatTab() {
     w.insertAdjacentHTML('beforeend', '<div class="sc-info" id="sc-info"><div class="pkc-note">Chọn một hội thoại để xem thông tin khách.</div></div>');   // cột Thông tin khách kiểu Pancake (js/48)
   }
   _scStop(); scLoadList();
-  _sc.timer = setInterval(function () { if (!_scOpen()) { _scStop(); return; } if (!document.hidden) { scLoadList(); if (_sc.active) scLoadMsgs(false); } }, 8000);
+  _sc.timer = setInterval(function () { if (!_scOpen()) { _scStop(); return; } if (!document.hidden) { scLoadList(); if (_sc.active) scLoadMsgs(false); } }, 20000);
   if (_sc.active) scDockSync(); else if (window._scDocked) _scUndock();   // vào lại tab: hiện đúng hồ sơ của hội thoại đang chọn, chưa chọn thì không để hồ sơ cũ treo ở đó
 }
 var _scQT;

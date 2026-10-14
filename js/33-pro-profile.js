@@ -27,6 +27,31 @@ function proKpiHtml_(days, nOrders, rev){
    + '<div class="pro-kpi purple"><span class="k-l">Doanh thu</span><span class="k-v">'+f(rev)+'</span><span class="k-s">đ</span></div>'
    + '</div>';
 }
+// ── B3c: thông tin nhanh dưới 3 thẻ (docs/ROADMAP-CRM-MAU.md): mua gần nhất · dự kiến tái mua (= mua gần nhất + chu kỳ ở trang Cấu hình) · kênh ưu tiên · không nhận quảng bá ──
+var PRO_PREF_CHANNELS = [ { v:'zalo', t:'Zalo' }, { v:'phone', t:'Điện thoại' }, { v:'facebook', t:'Facebook' }, { v:'sms', t:'SMS' } ];
+function proLastOrderTs_(orders){
+  var best = null;
+  (orders||[]).forEach(function(o){
+    var t = (o.date instanceof Date && !isNaN(o.date)) ? o.date.getTime() : (o.year ? new Date(o.year<100?2000+o.year:o.year, (o.month||1)-1, 1).getTime() : null);
+    if (t!==null && (best===null || t>best)) best = t;
+  });
+  return best;
+}
+function proFactsHtml_(orders, custom, now, cycle){
+  custom = custom || {}; now = now || new Date();
+  var fmt = function(ms){ var d = new Date(ms), p = function(n){ return (n<10?'0':'')+n; }; return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear(); };
+  var chip = function(txt, cls){ return '<span style="display:inline-block;padding:3px 9px;border-radius:999px;font-size:11.5px;margin:2px 4px 2px 0;'+(cls==='red'?'background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5':cls==='warn'?'background:#fff7ed;color:#c2410c;border:1px solid #fdba74':'background:var(--surface2,#f3f4f6);color:var(--text);border:1px solid var(--border)')+'">'+txt+'</span>'; };
+  var out = [], last = proLastOrderTs_(orders);
+  if (last!==null){
+    out.push(chip('🛒 Mua gần nhất: <b>'+fmt(last)+'</b>'));
+    var due = last + (cycle||30)*86400000, late = Math.floor((now.getTime()-due)/86400000);
+    out.push(late>=0 ? chip('🔄 Dự kiến tái mua: <b>'+fmt(due)+'</b>'+(late>0?' — quá '+late+' ngày':' — hôm nay'), late>0?'warn':'') : chip('🔄 Dự kiến tái mua: <b>'+fmt(due)+'</b> (còn '+(-late)+' ngày)'));
+  }
+  var pc = PRO_PREF_CHANNELS.find(function(x){ return x.v===custom.prefChannel; });
+  if (pc) out.push(chip('⭐ Kênh ưu tiên: <b>'+pc.t+'</b>'));
+  if (custom.noPromo) out.push(chip('🚫 Không nhận quảng bá', 'red'));
+  return out.length ? '<div style="margin:2px 0 8px">'+out.join('')+'</div>' : '';
+}
 function proStageHtml_(model){
   if (!model.length) return '';
   return '<ul class="pro-stage">'+model.map(function(m){ return '<li class="'+(m.cur?'cur':'')+'" title="'+String(m.label).replace(/"/g,'&quot;')+'">'+String(m.label).replace(/</g,'&lt;')+'</li>'; }).join('')+'</ul>';
@@ -107,6 +132,7 @@ function proRenderProfile_(){
   var tl = proTimeline_(D.notes, mine, D.orders, 30), tlTotal = D.notes.length + mine.length + D.orders.length;
   host.innerHTML = proStageHtml_(proStageModel_(CARE_STATUS_TREE, care.status||c.careStatus||''))
                  + proKpiHtml_(proDaysSinceLastOrder_(c.orders, new Date()), nOrd, _custRev_(c))
+                 + proFactsHtml_(c.orders, care.custom||c.custom, new Date(), (typeof _hmCfg==='function'?_hmCfg().cycle:30))
                  + proNextHtml_(proNextActions_(mine, c.phone, _ymd(new Date()), types, 3))
                  + proTimelineHtml_(tl, tlTotal);
   var det = host.querySelector('details.pro-tl-d'); if (det && wasOpen) det.open = true;

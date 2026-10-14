@@ -19,6 +19,8 @@ function doGet(e) {
   if (_gateErr) return jsonOut_(_gateErr);
   var _ownErr = _ownerGate_(action, p.token);
   if (_ownErr) return jsonOut_(_ownErr);
+  var _scpErr = _scopeGate_(action, p.token, p.phone);
+  if (_scpErr) return jsonOut_(_scpErr);
   return doGetCore_(e);
 }
 
@@ -123,6 +125,7 @@ function doGetCore_(e) {
     }
     if (action === 'saleDirectory') return jsonOut_(readSaleDirectory_());
     if (action === 'saleGroups') return jsonOut_({ ok: true, groups: readSaleGroups_() });
+    if (action === 'posMonthAdjust') return jsonOut_(posMonthAdjust_(e.parameter.month));
     // ── Nguon "Cham soc" (KH them nhanh, sheet rieng) — khong gop CareData/bao cao A-B-C ──
     if (action === 'careLeads') return jsonOut_({ rows: readCareLeads_() });
     // ── Nguon "CSKH-Duyên" (sheet thu 3, cung file DT TONG) — CRM gop vao khach theo SDT, xem readCskhDuyen_ ──
@@ -423,12 +426,13 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.46-owner-gate' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.49-pknative' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
     // ── NHAC VIEC HOM NAY (don Base ket giai doan > N gio). names = ten sale cua CS cach nhau '|' (rong = tat ca) ──
     if (action === 'todayTasks') return jsonOut_(ttTodayTasks_(e && e.parameter ? e.parameter.names : ''));
+    if (action === 'stageBoard') return jsonOut_(ttStageBoard_(e && e.parameter ? e.parameter.names : ''));   // Bang Kanban don Base theo giai doan (B5)
     if (action === 'reminders') {
       var csFilter = (e && e.parameter && e.parameter.cs) ? String(e.parameter.cs) : '';
       return jsonOut_({ reminders: readRemindersToday_(csFilter) });

@@ -580,6 +580,23 @@ function _userAliasGroups_() {
       });
     });
   } catch (e) {}
+  // Thẻ do admin gán trong Quản lý Team (Settings 'salePersonTags' = { "<tên chính>": ["thẻ", ...] }): cùng 1 người.
+  try {
+    var rawTags = getSetting_('salePersonTags');
+    if (rawTags) {
+      var tagObj = JSON.parse(rawTags) || {};
+      Object.keys(tagObj).forEach(function(primary) {
+        var uniq = [];
+        [primary].concat(Array.isArray(tagObj[primary]) ? tagObj[primary] : []).forEach(function(x) { x = String(x || '').trim(); if (x && uniq.indexOf(x) === -1) uniq.push(x); });
+        if (uniq.length < 2) return;
+        uniq.forEach(function(n) {
+          var k = _normTxt_(n), cur = map[k] || [];
+          uniq.forEach(function(x) { if (cur.indexOf(x) === -1) cur.push(x); });
+          map[k] = cur;
+        });
+      });
+    }
+  } catch (e2) {}
   return map;
 }
 // Trả hàm (tên sale bất kỳ) → tên Team; tìm theo chính tên đó, rồi theo MỌI tên khác của cùng người, rồi theo bảng khớp tên Pancake.
@@ -625,7 +642,36 @@ function _expandSaleFilterWithPancakeAliases_(names) {
   out.slice().forEach(function(n) {
     (_grp[_normTxt_(n)] || []).forEach(function(a) { var k = _normTxt_(a); if (!_seenF[k]) { _seenF[k] = true; out.push(a); } });
   });
-  return out;
+  // SUA 2026-10-14 (yeu cau Duyen): loc theo Team van ra 0 doanh thu voi nhung Sale CHUA tung duoc
+  // khop tay o PancakeNameMap va CHUA duoc gan "nhieu ten" o sheet Users (2 nguon tren) — trong khi
+  // sheet SaleDirectory ("🗂️ Quản lý tài khoản") da luu SAN ca 4 ten cua 1 nhan vien (ma Sale, ten
+  // Facebook, user Base, the tag Pancake) ngay luc tao tai khoan, la nguon CHUAN nhat nhung truoc
+  // gio bi bo qua hoan toan o ham nay. The chon Team tra ra ten Facebook/username, con cot "Thẻ"
+  // cua Pos lai ghi the tag Pancake (vd "ninhnga99") -> khong co doan duoi day thi 2 ten nay khong
+  // bao gio khop nhau. Fix: voi MOI dong SaleDirectory, neu BAT KY ten nao dang co trong bo loc (ke
+  // ca cac ten vua duoc PancakeNameMap/Users mo rong o tren) khop 1 trong 4 bien the cua dong do thi
+  // them CA 4 bien the con lai vao bo loc.
+  try {
+    var dirList = readSaleDirectory_().list || [];
+    var curFold = {};
+    out.forEach(function(n) { curFold[_normTxt_(n)] = true; });
+    for (var di = 0; di < dirList.length; di++) {
+      var rec = dirList[di];
+      var variants = [rec.maSale, rec.code, rec.tenFacebook, rec.userBase, rec.tenTagPancake].filter(Boolean);
+      var hit = false;
+      for (var vi = 0; vi < variants.length; vi++) { if (curFold[_normTxt_(variants[vi])]) { hit = true; break; } }
+      if (hit) { for (var vj = 0; vj < variants.length; vj++) out.push(variants[vj]); }
+    }
+  } catch (eDir) {}
+  // Khu trung (ten lap do bi nhieu nguon cung them) — giu nguyen thu tu xuat hien dau tien.
+  var seenOut = {}, dedup = [];
+  for (var oi = 0; oi < out.length; oi++) {
+    var key = _normTxt_(out[oi]);
+    if (key && seenOut[key]) continue;
+    if (key) seenOut[key] = true;
+    dedup.push(out[oi]);
+  }
+  return dedup;
 }
 
 // Ten "sale" dac biet co khoang trang tren cot The (khong phai username Pancake) nhung ke toan van tinh la 1 sale rieng — vd
