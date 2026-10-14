@@ -126,3 +126,5 @@ Yeu cau cua Duyen: Chat noi bo hien thi duoc o cua so chat nho o goc duoi phai (
 - [x] 4c-1 gas v13.46-owner-gate: chi chu so huu (`ownerUsers`, mac dinh = role admin) moi sua/xoa don o backend. Chi tiet + viec tiep: docs/SECURITY-PLAN.md muc "Buoc 4c-1".
 - [ ] Can nguoi dung: cho biet username admin "Duyent" de chay `datChuSoHuu`; xac nhan co bo `deleteDuplicateOrders` khoi extension Zalo khong.
 - [ ] Tiep theo: 4c-2 (loc khach theo CS o server) roi 4c-3 (action dang mo).
+- [x] 4c-2a gas v13.47-scope-gate: loc pham vi khach theo CS cho lookup/donOrdersByPhone/cskhDetail, cong tac `scopeMode` off|log|enforce (MAC DINH off). Chi tiet: docs/SECURITY-PLAN.md "Buoc 4c-2a".
+- [ ] Can Duyen: chay `datChuSoHuu` (username Duyent), roi `datPhamVi('log')`; xem `xemLogPhamVi` sau 2-3 ngay roi moi `enforce`. Tiep: 4c-2b (customers/reminders/orders + leader).

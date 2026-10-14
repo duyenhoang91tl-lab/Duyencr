@@ -112,4 +112,46 @@ ok(run('_featureGate_','salesReportA','tokCs')===null,'bo phan khong khop nguoi 
   ok(run('_ownerGate_','deleteOrder','tokA2')===null,'xoa owner -> quay lai du phong role admin');
 }
 
+// ===== BUOC 4c-2a: pham vi khach theo CS o server (lookup/donOrdersByPhone/cskhDetail) =====
+{
+  let PR={}, NOTES=[];
+  ctx.PropertiesService={getScriptProperties:()=>({getProperty:k=>PR[k]===undefined?null:PR[k],setProperty:(k,v)=>{PR[k]=v;}})};
+  const mk=(role,names)=>({username:role+(names&&names[0]||''),role,names:names||[]});
+  const own=h=>()=>h;   // namesFn gia: tap ten so huu 1 SDT
+  const H={'Hoa':1,'Lan':1};
+  ok(ctx._scopeVerdict_(mk('cs',['Hoa']),'0901',own(H))===true,'CS co ten trong careCS/don/assign -> trong pham vi');
+  ok(ctx._scopeVerdict_(mk('cs',['Mai']),'0901',own(H))===false,'CS khac -> NGOAI pham vi');
+  ok(ctx._scopeVerdict_(mk('cs',['Mai','Lan']),'0901',own(H))===true,'tai khoan gop nhieu ten: 1 ten khop la du');
+  ok(ctx._scopeVerdict_(mk('manager',['Mai']),'0901',own(H))===false,'manager khoi tao nhu CS (theo ten duoc gan)');
+  ok(ctx._scopeVerdict_(mk('cs',[]),'0901',own(H))===false,'CS chua gan ten -> khong thay khach nao (nhu client)');
+  ok(ctx._scopeVerdict_(mk('admin',[]),'0901',own(H))===true,'admin xem tat ca');
+  ok(ctx._scopeVerdict_(mk('viewer',[]),'0901',own(H))===true&&ctx._scopeVerdict_(mk('ceo',[]),'0901',own(H))===true,'viewer/ceo khong gioi han (nhu client)');
+  ok(ctx._scopeVerdict_(mk('leader',['Mai']),'0901',own(H))===null,'leader: chua kiem o server -> null (cho qua)');
+  // gate theo che do
+  const U1={username:'cs_mai',role:'cs',names:['Mai']};
+  ctx._sessUser_=t=>t==='tokMai'?U1:null;
+  ctx._scopeNamesForPhone_=()=>H;
+  const CS={};ctx.CacheService={getScriptCache:()=>({get:k=>CS[k]===undefined?null:CS[k],put:(k,v)=>{CS[k]=v;}})};
+  ctx.Utilities={formatDate:()=> '20261014'};
+  ok(ctx._scopeGate_('lookup','tokMai','0901')===null,'mac dinh OFF: khong lam gi');
+  PR.scopeMode='log';
+  ok(ctx._scopeGate_('lookup','tokMai','0901123')===null,'che do LOG: khong chan');
+  const rep=ctx._scopeReport_();
+  ok(rep.rows.some(r=>r.k==='cs_mai | lookup | OUT'&&r.n===1)&&rep.outSamples[0]==='cs_mai:***123','LOG ghi dem OUT + SDT da che ***123');
+  ok(!JSON.stringify(rep).includes('0901123'),'log KHONG chua SDT day du');
+  PR.scopeMode='enforce';
+  const d=ctx._scopeGate_('donOrdersByPhone','tokMai','0901');
+  ok(d&&d.code==='FORBIDDEN','che do ENFORCE: CS ngoai pham vi -> FORBIDDEN');
+  ctx._scopeNamesForPhone_=()=>({'Mai':1});
+  ok(ctx._scopeGate_('cskhDetail','tokMai','0901')===null,'ENFORCE: khach cua chinh minh -> cho qua');
+  ok(ctx._scopeGate_('customers','tokMai','0901')===null,'action ngoai danh sach -> khong dong vao');
+  ok(ctx._scopeGate_('lookup','','0901')===null&&ctx._scopeGate_('lookup','tokSai','0901')===null,'khong token / token sai -> de 4b xu ly');
+  ok(ctx._scopeGate_('lookup','tokMai','')===null,'khong co phone -> bo qua');
+  ok(/_scopeGate_\(action, p\.token, p\.phone\)/.test(src),'doGet goi _scopeGate_');
+  ctx._sessUser_=()=>{throw new Error('x');};
+  ok(ctx._scopeGate_('lookup','tokMai','0901')===null,'loi bat ngo -> nuot, KHONG chan nham');
+  // lookup = chi cac action doc theo SDT
+  ok(Object.keys(ctx.SCOPE_ACTIONS_).sort().join()==='cskhDetail,donOrdersByPhone,lookup','SCOPE_ACTIONS_ dung 3 action doc theo SDT');
+}
+
 console.log(fail?'\nFAILED '+fail:'\nALL ROLES TESTS PASSED');process.exit(fail?1:0);
