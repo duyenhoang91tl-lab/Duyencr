@@ -20,7 +20,7 @@ function run(scn) {
     buildPancakeReport_: () => ({ byCS: scn.byCS, byPage: [{ pageId: 'P1', tongTT: scn.byCS.reduce((s, r) => s + r.tongTT, 0) }] }),
   };
   vm.createContext(ctx);
-  ['_normTxt_', '_salePersonKeyFn_', '_srCloseRateSections_'].forEach((n) => { const code = grab(n); if (code) vm.runInContext(code, ctx); });
+  ['_normTxt_', '_stripVN_', '_foldSaleKey_', '_salePersonKeyFn_', '_salePersonKeyWithOrphanFold_', '_srCloseRateSections_'].forEach((n) => { const code = grab(n); if (code) vm.runInContext(code, ctx); });
   const rows = []; (scn.orders || []).forEach(([sale, n]) => { for (let i = 0; i < n; i++) rows.push({ kenhBan: 'K1', dateStr: '2026-10-05', saleBanRaw: sale }); });
   return ctx._srCloseRateSections_(rows, { dateFrom: '2026-10-01', dateTo: '2026-10-31' });
 }
@@ -63,9 +63,28 @@ let o6 = run({ pkMap: { SharedAcc: 'saleA|saleB' }, byCS: [{ name: 'saleA', tong
 eq([find(o6.saleCloseRate, 'saleA').closed, find(o6.saleCloseRate, 'saleB').closed], [5, 20], 'saleA|saleB khong bi gop thanh 1 nguoi');
 
 // === Khong co lien ket nao: hanh vi cu giu nguyen (2 ten khac nhau = 2 dong) ===
-let o7 = run({ byCS: [{ name: 'thuydinh1995', tongTT: 100 }], orders: [['thuydinh95', 3]], pkRows: [] });
-eq(o7.saleCloseRate.length, 2, 'chua link thi van tach 2 dong nhu cu (khong tu doan)');
+let o7 = run({ byCS: [{ name: 'thuydinh1995', tongTT: 100 }], orders: [['tdinh95', 3]], pkRows: [] });
+eq(o7.saleCloseRate.length, 2, 'chua link + khac phan chu -> van tach 2 dong (khong tu doan)');
 // === Don chua gan sale + khac hoa/thuong ===
 let o8 = run({ byCS: [{ name: 'Ninh Nga', tongTT: 10 }], orders: [['ninh nga', 1], ['', 2]], pkRows: [] });
 eq([find(o8.saleCloseRate, 'ninh nga').closed, find(o8.saleCloseRate, '(chưa gán sale)').closed], [1, 2], 'khac hoa/thuong gop dung; don chua gan sale giu nguyen');
+
+// === MO COI: KHONG co lien ket nao khai bao — theo quy uoc _resolveBonusSale_ (bo so duoi): 'thuydinh95' -> 'thuydinh1995' (dung tinh huong cua Duyen: link o Khop ten chi noi ten Pancake -> Sale) ===
+const orph = { byCS: [{ name: 'Thuydinh1995', tongTT: 1859 }, { name: 'ninhnga99', tongTT: 2998 }, { name: 'yenNTH2004', tongTT: 1768 }],
+  orders: [['thuydinh95', 55], ['ninhnga99', 57], ['yenNTH2004', 25]], pkRows: [pkRow('Thuydinh1995', 1859)], pkMap: {} };
+let p1 = run(orph);
+eq(find(p1.saleCloseRate, 'thuydinh1995') && [find(p1.saleCloseRate, 'thuydinh1995').closed, find(p1.saleCloseRate, 'thuydinh1995').held], [55, 1859], 'mo coi thuydinh95 -> gop vao thuydinh1995 (55/1859) du chua khai bao lien ket');
+eq(p1.saleCloseRate.some((r) => r.name.toLowerCase() === 'thuydinh95'), false, 'khong con dong mo coi thuydinh95');
+eq(p1.saleCloseRate.reduce((s, r) => s + r.closed, 0), 137, 'tong don giu nguyen 137 (khong mat, khong dem doi)');
+const pg1 = p1.saleCloseByPage.rows.find((r) => /thuydinh/i.test(r.name));
+eq(pg1 && [pg1.total.closed, pg1.total.held], [55, 1859], 'bang theo Page cung gop mo coi');
+// nhap nhang: 2 ung vien cung phan chu -> KHONG doan
+let p2 = run({ byCS: [{ name: 'thuydinh1995', tongTT: 100 }, { name: 'thuydinh2001', tongTT: 100 }], orders: [['thuydinh95', 5]], pkRows: [], pkMap: {} });
+eq(p2.saleCloseRate.map((r) => r.name + ':' + r.closed + '/' + r.held).sort(), ['thuydinh1995:0/100', 'thuydinh2001:0/100', 'thuydinh95:5/0'], 'nhap nhang (2 ung vien) -> khong gop, giu dong mo coi de canh bao');
+// ten co tuong tac rieng KHONG bi gop sang ten khac cung phan chu
+let p3 = run({ byCS: [{ name: 'thuydinh1995', tongTT: 100 }, { name: 'thuydinh95', tongTT: 50 }], orders: [['thuydinh95', 5], ['thuydinh1995', 7]], pkRows: [], pkMap: {} });
+eq([find(p3.saleCloseRate, 'thuydinh1995').closed, find(p3.saleCloseRate, 'thuydinh95').closed], [7, 5], 'da co tuong tac rieng -> khong bi gop (chi gop ten mo coi)');
+// phan chu qua ngan (< 4) -> khong gop
+let p4 = run({ byCS: [{ name: 'an1995', tongTT: 100 }], orders: [['an95', 5]], pkRows: [], pkMap: {} });
+eq(p4.saleCloseRate.length, 2, 'phan chu < 4 ky tu -> khong gop');
 console.log(fails ? '\n' + fails + ' CA SAI' : '\nTAT CA PASS'); process.exit(fails ? 1 : 0);

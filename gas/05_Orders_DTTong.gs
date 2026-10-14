@@ -641,6 +641,27 @@ function _salePersonKeyFn_() {
   } catch (e3) {}
   return function(name) { return find(_normTxt_(name)); };
 }
+// Gop them cac ten "mo coi" theo QUY UOC SAN CO cua _resolveBonusSale_ (tinh thuong): ten co DON nhung KHONG co tuong tac Pancake
+// nao (vd POS ghi 'thuydinh95', Pancake/CRM ghi 'thuydinh1995') duoc gop vao ten co tuong tac neu phan CHU (bo so duoi, >= 4 ky tu)
+// trung KHOP DUNG 1 ten. Nhap nhang (>= 2 ung vien) hoac khong co ung vien -> KHONG gop (de canh bao hien ra, khong doan bua).
+// Chi gop ten mo coi; ten da co tuong tac rieng khong bao gio bi gop sang ten khac. baseKey = ket qua _salePersonKeyFn_().
+function _salePersonKeyWithOrphanFold_(baseKey, anchorNames, orderNames) {
+  function stem(n) { var k = _foldSaleKey_(n).replace(/[0-9]+$/, ''); return k.length >= 4 ? k : ''; }
+  var anchorKeys = {}, stemToAnchors = {};
+  (anchorNames || []).forEach(function(n) {
+    var k = baseKey(n); anchorKeys[k] = true;
+    var st = stem(n); if (st) { if (!stemToAnchors[st]) stemToAnchors[st] = {}; stemToAnchors[st][k] = true; }
+  });
+  var redirect = {};
+  (orderNames || []).forEach(function(n) {
+    var k = baseKey(n);
+    if (anchorKeys[k] || redirect[k] !== undefined) return;
+    var st = stem(n); if (!st) return;
+    var cands = Object.keys(stemToAnchors[st] || {});
+    if (cands.length === 1) redirect[k] = cands[0];
+  });
+  return function(name) { var k = baseKey(name); return redirect[k] !== undefined ? redirect[k] : k; };
+}
 // Trả hàm (tên sale bất kỳ) → tên Team; tìm theo chính tên đó, rồi theo MỌI tên khác của cùng người, rồi theo bảng khớp tên Pancake.
 // Thành viên Team gồm cả leader (giống tab Quản lý Team). Không tìm ra → unassigned.
 function _makeTeamResolver_(unassigned) {

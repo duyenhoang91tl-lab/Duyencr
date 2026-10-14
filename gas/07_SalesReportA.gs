@@ -67,8 +67,16 @@ function _srCloseRateSections_(normRows, filters) {
 
   var saleCloseRate = [];
   var closeFrom = '';
+  // Khoa "cung 1 nguoi" DUNG CHUNG cho bang theo Sale va theo Page: nguon lien ket khai bao + gop ten mo coi (xem 2 ham tren).
+  var personKey = null;
   if (hasAnyPkData) {
-    var personKey = _salePersonKeyFn_();   // cung 1 nguoi nhieu ten (base/pos) -> 1 dong, khong tach doi
+    var pAnchor = buildPancakeReport_(filters.dateFrom, filters.dateTo, 'equal');
+    var anchorNames = pAnchor.byCS.filter(function(r) { return (r.tongTT || 0) > 0; }).map(function(r) { return r.name; });
+    var orderNamesAll = [];
+    for (var oi0 = 0; oi0 < normRows.length; oi0++) splitMulti_(normRows[oi0].saleBanRaw, ',').forEach(function(n) { orderNamesAll.push(n); });
+    personKey = _salePersonKeyWithOrphanFold_(_salePersonKeyFn_(), anchorNames, orderNamesAll);
+  }
+  if (hasAnyPkData) {
     var closeOrdersBySale = {}, orderDisp = {};
     for (var ci = 0; ci < normRows.length; ci++) {
       var mc = normRows[ci];
@@ -137,7 +145,7 @@ function _srCloseRateSections_(normRows, filters) {
   var saleCloseByPage = { pages: [], rows: [] };
   if (hasAnyPkData) {
     var mapSaleK = readPancakeMap_();
-    var personKeyP = _salePersonKeyFn_(), pgDisp = {}; // khoa 'cung 1 nguoi' + ten hien thi (Pancake di truoc)
+    var personKeyP = personKey, pgDisp = {}; // khoa 'cung 1 nguoi' (dung chung o tren) + ten hien thi (Pancake di truoc)
     var pageInfoByKenh = {};
     var ttBySaleKenh = {};
     var vPk = _pkStatsRowsMemo_();

@@ -2610,7 +2610,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.51-closerate-person-fold' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.52-closerate-orphan-fold' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -3362,6 +3362,27 @@ function _salePersonKeyFn_() {
     });
   } catch (e3) {}
   return function(name) { return find(_normTxt_(name)); };
+}
+// Gop them cac ten "mo coi" theo QUY UOC SAN CO cua _resolveBonusSale_ (tinh thuong): ten co DON nhung KHONG co tuong tac Pancake
+// nao (vd POS ghi 'thuydinh95', Pancake/CRM ghi 'thuydinh1995') duoc gop vao ten co tuong tac neu phan CHU (bo so duoi, >= 4 ky tu)
+// trung KHOP DUNG 1 ten. Nhap nhang (>= 2 ung vien) hoac khong co ung vien -> KHONG gop (de canh bao hien ra, khong doan bua).
+// Chi gop ten mo coi; ten da co tuong tac rieng khong bao gio bi gop sang ten khac. baseKey = ket qua _salePersonKeyFn_().
+function _salePersonKeyWithOrphanFold_(baseKey, anchorNames, orderNames) {
+  function stem(n) { var k = _foldSaleKey_(n).replace(/[0-9]+$/, ''); return k.length >= 4 ? k : ''; }
+  var anchorKeys = {}, stemToAnchors = {};
+  (anchorNames || []).forEach(function(n) {
+    var k = baseKey(n); anchorKeys[k] = true;
+    var st = stem(n); if (st) { if (!stemToAnchors[st]) stemToAnchors[st] = {}; stemToAnchors[st][k] = true; }
+  });
+  var redirect = {};
+  (orderNames || []).forEach(function(n) {
+    var k = baseKey(n);
+    if (anchorKeys[k] || redirect[k] !== undefined) return;
+    var st = stem(n); if (!st) return;
+    var cands = Object.keys(stemToAnchors[st] || {});
+    if (cands.length === 1) redirect[k] = cands[0];
+  });
+  return function(name) { var k = baseKey(name); return redirect[k] !== undefined ? redirect[k] : k; };
 }
 // Trả hàm (tên sale bất kỳ) → tên Team; tìm theo chính tên đó, rồi theo MỌI tên khác của cùng người, rồi theo bảng khớp tên Pancake.
 // Thành viên Team gồm cả leader (giống tab Quản lý Team). Không tìm ra → unassigned.
@@ -4263,8 +4284,16 @@ function _srCloseRateSections_(normRows, filters) {
 
   var saleCloseRate = [];
   var closeFrom = '';
+  // Khoa "cung 1 nguoi" DUNG CHUNG cho bang theo Sale va theo Page: nguon lien ket khai bao + gop ten mo coi (xem 2 ham tren).
+  var personKey = null;
   if (hasAnyPkData) {
-    var personKey = _salePersonKeyFn_();   // cung 1 nguoi nhieu ten (base/pos) -> 1 dong, khong tach doi
+    var pAnchor = buildPancakeReport_(filters.dateFrom, filters.dateTo, 'equal');
+    var anchorNames = pAnchor.byCS.filter(function(r) { return (r.tongTT || 0) > 0; }).map(function(r) { return r.name; });
+    var orderNamesAll = [];
+    for (var oi0 = 0; oi0 < normRows.length; oi0++) splitMulti_(normRows[oi0].saleBanRaw, ',').forEach(function(n) { orderNamesAll.push(n); });
+    personKey = _salePersonKeyWithOrphanFold_(_salePersonKeyFn_(), anchorNames, orderNamesAll);
+  }
+  if (hasAnyPkData) {
     var closeOrdersBySale = {}, orderDisp = {};
     for (var ci = 0; ci < normRows.length; ci++) {
       var mc = normRows[ci];
@@ -4333,7 +4362,7 @@ function _srCloseRateSections_(normRows, filters) {
   var saleCloseByPage = { pages: [], rows: [] };
   if (hasAnyPkData) {
     var mapSaleK = readPancakeMap_();
-    var personKeyP = _salePersonKeyFn_(), pgDisp = {}; // khoa 'cung 1 nguoi' + ten hien thi (Pancake di truoc)
+    var personKeyP = personKey, pgDisp = {}; // khoa 'cung 1 nguoi' (dung chung o tren) + ten hien thi (Pancake di truoc)
     var pageInfoByKenh = {};
     var ttBySaleKenh = {};
     var vPk = _pkStatsRowsMemo_();
