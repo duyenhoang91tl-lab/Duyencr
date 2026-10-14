@@ -22,8 +22,8 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `PRICE_LAST_COL_`, `GIA_COL_MIN_`, `GIA_COL_LIMIT_`, `_PRICE_STOPWORDS_`, `_CTKM_END_KW_`, `_CTKM_START_KW_`, `_CTKM_EXCL_KW_`, `_CTKM_KEYWORDS_`
 
 ## 03_Settings_CareRead.gs
-- Hàm: `getSetting_`, `getSettingsMulti_`, `setGasSource_`, `readSaleGroups_`, `saveSaleGroups_`, `_saleGroupLabel_`, `_auditClip_`, `_auditActor_`, `_auditCfg_`, `_auditDiffRows_`, `_auditUserSig_`, `setSetting_`, `_syncSaleChannelsToUsers_`, `addZaloNick_`, `readCareStatus_`, `careObjFromRow_`, `readCare_`, `readCareDelta_`, `readRemindersToday_`, `_remindersFromRows_`, `findCareByPhone_`, `careRow_`, `readExistingExtFields_`, `mergeExtFields_`, `_legacyReadOrdersUnused_`, `readTeams_`, `readUsers_`, `_secEq_`, `_adminKeyOk_`, `_isSensitiveSettingKey_`, `_isSensitiveWriteKey_`, `_demoToken_`, `_demoTokenOk_`, `_demoSrcOf_`, `_demoClipPerSource_`, `_demoMaskPhone_`, `_demoMaskText_`, `_demoMaskDeep_`, `_demoClip_`, `demoLogin_`, `_sessSecret_`, `_sessSign_`, `_sessIssue_`, `_sessVerify_`, `_sessUser_`, `_usersForClient_`, `_roleStrList_`, `_roleCfgNormalize_`, `readRoleConfig_`, `_roleResolve_`, `_roleBase_`, `_userDeptKeys_`, `_featureAllowed_`, `_featureGate_`, `roleConfigForClient_`, `saveRoleConfig_`, `_usersWriteAuth_`, `_upgradePwHash_`, `_checkLogin_`, `webLogin_`, `_ntlKey_`, `_extKeys_`, `_extKeyNew_`, `_extKeyEnsure_`, `_extKeyRotate_`, `_extKeyWho_`, `xemKhoaExtension`, `doiKhoaZalo`, `doiKhoaPancake`, `_enfModes_`, `_enfSet_`, `_srcBucket_`, `_enforceCheck_`, `xemTrangThaiChan`, `batChanWeb`, `tatChanWeb`, `batChanZalo`, `tatChanZalo`, `batChanPancake`, `tatChanPancake`, `batChanKhac`, `tatChanKhac`, `_ownerUsers_`, `_isOwner_`, `_ownerGate_`, `datChuSoHuu`, `xoaChuSoHuu`, `xemChuSoHuu`, `xemBiMatPhien`, `_ntlNote_`, `_ntlReport_`, `xemLogKhongToken`
-- Hằng/biến: `SALE_GROUPS_DEFAULT_`, `_AUDIT_TOKEN_`, `AUDIT_SKIP_SETTING_`, `DEMO_MAX_ROWS_`, `DEMO_ALLOWED_GET_`, `DEMO_CLIP_KEYS_`, `DEMO_CLIP_ROWS_ACTIONS_`, `DEMO_PHONE_KEY_RE_`, `DEMO_NOTE_KEY_RE_`, `DEMO_PHONE_STR_RE_`, `SESS_TTL_MS_`, `ROLE_BUILTIN_`, `ROLE_BASES_`, `ACTION_FEATURE_`, `NTL_ACTIONS_`, `EXT_KEY_NAMES_`, `EXT_ALLOWED_`, `ENF_SOURCES_`, `OWNER_ONLY_ACTIONS_`
+- Hàm: `getSetting_`, `getSettingsMulti_`, `setGasSource_`, `_ymAdd_`, `_posRevenueBySale_`, `_readPosSnapshots_`, `closePosMonth_`, `posMonthAdjust_`, `readSaleGroups_`, `saveSaleGroups_`, `_saleGroupLabel_`, `_auditClip_`, `_auditActor_`, `_auditCfg_`, `_auditDiffRows_`, `_auditUserSig_`, `setSetting_`, `_syncSaleChannelsToUsers_`, `addZaloNick_`, `readCareStatus_`, `careObjFromRow_`, `readCare_`, `readCareDelta_`, `readRemindersToday_`, `_remindersFromRows_`, `findCareByPhone_`, `careRow_`, `readExistingExtFields_`, `mergeExtFields_`, `_legacyReadOrdersUnused_`, `readTeams_`, `readUsers_`, `_secEq_`, `_adminKeyOk_`, `_isSensitiveSettingKey_`, `_isSensitiveWriteKey_`, `_demoToken_`, `_demoTokenOk_`, `_demoSrcOf_`, `_demoClipPerSource_`, `_demoMaskPhone_`, `_demoMaskText_`, `_demoMaskDeep_`, `_demoClip_`, `demoLogin_`, `_sessSecret_`, `_sessSign_`, `_sessIssue_`, `_sessVerify_`, `_sessUser_`, `_usersForClient_`, `_roleStrList_`, `_roleCfgNormalize_`, `readRoleConfig_`, `_roleResolve_`, `_roleBase_`, `_userDeptKeys_`, `_featureAllowed_`, `_featureGate_`, `roleConfigForClient_`, `saveRoleConfig_`, `_usersWriteAuth_`, `_upgradePwHash_`, `_checkLogin_`, `webLogin_`, `_ntlKey_`, `_extKeys_`, `_extKeyNew_`, `_extKeyEnsure_`, `_extKeyRotate_`, `_extKeyWho_`, `xemKhoaExtension`, `doiKhoaZalo`, `doiKhoaPancake`, `_enfModes_`, `_enfSet_`, `_srcBucket_`, `_enforceCheck_`, `xemTrangThaiChan`, `batChanWeb`, `tatChanWeb`, `batChanZalo`, `tatChanZalo`, `batChanPancake`, `tatChanPancake`, `batChanKhac`, `tatChanKhac`, `_ownerUsers_`, `_isOwner_`, `_ownerGate_`, `datChuSoHuu`, `xoaChuSoHuu`, `xemChuSoHuu`, `_scopeMode_`, `_scopeSplit_`, `_scopeAssignIndex_`, `_scopeNamesForPhone_`, `_scopeVerdict_`, `_scopeKey_`, `_scopeNote_`, `_scopeGate_`, `_scopeReport_`, `datPhamVi`, `xemPhamVi`, `xemLogPhamVi`, `xemBiMatPhien`, `_ntlNote_`, `_ntlReport_`, `xemLogKhongToken`
+- Hằng/biến: `SALE_GROUPS_DEFAULT_`, `_AUDIT_TOKEN_`, `AUDIT_SKIP_SETTING_`, `DEMO_MAX_ROWS_`, `DEMO_ALLOWED_GET_`, `DEMO_CLIP_KEYS_`, `DEMO_CLIP_ROWS_ACTIONS_`, `DEMO_PHONE_KEY_RE_`, `DEMO_NOTE_KEY_RE_`, `DEMO_PHONE_STR_RE_`, `SESS_TTL_MS_`, `ROLE_BUILTIN_`, `ROLE_BASES_`, `ACTION_FEATURE_`, `NTL_ACTIONS_`, `EXT_KEY_NAMES_`, `EXT_ALLOWED_`, `ENF_SOURCES_`, `OWNER_ONLY_ACTIONS_`, `SCOPE_ACTIONS_`
 
 ## 04_doGet.gs
 - Hàm: `doGet`, `doGetCore_`
@@ -60,7 +60,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 
 ## 13_Teams_Pancake.gs
 - Hàm: `saveTeams_`, `readMktTeams_`, `saveMktTeams_`, `_mktPageWeights_`, `_mktKenhWeights_`, `savePancakeStats_`, `readPancakeMapCI_`, `readPancakeMap_`, `pancakeAllNames_`, `savePancakeNameMap_`, `_pkStatsRowsMemo_`, `buildPancakeReport_`, `savePancakeSdtStats_`, `buildPancakeSdtReport_`, `readPancakePageMap_`, `readPancakePageMapByName_`, `pancakeAllPages_`, `savePancakePageMap_`, `classifyPancakeTag_`, `savePancakeTagStats_`, `buildPancakeTagReport_`, `_tagFunnelRates_`, `_pkSheetDateSpan_`, `saveSaleDirectory_`, `readSaleDirectory_`, `_pkTrackedDatesByPageAndSale_`, `_sumOrdersOnDates_`
-- Hằng/biến: `_pkStatsRowsMemoCache_`, `_pkReportMemoCache_`, `PK_STATUS_CODES_`, `SALE_DIR_HEADERS`
+- Hằng/biến: `_pancakeMapMemo_`, `_pkStatsRowsMemoCache_`, `_pkReportMemoCache_`, `PK_STATUS_CODES_`, `SALE_DIR_HEADERS`, `_saleDirMemo_`
 
 ## 14_KpiReport_Users_Assign.gs
 - Hàm: `buildKpiReport_`, `saveUsers_`, `saveAudit_`, `saveCareStatus_`, `readAssign_`, `assignRowsOf_`, `saveAssignEntry_`, `toggleAssignDone_`, `saveAssignHistory_`, `readAIContext_`, `_pwHash_`, `verifyLogin_`, `saveAIContext_`
@@ -84,7 +84,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 
 ## 19_BannedList_MktChecklist.gs
 - Hàm: `readBannedWords_`, `_mktMonthOf_`, `readMktConfigAll_`, `mktConfigForMonth_`, `_mktCleanCfgEntry_`, `_mktCheckPass_`, `saveMktChecklistConfig_`, `_mktTagNum_`, `_mktTagRows_`, `buildMktChecklistReport_`
-- Hằng/biến: `REPORT_SALE_SS_ID`, `BANNED_WORDS_SHEET_NAME`, `BANNED_WORDS_FALLBACK`, `MKT_DEFAULT_CFG_`, `MKT_MIN_TAGS_`
+- Hằng/biến: `REPORT_SALE_SS_ID`, `BANNED_WORDS_SHEET_NAME`, `BANNED_WORDS_FALLBACK`, `MKT_DEFAULT_CFG_`, `MKT_EXTRA_CODES_`, `MKT_EXTRA_DEFAULT_`, `MKT_EXTRA_TAGS_`, `MKT_MIN_TAGS_`
 
 ## 20_ExportLog_AutoAssign.gs
 - Hàm: `getExportLogSS_`, `_exportLogGetSheet_`, `_exportLogWriteDays_`, `_dateRangeList_`, `exportDailyReportLogs_`, `chayCaiDatTrigger`, `_aaDefaultCfg`, `_aaSplit`, `_aaRatioFor`, `_aaWeights`, `_aaRecipients`, `_aaBuckets`, `_aaPlan`, `_aaPlanCskh`, `_aaDateOk_`, `_aaPlanAll`, `_aaReadJson_`, `_aaWriteJson_`, `_tierCfgNormalize_`, `_tierCfg_`, `_aaHangKey_`, `_aaLoadCustomers_`, `_aaSetCareCS_`, `autoAssignRun_`, `autoAssignTick_`, `autoAssignRunNow_`, `installAutoAssignTrigger_`, `removeAutoAssignTrigger_`, `caiTriggerChiaTuDong`, `chayThuChiaTuDong`, `goTriggerChiaTuDong`
@@ -99,8 +99,8 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `SB_BATCH_`, `SB_TIME_BUDGET_MS_`, `SB_CARE_COLS_`, `SB_MIRROR_MAX_`, `SB_DIRTY_MAX_`, `SB_READ_FALLBACK_ON_MISS_`, `SB_DT_COLS_`, `SB_DON_COLS_`, `SB_DT_NUM_`, `SB_ORD_BLOCK_`, `SB_ORD_MAX_BLOCKS_`, `SB_ORD_RUN_TTL_MS_`, `SB_ORD_TICK_MINUTES_`, `SB_CARE_SYNC_BLOCK_`, `SB_CARE_SYNC_MAX_BLOCKS_`, `SB_CARE_SYNC_TICK_MINUTES_`, `SB_ORD_MAX_AGE_MS_`, `SB_PAGE_`, `SB_PAR_`, `SB_CARE_DELTA_MAX_`, `SB_SOAK_DAYS_`, `SB_CARE_MAX_AGE_MS_`, `SB_STEP5_MANUAL_`, `SB_BACKUP_TABLES_`, `SB_BACKUP_PAGE_`, `SB_BACKUP_KEEP_`, `SB_BACKUP_FOLDER_NAME_`, `SB_BACKUP_MAX_AGE_MS_`, `SB_BACKUP_RUN_TTL_MS_`, `SB_BACKUP_STALE_RUN_MS_`, `SB_PRUNE_MAX_ABS_`, `SB_PRUNE_MAX_PCT_`, `SB_PRUNE_GRACE_MS_`, `SB_PRUNE_CHUNK_`, `STORE_CASE_SS_ID_DEFAULT_`
 
 ## 23_TodayTasks.gs
-- Hàm: `_ttFold_`, `_ttParseVn_`, `_ttSkipSet_`, `_ttBuildRows_`, `ttTrackStages_`, `ttChayNgay`, `ttCaiTrigger`, `_ttStuckFromRows_`, `ttTodayTasks_`
-- Hằng/biến: `TT_TRACK_SHEET_`, `TT_TRACK_HEADERS_`, `TT_DEFAULT_HOURS_`, `TT_LOOKBACK_DAYS_`, `TT_REFRESH_MIN_`
+- Hàm: `_ttFold_`, `_ttParseVn_`, `_ttSkipSet_`, `_ttBuildRows_`, `ttTrackStages_`, `ttChayNgay`, `ttCaiTrigger`, `_ttStuckFromRows_`, `ttTodayTasks_`, `_ttBoardBuild_`, `ttStageBoard_`
+- Hằng/biến: `TT_TRACK_SHEET_`, `TT_TRACK_HEADERS_`, `TT_DEFAULT_HOURS_`, `TT_LOOKBACK_DAYS_`, `TT_REFRESH_MIN_`, `TT_STAGE_ORDER_`, `TT_BOARD_DONE_DAYS_`, `TT_BOARD_CAP_`
 
 ## 24_TonKho.gs
 - Hàm: `_khoJsonArr_`, `_khoUnames_`, `_khoFromRow_`, `readKho_`, `_khoById_`, `_khoLevel_`, `_khoAllows_`, `_tonkhoCode_`, `_tonkhoKey_`, `_khoNum_`, `_khoNowIso_`, `_khoNewId_`, `_khoAuth_`, `_khoWithLock_`, `_khoGate_`, `_tonkhoItemFromRow_`, `_tonkhoItemToRow_`, `readTonKho_`, `_tonkhoLoad_`, `_tonkhoLog_`, `readTonKhoLog_`, `khoSave_`, `tonKhoSet_`, `tonKhoAdjust_`, `tonKhoItemSave_`, `tonKhoItemDelete_`, `tonKhoImport_`, `_tkdCfg_`, `_tkdCfgSet_`, `readKhoCombo_`, `khoComboSave_`, `_tkdOrderKey_`, `_tkdLooksCombo_`, `_tkdExpandLines_`, `_tkdPickKho_`, `_tkdLedger_`, `_tkdLedgerRow_`, `_tkdRun_`, `tonKhoTruDonStatus_`, `tonKhoTruDonCauHinh_`, `tonKhoTruDonXemTruoc_`, `tonKhoTruDonChay_`, `tonKhoTruDonHoanTay_`, `tonKhoTruDonTick_`, `tonKhoTruDonCaiTrigger`, `tonKhoTruDonGoTrigger`, `tonKhoTruDonXemTruocTay`
@@ -115,7 +115,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `SH_CHAT_CH_`, `CHAT_CH_HEADERS_`, `SH_CHAT_MSG_`, `CHAT_MSG_HEADERS_`, `CHAT_MAX_TEXT_`, `CHAT_RING_MAX_`, `CHAT_RATE_MS_`, `CHAT_TAIL_ROWS_`, `CHAT_MAX_MEMBERS_`, `CHAT_GET_ACTIONS_`, `CHAT_POST_ACTIONS_`
 
 ## 27_PancakeHistory.gs
-- Hàm: `_pkAllPageTokens_`, `_pkIso_`, `_pkPlain_`, `_pkPhoneOfMsg_`, `_pkMapMsg_`, `_pkMapConv_`, `_pkFetchJson_`, `_pkInsertIgnore_`, `_pkFetchMsgs_`, `_pkHistState_`, `_pkHistSave_`, `pkHistSync_`, `pkLichSuThu`, `pkLichSuChay`, `pkLichSuXemTrangThai`, `pkLichSuLamLai`, `pkLichSuTick_`, `_pkUserList_`, `_pkMapStaff_`, `pkStaffSync_`, `pkNhanVienThu`, `pkNhanVienDongBo`, `pkLichSuCaiTrigger`, `removePkLichSuTrigger_`
+- Hàm: `_pkAllPageTokens_`, `_pkIso_`, `_pkPlain_`, `_pkPhoneOfMsg_`, `_pkMapMsg_`, `_pkMapConv_`, `_pkFetchJson_`, `_pkInsertIgnore_`, `_pkFetchMsgs_`, `_pkHistState_`, `_pkHistSave_`, `pkHistSync_`, `pkLichSuThu`, `pkLichSuChay`, `pkLichSuXemTrangThai`, `pkLichSuLamLai`, `pkLichSuTick_`, `_pkUserList_`, `_pkMapStaff_`, `pkStaffSync_`, `pkNhanVienThu`, `pkNhanVienDongBo`, `pkTagSync_`, `pkDanhMucDongBo`, `pkDanhMucTick_`, `pkDanhMucCaiTrigger`, `pkLichSuCaiTrigger`, `removePkLichSuTrigger_`
 - Hằng/biến: `PK_HIST_SECTION_`
 
 ## 28_StaffProfile.gs
@@ -127,6 +127,6 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `SH_MLIB_`, `MLIB_HEADERS_`, `MLIB_TYPES_`, `MLIB_MAX_BYTES_`, `MLIB_GET_ACTIONS_`, `MLIB_POST_ACTIONS_`
 
 ## 30_KhDiscuss.gs
-- Hàm: `_khdPhone_`, `_khdSheet_`, `_khdMsg_`, `khdList_`, `khdSend_`, `khdDelete_`, `khdDoGet_`, `khdDoPost_`
-- Hằng/biến: `SH_KHD_`, `KHD_HEADERS_`, `KHD_MAX_TEXT_`, `KHD_LIMIT_`, `KHD_TAIL_ROWS_`, `KHD_RATE_MS_`, `KHD_GET_ACTIONS_`, `KHD_POST_ACTIONS_`
+- Hàm: `_khdPhone_`, `_khdSheet_`, `_khdMsg_`, `_khdAssignees_`, `_khdLeaderCovers_`, `_khdManagerCovers_`, `_khdUserAllowed_`, `_khdAccess_`, `khdList_`, `khdSend_`, `khdDelete_`, `khdDoGet_`, `khdDoPost_`
+- Hằng/biến: `SH_KHD_`, `KHD_HEADERS_`, `KHD_MAX_TEXT_`, `KHD_LIMIT_`, `KHD_TAIL_ROWS_`, `KHD_RATE_MS_`, `KHD_GET_ACTIONS_`, `KHD_POST_ACTIONS_`, `KHD_FORBIDDEN_MSG_`
 

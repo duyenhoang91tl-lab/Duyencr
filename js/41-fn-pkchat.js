@@ -34,7 +34,7 @@ function _pkcMetaRow(conv) {   // the + nguoi xu ly cua hoi thoai
 function renderPkChatTab(c) {
   _pkcStop();
   _pkc = { phone: c.phone, convs: [], msgs: {}, active: '', after: '', timer: null, loading: false, firstLoad: true, err: '', sending: false, tick: 0, okAt: '' };
-  setTimeout(function () { if (_pkc.phone === c.phone && document.getElementById('pkc-root')) { pkcLoad(true); _pkc.timer = setInterval(_pkcTick, 6000); } }, 0);
+  setTimeout(function () { if (_pkc.phone === c.phone && document.getElementById('pkc-root')) { pkcLoad(true); _pkc.timer = setInterval(_pkcTick, 15000); } }, 0);
   return '<div id="pkc-root" class="pkc" data-phone="' + _pkcEsc(c.phone) + '">'
     + '<div class="pkc-convs" id="pkc-convs"></div>'
      + '<div class="pkc-meta" id="pkc-meta"></div>'

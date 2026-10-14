@@ -368,7 +368,20 @@ function _pkExportKpiOrdersDetail(){
   XLSX.writeFile(wb, 'ChiTietDonKpiPancake_'+_pkState.kpiFrom+'_'+_pkState.kpiTo+'.xlsx');
 }
 
-function _mktLabel(code){ return _PK_STATUS_LABEL[code] || ('L' + code.substring(1) + '. (tag mới)'); }
+function _mktLabel(code){ return _MKT_EXTRA_LABEL[code] || _PK_STATUS_LABEL[code] || ('L' + code.substring(1) + '. (tag mới)'); }
+// 3 CHỈ SỐ BỔ SUNG (tuỳ chọn xem thêm, chỉ ở Checklist MKT — báo cáo KPI Pancake giữ nguyên công thức cũ). Công thức do Duyên chốt 12/10/2026.
+var _MKT_EXTRA_LABEL = {
+  XCT: 'Tỷ lệ chốt Pancake — đơn có người tạo là sale trên Base ÷ tổng tương tác',
+  XL5: 'Chốt trong ngày (L5 + L5.1 + L5.2) ÷ tương tác khách mới',
+  XL9: 'Chốt đơn hôm trước (L9 + L9.1 + L9.2) ÷ tương tác khách cũ'
+};
+function _mktIsExtra(code){ return !!_MKT_EXTRA_LABEL[code]; }
+function _mktRowName(code){ return _mktIsExtra(code) ? '<span style="color:#4a2c8f">➕</span> '+esc(_mktLabel(code)) : '<b>'+esc(code)+'</b>. '+esc(_mktLabel(code)); }
+function _mktToggleExtra(on){
+  _mktState.showExtra = !!on;
+  try { localStorage.setItem('mkt_show_extra', on ? '1' : '0'); } catch(e){}
+  _mktRender();
+}
 
 async function renderMktChecklistTab(){
   var wrap = document.getElementById('mktchecklist-wrap');
@@ -422,7 +435,7 @@ function _mktDaysInRange_(from, to){
 function _mktOpenCfgEditor(){
   var rep = _mktState.report; if (!rep) return;
   var draft = {};
-  rep.tags.forEach(function(t){ draft[t.code] = { target: t.target===null ? '' : Math.round(t.target*1000)/10, denom: t.denom, op: t.op||'gte' }; });
+  rep.tags.concat(rep.extra||[]).forEach(function(t){ draft[t.code] = { target: t.target===null ? '' : Math.round(t.target*1000)/10, denom: t.denom, op: t.op||'gte' }; });
   _mktState.cfgDraft = draft;
   _mktRender();
 }
@@ -489,6 +502,17 @@ function _mktGroupMatrixHtml_(title, rep, groups, note, nameFn, hintFn){
         (t.rate!==null && t.rate!==undefined ? ' <span style="font-weight:700;color:'+_mktPctColor(t.passed)+'">('+t.rate+'%)</span>' : '')+'</td>';
     }).join('')+'</tr>';
   });
+  if (_mktState.showExtra && (rep.extra||[]).length){
+    h += '<tr><td colspan="'+(cols.length+1)+'" style="background:var(--surface2);font-weight:700;font-size:11px;color:var(--muted)">➕ Chỉ số bổ sung (tuỳ chọn)</td></tr>';
+    rep.extra.forEach(function(t0, i){
+      h += '<tr><td>'+_mktRowName(t0.code)+'</td>'+cols.map(function(c){
+        var t = (c.ref.extra||[])[i];
+        if (!t || t.count===null || t.count===undefined) return '<td style="text-align:right;color:var(--muted)">—</td>';
+        return '<td style="text-align:right">'+fmt(Math.round(t.count*100)/100)+
+          (t.rate!==null && t.rate!==undefined ? ' <span style="font-weight:700;color:'+_mktPctColor(t.passed)+'">('+t.rate+'%)</span>' : '')+'</td>';
+      }).join('')+'</tr>';
+    });
+  }
   return h + '</tbody></table></div>';
 }
 
@@ -507,6 +531,7 @@ function _mktRender(){
     '<span style="font-size:11px;color:var(--muted)">→</span>'+
     '<input type="date" value="'+esc(_mktState.to)+'" onchange="_mktSetCustomDate(\'to\',this.value)" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
     (rep ? '<button class="btn sm secondary" onclick="_mktOpenCfgEditor()">🎯 Sửa mục tiêu & mẫu số (tháng '+esc(rep.month)+')</button>' : '')+
+    (rep && rep.extra ? '<label style="font-size:12px;display:inline-flex;gap:5px;align-items:center;cursor:pointer" title="Tỷ lệ chốt Pancake theo người tạo đơn, chốt trong ngày (L5, L5.1, L5.2), chốt đơn hôm trước (L9, L9.1, L9.2)"><input type="checkbox" '+(_mktState.showExtra?'checked ':'')+'onchange="_mktToggleExtra(this.checked)"> ➕ Xem thêm chỉ số bổ sung</label>' : '')+
   '</div>';
 
   if (!rep){ wrap.innerHTML = html; return; }
@@ -550,9 +575,9 @@ function _mktRender(){
       '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>'+
         '<th style="text-align:left;padding:4px 6px">Tag</th><th style="text-align:left;padding:4px 6px">Toán tử</th><th style="text-align:right;padding:4px 6px">Mục tiêu (%)</th><th style="text-align:left;padding:4px 6px">Mẫu số</th>'+
       '</tr></thead><tbody>'+
-      rep.tags.map(function(t){
+      rep.tags.concat(_mktState.showExtra ? (rep.extra||[]) : []).map(function(t){
         var d = _mktState.cfgDraft[t.code];
-        return '<tr><td style="padding:4px 6px">'+esc(t.code)+'. '+esc(_mktLabel(t.code))+'</td>'+
+        return '<tr><td style="padding:4px 6px">'+(_mktIsExtra(t.code) ? _mktRowName(t.code) : esc(t.code)+'. '+esc(_mktLabel(t.code)))+'</td>'+
           '<td style="padding:4px 6px"><select onchange="_mktCfgSetOp(\''+t.code+'\',this.value)" style="font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
             opOpts.map(function(o){ return '<option value="'+o[0]+'"'+(d.op===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')+
           '</select></td>'+
@@ -581,13 +606,15 @@ function _mktRender(){
     '<th>Tag</th><th style="text-align:right">Số lượng</th><th style="text-align:right">TB/ngày</th><th>Mẫu số</th><th style="text-align:right">Giá trị mẫu số</th>'+
     '<th style="text-align:right">Tỷ lệ</th><th style="text-align:right">Mục tiêu</th><th>Trạng thái</th>'+
   '</tr></thead><tbody>';
-  rep.tags.forEach(function(t){
+  var _extraSep = false;
+  rep.tags.concat(_mktState.showExtra ? (rep.extra||[]) : []).forEach(function(t){
+    if (_mktIsExtra(t.code) && !_extraSep){ _extraSep = true; html += '<tr><td colspan="8" style="background:var(--surface2);font-weight:700;font-size:11px;color:var(--muted)">➕ Chỉ số bổ sung (tuỳ chọn — báo cáo KPI Pancake vẫn giữ công thức cũ)</td></tr>'; }
     var statusHtml = '<span style="color:var(--muted)">—</span>';
     if (t.passed === true) statusHtml = '<span style="color:var(--green);font-weight:700">✓ Đạt</span>';
     else if (t.passed === false) statusHtml = '<span style="color:var(--red,#d33);font-weight:700">✗ Chưa đạt</span>';
     var tbNgay = (t.count===null || t.count===undefined) ? null : Math.round((t.count/mktDays)*10)/10;
     html += '<tr>'+
-      '<td><b>'+esc(t.code)+'</b>. '+esc(_mktLabel(t.code))+(t.code==='L5'?' <span style="font-size:10px;color:var(--muted)">(Base)</span>':'')+'</td>'+
+      '<td>'+_mktRowName(t.code)+(t.code==='L5'?' <span style="font-size:10px;color:var(--muted)">(Base)</span>':'')+'</td>'+
       '<td style="text-align:right;font-weight:700">'+fmt(t.count)+'</td>'+
       '<td style="text-align:right;color:var(--muted)">'+(tbNgay!==null?fmt(tbNgay):'—')+'</td>'+
       '<td style="color:var(--muted);font-size:11px">'+(t.denomLabel||'—')+'</td>'+

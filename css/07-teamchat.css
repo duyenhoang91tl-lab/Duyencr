@@ -119,3 +119,15 @@ body.tc-on #stats-row,body.tc-on #files-bar{display:none!important}
 .tcm-comp textarea{flex:1;resize:none;border:1px solid var(--border-md);border-radius:var(--r);padding:6px 9px;font:inherit;font-size:13px;max-height:90px;background:var(--surface);color:var(--text)}
 .tcm-comp button{border:0;background:var(--green);color:#fff;border-radius:var(--r);width:34px;height:32px;cursor:pointer;font-size:14px}
 @media (max-width:720px){#tc-mini{display:none!important}}
+
+/* ── Chat nội bộ nhỏ KHÔNG đè Trợ lý AI (2026-10-14) ──
+   NGUYÊN NHÂN GỐC: #tc-mini (right:76px, z-index 320) và panel Trợ lý AI #pro-ai (right:0, rộng 380px, cũng z-index 320) cùng nằm góc dưới phải,
+   nên tiêu đề "Chat nội bộ" đè lên ô nhập + nút Gửi của AI khi panel AI mở.
+   Cách xử lý: khi AI mở, JS (proAiToggle_) bật class html.pro-ai-open -> khối chat nhỏ NHƯỜNG CHỖ, dịch sang trái đúng bằng bề rộng panel AI
+   (cùng biến --pro-ai-w), có hiệu ứng trượt; phần không đủ chỗ thì bị cắt từ bên trái (danh sách kênh ở cạnh phải luôn còn); màn hình vừa (<1100px)
+   chỉ giữ danh sách kênh, các cửa sổ hội thoại tạm ẩn (trạng thái vẫn giữ) rồi hiện lại khi đóng AI. */
+#tc-mini{transition:right .2s ease;max-width:calc(100vw - 24px)}
+html.pro-ai-open #tc-mini{right:calc(var(--pro-ai-w,380px) + 16px);max-width:calc(100vw - var(--pro-ai-w,380px) - 32px);overflow:hidden;justify-content:flex-start}
+html.pro-ai-open #tc-mini>*{flex-shrink:0}
+@media (max-width:1099px){html.pro-ai-open #tc-mini .tcm-win{display:none}}
+

@@ -157,15 +157,22 @@ function readPancakeMapCI_() {
   return { map: map, mapCI: mapCI };
 }
 
+// Memo trong PHAM VI 1 LAN THUC THI (1 request doGet/doPost) — tranh doc lai sheet PancakeNameMap
+// nhieu lan khi _expandSaleFilterWithPancakeAliases_ duoc goi lap lai cho tung ten/don (xem cac noi
+// goi readPancakeMap_ ben duoi). GAS khoi tao lai bien global cho MOI request nen khong lo du lieu cu.
+var _pancakeMapMemo_ = null;
 function readPancakeMap_() {
+  if (_pancakeMapMemo_) return _pancakeMapMemo_;
   var sh = getSheet_(SH_PK_MAP, PK_MAP_HEADERS);
   var out = {};
-  if (sh.getLastRow() < 2) return out;
-  var v = sh.getRange(2, 1, sh.getLastRow() - 1, PK_MAP_HEADERS.length).getValues();
-  for (var i = 0; i < v.length; i++) {
-    if (!v[i][0]) continue;
-    out[String(v[i][0])] = String(v[i][1] || '');
+  if (sh.getLastRow() >= 2) {
+    var v = sh.getRange(2, 1, sh.getLastRow() - 1, PK_MAP_HEADERS.length).getValues();
+    for (var i = 0; i < v.length; i++) {
+      if (!v[i][0]) continue;
+      out[String(v[i][0])] = String(v[i][1] || '');
+    }
   }
+  _pancakeMapMemo_ = out;
   return out;
 }
 
@@ -648,10 +655,15 @@ function saveSaleDirectory_(rows) {
   return jsonOut_({ ok: true, written: rows.length });
 }
 
+// Memo trong PHAM VI 1 LAN THUC THI — cung ly do/an toan nhu _pancakeMapMemo_ o readPancakeMap_
+// (ham nay se duoc goi THEM trong _expandSaleFilterWithPancakeAliases_, co the lap lai nhieu lan
+// cho tung ten/don trong 1 bao cao).
+var _saleDirMemo_ = null;
 function readSaleDirectory_() {
+  if (_saleDirMemo_) return _saleDirMemo_;
   var sh = getSheet_(SH_SALE_DIR, SALE_DIR_HEADERS);
   var list = [], byName = {};
-  if (sh.getLastRow() < 2) return { list: list, byName: byName };
+  if (sh.getLastRow() < 2) { _saleDirMemo_ = { list: list, byName: byName }; return _saleDirMemo_; }
   // Doc chung 1 nguon Van phong/Online voi Bao cao E/F ("🏷️ Phân loại Online/Offline", setting
   // 'saleChannels') THEO YEU CAU DUYEN 2026-09 (ap dung dong bo cho MOI bao cao, ke ca tai khoan
   // dang nhap qua _syncSaleChannelsToUsers_ trong setSetting_) — chi fallback ve tag Pancake S#/O#
@@ -687,7 +699,8 @@ function readSaleDirectory_() {
       if (k) byName[_normTxt_(k)] = rec;
     });
   }
-  return { list: list, byName: byName };
+  _saleDirMemo_ = { list: list, byName: byName };
+  return _saleDirMemo_;
 }
 
 // Xac dinh cac NGAY (trong khoang from-to) THUC SU co du lieu tuong tac Pancake (sheet

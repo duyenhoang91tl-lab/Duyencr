@@ -48,7 +48,7 @@ function khdBoxHtml_(key, inputId){
 function khdMount_(key, phone){
   var host = document.getElementById('khd-'+key); if (!host) return;
   if (_khd[key] && _khd[key].timer) clearInterval(_khd[key].timer);
-  var S = _khd[key] = { phone:phone, after:'', msgs:[], me:'', timer:null, n:0, busy:false, err:'' };
+  var S = _khd[key] = { phone:phone, after:'', msgs:[], me:'', timer:null, n:0, busy:false, err:'', locked:false };
   host.onclick = function(e){ var t = e.target; if (!t.closest) return;
     if (t.closest('[data-khd-send]')) { khdSend_(key); return; }
     var d = t.closest('[data-khd-del]'); if (d){ e.preventDefault(); khdDel_(key, d.getAttribute('data-khd-del')); } };
@@ -64,7 +64,11 @@ async function khdPoll_(key, first){
   S.n++; var full = first || S.n % 5 === 0;     // 5 lần poll nhẹ thì tải lại đủ 1 lần để thấy tin bị xoá
   var r = await khdApi_('GET', 'khDiscuss', { phone:S.phone, after: full ? '' : S.after });
   if (_khd[key] !== S) return;
-  if (!r.ok){ S.err = r.error || 'Lỗi tải thảo luận'; if (r.code==='AUTH'||r.code==='NOLOGIN') khdStop_(key); khdRender_(key, first); return; }
+  if (!r.ok){
+    S.err = r.error || 'Lỗi tải thảo luận';
+    if (r.code==='FORBIDDEN'){ S.locked = true; S.msgs = []; }          // không có quyền xem khách này: khoá hộp, ngừng hỏi server
+    if (r.code==='AUTH'||r.code==='NOLOGIN'||r.code==='FORBIDDEN'){ if (S.timer) clearInterval(S.timer); S.timer = null; }   // ngừng hỏi server, GIỮ trạng thái để còn hiện lý do
+    khdRender_(key, first); return; }
   S.err = ''; S.me = r.me || S.me;
   var prev = S.msgs.map(function(m){ return m.id; }).join();
   S.msgs = full ? r.messages.slice() : khdMergeMsgs_(S.msgs, r.messages);
@@ -75,6 +79,8 @@ function khdRender_(key, stick){
   var S = _khd[key], host = document.getElementById('khd-'+key); if (!S || !host) return;
   var log = host.querySelector('.khd-log'), near = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
   var isAdmin = (typeof currentUser!=='undefined' && currentUser && currentUser.role==='admin');
+  var ta = host.querySelector('textarea'), sb = host.querySelector('[data-khd-send]');
+  if (S.locked){ log.innerHTML = '<div class="khd-lock">🔒 '+proEsc_(S.err)+'</div>'; if (ta) ta.disabled = true; if (sb) sb.disabled = true; return; }
   log.innerHTML = (S.err ? '<div class="khd-err">'+proEsc_(S.err)+'</div>' : '')
     + (S.msgs.length ? S.msgs.map(function(m){ return khdMsgHtml_(m, S.me, isAdmin); }).join('') : (S.err ? '' : '<div class="khd-hint">Chưa có trao đổi nào về khách này. Gõ @ để tag đồng nghiệp — họ sẽ nhận thông báo.</div>'));
   if (stick || near) log.scrollTop = log.scrollHeight;
@@ -84,7 +90,8 @@ async function khdSend_(key){
   var ta = host.querySelector('textarea'), text = (ta.value||'').trim(); if (!text) return;
   S.busy = true; var r = await khdApi_('POST', 'khDiscussSend', { phone:S.phone, text:text }); S.busy = false;
   if (_khd[key] !== S) return;
-  if (!r.ok){ if (typeof toast==='function') toast('⚠ '+(r.error||'Không gửi được')); return; }
+  if (!r.ok){ if (r.code==='FORBIDDEN'){ S.locked = true; S.err = r.error; khdRender_(key, false); } if (typeof toast==='function') toast('⚠ '+(r.error||'Không gửi được')); return; }
+  if (r.skipped && r.skipped.length && typeof toast==='function') toast('⚠ Chưa thông báo cho '+r.skipped.join(', ')+' vì họ không có quyền xem thảo luận khách này (chỉ người đang nhận trên Pancake / được phân quyền).');
   ta.value = ''; S.msgs = khdMergeMsgs_(S.msgs, [r.message]); S.after = S.msgs[S.msgs.length-1].ts; S.err = ''; khdRender_(key, true); ta.focus();
 }
 async function khdDel_(key, id){
@@ -96,7 +103,7 @@ async function khdDel_(key, id){
 // Tab "🗨 Thảo luận" trong hồ sơ khách (js/03 gọi)
 function renderKhdTab(c){
   setTimeout(function(){ khdMount_('dp', c.phone); }, 0);
-  return '<div class="khd-wrap"><div class="khd-title">🗨 Thảo luận nội bộ <span>chỉ nhân viên thấy · khác với "💬 Chat Pancake" (nhắn khách)</span></div>'+khdBoxHtml_('dp','khd-input')+'</div>';
+  return '<div class="khd-wrap"><div class="khd-title">🗨 Thảo luận nội bộ <span>chỉ người đang nhận khách này trên Pancake và người được phân quyền xem được · khác với "💬 Chat Pancake" (nhắn khách)</span></div>'+khdBoxHtml_('dp','khd-input')+'</div>';
 }
 
 // ── Ghi chú nhanh (P5b): lưu không cần panel hồ sơ đang mở ──

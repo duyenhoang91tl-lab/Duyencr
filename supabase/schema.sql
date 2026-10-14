@@ -389,3 +389,18 @@ create table if not exists pk_staff (
   updated_at timestamptz default now()
 );
 alter table pk_staff enable row level security;   -- bật RLS, KHÔNG policy: chỉ service_role đọc/ghi (có tên + dữ liệu nhân viên)
+
+-- 11) pk_tags — danh mục THẺ Pancake (tags trong hội thoại chỉ là MÃ SỐ, vd [109]) để Worker đọc thẳng Supabase đổi mã -> tên/màu.
+--     Do GAS pkDanhMucDongBo ghi (GET /pages/{page}/tags). NGUYÊN NHÂN GỐC: Worker không giữ token Pancake, và không nên gọi API Pancake mỗi lần poll
+--     -> đồng bộ vài giờ/lần vào bảng này. RLS bật, KHÔNG policy: chỉ service_role đọc/ghi.
+create table if not exists pk_tags (
+  id         text primary key,            -- '<page_id>:<tag_id>'
+  page_id    text not null default '',
+  tag_id     text not null default '',
+  text       text default '',
+  color      text default '',
+  raw        jsonb,
+  updated_at timestamptz default now()
+);
+create index if not exists pk_tags_page_idx on pk_tags (page_id);
+alter table pk_tags enable row level security;

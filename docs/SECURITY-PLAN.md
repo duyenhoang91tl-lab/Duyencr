@@ -55,6 +55,18 @@ Deploy lại GAS (dán `gas_v13.js` hoặc nút "Đồng bộ mã GAS mới nh�
 
 ## Viec tiep (4c-2, 4c-3) - CHUA LAM
 - [ ] **Quyet dinh can xac nhan:** extension Zalo dang goi `deleteDuplicateOrders` (zalo-content.js:1057, 1361) bang khoa `ek` va `EXT_ALLOWED_.zalo` cho phep -> CS van xoa don trung duoc qua extension. Neu muon chi Duyent xoa: bo `deleteDuplicateOrders` khoi `EXT_ALLOWED_.zalo` + an nut trong extension (can reload extension).
-- [ ] 4c-2: loc `customers`/`lookup`/`donOrdersByPhone`/`reminders` THEO CS o server (CS chi nhan khach cua minh theo logic `_inUserScope` o js/08-fn-invalidatefiltercache.js: careCS, assign, hoac CS phu trach don o.cs; ai co quyen khac thi theo vai tro/bo phan). Luu y Worker cache: action nay phai khoa cache theo user (them vao `GATED_ACTIONS` o cloudflare/worker.mjs).
+- [~] 4c-2: (4c-2a LAM, xem duoi) loc `customers`/`lookup`/`donOrdersByPhone`/`reminders` THEO CS o server (CS chi nhan khach cua minh theo logic `_inUserScope` o js/08-fn-invalidatefiltercache.js: careCS, assign, hoac CS phu trach don o.cs; ai co quyen khac thi theo vai tro/bo phan). Luu y Worker cache: action nay phai khoa cache theo user (them vao `GATED_ACTIONS` o cloudflare/worker.mjs).
 - [ ] 4c-3: dua cac action dang mo vao kiem soat: assign (GET), setSetting/getSetting khoa thuong, saveCannedResponse, saveMessageTemplate, deleteMessageTemplate, saveAIContext, csStats, findDuplicateOrders, addZaloNick.
 - [ ] Sau khi xong: bat cong tac chan 4b theo thu tu trong "Buoc 4b" (can bat thi 4c-1 moi het ke ho khi gui khong token).
+
+## Buoc 4c-2a - LAM (gas v13.47-scope-gate, 2026-10-14): pham vi khach theo CS cho tra cuu TUNG SDT
+- Nguyen nhan goc: web chi loc "khach cua toi" o client (`_inUserScope`); token hop le goi thang `?action=lookup|donOrdersByPhone|cskhDetail&phone=` lay duoc ho so BAT KY khach nao.
+- `_scopeGate_` (doGet, sau `_ownerGate_`) + `_scopeVerdict_`: CS/manager thuoc pham vi neu ten minh nam trong CareData.cs, "Sale ban" cua don (DT TONG), sale trong du lieu don, careLeads.cs, hoac AssignData. admin + viewer/ceo/... khong gioi han; **leader chua kiem o server** (can team) -> cho qua. Chi chay khi co token hop le (extension dung `ek` -> KHONG qua gate nay).
+- Cong tac Script Properties `scopeMode`: `off` (mac dinh) | `log` (chi dem, khong chan) | `enforce`. Editor: `datPhamVi('log')`, `xemPhamVi`, `xemLogPhamVi` (dem theo user|action|in/OUT/unchecked + mau SDT da che).
+- **Quy trinh bat:** `datPhamVi('log')` -> sau 2-3 ngay lam viec xem `xemLogPhamVi`: neu dong `... | OUT` chi la nguoi dang xem khach khong cua ho (khong phai CS hop le bi loai nham) -> `datPhamVi('enforce')`. Loi thi `datPhamVi('off')` co hieu luc ngay, KHONG can deploy.
+- Worker KHONG cache lookup/donOrdersByPhone/cskhDetail (khong nam trong TTL_SEC) -> khong lo cache chia se.
+- Test: `node tools/test-roles.js` (phan 4c-2a).
+
+## Viec tiep sau 4c-2a - CHUA LAM
+- [ ] 4c-2b: `customers` (tra ca danh sach, Worker cache 15s DUNG CHUNG giua moi nguoi -> phai them `customers` vao `GATED_ACTIONS`/khoa cache theo user truoc khi loc), `reminders`, `orders`. Can quy tac leader (team) o server.
+- [ ] Leader o server: doc `teams` (`readTeams_`) de kiem tra thanh vien team.

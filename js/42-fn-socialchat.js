@@ -16,12 +16,33 @@ function renderSocialChatTab() {
     w.insertAdjacentHTML('beforeend', '<div class="sc-info" id="sc-info"><div class="pkc-note">Chọn một hội thoại để xem thông tin khách.</div></div>');   // cột Thông tin khách kiểu Pancake (js/48)
   }
   _scStop(); scLoadList();
-  _sc.timer = setInterval(function () { if (!_scOpen()) { _scStop(); return; } if (!document.hidden) { scLoadList(); if (_sc.active) scLoadMsgs(false); } }, 8000);
+  _sc.timer = setInterval(function () { if (!_scOpen()) { _scStop(); return; } if (!document.hidden) { scLoadList(); if (_sc.active) scLoadMsgs(false); } }, 20000);
   if (_sc.active) scDockSync(); else if (window._scDocked) _scUndock();   // vào lại tab: hiện đúng hồ sơ của hội thoại đang chọn, chưa chọn thì không để hồ sơ cũ treo ở đó
 }
 var _scQT;
 function _scQSoon() { clearTimeout(_scQT); _scQT = setTimeout(function () { _sc.q = ((document.getElementById('sc-q') || {}).value || '').trim(); scLoadList(); }, 350); }
+// Lỗi tải danh sách hiện NGAY TRÊN danh sách (màn hẹp/điện thoại ẩn khung chat bên phải nên dòng trạng thái ở đó không ai thấy -> danh sách trống không rõ lý do).
+function _scErrHint(msg) {
+  var m = String(msg || '');
+  if (/urlfetch|qua nhieu|too many|quota|han muc/i.test(m)) return 'Hôm nay máy chủ đã hết lượt gọi dịch vụ ngoài (UrlFetch) nên chưa đọc được hộp thư. Hạn mức tự làm mới khoảng 14h (giờ VN) — báo quản trị nếu cần xử lý ngay.';
+  if (/AUTH|dang nhap|đăng nhập/i.test(m)) return 'Phiên đăng nhập có thể đã hết hạn — đăng xuất rồi đăng nhập lại.';
+  if (/ket noi|kết nối|502|Failed to fetch/i.test(m)) return 'Kiểm tra mạng rồi bấm Thử lại.';
+  return '';
+}
+function _scListErr() {
+  var list = document.querySelector('.sc-list'); if (!list) return;
+  var box = document.getElementById('sc-lerr');
+  if (!_sc.err) { if (box) box.remove(); return; }
+  if (!box) {
+    box = document.createElement('div'); box.id = 'sc-lerr'; box.className = 'sc-lerr';
+    var f = list.querySelector('.sc-find'); if (f && f.insertAdjacentElement) f.insertAdjacentElement('afterend', box); else list.insertBefore(box, list.firstChild);
+  }
+  var hint = _scErrHint(_sc.err);
+  box.innerHTML = '<div><b>⚠ ' + _pkcEsc(_sc.err) + '</b></div>' + (hint ? '<div class="sc-lerr-h">' + _pkcEsc(hint) + '</div>' : '')
+    + '<button class="btn sm" type="button" onclick="scLoadList()">↻ Thử lại</button>';
+}
 function _scStatus() {
+  _scListErr();
   var el = document.getElementById('sc-status'); if (!el) return;
   el.className = 'pkc-status' + (_sc.err ? ' err' : ''); el.textContent = _sc.err || (_sc.okAt ? 'Cập nhật lúc ' + _sc.okAt : '');
 }

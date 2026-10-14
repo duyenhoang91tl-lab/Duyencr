@@ -933,7 +933,7 @@ function _rowHtml(c) {
   }
   return `<tr data-phone="${esc(c.phone)}" onclick="openDp(this.dataset.phone)">
     <td class="col-lastpos" style="${lastPosDisp}">${lastPosHtml}</td>
-    <td class="col-name"><div class="cname">${esc(c.name)}</div><div class="cphone" style="display:flex;align-items:center;gap:4px">${c.phone}<button data-phone="${esc(c.phone)}" onclick="event.stopPropagation();copyPhone(this.dataset.phone)" title="Copy SĐT" style="background:none;border:none;cursor:pointer;font-size:11px;padding:0 2px;color:var(--hint);line-height:1;opacity:.6" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'">📋</button></div></td>
+    <td class="col-name"><div class="cname">${esc(c.name)}${typeof _noPromoBadge_==='function'?_noPromoBadge_(c.phone):''}</div><div class="cphone" style="display:flex;align-items:center;gap:4px">${c.phone}<button data-phone="${esc(c.phone)}" onclick="event.stopPropagation();copyPhone(this.dataset.phone)" title="Copy SĐT" style="background:none;border:none;cursor:pointer;font-size:11px;padding:0 2px;color:var(--hint);line-height:1;opacity:.6" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'">📋</button></div></td>
     <td class="col-tier">${tb}</td>
     <td class="col-hang">${hangBadge(c.hangKey)}</td>
     <td class="col-care">${cb}${khb ? '<br>'+khb : ''}</td>

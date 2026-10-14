@@ -39,6 +39,8 @@ Code client của `index.html` (trước đây inline, ~1.4MB) đã tách ra `cs
 
 - `27-fn-bonuscore.js`: `_bcOrderInfo_`, `_bcGuess_`, `_bcMinProducts_`, `_bcIsVongProgram_` (lõi đếm SP thưởng; bản sao trong gas_v13.js)
 - `28-fn-bonusdetail.js`: tab K "Chi tiết thưởng" — `renderSalesReportTabK_`, `_bdFlag`, `_bdSlot`, `_bdRev`, `_bdSyncFromGAS`
+- `41-fn-stageboard.js`: Bảng Kanban đơn theo giai đoạn Base (B5) — `_sbLoad`, `_sbRender`; GAS ttStageBoard_
+- `40-fn-carepage.js`: màn Chăm sóc & tái mua (B4) + bộ tạo tab dùng chung `registerExtraTab`
 - `39-fn-buyfilter.js`: bộ lọc Loại khách (Tất cả / Chưa mua / Đã mua) — `setBuy`, `_isBoughtCustomer`
 - `37-fn-configpage.js`: trang ⚙ Cấu hình tập trung (B2) — ngưỡng ttStageHours/hmCycle/hmIdle lưu Settings + AuditLog, lần chạy tự động gần nhất, lối tắt
 - `36-fn-homechips.js`: 4 chip Hôm nay ở Tổng quan (B1 ROADMAP-CRM-MAU) — `hmCompute`, `hmRenderChips`, `hmOpenList`

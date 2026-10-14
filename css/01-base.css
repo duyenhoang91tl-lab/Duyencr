@@ -988,3 +988,6 @@ body.demo-mode .dp-tab[data-tab="chat"]{display:none !important;}
 
 .tf-link{color:#1d4ed8;cursor:pointer;margin-left:6px;font-size:11px;}
 .tf-link:hover{text-decoration:underline;}
+.sc-lerr{margin:8px;padding:9px 11px;border:1px solid #f3b8b0;background:#fdf0ee;color:#9b2c1f;border-radius:8px;font-size:12px;line-height:1.5;}
+.sc-lerr-h{margin:4px 0 6px;color:#7a3a30;font-size:11.5px;}
+.sc-lerr .btn{margin-top:4px;}

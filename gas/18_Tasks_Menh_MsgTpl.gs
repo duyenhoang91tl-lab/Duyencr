@@ -198,6 +198,7 @@ function _notifyMentions_(opts) {
     var selfUn = {};
     users.forEach(function (u) { [u.name, u.username].concat(u.names || []).forEach(function (n) { if (me[String(n || '').trim().toLowerCase()]) selfUn[String(u.username)] = 1; }); });
     tos = tos.filter(function (x) { return !selfUn[x]; });
+    if (opts.onlyUsers) tos = tos.filter(function (x) { return opts.onlyUsers[x] === 1; });   // vd. thao luan khach: chi bao cho nguoi co quyen xem
     if (!tos.length) return 0;
     var sh = getSheet_(SH_NOTIF, NOTIF_HEADERS), now = new Date().toISOString();
     var snip = String(opts.text || '').replace(/\s+/g, ' ').trim().slice(0, 160);
