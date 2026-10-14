@@ -8,6 +8,7 @@ Gồm: 1 backend Google Apps Script (`gas_v13.js`) + web app (`index.html`) + 2 
 2. Chỉ đọc đúng phần code liên quan trong repo (grep/view theo hàm), không đọc nguyên file lớn.
 3. Đừng hỏi lại người dùng những gì đã có trong các file KB này.
 4. Luôn đọc `01-rules-and-deploy.md` (đặc biệt mục **QUY TẮC GIT: merge-only**) trước khi commit/push hoặc khi sửa `gas_v13.js`.
+5. **Chỉ sửa theo YÊU CẦU MỚI NHẤT của Duyên** (quy tắc 14 trong `01-rules-and-deploy.md`): không tự sửa/dọn/xoá mục cũ; chỉ chỉnh mục cũ khi Duyên báo xoá/chỉnh liên quan. Thấy lỗi ở mục cũ ngoài phạm vi thì chỉ BÁO, không tự sửa.
 
 ## Bảng định tuyến: sửa gì → đọc file KB nào → sửa file nào trong repo
 | Việc cần làm | Đọc file KB | Sửa trong repo |

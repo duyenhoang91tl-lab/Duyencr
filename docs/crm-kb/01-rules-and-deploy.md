@@ -41,7 +41,7 @@ Cả 2 extension gọi chung 1 URL GAS.
 - Từ v13.19: `getGasSource`/`setGasSource` BẮT BUỘC có `adminKey` (= giá trị dòng `adminKey` trong sheet Settings; app hỏi 1 lần/máy, lưu `ome_admin_key`). Chưa đặt dòng đó = không ai lấy/đồng bộ được mã. Tài khoản test (role `demo`): xem `docs/TAI-KHOAN-TEST.md`.
 - (Từ 2026-10-11 deploy tự động nên KHÔNG còn bắt buộc nhắc bước này; chỉ cần khi Duyên chủ động muốn nút Copy trả mã mới.)
 
-## 13 quy tắc bắt buộc khi sửa code (quy tắc 5 = merge-only, xem mục QUY TẮC GIT ở đầu file)
+## 14 quy tắc bắt buộc khi sửa code (quy tắc 5 = merge-only, xem mục QUY TẮC GIT ở đầu file; quy tắc 14 = chỉ sửa theo yêu cầu mới nhất)
 1. Luôn clone repo MỚI NHẤT bằng token người dùng gửi trong tin nhắn đó (không dùng lại token cũ). Đọc kỹ file liên quan (view/grep) trước khi sửa.
 2. Sửa `gas_v13.js` → chạy `split-gas` + `--check`, push; deploy TỰ ĐỘNG, KHÔNG nhắc deploy/đồng bộ mã (mục trên).
 3. Sửa JS/CSS extension → nhắc reload extension.
@@ -55,6 +55,7 @@ Cả 2 extension gọi chung 1 URL GAS.
 11. Phát hiện quy ước/lỗi mới đáng nhớ → đề xuất cập nhật đúng file KB.
 12. Làm xong phần nào push ngay phần đó (từng mục nhỏ) kèm việc cần làm tiếp, để phiên khác tiếp tục được.
 13. (Đã thay 2026-10-11) Sửa `gas_v13.js`/`cloudflare/`/`supabase/` → KHÔNG nhắc deploy GAS / Worker / Supabase / đồng bộ mã: đã tự động qua GitHub Actions. Chỉ báo "workflow tự deploy" + Ctrl+F5 nếu đổi web; chỉ nhắc khi workflow đỏ hoặc cần chạy hàm tay. Không còn khối `gas-code-v9`.
+14. **CHỈ SỬA THEO YÊU CẦU MỚI NHẤT của Duyên (chốt 2026-10-14, Duyên yêu cầu).** Làm đúng và đủ việc Duyên vừa nhờ; KHÔNG tự sửa / dọn / đổi tên / refactor / đổi hành vi / xoá các mục cũ (tính năng, màn hình, hàm, cấu hình đã có) dù thấy chưa đẹp. Chỉ chỉnh mục cũ khi Duyên báo xoá hoặc chỉnh và việc đó liên quan trực tiếp tới mục cũ đó; khi đó chỉ đụng đúng phần được nêu. Nếu cần sửa nhỏ ở mục cũ để yêu cầu mới chạy được (vd thêm 1 dòng gọi hàm) thì giữ tối thiểu và nói rõ trong tin trả lời. Phát hiện lỗi hoặc việc đáng sửa ở mục cũ ngoài phạm vi: chỉ BÁO ngắn gọn cho Duyên quyết định, KHÔNG tự sửa. Thay đổi lớn ngoài yêu cầu (vd đổi cấu trúc, đổi tên file) phải hỏi trước.
 
 ## Checklist trước khi báo "đã xong"
 1. Đã grep hết mọi nơi gọi hàm vừa sửa chưa?
@@ -70,4 +71,4 @@ Cả 2 extension gọi chung 1 URL GAS.
 - Nút cài đặt admin của tab báo cáo gom vào 1 dropdown "⚙ Cài đặt" (`.gear-menu`/`.gear-menu-list` + `_srToggleGearMenu()`/`closeGearMenus()`), đã áp cho Báo cáo E — theo mẫu này nếu thêm chỗ khác.
 
 ## Instruction của Project (rule 13)
-Instruction của Project (rule 2 và 13) cần SỬA cho khớp: "Deploy GAS/Worker/Supabase đã tự động qua GitHub Actions — không nhắc deploy/đồng bộ mã nữa; chỉ nhắc reload extension, Ctrl+F5 web, hoặc hàm cần chạy tay." (Claude không sửa được Instruction — Duyên cập nhật ở Project settings.)
+Instruction của Project (rule 2 và 13) cần SỬA cho khớp: "Deploy GAS/Worker/Supabase đã tự động qua GitHub Actions — không nhắc deploy/đồng bộ mã nữa; chỉ nhắc reload extension, Ctrl+F5 web, hoặc hàm cần chạy tay." (Claude không sửa được Instruction — Duyên cập nhật ở Project settings.) Nên thêm vào Instruction của Project quy tắc 14: "Chỉ sửa theo yêu cầu mới nhất; chỉ chỉnh mục cũ khi Duyên báo xoá/chỉnh liên quan."
