@@ -50,5 +50,5 @@ const bl=big.ctx.khdList_({token:'tA',phone:'0934230669'}).messages;ok(bl.length
 // router + tách file
 ok(/KHD_GET_ACTIONS_\[action\] === 1\) return khdDoGet_\(p\)/.test(src)&&/KHD_POST_ACTIONS_\[action\] === 1\) return khdDoPost_\(action, data\)/.test(src),'doGet/doPost có route khDiscuss*');
 ok(fs.existsSync('gas/30_KhDiscuss.gs')&&fs.readFileSync('gas/30_KhDiscuss.gs','utf8').includes('function khdSend_('),'gas/30_KhDiscuss.gs đã sinh');
-ok(/ver: 'v13\.47-scope-gate'/.test(src),'ver = v13.47-scope-gate (action=count)');
+ok(/ver: 'v13\.48-pkquota'/.test(src),'ver = v13.48-pkquota (action=count)');
 process.exit(bad?1:0);

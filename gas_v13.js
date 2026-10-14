@@ -2513,7 +2513,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.47-scope-gate' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.48-pkquota' });
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -15462,11 +15462,14 @@ function _pkTagsOut_(raw, tmap) {
 // Ten nhan vien Pancake (bang pk_staff, do pkNhanVienDongBo dong bo). NGUYEN NHAN GOC them: hoi thoai chi luu assignee_ids (uuid Pancake) nen
 // khong hien duoc ten sale. LOI doc bang (chua tao / chua dong bo) KHONG duoc lam hong khung chat -> tra {} va chat van chay.
 function _pkStaffNames_() {
+  // Cache 6 gio (rong thi 10 phut): ham nay nam trong MOI lan poll hop thu -> neu moi lan lai goi Supabase thi ton 1 luot UrlFetch/poll.
+  var hit = _pkCacheGet_('pkStaffAll_'); if (hit) return hit;
+  var m = {};
   try {
-    var rows = sb_('GET', 'pk_staff?select=id,name&limit=1000').json || [], m = {};
-    rows.forEach(function (r) { if (r && r.id) m[String(r.id)] = String(r.name || ''); });
-    return m;
-  } catch (e) { return {}; }
+    (sb_('GET', 'pk_staff?select=id,name&limit=1000').json || []).forEach(function (r) { if (r && r.id) m[String(r.id)] = String(r.name || ''); });
+  } catch (e) { m = {}; }
+  _pkCachePut_('pkStaffAll_', m, Object.keys(m).length ? 21600 : 600);
+  return m;
 }
 function _pkConvOut_(c, names) {
   // assignees: ten tu bang pk_staff (pkNhanVienDongBo) truoc; thieu ten moi hoi API users cua Pancake (cache 6 gio). tags: ma so -> {ten, mau} (API tags cua page).
@@ -15529,9 +15532,15 @@ function pkChatInbox_(e) {
       var digits = q.replace(/\D/g, '');
       filter = '&' + ((digits.length >= 6 && digits.length >= q.length - 2) ? 'customer_phone=like.' + _pkEnc_('*' + digits + '*') : 'customer_name=ilike.' + _pkEnc_('*' + q + '*'));
     }
+    // NGUYEN NHAN GOC loi 'urlfetch qua nhieu lan/ngay': moi tab poll 8s -> moi lan >=2 UrlFetch (Supabase + ten NV) x nhieu tab x ca ngay vuot han muc
+    // (20.000/ngay tai khoan thuong). Danh sach hoi thoai giong nhau cho moi nguoi dung (khong loc theo nguoi) -> cache 15s DUNG CHUNG: bao nhieu tab cung chi ~4 luot/phut.
+    var ck = 'pkInbox_' + encodeURIComponent(q).slice(0, 80), hit = _pkCacheGet_(ck);
+    if (hit) return jsonOut_(hit);
     var _names = _pkStaffNames_();
     var cv = sb_('GET', 'pk_conversations?select=' + PK_CONV_COLS_ + filter + '&order=last_message_at.desc.nullslast&limit=60').json || [];
-    return jsonOut_({ ok: true, conversations: cv.map(function (c) { return _pkConvOut_(c, _names); }), serverTime: new Date().toISOString() });
+    var res = { ok: true, conversations: cv.map(function (c) { return _pkConvOut_(c, _names); }), serverTime: new Date().toISOString() };
+    _pkCachePut_(ck, res, 15);
+    return jsonOut_(res);
   } catch (err) { return jsonOut_({ error: 'Doc hop thu loi: ' + String(err && err.message || err).slice(0, 200) }); }
 }
 // GET pkChatConv: tin nhan cua 1 hoi thoai theo convId (after=<ISO> chi lay tin moi hon moc do).
