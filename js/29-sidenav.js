@@ -42,11 +42,12 @@
     { k:'cs',  t:'🔀 Cài đặt chia số',      ids:['act:assign','act:autoassign','act:assignhist'] },
     { k:'tm',  t:'👥 Cài đặt team',         ids:['team','act:acct'] },
     { k:'up',  t:'📤 Up data',              ids:['uploaddata','act:upload','act:sync','act:fullsync','act:dup'] },
-    { k:'st',  t:'⚙ Settings',              ids:['act:roles','act:help','act:theme','act:errlog','config','act:cstatus','act:khstatus','act:cfield','act:tier','audit','act:clear','act:taskflow'] }
+    { k:'st',  t:'⚙ Settings',              ids:['act:roles','act:dept','act:help','act:theme','act:errlog','config','act:cstatus','act:khstatus','act:cfield','act:tier','audit','act:clear','act:taskflow'] }
   ];
   // Mục "hành động" (mở modal có sẵn, không phải tab). admin:true = chỉ tài khoản admin thấy.
   var ACTS = {
     roles:      { t:'🛡 Phân quyền', f:'openRoleSettings', admin:true },
+    dept:       { t:'🏢 Phòng ban', f:'openDeptSettings', admin:true },
     help:       { t:'❓ Hướng dẫn sử dụng', f:'openHelpModal', open:true },
     theme:      { t:function(){ return (typeof _themeIsDark==='function' && _themeIsDark()) ? '☀ Chế độ sáng' : '🌙 Chế độ tối'; }, f:'toggleTheme', open:true },
     errlog:     { t:'🐞 Nhật ký lỗi (máy này)', f:'openErrLogModal', admin:true },

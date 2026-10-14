@@ -46,7 +46,7 @@ Code client của `index.html` (trước đây inline, ~1.4MB) đã tách ra `cs
 - `39-fn-buyfilter.js`: bộ lọc Loại khách (Tất cả / Chưa mua / Đã mua) — `setBuy`, `_isBoughtCustomer`
 - `37-fn-configpage.js`: trang ⚙ Cấu hình tập trung (B2) — ngưỡng ttStageHours/hmCycle/hmIdle lưu Settings + AuditLog, lần chạy tự động gần nhất, lối tắt
 - `36-fn-homechips.js`: 4 chip Hôm nay ở Tổng quan (B1 ROADMAP-CRM-MAU) — `hmCompute`, `hmRenderChips`, `hmOpenList`
-- `35-fn-deptsettings.js`: cài đặt phòng ban (tách riêng đội Online/Offline) — `openDeptSettings`, `_dpSave`, `DEPT_LIST`; GAS readDeptList_/readSaleDepts_/_orgApplyDepts_
+- `35-fn-deptsettings.js`: TRANG RIÊNG toàn màn hình "🏢 Phòng ban" (khung `.rs-page` như Phân quyền; mở từ Settings → 🏢 Phòng ban hoặc nút ⚙ Cài đặt phòng ở Tổng quan) — `openDeptSettings`, `closeDeptSettings`, `_dpSave` (ghi deptList + saleDepts rồi ĐỌC LẠI xác nhận), `DEPT_LIST`, `DEPT_DEFAULT`. Test: `tools/test-dept-settings.js`.
 - `34-fn-todaytasks.js`: nhắc việc hôm nay cho CS — `ttFetch`, `_ttCards`, `_ttCardHtml` (thẻ trong khung nhắc hẹn; backend gas/23_TodayTasks.gs)
 
 - `31-fn-orgoverview.js`: tab "🏠 Tổng quan" = MÀN HÌNH ĐẦU SAU ĐĂNG NHẬP (tự `switchTab('overview')` khi data-view hiện, trừ tài khoản test) + modal "🪪 Hồ sơ nhân sự" — `_ovLoad`, `_ovScope` (phạm vi xem theo vai trò), `_ovRender`, `openEmployeeProfile`, `_ovAskAI`; gọi GAS `action=orgOverview`.

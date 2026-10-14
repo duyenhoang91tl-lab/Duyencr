@@ -112,3 +112,12 @@ body.rs-open{overflow:hidden;}
 .rs-pv-i.ok{background:rgba(34,197,94,.14);color:#15803d;}
 .rs-pv-i.no{background:rgba(239,68,68,.12);color:#b91c1c;text-decoration:line-through;}
 @media (max-width:800px){.rs-body{flex-direction:column;}.rs-nav{width:auto;flex-direction:row;flex-wrap:wrap;border-right:0;border-bottom:1px solid var(--border);}.rs-note{display:none;}}
+
+/* ── Trang riêng "🏢 Phòng ban" (js/35-fn-deptsettings.js, dùng khung .rs-page như trang Phân quyền) ── */
+.dpg-banner{padding:10px 12px;border-radius:8px;font-size:13px;line-height:1.5;margin-bottom:12px;background:var(--surface2);border:1px solid var(--border);}
+.dpg-banner.err{background:#fef2f2;border-color:#fecaca;color:#991b1b;} .dpg-banner.ok{background:#f0fdf4;border-color:#bbf7d0;color:#166534;}
+.dpg-banner code{font-size:11px;word-break:break-all;}
+.dpg-row{display:flex;gap:8px;align-items:center;margin-bottom:6px;} .dpg-cnt{font-size:11px;color:var(--muted);min-width:60px;}
+.dpg-in{flex:1;padding:6px 9px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font:inherit;font-size:13px;}
+.dpg-bar{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;}
+
