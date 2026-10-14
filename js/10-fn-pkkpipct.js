@@ -1,5 +1,27 @@
 function _pkKpiPct(v){ return (v||v===0) ? (v+'%') : '—'; }
 
+// ═══ CẢNH BÁO TRONG BÁO CÁO: MẶC ĐỊNH ẨN, bấm biểu tượng 👁 mới hiện (Duyên yêu cầu 2026-10-12) ═══
+// Các dòng ⚠️ ("N đơn chưa gán…", "tên chưa khớp Sale/Page…", cảnh báo chung) làm rối báo cáo khi chụp gửi sếp → thu gọn thành 1 nút nhỏ.
+// _warnBox(key, boxHtml, label): boxHtml = khung cảnh báo cũ (giữ nguyên nội dung/kiểu); key = định danh để NHỚ trạng thái đã mở khi
+// báo cáo vẽ lại (mặc định luôn đóng). Dùng chung cho js/10 + js/11. Test: node tools/test-warn-eye.js
+var _warnOpen = {};
+function _warnBox(key, boxHtml, label){
+  if (!boxHtml) return '';
+  var open = !!_warnOpen[key];
+  return '<div class="warn-wrap" style="margin:0 0 10px">'+
+    '<a href="javascript:void(0)" class="warn-eye" data-warn="'+key+'" data-label="'+String(label||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'" onclick="_warnToggle(this)" '+
+    'title="Bấm để xem / ẩn cảnh báo" style="display:inline-block;font-size:11px;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:2px 10px;cursor:pointer;user-select:none;text-decoration:none">'+
+    (open ? '🙈 Ẩn cảnh báo' : '👁 '+(label ? String(label).replace(/&/g,'&amp;').replace(/</g,'&lt;') : 'Xem cảnh báo'))+'</a>'+
+    '<div class="warn-body" style="display:'+(open ? 'block' : 'none')+';margin-top:6px">'+boxHtml+'</div></div>';
+}
+function _warnToggle(a){
+  var wrap = a.parentNode, body = wrap && wrap.querySelector('.warn-body'); if (!body) return;
+  var show = body.style.display === 'none';
+  body.style.display = show ? 'block' : 'none';
+  _warnOpen[a.getAttribute('data-warn')] = show;
+  a.textContent = show ? '🙈 Ẩn cảnh báo' : '👁 ' + (a.getAttribute('data-label') || 'Xem cảnh báo');
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  BO LOC CO CAO CUA CAC BANG "Theo Page"/"Theo Sale" (tab Bao cao KPI Pancake) — dang GENERIC,
 //  KHONG dung chung state/co che voi bang "Danh sach KH" chinh (colFilters/openColDropdown), vi
@@ -186,22 +208,22 @@ function _pkRenderKpiPancake(){
   }
 
   if (rep.warnings && rep.warnings.length){
-    html += '<div style="margin:0 0 14px;padding:8px 10px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;font-size:12px;color:#92400e">'+
-      rep.warnings.map(function(w){ return '⚠️ '+esc(w); }).join('<br>')+'</div>';
+    html += _warnBox('kpi-warnings', '<div style="margin:0;padding:8px 10px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;font-size:12px;color:#92400e">'+
+      rep.warnings.map(function(w){ return '⚠️ '+esc(w); }).join('<br>')+'</div>', rep.warnings.length+' cảnh báo dữ liệu');
   }
 
   if (rep.unmappedSales && rep.unmappedSales.length){
-    html += '<div style="margin:0 0 14px;padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412">'+
+    html += _warnBox('kpi-unmapped-sales', '<div style="margin:0;padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412">'+
       '⚠️ '+rep.unmappedSales.length+' tên Nhân viên Pancake chưa khớp Sale CRM (nên đơn/doanh thu của họ đang tính = 0): '+
       rep.unmappedSales.map(function(n){ return esc(n); }).join(', ')+
-      ' — vào tab "📥 Báo cáo Pancake" → mục "Khớp tên" để khớp.</div>';
+      ' — vào tab "📥 Báo cáo Pancake" → mục "Khớp tên" để khớp.</div>', rep.unmappedSales.length+' tên Nhân viên chưa khớp Sale CRM');
   }
 
   if (rep.unmappedPages && rep.unmappedPages.length){
-    html += '<div style="margin:0 0 14px;padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412">'+
+    html += _warnBox('kpi-unmapped-pages', '<div style="margin:0;padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412">'+
       '⚠️ '+rep.unmappedPages.length+' Page chưa khớp Kênh bán (nên đơn/doanh thu của Page này đang tính = 0): '+
       rep.unmappedPages.map(function(p){ return esc(p.pageName||p.pageId); }).join(', ')+
-      ' — vào tab "📥 Báo cáo Pancake" → mục "🔗 Khớp Page Pancake ↔ Kênh bán CRM" để khớp.</div>';
+      ' — vào tab "📥 Báo cáo Pancake" → mục "🔗 Khớp Page Pancake ↔ Kênh bán CRM" để khớp.</div>', rep.unmappedPages.length+' Page chưa khớp Kênh bán');
   }
 
   // ── Tổng quan: tách khối "Kết quả bán hàng" nổi bật (chụp gửi sếp) khỏi khối phễu tương tác ──
@@ -825,7 +847,7 @@ function _pkRenderReportHtml(){
   '</div>';
 
   if (d.unmapped && d.unmapped.length){
-    html += '<div style="margin-bottom:10px;padding:8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412">⚠️ '+d.unmapped.length+' tên chưa khớp Sale CRM đang tính riêng theo tên Pancake gốc trong bảng "Theo CS" bên dưới: '+d.unmapped.map(esc).join(', ')+'</div>';
+    html += _warnBox('kpi-dash-unmapped', '<div style="margin:0;padding:8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412">⚠️ '+d.unmapped.length+' tên chưa khớp Sale CRM đang tính riêng theo tên Pancake gốc trong bảng "Theo CS" bên dưới: '+d.unmapped.map(esc).join(', ')+'</div>', d.unmapped.length+' tên chưa khớp Sale CRM');
   }
 
   html += '<div class="dash-section-title">Theo Page</div>';

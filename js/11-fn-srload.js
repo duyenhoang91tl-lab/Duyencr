@@ -619,7 +619,9 @@ function _srCloseRateBarHtml_(rows, searchTerm, unitLabel){
   // (khong co mau so) — truoc day bi AN im lang nen don cua ho 'bien mat' khoi bieu do. Nay liet ke ro de biet ma lien ket.
   var orphans = (rows||[]).filter(function(r){ return !(r.held>0) && r.closed>0; }).sort(function(a,b){ return b.closed-a.closed; });
   var orphanTot = orphans.reduce(function(s,r){return s+r.closed;},0);
-  var orphanHtml = orphans.length ? '<div style="font-size:11px;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:6px 8px;margin:6px 0">⚠️ <b>'+orphanTot+' đơn</b> chưa gán được vào tương tác Pancake nên KHÔNG nằm trong biểu đồ/trung bình: '+orphans.slice(0,8).map(function(r){ return esc(r.name)+' ('+r.closed+')'; }).join(', ')+(orphans.length>8?' …':'')+'. Nếu đây là tên khác của 1 Sale đã có → thêm vào "Tên khác" ở 🔑 Tài khoản (hoặc Quản lý tài khoản) để gộp.</div>' : '';
+  var orphanBox_ = orphans.length ? '<div style="font-size:11px;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:6px 8px;margin:6px 0">⚠️ <b>'+orphanTot+' đơn</b> chưa gán được vào tương tác Pancake nên KHÔNG nằm trong biểu đồ/trung bình: '+orphans.slice(0,8).map(function(r){ return esc(r.name)+' ('+r.closed+')'; }).join(', ')+(orphans.length>8?' …':'')+'. Nếu đây là tên khác của 1 Sale đã có → thêm vào "Tên khác" ở 🔑 Tài khoản (hoặc Quản lý tài khoản) để gộp.</div>' : '';
+  // MẶC ĐỊNH ẨN — bấm 👁 mới hiện (Duyên yêu cầu 2026-10-12; _warnBox ở js/10-fn-pkkpipct.js)
+  var orphanHtml = orphanBox_ ? _warnBox('cr-orphan', orphanBox_, orphanTot+' đơn chưa gán vào tương tác Pancake') : '';
   var lv = CLOSE_RATE_THRESHOLDS.levels;
   function colorFor(p){ return _crColorFor_(p); }
   var bars = filtered.map(function(r){
