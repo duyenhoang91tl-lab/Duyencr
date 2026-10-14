@@ -615,8 +615,8 @@ function _srCloseRateBarHtml_(rows, searchTerm, unitLabel){
   var totHeld = filtered.reduce(function(s,r){return s+r.held;},0);
   var totClosed = filtered.reduce(function(s,r){return s+r.closed;},0);
   var avgRate = totHeld ? Math.round(totClosed/totHeld*100) : 0;
-  var th = CLOSE_RATE_THRESHOLDS || { red:2, green:10 };
-  function colorFor(p){ return p>th.green ? '#16a34a' : (p>=th.red ? '#d97706' : '#dc2626'); }
+  var lv = CLOSE_RATE_THRESHOLDS.levels;
+  function colorFor(p){ return _crColorFor_(p); }
   var bars = filtered.map(function(r){
     var w = Math.max(2, Math.min(100, r.closeRate));
     return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">'+
@@ -626,31 +626,73 @@ function _srCloseRateBarHtml_(rows, searchTerm, unitLabel){
       '<div style="width:104px;font-size:11px;color:var(--muted);white-space:nowrap"><b style="color:var(--text)">'+r.closeRate+'%</b> ('+r.closed+'/'+r.held+')</div></div>';
   }).join('');
   var isAdmin = currentUser.role === 'admin' || currentUser.role === 'demo';
-  var legend = '<span style="color:#16a34a">■</span> &gt;'+th.green+'% &nbsp;<span style="color:#d97706">■</span> '+th.red+'–'+th.green+'% &nbsp;<span style="color:#dc2626">■</span> &lt;'+th.red+'%';
+  var legend = _srCrLegendHtml_(lv);
   var editBtn = isAdmin ? ' &nbsp;<a href="javascript:void(0)" onclick="_srToggleCloseRateEdit(this)" style="font-size:10.5px;color:var(--muted);text-decoration:underline">✎ sửa mốc</a>' : '';
   return '<div style="padding:4px 0 10px">'+
     '<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Trung bình: <b style="color:var(--text)">'+avgRate+'%</b> ('+totClosed+'/'+totHeld+' '+esc(unitLabel)+') &nbsp;·&nbsp; '+legend+editBtn+'</div>'+
-    (isAdmin ? '<div class="close-rate-edit-form" style="display:none;margin:-4px 0 10px;padding:8px;background:var(--surface2);border-radius:6px;font-size:11.5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
-      '<span>Đỏ dưới</span><input type="number" min="0" max="100" value="'+th.red+'" style="width:52px;padding:3px 5px;border:1px solid var(--border);border-radius:4px;background:var(--surface)" id="cr-edit-red">%'+
-      '<span>&nbsp;·&nbsp;Vàng đến</span><input type="number" min="0" max="100" value="'+th.green+'" style="width:52px;padding:3px 5px;border:1px solid var(--border);border-radius:4px;background:var(--surface)" id="cr-edit-green">%'+
-      '<span>&nbsp;·&nbsp;Xanh trên đó</span>'+
-      '<button class="btn sm primary" onclick="_srSaveCloseRateEdit(this)">Lưu</button>'+
-    '</div>' : '')+
+    (isAdmin ? _srCrFormHtml_(lv) : '')+
     bars+'</div>';
+}
+function _srCrLegendHtml_(lv){
+  return lv.map(function(l,i){
+    var nx = lv[i+1], txt;
+    if (!nx) txt = '≥'+l.from+'%';
+    else if (i===0) txt = '<'+nx.from+'%';
+    else txt = l.from+'–'+(nx.from % 1 === 0 ? (nx.from-1) : '<'+nx.from)+'%';   // tỷ lệ hiển thị là số nguyên nên "đến mốc kế - 1"
+    return '<span style="color:'+l.color+'">■</span> '+esc(txt).replace(/</g,'&lt;');
+  }).join(' &nbsp;');
+}
+var CR_INPUT_CSS = 'width:60px;padding:3px 5px;border:1px solid var(--border);border-radius:4px;background:var(--surface)';
+function _srCrRowHtml_(from, color, first){
+  return '<div class="cr-row" style="display:flex;gap:6px;align-items:center">'+
+    '<input type="color" class="cr-color" value="'+esc(color)+'" style="width:34px;height:26px;padding:0;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer">'+
+    '<span>Từ</span><input type="number" class="cr-from" min="0" max="100" step="0.1" value="'+from+'" '+(first?'disabled ':'')+'style="'+CR_INPUT_CSS+'">'+
+    '<span>% trở lên</span>'+(first ? '<span style="color:var(--muted)">(mức thấp nhất)</span>' : '<button type="button" class="btn sm" onclick="_srCrDelRow(this)" title="Xoá mức này">✕</button>')+
+  '</div>';
+}
+function _srCrFormHtml_(lv){
+  return '<div class="close-rate-edit-form" style="display:none;flex-direction:column;gap:6px;margin:-4px 0 10px;padding:8px;background:var(--surface2);border-radius:6px;font-size:11.5px">'+
+    '<div style="color:var(--muted)">Mỗi mức có 1 màu và tỷ lệ chốt bắt đầu từ bao nhiêu %. Thêm/bớt tuỳ ý (2–'+CLOSE_RATE_MAX_LEVELS+' mức).</div>'+
+    '<div class="cr-rows" style="display:flex;flex-direction:column;gap:6px">'+lv.map(function(l,i){ return _srCrRowHtml_(l.from, l.color, i===0); }).join('')+'</div>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+      '<button type="button" class="btn sm" onclick="_srCrAddRow(this)">＋ Thêm mức</button>'+
+      '<button type="button" class="btn sm" onclick="_srCrReset(this)">↺ Về mặc định (3 màu)</button>'+
+      '<button type="button" class="btn sm primary" onclick="_srSaveCloseRateEdit(this)">Lưu</button>'+
+    '</div></div>';
 }
 function _srToggleCloseRateEdit(a){
   var form = a.closest('div').nextElementSibling;
   if (form && form.classList.contains('close-rate-edit-form')) form.style.display = form.style.display==='none' ? 'flex' : 'none';
 }
+var CR_PALETTE = ['#dc2626','#ea580c','#d97706','#eab308','#84cc16','#16a34a','#0d9488','#2563eb'];
+function _srCrAddRow(btn){
+  var box = btn.closest('.close-rate-edit-form').querySelector('.cr-rows');
+  var rows = box.querySelectorAll('.cr-row');
+  if (rows.length >= CLOSE_RATE_MAX_LEVELS){ toast('⚠️ Tối đa '+CLOSE_RATE_MAX_LEVELS+' mức.'); return; }
+  var froms = [].map.call(rows, function(r){ return parseFloat(r.querySelector('.cr-from').value) || 0; });
+  var next = Math.min(100, Math.max.apply(null, froms) + 5);
+  box.insertAdjacentHTML('beforeend', _srCrRowHtml_(next, CR_PALETTE[Math.min(rows.length, CR_PALETTE.length-1)], false));
+}
+function _srCrDelRow(btn){
+  var box = btn.closest('.cr-rows');
+  if (box.querySelectorAll('.cr-row').length <= CLOSE_RATE_MIN_LEVELS){ toast('⚠️ Cần ít nhất '+CLOSE_RATE_MIN_LEVELS+' mức.'); return; }
+  btn.closest('.cr-row').remove();
+}
+function _srCrReset(btn){
+  var form = btn.closest('.close-rate-edit-form');
+  form.querySelector('.cr-rows').innerHTML = CLOSE_RATE_DEFAULT_LEVELS.map(function(l,i){ return _srCrRowHtml_(l.from, l.color, i===0); }).join('');
+}
 function _srSaveCloseRateEdit(btn){
   var form = btn.closest('.close-rate-edit-form');
-  var red = parseFloat(form.querySelector('#cr-edit-red').value);
-  var green = parseFloat(form.querySelector('#cr-edit-green').value);
-  if (isNaN(red) || isNaN(green) || red < 0 || green < 0 || red > 100 || green > 100){ toast('⚠️ Mốc % không hợp lệ.'); return; }
-  if (red > green){ toast('⚠️ Mốc đỏ phải nhỏ hơn hoặc bằng mốc vàng.'); return; }
-  _saveCloseRateThresholds(red, green);
-  form.style.display = 'none'; // an ngay hang nhap mac (Do duoi/Vang den/Xanh tren) sau khi luu
-  toast('✓ Đã lưu mốc màu: đỏ <'+red+'%, vàng '+red+'–'+green+'%, xanh >'+green+'%');
+  var lv = [].map.call(form.querySelectorAll('.cr-row'), function(r){ return { from: parseFloat(r.querySelector('.cr-from').value), color: r.querySelector('.cr-color').value }; });
+  if (lv.length < CLOSE_RATE_MIN_LEVELS || lv.length > CLOSE_RATE_MAX_LEVELS){ toast('⚠️ Cần từ '+CLOSE_RATE_MIN_LEVELS+' đến '+CLOSE_RATE_MAX_LEVELS+' mức.'); return; }
+  if (lv.some(function(x){ return isNaN(x.from) || x.from < 0 || x.from > 100; })){ toast('⚠️ Mốc % không hợp lệ (0–100).'); return; }
+  lv[0].from = 0;
+  var froms = lv.map(function(x){ return x.from; }).slice().sort(function(a,b){ return a-b; });
+  for (var i = 1; i < froms.length; i++) if (froms[i] === froms[i-1]){ toast('⚠️ Hai mức đang trùng mốc '+froms[i]+'%. Mỗi mức cần 1 mốc % khác nhau.'); return; }
+  _saveCloseRateThresholds(lv);
+  form.style.display = 'none'; // ẩn form sau khi lưu
+  toast('✓ Đã lưu '+lv.length+' mức màu Tỷ lệ chốt');
   if (_activeV9Tab === 'salesreport') renderSalesReportTab();
   if (_activeV9Tab === 'kpipancake') renderKpiPancakeTab();
 }
