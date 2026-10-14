@@ -34,7 +34,7 @@
   // Nhóm menu mẹ -> các mục con (theo data-bar-id). Mục chưa khai báo vẫn hiện, dồn vào nhóm "Khác".
   var GROUPS = [
     { k:'ov',  t:'🏠 Tổng quan',           ids:['act:notif','overview'] },
-    { k:'kh',  t:'👤 Hồ sơ',                ids:['tab-kh','tab-schedule','tab-overdue','tab-mydata','tab-task','act:profile'] },   // gộp hồ sơ khách hàng + hồ sơ nhân viên
+    { k:'kh',  t:'👤 Hồ sơ',                ids:['tab-kh','care2','stageboard','tab-schedule','tab-overdue','tab-mydata','tab-task','act:profile'] },   // gộp hồ sơ khách hàng + hồ sơ nhân viên
     { k:'sc',  t:'💬 Social',               ids:['tab-chat','tab-teamchat'] },
     { k:'kho', t:'📦 Kho',                 ids:['act:kho'] },
     { k:'tv',  t:'🧰 Tác vụ',               ids:['tab-zaloai','act:bc','act:bct','act:bcstat','act:futpl','act:bday'] },
