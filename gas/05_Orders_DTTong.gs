@@ -98,8 +98,12 @@ function _dtApplyBoDem_(orders) {
   }
 }
 function _isBhZeroOrder_(textBlob, revenue) { return BH_ORDER_RE_.test(String(textBlob || '')) && !(Number(revenue) > 0); }
-// Tỷ lệ chốt theo KÊNH tính trên BASE: tổng đơn bán được trên Base theo page (bỏ đơn hoàn/huỷ và BH không doanh thu) ÷ tổng tương tác Pancake của page.
-function _srKenhCloseRateFromBase_(filters) {
+// TỶ LỆ CHỐT (theo Sale / Kênh / Sale×Page) LUÔN TÍNH TRÊN BASE, dùng chung cho Báo cáo A (Base) và B (Pos) nên xem báo cáo nào cũng ra CÙNG số:
+// tử số = đơn Base theo ngày tạo trong kỳ (bỏ đơn huỷ/hoàn và đơn BH không doanh thu), mẫu số = tương tác Pancake. Không phụ thuộc bộ lọc
+// Sale/Kênh/Sản phẩm/Nguồn của từng báo cáo (các bộ lọc đó chỉ áp cho bảng doanh thu).
+function _srCloseRateSectionsFromBase_(filters) {
+  var tracked = _pkTrackedDatesByPageAndSale_(_dateStrToVnYmd_(filters.dateFrom), _dateStrToVnYmd_(filters.dateTo));
+  if (!Object.keys(tracked.datesByPage).length) return _srCloseRateSections_([], filters);   // chưa có dữ liệu Pancake → không cần đọc Base
   var rows = readDTTong_(true), norm = [];
   for (var i = 0; i < rows.length; i++) {
     var r = rows[i];
