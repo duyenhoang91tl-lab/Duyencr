@@ -213,4 +213,25 @@ ok(run('_featureGate_','salesReportA','tokCs')===null,'bo phan khong khop nguoi 
   ok(/_scopeListServe_\(action, p, e\)/.test(src),'doGet goi _scopeListServe_');
 }
 
+// ===== BUOC 4c-3: cau hinh cau truc chi admin/leader/manager; mau follow-up CS chi sua cua minh =====
+{
+  const US={tA:{username:'ad',role:'admin'},tL:{username:'ld',role:'leader'},tM:{username:'mg',role:'manager'},tC:{username:'cs_hoa',name:'Hoa',role:'cs',names:['Hoa']}};
+  ctx._sessUser_=t=>US[t]||null;
+  for(const a of ['saveTeams','saveMktTeams','saveSaleGroups','saveCareStatus']){
+    ok(ctx._cfgGate_(a,'tC').code==='FORBIDDEN',a+': CS goi thang -> FORBIDDEN');
+    ok(ctx._cfgGate_(a,'tA')===null&&ctx._cfgGate_(a,'tL')===null&&ctx._cfgGate_(a,'tM')===null,a+': admin/leader/manager duoc');
+  }
+  ok(ctx._cfgGate_('saveSingle','tC')===null&&ctx._cfgGate_('saveFollowUpTemplates','tC')===null&&ctx._cfgGate_('saveMessageTemplate','tC')===null,'trang thai tung khach (saveSingle) / mau cua CS KHONG bi chan o cong cau hinh');
+  ok(ctx._cfgGate_('saveTeams','')===null&&ctx._cfgGate_('saveTeams','tokSai')===null,'khong token / token sai: de cong tac 4b xu ly');
+  ok(/_cfgGate_\(d0\.action, d0\.token\)/.test(src),'doPost goi _cfgGate_');
+  // gop mau follow-up
+  const cur=[['*','7','chung admin',''],['CF','3','cua Hoa','hoa'],['CF','5','cua Mai','mai'],['*','10','cua Hoa2','hoa']];
+  const list=[{productCode:'*',days:'7',template:'CS thu xoa mau chung',cs:''},{productCode:'cf',days:'3',template:'Hoa sua',cs:'Hoa'},{productCode:'*',days:'9',template:'Hoa them',cs:'hoa'},{productCode:'*',days:'1',template:'ghi de cua Mai',cs:'mai'},{productCode:'*',days:'',template:'thieu ngay',cs:'hoa'}];
+  const m=ctx._fuMergeForUser_(cur,list,US.tC);
+  const txt=m.map(r=>r[2]+'|'+r[3]).sort().join(' ; ');
+  ok(txt==='Hoa sua|hoa ; Hoa them|hoa ; chung admin| ; cua Mai|mai','CS: giu mau chung + mau cua Mai nguyen ven, chi thay mau cua minh (khong ghi de, khong xoa): '+txt);
+  ok(m.every(r=>r.length===4)&&m.find(r=>r[2]==='Hoa sua')[0]==='CF','dong hop le co 4 cot, ma SP viet hoa');
+  ok(ctx._fuMergeForUser_(cur,[],US.tC).length===2&&ctx._fuMergeForUser_(cur,[],US.tC).every(r=>r[3]!=='hoa'),'CS gui bang rong -> chi xoa mau cua minh');
+}
+
 console.log(fail?'\nFAILED '+fail:'\nALL ROLES TESTS PASSED');process.exit(fail?1:0);

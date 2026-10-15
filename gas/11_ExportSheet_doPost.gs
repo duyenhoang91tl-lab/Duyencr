@@ -236,6 +236,8 @@ function doPost(e) {
     if (_denP) return jsonOut_(_denP);
     var _ownP = _ownerGate_(d0.action, d0.token);
     if (_ownP) return jsonOut_(_ownP);
+    var _cfgP = _cfgGate_(d0.action, d0.token);
+    if (_cfgP) return jsonOut_(_cfgP);
   }
   return doPostCore_(e);
 }
@@ -366,7 +368,7 @@ function doPostCore_(e) {
     // Dọn dòng CareData bị nhân bản (giữ dòng đầy đủ nhất cho mỗi SĐT)
     if (action === 'dedupeCare')           return dedupeCare_();
     // ── HOI THAM TU DONG: luu bang mau tin (UI Sasum) ──
-    if (action === 'saveFollowUpTemplates') return saveFollowUpTemplates_(data.templates);
+    if (action === 'saveFollowUpTemplates') return saveFollowUpTemplates_(data.templates, (function () { try { return data.token ? _sessUser_(data.token) : null; } catch (e) { return null; } })());
     if (action === 'saveFuResults')         return saveFuResults_(data.results);
     // ── MESSENGER/PHONG THUY AI: doc bang tra menh + mau canned response (Sheet Menh/CannedResponses,
     //    tu tao voi du lieu mac dinh neu chua co). Them 2026-09, KHONG dung chung sheet/cot voi CareData. ──
