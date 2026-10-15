@@ -2790,6 +2790,21 @@ var DT_DATE_SENTINEL_ = '\u0000__DATE__\u0000';
 
 // Chuyen 1 hang tho cua DT TONG thanh object "don hang" (giu ten truong nhu ORDER_HEADERS
 // cu de cac cho khac trong code/frontend it phai sua nhat co the)
+// ĐƠN BẢO HÀNH (BH) KHÔNG DOANH THU: mã bộ đếm đơn dạng BH196T10/2026 (nằm ở cột id/ghi chú của Base). Đơn BH mà doanh thu = 0
+// KHÔNG tính là 1 đơn khi tính tỷ lệ chốt; BH có doanh thu (vd 160k) vẫn tính, gắn đúng page nếu có Kênh bán.
+var BH_ORDER_RE_ = /(^|[^A-Za-z0-9])BH\s*\d{1,6}[A-Za-z]{0,3}\s*T\d{1,2}(?:\/\d{2,4})?/i;
+function _isBhZeroOrder_(textBlob, revenue) { return BH_ORDER_RE_.test(String(textBlob || '')) && !(Number(revenue) > 0); }
+// Tỷ lệ chốt theo KÊNH tính trên BASE: tổng đơn bán được trên Base theo page (bỏ đơn hoàn/huỷ và BH không doanh thu) ÷ tổng tương tác Pancake của page.
+function _srKenhCloseRateFromBase_(filters) {
+  var rows = readDTTong_(), norm = [];
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    if (r.bhZero || _isExcludedOrderStatus_(r.trangThai)) continue;
+    if (!dateInRange_(parseVNDate_(r.ngayTao), filters.dateFrom, filters.dateTo)) continue;
+    norm.push({ kenhBan: r.kenhBan, dateStr: r.ngayTao, saleBanRaw: r.saleBan });
+  }
+  return _srCloseRateSections_(norm, filters);
+}
 function dtRowToOrder_(row, rowIndex) {
   var dtVal = _dtCellToVnStr_(row[DT_COL_THOIGIANHT]);
   var ngayTaoStr = _dtCellToVnStr_(row[DT_COL_NGAYTAO]);
@@ -2817,6 +2832,8 @@ function dtRowToOrder_(row, rowIndex) {
     status: String(row[DT_COL_TRANGTHAI] || ''),
     zalo: '',
     note: String(row[DT_COL_GIAIDOAN] || ''),
+    bhZero: _isBhZeroOrder_([row[DT_COL_ID], row[DT_COL_SANPHAM], row[DT_COL_PHANLOAI], row[DT_COL_GIAIDOAN], row[DT_COL_GIAOCHO]].join(' '),
+      _normMoney_(row[DT_COL_GIATRIDON]) + (_dtIsExchangeOrder_(row[DT_COL_PHANLOAI]) ? _normMoney_(row[DT_COL_GIATRICHENH]) : 0)),
     careCS: '' // DT TONG khong co cot rieng cho careCS — xem setOrderCareCS_ ben duoi
   };
 }
@@ -3567,7 +3584,8 @@ function readDTTong_() {
         giaTriCoc:      _normMoney_(r[16]),
         giaTriDon:      _normMoney_(r[17]),
         giaTriChenh:    _normMoney_(r[18]),
-        id:             r[19]
+        id:             r[19],
+        bhZero:         _isBhZeroOrder_([r[19], r[14], r[15], r[6], r[2]].join(' '), _normMoney_(r[17]) + (_dtIsExchangeOrder_(r[15]) ? _normMoney_(r[18]) : 0))
       });
     } catch (eRow) {
       Logger.log('readDTTong_: loi doc dong ' + (rowNums ? rowNums[i] : i + 2) + ': ' + eRow);
@@ -4587,7 +4605,7 @@ function buildSalesReportA_(filters) {
   // ── Tỷ lệ chốt theo Sale / theo Kênh / theo Page — dùng hàm chung _srCloseRateSections_
   // (tách 2026-09 để Báo cáo B dùng lại cùng công thức). Chuẩn hoá "matched" (DT TỔNG) về hình
   // dạng chung {kenhBan, dateStr, saleBanRaw} rồi gọi — nội dung/công thức giữ NGUYÊN VẸN như cũ.
-  var normRowsA_ = matched.map(function(mc) {
+  var normRowsA_ = matched.filter(function(mc) { return !mc.bhZero; }).map(function(mc) {
     return { kenhBan: mc.kenhBan, dateStr: mc[dateField], saleBanRaw: mc.saleBan };
   });
   var closeSectionsA_ = _srCloseRateSections_(normRowsA_, filters);
@@ -5703,6 +5721,10 @@ function buildSalesReportB_(filters) {
     return { kenhBan: kenhB_, dateStr: m.ngayTaoDon, saleBanRaw: m.theSale };
   });
   var closeSectionsB_ = _srCloseRateSections_(normRowsB_, filters);
+  // Tỷ lệ chốt theo KÊNH: đơn bán được trên BASE theo page ÷ tương tác Pancake của page (không dùng đơn Pos); BH không doanh thu không tính.
+  if (closeSectionsB_.kenhCloseRate && closeSectionsB_.kenhCloseRate.length) {
+    try { var kbB_ = _srKenhCloseRateFromBase_(filters); closeSectionsB_.kenhCloseRate = kbB_.kenhCloseRate; closeSectionsB_.kenhFrom = kbB_.closeFrom; } catch (eKb) {}
+  }
 
   var mismatchCount = products['__MISMATCH__'] ? products['__MISMATCH__'].mismatchRows : 0;
 
@@ -5719,7 +5741,7 @@ function buildSalesReportB_(filters) {
     saleCloseRate: closeSectionsB_.saleCloseRate,
     saleCloseRateFrom: closeSectionsB_.closeFrom,
     kenhCloseRate: closeSectionsB_.kenhCloseRate,
-    kenhCloseRateFrom: closeSectionsB_.closeFrom,
+    kenhCloseRateFrom: closeSectionsB_.kenhFrom || closeSectionsB_.closeFrom,
     saleCloseByPage: closeSectionsB_.saleCloseByPage,
     trungBinhDon: matched.length ? Math.round(totalGiaTri / matched.length) : 0,
     mismatchRows: mismatchCount, // so dong bi lech so cot giua san pham/ma/so luong — nen kiem tra tay
@@ -8341,10 +8363,12 @@ function buildKpiReport_(from, to, saleFilter) {
     if (!byPageOrders[page]) byPageOrders[page] = { orders: 0, revenue: 0 };
     byPageOrders[page].orders += 1;
     byPageOrders[page].revenue += Number(o.revenue) || 0;
-    if (!ordersByKenhDate[page]) ordersByKenhDate[page] = {};
-    if (!ordersByKenhDate[page][dKeyOrder]) ordersByKenhDate[page][dKeyOrder] = { orders: 0, revenue: 0 };
-    ordersByKenhDate[page][dKeyOrder].orders += 1;
-    ordersByKenhDate[page][dKeyOrder].revenue += Number(o.revenue) || 0;
+    if (!o.bhZero) {   // đơn BH không doanh thu không tính vào tỷ lệ chốt
+      if (!ordersByKenhDate[page]) ordersByKenhDate[page] = {};
+      if (!ordersByKenhDate[page][dKeyOrder]) ordersByKenhDate[page][dKeyOrder] = { orders: 0, revenue: 0 };
+      ordersByKenhDate[page][dKeyOrder].orders += 1;
+      ordersByKenhDate[page][dKeyOrder].revenue += Number(o.revenue) || 0;
+    }
     ordersDetail.push({
       id: o.id || '', ngayTao: normOrderDate_(o.orderDate), kenhBan: page,
       sale: o.cs || '', giaTriDon: Number(o.revenue) || 0, sanPham: o.product || '', phone: o.phone || ''
@@ -8360,10 +8384,12 @@ function buildKpiReport_(from, to, saleFilter) {
       if (!bySaleOrders[sName]) bySaleOrders[sName] = { orders: 0, revenue: 0 };
       bySaleOrders[sName].orders += 1; // so don: khong chia
       bySaleOrders[sName].revenue += (Number(o.revenue) || 0) * w; // tien: chia deu
-      if (!ordersBySaleDate[sName]) ordersBySaleDate[sName] = {};
-      if (!ordersBySaleDate[sName][dKeyOrder]) ordersBySaleDate[sName][dKeyOrder] = { orders: 0, revenue: 0 };
-      ordersBySaleDate[sName][dKeyOrder].orders += 1;
-      ordersBySaleDate[sName][dKeyOrder].revenue += (Number(o.revenue) || 0) * w;
+      if (!o.bhZero) {
+        if (!ordersBySaleDate[sName]) ordersBySaleDate[sName] = {};
+        if (!ordersBySaleDate[sName][dKeyOrder]) ordersBySaleDate[sName][dKeyOrder] = { orders: 0, revenue: 0 };
+        ordersBySaleDate[sName][dKeyOrder].orders += 1;
+        ordersBySaleDate[sName][dKeyOrder].revenue += (Number(o.revenue) || 0) * w;
+      }
     }
   }
   var _trackedDates = _pkTrackedDatesByPageAndSale_(from, to);
@@ -12076,7 +12102,7 @@ function buildMktChecklistReport_(from, to) {
     // baseRevenue, the KPI mau xanh trong khoi Marketing cua tab "Báo cáo ngày") cong CA doanh
     // thu don da huy/hoan, cao hon han Bao cao A that (Duyen bao "doanh thu Base dang bi gap
     // doi"). Them dung 1 dieu kien vao if ben duoi, KHONG doi gi khac trong vong lap.
-    if (dt && dateInRange_(dt, from, to) && !_isExcludedOrderStatus_(rowsDt[i].trangThai)) {
+    if (dt && dateInRange_(dt, from, to) && !_isExcludedOrderStatus_(rowsDt[i].trangThai) && !rowsDt[i].bhZero) {   // BH không doanh thu không tính là đơn chốt
       var dKeyM = normOrderDate_(rowsDt[i].ngayTao);
       baseOrders++;
       var rev = Number(rowsDt[i].giaTriDon) || 0;

@@ -66,6 +66,21 @@ var DT_DATE_SENTINEL_ = '\u0000__DATE__\u0000';
 
 // Chuyen 1 hang tho cua DT TONG thanh object "don hang" (giu ten truong nhu ORDER_HEADERS
 // cu de cac cho khac trong code/frontend it phai sua nhat co the)
+// ĐƠN BẢO HÀNH (BH) KHÔNG DOANH THU: mã bộ đếm đơn dạng BH196T10/2026 (nằm ở cột id/ghi chú của Base). Đơn BH mà doanh thu = 0
+// KHÔNG tính là 1 đơn khi tính tỷ lệ chốt; BH có doanh thu (vd 160k) vẫn tính, gắn đúng page nếu có Kênh bán.
+var BH_ORDER_RE_ = /(^|[^A-Za-z0-9])BH\s*\d{1,6}[A-Za-z]{0,3}\s*T\d{1,2}(?:\/\d{2,4})?/i;
+function _isBhZeroOrder_(textBlob, revenue) { return BH_ORDER_RE_.test(String(textBlob || '')) && !(Number(revenue) > 0); }
+// Tỷ lệ chốt theo KÊNH tính trên BASE: tổng đơn bán được trên Base theo page (bỏ đơn hoàn/huỷ và BH không doanh thu) ÷ tổng tương tác Pancake của page.
+function _srKenhCloseRateFromBase_(filters) {
+  var rows = readDTTong_(), norm = [];
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    if (r.bhZero || _isExcludedOrderStatus_(r.trangThai)) continue;
+    if (!dateInRange_(parseVNDate_(r.ngayTao), filters.dateFrom, filters.dateTo)) continue;
+    norm.push({ kenhBan: r.kenhBan, dateStr: r.ngayTao, saleBanRaw: r.saleBan });
+  }
+  return _srCloseRateSections_(norm, filters);
+}
 function dtRowToOrder_(row, rowIndex) {
   var dtVal = _dtCellToVnStr_(row[DT_COL_THOIGIANHT]);
   var ngayTaoStr = _dtCellToVnStr_(row[DT_COL_NGAYTAO]);
@@ -93,6 +108,8 @@ function dtRowToOrder_(row, rowIndex) {
     status: String(row[DT_COL_TRANGTHAI] || ''),
     zalo: '',
     note: String(row[DT_COL_GIAIDOAN] || ''),
+    bhZero: _isBhZeroOrder_([row[DT_COL_ID], row[DT_COL_SANPHAM], row[DT_COL_PHANLOAI], row[DT_COL_GIAIDOAN], row[DT_COL_GIAOCHO]].join(' '),
+      _normMoney_(row[DT_COL_GIATRIDON]) + (_dtIsExchangeOrder_(row[DT_COL_PHANLOAI]) ? _normMoney_(row[DT_COL_GIATRICHENH]) : 0)),
     careCS: '' // DT TONG khong co cot rieng cho careCS — xem setOrderCareCS_ ben duoi
   };
 }
@@ -843,7 +860,8 @@ function readDTTong_() {
         giaTriCoc:      _normMoney_(r[16]),
         giaTriDon:      _normMoney_(r[17]),
         giaTriChenh:    _normMoney_(r[18]),
-        id:             r[19]
+        id:             r[19],
+        bhZero:         _isBhZeroOrder_([r[19], r[14], r[15], r[6], r[2]].join(' '), _normMoney_(r[17]) + (_dtIsExchangeOrder_(r[15]) ? _normMoney_(r[18]) : 0))
       });
     } catch (eRow) {
       Logger.log('readDTTong_: loi doc dong ' + (rowNums ? rowNums[i] : i + 2) + ': ' + eRow);

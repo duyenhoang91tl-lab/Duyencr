@@ -720,6 +720,10 @@ function buildSalesReportB_(filters) {
     return { kenhBan: kenhB_, dateStr: m.ngayTaoDon, saleBanRaw: m.theSale };
   });
   var closeSectionsB_ = _srCloseRateSections_(normRowsB_, filters);
+  // Tỷ lệ chốt theo KÊNH: đơn bán được trên BASE theo page ÷ tương tác Pancake của page (không dùng đơn Pos); BH không doanh thu không tính.
+  if (closeSectionsB_.kenhCloseRate && closeSectionsB_.kenhCloseRate.length) {
+    try { var kbB_ = _srKenhCloseRateFromBase_(filters); closeSectionsB_.kenhCloseRate = kbB_.kenhCloseRate; closeSectionsB_.kenhFrom = kbB_.closeFrom; } catch (eKb) {}
+  }
 
   var mismatchCount = products['__MISMATCH__'] ? products['__MISMATCH__'].mismatchRows : 0;
 
@@ -736,7 +740,7 @@ function buildSalesReportB_(filters) {
     saleCloseRate: closeSectionsB_.saleCloseRate,
     saleCloseRateFrom: closeSectionsB_.closeFrom,
     kenhCloseRate: closeSectionsB_.kenhCloseRate,
-    kenhCloseRateFrom: closeSectionsB_.closeFrom,
+    kenhCloseRateFrom: closeSectionsB_.kenhFrom || closeSectionsB_.closeFrom,
     saleCloseByPage: closeSectionsB_.saleCloseByPage,
     trungBinhDon: matched.length ? Math.round(totalGiaTri / matched.length) : 0,
     mismatchRows: mismatchCount, // so dong bi lech so cot giua san pham/ma/so luong — nen kiem tra tay
