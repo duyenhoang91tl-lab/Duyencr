@@ -31,6 +31,7 @@ function buildKpiReport_(from, to, saleFilter) {
   // rieng bao cao KPI nay. Cac bao cao doanh so A/B/C khac VAN giu nguyen o.date nhu cu,
   // khong dong cham toi (do la quyet dinh rieng, xem chu thich o dtRowToOrder_ dong ~994).
   var orders = readAllOrders_();
+  _dtApplyBoDem_(orders);   // cột U mã bộ đếm → nhận đơn BH không doanh thu
   var byPageOrders = {}, bySaleOrders = {};
   // MOI: gom them theo (kenh|sale) x NGAY — dung rieng cho tu so "Ty le chot", de chi cong don
   // trong dung nhung ngay Page/Sale do THUC SU co du lieu tuong tac Pancake (xem
@@ -69,10 +70,12 @@ function buildKpiReport_(from, to, saleFilter) {
     if (!byPageOrders[page]) byPageOrders[page] = { orders: 0, revenue: 0 };
     byPageOrders[page].orders += 1;
     byPageOrders[page].revenue += Number(o.revenue) || 0;
-    if (!ordersByKenhDate[page]) ordersByKenhDate[page] = {};
-    if (!ordersByKenhDate[page][dKeyOrder]) ordersByKenhDate[page][dKeyOrder] = { orders: 0, revenue: 0 };
-    ordersByKenhDate[page][dKeyOrder].orders += 1;
-    ordersByKenhDate[page][dKeyOrder].revenue += Number(o.revenue) || 0;
+    if (!o.bhZero) {   // đơn BH không doanh thu không tính vào tỷ lệ chốt
+      if (!ordersByKenhDate[page]) ordersByKenhDate[page] = {};
+      if (!ordersByKenhDate[page][dKeyOrder]) ordersByKenhDate[page][dKeyOrder] = { orders: 0, revenue: 0 };
+      ordersByKenhDate[page][dKeyOrder].orders += 1;
+      ordersByKenhDate[page][dKeyOrder].revenue += Number(o.revenue) || 0;
+    }
     ordersDetail.push({
       id: o.id || '', ngayTao: normOrderDate_(o.orderDate), kenhBan: page,
       sale: o.cs || '', giaTriDon: Number(o.revenue) || 0, sanPham: o.product || '', phone: o.phone || ''
@@ -88,10 +91,12 @@ function buildKpiReport_(from, to, saleFilter) {
       if (!bySaleOrders[sName]) bySaleOrders[sName] = { orders: 0, revenue: 0 };
       bySaleOrders[sName].orders += 1; // so don: khong chia
       bySaleOrders[sName].revenue += (Number(o.revenue) || 0) * w; // tien: chia deu
-      if (!ordersBySaleDate[sName]) ordersBySaleDate[sName] = {};
-      if (!ordersBySaleDate[sName][dKeyOrder]) ordersBySaleDate[sName][dKeyOrder] = { orders: 0, revenue: 0 };
-      ordersBySaleDate[sName][dKeyOrder].orders += 1;
-      ordersBySaleDate[sName][dKeyOrder].revenue += (Number(o.revenue) || 0) * w;
+      if (!o.bhZero) {
+        if (!ordersBySaleDate[sName]) ordersBySaleDate[sName] = {};
+        if (!ordersBySaleDate[sName][dKeyOrder]) ordersBySaleDate[sName][dKeyOrder] = { orders: 0, revenue: 0 };
+        ordersBySaleDate[sName][dKeyOrder].orders += 1;
+        ordersBySaleDate[sName][dKeyOrder].revenue += (Number(o.revenue) || 0) * w;
+      }
     }
   }
   var _trackedDates = _pkTrackedDatesByPageAndSale_(from, to);

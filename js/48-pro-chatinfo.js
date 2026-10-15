@@ -8,17 +8,27 @@ function proPhoneNorm_(p){ var d = String(p==null?'':p).replace(/\D/g,''); if (!
 function proInitials_(name){ var w = String(name||'').trim().split(/\s+/).filter(Boolean); if (!w.length) return '?'; return ((w.length>1 ? w[w.length-2].charAt(0) : '') + w[w.length-1].charAt(0)).toUpperCase(); }
 function proInfoRow_(k, v){ return '<div class="sc-ir"><span>'+proEsc_(k)+'</span><b>'+(v ? proEsc_(v) : '<i>—</i>')+'</b></div>'; }
 // conv: {name,phone}; c: khách CRM hoặc null; P: {D,days,rev,tree,now} (chỉ cần khi có c)
+function proPkBlock_(conv){   // "Thẻ Pancake" + "Người xử lý" như cột Thông tin của Pancake
+  if (!conv) return '';
+  var tags = (typeof _pkcTagsHtml==='function') ? _pkcTagsHtml(conv.tags) : '';
+  var warn = (!tags && conv.tagN>0) ? '<span class="pkc-warn" title="Có '+conv.tagN+' thẻ nhưng chưa lấy được tên thẻ (GAS chưa deploy bản mới / thiếu PANCAKE_PAGE_TOKENS)">⚠ '+conv.tagN+' thẻ (chưa lấy được tên thẻ)</span>' : '';
+  var ass = (conv.assignees && conv.assignees.length) ? proEsc_(conv.assignees.join(', ')) : '';
+  if (!tags && !warn && !ass) return '';
+  return '<div class="sc-pk">'+((tags||warn)?'<div class="sc-pk-r"><span class="k">Thẻ Pancake</span><span class="v">'+(tags||warn)+'</span></div>':'')
+    +(ass?'<div class="sc-pk-r"><span class="k">Người xử lý</span><span class="v">'+ass+'</span></div>':'')+'</div>';
+}
 function proChatInfoHtml_(conv, c, P){
   var head = function(name, phone, chips){ return '<div class="sc-info-h"><div class="sc-av">'+proEsc_(proInitials_(name))+'</div><div class="sc-info-t"><b>'+proEsc_(name||'Khách')+'</b>'
     +(phone?'<span class="sc-info-ph">'+proEsc_(phone)+'</span>':'')+(chips||'')+'</div></div>'; };
-  if (!conv || (!conv.phone && !c)) return head(conv&&conv.name, '', '')+'<div class="pkc-note">Hội thoại này chưa gắn SĐT nên chưa có hồ sơ khách. Dùng "🔗 Gắn hội thoại" trong hồ sơ khách để gắn.</div>';
-  if (!c) return head(conv.name, conv.phone, '')+'<div class="pkc-note">Chưa có khách nào trong CRM với SĐT này.</div>';
+  if (!conv || (!conv.phone && !c)) return head(conv&&conv.name, '', '')+proPkBlock_(conv)+'<div class="pkc-note">Hội thoại này chưa gắn SĐT nên chưa có hồ sơ khách. Dùng "🔗 Gắn hội thoại" trong hồ sơ khách để gắn.</div>';
+  if (!c) return head(conv.name, conv.phone, '')+proPkBlock_(conv)+'<div class="pkc-note">Chưa có khách nào trong CRM với SĐT này.</div>';
   var D = P.D, care = D.care||{}, status = care.status||c.careStatus||'', now = P.now||new Date();
   var custom = care.custom||c.custom||{};
   var chips = (c.tier?'<span class="pro-chip">'+proEsc_(c.tier)+'</span>':'')+(status?'<span class="pro-chip ok">'+proEsc_(status)+'</span>':'<span class="pro-chip warn">Chưa CS</span>');
   var pend = proNextActions_(D.mine, c.phone, now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0'), D.types, 3);
   var tl = proTimeline_(D.notes, D.mine, D.orders, 30);
   return head(c.name||conv.name, c.phone, chips)
+    + proPkBlock_(conv)
     + '<button type="button" class="btn sm sc-open" data-sc-open="'+proEsc_(c.phone)+'">👤 Mở hồ sơ đầy đủ</button>'
     + proStageHtml_(proStageModel_(P.tree||[], status))
     + proKpiHtml_(P.days, D.nOrd, P.rev)

@@ -402,6 +402,7 @@ function doGetCore_(e) {
     if (action === 'pkChatInbox') return pkChatInbox_(e);
     if (action === 'pkChatConv') return pkChatConv_(e);
     if (action === 'pkChatTags') return pkChatTags_(e);
+    if (action === 'pkChatDiag') return pkChatDiag_(e);
     if (action === 'roleConfig') {
       var _ru = _sessUser_(e && e.parameter && e.parameter.token);
       if (!_ru) return jsonOut_({ error: 'Can dang nhap.', code: 'AUTH' });
@@ -428,7 +429,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.53-pk-tags' });
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.54-pkstaff' });   // PHAI la chuoi viet thang (test-crm-ask/test-kh-discuss doi chieu); giu = PK_GAS_VER_
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──

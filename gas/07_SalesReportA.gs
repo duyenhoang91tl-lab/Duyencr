@@ -257,7 +257,7 @@ function buildSalesReportA_(filters) {
   // Bộ lọc Sale: mở rộng sang mọi tên cùng 1 người (tài khoản nhiều tên) + tên Pancake, so không phân biệt hoa/thường.
   var saleFilterFoldA = _expandSaleFilterWithPancakeAliases_(saleFilterArr).map(_normTxt_);
 
-  var rows = readDTTong_();
+  var rows = readDTTong_(true);
   var matched = [];
   for (var i = 0; i < rows.length; i++) {
     var row = rows[i];
@@ -368,10 +368,7 @@ function buildSalesReportA_(filters) {
   // ── Tỷ lệ chốt theo Sale / theo Kênh / theo Page — dùng hàm chung _srCloseRateSections_
   // (tách 2026-09 để Báo cáo B dùng lại cùng công thức). Chuẩn hoá "matched" (DT TỔNG) về hình
   // dạng chung {kenhBan, dateStr, saleBanRaw} rồi gọi — nội dung/công thức giữ NGUYÊN VẸN như cũ.
-  var normRowsA_ = matched.map(function(mc) {
-    return { kenhBan: mc.kenhBan, dateStr: mc[dateField], saleBanRaw: mc.saleBan };
-  });
-  var closeSectionsA_ = _srCloseRateSections_(normRowsA_, filters);
+  var closeSectionsA_ = _srCloseRateSectionsFromBase_(filters);   // cùng nguồn với Báo cáo B
   var saleCloseRate = closeSectionsA_.saleCloseRate;
   var kenhCloseRate = closeSectionsA_.kenhCloseRate;
   var saleCloseByPage = closeSectionsA_.saleCloseByPage;

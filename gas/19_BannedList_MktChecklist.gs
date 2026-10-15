@@ -264,7 +264,7 @@ function buildMktChecklistReport_(from, to) {
     if (!datesByKenhM[kn]) datesByKenhM[kn] = {};
     Object.keys(ds).forEach(function(d) { datesByKenhM[kn][d] = true; });
   });
-  var rowsDt = readDTTong_();
+  var rowsDt = readDTTong_(true);
   for (var i = 0; i < rowsDt.length; i++) {
     var dt = parseVNDate_(rowsDt[i].ngayTao);
     // SUA 2026-10-03: thieu dieu kien loai don Huy/Da hoan/Dang hoan (_isExcludedOrderStatus_)
@@ -272,7 +272,7 @@ function buildMktChecklistReport_(from, to) {
     // baseRevenue, the KPI mau xanh trong khoi Marketing cua tab "Báo cáo ngày") cong CA doanh
     // thu don da huy/hoan, cao hon han Bao cao A that (Duyen bao "doanh thu Base dang bi gap
     // doi"). Them dung 1 dieu kien vao if ben duoi, KHONG doi gi khac trong vong lap.
-    if (dt && dateInRange_(dt, from, to) && !_isExcludedOrderStatus_(rowsDt[i].trangThai)) {
+    if (dt && dateInRange_(dt, from, to) && !_isExcludedOrderStatus_(rowsDt[i].trangThai) && !rowsDt[i].bhZero) {   // BH không doanh thu không tính là đơn chốt
       var dKeyM = normOrderDate_(rowsDt[i].ngayTao);
       baseOrders++;
       var rev = Number(rowsDt[i].giaTriDon) || 0;

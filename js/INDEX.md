@@ -84,3 +84,6 @@ Code client của `index.html` (trước đây inline, ~1.4MB) đã tách ra `cs
 - `49-pro-discuss.js`: Thảo luận khách nội bộ (hộp chat theo SĐT + tag @) cho tab 🗨 Thảo luận trong hồ sơ khách và cột phải Social > Chat; `proNoteAdd_` lưu ghi chú nhanh không cần panel hồ sơ (`khdMount_`, `khdSend_`, `renderKhdTab`, `proNoteAdd_`). Backend `gas/30_KhDiscuss.gs`. Test: `tools/test-ui-pro-discuss.js`
 - `10-fn-pkkpipct.js` (đầu file): `_warnBox(key, boxHtml, label)` / `_warnToggle` — bọc cảnh báo ⚠️ trong báo cáo, mặc định ẩn, bấm 👁 mới hiện (dùng cả ở js/11 tỷ lệ chốt). Xem docs/crm-kb/05-sasum-reports-ui.md.
 - `43-fn-uxtools.js`: thêm `_guidesOn/applyGuides/setGuides` — công tắc hiện/ẩn lời hướng dẫn (class `guide-text`, mặc định ẩn; ô bật trong ❓ Hướng dẫn sử dụng). Xem docs/crm-kb/05-sasum-reports-ui.md.
+
+## js/51-demo-guard.js — tài khoản test (2026-10-15)
+Nạp sau `js/50`. Khi có `ome_demo_token`: hiển thị `…0000` → `••••` (SĐT đã bị máy chủ che) và mã hóa mọi file tải về (`a.download`, `XLSX.writeFile`) thành `.enc`. Giải mã: `tools/decrypt-demo-file.js`. Chi tiết: `docs/TAI-KHOAN-TEST.md`.
