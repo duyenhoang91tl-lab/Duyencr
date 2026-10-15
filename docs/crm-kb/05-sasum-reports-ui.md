@@ -73,3 +73,10 @@ Mọi câu **hướng dẫn cách dùng / giải thích cách tính / "bấm… 
 - **KHÔNG gắn `guide-text`** cho: câu trạng thái trống ("Chưa có…", "Chưa nạp báo cáo… vào tab … để nạp" — ẩn đi màn hình trông như hỏng), cảnh báo ⚠️ (dùng `_warnBox` ở mục trên), dữ liệu/ghi chú nghiệp vụ.
 - Màn "❓ Hướng dẫn sử dụng" (js/43) là nội dung xem theo yêu cầu nên giữ nguyên. Placeholder ô nhập giữ nguyên.
 - Test: `node tools/test-guides-hidden.js` (kiểm không gắn nhầm vào cảnh báo/trạng thái trống, công tắc, HTML không vỡ).
+
+## Báo cáo B (Pos) ẩn Sale/Kênh theo cài đặt admin (2026-10-14)
+- **Lỗi gốc:** cài đặt admin "Ẩn Page/Sale" (`hiddenSales` / `hiddenChannels`) chỉ được kiểm ở `readDTTong_` (Báo cáo A) và `buildPancakeReport_`; `buildSalesReportB_` đọc "dữ liệu đơn" Pos nhưng KHÔNG hề kiểm → sale đã nghỉ/ẩn (vd Dung1987) vẫn hiện ở báo cáo Pos (và các báo cáo dùng lại B: E hoa hồng, F, G...).
+- **Sửa:** `_donHiddenChecker_` (cạnh `_hiddenPageSaleSets_`) so khớp theo NGƯỜI (mọi tên cùng 1 người qua `_salePersonKeyFn_`, không so chuỗi y nguyên); đơn chỉ bị ẩn khi MỌI sale trên đơn đều bị ẩn (còn ≥1 sale không ẩn thì giữ, như `_isDTRowHidden_`) hoặc kênh (suy từ Nguồn đơn qua `_donKenhFromNguon_`) bị ẩn. Áp ở vòng lọc của B, sau bước lọc Sale/ghép đơn Base.
+- **Muốn sale nghỉ biến mất khỏi mọi báo cáo → thêm tên vào "Ẩn Sale" ở Cài đặt** (hệ thống KHÔNG có trạng thái "đã nghỉ" riêng).
+- Tỷ lệ chốt A = B do hàm dùng chung `_srCloseRateSectionsFromBase_` (đơn Base, bỏ đơn BH không doanh thu) — xem mục "TỶ LỆ CHỐT" phía trên/dưới. Chạy tay `xemTyLeChotAB` để so kênh + sale của A và B tháng này (log KHOP/LECH).
+- Test: `node tools/test-closerate-ab.js` (hàm thật + chạy `buildSalesReportB_` thật với dữ liệu giả).

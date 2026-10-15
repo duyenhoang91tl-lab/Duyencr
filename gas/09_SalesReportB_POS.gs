@@ -485,6 +485,7 @@ function buildSalesReportB_(filters) {
   // cho hay khong — dung 2 bo dem nay moi la so that de hien thi/canh bao, 2 mang [] chi de liet
   // ke VI DU (toi da 30 dong) phia sau.
   var ghepStats = { donCoMa: 0, daGhep: 0, gocBiLoai: 0, khongKhop: [], khongKhopCount: 0, trungDonGoc: [], trungDonGocCount: 0 };
+  var hiddenB_ = _donHiddenChecker_();
   var matched = [];
   for (var pj = 0; pj < pre.length; pj++) {
     var rowP = pre[pj];
@@ -548,6 +549,13 @@ function buildSalesReportB_(filters) {
       var hit = false;
       for (var si = 0; si < saleFilterFold.length; si++) { if (salesOnRow.indexOf(saleFilterFold[si]) !== -1) { hit = true; break; } }
       if (!hit) continue;
+    }
+    // AN theo cai dat admin (hiddenSales/hiddenChannels) — giong Bao cao A: don chi bi an khi MOI sale tren don deu bi an; hoac kenh bi an.
+    if (hiddenB_) {
+      var namesH = effRow.ghepShares ? effRow.ghepShares.map(function(x) { return x.name; }) : _donSaleNamesFromThe_(effRow.theSale);
+      namesH = namesH.filter(function(n) { return n && n !== '(chưa gán sale)'; });
+      if (namesH.length && namesH.every(hiddenB_.saleHidden)) continue;
+      if (hiddenB_.channelHidden(effRow.nguonDon)) continue;
     }
     // Don Quay Hao Nam gan the sale + note 30/70 -> chi 30% doanh thu la cua sale (xem _quaySaleRatio_)
     var hasSaleRow = effRow.ghepShares
