@@ -4105,6 +4105,32 @@ function _dtOrderRevenue_(m) {
 // cu cua buildSalesReportA_ (chi doi ten bien mc[dateField]/mc.saleBan -> mc.dateStr/mc.saleBanRaw
 // cho tong quat), KHONG duoc doi cong thuc khi sua — neu can doi cong thuc tinh ty le chot thi
 // sua o day se anh huong CA Bao cao A lan B.
+// YEU CAU DUYEN 12/10/2026: ty le chot o Bao cao B (Pos) cung phai la DON BASE / tuong tac Pancake — KHONG tinh theo don Pos
+// (Pos cuoi tuan len so cham hon Base 1 ngay nen ti le bi thap/lech so voi tuong tac Pancake cung ngay). Ham nay chon don Base (DT TONG)
+// voi DUNG quy tac cua Bao cao A: ngay TAO don trong [dateFrom, dateTo], bo don Huy/Tra lai/Hoan tien/That bai/Khieu nai, loc Sale
+// (mo rong ten + alias Pancake), loc san pham. Bo loc Nguon don cua B doi ra Kenh Base tuong ung (kenhAllow). Bo loc Marketer/CRM
+// (Trang thai CS, KH, Zalo, Nick Zalo) chi co tren don Pos nen KHONG ap dung duoc cho don Base. Doanh thu/so don/COD cua B van tinh tu Pos.
+function _srBaseRowsForCloseRate_(filters, kenhAllow) {
+  function toArr(v){ return Array.isArray(v) ? v.filter(Boolean) : (v ? [String(v).trim()] : []); }
+  var saleFold = _expandSaleFilterWithPancakeAliases_(toArr(filters.sale)).map(_normTxt_);
+  var terms = _foldTermsCSV_(filters.sanPham);
+  var rows = readDTTong_(), out = [];
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    var dt = parseVNDate_(row.ngayTao);
+    if (!dateInRange_(dt, filters.dateFrom, filters.dateTo)) continue;
+    if (_isExcludedOrderStatus_(row.trangThai)) continue;
+    if (kenhAllow && !kenhAllow[row.kenhBan]) continue;
+    if (saleFold.length) {
+      var onOrder = splitMulti_(row.saleBan, ',');
+      if (!onOrder.some(function(s){ return saleFold.indexOf(_normTxt_(s)) !== -1; })) continue;
+    }
+    if (!_pMatchAny_(row.sanPham, terms)) continue;
+    out.push({ kenhBan: row.kenhBan, dateStr: row.ngayTao, saleBanRaw: row.saleBan });
+  }
+  return out;
+}
+
 function _srCloseRateSections_(normRows, filters) {
   var UNASSIGNED = '(chưa gán sale)';
   var fFromYmd = _dateStrToVnYmd_(filters.dateFrom), fToYmd = _dateStrToVnYmd_(filters.dateTo);
@@ -5502,28 +5528,21 @@ function buildSalesReportB_(filters) {
   var byNguonArr = toArrB_(byNguon);
   var byMktArrB = toArrB_(byMktObj);
 
-  // Ty le chot theo Sale/Kenh/Page — dung LAI CHINH XAC cong thuc cua Bao cao A qua ham dung
-  // chung _srCloseRateSections_. Khac biet duy nhat voi A: "kenhBan" cua moi don B khong co san
-  // (B chi co "Nguon don") nen phai tu suy ra "kenhBan" chuan tu chuoi Nguon don, THU 2 CACH
-  // theo dung yeu cau Duyen 2026-10 ("khớp theo tên Page HOẶC Id Page"):
-  //   1) Trich ID Page o cuoi chuoi (vd "Facebook / Hiền Phạm Tourmaline (862972056891669)" ->
-  //      "862972056891669") roi tra qua PancakePageMap (readPancakePageMap_, khoa=pageId).
-  //   2) Neu (1) khong ra ket qua (khong co ID, vd "Bảo hành", "Quầy Hào Nam", "Fb Phạm Thu
-  //      Hiền" go tay khong theo chuan) — thu tiep trich TEN Page (bo tien to "Nen tang / " +
-  //      hau to "(ID)" neu co) va tra qua readPancakePageMapByName_ (khoa=pageName chuan hoa).
-  // Don khong khop duoc o CA 2 cach (chua tung duoc admin khop Page nao trong PancakePageMap)
-  // moi thuc su bi bo qua o buoc tinh ty le chot, giong cach A bo qua kenh chua khop Page.
-  var pkPageMapB_ = readPancakePageMap_();
-  var pkPageMapByNameB_ = readPancakePageMapByName_();
-  var normRowsB_ = matched.map(function(m) {
-    var pid = _extractPageIdFromNguonDon_(m.nguonDon);
-    var kenhB_ = pid ? (pkPageMapB_[pid] || '') : '';
-    if (!kenhB_) {
-      var pname_ = _extractPageNameFromNguonDon_(m.nguonDon);
-      if (pname_) kenhB_ = pkPageMapByNameB_[_normTxt_(pname_)] || '';
-    }
-    return { kenhBan: kenhB_, dateStr: m.ngayTaoDon, saleBanRaw: m.theSale };
-  });
+  // Ty le chot theo Sale/Kenh/Page — dung LAI CHINH XAC cong thuc cua Bao cao A qua ham dung chung _srCloseRateSections_,
+  // VA tu so la DON BASE (DT TONG), khong phai don Pos (yeu cau Duyen 12/10/2026 — xem _srBaseRowsForCloseRate_). Nhu vay A va B
+  // ra CUNG 1 con so khi chon cung ngay/sale. Rieng bo loc "Nguon don" cua B (chi co tren don Pos) duoc doi ra Kenh Base
+  // tuong ung theo 2 cach nhu truoc: (1) ID Page o cuoi chuoi qua PancakePageMap, (2) ten Page qua readPancakePageMapByName_.
+  var kenhAllowB_ = null;
+  if (nguonFilterArr.length) {
+    var pkPageMapB_ = readPancakePageMap_(), pkPageMapByNameB_ = readPancakePageMapByName_();
+    kenhAllowB_ = {};
+    nguonFilterArr.forEach(function(ng) {
+      var pid = _extractPageIdFromNguonDon_(ng), kn = pid ? (pkPageMapB_[pid] || '') : '';
+      if (!kn) { var pn = _extractPageNameFromNguonDon_(ng); if (pn) kn = pkPageMapByNameB_[_normTxt_(pn)] || ''; }
+      if (kn) kenhAllowB_[kn] = true;
+    });
+  }
+  var normRowsB_ = _srBaseRowsForCloseRate_(filters, kenhAllowB_);
   var closeSectionsB_ = _srCloseRateSections_(normRowsB_, filters);
 
   var mismatchCount = products['__MISMATCH__'] ? products['__MISMATCH__'].mismatchRows : 0;

@@ -697,28 +697,21 @@ function buildSalesReportB_(filters) {
   var byNguonArr = toArrB_(byNguon);
   var byMktArrB = toArrB_(byMktObj);
 
-  // Ty le chot theo Sale/Kenh/Page — dung LAI CHINH XAC cong thuc cua Bao cao A qua ham dung
-  // chung _srCloseRateSections_. Khac biet duy nhat voi A: "kenhBan" cua moi don B khong co san
-  // (B chi co "Nguon don") nen phai tu suy ra "kenhBan" chuan tu chuoi Nguon don, THU 2 CACH
-  // theo dung yeu cau Duyen 2026-10 ("khớp theo tên Page HOẶC Id Page"):
-  //   1) Trich ID Page o cuoi chuoi (vd "Facebook / Hiền Phạm Tourmaline (862972056891669)" ->
-  //      "862972056891669") roi tra qua PancakePageMap (readPancakePageMap_, khoa=pageId).
-  //   2) Neu (1) khong ra ket qua (khong co ID, vd "Bảo hành", "Quầy Hào Nam", "Fb Phạm Thu
-  //      Hiền" go tay khong theo chuan) — thu tiep trich TEN Page (bo tien to "Nen tang / " +
-  //      hau to "(ID)" neu co) va tra qua readPancakePageMapByName_ (khoa=pageName chuan hoa).
-  // Don khong khop duoc o CA 2 cach (chua tung duoc admin khop Page nao trong PancakePageMap)
-  // moi thuc su bi bo qua o buoc tinh ty le chot, giong cach A bo qua kenh chua khop Page.
-  var pkPageMapB_ = readPancakePageMap_();
-  var pkPageMapByNameB_ = readPancakePageMapByName_();
-  var normRowsB_ = matched.map(function(m) {
-    var pid = _extractPageIdFromNguonDon_(m.nguonDon);
-    var kenhB_ = pid ? (pkPageMapB_[pid] || '') : '';
-    if (!kenhB_) {
-      var pname_ = _extractPageNameFromNguonDon_(m.nguonDon);
-      if (pname_) kenhB_ = pkPageMapByNameB_[_normTxt_(pname_)] || '';
-    }
-    return { kenhBan: kenhB_, dateStr: m.ngayTaoDon, saleBanRaw: m.theSale };
-  });
+  // Ty le chot theo Sale/Kenh/Page — dung LAI CHINH XAC cong thuc cua Bao cao A qua ham dung chung _srCloseRateSections_,
+  // VA tu so la DON BASE (DT TONG), khong phai don Pos (yeu cau Duyen 12/10/2026 — xem _srBaseRowsForCloseRate_). Nhu vay A va B
+  // ra CUNG 1 con so khi chon cung ngay/sale. Rieng bo loc "Nguon don" cua B (chi co tren don Pos) duoc doi ra Kenh Base
+  // tuong ung theo 2 cach nhu truoc: (1) ID Page o cuoi chuoi qua PancakePageMap, (2) ten Page qua readPancakePageMapByName_.
+  var kenhAllowB_ = null;
+  if (nguonFilterArr.length) {
+    var pkPageMapB_ = readPancakePageMap_(), pkPageMapByNameB_ = readPancakePageMapByName_();
+    kenhAllowB_ = {};
+    nguonFilterArr.forEach(function(ng) {
+      var pid = _extractPageIdFromNguonDon_(ng), kn = pid ? (pkPageMapB_[pid] || '') : '';
+      if (!kn) { var pn = _extractPageNameFromNguonDon_(ng); if (pn) kn = pkPageMapByNameB_[_normTxt_(pn)] || ''; }
+      if (kn) kenhAllowB_[kn] = true;
+    });
+  }
+  var normRowsB_ = _srBaseRowsForCloseRate_(filters, kenhAllowB_);
   var closeSectionsB_ = _srCloseRateSections_(normRowsB_, filters);
 
   var mismatchCount = products['__MISMATCH__'] ? products['__MISMATCH__'].mismatchRows : 0;

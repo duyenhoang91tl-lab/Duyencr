@@ -48,6 +48,32 @@ function _dtOrderRevenue_(m) {
 // cu cua buildSalesReportA_ (chi doi ten bien mc[dateField]/mc.saleBan -> mc.dateStr/mc.saleBanRaw
 // cho tong quat), KHONG duoc doi cong thuc khi sua — neu can doi cong thuc tinh ty le chot thi
 // sua o day se anh huong CA Bao cao A lan B.
+// YEU CAU DUYEN 12/10/2026: ty le chot o Bao cao B (Pos) cung phai la DON BASE / tuong tac Pancake — KHONG tinh theo don Pos
+// (Pos cuoi tuan len so cham hon Base 1 ngay nen ti le bi thap/lech so voi tuong tac Pancake cung ngay). Ham nay chon don Base (DT TONG)
+// voi DUNG quy tac cua Bao cao A: ngay TAO don trong [dateFrom, dateTo], bo don Huy/Tra lai/Hoan tien/That bai/Khieu nai, loc Sale
+// (mo rong ten + alias Pancake), loc san pham. Bo loc Nguon don cua B doi ra Kenh Base tuong ung (kenhAllow). Bo loc Marketer/CRM
+// (Trang thai CS, KH, Zalo, Nick Zalo) chi co tren don Pos nen KHONG ap dung duoc cho don Base. Doanh thu/so don/COD cua B van tinh tu Pos.
+function _srBaseRowsForCloseRate_(filters, kenhAllow) {
+  function toArr(v){ return Array.isArray(v) ? v.filter(Boolean) : (v ? [String(v).trim()] : []); }
+  var saleFold = _expandSaleFilterWithPancakeAliases_(toArr(filters.sale)).map(_normTxt_);
+  var terms = _foldTermsCSV_(filters.sanPham);
+  var rows = readDTTong_(), out = [];
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    var dt = parseVNDate_(row.ngayTao);
+    if (!dateInRange_(dt, filters.dateFrom, filters.dateTo)) continue;
+    if (_isExcludedOrderStatus_(row.trangThai)) continue;
+    if (kenhAllow && !kenhAllow[row.kenhBan]) continue;
+    if (saleFold.length) {
+      var onOrder = splitMulti_(row.saleBan, ',');
+      if (!onOrder.some(function(s){ return saleFold.indexOf(_normTxt_(s)) !== -1; })) continue;
+    }
+    if (!_pMatchAny_(row.sanPham, terms)) continue;
+    out.push({ kenhBan: row.kenhBan, dateStr: row.ngayTao, saleBanRaw: row.saleBan });
+  }
+  return out;
+}
+
 function _srCloseRateSections_(normRows, filters) {
   var UNASSIGNED = '(chưa gán sale)';
   var fFromYmd = _dateStrToVnYmd_(filters.dateFrom), fToYmd = _dateStrToVnYmd_(filters.dateTo);

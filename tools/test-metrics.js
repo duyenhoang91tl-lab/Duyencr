@@ -32,6 +32,7 @@ vm.runInContext(`
   getCrmSS_ = function() { return { getSheetByName: function() { return null; } }; };
   readTeams_ = function() { return [{ name: 'Team 1', members: ['anhNP1999', 'dungnguyen1995'] }]; };
   readPancakeMap_ = function() { return {}; };
+  readDTTong_ = function() { return []; };   // Bao cao B nay doc don BASE cho ty le chot (tools/test-close-rate-base.js) — test nay chi can khong loi
   readPancakePageMap_ = function() { return {}; };
   readPancakePageMapByName_ = function() { return {}; };
   _pancakeKnownSaleNameSet_ = function() { return {}; };

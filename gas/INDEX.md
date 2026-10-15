@@ -37,7 +37,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `CSKH_DUYEN_SHEET_KEY_`, `CSKH_DUYEN_FIELDS_`, `XOA_SDT_BUDGET_MS_`
 
 ## 07_SalesReportA.gs
-- Hàm: `getSalesReportOptions_`, `_dtIsExchangeOrder_`, `_dtOrderRevenue_`, `_srCloseRateSections_`, `_extractPageIdFromNguonDon_`, `_extractPageNameFromNguonDon_`, `buildSalesReportA_`
+- Hàm: `getSalesReportOptions_`, `_dtIsExchangeOrder_`, `_dtOrderRevenue_`, `_srBaseRowsForCloseRate_`, `_srCloseRateSections_`, `_extractPageIdFromNguonDon_`, `_extractPageNameFromNguonDon_`, `buildSalesReportA_`
 
 ## 08_SaleKPI_FailedOrders.gs
 - Hàm: `readSaleKpiConfig_`, `_ymAdd_`, `_ymMonthsBetween_`, `_ymFirstDay_`, `_ymLastDay_`, `_todayYm_`, `_computeSaleMonthlyRevenue_`, `_computeSaleTierTimeline_`, `buildSaleKpiReport_`, `buildFailedOrderReport_`

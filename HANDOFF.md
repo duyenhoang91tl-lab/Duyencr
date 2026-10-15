@@ -142,3 +142,8 @@ Yeu cau cua Duyen: Chat noi bo hien thi duoc o cua so chat nho o goc duoi phai (
 - Đã sửa phía client (js/42 `_scListErr`/`_scErrHint`, css `.sc-lerr`): lỗi tải danh sách hiện NGAY TRÊN danh sách + gợi ý + nút ↻ Thử lại; hết lỗi thì tự ẩn. Test: `node tools/test-sc-list-error.js`.
 - NGUYÊN NHÂN GỐC phía máy chủ CHƯA xác minh được (phiên này không gọi được GAS/Worker). Nghi nhất: hết hạn mức UrlFetch/ngày của Apps Script (xem commit cde3f71, f244445: reset ~14h VN; cần DEPLOY LẠI GAS v13.48+ để có cache 15s; có thể bật Worker đọc thẳng Supabase `PK_NATIVE=1` sau khi chạy pkDanhMucDongBo). Sau khi tải lại trang, khung đỏ sẽ nói đúng lỗi máy chủ trả về.
 - `tools/test-pk-chat-gas.js` đang FAIL 1 ca ("nguoi xu ly: co ten trong pk_staff...") từ commit cache `_pkStaffNames_` của phiên khác — chưa đụng.
+
+## Tỷ lệ chốt Báo cáo B = đơn BASE ÷ tương tác Pancake (Duyên 12/10/2026)
+- Nguyên nhân: B truyền đơn Pos vào `_srCloseRateSections_`; Pos cuối tuần lên số chậm hơn Base ~1 ngày nên tử số thấp. Sửa: B gọi `_srBaseRowsForCloseRate_(filters, kenhAllow)` (đơn DT TỔNG, quy tắc y hệt A: ngày TẠO đơn, bỏ Huỷ/Trả lại/Hoàn tiền/Thất bại/Khiếu nại, lọc Sale (+alias Pancake), lọc sản phẩm). Doanh thu/số đơn/COD của B vẫn từ Pos. Test: `node tools/test-close-rate-base.js` (gồm A == B cùng số, Pos trống vẫn ra tỷ lệ Base).
+- Bộ lọc "Nguồn đơn" của B đổi ra Kênh Base qua ID Page / tên Page; bộ lọc Marketer + CRM (trạng thái CS/KH/Zalo/Nick Zalo) chỉ có trên đơn Pos nên KHÔNG áp được cho tỷ lệ chốt (đã ghi trong comment hàm).
+- Ảnh hưởng kèm: `buildCsStats_().closeRate` (Pancake AI) lấy từ B nên cũng đổi sang đơn Base. Các chỗ KHÁC (KPI Pancake, Checklist MKT, Hồ sơ nhân viên) đã dùng đơn Base/DT TỔNG từ trước — không đổi.

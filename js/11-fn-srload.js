@@ -746,7 +746,7 @@ function _srRenderA(d){
   // riêng lẻ (không gộp nhiều sale vào 1 dòng), và chỉ tính từ ngày có dữ liệu tương tác Pancake
   // trở đi (xem saleCloseRateFrom, bo qua nếu chưa từng nạp báo cáo Pancake ngày nào).
   var saleCloseNote = d.saleCloseRateFrom ? ' — tính từ '+esc(d.saleCloseRateFrom) : '';
-  var saleCloseHtml = '<div class="dash-section-title">Tỷ lệ chốt theo Sale <span style="font-weight:400;color:var(--muted);font-size:11px">(Số đơn / Tổng tương tác Pancake'+saleCloseNote+')</span></div>'+
+  var saleCloseHtml = '<div class="dash-section-title">Tỷ lệ chốt theo Sale <span style="font-weight:400;color:var(--muted);font-size:11px">(Số đơn Base ÷ Tổng tương tác Pancake'+saleCloseNote+')</span></div>'+
     (d.saleCloseRateFrom ? _srCloseRateBarHtml_(d.saleCloseRate, _srState.saleSearch, 'tương tác') :
       '<div style="color:var(--muted);text-align:center;padding:20px;font-size:12px">Chưa nạp báo cáo tương tác Pancake ngày nào — vào tab "📥 Báo cáo Pancake" để nạp trước khi xem tỷ lệ chốt theo Sale.</div>');
   html += '<div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">'+
@@ -836,7 +836,7 @@ function _srRenderA(d){
     // từ ngày có dữ liệu tương tác Pancake trở đi (xem kenhCloseRateFrom), giống hệt cách làm
     // ở "Tỷ lệ chốt theo Sale".
     var kenhCloseNote = d.kenhCloseRateFrom ? ' — tính từ '+esc(d.kenhCloseRateFrom) : '';
-    var kenhCloseHtml = '<div class="dash-section-title">Tỷ lệ chốt theo Kênh <span style="font-weight:400;color:var(--muted);font-size:11px">(Số đơn / Tổng tương tác Pancake'+kenhCloseNote+')</span></div>'+
+    var kenhCloseHtml = '<div class="dash-section-title">Tỷ lệ chốt theo Kênh <span style="font-weight:400;color:var(--muted);font-size:11px">(Số đơn Base ÷ Tổng tương tác Pancake'+kenhCloseNote+')</span></div>'+
       (d.kenhCloseRateFrom ? _srCloseRateBarHtml_(d.kenhCloseRate, _srState.kenhSearch, 'tương tác') :
         '<div style="color:var(--muted);text-align:center;padding:20px;font-size:12px">Chưa nạp báo cáo tương tác Pancake ngày nào — vào tab "📥 Báo cáo Pancake" để nạp trước khi xem tỷ lệ chốt theo Kênh.</div>');
     html += '<div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">'+
@@ -903,7 +903,7 @@ function _srRenderB(d){
   }
   // Tỷ lệ chốt theo Sale — đặt bên cạnh "Theo Sale", cùng công thức/hàm dùng chung với Báo cáo A.
   var bSaleCloseNote = d.saleCloseRateFrom ? ' — tính từ '+esc(d.saleCloseRateFrom) : '';
-  var saleCloseHtmlB_ = '<div class="dash-section-title">Tỷ lệ chốt theo Sale <span style="font-weight:400;color:var(--muted);font-size:11px">(Số đơn / Tổng tương tác Pancake'+bSaleCloseNote+')</span></div>'+
+  var saleCloseHtmlB_ = '<div class="dash-section-title">Tỷ lệ chốt theo Sale <span style="font-weight:400;color:var(--muted);font-size:11px">(Số đơn Base ÷ Tổng tương tác Pancake'+bSaleCloseNote+')</span></div>'+
     (d.saleCloseRateFrom ? _srCloseRateBarHtml_(d.saleCloseRate, _srState.bSaleSearch, 'tương tác') :
       '<div style="color:var(--muted);text-align:center;padding:20px;font-size:12px">Chưa nạp báo cáo tương tác Pancake ngày nào — vào tab "📥 Báo cáo Pancake" để nạp trước khi xem tỷ lệ chốt theo Sale.</div>');
   html += '<div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">'+
@@ -916,7 +916,7 @@ function _srRenderB(d){
     var scbpB_ = d.saleCloseByPage;
     var scbpRowsB_ = scbpB_.rows.filter(function(r){ return !_srState.bSaleSearch || r.name.toLowerCase().indexOf(_srState.bSaleSearch.toLowerCase())!==-1; });
     scbpRowsB_.sort(function(a,b){ return b.total.rate - a.total.rate; });
-    html += '<div class="dash-section-title" style="margin-top:18px">Tỷ lệ chốt theo Sale — từng Page<span style="font-weight:400;color:var(--muted);font-size:11px">'+bSaleCloseNote+'</span></div>';
+    html += '<div class="dash-section-title" style="margin-top:18px">Tỷ lệ chốt theo Sale — từng Page<span style="font-weight:400;color:var(--muted);font-size:11px"> (Số đơn Base ÷ Tổng tương tác Pancake'+bSaleCloseNote+')</span></div>';
     html += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Sale</th>'+
       scbpB_.pages.map(function(p){ return '<th style="text-align:right">'+esc(p.pageName)+'</th>'; }).join('')+
       '<th style="text-align:right"><b>Tổng cá nhân</b></th></tr></thead><tbody>';
@@ -978,7 +978,7 @@ function _srRenderB(d){
     // Tỷ lệ chốt theo Nguồn đơn — ghép từ "kenhCloseRate" (tên gọi nội bộ kế thừa từ Báo cáo A;
     // với B, kenh đã được suy ra từ ID Page trong "Nguồn đơn" nên vẫn đúng khái niệm).
     var bKenhCloseNote = d.kenhCloseRateFrom ? ' — tính từ '+esc(d.kenhCloseRateFrom) : '';
-    var nguonCloseHtmlB_ = '<div class="dash-section-title">Tỷ lệ chốt theo Nguồn đơn <span style="font-weight:400;color:var(--muted);font-size:11px">(Số đơn / Tổng tương tác Pancake'+bKenhCloseNote+' — chỉ tính được các dòng Nguồn đơn có kèm ID Page, vd "Facebook / Tên Page (ID)")</span></div>'+
+    var nguonCloseHtmlB_ = '<div class="dash-section-title">Tỷ lệ chốt theo Nguồn đơn <span style="font-weight:400;color:var(--muted);font-size:11px">(Số đơn Base ÷ Tổng tương tác Pancake'+bKenhCloseNote+' — chỉ tính được các dòng Nguồn đơn có kèm ID Page, vd "Facebook / Tên Page (ID)")</span></div>'+
       (d.kenhCloseRateFrom ? _srCloseRateBarHtml_(d.kenhCloseRate, _srState.bNguonSearch, 'tương tác') :
         '<div style="color:var(--muted);text-align:center;padding:20px;font-size:12px">Chưa nạp báo cáo tương tác Pancake ngày nào — vào tab "📥 Báo cáo Pancake" để nạp trước khi xem tỷ lệ chốt theo Nguồn.</div>');
     html += '<div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">'+
