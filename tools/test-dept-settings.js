@@ -54,7 +54,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
  t('mất mạng lúc mở → màn lỗi có nút Thử lại + gợi ý, không treo "Đang tải"',/Không tải được cấu hình phòng/.test(c.$('dp-page').textContent)&&/Thử lại/.test(c.$('dp-page').textContent)&&/Không kết nối được máy chủ/.test(c.$('dp-page').textContent));
  c.S.mode='';await c.w.openDeptSettings();t('bấm Thử lại khi mạng có lại → vào được trang',c.$('dp-page').querySelectorAll('.dpg-row').length===2);
  // kiểm tra đầu vào
- c=mk();await c.w.openDeptSettings();c.w.eval("_dp.list.forEach(g=>g.label='')");c.w.eval("_dpDirty()");await c.w.eval('_dpSave()');
+ c=mk();await c.w.openDeptSettings();c.w.eval("_dp.list.forEach(g=>g.label='')");c.w.eval("_dpMarkDirty()");await c.w.eval('_dpSave()');
  t('không còn phòng nào có tên → báo lỗi, KHÔNG gửi lên máy chủ',/ít nhất 1 phòng/.test(c.$('dp-errbar').textContent)&&c.S.posts.length===0);
  c.w.eval("_dp.list=[{key:'a',label:'Sale'},{key:'b',label:'sale '}]");await c.w.eval('_dpSave()');
  t('2 phòng trùng tên (khác hoa/thường) → báo lỗi, KHÔNG gửi',/trùng tên/.test(c.$('dp-errbar').textContent)&&c.S.posts.length===0);

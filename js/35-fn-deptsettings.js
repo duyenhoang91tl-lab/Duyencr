@@ -74,7 +74,9 @@ function closeDeptSettings(force){
   var ov = document.getElementById('dp-page'); if (ov) ov.classList.remove('open');
   document.body.classList.remove('rs-open');
 }
-function _dpDirty(){
+// Dat ten _dpMarkDirty (KHONG phai _dpDirty): js/06 da co `let _dpDirty` (co 'dang go do trong ho so khach') — trung ten la SyntaxError
+// 'Identifier has already been declared', ca file nay khong chay duoc (trang Phong ban + DEPT_LIST mac dinh deu mat).
+function _dpMarkDirty(){
   _dp.dirty = true; _dp.ok = '';
   var b = document.getElementById('dp-save'); if (b){ b.disabled = false; b.textContent = '💾 Lưu phòng'; }
   var h = document.getElementById('dp-dirty'); if (h) h.style.display = '';
@@ -124,14 +126,14 @@ function _dpRoomsHtml(){
         '<button class="btn xs danger" onclick="_dpDelRoom(' + i + ')" title="Xóa phòng">🗑</button></div>';
     }).join('') + '<button class="btn sm secondary" onclick="_dpAddRoom()">＋ Thêm phòng</button>';
 }
-function _dpRoomLabel(i, v){ if (_dp.list[i]){ _dp.list[i].label = v; _dpDirty(); } }
-function _dpAddRoom(){ _dp.list.push({ key: 'd' + Date.now(), label: '' }); _dpDirty(); _dpRender(); }
+function _dpRoomLabel(i, v){ if (_dp.list[i]){ _dp.list[i].label = v; _dpMarkDirty(); } }
+function _dpAddRoom(){ _dp.list.push({ key: 'd' + Date.now(), label: '' }); _dpMarkDirty(); _dpRender(); }
 function _dpDelRoom(i){
   var g = _dp.list[i]; if (!g) return;
   var n = _dpCount(g.key);
   if (n && !confirm('Phòng "' + g.label + '" đang có ' + n + ' người. Xóa phòng thì những người này thành "chưa phân phòng". Xóa?')) return;
   Object.keys(_dp.map).forEach(function(k){ if (_dp.map[k] === g.key) delete _dp.map[k]; });
-  _dp.list.splice(i, 1); _dpDirty(); _dpRender();
+  _dp.list.splice(i, 1); _dpMarkDirty(); _dpRender();
 }
 function _dpTeamsHtml(){
   var ts = _dpTeams();
@@ -143,7 +145,7 @@ function _dpTeamsHtml(){
 function _dpAssignTeam(i, key){
   var t = _dpTeams()[i]; if (!t || !key) return;
   t.members.forEach(function(n){ _dp.map[n] = key; });
-  _dpDirty(); _dp.ok = ''; toast('Đã gán ' + t.members.length + ' người của team "' + t.name + '" — nhớ bấm Lưu phòng');
+  _dpMarkDirty(); _dp.ok = ''; toast('Đã gán ' + t.members.length + ' người của team "' + t.name + '" — nhớ bấm Lưu phòng');
 }
 function _dpPeopleHtml(){
   return '<h3>🧑‍💼 Từng người</h3>' +
@@ -160,11 +162,11 @@ function _dpPeopleListHtml(){
     (rows.length ? '' : '<tr><td colspan="2" style="text-align:center;color:var(--muted);padding:12px">Không có tên nào khớp</td></tr>') + '</tbody></table></div>';
 }
 function _dpPeopleList(){ var el = document.getElementById('dp-people-list'); if (el) el.innerHTML = _dpPeopleListHtml(); }
-function _dpSetPerson(n, key){ if (key) _dp.map[n] = key; else delete _dp.map[n]; _dpDirty(); }
+function _dpSetPerson(n, key){ if (key) _dp.map[n] = key; else delete _dp.map[n]; _dpMarkDirty(); }
 function _dpAddPerson(){
   var n = ((document.getElementById('dp-new-name') || {}).value || '').trim(), k = (document.getElementById('dp-new-room') || {}).value;
   if (!n || !k){ toast('Nhập tên và chọn phòng'); return; }
-  _dp.map[n] = k; _dp.q = ''; _dpDirty(); _dpRender();
+  _dp.map[n] = k; _dp.q = ''; _dpMarkDirty(); _dpRender();
 }
 
 // ── lưu: kiểm tra → ghi 2 key → ĐỌC LẠI xác nhận ──

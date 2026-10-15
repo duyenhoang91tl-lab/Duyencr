@@ -171,14 +171,27 @@ function _pkcTick() {
   if (document.hidden) return;
   _pkc.tick++; pkcLoad(_pkc.tick % 10 === 0);   // 10 lần poll nhẹ thì tải đầy đủ 1 lần (phòng tin đến trễ có giờ cũ hơn mốc)
 }
+// Phien dang nhap khong con hop le (GAS tra code AUTH: token mat / het han / tai khoan bi khoa): xoa token cu va hien man hinh dang nhap 1 lan,
+// thay vi chi ghi dong "Can dang nhap." o duoi khung chat khien nguoi dung tuong CRM khong doc duoc tin nhan.
+var _pkcAuthShown = false;
+function _pkcAuthFail(j) {
+  if (!j || j.code !== 'AUTH') return false;
+  try { localStorage.removeItem('ome_sess_token'); localStorage.removeItem('ome_sess_exp'); } catch (e) {}
+  if (!_pkcAuthShown && typeof _showLogin === 'function') {
+    _pkcAuthShown = true;
+    try { _showLogin(); } catch (e) {}
+    if (typeof toast === 'function') toast('Phiên đăng nhập không còn hiệu lực — đăng nhập lại để xem tin nhắn.');
+  }
+  return true;
+}
 async function pkcLoad(full) {
   var P = _pkc; if (!P.phone || P.loading) return; P.loading = true; var ph = P.phone;
   try {
     var r = await fetch(_pkcUrl('action=pkChat&phone=' + encodeURIComponent(ph) + ((!full && P.after) ? '&after=' + encodeURIComponent(P.after) : '')), { redirect: 'follow' });
     var j = await r.json();
     if (_pkc.phone !== ph) return;   // đã chuyển sang khách khác
-    if (!j || j.error) { P.err = (j && j.error) || 'Không tải được chat.'; _pkcStatus(); return; }
-    P.err = ''; P.okAt = _pkcHm(new Date().toISOString()); P.gv = j.gv || '';
+    if (!j || j.error) { P.err = _pkcAuthFail(j) ? 'Phiên đăng nhập đã hết hạn — đăng nhập lại để xem tin nhắn.' : ((j && j.error) || 'Không tải được chat.'); _pkcStatus(); return; }
+    _pkcAuthShown = false; P.err = ''; P.okAt = _pkcHm(new Date().toISOString()); P.gv = j.gv || '';
     P.convs = j.conversations || []; _pkTagApplyOv(P.convs);
     if (full) P.msgs = {};
     (j.messages || []).forEach(function (m) { (P.msgs[m.c] = P.msgs[m.c] || {})[m.id] = m; if (m.at && (!P.after || m.at > P.after)) P.after = m.at; });

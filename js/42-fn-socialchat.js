@@ -57,8 +57,8 @@ async function scLoadList() {
   if (_sc.loading) return; _sc.loading = true;
   try {
     var j = await (await fetch(_pkcUrl('action=pkChatInbox' + (_sc.q ? '&q=' + encodeURIComponent(_sc.q) : '')), { redirect: 'follow' })).json();
-    if (!j || j.error) { _sc.err = (j && j.error) || 'Không tải được hộp thư.'; _scStatus(); return; }
-    _sc.err = ''; _sc.okAt = _pkcHm(new Date().toISOString()); _sc.gv = j.gv || ''; _sc.convs = j.conversations || []; _pkTagApplyOv(_sc.convs);
+    if (!j || j.error) { _sc.err = _pkcAuthFail(j) ? 'Phiên đăng nhập đã hết hạn — đăng nhập lại để xem tin nhắn.' : ((j && j.error) || 'Không tải được hộp thư.'); _scStatus(); return; }
+    _pkcAuthShown = false; _sc.err = ''; _sc.okAt = _pkcHm(new Date().toISOString()); _sc.gv = j.gv || ''; _sc.convs = j.conversations || []; _pkTagApplyOv(_sc.convs);
     _scRenderList(); _scStatus();
   } catch (e) { _sc.err = 'Không kết nối được máy chủ.'; _scStatus(); }
   finally { _sc.loading = false; }
@@ -166,7 +166,7 @@ async function scLoadMsgs(full) {
     var after = (!full && _sc.after[id]) ? '&after=' + encodeURIComponent(_sc.after[id]) : '';
     var j = await (await fetch(_pkcUrl('action=pkChatConv&conv=' + encodeURIComponent(id) + after), { redirect: 'follow' })).json();
     if (id !== _sc.active) return;
-    if (!j || j.error) { _sc.err = (j && j.error) || 'Không tải được tin nhắn.'; _scStatus(); return; }
+    if (!j || j.error) { _sc.err = _pkcAuthFail(j) ? 'Phiên đăng nhập đã hết hạn — đăng nhập lại để xem tin nhắn.' : ((j && j.error) || 'Không tải được tin nhắn.'); _scStatus(); return; }
     _sc.err = ''; if (full) { _sc.msgs[id] = {}; _sc.after[id] = ''; }
     (j.messages || []).forEach(function (m) { (_sc.msgs[id] = _sc.msgs[id] || {})[m.id] = m; if (m.at && (!_sc.after[id] || m.at > _sc.after[id])) _sc.after[id] = m.at; });
     _scRenderMsgs(full);
