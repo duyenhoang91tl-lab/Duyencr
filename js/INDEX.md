@@ -39,12 +39,14 @@ Code client của `index.html` (trước đây inline, ~1.4MB) đã tách ra `cs
 
 - `27-fn-bonuscore.js`: `_bcOrderInfo_`, `_bcGuess_`, `_bcMinProducts_`, `_bcIsVongProgram_` (lõi đếm SP thưởng; bản sao trong gas_v13.js)
 - `28-fn-bonusdetail.js`: tab K "Chi tiết thưởng" — `renderSalesReportTabK_`, `_bdFlag`, `_bdSlot`, `_bdRev`, `_bdSyncFromGAS`
+- `43-fn-uxtools.js`: B6 — chế độ tối (`toggleTheme`, css/10-dark.css), hướng dẫn sử dụng (`openHelpModal`), nhật ký lỗi trên máy (`openErrLogModal`)
+- `42-fn-homesummary.js`: 4 thẻ số + Phân bổ giai đoạn + Nguồn khách ở Tổng quan (B1) — `hsRender`, `hsLoad`
 - `41-fn-stageboard.js`: Bảng Kanban đơn theo giai đoạn Base (B5) — `_sbLoad`, `_sbRender`; GAS ttStageBoard_
 - `40-fn-carepage.js`: màn Chăm sóc & tái mua (B4) + bộ tạo tab dùng chung `registerExtraTab`
 - `39-fn-buyfilter.js`: bộ lọc Loại khách (Tất cả / Chưa mua / Đã mua) — `setBuy`, `_isBoughtCustomer`
 - `37-fn-configpage.js`: trang ⚙ Cấu hình tập trung (B2) — ngưỡng ttStageHours/hmCycle/hmIdle lưu Settings + AuditLog, lần chạy tự động gần nhất, lối tắt
 - `36-fn-homechips.js`: 4 chip Hôm nay ở Tổng quan (B1 ROADMAP-CRM-MAU) — `hmCompute`, `hmRenderChips`, `hmOpenList`
-- `35-fn-deptsettings.js`: cài đặt phòng ban (tách riêng đội Online/Offline) — `openDeptSettings`, `_dpSave`, `DEPT_LIST`; GAS readDeptList_/readSaleDepts_/_orgApplyDepts_
+- `35-fn-deptsettings.js`: TRANG RIÊNG toàn màn hình "🏢 Phòng ban" (khung `.rs-page` như Phân quyền; mở từ Settings → 🏢 Phòng ban hoặc nút ⚙ Cài đặt phòng ở Tổng quan) — `openDeptSettings`, `closeDeptSettings`, `_dpSave` (ghi deptList + saleDepts rồi ĐỌC LẠI xác nhận), `DEPT_LIST`, `DEPT_DEFAULT`. Test: `tools/test-dept-settings.js`.
 - `34-fn-todaytasks.js`: nhắc việc hôm nay cho CS — `ttFetch`, `_ttCards`, `_ttCardHtml` (thẻ trong khung nhắc hẹn; backend gas/23_TodayTasks.gs)
 
 - `31-fn-orgoverview.js`: tab "🏠 Tổng quan" = MÀN HÌNH ĐẦU SAU ĐĂNG NHẬP (tự `switchTab('overview')` khi data-view hiện, trừ tài khoản test) + modal "🪪 Hồ sơ nhân sự" — `_ovLoad`, `_ovScope` (phạm vi xem theo vai trò), `_ovRender`, `openEmployeeProfile`, `_ovAskAI`; gọi GAS `action=orgOverview`.
@@ -80,3 +82,8 @@ Code client của `index.html` (trước đây inline, ~1.4MB) đã tách ra `cs
 - `47-staff-profile.js`: Hồ sơ nhân viên — `openProfileModal` (menu `act:profile` nhóm Hồ sơ + nút 🪪 ở header): form họ tên/SĐT/email/Facebook + tổng quan kết quả theo kỳ (11 thẻ). Backend `gas/28_StaffProfile.gs` (profileGet/profileSave/staffOverview); khách đang giữ + đã kết bạn đếm tại client (`_spCustStats`). Test: `tools/test-staff-profile-ui.js` (jsdom), `tools/test-staff-profile.js` (backend).
 - `48-pro-chatinfo.js`: giao diện PRO — P5 cột "Thông tin khách" bên phải Social > Chat kiểu Pancake (`proPhoneNorm_`, `proInitials_`, `proChatInfoHtml_`, `proChatInfoRender_`; được `js/42-fn-socialchat.js` gọi từ `scPick`). Test: `tools/test-ui-pro-chatinfo.js`
 - `49-pro-discuss.js`: Thảo luận khách nội bộ (hộp chat theo SĐT + tag @) cho tab 🗨 Thảo luận trong hồ sơ khách và cột phải Social > Chat; `proNoteAdd_` lưu ghi chú nhanh không cần panel hồ sơ (`khdMount_`, `khdSend_`, `renderKhdTab`, `proNoteAdd_`). Backend `gas/30_KhDiscuss.gs`. Test: `tools/test-ui-pro-discuss.js`
+- `10-fn-pkkpipct.js` (đầu file): `_warnBox(key, boxHtml, label)` / `_warnToggle` — bọc cảnh báo ⚠️ trong báo cáo, mặc định ẩn, bấm 👁 mới hiện (dùng cả ở js/11 tỷ lệ chốt). Xem docs/crm-kb/05-sasum-reports-ui.md.
+- `43-fn-uxtools.js`: thêm `_guidesOn/applyGuides/setGuides` — công tắc hiện/ẩn lời hướng dẫn (class `guide-text`, mặc định ẩn; ô bật trong ❓ Hướng dẫn sử dụng). Xem docs/crm-kb/05-sasum-reports-ui.md.
+
+## js/51-demo-guard.js — tài khoản test (2026-10-15)
+Nạp sau `js/50`. Khi có `ome_demo_token`: hiển thị `…0000` → `••••` (SĐT đã bị máy chủ che) và mã hóa mọi file tải về (`a.download`, `XLSX.writeFile`) thành `.enc`. Giải mã: `tools/decrypt-demo-file.js`. Chi tiết: `docs/TAI-KHOAN-TEST.md`.

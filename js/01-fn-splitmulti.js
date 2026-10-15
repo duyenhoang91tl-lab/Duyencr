@@ -64,6 +64,34 @@ async function _syncKhStatusTreeFromGAS() {
     }
   } catch(e) { /* giữ nguyên bản local nếu lỗi mạng/parse */ }
 }
+// ── Mốc màu "Tỷ lệ chốt" nhiều mức (yêu cầu Duyên 2026-10-14: tự thêm/bớt, vd 5 mức 5 màu theo % khác nhau) ──
+// Dạng lưu: { levels: [ {from:0,color:'#dc2626'}, {from:2,color:'#d97706'}, {from:11,color:'#16a34a'} ] } — mức i áp dụng cho tỷ lệ >= from của nó
+// (và < from của mức kế tiếp); mức đầu luôn từ 0; 2–8 mức. Dạng CŨ { red, green } (đỏ < red, vàng red..green, xanh > green) được đổi tự động:
+// tỷ lệ hiển thị là SỐ NGUYÊN nên "> green" = ">= floor(green)+1" → kết quả màu y hệt trước đây.
+var CLOSE_RATE_DEFAULT_LEVELS = [{ from: 0, color: '#dc2626' }, { from: 2, color: '#d97706' }, { from: 11, color: '#16a34a' }];
+var CLOSE_RATE_MAX_LEVELS = 8, CLOSE_RATE_MIN_LEVELS = 2;
+function _crLevelsDefault_() { return JSON.parse(JSON.stringify(CLOSE_RATE_DEFAULT_LEVELS)); }
+function _crNormalize_(t) {
+  var raw = null;
+  if (t && Array.isArray(t.levels)) raw = t.levels;
+  else if (t && typeof t.red === 'number' && typeof t.green === 'number') {
+    raw = [{ from: 0, color: '#dc2626' }, { from: t.red, color: '#d97706' }, { from: Math.floor(t.green) + 1, color: '#16a34a' }];
+    if (t.red <= 0) raw.shift();   // mốc đỏ = 0 nghĩa là KHÔNG có mức đỏ (không tỷ lệ nào < 0): bỏ mức đỏ rỗng, vàng bắt đầu từ 0
+  }
+  if (!raw) return { levels: _crLevelsDefault_() };
+  var lv = raw.map(function (x) { return { from: Number(x && x.from), color: String((x && x.color) || '') }; })
+    .filter(function (x) { return isFinite(x.from) && x.from >= 0 && x.from <= 100 && /^#[0-9a-fA-F]{6}$/.test(x.color); })
+    .sort(function (a, b) { return a.from - b.from; });
+  var uniq = []; lv.forEach(function (x) { if (!uniq.length || x.from > uniq[uniq.length - 1].from) uniq.push(x); });
+  if (uniq.length < CLOSE_RATE_MIN_LEVELS || uniq.length > CLOSE_RATE_MAX_LEVELS) return { levels: _crLevelsDefault_() };
+  uniq[0].from = 0;
+  return { levels: uniq };
+}
+function _crColorFor_(p) {
+  var lv = (CLOSE_RATE_THRESHOLDS && CLOSE_RATE_THRESHOLDS.levels) || CLOSE_RATE_DEFAULT_LEVELS;
+  for (var i = lv.length - 1; i >= 0; i--) if (p >= lv[i].from) return lv[i].color;
+  return lv[0].color;
+}
 async function _syncCloseRateThresholdsFromGAS() {
   if (!gsUrl) return;
   try {
@@ -71,8 +99,8 @@ async function _syncCloseRateThresholdsFromGAS() {
     var data = await r.json();
     if (data && data.value) {
       var t = JSON.parse(data.value);
-      if (t && typeof t.red === 'number' && typeof t.green === 'number') {
-        CLOSE_RATE_THRESHOLDS = t;
+      if (t && (Array.isArray(t.levels) || (typeof t.red === 'number' && typeof t.green === 'number'))) {
+        CLOSE_RATE_THRESHOLDS = _crNormalize_(t);
         saveLS('ome_close_rate_thresholds', CLOSE_RATE_THRESHOLDS);
         if (typeof renderSalesReportTab === 'function' && _activeV9Tab === 'salesreport') renderSalesReportTab();
         if (typeof renderKpiPancakeTab === 'function' && _activeV9Tab === 'kpipancake') renderKpiPancakeTab();
@@ -80,13 +108,13 @@ async function _syncCloseRateThresholdsFromGAS() {
     }
   } catch(e) { /* giữ nguyên bản local nếu lỗi mạng/parse */ }
 }
-async function _saveCloseRateThresholds(red, green){
-  CLOSE_RATE_THRESHOLDS = { red: red, green: green };
+async function _saveCloseRateThresholds(levels){
+  CLOSE_RATE_THRESHOLDS = _crNormalize_({ levels: levels });
   saveLS('ome_close_rate_thresholds', CLOSE_RATE_THRESHOLDS);
   if (!gsUrl) return;
   try {
     await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'setSetting', key:'closeRateThresholds', value: JSON.stringify(CLOSE_RATE_THRESHOLDS) }) });
-    logAudit('setting','', '', 'Đổi mốc màu Tỷ lệ chốt: đỏ <'+red+'%, vàng '+red+'–'+green+'%, xanh >'+green+'%');
+    logAudit('setting','', '', 'Đổi mốc màu Tỷ lệ chốt: ' + CLOSE_RATE_THRESHOLDS.levels.map(function(l){ return '≥'+l.from+'% '+l.color; }).join(', '));
   } catch(e){ toast('❌ Lưu mốc màu lỗi: ' + e.message); }
 }
 

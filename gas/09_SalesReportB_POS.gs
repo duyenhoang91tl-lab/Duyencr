@@ -708,18 +708,7 @@ function buildSalesReportB_(filters) {
   //      hau to "(ID)" neu co) va tra qua readPancakePageMapByName_ (khoa=pageName chuan hoa).
   // Don khong khop duoc o CA 2 cach (chua tung duoc admin khop Page nao trong PancakePageMap)
   // moi thuc su bi bo qua o buoc tinh ty le chot, giong cach A bo qua kenh chua khop Page.
-  var pkPageMapB_ = readPancakePageMap_();
-  var pkPageMapByNameB_ = readPancakePageMapByName_();
-  var normRowsB_ = matched.map(function(m) {
-    var pid = _extractPageIdFromNguonDon_(m.nguonDon);
-    var kenhB_ = pid ? (pkPageMapB_[pid] || '') : '';
-    if (!kenhB_) {
-      var pname_ = _extractPageNameFromNguonDon_(m.nguonDon);
-      if (pname_) kenhB_ = pkPageMapByNameB_[_normTxt_(pname_)] || '';
-    }
-    return { kenhBan: kenhB_, dateStr: m.ngayTaoDon, saleBanRaw: m.theSale };
-  });
-  var closeSectionsB_ = _srCloseRateSections_(normRowsB_, filters);
+  var closeSectionsB_ = _srCloseRateSectionsFromBase_(filters);   // cùng nguồn với Báo cáo A: TLC luôn tính theo Base
 
   var mismatchCount = products['__MISMATCH__'] ? products['__MISMATCH__'].mismatchRows : 0;
 

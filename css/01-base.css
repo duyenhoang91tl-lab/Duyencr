@@ -871,6 +871,9 @@ body.demo-mode .dp-tab[data-tab="chat"]{display:none !important;}
 .pkc-crm{display:inline-block;padding:0 4px;border-radius:3px;background:var(--surface2,#eef1f5);color:var(--muted);font-size:9px;font-weight:700;letter-spacing:.02em;}
 .pkc-tag{display:inline-block;padding:1px 7px;border-radius:9px;font-size:10.5px;line-height:1.5;color:#fff;background:#6b7280;margin:0 3px 2px 0;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;}
 .pkc-tag.more{background:var(--surface2,#eef1f5);color:var(--muted);}
+.pkc-warn{display:inline-block;font-size:11px;color:var(--tn,#b45309);background:var(--tn-bg,#fff7ed);border:1px solid var(--tn-b,#fed7aa);border-radius:9px;padding:0 7px;margin-right:4px;cursor:help;}
+.sc-pk{margin:8px 0 4px;}.sc-pk-r{display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border);}
+.sc-pk-r .k{color:var(--muted);min-width:84px;flex:none;}.sc-pk-r .v{flex:1;min-width:0;line-height:1.7;}
 .pkc-ass{display:inline-block;font-size:11px;color:var(--muted);margin-left:2px;}
 .pkc-meta{padding:2px 10px 4px;}.pkc-meta:empty{display:none;}
 .sc-conv-g{margin-top:3px;line-height:1.7;}
@@ -991,3 +994,25 @@ body.demo-mode .dp-tab[data-tab="chat"]{display:none !important;}
 .sc-lerr{margin:8px;padding:9px 11px;border:1px solid #f3b8b0;background:#fdf0ee;color:#9b2c1f;border-radius:8px;font-size:12px;line-height:1.5;}
 .sc-lerr-h{margin:4px 0 6px;color:#7a3a30;font-size:11.5px;}
 .sc-lerr .btn{margin-top:4px;}
+/* Gắn/gỡ thẻ + "Đã chat" trong khung chat Pancake (js/41): thanh thẻ nằm ngay trên ô soạn tin */
+.pkc-who{padding:2px 10px;font-size:11px;color:var(--muted);line-height:1.8;} .pkc-who:empty{display:none;}
+.pkc-who-n{display:inline-block;background:var(--surface2,#eef1f5);border-radius:9px;padding:0 7px;margin:0 3px 0 0;color:var(--text);} .pkc-who-n i{font-style:normal;color:var(--muted);margin-left:2px;}
+.pkt-bar{padding:6px 10px;border-top:1px solid var(--border);background:var(--surface);}
+.pkt-row{display:flex;flex-wrap:wrap;align-items:center;gap:4px;}
+.pkt-lbl{font-size:13px;margin-right:2px;} .pkt-none{font-size:11px;color:var(--muted);margin-right:4px;}
+.pkt-cur{cursor:pointer;} .pkt-cur:hover{opacity:.85;}
+.pkt-pal{margin-top:6px;border:1px solid var(--border);border-radius:8px;padding:6px;background:var(--surface2,#f5f7fa);}
+.pkt-tools{display:flex;gap:6px;margin-bottom:6px;} .pkt-q{flex:1;min-width:0;padding:4px 8px;border:1px solid var(--border);border-radius:6px;font:inherit;font-size:12px;}
+.pkt-list{max-height:150px;overflow:auto;line-height:1.9;}
+.pkt-chip{cursor:pointer;background:transparent;color:#6b7280;border:1px solid #6b7280;padding:0 8px;}
+.pkt-chip:hover{opacity:.8;} .pkt-chip.pkt-on{color:#fff;}
+
+
+/* ── LỜI HƯỚNG DẪN / NHẮC NHỞ CÁCH DÙNG: MẶC ĐỊNH ẨN (Duyên yêu cầu 2026-10-12) ──
+   Thêm class "guide-text" vào bất kỳ câu hướng dẫn nào để nó tự ẩn. Bật lại: ❓ Hướng dẫn sử dụng → ô "Hiện lời hướng dẫn trong các màn hình"
+   (body.show-guides, lưu localStorage ome_show_guides). KHÔNG gắn cho: câu trạng thái trống ("Chưa có…"), cảnh báo ⚠️ (xem _warnBox), dữ liệu. */
+body:not(.show-guides) .guide-text,
+body:not(.show-guides) .task-form-hint,
+body:not(.show-guides) .tf-hint,
+body:not(.show-guides) .srb-m-hint,
+body:not(.show-guides) .pro-ai-hint{display:none !important;}

@@ -326,6 +326,7 @@ function doPostCore_(e) {
     // ── Chat Pancake trong CRM: gan hoi thoai voi SDT khach, gui tin tra loi ──
     if (action === 'pkChatLink') return pkChatLink_(data);
     if (action === 'pkChatSend') return pkChatSend_(data);
+    if (action === 'pkChatTag') return pkChatTag_(data);
     if (action === 'profileSave') return profileSave_(data);
     if (action === 'saveRoleConfig') return saveRoleConfig_(data.config, data.token);
     if (action === 'notifRead') { var _nu = _sessUser_(data.token); if (!_nu) return jsonOut_({ error: 'Can dang nhap.', code: 'AUTH' }); return jsonOut_(markNotifRead_(_nu.username, data.ids, !!data.all)); }

@@ -68,5 +68,26 @@ Deploy lại GAS (dán `gas_v13.js` hoặc nút "Đồng bộ mã GAS mới nh�
 - Test: `node tools/test-roles.js` (phan 4c-2a).
 
 ## Viec tiep sau 4c-2a - CHUA LAM
-- [ ] 4c-2b: `customers` (tra ca danh sach, Worker cache 15s DUNG CHUNG giua moi nguoi -> phai them `customers` vao `GATED_ACTIONS`/khoa cache theo user truoc khi loc), `reminders`, `orders`. Can quy tac leader (team) o server.
+- [x] (LAM, xem 'Buoc 4c-2b') 4c-2b: `customers` (tra ca danh sach, Worker cache 15s DUNG CHUNG giua moi nguoi -> phai them `customers` vao `GATED_ACTIONS`/khoa cache theo user truoc khi loc), `reminders`, `orders`. Can quy tac leader (team) o server.
 - [ ] Leader o server: doc `teams` (`readTeams_`) de kiem tra thanh vien team.
+
+## Buoc 4c-2b - LAM (gas v13.48-scope-list, 2026-10-14): loc DANH SACH theo pham vi
+- Nguyen nhan goc: 4c-2a moi chan tra cuu tung SDT; `customers`/`orders`/`careLeads`/`reminders` van tra CA DANH SACH cho moi token (client loc sau).
+- `_scopeListServe_` (doGet, sau `_scopeGate_`): chay doGetCore_ roi loc mang du lieu (customers.rows, orders.orders, careLeads.rows, reminders.reminders) theo tap SDT thuoc pham vi (`_scopePhoneSet_`, cache 60s/nguoi; nguon: CareData.cs, Sale ban cua don, du lieu don, careLeads, AssignData). Dung chung cong tac `scopeMode` (off|log|enforce). `log` = ghi dem "LIST would-filter N/M" va tra nguyen ven.
+- LEADER da duoc ho tro o server: pham vi = ten leader + thanh vien team (teams.leader/members, hoac team trung user.team); khong tim thay team -> chi ten minh. (4c-2a van de leader 'unchecked' cho tra cuu tung SDT - xem viec tiep.)
+- Worker: `customers`, `orders`, `careLeads` vao GATED_ACTIONS -> cache khoa theo user (can SESS_SECRET; khong co thi khong cache). Neu khong khoa, ban cache cua admin se bi CS lay duoc. Test Worker doi sang action chung `cskhDuyenLite`.
+- Gioi han con lai: (1) extension dung khoa `ek` (khong token) van lay toan bo; (2) `cskhDuyenLite`/`cskhDuyen`, `donSaleByPhone`, `searchOrder`... chua loc; (3) payload `customers?since=` (delta) loc cung kieu `rows`.
+- Test: `node tools/test-roles.js` (4c-2b), `node tools/test-cloudflare-worker.js`.
+- **Bat:** giu `scopeMode=log` vai ngay -> `xemLogPhamVi` xem dong `LIST would-filter` va `OUT`; kiem tra CS hop le khong bi mat khach (so khach "would-filter" ~ so khach khong thuoc ho) -> `datPhamVi('enforce')`. Loi -> `datPhamVi('off')` hieu luc ngay.
+
+## Viec tiep sau 4c-2b - CHUA LAM
+- [x] 4c-2c (LAM, xem duoi): leader cho tra cuu tung SDT; loc `cskhDuyenLite`/`cskhDuyen`/`searchOrder`. (`donSaleByPhone` KHONG phai action server - chi la bien client.)
+- [ ] 4c-3: action dang mo (assign GET, setSetting/getSetting khoa thuong, saveCannedResponse, saveMessageTemplate, deleteMessageTemplate, saveAIContext, csStats, findDuplicateOrders, addZaloNick).
+- [ ] Extension ek: quyet dinh co bo deleteDuplicateOrders khoi EXT_ALLOWED_.zalo khong; xem xet gan khoa ek theo nguoi.
+
+## Buoc 4c-2c - LAM (gas v13.49-scope-cskh, 2026-10-14)
+- Nguyen nhan goc: leader o 4c-2a bi de 'unchecked' (cho qua) nen leader van tra cuu duoc khach cua team khac; cskhDuyenLite/cskhDuyen/searchOrder tra du lieu khach (kem SDT) ma khong loc.
+- `_scopeVerdict_` dung chung `_scopeAllowedNames_` cho CS/manager/leader (leader = ten minh + thanh vien team, hoac team trung user.team). Them cskhDuyenLite, cskhDuyen (mang `rows`) va searchOrder (mang `results`) vao `SCOPE_LIST_ACTIONS_` (`SCOPE_LIST_KEY_` ghi ten mang).
+- Worker: `cskhDuyenLite` (cache chung 15s) vao `GATED_ACTIONS` de khoa theo user. Test Worker: phan cache chung tam go `cskhDuyenLite` khoi danh sach roi khoi phuc de test rieng.
+- Con ho: `noPhone`/`noPhoneSample` cua cskhDuyen* (dong khong co SDT) van tra nguyen; extension `ek` van thay het.
+- Bat/tat van la `scopeMode` (off|log|enforce) nhu 4c-2a/2b; khong can doi quy trinh.

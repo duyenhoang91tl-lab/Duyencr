@@ -357,7 +357,7 @@ function _aaRatioTeamsHtml(){
   if (!teams.length) return '';
   var cfg = _aaCfg;
   var h = '<div style="margin-top:12px;border-top:1px dashed var(--border,#e5e3dc);padding-top:10px"><b style="font-size:12px">Cài riêng theo Team</b>'+
-    '<div style="font-size:11px;color:var(--muted);margin:2px 0 6px">Bấm tên Team để cài tỷ lệ nguồn / ưu tiên cho cả Team (áp dụng cho mọi người trong Team, trừ người đã cài riêng). Chấm xanh = Team đang có tỷ lệ riêng.</div>'+
+    '<div class="guide-text" style="font-size:11px;color:var(--muted);margin:2px 0 6px">Bấm tên Team để cài tỷ lệ nguồn / ưu tiên cho cả Team (áp dụng cho mọi người trong Team, trừ người đã cài riêng). Chấm xanh = Team đang có tỷ lệ riêng.</div>'+
     '<div style="display:flex;gap:6px;flex-wrap:wrap">';
   teams.forEach(function(t){
     var has = !!((cfg.teamSrc && cfg.teamSrc[t.id]) || (cfg.teamPrio && cfg.teamPrio[t.id]) || (cfg.teamHang && cfg.teamHang[t.id]));
@@ -474,7 +474,7 @@ function renderAssignAuto(){
     '<label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;margin-bottom:10px"><input type="checkbox" '+(cfg.enabled?'checked':'')+' onchange="_aaSet(\'enabled\',this.checked)"> Bật chia tự động mỗi ngày <span style="font-weight:400;color:var(--muted)">(nguồn POS: DT tổng, Dữ liệu đơn, Chăm sóc)</span></label>'+
     '<div style="font-size:12px;color:var(--muted);margin-bottom:5px">Chia vào các thứ được tích (ngày bỏ tích = không chia):</div><div class="assign-sort-row">'+
     _AA_DOW.map(function(d){ return '<div class="assign-sort-btn '+((cfg.days||[]).indexOf(parseInt(d[0]))>=0?'active':'')+'" onclick="_aaToggleDay('+d[0]+')">'+d[1]+'</div>'; }).join('')+'</div>'+
-    '<div style="font-size:12px;margin-top:10px">Chỉ lấy KH POS/Base có <b>ngày đơn</b> từ <input type="date" value="'+esc(cfg.dateFrom||'')+'" onchange="_aaSet(\'dateFrom\',this.value)"> đến <input type="date" value="'+esc(cfg.dateTo||'')+'" onchange="_aaSet(\'dateTo\',this.value)"> '+((cfg.dateFrom||cfg.dateTo)?'<button class="btn sm" onclick="_aaSet(\'dateFrom\',\'\',false);_aaSet(\'dateTo\',\'\')">✕ Bỏ</button>':'')+'<div style="font-size:11px;color:var(--muted);margin-top:3px">Ví dụ chia khách tháng 9: 01/09 → 30/09. Để trống = không giới hạn. Chỉ áp cho nguồn POS/Base (DT tổng, Dữ liệu đơn, Chăm sóc); CSKH-Duyên chia riêng ở mục ③ và không có ngày đơn.</div></div>'+
+    '<div style="font-size:12px;margin-top:10px">Chỉ lấy KH POS/Base có <b>ngày đơn</b> từ <input type="date" value="'+esc(cfg.dateFrom||'')+'" onchange="_aaSet(\'dateFrom\',this.value)"> đến <input type="date" value="'+esc(cfg.dateTo||'')+'" onchange="_aaSet(\'dateTo\',this.value)"> '+((cfg.dateFrom||cfg.dateTo)?'<button class="btn sm" onclick="_aaSet(\'dateFrom\',\'\',false);_aaSet(\'dateTo\',\'\')">✕ Bỏ</button>':'')+'<div class="guide-text" style="font-size:11px;color:var(--muted);margin-top:3px">Ví dụ chia khách tháng 9: 01/09 → 30/09. Để trống = không giới hạn. Chỉ áp cho nguồn POS/Base (DT tổng, Dữ liệu đơn, Chăm sóc); CSKH-Duyên chia riêng ở mục ③ và không có ngày đơn.</div></div>'+
     '<label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:10px"><input type="checkbox" '+(cfg.onlyUnassigned?'checked':'')+' onchange="_aaSet(\'onlyUnassigned\',this.checked)"> Chỉ lấy KH <b>chưa chia lần nào</b> (nên bật, nếu không ngày nào cũng có thể chia lại đúng KH cũ)</label>'+
     '<label style="font-size:12px;display:block;margin-top:10px">Chia từ <input type="number" min="0" max="23" style="width:56px" value="'+(cfg.runHour==null?7:cfg.runHour)+'" onchange="_aaSet(\'runHour\',this.value)"> giờ sáng (giờ VN) — trước giờ này không chia</label>'+
     '<div style="font-size:11px;color:var(--hint);margin-top:8px">Chạy tự động bằng <b>trigger trên Google Apps Script</b> (không cần mở CRM): admin cài 1 lần — mở Apps Script Editor, chọn hàm <b>installAutoAssignTrigger_</b>, bấm Run. Chưa cài trigger thì hệ thống chỉ chia khi có admin mở CRM vào ngày đó. Sau khi sửa ở đây nhớ bấm <b>💾 Lưu cấu hình</b> (server dùng bản đã lưu).</div></div>';
@@ -503,7 +503,7 @@ function renderAssignAuto(){
   }
   h += '</div>';
   h += '<div class="assign-section"><div class="assign-section-title">② Tỷ lệ chung theo nguồn &amp; ưu tiên <span style="font-weight:400;font-size:12px;color:var(--muted)">— chỉ áp dụng nguồn POS</span></div>'+
-    '<div style="font-size:11px;color:var(--muted)">Áp dụng cho mọi người, trừ chỗ bạn cài riêng theo Team / từng người (bấm “Chi tiết” ở Team). Mỗi người: hạn mức → chia theo nguồn → mỗi nguồn chia tiếp theo ưu tiên.</div>'+
+    '<div class="guide-text" style="font-size:11px;color:var(--muted)">Áp dụng cho mọi người, trừ chỗ bạn cài riêng theo Team / từng người (bấm “Chi tiết” ở Team). Mỗi người: hạn mức → chia theo nguồn → mỗi nguồn chia tiếp theo ưu tiên.</div>'+
     _aaRatioHtml('src') + _aaRatioHtml('prio') + _aaRatioHtml('hang') + _aaRatioTeamsHtml() + '</div>';
   h += _aaCkHtml();
   var lr = cfg.lastResult;
@@ -578,7 +578,7 @@ function _aaShowRunResult(r){
       h += '<table class="dash-table"><thead><tr><th>Team</th><th>CS</th><th style="text-align:right">Hạn mức</th><th style="text-align:right">Đã chia</th><th>Ghi chú</th></tr></thead><tbody>'+
         p.entries.map(function(e){ return '<tr><td>'+esc(e.team)+(e.src==='cskh'?' <b style="color:#b45309">· CSKH</b>':'')+'</td><td>'+esc(e.name)+'</td><td style="text-align:right">'+e.quota+'</td><td style="text-align:right;font-weight:700">'+e.phones.length+'</td><td style="color:var(--red)">'+(sh[e.name+'|'+(e.src||'pos')]?'thiếu '+sh[e.name+'|'+(e.src||'pos')]+' KH (hết data phù hợp)':'')+'</td></tr>'; }).join('')+'</tbody></table>';
     } else {
-      h += '<div style="font-size:12px;color:var(--muted)">Kiểm tra: Team đã tích chưa · hạn mức &gt; 0 chưa · nguồn/ưu tiên có KH phù hợp không · bật "Chỉ lấy KH chưa chia lần nào" thì có thể đã chia hết KH chưa từng chia.'+(p.short.length ? '<br>Thiếu data: '+p.short.map(function(x){ return esc(x.name)+' thiếu '+x.missing; }).join(', ') : '')+'</div>';
+      h += '<div class="guide-text" style="font-size:12px;color:var(--muted)">Kiểm tra: Team đã tích chưa · hạn mức &gt; 0 chưa · nguồn/ưu tiên có KH phù hợp không · bật "Chỉ lấy KH chưa chia lần nào" thì có thể đã chia hết KH chưa từng chia.'+(p.short.length ? '<br>Thiếu data: '+p.short.map(function(x){ return esc(x.name)+' thiếu '+x.missing; }).join(', ') : '')+'</div>';
     }
     h += '</div>';
   }

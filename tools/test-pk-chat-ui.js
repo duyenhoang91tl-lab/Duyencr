@@ -55,9 +55,14 @@ const msgs=[{id:'m1',c:'P1_U1',dir:'in',text:'Xin chào <b>shop</b>\nCó size M 
  $('dp-body').innerHTML=w.renderPkChatTab({phone:'0955555555'});await sleep(40);
  t('khong co hoi thoai: bao + an o soan + mo san phan gan',/Chưa có hội thoại/.test($('pkc-msgs').textContent)&&$('pkc-compose').style.display==='none'&&$('pkc-link').open===true);
  // loi tai
+ w.__login=0;w.eval('_showLogin=function(){window.__login++;}');try{w.localStorage.setItem('ome_sess_token','TOK');}catch(e){}
  respond={'action=pkChat&':()=>({error:'Can dang nhap.',code:'AUTH'})};
  $('dp-body').innerHTML=w.renderPkChatTab({phone:'0966666666'});await sleep(40);
- t('loi AUTH hien o dong trang thai',/Can dang nhap/.test($('pkc-status').textContent));
+ t('loi AUTH hien thong bao de hieu o dong trang thai (khong con "Can dang nhap." tho)',/đăng nhập lại/.test($('pkc-status').textContent));
+ t('loi AUTH: xoa token cu + hien man hinh dang nhap DUNG 1 LAN (khong lap)',w.__login===1&&(function(){try{return w.localStorage.getItem('ome_sess_token')===null;}catch(e){return true;}})());
+ await w.pkcLoad(true);await sleep(20);t('goi lai van loi AUTH: khong bat man hinh dang nhap them lan nua',w.__login===1);
+ respond={'action=pkChat&':()=>({ok:true,conversations:[],messages:[]})};await w.pkcLoad(true);await sleep(20);w.pkcLoad(true);
+ t('tai thanh cong thi tha co: lan AUTH sau se hien dang nhap lai',w.eval('_pkcAuthShown')===false);
  // dung poll khi roi tab
  w.eval('_pkcStop()');t('_pkcStop xoa timer',w.eval('_pkc.timer')===null);
  console.log('\n'+ok+' OK, '+fail+' FAIL');process.exit(fail?1:0);

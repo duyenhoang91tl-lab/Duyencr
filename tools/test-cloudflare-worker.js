@@ -41,44 +41,46 @@ const W = 'https://crm.example.workers.dev/';
   ok(mod.isGoodJson('{"rows":[]}') && mod.isGoodJson('[1,2]') && !mod.isGoodJson('{"error":"x"}') && !mod.isGoodJson('<html>') && !mod.isGoodJson('') && !mod.isGoodJson('"str"') && !mod.isGoodJson('null'), 'isGoodJson');
 
   // ===== cache MISS -> HIT -> het han -> MISS =====
-  reset(); let r = await go('action=orders');
+  // cskhDuyenLite nay thuoc GATED_ACTIONS (4c-2c): tam go no khoi danh sach de kiem hanh vi cache CHUNG (khong khoa user), khoi phuc o cuoi phan nay.
+  const _gIdx = mod.GATED_ACTIONS.indexOf('cskhDuyenLite'); if (_gIdx !== -1) mod.GATED_ACTIONS.splice(_gIdx, 1);
+  reset(); let r = await go('action=cskhDuyenLite');
   ok(r.status === 200 && r.headers.get('x-crm-cache') === 'MISS' && calls.length === 1 && putCount === 1, 'lan 1 MISS, goi GAS 1 lan, luu cache');
-  ok(calls[0].url === GAS + '?action=orders&src=worker' && calls[0].init.redirect === 'follow', 'goi dung URL GAS + theo redirect: ' + calls[0].url);
+  ok(calls[0].url === GAS + '?action=cskhDuyenLite&src=worker' && calls[0].init.redirect === 'follow', 'goi dung URL GAS + theo redirect: ' + calls[0].url);
   ok(r.headers.get('access-control-allow-origin') === '*' && /x-crm-cache/.test(r.headers.get('access-control-expose-headers')), 'co CORS');
   const first = await r.text();
-  now += 5000; r = await go('action=orders'); ok(r.headers.get('x-crm-cache') === 'HIT' && calls.length === 1 && (await r.text()) === first, 'sau 5s: HIT, khong goi GAS, noi dung y het');
-  now += 11000; r = await go('action=orders'); ok(r.headers.get('x-crm-cache') === 'SWR' && calls.length === 2, 'sau 16s (> 15s, trong cua so SWR 60s): tra NGAY ban cu + lam moi nen');
+  now += 5000; r = await go('action=cskhDuyenLite'); ok(r.headers.get('x-crm-cache') === 'HIT' && calls.length === 1 && (await r.text()) === first, 'sau 5s: HIT, khong goi GAS, noi dung y het');
+  now += 11000; r = await go('action=cskhDuyenLite'); ok(r.headers.get('x-crm-cache') === 'SWR' && calls.length === 2, 'sau 16s (> 15s, trong cua so SWR 60s): tra NGAY ban cu + lam moi nen');
   ok(JSON.parse(await r.text()).n === 1, 'SWR tra ban cu (n=1) ngay lap tuc');
-  r = await go('action=orders'); ok(r.headers.get('x-crm-cache') === 'HIT' && calls.length === 2 && JSON.parse(await r.text()).n === 2, 'lan sau: HIT voi ban moi da lam xong o nen (n=2), khong goi GAS them');
-  reset(); await go('action=orders'); now += 100000; r = await go('action=orders'); ok(r.headers.get('x-crm-cache') === 'MISS' && calls.length === 2, 'qua cua so SWR (100s > 60s): cho ban moi nhu cu');
+  r = await go('action=cskhDuyenLite'); ok(r.headers.get('x-crm-cache') === 'HIT' && calls.length === 2 && JSON.parse(await r.text()).n === 2, 'lan sau: HIT voi ban moi da lam xong o nen (n=2), khong goi GAS them');
+  reset(); await go('action=cskhDuyenLite'); now += 100000; r = await go('action=cskhDuyenLite'); ok(r.headers.get('x-crm-cache') === 'MISS' && calls.length === 2, 'qua cua so SWR (100s > 60s): cho ban moi nhu cu');
   // gop request cung luc: 5 request cung khoa luc het han -> chi 1 lan goi GAS them
-  reset(); await go('action=orders'); now += 20000; originFn = () => ({ status: 200, body: { ok: true, n: 99 } });
-  const rs = await Promise.all([1, 2, 3, 4, 5].map(() => worker.fetch(req('action=orders'), env, ctx))); await Promise.all(pending.splice(0));
+  reset(); await go('action=cskhDuyenLite'); now += 20000; originFn = () => ({ status: 200, body: { ok: true, n: 99 } });
+  const rs = await Promise.all([1, 2, 3, 4, 5].map(() => worker.fetch(req('action=cskhDuyenLite'), env, ctx))); await Promise.all(pending.splice(0));
   ok(rs.every(q => q.headers.get('x-crm-cache') === 'SWR') && calls.length === 2, 'het han + 5 request cung luc: tat ca SWR, GAS chi bi goi them 1 lan (gop): ' + calls.length);
   reset(); originFn = () => ({ status: 200, body: { ok: true, n: 7 } });
   const ms = await Promise.all([1, 2, 3].map(() => worker.fetch(req('action=salesReportOptions'), env, ctx))); await Promise.all(pending.splice(0));
   ok(calls.length === 1 && ms.every(q => q.status === 200), 'MISS cung luc 3 request: gop 1 lan goi GAS');
   for (const q of ms) ok(JSON.parse(await q.text()).n === 7, 'moi nguoi goi doc duoc body day du');
   // SWR + GAS loi o nen: van tra ban cu, khong nem loi
-  reset(); await go('action=orders'); now += 20000; originFn = () => ({ throw: true }); r = await go('action=orders'); ok(r.headers.get('x-crm-cache') === 'SWR' && r.status === 200, 'SWR + lam moi nen loi: van tra ban cu 200');
+  reset(); await go('action=cskhDuyenLite'); now += 20000; originFn = () => ({ throw: true }); r = await go('action=cskhDuyenLite'); ok(r.headers.get('x-crm-cache') === 'SWR' && r.status === 200, 'SWR + lam moi nen loi: van tra ban cu 200');
   // tham so khac thu tu van trung cache
   reset(); await go('action=salesReportOptions&from=2026-10-01&to=2026-10-08'); r = await go('to=2026-10-08&action=salesReportOptions&from=2026-10-01'); ok(r.headers.get('x-crm-cache') === 'HIT' && calls.length === 1, 'doi thu tu tham so van HIT');
   r = await go('action=salesReportOptions&from=2026-10-01&to=2026-10-09'); ok(r.headers.get('x-crm-cache') === 'MISS' && calls.length === 2, 'khoang ngay khac = muc khac');
   // origin nhan DUNG thu tu/tham so goc
   ok(calls[1].url === GAS + '?action=salesReportOptions&from=2026-10-01&to=2026-10-09&src=worker', 'tham so chuyen tiep nguyen ven');
   // Buoc 3b: token/src cua tung nguoi KHONG chia nho cache; van chuyen tiep nguyen ven cho GAS; src san co khong bi ghi de
-  reset(); await go('action=orders&src=web&token=AAA&ek=X1'); r = await go('action=orders&src=zalo&ek=X2');
+  reset(); await go('action=cskhDuyenLite&src=web&token=AAA&ek=X1'); r = await go('action=cskhDuyenLite&src=zalo&ek=X2');
   ok(r.headers.get('x-crm-cache') === 'HIT' && calls.length === 1, 'ek (khoa extension) khong chia nho cache');
-  reset(); await go('action=orders&src=web&token=AAA'); r = await go('action=orders&src=web&token=BBB');
+  reset(); await go('action=cskhDuyenLite&src=web&token=AAA'); r = await go('action=cskhDuyenLite&src=web&token=BBB');
   ok(r.headers.get('x-crm-cache') === 'HIT' && calls.length === 1, 'hai nguoi khac token cung dung 1 cache');
-  ok(calls[0].url === GAS + '?action=orders&src=web&token=AAA', 'GAS nhan nguyen src + token cua nguoi goi: ' + calls[0].url);
+  ok(calls[0].url === GAS + '?action=cskhDuyenLite&src=web&token=AAA', 'GAS nhan nguyen src + token cua nguoi goi: ' + calls[0].url);
 
   // ===== chuyen thang (khong cache) =====
   reset();
   r = await go('action=customers&since=2026-10-09T00:00:00.000Z'); ok(r.headers.get('x-crm-cache') === 'BYPASS:delta', 'delta chuyen thang');
   r = await go('action=customers&since=2026-10-09T00:00:00.000Z'); ok(calls.length === 2 && putCount === 0, 'delta luon goi GAS, khong luu');
   r = await go('action=lookup&phone=0912345678'); ok(r.headers.get('x-crm-cache') === 'BYPASS:action', 'lookup chuyen thang');
-  r = await go('action=orders&demo=tok'); ok(r.headers.get('x-crm-cache') === 'BYPASS:private-param' && putCount === 0, 'demo chuyen thang');
+  r = await go('action=cskhDuyenLite&demo=tok'); ok(r.headers.get('x-crm-cache') === 'BYPASS:private-param' && putCount === 0, 'demo chuyen thang');
   r = await go('action=salesReportA&adminKey=SECRET'); ok(r.headers.get('x-crm-cache') === 'BYPASS:private-param' && putCount === 0, 'adminKey chuyen thang');
   ok([...store.keys()].every(k => !/SECRET|demo=/.test(k)), 'khong luu khoa/token vao cache');
   // POST: giu body + content-type, khong cache
@@ -89,25 +91,25 @@ const W = 'https://crm.example.workers.dev/';
 
   // ===== khong cache phan hoi loi =====
   reset(); originFn = () => ({ status: 200, body: { error: 'Thieu quyen' } });
-  r = await go('action=orders'); ok(r.headers.get('x-crm-cache') === 'BYPASS:not-cacheable' && putCount === 0 && JSON.parse(await r.text()).error, 'phan hoi {"error"} khong cache, van tra cho client');
-  originFn = () => ({ status: 200, body: '<html>Dang nhap Google</html>' }); r = await go('action=orders'); ok(putCount === 0 && (await r.text()).startsWith('<html>'), 'HTML (trang dang nhap) khong cache');
-  originFn = () => ({ status: 500, body: { rows: [] } }); r = await go('action=orders'); ok(putCount === 0 && r.status === 500, 'HTTP 500 khong cache, giu status');
-  originFn = () => ({ status: 200, body: { ok: true } }); r = await go('action=orders'); ok(r.headers.get('x-crm-cache') === 'MISS', 'sau loi, lan sau van cache binh thuong');
+  r = await go('action=cskhDuyenLite'); ok(r.headers.get('x-crm-cache') === 'BYPASS:not-cacheable' && putCount === 0 && JSON.parse(await r.text()).error, 'phan hoi {"error"} khong cache, van tra cho client');
+  originFn = () => ({ status: 200, body: '<html>Dang nhap Google</html>' }); r = await go('action=cskhDuyenLite'); ok(putCount === 0 && (await r.text()).startsWith('<html>'), 'HTML (trang dang nhap) khong cache');
+  originFn = () => ({ status: 500, body: { rows: [] } }); r = await go('action=cskhDuyenLite'); ok(putCount === 0 && r.status === 500, 'HTTP 500 khong cache, giu status');
+  originFn = () => ({ status: 200, body: { ok: true } }); r = await go('action=cskhDuyenLite'); ok(r.headers.get('x-crm-cache') === 'MISS', 'sau loi, lan sau van cache binh thuong');
   const big = '{"rows":"' + 'x'.repeat(9 * 1024 * 1024) + '"}'; reset(); originFn = () => ({ status: 200, body: big });
-  r = await go('action=orders'); ok(putCount === 0 && (await r.text()).length === big.length, 'phan hoi > 8MB khong cache nhung van tra du');
+  r = await go('action=cskhDuyenLite'); ok(putCount === 0 && (await r.text()).length === big.length, 'phan hoi > 8MB khong cache nhung van tra du');
 
   // ===== stale-if-error =====
-  reset(); await go('action=orders'); now += 90000;   // het han (15s) + qua cua so SWR (60s) nhung con trong 600s
-  originFn = () => ({ throw: true }); r = await go('action=orders'); ok(r.headers.get('x-crm-cache') === 'STALE' && r.status === 200, 'GAS sap + con ban cu -> tra STALE');
-  originFn = () => ({ status: 200, body: { error: 'quota' } }); r = await go('action=orders'); ok(r.headers.get('x-crm-cache') === 'STALE', 'GAS tra loi + con ban cu -> STALE');
-  now += 700000; originFn = () => ({ throw: true }); r = await go('action=orders'); ok(r.status === 502 && JSON.parse(await r.text()).error, 'ban cu qua 10 phut -> 502 co thong bao');
+  reset(); await go('action=cskhDuyenLite'); now += 90000;   // het han (15s) + qua cua so SWR (60s) nhung con trong 600s
+  originFn = () => ({ throw: true }); r = await go('action=cskhDuyenLite'); ok(r.headers.get('x-crm-cache') === 'STALE' && r.status === 200, 'GAS sap + con ban cu -> tra STALE');
+  originFn = () => ({ status: 200, body: { error: 'quota' } }); r = await go('action=cskhDuyenLite'); ok(r.headers.get('x-crm-cache') === 'STALE', 'GAS tra loi + con ban cu -> STALE');
+  now += 700000; originFn = () => ({ throw: true }); r = await go('action=cskhDuyenLite'); ok(r.status === 502 && JSON.parse(await r.text()).error, 'ban cu qua 10 phut -> 502 co thong bao');
   reset(); originFn = () => ({ throw: true }); r = await go('action=lookup&phone=1'); ok(r.status === 502, 'chuyen thang + GAS sap -> 502 co CORS'); ok(r.headers.get('access-control-allow-origin') === '*', 'loi van co CORS (de client doc duoc thong bao)');
 
   // ===== CORS preflight, thieu cau hinh, kill switch =====
   r = await worker.fetch(req('', { method: 'OPTIONS' }), env, ctx); ok(r.status === 204 && r.headers.get('access-control-allow-origin') === '*', 'OPTIONS 204 + CORS');
-  r = await worker.fetch(req('action=orders'), {}, ctx); ok(r.status === 500 && /GAS_URL/.test(await r.text()), 'thieu GAS_URL -> bao ro');
-  reset(); r = await go('action=orders', undefined, { GAS_URL: GAS, DISABLED: '1' }); ok(r.headers.get('x-crm-cache') === 'BYPASS:disabled' && putCount === 0, 'DISABLED=1 -> chi chuyen tiep');
-  r = await go('action=orders', undefined, { GAS_URL: GAS, DISABLED: '1' }); ok(calls.length === 2, 'DISABLED luon goi GAS');
+  r = await worker.fetch(req('action=cskhDuyenLite'), {}, ctx); ok(r.status === 500 && /GAS_URL/.test(await r.text()), 'thieu GAS_URL -> bao ro');
+  reset(); r = await go('action=cskhDuyenLite', undefined, { GAS_URL: GAS, DISABLED: '1' }); ok(r.headers.get('x-crm-cache') === 'BYPASS:disabled' && putCount === 0, 'DISABLED=1 -> chi chuyen tiep');
+  r = await go('action=cskhDuyenLite', undefined, { GAS_URL: GAS, DISABLED: '1' }); ok(calls.length === 2, 'DISABLED luon goi GAS');
   // ===== webhook Pancake -> Supabase (/pancake-webhook) =====
   const SB = 'https://abc.supabase.co', SBKEY = 'service-role-secret', WK = 'khoa-bi-mat-123';
   const wenv = { PANCAKE_WEBHOOK_KEY: WK, SUPABASE_URL: SB + '/', SUPABASE_SERVICE_KEY: SBKEY };   // CO Y khong co GAS_URL: route nay khong duoc phu thuoc GAS
@@ -150,7 +152,7 @@ const W = 'https://crm.example.workers.dev/';
   reset(); originFn = () => ({ throw: true }); r = await wh('?key=' + WK, post(ev)); ok(r.status === 502, 'mat mang toi Supabase -> 502');
   reset(); r = await wh('?key=' + WK, post('x'.repeat(1024 * 1024 + 1))); ok(r.status === 413 && calls.length === 0, 'payload > 1MB -> 413, khong ghi');
   reset(); r = await wh('?key=' + WK, { method: 'PUT', body: '{}' }); ok(r.status === 405 && calls.length === 0, 'PUT -> 405');
-  reset(); r = await worker.fetch(req('action=orders'), env, ctx); await Promise.all(pending.splice(0)); ok(r.headers.get('x-crm-cache') === 'MISS' && calls.length === 1 && calls[0].url.indexOf(GAS) === 0, 'route cu (cache GAS) khong bi anh huong');
+  reset(); r = await worker.fetch(req('action=cskhDuyenLite'), env, ctx); await Promise.all(pending.splice(0)); ok(r.headers.get('x-crm-cache') === 'MISS' && calls.length === 1 && calls[0].url.indexOf(GAS) === 0, 'route cu (cache GAS) khong bi anh huong');
   // ===== BUOC 4b: SESS_SECRET -> Worker chi phuc vu cache cho token phien hop le =====
   {
     const nodeCrypto = require('crypto'), SEC = 'bi-mat-phien';
@@ -160,16 +162,16 @@ const W = 'https://crm.example.workers.dev/';
     ok(await mod.verifySessToken(goodT, SEC) && await mod.verifySessToken(vnT, SEC), 'token dung (ke ca ten co dau)');
     ok(!(await mod.verifySessToken(expT, SEC)) && !(await mod.verifySessToken(goodT.slice(0, -3) + 'AAA', SEC)) && !(await mod.verifySessToken(goodT, 'sai-bi-mat')) && !(await mod.verifySessToken('', SEC)) && !(await mod.verifySessToken('abc', SEC)) && !(await mod.verifySessToken(goodT, '')), 'het han / sua chu ky / sai bi mat / rong / rac deu bi tu choi');
     const senv = { GAS_URL: GAS, SESS_SECRET: SEC };
-    reset(); r = await go('action=orders&token=' + goodT, undefined, senv); ok(r.headers.get('x-crm-cache') === 'MISS' && putCount === 1, 'token hop le -> cache binh thuong');
-    r = await go('action=orders&token=' + goodT, undefined, senv); ok(r.headers.get('x-crm-cache') === 'HIT' && calls.length === 1, 'token hop le -> HIT');
+    reset(); r = await go('action=cskhDuyenLite&token=' + goodT, undefined, senv); ok(r.headers.get('x-crm-cache') === 'MISS' && putCount === 1, 'token hop le -> cache binh thuong');
+    r = await go('action=cskhDuyenLite&token=' + goodT, undefined, senv); ok(r.headers.get('x-crm-cache') === 'HIT' && calls.length === 1, 'token hop le -> HIT');
     // nguoi khong co token / token gia / het han KHONG duoc an cache cua nguoi khac, va khong ghi cache
-    for (const [name, qs] of [['khong token', 'action=orders'], ['token gia', 'action=orders&token=abc.def'], ['token het han', 'action=orders&token=' + expT]]) {
+    for (const [name, qs] of [['khong token', 'action=cskhDuyenLite'], ['token gia', 'action=cskhDuyenLite&token=abc.def'], ['token het han', 'action=cskhDuyenLite&token=' + expT]]) {
       const before = calls.length; r = await go(qs, undefined, senv);
       ok(r.headers.get('x-crm-cache') === 'BYPASS:no-valid-token' && calls.length === before + 1 && calls[calls.length - 1].url.indexOf(GAS) === 0, name + ' -> chuyen thang GAS, khong an cache');
     }
-    reset(); await go('action=orders', undefined, senv); await go('action=orders', undefined, senv); ok(putCount === 0 && calls.length === 2, 'request khong token khong bao gio ghi cache');
+    reset(); await go('action=cskhDuyenLite', undefined, senv); await go('action=cskhDuyenLite', undefined, senv); ok(putCount === 0 && calls.length === 2, 'request khong token khong bao gio ghi cache');
     // GAS tu choi -> loi duoc tra nguyen, khong cache
-    reset(); originFn = () => ({ status: 200, body: { error: 'Can dang nhap lai', code: 'AUTH' } }); r = await go('action=orders', undefined, senv);
+    reset(); originFn = () => ({ status: 200, body: { error: 'Can dang nhap lai', code: 'AUTH' } }); r = await go('action=cskhDuyenLite', undefined, senv);
     ok(JSON.parse(await r.text()).code === 'AUTH' && putCount === 0, 'loi AUTH cua GAS duoc chuyen nguyen ve client');
     // Action bi chan theo phan quyen: cache RIENG tung nguoi; khong xac thuc duoc user thi khong cache
     {
@@ -179,10 +181,25 @@ const W = 'https://crm.example.workers.dev/';
       r = await go('action=salesReportA&from=1&to=2&token=' + goodT, undefined, senv); ok(r.headers.get('x-crm-cache') === 'HIT' && calls.length === 1, 'bao cao bi chan: cung nguoi -> HIT');
       r = await go('action=salesReportA&from=1&to=2&token=' + t2, undefined, senv); ok(r.headers.get('x-crm-cache') === 'MISS' && calls.length === 2, 'bao cao bi chan: nguoi khac KHONG an cache cua nguoi truoc');
       reset(); r = await go('action=salesReportA&from=1&to=2&token=' + goodT, undefined, env); ok(r.headers.get('x-crm-cache') === 'BYPASS:gated-no-user' && putCount === 0, 'khong co SESS_SECRET: bao cao bi chan khong cache');
-      reset(); await go('action=orders&token=' + goodT, undefined, senv); r = await go('action=orders&token=' + t2, undefined, senv); ok(r.headers.get('x-crm-cache') === 'HIT', 'action khong bi chan van dung chung cache');
+      reset(); await go('action=cskhDuyenLite&token=' + goodT, undefined, senv); r = await go('action=cskhDuyenLite&token=' + t2, undefined, senv); ok(r.headers.get('x-crm-cache') === 'HIT', 'action khong bi chan van dung chung cache');
+    // 4c-2b: customers/orders/careLeads da loc theo pham vi o GAS -> cache PHAI khoa theo user
+    for (const act of ['customers', 'orders', 'careLeads']) {
+      ok(mod.GATED_ACTIONS.indexOf(act) !== -1, act + ' nam trong GATED_ACTIONS');
+      reset(); await go('action=' + act + '&token=' + goodT, undefined, senv);
+      r = await go('action=' + act + '&token=' + goodT, undefined, senv); ok(r.headers.get('x-crm-cache') === 'HIT' && calls.length === 1, act + ': cung nguoi -> HIT');
+      r = await go('action=' + act + '&token=' + t2, undefined, senv); ok(r.headers.get('x-crm-cache') === 'MISS' && calls.length === 2, act + ': nguoi khac KHONG an cache cua nguoi truoc');
+      reset(); r = await go('action=' + act + '&token=' + goodT, undefined, env); ok(r.headers.get('x-crm-cache') === 'BYPASS:gated-no-user' && putCount === 0, act + ': khong SESS_SECRET -> khong cache');
+    }
     }
     // KHONG cau hinh SESS_SECRET -> hanh vi cu y het (khong can token)
-    reset(); r = await go('action=orders', undefined, env); ok(r.headers.get('x-crm-cache') === 'MISS' && putCount === 1, 'khong co SESS_SECRET -> nhu cu');
+    reset(); r = await go('action=cskhDuyenLite', undefined, env); ok(r.headers.get('x-crm-cache') === 'MISS' && putCount === 1, 'khong co SESS_SECRET -> nhu cu');
+    // 4c-2c: khoi phuc cskhDuyenLite vao GATED_ACTIONS (da go tam o dau phan cache chung) va kiem cache khoa theo user
+    mod.GATED_ACTIONS.push('cskhDuyenLite');
+    const t2c = mkTok('hoa', Date.now() + 1e6);
+    ok(mod.GATED_ACTIONS.indexOf('cskhDuyenLite') !== -1, 'cskhDuyenLite nam trong GATED_ACTIONS');
+    reset(); await go('action=cskhDuyenLite&token=' + goodT, undefined, senv);
+    r = await go('action=cskhDuyenLite&token=' + goodT, undefined, senv); ok(r.headers.get('x-crm-cache') === 'HIT' && calls.length === 1, 'cskhDuyenLite: cung nguoi -> HIT');
+    r = await go('action=cskhDuyenLite&token=' + t2c, undefined, senv); ok(r.headers.get('x-crm-cache') === 'MISS' && calls.length === 2, 'cskhDuyenLite: nguoi khac KHONG an cache cua nguoi truoc');
   }
   // ===== HOP THU PANCAKE DOC THANG TU WORKER (PK_NATIVE) =====
   {
@@ -226,7 +243,7 @@ const W = 'https://crm.example.workers.dev/';
     arm(); await nat('action=pkChatInbox&token=' + TD, nenv); ok(gasCalls().length === 1 && sb().length === 0, 'tai khoan trong PK_DENY_USERS (khong phan biet hoa thuong) -> GAS tu choi dung vai tro');
     arm(); await nat('action=pkChatInbox&token=' + T, Object.assign({}, nenv, { SUPABASE_SERVICE_KEY: '' })); ok(gasCalls().length === 1 && sb().length === 0, 'thieu khoa Supabase -> GAS');
     arm(); failSb = true; r = await nat('action=pkChatInbox&token=' + T); ok(gasCalls().length === 1 && r.status === 200, 'Supabase loi/mat mang -> du phong GAS, khong tra trang loi');
-    arm(); r = await nat('action=orders&token=' + T); ok(r.headers.get('x-crm-cache') !== 'NATIVE' && sb().length === 0, 'action khac khong bi anh huong');
+    arm(); r = await nat('action=cskhDuyenLite&token=' + T); ok(r.headers.get('x-crm-cache') !== 'NATIVE' && sb().length === 0, 'action khac khong bi anh huong');
     arm(); r = await go('action=pkChatInbox&token=' + T, { method: 'POST', body: '{}' }, nenv); ok(sb().length === 0, 'POST khong di vao nhanh doc truc tiep');
     // tim kiem + bao ve tham so
     arm(); await nat('action=pkChatInbox&token=' + T + '&q=' + encodeURIComponent('0378 996"789*')); ok(sb().some(c => c.url.indexOf('customer_phone=like.') > -1 && c.url.indexOf('customer_phone=like.*0378996789*') > -1), 'tim theo SDT -> customer_phone=like, ky tu dac biet bi bo');

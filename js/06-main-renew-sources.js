@@ -74,7 +74,7 @@ setTimeout(_syncKhStatusTreeFromGAS, 0);
 // khi mẫu số là số ĐƠN, không hợp khi mẫu số đổi thành TỔNG TƯƠNG TÁC Pancake — tỷ lệ tự
 // nhiên thấp hơn nhiều). Luu chung 1 setting ('closeRateThresholds') cho ca CRM, dung GIONG
 // pattern khStatusTree/fieldLabelCS o tren (cache local + dong bo GAS).
-let CLOSE_RATE_THRESHOLDS = loadLS('ome_close_rate_thresholds') || { red: 2, green: 10 };
+let CLOSE_RATE_THRESHOLDS = _crNormalize_(loadLS('ome_close_rate_thresholds'));   // dạng nhiều mức { levels:[{from,color}...] }; cấu hình cũ {red,green} tự đổi (xem _crNormalize_ ở js/01)
 setTimeout(_syncCloseRateThresholdsFromGAS, 0);
 // Ẩn/hiện Page & Sale khỏi báo cáo chung (yêu cầu 2026-09-25): admin tự chọn những
 // Page/kênh và Sale KHÔNG thuộc phạm vi mình quản lý để ẩn khỏi Dashboard/Báo cáo doanh

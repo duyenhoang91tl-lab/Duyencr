@@ -66,8 +66,20 @@ assert run("select direction||'|'||text from pk_messages where id = 'm_real1'", 
 ins({"data": {"post": None, "message": msg("m_cus2", PSID, "alo", "2026-10-11T21:00:00.000000", ["+84 901 234 567"]), "conversation": conv(["A-old"])}, "page_id": PAGE, "timestamp": 1791752000, "event_type": "messaging"})
 assert run("select customer_phone from pk_conversations where id = '%s'" % CONV, True) == '0912345678', 'SDT da co khong bi ghi de'
 # tach lai toan bo: idempotent, khong nhan doi
+n_msgs = int(run("select count(*) from pk_messages", True)); n_convs = int(run("select count(*) from pk_conversations", True))
 assert int(run("select pk_reprocess_raw()", True)) >= 9
-assert run("select count(*) from pk_messages", True) == '5' and run("select count(*) from pk_conversations", True) == '2', 'reprocess lam nhan doi'
+assert run("select count(*) from pk_messages", True) == str(n_msgs) and run("select count(*) from pk_conversations", True) == str(n_convs), 'reprocess lam nhan doi'
+# staff_name: tin 'out' lay ten nhan vien tu conversation.last_sent_by (neu webhook kem theo); tin khach thi rong; webhook gui lai khong kem ten khong xoa ten da biet
+cs = conv(["A-old"]); cs["last_sent_by"] = {"admin_id": "570423649807405", "admin_name": "Le Ninh", "id": PAGE, "name": "Page"}
+ins({"data": {"post": None, "message": msg("m_out2", PAGE, "Da em gui chi nhe", "2026-10-11T21:30:00.000000"), "conversation": cs}, "page_id": PAGE, "timestamp": 1791753000, "event_type": "messaging"})
+assert run("select staff_name from pk_messages where id='m_out2'", True) == 'Le Ninh', 'tin out phai co staff_name tu last_sent_by'
+assert run("select staff_name from pk_messages where id='m_cus1'", True) == '', 'tin khach khong co staff_name'
+assert run("select staff_name from pk_messages where id='m_out1'", True) == '', 'tin out cu (payload khong co last_sent_by) khong bi gan nham'
+ins({"data": {"post": None, "message": msg("m_out2", PAGE, "Da em gui chi nhe (sua)", "2026-10-11T21:30:00.000000"), "conversation": conv(["A-old"])}, "page_id": PAGE, "timestamp": 1791753100, "event_type": "messaging"})
+assert run("select staff_name||'|'||text from pk_messages where id='m_out2'", True) == 'Le Ninh|Da em gui chi nhe (sua)', 'gui lai khong kem ten phai giu ten cu va cap nhat noi dung'
+cm2 = conv(["A-old"]); cm2["last_sent_by"] = {"admin_name": "Nguoi Khac"}
+ins({"data": {"post": None, "message": msg("m_cus9", PSID, "tin khach", "2026-10-11T21:40:00.000000"), "conversation": cm2}, "page_id": PAGE, "timestamp": 1791753200, "event_type": "messaging"})
+assert run("select staff_name from pk_messages where id='m_cus9'", True) == '', 'tin khach KHONG lay last_sent_by'
 # anon khong duoc goi ham (neu role ton tai trong DB that); o day chi kiem tra RLS bat + khong policy
 assert run("select count(*) from pg_policies where tablename like 'pk_%'", True) == '0', 'khong duoc co policy'
 assert run("select bool_and(relrowsecurity) from pg_class where relname in ('pk_webhook_raw','pk_conversations','pk_messages')", True) == 't', 'RLS phai bat'

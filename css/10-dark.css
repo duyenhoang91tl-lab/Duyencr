@@ -1,0 +1,17 @@
+/* CHẾ ĐỘ TỐI (B6, docs/ROADMAP-CRM-MAU.md): bật bằng html[data-theme="dark"] (js/43-fn-uxtools.js; file css/10-dark.css). Toàn bộ giao diện dùng biến màu ở css/01-base.css nên chỉ cần đổi biến.
+   Chỗ nào còn màu cứng (#fff...) trong inline style sẽ giữ nguyên — báo Claude để đổi sang var(--...). */
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --bg:#14151a; --surface:#1d1f26; --surface2:#262932; --surface3:#30343f;
+  --border:rgba(255,255,255,0.10); --border-md:rgba(255,255,255,0.16); --border-strong:rgba(255,255,255,0.26);
+  --text:#e8e6e1; --muted:#a3a09a; --hint:#77746e;
+  --green:#3ecf8e; --green-bg:#12301f; --green-mid:#34b27b;
+  --vip:#a78bfa; --vip-bg:#2a2147; --vip-b:#5b4b9b;
+  --tt:#60a5fa; --tt-bg:#15283f; --tt-b:#2c5a96;
+  --tn:#fbbf24; --tn-bg:#3a2a12; --tn-b:#8a6a1f;
+  --red:#f87171; --red-bg:#3a1c1c; --red-b:#7f2d2d;
+  --blue:#60a5fa; --blue-bg:#14253b; --blue-b:#2c5a96;
+  --shadow:0 1px 3px rgba(0,0,0,.4); --shadow-md:0 4px 14px rgba(0,0,0,.5);
+}
+html[data-theme="dark"] .btn.primary { color:#0b1a12; }
+html[data-theme="dark"] input, html[data-theme="dark"] select, html[data-theme="dark"] textarea { background:var(--surface2); color:var(--text); border-color:var(--border-md); }

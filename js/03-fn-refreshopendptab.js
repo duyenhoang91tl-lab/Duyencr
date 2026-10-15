@@ -473,7 +473,7 @@ function _renderPosHistoryHtml_(c, rows) {
   const total = rows.reduce(function(sum, o){ return sum + (Number(o.revenue) || 0); }, 0);
   const fmtD = function(iso){ const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? (m[3] + '/' + m[2] + '/' + m[1]) : '—'; };
   return `<div class="dp-stitle">Lịch sử đặt hàng · Pos (${rows.length} đơn — ${fmtVND(total)})</div>
-    <div style="font-size:11px;color:var(--hint);margin:-2px 0 8px">Khách đã có đơn trên Pos nên lịch sử lấy theo Pos (chuẩn); các đơn Base đã nằm trong Pos nên không hiển thị lại.</div>
+    <div class="guide-text" style="font-size:11px;color:var(--hint);margin:-2px 0 8px">Khách đã có đơn trên Pos nên lịch sử lấy theo Pos (chuẩn); các đơn Base đã nằm trong Pos nên không hiển thị lại.</div>
     ${rows.slice(0,60).map(function(o){
       return `<div class="hist-item" style="border-left:3px solid var(--blue,#2563eb);padding-left:8px">
         <div class="hist-top"><span class="hist-date">${fmtD(o.date)}</span><span class="hist-price">${fmtVND(o.revenue)}</span></div>
@@ -1181,7 +1181,7 @@ function openNickZaloModal(phone) {
             '<button class="close-btn" onclick="closeNickZaloModal()">✕</button>' +
           '</div>' +
           '<div class="nz-modal-body">' +
-            '<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Tạo danh sách tên Nick Zalo dùng chung. CS chọn nick phù hợp khi chăm sóc từng khách.</div>' +
+            '<div class="guide-text" style="font-size:11px;color:var(--muted);margin-bottom:10px">Tạo danh sách tên Nick Zalo dùng chung. CS chọn nick phù hợp khi chăm sóc từng khách.</div>' +
             '<div class="nz-add-row">' +
               '<input class="nz-add-input" id="nz-new-input" placeholder="Nhập tên nick (vd: Zalo 1 Diệp...)" onkeydown="if(event.key===\'Enter\')addNickZaloToList()">' +
               '<button class="nz-add-confirm" onclick="addNickZaloToList()">+ Thêm</button>' +
