@@ -38,7 +38,7 @@ function openTeamAnalysisModal(){
           '<button class="btn primary" id="ta-run" onclick="runTeamAnalysis(false)">🤖 Phân tích</button>' +
           '<button class="btn" onclick="runTeamAnalysis(true)" title="Bỏ kết quả lưu tạm 10 phút, gọi AI viết lại">↻ Làm mới</button>' +
         '</div>' +
-        '<div id="ta-body" style="font-size:13px;color:var(--muted)">Chọn khoảng ngày rồi bấm “Phân tích”. Hệ thống đọc các báo cáo đã có (KPI Sale, KPI Pancake, đơn thất bại, CS thêm KH), chấm điểm từng người và nhờ AI nhận xét.</div>' +
+        '<div class="guide-text" id="ta-body" style="font-size:13px;color:var(--muted)">Chọn khoảng ngày rồi bấm “Phân tích”. Hệ thống đọc các báo cáo đã có (KPI Sale, KPI Pancake, đơn thất bại, CS thêm KH), chấm điểm từng người và nhờ AI nhận xét.</div>' +
       '</div>';
     el.addEventListener('mousedown', function(e){ if (e.target === el) closeTeamAnalysisModal(); });
     document.body.appendChild(el);

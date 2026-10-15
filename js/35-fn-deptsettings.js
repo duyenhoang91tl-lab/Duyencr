@@ -117,7 +117,7 @@ function _dpRender(){
     '<div class="rs-main">' + msgs + body + '</div></div>';
 }
 function _dpRoomsHtml(){
-  return '<h3>🏢 Danh sách phòng</h3><div style="font-size:12px;color:var(--muted);margin-bottom:10px">Đặt tên phòng, thêm hoặc xóa tuỳ ý. Phòng để trống tên sẽ bị bỏ khi lưu.</div>' +
+  return '<h3>🏢 Danh sách phòng</h3><div class="guide-text" style="font-size:12px;color:var(--muted);margin-bottom:10px">Đặt tên phòng, thêm hoặc xóa tuỳ ý. Phòng để trống tên sẽ bị bỏ khi lưu.</div>' +
     _dp.list.map(function(g, i){
       return '<div class="dpg-row"><input type="text" value="' + esc(g.label) + '" placeholder="Tên phòng" oninput="_dpRoomLabel(' + i + ',this.value)" class="dpg-in">' +
         '<span class="dpg-cnt">' + _dpCount(g.key) + ' người</span>' +
@@ -136,7 +136,7 @@ function _dpDelRoom(i){
 function _dpTeamsHtml(){
   var ts = _dpTeams();
   if (!ts.length) return '<h3>👥 Gán theo team</h3><div class="dpg-banner">Chưa có team nào. Tạo team ở <b>Cài đặt team</b> rồi quay lại đây (hoặc gán từng người ở mục “Từng người”).</div>';
-  return '<h3>👥 Gán nhanh cả team vào phòng</h3><div style="font-size:12px;color:var(--muted);margin-bottom:10px">Chọn phòng cho team: tất cả thành viên của team được gán vào phòng đó (có thể chỉnh lại từng người ở mục “Từng người”).</div>' +
+  return '<h3>👥 Gán nhanh cả team vào phòng</h3><div class="guide-text" style="font-size:12px;color:var(--muted);margin-bottom:10px">Chọn phòng cho team: tất cả thành viên của team được gán vào phòng đó (có thể chỉnh lại từng người ở mục “Từng người”).</div>' +
     '<table class="dash-table"><thead><tr><th>Team</th><th style="width:70px">Người</th><th style="width:190px">Gán vào phòng</th></tr></thead><tbody>' +
     ts.map(function(t, i){ return '<tr><td>' + esc(t.name) + '</td><td>' + t.members.length + '</td><td><select onchange="_dpAssignTeam(' + i + ',this.value);this.value=\'\'" style="width:180px">' + _dpOpts('', '— chọn phòng —') + '</select></td></tr>'; }).join('') + '</tbody></table>';
 }

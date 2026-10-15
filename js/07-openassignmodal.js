@@ -393,7 +393,7 @@ function renderAssignCreate() {
     </div>
 
     ${!isTeamMode ? `
-    <div style="font-size:10px;font-weight:400;color:var(--muted);margin-bottom:6px">(gõ tên để tìm, bấm để chọn — chọn được nhiều CS)</div>
+    <div class="guide-text" style="font-size:10px;font-weight:400;color:var(--muted);margin-bottom:6px">(gõ tên để tìm, bấm để chọn — chọn được nhiều CS)</div>
     <input class="assign-input" id="assign-cs-search" placeholder="🔍 Gõ tên CS để tìm nhanh..." style="width:100%;margin-bottom:8px;box-sizing:border-box"
       oninput="_filterAssignCSChips(this.value)">
     <div class="assign-cs-list" id="assign-cs-chips" style="margin-bottom:8px">
@@ -408,7 +408,7 @@ function renderAssignCreate() {
     </div>
     ${_advAssign.selectedCS.size===0?'<div style="font-size:11px;color:var(--hint);margin-top:6px">⬆ Chọn ít nhất 1 CS</div>':''}
     ` : `
-    <div style="font-size:10px;font-weight:400;color:var(--muted);margin-bottom:6px">(bấm để chọn Team — chọn được nhiều Team, tỷ lệ % cho từng thành viên nhập ở bước ③ bên dưới)</div>
+    <div class="guide-text" style="font-size:10px;font-weight:400;color:var(--muted);margin-bottom:6px">(bấm để chọn Team — chọn được nhiều Team, tỷ lệ % cho từng thành viên nhập ở bước ③ bên dưới)</div>
     <div class="assign-cs-list" id="assign-team-chips" style="margin-bottom:8px">
       ${teams.map(t => `<div class="assign-cs-chip-multi ${_advAssign.selectedTeams.has(t.id)?'selected':''}" data-team="${esc(t.id)}" onclick="_advAssignToggleTeam(this.dataset.team)">${esc(t.name)} <span style="opacity:.6">(${(t.members||[]).length})</span></div>`).join('')}
       ${teams.length===0?'<span style="color:var(--hint);font-size:12px">Chưa có Team nào — vào tab "Quản lý Team" để tạo Team trước.</span>':''}
@@ -1469,7 +1469,7 @@ function renderMyDataTab() {
   const noAction = document.getElementById('mydata-no-action')?.checked || false;
   const body = document.getElementById('mydata-body');
   if (!csName) {
-    body.innerHTML = '<div style="padding:40px;text-align:center;color:var(--hint)">Chọn tên CS của bạn để xem data được chia</div>';
+    body.innerHTML = '<div class="guide-text" style="padding:40px;text-align:center;color:var(--hint)">Chọn tên CS của bạn để xem data được chia</div>';
     return;
   }
   const myBatches = assignHistory.filter(h => h.csName === csName);

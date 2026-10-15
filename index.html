@@ -83,7 +83,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
     <details style="margin-top:8px">
       <summary style="font-size:11px;color:var(--muted);cursor:pointer">🔄 Đồng bộ mã GAS mới nhất (Admin — sau khi đã Deploy thủ công)</summary>
       <div style="margin-top:6px">
-        <div style="font-size:10.5px;color:var(--hint);margin-bottom:5px">Dán TOÀN BỘ nội dung file gas_v13.js mới nhất (bản vừa Deploy) vào đây rồi bấm Đồng bộ, để nút "Copy Apps Script Code" ở trên luôn đưa đúng bản mới nhất.</div>
+        <div class="guide-text" style="font-size:10.5px;color:var(--hint);margin-bottom:5px">Dán TOÀN BỘ nội dung file gas_v13.js mới nhất (bản vừa Deploy) vào đây rồi bấm Đồng bộ, để nút "Copy Apps Script Code" ở trên luôn đưa đúng bản mới nhất.</div>
         <textarea id="gs-source-sync-input" placeholder="Dán toàn bộ nội dung gas_v13.js vào đây..." style="width:100%;height:80px;font-family:monospace;font-size:11px;padding:6px 8px;border:1px solid var(--border-md);border-radius:var(--rsm);background:var(--surface)"></textarea>
         <button class="btn sm" style="margin-top:6px" onclick="syncGasSourceFromTextarea()">🔄 Đồng bộ</button>
       </div>
@@ -771,7 +771,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
       <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
           <div class="zai-label" style="margin:0;font-size:13px;font-weight:700">💬 Gợi ý tin nhắn</div>
-          <span style="font-size:11px;color:var(--muted)">Gõ tên sản phẩm → chọn mẫu đã duyệt → Copy dán vào chat</span>
+          <span class="guide-text" style="font-size:11px;color:var(--muted)">Gõ tên sản phẩm → chọn mẫu đã duyệt → Copy dán vào chat</span>
         </div>
         <div id="mt-suggest" style="margin-bottom:16px"></div>
 
@@ -1138,7 +1138,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
       </div>
       <!-- Cột phải: cây lựa chọn -->
       <div style="flex:1;min-width:0">
-        <div id="cf-tree-title" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--hint);margin-bottom:6px">Chọn 1 trường ở cột trái để sửa lựa chọn</div>
+        <div class="guide-text" id="cf-tree-title" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--hint);margin-bottom:6px">Chọn 1 trường ở cột trái để sửa lựa chọn</div>
         <div id="cf-tree" style="border:1px solid var(--border);border-radius:var(--rsm);padding:8px;min-height:120px;max-height:320px;overflow:auto"></div>
         <div id="cf-tree-tools" style="display:none;margin-top:8px">
           <div style="display:flex;gap:6px">
@@ -1282,7 +1282,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
       <button onclick="closeBroadcastCompose()" style="border:none;background:none;font-size:20px;cursor:pointer;line-height:1;">✕</button>
     </div>
     <div style="font-size:12px;color:#6b7280;margin-bottom:6px;" id="bc-compose-target-info"></div>
-    <div style="font-size:11px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:6px 10px;margin-bottom:10px;color:#166534;">
+    <div class="guide-text" style="font-size:11px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:6px 10px;margin-bottom:10px;color:#166534;">
       💡 Đây là chiến dịch <b>gửi 1 lần</b> (tin + ảnh, cùng nội dung). Còn <b>tin hỏi thăm tự động</b> theo mốc ngày sau mua (+7, +14, +1 tháng...) thì
       <a href="#" onclick="closeBroadcastCompose();openFuTplModal();return false" style="color:#00b14f;font-weight:600;text-decoration:underline">chỉnh mẫu tại đây</a> — máy tự tạo chiến dịch mỗi sáng.
     </div>
@@ -1342,7 +1342,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
         <button onclick="saveFuCfg()" style="padding:5px 12px;border:1px solid #00b14f;background:#f0fdf4;color:#166534;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">💾 Lưu phạm vi</button>
       </div>
       <div style="margin-top:8px"><b>Bật/tắt từng mốc</b> (bỏ tích = tạm tắt, mẫu tin vẫn giữ): <span id="fucfg-days" style="display:inline-flex;flex-wrap:wrap;gap:10px;margin-left:6px"></span></div>
-      <div style="color:#6b7280;margin-top:5px">Nguồn: các từ khoá cách nhau dấu phẩy, khớp chứa-chuỗi, không phân biệt hoa thường (vd thêm <code>renew</code>). Để trống = mặc định như cũ (từ 05/2026; landipage/messenger/web). Áp dụng từ lần quét kế tiếp.</div>
+      <div class="guide-text" style="color:#6b7280;margin-top:5px">Nguồn: các từ khoá cách nhau dấu phẩy, khớp chứa-chuỗi, không phân biệt hoa thường (vd thêm <code>renew</code>). Để trống = mặc định như cũ (từ 05/2026; landipage/messenger/web). Áp dụng từ lần quét kế tiếp.</div>
       <div id="fucfg-status" style="margin-top:4px;color:#00b14f"></div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
@@ -1595,7 +1595,7 @@ function openBcLogModal(phone){
       <input type="text" id="task-f-cs-search" placeholder="🔍 Gõ tìm nhanh tên user..." oninput="_taskRenderUserChips(this.value)" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;margin-bottom:6px">
       <div class="assign-cs-list" id="task-f-cs"></div>
       </div>
-      <div id="task-f-perm-note" style="display:none;color:var(--hint);font-size:11px;margin-top:4px">🔒 Chỉ Admin mới có thể chọn/đổi người tham gia. Bạn vẫn tạo/sửa được các thông tin khác của công việc.</div>
+      <div class="guide-text" id="task-f-perm-note" style="display:none;color:var(--hint);font-size:11px;margin-top:4px">🔒 Chỉ Admin mới có thể chọn/đổi người tham gia. Bạn vẫn tạo/sửa được các thông tin khác của công việc.</div>
     </div>
     <div class="assign-footer">
       <button class="btn secondary" onclick="closeTaskModal()">Hủy</button>

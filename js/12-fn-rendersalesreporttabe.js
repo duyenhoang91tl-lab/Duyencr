@@ -374,7 +374,7 @@ function _srRenderE_(d){
       _srMoney(rows.reduce(function(s,r){return s+(r.channelRevenue||0);},0)),
       '<b>'+_srMoney(c.totalCommission)+'</b>']);
     html += '</tbody></table>';
-    html += '<div style="font-size:11px;color:var(--muted);margin-top:6px">Rê chuột vào % để xem nguồn áp dụng (Cá nhân / Team X / Chưa cài).</div>';
+    html += '<div class="guide-text" style="font-size:11px;color:var(--muted);margin-top:6px">Rê chuột vào % để xem nguồn áp dụng (Cá nhân / Team X / Chưa cài).</div>';
   } else {
     html += '<div style="font-size:11px;color:var(--hint);margin-bottom:4px">Vẽ theo "Hoa hồng"</div>';
     html += _srChartSvg(rows, 'name', 'commission', _srState.eSaleView, true);
@@ -409,7 +409,7 @@ function _srRenderE_(d){
     if (!bonusRows.length) html += '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Không có thưởng nào phát sinh trong khoảng lọc</td></tr>';
     else html += _srTotalRowHtml_(['Tổng', '', '<b>'+_srMoney(bonusRows.reduce(function(s,r){return s+r.total;},0))+'</b>', '']);
     html += '</tbody></table>';
-    html += '<div style="font-size:11px;color:var(--muted);margin-top:6px">"SL ước tính" ở chương trình theo sản phẩm là ước lượng từ ô mô tả sản phẩm — nên đối chiếu lại trước khi chi nếu số tiền lớn. Chương trình có giới hạn Online/Offline sẽ không áp dụng cho Sale chưa được phân loại (cài ở Quản lý Team).</div>';
+    html += '<div class="guide-text" style="font-size:11px;color:var(--muted);margin-top:6px">"SL ước tính" ở chương trình theo sản phẩm là ước lượng từ ô mô tả sản phẩm — nên đối chiếu lại trước khi chi nếu số tiền lớn. Chương trình có giới hạn Online/Offline sẽ không áp dụng cho Sale chưa được phân loại (cài ở Quản lý Team).</div>';
   }
   return html;
 }
@@ -658,7 +658,7 @@ function _srRenderG_(d){
   if (!progs.length) html += '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px">Chưa có chương trình nào phát sinh thưởng</td></tr>';
   else html += _srTotalRowHtml_(['Tổng', fmt(progs.reduce(function(s,p){return s+p.tvCount;},0)), _srMoney(g.tv.total), fmt(progs.reduce(function(s,p){return s+p.ctCount;},0)), _srMoney(g.ct.total), '<b>'+_srMoney(g.total)+'</b>']);
   html += '</tbody></table>';
-  html += '<div style="font-size:11px;color:var(--muted);margin-top:6px">"SL ước tính" ở chương trình theo sản phẩm là ước lượng từ ô mô tả sản phẩm — nên đối chiếu lại bằng file CSV trước khi chi nếu số tiền lớn. Sale chưa phân loại Online/Offline/Thử việc chỉ nhận được các chương trình không giới hạn đối tượng. Sale Thử việc chưa đặt "Ngày bắt đầu" (👤 Quản lý tài khoản) sẽ không nhận các chương trình theo ngày thử việc.</div>';
+  html += '<div class="guide-text" style="font-size:11px;color:var(--muted);margin-top:6px">"SL ước tính" ở chương trình theo sản phẩm là ước lượng từ ô mô tả sản phẩm — nên đối chiếu lại bằng file CSV trước khi chi nếu số tiền lớn. Sale chưa phân loại Online/Offline/Thử việc chỉ nhận được các chương trình không giới hạn đối tượng. Sale Thử việc chưa đặt "Ngày bắt đầu" (👤 Quản lý tài khoản) sẽ không nhận các chương trình theo ngày thử việc.</div>';
   return html;
 }
 
@@ -1002,7 +1002,7 @@ function _renderChannelRatesModal(){
   if (!body) return;
   var keys = Object.keys(CHANNEL_COMMISSION_RATES).sort(function(a,b){ return a.localeCompare(b,'vi'); });
   var nguonOptions = (_srState && _srState.nguonOptions) || [];
-  var html = '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Đơn có Nguồn đơn khớp đúng (không phân biệt hoa/thường) 1 trong các tên dưới đây sẽ tính hoa hồng theo % cố định này, bỏ qua ngưỡng 15tr và % cá nhân/team. Mặc định (khi chưa cài): nguồn chỉ ghi "Facebook" = 1%.</div>';
+  var html = '<div class="guide-text" style="font-size:12px;color:var(--muted);margin-bottom:10px">Đơn có Nguồn đơn khớp đúng (không phân biệt hoa/thường) 1 trong các tên dưới đây sẽ tính hoa hồng theo % cố định này, bỏ qua ngưỡng 15tr và % cá nhân/team. Mặc định (khi chưa cài): nguồn chỉ ghi "Facebook" = 1%.</div>';
   html += '<table class="dash-table"><thead><tr><th>Nguồn đơn</th><th style="width:140px">% hoa hồng</th><th style="width:60px"></th></tr></thead><tbody>';
   keys.forEach(function(k){
     html += '<tr><td>'+esc(k)+'</td>'+
@@ -1163,7 +1163,7 @@ function _bpEditFormHtml_(p){
         '<span style="font-size:11.5px;color:var(--muted)">Từ</span><input type="number" min="0" value="'+esc(p.revenue.min)+'" style="width:140px" onchange="_bpDraft.revenue.min=this.value" placeholder="vd 20000000">'+
         '<span style="font-size:11.5px;color:var(--muted)">đến (bỏ trống = trở lên)</span><input type="number" min="0" value="'+esc(p.revenue.max)+'" style="width:140px" onchange="_bpDraft.revenue.max=this.value">'+
       '</div>'+
-      '<div style="margin-top:8px;font-size:11.5px;color:var(--muted)">Chỉ tính khi ô Sản phẩm của đơn có từ khoá (cách nhau dấu phẩy, bỏ trống = không lọc; chỉ áp dụng khi chọn \"Theo 1 đơn\"):</div>'+
+      '<div class="guide-text" style="margin-top:8px;font-size:11.5px;color:var(--muted)">Chỉ tính khi ô Sản phẩm của đơn có từ khoá (cách nhau dấu phẩy, bỏ trống = không lọc; chỉ áp dụng khi chọn \"Theo 1 đơn\"):</div>'+
       '<input type="text" value="'+esc(_bonusRequireKw_(p))+'" oninput="_bpDraft.requireProduct=this.value" style="width:100%" placeholder="VD: vòng">'+
       '</div>') : '')+
 
@@ -1187,7 +1187,7 @@ function _bpEditFormHtml_(p){
       '<input type="number" min="1" value="'+esc(p.probationDay.from)+'" style="width:70px" onchange="_bpDraft.probationDay.from=this.value" placeholder="1">'+
       '<span style="font-size:11.5px;color:var(--muted)">đến ngày thứ (bỏ trống = không giới hạn)</span>'+
       '<input type="number" min="1" value="'+esc(p.probationDay.to)+'" style="width:70px" onchange="_bpDraft.probationDay.to=this.value" placeholder="30">'+
-      '</div><div style="font-size:10.5px;color:var(--hint);margin-bottom:14px">Tính từ "Ngày bắt đầu" đặt riêng cho từng Sale ở 👤 Quản lý tài khoản (mốc tính thưởng theo ngày thử việc) — Ngày bắt đầu = ngày thứ 1. Sale chưa được đặt Ngày bắt đầu sẽ KHÔNG được tính chương trình có bật mục này.</div>') : '<div style="margin-bottom:10px"></div>')+
+      '</div><div class="guide-text" style="font-size:10.5px;color:var(--hint);margin-bottom:14px">Tính từ "Ngày bắt đầu" đặt riêng cho từng Sale ở 👤 Quản lý tài khoản (mốc tính thưởng theo ngày thử việc) — Ngày bắt đầu = ngày thứ 1. Sale chưa được đặt Ngày bắt đầu sẽ KHÔNG được tính chương trình có bật mục này.</div>') : '<div style="margin-bottom:10px"></div>')+
 
     '<div style="display:flex;gap:8px">'+
       '<button class="btn" onclick="_bpSave()">💾 Lưu chương trình</button>'+
@@ -1354,7 +1354,7 @@ function _bpSrcListHtml_(){
 }
 function _bpSrcSelHtml_(){
   var s = _bpDraft.sources || [];
-  return s.length ? ('Đã chọn '+s.length+' nguồn: <b>'+esc(s.join(', '))+'</b> — áp dụng chung Online + Offline.') : '<span style="color:var(--muted)">Chưa chọn nguồn = chương trình không giới hạn theo nguồn.</span>';
+  return s.length ? ('Đã chọn '+s.length+' nguồn: <b>'+esc(s.join(', '))+'</b> — áp dụng chung Online + Offline.') : '<span class="guide-text" style="color:var(--muted)">Chưa chọn nguồn = chương trình không giới hạn theo nguồn.</span>';
 }
 function _bpSrcRefresh_(){
   var a = document.getElementById('bp-src-list'), b = document.getElementById('bp-src-sel');
