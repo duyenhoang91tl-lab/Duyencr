@@ -56,7 +56,7 @@ Deploy lại GAS (dán `gas_v13.js` hoặc nút "Đồng bộ mã GAS mới nh�
 ## Viec tiep (4c-2, 4c-3) - CHUA LAM
 - [ ] **Quyet dinh can xac nhan:** extension Zalo dang goi `deleteDuplicateOrders` (zalo-content.js:1057, 1361) bang khoa `ek` va `EXT_ALLOWED_.zalo` cho phep -> CS van xoa don trung duoc qua extension. Neu muon chi Duyent xoa: bo `deleteDuplicateOrders` khoi `EXT_ALLOWED_.zalo` + an nut trong extension (can reload extension).
 - [~] 4c-2: (4c-2a LAM, xem duoi) loc `customers`/`lookup`/`donOrdersByPhone`/`reminders` THEO CS o server (CS chi nhan khach cua minh theo logic `_inUserScope` o js/08-fn-invalidatefiltercache.js: careCS, assign, hoac CS phu trach don o.cs; ai co quyen khac thi theo vai tro/bo phan). Luu y Worker cache: action nay phai khoa cache theo user (them vao `GATED_ACTIONS` o cloudflare/worker.mjs).
-- [ ] 4c-3: dua cac action dang mo vao kiem soat: assign (GET), setSetting/getSetting khoa thuong, saveCannedResponse, saveMessageTemplate, deleteMessageTemplate, saveAIContext, csStats, findDuplicateOrders, addZaloNick.
+- [~] 4c-3: (PHAN LON LAM, xem 'Buoc 4c-3') dua cac action dang mo vao kiem soat: assign (GET), setSetting/getSetting khoa thuong, saveCannedResponse, saveMessageTemplate, deleteMessageTemplate, saveAIContext, csStats, findDuplicateOrders, addZaloNick.
 - [ ] Sau khi xong: bat cong tac chan 4b theo thu tu trong "Buoc 4b" (can bat thi 4c-1 moi het ke ho khi gui khong token).
 
 ## Buoc 4c-2a - LAM (gas v13.47-scope-gate, 2026-10-14): pham vi khach theo CS cho tra cuu TUNG SDT
@@ -91,3 +91,12 @@ Deploy lại GAS (dán `gas_v13.js` hoặc nút "Đồng bộ mã GAS mới nh�
 - Worker: `cskhDuyenLite` (cache chung 15s) vao `GATED_ACTIONS` de khoa theo user. Test Worker: phan cache chung tam go `cskhDuyenLite` khoi danh sach roi khoi phuc de test rieng.
 - Con ho: `noPhone`/`noPhoneSample` cua cskhDuyen* (dong khong co SDT) van tra nguyen; extension `ek` van thay het.
 - Bat/tat van la `scopeMode` (off|log|enforce) nhu 4c-2a/2b; khong can doi quy trinh.
+
+## Buoc 4c-3 - LAM (2026-10-14): cau hinh cau truc, mau follow-up, mau chuan, extension Zalo
+Quy tac Duyen chot: (1) doi team/nhom sale/cay trang thai cham soc: admin + leader + manager; trang thai cua TUNG KHACH van do CS doi (saveSingle). (2) CS tu sua mau cua minh, xem kho mau chung; chon mau chuan: CHI admin. (3) Extension Zalo khong con xoa don.
+- `_cfgGate_` (doPost, sau `_ownerGate_`): `CFG_ACTIONS_` = saveTeams, saveMktTeams, saveSaleGroups, saveCareStatus -> chi `CFG_ROLES_` = admin/leader/manager (CS goi thang -> FORBIDDEN). Nguyen nhan goc: token hop le goi duoc moi action ghi cau hinh dung chung.
+- `saveFollowUpTemplates_(list, user)`: nguyen nhan goc = ham `clearContents` ca sheet roi ghi lai theo payload nen 1 CS gui danh sach la xoa/ghi de mau cua TAT CA. Nay: admin (hoac khong token) ghi de nhu cu; nguoi khac -> `_fuMergeForUser_` giu nguyen moi dong cua nguoi khac va dong chung (cs rong), chi thay cac dong cs = ten/username/names cua minh.
+- `MSG_TPL_APPROVER_ROLES_` = ['admin'] (bo 'manager'): chi admin duyet/sua/xoa mau chuan (kho mau chung `saveMessageTemplate_`/`deleteMessageTemplate_`/`approveMessageTemplate_`). CS tao -> pending, chi sua/xoa mau pending cua minh (da co san). **Manager mat quyen duyet** - day la thay doi hanh vi co chu y.
+- Extension Zalo: go han code xoa don (`zaiCheckDuplicates_`, `_zaiDeleteOneOrder_` chi con stub, an nut kiem tra don trung + nut x tung don) + bo `deleteDuplicateOrders` khoi `EXT_ALLOWED_.zalo`. **Can reload extension Zalo AI trong chrome://extensions.** Test: `tools/test-zalo-no-delete.js`.
+- Test: test-roles (4c-3), test-enforce, test-msgtpl (cap nhat theo admin-only), test-zalo-no-delete. Con ho: `ek` van doc duoc nhieu du lieu (xem 4c-2); `saveAudit`, `setSetting` khoa thuong, `saveAIContext`, `addZaloNick`, `csStats`, `assign`, `findDuplicateOrders` chua co luat vai tro (chua ro ai duoc dung).
+- Luu y: 2 test `test-staff-profile-ui`, `test-supabase-read` hong san tren main (khong lien quan).

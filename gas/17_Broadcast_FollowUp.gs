@@ -389,9 +389,18 @@ function listFollowUpTemplates_() {
 }
 
 // Ghi de toan bo bang mau tin (UI Sasum gui len danh sach day du sau khi sua)
-function saveFollowUpTemplates_(list) {
+function saveFollowUpTemplates_(list, user) {
   if (!Array.isArray(list)) return jsonOut_({ error: 'templates phai la mang' });
   var sh = getSheet_(SH_FU_TEMPLATE, FU_TEMPLATE_HEADERS);
+  if (user && user.role !== 'admin') {   // 4c-3: nguoi khong phai admin chi sua mau cua chinh minh
+    var last0 = sh.getLastRow();
+    var cur = last0 >= 2 ? sh.getRange(2, 1, last0 - 1, FU_TEMPLATE_HEADERS.length).getValues() : [];
+    var merged = _fuMergeForUser_(cur, list, user);
+    sh.clearContents();
+    var mx = [FU_TEMPLATE_HEADERS].concat(merged);
+    sh.getRange(1, 1, mx.length, FU_TEMPLATE_HEADERS.length).setValues(mx);
+    return jsonOut_({ ok: true, written: merged.length, scope: 'own' });
+  }
   sh.clearContents();
   var matrix = [FU_TEMPLATE_HEADERS];
   for (var i = 0; i < list.length; i++) {

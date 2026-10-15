@@ -1008,7 +1008,7 @@ function doiKhoaPancake() { _extKeyRotate_('pancake'); return xemKhoaExtension()
 //  va cac action KHONG nam trong NTL_ACTIONS_ (assign, setSetting, saveCannedResponse...).
 // ═══════════════════════════════════════════════════════════════
 var EXT_ALLOWED_ = {
-  zalo: { addCareLead: 1, broadcastMark: 1, customers: 1, deleteDuplicateOrders: 1, lookup: 1, reminders: 1, saveSingle: 1, syncZaloFriendStatus: 1 },
+  zalo: { addCareLead: 1, broadcastMark: 1, customers: 1, lookup: 1, reminders: 1, saveSingle: 1, syncZaloFriendStatus: 1 },
   pancake: { addCareLead: 1, customers: 1, donOrdersByPhone: 1, lookup: 1, reminders: 1, saveSingle: 1, toggleAssignDone: 1 }
 };
 var ENF_SOURCES_ = ['web', 'zalo', 'pancake', 'other'];
@@ -1315,6 +1315,47 @@ function _scopeListServe_(action, p, e) {
     if (mode === 'enforce') return jsonOut_(f.obj);
   } catch (e2) { Logger.log('_scopeListServe_: ' + e2); }
   return resp;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BUOC 4c-3 (v13.50): cau hinh CAU TRUC chi admin/leader/manager; mau follow-up CS chi sua cua minh; mau chuan chi admin.
+//  Nguyen nhan goc: token hop le goi duoc moi action ghi cau hinh dung chung -> CS goi thang API doi team/nhom sale/cay trang thai cham soc
+//  (trang thai cua TUNG KHACH van qua saveSingle, khong bi anh huong); saveFollowUpTemplates_ clearContents ca sheet roi ghi lai theo
+//  payload nen 1 CS gui danh sach la xoa/ghi de mau cua tat ca moi nguoi.
+// ═══════════════════════════════════════════════════════════════
+var CFG_ACTIONS_ = { saveTeams: 1, saveMktTeams: 1, saveSaleGroups: 1, saveCareStatus: 1 };
+var CFG_ROLES_ = ['admin', 'leader', 'manager'];
+function _cfgGate_(action, token) {
+  if (!CFG_ACTIONS_[action] || !token) return null;
+  try {
+    var u = _sessUser_(token);
+    if (u && CFG_ROLES_.indexOf(String(u.role || '')) < 0) return { error: 'Chi admin / leader / quan ly moi duoc sua cau hinh nay.', code: 'FORBIDDEN', action: action };
+  } catch (e) {}
+  return null;
+}
+// Tap khoa (chu thuong) the hien "chu so huu" cua dong mau follow-up: ten + username + names cua tai khoan.
+function _fuOwnKeys_(user) {
+  var k = {};
+  [user && user.name, user && user.username].concat((user && user.names) || []).forEach(function (n) { n = String(n || '').trim().toLowerCase(); if (n) k[n] = 1; });
+  return k;
+}
+// user = nguoi dung that tu token (null = khong token/extension -> hanh vi cu: ghi de ca sheet).
+// admin: ghi de ca sheet nhu cu. Nguoi khac: GIU NGUYEN moi dong cua nguoi khac, chi thay cac dong cs = chinh minh bang payload.
+function _fuMergeForUser_(existingRows, list, user) {
+  var keys = _fuOwnKeys_(user), out = [], i;
+  for (i = 0; i < existingRows.length; i++) {
+    var rc = String(existingRows[i][3] || '').trim().toLowerCase();
+    if (!keys[rc]) out.push(existingRows[i]);   // dong cua nguoi khac / dong chung (cs rong) -> khong dong vao
+  }
+  var mineName = String((user && (user.name || user.username)) || '').trim().toLowerCase();
+  for (i = 0; i < list.length; i++) {
+    var t = list[i] || {};
+    var tcs = String(t.cs || '').trim().toLowerCase();
+    if (!keys[tcs]) continue;   // bo dong khong phai cua minh (client co the gui ca bang)
+    if (!String(t.days || '').trim() || !String(t.template || '').trim()) continue;
+    out.push([String(t.productCode || '*').trim().toUpperCase(), String(t.days).trim(), String(t.template), tcs || mineName]);
+  }
+  return out;
 }
 
 // Bi mat ky token phien — dan vao bien Secret SESS_SECRET cua Cloudflare Worker de Worker chi phuc vu cache cho token hop le. KHONG dan vao chat/repo.

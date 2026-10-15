@@ -24,7 +24,7 @@ const T = (o) => Object.assign({ title: 'Chao khach', content: 'Xin chao anh/chi
 
 // 1) danh tinh nguoi goi
 reset();
-ok(C('tok_admin', '', '').priv && C('tok_mgr', '', '').priv, 'admin + manager la nguoi duyet');
+ok(C('tok_admin', '', '').priv && !C('tok_mgr', '', '').priv, '4c-3: CHI admin la nguoi duyet (manager KHONG con dac quyen duyet mau chuan)');
 ok(!C('tok_lead', '', '').priv && !C('tok_cs', '', '').priv, 'leader/cs KHONG duyet duoc (doi MSG_TPL_APPROVER_ROLES_ neu muon)');
 ok(C('', 'KEYZ', 'Lan').role === 'ext' && !C('', 'KEYZ', 'Lan').priv && C('', 'KEYZ', 'Lan').name === 'Lan', 'extension co khoa: khong dac quyen, ten tu khai');
 ok(C('', 'KEYX_SAI', 'Hacker').role === 'anon' && C('', '', 'x').role === 'anon', 'khoa sai / khong gi -> an danh');
@@ -33,7 +33,7 @@ ok(C('', 'KEYZ', 'x'.repeat(200)).name.length === 60, 'ten tu khai bi cat 60 ky 
 // 2) admin/manager tao mau -> da duyet ngay
 let r = save(T(), C('tok_admin', '', '')); ok(r.ok && r.status === 'approved', 'admin tao -> approved');
 let adminId = r.id; let row = ctx._tplRowToObj_(data[1]); ok(row.approvedBy === 'Admin' && row.product === 'Nhan vang 9999' && row.topic === 'Khach hoi gia' && row.createdBy === 'Admin', 'luu dung cot san pham/chu de/nguoi tao/nguoi duyet');
-r = save(T({ title: 'Mau QL' }), C('tok_mgr', '', '')); ok(r.status === 'approved', 'manager tao -> approved');
+r = save(T({ title: 'Mau QL' }), C('tok_mgr', '', '')); ok(r.status === 'pending', '4c-3: manager tao -> pending (khong con tu duyet)');
 // 3) nhan vien (web) de xuat -> pending; ten lay tu token, khong tin client
 r = save(T({ title: 'Mau cua Lan', createdBy: 'Admin' }), C('tok_cs', '', '')); ok(r.ok && r.status === 'pending', 'cs web tao -> pending');
 let lanId = r.id; ok(ctx._tplRowToObj_(data[data.length - 1]).createdBy === 'Lan', 'nguoi tao = ten that trong token, khong theo createdBy client gui');
@@ -41,11 +41,11 @@ let lanId = r.id; ok(ctx._tplRowToObj_(data[data.length - 1]).createdBy === 'Lan
 r = save(T({ title: 'Mau tu Zalo', createdBy: 'Mai' }), C('', 'KEYZ', 'Mai')); ok(r.status === 'pending', 'extension tao -> pending'); let maiExtId = r.id;
 r = save(T({ title: 'An danh' }), C('', '', '')); ok(r.status === 'pending', 'an danh (client cu khong token) tao -> pending, khong bao gio approved');
 // 5) tam nhin: nhan vien chi thay DA DUYET + mau CUA MINH; admin thay het
-let lan = read(C('tok_cs', '', '')).map(t => t.title).sort(); ok(lan.join('|') === 'Chao khach|Mau QL|Mau cua Lan', 'Lan thay mau da duyet + mau cua minh: ' + lan.join('|'));
+let lan = read(C('tok_cs', '', '')).map(t => t.title).sort(); ok(lan.join('|') === 'Chao khach|Mau cua Lan', 'Lan thay mau da duyet + mau cua minh: ' + lan.join('|'));
 { const mai = read(C('tok_cs2', '', '')); ok(!mai.some(t => t.title === 'Mau cua Lan') && mai.some(t => t.title === 'Mau tu Zalo') && mai.filter(t => t.status !== 'approved').every(t => t.createdBy === 'Mai'), 'Mai KHONG thay mau cho duyet cua Lan, chi thay mau cua minh (ke ca mau gui tu extension duoi ten Mai)'); }
-ok(read(C('', 'KEYZ', '')).length === 2 && read(C('', 'KEYZ', 'Mai')).length === 3, 'extension: khong ten -> chi mau da duyet; co ten -> them mau cua minh');
-ok(read(C('tok_admin', '', '')).length === 5 && read(C('tok_mgr', '', '')).length === 5, 'admin/manager thay tat ca');
-ok(read().length === 2 && read(C('', '', '')).length === 2, 'khong caller / an danh: chi mau da duyet');
+ok(read(C('', 'KEYZ', '')).length === 1 && read(C('', 'KEYZ', 'Mai')).length === 2, 'extension: khong ten -> chi mau da duyet; co ten -> them mau cua minh');
+ok(read(C('tok_admin', '', '')).length === 5 && read(C('tok_mgr', '', '')).length === 2, 'admin thay tat ca; manager (khong con dac quyen) chi thay mau da duyet + mau cua minh');
+ok(read().length === 1 && read(C('', '', '')).length === 1, 'khong caller / an danh: chi mau da duyet');
 // 6) nhan vien KHONG sua/xoa duoc mau da duyet; sua duoc mau cua minh chua duyet (quay lai pending)
 r = save(T({ id: adminId, content: 'doi noi dung' }), C('tok_cs', '', '')); ok(r.code === 'FORBIDDEN', 'cs sua mau da duyet -> bi chan');
 ok(ctx._tplRowToObj_(data[1]).content === 'Xin chao anh/chi', 'mau da duyet khong bi doi');
@@ -59,8 +59,9 @@ r = ctx.deleteMessageTemplate_(adminId, C('', 'KEYZ', 'Admin')); ok(r.code === '
 r = ctx.approveMessageTemplate_(lanId, 'approve', '', C('tok_cs', '', '')); ok(r.code === 'FORBIDDEN', 'cs tu duyet mau cua minh -> bi chan');
 r = ctx.approveMessageTemplate_(lanId, 'approve', '', C('', 'KEYZ', 'Admin')); ok(r.code === 'FORBIDDEN', 'extension khong duyet duoc');
 r = ctx.approveMessageTemplate_(lanId, 'approve', '', C('tok_lead', '', '')); ok(r.code === 'FORBIDDEN', 'leader khong duyet duoc');
-r = ctx.approveMessageTemplate_(lanId, 'approve', '', C('tok_mgr', '', '')); ok(r.ok && r.status === 'approved', 'manager duyet');
-row = ctx._tplRowToObj_(data.find(x => x[0] === lanId)); ok(row.status === 'approved' && row.approvedBy === 'Quản Lý' && row.rejectReason === '', 'ghi nguoi duyet');
+r = ctx.approveMessageTemplate_(lanId, 'approve', '', C('tok_mgr', '', '')); ok(r.code === 'FORBIDDEN', '4c-3: manager KHONG duyet duoc mau chuan');
+r = ctx.approveMessageTemplate_(lanId, 'approve', '', C('tok_admin', '', '')); ok(r.ok && r.status === 'approved', 'admin duyet');
+row = ctx._tplRowToObj_(data.find(x => x[0] === lanId)); ok(row.status === 'approved' && row.approvedBy === 'Admin' && row.rejectReason === '', 'ghi nguoi duyet');
 ok(read(C('tok_cs2', '', '')).some(t => t.id === lanId), 'sau khi duyet moi nguoi deu thay va dung duoc');
 // 8) tu choi kem ly do; nhan vien thay ly do, sua lai -> pending, xoa ly do
 let pid = save(T({ title: 'Mau xau' }), C('tok_cs2', '', '')).id;
@@ -72,7 +73,7 @@ row = ctx._tplRowToObj_(data.find(x => x[0] === pid)); ok(row.status === 'pendin
 ok(ctx.approveMessageTemplate_(pid, 'xoa', '', C('tok_admin', '', '')).error && ctx.approveMessageTemplate_('', 'approve', '', C('tok_admin', '', '')).error && ctx.approveMessageTemplate_('khong-co', 'approve', '', C('tok_admin', '', '')).error, 'decision/id sai -> bao loi');
 // 9) admin sua mau da duyet: giu nguyen trang thai; sua mau pending cua nhan vien: van pending (phai bam duyet)
 r = save(T({ id: adminId, content: 'Admin sua' }), C('tok_admin', '', '')); ok(r.status === 'approved' && ctx._tplRowToObj_(data[1]).content === 'Admin sua', 'admin sua giu approved');
-let p2 = save(T({ title: 'Cho' }), C('tok_cs', '', '')).id; r = save(T({ id: p2, content: 'QL chinh' }), C('tok_mgr', '', '')); ok(r.status === 'pending', 'QL sua mau pending -> van pending cho duyet');
+let p2 = save(T({ title: 'Cho' }), C('tok_cs', '', '')).id; r = save(T({ id: p2, content: 'QL chinh' }), C('tok_admin', '', '')); ok(r.status === 'pending', 'QL sua mau pending -> van pending cho duyet');
 // 10) mau CU (khong co cot status) = da duyet, hien cho moi nguoi; khong mat khi admin sua
 data.push(['mt_cu', 'Mau cu', 'noi dung cu', 'cu', 'Ai do', new Date(), new Date()]);
 ok(read(C('tok_cs', '', '')).some(t => t.id === 'mt_cu' && t.status === 'approved'), 'mau cu coi la approved');

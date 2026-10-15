@@ -1033,40 +1033,11 @@
   // thu, de bat ca truong hop doanh thu bi lech do loi nhap lieu, VD mat 3 so 0:
   // 689 thay vi 689.000) va hoi xac nhan truoc khi xoa. Chi tac dong len khach dang
   // xem tren the (khong dung de dedupe toan bo he thong — viec do lam ben Sasum).
+  // Bao mat 4c-3: CHI admin Duyent duoc sua/xoa don (tren web CRM). Extension khong con nut xoa don; server cung da bo action xoa don khoi danh sach cho phep cua extension Zalo.
+  const ZAI_CAN_DELETE_ORDERS = false;
   async function zaiCheckDuplicates_(phone) {
-    if (!GAS_URL) { alert('Chưa cấu hình Google Sheets URL.'); return; }
-    try {
-      const sep = GAS_URL.includes('?') ? '&' : '?';
-      const r = await fetch(GAS_URL + sep + 'action=findDuplicateOrders&phone=' + encodeURIComponent(phone), {redirect:'follow'});
-      const d = await r.json();
-      if (!d.ok) { alert('Lỗi kiểm tra: ' + (d.error || 'không rõ')); return; }
-      const groups = d.groups || [];
-      if (!groups.length) { alert('Không phát hiện đơn trùng cho khách này.'); return; }
-      const items = [];
-      let msg = 'Phát hiện đơn trùng của khách này:\n\n';
-      groups.forEach(g => {
-        const dateLabel = fmtDate_(g.date) || (g.month + '/' + g.year);
-        if (g.exact) {
-          msg += '• ' + dateLabel + ' — ' + Number(g.rows[0].revenue||0).toLocaleString('vi-VN') + 'đ — dư ' + g.extras.length + ' đơn giống hệt (sẽ xóa dòng dư, giữ 1 dòng)\n';
-        } else if (g.zeroLossPattern) {
-          msg += '• ' + dateLabel + ' — CÁC DÒNG DOANH THU: ' + g.rows.map(row => Number(row.revenue||0).toLocaleString('vi-VN')+'đ').join(' / ') + '\n  ⚠ ' + g.note + '\n';
-        } else {
-          msg += '• ' + dateLabel + ' — CÁC DÒNG DOANH THU KHÁC NHAU: ' + g.rows.map(row => Number(row.revenue||0).toLocaleString('vi-VN')+'đ').join(' / ') + '\n  ⚠ ' + g.note + '\n  → Mở Sasum (nút 🗑️ Đơn trùng) để tự chọn đúng dòng SAI cần xóa, tránh xóa nhầm dòng đúng.\n';
-        }
-        g.extras.forEach(row => items.push({ sheet: row.sheet, rowIndex: row.rowIndex }));
-      });
-      if (!items.length) { alert(msg); return; }
-      msg += '\nXóa ' + items.length + ' đơn được đề xuất ở trên? Không thể hoàn tác — hãy đọc kỹ các dòng có cảnh báo ⚠ trước khi đồng ý.';
-      if (!confirm(msg)) return;
-      const r2 = await fetch(GAS_URL, { method:'POST', body: JSON.stringify({ action:'deleteDuplicateOrders', items }), headers:{'Content-Type':'text/plain'} });
-      const d2 = await r2.json();
-      if (!d2.ok) { alert('Lỗi xóa: ' + (d2.error || 'không rõ')); return; }
-      alert('✓ Đã xóa ' + d2.deleted + ' đơn trùng.');
-      delete _lookupCache[phone];
-      await _zaiForceRefresh_(phone);
-    } catch (e) {
-      alert('Lỗi kết nối: ' + e.message);
-    }
+    // 4c-3: da go code xoa don khoi extension (chi admin xoa/sua don tren web CRM).
+    alert('Chi admin xoa/sua don tren web CRM.');
   }
 
   // ── TRA CUU BANG GIA (Sheet DANH_MUC, file PRICE_SS_ID — dung chung voi Pancake AI) ──
@@ -1404,21 +1375,8 @@
   // Xoa 1 dong don le (dung cho nut × ben canh so tien) — xac nhan truoc, xoa thang tren
   // Sheet (chinh la Sasum) roi lam moi lai the tu server de dam bao da dong bo.
   async function _zaiDeleteOneOrder_(phone, sheet, rowIndex, label) {
-    if (!GAS_URL) { alert('Chưa cấu hình Google Sheets URL.'); return; }
-    if (!sheet || !rowIndex) return;
-    if (!confirm('Xóa đơn nghi trùng (thiếu 3 số 0) sau đây?\n\n' + label + '\n\nKhông thể hoàn tác.')) return;
-    try {
-      const r = await fetch(GAS_URL, { method:'POST', body: JSON.stringify({
-        action:'deleteDuplicateOrders', items:[{ sheet, rowIndex }]
-      }), headers:{'Content-Type':'text/plain'} });
-      const d = await r.json();
-      if (!d.ok) { alert('Lỗi xóa: ' + (d.error || 'không rõ')); return; }
-      delete _lookupCache[phone];
-      await _zaiForceRefresh_(phone); // luon ve lai the + dong bo lai voi Sasum
-      showMsg('zai-save-status', '🗑️ Đã xóa đơn trùng và đồng bộ Sasum.', 3000);
-    } catch (e) {
-      alert('Lỗi kết nối: ' + e.message);
-    }
+    // 4c-3: da go code xoa don khoi extension (chi admin xoa/sua don tren web CRM).
+    alert('Chi admin xoa/sua don tren web CRM.');
   }
 
   // Chi ve lai khung the thong tin (doc, an toan de goi lai khi poll ma khong lam mat du lieu CS dang go)
@@ -1453,7 +1411,7 @@
         ${care&&care.note ? `<div class="zai-card-note">📝 ${escHtml(_latestNoteText_(care.note))}</div>` : ''}
         ${_cskhHtml_(cskhRows)}
         <div class="zai-card-orders" id="zai-orders-box"></div>
-        ${orders.length > 1 ? `<button type="button" class="zai-btn zai-btn-ghost zai-btn-sm zai-dup-btn" style="margin-top:6px;color:#dc2626" title="Kiểm tra & xóa đơn hàng bị trùng (cùng tháng + doanh thu) của khách này">🗑️ Kiểm tra đơn trùng</button>` : ''}
+        ${(ZAI_CAN_DELETE_ORDERS && orders.length > 1) ? `<button type="button" class="zai-btn zai-btn-ghost zai-btn-sm zai-dup-btn" style="margin-top:6px;color:#dc2626" title="Kiểm tra & xóa đơn hàng bị trùng (cùng tháng + doanh thu) của khách này">🗑️ Kiểm tra đơn trùng</button>` : ''}
       </div>`;
 
     const dupBtn = area.querySelector('.zai-dup-btn');
@@ -1467,6 +1425,7 @@
       const toggleBtn = ordersBox.querySelector('.zai-orders-toggle');
       if (toggleBtn) toggleBtn.onclick = () => { expanded = !expanded; paintOrders(); };
       ordersBox.querySelectorAll('.zai-order-x').forEach(btn => {
+        if (!ZAI_CAN_DELETE_ORDERS) { btn.remove(); return; }
         btn.onclick = () => _zaiDeleteOneOrder_(phone, btn.dataset.sheet, Number(btn.dataset.row), btn.dataset.label);
       });
     }
