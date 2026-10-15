@@ -87,3 +87,4 @@ Code client của `index.html` (trước đây inline, ~1.4MB) đã tách ra `cs
 
 ## js/51-demo-guard.js — tài khoản test (2026-10-15)
 Nạp sau `js/50`. Khi có `ome_demo_token`: hiển thị `…0000` → `••••` (SĐT đã bị máy chủ che) và mã hóa mọi file tải về (`a.download`, `XLSX.writeFile`) thành `.enc`. Giải mã: `tools/decrypt-demo-file.js`. Chi tiết: `docs/TAI-KHOAN-TEST.md`.
+- `40-fn-rolesettings.js` (L3, 14/10/2026): trang "Vai trò & quyền hạn" 3 tab (Quyền vai trò · Quyền từng người · Phòng ban & nhóm) — thẻ vai trò, ma trận Bật/Tắt có mô tả, cột Admin khóa, hàng cố định, Thay đổi gần đây (AuditLog `config:roleConfig`). Hàm mới: `_rsToggle`, `_rsMatrix2`, `_rsRoleCardsHtml`, `_rsPersonHtml`, `_rsDeptTabHtml`, `_rsDiffSummary`, `_rsLoadRecent`. CSS: `css/11-roles.css` (`rl-*`). Test: `node tools/test-roles-page.js`

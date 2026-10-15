@@ -27,7 +27,7 @@ let fail=0;const ok=(c,m)=>{if(!c){console.log('FAIL:',m);fail++;}else console.l
 ok(C("_roleBaseOf('ceo')")==='viewer'&&C("_roleBaseOf('tp')")==='manager'&&C("_roleBaseOf('leader')")==='leader'&&C("_roleBaseOf('admin')")==='admin'&&C("_roleBaseOf('demo')")==='demo','base cua vai tro built-in (demo giu "demo" nhu code cu)');
 ok(C("_roleBaseOf('lam_la')")==='cs','vai tro la -> cs');
 C("_roleCfg={v:1,roles:[{key:'ketoan',label:'Kế toán',base:'viewer',perms:null}],deptPerms:{}}");
-ok(C("_roleBaseOf('ketoan')")==='viewer'&&C("_roleLabel('ketoan')")==='Kế toán'&&C("_roleLabel('ceo')")==='CEO / Giám đốc'&&C("_roleLabel('cs')")==='Nhân viên','base + nhan vai tro tuy chinh/built-in');
+ok(C("_roleBaseOf('ketoan')")==='viewer'&&C("_roleLabel('ketoan')")==='Kế toán'&&C("_roleLabel('ceo')")==='CEO / Giám đốc'&&C("_roleLabel('cs')")==='Nhân viên kinh doanh'&&C("_roleLabel('leader')")==='Trưởng nhóm','base + nhan vai tro tuy chinh/built-in');
 ok(C("_roleKeysForSelect()").join()==='admin,ceo,tp,manager,leader,cs,ketoan,demo','danh sach vai tro cho o chon tai khoan');
 
 // ---- catalog ----
