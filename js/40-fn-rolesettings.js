@@ -174,11 +174,16 @@ function closeRoleSettings(force){
   var ov = document.getElementById('rs-page'); if (ov) ov.classList.remove('open');
   document.body.classList.remove('rs-open');
 }
-function _rsSetSec(s){ _rs.sec = s; _rsRender(); }
+function _rsSetSec(s){ var ch = _rs.sec !== s; _rs.sec = s; _rsRender(ch); }
 function _rsDirty(){ _rs.dirty = true; var b = document.getElementById('rs-save'); if (b) { b.disabled = false; b.textContent = '💾 Lưu phân quyền'; } var h = document.getElementById('rs-dirty'); if (h) h.style.display = ''; }
 
-function _rsRender(){
+function _rsRender(resetScroll){
   var ov = document.getElementById('rs-page'); if (!ov) return;
+  // Giữ vị trí cuộn: innerHTML thay toàn bộ làm .rs-main/.rs-scroll bị tạo lại → scrollTop về 0 (màn hình nhảy lên đầu sau mỗi lần bấm ô)
+  var _sv = [];
+  try {
+    ov.querySelectorAll('.rs-main,.rs-scroll,.rs-nav').forEach(function(el, i){ _sv.push([el.className, i, el.scrollTop, el.scrollLeft]); });
+  } catch (e) {}
   var body = _rs.sec === 'roles' ? _rsRolesHtml() : (_rs.sec === 'byrole' ? _rsMatrixHtml('role') : (_rs.sec === 'bydept' ? _rsMatrixHtml('dept') : _rsPreviewHtml()));
   ov.innerHTML = '<div class="rs-head"><button class="btn secondary sm" onclick="closeRoleSettings()">← Quay lại</button><div class="rs-title">🛡 Phân quyền hệ thống</div><span class="rs-sp"></span>' +
     '<span id="rs-dirty" class="rs-dirty" style="' + (_rs.dirty ? '' : 'display:none') + '">● Chưa lưu</span>' +
@@ -186,6 +191,13 @@ function _rsRender(){
     '<div class="rs-body"><div class="rs-nav">' + _RS_SECS.map(function(s){ return '<button class="rs-navbtn' + (_rs.sec === s[0] ? ' on' : '') + '" onclick="_rsSetSec(\'' + s[0] + '\')">' + s[1] + '</button>'; }).join('') +
     '<div class="rs-note">Mặc định chưa giới hạn gì: ai cũng thấy như trước. Chỉ khi bạn bật <b>Giới hạn hạng mục</b> cho một vai trò/bộ phận thì mới thu hẹp lại. Admin luôn thấy tất cả.<br><br>Quyền cuối cùng = quyền của <b>vai trò</b> VÀ quyền của <b>bộ phận</b> (người thuộc nhiều bộ phận được hợp các bộ phận). Giới hạn menu riêng của từng tài khoản (trong 🔑 Tài khoản) vẫn được ưu tiên cho các tab.</div></div>' +
     '<div class="rs-main">' + body + '</div></div>';
+  if (!resetScroll) try {
+    var _els = ov.querySelectorAll('.rs-main,.rs-scroll,.rs-nav');
+    _sv.forEach(function(s){
+      var el = _els[s[1]];
+      if (el && el.className === s[0]) { el.scrollTop = s[2]; el.scrollLeft = s[3]; }
+    });
+  } catch (e) {}
 }
 
 // ── Mục 1: Vai trò ──
