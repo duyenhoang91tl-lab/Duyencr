@@ -5,6 +5,11 @@
 // ── Chế độ tối: lưu localStorage 'ome_theme' ('dark' | 'light'); biến màu ở css/07-dark.css ──
 function _themeIsDark(){ try { return localStorage.getItem('ome_theme') === 'dark'; } catch(e){ return false; } }
 function applyTheme(){ document.documentElement.setAttribute('data-theme', _themeIsDark() ? 'dark' : 'light'); }
+// ── Lời hướng dẫn trong màn hình: MẶC ĐỊNH ẨN; bật lại ở ❓ Hướng dẫn sử dụng. Lưu localStorage 'ome_show_guides' ('1' = hiện). CSS: css/01-base.css ──
+function _guidesOn(){ try { return localStorage.getItem('ome_show_guides') === '1'; } catch(e){ return false; } }
+function applyGuides(){ if (document.body) document.body.classList.toggle('show-guides', _guidesOn()); }
+function setGuides(on){ try { localStorage.setItem('ome_show_guides', on ? '1' : '0'); } catch(e){} applyGuides(); }
+applyGuides();
 function toggleTheme(){ try { localStorage.setItem('ome_theme', _themeIsDark() ? 'light' : 'dark'); } catch(e){} applyTheme(); }
 applyTheme();
 
@@ -62,7 +67,9 @@ var _HELP_ITEMS = [
   ['🌙 Chế độ tối · 🐞 Nhật ký lỗi', 'Menu ☰ → Settings. Chế độ tối nhớ theo từng máy. Nhật ký lỗi (admin) giúp gửi lại lỗi cho người hỗ trợ.']
 ];
 function openHelpModal(){
-  _uxModal('help-modal', '❓ Hướng dẫn sử dụng', _HELP_ITEMS.map(function(x, i){
+  var guideToggle = '<label style="display:flex;gap:8px;align-items:center;padding:8px 10px;margin-bottom:8px;background:var(--surface2);border-radius:8px;font-size:12.5px;cursor:pointer">'+
+    '<input type="checkbox" '+(_guidesOn() ? 'checked ' : '')+'onchange="setGuides(this.checked)"> Hiện lời hướng dẫn / nhắc nhở trong các màn hình <span style="color:var(--muted);font-size:11px">(mặc định ẩn)</span></label>';
+  _uxModal('help-modal', '❓ Hướng dẫn sử dụng', guideToggle + _HELP_ITEMS.map(function(x, i){
     return '<details' + (i === 0 ? ' open' : '') + ' style="border-top:1px solid var(--border);padding:8px 0"><summary style="cursor:pointer;font-weight:600">' + x[0] + '</summary><div style="margin-top:6px;font-size:13px;line-height:1.6;color:var(--text)">' + esc(x[1]) + '</div></details>';
   }).join(''));
 }

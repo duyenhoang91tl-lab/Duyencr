@@ -190,7 +190,7 @@ function _pkRenderKpiPancake(){
   // ── Xuất nhật ký báo cáo hàng ngày (Sale/Kênh/MKT/Tag) ra Google Sheet riêng ──
   html += '<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:16px;background:var(--surface2)">'+
     '<div style="font-weight:700;font-size:13px;margin-bottom:2px">📅 Xuất nhật ký báo cáo hàng ngày</div>'+
-    '<div style="font-size:11.5px;color:var(--muted);margin-bottom:8px">Xuất báo cáo Sale bán + Kênh bán (theo Base/DT TỔNG) và MKT + Tag (tổng hợp từ Pancake) ra 4 sheet cố định trong 1 Google Sheet riêng — mỗi loại 1 sheet, mỗi ngày 1 dòng. Xuất lại trùng ngày sẽ tự thay thế dòng cũ của đúng ngày đó (tối đa 31 ngày/lần).</div>'+
+    '<div class="guide-text" style="font-size:11.5px;color:var(--muted);margin-bottom:8px">Xuất báo cáo Sale bán + Kênh bán (theo Base/DT TỔNG) và MKT + Tag (tổng hợp từ Pancake) ra 4 sheet cố định trong 1 Google Sheet riêng — mỗi loại 1 sheet, mỗi ngày 1 dòng. Xuất lại trùng ngày sẽ tự thay thế dòng cũ của đúng ngày đó (tối đa 31 ngày/lần).</div>'+
     '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
       '<span style="font-size:11px;color:var(--muted)">Từ:</span>'+
       '<input type="date" value="'+esc(_expLogState.from)+'" onchange="_expLogState.from=this.value" style="'+st+'">'+
@@ -244,7 +244,7 @@ function _pkRenderKpiPancake(){
   // ── Phễu tag L1-L8 toàn hệ thống ──
   if (rep.tagFunnelTotal){
     html += '<div class="dash-section-title">Phễu chuyển đổi L1 → L8 (toàn hệ thống)</div>';
-    html += '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">L1=Tổng tương tác · L2=Tổng SĐT thu thập (mẫu số riêng) · L3→L6=so với bước liền trước · L7=Tổng tương tác · L8=chỉ đếm số lượng (chưa có mẫu số tỷ lệ chuẩn). Di chuột vào tên tag để xem đầy đủ tiêu chí/điều kiện đạt chuẩn.</div>';
+    html += '<div class="guide-text" style="font-size:11px;color:var(--muted);margin-bottom:6px">L1=Tổng tương tác · L2=Tổng SĐT thu thập (mẫu số riêng) · L3→L6=so với bước liền trước · L7=Tổng tương tác · L8=chỉ đếm số lượng (chưa có mẫu số tỷ lệ chuẩn). Di chuột vào tên tag để xem đầy đủ tiêu chí/điều kiện đạt chuẩn.</div>';
     html += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Chỉ số</th>'+
       _PK_KPI_TAG_ORDER.map(function(k){ return '<th style="text-align:right;white-space:nowrap" title="'+esc(_PK_STATUS_LABEL[k]+' — '+(_PK_STATUS_DESC[k]||''))+'">'+esc(_PK_STATUS_LABEL[k]||_PK_KPI_TAG_SHORT[k])+'</th>'; }).join('')+
       '</tr></thead><tbody>'+
@@ -286,7 +286,7 @@ function _pkRenderKpiPancake(){
   // ── Theo MKT ──
   if (rep.byMkt){
     html += '<div class="dash-section-title" style="margin-top:18px">Theo MKT</div>';
-    html += '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Nhóm MKT chọn ở tab Team → "Nhóm MKT". Page chạy chung nhiều MKT được chia theo tỷ lệ đã nhập; đơn/doanh thu của 1 Kênh bán chỉ tính 1 lần.</div>';
+    html += '<div class="guide-text" style="font-size:11px;color:var(--muted);margin-bottom:6px">Nhóm MKT chọn ở tab Team → "Nhóm MKT". Page chạy chung nhiều MKT được chia theo tỷ lệ đã nhập; đơn/doanh thu của 1 Kênh bán chỉ tính 1 lần.</div>';
     html += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>MKT</th><th>Page</th>'+
       '<th style="text-align:right">Tương tác</th><th style="text-align:right">SĐT thu thập</th>'+
       '<th style="text-align:right">Đơn</th><th style="text-align:right">Doanh thu</th><th style="text-align:right">TB/đơn</th><th style="text-align:right">Tỷ lệ chốt</th>'+
@@ -498,7 +498,7 @@ async function _mktSaveCfg(){
 
 function _mktGroupMatrixHtml_(title, rep, groups, note, nameFn, hintFn){
   var h = '<div class="dash-section-title" style="margin-top:22px">'+title+'</div>'+
-    '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">'+esc(note)+'</div>';
+    '<div class="guide-text" style="font-size:11px;color:var(--muted);margin-bottom:6px">'+esc(note)+'</div>';
   if (!groups.length) return h + '<div style="color:var(--muted);font-size:12px;padding:10px">Chưa có dữ liệu nhóm.</div>';
   var cols = [{ name:'Tổng', hint:'', ref: rep }].concat(groups.map(function(g){ return { name: nameFn(g), hint: hintFn(g), ref: g }; }));
   h += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Chỉ số</th>'+

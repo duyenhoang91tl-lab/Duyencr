@@ -1007,3 +1007,12 @@ body.demo-mode .dp-tab[data-tab="chat"]{display:none !important;}
 .pkt-chip{cursor:pointer;background:transparent;color:#6b7280;border:1px solid #6b7280;padding:0 8px;}
 .pkt-chip:hover{opacity:.8;} .pkt-chip.pkt-on{color:#fff;}
 
+
+/* ── LỜI HƯỚNG DẪN / NHẮC NHỞ CÁCH DÙNG: MẶC ĐỊNH ẨN (Duyên yêu cầu 2026-10-12) ──
+   Thêm class "guide-text" vào bất kỳ câu hướng dẫn nào để nó tự ẩn. Bật lại: ❓ Hướng dẫn sử dụng → ô "Hiện lời hướng dẫn trong các màn hình"
+   (body.show-guides, lưu localStorage ome_show_guides). KHÔNG gắn cho: câu trạng thái trống ("Chưa có…"), cảnh báo ⚠️ (xem _warnBox), dữ liệu. */
+body:not(.show-guides) .guide-text,
+body:not(.show-guides) .task-form-hint,
+body:not(.show-guides) .tf-hint,
+body:not(.show-guides) .srb-m-hint,
+body:not(.show-guides) .pro-ai-hint{display:none !important;}

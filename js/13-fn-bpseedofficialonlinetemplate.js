@@ -440,7 +440,7 @@ function _srRenderH_(d){
   });
   html += totalRow('TỔNG CỘNG', _hSum_(d.rows, groups), true);
   html += '</tbody></table></div>';
-  html += '<div style="margin-top:8px;font-size:11px;color:var(--muted);line-height:1.5">'+
+  html += '<div class="guide-text" style="margin-top:8px;font-size:11px;color:var(--muted);line-height:1.5">'+
     'ℹ️ Tình trạng CS / Zalo tính theo <b>trạng thái HIỆN TẠI</b> của từng SĐT trong data đã chia (không phải trạng thái tại ngày chia). '+
     'Kết nối = Chốt + Phân vân + Đang liên hệ + Từ chối + Khiếu nại. Đã tương tác/đã liên hệ = SĐT đã có Tình trạng CS. Zalo phản hồi = Đã kết bạn; đã xin kết bạn/nhắn tin = Đã kết bạn + Chưa đồng ý + Không nhận tn lạ + Chặn + Hủy kết bạn. '+'Số đơn chốt / Doanh thu = tổng hợp tự động từ báo cáo CS nhập ở form chăm sóc khi chọn Chốt (chỉ tính SĐT thuộc data đã chia cho chính CS đó, đơn tạo từ ngày chia trở đi).'+'</div>';
   return html;
@@ -694,7 +694,7 @@ function openHKhMapModal_(){
   m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;align-items:center;justify-content:center';
   m.innerHTML = '<div style="background:var(--surface);border-radius:10px;padding:18px;max-width:520px;width:92%;max-height:86vh;overflow:auto">'+
     '<div style="font-weight:700;margin-bottom:6px">⚙ Trạng thái KH tự nhảy theo Tình trạng CS</div>'+
-    '<div style="font-size:12px;color:var(--muted);margin-bottom:12px">Chọn Trạng thái KH sẽ tự điền khi CS chọn Tình trạng CS thuộc nhóm đó. Để "— Chọn —" = tự khớp theo tên (VD: Chốt → Chốt). CS vẫn tự đổi tay được.</div>'+
+    '<div class="guide-text" style="font-size:12px;color:var(--muted);margin-bottom:12px">Chọn Trạng thái KH sẽ tự điền khi CS chọn Tình trạng CS thuộc nhóm đó. Để "— Chọn —" = tự khớp theo tên (VD: Chốt → Chốt). CS vẫn tự đổi tay được.</div>'+
     groups.map(function(g, i){
       return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><div style="flex:1;font-size:13px">'+esc(g.label)+'</div>'+
         '<select data-glabel="'+esc(g.label)+'" class="form-select" style="flex:1">'+_buildCustStatusOptions(_hKhMapOverride[g.label]||'')+'</select></div>';
@@ -834,7 +834,7 @@ function _srRenderC(d){
     }
   }
 
-  html += '<div style="font-size:11px;color:var(--hint);margin-top:8px">Chỉ tiêu KPI lấy từ tab "'+esc('KPI_ChiTieu')+'" trong Google Sheet CRM — tự vào Sheet điền/sửa số. Bấm vào 1 dòng để xem chi tiết đơn của kỳ này/kỳ trước.</div>';
+  html += '<div class="guide-text" style="font-size:11px;color:var(--hint);margin-top:8px">Chỉ tiêu KPI lấy từ tab "'+esc('KPI_ChiTieu')+'" trong Google Sheet CRM — tự vào Sheet điền/sửa số. Bấm vào 1 dòng để xem chi tiết đơn của kỳ này/kỳ trước.</div>';
   return html;
 }
 
@@ -1437,7 +1437,7 @@ function renderAssignTeam(){
     return;
   }
   var html = '<div style="margin-bottom:10px;font-size:13px">Tổng data sẽ chia: <b>'+fmt(pool.length)+' KH</b> '+
-    '<span style="color:var(--muted)">(nhập % cho từng team; data của team sẽ chia đều cho các thành viên đã set up trong team)</span></div>';
+    '<span class="guide-text" style="color:var(--muted)">(nhập % cho từng team; data của team sẽ chia đều cho các thành viên đã set up trong team)</span></div>';
   html += '<table class="dash-table"><thead><tr><th>Team</th><th>Thành viên</th><th style="width:120px">% nhận</th><th style="width:90px;text-align:right">≈ KH</th></tr></thead><tbody>';
   teams.forEach(function(t){
     var members = _teamMembersList(t);

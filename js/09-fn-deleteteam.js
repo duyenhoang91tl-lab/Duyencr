@@ -305,7 +305,7 @@ function _pkRenderAll(){
 
   html += '<details'+(_pkState.nameMapSectionOpen?' open':'')+' ontoggle="_pkState.nameMapSectionOpen=this.open" style="margin-top:22px">'+
     '<summary class="dash-section-title" style="cursor:pointer;display:inline-block">🔗 Khớp tên Nhân viên Pancake ↔ Sale CRM</summary>'+
-    '<div style="font-size:12px;color:var(--muted);margin:8px 0">Tên "Nhân viên" trên Pancake là tên Facebook cá nhân, thường không khớp tên đăng nhập (Sale) trong CRM — khớp 1 lần, dùng lại cho mọi lần nạp báo cáo sau.</div>'+
+    '<div class="guide-text" style="font-size:12px;color:var(--muted);margin:8px 0">Tên "Nhân viên" trên Pancake là tên Facebook cá nhân, thường không khớp tên đăng nhập (Sale) trong CRM — khớp 1 lần, dùng lại cho mọi lần nạp báo cáo sau.</div>'+
     _pkRenderMapTableHtml(isAdmin)+
   '</details>';
 

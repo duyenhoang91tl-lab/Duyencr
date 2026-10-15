@@ -160,7 +160,7 @@ function _ovRender(){
   if (s.mode === 'self') {
     var me = s.people[0];
     if (!me) { body.innerHTML = '<div style="color:var(--muted)">Chưa có số liệu cho tài khoản này trong kỳ (tên sale của tài khoản chưa khớp với báo cáo). Bấm ☰ Menu để vào các màn hình làm việc.</div>'; return; }
-    body.innerHTML = '<div style="margin-bottom:8px;color:var(--muted)">Đây là hồ sơ kết quả làm việc của bạn. Bấm <b>☰ Menu</b> ở góc trên để vào danh sách khách và các màn hình khác.</div><div id="ov-self"></div>';
+    body.innerHTML = '<div class="guide-text" style="margin-bottom:8px;color:var(--muted)">Đây là hồ sơ kết quả làm việc của bạn. Bấm <b>☰ Menu</b> ở góc trên để vào danh sách khách và các màn hình khác.</div><div id="ov-self"></div>';
     document.getElementById('ov-self').innerHTML = _ovProfileHtml(me, d); return;
   }
   h += '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px">' + [
@@ -178,7 +178,7 @@ function _ovRender(){
   }
   var tms = s.teams.filter(function(t){ return _ov.dept === '' || (_ov.dept === '_none' ? !t.deptKey : t.deptKey === _ov.dept); });
   if (s.teams.length) {
-    h += '<div style="font-weight:700;margin:4px 0 6px">👥 Theo team <span style="font-weight:400;color:var(--muted);font-size:11.5px">(bấm 1 dòng để lọc danh sách nhân viên bên dưới; người thuộc 2 team được tính ở cả 2)</span></div><div style="overflow-x:auto;margin-bottom:14px"><table class="ov-tbl"><tbody><tr>' +
+    h += '<div style="font-weight:700;margin:4px 0 6px">👥 Theo team <span class="guide-text" style="font-weight:400;color:var(--muted);font-size:11.5px">(bấm 1 dòng để lọc danh sách nhân viên bên dưới; người thuộc 2 team được tính ở cả 2)</span></div><div style="overflow-x:auto;margin-bottom:14px"><table class="ov-tbl"><tbody><tr>' +
       ['Team', 'Leader', 'Phòng', 'Nhân sự', 'Doanh thu', '% KPI', 'Số đơn', 'Đơn/ngày', 'Giá trị đơn TB', 'Tỷ lệ chốt', 'Thất bại', 'Đánh giá'].map(function(x){ return '<th>' + x + '</th>'; }).join('') + '</tr>' +
       (tms.length ? tms.map(function(t){
         return '<tr class="ov-row' + (_ov.team === t.name ? ' on' : '') + '" data-n="' + esc(t.name) + '" onclick="_ovSetTeam(this.dataset.n)"><td style="white-space:nowrap"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:' + esc(t.color || 'var(--muted)') + ';margin-right:6px"></span><b>' + esc(t.name) + '</b></td>' +

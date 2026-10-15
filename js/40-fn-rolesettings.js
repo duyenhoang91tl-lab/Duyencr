@@ -189,7 +189,7 @@ function _rsRender(resetScroll){
     '<span id="rs-dirty" class="rs-dirty" style="' + (_rs.dirty ? '' : 'display:none') + '">● Chưa lưu</span>' +
     '<button id="rs-save" class="btn primary" onclick="_rsSave()"' + (_rs.dirty ? '' : ' disabled') + '>💾 Lưu phân quyền</button></div>' +
     '<div class="rs-body"><div class="rs-nav">' + _RS_SECS.map(function(s){ return '<button class="rs-navbtn' + (_rs.sec === s[0] ? ' on' : '') + '" onclick="_rsSetSec(\'' + s[0] + '\')">' + s[1] + '</button>'; }).join('') +
-    '<div class="rs-note">Mặc định chưa giới hạn gì: ai cũng thấy như trước. Chỉ khi bạn bật <b>Giới hạn hạng mục</b> cho một vai trò/bộ phận thì mới thu hẹp lại. Admin luôn thấy tất cả.<br><br>Quyền cuối cùng = quyền của <b>vai trò</b> VÀ quyền của <b>bộ phận</b> (người thuộc nhiều bộ phận được hợp các bộ phận). Giới hạn menu riêng của từng tài khoản (trong 🔑 Tài khoản) vẫn được ưu tiên cho các tab.</div></div>' +
+    '<div class="rs-note guide-text">Mặc định chưa giới hạn gì: ai cũng thấy như trước. Chỉ khi bạn bật <b>Giới hạn hạng mục</b> cho một vai trò/bộ phận thì mới thu hẹp lại. Admin luôn thấy tất cả.<br><br>Quyền cuối cùng = quyền của <b>vai trò</b> VÀ quyền của <b>bộ phận</b> (người thuộc nhiều bộ phận được hợp các bộ phận). Giới hạn menu riêng của từng tài khoản (trong 🔑 Tài khoản) vẫn được ưu tiên cho các tab.</div></div>' +
     '<div class="rs-main">' + body + '</div></div>';
   if (!resetScroll) try {
     var _els = ov.querySelectorAll('.rs-main,.rs-scroll,.rs-nav');
@@ -212,7 +212,7 @@ function _rsRolesHtml(){
       '<td class="rs-c">' + n + '</td>' +
       '<td>' + (r.builtin ? '' : '<button class="btn secondary sm" onclick="_rsRoleDel(\'' + r.key + '\')">Xóa</button>') + '</td></tr>';
   }).join('');
-  return '<h3>Danh sách vai trò</h3><div class="rs-help">“Phạm vi dữ liệu” quyết định người đó thấy dữ liệu của ai (khách, đơn, báo cáo…). Hạng mục được xem cài ở mục bên cạnh. Gán vai trò cho từng người trong <b>🔑 Tài khoản</b>.</div>' +
+  return '<h3>Danh sách vai trò</h3><div class="rs-help guide-text">“Phạm vi dữ liệu” quyết định người đó thấy dữ liệu của ai (khách, đơn, báo cáo…). Hạng mục được xem cài ở mục bên cạnh. Gán vai trò cho từng người trong <b>🔑 Tài khoản</b>.</div>' +
     '<table class="rs-tbl"><thead><tr><th>Tên vai trò</th><th>Phạm vi dữ liệu</th><th>Mô tả</th><th class="rs-c">Số tài khoản</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>' +
     '<h3>Thêm vai trò mới</h3><div class="rs-add"><input id="rs-new-label" class="rs-in" placeholder="Tên vai trò (VD: Kế toán, Marketing lead…)">' +
     '<select id="rs-new-base">' + ['viewer','manager','leader','cs'].map(function(b){ return '<option value="' + b + '">' + esc(_ROLE_BASE_LABEL[b]) + '</option>'; }).join('') + '</select>' +
@@ -297,7 +297,7 @@ function _rsPreviewHtml(){
   var accs = (typeof accounts !== 'undefined' ? accounts : []).filter(function(a){ return a.role !== 'demo'; });
   var sel = '<select id="rs-pv-user" onchange="_rs.prevUser=this.value;_rsRender()"><option value="">— chọn tài khoản —</option>' + accs.map(function(a){
     return '<option value="' + esc(a.username) + '"' + (_rs.prevUser === a.username ? ' selected' : '') + '>' + esc(a.username) + ' — ' + esc(_rsLabelOf(a.role)) + '</option>'; }).join('') + '</select>';
-  var out = '<h3>Xem thử: tài khoản này thấy gì?</h3><div class="rs-help">Tính theo cấu hình ĐANG HIỂN THỊ ở đây (kể cả phần chưa lưu).</div>' + sel;
+  var out = '<h3>Xem thử: tài khoản này thấy gì?</h3><div class="rs-help guide-text">Tính theo cấu hình ĐANG HIỂN THỊ ở đây (kể cả phần chưa lưu).</div>' + sel;
   var a = accs.filter(function(x){ return x.username === _rs.prevUser; })[0];
   if (!a) return out;
   var base = _roleBaseOfCfg(a.role, _rs.cfg), dk = _deptKeysFor(a, _rs.cfg, _rs.saleDepts);
