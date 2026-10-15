@@ -22,9 +22,10 @@ Ngoại lệ DUY NHẤT: tính năng gắn chặt với 1 nền tảng (vd gửi
 
 **Zalo có, Pancake thiếu (gap):** đối chiếu phiên bản backend (`count`).
 **KHÔNG làm bù (quyết định bảo mật):** dò/xoá đơn trùng (`findDuplicateOrders`/`deleteDuplicateOrders`) — Bảo mật 4c-3 (2026-10-14) đã GỠ khỏi Zalo AI (chỉ admin xoá đơn trên web CRM), nên Pancake AI cũng KHÔNG được có. Nguyên tắc chung: tính năng đã bị gỡ vì bảo mật thì gỡ ở cả 2 bên, không "bù" ngược.
-**Pancake có, Zalo thiếu (gap):** nạp CTKM cho Soạn đơn (`ctkmCatalog`), kiến thức sản phẩm (`getKnowledge`), cây/phẳng bảng giá cho Soạn đơn (`priceCatalogTree`/`Flat`), ảnh sản phẩm (`productImageFlat`/`driveImageFromLink`), tra đơn theo SĐT (`donOrdersByPhone`), lưu/xoá mẫu tin nhắn (`saveMessageTemplate`/`deleteMessageTemplate`), giao/nhận việc + thống kê CS (`assign`/`toggleAssignDone`/`csStats`), đăng nhập xác minh (`verifyLogin`).
+**Pancake có, Zalo thiếu (gap):** nạp CTKM cho Soạn đơn (`ctkmCatalog`), kiến thức sản phẩm (`getKnowledge`), cây/phẳng bảng giá cho Soạn đơn (`priceCatalogTree`/`Flat`), ảnh sản phẩm (`productImageFlat`/`driveImageFromLink`), tra đơn theo SĐT (`donOrdersByPhone`), lưu/xoá mẫu tin nhắn (`saveMessageTemplate`/`deleteMessageTemplate`), giao/nhận việc (`assign`/`toggleAssignDone`), đăng nhập xác minh (`verifyLogin`).
 **Đặc thù nền tảng (hợp lệ):** Zalo — gửi hàng loạt (`broadcastQueue`/`broadcastMark`), trạng thái kết bạn (`syncZaloFriendStatus`); Pancake — câu trả lời nhanh (`saveCannedResponse`/`deleteCannedResponse`).
 > Các mục `gap` do máy phát hiện từ tên action, CHƯA xác minh từng cái có thật sự cần ở bên kia hay không. Làm bù theo thứ tự Duyên chọn; xong mục nào thì xoá mục đó khỏi allow-list (script sẽ nhắc).
 
 ## Đã làm bù (nhật ký)
 - 2026-10-14: **🎁 Tra cứu khuyến mãi (`ctkmSearch`)** — Zalo AI có mục menu giống Pancake AI; `node tools/test-ctkm-ui.js` chạy CÙNG dữ liệu qua hàm render của cả 2 bên và so khớp HTML.
+- 2026-10-14: **📊 Doanh số & hoa hồng của tôi (`csStats`)** — Zalo AI có mục menu giống Pancake AI (bộ lọc ngày nhanh, thẻ tổng, bảng hoa hồng, thưởng); mã Zalo được dẫn xuất cơ học từ mã Pancake. `node tools/test-stats-ui.js` so khớp HTML + bộ lọc ngày + kịch bản thao tác (đổi kỳ, thiếu CS, lỗi, phản hồi cũ đến trễ).

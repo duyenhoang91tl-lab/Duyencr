@@ -232,7 +232,8 @@
       { v: 'bc', label: '📢 Gửi hàng loạt' },
       { v: 'zs', label: '🔍 Quét trạng thái kết bạn Zalo' },
       { v: 'remind', label: '🔔 Lịch hẹn (0)' },
-      { v: 'ctkm', label: '🎁 Tra cứu khuyến mãi' }
+      { v: 'ctkm', label: '🎁 Tra cứu khuyến mãi' },
+      { v: 'stats', label: '📊 Doanh số & hoa hồng của tôi' }
     ].forEach(o => { const op = document.createElement('option'); op.value = o.v; op.textContent = o.label; menuSel.appendChild(op); });
     menuWrap.appendChild(menuSel);
     const menuContent = document.createElement('div');
@@ -280,12 +281,20 @@
       '<button class="zai-btn zai-btn-primary zai-btn-sm" id="zai-ctkm-btn" type="button">Tìm</button></div>' +
       '<div id="zai-ctkm-result"></div>';
     menuContent.appendChild(ctkmBody);
+
+    // 📊 Doanh số & hoa hồng của tôi — giống Pancake AI (nội dung dựng ở initStatsZai_ lần đầu mở)
+    const statsBody = document.createElement('div');
+    statsBody.id = 'zai-stats-body';
+    statsBody.style.display = 'none';
+    menuContent.appendChild(statsBody);
     ctkmBody.querySelector('#zai-ctkm-btn').addEventListener('click', doCtkmSearchZai_);
     ctkmBody.querySelector('#zai-ctkm-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') doCtkmSearchZai_(); });
 
     menuSel.addEventListener('change', () => {
       const v = menuSel.value;
       ctkmBody.style.display = v === 'ctkm' ? 'block' : 'none';
+      statsBody.style.display = v === 'stats' ? 'block' : 'none';
+      if (v === 'stats') initStatsZai_();
       if (v === 'ctkm' && !_zaiCtkmLoadedOnce) { _zaiCtkmLoadedOnce = true; doCtkmSearchZai_(); }   // mo muc la nap luon toan bo CTKM
       bcBody.style.display = v === 'bc' ? 'block' : 'none';
       zsBody.style.display = v === 'zs' ? 'block' : 'none';
@@ -1076,6 +1085,145 @@
     } catch (e) {
       box.innerHTML = '<div style="color:#1e3a8a;font-size:11.5px;font-style:italic;padding:4px 0">Lỗi kết nối: ' + escHtml(e.message) + '</div>';
     }
+  }
+
+  // ── DOANH SO & HOA HONG CUA TOI (GAS action=csStats, GET, chi doc) — y het muc "Doanh so & hoa hong cua toi" cua Pancake AI (quy tac song song) ──
+  // Bo loc nhanh giong CRM (hom nay, hom qua, tuan nay/truoc, thang, quy, nam hoac khoang ngay tu chon). So lieu do GAS tinh (cung quy tac Bao cao E o CRM):
+  // doanh thu, don >=15tr / <15tr, tong hoa hong, chuong trinh thuong. CS = nick CS dang chon o dau panel (_currentCS).
+  async function _zaiFetchCsStats_(cs, dateFrom, dateTo) {
+    if (!GAS_URL) return { ok: false, error: 'Chưa cài đặt URL GAS. Nhấn ⚙.' };
+    if (!cs) return { ok: false, error: 'Chưa chọn CS.' };
+    try {
+      const res = await fetch(GAS_URL + (GAS_URL.includes('?') ? '&' : '?') + 'action=csStats&cs=' + encodeURIComponent(cs) +
+        '&dateFrom=' + encodeURIComponent(dateFrom || '') + '&dateTo=' + encodeURIComponent(dateTo || ''), { redirect: 'follow' });
+      const data = await res.json();
+      if (data.error) return { ok: false, error: String(data.error) };
+      if (data.ok === false) return { ok: false, error: 'Không tính được số liệu.' };
+      return { ok: true, data };
+    } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+  }
+  const _ZAI_STATS_RANGES_ = [
+    { v: 'today', l: 'Hôm nay' }, { v: 'yesterday', l: 'Hôm qua' }, { v: 'thisWeek', l: 'Tuần này' }, { v: 'lastWeek', l: 'Tuần trước' },
+    { v: 'thisMonth', l: 'Tháng này' }, { v: 'lastMonth', l: 'Tháng trước' }, { v: 'thisQuarter', l: 'Quý này' }, { v: 'lastQuarter', l: 'Quý trước' },
+    { v: 'thisYear', l: 'Năm này' }, { v: 'lastYear', l: 'Năm trước' }, { v: 'custom', l: 'Tuỳ chỉnh…' } // đủ bộ lọc nhanh theo quy ước README mục 2
+  ];
+  let _zaiStatsState = { quick: 'thisMonth', from: '', to: '', loading: false, data: null, err: '', req: 0, built: false };
+  function _zaiStatsYmd_(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function _zaiStatsQuickRange_(key) {
+    const now = new Date(), y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+    const mk = (yy, mm, dd) => new Date(yy, mm, dd);
+    const mondayOf = (dt) => { const dow = dt.getDay(); return mk(dt.getFullYear(), dt.getMonth(), dt.getDate() - (dow === 0 ? 6 : dow - 1)); }; // tuần: thứ 2 → CN (giống CRM)
+    const r = (a, b) => ({ from: _zaiStatsYmd_(a), to: _zaiStatsYmd_(b) });
+    switch (key) {
+      case 'today': return r(now, now);
+      case 'yesterday': { const y1 = mk(y, m, d - 1); return r(y1, y1); }
+      case 'thisWeek': { const mo = mondayOf(now); return r(mo, mk(mo.getFullYear(), mo.getMonth(), mo.getDate() + 6)); }
+      case 'lastWeek': { const mo = mondayOf(now), ml = mk(mo.getFullYear(), mo.getMonth(), mo.getDate() - 7); return r(ml, mk(ml.getFullYear(), ml.getMonth(), ml.getDate() + 6)); }
+      case 'thisMonth': return r(mk(y, m, 1), mk(y, m + 1, 0));
+      case 'lastMonth': return r(mk(y, m - 1, 1), mk(y, m, 0));
+      case 'thisQuarter': { const q = Math.floor(m / 3); return r(mk(y, q * 3, 1), mk(y, q * 3 + 3, 0)); }
+      case 'lastQuarter': { let q = Math.floor(m / 3) - 1, yy = y; if (q < 0) { q = 3; yy = y - 1; } return r(mk(yy, q * 3, 1), mk(yy, q * 3 + 3, 0)); }
+      case 'thisYear': return r(mk(y, 0, 1), mk(y, 11, 31));
+      case 'lastYear': return r(mk(y - 1, 0, 1), mk(y - 1, 11, 31));
+      default: return null;
+    }
+  }
+  function _zaiStatsMoney_(n) { return Math.round(Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.') + 'đ'; }
+  function _zaiStatsDmy_(ymd) { const m = String(ymd || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? m[3] + '/' + m[2] + '/' + m[1] : String(ymd || ''); }
+
+  function initStatsZai_() {
+    const body = document.getElementById('zai-stats-body');
+    if (!body) return;
+    if (!_zaiStatsState.built) {
+      _zaiStatsState.built = true;
+      const r0 = _zaiStatsQuickRange_(_zaiStatsState.quick);
+      _zaiStatsState.from = r0.from; _zaiStatsState.to = r0.to;
+      body.innerHTML = `
+        <div class="zai-stats-toolbar">
+          <select id="zai-stats-quick">${_ZAI_STATS_RANGES_.map((o) => `<option value="${o.v}"${o.v === _zaiStatsState.quick ? ' selected' : ''}>${o.l}</option>`).join('')}</select>
+          <input type="date" id="zai-stats-from" value="${_zaiStatsState.from}" title="Từ ngày" />
+          <span>→</span>
+          <input type="date" id="zai-stats-to" value="${_zaiStatsState.to}" title="Đến ngày" />
+          <button type="button" id="zai-stats-go">Xem</button>
+        </div>
+        <div id="zai-stats-result"></div>`;
+      const q = body.querySelector('#zai-stats-quick'), f = body.querySelector('#zai-stats-from'), t = body.querySelector('#zai-stats-to');
+      q.addEventListener('change', () => {
+        _zaiStatsState.quick = q.value;
+        if (q.value !== 'custom') { const r = _zaiStatsQuickRange_(q.value); f.value = _zaiStatsState.from = r.from; t.value = _zaiStatsState.to = r.to; loadStatsZai_(); }
+      });
+      f.addEventListener('change', () => { _zaiStatsState.from = f.value; _zaiStatsState.quick = 'custom'; q.value = 'custom'; });
+      t.addEventListener('change', () => { _zaiStatsState.to = t.value; _zaiStatsState.quick = 'custom'; q.value = 'custom'; });
+      body.querySelector('#zai-stats-go').addEventListener('click', loadStatsZai_);
+    }
+    loadStatsZai_();
+  }
+
+  function loadStatsZai_() {
+    const cs = _currentCS || '';
+    const resEl = document.getElementById('zai-stats-result');
+    if (!resEl) return;
+    if (!cs) { _zaiStatsState.data = null; resEl.innerHTML = '<div class="zai-stats-note">Chọn "CS đang dùng" ở đầu panel để xem số liệu.</div>'; return; }
+    if (!_zaiStatsState.from || !_zaiStatsState.to) { resEl.innerHTML = '<div class="zai-stats-note">Chọn khoảng ngày rồi bấm Xem.</div>'; return; }
+    if (_zaiStatsState.from > _zaiStatsState.to) { resEl.innerHTML = '<div class="zai-stats-note zai-stats-err">Ngày bắt đầu phải trước ngày kết thúc.</div>'; return; }
+    const req = ++_zaiStatsState.req;
+    _zaiStatsState.loading = true;
+    resEl.innerHTML = '<div class="zai-stats-note">⏳ Đang tính số liệu... (khoảng ngày rộng có thể mất tới ~1 phút)</div>';
+    _zaiFetchCsStats_(cs, _zaiStatsState.from, _zaiStatsState.to).then((resp) => {
+      if (req !== _zaiStatsState.req) return; // đã bấm lần khác → bỏ kết quả cũ
+      _zaiStatsState.loading = false;
+      if (!resp?.ok) {
+        _zaiStatsState.data = null;
+        resEl.innerHTML = `<div class="zai-stats-note zai-stats-err">⚠️ ${escHtml(resp?.error || 'Không tải được số liệu. Thử bấm Xem lại.')}</div>`;
+        return;
+      }
+      _zaiStatsState.data = resp.data;
+      renderStatsZai_();
+    });
+  }
+
+  function renderStatsZai_() {
+    const resEl = document.getElementById('zai-stats-result');
+    const d = _zaiStatsState.data;
+    if (!resEl || !d) return;
+    const c = d.commission || {}, b = d.bonus || {};
+    const card = (label, val, sub) => `<div class="zai-stats-card"><div class="zai-stats-card-l">${label}</div><div class="zai-stats-card-v">${val}</div>${sub ? `<div class="zai-stats-card-s">${sub}</div>` : ''}</div>`;
+    let h = `<div class="zai-stats-range">👤 <b>${escHtml(d.cs)}</b> · ${_zaiStatsDmy_(d.from)} → ${_zaiStatsDmy_(d.to)}</div>`;
+    h += '<div class="zai-stats-cards">';
+    h += card('Tổng số đơn', String(d.totalOrders || 0));
+    h += card('Doanh thu', _zaiStatsMoney_(d.revenue));
+    h += card('Tỷ lệ chốt', d.closeRate ? d.closeRate.rate + '%' : '—', d.closeRate ? `${d.closeRate.closed} đơn / ${d.closeRate.held} khách` : 'chưa có dữ liệu tương tác');
+    h += card('Tổng hoa hồng', _zaiStatsMoney_(c.total), (b.total ? '+ thưởng ' + _zaiStatsMoney_(b.total) : ''));
+    h += '</div>';
+
+    // Hoa hồng
+    const thrM = Math.round((c.threshold || 15000000) / 1000000);
+    h += '<div class="zai-stats-sec">💵 Hoa hồng</div><table class="zai-stats-tbl"><thead><tr><th>Loại đơn</th><th>Đơn</th><th>Doanh thu</th><th>%</th><th>Hoa hồng</th></tr></thead><tbody>';
+    h += `<tr><td>Đơn ≥ ${thrM}tr</td><td>${c.ordersAbove15 || 0}</td><td>${_zaiStatsMoney_(c.revenueAbove15)}</td><td>${c.rateAbove15 || 0}%</td><td>${_zaiStatsMoney_(c.commissionAbove15)}</td></tr>`;
+    h += `<tr><td>Đơn &lt; ${thrM}tr</td><td>${c.ordersBelow15 || 0}</td><td>${_zaiStatsMoney_(c.revenueBelow15)}</td><td>${c.rateBelow15 || 0}%</td><td>${_zaiStatsMoney_(c.commissionBelow15)}</td></tr>`;
+    if (c.ordersChannel) {
+      const chs = Object.keys(c.channelBreakdown || {}).map((k) => `${escHtml(k)} ${c.channelBreakdown[k].rate}%`).join(', ');
+      h += `<tr><td>Kênh có % riêng${chs ? ` <span class="zai-stats-mut">(${chs})</span>` : ''}</td><td>${c.ordersChannel}</td><td>${_zaiStatsMoney_(c.revenueChannel)}</td><td>—</td><td>${_zaiStatsMoney_(c.commissionChannel)}</td></tr>`;
+    }
+    h += `<tr class="zai-stats-total"><td colspan="4">Tổng hoa hồng</td><td>${_zaiStatsMoney_(c.total)}</td></tr></tbody></table>`;
+    h += `<div class="zai-stats-mut">Nguồn %: ${escHtml(c.sourceAbove15 || '')}${c.sourceBelow15 && c.sourceBelow15 !== c.sourceAbove15 ? ' / ' + escHtml(c.sourceBelow15) : ''}. Doanh thu là phần của bạn (đơn nhiều sale được chia theo đơn gốc / đều).</div>`;
+
+    // Thưởng
+    h += `<div class="zai-stats-sec">🏆 Chương trình thưởng · <b>${_zaiStatsMoney_(b.total)}</b></div>`;
+    if ((b.items || []).length) {
+      h += '<details class="zai-stats-det"><summary>Chi tiết thưởng đã đạt (' + b.items.length + ')</summary><table class="zai-stats-tbl"><tbody>' +
+        b.items.map((it) => `<tr><td>${_zaiStatsDmy_(it.date)}</td><td>${escHtml(it.program)}<div class="zai-stats-mut">${escHtml(it.scope)} — ${escHtml(it.detail)}</div></td><td>${_zaiStatsMoney_(it.amount)}</td></tr>`).join('') +
+        '</tbody></table></details>';
+    } else {
+      h += '<div class="zai-stats-mut">Chưa đạt mức thưởng nào trong khoảng này.</div>';
+    }
+    if ((b.activePrograms || []).length) {
+      h += '<details class="zai-stats-det"><summary>Chương trình đang áp dụng (' + b.activePrograms.length + ')</summary>' +
+        b.activePrograms.map((p) => `<div class="zai-stats-prog"><b>${escHtml(p.name)}</b>${p.dateFrom || p.dateTo ? ` <span class="zai-stats-mut">(${p.dateFrom ? _zaiStatsDmy_(p.dateFrom) : '…'} → ${p.dateTo ? _zaiStatsDmy_(p.dateTo) : '…'})</span>` : ''}<div class="zai-stats-mut">${escHtml(p.summary || 'Xem chi tiết ở CRM')}</div></div>`).join('') + '</details>';
+    }
+    h += '<div class="zai-stats-mut" style="margin-top:6px">Số liệu tạm tính theo Pos (đã ghép Base) — đối chiếu kế toán trước khi chi trả. Thưởng theo SP là ước lượng số lượng.</div>';
+    if (d.ghepLoi) h += `<div class="zai-stats-note zai-stats-err">⚠️ Lỗi khi đối chiếu Base (đã chia theo Pos): ${escHtml(d.ghepLoi)}</div>`;
+    resEl.innerHTML = h;
   }
 
   // ── TRA CUU KHUYEN MAI (CTKM) — y het muc "Tra cuu khuyen mai" cua Pancake AI (GAS action=ctkmSearch, GET, chi doc, KHONG qua AI) ──
