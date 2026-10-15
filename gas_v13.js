@@ -2823,17 +2823,23 @@ function _dtApplyBoDem_(orders) {
 }
 function _isBhZeroOrder_(textBlob, revenue) { return BH_ORDER_RE_.test(String(textBlob || '')) && !(Number(revenue) > 0); }
 // TỶ LỆ CHỐT (theo Sale / Kênh / Sale×Page) LUÔN TÍNH TRÊN BASE, dùng chung cho Báo cáo A (Base) và B (Pos) nên xem báo cáo nào cũng ra CÙNG số:
-// tử số = đơn Base theo ngày tạo trong kỳ (bỏ đơn huỷ/hoàn và đơn BH không doanh thu), mẫu số = tương tác Pancake. Không phụ thuộc bộ lọc
+// tử số = đơn Base theo ngày tạo trong kỳ (bỏ đơn huỷ/hoàn và đơn BH không doanh thu; tính cho NGƯỜI TẠO đơn), mẫu số = tương tác Pancake. Không phụ thuộc bộ lọc
 // Sale/Kênh/Sản phẩm/Nguồn của từng báo cáo (các bộ lọc đó chỉ áp cho bảng doanh thu).
 function _srCloseRateSectionsFromBase_(filters) {
   var tracked = _pkTrackedDatesByPageAndSale_(_dateStrToVnYmd_(filters.dateFrom), _dateStrToVnYmd_(filters.dateTo));
   if (!Object.keys(tracked.datesByPage).length) return _srCloseRateSections_([], filters);   // chưa có dữ liệu Pancake → không cần đọc Base
+  // Đơn chốt tính cho đúng 1 sale = NGƯỜI TẠO (cột B của DT TỔNG), không chia cho các sale ghi ở "Sale bán". Người tạo không phải sale
+  // (không có trong Pancake/Danh sách Sale, kể cả tên khác cùng người) → dồn vào "(chưa gán sale)", không tính cho sale nào. Kênh vẫn đếm mọi đơn.
+  var pkFn = _salePersonKeyFn_(), known = {};
+  try { buildPancakeReport_(filters.dateFrom, filters.dateTo, 'equal').byCS.forEach(function(n) { known[pkFn(n.name)] = 1; }); } catch (e1) {}
+  try { Object.keys(readSaleDirectory_().byName || {}).forEach(function(k) { known[pkFn(k)] = 1; }); } catch (e2) {}
   var rows = readDTTong_(true), norm = [];
   for (var i = 0; i < rows.length; i++) {
     var r = rows[i];
     if (r.bhZero || _isExcludedOrderStatus_(r.trangThai)) continue;
     if (!dateInRange_(parseVNDate_(r.ngayTao), filters.dateFrom, filters.dateTo)) continue;
-    norm.push({ kenhBan: r.kenhBan, dateStr: r.ngayTao, saleBanRaw: r.saleBan });
+    var creator = r.nguoiTao ? String(r.nguoiTao).trim() : '';
+    norm.push({ kenhBan: r.kenhBan, dateStr: r.ngayTao, saleBanRaw: (creator && known[pkFn(creator)]) ? creator : '' });
   }
   return _srCloseRateSections_(norm, filters);
 }
