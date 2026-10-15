@@ -24,7 +24,7 @@ const TTL_SEC = {
 };
 // Action GAS chan theo phan quyen (vai tro/bo phan) -> KHONG duoc dung chung cache giua cac nguoi (neu khong nguoi bi chan van doc duoc ban cache cua nguoi khac).
 // Khoa cache them user trong token; khong co SESS_SECRET (khong xac thuc duoc token) thi khong cache.
-export const GATED_ACTIONS = ['salesReportA', 'salesReportB', 'salesReportC', 'saleKpiReport', 'failedOrderReport', 'careLeadReport', 'kpiReport', 'mktChecklist', 'pancakeReport', 'pancakeSdtReport'];
+export const GATED_ACTIONS = ['salesReportA', 'salesReportB', 'salesReportC', 'saleKpiReport', 'failedOrderReport', 'careLeadReport', 'kpiReport', 'mktChecklist', 'pancakeReport', 'pancakeSdtReport', 'customers', 'orders', 'careLeads', 'cskhDuyenLite'];
 export function tokenUser(tok) {
   try {
     tok = String(tok || ''); const i = tok.indexOf('.'); if (i < 1) return '';
@@ -232,7 +232,7 @@ export function pkConvOut(c, names, tmap) {
   });
   return { id: c.id, pageId: pg, name: c.customer_name || '', phone: c.customer_phone || '', lastAt: c.last_message_at || '',
            lastText: String(c.last_text || c.snippet || '').slice(0, 140), seen: c.seen !== false, replied: !!c.is_replied, type: c.conv_type || '',
-           assigneeIds: ids, assignees: ass, tags };
+           assigneeIds: ids, assignees: ass, tags, tagN: Array.isArray(c.tags) ? c.tags.length : 0 };
 }
 function pkAtts(arr) {
   const out = [];
@@ -247,16 +247,17 @@ function pkAtts(arr) {
 export function pkMsgOut(m) {
   const f = (m.fromraw && typeof m.fromraw === 'object') ? m.fromraw : {};
   const dir = m.direction === 'out' ? 'out' : 'in', crm = dir === 'out' ? String(m.crm_user || '') : '';
-  const staff = crm || (dir === 'out' ? String(f.admin_name || f.adminName || f.staff_name || f.user_name || '') : '');
+  const staff = crm || (dir === 'out' ? String(m.staff_name || f.admin_name || f.adminName || f.staff_name || f.user_name || '') : '');
   return { id: m.id, c: m.conversation_id, dir, text: String(m.text || ''), at: m.sent_at || '', from: m.sender_name || '', staff, crm: !!crm, att: pkAtts(m.attachments) };
 }
 async function pkMsgs(env, tail) {
   const base = 'pk_messages?select=id,conversation_id,direction,text,sent_at,sender_name,fromraw:raw-%3Efrom,attachments:raw-%3Eattachments';
-  try { return await pkSbGet(env, base.replace('sender_name,', 'sender_name,crm_user,') + tail); }   // cot crm_user co the chua tao -> thu lai khong cot do (giong GAS)
+  try { return await pkSbGet(env, base.replace('sender_name,', 'sender_name,crm_user,staff_name,') + tail); }   // cot crm_user co the chua tao -> thu lai khong cot do (giong GAS)
   catch (e) { return await pkSbGet(env, base + tail); }
 }
 const pkInList = ids => 'in.(' + ids.map(x => '"' + String(x).replace(/["\\]/g, '') + '"').join(',') + ')';
 const pkIso = v => /^\d{4}-\d{2}-\d{2}T[\d:.+\-Z]+$/.test(String(v || '')) ? String(v) : '';
+const PK_GV = 'worker-native';   // client (js/41 _pkcVerText) coi co gv = ban moi; khong co = GAS cu chua deploy lai
 export async function pkChatRun(act, sp, env) {
   const enc = encodeURIComponent, q = String(sp.get('q') || '').replace(/[*,()"\\]/g, ' ').trim();
   const filterOf = () => { const d = q.replace(/\D/g, ''); return (d.length >= 6 && d.length >= q.length - 2) ? 'customer_phone=like.' + enc('*' + d + '*') : 'customer_name=ilike.' + enc('*' + q + '*'); };
@@ -267,7 +268,7 @@ export async function pkChatRun(act, sp, env) {
   };
   if (act === 'pkChatInbox') {
     const key = 'inbox:' + q, hit = pkMemoGet(key, 10000); if (hit) return hit;   // 10s dung chung giua cac tab/nguoi dung cung isolate
-    const out = { ok: true, conversations: await list(q.length >= 2 ? filterOf() : '', 60), serverTime: new Date().toISOString() };
+    const out = { ok: true, gv: PK_GV, conversations: await list(q.length >= 2 ? filterOf() : '', 60), serverTime: new Date().toISOString() };
     pkMemoPut(key, out); return out;
   }
   if (act === 'pkChatFind') {
@@ -278,12 +279,12 @@ export async function pkChatRun(act, sp, env) {
     const conv = String(sp.get('conv') || ''); if (!conv) return { error: 'Thieu conv.' };
     const after = pkIso(sp.get('after'));
     const tail = '&conversation_id=eq.' + enc(conv) + (after ? '&sent_at=gt.' + enc(after) : '') + '&order=sent_at.desc.nullslast&limit=' + (after ? 100 : 150);
-    return { ok: true, messages: (await pkMsgs(env, tail)).reverse().map(pkMsgOut), serverTime: new Date().toISOString() };
+    return { ok: true, gv: PK_GV, messages: (await pkMsgs(env, tail)).reverse().map(pkMsgOut), serverTime: new Date().toISOString() };
   }
   if (act === 'pkChat') {
     const phone = pkNormPhone(sp.get('phone')); if (phone.length < 9) return { error: 'SDT khong hop le.' };
     const convs = await list('customer_phone=eq.' + enc(phone), 8);
-    const out = { ok: true, phone, conversations: convs, messages: [], serverTime: new Date().toISOString() };
+    const out = { ok: true, gv: PK_GV, phone, conversations: convs, messages: [], serverTime: new Date().toISOString() };
     if (!convs.length) return out;
     const after = pkIso(sp.get('after'));
     const tail = '&conversation_id=' + enc(pkInList(convs.map(c => c.id))) + (after ? '&sent_at=gt.' + enc(after) : '') + '&order=sent_at.desc.nullslast&limit=' + (after ? 100 : 150);

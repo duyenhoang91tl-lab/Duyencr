@@ -30,6 +30,7 @@ function _pkAtts_(arr) {
 // THE (tag) + NGUOI XU LY nhu Pancake (2026-10-12): webhook chi luu MA SO the (tags = [26, 28...]) va uuid nhan vien (assignee_ids) -> doi sang TEN + MAU
 // bang API chinh thuc cua Pancake: GET /api/public_api/v1/pages/{page}/tags (-> {tags:[{id,text,color}]}) va /pages/{page}/users (-> {users:[{id,name}]}).
 // Cache 6 gio theo page (CacheService) de khong goi Pancake moi lan poll; loi/chua co token page -> bo qua tham lang (hoi thoai van hien, chi thieu the).
+var PK_GAS_VER_ = 'v13.54-pkstaff';   // client hien o dong trang thai chat; thieu truong nay = GAS cu chua deploy lai
 var _pkMemo_ = {};   // trong 1 lan chay GAS (bien toan cuc khoi tao lai moi lan chay)
 function _pkCacheGet_(k) { try { var v = CacheService.getScriptCache().get(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
 function _pkCachePut_(k, o, ttl) { try { CacheService.getScriptCache().put(k, JSON.stringify(o), ttl); } catch (e) {} }
@@ -89,20 +90,52 @@ function _pkConvOut_(c, names) {
   ids.forEach(function (i) { var n = nm[i]; if (!n) { if (um === null) um = _pkUserMap_(pg); n = um[i]; } if (n) ass.push(n); });
   return { id: c.id, pageId: pg, name: c.customer_name || '', phone: c.customer_phone || '', lastAt: c.last_message_at || '',
            lastText: String(c.last_text || c.snippet || '').slice(0, 140), seen: c.seen !== false, replied: !!c.is_replied, type: c.conv_type || '',
-           assigneeIds: ids, assignees: ass, tags: _pkTagsOut_(c.tags, _pkTagMap_(pg)) };
+           assigneeIds: ids, assignees: ass, tags: _pkTagsOut_(c.tags, _pkTagMap_(pg)), tagN: Array.isArray(c.tags) ? c.tags.length : 0 };
 }
 // TIN NHAN: nguoi gui. out = nhan vien tra loi: uu tien ten nhan vien CRM da gui (cot crm_user, ghi luc gui tu CRM), roi den ten nhan vien tren Pancake
 // trong raw.from (admin_name — cung ten truong ma Pancake dung o conversation.last_sent_by). Khong co thi client hien ten page (m.from). in = khach (from = ten khach).
+// Thu tu: crm_user > staff_name (webhook ghi luc nhan tin tu last_sent_by) > raw.from.admin_name > (tin out moi nhat) last_sent_by hien tai.
 function _pkMsgOut_(m) {
   var f = (m.fromraw && typeof m.fromraw === 'object') ? m.fromraw : {};
   var dir = m.direction === 'out' ? 'out' : 'in', crm = dir === 'out' ? String(m.crm_user || '') : '';
-  var staff = crm || (dir === 'out' ? String(f.admin_name || f.adminName || f.staff_name || f.user_name || '') : '');
+  var staff = crm || (dir === 'out' ? String(m.staff_name || f.admin_name || f.adminName || f.staff_name || f.user_name || '') : '');
   return { id: m.id, c: m.conversation_id, dir: dir, text: String(m.text || ''), at: m.sent_at || '', from: m.sender_name || '', staff: staff, crm: !!crm, att: _pkAtts_(m.attachments) };
+}
+// last_sent_by cua hoi thoai = nhan vien gui tin CUOI CUNG cua page => chinh la tin 'out' moi nhat. Dung de dien ten cho tin do khi raw.from khong co ten nhan vien.
+// API cong khai KHONG tra ten nhan vien cho TUNG tin (message.from chi la khach) — chi co last_sent_by (admin_name) o muc HOI THOAI = nhan vien gui tin CUOI cua page.
+// Lay tu danh sach 60 hoi thoai moi nhat cua page (1 lan goi, cache 60 giay/page), roi gan cho tin 'out' moi nhat va LUU lai (pk_messages.staff_name) de khong mat khi co tin moi hon.
+function _pkLastSentMap_(page) {   // convId -> ten nhan vien
+  if (!page) return {};
+  var key = 'pkLsb_' + page, hit = _pkMemo_[key] || _pkCacheGet_(key); if (hit) { _pkMemo_[key] = hit; return hit; }
+  var tok = _pkPageToken_(page), map = {};
+  if (tok) {
+    var j = _pkApiGet_('https://pages.fm/api/public_api/v2/pages/' + _pkEnc_(page) + '/conversations?page_access_token=' + _pkEnc_(tok) + '&type=INBOX');
+    (j && Array.isArray(j.conversations) ? j.conversations : []).forEach(function (c) { var n = c && c.id ? _pkLsbName_(c.last_sent_by) : ''; if (n) map[String(c.id)] = n; });
+  }
+  _pkMemo_[key] = map; _pkCachePut_(key, map, 120);
+  return map;
+}
+function _pkLsbName_(lsb) { var o = (lsb && typeof lsb === 'object') ? lsb : {}; return String(o.admin_name || o.adminName || o.name || ''); }
+function _pkApplyLsb_(msgs, lsbByConv) {   // msgs da sap theo thoi gian tang dan; lsbByConv: convId -> ten (chuoi) hoac object last_sent_by
+  var done = {};
+  for (var i = msgs.length - 1; i >= 0; i--) {
+    var m = msgs[i]; if (m.dir !== 'out' || done[m.c]) continue; done[m.c] = true;
+    if (!m.staff) {
+      var v = lsbByConv[m.c], n = (typeof v === 'string') ? v : _pkLsbName_(v);
+      if (n) { m.staff = n; _pkSaveStaff_(m.id, n); }   // luu lai de tin nay giu ten du sau do co tin moi hon
+    }
+  }
+  return msgs;
+}
+function _pkSaveStaff_(mid, name) {   // best-effort; chi ghi khi chua co ten (khong de len ten da biet)
+  if (!mid || !name) return;
+  try { sb_('PATCH', 'pk_messages?id=eq.' + _pkEnc_(mid) + '&or=(staff_name.is.null,staff_name.eq.)', { staff_name: name }, { Prefer: 'return=minimal' }); }
+  catch (e) { Logger.log('pkSaveStaff: ' + String(e && e.message || e).slice(0, 120)); }   // cot staff_name chua deploy -> bo qua
 }
 // Doc tin: thu kem cot crm_user; neu schema chua deploy cot do (HTTP 400) thi doc lai khong co no — de CRM khong hong trong luc cho deploy schema.
 function _pkMsgs_(tail) {
   var base = 'pk_messages?select=id,conversation_id,direction,text,sent_at,sender_name,fromraw:raw-%3Efrom,attachments:raw-%3Eattachments';
-  try { return sb_('GET', base.replace('sender_name,', 'sender_name,crm_user,') + tail).json || []; }
+  try { return sb_('GET', base.replace('sender_name,', 'sender_name,crm_user,staff_name,') + tail).json || []; }
   catch (e) { return sb_('GET', base + tail).json || []; }
 }
 // Ghi nhan NHAN VIEN CRM da gui tin (Pancake chi biet token cua page). Best-effort: loi thi bo qua, khong lam hong viec gui.
@@ -114,7 +147,7 @@ function _pkMarkCrmSender_(mid, convId, page, text, who) {
     sb_('POST', 'pk_messages?on_conflict=id', { id: mid, conversation_id: convId, page_id: page, direction: 'out', text: text, sent_at: new Date().toISOString(), crm_user: who }, { Prefer: 'resolution=ignore-duplicates,return=minimal' });
   } catch (e) { Logger.log('pkMarkCrmSender: ' + String(e && e.message || e).slice(0, 160)); }
 }
-var PK_CONV_COLS_ = 'id,page_id,customer_name,customer_phone,last_message_at,last_text,snippet,seen,is_replied,conv_type,tags,assignee_ids';
+var PK_CONV_COLS_ = 'id,page_id,customer_name,customer_phone,last_message_at,last_text,snippet,seen,is_replied,conv_type,tags,assignee_ids,lsb:raw-%3Econversation-%3Elast_sent_by';
 // GET pkChat: cac hoi thoai gan voi SDT + tin nhan (moi nhat cuoi). after=<ISO> chi lay tin moi hon moc do (poll nhe).
 function pkChat_(e) {
   var p = (e && e.parameter) || {};
@@ -124,12 +157,13 @@ function pkChat_(e) {
   try {
     var _names = _pkStaffNames_();
     var cv = sb_('GET', 'pk_conversations?select=' + PK_CONV_COLS_ + '&customer_phone=eq.' + _pkEnc_(phone) + '&order=last_message_at.desc.nullslast&limit=8').json || [];
-    var out = { ok: true, phone: phone, conversations: cv.map(function (c) { return _pkConvOut_(c, _names); }), messages: [], serverTime: new Date().toISOString() };
+    var out = { ok: true, gv: PK_GAS_VER_, phone: phone, conversations: cv.map(function (c) { return _pkConvOut_(c, _names); }), messages: [], serverTime: new Date().toISOString() };
     if (!cv.length) return jsonOut_(out);
     var after = /^\d{4}-\d{2}-\d{2}T[\d:.+\-Z]+$/.test(String(p.after || '')) ? String(p.after) : '';
     var tail = '&conversation_id=' + _pkEnc_(_pkInList_(cv.map(function (c) { return c.id; })))
           + (after ? '&sent_at=gt.' + _pkEnc_(after) : '') + '&order=sent_at.desc.nullslast&limit=' + (after ? 100 : 150);
-    out.messages = _pkMsgs_(tail).reverse().map(_pkMsgOut_);
+    var _lsb = {}; cv.forEach(function (c) { _lsb[c.id] = _pkLastSentMap_(c.page_id)[c.id] || _pkLsbName_(c.lsb); });
+    out.messages = _pkApplyLsb_(_pkMsgs_(tail).reverse().map(_pkMsgOut_), _lsb);
     return jsonOut_(out);
   } catch (err) { return jsonOut_({ error: 'Doc chat loi: ' + String(err && err.message || err).slice(0, 200) }); }
 }
@@ -150,7 +184,8 @@ function pkChatInbox_(e) {
     if (hit) return jsonOut_(hit);
     var _names = _pkStaffNames_();
     var cv = sb_('GET', 'pk_conversations?select=' + PK_CONV_COLS_ + filter + '&order=last_message_at.desc.nullslast&limit=60').json || [];
-    var res = { ok: true, conversations: cv.map(function (c) { return _pkConvOut_(c, _names); }), serverTime: new Date().toISOString() };
+    var list = cv.map(function (c) { return _pkConvOut_(c, _names); });
+    var res = { ok: true, gv: PK_GAS_VER_, conversations: list, serverTime: new Date().toISOString() };
     _pkCachePut_(ck, res, 15);
     return jsonOut_(res);
   } catch (err) { return jsonOut_({ error: 'Doc hop thu loi: ' + String(err && err.message || err).slice(0, 200) }); }
@@ -165,8 +200,45 @@ function pkChatConv_(e) {
     var after = /^\d{4}-\d{2}-\d{2}T[\d:.+\-Z]+$/.test(String(p.after || '')) ? String(p.after) : '';
     var tail = '&conversation_id=eq.' + _pkEnc_(conv)
           + (after ? '&sent_at=gt.' + _pkEnc_(after) : '') + '&order=sent_at.desc.nullslast&limit=' + (after ? 100 : 150);
-    return jsonOut_({ ok: true, messages: _pkMsgs_(tail).reverse().map(_pkMsgOut_), serverTime: new Date().toISOString() });
+    var _lsb = {};
+    try { var _cr = sb_('GET', 'pk_conversations?select=id,page_id,lsb:raw-%3Econversation-%3Elast_sent_by&id=eq.' + _pkEnc_(conv) + '&limit=1').json || []; if (_cr[0]) _lsb[_cr[0].id] = _pkLastSentMap_(_cr[0].page_id)[_cr[0].id] || _pkLsbName_(_cr[0].lsb); } catch (e2) {}
+    return jsonOut_({ ok: true, gv: PK_GAS_VER_, messages: _pkApplyLsb_(_pkMsgs_(tail).reverse().map(_pkMsgOut_), _lsb), serverTime: new Date().toISOString() });
   } catch (err) { return jsonOut_({ error: 'Doc tin nhan loi: ' + String(err && err.message || err).slice(0, 200) }); }
+}
+// GET pkChatDiag?conv=...: CHAN DOAN 1 hoi thoai (CHI ADMIN) — tra ve du lieu that de biet vi sao chua hien the / ten nhan vien:
+// the + nhan vien luu trong Supabase, ket qua goi API tags/users cua Pancake (ma HTTP, so luong, mau), khoa cua raw.from va last_sent_by o cac tin gan nhat.
+// KHONG tra token. Noi dung tin bi cat ngan; chi gui ten truong + gia tri ngan.
+function pkChatDiag_(e) {
+  var p = (e && e.parameter) || {}, a = _pkAuth_(p.token); if (a.err) return a.err;
+  if (String(a.user.role || '') !== 'admin') return jsonOut_({ error: 'Chi admin dung duoc chan doan.' });
+  var conv = String(p.conv || ''); if (!conv) return jsonOut_({ error: 'Thieu conv.' });
+  try {
+    var c = (sb_('GET', 'pk_conversations?select=id,page_id,tags,assignee_ids,conv_type,version,lsb:raw-%3Econversation-%3Elast_sent_by&id=eq.' + _pkEnc_(conv) + '&limit=1').json || [])[0];
+    if (!c) return jsonOut_({ error: 'Khong thay hoi thoai trong Supabase.' });
+    var pg = c.page_id || '', tok = _pkPageToken_(pg);
+    var out = { ok: true, gv: PK_GAS_VER_, conv: conv, pageId: pg, hasPageToken: !!tok, tagsStored: c.tags, assigneeIdsStored: c.assignee_ids, lastSentBy: c.lsb || null };
+    var probe = function (path, pick) {
+      if (!tok) return { ok: false, err: 'Chua co page token (PANCAKE_PAGE_TOKENS)' };
+      try {
+        var r = UrlFetchApp.fetch('https://pages.fm/api/public_api/v1/pages/' + _pkEnc_(pg) + path + '?page_access_token=' + _pkEnc_(tok), { muteHttpExceptions: true });
+        var code = r.getResponseCode(), txt = r.getContentText() || '', j = null; try { j = JSON.parse(txt); } catch (x) {}
+        var arr = j && Array.isArray(j[pick]) ? j[pick] : [];
+        return { ok: code < 300, code: code, keys: j && typeof j === 'object' ? Object.keys(j) : [], n: arr.length, sample: arr.slice(0, 3), head: j ? '' : txt.slice(0, 160) };
+      } catch (x) { return { ok: false, err: String(x && x.message || x).slice(0, 160) }; }
+    };
+    out.lastSentByApi = _pkLastSentMap_(pg)[conv] || '(khong co trong 60 hoi thoai moi nhat hoac API khong tra last_sent_by)';
+    out.tagsApi = probe('/tags', 'tags');
+    var u = probe('/users', 'users'); if (u.sample) u.sample = u.sample.map(function (x) { return { id: x && x.id, name: x && x.name }; }); out.usersApi = u;
+    var ms; try { ms = sb_('GET', 'pk_messages?select=id,direction,sender_name,staff_name,crm_user,raw&conversation_id=eq.' + _pkEnc_(conv) + '&order=sent_at.desc.nullslast&limit=8').json || []; }
+    catch (e1) { ms = sb_('GET', 'pk_messages?select=id,direction,sender_name,raw&conversation_id=eq.' + _pkEnc_(conv) + '&order=sent_at.desc.nullslast&limit=8').json || []; }
+    out.messages = ms.map(function (m) {
+      var raw = (m.raw && typeof m.raw === 'object') ? m.raw : {}, f = (raw.from && typeof raw.from === 'object') ? raw.from : {}, top = {};
+      Object.keys(raw).forEach(function (k) { var v = raw[k]; if (typeof v === 'string' && !/^(message|original_message|text|html)$/.test(k)) top[k] = v.slice(0, 40); else if (typeof v === 'number' || typeof v === 'boolean') top[k] = v; });
+      var from = {}; Object.keys(f).forEach(function (k) { var v = f[k]; from[k] = (typeof v === 'string') ? v.slice(0, 40) : (typeof v === 'object' ? '[' + typeof v + ']' : v); });
+      return { id: m.id, dir: m.direction, senderName: m.sender_name, staffName: m.staff_name === undefined ? '(chua co cot)' : m.staff_name, crmUser: m.crm_user === undefined ? '(chua co cot)' : m.crm_user, rawKeys: Object.keys(raw), from: from, top: top };
+    });
+    return jsonOut_(out);
+  } catch (err) { return jsonOut_({ error: 'Chan doan loi: ' + String(err && err.message || err).slice(0, 200) }); }
 }
 // GET pkChatFind: tim hoi thoai (theo ten khach Pancake hoac SDT) de gan cho khach — cho truong hop webhook chua tu bat duoc SDT.
 function pkChatFind_(e) {
@@ -224,5 +296,79 @@ function pkChatSend_(data) {
     _pkMarkCrmSender_((j && j.id) || '', convId, page, text, String(a.user.name || a.user.username || ''));   // tin hien ten nhan vien CRM da gui
     return jsonOut_({ ok: true, id: (j && j.id) || '' });
   } catch (err) { return jsonOut_({ error: 'Gui tin loi: ' + String(err && err.message || err).slice(0, 200) }); }
+}
+
+// ═══ GAN / GO THE (TAG) TU CRM nhu Pancake + NGUOI DA CHAT (2026-10-13) ═══
+// Pancake -> CRM: the cua hoi thoai den qua webhook (su kien 'conversation' cap nhat cot tags). CRM -> Pancake: tai lieu chinh thuc
+//   POST /api/public_api/v1/pages/{page}/conversations/{conv}/tags?page_access_token=...  body {action:'add'|'remove', tag_id:'<ma so>'}
+//   -> {success:true, data:[ma the sau khi cap nhat]}. Ngay sau khi Pancake nhan, ghi luon `tags` moi vao Supabase de man hinh CRM hien ngay (webhook vong lai
+//   sau do se ghi cung gia tri; su kien cu den tre co version nho hon bi bo qua nhu cu). Token page nam o Script Properties nhu pkChatSend.
+function _pkTagsForget_(page) {
+  try { delete _pkMemo_['pkTags_' + page]; } catch (e) {}
+  try { CacheService.getScriptCache().remove('pkTags_' + page); } catch (e) {}
+}
+function _pkConvRow_(convId) {
+  var rows = sb_('GET', 'pk_conversations?select=id,page_id,conv_type,tags&id=eq.' + _pkEnc_(convId) + '&limit=1').json || [];
+  return rows[0] || null;
+}
+function _pkTagCatalog_(page) {   // [{id,t,c}] theo ma so tang dan (bo ma khong phai so)
+  var map = _pkTagMap_(page), out = [];
+  Object.keys(map).forEach(function (k) { if (map[k] && map[k].t && isFinite(Number(k))) out.push({ id: k, t: map[k].t, c: map[k].c }); });
+  out.sort(function (a, b) { return Number(a.id) - Number(b.id); });
+  return out;
+}
+// GET pkChatTags?pageId=<page>|conv=<convId>[&refresh=1]: danh sach the cua page (ten + mau) de chon khi gan the.
+function pkChatTags_(e) {
+  var p = (e && e.parameter) || {};
+  var a = _pkAuth_(p.token); if (a.err) return a.err;
+  try {
+    var page = String(p.pageId || '');
+    if (!page && p.conv) { var c = _pkConvRow_(String(p.conv)); page = c ? String(c.page_id || '') : ''; }
+    if (!page) return jsonOut_({ error: 'Thieu pageId.' });
+    if (!_pkPageToken_(page)) return jsonOut_({ error: 'Chua cai token Pancake cho page ' + page + ' (Script properties > PANCAKE_PAGE_TOKENS).' });
+    if (String(p.refresh || '') === '1') _pkTagsForget_(page);   // vua tao/doi ten the tren Pancake -> bo cache 6 gio
+    return jsonOut_({ ok: true, pageId: page, tags: _pkTagCatalog_(page) });
+  } catch (err) { return jsonOut_({ error: 'Doc danh sach the loi: ' + String(err && err.message || err).slice(0, 200) }); }
+}
+// POST pkChatTag {convId, tagId, op:'add'|'remove'}: gan/go 1 the. Moi tai khoan dang nhap (tru test) deu gan/go duoc (giong viec xem/gui tin hien nay);
+// Pancake tu luu lich su gan/go the (tag_histories) theo tai khoan cua token page.
+function pkChatTag_(data) {
+  var a = _pkAuth_(data && data.token); if (a.err) return a.err;
+  var convId = String((data && data.convId) || ''), tagId = String(data && data.tagId !== undefined && data.tagId !== null ? data.tagId : '').trim(), op = String((data && data.op) || '').toLowerCase();
+  if (!convId) return jsonOut_({ error: 'Thieu convId.' });
+  if (!/^-?\d{1,9}$/.test(tagId)) return jsonOut_({ error: 'Ma the khong hop le.' });
+  if (op !== 'add' && op !== 'remove') return jsonOut_({ error: 'op phai la add hoac remove.' });
+  try {
+    var conv = _pkConvRow_(convId);
+    if (!conv) return jsonOut_({ error: 'Khong tim thay hoi thoai.' });
+    var page = String(conv.page_id || ''); if (!page) return jsonOut_({ error: 'Hoi thoai chua co page_id.' });
+    var tok = _pkPageToken_(page);
+    if (!tok) return jsonOut_({ error: 'Chua cai token Pancake cho page ' + page + '. Vao Apps Script > Project Settings > Script properties, them PANCAKE_PAGE_TOKENS = {"' + page + '":"<page_access_token>"}.' });
+    var map = _pkTagMap_(page);
+    if (Object.keys(map).length && !map[tagId]) return jsonOut_({ error: 'The khong con tren page nay (co the vua bi xoa tren Pancake) - bam tai lai danh sach the roi thu lai.' });
+    var url = 'https://pages.fm/api/public_api/v1/pages/' + _pkEnc_(page) + '/conversations/' + _pkEnc_(convId) + '/tags?page_access_token=' + _pkEnc_(tok);
+    var res = UrlFetchApp.fetch(url, { method: 'post', contentType: 'application/json', payload: JSON.stringify({ action: op, tag_id: tagId }), muteHttpExceptions: true });
+    var code = res.getResponseCode(), body = res.getContentText() || '', j = null;
+    try { j = JSON.parse(body); } catch (eJ) {}
+    if (code >= 300 || (j && j.success === false)) return jsonOut_({ error: 'Pancake tu choi (HTTP ' + code + '): ' + body.slice(0, 240).split(tok).join('***') });
+    var ids = (j && Array.isArray(j.data)) ? j.data : null;
+    if (!ids) {   // Pancake khong tra danh sach the sau khi cap nhat -> tu tinh tu the hien co
+      var cur = (Array.isArray(conv.tags) ? conv.tags : []).map(function (x) { return (x && typeof x === 'object') ? x.id : x; });
+      ids = op === 'add' ? (cur.map(String).indexOf(tagId) >= 0 ? cur : cur.concat([Number(tagId)])) : cur.filter(function (x) { return String(x) !== tagId; });
+    }
+    try { sb_('PATCH', 'pk_conversations?id=eq.' + _pkEnc_(convId), { tags: ids }); }   // hien ngay tren CRM; loi thi webhook se bu
+    catch (eS) { Logger.log('pkChatTag PATCH: ' + String(eS && eS.message || eS).slice(0, 160)); }
+    Logger.log('pkChatTag ' + a.user.username + ' ' + convId + ' ' + op + ' ' + tagId);
+    return jsonOut_({ ok: true, tags: _pkTagsOut_(ids, map), ids: ids });
+  } catch (err) { return jsonOut_({ error: 'Gan the loi: ' + String(err && err.message || err).slice(0, 200) }); }
+}
+// (Khong tinh 'nguoi tra loi gan nhat' cho tung hoi thoai o DANH SACH: can them 1 truy van Supabase/lan poll, vi pham tran UrlFetch 20.000/ngay — xem NGUYEN NHAN
+//  GOC o pkChatInbox_. 'Da chat' + ten nguoi gui duoi tung tin tinh o client tu cac tin da tai, khong ton luot goi nao.)
+// Chay trong Apps Script Editor khi muon biet Pancake gui TEN NHAN VIEN o truong nao cua tin 'out' (neu CRM chua hien ten nguoi chat tren Pancake):
+// ghi vao Execution log phan raw.from cua 5 tin nhan vien gan nhat.
+function pkXemNguoiChat() {
+  var rows = sb_('GET', 'pk_messages?select=id,conversation_id,sent_at,fromraw:raw-%3Efrom&direction=eq.out&order=sent_at.desc.nullslast&limit=40').json || [], n = 0;
+  rows.forEach(function (r) { if (n >= 5) return; var f = r.fromraw; if (f && typeof f === 'object') { n++; Logger.log(r.sent_at + ' ' + r.id + ' from=' + JSON.stringify(f).slice(0, 400)); } });
+  if (!n) Logger.log('Chua co tin nhan vien nao co truong from trong pk_messages.raw');
 }
 

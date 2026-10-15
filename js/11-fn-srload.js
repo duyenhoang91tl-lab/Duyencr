@@ -311,7 +311,7 @@ function _srHiddenPageSaleCol_(title, allNames, draftArr, kind, searchKey){
 }
 function _srHiddenPageSaleHtml(){
   var html = '<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px;background:var(--surface2)">';
-  html += '<div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">Bỏ tích Page/kênh hoặc Sale KHÔNG thuộc phạm vi quản lý của bạn — sẽ ẩn khỏi Dashboard, Báo cáo doanh số A–E và KPI Pancake ngay khi bấm Lưu (không xoá dữ liệu, chỉ ẩn khỏi báo cáo chung).</div>';
+  html += '<div class="guide-text" style="font-size:12.5px;color:var(--muted);margin-bottom:8px">Bỏ tích Page/kênh hoặc Sale KHÔNG thuộc phạm vi quản lý của bạn — sẽ ẩn khỏi Dashboard, Báo cáo doanh số A–E và KPI Pancake ngay khi bấm Lưu (không xoá dữ liệu, chỉ ẩn khỏi báo cáo chung).</div>';
   html += '<div style="display:flex;gap:20px;flex-wrap:wrap">';
   html += _srHiddenPageSaleCol_('📡 Page / Kênh bán', _allChannelNames(), _srState.hiddenDraftChannels||[], 'channel', 'hiddenSearchChannel');
   html += _srHiddenPageSaleCol_('👤 Sale', _allCSNames(), _srState.hiddenDraftSales||[], 'sale', 'hiddenSearchSale');
@@ -615,6 +615,13 @@ function _srCloseRateBarHtml_(rows, searchTerm, unitLabel){
   var totHeld = filtered.reduce(function(s,r){return s+r.held;},0);
   var totClosed = filtered.reduce(function(s,r){return s+r.closed;},0);
   var avgRate = totHeld ? Math.round(totClosed/totHeld*100) : 0;
+  // Dong co DON nhung 0 tuong tac Pancake (thuong la 2 ten khac nhau cua cung 1 nguoi chua duoc lien ket) khong ve duoc thanh cot
+  // (khong co mau so) — truoc day bi AN im lang nen don cua ho 'bien mat' khoi bieu do. Nay liet ke ro de biet ma lien ket.
+  var orphans = (rows||[]).filter(function(r){ return !(r.held>0) && r.closed>0; }).sort(function(a,b){ return b.closed-a.closed; });
+  var orphanTot = orphans.reduce(function(s,r){return s+r.closed;},0);
+  var orphanBox_ = orphans.length ? '<div style="font-size:11px;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:6px 8px;margin:6px 0">⚠️ <b>'+orphanTot+' đơn</b> chưa gán được vào tương tác Pancake nên KHÔNG nằm trong biểu đồ/trung bình: '+orphans.slice(0,8).map(function(r){ return esc(r.name)+' ('+r.closed+')'; }).join(', ')+(orphans.length>8?' …':'')+'. Nếu đây là tên khác của 1 Sale đã có → thêm vào "Tên khác" ở 🔑 Tài khoản (hoặc Quản lý tài khoản) để gộp.</div>' : '';
+  // MẶC ĐỊNH ẨN — bấm 👁 mới hiện (Duyên yêu cầu 2026-10-12; _warnBox ở js/10-fn-pkkpipct.js)
+  var orphanHtml = orphanBox_ ? _warnBox('cr-orphan', orphanBox_, orphanTot+' đơn chưa gán vào tương tác Pancake') : '';
   var lv = CLOSE_RATE_THRESHOLDS.levels;
   function colorFor(p){ return _crColorFor_(p); }
   var bars = filtered.map(function(r){
@@ -631,6 +638,7 @@ function _srCloseRateBarHtml_(rows, searchTerm, unitLabel){
   return '<div style="padding:4px 0 10px">'+
     '<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Trung bình: <b style="color:var(--text)">'+avgRate+'%</b> ('+totClosed+'/'+totHeld+' '+esc(unitLabel)+') &nbsp;·&nbsp; '+legend+editBtn+'</div>'+
     (isAdmin ? _srCrFormHtml_(lv) : '')+
+    orphanHtml+
     bars+'</div>';
 }
 function _srCrLegendHtml_(lv){
@@ -1349,7 +1357,7 @@ function _srRenderL_(d){
   if (!(d.bySale||[]).length) h += '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:16px">Không có dữ liệu trong khoảng ngày này</td></tr>';
   else h += _srTotalRowHtml_(['Tổng (cộng theo từng Sale)', fmt(tot.kh), fmt(tot.co), fmt(tot.don), _srMoney(tot.dt), _srMoney(tot.cr), _srMoney(tot.dup)]);
   h += '</tbody></table></div>';
-  h += '<div style="font-size:10.5px;color:var(--hint);margin:3px 0 12px">Cột "Doanh thu đơn" của từng Sale là doanh thu đầy đủ của các đơn khách mua khi qua cửa hàng (đơn có 2 Sale sẽ hiện ở cả 2 dòng); "Doanh thu chia thêm" mới là số tính cho Sale.</div>';
+  h += '<div class="guide-text" style="font-size:10.5px;color:var(--hint);margin:3px 0 12px">Cột "Doanh thu đơn" của từng Sale là doanh thu đầy đủ của các đơn khách mua khi qua cửa hàng (đơn có 2 Sale sẽ hiện ở cả 2 dòng); "Doanh thu chia thêm" mới là số tính cho Sale.</div>';
 
   // Chi tiet
   h += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0"><span style="font-weight:700;font-size:13px">Chi tiết khách qua cửa hàng ('+fmt(rows.length)+' dòng)</span>'+

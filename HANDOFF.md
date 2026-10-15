@@ -144,6 +144,5 @@ Yeu cau cua Duyen: Chat noi bo hien thi duoc o cua so chat nho o goc duoi phai (
 - `tools/test-pk-chat-gas.js` đang FAIL 1 ca ("nguoi xu ly: co ten trong pk_staff...") từ commit cache `_pkStaffNames_` của phiên khác — chưa đụng.
 
 ## Tỷ lệ chốt Báo cáo B = đơn BASE ÷ tương tác Pancake (Duyên 12/10/2026)
-- Nguyên nhân: B truyền đơn Pos vào `_srCloseRateSections_`; Pos cuối tuần lên số chậm hơn Base ~1 ngày nên tử số thấp. Sửa: B gọi `_srBaseRowsForCloseRate_(filters, kenhAllow)` (đơn DT TỔNG, quy tắc y hệt A: ngày TẠO đơn, bỏ Huỷ/Trả lại/Hoàn tiền/Thất bại/Khiếu nại, lọc Sale (+alias Pancake), lọc sản phẩm). Doanh thu/số đơn/COD của B vẫn từ Pos. Test: `node tools/test-close-rate-base.js` (gồm A == B cùng số, Pos trống vẫn ra tỷ lệ Base).
-- Bộ lọc "Nguồn đơn" của B đổi ra Kênh Base qua ID Page / tên Page; bộ lọc Marketer + CRM (trạng thái CS/KH/Zalo/Nick Zalo) chỉ có trên đơn Pos nên KHÔNG áp được cho tỷ lệ chốt (đã ghi trong comment hàm).
-- Ảnh hưởng kèm: `buildCsStats_().closeRate` (Pancake AI) lấy từ B nên cũng đổi sang đơn Base. Các chỗ KHÁC (KPI Pancake, Checklist MKT, Hồ sơ nhân viên) đã dùng đơn Base/DT TỔNG từ trước — không đổi.
+- Phiên khác đã làm xong phần backend (`_srCloseRateSectionsFromBase_`: A và B cùng tính trên Base, theo NGƯỜI TẠO đơn, bỏ đơn huỷ/hoàn + đơn BH không doanh thu, không phụ thuộc bộ lọc Sale/Kênh/Sản phẩm/Nguồn). Phiên này chỉ: (1) bỏ bản trùng của mình, (2) ghi rõ nhãn trên màn hình A và B: "Số đơn Base ÷ Tổng tương tác Pancake" (js/11-fn-srload.js), (3) thêm test `tools/test-close-rate-base.js` kiểm A == B cùng số và Pos trống/đổi vẫn không ảnh hưởng.
+- Ảnh hưởng kèm: `buildCsStats_().closeRate` (Pancake AI) lấy từ B nên cũng theo đơn Base.

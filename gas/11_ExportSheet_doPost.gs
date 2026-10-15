@@ -236,6 +236,8 @@ function doPost(e) {
     if (_denP) return jsonOut_(_denP);
     var _ownP = _ownerGate_(d0.action, d0.token);
     if (_ownP) return jsonOut_(_ownP);
+    var _cfgP = _cfgGate_(d0.action, d0.token);
+    if (_cfgP) return jsonOut_(_cfgP);
   }
   return doPostCore_(e);
 }
@@ -326,6 +328,7 @@ function doPostCore_(e) {
     // ── Chat Pancake trong CRM: gan hoi thoai voi SDT khach, gui tin tra loi ──
     if (action === 'pkChatLink') return pkChatLink_(data);
     if (action === 'pkChatSend') return pkChatSend_(data);
+    if (action === 'pkChatTag') return pkChatTag_(data);
     if (action === 'profileSave') return profileSave_(data);
     if (action === 'saveRoleConfig') return saveRoleConfig_(data.config, data.token);
     if (action === 'notifRead') { var _nu = _sessUser_(data.token); if (!_nu) return jsonOut_({ error: 'Can dang nhap.', code: 'AUTH' }); return jsonOut_(markNotifRead_(_nu.username, data.ids, !!data.all)); }
@@ -365,7 +368,7 @@ function doPostCore_(e) {
     // Dọn dòng CareData bị nhân bản (giữ dòng đầy đủ nhất cho mỗi SĐT)
     if (action === 'dedupeCare')           return dedupeCare_();
     // ── HOI THAM TU DONG: luu bang mau tin (UI Sasum) ──
-    if (action === 'saveFollowUpTemplates') return saveFollowUpTemplates_(data.templates);
+    if (action === 'saveFollowUpTemplates') return saveFollowUpTemplates_(data.templates, (function () { try { return data.token ? _sessUser_(data.token) : null; } catch (e) { return null; } })());
     if (action === 'saveFuResults')         return saveFuResults_(data.results);
     // ── MESSENGER/PHONG THUY AI: doc bang tra menh + mau canned response (Sheet Menh/CannedResponses,
     //    tu tao voi du lieu mac dinh neu chua co). Them 2026-09, KHONG dung chung sheet/cot voi CareData. ──

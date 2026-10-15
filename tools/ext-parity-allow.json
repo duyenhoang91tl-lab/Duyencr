@@ -1,29 +1,83 @@
 {
   "_doc": "QUY TAC SONG SONG (docs/crm-kb/08-extension-parity.md): action GAS dung o CA Zalo AI va Pancake AI thi khong can ghi o day. Action chi o MOT ben PHAI co dong o day: 'platform' = dac thu nen tang (co ly do), 'gap' = ben kia CHUA co, can Duyen chot co lam khong. tools/check-ext-parity.js bao LOI khi co action lech ma chua ghi o day.",
   "onlyZalo": {
-    "broadcastQueue":        { "status": "platform", "note": "Gui hang loat qua ban be Zalo — Pancake khong co kenh nay" },
-    "broadcastMark":         { "status": "platform", "note": "Danh dau tien do chien dich gui hang loat Zalo" },
-    "syncZaloFriendStatus":  { "status": "platform", "note": "Trang thai ket ban Zalo (cot zalo CareData) — chi co o Zalo" },
-    "count":                 { "status": "gap", "note": "Zalo doi chieu phien ban backend (`ver`); Pancake chua co — xem co can khong" },
-    "findDuplicateOrders":   { "status": "gap", "note": "Zalo co cong cu do don trung; Pancake chua co" },
-    "deleteDuplicateOrders": { "status": "gap", "note": "Zalo co cong cu xoa don trung; Pancake chua co" }
+    "broadcastQueue": {
+      "status": "platform",
+      "note": "Gui hang loat qua ban be Zalo — Pancake khong co kenh nay"
+    },
+    "broadcastMark": {
+      "status": "platform",
+      "note": "Danh dau tien do chien dich gui hang loat Zalo"
+    },
+    "syncZaloFriendStatus": {
+      "status": "platform",
+      "note": "Trang thai ket ban Zalo (cot zalo CareData) — chi co o Zalo"
+    },
+    "count": {
+      "status": "gap",
+      "note": "Zalo doi chieu phien ban backend (`ver`); Pancake chua co — xem co can khong"
+    }
   },
   "onlyPancake": {
-    "saveCannedResponse":    { "status": "platform", "note": "Cau tra loi nhanh (canned) la tinh nang cua nen tang Pancake" },
-    "deleteCannedResponse":  { "status": "platform", "note": "nt" },
-    "verifyLogin":           { "status": "gap", "note": "Pancake co dang nhap xac minh nhan vien; Zalo chua — doi chieu voi docs/SECURITY-PLAN.md" },
-    "assign":                { "status": "gap", "note": "Pancake co giao/nhan viec (assign); Zalo chua" },
-    "toggleAssignDone":      { "status": "gap", "note": "Pancake danh dau viec xong; Zalo chua" },
-    "csStats":               { "status": "gap", "note": "Pancake co thong ke CS; Zalo chua" },
-    "ctkmSearch":            { "status": "gap", "note": "Tra cuu CTKM — Zalo chua co" },
-    "ctkmCatalog":           { "status": "gap", "note": "Danh muc CTKM — Zalo chua co" },
-    "getKnowledge":          { "status": "gap", "note": "Kien thuc san pham — Zalo chua doc truc tiep" },
-    "priceCatalogTree":      { "status": "gap", "note": "Cay danh muc bang gia (Soan don) — Zalo chi co tim phang" },
-    "priceCatalogFlat":      { "status": "gap", "note": "Bang gia phang cho Soan don — Zalo chua" },
-    "productImageFlat":      { "status": "gap", "note": "Anh san pham — Zalo chua" },
-    "driveImageFromLink":    { "status": "gap", "note": "Lay anh Drive tu link — Zalo chua" },
-    "donOrdersByPhone":      { "status": "gap", "note": "Tra don theo SDT — Zalo chua dung action nay" },
-    "saveMessageTemplate":   { "status": "gap", "note": "Pancake luu/sua mau tin; Zalo moi chi DOC mau da duyet (messageTemplates)" },
-    "deleteMessageTemplate": { "status": "gap", "note": "nt" }
+    "saveCannedResponse": {
+      "status": "platform",
+      "note": "Cau tra loi nhanh (canned) la tinh nang cua nen tang Pancake"
+    },
+    "deleteCannedResponse": {
+      "status": "platform",
+      "note": "nt"
+    },
+    "verifyLogin": {
+      "status": "gap",
+      "note": "Pancake co dang nhap xac minh nhan vien; Zalo chua — doi chieu voi docs/SECURITY-PLAN.md"
+    },
+    "assign": {
+      "status": "gap",
+      "note": "Pancake co giao/nhan viec (assign); Zalo chua"
+    },
+    "toggleAssignDone": {
+      "status": "gap",
+      "note": "Pancake danh dau viec xong; Zalo chua"
+    },
+    "csStats": {
+      "status": "gap",
+      "note": "Pancake co thong ke CS; Zalo chua"
+    },
+    "ctkmCatalog": {
+      "status": "gap",
+      "note": "Danh muc CTKM — Zalo chua co"
+    },
+    "getKnowledge": {
+      "status": "gap",
+      "note": "Kien thuc san pham — Zalo chua doc truc tiep"
+    },
+    "priceCatalogTree": {
+      "status": "gap",
+      "note": "Cay danh muc bang gia (Soan don) — Zalo chi co tim phang"
+    },
+    "priceCatalogFlat": {
+      "status": "gap",
+      "note": "Bang gia phang cho Soan don — Zalo chua"
+    },
+    "productImageFlat": {
+      "status": "gap",
+      "note": "Anh san pham — Zalo chua"
+    },
+    "driveImageFromLink": {
+      "status": "gap",
+      "note": "Lay anh Drive tu link — Zalo chua"
+    },
+    "donOrdersByPhone": {
+      "status": "gap",
+      "note": "Tra don theo SDT — Zalo chua dung action nay"
+    },
+    "saveMessageTemplate": {
+      "status": "gap",
+      "note": "Pancake luu/sua mau tin; Zalo moi chi DOC mau da duyet (messageTemplates)"
+    },
+    "deleteMessageTemplate": {
+      "status": "gap",
+      "note": "nt"
+    }
   }
 }

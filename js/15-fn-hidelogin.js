@@ -290,7 +290,7 @@ function _acctDetailHtml(a){
           '</label>';
         }).join('')+
       '</div>'+
-      '<div style="font-size:10.5px;color:var(--muted);margin-top:5px">Bỏ tick = tài khoản này sẽ KHÔNG thấy mục đó ở đâu cả (kể cả trong "☰ Menu").</div>'
+      '<div class="guide-text" style="font-size:10.5px;color:var(--muted);margin-top:5px">Bỏ tick = tài khoản này sẽ KHÔNG thấy mục đó ở đâu cả (kể cả trong "☰ Menu").</div>'
     : '<div style="font-size:10.5px;color:var(--muted);margin-top:4px">Đang KHÔNG giới hạn — tài khoản xem đủ menu theo đúng vai trò hiện tại.</div>')+
   '</div>';
 

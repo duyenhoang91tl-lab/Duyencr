@@ -38,7 +38,8 @@ ok(chk('customers', expired, '', 'web').code === 'AUTH', 'token het han bi chan'
 ok(chk('customers', good + 'x', '', 'web').code === 'AUTH', 'token sua chu ky bi chan');
 ok(chk('deleteOrder', 'abc.def', '', 'web').code === 'AUTH', 'token rac bi chan');
 // 4) extension co khoa dung: chi action trong danh sach
-ok(chk('lookup', '', keys.zalo, 'zalo') === null && chk('deleteDuplicateOrders', '', keys.zalo, 'zalo') === null, 'zalo: action cho phep qua');
+ok(chk('lookup', '', keys.zalo, 'zalo') === null, 'zalo: action cho phep qua');
+ok(chk('deleteDuplicateOrders', '', keys.zalo, 'zalo') !== null, '4c-3: extension Zalo KHONG con duoc deleteDuplicateOrders');
 r = chk('deleteOrder', '', keys.zalo, 'zalo'); ok(r && r.code === 'FORBIDDEN', 'zalo: deleteOrder bi tu choi du khoa dung');
 ok(chk('replaceOrders', '', keys.pancake, 'pancake').code === 'FORBIDDEN' && chk('saveUsers', '', keys.pancake, 'pancake') === null, 'pancake: replaceOrders bi chan (saveUsers khong thuoc NTL, co co che rieng)');
 ok(chk('toggleAssignDone', '', keys.pancake, 'pancake') === null && chk('toggleAssignDone', '', keys.zalo, 'zalo').code === 'FORBIDDEN', 'danh sach cho phep rieng tung extension');
@@ -68,8 +69,8 @@ cacheStore = {}; props.enforceModes = '{hong'; ok(chk('customers', '', '', 'web'
 // 13) nguon khong hop le bi tu choi
 let thr = false; try { ctx._enfSet_('hack', true); } catch (e) { thr = true; } ok(thr, 'ten nguon la bi tu choi');
 // 14) hook that su nam trong doGet/doPost, SAU _ntlNote_ va SAU cac kiem tra demo/saveUsers (khong bi bo sot khi sua sau nay)
-ok(/_ntlNote_\('GET'[^\n]*\n\s*var _denG = _enforceCheck_\(action, p\.token, p\.ek, p\.src\);\s*\n\s*if \(_denG\) return jsonOut_\(_denG\);\s*\n(?:\s*var _gateErr = _featureGate_\(action, p\.token\);\s*\n\s*if \(_gateErr\) return jsonOut_\(_gateErr\);\s*\n)?(?:\s*var _ownErr = _ownerGate_\(action, p\.token\);\s*\n\s*if \(_ownErr\) return jsonOut_\(_ownErr\);\s*\n)?(?:\s*var _scpErr = _scopeGate_\(action, p\.token, p\.phone\);\s*\n\s*if \(_scpErr\) return jsonOut_\(_scpErr\);\s*\n)?\s*return doGetCore_\(e\);/.test(src), 'doGet phai goi _enforceCheck_ truoc doGetCore_');
-ok(/_ntlNote_\('POST'[^\n]*\n\s*var _denP = _enforceCheck_\(d0\.action, d0\.token, d0\.ek, d0\.src\);\s*\n\s*if \(_denP\) return jsonOut_\(_denP\);\s*\n(?:\s*var _ownP = _ownerGate_\(d0\.action, d0\.token\);\s*\n\s*if \(_ownP\) return jsonOut_\(_ownP\);\s*\n)?\s*\}\s*\n\s*return doPostCore_\(e\);/.test(src), 'doPost phai goi _enforceCheck_ truoc doPostCore_');
+ok(/_ntlNote_\('GET'[^\n]*\n\s*var _denG = _enforceCheck_\(action, p\.token, p\.ek, p\.src\);\s*\n\s*if \(_denG\) return jsonOut_\(_denG\);\s*\n(?:\s*var _gateErr = _featureGate_\(action, p\.token\);\s*\n\s*if \(_gateErr\) return jsonOut_\(_gateErr\);\s*\n)?(?:\s*var _ownErr = _ownerGate_\(action, p\.token\);\s*\n\s*if \(_ownErr\) return jsonOut_\(_ownErr\);\s*\n)?(?:\s*var _scpErr = _scopeGate_\(action, p\.token, p\.phone\);\s*\n\s*if \(_scpErr\) return jsonOut_\(_scpErr\);\s*\n)?(?:\s*if \(SCOPE_LIST_ACTIONS_\[action\] && p\.token\) \{[^\n]*\}\s*\n)?\s*return doGetCore_\(e\);/.test(src), 'doGet phai goi _enforceCheck_ truoc doGetCore_');
+ok(/_ntlNote_\('POST'[^\n]*\n\s*var _denP = _enforceCheck_\(d0\.action, d0\.token, d0\.ek, d0\.src\);\s*\n\s*if \(_denP\) return jsonOut_\(_denP\);\s*\n(?:\s*var _ownP = _ownerGate_\(d0\.action, d0\.token\);\s*\n\s*if \(_ownP\) return jsonOut_\(_ownP\);\s*\n)?(?:\s*var _cfgP = _cfgGate_\(d0\.action, d0\.token\);\s*\n\s*if \(_cfgP\) return jsonOut_\(_cfgP\);\s*\n)?\s*\}\s*\n\s*return doPostCore_\(e\);/.test(src), 'doPost phai goi _enforceCheck_ truoc doPostCore_');
 // 15) moi action trong EXT_ALLOWED_ la action that va nam trong NTL_ACTIONS_ (khong ghi nham ten)
 const allowed = vm.runInContext('EXT_ALLOWED_', ctx), tracked = vm.runInContext('NTL_ACTIONS_', ctx);
 for (const e of Object.keys(allowed)) for (const a of Object.keys(allowed[e])) ok(tracked[a] === 1, e + ' cho phep "' + a + '" nhung khong nam trong NTL_ACTIONS_');

@@ -63,7 +63,7 @@ function openTierConfig(){
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3000;display:flex;align-items:center;justify-content:center';
   ov.innerHTML = '<div style="background:var(--surface);border-radius:12px;padding:16px 18px;width:min(480px,94vw);box-shadow:0 12px 40px rgba(0,0,0,.25)">' +
     '<div style="font-weight:600;margin-bottom:4px">🏅 Cấu hình hạng khách hàng</div>' +
-    '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Hạng tính theo tổng doanh thu Pos của khách (giữ nguyên cách tính hiện tại). Đổi tên và ngưỡng — ngưỡng phải tăng dần. Hạng đầu luôn từ 0đ.</div>' +
+    '<div class="guide-text" style="font-size:12px;color:var(--muted);margin-bottom:10px">Hạng tính theo tổng doanh thu Pos của khách (giữ nguyên cách tính hiện tại). Đổi tên và ngưỡng — ngưỡng phải tăng dần. Hạng đầu luôn từ 0đ.</div>' +
     '<table style="width:100%;font-size:12px"><tr style="color:var(--muted)"><td></td><td>Tên hạng</td><td>Từ doanh thu (triệu đồng)</td></tr>' +
     cfg.map(function(t,i){ return '<tr><td style="padding:4px 6px 4px 0;color:var(--muted)">' + (i+1) + '</td>' +
       '<td><input data-k="' + t.key + '" data-f="label" value="' + esc(t.label) + '" maxlength="30" style="width:100%;padding:5px;border:1px solid var(--border);border-radius:6px"></td>' +

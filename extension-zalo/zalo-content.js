@@ -231,7 +231,8 @@
       { v: '', label: '— Chọn mục —' },
       { v: 'bc', label: '📢 Gửi hàng loạt' },
       { v: 'zs', label: '🔍 Quét trạng thái kết bạn Zalo' },
-      { v: 'remind', label: '🔔 Lịch hẹn (0)' }
+      { v: 'remind', label: '🔔 Lịch hẹn (0)' },
+      { v: 'ctkm', label: '🎁 Tra cứu khuyến mãi' }
     ].forEach(o => { const op = document.createElement('option'); op.value = o.v; op.textContent = o.label; menuSel.appendChild(op); });
     menuWrap.appendChild(menuSel);
     const menuContent = document.createElement('div');
@@ -270,8 +271,22 @@
     remindBody.style.display = 'none';
     menuContent.appendChild(remindBody);
 
+    // 🎁 Tra cứu khuyến mãi (Sheet CTKM, cùng file với bảng giá) — giống mục "Tra cứu khuyến mãi" của Pancake AI (quy tắc song song)
+    const ctkmBody = document.createElement('div');
+    ctkmBody.id = 'zai-ctkm-body';
+    ctkmBody.style.display = 'none';
+    ctkmBody.innerHTML =
+      '<div id="zai-ctkm-row"><input type="text" id="zai-ctkm-q" placeholder="Từ khoá khuyến mãi (để trống = xem tất cả)..." />' +
+      '<button class="zai-btn zai-btn-primary zai-btn-sm" id="zai-ctkm-btn" type="button">Tìm</button></div>' +
+      '<div id="zai-ctkm-result"></div>';
+    menuContent.appendChild(ctkmBody);
+    ctkmBody.querySelector('#zai-ctkm-btn').addEventListener('click', doCtkmSearchZai_);
+    ctkmBody.querySelector('#zai-ctkm-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') doCtkmSearchZai_(); });
+
     menuSel.addEventListener('change', () => {
       const v = menuSel.value;
+      ctkmBody.style.display = v === 'ctkm' ? 'block' : 'none';
+      if (v === 'ctkm' && !_zaiCtkmLoadedOnce) { _zaiCtkmLoadedOnce = true; doCtkmSearchZai_(); }   // mo muc la nap luon toan bo CTKM
       bcBody.style.display = v === 'bc' ? 'block' : 'none';
       zsBody.style.display = v === 'zs' ? 'block' : 'none';
       remindBody.style.display = v === 'remind' ? 'block' : 'none';
@@ -1033,40 +1048,11 @@
   // thu, de bat ca truong hop doanh thu bi lech do loi nhap lieu, VD mat 3 so 0:
   // 689 thay vi 689.000) va hoi xac nhan truoc khi xoa. Chi tac dong len khach dang
   // xem tren the (khong dung de dedupe toan bo he thong — viec do lam ben Sasum).
+  // Bao mat 4c-3: CHI admin Duyent duoc sua/xoa don (tren web CRM). Extension khong con nut xoa don; server cung da bo action xoa don khoi danh sach cho phep cua extension Zalo.
+  const ZAI_CAN_DELETE_ORDERS = false;
   async function zaiCheckDuplicates_(phone) {
-    if (!GAS_URL) { alert('Chưa cấu hình Google Sheets URL.'); return; }
-    try {
-      const sep = GAS_URL.includes('?') ? '&' : '?';
-      const r = await fetch(GAS_URL + sep + 'action=findDuplicateOrders&phone=' + encodeURIComponent(phone), {redirect:'follow'});
-      const d = await r.json();
-      if (!d.ok) { alert('Lỗi kiểm tra: ' + (d.error || 'không rõ')); return; }
-      const groups = d.groups || [];
-      if (!groups.length) { alert('Không phát hiện đơn trùng cho khách này.'); return; }
-      const items = [];
-      let msg = 'Phát hiện đơn trùng của khách này:\n\n';
-      groups.forEach(g => {
-        const dateLabel = fmtDate_(g.date) || (g.month + '/' + g.year);
-        if (g.exact) {
-          msg += '• ' + dateLabel + ' — ' + Number(g.rows[0].revenue||0).toLocaleString('vi-VN') + 'đ — dư ' + g.extras.length + ' đơn giống hệt (sẽ xóa dòng dư, giữ 1 dòng)\n';
-        } else if (g.zeroLossPattern) {
-          msg += '• ' + dateLabel + ' — CÁC DÒNG DOANH THU: ' + g.rows.map(row => Number(row.revenue||0).toLocaleString('vi-VN')+'đ').join(' / ') + '\n  ⚠ ' + g.note + '\n';
-        } else {
-          msg += '• ' + dateLabel + ' — CÁC DÒNG DOANH THU KHÁC NHAU: ' + g.rows.map(row => Number(row.revenue||0).toLocaleString('vi-VN')+'đ').join(' / ') + '\n  ⚠ ' + g.note + '\n  → Mở Sasum (nút 🗑️ Đơn trùng) để tự chọn đúng dòng SAI cần xóa, tránh xóa nhầm dòng đúng.\n';
-        }
-        g.extras.forEach(row => items.push({ sheet: row.sheet, rowIndex: row.rowIndex }));
-      });
-      if (!items.length) { alert(msg); return; }
-      msg += '\nXóa ' + items.length + ' đơn được đề xuất ở trên? Không thể hoàn tác — hãy đọc kỹ các dòng có cảnh báo ⚠ trước khi đồng ý.';
-      if (!confirm(msg)) return;
-      const r2 = await fetch(GAS_URL, { method:'POST', body: JSON.stringify({ action:'deleteDuplicateOrders', items }), headers:{'Content-Type':'text/plain'} });
-      const d2 = await r2.json();
-      if (!d2.ok) { alert('Lỗi xóa: ' + (d2.error || 'không rõ')); return; }
-      alert('✓ Đã xóa ' + d2.deleted + ' đơn trùng.');
-      delete _lookupCache[phone];
-      await _zaiForceRefresh_(phone);
-    } catch (e) {
-      alert('Lỗi kết nối: ' + e.message);
-    }
+    // 4c-3: da go code xoa don khoi extension (chi admin xoa/sua don tren web CRM).
+    alert('Chi admin xoa/sua don tren web CRM.');
   }
 
   // ── TRA CUU BANG GIA (Sheet DANH_MUC, file PRICE_SS_ID — dung chung voi Pancake AI) ──
@@ -1090,6 +1076,52 @@
     } catch (e) {
       box.innerHTML = '<div style="color:#1e3a8a;font-size:11.5px;font-style:italic;padding:4px 0">Lỗi kết nối: ' + escHtml(e.message) + '</div>';
     }
+  }
+
+  // ── TRA CUU KHUYEN MAI (CTKM) — y het muc "Tra cuu khuyen mai" cua Pancake AI (GAS action=ctkmSearch, GET, chi doc, KHONG qua AI) ──
+  // Hien nguyen cac cot cua sheet CTKM dang the (khong gia / khong nut them gio hang), kem nhan han su dung va dieu kien KHONG ap dung.
+  let _zaiCtkmLoadedOnce = false;
+  function _zaiStripVN_(s) {
+    return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
+  }
+  async function doCtkmSearchZai_() {
+    const q = (document.getElementById('zai-ctkm-q').value || '').trim();
+    const box = document.getElementById('zai-ctkm-result');
+    if (!GAS_URL) { box.innerHTML = '<div class="zai-ctkm-loading">Chưa cài đặt URL GAS. Nhấn ⚙.</div>'; return; }
+    box.innerHTML = '<div class="zai-ctkm-loading">Đang tìm...</div>';
+    try {
+      const res = await fetch(GAS_URL + (GAS_URL.includes('?') ? '&' : '?') + 'action=ctkmSearch' + (q ? '&q=' + encodeURIComponent(q) : ''), { redirect: 'follow' });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      renderCtkmRowsZai_(data.rows || [], q);
+    } catch (e) { box.innerHTML = '<div class="zai-ctkm-loading">Lỗi: ' + escHtml(e.message || 'không rõ') + '</div>'; }
+  }
+  function renderCtkmRowsZai_(rows, q) {
+    const box = document.getElementById('zai-ctkm-result');
+    if (!rows.length) {
+      box.innerHTML = '<div class="zai-ctkm-loading">Không tìm thấy' + (q ? ' cho "' + escHtml(q) + '"' : '') + ' — kiểm tra lại sheet CTKM (cùng file với bảng giá).</div>';
+      return;
+    }
+    box.innerHTML = rows.slice(0, 30).map((row) => {
+      const exclKey = row.__ctkmExclusionKey || '';
+      const keys = Object.keys(row).filter((k) =>
+        row[k] !== '' && row[k] !== null && row[k] !== undefined &&
+        _zaiStripVN_(k).trim() !== 'stt' &&
+        k.indexOf('__ctkm') !== 0 &&      // bo cac field noi bo (trang thai/ngoai le da tach rieng hien ben duoi)
+        k !== exclKey                      // bo trung cot dieu kien loai tru (da hien rieng)
+      );
+      if (!keys.length) return '';
+      // Cot dau tien con lai lam tieu de the, cac cot sau la nhan phu — KHONG doan ten cot (sheet CTKM co the doi ten cot).
+      const titleKey = keys[0], restKeys = keys.slice(1);
+      const line = (k) => '<span class="zai-ctkm-field"><b>' + escHtml(k) + ':</b> ' + escHtml(row[k]) + '</span>';
+      const statusHtml = row.__ctkmStatusLabel
+        ? '<div class="zai-ctkm-status' + (row.__ctkmExpired ? ' zai-ctkm-status-expired' : (row.__ctkmUpcoming ? ' zai-ctkm-status-upcoming' : ' zai-ctkm-status-active')) + '">' + escHtml(row.__ctkmStatusLabel) + '</div>'
+        : '';
+      const exclHtml = row.__ctkmExclusionNote
+        ? '<div class="zai-ctkm-excl">⚠️ <b>' + (exclKey ? escHtml(exclKey) : 'Điều kiện không áp dụng') + ':</b> ' + escHtml(row.__ctkmExclusionNote) + '</div>'
+        : '';
+      return '<div class="zai-ctkm-item' + (row.__ctkmExpired ? ' zai-ctkm-item-expired' : '') + '"><div class="zai-ctkm-title">' + escHtml(String(row[titleKey])) + '</div>' + statusHtml + restKeys.map(line).join(' ') + exclHtml + '</div>';
+    }).join('');
   }
 
   // ── HOI AI VE GIA (van ngan) — y het nut "🤖 Hoi AI" cua Pancake AI (quy tac: tinh nang co o Pancake AI thi Zalo AI cung co) ──
@@ -1404,21 +1436,8 @@
   // Xoa 1 dong don le (dung cho nut × ben canh so tien) — xac nhan truoc, xoa thang tren
   // Sheet (chinh la Sasum) roi lam moi lai the tu server de dam bao da dong bo.
   async function _zaiDeleteOneOrder_(phone, sheet, rowIndex, label) {
-    if (!GAS_URL) { alert('Chưa cấu hình Google Sheets URL.'); return; }
-    if (!sheet || !rowIndex) return;
-    if (!confirm('Xóa đơn nghi trùng (thiếu 3 số 0) sau đây?\n\n' + label + '\n\nKhông thể hoàn tác.')) return;
-    try {
-      const r = await fetch(GAS_URL, { method:'POST', body: JSON.stringify({
-        action:'deleteDuplicateOrders', items:[{ sheet, rowIndex }]
-      }), headers:{'Content-Type':'text/plain'} });
-      const d = await r.json();
-      if (!d.ok) { alert('Lỗi xóa: ' + (d.error || 'không rõ')); return; }
-      delete _lookupCache[phone];
-      await _zaiForceRefresh_(phone); // luon ve lai the + dong bo lai voi Sasum
-      showMsg('zai-save-status', '🗑️ Đã xóa đơn trùng và đồng bộ Sasum.', 3000);
-    } catch (e) {
-      alert('Lỗi kết nối: ' + e.message);
-    }
+    // 4c-3: da go code xoa don khoi extension (chi admin xoa/sua don tren web CRM).
+    alert('Chi admin xoa/sua don tren web CRM.');
   }
 
   // Chi ve lai khung the thong tin (doc, an toan de goi lai khi poll ma khong lam mat du lieu CS dang go)
@@ -1453,7 +1472,7 @@
         ${care&&care.note ? `<div class="zai-card-note">📝 ${escHtml(_latestNoteText_(care.note))}</div>` : ''}
         ${_cskhHtml_(cskhRows)}
         <div class="zai-card-orders" id="zai-orders-box"></div>
-        ${orders.length > 1 ? `<button type="button" class="zai-btn zai-btn-ghost zai-btn-sm zai-dup-btn" style="margin-top:6px;color:#dc2626" title="Kiểm tra & xóa đơn hàng bị trùng (cùng tháng + doanh thu) của khách này">🗑️ Kiểm tra đơn trùng</button>` : ''}
+        ${(ZAI_CAN_DELETE_ORDERS && orders.length > 1) ? `<button type="button" class="zai-btn zai-btn-ghost zai-btn-sm zai-dup-btn" style="margin-top:6px;color:#dc2626" title="Kiểm tra & xóa đơn hàng bị trùng (cùng tháng + doanh thu) của khách này">🗑️ Kiểm tra đơn trùng</button>` : ''}
       </div>`;
 
     const dupBtn = area.querySelector('.zai-dup-btn');
@@ -1467,6 +1486,7 @@
       const toggleBtn = ordersBox.querySelector('.zai-orders-toggle');
       if (toggleBtn) toggleBtn.onclick = () => { expanded = !expanded; paintOrders(); };
       ordersBox.querySelectorAll('.zai-order-x').forEach(btn => {
+        if (!ZAI_CAN_DELETE_ORDERS) { btn.remove(); return; }
         btn.onclick = () => _zaiDeleteOneOrder_(phone, btn.dataset.sheet, Number(btn.dataset.row), btn.dataset.label);
       });
     }

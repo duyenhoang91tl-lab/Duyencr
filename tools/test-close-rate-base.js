@@ -23,6 +23,8 @@ vm.runInContext(`
   __base.push(__b('05/10/2026', 'saleA', 'Hoàn thành', 'K1', 'Vòng bạc'));   // san pham khac
   __base.push(__b('05/10/2026', 'saleC', 'Hoàn thành', 'K2'));              // kenh K2 (khong co Pancake)
   __base.push(__b('30/09/2026', 'saleA'));                    // ngoai ky
+  __base.push(Object.assign(__b('05/10/2026', 'saleA'), { nguoiTao: 'mktX' }));   // nguoi tao KHONG phai sale -> chi dem cho kenh
+  __base.push(Object.assign(__b('05/10/2026', 'saleA'), { bhZero: true }));       // don BH khong doanh thu -> loai
   readDTTong_ = function() { return __base; };
   readPancakePageMap_ = function() { return { P1: 'K1', '862972056891669': 'K1' }; };
   readPancakePageMapByName_ = function() { return { 'page mot': 'K1' }; };
@@ -38,28 +40,27 @@ vm.runInContext(`
 `, ctx);
 const F = { dateFrom: '2026-10-01', dateTo: '2026-10-12' };
 const B = (f) => vm.runInContext('buildSalesReportB_(' + JSON.stringify(Object.assign({}, F, f || {})) + ')', ctx);
+const A = (f) => vm.runInContext('buildSalesReportA_(' + JSON.stringify(Object.assign({}, F, f || {})) + ')', ctx);
 
-// 1) Pos TRONG nhung Base co don -> ty le chot van tinh theo Base
+// 1) Pos TRONG nhung Base co don -> ty le chot van tinh theo Base (tu so = don Base theo NGUOI TAO; mau so = tuong tac Pancake)
 let r = B();
 const sale = n => r.saleCloseRate.find(x => x.name === n);
 eq(r.totalOrders, 0, 'so don/doanh thu cua B van tinh tu Pos (Pos trong -> 0 don)');
-eq(sale('saleA'), { name: 'saleA', held: 100, closed: 7, closeRate: 7 }, 'saleA: 7 don Base (6 + 1 san pham khac) / 100 tuong tac = 7%, KHONG bi keo thap boi Pos');
+eq(sale('saleA'), { name: 'saleA', held: 100, closed: 7, closeRate: 7 }, 'saleA: 7 don Base / 100 tuong tac = 7%, KHONG bi keo thap boi Pos');
 eq(sale('saleB'), { name: 'saleB', held: 50, closed: 3, closeRate: 6 }, 'saleB: 3 don Base / 50 tuong tac = 6%');
-const k1 = r.kenhCloseRate.find(x => x.name === 'K1'); eq([k1.held, k1.closed, k1.closeRate], [150, 10, 6.7], 'kenh K1: 10 don Base / 150 tuong tac = 6.7% (K2 khong co Pancake khong vao)');
-ok(!r.kenhCloseRate.some(x => x.name === 'K2' && x.closed), 'don kenh khong co ngay Pancake bi bo qua');
+eq(sale('(chưa gán sale)').closed, 1, 'nguoi tao khong phai sale (mktX) -> don do vao "(chua gan sale)", khong tinh cho sale nao');
+const k1 = r.kenhCloseRate.find(x => x.name === 'K1'); eq([k1.held, k1.closed, k1.closeRate], [150, 11, 7.3], 'kenh K1 dem moi don Base (ke ca nguoi tao khong phai sale): 11 / 150 = 7.3%');
+ok(!r.kenhCloseRate.some(x => x.name === 'K2' && x.closed), 'don kenh/ngay khong co du lieu Pancake bi bo qua');
+// don That bai, don BH khong doanh thu, don ngoai ky, ngay khong co Pancake deu KHONG vao tu so (da nam trong con so 7/3/11 o tren)
 
-// 2) Khi Pos co don (khac so luong) thi ty le chot KHONG doi — chi doanh thu/so don cua B theo Pos
+// 2) Khi Pos co don thi ty le chot KHONG doi — chi doanh thu/so don cua B theo Pos
 vm.runInContext("__pos = [{ ngayTaoDon: '05/10/2026', trangThai: 'Hoàn thành', theSale: 'saleA', soDienThoai: '0900000001', nguonDon: 'Facebook / Page Mot (862972056891669)', giaTri: 1, sanPham: 'Nhẫn vàng' }];", ctx);
 const r2 = B(); eq(r2.saleCloseRate.find(x => x.name === 'saleA').closed, 7, 'co don Pos hay khong, tu so ty le chot van la don Base');
 
-// 3) Hai bao cao ra CUNG con so khi chon cung ngay/sale (A = nguon chuan)
-const A = vm.runInContext('buildSalesReportA_(' + JSON.stringify(F) + ')', ctx);
-eq(r2.saleCloseRate, A.saleCloseRate, 'A va B: ty le chot theo Sale giong het'); eq(r2.kenhCloseRate, A.kenhCloseRate, 'A va B: ty le chot theo Kenh giong het');
+// 3) Hai bao cao ra CUNG con so khi chon cung ngay (A = nguon chuan)
+const a = A(); eq(r2.saleCloseRate, a.saleCloseRate, 'A va B: ty le chot theo Sale giong het'); eq(r2.kenhCloseRate, a.kenhCloseRate, 'A va B: ty le chot theo Kenh giong het');
 
-// 4) Bo loc: Sale, San pham, Nguon don -> Kenh
-const rs = B({ sale: ['saleB'] }); eq(rs.saleCloseRate.find(x => x.name === 'saleB').closed, 3, 'loc Sale=saleB van ra 3 don'); ok(!(rs.saleCloseRate.find(x => x.name === 'saleA') || { closed: 0 }).closed, 'loc Sale=saleB: khong dem don cua saleA');
-const rp = B({ sanPham: 'Vòng bạc' }); eq(rp.saleCloseRate.find(x => x.name === 'saleA').closed, 1, 'loc San pham: chi 1 don Vong bac');
-const rn = B({ nguon: ['Facebook / Page Mot (862972056891669)'] }); eq(rn.kenhCloseRate.find(x => x.name === 'K1').closed, 10, 'loc Nguon don -> doi ra Kenh K1 (khop ID Page)');
-const rn2 = B({ nguon: ['Facebook / Page Mot'] }); eq(rn2.kenhCloseRate.find(x => x.name === 'K1').closed, 10, 'loc Nguon don -> khop ten Page khi khong co ID');
-const rn3 = B({ nguon: ['Nguon la khong khop Page nao'] }); eq(rn3.kenhCloseRate.filter(x => x.closed).length, 0, 'Nguon khong khop Page nao -> khong don nao');
+// 4) Bo loc Sale/San pham/Nguon cua tung bao cao CHI ap cho bang doanh thu — khong lam doi ty le chot (A va B van cung so)
+const rs = B({ sale: ['saleB'], sanPham: 'Vòng bạc', nguon: ['Facebook / Page Mot (862972056891669)'] }), as = A({ sale: ['saleB'], sanPham: 'Vòng bạc' });
+eq(rs.saleCloseRate, r2.saleCloseRate, 'B co loc Sale/San pham/Nguon: ty le chot khong doi'); eq(as.saleCloseRate, r2.saleCloseRate, 'A co loc: ty le chot khong doi');
 console.log('ALL CLOSE-RATE-BASE TESTS PASSED');

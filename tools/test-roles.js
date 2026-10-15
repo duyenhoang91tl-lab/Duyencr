@@ -126,7 +126,13 @@ ok(run('_featureGate_','salesReportA','tokCs')===null,'bo phan khong khop nguoi 
   ok(ctx._scopeVerdict_(mk('cs',[]),'0901',own(H))===false,'CS chua gan ten -> khong thay khach nao (nhu client)');
   ok(ctx._scopeVerdict_(mk('admin',[]),'0901',own(H))===true,'admin xem tat ca');
   ok(ctx._scopeVerdict_(mk('viewer',[]),'0901',own(H))===true&&ctx._scopeVerdict_(mk('ceo',[]),'0901',own(H))===true,'viewer/ceo khong gioi han (nhu client)');
-  ok(ctx._scopeVerdict_(mk('leader',['Mai']),'0901',own(H))===null,'leader: chua kiem o server -> null (cho qua)');
+  ctx.getCrmSS_=()=>({getSheetByName:()=>({})});
+  ctx.readTeams_=()=>[{name:'T1',leader:'Lan',members:['Hoa','Mai']},{name:'T2',leader:'Bao',members:['Cuc']}];
+  ok(ctx._scopeVerdict_(mk('leader',['Lan']),'0901',own({'Hoa':1}))===true,'leader: khach cua THANH VIEN team -> trong pham vi (4c-2c)');
+  ok(ctx._scopeVerdict_(mk('leader',['Lan']),'0901',own({'Cuc':1}))===false,'leader: khach cua team KHAC -> NGOAI pham vi');
+  ok(ctx._scopeVerdict_(mk('leader',['Lan']),'0901',own({'Lan':1}))===true,'leader: khach cua chinh minh -> trong pham vi');
+  ok(ctx._scopeVerdict_({username:'l2',role:'leader',names:[],team:'T2'},'0901',own({'Cuc':1}))===true,'leader theo user.team khi chua gan ten -> thay khach thanh vien team do');
+  ok(ctx._scopeVerdict_({username:'l3',role:'leader',names:[]},'0901',own({'Cuc':1}))===false,'leader khong ten, khong team -> khong thay gi');
   // gate theo che do
   const U1={username:'cs_mai',role:'cs',names:['Mai']};
   ctx._sessUser_=t=>t==='tokMai'?U1:null;
@@ -152,6 +158,80 @@ ok(run('_featureGate_','salesReportA','tokCs')===null,'bo phan khong khop nguoi 
   ok(ctx._scopeGate_('lookup','tokMai','0901')===null,'loi bat ngo -> nuot, KHONG chan nham');
   // lookup = chi cac action doc theo SDT
   ok(Object.keys(ctx.SCOPE_ACTIONS_).sort().join()==='cskhDetail,donOrdersByPhone,lookup','SCOPE_ACTIONS_ dung 3 action doc theo SDT');
+}
+
+// ===== BUOC 4c-2b: loc danh sach theo pham vi (customers/orders/careLeads/reminders) =====
+{
+  let PR={scopeMode:'enforce'}, CSH={};
+  ctx.PropertiesService={getScriptProperties:()=>({getProperty:k=>PR[k]===undefined?null:PR[k],setProperty:(k,v)=>{PR[k]=v;}})};
+  ctx.CacheService={getScriptCache:()=>({get:k=>CSH[k]===undefined?null:CSH[k],put:(k,v)=>{CSH[k]=v;}})};
+  ctx.Utilities={formatDate:()=>'20261014'};
+  ctx.normPhone_=x=>String(x).replace(/\D/g,'');
+  // allowed names
+  ctx.getCrmSS_=()=>({getSheetByName:()=>({})});
+  ctx.readTeams_=()=>[{name:'T1',leader:'Lan',members:['Hoa','Mai']},{name:'T2',leader:'Bao',members:['Cuc']}];
+  const A=u=>ctx._scopeAllowedNames_(u);
+  ok(A({role:'admin'})===null&&A({role:'viewer'})===null&&A({role:'ceo'})===null,'admin/viewer/ceo: khong gioi han (null)');
+  ok(Object.keys(A({role:'cs',names:['Hoa']})).join()==='Hoa','CS: chi ten minh');
+  ok(Object.keys(A({role:'manager',names:['Hoa','Nga']})).sort().join()==='Hoa,Nga','manager/CS gop nhieu ten');
+  ok(Object.keys(A({role:'leader',names:['Lan'],team:''})).sort().join()==='Hoa,Lan,Mai','leader: minh + thanh vien team cua minh');
+  ok(Object.keys(A({role:'leader',names:['Zed'],team:'T2'})).sort().join()==='Bao,Cuc,Zed','leader theo user.team: them thanh vien team do');
+  ok(Object.keys(A({role:'cs',names:[]})).length===0,'CS chua gan ten -> tap rong (khong thay gi)');
+  // filter
+  const set={'0901':1,'0902':1};
+  const F=ctx._scopeFilterObj_;
+  let f=F('customers',{rows:[{phone:'0901'},{phone:'0903'},{phone:'0902'}],careStatus:{a:1}},set);
+  ok(f.obj.rows.length===2&&f.total===3&&f.kept===2&&f.obj.careStatus.a===1,'customers: loc rows, giu careStatus');
+  f=F('orders',{orders:[{phone:'0901'},{phone:'0999'}],errorCount:2},set); ok(f.obj.orders.length===1&&f.obj.errorCount===2,'orders: loc, giu errorCount');
+  f=F('careLeads',{rows:[{phone:'0902'},{phone:'0555'}]},set); ok(f.obj.rows.length===1,'careLeads: loc theo SDT');
+  f=F('reminders',{reminders:[{phone:'0901'},{phone:'0555'}]},set); ok(f.obj.reminders.length===1,'reminders: loc theo SDT');
+  f=F('customers',{rows:[{phone:'84901'}]},{'0901':1}); ok(true,'(chuan hoa SDT dung chung normPhone_)');
+  const orig={rows:[{phone:'0903'}]}; f=F('customers',orig,set); ok(orig.rows.length===1,'khong sua doi object goc (copy)');
+  ok(F('customers',{error:'x'},set).obj.error==='x','payload loi/khong co mang -> tra nguyen');
+  // 4c-2c: cskhDuyenLite / cskhDuyen (rows) va searchOrder (results)
+  for(const act of ['cskhDuyenLite','cskhDuyen']){ f=F(act,{ok:true,rows:[{phone:'0901'},{phone:'0555'}],total:2},set); ok(f.obj.rows.length===1&&f.obj.total===2&&f.obj.ok===true,act+': loc rows theo SDT, giu cac truong khac'); }
+  f=F('searchOrder',{ok:true,results:[{phone:'0901',code:'A'},{phone:'0555',code:'B'}]},set); ok(f.obj.results.length===1&&f.obj.results[0].code==='A','searchOrder: loc results theo SDT');
+  ok(['cskhDuyenLite','cskhDuyen','searchOrder'].every(a=>ctx.SCOPE_LIST_ACTIONS_[a]===1),'SCOPE_LIST_ACTIONS_ co 3 action 4c-2c');
+  // serve
+  const U={username:'cs_hoa',role:'cs',names:['Hoa']};
+  ctx._sessUser_=t=>t==='tok'?U:(t==='tokAd'?{username:'ad',role:'admin',names:[]}:null);
+  ctx._scopePhoneSet_=()=>set;
+  const mkResp=o=>({getContent:()=>JSON.stringify(o)});
+  ctx.doGetCore_=()=>mkResp({rows:[{phone:'0901'},{phone:'0903'}]});
+  ctx.jsonOut_=o=>({getContent:()=>JSON.stringify(o)});
+  let out=ctx._scopeListServe_('customers',{token:'tok'},{});
+  ok(JSON.parse(out.getContent()).rows.length===1,'ENFORCE: CS nhan danh sach da loc');
+  out=ctx._scopeListServe_('customers',{token:'tokAd'},{}); ok(out===null,'admin: tra null -> doGet chay nhu cu');
+  PR.scopeMode='log';
+  out=ctx._scopeListServe_('customers',{token:'tok'},{}); ok(JSON.parse(out.getContent()).rows.length===2,'LOG: tra NGUYEN VEN (khong loc)');
+  ok(ctx._scopeReport_().rows.some(r=>/cs_hoa \| customers \| LIST would-filter 1\/2/.test(r.k)),'LOG: ghi dem so dong se bi loc');
+  PR.scopeMode='off'; ok(ctx._scopeListServe_('customers',{token:'tok'},{})===null,'OFF: khong lam gi');
+  PR.scopeMode='enforce';
+  ok(ctx._scopeListServe_('teams',{token:'tok'},{})===null&&ctx._scopeListServe_('customers',{token:''},{})===null,'action khac / khong token -> null');
+  ctx.doGetCore_=()=>{throw new Error('boom');}; ok(ctx._scopeListServe_('customers',{token:'tok'},{})===null,'doGetCore_ loi -> null (de doGet tu xu ly)');
+  ctx.doGetCore_=()=>({getContent:()=>'not json'}); ok(ctx._scopeListServe_('customers',{token:'tok'},{})===null,'phan hoi khong phai JSON -> null');
+  ok(/_scopeListServe_\(action, p, e\)/.test(src),'doGet goi _scopeListServe_');
+}
+
+// ===== BUOC 4c-3: cau hinh cau truc chi admin/leader/manager; mau follow-up CS chi sua cua minh =====
+{
+  const US={tA:{username:'ad',role:'admin'},tL:{username:'ld',role:'leader'},tM:{username:'mg',role:'manager'},tC:{username:'cs_hoa',name:'Hoa',role:'cs',names:['Hoa']}};
+  ctx._sessUser_=t=>US[t]||null;
+  for(const a of ['saveTeams','saveMktTeams','saveSaleGroups','saveCareStatus']){
+    ok(ctx._cfgGate_(a,'tC').code==='FORBIDDEN',a+': CS goi thang -> FORBIDDEN');
+    ok(ctx._cfgGate_(a,'tA')===null&&ctx._cfgGate_(a,'tL')===null&&ctx._cfgGate_(a,'tM')===null,a+': admin/leader/manager duoc');
+  }
+  ok(ctx._cfgGate_('saveSingle','tC')===null&&ctx._cfgGate_('saveFollowUpTemplates','tC')===null&&ctx._cfgGate_('saveMessageTemplate','tC')===null,'trang thai tung khach (saveSingle) / mau cua CS KHONG bi chan o cong cau hinh');
+  ok(ctx._cfgGate_('saveTeams','')===null&&ctx._cfgGate_('saveTeams','tokSai')===null,'khong token / token sai: de cong tac 4b xu ly');
+  ok(/_cfgGate_\(d0\.action, d0\.token\)/.test(src),'doPost goi _cfgGate_');
+  // gop mau follow-up
+  const cur=[['*','7','chung admin',''],['CF','3','cua Hoa','hoa'],['CF','5','cua Mai','mai'],['*','10','cua Hoa2','hoa']];
+  const list=[{productCode:'*',days:'7',template:'CS thu xoa mau chung',cs:''},{productCode:'cf',days:'3',template:'Hoa sua',cs:'Hoa'},{productCode:'*',days:'9',template:'Hoa them',cs:'hoa'},{productCode:'*',days:'1',template:'ghi de cua Mai',cs:'mai'},{productCode:'*',days:'',template:'thieu ngay',cs:'hoa'}];
+  const m=ctx._fuMergeForUser_(cur,list,US.tC);
+  const txt=m.map(r=>r[2]+'|'+r[3]).sort().join(' ; ');
+  ok(txt==='Hoa sua|hoa ; Hoa them|hoa ; chung admin| ; cua Mai|mai','CS: giu mau chung + mau cua Mai nguyen ven, chi thay mau cua minh (khong ghi de, khong xoa): '+txt);
+  ok(m.every(r=>r.length===4)&&m.find(r=>r[2]==='Hoa sua')[0]==='CF','dong hop le co 4 cot, ma SP viet hoa');
+  ok(ctx._fuMergeForUser_(cur,[],US.tC).length===2&&ctx._fuMergeForUser_(cur,[],US.tC).every(r=>r[3]!=='hoa'),'CS gui bang rong -> chi xoa mau cua minh');
 }
 
 console.log(fail?'\nFAILED '+fail:'\nALL ROLES TESTS PASSED');process.exit(fail?1:0);
