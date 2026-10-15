@@ -16,14 +16,6 @@
     "count": {
       "status": "gap",
       "note": "Zalo doi chieu phien ban backend (`ver`); Pancake chua co — xem co can khong"
-    },
-    "findDuplicateOrders": {
-      "status": "gap",
-      "note": "Zalo co cong cu do don trung; Pancake chua co"
-    },
-    "deleteDuplicateOrders": {
-      "status": "gap",
-      "note": "Zalo co cong cu xoa don trung; Pancake chua co"
     }
   },
   "onlyPancake": {

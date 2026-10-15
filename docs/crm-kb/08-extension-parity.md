@@ -20,7 +20,8 @@ Ngoại lệ DUY NHẤT: tính năng gắn chặt với 1 nền tảng (vd gửi
 ## Danh sách còn lệch (trạng thái 2026-10-13) — cần Duyên chốt có làm bù không
 `status: "platform"` = đặc thù nền tảng, hợp lệ. `status: "gap"` = bên kia CHƯA có (chi tiết từng mục: `node tools/check-ext-parity.js --list`).
 
-**Zalo có, Pancake thiếu (gap):** đối chiếu phiên bản backend (`count`), công cụ dò/xoá đơn trùng (`findDuplicateOrders`/`deleteDuplicateOrders`).
+**Zalo có, Pancake thiếu (gap):** đối chiếu phiên bản backend (`count`).
+**KHÔNG làm bù (quyết định bảo mật):** dò/xoá đơn trùng (`findDuplicateOrders`/`deleteDuplicateOrders`) — Bảo mật 4c-3 (2026-10-14) đã GỠ khỏi Zalo AI (chỉ admin xoá đơn trên web CRM), nên Pancake AI cũng KHÔNG được có. Nguyên tắc chung: tính năng đã bị gỡ vì bảo mật thì gỡ ở cả 2 bên, không "bù" ngược.
 **Pancake có, Zalo thiếu (gap):** nạp CTKM cho Soạn đơn (`ctkmCatalog`), kiến thức sản phẩm (`getKnowledge`), cây/phẳng bảng giá cho Soạn đơn (`priceCatalogTree`/`Flat`), ảnh sản phẩm (`productImageFlat`/`driveImageFromLink`), tra đơn theo SĐT (`donOrdersByPhone`), lưu/xoá mẫu tin nhắn (`saveMessageTemplate`/`deleteMessageTemplate`), giao/nhận việc + thống kê CS (`assign`/`toggleAssignDone`/`csStats`), đăng nhập xác minh (`verifyLogin`).
 **Đặc thù nền tảng (hợp lệ):** Zalo — gửi hàng loạt (`broadcastQueue`/`broadcastMark`), trạng thái kết bạn (`syncZaloFriendStatus`); Pancake — câu trả lời nhanh (`saveCannedResponse`/`deleteCannedResponse`).
 > Các mục `gap` do máy phát hiện từ tên action, CHƯA xác minh từng cái có thật sự cần ở bên kia hay không. Làm bù theo thứ tự Duyên chọn; xong mục nào thì xoá mục đó khỏi allow-list (script sẽ nhắc).
