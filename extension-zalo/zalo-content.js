@@ -231,7 +231,8 @@
       { v: '', label: '— Chọn mục —' },
       { v: 'bc', label: '📢 Gửi hàng loạt' },
       { v: 'zs', label: '🔍 Quét trạng thái kết bạn Zalo' },
-      { v: 'remind', label: '🔔 Lịch hẹn (0)' }
+      { v: 'remind', label: '🔔 Lịch hẹn (0)' },
+      { v: 'ctkm', label: '🎁 Tra cứu khuyến mãi' }
     ].forEach(o => { const op = document.createElement('option'); op.value = o.v; op.textContent = o.label; menuSel.appendChild(op); });
     menuWrap.appendChild(menuSel);
     const menuContent = document.createElement('div');
@@ -270,8 +271,22 @@
     remindBody.style.display = 'none';
     menuContent.appendChild(remindBody);
 
+    // 🎁 Tra cứu khuyến mãi (Sheet CTKM, cùng file với bảng giá) — giống mục "Tra cứu khuyến mãi" của Pancake AI (quy tắc song song)
+    const ctkmBody = document.createElement('div');
+    ctkmBody.id = 'zai-ctkm-body';
+    ctkmBody.style.display = 'none';
+    ctkmBody.innerHTML =
+      '<div id="zai-ctkm-row"><input type="text" id="zai-ctkm-q" placeholder="Từ khoá khuyến mãi (để trống = xem tất cả)..." />' +
+      '<button class="zai-btn zai-btn-primary zai-btn-sm" id="zai-ctkm-btn" type="button">Tìm</button></div>' +
+      '<div id="zai-ctkm-result"></div>';
+    menuContent.appendChild(ctkmBody);
+    ctkmBody.querySelector('#zai-ctkm-btn').addEventListener('click', doCtkmSearchZai_);
+    ctkmBody.querySelector('#zai-ctkm-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') doCtkmSearchZai_(); });
+
     menuSel.addEventListener('change', () => {
       const v = menuSel.value;
+      ctkmBody.style.display = v === 'ctkm' ? 'block' : 'none';
+      if (v === 'ctkm' && !_zaiCtkmLoadedOnce) { _zaiCtkmLoadedOnce = true; doCtkmSearchZai_(); }   // mo muc la nap luon toan bo CTKM
       bcBody.style.display = v === 'bc' ? 'block' : 'none';
       zsBody.style.display = v === 'zs' ? 'block' : 'none';
       remindBody.style.display = v === 'remind' ? 'block' : 'none';
@@ -1090,6 +1105,52 @@
     } catch (e) {
       box.innerHTML = '<div style="color:#1e3a8a;font-size:11.5px;font-style:italic;padding:4px 0">Lỗi kết nối: ' + escHtml(e.message) + '</div>';
     }
+  }
+
+  // ── TRA CUU KHUYEN MAI (CTKM) — y het muc "Tra cuu khuyen mai" cua Pancake AI (GAS action=ctkmSearch, GET, chi doc, KHONG qua AI) ──
+  // Hien nguyen cac cot cua sheet CTKM dang the (khong gia / khong nut them gio hang), kem nhan han su dung va dieu kien KHONG ap dung.
+  let _zaiCtkmLoadedOnce = false;
+  function _zaiStripVN_(s) {
+    return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
+  }
+  async function doCtkmSearchZai_() {
+    const q = (document.getElementById('zai-ctkm-q').value || '').trim();
+    const box = document.getElementById('zai-ctkm-result');
+    if (!GAS_URL) { box.innerHTML = '<div class="zai-ctkm-loading">Chưa cài đặt URL GAS. Nhấn ⚙.</div>'; return; }
+    box.innerHTML = '<div class="zai-ctkm-loading">Đang tìm...</div>';
+    try {
+      const res = await fetch(GAS_URL + (GAS_URL.includes('?') ? '&' : '?') + 'action=ctkmSearch' + (q ? '&q=' + encodeURIComponent(q) : ''), { redirect: 'follow' });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      renderCtkmRowsZai_(data.rows || [], q);
+    } catch (e) { box.innerHTML = '<div class="zai-ctkm-loading">Lỗi: ' + escHtml(e.message || 'không rõ') + '</div>'; }
+  }
+  function renderCtkmRowsZai_(rows, q) {
+    const box = document.getElementById('zai-ctkm-result');
+    if (!rows.length) {
+      box.innerHTML = '<div class="zai-ctkm-loading">Không tìm thấy' + (q ? ' cho "' + escHtml(q) + '"' : '') + ' — kiểm tra lại sheet CTKM (cùng file với bảng giá).</div>';
+      return;
+    }
+    box.innerHTML = rows.slice(0, 30).map((row) => {
+      const exclKey = row.__ctkmExclusionKey || '';
+      const keys = Object.keys(row).filter((k) =>
+        row[k] !== '' && row[k] !== null && row[k] !== undefined &&
+        _zaiStripVN_(k).trim() !== 'stt' &&
+        k.indexOf('__ctkm') !== 0 &&      // bo cac field noi bo (trang thai/ngoai le da tach rieng hien ben duoi)
+        k !== exclKey                      // bo trung cot dieu kien loai tru (da hien rieng)
+      );
+      if (!keys.length) return '';
+      // Cot dau tien con lai lam tieu de the, cac cot sau la nhan phu — KHONG doan ten cot (sheet CTKM co the doi ten cot).
+      const titleKey = keys[0], restKeys = keys.slice(1);
+      const line = (k) => '<span class="zai-ctkm-field"><b>' + escHtml(k) + ':</b> ' + escHtml(row[k]) + '</span>';
+      const statusHtml = row.__ctkmStatusLabel
+        ? '<div class="zai-ctkm-status' + (row.__ctkmExpired ? ' zai-ctkm-status-expired' : (row.__ctkmUpcoming ? ' zai-ctkm-status-upcoming' : ' zai-ctkm-status-active')) + '">' + escHtml(row.__ctkmStatusLabel) + '</div>'
+        : '';
+      const exclHtml = row.__ctkmExclusionNote
+        ? '<div class="zai-ctkm-excl">⚠️ <b>' + (exclKey ? escHtml(exclKey) : 'Điều kiện không áp dụng') + ':</b> ' + escHtml(row.__ctkmExclusionNote) + '</div>'
+        : '';
+      return '<div class="zai-ctkm-item' + (row.__ctkmExpired ? ' zai-ctkm-item-expired' : '') + '"><div class="zai-ctkm-title">' + escHtml(String(row[titleKey])) + '</div>' + statusHtml + restKeys.map(line).join(' ') + exclHtml + '</div>';
+    }).join('');
   }
 
   // ── HOI AI VE GIA (van ngan) — y het nut "🤖 Hoi AI" cua Pancake AI (quy tac: tinh nang co o Pancake AI thi Zalo AI cung co) ──

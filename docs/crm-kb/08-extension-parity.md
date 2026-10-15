@@ -21,6 +21,9 @@ Ngoại lệ DUY NHẤT: tính năng gắn chặt với 1 nền tảng (vd gửi
 `status: "platform"` = đặc thù nền tảng, hợp lệ. `status: "gap"` = bên kia CHƯA có (chi tiết từng mục: `node tools/check-ext-parity.js --list`).
 
 **Zalo có, Pancake thiếu (gap):** đối chiếu phiên bản backend (`count`), công cụ dò/xoá đơn trùng (`findDuplicateOrders`/`deleteDuplicateOrders`).
-**Pancake có, Zalo thiếu (gap):** tra CTKM (`ctkmSearch`/`ctkmCatalog`), kiến thức sản phẩm (`getKnowledge`), cây/phẳng bảng giá cho Soạn đơn (`priceCatalogTree`/`Flat`), ảnh sản phẩm (`productImageFlat`/`driveImageFromLink`), tra đơn theo SĐT (`donOrdersByPhone`), lưu/xoá mẫu tin nhắn (`saveMessageTemplate`/`deleteMessageTemplate`), giao/nhận việc + thống kê CS (`assign`/`toggleAssignDone`/`csStats`), đăng nhập xác minh (`verifyLogin`).
+**Pancake có, Zalo thiếu (gap):** nạp CTKM cho Soạn đơn (`ctkmCatalog`), kiến thức sản phẩm (`getKnowledge`), cây/phẳng bảng giá cho Soạn đơn (`priceCatalogTree`/`Flat`), ảnh sản phẩm (`productImageFlat`/`driveImageFromLink`), tra đơn theo SĐT (`donOrdersByPhone`), lưu/xoá mẫu tin nhắn (`saveMessageTemplate`/`deleteMessageTemplate`), giao/nhận việc + thống kê CS (`assign`/`toggleAssignDone`/`csStats`), đăng nhập xác minh (`verifyLogin`).
 **Đặc thù nền tảng (hợp lệ):** Zalo — gửi hàng loạt (`broadcastQueue`/`broadcastMark`), trạng thái kết bạn (`syncZaloFriendStatus`); Pancake — câu trả lời nhanh (`saveCannedResponse`/`deleteCannedResponse`).
 > Các mục `gap` do máy phát hiện từ tên action, CHƯA xác minh từng cái có thật sự cần ở bên kia hay không. Làm bù theo thứ tự Duyên chọn; xong mục nào thì xoá mục đó khỏi allow-list (script sẽ nhắc).
+
+## Đã làm bù (nhật ký)
+- 2026-10-14: **🎁 Tra cứu khuyến mãi (`ctkmSearch`)** — Zalo AI có mục menu giống Pancake AI; `node tools/test-ctkm-ui.js` chạy CÙNG dữ liệu qua hàm render của cả 2 bên và so khớp HTML.
