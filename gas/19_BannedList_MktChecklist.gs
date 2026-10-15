@@ -264,7 +264,7 @@ function buildMktChecklistReport_(from, to) {
     if (!datesByKenhM[kn]) datesByKenhM[kn] = {};
     Object.keys(ds).forEach(function(d) { datesByKenhM[kn][d] = true; });
   });
-  var rowsDt = readDTTong_();
+  var rowsDt = readDTTong_(true);
   for (var i = 0; i < rowsDt.length; i++) {
     var dt = parseVNDate_(rowsDt[i].ngayTao);
     // SUA 2026-10-03: thieu dieu kien loai don Huy/Da hoan/Dang hoan (_isExcludedOrderStatus_)

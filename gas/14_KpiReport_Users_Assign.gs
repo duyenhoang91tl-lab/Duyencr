@@ -31,6 +31,7 @@ function buildKpiReport_(from, to, saleFilter) {
   // rieng bao cao KPI nay. Cac bao cao doanh so A/B/C khac VAN giu nguyen o.date nhu cu,
   // khong dong cham toi (do la quyet dinh rieng, xem chu thich o dtRowToOrder_ dong ~994).
   var orders = readAllOrders_();
+  _dtApplyBoDem_(orders);   // cột U mã bộ đếm → nhận đơn BH không doanh thu
   var byPageOrders = {}, bySaleOrders = {};
   // MOI: gom them theo (kenh|sale) x NGAY — dung rieng cho tu so "Ty le chot", de chi cong don
   // trong dung nhung ngay Page/Sale do THUC SU co du lieu tuong tac Pancake (xem

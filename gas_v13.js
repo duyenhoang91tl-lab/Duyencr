@@ -2783,6 +2783,7 @@ var DT_COL_GIATRICOC  = 16;
 var DT_COL_GIATRIDON  = 17;
 var DT_COL_GIATRICHENH= 18;
 var DT_COL_ID         = 19;
+var DT_COL_BODEM      = 20;   // cột U = 'Mã bộ đếm' (vd BH196T10/2026) — NGOÀI vùng A:T (DT_TONG_WIDTH); chỉ đọc riêng khi tính tỷ lệ chốt
 var DT_TONG_WIDTH     = 20; // A:T
 // Sentinel dung thay cho "instanceof Date" khi gia tri tho cua "DT TỔNG " di qua cache (xem
 // _readDTTongRawValuesCached_) — JSON.stringify bien Date thanh chuoi ISO, mat instanceof Date.
@@ -2790,13 +2791,40 @@ var DT_DATE_SENTINEL_ = '\u0000__DATE__\u0000';
 
 // Chuyen 1 hang tho cua DT TONG thanh object "don hang" (giu ten truong nhu ORDER_HEADERS
 // cu de cac cho khac trong code/frontend it phai sua nhat co the)
-// ĐƠN BẢO HÀNH (BH) KHÔNG DOANH THU: mã bộ đếm đơn dạng BH196T10/2026 (nằm ở cột id/ghi chú của Base). Đơn BH mà doanh thu = 0
+// ĐƠN BẢO HÀNH (BH) KHÔNG DOANH THU: mã bộ đếm dạng BH196T10/2026: ở Base nằm ở cột U 'Mã bộ đếm' (DT_COL_BODEM), ở Pos nằm ở cột ghi chú (Q). Đơn BH mà doanh thu = 0
 // KHÔNG tính là 1 đơn khi tính tỷ lệ chốt; BH có doanh thu (vd 160k) vẫn tính, gắn đúng page nếu có Kênh bán.
 var BH_ORDER_RE_ = /(^|[^A-Za-z0-9])BH\s*\d{1,6}[A-Za-z]{0,3}\s*T\d{1,2}(?:\/\d{2,4})?/i;
+var _dtBoDemMemo_ = null;
+// Cột U "Mã bộ đếm" của DT TỔNG (mảng chuỗi, phần tử i = dòng sheet i+2). 1 lần đọc 1 cột, nhớ 5s trong cùng request. null nếu sheet không có cột U.
+function _dtBoDemCol_() {
+  var now = Date.now();
+  if (_dtBoDemMemo_ && now - _dtBoDemMemo_.t < 5000) return _dtBoDemMemo_.v;
+  var v = null;
+  try {
+    var sh = getDTSS_().getSheetByName(DT_TONG_SHEET);
+    if (sh) {
+      var last = sh.getLastRow();
+      if (last >= 2 && sh.getLastColumn() >= DT_COL_BODEM + 1) {
+        v = sh.getRange(2, DT_COL_BODEM + 1, last - 1, 1).getValues().map(function(x) { return (x[0] === null || x[0] === undefined) ? '' : String(x[0]); });
+      }
+    }
+  } catch (e) {}
+  _dtBoDemMemo_ = { t: now, v: v };
+  return v;
+}
+// Gắn mã bộ đếm (cột U) + cờ bhZero cho danh sách order từ readAllOrders_ (dùng rowIndex = dòng sheet).
+function _dtApplyBoDem_(orders) {
+  var bd = _dtBoDemCol_();
+  if (!bd) return;
+  for (var i = 0; i < orders.length; i++) {
+    var c = bd[(orders[i].rowIndex || 0) - 2];
+    if (c) { orders[i].maBoDem = c; orders[i].bhZero = orders[i].bhZero || _isBhZeroOrder_(c, orders[i].revenue); }
+  }
+}
 function _isBhZeroOrder_(textBlob, revenue) { return BH_ORDER_RE_.test(String(textBlob || '')) && !(Number(revenue) > 0); }
 // Tỷ lệ chốt theo KÊNH tính trên BASE: tổng đơn bán được trên Base theo page (bỏ đơn hoàn/huỷ và BH không doanh thu) ÷ tổng tương tác Pancake của page.
 function _srKenhCloseRateFromBase_(filters) {
-  var rows = readDTTong_(), norm = [];
+  var rows = readDTTong_(true), norm = [];
   for (var i = 0; i < rows.length; i++) {
     var r = rows[i];
     if (r.bhZero || _isExcludedOrderStatus_(r.trangThai)) continue;
@@ -3541,7 +3569,7 @@ function _isDTRowHidden_(kenhBan, saleBan, sets) {
   return false;
 }
 
-function readDTTong_() {
+function readDTTong_(withBoDem) {   // withBoDem=true: đọc thêm cột U (mã bộ đếm) để nhận đơn BH không doanh thu
   var _t0 = Date.now();
   var vals, rowNums = null;
   // Supabase buoc 4c: khi cho phep (SB_ORD_READ=on, ban sao dong bo moi, khong dirty) doc dt_tong thay vi quet ca sheet.
@@ -3558,6 +3586,7 @@ function readDTTong_() {
   }
   var _tRead = Date.now() - _t0;
   var hiddenSets = _hiddenPageSaleSets_();
+  var boDem = withBoDem ? _dtBoDemCol_() : null;
   var out = [];
   for (var i = 0; i < vals.length; i++) {
     var r = vals[i];
@@ -3585,7 +3614,8 @@ function readDTTong_() {
         giaTriDon:      _normMoney_(r[17]),
         giaTriChenh:    _normMoney_(r[18]),
         id:             r[19],
-        bhZero:         _isBhZeroOrder_([r[19], r[14], r[15], r[6], r[2]].join(' '), _normMoney_(r[17]) + (_dtIsExchangeOrder_(r[15]) ? _normMoney_(r[18]) : 0))
+        maBoDem:        boDem ? (boDem[(rowNums ? rowNums[i] : i + 2) - 2] || '') : '',
+        bhZero:         _isBhZeroOrder_([r[19], r[14], r[15], r[6], r[2], boDem ? (boDem[(rowNums ? rowNums[i] : i + 2) - 2] || '') : ''].join(' '), _normMoney_(r[17]) + (_dtIsExchangeOrder_(r[15]) ? _normMoney_(r[18]) : 0))
       });
     } catch (eRow) {
       Logger.log('readDTTong_: loi doc dong ' + (rowNums ? rowNums[i] : i + 2) + ': ' + eRow);
@@ -4494,7 +4524,7 @@ function buildSalesReportA_(filters) {
   // Bộ lọc Sale: mở rộng sang mọi tên cùng 1 người (tài khoản nhiều tên) + tên Pancake, so không phân biệt hoa/thường.
   var saleFilterFoldA = _expandSaleFilterWithPancakeAliases_(saleFilterArr).map(_normTxt_);
 
-  var rows = readDTTong_();
+  var rows = readDTTong_(true);
   var matched = [];
   for (var i = 0; i < rows.length; i++) {
     var row = rows[i];
@@ -5711,7 +5741,7 @@ function buildSalesReportB_(filters) {
   // moi thuc su bi bo qua o buoc tinh ty le chot, giong cach A bo qua kenh chua khop Page.
   var pkPageMapB_ = readPancakePageMap_();
   var pkPageMapByNameB_ = readPancakePageMapByName_();
-  var normRowsB_ = matched.map(function(m) {
+  var normRowsB_ = matched.filter(function(m) { return !_isBhZeroOrder_(m.ghiChu, m.giaTriSauGiam); }).map(function(m) {   // Pos: mã BH ở cột ghi chú; BH không doanh thu không tính là đơn chốt
     var pid = _extractPageIdFromNguonDon_(m.nguonDon);
     var kenhB_ = pid ? (pkPageMapB_[pid] || '') : '';
     if (!kenhB_) {
@@ -8325,6 +8355,7 @@ function buildKpiReport_(from, to, saleFilter) {
   // rieng bao cao KPI nay. Cac bao cao doanh so A/B/C khac VAN giu nguyen o.date nhu cu,
   // khong dong cham toi (do la quyet dinh rieng, xem chu thich o dtRowToOrder_ dong ~994).
   var orders = readAllOrders_();
+  _dtApplyBoDem_(orders);   // cột U mã bộ đếm → nhận đơn BH không doanh thu
   var byPageOrders = {}, bySaleOrders = {};
   // MOI: gom them theo (kenh|sale) x NGAY — dung rieng cho tu so "Ty le chot", de chi cong don
   // trong dung nhung ngay Page/Sale do THUC SU co du lieu tuong tac Pancake (xem
@@ -12094,7 +12125,7 @@ function buildMktChecklistReport_(from, to) {
     if (!datesByKenhM[kn]) datesByKenhM[kn] = {};
     Object.keys(ds).forEach(function(d) { datesByKenhM[kn][d] = true; });
   });
-  var rowsDt = readDTTong_();
+  var rowsDt = readDTTong_(true);
   for (var i = 0; i < rowsDt.length; i++) {
     var dt = parseVNDate_(rowsDt[i].ngayTao);
     // SUA 2026-10-03: thieu dieu kien loai don Huy/Da hoan/Dang hoan (_isExcludedOrderStatus_)

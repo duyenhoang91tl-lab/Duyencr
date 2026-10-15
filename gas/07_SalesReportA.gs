@@ -257,7 +257,7 @@ function buildSalesReportA_(filters) {
   // Bộ lọc Sale: mở rộng sang mọi tên cùng 1 người (tài khoản nhiều tên) + tên Pancake, so không phân biệt hoa/thường.
   var saleFilterFoldA = _expandSaleFilterWithPancakeAliases_(saleFilterArr).map(_normTxt_);
 
-  var rows = readDTTong_();
+  var rows = readDTTong_(true);
   var matched = [];
   for (var i = 0; i < rows.length; i++) {
     var row = rows[i];

@@ -710,7 +710,7 @@ function buildSalesReportB_(filters) {
   // moi thuc su bi bo qua o buoc tinh ty le chot, giong cach A bo qua kenh chua khop Page.
   var pkPageMapB_ = readPancakePageMap_();
   var pkPageMapByNameB_ = readPancakePageMapByName_();
-  var normRowsB_ = matched.map(function(m) {
+  var normRowsB_ = matched.filter(function(m) { return !_isBhZeroOrder_(m.ghiChu, m.giaTriSauGiam); }).map(function(m) {   // Pos: mã BH ở cột ghi chú; BH không doanh thu không tính là đơn chốt
     var pid = _extractPageIdFromNguonDon_(m.nguonDon);
     var kenhB_ = pid ? (pkPageMapB_[pid] || '') : '';
     if (!kenhB_) {
