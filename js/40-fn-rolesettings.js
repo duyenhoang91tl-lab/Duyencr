@@ -10,8 +10,8 @@ var _ROLE_BUILTIN = [
   { key:'ceo',     label:'CEO / Giám đốc', base:'viewer',  desc:'Xem toàn bộ dữ liệu công ty, không có quyền quản trị tài khoản.' },
   { key:'tp',      label:'Trưởng phòng',   base:'manager', desc:'Xem dữ liệu của các phòng được giao phụ trách.' },
   { key:'manager', label:'Quản lý',        base:'manager', desc:'Xem dữ liệu của các phòng/sale được giao phụ trách.' },
-  { key:'leader',  label:'Trưởng team',    base:'leader',  desc:'Xem dữ liệu của cả team mình làm trưởng.' },
-  { key:'cs',      label:'Nhân viên',      base:'cs',      desc:'Chỉ thấy dữ liệu của chính mình.' },
+  { key:'leader',  label:'Trưởng nhóm',    base:'leader',  desc:'Xem dữ liệu của cả team mình làm trưởng.' },
+  { key:'cs',      label:'Nhân viên kinh doanh', base:'cs',      desc:'Chỉ thấy dữ liệu của chính mình.' },
   { key:'demo',    label:'Tài khoản test', base:'demo',    locked:true, hidden:true, desc:'Chỉ xem báo cáo mẫu.' }
 ];
 var _ROLE_BASE_LABEL = { viewer:'Xem toàn công ty (không quản trị)', manager:'Theo phòng phụ trách', leader:'Theo team mình làm trưởng', cs:'Chỉ dữ liệu của chính mình', admin:'Toàn quyền', demo:'Báo cáo mẫu' };
@@ -105,7 +105,7 @@ function _rolesReapply(){
 })();
 
 // ═══ Trang cài đặt ═══
-var _rs = { cfg:null, sec:'roles', dirty:false, depts:[], saleDepts:{}, loading:false, prevUser:'' };
+var _rs = { cfg:null, sec:'roles', tab:'role', sel:'ceo', pq:'', recent:null, dirty:false, depts:[], saleDepts:{}, loading:false, prevUser:'' };
 var _RS_SECS = [['roles','👥 Vai trò'],['byrole','🧩 Quyền theo vai trò'],['bydept','🏢 Quyền theo bộ phận'],['preview','🔍 Xem thử theo tài khoản']];
 
 function _rsCatalog(){
@@ -142,7 +142,7 @@ function _rsRole(key){
 }
 function _rsRolesList(){
   var out = [];
-  _ROLE_BUILTIN.forEach(function(b){ if (!b.hidden) { var o = _rsRole(b.key); o.builtin = true; o.base = b.base; out.push(o); } });
+  _ROLE_BUILTIN.forEach(function(b){ if (!b.hidden) { var o = _rsRole(b.key); o.builtin = true; o.base = b.base; o.locked = !!b.locked; out.push(o); } });   // locked lấy từ định nghĩa có sẵn (cấu hình chưa có Admin vẫn phải khóa cột Admin)
   _rs.cfg.roles.forEach(function(r){ if (!_ROLE_BUILTIN.some(function(b){ return b.key === r.key; })) out.push(r); });
   return out;
 }
@@ -166,7 +166,7 @@ async function openRoleSettings(){
       _rs.depts = (Array.isArray(dl) && dl.length) ? dl : (typeof DEPT_LIST !== 'undefined' ? DEPT_LIST.slice() : []);
       _rs.saleDepts = d2 && d2.value ? (JSON.parse(d2.value) || {}) : {};
     } catch (e) { _rs.depts = (typeof DEPT_LIST !== 'undefined' ? DEPT_LIST.slice() : []); _rs.saleDepts = {}; }
-    _rs.dirty = false; _rs.sec = 'roles'; _rsRender();
+    _rs.dirty = false; _rs.sec = 'roles'; _rs.tab = _rs.tab || 'role'; _rs.recent = null; _rsRender();
   } catch (e) { ov.innerHTML = '<div class="rs-loading">Lỗi kết nối: ' + esc(e.message) + '</div><button class="btn" onclick="closeRoleSettings(true)">Đóng</button>'; }
 }
 function closeRoleSettings(force){
@@ -175,29 +175,230 @@ function closeRoleSettings(force){
   document.body.classList.remove('rs-open');
 }
 function _rsSetSec(s){ var ch = _rs.sec !== s; _rs.sec = s; _rsRender(ch); }
-function _rsDirty(){ _rs.dirty = true; var b = document.getElementById('rs-save'); if (b) { b.disabled = false; b.textContent = '💾 Lưu phân quyền'; } var h = document.getElementById('rs-dirty'); if (h) h.style.display = ''; }
+function _rsDirty(){ _rs.dirty = true; var b = document.getElementById('rs-save'); if (b) { b.disabled = false; b.textContent = 'Lưu quyền'; } var d = document.getElementById('rs-discard'); if (d) d.disabled = false; var h = document.getElementById('rs-dirty'); if (h) h.style.display = ''; }
+
+// ═══ GIAO DIỆN MỚI (L3, theo clip "CRM mẫu" 14/10/2026): 3 tab ═══
+// Giữ NGUYÊN toàn bộ logic quyền (_rsCell/_rsLimit/_rsRole*/_featAllowedFor/_rsSave...) — chỉ đổi lớp hiển thị. Các hàm vẽ cũ (_rsRolesHtml/_rsMatrixHtml/_rsPreviewHtml) còn lại để test cũ chạy.
+var _RS_TABS = [['role','Quyền vai trò'],['person','Quyền từng người'],['dept','Phòng ban & nhóm']];
+var _RS_DESC = {
+  'overview':'Xem màn Tổng quan: số liệu, nhắc việc và biểu đồ theo phạm vi dữ liệu của mình.',
+  'tab-kh':'Xem và tìm danh sách khách hàng trong phạm vi được giao; mở hồ sơ khách.',
+  'tab-schedule':'Xem lịch chăm sóc và lịch hẹn của khách trong phạm vi được giao.',
+  'tab-overdue':'Xem các khách và công việc đã quá hạn chăm sóc.',
+  'tab-mydata':'Xem dữ liệu khách được chia riêng cho mình.',
+  'tab-zaloai':'Dùng Zalo AI: gợi ý trả lời và ghi chú trên Zalo.',
+  'tab-chat':'Xem hộp thư hội thoại mạng xã hội (Pancake) trong phạm vi được giao.',
+  'tab-teamchat':'Chat nội bộ giữa các thành viên.',
+  'tab-task':'Xem và xử lý công việc (nhắc việc, lịch tự động) được giao.',
+  'dashboard':'Xem Dashboard tổng hợp.',
+  'team':'Xem và quản lý nhóm, thành viên (Quản lý Team).',
+  'audit':'Xem Nhật ký thay đổi: ai đổi gì, lúc nào.',
+  'salesreport':'Xem các báo cáo doanh số A–L (nhân viên, sản phẩm, kênh...).',
+  'pancake':'Xem báo cáo hiệu quả Pancake (hội thoại, tin nhắn).',
+  'kpipancake':'Xem KPI Pancake của nhân viên.',
+  'mktchecklist':'Xem Checklist Marketing.',
+  'dailybrief':'Xem báo cáo tổng hợp trong ngày.',
+  'uploaddata':'Tải dữ liệu lên (Excel / đồng bộ) vào CRM.'
+};
+function _rsDesc(id, label){
+  if (Object.prototype.hasOwnProperty.call(_RS_DESC, id)) return _RS_DESC[id];
+  return id.indexOf('act:') === 0 ? 'Cho phép dùng tác vụ "' + label + '" trong menu Tác vụ.' : 'Cho phép mở mục "' + label + '".';
+}
+function _rsActLabel(a){ var t = typeof a.t === 'function' ? a.t() : a.t; return String(t).replace(/^\s*\S+\s/, function(m){ return /^[\wÀ-ỹ]/.test(m) ? m : ''; }); }
+// Các tác vụ chỉ Admin (cố định, không cấp được cho vai trò khác).
+function _rsFixedRows(){
+  var out = []; var acts = window._SN_ACTS || {};
+  Object.keys(acts).forEach(function(k){ var a = acts[k]; if (a && a.admin) out.push({ id:'act:' + k, label:_rsActLabel(a), desc:'Chỉ Quản trị viên — không thể cấp cho vai trò khác.' }); });
+  return out;
+}
+function _rsTabsHtml(){
+  return '<div class="rl-tabs">' + _RS_TABS.map(function(t){ return '<button class="rl-tab' + (_rs.tab === t[0] ? ' on' : '') + '" onclick="_rsSetTab(\'' + t[0] + '\')">' + t[1] + '</button>'; }).join('') + '</div>';
+}
+function _rsSetTab(t){ var ch = _rs.tab !== t; _rs.tab = t; _rs.adding = false; _rsRender(ch); }
+function _rsAddOpen(){ _rs.adding = true; _rsRender(); var i = document.getElementById('rs-new-label'); if (i && i.focus) i.focus(); }
+function _rsAddHtml(){
+  if (!_rs.adding) return '';
+  return '<div class="rl-det rl-add"><h3>Thêm vai trò mới</h3><div class="rl-det-grid"><div><label>Tên vai trò</label><input id="rs-new-label" class="rl-in" placeholder="VD: Kế toán, Trưởng marketing…"></div>' +
+    '<div><label>Phạm vi dữ liệu</label><select id="rs-new-base" class="rl-in">' + ['viewer','manager','leader','cs'].map(function(b){ return '<option value="' + b + '">' + esc(_ROLE_BASE_LABEL[b]) + '</option>'; }).join('') + '</select></div></div>' +
+    '<p class="rl-help">Vai trò mới bắt đầu không giới hạn tính năng; chỉnh ở bảng bên dưới rồi bấm <b>Lưu quyền</b>. <button class="rl-btn pri" onclick="_rsRoleAdd()">Tạo vai trò</button> <button class="rl-btn" onclick="_rs.adding=false;_rsRender()">Hủy</button></p></div>';
+}
+function _rsSelRole(k){ _rs.sel = k; _rsRender(); }
+function _rsPickPerson(u){ _rs.prevUser = u; _rsRender(); }
+function _rsPersonQ(v){ _rs.pq = v; _rsRender(); var i = document.getElementById('rl-pq'); if (i) { try { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } catch (e) {} } }
+
+// Bật/tắt 1 ô trong ma trận. Cột chưa giới hạn (perms null) = xem tất cả: bấm tắt 1 mục → chuyển sang giới hạn = mọi mục TRỪ mục đó; bật lại đủ mọi mục → trở về không giới hạn (null).
+function _rsToggle(kind, id, fid){
+  var all = _rsAllIds(), cur = _rsPermsOf(kind, id), p = cur === null ? all.slice() : cur.slice(), i = p.indexOf(fid);
+  if (i === -1) p.push(fid); else p.splice(i, 1);
+  var full = all.every(function(x){ return p.indexOf(x) !== -1; });
+  _rsSetPerms(kind, id, full ? null : p); _rsDirty(); _rsRender();
+}
+function _rsDiscard(){
+  if (!_rs.dirty) return;
+  if (!confirm('Bỏ mọi thay đổi chưa lưu và tải lại cấu hình từ máy chủ?')) return;
+  _rs.dirty = false; openRoleSettings();
+}
+// Tóm tắt 1 lần lưu từ AuditLog (oldValue/newValue là JSON cấu hình): vai trò / phòng nào đổi quyền.
+function _rsDiffSummary(oldV, newV){
+  try {
+    var A = typeof oldV === 'string' ? JSON.parse(oldV) : (oldV || {}), B = typeof newV === 'string' ? JSON.parse(newV) : (newV || {});
+    var key = function(p){ return JSON.stringify(p == null ? null : p); };
+    var rolesA = {}; (A.roles || []).forEach(function(r){ rolesA[r.key] = r; });
+    var lab = function(r){ if (r.label) return r.label; var b = null; _ROLE_BUILTIN.forEach(function(x){ if (x.key === r.key) b = x; }); return b ? b.label : r.key; };
+    var roles = (B.roles || []).filter(function(r){ var o = rolesA[r.key]; return !o || key(o.perms) !== key(r.perms) || o.label !== r.label || o.desc !== r.desc || o.base !== r.base; }).map(lab);
+    var dA = A.deptPerms || {}, dB = B.deptPerms || {}, ks = {}; Object.keys(dA).concat(Object.keys(dB)).forEach(function(k){ ks[k] = 1; });
+    var depts = Object.keys(ks).filter(function(k){ return key(dA[k]) !== key(dB[k]); });
+    var out = []; if (roles.length) out.push('Vai trò: ' + roles.join(', ')); if (depts.length) out.push('Phòng: ' + depts.join(', '));
+    return out.join(' · ') || 'Cập nhật cấu hình';
+  } catch (e) { return 'Cập nhật cấu hình'; }
+}
+async function _rsLoadRecent(){
+  var el = document.getElementById('rl-recent-body'); if (!el) return;
+  try {
+    var sep = gsUrl.indexOf('?') > -1 ? '&' : '?';
+    var j = await (await fetch(gsUrl + sep + 'action=audit', { redirect:'follow' })).json();
+    var rows = ((j && j.audit) || []).filter(function(r){ return String(r.action || '') === 'config:roleConfig'; }).slice(0, 5);
+    _rs.recent = rows; _rsRecentPaint();
+  } catch (e) { el.textContent = 'Không tải được lịch sử thay đổi.'; }
+}
+function _rsRecentPaint(){
+  var el = document.getElementById('rl-recent-body'), hd = document.getElementById('rl-recent-time'); if (!el) return;
+  var rows = _rs.recent || [];
+  var fmt = function(t){ var d = new Date(t); if (isNaN(d.getTime())) return String(t || ''); var p = function(n){ return (n < 10 ? '0' : '') + n; }; return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() + ' · ' + p(d.getHours()) + ':' + p(d.getMinutes()); };
+  if (hd) hd.textContent = rows.length ? 'Cập nhật ' + fmt(rows[0].timestamp) : '';
+  el.innerHTML = rows.length ? rows.map(function(r){ return '<div class="rl-ev"><span class="rl-ev-t">' + esc(fmt(r.timestamp)) + '</span><span class="rl-ev-u">' + esc(r.user || '') + '</span><span class="rl-ev-s">' + esc(_rsDiffSummary(r.oldValue, r.newValue)) + '</span></div>'; }).join('')
+    : '<div class="rl-empty">Chưa có thay đổi. Hệ thống đang sử dụng quyền mặc định.</div>';
+}
+
+function _rsRoleCardsHtml(){
+  var list = _rsRolesList(), sel = _rs.sel;
+  var cards = list.map(function(r){
+    var n = _rsUsersOf(r.key);
+    return '<button class="rl-rc' + (sel === r.key ? ' on' : '') + '" onclick="_rsSelRole(' + _rsEsc(r.key) + ')"><div class="rl-rc-h"><b>' + esc(r.label) + '</b>' + (r.locked ? '<span class="rl-badge">🔒 Khóa</span>' : '') + '</div><div class="rl-rc-d">' + esc(r.desc || '') + '</div><div class="rl-rc-n">' + n + ' tài khoản</div></button>';
+  }).join('') + '<button class="rl-rc rl-rc-add" onclick="_rsAddOpen()"><div class="rl-rc-h"><b>＋ Thêm vai trò</b></div><div class="rl-rc-d">Tạo vai trò riêng (vd: Kế toán, Trưởng marketing).</div></button>';
+  return '<div class="rl-cards">' + cards + '</div>';
+}
+function _rsRoleDetailHtml(){
+  var r = _rsRolesList().filter(function(x){ return x.key === _rs.sel; })[0];
+  if (!r) return '';
+  var n = _rsUsersOf(r.key), base = _ROLE_BASE_LABEL[r.base] || r.base;
+  if (r.locked) return '<div class="rl-det"><h3>' + esc(r.label) + '</h3><p>' + esc(r.desc || '') + '</p><p class="rl-help">Phạm vi dữ liệu: ' + esc(base) + ' · ' + n + ' tài khoản.</p><p class="rl-help"><b>Quyền Quản trị viên luôn bật để bảo đảm truy cập quản trị.</b></p></div>';
+  var baseSel = r.builtin ? '<span class="rl-chip">' + esc(base) + '</span>' :
+    '<select class="rl-in" onchange="_rsRoleSet(' + _rsEsc(r.key) + ',\'base\',this.value)">' + ['viewer','manager','leader','cs'].map(function(b){ return '<option value="' + b + '"' + (r.base === b ? ' selected' : '') + '>' + esc(_ROLE_BASE_LABEL[b]) + '</option>'; }).join('') + '</select>';
+  return '<div class="rl-det"><div class="rl-det-grid"><div><label>Tên vai trò</label><input class="rl-in" value="' + esc(r.label) + '" onchange="_rsRoleSet(' + _rsEsc(r.key) + ',\'label\',this.value)"></div>' +
+    '<div><label>Phạm vi dữ liệu</label>' + baseSel + '</div>' +
+    '<div class="rl-det-wide"><label>Mô tả</label><input class="rl-in" value="' + esc(r.desc || '') + '" onchange="_rsRoleSet(' + _rsEsc(r.key) + ',\'desc\',this.value)"></div></div>' +
+    '<p class="rl-help">Khóa: <code>' + esc(r.key) + '</code>' + (r.builtin ? ' · vai trò có sẵn' : '') + ' · ' + n + ' tài khoản. Bấm vào ô <b>Bật/Tắt</b> ở bảng dưới để đổi quyền của vai trò này.' +
+    (r.builtin ? '' : ' <button class="rl-link" onclick="_rsRoleDel(' + _rsEsc(r.key) + ')">Xóa vai trò</button>') + '</p></div>';
+}
+function _rsCountText(c){ var tot = _rsAllIds().length; return Array.isArray(c.perms) ? c.perms.length + '/' + tot + ' mục' : 'Xem tất cả'; }
+function _rsDeptStats(key){
+  var sales = Object.keys(_rs.saleDepts || {}).filter(function(n){ return _rs.saleDepts[n] === key; }).length;
+  var mgr = (typeof accounts !== 'undefined' ? accounts : []).filter(function(a){ return _roleBaseOfCfg(a.role, _rs.cfg) === 'manager' && String(a.team || '').split(',').map(function(x){ return x.trim(); }).indexOf(key) !== -1; }).length;
+  return { sales:sales, managers:mgr };
+}
+// Ma trận kiểu clip: dòng có tên + mô tả, nhóm có dòng tiêu đề, ô Bật/Tắt bấm được, cột Admin "Luôn bật · khóa", hàng "Quản trị hệ thống · cố định".
+function _rsMatrix2(kind){
+  var cat = _rsCatalog(), cols;
+  if (kind === 'role') cols = _rsRolesList().map(function(r){ return { id:r.key, label:r.label, perms:r.perms, locked:!!r.locked }; });
+  else cols = _rs.depts.map(function(d){ var p = _rs.cfg.deptPerms[d.key]; return { id:d.key, label:d.label, perms:Array.isArray(p) ? p : null, locked:false, st:_rsDeptStats(d.key) }; });
+  if (!cols.length) return '<div class="rl-empty">Chưa có phòng ban nào. Tạo phòng ở <b>Tổng quan → Cài đặt phòng</b> rồi mở lại trang này.</div>';
+  var head = '<tr><th class="rl-feat">Tính năng</th>' + cols.map(function(c){
+    var sub = c.st ? c.st.sales + ' sale · ' + c.st.managers + ' trưởng phòng' : (c.locked ? 'Toàn quyền' : _rsCountText(c));
+    return '<th class="rl-col' + (c.locked ? ' rl-lock' : '') + (kind === 'role' && c.id === _rs.sel ? ' rl-sel' : '') + '"><div class="rl-colname">' + esc(c.label) + '</div><div class="rl-colsub">' + esc(sub) + '</div></th>';
+  }).join('') + '</tr>';
+  var rows = cat.map(function(g){
+    var gr = '<tr class="rl-grp"><td colspan="' + (cols.length + 1) + '">' + esc(g.title) + '</td></tr>';
+    return gr + g.items.map(function(it){
+      return '<tr><td class="rl-feat"><div class="rl-ft">' + esc(it.label) + '</div><div class="rl-fd">' + esc(_rsDesc(it.id, it.label)) + '</div></td>' + cols.map(function(c){
+        if (c.locked) return '<td class="rl-cell rl-lock"><b>Bật</b><small>Luôn bật · khóa</small></td>';
+        var on = !Array.isArray(c.perms) || c.perms.indexOf(it.id) !== -1;
+        return '<td class="rl-cell' + (kind === 'role' && c.id === _rs.sel ? ' rl-sel' : '') + '"><button class="rl-tg ' + (on ? 'on' : 'off') + '" aria-pressed="' + on + '" onclick="_rsToggle(' + _rsEsc(kind) + ',' + _rsEsc(c.id) + ',' + _rsEsc(it.id) + ')">' + (on ? 'Bật' : 'Tắt') + '</button></td>';
+      }).join('') + '</tr>';
+    }).join('');
+  }).join('');
+  var fx = _rsFixedRows();
+  if (kind === 'role' && fx.length) rows += '<tr class="rl-grp"><td colspan="' + (cols.length + 1) + '">Quản trị hệ thống · cố định</td></tr>' + fx.map(function(it){
+    return '<tr><td class="rl-feat"><div class="rl-ft">' + esc(it.label) + '</div><div class="rl-fd">' + esc(it.desc) + '</div></td>' + cols.map(function(c){
+      return c.locked ? '<td class="rl-cell rl-lock"><b>Bật</b><small>Có khóa</small></td>' : '<td class="rl-cell rl-na"><span>Không được cấp</span></td>';
+    }).join('') + '</tr>';
+  }).join('');
+  return '<div class="rl-scroll"><table class="rl-mx"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table></div>';
+}
+function _rsCopyBar(kind){
+  var cols = _rsCols(kind); if (cols.length < 2) return '';
+  var opts = cols.map(function(c){ return '<option value="' + esc(c.id) + '">' + esc(c.label) + '</option>'; }).join('');
+  return '<div class="rl-copy">Sao chép quyền từ <select id="rs-copy-from" class="rl-in">' + opts + '</select> sang <select id="rs-copy-to" class="rl-in">' + opts + '</select> <button class="rl-btn" onclick="_rsCopy(' + _rsEsc(kind) + ')">Sao chép</button></div>';
+}
+function _rsRoleTabHtml(){
+  return '<h2>Quyền sử dụng theo vai trò</h2><p class="rl-sub">Xem phạm vi của ' + _rsRolesList().length + ' vai trò. Chọn một vai trò để đổi tên, mô tả, phạm vi dữ liệu; bấm ô <b>Bật/Tắt</b> để bật hoặc tắt tính năng cho tất cả người dùng thuộc vai trò đó. Quyền cuối cùng = quyền của <b>vai trò</b> VÀ quyền của <b>phòng ban</b> (tab Phòng ban & nhóm).</p>' +
+    _rsRoleCardsHtml() + _rsAddHtml() + _rsRoleDetailHtml() + _rsCopyBar('role') + _rsMatrix2('role') +
+    '<p class="rl-note">Khi lưu, quyền mới được kiểm tra ở máy chủ cho các thao tác tiếp theo. Công việc đã tạo và dữ liệu đã lưu vẫn được giữ.</p>' +
+    '<div class="rl-recent"><div class="rl-recent-h"><h3>Thay đổi gần đây</h3><span id="rl-recent-time" class="rl-sub"></span></div><div id="rl-recent-body"><div class="rl-empty">Đang tải…</div></div></div>';
+}
+function _rsDeptTabHtml(){
+  return '<h2>Phòng ban & nhóm</h2><p class="rl-sub">Quyền theo phòng ban: người thuộc phòng nào chỉ được dùng các tính năng được bật cho phòng đó (người chưa thuộc phòng nào không bị giới hạn theo phòng). Phòng ban tạo ở <b>Tổng quan → Cài đặt phòng</b>; tick cột để thu hẹp, để trống = xem tất cả.</p>' +
+    _rsCopyBar('dept') + _rsMatrix2('dept') +
+    '<div class="rl-chips">' + _rs.depts.map(function(d){ var st = _rsDeptStats(d.key), lim = Array.isArray(_rs.cfg.deptPerms[d.key]);
+      return '<div class="rl-dc"><b>' + esc(d.label) + '</b><span>' + st.sales + ' sale · ' + st.managers + ' trưởng phòng</span><label class="rl-sw"><input type="checkbox"' + (lim ? ' checked' : '') + ' onchange="_rsLimit(\'dept\',' + _rsEsc(d.key).replace(/"/g, '&quot;') + ',this.checked)"> Giới hạn tính năng</label></div>'; }).join('') + '</div>';
+}
+function _rsPersonHtml(){
+  var accs = (typeof accounts !== 'undefined' ? accounts : []).filter(function(a){ return a.role !== 'demo'; });
+  var q = String(_rs.pq || '').toLowerCase().trim();
+  var shown = accs.filter(function(a){ return !q || String(a.username || '').toLowerCase().indexOf(q) !== -1 || String(a.name || '').toLowerCase().indexOf(q) !== -1; });
+  var list = shown.map(function(a){
+    return '<button class="rl-pi' + (_rs.prevUser === a.username ? ' on' : '') + '" onclick="_rsPickPerson(' + _rsEsc(a.username) + ')"><div class="rl-pn">' + esc(a.name || a.username) + '</div><div class="rl-ps">' + esc(a.username) + ' · ' + esc(_rsLabelOf(a.role)) + (Array.isArray(a.perms) ? ' · <b>giới hạn riêng</b>' : '') + '</div></button>';
+  }).join('') || '<div class="rl-empty">Không có tài khoản phù hợp.</div>';
+  var a = accs.filter(function(x){ return x.username === _rs.prevUser; })[0];
+  var left = '<div class="rl-pl"><input id="rl-pq" class="rl-in" placeholder="Tìm tài khoản..." value="' + esc(_rs.pq || '') + '" oninput="_rsPersonQ(this.value)"><div class="rl-plist">' + list + '</div></div>';
+  if (!a) return '<h2>Quyền từng người</h2><p class="rl-sub">Chọn một tài khoản để xem họ được dùng gì, và đặt <b>giới hạn menu riêng</b> cho người đó.</p><div class="rl-two">' + left + '<div class="rl-pd"><div class="rl-empty">Chọn một tài khoản ở bên trái.</div></div></div>';
+  var base = _roleBaseOfCfg(a.role, _rs.cfg), dk = _deptKeysFor(a, _rs.cfg, _rs.saleDepts);
+  var dn = dk.map(function(k){ var d = _rs.depts.filter(function(x){ return x.key === k; })[0]; return d ? d.label : k; });
+  var limited = Array.isArray(a.perms), uk = esc(a.username), cat = _rsCatalog();
+  var head = '<div class="rl-pdh"><div><h3>' + esc(a.name || a.username) + '</h3><div class="rl-sub">' + esc(a.username) + ' · ' + esc(_rsLabelOf(a.role)) + ' · ' + esc(_ROLE_BASE_LABEL[base] || base) + ' · Phòng: ' + (dn.length ? esc(dn.join(', ')) : 'chưa thuộc phòng nào') + '</div></div>' +
+    '<label class="rl-sw"><input type="checkbox"' + (limited ? ' checked' : '') + ' onchange="_rsPersonLimit(' + _rsEsc(a.username).replace(/"/g, '&quot;') + ',this.checked)"> Giới hạn menu riêng cho người này</label></div>' +
+    '<p class="rl-note">' + (limited ? 'Đang giới hạn riêng: với các mục menu, danh sách riêng của người này được ưu tiên hơn vai trò và phòng ban. Thay đổi ở đây được <b>lưu ngay</b> (không cần bấm Lưu quyền).' : 'Chưa giới hạn riêng: người này dùng đúng quyền của vai trò và phòng ban. Bật công tắc để tự chọn mục cho riêng người này (lưu ngay).') + '</p>';
+  var rows = cat.map(function(g){
+    return '<tr class="rl-grp"><td colspan="4">' + esc(g.title) + '</td></tr>' + g.items.map(function(it){
+      var isAct = it.id.indexOf('act:') === 0;
+      var byRole = _featAllowedFor(Object.assign({}, a, { perms:null }), it.id, _rs.cfg, _rs.saleDepts), fin = _featAllowedFor(a, it.id, _rs.cfg, _rs.saleDepts);
+      var own = (limited && !isAct) ? '<button class="rl-tg ' + (a.perms.indexOf(it.id) !== -1 ? 'on' : 'off') + '" onclick="_rsPersonToggle(' + _rsEsc(a.username) + ',' + _rsEsc(it.id) + ')">' + (a.perms.indexOf(it.id) !== -1 ? 'Bật' : 'Tắt') + '</button>' : '<span class="rl-dash">' + (isAct ? 'theo vai trò' : '—') + '</span>';
+      return '<tr><td class="rl-feat"><div class="rl-ft">' + esc(it.label) + '</div><div class="rl-fd">' + esc(_rsDesc(it.id, it.label)) + '</div></td><td class="rl-cell"><span class="rl-st ' + (byRole ? 'on' : 'off') + '">' + (byRole ? 'Bật' : 'Tắt') + '</span></td><td class="rl-cell">' + own + '</td><td class="rl-cell"><span class="rl-st ' + (fin ? 'on' : 'off') + '">' + (fin ? 'Bật' : 'Tắt') + '</span></td></tr>';
+    }).join('');
+  }).join('');
+  var tbl = '<div class="rl-scroll"><table class="rl-mx"><thead><tr><th class="rl-feat">Tính năng</th><th class="rl-col">Theo vai trò &amp; phòng</th><th class="rl-col">Riêng người này</th><th class="rl-col">Kết quả</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+  return '<h2>Quyền từng người</h2><div class="rl-two">' + left + '<div class="rl-pd">' + head + tbl + '</div></div>';
+}
+// Giới hạn menu riêng dùng đúng hàm của hộp thoại Tài khoản (lưu ngay lên máy chủ).
+function _rsPersonLimit(u, on){
+  if (typeof acctTogglePermLimit !== 'function') { toast('Chưa tải xong chức năng tài khoản — tải lại trang.'); return; }
+  acctTogglePermLimit(u, on); setTimeout(_rsRender, 120);
+}
+function _rsPersonToggle(u, id){
+  if (typeof acctTogglePermTab !== 'function' || typeof _findAccount !== 'function') return;
+  var a = _findAccount(u); if (!a || !Array.isArray(a.perms)) return;
+  acctTogglePermTab(u, id, a.perms.indexOf(id) === -1); setTimeout(_rsRender, 120);
+}
 
 function _rsRender(resetScroll){
   var ov = document.getElementById('rs-page'); if (!ov) return;
-  // Giữ vị trí cuộn: innerHTML thay toàn bộ làm .rs-main/.rs-scroll bị tạo lại → scrollTop về 0 (màn hình nhảy lên đầu sau mỗi lần bấm ô)
+  // Giữ vị trí cuộn (sửa 31da91a): innerHTML thay toàn bộ nên các khung cuộn bị tạo lại → scrollTop về 0 (nhảy lên đầu sau mỗi lần bấm ô). Đổi tab thì cuộn lại từ đầu.
   var _sv = [];
-  try {
-    ov.querySelectorAll('.rs-main,.rs-scroll,.rs-nav').forEach(function(el, i){ _sv.push([el.className, i, el.scrollTop, el.scrollLeft]); });
-  } catch (e) {}
-  var body = _rs.sec === 'roles' ? _rsRolesHtml() : (_rs.sec === 'byrole' ? _rsMatrixHtml('role') : (_rs.sec === 'bydept' ? _rsMatrixHtml('dept') : _rsPreviewHtml()));
-  ov.innerHTML = '<div class="rs-head"><button class="btn secondary sm" onclick="closeRoleSettings()">← Quay lại</button><div class="rs-title">🛡 Phân quyền hệ thống</div><span class="rs-sp"></span>' +
-    '<span id="rs-dirty" class="rs-dirty" style="' + (_rs.dirty ? '' : 'display:none') + '">● Chưa lưu</span>' +
-    '<button id="rs-save" class="btn primary" onclick="_rsSave()"' + (_rs.dirty ? '' : ' disabled') + '>💾 Lưu phân quyền</button></div>' +
-    '<div class="rs-body"><div class="rs-nav">' + _RS_SECS.map(function(s){ return '<button class="rs-navbtn' + (_rs.sec === s[0] ? ' on' : '') + '" onclick="_rsSetSec(\'' + s[0] + '\')">' + s[1] + '</button>'; }).join('') +
-    '<div class="rs-note guide-text">Mặc định chưa giới hạn gì: ai cũng thấy như trước. Chỉ khi bạn bật <b>Giới hạn hạng mục</b> cho một vai trò/bộ phận thì mới thu hẹp lại. Admin luôn thấy tất cả.<br><br>Quyền cuối cùng = quyền của <b>vai trò</b> VÀ quyền của <b>bộ phận</b> (người thuộc nhiều bộ phận được hợp các bộ phận). Giới hạn menu riêng của từng tài khoản (trong 🔑 Tài khoản) vẫn được ưu tiên cho các tab.</div></div>' +
-    '<div class="rs-main">' + body + '</div></div>';
+  try { ov.querySelectorAll('.rl-body,.rl-scroll,.rl-plist').forEach(function(el, i){ _sv.push([el.className, i, el.scrollTop, el.scrollLeft]); }); } catch (e) {}
+  ov.className = 'rs-page rl-page open';
+  if (!_rs.tab) _rs.tab = 'role';
+  if (!_rs.sel) _rs.sel = 'ceo';
+  var body = _rs.tab === 'person' ? _rsPersonHtml() : (_rs.tab === 'dept' ? _rsDeptTabHtml() : _rsRoleTabHtml());
+  ov.innerHTML = '<div class="rl-top"><button class="rl-back" onclick="closeRoleSettings()">← Quay lại</button><div class="rl-titles"><div class="rl-crumb">QUẢN LÝ</div><h1>Vai trò &amp; quyền hạn</h1></div><span class="rl-sp"></span>' +
+    '<span id="rs-dirty" class="rl-dirty" style="' + (_rs.dirty ? '' : 'display:none') + '">● Chưa lưu</span>' +
+    '<button id="rs-discard" class="rl-btn" onclick="_rsDiscard()"' + (_rs.dirty ? '' : ' disabled') + '>Bỏ thay đổi</button>' +
+    '<button id="rs-save" class="rl-btn pri" onclick="_rsSave()"' + (_rs.dirty ? '' : ' disabled') + '>Lưu quyền</button></div>' +
+    '<div class="rl-body">' + _rsTabsHtml() + '<div class="rl-main">' + body + '</div></div>';
   if (!resetScroll) try {
-    var _els = ov.querySelectorAll('.rs-main,.rs-scroll,.rs-nav');
-    _sv.forEach(function(s){
-      var el = _els[s[1]];
-      if (el && el.className === s[0]) { el.scrollTop = s[2]; el.scrollLeft = s[3]; }
-    });
+    var _els = ov.querySelectorAll('.rl-body,.rl-scroll,.rl-plist');
+    _sv.forEach(function(sv){ var el = _els[sv[1]]; if (el && el.className === sv[0]) { el.scrollTop = sv[2]; el.scrollLeft = sv[3]; } });
   } catch (e) {}
+  if (_rs.tab === 'role') { if (_rs.recent) _rsRecentPaint(); else _rsLoadRecent(); }
 }
 
 // ── Mục 1: Vai trò ──
@@ -226,6 +427,7 @@ function _rsRoleAdd(){
   var k = _rsSlug(l); if (k.length < 2) k = 'role_' + Date.now().toString(36).slice(-5);
   if (_rsRolesList().some(function(r){ return r.key === k; }) || k === 'demo') k += '_' + Date.now().toString(36).slice(-3);
   _rs.cfg.roles.push({ key:k, label:l.slice(0, 40), desc:'', base:b, perms:null });
+  _rs.adding = false; _rs.sel = k;
   _rsDirty(); _rsRender();
 }
 function _rsRoleDel(key){
@@ -319,9 +521,9 @@ async function _rsSave(){
   try {
     var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'saveRoleConfig', config:_rs.cfg }) });
     var j = await r.json();
-    if (!j || !j.ok) { toast('Lỗi lưu: ' + ((j && j.error) || 'không rõ')); if (b) { b.disabled = false; b.textContent = '💾 Lưu phân quyền'; } return; }
+    if (!j || !j.ok) { toast('Lỗi lưu: ' + ((j && j.error) || 'không rõ')); if (b) { b.disabled = false; b.textContent = 'Lưu quyền'; } return; }
     _rs.cfg = JSON.parse(JSON.stringify(j.config)); _roleCfg = JSON.parse(JSON.stringify(j.config)); _rs.dirty = false;
-    toast('✓ Đã lưu phân quyền (ghi vào Nhật ký)'); _rsRender();
+    toast('✓ Đã lưu phân quyền (ghi vào Nhật ký)'); _rs.recent = null; _rsRender();
     _rolesFetchMine();
-  } catch (e) { toast('Lỗi kết nối, chưa lưu.'); if (b) { b.disabled = false; b.textContent = '💾 Lưu phân quyền'; } }
+  } catch (e) { toast('Lỗi kết nối, chưa lưu.'); if (b) { b.disabled = false; b.textContent = 'Lưu quyền'; } }
 }

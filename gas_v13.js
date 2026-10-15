@@ -3602,6 +3602,32 @@ function _donHasExcludedStatus_(trangThaiCol) {
 // nhung Page/kenh va Sale khong thuoc pham vi quan ly cua minh de AN khoi moi bao cao
 // dung chung (Dashboard, Bao cao doanh so A-E, KPI Pancake...). Luu 2 setting JSON array
 // dung chung pattern voi cac setting khac (getSetting_/setSetting_).
+// Bao cao B (Pos) cung phai AN Page/Sale theo cai dat admin (hiddenChannels/hiddenSales) nhu Bao cao A — truoc day B khong kiem tra nen sale da nghi/an
+// (vd Dung1987) van hien trong bao cao Pos. So khop theo NGUOI (moi ten cung 1 nguoi qua _salePersonKeyFn_), khong theo chuoi y nguyen.
+// Tra ve null neu admin khong an gi. Don chi bi an khi MOI sale tren don deu bi an (con >=1 sale khong an thi giu, giong _isDTRowHidden_).
+function _donHiddenChecker_() {
+  var sets = _hiddenPageSaleSets_();
+  if (!sets.sales.length && !sets.channels.length) return null;
+  var keyFn = sets.sales.length ? _salePersonKeyFn_() : null, hiddenKeys = {};
+  if (keyFn) sets.sales.forEach(function(n) { var k = keyFn(n); if (k) hiddenKeys[k] = true; });
+  var pageById = null, pageByName = null;
+  return {
+    saleHidden: function(name) { if (!keyFn) return false; var k = keyFn(name); return !!k && !!hiddenKeys[k]; },
+    channelHidden: function(nguonDon) {
+      if (!sets.channels.length) return false;
+      if (!pageById) { pageById = readPancakePageMap_(); pageByName = readPancakePageMapByName_(); }
+      var kenh = _donKenhFromNguon_(nguonDon, pageById, pageByName);
+      return !!kenh && sets.channels.indexOf(kenh) !== -1;
+    }
+  };
+}
+// Nguon don Pos -> kenh ban chuan: (1) ID Page o cuoi chuoi qua PancakePageMap; (2) khong co thi TEN Page qua readPancakePageMapByName_.
+function _donKenhFromNguon_(nguonDon, pageById, pageByName) {
+  var pid = _extractPageIdFromNguonDon_(nguonDon), kenh = pid ? (pageById[pid] || '') : '';
+  if (!kenh) { var pn = _extractPageNameFromNguonDon_(nguonDon); if (pn) kenh = pageByName[_normTxt_(pn)] || ''; }
+  return kenh;
+}
+
 function _hiddenPageSaleSets_() {
   var hc = [], hs = [];
   try { var v = getSetting_('hiddenChannels'); if (v) hc = JSON.parse(v); } catch (e) {}
@@ -5564,6 +5590,7 @@ function buildSalesReportB_(filters) {
   // cho hay khong — dung 2 bo dem nay moi la so that de hien thi/canh bao, 2 mang [] chi de liet
   // ke VI DU (toi da 30 dong) phia sau.
   var ghepStats = { donCoMa: 0, daGhep: 0, gocBiLoai: 0, khongKhop: [], khongKhopCount: 0, trungDonGoc: [], trungDonGocCount: 0 };
+  var hiddenB_ = _donHiddenChecker_();
   var matched = [];
   for (var pj = 0; pj < pre.length; pj++) {
     var rowP = pre[pj];
@@ -5627,6 +5654,13 @@ function buildSalesReportB_(filters) {
       var hit = false;
       for (var si = 0; si < saleFilterFold.length; si++) { if (salesOnRow.indexOf(saleFilterFold[si]) !== -1) { hit = true; break; } }
       if (!hit) continue;
+    }
+    // AN theo cai dat admin (hiddenSales/hiddenChannels) — giong Bao cao A: don chi bi an khi MOI sale tren don deu bi an; hoac kenh bi an.
+    if (hiddenB_) {
+      var namesH = effRow.ghepShares ? effRow.ghepShares.map(function(x) { return x.name; }) : _donSaleNamesFromThe_(effRow.theSale);
+      namesH = namesH.filter(function(n) { return n && n !== '(chưa gán sale)'; });
+      if (namesH.length && namesH.every(hiddenB_.saleHidden)) continue;
+      if (hiddenB_.channelHidden(effRow.nguonDon)) continue;
     }
     // Don Quay Hao Nam gan the sale + note 30/70 -> chi 30% doanh thu la cua sale (xem _quaySaleRatio_)
     var hasSaleRow = effRow.ghepShares
@@ -14012,6 +14046,22 @@ function sbKHDongBoLai() { _sbLogSync_(sbSyncCare_({ fresh: true })); }   // bo 
 function sbKHCaiTrigger() { Logger.log(installSbCareTrigger_()); }
 function sbKHGoTrigger()  { Logger.log(removeSbCareTrigger_()); }
 function sbKHTrangThaiDongBo() { Logger.log(JSON.stringify(sbCareSyncStatus_(), null, 2)); }
+// Chay tay: so Ty le chot theo KENH + theo SALE cua Bao cao A (Base) voi Bao cao B (Pos) THANG NAY — phai GIONG HET (cung nguon don Base).
+function xemTyLeChotAB() {
+  var today = _vnYmd_(new Date()), from = today.substring(0, 8) + '01';
+  var f = { dateFrom: from, dateTo: today, sale: [], nguon: [], marketer: [], sanPham: '', careStatus: [], khStatus: [], zaloStatus: [], nickZalo: '' };
+  var a = buildSalesReportA_(f), b = buildSalesReportB_(f), diff = 0;
+  Logger.log('Kỳ ' + from + ' → ' + today);
+  function cmp(label, x, y) {
+    var mx = {}, my = {}; (x || []).forEach(function(r) { mx[r.name] = r.closed + '/' + r.held + '=' + r.closeRate; }); (y || []).forEach(function(r) { my[r.name] = r.closed + '/' + r.held + '=' + r.closeRate; });
+    Object.keys(mx).concat(Object.keys(my)).filter(function(k, i, arr) { return arr.indexOf(k) === i; }).forEach(function(k) {
+      var same = mx[k] === my[k]; if (!same) diff++;
+      Logger.log((same ? 'KHOP  ' : 'LECH  ') + label + ' ' + k + ' | A(Base): ' + (mx[k] || '-') + ' | B(Pos): ' + (my[k] || '-'));
+    });
+  }
+  cmp('KENH', a.kenhCloseRate, b.kenhCloseRate); cmp('SALE', a.saleCloseRate, b.saleCloseRate);
+  Logger.log(diff ? ('=> ' + diff + ' dong LECH — gui log nay de kiem tra') : '=> KHOP HET: Ty le chot A (Base) va B (Pos) giong nhau.');
+}
 function sbDonHangDongBo() { _sbLogSync_(sbOrdersSync_()); }
 function sbDonHangDongBoLai() { _sbLogSync_(sbOrdersSync_({ fresh: true })); }   // xoa sach 2 bang Supabase roi day lai tat ca (dung khi nghi Supabase bi sua tay / lech)
 function sbDonHangCaiTrigger() { Logger.log(installSbOrdersTrigger_()); }

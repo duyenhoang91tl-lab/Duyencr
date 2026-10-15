@@ -960,6 +960,22 @@ function sbKHDongBoLai() { _sbLogSync_(sbSyncCare_({ fresh: true })); }   // bo 
 function sbKHCaiTrigger() { Logger.log(installSbCareTrigger_()); }
 function sbKHGoTrigger()  { Logger.log(removeSbCareTrigger_()); }
 function sbKHTrangThaiDongBo() { Logger.log(JSON.stringify(sbCareSyncStatus_(), null, 2)); }
+// Chay tay: so Ty le chot theo KENH + theo SALE cua Bao cao A (Base) voi Bao cao B (Pos) THANG NAY — phai GIONG HET (cung nguon don Base).
+function xemTyLeChotAB() {
+  var today = _vnYmd_(new Date()), from = today.substring(0, 8) + '01';
+  var f = { dateFrom: from, dateTo: today, sale: [], nguon: [], marketer: [], sanPham: '', careStatus: [], khStatus: [], zaloStatus: [], nickZalo: '' };
+  var a = buildSalesReportA_(f), b = buildSalesReportB_(f), diff = 0;
+  Logger.log('Kỳ ' + from + ' → ' + today);
+  function cmp(label, x, y) {
+    var mx = {}, my = {}; (x || []).forEach(function(r) { mx[r.name] = r.closed + '/' + r.held + '=' + r.closeRate; }); (y || []).forEach(function(r) { my[r.name] = r.closed + '/' + r.held + '=' + r.closeRate; });
+    Object.keys(mx).concat(Object.keys(my)).filter(function(k, i, arr) { return arr.indexOf(k) === i; }).forEach(function(k) {
+      var same = mx[k] === my[k]; if (!same) diff++;
+      Logger.log((same ? 'KHOP  ' : 'LECH  ') + label + ' ' + k + ' | A(Base): ' + (mx[k] || '-') + ' | B(Pos): ' + (my[k] || '-'));
+    });
+  }
+  cmp('KENH', a.kenhCloseRate, b.kenhCloseRate); cmp('SALE', a.saleCloseRate, b.saleCloseRate);
+  Logger.log(diff ? ('=> ' + diff + ' dong LECH — gui log nay de kiem tra') : '=> KHOP HET: Ty le chot A (Base) va B (Pos) giong nhau.');
+}
 function sbDonHangDongBo() { _sbLogSync_(sbOrdersSync_()); }
 function sbDonHangDongBoLai() { _sbLogSync_(sbOrdersSync_({ fresh: true })); }   // xoa sach 2 bang Supabase roi day lai tat ca (dung khi nghi Supabase bi sua tay / lech)
 function sbDonHangCaiTrigger() { Logger.log(installSbOrdersTrigger_()); }

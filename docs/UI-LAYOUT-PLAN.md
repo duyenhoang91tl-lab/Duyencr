@@ -36,10 +36,21 @@ Nguồn: clip 2 phút 53 giây, app "CustomerCare CRM" (dữ liệu demo). Bổ 
 - [ ] **L4 – Áp dụng khuôn mới theo từng màn:** Tổng quan → Danh sách khách → Công việc → Báo cáo (A–L dùng thẻ số/bảng mới) → Tồn kho → Cấu hình. Mỗi màn 1 lần push.
 - [ ] **L5 – Chế độ tối** (nếu Duyên muốn — clip có công tắc) và **L6 – màn hình nhỏ/điện thoại** (menu trượt).
 
-## 5. Câu hỏi cần Duyên chốt (chặn L0/L1/L3)
-1. **Màu thương hiệu:** clip dùng xanh dương + trắng sạch; CRM hiện tại menu/đầu trang màu tím (PRO). Đổi sang xanh như clip, hay giữ tím và chỉ lấy bố cục?
-2. **Phông chữ:** clip dùng phông hình học hiện đại (chữ số rất đẹp ở thẻ số). Cho tải 1 phông từ Google Fonts, hay giữ phông hệ thống?
-3. **Menu:** giữ nhóm menu hiện tại (như Duyên chốt 11/10) hay sắp lại đúng thứ tự/nhóm như clip?
-4. **Phân quyền — tab 2 & 3 chưa thấy trong clip:** "Quyền từng người" = ngoại lệ bật/tắt riêng cho từng tài khoản (ghi đè quyền vai trò)? "Phòng ban & nhóm" = quyền theo phòng/team (như mục "Quyền theo bộ phận" hiện có)? Duyên quay thêm 2 tab đó, hoặc xác nhận theo cách hiểu này.
-5. **Vai trò:** CRM có 6 vai trò (thêm "Quản lý" so với 5 vai trò trong clip). Giữ cả 6 cột, hay gộp "Quản lý" vào "Trưởng phòng"?
-6. **Tên "Trưởng nhóm" / "Nhân viên kinh doanh"** dùng như clip, hay giữ "Trưởng team" / "Nhân viên"?
+## 5. Quyết định Duyên đã chốt (14/10/2026)
+1. **Khung và màu:** khung **xanh navy** kiểu ảnh Duyên gửi (menu trái + thanh trên cùng màu navy đậm liền một khối; nội dung là một tấm trắng bo góc nằm trong khung). Thanh trên: tên công ty kèm mũi tên chọn, chuông, trợ giúp, ảnh đại diện. Menu có **nhóm con mở/đóng** (vd "Thống kê" → Khách hàng / Nhiệm vụ / Vấn đề / Lịch hẹn), mục đang chọn là viên thuốc đậm hơn, "Thu gọn" ở cuối.
+2. **Đầu trang báo cáo / Tổng quan:** nút làm mới + thanh chọn nhanh `Hôm nay | Tuần này | Tháng này` + biểu tượng lịch + nút "Bộ lọc"; dưới đó là tab viên thuốc. Thẻ "Tổng quan" 4 số có nhãn % đỏ nhạt khi giảm; thẻ đôi kiểu Giới tính / Độ tuổi (thanh nhiều màu + chú giải).
+3. **Menu:** gom thành nhóm con mở/đóng; **sắp xếp như clip** nhưng **phải đủ mọi mục menu hiện có** (không bỏ mục nào — làm bảng đối chiếu mục cũ → vị trí mới trước khi đổi).
+4. **Phông:** tải phông hiện đại từ Google Fonts → **Be Vietnam Pro** (hỗ trợ tiếng Việt). Đã nạp ở `<head>`; trang Phân quyền dùng ngay, phần còn lại của app áp dụng ở L0/L1.
+5. **Phân quyền — "Quyền từng người" và "Phòng ban & nhóm"** là cài đặt cho **cá nhân** và **phòng ban**, mở thành **tab riêng trong trang Phân quyền** (không nhét vào hộp thoại).
+6. **6 cột vai trò** (Admin, CEO, Trưởng phòng, Quản lý, Trưởng nhóm, Nhân viên kinh doanh) + vai trò tùy chỉnh thêm cột.
+7. **Tên gọi:** "Trưởng nhóm" (cũ: Trưởng team), "Nhân viên kinh doanh" (cũ: Nhân viên). Đã đổi nhãn trong `_ROLE_BUILTIN`.
+
+## 6. Tiến độ L3 (trang Phân quyền) — đã làm
+- [x] `js/40-fn-rolesettings.js`: dựng lại lớp hiển thị thành 3 tab (Quyền vai trò · Quyền từng người · Phòng ban & nhóm). **Giữ nguyên toàn bộ logic quyền và backend** (`roleConfig` / `saveRoleConfig` / `_featAllowedFor` / chặn ở GAS); các hàm vẽ cũ còn lại để test cũ chạy. Không đổi GAS → **không cần deploy GAS**.
+  - Quyền vai trò: 6 thẻ vai trò (chọn → tô cột; thẻ Admin có 🔒 Khóa), khung chi tiết vai trò (đổi tên/mô tả/phạm vi, xóa vai trò tùy chỉnh), thẻ "＋ Thêm vai trò" mở khung nhập, ma trận có **nhóm + mô tả từng tính năng**, ô **Bật/Tắt bấm được**, cột Admin "Luôn bật · khóa", hàng "Quản trị hệ thống · cố định" (tác vụ chỉ Admin: Admin "Có khóa", vai trò khác "Không được cấp"), nút **Bỏ thay đổi** / **Lưu quyền** (mờ cho tới khi có thay đổi), khối **Thay đổi gần đây** đọc `AuditLog` (`config:roleConfig`) kèm tóm tắt vai trò/phòng nào đổi.
+  - Cột chưa giới hạn = xem tất cả: bấm Tắt 1 ô → chuyển sang "mọi mục trừ mục đó"; bật lại đủ → về không giới hạn.
+  - Quyền từng người: danh sách tài khoản + tìm kiếm; chi tiết cột *Theo vai trò & phòng · Riêng người này · Kết quả*; công tắc "Giới hạn menu riêng" dùng đúng hàm của hộp thoại Tài khoản (`acctTogglePermLimit/Tab`) nên **lưu ngay** (không qua nút Lưu quyền); quyền tác vụ (`act:`) chỉ theo vai trò/phòng.
+  - Phòng ban & nhóm: cột theo phòng + thống kê số sale / trưởng phòng, công tắc "Giới hạn tính năng", thanh Sao chép quyền.
+- [x] `css/11-roles.css` (class `rl-*`, tông navy + xanh), nạp trong `index.html`. Test: `node tools/test-roles-page.js` (cần jsdom), `tools/test-roles-ui.js` (đã cập nhật nhãn mới), `tools/test-roles.js`.
+- [ ] **Việc cần Duyên:** mở CRM (Ctrl+F5) → Menu → Phân quyền → gửi ảnh chụp 3 tab để chỉnh khoảng cách/màu (chưa tự nhìn được hình dáng thật).
+- [ ] Còn lại: L0 (biến thiết kế + áp phông Be Vietnam Pro toàn app), L1 (khung navy: thanh trên + menu nhóm con mở/đóng + Thu gọn), L2 (thanh `Hôm nay | Tuần này | Tháng này`, thẻ số, bảng + phân trang, trạng thái rỗng/đang tải), L4 (áp từng màn), L5 (chế độ tối), L6 (điện thoại).

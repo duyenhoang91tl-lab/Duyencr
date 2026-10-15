@@ -837,6 +837,32 @@ function _donHasExcludedStatus_(trangThaiCol) {
 // nhung Page/kenh va Sale khong thuoc pham vi quan ly cua minh de AN khoi moi bao cao
 // dung chung (Dashboard, Bao cao doanh so A-E, KPI Pancake...). Luu 2 setting JSON array
 // dung chung pattern voi cac setting khac (getSetting_/setSetting_).
+// Bao cao B (Pos) cung phai AN Page/Sale theo cai dat admin (hiddenChannels/hiddenSales) nhu Bao cao A — truoc day B khong kiem tra nen sale da nghi/an
+// (vd Dung1987) van hien trong bao cao Pos. So khop theo NGUOI (moi ten cung 1 nguoi qua _salePersonKeyFn_), khong theo chuoi y nguyen.
+// Tra ve null neu admin khong an gi. Don chi bi an khi MOI sale tren don deu bi an (con >=1 sale khong an thi giu, giong _isDTRowHidden_).
+function _donHiddenChecker_() {
+  var sets = _hiddenPageSaleSets_();
+  if (!sets.sales.length && !sets.channels.length) return null;
+  var keyFn = sets.sales.length ? _salePersonKeyFn_() : null, hiddenKeys = {};
+  if (keyFn) sets.sales.forEach(function(n) { var k = keyFn(n); if (k) hiddenKeys[k] = true; });
+  var pageById = null, pageByName = null;
+  return {
+    saleHidden: function(name) { if (!keyFn) return false; var k = keyFn(name); return !!k && !!hiddenKeys[k]; },
+    channelHidden: function(nguonDon) {
+      if (!sets.channels.length) return false;
+      if (!pageById) { pageById = readPancakePageMap_(); pageByName = readPancakePageMapByName_(); }
+      var kenh = _donKenhFromNguon_(nguonDon, pageById, pageByName);
+      return !!kenh && sets.channels.indexOf(kenh) !== -1;
+    }
+  };
+}
+// Nguon don Pos -> kenh ban chuan: (1) ID Page o cuoi chuoi qua PancakePageMap; (2) khong co thi TEN Page qua readPancakePageMapByName_.
+function _donKenhFromNguon_(nguonDon, pageById, pageByName) {
+  var pid = _extractPageIdFromNguonDon_(nguonDon), kenh = pid ? (pageById[pid] || '') : '';
+  if (!kenh) { var pn = _extractPageNameFromNguonDon_(nguonDon); if (pn) kenh = pageByName[_normTxt_(pn)] || ''; }
+  return kenh;
+}
+
 function _hiddenPageSaleSets_() {
   var hc = [], hs = [];
   try { var v = getSetting_('hiddenChannels'); if (v) hc = JSON.parse(v); } catch (e) {}

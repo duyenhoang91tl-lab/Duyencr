@@ -1144,19 +1144,36 @@
   // Pancake/Messenger tự nhận diện SĐT trong tin nhắn rồi bọc bằng <span class="phone-tag ...">
   // (đôi khi span cha còn có id dạng "m_<hash>_<sđt>"). Đọc từ đây đáng tin hơn quét chữ tự do
   // vì nền tảng đã xác nhận đó thực sự là SĐT (khỏi nhầm mã đơn/mã vận đơn).
+  // Cấu trúc thật của Pancake (xác nhận bằng payload webhook 2026-10-13): SĐT trong tin khách nằm ở
+  //   <Copy id="m_<hash>_<sđt>" text="<sđt>"><span class="phone-tag phone-tag-trusted">sđt</span></Copy>
+  // => đọc đủ 3 nguồn: chữ trong .phone-tag, thuộc tính text của <Copy>, đuôi id "_<sđt>".
+  // CHỈ lấy SĐT trong tin của KHÁCH (customerMsgSelector) và xếp MỚI NHẤT TRƯỚC — khớp cách CRM/Supabase tách
+  // (chỉ nhận SĐT từ tin khách, không nhầm SĐT page/sale tự gõ). Không có tin khách nào có SĐT mới quét cả khung chat.
+  function phonesInNode_(root) {
+    const out = [];
+    const add = (raw) => { const p = normPhone(raw); if (/^0[3-9]\d{8}$/.test(p) && out.indexOf(p) === -1) out.push(p); };
+    const nodes = [];
+    if (root.matches && (root.matches('.phone-tag') || root.hasAttribute('text') || root.id)) nodes.push(root);
+    root.querySelectorAll('.phone-tag, copy[text], [id]').forEach((el) => nodes.push(el));
+    nodes.forEach((el) => {
+      if (el.classList && el.classList.contains('phone-tag')) add(el.textContent);
+      const t = el.getAttribute && el.getAttribute('text'); if (t) add(t);
+      const m = (el.id || '').match(/_(\d{9,11})$/); if (m) add(m[1]);
+    });
+    return out;
+  }
   function extractTaggedPhones_(scope) {
-    const found = new Set();
-    scope.querySelectorAll('.phone-tag').forEach((el) => {
-      const p = normPhone(el.textContent);
-      if (/^0[3-9]\d{8}$/.test(p)) found.add(p);
-    });
-    scope.querySelectorAll('[id]').forEach((el) => {
-      const m = el.id.match(/_(\d{9,11})$/);
-      if (!m) return;
-      const p = normPhone(m[1]);
-      if (/^0[3-9]\d{8}$/.test(p)) found.add(p);
-    });
-    return Array.from(found);
+    const sel = settings.selectors?.[PLATFORM];
+    const found = [];
+    const push = (arr) => arr.forEach((p) => { if (found.indexOf(p) === -1) found.push(p); });
+    if (sel?.customerMsgSelector) {
+      let items = [];
+      try { items = Array.from(scope.querySelectorAll(sel.customerMsgSelector)); } catch (e) { items = []; }
+      for (let i = items.length - 1; i >= 0; i--) push(phonesInNode_(items[i]));   // tin khách mới nhất trước
+      if (found.length) return found;
+    }
+    push(phonesInNode_(scope));   // fallback: cả khung chat (chưa phân biệt được tin khách)
+    return found;
   }
 
   // Trả về DANH SÁCH sđt tìm được trong đoạn chat hiện tại (có thể là 1, 2, hoặc nhiều).
