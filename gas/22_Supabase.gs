@@ -974,8 +974,6 @@ function _tlcDiagnose_(filters) {
   Object.keys(pkMap).forEach(function (pid) { var kn = pkMap[pid]; if (!kn) return; (kenhPages[kn] = kenhPages[kn] || []).push(pid); });
   var pkFn = _salePersonKeyFn_(), known = {};
   var rep = buildPancakeReport_(filters.dateFrom, filters.dateTo, 'equal'), byCS = rep.byCS || [];
-  byCS.forEach(function (n) { known[pkFn(n.name)] = n.name; });
-  try { Object.keys(readSaleDirectory_().byName || {}).forEach(function (k) { if (!known[pkFn(k)]) known[pkFn(k)] = k; }); } catch (e) {}
   var anchorNames = byCS.filter(function (r) { return (r.tongTT || 0) > 0; }).map(function (r) { return r.name; });
   var rows = readDTTong_(true), inRange = [], i;
   var skipped = { bhZero: 0, trangThaiLoai: 0, ngoaiKy: 0 };
@@ -989,30 +987,34 @@ function _tlcDiagnose_(filters) {
   var orderNames = [];
   inRange.forEach(function (r) { if (r.nguoiTao) orderNames.push(String(r.nguoiTao).trim()); });
   var personKey = _salePersonKeyWithOrphanFold_(pkFn, anchorNames, orderNames);
-  var disp = {}, held = {}, byCreator = {}, bySaleBan = {}, notCovered = {}, unknownCreators = {}, noCreator = 0, countedTotal = 0, unassignedTotal = 0;
+  byCS.forEach(function (n) { known[personKey(n.name)] = n.name; });
+  try { Object.keys(readSaleDirectory_().byName || {}).forEach(function (k) { if (!known[personKey(k)]) known[personKey(k)] = k; }); } catch (e) {}
+  var disp = {}, held = {}, byCreator = {}, bySaleBan = {}, bySaleBanCov = {}, notCovered = {}, unknownCreators = {}, noCreator = 0, countedTotal = 0, unassignedTotal = 0;
   byCS.forEach(function (n) { var k = personKey(n.name); disp[k] = disp[k] || n.name; held[k] = (held[k] || 0) + (n.tongTT || 0); });
   inRange.forEach(function (r) {
     var dt = parseVNDate_(r.ngayTao), ymd = dt ? _vnYmd_(dt) : '';
     var kn = r.kenhBan || '(chưa có kênh)', pids = kenhPages[r.kenhBan] || [];
     splitMulti_(r.saleBan, ',').forEach(function (sn) { var k = personKey(sn); disp[k] = disp[k] || sn; bySaleBan[k] = (bySaleBan[k] || 0) + 1; });
     var isCov = pids.some(function (pid) { return covered[pid] && covered[pid][ymd]; });
+    if (isCov) splitMulti_(r.saleBan, ',').forEach(function (sn) { var k2 = personKey(sn); bySaleBanCov[k2] = (bySaleBanCov[k2] || 0) + 1; });
     if (!isCov) {
       var why = pids.length ? 'kênh có Page nhưng Page chưa nạp tương tác ngày đơn' : 'kênh CHƯA gán Page Pancake';
       var key = kn + ' — ' + why; notCovered[key] = (notCovered[key] || 0) + 1; return;
     }
     var creator = r.nguoiTao ? String(r.nguoiTao).trim() : '';
     if (!creator) { noCreator++; unassignedTotal++; return; }
-    if (!known[pkFn(creator)]) { unknownCreators[creator] = (unknownCreators[creator] || 0) + 1; unassignedTotal++; return; }
+    if (!known[personKey(creator)]) { unknownCreators[creator] = (unknownCreators[creator] || 0) + 1; unassignedTotal++; return; }
     var pk = personKey(creator); disp[pk] = disp[pk] || creator;
     byCreator[pk] = (byCreator[pk] || 0) + 1; countedTotal++;
   });
-  var keys = {}; [held, byCreator, bySaleBan].forEach(function (m) { Object.keys(m).forEach(function (k) { keys[k] = 1; }); });
+  var keys = {}; [held, byCreator, bySaleBan, bySaleBanCov].forEach(function (m) { Object.keys(m).forEach(function (k) { keys[k] = 1; }); });
   var people = Object.keys(keys).map(function (k) {
     var h = held[k] || 0, c = byCreator[k] || 0;
-    return { name: disp[k] || k, held: Math.round(h), byCreator: c, bySaleBan: bySaleBan[k] || 0, rate: h ? Math.round(c / h * 1000) / 10 : null };
+    var sc = bySaleBanCov[k] || 0;
+    return { name: disp[k] || k, held: Math.round(h), byCreator: c, bySaleBan: bySaleBan[k] || 0, bySaleBanCov: sc, rate: h ? Math.round(c / h * 1000) / 10 : null, rateSaleBan: h ? Math.round(sc / h * 1000) / 10 : null };
   }).sort(function (a, b) { return b.bySaleBan - a.bySaleBan; });
   var ncTotal = 0; Object.keys(notCovered).forEach(function (k) { ncTotal += notCovered[k]; });
-  return { from: filters.dateFrom, to: filters.dateTo, rowsRead: rows.length, skipped: skipped, ordersInRange: inRange.length, countedForSale: countedTotal,
+  return { mode: _closeRateBy_(), from: filters.dateFrom, to: filters.dateTo, rowsRead: rows.length, skipped: skipped, ordersInRange: inRange.length, countedForSale: countedTotal,
            unassigned: unassignedTotal, noCreator: noCreator, unknownCreators: unknownCreators, notCovered: notCovered, notCoveredTotal: ncTotal, people: people, anchorNames: anchorNames };
 }
 function chanDoanTyLeChot() {
@@ -1020,6 +1022,7 @@ function chanDoanTyLeChot() {
   var f = { dateFrom: from, dateTo: today };
   var d = _tlcDiagnose_(f);
   Logger.log('=== CHẨN ĐOÁN TỶ LỆ CHỐT THEO SALE · ' + d.from + ' → ' + d.to + ' ===');
+  Logger.log('Cách gán đơn đang dùng cho Tỷ lệ chốt: ' + (d.mode === 'saleban' ? 'SALE BÁN (mỗi sale ghi trên đơn +1 đơn)' : 'NGƯỜI TẠO (cột B DT TỔNG)') + '. Đổi: datTyLeChotTheo(\'saleban\' | \'nguoitao\').');
   Logger.log('Đọc ' + d.rowsRead + ' dòng DT TỔNG; bỏ: đơn BH 0đ ' + d.skipped.bhZero + ', trạng thái loại ' + d.skipped.trangThaiLoai + ', ngoài kỳ ' + d.skipped.ngoaiKy + ' → còn ' + d.ordersInRange + ' đơn trong kỳ.');
   Logger.log('KẾT QUẢ: ' + d.countedForSale + ' đơn tính cho sale (theo NGƯỜI TẠO) | ' + d.unassigned + ' đơn "(chưa gán sale)" | ' + d.notCoveredTotal + ' đơn KHÔNG được đếm (kênh/ngày chưa có Pancake).');
   Logger.log('--- (A) Đơn KHÔNG được đếm vì kênh/ngày chưa có tương tác Pancake ---');
@@ -1028,7 +1031,7 @@ function chanDoanTyLeChot() {
   Object.keys(d.unknownCreators).sort(function (a, b) { return d.unknownCreators[b] - d.unknownCreators[a]; }).forEach(function (k) { Logger.log('  ' + d.unknownCreators[k] + ' đơn · người tạo = "' + k + '"'); });
   Logger.log('--- (C) Từng người: đơn theo NGƯỜI TẠO (dùng cho tỷ lệ chốt) so với đơn theo SALE BÁN (bảng bên trái) ---');
   d.people.forEach(function (p) {
-    Logger.log('  ' + p.name + ' | tương tác ' + p.held + ' | đơn theo người tạo ' + p.byCreator + ' | đơn theo sale bán ' + p.bySaleBan + ' | tỷ lệ ' + (p.rate == null ? '-' : p.rate + '%') + (p.bySaleBan > p.byCreator ? ' | LỆCH ' + (p.bySaleBan - p.byCreator) + ' đơn' : ''));
+    Logger.log('  ' + p.name + ' | tương tác ' + p.held + ' | đơn theo người tạo ' + p.byCreator + ' | đơn theo sale bán ' + p.bySaleBan + ' (trong kênh Pancake ' + p.bySaleBanCov + ') | tỷ lệ theo người tạo ' + (p.rate == null ? '-' : p.rate + '%') + ' | theo sale bán ' + (p.rateSaleBan == null ? '-' : p.rateSaleBan + '%') + (p.bySaleBan > p.byCreator ? ' | LỆCH ' + (p.bySaleBan - p.byCreator) + ' đơn' : ''));
   });
   return d;
 }

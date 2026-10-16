@@ -26,6 +26,8 @@ vm.runInContext(`
   __base.push(Object.assign(__b('05/10/2026', 'saleA'), { nguoiTao: 'mktX' }));   // nguoi tao KHONG phai sale -> chi dem cho kenh
   __base.push(Object.assign(__b('05/10/2026', 'saleA'), { bhZero: true }));       // don BH khong doanh thu -> loai
   readDTTong_ = function() { return __base; };
+  var __by = 'nguoitao';   // Cach gan don (closeRateBy): test goc kiem NGUOI TAO; phan cuoi doi sang 'saleban' (MAC DINH moi)
+  getSetting_ = function(k) { return k === 'closeRateBy' ? __by : null; };
   readPancakePageMap_ = function() { return { P1: 'K1', '862972056891669': 'K1' }; };
   readPancakePageMapByName_ = function() { return { 'page mot': 'K1' }; };
   readPancakeMap_ = function() { return {}; };
@@ -63,4 +65,10 @@ const a = A(); eq(r2.saleCloseRate, a.saleCloseRate, 'A va B: ty le chot theo Sa
 // 4) Bo loc Sale/San pham/Nguon cua tung bao cao CHI ap cho bang doanh thu — khong lam doi ty le chot (A va B van cung so)
 const rs = B({ sale: ['saleB'], sanPham: 'Vòng bạc', nguon: ['Facebook / Page Mot (862972056891669)'] }), as = A({ sale: ['saleB'], sanPham: 'Vòng bạc' });
 eq(rs.saleCloseRate, r2.saleCloseRate, 'B co loc Sale/San pham/Nguon: ty le chot khong doi'); eq(as.saleCloseRate, r2.saleCloseRate, 'A co loc: ty le chot khong doi');
+// 2) Cach gan don MAC DINH = SALE BAN (Duyen chot 2026-10-16): moi sale ghi o "Sale ban" +1 don, KHONG phu thuoc nguoi tao
+vm.runInContext("__by = 'saleban';", ctx);
+r = B();
+eq(sale('saleA').closed, 8, 'SALE BAN: saleA = 8 don (7 don nhu tren + don co nguoi tao la mktX vi Sale ban van la saleA)');
+eq(sale('saleB').closed, 3, 'SALE BAN: saleB = 3 don');
+
 console.log('ALL CLOSE-RATE-BASE TESTS PASSED');

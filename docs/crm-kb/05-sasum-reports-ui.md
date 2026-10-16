@@ -98,3 +98,11 @@ Menu **Cài đặt team → 🔗 Khớp sale** (admin; `js/52-fn-salematch.js`, 
 - **Chạy tay trong Apps Script Editor: `chanDoanTyLeChot`** (tháng này; chỉ đọc + Logger.log). In 3 khối: (A) đơn không được đếm theo kênh/ngày, (B) tên người tạo không khớp + số đơn, (C) từng người: tương tác Pancake, đơn theo người tạo, đơn theo sale bán, số đơn LỆCH. Gửi log này để biết lỗi nằm ở tên người tạo hay ở kênh/Page. Lõi: `_tlcDiagnose_` (lặp lại đúng quy tắc trên).
 - Test: `node tools/test-closerate-diag.js` (chạy hàm thật; đối chiếu với `_srCloseRateSectionsFromBase_` thật: cùng số).
 
+## Tỷ lệ chốt: chọn cách gán đơn cho sale — `closeRateBy` (2026-10-16, Duyên chốt)
+- **Nguyên nhân gốc (log `chanDoanTyLeChot` tháng 10):** tỷ lệ chốt đếm đơn theo NGƯỜI TẠO nên lệch bảng "Theo Sale bán" (vd anhtrinh1995 52 đơn Sale bán nhưng 0 đơn người tạo vì người tạo là `anhTP1995`, tên chưa khớp). 66 đơn "(chưa gán sale)" = 47 đơn `anhTP1995` + 19 đơn `minhquach95`. 197/596 đơn không được đếm vì kênh chưa gán Page Pancake (Bảo hành, Zalo CSKH, BH tại quầy, Fb Phạm Thu Hiền...) — **đúng thiết kế**, tỷ lệ chốt chỉ tính kênh Pancake.
+- **Lỗi code phát hiện:** chế độ người tạo nhận diện "người tạo có phải sale" bằng `_salePersonKeyFn_` KHÔNG có gộp tên mồ côi, nên `minhquach95` bị loại thành "(chưa gán)" dù quy ước gộp tên (`minhquach95` → `minhquach1995`) vốn áp dụng được. Đã sửa: dùng `_salePersonKeyWithOrphanFold_` ở bước nhận diện.
+- **Cách gán đơn nay chọn được:** Settings `closeRateBy` (hàm `_closeRateBy_`): **`saleban` (MẶC ĐỊNH)** = mỗi sale ghi ở cột "Sale bán" của đơn được +1 đơn (đơn 2 sale tính cho cả 2, giống bảng bên trái); `nguoitao` = chỉ người tạo (cột B). Đổi trong Apps Script Editor: `datTyLeChotTheo('saleban')` / `datTyLeChotTheo('nguoitao')` (báo cáo có thể cache vài phút). Dùng chung cho Báo cáo A và B (`_srCloseRateSectionsFromBase_`). Kênh vẫn đếm mọi đơn.
+- Số Sale bán trong tỷ lệ chốt vẫn **ít hơn** bảng bên trái vì chỉ đếm đơn của kênh có Page Pancake đã nạp tương tác ngày đó. `chanDoanTyLeChot` in cả hai cột + tỷ lệ theo cả hai cách để so.
+- Tên người tạo `anhTP1995` cần khớp tay (🔗 Khớp sale) nếu muốn dùng chế độ `nguoitao` — không tự đoán được từ tên.
+- Test: `node tools/test-closerate-diag.js` (cả 2 chế độ + gộp `minhquach95` + chẩn đoán, chạy hàm thật), `node tools/test-close-rate-base.js`.
+
