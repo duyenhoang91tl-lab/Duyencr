@@ -94,12 +94,13 @@
     if (mx !== (S.lastRead[ch] || 0)) { S.lastRead[ch] = mx; saveLR(); }
     renderBadges();
   }
+  function titleText() { var n = S.me ? totalUnread() : 0; return (n ? '(' + (n > 99 ? '99+' : n) + ') ' : '') + S.title0; }
   function renderBadges() {
     var n = S.me ? totalUnread() : 0, b = $('tb-teamchat');
     if (b) { b.textContent = n > 99 ? '99+' : n; b.style.display = n ? '' : 'none'; b.style.background = n ? '#fee2e2' : ''; b.style.color = n ? '#991b1b' : ''; }
     var t = $('sn-toggle'); if (t) t.classList.toggle('tc-unread', n > 0);
     if (!S.title0) S.title0 = document.title.replace(/^\(\d+\+?\)\s*/, '');
-    document.title = (n ? '(' + (n > 99 ? '99+' : n) + ') ' : '') + S.title0;
+    document.title = (S.blink && S.blink.phase) ? S.blink.alt : titleText();
     renderSide(); miniRenderAll();
   }
 
@@ -166,7 +167,7 @@
     } else {
       var viewing = S.panelOn && !document.hidden;
       var theirs = fresh.filter(function (m) { return m.u !== S.me.username && !(viewing && m.c === S.active) && !miniViewing(m.c); });
-      if (theirs.length) { var t = theirs[theirs.length - 1], c = chById(t.c); say('💬 ' + t.n + (c && c.type !== 'dm' ? ' (' + chName(c) + ')' : '') + ': ' + t.t.slice(0, 60)); }
+      if (theirs.length) { var t = theirs[theirs.length - 1], c = chById(t.c); say('💬 ' + t.n + (c && c.type !== 'dm' ? ' (' + chName(c) + ')' : '') + ': ' + t.t.slice(0, 60)); miniNotify(theirs); }
     }
     if (S.panelOn && fresh.some(function (m) { return m.c === S.active; })) { renderMsgs(); if (!document.hidden) markRead(S.active); }
     S.mini.wins.forEach(function (w) { if (fresh.some(function (m) { return m.c === w.id; })) miniRenderWin(w, false); });
@@ -184,7 +185,7 @@
     await tick();
     miniRestore();   // sau tick dau (de moc 'da doc' lan dau tren may duoc dat truoc khi cua so nho tu danh dau da doc)
   }
-  function stop() { miniReset(); S.started = false; clearTimeout(S.timer); S.me = null; S.pendingDm = null; S.active = 'general'; S.reply = null; S.chans = []; S.msgs = {}; S.last = 0; S.chver = -1; renderBadges(); }
+  function stop() { miniReset(); titleBlinkStop(); S.started = false; clearTimeout(S.timer); S.me = null; S.pendingDm = null; S.active = 'general'; S.reply = null; S.chans = []; S.msgs = {}; S.last = 0; S.chver = -1; renderBadges(); }
 
   // ───────────── giao dien ─────────────
   function ensurePanel() {
@@ -409,10 +410,10 @@
   // Chi hien khi dang o tab khac (o tab Chat da co khung day du). Trang thai (mo/thu gon) nho theo may: localStorage ome_chat_mini_<user>.
   // Moi chuoi nguoi dung di qua esc()/textContent; id kenh chi nam trong thuoc tinh data-ch (khong vao chuoi JS).
   var MINI_W = 340, MINI_MAX = 3;
-  S.mini = { listOpen: false, wins: [], q: '', hidden: false, justDragged: false };
+  S.mini = { listOpen: false, wins: [], q: '', hidden: false, justDragged: false, snd: true };
   function miniKey() { return 'ome_chat_mini_' + (S.me ? S.me.username : ''); }
   function miniSave() {
-    try { localStorage.setItem(miniKey(), JSON.stringify({ l: S.mini.listOpen ? 1 : 0, h: S.mini.hidden ? 1 : 0, w: S.mini.wins.map(function (w) { return [w.id, w.min ? 1 : 0]; }) })); } catch (e) {}
+    try { localStorage.setItem(miniKey(), JSON.stringify({ l: S.mini.listOpen ? 1 : 0, h: S.mini.hidden ? 1 : 0, s: S.mini.snd ? 1 : 0, w: S.mini.wins.map(function (w) { return [w.id, w.min ? 1 : 0]; }) })); } catch (e) {}
   }
   function miniMax() { var room = (window.innerWidth || 1200) - 76 - 290 - 20; return Math.max(1, Math.min(MINI_MAX, Math.floor(room / (MINI_W + 10)))); }
   function miniWin(id) { for (var i = 0; i < S.mini.wins.length; i++) if (S.mini.wins[i].id === id) return S.mini.wins[i]; return null; }
@@ -492,7 +493,7 @@
     d = document.createElement('div'); d.id = 'tc-mini'; d.className = 'off';
     d.innerHTML = '<div class="tcm-list" id="tcm-list">' +
       '<div class="tcm-lh" data-act="list" title="Bấm để mở/thu danh sách · Kéo để di chuyển"><span>💬 Chat nội bộ</span><span class="tcm-nb" id="tcm-lbadge" style="display:none">0</span><span class="tcm-sp"></span>' +
-        '<button data-act="newdm" title="Nhắn riêng">✉</button><button data-act="newch" title="Tạo nhóm">＋</button><button data-act="hide" title="Thu nhỏ hẳn thành biểu tượng 💬">–</button></div>' +
+        '<button data-act="snd" id="tcm-snd" title="Âm báo tin mới">🔔</button><button data-act="newdm" title="Nhắn riêng">✉</button><button data-act="newch" title="Tạo nhóm">＋</button><button data-act="hide" title="Thu nhỏ hẳn thành biểu tượng 💬">–</button></div>' +
       '<div class="tcm-lp"><input class="tcm-q" placeholder="Tìm kênh / người…"><div class="tcm-lbody" id="tcm-lbody"></div></div></div>';
     document.body.appendChild(d);
     miniDrag(d, '.tcm-lh,.tcm-wh', 'd');   // phai dang ky TRUOC miniClick de chan duoc click sau khi keo
@@ -516,11 +517,15 @@
     if (act === 'list') { S.mini.listOpen = !S.mini.listOpen; miniSave(); miniRenderAll(); if (S.mini.listOpen) { var q = $('tc-mini').querySelector('.tcm-q'); if (q) q.focus(); } }
     else if (act === 'newdm') { e.stopPropagation(); tcNewDm(true); }
     else if (act === 'newch') { e.stopPropagation(); tcNewChannel(true); }
+    else if (act === 'snd') { e.stopPropagation(); S.mini.snd = !S.mini.snd; miniSave(); miniSndBtn(); if (S.mini.snd) miniBeep(true); }
     else if (act === 'hide') { e.stopPropagation(); S.mini.hidden = true; miniSave(); miniRenderAll(); }
     else if (act === 'open') miniOpen(ch);
     else if (act === 'wmin' && w) { w.min = !w.min; miniSave(); miniRenderWin(w, true); if (!w.min) { miniMarkVisible(); var ta = w.el.querySelector('textarea'); if (ta) ta.focus(); } else renderBadges(); }
     else if (act === 'wclose' && w) miniClose(ch);
     else if (act === 'wsend' && w) miniSend(w);
+    else if (act === 'wreply' && w) miniReply(w, a.getAttribute('data-id'));
+    else if (act === 'wreplyx' && w) { w.reply = null; miniRenderReply(w); }
+    else if (act === 'wdel' && w) miniDel(w, a.getAttribute('data-id'));
     else if (act === 'older' && w) { var arr = (S.msgs[ch] || []).filter(function (m) { return !m.tmp; }); if (arr.length) loadHistory(ch, arr[0].id).then(function () { w.sig = ''; miniRenderWin(w); }); }
     else if (act === 'wfull' && w) {
       miniClose(ch);
@@ -532,7 +537,7 @@
     var el = document.createElement('div'); el.className = 'tcm-win'; el.setAttribute('data-ch', w.id);
     el.innerHTML = '<div class="tcm-wh" data-act="wmin"><span class="tcm-wt"></span><span class="tcm-nb" style="display:none"></span><span class="tcm-sp"></span>' +
       '<button data-act="wfull" title="Mở trong tab Chat nội bộ">⤢</button><button data-act="wmin" title="Thu gọn / mở">–</button><button data-act="wclose" title="Đóng">×</button></div>' +
-      '<div class="tcm-wb"><div class="tcm-msgs"></div><div class="tcm-comp"><textarea rows="1" maxlength="' + MAX_LEN + '" placeholder="Nhập tin nhắn…"></textarea>' +
+      '<div class="tcm-wb"><div class="tcm-msgs"></div><div class="tcm-reply" style="display:none"></div><div class="tcm-comp"><textarea rows="1" maxlength="' + MAX_LEN + '" placeholder="Nhập tin nhắn…"></textarea>' +
       '<button data-act="wsend" title="Gửi">➤</button></div></div>';
     return el;
   }
@@ -564,10 +569,15 @@
       var dk = dayKey(m.ts || Date.now());
       if (dk !== lastDay) { h += '<div class="tc-day"><span>' + dayLabel(m.ts || Date.now()) + '</span></div>'; lastDay = dk; lastU = ''; }
       var mine = m.u === S.me.username, grp = (m.u === lastU && (m.ts - lastT) < 300000);
-      h += '<div class="tc-msg' + (mine ? ' mine' : '') + (grp ? ' grp' : '') + (m.tmp ? ' tmp' : '') + (mentionsMe(m) && !mine ? ' men' : '') + '">' +
+      var q = '';
+      if (m.r) { var ref = a.filter(function (x) { return String(x.id) === String(m.r); })[0]; q = '<div class="tc-quote">↩ ' + (ref ? '<b>' + esc(ref.n) + '</b>: ' + esc(ref.t.slice(0, 80)) : 'tin nhắn trước đó') + '</div>'; }
+      var mid = esc(String(m.id));
+      h += '<div class="tc-msg' + (mine ? ' mine' : '') + (grp ? ' grp' : '') + (m.tmp ? ' tmp' : '') + (mentionsMe(m) && !mine ? ' men' : '') + '" data-id="' + mid + '">' +
         (grp ? '<div class="tc-av ph"></div>' : '<div class="tc-av" style="background:' + colorOf(m.u) + '">' + esc(initials(m.n)) + '</div>') +
-        '<div class="tc-bd">' + (grp ? '' : '<div class="tc-who"><b>' + esc(m.n) + '</b><span>' + hhmm(m.ts) + '</span></div>') +
-        '<div class="tc-tx">' + fmtText(m.t) + '</div></div>' + (m.tmp ? '<div class="tc-st">đang gửi…</div>' : '') + '</div>';
+        '<div class="tc-bd">' + (grp ? '' : '<div class="tc-who"><b>' + esc(m.n) + '</b><span>' + hhmm(m.ts) + '</span></div>') + q +
+        '<div class="tc-tx">' + fmtText(m.t) + '</div></div>' +
+        (m.tmp ? '<div class="tc-st">đang gửi…</div>' : '<div class="tc-acts"><button data-act="wreply" data-id="' + mid + '" title="Trả lời">↩</button>' +
+          ((mine || S.me.role === 'admin') ? '<button data-act="wdel" data-id="' + mid + '" title="Xoá">🗑</button>' : '') + '</div>') + '</div>';
       lastU = m.u; lastT = m.ts;
     });
     return h;
@@ -579,12 +589,77 @@
     nb.textContent = n > 99 ? '99+' : n; nb.style.display = (n && w.min) ? '' : 'none'; nb.classList.toggle('men', unreadMention(w.id));
     el.classList.toggle('min', !!w.min);
     if (w.min) return;
+    miniRenderReply(w);
     var a = S.msgs[w.id] || [], sig = a.length + '|' + (a.length ? a[a.length - 1].id : '') + '|' + (S.more[w.id] ? 1 : 0) + '|' + S.authFail;
     if (sig === w.sig && !stick) return;
     w.sig = sig;
     var box = el.querySelector('.tcm-msgs'), near = box.scrollHeight - box.scrollTop - box.clientHeight < 70, prevH = box.scrollHeight, prevT = box.scrollTop;
     box.innerHTML = S.authFail ? '<div class="tc-empty">Phiên đăng nhập đã hết hạn — đăng nhập lại để dùng chat.</div>' : miniMsgsHtml(w.id);
     if (stick || near) box.scrollTop = box.scrollHeight; else box.scrollTop = prevT + (box.scrollHeight - prevH);
+  }
+  // ───────────── am bao + nhap nhay tieu de khi co tin moi ─────────────
+  // Chi bao khi tin cua NGUOI KHAC va khong ai dang xem kenh do (cung dieu kien voi toast). Am: 2 not ngan qua Web Audio (khong can file am
+  // thanh); trinh duyet chan am truoc khi nguoi dung tuong tac voi trang -> bat loi, im lang. Tieu de tab nhap nhay CHI khi tab trinh duyet dang an,
+  // dung lai khi quay lai tab.
+  var _ac = null, _lastBeep = 0;
+  function miniBeep(force) {
+    if (!S.mini.snd && !force) return;
+    var now = Date.now(); if (!force && now - _lastBeep < 2500) return; _lastBeep = now;
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+      if (!_ac) _ac = new AC();
+      if (_ac.state === 'suspended' && _ac.resume) _ac.resume();
+      [[880, 0], [1175, 0.13]].forEach(function (n) {
+        var o = _ac.createOscillator(), g = _ac.createGain(), t0 = _ac.currentTime + n[1];
+        o.type = 'sine'; o.frequency.setValueAtTime(n[0], t0);
+        g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.12, t0 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.14);
+        o.connect(g); g.connect(_ac.destination); o.start(t0); o.stop(t0 + 0.16);
+      });
+    } catch (e) {}
+  }
+  function miniSndBtn() { var b = $('tcm-snd'); if (!b) return; b.textContent = S.mini.snd ? '🔔' : '🔕'; b.style.opacity = S.mini.snd ? '' : '.6'; b.title = S.mini.snd ? 'Âm báo tin mới: đang BẬT (bấm để tắt)' : 'Âm báo tin mới: đang TẮT (bấm để bật)'; }
+  function titleBlinkStop() {
+    if (S.blink) { clearInterval(S.blink.timer); S.blink = null; }
+    if (S.title0) document.title = titleText();
+  }
+  function titleBlinkStart(who) {
+    if (!document.hidden || !S.title0) return;
+    var alt = '💬 ' + String(who || 'Tin nhắn mới').slice(0, 24) + ' nhắn…';
+    if (S.blink) { S.blink.alt = alt; return; }
+    S.blink = { alt: alt, phase: false, timer: setInterval(function () {
+      if (!document.hidden || !S.blink) { titleBlinkStop(); return; }
+      S.blink.phase = !S.blink.phase; document.title = S.blink.phase ? S.blink.alt : titleText();
+    }, 1000) };
+  }
+  function miniNotify(theirs) {
+    if (!theirs.length) return;
+    miniBeep(false);
+    titleBlinkStart(theirs[theirs.length - 1].n);
+  }
+  function miniRenderReply(w) {
+    var b = w.el && w.el.querySelector('.tcm-reply'); if (!b) return;
+    if (!w.reply) { b.style.display = 'none'; b.innerHTML = ''; return; }
+    b.style.display = '';
+    b.innerHTML = '<span class="tcm-rt">↩ Trả lời <b>' + esc(w.reply.n) + '</b>: ' + esc(w.reply.t.slice(0, 60)) + '</span><button data-act="wreplyx" title="Bỏ trả lời">✕</button>';
+  }
+  function miniReply(w, id) {
+    var m = (S.msgs[w.id] || []).filter(function (x) { return String(x.id) === String(id); })[0];
+    if (!m || m.tmp) return;
+    w.reply = m; miniRenderReply(w);
+    var ta = w.el.querySelector('textarea'); if (ta) ta.focus();
+  }
+  async function miniDel(w, id) {
+    var ch = w.id, m = (S.msgs[ch] || []).filter(function (x) { return String(x.id) === String(id); })[0];
+    if (!m || m.tmp || !S.me) return;
+    if (!(m.u === S.me.username || S.me.role === 'admin')) return;   // server cung kiem lai; day chi la chan som
+    if (!confirm('Xoá tin nhắn này? Mọi người trong kênh sẽ không còn thấy.')) return;
+    var r = await apiPost('chatDelete', { id: id });
+    if (!r.ok) { say(r.error || 'Không xoá được tin nhắn'); return; }
+    S.msgs[ch] = (S.msgs[ch] || []).filter(function (x) { return String(x.id) !== String(id); });
+    S.dver = r.dver;
+    S.mini.wins.forEach(function (x) { if (x.reply && String(x.reply.id) === String(id)) { x.reply = null; } x.sig = ''; miniRenderWin(x); });
+    if (S.panelOn && S.active === ch) renderMsgs();
+    renderSide(); renderBadges();
   }
   function miniRenderAll() {
     var d = $('tc-mini'); if (!d) { if (!S.me) return; d = miniDock(); }
@@ -596,6 +671,7 @@
     var lst = $('tcm-list'), b = $('tcm-lbadge'), n = totalUnread();
     var bb = $('tcb-badge'); if (bb) { bb.textContent = n > 99 ? '99+' : n; bb.style.display = n ? '' : 'none'; }
     bub.classList.toggle('has', n > 0);
+    miniSndBtn();
     if (S.mini.hidden) { posReclamp(bub, 'b'); return; }
     lst.classList.toggle('open', !!S.mini.listOpen);
     b.textContent = n > 99 ? '99+' : n; b.style.display = n ? '' : 'none';
@@ -608,7 +684,7 @@
     var w = miniWin(id);
     if (w) w.min = false;
     else {
-      w = { id: id, min: false, el: null, sending: false, sig: '' };
+      w = { id: id, min: false, el: null, sending: false, sig: '', reply: null };
       S.mini.wins.unshift(w);
       while (S.mini.wins.length > miniMax()) { var old = S.mini.wins.pop(); if (old.el) old.el.remove(); }
     }
@@ -633,7 +709,8 @@
     miniReset();
     S.mini.listOpen = !!(raw && raw.l);
     S.mini.hidden = !!(raw && raw.h);
-    if (raw && raw.w) raw.w.slice(0, miniMax()).forEach(function (x) { if (chById(x[0])) S.mini.wins.push({ id: x[0], min: !!x[1], el: null, sending: false, sig: '' }); });
+    S.mini.snd = !(raw && raw.s === 0);   // mac dinh BAT am bao; chi tat khi nguoi dung da tat tren may nay
+    if (raw && raw.w) raw.w.slice(0, miniMax()).forEach(function (x) { if (chById(x[0])) S.mini.wins.push({ id: x[0], min: !!x[1], el: null, sending: false, sig: '', reply: null }); });
     miniSync(); posApply(); miniRenderAll();
     S.mini.wins.forEach(function (w) {
       if (!S.msgs[w.id] || !S.msgs[w.id].length) loadHistory(w.id).then(function () { miniRenderWin(w, true); miniMarkVisible(); });
@@ -645,7 +722,10 @@
     S.mini.wins.forEach(function (w) {
       if (w.id === S.active && S.panelOn) return;
       S.msgs[w.id] = (S.msgs[w.id] || []).filter(function (m) { return m.tmp; });
-      loadHistory(w.id).then(function () { miniRenderWin(w, true); });
+      loadHistory(w.id).then(function () {
+        if (w.reply && !(S.msgs[w.id] || []).some(function (x) { return String(x.id) === String(w.reply.id); })) w.reply = null;
+        miniRenderWin(w, true);
+      });
     });
   }
   async function miniSend(w) {
@@ -653,10 +733,11 @@
     var text = ta.value.trim(); if (!text) return;
     if (text.length > MAX_LEN) { say('Tin nhắn quá dài (tối đa ' + MAX_LEN + ' ký tự)'); return; }
     var ch = w.id; w.sending = true;
-    var tmp = { id: 't' + Date.now(), c: ch, u: S.me.username, n: S.me.name, t: text, ts: Date.now(), r: '', tmp: true };
+    var rep0 = w.reply, replyId = rep0 ? String(rep0.id) : '';
+    var tmp = { id: 't' + Date.now(), c: ch, u: S.me.username, n: S.me.name, t: text, ts: Date.now(), r: replyId, tmp: true };
     (S.msgs[ch] || (S.msgs[ch] = [])).push(tmp);
-    ta.value = ''; ta.style.height = 'auto'; miniRenderWin(w, true);
-    var r = await apiPost('chatSend', { channel: ch, text: text, replyTo: '' });
+    ta.value = ''; ta.style.height = 'auto'; w.reply = null; miniRenderWin(w, true);
+    var r = await apiPost('chatSend', { channel: ch, text: text, replyTo: replyId });
     S.msgs[ch] = (S.msgs[ch] || []).filter(function (m) { return m !== tmp; });
     if (r.ok) {
       addMsg(r.msg); S.last = Math.max(S.last, r.last || 0);
@@ -665,6 +746,7 @@
     } else {
       if (r.code === 'AUTH') S.authFail = true;
       say(r.error || 'Gửi không được, thử lại'); if (!ta.value) ta.value = text;
+      if (!w.reply) w.reply = rep0;   // gui loi: giu lai trich dan de gui lai
     }
     w.sending = false; miniRenderWin(w, true);
     if (S.panelOn && S.active === ch) renderMsgs(true);
@@ -699,7 +781,8 @@
     if (tab === 'teamchat') { ensurePanel(); p = $('tab-teamchat'); if (p) p.style.display = 'flex'; enter(); }
     else if (p) p.style.display = 'none';
   };
-  document.addEventListener('visibilitychange', function () { if (!document.hidden && S.started) { clearTimeout(S.timer); tick(); if (S.panelOn) markRead(S.active); miniMarkVisible(); } });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && S.started) { clearTimeout(S.timer); tick(); if (S.panelOn) markRead(S.active); miniMarkVisible(); }
+    if (!document.hidden) titleBlinkStop(); });
   // Tu khoi dong sau khi dang nhap (de huy hieu chua doc chay ca khi chua mo tab Chat); dung lai khi dang xuat.
   setInterval(function () {
     var has = !!tok() && !!gs();

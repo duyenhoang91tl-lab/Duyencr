@@ -144,3 +144,11 @@ html.pro-ai-open #tc-mini>*{flex-shrink:0}
 @keyframes tcb-pulse{0%,100%{box-shadow:var(--shadow-md)}50%{box-shadow:0 0 0 6px rgba(220,38,38,.25)}}
 html.pro-ai-open #tc-bubble{right:calc(var(--pro-ai-w,380px) + 16px)}
 @media (max-width:720px){#tc-bubble{display:none!important}}
+
+/* CUA SO NHO: tra loi / xoa tin (thanh trich dan tren o nhap, nut o goc tin) + nut chuong am bao (2026-10-16) */
+.tcm-reply{display:flex;align-items:center;gap:6px;padding:5px 8px;font-size:12px;background:var(--surface2);border-top:1px solid var(--border);color:var(--muted);flex-shrink:0}
+.tcm-reply .tcm-rt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tcm-reply button{background:none;border:0;cursor:pointer;color:inherit;font-size:13px;padding:2px 6px;border-radius:4px}
+.tcm-reply button:hover{background:var(--border)}
+.tcm-msgs .tc-acts{top:-10px;right:2px}
+.tcm-msgs .tc-quote{font-size:11.5px}
