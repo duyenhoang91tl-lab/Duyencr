@@ -614,7 +614,7 @@ function _srCloseRateBarHtml_(rows, searchTerm, unitLabel){
   filtered.sort(function(a,b){ return b.closeRate-a.closeRate; });
   var totHeld = filtered.reduce(function(s,r){return s+r.held;},0);
   var totClosed = filtered.reduce(function(s,r){return s+r.closed;},0);
-  var avgRate = totHeld ? Math.round(totClosed/totHeld*100) : 0;
+  var avgRate = totHeld ? Math.round(totClosed/totHeld*1000)/10 : 0;   // 1 chữ số thập phân, cùng độ chính xác với từng dòng (333/39781 = 0.8%, không làm tròn thành 1%)
   // Dong co DON nhung 0 tuong tac Pancake (thuong la 2 ten khac nhau cua cung 1 nguoi chua duoc lien ket) khong ve duoc thanh cot
   // (khong co mau so) — truoc day bi AN im lang nen don cua ho 'bien mat' khoi bieu do. Nay liet ke ro de biet ma lien ket.
   var orphans = (rows||[]).filter(function(r){ return !(r.held>0) && r.closed>0; }).sort(function(a,b){ return b.closed-a.closed; });
@@ -624,8 +624,10 @@ function _srCloseRateBarHtml_(rows, searchTerm, unitLabel){
   var orphanHtml = orphanBox_ ? _warnBox('cr-orphan', orphanBox_, orphanTot+' đơn chưa gán vào tương tác Pancake') : '';
   var lv = CLOSE_RATE_THRESHOLDS.levels;
   function colorFor(p){ return _crColorFor_(p); }
+  // Độ dài cột tính theo TỶ LỆ SO VỚI NGƯỜI CAO NHẤT (không phải so với 100%): tỷ lệ chốt thật chỉ 0–3% nên trước đây mọi cột chỉ rộng 1–3% khung → chỉ còn chấm tròn nhỏ.
+  var maxRate = filtered.reduce(function(m,r){ return Math.max(m, r.closeRate||0); }, 0);
   var bars = filtered.map(function(r){
-    var w = Math.max(2, Math.min(100, r.closeRate));
+    var w = maxRate > 0 ? Math.max(r.closeRate > 0 ? 3 : 0, Math.min(100, r.closeRate/maxRate*100)) : 0;
     return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">'+
       '<div style="width:112px;font-size:11.5px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(r.name)+'">'+esc(r.name)+'</div>'+
       '<div style="flex:1;background:var(--surface2);border-radius:4px;overflow:hidden;height:15px">'+
