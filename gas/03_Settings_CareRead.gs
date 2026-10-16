@@ -1071,7 +1071,7 @@ function tatChanKhac() { return _enfSet_('other', false); }
 //  (khong doi hanh vi cu). Cai: chay datChuSoHuu('ten_dang_nhap') trong Editor; xem: xemChuSoHuu. Chi chan khi co token hop le
 //  (token thieu/het han do cong tac 4b xu ly) va KHONG chan khoa extension (extension dung `ek`, xem EXT_ALLOWED_).
 // ═══════════════════════════════════════════════════════════════
-var OWNER_ONLY_ACTIONS_ = { patchOrder: 1, deleteOrder: 1, deleteDuplicateOrders: 1, replaceOrders: 1, importSheetRows: 1, dedupeCare: 1 };
+var OWNER_ONLY_ACTIONS_ = { patchOrder: 1, deleteOrder: 1, deleteDuplicateOrders: 1, replaceOrders: 1, importSheetRows: 1, dedupeCare: 1, findDuplicateOrders: 1 };   // findDuplicateOrders (quet don trung, chi menu admin) di cung deleteDuplicateOrders (4c-3)
 function _ownerUsers_() {
   var a = [];
   try { a = JSON.parse(PropertiesService.getScriptProperties().getProperty('ownerUsers') || '[]') || []; } catch (e) { a = []; }

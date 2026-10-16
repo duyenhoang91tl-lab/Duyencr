@@ -25,7 +25,7 @@ JSDOM.fromFile(path.join(__dirname, '..', 'index.html'), { runScripts: 'dangerou
       SALE_GROUPS = [{ key:'online', label:'Online' }, { key:'offline', label:'Văn phòng' }];
       SALE_CHANNELS = { yenNTH2004:'offline', ANHNP1999:'offline', thuNH1986:'offline', dungnguyen1995:'online', ghost:'online' };
       _srState.sub = 'A'; renderSalesReportTab();`);
-    const S = () => w.eval('_srState.sale'), T = () => w.eval('_srState.team'), txt = () => (D.getElementById('fp-bar') || { textContent: '' }).textContent;
+    const S = () => w.eval('_srState.sale'), T = () => w.eval('_srState.team'), txt = () => (D.getElementById('fp-info') || { textContent: '' }).textContent;
     const pick = (team) => w.eval(`srbMenuPick({ getAttribute: function(a){ return a === 'data-k' ? 'team' : '${team}'; } })`);
     // 1) chon Van phong
     pick('Văn phòng'); await wait(20);
@@ -58,8 +58,8 @@ JSDOM.fromFile(path.join(__dirname, '..', 'index.html'), { runScripts: 'dangerou
     const vp = g.find(x => x.key === 'offline'), ol = g.find(x => x.key === 'online');
     ok(JSON.stringify(vp.sales) === '["yenNTH2004","anhNP1999","thuNH1986"]' && vp.missing.length === 0, 'doi Van phong: khop ten khong phan biet hoa/thuong (ANHNP1999 -> anhNP1999)');
     ok(JSON.stringify(ol.sales) === '["dungnguyen1995"]' && JSON.stringify(ol.missing) === '["ghost"]', 'doi Online: 1 ten khop, 1 ten khong co trong du lieu bao cao');
-    const chip = k => D.querySelector('#fp-bar .fp-grp[data-key="' + k + '"]');
-    ok(chip('offline') && /Văn phòng/.test(chip('offline').textContent) && /3 sale/.test(chip('offline').textContent), 'co nut doi Van phong (3 sale)');
+    const chip = k => D.querySelector('#fp-gear .fp-grp[data-key="' + k + '"]');
+    ok(chip('offline') && /Văn phòng/.test(chip('offline').textContent) && /3 sale/.test(chip('offline').textContent), 'co muc doi Van phong (3 sale) trong menu Mau');
     ok(/ghost/.test(chip('online').getAttribute('title')), 'tooltip doi Online bao ten bi bo');
     chip('offline').click(); await wait(80);
     ok(JSON.stringify(S()) === '["yenNTH2004","anhNP1999","thuNH1986"]' && T().length === 0, 'bam doi Van phong -> loc dung 3 Sale');

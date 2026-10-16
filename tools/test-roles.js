@@ -102,7 +102,7 @@ ok(run('_featureGate_','salesReportA','tokCs')===null,'bo phan khong khop nguoi 
   run('datChuSoHuu','Duyent');
   ok(run('_ownerGate_','replaceOrders','tokD')===null,'owner duyent duoc sua/xoa');
   ok(run('_ownerGate_','deleteDuplicateOrders','tokA2').code==='FORBIDDEN','admin khac KHONG phai owner -> bi chan');
-  for(const a of ['patchOrder','deleteOrder','deleteDuplicateOrders','replaceOrders','importSheetRows','dedupeCare']) ok(run('_ownerGate_',a,'tokC').code==='FORBIDDEN',a+' bi chan voi CS');
+  for(const a of ['patchOrder','deleteOrder','deleteDuplicateOrders','replaceOrders','importSheetRows','dedupeCare','findDuplicateOrders']) ok(run('_ownerGate_',a,'tokC').code==='FORBIDDEN',a+' bi chan voi CS');
   // action thuong cua CS khong bi chan
   for(const a of ['saveSingle','customers','lookup','addCareLead','setOrderCareCS','saveTask','reminders']) ok(run('_ownerGate_',a,'tokC')===null,a+' van chay binh thuong voi CS');
   ok(run('_ownerGate_','deleteOrder','')===null&&run('_ownerGate_','deleteOrder','tokSai')===null,'khong token / token sai: de cong tac 4b xu ly (khong chan o day)');

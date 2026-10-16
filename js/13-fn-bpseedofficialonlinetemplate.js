@@ -1250,6 +1250,7 @@ function _srbMenuHTML_(){
     '<div class="srb-menu-panel" id="srb-menu-panel" onclick="event.stopPropagation()" style="display:' + (_srbMenu.open ? 'block' : 'none') + '">' + (_srbMenu.open ? _srbMenuPanelHtml_() : '') + '</div></div>';
 }
 function _srbMenuRefresh_(){   // cập nhật nút + dòng tóm tắt (không đụng ô đang gõ)
+  if (typeof _fpRefresh === 'function') _fpRefresh();   // ô Mẫu lọc nhanh (js/48) biết bộ lọc còn khớp mẫu không
   var total = _srbMenuTotal_();
   var n = document.getElementById('srb-menu-n'); if (n) n.textContent = total ? '(' + total + ')' : '';
   var s = document.getElementById('srb-menu-sum'); if (s) s.innerHTML = _srbMenuSummary_();

@@ -156,3 +156,9 @@ Yeu cau cua Duyen: Chat noi bo hien thi duoc o cua so chat nho o goc duoi phai (
 - Thêm bảng đối chiếu ngay dưới thanh Mẫu lọc nhanh (`_srState._teamSyncInfo`): Team nào → bao nhiêu Sale, danh sách tên KHỚP và tên bị BỎ vì không có trong dữ liệu báo cáo (trước đây chỉ là toast thoáng qua).
 - Thêm nút lọc nhanh theo ĐỘI (Văn phòng / Online / Thử việc…) lấy từ `SALE_CHANNELS` + `SALE_GROUPS` (Báo cáo E → Phân loại Sale), khớp tên không phân biệt hoa/thường/dấu với danh sách Sale của báo cáo đang xem.
 - CHƯA xác định được: nếu sau sửa vẫn sai thì rất có thể do TÊN thành viên trong "Quản lý Team" khác tên Sale trong dữ liệu (cần gán Thẻ ở tab Quản lý Team / sửa tên) — bảng đối chiếu sẽ hiện đúng tên nào bị bỏ. Test: `node tools/test-team-filter.js`.
+- [x] 4c-3b: findDuplicateOrders vao nhom owner-only; rasoat cac action con mo (khong can chan them). Chuoi 4c xong - con viec van hanh (datChuSoHuu, scopeMode log->enforce, bat 4b). Chi tiet: docs/SECURITY-PLAN.md 'Buoc 4c-3b'.
+
+### 16/10/2026 — Mẫu lọc nhanh chuyển lên thanh công cụ (yêu cầu Duyên)
+- `js/48-filter-presets.js`: ô mẫu không còn là thanh đứt nét riêng bên dưới; nay chèn TRONG `.srb-bar`, ngay trước 🧰 Tác vụ (cùng hàng). 0 mẫu = menu "⚡ Mẫu lọc nhanh ▾"; 1 mẫu = 1 nút bấm là lọc; ≥2 mẫu = dropdown chọn mẫu (chọn dòng đầu "⚡ Mẫu lọc nhanh…" khi đang dùng mẫu = tắt). Đang dùng mẫu (bộ lọc khớp mẫu) → nút "✕ Tắt lọc nhanh": đặt lại các bộ lọc của báo cáo đó (Sale/Kênh/…/ô Team, cờ *Customized) về mặc định rồi tải lại, KHÔNG đổi ngày.
+- Menu "⚙ Mẫu ▾": Tạo mẫu (chọn Sale), Lưu bộ lọc hiện tại, và mục Quản lý mẫu (mỗi mẫu 1 dòng: ✎ sửa, ⟳ ghi đè, ✕ xoá). Dữ liệu mẫu (localStorage `ome_sr_filter_presets_v1:<user>`) giữ nguyên, không cần chuyển đổi.
+- `js/13` `_srbMenuRefresh_` gọi `_fpRefresh()` để trạng thái "đang dùng mẫu" cập nhật khi đổi bộ lọc qua menu 🔎. Test: `node tools/test-filter-presets.js` (jsdom, đã viết lại cho giao diện mới).
