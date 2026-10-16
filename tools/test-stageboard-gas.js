@@ -1,0 +1,21 @@
+// Test GAS: _ttBoardBuild_ dua ma bo dem (cot U DT TONG) vao tung the cua Bang don theo giai doan. Chay: node tools/test-stageboard-gas.js
+const fs = require('fs'), vm = require('vm'), path = require('path');
+const src = fs.readFileSync(path.join(__dirname, '..', 'gas_v13.js'), 'utf8');
+const grab = (name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('khong thay ham ' + name); let d = 0, j = src.indexOf('{', i); for (let k = j; k < src.length; k++) { if (src[k] === '{') d++; if (src[k] === '}') { d--; if (!d) return src.slice(i, k + 1); } } };
+const grabVar = (name) => { const m = src.match(new RegExp('^var ' + name + '\\s*=[^;]*;', 'm')); if (!m) throw new Error('khong thay bien ' + name); return m[0]; };
+const ctx = {}; vm.createContext(ctx);
+['_stripVN_', '_normTxt_', '_ttFold_', '_ttParseVn_', '_isExcludedOrderStatus_', '_ttBoardBuild_'].forEach((n) => vm.runInContext(grab(n), ctx));
+['TT_STAGE_ORDER_', 'TT_LOOKBACK_DAYS_', 'TT_BOARD_DONE_DAYS_', 'TT_BOARD_CAP_'].forEach((n) => vm.runInContext(grabVar(n), ctx));
+let fails = 0; const eq = (a, b, m) => { if (JSON.stringify(a) !== JSON.stringify(b)) { fails++; console.log('FAIL', m, '\n  co :', JSON.stringify(a), '\n  can:', JSON.stringify(b)); } else console.log('ok  ', m); };
+const now = Date.now(), fmt = (t) => { const d = new Date(t); return d.getDate() + '/' + (d.getMonth() + 1) + '/' + d.getFullYear() + ' 00:00:00'; };
+const mk = (id, extra) => Object.assign({ id: id, giaiDoan: 'Phân loại đơn', trangThai: '', ngayTao: fmt(now - 86400000), saleBan: 'ninhnga99', giaoCho: 'x', sanPham: 'SP ' + id, giaTriDon: 1000 }, extra || {});
+const orders = [mk('3415154', { maBoDem: '196T10/2026' }), mk('3481144', { maBoDem: '' }), mk('3500001'), mk('3500002', { maBoDem: '  BH7T10/2026 ' })];
+const stages = ctx._ttBoardBuild_(orders, [], '', now, 24, {});
+const col = stages.find((s) => s.name === 'Phân loại đơn');
+const byId = {}; col.items.forEach((it) => { byId[it.id] = it; });
+eq(byId['3415154'].maBoDem, '196T10/2026', 'don co ma bo dem -> the mang ma bo dem');
+eq(byId['3481144'].maBoDem, '', 'ma bo dem rong -> chuoi rong (front-end lui ve #id)');
+eq(byId['3500001'].maBoDem, '', 'don khong co truong maBoDem (khong doc cot U) -> chuoi rong, khong undefined');
+eq(byId['3500002'].maBoDem, 'BH7T10/2026', 'cat khoang trang 2 dau ma');
+eq(byId['3415154'].id, '3415154', 'van giu id Base de tra cuu / tim kiem cu');
+console.log(fails ? '\n' + fails + ' CA SAI' : '\nTAT CA PASS'); process.exit(fails ? 1 : 0);

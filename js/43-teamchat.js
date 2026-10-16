@@ -409,24 +409,94 @@
   // Chi hien khi dang o tab khac (o tab Chat da co khung day du). Trang thai (mo/thu gon) nho theo may: localStorage ome_chat_mini_<user>.
   // Moi chuoi nguoi dung di qua esc()/textContent; id kenh chi nam trong thuoc tinh data-ch (khong vao chuoi JS).
   var MINI_W = 340, MINI_MAX = 3;
-  S.mini = { listOpen: false, wins: [], q: '' };
+  S.mini = { listOpen: false, wins: [], q: '', hidden: false, justDragged: false };
   function miniKey() { return 'ome_chat_mini_' + (S.me ? S.me.username : ''); }
   function miniSave() {
-    try { localStorage.setItem(miniKey(), JSON.stringify({ l: S.mini.listOpen ? 1 : 0, w: S.mini.wins.map(function (w) { return [w.id, w.min ? 1 : 0]; }) })); } catch (e) {}
+    try { localStorage.setItem(miniKey(), JSON.stringify({ l: S.mini.listOpen ? 1 : 0, h: S.mini.hidden ? 1 : 0, w: S.mini.wins.map(function (w) { return [w.id, w.min ? 1 : 0]; }) })); } catch (e) {}
   }
   function miniMax() { var room = (window.innerWidth || 1200) - 76 - 290 - 20; return Math.max(1, Math.min(MINI_MAX, Math.floor(room / (MINI_W + 10)))); }
   function miniWin(id) { for (var i = 0; i < S.mini.wins.length; i++) if (S.mini.wins[i].id === id) return S.mini.wins[i]; return null; }
-  function miniViewing(ch) { var w = miniWin(ch); return !!w && !w.min && !S.panelOn && !document.hidden; }
+  function miniViewing(ch) { var w = miniWin(ch); return !!w && !w.min && !S.mini.hidden && !S.panelOn && !document.hidden; }   // dock thu nho hang = khong ai dang xem -> tin van tinh chua doc
   function miniMarkVisible() { S.mini.wins.forEach(function (w) { if (miniViewing(w.id)) markRead(w.id); }); }
+
+  // ───────────── keo-tha + thu nho hang (2026-10-16) ─────────────
+  // Vi tri luu theo may + tai khoan: localStorage ome_chat_pos_<user> = { d:{r,b}, b:{r,b} } (d = dock, b = bong bong thu nho; r/b = khoang cach toi
+  // mep PHAI / DUOI man hinh — giu nguyen cach neo cu nen cua so moi mo van mo rong sang trai va len tren). Khong luu = vi tri mac dinh theo CSS
+  // (goc duoi phai, tu nhuong cho Tro ly AI). Da keo di thi dung vi tri nguoi dung chon, khong tu dich nua.
+  function posKey() { return 'ome_chat_pos_' + (S.me ? S.me.username : ''); }
+  function posLoad() { try { return JSON.parse(localStorage.getItem(posKey()) || '{}') || {}; } catch (e) { return {}; } }
+  function posSave(which, p) { var all = posLoad(); all[which] = p; try { localStorage.setItem(posKey(), JSON.stringify(all)); } catch (e) {} }
+  // Giu phan tieu de luon nam trong man hinh de con cho bam keo lai: dock giu thanh tieu de danh sach (rong 280) + dinh khong bi tran len tren.
+  function posClamp(el, which, r, b) {
+    var W = window.innerWidth || 1200, H = window.innerHeight || 800;
+    var keep = which === 'b' ? (el.offsetWidth || 48) : 280;
+    var maxR = Math.max(0, W - keep), maxB = Math.max(0, H - Math.max(el.offsetHeight || 40, 40));
+    return { r: Math.min(Math.max(0, r), maxR), b: Math.min(Math.max(0, b), maxB) };
+  }
+  function posApply() {
+    var all = posLoad();
+    [['d', $('tc-mini')], ['b', $('tc-bubble')]].forEach(function (x) {
+      var el = x[1], p = all[x[0]]; if (!el) return;
+      if (p && isFinite(p.r) && isFinite(p.b)) { var c = posClamp(el, x[0], p.r, p.b); el.style.right = c.r + 'px'; el.style.bottom = c.b + 'px'; }
+      else { el.style.right = ''; el.style.bottom = ''; }
+    });
+  }
+  function posReclamp(el, which) {   // cua so moi mo lam dock cao them / man hinh thu nho -> keo nguoc vao vung nhin thay
+    if (!el || !el.style.right) return;
+    var c = posClamp(el, which, parseFloat(el.style.right) || 0, parseFloat(el.style.bottom) || 0);
+    if (c.r + 'px' !== el.style.right) el.style.right = c.r + 'px';
+    if (c.b + 'px' !== el.style.bottom) el.style.bottom = c.b + 'px';
+  }
+  // Keo bang thanh tieu de (handleSel); nut/o nhap ben trong tieu de van bam binh thuong. Keo < 5px = coi la CLICK (mo/thu danh sach nhu cu).
+  // Sau 1 lan keo that, chan dung 1 su kien click tiep theo (neu khong thanh tieu de se bi bam nham "thu/mo").
+  function miniDrag(el, handleSel, which) {
+    var st = null;
+    el.addEventListener('pointerdown', function (e) {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      var h = e.target.closest ? e.target.closest(handleSel) : null;
+      if (!h || (e.target.closest && e.target.closest('button,input,textarea,a,select'))) return;
+      var rc = el.getBoundingClientRect();
+      st = { id: e.pointerId, x: e.clientX, y: e.clientY, r: (window.innerWidth || 1200) - rc.right, b: (window.innerHeight || 800) - rc.bottom, moved: false };
+      try { h.setPointerCapture(e.pointerId); } catch (x) {}
+    });
+    el.addEventListener('pointermove', function (e) {
+      if (!st || e.pointerId !== st.id) return;
+      var dx = e.clientX - st.x, dy = e.clientY - st.y;
+      if (!st.moved) { if (Math.abs(dx) + Math.abs(dy) < 5) return; st.moved = true; el.classList.add('tcm-dragging'); }
+      var c = posClamp(el, which, st.r - dx, st.b - dy);
+      el.style.right = c.r + 'px'; el.style.bottom = c.b + 'px';
+    });
+    function end(e) {
+      if (!st || (e && e.pointerId !== st.id)) return;
+      var moved = st.moved; st = null; el.classList.remove('tcm-dragging');
+      if (moved) { S.mini.justDragged = true; setTimeout(function () { S.mini.justDragged = false; }, 120); posSave(which, { r: parseFloat(el.style.right) || 0, b: parseFloat(el.style.bottom) || 0 }); }
+    }
+    el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+    el.addEventListener('click', function (e) { if (S.mini.justDragged) { S.mini.justDragged = false; e.stopImmediatePropagation(); e.stopPropagation(); e.preventDefault(); } }, true);
+  }
+  // Bong bong 💬 khi "thu nho hang": cung keo duoc, co huy hieu chua doc, bam de mo lai dock nhu truoc.
+  function miniBubble() {
+    var b = $('tc-bubble'); if (b) return b;
+    b = document.createElement('div'); b.id = 'tc-bubble'; b.className = 'off';
+    b.title = 'Chat nội bộ — bấm để mở lại · kéo để di chuyển';
+    b.innerHTML = '💬<span class="tcm-nb" id="tcb-badge" style="display:none">0</span>';
+    document.body.appendChild(b);
+    miniDrag(b, '#tc-bubble', 'b');
+    b.addEventListener('click', function () { S.mini.hidden = false; miniSave(); miniRenderAll(); miniMarkVisible(); });
+    posApply();
+    return b;
+  }
 
   function miniDock() {
     var d = $('tc-mini'); if (d) return d;
     d = document.createElement('div'); d.id = 'tc-mini'; d.className = 'off';
     d.innerHTML = '<div class="tcm-list" id="tcm-list">' +
-      '<div class="tcm-lh" data-act="list"><span>💬 Chat nội bộ</span><span class="tcm-nb" id="tcm-lbadge" style="display:none">0</span><span class="tcm-sp"></span>' +
-        '<button data-act="newdm" title="Nhắn riêng">✉</button><button data-act="newch" title="Tạo nhóm">＋</button></div>' +
+      '<div class="tcm-lh" data-act="list" title="Bấm để mở/thu danh sách · Kéo để di chuyển"><span>💬 Chat nội bộ</span><span class="tcm-nb" id="tcm-lbadge" style="display:none">0</span><span class="tcm-sp"></span>' +
+        '<button data-act="newdm" title="Nhắn riêng">✉</button><button data-act="newch" title="Tạo nhóm">＋</button><button data-act="hide" title="Thu nhỏ hẳn thành biểu tượng 💬">–</button></div>' +
       '<div class="tcm-lp"><input class="tcm-q" placeholder="Tìm kênh / người…"><div class="tcm-lbody" id="tcm-lbody"></div></div></div>';
     document.body.appendChild(d);
+    miniDrag(d, '.tcm-lh,.tcm-wh', 'd');   // phai dang ky TRUOC miniClick de chan duoc click sau khi keo
+    posApply();
     d.addEventListener('click', miniClick);
     d.addEventListener('keydown', function (e) {
       if (e.target.tagName !== 'TEXTAREA' || e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
@@ -446,6 +516,7 @@
     if (act === 'list') { S.mini.listOpen = !S.mini.listOpen; miniSave(); miniRenderAll(); if (S.mini.listOpen) { var q = $('tc-mini').querySelector('.tcm-q'); if (q) q.focus(); } }
     else if (act === 'newdm') { e.stopPropagation(); tcNewDm(true); }
     else if (act === 'newch') { e.stopPropagation(); tcNewChannel(true); }
+    else if (act === 'hide') { e.stopPropagation(); S.mini.hidden = true; miniSave(); miniRenderAll(); }
     else if (act === 'open') miniOpen(ch);
     else if (act === 'wmin' && w) { w.min = !w.min; miniSave(); miniRenderWin(w, true); if (!w.min) { miniMarkVisible(); var ta = w.el.querySelector('textarea'); if (ta) ta.focus(); } else renderBadges(); }
     else if (act === 'wclose' && w) miniClose(ch);
@@ -518,13 +589,19 @@
   function miniRenderAll() {
     var d = $('tc-mini'); if (!d) { if (!S.me) return; d = miniDock(); }
     var show = !!S.me && !S.panelOn && !S.authFail;
-    d.classList.toggle('off', !show);
+    var bub = miniBubble();
+    d.classList.toggle('off', !show || !!S.mini.hidden);        // dock bi an khi nguoi dung thu nho hang -> chi con bong bong
+    bub.classList.toggle('off', !show || !S.mini.hidden);
     if (!show) return;
     var lst = $('tcm-list'), b = $('tcm-lbadge'), n = totalUnread();
+    var bb = $('tcb-badge'); if (bb) { bb.textContent = n > 99 ? '99+' : n; bb.style.display = n ? '' : 'none'; }
+    bub.classList.toggle('has', n > 0);
+    if (S.mini.hidden) { posReclamp(bub, 'b'); return; }
     lst.classList.toggle('open', !!S.mini.listOpen);
     b.textContent = n > 99 ? '99+' : n; b.style.display = n ? '' : 'none';
     if (S.mini.listOpen) miniRenderListBody();
     S.mini.wins.forEach(function (w) { miniRenderWin(w); });
+    posReclamp(d, 'd');
   }
   function miniOpen(id) {
     if (!S.me || !chById(id)) return;
@@ -555,8 +632,9 @@
     var raw = null; try { raw = JSON.parse(localStorage.getItem(miniKey()) || 'null'); } catch (e) {}
     miniReset();
     S.mini.listOpen = !!(raw && raw.l);
+    S.mini.hidden = !!(raw && raw.h);
     if (raw && raw.w) raw.w.slice(0, miniMax()).forEach(function (x) { if (chById(x[0])) S.mini.wins.push({ id: x[0], min: !!x[1], el: null, sending: false, sig: '' }); });
-    miniSync(); miniRenderAll();
+    miniSync(); posApply(); miniRenderAll();
     S.mini.wins.forEach(function (w) {
       if (!S.msgs[w.id] || !S.msgs[w.id].length) loadHistory(w.id).then(function () { miniRenderWin(w, true); miniMarkVisible(); });
       else { miniRenderWin(w, true); }
@@ -593,6 +671,7 @@
     renderSide(); renderBadges();
   }
   window.addEventListener('resize', function () {
+    posReclamp($('tc-mini'), 'd'); posReclamp($('tc-bubble'), 'b');   // thu nho cua so trinh duyet: keo dock/bong bong vao lai vung nhin thay
     var mx = miniMax(); if (S.mini.wins.length <= mx) return;
     while (S.mini.wins.length > mx) { var old = S.mini.wins.pop(); if (old.el) old.el.remove(); }
     miniSave();

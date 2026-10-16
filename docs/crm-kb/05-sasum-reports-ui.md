@@ -80,3 +80,9 @@ Mọi câu **hướng dẫn cách dùng / giải thích cách tính / "bấm… 
 - **Muốn sale nghỉ biến mất khỏi mọi báo cáo → thêm tên vào "Ẩn Sale" ở Cài đặt** (hệ thống KHÔNG có trạng thái "đã nghỉ" riêng).
 - Tỷ lệ chốt A = B do hàm dùng chung `_srCloseRateSectionsFromBase_` (đơn Base, bỏ đơn BH không doanh thu) — xem mục "TỶ LỆ CHỐT" phía trên/dưới. Chạy tay `xemTyLeChotAB` để so kênh + sale của A và B tháng này (log KHOP/LECH).
 - Test: `node tools/test-closerate-ab.js` (hàm thật + chạy `buildSalesReportB_` thật với dữ liệu giả).
+
+## Bảng đơn theo giai đoạn: hiện MÃ BỘ ĐẾM, bấm để sao chép — 2026-10-16
+- Thẻ và tiêu đề modal hiện **mã bộ đếm** (cột U của DT TỔNG, vd `196T10/2026`, `BH196T10/2026`) thay cho id số của Base; đơn chưa có mã bộ đếm lùi về `#id`. Modal còn hàng "Mã đơn Base #id" để tra trên Base. Tìm kiếm khớp cả mã bộ đếm lẫn id.
+- GAS: `ttStageBoard_` gọi `readDTTong_(true)` (đọc thêm cột U) và `_ttBoardBuild_` thêm `maBoDem` vào từng thẻ. Danh sách "Đơn kẹt" ở trang chủ (`ttTodayTasks_`/`_ttStuckFromRows_`) vẫn hiện id số vì không đọc DT TỔNG — nếu cần đổi theo thì phải map id→maBoDem ở đó (tốn thêm 1 lần đọc DT TỔNG).
+- Chip mã (`.sb-code`, js/41) bấm = sao chép (`navigator.clipboard`, dự phòng `execCommand`), `stopPropagation` nên không mở modal. Test: `tools/test-stageboard-bodem.js` (jsdom), `tools/test-stageboard-gas.js`.
+
