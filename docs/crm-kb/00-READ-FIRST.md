@@ -25,6 +25,7 @@ Gồm: 1 backend Google Apps Script (`gas_v13.js`) + web app (`index.html`) + 2 
 | Bảo mật backend: đăng nhập server/token, việc còn lại (bước 3-4) | `docs/SECURITY-PLAN.md` | — |
 | Chuyển HẲN sang Supabase (kế hoạch 6 giai đoạn, đã được Duyên đồng ý 2026-10-11) | `docs/MIGRATE-SUPABASE-FULL.md` (+ `docs/SUPABASE-PLAN.md`) | `gas_v13.js` (khối Supabase), `cloudflare/worker.mjs`, `supabase/schema.sql` |
 | Lộ trình thực hiện file yêu cầu CRM (8 mục: mốc sau mua, resale, hạng, AI tóm tắt, hồ sơ sale, hộp thư chung, quy trình đơn) | `docs/ROADMAP-YEU-CAU.md` | — |
+| Kế hoạch bổ sung CRM 2026-10-16 (phân quyền theo bộ phận/trường, đơn hàng 5 bước, khuyến mãi, tích điểm, báo cáo 30/70, UI nhập đơn; phần API tạm bỏ) — việc U1–U6, mỗi việc có issue GitHub nhãn `crm-update` | `docs/ROADMAP-CRM-UPDATE.md` | — |
 
 ## Web app Sasum đã TÁCH FILE (2026-10-08, chống lag)
 `index.html` (~112KB) chỉ còn khung HTML; CSS ở `css/01..04`, JS ở `js/NN-*.js` (nạp bằng `<script src>` đúng thứ tự cũ). Tra hàm → file: `js/INDEX.md` hoặc `grep -n "function tenHam" js/*.js`. KHÔNG đổi thứ tự thẻ `<script>` trong `index.html`. Chi tiết quy ước (file `fn-*` / `main-*`) ở đầu `js/INDEX.md`.
