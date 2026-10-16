@@ -73,7 +73,7 @@ function _scRenderList() {
       + (c.assignees && c.assignees.length ? '<div class="sc-conv-s">\ud83d\udc64 ' + _pkcEsc(c.assignees.join(', ')) + '</div>' : '')   // ten sale phu trach (pk_staff); chua co ten -> khong hien, KHONG lo uuid
       + '<div class="sc-conv-t">' + _pkcEsc(c.lastText || '') + '</div>'
       + (c.tags && c.tags.length ? '<div class="sc-conv-g">' + _pkcTagsHtml(c.tags, 3) + '</div>' : '')
-      + (c.seen === false ? '<i class="sc-dot"></i>' : '') + '</div>';
+      + (c.seen === false ? '<i class="sc-dot"></i>' : '') + '</div></div>';   // dong 1: dong .sc-conv-body, dong 2: dong .sc-conv. Thieu cai thu 2 thi moi dong bi long vao dong truoc
   }).join('') : '<div class="pkc-note">Không có hội thoại nào.</div>';
   var hm = document.getElementById('sc-head-m');
   if (hm) hm.innerHTML = _pkcMetaRow(_sc.convs.filter(function (x) { return x.id === _sc.active; })[0]);
