@@ -3390,6 +3390,10 @@ function _userAliasGroups_() {
   var map = {};
   try {
     readUsers_(getCrmSS_().getSheetByName(SH_USER)).forEach(function(u) {
+      // CHI tai khoan Sale (role 'cs') moi tinh "nhieu ten = 1 nguoi" — dung nhu phia client (_personAliases). Tai khoan Leader/Quan ly/Admin
+      // cung co cot 'names' nhung do la DANH SACH NHIEU NGUOI KHAC NHAU (pham vi quan ly): neu gop vao thi chon 1 Sale hay 1 Team keo theo ca danh sach
+      // do (va cac danh sach chong nhau gop thanh 1 cuc) -> loc Sale/Team ra sai (loi 'loc Team VP/OL van sai', sua 2026-10-15).
+      if (String(u.role || 'cs') !== 'cs') return;
       var all = [];
       (u.names || []).concat([u.name]).forEach(function(n) { n = String(n || '').trim(); if (n && all.indexOf(n) === -1) all.push(n); });
       if (all.length < 2) return;
