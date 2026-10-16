@@ -332,11 +332,24 @@ function _srSaveHiddenPanel(){
 }
 
 function _srComboInit(domId, field, optKey){ _srComboReg[domId] = { field: field, optKey: optKey }; }
+// Danh sách Sale do việc chọn Team điền vào (khác danh sách người dùng tự chọn) — nhớ chữ ký để khi BỎ HẾT Team thì gỡ đúng danh sách đó,
+// còn nếu người dùng đã tự sửa Sale sau khi chọn Team thì giữ nguyên. Trước đây bỏ Team không gỡ Sale -> báo cáo vẫn lọc theo Team cũ (nguyên nhân 'lọc Team sai').
+function _srSaleSig_(arr){ return JSON.stringify((arr || []).slice().sort()); }
+function _srClearAutoSale_(saleField){
+  var sig = _srState['_autoSaleSig_' + saleField];
+  if (sig && _srSaleSig_(_srState[saleField]) === sig) {
+    _srState[saleField] = [];
+    if (saleField === 'eSale') _srState.eSaleCustomized = true;
+    if (saleField === 'gSale') _srState.gSaleCustomized = true;
+  }
+  _srState['_autoSaleSig_' + saleField] = '';
+  if (_srState._teamSyncInfo) delete _srState._teamSyncInfo[saleField];
+}
 function _srSyncTeamToSale_(teamField){
   var saleField = _srTeamFieldToSaleField_[teamField];
   if (!saleField) return;
   var selTeams = _srState[teamField] || [];
-  if (!selTeams.length) return;
+  if (!selTeams.length) { _srClearAutoSale_(saleField); return; }
   var union = [];
   var notFound = [];
   selTeams.forEach(function(tname){
@@ -356,11 +369,13 @@ function _srSyncTeamToSale_(teamField){
   // (hoa/thường, dấu, khoảng trắng) hoặc không có trong nguồn → bộ lọc ra 0 đơn → doanh thu 0đ.
   // Nên với MỌI báo cáo: đổi tên Team sang đúng tên trong danh sách Sale của báo cáo đó, bỏ tên không có thật và báo rõ.
   var _srcOpts = (saleField === 'eSale' || saleField === 'fSale' || saleField === 'bSale') ? (_srState.saleBOptions||[]) : (_srState.saleOptions||[]);
+  var _missingAll = [];
   if (_srcOpts.length){
     var _fold = function(x){ return String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/gi,'d').replace(/\s+/g,' ').trim().toLowerCase(); };
     var _canon = {}; _srcOpts.forEach(function(n){ _canon[_fold(n)] = n; });
     var _kept = [], _missing = [];
     union.forEach(function(n){ var c = _canon[_fold(n)]; if (c !== undefined) { if (_kept.indexOf(c) === -1) _kept.push(c); } else _missing.push(n); });
+    _missingAll = _missing;
     if (_missing.length) toast('⚠ ' + _missing.length + ' tên trong Team không có trong dữ liệu báo cáo (bỏ qua): ' + _missing.slice(0,6).join(', ') + (_missing.length>6?'...':''));
     if (!_kept.length){
       toast('⚠ Không tên nào trong Team khớp tên Sale của báo cáo — giữ nguyên bộ lọc Sale hiện tại. Sửa tên trong "Quản lý Team" cho đúng tên trong báo cáo.');
@@ -370,6 +385,8 @@ function _srSyncTeamToSale_(teamField){
   }
   if (notFound.length) toast('⚠ Không khớp được Team: ' + notFound.join(', ') + ' — kết quả lọc chỉ gồm các Team còn lại');
   _srState[saleField] = union;
+  _srState['_autoSaleSig_' + saleField] = _srSaleSig_(union);
+  (_srState._teamSyncInfo = _srState._teamSyncInfo || {})[saleField] = { teams: selTeams.slice(), sales: union.slice(), missing: _missingAll.slice(), notFound: notFound.slice() };
   if (saleField === 'eSale') _srState.eSaleCustomized = true;
   if (saleField === 'gSale') _srState.gSaleCustomized = true;
 }
@@ -445,7 +462,7 @@ function srComboClear(e, domId){
   _srState[r.field] = [];
   if (r.field === 'eSale') _srState.eSaleCustomized = true;
   if (r.field === 'gSale') _srState.gSaleCustomized = true;
-  if (_srTeamFieldToSaleField_[r.field]){ renderSalesReportTab(); return; }
+  if (_srTeamFieldToSaleField_[r.field]){ _srSyncTeamToSale_(r.field); renderSalesReportTab(); return; }
   var ci = document.getElementById(domId+'-input'); if (ci) ci.value = '';
   srRenderComboChips(domId);
   var l = document.getElementById(domId+'-list');

@@ -929,7 +929,7 @@ function srbComboToggleItem(key, e, value){
 function srbComboRemove(key, value){
   var cfg = _SRB_COMBO_CFG[key];
   _srState[cfg.stateKey] = (_srState[cfg.stateKey]||[]).filter(function(v){ return v!==value; });
-  if (_srTeamFieldToSaleField_[cfg.stateKey]){ renderSalesReportTab(); return; }
+  if (_srTeamFieldToSaleField_[cfg.stateKey]){ _srSyncTeamToSale_(cfg.stateKey); renderSalesReportTab(); return; }
   srbRenderChips(key);
   var l = document.getElementById(cfg.id+'-list');
   if (l && l.classList.contains('open')){ var ci=document.getElementById(cfg.id+'-input'); srbComboRender(key, ci?ci.value:''); }
@@ -938,7 +938,7 @@ function srbComboClear(key, e){
   if (e) e.stopPropagation();
   var cfg = _SRB_COMBO_CFG[key];
   _srState[cfg.stateKey] = [];
-  if (_srTeamFieldToSaleField_[cfg.stateKey]){ renderSalesReportTab(); return; }
+  if (_srTeamFieldToSaleField_[cfg.stateKey]){ _srSyncTeamToSale_(cfg.stateKey); renderSalesReportTab(); return; }
   var ci = document.getElementById(cfg.id+'-input'); if (ci) ci.value = '';
   srbRenderChips(key);
   var l = document.getElementById(cfg.id+'-list');
@@ -1335,7 +1335,7 @@ function srbMenuText(key, v){ var cat = _srbMenuCat_(key); if (!cat) return; _sr
 function srbMenuClearCat(key){
   var cat = _srbMenuCat_(key); if (!cat) return;
   _srbMenuReset_(cat);
-  if (_srTeamFieldToSaleField_[cat.stateKey]){ renderSalesReportTab(); return; }
+  if (_srTeamFieldToSaleField_[cat.stateKey]){ _srSyncTeamToSale_(cat.stateKey); renderSalesReportTab(); return; }
   _srbMenuPaint_(); _srbMenuRefresh_();
 }
 function srbMenuClearAll(){

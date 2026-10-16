@@ -51,6 +51,38 @@
   }
   function newId(){ return 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
+  // ── Lọc nhanh theo ĐỘI (Văn phòng / Online / Thử việc…) lấy từ cách phân loại từng Sale (SALE_CHANNELS, Báo cáo E → "Phân loại Sale") —
+  //    cùng bảng tên Sale với báo cáo nên không phụ thuộc "Quản lý Team". Tên Sale đổi sang đúng tên có trong dữ liệu của báo cáo đang xem.
+  function foldN(x){ return String(x == null ? '' : x).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').replace(/\s+/g, ' ').trim().toLowerCase(); }
+  function groupsFor(sub){
+    var canon = {}; saleOptionsFor(sub).forEach(function(n){ canon[foldN(n)] = n; });
+    var ch = (typeof SALE_CHANNELS !== 'undefined' && SALE_CHANNELS) || {}, gs = ((typeof SALE_GROUPS !== 'undefined' && SALE_GROUPS) || []).slice();
+    if (!gs.some(function(g){ return g.key === 'probation'; }) && Object.keys(ch).some(function(n){ return ch[n] === 'probation'; })) gs.push({ key:'probation', label:'Thử việc' });
+    return gs.map(function(g){
+      var all = Object.keys(ch).filter(function(n){ return ch[n] === g.key; }), kept = [], miss = [];
+      all.forEach(function(n){ var c2 = canon[foldN(n)]; if (c2 !== undefined) { if (kept.indexOf(c2) === -1) kept.push(c2); } else miss.push(n); });
+      return { key:g.key, label:g.label, sales:kept, missing:miss, total:all.length };
+    });
+  }
+  function sameSet(a, b){ a = (a || []).slice().sort(); b = (b || []).slice().sort(); return JSON.stringify(a) === JSON.stringify(b); }
+  function groupChipsHtml(sub){
+    var c = CFG[sub], cur = _srState[c.sale] || [], gs = groupsFor(sub);
+    if (!gs.length) return '';
+    return '<div class="fp-row2"><span class="fp-lb2">Theo đội:</span>' + gs.map(function(g){
+      var on = g.sales.length && sameSet(cur, g.sales);
+      var tip = g.sales.length ? ('Lọc ' + g.sales.length + ' Sale: ' + g.sales.slice(0, 25).join(', ') + (g.sales.length > 25 ? '…' : '') + (g.missing.length ? ' — ⚠ ' + g.missing.length + ' tên được phân loại vào đội này nhưng không có trong dữ liệu báo cáo: ' + g.missing.slice(0, 12).join(', ') : ''))
+        : (g.total ? 'Có ' + g.total + ' Sale được phân loại vào đội này nhưng không tên nào có trong dữ liệu báo cáo đang xem' : 'Chưa Sale nào được phân loại vào đội này (Báo cáo E → Phân loại Sale)');
+      return '<button type="button" class="fp-grp' + (on ? ' on' : '') + (g.sales.length ? '' : ' off') + '" data-fp="grp" data-key="' + e(g.key) + '" title="' + e(tip) + '">' + e(g.label) + ' <span class="fp-n">' + g.sales.length + ' sale</span></button>';
+    }).join('') + '</div>';
+  }
+  function infoHtml(sub){
+    var c = CFG[sub]; if (!c.team) return '';
+    var teamsSel = _srState[c.team] || [], info = (_srState._teamSyncInfo || {})[c.sale];
+    if (!teamsSel.length || !info) return '';
+    return '<div class="fp-info">👥 Team <b>' + e(info.teams.join(', ')) + '</b> → đang lọc <b>' + info.sales.length + '</b> Sale: ' + e(info.sales.slice(0, 15).join(', ') + (info.sales.length > 15 ? '…' : '')) +
+      (info.missing.length ? '<br><span class="fp-bad">⚠ ' + info.missing.length + ' tên trong Team không có trong dữ liệu báo cáo nên BỊ BỎ: ' + e(info.missing.slice(0, 15).join(', ')) + ' — sửa tên ở “Quản lý Team” hoặc gán Thẻ cho đúng.</span>' : '') +
+      (info.notFound.length ? '<br><span class="fp-bad">⚠ Không tìm thấy Team: ' + e(info.notFound.join(', ')) + '</span>' : '') + '</div>';
+  }
   function barHtml(sub){
     var list = forSub(sub), c = CFG[sub];
     var chips = list.map(function(p){
@@ -63,7 +95,7 @@
     }).join('');
     return '<div id="fp-bar" class="fp-bar"><span class="fp-lb">⚡ Mẫu lọc nhanh</span>' + (chips || '<span class="fp-mu">Chưa có mẫu — bấm “Tạo mẫu” để chọn sẵn các Sale.</span>') +
       '<button type="button" class="btn sm secondary" data-fp="new">＋ Tạo mẫu</button>' +
-      '<button type="button" class="btn sm secondary" data-fp="save" title="Lưu đúng bộ lọc đang chọn (Sale, Kênh, Sản phẩm…, không gồm ngày) thành mẫu">💾 Lưu bộ lọc hiện tại</button></div>';
+      '<button type="button" class="btn sm secondary" data-fp="save" title="Lưu đúng bộ lọc đang chọn (Sale, Kênh, Sản phẩm…, không gồm ngày) thành mẫu">💾 Lưu bộ lọc hiện tại</button>' + groupChipsHtml(sub) + infoHtml(sub) + '</div>';
   }
   function inject(){
     var wrap = document.getElementById('salesreport-wrap'); if (!wrap) return;
@@ -81,6 +113,18 @@
     if (c.custom) _srState[c.custom] = true;     // E/F/G/L: đã tự chỉnh Sale → không bị ghi đè bởi mặc định theo vai trò
     if (typeof _srEnforceScope === 'function') _srEnforceScope();   // người bị giới hạn phạm vi (leader…) vẫn chỉ xem được phần của mình
     toastF('⚡ Đã áp dụng mẫu “' + p.name + '”');
+    if (typeof _srApply === 'function') _srApply(); else renderSalesReportTab();
+  }
+  function applyGroup(key){
+    var sub = _srState.sub, c = CFG[sub]; if (!c) return;
+    var g = groupsFor(sub).filter(function(x){ return x.key === key; })[0]; if (!g) return;
+    if (!g.sales.length) { toastF('⚠ Đội “' + g.label + '”: ' + (g.total ? 'không tên Sale nào khớp dữ liệu báo cáo đang xem' : 'chưa có Sale nào được phân loại (Báo cáo E → Phân loại Sale)')); return; }
+    _srState[c.sale] = g.sales.slice();
+    if (c.team) _srState[c.team] = [];
+    _srState['_autoSaleSig_' + c.sale] = '';
+    if (c.custom) _srState[c.custom] = true;
+    if (typeof _srEnforceScope === 'function') _srEnforceScope();
+    toastF('Đã lọc đội “' + g.label + '” (' + g.sales.length + ' Sale)' + (g.missing.length ? ' — ' + g.missing.length + ' tên không có trong báo cáo' : ''));
     if (typeof _srApply === 'function') _srApply(); else renderSalesReportTab();
   }
   function saveCurrent(){
@@ -178,7 +222,7 @@
   document.addEventListener('click', function(ev){
     var b = ev.target.closest && ev.target.closest('#fp-bar [data-fp]'); if (!b) return;
     var a = b.getAttribute('data-fp'), id = b.getAttribute('data-id');
-    if (a === 'apply') applyPreset(id); else if (a === 'new') openEditor(''); else if (a === 'edit') openEditor(id);
+    if (a === 'grp') applyGroup(b.getAttribute('data-key')); else if (a === 'apply') applyPreset(id); else if (a === 'new') openEditor(''); else if (a === 'edit') openEditor(id);
     else if (a === 'save') saveCurrent(); else if (a === 'overwrite') overwrite(id); else if (a === 'del') del(id);
   });
   // Bọc renderSalesReportTab: sau mỗi lần vẽ báo cáo thì chèn lại thanh mẫu
@@ -186,5 +230,5 @@
   if (typeof _orig === 'function') {
     window.renderSalesReportTab = renderSalesReportTab = function(){ var r = _orig.apply(this, arguments); try { inject(); } catch(err){} return r; };
   }
-  window._fpApply = applyPreset; window._fpList = loadAll;   // dùng cho test
+  window._fpApplyGroup = applyGroup; window._fpGroups = groupsFor; window._fpApply = applyPreset; window._fpList = loadAll;   // dùng cho test
 })();
