@@ -146,3 +146,7 @@ Yeu cau cua Duyen: Chat noi bo hien thi duoc o cua so chat nho o goc duoi phai (
 ## Tỷ lệ chốt Báo cáo B = đơn BASE ÷ tương tác Pancake (Duyên 12/10/2026)
 - Phiên khác đã làm xong phần backend (`_srCloseRateSectionsFromBase_`: A và B cùng tính trên Base, theo NGƯỜI TẠO đơn, bỏ đơn huỷ/hoàn + đơn BH không doanh thu, không phụ thuộc bộ lọc Sale/Kênh/Sản phẩm/Nguồn). Phiên này chỉ: (1) bỏ bản trùng của mình, (2) ghi rõ nhãn trên màn hình A và B: "Số đơn Base ÷ Tổng tương tác Pancake" (js/11-fn-srload.js), (3) thêm test `tools/test-close-rate-base.js` kiểm A == B cùng số và Pos trống/đổi vẫn không ảnh hưởng.
 - Ảnh hưởng kèm: `buildCsStats_().closeRate` (Pancake AI) lấy từ B nên cũng theo đơn Base.
+
+## Mẫu lọc nhanh Báo cáo doanh số (Duyên 12/10/2026)
+- Lý do: "Lọc theo Team" (Văn phòng/Online) vẫn lỗi dù đã sửa nhiều lần → Duyên muốn tự tạo mẫu lọc theo các Sale mình chọn, bấm mẫu là lọc ngay (trừ lọc thời gian). Đã làm `js/48-filter-presets.js` + `css/10-filter-presets.css` (xem js/INDEX.md). KHÔNG sửa `_srSyncTeamToSale_` / ô "Lọc theo Team" — nguyên nhân gốc lỗi Team CHƯA điều tra (nghi: tên thành viên trong tab Quản lý Team khác tên Sale trong dữ liệu báo cáo, hoặc `teams` cũ ở localStorage); khi áp mẫu thì ô Team bị xoá để không lẫn.
+- Giới hạn: mẫu lưu ở TRÌNH DUYỆT (localStorage) theo tài khoản — không chia sẻ giữa máy/giữa 2 địa chỉ web (github.io vs workers.dev). Muốn đồng bộ nhiều máy → lưu lên GAS Settings (chưa làm). Test: `node tools/test-filter-presets.js`.
