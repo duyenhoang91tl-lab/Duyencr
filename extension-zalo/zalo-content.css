@@ -627,3 +627,18 @@ textarea {
 .zai-stats-det { margin: 4px 0; font-size: 11px; }
 .zai-stats-det summary { cursor: pointer; color: #2563eb; }
 .zai-stats-prog { padding: 3px 0; border-bottom: 1px dashed #e5e7eb; }
+
+/* Mẫu tin nhắn tư vấn — đồng bộ với Pancake AI (.pk-tpl-*, .pk-ai-suggestion-item) */
+#zai-tpl-row { display: flex; gap: 6px; margin-bottom: 6px; }
+#zai-tpl-q { flex: 1; min-width: 0; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; }
+#zai-tpl-refresh, #zai-tpl-add { border: 1px solid #ccc; background: #fff; border-radius: 6px; padding: 4px 8px; cursor: pointer; }
+#zai-tpl-status { font-size: 11px; color: #1e3a8a; margin-bottom: 4px; }
+#zai-tpl-result { max-height: 340px; overflow-y: auto; }
+.zai-tpl-item { border: 1px solid #dbeafe; background: #f0f7ff; padding: 8px; border-radius: 6px; cursor: pointer; line-height: 1.4; margin-bottom: 6px; }
+.zai-tpl-item:hover { background: #dbeafe; }
+.zai-tpl-acts { display: flex; gap: 6px; margin-top: 5px; }
+.zai-tpl-form-box { border: 1px solid #93c5fd; background: #f8fbff; border-radius: 6px; padding: 8px; margin: 6px 0; }
+.zai-tpl-form-title { font-weight: 700; font-size: 12px; margin-bottom: 6px; }
+.zai-tpl-form-box input, .zai-tpl-form-box textarea { width: 100%; box-sizing: border-box; padding: 5px 8px; margin-bottom: 6px; border: 1px solid #ccc; border-radius: 6px; font-size: 12px; line-height: 1.4; resize: vertical; }
+.zai-tpl-bar { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+.zai-tpl-save:disabled { opacity: .7; }

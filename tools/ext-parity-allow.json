@@ -66,14 +66,6 @@
     "donOrdersByPhone": {
       "status": "gap",
       "note": "Tra don theo SDT — Zalo chua dung action nay"
-    },
-    "saveMessageTemplate": {
-      "status": "gap",
-      "note": "Pancake luu/sua mau tin; Zalo moi chi DOC mau da duyet (messageTemplates)"
-    },
-    "deleteMessageTemplate": {
-      "status": "gap",
-      "note": "nt"
     }
   }
 }
