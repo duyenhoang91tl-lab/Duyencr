@@ -92,3 +92,9 @@ Menu **Cài đặt team → 🔗 Khớp sale** (admin; `js/52-fn-salematch.js`, 
 - **Sửa lỗi "lọc Team vẫn sai":** `_expandSaleFilterWithPancakeAliases_` trước đây mở rộng 1 LẦN theo thứ tự cố định (PancakeMap → Users/thẻ → SaleDirectory) nên chuỗi A~B (thẻ) rồi B~C (SaleDirectory) hoặc chọn tên Pancake chỉ ra đủ tuỳ thứ tự. Nay nạp 3 nguồn 1 lần rồi LẶP đến khi hết tên mới (≤10 vòng); PancakeMap chiều ngược chỉ khi 1-1 (dòng `saleA|saleB` không gộp 2 người).
 - Test: `node tools/test-salematch.js` (backend) + `node tools/test-salematch-ui.js` (giao diện, cần jsdom).
 
+## Chẩn đoán "Tỷ lệ chốt theo Sale" ra sai — `chanDoanTyLeChot` (2026-10-16)
+- **Quy tắc đang chạy (không phải lỗi, nhưng hay gây hiểu nhầm):** biểu đồ "Tỷ lệ chốt theo Sale" (Báo cáo A và B dùng chung `_srCloseRateSectionsFromBase_`) đếm đơn theo **NGƯỜI TẠO (cột B DT TỔNG)**, KHÔNG theo "Sale bán". Bảng "Theo Sale bán" bên trái đếm theo Sale bán nên số hai bên **vốn không khớp** (vd ninhnga99 87 đơn ở bảng, 65 ở tỷ lệ chốt).
+- Một đơn **không tính cho sale nào** khi: (a) kênh bán chưa gán Page Pancake hoặc Page chưa nạp tương tác ngày tạo đơn (`_srOrderCovered_`) → không đếm đơn đó ở đâu cả; (b) người tạo không khớp tên nào có tương tác Pancake / Danh sách Sale (qua `_salePersonKeyFn_`) → dồn vào "(chưa gán sale)"; (c) đơn BH 0đ / trạng thái loại / ngoài kỳ.
+- **Chạy tay trong Apps Script Editor: `chanDoanTyLeChot`** (tháng này; chỉ đọc + Logger.log). In 3 khối: (A) đơn không được đếm theo kênh/ngày, (B) tên người tạo không khớp + số đơn, (C) từng người: tương tác Pancake, đơn theo người tạo, đơn theo sale bán, số đơn LỆCH. Gửi log này để biết lỗi nằm ở tên người tạo hay ở kênh/Page. Lõi: `_tlcDiagnose_` (lặp lại đúng quy tắc trên).
+- Test: `node tools/test-closerate-diag.js` (chạy hàm thật; đối chiếu với `_srCloseRateSectionsFromBase_` thật: cùng số).
+

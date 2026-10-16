@@ -960,6 +960,78 @@ function sbKHDongBoLai() { _sbLogSync_(sbSyncCare_({ fresh: true })); }   // bo 
 function sbKHCaiTrigger() { Logger.log(installSbCareTrigger_()); }
 function sbKHGoTrigger()  { Logger.log(removeSbCareTrigger_()); }
 function sbKHTrangThaiDongBo() { Logger.log(JSON.stringify(sbCareSyncStatus_(), null, 2)); }
+// ═══════════════════════════════════════════════════════════════
+//  CHAN DOAN TY LE CHOT THEO SALE (chay tay: chanDoanTyLeChot). Khong ghi gi, chi doc + Logger.log.
+//  Lap lai DUNG quy tac cua _srCloseRateSectionsFromBase_/_srCloseRateSections_ nhung ghi LY DO vi sao tung don khong tinh cho sale:
+//   (1) don khong duoc dem vi KENH chua gan Page Pancake / Page chua nap tuong tac ngay do (_srOrderCovered_)
+//   (2) NGUOI TAO (cot B DT TONG) khong khop ten nao co tuong tac Pancake / Danh sach Sale -> dom vao "(chua gan sale)"
+//   (3) don tinh cho nguoi tao theo tung "nguoi" (khoa cung 1 nguoi) -> so voi so don theo "Sale ban" va tuong tac Pancake.
+// ═══════════════════════════════════════════════════════════════
+function _tlcDiagnose_(filters) {
+  var fFrom = _dateStrToVnYmd_(filters.dateFrom), fTo = _dateStrToVnYmd_(filters.dateTo);
+  var covered = _pkTrackedDatesByPageAndSale_(fFrom, fTo).datesByPage || {};
+  var pkMap = readPancakePageMap_() || {}, kenhPages = {};
+  Object.keys(pkMap).forEach(function (pid) { var kn = pkMap[pid]; if (!kn) return; (kenhPages[kn] = kenhPages[kn] || []).push(pid); });
+  var pkFn = _salePersonKeyFn_(), known = {};
+  var rep = buildPancakeReport_(filters.dateFrom, filters.dateTo, 'equal'), byCS = rep.byCS || [];
+  byCS.forEach(function (n) { known[pkFn(n.name)] = n.name; });
+  try { Object.keys(readSaleDirectory_().byName || {}).forEach(function (k) { if (!known[pkFn(k)]) known[pkFn(k)] = k; }); } catch (e) {}
+  var anchorNames = byCS.filter(function (r) { return (r.tongTT || 0) > 0; }).map(function (r) { return r.name; });
+  var rows = readDTTong_(true), inRange = [], i;
+  var skipped = { bhZero: 0, trangThaiLoai: 0, ngoaiKy: 0 };
+  for (i = 0; i < rows.length; i++) {
+    var r0 = rows[i];
+    if (r0.bhZero) { skipped.bhZero++; continue; }
+    if (_isExcludedOrderStatus_(r0.trangThai)) { skipped.trangThaiLoai++; continue; }
+    if (!dateInRange_(parseVNDate_(r0.ngayTao), filters.dateFrom, filters.dateTo)) { skipped.ngoaiKy++; continue; }
+    inRange.push(r0);
+  }
+  var orderNames = [];
+  inRange.forEach(function (r) { if (r.nguoiTao) orderNames.push(String(r.nguoiTao).trim()); });
+  var personKey = _salePersonKeyWithOrphanFold_(pkFn, anchorNames, orderNames);
+  var disp = {}, held = {}, byCreator = {}, bySaleBan = {}, notCovered = {}, unknownCreators = {}, noCreator = 0, countedTotal = 0, unassignedTotal = 0;
+  byCS.forEach(function (n) { var k = personKey(n.name); disp[k] = disp[k] || n.name; held[k] = (held[k] || 0) + (n.tongTT || 0); });
+  inRange.forEach(function (r) {
+    var dt = parseVNDate_(r.ngayTao), ymd = dt ? _vnYmd_(dt) : '';
+    var kn = r.kenhBan || '(chưa có kênh)', pids = kenhPages[r.kenhBan] || [];
+    splitMulti_(r.saleBan, ',').forEach(function (sn) { var k = personKey(sn); disp[k] = disp[k] || sn; bySaleBan[k] = (bySaleBan[k] || 0) + 1; });
+    var isCov = pids.some(function (pid) { return covered[pid] && covered[pid][ymd]; });
+    if (!isCov) {
+      var why = pids.length ? 'kênh có Page nhưng Page chưa nạp tương tác ngày đơn' : 'kênh CHƯA gán Page Pancake';
+      var key = kn + ' — ' + why; notCovered[key] = (notCovered[key] || 0) + 1; return;
+    }
+    var creator = r.nguoiTao ? String(r.nguoiTao).trim() : '';
+    if (!creator) { noCreator++; unassignedTotal++; return; }
+    if (!known[pkFn(creator)]) { unknownCreators[creator] = (unknownCreators[creator] || 0) + 1; unassignedTotal++; return; }
+    var pk = personKey(creator); disp[pk] = disp[pk] || creator;
+    byCreator[pk] = (byCreator[pk] || 0) + 1; countedTotal++;
+  });
+  var keys = {}; [held, byCreator, bySaleBan].forEach(function (m) { Object.keys(m).forEach(function (k) { keys[k] = 1; }); });
+  var people = Object.keys(keys).map(function (k) {
+    var h = held[k] || 0, c = byCreator[k] || 0;
+    return { name: disp[k] || k, held: Math.round(h), byCreator: c, bySaleBan: bySaleBan[k] || 0, rate: h ? Math.round(c / h * 1000) / 10 : null };
+  }).sort(function (a, b) { return b.bySaleBan - a.bySaleBan; });
+  var ncTotal = 0; Object.keys(notCovered).forEach(function (k) { ncTotal += notCovered[k]; });
+  return { from: filters.dateFrom, to: filters.dateTo, rowsRead: rows.length, skipped: skipped, ordersInRange: inRange.length, countedForSale: countedTotal,
+           unassigned: unassignedTotal, noCreator: noCreator, unknownCreators: unknownCreators, notCovered: notCovered, notCoveredTotal: ncTotal, people: people, anchorNames: anchorNames };
+}
+function chanDoanTyLeChot() {
+  var today = _vnYmd_(new Date()), from = today.substring(0, 8) + '01';
+  var f = { dateFrom: from, dateTo: today };
+  var d = _tlcDiagnose_(f);
+  Logger.log('=== CHẨN ĐOÁN TỶ LỆ CHỐT THEO SALE · ' + d.from + ' → ' + d.to + ' ===');
+  Logger.log('Đọc ' + d.rowsRead + ' dòng DT TỔNG; bỏ: đơn BH 0đ ' + d.skipped.bhZero + ', trạng thái loại ' + d.skipped.trangThaiLoai + ', ngoài kỳ ' + d.skipped.ngoaiKy + ' → còn ' + d.ordersInRange + ' đơn trong kỳ.');
+  Logger.log('KẾT QUẢ: ' + d.countedForSale + ' đơn tính cho sale (theo NGƯỜI TẠO) | ' + d.unassigned + ' đơn "(chưa gán sale)" | ' + d.notCoveredTotal + ' đơn KHÔNG được đếm (kênh/ngày chưa có Pancake).');
+  Logger.log('--- (A) Đơn KHÔNG được đếm vì kênh/ngày chưa có tương tác Pancake ---');
+  Object.keys(d.notCovered).sort(function (a, b) { return d.notCovered[b] - d.notCovered[a]; }).forEach(function (k) { Logger.log('  ' + d.notCovered[k] + ' đơn · ' + k); });
+  Logger.log('--- (B) NGƯỜI TẠO không khớp tên nào có tương tác Pancake → "(chưa gán sale)" (' + d.noCreator + ' đơn không có người tạo) ---');
+  Object.keys(d.unknownCreators).sort(function (a, b) { return d.unknownCreators[b] - d.unknownCreators[a]; }).forEach(function (k) { Logger.log('  ' + d.unknownCreators[k] + ' đơn · người tạo = "' + k + '"'); });
+  Logger.log('--- (C) Từng người: đơn theo NGƯỜI TẠO (dùng cho tỷ lệ chốt) so với đơn theo SALE BÁN (bảng bên trái) ---');
+  d.people.forEach(function (p) {
+    Logger.log('  ' + p.name + ' | tương tác ' + p.held + ' | đơn theo người tạo ' + p.byCreator + ' | đơn theo sale bán ' + p.bySaleBan + ' | tỷ lệ ' + (p.rate == null ? '-' : p.rate + '%') + (p.bySaleBan > p.byCreator ? ' | LỆCH ' + (p.bySaleBan - p.byCreator) + ' đơn' : ''));
+  });
+  return d;
+}
 // Chay tay: so Ty le chot theo KENH + theo SALE cua Bao cao A (Base) voi Bao cao B (Pos) THANG NAY — phai GIONG HET (cung nguon don Base).
 function xemTyLeChotAB() {
   var today = _vnYmd_(new Date()), from = today.substring(0, 8) + '01';
