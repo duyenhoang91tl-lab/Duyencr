@@ -105,6 +105,7 @@ function doGetCore_(e) {
     }
     if (action === 'teams')     return jsonOut_({ teams: readTeams_(ss.getSheetByName(SH_TEAM)) });
     if (action === 'mktTeams')  return jsonOut_({ teams: readMktTeams_() });
+    if (action === 'saleMatchCandidates') return jsonOut_(saleMatchCandidates_(e.parameter || {}));
     if (action === 'khoList')   return jsonOut_({ kho: readKho_() });
     if (action === 'khoCombo')  return jsonOut_({ combos: readKhoCombo_() });
     if (action === 'tonKhoTruDonTrangThai') return jsonOut_(tonKhoTruDonStatus_());
