@@ -100,3 +100,9 @@ Quy tac Duyen chot: (1) doi team/nhom sale/cay trang thai cham soc: admin + lead
 - Extension Zalo: go han code xoa don (`zaiCheckDuplicates_`, `_zaiDeleteOneOrder_` chi con stub, an nut kiem tra don trung + nut x tung don) + bo `deleteDuplicateOrders` khoi `EXT_ALLOWED_.zalo`. **Can reload extension Zalo AI trong chrome://extensions.** Test: `tools/test-zalo-no-delete.js`.
 - Test: test-roles (4c-3), test-enforce, test-msgtpl (cap nhat theo admin-only), test-zalo-no-delete. Con ho: `ek` van doc duoc nhieu du lieu (xem 4c-2); `saveAudit`, `setSetting` khoa thuong, `saveAIContext`, `addZaloNick`, `csStats`, `assign`, `findDuplicateOrders` chua co luat vai tro (chua ro ai duoc dung).
 - Luu y: 2 test `test-staff-profile-ui`, `test-supabase-read` hong san tren main (khong lien quan).
+
+## Buoc 4c-3b - LAM (2026-10-14): rasoat not cac action con mo
+- `findDuplicateOrders` (quet don trung; chi menu "Don trung" co co `admin:true` o js/29-sidenav.js, extension da go) vao `OWNER_ONLY_ACTIONS_` cung `deleteDuplicateOrders`.
+- Da xem va CHU Y KHONG CHAN: `csStats` (khong phai action server, chi la ham tinh phia client), `saveAudit` (client ghi nhat ky thay doi cua MOI nguoi), `saveAIContext` (extension CS luu mau cau AI da sua), `addZaloNick` (server tu MERGE, khong ghi de nick nguoi khac), `setSetting` (key nhay cam da bat `adminKey`). `assign` (GET): khong loc vi client can toan bo bang chia de tinh `_heldBy`; xem lai neu doi logic.
+- Chuoi bao mat 4c-1..4c-3 xong; con viec VAN HANH: `datChuSoHuu`, `datPhamVi('log')` -> xem `xemLogPhamVi` -> `datPhamVi('enforce')`; bat cong tac chan 4b (batChanWeb/Zalo/Pancake/Khac) theo thu tu.
+
