@@ -4,6 +4,7 @@
 //  Bấm mẫu → gán thẳng bộ lọc rồi tải lại báo cáo, KHÔNG đi qua "Lọc theo Team" (_srSyncTeamToSale_).
 //  Mẫu theo TỪNG báo cáo (A/B/C… có bộ lọc khác nhau) và theo TỪNG tài khoản; lưu ở trình duyệt (localStorage). Thanh mẫu chèn sau dòng chọn báo cáo
 //  mỗi lần renderSalesReportTab chạy (bọc hàm, không sửa các renderer cũ).
+//  (16/10/2026) Ô mẫu chuyển vào thanh công cụ chung .srb-bar, cùng hàng 🧰 Tác vụ: 1 mẫu = nút, ≥2 mẫu = dropdown, có nút ✕ Tắt lọc nhanh.
 // ═══════════════════════════════════════════════════════
 (function(){
   // Bộ lọc (không ngày, không team) của từng báo cáo; sale = khoá chứa danh sách Sale; team = ô "Lọc theo Team" (chỉ là công cụ điền ô Sale nên KHÔNG lưu);
@@ -51,26 +52,48 @@
   }
   function newId(){ return 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
-  function barHtml(sub){
-    var list = forSub(sub), c = CFG[sub];
-    var chips = list.map(function(p){
-      var n = ((p.filters && p.filters[c.sale]) || []).length, on = sameFilters(sub, p.filters || {});
-      return '<span class="fp-chip' + (on ? ' on' : '') + '">' +
-        '<button type="button" class="fp-go" data-fp="apply" data-id="' + e(p.id) + '" title="' + e(describe(p)) + '">' + e(p.name) + (n ? ' <span class="fp-n">' + n + ' sale</span>' : '') + '</button>' +
-        '<button type="button" class="fp-ic" data-fp="edit" data-id="' + e(p.id) + '" title="Sửa tên / danh sách Sale của mẫu">✎</button>' +
-        '<button type="button" class="fp-ic" data-fp="overwrite" data-id="' + e(p.id) + '" title="Ghi đè mẫu bằng bộ lọc đang chọn">⟳</button>' +
-        '<button type="button" class="fp-ic" data-fp="del" data-id="' + e(p.id) + '" title="Xoá mẫu">✕</button></span>';
-    }).join('');
-    return '<div id="fp-bar" class="fp-bar"><span class="fp-lb">⚡ Mẫu lọc nhanh</span>' + (chips || '<span class="fp-mu">Chưa có mẫu — bấm “Tạo mẫu” để chọn sẵn các Sale.</span>') +
-      '<button type="button" class="btn sm secondary" data-fp="new">＋ Tạo mẫu</button>' +
-      '<button type="button" class="btn sm secondary" data-fp="save" title="Lưu đúng bộ lọc đang chọn (Sale, Kênh, Sản phẩm…, không gồm ngày) thành mẫu">💾 Lưu bộ lọc hiện tại</button></div>';
+  // ── Ô mẫu nằm TRONG thanh công cụ (.srb-bar), cùng hàng với 🧰 Tác vụ ──
+  //  0 mẫu: chỉ có menu "⚡ Mẫu lọc nhanh ▾" (Tạo mẫu / Lưu bộ lọc hiện tại) · 1 mẫu: 1 nút bấm là lọc · ≥2 mẫu: dropdown chọn mẫu.
+  //  Đang dùng mẫu → hiện nút "✕ Tắt lọc nhanh" (bỏ các bộ lọc của báo cáo này và tải lại).
+  var ACT = {};   // báo cáo -> id mẫu vừa bấm (ưu tiên khi 2 mẫu giống hệt nhau)
+  function hasAny(sub, f){ return CFG[sub].keys.some(function(k){ var v = f[k]; return Array.isArray(v) ? v.length > 0 : !!v; }); }
+  function activeOf(sub){
+    var list = forSub(sub), t = list.filter(function(p){ return p.id === ACT[sub]; })[0];
+    if (t && sameFilters(sub, t.filters || {})) return t;
+    return list.filter(function(p){ return hasAny(sub, p.filters || {}) && sameFilters(sub, p.filters || {}); })[0] || null;
+  }
+  function ctlHtml(sub){
+    var list = forSub(sub), c = CFG[sub], act = activeOf(sub), h = '<span class="fp-ctl" id="fp-ctl">';
+    function nSale(p){ return ((p.filters && p.filters[c.sale]) || []).length; }
+    if (list.length === 1){
+      var p1 = list[0], n1 = nSale(p1);
+      h += '<button type="button" class="btn sm fp-one' + (act ? ' on' : '') + '" data-fp="apply" data-id="' + e(p1.id) + '" onclick="_fpPick(this.getAttribute(\'data-id\'))" title="' + e(describe(p1)) + '">⚡ ' + e(p1.name) + (n1 ? ' <span class="fp-n">' + n1 + ' sale</span>' : '') + '</button>';
+    } else if (list.length > 1){
+      h += '<select class="fp-sel' + (act ? ' on' : '') + '" onchange="_fpPick(this.value)" title="Chọn mẫu lọc nhanh">' +
+        '<option value="">⚡ Mẫu lọc nhanh…</option>' +
+        list.map(function(p){ var n = nSale(p); return '<option value="' + e(p.id) + '"' + (act && act.id === p.id ? ' selected' : '') + '>' + e(p.name) + (n ? ' (' + n + ' sale)' : '') + '</option>'; }).join('') + '</select>';
+    }
+    if (act) h += '<button type="button" class="btn sm fp-off" data-fp="off" onclick="_fpOff()" title="Tắt lọc nhanh: bỏ các bộ lọc đang chọn của báo cáo này và tải lại">✕ Tắt lọc nhanh</button>';
+    h += '<div class="gear-menu"><button type="button" class="btn sm" onclick="_srToggleGearMenu(event,\'fp-gear\')">' + (list.length ? '⚙ Mẫu ▾' : '⚡ Mẫu lọc nhanh ▾') + '</button>' +
+      '<div class="gear-menu-list fp-gear" id="fp-gear">' +
+      '<div data-fp="new" onclick="_fpDo(\'new\')">＋ Tạo mẫu (chọn sẵn các Sale)</div>' +
+      '<div data-fp="save" onclick="_fpDo(\'save\')" title="Lưu đúng bộ lọc đang chọn (Sale, Kênh, Sản phẩm…, không gồm ngày) thành mẫu">💾 Lưu bộ lọc hiện tại thành mẫu</div>' +
+      (list.length ? '<div class="fp-mh">Quản lý mẫu</div>' : '') +
+      list.map(function(p){
+        return '<div class="fp-mrow" title="' + e(describe(p)) + '"><span class="fp-mn">' + e(p.name) + '</span>' +
+          '<span class="fp-ic" data-fp="edit" data-id="' + e(p.id) + '" onclick="_fpDo(\'edit\',this.getAttribute(\'data-id\'))" title="Sửa tên / danh sách Sale của mẫu">✎</span>' +
+          '<span class="fp-ic" data-fp="overwrite" data-id="' + e(p.id) + '" onclick="_fpDo(\'overwrite\',this.getAttribute(\'data-id\'))" title="Ghi đè mẫu bằng bộ lọc đang chọn">⟳</span>' +
+          '<span class="fp-ic" data-fp="del" data-id="' + e(p.id) + '" onclick="_fpDo(\'del\',this.getAttribute(\'data-id\'))" title="Xoá mẫu">✕</span></div>';
+      }).join('') + '</div></div></span>';
+    return h;
   }
   function inject(){
     var wrap = document.getElementById('salesreport-wrap'); if (!wrap) return;
-    var old = document.getElementById('fp-bar'); if (old && old.parentNode) old.parentNode.removeChild(old);
+    ['fp-ctl','fp-bar'].forEach(function(id){ var old = document.getElementById(id); if (old && old.parentNode) old.parentNode.removeChild(old); });
     var sub = (typeof _srState !== 'undefined') ? _srState.sub : ''; if (!CFG[sub]) return;
-    var first = wrap.firstElementChild; if (!first) return;
-    first.insertAdjacentHTML('afterend', barHtml(sub));
+    var bar = wrap.querySelector('.srb-bar'); if (!bar) return;
+    var anchor = null; for (var i = bar.children.length - 1; i >= 0; i--) { if (bar.children[i].classList.contains('gear-menu')) { anchor = bar.children[i]; break; } }
+    if (anchor) anchor.insertAdjacentHTML('beforebegin', ctlHtml(sub)); else bar.insertAdjacentHTML('beforeend', ctlHtml(sub));
   }
 
   function applyPreset(id){
@@ -80,7 +103,18 @@
     if (c.team) _srState[c.team] = [];          // ô "Lọc theo Team" chỉ là công cụ điền ô Sale — mẫu đã chứa sẵn danh sách Sale
     if (c.custom) _srState[c.custom] = true;     // E/F/G/L: đã tự chỉnh Sale → không bị ghi đè bởi mặc định theo vai trò
     if (typeof _srEnforceScope === 'function') _srEnforceScope();   // người bị giới hạn phạm vi (leader…) vẫn chỉ xem được phần của mình
+    ACT[p.sub] = p.id;
     toastF('⚡ Đã áp dụng mẫu “' + p.name + '”');
+    if (typeof _srApply === 'function') _srApply(); else renderSalesReportTab();
+  }
+  function turnOff(){
+    var sub = _srState.sub, c = CFG[sub]; if (!c) return;
+    c.keys.forEach(function(k){ _srState[k] = emptyLike(_srState[k]); });
+    if (c.team) _srState[c.team] = [];
+    if (c.custom) _srState[c.custom] = false;     // E/F/G/L: về mặc định theo vai trò
+    ACT[sub] = '';
+    if (typeof _srEnforceScope === 'function') _srEnforceScope();
+    toastF('Đã tắt lọc nhanh');
     if (typeof _srApply === 'function') _srApply(); else renderSalesReportTab();
   }
   function saveCurrent(){
@@ -88,8 +122,8 @@
     var name = (prompt('Đặt tên cho mẫu lọc (vd “Văn phòng”, “Nhóm Online mới”):', '') || '').trim();
     if (!name) return;
     if (forSub(sub).some(function(p){ return p.name.toLowerCase() === name.toLowerCase(); })) { toastF('⚠ Đã có mẫu tên “' + name + '” — hãy đặt tên khác hoặc dùng ⟳ để ghi đè.'); return; }
-    var list = loadAll(); list.push({ id:newId(), sub:sub, name:name, filters:snapshot(sub), created:Date.now() });
-    if (saveAll(list)) { toastF('✓ Đã lưu mẫu “' + name + '”'); inject(); }
+    var list = loadAll(), np = { id:newId(), sub:sub, name:name, filters:snapshot(sub), created:Date.now() }; list.push(np);
+    if (saveAll(list)) { ACT[sub] = np.id; toastF('✓ Đã lưu mẫu “' + name + '”'); inject(); }
   }
   function overwrite(id){
     var list = loadAll(), p = list.filter(function(x){ return x.id === id; })[0]; if (!p || p.sub !== _srState.sub) return;
@@ -174,13 +208,14 @@
     if (saveAll(list)){ toastF('✓ Đã lưu mẫu “' + name + '”'); closeEditor(); inject(); }
   }
 
-  // Bắt sự kiện trên thanh mẫu (uỷ quyền, vì thanh bị vẽ lại mỗi lần render)
-  document.addEventListener('click', function(ev){
-    var b = ev.target.closest && ev.target.closest('#fp-bar [data-fp]'); if (!b) return;
-    var a = b.getAttribute('data-fp'), id = b.getAttribute('data-id');
-    if (a === 'apply') applyPreset(id); else if (a === 'new') openEditor(''); else if (a === 'edit') openEditor(id);
+  // Hành động từ ô mẫu trên thanh công cụ (gọi bằng onclick/onchange nhúng sẵn vì ô bị vẽ lại mỗi lần render)
+  window._fpPick = function(id){ if (id) applyPreset(id); else { if (activeOf(_srState.sub)) turnOff(); else inject(); } };
+  window._fpOff = turnOff;
+  window._fpDo = function(a, id){
+    if (a === 'new') openEditor(''); else if (a === 'edit') openEditor(id);
     else if (a === 'save') saveCurrent(); else if (a === 'overwrite') overwrite(id); else if (a === 'del') del(id);
-  });
+  };
+  window._fpRefresh = function(){ try { inject(); } catch(err){} };   // bộ lọc đổi qua menu 🔎 → cập nhật trạng thái mẫu đang dùng
   // Bọc renderSalesReportTab: sau mỗi lần vẽ báo cáo thì chèn lại thanh mẫu
   var _orig = window.renderSalesReportTab;
   if (typeof _orig === 'function') {
