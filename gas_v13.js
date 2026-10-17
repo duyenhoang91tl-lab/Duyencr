@@ -6909,6 +6909,7 @@ function doPostCore_(e) {
     if (action === 'pkChatLink') return pkChatLink_(data);
     if (action === 'pkChatSend') return pkChatSend_(data);
     if (action === 'pkChatTag') return pkChatTag_(data);
+    if (action === 'pkChatRead') return pkChatRead_(data);
     if (action === 'profileSave') return profileSave_(data);
     if (action === 'saveRoleConfig') return saveRoleConfig_(data.config, data.token);
     if (action === 'notifRead') { var _nu = _sessUser_(data.token); if (!_nu) return jsonOut_({ error: 'Can dang nhap.', code: 'AUTH' }); return jsonOut_(markNotifRead_(_nu.username, data.ids, !!data.all)); }
@@ -16235,6 +16236,35 @@ function pkChatTag_(data) {
     Logger.log('pkChatTag ' + a.user.username + ' ' + convId + ' ' + op + ' ' + tagId);
     return jsonOut_({ ok: true, tags: _pkTagsOut_(ids, map), ids: ids });
   } catch (err) { return jsonOut_({ error: 'Gan the loi: ' + String(err && err.message || err).slice(0, 200) }); }
+}
+// ═══ DANH DAU DA DOC / CHUA DOC tu CRM nhu Pancake (2026-10-17) ═══
+// Tai lieu chinh thuc: POST /api/public_api/v1/pages/{page}/conversations/{conv}/read  va  .../unread  ?page_access_token=...
+// Sau khi Pancake nhan, ghi luon cot `seen` vao Supabase de CRM hien cham/in dam ngay (webhook 'conversation' vong lai sau do se ghi cung gia tri;
+// su kien cu den tre co version nho hon bi bo qua nhu cu). Hop thu chung cache 15 giay (pkChatInbox_) -> xoa khoa cache khong-loc de khong hien lai trang thai cu.
+// POST pkChatRead {convId, op:'read'|'unread'}: moi tai khoan dang nhap (tru test) deu dung duoc, giong gan/go the.
+function pkChatRead_(data) {
+  var a = _pkAuth_(data && data.token); if (a.err) return a.err;
+  var convId = String((data && data.convId) || ''), op = String((data && data.op) || '').toLowerCase();
+  if (!convId) return jsonOut_({ error: 'Thieu convId.' });
+  if (op !== 'read' && op !== 'unread') return jsonOut_({ error: 'op phai la read hoac unread.' });
+  try {
+    var conv = _pkConvRow_(convId);
+    if (!conv) return jsonOut_({ error: 'Khong tim thay hoi thoai.' });
+    var page = String(conv.page_id || ''); if (!page) return jsonOut_({ error: 'Hoi thoai chua co page_id.' });
+    var tok = _pkPageToken_(page);
+    if (!tok) return jsonOut_({ error: 'Chua cai token Pancake cho page ' + page + '. Vao Apps Script > Project Settings > Script properties, them PANCAKE_PAGE_TOKENS = {"' + page + '":"<page_access_token>"}.' });
+    var url = 'https://pages.fm/api/public_api/v1/pages/' + _pkEnc_(page) + '/conversations/' + _pkEnc_(convId) + '/' + op + '?page_access_token=' + _pkEnc_(tok);
+    var res = UrlFetchApp.fetch(url, { method: 'post', contentType: 'application/json', payload: '{}', muteHttpExceptions: true });
+    var code = res.getResponseCode(), body = res.getContentText() || '', j = null;
+    try { j = JSON.parse(body); } catch (eJ) {}
+    if (code >= 300 || (j && j.success === false)) return jsonOut_({ error: 'Pancake tu choi (HTTP ' + code + '): ' + body.slice(0, 240).split(tok).join('***') });
+    var seen = op === 'read';
+    try { sb_('PATCH', 'pk_conversations?id=eq.' + _pkEnc_(convId), { seen: seen }); }   // hien ngay tren CRM; loi thi webhook se bu
+    catch (eS) { Logger.log('pkChatRead PATCH: ' + String(eS && eS.message || eS).slice(0, 160)); }
+    try { CacheService.getScriptCache().remove('pkInbox_'); } catch (eC) {}
+    Logger.log('pkChatRead ' + a.user.username + ' ' + convId + ' ' + op);
+    return jsonOut_({ ok: true, seen: seen });
+  } catch (err) { return jsonOut_({ error: 'Danh dau da doc loi: ' + String(err && err.message || err).slice(0, 200) }); }
 }
 // (Khong tinh 'nguoi tra loi gan nhat' cho tung hoi thoai o DANH SACH: can them 1 truy van Supabase/lan poll, vi pham tran UrlFetch 20.000/ngay — xem NGUYEN NHAN
 //  GOC o pkChatInbox_. 'Da chat' + ten nguoi gui duoi tung tin tinh o client tu cac tin da tai, khong ton luot goi nao.)
