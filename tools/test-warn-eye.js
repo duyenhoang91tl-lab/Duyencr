@@ -29,7 +29,7 @@ ok(/var orphanHtml = orphanBox_ \? _warnBox\('cr-orphan'/.test(j11)&&!/var orpha
   const st=j11.indexOf('function _srCloseRateBarHtml_'); let depth=0,i=j11.indexOf('{',st),e=i;
   for(;e<j11.length;e++){ if(j11[e]==='{')depth++; else if(j11[e]==='}'){depth--; if(!depth)break;} }
   const fn=j11.slice(st,e+1);
-  const c2={esc:s=>String(s),currentUser:{role:'staff'},CLOSE_RATE_THRESHOLDS:{levels:[]},_crColorFor_:()=>'#000',_srCrLegendHtml_:()=>'',_srCrFormHtml_:()=>''};
+  const c2={fmt:x=>String(x),esc:s=>String(s),currentUser:{role:'staff'},CLOSE_RATE_THRESHOLDS:{levels:[]},_crColorFor_:()=>'#000',_srCrLegendHtml_:()=>'',_srCrFormHtml_:()=>''};
   vm.createContext(c2); vm.runInContext(src,c2); vm.runInContext(fn,c2);
   const rows=[{name:'Sale A',held:100,closed:30,closeRate:30},{name:'(Chưa đối soát)',held:0,closed:227,closeRate:0},{name:'(Giao không thành)',held:0,closed:16,closeRate:0},{name:'(chưa gán sale)',held:0,closed:7,closeRate:0},{name:'Đang giao hàng',held:0,closed:7,closeRate:0},{name:'nguyenngo1988',held:0,closed:2,closeRate:0},{name:'Anhnguyen1996',held:0,closed:1,closeRate:0},{name:'Hoàn một phần',held:0,closed:1,closeRate:0},{name:'Thuynguyen1987',held:0,closed:1,closeRate:0}];
   const out=c2._srCloseRateBarHtml_(rows,'','đơn');
@@ -37,5 +37,8 @@ ok(/var orphanHtml = orphanBox_ \? _warnBox\('cr-orphan'/.test(j11)&&!/var orpha
   ok(/class="warn-body" style="display:none[^"]*"[^>]*>\s*<div[^>]*>⚠️ <b>262 đơn<\/b>/.test(out),'ham that: khung canh bao day du van co nhung dang AN');
   ok(/Sale A/.test(out)&&/Trung bình:/.test(out),'bieu do + trung binh van ve binh thuong');
   ok(!/warn-wrap/.test(c2._srCloseRateBarHtml_([{name:'Sale A',held:100,closed:30,closeRate:30}],'','đơn')),'khong co don mo coi -> khong ve nut');
+  const out2=c2._srCloseRateBarHtml_([{name:'Sale A',held:100,closed:30,closeRate:30}],'','tương tác',{tongTT:145,pages:[{pageName:'NGUỒN',tongTT:145}]});
+  ok(/👁 145 tương tác ở 1 Page chưa khớp kênh \(không tính\)/.test(out2)&&/KHÔNG tính vào mẫu số/.test(out2)&&/class="warn-body" style="display:none[^"]*"[^>]*>\s*<div[^>]*>⚠️ <b>145<\/b>/.test(out2),'tuong tac o Page chua khop kenh: bao trong khung AN (👁), noi dung day du co ten Page');
+  ok(!/cr-excluded-tt/.test(c2._srCloseRateBarHtml_([{name:'Sale A',held:100,closed:30,closeRate:30}],'','tương tác',null)),'khong co phan bi loai -> khong ve khung');
 })();
 console.log(fail?('\n'+fail+' FAIL'):'\nALL PASS'); process.exit(fail?1:0);

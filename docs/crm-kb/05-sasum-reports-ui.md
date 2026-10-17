@@ -80,3 +80,11 @@ Mọi câu **hướng dẫn cách dùng / giải thích cách tính / "bấm… 
 - **Muốn sale nghỉ biến mất khỏi mọi báo cáo → thêm tên vào "Ẩn Sale" ở Cài đặt** (hệ thống KHÔNG có trạng thái "đã nghỉ" riêng).
 - Tỷ lệ chốt A = B do hàm dùng chung `_srCloseRateSectionsFromBase_` (đơn Base, bỏ đơn BH không doanh thu) — xem mục "TỶ LỆ CHỐT" phía trên/dưới. Chạy tay `xemTyLeChotAB` để so kênh + sale của A và B tháng này (log KHOP/LECH).
 - Test: `node tools/test-closerate-ab.js` (hàm thật + chạy `buildSalesReportB_` thật với dữ liệu giả).
+
+## Tỷ lệ chốt theo Sale: MẪU SỐ chỉ tính Page đã khớp Kênh bán (2026-10-15)
+Công thức (Duyên chốt): **Tỷ lệ chốt = số đơn Base do Sale TẠO (cột B "Người tạo") ÷ số tương tác trên Page Pancake TƯƠNG ỨNG** — tử số và mẫu số cùng phạm vi Page.
+- Tử số: đơn của người tạo ở Kênh bán có Page Pancake đã khớp (🔗 Khớp Page ↔ Kênh bán) VÀ có dữ liệu tương tác đúng ngày đó (`_srOrderCovered_`); đơn kênh không có Page (Zalo cá nhân, Bảo hành, Tiktok, "Fb Phạm Thu Hiền" khi chưa khớp Page...) KHÔNG tính.
+- Mẫu số (SỬA): trước đây bảng "theo Sale" cộng tương tác của TẤT CẢ Page (`byCS.tongTT`) → Page chưa khớp kênh làm phình mẫu số mà không có đơn tương ứng → tỷ lệ thấp, lệch giữa bảng theo Sale với bảng theo Kênh / Sale×Page (hai bảng này vốn đã chỉ lấy Page có kênh) và lệch giữa báo cáo tháng với báo cáo ngày. Nay `buildPancakeReport_` trả thêm `byCS[].tongTTMapped` (chỉ tương tác ở Page có trong `PancakePageMap`, chia đều như `split='equal'`) + `byPage[].kenh` + `pageMapped`, và `_srCloseRateSections_` dùng `tongTTMapped` làm mẫu số (khi `pageMapped=false` dùng `tongTT` như cũ). Phần ở Page chưa khớp được trả qua `closeExcluded` ({tongTT, pages}) → UI báo trong khung ẩn 👁 ("N tương tác ở M Page chưa khớp kênh (không tính)"). Chưa khớp Page nào (map rỗng) → giữ cách cũ (tất cả Page) để không ra toàn 0.
+- Ảnh hưởng: `saleCloseRate` còn dùng xét THƯỞNG theo tỷ lệ chốt (`_resolveBonusSale_`/chương trình thưởng) → tỷ lệ đúng hơn thì thưởng cũng tính theo mẫu số mới.
+- Muốn đơn kênh "Fb Phạm Thu Hiền" tính: khớp kênh đó với đúng Page Pancake có dữ liệu tương tác (🔗 Khớp Page Pancake ↔ Kênh bán CRM), KHÔNG sửa công thức.
+- Test: `node tools/test-close-rate-mapped.js` (chạy hàm thật với 66 đơn Base ngày 15/10/2026: ninhnga99 7/150 thay vì 7/203, huyenmaii1990 2/190 thay vì 2/213).

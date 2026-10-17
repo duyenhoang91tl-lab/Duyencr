@@ -732,6 +732,7 @@ function buildSalesReportB_(filters) {
     byMkt: byMktArrB,
     saleCloseRate: closeSectionsB_.saleCloseRate,
     saleCloseRateFrom: closeSectionsB_.closeFrom,
+    saleCloseRateExcluded: closeSectionsB_.closeExcluded || null,
     kenhCloseRate: closeSectionsB_.kenhCloseRate,
     kenhCloseRateFrom: closeSectionsB_.closeFrom,
     saleCloseByPage: closeSectionsB_.saleCloseByPage,

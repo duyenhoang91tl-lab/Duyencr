@@ -607,7 +607,7 @@ function _srCloseRateByKenh_(){ return _srCloseRateGroups_(_srCustKenh_, HIDDEN_
 
 // Vẽ cột ngang tỷ lệ chốt — xanh/vàng/đỏ theo mức %, kèm số liệu chốt/tổng bên cạnh mỗi cột,
 // và dòng trung bình chung ở trên để dễ đối chiếu nhanh khi chụp màn hình gửi sếp.
-function _srCloseRateBarHtml_(rows, searchTerm, unitLabel){
+function _srCloseRateBarHtml_(rows, searchTerm, unitLabel, excluded){
   unitLabel = unitLabel || 'KH';
   var filtered = (rows||[]).filter(function(r){ return r.held>0 && (!searchTerm || r.name.toLowerCase().indexOf(searchTerm.toLowerCase())!==-1); });
   if (!filtered.length) return '<div style="color:var(--muted);text-align:center;padding:20px;font-size:12px">Không có dữ liệu để tính tỷ lệ chốt</div>';
@@ -622,6 +622,15 @@ function _srCloseRateBarHtml_(rows, searchTerm, unitLabel){
   var orphanBox_ = orphans.length ? '<div style="font-size:11px;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:6px 8px;margin:6px 0">⚠️ <b>'+orphanTot+' đơn</b> chưa gán được vào tương tác Pancake nên KHÔNG nằm trong biểu đồ/trung bình: '+orphans.slice(0,8).map(function(r){ return esc(r.name)+' ('+r.closed+')'; }).join(', ')+(orphans.length>8?' …':'')+'. Nếu đây là tên khác của 1 Sale đã có → thêm vào "Tên khác" ở 🔑 Tài khoản (hoặc Quản lý tài khoản) để gộp.</div>' : '';
   // MẶC ĐỊNH ẨN — bấm 👁 mới hiện (Duyên yêu cầu 2026-10-12; _warnBox ở js/10-fn-pkkpipct.js)
   var orphanHtml = orphanBox_ ? _warnBox('cr-orphan', orphanBox_, orphanTot+' đơn chưa gán vào tương tác Pancake') : '';
+  // Mẫu số CHỈ tính tương tác của Page đã khớp Kênh bán (cùng quy tắc bảng theo Kênh / Sale×Page). Phần ở Page chưa khớp được báo ở đây (ẩn sau 👁).
+  if (excluded && excluded.tongTT > 0 && (excluded.pages || []).length){
+    orphanHtml += _warnBox('cr-excluded-tt',
+      '<div style="margin:0;padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412">'+
+      '⚠️ <b>'+fmt(Math.round(excluded.tongTT))+'</b> tương tác ở <b>'+excluded.pages.length+'</b> Page chưa khớp Kênh bán nên <b>KHÔNG tính vào mẫu số</b> (không có đơn tương ứng để chia): '+
+      excluded.pages.map(function(p){ return esc(p.pageName)+' ('+fmt(Math.round(p.tongTT))+')'; }).join(', ')+
+      '. Muốn tính → vào tab "📥 Báo cáo Pancake" → mục "🔗 Khớp Page Pancake ↔ Kênh bán CRM".</div>',
+      fmt(Math.round(excluded.tongTT))+' tương tác ở '+excluded.pages.length+' Page chưa khớp kênh (không tính)');
+  }
   var lv = CLOSE_RATE_THRESHOLDS.levels;
   function colorFor(p){ return _crColorFor_(p); }
   // Độ dài cột tính theo TỶ LỆ SO VỚI NGƯỜI CAO NHẤT (không phải so với 100%): tỷ lệ chốt thật chỉ 0–3% nên trước đây mọi cột chỉ rộng 1–3% khung → chỉ còn chấm tròn nhỏ.
@@ -757,7 +766,7 @@ function _srRenderA(d){
   // trở đi (xem saleCloseRateFrom, bo qua nếu chưa từng nạp báo cáo Pancake ngày nào).
   var saleCloseNote = d.saleCloseRateFrom ? ' — tính từ '+esc(d.saleCloseRateFrom) : '';
   var saleCloseHtml = '<div class="dash-section-title">Tỷ lệ chốt theo Sale <span style="font-weight:400;color:var(--muted);font-size:11px">(Số đơn Base ÷ Tổng tương tác Pancake'+saleCloseNote+')</span></div>'+
-    (d.saleCloseRateFrom ? _srCloseRateBarHtml_(d.saleCloseRate, _srState.saleSearch, 'tương tác') :
+    (d.saleCloseRateFrom ? _srCloseRateBarHtml_(d.saleCloseRate, _srState.saleSearch, 'tương tác', d.saleCloseRateExcluded) :
       '<div style="color:var(--muted);text-align:center;padding:20px;font-size:12px">Chưa nạp báo cáo tương tác Pancake ngày nào — vào tab "📥 Báo cáo Pancake" để nạp trước khi xem tỷ lệ chốt theo Sale.</div>');
   html += '<div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">'+
     '<div style="flex:1 1 380px;min-width:320px">'+saleHtml+'</div>'+
@@ -914,7 +923,7 @@ function _srRenderB(d){
   // Tỷ lệ chốt theo Sale — đặt bên cạnh "Theo Sale", cùng công thức/hàm dùng chung với Báo cáo A.
   var bSaleCloseNote = d.saleCloseRateFrom ? ' — tính từ '+esc(d.saleCloseRateFrom) : '';
   var saleCloseHtmlB_ = '<div class="dash-section-title">Tỷ lệ chốt theo Sale <span style="font-weight:400;color:var(--muted);font-size:11px">(Số đơn Base ÷ Tổng tương tác Pancake'+bSaleCloseNote+')</span></div>'+
-    (d.saleCloseRateFrom ? _srCloseRateBarHtml_(d.saleCloseRate, _srState.bSaleSearch, 'tương tác') :
+    (d.saleCloseRateFrom ? _srCloseRateBarHtml_(d.saleCloseRate, _srState.bSaleSearch, 'tương tác', d.saleCloseRateExcluded) :
       '<div style="color:var(--muted);text-align:center;padding:20px;font-size:12px">Chưa nạp báo cáo tương tác Pancake ngày nào — vào tab "📥 Báo cáo Pancake" để nạp trước khi xem tỷ lệ chốt theo Sale.</div>');
   html += '<div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">'+
     '<div style="flex:1 1 380px;min-width:320px">'+saleHtmlB_+'</div>'+

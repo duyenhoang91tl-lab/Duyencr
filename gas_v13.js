@@ -4411,6 +4411,7 @@ function _srCloseRateSections_(normRows, filters) {
 
   var saleCloseRate = [];
   var closeFrom = '';
+  var closeExcluded = null;   // { tongTT, pages:[{pageName,tongTT}] } tuong tac o Page CHUA khop Kenh ban nen khong tinh vao mau so ty le chot
   // Khoa "cung 1 nguoi" DUNG CHUNG cho bang theo Sale va theo Page: nguon lien ket khai bao + gop ten mo coi (xem 2 ham tren).
   var personKey = null;
   if (hasAnyPkData) {
@@ -4440,10 +4441,21 @@ function _srCloseRateSections_(normRows, filters) {
     var pInt2 = buildPancakeReport_(filters.dateFrom, filters.dateTo, 'equal');
     var closeAgg = {};
     // Tuong tac (Pancake) di truoc: ten hien thi uu tien ten phia Pancake; nhieu dong cung nguoi thi CONG DON tongTT (khong ghi de).
+    // MAU SO = tuong tac CHI cua cac Page CO Kenh ban tuong ung (tongTTMapped) — cung quy tac voi bang theo Kenh va Sale x Page ben duoi va khop voi tu so
+    // (don Base cua NGUOI TAO chi tinh khi kenh co Page Pancake + co du lieu ngay do). Truoc day cong TAT CA Page ke ca Page chua khop kenh (khong co don
+    // tuong ung) -> ty le bi keo thap, lech giua bang theo Sale va bang theo Kenh/Page, lech giua bao cao thang va ngay. Chua khop Page nao (pageMapped=false)
+    // thi giu cach cu (tat ca Page) de khong ra toan 0. Page bi loai duoc bao qua closeExcluded (UI an sau nut con mat).
+    var useMappedTT = !!pInt2.pageMapped;
+    if (useMappedTT) {
+      var exclList = (pInt2.byPage || []).filter(function(p) { return !p.kenh && (p.tongTT || 0) > 0; })
+        .map(function(p) { return { pageName: String(p.pageName || p.pageId), tongTT: p.tongTT || 0 }; })
+        .sort(function(a, b) { return b.tongTT - a.tongTT; });
+      closeExcluded = { tongTT: Math.round(exclList.reduce(function(a, p) { return a + p.tongTT; }, 0) * 100) / 100, pages: exclList.slice(0, 12) };
+    }
     pInt2.byCS.forEach(function(r) {
       var k = personKey(r.name);
       if (!closeAgg[k]) closeAgg[k] = { name: r.name, tongTT: 0, orders: 0 };
-      closeAgg[k].tongTT += r.tongTT || 0;
+      closeAgg[k].tongTT += useMappedTT ? (r.tongTTMapped || 0) : (r.tongTT || 0);
     });
     Object.keys(closeOrdersBySale).forEach(function(k) {
       if (!closeAgg[k]) closeAgg[k] = { name: orderDisp[k], tongTT: 0, orders: 0 };
@@ -4556,7 +4568,7 @@ function _srCloseRateSections_(normRows, filters) {
     });
   }
 
-  return { saleCloseRate: saleCloseRate, kenhCloseRate: kenhCloseRate, saleCloseByPage: saleCloseByPage, closeFrom: closeFrom || null };
+  return { saleCloseRate: saleCloseRate, kenhCloseRate: kenhCloseRate, saleCloseByPage: saleCloseByPage, closeFrom: closeFrom || null, closeExcluded: closeExcluded };
 }
 
 // Trich pageId (so cuoi trong ngoac don o cuoi chuoi) tu cot "Nguồn đơn" cua Bao cao B, vd
@@ -4729,6 +4741,7 @@ function buildSalesReportA_(filters) {
     byMkt: byMktArr,
     saleCloseRate: saleCloseRate,
     saleCloseRateFrom: closeFrom || null,
+    saleCloseRateExcluded: closeSectionsA_.closeExcluded || null,
     kenhCloseRate: kenhCloseRate,
     kenhCloseRateFrom: closeFrom || null,
     saleCloseByPage: saleCloseByPage,
@@ -5837,6 +5850,7 @@ function buildSalesReportB_(filters) {
     byMkt: byMktArrB,
     saleCloseRate: closeSectionsB_.saleCloseRate,
     saleCloseRateFrom: closeSectionsB_.closeFrom,
+    saleCloseRateExcluded: closeSectionsB_.closeExcluded || null,
     kenhCloseRate: closeSectionsB_.kenhCloseRate,
     kenhCloseRateFrom: closeSectionsB_.closeFrom,
     saleCloseByPage: closeSectionsB_.saleCloseByPage,
@@ -7897,6 +7911,8 @@ function buildPancakeReport_(from, to, split) {
     return _pkReportMemoCache_.data;
   }
   var mapPair = readPancakeMapCI_(), map = mapPair.map, mapCI = mapPair.mapCI;
+  // Page -> Kenh ban (PancakePageMap): de tinh them MAU SO "chi tuong tac o Page DA khop kenh" cho ty le chot (tongTTMapped). Loi doc map khong duoc lam hong bao cao.
+  var kenhOfPage = {}; try { kenhOfPage = readPancakePageMap_() || {}; } catch (eKm) { kenhOfPage = {}; }
   var byPage = {}, byCS = {};
   var unmappedSet = {}, unmappedCanon = {}; // ci-key -> ten hien thi (giu ban DAU TIEN gap)
   var salesCanon = {}; // ci-key -> ten hien thi DAU TIEN gap, danh cho ten Sale DA khop qua PancakeNameMap
@@ -7913,7 +7929,7 @@ function buildPancakeReport_(from, to, split) {
       var khCu=+v[i][4]||0, khMoi=+v[i][5]||0, tongTT=+v[i][6]||0, tinNhan=+v[i][7]||0,
           binhLuan=+v[i][8]||0, hoiThoaiMoi=+v[i][9]||0, dhKhMoi=+v[i][10]||0, dhKhCu=+v[i][11]||0, tongDH=+v[i][12]||0;
 
-      if (!byPage[pageId]) byPage[pageId] = { pageId: pageId, pageName: pageName, khCu:0, khMoi:0, tongTT:0, tinNhan:0, binhLuan:0, hoiThoaiMoi:0, dhKhMoi:0, dhKhCu:0, tongDH:0 };
+      if (!byPage[pageId]) byPage[pageId] = { pageId: pageId, pageName: pageName, kenh: kenhOfPage[pageId] || '', khCu:0, khMoi:0, tongTT:0, tinNhan:0, binhLuan:0, hoiThoaiMoi:0, dhKhMoi:0, dhKhCu:0, tongDH:0 };
       var bp = byPage[pageId];
       bp.khCu+=khCu; bp.khMoi+=khMoi; bp.tongTT+=tongTT; bp.tinNhan+=tinNhan; bp.binhLuan+=binhLuan;
       bp.hoiThoaiMoi+=hoiThoaiMoi; bp.dhKhMoi+=dhKhMoi; bp.dhKhCu+=dhKhCu; bp.tongDH+=tongDH;
@@ -7937,12 +7953,13 @@ function buildPancakeReport_(from, to, split) {
         // "biichnguyen1993" va "Biichnguyen1993 "). Ten hien thi = ban DAU TIEN gap.
         var csKey = _normTxt_(saleName);
         if (!salesCanon[csKey]) salesCanon[csKey] = saleName;
-        if (!byCS[csKey]) byCS[csKey] = { name: salesCanon[csKey], pancakeNames: {}, mapped: mapped, shared: false, khCu:0, khMoi:0, tongTT:0, tinNhan:0, binhLuan:0, hoiThoaiMoi:0, dhKhMoi:0, dhKhCu:0, tongDH:0 };
+        if (!byCS[csKey]) byCS[csKey] = { name: salesCanon[csKey], pancakeNames: {}, mapped: mapped, shared: false, khCu:0, khMoi:0, tongTT:0, tongTTMapped:0, tinNhan:0, binhLuan:0, hoiThoaiMoi:0, dhKhMoi:0, dhKhCu:0, tongDH:0 };
         var bc = byCS[csKey];
         bc.pancakeNames[nhanVien] = true;
         if (mapped) bc.mapped = true; // neu >=1 nguon da khop thi coi la mapped (hiem khi trung ten CS voi ten chua khop)
         if (sales.length > 1) bc.shared = true;
         bc.khCu+=khCu*w; bc.khMoi+=khMoi*w; bc.tongTT+=tongTT*w; bc.tinNhan+=tinNhan*w; bc.binhLuan+=binhLuan*w;
+        if (kenhOfPage[pageId]) bc.tongTTMapped += tongTT*w;   // chi Page da khop Kenh ban (mau so ty le chot)
         bc.hoiThoaiMoi+=hoiThoaiMoi*w; bc.dhKhMoi+=dhKhMoi*w; bc.dhKhCu+=dhKhCu*w; bc.tongDH+=tongDH*w;
       }
     }
@@ -7952,7 +7969,7 @@ function buildPancakeReport_(from, to, split) {
     var arr = Object.keys(obj).map(function(k) {
       var r = obj[k];
       r.tyLeCD = r.tongTT ? Math.round(r.tongDH / r.tongTT * 1000) / 10 : 0;
-      ['khCu','khMoi','tongTT','tinNhan','binhLuan','hoiThoaiMoi','dhKhMoi','dhKhCu','tongDH'].forEach(function(f) { r[f] = Math.round(r[f] * 100) / 100; });
+      ['khCu','khMoi','tongTT','tongTTMapped','tinNhan','binhLuan','hoiThoaiMoi','dhKhMoi','dhKhCu','tongDH'].forEach(function(f) { if (r[f] !== undefined) r[f] = Math.round(r[f] * 100) / 100; });
       if (r.pancakeNames) r.pancakeNames = Object.keys(r.pancakeNames);
       return r;
     });
@@ -7965,7 +7982,8 @@ function buildPancakeReport_(from, to, split) {
   }
 
   var hiddenSets2 = _hiddenPageSaleSets_();
-  var _pkReportResult_ = { byPage: finalize(byPage, hiddenSets2.channels, 'pageName'), byCS: finalize(byCS, hiddenSets2.sales, 'name'), unmapped: Object.keys(unmappedSet).sort(), split: split };
+  var _pkReportResult_ = { byPage: finalize(byPage, hiddenSets2.channels, 'pageName'), byCS: finalize(byCS, hiddenSets2.sales, 'name'), unmapped: Object.keys(unmappedSet).sort(), split: split,
+    pageMapped: Object.keys(kenhOfPage).some(function(pid) { return !!kenhOfPage[pid]; }) };   // co it nhat 1 Page da khop Kenh ban
   _pkReportMemoCache_ = { key: _pkMemoKey_, time: _pkMemoNow_, data: _pkReportResult_ };
   return _pkReportResult_;
 }
