@@ -62,9 +62,15 @@ Cách làm cho mọi người nhận việc: đọc `docs/crm-kb/00-READ-FIRST.m
 - [ ] U5d Tất cả lấy từ `posMetrics_`/hàm dùng chung (một chỉ số một hàm); xuất Sheet; phân quyền theo vai trò.
 
 ### U6 — Giao diện nhập đơn (mục 14) · làm song song, ít phụ thuộc
-- [ ] U6a Thanh tìm kiếm sản phẩm thông minh trong Soạn đơn (gõ không dấu, gõ một phần, gợi ý theo bảng giá DANH_MUC) — **cả Pancake AI và Zalo AI** (chạy `node tools/check-ext-parity.js`).
-- [ ] U6b Tách 2 ô "Ghi chú nội bộ" (giữa các phòng ban, không in cho khách) và "Ghi chú đơn hàng" (đi theo đơn tới Đóng gói) trong form đơn (CRM web + extension).
-- [ ] U6c Tốc độ: phím tắt, nhớ lựa chọn gần nhất, thêm dòng nhanh — đo số thao tác trước/sau.
+**Đối chiếu code 2026-10-17 (đổi phạm vi so với bản đầu):**
+- Pancake AI **đã có** ô tìm sản phẩm không dấu/khớp một phần trong Soạn đơn (`#pkb-q`, `_fold_`, danh mục phẳng `priceCatalogFlat`, có chế độ tìm trực tiếp dự phòng) → U6a phía Pancake gần như xong, chỉ còn tinh chỉnh (xếp hạng kết quả, nhớ lựa chọn gần nhất).
+- **Zalo AI chưa có giỏ hàng/Soạn đơn** (nằm trong danh sách `gap` ở `08-extension-parity.md`) → U6a/U3d phía Zalo thực chất là **làm bù cả Soạn đơn cho Zalo AI** (việc lớn riêng, quy tắc 15).
+- Giỏ hàng trong extension là **văn bản gửi khách** (nút "Sao chép đơn hàng" → dán vào chat), KHÔNG phải bản ghi đơn nội bộ → "Ghi chú nội bộ" / "Ghi chú đơn hàng" **không đặt vào giỏ này** (sẽ lộ cho khách) mà đặt trong **form Đơn hàng của U2d** (CRM web), nơi có người nhận là Cửa hàng/Đóng gói.
+- [ ] U6a-1 (Pancake) Tinh chỉnh tìm SP: xếp hạng theo độ khớp, nhớ SP/chất liệu dùng gần nhất, đếm số thao tác trước/sau.
+- [ ] U6a-2 (Zalo) Làm bù Soạn đơn + giỏ hàng cho Zalo AI (dẫn xuất cơ học từ Pancake như các lần làm bù trước; `node tools/check-ext-parity.js`).
+- [ ] U6b Hai ô "Ghi chú nội bộ" (không in cho khách) / "Ghi chú đơn hàng" (đi theo đơn tới Đóng gói) — làm cùng U2d trong form Đơn hàng; Đóng gói chỉ thấy "Ghi chú đơn hàng".
+- [ ] U6c Tốc độ nhập: phím tắt, thêm dòng nhanh (sau U6a).
+- [ ] U3d (phụ thuộc U6a-2 cho Zalo) Gắn `calcPromo_` vào giỏ Pancake AI: nạp `promoConfig` qua `getSettings` (background), nút "🎁 Áp CT tự động" điền giá cuối + quà thay cho chọn tay từng dòng; sau đó làm cho Zalo AI.
 
 ## Thứ tự đề xuất để phân công song song
 1. **Làm ngay, độc lập:** U6 (giao diện nhập đơn), U3a–U3c (engine khuyến mãi, thuần logic + test), U5b/U5c (số liệu có sẵn), U1a–U1b (hạ tầng quyền theo trường).
