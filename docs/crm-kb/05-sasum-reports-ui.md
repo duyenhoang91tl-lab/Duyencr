@@ -106,3 +106,9 @@ Menu **Cài đặt team → 🔗 Khớp sale** (admin; `js/52-fn-salematch.js`, 
 - Tên người tạo `anhTP1995` cần khớp tay (🔗 Khớp sale) nếu muốn dùng chế độ `nguoitao` — không tự đoán được từ tên.
 - Test: `node tools/test-closerate-diag.js` (cả 2 chế độ + gộp `minhquach95` + chẩn đoán, chạy hàm thật), `node tools/test-close-rate-base.js`.
 
+## Thẻ "Tỷ lệ chốt TB" ở đầu Báo cáo A và B (2026-10-16)
+- Duyên yêu cầu đưa **tỷ lệ chốt trung bình chung** lên cụm thẻ tổng đầu báo cáo (trước đây chỉ có ở dòng "Trung bình: x% (đơn/tương tác)" trong biểu đồ "Tỷ lệ chốt theo Sale").
+- `js/11-fn-srload.js`: `_srCloseRateAvg_(rows)` (= Σ đơn chốt ÷ Σ tương tác Pancake của các dòng có tương tác, 1 chữ số thập phân — CÙNG công thức dòng "Trung bình" của biểu đồ, không phụ thuộc ô tìm nhanh, đơn mồ côi/"(chưa gán sale)" không tính) và `_srCloseRateKpiCard_(d)` (viền xanh ngọc, chỉ vẽ khi báo cáo đã nạp Pancake `saleCloseRateFrom` và có tương tác). Gọi trong `_srRenderA` và `_srRenderB`.
+- Xuất Excel Báo cáo A/B (`js/13-...`) thêm 2 dòng ở sheet Tổng quan: "Tỷ lệ chốt TB (%)" và "Đơn chốt ÷ tương tác Pancake".
+- Test: `node tools/test-closerate-kpi-card.js`. Chỉ đổi JS web — Ctrl+F5, không cần deploy lại GAS.
+

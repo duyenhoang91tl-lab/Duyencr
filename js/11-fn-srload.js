@@ -641,6 +641,20 @@ function _srCloseRateGroups_(keyFn, hiddenSet){
 function _srCloseRateBySale_(){ return _srCloseRateGroups_(function(c){ return _heldBy(c) || ''; }, HIDDEN_SALES); }
 function _srCloseRateByKenh_(){ return _srCloseRateGroups_(_srCustKenh_, HIDDEN_CHANNELS); }
 
+// Tỷ lệ chốt TRUNG BÌNH CHUNG = tổng đơn chốt ÷ tổng tương tác Pancake của các dòng có tương tác — CÙNG công thức với dòng "Trung bình" của biểu đồ
+// bên dưới (không phụ thuộc ô tìm nhanh). Đưa lên cụm thẻ tổng đầu báo cáo (Duyên yêu cầu 2026-10-16). Chỉ có khi báo cáo đã nạp được tương tác Pancake (saleCloseRateFrom).
+function _srCloseRateAvg_(rows){
+  var held = 0, closed = 0;
+  (rows||[]).forEach(function(r){ if (r && r.held > 0){ held += r.held; closed += (r.closed||0); } });
+  return { held: held, closed: closed, avg: held ? Math.round(closed/held*1000)/10 : 0, has: held > 0 };
+}
+function _srCloseRateKpiCard_(d){
+  if (!d || !d.saleCloseRateFrom) return '';
+  var a = _srCloseRateAvg_(d.saleCloseRate);
+  if (!a.has) return '';
+  return '<div class="kpi-card" style="border:1.5px solid #0e7490"><div class="kpi-val" style="color:#0e7490">'+a.avg+'%</div>'+
+    '<div class="kpi-label"><b>Tỷ lệ chốt TB</b> ('+fmt(a.closed)+' đơn ÷ '+fmt(a.held)+' tương tác Pancake)</div></div>';
+}
 // Vẽ cột ngang tỷ lệ chốt — xanh/vàng/đỏ theo mức %, kèm số liệu chốt/tổng bên cạnh mỗi cột,
 // và dòng trung bình chung ở trên để dễ đối chiếu nhanh khi chụp màn hình gửi sếp.
 function _srCloseRateBarHtml_(rows, searchTerm, unitLabel){
@@ -770,6 +784,7 @@ function _srRenderA(d){
     (d.totalGiaTriChenh ? '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalGiaTriChenh)+'</div><div class="kpi-label">Trong đó: chênh lệch đơn đổi</div></div>' : '') +
     '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+_srMoney(d.totalGiaTri)+'</div><div class="kpi-label"><b>Tổng đơn (doanh thu, ko ship)</b></div></div>' +
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.trungBinhDon)+'</div><div class="kpi-label">Trung bình đơn (Tổng đơn ÷ số đơn)</div></div>' +
+    _srCloseRateKpiCard_(d) +
     '</div>' +
     '<div style="font-size:11px;color:var(--muted);margin:-10px 0 10px">Tổng đơn = cộng dồn "Tổng giá trị đơn hàng" (không ship) của TỪNG đơn + phần "Giá trị chênh lệch" của riêng các đơn đổi hàng — đây mới là số doanh thu chuẩn để đối chiếu, không phải cột Cọc.</div>' +
     '<label style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);margin-bottom:12px;cursor:pointer">'+
@@ -938,6 +953,7 @@ function _srRenderB(d){
     '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+fmt(d.totalOrders)+'</div><div class="kpi-label"><b>Số lượng đơn</b></div></div>' +
     '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+_srMoney(d.totalGiaTri)+'</div><div class="kpi-label"><b>Tổng giá trị đơn hàng sau giảm giá</b></div></div>' +
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(bTb)+'</div><div class="kpi-label">Trung bình đơn</div></div>' +
+    _srCloseRateKpiCard_(d) +
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalCod)+'</div><div class="kpi-label">Tổng COD</div></div>' +
     '</div>';
 

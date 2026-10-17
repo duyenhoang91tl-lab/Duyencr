@@ -1368,6 +1368,7 @@ function exportSalesReport(){
       ['Trong đó: chênh lệch đơn đổi', d.totalGiaTriChenh||0],
       ['Tổng đơn (doanh thu, ko ship)', d.totalGiaTri],
       ['Trung bình đơn', d.trungBinhDon]];
+    (function(){ var cr = (typeof _srCloseRateAvg_ === 'function' && d.saleCloseRateFrom) ? _srCloseRateAvg_(d.saleCloseRate) : null; if (cr && cr.has) summary.push(['Tỷ lệ chốt TB (%)', cr.avg], ['Đơn chốt ÷ tương tác Pancake', cr.closed + ' / ' + cr.held]); })();
     var bySaleRows = [['Sale','Số đơn','Cọc','Tổng đơn','TB đơn']];
     (d.bySale||[]).forEach(function(s){ bySaleRows.push([s.name, s.orders, s.coc, s.giaTri, s.trungBinhDon]); });
     var byTeamRows = [['Team Sale','Số đơn','Cọc','Tổng đơn','TB đơn']];
@@ -1395,6 +1396,7 @@ function exportSalesReport(){
       ['Số lượng đơn', dB.totalOrders],
       ['Tổng giá trị sau giảm giá', dB.totalGiaTri],
       ['Tổng COD', dB.totalCod]];
+    (function(){ var cr = (typeof _srCloseRateAvg_ === 'function' && dB.saleCloseRateFrom) ? _srCloseRateAvg_(dB.saleCloseRate) : null; if (cr && cr.has) summaryB.push(['Tỷ lệ chốt TB (%)', cr.avg], ['Đơn chốt ÷ tương tác Pancake', cr.closed + ' / ' + cr.held]); })();
     var productRows = [['Mã sản phẩm','Tên sản phẩm','Tổng số lượng']];
     (dB.products||[]).forEach(function(p){ productRows.push([p.code, p.name, p.soLuong]); });
     var bySaleRowsB = [['Sale','Số đơn','Giá trị sau giảm giá','COD']];
