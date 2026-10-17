@@ -352,11 +352,16 @@ function _srSyncTeamToSale_(teamField){
   if (!selTeams.length) { _srClearAutoSale_(saleField); return; }
   var union = [];
   var notFound = [];
+  var _people = [];   // MỖI thành viên Team = 1 NGƯỜI: { name: tên ghi trong Team, names: mọi tên/thẻ cùng người } — để báo thiếu theo NGƯỜI, không theo từng tên phụ
   selTeams.forEach(function(tname){
     var want = String(tname||'').trim().toLowerCase();
     var t = (teams||[]).find(function(x){ return String(x.name || '(chưa đặt tên)').trim().toLowerCase() === want; });
     if (!t) { notFound.push(tname); return; }
-    [t.leader].concat(t.members||[]).filter(Boolean).forEach(function(n){ (_personAliases(n) || [n]).concat([n]).forEach(function(a){ if (a && union.indexOf(a)===-1) union.push(a); }); });   // gồm mọi thẻ/tên cùng người
+    [t.leader].concat(t.members||[]).filter(Boolean).forEach(function(n){
+      var grp = []; (_personAliases(n) || [n]).concat([n]).forEach(function(a){ if (a && grp.indexOf(a)===-1) grp.push(a); });   // gồm mọi thẻ/tên cùng người
+      _people.push({ name: n, names: grp });
+      grp.forEach(function(a){ if (union.indexOf(a)===-1) union.push(a); });
+    });
   });
   // KHONG ghi de bo loc Sale bang mang RONG: backend coi mang Sale rong = KHONG LOC GI (hien het
   // du lieu) -> user tuong dang loc theo Team ma thuc ra dang xem toan bo. Neu khong khop duoc Team
@@ -373,10 +378,24 @@ function _srSyncTeamToSale_(teamField){
   if (_srcOpts.length){
     var _fold = function(x){ return String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/gi,'d').replace(/\s+/g,' ').trim().toLowerCase(); };
     var _canon = {}; _srcOpts.forEach(function(n){ _canon[_fold(n)] = n; });
-    var _kept = [], _missing = [];
-    union.forEach(function(n){ var c = _canon[_fold(n)]; if (c !== undefined) { if (_kept.indexOf(c) === -1) _kept.push(c); } else _missing.push(n); });
+    // Tên gõ kiểu "S6 anhtrinh1995" / "6" (số thứ tự sale + thẻ) → bỏ tiền tố "S<số>" và số đứng riêng để khớp đúng thẻ trong dữ liệu.
+    var _stripTag = function(x){ return _fold(x).replace(/^s\d+\s+/, '').replace(/(^|\s)\d+(?=\s|$)/g, ' ').replace(/\s+/g, ' ').trim(); };
+    var _kept = [], _missing = [], _seenMiss = {};
+    var _keepName = function(c){ if (c !== undefined && _kept.indexOf(c) === -1) _kept.push(c); };
+    _people.forEach(function(pp){
+      var hit = false;
+      pp.names.forEach(function(n){
+        var c = _canon[_fold(n)];
+        if (c === undefined) { var st = _stripTag(n); if (st && st !== _fold(n)) c = _canon[st]; }
+        if (c !== undefined) { hit = true; _keepName(c); }
+      });
+      // Chỉ báo "bị bỏ" khi KHÔNG tên/thẻ nào của người đó có trong dữ liệu báo cáo (các tên phụ không khớp nhưng người đó đã có tên khớp thì không phải lỗi).
+      if (!hit && !_seenMiss[_fold(pp.name)]) { _seenMiss[_fold(pp.name)] = 1; _missing.push(pp.name); }
+    });
+    // Tên lẻ trong union không thuộc người nào ở trên (phòng hờ) vẫn được khớp như cũ.
+    union.forEach(function(n){ _keepName(_canon[_fold(n)]); });
     _missingAll = _missing;
-    if (_missing.length) toast('⚠ ' + _missing.length + ' tên trong Team không có trong dữ liệu báo cáo (bỏ qua): ' + _missing.slice(0,6).join(', ') + (_missing.length>6?'...':''));
+    if (_missing.length) toast('⚠ ' + _missing.length + ' người trong Team không có tên nào khớp dữ liệu báo cáo (bỏ qua): ' + _missing.slice(0,6).join(', ') + (_missing.length>6?'...':''));
     if (!_kept.length){
       toast('⚠ Không tên nào trong Team khớp tên Sale của báo cáo — giữ nguyên bộ lọc Sale hiện tại. Sửa tên trong "Quản lý Team" cho đúng tên trong báo cáo.');
       return;
