@@ -146,6 +146,23 @@ function _srCloseRateSectionsFromBase_(filters) {
   }
   return _srCloseRateSections_(norm, filters);
 }
+// Bộ lọc Sale của báo cáo áp luôn lên "Tỷ lệ chốt theo Sale" (trước đây biểu đồ này luôn ra TẤT CẢ sale dù đã lọc — Duyên báo 2026-10-12): giữ dòng của
+// đúng những người được chọn; tên trong bộ lọc (Pos/Base, vd 'thuydinh95') gộp về dòng biểu đồ (Pancake, vd 'thuydinh1995') theo CÙNG quy tắc gộp tên mồ côi.
+// Số của từng sale KHÔNG đổi vì tỷ lệ mỗi người độc lập với người khác.
+function _srFilterCloseBySale_(sections, saleFilter) {
+  if (!sections || !saleFilter || !saleFilter.length) return sections;
+  var names = saleFilter;
+  try { names = _expandSaleFilterWithPancakeAliases_(saleFilter); } catch (e) {}
+  var pk = _salePersonKeyFn_();
+  var rowNames = (sections.saleCloseRate || []).map(function(r) { return r.name; });   // neo = dòng biểu đồ chính (tên Pancake)
+  var pageNames = ((sections.saleCloseByPage && sections.saleCloseByPage.rows) || []).map(function(r) { return r.name; });
+  var fold = _salePersonKeyWithOrphanFold_(pk, rowNames, names.concat(pageNames)), want = {};
+  names.forEach(function(n) { var k = fold(n); if (k) want[k] = 1; });
+  function keep(rows) { return (rows || []).filter(function(r) { return !!want[fold(r.name)]; }); }
+  sections.saleCloseRate = keep(sections.saleCloseRate);
+  if (sections.saleCloseByPage && sections.saleCloseByPage.rows) sections.saleCloseByPage.rows = keep(sections.saleCloseByPage.rows);
+  return sections;
+}
 function dtRowToOrder_(row, rowIndex) {
   var dtVal = _dtCellToVnStr_(row[DT_COL_THOIGIANHT]);
   var ngayTaoStr = _dtCellToVnStr_(row[DT_COL_NGAYTAO]);

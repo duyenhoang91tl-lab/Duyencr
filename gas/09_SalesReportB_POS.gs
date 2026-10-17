@@ -716,7 +716,7 @@ function buildSalesReportB_(filters) {
   //      hau to "(ID)" neu co) va tra qua readPancakePageMapByName_ (khoa=pageName chuan hoa).
   // Don khong khop duoc o CA 2 cach (chua tung duoc admin khop Page nao trong PancakePageMap)
   // moi thuc su bi bo qua o buoc tinh ty le chot, giong cach A bo qua kenh chua khop Page.
-  var closeSectionsB_ = _srCloseRateSectionsFromBase_(filters);   // cùng nguồn với Báo cáo A: TLC luôn tính theo Base
+  var closeSectionsB_ = _srFilterCloseBySale_(_srCloseRateSectionsFromBase_(filters), filters.sale);   // cùng nguồn với Báo cáo A: TLC luôn tính theo Base; bộ lọc Sale áp cả lên biểu đồ này
 
   var mismatchCount = products['__MISMATCH__'] ? products['__MISMATCH__'].mismatchRows : 0;
 
