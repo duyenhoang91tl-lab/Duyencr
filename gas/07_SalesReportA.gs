@@ -259,17 +259,33 @@ function buildSalesReportA_(filters) {
 
   var rows = readDTTong_(true);
   var matched = [];
+  // CHAN DOAN (2026-10-17, Duyen: "Theo Sale van 0 dong"): dem so dong con lai sau TUNG buoc loc + ten Sale that cua cac don trong ky bi loai vi Sale,
+  // de khi ra 0 don biet ngay mat o buoc nao (ngay / trang thai / kenh / ten Sale) thay vi doan.
+  var dg = { rows: rows.length, badDate: 0, inDate: 0, notExcluded: 0, afterKenh: 0, afterSale: 0, dateMin: 0, dateMax: 0, sampleDate: '', miss: {} };
   for (var i = 0; i < rows.length; i++) {
     var row = rows[i];
     var dt = parseVNDate_(row[dateField]);
+    if (!dt) { dg.badDate++; if (!dg.sampleDate && row[dateField]) dg.sampleDate = String(row[dateField]).slice(0, 30); }
+    else { var tms = dt.getTime(); if (!dg.dateMin || tms < dg.dateMin) dg.dateMin = tms; if (tms > dg.dateMax) dg.dateMax = tms; }
     if (!dateInRange_(dt, filters.dateFrom, filters.dateTo)) continue;
+    dg.inDate++;
     if (_isExcludedOrderStatus_(row.trangThai)) continue; // bo don Huy/Tra lai/Hoan tien/Thai bai/Khieu nai (Quy che thu lao Sale)
+    dg.notExcluded++;
     if (kenhFilterArr.length && kenhFilterArr.indexOf(row.kenhBan) === -1) continue;
+    dg.afterKenh++;
     var salesOnOrder = splitMulti_(row.saleBan, ',');
-    if (saleFilterFoldA.length && !salesOnOrder.some(function(s){ return saleFilterFoldA.indexOf(_normTxt_(s)) !== -1; })) continue;
+    if (saleFilterFoldA.length && !salesOnOrder.some(function(s){ return saleFilterFoldA.indexOf(_normTxt_(s)) !== -1; })) {
+      salesOnOrder.forEach(function(sn) { if (Object.keys(dg.miss).length < 300 || dg.miss[sn]) dg.miss[sn] = (dg.miss[sn] || 0) + 1; });
+      continue;
+    }
+    dg.afterSale++;
     if (!_pMatchAny_(row.sanPham, sanPhamTerms)) continue;
     matched.push(row);
   }
+  function _dgDay(ms) { if (!ms) return ''; var d0 = new Date(ms + 7 * 3600000); return ('0' + d0.getUTCDate()).slice(-2) + '/' + ('0' + (d0.getUTCMonth() + 1)).slice(-2) + '/' + d0.getUTCFullYear(); }   // gio VN (UTC+7), khong phu thuoc mui gio may chay
+  var diag = { rows: dg.rows, badDate: dg.badDate, inDate: dg.inDate, notExcluded: dg.notExcluded, afterKenh: dg.afterKenh, afterSale: dg.afterSale,
+               dateMin: _dgDay(dg.dateMin), dateMax: _dgDay(dg.dateMax), sampleDate: dg.sampleDate, saleFilterN: saleFilterFoldA.length,
+               missNames: Object.keys(dg.miss).sort(function(x, y) { return dg.miss[y] - dg.miss[x]; }).slice(0, 25).map(function(k) { return k + ' (' + dg.miss[k] + ')'; }) };
 
   // Tong chung: tinh du gia tri 1 lan, KHONG chia theo sale
   var totalCoc = 0, totalGiaTri = 0, totalGiaTriChenh = 0;
@@ -376,6 +392,7 @@ function buildSalesReportA_(filters) {
 
   return {
     totalOrders: matched.length,
+    diag: diag,
     totalCoc: totalCoc,
     totalGiaTri: totalGiaTri,
     totalGiaTriChenh: totalGiaTriChenh,

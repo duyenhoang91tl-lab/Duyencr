@@ -747,9 +747,24 @@ function _srCocTh(){ return _srState.showCoc ? '<th style="text-align:right">C�
 function _srCocTd(v){ return _srState.showCoc ? '<td style="text-align:right">'+_srMoney(v)+'</td>' : ''; }
 function _srCocColspan(base){ return _srState.showCoc ? base : base-1; }
 
+// Báo cáo A ra 0 đơn: hiện bảng chẩn đoán từ backend (diag) — mất ở bước nào (dữ liệu / ngày / trạng thái / kênh / tên Sale) + tên Sale thật trong dữ liệu.
+function _srZeroDiagA_(d){
+  var g = d && d.diag; if (!g || d.totalOrders) return '';
+  var why;
+  if (!g.rows) why = 'Nguồn dữ liệu đơn (DT TỔNG) đang <b>trống</b> — kiểm tra sheet DT TỔNG / đồng bộ Supabase.';
+  else if (!g.inDate) why = 'Có ' + g.rows + ' đơn trong dữ liệu nhưng <b>không đơn nào nằm trong khoảng ngày đã chọn</b> (dữ liệu từ ' + e_(g.dateMin) + ' đến ' + e_(g.dateMax) + (g.badDate ? '; ' + g.badDate + ' dòng sai định dạng ngày, vd “' + e_(g.sampleDate) + '”' : '') + ').';
+  else if (!g.notExcluded) why = 'Trong ngày có ' + g.inDate + ' đơn nhưng <b>tất cả bị loại do trạng thái</b> (Thất bại).';
+  else if (!g.afterKenh) why = 'Còn ' + g.notExcluded + ' đơn nhưng <b>không đơn nào thuộc Kênh đã chọn</b>.';
+  else if (!g.afterSale) why = 'Còn ' + g.afterKenh + ' đơn trong ngày nhưng <b>không đơn nào có Sale trùng bộ lọc Sale</b> (' + g.saleFilterN + ' tên đang lọc). Tên Sale thật trên các đơn đó bên dưới — gắn thẻ/Khớp sale cho đúng tên này.';
+  else why = 'Còn ' + g.afterSale + ' đơn nhưng bị loại ở bộ lọc Sản phẩm.';
+  return '<div class="fp-info" style="margin:0 0 12px"><b>⚠ 0 đơn — vì sao?</b><br>' + why +
+    '<br><span style="font-size:11px;color:var(--muted)">Dòng dữ liệu: ' + g.rows + ' → trong ngày: ' + g.inDate + ' → không bị hủy/trả: ' + g.notExcluded + ' → đúng kênh: ' + g.afterKenh + ' → đúng Sale: ' + g.afterSale + '</span>' +
+    ((g.missNames && g.missNames.length && g.inDate) ? '<br><span style="font-size:11.5px"><b>Tên Sale trên các đơn bị loại (nhiều nhất):</b> ' + g.missNames.map(e_).join(', ') + '</span>' : '') + '</div>';
+}
+function e_(s){ return (typeof esc === 'function') ? esc(s) : String(s == null ? '' : s).replace(/[&<>"']/g, function(ch){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]; }); }
 function _srRenderA(d){
   if (!d) return _srNoDataHtml_();
-  var html = '<div class="kpi-grid" style="margin-bottom:16px">' +
+  var html = _srZeroDiagA_(d) + '<div class="kpi-grid" style="margin-bottom:16px">' +
     '<div class="kpi-card"><div class="kpi-val">'+fmt(d.totalOrders)+'</div><div class="kpi-label">Số lượng đơn</div></div>' +
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalCoc)+'</div><div class="kpi-label">Tổng tiền đã cọc/CK (tham khảo)</div></div>' +
     (d.totalGiaTriChenh ? '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalGiaTriChenh)+'</div><div class="kpi-label">Trong đó: chênh lệch đơn đổi</div></div>' : '') +
