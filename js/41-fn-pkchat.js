@@ -47,6 +47,7 @@ var _pkTagCfg = {
   'sc-tags': { conv: function () { return (typeof _sc !== 'undefined' ? _sc.convs : []).filter(function (x) { return x.id === _sc.active; })[0]; }, after: function () { if (typeof _scRenderList === 'function') _scRenderList(); } },
   'pkc-tags': { conv: function () { return _pkc.convs.filter(function (x) { return x.id === _pkc.active; })[0]; }, after: function () { var mt = document.getElementById('pkc-meta'), c = _pkTagCfg['pkc-tags'].conv(); if (mt) mt.innerHTML = _pkcMetaRow(c); } }
 };
+function _pkTagWantOpen() { try { return localStorage.getItem('ome_pk_tag_open') !== '0'; } catch (e) { return true; } }   // mac dinh MO luoi the nhu Pancake
 function _pkcColor(c) { return /^#[0-9a-fA-F]{3,8}$/.test(c || '') ? c : ''; }
 function _pkcFoldS(s) { return (typeof _foldVi === 'function') ? _foldVi(String(s || '')) : String(s || '').toLowerCase(); }
 function _pkTagApplyOv(convs) {   // goi sau moi lan tai danh sach hoi thoai tu server
@@ -69,16 +70,17 @@ function _pkTagListHtml(barId, conv, cat, ui) {
   var qf = _pkcFoldS(ui.q).trim();
   var items = (cat.tags || []).filter(function (t) { return !qf || _pkcFoldS(t.t).indexOf(qf) >= 0; });
   if (!items.length) return '<div class="pkc-note">' + (cat.tags && cat.tags.length ? 'Không có thẻ phù hợp.' : 'Page này chưa có thẻ nào.') + '</div>';
+  // Lưới ô màu nhỏ gọn như Pancake: ô ĐẶC màu của thẻ; thẻ chưa gắn nhạt hơn (opacity), thẻ đang gắn đậm + ✓. Tên dài bị cắt (…), rê chuột xem đủ tên.
   return items.map(function (t) {
     var on = !!have[String(t.id)], c = _pkcColor(t.c) || '#6b7280';
-    return '<span class="pkc-tag pkt-chip' + (on ? ' pkt-on' : '') + '" data-tid="' + _pkcEsc(t.id) + '" style="' + (on ? 'background:' + c + ';border-color:' + c : 'border-color:' + c + ';color:' + c) + '" title="' + (on ? 'Bấm để gỡ thẻ' : 'Bấm để gắn thẻ') + '" onclick="pkTagToggle(\'' + barId + '\',this.getAttribute(\'data-tid\'))">' + (on ? '✓ ' : '') + _pkcEsc(t.t) + '</span>';
+    return '<span class="pkc-tag pkt-chip' + (on ? ' pkt-on' : '') + '" data-tid="' + _pkcEsc(t.id) + '" style="--c:' + c + '" title="' + _pkcEsc(t.t) + (on ? ' — bấm để gỡ' : ' — bấm để gắn') + '" onclick="pkTagToggle(\'' + barId + '\',this.getAttribute(\'data-tid\'))">' + (on ? '✓ ' : '') + _pkcEsc(t.t) + '</span>';
   }).join('');
 }
 function pkTagBarRender(barId) {
   var el = document.getElementById(barId), cfg = _pkTagCfg[barId]; if (!el || !cfg) return;
   var conv = cfg.conv();
   if (!conv) { el.style.display = 'none'; el.innerHTML = ''; return; }
-  var ui = _pkTagUI[barId] = _pkTagUI[barId] || { open: false, q: '', sig: '' };
+  var ui = _pkTagUI[barId] = _pkTagUI[barId] || { open: _pkTagWantOpen(), q: '', sig: '' };
   var cat = _pkTagCat[conv.pageId];
   if (!cat && conv.pageId) pkTagsLoad(conv.pageId, false);
   var sig = [conv.id, (conv.tags || []).map(function (t) { return t.id; }).join(','), cat ? cat.at + ':' + (cat.tags || []).length + ':' + cat.err : 'x', ui.open].join('|');
@@ -88,18 +90,20 @@ function pkTagBarRender(barId) {
     var c = _pkcColor(t.c);
     return '<span class="pkc-tag pkt-cur"' + (c ? ' style="background:' + c + '"' : '') + ' data-tid="' + _pkcEsc(t.id) + '" title="Bấm để gỡ thẻ" onclick="pkTagToggle(\'' + barId + '\',this.getAttribute(\'data-tid\'))">' + _pkcEsc(t.t) + ' ✕</span>';
   }).join('');
+  var tools = '';
+  if (ui.open) tools = '<span class="pkt-tools"><input class="pkt-q" placeholder="Tìm thẻ…" value="' + _pkcEsc(ui.q) + '" oninput="pkTagSearch(\'' + barId + '\',this.value)">'
+    + '<button type="button" class="btn sm" title="Tải lại danh sách thẻ từ Pancake" onclick="pkTagsReload(\'' + barId + '\')">🔄</button></span>';
   var h = '<div class="pkt-row"><span class="pkt-lbl" title="Thẻ của hội thoại — đồng bộ với Pancake">🏷</span>' + (chips || '<span class="pkt-none">Chưa có thẻ</span>')
-    + '<button type="button" class="btn sm" onclick="pkTagOpen(\'' + barId + '\')">' + (ui.open ? '▲ Đóng' : '＋ Gắn thẻ') + '</button></div>';
+    + tools + '<button type="button" class="btn sm pkt-tg" onclick="pkTagOpen(\'' + barId + '\')">' + (ui.open ? '▲ Thu gọn' : '＋ Gắn thẻ') + '</button></div>';
   if (ui.open) {
-    h += '<div class="pkt-pal"><div class="pkt-tools"><input class="pkt-q" placeholder="Tìm thẻ…" value="' + _pkcEsc(ui.q) + '" oninput="pkTagSearch(\'' + barId + '\',this.value)">'
-      + '<button type="button" class="btn sm" title="Tải lại danh sách thẻ từ Pancake" onclick="pkTagsReload(\'' + barId + '\')">🔄</button></div>'
-      + '<div class="pkt-list" id="' + barId + '-list">' + (!cat || cat.loading ? '<div class="pkc-note">Đang tải thẻ…</div>' : (cat.err && !(cat.tags || []).length ? '<div class="pkc-note err">' + _pkcEsc(cat.err) + '</div>' : _pkTagListHtml(barId, conv, cat, ui))) + '</div></div>';
+    h += '<div class="pkt-pal"><div class="pkt-list" id="' + barId + '-list">' + (!cat || cat.loading ? '<div class="pkc-note">Đang tải thẻ…</div>' : (cat.err && !(cat.tags || []).length ? '<div class="pkc-note err">' + _pkcEsc(cat.err) + '</div>' : _pkTagListHtml(barId, conv, cat, ui))) + '</div></div>';
   }
   el.style.display = ''; el.innerHTML = h;
 }
 function pkTagOpen(barId) {
-  var ui = _pkTagUI[barId] = _pkTagUI[barId] || { open: false, q: '', sig: '' }, conv = _pkTagCfg[barId].conv();
+  var ui = _pkTagUI[barId] = _pkTagUI[barId] || { open: _pkTagWantOpen(), q: '', sig: '' }, conv = _pkTagCfg[barId].conv();
   ui.open = !ui.open; ui.sig = '';
+  try { localStorage.setItem('ome_pk_tag_open', ui.open ? '1' : '0'); } catch (e) {}   // nho lua chon thu gon/mo giua cac hoi thoai va cac lan mo CRM
   var cat = conv && _pkTagCat[conv.pageId];
   if (ui.open && conv && (!cat || cat.err || Date.now() - cat.at > 600000)) pkTagsLoad(conv.pageId, false);   // mo bang: danh sach cu qua 10 phut / lan truoc loi -> tai lai
   pkTagBarRender(barId);
