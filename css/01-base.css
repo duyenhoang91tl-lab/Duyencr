@@ -1030,3 +1030,8 @@ body:not(.show-guides) .pro-ai-hint{display:none !important;}
 @media (hover:none){.sc-seenbtn{opacity:1;}}
 .pk-seen-btn{font-size:12px;} .pk-seen-btn.unseen{border-color:#f59e0b;color:#b45309;font-weight:600;}
 #sc-seen{display:inline-flex;margin-left:auto;} .pkc-seen{display:flex;justify-content:flex-end;} .pkc-seen:empty{display:none;}
+/* Thu muc chat Social > Chat (loc nhanh theo Chua doc / Chua tra loi / the Pancake) */
+.sc-folders{display:flex;flex-wrap:wrap;gap:5px;padding:6px 8px;border-bottom:1px solid var(--border);max-height:96px;overflow-y:auto;}
+.sc-fchip{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:14px;padding:2px 9px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
+.sc-fchip b{color:var(--muted);font-weight:600;} .sc-fchip.on{background:var(--green);border-color:var(--green);color:#fff;} .sc-fchip.on b{color:#fff;}
+.sc-fdot{width:8px;height:8px;border-radius:50%;display:inline-block;}
