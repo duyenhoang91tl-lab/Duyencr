@@ -42,9 +42,9 @@ Cách làm cho mọi người nhận việc: đọc `docs/crm-kb/00-READ-FIRST.m
 - Bước 4 (giao vận tự động qua API hãng) = thuộc phần API, TẠM BỎ; trong lúc đó cho đổi trạng thái giao tay.
 
 ### U3 — Engine khuyến mãi (mục 12.1) · Q-E đã chốt · nên làm trước U2e
-- [ ] U3a Mô hình CTKM có cấu trúc (Settings hoặc Supabase): loại (combo giá sốc / % / số tiền cố định / quà tặng / voucher mã — làm đủ), điều kiện (sản phẩm, SL tối thiểu, thời gian, nguồn đơn), giới hạn dùng, cờ **áp đồng thời** / **không áp cùng CT khác** (+ danh sách loại trừ) do admin cài, thứ tự ưu tiên.
-- [ ] U3b Hàm tính giá cuối thuần (`calcPromo_(items, promos, voucher)`) dùng chung client + backend, có test Node nhiều ca (combo + % + quà + voucher; hết hạn; không đủ điều kiện; hai CT loại trừ nhau; hai CT áp đồng thời).
-- [ ] U3c Màn admin tạo/sửa CTKM (tự nhập, không phụ thuộc đọc sheet `CTKM` cũ; giữ sheet cũ cho AI trả lời như hiện nay).
+- [x] U3a (2026-10-17, `js/53-fn-promo-engine.js`, Settings `promoConfig`) Mô hình CTKM có cấu trúc (Settings hoặc Supabase): loại (combo giá sốc / % / số tiền cố định / quà tặng / voucher mã — làm đủ), điều kiện (sản phẩm, SL tối thiểu, thời gian, nguồn đơn), giới hạn dùng, cờ **áp đồng thời** / **không áp cùng CT khác** (+ danh sách loại trừ) do admin cài, thứ tự ưu tiên.
+- [x] U3b (2026-10-17, `calcPromo_`, test `node tools/test-promo-engine.js` 18 ca; CÒN: sao sang backend khi U2 cần tính phía server) Hàm tính giá cuối thuần (`calcPromo_(items, promos, voucher)`) dùng chung client + backend, có test Node nhiều ca (combo + % + quà + voucher; hết hạn; không đủ điều kiện; hai CT loại trừ nhau; hai CT áp đồng thời).
+- [x] U3c (2026-10-17, `js/54-fn-promo-admin.js`, menu ⚙ Settings → 🎁 Cấu hình khuyến mãi, có ô Thử tính; test `NODE_PATH=<jsdom> node tools/test-promo-admin-ui.js`) Màn admin tạo/sửa CTKM (tự nhập, không phụ thuộc đọc sheet `CTKM` cũ; giữ sheet cũ cho AI trả lời như hiện nay).
 - [ ] U3d Gắn vào giỏ hàng Pancake AI + Zalo AI (quy tắc 15) và form đơn U2: Sale chọn sản phẩm → giá cuối tự tính, hiện rõ CTKM đã áp.
 - [ ] U3e Gắn CTKM vào chiến dịch resale (P3a "Ưu đãi").
 
