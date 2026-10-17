@@ -203,7 +203,7 @@ async function _aaPullCfg(){
     var keep = { lastRun:_aaCfg.lastRun, lastResult:_aaCfg.lastResult };
     // Đang có chỉnh sửa chưa lưu -> KHÔNG ghi đè bằng bản cũ từ server (trước đây lần nạp chậm xong sau khi bạn đã sửa sẽ xoá mất thay đổi vừa nhập).
     if (cfgRaw && !_aaDirty) { _aaCfg = Object.assign(_aaDefaultCfg(), JSON.parse(cfgRaw), keep); }
-    if (stRaw) { var st = JSON.parse(stRaw); _aaCfg.lastRun = st.lastRun || ''; _aaCfg.lastResult = st.lastResult || null; _aaCfg.lastBy = st.by || ''; }
+    if (stRaw) { var st = JSON.parse(stRaw); _aaCfg.lastRun = st.lastRun || ''; _aaCfg.lastResult = st.lastResult || null; _aaCfg.lastBy = st.by || ''; _aaCfg.lastError = st.lastError || null; }
     saveLS('ome_auto_assign_cfg', _aaCfg);
   } catch(e) { console.warn('[AutoAssign] nạp cấu hình lỗi', e); }
 }
@@ -461,6 +461,22 @@ function _aaCkHtml(){
   h += '</tbody></table><div style="font-size:12px;margin-top:6px;color:var(--muted)">Tổng hạn mức CSKH mỗi ngày: <b style="color:var(--green)">'+totalQ+' KH</b>'+(rc.warn.length ? ' · <span style="color:var(--red)">'+rc.warn.map(esc).join('; ')+'</span>' : '')+'</div></div>';
   return h;
 }
+// Ô TRẠNG THÁI lần chạy chia tự động gần nhất. NGUYÊN NHÂN GỐC thêm: trước đây giao diện KHÔNG hiện lastResult/lỗi nên khi không chia được
+// (khoảng ngày loại hết KH, đã chia hết, thiếu người nhận, lỗi hạn mức...) admin không biết hệ thống đã chạy chưa và vì sao không chia.
+function _aaStatusHtml(cfg){
+  var r = cfg.lastResult, e = cfg.lastError, rows = [];
+  if (!cfg.lastRun && !r && !e) return '<div style="font-size:12px;margin-top:10px;color:var(--muted)">Chưa có lần chạy tự động nào được ghi nhận.</div>';
+  var by = cfg.lastBy === 'server' ? 'tự động (server)' : (cfg.lastBy ? 'trình duyệt' : '');
+  rows.push('<b>Lần chạy gần nhất:</b> ' + esc(cfg.lastRun || (r && r.date) || '—') + (by ? ' · ' + by : ''));
+  if (r) {
+    if (r.total > 0) rows.push('<span style="color:#15803d">✓ Đã chia ' + esc(String(r.total)) + ' KH cho ' + esc(String(r.people)) + ' người.</span>');
+    else rows.push('<span style="color:#b45309">Không chia được KH nào.</span>');
+    (r.warn || []).forEach(function(w){ rows.push('<span style="color:#b45309">⚠ ' + esc(String(w)) + '</span>'); });
+    if ((r.short || []).length && r.total > 0) rows.push('<span style="color:#b45309">Thiếu KH cho ' + r.short.length + ' người (không đủ KH thoả điều kiện).</span>');
+  }
+  if (e) rows.push('<span style="color:#b91c1c">✗ Lỗi lần chạy ' + esc(String((e.at || '').slice(0, 16).replace('T', ' '))) + ': ' + esc(String(e.msg || '')) + ' — ' + (e.partial ? 'đã chia một phần, không tự chạy lại hôm nay để tránh chia trùng.' : 'chưa chia ca nào, hệ thống sẽ tự thử lại ở lần kiểm tra sau.') + '</span>');
+  return '<div style="font-size:12px;margin-top:10px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;line-height:1.6">' + rows.join('<br>') + '</div>';
+}
 function renderAssignAuto(){
   var body = document.getElementById('assign-body'); if (!body) return;
   var cfg = _aaCfg, rc = _aaRecipients(cfg, teams, _aaMembersOf), qmap = {};
@@ -477,7 +493,7 @@ function renderAssignAuto(){
     '<div style="font-size:12px;margin-top:10px">Chỉ lấy KH POS/Base có <b>ngày đơn</b> từ <input type="date" value="'+esc(cfg.dateFrom||'')+'" onchange="_aaSet(\'dateFrom\',this.value)"> đến <input type="date" value="'+esc(cfg.dateTo||'')+'" onchange="_aaSet(\'dateTo\',this.value)"> '+((cfg.dateFrom||cfg.dateTo)?'<button class="btn sm" onclick="_aaSet(\'dateFrom\',\'\',false);_aaSet(\'dateTo\',\'\')">✕ Bỏ</button>':'')+'<div class="guide-text" style="font-size:11px;color:var(--muted);margin-top:3px">Ví dụ chia khách tháng 9: 01/09 → 30/09. Để trống = không giới hạn. Chỉ áp cho nguồn POS/Base (DT tổng, Dữ liệu đơn, Chăm sóc); CSKH-Duyên chia riêng ở mục ③ và không có ngày đơn.</div></div>'+
     '<label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:10px"><input type="checkbox" '+(cfg.onlyUnassigned?'checked':'')+' onchange="_aaSet(\'onlyUnassigned\',this.checked)"> Chỉ lấy KH <b>chưa chia lần nào</b> (nên bật, nếu không ngày nào cũng có thể chia lại đúng KH cũ)</label>'+
     '<label style="font-size:12px;display:block;margin-top:10px">Chia từ <input type="number" min="0" max="23" style="width:56px" value="'+(cfg.runHour==null?7:cfg.runHour)+'" onchange="_aaSet(\'runHour\',this.value)"> giờ sáng (giờ VN) — trước giờ này không chia</label>'+
-    '<div style="font-size:11px;color:var(--hint);margin-top:8px">Chạy tự động bằng <b>trigger trên Google Apps Script</b> (không cần mở CRM): admin cài 1 lần — mở Apps Script Editor, chọn hàm <b>installAutoAssignTrigger_</b>, bấm Run. Chưa cài trigger thì hệ thống chỉ chia khi có admin mở CRM vào ngày đó. Sau khi sửa ở đây nhớ bấm <b>💾 Lưu cấu hình</b> (server dùng bản đã lưu).</div></div>';
+    _aaStatusHtml(cfg)+'<div style="font-size:11px;color:var(--hint);margin-top:8px">Chạy tự động bằng <b>trigger trên Google Apps Script</b> (không cần mở CRM): admin cài 1 lần — mở Apps Script Editor, chọn hàm <b>installAutoAssignTrigger_</b>, bấm Run. Chưa cài trigger thì hệ thống chỉ chia khi có admin mở CRM vào ngày đó. Sau khi sửa ở đây nhớ bấm <b>💾 Lưu cấu hình</b> (server dùng bản đã lưu).</div></div>';
 
   h += '<div class="assign-section"><div class="assign-section-title">① Chia cho các Team <span style="font-weight:400;font-size:12px;color:var(--muted)">— nguồn POS</span></div>'+
     '<label style="font-size:12px">Tổng KH/ngày (dùng cho Team chia theo %): <input type="number" min="0" style="width:90px" value="'+(cfg.dailyTotal||'')+'" placeholder="0" onchange="_aaSet(\'dailyTotal\',this.value)"></label>';

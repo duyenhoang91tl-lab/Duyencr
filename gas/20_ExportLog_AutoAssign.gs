@@ -334,10 +334,15 @@ function _aaDateOk_(cfg, c) {
 }
 // Ke hoach ca ngay = CSKH (rieng) + POS (tu dt/don/cs). opts: {pos:bool, cskh:bool} (mac dinh ca hai). CHIEN DICH 1 = POS/Base chay TRUOC (theo yeu cau Duyen 2026-10-10), roi toi CSKH-Duyen (rieng): KH co ca 2 nguon thuoc ve POS/Base.
 function _aaPlanAll(cfg, teamsArr, membersOf, custs, everSet, opts){
+  var _total = (custs || []).length;
   custs = (custs || []).filter(function (c) { return c && isValidVnPhone_(c.phone); });   // chi chia SDT di dong VN hop le
-  opts = opts || {}; var taken = new Set(), out = { entries:[], short:[], warn:[] };
+  opts = opts || {}; var taken = new Set(), out = { entries:[], short:[], warn:[], diag:{ total:_total, validPhone:custs.length } };
   if (opts.pos !== false){
-    var p = _aaPlan(cfg, teamsArr, membersOf, (cfg.dateFrom || cfg.dateTo) ? custs.filter(function (c) { return _aaDateOk_(cfg, c); }) : custs, everSet, taken);
+    // diag = so KH con lai sau tung buoc loc (de biet VI SAO khong chia duoc, thay vi chi thay 'khong chia'): tong -> SDT hop le -> trong khoang ngay don -> chua chia lan nao
+    var _pool = (cfg.dateFrom || cfg.dateTo) ? custs.filter(function (c) { return _aaDateOk_(cfg, c); }) : custs;
+    out.diag.afterDate = _pool.length;
+    out.diag.unassigned = cfg.onlyUnassigned ? _pool.filter(function (c) { return !(everSet && everSet.has(c.phone)); }).length : _pool.length;
+    var p = _aaPlan(cfg, teamsArr, membersOf, _pool, everSet, taken);
     p.entries.forEach(function(e){ e.src = 'pos'; }); p.short.forEach(function(x){ x.src = 'pos'; });
     out.entries = out.entries.concat(p.entries); out.short = out.short.concat(p.short); out.warn = out.warn.concat(p.warn);
   }
@@ -454,36 +459,61 @@ function autoAssignRun_(force) {
       opts = { pos: posOk, cskh: cskhOk };
       if (hour < runHour) return { skipped: 'chua den gio (' + runHour + 'h)' };
       if (st.lastRun === today) return { skipped: 'hom nay da chia' };
+      var _prevLastRun = st.lastRun || '';
       st.lastRun = today; st.by = 'server'; st.startedAt = now.toISOString();
       _aaWriteJson_('autoAssignState', st);   // danh dau TRUOC khi chia: loi giua chung thi khong tu chia lai gay trung
     }
-    var teams = readTeams_(getCrmSS_().getSheetByName(SH_TEAM));
-    var membersOf = function (t) {
-      var m = cfg.teamMembers && cfg.teamMembers[t.id];   // UI luu san danh sach da gop 1-nguoi-nhieu-ten
-      if (m && m.length) return m;
-      var seen = {}, out = [];
-      [t.leader].concat(t.members || []).forEach(function (n) { if (n && !seen[n]) { seen[n] = true; out.push(n); } });
-      return out;
-    };
-    var u = _aaLoadCustomers_();
-    var everSet = { has: function (p) { return !!u.ever[p]; } };
-    var plan = _aaPlanAll(cfg, teams, membersOf, u.custs, everSet, opts);
-    var dm = today.slice(8) + '/' + today.slice(5, 7), nowStr = now.toISOString().slice(0, 16).replace('T', ' '), careMap = {}, total = 0;
-    plan.entries.forEach(function (e) {
-      var en = { id: now.getTime() + '_' + Math.random().toString(36).slice(2, 6), date: nowStr, csName: e.name, phones: e.phones, donePhones: [],
-        label: (force ? 'Chạy thử' : 'Tự động ' + dm) + (e.src === 'cskh' ? ' CSKH-Duyên' : '') + ' — ' + e.team + ' → ' + e.name + ' (' + e.phones.length + ' KH)', team: e.team, auto: true };
-      saveAssignEntry_(en);
-      e.phones.forEach(function (p) { careMap[p] = e.name; });
-      total += e.phones.length;
-    });
-    _aaSetCareCS_(careMap);
-    st.lastResult = { date: today, total: total, people: plan.entries.length, short: plan.short, warn: plan.warn, forced: !!force, by: 'server' };
-    st.finishedAt = new Date().toISOString();
-    if (force && !st.lastRun) st.lastRun = '';
-    _aaWriteJson_('autoAssignState', st);
-    try { CacheService.getScriptCache().remove('customers_v12'); } catch (e3) {}
-    return st.lastResult;
+    var _savedAny = false;
+    try {
+      var teams = readTeams_(getCrmSS_().getSheetByName(SH_TEAM));
+      var membersOf = function (t) {
+        var m = cfg.teamMembers && cfg.teamMembers[t.id];   // UI luu san danh sach da gop 1-nguoi-nhieu-ten
+        if (m && m.length) return m;
+        var seen = {}, out = [];
+        [t.leader].concat(t.members || []).forEach(function (n) { if (n && !seen[n]) { seen[n] = true; out.push(n); } });
+        return out;
+      };
+      var u = _aaLoadCustomers_();
+      var everSet = { has: function (p) { return !!u.ever[p]; } };
+      var plan = _aaPlanAll(cfg, teams, membersOf, u.custs, everSet, opts);
+      if (!plan.entries.length) plan.warn.push(_aaWhyEmpty_(plan.diag, cfg));   // khong chia duoc ca nao -> noi ro ly do (truoc day chi in 'thieu X KH' tung nguoi, khong noi vi sao)
+      var dm = today.slice(8) + '/' + today.slice(5, 7), nowStr = now.toISOString().slice(0, 16).replace('T', ' '), careMap = {}, total = 0;
+      plan.entries.forEach(function (e) {
+        var en = { id: now.getTime() + '_' + Math.random().toString(36).slice(2, 6), date: nowStr, csName: e.name, phones: e.phones, donePhones: [],
+          label: (force ? 'Chạy thử' : 'Tự động ' + dm) + (e.src === 'cskh' ? ' CSKH-Duyên' : '') + ' — ' + e.team + ' → ' + e.name + ' (' + e.phones.length + ' KH)', team: e.team, auto: true };
+        saveAssignEntry_(en); _savedAny = true;
+        e.phones.forEach(function (p) { careMap[p] = e.name; });
+        total += e.phones.length;
+      });
+      _aaSetCareCS_(careMap);
+      st.lastResult = { date: today, total: total, people: plan.entries.length, short: plan.short, warn: plan.warn, diag: plan.diag, forced: !!force, by: 'server' };
+      delete st.lastError;
+      st.finishedAt = new Date().toISOString();
+      if (force && !st.lastRun) st.lastRun = '';
+      _aaWriteJson_('autoAssignState', st);
+      try { CacheService.getScriptCache().remove('customers_v12'); } catch (e3) {}
+      return st.lastResult;
+    } catch (err) {
+      // NGUYEN NHAN GOC 'he thong khong chia duoc': lastRun duoc danh dau 'hom nay da chia' TRUOC khi chia; neu loi giua chung (vd het han muc UrlFetch/ghi Supabase loi/het thoi gian)
+      // truoc khi chia duoc ca nao thi ngay do bi KHOA, cac lan tick sau deu 'hom nay da chia' -> ca ngay khong chia gi va khong ai biet. Nay: chua chia ca nao thi MO KHOA de gio sau tu thu lai;
+      // da chia mot phan thi giu khoa (tranh chia trung) nhung ghi loi vao state de hien ra.
+      var _msg = String(err && err.message || err).slice(0, 300);
+      if (!force && !_savedAny) st.lastRun = _prevLastRun;
+      st.lastError = { at: new Date().toISOString(), msg: _msg, partial: _savedAny };
+      st.finishedAt = new Date().toISOString();
+      try { _aaWriteJson_('autoAssignState', st); } catch (e4) {}
+      return { error: _msg, partial: _savedAny, retry: !force && !_savedAny };
+    }
   } finally { lock.releaseLock(); }
+}
+// Giai thich vi sao KH POS/Base khong du de chia (dung diag cua _aaPlanAll): chi ra BUOC LOC dau tien cho ra 0 KH.
+function _aaWhyEmpty_(d, cfg) {
+  d = d || {};
+  var a = 'KH: tong ' + (d.total || 0) + ' -> SDT hop le ' + (d.validPhone || 0) + (cfg && (cfg.dateFrom || cfg.dateTo) ? ' -> trong khoang ngay don ' + (d.afterDate || 0) : '') + (cfg && cfg.onlyUnassigned ? ' -> chua chia lan nao ' + (d.unassigned || 0) : '') + '. ';
+  if (!d.validPhone) return 'Khong chia duoc ca nao: khong co KH nao co SDT di dong hop le (kiem tra du lieu DT TONG / Du lieu don). ' + a;
+  if (cfg && (cfg.dateFrom || cfg.dateTo) && !d.afterDate) return 'Khong chia duoc ca nao: khong KH nao co ngay don trong khoang ' + (cfg.dateFrom || '...') + ' den ' + (cfg.dateTo || '...') + ' (ngay don lay tu DT TONG; KH khong co ngay don bi loai). Mo rong khoang ngay hoac bam Bo. ' + a;
+  if (cfg && cfg.onlyUnassigned && !d.unassigned) return 'Khong chia duoc ca nao: tat ca KH trong khoang da tung duoc chia truoc do (dang tich "Chi lay KH chua chia lan nao"). Bo tich neu muon chia lai. ' + a;
+  return 'Khong chia duoc ca nao: con KH nhung khong co nguoi nhan hoac han muc = 0 (kiem tra da tich Team/thanh vien va "So KH/ngay" > 0, va thanh vien co trong Team). ' + a;
 }
 function autoAssignTick_() { return autoAssignRun_(false); }
 function autoAssignRunNow_() { return autoAssignRun_(true); }   // chay thu tu Editor (chia THAT)
@@ -497,6 +527,25 @@ function removeAutoAssignTrigger_() {
   var n = 0;
   ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'autoAssignTick_') { ScriptApp.deleteTrigger(t); n++; } });
   return 'Da go ' + n + ' trigger autoAssignTick_.';
+}
+// KIEM TRA chia tu dong (KHONG ghi gi): trigger da cai chua, cau hinh, lan chay gan nhat + loi, va ke hoach hom nay (bao nhieu KH qua tung buoc loc). Chay tu Editor: kiemTraChiaTuDong.
+function kiemTraChiaTuDong() {
+  var info = { trigger: ScriptApp.getProjectTriggers().filter(function (t) { return t.getHandlerFunction() === 'autoAssignTick_'; }).length };
+  info.canhBao = info.trigger ? '' : 'CHUA CAI TRIGGER: chay caiTriggerChiaTuDong 1 lan, neu khong chi chia khi admin mo CRM vao ngay do.';
+  var cfg = _aaReadJson_('autoAssignCfg'), st = _aaReadJson_('autoAssignState') || {};
+  if (!cfg) { info.cauHinh = 'CHUA CO CAU HINH (vao Chia data nang cao -> Chia tu dong -> Luu cau hinh)'; Logger.log(JSON.stringify(info, null, 2)); return info; }
+  var tk = Object.keys(cfg.teams || {}).filter(function (k) { return cfg.teams[k] && cfg.teams[k].on; });
+  info.cauHinh = { bat: !!cfg.enabled, ngay: cfg.days, gioChay: cfg.runHour, tuNgay: cfg.dateFrom || '', denNgay: cfg.dateTo || '', chiChuaChia: !!cfg.onlyUnassigned, soTeamDaTich: tk.length };
+  info.lanChayGanNhat = { lastRun: st.lastRun || '', ketQua: st.lastResult || null, loi: st.lastError || null };
+  try {
+    var teams = readTeams_(getCrmSS_().getSheetByName(SH_TEAM)), u = _aaLoadCustomers_();
+    var membersOf = function (t) { var m = cfg.teamMembers && cfg.teamMembers[t.id]; if (m && m.length) return m; var seen = {}, o = []; [t.leader].concat(t.members || []).forEach(function (n) { if (n && !seen[n]) { seen[n] = true; o.push(n); } }); return o; };
+    cfg.teams = cfg.teams || {}; cfg.members = cfg.members || {}; cfg.memberMode = cfg.memberMode || {}; cfg.cskhTeams = cfg.cskhTeams || {}; cfg.cskhMembers = cfg.cskhMembers || {}; cfg.cskhMemberMode = cfg.cskhMemberMode || {};
+    cfg.src = cfg.src || { mode: 'pct', vals: {} }; cfg.prio = cfg.prio || { mode: 'pct', vals: {} }; cfg.hang = cfg.hang || { mode: 'pct', vals: {} };
+    var plan = _aaPlanAll(cfg, teams, membersOf, u.custs, { has: function (p) { return !!u.ever[p]; } }, { pos: true, cskh: false });
+    info.keHoachHomNay = { nguoiNhan: plan.entries.length, tongKH: plan.entries.reduce(function (n, e) { return n + e.phones.length; }, 0), thieu: plan.short, canhBao: plan.warn, locTungBuoc: plan.diag, lyDo: plan.entries.length ? '' : _aaWhyEmpty_(plan.diag, cfg) };
+  } catch (e) { info.keHoachLoi = String(e && e.message || e).slice(0, 300); }
+  Logger.log(JSON.stringify(info, null, 2)); return info;
 }
 function caiTriggerChiaTuDong() {
   Logger.log(installAutoAssignTrigger_());
