@@ -119,3 +119,7 @@ Công thức (Duyên chốt): **Tỷ lệ chốt = số đơn Base do Sale TẠO
 - Ảnh hưởng: `saleCloseRate` còn dùng xét THƯỞNG theo tỷ lệ chốt (`_resolveBonusSale_`/chương trình thưởng) → tỷ lệ đúng hơn thì thưởng cũng tính theo mẫu số mới.
 - Muốn đơn kênh "Fb Phạm Thu Hiền" tính: khớp kênh đó với đúng Page Pancake có dữ liệu tương tác (🔗 Khớp Page Pancake ↔ Kênh bán CRM), KHÔNG sửa công thức.
 - Test: `node tools/test-close-rate-mapped.js` (chạy hàm thật với 66 đơn Base ngày 15/10/2026: ninhnga99 7/150 thay vì 7/203, huyenmaii1990 2/190 thay vì 2/213).
+
+## Tổng quan: thẻ "Doanh thu Pos" (2026-10-16)
+`js/42-fn-homesummary.js` — thẻ 💰 lấy **tổng của Báo cáo B** (`totalGiaTri` / `totalOrders` của action `salesReportB`, cùng lần gọi với "Nguồn khách"): TOÀN CÔNG TY khi không lọc Phòng/Team/tên, theo bộ lọc khi có lọc (ghi rõ "toàn công ty" / "theo bộ lọc"). Lỗi trước đó: thẻ lấy `c.revenue` từ `_ovAgg` (cộng số theo từng người của Tổng quan) nên hiện 0đ trong khi Nguồn khách hiện hàng tỷ. Đang tải hiện "…", lỗi tải B hiện "—" (không bao giờ hiện 0đ giả). Test: `node tools/test-home-revenue.js` (jsdom).
+
