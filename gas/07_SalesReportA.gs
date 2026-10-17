@@ -67,6 +67,7 @@ function _srCloseRateSections_(normRows, filters) {
 
   var saleCloseRate = [];
   var closeFrom = '';
+  var closeExcluded = null;   // { tongTT, pages:[{pageName,tongTT}] } tuong tac o Page CHUA khop Kenh ban nen khong tinh vao mau so ty le chot
   // Khoa "cung 1 nguoi" DUNG CHUNG cho bang theo Sale va theo Page: nguon lien ket khai bao + gop ten mo coi (xem 2 ham tren).
   var personKey = null;
   if (hasAnyPkData) {
@@ -96,10 +97,21 @@ function _srCloseRateSections_(normRows, filters) {
     var pInt2 = buildPancakeReport_(filters.dateFrom, filters.dateTo, 'equal');
     var closeAgg = {};
     // Tuong tac (Pancake) di truoc: ten hien thi uu tien ten phia Pancake; nhieu dong cung nguoi thi CONG DON tongTT (khong ghi de).
+    // MAU SO = tuong tac CHI cua cac Page CO Kenh ban tuong ung (tongTTMapped) — cung quy tac voi bang theo Kenh va Sale x Page ben duoi va khop voi tu so
+    // (don Base cua NGUOI TAO chi tinh khi kenh co Page Pancake + co du lieu ngay do). Truoc day cong TAT CA Page ke ca Page chua khop kenh (khong co don
+    // tuong ung) -> ty le bi keo thap, lech giua bang theo Sale va bang theo Kenh/Page, lech giua bao cao thang va ngay. Chua khop Page nao (pageMapped=false)
+    // thi giu cach cu (tat ca Page) de khong ra toan 0. Page bi loai duoc bao qua closeExcluded (UI an sau nut con mat).
+    var useMappedTT = !!pInt2.pageMapped;
+    if (useMappedTT) {
+      var exclList = (pInt2.byPage || []).filter(function(p) { return !p.kenh && (p.tongTT || 0) > 0; })
+        .map(function(p) { return { pageName: String(p.pageName || p.pageId), tongTT: p.tongTT || 0 }; })
+        .sort(function(a, b) { return b.tongTT - a.tongTT; });
+      closeExcluded = { tongTT: Math.round(exclList.reduce(function(a, p) { return a + p.tongTT; }, 0) * 100) / 100, pages: exclList.slice(0, 12) };
+    }
     pInt2.byCS.forEach(function(r) {
       var k = personKey(r.name);
       if (!closeAgg[k]) closeAgg[k] = { name: r.name, tongTT: 0, orders: 0 };
-      closeAgg[k].tongTT += r.tongTT || 0;
+      closeAgg[k].tongTT += useMappedTT ? (r.tongTTMapped || 0) : (r.tongTT || 0);
     });
     Object.keys(closeOrdersBySale).forEach(function(k) {
       if (!closeAgg[k]) closeAgg[k] = { name: orderDisp[k], tongTT: 0, orders: 0 };
@@ -212,7 +224,7 @@ function _srCloseRateSections_(normRows, filters) {
     });
   }
 
-  return { saleCloseRate: saleCloseRate, kenhCloseRate: kenhCloseRate, saleCloseByPage: saleCloseByPage, closeFrom: closeFrom || null };
+  return { saleCloseRate: saleCloseRate, kenhCloseRate: kenhCloseRate, saleCloseByPage: saleCloseByPage, closeFrom: closeFrom || null, closeExcluded: closeExcluded };
 }
 
 // Trich pageId (so cuoi trong ngoac don o cuoi chuoi) tu cot "Nguồn đơn" cua Bao cao B, vd
@@ -259,17 +271,33 @@ function buildSalesReportA_(filters) {
 
   var rows = readDTTong_(true);
   var matched = [];
+  // CHAN DOAN (2026-10-17, Duyen: "Theo Sale van 0 dong"): dem so dong con lai sau TUNG buoc loc + ten Sale that cua cac don trong ky bi loai vi Sale,
+  // de khi ra 0 don biet ngay mat o buoc nao (ngay / trang thai / kenh / ten Sale) thay vi doan.
+  var dg = { rows: rows.length, badDate: 0, inDate: 0, notExcluded: 0, afterKenh: 0, afterSale: 0, dateMin: 0, dateMax: 0, sampleDate: '', miss: {} };
   for (var i = 0; i < rows.length; i++) {
     var row = rows[i];
     var dt = parseVNDate_(row[dateField]);
+    if (!dt) { dg.badDate++; if (!dg.sampleDate && row[dateField]) dg.sampleDate = String(row[dateField]).slice(0, 30); }
+    else { var tms = dt.getTime(); if (!dg.dateMin || tms < dg.dateMin) dg.dateMin = tms; if (tms > dg.dateMax) dg.dateMax = tms; }
     if (!dateInRange_(dt, filters.dateFrom, filters.dateTo)) continue;
+    dg.inDate++;
     if (_isExcludedOrderStatus_(row.trangThai)) continue; // bo don Huy/Tra lai/Hoan tien/Thai bai/Khieu nai (Quy che thu lao Sale)
+    dg.notExcluded++;
     if (kenhFilterArr.length && kenhFilterArr.indexOf(row.kenhBan) === -1) continue;
+    dg.afterKenh++;
     var salesOnOrder = splitMulti_(row.saleBan, ',');
-    if (saleFilterFoldA.length && !salesOnOrder.some(function(s){ return saleFilterFoldA.indexOf(_normTxt_(s)) !== -1; })) continue;
+    if (saleFilterFoldA.length && !salesOnOrder.some(function(s){ return saleFilterFoldA.indexOf(_normTxt_(s)) !== -1; })) {
+      salesOnOrder.forEach(function(sn) { if (Object.keys(dg.miss).length < 300 || dg.miss[sn]) dg.miss[sn] = (dg.miss[sn] || 0) + 1; });
+      continue;
+    }
+    dg.afterSale++;
     if (!_pMatchAny_(row.sanPham, sanPhamTerms)) continue;
     matched.push(row);
   }
+  function _dgDay(ms) { if (!ms) return ''; var d0 = new Date(ms + 7 * 3600000); return ('0' + d0.getUTCDate()).slice(-2) + '/' + ('0' + (d0.getUTCMonth() + 1)).slice(-2) + '/' + d0.getUTCFullYear(); }   // gio VN (UTC+7), khong phu thuoc mui gio may chay
+  var diag = { rows: dg.rows, badDate: dg.badDate, inDate: dg.inDate, notExcluded: dg.notExcluded, afterKenh: dg.afterKenh, afterSale: dg.afterSale,
+               dateMin: _dgDay(dg.dateMin), dateMax: _dgDay(dg.dateMax), sampleDate: dg.sampleDate, saleFilterN: saleFilterFoldA.length,
+               missNames: Object.keys(dg.miss).sort(function(x, y) { return dg.miss[y] - dg.miss[x]; }).slice(0, 25).map(function(k) { return k + ' (' + dg.miss[k] + ')'; }) };
 
   // Tong chung: tinh du gia tri 1 lan, KHONG chia theo sale
   var totalCoc = 0, totalGiaTri = 0, totalGiaTriChenh = 0;
@@ -376,6 +404,7 @@ function buildSalesReportA_(filters) {
 
   return {
     totalOrders: matched.length,
+    diag: diag,
     totalCoc: totalCoc,
     totalGiaTri: totalGiaTri,
     totalGiaTriChenh: totalGiaTriChenh,
@@ -385,6 +414,7 @@ function buildSalesReportA_(filters) {
     byMkt: byMktArr,
     saleCloseRate: saleCloseRate,
     saleCloseRateFrom: closeFrom || null,
+    saleCloseRateExcluded: closeSectionsA_.closeExcluded || null,
     kenhCloseRate: kenhCloseRate,
     kenhCloseRateFrom: closeFrom || null,
     saleCloseByPage: saleCloseByPage,
