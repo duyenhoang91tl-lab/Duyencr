@@ -70,7 +70,7 @@ Cách làm cho mọi người nhận việc: đọc `docs/crm-kb/00-READ-FIRST.m
 - [ ] U6a-2 (Zalo) Làm bù Soạn đơn + giỏ hàng cho Zalo AI (dẫn xuất cơ học từ Pancake như các lần làm bù trước; `node tools/check-ext-parity.js`).
 - [ ] U6b Hai ô "Ghi chú nội bộ" (không in cho khách) / "Ghi chú đơn hàng" (đi theo đơn tới Đóng gói) — làm cùng U2d trong form Đơn hàng; Đóng gói chỉ thấy "Ghi chú đơn hàng".
 - [ ] U6c Tốc độ nhập: phím tắt, thêm dòng nhanh (sau U6a).
-- [ ] U3d (phụ thuộc U6a-2 cho Zalo) Gắn `calcPromo_` vào giỏ Pancake AI: nạp `promoConfig` qua `getSettings` (background), nút "🎁 Áp CT tự động" điền giá cuối + quà thay cho chọn tay từng dòng; sau đó làm cho Zalo AI.
+- [~] U3d (2026-10-17: XONG phía Pancake AI — nút "🎁 CT tự động" trong giỏ hàng: `pancake-promo.js` = bản sao nguyên văn `js/53-fn-promo-engine.js` (test lệch), background `GET_PROMO_CONFIG`, kết quả chỉ đề xuất, bấm "Áp vào đơn" mới ghi Giảm giá tổng + Quà tặng; CÒN Zalo AI, ghi `gap` ở `tools/ext-parity-allow.json`; CÒN form đơn U2d) (phụ thuộc U6a-2 cho Zalo) Gắn `calcPromo_` vào giỏ Pancake AI: nạp `promoConfig` qua `getSettings` (background), nút "🎁 Áp CT tự động" điền giá cuối + quà thay cho chọn tay từng dòng; sau đó làm cho Zalo AI.
 
 ## Thứ tự đề xuất để phân công song song
 1. **Làm ngay, độc lập:** U6 (giao diện nhập đơn), U3a–U3c (engine khuyến mãi, thuần logic + test), U5b/U5c (số liệu có sẵn), U1a–U1b (hạ tầng quyền theo trường).

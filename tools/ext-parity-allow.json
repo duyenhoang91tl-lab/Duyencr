@@ -39,6 +39,10 @@
       "status": "gap",
       "note": "Pancake danh dau viec xong; Zalo chua"
     },
+    "getSettings": {
+      "status": "gap",
+      "note": "U3d: nut Ap CT tu dong trong gio hang Pancake AI doc promoConfig — Zalo AI chua co gio hang/Soan don, lam bu cung U6a-2 (docs/ROADMAP-CRM-UPDATE.md)"
+    },
     "ctkmCatalog": {
       "status": "gap",
       "note": "Danh muc CTKM — Zalo chua co"

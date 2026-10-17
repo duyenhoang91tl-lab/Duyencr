@@ -485,6 +485,12 @@
               <label>🎁 Quà tặng kèm</label>
               <input type="text" id="pk-cart-gift" placeholder="VD: tặng 1 vòng phong thủy nhỏ..." />
             </div>
+            <div class="pk-cart-extra-row" id="pk-cart-promo-row">
+              <label>🎁 CT tự động</label>
+              <input type="text" id="pk-cart-voucher" placeholder="Mã voucher (nếu có)" style="flex:1" />
+              <button id="pk-cart-promo-calc" title="Tính khuyến mãi theo cấu hình admin (combo, %, số tiền, quà, voucher)">Tính CT</button>
+              <div id="pk-cart-promo-out" style="display:none;width:100%;font-size:11.5px;line-height:1.5"></div>
+            </div>
             <div class="pk-cart-extra-row">
               <label>Giảm giá tổng</label>
               <select id="pk-cart-discount-type">
@@ -723,6 +729,7 @@
     panelEl.querySelector('#pk-cart-price-k').addEventListener('change', (e) => {
       _cartExtra.priceInK = e.target.checked; saveCart_(); renderCart_(); // render lai de doi hien thi cac dong gia da co
     });
+    panelEl.querySelector('#pk-cart-promo-calc').addEventListener('click', () => { _calcAutoPromo_(); });
     panelEl.querySelector('#pk-cart-copy').addEventListener('click', () => {
       const text = _buildCartSummaryText_();
       if (!text.trim()) { setStatus('Chưa có sản phẩm nào được tick trong đơn.'); return; }
@@ -3937,6 +3944,56 @@
     const total = subtotal - discountAmt + gold + ship;
     return { checked, subtotal, discBase, discountAmt, gold, ship, total };
   }
+
+  // ── U3d: CT KHUYẾN MÃI TỰ ĐỘNG (admin cài ở CRM → Settings 'promoConfig'; engine calcPromo_ ở pancake-promo.js) ──
+  // Chỉ tính trên các dòng đã tick VÀ chưa có CTKM riêng (promoType = none) để không giảm 2 lần. Kết quả chỉ ĐỀ XUẤT:
+  // Sale bấm "Áp vào đơn" mới ghi vào Giảm giá tổng + Quà tặng kèm (không tự đổi gì khi chưa bấm).
+  let _promoCfg = null;
+  function _loadPromoCfg_(cb) {
+    if (_promoCfg) { cb(null); return; }
+    safeSendMessage_({ type: 'GET_PROMO_CONFIG' }, (resp) => {
+      if (!resp?.ok) { cb(resp?.error || 'không tải được cấu hình khuyến mãi'); return; }
+      _promoCfg = promoNormalize_(resp.data?.promoConfig || '[]');
+      cb(null);
+    });
+  }
+  function _calcAutoPromo_() {
+    const out = panelEl.querySelector('#pk-cart-promo-out');
+    out.style.display = 'block';
+    out.textContent = 'Đang tính...';
+    _loadPromoCfg_((err) => {
+      if (err) { out.innerHTML = `<span style="color:#b91c1c">${escapeHtml(String(err))}</span>`; return; }
+      if (!_promoCfg.length) { out.textContent = 'Admin chưa cài chương trình khuyến mãi nào (CRM → Settings → 🎁 Cấu hình khuyến mãi).'; return; }
+      const rows = _cartItems.filter((i) => i.checked && (!i.promoType || i.promoType === 'none'));
+      if (!rows.length) { out.textContent = 'Chưa có dòng nào để tính (tick sản phẩm và để trống CTKM riêng của dòng).'; return; }
+      const voucher = String(panelEl.querySelector('#pk-cart-voucher').value || '').split(',').map((x) => x.trim()).filter(Boolean);
+      const r = calcPromo_(rows.map((i) => ({ name: i.name, qty: Number(i.qty) || 0, price: Number(i.price) || 0 })), _promoCfg, { vouchers: voucher });
+      const vnd = (n) => Number(n).toLocaleString('vi-VN') + 'đ';
+      const giftText = r.gifts.map((g) => g.name + (g.qty > 1 ? ' x' + g.qty : '')).join(', ');
+      let h = `<div>Tạm tính: <b>${vnd(r.subtotal)}</b> · Giảm: <b>-${vnd(r.discount)}</b> · Còn: <b>${vnd(r.total)}</b></div>`;
+      if (r.applied.length) h += `<div>✅ ${r.applied.map((a) => escapeHtml(a.name)).join('; ')}</div>`;
+      if (giftText) h += `<div>🎁 Quà: ${escapeHtml(giftText)}</div>`;
+      if (!r.applied.length) h += '<div>Không có chương trình nào áp dụng được cho giỏ này.</div>';
+      if (r.applied.length) h += '<button id="pk-cart-promo-apply">Áp vào đơn</button>';
+      out.innerHTML = h;
+      const btn = out.querySelector('#pk-cart-promo-apply');
+      if (btn) btn.addEventListener('click', () => {
+        if (_cartExtra.discountType !== 'none' && Number(_cartExtra.discountValue) > 0 &&
+            !confirm('Đơn đang có Giảm giá tổng nhập tay. Thay bằng kết quả CT tự động?')) return;
+        _cartExtra.discountType = r.discount > 0 ? 'amount' : 'none';
+        _cartExtra.discountValue = r.discount;
+        // Dòng không dùng CT tự động (có CTKM riêng) không được tính vào giảm giá tổng
+        _cartItems.forEach((i) => { if (i.checked && i.promoType && i.promoType !== 'none') i.inTotalDiscount = false; });
+        if (giftText) {
+          const cur = String(_cartExtra.gift || '').trim();
+          if (cur.indexOf(giftText) === -1) _cartExtra.gift = cur ? cur + ', ' + giftText : giftText;
+        }
+        saveCart_(); renderCart_();
+        setStatus('🎁 Đã áp CT tự động vào đơn.');
+      });
+    });
+  }
+
 
   function _renderCartTotal_() {
     const t = _cartTotals_();
