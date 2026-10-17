@@ -177,3 +177,7 @@ Yeu cau cua Duyen: Chat noi bo hien thi duoc o cua so chat nho o goc duoi phai (
 - Test: `node tools/test-chat-mini.js` (mở rộng: trả lời, trích dẫn, huỷ trả lời, xoá, không có nút xoá trên tin người khác, âm báo, nhấp nháy tiêu đề, tắt chuông). `test-chat.js`, `test-chat-drag.js` vẫn qua.
 - Chưa thử trên trình duyệt thật (chỉ jsdom). Nút 🔔 nằm trên dock nên chỉ chỉnh được khi dock đang hiện (không phải ở tab Chat / đang thu thành bong bóng).
 - [x] The 'Ty le chot TB' o dau Bao cao A/B + dong trong Excel (js/11 _srCloseRateKpiCard_). Chi tiet docs/crm-kb/05.
+
+## Lọc nhanh (mẫu) không có tác dụng — vòng sửa
+- Đã kiểm tra trên Chromium thật: admin 1180/760px, dropdown ≥2 mẫu + nút "Tắt lọc nhanh" chạy đúng ở A–G, L.
+- Nguyên nhân khả dĩ: (1) trình duyệt giữ JS/CSS cũ (không có cache-busting) → thêm `?v=` cho js/48 + css/10; (2) leader/CS bị `_srEnforceScope` ép về chính mình nên mẫu như "không đổi" → nay có toast báo rõ.
