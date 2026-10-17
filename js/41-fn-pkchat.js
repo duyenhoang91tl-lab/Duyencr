@@ -136,6 +136,54 @@ async function pkTagToggle(barId, tagId) {
     cfg.after(); pkTagBarRender(barId);
   }
 }
+// ═══ DANH DAU DA DOC / CHUA DOC (2026-10-17) — nhu Pancake; dung chung cho Social > Chat (js/42, ca nut o dau khung chat lan nut nho o tung dong danh sach) va tab Chat trong ho so khach ═══
+// Bam = doi trang thai ngay (lac quan) roi goi GAS pkChatRead -> API Pancake read/unread; loi thi tra lai trang thai cu va bao. _pkSeenOv giu ket qua 20 giay
+// de lan poll (danh sach co cache 15 giay o server) khong lam cham xanh/chu dam nhay lai trang thai cu. Cung 1 hoi thoai co the nam ca 2 danh sach (_sc va _pkc) -> cap nhat ca hai.
+var _pkSeenOv = {};     // convId -> { seen, until }
+var _pkSeenBusy = {};   // convId -> true (chong bam doi)
+function _pkSeenLists() { return [typeof _sc !== 'undefined' ? _sc.convs : [], _pkc.convs]; }
+function _pkSeenApplyOv(convs) {   // goi sau moi lan tai danh sach hoi thoai tu server (cung cho voi _pkTagApplyOv)
+  var now = Date.now();
+  (convs || []).forEach(function (c) { var o = _pkSeenOv[c.id]; if (!o) return; if (o.until < now) { delete _pkSeenOv[c.id]; return; } c.seen = o.seen; });
+}
+function _pkSeenBtnHtml(conv, cls) {   // seen === false = dang CHUA doc -> nut cho phep danh dau DA doc, nguoc lai
+  var un = conv.seen === false, t = un ? 'Đánh dấu đã đọc' : 'Đánh dấu chưa đọc';
+  return '<button type="button" class="' + cls + '" data-id="' + _pkcEsc(conv.id) + '" title="' + t + ' (đồng bộ với Pancake)" onclick="event.stopPropagation();pkSeenToggle(this.getAttribute(\'data-id\'))">' + (un ? '✓ Đã đọc' : '● Chưa đọc') + '</button>';
+}
+function _pkSeenRefresh() {
+  if (typeof _scRenderList === 'function' && document.getElementById('sc-convs')) _scRenderList();
+  if (document.getElementById('pkc-root')) _pkcRender(false);
+}
+function pkSeenRender(where) {   // ve nut o DAU khung chat: 'sc' (Social > Chat) hoac 'pkc' (ho so khach)
+  var conv, el;
+  if (where === 'sc') {
+    conv = (typeof _sc !== 'undefined' ? _sc.convs : []).filter(function (x) { return x.id === _sc.active; })[0];
+    var head = document.getElementById('sc-head'); if (!head) return;
+    el = document.getElementById('sc-seen');
+    if (!el) { el = document.createElement('span'); el.id = 'sc-seen'; var hm = document.getElementById('sc-head-m'); if (hm && hm.parentNode === head) head.insertBefore(el, hm); else head.appendChild(el); }
+  } else {
+    conv = _pkc.convs.filter(function (x) { return x.id === _pkc.active; })[0];
+    el = document.getElementById('pkc-seen');
+  }
+  if (!el) return;
+  el.innerHTML = conv ? _pkSeenBtnHtml(conv, 'btn sm pk-seen-btn' + (conv.seen === false ? ' unseen' : '')) : '';
+}
+async function pkSeenToggle(convId) {
+  convId = String(convId || ''); if (!convId || _pkSeenBusy[convId]) return;
+  var all = []; _pkSeenLists().forEach(function (l) { (l || []).forEach(function (c) { if (c.id === convId) all.push(c); }); });
+  if (!all.length) return;
+  var wasSeen = all[0].seen !== false, op = wasSeen ? 'unread' : 'read', now = !wasSeen;
+  _pkSeenBusy[convId] = true;
+  all.forEach(function (c) { c.seen = now; }); _pkSeenOv[convId] = { seen: now, until: Date.now() + 20000 }; _pkSeenRefresh();
+  try {
+    var j = await (await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify({ action: 'pkChatRead', convId: convId, op: op }) })).json();
+    if (!j || !j.ok) throw new Error((j && j.error) || 'Đánh dấu thất bại.');
+    if (typeof toast === 'function') toast(now ? '✓ Đã đánh dấu đã đọc' : '● Đã đánh dấu chưa đọc');
+  } catch (e) {
+    all.forEach(function (c) { c.seen = wasSeen; }); delete _pkSeenOv[convId];
+    if (typeof toast === 'function') toast('✕ ' + (e && e.message || 'Đánh dấu lỗi'));
+  } finally { delete _pkSeenBusy[convId]; _pkSeenRefresh(); }
+}
 // "Da chat": nhan vien da tra loi trong hoi thoai (tu cac tin dang tai: ten nhan vien CRM / nhan vien Pancake), kem so tin. Tin chi co ten page khong tinh la nguoi.
 function _pkcWhoHtml(msgs) {
   var cnt = {}, order = [];
@@ -154,6 +202,7 @@ function renderPkChatTab(c) {
   setTimeout(function () { if (_pkc.phone === c.phone && document.getElementById('pkc-root')) { pkcLoad(true); _pkc.timer = setInterval(_pkcTick, 15000); } }, 0);
   return '<div id="pkc-root" class="pkc" data-phone="' + _pkcEsc(c.phone) + '">'
     + '<div class="pkc-convs" id="pkc-convs"></div>'
+     + '<div class="pkc-seen" id="pkc-seen"></div>'
      + '<div class="pkc-meta" id="pkc-meta"></div>'
      + '<div class="pkc-who" id="pkc-who"></div>'
     + '<div class="pkc-msgs" id="pkc-msgs"><div class="pkc-note">Đang tải tin nhắn…</div></div>'
@@ -196,7 +245,7 @@ async function pkcLoad(full) {
     if (_pkc.phone !== ph) return;   // đã chuyển sang khách khác
     if (!j || j.error) { P.err = _pkcAuthFail(j) ? 'Phiên đăng nhập đã hết hạn — đăng nhập lại để xem tin nhắn.' : ((j && j.error) || 'Không tải được chat.'); _pkcStatus(); return; }
     _pkcAuthShown = false; P.err = ''; P.okAt = _pkcHm(new Date().toISOString()); P.gv = j.gv || '';
-    P.convs = j.conversations || []; _pkTagApplyOv(P.convs);
+    P.convs = j.conversations || []; _pkTagApplyOv(P.convs); _pkSeenApplyOv(P.convs);
     if (full) P.msgs = {};
     (j.messages || []).forEach(function (m) { (P.msgs[m.c] = P.msgs[m.c] || {})[m.id] = m; if (m.at && (!P.after || m.at > P.after)) P.after = m.at; });
     if (!P.active || !P.convs.some(function (c) { return c.id === P.active; })) P.active = P.convs.length ? P.convs[0].id : '';
@@ -223,7 +272,7 @@ function _pkcRender(forceBottom) {
   var near = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
   var comp = document.getElementById('pkc-compose'), lk = document.getElementById('pkc-link'), mt = document.getElementById('pkc-meta');
   if (mt) mt.innerHTML = _pkcMetaRow(P.convs.filter(function (c) { return c.id === P.active; })[0]);
-  pkTagBarRender('pkc-tags'); var wh = document.getElementById('pkc-who'); if (wh) wh.innerHTML = _pkcWhoHtml(P.msgs[P.active]);
+  pkSeenRender('pkc'); pkTagBarRender('pkc-tags'); var wh = document.getElementById('pkc-who'); if (wh) wh.innerHTML = _pkcWhoHtml(P.msgs[P.active]);
   if (!P.active) {
     box.innerHTML = '<div class="pkc-note">Chưa có hội thoại Pancake nào gắn với SĐT này.<br>Nếu khách đã nhắn Pancake, bấm "Gắn hội thoại" bên dưới, tìm theo tên trên Pancake rồi gắn.</div>';
     if (comp) comp.style.display = 'none'; if (lk) lk.open = true; _pkcStatus(); return;
