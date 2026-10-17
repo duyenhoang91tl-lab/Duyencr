@@ -332,18 +332,36 @@ function _srSaveHiddenPanel(){
 }
 
 function _srComboInit(domId, field, optKey){ _srComboReg[domId] = { field: field, optKey: optKey }; }
+// Danh sách Sale do việc chọn Team điền vào (khác danh sách người dùng tự chọn) — nhớ chữ ký để khi BỎ HẾT Team thì gỡ đúng danh sách đó,
+// còn nếu người dùng đã tự sửa Sale sau khi chọn Team thì giữ nguyên. Trước đây bỏ Team không gỡ Sale -> báo cáo vẫn lọc theo Team cũ (nguyên nhân 'lọc Team sai').
+function _srSaleSig_(arr){ return JSON.stringify((arr || []).slice().sort()); }
+function _srClearAutoSale_(saleField){
+  var sig = _srState['_autoSaleSig_' + saleField];
+  if (sig && _srSaleSig_(_srState[saleField]) === sig) {
+    _srState[saleField] = [];
+    if (saleField === 'eSale') _srState.eSaleCustomized = true;
+    if (saleField === 'gSale') _srState.gSaleCustomized = true;
+  }
+  _srState['_autoSaleSig_' + saleField] = '';
+  if (_srState._teamSyncInfo) delete _srState._teamSyncInfo[saleField];
+}
 function _srSyncTeamToSale_(teamField){
   var saleField = _srTeamFieldToSaleField_[teamField];
   if (!saleField) return;
   var selTeams = _srState[teamField] || [];
-  if (!selTeams.length) return;
+  if (!selTeams.length) { _srClearAutoSale_(saleField); return; }
   var union = [];
   var notFound = [];
+  var _people = [];   // MỖI thành viên Team = 1 NGƯỜI: { name: tên ghi trong Team, names: mọi tên/thẻ cùng người } — để báo thiếu theo NGƯỜI, không theo từng tên phụ
   selTeams.forEach(function(tname){
     var want = String(tname||'').trim().toLowerCase();
     var t = (teams||[]).find(function(x){ return String(x.name || '(chưa đặt tên)').trim().toLowerCase() === want; });
     if (!t) { notFound.push(tname); return; }
-    [t.leader].concat(t.members||[]).filter(Boolean).forEach(function(n){ (_personAliases(n) || [n]).concat([n]).forEach(function(a){ if (a && union.indexOf(a)===-1) union.push(a); }); });   // gồm mọi thẻ/tên cùng người
+    [t.leader].concat(t.members||[]).filter(Boolean).forEach(function(n){
+      var grp = []; (_personAliases(n) || [n]).concat([n]).forEach(function(a){ if (a && grp.indexOf(a)===-1) grp.push(a); });   // gồm mọi thẻ/tên cùng người
+      _people.push({ name: n, names: grp });
+      grp.forEach(function(a){ if (union.indexOf(a)===-1) union.push(a); });
+    });
   });
   // KHONG ghi de bo loc Sale bang mang RONG: backend coi mang Sale rong = KHONG LOC GI (hien het
   // du lieu) -> user tuong dang loc theo Team ma thuc ra dang xem toan bo. Neu khong khop duoc Team
@@ -356,12 +374,28 @@ function _srSyncTeamToSale_(teamField){
   // (hoa/thường, dấu, khoảng trắng) hoặc không có trong nguồn → bộ lọc ra 0 đơn → doanh thu 0đ.
   // Nên với MỌI báo cáo: đổi tên Team sang đúng tên trong danh sách Sale của báo cáo đó, bỏ tên không có thật và báo rõ.
   var _srcOpts = (saleField === 'eSale' || saleField === 'fSale' || saleField === 'bSale') ? (_srState.saleBOptions||[]) : (_srState.saleOptions||[]);
+  var _missingAll = [];
   if (_srcOpts.length){
     var _fold = function(x){ return String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/gi,'d').replace(/\s+/g,' ').trim().toLowerCase(); };
     var _canon = {}; _srcOpts.forEach(function(n){ _canon[_fold(n)] = n; });
-    var _kept = [], _missing = [];
-    union.forEach(function(n){ var c = _canon[_fold(n)]; if (c !== undefined) { if (_kept.indexOf(c) === -1) _kept.push(c); } else _missing.push(n); });
-    if (_missing.length) toast('⚠ ' + _missing.length + ' tên trong Team không có trong dữ liệu báo cáo (bỏ qua): ' + _missing.slice(0,6).join(', ') + (_missing.length>6?'...':''));
+    // Tên gõ kiểu "S6 anhtrinh1995" / "6" (số thứ tự sale + thẻ) → bỏ tiền tố "S<số>" và số đứng riêng để khớp đúng thẻ trong dữ liệu.
+    var _stripTag = function(x){ return _fold(x).replace(/^s\d+\s+/, '').replace(/(^|\s)\d+(?=\s|$)/g, ' ').replace(/\s+/g, ' ').trim(); };
+    var _kept = [], _missing = [], _seenMiss = {};
+    var _keepName = function(c){ if (c !== undefined && _kept.indexOf(c) === -1) _kept.push(c); };
+    _people.forEach(function(pp){
+      var hit = false;
+      pp.names.forEach(function(n){
+        var c = _canon[_fold(n)];
+        if (c === undefined) { var st = _stripTag(n); if (st && st !== _fold(n)) c = _canon[st]; }
+        if (c !== undefined) { hit = true; _keepName(c); }
+      });
+      // Chỉ báo "bị bỏ" khi KHÔNG tên/thẻ nào của người đó có trong dữ liệu báo cáo (các tên phụ không khớp nhưng người đó đã có tên khớp thì không phải lỗi).
+      if (!hit && !_seenMiss[_fold(pp.name)]) { _seenMiss[_fold(pp.name)] = 1; _missing.push(pp.name); }
+    });
+    // Tên lẻ trong union không thuộc người nào ở trên (phòng hờ) vẫn được khớp như cũ.
+    union.forEach(function(n){ _keepName(_canon[_fold(n)]); });
+    _missingAll = _missing;
+    if (_missing.length) toast('⚠ ' + _missing.length + ' người trong Team không có tên nào khớp dữ liệu báo cáo (bỏ qua): ' + _missing.slice(0,6).join(', ') + (_missing.length>6?'...':''));
     if (!_kept.length){
       toast('⚠ Không tên nào trong Team khớp tên Sale của báo cáo — giữ nguyên bộ lọc Sale hiện tại. Sửa tên trong "Quản lý Team" cho đúng tên trong báo cáo.');
       return;
@@ -370,6 +404,8 @@ function _srSyncTeamToSale_(teamField){
   }
   if (notFound.length) toast('⚠ Không khớp được Team: ' + notFound.join(', ') + ' — kết quả lọc chỉ gồm các Team còn lại');
   _srState[saleField] = union;
+  _srState['_autoSaleSig_' + saleField] = _srSaleSig_(union);
+  (_srState._teamSyncInfo = _srState._teamSyncInfo || {})[saleField] = { teams: selTeams.slice(), sales: union.slice(), missing: _missingAll.slice(), notFound: notFound.slice() };
   if (saleField === 'eSale') _srState.eSaleCustomized = true;
   if (saleField === 'gSale') _srState.gSaleCustomized = true;
 }
@@ -445,7 +481,7 @@ function srComboClear(e, domId){
   _srState[r.field] = [];
   if (r.field === 'eSale') _srState.eSaleCustomized = true;
   if (r.field === 'gSale') _srState.gSaleCustomized = true;
-  if (_srTeamFieldToSaleField_[r.field]){ renderSalesReportTab(); return; }
+  if (_srTeamFieldToSaleField_[r.field]){ _srSyncTeamToSale_(r.field); renderSalesReportTab(); return; }
   var ci = document.getElementById(domId+'-input'); if (ci) ci.value = '';
   srRenderComboChips(domId);
   var l = document.getElementById(domId+'-list');
@@ -605,6 +641,20 @@ function _srCloseRateGroups_(keyFn, hiddenSet){
 function _srCloseRateBySale_(){ return _srCloseRateGroups_(function(c){ return _heldBy(c) || ''; }, HIDDEN_SALES); }
 function _srCloseRateByKenh_(){ return _srCloseRateGroups_(_srCustKenh_, HIDDEN_CHANNELS); }
 
+// Tỷ lệ chốt TRUNG BÌNH CHUNG = tổng đơn chốt ÷ tổng tương tác Pancake của các dòng có tương tác — CÙNG công thức với dòng "Trung bình" của biểu đồ
+// bên dưới (không phụ thuộc ô tìm nhanh). Đưa lên cụm thẻ tổng đầu báo cáo (Duyên yêu cầu 2026-10-16). Chỉ có khi báo cáo đã nạp được tương tác Pancake (saleCloseRateFrom).
+function _srCloseRateAvg_(rows){
+  var held = 0, closed = 0;
+  (rows||[]).forEach(function(r){ if (r && r.held > 0){ held += r.held; closed += (r.closed||0); } });
+  return { held: held, closed: closed, avg: held ? Math.round(closed/held*1000)/10 : 0, has: held > 0 };
+}
+function _srCloseRateKpiCard_(d){
+  if (!d || !d.saleCloseRateFrom) return '';
+  var a = _srCloseRateAvg_(d.saleCloseRate);
+  if (!a.has) return '';
+  return '<div class="kpi-card" style="border:1.5px solid #0e7490"><div class="kpi-val" style="color:#0e7490">'+a.avg+'%</div>'+
+    '<div class="kpi-label"><b>Tỷ lệ chốt TB</b> ('+fmt(a.closed)+' đơn ÷ '+fmt(a.held)+' tương tác Pancake)</div></div>';
+}
 // Vẽ cột ngang tỷ lệ chốt — xanh/vàng/đỏ theo mức %, kèm số liệu chốt/tổng bên cạnh mỗi cột,
 // và dòng trung bình chung ở trên để dễ đối chiếu nhanh khi chụp màn hình gửi sếp.
 function _srCloseRateBarHtml_(rows, searchTerm, unitLabel, excluded){
@@ -720,14 +770,30 @@ function _srCocTh(){ return _srState.showCoc ? '<th style="text-align:right">C�
 function _srCocTd(v){ return _srState.showCoc ? '<td style="text-align:right">'+_srMoney(v)+'</td>' : ''; }
 function _srCocColspan(base){ return _srState.showCoc ? base : base-1; }
 
+// Báo cáo A ra 0 đơn: hiện bảng chẩn đoán từ backend (diag) — mất ở bước nào (dữ liệu / ngày / trạng thái / kênh / tên Sale) + tên Sale thật trong dữ liệu.
+function _srZeroDiagA_(d){
+  var g = d && d.diag; if (!g || d.totalOrders) return '';
+  var why;
+  if (!g.rows) why = 'Nguồn dữ liệu đơn (DT TỔNG) đang <b>trống</b> — kiểm tra sheet DT TỔNG / đồng bộ Supabase.';
+  else if (!g.inDate) why = 'Có ' + g.rows + ' đơn trong dữ liệu nhưng <b>không đơn nào nằm trong khoảng ngày đã chọn</b> (dữ liệu từ ' + e_(g.dateMin) + ' đến ' + e_(g.dateMax) + (g.badDate ? '; ' + g.badDate + ' dòng sai định dạng ngày, vd “' + e_(g.sampleDate) + '”' : '') + ').';
+  else if (!g.notExcluded) why = 'Trong ngày có ' + g.inDate + ' đơn nhưng <b>tất cả bị loại do trạng thái</b> (Thất bại).';
+  else if (!g.afterKenh) why = 'Còn ' + g.notExcluded + ' đơn nhưng <b>không đơn nào thuộc Kênh đã chọn</b>.';
+  else if (!g.afterSale) why = 'Còn ' + g.afterKenh + ' đơn trong ngày nhưng <b>không đơn nào có Sale trùng bộ lọc Sale</b> (' + g.saleFilterN + ' tên đang lọc). Tên Sale thật trên các đơn đó bên dưới — gắn thẻ/Khớp sale cho đúng tên này.';
+  else why = 'Còn ' + g.afterSale + ' đơn nhưng bị loại ở bộ lọc Sản phẩm.';
+  return '<div class="fp-info" style="margin:0 0 12px"><b>⚠ 0 đơn — vì sao?</b><br>' + why +
+    '<br><span style="font-size:11px;color:var(--muted)">Dòng dữ liệu: ' + g.rows + ' → trong ngày: ' + g.inDate + ' → không bị hủy/trả: ' + g.notExcluded + ' → đúng kênh: ' + g.afterKenh + ' → đúng Sale: ' + g.afterSale + '</span>' +
+    ((g.missNames && g.missNames.length && g.inDate) ? '<br><span style="font-size:11.5px"><b>Tên Sale trên các đơn bị loại (nhiều nhất):</b> ' + g.missNames.map(e_).join(', ') + '</span>' : '') + '</div>';
+}
+function e_(s){ return (typeof esc === 'function') ? esc(s) : String(s == null ? '' : s).replace(/[&<>"']/g, function(ch){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]; }); }
 function _srRenderA(d){
   if (!d) return _srNoDataHtml_();
-  var html = '<div class="kpi-grid" style="margin-bottom:16px">' +
+  var html = _srZeroDiagA_(d) + '<div class="kpi-grid" style="margin-bottom:16px">' +
     '<div class="kpi-card"><div class="kpi-val">'+fmt(d.totalOrders)+'</div><div class="kpi-label">Số lượng đơn</div></div>' +
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalCoc)+'</div><div class="kpi-label">Tổng tiền đã cọc/CK (tham khảo)</div></div>' +
     (d.totalGiaTriChenh ? '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalGiaTriChenh)+'</div><div class="kpi-label">Trong đó: chênh lệch đơn đổi</div></div>' : '') +
     '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+_srMoney(d.totalGiaTri)+'</div><div class="kpi-label"><b>Tổng đơn (doanh thu, ko ship)</b></div></div>' +
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.trungBinhDon)+'</div><div class="kpi-label">Trung bình đơn (Tổng đơn ÷ số đơn)</div></div>' +
+    _srCloseRateKpiCard_(d) +
     '</div>' +
     '<div style="font-size:11px;color:var(--muted);margin:-10px 0 10px">Tổng đơn = cộng dồn "Tổng giá trị đơn hàng" (không ship) của TỪNG đơn + phần "Giá trị chênh lệch" của riêng các đơn đổi hàng — đây mới là số doanh thu chuẩn để đối chiếu, không phải cột Cọc.</div>' +
     '<label style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);margin-bottom:12px;cursor:pointer">'+
@@ -896,6 +962,7 @@ function _srRenderB(d){
     '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+fmt(d.totalOrders)+'</div><div class="kpi-label"><b>Số lượng đơn</b></div></div>' +
     '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+_srMoney(d.totalGiaTri)+'</div><div class="kpi-label"><b>Tổng giá trị đơn hàng sau giảm giá</b></div></div>' +
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(bTb)+'</div><div class="kpi-label">Trung bình đơn</div></div>' +
+    _srCloseRateKpiCard_(d) +
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalCod)+'</div><div class="kpi-label">Tổng COD</div></div>' +
     '</div>';
 

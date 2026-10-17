@@ -31,3 +31,10 @@ Thêm mục mới ở CUỐI, mỗi mục: triệu chứng → nguyên nhân g�
 - **Cách tránh:** trước khi đặt tên hàm/biến toàn cục mới, `grep -rn "\b<ten>\b" js/`. `tools/test-dist-equivalence.js` (chạy trong CI deploy-web) nay **thất bại** nếu trang nạp có `SyntaxError`/"has already been declared". Test từng file bằng jsdom riêng KHÔNG bắt được loại lỗi này.
 - **Chat Pancake mất phiên:** khi GAS trả `code:'AUTH'` (token mất/hết hạn/tài khoản bị khoá) khung chat chỉ ghi "Can dang nhap." nên trông như CRM không đọc được tin. Nay `_pkcAuthFail` (js/41) xoá token cũ và hiện màn hình đăng nhập 1 lần kèm thông báo rõ.
 
+## 2026-10-16 — Danh sách hội thoại Social > Chat vỡ bố cục (thiếu `</div>`)
+- **Triệu chứng:** các dòng hội thoại xếp ngang cạnh nhau, avatar/tên/tin nhắn chồng lên nhau, dòng đầu cao ~300px; so với Pancake chỉ là danh sách gọn từng dòng.
+- **Nguyên nhân gốc:** commit `99129f2` (UI Pro P5a, 12/10) đổi mẫu dòng thành `<div class="sc-conv"><div class="sc-av">…</div><div class="sc-conv-body">…` nhưng cuối mẫu chỉ có MỘT `</div>`. Dòng `.sc-conv` không bao giờ được đóng nên mỗi dòng sau bị lồng vào dòng trước (flex lồng flex → xếp ngang, `.sc-conv-body` rộng 0px).
+- **Sao không ai thấy:** jsdom không có bộ máy layout nên không nhìn ra xếp ngang/chữ bị ép; test chỉ kiểm nội dung chữ. Dùng Chrome thật (`tools/shot-chat-ui.mjs`) mới thấy và đo được (`getBoundingClientRect`).
+- **Cách tránh:** (1) `tools/test-sc-list-markup.js` kiểm cấu trúc: mỗi `.sc-conv` là con TRỰC TIẾP của `#sc-convs`, không lồng nhau, số `<div>` mở = số `</div>`; (2) khi sửa mẫu HTML dạng chuỗi nối `+ '<div …'` luôn đếm lại cặp mở/đóng; (3) lỗi hiển thị thì chụp ảnh bằng Chrome thật trước khi sửa.
+- **Thanh thẻ kiểu Pancake:** lưới ô đặc màu nhỏ gọn (tối đa ~3 hàng rồi cuộn), thẻ đang gắn đậm + ✓, chưa gắn nhạt; mở sẵn như Pancake, bấm "▲ Thu gọn" để lấy lại chỗ cho tin nhắn (nhớ lựa chọn trong `localStorage.ome_pk_tag_open`).
+
