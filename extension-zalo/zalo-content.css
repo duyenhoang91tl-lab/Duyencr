@@ -642,3 +642,28 @@ textarea {
 .zai-tpl-form-box input, .zai-tpl-form-box textarea { width: 100%; box-sizing: border-box; padding: 5px 8px; margin-bottom: 6px; border: 1px solid #ccc; border-radius: 6px; font-size: 12px; line-height: 1.4; resize: vertical; }
 .zai-tpl-bar { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
 .zai-tpl-save:disabled { opacity: .7; }
+
+
+/* Tìm ảnh sản phẩm — đồng bộ với Pancake AI (#pk-img-*, .pk-builder-row) */
+.zai-builder-row { margin-bottom: 6px; }
+.zai-builder-row > label,
+.pk-builder-inline label {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #1e3a8a;
+  margin-bottom: 2px;
+}
+.zai-builder-row select,
+.zai-builder-row input[type="text"],
+.pk-builder-inline select,
+.pk-builder-inline input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 12px;
+  padding: 4px 6px;
+  border: 1px solid #93c5fd;
+  border-radius: 5px;
+  background: #fff;
+}
+#zai-img-status { font-size: 11px; color: #1e3a8a; margin: 4px 0; }
