@@ -80,3 +80,46 @@ Mọi câu **hướng dẫn cách dùng / giải thích cách tính / "bấm… 
 - **Muốn sale nghỉ biến mất khỏi mọi báo cáo → thêm tên vào "Ẩn Sale" ở Cài đặt** (hệ thống KHÔNG có trạng thái "đã nghỉ" riêng).
 - Tỷ lệ chốt A = B do hàm dùng chung `_srCloseRateSectionsFromBase_` (đơn Base, bỏ đơn BH không doanh thu) — xem mục "TỶ LỆ CHỐT" phía trên/dưới. Chạy tay `xemTyLeChotAB` để so kênh + sale của A và B tháng này (log KHOP/LECH).
 - Test: `node tools/test-closerate-ab.js` (hàm thật + chạy `buildSalesReportB_` thật với dữ liệu giả).
+
+## Bảng đơn theo giai đoạn: hiện MÃ BỘ ĐẾM, bấm để sao chép — 2026-10-16
+- Thẻ và tiêu đề modal hiện **mã bộ đếm** (cột U của DT TỔNG, vd `196T10/2026`, `BH196T10/2026`) thay cho id số của Base; đơn chưa có mã bộ đếm lùi về `#id`. Modal còn hàng "Mã đơn Base #id" để tra trên Base. Tìm kiếm khớp cả mã bộ đếm lẫn id.
+- GAS: `ttStageBoard_` gọi `readDTTong_(true)` (đọc thêm cột U) và `_ttBoardBuild_` thêm `maBoDem` vào từng thẻ. Danh sách "Đơn kẹt" ở trang chủ (`ttTodayTasks_`/`_ttStuckFromRows_`) vẫn hiện id số vì không đọc DT TỔNG — nếu cần đổi theo thì phải map id→maBoDem ở đó (tốn thêm 1 lần đọc DT TỔNG).
+- Chip mã (`.sb-code`, js/41) bấm = sao chép (`navigator.clipboard`, dự phòng `execCommand`), `stopPropagation` nên không mở modal. Test: `tools/test-stageboard-bodem.js` (jsdom), `tools/test-stageboard-gas.js`.
+
+## 🔗 Khớp sale (2026-10-15) — 1 chỗ khớp mọi tên của cùng 1 người
+Menu **Cài đặt team → 🔗 Khớp sale** (admin; `js/52-fn-salematch.js`, ACTS.salematch). Quét tên ở: tài khoản + tên CRM (Users), Quản lý tài khoản (mã Sale / TK Facebook / user Base / thẻ Pancake), Pancake (`pancakeAllNames_` + PancakeNameMap), Base (Sale bán + Người tạo của DT TỔNG), Pos (cột Thẻ) — kèm số lần xuất hiện (GET `saleMatchCandidates`, chỉ admin/manager theo token phiên). 3 tab: **Đã khớp** (nhóm, đổi tên chính, thêm/bỏ tên, tách nhóm; mục "Hệ thống tự gộp" cho tên đã tự hiểu cùng người qua Users/Quản lý tài khoản/PancakeMap → bấm "Cố định thành nhóm"), **Chưa khớp** (tick nhiều tên → Gộp vào nhóm có sẵn hoặc người mới), **Gợi ý** (tên giống nhau sau khi bỏ dấu/khoảng trắng/số đuôi nhưng chưa cùng người).
+- **Lưu ở `salePersonTags`** = `{ "<tên chính>": ["tên khác", ...] }` — CÙNG kho với "Thẻ nhân viên" cũ (`js/50-person-tags.js`), nên backend `_userAliasGroups_` → `_salePersonKeyFn_` (union-find) và `_expandSaleFilterWithPancakeAliases_` đọc sẵn: lọc Sale/Team, bảng "Theo Team", báo cáo A/B/E/F/G, Ẩn Sale đều dùng chung, 2 chiều. Mỗi tên chỉ ở 1 nhóm.
+- **Sửa lỗi "lọc Team vẫn sai":** `_expandSaleFilterWithPancakeAliases_` trước đây mở rộng 1 LẦN theo thứ tự cố định (PancakeMap → Users/thẻ → SaleDirectory) nên chuỗi A~B (thẻ) rồi B~C (SaleDirectory) hoặc chọn tên Pancake chỉ ra đủ tuỳ thứ tự. Nay nạp 3 nguồn 1 lần rồi LẶP đến khi hết tên mới (≤10 vòng); PancakeMap chiều ngược chỉ khi 1-1 (dòng `saleA|saleB` không gộp 2 người).
+- Test: `node tools/test-salematch.js` (backend) + `node tools/test-salematch-ui.js` (giao diện, cần jsdom).
+
+## Chẩn đoán "Tỷ lệ chốt theo Sale" ra sai — `chanDoanTyLeChot` (2026-10-16)
+- **Quy tắc đang chạy (không phải lỗi, nhưng hay gây hiểu nhầm):** biểu đồ "Tỷ lệ chốt theo Sale" (Báo cáo A và B dùng chung `_srCloseRateSectionsFromBase_`) đếm đơn theo **NGƯỜI TẠO (cột B DT TỔNG)**, KHÔNG theo "Sale bán". Bảng "Theo Sale bán" bên trái đếm theo Sale bán nên số hai bên **vốn không khớp** (vd ninhnga99 87 đơn ở bảng, 65 ở tỷ lệ chốt).
+- Một đơn **không tính cho sale nào** khi: (a) kênh bán chưa gán Page Pancake hoặc Page chưa nạp tương tác ngày tạo đơn (`_srOrderCovered_`) → không đếm đơn đó ở đâu cả; (b) người tạo không khớp tên nào có tương tác Pancake / Danh sách Sale (qua `_salePersonKeyFn_`) → dồn vào "(chưa gán sale)"; (c) đơn BH 0đ / trạng thái loại / ngoài kỳ.
+- **Chạy tay trong Apps Script Editor: `chanDoanTyLeChot`** (tháng này; chỉ đọc + Logger.log). In 3 khối: (A) đơn không được đếm theo kênh/ngày, (B) tên người tạo không khớp + số đơn, (C) từng người: tương tác Pancake, đơn theo người tạo, đơn theo sale bán, số đơn LỆCH. Gửi log này để biết lỗi nằm ở tên người tạo hay ở kênh/Page. Lõi: `_tlcDiagnose_` (lặp lại đúng quy tắc trên).
+- Test: `node tools/test-closerate-diag.js` (chạy hàm thật; đối chiếu với `_srCloseRateSectionsFromBase_` thật: cùng số).
+
+## Tỷ lệ chốt: chọn cách gán đơn cho sale — `closeRateBy` (2026-10-16, Duyên chốt)
+- **Nguyên nhân gốc (log `chanDoanTyLeChot` tháng 10):** tỷ lệ chốt đếm đơn theo NGƯỜI TẠO nên lệch bảng "Theo Sale bán" (vd anhtrinh1995 52 đơn Sale bán nhưng 0 đơn người tạo vì người tạo là `anhTP1995`, tên chưa khớp). 66 đơn "(chưa gán sale)" = 47 đơn `anhTP1995` + 19 đơn `minhquach95`. 197/596 đơn không được đếm vì kênh chưa gán Page Pancake (Bảo hành, Zalo CSKH, BH tại quầy, Fb Phạm Thu Hiền...) — **đúng thiết kế**, tỷ lệ chốt chỉ tính kênh Pancake.
+- **Lỗi code phát hiện:** chế độ người tạo nhận diện "người tạo có phải sale" bằng `_salePersonKeyFn_` KHÔNG có gộp tên mồ côi, nên `minhquach95` bị loại thành "(chưa gán)" dù quy ước gộp tên (`minhquach95` → `minhquach1995`) vốn áp dụng được. Đã sửa: dùng `_salePersonKeyWithOrphanFold_` ở bước nhận diện.
+- **Cách gán đơn nay chọn được:** Settings `closeRateBy` (hàm `_closeRateBy_`): **`saleban` (MẶC ĐỊNH)** = mỗi sale ghi ở cột "Sale bán" của đơn được +1 đơn (đơn 2 sale tính cho cả 2, giống bảng bên trái); `nguoitao` = chỉ người tạo (cột B). Đổi trong Apps Script Editor: `datTyLeChotTheo('saleban')` / `datTyLeChotTheo('nguoitao')` (báo cáo có thể cache vài phút). Dùng chung cho Báo cáo A và B (`_srCloseRateSectionsFromBase_`). Kênh vẫn đếm mọi đơn.
+- Số Sale bán trong tỷ lệ chốt vẫn **ít hơn** bảng bên trái vì chỉ đếm đơn của kênh có Page Pancake đã nạp tương tác ngày đó. `chanDoanTyLeChot` in cả hai cột + tỷ lệ theo cả hai cách để so.
+- Tên người tạo `anhTP1995` cần khớp tay (🔗 Khớp sale) nếu muốn dùng chế độ `nguoitao` — không tự đoán được từ tên.
+- Test: `node tools/test-closerate-diag.js` (cả 2 chế độ + gộp `minhquach95` + chẩn đoán, chạy hàm thật), `node tools/test-close-rate-base.js`.
+
+## Thẻ "Tỷ lệ chốt TB" ở đầu Báo cáo A và B (2026-10-16)
+- Duyên yêu cầu đưa **tỷ lệ chốt trung bình chung** lên cụm thẻ tổng đầu báo cáo (trước đây chỉ có ở dòng "Trung bình: x% (đơn/tương tác)" trong biểu đồ "Tỷ lệ chốt theo Sale").
+- `js/11-fn-srload.js`: `_srCloseRateAvg_(rows)` (= Σ đơn chốt ÷ Σ tương tác Pancake của các dòng có tương tác, 1 chữ số thập phân — CÙNG công thức dòng "Trung bình" của biểu đồ, không phụ thuộc ô tìm nhanh, đơn mồ côi/"(chưa gán sale)" không tính) và `_srCloseRateKpiCard_(d)` (viền xanh ngọc, chỉ vẽ khi báo cáo đã nạp Pancake `saleCloseRateFrom` và có tương tác). Gọi trong `_srRenderA` và `_srRenderB`.
+- Xuất Excel Báo cáo A/B (`js/13-...`) thêm 2 dòng ở sheet Tổng quan: "Tỷ lệ chốt TB (%)" và "Đơn chốt ÷ tương tác Pancake".
+- Test: `node tools/test-closerate-kpi-card.js`. Chỉ đổi JS web — Ctrl+F5, không cần deploy lại GAS.
+
+## Tỷ lệ chốt theo Sale: MẪU SỐ chỉ tính Page đã khớp Kênh bán (2026-10-15)
+Công thức (Duyên chốt): **Tỷ lệ chốt = số đơn Base do Sale TẠO (cột B "Người tạo") ÷ số tương tác trên Page Pancake TƯƠNG ỨNG** — tử số và mẫu số cùng phạm vi Page.
+- Tử số: đơn của người tạo ở Kênh bán có Page Pancake đã khớp (🔗 Khớp Page ↔ Kênh bán) VÀ có dữ liệu tương tác đúng ngày đó (`_srOrderCovered_`); đơn kênh không có Page (Zalo cá nhân, Bảo hành, Tiktok, "Fb Phạm Thu Hiền" khi chưa khớp Page...) KHÔNG tính.
+- Mẫu số (SỬA): trước đây bảng "theo Sale" cộng tương tác của TẤT CẢ Page (`byCS.tongTT`) → Page chưa khớp kênh làm phình mẫu số mà không có đơn tương ứng → tỷ lệ thấp, lệch giữa bảng theo Sale với bảng theo Kênh / Sale×Page (hai bảng này vốn đã chỉ lấy Page có kênh) và lệch giữa báo cáo tháng với báo cáo ngày. Nay `buildPancakeReport_` trả thêm `byCS[].tongTTMapped` (chỉ tương tác ở Page có trong `PancakePageMap`, chia đều như `split='equal'`) + `byPage[].kenh` + `pageMapped`, và `_srCloseRateSections_` dùng `tongTTMapped` làm mẫu số (khi `pageMapped=false` dùng `tongTT` như cũ). Phần ở Page chưa khớp được trả qua `closeExcluded` ({tongTT, pages}) → UI báo trong khung ẩn 👁 ("N tương tác ở M Page chưa khớp kênh (không tính)"). Chưa khớp Page nào (map rỗng) → giữ cách cũ (tất cả Page) để không ra toàn 0.
+- Ảnh hưởng: `saleCloseRate` còn dùng xét THƯỞNG theo tỷ lệ chốt (`_resolveBonusSale_`/chương trình thưởng) → tỷ lệ đúng hơn thì thưởng cũng tính theo mẫu số mới.
+- Muốn đơn kênh "Fb Phạm Thu Hiền" tính: khớp kênh đó với đúng Page Pancake có dữ liệu tương tác (🔗 Khớp Page Pancake ↔ Kênh bán CRM), KHÔNG sửa công thức.
+- Test: `node tools/test-close-rate-mapped.js` (chạy hàm thật với 66 đơn Base ngày 15/10/2026: ninhnga99 7/150 thay vì 7/203, huyenmaii1990 2/190 thay vì 2/213).
+
+## Tổng quan: thẻ "Doanh thu Pos" (2026-10-16)
+`js/42-fn-homesummary.js` — thẻ 💰 lấy **tổng của Báo cáo B** (`totalGiaTri` / `totalOrders` của action `salesReportB`, cùng lần gọi với "Nguồn khách"): TOÀN CÔNG TY khi không lọc Phòng/Team/tên, theo bộ lọc khi có lọc (ghi rõ "toàn công ty" / "theo bộ lọc"). Lỗi trước đó: thẻ lấy `c.revenue` từ `_ovAgg` (cộng số theo từng người của Tổng quan) nên hiện 0đ trong khi Nguồn khách hiện hàng tỷ. Đang tải hiện "…", lỗi tải B hiện "—" (không bao giờ hiện 0đ giả). Test: `node tools/test-home-revenue.js` (jsdom).
+

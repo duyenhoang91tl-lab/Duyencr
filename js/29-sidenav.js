@@ -40,9 +40,9 @@
     { k:'tv',  t:'🧰 Tác vụ',               ids:['tab-zaloai','act:bc','act:bct','act:bcstat','act:futpl','act:bday'] },
     { k:'rp',  t:'📊 Báo cáo',              ids:['salesreport','pancake','kpipancake','mktchecklist','dailybrief','dashboard','act:fureport','act:teamai'] },
     { k:'cs',  t:'🔀 Cài đặt chia số',      ids:['act:assign','act:autoassign','act:assignhist'] },
-    { k:'tm',  t:'👥 Cài đặt team',         ids:['team','act:acct'] },
+    { k:'tm',  t:'👥 Cài đặt team',         ids:['team','act:salematch','act:acct'] },
     { k:'up',  t:'📤 Up data',              ids:['uploaddata','act:upload','act:sync','act:fullsync','act:dup'] },
-    { k:'st',  t:'⚙ Settings',              ids:['act:roles','act:dept','act:help','act:theme','act:errlog','config','act:cstatus','act:khstatus','act:cfield','act:tier','audit','act:clear','act:taskflow'] }
+    { k:'st',  t:'⚙ Settings',              ids:['act:roles','act:dept','act:help','act:theme','act:errlog','config','act:cstatus','act:khstatus','act:cfield','act:tier','act:promo','audit','act:clear','act:taskflow'] }
   ];
   // Mục "hành động" (mở modal có sẵn, không phải tab). admin:true = chỉ tài khoản admin thấy.
   var ACTS = {
@@ -54,6 +54,7 @@
     notif:      { t:function(){ return (typeof _ntLabel==='function') ? _ntLabel() : '🔔 Thông báo'; }, f:'openNotifModal' },
     kho:        { t:'📦 Tồn kho', f:'openKhoModal' },
     profile:    { t:'🪪 Hồ sơ nhân viên', f:'openProfileModal' },
+    salematch:  { t:'🔗 Khớp sale', f:'openSaleMatchModal', admin:true },
     acct:       { t:'🔑 Tài khoản đăng nhập', f:'openAcctModal', admin:true },
     taskflow:   { t:'🧩 Quy trình công việc', f:'openTaskFlowManager', admin:true },
     assign:     { t:'👥 Chia data', f:'openAssignModal', admin:true },
@@ -73,6 +74,7 @@
     cstatus:    { t:function(){ return '⚙ ' + (typeof FIELD_LABEL_CS!=='undefined'?FIELD_LABEL_CS:'Tình trạng chăm sóc'); }, f:'openCareStatusModal', admin:true },
     khstatus:   { t:function(){ return '⚙ ' + (typeof FIELD_LABEL_KH!=='undefined'?FIELD_LABEL_KH:'Trạng thái KH'); }, f:'openKhStatusModal', admin:true },
     tier:       { t:'🏅 Cấu hình hạng KH', f:'openTierConfig', admin:true },
+    promo:      { t:'🎁 Cấu hình khuyến mãi', f:'openPromoConfig', admin:true },
     cfield:     { t:'➕ Trường tự tạo', f:'openCustomFieldsModal', admin:true },
     clear:      { t:'🧹 Xóa data trên máy', f:'clearData', admin:true }
   };

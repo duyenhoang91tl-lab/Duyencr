@@ -58,7 +58,7 @@ async function scLoadList() {
   try {
     var j = await (await fetch(_pkcUrl('action=pkChatInbox' + (_sc.q ? '&q=' + encodeURIComponent(_sc.q) : '')), { redirect: 'follow' })).json();
     if (!j || j.error) { _sc.err = _pkcAuthFail(j) ? 'Phiên đăng nhập đã hết hạn — đăng nhập lại để xem tin nhắn.' : ((j && j.error) || 'Không tải được hộp thư.'); _scStatus(); return; }
-    _pkcAuthShown = false; _sc.err = ''; _sc.okAt = _pkcHm(new Date().toISOString()); _sc.gv = j.gv || ''; _sc.convs = j.conversations || []; _pkTagApplyOv(_sc.convs);
+    _pkcAuthShown = false; _sc.err = ''; _sc.okAt = _pkcHm(new Date().toISOString()); _sc.gv = j.gv || ''; _sc.convs = j.conversations || []; _pkTagApplyOv(_sc.convs); _pkSeenApplyOv(_sc.convs);
     _scRenderList(); _scStatus();
   } catch (e) { _sc.err = 'Không kết nối được máy chủ.'; _scStatus(); }
   finally { _sc.loading = false; }
@@ -73,17 +73,18 @@ function _scRenderList() {
       + (c.assignees && c.assignees.length ? '<div class="sc-conv-s">\ud83d\udc64 ' + _pkcEsc(c.assignees.join(', ')) + '</div>' : '')   // ten sale phu trach (pk_staff); chua co ten -> khong hien, KHONG lo uuid
       + '<div class="sc-conv-t">' + _pkcEsc(c.lastText || '') + '</div>'
       + (c.tags && c.tags.length ? '<div class="sc-conv-g">' + _pkcTagsHtml(c.tags, 3) + '</div>' : '')
-      + (c.seen === false ? '<i class="sc-dot"></i>' : '') + '</div>';
+      + (c.seen === false ? '<i class="sc-dot"></i>' : '') + '</div>' + (typeof _pkSeenBtnHtml === 'function' ? _pkSeenBtnHtml(c, 'sc-seenbtn') : '') + '</div>';   // dong 1: dong .sc-conv-body, dong 2: dong .sc-conv. Thieu cai thu 2 thi moi dong bi long vao dong truoc
   }).join('') : '<div class="pkc-note">Không có hội thoại nào.</div>';
   var hm = document.getElementById('sc-head-m');
   if (hm) hm.innerHTML = _pkcMetaRow(_sc.convs.filter(function (x) { return x.id === _sc.active; })[0]);
-  pkTagBarRender('sc-tags');
+  pkTagBarRender('sc-tags'); if (typeof pkSeenRender === 'function') pkSeenRender('sc');
 }
 function scPick(id) {
   _sc.active = id; _scRenderList();
   var c = _sc.convs.filter(function (x) { return x.id === id; })[0] || {};
   var h = document.getElementById('sc-head');
   if (h) h.innerHTML = '<button class="btn sm sc-back" onclick="scBack()">←</button><b>' + _pkcEsc(c.name || 'Khách Pancake') + '</b>' + (c.phone ? ' <span class="pkc-ph">' + _pkcEsc(c.phone) + '</span> <button class="btn sm" onclick="scOpenProfile()">👤 Mở hồ sơ</button>' : ' <span class="pkc-ph">chưa gắn SĐT</span>') + (typeof _ovIsAdmin === 'function' && _ovIsAdmin() ? ' <button class="btn sm" onclick="scDiag()" title="Chẩn đoán thẻ / tên nhân viên (chỉ admin)">🔍 Chẩn đoán</button>' : '') + '<div class="sc-head-m" id="sc-head-m">' + _pkcMetaRow(c) + '</div>';
+  if (typeof pkSeenRender === 'function') pkSeenRender('sc');   // nut Danh dau chua doc/da doc o dau khung chat
   var cp = document.getElementById('sc-compose'); if (cp) cp.style.display = (c.type === 'COMMENT') ? 'none' : '';
   var wh0 = document.getElementById('sc-who'); if (wh0) wh0.innerHTML = '';
   var box = document.getElementById('sc-main'); if (box) box.classList.add('has-conv');

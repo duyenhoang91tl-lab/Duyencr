@@ -39,8 +39,13 @@ const MSGS = [{ id: 'm1', c: 'C1', dir: 'in', text: 'Cho m xin giá', at: '2026-
   t('dong "Da chat": Le Ninh 2, Lan 1 (tin chi co ten page khong tinh)', /Đã chat/.test($('sc-who').textContent) && /Le Ninh\s*2/.test($('sc-who').textContent) && /Lan\s*1/.test($('sc-who').textContent) && !/Hiền Tour/.test($('sc-who').textContent));
   t('"Da chat": nguoi nhieu tin hon dung truoc', $('sc-who').textContent.indexOf('Le Ninh') < $('sc-who').textContent.indexOf('Lan'));
   t('tai danh sach the cua page khi hien thanh the (1 lan)', tagsGets === 1 && log.some(x => x.u && x.u.includes('action=pkChatTags&pageId=P1')));
-  t('bang chon dong luc dau', !$('sc-tags').querySelector('.pkt-pal'));
+  t('luoi the MO san nhu Pancake (mac dinh)', !!$('sc-tags').querySelector('.pkt-pal') && /Thu gọn/.test($('sc-tags').textContent));
+  t('o the dac mau (bien --c), the chua gan nhat hon the dang gan', /--c:\s*#bd2727/.test($('sc-tags').innerHTML) && w.getComputedStyle !== undefined);
   w.pkTagOpen('sc-tags'); await sleep(10);
+  t('bam "Thu gon": an luoi, giu thanh the dang gan', !$('sc-tags').querySelector('.pkt-pal') && /Gắn thẻ/.test($('sc-tags').textContent) && $('sc-tags').innerHTML.includes('L1. Chuẩn ✕'));
+  t('lua chon thu gon duoc nho (lan sau mo CRM van thu gon)', w.localStorage.getItem('ome_pk_tag_open') === '0' && w.eval('_pkTagWantOpen()') === false);
+  w.pkTagOpen('sc-tags'); await sleep(10);
+  t('mo lai: luoi hien + nho lua chon mo', !!$('sc-tags').querySelector('.pkt-pal') && w.localStorage.getItem('ome_pk_tag_open') === '1');
   const chips = () => [...$('sc-tags-list').querySelectorAll('.pkt-chip')];
   t('mo bang: du 4 the cua page', chips().length === 4);
   t('the dang gan co dau ✓ va to mau', chips().find(c => c.textContent.includes('L1. Chuẩn')).className.includes('pkt-on') && chips().find(c => c.textContent.includes('L1')).textContent.startsWith('✓'));
@@ -96,7 +101,7 @@ const MSGS = [{ id: 'm1', c: 'C1', dir: 'in', text: 'Cho m xin giá', at: '2026-
   routes['action=pkChat&'] = () => ({ ok: true, phone: '0867321246', conversations: [Object.assign(conv(), { tags: serverTags.map(x => ({ ...x })) })], messages: MSGS });
   await w.pkcLoad(true); await sleep(40);
   t('ho so khach: thanh the + "Da chat" cung hien', $('pkc-tags').innerHTML.includes('L1. Chuẩn ✕') && /Le Ninh\s*2/.test($('pkc-who').textContent));
-  tagPosts.length = 0; w.pkTagOpen('pkc-tags'); await sleep(10); await w.pkTagToggle('pkc-tags', '5'); await sleep(10);
+  tagPosts.length = 0; await w.pkTagToggle('pkc-tags', '5'); await sleep(10);
   t('ho so khach: gan the hoat dong (POST + hien)', tagPosts.length === 1 && tagPosts[0].tagId === '5' && $('pkc-meta').innerHTML.includes('Trả hàng'));
   // ---- khong co hoi thoai -> an thanh the ----
   routes['action=pkChat&'] = () => ({ ok: true, phone: '0867321246', conversations: [], messages: [] }); await w.pkcLoad(true); await sleep(20);
