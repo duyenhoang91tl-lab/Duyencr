@@ -15,7 +15,7 @@ function qrPillsHtml_(selectedKey, expr, opts){
   var h = '<span class="qr-pills" role="group" aria-label="Chọn nhanh khoảng ngày"' + (opts && opts.style ? ' style="' + qrAttr_(opts.style) + '"' : '') + '>';
   QR_MAIN_.forEach(function(key){ if (label[key]) h += '<button type="button" class="qr-b' + (k === key ? ' on' : '') + '" value="' + key + '" onclick="qrPick_(this);' + e + '">' + qrAttr_(label[key]) + '</button>'; });
   var others = all.filter(function(o){ return QR_MAIN_.indexOf(o.v) === -1; }), otherSel = others.some(function(o){ return o.v === k && k !== 'custom'; });
-  h += '<select class="qr-more' + (otherSel ? ' on' : '') + '" aria-label="Mốc khác" onchange="if(!this.value)return;qrPick_(this);' + e + '"><option value=""' + (otherSel ? '' : ' selected') + '>Khác ▾</option>' +
+  h += '<select class="qr-more' + (otherSel ? ' on' : '') + '" aria-label="Mốc khác" onchange="if(!this.value)return;qrPick_(this);' + e + '"><option value=""' + (otherSel ? '' : ' selected') + '>Khác</option>' +
     others.map(function(o){ return '<option value="' + o.v + '"' + (otherSel && o.v === k ? ' selected' : '') + '>' + qrAttr_(o.l) + '</option>'; }).join('') + '</select></span>';
   return h;
 }
