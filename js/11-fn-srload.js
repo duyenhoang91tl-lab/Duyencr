@@ -772,7 +772,18 @@ function _srCocColspan(base){ return _srState.showCoc ? base : base-1; }
 
 // Báo cáo A ra 0 đơn: hiện bảng chẩn đoán từ backend (diag) — mất ở bước nào (dữ liệu / ngày / trạng thái / kênh / tên Sale) + tên Sale thật trong dữ liệu.
 function _srZeroDiagA_(d){
-  if (d && !d.totalOrders && !d.diag) return '<div class="fp-info" style="margin:0 0 12px"><b>⚠ 0 đơn</b> — máy chủ <b>không trả phần chẩn đoán</b> (bản backend GAS chạy thật chưa phải bản mới, hoặc Worker đang trả bản cache cũ). Thử mở CRM với đuôi <code>?worker=0</code> (gọi thẳng Apps Script, bỏ qua cache Worker) rồi lọc lại; nếu khung này vẫn hiện thì bản GAS đang chạy chưa có chẩn đoán.</div>';
+  if (d && !d.totalOrders && !d.diag) {
+    // Tự hỏi backend (action=count -> ver) rồi ghi vào khung: cho biết bản GAS đang chạy THẬT + web đang gọi qua Worker hay thẳng Apps Script.
+    setTimeout(function(){
+      var el = document.getElementById('sr-ver-probe'); if (!el) return;
+      var via = (typeof GAS_URL_DIRECT !== 'undefined' && gsUrl === GAS_URL_DIRECT) ? 'gọi THẲNG Apps Script' : 'gọi qua Worker cache';
+      fetch(gsUrl + (gsUrl.indexOf('?') >= 0 ? '&' : '?') + 'action=count&_=' + Date.now(), { redirect: 'follow' }).then(function(r){ return r.text(); }).then(function(t){
+        var j = null; try { j = JSON.parse(t); } catch (e) {}
+        el.textContent = j && j.ver ? ('Bản backend đang chạy: ' + j.ver + ' (' + via + '). Bản mới nhất có chẩn đoán là v13.56-diagA' + (j.ver === 'v13.56-diagA' ? ' → ĐÃ là bản mới.' : ' → CHƯA phải bản mới.')) : ('Không đọc được phiên bản backend (' + via + '): ' + String(t).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').slice(0, 140));
+      }).catch(function(er){ el.textContent = 'Không gọi được backend (' + via + '): ' + (er && er.message || er); });
+    }, 0);
+    return '<div class="fp-info" style="margin:0 0 12px"><b>⚠ 0 đơn</b> — máy chủ <b>không trả phần chẩn đoán</b> (bản backend GAS chạy thật chưa phải bản mới, hoặc Worker đang trả bản cache cũ).<br><span id="sr-ver-probe" style="font-size:12px"><i>Đang kiểm tra phiên bản backend…</i></span></div>';
+  }
   var g = d && d.diag; if (!g || d.totalOrders) return '';
   var why;
   if (!g.rows) why = 'Nguồn dữ liệu đơn (DT TỔNG) đang <b>trống</b> — kiểm tra sheet DT TỔNG / đồng bộ Supabase.';
