@@ -282,7 +282,7 @@ function doGetCore_(e) {
                  sanPham: pA.sanPham || '',
                  byCreator: pA.byCreator === '1' || pA.byCreator === 'true' };
       var cacheA = CacheService.getScriptCache();
-      var cKeyA = 'salesA_' + JSON.stringify(fA);
+      var cKeyA = _reportCacheKey_('salesA_', fA);
       var cachedA = cacheA.get(cKeyA);
       if (cachedA) { try { return jsonOut_(JSON.parse(cachedA)); } catch(ec) {} }
       var resA = buildSalesReportA_(fA);
@@ -316,7 +316,7 @@ function doGetCore_(e) {
                  sale: splitG_(pG.sale), nguon: splitG_(pG.nguon), marketer: splitG_(pG.marketer),
                  sanPham: pG.sanPham || '' };
       var cacheG = CacheService.getScriptCache();
-      var cKeyG = 'salesG_pos3_' + JSON.stringify(fG);
+      var cKeyG = _reportCacheKey_('salesG_pos3_', fG);
       var cachedG = cacheG.get(cKeyG);
       if (cachedG) { try { return jsonOut_(JSON.parse(cachedG)); } catch(ec) {} }
       var resG = buildFailedOrderReport_(fG);
@@ -332,7 +332,7 @@ function doGetCore_(e) {
                  careStatus: splitCSV_(pB.careStatus), khStatus: splitCSV_(pB.khStatus),
                  zaloStatus: splitCSV_(pB.zaloStatus), nickZalo: pB.nickZalo || '' };
       var cacheB = CacheService.getScriptCache();
-      var cKeyB = 'salesB4_' + JSON.stringify(fB);
+      var cKeyB = _reportCacheKey_('salesB4_', fB);
       var cachedB = cacheB.get(cKeyB);
       if (cachedB) { try { return jsonOut_(JSON.parse(cachedB)); } catch(ec) {} }
       var resB = buildSalesReportB_(fB);
@@ -363,7 +363,7 @@ function doGetCore_(e) {
                  sanPham: pC.sanPham || '',
                  byCreator: pC.byCreator === '1' || pC.byCreator === 'true' };
       var cacheC = CacheService.getScriptCache();
-      var cKeyC = 'salesC_' + JSON.stringify(fC);
+      var cKeyC = _reportCacheKey_('salesC_', fC);
       var cachedC = cacheC.get(cKeyC);
       if (cachedC) { try { return jsonOut_(JSON.parse(cachedC)); } catch(ec) {} }
       var resC = buildSalesReportC_(fC);

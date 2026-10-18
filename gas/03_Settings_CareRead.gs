@@ -1199,6 +1199,15 @@ function _scopeGate_(action, token, phone) {
   } catch (e) {}
   return null;
 }
+// KHOA CACHE BAO CAO (A/B/C/G): CacheService chi nhan khoa <= 250 ky tu, vuot thi NEM LOI "Argument too large: key" ngay o cache.get (khong nam trong try).
+// NGUYEN NHAN GOC Bao cao A ra 0 don (Duyen 17-18/10/2026): khoa = prefix + JSON.stringify(bo loc) chua ten 16-17 Sale (>250 ky tu) => moi lan loc nhieu Sale/Team deu loi
+// 'Doi so qua lon: key' va giao dien ve toan so 0. Khoa ngan (<=200) GIU NGUYEN nhu cu; khoa dai -> prefix + 'h_' + MD5 cua JSON (cung bo loc => cung khoa).
+function _reportCacheKey_(prefix, filters) {
+  var js = JSON.stringify(filters);
+  if ((prefix + js).length <= 200) return prefix + js;
+  var d = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, js, Utilities.Charset.UTF_8);
+  return prefix + 'h_' + d.map(function(b) { return ('0' + (b & 0xff).toString(16)).slice(-2); }).join('');
+}
 function _scopeReport_() {
   var raw = CacheService.getScriptCache().get(_scopeKey_()), m = {};
   if (raw) { try { m = JSON.parse(raw) || {}; } catch (e0) { m = {}; } }

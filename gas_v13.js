@@ -2021,6 +2021,15 @@ function _scopeGate_(action, token, phone) {
   } catch (e) {}
   return null;
 }
+// KHOA CACHE BAO CAO (A/B/C/G): CacheService chi nhan khoa <= 250 ky tu, vuot thi NEM LOI "Argument too large: key" ngay o cache.get (khong nam trong try).
+// NGUYEN NHAN GOC Bao cao A ra 0 don (Duyen 17-18/10/2026): khoa = prefix + JSON.stringify(bo loc) chua ten 16-17 Sale (>250 ky tu) => moi lan loc nhieu Sale/Team deu loi
+// 'Doi so qua lon: key' va giao dien ve toan so 0. Khoa ngan (<=200) GIU NGUYEN nhu cu; khoa dai -> prefix + 'h_' + MD5 cua JSON (cung bo loc => cung khoa).
+function _reportCacheKey_(prefix, filters) {
+  var js = JSON.stringify(filters);
+  if ((prefix + js).length <= 200) return prefix + js;
+  var d = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, js, Utilities.Charset.UTF_8);
+  return prefix + 'h_' + d.map(function(b) { return ('0' + (b & 0xff).toString(16)).slice(-2); }).join('');
+}
 function _scopeReport_() {
   var raw = CacheService.getScriptCache().get(_scopeKey_()), m = {};
   if (raw) { try { m = JSON.parse(raw) || {}; } catch (e0) { m = {}; } }
@@ -2506,7 +2515,7 @@ function doGetCore_(e) {
                  sanPham: pA.sanPham || '',
                  byCreator: pA.byCreator === '1' || pA.byCreator === 'true' };
       var cacheA = CacheService.getScriptCache();
-      var cKeyA = 'salesA_' + JSON.stringify(fA);
+      var cKeyA = _reportCacheKey_('salesA_', fA);
       var cachedA = cacheA.get(cKeyA);
       if (cachedA) { try { return jsonOut_(JSON.parse(cachedA)); } catch(ec) {} }
       var resA = buildSalesReportA_(fA);
@@ -2540,7 +2549,7 @@ function doGetCore_(e) {
                  sale: splitG_(pG.sale), nguon: splitG_(pG.nguon), marketer: splitG_(pG.marketer),
                  sanPham: pG.sanPham || '' };
       var cacheG = CacheService.getScriptCache();
-      var cKeyG = 'salesG_pos3_' + JSON.stringify(fG);
+      var cKeyG = _reportCacheKey_('salesG_pos3_', fG);
       var cachedG = cacheG.get(cKeyG);
       if (cachedG) { try { return jsonOut_(JSON.parse(cachedG)); } catch(ec) {} }
       var resG = buildFailedOrderReport_(fG);
@@ -2556,7 +2565,7 @@ function doGetCore_(e) {
                  careStatus: splitCSV_(pB.careStatus), khStatus: splitCSV_(pB.khStatus),
                  zaloStatus: splitCSV_(pB.zaloStatus), nickZalo: pB.nickZalo || '' };
       var cacheB = CacheService.getScriptCache();
-      var cKeyB = 'salesB4_' + JSON.stringify(fB);
+      var cKeyB = _reportCacheKey_('salesB4_', fB);
       var cachedB = cacheB.get(cKeyB);
       if (cachedB) { try { return jsonOut_(JSON.parse(cachedB)); } catch(ec) {} }
       var resB = buildSalesReportB_(fB);
@@ -2587,7 +2596,7 @@ function doGetCore_(e) {
                  sanPham: pC.sanPham || '',
                  byCreator: pC.byCreator === '1' || pC.byCreator === 'true' };
       var cacheC = CacheService.getScriptCache();
-      var cKeyC = 'salesC_' + JSON.stringify(fC);
+      var cKeyC = _reportCacheKey_('salesC_', fC);
       var cachedC = cacheC.get(cKeyC);
       if (cachedC) { try { return jsonOut_(JSON.parse(cachedC)); } catch(ec) {} }
       var resC = buildSalesReportC_(fC);
