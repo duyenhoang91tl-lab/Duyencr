@@ -772,6 +772,7 @@ function _srCocColspan(base){ return _srState.showCoc ? base : base-1; }
 
 // Báo cáo A ra 0 đơn: hiện bảng chẩn đoán từ backend (diag) — mất ở bước nào (dữ liệu / ngày / trạng thái / kênh / tên Sale) + tên Sale thật trong dữ liệu.
 function _srZeroDiagA_(d){
+  if (d && !d.totalOrders && !d.diag) return '<div class="fp-info" style="margin:0 0 12px"><b>⚠ 0 đơn</b> — máy chủ <b>không trả phần chẩn đoán</b> (bản backend GAS chạy thật chưa phải bản mới, hoặc Worker đang trả bản cache cũ). Thử mở CRM với đuôi <code>?worker=0</code> (gọi thẳng Apps Script, bỏ qua cache Worker) rồi lọc lại; nếu khung này vẫn hiện thì bản GAS đang chạy chưa có chẩn đoán.</div>';
   var g = d && d.diag; if (!g || d.totalOrders) return '';
   var why;
   if (!g.rows) why = 'Nguồn dữ liệu đơn (DT TỔNG) đang <b>trống</b> — kiểm tra sheet DT TỔNG / đồng bộ Supabase.';
