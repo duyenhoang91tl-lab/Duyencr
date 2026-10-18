@@ -797,6 +797,15 @@ function _srZeroDiagA_(d){
     ((g.missNames && g.missNames.length && g.inDate) ? '<br><span style="font-size:11.5px"><b>Tên Sale trên các đơn bị loại (nhiều nhất):</b> ' + g.missNames.map(e_).join(', ') + '</span>' : '') + '</div>';
 }
 function e_(s){ return (typeof esc === 'function') ? esc(s) : String(s == null ? '' : s).replace(/[&<>"']/g, function(ch){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]; }); }
+// Khi đang lọc theo Sale/Team: đơn có nhiều sale (vd "Kd + kế toán + Mến") khiến người ĐỒNG BÁN không thuộc bộ lọc cũng hiện thành 1 dòng trong bảng "Theo Sale".
+// Chỉ giữ các dòng thuộc người đã chọn (kể cả tên phụ cùng 1 người). Tổng/tiền chia đều vẫn do máy chủ tính, không đổi.
+function _srKeepSelectedSales_(rows, sel){
+  if (!sel || !sel.length || _srState.byCreator) return rows;   // chế độ 'người tạo đơn': dòng là người tạo, không lọc theo Sale bán
+  var fold = function(x){ return String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/gi,'d').replace(/\s+/g,' ').trim().toLowerCase(); };
+  var ok = {};
+  sel.forEach(function(n){ ok[fold(n)] = 1; ((typeof _personAliases === 'function' ? _personAliases(n) : []) || []).forEach(function(a){ ok[fold(a)] = 1; }); });
+  return (rows || []).filter(function(r){ return ok[fold(r && r.name)]; });
+}
 function _srRenderA(d){
   if (!d) return _srNoDataHtml_();
   var html = _srZeroDiagA_(d) + '<div class="kpi-grid" style="margin-bottom:16px">' +
@@ -814,7 +823,7 @@ function _srRenderA(d){
 
   _SR_COLTH_ROWSFN_['aSale'] = function(){ return (_srState.dataA && _srState.dataA.bySale) || []; };
   _SR_COLTH_GETTER_['aSale'] = { name: function(r){ return r.name; } };
-  var saleRows = _srApplyColFilters_(d.bySale||[], 'aSale', _SR_COLTH_GETTER_['aSale']).filter(function(s){ return !_srState.saleSearch || s.name.toLowerCase().indexOf(_srState.saleSearch.toLowerCase())!==-1; });
+  var saleRows = _srApplyColFilters_(_srKeepSelectedSales_(d.bySale||[], _srState.sale), 'aSale', _SR_COLTH_GETTER_['aSale']).filter(function(s){ return !_srState.saleSearch || s.name.toLowerCase().indexOf(_srState.saleSearch.toLowerCase())!==-1; });
   var saleHtml = '<div class="dash-section-title">Theo Sale bán <span style="font-weight:400;color:var(--muted);font-size:11px">'+
     (_srState.byCreator ? '(tính trọn vẹn cho người tạo đơn — không chia đều)' : '(số đơn giữ nguyên — tiền chia đều cho số sale/đơn)')+
     '</span>'+_srViewToggleHtml('aSaleView')+'</div>';
@@ -983,7 +992,7 @@ function _srRenderB(d){
 
   _SR_COLTH_ROWSFN_['bSale'] = function(){ return (_srState.dataB && _srState.dataB.bySale) || []; };
   _SR_COLTH_GETTER_['bSale'] = { name: function(s){ return s.name; } };
-  var saleRows = _srApplyColFilters_(d.bySale||[], 'bSale', _SR_COLTH_GETTER_['bSale']).filter(function(s){ return !_srState.bSaleSearch || (s.name||'').toLowerCase().indexOf(_srState.bSaleSearch.toLowerCase())!==-1; });
+  var saleRows = _srApplyColFilters_(_srKeepSelectedSales_(d.bySale||[], _srState.bSale), 'bSale', _SR_COLTH_GETTER_['bSale']).filter(function(s){ return !_srState.bSaleSearch || (s.name||'').toLowerCase().indexOf(_srState.bSaleSearch.toLowerCase())!==-1; });
   var saleHtmlB_ = '<div class="dash-section-title">Theo Sale <span style="font-weight:400;color:var(--muted);font-size:11px">(tiền chia đều cho số sale/đơn, số đơn giữ nguyên)</span>'+_srViewToggleHtml('bSaleView')+'</div>';
   saleHtmlB_ += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.bSaleSearch)+'" oninput="_srState.bSaleSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
   if (_srState.bSaleView === 'table'){

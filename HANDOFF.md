@@ -181,3 +181,6 @@ Yeu cau cua Duyen: Chat noi bo hien thi duoc o cua so chat nho o goc duoi phai (
 ## Lọc nhanh (mẫu) không có tác dụng — vòng sửa
 - Đã kiểm tra trên Chromium thật: admin 1180/760px, dropdown ≥2 mẫu + nút "Tắt lọc nhanh" chạy đúng ở A–G, L.
 - Nguyên nhân khả dĩ: (1) trình duyệt giữ JS/CSS cũ (không có cache-busting) → thêm `?v=` cho js/48 + css/10; (2) leader/CS bị `_srEnforceScope` ép về chính mình nên mẫu như "không đổi" → nay có toast báo rõ.
+
+## Báo cáo A/B "Theo Sale" lẫn người ngoài bộ lọc (kế toán, Mến)
+- Nguyên nhân: đơn có nhiều sale ("Kd + kế toán + Mến") → backend tạo thêm dòng cho người đồng bán dù không thuộc bộ lọc. Sửa phía giao diện `_srKeepSelectedSales_` (js/11): khi có chọn Sale/Team chỉ giữ dòng của người đã chọn (kể cả tên phụ); bỏ qua ở chế độ "người tạo đơn". Tổng/tiền chia đều vẫn do máy chủ tính. Test: tools/test-sr-keep-selected-sales.js.
