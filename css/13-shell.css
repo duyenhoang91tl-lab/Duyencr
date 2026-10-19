@@ -22,7 +22,8 @@ html.ui-pro.ui-shell #data-view .tabs .sn-gh{background:none;border:none;box-sha
 html.ui-pro.ui-shell #data-view .tabs .sn-gh:hover{background:none;color:#fff;}
 /* ghim cố định (chưa thu gọn) */
 html.ui-pro.ui-shell:not(.shell-collapsed) #data-view .tabs{transform:none;visibility:visible;transition:none;top:50px;width:240px;padding:8px 12px 12px!important;}
-html.ui-pro.ui-shell:not(.shell-collapsed) #data-view{margin-left:240px;border-top-left-radius:16px;background:var(--bg);}
+/* NGUYÊN NHÂN LỖI NỀN/SIZE (19/10/2026): .app là flex [sidebar lọc KH 260px][#data-view]. Trước đây margin-left:240px đặt lên #data-view nên sidebar xanh nằm DƯỚI menu navy (fixed 240px, chỉ lộ ~20px) và giữa sidebar với nội dung hở 1 khoảng xanh ~240px, nội dung bị đẩy lệch phải. Nay chừa 240px ở .app (cả sidebar + nội dung dịch sang phải cạnh menu), #data-view giữ nền xanh gradient của html.ui-pro .main như cũ (không đè var(--bg) phẳng). */
+html.ui-pro.ui-shell:not(.shell-collapsed) .app{margin-left:240px;border-top-left-radius:16px;overflow:hidden;}
 html.ui-pro.ui-shell:not(.shell-collapsed) #sn-toggle,
 html.ui-pro.ui-shell:not(.shell-collapsed) #sn-backdrop{display:none!important;}
 /* thanh tab hồ sơ đang mở ở đáy (css/06-pro.css #pro-tabbar): menu ghim dừng phía trên thanh, thanh bắt đầu sau menu và cùng màu navy */

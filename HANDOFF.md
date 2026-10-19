@@ -1,6 +1,10 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-10-19 — Sửa nền/size khung navy (L1)
+- [x] css/13-shell.css: margin-left 240px chuyển từ #data-view sang .app (+ bo góc 16px, overflow:hidden); bỏ `background:var(--bg)` ở #data-view để nền xanh gradient của `html.ui-pro .main` hiện lại. Cache-bust `?v=20261019a`.
+- [ ] CẦN LÀM TIẾP: Duyên xem lại màn thật (reload cứng Ctrl+F5) — nếu sidebar lọc KH còn chiếm chỗ không mong muốn thì cân nhắc thêm nút ẩn sidebar; kiểm tra các tab khác (Báo cáo, Chat) cùng bố cục.
+
 # HANDOFF — Giao diện PRO (kiểu Creatio)
 
 Giao diện pro là MẶC ĐỊNH — `<html class="ui-pro">` gắn cứng trong index.html; ĐÃ BỎ công tắc `?ui=pro`/`?ui=classic` và localStorage `ui_mode` (không còn bản cũ để quay lại).
