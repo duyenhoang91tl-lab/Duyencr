@@ -401,6 +401,7 @@ function doGetCore_(e) {
     if (action === 'pkChat')     return pkChat_(e);
     if (action === 'pkChatFind') return pkChatFind_(e);
     if (action === 'pkChatInbox') return pkChatInbox_(e);
+    if (action === 'pkChatFilterOpts') return pkChatFilterOpts_(e);
     if (action === 'pkChatConv') return pkChatConv_(e);
     if (action === 'pkChatTags') return pkChatTags_(e);
     if (action === 'pkChatDiag') return pkChatDiag_(e);
