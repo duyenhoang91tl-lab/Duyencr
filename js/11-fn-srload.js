@@ -673,14 +673,8 @@ function _srCloseRateBarHtml_(rows, searchTerm, unitLabel, excluded){
   // MẶC ĐỊNH ẨN — bấm 👁 mới hiện (Duyên yêu cầu 2026-10-12; _warnBox ở js/10-fn-pkkpipct.js)
   var orphanHtml = orphanBox_ ? _warnBox('cr-orphan', orphanBox_, orphanTot+' đơn chưa gán vào tương tác Pancake') : '';
   // Mẫu số CHỈ tính tương tác của Page đã khớp Kênh bán (cùng quy tắc bảng theo Kênh / Sale×Page). Phần ở Page chưa khớp được báo ở đây (ẩn sau 👁).
-  if (excluded && excluded.tongTT > 0 && (excluded.pages || []).length){
-    orphanHtml += _warnBox('cr-excluded-tt',
-      '<div style="margin:0;padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412">'+
-      '⚠️ <b>'+fmt(Math.round(excluded.tongTT))+'</b> tương tác ở <b>'+excluded.pages.length+'</b> Page chưa khớp Kênh bán nên <b>KHÔNG tính vào mẫu số</b> (không có đơn tương ứng để chia): '+
-      excluded.pages.map(function(p){ return esc(p.pageName)+' ('+fmt(Math.round(p.tongTT))+')'; }).join(', ')+
-      '. Muốn tính → vào tab "📥 Báo cáo Pancake" → mục "🔗 Khớp Page Pancake ↔ Kênh bán CRM".</div>',
-      fmt(Math.round(excluded.tongTT))+' tương tác ở '+excluded.pages.length+' Page chưa khớp kênh (không tính)');
-  }
+  // (18/10/2026) Duyên yêu cầu TẮT HẲN ô "👁 N tương tác ở M Page chưa khớp kênh (không tính)" — số tương tác ở Page chưa khớp Kênh vẫn KHÔNG tính vào mẫu số (không đổi cách tính),
+  // chỉ không hiện cảnh báo nữa; muốn xem/sửa thì vào tab "📥 Báo cáo Pancake" → "🔗 Khớp Page Pancake ↔ Kênh bán CRM".
   var lv = CLOSE_RATE_THRESHOLDS.levels;
   function colorFor(p){ return _crColorFor_(p); }
   // Độ dài cột tính theo TỶ LỆ SO VỚI NGƯỜI CAO NHẤT (không phải so với 100%): tỷ lệ chốt thật chỉ 0–3% nên trước đây mọi cột chỉ rộng 1–3% khung → chỉ còn chấm tròn nhỏ.

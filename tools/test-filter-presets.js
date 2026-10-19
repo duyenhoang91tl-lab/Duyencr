@@ -24,10 +24,10 @@ JSDOM.fromFile(path.join(__dirname, '..', 'index.html'), { runScripts: 'dangerou
     const one = () => D.querySelector('#fp-ctl .fp-one'), sel = () => D.querySelector('#fp-ctl .fp-sel'), off = () => D.querySelector('#fp-ctl .fp-off');
     const menu = a => D.querySelector('#fp-gear [data-fp=' + a + ']');
     const state = k => JSON.stringify(w.eval('_srState.' + k));
-    // 0) Vi tri: ngay TRONG thanh cong cu, lien truoc nut Tac vu (cung hang)
+    // 0) Vi tri: ngay TRONG thanh cong cu, lien SAU nut Tac vu
     ok(ctl(), 'co o Mau loc nhanh o Bao cao A'); ok(!D.getElementById('fp-bar'), 'khong con thanh mau rieng ben duoi');
     ok(ctl().parentNode.classList.contains('srb-bar'), 'o mau nam TRONG thanh cong cu (.srb-bar)');
-    ok(ctl().nextElementSibling && ctl().nextElementSibling.classList.contains('gear-menu') && /Tác vụ/.test(ctl().nextElementSibling.textContent), 'o mau nam ngay truoc nut Tac vu (cung hang)');
+    ok(ctl().previousElementSibling && ctl().previousElementSibling.classList.contains('gear-menu') && /Tác vụ/.test(ctl().previousElementSibling.textContent), 'o mau nam ngay SAU nut Tac vu (18/10/2026: Tac vu luon o hang dau, chip mau xuong dong neu thanh dai)');
     ok(!one() && !sel() && !off() && /Mẫu lọc nhanh/.test(ctl().textContent), 'ban dau chua co mau: chi co menu "Mau loc nhanh"');
     ok(menu('new') && menu('save'), 'menu co Tao mau + Luu bo loc hien tai');
 

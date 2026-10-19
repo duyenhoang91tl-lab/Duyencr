@@ -1035,3 +1035,6 @@ body:not(.show-guides) .pro-ai-hint{display:none !important;}
 .sc-fchip{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:14px;padding:2px 9px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
 .sc-fchip b{color:var(--muted);font-weight:600;} .sc-fchip.on{background:var(--green);border-color:var(--green);color:#fff;} .sc-fchip.on b{color:#fff;}
 .sc-fdot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+/* (18/10/2026) Bỏ dòng tóm tắt "Sale (18)" dưới thanh công cụ (đã có trong 🔎 Bộ lọc); "✕ Xoá lọc" chỉ hiện khi KHÔNG có nút ✕ Tắt lọc nhanh (lọc tay, không dùng mẫu) */
+.srb-bar .srb-m-sum{display:none !important;}
+.srb-bar:has(.fp-off) .srb-m-x{display:none !important;}

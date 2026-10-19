@@ -139,7 +139,8 @@
     var sub = (typeof _srState !== 'undefined') ? _srState.sub : ''; if (!CFG[sub]) return;
     var bar = wrap.querySelector('.srb-bar'); if (!bar) return;
     var anchor = null; for (var i = bar.children.length - 1; i >= 0; i--) { if (bar.children[i].classList.contains('gear-menu')) { anchor = bar.children[i]; break; } }
-    if (anchor) anchor.insertAdjacentHTML('beforebegin', ctlHtml(sub)); else bar.insertAdjacentHTML('beforeend', ctlHtml(sub));
+    // (18/10/2026) Cụm mẫu đặt SAU 🧰 Tác vụ: thanh công cụ dài quá thì chip mẫu xuống dòng, còn Tác vụ luôn ở hàng đầu cùng ô chọn báo cáo/ngày/Bộ lọc/Lọc.
+    if (anchor) anchor.insertAdjacentHTML('afterend', ctlHtml(sub)); else bar.insertAdjacentHTML('beforeend', ctlHtml(sub));
     var inf = infoHtml(sub); if (inf) bar.insertAdjacentHTML('afterend', inf);
   }
 
