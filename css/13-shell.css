@@ -33,3 +33,13 @@ html.ui-pro.ui-shell #pro-tabbar{background:linear-gradient(90deg,#2b7a4b,#58a97
 #data-view .tabs .sh-foot button:hover{background:rgba(255,255,255,.08);color:#fff;}
 
 /* 19/10/2026 (lần 2): BỎ HẲN nền xanh dương navy — chỉ còn xanh lá chuyển màu (header, menu, nền trang đều lấy từ css/06-pro.css). Khung: .app dịch 240px sát menu, không bo góc, không khe hở. */
+
+/* 19/10/2026 (lần 3): (1) THU GỌN = ẩn cả menu trái lẫn sidebar lọc KH, nội dung full màn; mũi tên #sh-edge ở mép trái để hiện lại.
+   (2) Màn Báo cáo (body.rpt-mode ẩn .tabs + .sidebar) trước đây vẫn chừa 240px => cột xanh thừa: nay full màn, không chừa. */
+html.ui-pro.ui-shell.shell-collapsed .app .sidebar{display:none;}
+html.ui-pro.ui-shell body.rpt-mode .app{margin-left:0;}
+html.ui-pro.ui-shell body.rpt-mode #pro-tabbar{left:0;}
+html.ui-pro.ui-shell body.rpt-mode #sh-edge{display:none!important;}
+html.ui-pro.ui-shell #sh-edge{position:fixed;top:50%;left:0;transform:translateY(-50%);z-index:640;width:18px;height:52px;padding:0;border:none;border-radius:0 10px 10px 0;background:#2b7a4b;color:#fff;font-size:18px;line-height:52px;cursor:pointer;box-shadow:2px 0 8px rgba(20,83,45,.3);opacity:.85;}
+html.ui-pro.ui-shell #sh-edge:hover{opacity:1;background:#14532d;}
+html.ui-pro.ui-shell:not(.shell-collapsed) #sh-edge{left:240px;}

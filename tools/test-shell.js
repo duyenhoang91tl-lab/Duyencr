@@ -36,7 +36,7 @@ function boot(o) {
     { url: 'http://localhost/', runScripts: 'dangerously', pretendToBeVisual: true });
   const w = dom.window;
   Object.defineProperty(w, 'innerWidth', { value: o.width || 1400, configurable: true, writable: true });
-  if (o.pref) w.localStorage.setItem('ome_shell', o.pref); if (o.col) w.localStorage.setItem('ome_shell_col', '1');
+  if (o.pref) w.localStorage.setItem('ome_shell', o.pref); w.localStorage.setItem('ome_shell_col', o.col ? '1' : '0');  /* mac dinh that la THU GON (xem js/55); test mac dinh ghim */
   if (o.cls) o.cls.forEach(c => w.document.documentElement.classList.add(c));
   if (o.bodyCls) w.document.body.classList.add(o.bodyCls);
   w.confirm = () => (o.confirm === undefined ? true : o.confirm);

@@ -17,7 +17,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') (function(
   function state(){
     var dv = document.getElementById('data-view'), h = document.documentElement;
     return { pref: ls(KEY) === 'off' ? 'off' : 'on', width: window.innerWidth || 0, dataViewShown: !!(dv && dv.style.display !== 'none'),
-      blocked: h.classList.contains('db-standalone') || document.body.classList.contains('rpt-mode'), collapsed: ls(KCOL) === '1' };
+      blocked: h.classList.contains('db-standalone') || document.body.classList.contains('rpt-mode'), collapsed: ls(KCOL) !== '0' };   // MẶC ĐỊNH THU GỌN (ẩn menu + sidebar lọc); bấm mũi tên mép trái để hiện
   }
   function foot(d, st){
     var t = document.querySelector('#data-view .tabs'); if (!t) return;
@@ -40,13 +40,26 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') (function(
     var old = f.querySelector('.sh-old'); old.style.display = (d.on || (wideOk && st.pref === 'off')) ? '' : 'none';
     old.textContent = d.on ? '⇄ Giao diện cũ' : '✨ Giao diện mới';
   }
+  // Mũi tên mép trái: ẩn/hiện CÙNG LÚC menu trái + sidebar lọc KH (class shell-collapsed; css/13-shell.css ẩn .sidebar khi thu gọn).
+  function edge(d, st){
+    var b = document.getElementById('sh-edge');
+    if (!d.on) { if (b) b.style.display = 'none'; return; }
+    if (!b) {
+      b = document.createElement('button'); b.id = 'sh-edge'; b.type = 'button';
+      b.addEventListener('click', function(){ shellToggleCollapse(); });
+      document.body.appendChild(b);
+    }
+    b.style.display = ''; b.textContent = d.collapsed ? '›' : '‹';
+    b.title = d.collapsed ? 'Hiện menu + bộ lọc' : 'Ẩn menu + bộ lọc';
+  }
   window.shellApply = function(){
     var st = state(), d = shellDecide_(st), h = document.documentElement;
     h.classList.toggle('ui-shell', d.on); h.classList.toggle('shell-collapsed', d.collapsed);
     foot(d, st);
+    edge(d, st);
     return d;
   };
-  window.shellToggleCollapse = function(){ lsSet(KCOL, ls(KCOL) === '1' ? '0' : '1'); return window.shellApply(); };
+  window.shellToggleCollapse = function(){ lsSet(KCOL, ls(KCOL) !== '0' ? '0' : '1'); return window.shellApply(); };
   function init(){
     window.shellApply();
     window.addEventListener('resize', window.shellApply);
