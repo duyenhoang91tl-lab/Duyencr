@@ -779,7 +779,7 @@ function _srZeroDiagA_(d){
       var via = (typeof GAS_URL_DIRECT !== 'undefined' && gsUrl === GAS_URL_DIRECT) ? 'gọi THẲNG Apps Script' : 'gọi qua Worker cache';
       fetch(gsUrl + (gsUrl.indexOf('?') >= 0 ? '&' : '?') + 'action=count&_=' + Date.now(), { redirect: 'follow' }).then(function(r){ return r.text(); }).then(function(t){
         var j = null; try { j = JSON.parse(t); } catch (e) {}
-        el.textContent = j && j.ver ? ('Bản backend đang chạy: ' + j.ver + ' (' + via + '). Bản mới nhất có chẩn đoán là v13.56-diagA' + (j.ver === 'v13.56-diagA' ? ' → ĐÃ là bản mới.' : ' → CHƯA phải bản mới.')) : ('Không đọc được phiên bản backend (' + via + '): ' + String(t).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').slice(0, 140));
+        el.textContent = j && j.ver ? ('Bản backend đang chạy: ' + j.ver + ' (' + via + '). Bản mới nhất có chẩn đoán là v13.56-diag-a' + (j.ver === 'v13.56-diag-a' ? ' → ĐÃ là bản mới.' : ' → CHƯA phải bản mới.')) : ('Không đọc được phiên bản backend (' + via + '): ' + String(t).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').slice(0, 140));
       }).catch(function(er){ el.textContent = 'Không gọi được backend (' + via + '): ' + (er && er.message || er); });
     }, 0);
     return '<div class="fp-info" style="margin:0 0 12px"><b>⚠ 0 đơn</b> — máy chủ <b>không trả phần chẩn đoán</b> (bản backend GAS chạy thật chưa phải bản mới, hoặc Worker đang trả bản cache cũ).<br><span id="sr-ver-probe" style="font-size:12px"><i>Đang kiểm tra phiên bản backend…</i></span></div>';

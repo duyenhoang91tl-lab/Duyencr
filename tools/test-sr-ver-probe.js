@@ -12,7 +12,7 @@ const ok = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1); }
   let h = ctx._srZeroDiagA_({ totalOrders: 0 }); await new Promise(r => setTimeout(r, 5));
   ok(/không trả phần chẩn đoán/.test(h) && /sr-ver-probe/.test(h), 'thieu diag -> khung canh bao + cho hien phien ban');
   ok(/action=count/.test(url) && /v13\.55-board-bodem/.test(el.textContent) && /CHƯA phải bản mới/.test(el.textContent) && /Worker cache/.test(el.textContent), 'hien ver cu + qua Worker: ' + el.textContent);
-  reply = '{"ver":"v13.56-diagA"}'; ctx.gsUrl = ctx.GAS_URL_DIRECT; ctx._srZeroDiagA_({ totalOrders: 0 }); await new Promise(r => setTimeout(r, 5));
+  reply = '{"ver":"v13.56-diag-a"}'; ctx.gsUrl = ctx.GAS_URL_DIRECT; ctx._srZeroDiagA_({ totalOrders: 0 }); await new Promise(r => setTimeout(r, 5));
   ok(/ĐÃ là bản mới/.test(el.textContent) && /THẲNG Apps Script/.test(el.textContent), 'ver moi + goi thang');
   reply = '<html><body>Rất tiếc, không thể mở</body></html>'; ctx._srZeroDiagA_({ totalOrders: 0 }); await new Promise(r => setTimeout(r, 5));
   ok(/Không đọc được phiên bản/.test(el.textContent) && /Rất tiếc/.test(el.textContent) && !/</.test(el.textContent), 'tra HTML loi -> hien noi dung loi (bo the)');

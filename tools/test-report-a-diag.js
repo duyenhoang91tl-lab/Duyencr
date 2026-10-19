@@ -31,4 +31,10 @@ r = run([b('05/10/2026', 'Trịnh Phương Anh'), b('06/10/2026', 'Trịnh Phư�
 ok(r.totalOrders === 0 && r.diag.afterKenh === 3 && r.diag.afterSale === 0 && r.diag.missNames[0] === 'Trịnh Phương Anh (2)', 'loc Sale khong khop: liet ke ten Sale that: ' + JSON.stringify(J(r.diag.missNames)));
 r = run([b('05/10/2026', 'anhtrinh1995'), b('06/10/2026', 'Dung')], { sale: ['AnhTrinh1995'] });
 ok(r.totalOrders === 1 && r.diag.afterSale === 1 && r.totalGiaTri === 1000000, 'khop khong phan biet hoa/thuong -> tinh du lieu dung, diag van di kem');
+// Loc Sale + don nhieu sale: khong ve them dong cho sale KHONG duoc chon (Duyen 18/10/2026: lan menbui2002, phongketoan)
+r = run([b('05/10/2026', 'ninhnga99, menbui2002'), b('06/10/2026', 'ninhnga99'), b('07/10/2026', 'menbui2002, phongketoan')], { sale: ['ninhnga99'] });
+ok(r.totalOrders === 2 && J(r.bySale).length === 1 && r.bySale[0].name === 'ninhnga99' && r.bySale[0].orders === 2, 'loc Sale: bang Theo Sale chi co nguoi duoc chon: ' + JSON.stringify(J(r.bySale).map(x => x.name)));
+ok(Math.round(r.bySale[0].giaTri) === 1500000, 'tien van chia deu cho TAT CA sale tren don (500k + 1000k): ' + r.bySale[0].giaTri);
+r = run([b('05/10/2026', 'ninhnga99, menbui2002')], {});
+ok(J(r.bySale).length === 2, 'KHONG loc Sale: van hien du ca 2 nguoi tren don');
 console.log('ALL REPORT-A DIAG TESTS PASSED');
