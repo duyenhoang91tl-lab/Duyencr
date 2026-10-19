@@ -2,35 +2,34 @@
    CHỈ có hiệu lực khi <html> có class .ui-shell (js/55-fn-shell.js bật khi: màn dữ liệu chính đang hiện + màn hình >= 1100px + người dùng chưa chọn "Giao diện cũ").
    .shell-collapsed = đã Thu gọn: menu quay về ngăn kéo ẩn (bấm ☰ Menu) như trước, nội dung chiếm toàn bề ngang; vẫn giữ màu navy.
    Mọi selector đều bắt đầu bằng html.ui-pro.ui-shell nên KHÔNG ảnh hưởng giao diện cũ; tắt = xóa class. */
-html.ui-pro.ui-shell body{background:#1b3558;}
-html.ui-pro.ui-shell header{background:#1b3558;box-shadow:none;border-bottom:1px solid rgba(255,255,255,.08);}
 html.ui-pro.ui-shell header .logo{color:#fff;}
-html.ui-pro.ui-shell header .logo span{color:#9fb6d6!important;}
+html.ui-pro.ui-shell header .logo span{color:#d3ecd9!important;}
 html.ui-pro.ui-shell header .fstatus{color:rgba(255,255,255,.7);}
-html.ui-pro.ui-shell header .btn.primary{background:#2563eb;border-color:#2563eb;color:#fff;}
 /* menu */
-html.ui-pro.ui-shell #data-view .tabs{background:#1b3558;border-right:none;box-shadow:none;scrollbar-width:thin;scrollbar-color:#3d5a85 transparent;}
+html.ui-pro.ui-shell #data-view .tabs{background:linear-gradient(180deg,#14532d 0%,#2b7a4b 55%,#58a977 100%);border-right:none;box-shadow:none;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.35) transparent;}
 html.ui-pro.ui-shell #data-view .tabs .tab,
 html.ui-pro.ui-shell #data-view .tabs .sn-act,
-html.ui-pro.ui-shell #data-view .tabs #reportsgroup-list .tab{color:#cfd9e8;border-left-color:transparent;border-radius:10px;}
+html.ui-pro.ui-shell #data-view .tabs #reportsgroup-list .tab{color:#eaf6ee;border-left-color:transparent;border-radius:10px;}
 html.ui-pro.ui-shell #data-view .tabs .tab:hover,
 html.ui-pro.ui-shell #data-view .tabs .sn-act:hover,
 html.ui-pro.ui-shell #data-view .tabs #reportsgroup-list .tab:hover{background:rgba(255,255,255,.08);color:#fff;}
 html.ui-pro.ui-shell #data-view .tabs .tab.active,
-html.ui-pro.ui-shell #data-view .tabs #reportsgroup-list .tab.active{background:#2c4a78;border-left-color:transparent;color:#fff;font-weight:600;}
-html.ui-pro.ui-shell #data-view .tabs .sn-gh{background:none;border:none;box-shadow:none;border-radius:8px;color:#8ea3c2;padding:14px 10px 6px;margin-top:4px;font-size:11px;font-weight:700;letter-spacing:.08em;}
+html.ui-pro.ui-shell #data-view .tabs #reportsgroup-list .tab.active{background:rgba(255,255,255,.22);border-left-color:transparent;color:#fff;font-weight:600;}
+html.ui-pro.ui-shell #data-view .tabs .sn-gh{background:none;border:none;box-shadow:none;border-radius:8px;color:#d3ecd9;padding:14px 10px 6px;margin-top:4px;font-size:11px;font-weight:700;letter-spacing:.08em;}
 html.ui-pro.ui-shell #data-view .tabs .sn-gh:hover{background:none;color:#fff;}
 /* ghim cố định (chưa thu gọn) */
 html.ui-pro.ui-shell:not(.shell-collapsed) #data-view .tabs{transform:none;visibility:visible;transition:none;top:50px;width:240px;padding:8px 12px 12px!important;}
 /* NGUYÊN NHÂN LỖI NỀN/SIZE (19/10/2026): .app là flex [sidebar lọc KH 260px][#data-view]. Trước đây margin-left:240px đặt lên #data-view nên sidebar xanh nằm DƯỚI menu navy (fixed 240px, chỉ lộ ~20px) và giữa sidebar với nội dung hở 1 khoảng xanh ~240px, nội dung bị đẩy lệch phải. Nay chừa 240px ở .app (cả sidebar + nội dung dịch sang phải cạnh menu), #data-view giữ nền xanh gradient của html.ui-pro .main như cũ (không đè var(--bg) phẳng). */
-html.ui-pro.ui-shell:not(.shell-collapsed) .app{margin-left:240px;border-top-left-radius:16px;overflow:hidden;}
+html.ui-pro.ui-shell:not(.shell-collapsed) .app{margin-left:240px;}
 html.ui-pro.ui-shell:not(.shell-collapsed) #sn-toggle,
 html.ui-pro.ui-shell:not(.shell-collapsed) #sn-backdrop{display:none!important;}
 /* thanh tab hồ sơ đang mở ở đáy (css/06-pro.css #pro-tabbar): menu ghim dừng phía trên thanh, thanh bắt đầu sau menu và cùng màu navy */
 html.ui-pro.ui-shell:not(.shell-collapsed) body.pro-has-tabs #data-view .tabs{bottom:38px;}
 html.ui-pro.ui-shell:not(.shell-collapsed) #pro-tabbar{left:240px;}
-html.ui-pro.ui-shell #pro-tabbar{background:#1b3558;box-shadow:none;border-top:1px solid rgba(255,255,255,.08);}
+html.ui-pro.ui-shell #pro-tabbar{background:linear-gradient(90deg,#2b7a4b,#58a977);box-shadow:none;border-top:1px solid rgba(255,255,255,.08);}
 /* chân menu: Thu gọn / Ghim + Giao diện cũ (nút do js/55-fn-shell.js thêm; dùng cả khi ở giao diện cũ để bật lại) */
 #data-view .tabs .sh-foot{order:99999;margin-top:auto;padding-top:10px;display:flex;flex-direction:column;gap:2px;border-top:1px solid rgba(255,255,255,.14);}
-#data-view .tabs .sh-foot button{background:none;border:none;color:#9fb6d6;font:inherit;font-size:12.5px;text-align:left;padding:8px 10px;border-radius:8px;cursor:pointer;}
+#data-view .tabs .sh-foot button{background:none;border:none;color:#eaf6ee;font:inherit;font-size:12.5px;text-align:left;padding:8px 10px;border-radius:8px;cursor:pointer;}
 #data-view .tabs .sh-foot button:hover{background:rgba(255,255,255,.08);color:#fff;}
+
+/* 19/10/2026 (lần 2): BỎ HẲN nền xanh dương navy — chỉ còn xanh lá chuyển màu (header, menu, nền trang đều lấy từ css/06-pro.css). Khung: .app dịch 240px sát menu, không bo góc, không khe hở. */

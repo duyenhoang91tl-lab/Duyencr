@@ -24,7 +24,7 @@ const bad = sels.filter(s => !s.startsWith('html.ui-pro.ui-shell') && !s.startsW
 ok(sels.length > 20 && bad.length === 0, 'moi selector nam trong .ui-shell hoac .sh-foot; vi pham: ' + bad.join(' | '));
 ok(/html\.ui-pro\.ui-shell:not\(\.shell-collapsed\) \.app\{margin-left:240px/.test(css), 'cham: noi dung dich 240px khi ghim');
 ok(/#sn-toggle[^}]*display:none!important/.test(css), 'an nut Menu khi da ghim');
-ok(/#1b3558/.test(css) && /#2c4a78/.test(css), 'tong navy');
+ok(!/#1b3558|#2c4a78/.test(css) && /linear-gradient\(180deg,#14532d/.test(css), 'khong con navy, menu xanh la gradient');
 ok(/body\.pro-has-tabs #data-view \.tabs\{bottom:38px/.test(css) && /#pro-tabbar\{left:240px/.test(css), 'thanh tab ho so o day: menu dung tren thanh, thanh bat dau sau menu');
 
 let JSDOM; try { ({ JSDOM } = require('jsdom')); } catch (e) { console.log('(bo qua phan DOM: chua cai jsdom)'); console.log('ALL SHELL TESTS PASSED (chi logic + CSS)'); process.exit(0); }
