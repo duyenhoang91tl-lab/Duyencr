@@ -14,8 +14,8 @@
       "note": "Trang thai ket ban Zalo (cot zalo CareData) — chi co o Zalo"
     },
     "count": {
-      "status": "gap",
-      "note": "Zalo doi chieu phien ban backend (`ver`); Pancake chua co — xem co can khong"
+      "status": "platform",
+      "note": "Chi dung de chan doan loi \"Unknown action\" khi dong bo trang thai ket ban Zalo (syncZaloFriendStatus) — tinh nang chi co o Zalo, Pancake khong co cho nao can"
     }
   },
   "onlyPancake": {

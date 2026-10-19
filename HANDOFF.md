@@ -1,6 +1,10 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-10-19 — Sửa nền/size khung navy (L1)
+- [x] css/13-shell.css: margin-left 240px chuyển từ #data-view sang .app (+ bo góc 16px, overflow:hidden); bỏ `background:var(--bg)` ở #data-view để nền xanh gradient của `html.ui-pro .main` hiện lại. Cache-bust `?v=20261019a`.
+- [ ] CẦN LÀM TIẾP: Duyên xem lại màn thật (reload cứng Ctrl+F5) — nếu sidebar lọc KH còn chiếm chỗ không mong muốn thì cân nhắc thêm nút ẩn sidebar; kiểm tra các tab khác (Báo cáo, Chat) cùng bố cục.
+
 # HANDOFF — Giao diện PRO (kiểu Creatio)
 
 Giao diện pro là MẶC ĐỊNH — `<html class="ui-pro">` gắn cứng trong index.html; ĐÃ BỎ công tắc `?ui=pro`/`?ui=classic` và localStorage `ui_mode` (không còn bản cũ để quay lại).
@@ -177,3 +181,10 @@ Yeu cau cua Duyen: Chat noi bo hien thi duoc o cua so chat nho o goc duoi phai (
 - Test: `node tools/test-chat-mini.js` (mở rộng: trả lời, trích dẫn, huỷ trả lời, xoá, không có nút xoá trên tin người khác, âm báo, nhấp nháy tiêu đề, tắt chuông). `test-chat.js`, `test-chat-drag.js` vẫn qua.
 - Chưa thử trên trình duyệt thật (chỉ jsdom). Nút 🔔 nằm trên dock nên chỉ chỉnh được khi dock đang hiện (không phải ở tab Chat / đang thu thành bong bóng).
 - [x] The 'Ty le chot TB' o dau Bao cao A/B + dong trong Excel (js/11 _srCloseRateKpiCard_). Chi tiet docs/crm-kb/05.
+
+## Lọc nhanh (mẫu) không có tác dụng — vòng sửa
+- Đã kiểm tra trên Chromium thật: admin 1180/760px, dropdown ≥2 mẫu + nút "Tắt lọc nhanh" chạy đúng ở A–G, L.
+- Nguyên nhân khả dĩ: (1) trình duyệt giữ JS/CSS cũ (không có cache-busting) → thêm `?v=` cho js/48 + css/10; (2) leader/CS bị `_srEnforceScope` ép về chính mình nên mẫu như "không đổi" → nay có toast báo rõ.
+
+## Báo cáo A/B "Theo Sale" lẫn người ngoài bộ lọc (kế toán, Mến)
+- Nguyên nhân: đơn có nhiều sale ("Kd + kế toán + Mến") → backend tạo thêm dòng cho người đồng bán dù không thuộc bộ lọc. Sửa phía giao diện `_srKeepSelectedSales_` (js/11): khi có chọn Sale/Team chỉ giữ dòng của người đã chọn (kể cả tên phụ); bỏ qua ở chế độ "người tạo đơn". Tổng/tiền chia đều vẫn do máy chủ tính. Test: tools/test-sr-keep-selected-sales.js.

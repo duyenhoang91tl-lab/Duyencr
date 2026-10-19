@@ -22,7 +22,7 @@ const css = fs.readFileSync(path.join(ROOT, 'css', '13-shell.css'), 'utf8').repl
 const sels = []; css.split('}').forEach(r => { const i = r.indexOf('{'); if (i > -1) r.slice(0, i).split(',').forEach(s => { s = s.trim(); if (s) sels.push(s); }); });
 const bad = sels.filter(s => !s.startsWith('html.ui-pro.ui-shell') && !s.startsWith('#data-view .tabs .sh-foot'));
 ok(sels.length > 20 && bad.length === 0, 'moi selector nam trong .ui-shell hoac .sh-foot; vi pham: ' + bad.join(' | '));
-ok(/html\.ui-pro\.ui-shell:not\(\.shell-collapsed\) #data-view\{margin-left:240px/.test(css), 'cham: noi dung dich 240px khi ghim');
+ok(/html\.ui-pro\.ui-shell:not\(\.shell-collapsed\) \.app\{margin-left:240px/.test(css), 'cham: noi dung dich 240px khi ghim');
 ok(/#sn-toggle[^}]*display:none!important/.test(css), 'an nut Menu khi da ghim');
 ok(/#1b3558/.test(css) && /#2c4a78/.test(css), 'tong navy');
 ok(/body\.pro-has-tabs #data-view \.tabs\{bottom:38px/.test(css) && /#pro-tabbar\{left:240px/.test(css), 'thanh tab ho so o day: menu dung tren thanh, thanh bat dau sau menu');

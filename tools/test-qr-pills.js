@@ -16,7 +16,7 @@ const sel = h.slice(h.indexOf('<select'));
 ok(sel.includes('onchange="if(!this.value)return;qrPick_(this);_ovQuick(this.value)"'), 'ô Khác gọi cùng biểu thức, bỏ qua lựa chọn rỗng');
 const opts = (sel.match(/<option value="[^"]*"/g) || []).map(s => s.slice(15, -1));
 ok(opts.join() === ',yesterday,lastWeek,lastMonth,thisQuarter,lastQuarter,thisYear,lastYear,custom', 'ô Khác chứa các mốc còn lại (không lặp 3 mốc chính): ' + opts.join());
-ok(/<option value="" selected>Khác ▾<\/option>/.test(h), 'mặc định hiện "Khác ▾"');
+ok(/<option value="" selected>Khác<\/option>/.test(h) && !h.includes('Khác ▾'), 'mặc định hiện "Khác" (không tự thêm mũi tên: trình duyệt đã có mũi tên của ô chọn)');
 h = H('thisWeek', 'f(this.value)'); ok(/<button[^>]*class="qr-b on"[^>]*value="thisWeek"/.test(h) && (h.match(/qr-b on/g) || []).length === 1, 'chọn Tuần này -> chỉ nút đó sáng');
 h = H('lastMonth', 'f(this.value)'); ok(!/qr-b on/.test(h) && /qr-more on/.test(h) && /<option value="lastMonth" selected>/.test(h), 'chọn mốc ở ô Khác -> ô Khác sáng + chọn đúng mốc');
 h = H('', 'f(this.value)'); ok(!/qr-b on/.test(h), 'rỗng = không mốc');
@@ -43,7 +43,7 @@ let g = mount('custom'); const btns = () => Array.from(g.querySelectorAll('butto
 btns()[0].click(); ok(w.__calls.pop() === 'today' && btns()[0].classList.contains('on') && btns().filter(b => b.classList.contains('on')).length === 1, 'bấm Hôm nay: gọi f("today"), chỉ nút đó sáng');
 btns()[2].click(); ok(w.__calls.pop() === 'thisMonth' && btns()[2].classList.contains('on') && !btns()[0].classList.contains('on'), 'bấm Tháng này: chuyển sáng sang nút đó');
 more().value = 'lastWeek'; more().dispatchEvent(new w.Event('change')); ok(w.__calls.pop() === 'lastWeek' && more().classList.contains('on') && btns().every(b => !b.classList.contains('on')), 'chọn ở ô Khác: gọi đúng mốc, tắt các nút, ô Khác sáng');
-btns()[1].click(); ok(w.__calls.pop() === 'thisWeek' && more().value === '' && !more().classList.contains('on'), 'bấm lại nút: ô Khác trở về "Khác ▾" và hết sáng');
-const n0 = w.__calls.length; more().value = ''; more().dispatchEvent(new w.Event('change')); ok(w.__calls.length === n0, 'chọn dòng rỗng "Khác ▾": không gọi hàm');
+btns()[1].click(); ok(w.__calls.pop() === 'thisWeek' && more().value === '' && !more().classList.contains('on'), 'bấm lại nút: ô Khác trở về "Khác" và hết sáng');
+const n0 = w.__calls.length; more().value = ''; more().dispatchEvent(new w.Event('change')); ok(w.__calls.length === n0, 'chọn dòng rỗng "Khác": không gọi hàm');
 w.qrPick_(null); w.qrPick_(w.document.body); ok(true, 'qrPick_ với phần tử ngoài nhóm không lỗi');
 console.log('ALL QR PILLS TESTS PASSED');

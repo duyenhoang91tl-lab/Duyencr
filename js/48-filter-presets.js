@@ -149,9 +149,11 @@
     c.keys.forEach(function(k){ var v = p.filters ? p.filters[k] : undefined; _srState[k] = (v === undefined) ? emptyLike(_srState[k]) : (Array.isArray(v) ? v.slice() : v); });
     if (c.team) _srState[c.team] = [];          // ô "Lọc theo Team" chỉ là công cụ điền ô Sale — mẫu đã chứa sẵn danh sách Sale
     if (c.custom) _srState[c.custom] = true;     // E/F/G/L: đã tự chỉnh Sale → không bị ghi đè bởi mặc định theo vai trò
+    var before = JSON.stringify(c.keys.map(function(k){ return _srState[k]; }));
     if (typeof _srEnforceScope === 'function') _srEnforceScope();   // người bị giới hạn phạm vi (leader…) vẫn chỉ xem được phần của mình
+    var limited = before !== JSON.stringify(c.keys.map(function(k){ return _srState[k]; }));
     ACT[p.sub] = p.id;
-    toastF('⚡ Đã áp dụng mẫu “' + p.name + '”');
+    toastF(limited ? '⚠ Mẫu “' + p.name + '” bị giới hạn theo quyền của bạn — chỉ xem được dữ liệu của mình' : '⚡ Đã áp dụng mẫu “' + p.name + '”');
     if (typeof _srApply === 'function') _srApply(); else renderSalesReportTab();
   }
   function turnOff(){

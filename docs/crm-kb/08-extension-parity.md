@@ -20,7 +20,7 @@ Ngoại lệ DUY NHẤT: tính năng gắn chặt với 1 nền tảng (vd gửi
 ## Danh sách còn lệch (trạng thái 2026-10-13) — cần Duyên chốt có làm bù không
 `status: "platform"` = đặc thù nền tảng, hợp lệ. `status: "gap"` = bên kia CHƯA có (chi tiết từng mục: `node tools/check-ext-parity.js --list`).
 
-**Zalo có, Pancake thiếu (gap):** đối chiếu phiên bản backend (`count`).
+**Zalo có, Pancake thiếu (gap):** không còn mục nào. (`count` — đối chiếu phiên bản backend — chỉ để chẩn đoán lỗi cho chức năng quét kết bạn riêng của Zalo nên đã chuyển sang `platform`.)
 **KHÔNG làm bù (quyết định bảo mật):** dò/xoá đơn trùng (`findDuplicateOrders`/`deleteDuplicateOrders`) — Bảo mật 4c-3 (2026-10-14) đã GỠ khỏi Zalo AI (chỉ admin xoá đơn trên web CRM), nên Pancake AI cũng KHÔNG được có. Nguyên tắc chung: tính năng đã bị gỡ vì bảo mật thì gỡ ở cả 2 bên, không "bù" ngược.
 **Pancake có, Zalo thiếu (gap):** nạp CTKM cho Soạn đơn (`ctkmCatalog`), kiến thức sản phẩm (`getKnowledge`), cây/phẳng bảng giá cho Soạn đơn (`priceCatalogTree`/`Flat`), tra đơn theo SĐT (`donOrdersByPhone`), giao/nhận việc (`assign`/`toggleAssignDone`), đăng nhập xác minh (`verifyLogin`).
 **Đặc thù nền tảng (hợp lệ):** Zalo — gửi hàng loạt (`broadcastQueue`/`broadcastMark`), trạng thái kết bạn (`syncZaloFriendStatus`); Pancake — câu trả lời nhanh (`saveCannedResponse`/`deleteCannedResponse`).
@@ -34,3 +34,6 @@ Ngoại lệ DUY NHẤT: tính năng gắn chặt với 1 nền tảng (vd gửi
 
 ## Lệch không đo được bằng script (theo dõi tay)
 - **Pancake AI hiện ảnh sản phẩm kèm gợi ý trả lời** (nút "📷 Copy ảnh: …" → clipboard → Ctrl+V vào khung chat; `renderImageSuggestion`/`copyProductImage_`, ảnh nằm trong phần phản hồi của gợi ý AI). Zalo AI chưa có. Cần làm bù khi Duyên chốt (cần xác minh server trả `image` cho luồng Zalo và Zalo cho phép dán ảnh từ clipboard vào ô chat).
+
+## Kế hoạch làm bù tiếp theo: 🧩 Soạn đơn (lớn nhất — làm theo giai đoạn)
+Soạn đơn của Pancake = bộ chọn sản phẩm (từng bước/Gõ tìm trực tiếp) + giỏ hàng LƯU THEO TỪNG SĐT (`chrome.storage.local`) + giảm giá từng dòng/tổng + quà tặng + freeship + thêm vàng (đơn giá `goldUnitAmount` từ GAS) + nút "Tính CT" tự động + sao chép tin nhắn tổng kết đơn + thông tin KH. Khoảng 1.000 dòng, chạm nhiều chỗ của giao diện (thêm vùng giỏ hàng dưới panel, chọn loại đá SAPHIA/RUBY dùng chung). Đề xuất 3 giai đoạn, mỗi giai đoạn 1 commit + test so khớp 2 bên: **S1** giỏ hàng cốt lõi (thêm dòng thủ công, sửa dòng, tổng tiền, giảm giá/vàng/freeship, lưu theo SĐT, sao chép tổng kết); **S2** bộ chọn sản phẩm (từng bước + Gõ tìm) thêm vào giỏ; **S3** CTKM theo sản phẩm + "Tính CT" tự động. Phần riêng của Pancake (đọc khung đơn hàng của Pancake `_findOrderPanelContainer_`, `_pkLatestOrderHtml_`...) KHÔNG port — là đặc thù nền tảng.
