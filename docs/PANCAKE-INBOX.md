@@ -49,6 +49,13 @@ Apps Script không nhận realtime tốt nên không đứng giữa luồng này
 - **CHƯA xác nhận với Pancake thật:** token page có quyền read/unread không (lần bấm đầu nếu lỗi, thông báo của Pancake hiện nguyên văn). Chưa xem trên trình duyệt thật (đã test jsdom).
 - **Test:** `node tools/test-pk-chat-read.js` (GAS), `NODE_PATH=<jsdom> node tools/test-pk-chat-seen.js` (giao diện, 21 ca).
 
+## Bộ lọc hộp thư + Thư mục ẩn/hiện (2026-10-18) — Social > Chat
+- **Giao diện (js/42):** dưới ô tìm kiếm có 2 nút **🔎 Bộ lọc** và **🏷 Thư mục**, cả hai **mặc định ẩn**, bấm mới hiện. Thư mục = các chip cũ (Tất cả / Chưa đọc / Chưa trả lời / từng thẻ). Bộ lọc = 6 ô chọn: Loại (Tất cả/Tin nhắn/Bình luận) · Chưa trả lời (mới nhất trước / chờ lâu nhất 30 ngày / đã đọc nhưng chưa trả lời — 3 mục menu "Lọc chưa trả lời" của Pancake) · Số điện thoại (có / chưa có) · Page · Nguồn (kênh bán) · Nhân viên. Nút sáng màu + số đếm khi đang lọc; "✕ Xoá lọc" bỏ cả bộ lọc lẫn thư mục.
+- **Lọc ở SERVER** (không chỉ 60 hội thoại đang tải): `pkChatInbox` nhận `type, un, ph, page, nguon, nv` (xem `_pkInboxFilter_` trong gas_v13.js); có lọc thì lấy tối đa 100 + khóa cache riêng 15 giây. `pkChatFilterOpts` trả danh sách cho các ô chọn.
+- **Nguồn** = "Kênh bán" của Page theo bảng **Khớp Page ↔ Kênh bán** (sheet `PancakePageMap`); **tên Page** cũng lấy từ bảng đó (Page có token mà chưa khớp thì hiện mã Page). **Nhân viên** lấy từ bảng `pk_staff`, lọc theo `assignee_ids` (người phụ trách hội thoại).
+- **CHƯA làm được** (chưa có trường dữ liệu xác nhận trong payload Pancake): "Lọc tin nhắn" AI đang xử lý / AI đã tắt / AI đã chuyển tiếp; "Lọc bình luận" chưa gửi tin riêng / đã đánh dấu tạo đơn / đến từ livestream. Muốn làm: xem mẫu `raw->conversation` thật của 1 hội thoại có các trạng thái đó để biết tên trường.
+- **Test:** `node tools/test-pk-inbox-filters.js` (GAS, 25 ca), `NODE_PATH=<jsdom> node tools/test-sc-filters.js` (giao diện, 25 ca).
+
 ## Bước 1b — cài đặt, làm 1 lần
 
 ### A. Đợi Supabase có bảng mới
