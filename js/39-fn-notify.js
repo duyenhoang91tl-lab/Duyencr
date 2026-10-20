@@ -47,8 +47,8 @@ function _ntAgo(iso){
   return new Date(t).toLocaleDateString('vi-VN');
 }
 // Sự kiện quy trình công việc: kind = task_assign | task_turn | task_request | task_decision | task_done (js/44-fn-taskflow.js, GAS _notifyTaskEvent_)
-function _ntIsTaskEvt(it){ return String((it && it.kind) || '').indexOf('task_') === 0; }
-function _ntTaskIcon(it){ return ({ task_assign:'📌', task_turn:'➡️', task_request:'✋', task_decision:'⚖️', task_done:'🏁' })[it.kind] || '🔔'; }
+function _ntIsTaskEvt(it){ var k = String((it && it.kind) || ''); return k.indexOf('task_') === 0 || k === 'chatviolation'; }   // chatviolation = cảnh báo giám sát chat (GAS _cvNotify_): text là câu hoàn chỉnh
+function _ntTaskIcon(it){ return ({ task_assign:'📌', task_turn:'➡️', task_request:'✋', task_decision:'⚖️', task_done:'🏁', chatviolation:'⚠️' })[it.kind] || '🔔'; }
 function _ntWhere(it){
   if (it.kind === 'note') return 'trong ghi chú khách ' + (it.refId || '');
   if (it.kind === 'khthread') return 'trong thảo luận về khách ' + (it.refId || '');
@@ -106,6 +106,8 @@ function ntOpenItem(id){
       if (it.kind === 'khthread') { var dt = document.querySelector('#dp .dp-tab[data-tab="discuss"]'); if (dt && typeof switchDpTab === 'function') switchDpTab('discuss', dt); }   // mở thẳng tab Thảo luận
     } else if (it.refType === 'task') {
       _ntOpenTask(it.refId, it.kind === 'comment');
+    } else if (it.refType === 'chatviolation') {
+      toast('Cảnh báo chat chưa gắn được SĐT khách — xem chi tiết ở sheet ChatViolations (hội thoại ' + (it.refId || '') + ')');
     }
   } catch(e){ toast('Lỗi mở thông báo: ' + e.message); }
 }

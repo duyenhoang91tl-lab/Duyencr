@@ -160,3 +160,218 @@ function khdDoPost_(action, d) {
   try { return jsonOut_(action === 'khDiscussSend' ? khdSend_(d) : khdDelete_(d)); }
   catch (err) { return jsonOut_({ ok: false, error: 'Loi thao luan: ' + (err && err.message || err) }); }
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  GIAM SAT CHAT PANCAKE — phat hien sale dung TU CAM va canh bao admin (yeu cau Duyen 2026-10-17)
+//  Nguon tu cam: sheet "Luu y tu cam" (file Report Sale) qua readBannedWords_ (cot "Tu cam"; fallback neu mat quyen). Doi sheet la tu cap nhat (cache 30 phut).
+//  Nguon tin: pk_messages (Supabase, do webhook Pancake ghi) direction='out' — TIN GUI RA cua page/sale; quet dinh ky (trigger 5 phut) tu moc cvCursor.
+//  Dau ra: sheet "ChatViolations" (chi tiet tung tin vi pham) + THONG BAO trong CRM cho admin (mac dinh duyenht; moi lan quet gop 1 thong bao/nhan vien de khong don dap) + email tuy chon.
+//  Khop: khong phan biet hoa thuong, theo TU/CUM (khong bat chuoi con: "loc" khong khop "block"); tin gõ KHONG DAU thi so voi ban bo dau; cum dai nuot cum ngan ("loc phuc tinh" khong bao them "loc").
+//  Settings: chatAuditIgnore (tu bo qua, vd "tien, loc" vi qua pho bien khi chat), chatAuditAdmins (username nhan canh bao, mac dinh duyenht), chatAuditEmail (tuy chon).
+//  Editor: batGiamSatChat(gioQuaKhu) / tatGiamSatChat / chayGiamSatChat / xemTuCamGiamSat / datChatAuditBoQua(csv) / datChatAuditAdmin(csv).
+//  GIOI HAN: Pancake khong tra ten nhan vien cho tung tin gui tu app Pancake (xem docs/PANCAKE-INBOX.md) nen tin do ghi "(chua ro nhan vien)" kem Page + hoi thoai de tra.
+// ═══════════════════════════════════════════════════════════════
+var CV_SHEET = 'ChatViolations';
+var CV_HEADERS = ['id', 'detectedAt', 'sentAt', 'page', 'convId', 'phone', 'customer', 'staff', 'words', 'snippet'];
+var CV_DEFAULT_ADMINS = ['duyenht'];
+function _cvNorm_(s) { return String(s === null || s === undefined ? '' : s).normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim(); }
+function _cvHasVN_(s) { return /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(String(s || '')); }
+function _cvStrip_(s) { return _stripVN_(_cvNorm_(s)).replace(/đ/g, 'd'); }
+function _cvWordCh_(ch) { return !!ch && /[0-9A-Za-zÀ-ỹ_]/.test(ch); }
+// phrase xuat hien trong hay NHU MOT TU/CUM (ky tu truoc/sau khong phai chu-so).
+function _cvFindPhrase_(hay, phrase) {
+  if (!phrase) return false;
+  var from = 0, i;
+  while ((i = hay.indexOf(phrase, from)) !== -1) {
+    if (!_cvWordCh_(hay.charAt(i - 1)) && !_cvWordCh_(hay.charAt(i + phrase.length))) return true;
+    from = i + 1;
+  }
+  return false;
+}
+function _cvSplitCsv_(v) { return String(v || '').split(/[,;\n]/).map(function (x) { return _cvNorm_(x); }).filter(Boolean); }
+// list: [{tuCam, thayThe}] -> [{raw, norm, strip, thayThe}] (bo trung, bo cum qua ngan, bo cum trong danh sach bo qua)
+function _cvCompile_(list, ignoreCsv) {
+  var ign = {}, seen = {}, out = [];
+  _cvSplitCsv_(ignoreCsv).forEach(function (x) { ign[x] = 1; ign[_cvStrip_(x)] = 1; });
+  (list || []).forEach(function (w) {
+    var raw = String((w && (w.tuCam || w.raw)) || '').trim(), norm = _cvNorm_(raw);
+    if (norm.length < 2 || seen[norm]) return;
+    var strip = _cvStrip_(raw);
+    if (ign[norm] || ign[strip]) return;
+    seen[norm] = 1;
+    out.push({ raw: raw, norm: norm, strip: strip, thayThe: String((w && w.thayThe) || '') });
+  });
+  return out;
+}
+// Tra ve cac tu cam co trong text: [{raw, thayThe}]. Cum dai nuot cum ngan nam trong no.
+function cvDetect_(text, compiled) {
+  var t = String(text || '');
+  if (!t.trim()) return [];
+  var norm = _cvNorm_(t), plain = !_cvHasVN_(t), stripped = plain ? _cvStrip_(t) : '', hits = [];
+  (compiled || []).forEach(function (w) {
+    if (_cvFindPhrase_(norm, w.norm) || (plain && w.strip && _cvFindPhrase_(stripped, w.strip))) hits.push(w);
+  });
+  return hits.filter(function (a) {
+    return !hits.some(function (b) { return b !== a && b.norm.length > a.norm.length && b.norm.indexOf(a.norm) !== -1; });
+  }).map(function (w) { return { raw: w.raw, thayThe: w.thayThe }; });
+}
+function _cvBannedCompiled_() {
+  var cache = CacheService.getScriptCache(), list = null, raw = null;
+  try { raw = cache.get('cv_banned_v1'); } catch (e) {}
+  if (raw) { try { list = JSON.parse(raw); } catch (e1) {} }
+  if (!list) { list = readBannedWords_() || []; try { cache.put('cv_banned_v1', JSON.stringify(list), 1800); } catch (e2) {} }
+  var ign = ''; try { ign = getSetting_('chatAuditIgnore') || ''; } catch (e3) {}
+  return _cvCompile_(list, ign);
+}
+function _cvAdmins_() {
+  var v = ''; try { v = getSetting_('chatAuditAdmins') || ''; } catch (e) {}
+  var a = String(v).split(/[,;\s]+/).map(function (x) { return x.trim().toLowerCase(); }).filter(Boolean);
+  return a.length ? a : CV_DEFAULT_ADMINS.slice();
+}
+// Ten nhan vien gui tin 'out': nhan vien CRM > nhan vien Pancake (staff_name) > raw.from.admin_name. Khong co -> '' (chua ro).
+function _cvStaff_(m) {
+  var f = m && m.fromraw, adm = f && typeof f === 'object' ? (f.admin_name || '') : '';
+  return String((m && (m.crm_user || m.staff_name)) || adm || '').trim();
+}
+// msgs: [{id, text, sent_at, conversation_id, page_id, staff_name, crm_user, fromraw}] -> vi pham [{id, sentAt, convId, pageId, staff, words:[raw], snippet}]
+function cvScanMessages_(msgs, compiled) {
+  var out = [];
+  (msgs || []).forEach(function (m) {
+    if (!m || !m.id) return;
+    var hits = cvDetect_(m.text, compiled);
+    if (!hits.length) return;
+    out.push({ id: String(m.id), sentAt: m.sent_at || '', convId: m.conversation_id || '', pageId: m.page_id || '', staff: _cvStaff_(m),
+               words: hits.map(function (h) { return h.raw; }), suggest: hits.map(function (h) { return h.thayThe; }).filter(Boolean),
+               snippet: String(m.text || '').replace(/\s+/g, ' ').trim().slice(0, 300) });
+  });
+  return out;
+}
+// Cau canh bao gop theo nhan vien (<= 160 ky tu vi cot text cua Notifications).
+function _cvNotifText_(staff, vs) {
+  var cnt = {}, order = [];
+  vs.forEach(function (v) { v.words.forEach(function (w) { if (!cnt[w]) { cnt[w] = 0; order.push(w); } cnt[w]++; }); });
+  order.sort(function (a, b) { return cnt[b] - cnt[a]; });
+  var top = order.slice(0, 4).map(function (w) { return '"' + w + '"' + (cnt[w] > 1 ? ' ×' + cnt[w] : ''); }).join(', ');
+  var s = '⚠️ ' + (staff || '(chưa rõ nhân viên)') + ' dùng từ cấm trong ' + vs.length + ' tin: ' + top + (order.length > 4 ? ' …' : '');
+  return s.length > 160 ? s.slice(0, 159) + '…' : s;
+}
+function _cvNotify_(admins, vs) {
+  if (!vs.length || !admins.length) return 0;
+  var byStaff = {}, keys = [];
+  vs.forEach(function (v) { var k = v.staff || ''; if (!byStaff[k]) { byStaff[k] = []; keys.push(k); } byStaff[k].push(v); });
+  var sh = getSheet_(SH_NOTIF, NOTIF_HEADERS), now = new Date().toISOString(), rows = [];
+  keys.forEach(function (k, ki) {
+    var list = byStaff[k], first = list[0], phone = first.phone || '';
+    admins.forEach(function (to, ai) {
+      rows.push(['nt_' + Date.now() + '_cv' + ki + '_' + ai + '_' + Math.floor(Math.random() * 1000), to, 'Giám sát chat', 'chatviolation',
+                 phone ? 'customer' : 'chatviolation', phone || first.convId || '', String(list.length), _cvNotifText_(k, list), now, '']);
+    });
+  });
+  if (rows.length) sh.getRange(sh.getLastRow() + 1, 1, rows.length, NOTIF_HEADERS.length).setValues(rows);
+  return rows.length;
+}
+function _cvEmail_(vs) {
+  var to = ''; try { to = String(getSetting_('chatAuditEmail') || '').trim(); } catch (e) {}
+  if (!to || !vs.length) return 0;
+  try {
+    var lines = vs.slice(0, 30).map(function (v) { return '• ' + (v.staff || '(chưa rõ nhân viên)') + ' · ' + (v.pageLabel || v.pageId) + ' · ' + (v.customer || v.phone || v.convId) + ' · từ cấm: ' + v.words.join(', ') + '\n   "' + v.snippet.slice(0, 160) + '"'; });
+    MailApp.sendEmail(to, '[CRM] ' + vs.length + ' tin chat dùng từ cấm', lines.join('\n') + (vs.length > 30 ? '\n… và ' + (vs.length - 30) + ' tin nữa (xem sheet ChatViolations)' : ''));
+    return 1;
+  } catch (e2) { return 0; }
+}
+// Bo sung phone/ten khach/nhan Page vao vi pham (1 truy van pk_conversations cho cac hoi thoai co vi pham).
+function _cvEnrich_(vs) {
+  var ids = {}, map = {};
+  vs.forEach(function (v) { if (v.convId) ids[v.convId] = 1; });
+  var keys = Object.keys(ids);
+  if (keys.length) {
+    try {
+      var q = keys.slice(0, 100).map(function (x) { return '"' + String(x).replace(/"/g, '') + '"'; }).join(',');
+      (sb_('GET', 'pk_conversations?select=id,customer_name,customer_phone&id=in.(' + _pkEnc_(q) + ')').json || []).forEach(function (c) { map[c.id] = c; });
+    } catch (e) { Logger.log('cv enrich: ' + e); }
+  }
+  var pm = {}; try { pm = readPancakePageMap_() || {}; } catch (e1) {}
+  vs.forEach(function (v) {
+    var c = map[v.convId] || {};
+    v.customer = c.customer_name || ''; v.phone = c.customer_phone ? normPhone_(String(c.customer_phone)) : '';
+    v.pageLabel = pm[v.pageId] || v.pageId;
+  });
+  return vs;
+}
+// Quet 1 lan: tu moc cvCursor den hien tai (toi da 5 trang x 500 tin). Tra ve {scanned, violations, notified, cursor, note}.
+function cvScanOnce_() {
+  var res = { scanned: 0, violations: 0, notified: 0, cursor: '', note: '' };
+  var props = PropertiesService.getScriptProperties(), lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) { res.note = 'dang chay luot khac'; return res; }
+  try {
+    var compiled = _cvBannedCompiled_();
+    if (!compiled.length) { res.note = 'chua doc duoc danh sach tu cam'; return res; }
+    var cursor = props.getProperty('cvCursor') || new Date(Date.now() - 3600 * 1000).toISOString();
+    var all = [], page = 0, last = cursor, n;
+    do {
+      var rows = sb_('GET', 'pk_messages?select=id,conversation_id,page_id,text,sent_at,staff_name,crm_user,fromraw:raw-%3Efrom&direction=eq.out&sent_at=gt.' + _pkEnc_(last) + '&order=sent_at.asc&limit=500').json || [];
+      n = rows.length; res.scanned += n;
+      if (n) { all = all.concat(cvScanMessages_(rows, compiled)); last = rows[n - 1].sent_at || last; }
+      page++;
+    } while (n === 500 && page < 5);
+    var vs = all;
+    if (vs.length) {
+      var sh = getSheet_(CV_SHEET, CV_HEADERS), have = {}, lr = sh.getLastRow();
+      if (lr >= 2) sh.getRange(Math.max(2, lr - 1999), 1, Math.min(2000, lr - 1), 1).getValues().forEach(function (r) { have[String(r[0])] = 1; });
+      vs = vs.filter(function (v) { return !have[v.id]; });
+      if (vs.length) {
+        _cvEnrich_(vs);
+        var now = new Date().toISOString();
+        var rowsOut = vs.map(function (v) { return [v.id, now, v.sentAt, v.pageLabel || v.pageId, v.convId, v.phone, v.customer, v.staff || '(chưa rõ nhân viên)', v.words.join(', '), v.snippet]; });
+        sh.getRange(sh.getLastRow() + 1, 1, rowsOut.length, CV_HEADERS.length).setValues(rowsOut);
+        res.notified = _cvNotify_(_cvAdmins_(), vs); _cvEmail_(vs);
+      }
+    }
+    res.violations = vs.length;
+    props.setProperty('cvCursor', last); res.cursor = last;
+    return res;
+  } catch (e) { res.note = 'loi: ' + (e && e.message || e); Logger.log('cvScanOnce_: ' + res.note); return res; }
+  finally { try { lock.releaseLock(); } catch (e9) {} }
+}
+function chatAuditScan() { var r = cvScanOnce_(); Logger.log('Giam sat chat: quet ' + r.scanned + ' tin, ' + r.violations + ' vi pham moi, ' + r.notified + ' thong bao. ' + (r.note || '')); return r; }
+function chayGiamSatChat() { return chatAuditScan(); }
+// Bat giam sat: tao trigger 5 phut/lan va dat moc quet tu gioQuaKhu gio truoc (mac dinh 1 gio; toi da 72).
+function batGiamSatChat(gioQuaKhu) {
+  var h = Math.min(72, Math.max(0, Number(gioQuaKhu) >= 0 ? Number(gioQuaKhu) : 1));
+  tatGiamSatChat();
+  ScriptApp.newTrigger('chatAuditScan').timeBased().everyMinutes(5).create();
+  PropertiesService.getScriptProperties().setProperty('cvCursor', new Date(Date.now() - h * 3600 * 1000).toISOString());
+  Logger.log('Da BAT giam sat chat (5 phut/lan), quet tu ' + h + ' gio truoc. Canh bao gui cho: ' + _cvAdmins_().join(', ') + '. Xem tu cam dang dung: xemTuCamGiamSat.');
+  return h;
+}
+function tatGiamSatChat() {
+  var n = 0;
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'chatAuditScan') { ScriptApp.deleteTrigger(t); n++; } });
+  Logger.log('Da tat giam sat chat (xoa ' + n + ' trigger).');
+  return n;
+}
+function xemTuCamGiamSat() {
+  var c = _cvBannedCompiled_();
+  Logger.log('Giam sat chat dung ' + c.length + ' tu/cum cam (da bo cac tu trong chatAuditIgnore). Nhan canh bao: ' + _cvAdmins_().join(', '));
+  c.forEach(function (w) { Logger.log('  - ' + w.raw + (w.thayThe ? '  → nen dung: ' + w.thayThe : '')); });
+  return c.length;
+}
+function datChatAuditBoQua(csv) { setSetting_('chatAuditIgnore', String(csv || '')); try { CacheService.getScriptCache().remove('cv_banned_v1'); } catch (e) {} Logger.log('Tu bo qua khi giam sat chat: ' + (csv || '(khong)')); return csv; }
+function datChatAuditAdmin(csv) { if (!String(csv || '').trim()) throw new Error('datChatAuditAdmin("duyenht")'); setSetting_('chatAuditAdmins', String(csv)); Logger.log('Nguoi nhan canh bao chat: ' + csv); return csv; }
+// GET chatViolations (CHI admin, bat buoc token hop le): danh sach vi pham moi nhat + tong hop.
+function cvList_(p) {
+  var u = null; try { u = p && p.token ? _sessUser_(p.token) : null; } catch (e) {}
+  if (!u || u.role !== 'admin') return { error: 'Chi admin xem duoc canh bao chat.', code: 'FORBIDDEN' };
+  var sh = getCrmSS_().getSheetByName(CV_SHEET), items = [], byStaff = {}, byWord = {};
+  if (sh && sh.getLastRow() >= 2) {
+    var v = sh.getRange(2, 1, sh.getLastRow() - 1, CV_HEADERS.length).getValues();
+    for (var i = v.length - 1; i >= 0; i--) {
+      var r = v[i]; if (!r[0]) continue;
+      var o = { id: String(r[0]), detectedAt: r[1] instanceof Date ? r[1].toISOString() : String(r[1]), sentAt: r[2] instanceof Date ? r[2].toISOString() : String(r[2]), page: r[3], convId: r[4], phone: r[5], customer: r[6], staff: r[7], words: r[8], snippet: r[9] };
+      if (items.length < 200) items.push(o);
+      byStaff[o.staff] = (byStaff[o.staff] || 0) + 1;
+      String(o.words).split(',').forEach(function (w) { w = w.trim(); if (w) byWord[w] = (byWord[w] || 0) + 1; });
+    }
+  }
+  return { ok: true, items: items, byStaff: byStaff, byWord: byWord, admins: _cvAdmins_() };
+}

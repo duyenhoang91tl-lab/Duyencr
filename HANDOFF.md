@@ -194,3 +194,4 @@ Yeu cau cua Duyen: Chat noi bo hien thi duoc o cua so chat nho o goc duoi phai (
 
 ## Báo cáo A/B "Theo Sale" lẫn người ngoài bộ lọc (kế toán, Mến)
 - Nguyên nhân: đơn có nhiều sale ("Kd + kế toán + Mến") → backend tạo thêm dòng cho người đồng bán dù không thuộc bộ lọc. Sửa phía giao diện `_srKeepSelectedSales_` (js/11): khi có chọn Sale/Team chỉ giữ dòng của người đã chọn (kể cả tên phụ); bỏ qua ở chế độ "người tạo đơn". Tổng/tiền chia đều vẫn do máy chủ tính. Test: tools/test-sr-keep-selected-sales.js.
+- [x] Giam sat chat Pancake GD1 (2026-10-17): quet pk_messages 'out' theo tu cam (sheet 'Luu y tu cam'), ghi ChatViolations + thong bao duyenht. Can Duyen: xemTuCamGiamSat, datChatAuditBoQua('tien, loc') neu bao ngap, batGiamSatChat(24). GD2 (canh bao ngay tren Pancake/extension) CHUA lam. Chi tiet: docs/GIAM-SAT-CHAT.md.
