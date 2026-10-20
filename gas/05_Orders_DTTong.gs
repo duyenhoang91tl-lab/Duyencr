@@ -909,9 +909,7 @@ function _donSaleNamesFromThe_(theStr) {
 // loai DUNG 4 trang thai "Hủy đơn", "Hoàn đơn", "Đã hoàn", "Đang hoàn" (khop TOAN BO chuoi, khong dau/khong
 // phan biet hoa-thuong; 'Đã hoàn' duoc Duyen xac nhan bo sung 2026-10-12 — ban 711bd52 lo bo mat) — KHAC HOAN TOAN quy tac cua Base (chi "Thất bại", xem EXCLUDED_ORDER_STATUSES_
 // o tren). Ham nay CHI duoc goi boi Bao cao B (+E che do Pos, F, G) — khong dung cho Base.
-// QUY TAC CUOI CUNG (Duyen 20/10/2026): DOANH THU Pos CHI loai DUNG 2 trang thai:
-// 'Da hoan' va 'Dang hoan' (cot O). KHONG loai 'Huy don' / 'Hoan don'.
-var POS_EXCLUDED_ORDER_STATUSES_ = ['da hoan', 'dang hoan'];
+var POS_EXCLUDED_ORDER_STATUSES_ = ['huy don', 'hoan don', 'da hoan', 'dang hoan'];
 function _donHasExcludedStatus_(trangThaiCol) {
   var s = _stripVN_(trangThaiCol).trim();
   if (!s) return false;

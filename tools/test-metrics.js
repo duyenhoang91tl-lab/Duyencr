@@ -16,13 +16,12 @@ const ctx = { SpreadsheetApp: svc(), CacheService: svc(), PropertiesService: svc
 vm.createContext(ctx);
 vm.runInContext(src, ctx, { filename: 'gas_v13.js' });
 
-// ---- Quy tac loai don cua POS (Duyen xac nhan 10/2026): CHI loai 'Hủy đơn', 'Đã hoàn', 'Đã hoàn', 'Đang hoàn' (khop CA chuoi,
+// ---- Quy tac loai don cua POS (Duyen xac nhan 10/2026): CHI loai 'Hủy đơn', 'Hoàn đơn', 'Đã hoàn', 'Đang hoàn' (khop CA chuoi,
 // khong dau, khong phan biet hoa/thuong). Commit 711bd52 lo bo mat 'Đã hoàn' nen don 'Đã hoàn' bi tinh la hop le (10 don thay vi 9) — Duyen xac nhan 12/10: 'Đã' va 'Đang hoàn' deu loai.
 const excl = t => vm.runInContext('_donHasExcludedStatus_(' + JSON.stringify(t) + ')', ctx);
-// QUY TAC MOI (Duyen 20/10/2026): CHI loai 'Đã hoàn' va 'Đang hoàn'; 'Hủy đơn'/'Hoàn đơn' KHONG con bi loai.
-ok(excl('Đã hoàn') && excl('Đang hoàn') && !excl('Hủy đơn') && !excl('Hoàn đơn'), 'POS CHI loai 2 trang thai: Da hoan, Dang hoan (Huy don, Hoan don KHONG loai)');
-ok(excl('ĐÃ HOÀN') && excl(' đang  hoàn '.replace('  ',' ')) && !excl('Huỷ đơn'), 'viet hoa, khoang trang van khop; Huy don (dau hoi) khong loai');
-ok(excl('  da hoan ') && excl('DANG HOAN'), 'khop khong dau/khong phan biet hoa-thuong, bo khoang trang');
+ok(excl('Hủy đơn') && excl('Hoàn đơn') && excl('Đã hoàn') && excl('Đang hoàn'), 'POS loai dung 4 trang thai: Huy don, Hoan don, Da hoan, Dang hoan');
+ok(excl('Huỷ đơn') && excl('ĐÃ HOÀN') && excl(' đang  hoàn '.replace('  ',' ')), 'bien the dau hoi (Huỷ), viet hoa, khoang trang van khop');
+ok(excl('HOÀN ĐƠN') && excl('  hoan don '), 'khop khong dau/khong phan biet hoa-thuong, bo khoang trang');
 ok(!excl('Hoàn thành') && !excl('') && !excl('Đã giao') && !excl('Hoàn tất'), 'trang thai khac (Hoan thanh, rong, Da giao, Hoan tat) KHONG bi loai — khop CA chuoi, khong khop mot phan');
 
 // ---- du lieu gia cho phan DOC sheet (ghi de sau khi nap) ----
@@ -51,7 +50,7 @@ const row = (ngay, phone, the, trangThai, gia, extra) => Object.assign({ ngayTao
 setDon([
   // lich su (ngoai ky): khach 0901 mua 01/09 (hop le), khach 0902 chi co don "Hoàn đơn" 02/09 (KHONG tinh la da mua), khach 0903 mua 20/09
   row('01/09/2026', '0901111111', 'anhNP1999', 'Hoàn thành', 1000000),
-  row('02/09/2026', '0902222222', 'anhNP1999', 'Đã hoàn', 500000),
+  row('02/09/2026', '0902222222', 'anhNP1999', 'Hoàn đơn', 500000),
   row('20/09/2026', '0903333333', 'dungnguyen1995', 'Hoàn thành', 700000),
   // trong ky
   row('05/10/2026', '0901111111', 'anhNP1999', 'Hoàn thành', 2000000),                      // A: khach cu (01/09) -> BAN LAI, 1 sale
@@ -155,8 +154,8 @@ setDon([
   row('05/10/2026', '0901111111', 'anhNP1999', 'Hoàn thành', 2000000),
   row('06/10/2026', '0904444444', 'anhNP1999, dungnguyen1995', 'Hoàn thành', 4000000),
   row('07/10/2026', '0905555555', 'dungnguyen1995', 'Đã hoàn', 900000),
-  row('08/10/2026', '0906666666', 'anhNP1999', 'Đã hoàn', 300000),
-  row('08/10/2026', '0907777777', 'cuong2000', 'Đang hoàn', 700000),      // chi co don huy/hoan, khong co doanh thu / KPI
+  row('08/10/2026', '0906666666', 'anhNP1999', 'Hoàn đơn', 300000),
+  row('08/10/2026', '0907777777', 'cuong2000', 'Hủy đơn', 700000),      // chi co don huy/hoan, khong co doanh thu / KPI
 ]);
 vm.runInContext(`
   var __CALLS__ = { B: 0, G: 0 };
