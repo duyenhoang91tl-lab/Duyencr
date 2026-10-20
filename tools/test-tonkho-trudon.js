@@ -11,7 +11,8 @@ function fnSrc(name) {
 }
 const a0 = src.indexOf('var SH_KHO ='), a1 = src.indexOf('var PK_CHAT_SECTION_ =');
 const code = [fnSrc('normPhone_'), fnSrc('_stripVN_'), 'var VN_OFFSET_MS = 7 * 3600 * 1000;', fnSrc('_vnMidnight_'), fnSrc('_vnYmdParts_'), fnSrc('parseVNDate_'), fnSrc('splitMulti_'),
-  "var POS_EXCLUDED_ORDER_STATUSES_ = ['huy don', 'hoan don', 'da hoan', 'dang hoan'];", fnSrc('_donHasExcludedStatus_'), src.slice(a0, a1)].join('\n');
+  "var POS_EXCLUDED_ORDER_STATUSES_ = ['huy don', 'hoan don', 'da hoan', 'dang hoan'];", src.slice(src.indexOf('var BIZ_RULES_DEFAULT_ ='), src.indexOf('// Loai don khoi doanh so/so don cho cac BAO CAO')), // quy tac cau hinh duoc (bizRules); khong co getSetting_ => mac dinh
+  fnSrc('_donHasExcludedStatus_'), src.slice(a0, a1)].join('\n');
 const ok = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1); } };
 const J = x => JSON.stringify(x);
 
