@@ -1,6 +1,12 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-10-20 — Nhập file Base/Pos an toàn (Báo cáo I)
+- [x] gas_v13.js `doImportSheetRows_`: thêm `dryRun` (chỉ đếm, không ghi); BỎ khử trùng toàn sheet sau khi ghi (có thể xóa nhầm dòng CŨ); kiểm tra số dòng sau ghi. Chỉ NỐI THÊM dòng mới, đơn đã có (theo khóa đơn chuẩn hóa) thì BỎ QUA, không ghi đè/xóa. Test: `node tools/test-import-safe.js`.
+- [x] js/11-fn-srload.js `_impUpload`: bấm Nhập → xem trước (N mới / M đã có) → xác nhận mới ghi. Backend cũ không có dryRun vẫn chạy được (không ghi 2 lần).
+- [x] (20/10, lần 2) CẬP NHẬT đơn cũ khi file mới đổi: client gửi `updateExisting:true`; backend chỉ ghi các ô file có giá trị MỚI khác rỗng và khác cũ (so sánh chuẩn hóa ngày/tiền/chữ), KHÔNG xóa trắng ô cũ, KHÔNG ghi đè ô công thức, bỏ cột STT (Pos) và Mã bộ đếm (Base), tối đa 1500 đơn/lần, giá trị cũ ghi vào sheet "Nhật ký cập nhật nhập file" (thoiGian, sheet, dong, khoaDon, cot, giaTriCu, giaTriMoi) để khôi phục tay. Client cũ không gửi cờ → chỉ bỏ qua như trước.
+- [ ] CẦN LÀM TIẾP: nút "Hoàn tác lần nhập" đọc nhật ký để trả giá trị cũ (chưa làm). Nút "Đẩy dữ liệu" (saveOrders) vẫn bị tắt ở backend — chủ ý.
+
 ## 2026-10-19 — Sửa nền/size khung navy (L1)
 - [x] css/13-shell.css: margin-left 240px chuyển từ #data-view sang .app (+ bo góc 16px, overflow:hidden); bỏ `background:var(--bg)` ở #data-view để nền xanh gradient của `html.ui-pro .main` hiện lại. Cache-bust `?v=20261019a`.
 - [ ] CẦN LÀM TIẾP: Duyên xem lại màn thật (reload cứng Ctrl+F5) — nếu sidebar lọc KH còn chiếm chỗ không mong muốn thì cân nhắc thêm nút ẩn sidebar; kiểm tra các tab khác (Báo cáo, Chat) cùng bố cục.

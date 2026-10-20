@@ -1038,3 +1038,12 @@ body:not(.show-guides) .pro-ai-hint{display:none !important;}
 /* (18/10/2026) Bỏ dòng tóm tắt "Sale (18)" dưới thanh công cụ (đã có trong 🔎 Bộ lọc); "✕ Xoá lọc" chỉ hiện khi KHÔNG có nút ✕ Tắt lọc nhanh (lọc tay, không dùng mẫu) */
 .srb-bar .srb-m-sum{display:none !important;}
 .srb-bar:has(.fp-off) .srb-m-x{display:none !important;}
+/* Bộ lọc + Thư mục của Social > Chat (18/10/2026): cả hai ẩn mặc định, bấm nút mới hiện */
+.sc-ftools{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid var(--border);}
+.sc-ftools .btn.on{border-color:var(--green);color:var(--green);font-weight:600;}
+.sc-fx{font-size:11.5px;color:var(--red);text-decoration:none;cursor:pointer;margin-left:auto;}
+.sc-fpanel{display:grid;grid-template-columns:1fr 1fr;gap:6px 8px;padding:8px;border-bottom:1px solid var(--border);background:var(--surface2);}
+.sc-fl{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--muted);min-width:0;}
+.sc-fl select{width:100%;box-sizing:border-box;font-size:12px;padding:5px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);}
+.sc-fnote{grid-column:1/-1;font-size:11px;color:var(--muted);}
+
