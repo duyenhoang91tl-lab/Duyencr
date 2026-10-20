@@ -123,3 +123,8 @@ Công thức (Duyên chốt): **Tỷ lệ chốt = số đơn Base do Sale TẠO
 ## Tổng quan: thẻ "Doanh thu Pos" (2026-10-16)
 `js/42-fn-homesummary.js` — thẻ 💰 lấy **tổng của Báo cáo B** (`totalGiaTri` / `totalOrders` của action `salesReportB`, cùng lần gọi với "Nguồn khách"): TOÀN CÔNG TY khi không lọc Phòng/Team/tên, theo bộ lọc khi có lọc (ghi rõ "toàn công ty" / "theo bộ lọc"). Lỗi trước đó: thẻ lấy `c.revenue` từ `_ovAgg` (cộng số theo từng người của Tổng quan) nên hiện 0đ trong khi Nguồn khách hiện hàng tỷ. Đang tải hiện "…", lỗi tải B hiện "—" (không bao giờ hiện 0đ giả). Test: `node tools/test-home-revenue.js` (jsdom).
 
+
+## Lọc Sale: bảng "Theo Sale bán"/"Theo Team Sale" chỉ hiện người trong bộ lọc (2026-10-17, GAS v13.57-saleonly)
+- Lỗi (Duyên báo: lọc 16 Sale nhưng bảng vẫn có `menbui2002`, `phongketoan`): bộ lọc Sale chọn **đơn** có ÍT NHẤT 1 sale trong danh sách, rồi các bảng Theo Sale/Theo Team cộng dồn **mọi sale có trên đơn** → người đồng bán (kế toán…) lọt vào. Sửa ở Báo cáo A, B (POS), C và Đơn thất bại bằng hàm chung `_saleWantedFn_` (so khớp tên + tên khác của cùng người): khi có lọc Sale, vòng cộng bỏ qua người ngoài bộ lọc.
+- KHÔNG đổi: tiền vẫn chia đều theo TỔNG số sale trên đơn (phần của từng người giữ nguyên); các thẻ KPI tổng (tổng đơn/tổng tiền) vẫn là tổng các đơn khớp bộ lọc — nên tổng của bảng có thể nhỏ hơn thẻ KPI khi đơn có người đồng bán ngoài bộ lọc.
+- Test: `node tools/test-sale-filter-cosellers.js` (A và C chạy hàm thật, có đối chứng âm tính trên mã cũ; B và Đơn thất bại kiểm tra tĩnh).

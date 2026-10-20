@@ -558,6 +558,7 @@ function buildSalesReportC_(filters) {
   var UNASSIGNED = '(chưa gán sale)';
   var saleFilterArr = Array.isArray(filters.sale) ? filters.sale.filter(function(s){return s;}) : [];
   var saleFilterFoldC = _expandSaleFilterWithPancakeAliases_(saleFilterArr).map(_normTxt_);
+  var wantSaleC_ = _saleWantedFn_(saleFilterFoldC);
   var kenhFilterArr = Array.isArray(filters.kenh) ? filters.kenh.filter(function(s){return s;}) : [];
   var sanPhamTerms = _foldTermsCSV_(filters.sanPham);
   // Giong het quy uoc "Tinh theo nguoi tao don" cua buildSalesReportA_: tich thi tinh TRON VEN
@@ -591,6 +592,7 @@ function buildSalesReportC_(filters) {
         if (salesList.length === 0) salesList = [UNASSIGNED];
         var n = salesList.length;
         for (var k = 0; k < salesList.length; k++) {
+          if (!wantSaleC_(salesList[k])) continue;   // dang loc Sale: khong liet ke nguoi dong ban nam ngoai bo loc
           bySale[salesList[k]] = (bySale[salesList[k]] || 0) + row.giaTriDon / n;
         }
       }

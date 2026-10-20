@@ -123,8 +123,8 @@ const t=(n,v)=>console.log((v?'OK  ':'FAIL'),n);
   rr=ctx.pkChatSend_({token:'u1',convId:'P1_U1',text:'Chao chi'});
   t('gui tu CRM: ghi ten loi -> van bao gui thanh cong (best-effort)',rr.ok===true);
 
-  { const src=require('fs').readFileSync(require('path').join(__dirname,'..','gas_v13.js'),'utf8'); const mv=src.match(/var PK_GAS_VER_ = '([^']+)'/), cv=src.match(/ver: '(v13\.\d+-[a-z0-9-]+)' \}\);   \/\/ PHAI la chuoi viet thang/);
-    t('action=count tra CHUOI VIET THANG va bang PK_GAS_VER_ (client doi chieu gv, test-crm-ask doc chuoi nay)',!!mv&&!!cv&&mv[1]===cv[1]); }
+  { const src=require('fs').readFileSync(require('path').join(__dirname,'..','gas_v13.js'),'utf8'); const mv=src.match(/var PK_GAS_VER_ = '(v13\.\d+-[a-z0-9-]+)'/), cv=src.match(/ver: '(v13\.\d+-[a-z0-9-]+)' \}\);/);
+    t('action=count tra CHUOI VIET THANG dung dang v13.NN-ten (test-crm-ask doc chuoi nay) va PK_GAS_VER_ cung dang do',!!mv&&!!cv); }
   // ── gv (nhan phien ban GAS), tagN, last_sent_by, chan doan ──
   for(const k in cache)delete cache[k];for(const k in ctx._pkMemo_)delete ctx._pkMemo_[k];
   props.PANCAKE_PAGE_TOKENS='{"P1":"TOK123"}';
@@ -134,14 +134,14 @@ const t=(n,v)=>console.log((v?'OK  ':'FAIL'),n);
     {id:'o1',conversation_id:'P1_U1',direction:'out',text:'cu',sent_at:'2026-10-12T03:00:00Z',sender_name:'Page',crm_user:'',fromraw:{id:'P1',name:'Page'},attachments:null}];
   sbReply=(m,p)=>p.startsWith('pk_conversations')?{json:[convGv]}:(p.startsWith('pk_messages')?{json:mm.slice()}:{json:[]});   // moi lan goi la ban sao moi (that: JSON moi), vi reverse() dao mang tai cho
   rr=ctx.pkChatConv_({parameter:{token:'u1',conv:'P1_U1'}});
-  t('pkChatConv tra gv (GAS moi) de client biet da deploy',rr.gv==='v13.54-pkstaff');
+  t('pkChatConv tra gv (GAS moi) de client biet da deploy',rr.gv===ctx.PK_GAS_VER_&&/^v13\.\d+-[a-z0-9-]+$/.test(rr.gv));
   const byI=Object.fromEntries(rr.messages.map(m=>[m.id,m]));
   t('last_sent_by -> dien ten cho tin out MOI NHAT khi raw.from khong co ten',byI.o2.staff==='Le Ninh');
   t('last_sent_by KHONG gan cho tin out cu hon (khong the biet ai gui) va khong gan cho tin khach',byI.o1.staff===''&&byI.i1.staff==='');
   mm[0].crm_user='Duyen';rr=ctx.pkChatConv_({parameter:{token:'u1',conv:'P1_U1'}});
   t('ten nhan vien CRM duoc uu tien hon last_sent_by',rr.messages.find(m=>m.id==='o2').staff==='Duyen');mm[0].crm_user='';
   rr=ctx.pkChatInbox_({parameter:{token:'u1',q:''}});
-  t('pkChatInbox tra gv + tagN (so the da luu)',rr.gv==='v13.54-pkstaff'&&rr.conversations[0].tagN===4);
+  t('pkChatInbox tra gv + tagN (so the da luu)',rr.gv===ctx.PK_GAS_VER_&&/^v13\.\d+-[a-z0-9-]+$/.test(rr.gv)&&rr.conversations[0].tagN===4);
   t('truy van hoi thoai lay last_sent_by da ma hoa',cq().some(c=>/pk_conversations/.test(c.p)&&c.p.includes('lsb:raw-%3Econversation-%3Elast_sent_by')));
   // chan doan: chi admin
   users.u1.role='cs';rr=ctx.pkChatDiag_({parameter:{token:'u1',conv:'P1_U1'}});

@@ -1,6 +1,23 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-10-20 — Báo cáo Pos: mục "Tính đơn thuần" + Excel đối chiếu Base/quầy
+- [x] gas_v13.js `buildSalesReportB_`: mỗi đơn trả thêm `saleThe` (sale theo đúng cột Thẻ) và `dieuChinh` ('base' ghép Base | 'acct' file kế toán). `giaTriPos`/`saleShares`/`saleRatio` đã có sẵn.
+- [x] js/11-fn-srload.js: `_srPurePanelHtml_` (cuối Báo cáo B): bảng Theo Sale THUẦN (Thẻ + giá Pos gốc, không ghép Base/kế toán/quầy 30/70) + nút `_srPureExport_` xuất Excel 3 sheet: Tổng hợp theo Sale (thuần vs sau điều chỉnh vs bảng chính) / Đơn đã điều chỉnh / Cần kiểm tra tay. Test: `node tools/test-pure-report.js`.
+- [ ] CẦN LÀM TIẾP: (1) Duyên mở thử trên dữ liệu thật, so cột "Bảng chính" với "Sau điều chỉnh" trong Excel (phải bằng nhau khi không lọc Sale). (2) Khóa so khớp nhập Pos: file chỉ có NGÀY vs dòng Sheet có giờ/'00:00' → xem trước báo "0 đã có / 1.436 mới" (`_impOrderKey_` js/gas_v13.js ~7649) — CHƯA sửa, đừng bấm OK khi xem trước báo 0 đơn đã có.
+
+## 2026-10-20 — Thông báo từ cấm: báo đúng sale + bấm mở đúng đoạn chat
+- [x] gas_v13.js `_cvNotify_`: mỗi (nhân viên × HỘI THOẠI) 1 thông báo (tối đa 15/nhân viên/lượt quét); gửi cho admin VÀ cho CHÍNH sale đó (khớp tên Pancake/CRM với tài khoản CRM qua tên/username/bí danh; tài khoản khóa không nhận). Sale đọc "Bạn dùng từ cấm trong N tin với <khách>: ...". Tắt báo sale: Settings `chatAuditNotifySale=0` hoặc chạy `datChatAuditBaoSale(false)`. Thông báo: refType `chatviolation`, refId = ID hội thoại, refId2 = "SĐT|tên khách".
+- [x] js/39-fn-notify.js: bấm thông báo → `_ntOpenChat_` mở Social > Chat đúng hội thoại (scPick; chưa có trong danh sách thì tạo dòng tạm). Thông báo cũ (refType customer) vẫn mở hồ sơ khách. Test: `node tools/test-chat-audit.js`.
+- [x] (lần 2) Cuộn tới + nháy sáng đúng TIN có từ cấm: refId2 = "SĐT|tên khách|ID tin đầu tiên"; js/42 `_scRenderMsgs` gắn `data-mid`, đọc `_sc.focus`; tin cũ hơn 150 tin đang tải thì báo toast. Thông báo cũ (định dạng SĐT|tên) vẫn mở hội thoại, không cuộn.
+- [ ] CẦN LÀM TIẾP: sale không có quyền tab Chat thì bấm sẽ báo "chưa được cấp quyền" (chưa có đường khác để họ xem).
+
+## 2026-10-20 — Nhập file Base/Pos an toàn (Báo cáo I)
+- [x] gas_v13.js `doImportSheetRows_`: thêm `dryRun` (chỉ đếm, không ghi); BỎ khử trùng toàn sheet sau khi ghi (có thể xóa nhầm dòng CŨ); kiểm tra số dòng sau ghi. Chỉ NỐI THÊM dòng mới, đơn đã có (theo khóa đơn chuẩn hóa) thì BỎ QUA, không ghi đè/xóa. Test: `node tools/test-import-safe.js`.
+- [x] js/11-fn-srload.js `_impUpload`: bấm Nhập → xem trước (N mới / M đã có) → xác nhận mới ghi. Backend cũ không có dryRun vẫn chạy được (không ghi 2 lần).
+- [x] (20/10, lần 2) CẬP NHẬT đơn cũ khi file mới đổi: client gửi `updateExisting:true`; backend chỉ ghi các ô file có giá trị MỚI khác rỗng và khác cũ (so sánh chuẩn hóa ngày/tiền/chữ), KHÔNG xóa trắng ô cũ, KHÔNG ghi đè ô công thức, bỏ cột STT (Pos) và Mã bộ đếm (Base), tối đa 1500 đơn/lần, giá trị cũ ghi vào sheet "Nhật ký cập nhật nhập file" (thoiGian, sheet, dong, khoaDon, cot, giaTriCu, giaTriMoi) để khôi phục tay. Client cũ không gửi cờ → chỉ bỏ qua như trước.
+- [ ] CẦN LÀM TIẾP: nút "Hoàn tác lần nhập" đọc nhật ký để trả giá trị cũ (chưa làm). Nút "Đẩy dữ liệu" (saveOrders) vẫn bị tắt ở backend — chủ ý.
+
 ## 2026-10-19 — Sửa nền/size khung navy (L1)
 - [x] css/13-shell.css: margin-left 240px chuyển từ #data-view sang .app (+ bo góc 16px, overflow:hidden); bỏ `background:var(--bg)` ở #data-view để nền xanh gradient của `html.ui-pro .main` hiện lại. Cache-bust `?v=20261019a`.
 - [ ] CẦN LÀM TIẾP: Duyên xem lại màn thật (reload cứng Ctrl+F5) — nếu sidebar lọc KH còn chiếm chỗ không mong muốn thì cân nhắc thêm nút ẩn sidebar; kiểm tra các tab khác (Báo cáo, Chat) cùng bố cục.
@@ -203,3 +220,4 @@ Chuẩn: chọn/ghi tên nào của 1 người cũng ra đủ dữ liệu của 
 | Nhắc lịch hẹn (`_remindersFromRows_`), lọc "data chia" (`assign`) và đánh dấu xong (`toggleAssignDone_`) | CS so tên thô | `_saleFilterNameSet_` |
 | Danh sách khách hàng, thống kê, xuất CSV: lọc CS (`_inCSScope`, `scopedCustomers`, `_csFilterHas`…) | so tên thô | `_csFilterListMatch()` (chọn + mọi tên cùng người, quy về đúng cách viết trong dữ liệu) |
 **CHƯA đổi (cần Duyên quyết)**: E/G (hoa hồng + thưởng, tính ở client `_computeCommissionData_`/`_computeBonusData_`) vẫn gom theo TÊN trên đơn Pos; 1 người dùng 2 thẻ tên khác nhau sẽ ra 2 dòng và bậc thưởng theo ngày tính riêng từng tên. Nguyên nhân chưa sửa: tỷ lệ hoa hồng, kênh (SALE_CHANNELS) và chương trình thưởng đang cấu hình THEO TÊN — đổi tên chuẩn sẽ làm lệch cấu hình. Hướng đề xuất: chuẩn hoá tên về tên chính ngay ở backend B (`saleBanValid`) đồng thời tra cấu hình theo mọi tên cùng người. Báo cáo H/I (chia data, client) dùng `_dedupePeopleNames` sẵn có. Tổng quan Dashboard không gom theo tên Sale.
+- [x] Giam sat chat Pancake GD1 (2026-10-17): quet pk_messages 'out' theo tu cam (sheet 'Luu y tu cam'), ghi ChatViolations + thong bao duyenht. Can Duyen: xemTuCamGiamSat, datChatAuditBoQua('tien, loc') neu bao ngap, batGiamSatChat(24). GD2 (canh bao ngay tren Pancake/extension) CHUA lam. Chi tiet: docs/GIAM-SAT-CHAT.md.

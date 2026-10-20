@@ -268,6 +268,7 @@ function buildSalesReportA_(filters) {
   var byCreator = !!filters.byCreator;
   // Bộ lọc Sale: mở rộng sang mọi tên cùng 1 người (tài khoản nhiều tên) + tên Pancake, so không phân biệt hoa/thường.
   var saleFilterFoldA = _expandSaleFilterWithPancakeAliases_(saleFilterArr).map(_normTxt_);
+  var wantSaleA_ = _saleWantedFn_(saleFilterFoldA);
 
   var rows = readDTTong_(true);
   var matched = [];
@@ -349,9 +350,7 @@ function buildSalesReportA_(filters) {
       var teamsOnOrder = {};
       for (var k = 0; k < salesList.length; k++) {
         var sName = salesList[k];
-        // Dang LOC theo Sale: don co nhieu sale (vd "ninhnga99, menbui2002") chi hien dong cua nguoi DUOC CHON; sale khong chon tren cung don (menbui2002, phongketoan...)
-        // khong ve them dong. Tien van chia deu cho TAT CA N sale tren don nen phan cua nguoi duoc chon khong doi.
-        if (saleFilterFoldA.length && saleFilterFoldA.indexOf(_normTxt_(sName)) === -1) continue;
+        if (!wantSaleA_(sName)) continue;   // dang loc Sale: khong liet ke nguoi dong ban nam ngoai bo loc (n van la TONG sale tren don nen tien chia khong doi)
         if (!bySale[sName]) bySale[sName] = { orders: 0, coc: 0, giaTri: 0 };
         bySale[sName].orders += 1;                 // so don: khong chia
         bySale[sName].coc += m.giaTriCoc / n;       // tien: chia deu cho N sale

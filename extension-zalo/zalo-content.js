@@ -361,6 +361,78 @@
     addEl(priceWrap, 'div', {id:'zai-price-ai', style:'display:none;'});
     addEl(priceWrap, 'div', {id:'zai-price-result', style:'max-height:340px;overflow-y:auto;'});
 
+    // 🧾 Đơn hàng đang tính (giỏ hàng theo SĐT) — giống Pancake AI. S1: luôn hiện sẵn để dùng "＋ Thêm dòng thủ công"; S2 (bộ chọn sản phẩm) sẽ chuyển sang kiểu ẩn-cho-đến-khi-dùng.
+    const cartSection = document.createElement('div');
+    cartSection.id = 'zai-cart-section';
+    cartSection.dataset.everOpened = '1';
+    cartSection.innerHTML = `          <div id="zai-cart-header" style="display:flex;justify-content:space-between;align-items:center">
+            <span>🧾 Đơn hàng đang tính (<span id="zai-cart-count">0</span>)</span>
+            <label style="font-size:10.5px;font-weight:400;color:#831843;display:flex;align-items:center;gap:3px">
+              <input type="checkbox" id="zai-cart-price-k" /> Nhập giá theo nghìn (k)
+            </label>
+          </div>
+          <div id="zai-cart-list"></div>
+          <div id="zai-cart-addrow">
+            <button id="zai-cart-add-manual" title="Thêm 1 dòng sản phẩm tự nhập (khi hệ thống tính sai hoặc không tra được)">＋ Thêm dòng thủ công</button>
+          </div>
+          <div id="zai-cart-extra">
+            <div class="zai-cart-extra-row">
+              <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+                <input type="checkbox" id="zai-cart-showcust" /> + Thêm thông tin KH (tên, SĐT, địa chỉ)
+              </label>
+            </div>
+            <div id="zai-cart-custinfo" style="display:none">
+              <div class="zai-cart-extra-row">
+                <label>Danh xưng</label>
+                <select id="zai-cart-honorific" style="width:76px">
+                  <option value="">—</option>
+                  <option value="Anh">Anh</option>
+                  <option value="Chị">Chị</option>
+                </select>
+                <input type="text" id="zai-cart-custname" placeholder="Tên khách hàng" style="flex:1" />
+                <input type="text" id="zai-cart-custphone" placeholder="SĐT" style="width:110px" />
+              </div>
+              <div class="zai-cart-extra-row">
+                <label>📍 Địa chỉ</label>
+                <input type="text" id="zai-cart-address" placeholder="Địa chỉ giao hàng..." style="flex:1" />
+              </div>
+            </div>
+            <div class="zai-cart-extra-row">
+              <label>🎁 Quà tặng kèm</label>
+              <input type="text" id="zai-cart-gift" placeholder="VD: tặng 1 vòng phong thủy nhỏ..." />
+            </div>
+            <div class="zai-cart-extra-row">
+              <label>Giảm giá tổng</label>
+              <select id="zai-cart-discount-type">
+                <option value="none">Không giảm</option>
+                <option value="percent">% </option>
+                <option value="amount">Số tiền</option>
+              </select>
+              <input type="number" id="zai-cart-discount-value" placeholder="0" min="0" style="display:none" />
+              <span style="font-size:10px;color:#9d174d;opacity:.8;display:block;width:100%">Chỉ áp dụng cho SP có tích "Tính vào Giảm giá tổng" ở từng dòng bên trên</span>
+            </div>
+            <div class="zai-cart-extra-row">
+              <label id="zai-cart-gold-label">Thêm vàng (SL × 350.000đ)</label>
+              <input type="number" id="zai-cart-gold" placeholder="0" min="0" title="Nhập số lượng — mỗi đơn vị = 350.000đ (VD: 2 = 700.000đ). Đơn giá do admin cài trên CRM." />
+            </div>
+            <div class="zai-cart-extra-row">
+              <label><input type="checkbox" id="zai-cart-freeship" /> Freeship</label>
+              <span style="font-size:10px;color:#9d174d;opacity:.8">không tích → tự cộng 40k ship</span>
+            </div>
+            <div class="zai-cart-extra-row">
+              <label>Trạng thái đơn</label>
+              <input type="text" id="zai-cart-status" placeholder="VD: ĐÃ CHUYỂN FULL - khách qua cửa hàng lấy" style="flex:1" />
+            </div>
+          </div>
+          <div id="zai-cart-total"></div>
+          <div id="zai-cart-actions">
+            <button id="zai-cart-copy">📋 Sao chép đơn hàng</button>
+            <button id="zai-cart-clear">🗑 Xoá hết</button>
+          </div>
+          <div id="zai-cart-msg"></div>
+        `;
+    body.appendChild(cartSection);
+
     body.appendChild(Object.assign(document.createElement('hr'), {className:'zai-div'}));
 
     // ── 2. AI SECTION (len tren) ──
@@ -486,6 +558,7 @@
     document.getElementById('zai-lookup-btn').addEventListener('click', doLookup);
     document.getElementById('zai-price-btn').addEventListener('click', doPriceSearchZai_);
     document.getElementById('zai-price-ai-btn').addEventListener('click', askPriceAiZai_);
+    bindCartZai_();   // sau khi panel da nam trong tai lieu (cac listener dung document.getElementById)
     document.getElementById('zai-price-q').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') doPriceSearchZai_();
     });
@@ -1113,6 +1186,429 @@
     } catch (e) {
       box.innerHTML = '<div style="color:#1e3a8a;font-size:11.5px;font-style:italic;padding:4px 0">Lỗi kết nối: ' + escHtml(e.message) + '</div>';
     }
+  }
+
+  // ── SOAN DON — S1: GIO HANG (giong "Don hang dang tinh" cua Pancake AI, quy tac song song) ──
+  // Gio hang luu THEO TUNG SDT khach (chrome.storage.local, rieng may nay): dong san pham (ten/SL/gia/chat lieu tick nhieu/mau/size/CTKM rieng/ghi chu), thong tin KH,
+  // qua tang, giam giá tong (chi tren SP duoc tich), them vang (SL x don gia vang tu GAS 'goldUnitAmount'), freeship (khong tich = +40k), tong don va TIN NHAN TONG KET de sao chep.
+  // Ma ham ben duoi DAN XUAT CO HOC tu Pancake. Khac biet co chu y: (1) tu cam "Luu y tu cam" (getKnowledge) chi ap dung Messenger/Facebook nen _zaiBannedWords de rong,
+  // con 3 quy tac doi ten san pham (PRODUCT_NAME_OVERRIDES) van ap dung nhu Pancake; (2) nut "Tinh CT" tu dong + CTKM theo san pham la S3; (3) bo chon san pham them vao gio la S2.
+  let _zaiBannedWords = [];
+  let _zaiGoldUnitAmount = 350000;   // don gia 1 don vi "vang" (d); admin cai o CRM (gear Cai dat > Don gia vang) — setting chung GAS 'goldUnitAmount'
+  function _zaiCartStatus_(text) { const el = document.getElementById('zai-cart-msg'); if (el) el.textContent = text; }
+  // Tuong duong handleGetGoldUnit o pancake-background.js: loi/chua cau hinh -> mac dinh 350.000d
+  async function loadGoldUnitAmountZai_() {
+    let n = NaN;
+    try {
+      if (GAS_URL) {
+        const res = await fetch(GAS_URL + (GAS_URL.includes('?') ? '&' : '?') + 'action=getSetting&key=goldUnitAmount', { redirect: 'follow' });
+        n = Number((await res.json())?.value);
+      }
+    } catch (e) { /* het cach, dung mac dinh */ }
+    _zaiGoldUnitAmount = (n > 0) ? n : 350000;
+    updateGoldUnitLabelZai_();
+  }
+  // Doi SDT (doi hoi thoai) -> nap gio hang cua SDT do (Zalo khong co su kien rieng nen kiem tra moi giay)
+  let _zaiCartWatchPhone = null;
+  function startCartWatchZai_() {
+    setInterval(() => { if (_currentPhone !== _zaiCartWatchPhone) { _zaiCartWatchPhone = _currentPhone; loadCartForCurrentPhoneZai_(); } }, 1000);
+  }
+  function bindCartZai_() {
+  document.getElementById('zai-cart-add-manual').addEventListener('click', () => {
+        document.getElementById('zai-cart-section').dataset.everOpened = '1';
+        addToCartZai_({ name: '', note: '', price: 0, qty: 1 });
+        // focus ngay vao o ten cua dong vua them cho de go
+        setTimeout(() => {
+          const rows = document.querySelectorAll('#zai-cart-list .zai-cart-name');
+          if (rows.length) rows[rows.length - 1].focus();
+        }, 30);
+      });
+      document.getElementById('zai-cart-showcust').addEventListener('change', (e) => {
+        _zaiCartExtra.showCustInfo = e.target.checked;
+        document.getElementById('zai-cart-custinfo').style.display = e.target.checked ? '' : 'none';
+        saveCartZai_();
+      });
+      document.getElementById('zai-cart-honorific').addEventListener('change', (e) => { _zaiCartExtra.honorific = e.target.value; saveCartZai_(); });
+      document.getElementById('zai-cart-custname').addEventListener('input', (e) => { _zaiCartExtra.custName = e.target.value; });
+      document.getElementById('zai-cart-custname').addEventListener('change', () => { saveCartZai_(); });
+      document.getElementById('zai-cart-custphone').addEventListener('input', (e) => { _zaiCartExtra.custPhone = e.target.value; });
+      document.getElementById('zai-cart-custphone').addEventListener('change', () => { saveCartZai_(); });
+      document.getElementById('zai-cart-address').addEventListener('input', (e) => { _zaiCartExtra.address = e.target.value; });
+      document.getElementById('zai-cart-address').addEventListener('change', () => { saveCartZai_(); });
+      document.getElementById('zai-cart-status').addEventListener('input', (e) => { _zaiCartExtra.status = e.target.value; });
+      document.getElementById('zai-cart-status').addEventListener('change', () => { saveCartZai_(); });
+      document.getElementById('zai-cart-gift').addEventListener('input', (e) => { _zaiCartExtra.gift = e.target.value; });
+      document.getElementById('zai-cart-gift').addEventListener('change', () => { saveCartZai_(); });
+      document.getElementById('zai-cart-discount-type').addEventListener('change', (e) => {
+        _zaiCartExtra.discountType = e.target.value;
+        document.getElementById('zai-cart-discount-value').style.display = e.target.value === 'none' ? 'none' : '';
+        saveCartZai_(); _zaiRenderCartTotal_();
+      });
+      document.getElementById('zai-cart-discount-value').addEventListener('input', (e) => {
+        _zaiCartExtra.discountValue = Number(e.target.value) || 0; _zaiRenderCartTotal_();
+      });
+      document.getElementById('zai-cart-discount-value').addEventListener('change', () => { saveCartZai_(); });
+      document.getElementById('zai-cart-gold').addEventListener('input', (e) => { _zaiCartExtra.gold = Math.max(0, Number(e.target.value) || 0); _zaiRenderCartTotal_(); });
+      document.getElementById('zai-cart-gold').addEventListener('change', () => { saveCartZai_(); });
+      document.getElementById('zai-cart-freeship').addEventListener('change', (e) => {
+        _zaiCartExtra.freeship = e.target.checked; saveCartZai_(); _zaiRenderCartTotal_();
+      });
+      document.getElementById('zai-cart-price-k').addEventListener('change', (e) => {
+        _zaiCartExtra.priceInK = e.target.checked; saveCartZai_(); renderCartZai_(); // render lai de doi hien thi cac dong gia da co
+      });
+      document.getElementById('zai-cart-copy').addEventListener('click', () => {
+        const text = _zaiBuildCartSummaryText_();
+        if (!text.trim()) { _zaiCartStatus_('Chưa có sản phẩm nào được tick trong đơn.'); return; }
+        navigator.clipboard.writeText(text).then(() => {
+          _zaiCartStatus_('📋 Đã sao chép đơn hàng — dán vào khung chat để gửi khách.');
+        }).catch(() => { _zaiCartStatus_('Không sao chép được, hãy bôi đen và copy thủ công.'); });
+      });
+      document.getElementById('zai-cart-clear').addEventListener('click', () => {
+        if (!_zaiCartItems.length) return;
+        if (!confirm('Xoá toàn bộ đơn hàng đang tính cho khách này?')) return;
+        _zaiCartItems = [];
+        _zaiCartExtra = { showCustInfo: false, honorific: '', custName: '', custPhone: '', address: '', gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, status: '', priceInK: false };
+        saveCartZai_(); renderCartZai_();
+      });
+  }
+
+  let _zaiCartItems = [];
+
+  let _zaiCartExtra = { showCustInfo: false, honorific: '', custName: '', custPhone: '', address: '', gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, status: '', priceInK: false };
+
+  let _zaiCartLoadedFor = null;
+
+  const ZAI_SHIP_FEE = 40000;
+
+  const ZAI_PRODUCT_NAME_OVERRIDES = [
+    { tuCam: 'túi tiền', thayThe: 'túi' },
+    { tuCam: 'Lộc phúc tình', thayThe: 'lpt' },
+    { tuCam: 'thiên lộc', thayThe: 'TL' } // "lộc" là từ cấm → viết tắt TL khi lên đơn
+  ];
+
+  const _zaiApplyPromo_ = (base, type, val) => {
+    let d = 0;
+    if (type === 'amount') d = (Number(val) || 0) * 1000;
+    else if (type === 'percent') d = Math.round(base * (Number(val) || 0) / 100);
+    return base - Math.min(Math.max(d, 0), base);
+  };
+
+  function _zaiLineTotal_(i) {
+    const base = (Number(i.qty) || 0) * (Number(i.price) || 0);
+    return _zaiApplyPromo_(base, i.promoType, i.promoValue);
+  }
+
+  function _zaiCartKey_(phone) { return 'zaiCart_' + (phone || '_no_phone_'); }
+
+  function loadCartForCurrentPhoneZai_() {
+    const key = _zaiCartKey_(_currentPhone);
+    if (_zaiCartLoadedFor === key) { renderCartZai_(); return; }
+    chrome.storage.local.get([key], (res) => {
+      const saved = res[key] || { items: [], extra: { showCustInfo: false, honorific: '', custName: '', custPhone: '', address: '', gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, status: '', priceInK: false } };
+      _zaiCartItems = saved.items || [];
+      _zaiCartExtra = Object.assign({ showCustInfo: false, honorific: '', custName: '', custPhone: '', address: '', gift: '', discountType: 'none', discountValue: 0, freeship: false, gold: 0, status: '', priceInK: false }, saved.extra || {});
+      _zaiCartLoadedFor = key;
+      renderCartZai_();
+    });
+  }
+
+  function saveCartZai_() {
+    const key = _zaiCartKey_(_currentPhone);
+    chrome.storage.local.set({ [key]: { items: _zaiCartItems, extra: _zaiCartExtra } });
+  }
+
+  function addToCartZai_(item) {
+    // Neu Chat lieu la 1 o gom nhieu lua chon danh so chung (vd "1. X 2. Y 3. Z") thi tach rieng
+    // thanh danh sach de Sale TICK CHON tung cai (co the chon nhieu) thay vi nhet ca cum cho khach.
+    // Chua chon gi -> chatLieu de trong (khong con mac dinh nhet nguyen chuoi tho nhu truoc).
+    const clOptions = _zaiParseNumberedList_(item.chatLieu);
+    _zaiCartItems.push({
+      id: 'ci_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+      name: item.name || '(chưa đặt tên)',
+      note: item.note || '',
+      noteExtra: item.noteExtra || '', // Ghi chú thêm — CS tự gõ riêng cho sản phẩm này, độc lập với "note"
+                                        // nguồn (từ bảng giá) và độc lập với CTKM/giảm giá/tặng quà.
+      qty: item.qty || 1,
+      price: item.price || 0,
+      chatLieu: clOptions ? '' : (item.chatLieu || ''),
+      chatLieuOptions: clOptions || null,
+      mauSac: item.mauSac || '',
+      size: item.size || '',
+      promoType: item.promoType || 'none',   // CTKM riêng của dòng: none | amount (k) | percent | gift
+      promoValue: item.promoValue === undefined ? '' : item.promoValue,
+      inTotalDiscount: item.inTotalDiscount !== false, // co tinh vao "Giam gia TONG" (o zai-cart-discount-*,
+                                                        // ap dung tren tong cac SP duoc tich) hay khong.
+                                                        // Mac dinh CO tinh — bo tick de loai rieng SP nay ra.
+      checked: true
+    });
+    saveCartZai_();
+    renderCartZai_();
+  }
+
+  function _zaiUpdateCartItem_(id, field, value, deferSave) {
+    const it = _zaiCartItems.find((x) => x.id === id);
+    if (!it) return;
+    it[field] = value;
+    if (!deferSave) { saveCartZai_(); }
+    _zaiRenderCartTotal_();
+    document.getElementById('zai-cart-count').textContent = _zaiCartItems.filter(i => i.checked).length;
+  }
+
+  function _zaiCartTotals_() {
+    const checked = _zaiCartItems.filter((i) => i.checked);
+    const subtotal = checked.reduce((s, i) => s + _zaiLineTotal_(i), 0);
+    const discBase = checked.filter((i) => i.inTotalDiscount !== false).reduce((s, i) => s + _zaiLineTotal_(i), 0);
+    let discountAmt = 0;
+    if (_zaiCartExtra.discountType === 'percent') discountAmt = Math.round(discBase * (Number(_zaiCartExtra.discountValue) || 0) / 100);
+    else if (_zaiCartExtra.discountType === 'amount') discountAmt = Number(_zaiCartExtra.discountValue) || 0;
+    discountAmt = Math.min(discountAmt, discBase);
+    const gold = (Number(_zaiCartExtra.gold) || 0) * _zaiGoldUnitAmount;
+    const ship = _zaiCartExtra.freeship ? 0 : ZAI_SHIP_FEE;
+    const total = subtotal - discountAmt + gold + ship;
+    return { checked, subtotal, discBase, discountAmt, gold, ship, total };
+  }
+
+  function _zaiRenderCartTotal_() {
+    const t = _zaiCartTotals_();
+    const fmt = (n) => n.toLocaleString('vi-VN') + 'đ';
+    // cập nhật thành tiền từng dòng
+    document.querySelectorAll('#zai-cart-list .zai-cart-row').forEach((rowEl) => {
+      const it = _zaiCartItems.find((x) => x.id === rowEl.dataset.id);
+      const el = rowEl.querySelector('.zai-cart-linetotal');
+      if (it && el) el.textContent = '= ' + fmt(_zaiLineTotal_(it)) + (it.promoType === 'gift' && it.promoValue ? ' 🎁' : '');
+    });
+    document.getElementById('zai-cart-total').innerHTML =
+      `<div>Tạm tính (${t.checked.length} sản phẩm): <b>${fmt(t.subtotal)}</b></div>` +
+      (t.discountAmt > 0 ? `<div>Giảm giá tổng (trên ${_zaiCartItems.filter(i=>i.checked && i.inTotalDiscount!==false).length} SP đã tích): <b>-${fmt(t.discountAmt)}</b></div>` : '') +
+      (t.gold > 0 ? `<div>Thêm vàng: <b>+${fmt(t.gold)}</b></div>` : '') +
+      `<div>Phí ship: <b>${t.ship ? '+' + fmt(t.ship) : 'Miễn phí'}</b></div>` +
+      `<div class="zai-cart-total-final">Tổng đơn: <b>${fmt(t.total)}</b>${_zaiCartExtra.freeship ? ' <span class="zai-cart-freeship-tag">Freeship</span>' : ''}</div>`;
+  }
+
+  function sanitizeProductNameZai_(name) {
+    if (!name) return name;
+    let out = name;
+    const all = ZAI_PRODUCT_NAME_OVERRIDES.concat(_zaiBannedWords).sort((a, b) => b.tuCam.length - a.tuCam.length);
+    all.forEach((bw) => {
+      if (!bw.tuCam) return;
+      const esc = bw.tuCam.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      out = out.replace(new RegExp(esc, 'gi'), bw.thayThe || '');
+    });
+    return out.replace(/\s{2,}/g, ' ').trim();
+  }
+
+  function _zaiSentenceCase_(s) {
+    s = String(s || '').trim().toLowerCase();
+    if (!s) return s;
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
+  function _zaiBuildCartSummaryText_() {
+    const t = _zaiCartTotals_();
+    if (!t.checked.length) return ''; // chua tick san pham nao -> tra ve rong, nut Sao chep se bao "chua co san pham" thay vi copy 1 don gan nhu trong
+    // kNum: chỉ số đã quy đổi nghìn, CHƯA có chữ 'k' (dùng trong "380x2 = ..." — số nhân KHÔNG
+    // kèm 'k', chỉ số cuối mới kèm). k: có kèm 'k' (dùng cho giá gốc/giá sau giảm).
+    const kNum = (n) => Math.round(n / 1000).toLocaleString('vi-VN');
+    const k = (n) => kNum(n) + 'k';
+    const clean = (str) => sanitizeProductNameZai_(str);
+
+    const itemLines = t.checked.map((i) => {
+      const name = _zaiSentenceCase_(String(i.name || '').replace(/^trang sức\s+/i, ''));
+      const size = (i.size && i.size !== '(mặc định)') ? ' ' + String(i.size).toLowerCase() : '';
+      const cl = i.chatLieu ? ' chất liệu ' + String(i.chatLieu).toLowerCase() : '';
+      const mau = i.mauSac ? ' màu ' + String(i.mauSac).toLowerCase() : '';
+      const desc = `${name}${size}${cl}${mau}`;
+      const qty = Math.max(1, Number(i.qty) || 1);
+      const unit = Number(i.price) || 0;
+      const total = _zaiLineTotal_(i);
+
+      let priceText;
+      if (i.promoType === 'percent' && Number(i.promoValue) > 0) {
+        priceText = `${k(unit)}${qty > 1 ? 'x' + qty : ''} giảm ${Number(i.promoValue)}% còn ${k(total)}`;
+      } else if (i.promoType === 'amount' && Number(i.promoValue) > 0) {
+        priceText = `${k(unit)}${qty > 1 ? 'x' + qty : ''} giảm ${Number(i.promoValue).toLocaleString('vi-VN')}k còn ${k(total)}`;
+      } else if (qty > 1) {
+        priceText = `${kNum(unit)}x${qty} = ${k(total)}`; // vd "380x2 = 760k" — so nhan KHONG kem 'k'
+      } else {
+        priceText = k(total);
+      }
+      const giftSuffix = (i.promoType === 'gift' && i.promoValue) ? ` + tặng ${i.promoValue}` : '';
+      const noteSuffix = i.noteExtra ? ` (${i.noteExtra})` : '';
+      return clean(`${desc} ${priceText}${giftSuffix}${noteSuffix}`);
+    });
+
+    const lines = [];
+    // Chi dua ten/SDT/dia chi vao don khi o "+ Them thong tin KH" dang TICH — tich tat thi
+    // KHONG dung du du lieu con luu lai tu don truoc (tranh dinh nham ten/SDT/dia chi cu).
+    if (_zaiCartExtra.showCustInfo) {
+      const custLine = [_zaiCartExtra.honorific, _zaiCartExtra.custName, _zaiCartExtra.custPhone].filter((x) => x && String(x).trim()).join(' ');
+      if (custLine) lines.push(clean(custLine));
+      if (_zaiCartExtra.address) lines.push(clean(`Địa chỉ: ${_zaiCartExtra.address}`));
+    }
+    lines.push(...itemLines);
+
+    // "Tổng sau giảm" = tạm tính đã trừ CTKM từng dòng + giảm giá chung — CHƯA gồm vàng/ship.
+    const afterDiscount = t.subtotal - t.discountAmt;
+    // Chỉ ghi "Tổng sau giảm" khi THẬT SỰ có giảm giá (giảm giá tổng của đơn, hoặc ít nhất 1
+    // dòng có giảm % / giảm tiền) — nếu không áp dụng giảm nào cả thì đây chỉ là báo giá bình
+    // thường, ghi "Tổng sau giảm" sẽ gây hiểu lầm là có giảm (yêu cầu Duyên).
+    const hasAnyDiscount = t.discountAmt > 0 || t.checked.some((i) =>
+      (i.promoType === 'percent' || i.promoType === 'amount') && Number(i.promoValue) > 0);
+    lines.push(`${hasAnyDiscount ? 'Tổng sau giảm' : 'Báo giá'}: ${k(afterDiscount)}`);
+    if (t.gold > 0) lines.push(`Thêm vàng: ${k(t.gold)}`);
+    lines.push(t.ship > 0 ? `Phí ship: ${k(t.ship)}` : 'Freeship');
+    if (_zaiCartExtra.gift) lines.push(clean(`Quà tặng kèm: ${_zaiCartExtra.gift}`));
+    // Chi them dong "Tong cong" khi co vang/ship lam tong cuoi KHAC voi "Tong sau giam" o tren —
+    // tranh lap lai 1 con so y het (nhu vi du cua Duyen: Freeship + khong vang -> khong can dong nay).
+    if (t.total !== afterDiscount) lines.push(`Tổng cộng: ${k(t.total)}`);
+    if (_zaiCartExtra.status) lines.push(clean(_zaiCartExtra.status));
+
+    return lines.join('\n');
+  }
+
+  function renderCartZai_() {
+    const section = document.getElementById('zai-cart-section');
+    if (!section) return;
+    if (_zaiCartItems.length) section.dataset.everOpened = '1';
+    section.style.display = (_zaiCartItems.length || section.dataset.everOpened) ? 'block' : 'none';
+    document.getElementById('zai-cart-count').textContent = _zaiCartItems.filter(i => i.checked).length;
+
+    const list = document.getElementById('zai-cart-list');
+    list.innerHTML = _zaiCartItems.map((it) => {
+      // Neu day la dong co Chat lieu duoc tach tu 1 o gom nhieu lua chon (xem _zaiParseNumberedList_
+      // trong addToCartZai_), hien checkbox tick tung lua chon (duoc tick nhieu) thay vi 1 o text
+      // nhet nguyen chuoi. Dong nhap thu cong / chat lieu don gian (vd "VÀNG 10K") van la o text
+      // nhu cu — khong ep phai co danh sach khi khong can.
+      const selectedCl = new Set((it.chatLieu || '').split(',').map((s) => s.trim()).filter(Boolean));
+      const chatLieuHtml = (it.chatLieuOptions && it.chatLieuOptions.length)
+        ? `<div class="zai-cart-chatlieu-multi">
+            <div class="zai-cl-multi-label">Chất liệu (tick 1 hoặc nhiều):</div>
+            ${it.chatLieuOptions.map((opt) => `
+              <label class="zai-cl-opt">
+                <input type="checkbox" class="zai-cl-opt-chk" data-opt="${escAttrZai_(opt)}" ${selectedCl.has(opt) ? 'checked' : ''} />
+                <span>${escAttrZai_(opt)}</span>
+              </label>`).join('')}
+          </div>`
+        : `<input type="text" class="zai-cart-chatlieu" value="${escAttrZai_(it.chatLieu || '')}" placeholder="Chất liệu" />`;
+      return `
+      <div class="zai-cart-row" data-id="${it.id}">
+        <input type="checkbox" class="zai-cart-chk" ${it.checked ? 'checked' : ''} />
+        <input type="text" class="zai-cart-name" value="${escAttrZai_(it.name)}" placeholder="Tên sản phẩm" />
+        <input type="number" class="zai-cart-qty" value="${it.qty}" min="1" title="Số lượng" />
+        <input type="number" class="zai-cart-price" value="${_zaiCartExtra.priceInK ? (it.price ? it.price / 1000 : '') : it.price}" min="0" title="${_zaiCartExtra.priceInK ? 'Đơn giá (nghìn đ — gõ 2800 = 2.800.000đ)' : 'Đơn giá (đ)'}" />
+        <button class="zai-cart-del" title="Xoá dòng này">✕</button>
+        <div class="zai-cart-detail-row">
+          ${chatLieuHtml}
+          <input type="text" class="zai-cart-mausac" value="${escAttrZai_(it.mauSac || '')}" placeholder="Màu sắc" />
+          <input type="text" class="zai-cart-size" value="${escAttrZai_(it.size || '')}" placeholder="Size" />
+        </div>
+        <div class="zai-cart-promo-row">
+          <select class="zai-cart-promotype" title="CTKM riêng cho sản phẩm này">
+            <option value="none"${(it.promoType || 'none') === 'none' ? ' selected' : ''}>CTKM: không</option>
+            <option value="amount"${it.promoType === 'amount' ? ' selected' : ''}>Giảm tiền (k)</option>
+            <option value="percent"${it.promoType === 'percent' ? ' selected' : ''}>Giảm %</option>
+            <option value="gift"${it.promoType === 'gift' ? ' selected' : ''}>Tặng quà</option>
+          </select>
+          <input type="text" class="zai-cart-promoval" value="${escAttrZai_(it.promoValue === undefined ? '' : it.promoValue)}" placeholder="${it.promoType === 'gift' ? 'Quà tặng' : (it.promoType === 'percent' ? '% giảm' : 'Số tiền (k)')}" style="${(!it.promoType || it.promoType === 'none') ? 'display:none' : ''}" />
+          <span class="zai-cart-linetotal"></span>
+        </div>
+        <div class="zai-cart-noteextra-row">
+          <input type="text" class="zai-cart-noteextra" value="${escAttrZai_(it.noteExtra || '')}" placeholder="📝 Ghi chú thêm cho sản phẩm này (không bắt buộc)" />
+        </div>
+        <label class="zai-cart-total-disc-chk" title="Có tính sản phẩm này vào mục 'Giảm giá tổng' bên dưới không">
+          <input type="checkbox" class="zai-cart-intotaldisc" ${it.inTotalDiscount !== false ? 'checked' : ''} /> Tính vào Giảm giá tổng
+        </label>
+        ${it.note ? `<div class="zai-cart-note">${escAttrZai_(it.note)}</div>` : ''}
+      </div>
+    `;
+    }).join('') || '<div class="zai-cart-empty">Chưa có sản phẩm nào. Dùng tab "Soạn đơn" hoặc "+ Thêm" ở kết quả tra giá phía trên, hoặc "+ Thêm dòng thủ công".</div>';
+
+    list.querySelectorAll('.zai-cl-opt-chk').forEach((chk) => {
+      chk.addEventListener('change', (e) => {
+        const rowEl = e.target.closest('.zai-cart-row');
+        const id = rowEl.dataset.id;
+        const checkedOpts = [...rowEl.querySelectorAll('.zai-cl-opt-chk:checked')].map((c) => c.dataset.opt);
+        _zaiUpdateCartItem_(id, 'chatLieu', checkedOpts.join(', '), true);
+        saveCartZai_();
+      });
+    });
+
+    list.querySelectorAll('.zai-cart-row').forEach((row) => {
+      const id = row.dataset.id;
+      row.querySelector('.zai-cart-chk').addEventListener('change', (e) => { _zaiUpdateCartItem_(id, 'checked', e.target.checked); saveCartZai_(); });
+      const nameEl = row.querySelector('.zai-cart-name');
+      nameEl.addEventListener('input', (e) => { _zaiUpdateCartItem_(id, 'name', e.target.value, true); });
+      nameEl.addEventListener('change', () => { saveCartZai_(); });
+      const chatLieuEl = row.querySelector('.zai-cart-chatlieu');
+      if (chatLieuEl) {
+        chatLieuEl.addEventListener('input', (e) => { _zaiUpdateCartItem_(id, 'chatLieu', e.target.value, true); });
+        chatLieuEl.addEventListener('change', () => { saveCartZai_(); });
+      }
+      const mauSacEl = row.querySelector('.zai-cart-mausac');
+      mauSacEl.addEventListener('input', (e) => { _zaiUpdateCartItem_(id, 'mauSac', e.target.value, true); });
+      mauSacEl.addEventListener('change', () => { saveCartZai_(); });
+      const sizeEl = row.querySelector('.zai-cart-size');
+      sizeEl.addEventListener('input', (e) => { _zaiUpdateCartItem_(id, 'size', e.target.value, true); });
+      sizeEl.addEventListener('change', () => { saveCartZai_(); });
+      const qtyEl = row.querySelector('.zai-cart-qty');
+      qtyEl.addEventListener('input', (e) => { _zaiUpdateCartItem_(id, 'qty', Math.max(1, Number(e.target.value) || 1), true); });
+      qtyEl.addEventListener('change', () => { saveCartZai_(); });
+      const priceEl = row.querySelector('.zai-cart-price');
+      priceEl.addEventListener('input', (e) => {
+        const raw = Math.max(0, Number(e.target.value) || 0);
+        const price = _zaiCartExtra.priceInK ? raw * 1000 : raw; // toggle "nhap gia theo nghin" — luon luu du.lieu goc bang dong day du
+        _zaiUpdateCartItem_(id, 'price', price, true);
+      });
+      priceEl.addEventListener('change', () => { saveCartZai_(); });
+      row.querySelector('.zai-cart-promotype').addEventListener('change', (e) => {
+        _zaiUpdateCartItem_(id, 'promoType', e.target.value); _zaiUpdateCartItem_(id, 'promoValue', '');
+        saveCartZai_(); renderCartZai_();
+      });
+      const promoValEl = row.querySelector('.zai-cart-promoval');
+      promoValEl.addEventListener('input', (e) => {
+        const it2 = _zaiCartItems.find((x) => x.id === id);
+        _zaiUpdateCartItem_(id, 'promoValue', it2 && it2.promoType === 'gift' ? e.target.value : (Number(e.target.value) || 0), true);
+      });
+      promoValEl.addEventListener('change', () => { saveCartZai_(); });
+      const noteExtraEl = row.querySelector('.zai-cart-noteextra');
+      noteExtraEl.addEventListener('input', (e) => { _zaiUpdateCartItem_(id, 'noteExtra', e.target.value, true); });
+      noteExtraEl.addEventListener('change', () => { saveCartZai_(); });
+      row.querySelector('.zai-cart-intotaldisc').addEventListener('change', (e) => {
+        _zaiUpdateCartItem_(id, 'inTotalDiscount', e.target.checked); saveCartZai_();
+      });
+      row.querySelector('.zai-cart-del').addEventListener('click', () => {
+        _zaiCartItems = _zaiCartItems.filter((x) => x.id !== id);
+        saveCartZai_(); renderCartZai_();
+      });
+    });
+
+    document.getElementById('zai-cart-showcust').checked = !!_zaiCartExtra.showCustInfo;
+    document.getElementById('zai-cart-custinfo').style.display = _zaiCartExtra.showCustInfo ? '' : 'none';
+    document.getElementById('zai-cart-honorific').value = _zaiCartExtra.honorific || '';
+    document.getElementById('zai-cart-custname').value = _zaiCartExtra.custName || '';
+    // Tu dien SDT tu ngu canh doan chat (_currentPhone) neu Sale CHUA tung go gi vao o nay —
+    // go tay roi thi giu nguyen theo Sale, khong ghi de nua (vd SDT nguoi nhan khac SDT chat).
+    if (!_zaiCartExtra.custPhone && _currentPhone) _zaiCartExtra.custPhone = _currentPhone;
+    document.getElementById('zai-cart-custphone').value = _zaiCartExtra.custPhone || '';
+    document.getElementById('zai-cart-address').value = _zaiCartExtra.address || '';
+    document.getElementById('zai-cart-status').value = _zaiCartExtra.status || '';
+    document.getElementById('zai-cart-gift').value = _zaiCartExtra.gift || '';
+    document.getElementById('zai-cart-discount-type').value = _zaiCartExtra.discountType || 'none';
+    document.getElementById('zai-cart-discount-value').value = _zaiCartExtra.discountValue || '';
+    document.getElementById('zai-cart-discount-value').style.display = _zaiCartExtra.discountType === 'none' ? 'none' : '';
+    document.getElementById('zai-cart-freeship').checked = !!_zaiCartExtra.freeship;
+    document.getElementById('zai-cart-gold').value = _zaiCartExtra.gold || '';
+    document.getElementById('zai-cart-price-k').checked = !!_zaiCartExtra.priceInK;
+
+    _zaiRenderCartTotal_();
+  }
+
+  function updateGoldUnitLabelZai_() {
+    const label = document.getElementById('zai-cart-gold-label');
+    const input = document.getElementById('zai-cart-gold');
+    const unitTxt = _zaiGoldUnitAmount.toLocaleString('vi-VN') + 'đ';
+    if (label) label.textContent = `Thêm vàng (SL × ${unitTxt})`;
+    if (input) input.title = `Nhập số lượng — mỗi đơn vị = ${unitTxt} (VD: 2 = ${(2 * _zaiGoldUnitAmount).toLocaleString('vi-VN')}đ). Đơn giá do admin cài trên CRM.`;
   }
 
   // ── TIM ANH SAN PHAM (anh trong thu muc Drive, link o cot "Link anh" cua DANH_MUC) — y het muc "Tim anh san pham" cua Pancake AI (quy tac song song) ──
@@ -3974,7 +4470,7 @@ async function startReminderPoll_() {
   }
 
 
-  function init() { buildPanel(); watchZaloChat(); startCarePoll_(); }
+  function init() { buildPanel(); watchZaloChat(); startCarePoll_(); loadGoldUnitAmountZai_(); startCartWatchZai_(); }
   if (document.readyState==='loading') document.addEventListener('DOMContentLoaded',init);
   else init();
 })();

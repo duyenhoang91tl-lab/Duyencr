@@ -15,7 +15,7 @@ function _pkcStop() { if (_pkc.timer) { clearInterval(_pkc.timer); _pkc.timer = 
 // Duoi moi tin: TEN NGUOI GUI · GIO (re chuot xem du ngay gio giay). Tin cua nhan vien: ten nhan vien (CRM hoac Pancake), khong co thi ten page; tin khach: ten khach.
 function _pkcFull(iso) { var d = new Date(iso); if (isNaN(d)) return ''; return _pkcDay(iso) + ' ' + _pkcHm(iso) + ':' + ('0' + d.getSeconds()).slice(-2); }
 function _pkcMeName() { try { return (currentUser && (currentUser.name || currentUser.username)) || 'Bạn'; } catch (e) { return 'Bạn'; } }
-var PKC_UI_VER = '2026-10-12.3';   // hien o dong trang thai de biet trinh duyet dang chay ban giao dien nao
+var PKC_UI_VER = '2026-10-19.1';   // hien o dong trang thai de biet trinh duyet dang chay ban giao dien nao
 function _pkcVerText(gv) { return ' · giao diện ' + PKC_UI_VER + (gv ? ' · GAS ' + gv : ' · ⚠ GAS CŨ (chưa deploy lại — thiếu thẻ/tên nhân viên)'); }
 function _pkcMetaHtml(m, conv) {
   // LUON co ten: tin nhan vien = ten nhan vien (CRM/Pancake) > ten page > "Nhân viên"; tin khach = ten khach > ten hoi thoai > "Khách"
