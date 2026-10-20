@@ -665,6 +665,14 @@ function _pancakeKnownSaleNameSet_() {
 // Tên Sale của CÙNG 1 NGƯỜI (tài khoản gắn nhiều tên, vd thuthuy95 + thuthuy1995): fold tên → mọi tên cùng người.
 // Nguồn: cột "names" của sheet Users (admin gắn trong 🔑 Tài khoản). Dùng để bộ lọc Sale/Team và bảng "Theo Team" của
 // mọi báo cáo nhận ra các tên khác nhau của 1 người (Base ghi tên này, Pos ghi tên kia) thay vì coi là 2 người.
+// KHOP DANH TINH CHUAN cho bo loc Sale cua MOI bao cao: tap ten (da _normTxt_) = cac ten nguoi dung chon + moi ten cung nguoi (Khop Sale:
+// The/tai khoan Sale/SaleDirectory/PancakeNameMap). Chon ten nao trong nhom cung ra du du lieu cua ca nhom (2 chieu). Truoc day Bao cao D, KPI Pancake
+// va L so khop ten THO nen ten da khop van bi bo sot (ra soat 2026-10-15).
+function _saleFilterNameSet_(arr) {
+  var set = {};
+  _expandSaleFilterWithPancakeAliases_((arr || []).filter(Boolean)).forEach(function(n) { var k = _normTxt_(n); if (k) set[k] = true; });
+  return set;
+}
 function _userAliasGroups_() {
   var map = {};
   try {

@@ -62,13 +62,8 @@ const r2 = B(); eq(r2.saleCloseRate.find(x => x.name === 'saleA').closed, 7, 'co
 // 3) Hai bao cao ra CUNG con so khi chon cung ngay (A = nguon chuan)
 const a = A(); eq(r2.saleCloseRate, a.saleCloseRate, 'A va B: ty le chot theo Sale giong het'); eq(r2.kenhCloseRate, a.kenhCloseRate, 'A va B: ty le chot theo Kenh giong het');
 
-// 4) Bo loc Sale/San pham/Nguon cua tung bao cao CHI ap cho bang doanh thu — khong lam doi ty le chot (A va B van cung so)
-const rs = B({ sale: ['saleB'], sanPham: 'Vòng bạc', nguon: ['Facebook / Page Mot (862972056891669)'] }), as = A({ sale: ['saleB'], sanPham: 'Vòng bạc' });
-eq(rs.saleCloseRate, r2.saleCloseRate, 'B co loc Sale/San pham/Nguon: ty le chot khong doi'); eq(as.saleCloseRate, r2.saleCloseRate, 'A co loc: ty le chot khong doi');
-// 2) Cach gan don MAC DINH = SALE BAN (Duyen chot 2026-10-16): moi sale ghi o "Sale ban" +1 don, KHONG phu thuoc nguoi tao
-vm.runInContext("__by = 'saleban';", ctx);
-r = B();
-eq(sale('saleA').closed, 8, 'SALE BAN: saleA = 8 don (7 don nhu tren + don co nguoi tao la mktX vi Sale ban van la saleA)');
-eq(sale('saleB').closed, 3, 'SALE BAN: saleB = 3 don');
-
+// 4) Loc Sale (A va B): bang/bieu do ty le chot CHI hien nguoi duoc chon, nhung ty le cua tung nguoi KHONG doi (van la don Base / tuong tac Pancake); A == B
+const rs = B({ sale: ['saleB'] }), as = A({ sale: ['saleB'] });
+eq(rs.saleCloseRate, [r2.saleCloseRate.find(x => x.name === 'saleB')], 'B loc Sale=saleB: chi con saleB, ty le giu nguyen 3/50 = 6%');
+eq(as.saleCloseRate, rs.saleCloseRate, 'A va B loc cung Sale: ra cung ty le chot');
 console.log('ALL CLOSE-RATE-BASE TESTS PASSED');

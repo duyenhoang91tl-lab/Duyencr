@@ -641,10 +641,11 @@ function buildCareLeadReport_(filters) {
   var csFilterArr = Array.isArray(filters.cs) ? filters.cs.filter(function(s){return s;})
     : (filters.cs ? [String(filters.cs).trim()] : []);
   var rows = readCareLeads_();
+  var csFilterSet = csFilterArr.length ? _saleFilterNameSet_(csFilterArr) : null;   // chon ten nao trong nhom Khop Sale cung ra du ca nhom
   var matched = rows.filter(function(r) {
     var dt = r.createdAt ? new Date(r.createdAt) : null;
     if (!dateInRange_(dt, filters.dateFrom, filters.dateTo)) return false;
-    if (csFilterArr.length && csFilterArr.indexOf(String(r.cs||'')) === -1) return false;
+    if (csFilterSet && !csFilterSet[_normTxt_(String(r.cs||''))]) return false;
     return true;
   });
   var byCS = {};

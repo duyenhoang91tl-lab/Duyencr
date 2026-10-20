@@ -188,3 +188,18 @@ Yeu cau cua Duyen: Chat noi bo hien thi duoc o cua so chat nho o goc duoi phai (
 
 ## Báo cáo A/B "Theo Sale" lẫn người ngoài bộ lọc (kế toán, Mến)
 - Nguyên nhân: đơn có nhiều sale ("Kd + kế toán + Mến") → backend tạo thêm dòng cho người đồng bán dù không thuộc bộ lọc. Sửa phía giao diện `_srKeepSelectedSales_` (js/11): khi có chọn Sale/Team chỉ giữ dòng của người đã chọn (kể cả tên phụ); bỏ qua ở chế độ "người tạo đơn". Tổng/tiền chia đều vẫn do máy chủ tính. Test: tools/test-sr-keep-selected-sales.js.
+
+## RÀ SOÁT: mọi báo cáo theo DANH TÍNH CHUẨN (Khớp Sale) — 2026-10-15
+Chuẩn: chọn/ghi tên nào của 1 người cũng ra đủ dữ liệu của người đó (2 chiều), 1 người nhiều tên KHÔNG tách thành nhiều người, không lẫn người khác. Nguồn khớp: tài khoản Sale (role cs), Thẻ (salePersonTags), SaleDirectory, PancakeNameMap 1-1. Test: `node tools/test-sale-match-reports.js`, `tools/test-cs-filter-match.js`, `tools/test-sale-match.js`.
+| Báo cáo / chỗ lọc | Trước | Nay |
+|---|---|---|
+| A, B, C, F (KPI Sale), G (đơn thất bại), tỷ lệ chốt, thưởng/hoa hồng backend, csStats, hồ sơ | đã dùng khớp | giữ nguyên (lỗi gốc gộp Leader/Admin đã sửa ở bước 1) |
+| D (khách tự thêm) lọc CS | so tên thô | `_saleFilterNameSet_` |
+| KPI Pancake (`buildKpiReport_`) lọc Sale (cũng là phạm vi dữ liệu phía server) | so tên thô | `_saleFilterNameSet_` |
+| L (khách qua cửa hàng) `same()` | alias riêng (SaleDirectory+Pancake), không có Thẻ/tài khoản | thêm `_salePersonKeyFn_` |
+| Phân tích Team (`buildTeamMetrics_`) | khoá theo tên thô → 1 người nhiều tên thành nhiều người, số liệu các nguồn rơi vào người khác nhau | khoá theo danh tính, CỘNG DỒN doanh thu/đơn/tương tác/đơn huỷ/KH tự thêm, tính lại % mục tiêu, tỷ lệ chốt theo trọng số |
+| Tổng quan tổ chức (`orgOverview_`, `_orgApplyDepts_`) | thành viên Team/phòng khớp tên thô | khoá theo danh tính |
+| Checklist MKT — Theo Team Sale | `nhomOf` tra SaleDirectory theo tên thô; 1 người nhiều tên đếm nhiều Sale | thêm tra theo danh tính + đếm 1 người = 1 Sale |
+| Nhắc lịch hẹn (`_remindersFromRows_`), lọc "data chia" (`assign`) và đánh dấu xong (`toggleAssignDone_`) | CS so tên thô | `_saleFilterNameSet_` |
+| Danh sách khách hàng, thống kê, xuất CSV: lọc CS (`_inCSScope`, `scopedCustomers`, `_csFilterHas`…) | so tên thô | `_csFilterListMatch()` (chọn + mọi tên cùng người, quy về đúng cách viết trong dữ liệu) |
+**CHƯA đổi (cần Duyên quyết)**: E/G (hoa hồng + thưởng, tính ở client `_computeCommissionData_`/`_computeBonusData_`) vẫn gom theo TÊN trên đơn Pos; 1 người dùng 2 thẻ tên khác nhau sẽ ra 2 dòng và bậc thưởng theo ngày tính riêng từng tên. Nguyên nhân chưa sửa: tỷ lệ hoa hồng, kênh (SALE_CHANNELS) và chương trình thưởng đang cấu hình THEO TÊN — đổi tên chuẩn sẽ làm lệch cấu hình. Hướng đề xuất: chuẩn hoá tên về tên chính ngay ở backend B (`saleBanValid`) đồng thời tra cấu hình theo mọi tên cùng người. Báo cáo H/I (chia data, client) dùng `_dedupePeopleNames` sẵn có. Tổng quan Dashboard không gom theo tên Sale.

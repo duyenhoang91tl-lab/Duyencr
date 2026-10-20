@@ -1808,6 +1808,7 @@ function _storeCaseReadSheet_() {
 // Nguon: SaleDirectory (userBase/ten Facebook/tag Pancake) + bang khop ten Pancake + ten dang co tren cot The Pos.
 function _storeCaseBuildCtx_(posNameSet) {
   var variants = {}, outs = {}, aliasOf = {};
+  var personKey = _salePersonKeyFn_();   // Khop Sale (The / tai khoan Sale / SaleDirectory / PancakeNameMap): cung nguoi -> cung khoa
   function addOut(n) { n = String(n || '').trim(); if (n) outs[n] = _foldSaleKey_(n); }
   function addVariant(v, out, how) { var f = _foldSaleKey_(v); if (f && !variants[f]) variants[f] = { name: out, how: how }; }
   try {
@@ -1858,6 +1859,8 @@ function _storeCaseBuildCtx_(posNameSet) {
       if (fa === fb) return true;
       var na = stripD(fa), nb = stripD(fb);
       if (na.length >= 4 && na === nb) return true;
+      var pa = personKey(a), pb = personKey(b);
+      if (pa && pa === pb) return true;   // 2 ten da khop thu cong (Khop Sale) la cung 1 nguoi
       return (aliasOf[fa] || []).indexOf(fb) !== -1 || (aliasOf[fb] || []).indexOf(fa) !== -1;
     }
   };
