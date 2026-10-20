@@ -149,6 +149,21 @@ function _srCloseRateSectionsFromBase_(filters) {
 // Bộ lọc Sale của báo cáo áp luôn lên "Tỷ lệ chốt theo Sale" (trước đây biểu đồ này luôn ra TẤT CẢ sale dù đã lọc — Duyên báo 2026-10-12): giữ dòng của
 // đúng những người được chọn; tên trong bộ lọc (Pos/Base, vd 'thuydinh95') gộp về dòng biểu đồ (Pancake, vd 'thuydinh1995') theo CÙNG quy tắc gộp tên mồ côi.
 // Số của từng sale KHÔNG đổi vì tỷ lệ mỗi người độc lập với người khác.
+// BO LOC SALE CHI HIEN NGUOI TRONG BO LOC (Duyen bao 2026-10-17: loc 16 Sale nhung bang "Theo Sale ban" van hien menbui2002 / phongketoan...).
+// NGUYEN NHAN GOC: bo loc Sale chon DON co it nhat 1 sale trong danh sach, roi cac bang Theo Sale / Theo Team cong don MOI sale co tren don do — ke ca nguoi dong ban khong nam trong bo loc.
+// Nay khi co loc Sale: bang chi ghi nguoi trong bo loc (foldArr da mo rong theo ten khac cua cung nguoi). Tien van chia deu cho TOAN BO sale tren don nen phan cua tung nguoi khong doi;
+// cac the KPI tong (tong don/tong tien) van la tong cua cac don khop bo loc.
+function _saleWantedFn_(foldArr) {
+  var idx = {}, memo = {}; (foldArr || []).forEach(function(x) { idx[x] = 1; });
+  var hasFilter = !!(foldArr && foldArr.length);
+  return function(name) {
+    if (!hasFilter) return true;
+    var k = _normTxt_(name); if (memo[k] !== undefined) return memo[k];
+    var ok = !!idx[k];
+    if (!ok) { try { ok = _expandSaleFilterWithPancakeAliases_([name]).some(function(a) { return !!idx[_normTxt_(a)]; }); } catch (e) {} }   // ten chuan tren don <-> ten Pancake dang chon trong bo loc
+    return (memo[k] = ok);
+  };
+}
 function _srFilterCloseBySale_(sections, saleFilter) {
   if (!sections || !saleFilter || !saleFilter.length) return sections;
   var names = saleFilter;

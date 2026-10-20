@@ -65,7 +65,7 @@ const msgs=[{id:'m1',c:'P1_U1',dir:'in',text:'Sao v c',at:AT[0],from:'Mến Hoà
   t('co 3 the nhung chua co ten -> hien canh bao ⚠ ro rang (khong im lang)',/pkc-warn/.test(rowW)&&rowW.includes('3 thẻ'));
   t('khong co the nao (tagN=0) -> khong canh bao',!/pkc-warn/.test(w._pkcMetaRow({tags:[],tagN:0,assignees:[]})));
   // ── nhan phien ban giao dien + GAS ──
-  t('dong trang thai co phien ban giao dien + GAS moi',w._pkcVerText('v13.54-pkstaff').includes(w.PKC_UI_VER)&&w._pkcVerText('v13.54-pkstaff').includes('GAS v13.54-pkstaff'));
+  t('dong trang thai co phien ban giao dien + GAS moi',w._pkcVerText('v13.99-test').includes(w.PKC_UI_VER)&&w._pkcVerText('v13.99-test').includes('GAS v13.99-test'));
   t('GAS cu (khong co gv) -> canh bao "chua deploy lai"',w._pkcVerText('').includes('GAS CŨ')&&w._pkcVerText('').includes('deploy'));
   // ── cot Thong tin ben phai (js/48): The Pancake + Nguoi xu ly ──
   const src48=fs.readFileSync(path.join(__dirname,'..','js','48-pro-chatinfo.js'),'utf8');
@@ -81,7 +81,7 @@ const msgs=[{id:'m1',c:'P1_U1',dir:'in',text:'Sao v c',at:AT[0],from:'Mến Hoà
   t('khong phai admin: KHONG co nut Chẩn đoán',!$('sc-head').textContent.includes('Chẩn đoán'));
   w.eval('window.__adm=true');w.scPick('P1_U1');await sleep(40);
   t('admin: co nut Chẩn đoán o dau khung chat',$('sc-head').textContent.includes('Chẩn đoán'));
-  respond={'action=pkChatDiag':()=>({ok:true,gv:'v13.54-pkstaff',tagsStored:[26,28],tagsApi:{ok:false,code:401}})};
+  respond={'action=pkChatDiag':()=>({ok:true,gv:'v13.99-test',tagsStored:[26,28],tagsApi:{ok:false,code:401}})};
   await w.scDiag();
   const dtxt=$('sc-diag-t').value;
   t('chan doan: hien JSON that + phien ban giao dien/GAS (de dan cho nguoi ho tro)',dtxt.includes('"tagsStored"')&&dtxt.includes('"code": 401')&&dtxt.includes(w.PKC_UI_VER)&&log.some(l=>/action=pkChatDiag&conv=P1_U1/.test(l.u)));
