@@ -119,7 +119,43 @@ setTimeout(_syncCustomFieldsFromGAS, 0);
 //  Ô nào để trống ('' / undefined) thì dùng % của TEAM mà người đó thuộc về
 //  (xem _resolveCommissionRate_).
 // ════════════════════════════════════════════════════════════════════
-const COMMISSION_THRESHOLD = 15000000; // 15 triệu — ngưỡng phân loại đơn "≥15tr" / "<15tr"
+let COMMISSION_THRESHOLD = 15000000; // MẶC ĐỊNH 15 triệu — ngưỡng phân loại đơn "≥ ngưỡng" / "< ngưỡng". Admin đổi được ở Cấu hình (Settings 'bizRules'), xem _bizApply_ bên dưới.
+// ── QUY TẮC TÍNH DOANH THU/HOA HỒNG CẤU HÌNH ĐƯỢC (bizRules) — CRM sẽ mở rộng/bán cho công ty khác nên không cứng trong code ──
+// Nguồn thật = Settings 'bizRules' (JSON) trên GAS; client giữ bản sao ở BIZ_RULES + localStorage 'ome_biz_rules'. Trống/sai kiểu => mặc định = hành vi cũ.
+// Phải khớp BIZ_RULES_DEFAULT_ / _bizRules_ ở gas_v13.js. Hiện client chỉ DÙNG commissionThreshold (hoa hồng ở Báo cáo E); các khóa còn lại
+// (trạng thái đơn bị loại, tỷ lệ quầy) do backend áp khi dựng báo cáo — client giữ để hiển thị/sửa ở trang Cấu hình.
+var _BIZ_DEFAULT_ = { commissionThreshold: 15000000, baseExcludedStatuses: ['Thất bại'], posExcludedStatuses: ['Hủy đơn', 'Hoàn đơn', 'Đã hoàn', 'Đang hoàn'], quayRatio: 0.3, quayKeywords: ['Quầy Hào Nam', 'Cửa hàng'] };
+var BIZ_RULES = JSON.parse(JSON.stringify(_BIZ_DEFAULT_));
+function _bizApply_(raw) {
+  var D = _BIZ_DEFAULT_; if (!raw || typeof raw !== 'object') raw = {};
+  function list(v, fb) { if (!Array.isArray(v)) return fb.slice(); var o = [], seen = {}; v.forEach(function(x){ x = String(x == null ? '' : x).replace(/\s+/g, ' ').trim(); var k = x.toLowerCase(); if (x && !seen[k]) { seen[k] = 1; o.push(x); } }); return o; }
+  var thr = Number(raw.commissionThreshold), ratio = Number(raw.quayRatio);
+  var before = JSON.stringify(BIZ_RULES);
+  BIZ_RULES = {
+    commissionThreshold: (isFinite(thr) && thr > 0) ? thr : D.commissionThreshold,
+    baseExcludedStatuses: list(raw.baseExcludedStatuses, D.baseExcludedStatuses),
+    posExcludedStatuses: list(raw.posExcludedStatuses, D.posExcludedStatuses),
+    quayRatio: (isFinite(ratio) && ratio > 0 && ratio <= 1) ? ratio : D.quayRatio,
+    quayKeywords: list(raw.quayKeywords, D.quayKeywords)
+  };
+  COMMISSION_THRESHOLD = BIZ_RULES.commissionThreshold;
+  return before !== JSON.stringify(BIZ_RULES);
+}
+// Nhãn ngắn của ngưỡng cho chữ trên giao diện: 15000000 -> "15tr", 12500000 -> "12,5tr". Thay cho chữ "15tr" cứng.
+function _commThrLabel_() { var m = Math.round(COMMISSION_THRESHOLD / 10000) / 100; return String(m).replace('.', ',') + 'tr'; }
+try { var _bizLs = loadLS('ome_biz_rules'); if (_bizLs) _bizApply_(_bizLs); } catch(e) {}
+async function _syncBizRulesFromGAS() {
+  if (!gsUrl) return;
+  try {
+    var r = await fetch(gsUrl + '?action=getSetting&key=bizRules', { redirect: 'follow' });
+    var data = await r.json();
+    var obj = (data && data.value) ? JSON.parse(data.value) : {};   // chưa cài => {} => mặc định
+    var changed = _bizApply_(obj);
+    saveLS('ome_biz_rules', obj);
+    if (changed && typeof _srState !== 'undefined' && _srState.sub === 'E' && typeof renderSalesReportTab === 'function') renderSalesReportTab();
+  } catch(e) { /* giữ bản local nếu lỗi mạng/parse */ }
+}
+setTimeout(_syncBizRulesFromGAS, 0);
 let INDIVIDUAL_RATES = (function(){
   try { var v = loadLS('ome_individual_rates'); return (v && typeof v === 'object') ? v : {}; } catch(e){ return {}; }
 })();

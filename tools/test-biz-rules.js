@@ -35,4 +35,10 @@ ok(run("_donHasExcludedStatus_('Đã hủy') && _donHasExcludedStatus_('trả h�
 ok(run("!_donHasExcludedStatus_('Hủy đơn')"), 'Pos KHONG con loai Hủy đơn khi admin bo di');
 ok(run("!_isExcludedOrderStatus_('Thất bại')"), 'Base: danh sach rong = khong loai trang thai nao');
 ok(run("_quaySaleRatio_('Showroom Hà Nội','',true) === 0.4 && _quaySaleRatio_('Quầy Hào Nam','',true) === 1"), 'quay: tu khoa + ty le moi');
+
+// (3) Chot chan quyen ghi bizRules: chi admin co token phien
+vm.runInContext("_sessUser_ = function(t){ return ({ A: { role: 'admin' }, C: { role: 'cs' }, L: { role: 'leader' } })[t] || null; };", ctx);
+ok(run("_bizRulesWriteDenied_('A')") === null, 'admin co token => duoc ghi');
+ok(run("_bizRulesWriteDenied_('C').code") === 'FORBIDDEN' && run("_bizRulesWriteDenied_('L').code") === 'FORBIDDEN', 'cs / leader => tu choi');
+ok(run("_bizRulesWriteDenied_('').code") === 'FORBIDDEN' && run("_bizRulesWriteDenied_('hong').code") === 'FORBIDDEN', 'khong token / token sai => tu choi');
 console.log('BIZ RULES TESTS PASSED');

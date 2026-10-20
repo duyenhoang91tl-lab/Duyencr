@@ -1,6 +1,14 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-10-20 — Cấu hình quy tắc tính doanh thu/hoa hồng (bizRules) — để CRM bán ra ngoài
+Yêu cầu Duyên: cách tính doanh thu, hoa hồng, loại báo cáo… phải tự cài trong phần Cấu hình, không nằm cứng trong code. Chi tiết kỹ thuật: `docs/crm-kb/02-backend-gas.md` mục `bizRules`.
+- [x] Bước 1 (commit 694eeab) backend: `_bizRules_()` đọc Settings `bizRules`; áp cho trạng thái đơn Base/Pos bị loại, ngưỡng hoa hồng (csStats), tỷ lệ + từ khóa nguồn quầy 30/70. Mặc định = hành vi cũ.
+- [x] Bước 2+3 client + UI: js/06 (`COMMISSION_THRESHOLD` thành `let`, `_bizApply_`, `_commThrLabel_`, nạp từ server), js/37 mục "📐 Quy tắc tính doanh thu & hoa hồng" (lưu + Nhật ký + Về mặc định), js/12 chữ "15tr" cứng ở Báo cáo E thành nhãn động. Ghi `bizRules` chỉ admin có token (server chặn).
+- Test: `node tools/test-biz-rules.js`, `node tools/test-biz-rules-client.js` (14 test cũ khác đã lỗi sẵn trên bản gốc, không liên quan).
+- [ ] CẦN LÀM TIẾP (chưa làm, đề xuất theo thứ tự): (a) KPI Báo cáo F: hạng/mục tiêu `SALE_TIER_*` (gas ~4897) → đưa vào cấu hình; (b) bảng % hoa hồng mặc định `def` (Online/Offline) ở js/01 ~418 và csStats; (c) chữ "≥15tr" còn lại ở gas (~6185 lý do thưởng), js/27-fn-bonuscore.js (mốc thưởng vòng 15tr/20tr), js/08; (d) bật/tắt + đổi tên các báo cáo A–L theo công ty (`_PERM_TAB_DEFS`); (e) tên sheet cứng "DT TỔNG ", "dữ liệu đơn", ID Google Sheet cứng (PRICE_SS_ID...) → cấu hình theo công ty; (f) hạng khách `_TIER_DEFAULT_` đã có `tierConfig` riêng (js/33), chưa gộp vào trang Cấu hình.
+- [ ] Duyên cần làm tay: Ctrl+F5 web; vào ⚙ Cấu hình xem mục mới. Workflow GAS tự deploy (kiểm tra tab Actions xanh).
+
 ## 2026-10-20 — Báo cáo Pos: mục "Tính đơn thuần" + Excel đối chiếu Base/quầy
 - [x] gas_v13.js `buildSalesReportB_`: mỗi đơn trả thêm `saleThe` (sale theo đúng cột Thẻ) và `dieuChinh` ('base' ghép Base | 'acct' file kế toán). `giaTriPos`/`saleShares`/`saleRatio` đã có sẵn.
 - [x] js/11-fn-srload.js: `_srPurePanelHtml_` (cuối Báo cáo B): bảng Theo Sale THUẦN (Thẻ + giá Pos gốc, không ghép Base/kế toán/quầy 30/70) + nút `_srPureExport_` xuất Excel 3 sheet: Tổng hợp theo Sale (thuần vs sau điều chỉnh vs bảng chính) / Đơn đã điều chỉnh / Cần kiểm tra tay. Test: `node tools/test-pure-report.js`.
