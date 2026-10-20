@@ -1,6 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-10-20 — Báo cáo Pos: mục "Tính đơn thuần" + Excel đối chiếu Base/quầy
+- [x] gas_v13.js `buildSalesReportB_`: mỗi đơn trả thêm `saleThe` (sale theo đúng cột Thẻ) và `dieuChinh` ('base' ghép Base | 'acct' file kế toán). `giaTriPos`/`saleShares`/`saleRatio` đã có sẵn.
+- [x] js/11-fn-srload.js: `_srPurePanelHtml_` (cuối Báo cáo B): bảng Theo Sale THUẦN (Thẻ + giá Pos gốc, không ghép Base/kế toán/quầy 30/70) + nút `_srPureExport_` xuất Excel 3 sheet: Tổng hợp theo Sale (thuần vs sau điều chỉnh vs bảng chính) / Đơn đã điều chỉnh / Cần kiểm tra tay. Test: `node tools/test-pure-report.js`.
+- [ ] CẦN LÀM TIẾP: (1) Duyên mở thử trên dữ liệu thật, so cột "Bảng chính" với "Sau điều chỉnh" trong Excel (phải bằng nhau khi không lọc Sale). (2) Khóa so khớp nhập Pos: file chỉ có NGÀY vs dòng Sheet có giờ/'00:00' → xem trước báo "0 đã có / 1.436 mới" (`_impOrderKey_` js/gas_v13.js ~7649) — CHƯA sửa, đừng bấm OK khi xem trước báo 0 đơn đã có.
+
 ## 2026-10-20 — Thông báo từ cấm: báo đúng sale + bấm mở đúng đoạn chat
 - [x] gas_v13.js `_cvNotify_`: mỗi (nhân viên × HỘI THOẠI) 1 thông báo (tối đa 15/nhân viên/lượt quét); gửi cho admin VÀ cho CHÍNH sale đó (khớp tên Pancake/CRM với tài khoản CRM qua tên/username/bí danh; tài khoản khóa không nhận). Sale đọc "Bạn dùng từ cấm trong N tin với <khách>: ...". Tắt báo sale: Settings `chatAuditNotifySale=0` hoặc chạy `datChatAuditBaoSale(false)`. Thông báo: refType `chatviolation`, refId = ID hội thoại, refId2 = "SĐT|tên khách".
 - [x] js/39-fn-notify.js: bấm thông báo → `_ntOpenChat_` mở Social > Chat đúng hội thoại (scPick; chưa có trong danh sách thì tạo dòng tạm). Thông báo cũ (refType customer) vẫn mở hồ sơ khách. Test: `node tools/test-chat-audit.js`.
