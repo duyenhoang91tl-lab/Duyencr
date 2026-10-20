@@ -1283,8 +1283,29 @@ async function _impUpload(kind){
   if (_impState.uploading) return; // chong bam dup -> 2 request cung luc
   _impState.uploading = true; renderSalesReportTab();
   try {
-    var res = await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'importSheetRows', sheet: kind, rows: rows }) });
-    var d = await res.json();
+    // BƯỚC 1 — XEM TRƯỚC (không ghi gì): backend đếm dòng MỚI / đơn ĐÃ CÓ. Backend cũ chưa hỗ trợ dryRun sẽ trả kết quả ghi thật
+    // (không có d0.dryRun) -> không bao giờ ghi 2 lần: dùng kết quả đó luôn như trước.
+    var _lbl = kind === 'base' ? 'Base (DT TỔNG)' : 'Pos (dữ liệu đơn)';
+    var _isReal = false, d = null;
+    var res0 = await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'importSheetRows', sheet: kind, rows: rows, dryRun: true }) });
+    var d0 = await res0.json();
+    if (d0.error) throw new Error(d0.error);
+    if (d0.dryRun) {
+      if (!d0.wouldWrite) {
+        toast('ℹ️ Không có dòng mới: cả ' + fmt(d0.skippedExisting || 0) + ' đơn trong file đều ĐÃ CÓ trong hệ thống — không ghi gì, dữ liệu cũ giữ nguyên.');
+        _impState.result = Object.assign({ kind: kind, written: 0 }, d0);
+        return;
+      }
+      if (!confirm('NHẬP DỮ LIỆU ' + _lbl + ' — xem trước:\n\n'
+        + '• Sẽ THÊM ' + fmt(d0.wouldWrite) + ' dòng MỚI (nối tiếp cuối sheet)\n'
+        + '• Bỏ qua ' + fmt(d0.skippedExisting || 0) + ' đơn ĐÃ CÓ (giống dữ liệu cũ — không ghi đè, không xóa)\n'
+        + (d0.skippedDupInFile ? '• Bỏ qua ' + fmt(d0.skippedDupInFile) + ' dòng trùng ngay trong file\n' : '')
+        + '\nDữ liệu cũ trên Sheet được GIỮ NGUYÊN 100%. Tiếp tục nhập?')) { toast('Đã hủy — chưa ghi gì.'); return; }
+    } else { _isReal = true; d = d0; }
+    if (!_isReal) {
+      var res = await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'importSheetRows', sheet: kind, rows: rows }) });
+      d = await res.json();
+    }
     if (d.error) throw new Error(d.error);
     _impState.result = Object.assign({ kind: kind }, d);
     toast('✓ Đã nhập '+fmt(d.written)+' dòng mới'+(d.skippedExisting?', bỏ qua '+fmt(d.skippedExisting)+' đơn ĐÃ CÓ trong hệ thống':'')+(d.dedupedAfter?' (tự loại '+fmt(d.dedupedAfter)+' dòng trùng tuyệt đối)':'')+' vào '+(kind==='base'?'DT TỔNG':'dữ liệu đơn')+'.');
