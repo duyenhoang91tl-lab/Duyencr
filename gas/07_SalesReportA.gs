@@ -349,6 +349,9 @@ function buildSalesReportA_(filters) {
       var teamsOnOrder = {};
       for (var k = 0; k < salesList.length; k++) {
         var sName = salesList[k];
+        // Dang LOC theo Sale: don co nhieu sale (vd "ninhnga99, menbui2002") chi hien dong cua nguoi DUOC CHON; sale khong chon tren cung don (menbui2002, phongketoan...)
+        // khong ve them dong. Tien van chia deu cho TAT CA N sale tren don nen phan cua nguoi duoc chon khong doi.
+        if (saleFilterFoldA.length && saleFilterFoldA.indexOf(_normTxt_(sName)) === -1) continue;
         if (!bySale[sName]) bySale[sName] = { orders: 0, coc: 0, giaTri: 0 };
         bySale[sName].orders += 1;                 // so don: khong chia
         bySale[sName].coc += m.giaTriCoc / n;       // tien: chia deu cho N sale
@@ -396,7 +399,7 @@ function buildSalesReportA_(filters) {
   // ── Tỷ lệ chốt theo Sale / theo Kênh / theo Page — dùng hàm chung _srCloseRateSections_
   // (tách 2026-09 để Báo cáo B dùng lại cùng công thức). Chuẩn hoá "matched" (DT TỔNG) về hình
   // dạng chung {kenhBan, dateStr, saleBanRaw} rồi gọi — nội dung/công thức giữ NGUYÊN VẸN như cũ.
-  var closeSectionsA_ = _srCloseRateSectionsFromBase_(filters);   // cùng nguồn với Báo cáo B
+  var closeSectionsA_ = _srFilterCloseBySale_(_srCloseRateSectionsFromBase_(filters), filters.sale);   // cùng nguồn với Báo cáo B; bộ lọc Sale áp cả lên biểu đồ này
   var saleCloseRate = closeSectionsA_.saleCloseRate;
   var kenhCloseRate = closeSectionsA_.kenhCloseRate;
   var saleCloseByPage = closeSectionsA_.saleCloseByPage;

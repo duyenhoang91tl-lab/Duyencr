@@ -1,5 +1,5 @@
 {
-  "_doc": "QUY TAC SONG SONG (docs/crm-kb/08-extension-parity.md): action GAS dung o CA Zalo AI va Pancake AI thi khong can ghi o day. Action chi o MOT ben PHAI co dong o day: 'platform' = dac thu nen tang (co ly do), 'gap' = ben kia CHUA co, can Duyen chot co lam khong. tools/check-ext-parity.js bao LOI khi co action lech ma chua ghi o day.",
+  "_doc": "QUY TAC SONG SONG (docs/crm-kb/08-extension-parity.md): action GAS dung o CA Zalo AI va Pancake AI thi khong can ghi o day. Action chi o MOT ben PHAI co dong o day: 'platform' = dac thu nen tang (co ly do), 'gap' = ben kia CHUA co, can Duyen chot co lam khong. tools/check-ext-parity.js bao LOI khi co action lech ma chua ghi o day. LUU Y: script chi thay lech o muc ACTION GAS; lech trong NOI DUNG phan hoi (vd Pancake AI hien anh san pham kem goi y tra loi) khong bi bat — theo doi bang tay o docs/crm-kb/08-extension-parity.md muc 'Lech khong do duoc bang script'.",
   "onlyZalo": {
     "broadcastQueue": {
       "status": "platform",
@@ -14,8 +14,8 @@
       "note": "Trang thai ket ban Zalo (cot zalo CareData) — chi co o Zalo"
     },
     "count": {
-      "status": "gap",
-      "note": "Zalo doi chieu phien ban backend (`ver`); Pancake chua co — xem co can khong"
+      "status": "platform",
+      "note": "Chi dung de chan doan loi \"Unknown action\" khi dong bo trang thai ket ban Zalo (syncZaloFriendStatus) — tinh nang chi co o Zalo, Pancake khong co cho nao can"
     }
   },
   "onlyPancake": {
@@ -39,6 +39,10 @@
       "status": "gap",
       "note": "Pancake danh dau viec xong; Zalo chua"
     },
+    "getSettings": {
+      "status": "gap",
+      "note": "U3d: nut Ap CT tu dong trong gio hang Pancake AI doc promoConfig — Zalo AI chua co gio hang/Soan don, lam bu cung U6a-2 (docs/ROADMAP-CRM-UPDATE.md)"
+    },
     "ctkmCatalog": {
       "status": "gap",
       "note": "Danh muc CTKM — Zalo chua co"
@@ -54,14 +58,6 @@
     "priceCatalogFlat": {
       "status": "gap",
       "note": "Bang gia phang cho Soan don — Zalo chua"
-    },
-    "productImageFlat": {
-      "status": "gap",
-      "note": "Anh san pham — Zalo chua"
-    },
-    "driveImageFromLink": {
-      "status": "gap",
-      "note": "Lay anh Drive tu link — Zalo chua"
     },
     "donOrdersByPhone": {
       "status": "gap",

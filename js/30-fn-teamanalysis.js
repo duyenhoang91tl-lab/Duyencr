@@ -34,7 +34,7 @@ function openTeamAnalysisModal(){
         '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">' +
           '<label style="font-size:12px;color:var(--muted)">Từ</label><input type="date" id="ta-from" class="ymf-date">' +
           '<label style="font-size:12px;color:var(--muted)">Đến</label><input type="date" id="ta-to" class="ymf-date">' +
-          '<button class="btn" onclick="_taRange(\'week\')">7 ngày</button>' + _quickRangeSelectHtml('custom', "_taQuick(this.value)") + '' +
+          '<button class="btn" onclick="_taRange(\'week\')">7 ngày</button>' + (typeof qrPillsHtml_ === 'function' ? qrPillsHtml_('custom', "_taQuick(this.value)") : _quickRangeSelectHtml('custom', "_taQuick(this.value)")) + '' +
           '<button class="btn primary" id="ta-run" onclick="runTeamAnalysis(false)">🤖 Phân tích</button>' +
           '<button class="btn" onclick="runTeamAnalysis(true)" title="Bỏ kết quả lưu tạm 10 phút, gọi AI viết lại">↻ Làm mới</button>' +
         '</div>' +

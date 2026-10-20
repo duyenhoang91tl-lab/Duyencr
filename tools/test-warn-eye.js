@@ -38,7 +38,7 @@ ok(/var orphanHtml = orphanBox_ \? _warnBox\('cr-orphan'/.test(j11)&&!/var orpha
   ok(/Sale A/.test(out)&&/Trung bình:/.test(out),'bieu do + trung binh van ve binh thuong');
   ok(!/warn-wrap/.test(c2._srCloseRateBarHtml_([{name:'Sale A',held:100,closed:30,closeRate:30}],'','đơn')),'khong co don mo coi -> khong ve nut');
   const out2=c2._srCloseRateBarHtml_([{name:'Sale A',held:100,closed:30,closeRate:30}],'','tương tác',{tongTT:145,pages:[{pageName:'NGUỒN',tongTT:145}]});
-  ok(/👁 145 tương tác ở 1 Page chưa khớp kênh \(không tính\)/.test(out2)&&/KHÔNG tính vào mẫu số/.test(out2)&&/class="warn-body" style="display:none[^"]*"[^>]*>\s*<div[^>]*>⚠️ <b>145<\/b>/.test(out2),'tuong tac o Page chua khop kenh: bao trong khung AN (👁), noi dung day du co ten Page');
+  ok(!/cr-excluded-tt|chưa khớp kênh|KHÔNG tính vào mẫu số/.test(out2)&&/Sale A/.test(out2),'tuong tac o Page chua khop kenh: TAT HAN ca nut 👁 lan khung canh bao (Duyen 18/10/2026), bieu do van ve binh thuong');
   ok(!/cr-excluded-tt/.test(c2._srCloseRateBarHtml_([{name:'Sale A',held:100,closed:30,closeRate:30}],'','tương tác',null)),'khong co phan bi loai -> khong ve khung');
 })();
 console.log(fail?('\n'+fail+' FAIL'):'\nALL PASS'); process.exit(fail?1:0);

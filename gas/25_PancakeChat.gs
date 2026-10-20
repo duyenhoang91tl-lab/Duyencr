@@ -167,7 +167,59 @@ function pkChat_(e) {
     return jsonOut_(out);
   } catch (err) { return jsonOut_({ error: 'Doc chat loi: ' + String(err && err.message || err).slice(0, 200) }); }
 }
-// GET pkChatInbox: hop thu chung — cac hoi thoai moi nhat (q = loc theo ten/SDT, rong = tat ca). Man hinh Social > Chat.
+// ═══ BO LOC HOP THU (2026-10-18, Duyen: loc theo SDT / Page / Nguon / Nhan vien + kieu menu Pancake) ═══
+// Moi bo loc lam o SERVER (khong chi 60 hoi thoai dang tai) bang tham so PostgREST: type=INBOX|COMMENT · un=new|wait|read (chua tra loi: moi nhat / cho lau nhat 30 ngay /
+// da doc nhung chua tra loi — 3 muc menu "Loc chua tra loi" cua Pancake) · ph=1|0 (co / chua co SDT) · page=<id> · nguon=<ten Kenh ban cua Page, theo bang Khop Page↔Kenh> · nv=<id nhan vien Pancake>.
+// Chua lam duoc (CHUA co truong du lieu xac nhan): "Loc tin nhan" AI dang xu ly/da tat/da chuyen tiep, "Loc binh luan" livestream/da tao don — can xem mau payload that cua Pancake.
+function _pkInboxFilter_(p, info) {
+  p = p || {}; info = info || {};
+  var safe = function (x) { return String(x == null ? '' : x).replace(/[^A-Za-z0-9_\-:.]/g, '').slice(0, 80); };
+  var f = '', order = 'desc', key = [];
+  var type = String(p.type || '').toUpperCase(); if (type === 'INBOX' || type === 'COMMENT') { f += '&conv_type=eq.' + type; key.push('t' + type); }
+  var un = String(p.un || '');
+  if (un === 'new' || un === 'wait' || un === 'read') {
+    f += '&is_replied=eq.false'; key.push('u' + un);
+    if (un === 'read') f += '&seen=eq.true';
+    if (un === 'wait') { order = 'asc'; f += '&last_message_at=gte.' + _pkEnc_(new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 13) + ':00:00Z'); }   // "cho lau nhat" trong 30 ngay gan day (khong keo ve hoi thoai cu tu nhieu thang truoc); lam tron gio de khoa cache on dinh
+  }
+  var ph = String(p.ph || '');
+  if (ph === '1') { f += '&customer_phone=neq.'; key.push('p1'); }
+  else if (ph === '0') { f += '&or=(customer_phone.is.null,customer_phone.eq.)'; key.push('p0'); }
+  var page = safe(p.page), nguon = String(p.nguon || '').trim();
+  var ids = null;
+  if (nguon) {
+    var nf = nguon.toLowerCase(); ids = Object.keys(info).filter(function (id) { return String((info[id] && info[id].kenh) || '').trim().toLowerCase() === nf; });
+    key.push('n' + nf.replace(/[^a-z0-9]/g, '').slice(0, 30));
+  }
+  if (page) { f += '&page_id=eq.' + _pkEnc_(page) + ((ids && ids.indexOf(page) === -1) ? '&id=eq.__khong_co__' : ''); key.push('g' + page); }
+  else if (ids) { f += ids.length ? '&page_id=in.(' + ids.map(function (i) { return _pkEnc_(safe(i)); }).join(',') + ')' : '&id=eq.__khong_co__'; }
+  var nv = safe(p.nv); if (nv) { f += '&assignee_ids=cs.' + _pkEnc_('{' + nv + '}'); key.push('v' + nv); }
+  return { tail: f, order: order, active: !!f, key: key.join('|') };
+}
+// pageId -> {name, kenh} tu bang PancakePageMap (Khop Page ↔ Kenh ban) + Page co token nhung chua co trong bang (chi co id). Cache 10 phut.
+function _pkPageInfo_() {
+  var hit = _pkCacheGet_('pkPageInfo_'); if (hit) return hit;
+  var m = {};
+  try {
+    var sh = getSheet_(SH_PK_PAGEMAP, PK_PAGEMAP_HEADERS), lr = sh.getLastRow();
+    if (lr >= 2) sh.getRange(2, 1, lr - 1, 3).getValues().forEach(function (r) { if (r[0]) m[String(r[0])] = { name: String(r[1] || ''), kenh: String(r[2] || '') }; });
+  } catch (e) {}
+  try { var tk = JSON.parse(PropertiesService.getScriptProperties().getProperty('PANCAKE_PAGE_TOKENS') || '{}'); Object.keys(tk || {}).forEach(function (id) { if (!m[id]) m[id] = { name: '', kenh: '' }; }); } catch (e2) {}
+  _pkCachePut_('pkPageInfo_', m, 600);
+  return m;
+}
+// GET pkChatFilterOpts: danh sach lua chon cho o loc hop thu: Page (id + ten + kenh), Nguon (cac Kenh ban), Nhan vien (id + ten).
+function pkChatFilterOpts_(e) {
+  var p = (e && e.parameter) || {}, a = _pkAuth_(p.token); if (a.err) return a.err;
+  try {
+    var info = _pkPageInfo_(), names = _pkStaffNames_(), seenK = {};
+    var pages = Object.keys(info).map(function (id) { return { id: id, name: info[id].name || id, kenh: info[id].kenh || '' }; }).sort(function (x, y) { return x.name.localeCompare(y.name); });
+    var nguon = []; pages.forEach(function (pg) { var k = pg.kenh.trim(); if (k && !seenK[k.toLowerCase()]) { seenK[k.toLowerCase()] = 1; nguon.push(k); } }); nguon.sort(function (x, y) { return x.localeCompare(y); });
+    var staff = Object.keys(names).filter(function (id) { return names[id]; }).map(function (id) { return { id: id, name: names[id] }; }).sort(function (x, y) { return x.name.localeCompare(y.name); });
+    return jsonOut_({ ok: true, pages: pages, nguon: nguon, staff: staff });
+  } catch (err) { return jsonOut_({ error: 'Doc danh sach loc loi: ' + String(err && err.message || err).slice(0, 200) }); }
+}
+// GET pkChatInbox: hop thu chung — cac hoi thoai moi nhat (q = loc theo ten/SDT, rong = tat ca; them type/un/ph/page/nguon/nv xem _pkInboxFilter_). Man hinh Social > Chat.
 function pkChatInbox_(e) {
   var p = (e && e.parameter) || {};
   var a = _pkAuth_(p.token); if (a.err) return a.err;
@@ -178,12 +230,14 @@ function pkChatInbox_(e) {
       var digits = q.replace(/\D/g, '');
       filter = '&' + ((digits.length >= 6 && digits.length >= q.length - 2) ? 'customer_phone=like.' + _pkEnc_('*' + digits + '*') : 'customer_name=ilike.' + _pkEnc_('*' + q + '*'));
     }
+    var fx = _pkInboxFilter_(p, (p.nguon ? _pkPageInfo_() : {}));
     // NGUYEN NHAN GOC loi 'urlfetch qua nhieu lan/ngay': moi tab poll 8s -> moi lan >=2 UrlFetch (Supabase + ten NV) x nhieu tab x ca ngay vuot han muc
     // (20.000/ngay tai khoan thuong). Danh sach hoi thoai giong nhau cho moi nguoi dung (khong loc theo nguoi) -> cache 15s DUNG CHUNG: bao nhieu tab cung chi ~4 luot/phut.
-    var ck = 'pkInbox_' + encodeURIComponent(q).slice(0, 80), hit = _pkCacheGet_(ck);
+    // Khong co bo loc: giu NGUYEN khoa cu 'pkInbox_<q>' (pkChatRead_ xoa khoa nay khi doi da doc/chua doc). Co bo loc: khoa rieng theo (q + bo loc), rut gon neu dai.
+    var ck = fx.active ? _reportCacheKey_('pkInboxF_', { q: q, f: fx.key + '#' + fx.tail }) : ('pkInbox_' + encodeURIComponent(q).slice(0, 80)), hit = _pkCacheGet_(ck);
     if (hit) return jsonOut_(hit);
     var _names = _pkStaffNames_();
-    var cv = sb_('GET', 'pk_conversations?select=' + PK_CONV_COLS_ + filter + '&order=last_message_at.desc.nullslast&limit=60').json || [];
+    var cv = sb_('GET', 'pk_conversations?select=' + PK_CONV_COLS_ + filter + fx.tail + '&order=last_message_at.' + fx.order + '.nullslast&limit=' + (fx.active ? 100 : 60)).json || [];
     var list = cv.map(function (c) { return _pkConvOut_(c, _names); });
     var res = { ok: true, gv: PK_GAS_VER_, conversations: list, serverTime: new Date().toISOString() };
     _pkCachePut_(ck, res, 15);

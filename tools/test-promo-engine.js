@@ -79,3 +79,9 @@ ok('chuẩn hoá nhận chuỗi JSON và {promos:[]}, bỏ id trùng', () => {
 });
 ok('giỏ rỗng / qty 0', () => { const r = calcPromo_([{ name: 'a', qty: 0, price: 5 }], [P({ id: 'a', name: 'a', type: 'percent', value: 5 })], { date: D }); assert.strictEqual(r.total, 0); });
 console.log('\nOK', n, 'ca');
+// Bản sao trong extension phải GIỐNG HỆT nguồn (quy tắc: sửa js/53 thì chép lại sang các extension)
+const src = fs.readFileSync(__dirname + '/../js/53-fn-promo-engine.js', 'utf8');
+for (const f of ['extension-pancake/pancake-promo.js']) {
+  const p = __dirname + '/../' + f;
+  if (fs.existsSync(p)) { assert.strictEqual(fs.readFileSync(p, 'utf8'), src, f + ' lệch khỏi js/53-fn-promo-engine.js — chạy: cp js/53-fn-promo-engine.js ' + f); console.log('✓ bản sao ' + f + ' khớp'); }
+}

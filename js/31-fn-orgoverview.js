@@ -80,7 +80,7 @@ function _ovEnsurePanel(){
     p.innerHTML = '<div class="dash-wrap" id="overview-wrap"><div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">' +
       '<div style="font-size:18px;font-weight:700;flex:1;min-width:220px">🏠 Tổng quan kết quả kinh doanh <span id="ov-scope" style="font-size:12px;font-weight:500;color:var(--muted)"></span></div>' +
       '<input type="date" id="ov-from" class="ymf-date"><span style="color:var(--muted)">→</span><input type="date" id="ov-to" class="ymf-date">' +
-      '<button class="btn" onclick="_ovRange(\'week\');_ovLoad(false)">7 ngày</button>' + _quickRangeSelectHtml('custom', "_ovQuick(this.value)") + '' +
+      '<button class="btn" onclick="_ovRange(\'week\');_ovLoad(false)">7 ngày</button>' + (typeof qrPillsHtml_ === 'function' ? qrPillsHtml_('custom', "_ovQuick(this.value)") : _quickRangeSelectHtml('custom', "_ovQuick(this.value)")) + '' +
       '<button class="btn primary" onclick="_ovLoad(false)">Xem</button><button class="btn" onclick="_ovLoad(true)" title="Tính lại, bỏ kết quả lưu tạm 5 phút">↻</button></div>' +
       '<div id="hm-chips" style="margin-bottom:12px"></div><div id="ov-body" style="font-size:13px;color:var(--muted)">⏳ Đang tải…</div></div>';
     dv.appendChild(p); _ovRange('month');

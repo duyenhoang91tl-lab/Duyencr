@@ -1218,7 +1218,14 @@ async function _srFetch(action, params){
     }
     var txt = await r.text();
     try {
-      return JSON.parse(txt);
+      var _obj = JSON.parse(txt);
+      // Máy chủ trả {error:...} (hết phiên / không đủ quyền / lỗi GAS) cho báo cáo doanh số: trước đây giao diện vẽ toàn số 0 vì thiếu field -> trông như "không có đơn".
+      // Nay báo thẳng lỗi (qua _srNoDataHtml_) để biết đó là lỗi chứ không phải dữ liệu rỗng. Chỉ áp cho các action báo cáo (salesReport*).
+      if (_obj && typeof _obj === 'object' && typeof _obj.error === 'string' && /^salesReport/.test(action)) {
+        _srState.lastFetchError = 'Máy chủ báo lỗi: ' + _obj.error + (_obj.code ? ' [' + _obj.code + ']' : '') + (_obj.code === 'AUTH' || /đăng nhập|dang nhap/i.test(_obj.error) ? ' — đăng xuất rồi đăng nhập lại.' : '');
+        return null;
+      }
+      return _obj;
     } catch (eParse) {
       // GAS thuong tra ve 1 trang HTML loi (vd "Exceeded maximum execution time") thay vi JSON
       // khi script chay qua 6 phut hoac gap loi khong bat duoc — rat hay gap khi khoang ngay loc

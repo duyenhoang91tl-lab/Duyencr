@@ -139,7 +139,8 @@
     var sub = (typeof _srState !== 'undefined') ? _srState.sub : ''; if (!CFG[sub]) return;
     var bar = wrap.querySelector('.srb-bar'); if (!bar) return;
     var anchor = null; for (var i = bar.children.length - 1; i >= 0; i--) { if (bar.children[i].classList.contains('gear-menu')) { anchor = bar.children[i]; break; } }
-    if (anchor) anchor.insertAdjacentHTML('beforebegin', ctlHtml(sub)); else bar.insertAdjacentHTML('beforeend', ctlHtml(sub));
+    // (18/10/2026) Cụm mẫu đặt SAU 🧰 Tác vụ: thanh công cụ dài quá thì chip mẫu xuống dòng, còn Tác vụ luôn ở hàng đầu cùng ô chọn báo cáo/ngày/Bộ lọc/Lọc.
+    if (anchor) anchor.insertAdjacentHTML('afterend', ctlHtml(sub)); else bar.insertAdjacentHTML('beforeend', ctlHtml(sub));
     var inf = infoHtml(sub); if (inf) bar.insertAdjacentHTML('afterend', inf);
   }
 
@@ -149,9 +150,11 @@
     c.keys.forEach(function(k){ var v = p.filters ? p.filters[k] : undefined; _srState[k] = (v === undefined) ? emptyLike(_srState[k]) : (Array.isArray(v) ? v.slice() : v); });
     if (c.team) _srState[c.team] = [];          // ô "Lọc theo Team" chỉ là công cụ điền ô Sale — mẫu đã chứa sẵn danh sách Sale
     if (c.custom) _srState[c.custom] = true;     // E/F/G/L: đã tự chỉnh Sale → không bị ghi đè bởi mặc định theo vai trò
+    var before = JSON.stringify(c.keys.map(function(k){ return _srState[k]; }));
     if (typeof _srEnforceScope === 'function') _srEnforceScope();   // người bị giới hạn phạm vi (leader…) vẫn chỉ xem được phần của mình
+    var limited = before !== JSON.stringify(c.keys.map(function(k){ return _srState[k]; }));
     ACT[p.sub] = p.id;
-    toastF('⚡ Đã áp dụng mẫu “' + p.name + '”');
+    toastF(limited ? '⚠ Mẫu “' + p.name + '” bị giới hạn theo quyền của bạn — chỉ xem được dữ liệu của mình' : '⚡ Đã áp dụng mẫu “' + p.name + '”');
     if (typeof _srApply === 'function') _srApply(); else renderSalesReportTab();
   }
   function turnOff(){

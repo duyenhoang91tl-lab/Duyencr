@@ -3,13 +3,16 @@
 //  phải = tin nhắn + ô trả lời. Dùng lại backend của chat trong hồ sơ khách (js/41): pkChatInbox (danh sách), pkChatConv (tin nhắn),
 //  pkChatSend (gửi). Bấm "Mở hồ sơ" để nhảy sang khách có cùng SĐT. Poll nhẹ 8s khi đang mở tab.
 // ═══════════════════════════════════════════════════════
-var _sc = { convs: [], msgs: {}, active: '', after: {}, q: '', timer: null, loading: false, err: '', sending: false, okAt: '' };
+var _sc = { convs: [], msgs: {}, active: '', after: {}, q: '', timer: null, loading: false, err: '', sending: false, okAt: '', fold: '',
+  f: { type: '', un: '', ph: '', page: '', nguon: '', nv: '' }, fopen: false, folopen: false, opts: null, optsLoading: false, again: false };   // f = bộ lọc gửi lên máy chủ; fopen/folopen = panel Bộ lọc / Thư mục (MẶC ĐỊNH ẨN)
 function _scOpen() { var t = document.getElementById('tab-chat'); return !!t && t.style.display !== 'none' && _activeV9Tab === 'chat'; }
 function _scStop() { if (_sc.timer) { clearInterval(_sc.timer); _sc.timer = null; } }
 function renderSocialChatTab() {
   var w = document.getElementById('chat-wrap'); if (!w) return;
   if (!w.firstChild) {
-    w.innerHTML = '<div class="sc-list"><div class="sc-find"><input id="sc-q" type="search" placeholder="🔍 Tìm hội thoại: tên hoặc SĐT…" oninput="_scQSoon()"></div><div id="sc-convs" class="sc-convs"></div></div>'
+    w.innerHTML = '<div class="sc-list"><div class="sc-find"><input id="sc-q" type="search" placeholder="🔍 Tìm hội thoại: tên hoặc SĐT…" oninput="_scQSoon()"></div>'
+      + '<div class="sc-ftools" id="sc-ftools"><button type="button" class="btn sm" id="sc-fbtn" onclick="scToggleFilters()">🔎 Bộ lọc<span id="sc-fn"></span> ▾</button><button type="button" class="btn sm" id="sc-folbtn" onclick="scToggleFolders()">🏷 Thư mục<span id="sc-foln"></span> ▾</button><a class="sc-fx" id="sc-fx" href="javascript:void(0)" onclick="scClearFilters()" style="display:none">✕ Xoá lọc</a></div>'
+      + '<div class="sc-fpanel" id="sc-fpanel" style="display:none"></div><div id="sc-convs" class="sc-convs"></div></div>'
       + '<div class="sc-main" id="sc-main"><div class="sc-head" id="sc-head"></div><div class="pkc-who" id="sc-who"></div><div class="pkc-msgs sc-msgs" id="sc-msgs"><div class="pkc-note">Chọn một hội thoại bên trái.</div></div>'
       + '<div class="pkc-status" id="sc-status"></div>'
       + '<div class="pkt-bar" id="sc-tags" style="display:none"></div>'
@@ -53,19 +56,107 @@ function _scAgo(iso) {
   if (m < 1) return 'vừa xong'; if (m < 60) return m + ' phút'; if (m < 1440) return Math.floor(m / 60) + ' giờ';
   return _pkcDay(iso).slice(0, 5);
 }
+// Tham số bộ lọc gửi máy chủ (lọc ở SERVER nên không bị giới hạn 60 hội thoại đang tải): type · un · ph · page · nguon · nv — xem pkChatInbox_ (GAS).
+function _scFilterQuery_() {
+  return ['type', 'un', 'ph', 'page', 'nguon', 'nv'].map(function (k) { return _sc.f[k] ? '&' + k + '=' + encodeURIComponent(_sc.f[k]) : ''; }).join('');
+}
+function _scFilterCount_() { return ['type', 'un', 'ph', 'page', 'nguon', 'nv'].filter(function (k) { return !!_sc.f[k]; }).length; }
 async function scLoadList() {
-  if (_sc.loading) return; _sc.loading = true;
+  if (_sc.loading) { _sc.again = true; return; }   // đổi bộ lọc/tìm kiếm khi đang tải dở -> tải lại ngay sau đó (không bỏ rơi lần đổi)
+  _sc.loading = true;
   try {
-    var j = await (await fetch(_pkcUrl('action=pkChatInbox' + (_sc.q ? '&q=' + encodeURIComponent(_sc.q) : '')), { redirect: 'follow' })).json();
+    var j = await (await fetch(_pkcUrl('action=pkChatInbox' + (_sc.q ? '&q=' + encodeURIComponent(_sc.q) : '') + _scFilterQuery_()), { redirect: 'follow' })).json();
     if (!j || j.error) { _sc.err = _pkcAuthFail(j) ? 'Phiên đăng nhập đã hết hạn — đăng nhập lại để xem tin nhắn.' : ((j && j.error) || 'Không tải được hộp thư.'); _scStatus(); return; }
     _pkcAuthShown = false; _sc.err = ''; _sc.okAt = _pkcHm(new Date().toISOString()); _sc.gv = j.gv || ''; _sc.convs = j.conversations || []; _pkTagApplyOv(_sc.convs); _pkSeenApplyOv(_sc.convs);
     _scRenderList(); _scStatus();
   } catch (e) { _sc.err = 'Không kết nối được máy chủ.'; _scStatus(); }
-  finally { _sc.loading = false; }
+  finally { _sc.loading = false; if (_sc.again) { _sc.again = false; scLoadList(); } }
+}
+// ═══ BỘ LỌC + THƯ MỤC (18/10/2026) — cả hai MẶC ĐỊNH ẨN, bấm nút mới hiện ═══
+var _SC_TYPE_ = [['', 'Tất cả'], ['INBOX', 'Tin nhắn'], ['COMMENT', 'Bình luận']];
+var _SC_UN_ = [['', 'Tất cả'], ['new', 'Chưa trả lời — mới nhất trước'], ['wait', 'Chưa trả lời — chờ lâu nhất (30 ngày)'], ['read', 'Đã đọc nhưng chưa trả lời']];   // 3 mục menu "Lọc chưa trả lời" của Pancake
+var _SC_PH_ = [['', 'Tất cả'], ['1', 'Có SĐT'], ['0', 'Chưa có SĐT']];
+function _scFilterBadge_() {
+  var n = _scFilterCount_(), b = document.getElementById('sc-fn'); if (b) b.textContent = n ? ' (' + n + ')' : '';
+  var fb = document.getElementById('sc-fbtn'); if (fb) fb.className = 'btn sm' + (n ? ' on' : '');
+  var fo = document.getElementById('sc-foln'); if (fo) fo.textContent = _sc.fold ? ' (1)' : '';
+  var ob = document.getElementById('sc-folbtn'); if (ob) ob.className = 'btn sm' + (_sc.fold ? ' on' : '');
+  var x = document.getElementById('sc-fx'); if (x) x.style.display = (n || _sc.fold) ? '' : 'none';
+}
+function _scRenderFPanel_() {
+  var el = document.getElementById('sc-fpanel'); if (!el) return;
+  el.style.display = _sc.fopen ? '' : 'none'; if (!_sc.fopen) { el.innerHTML = ''; return; }
+  var o = _sc.opts || { pages: [], nguon: [], staff: [] };
+  var withCur = function (list, k) { if (_sc.f[k] && !list.some(function (x) { return x[0] === _sc.f[k]; })) list = list.concat([[_sc.f[k], _sc.f[k]]]); return list; };
+  var sel = function (k, label, list) {
+    list = withCur(list, k);
+    return '<label class="sc-fl"><span>' + label + '</span><select onchange="scSetF(\'' + k + '\',this.value)">' + list.map(function (x) {
+      return '<option value="' + _pkcEsc(x[0]) + '"' + (_sc.f[k] === x[0] ? ' selected' : '') + '>' + _pkcEsc(x[1]) + '</option>'; }).join('') + '</select></label>';
+  };
+  el.innerHTML = sel('type', 'Loại', _SC_TYPE_) + sel('un', 'Chưa trả lời', _SC_UN_) + sel('ph', 'Số điện thoại', _SC_PH_)
+    + sel('page', 'Page', [['', 'Tất cả Page']].concat((o.pages || []).map(function (p) { return [p.id, p.name + (p.kenh ? ' · ' + p.kenh : '')]; })))
+    + sel('nguon', 'Nguồn (kênh bán)', [['', 'Tất cả nguồn']].concat((o.nguon || []).map(function (n) { return [n, n]; })))
+    + sel('nv', 'Nhân viên', [['', 'Tất cả nhân viên']].concat((o.staff || []).map(function (s) { return [s.id, s.name]; })))
+    + (_sc.opts ? '' : '<div class="sc-fnote">Đang tải danh sách Page / Nguồn / Nhân viên…</div>')
+    + ((_sc.opts && _sc.opts.err) ? '<div class="sc-fnote">⚠ ' + _pkcEsc(_sc.opts.err) + '</div>' : '');
+}
+async function scLoadOpts() {
+  if (_sc.opts || _sc.optsLoading) return; _sc.optsLoading = true;
+  try {
+    var j = await (await fetch(_pkcUrl('action=pkChatFilterOpts'), { redirect: 'follow' })).json();
+    _sc.opts = (j && j.ok) ? { pages: j.pages || [], nguon: j.nguon || [], staff: j.staff || [] } : { pages: [], nguon: [], staff: [], err: (j && j.error) || 'Không tải được danh sách lọc.' };
+  } catch (e) { _sc.opts = { pages: [], nguon: [], staff: [], err: 'Không kết nối được máy chủ.' }; }
+  finally { _sc.optsLoading = false; _scRenderFPanel_(); }
+}
+function scToggleFilters() { _sc.fopen = !_sc.fopen; _scRenderFPanel_(); if (_sc.fopen) scLoadOpts(); }
+function scToggleFolders() { _sc.folopen = !_sc.folopen; _scRenderFolders(); }
+function scSetF(k, v) { if (!(k in _sc.f)) return; _sc.f[k] = String(v || ''); _scFilterBadge_(); scLoadList(); }
+function scClearFilters() {
+  Object.keys(_sc.f).forEach(function (k) { _sc.f[k] = ''; }); _sc.fold = '';
+  _scRenderFPanel_(); _scFilterBadge_(); scLoadList();
+}
+// THƯ MỤC chat (2026-10-12): lọc nhanh danh sách đang tải theo Chưa đọc / Chưa trả lời / từng THẺ Pancake (theo tên thẻ, gộp giữa các page).
+// Đếm theo các hội thoại ĐANG TẢI (mới nhất), không phải toàn bộ lịch sử — gõ ô tìm kiếm để tìm sâu hơn.
+function _scTagKey(t) { return 'tag:' + String(t && t.t || '').toLowerCase(); }
+function _scInFolder(c) {
+  var k = _sc.fold; if (!k) return true;
+  if (k === '@unseen') return c.seen === false;
+  if (k === '@unreplied') return !c.replied;
+  return (c.tags || []).some(function (t) { return _scTagKey(t) === k; });
+}
+function scFolder(k) { _sc.fold = (_sc.fold === k) ? '' : k; _scRenderList(); }
+function _scRenderFolders() {
+  var list = document.querySelector('#tab-chat .sc-list'); if (!list) return;
+  var box = document.getElementById('sc-folders');
+  if (!box) { box = document.createElement('div'); box.id = 'sc-folders'; box.className = 'sc-folders'; var f = document.getElementById('sc-fpanel') || list.querySelector('.sc-find'); if (f && f.insertAdjacentElement) f.insertAdjacentElement('afterend', box); else list.insertBefore(box, list.firstChild); }
+  box.style.display = _sc.folopen ? '' : 'none';   // MẶC ĐỊNH ẨN — bấm "🏷 Thư mục" mới hiện
+  var un = 0, nr = 0, tg = {};
+  _sc.convs.forEach(function (c) {
+    if (c.seen === false) un++; if (!c.replied) nr++;
+    var seen = {}; (c.tags || []).forEach(function (t) { var k = _scTagKey(t); if (!t.t || seen[k]) return; seen[k] = 1; var x = tg[k] || (tg[k] = { k: k, t: t.t, c: t.c, n: 0 }); x.n++; });
+  });
+  var tags = Object.keys(tg).map(function (k) { return tg[k]; }).sort(function (a, b) { return b.n - a.n; });
+  var chip = function (key, label, n, color) {
+    return '<button type="button" class="sc-fchip' + (_sc.fold === key ? ' on' : '') + '" data-k="' + _pkcEsc(key) + '" onclick="scFolder(this.getAttribute(\'data-k\'))">'
+      + (color && /^#[0-9a-fA-F]{3,8}$/.test(color) ? '<i class="sc-fdot" style="background:' + color + '"></i>' : '') + _pkcEsc(label) + ' <b>' + n + '</b></button>';
+  };
+  box.innerHTML = chip('', 'Tất cả', _sc.convs.length) + chip('@unseen', '🔵 Chưa đọc', un) + chip('@unreplied', '↩ Chưa trả lời', nr) + tags.map(function (t) { return chip(t.k, t.t, t.n, t.c); }).join('');
+  box.title = 'Đếm theo các hội thoại đang tải (mới nhất)';
+  _scFilterBadge_();
+}
+// Link mở ĐÚNG hội thoại trên Pancake. Mẫu mặc định CHƯA xác nhận với link thật — nếu sai, đặt window.PK_CONV_URL_TPL (hoặc báo để sửa mặc định).
+function _scPancakeUrl(c) {
+  if (!c || !c.pageId) return '';
+  var tpl = String(window.PK_CONV_URL_TPL || 'https://pancake.vn/{page_id}?c_id={conv_id}');
+  var id = String(c.id || ''), pg = String(c.pageId);
+  if (id.indexOf(pg + '_') === 0) id = id.slice(pg.length + 1);
+  return tpl.replace('{page_id}', encodeURIComponent(pg)).replace('{conv_id}', encodeURIComponent(id));
 }
 function _scRenderList() {
   var el = document.getElementById('sc-convs'); if (!el) return;
-  el.innerHTML = _sc.convs.length ? _sc.convs.map(function (c) {
+  _scRenderFolders();
+  var view = _sc.convs.filter(_scInFolder);
+  el.innerHTML = view.length ? view.map(function (c) {
     return '<div class="sc-conv' + (c.id === _sc.active ? ' on' : '') + (c.seen === false ? ' unseen' : '') + '" data-id="' + _pkcEsc(c.id) + '" onclick="scPick(this.getAttribute(\'data-id\'))">'
       + '<div class="sc-av">' + _pkcEsc(typeof proInitials_ === 'function' ? proInitials_(c.name) : '?') + '</div><div class="sc-conv-body">'
       + '<div class="sc-conv-n"><b>' + _pkcEsc(c.name || 'Khách Pancake') + '</b><span>' + _pkcEsc(_scAgo(c.lastAt)) + '</span></div>'
@@ -74,7 +165,7 @@ function _scRenderList() {
       + '<div class="sc-conv-t">' + _pkcEsc(c.lastText || '') + '</div>'
       + (c.tags && c.tags.length ? '<div class="sc-conv-g">' + _pkcTagsHtml(c.tags, 3) + '</div>' : '')
       + (c.seen === false ? '<i class="sc-dot"></i>' : '') + '</div>' + (typeof _pkSeenBtnHtml === 'function' ? _pkSeenBtnHtml(c, 'sc-seenbtn') : '') + '</div>';   // dong 1: dong .sc-conv-body, dong 2: dong .sc-conv. Thieu cai thu 2 thi moi dong bi long vao dong truoc
-  }).join('') : '<div class="pkc-note">Không có hội thoại nào.</div>';
+  }).join('') : '<div class="pkc-note">Không có hội thoại nào' + (_scFilterCount_() ? ' khớp bộ lọc' : '') + (_sc.fold ? ' trong thư mục này' : '') + '.</div>';
   var hm = document.getElementById('sc-head-m');
   if (hm) hm.innerHTML = _pkcMetaRow(_sc.convs.filter(function (x) { return x.id === _sc.active; })[0]);
   pkTagBarRender('sc-tags'); if (typeof pkSeenRender === 'function') pkSeenRender('sc');
@@ -83,7 +174,7 @@ function scPick(id) {
   _sc.active = id; _scRenderList();
   var c = _sc.convs.filter(function (x) { return x.id === id; })[0] || {};
   var h = document.getElementById('sc-head');
-  if (h) h.innerHTML = '<button class="btn sm sc-back" onclick="scBack()">←</button><b>' + _pkcEsc(c.name || 'Khách Pancake') + '</b>' + (c.phone ? ' <span class="pkc-ph">' + _pkcEsc(c.phone) + '</span> <button class="btn sm" onclick="scOpenProfile()">👤 Mở hồ sơ</button>' : ' <span class="pkc-ph">chưa gắn SĐT</span>') + (typeof _ovIsAdmin === 'function' && _ovIsAdmin() ? ' <button class="btn sm" onclick="scDiag()" title="Chẩn đoán thẻ / tên nhân viên (chỉ admin)">🔍 Chẩn đoán</button>' : '') + '<div class="sc-head-m" id="sc-head-m">' + _pkcMetaRow(c) + '</div>';
+  if (h) h.innerHTML = '<button class="btn sm sc-back" onclick="scBack()">←</button><b>' + _pkcEsc(c.name || 'Khách Pancake') + '</b>' + (c.phone ? ' <span class="pkc-ph">' + _pkcEsc(c.phone) + '</span> <button class="btn sm" onclick="scOpenProfile()">👤 Mở hồ sơ</button>' : ' <span class="pkc-ph">chưa gắn SĐT</span>') + (typeof _ovIsAdmin === 'function' && _ovIsAdmin() ? ' <button class="btn sm" onclick="scDiag()" title="Chẩn đoán thẻ / tên nhân viên (chỉ admin)">🔍 Chẩn đoán</button>' : '') + (_scPancakeUrl(c) ? ' <a class="btn sm" href="' + _pkcEsc(_scPancakeUrl(c)) + '" target="_blank" rel="noopener" title="Mở đúng hội thoại này trên Pancake">↗ Pancake</a>' : '') + '<div class="sc-head-m" id="sc-head-m">' + _pkcMetaRow(c) + '</div>';
   if (typeof pkSeenRender === 'function') pkSeenRender('sc');   // nut Danh dau chua doc/da doc o dau khung chat
   var cp = document.getElementById('sc-compose'); if (cp) cp.style.display = (c.type === 'COMMENT') ? 'none' : '';
   var wh0 = document.getElementById('sc-who'); if (wh0) wh0.innerHTML = '';

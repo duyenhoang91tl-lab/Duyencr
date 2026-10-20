@@ -192,9 +192,18 @@ function switchDpTab(tab, el) {
   else body.innerHTML = renderInfoTab(c);
 }
 
+function _csPickList_(customers, teamsArr, isAdmin){
+  const set = new Set();
+  (customers || []).forEach(x => (x.orders || []).forEach(o => { if (o && o.cs) set.add(String(o.cs).trim()); }));
+  if (isAdmin) (teamsArr || []).forEach(t => { [t && t.leader].concat((t && t.members) || []).forEach(n => { n = String(n || '').trim(); if (n) set.add(n); }); });
+  set.delete('');
+  return [...set].sort();
+}
 function renderCareTab(c) {
   const care = careData[c.phone] || {};
-  const allCS = [...new Set(allCustomers.flatMap(x=>x.orders.map(o=>o.cs)).filter(Boolean))].sort();
+  // Danh sách CS để chọn: CS đã có trong đơn + (admin) mọi thành viên/trưởng nhóm các Team. NGUYÊN NHÂN GỐC thêm: trước đây chỉ lấy CS xuất hiện trong ĐƠN
+  // nên CS mới (chưa có đơn nào) không chọn được -> admin không chia được KH cho họ ở hồ sơ khách.
+  const allCS = _csPickList_(allCustomers, (typeof teams !== 'undefined' ? teams : []), (typeof currentUser === 'undefined' || !currentUser || currentUser.role === 'admin'))   // cùng quy ước admin với nút Xóa đơn bên dưới;
   const today = _ymd(new Date());
   // MENU gập (yêu cầu Duyên 2026-10-11): "Thông tin chăm sóc" + "Lịch chăm sóc nhanh" là 2 mục của 1 menu, chỉ mở 1 mục một lúc (dpAccToggle)
   const _schedCnt = [care.schedGoi, care.schedSP, care.schedCS, care.schedHen].filter(Boolean).length;

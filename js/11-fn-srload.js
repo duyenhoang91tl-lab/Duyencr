@@ -673,14 +673,8 @@ function _srCloseRateBarHtml_(rows, searchTerm, unitLabel, excluded){
   // MẶC ĐỊNH ẨN — bấm 👁 mới hiện (Duyên yêu cầu 2026-10-12; _warnBox ở js/10-fn-pkkpipct.js)
   var orphanHtml = orphanBox_ ? _warnBox('cr-orphan', orphanBox_, orphanTot+' đơn chưa gán vào tương tác Pancake') : '';
   // Mẫu số CHỈ tính tương tác của Page đã khớp Kênh bán (cùng quy tắc bảng theo Kênh / Sale×Page). Phần ở Page chưa khớp được báo ở đây (ẩn sau 👁).
-  if (excluded && excluded.tongTT > 0 && (excluded.pages || []).length){
-    orphanHtml += _warnBox('cr-excluded-tt',
-      '<div style="margin:0;padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412">'+
-      '⚠️ <b>'+fmt(Math.round(excluded.tongTT))+'</b> tương tác ở <b>'+excluded.pages.length+'</b> Page chưa khớp Kênh bán nên <b>KHÔNG tính vào mẫu số</b> (không có đơn tương ứng để chia): '+
-      excluded.pages.map(function(p){ return esc(p.pageName)+' ('+fmt(Math.round(p.tongTT))+')'; }).join(', ')+
-      '. Muốn tính → vào tab "📥 Báo cáo Pancake" → mục "🔗 Khớp Page Pancake ↔ Kênh bán CRM".</div>',
-      fmt(Math.round(excluded.tongTT))+' tương tác ở '+excluded.pages.length+' Page chưa khớp kênh (không tính)');
-  }
+  // (18/10/2026) Duyên yêu cầu TẮT HẲN ô "👁 N tương tác ở M Page chưa khớp kênh (không tính)" — số tương tác ở Page chưa khớp Kênh vẫn KHÔNG tính vào mẫu số (không đổi cách tính),
+  // chỉ không hiện cảnh báo nữa; muốn xem/sửa thì vào tab "📥 Báo cáo Pancake" → "🔗 Khớp Page Pancake ↔ Kênh bán CRM".
   var lv = CLOSE_RATE_THRESHOLDS.levels;
   function colorFor(p){ return _crColorFor_(p); }
   // Độ dài cột tính theo TỶ LỆ SO VỚI NGƯỜI CAO NHẤT (không phải so với 100%): tỷ lệ chốt thật chỉ 0–3% nên trước đây mọi cột chỉ rộng 1–3% khung → chỉ còn chấm tròn nhỏ.
@@ -772,6 +766,18 @@ function _srCocColspan(base){ return _srState.showCoc ? base : base-1; }
 
 // Báo cáo A ra 0 đơn: hiện bảng chẩn đoán từ backend (diag) — mất ở bước nào (dữ liệu / ngày / trạng thái / kênh / tên Sale) + tên Sale thật trong dữ liệu.
 function _srZeroDiagA_(d){
+  if (d && !d.totalOrders && !d.diag) {
+    // Tự hỏi backend (action=count -> ver) rồi ghi vào khung: cho biết bản GAS đang chạy THẬT + web đang gọi qua Worker hay thẳng Apps Script.
+    setTimeout(function(){
+      var el = document.getElementById('sr-ver-probe'); if (!el) return;
+      var via = (typeof GAS_URL_DIRECT !== 'undefined' && gsUrl === GAS_URL_DIRECT) ? 'gọi THẲNG Apps Script' : 'gọi qua Worker cache';
+      fetch(gsUrl + (gsUrl.indexOf('?') >= 0 ? '&' : '?') + 'action=count&_=' + Date.now(), { redirect: 'follow' }).then(function(r){ return r.text(); }).then(function(t){
+        var j = null; try { j = JSON.parse(t); } catch (e) {}
+        el.textContent = j && j.ver ? ('Bản backend đang chạy: ' + j.ver + ' (' + via + '). Bản mới nhất có chẩn đoán là v13.56-diag-a' + (j.ver === 'v13.56-diag-a' ? ' → ĐÃ là bản mới.' : ' → CHƯA phải bản mới.')) : ('Không đọc được phiên bản backend (' + via + '): ' + String(t).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').slice(0, 140));
+      }).catch(function(er){ el.textContent = 'Không gọi được backend (' + via + '): ' + (er && er.message || er); });
+    }, 0);
+    return '<div class="fp-info" style="margin:0 0 12px"><b>⚠ 0 đơn</b> — máy chủ <b>không trả phần chẩn đoán</b> (bản backend GAS chạy thật chưa phải bản mới, hoặc Worker đang trả bản cache cũ).<br><span id="sr-ver-probe" style="font-size:12px"><i>Đang kiểm tra phiên bản backend…</i></span></div>';
+  }
   var g = d && d.diag; if (!g || d.totalOrders) return '';
   var why;
   if (!g.rows) why = 'Nguồn dữ liệu đơn (DT TỔNG) đang <b>trống</b> — kiểm tra sheet DT TỔNG / đồng bộ Supabase.';
@@ -785,6 +791,15 @@ function _srZeroDiagA_(d){
     ((g.missNames && g.missNames.length && g.inDate) ? '<br><span style="font-size:11.5px"><b>Tên Sale trên các đơn bị loại (nhiều nhất):</b> ' + g.missNames.map(e_).join(', ') + '</span>' : '') + '</div>';
 }
 function e_(s){ return (typeof esc === 'function') ? esc(s) : String(s == null ? '' : s).replace(/[&<>"']/g, function(ch){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]; }); }
+// Khi đang lọc theo Sale/Team: đơn có nhiều sale (vd "Kd + kế toán + Mến") khiến người ĐỒNG BÁN không thuộc bộ lọc cũng hiện thành 1 dòng trong bảng "Theo Sale".
+// Chỉ giữ các dòng thuộc người đã chọn (kể cả tên phụ cùng 1 người). Tổng/tiền chia đều vẫn do máy chủ tính, không đổi.
+function _srKeepSelectedSales_(rows, sel){
+  if (!sel || !sel.length || _srState.byCreator) return rows;   // chế độ 'người tạo đơn': dòng là người tạo, không lọc theo Sale bán
+  var fold = function(x){ return String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/gi,'d').replace(/\s+/g,' ').trim().toLowerCase(); };
+  var ok = {};
+  sel.forEach(function(n){ ok[fold(n)] = 1; ((typeof _personAliases === 'function' ? _personAliases(n) : []) || []).forEach(function(a){ ok[fold(a)] = 1; }); });
+  return (rows || []).filter(function(r){ return ok[fold(r && r.name)]; });
+}
 function _srRenderA(d){
   if (!d) return _srNoDataHtml_();
   var html = _srZeroDiagA_(d) + '<div class="kpi-grid" style="margin-bottom:16px">' +
@@ -802,7 +817,7 @@ function _srRenderA(d){
 
   _SR_COLTH_ROWSFN_['aSale'] = function(){ return (_srState.dataA && _srState.dataA.bySale) || []; };
   _SR_COLTH_GETTER_['aSale'] = { name: function(r){ return r.name; } };
-  var saleRows = _srApplyColFilters_(d.bySale||[], 'aSale', _SR_COLTH_GETTER_['aSale']).filter(function(s){ return !_srState.saleSearch || s.name.toLowerCase().indexOf(_srState.saleSearch.toLowerCase())!==-1; });
+  var saleRows = _srApplyColFilters_(_srKeepSelectedSales_(d.bySale||[], _srState.sale), 'aSale', _SR_COLTH_GETTER_['aSale']).filter(function(s){ return !_srState.saleSearch || s.name.toLowerCase().indexOf(_srState.saleSearch.toLowerCase())!==-1; });
   var saleHtml = '<div class="dash-section-title">Theo Sale bán <span style="font-weight:400;color:var(--muted);font-size:11px">'+
     (_srState.byCreator ? '(tính trọn vẹn cho người tạo đơn — không chia đều)' : '(số đơn giữ nguyên — tiền chia đều cho số sale/đơn)')+
     '</span>'+_srViewToggleHtml('aSaleView')+'</div>';
@@ -971,7 +986,7 @@ function _srRenderB(d){
 
   _SR_COLTH_ROWSFN_['bSale'] = function(){ return (_srState.dataB && _srState.dataB.bySale) || []; };
   _SR_COLTH_GETTER_['bSale'] = { name: function(s){ return s.name; } };
-  var saleRows = _srApplyColFilters_(d.bySale||[], 'bSale', _SR_COLTH_GETTER_['bSale']).filter(function(s){ return !_srState.bSaleSearch || (s.name||'').toLowerCase().indexOf(_srState.bSaleSearch.toLowerCase())!==-1; });
+  var saleRows = _srApplyColFilters_(_srKeepSelectedSales_(d.bySale||[], _srState.bSale), 'bSale', _SR_COLTH_GETTER_['bSale']).filter(function(s){ return !_srState.bSaleSearch || (s.name||'').toLowerCase().indexOf(_srState.bSaleSearch.toLowerCase())!==-1; });
   var saleHtmlB_ = '<div class="dash-section-title">Theo Sale <span style="font-weight:400;color:var(--muted);font-size:11px">(tiền chia đều cho số sale/đơn, số đơn giữ nguyên)</span>'+_srViewToggleHtml('bSaleView')+'</div>';
   saleHtmlB_ += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.bSaleSearch)+'" oninput="_srState.bSaleSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
   if (_srState.bSaleView === 'table'){
@@ -1268,12 +1283,34 @@ async function _impUpload(kind){
   if (_impState.uploading) return; // chong bam dup -> 2 request cung luc
   _impState.uploading = true; renderSalesReportTab();
   try {
-    var res = await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'importSheetRows', sheet: kind, rows: rows }) });
-    var d = await res.json();
+    // BƯỚC 1 — XEM TRƯỚC (không ghi gì): backend đếm dòng MỚI / đơn ĐÃ CÓ. Backend cũ chưa hỗ trợ dryRun sẽ trả kết quả ghi thật
+    // (không có d0.dryRun) -> không bao giờ ghi 2 lần: dùng kết quả đó luôn như trước.
+    var _lbl = kind === 'base' ? 'Base (DT TỔNG)' : 'Pos (dữ liệu đơn)';
+    var _isReal = false, d = null;
+    var res0 = await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'importSheetRows', sheet: kind, rows: rows, dryRun: true, updateExisting: true }) });
+    var d0 = await res0.json();
+    if (d0.error) throw new Error(d0.error);
+    if (d0.dryRun) {
+      if (!d0.wouldWrite && !d0.wouldUpdateRows) {
+        toast('ℹ️ Không có dòng mới: cả ' + fmt(d0.skippedExisting || 0) + ' đơn trong file đều ĐÃ CÓ trong hệ thống — không ghi gì, dữ liệu cũ giữ nguyên.');
+        _impState.result = Object.assign({ kind: kind, written: 0 }, d0);
+        return;
+      }
+      if (!confirm('NHẬP DỮ LIỆU ' + _lbl + ' — xem trước:\n\n'
+        + '• Sẽ THÊM ' + fmt(d0.wouldWrite) + ' dòng MỚI (nối tiếp cuối sheet)\n'
+        + '• ' + fmt(d0.skippedExisting || 0) + ' đơn ĐÃ CÓ: ' + (d0.wouldUpdateRows ? 'CẬP NHẬT ' + fmt(d0.wouldUpdateRows) + ' đơn có thông tin đổi (' + fmt(d0.wouldUpdateCells) + ' ô; chỉ ghi ô file có giá trị mới khác, KHÔNG xóa trắng ô cũ, giá trị cũ được lưu vào sheet "Nhật ký cập nhật nhập file"), còn lại giống hệt → bỏ qua' : 'giống dữ liệu cũ → bỏ qua, không ghi đè, không xóa') + '\n'
+        + (d0.updateOverLimit ? '• Còn ' + fmt(d0.updateOverLimit) + ' đơn đổi nữa — vượt giới hạn 1 lần, nhập lại cùng file để cập nhật tiếp\n' : '')
+        + (d0.skippedDupInFile ? '• Bỏ qua ' + fmt(d0.skippedDupInFile) + ' dòng trùng ngay trong file\n' : '')
+        + '\nDữ liệu cũ trên Sheet được GIỮ NGUYÊN 100%. Tiếp tục nhập?')) { toast('Đã hủy — chưa ghi gì.'); return; }
+    } else { _isReal = true; d = d0; }
+    if (!_isReal) {
+      var res = await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'importSheetRows', sheet: kind, rows: rows, updateExisting: true }) });
+      d = await res.json();
+    }
     if (d.error) throw new Error(d.error);
     _impState.result = Object.assign({ kind: kind }, d);
-    toast('✓ Đã nhập '+fmt(d.written)+' dòng mới'+(d.skippedExisting?', bỏ qua '+fmt(d.skippedExisting)+' đơn ĐÃ CÓ trong hệ thống':'')+(d.dedupedAfter?' (tự loại '+fmt(d.dedupedAfter)+' dòng trùng tuyệt đối)':'')+' vào '+(kind==='base'?'DT TỔNG':'dữ liệu đơn')+'.');
-    logAudit('import_'+kind, '', '', 'Nhập dữ liệu '+(kind==='base'?'Base':'Pos')+' từ file: +'+d.written+' dòng, loại trùng '+(d.dedupedAfter||0));
+    toast('✓ Đã nhập '+fmt(d.written)+' dòng mới'+(d.skippedExisting?', '+fmt(d.skippedExisting)+' đơn ĐÃ CÓ'+(d.updatedRows?' (cập nhật '+fmt(d.updatedRows)+' đơn có thông tin đổi, còn lại bỏ qua)':' (bỏ qua)'):'')+(d.dedupedAfter?' (tự loại '+fmt(d.dedupedAfter)+' dòng trùng tuyệt đối)':'')+' vào '+(kind==='base'?'DT TỔNG':'dữ liệu đơn')+'.');
+    logAudit('import_'+kind, '', '', 'Nhập dữ liệu '+(kind==='base'?'Base':'Pos')+' từ file: +'+d.written+' dòng, cập nhật '+(d.updatedRows||0)+' đơn/'+(d.updatedCells||0)+' ô, loại trùng '+(d.dedupedAfter||0));
     if (kind === 'base'){ _impState.baseRows = null; _impState.baseFileName = ''; _impState.baseWarn = ''; }
     else { _impState.posRows = null; _impState.posFileName = ''; _impState.posWarn = ''; }
     var fi = document.getElementById('imp-file-'+kind); if (fi) fi.value = '';
@@ -1302,7 +1339,7 @@ function _impPickCard_(kind, label, hint, sheetTarget){
   }
   var res = _impState.result;
   if (res && res.kind === kind){
-    html += '<div style="margin-top:8px;padding:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;font-size:12px;color:#166534">✓ Đã thêm <b>'+fmt(res.written)+'</b> dòng mới'+(res.skippedExisting?', bỏ qua <b>'+fmt(res.skippedExisting)+'</b> đơn ĐÃ CÓ sẵn trong hệ thống (không ghi lại → không nhân đôi doanh thu)':'')+(res.skippedDupInFile?', bỏ qua '+fmt(res.skippedDupInFile)+' dòng trùng ngay trong file':'')+(res.dedupedAfter?', tự động loại '+fmt(res.dedupedAfter)+' dòng trùng tuyệt đối với dữ liệu sẵn có':'')+'.</div>';
+    html += '<div style="margin-top:8px;padding:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;font-size:12px;color:#166534">✓ Đã thêm <b>'+fmt(res.written)+'</b> dòng mới'+(res.skippedExisting?', bỏ qua <b>'+fmt(res.skippedExisting)+'</b> đơn ĐÃ CÓ sẵn trong hệ thống (không ghi lại → không nhân đôi doanh thu)':'')+(res.updatedRows?', <b>cập nhật '+fmt(res.updatedRows)+'</b> đơn cũ có thông tin đổi ('+fmt(res.updatedCells)+' ô — giá trị cũ lưu ở sheet "Nhật ký cập nhật nhập file")':'')+(res.skippedDupInFile?', bỏ qua '+fmt(res.skippedDupInFile)+' dòng trùng ngay trong file':'')+(res.dedupedAfter?', tự động loại '+fmt(res.dedupedAfter)+' dòng trùng tuyệt đối với dữ liệu sẵn có':'')+'.</div>';
   }
   html += '</div>';
   return html;

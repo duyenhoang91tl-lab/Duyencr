@@ -233,6 +233,7 @@
       { v: 'zs', label: '🔍 Quét trạng thái kết bạn Zalo' },
       { v: 'remind', label: '🔔 Lịch hẹn (0)' },
       { v: 'ctkm', label: '🎁 Tra cứu khuyến mãi' },
+      { v: 'img', label: '🖼 Tìm ảnh sản phẩm' },
       { v: 'tpl', label: '📚 Mẫu tin nhắn tư vấn' },
       { v: 'stats', label: '📊 Doanh số & hoa hồng của tôi' }
     ].forEach(o => { const op = document.createElement('option'); op.value = o.v; op.textContent = o.label; menuSel.appendChild(op); });
@@ -283,6 +284,15 @@
       '<div id="zai-ctkm-result"></div>';
     menuContent.appendChild(ctkmBody);
 
+    // 🖼 Tìm ảnh sản phẩm — giống Pancake AI
+    const imgBody = document.createElement('div');
+    imgBody.id = 'zai-img-body';
+    imgBody.style.display = 'none';
+    imgBody.innerHTML =
+      '<input type="text" id="zai-img-q" placeholder="Gõ tên sản phẩm (VD: tỷ hưu, nhẫn, charm) — có thể bỏ trống các mục dưới" autocomplete="off" />' +
+      '<div id="zai-img-status"></div><div id="zai-img-dyn"></div>';
+    menuContent.appendChild(imgBody);
+
     // 📚 Mẫu tin nhắn tư vấn — giống Pancake AI
     const tplBody = document.createElement('div');
     tplBody.id = 'zai-tpl-body';
@@ -308,6 +318,8 @@
       const v = menuSel.value;
       ctkmBody.style.display = v === 'ctkm' ? 'block' : 'none';
       statsBody.style.display = v === 'stats' ? 'block' : 'none';
+      imgBody.style.display = v === 'img' ? 'block' : 'none';
+      if (v === 'img') initImgSearchZai_();
       tplBody.style.display = v === 'tpl' ? 'block' : 'none';
       if (v === 'tpl' && !_zaiTplLoadedOnce) { _zaiTplLoadedOnce = true; loadMsgTemplatesZai_(); }   // mo muc la nap luon toan bo mau
       if (v === 'stats') initStatsZai_();
@@ -1101,6 +1113,290 @@
     } catch (e) {
       box.innerHTML = '<div style="color:#1e3a8a;font-size:11.5px;font-style:italic;padding:4px 0">Lỗi kết nối: ' + escHtml(e.message) + '</div>';
     }
+  }
+
+  // ── TIM ANH SAN PHAM (anh trong thu muc Drive, link o cot "Link anh" cua DANH_MUC) — y het muc "Tim anh san pham" cua Pancake AI (quy tac song song) ──
+  // Chon nhom/ten/size/chat lieu/mau -> hien toi da 6 anh ket qua (kem link mo tren Drive).
+  // GAS: productImageFlat (danh muc phang), driveImageFromLink (doc anh theo link; file chua chia se -> chi hien link mo). Ma ham ben duoi DAN XUAT CO HOC tu Pancake
+  // (gom ca bo tro giup dung chung voi "Soan don": tach chat lieu 2 cap...). Cac ham bo tro dung tien to _zai...
+  function _zaiImgStatus_(text) { const el = document.getElementById('zai-img-status'); if (el) el.textContent = text; }
+  // Tuong duong handleGetProductImageFlat / handleGetDriveImage o pancake-background.js: GET GAS, loi -> {ok:false,error}
+  async function _zaiImgCall_(type, p) {
+    try {
+      if (!GAS_URL) throw new Error('Chưa cài đặt URL GAS. Nhấn ⚙.');
+      const sep = GAS_URL.includes('?') ? '&' : '?';
+      let url;
+      if (type === 'GET_DRIVE_IMAGE') { const link = p?.link || ''; if (!link) throw new Error('Thiếu link ảnh.'); url = GAS_URL + sep + 'action=driveImageFromLink&link=' + encodeURIComponent(link); }
+      else url = GAS_URL + sep + 'action=productImageFlat';
+      const res = await fetch(url, { redirect: 'follow' });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || (type === 'GET_DRIVE_IMAGE' ? 'Không đọc được ảnh.' : 'Không tải được danh sách sản phẩm.'));
+      return { ok: true, data: type === 'GET_DRIVE_IMAGE' ? data : { items: data.items || [] } };
+    } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+  }
+    function _zaiLocalStripVN_(s) {
+    if (!s) return '';
+    s = String(s).toLowerCase();
+    s = s.replace(/[àáạảãâầấậẩẫăằắặẳẵ]/g, 'a').replace(/[èéẹẻẽêềếệểễ]/g, 'e')
+      .replace(/[ìíịỉĩ]/g, 'i').replace(/[òóọỏõôồốộổỗơờớợởỡ]/g, 'o')
+      .replace(/[ùúụủũưừứựửữ]/g, 'u').replace(/[ỳýỵỷỹ]/g, 'y').replace(/đ/g, 'd');
+    return s;
+  }
+
+  const _zaiItemFold_ = (s) => _zaiLocalStripVN_(String(s || '').normalize('NFC')).replace(/\s+/g, ' ').trim();
+
+  const _zaiVnSort_ = (a, b) => String(a).localeCompare(String(b), 'vi', { numeric: true });
+
+  const _zaiItemNames_ = (it) => {
+    const out = [];
+    if (it.t) out.push(it.t);
+    if (it.m && _zaiItemFold_(it.m) !== _zaiItemFold_(it.t)) out.push(it.m);
+    return out;
+  };
+
+  function _zaiParseNumberedList_(str) {
+    str = String(str || '').trim();
+    if (!str) return null;
+    const re = /(\d+)\.\s*/g;
+    const marks = [];
+    let m;
+    while ((m = re.exec(str))) marks.push({ idx: m.index, num: Number(m[1]), end: re.lastIndex });
+    if (marks.length < 2) return null;
+    for (let i = 0; i < marks.length; i++) { if (marks[i].num !== i + 1) return null; }
+    const out = [];
+    for (let i = 0; i < marks.length; i++) {
+      const start = marks[i].end;
+      const stop = i + 1 < marks.length ? marks[i + 1].idx : str.length;
+      const piece = str.slice(start, stop).trim();
+      if (piece) out.push(piece);
+    }
+    return out.length >= 2 ? out : null;
+  }
+
+  function _zaiSplitTopLevel_(str, sepChar) {
+    const out = []; let depth = 0, cur = '';
+    for (const ch of String(str)) {
+      if (ch === '(' || ch === '[') depth++;
+      else if ((ch === ')' || ch === ']') && depth > 0) depth--;
+      if (ch === sepChar && depth === 0) { out.push(cur); cur = ''; } else cur += ch;
+    }
+    out.push(cur);
+    return out;
+  }
+
+  function _zaiParseMaterialTree_(str) {
+    str = String(str || '').trim();
+    if (!str) return [];
+    const clean = (x) => String(x).replace(/\s+/g, ' ').trim();
+    // Bước 1: các nhóm lớn (mỗi nhóm = 1 cha)
+    let groups = _zaiParseNumberedList_(str);
+    if (!groups) {
+      groups = [];
+      str.split(/\r?\n|;|\|/).forEach((line) => {
+        const parts = line.split(/\s+[-\u2013\u2014]\s+/);
+        if (parts.length >= 2) parts.forEach((x) => groups.push(x.replace(/^\s*\d{1,2}\s*(?=\p{L}{2,})/u, ''))); // bỏ SỐ LƯỢNG đứng đầu
+        else groups.push(line);
+      });
+    }
+    // Bước 2: mỗi nhóm → cha (+ con nếu có ":")
+    const tree = []; const byKey = {};
+    const addNode = (parent, kids) => {
+      parent = clean(parent); if (!parent) return;
+      const k = parent.toLowerCase();
+      let node = byKey[k];
+      if (!node) { node = { parent: parent, children: [] }; byKey[k] = node; tree.push(node); }
+      (kids || []).forEach((c) => { c = clean(c); if (c && node.children.indexOf(c) === -1) node.children.push(c); });
+    };
+    groups.forEach((g) => {
+      g = clean(g).replace(/^\d{1,2}\.\s+/, ''); // ô chỉ có 1 mục đánh số lẻ loi "1. Citrin: ..." → bỏ số thứ tự
+      if (!g) return;
+      const colon = _zaiSplitTopLevel_(g, ':');
+      if (colon.length >= 2 && clean(colon[0]) && clean(colon[0]).indexOf(',') === -1) {
+        addNode(colon[0], _zaiSplitTopLevel_(colon.slice(1).join(':'), ','));
+      } else {
+        _zaiSplitTopLevel_(g, ',').forEach((part) => addNode(part, []));
+      }
+    });
+    return tree;
+  }
+
+  let _zaiImgFlatItems = null;   // null = chưa tải; [] = tải rồi nhưng rỗng
+  let _zaiImgFlatLoading = false;
+  let _zaiImgLiveTimer = null;
+  const _zaiImgBldBlank_ = () => ({ q: '', nhom: '', ten: '', size: '', cl: '', cl2: '', mau: '' });
+  let _zaiImgBld = _zaiImgBldBlank_();
+
+  function initImgSearchZai_() {
+    const host = document.getElementById('zai-img-body');
+    if (!host.dataset.ready) {
+      host.dataset.ready = '1';
+      host.querySelector('#zai-img-q').addEventListener('input', (e) => {
+        _zaiImgBld = Object.assign(_zaiImgBldBlank_(), { q: e.target.value }); // đổi từ khoá → chọn lại từ đầu
+        clearTimeout(_zaiImgLiveTimer);
+        _zaiImgLiveTimer = setTimeout(renderImgDynZai_, 120);
+      });
+    }
+    if (_zaiImgFlatItems === null && !_zaiImgFlatLoading) loadImgFlatZai_();
+    renderImgDynZai_();
+  }
+
+  function loadImgFlatZai_() {
+    _zaiImgFlatLoading = true;
+    const dyn = document.getElementById('zai-img-dyn');
+    if (dyn) dyn.innerHTML = '<div class="zai-ctkm-loading">Đang tải danh mục sản phẩm...</div>';
+    _zaiImgCall_('GET_PRODUCT_IMAGE_FLAT').then((resp) => {
+      _zaiImgFlatLoading = false;
+      if (resp?.ok) {
+        _zaiImgFlatItems = resp.data.items || [];
+      } else {
+        _zaiImgFlatItems = [];
+        if (dyn) dyn.innerHTML = `<div class="zai-ctkm-loading">Lỗi: ${escAttrZai_(resp?.error || 'không tải được danh mục')}</div>`;
+        return;
+      }
+      renderImgDynZai_();
+    });
+  }
+
+  function _bindImgBuilderZai_(dyn) {
+    const on = (id, fn) => { const el = dyn.querySelector('#' + id); if (el) el.addEventListener('change', fn); };
+    on('zaiimg-nhom', (e) => { _zaiImgBld.nhom = e.target.value; _zaiImgBld.ten = ''; _zaiImgBld.size = ''; _zaiImgBld.cl = ''; _zaiImgBld.cl2 = ''; _zaiImgBld.mau = ''; renderImgDynZai_(); });
+    on('zaiimg-ten', (e) => { _zaiImgBld.ten = e.target.value; _zaiImgBld.size = ''; _zaiImgBld.cl = ''; _zaiImgBld.cl2 = ''; _zaiImgBld.mau = ''; renderImgDynZai_(); });
+    on('zaiimg-size', (e) => { _zaiImgBld.size = e.target.value; _zaiImgBld.cl = ''; _zaiImgBld.cl2 = ''; _zaiImgBld.mau = ''; renderImgDynZai_(); });
+    on('zaiimg-cl', (e) => { _zaiImgBld.cl = e.target.value; _zaiImgBld.cl2 = ''; _zaiImgBld.mau = ''; renderImgDynZai_(); });
+    on('zaiimg-cl2', (e) => { _zaiImgBld.cl2 = e.target.value; _zaiImgBld.mau = ''; renderImgDynZai_(); });
+    on('zaiimg-mau', (e) => { _zaiImgBld.mau = e.target.value; renderImgDynZai_(); });
+  }
+
+  function _loadImgSlotZai_(i, link) {
+    _zaiImgCall_('GET_DRIVE_IMAGE', { link }).then((resp) => {
+      const slot = document.getElementById(`zaiimg-slot-${i}`);
+      if (!slot) return;
+      if (!resp?.ok) { slot.innerHTML = `<div class="zai-ctkm-loading">Lỗi: ${escAttrZai_(resp?.error || 'không đọc được ảnh')}</div>`; return; }
+      const data = resp.data;
+      if (data.image && data.image.base64) {
+        slot.innerHTML = `<img src="data:${data.image.mimeType};base64,${data.image.base64}" style="max-width:100%;border-radius:8px;border:1px solid #e5e7eb" />` +
+          `<div style="margin-top:4px"><a href="${escAttrZai_(data.imageLink)}" target="_blank" class="zai-btn zai-btn-secondary zai-btn-sm" style="display:inline-block;text-decoration:none;font-size:11px">🔗 Mở trên Drive</a></div>`;
+      } else if (data.imageLink) {
+        slot.innerHTML = `<div class="zai-ctkm-loading">Không hiển thị được ảnh trực tiếp (file chưa chia sẻ hoặc quá lớn):</div>` +
+          `<a href="${escAttrZai_(data.imageLink)}" target="_blank" class="zai-btn zai-btn-secondary zai-btn-sm" style="display:inline-block;text-decoration:none;font-size:11px">🔗 Mở ảnh</a>`;
+      } else {
+        slot.innerHTML = '<div class="zai-ctkm-loading">Chưa có link ảnh.</div>';
+      }
+    });
+  }
+
+  function renderImgDynZai_() {
+    const dyn = document.getElementById('zai-img-dyn');
+    if (!dyn || _zaiImgFlatLoading) return; // dang co thong bao loading roi, khong ghi de
+    const items = _zaiImgFlatItems || [];
+    if (!items.length) { dyn.innerHTML = _zaiImgFlatItems === null ? '' : '<div class="zai-ctkm-loading">Không tải được danh mục sản phẩm (kiểm tra lại cột Link ảnh trong DANH_MUC).</div>'; return; }
+
+    const words = _zaiItemFold_(_zaiImgBld.q).split(' ').filter(Boolean);
+    const pool0 = words.length ? items.filter((it) => { const h = _zaiItemFold_(it.n + ' ' + it.t + ' ' + it.m); return words.every((w) => h.indexOf(w) !== -1); }) : items;
+    if (!pool0.length) { dyn.innerHTML = '<div class="zai-ctkm-loading">Không tìm thấy sản phẩm nào khớp.</div>'; return; }
+
+    const opt = (v, label, sel) => `<option value="${escAttrZai_(v)}"${sel ? ' selected' : ''}>${escAttrZai_(label)}</option>`;
+    const row = (label, inner) => `<div class="zai-builder-row"><label>${label}</label>${inner}</div>`;
+    const searchInput = (id, values, curVal, placeholder) =>
+      `<input type="text" id="${id}" list="${id}-dl" autocomplete="off" placeholder="${escAttrZai_(placeholder)}" value="${escAttrZai_(curVal || '')}" />` +
+      `<datalist id="${id}-dl">${values.map((v) => `<option value="${escAttrZai_(v)}"></option>`).join('')}</datalist>`;
+    let html = '';
+
+    // 1) Nhóm sản phẩm (bỏ trống được)
+    const groups = [...new Set(pool0.map((it) => it.n).filter(Boolean))].sort(_zaiVnSort_);
+    if (_zaiImgBld.nhom && groups.indexOf(_zaiImgBld.nhom) === -1) _zaiImgBld.nhom = '';
+    if (groups.length === 1 && !_zaiImgBld.nhom) _zaiImgBld.nhom = groups[0];
+    if (groups.length) html += row(`Nhóm sản phẩm (${groups.length})`, searchInput('zaiimg-nhom', groups, _zaiImgBld.nhom, '— Tất cả nhóm — (gõ để tìm hoặc bấm chọn)'));
+    const pool1 = _zaiImgBld.nhom ? pool0.filter((it) => it.n === _zaiImgBld.nhom) : pool0;
+
+    // 2) Tên sản phẩm / tên thương mại (bỏ trống được)
+    if (!words.length && !_zaiImgBld.nhom) {
+      dyn.innerHTML = html + '<div class="zai-ctkm-loading">Gõ tên ở ô trên hoặc chọn Nhóm sản phẩm để hiện danh sách tên.</div>';
+      _bindImgBuilderZai_(dyn); return;
+    }
+    const nameMap = {};
+    pool1.forEach((it) => _zaiItemNames_(it).forEach((nm) => { const f = _zaiItemFold_(nm); if (!nameMap[f]) nameMap[f] = nm; }));
+    const names = Object.keys(nameMap).map((f) => nameMap[f]).sort(_zaiVnSort_);
+    if (_zaiImgBld.ten && !nameMap[_zaiItemFold_(_zaiImgBld.ten)]) _zaiImgBld.ten = '';
+    if (!_zaiImgBld.ten && names.length === 1) _zaiImgBld.ten = names[0];
+    html += row(`Tên sản phẩm (${names.length})`, searchInput('zaiimg-ten', names, _zaiImgBld.ten, '— Tất cả — (gõ để tìm hoặc bấm chọn)'));
+
+    let candidates = pool1;
+    if (_zaiImgBld.ten) {
+      const tf = _zaiItemFold_(_zaiImgBld.ten);
+      const poolT = pool1.filter((it) => _zaiItemNames_(it).some((nm) => _zaiItemFold_(nm) === tf));
+
+      // 3) Kiểu / Size (bỏ trống được)
+      const sizeVal = (it) => it.s || '__def__';
+      const sizes = [...new Set(poolT.map(sizeVal))].sort(_zaiVnSort_);
+      if (_zaiImgBld.size && sizes.indexOf(_zaiImgBld.size) === -1) _zaiImgBld.size = '';
+      if (!_zaiImgBld.size && sizes.length === 1) _zaiImgBld.size = sizes[0];
+      if (sizes.length > 1 || (sizes.length === 1 && sizes[0] !== '__def__')) {
+        html += row(`Kiểu / Size (${sizes.length})`, `<select id="zaiimg-size"><option value="">— Tất cả — (bỏ trống nếu không chắc)</option>${sizes.map((v) => opt(v, v === '__def__' ? '(mặc định)' : v, v === _zaiImgBld.size)).join('')}</select>`);
+      }
+      const poolS = _zaiImgBld.size ? poolT.filter((it) => sizeVal(it) === _zaiImgBld.size) : poolT;
+
+      // 4) Chất liệu (bỏ trống được) — 2 CẤP theo xác nhận Duyên 2026-10-05: 1 ô DANH_MUC nhét nhiều chất liệu
+      // ("1. Aqua xanh biển 2. Citrin: vàng mỡ gà 3. Thạch anh: dâu xanh, dâu hồng 4. Ngọc: Cẩm thạch Type B, lam thủy,
+      // ngọc bích"); chữ đứng TRƯỚC dấu ":" là chất liệu CHA, phần SAU ":" là các mục CON của nó. Dropdown 4 chọn
+      // CHA; chọn xong nếu cha có mục con thì hiện thêm dropdown 4b chọn CON (xem _zaiParseMaterialTree_).
+      const clTree = (it) => { const t = _zaiParseMaterialTree_(it.c); return t.length ? t : [{ parent: '__none__', children: [] }]; };
+      const cls = [...new Set(poolS.reduce((acc, it) => acc.concat(clTree(it).map((n) => n.parent)), []))].sort(_zaiVnSort_);
+      if (_zaiImgBld.cl && cls.indexOf(_zaiImgBld.cl) === -1) { _zaiImgBld.cl = ''; _zaiImgBld.cl2 = ''; }
+      if (!_zaiImgBld.cl && cls.length === 1) _zaiImgBld.cl = cls[0];
+      if (cls.length > 1 || (cls.length === 1 && cls[0] !== '__none__')) {
+        html += row(`Chất liệu (${cls.length})`, `<select id="zaiimg-cl"><option value="">— Tất cả — (bỏ trống nếu không chắc)</option>${cls.map((v) => opt(v, v === '__none__' ? '(không ghi)' : v, v === _zaiImgBld.cl)).join('')}</select>`);
+      }
+      const hasParent = (it) => clTree(it).some((n) => n.parent === _zaiImgBld.cl);
+      let poolCl = _zaiImgBld.cl ? poolS.filter(hasParent) : poolS;
+      // 4b) Mục CON của chất liệu cha đang chọn (chỉ hiện khi có)
+      if (_zaiImgBld.cl) {
+        const kids = [...new Set(poolCl.reduce((acc, it) => acc.concat(clTree(it).filter((n) => n.parent === _zaiImgBld.cl).reduce((a2, n) => a2.concat(n.children), [])), []))].sort(_zaiVnSort_);
+        if (_zaiImgBld.cl2 && kids.indexOf(_zaiImgBld.cl2) === -1) _zaiImgBld.cl2 = '';
+        if (!_zaiImgBld.cl2 && kids.length === 1) _zaiImgBld.cl2 = kids[0];
+        if (kids.length) {
+          html += row(`${escAttrZai_(_zaiImgBld.cl === '__none__' ? 'Chi tiết' : _zaiImgBld.cl)} — chi tiết (${kids.length})`, `<select id="zaiimg-cl2"><option value="">— Tất cả — (bỏ trống nếu không chắc)</option>${kids.map((v) => opt(v, v, v === _zaiImgBld.cl2)).join('')}</select>`);
+        }
+        if (_zaiImgBld.cl2) poolCl = poolCl.filter((it) => clTree(it).some((n) => n.parent === _zaiImgBld.cl && n.children.indexOf(_zaiImgBld.cl2) !== -1));
+      }
+
+      // 5) Màu sắc (CHỈ hiện nếu DANH_MUC có cột "Màu sắc" — không phải hệ thống tự nhận diện
+      // màu từ ảnh, chỉ đọc đúng dữ liệu chữ trong sheet, xem _productImgCols_ bên gas_v13.js)
+      const mauVal = (it) => it.mau || '__none__';
+      const maus = [...new Set(poolCl.map(mauVal))].filter(Boolean).sort(_zaiVnSort_);
+      if (_zaiImgBld.mau && maus.indexOf(_zaiImgBld.mau) === -1) _zaiImgBld.mau = '';
+      if (!_zaiImgBld.mau && maus.length === 1) _zaiImgBld.mau = maus[0];
+      if (maus.length > 1 || (maus.length === 1 && maus[0] !== '__none__')) {
+        html += row(`Màu sắc (${maus.length})`, `<select id="zaiimg-mau"><option value="">— Tất cả — (bỏ trống nếu không chắc)</option>${maus.map((v) => opt(v, v === '__none__' ? '(không ghi)' : v, v === _zaiImgBld.mau)).join('')}</select>`);
+      }
+      candidates = _zaiImgBld.mau ? poolCl.filter((it) => mauVal(it) === _zaiImgBld.mau) : poolCl;
+    } else {
+      candidates = null; // chua chon ten -> chua hien anh gi, tranh liet ke qua nhieu
+    }
+
+    if (candidates && candidates.length) {
+      // Loai trung link anh (nhieu dong co the cung 1 anh) de khong hien trung lap.
+      const seen = new Set();
+      const uniq = candidates.filter((it) => { const key = it.img || ''; if (key && seen.has(key)) return false; if (key) seen.add(key); return true; });
+      const toShow = uniq.slice(0, 6);
+      // 6 ảnh này LÀ KẾT QUẢ CUỐI sau khi đã áp hết các bộ lọc đang chọn ở trên (kể cả khi 1 vài
+      // mục cố ý để trống) — không phải bước trung gian còn lọc tiếp ngầm phía sau.
+      html += `<div id="zaiimg-results">` + toShow.map((it, i) => {
+        const label = [it.t || it.m, it.s, (_zaiImgBld.cl && _zaiImgBld.cl !== '__none__') ? (_zaiImgBld.cl + (_zaiImgBld.cl2 ? ': ' + _zaiImgBld.cl2 : '')) : _zaiParseMaterialTree_(it.c).map((n) => n.parent).join(' / '), it.mau].filter(Boolean).join(' · ');
+        return `<div class="zai-ctkm-item">
+          <div class="zai-ctkm-title">${escAttrZai_(label)}</div>
+          <div id="zaiimg-slot-${i}">${it.img ? '<div class="zai-ctkm-loading">Đang tải ảnh...</div>' : '<div class="zai-ctkm-loading">Sản phẩm này chưa có link ảnh.</div>'}</div>
+        </div>`;
+      }).join('') + '</div>';
+      if (uniq.length > toShow.length) html += `<div class="zai-ctkm-loading">Còn ${uniq.length - toShow.length} biến thể khác chưa hiện — chọn thêm Kiểu/Size/Chất liệu/Màu sắc ở trên để thu hẹp xuống dưới 6.</div>`;
+      dyn.innerHTML = html;
+      _bindImgBuilderZai_(dyn);
+      toShow.forEach((it, i) => { if (it.img) _loadImgSlotZai_(i, it.img); });
+      return;
+    }
+
+    dyn.innerHTML = html;
+    _bindImgBuilderZai_(dyn);
   }
 
   // ── MAU TIN NHAN TU VAN (thu vien mau do quan ly duyet tren CRM) — y het muc "Mau tin nhan tu van" cua Pancake AI (quy tac song song) ──

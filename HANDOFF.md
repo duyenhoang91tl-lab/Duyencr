@@ -1,6 +1,16 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-10-20 — Nhập file Base/Pos an toàn (Báo cáo I)
+- [x] gas_v13.js `doImportSheetRows_`: thêm `dryRun` (chỉ đếm, không ghi); BỎ khử trùng toàn sheet sau khi ghi (có thể xóa nhầm dòng CŨ); kiểm tra số dòng sau ghi. Chỉ NỐI THÊM dòng mới, đơn đã có (theo khóa đơn chuẩn hóa) thì BỎ QUA, không ghi đè/xóa. Test: `node tools/test-import-safe.js`.
+- [x] js/11-fn-srload.js `_impUpload`: bấm Nhập → xem trước (N mới / M đã có) → xác nhận mới ghi. Backend cũ không có dryRun vẫn chạy được (không ghi 2 lần).
+- [x] (20/10, lần 2) CẬP NHẬT đơn cũ khi file mới đổi: client gửi `updateExisting:true`; backend chỉ ghi các ô file có giá trị MỚI khác rỗng và khác cũ (so sánh chuẩn hóa ngày/tiền/chữ), KHÔNG xóa trắng ô cũ, KHÔNG ghi đè ô công thức, bỏ cột STT (Pos) và Mã bộ đếm (Base), tối đa 1500 đơn/lần, giá trị cũ ghi vào sheet "Nhật ký cập nhật nhập file" (thoiGian, sheet, dong, khoaDon, cot, giaTriCu, giaTriMoi) để khôi phục tay. Client cũ không gửi cờ → chỉ bỏ qua như trước.
+- [ ] CẦN LÀM TIẾP: nút "Hoàn tác lần nhập" đọc nhật ký để trả giá trị cũ (chưa làm). Nút "Đẩy dữ liệu" (saveOrders) vẫn bị tắt ở backend — chủ ý.
+
+## 2026-10-19 — Sửa nền/size khung navy (L1)
+- [x] css/13-shell.css: margin-left 240px chuyển từ #data-view sang .app (+ bo góc 16px, overflow:hidden); bỏ `background:var(--bg)` ở #data-view để nền xanh gradient của `html.ui-pro .main` hiện lại. Cache-bust `?v=20261019a`.
+- [ ] CẦN LÀM TIẾP: Duyên xem lại màn thật (reload cứng Ctrl+F5) — nếu sidebar lọc KH còn chiếm chỗ không mong muốn thì cân nhắc thêm nút ẩn sidebar; kiểm tra các tab khác (Báo cáo, Chat) cùng bố cục.
+
 # HANDOFF — Giao diện PRO (kiểu Creatio)
 
 Giao diện pro là MẶC ĐỊNH — `<html class="ui-pro">` gắn cứng trong index.html; ĐÃ BỎ công tắc `?ui=pro`/`?ui=classic` và localStorage `ui_mode` (không còn bản cũ để quay lại).
@@ -162,6 +172,11 @@ Yeu cau cua Duyen: Chat noi bo hien thi duoc o cua so chat nho o goc duoi phai (
 - `js/48-filter-presets.js`: ô mẫu không còn là thanh đứt nét riêng bên dưới; nay chèn TRONG `.srb-bar`, ngay trước 🧰 Tác vụ (cùng hàng). 0 mẫu = menu "⚡ Mẫu lọc nhanh ▾"; 1 mẫu = 1 nút bấm là lọc; ≥2 mẫu = dropdown chọn mẫu (chọn dòng đầu "⚡ Mẫu lọc nhanh…" khi đang dùng mẫu = tắt). Đang dùng mẫu (bộ lọc khớp mẫu) → nút "✕ Tắt lọc nhanh": đặt lại các bộ lọc của báo cáo đó (Sale/Kênh/…/ô Team, cờ *Customized) về mặc định rồi tải lại, KHÔNG đổi ngày.
 - Menu "⚙ Mẫu ▾": Tạo mẫu (chọn Sale), Lưu bộ lọc hiện tại, và mục Quản lý mẫu (mỗi mẫu 1 dòng: ✎ sửa, ⟳ ghi đè, ✕ xoá). Dữ liệu mẫu (localStorage `ome_sr_filter_presets_v1:<user>`) giữ nguyên, không cần chuyển đổi.
 - `js/13` `_srbMenuRefresh_` gọi `_fpRefresh()` để trạng thái "đang dùng mẫu" cập nhật khi đổi bộ lọc qua menu 🔎. Test: `node tools/test-filter-presets.js` (jsdom, đã viết lại cho giao diện mới).
+
+## Khớp Sale — bước 1 (Duyên 12/10/2026): sửa lỗi GỐC làm lọc Team/Sale sai
+- Nguyên nhân gốc (đã tái hiện): backend `_userAliasGroups_` gom MỌI tài khoản có >=2 tên thành "1 người", kể cả Leader/Quản lý/Admin — cột `names` của họ là DANH SÁCH NHIỀU NGƯỜI KHÁC NHAU (phạm vi quản lý). Nên chọn 1 Sale/1 Team kéo theo cả danh sách của leader, các danh sách chồng nhau gộp thành 1 cục (cũng làm sai tỷ lệ chốt qua `_salePersonKeyFn_`). Client `_personAliases` đã chỉ tính role cs từ trước nên giao diện sửa mãi không hết. Sửa: `_userAliasGroups_` chỉ gom tài khoản role 'cs'. Test: `node tools/test-sale-match.js`.
+- Bước 2 ĐÃ CÓ do phiên khác làm (commit 3b0cd61: mục "🔗 Khớp sale" js/52-fn-salematch.js + backend saleMatchCandidates, lưu salePersonTags) — phiên này KHÔNG làm trùng, chỉ kiểm tra chạy khớp với bản sửa bước 1 (test-salematch-ui, test-sale-match, test-team-filter đều qua).
+- Đã dùng danh tính khớp (backend): Báo cáo A, B, C, G (đơn thất bại), tỷ lệ chốt, thưởng/hoa hồng, csStats, hồ sơ nhân viên; (client) ô Sale/Team của báo cáo doanh số. **CHƯA kiểm tra**: Báo cáo D/E/F/L, KPI Pancake, Checklist MKT, lọc CS ở danh sách khách hàng — nếu còn lọc sai ở đó thì cần nối thêm `_expandSaleFilterWithPancakeAliases_`/`_personAliases`.
 - [~] Tỷ lệ chốt theo Sale ra sai (Duyên báo 2026-10-16): thêm `chanDoanTyLeChot` (Editor) + `_tlcDiagnose_` để chẩn đoán trên dữ liệu thật. CHƯA sửa quy tắc đếm. Việc tiếp: Duyên chạy hàm, gửi log -> xác định nguyên nhân (tên người tạo không khớp / kênh chưa gán Page / định nghĩa người tạo vs Sale bán). Chi tiết: docs/crm-kb/05-sasum-reports-ui.md 'Chẩn đoán Tỷ lệ chốt'.
 - [x] Ty le chot theo Sale (2026-10-16): them setting `closeRateBy` MAC DINH 'saleban' (doi bang datTyLeChotTheo), va va loi gop ten mo coi o che do nguoitao (minhquach95). Con: Duyen xem lai so sau deploy; neu muon dung 'nguoitao' thi khop tay anhTP1995 o Khop sale. Chi tiet: docs/crm-kb/05 'Ty le chot: chon cach gan don'.
 
@@ -172,3 +187,10 @@ Yeu cau cua Duyen: Chat noi bo hien thi duoc o cua so chat nho o goc duoi phai (
 - Test: `node tools/test-chat-mini.js` (mở rộng: trả lời, trích dẫn, huỷ trả lời, xoá, không có nút xoá trên tin người khác, âm báo, nhấp nháy tiêu đề, tắt chuông). `test-chat.js`, `test-chat-drag.js` vẫn qua.
 - Chưa thử trên trình duyệt thật (chỉ jsdom). Nút 🔔 nằm trên dock nên chỉ chỉnh được khi dock đang hiện (không phải ở tab Chat / đang thu thành bong bóng).
 - [x] The 'Ty le chot TB' o dau Bao cao A/B + dong trong Excel (js/11 _srCloseRateKpiCard_). Chi tiet docs/crm-kb/05.
+
+## Lọc nhanh (mẫu) không có tác dụng — vòng sửa
+- Đã kiểm tra trên Chromium thật: admin 1180/760px, dropdown ≥2 mẫu + nút "Tắt lọc nhanh" chạy đúng ở A–G, L.
+- Nguyên nhân khả dĩ: (1) trình duyệt giữ JS/CSS cũ (không có cache-busting) → thêm `?v=` cho js/48 + css/10; (2) leader/CS bị `_srEnforceScope` ép về chính mình nên mẫu như "không đổi" → nay có toast báo rõ.
+
+## Báo cáo A/B "Theo Sale" lẫn người ngoài bộ lọc (kế toán, Mến)
+- Nguyên nhân: đơn có nhiều sale ("Kd + kế toán + Mến") → backend tạo thêm dòng cho người đồng bán dù không thuộc bộ lọc. Sửa phía giao diện `_srKeepSelectedSales_` (js/11): khi có chọn Sale/Team chỉ giữ dòng của người đã chọn (kể cả tên phụ); bỏ qua ở chế độ "người tạo đơn". Tổng/tiền chia đều vẫn do máy chủ tính. Test: tools/test-sr-keep-selected-sales.js.
