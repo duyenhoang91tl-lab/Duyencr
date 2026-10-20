@@ -1047,3 +1047,7 @@ body:not(.show-guides) .pro-ai-hint{display:none !important;}
 .sc-fl select{width:100%;box-sizing:border-box;font-size:12px;padding:5px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);}
 .sc-fnote{grid-column:1/-1;font-size:11px;color:var(--muted);}
 
+
+/* Tin có từ cấm được mở từ thông báo giám sát chat: nháy sáng ~6s (js/42 _scRenderMsgs) */
+.pkc-m.pkc-hl .pkc-b{outline:3px solid #f59e0b;box-shadow:0 0 0 6px rgba(245,158,11,.25);animation:pkcHl 1s ease-in-out 3;}
+@keyframes pkcHl{50%{box-shadow:0 0 0 10px rgba(245,158,11,.1);}}

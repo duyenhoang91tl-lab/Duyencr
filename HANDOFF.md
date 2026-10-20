@@ -1,6 +1,12 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-10-20 — Thông báo từ cấm: báo đúng sale + bấm mở đúng đoạn chat
+- [x] gas_v13.js `_cvNotify_`: mỗi (nhân viên × HỘI THOẠI) 1 thông báo (tối đa 15/nhân viên/lượt quét); gửi cho admin VÀ cho CHÍNH sale đó (khớp tên Pancake/CRM với tài khoản CRM qua tên/username/bí danh; tài khoản khóa không nhận). Sale đọc "Bạn dùng từ cấm trong N tin với <khách>: ...". Tắt báo sale: Settings `chatAuditNotifySale=0` hoặc chạy `datChatAuditBaoSale(false)`. Thông báo: refType `chatviolation`, refId = ID hội thoại, refId2 = "SĐT|tên khách".
+- [x] js/39-fn-notify.js: bấm thông báo → `_ntOpenChat_` mở Social > Chat đúng hội thoại (scPick; chưa có trong danh sách thì tạo dòng tạm). Thông báo cũ (refType customer) vẫn mở hồ sơ khách. Test: `node tools/test-chat-audit.js`.
+- [x] (lần 2) Cuộn tới + nháy sáng đúng TIN có từ cấm: refId2 = "SĐT|tên khách|ID tin đầu tiên"; js/42 `_scRenderMsgs` gắn `data-mid`, đọc `_sc.focus`; tin cũ hơn 150 tin đang tải thì báo toast. Thông báo cũ (định dạng SĐT|tên) vẫn mở hội thoại, không cuộn.
+- [ ] CẦN LÀM TIẾP: sale không có quyền tab Chat thì bấm sẽ báo "chưa được cấp quyền" (chưa có đường khác để họ xem).
+
 ## 2026-10-20 — Nhập file Base/Pos an toàn (Báo cáo I)
 - [x] gas_v13.js `doImportSheetRows_`: thêm `dryRun` (chỉ đếm, không ghi); BỎ khử trùng toàn sheet sau khi ghi (có thể xóa nhầm dòng CŨ); kiểm tra số dòng sau ghi. Chỉ NỐI THÊM dòng mới, đơn đã có (theo khóa đơn chuẩn hóa) thì BỎ QUA, không ghi đè/xóa. Test: `node tools/test-import-safe.js`.
 - [x] js/11-fn-srload.js `_impUpload`: bấm Nhập → xem trước (N mới / M đã có) → xác nhận mới ghi. Backend cũ không có dryRun vẫn chạy được (không ghi 2 lần).
@@ -194,3 +200,4 @@ Yeu cau cua Duyen: Chat noi bo hien thi duoc o cua so chat nho o goc duoi phai (
 
 ## Báo cáo A/B "Theo Sale" lẫn người ngoài bộ lọc (kế toán, Mến)
 - Nguyên nhân: đơn có nhiều sale ("Kd + kế toán + Mến") → backend tạo thêm dòng cho người đồng bán dù không thuộc bộ lọc. Sửa phía giao diện `_srKeepSelectedSales_` (js/11): khi có chọn Sale/Team chỉ giữ dòng của người đã chọn (kể cả tên phụ); bỏ qua ở chế độ "người tạo đơn". Tổng/tiền chia đều vẫn do máy chủ tính. Test: tools/test-sr-keep-selected-sales.js.
+- [x] Giam sat chat Pancake GD1 (2026-10-17): quet pk_messages 'out' theo tu cam (sheet 'Luu y tu cam'), ghi ChatViolations + thong bao duyenht. Can Duyen: xemTuCamGiamSat, datChatAuditBoQua('tien, loc') neu bao ngap, batGiamSatChat(24). GD2 (canh bao ngay tren Pancake/extension) CHUA lam. Chi tiet: docs/GIAM-SAT-CHAT.md.

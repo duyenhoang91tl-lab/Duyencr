@@ -275,11 +275,18 @@ function _scRenderMsgs(forceBottom) {
   var html = '', lastDay = '';
   list.forEach(function (m) {
     var d = _pkcDay(m.at); if (d && d !== lastDay) { lastDay = d; html += '<div class="pkc-day">' + d + '</div>'; }
-    html += '<div class="pkc-m ' + (m.dir === 'out' ? 'out' : 'in') + '"><div class="pkc-b">' + _pkcEsc(m.text).replace(/\n/g, '<br>') + _pkcAttHtml(m.att) + '</div>' + _pkcMetaHtml(m, conv) + '</div>';
+    html += '<div class="pkc-m ' + (m.dir === 'out' ? 'out' : 'in') + '" data-mid="' + _pkcEsc(String(m.id || '')) + '"><div class="pkc-b">' + _pkcEsc(m.text).replace(/\n/g, '<br>') + _pkcAttHtml(m.att) + '</div>' + _pkcMetaHtml(m, conv) + '</div>';
   });
   box.innerHTML = html || '<div class="pkc-note">Hội thoại chưa có tin nhắn nào được lưu.</div>';
   var wh = document.getElementById('sc-who'); if (wh) wh.innerHTML = _pkcWhoHtml(_sc.msgs[_sc.active]);
   if (forceBottom || near) box.scrollTop = box.scrollHeight;
+  // Mở từ thông báo từ cấm (js/39 _ntOpenChat_): cuộn tới + nháy sáng đúng tin có từ cấm; tin cũ hơn đoạn đang tải thì báo rõ.
+  if (_sc.focus && _sc.focus.conv === _sc.active && list.length) {
+    var _fe = null; [].forEach.call(box.querySelectorAll('.pkc-m[data-mid]'), function (x) { if (x.getAttribute('data-mid') === _sc.focus.mid) _fe = x; });
+    if (_fe) { _fe.scrollIntoView({ block: 'center' }); _fe.classList.add('pkc-hl'); setTimeout(function () { _fe.classList.remove('pkc-hl'); }, 6000); }
+    else if (typeof toast === 'function') toast('Tin có từ cấm nằm xa hơn đoạn chat đang hiển thị (chỉ tải 150 tin gần nhất) — xem sheet ChatViolations để thấy nội dung tin.');
+    _sc.focus = null;
+  }
   _scStatus();
 }
 async function scSend() {
