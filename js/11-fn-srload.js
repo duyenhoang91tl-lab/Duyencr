@@ -1204,6 +1204,21 @@ function _srPurePanelHtml_(d){
   if (calc.unassigned.orders) h += '<div style="font-size:11.5px;color:var(--muted);margin-top:6px">Không nằm trong bảng: ' + fmt(calc.unassigned.orders) + ' đơn không có sale trên cột "Thẻ" (' + _srMoney(calc.unassigned.giaTri) + ') — vd đơn Quầy Hào Nam không gắn sale, giống bảng "Theo Sale" chính.</div>';
   return h;
 }
+// Sheet CHI TIẾT của file Excel đối chiếu (20/10/2026, Duyên hỏi vì sao Pos đơn thuần lệch file Pancake gốc): MỖI DÒNG = 1 đơn × 1 sale (chia đều theo Thẻ, giá Pos gốc) — đúng các dòng cộng nên bảng "Theo Sale".
+// Kèm trạng thái đang có TRONG CRM + dòng trong sheet "dữ liệu đơn" để dò từng đơn với file Pancake (VLOOKUP theo SĐT/ngày/giá, hoặc cột STT = dòng − 1). Lọc cột "Sale" rồi SUM cột "Tiền chia" = số trên bảng.
+function _srPureDetailRows_(orders){
+  var rows = [['Dòng trong sheet "dữ liệu đơn"', 'Ngày tạo', 'Khách', 'SĐT', 'Nguồn đơn', 'Thẻ (nguyên văn)', 'Trạng thái (trong CRM)', 'Giá Pos gốc', 'Số sale chia', 'Sale', 'Phần chia (%)', 'Tiền chia (thuần)', 'Ghi chú Pos', 'Gộp từ đơn tách']];
+  (orders || []).forEach(function(o){
+    var sh = _srOrderShares_(o, 'pure');
+    var v = (o.giaTriPos !== undefined && o.giaTriPos !== null) ? Number(o.giaTriPos) : Number(o.giaTriSauGiam);
+    var tach = (o.tachSoDon && o.tachSoDon > 1) ? ('Gộp ' + o.tachSoDon + ' phần: ' + (o.tachGiaTri || []).join(' + ')) : '';
+    sh.forEach(function(x){
+      rows.push([o.posRow || '', o.ngayTaoDon || '', o.khachHang || '', o.soDienThoai || '', o.nguonDon || '', o.theSale || '', o.trangThai || '', Math.round(v || 0), sh.length, x.name,
+        Math.round(x.frac * 1000) / 10, Math.round(x.giaTri), o.ghiChu || '', tach]);
+    });
+  });
+  return rows;
+}
 function _srPureExport_(){
   var d = _srState.dataB;
   if (!d || !d.orders){ alert('Chưa có dữ liệu Báo cáo B — hãy tải báo cáo trước.'); return; }
@@ -1243,6 +1258,7 @@ function _srPureExport_(){
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sum), 'Tổng hợp theo Sale');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(det), 'Đơn đã điều chỉnh');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(chk), 'Cần kiểm tra tay');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(_srPureDetailRows_(orders)), 'Chi tiết thuần từng đơn');
   XLSX.writeFile(wb, 'BaoCao_Pos_DonThuan_DoiChieu_' + _ymd(new Date()) + '.xlsx');
 }
 

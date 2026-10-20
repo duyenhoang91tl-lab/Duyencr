@@ -442,7 +442,7 @@ function updateCampaignFilter() {
   const sel = document.getElementById('campaign-filter');
   if (!sel) return;
   const cur = sel.value;
-  const csFList = _csFilterList();
+  const csFList = _csFilterListMatch();
 
   // Lọc chiến dịch theo CS đang chọn (nếu có) — multi: khớp BẤT KỲ CS nào trong danh sách
   const batches = (typeof assignHistory !== 'undefined' ? assignHistory : [])
@@ -503,7 +503,7 @@ function debouncedApplyFilters() {
 function applyFilters() {
   const q = s(document.getElementById('search-input').value).toLowerCase();
   const sort = document.querySelector('.srt').value;
-  const csFList = _csFilterList();
+  const csFList = _csFilterListMatch();
   const dataSrcF = document.getElementById('datasrc-filter')?.value || 'all';
   const ymYear = document.getElementById('ymf-year')?.value || '';
   const ymMonth = document.getElementById('ymf-month')?.value || '';
@@ -1085,7 +1085,7 @@ function _schedResponsibleCS(it) {
 }
 function _schedCsFilter(it, _preList) {
   // Đọc filter từ DOM (currentCS không bao giờ được cập nhật). _preList: nơi gọi đã đọc sẵn 1 lần cho cả vòng lặp.
-  let filterList = _preList ? _preList.slice() : _csFilterList();
+  let filterList = _preList ? _preList.slice() : _csFilterListMatch();
   // Khi đăng nhập role=cs mà chưa chọn filter → tự dùng (các) tên CS đăng nhập
   if (!filterList.length && typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'cs' || currentUser.role === 'manager')) {
     filterList = (currentUser.names && currentUser.names.length) ? currentUser.names.slice() : (currentUser.name ? [currentUser.name] : []);
@@ -1140,7 +1140,7 @@ function _schedToggleDay(dayStr) {
 }
 
 function renderScheduleTab() {
-  const _schedFl = _csFilterList();   // đọc DOM 1 lần/lượt vẽ, không đọc lại cho từng lịch hẹn
+  const _schedFl = _csFilterListMatch();   // đọc DOM 1 lần/lượt vẽ, không đọc lại cho từng lịch hẹn
   const base = new Date(); base.setHours(0,0,0,0);
   const todayStr = _ymd(base);
   const grid = document.getElementById('sched-grid');
@@ -1206,7 +1206,7 @@ function schedSeg(which) {
 
 function renderOverdueTab() {
   const today = _ymd(new Date());
-  const _ovFl = _csFilterList();   // đọc DOM 1 lần, không đọc lại cho từng lịch quá hạn
+  const _ovFl = _csFilterListMatch();   // đọc DOM 1 lần, không đọc lại cho từng lịch quá hạn
   const items = schedules.filter(x => x.date < today && !x.done && _schedCsFilter(x, _ovFl)).sort((a,b)=>a.date.localeCompare(b.date));
   txt('tb-over', fmt(items.length));
   txt('s-over', fmt(items.length));

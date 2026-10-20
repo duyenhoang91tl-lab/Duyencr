@@ -153,7 +153,7 @@ document.addEventListener('DOMContentLoaded', function () {
 // ═══════════════════════════════════════════════════════
 function exportCSV() {
   const q=s(document.getElementById('search-input').value).toLowerCase();
-  const csFList=_csFilterList();
+  const csFList=_csFilterListMatch();
   let list=allCustomers.filter(c=>{
     if(currentTier!=='all'&&c.tier!==currentTier) return false;
     if(currentCare!=='all'&&c.careStatus!==currentCare) return false;
