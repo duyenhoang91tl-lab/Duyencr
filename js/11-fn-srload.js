@@ -1287,29 +1287,30 @@ async function _impUpload(kind){
     // (không có d0.dryRun) -> không bao giờ ghi 2 lần: dùng kết quả đó luôn như trước.
     var _lbl = kind === 'base' ? 'Base (DT TỔNG)' : 'Pos (dữ liệu đơn)';
     var _isReal = false, d = null;
-    var res0 = await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'importSheetRows', sheet: kind, rows: rows, dryRun: true }) });
+    var res0 = await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'importSheetRows', sheet: kind, rows: rows, dryRun: true, updateExisting: true }) });
     var d0 = await res0.json();
     if (d0.error) throw new Error(d0.error);
     if (d0.dryRun) {
-      if (!d0.wouldWrite) {
+      if (!d0.wouldWrite && !d0.wouldUpdateRows) {
         toast('ℹ️ Không có dòng mới: cả ' + fmt(d0.skippedExisting || 0) + ' đơn trong file đều ĐÃ CÓ trong hệ thống — không ghi gì, dữ liệu cũ giữ nguyên.');
         _impState.result = Object.assign({ kind: kind, written: 0 }, d0);
         return;
       }
       if (!confirm('NHẬP DỮ LIỆU ' + _lbl + ' — xem trước:\n\n'
         + '• Sẽ THÊM ' + fmt(d0.wouldWrite) + ' dòng MỚI (nối tiếp cuối sheet)\n'
-        + '• Bỏ qua ' + fmt(d0.skippedExisting || 0) + ' đơn ĐÃ CÓ (giống dữ liệu cũ — không ghi đè, không xóa)\n'
+        + '• ' + fmt(d0.skippedExisting || 0) + ' đơn ĐÃ CÓ: ' + (d0.wouldUpdateRows ? 'CẬP NHẬT ' + fmt(d0.wouldUpdateRows) + ' đơn có thông tin đổi (' + fmt(d0.wouldUpdateCells) + ' ô; chỉ ghi ô file có giá trị mới khác, KHÔNG xóa trắng ô cũ, giá trị cũ được lưu vào sheet "Nhật ký cập nhật nhập file"), còn lại giống hệt → bỏ qua' : 'giống dữ liệu cũ → bỏ qua, không ghi đè, không xóa') + '\n'
+        + (d0.updateOverLimit ? '• Còn ' + fmt(d0.updateOverLimit) + ' đơn đổi nữa — vượt giới hạn 1 lần, nhập lại cùng file để cập nhật tiếp\n' : '')
         + (d0.skippedDupInFile ? '• Bỏ qua ' + fmt(d0.skippedDupInFile) + ' dòng trùng ngay trong file\n' : '')
         + '\nDữ liệu cũ trên Sheet được GIỮ NGUYÊN 100%. Tiếp tục nhập?')) { toast('Đã hủy — chưa ghi gì.'); return; }
     } else { _isReal = true; d = d0; }
     if (!_isReal) {
-      var res = await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'importSheetRows', sheet: kind, rows: rows }) });
+      var res = await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'importSheetRows', sheet: kind, rows: rows, updateExisting: true }) });
       d = await res.json();
     }
     if (d.error) throw new Error(d.error);
     _impState.result = Object.assign({ kind: kind }, d);
-    toast('✓ Đã nhập '+fmt(d.written)+' dòng mới'+(d.skippedExisting?', bỏ qua '+fmt(d.skippedExisting)+' đơn ĐÃ CÓ trong hệ thống':'')+(d.dedupedAfter?' (tự loại '+fmt(d.dedupedAfter)+' dòng trùng tuyệt đối)':'')+' vào '+(kind==='base'?'DT TỔNG':'dữ liệu đơn')+'.');
-    logAudit('import_'+kind, '', '', 'Nhập dữ liệu '+(kind==='base'?'Base':'Pos')+' từ file: +'+d.written+' dòng, loại trùng '+(d.dedupedAfter||0));
+    toast('✓ Đã nhập '+fmt(d.written)+' dòng mới'+(d.skippedExisting?', '+fmt(d.skippedExisting)+' đơn ĐÃ CÓ'+(d.updatedRows?' (cập nhật '+fmt(d.updatedRows)+' đơn có thông tin đổi, còn lại bỏ qua)':' (bỏ qua)'):'')+(d.dedupedAfter?' (tự loại '+fmt(d.dedupedAfter)+' dòng trùng tuyệt đối)':'')+' vào '+(kind==='base'?'DT TỔNG':'dữ liệu đơn')+'.');
+    logAudit('import_'+kind, '', '', 'Nhập dữ liệu '+(kind==='base'?'Base':'Pos')+' từ file: +'+d.written+' dòng, cập nhật '+(d.updatedRows||0)+' đơn/'+(d.updatedCells||0)+' ô, loại trùng '+(d.dedupedAfter||0));
     if (kind === 'base'){ _impState.baseRows = null; _impState.baseFileName = ''; _impState.baseWarn = ''; }
     else { _impState.posRows = null; _impState.posFileName = ''; _impState.posWarn = ''; }
     var fi = document.getElementById('imp-file-'+kind); if (fi) fi.value = '';
@@ -1338,7 +1339,7 @@ function _impPickCard_(kind, label, hint, sheetTarget){
   }
   var res = _impState.result;
   if (res && res.kind === kind){
-    html += '<div style="margin-top:8px;padding:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;font-size:12px;color:#166534">✓ Đã thêm <b>'+fmt(res.written)+'</b> dòng mới'+(res.skippedExisting?', bỏ qua <b>'+fmt(res.skippedExisting)+'</b> đơn ĐÃ CÓ sẵn trong hệ thống (không ghi lại → không nhân đôi doanh thu)':'')+(res.skippedDupInFile?', bỏ qua '+fmt(res.skippedDupInFile)+' dòng trùng ngay trong file':'')+(res.dedupedAfter?', tự động loại '+fmt(res.dedupedAfter)+' dòng trùng tuyệt đối với dữ liệu sẵn có':'')+'.</div>';
+    html += '<div style="margin-top:8px;padding:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;font-size:12px;color:#166534">✓ Đã thêm <b>'+fmt(res.written)+'</b> dòng mới'+(res.skippedExisting?', bỏ qua <b>'+fmt(res.skippedExisting)+'</b> đơn ĐÃ CÓ sẵn trong hệ thống (không ghi lại → không nhân đôi doanh thu)':'')+(res.updatedRows?', <b>cập nhật '+fmt(res.updatedRows)+'</b> đơn cũ có thông tin đổi ('+fmt(res.updatedCells)+' ô — giá trị cũ lưu ở sheet "Nhật ký cập nhật nhập file")':'')+(res.skippedDupInFile?', bỏ qua '+fmt(res.skippedDupInFile)+' dòng trùng ngay trong file':'')+(res.dedupedAfter?', tự động loại '+fmt(res.dedupedAfter)+' dòng trùng tuyệt đối với dữ liệu sẵn có':'')+'.</div>';
   }
   html += '</div>';
   return html;

@@ -299,7 +299,7 @@ function doPostCore_(e) {
     if (action === 'saveUsers')           return saveUsers_(data.users);
     if (action === 'saveAudit')           return saveAudit_(data.rows);
     // ── Nhap du lieu Base/Pos tu file export (thay copy tay vao Google Sheet) ──
-    if (action === 'importSheetRows')     return doImportSheetRows_(data.sheet, data.rows, data.dryRun);
+    if (action === 'importSheetRows')     return doImportSheetRows_(data.sheet, data.rows, data.dryRun, data.updateExisting);
     // ── Bao cao Pancake ──
     if (action === 'savePancakeStats')    return savePancakeStats_(data.rows);
     if (action === 'savePancakeNameMap')  return savePancakeNameMap_(data.pancakeName, data.saleName);

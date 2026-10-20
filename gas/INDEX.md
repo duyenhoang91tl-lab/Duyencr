@@ -55,8 +55,8 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hàm: `exportSalesReportToSheet_`, `doPost`, `doPostCore_`
 
 ## 12_SaveCare_Orders_Dedupe.gs
-- Hàm: `invalidateLookupCache_`, `saveAllCare_`, `saveSingleCare_`, `saveBatchCare_`, `syncZaloFriendStatus_`, `saveOrders_`, `patchOrder_`, `deleteOrder_`, `normOrderDate_`, `_normTxt_`, `findDuplicateOrders_`, `deleteDuplicateOrders_`, `_rowKeyExact_`, `_rowIsBlank_`, `_autoDedupExactRowsInSheet_`, `_autoDedupLog_`, `onChangeDedupTrigger_`, `installAutoDedupTrigger_`, `_impHm_`, `_impOrderKey_`, `doImportSheetRows_`, `doImportSheetRowsLocked_`, `replaceOrders_`, `setOrderCareCS_`, `setOrderCareCSBatch_`, `_auditTeamSig_`, `_auditTeamMap_`
-- Hằng/biến: `SH_AUTO_DEDUP_LOG`, `AUTO_DEDUP_LOG_HEADERS`
+- Hàm: `invalidateLookupCache_`, `saveAllCare_`, `saveSingleCare_`, `saveBatchCare_`, `syncZaloFriendStatus_`, `saveOrders_`, `patchOrder_`, `deleteOrder_`, `normOrderDate_`, `_normTxt_`, `findDuplicateOrders_`, `deleteDuplicateOrders_`, `_rowKeyExact_`, `_rowIsBlank_`, `_autoDedupExactRowsInSheet_`, `_autoDedupLog_`, `onChangeDedupTrigger_`, `installAutoDedupTrigger_`, `_impHm_`, `_impOrderKey_`, `_impColName_`, `_impCellStr_`, `_impCellEq_`, `_impDiffRow_`, `doImportSheetRows_`, `doImportSheetRowsLocked_`, `replaceOrders_`, `setOrderCareCS_`, `setOrderCareCSBatch_`, `_auditTeamSig_`, `_auditTeamMap_`
+- Hằng/biến: `SH_AUTO_DEDUP_LOG`, `AUTO_DEDUP_LOG_HEADERS`, `SH_IMPORT_UPD_LOG`, `IMPORT_UPD_LOG_HEADERS`, `IMPORT_UPD_MAX_ROWS`
 
 ## 13_Teams_Pancake.gs
 - Hàm: `saveTeams_`, `readMktTeams_`, `saveMktTeams_`, `_mktPageWeights_`, `_mktKenhWeights_`, `savePancakeStats_`, `readPancakeMapCI_`, `readPancakeMap_`, `pancakeAllNames_`, `savePancakeNameMap_`, `_pkStatsRowsMemo_`, `buildPancakeReport_`, `savePancakeSdtStats_`, `buildPancakeSdtReport_`, `readPancakePageMap_`, `readPancakePageMapByName_`, `pancakeAllPages_`, `savePancakePageMap_`, `classifyPancakeTag_`, `savePancakeTagStats_`, `buildPancakeTagReport_`, `_tagFunnelRates_`, `_pkSheetDateSpan_`, `saveSaleDirectory_`, `readSaleDirectory_`, `_pkTrackedDatesByPageAndSale_`, `_sumOrdersOnDates_`
