@@ -17708,7 +17708,7 @@ function _cvStaffUsers_(users, staff) {
 }
 var CV_NOTIF_MAX_GROUPS_ = 15;   // toi da so thong bao / nhan vien / luot quet (phan du gop vao thong bao cuoi) — tranh don dap
 // THONG BAO (20/10/2026, Duyen): moi (nhan vien x HOI THOAI) 1 thong bao; gui cho admin VA cho CHINH sale do (neu khop tai khoan CRM; tat bang Settings chatAuditNotifySale = 0).
-// refType='chatviolation', refId = ID hoi thoai (bam vao thong bao mo dung doan chat), refId2 = "SDT|ten khach".
+// refType='chatviolation', refId = ID hoi thoai (bam vao thong bao mo dung doan chat), refId2 = "SDT|ten khach|ID tin dau tien".
 function _cvNotify_(admins, vs) {
   if (!vs.length) return 0;
   var notifySale = true, users = [];
@@ -17734,7 +17734,7 @@ function _cvNotify_(admins, vs) {
     var saleUsers = notifySale ? _cvStaffUsers_(users, sk).filter(function (u) { return !adminLow[u.toLowerCase()]; }) : [];
     keys.forEach(function (ck) {
       var list = st.groups[ck], first = list[0];
-      var info = (first.phone || '') + '|' + (first.customer || '');
+      var info = (first.phone || '') + '|' + String(first.customer || '').replace(/\|/g, ' ') + '|' + (first.id || '');   // SDT|ten khach|ID tin co tu cam DAU TIEN (client cuon toi dung tin do)
       var ref = first.convId || first.phone || '';
       var mk = function (to, self) {
         rows.push(['nt_' + Date.now() + '_cv' + (seq++) + '_' + Math.floor(Math.random() * 1000), to, 'Giám sát chat', 'chatviolation', 'chatviolation', ref, info, _cvNotifText_(sk, list, self), now, '']);

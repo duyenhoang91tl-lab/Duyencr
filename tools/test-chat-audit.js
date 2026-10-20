@@ -84,7 +84,7 @@ ok(cvRows[3][7] === '(chưa rõ nhân viên)' && cvRows[3][3] === 'P2', 'tin kho
 const nr = SHEETS['Notifications'].rows;
 ok(nr.length === 1 + 8 && r.notified === 8, 'Lan x 2 hoi thoai (c1,c2) x [2 admin + chinh Lan] = 6, + (chua ro x 1 hoi thoai x 2 admin) = 2 => 8 thong bao, tach theo HOI THOAI — got ' + r.notified);
 ok(nr.slice(1).filter((x) => x[1] === 'lan01').length === 2 && nr.slice(1).every((x) => x[1] !== 'old'), 'chinh sale chi nhan phan cua minh (2 hoi thoai), tai khoan da khoa khong nhan');
-ok(nr[1][1] === 'duyenht' && nr[2][1] === 'ad2' && nr[3][1] === 'lan01' && nr[1][3] === 'chatviolation' && nr[1][4] === 'chatviolation' && nr[1][5] === 'c1' && nr[1][6] === '0901234567|Chị Hoa', 'thong bao: admin + CHINH sale (lan01), refId = ID hoi thoai de mo dung chat, refId2 = SDT|ten khach');
+ok(nr[1][1] === 'duyenht' && nr[2][1] === 'ad2' && nr[3][1] === 'lan01' && nr[1][3] === 'chatviolation' && nr[1][4] === 'chatviolation' && nr[1][5] === 'c1' && nr[1][6] === '0901234567|Chị Hoa|m1', 'thong bao: admin + CHINH sale (lan01), refId = ID hoi thoai de mo dung chat, refId2 = SDT|ten khach|ID tin co tu cam dau tien');
 ok(/^⚠️ Bạn dùng từ cấm/.test(nr[3][7]) && /^⚠️ Lan dùng từ cấm/.test(nr[1][7]), 'sale nhan "Ban dung tu cam...", admin nhan ten sale');
 ok(nr.slice(1).every((x) => String(x[7]).length <= 160 && x[9] === ''), 'text <=160 ky tu, chua doc');
 ok(PROPS.cvCursor === '2026-10-17T01:03:00Z', 'moc quet tien den tin cuoi (khong quet lai)');
@@ -123,5 +123,7 @@ SET.chatAuditAdmins = ''; ok(JSON.stringify(ctx._cvAdmins_()) === '["duyenht"]',
 const nj = fs.readFileSync(path.join(__dirname, '..', 'js', '39-fn-notify.js'), 'utf8');
 ok(/k === 'chatviolation'/.test(nj) && /chatviolation:'⚠️'/.test(nj), 'web: thong bao chatviolation hien nhu su kien he thong, icon ⚠️');
 ok(/_ntOpenChat_\(it\.refId/.test(nj) && /function _ntOpenChat_/.test(nj) && /scPick\(convId\)/.test(nj), 'web: bam thong bao tu cam mo dung doan chat (Social > Chat, scPick theo ID hoi thoai)');
+const sj = fs.readFileSync(path.join(__dirname, '..', 'js', '42-fn-socialchat.js'), 'utf8');
+ok(/data-mid="/.test(sj) && /_sc\.focus\.mid/.test(sj) && /scrollIntoView/.test(sj) && /_ntOpenChat_\(it\.refId, _ci\[0\] \|\| '', _nm, _mid\)/.test(nj), 'web: tin chat co data-mid, cuon toi + nhay sang dung tin co tu cam (_sc.focus)');
 ok(/refType === 'chatviolation'/.test(nj), 'web: thong bao tu cam cu (chua co hoi thoai) van bao xem sheet ChatViolations');
 console.log(fail ? '\nFAILED ' + fail : '\nALL CHAT AUDIT TESTS PASSED'); process.exit(fail ? 1 : 0);

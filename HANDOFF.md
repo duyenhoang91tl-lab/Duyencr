@@ -4,7 +4,8 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 ## 2026-10-20 — Thông báo từ cấm: báo đúng sale + bấm mở đúng đoạn chat
 - [x] gas_v13.js `_cvNotify_`: mỗi (nhân viên × HỘI THOẠI) 1 thông báo (tối đa 15/nhân viên/lượt quét); gửi cho admin VÀ cho CHÍNH sale đó (khớp tên Pancake/CRM với tài khoản CRM qua tên/username/bí danh; tài khoản khóa không nhận). Sale đọc "Bạn dùng từ cấm trong N tin với <khách>: ...". Tắt báo sale: Settings `chatAuditNotifySale=0` hoặc chạy `datChatAuditBaoSale(false)`. Thông báo: refType `chatviolation`, refId = ID hội thoại, refId2 = "SĐT|tên khách".
 - [x] js/39-fn-notify.js: bấm thông báo → `_ntOpenChat_` mở Social > Chat đúng hội thoại (scPick; chưa có trong danh sách thì tạo dòng tạm). Thông báo cũ (refType customer) vẫn mở hồ sơ khách. Test: `node tools/test-chat-audit.js`.
-- [ ] CẦN LÀM TIẾP: cuộn tới/đánh dấu đúng TIN có từ cấm trong khung chat (hiện chỉ mở hội thoại); sale không có quyền tab Chat thì bấm sẽ báo "chưa được cấp quyền".
+- [x] (lần 2) Cuộn tới + nháy sáng đúng TIN có từ cấm: refId2 = "SĐT|tên khách|ID tin đầu tiên"; js/42 `_scRenderMsgs` gắn `data-mid`, đọc `_sc.focus`; tin cũ hơn 150 tin đang tải thì báo toast. Thông báo cũ (định dạng SĐT|tên) vẫn mở hội thoại, không cuộn.
+- [ ] CẦN LÀM TIẾP: sale không có quyền tab Chat thì bấm sẽ báo "chưa được cấp quyền" (chưa có đường khác để họ xem).
 
 ## 2026-10-20 — Nhập file Base/Pos an toàn (Báo cáo I)
 - [x] gas_v13.js `doImportSheetRows_`: thêm `dryRun` (chỉ đếm, không ghi); BỎ khử trùng toàn sheet sau khi ghi (có thể xóa nhầm dòng CŨ); kiểm tra số dòng sau ghi. Chỉ NỐI THÊM dòng mới, đơn đã có (theo khóa đơn chuẩn hóa) thì BỎ QUA, không ghi đè/xóa. Test: `node tools/test-import-safe.js`.

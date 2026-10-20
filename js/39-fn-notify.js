@@ -100,8 +100,9 @@ function ntOpenItem(id){
   ntClose();
   try {
     if (it.kind === 'chatviolation' && it.refType === 'chatviolation' && it.refId) {
-      var _ci = String(it.refId2 || '').split('|');
-      _ntOpenChat_(it.refId, _ci[0] || '', _ci.slice(1).join('|') || '');   // mở thẳng đoạn chat (Social > Chat) của hội thoại bị cảnh báo
+      var _ci = String(it.refId2 || '').split('|'), _mid = '', _nm = '';
+      if (_ci.length >= 3) { _mid = _ci[_ci.length - 1]; _nm = _ci.slice(1, -1).join('|'); } else { _nm = _ci.slice(1).join('|'); }   // định dạng cũ: SĐT|tên (không có mã tin)
+      _ntOpenChat_(it.refId, _ci[0] || '', _nm, _mid);   // mở thẳng đoạn chat (Social > Chat) của hội thoại bị cảnh báo
     } else if (it.refType === 'customer') {
       if (typeof openDp !== 'function') { toast('Chưa mở được khách'); return; }
       if (typeof customerMap !== 'undefined' && !customerMap[it.refId]) toast('Không thấy khách ' + it.refId + ' trong danh sách đang tải');
@@ -115,14 +116,14 @@ function ntOpenItem(id){
   } catch(e){ toast('Lỗi mở thông báo: ' + e.message); }
 }
 // Mở Social > Chat đúng hội thoại bị cảnh báo từ cấm. Hội thoại chưa nằm trong danh sách đang tải (cũ/ngoài bộ lọc) thì tạo dòng tạm để vẫn mở được tin nhắn.
-function _ntOpenChat_(convId, phone, name){
+function _ntOpenChat_(convId, phone, name, msgId){
   var tab = document.querySelector('#data-view .tabs .tab[data-bar-id="tab-chat"]');
   if (tab) tab.click(); else if (typeof switchTab === 'function') { try { switchTab('chat', document.querySelector('.tab')); } catch(e){} }
   var tries = 0;
   (function wait(){
     if (typeof scPick === 'function' && typeof _sc !== 'undefined' && document.getElementById('sc-convs')) {
       if (!_sc.convs.some(function(c){ return c.id === convId; })) _sc.convs.unshift({ id: convId, name: name || 'Khách Pancake', phone: phone || '', type: 'INBOX' });
-      try { _scRenderList(); scPick(convId); } catch(e){ toast('Lỗi mở chat: ' + e.message); }
+      try { _sc.focus = msgId ? { conv: convId, mid: String(msgId) } : null; _scRenderList(); scPick(convId); } catch(e){ toast('Lỗi mở chat: ' + e.message); }   // _sc.focus: _scRenderMsgs cuộn tới + nháy sáng đúng tin có từ cấm
       return;
     }
     if (++tries > 30) { toast('Không mở được tab Chat — bạn có thể chưa được cấp quyền xem Chat (Social)'); return; }
