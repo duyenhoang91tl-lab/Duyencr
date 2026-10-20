@@ -62,6 +62,8 @@ vm.runInContext(`
   getSheet_ = function(n, h) { return __fake.fakeSheet(n, h); };
   getSetting_ = function(k) { return __fake.SET[k] || null; };
   setSetting_ = function(k, v) { __fake.SET[k] = v; return {}; };
+  getCrmSS_ = function() { return { getSheetByName: function() { return null; } }; };
+  readUsers_ = function() { return [ { username: 'lan01', name: 'Lan', names: ['Lan'], active: true }, { username: 'old', name: 'Lan', active: false } ]; };
   readBannedWords_ = function() { return ${JSON.stringify(WORDS)}; };
   readPancakePageMap_ = function() { return { P1: 'Fb Phong Thủy' }; };
   normPhone_ = function(s) { return String(s).replace(/\\D/g, ''); };
@@ -80,8 +82,10 @@ const cvRows = SHEETS['ChatViolations'].rows;
 ok(cvRows.length === 4 && cvRows[1][0] === 'm1' && cvRows[1][5] === '0901234567' && cvRows[1][6] === 'Chị Hoa' && cvRows[1][3] === 'Fb Phong Thủy', 'ghi log: SDT chuan hoa, ten khach, ten Page (kenh)');
 ok(cvRows[3][7] === '(chưa rõ nhân viên)' && cvRows[3][3] === 'P2', 'tin khong co nhan vien -> "(chua ro nhan vien)", Page chua khop hien ma Page');
 const nr = SHEETS['Notifications'].rows;
-ok(nr.length === 1 + 4 && r.notified === 4, '2 nhan vien (Lan + chua ro) x 2 admin = 4 thong bao, GOP theo nhan vien — got ' + r.notified);
-ok(nr[1][1] === 'duyenht' && nr[2][1] === 'ad2' && nr[1][3] === 'chatviolation' && nr[1][4] === 'customer' && nr[1][5] === '0901234567', 'thong bao: nguoi nhan, loai, mo thang khach (customer + SDT)');
+ok(nr.length === 1 + 8 && r.notified === 8, 'Lan x 2 hoi thoai (c1,c2) x [2 admin + chinh Lan] = 6, + (chua ro x 1 hoi thoai x 2 admin) = 2 => 8 thong bao, tach theo HOI THOAI — got ' + r.notified);
+ok(nr.slice(1).filter((x) => x[1] === 'lan01').length === 2 && nr.slice(1).every((x) => x[1] !== 'old'), 'chinh sale chi nhan phan cua minh (2 hoi thoai), tai khoan da khoa khong nhan');
+ok(nr[1][1] === 'duyenht' && nr[2][1] === 'ad2' && nr[3][1] === 'lan01' && nr[1][3] === 'chatviolation' && nr[1][4] === 'chatviolation' && nr[1][5] === 'c1' && nr[1][6] === '0901234567|Chị Hoa', 'thong bao: admin + CHINH sale (lan01), refId = ID hoi thoai de mo dung chat, refId2 = SDT|ten khach');
+ok(/^⚠️ Bạn dùng từ cấm/.test(nr[3][7]) && /^⚠️ Lan dùng từ cấm/.test(nr[1][7]), 'sale nhan "Ban dung tu cam...", admin nhan ten sale');
 ok(nr.slice(1).every((x) => String(x[7]).length <= 160 && x[9] === ''), 'text <=160 ky tu, chua doc');
 ok(PROPS.cvCursor === '2026-10-17T01:03:00Z', 'moc quet tien den tin cuoi (khong quet lai)');
 ok(calls.some((c) => /direction=eq\.out/.test(c) && /order=sent_at\.asc/.test(c)), 'chi doc tin GUI RA, theo thu tu thoi gian');
@@ -118,5 +122,6 @@ SET.chatAuditAdmins = ''; ok(JSON.stringify(ctx._cvAdmins_()) === '["duyenht"]',
 // ---- chuong thong bao tren web (js/39) ----
 const nj = fs.readFileSync(path.join(__dirname, '..', 'js', '39-fn-notify.js'), 'utf8');
 ok(/k === 'chatviolation'/.test(nj) && /chatviolation:'⚠️'/.test(nj), 'web: thong bao chatviolation hien nhu su kien he thong, icon ⚠️');
-ok(/refType === 'chatviolation'/.test(nj), 'web: thong bao chua gan duoc SDT bao xem sheet ChatViolations');
+ok(/_ntOpenChat_\(it\.refId/.test(nj) && /function _ntOpenChat_/.test(nj) && /scPick\(convId\)/.test(nj), 'web: bam thong bao tu cam mo dung doan chat (Social > Chat, scPick theo ID hoi thoai)');
+ok(/refType === 'chatviolation'/.test(nj), 'web: thong bao tu cam cu (chua co hoi thoai) van bao xem sheet ChatViolations');
 console.log(fail ? '\nFAILED ' + fail : '\nALL CHAT AUDIT TESTS PASSED'); process.exit(fail ? 1 : 0);

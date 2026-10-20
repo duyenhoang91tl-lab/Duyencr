@@ -168,6 +168,7 @@ function khdDoPost_(action, d) {
 //  Dau ra: sheet "ChatViolations" (chi tiet tung tin vi pham) + THONG BAO trong CRM cho admin (mac dinh duyenht; moi lan quet gop 1 thong bao/nhan vien de khong don dap) + email tuy chon.
 //  Khop: khong phan biet hoa thuong, theo TU/CUM (khong bat chuoi con: "loc" khong khop "block"); tin gõ KHONG DAU thi so voi ban bo dau; cum dai nuot cum ngan ("loc phuc tinh" khong bao them "loc").
 //  Settings: chatAuditIgnore (tu bo qua, vd "tien, loc" vi qua pho bien khi chat), chatAuditAdmins (username nhan canh bao, mac dinh duyenht), chatAuditEmail (tuy chon).
+//  Settings them (20/10): chatAuditNotifySale (0 = chi bao admin, khong bao chinh sale; mac dinh bao ca sale khop tai khoan CRM). Editor them: datChatAuditBaoSale(true/false).
 //  Editor: batGiamSatChat(gioQuaKhu) / tatGiamSatChat / chayGiamSatChat / xemTuCamGiamSat / datChatAuditBoQua(csv) / datChatAuditAdmin(csv).
 //  GIOI HAN: Pancake khong tra ten nhan vien cho tung tin gui tu app Pancake (xem docs/PANCAKE-INBOX.md) nen tin do ghi "(chua ro nhan vien)" kem Page + hoi thoai de tra.
 // ═══════════════════════════════════════════════════════════════
@@ -246,25 +247,62 @@ function cvScanMessages_(msgs, compiled) {
   });
   return out;
 }
-// Cau canh bao gop theo nhan vien (<= 160 ky tu vi cot text cua Notifications).
-function _cvNotifText_(staff, vs) {
+// Cau canh bao gop theo (nhan vien x hoi thoai) (<= 160 ky tu vi cot text cua Notifications). self=true: gui CHO CHINH sale do ("Ban dung tu cam...").
+function _cvNotifText_(staff, vs, self) {
   var cnt = {}, order = [];
   vs.forEach(function (v) { v.words.forEach(function (w) { if (!cnt[w]) { cnt[w] = 0; order.push(w); } cnt[w]++; }); });
   order.sort(function (a, b) { return cnt[b] - cnt[a]; });
   var top = order.slice(0, 4).map(function (w) { return '"' + w + '"' + (cnt[w] > 1 ? ' ×' + cnt[w] : ''); }).join(', ');
-  var s = '⚠️ ' + (staff || '(chưa rõ nhân viên)') + ' dùng từ cấm trong ' + vs.length + ' tin: ' + top + (order.length > 4 ? ' …' : '');
+  var cust = ''; for (var i = 0; i < vs.length; i++) { if (vs[i].customer) { cust = String(vs[i].customer).slice(0, 30); break; } }
+  var s = '⚠️ ' + (self ? 'Bạn' : (staff || '(chưa rõ nhân viên)')) + ' dùng từ cấm trong ' + vs.length + ' tin' + (cust ? ' với ' + cust : '') + ': ' + top + (order.length > 4 ? ' …' : '');
   return s.length > 160 ? s.slice(0, 159) + '…' : s;
 }
+// Ten nhan vien (tu Pancake/CRM) -> cac username CRM (con hoat dong) khop theo ten hien thi / username / bi danh (cot names) — cung cach _notifyTaskEvent_.
+function _cvStaffUsers_(users, staff) {
+  var key = String(staff || '').trim().toLowerCase(), out = [];
+  if (!key) return out;
+  (users || []).forEach(function (u) {
+    if (u.active === false) return;
+    var al = [u.name, u.username].concat(u.names || []).map(function (x) { return String(x || '').trim().toLowerCase(); });
+    if (al.indexOf(key) >= 0 && out.indexOf(String(u.username)) < 0) out.push(String(u.username));
+  });
+  return out;
+}
+var CV_NOTIF_MAX_GROUPS_ = 15;   // toi da so thong bao / nhan vien / luot quet (phan du gop vao thong bao cuoi) — tranh don dap
+// THONG BAO (20/10/2026, Duyen): moi (nhan vien x HOI THOAI) 1 thong bao; gui cho admin VA cho CHINH sale do (neu khop tai khoan CRM; tat bang Settings chatAuditNotifySale = 0).
+// refType='chatviolation', refId = ID hoi thoai (bam vao thong bao mo dung doan chat), refId2 = "SDT|ten khach".
 function _cvNotify_(admins, vs) {
-  if (!vs.length || !admins.length) return 0;
-  var byStaff = {}, keys = [];
-  vs.forEach(function (v) { var k = v.staff || ''; if (!byStaff[k]) { byStaff[k] = []; keys.push(k); } byStaff[k].push(v); });
-  var sh = getSheet_(SH_NOTIF, NOTIF_HEADERS), now = new Date().toISOString(), rows = [];
-  keys.forEach(function (k, ki) {
-    var list = byStaff[k], first = list[0], phone = first.phone || '';
-    admins.forEach(function (to, ai) {
-      rows.push(['nt_' + Date.now() + '_cv' + ki + '_' + ai + '_' + Math.floor(Math.random() * 1000), to, 'Giám sát chat', 'chatviolation',
-                 phone ? 'customer' : 'chatviolation', phone || first.convId || '', String(list.length), _cvNotifText_(k, list), now, '']);
+  if (!vs.length) return 0;
+  var notifySale = true, users = [];
+  try { var fl = String(getSetting_('chatAuditNotifySale') || '').trim().toLowerCase(); if (fl === '0' || fl === 'false' || fl === 'off' || fl === 'tat') notifySale = false; } catch (e0) {}
+  if (notifySale) { try { users = readUsers_(getCrmSS_().getSheetByName(SH_USER)) || []; } catch (e1) { users = []; } }
+  var byStaff = {}, staffOrder = [];
+  vs.forEach(function (v) {
+    var sk = v.staff || '', ck = v.convId || v.phone || '';
+    if (!byStaff[sk]) { byStaff[sk] = { keys: [], groups: {} }; staffOrder.push(sk); }
+    var st = byStaff[sk];
+    if (!st.groups[ck]) { st.groups[ck] = []; st.keys.push(ck); }
+    st.groups[ck].push(v);
+  });
+  var sh = getSheet_(SH_NOTIF, NOTIF_HEADERS), now = new Date().toISOString(), rows = [], seq = 0;
+  var adminLow = {}; (admins || []).forEach(function (a) { adminLow[String(a).toLowerCase()] = 1; });
+  staffOrder.forEach(function (sk) {
+    var st = byStaff[sk], keys = st.keys.slice();
+    if (keys.length > CV_NOTIF_MAX_GROUPS_) {   // qua nhieu hoi thoai: phan du gop vao nhom cuoi
+      var tail = keys.splice(CV_NOTIF_MAX_GROUPS_ - 1);
+      var merged = []; tail.forEach(function (k) { merged = merged.concat(st.groups[k]); });
+      st.groups[tail[0]] = merged; keys.push(tail[0]);
+    }
+    var saleUsers = notifySale ? _cvStaffUsers_(users, sk).filter(function (u) { return !adminLow[u.toLowerCase()]; }) : [];
+    keys.forEach(function (ck) {
+      var list = st.groups[ck], first = list[0];
+      var info = (first.phone || '') + '|' + (first.customer || '');
+      var ref = first.convId || first.phone || '';
+      var mk = function (to, self) {
+        rows.push(['nt_' + Date.now() + '_cv' + (seq++) + '_' + Math.floor(Math.random() * 1000), to, 'Giám sát chat', 'chatviolation', 'chatviolation', ref, info, _cvNotifText_(sk, list, self), now, '']);
+      };
+      (admins || []).forEach(function (to) { mk(to, false); });
+      saleUsers.forEach(function (to) { mk(to, true); });
     });
   });
   if (rows.length) sh.getRange(sh.getLastRow() + 1, 1, rows.length, NOTIF_HEADERS.length).setValues(rows);
@@ -357,6 +395,8 @@ function xemTuCamGiamSat() {
   return c.length;
 }
 function datChatAuditBoQua(csv) { setSetting_('chatAuditIgnore', String(csv || '')); try { CacheService.getScriptCache().remove('cv_banned_v1'); } catch (e) {} Logger.log('Tu bo qua khi giam sat chat: ' + (csv || '(khong)')); return csv; }
+// Bat/tat gui thong bao tu cam CHO CHINH SALE (mac dinh BAT): datChatAuditBaoSale(false) de chi bao admin.
+function datChatAuditBaoSale(bat) { setSetting_('chatAuditNotifySale', bat === false || String(bat).toLowerCase() === 'false' || String(bat) === '0' ? '0' : '1'); Logger.log('Bao tu cam cho chinh sale: ' + (getSetting_('chatAuditNotifySale') === '0' ? 'TAT' : 'BAT')); }
 function datChatAuditAdmin(csv) { if (!String(csv || '').trim()) throw new Error('datChatAuditAdmin("duyenht")'); setSetting_('chatAuditAdmins', String(csv)); Logger.log('Nguoi nhan canh bao chat: ' + csv); return csv; }
 // GET chatViolations (CHI admin, bat buoc token hop le): danh sach vi pham moi nhat + tong hop.
 function cvList_(p) {

@@ -99,7 +99,10 @@ function ntOpenItem(id){
   if (!it.read) _ntMark([id], false);
   ntClose();
   try {
-    if (it.refType === 'customer') {
+    if (it.kind === 'chatviolation' && it.refType === 'chatviolation' && it.refId) {
+      var _ci = String(it.refId2 || '').split('|');
+      _ntOpenChat_(it.refId, _ci[0] || '', _ci.slice(1).join('|') || '');   // mở thẳng đoạn chat (Social > Chat) của hội thoại bị cảnh báo
+    } else if (it.refType === 'customer') {
       if (typeof openDp !== 'function') { toast('Chưa mở được khách'); return; }
       if (typeof customerMap !== 'undefined' && !customerMap[it.refId]) toast('Không thấy khách ' + it.refId + ' trong danh sách đang tải');
       openDp(it.refId);
@@ -107,9 +110,24 @@ function ntOpenItem(id){
     } else if (it.refType === 'task') {
       _ntOpenTask(it.refId, it.kind === 'comment');
     } else if (it.refType === 'chatviolation') {
-      toast('Cảnh báo chat chưa gắn được SĐT khách — xem chi tiết ở sheet ChatViolations (hội thoại ' + (it.refId || '') + ')');
+      toast('Cảnh báo chat cũ chưa gắn được hội thoại — xem chi tiết ở sheet ChatViolations');
     }
   } catch(e){ toast('Lỗi mở thông báo: ' + e.message); }
+}
+// Mở Social > Chat đúng hội thoại bị cảnh báo từ cấm. Hội thoại chưa nằm trong danh sách đang tải (cũ/ngoài bộ lọc) thì tạo dòng tạm để vẫn mở được tin nhắn.
+function _ntOpenChat_(convId, phone, name){
+  var tab = document.querySelector('#data-view .tabs .tab[data-bar-id="tab-chat"]');
+  if (tab) tab.click(); else if (typeof switchTab === 'function') { try { switchTab('chat', document.querySelector('.tab')); } catch(e){} }
+  var tries = 0;
+  (function wait(){
+    if (typeof scPick === 'function' && typeof _sc !== 'undefined' && document.getElementById('sc-convs')) {
+      if (!_sc.convs.some(function(c){ return c.id === convId; })) _sc.convs.unshift({ id: convId, name: name || 'Khách Pancake', phone: phone || '', type: 'INBOX' });
+      try { _scRenderList(); scPick(convId); } catch(e){ toast('Lỗi mở chat: ' + e.message); }
+      return;
+    }
+    if (++tries > 30) { toast('Không mở được tab Chat — bạn có thể chưa được cấp quyền xem Chat (Social)'); return; }
+    setTimeout(wait, 200);
+  })();
 }
 function _ntOpenTask(taskId, discuss){
   var tab = document.querySelector('#data-view .tabs .tab[data-bar-id="tab-task"]');
