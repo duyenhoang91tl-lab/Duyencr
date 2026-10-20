@@ -118,9 +118,8 @@ async function _srLoad(){
 // Gom TOÀN BỘ báo cáo con (A–L, Nhập dữ liệu) vào 1 ô chọn duy nhất cho gọn màn hình (thay dải ~11 nút).
 // K (chi tiết đơn thưởng) là màn con của G nên hiển thị như đang ở G. Dùng chung cho mọi báo cáo con.
 function _srSubSelectHtml_(){
-  var items = [['A','Báo cáo A — Base'],['B','Báo cáo B — Pos'],['C','Báo cáo C — So sánh kỳ Base'],['D','Báo cáo D — Sale tự thêm'],
-    ['E','Báo cáo E — Hoa hồng nhân viên Pos'],['F','Báo cáo F — KPI Sale'],['G','Báo cáo G — Thưởng thử việc / chính thức'],
-    ['H','Báo cáo H — Tổng quan data đã chia'],['I','Báo cáo I — Chia data Renew'],['L','Báo cáo L — KH qua cửa hàng']];
+  var admin = _srIsAdmin();   // danh sách + tên + bật/tắt theo Cấu hình (_srItems_ ở js/06); admin vẫn thấy báo cáo đang ẩn
+  var items = _srItems_().filter(function(it){ return admin || !it[2]; }).map(function(it){ return [it[0], it[1] + (it[2] ? ' (đang ẩn)' : '')]; });
   if (_srIsAdmin()) items.push(['J','📤 Nhập dữ liệu Base/Pos']);
   var cur = _srState.sub === 'K' ? 'G' : _srState.sub;
   return '<select onchange="_srSetSub(this.value)" title="Chọn báo cáo" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-weight:600;font-size:13px;max-width:100%">' +
@@ -583,6 +582,7 @@ function renderSalesReportTab(){
   // cần gọi thêm action backend. Đặt tên trùng để tránh 2 team trùng tên gây nhầm khi lọc.
   _srState.teamOptions = (teams||[]).map(function(t){ return t.name || '(chưa đặt tên)'; });
 
+  if (_srEnsureSubAllowed_()){ _srLoad(); return; }   // báo cáo hiện tại bị ẩn với người này => sang báo cáo bật đầu tiên
   var subTabs = '<div style="margin-bottom:14px">' + _srSubSelectHtml_() + '</div>';
 
   if (_srState.sub === 'C') { renderSalesReportTabC_(wrap, subTabs); return; }

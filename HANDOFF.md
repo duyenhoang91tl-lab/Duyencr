@@ -1,6 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-10-20 — Cấu hình danh sách báo cáo A–L (mục 4 của việc cấu hình bán CRM)
+- [x] Settings `reportsConfig`: bật/tắt + đặt tên từng báo cáo. js/06 (`_SR_DEFAULT_ITEMS_`, `_rcApply_`, `_srItems_`, `_srEnsureSubAllowed_`, nạp từ server), js/11 `_srSubSelectHtml_` + chuyển báo cáo khi bị ẩn, js/37 mục "🗂 Báo cáo hiển thị", gas_v13.js chỉ admin ghi. Test `node tools/test-reports-config.js`. Chi tiết: `docs/crm-kb/02-backend-gas.md`.
+- Giới hạn có chủ ý: chỉ ẨN ở giao diện chọn báo cáo, KHÔNG chặn backend/quyền dữ liệu; tên mới chỉ đổi ở ô chọn (tiêu đề bên trong từng báo cáo vẫn chữ cũ); báo cáo J (nhập dữ liệu), K không cấu hình.
+- [ ] CẦN LÀM TIẾP: (a) bậc KPI Báo cáo F; (b) bảng % hoa hồng mặc định Online/Offline; (c) chữ "15tr" còn lại (gas ~6185, js/27, js/08); (e) tên sheet/ID Google Sheet cứng theo công ty; (g) đổi tên báo cáo ở tiêu đề bên trong + menu/tab khác nếu cần. Duyên: Ctrl+F5 rồi vào ⚙ Cấu hình.
+
 ## 2026-10-20 — Cấu hình quy tắc tính doanh thu/hoa hồng (bizRules) — để CRM bán ra ngoài
 Yêu cầu Duyên: cách tính doanh thu, hoa hồng, loại báo cáo… phải tự cài trong phần Cấu hình, không nằm cứng trong code. Chi tiết kỹ thuật: `docs/crm-kb/02-backend-gas.md` mục `bizRules`.
 - [x] Bước 1 (commit 694eeab) backend: `_bizRules_()` đọc Settings `bizRules`; áp cho trạng thái đơn Base/Pos bị loại, ngưỡng hoa hồng (csStats), tỷ lệ + từ khóa nguồn quầy 30/70. Mặc định = hành vi cũ.

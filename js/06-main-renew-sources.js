@@ -156,6 +156,51 @@ async function _syncBizRulesFromGAS() {
   } catch(e) { /* giữ bản local nếu lỗi mạng/parse */ }
 }
 setTimeout(_syncBizRulesFromGAS, 0);
+
+// ── DANH SÁCH BÁO CÁO CẤU HÌNH ĐƯỢC (Settings 'reportsConfig') — mỗi công ty bật/tắt + đặt tên báo cáo riêng (CRM bán ra ngoài). ──
+// { "<mã A-L>": { enabled: false, label: "tên hiển thị" } }. Chưa cài = bật hết, tên mặc định. Chỉ ẨN trên giao diện chọn báo cáo; quyền xem dữ liệu
+// vẫn theo phân quyền tab/backend. Admin vẫn thấy báo cáo đang ẩn (gắn "(đang ẩn)") để bật lại. Luôn giữ ít nhất 1 báo cáo bật.
+var _SR_DEFAULT_ITEMS_ = [['A','Báo cáo A — Base'],['B','Báo cáo B — Pos'],['C','Báo cáo C — So sánh kỳ Base'],['D','Báo cáo D — Sale tự thêm'],
+  ['E','Báo cáo E — Hoa hồng nhân viên Pos'],['F','Báo cáo F — KPI Sale'],['G','Báo cáo G — Thưởng thử việc / chính thức'],
+  ['H','Báo cáo H — Tổng quan data đã chia'],['I','Báo cáo I — Chia data Renew'],['L','Báo cáo L — KH qua cửa hàng']];
+var REPORTS_CFG = {};
+function _rcApply_(raw) {
+  var out = {}, before = JSON.stringify(REPORTS_CFG);
+  if (raw && typeof raw === 'object') _SR_DEFAULT_ITEMS_.forEach(function(it){
+    var o = raw[it[0]]; if (!o || typeof o !== 'object') return;
+    var e = { enabled: o.enabled !== false, label: String(o.label || '').replace(/\s+/g, ' ').trim().slice(0, 60) };
+    if (!e.enabled || e.label) out[it[0]] = e;
+  });
+  if (_SR_DEFAULT_ITEMS_.every(function(it){ return out[it[0]] && out[it[0]].enabled === false; })) out = {};   // tắt hết = cấu hình hỏng => bật lại hết
+  REPORTS_CFG = out;
+  return before !== JSON.stringify(REPORTS_CFG);
+}
+// [[mã, tên, đangẨn], ...] — tên theo cấu hình (trống = mặc định)
+function _srItems_() {
+  return _SR_DEFAULT_ITEMS_.map(function(it){ var c = REPORTS_CFG[it[0]] || {}; return [it[0], c.label || it[1], c.enabled === false]; });
+}
+// Người không phải admin đang đứng ở báo cáo bị ẩn => chuyển sang báo cáo bật đầu tiên. Trả true nếu đã đổi.
+function _srEnsureSubAllowed_() {
+  if (typeof _srIsAdmin === 'function' && _srIsAdmin()) return false;
+  var cur = _srState.sub === 'K' ? 'G' : _srState.sub;
+  var items = _srItems_(), hit = items.filter(function(it){ return it[0] === cur; })[0];
+  if (!hit || !hit[2]) return false;
+  var first = items.filter(function(it){ return !it[2]; })[0];
+  if (!first) return false;
+  _srState.sub = first[0]; return true;
+}
+try { var _rcLs = loadLS('ome_reports_cfg'); if (_rcLs) _rcApply_(_rcLs); } catch(e) {}
+async function _syncReportsCfgFromGAS() {
+  if (!gsUrl) return;
+  try {
+    var r = await fetch(gsUrl + '?action=getSetting&key=reportsConfig', { redirect: 'follow' });
+    var data = await r.json();
+    var obj = (data && data.value) ? JSON.parse(data.value) : {};
+    var changed = _rcApply_(obj); saveLS('ome_reports_cfg', obj);
+    if (changed && typeof _activeV9Tab !== 'undefined' && _activeV9Tab === 'salesreport' && typeof renderSalesReportTab === 'function') renderSalesReportTab();
+  } catch(e) { /* giữ bản local nếu lỗi mạng/parse */ }
+}
+setTimeout(_syncReportsCfgFromGAS, 0);
 let INDIVIDUAL_RATES = (function(){
   try { var v = loadLS('ome_individual_rates'); return (v && typeof v === 'object') ? v : {}; } catch(e){ return {}; }
 })();

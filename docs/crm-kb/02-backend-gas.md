@@ -31,4 +31,5 @@ Ghi chú nội bộ (cột Q "dữ liệu đơn") dạng `<mã gốc>/<năm>/<s�
 - Client: `js/06` có `COMMISSION_THRESHOLD` (đã `let`), `BIZ_RULES`, `_bizApply_`, `_commThrLabel_()` (nhãn "15tr" động — dùng cho chữ trên UI thay vì gõ cứng "15tr"), nạp lúc khởi động qua `_syncBizRulesFromGAS`.
 - Ghi `bizRules` BẮT BUỘC token phiên của admin (`_bizRulesWriteDenied_` ở doPost). Test: `node tools/test-biz-rules.js` + `node tools/test-biz-rules-client.js`.
 - Thêm quy tắc mới ⇒ thêm khóa vào CẢ `BIZ_RULES_DEFAULT_` (GAS) và `_BIZ_DEFAULT_` (js/06) + ô nhập ở `_cfgBizHtml_`/`_cfgBizSave` + test.
+- **Danh sách báo cáo cấu hình được — Settings `reportsConfig`** (2026-10-20): `{ "<A-L>": { enabled, label } }`, sửa ở ⚙ Cấu hình > 🗂 Báo cáo hiển thị. Mã/tên mặc định `_SR_DEFAULT_ITEMS_` + `_rcApply_`/`_srItems_`/`_srEnsureSubAllowed_` ở js/06; ô chọn báo cáo `_srSubSelectHtml_` (js/11) đọc từ đó. Chỉ ẨN trên giao diện (không thay quyền xem dữ liệu); admin vẫn thấy báo cáo ẩn; luôn ≥1 báo cáo bật. Ghi key này cũng chỉ admin (`_bizRulesWriteDenied_`). Thêm báo cáo mới ⇒ thêm vào `_SR_DEFAULT_ITEMS_`. Test: `node tools/test-reports-config.js`.
 

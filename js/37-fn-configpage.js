@@ -26,12 +26,13 @@ function _cfgEnsurePanel(){
 async function _cfgLoad(){
   if (!gsUrl) return;
   try {
-    var keys = _CFG_FIELDS.map(function(f){ return f.key; }).concat(['ttLastTrackedMs', 'bizRules']).join(',');
+    var keys = _CFG_FIELDS.map(function(f){ return f.key; }).concat(['ttLastTrackedMs', 'bizRules', 'reportsConfig']).join(',');
     var r = await fetch(gsUrl + (gsUrl.indexOf('?') < 0 ? '?' : '&') + 'action=getSettings&keys=' + keys, { redirect:'follow' });
     var d = await r.json(), v = (d && d.values) || {};
     _CFG_FIELDS.forEach(function(f){ _cfg.vals[f.key] = (v[f.key] !== undefined && v[f.key] !== null && String(v[f.key]) !== '') ? Number(v[f.key]) : f.def; });
     _cfg.last = Number(v.ttLastTrackedMs) || 0; _cfg.loaded = true;
     try { if (v.bizRules) _bizApply_(JSON.parse(v.bizRules)); } catch(eB){}   // quy tắc tính doanh thu/hoa hồng (js/06)
+    try { _rcApply_(v.reportsConfig ? JSON.parse(v.reportsConfig) : {}); } catch(eR){}   // danh sách báo cáo bật/tắt + tên (js/06)
   } catch(e){ _CFG_FIELDS.forEach(function(f){ if (_cfg.vals[f.key] == null) _cfg.vals[f.key] = f.def; }); }
 }
 function _cfgFmtTime(ms){
@@ -51,6 +52,7 @@ function _cfgRender(){
     '<div class="dash-section"><div style="font-weight:700;margin-bottom:2px">⏱ Mốc nhắc việc</div>' + rows +
     '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn primary" id="cfg-save" onclick="_cfgSave()">💾 Lưu cấu hình</button><span style="font-size:11.5px;color:var(--muted)">Lưu lên server — mọi máy dùng chung; mỗi thay đổi ghi vào Nhật ký.</span></div></div>' +
     _cfgBizHtml_() +
+    _cfgRptHtml_() +
     '<div class="dash-section" style="margin-top:14px"><div style="font-weight:700;margin-bottom:6px">🤖 Chạy tự động</div><div style="font-size:13px">Lần theo dõi giai đoạn đơn Base gần nhất: <b>' + esc(_cfgFmtTime(_cfg.last)) + '</b></div>' +
     '<div style="font-size:11.5px;color:var(--muted);margin-top:3px">Chạy mỗi giờ trên máy chủ (trong Apps Script chạy <code>ttCaiTrigger</code> một lần để bật). Quá 2 giờ chưa chạy nghĩa là trigger đang tắt.</div></div>' +
     '<div class="dash-section" style="margin-top:14px"><div style="font-weight:700;margin-bottom:8px">🔗 Lối tắt cài đặt</div><div style="display:flex;flex-wrap:wrap;gap:8px">' +
@@ -97,6 +99,38 @@ async function _cfgBizSave(reset){
     if (oldStr !== newStr) fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'saveAudit', rows: [{ timestamp: new Date().toISOString(), user: (currentUser && currentUser.name) || '', action: 'Cấu hình: Quy tắc tính doanh thu/hoa hồng' + (reset ? ' (về mặc định)' : ''), phone: '', oldValue: oldStr, newValue: newStr }] }) }).catch(function(){});
     toast(oldStr === newStr ? 'Không có thay đổi' : '✓ Đã lưu quy tắc — báo cáo sẽ tính theo quy tắc mới');
     if (typeof _srState !== 'undefined' && _srState.sub === 'E' && typeof renderSalesReportTab === 'function') renderSalesReportTab();
+  } catch(e){ toast('Lưu lỗi: ' + (e && e.message || e)); }
+  _cfgRender();
+}
+// ── DANH SÁCH BÁO CÁO (reportsConfig): bật/tắt + đặt tên từng báo cáo cho công ty. Chỉ ẩn trên ô chọn báo cáo; admin vẫn thấy báo cáo ẩn. ──
+function _cfgRptHtml_(){
+  var rows = _SR_DEFAULT_ITEMS_.map(function(it){
+    var c = REPORTS_CFG[it[0]] || {}, on = c.enabled !== false;
+    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--border);flex-wrap:wrap">' +
+      '<label style="display:flex;align-items:center;gap:6px;min-width:60px;font-weight:600"><input type="checkbox" id="cfg-rpt-on-' + it[0] + '"' + (on ? ' checked' : '') + '> ' + it[0] + '</label>' +
+      '<input type="text" id="cfg-rpt-lb-' + it[0] + '" maxlength="60" placeholder="' + esc(it[1]) + '" value="' + esc(c.label || '') + '" style="flex:1;min-width:220px;padding:5px 8px;border:1px solid var(--border);border-radius:6px"></div>';
+  }).join('');
+  return '<div class="dash-section" style="margin-top:14px"><div style="font-weight:700;margin-bottom:2px">🗂 Báo cáo hiển thị</div>' +
+    '<div style="font-size:11.5px;color:var(--muted);margin-bottom:6px">Bỏ tick = ẩn báo cáo khỏi ô chọn báo cáo của nhân viên (admin vẫn thấy, gắn "đang ẩn"). Để trống tên = dùng tên mặc định (chữ mờ). Quyền xem dữ liệu vẫn theo phân quyền tab.</div>' + rows +
+    '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn primary" id="cfg-rpt-save" onclick="_cfgRptSave()">💾 Lưu danh sách báo cáo</button><button class="btn" onclick="_cfgRptSave(true)">↺ Về mặc định</button></div></div>';
+}
+async function _cfgRptSave(reset){
+  var out = {};
+  if (!reset){
+    _SR_DEFAULT_ITEMS_.forEach(function(it){
+      var on = !!(document.getElementById('cfg-rpt-on-' + it[0]) || {}).checked, lb = String((document.getElementById('cfg-rpt-lb-' + it[0]) || {}).value || '').replace(/\s+/g, ' ').trim();
+      if (!on || lb) out[it[0]] = { enabled: on, label: lb };
+    });
+    if (_SR_DEFAULT_ITEMS_.every(function(it){ return out[it[0]] && out[it[0]].enabled === false; })){ toast('Phải để ít nhất 1 báo cáo được bật'); return; }
+  }
+  var oldStr = JSON.stringify(REPORTS_CFG), btn = document.getElementById('cfg-rpt-save'); if (btn){ btn.disabled = true; btn.textContent = '⏳ Đang lưu…'; }
+  try {
+    var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'setSetting', key:'reportsConfig', value: JSON.stringify(out) }) });
+    var d = await r.json().catch(function(){ return {}; }); if (d && d.error) throw new Error(d.error);
+    _rcApply_(out); saveLS('ome_reports_cfg', out);
+    var newStr = JSON.stringify(REPORTS_CFG);
+    if (oldStr !== newStr) fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'saveAudit', rows: [{ timestamp: new Date().toISOString(), user: (currentUser && currentUser.name) || '', action: 'Cấu hình: Danh sách báo cáo' + (reset ? ' (về mặc định)' : ''), phone: '', oldValue: oldStr, newValue: newStr }] }) }).catch(function(){});
+    toast(oldStr === newStr ? 'Không có thay đổi' : '✓ Đã lưu danh sách báo cáo');
   } catch(e){ toast('Lưu lỗi: ' + (e && e.message || e)); }
   _cfgRender();
 }

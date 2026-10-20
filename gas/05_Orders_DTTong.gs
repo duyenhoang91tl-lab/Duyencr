@@ -645,7 +645,7 @@ function _bizRules_() {
 function _bizRulesWriteDenied_(token) {
   var u = null;
   try { u = token ? _sessUser_(token) : null; } catch (e) { u = null; }
-  if (!u || String(u.role || '') !== 'admin') return { error: 'Chi admin (da dang nhap) moi duoc sua quy tac tinh doanh thu/hoa hong.', code: 'FORBIDDEN', action: 'setSetting' };
+  if (!u || String(u.role || '') !== 'admin') return { error: 'Chi admin (da dang nhap) moi duoc sua quy tac tinh doanh thu/hoa hong va danh sach bao cao.', code: 'FORBIDDEN', action: 'setSetting' };
   return null;
 }
 
