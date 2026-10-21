@@ -3378,56 +3378,6 @@ function dateInRange_(dt, fromStr, toStr) {
   return true;
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  QUY TAC TINH DOANH THU / HOA HONG CAU HINH DUOC (bizRules) — yeu cau Duyen 2026-10-20: CRM se mo rong/ban cho cong ty khac,
-//  nen cac quy tac kinh doanh KHONG duoc nam cung trong code. Luu o Settings key 'bizRules' (JSON), admin sua o CRM > Cau hinh.
-//  NGUYEN TAC: moi truong de trong / sai kieu => dung GIA TRI MAC DINH ben duoi (= dung hanh vi cu cua Hien Tour), nen chua cai gi
-//  thi ket qua khong doi. Ket qua doc 1 lan moi lan chay (GAS khoi tao lai bien toan cuc moi request) vi ham duoc goi trong vong lap don.
-//  Client (index.html) doc cung key nay (js/06 COMMISSION_THRESHOLD) — hoa hong o CRM va o Pancake AI (csStats) phai cung 1 nguong.
-// ═══════════════════════════════════════════════════════════════
-var BIZ_RULES_DEFAULT_ = {
-  commissionThreshold: 15000000,                                   // don >= nguong => % hoa hong "tren nguong", nguoc lai "duoi nguong"
-  baseExcludedStatuses: ['Thất bại'],                              // Base (DT TONG cot H): trang thai bi loai khoi doanh so — khop CA chuoi
-  posExcludedStatuses: ['Hủy đơn', 'Hoàn đơn', 'Đã hoàn', 'Đang hoàn'], // Pos (sheet "du lieu don"): trang thai bi loai — khop CA chuoi
-  quayRatio: 0.3,                                                  // don nguon cua hang co gan the sale: sale duoc tinh ty le nay (0.3 = 30/70)
-  quayKeywords: ['Quầy Hào Nam', 'Cửa hàng']                       // nguon don chua tu khoa nay (khong dau/hoa-thuong) => ap quayRatio
-};
-var _BIZ_RULES_MEMO_ = null;
-function _bizStrList_(v, fallback) {
-  if (!Array.isArray(v)) return fallback.slice();
-  var out = [], seen = {};
-  v.forEach(function (x) { x = String(x == null ? '' : x).replace(/\s+/g, ' ').trim(); var k = _stripVN_(x); if (x && !seen[k]) { seen[k] = 1; out.push(x); } });
-  return out; // mang rong HOP LE (vd khong loai trang thai nao) — chi roi ve mac dinh khi khong phai mang
-}
-function _bizRules_() {
-  if (_BIZ_RULES_MEMO_) return _BIZ_RULES_MEMO_;
-  var D = BIZ_RULES_DEFAULT_, raw = null;
-  try { var t = getSetting_('bizRules'); if (t) raw = JSON.parse(t); } catch (e) { raw = null; }
-  if (!raw || typeof raw !== 'object') raw = {};
-  var thr = Number(raw.commissionThreshold), ratio = Number(raw.quayRatio);
-  var r = {
-    commissionThreshold: (isFinite(thr) && thr > 0) ? thr : D.commissionThreshold,
-    baseExcludedStatuses: _bizStrList_(raw.baseExcludedStatuses, D.baseExcludedStatuses),
-    posExcludedStatuses: _bizStrList_(raw.posExcludedStatuses, D.posExcludedStatuses),
-    quayRatio: (isFinite(ratio) && ratio > 0 && ratio <= 1) ? ratio : D.quayRatio,
-    quayKeywords: _bizStrList_(raw.quayKeywords, D.quayKeywords)
-  };
-  var fold = function (a) { var o = {}; a.forEach(function (x) { var k = _stripVN_(x).replace(/\s+/g, ' ').trim(); if (k) o[k] = 1; }); return o; };
-  r.baseSet = fold(r.baseExcludedStatuses); r.posSet = fold(r.posExcludedStatuses);
-  r.quayFold = Object.keys(fold(r.quayKeywords));
-  _BIZ_RULES_MEMO_ = r;
-  return r;
-}
-
-// Ghi bizRules = doi cach tinh tien hoa hong/doanh thu cua ca cong ty => BAT BUOC token phien cua ADMIN (khac cac setting thuong: khong token
-// van qua duoc cho extension cu). Extension khong bao gio ghi key nay; web luon tu gan token (js/06 fetch wrapper).
-function _bizRulesWriteDenied_(token) {
-  var u = null;
-  try { u = token ? _sessUser_(token) : null; } catch (e) { u = null; }
-  if (!u || String(u.role || '') !== 'admin') return { error: 'Chi admin (da dang nhap) moi duoc sua quy tac tinh doanh thu/hoa hong va danh sach bao cao.', code: 'FORBIDDEN', action: 'setSetting' };
-  return null;
-}
-
 // Loai don khoi doanh so/so don cho cac BAO CAO TINH TREN BASE (DT TONG, cot H "Trạng thái") —
 // THEO XAC NHAN CUOI CUNG CUA DUYEN (2026-10): CHI loai DUY NHAT trang thai "Thất bại", khop
 // TOAN BO chuoi (khong phai substring) de tuyet doi khong dung nham cac trang thai khac. KHONG
@@ -3438,7 +3388,7 @@ var EXCLUDED_ORDER_STATUSES_ = ['that bai'];
 function _isExcludedOrderStatus_(trangThai) {
   var s = _stripVN_(trangThai).trim();
   if (!s) return false;
-  return _bizRules_().baseSet[s.replace(/\s+/g, ' ')] === 1; // danh sach cau hinh duoc (bizRules.baseExcludedStatuses), mac dinh = EXCLUDED_ORDER_STATUSES_
+  return EXCLUDED_ORDER_STATUSES_.indexOf(s) !== -1;
 }
 
 
@@ -3738,11 +3688,13 @@ function _donSaleNamesFromThe_(theStr) {
 // loai DUNG 4 trang thai "Hủy đơn", "Hoàn đơn", "Đã hoàn", "Đang hoàn" (khop TOAN BO chuoi, khong dau/khong
 // phan biet hoa-thuong; 'Đã hoàn' duoc Duyen xac nhan bo sung 2026-10-12 — ban 711bd52 lo bo mat) — KHAC HOAN TOAN quy tac cua Base (chi "Thất bại", xem EXCLUDED_ORDER_STATUSES_
 // o tren). Ham nay CHI duoc goi boi Bao cao B (+E che do Pos, F, G) — khong dung cho Base.
-var POS_EXCLUDED_ORDER_STATUSES_ = ['huy don', 'hoan don', 'da hoan', 'dang hoan'];
+// QUY TAC CUOI CUNG (Duyen 20/10/2026): DOANH THU Pos CHI loai DUNG 2 trang thai:
+// 'Da hoan' va 'Dang hoan' (cot O). KHONG loai 'Huy don' / 'Hoan don'.
+var POS_EXCLUDED_ORDER_STATUSES_ = ['da hoan', 'dang hoan'];
 function _donHasExcludedStatus_(trangThaiCol) {
   var s = _stripVN_(trangThaiCol).trim();
   if (!s) return false;
-  return _bizRules_().posSet[s.replace(/\s+/g, ' ')] === 1; // danh sach cau hinh duoc (bizRules.posExcludedStatuses), mac dinh = POS_EXCLUDED_ORDER_STATUSES_
+  return POS_EXCLUDED_ORDER_STATUSES_.indexOf(s) !== -1;
 }
 
 // ── Doc toan bo sheet "DT TỔNG " thanh mang object ──
@@ -5560,8 +5512,7 @@ function _quaySaleRatio_(nguonDon, ghiChu, hasSale) {
   // 30% la phan cua sale (chia deu tiep cho cac sale tham gia), 70% la cua quay. KHONG con bat buoc ghi chu
   // phai ghi '30/70' nhu ban truoc. Bo dau truoc khi so de khop bat ke hoa/thuong/dau.
   var nguonFold = String(nguonDon || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/\s+/g, ' ').trim();
-  var BR = _bizRules_(); // tu khoa nguon cua hang + ty le: cau hinh duoc (bizRules.quayKeywords / quayRatio), mac dinh Quay Hao Nam/Cua hang + QUAY_SALE_RATIO_
-  for (var qi = 0; qi < BR.quayFold.length; qi++) if (nguonFold.indexOf(BR.quayFold[qi]) !== -1) return BR.quayRatio;
+  if (nguonFold.indexOf('quay hao nam') !== -1 || nguonFold.indexOf('cua hang') !== -1) return QUAY_SALE_RATIO_;
   return 1;
 }
 
@@ -6325,7 +6276,7 @@ function buildCsStats_(cs, dateFrom, dateTo) {
   }
 
   // 4) Duyet don: so don, doanh thu (phan cua toi), hoa hong
-  var T = _bizRules_().commissionThreshold; // cau hinh duoc (bizRules), mac dinh = CS_COMMISSION_THRESHOLD_ — phai khop COMMISSION_THRESHOLD o client (js/06)
+  var T = CS_COMMISSION_THRESHOLD_;
   var totalOrders = 0, revenue = 0;
   var ordA = 0, ordB = 0, revA = 0, revB = 0, ordCh = 0, revCh = 0, commCh = 0, chBreak = {};
   var mine = []; // don cua toi (de cham thuong)
@@ -6960,7 +6911,6 @@ function doPost(e) {
     if (d0.action === 'saveUsers') { var _ua = _usersWriteAuth_(d0.token); if (!_ua.ok) return jsonOut_({ error: _ua.error, code: 'AUTH' }); }
     if (d0.action === 'setGasSource' && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de dong bo ma nguon GAS.' });
     if (d0.action === 'setSetting' && _isSensitiveWriteKey_(d0.key) && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Khong duoc ghi key nay.' });
-    if (d0.action === 'setSetting' && (String(d0.key || '').trim() === 'bizRules' || String(d0.key || '').trim() === 'reportsConfig')) { var _bizDen = _bizRulesWriteDenied_(d0.token); if (_bizDen) return jsonOut_(_bizDen); }
   }
   if (d0 && typeof d0 === 'object') {
     _AUDIT_TOKEN_ = String(d0.token || '');
@@ -7715,38 +7665,20 @@ function _impHm_(v) {
   var m = String(v == null ? '' : v).trim().match(/\s(\d{1,2}):(\d{2})/);
   return m ? String(m[1]).padStart(2, '0') + ':' + m[2] : '';
 }
-// SUA 2026-10-20 (HANDOFF: xem truoc nhap Pos bao "0 da co / 1.436 moi"): NGUYEN NHAN GOC = khoa Pos co GIO:PHUT (_impHm_) nhung file Excel chi co NGAY
-// (gio rong) con dong da co trong Sheet co gio that hoac '00:00' -> khoa KHAC nhau -> don nao cung bi coi la moi (nhap that se them TRUNG toan bo).
-// Nay khoa tach 2 phan: k = khoa KHONG co gio, hm = gio:phut. "Chua biet gio" (hm rong hoac '00:00' = Excel/Sheet luu ngay khong gio) khop voi MOI gio cua
-// cung don; 2 gio THAT khac nhau (vd 09:15 va 14:40, cung khach/san pham/gia) van la 2 don rieng. full = khoa day du dang cu (giu cho test/nhat ky).
-function _impHmUnknown_(hm) { return hm === '' || hm === '00:00'; }
-function _impHmCompat_(a, b) { return a === b || _impHmUnknown_(a) || _impHmUnknown_(b); }
-function _impOrderKeyParts_(sheetKey, row) {
+function _impOrderKey_(sheetKey, row) {
   if (sheetKey === 'base') {
-    var id = String(row[DT_COL_ID] == null ? '' : row[DT_COL_ID]).trim(), kb;
-    if (id) kb = 'id|' + id;
-    else {
-      var ph = normPhone_(String(row[DT_COL_PHONE] || ''));
-      kb = !ph ? 'x|' + _rowKeyExact_(row) : 'f|' + ph + '|' + normOrderDate_(row[DT_COL_NGAYTAO]) + '|' + normOrderDate_(row[DT_COL_THOIGIANHT]) + '|' +
-        _normMoney_(row[DT_COL_GIATRIDON]) + '|' + _normTxt_(row[DT_COL_SANPHAM]);
-    }
-    return { k: kb, hm: '', full: kb };
+    var id = String(row[DT_COL_ID] == null ? '' : row[DT_COL_ID]).trim();
+    if (id) return 'id|' + id;
+    var ph = normPhone_(String(row[DT_COL_PHONE] || ''));
+    if (!ph) return 'x|' + _rowKeyExact_(row);
+    return 'f|' + ph + '|' + normOrderDate_(row[DT_COL_NGAYTAO]) + '|' + normOrderDate_(row[DT_COL_THOIGIANHT]) + '|' +
+      _normMoney_(row[DT_COL_GIATRIDON]) + '|' + _normTxt_(row[DT_COL_SANPHAM]);
   }
   var phP = normPhone_(String(row[4] || ''));
   var nameP = _normTxt_(row[3]), spP = _normTxt_(row[8]);
-  if (!phP && !nameP && !spP) { var kx = 'x|' + _rowKeyExact_(row); return { k: kx, hm: '', full: kx }; }
-  var dP = normOrderDate_(row[1]), hm = _impHm_(row[1]);
-  var rest = phP + '|' + nameP + '|' + spP + '|' + _normTxt_(row[9]) + '|' + _normTxt_(row[10]) + '|' + _normMoney_(row[11]) + '|' + _normMoney_(row[12]);
-  return { k: 'p|' + dP + '|' + rest, hm: hm, full: 'p|' + dP + '|' + hm + '|' + rest };
-}
-function _impOrderKey_(sheetKey, row) { return _impOrderKeyParts_(sheetKey, row).full; }
-// Tim dong da co (idx[k] = [{hm, ...}]) khop khoa pe: uu tien cung gio y het, sau do gio tuong thich (1 ben chua biet gio).
-function _impFindExist_(idx, pe) {
-  var list = idx[pe.k], i;
-  if (!list) return null;
-  for (i = 0; i < list.length; i++) if (list[i].hm === pe.hm) return list[i];
-  for (i = 0; i < list.length; i++) if (_impHmCompat_(list[i].hm, pe.hm)) return list[i];
-  return null;
+  if (!phP && !nameP && !spP) return 'x|' + _rowKeyExact_(row);
+  return 'p|' + normOrderDate_(row[1]) + '|' + _impHm_(row[1]) + '|' + phP + '|' + nameP + '|' + spP + '|' +
+    _normTxt_(row[9]) + '|' + _normTxt_(row[10]) + '|' + _normMoney_(row[11]) + '|' + _normMoney_(row[12]);
 }
 
 // ═══ CAP NHAT DON CU KHI FILE MOI DOI (them 2026-10-20 theo yeu cau Duyen) ═══
@@ -7833,7 +7765,7 @@ function doImportSheetRowsLocked_(sheetKey, sheetName, sh, rows, dryRun, updateE
   // Bo cac dong DON DA CO SAN trong Sheet (theo khoa don chuan hoa — xem _impOrderKey_). Doc lai chinh
   // Sheet (khong tin cache) trong luc dang giu khoa.
   var keyW = (sheetKey === 'pos') ? DON_CHITIET_WIDTH : DT_TONG_WIDTH;
-  var existIdx = {}, updPlan = [], updDone = {}, updCells = 0, updOverLimit = 0;
+  var existKeys = {}, existRow = {}, updPlan = [], updDone = {}, updCells = 0, updOverLimit = 0;
   var lastNow = sh.getLastRow();
   if (lastNow >= 2) {
     var readW = Math.min(Math.max(keyW, width), sh.getMaxColumns());
@@ -7842,29 +7774,29 @@ function doImportSheetRowsLocked_(sheetKey, sheetName, sh, rows, dryRun, updateE
       var er = exVals[e];
       if (_rowIsBlank_(er)) continue;
       while (er.length < keyW) er.push('');
-      var pe0 = _impOrderKeyParts_(sheetKey, er);
-      (existIdx[pe0.k] = existIdx[pe0.k] || []).push({ hm: pe0.hm, r: e + 2, vals: updateExisting ? er : null });   // moi dong cua khoa; khop theo khoa + gio (_impFindExist_)
+      var ek = _impOrderKey_(sheetKey, er);
+      if (!existKeys[ek]) { existKeys[ek] = true; if (updateExisting) existRow[ek] = { r: e + 2, vals: er }; }   // giu dong DAU TIEN cua moi khoa
     }
   }
-  var fresh = [], skippedExisting = 0, seenIdx = {};
+  var fresh = [], skippedExisting = 0, seenKey = {};
   for (var w = 0; w < toWrite.length; w++) {
     var kr = toWrite[w].slice(0);
     while (kr.length < keyW) kr.push('');
-    var pk2 = _impOrderKeyParts_(sheetKey, kr), k2 = pk2.full, hit = _impFindExist_(existIdx, pk2);
-    if (hit) {
+    var k2 = _impOrderKey_(sheetKey, kr);
+    if (existKeys[k2]) {
       skippedExisting++;
-      if (updateExisting && hit.vals && !updDone[hit.r]) {
-        updDone[hit.r] = true;
-        var df = _impDiffRow_(sheetKey, hit.vals, toWrite[w], width);
+      if (updateExisting && existRow[k2] && !updDone[k2]) {
+        updDone[k2] = true;
+        var df = _impDiffRow_(sheetKey, existRow[k2].vals, toWrite[w], width);
         if (df.length) {
           if (updPlan.length >= IMPORT_UPD_MAX_ROWS) updOverLimit++;
-          else { updPlan.push({ r: hit.r, key: k2, diffs: df }); updCells += df.length; }
+          else { updPlan.push({ r: existRow[k2].r, key: k2, diffs: df }); updCells += df.length; }
         }
       }
       continue;
     }
-    if (_impFindExist_(seenIdx, pk2)) { skippedDupInFile++; continue; }
-    (seenIdx[pk2.k] = seenIdx[pk2.k] || []).push({ hm: pk2.hm });
+    if (seenKey[k2]) { skippedDupInFile++; continue; }
+    seenKey[k2] = true;
     fresh.push(toWrite[w]);
   }
   toWrite = fresh;
@@ -15333,7 +15265,7 @@ function _storeCaseShare_() {
     var v = parseFloat(String(getSetting_('storeCaseSharePct') || '').replace(',', '.'));
     if (!isNaN(v) && v > 0 && v <= 100) return v / 100;
   } catch (e) {}
-  return _bizRules_().quayRatio;
+  return QUAY_SALE_RATIO_;
 }
 
 // Tach "10-11" / "25-26-27" / "28/29" / "3,4" thanh cac NGAY (yyyy-MM-dd). Thang lay o cot Thang; nam suy ra:

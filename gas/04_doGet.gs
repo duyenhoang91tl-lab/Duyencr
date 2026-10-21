@@ -19,7 +19,7 @@ function doGet(e) {
   if (_gateErr) return jsonOut_(_gateErr);
   var _ownErr = _ownerGate_(action, p.token);
   if (_ownErr) return jsonOut_(_ownErr);
-  var _scpErr = _scopeGate_(action, p.token, p.phone);
+  var _scpErr = _scopeGate_(action, p.token, p.phone, p.via);
   if (_scpErr) return jsonOut_(_scpErr);
   if (SCOPE_LIST_ACTIONS_[action] && p.token) { var _scpL = _scopeListServe_(action, p, e); if (_scpL) return _scpL; }
   return doGetCore_(e);

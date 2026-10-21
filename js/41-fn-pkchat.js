@@ -184,17 +184,20 @@ async function pkSeenToggle(convId) {
     if (typeof toast === 'function') toast('✕ ' + (e && e.message || 'Đánh dấu lỗi'));
   } finally { delete _pkSeenBusy[convId]; _pkSeenRefresh(); }
 }
-// "Da chat": nhan vien da tra loi trong hoi thoai (tu cac tin dang tai: ten nhan vien CRM / nhan vien Pancake), kem so tin. Tin chi co ten page khong tinh la nguoi.
+// "Da chat": nhan vien da tra loi trong hoi thoai TRONG 72 GIO GAN NHAT (Duyen yeu cau 2026-10-18: chi hien nhung ai dang chat, khong ke ca nguoi chat tu cach day lau),
+// kem so tin. Dem tu cac tin dang tai (ten nhan vien CRM / nhan vien Pancake). Tin chi co ten page khong tinh la nguoi; tin tam vua gui tinh la bay gio.
+var PKC_WHO_HOURS = 72;
 function _pkcWhoHtml(msgs) {
-  var cnt = {}, order = [];
+  var cnt = {}, order = [], now = Date.now(), cut = now - PKC_WHO_HOURS * 3600000;
   Object.keys(msgs || {}).forEach(function (k) {
     var m = msgs[k]; if (!m || m.dir !== 'out') return;
     var n = m.tmp ? _pkcMeName() : (m.staff || ''); if (!n) return;
+    var t = m.tmp ? now : Date.parse(m.at); if (!isFinite(t) || t < cut) return;   // qua 72 gio (hoac khong ro gio) -> khong tinh
     if (!(n in cnt)) { cnt[n] = 0; order.push(n); } cnt[n]++;
   });
   if (!order.length) return '';
   order.sort(function (a, b) { return cnt[b] - cnt[a]; });
-  return '<span class="pkc-who-l" title="Nhân viên đã trả lời trong các tin đang hiển thị">✍️ Đã chat:</span> ' + order.map(function (n) { return '<span class="pkc-who-n" title="' + cnt[n] + ' tin">' + _pkcEsc(n) + ' <i>' + cnt[n] + '</i></span>'; }).join('');
+  return '<span class="pkc-who-l" title="Nhân viên đã trả lời trong ' + PKC_WHO_HOURS + ' giờ gần nhất (tính từ các tin đang tải)">✍️ Đã chat (' + PKC_WHO_HOURS + 'h):</span> ' + order.map(function (n) { return '<span class="pkc-who-n" title="' + cnt[n] + ' tin trong ' + PKC_WHO_HOURS + ' giờ gần nhất">' + _pkcEsc(n) + ' <i>' + cnt[n] + '</i></span>'; }).join('');
 }
 function renderPkChatTab(c) {
   _pkcStop();

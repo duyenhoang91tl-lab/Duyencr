@@ -230,13 +230,66 @@ async function _ordSearchRun(q){
     }).join('');
   } catch(e){ if (seq === _ordSearchSeq) box.innerHTML = '<div class="ors-h">Lỗi tìm mã đơn: ' + esc(e.message) + '</div>'; }
 }
-function _ordSearchPick(i){
+// ── TRA CUU KHACH NGOAI PHAM VI (Duyen yeu cau 2026-10-21) ──
+// Sale go DUNG SDT (9-11 so) hoac chon 1 ma don trong o tim kiem thi xem duoc ho so khach du khach khong thuoc ten minh.
+// Nguyen nhan goc khong xem duoc: server (scopeMode=enforce) chi tra danh sach khach/don thuoc pham vi cua sale -> khach khac khong co trong
+// customerMap, va lookup/searchOrder bi chan/loc. Nay: lookup kem via=search (server bo qua chan + ghi log 'search-out'), nap 1 khach do
+// vao customerMap/careData roi dung lai luong cu (mergeRows + buildCustomers). Danh sach khach van loc theo pham vi nhu cu; chi tra cuu tung khach.
+window._oosPhones = window._oosPhones || {};   // phone -> true: khach nap qua tim kiem (js/06 wrapper fetch them via=search cho lookup/donOrdersByPhone/cskhDetail)
+var _oosState = {};
+async function _pullSearchCustomer_(raw){
+  var ph = (typeof normPhone === 'function' ? normPhone(raw) : '') || String(raw || '').replace(/\D/g, '');
+  if (!ph || typeof gsUrl === 'undefined' || !gsUrl || typeof customerMap === 'undefined') return null;
+  if (customerMap[ph]) return ph;
+  if (_oosState[ph] === 'loading' || _oosState[ph] === 'fail') return null;
+  _oosState[ph] = 'loading';
+  try {
+    var sep = gsUrl.indexOf('?') > -1 ? '&' : '?';
+    var r = await fetch(gsUrl + sep + 'action=lookup&via=search&phone=' + encodeURIComponent(ph), { redirect:'follow' });
+    var j = await r.json();
+    if (!j || j.error || j.ok === false) { _oosState[ph] = 'fail'; if (typeof toast === 'function') toast((j && j.error) || 'Không tra cứu được khách này'); return null; }
+    var care = j.care || null, ords = j.orders || [], ck = j.cskh || [], don = j.don || [];
+    if (!care && !ords.length && !ck.length && !don.length) { _oosState[ph] = 'fail'; if (typeof toast === 'function') toast('Không tìm thấy khách với SĐT ' + ph); return null; }
+    window._oosPhones[ph] = true;
+    if (ords.length && typeof mergeRows === 'function') {
+      mergeRows(ords.map(function(o){ return {
+        date: o.date ? parseVNDate_(o.date) : null,
+        year: parseNum(o.year), month: parseNum(o.month),
+        cs: o.cs||'', name: o.name||'', phone: o.phone||ph,
+        source: o.source||'', revenue: _normRev(o.revenue),
+        product: o.product||'', productDetail: o.productDetail||'',
+        status: o.status||'', zalo: o.zalo||'', note: o.note||''
+      }; }));
+    }
+    if (care) {
+      careData[ph] = {
+        status: care.status||'', zalo: care.zalo||'', cs: care.cs||'', note: care.note||'',
+        schedGoi: care.schedGoi||'', schedGoiNote: care.schedGoiNote||'', schedSP: care.schedSP||'', schedSPNote: care.schedSPNote||'',
+        schedCS: care.schedCS||'', schedCSNote: care.schedCSNote||'', schedHen: care.schedHen||'', schedHenNote: care.schedHenNote||'',
+        updated: care.updated||'', khStatus: care.khStatus||'', nickZalos: care.nickZalos||[], zaloPhones: care.zaloPhones||[],
+        birthday: care.birthday||'', tag: care.tag||'', custom: (care.custom && typeof care.custom === 'object') ? care.custom : {}
+      };
+    }
+    if (ck.length && typeof cskhData !== 'undefined' && cskhData) { cskhData[ph] = ck; if (typeof _cskhDetailCache !== 'undefined') _cskhDetailCache[ph] = ck; }
+    if (!customerMap[ph]) {   // khach chi co o CareData/CSKH/du lieu don (khong co don DT TONG) -> tao dong toi thieu de hien trong danh sach
+      customerMap[ph] = { phone: ph, name: (care && care.name) || (ck.find(function(x){ return x && x.name; }) || {}).name || ph, orders: [],
+        sources: new Set(), brands: new Set(), _keys: new Set(), _rawStatus: (care && care.status) || '', _rawZalo: (care && care.zalo) || '', _rawNote: (care && care.note) || '' };
+    }
+    buildCustomers();
+    _oosState[ph] = 'done';
+    return customerMap[ph] ? ph : null;
+  } catch (e) { _oosState[ph] = 'fail'; if (typeof toast === 'function') toast('Lỗi tra cứu khách: ' + (e && e.message || e)); return null; }
+}
+async function _ordSearchPick(i){
   var o = (window.__ordSearchRes || [])[i], inp = document.getElementById('search-input'), box = document.getElementById('ord-search-res');
   if (box) box.style.display = 'none';
   if (!o || !o.phone || !inp) return;
-  inp.value = o.phone;
+  var ph = (typeof normPhone === 'function' ? normPhone(o.phone) : '') || o.phone;
+  if (typeof customerMap !== 'undefined' && !customerMap[ph] && !customerMap[o.phone]) await _pullSearchCustomer_(ph);   // khach ngoai pham vi: nap rieng khach nay
+  var key = (typeof customerMap !== 'undefined' && customerMap[o.phone]) ? o.phone : ph;
+  inp.value = key;
   if (typeof applyFilters === 'function') applyFilters();
-  if (typeof openDp === 'function' && typeof customerMap !== 'undefined' && customerMap[o.phone]) { try { openDp(o.phone); } catch(e){} }
+  if (typeof openDp === 'function' && typeof customerMap !== 'undefined' && customerMap[key]) { try { openDp(key); } catch(e){} }
 }
 document.addEventListener('click', function(e){
   var box = document.getElementById('ord-search-res');

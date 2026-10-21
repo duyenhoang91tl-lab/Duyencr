@@ -4488,4 +4488,304 @@
     const el = panelEl?.querySelector("#pk-ai-status");
     if (el) el.innerText = text;
   }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // MODULE: PHÍM TẮT GÕ NHANH (slash-command "/" trong ô chat)
+  // ══════════════════════════════════════════════════════════════════════════
+  // CS gõ "/" vào ô chat → popup nổi hiện danh sách mẫu tin nhắn (từ _cannedResponses +
+  // _msgTemplates). Tiếp tục gõ để lọc nhanh. Chọn mẫu → text được chèn vào ô chat;
+  // nếu mẫu có ảnh đính kèm thì tự copy ảnh vào clipboard đồng thời.
+  //
+  // Cú pháp phím tắt:
+  //   /          → mở popup, hiện TẤT CẢ mẫu (tối đa 30)
+  //   /giá       → lọc mẫu chứa "giá"
+  //   /ship      → lọc mẫu chứa "ship"
+  //   Escape     → đóng popup
+  //   ↑ ↓ Enter  → điều hướng + chọn trong popup
+  // ══════════════════════════════════════════════════════════════════════════
+
+  let _slashPopupEl = null;      // DOM node của popup
+  let _slashActiveIdx = -1;      // index mục đang highlight
+  let _slashItems = [];          // mảng { label, text, image? } đang hiển thị
+
+  // Lấy ô chat đang active (textarea hoặc contenteditable Pancake)
+  function _slashGetChatBox_() {
+    const sel = settings?.selectors?.[PLATFORM];
+    if (sel?.replyBox) {
+      const box = document.querySelector(sel.replyBox);
+      if (box) return box;
+    }
+    // Fallback: tìm contenteditable đang focused
+    const focused = document.activeElement;
+    if (focused && (focused.isContentEditable || focused.tagName === 'TEXTAREA' || focused.tagName === 'INPUT')) {
+      return focused;
+    }
+    return null;
+  }
+
+  // Tập hợp TẤT CẢ mẫu: _cannedResponses (local) + _msgTemplates (từ CRM, status=approved)
+  function _slashAllTemplates_() {
+    const all = [];
+    // 1. Mẫu có sẵn local (_cannedResponses)
+    (_cannedResponses || []).forEach((c) => {
+      if (c && c.text) all.push({ label: c.label || c.id, text: c.text, image: null, src: 'local' });
+    });
+    // 2. Mẫu từ CRM (đã duyệt)
+    (_msgTemplates || []).forEach((t) => {
+      if (t && t.content && t.status === 'approved') {
+        all.push({ label: t.title || t.id, text: t.content, image: t.image || null, src: 'crm' });
+      }
+    });
+    return all;
+  }
+
+  // Lọc mẫu theo query (không dấu, không phân biệt hoa/thường)
+  function _slashFilter_(q) {
+    const norm = (s) => _stripVN_((s || '').toLowerCase());
+    const nq = norm(q);
+    const all = _slashAllTemplates_();
+    if (!nq) return all.slice(0, 30);
+    return all.filter((item) =>
+      norm(item.label).includes(nq) || norm(item.text).includes(nq)
+    ).slice(0, 30);
+  }
+
+  // Tạo popup DOM (lần đầu) hoặc trả về cái đã có
+  function _slashEnsurePopup_() {
+    if (_slashPopupEl && document.body.contains(_slashPopupEl)) return _slashPopupEl;
+    const el = document.createElement('div');
+    el.id = 'pk-slash-popup';
+    el.style.cssText = [
+      'position:fixed','z-index:2147483647','background:#fff','border:1px solid #e5e7eb',
+      'border-radius:10px','box-shadow:0 8px 32px rgba(0,0,0,.18)','padding:4px 0',
+      'min-width:280px','max-width:480px','max-height:320px','overflow-y:auto',
+      'font-size:13px','font-family:inherit','display:none'
+    ].join(';');
+    document.body.appendChild(el);
+    _slashPopupEl = el;
+    return el;
+  }
+
+  // Hiển thị popup với danh sách items, định vị cạnh ô chat
+  function _slashShow_(chatBox, items) {
+    _slashItems = items;
+    _slashActiveIdx = items.length ? 0 : -1;
+    const popup = _slashEnsurePopup_();
+    popup.innerHTML = items.length
+      ? items.map((item, i) =>
+          `<div class="pk-slash-item${i === 0 ? ' pk-slash-active' : ''}" data-idx="${i}" style="` +
+          `padding:7px 12px;cursor:pointer;border-radius:6px;margin:1px 4px;` +
+          `${i === 0 ? 'background:#f0f9ff;' : ''}` +
+          `display:flex;flex-direction:column;gap:1px">` +
+          `<span style="font-weight:600;color:#1d4ed8">${escapeHtml(item.label)}</span>` +
+          `<span style="color:#6b7280;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:440px">${escapeHtml(item.text.slice(0, 100))}${item.text.length > 100 ? '…' : ''}</span>` +
+          `${item.image ? '<span style="font-size:10px;color:#059669">📷 Kèm ảnh</span>' : ''}` +
+          `</div>`
+        ).join('')
+      : '<div style="padding:10px 14px;color:#9ca3af;font-style:italic">Không tìm thấy mẫu nào</div>';
+
+    // Định vị phía trên ô chat
+    const rect = chatBox.getBoundingClientRect();
+    const popupH = Math.min(320, items.length * 54 + 8);
+    let top = rect.top - popupH - 6;
+    if (top < 8) top = rect.bottom + 6;
+    popup.style.left = Math.max(8, rect.left) + 'px';
+    popup.style.top = top + 'px';
+    popup.style.display = 'block';
+
+    // Click để chọn
+    popup.querySelectorAll('.pk-slash-item').forEach((row) => {
+      row.addEventListener('mousedown', (e) => {
+        e.preventDefault(); // tránh blur ô chat
+        const idx = parseInt(row.dataset.idx, 10);
+        _slashApply_(chatBox, idx);
+      });
+      row.addEventListener('mouseenter', () => {
+        _slashSetActive_(parseInt(row.dataset.idx, 10));
+      });
+    });
+  }
+
+  function _slashHide_() {
+    if (_slashPopupEl) _slashPopupEl.style.display = 'none';
+    _slashItems = [];
+    _slashActiveIdx = -1;
+  }
+
+  function _slashSetActive_(idx) {
+    _slashActiveIdx = idx;
+    if (!_slashPopupEl) return;
+    _slashPopupEl.querySelectorAll('.pk-slash-item').forEach((row, i) => {
+      const active = i === idx;
+      row.style.background = active ? '#f0f9ff' : '';
+      row.classList.toggle('pk-slash-active', active);
+      if (active) row.scrollIntoView({ block: 'nearest' });
+    });
+  }
+
+  // Áp dụng mẫu: chèn text vào ô chat + copy ảnh nếu có
+  function _slashApply_(chatBox, idx) {
+    const item = _slashItems[idx];
+    if (!item) return;
+    _slashHide_();
+
+    // Xoá phần "/..." CS đã gõ trước khi chèn mẫu
+    _slashClearSlashText_(chatBox);
+
+    // Chèn text
+    if (chatBox.tagName === 'TEXTAREA' || chatBox.tagName === 'INPUT') {
+      const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+      nativeSetter?.call(chatBox, item.text);
+      chatBox.dispatchEvent(new Event('input', { bubbles: true }));
+    } else if (chatBox.isContentEditable) {
+      chatBox.focus();
+      document.execCommand('insertText', false, item.text);
+    }
+
+    // Copy ảnh kèm vào clipboard nếu có
+    if (item.image) {
+      copyProductImage_(item.image, null);
+      setStatus(`Đã chèn mẫu "${item.label}" + copy ảnh vào clipboard — Ctrl+V để dán ảnh vào chat.`);
+    } else {
+      setStatus(`Đã chèn mẫu "${item.label}".`);
+    }
+  }
+
+  // Xoá đoạn "/query" CS đã gõ trong ô chat
+  function _slashClearSlashText_(chatBox) {
+    try {
+      if (chatBox.isContentEditable) {
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return;
+        const range = sel.getRangeAt(0);
+        const node = range.startContainer;
+        if (node.nodeType === Node.TEXT_NODE) {
+          const text = node.textContent;
+          const pos = range.startOffset;
+          // Tìm vị trí "/" gần nhất trước cursor
+          let slashPos = -1;
+          for (let i = pos - 1; i >= 0; i--) {
+            if (text[i] === '/') { slashPos = i; break; }
+          }
+          if (slashPos >= 0) {
+            node.textContent = text.slice(0, slashPos) + text.slice(pos);
+            const newRange = document.createRange();
+            newRange.setStart(node, slashPos);
+            newRange.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+            chatBox.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
+      } else if (chatBox.tagName === 'TEXTAREA') {
+        const v = chatBox.value, cur = chatBox.selectionStart;
+        let slashPos = -1;
+        for (let i = cur - 1; i >= 0; i--) {
+          if (v[i] === '/') { slashPos = i; break; }
+        }
+        if (slashPos >= 0) {
+          const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+          nativeSetter?.call(chatBox, v.slice(0, slashPos) + v.slice(cur));
+          chatBox.setSelectionRange(slashPos, slashPos);
+          chatBox.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+    } catch (_) { /* bỏ qua nếu lỗi DOM */ }
+  }
+
+  // Lấy phần query sau "/" tại vị trí cursor hiện tại
+  function _slashGetQuery_(chatBox) {
+    try {
+      if (chatBox.isContentEditable) {
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return null;
+        const range = sel.getRangeAt(0);
+        const node = range.startContainer;
+        if (node.nodeType !== Node.TEXT_NODE) return null;
+        const text = node.textContent;
+        const pos = range.startOffset;
+        // Tìm "/" gần nhất trước cursor
+        for (let i = pos - 1; i >= 0; i--) {
+          if (text[i] === '/') return text.slice(i + 1, pos);
+          if (text[i] === ' ' || text[i] === '\n') break; // chỉ tìm trong từ hiện tại
+        }
+      } else if (chatBox.tagName === 'TEXTAREA') {
+        const v = chatBox.value, cur = chatBox.selectionStart;
+        for (let i = cur - 1; i >= 0; i--) {
+          if (v[i] === '/') return v.slice(i + 1, cur);
+          if (v[i] === ' ' || v[i] === '\n') break;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  // Lắng nghe input trên TẤT CẢ ô chat trong trang (dùng event delegation)
+  function _slashInitListener_() {
+    document.addEventListener('input', (e) => {
+      const box = e.target;
+      if (!box) return;
+      // Chỉ xử lý ô chat (contenteditable hoặc textarea trong vùng chat Pancake)
+      if (!box.isContentEditable && box.tagName !== 'TEXTAREA' && box.tagName !== 'INPUT') return;
+      if (box.closest('#pk-panel, #pk-slash-popup, .pk-panel-container')) return; // bỏ qua ô input trong panel
+
+      const q = _slashGetQuery_(box);
+      if (q === null) { _slashHide_(); return; }
+
+      // Nạp mẫu từ CRM nếu chưa có (không block UI — dùng callback)
+      const showNow = () => {
+        const items = _slashFilter_(q);
+        if (items.length === 0 && q.length === 0) return; // tránh hiện popup rỗng khi gõ "/" lúc chưa có mẫu
+        _slashShow_(box, items);
+      };
+      if (!_msgTemplates.length) {
+        safeSendMessage_({ type: 'GET_MESSAGE_TEMPLATES' }, (resp) => {
+          if (resp?.ok) { _msgTemplates = resp.data.templates || []; _msgTplTs = Date.now(); }
+          showNow();
+        });
+      } else {
+        showNow();
+      }
+    }, true);
+
+    document.addEventListener('keydown', (e) => {
+      if (!_slashPopupEl || _slashPopupEl.style.display === 'none') return;
+      if (e.key === 'Escape') { e.preventDefault(); _slashHide_(); return; }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        _slashSetActive_(Math.min(_slashActiveIdx + 1, _slashItems.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        _slashSetActive_(Math.max(_slashActiveIdx - 1, 0));
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        if (_slashActiveIdx >= 0) {
+          e.preventDefault();
+          e.stopPropagation();
+          const box = _slashGetChatBox_();
+          if (box) _slashApply_(box, _slashActiveIdx);
+        }
+      }
+    }, true);
+
+    // Đóng popup khi click ra ngoài
+    document.addEventListener('click', (e) => {
+      if (_slashPopupEl && !_slashPopupEl.contains(e.target)) _slashHide_();
+    }, true);
+  }
+
+  // Khởi động module sau khi settings và panel đã sẵn sàng
+  (function _slashBoot_() {
+    // Đợi settings load xong rồi mới init (settings load async ở initPanel_)
+    const tryInit = () => {
+      if (settings) { _slashInitListener_(); return; }
+      setTimeout(tryInit, 500);
+    };
+    tryInit();
+  })();
+  // ── kết thúc MODULE PHÍM TẮT GÕ NHANH ──
+
 })();

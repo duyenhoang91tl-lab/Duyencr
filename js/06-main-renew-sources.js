@@ -361,6 +361,11 @@ let gsUrl = FIXED_GS_URL || loadLS('ome_gs_url') || '';
           if (tok && u.indexOf('action=users') === -1) add.push('demo=' + encodeURIComponent(tok));
           if (!/[?&]src=/.test(u)) add.push('src=web');
           if (st && !/[?&]token=/.test(u)) add.push('token=' + encodeURIComponent(st));
+          // Khach nap qua o tim kiem (ngoai pham vi, js/29 _pullSearchCustomer_): mo ho so can lookup/donOrdersByPhone/cskhDetail -> kem via=search de server khong chan
+          if (window._oosPhones && /[?&]action=(lookup|donOrdersByPhone|cskhDetail)(&|$)/.test(u) && !/[?&]via=/.test(u)) {
+            var _mm = u.match(/[?&]phone=([^&]*)/);
+            if (_mm) { var _pp0 = decodeURIComponent(_mm[1]), _pp = (typeof normPhone === 'function' ? normPhone(_pp0) : '') || _pp0; if (window._oosPhones[_pp]) add.push('via=search'); }
+          }
           if (add.length) u += (u.indexOf('?') > -1 ? '&' : '?') + add.join('&');
         }
       }

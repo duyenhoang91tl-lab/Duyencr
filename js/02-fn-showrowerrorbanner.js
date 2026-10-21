@@ -545,6 +545,10 @@ function applyFilters() {
   const isPhoneSearch = q && /^\d{4,}$/.test(q);
   if (isPhoneSearch) {
     const pList = allCustomers.filter(c => c.phone.includes(q));
+    // SDT day du (9-11 so) khong co trong danh sach (khach ngoai pham vi bi server loc): tra cuu rieng khach do (js/29), xong ve lai bo loc
+    if (!pList.length && /^\d{9,11}$/.test(q) && typeof _pullSearchCustomer_ === 'function') {
+      _pullSearchCustomer_(q).then(function(ph){ if (ph && typeof applyFilters === 'function') applyFilters(); });
+    }
     renderTable(pList);
     txt('result-count', fmt(pList.length));
     txt('tb-list', fmt(pList.length));

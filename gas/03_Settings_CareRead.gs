@@ -1187,13 +1187,21 @@ function _scopeNote_(user, action, phone, verdict) {
     cache.put(key, JSON.stringify(m), 21600);
   } catch (e) {}
 }
-function _scopeGate_(action, token, phone) {
+function _scopeGate_(action, token, phone, via) {
   if (!SCOPE_ACTIONS_[action] || !token || !phone) return null;
   var mode = _scopeMode_();
   if (mode === 'off') return null;
   try {
     var u = _sessUser_(token);
     if (!u) return null;
+    // TRA CUU CHU DICH (Duyen yeu cau 2026-10-21): sale go DUNG SDT / ma don vao o tim kiem thi duoc xem ho so khach du khach khong thuoc ten minh.
+    // Chi bo qua cho request do client danh dau via=search; moi truong hop khac (mo ho so tu danh sach, extension...) van bi chan nhu cu.
+    // Van ghi log 'search-out' de admin biet ai tra cuu khach ngoai pham vi (xemLogPhamVi).
+    if (via === 'search') {
+      var vs = _scopeVerdict_(u, phone);
+      _scopeNote_(u, action, phone, vs === false ? 'search-out' : 'search-in');
+      return null;
+    }
     var v = _scopeVerdict_(u, phone);
     _scopeNote_(u, action, phone, v === true ? 'in' : (v === false ? 'OUT' : 'unchecked'));
     if (v === false && mode === 'enforce') return { error: 'Khach nay khong thuoc pham vi cua ban.', code: 'FORBIDDEN', action: action };
@@ -1310,6 +1318,9 @@ function _scopeListServe_(action, p, e) {
   if (!SCOPE_LIST_ACTIONS_[action] || !p.token) return null;
   var mode = _scopeMode_();
   if (mode === 'off') return null;
+  // searchOrder = TIM THEO MA DON (Duyen yeu cau 2026-10-21): sale tim ma don bat ky van thay ket qua (de nhay toi khach), khong loc theo pham vi.
+  // Nguyen nhan goc khong ra: action nay nam trong SCOPE_LIST_ACTIONS_ nen enforce loc het dong co SDT ngoai ten sale. Toi da 30 dong/lan, chuoi >= 3 ky tu.
+  if (action === 'searchOrder') { try { _scopeNote_(_sessUser_(p.token), action, '', 'search-unfiltered'); } catch (eS) {} return null; }
   var user, allowed, resp, obj;
   try {
     user = _sessUser_(p.token);
