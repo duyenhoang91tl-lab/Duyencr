@@ -1433,7 +1433,7 @@ async function _impUpload(kind){
     // NHAP FILE GOI THANG Apps Script (khong qua Worker/Cloudflare): Cloudflare cat moi request sau ~100 giay (loi 524 "error code: 524"),
     // trong khi doc+doi chieu ca sheet DT TONG co the lau hon -> nhap that bai TRUOC khi cap nhat duoc don (vd don da "That bai" van giu "Dang xu ly").
     var impUrl = (typeof GAS_URL_DIRECT !== 'undefined' && GAS_URL_DIRECT) ? GAS_URL_DIRECT : gsUrl;
-    var res0 = await fetch(impUrl, { method:'POST', body: JSON.stringify({ action:'importSheetRows', sheet: kind, rows: rows, dryRun: true, updateExisting: true }) });
+    var res0 = await fetch(impUrl, { method:'POST', body: JSON.stringify({ action:'importSheetRows', token: _impTok_(), sheet: kind, rows: rows, dryRun: true, updateExisting: true }) });
     var d0 = await _impJson_(res0);
     if (d0.error) throw new Error(d0.error);
     if (d0.dryRun) {
@@ -1450,7 +1450,7 @@ async function _impUpload(kind){
         + '\nDữ liệu cũ trên Sheet được GIỮ NGUYÊN 100%. Tiếp tục nhập?')) { toast('Đã hủy — chưa ghi gì.'); return; }
     } else { _isReal = true; d = d0; }
     if (!_isReal) {
-      var res = await fetch(impUrl, { method:'POST', body: JSON.stringify({ action:'importSheetRows', sheet: kind, rows: rows, updateExisting: true }) });
+      var res = await fetch(impUrl, { method:'POST', body: JSON.stringify({ action:'importSheetRows', token: _impTok_(), sheet: kind, rows: rows, updateExisting: true }) });
       d = await _impJson_(res);
     }
     if (d.error) throw new Error(d.error);
@@ -1460,6 +1460,7 @@ async function _impUpload(kind){
     if (kind === 'base'){ _impState.baseRows = null; _impState.baseFileName = ''; _impState.baseWarn = ''; }
     else { _impState.posRows = null; _impState.posFileName = ''; _impState.posWarn = ''; }
     var fi = document.getElementById('imp-file-'+kind); if (fi) fi.value = '';
+    _impHist.items = null;   // co lan nhap moi -> tai lai lich su
     // Du lieu goc da doi -> cac bao cao doanh so dang cache tren client (neu co) co the sai lech,
     // xoa de buoc tai lai tu server khi nguoi dung xem lai cac tab bao cao.
     _srState.dataA = _srState.dataB = _srState.dataC = _srState.dataE = _srState.dataF = _srState.dataG = _srState.dataH = null;
@@ -1491,6 +1492,73 @@ function _impPickCard_(kind, label, hint, sheetTarget){
   return html;
 }
 
+// ── LỊCH SỬ NHẬP + HOÀN TÁC (backend: importBatches / importUndo, chỉ chủ sở hữu; xem docs/crm-kb + HANDOFF 2026-10-20) ──
+// Đường nhập file gọi THẲNG Apps Script (không qua Worker) nên bộ gắn token ở js/06 (chỉ áp cho URL Worker) không chạy -> gắn token thủ công.
+var _impHist = { items: null, loading: false, err: '', busy: '' };
+function _impTok_(){ try { return localStorage.getItem('ome_sess_token') || ''; } catch(e){ return ''; } }
+function _impGasUrl_(){ return (typeof GAS_URL_DIRECT !== 'undefined' && GAS_URL_DIRECT) ? GAS_URL_DIRECT : gsUrl; }
+async function _impLoadHist_(){
+  if (_impHist.loading) return;
+  _impHist.loading = true; _impHist.err = ''; renderSalesReportTab();
+  try {
+    var u = _impGasUrl_();
+    var res = await fetch(u + (u.indexOf('?') > -1 ? '&' : '?') + 'action=importBatches&token=' + encodeURIComponent(_impTok_()));
+    var d = await _impJson_(res);
+    if (d.error) { _impHist.items = []; _impHist.err = (d.code === 'FORBIDDEN') ? 'Chỉ chủ sở hữu (admin chính) xem và hoàn tác được lịch sử nhập.' : d.error; }
+    else _impHist.items = d.items || [];
+  } catch(e){ _impHist.items = []; _impHist.err = 'Không tải được lịch sử nhập: ' + e.message; }
+  finally { _impHist.loading = false; renderSalesReportTab(); }
+}
+async function _impUndo_(batchId){
+  if (_impHist.busy) return;
+  _impHist.busy = batchId; renderSalesReportTab();
+  try {
+    var u = _impGasUrl_(), call = async function(dry){
+      var r = await fetch(u, { method:'POST', body: JSON.stringify({ action:'importUndo', token: _impTok_(), batchId: batchId, dryRun: dry }) });
+      return await _impJson_(r);
+    };
+    var d0 = await call(true);
+    if (d0.error) throw new Error(d0.error);
+    var when = d0.time ? new Date(d0.time).toLocaleString('vi-VN') : '';
+    var msg = 'HOÀN TÁC lần nhập ' + when + (d0.who ? ' của ' + d0.who : '') + ' (' + (d0.sheet || '') + ') — xem trước:\n\n'
+      + '• XÓA ' + fmt(d0.wouldDelete || 0) + ' dòng đã thêm (có SAO LƯU vào sheet "Sao lưu hoàn tác nhập" trước khi xóa)\n'
+      + '• KHÔI PHỤC ' + fmt(d0.wouldRestoreCells || 0) + ' ô đã cập nhật về giá trị cũ\n'
+      + (d0.skippedEdited ? '• GIỮ NGUYÊN ' + fmt(d0.skippedEdited) + ' ô đã bị sửa tay sau lần nhập\n' : '')
+      + (d0.missing ? '• ' + fmt(d0.missing) + ' dòng không còn trên Sheet (đã bị xóa tay trước) — bỏ qua\n' : '')
+      + (d0.skippedNoRow ? '• ' + fmt(d0.skippedNoRow) + ' ô không tìm thấy đơn tương ứng — bỏ qua\n' : '')
+      + '\nChỉ hoàn tác được 1 lần. Tiếp tục?';
+    if (!d0.wouldDelete && !d0.wouldRestoreCells) { toast('ℹ️ Không còn gì để hoàn tác (các dòng/ô của lần nhập này đã không còn hoặc đã bị sửa).'); return; }
+    if (!confirm(msg)) { toast('Đã hủy — chưa thay đổi gì.'); return; }
+    var d = await call(false);
+    if (d.error) throw new Error(d.error);
+    toast('↩️ Đã hoàn tác: xóa ' + fmt(d.deleted || 0) + ' dòng, khôi phục ' + fmt(d.restoredCells || 0) + ' ô.');
+    try { logAudit('import_undo', '', '', 'Hoàn tác lần nhập ' + batchId + ': xóa ' + (d.deleted||0) + ' dòng, khôi phục ' + (d.restoredCells||0) + ' ô'); } catch(eA){}
+    _srState.dataA = _srState.dataB = _srState.dataC = _srState.dataE = _srState.dataF = _srState.dataG = _srState.dataH = null;
+    _impHist.items = null;
+  } catch(e){
+    toast('❌ Hoàn tác lỗi: ' + e.message);
+  } finally {
+    _impHist.busy = ''; renderSalesReportTab();
+  }
+}
+function _impHistHtml_(){
+  var h = '<div class="dash-section-title" style="margin-top:22px">🕘 Lịch sử nhập (30 lần gần nhất) '
+    + '<button class="btn sm secondary" style="margin-left:8px" onclick="_impHist.items=null;_impLoadHist_()" ' + (_impHist.loading ? 'disabled' : '') + '>↻ Tải lại</button></div>';
+  if (_impHist.loading && !_impHist.items) return h + '<div style="color:var(--muted);padding:10px">Đang tải...</div>';
+  if (_impHist.err) return h + '<div style="padding:10px;font-size:12.5px;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px">' + esc(_impHist.err) + '</div>';
+  var items = _impHist.items || [];
+  if (!items.length) return h + '<div style="color:var(--muted);padding:10px;font-size:12.5px">Chưa có lần nhập nào được ghi nhật ký (chỉ các lần nhập SAU khi bật tính năng này mới hoàn tác được).</div>';
+  h += '<table class="dash-table"><thead><tr><th>Thời gian</th><th>Người nhập</th><th>Sheet</th><th>Thêm dòng</th><th>Ô cập nhật</th><th>Trạng thái</th></tr></thead><tbody>';
+  items.forEach(function(it){
+    var when = it.time ? new Date(it.time).toLocaleString('vi-VN') : '';
+    var st;
+    if (it.status === 'da-hoan-tac') st = '<span style="color:#6b7280">↩️ Đã hoàn tác' + (it.undoneBy ? ' bởi ' + esc(it.undoneBy) : '') + '</span>';
+    else if (it.status === 'ok') st = '<button class="btn sm danger" ' + (_impHist.busy ? 'disabled' : '') + ' onclick="_impUndo_(\'' + esc(it.id) + '\')">' + (_impHist.busy === it.id ? 'Đang xử lý...' : '↩️ Hoàn tác') + '</button>';
+    else st = '<span style="color:#9a3412" title="Lần nhập quá 5000 dòng nên không lưu dấu vân">⛔ Không hoàn tác được</span>';
+    h += '<tr><td>' + esc(when) + '</td><td>' + esc(it.who || '(không rõ)') + '</td><td>' + esc(it.sheet || '') + '</td><td>' + fmt(it.written || 0) + '</td><td>' + fmt(it.updatedCells || 0) + '</td><td>' + st + '</td></tr>';
+  });
+  return h + '</tbody></table>';
+}
 function renderSalesReportTabJ_(wrap, subTabs){
   if (!_srIsAdmin()){ wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + '<div style="color:var(--muted);padding:20px;text-align:center">🔒 Chỉ Admin được nhập dữ liệu Base/Pos.</div>'; return; }
   var html = '<div style="font-size:12.5px;color:var(--muted);margin-bottom:14px">Tải lên file export từ Base platform / Pancake POS — hệ thống tự đọc và nối tiếp vào đúng sheet nguồn trên Google Sheet (không cần copy tay), tự loại bỏ các dòng trùng tuyệt đối (giống hệt mọi cột) với dữ liệu đã có sẵn.</div>';
@@ -1498,6 +1566,8 @@ function renderSalesReportTabJ_(wrap, subTabs){
   html += _impPickCard_('base', '📥 Dữ liệu Base', 'File export "Danh sách công việc" (sheet "Tất cả"), .xls/.xlsx', 'DT TỔNG ');
   html += _impPickCard_('pos', '📥 Dữ liệu Pos', 'File export đơn hàng (Pancake POS), .xlsx', 'dữ liệu đơn');
   html += '</div>';
+  if (_impHist.items === null && !_impHist.loading) setTimeout(_impLoadHist_, 0);   // tai lich su 1 lan khi mo tab (lan nhap moi / bam Tai lai thi dat items=null)
+  html += _impHistHtml_();
   wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + html;
 }
 

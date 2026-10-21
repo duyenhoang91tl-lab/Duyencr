@@ -22,11 +22,12 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 - [ ] **Duyên làm tay:** chờ Actions deploy xanh → Nhập file Pos lại bằng file cũ → bấm **xem trước** (KHÔNG bấm OK nếu vẫn báo 0 đơn đã có) → gửi lại số "đã có / mới". Nếu vẫn báo 0: có thêm lệch ở cột khác (tên khách/giá/mã SP) — gửi 1 dòng mẫu cả file lẫn Sheet để chẩn đoán.
 
 
-## 2026-10-20 — "Hoàn tác lần nhập" file Base/Pos (backend XONG, giao diện CHƯA)
+## 2026-10-20 — "Hoàn tác lần nhập" file Base/Pos (backend + giao diện XONG)
 - [x] **Backend (gas_v13.js, test `tools/test-import-undo.js` 33 ca):** mỗi lần nhập ghi 1 dòng vào sheet **"Nhật ký lần nhập"** (batchId, người nhập, `dongDau`/`soDong` đã thêm, **dấu vân** hash khóa đơn không giờ của từng dòng thêm, vùng dòng trong "Nhật ký cập nhật nhập file"). `importSheetRows` trả thêm `batchId`.
 - [x] **`importUndo {batchId, dryRun}` (POST, chỉ chủ sở hữu — nằm trong `OWNER_ONLY_ACTIONS_`, bắt buộc token):** (1) khôi phục các ô đã cập nhật — CHỈ ô vẫn còn đúng giá trị mới (NV sửa tay sau đó thì GIỮ, báo `skippedEdited`); (2) xóa các dòng đã thêm, **định vị bằng dấu vân** (không tin vị trí → chèn/xóa dòng phía trên không xóa nhầm), dòng NV đã xóa tay trước thì báo `missing`; (3) **sao lưu** dòng bị xóa vào sheet "Sao lưu hoàn tác nhập" trước khi xóa. Có `dryRun` xem trước. Mỗi lần nhập hoàn tác 1 lần (`da-hoan-tac`). Lần nhập > 5000 dòng: vẫn nhập nhưng `khong-hoan-tac-duoc`.
 - [x] `importBatches` (GET, chủ sở hữu): 30 lần nhập gần nhất (`canUndo`).
-- [ ] **Giao diện CHƯA làm:** trong màn nhập file (js/16-main-currentuser.js ~383 / js/11-fn-srload.js ~1092) thêm bảng "Lịch sử nhập" + nút **Hoàn tác** → gọi `importUndo` với `dryRun:true`, hiện "sẽ xóa N dòng, khôi phục M ô, bỏ qua K ô đã sửa tay" → xác nhận → gọi thật. Hiện chỉ gọi được bằng API/Editor. Lưu ý: nhập lần này (trước khi deploy) CHƯA có nhật ký nên không hoàn tác được; chỉ các lần nhập SAU deploy mới có.
+- [x] **Giao diện (js/11-fn-srload.js, test `tools/test-import-undo-ui.js` 21 ca):** tab nhập file (Báo cáo J) có bảng **"Lịch sử nhập"** (30 lần gần nhất, nút **↩️ Hoàn tác** → xem trước "xóa N dòng / khôi phục M ô / giữ K ô đã sửa tay" → xác nhận → thật; chỉ lần `ok`). Tải 1 lần khi mở tab, nút ↻ Tải lại. **Đường nhập file gọi THẲNG Apps Script nên bộ gắn token ở js/06 không áp dụng → đã gắn `token` thủ công vào 2 lời gọi `importSheetRows` + hoàn tác/lịch sử.** HỆ QUẢ: từ nay nhập file bị cổng chủ sở hữu (`OWNER_ONLY_ACTIONS_`) chặn với admin KHÔNG phải chủ sở hữu (trước đây thiếu token nên lọt qua) — đúng quy tắc "chỉ Duyent sửa/xóa"; nếu muốn admin khác nhập được thì đổi `datChuSoHuu`/bỏ `importSheetRows` khỏi nhóm.
+- [ ] Lưu ý: lần nhập TRƯỚC khi deploy tính năng này CHƯA có nhật ký nên không hoàn tác được; chỉ lần nhập SAU deploy mới có.
 - [ ] Giới hạn: khôi phục ô ghi lại **chuỗi** ở nhật ký (số → Number, ISO → Date, SĐT/chuỗi giữ nguyên); định dạng ô đặc biệt có thể khác nhẹ. Sheet "Sao lưu hoàn tác nhập" tự tạo.
 
 
