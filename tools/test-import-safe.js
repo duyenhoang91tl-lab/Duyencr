@@ -7,7 +7,7 @@ function fnSrc(name) { const i = src.indexOf('function ' + name + '('); if (i < 
   let d = 0, k = src.indexOf('{', i); for (let j = k; j < src.length; j++) { if (src[j] === '{') d++; else if (src[j] === '}' && --d === 0) return src.slice(i, j + 1); } }
 const ok = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1); } else console.log('ok   ' + m); };
 const consts = 'var DT_TONG_WIDTH=20,DON_CHITIET_WIDTH=17,DT_COL_NGAYTAO=0,DT_COL_PHONE=3,DT_COL_THOIGIANHT=10,DT_COL_SANPHAM=14,DT_COL_GIATRIDON=17,DT_COL_ID=19,DT_COL_BODEM=20,SH_IMPORT_UPD_LOG="log",IMPORT_UPD_LOG_HEADERS=[1,2,3,4,5,6,7],IMPORT_UPD_MAX_ROWS=1500,VN_OFFSET_MS=7*3600*1000;';
-const fns = ['_impColName_','_impCellStr_','_impCellEq_','_impDiffRow_','_impHm_','_impOrderKey_','doImportSheetRows_','doImportSheetRowsLocked_','_rowKeyExact_','_rowIsBlank_','_autoDedupExactRowsInSheet_','normPhone_','normOrderDate_','parseVNDate_','_vnMidnight_','_vnYmd_','_vnYmdParts_','_normMoney_','_normTxt_'].map(fnSrc).join('\n');
+const fns = ['_impColName_','_impCellStr_','_impCellEq_','_impDiffRow_','_impHm_','_impHmUnknown_','_impHmCompat_','_impOrderKeyParts_','_impOrderKey_','_impFindExist_','doImportSheetRows_','doImportSheetRowsLocked_','_rowKeyExact_','_rowIsBlank_','_autoDedupExactRowsInSheet_','normPhone_','normOrderDate_','parseVNDate_','_vnMidnight_','_vnYmd_','_vnYmdParts_','_normMoney_','_normTxt_'].map(fnSrc).join('\n');
 function mkSheet(rows, formulas) {
   const sh = { rows: rows.map(r => r.slice()), deleted: 0, formulas: formulas || {},
     getLastRow() { return this.rows.length + 1; }, getMaxColumns() { return 40; }, getName() { return 'DT TỔNG '; },
@@ -63,19 +63,45 @@ rs = ctx.doImportSheetRows_('base', [f1, f2, f3], false, true);
 ok(rs.updatedRows === 0 && rs.written === 0 && logSheet.rows.length === 2, 'nhap lai file: khong cap nhat them');
 rs = ctx.doImportSheetRows_('base', [r0('U1', '0944444444', 1000000, 'Huy')], false);
 ok(!rs.updatedRows && sheet.rows[0][7] === 'Hoan thanh', 'khong bat updateExisting (client cu): chi bo qua, khong sua');
-// ===== POS: file chi co NGAY (khong gio) phai khop dong da co (Date nua dem '00:00' hoac co gio) — loi 20/10/2026 bao '0 da co / 1.436 moi' =====
-const prow = (d, ph, name, sp, v, extra) => { const r = new Array(17).fill(''); r[0] = 1; r[1] = d; r[3] = name; r[4] = ph; r[8] = sp; r[9] = 'MA'; r[10] = 1; r[11] = v; r[12] = 0; if (extra) r[16] = extra; return r; };
-sheet = mkSheet([
-  prow(new Date(Date.UTC(2026, 9, 18, 17, 0)), '0977359792', 'C Hanh', 'NHAN', 5850000),          // Date = 19/10/2026 00:00 gio VN (Sheets tu doi chuoi thanh Date)
-  prow('19/10/2026 14:22', '0965023033', 'C Nhung', 'VONG', 17730000),                              // dong cu co GIO
-  prow('18/10/2026', '0989030761', 'C Thu', 'CHARM', 550000)]);                                      // dong cu chuoi chi co ngay
-const pf = [prow('19/10/2026', '0977359792', 'C Hanh', 'NHAN', 5850000), prow('19/10/2026', '0965023033', 'C Nhung', 'VONG', 17730000),
-            prow('18/10/2026', '0989030761', 'C Thu', 'CHARM', 550000), prow('19/10/2026', '0911000111', 'C Moi', 'NHAN', 1000000)];
-const pb = JSON.stringify(sheet.rows);
-let pr = ctx.doImportSheetRows_('pos', pf, true);
-ok(pr.wouldWrite === 1 && pr.skippedExisting === 3, 'Pos chi co ngay: khop dong da co (Date nua dem / co gio / chuoi ngay) -> chi 1 dong moi that su');
-pr = ctx.doImportSheetRows_('pos', pf);
-ok(pr.written === 1 && sheet.rows.length === 4 && JSON.stringify(sheet.rows.slice(0, 3)) === pb.slice(0, 0) + JSON.stringify(JSON.parse(pb)), 'Pos: chi them dong moi, 3 dong cu nguyen ven');
-pr = ctx.doImportSheetRows_('pos', pf);
-ok(pr.written === 0 && sheet.rows.length === 4, 'Pos: nhap lai -> khong them gi');
+// ===== POS: khoa don CHIU DUOC lech GIO (HANDOFF 2026-10-20: xem truoc bao "0 da co / 1.436 moi") =====
+// Cot Pos: [1]=ngay(+gio) [3]=ten khach [4]=SDT [8]=san pham [9]=ma SP [10]=so luong [11]=gia sau giam [12]=COD
+const pos = (ngay, ph, ten, sp, ma, sl, gia, cod, extra) => { const r = new Array(17).fill(''); r[0] = 1; r[1] = ngay; r[3] = ten; r[4] = ph; r[8] = sp; r[9] = ma; r[10] = sl; r[11] = gia; r[12] = cod; if (extra !== undefined) r[16] = extra; return r; };
+const dt = (d, h, m) => new Date(Date.UTC(2026, 9, d, h - 7, m));                // Date theo gio VN (UTC+7)
+const keyP = (r) => ctx._impOrderKey_('pos', r), partsP = (r) => ctx._impOrderKeyParts_('pos', r);
+ok(partsP(pos('05/10/2026 14:32', '0901', 'A', 'Nhan', 'N1', 1, 1000000, 500000)).k === partsP(pos('05/10/2026', '0901', 'A', 'Nhan', 'N1', 1, 1000000, 500000)).k, 'Pos: khoa KHONG gio giong nhau du 1 ben co gio, 1 ben chi co ngay');
+ok(ctx._impHmUnknown_('') && ctx._impHmUnknown_('00:00') && !ctx._impHmUnknown_('09:15'), "'' va '00:00' = chua biet gio; 09:15 la gio that");
+ok(ctx._impHmCompat_('', '14:32') && ctx._impHmCompat_('00:00', '14:32') && ctx._impHmCompat_('14:32', '14:32') && !ctx._impHmCompat_('09:15', '14:40'), 'gio tuong thich: 1 ben chua biet gio, hoac cung gio; 2 gio that khac nhau thi KHONG');
+ok(keyP(pos('05/10/2026 14:32', '0901', 'A', 'Nhan', 'N1', 1, 1000000, 0)) === 'p|05/10/2026|14:32|0901|a|nhan|n1|1|1000000|0'.replace('05/10/2026', ctx.normOrderDate_('05/10/2026')).replace('|a|', '|' + ctx._normTxt_('A') + '|').replace('|nhan|', '|' + ctx._normTxt_('Nhan') + '|').replace('|n1|', '|' + ctx._normTxt_('N1') + '|'), '_impOrderKey_ van ra khoa day du dang cu (co gio)');
+// Sheet co gio that / 00:00 / Date, file chi co NGAY (dung tinh huong bao 0 da co)
+const sP = [pos('05/10/2026 14:32', '0901111111', 'Hoa', 'Nhan vang', 'NV1', 1, 5000000, 2500000), pos(dt(6, 0, 0), '0902222222', 'Lan', 'Vong bac', 'VB1', 2, 3000000, 0),
+            pos('07/10/2026 00:00', '0903333333', 'Mai', 'Day chuyen', 'DC1', 1, 4000000, 4000000), pos(dt(8, 10, 5), '0904444444', 'Nga', 'Charm', 'CH1', 3, 900000, 0)];
+sheet = mkSheet(sP.map(x => x.slice())); logSheet = mkSheet([]);
+const fileP = [pos('05/10/2026', '0901111111', 'Hoa', 'Nhan vang', 'NV1', 1, 5000000, 2500000), pos('06/10/2026', '0902222222', 'Lan', 'Vong bac', 'VB1', 2, '3.000.000', 0),
+               pos('07/10/2026', '0903333333', 'Mai', 'Day chuyen', 'DC1', 1, 4000000, 4000000), pos('08/10/2026', '0904444444', 'Nga', 'Charm', 'CH1', 3, 900000, 0),
+               pos('09/10/2026', '0905555555', 'Van', 'Khuyen tai', 'KT1', 1, 2000000, 0)];
+let pv2 = ctx.doImportSheetRows_('pos', fileP, true);
+ok(pv2.dryRun && pv2.skippedExisting === 4 && pv2.wouldWrite === 1, 'Pos xem truoc: file chi co NGAY vs Sheet co gio/00:00/Date -> 4 da co, 1 moi (truoc day bao 0 da co / 5 moi)');
+const snapP = JSON.stringify(sheet.rows);
+let wp = ctx.doImportSheetRows_('pos', fileP);
+ok(wp.written === 1 && sheet.rows.length === 5 && JSON.stringify(sheet.rows.slice(0, 4)) === JSON.stringify(JSON.parse(snapP).slice(0, 4)) && sheet.rows[4][4] === '0905555555', 'Pos nhap that: chi them 1 don moi, 4 don cu khong bi them trung');
+wp = ctx.doImportSheetRows_('pos', fileP); ok(wp.written === 0 && sheet.rows.length === 5, 'Pos nhap lai: khong them gi');
+// Nguoc lai: file CO gio, Sheet chi co ngay
+sheet = mkSheet([pos('10/10/2026', '0906666666', 'Tu', 'Nhan', 'N2', 1, 1000000, 0)]);
+pv2 = ctx.doImportSheetRows_('pos', [pos('10/10/2026 16:20', '0906666666', 'Tu', 'Nhan', 'N2', 1, 1000000, 0)], true);
+ok(pv2.skippedExisting === 1 && pv2.wouldWrite === 0, 'Pos: file co gio, Sheet chi co ngay -> van la don da co');
+// 2 don THAT khac gio (cung khach/san pham/gia) van la 2 don rieng
+sheet = mkSheet([pos('11/10/2026 09:15', '0907777777', 'Dao', 'Nhan', 'N3', 1, 1000000, 0)]);
+pv2 = ctx.doImportSheetRows_('pos', [pos('11/10/2026 14:40', '0907777777', 'Dao', 'Nhan', 'N3', 1, 1000000, 0)], true);
+ok(pv2.skippedExisting === 0 && pv2.wouldWrite === 1, 'Pos: 2 gio THAT khac nhau (09:15 vs 14:40) cung khach+san pham+gia -> la 2 don, KHONG bi nuot');
+// Trung trong file: cung don khi 1 dong co gio, 1 dong chi ngay -> chi 1 dong moi
+sheet = mkSheet([]);
+pv2 = ctx.doImportSheetRows_('pos', [pos('12/10/2026 11:00', '0908888888', 'Ba', 'Nhan', 'N4', 1, 1000000, 0), pos('12/10/2026', '0908888888', 'Ba', 'Nhan', 'N4', 1, 1000000, 0)], true);
+ok(pv2.wouldWrite === 1 && pv2.skippedDupInFile === 1, 'Pos: cung don 1 dong co gio + 1 dong chi ngay trong file -> chi 1 dong moi');
+// Cap nhat don cu: khop duoc dong cu du lech gio; cot ngay KHONG bi coi la "doi" chi vi file thieu gio
+sheet = mkSheet([pos('13/10/2026 15:45', '0909999999', 'Cu', 'Nhan', 'N5', 1, 1000000, 0, 'ghi chu cu')]); logSheet = mkSheet([]);
+const upd = pos('13/10/2026', '0909999999', 'Cu', 'Nhan', 'N5', 1, 1000000, 0, 'ghi chu moi');
+let up = ctx.doImportSheetRows_('pos', [upd], true, true);
+ok(up.skippedExisting === 1 && up.wouldWrite === 0 && up.wouldUpdateRows === 1 && up.wouldUpdateCells === 1, 'Pos cap nhat: khop don cu du lech gio, chi 1 o doi (cot ghi chu), cot ngay khong bi coi la doi');
+up = ctx.doImportSheetRows_('pos', [upd], false, true);
+ok(up.updatedRows === 1 && sheet.rows[0][16] === 'ghi chu moi' && String(sheet.rows[0][1]).indexOf('15:45') >= 0, 'Pos cap nhat that: ghi o ghi chu, GIU nguyen ngay-gio cu 15:45');
 console.log('ALL IMPORT-SAFE TESTS PASSED');

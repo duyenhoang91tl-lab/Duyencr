@@ -274,7 +274,8 @@ function _quaySaleRatio_(nguonDon, ghiChu, hasSale) {
   // 30% la phan cua sale (chia deu tiep cho cac sale tham gia), 70% la cua quay. KHONG con bat buoc ghi chu
   // phai ghi '30/70' nhu ban truoc. Bo dau truoc khi so de khop bat ke hoa/thuong/dau.
   var nguonFold = String(nguonDon || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/\s+/g, ' ').trim();
-  if (nguonFold.indexOf('quay hao nam') !== -1 || nguonFold.indexOf('cua hang') !== -1) return QUAY_SALE_RATIO_;
+  var BR = _bizRules_(); // tu khoa nguon cua hang + ty le: cau hinh duoc (bizRules.quayKeywords / quayRatio), mac dinh Quay Hao Nam/Cua hang + QUAY_SALE_RATIO_
+  for (var qi = 0; qi < BR.quayFold.length; qi++) if (nguonFold.indexOf(BR.quayFold[qi]) !== -1) return BR.quayRatio;
   return 1;
 }
 
@@ -402,6 +403,7 @@ function buildSalesReportB_(filters) {
   function toArr(v){ return Array.isArray(v) ? v.filter(Boolean) : (v ? [String(v).trim()] : []); }
   var saleFilterArr = _expandSaleFilterWithPancakeAliases_(toArr(filters.sale));
   var saleFilterFold = saleFilterArr.map(_normTxt_);
+  var wantSaleB_ = _saleWantedFn_(saleFilterFold);
   var nguonFilterArr = toArr(filters.nguon);
   var marketerFilterArr = toArr(filters.marketer);
   var careStatusArr = toArr(filters.careStatus);
@@ -611,6 +613,7 @@ function buildSalesReportB_(filters) {
     var teamsOnOrderB = {};
     for (var si2 = 0; si2 < salesOnOrder.length; si2++) {
       var sName = salesOnOrder[si2];
+      if (!wantSaleB_(sName)) continue;   // dang loc Sale: khong liet ke nguoi dong ban nam ngoai bo loc (frac van theo ca don nen tien cua tung nguoi khong doi)
       var fr = fracOf(sName) * (m.saleRatio || 1); // saleRatio 0.3 = don Quay 30/70 (phan con lai 70% la cua quay)
       if (!bySale[sName]) bySale[sName] = { orders: 0, giaTri: 0, cod: 0 };
       bySale[sName].orders += 1;
@@ -744,6 +747,7 @@ function buildSalesReportB_(filters) {
     orders: matched.map(function(m){
       return {
         ngayTaoDon: m.ngayTaoDon, khachHang: m.khachHang, soDienThoai: m.soDienThoai,
+        posRow: m.posRow || undefined,   // dong that trong sheet "dữ liệu đơn" (de doi chieu tung don voi file Pancake goc — xem sheet chi tiet cua nut Xuat Excel doi chieu Bao cao B)
         nguonDon: m.nguonDon, theSale: m.theSale, trangThai: m.trangThai, sanPham: m.sanPham, maSanPham: m.maSanPham, soLuong: m.soLuong,
         giaTriSauGiam: m.giaTriSauGiam, cod: m.cod, marketer: m.marketer,
         // Ghi chu don Pos (cot Q) — CHUA ma don Pos de ke toan doi chieu (xuat Excel Bao cao G dung field nay). Cat 300 ky tu de payload khong phinh.
@@ -753,12 +757,10 @@ function buildSalesReportB_(filters) {
         giaTriPos: m.ghepShares ? m.giaTriPos : undefined,
         saleShares: m.ghepShares || undefined,
         saleRatio: m.saleRatio || undefined, // 0.3 = don Quay Hao Nam gan the sale + note 30/70
-        // BAO CAO TINH DON THUAN (20/10/2026, Duyen): saleThe = sale theo DUNG cot "Thẻ" (chia deu, KHONG ghep Base / KHONG file ke toan / KHONG quay 30-70);
-        // dieuChinh = 'acct' (file ke toan chia) | 'base' (ghep don Base) — don nao co 1 trong 2 hoac saleRatio la don "da dieu chinh" (client xuat Excel doi chieu).
+        // BAO CAO TINH DON THUAN (20/10/2026, Duyen): saleThe = sale theo DUNG cot "Thẻ" (chia deu) — KHONG ghep Base / KHONG file ke toan / KHONG quay 30/70.
+        // dieuChinh = 'acct' (chia theo file ke toan) | 'base' (ghep don Base); don co saleRatio cung la don da dieu chinh (client xuat Excel doi chieu).
         saleThe: _donSaleNamesFromThe_(m.theSale).join(','),
         dieuChinh: m.acctStatus ? 'acct' : (m.ghepShares ? 'base' : undefined),
-        acctStatus: m.acctStatus || undefined,
-        ghepCodes: m.ghepCodes || undefined,
         // Don Pos TACH da gop (xem _mergeTachDon_): tachKey = ma goc, tachSoDon = so phan, tachGiaTri = gia tri tung phan; giaTriSauGiam o tren = TONG cac phan.
         tachKey: m.tachKey || undefined, tachSoDon: m.tachSoDon || undefined, tachGiaTri: m.tachGiaTri || undefined,
         // saleBanValid: danh sach ten sale đã qua _donSaleNamesFromThe_ (loc theo danh sach ten

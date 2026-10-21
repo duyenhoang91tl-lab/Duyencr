@@ -348,11 +348,12 @@ function _remindersFromRows_(rows, csFilter) {
   // Ngay hom nay dang YYYY-MM-DD (gio dia phuong) de loc nhanh cot schedules truoc khi JSON.parse (ham nay chay moi ~5 phut/may).
   var todayYmd = today.getFullYear() + '-' + ('0' + (today.getMonth()+1)).slice(-2) + '-' + ('0' + today.getDate()).slice(-2);
   var reminders = [], byPhone = {};
+  var csSetR = csFilter ? _saleFilterNameSet_([csFilter]) : null;   // KHOP SALE: lich hen cua nguoi nay ke ca khi cot CS ghi bang ten khac cua ho
   for (var ri = 0; ri < rows.length; ri++) {
     var rw = rows[ri];
     if (!rw[0]) continue;
     var rcs = String(rw[3]||'').trim();
-    if (csFilter && rcs !== csFilter) continue;
+    if (csSetR && !csSetR[_normTxt_(rcs)]) continue;
     var npR = normPhone_(String(rw[0]));
     // (1) Hen chinh (cot schedHen) — CHI hen TRONG NGAY hom nay (khong lay qua han), nhu cu.
     var rhen = rw[12];

@@ -5,6 +5,30 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 - [x] **LỖI NHẬP POS**: file Pos chỉ có NGÀY (không giờ) mà Sheet có giờ / Date nửa đêm → khóa lệch ('00:00' ≠ '') → xem trước báo "0 đã có / 1.436 mới" (nếu bấm OK sẽ ghi TRÙNG cả tháng). Sửa `_impOrderKey_` (coi 00:00 = không giờ) + so thêm khóa không giờ khi file không có giờ. Test: `node tools/test-import-safe.js`. SAU KHI GAS deploy: nhập lại file xem trước phải ra "đã có" ≈ gần hết; CHƯA thấy vậy thì ĐỪNG bấm OK, kiểm tra khóa.
 - [x] js/11-fn-srload.js: cuối Báo cáo B có mục "🧮 Báo cáo tính đơn thuần" (sale theo cột Thẻ, chia đều, giá Pos gốc; không ghép Base/kế toán/quầy; cột Chênh so bảng chính) + nút "📥 Xuất Excel đối chiếu" 3 sheet: Đơn đã điều chỉnh / Theo Sale thuần vs đối chiếu / Cần kiểm tra tay. gas: mỗi đơn trả thêm `saleThe`, `dieuChinh`, `acctStatus`. Test: `node tools/test-pos-pure.js`.
 - [ ] CẦN LÀM TIẾP: chưa push được nếu thiếu token (đã commit local). Duyên mở Báo cáo B bấm Lọc, kéo xuống cuối kiểm tra số + file Excel.
+## 2026-10-20 — Nhập file Pos: sửa khóa so khớp lệch GIỜ (xem trước báo "0 đã có / 1.436 mới")
+- [x] **Nguyên nhân gốc:** khóa đơn Pos (`_impOrderKey_`) có cả GIỜ:PHÚT (`_impHm_`) nhưng file Excel chỉ có NGÀY (giờ rỗng) còn dòng đã có trong Sheet có giờ thật hoặc `00:00` → hai khóa khác nhau (`p|2026-10-05|14:32|…` vs `p|2026-10-05||…`) → mọi đơn bị coi là mới; bấm nhập thật sẽ THÊM TRÙNG toàn bộ.
+- [x] **Sửa (gas_v13.js):** `_impOrderKeyParts_` tách khóa thành `k` (không giờ) + `hm`; `_impHmUnknown_` ('' hoặc '00:00' = chưa biết giờ) khớp với MỌI giờ của cùng đơn (`_impHmCompat_`, `_impFindExist_`); 2 giờ THẬT khác nhau (09:15 vs 14:40, cùng khách/SP/giá) vẫn là 2 đơn riêng. Áp cho lọc đơn đã có, tìm dòng cũ để cập nhật (`updateExisting`) và loại trùng trong file. Base không đổi (không có giờ trong khóa). `_impOrderKey_` vẫn ra khóa đầy đủ dạng cũ.
+- [x] Test: `node tools/test-import-safe.js` (thêm 11 ca Pos: chỉ-ngày vs có giờ / 00:00 / Date, ngược lại, 2 giờ thật, trùng trong file, cập nhật giữ nguyên giờ cũ).
+- [ ] **Duyên làm tay:** chờ Actions deploy xanh → Nhập file Pos lại bằng file cũ → bấm **xem trước** (KHÔNG bấm OK nếu vẫn báo 0 đơn đã có) → gửi lại số "đã có / mới". Nếu vẫn báo 0: có thêm lệch ở cột khác (tên khách/giá/mã SP) — gửi 1 dòng mẫu cả file lẫn Sheet để chẩn đoán.
+
+
+## 2026-10-20 — Cấu hình danh sách báo cáo A–L (mục 4 của việc cấu hình bán CRM)
+- [x] Settings `reportsConfig`: bật/tắt + đặt tên từng báo cáo. js/06 (`_SR_DEFAULT_ITEMS_`, `_rcApply_`, `_srItems_`, `_srEnsureSubAllowed_`, nạp từ server), js/11 `_srSubSelectHtml_` + chuyển báo cáo khi bị ẩn, js/37 mục "🗂 Báo cáo hiển thị", gas_v13.js chỉ admin ghi. Test `node tools/test-reports-config.js`. Chi tiết: `docs/crm-kb/02-backend-gas.md`.
+- Giới hạn có chủ ý: chỉ ẨN ở giao diện chọn báo cáo, KHÔNG chặn backend/quyền dữ liệu; tên mới chỉ đổi ở ô chọn (tiêu đề bên trong từng báo cáo vẫn chữ cũ); báo cáo J (nhập dữ liệu), K không cấu hình.
+- [ ] CẦN LÀM TIẾP: (a) bậc KPI Báo cáo F; (b) bảng % hoa hồng mặc định Online/Offline; (c) chữ "15tr" còn lại (gas ~6185, js/27, js/08); (e) tên sheet/ID Google Sheet cứng theo công ty; (g) đổi tên báo cáo ở tiêu đề bên trong + menu/tab khác nếu cần. Duyên: Ctrl+F5 rồi vào ⚙ Cấu hình.
+
+## 2026-10-20 — Cấu hình quy tắc tính doanh thu/hoa hồng (bizRules) — để CRM bán ra ngoài
+Yêu cầu Duyên: cách tính doanh thu, hoa hồng, loại báo cáo… phải tự cài trong phần Cấu hình, không nằm cứng trong code. Chi tiết kỹ thuật: `docs/crm-kb/02-backend-gas.md` mục `bizRules`.
+- [x] Bước 1 (commit 694eeab) backend: `_bizRules_()` đọc Settings `bizRules`; áp cho trạng thái đơn Base/Pos bị loại, ngưỡng hoa hồng (csStats), tỷ lệ + từ khóa nguồn quầy 30/70. Mặc định = hành vi cũ.
+- [x] Bước 2+3 client + UI: js/06 (`COMMISSION_THRESHOLD` thành `let`, `_bizApply_`, `_commThrLabel_`, nạp từ server), js/37 mục "📐 Quy tắc tính doanh thu & hoa hồng" (lưu + Nhật ký + Về mặc định), js/12 chữ "15tr" cứng ở Báo cáo E thành nhãn động. Ghi `bizRules` chỉ admin có token (server chặn).
+- Test: `node tools/test-biz-rules.js`, `node tools/test-biz-rules-client.js` (14 test cũ khác đã lỗi sẵn trên bản gốc, không liên quan).
+- [ ] CẦN LÀM TIẾP (chưa làm, đề xuất theo thứ tự): (a) KPI Báo cáo F: hạng/mục tiêu `SALE_TIER_*` (gas ~4897) → đưa vào cấu hình; (b) bảng % hoa hồng mặc định `def` (Online/Offline) ở js/01 ~418 và csStats; (c) chữ "≥15tr" còn lại ở gas (~6185 lý do thưởng), js/27-fn-bonuscore.js (mốc thưởng vòng 15tr/20tr), js/08; (d) bật/tắt + đổi tên các báo cáo A–L theo công ty (`_PERM_TAB_DEFS`); (e) tên sheet cứng "DT TỔNG ", "dữ liệu đơn", ID Google Sheet cứng (PRICE_SS_ID...) → cấu hình theo công ty; (f) hạng khách `_TIER_DEFAULT_` đã có `tierConfig` riêng (js/33), chưa gộp vào trang Cấu hình.
+- [ ] Duyên cần làm tay: Ctrl+F5 web; vào ⚙ Cấu hình xem mục mới. Workflow GAS tự deploy (kiểm tra tab Actions xanh).
+
+## 2026-10-20 — Báo cáo Pos: mục "Tính đơn thuần" + Excel đối chiếu Base/quầy
+- [x] gas_v13.js `buildSalesReportB_`: mỗi đơn trả thêm `saleThe` (sale theo đúng cột Thẻ) và `dieuChinh` ('base' ghép Base | 'acct' file kế toán). `giaTriPos`/`saleShares`/`saleRatio` đã có sẵn.
+- [x] js/11-fn-srload.js: `_srPurePanelHtml_` (cuối Báo cáo B): bảng Theo Sale THUẦN (Thẻ + giá Pos gốc, không ghép Base/kế toán/quầy 30/70) + nút `_srPureExport_` xuất Excel 3 sheet: Tổng hợp theo Sale (thuần vs sau điều chỉnh vs bảng chính) / Đơn đã điều chỉnh / Cần kiểm tra tay. Test: `node tools/test-pure-report.js`.
+- [ ] CẦN LÀM TIẾP: (1) Duyên mở thử trên dữ liệu thật, so cột "Bảng chính" với "Sau điều chỉnh" trong Excel (phải bằng nhau khi không lọc Sale). (2) ✅ ĐÃ SỬA (2026-10-20, xem mục dưới): khóa so khớp Pos nay chịu được lệch giờ — Duyên xem trước lại, kỳ vọng số "đã có" > 0.
 
 ## 2026-10-20 — Thông báo từ cấm: báo đúng sale + bấm mở đúng đoạn chat
 - [x] gas_v13.js `_cvNotify_`: mỗi (nhân viên × HỘI THOẠI) 1 thông báo (tối đa 15/nhân viên/lượt quét); gửi cho admin VÀ cho CHÍNH sale đó (khớp tên Pancake/CRM với tài khoản CRM qua tên/username/bí danh; tài khoản khóa không nhận). Sale đọc "Bạn dùng từ cấm trong N tin với <khách>: ...". Tắt báo sale: Settings `chatAuditNotifySale=0` hoặc chạy `datChatAuditBaoSale(false)`. Thông báo: refType `chatviolation`, refId = ID hội thoại, refId2 = "SĐT|tên khách".
@@ -205,4 +229,19 @@ Yeu cau cua Duyen: Chat noi bo hien thi duoc o cua so chat nho o goc duoi phai (
 
 ## Báo cáo A/B "Theo Sale" lẫn người ngoài bộ lọc (kế toán, Mến)
 - Nguyên nhân: đơn có nhiều sale ("Kd + kế toán + Mến") → backend tạo thêm dòng cho người đồng bán dù không thuộc bộ lọc. Sửa phía giao diện `_srKeepSelectedSales_` (js/11): khi có chọn Sale/Team chỉ giữ dòng của người đã chọn (kể cả tên phụ); bỏ qua ở chế độ "người tạo đơn". Tổng/tiền chia đều vẫn do máy chủ tính. Test: tools/test-sr-keep-selected-sales.js.
+
+## RÀ SOÁT: mọi báo cáo theo DANH TÍNH CHUẨN (Khớp Sale) — 2026-10-15
+Chuẩn: chọn/ghi tên nào của 1 người cũng ra đủ dữ liệu của người đó (2 chiều), 1 người nhiều tên KHÔNG tách thành nhiều người, không lẫn người khác. Nguồn khớp: tài khoản Sale (role cs), Thẻ (salePersonTags), SaleDirectory, PancakeNameMap 1-1. Test: `node tools/test-sale-match-reports.js`, `tools/test-cs-filter-match.js`, `tools/test-sale-match.js`.
+| Báo cáo / chỗ lọc | Trước | Nay |
+|---|---|---|
+| A, B, C, F (KPI Sale), G (đơn thất bại), tỷ lệ chốt, thưởng/hoa hồng backend, csStats, hồ sơ | đã dùng khớp | giữ nguyên (lỗi gốc gộp Leader/Admin đã sửa ở bước 1) |
+| D (khách tự thêm) lọc CS | so tên thô | `_saleFilterNameSet_` |
+| KPI Pancake (`buildKpiReport_`) lọc Sale (cũng là phạm vi dữ liệu phía server) | so tên thô | `_saleFilterNameSet_` |
+| L (khách qua cửa hàng) `same()` | alias riêng (SaleDirectory+Pancake), không có Thẻ/tài khoản | thêm `_salePersonKeyFn_` |
+| Phân tích Team (`buildTeamMetrics_`) | khoá theo tên thô → 1 người nhiều tên thành nhiều người, số liệu các nguồn rơi vào người khác nhau | khoá theo danh tính, CỘNG DỒN doanh thu/đơn/tương tác/đơn huỷ/KH tự thêm, tính lại % mục tiêu, tỷ lệ chốt theo trọng số |
+| Tổng quan tổ chức (`orgOverview_`, `_orgApplyDepts_`) | thành viên Team/phòng khớp tên thô | khoá theo danh tính |
+| Checklist MKT — Theo Team Sale | `nhomOf` tra SaleDirectory theo tên thô; 1 người nhiều tên đếm nhiều Sale | thêm tra theo danh tính + đếm 1 người = 1 Sale |
+| Nhắc lịch hẹn (`_remindersFromRows_`), lọc "data chia" (`assign`) và đánh dấu xong (`toggleAssignDone_`) | CS so tên thô | `_saleFilterNameSet_` |
+| Danh sách khách hàng, thống kê, xuất CSV: lọc CS (`_inCSScope`, `scopedCustomers`, `_csFilterHas`…) | so tên thô | `_csFilterListMatch()` (chọn + mọi tên cùng người, quy về đúng cách viết trong dữ liệu) |
+**CHƯA đổi (cần Duyên quyết)**: E/G (hoa hồng + thưởng, tính ở client `_computeCommissionData_`/`_computeBonusData_`) vẫn gom theo TÊN trên đơn Pos; 1 người dùng 2 thẻ tên khác nhau sẽ ra 2 dòng và bậc thưởng theo ngày tính riêng từng tên. Nguyên nhân chưa sửa: tỷ lệ hoa hồng, kênh (SALE_CHANNELS) và chương trình thưởng đang cấu hình THEO TÊN — đổi tên chuẩn sẽ làm lệch cấu hình. Hướng đề xuất: chuẩn hoá tên về tên chính ngay ở backend B (`saleBanValid`) đồng thời tra cấu hình theo mọi tên cùng người. Báo cáo H/I (chia data, client) dùng `_dedupePeopleNames` sẵn có. Tổng quan Dashboard không gom theo tên Sale.
 - [x] Giam sat chat Pancake GD1 (2026-10-17): quet pk_messages 'out' theo tu cam (sheet 'Luu y tu cam'), ghi ChatViolations + thong bao duyenht. Can Duyen: xemTuCamGiamSat, datChatAuditBoQua('tien, loc') neu bao ngap, batGiamSatChat(24). GD2 (canh bao ngay tren Pancake/extension) CHUA lam. Chi tiet: docs/GIAM-SAT-CHAT.md.

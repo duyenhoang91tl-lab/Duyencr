@@ -16,7 +16,7 @@ const consts = between("var DT_TONG_SHEET", "// SUA 2026-10-04: 15") + between("
 const NAMES = ['_vnYmdParts_', '_vnMidnight_', 'normPhone_', '_dtCellToVnStr_', '_normMoney_', 'parseVNDate_', 'splitMulti_', '_donConvertRows_', 'dtRowToOrder_',
   '_hiddenPageSaleSets_', '_isDTRowHidden_', '_donSaleNamesFromThe_', 'readDTTong_', 'readOrdersByPhone_', '_dedupeSameOrders_', '_readOrdersByPhoneSheets_',
   'findDonRowsByPhone_', 'readDonChiTiet_', 'readRemindersToday_', '_remindersFromRows_'];
-const code = [consts, 'var VN_OFFSET_MS = 7 * 3600 * 1000; var SH_CARE = "CareData";', NAMES.map(fnSrc).join('\n'), src.slice(src.indexOf('var SB_BATCH_ ='))].join('\n');
+const code = [consts, 'var VN_OFFSET_MS = 7 * 3600 * 1000; var SH_CARE = "CareData"; function _saleFilterNameSet_(arr) { var o = {}; (arr || []).forEach(function(n) { o[_normTxt_(n)] = true; }); return o; }', NAMES.map(fnSrc).join('\n'), src.slice(src.indexOf('var SB_BATCH_ ='))].join('\n');
 
 const ok = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1); } };
 const D = (y, m, d, h = 0, mi = 0) => new Date(Date.UTC(y, m - 1, d, h, mi));
