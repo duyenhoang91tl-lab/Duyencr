@@ -1412,6 +1412,13 @@ async function _impOnFileSelected(input, kind){
   }
 }
 
+// Doc phan hoi nhap file: neu khong phai JSON (trang loi HTML / "error code: 524") thi bao loi de hieu thay vi "Unexpected token".
+async function _impJson_(res){
+  var txt = await res.text();
+  try { return JSON.parse(txt); }
+  catch(e){ throw new Error('Máy chủ không trả kết quả hợp lệ (' + String(txt).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) + ') — nếu là "524" nghĩa là quá thời gian chờ; chưa ghi gì với bước xem trước.'); }
+}
+
 async function _impUpload(kind){
   if (!gsUrl){ toast('❌ Chưa cấu hình URL Google Apps Script.'); return; }
   var rows = kind === 'base' ? _impState.baseRows : _impState.posRows;
@@ -1423,8 +1430,11 @@ async function _impUpload(kind){
     // (không có d0.dryRun) -> không bao giờ ghi 2 lần: dùng kết quả đó luôn như trước.
     var _lbl = kind === 'base' ? 'Base (DT TỔNG)' : 'Pos (dữ liệu đơn)';
     var _isReal = false, d = null;
-    var res0 = await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'importSheetRows', sheet: kind, rows: rows, dryRun: true, updateExisting: true }) });
-    var d0 = await res0.json();
+    // NHAP FILE GOI THANG Apps Script (khong qua Worker/Cloudflare): Cloudflare cat moi request sau ~100 giay (loi 524 "error code: 524"),
+    // trong khi doc+doi chieu ca sheet DT TONG co the lau hon -> nhap that bai TRUOC khi cap nhat duoc don (vd don da "That bai" van giu "Dang xu ly").
+    var impUrl = (typeof GAS_URL_DIRECT !== 'undefined' && GAS_URL_DIRECT) ? GAS_URL_DIRECT : gsUrl;
+    var res0 = await fetch(impUrl, { method:'POST', body: JSON.stringify({ action:'importSheetRows', sheet: kind, rows: rows, dryRun: true, updateExisting: true }) });
+    var d0 = await _impJson_(res0);
     if (d0.error) throw new Error(d0.error);
     if (d0.dryRun) {
       if (!d0.wouldWrite && !d0.wouldUpdateRows) {
@@ -1440,8 +1450,8 @@ async function _impUpload(kind){
         + '\nDữ liệu cũ trên Sheet được GIỮ NGUYÊN 100%. Tiếp tục nhập?')) { toast('Đã hủy — chưa ghi gì.'); return; }
     } else { _isReal = true; d = d0; }
     if (!_isReal) {
-      var res = await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'importSheetRows', sheet: kind, rows: rows, updateExisting: true }) });
-      d = await res.json();
+      var res = await fetch(impUrl, { method:'POST', body: JSON.stringify({ action:'importSheetRows', sheet: kind, rows: rows, updateExisting: true }) });
+      d = await _impJson_(res);
     }
     if (d.error) throw new Error(d.error);
     _impState.result = Object.assign({ kind: kind }, d);
