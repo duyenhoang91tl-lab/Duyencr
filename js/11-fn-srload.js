@@ -1122,6 +1122,7 @@ function _srRenderB(d){
       html += _srChartSvg(productRows, 'name', 'soLuong', _srState.bProductView, false);
     }
   }
+  html += _srBaseCheckPanelHtml_(d);   // Báo cáo check ngược Base (đơn Pos ghép đơn gốc Base) + nút xuất Excel cho kế toán
   html += _srPosMonthPanelHtml_();
   html += _srPurePanelHtml_(d);   // CUỐI CÙNG: báo cáo tính đơn thuần theo Thẻ + nút xuất Excel đối chiếu Base / chia quầy
   return html;
@@ -1260,6 +1261,108 @@ function _srPureExport_(){
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(chk), 'Cần kiểm tra tay');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(_srPureDetailRows_(orders)), 'Chi tiết thuần từng đơn');
   XLSX.writeFile(wb, 'BaoCao_Pos_DonThuan_DoiChieu_' + _ymd(new Date()) + '.xlsx');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BÁO CÁO CHECK NGƯỢC BASE (21/10/2026, Duyên: kế toán đối chiếu TỪNG đơn Pos ↔ đơn gốc Base ↔ chia sale, xuất Excel)
+// Nguồn: d.orders[].ghepBase (backend trả từng đơn gốc Base đã khớp qua mã bộ đếm ở ghi chú Pos) + saleShares (tỷ lệ chia).
+// Chỉ liệt kê đơn Pos ĐÃ GHÉP được với Base (có ghepBase). Đơn có mã nhưng không khớp / trùng đơn gốc / gốc bị loại nằm ở sheet "Cần kiểm tra tay".
+// ═══════════════════════════════════════════════════════════════════════════
+function _srBcOrders_(d){ return ((d && d.orders) || []).filter(function(o){ return o.ghepBase && o.ghepBase.length; }); }
+function _srBcBaseSum_(o){ return (o.ghepBase || []).reduce(function(s, b){ return s + (b.tinh ? (Number(b.giaTri) || 0) : 0); }, 0); }
+function _srBcPosVal_(o){ return (o.giaTriPos !== undefined && o.giaTriPos !== null) ? (Number(o.giaTriPos) || 0) : (Number(o.giaTriSauGiam) || 0); }
+function _srBcQuayTxt_(o){ return (o.saleRatio && Number(o.saleRatio) !== 1) ? ('Quầy ' + Math.round(Number(o.saleRatio) * 100) + '%') : ''; }
+// Dựng 3 bảng dữ liệu (mảng-của-mảng, dòng đầu là tiêu đề) + tổng. Tiền của đơn (Giá Pos / Tổng Base / Chênh) CHỈ ghi ở dòng đầu mỗi đơn để SUM cột không bị cộng lặp.
+function _srBcBuild_(orders){
+  var detail = [['STT đơn Pos', 'Dòng trong sheet "dữ liệu đơn"', 'Ngày Pos', 'Khách', 'SĐT', 'Nguồn đơn', 'Thẻ Pos (nguyên văn)', 'Giá Pos gốc (1 lần/đơn)', 'Ghi chú Pos', 'Mã bộ đếm đã khớp',
+    'Dòng trong DT TỔNG (Base)', 'Mã Base', 'Ngày tạo Base', 'Người tạo Base', 'Sale bán (Base)', 'Trạng thái Base', 'Giá trị đơn gốc Base', 'Có tính doanh thu?', 'Tổng Base được tính (1 lần/đơn)', 'Chênh Base − Pos (1 lần/đơn)']];
+  var chia = [['STT đơn Pos', 'Dòng trong sheet "dữ liệu đơn"', 'Ngày Pos', 'Khách', 'SĐT', 'Sale', 'Phần chia (%)', 'Tiền chia (theo Base)', 'Ghi chú']];
+  var tot = { don: 0, pos: 0, base: 0, lech: 0 };
+  (orders || []).forEach(function(o, i){
+    var posV = _srBcPosVal_(o), baseV = _srBcBaseSum_(o);
+    tot.don++; tot.pos += posV; tot.base += baseV;
+    if (Math.abs(baseV - posV) > 1) tot.lech++;
+    (o.ghepBase || []).forEach(function(b, k){
+      var first = k === 0;
+      detail.push([i + 1, o.posRow || '', o.ngayTaoDon || '', o.khachHang || '', o.soDienThoai || '', o.nguonDon || '', o.theSale || '', first ? Math.round(posV) : '', o.ghiChu || '', (o.ghepCodes || []).join(', '),
+        b.dong || '', b.ma || '', b.ngay || '', b.nguoiTao || '', b.saleBan || '', b.trangThai || '', Math.round(Number(b.giaTri) || 0), b.tinh ? 'Có' : 'Không (đơn Base bị loại)',
+        first ? Math.round(baseV) : '', first ? Math.round(baseV - posV) : '']);
+    });
+    _srOrderShares_(o, 'adj').forEach(function(x){
+      chia.push([i + 1, o.posRow || '', o.ngayTaoDon || '', o.khachHang || '', o.soDienThoai || '', x.name, Math.round(x.frac * 1000) / 10, Math.round(x.giaTri), _srBcQuayTxt_(o)]);
+    });
+  });
+  return { detail: detail, chia: chia, tot: tot };
+}
+// Sheet "Cần kiểm tra tay": mã có nhưng không khớp Base / mã trùng đơn gốc / đơn Pos bị bỏ vì gốc Base đã Thất bại / nghi ghép nhưng chưa ghép.
+function _srBcCheckRows_(d){
+  var chk = [['Nhóm', 'Ngày', 'SĐT', 'Khách / Thẻ sale', 'Mã bộ đếm', 'Giá Pos', 'Ghi chú / chi tiết']];
+  var g = (d && d.ghep) || {};
+  (g.khongKhop || []).forEach(function(x){ chk.push(['Có mã bộ đếm nhưng KHÔNG khớp Base (đang tính theo Thẻ Pos)', x.ngay, x.sdt, '', (x.maCoDon || []).join(', '), '', (x.ghiChu || '') + (x.maKhongTim && x.maKhongTim.length ? ' — mã không tìm thấy: ' + x.maKhongTim.join(', ') : '')]); });
+  (g.trungDonGoc || []).forEach(function(x){ chk.push(['Mã trùng đơn gốc Base đã dùng cho đơn Pos khác (đang tính theo Thẻ Pos)', x.ngay, x.sdt, '', (x.maCoDon || []).join(', '), '', x.ghiChu || '']); });
+  (g.gocBiLoaiList || []).forEach(function(x){ chk.push(['Đơn Pos BỊ BỎ khỏi doanh thu vì mọi đơn gốc Base đã Thất bại', x.ngay, x.sdt, (x.khach || '') + (x.theSale ? ' / ' + x.theSale : ''), (x.ma || []).join(', '), x.giaPos, x.ghiChu || '']); });
+  ((d && d.ghepCheck && d.ghepCheck.list) || []).forEach(function(x){ chk.push(['Nghi ghép nhưng CHƯA ghép (≥2 mã / chữ "ghép")', x.ngay, x.sdt, x.theSale, (x.ma || []).join(', '), x.gia, x.ghiChu || '']); });
+  if (chk.length === 1) chk.push(['(không có mục nào cần kiểm tra tay)', '', '', '', '', '', '']);
+  return chk;
+}
+function _srBaseCheckPanelHtml_(d){
+  if (!d || !d.orders) return '';
+  var orders = _srBcOrders_(d), g = d.ghep || {};
+  var b = _srBcBuild_(orders), t = b.tot;
+  var h = '<div class="dash-section-title" style="margin-top:26px">🔁 Báo cáo check ngược Base <span style="font-weight:400;color:var(--muted);font-size:11px">(đơn Pos đã ghép với đơn gốc Base qua mã bộ đếm ở ghi chú — chia sale theo đơn gốc Base)</span></div>';
+  h += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Đơn Pos đã ghép: <b>' + fmt(t.don) + '</b> · Giá Pos gốc <b>' + _srMoney(t.pos) + '</b> · Doanh thu theo Base <b>' + _srMoney(t.base) + '</b> · Chênh <b>' + _srMoney(t.base - t.pos) + '</b>' +
+    ' · Cần kiểm tra tay: không khớp <b>' + fmt(g.khongKhopCount || 0) + '</b>, trùng đơn gốc <b>' + fmt(g.trungDonGocCount || 0) + '</b>, gốc Base Thất bại (đơn Pos bị bỏ) <b>' + fmt(g.gocBiLoai || 0) + '</b>, nghi ghép chưa ghép <b>' + fmt((d.ghepCheck && d.ghepCheck.count) || 0) + '</b>. ' +
+    '<button class="btn sm" onclick="_srBaseCheckExport_()">📥 Xuất Excel check ngược Base</button></div>';
+  if (!orders.length){ return h + '<div style="font-size:12px;color:var(--muted)">Trong kỳ đang chọn không có đơn Pos nào ghép được với Base (ghi chú Pos cần ≥2 mã bộ đếm).</div>'; }
+  var LIM = 100;
+  h += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Ngày</th><th>Khách / SĐT</th><th>Thẻ Pos</th><th style="text-align:right">Giá Pos gốc</th><th style="text-align:right">Theo Base</th><th style="text-align:right">Chênh</th><th>Đơn gốc Base</th><th>Chia sale (theo Base)</th></tr></thead><tbody>';
+  orders.slice(0, LIM).forEach(function(o){
+    var posV = _srBcPosVal_(o), baseV = _srBcBaseSum_(o), lech = baseV - posV;
+    var src = (o.ghepBase || []).map(function(x){ return esc((x.ma || '') + ' · ' + (x.nguoiTao || '?') + ' · ' + (x.saleBan || '(chưa gán)') + ' · ' + fmt(Math.round(Number(x.giaTri) || 0)) + (x.tinh ? '' : ' (bị loại: ' + (x.trangThai || '') + ')')); }).join('<br>');
+    var sh = _srOrderShares_(o, 'adj').map(function(x){ return esc(x.name) + ' ' + fmt(Math.round(x.giaTri)) + ' (' + (Math.round(x.frac * 1000) / 10) + '%)'; }).join('<br>') + (_srBcQuayTxt_(o) ? '<br><i>' + esc(_srBcQuayTxt_(o)) + '</i>' : '');
+    h += '<tr><td>' + esc(o.ngayTaoDon || '') + '</td><td>' + esc(o.khachHang || '') + '<br><span style="color:var(--muted)">' + esc(o.soDienThoai || '') + '</span></td><td>' + esc(o.theSale || '') + '</td>' +
+      '<td style="text-align:right">' + _srMoney(posV) + '</td><td style="text-align:right">' + _srMoney(baseV) + '</td><td style="text-align:right;' + (Math.abs(lech) > 1 ? 'color:#c00;font-weight:600' : '') + '">' + _srMoney(lech) + '</td><td style="font-size:11.5px">' + src + '</td><td style="font-size:11.5px">' + sh + '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  if (orders.length > LIM) h += '<div style="font-size:11.5px;color:var(--muted);margin-top:6px">Đang hiện ' + LIM + '/' + fmt(orders.length) + ' đơn — bấm <b>Xuất Excel</b> để xem đủ.</div>';
+  return h;
+}
+function _srBaseCheckExport_(){
+  var d = _srState.dataB;
+  if (!d || !d.orders){ alert('Chưa có dữ liệu Báo cáo B — hãy tải báo cáo trước.'); return; }
+  if (typeof XLSX === 'undefined'){ alert('Thiếu thư viện Excel (XLSX).'); return; }
+  var orders = _srBcOrders_(d), b = _srBcBuild_(orders), t = b.tot, g = d.ghep || {};
+  var pure = _srPureCalc_(orders, 'pure'), adj = _srPureCalc_(orders, 'adj'), pm = {}, am = {}, names = [];
+  pure.rows.forEach(function(r){ pm[r.name] = r; if (names.indexOf(r.name) < 0) names.push(r.name); });
+  adj.rows.forEach(function(r){ am[r.name] = r; if (names.indexOf(r.name) < 0) names.push(r.name); });
+  names.sort(function(x, y){ return ((am[y] || {}).giaTri || 0) - ((am[x] || {}).giaTri || 0); });
+  var z = { orders: 0, giaTri: 0 };
+  var bySale = [['Sale', 'Số đơn (chia theo Thẻ Pos)', 'Giá trị (theo Thẻ Pos, giá Pos gốc)', 'Số đơn (theo đơn gốc Base)', 'Giá trị (theo đơn gốc Base)', 'Chênh số đơn', 'Chênh giá trị (Base − Thẻ Pos)']];
+  names.forEach(function(n){ var p = pm[n] || z, a = am[n] || z; bySale.push([n, p.orders, Math.round(p.giaTri), a.orders, Math.round(a.giaTri), a.orders - p.orders, Math.round(a.giaTri - p.giaTri)]); });
+  var ov = [['Chỉ tiêu', 'Giá trị'],
+    ['Ngày xuất', new Date().toLocaleString('vi-VN')],
+    ['Số đơn Pos đã ghép với Base (trong kỳ đang chọn)', t.don],
+    ['Tổng giá Pos gốc của các đơn này', Math.round(t.pos)],
+    ['Tổng doanh thu theo đơn gốc Base (chỉ đơn Base còn tính)', Math.round(t.base)],
+    ['Chênh (Base − Pos)', Math.round(t.base - t.pos)],
+    ['Số đơn Pos có giá lệch Base (> 1đ)', t.lech],
+    ['Đơn Pos có mã bộ đếm (≥2 mã)', g.donCoMa || 0],
+    ['— đã ghép được', g.daGhep || 0],
+    ['— có mã nhưng KHÔNG khớp Base', g.khongKhopCount || 0],
+    ['— mã trùng đơn gốc đã dùng', g.trungDonGocCount || 0],
+    ['— bị bỏ vì mọi đơn gốc Base Thất bại', g.gocBiLoai || 0],
+    ['Nghi ghép nhưng CHƯA ghép', (d.ghepCheck && d.ghepCheck.count) || 0],
+    ['', ''],
+    ['Cách đọc', 'Sheet "Check ngược từng đơn": mỗi dòng = 1 đơn Pos × 1 đơn gốc Base; các cột tiền của đơn Pos chỉ ghi ở dòng đầu mỗi đơn nên SUM cột không bị lặp.'],
+    ['', 'Sheet "Chia theo sale": phần tiền từng sale của mỗi đơn Pos theo đơn gốc Base (đã gồm quầy 30/70 nếu có). Lọc cột Sale rồi SUM "Tiền chia" = số trên bảng Theo Sale.'],
+    ['', 'Đơn Pos KHÔNG có trong sheet này: đơn không ghi mã bộ đếm hoặc chỉ 1 mã (tính thuần theo Thẻ Pos).']];
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ov), 'Tổng quan');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(b.detail), 'Check ngược từng đơn');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(b.chia), 'Chia theo sale');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(bySale), 'Tổng theo sale (đơn ghép)');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(_srBcCheckRows_(d)), 'Cần kiểm tra tay');
+  XLSX.writeFile(wb, 'BaoCao_Pos_CheckNguocBase_' + _ymd(new Date()) + '.xlsx');
 }
 
 // ── CHOT THANG POS + TRU HOAN/HUY THANG TRUOC (quy tac 5, Duyen 10/2026) — chi Admin ──
