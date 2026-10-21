@@ -20,7 +20,8 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 - [x] tools/test-import-safe.js: bổ sung khung test cho _impBatchLog_/Logger (phiên thêm hoàn tác nhập quên cập nhật test).
 - [x] Server nhập Pos 43.754 dòng (kể cả ô null) chạy đúng ở mô phỏng Node (xem trước + ghi thật, ~0,5s) -> lỗi KHÔNG nằm ở logic nhập.
 - [x] js/11 `_impUpload`: renderSalesReportTab() ở đầu hàm (ngoài try) và trong finally có thể ném lỗi và bị tab Up dữ liệu báo nhầm là lỗi lưu -> bọc `_impRender_()` (try/catch + console.error). js/14 `_upRun_` ghi stack ra Console.
-- [ ] CẦN LÀM TIẾP: nếu vẫn lỗi sau khi tải lại web (Ctrl+F5), lấy dòng đỏ trong Console (F12) có chữ "[nhap file]" / "[up du lieu]" để biết đúng hàm gây null.length.
+- [x] NGUYÊN NHÂN THẬT (từ Console của Duyên): `_impPickCard_` (js/11) đọc `rows.length` khi `_impState.posRows/baseRows = null` nhưng `...FileName` còn -> ném lỗi mỗi lần vẽ lại. Do `_upSaveItem_` (js/14) đặt rows=null khi lưu lỗi mà không xóa tên file. Đã sửa cả 2 chỗ (guard `fname && rows`, và xóa tên file cùng lúc).
+- [ ] (đã xử lý, giữ để tra) nếu vẫn lỗi sau khi tải lại web (Ctrl+F5), lấy dòng đỏ trong Console (F12) có chữ "[nhap file]" / "[up du lieu]" để biết đúng hàm gây null.length.
 
 ## 2026-10-20 — Nhập file Pos: sửa khóa so khớp lệch GIỜ (xem trước báo "0 đã có / 1.436 mới")
 - [x] **Nguyên nhân gốc:** khóa đơn Pos (`_impOrderKey_`) có cả GIỜ:PHÚT (`_impHm_`) nhưng file Excel chỉ có NGÀY (giờ rỗng) còn dòng đã có trong Sheet có giờ thật hoặc `00:00` → hai khóa khác nhau (`p|2026-10-05|14:32|…` vs `p|2026-10-05||…`) → mọi đơn bị coi là mới; bấm nhập thật sẽ THÊM TRÙNG toàn bộ.

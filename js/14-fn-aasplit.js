@@ -761,7 +761,7 @@ async function _upSaveItem_(it){
     msg = await _upRun_(function(){ return _impUpload(k); });
     var r = _impState.result; ok = !!(r && r.kind === k);
     if (ok) it.msg = 'Đã nhập ' + fmt(r.written) + ' dòng mới' + (r.dedupedAfter ? ' · tự loại ' + fmt(r.dedupedAfter) + ' dòng trùng' : '');
-    else { if (k === 'base') _impState.baseRows = null; else _impState.posRows = null; it.msg = _upClean_(msg) || 'Lưu lỗi.'; }
+    else { if (k === 'base'){ _impState.baseRows = null; _impState.baseFileName = ''; } else { _impState.posRows = null; _impState.posFileName = ''; } it.msg = _upClean_(msg) || 'Lưu lỗi.'; }
   } else if (k === 'pk_eng'){
     _pkState.parsedRows = it.rows; _pkState.parsedUnmapped = [];
     msg = await _upRun_(_pkUploadToCRM);

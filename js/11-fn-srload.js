@@ -1483,7 +1483,7 @@ function _impPickCard_(kind, label, hint, sheetTarget){
   html += '<div style="font-weight:600;margin-bottom:4px">'+label+'</div>';
   html += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">'+hint+' — sẽ nối tiếp vào sheet <b>"'+esc(sheetTarget)+'"</b>.</div>';
   html += '<input type="file" id="imp-file-'+kind+'" accept=".xlsx,.xls" onchange="_impOnFileSelected(this,\''+kind+'\')" style="font-size:12px">';
-  if (fname){
+  if (fname && rows && rows.length){   // NGUYEN NHAN GOC 21/10/2026: tab 'Up du lieu' dat rows=null khi luu loi nhung ten file con -> rows.length ném lỗi moi lan ve lai
     html += '<div style="margin-top:8px;font-size:12px">📄 '+esc(fname)+' — <b>'+fmt(rows.length)+'</b> dòng đọc được.</div>';
     if (warn) html += '<div style="margin-top:6px;padding:6px 8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:11.5px;color:#9a3412">'+esc(warn)+'</div>';
     html += '<button class="btn sm primary" style="margin-top:8px" '+(_impState.uploading?'disabled':'')+' onclick="_impUpload(\''+kind+'\')">'+(_impState.uploading?'Đang nhập...':'💾 Nhập '+fmt(rows.length)+' dòng vào CRM')+'</button>';
