@@ -664,7 +664,7 @@ function _impDiffRow_(sheetKey, oldVals, newRow, width) {
   return out;
 }
 
-function doImportSheetRows_(sheetKey, rows, dryRun, updateExisting) {
+function doImportSheetRows_(sheetKey, rows, dryRun, updateExisting, who) {
   if (!Array.isArray(rows) || !rows.length) return jsonOut_({ error: 'Không có dòng nào để nhập.' });
   var sheetName = sheetKey === 'pos' ? DON_CHITIET_SHEET : (sheetKey === 'base' ? DT_TONG_SHEET : '');
   if (!sheetName) return jsonOut_({ error: 'Tham số sheet không hợp lệ (chỉ nhận "base" hoặc "pos").' });
@@ -676,12 +676,12 @@ function doImportSheetRows_(sheetKey, rows, dryRun, updateExisting) {
   var impLock = LockService.getScriptLock();
   if (!impLock.tryLock(25000)) return jsonOut_({ error: 'Hệ thống đang xử lý 1 lần nhập khác — đợi vài giây rồi bấm lại (KHÔNG bấm liên tục).' });
   try {
-    return doImportSheetRowsLocked_(sheetKey, sheetName, sh, rows, dryRun === true, updateExisting === true);
+    return doImportSheetRowsLocked_(sheetKey, sheetName, sh, rows, dryRun === true, updateExisting === true, who);
   } finally {
     try { impLock.releaseLock(); } catch (eRel) {}
   }
 }
-function doImportSheetRowsLocked_(sheetKey, sheetName, sh, rows, dryRun, updateExisting) {
+function doImportSheetRowsLocked_(sheetKey, sheetName, sh, rows, dryRun, updateExisting, who) {
   var width = 0;
   for (var i = 0; i < rows.length; i++) {
     if (!Array.isArray(rows[i])) return jsonOut_({ error: 'Dữ liệu dòng ' + (i + 1) + ' không đúng định dạng (không phải mảng).' });
@@ -744,7 +744,7 @@ function doImportSheetRowsLocked_(sheetKey, sheetName, sh, rows, dryRun, updateE
   if (dryRun) return jsonOut_({ ok: true, dryRun: true, wouldWrite: toWrite.length, skippedDupInFile: skippedDupInFile, skippedExisting: skippedExisting, readRows: rows.length,
     wouldUpdateRows: updPlan.length, wouldUpdateCells: updCells, updateOverLimit: updOverLimit });
   // CAP NHAT don cu (neu client bat updateExisting): chi ghi o doi, giu nguyen cong thuc, ghi nhat ky gia tri cu.
-  var updatedRows = 0, updatedCells = 0;
+  var updatedRows = 0, updatedCells = 0, updLogFrom = 0, updLogCount = 0;
   if (updPlan.length) {
     var logRows = [], nowU = new Date();
     for (var u = 0; u < updPlan.length; u++) {
@@ -762,13 +762,14 @@ function doImportSheetRowsLocked_(sheetKey, sheetName, sh, rows, dryRun, updateE
       if (changed) { rng.setValues([outRow]); updatedRows++; updatedCells += changed; }
     }
     if (logRows.length) {
-      try { var lgS = getSheet_(SH_IMPORT_UPD_LOG, IMPORT_UPD_LOG_HEADERS); lgS.getRange(lgS.getLastRow() + 1, 1, logRows.length, IMPORT_UPD_LOG_HEADERS.length).setValues(logRows); } catch (eLg) {}
+      try { var lgS = getSheet_(SH_IMPORT_UPD_LOG, IMPORT_UPD_LOG_HEADERS); updLogFrom = lgS.getLastRow() + 1; lgS.getRange(updLogFrom, 1, logRows.length, IMPORT_UPD_LOG_HEADERS.length).setValues(logRows); updLogCount = logRows.length; } catch (eLg) { updLogFrom = 0; updLogCount = 0; }
     }
     SpreadsheetApp.flush();
   }
   if (!toWrite.length) {
     if (updatedRows) { sbMarkOrdersDirty_(sheetName === DON_CHITIET_SHEET ? 'don' : 'dt', 'import'); try { var c0 = CacheService.getScriptCache(); if (sheetName === DON_CHITIET_SHEET) c0.removeAll(['donChiTiet_v4_n', 'don_phones_v6_n']); else c0.removeAll(['srptOptions_v3', 'orders_v1_n']); } catch (e0) {} }
-    return jsonOut_({ ok: true, written: 0, skippedDupInFile: skippedDupInFile, skippedExisting: skippedExisting, dedupedAfter: 0, updatedRows: updatedRows, updatedCells: updatedCells, updateOverLimit: updOverLimit });
+    var batchId0 = updatedRows ? _impBatchLog_(sheetName, sheetKey, 0, [], updLogFrom, updLogCount, who) : '';
+    return jsonOut_({ ok: true, written: 0, skippedDupInFile: skippedDupInFile, skippedExisting: skippedExisting, dedupedAfter: 0, updatedRows: updatedRows, updatedCells: updatedCells, updateOverLimit: updOverLimit, batchId: batchId0 });
   }
 
   var rowsBefore = sh.getLastRow();
@@ -794,7 +795,153 @@ function doImportSheetRowsLocked_(sheetKey, sheetName, sh, rows, dryRun, updateE
     else cache.removeAll(['srptOptions_v3', 'orders_v1_n']);
   } catch (ec) {}
 
-  return jsonOut_({ ok: true, written: toWrite.length, skippedDupInFile: skippedDupInFile, skippedExisting: skippedExisting, dedupedAfter: dedupRes.deleted, updatedRows: updatedRows, updatedCells: updatedCells, updateOverLimit: updOverLimit });
+  var batchId = _impBatchLog_(sheetName, sheetKey, rowsBefore + 1, toWrite.map(function (wr) { var pr = wr.slice(0); while (pr.length < keyW) pr.push(''); return pr; }), updLogFrom, updLogCount, who);
+  return jsonOut_({ ok: true, written: toWrite.length, skippedDupInFile: skippedDupInFile, skippedExisting: skippedExisting, dedupedAfter: dedupRes.deleted, updatedRows: updatedRows, updatedCells: updatedCells, updateOverLimit: updOverLimit, batchId: batchId });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  HOAN TAC LAN NHAP FILE (HANDOFF 2026-10-20 "Hoan tac lan nhap") — chi chu so huu (importUndo nam trong OWNER_ONLY_ACTIONS_).
+//  Moi lan nhap GHI 1 dong vao sheet "Nhat ky lan nhap": batchId, ai nhap, vi tri dong them (dongDau, soDong), DAU VAN tung dong them (hash cua khoa don KHONG gio),
+//  vung dong trong "Nhat ky cap nhat nhap file" (cac o da sua kem gia tri cu). Hoan tac = (1) KHOI PHUC gia tri cu cua cac o da cap nhat — chi o van con DUNG
+//  gia tri moi (neu NV da sua tay sau do thi giu nguyen, bao so o bo qua) roi (2) XOA cac dong da them — dinh vi bang DAU VAN (khong tin vi tri, vi co the da chen/xoa dong),
+//  SAO LUU ban sao cac dong bi xoa vao sheet "Sao luu hoan tac nhap" truoc. Co xem truoc (dryRun). Moi lan nhap chi hoan tac duoc 1 lan.
+// ═══════════════════════════════════════════════════════════════
+var SH_IMPORT_BATCH = 'Nhật ký lần nhập';
+var IMPORT_BATCH_HEADERS = ['batchId', 'thoiGian', 'nguoi', 'sheet', 'dongDau', 'soDong', 'dauVan', 'updLogDau', 'updLogSo', 'trangThai', 'hoanTacLuc', 'hoanTacBoi'];
+var SH_IMPORT_UNDO_BACKUP = 'Sao lưu hoàn tác nhập';
+var IMPORT_UNDO_MAX_ROWS = 5000;   // vuot -> van nhap duoc nhung KHONG luu dau van (o 50.000 ky tu/o) -> trangThai 'khong-hoan-tac-duoc'
+function _impWho_(token) { try { var u = token ? _sessUser_(token) : null; return u ? String(u.username || u.name || '') : ''; } catch (e) { return ''; } }
+function _impFp_(str) { var h = 5381, t = String(str); for (var i = 0; i < t.length; i++) h = (((h << 5) + h) + t.charCodeAt(i)) | 0; return (h >>> 0).toString(36); }
+function _impKeyDropHm_(full) {   // 'p|ngay|gio|...' -> 'p|ngay|...' (khoa Pos co gio); cac khoa khac giu nguyen
+  var t = String(full || ''); if (t.indexOf('p|') !== 0) return t;
+  var a = t.split('|'); if (a.length < 4) return t; a.splice(2, 1); return a.join('|');
+}
+function _impColIdx_(letters) { var n = 0, t = String(letters || '').toUpperCase(); for (var i = 0; i < t.length; i++) n = n * 26 + (t.charCodeAt(i) - 64); return n - 1; }
+function _impCellFromStr_(str) {   // nhat ky luu chuoi: ISO -> Date, so -> Number, con lai chuoi
+  var t = String(str === null || str === undefined ? '' : str);
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(t)) { var d = new Date(t); if (!isNaN(d.getTime())) return d; }
+  if (/^-?\d+(\.\d+)?$/.test(t) && t.replace('-', '').replace('.', '').length < 16 && !/^0\d/.test(t.replace('-', ''))) return Number(t);
+  return t;
+}
+function _impBatchLog_(sheetName, sheetKey, rowStart, rowsWritten, updFrom, updCount, who) {
+  try {
+    var sh = getSheet_(SH_IMPORT_BATCH, IMPORT_BATCH_HEADERS), n = (rowsWritten || []).length, fps = '', status = 'ok';
+    var id = 'imp_' + Utilities.formatDate(new Date(), 'GMT+7', 'yyyyMMdd_HHmmss') + '_' + Math.floor(Math.random() * 1000);
+    if (n > IMPORT_UNDO_MAX_ROWS) status = 'khong-hoan-tac-duoc';
+    else fps = rowsWritten.map(function (r) { return _impFp_(_impOrderKeyParts_(sheetKey, r).k); }).join(',');
+    sh.getRange(sh.getLastRow() + 1, 1, 1, IMPORT_BATCH_HEADERS.length).setValues([[id, new Date(), who || '', sheetName, rowStart, n, fps, updFrom || 0, updCount || 0, status, '', '']]);
+    return id;
+  } catch (e) { Logger.log('_impBatchLog_: ' + e); return ''; }
+}
+function _impReadBatch_(batchId) {
+  var sh = getCrmSS_().getSheetByName(SH_IMPORT_BATCH);
+  if (!sh || sh.getLastRow() < 2) return null;
+  var v = sh.getRange(2, 1, sh.getLastRow() - 1, IMPORT_BATCH_HEADERS.length).getValues();
+  for (var i = v.length - 1; i >= 0; i--) if (String(v[i][0]) === String(batchId)) {
+    var r = v[i];
+    return { row: i + 2, sheet: sh, id: String(r[0]), time: r[1], who: String(r[2] || ''), sheetName: String(r[3] || ''), rowStart: Number(r[4]) || 0, count: Number(r[5]) || 0,
+             fps: String(r[6] || '') ? String(r[6]).split(',') : [], updFrom: Number(r[7]) || 0, updCount: Number(r[8]) || 0, status: String(r[9] || 'ok') };
+  }
+  return null;
+}
+function importBatchesList_() {
+  var sh = getCrmSS_().getSheetByName(SH_IMPORT_BATCH), items = [];
+  if (sh && sh.getLastRow() >= 2) {
+    var v = sh.getRange(2, 1, sh.getLastRow() - 1, IMPORT_BATCH_HEADERS.length).getValues();
+    for (var i = v.length - 1; i >= 0 && items.length < 30; i--) {
+      var r = v[i]; if (!r[0]) continue;
+      items.push({ id: String(r[0]), time: r[1] instanceof Date ? r[1].toISOString() : String(r[1]), who: String(r[2] || ''), sheet: String(r[3] || ''), written: Number(r[5]) || 0, updatedCells: Number(r[8]) || 0,
+                   status: String(r[9] || 'ok'), undoneAt: r[10] instanceof Date ? r[10].toISOString() : String(r[10] || ''), undoneBy: String(r[11] || ''), canUndo: String(r[9] || 'ok') === 'ok' });
+    }
+  }
+  return { ok: true, items: items };
+}
+// Doc sheet 1 lan -> tra {rowsByFp, rowsByK, rowVals(row->mang), keyW}.
+function _impScanSheet_(sheetKey, sh) {
+  var keyW = (sheetKey === 'pos') ? DON_CHITIET_WIDTH : DT_TONG_WIDTH, last = sh.getLastRow(), out = { rowsByFp: {}, rowsByK: {}, vals: {}, keyW: keyW, last: last };
+  if (last < 2) return out;
+  var v = sh.getRange(2, 1, last - 1, Math.min(keyW, sh.getMaxColumns())).getValues();
+  for (var i = 0; i < v.length; i++) {
+    var r = v[i]; if (_rowIsBlank_(r)) continue;
+    while (r.length < keyW) r.push('');
+    var k = _impOrderKeyParts_(sheetKey, r).k, fp = _impFp_(k), rn = i + 2;
+    (out.rowsByFp[fp] = out.rowsByFp[fp] || []).push(rn); (out.rowsByK[k] = out.rowsByK[k] || []).push(rn); out.vals[rn] = r;
+  }
+  return out;
+}
+function _impNearest_(cands, want, used) {
+  var best = 0, bd = 1e12;
+  for (var i = 0; i < (cands || []).length; i++) { if (used[cands[i]]) continue; var d = Math.abs(cands[i] - want); if (d < bd) { bd = d; best = cands[i]; } }
+  return best;
+}
+// Dinh vi cac dong da them bang dau van. Tra {rows:[so dong tang dan], missing}.
+function _impLocateAppended_(batch, scan) {
+  var used = {}, rows = [], missing = 0;
+  for (var i = 0; i < batch.fps.length; i++) {
+    var cands = scan.rowsByFp[batch.fps[i]], want = batch.rowStart + i, pick = 0;
+    if (cands && cands.indexOf(want) !== -1 && !used[want]) pick = want; else pick = _impNearest_(cands, want, used);
+    if (pick) { used[pick] = 1; rows.push(pick); } else missing++;
+  }
+  rows.sort(function (a, b) { return a - b; });
+  return { rows: rows, missing: missing };
+}
+// Ke hoach khoi phuc cac o da cap nhat: [{row, j, oldV, curV}] + so o bo qua (da bi sua sau do / khong tim thay dong).
+function _impPlanRestore_(batch, sheetKey, scan) {
+  var plan = [], skippedEdited = 0, skippedNoRow = 0;
+  if (!batch.updFrom || !batch.updCount) return { plan: plan, skippedEdited: 0, skippedNoRow: 0 };
+  var lg = getCrmSS_().getSheetByName(SH_IMPORT_UPD_LOG);
+  if (!lg) return { plan: plan, skippedEdited: 0, skippedNoRow: batch.updCount };
+  var rows = lg.getRange(batch.updFrom, 1, batch.updCount, IMPORT_UPD_LOG_HEADERS.length).getValues();
+  rows.forEach(function (lr) {
+    if (String(lr[1]) !== batch.sheetName) { skippedNoRow++; return; }
+    var rn = Number(lr[2]), kk = _impKeyDropHm_(lr[3]), j = _impColIdx_(lr[4]);
+    if (!(scan.vals[rn] && _impOrderKeyParts_(sheetKey, scan.vals[rn]).k === kk)) rn = _impNearest_(scan.rowsByK[kk], Number(lr[2]), {});   // hang da chen/xoa -> tim theo khoa don
+    if (!rn || !scan.vals[rn]) { skippedNoRow++; return; }
+    var cur = scan.vals[rn][j];
+    if (!_impCellEq_(cur, lr[6])) { skippedEdited++; return; }   // o da bi doi sau lan nhap -> khong dong vao
+    plan.push({ row: rn, j: j, oldV: _impCellFromStr_(lr[5]) });
+  });
+  return { plan: plan, skippedEdited: skippedEdited, skippedNoRow: skippedNoRow };
+}
+function doImportUndo_(batchId, dryRun, who) {
+  if (!who) return jsonOut_({ error: 'Cần đăng nhập (token hợp lệ) để hoàn tác lần nhập.', code: 'AUTH' });
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(25000)) return jsonOut_({ error: 'Hệ thống đang xử lý 1 lần nhập/hoàn tác khác — đợi vài giây rồi bấm lại.' });
+  try { return jsonOut_(_impUndoLocked_(batchId, dryRun === true, who)); }
+  catch (e) { return jsonOut_({ error: 'Lỗi hoàn tác: ' + (e && e.message || e) }); }
+  finally { try { lock.releaseLock(); } catch (e9) {} }
+}
+function _impUndoLocked_(batchId, dryRun, who) {
+  var batch = _impReadBatch_(batchId);
+  if (!batch) return { error: 'Không tìm thấy lần nhập "' + batchId + '".' };
+  if (batch.status === 'da-hoan-tac') return { error: 'Lần nhập này đã được hoàn tác rồi.' };
+  if (batch.status !== 'ok') return { error: 'Lần nhập này quá lớn (> ' + IMPORT_UNDO_MAX_ROWS + ' dòng) nên không có dấu vân để hoàn tác an toàn.' };
+  var sheetKey = batch.sheetName === DON_CHITIET_SHEET ? 'pos' : (batch.sheetName === DT_TONG_SHEET ? 'base' : '');
+  if (!sheetKey) return { error: 'Sheet "' + batch.sheetName + '" không hợp lệ.' };
+  var sh = getDTSS_().getSheetByName(batch.sheetName);
+  if (!sh) return { error: 'Không tìm thấy sheet "' + batch.sheetName + '".' };
+  var scan = _impScanSheet_(sheetKey, sh), loc = _impLocateAppended_(batch, scan), rs = _impPlanRestore_(batch, sheetKey, scan);
+  var info = { ok: true, batchId: batch.id, who: batch.who, time: batch.time instanceof Date ? batch.time.toISOString() : String(batch.time), sheet: batch.sheetName,
+               appended: batch.count, wouldDelete: loc.rows.length, missing: loc.missing, wouldRestoreCells: rs.plan.length, skippedEdited: rs.skippedEdited, skippedNoRow: rs.skippedNoRow };
+  if (dryRun) { info.dryRun = true; return info; }
+  var now = new Date();
+  // (1) khoi phuc o da cap nhat (truoc khi xoa dong de vi tri con dung)
+  rs.plan.forEach(function (it) { sh.getRange(it.row, it.j + 1).setValue(it.oldV); });
+  // (2) sao luu roi xoa dong da them (xoa tu duoi len theo tung khoi lien tiep)
+  if (loc.rows.length) {
+    var bk = getSheet_(SH_IMPORT_UNDO_BACKUP, ['batchId', 'hoanTacLuc', 'sheet', 'dongGoc'].concat(Array.apply(null, Array(scan.keyW)).map(function (_, i) { return _impColName_(i); })));
+    var bkRows = loc.rows.map(function (rn) { return [batch.id, now, batch.sheetName, rn].concat(scan.vals[rn].slice(0, scan.keyW)); });
+    bk.getRange(bk.getLastRow() + 1, 1, bkRows.length, bkRows[0].length).setValues(bkRows);
+    var blocks = [], i0 = 0;
+    while (i0 < loc.rows.length) { var i1 = i0; while (i1 + 1 < loc.rows.length && loc.rows[i1 + 1] === loc.rows[i1] + 1) i1++; blocks.push([loc.rows[i0], i1 - i0 + 1]); i0 = i1 + 1; }
+    for (var b = blocks.length - 1; b >= 0; b--) sh.deleteRows(blocks[b][0], blocks[b][1]);
+  }
+  batch.sheet.getRange(batch.row, IMPORT_BATCH_HEADERS.indexOf('trangThai') + 1, 1, 3).setValues([['da-hoan-tac', now, who || '']]);
+  SpreadsheetApp.flush();
+  sbMarkOrdersDirty_(batch.sheetName === DON_CHITIET_SHEET ? 'don' : 'dt', 'importUndo');
+  try { var cache = CacheService.getScriptCache(); if (batch.sheetName === DON_CHITIET_SHEET) cache.removeAll(['donChiTiet_v4_n', 'don_phones_v6_n']); else cache.removeAll(['srptOptions_v3', 'orders_v1_n']); } catch (ec) {}
+  info.deleted = loc.rows.length; info.restoredCells = rs.plan.length;
+  return info;
 }
 
 // Da ngung ho tro thay toan bo du lieu don hang tu client (truoc day dung khi dong bo
