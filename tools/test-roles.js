@@ -153,7 +153,7 @@ ok(run('_featureGate_','salesReportA','tokCs')===null,'bo phan khong khop nguoi 
   ok(ctx._scopeGate_('customers','tokMai','0901')===null,'action ngoai danh sach -> khong dong vao');
   ok(ctx._scopeGate_('lookup','','0901')===null&&ctx._scopeGate_('lookup','tokSai','0901')===null,'khong token / token sai -> de 4b xu ly');
   ok(ctx._scopeGate_('lookup','tokMai','')===null,'khong co phone -> bo qua');
-  ok(/_scopeGate_\(action, p\.token, p\.phone\)/.test(src),'doGet goi _scopeGate_');
+  ok(/_scopeGate_\(action, p\.token, p\.phone(?:, p\.via)?\)/.test(src),'doGet goi _scopeGate_');
   ctx._sessUser_=()=>{throw new Error('x');};
   ok(ctx._scopeGate_('lookup','tokMai','0901')===null,'loi bat ngo -> nuot, KHONG chan nham');
   // lookup = chi cac action doc theo SDT
