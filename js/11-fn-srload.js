@@ -1419,12 +1419,16 @@ async function _impJson_(res){
   catch(e){ throw new Error('Máy chủ không trả kết quả hợp lệ (' + String(txt).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) + ') — nếu là "524" nghĩa là quá thời gian chờ; chưa ghi gì với bước xem trước.'); }
 }
 
+// Ve lai bao cao SAU/TRUOC khi nhap file: loi ve (vd 1 bang dang mo gap du lieu null) KHONG duoc lam hong viec nhap file va KHONG duoc hien nhu 'Loi luu file'.
+// NGUYEN NHAN GOC (21/10/2026, Duyen: up file Pos 1 thang bao "Cannot read properties of null (reading 'length')"): renderSalesReportTab() duoc goi o dau ham
+// (ngoai try) va trong finally -> 1 exception khi ve lai bay ra khoi _impUpload va bi tab 'Up du lieu hang ngay' bao la loi luu, du viec nhap (hoac xem truoc) chua/da xong.
+function _impRender_(){ try { renderSalesReportTab(); } catch (e) { console.error('[nhap file] loi ve lai bao cao (da bo qua, khong anh huong viec nhap):', e && e.stack ? e.stack : e); } }
 async function _impUpload(kind){
   if (!gsUrl){ toast('❌ Chưa cấu hình URL Google Apps Script.'); return; }
   var rows = kind === 'base' ? _impState.baseRows : _impState.posRows;
   if (!rows || !rows.length) return;
   if (_impState.uploading) return; // chong bam dup -> 2 request cung luc
-  _impState.uploading = true; renderSalesReportTab();
+  _impState.uploading = true; _impRender_();
   try {
     // BƯỚC 1 — XEM TRƯỚC (không ghi gì): backend đếm dòng MỚI / đơn ĐÃ CÓ. Backend cũ chưa hỗ trợ dryRun sẽ trả kết quả ghi thật
     // (không có d0.dryRun) -> không bao giờ ghi 2 lần: dùng kết quả đó luôn như trước.
@@ -1467,7 +1471,7 @@ async function _impUpload(kind){
   } catch(e){
     toast('❌ Nhập lỗi: ' + e.message);
   } finally {
-    _impState.uploading = false; renderSalesReportTab();
+    _impState.uploading = false; _impRender_();
   }
 }
 

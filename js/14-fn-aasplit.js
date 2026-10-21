@@ -745,7 +745,7 @@ function _upClear(){ if (_upState.busy) return; _upState.items = []; renderUploa
 async function _upRun_(fn){
   var orig = toast, last = '';
   toast = function(m){ last = String(m == null ? '' : m); };
-  try { await fn(); } catch (e) { last = '❌ ' + e.message; } finally { toast = orig; }
+  try { await fn(); } catch (e) { console.error('[up du lieu] loi:', e && e.stack ? e.stack : e); last = '❌ ' + e.message; } finally { toast = orig; }
   return last;
 }
 function _upClean_(m){ return String(m || '').replace(/^[✓✅❌⚠️\s]+/, '').trim(); }
