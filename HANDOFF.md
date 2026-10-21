@@ -1,6 +1,11 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-10-21 — Báo cáo Pos "tính đơn thuần" + sửa khóa so khớp nhập Pos
+- [x] **LỖI NHẬP POS**: file Pos chỉ có NGÀY (không giờ) mà Sheet có giờ / Date nửa đêm → khóa lệch ('00:00' ≠ '') → xem trước báo "0 đã có / 1.436 mới" (nếu bấm OK sẽ ghi TRÙNG cả tháng). Sửa `_impOrderKey_` (coi 00:00 = không giờ) + so thêm khóa không giờ khi file không có giờ. Test: `node tools/test-import-safe.js`. SAU KHI GAS deploy: nhập lại file xem trước phải ra "đã có" ≈ gần hết; CHƯA thấy vậy thì ĐỪNG bấm OK, kiểm tra khóa.
+- [x] js/11-fn-srload.js: cuối Báo cáo B có mục "🧮 Báo cáo tính đơn thuần" (sale theo cột Thẻ, chia đều, giá Pos gốc; không ghép Base/kế toán/quầy; cột Chênh so bảng chính) + nút "📥 Xuất Excel đối chiếu" 3 sheet: Đơn đã điều chỉnh / Theo Sale thuần vs đối chiếu / Cần kiểm tra tay. gas: mỗi đơn trả thêm `saleThe`, `dieuChinh`, `acctStatus`. Test: `node tools/test-pos-pure.js`.
+- [ ] CẦN LÀM TIẾP: chưa push được nếu thiếu token (đã commit local). Duyên mở Báo cáo B bấm Lọc, kéo xuống cuối kiểm tra số + file Excel.
+
 ## 2026-10-20 — Thông báo từ cấm: báo đúng sale + bấm mở đúng đoạn chat
 - [x] gas_v13.js `_cvNotify_`: mỗi (nhân viên × HỘI THOẠI) 1 thông báo (tối đa 15/nhân viên/lượt quét); gửi cho admin VÀ cho CHÍNH sale đó (khớp tên Pancake/CRM với tài khoản CRM qua tên/username/bí danh; tài khoản khóa không nhận). Sale đọc "Bạn dùng từ cấm trong N tin với <khách>: ...". Tắt báo sale: Settings `chatAuditNotifySale=0` hoặc chạy `datChatAuditBaoSale(false)`. Thông báo: refType `chatviolation`, refId = ID hội thoại, refId2 = "SĐT|tên khách".
 - [x] js/39-fn-notify.js: bấm thông báo → `_ntOpenChat_` mở Social > Chat đúng hội thoại (scPick; chưa có trong danh sách thì tạo dòng tạm). Thông báo cũ (refType customer) vẫn mở hồ sơ khách. Test: `node tools/test-chat-audit.js`.

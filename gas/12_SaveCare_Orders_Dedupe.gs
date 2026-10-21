@@ -587,7 +587,7 @@ function _impHm_(v) {
   var m = String(v == null ? '' : v).trim().match(/\s(\d{1,2}):(\d{2})/);
   return m ? String(m[1]).padStart(2, '0') + ':' + m[2] : '';
 }
-function _impOrderKey_(sheetKey, row) {
+function _impOrderKey_(sheetKey, row, noHm) {
   if (sheetKey === 'base') {
     var id = String(row[DT_COL_ID] == null ? '' : row[DT_COL_ID]).trim();
     if (id) return 'id|' + id;
@@ -599,7 +599,10 @@ function _impOrderKey_(sheetKey, row) {
   var phP = normPhone_(String(row[4] || ''));
   var nameP = _normTxt_(row[3]), spP = _normTxt_(row[8]);
   if (!phP && !nameP && !spP) return 'x|' + _rowKeyExact_(row);
-  return 'p|' + normOrderDate_(row[1]) + '|' + _impHm_(row[1]) + '|' + phP + '|' + nameP + '|' + spP + '|' +
+  // Gio: '00:00' (Google Sheet tu doi chuoi 'dd/MM/yyyy' thanh Date luc nua dem) coi nhu KHONG co gio — file export Pos chi co NGAY, khong co gio
+  // (NGUYEN NHAN GOC 20/10/2026: xem truoc bao '0 don da co / 1.436 moi' du Sheet da co du don -> khoa lech vi '00:00' != '' -> nhap se GHI TRUNG ca thang).
+  var hmP = _impHm_(row[1]); if (hmP === '00:00') hmP = '';
+  return 'p|' + normOrderDate_(row[1]) + '|' + (noHm ? '' : hmP) + '|' + phP + '|' + nameP + '|' + spP + '|' +
     _normTxt_(row[9]) + '|' + _normTxt_(row[10]) + '|' + _normMoney_(row[11]) + '|' + _normMoney_(row[12]);
 }
 
@@ -687,7 +690,7 @@ function doImportSheetRowsLocked_(sheetKey, sheetName, sh, rows, dryRun, updateE
   // Bo cac dong DON DA CO SAN trong Sheet (theo khoa don chuan hoa — xem _impOrderKey_). Doc lai chinh
   // Sheet (khong tin cache) trong luc dang giu khoa.
   var keyW = (sheetKey === 'pos') ? DON_CHITIET_WIDTH : DT_TONG_WIDTH;
-  var existKeys = {}, existRow = {}, updPlan = [], updDone = {}, updCells = 0, updOverLimit = 0;
+  var existKeys = {}, existRow = {}, existNoHm = {}, existRowNoHm = {}, updPlan = [], updDone = {}, updCells = 0, updOverLimit = 0;
   var lastNow = sh.getLastRow();
   if (lastNow >= 2) {
     var readW = Math.min(Math.max(keyW, width), sh.getMaxColumns());
@@ -698,6 +701,7 @@ function doImportSheetRowsLocked_(sheetKey, sheetName, sh, rows, dryRun, updateE
       while (er.length < keyW) er.push('');
       var ek = _impOrderKey_(sheetKey, er);
       if (!existKeys[ek]) { existKeys[ek] = true; if (updateExisting) existRow[ek] = { r: e + 2, vals: er }; }   // giu dong DAU TIEN cua moi khoa
+      if (sheetKey === 'pos') { var enh = _impOrderKey_(sheetKey, er, true); if (!existNoHm[enh]) { existNoHm[enh] = true; if (updateExisting) existRowNoHm[enh] = { r: e + 2, vals: er }; } }
     }
   }
   var fresh = [], skippedExisting = 0, seenKey = {};
@@ -705,14 +709,19 @@ function doImportSheetRowsLocked_(sheetKey, sheetName, sh, rows, dryRun, updateE
     var kr = toWrite[w].slice(0);
     while (kr.length < keyW) kr.push('');
     var k2 = _impOrderKey_(sheetKey, kr);
-    if (existKeys[k2]) {
+    // File Pos CHI CO NGAY (khong gio) -> doi chieu them theo khoa KHONG gio voi cac dong da co (du dong da co co gio hay khong).
+    var k2n = '';
+    if (sheetKey === 'pos' && _impHm_(kr[1]) === '') k2n = _impOrderKey_(sheetKey, kr, true);
+    var hitExist = !!existKeys[k2] || (k2n && !!existNoHm[k2n]);
+    if (hitExist) {
       skippedExisting++;
-      if (updateExisting && existRow[k2] && !updDone[k2]) {
-        updDone[k2] = true;
-        var df = _impDiffRow_(sheetKey, existRow[k2].vals, toWrite[w], width);
+      var exRef = existKeys[k2] ? existRow[k2] : existRowNoHm[k2n], dk = existKeys[k2] ? k2 : k2n;
+      if (updateExisting && exRef && !updDone[dk]) {
+        updDone[dk] = true;
+        var df = _impDiffRow_(sheetKey, exRef.vals, toWrite[w], width);
         if (df.length) {
           if (updPlan.length >= IMPORT_UPD_MAX_ROWS) updOverLimit++;
-          else { updPlan.push({ r: existRow[k2].r, key: k2, diffs: df }); updCells += df.length; }
+          else { updPlan.push({ r: exRef.r, key: dk, diffs: df }); updCells += df.length; }
         }
       }
       continue;

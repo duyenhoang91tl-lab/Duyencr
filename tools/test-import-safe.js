@@ -63,4 +63,19 @@ rs = ctx.doImportSheetRows_('base', [f1, f2, f3], false, true);
 ok(rs.updatedRows === 0 && rs.written === 0 && logSheet.rows.length === 2, 'nhap lai file: khong cap nhat them');
 rs = ctx.doImportSheetRows_('base', [r0('U1', '0944444444', 1000000, 'Huy')], false);
 ok(!rs.updatedRows && sheet.rows[0][7] === 'Hoan thanh', 'khong bat updateExisting (client cu): chi bo qua, khong sua');
+// ===== POS: file chi co NGAY (khong gio) phai khop dong da co (Date nua dem '00:00' hoac co gio) — loi 20/10/2026 bao '0 da co / 1.436 moi' =====
+const prow = (d, ph, name, sp, v, extra) => { const r = new Array(17).fill(''); r[0] = 1; r[1] = d; r[3] = name; r[4] = ph; r[8] = sp; r[9] = 'MA'; r[10] = 1; r[11] = v; r[12] = 0; if (extra) r[16] = extra; return r; };
+sheet = mkSheet([
+  prow(new Date(Date.UTC(2026, 9, 18, 17, 0)), '0977359792', 'C Hanh', 'NHAN', 5850000),          // Date = 19/10/2026 00:00 gio VN (Sheets tu doi chuoi thanh Date)
+  prow('19/10/2026 14:22', '0965023033', 'C Nhung', 'VONG', 17730000),                              // dong cu co GIO
+  prow('18/10/2026', '0989030761', 'C Thu', 'CHARM', 550000)]);                                      // dong cu chuoi chi co ngay
+const pf = [prow('19/10/2026', '0977359792', 'C Hanh', 'NHAN', 5850000), prow('19/10/2026', '0965023033', 'C Nhung', 'VONG', 17730000),
+            prow('18/10/2026', '0989030761', 'C Thu', 'CHARM', 550000), prow('19/10/2026', '0911000111', 'C Moi', 'NHAN', 1000000)];
+const pb = JSON.stringify(sheet.rows);
+let pr = ctx.doImportSheetRows_('pos', pf, true);
+ok(pr.wouldWrite === 1 && pr.skippedExisting === 3, 'Pos chi co ngay: khop dong da co (Date nua dem / co gio / chuoi ngay) -> chi 1 dong moi that su');
+pr = ctx.doImportSheetRows_('pos', pf);
+ok(pr.written === 1 && sheet.rows.length === 4 && JSON.stringify(sheet.rows.slice(0, 3)) === pb.slice(0, 0) + JSON.stringify(JSON.parse(pb)), 'Pos: chi them dong moi, 3 dong cu nguyen ven');
+pr = ctx.doImportSheetRows_('pos', pf);
+ok(pr.written === 0 && sheet.rows.length === 4, 'Pos: nhap lai -> khong them gi');
 console.log('ALL IMPORT-SAFE TESTS PASSED');
