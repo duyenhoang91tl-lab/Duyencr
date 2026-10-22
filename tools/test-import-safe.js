@@ -63,6 +63,16 @@ rs = ctx.doImportSheetRows_('base', [f1, f2, f3], false, true);
 ok(rs.updatedRows === 0 && rs.written === 0 && logSheet.rows.length === 2, 'nhap lai file: khong cap nhat them');
 rs = ctx.doImportSheetRows_('base', [r0('U1', '0944444444', 1000000, 'Huy')], false);
 ok(!rs.updatedRows && sheet.rows[0][7] === 'Hoan thanh', 'khong bat updateExisting (client cu): chi bo qua, khong sua');
+// ===== Dong cu CHUA co ID (cot T rong) + file co ID & trang thai 'That bai': phai CAP NHAT dong cu, khong them trung =====
+{
+  const oldN = row('', '0977777777', 5000000); oldN[7] = 'Dang xu ly';
+  const oldD = row('D9', '0988888888', 6000000); oldD[7] = 'Dang xu ly';
+  sheet = mkSheet([oldN, oldD]); logSheet = mkSheet([]);
+  const fN = row('N1', '0977777777', 5000000); fN[7] = 'That bai';
+  const fD = row('D8', '0988888888', 6000000); fD[7] = 'That bai';   // ID KHAC dong cu co ID -> la don khac, khong duoc khop
+  const rr = ctx.doImportSheetRows_('base', [fN, fD], false, true);
+  ok(rr.updatedRows === 1 && rr.written === 1 && sheet.rows[0][7] === 'That bai' && sheet.rows[0][19] === 'N1' && sheet.rows[1][7] === 'Dang xu ly', 'dong cu thieu ID: cap nhat trang thai That bai + dien ID; ID khac thi la don moi');
+}
 // ===== POS: khoa don CHIU DUOC lech GIO (HANDOFF 2026-10-20: xem truoc bao "0 da co / 1.436 moi") =====
 // Cot Pos: [1]=ngay(+gio) [3]=ten khach [4]=SDT [8]=san pham [9]=ma SP [10]=so luong [11]=gia sau giam [12]=COD
 const pos = (ngay, ph, ten, sp, ma, sl, gia, cod, extra) => { const r = new Array(17).fill(''); r[0] = 1; r[1] = ngay; r[3] = ten; r[4] = ph; r[8] = sp; r[9] = ma; r[10] = sl; r[11] = gia; r[12] = cod; if (extra !== undefined) r[16] = extra; return r; };
