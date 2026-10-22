@@ -545,6 +545,8 @@
           <div id="pk-canned-body" style="display:none"></div>
         </div>` : ''}
 
+        <div id="pk-ban-row"><button id="pk-ban-btn" type="button" title="Quét tin đang soạn trong ô trả lời — báo nếu có từ cấm (trước khi bấm gửi)">🚫 Quét từ cấm</button></div>
+        <div id="pk-ban-result" style="display:none"></div>
         <div id="pk-ai-status">Chưa có hội thoại nào được chọn.</div>
 
         <div class="pk-tones" id="pk-tones">
@@ -681,6 +683,7 @@
       if (v === "assign") initAssignTab_();
     });
     panelEl.querySelector("#pk-rem-refresh").addEventListener("click", () => loadReminders_());
+    panelEl.querySelector("#pk-ban-btn").addEventListener("click", scanBannedDraft_);
     panelEl.querySelector("#pk-price-btn").addEventListener("click", doPriceSearch_);
     panelEl.querySelector("#pk-price-ai-btn").addEventListener("click", askPriceAi_);
     panelEl.querySelector("#pk-price-q").addEventListener("keydown", (e) => {
@@ -4575,6 +4578,47 @@
     }
 
     setStatus("Đã chèn gợi ý vào ô trả lời.");
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // MODULE: 🚫 QUÉT TỪ CẤM (Duyên yêu cầu 2026-10-21)
+  // Sale gõ xong tin trong ô trả lời → bấm nút → quét nội dung đang soạn; có từ cấm thì cảnh báo
+  // 'Từ cấm “X” không được phép sử dụng nhé!'. Quét ở GAS (action scanBanned) bằng ĐÚNG danh sách + bộ phát hiện của giám sát chat
+  // → nút báo sạch thì giám sát chat cũng không bắt. Không tự sửa/không tự gửi tin, chỉ báo.
+  // ══════════════════════════════════════════════════════════════════════════
+  let _lastEditableEl_ = null;   // ô soạn tin cuối cùng được focus (bấm nút trong panel làm ô chat mất focus)
+  document.addEventListener('focusin', (e) => {
+    const t = e.target;
+    if (!t || (panelEl && panelEl.contains(t))) return;
+    if (t.isContentEditable || t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && (t.type === 'text' || t.type === 'search'))) _lastEditableEl_ = t;
+  }, true);
+  function _readDraftText_() {
+    let box = null;
+    try { box = _slashGetChatBox_(); } catch (e) { box = null; }
+    if (!box || (panelEl && panelEl.contains(box))) box = (_lastEditableEl_ && document.body.contains(_lastEditableEl_)) ? _lastEditableEl_ : null;
+    if (!box) return null;
+    return (box.tagName === 'TEXTAREA' || box.tagName === 'INPUT') ? (box.value || '') : (box.innerText || box.textContent || '');
+  }
+  function _banWarnHtml_(hits) {
+    const words = hits.map((h) => '“' + escapeHtml(h.word) + '”').join(', ');
+    const sug = hits.filter((h) => h.thayThe).map((h) => '“' + escapeHtml(h.word) + '” → ' + escapeHtml(h.thayThe));
+    return '⚠️ Từ cấm ' + words + ' không được phép sử dụng nhé!' + (sug.length ? '<div class="pk-ban-sug">Gợi ý thay: ' + sug.join('; ') + '</div>' : '');
+  }
+  function scanBannedDraft_() {
+    const out = panelEl?.querySelector('#pk-ban-result'), btn = panelEl?.querySelector('#pk-ban-btn');
+    if (!out || !btn) return;
+    const show = (cls, html) => { out.className = cls; out.innerHTML = html; out.style.display = ''; };
+    const text = _readDraftText_();
+    if (text === null) { show('pk-ban-info', 'Không tìm thấy ô soạn tin — bấm vào ô trả lời, gõ tin rồi bấm lại.'); return; }
+    if (!text.trim()) { show('pk-ban-info', 'Ô trả lời đang trống — gõ tin rồi bấm quét.'); return; }
+    btn.disabled = true; const old = btn.textContent; btn.textContent = 'Đang quét…';
+    safeSendMessage_({ type: 'SCAN_BANNED', payload: { text } }, (resp) => {
+      btn.disabled = false; btn.textContent = old;
+      if (!resp?.ok) { show('pk-ban-info', 'Không quét được từ cấm: ' + escapeHtml(resp?.error || PK_API_ERR)); return; }
+      const hits = resp.data?.hits || [];
+      if (hits.length) show('pk-ban-warn', _banWarnHtml_(hits));
+      else show('pk-ban-ok', '✅ Không có từ cấm trong tin đang soạn.');
+    });
   }
 
   function setStatus(text) {

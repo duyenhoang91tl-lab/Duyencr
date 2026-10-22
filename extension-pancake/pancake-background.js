@@ -422,6 +422,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // Nut "Quet tu cam": gui doan chat dang soan len GAS (action scanBanned, dung chung danh sach tu cam voi giam sat chat) -> { hits:[{word,thayThe}] }
+  if (msg?.type === "SCAN_BANNED") {
+    _postGas_({ action: "scanBanned", text: String(msg.payload?.text || "") })
+      .then((data) => sendResponse({ ok: true, data: { hits: data.hits || [] } }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
   if (msg?.type === "GET_MESSAGE_TEMPLATES") {
     handleGetMessageTemplates()
       .then((data) => sendResponse({ ok: true, data }))

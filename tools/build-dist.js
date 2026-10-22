@@ -8,6 +8,8 @@ const fs = require('fs'), path = require('path');
 const { minify } = require('terser');
 const CleanCSS = require('clean-css');
 const root = path.join(__dirname, '..'), out = path.join(root, 'dist');
+// Lớp CHẾ ĐỘ TỐI tự sinh (css/99-dark-auto.css): luôn sinh lại trước khi nén để bản phát hành không bao giờ dùng bản lỗi thời nếu ai đó quên chạy tools/gen-dark-theme.js.
+require('./gen-dark-theme.js').write();
 fs.rmSync(out, { recursive: true, force: true });
 for (const d of ['js', 'css']) fs.mkdirSync(path.join(out, d), { recursive: true });
 (async () => {

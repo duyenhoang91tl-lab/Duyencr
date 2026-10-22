@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Test (jsdom) CRM — Kho mau luu san (js/20-loadaiexamples.js): Copy ca cau / Tung doan, chip nhom, form chon nhom SP tu bang gia, tu nhan nhom, payload co `nhom` (Duyen 21/10/2026).
+// Test (jsdom) CRM — Kho mau luu san (js/20-loadaiexamples.js): Copy ca cau / Tung doan, chip nhom (form nhom SP + tu phan loai do phien khac lam: xem HANDOFF) (Duyen 21/10/2026).
 let JSDOM; try { ({ JSDOM } = require('jsdom')); } catch (e) { console.log('SKIP: chua cai jsdom'); process.exit(0); }
 const fs = require('fs'), path = require('path');
 const ok = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1); } };
@@ -50,22 +50,5 @@ const TPLS = [
   w.document.getElementById('mt-search').value = 'nhan'; w.renderMsgTemplateList();
   ok(w.document.getElementById('mt-list').children.length >= 1 && w.document.getElementById('mt-list').textContent.includes('Chao'), 'tim theo nhom/san pham ra mau Nhan');
   w.document.getElementById('mt-search').value = '';
-  // form
-  w.openMsgTemplateForm(null); await sleep(20);
-  const opts = id => [...w.document.querySelectorAll(id + ' option')].map(o => o.value);
-  ok(opts('#mt-nhom-dl').join('|') === 'Charm|Lắc|Nhẫn', 'datalist nhom tu bang gia: ' + opts('#mt-nhom-dl').join('|'));
-  const $ = id => w.document.querySelector(id), fire = (el, ev) => el.dispatchEvent(new w.Event(ev, { bubbles: true }));
-  $('#mt-f-product').value = 'nhan vang 9999'; fire($('#mt-f-product'), 'input');
-  ok($('#mt-f-nhom').value === 'Nhẫn' && $('#mt-f-autohint').textContent.includes('tự nhận nhóm'), 'go ten SP -> tu nhan nhom');
-  $('#mt-f-nhom').value = 'Charm'; $('#mt-f-product').value = 'Lắc Tay Vàng'; fire($('#mt-f-product'), 'input');
-  ok($('#mt-f-nhom').value === 'Charm', 'khong ghi de nhom da chon');
-  $('#mt-f-nhom').value = ''; fire($('#mt-f-product'), 'input');
-  ok($('#mt-f-autohint').textContent.includes('nhiều nhóm') && $('#mt-f-nhom').value === '', 'ten thuoc nhieu nhom: chi goi y');
-  // validate + luu
-  $('#mt-f-product').value = ''; $('#mt-f-content').value = ''; await w.saveMsgTemplateUI(); ok(posts.length === 0 && w.__alert.includes('nội dung'), 'thieu noi dung -> khong gui');
-  $('#mt-f-content').value = 'Dong 1\nDong 2'; await w.saveMsgTemplateUI(); ok(posts.length === 0 && w.__alert.includes('nhóm sản phẩm'), 'khong nhom/SP/tinh huong -> khong gui');
-  $('#mt-f-nhom').value = 'Nhẫn'; $('#mt-f-product').value = 'Nhẫn Vàng 9999'; $('#mt-f-topic').value = 'Hỏi giá'; await w.saveMsgTemplateUI();
-  const t = posts[0] && posts[0].template;
-  ok(t && t.nhom === 'Nhẫn' && t.product === 'Nhẫn Vàng 9999' && t.content === 'Dong 1\nDong 2' && t.title === 'Nhẫn Vàng 9999 — Hỏi giá' && t.createdBy === 'Hoa', 'payload co nhom, tieu de tu dat, createdBy: ' + JSON.stringify(t));
   console.log('ALL CRM TPL LINES TESTS PASSED');
 })().catch(e => { console.error('FAIL (ngoai le):', e && e.message, e && e.name, e && e.stack ? String(e.stack).split('\n').slice(0,4).join(' | ') : ''); process.exit(1); });

@@ -14,7 +14,7 @@ function makeCtx(o) {
   const ctx = { Logger: { log() {} }, getSetting_: (k) => settings[k] || '', _userAliasGroups_: () => o.userGroups || {}, readSaleDirectory_: () => ({ list: [] }), readPancakeMap_: () => ({}),
     readPancakePageMap_: () => o.pageById || {}, readPancakePageMapByName_: () => o.pageByName || {} };
   vm.createContext(ctx);
-  ['_normTxt_', '_stripVN_', '_foldSaleKey_', '_salePersonKeyFn_', '_salePersonKeyWithOrphanFold_', '_psheetNoAccent_', '_hiddenPageSaleSets_', '_donHiddenChecker_', '_donKenhFromNguon_',
+  ['_normTxt_', '_stripVN_', '_foldSaleKey_', '_salePersonKeyFn_', '_salePersonIdentity_', '_salePersonKeyWithOrphanFold_', '_psheetNoAccent_', '_hiddenPageSaleSets_', '_donHiddenChecker_', '_donKenhFromNguon_',
    '_extractPageIdFromNguonDon_', '_extractPageNameFromNguonDon_'].forEach((n) => { try { vm.runInContext(grab(n), ctx); } catch (e) { if (!/khong thay ham/.test(e.message)) throw e; } });
   return ctx;
 }
