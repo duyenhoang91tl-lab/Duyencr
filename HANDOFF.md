@@ -8,6 +8,10 @@ Yêu cầu Duyên: thêm/bớt từ cấm trong mục Cấu hình, không phải
 - [ ] **Bước 3 — kiểm tra song song (quy tắc 15):** `pancake-content.js` / extension Zalo đọc từ cấm qua backend (`bannedWords` trong action menh/canned) nên tự ăn cấu hình mới — xác nhận bằng grep + `node tools/check-ext-parity.js`; không cần sửa extension nếu chỉ đọc từ server.
 - [ ] Sau khi xong cả 3 bước: Actions deploy GAS xanh → Ctrl+F5 web → vào ⚙ Cấu hình thử thêm 1 từ cấm, rồi gõ từ đó trong chat Pancake xem có báo vi phạm (cache đã được xóa khi lưu).
 
+## 2026-10-22 — Pancake AI: mọi lỗi API chỉ hiện "Lỗi API"
+- [x] extension-pancake/pancake-content.js: `normalizeApiResp_` trong `safeSendMessage_` đổi MỌI `resp.error` (GAS/AI/mạng/Pancake) thành đúng 1 câu "Lỗi API" (chi tiết gốc ở `resp.errorRaw` + Console F12). Giữ nguyên: VERIFY_LOGIN (sai mật khẩu...), thiếu cấu hình (`Chưa cấu hình URL`/`Thiếu Provider`/`API Key`), mã nội bộ `GAS_NO_FLAT`. Đã bỏ các tiền tố "Lỗi ...:" trước lỗi API (tránh "Lỗi: Lỗi API"), dòng `aiError`/`ghepLoi` cũng chỉ ghi "Lỗi API". Test: `node tools/test-pancake-apierr.js`.
+- [ ] CẦN LÀM TIẾP: nút "Kiểm tra Key" trong trang Options của extension vẫn hiện lỗi chi tiết của nhà cung cấp AI (cố ý — đó là công cụ chẩn đoán). Zalo AI chưa đổi (chỉ yêu cầu Pancake AI). Sau khi push: reload extension ở chrome://extensions.
+
 ## 2026-10-21 — Sale tìm SĐT / mã đơn xem được khách NGOÀI phạm vi của mình
 - [x] **Nguyên nhân gốc:** server (`scopeMode=enforce`, gas 4c-2a/2b) chỉ trả khách/đơn thuộc tên sale: `customers` bị lọc nên khách khác KHÔNG có trong `customerMap` (client không mở được hồ sơ); `lookup`/`donOrdersByPhone`/`cskhDetail` trả FORBIDDEN; `searchOrder` nằm trong `SCOPE_LIST_ACTIONS_` nên bị lọc hết dòng có SĐT ngoài phạm vi.
 - [x] **gas_v13.js:** `_scopeGate_(action, token, phone, via)` bỏ qua chặn khi request có `via=search` (vẫn ghi log `search-in`/`search-out` → xem bằng `xemLogPhamVi`); `_scopeListServe_` không lọc `searchOrder` (log `search-unfiltered`). Danh sách khách/đơn (`customers`, `orders`...) VẪN lọc theo phạm vi như cũ.
