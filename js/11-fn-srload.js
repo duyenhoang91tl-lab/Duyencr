@@ -1122,6 +1122,7 @@ function _srRenderB(d){
       html += _srChartSvg(productRows, 'name', 'soLuong', _srState.bProductView, false);
     }
   }
+  html += _srBaseCheckPanelHtml_(d);   // Báo cáo check ngược Base (đơn Pos ghép đơn gốc Base) + nút xuất Excel cho kế toán
   html += _srPosMonthPanelHtml_();
   html += _srPurePanelHtml_(d);   // CUỐI CÙNG: báo cáo tính đơn thuần theo Thẻ + nút xuất Excel đối chiếu Base / chia quầy
   return html;
@@ -1260,6 +1261,108 @@ function _srPureExport_(){
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(chk), 'Cần kiểm tra tay');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(_srPureDetailRows_(orders)), 'Chi tiết thuần từng đơn');
   XLSX.writeFile(wb, 'BaoCao_Pos_DonThuan_DoiChieu_' + _ymd(new Date()) + '.xlsx');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BÁO CÁO CHECK NGƯỢC BASE (21/10/2026, Duyên: kế toán đối chiếu TỪNG đơn Pos ↔ đơn gốc Base ↔ chia sale, xuất Excel)
+// Nguồn: d.orders[].ghepBase (backend trả từng đơn gốc Base đã khớp qua mã bộ đếm ở ghi chú Pos) + saleShares (tỷ lệ chia).
+// Chỉ liệt kê đơn Pos ĐÃ GHÉP được với Base (có ghepBase). Đơn có mã nhưng không khớp / trùng đơn gốc / gốc bị loại nằm ở sheet "Cần kiểm tra tay".
+// ═══════════════════════════════════════════════════════════════════════════
+function _srBcOrders_(d){ return ((d && d.orders) || []).filter(function(o){ return o.ghepBase && o.ghepBase.length; }); }
+function _srBcBaseSum_(o){ return (o.ghepBase || []).reduce(function(s, b){ return s + (b.tinh ? (Number(b.giaTri) || 0) : 0); }, 0); }
+function _srBcPosVal_(o){ return (o.giaTriPos !== undefined && o.giaTriPos !== null) ? (Number(o.giaTriPos) || 0) : (Number(o.giaTriSauGiam) || 0); }
+function _srBcQuayTxt_(o){ return (o.saleRatio && Number(o.saleRatio) !== 1) ? ('Quầy ' + Math.round(Number(o.saleRatio) * 100) + '%') : ''; }
+// Dựng 3 bảng dữ liệu (mảng-của-mảng, dòng đầu là tiêu đề) + tổng. Tiền của đơn (Giá Pos / Tổng Base / Chênh) CHỈ ghi ở dòng đầu mỗi đơn để SUM cột không bị cộng lặp.
+function _srBcBuild_(orders){
+  var detail = [['STT đơn Pos', 'Dòng trong sheet "dữ liệu đơn"', 'Ngày Pos', 'Khách', 'SĐT', 'Nguồn đơn', 'Thẻ Pos (nguyên văn)', 'Giá Pos gốc (1 lần/đơn)', 'Ghi chú Pos', 'Mã bộ đếm đã khớp',
+    'Dòng trong DT TỔNG (Base)', 'Mã Base', 'Ngày tạo Base', 'Người tạo Base', 'Sale bán (Base)', 'Trạng thái Base', 'Giá trị đơn gốc Base', 'Có tính doanh thu?', 'Tổng Base được tính (1 lần/đơn)', 'Chênh Base − Pos (1 lần/đơn)']];
+  var chia = [['STT đơn Pos', 'Dòng trong sheet "dữ liệu đơn"', 'Ngày Pos', 'Khách', 'SĐT', 'Sale', 'Phần chia (%)', 'Tiền chia (theo Base)', 'Ghi chú']];
+  var tot = { don: 0, pos: 0, base: 0, lech: 0 };
+  (orders || []).forEach(function(o, i){
+    var posV = _srBcPosVal_(o), baseV = _srBcBaseSum_(o);
+    tot.don++; tot.pos += posV; tot.base += baseV;
+    if (Math.abs(baseV - posV) > 1) tot.lech++;
+    (o.ghepBase || []).forEach(function(b, k){
+      var first = k === 0;
+      detail.push([i + 1, o.posRow || '', o.ngayTaoDon || '', o.khachHang || '', o.soDienThoai || '', o.nguonDon || '', o.theSale || '', first ? Math.round(posV) : '', o.ghiChu || '', (o.ghepCodes || []).join(', '),
+        b.dong || '', b.ma || '', b.ngay || '', b.nguoiTao || '', b.saleBan || '', b.trangThai || '', Math.round(Number(b.giaTri) || 0), b.tinh ? 'Có' : 'Không (đơn Base bị loại)',
+        first ? Math.round(baseV) : '', first ? Math.round(baseV - posV) : '']);
+    });
+    _srOrderShares_(o, 'adj').forEach(function(x){
+      chia.push([i + 1, o.posRow || '', o.ngayTaoDon || '', o.khachHang || '', o.soDienThoai || '', x.name, Math.round(x.frac * 1000) / 10, Math.round(x.giaTri), _srBcQuayTxt_(o)]);
+    });
+  });
+  return { detail: detail, chia: chia, tot: tot };
+}
+// Sheet "Cần kiểm tra tay": mã có nhưng không khớp Base / mã trùng đơn gốc / đơn Pos bị bỏ vì gốc Base đã Thất bại / nghi ghép nhưng chưa ghép.
+function _srBcCheckRows_(d){
+  var chk = [['Nhóm', 'Ngày', 'SĐT', 'Khách / Thẻ sale', 'Mã bộ đếm', 'Giá Pos', 'Ghi chú / chi tiết']];
+  var g = (d && d.ghep) || {};
+  (g.khongKhop || []).forEach(function(x){ chk.push(['Có mã bộ đếm nhưng KHÔNG khớp Base (đang tính theo Thẻ Pos)', x.ngay, x.sdt, '', (x.maCoDon || []).join(', '), '', (x.ghiChu || '') + (x.maKhongTim && x.maKhongTim.length ? ' — mã không tìm thấy: ' + x.maKhongTim.join(', ') : '')]); });
+  (g.trungDonGoc || []).forEach(function(x){ chk.push(['Mã trùng đơn gốc Base đã dùng cho đơn Pos khác (đang tính theo Thẻ Pos)', x.ngay, x.sdt, '', (x.maCoDon || []).join(', '), '', x.ghiChu || '']); });
+  (g.gocBiLoaiList || []).forEach(function(x){ chk.push(['Đơn Pos BỊ BỎ khỏi doanh thu vì mọi đơn gốc Base đã Thất bại', x.ngay, x.sdt, (x.khach || '') + (x.theSale ? ' / ' + x.theSale : ''), (x.ma || []).join(', '), x.giaPos, x.ghiChu || '']); });
+  ((d && d.ghepCheck && d.ghepCheck.list) || []).forEach(function(x){ chk.push(['Nghi ghép nhưng CHƯA ghép (≥2 mã / chữ "ghép")', x.ngay, x.sdt, x.theSale, (x.ma || []).join(', '), x.gia, x.ghiChu || '']); });
+  if (chk.length === 1) chk.push(['(không có mục nào cần kiểm tra tay)', '', '', '', '', '', '']);
+  return chk;
+}
+function _srBaseCheckPanelHtml_(d){
+  if (!d || !d.orders) return '';
+  var orders = _srBcOrders_(d), g = d.ghep || {};
+  var b = _srBcBuild_(orders), t = b.tot;
+  var h = '<div class="dash-section-title" style="margin-top:26px">🔁 Báo cáo check ngược Base <span style="font-weight:400;color:var(--muted);font-size:11px">(đơn Pos đã ghép với đơn gốc Base qua mã bộ đếm ở ghi chú — chia sale theo đơn gốc Base)</span></div>';
+  h += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Đơn Pos đã ghép: <b>' + fmt(t.don) + '</b> · Giá Pos gốc <b>' + _srMoney(t.pos) + '</b> · Doanh thu theo Base <b>' + _srMoney(t.base) + '</b> · Chênh <b>' + _srMoney(t.base - t.pos) + '</b>' +
+    ' · Cần kiểm tra tay: không khớp <b>' + fmt(g.khongKhopCount || 0) + '</b>, trùng đơn gốc <b>' + fmt(g.trungDonGocCount || 0) + '</b>, gốc Base Thất bại (đơn Pos bị bỏ) <b>' + fmt(g.gocBiLoai || 0) + '</b>, nghi ghép chưa ghép <b>' + fmt((d.ghepCheck && d.ghepCheck.count) || 0) + '</b>. ' +
+    '<button class="btn sm" onclick="_srBaseCheckExport_()">📥 Xuất Excel check ngược Base</button></div>';
+  if (!orders.length){ return h + '<div style="font-size:12px;color:var(--muted)">Trong kỳ đang chọn không có đơn Pos nào ghép được với Base (ghi chú Pos cần ≥2 mã bộ đếm).</div>'; }
+  var LIM = 100;
+  h += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Ngày</th><th>Khách / SĐT</th><th>Thẻ Pos</th><th style="text-align:right">Giá Pos gốc</th><th style="text-align:right">Theo Base</th><th style="text-align:right">Chênh</th><th>Đơn gốc Base</th><th>Chia sale (theo Base)</th></tr></thead><tbody>';
+  orders.slice(0, LIM).forEach(function(o){
+    var posV = _srBcPosVal_(o), baseV = _srBcBaseSum_(o), lech = baseV - posV;
+    var src = (o.ghepBase || []).map(function(x){ return esc((x.ma || '') + ' · ' + (x.nguoiTao || '?') + ' · ' + (x.saleBan || '(chưa gán)') + ' · ' + fmt(Math.round(Number(x.giaTri) || 0)) + (x.tinh ? '' : ' (bị loại: ' + (x.trangThai || '') + ')')); }).join('<br>');
+    var sh = _srOrderShares_(o, 'adj').map(function(x){ return esc(x.name) + ' ' + fmt(Math.round(x.giaTri)) + ' (' + (Math.round(x.frac * 1000) / 10) + '%)'; }).join('<br>') + (_srBcQuayTxt_(o) ? '<br><i>' + esc(_srBcQuayTxt_(o)) + '</i>' : '');
+    h += '<tr><td>' + esc(o.ngayTaoDon || '') + '</td><td>' + esc(o.khachHang || '') + '<br><span style="color:var(--muted)">' + esc(o.soDienThoai || '') + '</span></td><td>' + esc(o.theSale || '') + '</td>' +
+      '<td style="text-align:right">' + _srMoney(posV) + '</td><td style="text-align:right">' + _srMoney(baseV) + '</td><td style="text-align:right;' + (Math.abs(lech) > 1 ? 'color:#c00;font-weight:600' : '') + '">' + _srMoney(lech) + '</td><td style="font-size:11.5px">' + src + '</td><td style="font-size:11.5px">' + sh + '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  if (orders.length > LIM) h += '<div style="font-size:11.5px;color:var(--muted);margin-top:6px">Đang hiện ' + LIM + '/' + fmt(orders.length) + ' đơn — bấm <b>Xuất Excel</b> để xem đủ.</div>';
+  return h;
+}
+function _srBaseCheckExport_(){
+  var d = _srState.dataB;
+  if (!d || !d.orders){ alert('Chưa có dữ liệu Báo cáo B — hãy tải báo cáo trước.'); return; }
+  if (typeof XLSX === 'undefined'){ alert('Thiếu thư viện Excel (XLSX).'); return; }
+  var orders = _srBcOrders_(d), b = _srBcBuild_(orders), t = b.tot, g = d.ghep || {};
+  var pure = _srPureCalc_(orders, 'pure'), adj = _srPureCalc_(orders, 'adj'), pm = {}, am = {}, names = [];
+  pure.rows.forEach(function(r){ pm[r.name] = r; if (names.indexOf(r.name) < 0) names.push(r.name); });
+  adj.rows.forEach(function(r){ am[r.name] = r; if (names.indexOf(r.name) < 0) names.push(r.name); });
+  names.sort(function(x, y){ return ((am[y] || {}).giaTri || 0) - ((am[x] || {}).giaTri || 0); });
+  var z = { orders: 0, giaTri: 0 };
+  var bySale = [['Sale', 'Số đơn (chia theo Thẻ Pos)', 'Giá trị (theo Thẻ Pos, giá Pos gốc)', 'Số đơn (theo đơn gốc Base)', 'Giá trị (theo đơn gốc Base)', 'Chênh số đơn', 'Chênh giá trị (Base − Thẻ Pos)']];
+  names.forEach(function(n){ var p = pm[n] || z, a = am[n] || z; bySale.push([n, p.orders, Math.round(p.giaTri), a.orders, Math.round(a.giaTri), a.orders - p.orders, Math.round(a.giaTri - p.giaTri)]); });
+  var ov = [['Chỉ tiêu', 'Giá trị'],
+    ['Ngày xuất', new Date().toLocaleString('vi-VN')],
+    ['Số đơn Pos đã ghép với Base (trong kỳ đang chọn)', t.don],
+    ['Tổng giá Pos gốc của các đơn này', Math.round(t.pos)],
+    ['Tổng doanh thu theo đơn gốc Base (chỉ đơn Base còn tính)', Math.round(t.base)],
+    ['Chênh (Base − Pos)', Math.round(t.base - t.pos)],
+    ['Số đơn Pos có giá lệch Base (> 1đ)', t.lech],
+    ['Đơn Pos có mã bộ đếm (≥2 mã)', g.donCoMa || 0],
+    ['— đã ghép được', g.daGhep || 0],
+    ['— có mã nhưng KHÔNG khớp Base', g.khongKhopCount || 0],
+    ['— mã trùng đơn gốc đã dùng', g.trungDonGocCount || 0],
+    ['— bị bỏ vì mọi đơn gốc Base Thất bại', g.gocBiLoai || 0],
+    ['Nghi ghép nhưng CHƯA ghép', (d.ghepCheck && d.ghepCheck.count) || 0],
+    ['', ''],
+    ['Cách đọc', 'Sheet "Check ngược từng đơn": mỗi dòng = 1 đơn Pos × 1 đơn gốc Base; các cột tiền của đơn Pos chỉ ghi ở dòng đầu mỗi đơn nên SUM cột không bị lặp.'],
+    ['', 'Sheet "Chia theo sale": phần tiền từng sale của mỗi đơn Pos theo đơn gốc Base (đã gồm quầy 30/70 nếu có). Lọc cột Sale rồi SUM "Tiền chia" = số trên bảng Theo Sale.'],
+    ['', 'Đơn Pos KHÔNG có trong sheet này: đơn không ghi mã bộ đếm hoặc chỉ 1 mã (tính thuần theo Thẻ Pos).']];
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ov), 'Tổng quan');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(b.detail), 'Check ngược từng đơn');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(b.chia), 'Chia theo sale');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(bySale), 'Tổng theo sale (đơn ghép)');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(_srBcCheckRows_(d)), 'Cần kiểm tra tay');
+  XLSX.writeFile(wb, 'BaoCao_Pos_CheckNguocBase_' + _ymd(new Date()) + '.xlsx');
 }
 
 // ── CHOT THANG POS + TRU HOAN/HUY THANG TRUOC (quy tac 5, Duyen 10/2026) — chi Admin ──
@@ -1419,12 +1522,16 @@ async function _impJson_(res){
   catch(e){ throw new Error('Máy chủ không trả kết quả hợp lệ (' + String(txt).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) + ') — nếu là "524" nghĩa là quá thời gian chờ; chưa ghi gì với bước xem trước.'); }
 }
 
+// Ve lai bao cao SAU/TRUOC khi nhap file: loi ve (vd 1 bang dang mo gap du lieu null) KHONG duoc lam hong viec nhap file va KHONG duoc hien nhu 'Loi luu file'.
+// NGUYEN NHAN GOC (21/10/2026, Duyen: up file Pos 1 thang bao "Cannot read properties of null (reading 'length')"): renderSalesReportTab() duoc goi o dau ham
+// (ngoai try) va trong finally -> 1 exception khi ve lai bay ra khoi _impUpload va bi tab 'Up du lieu hang ngay' bao la loi luu, du viec nhap (hoac xem truoc) chua/da xong.
+function _impRender_(){ try { renderSalesReportTab(); } catch (e) { console.error('[nhap file] loi ve lai bao cao (da bo qua, khong anh huong viec nhap):', e && e.stack ? e.stack : e); } }
 async function _impUpload(kind){
   if (!gsUrl){ toast('❌ Chưa cấu hình URL Google Apps Script.'); return; }
   var rows = kind === 'base' ? _impState.baseRows : _impState.posRows;
   if (!rows || !rows.length) return;
   if (_impState.uploading) return; // chong bam dup -> 2 request cung luc
-  _impState.uploading = true; renderSalesReportTab();
+  _impState.uploading = true; _impRender_();
   try {
     // BƯỚC 1 — XEM TRƯỚC (không ghi gì): backend đếm dòng MỚI / đơn ĐÃ CÓ. Backend cũ chưa hỗ trợ dryRun sẽ trả kết quả ghi thật
     // (không có d0.dryRun) -> không bao giờ ghi 2 lần: dùng kết quả đó luôn như trước.
@@ -1433,7 +1540,7 @@ async function _impUpload(kind){
     // NHAP FILE GOI THANG Apps Script (khong qua Worker/Cloudflare): Cloudflare cat moi request sau ~100 giay (loi 524 "error code: 524"),
     // trong khi doc+doi chieu ca sheet DT TONG co the lau hon -> nhap that bai TRUOC khi cap nhat duoc don (vd don da "That bai" van giu "Dang xu ly").
     var impUrl = (typeof GAS_URL_DIRECT !== 'undefined' && GAS_URL_DIRECT) ? GAS_URL_DIRECT : gsUrl;
-    var res0 = await fetch(impUrl, { method:'POST', body: JSON.stringify({ action:'importSheetRows', sheet: kind, rows: rows, dryRun: true, updateExisting: true }) });
+    var res0 = await fetch(impUrl, { method:'POST', body: JSON.stringify({ action:'importSheetRows', token: _impTok_(), sheet: kind, rows: rows, dryRun: true, updateExisting: true }) });
     var d0 = await _impJson_(res0);
     if (d0.error) throw new Error(d0.error);
     if (d0.dryRun) {
@@ -1450,7 +1557,7 @@ async function _impUpload(kind){
         + '\nDữ liệu cũ trên Sheet được GIỮ NGUYÊN 100%. Tiếp tục nhập?')) { toast('Đã hủy — chưa ghi gì.'); return; }
     } else { _isReal = true; d = d0; }
     if (!_isReal) {
-      var res = await fetch(impUrl, { method:'POST', body: JSON.stringify({ action:'importSheetRows', sheet: kind, rows: rows, updateExisting: true }) });
+      var res = await fetch(impUrl, { method:'POST', body: JSON.stringify({ action:'importSheetRows', token: _impTok_(), sheet: kind, rows: rows, updateExisting: true }) });
       d = await _impJson_(res);
     }
     if (d.error) throw new Error(d.error);
@@ -1460,13 +1567,14 @@ async function _impUpload(kind){
     if (kind === 'base'){ _impState.baseRows = null; _impState.baseFileName = ''; _impState.baseWarn = ''; }
     else { _impState.posRows = null; _impState.posFileName = ''; _impState.posWarn = ''; }
     var fi = document.getElementById('imp-file-'+kind); if (fi) fi.value = '';
+    _impHist.items = null;   // co lan nhap moi -> tai lai lich su
     // Du lieu goc da doi -> cac bao cao doanh so dang cache tren client (neu co) co the sai lech,
     // xoa de buoc tai lai tu server khi nguoi dung xem lai cac tab bao cao.
     _srState.dataA = _srState.dataB = _srState.dataC = _srState.dataE = _srState.dataF = _srState.dataG = _srState.dataH = null;
   } catch(e){
     toast('❌ Nhập lỗi: ' + e.message);
   } finally {
-    _impState.uploading = false; renderSalesReportTab();
+    _impState.uploading = false; _impRender_();
   }
 }
 
@@ -1478,7 +1586,7 @@ function _impPickCard_(kind, label, hint, sheetTarget){
   html += '<div style="font-weight:600;margin-bottom:4px">'+label+'</div>';
   html += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">'+hint+' — sẽ nối tiếp vào sheet <b>"'+esc(sheetTarget)+'"</b>.</div>';
   html += '<input type="file" id="imp-file-'+kind+'" accept=".xlsx,.xls" onchange="_impOnFileSelected(this,\''+kind+'\')" style="font-size:12px">';
-  if (fname){
+  if (fname && rows && rows.length){   // NGUYEN NHAN GOC 21/10/2026: tab 'Up du lieu' dat rows=null khi luu loi nhung ten file con -> rows.length ném lỗi moi lan ve lai
     html += '<div style="margin-top:8px;font-size:12px">📄 '+esc(fname)+' — <b>'+fmt(rows.length)+'</b> dòng đọc được.</div>';
     if (warn) html += '<div style="margin-top:6px;padding:6px 8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:11.5px;color:#9a3412">'+esc(warn)+'</div>';
     html += '<button class="btn sm primary" style="margin-top:8px" '+(_impState.uploading?'disabled':'')+' onclick="_impUpload(\''+kind+'\')">'+(_impState.uploading?'Đang nhập...':'💾 Nhập '+fmt(rows.length)+' dòng vào CRM')+'</button>';
@@ -1491,6 +1599,73 @@ function _impPickCard_(kind, label, hint, sheetTarget){
   return html;
 }
 
+// ── LỊCH SỬ NHẬP + HOÀN TÁC (backend: importBatches / importUndo, chỉ chủ sở hữu; xem docs/crm-kb + HANDOFF 2026-10-20) ──
+// Đường nhập file gọi THẲNG Apps Script (không qua Worker) nên bộ gắn token ở js/06 (chỉ áp cho URL Worker) không chạy -> gắn token thủ công.
+var _impHist = { items: null, loading: false, err: '', busy: '' };
+function _impTok_(){ try { return localStorage.getItem('ome_sess_token') || ''; } catch(e){ return ''; } }
+function _impGasUrl_(){ return (typeof GAS_URL_DIRECT !== 'undefined' && GAS_URL_DIRECT) ? GAS_URL_DIRECT : gsUrl; }
+async function _impLoadHist_(){
+  if (_impHist.loading) return;
+  _impHist.loading = true; _impHist.err = ''; renderSalesReportTab();
+  try {
+    var u = _impGasUrl_();
+    var res = await fetch(u + (u.indexOf('?') > -1 ? '&' : '?') + 'action=importBatches&token=' + encodeURIComponent(_impTok_()));
+    var d = await _impJson_(res);
+    if (d.error) { _impHist.items = []; _impHist.err = (d.code === 'FORBIDDEN') ? 'Chỉ chủ sở hữu (admin chính) xem và hoàn tác được lịch sử nhập.' : d.error; }
+    else _impHist.items = d.items || [];
+  } catch(e){ _impHist.items = []; _impHist.err = 'Không tải được lịch sử nhập: ' + e.message; }
+  finally { _impHist.loading = false; renderSalesReportTab(); }
+}
+async function _impUndo_(batchId){
+  if (_impHist.busy) return;
+  _impHist.busy = batchId; renderSalesReportTab();
+  try {
+    var u = _impGasUrl_(), call = async function(dry){
+      var r = await fetch(u, { method:'POST', body: JSON.stringify({ action:'importUndo', token: _impTok_(), batchId: batchId, dryRun: dry }) });
+      return await _impJson_(r);
+    };
+    var d0 = await call(true);
+    if (d0.error) throw new Error(d0.error);
+    var when = d0.time ? new Date(d0.time).toLocaleString('vi-VN') : '';
+    var msg = 'HOÀN TÁC lần nhập ' + when + (d0.who ? ' của ' + d0.who : '') + ' (' + (d0.sheet || '') + ') — xem trước:\n\n'
+      + '• XÓA ' + fmt(d0.wouldDelete || 0) + ' dòng đã thêm (có SAO LƯU vào sheet "Sao lưu hoàn tác nhập" trước khi xóa)\n'
+      + '• KHÔI PHỤC ' + fmt(d0.wouldRestoreCells || 0) + ' ô đã cập nhật về giá trị cũ\n'
+      + (d0.skippedEdited ? '• GIỮ NGUYÊN ' + fmt(d0.skippedEdited) + ' ô đã bị sửa tay sau lần nhập\n' : '')
+      + (d0.missing ? '• ' + fmt(d0.missing) + ' dòng không còn trên Sheet (đã bị xóa tay trước) — bỏ qua\n' : '')
+      + (d0.skippedNoRow ? '• ' + fmt(d0.skippedNoRow) + ' ô không tìm thấy đơn tương ứng — bỏ qua\n' : '')
+      + '\nChỉ hoàn tác được 1 lần. Tiếp tục?';
+    if (!d0.wouldDelete && !d0.wouldRestoreCells) { toast('ℹ️ Không còn gì để hoàn tác (các dòng/ô của lần nhập này đã không còn hoặc đã bị sửa).'); return; }
+    if (!confirm(msg)) { toast('Đã hủy — chưa thay đổi gì.'); return; }
+    var d = await call(false);
+    if (d.error) throw new Error(d.error);
+    toast('↩️ Đã hoàn tác: xóa ' + fmt(d.deleted || 0) + ' dòng, khôi phục ' + fmt(d.restoredCells || 0) + ' ô.');
+    try { logAudit('import_undo', '', '', 'Hoàn tác lần nhập ' + batchId + ': xóa ' + (d.deleted||0) + ' dòng, khôi phục ' + (d.restoredCells||0) + ' ô'); } catch(eA){}
+    _srState.dataA = _srState.dataB = _srState.dataC = _srState.dataE = _srState.dataF = _srState.dataG = _srState.dataH = null;
+    _impHist.items = null;
+  } catch(e){
+    toast('❌ Hoàn tác lỗi: ' + e.message);
+  } finally {
+    _impHist.busy = ''; renderSalesReportTab();
+  }
+}
+function _impHistHtml_(){
+  var h = '<div class="dash-section-title" style="margin-top:22px">🕘 Lịch sử nhập (30 lần gần nhất) '
+    + '<button class="btn sm secondary" style="margin-left:8px" onclick="_impHist.items=null;_impLoadHist_()" ' + (_impHist.loading ? 'disabled' : '') + '>↻ Tải lại</button></div>';
+  if (_impHist.loading && !_impHist.items) return h + '<div style="color:var(--muted);padding:10px">Đang tải...</div>';
+  if (_impHist.err) return h + '<div style="padding:10px;font-size:12.5px;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px">' + esc(_impHist.err) + '</div>';
+  var items = _impHist.items || [];
+  if (!items.length) return h + '<div style="color:var(--muted);padding:10px;font-size:12.5px">Chưa có lần nhập nào được ghi nhật ký (chỉ các lần nhập SAU khi bật tính năng này mới hoàn tác được).</div>';
+  h += '<table class="dash-table"><thead><tr><th>Thời gian</th><th>Người nhập</th><th>Sheet</th><th>Thêm dòng</th><th>Ô cập nhật</th><th>Trạng thái</th></tr></thead><tbody>';
+  items.forEach(function(it){
+    var when = it.time ? new Date(it.time).toLocaleString('vi-VN') : '';
+    var st;
+    if (it.status === 'da-hoan-tac') st = '<span style="color:#6b7280">↩️ Đã hoàn tác' + (it.undoneBy ? ' bởi ' + esc(it.undoneBy) : '') + '</span>';
+    else if (it.status === 'ok') st = '<button class="btn sm danger" ' + (_impHist.busy ? 'disabled' : '') + ' onclick="_impUndo_(\'' + esc(it.id) + '\')">' + (_impHist.busy === it.id ? 'Đang xử lý...' : '↩️ Hoàn tác') + '</button>';
+    else st = '<span style="color:#9a3412" title="Lần nhập quá 5000 dòng nên không lưu dấu vân">⛔ Không hoàn tác được</span>';
+    h += '<tr><td>' + esc(when) + '</td><td>' + esc(it.who || '(không rõ)') + '</td><td>' + esc(it.sheet || '') + '</td><td>' + fmt(it.written || 0) + '</td><td>' + fmt(it.updatedCells || 0) + '</td><td>' + st + '</td></tr>';
+  });
+  return h + '</tbody></table>';
+}
 function renderSalesReportTabJ_(wrap, subTabs){
   if (!_srIsAdmin()){ wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + '<div style="color:var(--muted);padding:20px;text-align:center">🔒 Chỉ Admin được nhập dữ liệu Base/Pos.</div>'; return; }
   var html = '<div style="font-size:12.5px;color:var(--muted);margin-bottom:14px">Tải lên file export từ Base platform / Pancake POS — hệ thống tự đọc và nối tiếp vào đúng sheet nguồn trên Google Sheet (không cần copy tay), tự loại bỏ các dòng trùng tuyệt đối (giống hệt mọi cột) với dữ liệu đã có sẵn.</div>';
@@ -1498,6 +1673,8 @@ function renderSalesReportTabJ_(wrap, subTabs){
   html += _impPickCard_('base', '📥 Dữ liệu Base', 'File export "Danh sách công việc" (sheet "Tất cả"), .xls/.xlsx', 'DT TỔNG ');
   html += _impPickCard_('pos', '📥 Dữ liệu Pos', 'File export đơn hàng (Pancake POS), .xlsx', 'dữ liệu đơn');
   html += '</div>';
+  if (_impHist.items === null && !_impHist.loading) setTimeout(_impLoadHist_, 0);   // tai lich su 1 lan khi mo tab (lan nhap moi / bam Tai lai thi dat items=null)
+  html += _impHistHtml_();
   wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' + subTabs + html;
 }
 
