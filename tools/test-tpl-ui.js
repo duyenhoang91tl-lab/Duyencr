@@ -11,7 +11,7 @@ const psrc = fs.readFileSync(path.join(__dirname, '..', 'extension-pancake', 'pa
 function fnSrc(src, name) { const i = src.indexOf('function ' + name); if (i < 0) throw new Error('khong thay ' + name); let d = 0, k = src.indexOf('{', i); for (let m = k; m < src.length; m++) { if (src[m] === '{') d++; else if (src[m] === '}') { d--; if (d === 0) return src.slice(i, m + 1); } } }
 const zchunk = zsrc.slice(zsrc.indexOf('  let _zaiMsgTemplates = []'), zsrc.indexOf('  // ── DOANH SO & HOA HONG CUA TOI'));
 const zhelp = fnSrc(zsrc, 'zaiFold_') + '\n' + fnSrc(zsrc, 'zaiRankTpls_');
-const phelp = ['_stripVNlocal_', 'isMyOpenTpl_', 'rankMsgTemplates_', 'renderMsgTemplateRows_', 'openTplForm_', 'loadMsgTemplates_'].map(n => fnSrc(psrc, n)).join('\n');
+const phelp = ['_stripVNlocal_', 'isMyOpenTpl_', 'tplLines_', 'rankMsgTemplates_', 'renderMsgTemplateRows_', 'openTplForm_', 'loadMsgTemplates_'].map(n => fnSrc(psrc, n)).join('\n');
 const esc1 = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const esc2 = s => String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 

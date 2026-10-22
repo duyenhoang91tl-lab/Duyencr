@@ -2993,6 +2993,11 @@
     return !!me && t.status && t.status !== 'approved' && String(t.createdBy || '').trim().toLowerCase() === me;
   }
 
+  // Tach mau thanh tung DOAN: moi dong (xuong dong) = 1 tin nhan rieng. Bo dong trong, cat khoang trang 2 dau.
+  function tplLines_(content) {
+    return String(content || '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+  }
+
   function renderMsgTemplateRows_() {
     const box = panelEl.querySelector('#pk-tpl-result');
     if (!box) return;
@@ -3007,31 +3012,52 @@
         + String(t.tags || '').split(',').map((x) => x.trim()).filter(Boolean).map((tg) => ` <span class="pk-price-field">#${escapeHtml(tg)}</span>`).join('');
       const preview = t.content.length > 160 ? t.content.slice(0, 160) + '…' : t.content;
       const mine = isMyOpenTpl_(t);
-      const badge = !mine ? '' : (t.status === 'rejected'
+      const others = !mine && t.status === 'pending';   // 21/10/2026: CS xem duoc ca mau CHUA DUYET cua nguoi khac (tham khao) — AI chi hoc mau DA DUYET
+      const badge = others ? `<div style="color:#92400e;font-size:11px">⏳ Chưa duyệt${t.createdBy ? ' — ' + escapeHtml(t.createdBy) + ' đề xuất' : ''} (tham khảo, chờ admin duyệt)</div>` : !mine ? '' : (t.status === 'rejected'
         ? `<div style="color:#991b1b;font-size:11px">❌ Bị từ chối${t.rejectReason ? ': ' + escapeHtml(t.rejectReason) : ''} — sửa lại để gửi duyệt lại</div>`
         : '<div style="color:#92400e;font-size:11px">⏳ Chờ quản lý duyệt — chưa dùng được cho người khác</div>');
       return `<div class="pk-price-item pk-ai-suggestion-item" data-tid="${escapeHtml(t.id)}" title="Bấm để chèn vào ô trả lời">` +
         `<div class="pk-ctkm-title">${escapeHtml(t.title)}</div>` + badge +
         `<div>${escapeHtml(preview)}</div>` +
         (chips ? `<div style="margin-top:3px">${chips}</div>` : '') +
-        `<div class="pk-tpl-acts"><button type="button" class="pk-btn-outline" data-cid="${escapeHtml(t.id)}">📋 Copy</button>` +
+        `<div class="pk-tpl-acts"><button type="button" class="pk-btn-outline" data-cid="${escapeHtml(t.id)}" title="Copy nguyên cả mẫu (cả đoạn dài)">📋 Copy cả câu</button>` +
+        `<button type="button" class="pk-btn-outline" data-iid="${escapeHtml(t.id)}" title="Chèn nguyên cả mẫu vào ô chat">➡ Chèn cả câu</button>` +
+        (tplLines_(t.content).length > 1 ? `<button type="button" class="pk-btn-outline" data-ltog="${escapeHtml(t.id)}" title="Tách mỗi dòng thành 1 tin nhắn riêng">📑 Từng đoạn (${tplLines_(t.content).length})</button>` : '') +
         (mine ? `<button type="button" class="pk-btn-outline" data-eid="${escapeHtml(t.id)}">✏️ Sửa</button><button type="button" class="pk-btn-outline" data-did="${escapeHtml(t.id)}">🗑 Xoá</button>` : '') +
-        `</div></div>`;
+        `</div>` +
+        (tplLines_(t.content).length > 1 ? `<div class="pk-tpl-lines" data-lbox="${escapeHtml(t.id)}" style="display:none">` + tplLines_(t.content).map((ln, k) =>
+          `<div class="pk-tpl-line"><span class="pk-tpl-line-txt">${escapeHtml(ln)}</span>` +
+          `<button type="button" class="pk-btn-outline" data-lc="${escapeHtml(t.id)}|${k}" title="Copy đoạn này (1 tin nhắn)">📋 Copy đoạn</button>` +
+          `<button type="button" class="pk-btn-outline" data-li="${escapeHtml(t.id)}|${k}" title="Đưa đoạn này vào ô chat">➡ Chèn</button></div>`).join('') + `</div>` : '') +
+        `</div>`;
     }).join('');
     box.querySelectorAll('[data-tid]').forEach((el) => {
       el.addEventListener('click', (e) => {
-        if (e.target.closest('button')) return; // bam nut thi khong chen vao o tra loi
+        if (e.target.closest('button') || e.target.closest('.pk-tpl-lines')) return; // bam nut / vung tung doan thi khong chen ca mau vao o tra loi
         const t = _msgTemplates.find((x) => x.id === el.dataset.tid);
         if (t) insertReply(t.content); // dung lai ham co san — tu dong xu ly ca contenteditable lan textarea
       });
     });
+    const flashBtn_ = (b, txt) => { const old = b.textContent; b.textContent = txt; setTimeout(() => { b.textContent = old; }, 1200); };
+    const copyBtn_ = (b, text) => navigator.clipboard.writeText(text).then(() => flashBtn_(b, '✅ Đã copy')).catch(() => setStatus('Không copy được — bấm vào thẻ để chèn thẳng vào ô trả lời.'));
+    const lineOf_ = (key) => { const [id, k] = String(key).split('|'); const t = _msgTemplates.find((x) => x.id === id); return t ? (tplLines_(t.content)[Number(k)] || '') : ''; };
     box.querySelectorAll('[data-cid]').forEach((b) => b.addEventListener('click', (e) => {
       e.stopPropagation();
       const t = _msgTemplates.find((x) => x.id === b.dataset.cid);
-      if (!t) return;
-      const done = () => { const old = b.textContent; b.textContent = '✅ Đã copy'; setTimeout(() => { b.textContent = old; }, 1200); };
-      navigator.clipboard.writeText(t.content).then(done).catch(() => setStatus('Không copy được — bấm vào thẻ để chèn thẳng vào ô trả lời.'));
+      if (t) copyBtn_(b, t.content);   // Copy CA CAU: giu nguyen xuong dong, dan duoc ca doan dai
     }));
+    box.querySelectorAll('[data-iid]').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const t = _msgTemplates.find((x) => x.id === b.dataset.iid);
+      if (t) { insertReply(t.content); flashBtn_(b, '✅ Đã chèn'); }
+    }));
+    box.querySelectorAll('[data-ltog]').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const lb = box.querySelector(`[data-lbox="${CSS.escape(b.dataset.ltog)}"]`);
+      if (lb) lb.style.display = lb.style.display === 'none' ? '' : 'none';
+    }));
+    box.querySelectorAll('[data-lc]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); const ln = lineOf_(b.dataset.lc); if (ln) copyBtn_(b, ln); }));
+    box.querySelectorAll('[data-li]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); const ln = lineOf_(b.dataset.li); if (ln) { insertReply(ln); flashBtn_(b, '✅ Đã chèn'); } }));
     box.querySelectorAll('[data-eid]').forEach((b) => b.addEventListener('click', (e) => {
       e.stopPropagation();
       openTplForm_(_msgTemplates.find((x) => x.id === b.dataset.eid) || null);
