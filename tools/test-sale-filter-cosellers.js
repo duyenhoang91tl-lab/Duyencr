@@ -35,7 +35,7 @@ let a = run('buildSalesReportA_', { sale: ['anhtrinh1995', 'yenNTH2004'] });
 ok(names(a.bySale) === 'anhtrinh1995,yenNTH2004', 'A: loc 2 sale -> bang Theo Sale CHI co 2 nguoi do (khong co menbui2002/phongketoan): ' + names(a.bySale));
 ok(by(a.bySale, 'anhtrinh1995').orders === 2 && by(a.bySale, 'anhtrinh1995').giaTri === 500000 + 500000, 'A: so don giu nguyen (2); tien van chia deu theo SO SALE TREN DON (1.000.000/2 + 500.000 = 1.000.000)');
 ok(by(a.bySale, 'yenNTH2004').giaTri === 1000000, 'A: yenNTH2004 dong ban voi phongketoan: nhan 1/2 = 1.000.000');
-ok(a.totalOrders === 3 && a.totalGiaTri === 1000000 + 500000 + 2000000, 'A: the tong KPI van la tong cac DON khop bo loc (3 don, 3.500.000) — khong doi');
+ok(a.totalOrders === 3 && a.totalGiaTri === 1000000 + 1000000 && a.totalGiaTri === a.bySale.reduce((x, y) => x + y.giaTri, 0), 'A: (21/10/2026) o tong dau trang: SO DON van dem nguyen don (3) nhung TIEN chi cong phan cua nguoi duoc chon (2.000.000) = tong bang Theo Sale');
 ok(!by(a.byTeamSale, 'Phòng Kế toán') && by(a.byTeamSale, 'Team Online'), 'A: bang Theo Team Sale cung khong con "Phòng Kế toán": ' + names(a.byTeamSale));
 // khong loc -> day du moi nguoi
 a = run('buildSalesReportA_', {});

@@ -4818,16 +4818,24 @@ function buildSalesReportA_(filters) {
   for (var j = 0; j < matched.length; j++) {
     var m = matched[j];
     var revenue = _dtOrderRevenue_(m);
-    if (_dtIsExchangeOrder_(m.phanLoai)) totalGiaTriChenh += (m.giaTriChenh || 0);
-    totalCoc += m.giaTriCoc;
-    totalGiaTri += revenue;
+    // (21/10/2026, Duyen: "cac o bao cao dau trang cung chi tinh theo nhung nguoi duoc loc") Dang loc Sale: tien tren o dau trang + bang Theo Kenh chi cong PHAN cua nhung nguoi
+    // duoc chon (don co 3 sale, chon 1 nguoi -> 1/3), khop bang Theo Sale / bieu do. So DON van dem nguyen don. Khong loc Sale (hoac tinh theo nguoi tao) -> selFrac = 1 nhu cu.
+    var selFrac = 1;
+    if (!byCreator && saleFilterFoldA.length) {
+      var sl0 = splitMulti_(m.saleBan, ',');
+      selFrac = sl0.length ? sl0.filter(wantSaleA_).length / sl0.length : 0;
+    }
+    var revenueSel = revenue * selFrac, cocSel = m.giaTriCoc * selFrac;
+    if (_dtIsExchangeOrder_(m.phanLoai)) totalGiaTriChenh += (m.giaTriChenh || 0) * selFrac;
+    totalCoc += cocSel;
+    totalGiaTri += revenueSel;
 
     // breakdown theo kenh: kenh la single-value, khong chia
     var kName = m.kenhBan || '(chưa có kênh)';
     if (!byKenh[kName]) byKenh[kName] = { orders: 0, coc: 0, giaTri: 0 };
     byKenh[kName].orders += 1;
-    byKenh[kName].coc += m.giaTriCoc;
-    byKenh[kName].giaTri += revenue;
+    byKenh[kName].coc += cocSel;
+    byKenh[kName].giaTri += revenueSel;
 
     // breakdown theo sale:
     // - Mac dinh: so don GIU NGUYEN (khong chia), phan tien CHIA DEU cho N sale tren don.
@@ -5436,6 +5444,43 @@ function _pickBaseRowsForCode_(code, idx) {
   return null;
 }
 
+// ── MA BAO HANH "BH..." (yeu cau Duyen 21/10/2026) ──
+// Ma BH (vd "BH108T10/2026") = don GOC khach mang di gui BAO HANH: BO chu "BH" -> "108T10/2026" la don goc tren Base, dung de BIET TINH CHO SALE NAO. Doanh thu cua don bao hanh van
+// la gia Pos cua chinh don do (neu co doanh thu) — KHONG lay gia tri don goc Base (tranh cong doanh thu don goc lan nua). Chi ap khi ghi chu chi co ma BH (khong lan ma don thuong).
+function _splitBhCodes_(codes) {
+  var normal = [], bh = [], bhOrig = [], seen = {};
+  (codes || []).forEach(function(c) {
+    var n = _normCounterCode_(c);
+    if (/^BH\d/.test(n)) { bh.push(n); var o = n.replace(/^BH/, ''); if (!seen[o]) { seen[o] = true; bhOrig.push(o); } }
+    else normal.push(n);
+  });
+  return { normal: normal, bh: bh, bhOrig: bhOrig };
+}
+function _resolveBhOrigin_(origins, idx, posValue) {
+  var picked = [], missing = [], seenRow = {};
+  origins.forEach(function(c) {
+    var rows = _pickBaseRowsForCode_(c, idx);
+    if (!rows || !rows.length) { missing.push(c); return; }
+    rows.forEach(function(r) { if (!seenRow[r.rowIndex]) { seenRow[r.rowIndex] = true; picked.push(r); } });
+  });
+  if (missing.length) return { status: 'khongKhop', codes: origins, missing: missing };
+  var total = 0, shareAmt = {}, names = [], baseOrders = [];
+  picked.forEach(function(br) {
+    var excl = _isExcludedOrderStatus_(br.trangThai), d0 = parseVNDate_(br.ngayTao);
+    baseOrders.push({ dong: br.rowIndex, ma: br.code || '', ngay: d0 ? _vnYmd_(d0) : '', nguoiTao: br.creator || '', saleBan: String(br.saleBan || ''),
+      trangThai: String(br.trangThai || ''), giaTri: Number(br.giaTriDon) || 0, tinh: !excl });
+    if (excl) return;   // don goc Base 'Thất bại' -> khong dung de chia (roi ve chia theo The Pos, khong mat doanh thu cua don bao hanh)
+    var rv = Number(br.giaTriDon) || 0;
+    var sales = String(br.saleBan || '').split(',').map(function(x) { return x.trim(); }).filter(Boolean);
+    if (!sales.length) sales = ['(chưa gán sale)'];
+    total += rv;
+    sales.forEach(function(sn) { if (shareAmt[sn] === undefined) { shareAmt[sn] = 0; names.push(sn); } shareAmt[sn] += rv / sales.length; });
+  });
+  if (!names.length) return { status: 'khongKhop', codes: origins, missing: origins };
+  var shares = names.map(function(sn) { return { name: sn, frac: total > 0 ? shareAmt[sn] / total : 1 / names.length }; });
+  return { status: 'ok', total: Number(posValue) || 0, shares: shares, codes: origins, baseRows: picked.length, creators: [], baseNgayTao: '', baseOrders: baseOrders, bh: true };
+}
+
 // Tinh GHEP cho 1 don Pos. usedBaseRows: set (cap request) cac dong Base da duoc 1 don Pos khac nhan —
 // chong cong trung doanh thu khi 2 don Pos cung tro toi 1 don goc. Tra ve:
 //   null                      — don khong co ma bo dem trong ghi chu (chia Pos binh thuong)
@@ -5760,12 +5805,15 @@ function buildSalesReportB_(filters) {
   }
 
   // GHEP DON POS <-> BASE (cot Q ghi chu): tach ma bo dem tu ghi chu, chi doc "DT TỔNG " khi THUC SU co ma.
-  var codesByRow = [], wantedCodes = {}, anyCodes = false;
+  var codesByRow = [], bhOrigByRow = [], wantedCodes = {}, anyCodes = false;
   for (var pi = 0; pi < pre.length; pi++) {
     var cds = POS_GHEP_BASE_ENABLED_ ? _extractCounterCodes_(pre[pi].ghiChu) : [];
-    if (cds.length < POS_GHEP_MIN_CODES_) cds = []; // chi don ghep (>=2 ma) moi check nguoc Base; 1 ma -> tinh thuan Pos
-    codesByRow.push(cds);
+    var bhSp = _splitBhCodes_(cds), bhOrig = null;
+    if (bhSp.bh.length && !bhSp.normal.length) { bhOrig = bhSp.bhOrig; cds = []; }   // don BAO HANH: tra don goc (bo chu BH) de biet sale; doanh thu giu theo Pos
+    else { cds = (cds.length >= POS_GHEP_MIN_CODES_) ? bhSp.normal : []; }            // chi don ghep (>=2 ma) moi check nguoc Base; 1 ma -> tinh thuan Pos; ma BH lan ma thuong khong dung de ghep
+    codesByRow.push(cds); bhOrigByRow.push(bhOrig);
     if (cds.length) { anyCodes = true; cds.forEach(function(c) { wantedCodes[c] = true; }); }
+    if (bhOrig) { anyCodes = true; bhOrig.forEach(function(c) { wantedCodes[c] = true; }); }
   }
   var baseIdx = null;
   var ghepErr = '', ghepMs = 0;
@@ -5793,7 +5841,8 @@ function buildSalesReportB_(filters) {
   var matched = [];
   for (var pj = 0; pj < pre.length; pj++) {
     var rowP = pre[pj];
-    var gh = codesByRow[pj].length ? _resolveGhepDon_(codesByRow[pj], baseIdx, usedBaseRows) : null;
+    var gh = bhOrigByRow[pj] ? _resolveBhOrigin_(bhOrigByRow[pj], baseIdx, Number(rowP.giaTriSauGiam) || 0)
+      : (codesByRow[pj].length ? _resolveGhepDon_(codesByRow[pj], baseIdx, usedBaseRows) : null);
     var effRow = rowP;
     if (gh) {
       ghepStats.donCoMa++;
