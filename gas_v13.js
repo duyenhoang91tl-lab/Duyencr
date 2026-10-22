@@ -10120,6 +10120,124 @@ function _orgApplyDepts_(people, byKey, sd, deptList, UNK) {
     if (dm && lbl[dm.key]) { x.deptKey = dm.key; x.dept = lbl[dm.key]; } else { x.deptKey = ''; x.dept = UNK; }
   });
 }
+// ── PHAN BO PHONG BAN THEO FILE NHAN SU (Duyen yeu cau 2026-10-21) ──
+// Nguon: FILE_NHAN_SU_TONG_HOP.xlsx (cot BO PHAN + TEN NHAN VIEN; KHONG luu CCCD/ngay sinh/SDT/dia chi). Ghi 2 Settings: deptList (them phong con thieu) + saleDepts (ten -> key phong).
+// CHAY TAY 1 LAN trong Apps Script Editor: datPhongBanTuFileNhanSu() = XEM TRUOC (chi ghi Logger, khong ghi gi); datPhongBanTuFileNhanSu(true) = GHI THAT.
+// GOP, khong de: giu moi phong/nguoi dang co ngoai file; nguoi da co (khop ten khong phan biet hoa/thuong) thi doi sang phong theo file, khong tao khoa trung.
+// Ten xuat hien o 2 bo phan khac nhau trong file (cung ten 2 nguoi) -> BO QUA va bao trong Logger de gan tay o Settings > Phong ban.
+var PHONGBAN_NHANSU_NEW_ = [
+  { key: 'banlanhdao', label: 'Ban lãnh đạo' }, { key: 'cskh', label: 'CSKH' }, { key: 'khobaohanh', label: 'Kho bảo hành' },
+  { key: 'khoncc', label: 'Kho NCC + SX' }, { key: 'khonhacungcap', label: 'Kho nhà cung cấp' }
+];
+var PHONGBAN_NHANSU_ = [
+  ['Lại Thị Thảo', 'banlanhdao'],
+  ['Nguyễn Thị Diệu My', 'hr'],
+  ['Nguyễn Thị Mậu', 'hr'],
+  ['Lê Xuân Cảnh', 'hr'],
+  ['Nguyễn Thị Thúy Hoàn', 'cuahang'],
+  ['Lê Trà My', 'cuahang'],
+  ['Nguyễn Thùy Trang', 'cuahang'],
+  ['Nguyễn Lan Hương', 'cuahang'],
+  ['Trần Tú Anh', 'cuahang'],
+  ['Hà Thị Kim Thúy', 'cuahang'],
+  ['Dương Thị Thanh Tâm', 'nguon'],
+  ['Nguyễn Thanh Hồng', 'nguon'],
+  ['Hoàng Ngọc Tuấn Tú', 'khobaohanh'],
+  ['Vương Minh Anh', 'khobaohanh'],
+  ['Võ Hoàng Lan', 'khobaohanh'],
+  ['Nguyễn Thị Xoan', 'thanhpham'],
+  ['Nguyễn Thị Hồng Vân', 'thanhpham'],
+  ['Nghiêm Thị Thu Hằng', 'thanhpham'],
+  ['Nguyễn Thu Huyền', 'thanhpham'],
+  ['Trần Thị Thơm', 'thanhpham'],
+  ['Lê Thị Thanh Hoa', 'thanhpham'],
+  ['Vương Thị Trang', 'thanhpham'],
+  ['Nguyễn Thị Kim Thu', 'khoncc'],
+  ['Phạm Thu Hà', 'sanxuat'],
+  ['Nguyễn Thị Lan', 'sanxuat'],
+  ['Nguyễn Thu Thủy', 'sanxuat'],
+  ['Nguyễn Thị Nhung', 'sanxuat'],
+  ['Ngô Trung Thành', 'khonhacungcap'],
+  ['Lê Hồng Vân', 'khonhacungcap'],
+  ['Ngô Duy Nguyện', 'khonhacungcap'],
+  ['Nguyễn Khánh Ly', 'ketoan'],
+  ['Nguyễn Thu Huyền', 'ketoan'],
+  ['Vương Thúy Anh', 'ketoan'],
+  ['Phạm Thị Oanh', 'ketoan'],
+  ['Đào Thị Hồng Hạnh', 'ketoan'],
+  ['Kiều Mai Thanh Thùy', 'ketoan'],
+  ['Âu Thị Hải Yến', 'ketoan'],
+  ['Phạm Thị Hồng', 'ketoan'],
+  ['Trịnh Tuấn Anh', 'ketoan'],
+  ['Nguyễn Lâm Yến Nhi', 'ketoan'],
+  ['Nguyễn Thế Anh', 'ketoan'],
+  ['Trần Văn Trường', 'media'],
+  ['Trần Anh Tuấn', 'media'],
+  ['Trần Huy Hoàng', 'media'],
+  ['Nguyễn Thúy Quỳnh', 'cskh'],
+  ['Bùi Đoàn Thùy Mến', 'cskh'],
+  ['Vũ Thị Thu Trang', 'cskh'],
+  ['Trịnh Hằng Nga', 'cskh'],
+  ['Nguyễn Mỹ Linh', 'cskh'],
+  ['Ngô Việt Huy', 'marketing'],
+  ['Nguyễn Văn Hưng', 'marketing'],
+  ['Hoàng Thị Duyên', 'sale'],
+  ['Trịnh Phương Anh', 'sale'],
+  ['Nguyễn Thị Hải Yến', 'sale'],
+  ['Nguyễn Phương Anh', 'sale'],
+  ['Nguyễn Huyền Trang', 'sale'],
+  ['Lê Kiều Ninh', 'sale'],
+  ['Phan Thị Ngọc Hà', 'sale'],
+  ['Nguyễn Phương Thanh', 'sale'],
+  ['NguyễN Bích Ngọc', 'sale'],
+  ['Đinh Thị Thu Thủy', 'sale'],
+  ['Ninh Thị Ngà', 'sale'],
+  ['Nguyễn Thị Phương Thảo', 'sale'],
+  ['Mai Thi Thu Huyền', 'sale'],
+  ['Nguyễn Thị Bích', 'sale'],
+  ['Nguyễn Thị Thùy Dung', 'sale'],
+  ['Tạ Thúy Hà', 'sale'],
+  ['Quách Thị Minh', 'sale'],
+  ['Phạm Thị Hoàng Tươi', 'sale'],
+  ['Nguyễn Thị Tuyết Mai', 'sale']
+];
+function _phongBanNhanSuPlan_(deptListCur, saleDeptsCur) {
+  var list = (deptListCur || []).map(function (g) { return { key: g.key, label: g.label }; });
+  var haveKey = {}; list.forEach(function (g) { haveKey[g.key] = 1; });
+  var addDepts = [];
+  // Them MOI phong ma file dung ma deptList dang chay chua co (ke ca phong mac dinh da bi xoa/sua tren CRM) — thieu key thi nguoi duoc gan se hien '(chua phan phong)'.
+  var used = {}; PHONGBAN_NHANSU_.forEach(function (r) { used[r[1]] = 1; });
+  DEPT_LIST_DEFAULT_.concat(PHONGBAN_NHANSU_NEW_).forEach(function (g) { if (used[g.key] && !haveKey[g.key]) { haveKey[g.key] = 1; list.push({ key: g.key, label: g.label }); addDepts.push(g.key); } });
+  var cnt = {}; PHONGBAN_NHANSU_.forEach(function (r) { var k = _normTxt_(r[0]); cnt[k] = (cnt[k] || {}); cnt[k][r[1]] = 1; });
+  var map = {}; Object.keys(saleDeptsCur || {}).forEach(function (n) { map[n] = saleDeptsCur[n]; });
+  var byNorm = {}; Object.keys(map).forEach(function (n) { byNorm[_normTxt_(n)] = n; });
+  var added = [], changed = [], same = [], skipped = [];
+  PHONGBAN_NHANSU_.forEach(function (r) {
+    var k = _normTxt_(r[0]);
+    if (Object.keys(cnt[k]).length > 1) { if (skipped.indexOf(r[0]) < 0) skipped.push(r[0]); return; }
+    var exist = byNorm[k];
+    if (exist === undefined) { map[r[0]] = r[1]; byNorm[k] = r[0]; added.push(r[0] + ' -> ' + r[1]); }
+    else if (map[exist] !== r[1]) { changed.push(exist + ': ' + map[exist] + ' -> ' + r[1]); map[exist] = r[1]; }
+    else same.push(exist);
+  });
+  return { deptList: list, saleDepts: map, addDepts: addDepts, added: added, changed: changed, same: same, skipped: skipped };
+}
+function datPhongBanTuFileNhanSu(apply) {
+  var cur = {}; try { cur = JSON.parse(getSetting_('saleDepts') || '{}') || {}; } catch (e) { cur = {}; }
+  var plan = _phongBanNhanSuPlan_(readDeptList_(), cur);
+  Logger.log('Phong moi them vao danh sach: ' + (plan.addDepts.join(', ') || '(khong)'));
+  Logger.log('Nguoi THEM MOI (' + plan.added.length + '): ' + plan.added.join(' | '));
+  Logger.log('Nguoi DOI PHONG (' + plan.changed.length + '): ' + (plan.changed.join(' | ') || '(khong)'));
+  Logger.log('Nguoi da dung phong (' + plan.same.length + ') — giu nguyen');
+  Logger.log('BO QUA vi trung ten o nhieu bo phan (' + plan.skipped.length + '): ' + (plan.skipped.join(', ') || '(khong)') + ' — gan tay o Settings > Phong ban');
+  if (apply !== true) { Logger.log('=> XEM TRUOC, chua ghi gi. Chay datPhongBanTuFileNhanSu(true) de ghi that.'); return plan; }
+  setSetting_('deptList', JSON.stringify(plan.deptList));
+  setSetting_('saleDepts', JSON.stringify(plan.saleDepts));
+  try { CacheService.getScriptCache().remove('orgOv_v2_'); } catch (e2) {}
+  Logger.log('=> DA GHI deptList + saleDepts. Vao CRM Ctrl+F5 > Settings > Phong ban de kiem tra (hoac bam Lam moi o Tong quan).');
+  return plan;
+}
+
 function orgOverview_(p) {
   var today = _vnYmd_(new Date());
   var from = p.from || p.dateFrom || (today.substring(0, 8) + '01'), to = p.to || p.dateTo || today;
