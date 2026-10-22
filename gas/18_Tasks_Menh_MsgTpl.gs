@@ -982,6 +982,7 @@ function saveMessageTemplate_(data, caller) {
       sh.getRange(i + 1, 7, 1, 4).setValues([[now, product, topic, 'pending']]);
       sh.getRange(i + 1, 11, 1, 3).setValues([['', '', '']]);
       if (nhomSet) sh.getRange(i + 1, MSG_TPL_HEADERS.indexOf('nhom') + 1).setValue(nhom);
+      _tplNotifyPending_(cur.id, title, author);   // mau da sua -> cho duyet lai: bao admin
       return jsonOut_({ ok: true, id: cur.id, status: 'pending' });
     }
   }
@@ -989,6 +990,7 @@ function saveMessageTemplate_(data, caller) {
   var newId = (caller.priv && data.id) ? String(data.id) : 'mt_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
   var status = caller.priv ? 'approved' : 'pending';
   sh.appendRow([newId, title, content, tags, author, now, now, product, topic, status, caller.priv ? author : '', caller.priv ? now : '', '', nhom]);
+  if (status === 'pending') _tplNotifyPending_(newId, title, author);   // de xuat mau moi -> bao admin duyet
   return jsonOut_({ ok: true, id: newId, status: status });
 }
 
@@ -1030,6 +1032,7 @@ function deleteMessageTemplate_(id, caller) {
         return jsonOut_({ error: 'Chi admin/quan ly moi duoc xoa mau da duyet (nhan vien chi xoa duoc mau cua minh chua duyet).', code: 'FORBIDDEN' });
       }
       sh.deleteRow(i + 1);
+      _tplNotifClear_(id);   // mau bi xoa -> khong con gi de duyet
       return jsonOut_({ ok: true });
     }
   }
@@ -1048,8 +1051,51 @@ function approveMessageTemplate_(id, decision, reason, caller) {
     if (String(vals[i][0]) !== String(id)) continue;
     var st = decision === 'approve' ? 'approved' : 'rejected';
     sh.getRange(i + 1, 10, 1, 4).setValues([[st, caller.name, new Date(), decision === 'reject' ? String(reason || '').trim().slice(0, 300) : '']]);
+    _tplNotifClear_(id);   // da xu ly (o CRM HOAC o extension) -> thong bao cua MOI admin chuyen 'da doc'
     return jsonOut_({ ok: true, id: String(id), status: st });
   }
   return jsonOut_({ error: 'Khong tim thay mau tin' });
+}
+// ── THONG BAO MAU TIN CHO DUYET (kind 'tplpending', refType 'tpl', refId = id mau) ──
+// NGUYEN NHAN GOC them: admin chi biet co mau cho duyet khi tu mo tab Quan ly mau (huy hieu 'n mau cho duyet'), nen mau cua nhan vien nam cho lau.
+// Nay: nhan vien de xuat/sua mau -> moi admin (MSG_TPL_APPROVER_ROLES_) nhan thong bao tren CRM (chuong); extension Pancake AI doc cung nguon qua action tplPending.
+// Dung 1 thong bao CHUA DOC cho moi (admin, mau) -> sua mau nhieu lan khong spam. Duyet/tu choi xong (o dau cung duoc) -> don het thong bao cua mau do.
+function _tplNotifyPending_(id, title, author) {
+  try {
+    var users = readUsers_(getCrmSS_().getSheetByName(SH_USER)) || [], me = String(author || '').trim().toLowerCase(), to = [];
+    users.forEach(function (u) {
+      if (!u || u.active === false || MSG_TPL_APPROVER_ROLES_.indexOf(String(u.role || '')) < 0) return;
+      if ([u.name, u.username].some(function (x) { return String(x || '').trim().toLowerCase() === me && me; })) return;   // khong tu bao minh
+      to.push(String(u.username));
+    });
+    if (!to.length) return 0;
+    var sh = getSheet_(SH_NOTIF, NOTIF_HEADERS), v = sh.getLastRow() >= 2 ? sh.getDataRange().getValues() : [], has = {};
+    for (var i = 1; i < v.length; i++) { if (String(v[i][4]) === 'tpl' && String(v[i][5]) === String(id) && !v[i][9]) has[String(v[i][1]).toLowerCase()] = 1; }
+    var now = new Date().toISOString(), txt = ('Mau tin cho duyet: ' + String(title || '').replace(/\s+/g, ' ').trim()).slice(0, 160), rows = [];
+    to.forEach(function (u, k) {
+      if (has[u.toLowerCase()]) return;
+      rows.push(['nt_' + Date.now() + '_tpl' + k + '_' + Math.floor(Math.random() * 1000), u, String(author || 'Nhan vien'), 'tplpending', 'tpl', String(id), '', txt, now, '']);
+    });
+    if (rows.length) sh.getRange(sh.getLastRow() + 1, 1, rows.length, NOTIF_HEADERS.length).setValues(rows);
+    return rows.length;
+  } catch (e) { return 0; }   // thong bao hong khong duoc lam hong viec luu mau
+}
+function _tplNotifClear_(id) {
+  try {
+    var sh = getCrmSS_().getSheetByName(SH_NOTIF); if (!sh || sh.getLastRow() < 2) return 0;
+    var v = sh.getDataRange().getValues(), now = new Date().toISOString(), n = 0;
+    for (var i = 1; i < v.length; i++) {
+      if (String(v[i][4]) === 'tpl' && String(v[i][5]) === String(id) && !v[i][9]) { sh.getRange(i + 1, 10).setValue(now); n++; }
+    }
+    return n;
+  } catch (e) { return 0; }
+}
+// Danh sach mau CHO DUYET (nhe, cho extension Pancake AI hoi dinh ky). Chi admin/quan ly (theo token phien).
+function tplPendingList_(caller) {
+  if (!caller || !caller.priv) return jsonOut_({ error: 'Chi admin / quan ly moi xem duoc mau cho duyet.', code: 'FORBIDDEN' });
+  var list = readMessageTemplates_(caller).filter(function (t) { return t.status === 'pending'; });
+  list.sort(function (a, b) { return String(b.createdAt || '').localeCompare(String(a.createdAt || '')); });
+  return jsonOut_({ ok: true, count: list.length, serverTime: new Date().toISOString(),
+    items: list.slice(0, 30).map(function (t) { return { id: t.id, title: t.title, content: String(t.content || '').slice(0, 1200), product: t.product || '', topic: t.topic || '', createdBy: t.createdBy || '', createdAt: t.createdAt || '' }; }) });
 }
 

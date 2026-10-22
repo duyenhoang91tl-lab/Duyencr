@@ -529,6 +529,7 @@ function doGetCore_(e) {
     }
 
     // ── MAU AI DA HOC (sheet AIContext, type combo_template): CRM xem/sua/xoa ──
+    if (action === 'tplPending') return tplPendingList_(_tplCaller_(e.parameter.token, '', ''));   // extension Pancake AI hoi dinh ky: chi admin (theo token phien)
     if (action === 'aiExamples') {
       return jsonOut_({ examples: readAIExamples_() });
     }

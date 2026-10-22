@@ -47,8 +47,8 @@ function _ntAgo(iso){
   return new Date(t).toLocaleDateString('vi-VN');
 }
 // Sự kiện quy trình công việc: kind = task_assign | task_turn | task_request | task_decision | task_done (js/44-fn-taskflow.js, GAS _notifyTaskEvent_)
-function _ntIsTaskEvt(it){ var k = String((it && it.kind) || ''); return k.indexOf('task_') === 0 || k === 'chatviolation'; }   // chatviolation = cảnh báo giám sát chat (GAS _cvNotify_): text là câu hoàn chỉnh
-function _ntTaskIcon(it){ return ({ task_assign:'📌', task_turn:'➡️', task_request:'✋', task_decision:'⚖️', task_done:'🏁', chatviolation:'⚠️' })[it.kind] || '🔔'; }
+function _ntIsTaskEvt(it){ var k = String((it && it.kind) || ''); return k.indexOf('task_') === 0 || k === 'chatviolation' || k === 'tplpending'; }   // chatviolation = cảnh báo giám sát chat (GAS _cvNotify_): text là câu hoàn chỉnh
+function _ntTaskIcon(it){ return ({ task_assign:'📌', task_turn:'➡️', task_request:'✋', task_decision:'⚖️', task_done:'🏁', chatviolation:'⚠️' , tplpending:'📝' })[it.kind] || '🔔'; }
 function _ntWhere(it){
   if (it.kind === 'note') return 'trong ghi chú khách ' + (it.refId || '');
   if (it.kind === 'khthread') return 'trong thảo luận về khách ' + (it.refId || '');
@@ -108,6 +108,8 @@ function ntOpenItem(id){
       if (typeof customerMap !== 'undefined' && !customerMap[it.refId]) toast('Không thấy khách ' + it.refId + ' trong danh sách đang tải');
       openDp(it.refId);
       if (it.kind === 'khthread') { var dt = document.querySelector('#dp .dp-tab[data-tab="discuss"]'); if (dt && typeof switchDpTab === 'function') switchDpTab('discuss', dt); }   // mở thẳng tab Thảo luận
+    } else if (it.refType === 'tpl') {
+      _ntOpenTpl_(it.refId);   // mau tin cho duyet -> Zalo AI > Quan ly mau, loc 'Cho duyet'
     } else if (it.refType === 'task') {
       _ntOpenTask(it.refId, it.kind === 'comment');
     } else if (it.refType === 'chatviolation') {
@@ -116,6 +118,24 @@ function ntOpenItem(id){
   } catch(e){ toast('Lỗi mở thông báo: ' + e.message); }
 }
 // Mở Social > Chat đúng hội thoại bị cảnh báo từ cấm. Hội thoại chưa nằm trong danh sách đang tải (cũ/ngoài bộ lọc) thì tạo dòng tạm để vẫn mở được tin nhắn.
+// Mở Zalo AI > Quản lý mẫu và lọc "Chờ duyệt" (thông báo mẫu tin cần duyệt, GAS _tplNotifyPending_); cuộn tới đúng mẫu nếu thấy.
+function _ntOpenTpl_(id){
+  var tab = document.querySelector('#data-view .tabs .tab[data-bar-id="tab-zaloai"]');
+  if (tab) tab.click(); else if (typeof switchTab === 'function') { try { switchTab('zaloai', document.querySelector('.tab')); } catch(e){} }
+  var tries = 0;
+  (function wait(){
+    if (document.getElementById('mt-status-filter') && typeof mtShowPending === 'function') {
+      try { if (typeof loadMsgTemplates === 'function' && (typeof _msgTemplates === 'undefined' || !_msgTemplates.length)) { loadMsgTemplates(true); } } catch(e){}
+      setTimeout(function(){
+        mtShowPending();
+        var b = document.querySelector('[onclick*="approveMsgTemplateUI(\'' + String(id).replace(/["'\\]/g, '') + '\'"]');
+        if (b && b.scrollIntoView) b.scrollIntoView({ block:'center' });
+      }, 300);
+      return;
+    }
+    if (++tries < 40) setTimeout(wait, 150);
+  })();
+}
 function _ntOpenChat_(convId, phone, name, msgId){
   var tab = document.querySelector('#data-view .tabs .tab[data-bar-id="tab-chat"]');
   if (tab) tab.click(); else if (typeof switchTab === 'function') { try { switchTab('chat', document.querySelector('.tab')); } catch(e){} }
