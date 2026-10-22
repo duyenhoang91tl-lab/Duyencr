@@ -589,10 +589,18 @@ function _srGDecode_(s){
   return String(s == null ? '' : s).replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#0?39;/g,"'").replace(/&amp;/g,'&');
 }
 // Tách kết quả _computeBonusData_ thành 2 nhóm + tổng hợp theo chương trình.
+// Thưởng Thử việc / Chính thức CHỈ tính cho đội Sale Online + Văn phòng (đều thuộc phòng Kinh doanh) và Sale Thử việc.
+// Người chưa phân loại hoặc thuộc đội khác (CSKH, quầy…) không nhận thưởng ở báo cáo này (yêu cầu Duyên 2026-10-22).
+function _srGEligible_(name){
+  var c = _saleChannelOf_(name);
+  return c === 'online' || c === 'offline' || c === 'probation';
+}
 function _srGBuildGroups_(orders){
   var bonus = _computeBonusData_(orders || []);
-  var g = { tv: { rows: [], total: 0 }, ct: { rows: [], total: 0 }, total: bonus.total, programs: {} };
+  var g = { tv: { rows: [], total: 0 }, ct: { rows: [], total: 0 }, total: 0, programs: {}, skipped: [] };
   bonus.bySale.forEach(function(r){
+    if (!_srGEligible_(r.name)) { g.skipped.push(r.name); return; }
+    g.total += r.total;
     var isTv = _saleChannelOf_(r.name) === 'probation';
     var grp = isTv ? g.tv : g.ct;
     grp.rows.push(r); grp.total += r.total;
@@ -611,7 +619,7 @@ function _srRenderG_(d){
   }
   var g = _srGBuildGroups_(d.orders || []);
   var html = '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Thưởng tính theo đúng các chương trình đã cài ở "🏆 Chương trình thưởng" (cùng cách tính với mục c) của Báo cáo E), '+
-    'trên đơn Pos trong khoảng ngày lọc. <b>Thử việc</b> = Sale phân loại "Thử việc"; <b>Chính thức</b> = Sale Online/Offline/chưa phân loại. '+
+    'trên đơn Pos trong khoảng ngày lọc. <b>Thử việc</b> = Sale phân loại "Thử việc"; <b>Chính thức</b> = Sale đội Online / Văn phòng (phòng Kinh doanh). Sale chưa phân loại hoặc thuộc đội khác không được tính thưởng.'+
     'Nhóm cơ chế "theo ngày" chỉ lấy mức cao nhất; các nhóm khác nhau cộng dồn.</div>';
 
   html += '<div class="kpi-grid" style="margin-bottom:16px">'+
@@ -620,6 +628,7 @@ function _srRenderG_(d){
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(g.ct.total)+'</div><div class="kpi-label">Thưởng Chính thức ('+fmt(g.ct.rows.length)+' Sale)</div></div>'+
     '<div class="kpi-card"><div class="kpi-val">'+fmt((d.orders||[]).length)+'</div><div class="kpi-label">Đơn Pos dùng để tính</div></div>'+
     '</div>';
+  if (g.skipped.length) html += '<div style="font-size:11.5px;color:#9a3412;margin-bottom:10px">Không tính thưởng cho '+g.skipped.length+' Sale chưa thuộc đội Online/Văn phòng: '+esc(g.skipped.slice(0,8).join(', '))+(g.skipped.length>8?'…':'')+' — phân loại ở Báo cáo E → "Phân loại Sale" nếu cần.</div>';
   html += '<div style="margin-bottom:14px"><button class="btn sm" onclick="_srSetSub(\'K\')">📋 Chi tiết đơn thưởng (đếm sản phẩm)</button></div>';
 
   function groupTable(title, key, grp, isTv){
