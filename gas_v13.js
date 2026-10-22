@@ -10238,6 +10238,67 @@ function datPhongBanTuFileNhanSu(apply) {
   return plan;
 }
 
+// ── HO SO NHAN SU: luu NGAY SINH + SDT + DIA CHI (Duyen yeu cau 2026-10-21) ──
+// DU LIEU CA NHAN => KHONG dua vao repo (repo GitHub dang CONG KHAI). Nguon la 1 TAB trong chinh Google Sheet CRM do Duyen tu nhap file xlsx vao
+// (Google Sheets > File > Nhap > tai file > "Chen trang tinh moi", dat ten tab = NhanSuImport). CHAY TAY trong Apps Script Editor:
+// nhapHoSoNhanSu() = XEM TRUOC (khong ghi); nhapHoSoNhanSu(true) = ghi vao sheet 'HoSoNhanSu'. Sheet nay KHONG co action GAS nao doc/tra ra
+// (chi mo truc tiep bang Google Sheets) nen chi nguoi co quyen sua Sheet moi thay. KHONG nhap CCCD (co chu y bo qua cot CCCD).
+// Khoa dong = ten + bo phan (khong phan biet hoa/thuong/dau) nen 2 nguoi trung ten o 2 bo phan van la 2 dong. Chay lai = cap nhat dong cu, khong nhan doi.
+var SH_HOSO_NS = 'HoSoNhanSu';
+var HOSO_NS_HEADERS = ['name', 'dept', 'position', 'birthday', 'phone', 'address', 'updatedAt'];
+function _nsFold_(s) { return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/\s+/g, ' ').trim(); }
+function _nsDate_(v) {
+  if (v instanceof Date) return Utilities.formatDate(v, 'GMT+7', 'dd/MM/yyyy');
+  return String(v == null ? '' : v).trim();
+}
+function _nsPhone_(v) {
+  var d = String(v == null ? '' : v).replace(/[\s.\-()]/g, '');
+  if (/^\d{9}$/.test(d)) d = '0' + d;   // Sheets bo so 0 dau khi doc SDT thanh so
+  return d;
+}
+// values = mang 2 chieu cua tab nguon (dong 1 = tieu de). Tra { rows:[{name,dept,position,birthday,phone,address}], missing:[cot thieu] }. Khong bao gio doc cot CCCD.
+function _nsBuildRows_(values) {
+  var hdr = (values && values[0] || []).map(_nsFold_), col = {};
+  [['name', 'ten nhan vien'], ['dept', 'bo phan'], ['position', 'vi tri'], ['birthday', 'ngay sinh'], ['phone', 'so dien thoai'], ['address', 'dia chi hien tai']]
+    .forEach(function (x) { col[x[0]] = hdr.indexOf(x[1]); });
+  var missing = []; Object.keys(col).forEach(function (k) { if (col[k] < 0) missing.push(k); });
+  var rows = [];
+  if (col.name < 0) return { rows: rows, missing: missing };
+  for (var i = 1; i < values.length; i++) {
+    var r = values[i], nm = String(r[col.name] == null ? '' : r[col.name]).replace(/\s+/g, ' ').trim();
+    if (!nm) continue;
+    rows.push({ name: nm, dept: col.dept >= 0 ? String(r[col.dept] || '').replace(/\s+/g, ' ').trim() : '',
+      position: col.position >= 0 ? String(r[col.position] || '').trim() : '', birthday: col.birthday >= 0 ? _nsDate_(r[col.birthday]) : '',
+      phone: col.phone >= 0 ? _nsPhone_(r[col.phone]) : '', address: col.address >= 0 ? String(r[col.address] || '').replace(/\s+/g, ' ').trim() : '' });
+  }
+  return { rows: rows, missing: missing };
+}
+function nhapHoSoNhanSu(apply, tenTabNguon) {
+  var src = getCrmSS_().getSheetByName(tenTabNguon || 'NhanSuImport');
+  if (!src) throw new Error('Chua co tab "' + (tenTabNguon || 'NhanSuImport') + '" trong Google Sheet CRM. Nhap file xlsx vao thanh tab moi voi ten do (File > Nhap) roi chay lai.');
+  var b = _nsBuildRows_(src.getDataRange().getValues());
+  if (b.missing.length) Logger.log('CANH BAO thieu cot: ' + b.missing.join(', ') + ' (cot thieu se de trong)');
+  var sh = getSheet_(SH_HOSO_NS, HOSO_NS_HEADERS), last = sh.getLastRow();
+  var cur = last >= 2 ? sh.getRange(2, 1, last - 1, HOSO_NS_HEADERS.length).getValues() : [], idx = {};
+  cur.forEach(function (r, i) { idx[_nsFold_(r[0]) + '|' + _nsFold_(r[1])] = i; });
+  var now = Utilities.formatDate(new Date(), 'GMT+7', 'yyyy-MM-dd HH:mm'), add = 0, upd = 0, same = 0;
+  b.rows.forEach(function (x) {
+    var line = [x.name, x.dept, x.position, x.birthday, x.phone, x.address, now], k = _nsFold_(x.name) + '|' + _nsFold_(x.dept);
+    if (idx[k] === undefined) { idx[k] = cur.length; cur.push(line); add++; return; }
+    var o = cur[idx[k]];
+    if (o.slice(0, 6).join('\u0001') === line.slice(0, 6).join('\u0001')) { same++; return; }
+    cur[idx[k]] = line; upd++;
+  });
+  Logger.log('Doc ' + b.rows.length + ' nguoi tu tab nguon: THEM MOI ' + add + ' · CAP NHAT ' + upd + ' · khong doi ' + same + '. Tong dong sau khi ghi: ' + cur.length);
+  if (apply !== true) { Logger.log('=> XEM TRUOC, chua ghi gi. Chay nhapHoSoNhanSu(true) de ghi that.'); return { add: add, upd: upd, same: same }; }
+  if (!cur.length) return { add: 0, upd: 0, same: 0 };
+  var rng = sh.getRange(2, 1, cur.length, HOSO_NS_HEADERS.length);
+  rng.setNumberFormat('@');   // luu dang CHU: giu so 0 dau cua SDT, ngay sinh khong bi Sheets doi thanh Date, chu dau = + - @ khong thanh cong thuc
+  rng.setValues(cur);
+  Logger.log('=> DA GHI sheet ' + SH_HOSO_NS + '. Nen XOA tab nguon sau khi kiem tra (de khong con ban sao CCCD) va chi chia se Sheet cho nguoi can.');
+  return { add: add, upd: upd, same: same };
+}
+
 function orgOverview_(p) {
   var today = _vnYmd_(new Date());
   var from = p.from || p.dateFrom || (today.substring(0, 8) + '01'), to = p.to || p.dateTo || today;
