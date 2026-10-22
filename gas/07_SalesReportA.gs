@@ -314,16 +314,24 @@ function buildSalesReportA_(filters) {
   for (var j = 0; j < matched.length; j++) {
     var m = matched[j];
     var revenue = _dtOrderRevenue_(m);
-    if (_dtIsExchangeOrder_(m.phanLoai)) totalGiaTriChenh += (m.giaTriChenh || 0);
-    totalCoc += m.giaTriCoc;
-    totalGiaTri += revenue;
+    // (21/10/2026, Duyen: "cac o bao cao dau trang cung chi tinh theo nhung nguoi duoc loc") Dang loc Sale: tien tren o dau trang + bang Theo Kenh chi cong PHAN cua nhung nguoi
+    // duoc chon (don co 3 sale, chon 1 nguoi -> 1/3), khop bang Theo Sale / bieu do. So DON van dem nguyen don. Khong loc Sale (hoac tinh theo nguoi tao) -> selFrac = 1 nhu cu.
+    var selFrac = 1;
+    if (!byCreator && saleFilterFoldA.length) {
+      var sl0 = splitMulti_(m.saleBan, ',');
+      selFrac = sl0.length ? sl0.filter(wantSaleA_).length / sl0.length : 0;
+    }
+    var revenueSel = revenue * selFrac, cocSel = m.giaTriCoc * selFrac;
+    if (_dtIsExchangeOrder_(m.phanLoai)) totalGiaTriChenh += (m.giaTriChenh || 0) * selFrac;
+    totalCoc += cocSel;
+    totalGiaTri += revenueSel;
 
     // breakdown theo kenh: kenh la single-value, khong chia
     var kName = m.kenhBan || '(chưa có kênh)';
     if (!byKenh[kName]) byKenh[kName] = { orders: 0, coc: 0, giaTri: 0 };
     byKenh[kName].orders += 1;
-    byKenh[kName].coc += m.giaTriCoc;
-    byKenh[kName].giaTri += revenue;
+    byKenh[kName].coc += cocSel;
+    byKenh[kName].giaTri += revenueSel;
 
     // breakdown theo sale:
     // - Mac dinh: so don GIU NGUYEN (khong chia), phan tien CHIA DEU cho N sale tren don.

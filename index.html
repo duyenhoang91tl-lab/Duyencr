@@ -329,6 +329,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
         <option value="don">Dữ liệu đơn</option>
         <option value="cskh">CSKH-Duyên (VIP/SPV)</option>
         <option value="assign">Chia data (được chia cho tôi)</option>
+        <option value="split">Danh sách đơn chia (đơn sale khác chia cho tôi)</option>
       </select>
     </div>
     <div class="sb-label">Loại khách</div>
@@ -788,6 +789,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
             <option value="rejected">❌ Bị từ chối</option>
             <option value="mine">Của tôi</option>
           </select>
+          <select id="mt-group-filter" class="assign-input" onchange="renderMsgTemplateList()" style="font-size:12px;padding:4px 8px" title="Lọc theo nhóm sản phẩm"><option value="">Tất cả nhóm</option></select>
           <input id="mt-search" class="zai-input" placeholder="Tìm theo sản phẩm / chủ đề / tag / nội dung..." style="flex:1;min-width:180px" oninput="renderMsgTemplateList()">
           <button class="btn sm primary" onclick="openMsgTemplateForm()">+ Thêm mẫu</button>
         </div>
@@ -799,9 +801,11 @@ window.addEventListener('load',function(){var s=document.createElement('script')
             <input id="mt-f-product" class="zai-input" placeholder="📦 Sản phẩm áp dụng, cách nhau dấu phẩy (VD: Nhẫn vàng 9999, Lắc tay)" style="flex:1;min-width:200px">
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+            <select id="mt-f-group" class="assign-input" style="flex:1;min-width:200px" title="Nhóm sản phẩm của mẫu — để trống thì hệ thống tự phân loại theo tên sản phẩm / nội dung"><option value="">🗂 Nhóm sản phẩm: tự phân loại</option></select>
             <input id="mt-f-topic" class="zai-input" placeholder="💬 Nội dung hội thoại / tình huống (VD: Khách hỏi giá, Khách phân vân)" style="flex:1;min-width:200px">
             <input id="mt-f-tags" class="zai-input" placeholder="Tag, phân cách bằng dấu phẩy (VD: giu-khach, bao-hanh)" style="flex:1;min-width:200px">
           </div>
+          <div style="font-size:11px;color:var(--muted);margin:-2px 0 8px">🗂 Chọn nhóm sản phẩm hoặc <b>để "tự phân loại"</b> — hệ thống tự xếp nhóm theo tên sản phẩm / nội dung mẫu; mẫu chung (chào hỏi...) không thuộc nhóm nào.</div>
           <textarea id="mt-f-content" class="zai-textarea" placeholder="Nội dung mẫu tin nhắn..." rows="4" style="width:100%;margin-bottom:8px"></textarea>
           <div style="display:flex;gap:8px;justify-content:flex-end">
             <button class="btn sm" onclick="closeMsgTemplateForm()">Hủy</button>
@@ -1176,6 +1180,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 <link rel="stylesheet" href="css/12-salematch.css">
 <link rel="stylesheet" href="css/13-shell.css?v=20261019c">
 <link rel="stylesheet" href="css/14-qrpills.css">
+<link rel="stylesheet" href="css/99-dark-auto.css"><!-- TỰ SINH (tools/gen-dark-theme.js): lớp chế độ tối cho màu cứng; chỉ có hiệu lực khi html[data-theme="dark"]; PHẢI nạp sau cùng -->
 
 <script src="js/18-openkhstatusmodal.js"></script>
 
@@ -1696,6 +1701,7 @@ function openBcLogModal(phone){
 <script src="js/48-filter-presets.js?v=20261017"></script>
 <script src="js/48-pro-chatinfo.js"></script>
 <script src="js/49-pro-discuss.js"></script>
+<script src="js/50-split-orders.js"></script>
 <script src="js/50-person-tags.js"></script>
 <script src="js/51-demo-guard.js"></script>
 <script src="js/52-fn-salematch.js"></script>

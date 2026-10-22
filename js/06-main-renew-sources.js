@@ -162,7 +162,7 @@ setTimeout(_syncBizRulesFromGAS, 0);
 // vẫn theo phân quyền tab/backend. Admin vẫn thấy báo cáo đang ẩn (gắn "(đang ẩn)") để bật lại. Luôn giữ ít nhất 1 báo cáo bật.
 var _SR_DEFAULT_ITEMS_ = [['A','Báo cáo A — Base'],['B','Báo cáo B — Pos'],['C','Báo cáo C — So sánh kỳ Base'],['D','Báo cáo D — Sale tự thêm'],
   ['E','Báo cáo E — Hoa hồng nhân viên Pos'],['F','Báo cáo F — KPI Sale'],['G','Báo cáo G — Thưởng thử việc / chính thức'],
-  ['H','Báo cáo H — Tổng quan data đã chia'],['I','Báo cáo I — Chia data Renew'],['L','Báo cáo L — KH qua cửa hàng']];
+  ['H','Báo cáo H — Tổng quan data đã chia'],['I','Báo cáo I — Chia data Renew'],['L','Báo cáo L — KH qua cửa hàng'],['M','Báo cáo M – Tổng quan đơn chia']];
 var REPORTS_CFG = {};
 function _rcApply_(raw) {
   var out = {}, before = JSON.stringify(REPORTS_CFG);

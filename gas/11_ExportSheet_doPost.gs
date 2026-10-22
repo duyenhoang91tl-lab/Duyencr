@@ -376,6 +376,9 @@ function doPostCore_(e) {
     // ── MESSENGER/PHONG THUY AI: doc bang tra menh + mau canned response (Sheet Menh/CannedResponses,
     //    tu tao voi du lieu mac dinh neu chua co). Them 2026-09, KHONG dung chung sheet/cot voi CareData. ──
     if (action === 'getKnowledge') return jsonOut_(getMessengerKnowledge_());
+    // ── QUET TU CAM truoc khi gui (nut "Quet tu cam" tren Pancake AI, Duyen yeu cau 2026-10-21): dung CHUNG bo phat hien + danh sach + ds bo qua voi giam sat chat
+    //    (cvDetect_/_cvBannedCompiled_) -> nut bao sach thi giam sat chat cung khong bat. Chi doc, khong ghi gi. ──
+    if (action === 'scanBanned')   return jsonOut_(scanBannedText_(data.text));
     // ── MAU TIN NHAN TU VAN KHACH: them/sua (form tren CRM tab ZALO AI) / xoa 1 mau ──
     if (action === 'saveMessageTemplate')   return saveMessageTemplate_(data.template || data, _tplCaller_(data.token, data.ek, (data.template || data).createdBy));
     if (action === 'deleteMessageTemplate') return deleteMessageTemplate_(data.id, _tplCaller_(data.token, data.ek, data.createdBy));

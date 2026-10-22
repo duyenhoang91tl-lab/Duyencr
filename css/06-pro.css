@@ -226,3 +226,16 @@ html.ui-pro .khd-err{color:var(--pro-red);}
 html.ui-pro .khd-in{display:flex;gap:8px;padding:8px;border-top:1px solid var(--pro-line);}
 html.ui-pro .khd-in textarea{flex:1;resize:none;border:1px solid var(--pro-line);border-radius:10px;padding:7px 10px;font:inherit;font-size:13px;}
 html.ui-pro .khd-lock{font-size:12.5px;color:var(--pro-ink);text-align:center;padding:18px 12px;background:#fff7e6;border:1px dashed var(--pro-orange);border-radius:10px;margin:6px;line-height:1.5;}
+/* Đơn chia: banner "Danh sách đơn chia" (lọc nguồn dữ liệu) + Báo cáo M */
+html.ui-pro .split-banner{margin:8px 12px;padding:10px 12px;border:1px solid var(--pro-line);border-radius:12px;background:var(--surface);box-shadow:var(--pro-shadow);}
+html.ui-pro .split-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;font-size:13.5px;color:var(--pro-ink);}
+html.ui-pro .split-sub{color:var(--muted);font-size:12px;}
+html.ui-pro .split-tiles,html.ui-pro .split-kpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));}
+html.ui-pro .split-msg{font-size:12.5px;color:var(--muted);padding:8px 2px;}
+html.ui-pro .split-err{color:var(--pro-red);}
+html.ui-pro .split-d{margin-top:8px;}
+html.ui-pro .split-d summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--pro-purple);padding:4px 0;}
+html.ui-pro .split-d tbody tr{cursor:pointer;}
+html.ui-pro .split-d tbody tr:hover{background:var(--pro-soft);}
+html.ui-pro .split-ph{font-size:11px;color:var(--muted);}
+html.ui-pro .dash-table .r,html.ui-pro .split-d .r{text-align:right;}

@@ -311,13 +311,13 @@ function callAI_(data) {
     }
     // Kem theo dau key dang dung (da che) de phan biet ngay 2 truong hop rat de nham:
     // key SAI vs key DUNG nhung het quota/het han — truoc day chi thay "401" nen kho doan.
-    errors.push(pv.name + ' [' + _maskKey_(pv.key) + ']: ' + (r.error || 'rong'));
+    var _m = String(r.error || '').match(/\b[1-5]\d\d\b/);   // chi lay ma loi HTTP (401/402/429...) — khong tra ve noi dung dai
+    errors.push(pv.name + ' ' + (_m ? _m[0] : 'loi'));
   }
   if (!anyKey) {
     return jsonOut_({ error: 'Chua co API Key nao trong sheet Settings. Mo extension → banh rang ⚙ → nhap it nhat 1 key (Groq/Cerebras/Gemini/OpenRouter) roi bam Luu. Thieu: ' + missing.join(', ') });
   }
-  var msg = 'Tat ca API deu loi: ' + errors.join(' | ');
-  if (missing.length) msg += ' || Chua cau hinh: ' + missing.join(', ');
+  var msg = 'Lỗi API: ' + errors.join(' · ');
   return jsonOut_({ error: msg });
 }
 
