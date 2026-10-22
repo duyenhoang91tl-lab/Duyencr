@@ -402,7 +402,7 @@
             <option value="price">💰 Tra cứu giá & tin nhắn gợi ý</option>
             <option value="ctkm">🎁 Tra cứu khuyến mãi</option>
             <option value="img">🖼 Tìm ảnh sản phẩm</option>
-            <option value="tpl">📚 Mẫu tin nhắn tư vấn</option>
+            <option value="tpl">📚 Tạo mẫu lưu sẵn / Mẫu tư vấn</option>
             <option value="stats">📊 Doanh số & hoa hồng của tôi</option>
             <option value="assign">📋 Data được chia (0)</option>
           </select>
@@ -456,7 +456,7 @@
               <div id="pk-tpl-row">
                 <input type="text" id="pk-tpl-q" placeholder="🔎 Gõ tên sản phẩm / nội dung hội thoại để gợi ý tin nhắn..." autocomplete="off" />
                 <button id="pk-tpl-refresh" title="Tải lại từ CRM">🔄</button>
-                <button id="pk-tpl-add" title="Đề xuất mẫu mới (chờ quản lý duyệt)">➕</button>
+                <button id="pk-tpl-add" title="Tạo mẫu lưu sẵn để AI học (CS: chờ admin duyệt)">➕ Tạo mẫu lưu sẵn</button>
               </div>
               <div id="pk-tpl-form"></div>
               <div id="pk-tpl-result"></div>
@@ -2965,13 +2965,14 @@
     const words = _stripVNlocal_((query || '').trim().toLowerCase()).split(/\s+/).filter(Boolean);
     const out = [];
     list.forEach((t, idx) => {
-      const f = { product: _stripVNlocal_((t.product || '').toLowerCase()), topic: _stripVNlocal_((t.topic || '').toLowerCase()), tags: _stripVNlocal_((t.tags || '').toLowerCase()),
+      const f = { nhom: _stripVNlocal_((t.nhom || '').toLowerCase()), product: _stripVNlocal_((t.product || '').toLowerCase()), topic: _stripVNlocal_((t.topic || '').toLowerCase()), tags: _stripVNlocal_((t.tags || '').toLowerCase()),
         title: _stripVNlocal_((t.title || '').toLowerCase()), content: _stripVNlocal_((t.content || '').toLowerCase()) };
       const parts = String(t.product || '').split(/[,;|\n]/).map((x) => _stripVNlocal_(x.toLowerCase()).trim()).filter(Boolean);
       let score = 0, all = true;
       for (const w of words) {
         let hit = 0;
         if (f.product.indexOf(w) >= 0) hit = Math.max(hit, 5);
+        if (f.nhom.indexOf(w) >= 0) hit = Math.max(hit, 4);
         if (f.topic.indexOf(w) >= 0) hit = Math.max(hit, 3);
         if (f.tags.indexOf(w) >= 0) hit = Math.max(hit, 3);
         if (f.title.indexOf(w) >= 0) hit = Math.max(hit, 2);
@@ -3007,7 +3008,7 @@
       return;
     }
     box.innerHTML = rows.map((t) => {
-      const chips = String(t.product || '').split(/[,;|\n]/).map((x) => x.trim()).filter(Boolean).map((p) => `<span class="pk-price-field">📦 ${escapeHtml(p)}</span>`).join(' ')
+      const chips = (t.nhom ? `<span class="pk-price-field">🗂 ${escapeHtml(t.nhom)}</span> ` : '') + String(t.product || '').split(/[,;|\n]/).map((x) => x.trim()).filter(Boolean).map((p) => `<span class="pk-price-field">📦 ${escapeHtml(p)}</span>`).join(' ')
         + (t.topic ? ` <span class="pk-price-field">💬 ${escapeHtml(t.topic)}</span>` : '')
         + String(t.tags || '').split(',').map((x) => x.trim()).filter(Boolean).map((tg) => ` <span class="pk-price-field">#${escapeHtml(tg)}</span>`).join('');
       const preview = t.content.length > 160 ? t.content.slice(0, 160) + '…' : t.content;
@@ -3074,45 +3075,95 @@
     }));
   }
 
-  // Form DE XUAT mau tin ngay tren Pancake. Mau moi o trang thai "cho duyet" — chi dung duoc cho nguoi khac sau khi admin/quan ly duyet tren CRM.
+  // Danh muc san pham (cot Nhom SP / Ten SP bang gia DANH_MUC) cho form "Tao mau luu san": dung CHUNG cache voi "Tim anh san pham" (_imgFlatItems).
+  // Loi tai KHONG lam hong form (van go tay duoc) va KHONG khoa tab tim anh (de null de tab do tu tai lai).
+  function ensureTplCatalog_(cb) {
+    if (_imgFlatItems !== null) { cb(); return; }
+    if (_imgFlatLoading) { setTimeout(() => ensureTplCatalog_(cb), 400); return; }
+    _imgFlatLoading = true;
+    safeSendMessage_({ type: 'GET_PRODUCT_IMAGE_FLAT' }, (resp) => {
+      _imgFlatLoading = false;
+      if (resp?.ok) _imgFlatItems = resp.data.items || [];
+      cb();
+    });
+  }
+
+  // Form "TAO MAU LUU SAN" (Duyen 21/10/2026): CS chon NHOM SP (co san o bang gia) va/hoac go TEN SP (co goi y; AI tu nhan nhom khi ten khop bang gia),
+  // roi them mau cau tu van — moi dong = 1 tin nhan. Mau cua CS luon o trang thai "Cho duyet" (admin duyet tren CRM); AI CHI hoc mau DA DUYET.
   // Extension khong co tai khoan dang nhap nen KHONG duyet/sua mau da duyet tai day (server cung chan).
   function openTplForm_(t) {
     const host = panelEl.querySelector('#pk-tpl-form');
-    if (!settings.csName) { setStatus('Chọn tên CS của bạn trước (ô tên CS ở trên) để đề xuất mẫu.'); return; }
+    if (!settings.csName) { setStatus('Chọn tên CS của bạn trước (ô tên CS ở trên) để tạo mẫu.'); return; }
     host.innerHTML = `
       <div class="pk-tpl-form-box">
-        <div class="pk-tpl-form-title">${t ? '✏️ Sửa mẫu đề xuất' : '➕ Đề xuất mẫu mới'}</div>
-        <div style="font-size:11px;color:#6b7280;margin-bottom:4px">Mẫu sẽ ở trạng thái "Chờ duyệt" cho đến khi quản lý duyệt trên CRM.</div>
-        <input type="text" id="pk-tpl-f-title" placeholder="Tiêu đề mẫu" autocomplete="off" />
-        <input type="text" id="pk-tpl-f-product" placeholder="📦 Sản phẩm áp dụng, cách nhau dấu phẩy (VD: Nhẫn vàng, Lắc tay)" autocomplete="off" />
-        <input type="text" id="pk-tpl-f-topic" placeholder="💬 Nội dung hội thoại / tình huống (VD: Khách hỏi giá)" autocomplete="off" />
-        <textarea id="pk-tpl-f-content" rows="5" placeholder="Nội dung tin nhắn mẫu"></textarea>
+        <div class="pk-tpl-form-title">${t ? '✏️ Sửa mẫu lưu sẵn' : '➕ Tạo mẫu lưu sẵn'}</div>
+        <div style="font-size:11px;color:#6b7280;margin-bottom:4px">Chọn <b>nhóm sản phẩm</b> (có sẵn ở bảng giá) hoặc gõ <b>tên sản phẩm</b> — hệ thống tự nhận nhóm. Mẫu của bạn ở trạng thái <b>Chờ duyệt</b>; AI chỉ học sau khi admin duyệt trên CRM.</div>
+        <input type="text" id="pk-tpl-f-nhom" list="pk-tpl-nhom-dl" placeholder="🗂 Nhóm sản phẩm (chọn từ bảng giá hoặc gõ)" autocomplete="off" />
+        <datalist id="pk-tpl-nhom-dl"></datalist>
+        <input type="text" id="pk-tpl-f-product" list="pk-tpl-prod-dl" placeholder="📦 Tên sản phẩm, cách nhau dấu phẩy (VD: Nhẫn vàng, Lắc tay)" autocomplete="off" />
+        <datalist id="pk-tpl-prod-dl"></datalist>
+        <div id="pk-tpl-f-hint" style="font-size:11px;color:#047857;min-height:14px"></div>
+        <input type="text" id="pk-tpl-f-topic" placeholder="💬 Tình huống / nội dung hội thoại (VD: Khách hỏi giá)" autocomplete="off" />
+        <input type="text" id="pk-tpl-f-title" placeholder="Tiêu đề mẫu (bỏ trống = tự đặt theo sản phẩm + tình huống)" autocomplete="off" />
+        <textarea id="pk-tpl-f-content" rows="6" placeholder="Mẫu câu tư vấn — mỗi dòng (xuống dòng) sẽ là 1 tin nhắn riêng khi gửi cho khách"></textarea>
         <input type="text" id="pk-tpl-f-tags" placeholder="Tag, cách nhau dấu phẩy (VD: chào hỏi, bảo hành)" autocomplete="off" />
         <div class="pk-ai-sug-bar">
-          <button type="button" class="pk-btn-outline pk-ai-sug-save" id="pk-tpl-f-save">📨 Gửi đề xuất</button>
+          <button type="button" class="pk-btn-outline pk-ai-sug-save" id="pk-tpl-f-save">📨 Lưu mẫu (chờ duyệt)</button>
           <button type="button" class="pk-btn-outline" id="pk-tpl-f-cancel">Huỷ</button>
         </div>
       </div>`;
     const $ = (id) => host.querySelector(id);
-    $('#pk-tpl-f-title').value = t ? t.title : '';
+    $('#pk-tpl-f-nhom').value = t ? (t.nhom || '') : '';
     $('#pk-tpl-f-product').value = t ? (t.product || '') : '';
     $('#pk-tpl-f-topic').value = t ? (t.topic || '') : '';
+    $('#pk-tpl-f-title').value = t ? t.title : '';
     $('#pk-tpl-f-content').value = t ? t.content : '';
     $('#pk-tpl-f-tags').value = t ? (t.tags || '') : '';
-    $('#pk-tpl-f-title').focus();
+    $('#pk-tpl-f-nhom').focus();
+
+    // Goi y nhom / ten SP tu bang gia + tu nhan nhom khi ten SP khop
+    const fillLists = () => {
+      const items = _imgFlatItems || [];
+      const nhomVal = $('#pk-tpl-f-nhom').value.trim();
+      const groups = [...new Set(items.map((it) => it.n).filter(Boolean))].sort(_vnSort_);
+      $('#pk-tpl-nhom-dl').innerHTML = groups.map((g) => `<option value="${escapeHtml(g)}"></option>`).join('');
+      const pool = nhomVal && groups.indexOf(nhomVal) >= 0 ? items.filter((it) => it.n === nhomVal) : items;
+      const nm = {}; pool.forEach((it) => _itemNames_(it).forEach((n) => { const f = _fold_(n); if (!nm[f]) nm[f] = n; }));
+      $('#pk-tpl-prod-dl').innerHTML = Object.keys(nm).map((f) => nm[f]).sort(_vnSort_).slice(0, 400).map((n) => `<option value="${escapeHtml(n)}"></option>`).join('');
+    };
+    const detectGroup = () => {
+      const items = _imgFlatItems || [];
+      if (!items.length) return;
+      const toks = $('#pk-tpl-f-product').value.split(/[,;|\n]/).map((x) => _fold_(x)).filter(Boolean);
+      if (!toks.length) { $('#pk-tpl-f-hint').textContent = ''; return; }
+      const found = new Set(); let matched = 0;
+      toks.forEach((tk) => { const g = items.filter((it) => _itemNames_(it).some((n) => _fold_(n) === tk)).map((it) => it.n).filter(Boolean); if (g.length) matched++; g.forEach((x) => found.add(x)); });
+      const gs = [...found];
+      const cur = $('#pk-tpl-f-nhom').value.trim();
+      if (gs.length === 1 && !cur) { $('#pk-tpl-f-nhom').value = gs[0]; $('#pk-tpl-f-hint').textContent = '🤖 Đã tự nhận nhóm: ' + gs[0]; }
+      else if (gs.length > 1 && !cur) $('#pk-tpl-f-hint').textContent = '🤖 Sản phẩm thuộc nhiều nhóm (' + gs.slice(0, 3).join(', ') + ') — chọn nhóm ở ô trên nếu muốn.';
+      else if (!matched) $('#pk-tpl-f-hint').textContent = 'Tên này chưa có trong bảng giá — vẫn lưu được, AI sẽ nhận diện theo tên bạn gõ.';
+      else $('#pk-tpl-f-hint').textContent = '';
+    };
+    ensureTplCatalog_(() => { if (!host.contains($('#pk-tpl-f-nhom') || null)) return; fillLists(); detectGroup(); });
+    $('#pk-tpl-f-nhom').addEventListener('input', fillLists);
+    $('#pk-tpl-f-product').addEventListener('input', detectGroup);
+    $('#pk-tpl-f-product').addEventListener('change', detectGroup);
     $('#pk-tpl-f-cancel').addEventListener('click', () => { host.innerHTML = ''; });
     $('#pk-tpl-f-save').addEventListener('click', () => {
-      const title = $('#pk-tpl-f-title').value.trim();
+      const nhom = $('#pk-tpl-f-nhom').value.trim(), product = $('#pk-tpl-f-product').value.trim(), topic = $('#pk-tpl-f-topic').value.trim();
       const content = $('#pk-tpl-f-content').value.trim();
-      if (!title || !content) { setStatus('Cần nhập đủ tiêu đề và nội dung mẫu.'); return; }
+      if (!content) { setStatus('Cần nhập nội dung mẫu câu tư vấn.'); return; }
+      if (!nhom && !product && !topic) { setStatus('Chọn nhóm sản phẩm, gõ tên sản phẩm hoặc nhập tình huống để AI biết mẫu này dùng cho đâu.'); return; }
+      const title = $('#pk-tpl-f-title').value.trim() || ((product || nhom || 'Mẫu tư vấn') + (topic ? ' — ' + topic : ''));
       const btn = $('#pk-tpl-f-save');
-      btn.disabled = true; btn.innerText = 'Đang gửi...';
+      btn.disabled = true; btn.innerText = 'Đang lưu...';
       safeSendMessage_({ type: 'SAVE_MESSAGE_TEMPLATE', payload: {
         id: t ? t.id : '', title, content, tags: $('#pk-tpl-f-tags').value.trim(),
-        product: $('#pk-tpl-f-product').value.trim(), topic: $('#pk-tpl-f-topic').value.trim(), createdBy: settings.csName || ''
+        product, nhom, topic, createdBy: settings.csName || ''
       } }, (resp) => {
-        if (resp?.ok) { host.innerHTML = ''; setStatus('Đã gửi đề xuất — quản lý duyệt xong mẫu mới dùng được cho mọi người.'); loadMsgTemplates_(); }
-        else { btn.disabled = false; btn.innerText = '📨 Gửi đề xuất'; setStatus(resp?.error || PK_API_ERR); }
+        if (resp?.ok) { host.innerHTML = ''; setStatus('Đã lưu mẫu (chờ duyệt) — admin duyệt xong AI mới học và mọi người dùng như mẫu chuẩn.'); loadMsgTemplates_(); }
+        else { btn.disabled = false; btn.innerText = '📨 Lưu mẫu (chờ duyệt)'; setStatus(resp?.error || PK_API_ERR); }
       });
     });
   }
