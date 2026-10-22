@@ -44,6 +44,15 @@ var BANNED_WORDS_FALLBACK = [
 ];
 
 function readBannedWords_() {
+  var cfg = _bannedCfg_(), base = cfg.useSheet ? (readBannedWordsSheet_() || []) : [], pos = {}, out = [];
+  base.forEach(function (it) { pos[_stripVN_(it.tuCam).toLowerCase()] = out.length; out.push({ tuCam: it.tuCam, thayThe: it.thayThe }); });
+  cfg.items.forEach(function (it) {
+    var k = _stripVN_(it.tuCam).toLowerCase();
+    if (pos[k] !== undefined) out[pos[k]] = { tuCam: it.tuCam, thayThe: it.thayThe }; else { pos[k] = out.length; out.push({ tuCam: it.tuCam, thayThe: it.thayThe }); }
+  });
+  return out;
+}
+function readBannedWordsSheet_() {
   try {
     var ss = SpreadsheetApp.openById(REPORT_SALE_SS_ID);
     var sh = ss.getSheetByName(BANNED_WORDS_SHEET_NAME);

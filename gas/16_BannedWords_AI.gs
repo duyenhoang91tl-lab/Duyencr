@@ -8,7 +8,39 @@
 var BANNED_WORDS_SS_ID = '1qyyG2Pj8QOVNTb4B9JX8VQsrjFlZX-WhpovX1qDkvzM';
 var BANNED_WORDS_GID = 1343060455; // tab "Lưu ý từ cấm"
 
+// ─── TU CAM CAU HINH DUOC (Settings 'bannedWordsCfg') — yeu cau Duyen 2026-10-22: them/bot tu cam NGAY TRONG CRM > Cau hinh, khong can mo Google Sheet.
+// JSON: { useSheet: true|false (mac dinh true = van doc them sheet "Luu y tu cam"), items: [ { tuCam, thayThe } ] }.
+// Ket qua HOP NHAT vao CA 2 duong doc: readBannedWords_ (client/extension/quet chat) va readBannedWordsList_ (nhac AI). Tu trung voi sheet -> ban cau hinh THAY (ghi de "thay the").
+function _bannedCfg_() {
+  var raw = null, items = [], seen = {};
+  try { var t = getSetting_('bannedWordsCfg'); if (t) raw = JSON.parse(t); } catch (e) { raw = null; }
+  if (!raw || typeof raw !== 'object') raw = {};
+  (Array.isArray(raw.items) ? raw.items : []).forEach(function (it) {
+    if (!it || typeof it !== 'object') return;
+    var w = String(it.tuCam == null ? '' : it.tuCam).replace(/\s+/g, ' ').trim().slice(0, 100);
+    if (!w) return;
+    var k = _stripVN_(w).toLowerCase();
+    if (seen[k] || items.length >= 500) return;
+    seen[k] = 1;
+    items.push({ tuCam: w, thayThe: String(it.thayThe == null ? '' : it.thayThe).replace(/\s+/g, ' ').trim().slice(0, 300) });
+  });
+  return { useSheet: raw.useSheet !== false, items: items };
+}
+function _bannedCacheClear_() {
+  try { var c = CacheService.getScriptCache(); c.remove('banned_words_v1'); c.remove('cv_banned_v1'); } catch (e) {}
+}
 function readBannedWordsList_() {
+  var cfg = _bannedCfg_(), out = [], mine = {};
+  cfg.items.forEach(function (it) { mine[_stripVN_(it.tuCam).toLowerCase()] = 1; });
+  // Tu cua sheet bi ban cau hinh ghi de (trung tu) thi BO khoi dong sheet — tranh 2 dong cung 1 tu nhung "thay bang" mau thuan nhau trong prompt AI
+  (cfg.useSheet ? readBannedWordsListSheet_() : []).forEach(function (row) {
+    var ws = (row.words || []).filter(function (w) { return !mine[_stripVN_(w).toLowerCase()]; });
+    if (ws.length) out.push({ words: ws, allowed: row.allowed });
+  });
+  cfg.items.forEach(function (it) { out.push({ words: [it.tuCam], allowed: it.thayThe }); });
+  return out;
+}
+function readBannedWordsListSheet_() {
   try {
     var ss = SpreadsheetApp.openById(BANNED_WORDS_SS_ID);
     var sh = ss.getSheetById(BANNED_WORDS_GID);

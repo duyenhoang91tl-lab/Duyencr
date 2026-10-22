@@ -71,7 +71,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `_PSHEET_STOPWORDS_`, `DEPT_LIST_DEFAULT_`, `_DRIVE_IMG_MAX_BYTES_`
 
 ## 16_BannedWords_AI.gs
-- Hàm: `readBannedWordsList_`, `_bannedWordsPromptBlock_`, `_priceCatalogRowsCached_`, `priceAsk_`, `_priceQaSystemPrompt_`, `priceQa_`, `_crmAskPriceBlock_`, `_buildAISystemPrompt_`, `_aiOpenAICompat_`, `_aiGemini_`, `_crmAskSystemPrompt_`, `callAI_`, `_maskKey_`, `diagApiKeys`, `testScript`
+- Hàm: `_bannedCfg_`, `_bannedCacheClear_`, `readBannedWordsList_`, `readBannedWordsListSheet_`, `_bannedWordsPromptBlock_`, `_priceCatalogRowsCached_`, `priceAsk_`, `_priceQaSystemPrompt_`, `priceQa_`, `_crmAskPriceBlock_`, `_buildAISystemPrompt_`, `_aiOpenAICompat_`, `_aiGemini_`, `_crmAskSystemPrompt_`, `callAI_`, `_maskKey_`, `diagApiKeys`, `testScript`
 - Hằng/biến: `BANNED_WORDS_SS_ID`, `BANNED_WORDS_GID`
 
 ## 17_Broadcast_FollowUp.gs
@@ -83,7 +83,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `SH_TASK`, `TASK_HEADERS`, `SH_TASK_COMMENT`, `TASK_COMMENT_HEADERS`, `SH_NOTIF`, `NOTIF_HEADERS`, `SH_TASK_FLOW`, `TASK_FLOW_HEADERS`, `SH_TASK_REQ`, `TASK_REQ_HEADERS`, `SH_MENH`, `SH_CANNED`, `MENH_DEFAULT_ROWS`, `MENH_SHEET_MARK`, `CANNED_DEFAULT_ROWS`, `SH_MSG_TPL`, `MSG_TPL_HEADERS`, `MSG_TPL_APPROVER_ROLES_`, `MSG_TPL_STATUS_`
 
 ## 19_BannedList_MktChecklist.gs
-- Hàm: `readBannedWords_`, `_mktMonthOf_`, `readMktConfigAll_`, `mktConfigForMonth_`, `_mktCleanCfgEntry_`, `_mktCheckPass_`, `saveMktChecklistConfig_`, `_mktTagNum_`, `_mktTagRows_`, `buildMktChecklistReport_`
+- Hàm: `readBannedWords_`, `readBannedWordsSheet_`, `_mktMonthOf_`, `readMktConfigAll_`, `mktConfigForMonth_`, `_mktCleanCfgEntry_`, `_mktCheckPass_`, `saveMktChecklistConfig_`, `_mktTagNum_`, `_mktTagRows_`, `buildMktChecklistReport_`
 - Hằng/biến: `REPORT_SALE_SS_ID`, `BANNED_WORDS_SHEET_NAME`, `BANNED_WORDS_FALLBACK`, `MKT_DEFAULT_CFG_`, `MKT_EXTRA_CODES_`, `MKT_EXTRA_DEFAULT_`, `MKT_EXTRA_TAGS_`, `MKT_MIN_TAGS_`
 
 ## 20_ExportLog_AutoAssign.gs
