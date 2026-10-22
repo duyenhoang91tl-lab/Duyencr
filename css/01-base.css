@@ -15,7 +15,12 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 *:focus-visible{outline:2px solid var(--green-mid);outline-offset:1px;}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.55;-webkit-tap-highlight-color:transparent;}
+/* Font toàn CRM: Be Vietnam Pro (Google Fonts, thiết kế riêng cho tiếng Việt — dấu thanh rõ, số dễ đọc). index.html nạp wght 400/500/600/700 (display=swap):
+   chưa tải xong hoặc offline thì dùng font hệ thống thay thế, không vỡ bố cục. Ô nhập/nút phải kế thừa font (trình duyệt mặc định dùng font hệ thống riêng). */
+:root{--font:'Be Vietnam Pro',system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;}
+button,input,select,textarea,optgroup{font-family:inherit;}
+table,.num,.stat-n,.kpi-n{font-variant-numeric:tabular-nums;}   /* chữ số cùng bề rộng: cột tiền/đơn/ngày thẳng hàng */
+body{font-family:var(--font);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;background:var(--bg);color:var(--text);font-size:14px;line-height:1.55;-webkit-tap-highlight-color:transparent;}
 ::selection{background:var(--green-bg);color:var(--green);}
 
 /* ── HEADER ── */

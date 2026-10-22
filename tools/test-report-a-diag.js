@@ -37,4 +37,11 @@ ok(r.totalOrders === 2 && J(r.bySale).length === 1 && r.bySale[0].name === 'ninh
 ok(Math.round(r.bySale[0].giaTri) === 1500000, 'tien van chia deu cho TAT CA sale tren don (500k + 1000k): ' + r.bySale[0].giaTri);
 r = run([b('05/10/2026', 'ninhnga99, menbui2002')], {});
 ok(J(r.bySale).length === 2, 'KHONG loc Sale: van hien du ca 2 nguoi tren don');
+// O dau trang + Theo Kenh chi tinh phan cua nguoi duoc chon (21/10/2026)
+r = run([b('05/10/2026', 'ninhnga99, menbui2002'), b('06/10/2026', 'ninhnga99'), b('07/10/2026', 'menbui2002, phongketoan')], { sale: ['ninhnga99'] });
+ok(r.totalOrders === 2 && Math.round(r.totalGiaTri) === 1500000, 'o dau trang chi tinh phan nguoi duoc chon (500k + 1000k): ' + r.totalGiaTri);
+ok(Math.round(r.totalGiaTri) === Math.round(r.bySale.reduce((a, x) => a + x.giaTri, 0)), 'tong o dau trang KHOP tong bang Theo Sale');
+ok(Math.round(r.byKenh.reduce((a, x) => a + x.giaTri, 0)) === 1500000 && Math.round(r.totalCoc) === 0, 'bang Theo Kenh cung theo phan nguoi duoc chon');
+r = run([b('05/10/2026', 'ninhnga99, menbui2002'), b('06/10/2026', 'ninhnga99')], {});
+ok(r.totalOrders === 2 && Math.round(r.totalGiaTri) === 2000000, 'KHONG loc Sale: tong nguyen don nhu cu');
 console.log('ALL REPORT-A DIAG TESTS PASSED');

@@ -33,3 +33,11 @@ Menu "💰 Tra cứu giá & tin nhắn gợi ý" (`#pk-price-body`, ô `#pk-pric
 
 ## Giám sát chat — từ cấm (2026-10-17)
 Quét tin nhân viên gửi trong `pk_messages` theo sheet "Lưu ý từ cấm", cảnh báo admin `duyenht` (chuông + sheet `ChatViolations`). Giai đoạn 1 (server) xong; giai đoạn 2 (cảnh báo ngay trên extension Pancake AI) chưa làm. Xem docs/GIAM-SAT-CHAT.md.
+
+### 🚫 Nút "Quét từ cấm" trong panel Pancake AI (2026-10-21, Duyên yêu cầu)
+Sale gõ tin trong ô trả lời → bấm **🚫 Quét từ cấm** (`#pk-ban-btn`, ngay trên dòng trạng thái `#pk-ai-status`) → nếu có từ cấm hiện khung đỏ `Từ cấm “X” không được phép sử dụng nhé!` (nhiều từ: “A”, “B”; kèm gợi ý thay nếu sheet có cột thay thế); sạch → khung xanh; ô trống/không thấy ô soạn/lỗi mạng → khung xám (KHÔNG bao giờ báo "sạch" khi quét lỗi). Chỉ báo, không sửa/không gửi tin.
+- **Luồng:** `scanBannedDraft_` (pancake-content.js) → `SCAN_BANNED` (pancake-background.js, `_postGas_`) → GAS `scanBanned` (doPost) → `scanBannedText_` = `cvDetect_(text, _cvBannedCompiled_())` — CÙNG danh sách ("Lưu ý từ cấm") + danh sách bỏ qua (`chatAuditIgnore`) + cách khớp không phân biệt hoa/thường/dấu với giám sát chat → nút báo sạch thì giám sát chat cũng không bắt.
+- **Nguyên nhân chọn quét ở server:** `_bannedWords` phía extension chỉ nạp cho Messenger (`IS_PHONGTHUY`) và `handleGetKnowledge` (background) không trả `bannedWords` nên danh sách đó thực tế luôn rỗng — không dùng được.
+- Ô đọc tin: `_slashGetChatBox_()` (selector `replyBox`) → dự phòng ô soạn tin focus gần nhất (`_lastEditableEl_`), vì bấm nút trong panel làm ô chat mất focus.
+- **Zalo AI chưa có** (ghi `gap` trong `tools/ext-parity-allow.json`; chờ Duyên chốt). Test: `node tools/test-pancake-banned-scan.js` (phần giao diện cần jsdom).
+- **Việc cần làm tiếp:** Duyên kiểm tra sheet "Lưu ý từ cấm" đã có từ "Thỉnh" chưa (nút chỉ bắt từ có trong sheet); nếu sale gõ không dấu thì "thinh" cũng bị bắt (theo quy tắc chung của giám sát chat).

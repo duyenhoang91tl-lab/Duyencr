@@ -20,7 +20,7 @@ function run(scn) {
     buildPancakeReport_: () => ({ byCS: scn.byCS, byPage: [{ pageId: 'P1', tongTT: scn.byCS.reduce((s, r) => s + r.tongTT, 0) }] }),
   };
   vm.createContext(ctx);
-  ['_normTxt_', '_stripVN_', '_foldSaleKey_', '_salePersonKeyFn_', '_salePersonKeyWithOrphanFold_', '_srCloseRateSections_'].forEach((n) => { const code = grab(n); if (code) vm.runInContext(code, ctx); });
+  ['_normTxt_', '_stripVN_', '_foldSaleKey_', '_salePersonKeyFn_', '_salePersonIdentity_', '_salePersonKeyWithOrphanFold_', '_srCloseRateSections_'].forEach((n) => { const code = grab(n); if (code) vm.runInContext(code, ctx); });
   const rows = []; (scn.orders || []).forEach(([sale, n]) => { for (let i = 0; i < n; i++) rows.push({ kenhBan: 'K1', dateStr: '2026-10-05', saleBanRaw: sale }); });
   return ctx._srCloseRateSections_(rows, { dateFrom: '2026-10-01', dateTo: '2026-10-31' });
 }

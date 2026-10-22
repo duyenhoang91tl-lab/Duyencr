@@ -14,7 +14,10 @@ const sheet = { getDataRange: () => ({ getValues: () => data.map(r => r.slice())
   deleteRow: r => { data.splice(r - 1, 1); } };
 const users = { tok_admin: { username: 'ad', name: 'Admin', role: 'admin' }, tok_mgr: { username: 'qm', name: 'Quản Lý', role: 'manager' }, tok_lead: { username: 'ld', name: 'Trưởng Nhóm', role: 'leader' }, tok_cs: { username: 'lan', name: 'Lan', role: 'cs' }, tok_cs2: { username: 'mai', name: 'Mai', role: 'cs' } };
 const ctx = { jsonOut_: o => o, getSheet_: () => sheet, _sessUser_: t => users[t] || null, _extKeyWho_: ek => ek === 'KEYZ' ? 'zalo' : (ek === 'KEYP' ? 'pancake' : (ek ? 'sai' : '')), Date, JSON, Math, String, isNaN };
+// Nhom san pham (2026-10-16): readMessageTemplates_ nay goi _tplCatalogIndex_ -> gia lap DANH_MUC rong (test nay chi kiem quyen/trang thai; phan nhom: tools/test-msgtpl-group.js)
+Object.assign(ctx, { buildPriceCatalogFlat_: () => ({ ok: true, items: [] }), CacheService: { getScriptCache: () => ({ get: () => null, put: () => {} }) } });
 vm.createContext(ctx);
+vm.runInContext('var _tplCatIdxMemo_ = null; var MSG_TPL_CAT_CACHE_KEY_ = "tplcat_v1";' + fn('_stripVN_') + fn('_tplFoldAcc_') + fn('_tplCatalogIndex_') + fn('_tplClassify_') + fn('_tplGroupList_'), ctx);
 vm.runInContext(consts + fn('_tplCaller_') + fn('_tplRowToObj_') + fn('_tplOwns_') + fn('readMessageTemplates_') + fn('saveMessageTemplate_') + fn('deleteMessageTemplate_') + fn('approveMessageTemplate_'), ctx);
 const H = vm.runInContext('MSG_TPL_HEADERS', ctx);
 const reset = () => { data = [H.slice()]; };
@@ -41,11 +44,11 @@ let lanId = r.id; ok(ctx._tplRowToObj_(data[data.length - 1]).createdBy === 'Lan
 r = save(T({ title: 'Mau tu Zalo', createdBy: 'Mai' }), C('', 'KEYZ', 'Mai')); ok(r.status === 'pending', 'extension tao -> pending'); let maiExtId = r.id;
 r = save(T({ title: 'An danh' }), C('', '', '')); ok(r.status === 'pending', 'an danh (client cu khong token) tao -> pending, khong bao gio approved');
 // 5) tam nhin: nhan vien chi thay DA DUYET + mau CUA MINH; admin thay het
-let lan = read(C('tok_cs', '', '')).map(t => t.title).sort(); ok(lan.join('|') === 'Chao khach|Mau cua Lan', 'Lan thay mau da duyet + mau cua minh: ' + lan.join('|'));
-{ const mai = read(C('tok_cs2', '', '')); ok(!mai.some(t => t.title === 'Mau cua Lan') && mai.some(t => t.title === 'Mau tu Zalo') && mai.filter(t => t.status !== 'approved').every(t => t.createdBy === 'Mai'), 'Mai KHONG thay mau cho duyet cua Lan, chi thay mau cua minh (ke ca mau gui tu extension duoi ten Mai)'); }
-ok(read(C('', 'KEYZ', '')).length === 1 && read(C('', 'KEYZ', 'Mai')).length === 2, 'extension: khong ten -> chi mau da duyet; co ten -> them mau cua minh');
-ok(read(C('tok_admin', '', '')).length === 5 && read(C('tok_mgr', '', '')).length === 2, 'admin thay tat ca; manager (khong con dac quyen) chi thay mau da duyet + mau cua minh');
-ok(read().length === 1 && read(C('', '', '')).length === 1, 'khong caller / an danh: chi mau da duyet');
+let lan = read(C('tok_cs', '', '')).map(t => t.title); ok(lan.length === 5 && lan.includes('Chao khach') && lan.includes('Mau cua Lan') && lan.includes('Mau tu Zalo'), '21/10/2026: Lan thay mau da duyet + mau CHO DUYET cua moi nguoi: ' + lan.join('|'));
+{ const mai = read(C('tok_cs2', '', '')); ok(mai.some(t => t.title === 'Mau cua Lan') && mai.some(t => t.title === 'Mau tu Zalo') && mai.filter(t => t.status === 'pending').length === 4, 'Mai THAY ca mau cho duyet cua Lan (CS xem duoc kho chua duyet cua nhau)'); }
+ok(read(C('', 'KEYZ', '')).length === 5 && read(C('', 'KEYZ', 'Mai')).length === 5, 'extension (co/khong ten): thay da duyet + cho duyet cua moi nguoi');
+ok(read(C('tok_admin', '', '')).length === 5 && read(C('tok_mgr', '', '')).length === 5, 'admin thay tat ca; manager (khong dac quyen) thay da duyet + cho duyet');
+ok(read().length === 1 && read(C('', '', '')).length === 1, 'khong caller / an danh: CHI mau da duyet (khong thay mau cho duyet)');
 // 6) nhan vien KHONG sua/xoa duoc mau da duyet; sua duoc mau cua minh chua duyet (quay lai pending)
 r = save(T({ id: adminId, content: 'doi noi dung' }), C('tok_cs', '', '')); ok(r.code === 'FORBIDDEN', 'cs sua mau da duyet -> bi chan');
 ok(ctx._tplRowToObj_(data[1]).content === 'Xin chao anh/chi', 'mau da duyet khong bi doi');
@@ -86,4 +89,24 @@ ok(save({ title: '', content: 'x' }, C('tok_admin', '', '')).error && save({ tit
 const long = save(T({ title: 't'.repeat(500), content: 'c'.repeat(9000), product: 'p'.repeat(900) }), C('tok_admin', '', '')); row = ctx._tplRowToObj_(data.find(x => x[0] === long.id)); ok(row.title.length === 200 && row.content.length === 4000 && row.product.length === 300, 'cat do dai');
 // 13) hook that su nam trong code (khong bi sua mat sau nay)
 ok(/saveMessageTemplate_\(data\.template \|\| data, _tplCaller_\(data\.token, data\.ek,/.test(src) && /deleteMessageTemplate_\(data\.id, _tplCaller_\(/.test(src) && /approveMessageTemplate_\(data\.id, data\.decision, data\.reason, _tplCaller_\(/.test(src) && /readMessageTemplates_\(_tc\)/.test(src), 'dispatch phai truyen caller');
+// 10) 21/10/2026 — NHOM san pham luu duoc + AI hoc tu mau DA DUYET khop san pham/nhom (chua duyet / bi tu choi KHONG vao prompt)
+vm.runInContext(fn('_psheetNoAccent_') + fn('_tplPromptBlock_'), ctx);
+reset();
+r = save(T({ title: 'Mau Nhan', product: 'Nhẫn Vàng 9999', nhom: 'Nhẫn', topic: 'Khách hỏi giá', content: 'Dạ em chào chị ạ\nNhẫn bên em giá tốt lắm ạ' }), C('tok_admin', '', ''));
+ok(r.ok && ctx._tplRowToObj_(data[1]).nhom === 'Nhẫn', 'luu duoc cot nhom san pham');
+r = save(T({ title: 'Mau Lac cho duyet', product: 'Lắc tay', nhom: 'Lắc', content: 'MAU-CHUA-DUYET-LAC' }), C('tok_cs', '', ''));
+let lacId = r.id;
+ok(ctx._tplRowToObj_(data[2]).nhom === 'Lắc' && r.status === 'pending', 'CS luu mau kem nhom -> pending');
+r = save(T({ id: lacId, title: 'Mau Lac cho duyet', product: 'Lắc tay', nhom: 'Lắc bạc', content: 'MAU-CHUA-DUYET-LAC' }), C('tok_cs', '', ''));
+ok(ctx._tplRowToObj_(data[2]).nhom === 'Lắc bạc', 'sua mau cap nhat duoc nhom');
+let blk = ctx._tplPromptBlock_('Khach hoi nhan vang 9999 gia bao nhieu');
+ok(blk.indexOf('Nhẫn bên em giá tốt') >= 0, 'AI nhan mau DA DUYET khi yeu cau nhac ten san pham (khong dau, khong phan biet hoa thuong)');
+ok(ctx._tplPromptBlock_('khach hoi lac tay').indexOf('MAU-CHUA-DUYET-LAC') < 0, 'mau CHUA DUYET khong vao prompt AI');
+ok(ctx._tplPromptBlock_('khach hoi ve mon hang bat ky khong lien quan') === '' && ctx._tplPromptBlock_('') === '', 'khong khop san pham/nhom -> khong chen gi');
+ok(ctx._tplPromptBlock_('khach hoi NHAN dep khong').indexOf('Nhẫn bên em') >= 0, 'khop theo NHOM san pham (nhom = Nhan) du khong nhac ten day du');
+ctx.approveMessageTemplate_(lacId, 'approve', '', C('tok_admin', '', ''));
+ok(ctx._tplPromptBlock_('khach hoi lac tay').indexOf('MAU-CHUA-DUYET-LAC') >= 0, 'admin duyet xong -> AI bat dau hoc mau nay');
+for (let k = 0; k < 6; k++) save(T({ title: 'Nhan ' + k, product: 'Nhẫn Vàng 9999', content: 'X'.repeat(900) }), C('tok_admin', '', ''));
+blk = ctx._tplPromptBlock_('nhan vang 9999');
+ok((blk.match(/^Mau \d/gm) || []).length === 3 && blk.length < 2000, 'toi da 3 mau, moi mau cat 500 ky tu -> prompt khong phinh');
 console.log('ALL MSGTPL TESTS PASSED');

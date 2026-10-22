@@ -38,3 +38,9 @@ Thêm mục mới ở CUỐI, mỗi mục: triệu chứng → nguyên nhân g�
 - **Cách tránh:** (1) `tools/test-sc-list-markup.js` kiểm cấu trúc: mỗi `.sc-conv` là con TRỰC TIẾP của `#sc-convs`, không lồng nhau, số `<div>` mở = số `</div>`; (2) khi sửa mẫu HTML dạng chuỗi nối `+ '<div …'` luôn đếm lại cặp mở/đóng; (3) lỗi hiển thị thì chụp ảnh bằng Chrome thật trước khi sửa.
 - **Thanh thẻ kiểu Pancake:** lưới ô đặc màu nhỏ gọn (tối đa ~3 hàng rồi cuộn), thẻ đang gắn đậm + ✓, chưa gắn nhạt; mở sẵn như Pancake, bấm "▲ Thu gọn" để lấy lại chỗ cho tin nhắn (nhớ lựa chọn trong `localStorage.ome_pk_tag_open`).
 
+## 2026-10-16 — Chế độ tối: nền sáng + chữ sáng (chữ vô hình), font hệ thống không đồng nhất
+- **Nguyên nhân gốc:** `css/10-dark.css` chỉ đổi biến màu; ~870 chỗ màu cứng + biến riêng `--pro-*` không đổi theo. Chi tiết và cách sửa (lớp tự sinh `css/99-dark-auto.css`): `docs/DARK-THEME.md`.
+- **Quy ước mới:** viết CSS/inline mới cứ dùng mã hex bình thường — `tools/gen-dark-theme.js` tự sinh bản tối; chạy lại sau khi đổi (hoặc build-dist tự chạy). Nếu gán style bằng JS `cssText` thì thêm ngoại lệ vào `css/10-dark.css`.
+- **Font:** Be Vietnam Pro toàn CRM (`--font`); nút/ô nhập phải `font-family:inherit`.
+- **Bài học kiểm tra:** lỗi giao diện phải chụp bằng Chrome thật (cả hai chế độ), jsdom không thấy màu/bố cục.
+

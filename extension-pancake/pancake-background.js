@@ -422,6 +422,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // Nut "Quet tu cam": gui doan chat dang soan len GAS (action scanBanned, dung chung danh sach tu cam voi giam sat chat) -> { hits:[{word,thayThe}] }
+  if (msg?.type === "SCAN_BANNED") {
+    _postGas_({ action: "scanBanned", text: String(msg.payload?.text || "") })
+      .then((data) => sendResponse({ ok: true, data: { hits: data.hits || [] } }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
   if (msg?.type === "GET_MESSAGE_TEMPLATES") {
     handleGetMessageTemplates()
       .then((data) => sendResponse({ ok: true, data }))
@@ -1223,7 +1231,7 @@ async function _postGas_(body) {
 async function handleSaveMessageTemplate(t) {
   return _postGas_({ action: "saveMessageTemplate", template: {
     id: t?.id || "", title: t?.title || "", content: t?.content || "", tags: t?.tags || "",
-    product: t?.product || "", topic: t?.topic || "", createdBy: t?.createdBy || ""
+    product: t?.product || "", nhom: t?.nhom || "", topic: t?.topic || "", createdBy: t?.createdBy || ""
   } });
 }
 async function handleDeleteMessageTemplate(p) {
