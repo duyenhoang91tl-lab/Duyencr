@@ -97,6 +97,9 @@ async function _srLoad(){
       dateFrom: _srState.lDateFrom, dateTo: _srState.lDateTo,
       sale: (_srState.lSale||[]).join(',')
     });
+  } else if (_srState.sub === 'M') {
+    // Tổng quan đơn chia (js/50): tổng đơn thực tế, doanh thu, TB/đơn + theo từng sale số đơn chia / doanh thu từ đơn chia — GAS splitOrderReport
+    await splitReportLoad_();
   } else if (_srState.sub === 'G' || _srState.sub === 'K') {
     // Chuong trinh thuong Thu viec/Chinh thuc: CUNG nguon va cach map field voi Bao cao E (salesReportB/Pos)
     // de _computeBonusData_ dung chung nguyen ven. Dropdown khong phai 'custom' -> khoang ngay PHAI khop dropdown.
@@ -594,6 +597,7 @@ function renderSalesReportTab(){
   if (_srState.sub === 'I') { renderSalesReportTabI_(wrap, subTabs); return; }
   if (_srState.sub === 'J') { renderSalesReportTabJ_(wrap, subTabs); return; }
   if (_srState.sub === 'L') { renderSalesReportTabL_(wrap, subTabs); return; }
+  if (_srState.sub === 'M') { renderSalesReportTabM_(wrap, subTabs); return; }
   if (_srState.sub === 'K') { renderSalesReportTabK_(wrap, subTabs); return; }
 
   var bar = _srBarHtml_();
