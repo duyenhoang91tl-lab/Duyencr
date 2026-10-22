@@ -402,7 +402,7 @@
             <option value="price">💰 Tra cứu giá & tin nhắn gợi ý</option>
             <option value="ctkm">🎁 Tra cứu khuyến mãi</option>
             <option value="img">🖼 Tìm ảnh sản phẩm</option>
-            <option value="tpl">📚 Mẫu tin nhắn tư vấn</option>
+            <option value="tpl">📚 Tạo mẫu lưu sẵn / Mẫu tư vấn</option>
             <option value="stats">📊 Doanh số & hoa hồng của tôi</option>
             <option value="assign">📋 Data được chia (0)</option>
           </select>
@@ -456,7 +456,7 @@
               <div id="pk-tpl-row">
                 <input type="text" id="pk-tpl-q" placeholder="🔎 Gõ tên sản phẩm / nội dung hội thoại để gợi ý tin nhắn..." autocomplete="off" />
                 <button id="pk-tpl-refresh" title="Tải lại từ CRM">🔄</button>
-                <button id="pk-tpl-add" title="Đề xuất mẫu mới (chờ quản lý duyệt)">➕</button>
+                <button id="pk-tpl-add" title="Tạo mẫu lưu sẵn để AI học (CS: chờ admin duyệt)">➕ Tạo mẫu lưu sẵn</button>
               </div>
               <div id="pk-tpl-form"></div>
               <div id="pk-tpl-result"></div>
@@ -545,6 +545,8 @@
           <div id="pk-canned-body" style="display:none"></div>
         </div>` : ''}
 
+        <div id="pk-ban-row"><button id="pk-ban-btn" type="button" title="Quét tin đang soạn trong ô trả lời — báo nếu có từ cấm (trước khi bấm gửi)">🚫 Quét từ cấm</button></div>
+        <div id="pk-ban-result" style="display:none"></div>
         <div id="pk-ai-status">Chưa có hội thoại nào được chọn.</div>
 
         <div class="pk-tones" id="pk-tones">
@@ -681,6 +683,7 @@
       if (v === "assign") initAssignTab_();
     });
     panelEl.querySelector("#pk-rem-refresh").addEventListener("click", () => loadReminders_());
+    panelEl.querySelector("#pk-ban-btn").addEventListener("click", scanBannedDraft_);
     panelEl.querySelector("#pk-price-btn").addEventListener("click", doPriceSearch_);
     panelEl.querySelector("#pk-price-ai-btn").addEventListener("click", askPriceAi_);
     panelEl.querySelector("#pk-price-q").addEventListener("keydown", (e) => {
@@ -2965,13 +2968,14 @@
     const words = _stripVNlocal_((query || '').trim().toLowerCase()).split(/\s+/).filter(Boolean);
     const out = [];
     list.forEach((t, idx) => {
-      const f = { product: _stripVNlocal_((t.product || '').toLowerCase()), topic: _stripVNlocal_((t.topic || '').toLowerCase()), tags: _stripVNlocal_((t.tags || '').toLowerCase()),
+      const f = { nhom: _stripVNlocal_((t.nhom || '').toLowerCase()), product: _stripVNlocal_((t.product || '').toLowerCase()), topic: _stripVNlocal_((t.topic || '').toLowerCase()), tags: _stripVNlocal_((t.tags || '').toLowerCase()),
         title: _stripVNlocal_((t.title || '').toLowerCase()), content: _stripVNlocal_((t.content || '').toLowerCase()) };
       const parts = String(t.product || '').split(/[,;|\n]/).map((x) => _stripVNlocal_(x.toLowerCase()).trim()).filter(Boolean);
       let score = 0, all = true;
       for (const w of words) {
         let hit = 0;
         if (f.product.indexOf(w) >= 0) hit = Math.max(hit, 5);
+        if (f.nhom.indexOf(w) >= 0) hit = Math.max(hit, 4);
         if (f.topic.indexOf(w) >= 0) hit = Math.max(hit, 3);
         if (f.tags.indexOf(w) >= 0) hit = Math.max(hit, 3);
         if (f.title.indexOf(w) >= 0) hit = Math.max(hit, 2);
@@ -2993,6 +2997,11 @@
     return !!me && t.status && t.status !== 'approved' && String(t.createdBy || '').trim().toLowerCase() === me;
   }
 
+  // Tach mau thanh tung DOAN: moi dong (xuong dong) = 1 tin nhan rieng. Bo dong trong, cat khoang trang 2 dau.
+  function tplLines_(content) {
+    return String(content || '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+  }
+
   function renderMsgTemplateRows_() {
     const box = panelEl.querySelector('#pk-tpl-result');
     if (!box) return;
@@ -3002,36 +3011,57 @@
       return;
     }
     box.innerHTML = rows.map((t) => {
-      const chips = String(t.product || '').split(/[,;|\n]/).map((x) => x.trim()).filter(Boolean).map((p) => `<span class="pk-price-field">📦 ${escapeHtml(p)}</span>`).join(' ')
+      const chips = (t.nhom ? `<span class="pk-price-field">🗂 ${escapeHtml(t.nhom)}</span> ` : '') + String(t.product || '').split(/[,;|\n]/).map((x) => x.trim()).filter(Boolean).map((p) => `<span class="pk-price-field">📦 ${escapeHtml(p)}</span>`).join(' ')
         + (t.topic ? ` <span class="pk-price-field">💬 ${escapeHtml(t.topic)}</span>` : '')
         + String(t.tags || '').split(',').map((x) => x.trim()).filter(Boolean).map((tg) => ` <span class="pk-price-field">#${escapeHtml(tg)}</span>`).join('');
       const preview = t.content.length > 160 ? t.content.slice(0, 160) + '…' : t.content;
       const mine = isMyOpenTpl_(t);
-      const badge = !mine ? '' : (t.status === 'rejected'
+      const others = !mine && t.status === 'pending';   // 21/10/2026: CS xem duoc ca mau CHUA DUYET cua nguoi khac (tham khao) — AI chi hoc mau DA DUYET
+      const badge = others ? `<div style="color:#92400e;font-size:11px">⏳ Chưa duyệt${t.createdBy ? ' — ' + escapeHtml(t.createdBy) + ' đề xuất' : ''} (tham khảo, chờ admin duyệt)</div>` : !mine ? '' : (t.status === 'rejected'
         ? `<div style="color:#991b1b;font-size:11px">❌ Bị từ chối${t.rejectReason ? ': ' + escapeHtml(t.rejectReason) : ''} — sửa lại để gửi duyệt lại</div>`
         : '<div style="color:#92400e;font-size:11px">⏳ Chờ quản lý duyệt — chưa dùng được cho người khác</div>');
       return `<div class="pk-price-item pk-ai-suggestion-item" data-tid="${escapeHtml(t.id)}" title="Bấm để chèn vào ô trả lời">` +
         `<div class="pk-ctkm-title">${escapeHtml(t.title)}</div>` + badge +
         `<div>${escapeHtml(preview)}</div>` +
         (chips ? `<div style="margin-top:3px">${chips}</div>` : '') +
-        `<div class="pk-tpl-acts"><button type="button" class="pk-btn-outline" data-cid="${escapeHtml(t.id)}">📋 Copy</button>` +
+        `<div class="pk-tpl-acts"><button type="button" class="pk-btn-outline" data-cid="${escapeHtml(t.id)}" title="Copy nguyên cả mẫu (cả đoạn dài)">📋 Copy cả câu</button>` +
+        `<button type="button" class="pk-btn-outline" data-iid="${escapeHtml(t.id)}" title="Chèn nguyên cả mẫu vào ô chat">➡ Chèn cả câu</button>` +
+        (tplLines_(t.content).length > 1 ? `<button type="button" class="pk-btn-outline" data-ltog="${escapeHtml(t.id)}" title="Tách mỗi dòng thành 1 tin nhắn riêng">📑 Từng đoạn (${tplLines_(t.content).length})</button>` : '') +
         (mine ? `<button type="button" class="pk-btn-outline" data-eid="${escapeHtml(t.id)}">✏️ Sửa</button><button type="button" class="pk-btn-outline" data-did="${escapeHtml(t.id)}">🗑 Xoá</button>` : '') +
-        `</div></div>`;
+        `</div>` +
+        (tplLines_(t.content).length > 1 ? `<div class="pk-tpl-lines" data-lbox="${escapeHtml(t.id)}" style="display:none">` + tplLines_(t.content).map((ln, k) =>
+          `<div class="pk-tpl-line"><span class="pk-tpl-line-txt">${escapeHtml(ln)}</span>` +
+          `<button type="button" class="pk-btn-outline" data-lc="${escapeHtml(t.id)}|${k}" title="Copy đoạn này (1 tin nhắn)">📋 Copy đoạn</button>` +
+          `<button type="button" class="pk-btn-outline" data-li="${escapeHtml(t.id)}|${k}" title="Đưa đoạn này vào ô chat">➡ Chèn</button></div>`).join('') + `</div>` : '') +
+        `</div>`;
     }).join('');
     box.querySelectorAll('[data-tid]').forEach((el) => {
       el.addEventListener('click', (e) => {
-        if (e.target.closest('button')) return; // bam nut thi khong chen vao o tra loi
+        if (e.target.closest('button') || e.target.closest('.pk-tpl-lines')) return; // bam nut / vung tung doan thi khong chen ca mau vao o tra loi
         const t = _msgTemplates.find((x) => x.id === el.dataset.tid);
         if (t) insertReply(t.content); // dung lai ham co san — tu dong xu ly ca contenteditable lan textarea
       });
     });
+    const flashBtn_ = (b, txt) => { const old = b.textContent; b.textContent = txt; setTimeout(() => { b.textContent = old; }, 1200); };
+    const copyBtn_ = (b, text) => navigator.clipboard.writeText(text).then(() => flashBtn_(b, '✅ Đã copy')).catch(() => setStatus('Không copy được — bấm vào thẻ để chèn thẳng vào ô trả lời.'));
+    const lineOf_ = (key) => { const [id, k] = String(key).split('|'); const t = _msgTemplates.find((x) => x.id === id); return t ? (tplLines_(t.content)[Number(k)] || '') : ''; };
     box.querySelectorAll('[data-cid]').forEach((b) => b.addEventListener('click', (e) => {
       e.stopPropagation();
       const t = _msgTemplates.find((x) => x.id === b.dataset.cid);
-      if (!t) return;
-      const done = () => { const old = b.textContent; b.textContent = '✅ Đã copy'; setTimeout(() => { b.textContent = old; }, 1200); };
-      navigator.clipboard.writeText(t.content).then(done).catch(() => setStatus('Không copy được — bấm vào thẻ để chèn thẳng vào ô trả lời.'));
+      if (t) copyBtn_(b, t.content);   // Copy CA CAU: giu nguyen xuong dong, dan duoc ca doan dai
     }));
+    box.querySelectorAll('[data-iid]').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const t = _msgTemplates.find((x) => x.id === b.dataset.iid);
+      if (t) { insertReply(t.content); flashBtn_(b, '✅ Đã chèn'); }
+    }));
+    box.querySelectorAll('[data-ltog]').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const lb = box.querySelector(`[data-lbox="${CSS.escape(b.dataset.ltog)}"]`);
+      if (lb) lb.style.display = lb.style.display === 'none' ? '' : 'none';
+    }));
+    box.querySelectorAll('[data-lc]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); const ln = lineOf_(b.dataset.lc); if (ln) copyBtn_(b, ln); }));
+    box.querySelectorAll('[data-li]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); const ln = lineOf_(b.dataset.li); if (ln) { insertReply(ln); flashBtn_(b, '✅ Đã chèn'); } }));
     box.querySelectorAll('[data-eid]').forEach((b) => b.addEventListener('click', (e) => {
       e.stopPropagation();
       openTplForm_(_msgTemplates.find((x) => x.id === b.dataset.eid) || null);
@@ -3048,45 +3078,95 @@
     }));
   }
 
-  // Form DE XUAT mau tin ngay tren Pancake. Mau moi o trang thai "cho duyet" — chi dung duoc cho nguoi khac sau khi admin/quan ly duyet tren CRM.
+  // Danh muc san pham (cot Nhom SP / Ten SP bang gia DANH_MUC) cho form "Tao mau luu san": dung CHUNG cache voi "Tim anh san pham" (_imgFlatItems).
+  // Loi tai KHONG lam hong form (van go tay duoc) va KHONG khoa tab tim anh (de null de tab do tu tai lai).
+  function ensureTplCatalog_(cb) {
+    if (_imgFlatItems !== null) { cb(); return; }
+    if (_imgFlatLoading) { setTimeout(() => ensureTplCatalog_(cb), 400); return; }
+    _imgFlatLoading = true;
+    safeSendMessage_({ type: 'GET_PRODUCT_IMAGE_FLAT' }, (resp) => {
+      _imgFlatLoading = false;
+      if (resp?.ok) _imgFlatItems = resp.data.items || [];
+      cb();
+    });
+  }
+
+  // Form "TAO MAU LUU SAN" (Duyen 21/10/2026): CS chon NHOM SP (co san o bang gia) va/hoac go TEN SP (co goi y; AI tu nhan nhom khi ten khop bang gia),
+  // roi them mau cau tu van — moi dong = 1 tin nhan. Mau cua CS luon o trang thai "Cho duyet" (admin duyet tren CRM); AI CHI hoc mau DA DUYET.
   // Extension khong co tai khoan dang nhap nen KHONG duyet/sua mau da duyet tai day (server cung chan).
   function openTplForm_(t) {
     const host = panelEl.querySelector('#pk-tpl-form');
-    if (!settings.csName) { setStatus('Chọn tên CS của bạn trước (ô tên CS ở trên) để đề xuất mẫu.'); return; }
+    if (!settings.csName) { setStatus('Chọn tên CS của bạn trước (ô tên CS ở trên) để tạo mẫu.'); return; }
     host.innerHTML = `
       <div class="pk-tpl-form-box">
-        <div class="pk-tpl-form-title">${t ? '✏️ Sửa mẫu đề xuất' : '➕ Đề xuất mẫu mới'}</div>
-        <div style="font-size:11px;color:#6b7280;margin-bottom:4px">Mẫu sẽ ở trạng thái "Chờ duyệt" cho đến khi quản lý duyệt trên CRM.</div>
-        <input type="text" id="pk-tpl-f-title" placeholder="Tiêu đề mẫu" autocomplete="off" />
-        <input type="text" id="pk-tpl-f-product" placeholder="📦 Sản phẩm áp dụng, cách nhau dấu phẩy (VD: Nhẫn vàng, Lắc tay)" autocomplete="off" />
-        <input type="text" id="pk-tpl-f-topic" placeholder="💬 Nội dung hội thoại / tình huống (VD: Khách hỏi giá)" autocomplete="off" />
-        <textarea id="pk-tpl-f-content" rows="5" placeholder="Nội dung tin nhắn mẫu"></textarea>
+        <div class="pk-tpl-form-title">${t ? '✏️ Sửa mẫu lưu sẵn' : '➕ Tạo mẫu lưu sẵn'}</div>
+        <div style="font-size:11px;color:#6b7280;margin-bottom:4px">Chọn <b>nhóm sản phẩm</b> (có sẵn ở bảng giá) hoặc gõ <b>tên sản phẩm</b> — hệ thống tự nhận nhóm. Mẫu của bạn ở trạng thái <b>Chờ duyệt</b>; AI chỉ học sau khi admin duyệt trên CRM.</div>
+        <input type="text" id="pk-tpl-f-nhom" list="pk-tpl-nhom-dl" placeholder="🗂 Nhóm sản phẩm (chọn từ bảng giá hoặc gõ)" autocomplete="off" />
+        <datalist id="pk-tpl-nhom-dl"></datalist>
+        <input type="text" id="pk-tpl-f-product" list="pk-tpl-prod-dl" placeholder="📦 Tên sản phẩm, cách nhau dấu phẩy (VD: Nhẫn vàng, Lắc tay)" autocomplete="off" />
+        <datalist id="pk-tpl-prod-dl"></datalist>
+        <div id="pk-tpl-f-hint" style="font-size:11px;color:#047857;min-height:14px"></div>
+        <input type="text" id="pk-tpl-f-topic" placeholder="💬 Tình huống / nội dung hội thoại (VD: Khách hỏi giá)" autocomplete="off" />
+        <input type="text" id="pk-tpl-f-title" placeholder="Tiêu đề mẫu (bỏ trống = tự đặt theo sản phẩm + tình huống)" autocomplete="off" />
+        <textarea id="pk-tpl-f-content" rows="6" placeholder="Mẫu câu tư vấn — mỗi dòng (xuống dòng) sẽ là 1 tin nhắn riêng khi gửi cho khách"></textarea>
         <input type="text" id="pk-tpl-f-tags" placeholder="Tag, cách nhau dấu phẩy (VD: chào hỏi, bảo hành)" autocomplete="off" />
         <div class="pk-ai-sug-bar">
-          <button type="button" class="pk-btn-outline pk-ai-sug-save" id="pk-tpl-f-save">📨 Gửi đề xuất</button>
+          <button type="button" class="pk-btn-outline pk-ai-sug-save" id="pk-tpl-f-save">📨 Lưu mẫu (chờ duyệt)</button>
           <button type="button" class="pk-btn-outline" id="pk-tpl-f-cancel">Huỷ</button>
         </div>
       </div>`;
     const $ = (id) => host.querySelector(id);
-    $('#pk-tpl-f-title').value = t ? t.title : '';
+    $('#pk-tpl-f-nhom').value = t ? (t.nhom || '') : '';
     $('#pk-tpl-f-product').value = t ? (t.product || '') : '';
     $('#pk-tpl-f-topic').value = t ? (t.topic || '') : '';
+    $('#pk-tpl-f-title').value = t ? t.title : '';
     $('#pk-tpl-f-content').value = t ? t.content : '';
     $('#pk-tpl-f-tags').value = t ? (t.tags || '') : '';
-    $('#pk-tpl-f-title').focus();
+    $('#pk-tpl-f-nhom').focus();
+
+    // Goi y nhom / ten SP tu bang gia + tu nhan nhom khi ten SP khop
+    const fillLists = () => {
+      const items = _imgFlatItems || [];
+      const nhomVal = $('#pk-tpl-f-nhom').value.trim();
+      const groups = [...new Set(items.map((it) => it.n).filter(Boolean))].sort(_vnSort_);
+      $('#pk-tpl-nhom-dl').innerHTML = groups.map((g) => `<option value="${escapeHtml(g)}"></option>`).join('');
+      const pool = nhomVal && groups.indexOf(nhomVal) >= 0 ? items.filter((it) => it.n === nhomVal) : items;
+      const nm = {}; pool.forEach((it) => _itemNames_(it).forEach((n) => { const f = _fold_(n); if (!nm[f]) nm[f] = n; }));
+      $('#pk-tpl-prod-dl').innerHTML = Object.keys(nm).map((f) => nm[f]).sort(_vnSort_).slice(0, 400).map((n) => `<option value="${escapeHtml(n)}"></option>`).join('');
+    };
+    const detectGroup = () => {
+      const items = _imgFlatItems || [];
+      if (!items.length) return;
+      const toks = $('#pk-tpl-f-product').value.split(/[,;|\n]/).map((x) => _fold_(x)).filter(Boolean);
+      if (!toks.length) { $('#pk-tpl-f-hint').textContent = ''; return; }
+      const found = new Set(); let matched = 0;
+      toks.forEach((tk) => { const g = items.filter((it) => _itemNames_(it).some((n) => _fold_(n) === tk)).map((it) => it.n).filter(Boolean); if (g.length) matched++; g.forEach((x) => found.add(x)); });
+      const gs = [...found];
+      const cur = $('#pk-tpl-f-nhom').value.trim();
+      if (gs.length === 1 && !cur) { $('#pk-tpl-f-nhom').value = gs[0]; $('#pk-tpl-f-hint').textContent = '🤖 Đã tự nhận nhóm: ' + gs[0]; }
+      else if (gs.length > 1 && !cur) $('#pk-tpl-f-hint').textContent = '🤖 Sản phẩm thuộc nhiều nhóm (' + gs.slice(0, 3).join(', ') + ') — chọn nhóm ở ô trên nếu muốn.';
+      else if (!matched) $('#pk-tpl-f-hint').textContent = 'Tên này chưa có trong bảng giá — vẫn lưu được, AI sẽ nhận diện theo tên bạn gõ.';
+      else $('#pk-tpl-f-hint').textContent = '';
+    };
+    ensureTplCatalog_(() => { if (!host.contains($('#pk-tpl-f-nhom') || null)) return; fillLists(); detectGroup(); });
+    $('#pk-tpl-f-nhom').addEventListener('input', fillLists);
+    $('#pk-tpl-f-product').addEventListener('input', detectGroup);
+    $('#pk-tpl-f-product').addEventListener('change', detectGroup);
     $('#pk-tpl-f-cancel').addEventListener('click', () => { host.innerHTML = ''; });
     $('#pk-tpl-f-save').addEventListener('click', () => {
-      const title = $('#pk-tpl-f-title').value.trim();
+      const nhom = $('#pk-tpl-f-nhom').value.trim(), product = $('#pk-tpl-f-product').value.trim(), topic = $('#pk-tpl-f-topic').value.trim();
       const content = $('#pk-tpl-f-content').value.trim();
-      if (!title || !content) { setStatus('Cần nhập đủ tiêu đề và nội dung mẫu.'); return; }
+      if (!content) { setStatus('Cần nhập nội dung mẫu câu tư vấn.'); return; }
+      if (!nhom && !product && !topic) { setStatus('Chọn nhóm sản phẩm, gõ tên sản phẩm hoặc nhập tình huống để AI biết mẫu này dùng cho đâu.'); return; }
+      const title = $('#pk-tpl-f-title').value.trim() || ((product || nhom || 'Mẫu tư vấn') + (topic ? ' — ' + topic : ''));
       const btn = $('#pk-tpl-f-save');
-      btn.disabled = true; btn.innerText = 'Đang gửi...';
+      btn.disabled = true; btn.innerText = 'Đang lưu...';
       safeSendMessage_({ type: 'SAVE_MESSAGE_TEMPLATE', payload: {
         id: t ? t.id : '', title, content, tags: $('#pk-tpl-f-tags').value.trim(),
-        product: $('#pk-tpl-f-product').value.trim(), topic: $('#pk-tpl-f-topic').value.trim(), createdBy: settings.csName || ''
+        product, nhom, topic, createdBy: settings.csName || ''
       } }, (resp) => {
-        if (resp?.ok) { host.innerHTML = ''; setStatus('Đã gửi đề xuất — quản lý duyệt xong mẫu mới dùng được cho mọi người.'); loadMsgTemplates_(); }
-        else { btn.disabled = false; btn.innerText = '📨 Gửi đề xuất'; setStatus(resp?.error || PK_API_ERR); }
+        if (resp?.ok) { host.innerHTML = ''; setStatus('Đã lưu mẫu (chờ duyệt) — admin duyệt xong AI mới học và mọi người dùng như mẫu chuẩn.'); loadMsgTemplates_(); }
+        else { btn.disabled = false; btn.innerText = '📨 Lưu mẫu (chờ duyệt)'; setStatus(resp?.error || PK_API_ERR); }
       });
     });
   }
@@ -4498,6 +4578,47 @@
     }
 
     setStatus("Đã chèn gợi ý vào ô trả lời.");
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // MODULE: 🚫 QUÉT TỪ CẤM (Duyên yêu cầu 2026-10-21)
+  // Sale gõ xong tin trong ô trả lời → bấm nút → quét nội dung đang soạn; có từ cấm thì cảnh báo
+  // 'Từ cấm “X” không được phép sử dụng nhé!'. Quét ở GAS (action scanBanned) bằng ĐÚNG danh sách + bộ phát hiện của giám sát chat
+  // → nút báo sạch thì giám sát chat cũng không bắt. Không tự sửa/không tự gửi tin, chỉ báo.
+  // ══════════════════════════════════════════════════════════════════════════
+  let _lastEditableEl_ = null;   // ô soạn tin cuối cùng được focus (bấm nút trong panel làm ô chat mất focus)
+  document.addEventListener('focusin', (e) => {
+    const t = e.target;
+    if (!t || (panelEl && panelEl.contains(t))) return;
+    if (t.isContentEditable || t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && (t.type === 'text' || t.type === 'search'))) _lastEditableEl_ = t;
+  }, true);
+  function _readDraftText_() {
+    let box = null;
+    try { box = _slashGetChatBox_(); } catch (e) { box = null; }
+    if (!box || (panelEl && panelEl.contains(box))) box = (_lastEditableEl_ && document.body.contains(_lastEditableEl_)) ? _lastEditableEl_ : null;
+    if (!box) return null;
+    return (box.tagName === 'TEXTAREA' || box.tagName === 'INPUT') ? (box.value || '') : (box.innerText || box.textContent || '');
+  }
+  function _banWarnHtml_(hits) {
+    const words = hits.map((h) => '“' + escapeHtml(h.word) + '”').join(', ');
+    const sug = hits.filter((h) => h.thayThe).map((h) => '“' + escapeHtml(h.word) + '” → ' + escapeHtml(h.thayThe));
+    return '⚠️ Từ cấm ' + words + ' không được phép sử dụng nhé!' + (sug.length ? '<div class="pk-ban-sug">Gợi ý thay: ' + sug.join('; ') + '</div>' : '');
+  }
+  function scanBannedDraft_() {
+    const out = panelEl?.querySelector('#pk-ban-result'), btn = panelEl?.querySelector('#pk-ban-btn');
+    if (!out || !btn) return;
+    const show = (cls, html) => { out.className = cls; out.innerHTML = html; out.style.display = ''; };
+    const text = _readDraftText_();
+    if (text === null) { show('pk-ban-info', 'Không tìm thấy ô soạn tin — bấm vào ô trả lời, gõ tin rồi bấm lại.'); return; }
+    if (!text.trim()) { show('pk-ban-info', 'Ô trả lời đang trống — gõ tin rồi bấm quét.'); return; }
+    btn.disabled = true; const old = btn.textContent; btn.textContent = 'Đang quét…';
+    safeSendMessage_({ type: 'SCAN_BANNED', payload: { text } }, (resp) => {
+      btn.disabled = false; btn.textContent = old;
+      if (!resp?.ok) { show('pk-ban-info', 'Không quét được từ cấm: ' + escapeHtml(resp?.error || PK_API_ERR)); return; }
+      const hits = resp.data?.hits || [];
+      if (hits.length) show('pk-ban-warn', _banWarnHtml_(hits));
+      else show('pk-ban-ok', '✅ Không có từ cấm trong tin đang soạn.');
+    });
   }
 
   function setStatus(text) {

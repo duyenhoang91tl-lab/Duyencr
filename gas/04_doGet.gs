@@ -11,6 +11,7 @@ function doGet(e) {
   }
   if (MLIB_GET_ACTIONS_[action] === 1) return mlibDoGet_(action, p);   // thu vien anh/ghi am/mau tin: tu kiem token
   if (KHD_GET_ACTIONS_[action] === 1) return khdDoGet_(p);   // thao luan khach (noi bo): tu kiem token
+  if (SPLIT_GET_ACTIONS_[action] === 1) return splitDoGet_(action, p);   // don chia (bao cao M + danh sach don chia): token -> phan quyen theo vai tro
   if (CHAT_GET_ACTIONS_[action] === 1) return chatDoGet_(action, p);   // chat noi bo: tu kiem token, khong qua doGetCore_
   _ntlNote_('GET', action, p.token, p.src, p.ek);
   var _denG = _enforceCheck_(action, p.token, p.ek, p.src);
@@ -433,7 +434,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.57-saleonly' });   // PHAI la chuoi viet thang (test-crm-ask/test-kh-discuss doi chieu); giu = PK_GAS_VER_
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.59-msgtpl-nhom' });   // PHAI la chuoi viet thang (test-crm-ask/test-kh-discuss doi chieu); giu = PK_GAS_VER_
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -524,10 +525,11 @@ function doGetCore_(e) {
     if (action === 'messageTemplates') {
       var _tc = _tplCaller_(e.parameter.token, e.parameter.ek, e.parameter.by);
       var _tl = readMessageTemplates_(_tc);
-      return jsonOut_({ templates: _tl, canApprove: !!_tc.priv, pendingCount: _tc.priv ? _tl.filter(function (t) { return t.status === 'pending'; }).length : 0 });
+      return jsonOut_({ templates: _tl, groups: _tplGroupList_(_tl), canApprove: !!_tc.priv, pendingCount: _tc.priv ? _tl.filter(function (t) { return t.status === 'pending'; }).length : 0 });
     }
 
     // ── MAU AI DA HOC (sheet AIContext, type combo_template): CRM xem/sua/xoa ──
+    if (action === 'tplPending') return tplPendingList_(_tplCaller_(e.parameter.token, '', ''));   // extension Pancake AI hoi dinh ky: chi admin (theo token phien)
     if (action === 'aiExamples') {
       return jsonOut_({ examples: readAIExamples_() });
     }

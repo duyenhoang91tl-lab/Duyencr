@@ -74,6 +74,7 @@ async function _srLoad(){
     // rong vi o.ngayTao undefined o moi don Pos, du da map dung saleBan/giaTriDon. Dung
     // saleBanValid (ten sale da loc hop le, xem _donSaleNamesFromThe_) thay vi theSale tho de
     // tranh ghi chu/ten sai chinh ta trong cot Thẻ bi tinh nham thanh 1 "sale" ao.
+    _srRegisterIdentity_(dPos);
     if (dPos && dPos.orders) dPos.orders = dPos.orders.map(function(o){ return Object.assign({}, o, { saleBan: (o.saleBanValid !== undefined ? o.saleBanValid : o.theSale), giaTriDon: o.giaTriSauGiam, ngayTao: o.ngayTaoDon }); });
     _srState.dataE = dPos;
   } else if (_srState.sub === 'F') {
@@ -108,6 +109,7 @@ async function _srLoad(){
       dateFrom: _srState.gDateFrom, dateTo: _srState.gDateTo,
       sale: (_srState.gSale||[]).join(',')
     });
+    _srRegisterIdentity_(dPosG);
     if (dPosG && dPosG.orders) dPosG.orders = dPosG.orders.map(function(o){ return Object.assign({}, o, { saleBan: (o.saleBanValid !== undefined ? o.saleBanValid : o.theSale), giaTriDon: o.giaTriSauGiam, ngayTao: o.ngayTaoDon }); });
     _srState.dataG = dPosG;
   }
@@ -1516,10 +1518,52 @@ async function _impOnFileSelected(input, kind){
 }
 
 // Doc phan hoi nhap file: neu khong phai JSON (trang loi HTML / "error code: 524") thi bao loi de hieu thay vi "Unexpected token".
-async function _impJson_(res){
+async function _impJson_(res, phase){
   var txt = await res.text();
   try { return JSON.parse(txt); }
-  catch(e){ throw new Error('Máy chủ không trả kết quả hợp lệ (' + String(txt).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) + ') — nếu là "524" nghĩa là quá thời gian chờ; chưa ghi gì với bước xem trước.'); }
+  catch(e){
+    var tail = (phase === 'write')
+      ? ' — LẦN NHẬP THẬT: có thể máy chủ đã ghi một phần/đủ dù báo lỗi. KHÔNG nhập lại ngay: mở "Lịch sử nhập" xem lần nhập mới nhất, hoặc bấm nhập lại để xem trước (hệ thống tự bỏ qua đơn đã có).'
+      : ' — nếu là "524"/"502" nghĩa là quá thời gian chờ/máy chủ bận; chưa ghi gì với bước xem trước.';
+    throw new Error('Máy chủ không trả kết quả hợp lệ (' + (res && res.status ? 'HTTP ' + res.status + ': ' : '') + String(txt).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) + ')' + tail);
+  }
+}
+// Hop xac nhan TRONG TRANG (thay confirm() cua trinh duyet). NGUYEN NHAN GOC (Duyen 2026-10-21: up Base + Pos cung bao "Da huy — chua ghi gi" du khong bam Huy):
+// confirm() bi trinh duyet tu dong tra ve false (tab dang o nen / da bam "chan hop thoai" / nhieu hop thoai lien tiep) va KHONG bao gi -> tuong nhu nguoi dung huy.
+// Hop trong trang luon cho den khi nguoi dung bam; hien du so lieu xem truoc nen chup gui duoc.
+function _impAsk_(title, body, okLabel){
+  if (typeof document === 'undefined' || !document.body) return Promise.resolve(confirm(title + '\n\n' + body));
+  return new Promise(function(resolve){
+    var ov = document.createElement('div');
+    ov.id = 'imp-ask-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:16px';
+    ov.innerHTML = '<div role="dialog" aria-modal="true" style="background:var(--surface,#fff);color:var(--text,#111);border-radius:10px;max-width:600px;width:100%;max-height:88vh;overflow:auto;padding:18px 20px;box-shadow:0 10px 40px rgba(0,0,0,.3)">'
+      + '<div style="font-weight:700;font-size:15px;margin-bottom:10px">' + esc(title) + '</div>'
+      + '<div style="white-space:pre-wrap;font-size:13px;line-height:1.55;user-select:text">' + esc(body) + '</div>'
+      + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">'
+      + '<button type="button" class="btn secondary" data-v="0">Hủy</button>'
+      + '<button type="button" class="btn primary" data-v="1">' + esc(okLabel || 'Đồng ý') + '</button></div></div>';
+    function done(v){ document.removeEventListener('keydown', onKey, true); if (ov.parentNode) ov.parentNode.removeChild(ov); resolve(v); }
+    function onKey(e){ if (e.key === 'Escape') { e.preventDefault(); done(false); } }
+    ov.addEventListener('click', function(e){ var b = e.target && e.target.closest ? e.target.closest('button[data-v]') : null; if (b) done(b.getAttribute('data-v') === '1'); });
+    document.addEventListener('keydown', onKey, true);
+    document.body.appendChild(ov);
+  });
+}
+// Goi Apps Script cho nhap file. XEM TRUOC (dryRun) khong ghi gi -> an toan thu lai toi da `retries` lan khi gap 502/524/loi mang/phan hoi khong phai JSON.
+// Lan GHI THAT khong thu lai o day (de nguoi dung kiem tra lich su truoc, tranh ghi chong khi may chu da ghi nhung tra loi hong).
+async function _impPost_(url, payload, phase, retries){
+  var last, n = retries || 0;
+  for (var a = 0; a <= n; a++){
+    try {
+      var res = await fetch(url, { method:'POST', body: JSON.stringify(payload) });
+      return await _impJson_(res, phase);
+    } catch(e){
+      last = e;
+      if (a < n) await new Promise(function(r){ setTimeout(r, 2500 * (a + 1)); });
+    }
+  }
+  throw last;
 }
 
 // Ve lai bao cao SAU/TRUOC khi nhap file: loi ve (vd 1 bang dang mo gap du lieu null) KHONG duoc lam hong viec nhap file va KHONG duoc hien nhu 'Loi luu file'.
@@ -1540,8 +1584,7 @@ async function _impUpload(kind){
     // NHAP FILE GOI THANG Apps Script (khong qua Worker/Cloudflare): Cloudflare cat moi request sau ~100 giay (loi 524 "error code: 524"),
     // trong khi doc+doi chieu ca sheet DT TONG co the lau hon -> nhap that bai TRUOC khi cap nhat duoc don (vd don da "That bai" van giu "Dang xu ly").
     var impUrl = (typeof GAS_URL_DIRECT !== 'undefined' && GAS_URL_DIRECT) ? GAS_URL_DIRECT : gsUrl;
-    var res0 = await fetch(impUrl, { method:'POST', body: JSON.stringify({ action:'importSheetRows', token: _impTok_(), sheet: kind, rows: rows, dryRun: true, updateExisting: true }) });
-    var d0 = await _impJson_(res0);
+    var d0 = await _impPost_(impUrl, { action:'importSheetRows', token: _impTok_(), sheet: kind, rows: rows, dryRun: true, updateExisting: true }, 'preview', 2);
     if (d0.error) throw new Error(d0.error);
     if (d0.dryRun) {
       if (!d0.wouldWrite && !d0.wouldUpdateRows) {
@@ -1549,20 +1592,21 @@ async function _impUpload(kind){
         _impState.result = Object.assign({ kind: kind, written: 0 }, d0);
         return;
       }
-      if (!confirm('NHẬP DỮ LIỆU ' + _lbl + ' — xem trước:\n\n'
+      var _askBody = ''
         + '• Sẽ THÊM ' + fmt(d0.wouldWrite) + ' dòng MỚI (nối tiếp cuối sheet)\n'
         + '• ' + fmt(d0.skippedExisting || 0) + ' đơn ĐÃ CÓ: ' + (d0.wouldUpdateRows ? 'CẬP NHẬT ' + fmt(d0.wouldUpdateRows) + ' đơn có thông tin đổi (' + fmt(d0.wouldUpdateCells) + ' ô; chỉ ghi ô file có giá trị mới khác, KHÔNG xóa trắng ô cũ, giá trị cũ được lưu vào sheet "Nhật ký cập nhật nhập file"), còn lại giống hệt → bỏ qua' : 'giống dữ liệu cũ → bỏ qua, không ghi đè, không xóa') + '\n'
         + (d0.updateOverLimit ? '• Còn ' + fmt(d0.updateOverLimit) + ' đơn đổi nữa — vượt giới hạn 1 lần, nhập lại cùng file để cập nhật tiếp\n' : '')
         + (d0.skippedDupInFile ? '• Bỏ qua ' + fmt(d0.skippedDupInFile) + ' dòng trùng ngay trong file\n' : '')
-        + '\nDữ liệu cũ trên Sheet được GIỮ NGUYÊN 100%. Tiếp tục nhập?')) { toast('Đã hủy — chưa ghi gì.'); return; }
+        + '\nDữ liệu cũ trên Sheet được GIỮ NGUYÊN 100%. Tiếp tục nhập?';
+      var _go = await _impAsk_('NHẬP DỮ LIỆU ' + _lbl + ' — xem trước', _askBody, '✅ Nhập');
+      if (!_go) { toast('Đã hủy — chưa ghi gì. (Xem trước: thêm ' + fmt(d0.wouldWrite) + ' dòng mới, ' + fmt(d0.skippedExisting || 0) + ' đơn đã có.)'); return; }
     } else { _isReal = true; d = d0; }
     if (!_isReal) {
-      var res = await fetch(impUrl, { method:'POST', body: JSON.stringify({ action:'importSheetRows', token: _impTok_(), sheet: kind, rows: rows, updateExisting: true }) });
-      d = await _impJson_(res);
+      d = await _impPost_(impUrl, { action:'importSheetRows', token: _impTok_(), sheet: kind, rows: rows, updateExisting: true }, 'write', 0);
     }
     if (d.error) throw new Error(d.error);
     _impState.result = Object.assign({ kind: kind }, d);
-    toast('✓ Đã nhập '+fmt(d.written)+' dòng mới'+(d.skippedExisting?', '+fmt(d.skippedExisting)+' đơn ĐÃ CÓ'+(d.updatedRows?' (cập nhật '+fmt(d.updatedRows)+' đơn có thông tin đổi, còn lại bỏ qua)':' (bỏ qua)'):'')+(d.dedupedAfter?' (tự loại '+fmt(d.dedupedAfter)+' dòng trùng tuyệt đối)':'')+' vào '+(kind==='base'?'DT TỔNG':'dữ liệu đơn')+'.');
+    toast('✓ Đã nhập '+fmt(d.written)+' dòng mới'+(d.skippedExisting?', '+fmt(d.skippedExisting)+' đơn ĐÃ CÓ'+(d.updatedRows?' (cập nhật '+fmt(d.updatedRows)+' đơn có thông tin đổi, còn lại bỏ qua)':' (bỏ qua)'):'')+(d.dedupedAfter?' (tự dọn '+fmt(d.dedupedAfter)+' dòng trùng'+(kind==='pos'?' — giống nhau trừ STT/Trạng thái/Ghi chú, đã ghi đè Trạng thái/Ghi chú mới nhất':'')+')':'')+' vào '+(kind==='base'?'DT TỔNG':'dữ liệu đơn')+'.');
     logAudit('import_'+kind, '', '', 'Nhập dữ liệu '+(kind==='base'?'Base':'Pos')+' từ file: +'+d.written+' dòng, cập nhật '+(d.updatedRows||0)+' đơn/'+(d.updatedCells||0)+' ô, loại trùng '+(d.dedupedAfter||0));
     if (kind === 'base'){ _impState.baseRows = null; _impState.baseFileName = ''; _impState.baseWarn = ''; }
     else { _impState.posRows = null; _impState.posFileName = ''; _impState.posWarn = ''; }

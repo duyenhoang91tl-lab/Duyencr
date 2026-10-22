@@ -1,0 +1,10 @@
+var src = require('fs').readFileSync(__dirname + '/../js/12-fn-rendersalesreporttabe.js', 'utf8');
+var fn = src.match(/function _srGEligible_[\s\S]*?\n}\n/)[0];
+var gb = src.match(/function _srGBuildGroups_[\s\S]*?\n}\n/)[0];
+var CH = { a:'online', b:'offline', c:'probation', d:'cskh' };
+var _saleChannelOf_ = function(n){ return CH[n] || ''; };
+var _computeBonusData_ = function(){ return { total: 100, bySale: ['a','b','c','d','x'].map(function(n){ return { name:n, total:20, items:[{program:'P',amount:20}] }; }) }; };
+eval(fn + gb);
+var g = _srGBuildGroups_([]);
+var ok = g.total === 60 && g.tv.rows.length === 1 && g.ct.rows.length === 2 && g.skipped.join() === 'd,x';
+console.log(ok ? 'ALL PASS' : 'FAIL ' + JSON.stringify(g)); process.exit(ok ? 0 : 1);

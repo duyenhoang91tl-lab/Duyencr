@@ -235,6 +235,14 @@ function _cvStaff_(m) {
   return String((m && (m.crm_user || m.staff_name)) || adm || '').trim();
 }
 // msgs: [{id, text, sent_at, conversation_id, page_id, staff_name, crm_user, fromraw}] -> vi pham [{id, sentAt, convId, pageId, staff, words:[raw], snippet}]
+// Quet 1 doan chat NHAN VIEN DANG SOAN. Tra { ok, hits:[{word, thayThe}] }. Cat tai 5000 ky tu (tin nhan chat khong dai hon).
+function scanBannedText_(text) {
+  try {
+    var t = String(text == null ? '' : text).slice(0, 5000);
+    var hits = cvDetect_(t, _cvBannedCompiled_());
+    return { ok: true, hits: hits.map(function (h) { return { word: h.raw, thayThe: h.thayThe || '' }; }) };
+  } catch (e) { return { ok: false, error: 'Khong quet duoc tu cam: ' + (e && e.message || e) }; }
+}
 function cvScanMessages_(msgs, compiled) {
   var out = [];
   (msgs || []).forEach(function (m) {
@@ -415,3 +423,4 @@ function cvList_(p) {
   }
   return { ok: true, items: items, byStaff: byStaff, byWord: byWord, admins: _cvAdmins_() };
 }
+

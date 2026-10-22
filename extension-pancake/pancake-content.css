@@ -1337,7 +1337,11 @@
 .pk-ai-sug-save:disabled { opacity: .7; }
 
 /* Them/sua/xoa mau tin tren Pancake (thu vien mau chung voi CRM) */
-.pk-tpl-acts { display: flex; gap: 6px; margin-top: 5px; }
+.pk-tpl-acts { display: flex; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
+.pk-tpl-lines { margin-top: 6px; border-top: 1px dashed #cbd5e1; padding-top: 4px; }
+.pk-tpl-line { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-bottom: 1px solid #f1f5f9; }
+.pk-tpl-line-txt { flex: 1; min-width: 0; font-size: 12px; white-space: pre-wrap; word-break: break-word; }
+.pk-tpl-line .pk-btn-outline { font-size: 11px; padding: 2px 6px; flex: none; }
 .pk-tpl-acts button { font-size: 11px; padding: 2px 8px; }
 .pk-tpl-form-box { border: 1px solid #93c5fd; background: #f8fbff; border-radius: 6px; padding: 8px; margin: 6px 0; }
 .pk-tpl-form-title { font-weight: 700; font-size: 12px; margin-bottom: 6px; }
@@ -1389,3 +1393,14 @@
 .pk-nba-why { font-size:11px; color:#64748b; margin:2px 0 5px; }
 .pk-nba-btns { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
 #pk-nba-msg textarea { width:100%; box-sizing:border-box; margin-top:6px; font-size:12px; }
+
+/* 🚫 Quét từ cấm (2026-10-21) */
+#pk-ban-row { padding: 6px 10px 0; }
+#pk-ban-btn { width: 100%; padding: 7px 10px; border: 1px solid #dc2626; background: #fff; color: #b91c1c; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+#pk-ban-btn:hover:not(:disabled) { background: #fef2f2; }
+#pk-ban-btn:disabled { opacity: .6; cursor: wait; }
+#pk-ban-result { margin: 6px 10px 0; padding: 8px 10px; border-radius: 6px; font-size: 12px; line-height: 1.45; }
+#pk-ban-result.pk-ban-warn { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; font-weight: 600; }
+#pk-ban-result.pk-ban-ok { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
+#pk-ban-result.pk-ban-info { background: #f3f4f6; border: 1px solid #e5e7eb; color: #374151; }
+#pk-ban-result .pk-ban-sug { margin-top: 4px; font-weight: 400; font-size: 11px; }

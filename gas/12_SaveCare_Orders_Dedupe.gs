@@ -515,6 +515,140 @@ function _autoDedupLog_(sheetName, deleted) {
     sh.appendRow([new Date(), sheetName, deleted, 'Tự động xoá dòng trùng tuyệt đối (trigger onChange) — xem lại sheet "' + sheetName + '" nếu thấy nghi ngờ.']);
   } catch (e) {}
 }
+// ═══ DỌN TRÙNG POS "dữ liệu đơn" — bỏ qua STT (A), Trạng thái (O), Ghi chú nội bộ (Q) — thêm 2026-10-22 theo yêu cầu Duyên ═══
+// NGUYÊN NHÂN GỐC đơn Pos bị trùng trên CRM: bộ dọn trùng cũ (_autoDedupExactRowsInSheet_) chỉ xoá dòng GIỐNG Y HỆT MỌI CỘT (kể cả A=STT,
+// vốn đổi mỗi lần export Pancake, O=Trạng thái và Q=Ghi chú, vốn sửa theo thời gian). Cùng 1 đơn nằm 2 dòng, chỉ khác STT/Trạng thái/Ghi chú
+// -> KHÔNG bao giờ bị coi là trùng -> dòng thừa nằm lại, doanh thu/đếm đơn bị nhân đôi. Quy tắc mới: gom dòng theo TẤT CẢ cột trừ A, O, Q
+// (cùng khoá thời gian chịu lệch giờ như khoá nhập file: '' / '00:00' = chưa biết giờ, 2 giờ THẬT khác nhau = 2 đơn riêng). Mỗi nhóm trùng:
+// GIỮ dòng ĐẦU (giữ vị trí, công thức); nếu dòng MỚI NHẤT (cuối nhóm) có Trạng thái/Ghi chú khác (và không rỗng) -> GHI ĐÈ vào dòng giữ lại
+// (file Pos mới nhất thắng; không bao giờ xoá trắng ô cũ; không ghi đè ô công thức); rồi XOÁ các dòng còn lại — SAO LƯU nguyên dòng bị xoá
+// + giá trị cũ của ô bị ghi đè vào nhật ký TRƯỚC khi xoá (sao lưu lỗi -> không xoá gì).
+var SH_POS_DEDUP_LOG = 'Nhật ký dọn trùng Pos';
+var POS_DEDUP_LOG_HEADERS = ['thoiGian', 'dongBiXoa', 'dongGiuLai', 'khoaDon', 'giaTriDongBiXoa'];
+var POS_COL_TRANGTHAI = 14;      // cot O trong "dữ liệu đơn" (Q = DON_COL_GHICHU, A = STT) — 3 cot KHONG tham gia so khop
+var POS_DEDUP_MAX_DELETE = 3000; // toi da dong xoa/lan chay (con du thi lan sau — nhap file / trigger — don tiep), tranh qua gio Apps Script
+function _posDedupKeyParts_(row) {
+  var cols = [];
+  for (var j = 1; j < DON_CHITIET_WIDTH; j++) {
+    if (j === POS_COL_TRANGTHAI || j === DON_COL_GHICHU) continue;
+    var v = row[j];
+    if (j === 1) cols.push(normOrderDate_(v));                                  // chi NGAY; gio tach rieng (hm) de chiu lech
+    else if (j === 4) cols.push(normPhone_(String(v == null ? '' : v)));        // 837923113 == 0837923113
+    else if (j === 11 || j === 12) cols.push(String(_normMoney_(v)));           // gia sau giam / COD: "6.950.000" == 6950000
+    else cols.push(_normTxt_(_impCellStr_(v)));
+  }
+  return { k: 'pd|' + cols.join('|'), hm: _impHm_(row[1]) };
+}
+// preferRows (tuy chon) = { soDongSheet: true } — cac dong file Pos vua nhap KHOP: gia tri Trang thai/Ghi chu cua dong do la MOI NHAT (file la nguon
+// su that), uu tien hon quy tac 'dong cuoi nhom'. Neu khong, sau khi nhap file cap nhat dong DAU, dong cuoi (cu) se ghi de nguoc lai.
+function _dedupePosRelaxedInSheet_(sh, preferRows) {
+  var res = { deleted: 0, groups: 0, updatedCells: 0 };
+  if (!sh) return res;
+  var last = sh.getLastRow();
+  if (last < 3) return res;   // can >=2 dong du lieu moi co the trung
+  var width = Math.min(DON_CHITIET_WIDTH, sh.getMaxColumns());
+  var vals = sh.getRange(2, 1, last - 1, width).getValues();
+  var idx = {}, clusters = [];
+  for (var i = 0; i < vals.length; i++) {
+    var row = vals[i];
+    while (row.length < DON_CHITIET_WIDTH) row.push('');
+    if (_rowIsBlank_(row)) continue;
+    // Dong khong co SDT va khong du (ten + san pham): khong du dinh danh don -> KHONG dung vao (vd dong 'Tong', dong noi tiep)
+    if (!normPhone_(String(row[4] == null ? '' : row[4])) && !(_normTxt_(row[3]) && _normTxt_(row[8]))) continue;
+    var pk = _posDedupKeyParts_(row), hit = _impFindExist_(idx, pk);
+    if (!hit) { hit = { hm: pk.hm, rows: [i] }; (idx[pk.k] = idx[pk.k] || []).push(hit); clusters.push(hit); }
+    else { hit.rows.push(i); if (_impHmUnknown_(hit.hm) && !_impHmUnknown_(pk.hm)) hit.hm = pk.hm; }
+  }
+  var now = new Date(), delRows = [], backup = [], updLog = [], plans = [], planned = 0;
+  for (var c = 0; c < clusters.length; c++) {
+    var cl = clusters[c];
+    if (cl.rows.length < 2) continue;
+    var room = POS_DEDUP_MAX_DELETE - planned;
+    if (room <= 0) break;
+    if (cl.rows.length - 1 > room) cl.rows = cl.rows.slice(0, 1 + room);   // nhom khong lo: xu ly 1 phan, phan con lai de lan chay sau
+    planned += cl.rows.length - 1;
+    var keep = cl.rows[0], cellPlan = [], src = -1;
+    if (preferRows) { for (var q2 = cl.rows.length - 1; q2 >= 0; q2--) if (preferRows[cl.rows[q2] + 2]) { src = q2; break; } }
+    [POS_COL_TRANGTHAI, DON_COL_GHICHU].forEach(function (j) {
+      if (src >= 0) {                                                      // co dong khop file Pos: chi lay gia tri cua dong do
+        var pv = vals[cl.rows[src]][j];
+        if (src > 0 && _impCellStr_(pv).trim() !== '' && !_impCellEq_(vals[keep][j], pv)) cellPlan.push({ j: j, oldV: vals[keep][j], newV: pv });
+        return;
+      }
+      for (var q = cl.rows.length - 1; q >= 0; q--) {                      // dong MOI NHAT co gia tri khong rong
+        var cv = vals[cl.rows[q]][j];
+        if (_impCellStr_(cv).trim() === '') continue;
+        if (q > 0 && !_impCellEq_(vals[keep][j], cv)) cellPlan.push({ j: j, oldV: vals[keep][j], newV: cv });
+        return;                                                             // q === 0: dong giu lai da la moi nhat
+      }
+    });
+    plans.push({ keep: keep, cl: cl, cellPlan: cellPlan });
+  }
+  if (!plans.length) return res;
+  // 1) SAO LUU truoc: nguyen dong bi xoa. Loi sao luu -> KHONG xoa/ghi gi.
+  plans.forEach(function (p) {
+    for (var d = 1; d < p.cl.rows.length; d++) {
+      var ri = p.cl.rows[d];
+      backup.push([now, ri + 2, p.keep + 2, 'pos-dedupe', JSON.stringify(vals[ri].map(_impCellStr_)).substring(0, 45000)]);
+    }
+  });
+  try {
+    var lg = getSheet_(SH_POS_DEDUP_LOG, POS_DEDUP_LOG_HEADERS);
+    lg.getRange(lg.getLastRow() + 1, 1, backup.length, POS_DEDUP_LOG_HEADERS.length).setValues(backup);
+  } catch (eBk) { return res; }
+  // 2) GHI DE Trang thai/Ghi chu vao dong giu lai (nhat ky gia tri cu o sheet SH_IMPORT_UPD_LOG nhu khi nhap file)
+  plans.forEach(function (p) {
+    var okPlan = true;
+    p.cellPlan.forEach(function (cp) {
+      try {
+        var cell = sh.getRange(p.keep + 2, cp.j + 1, 1, 1);
+        if (cell.getFormulas()[0][0]) return;                              // o cong thuc: khong ghi de
+        cell.setValues([[cp.newV]]);
+        updLog.push([now, sh.getName(), p.keep + 2, 'pos-dedupe', _impColName_(cp.j), _impCellStr_(cp.oldV), _impCellStr_(cp.newV)]);
+        res.updatedCells++;
+      } catch (eUp) { okPlan = false; }
+    });
+    if (okPlan) { for (var d = 1; d < p.cl.rows.length; d++) delRows.push(p.cl.rows[d] + 2); res.groups++; }
+  });
+  if (updLog.length) {
+    try { var ul = getSheet_(SH_IMPORT_UPD_LOG, IMPORT_UPD_LOG_HEADERS); ul.getRange(ul.getLastRow() + 1, 1, updLog.length, IMPORT_UPD_LOG_HEADERS.length).setValues(updLog); } catch (eUl) {}
+  }
+  // 3) XOA tu duoi len tren, gom cac dong lien tiep thanh 1 lenh deleteRows (nhanh, khong lech chi so)
+  delRows.sort(function (a, b) { return b - a; });
+  var s = 0;
+  while (s < delRows.length) {
+    var e = s;
+    while (e + 1 < delRows.length && delRows[e + 1] === delRows[e] - 1) e++;
+    var cnt = e - s + 1;
+    try { sh.deleteRows(delRows[e], cnt); res.deleted += cnt; } catch (eDel) {}
+    s = e + 1;
+  }
+  return res;
+}
+// Nhap file Pos xong (script ghi KHONG kich hoat trigger onChange) -> don trung con sot trong sheet bang dung quy tac tren, roi xoa cache.
+function _impPosCleanup_(sheetKey, sh, preferRows) {
+  var r = { deleted: 0, updatedCells: 0 };
+  if (sheetKey !== 'pos') return r;
+  try {
+    var x = _dedupePosRelaxedInSheet_(sh, preferRows);
+    r.deleted = x.deleted; r.updatedCells = x.updatedCells;
+    if (x.deleted || x.updatedCells) {
+      sbMarkOrdersDirty_('don', 'posDedup');
+      try { CacheService.getScriptCache().removeAll(['donChiTiet_v4_n', 'don_phones_v6_n']); } catch (ec) {}
+      _autoDedupLog_(DON_CHITIET_SHEET, x.deleted);
+    }
+  } catch (e) { try { Logger.log('_impPosCleanup_ loi: ' + e); } catch (e2) {} }
+  return r;
+}
+// CHAY TAY (Apps Script Editor -> chon dedupePosNow_ -> Run) de don trung Pos CO SAN ngay, khong cho nhap file/trigger. Chay lai nhieu lan van an toan.
+function dedupePosNow_() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(25000)) return 'Dang co thao tac khac ghi du lieu — doi vai giay roi chay lai.';
+  try {
+    var r = _impPosCleanup_('pos', getDTSS_().getSheetByName(DON_CHITIET_SHEET));
+    return 'Da xoa ' + r.deleted + ' dong trung Pos, cap nhat ' + r.updatedCells + ' o (trang thai/ghi chu). Neu con du, chay lai (toi da ' + POS_DEDUP_MAX_DELETE + ' dong/lan).';
+  } finally { lock.releaseLock(); }
+}
 // Ham duoc Google Sheets TU GOI khi spreadsheet DT_SS_ID (chua ca Base + Pos) co bat ky thay
 // doi nao (dan/nhap/xoa dong, sua 1 o...) — xem installAutoDedupTrigger_ o duoi de cai dat
 // trigger nay 1 LAN. Dung LockService de tranh 2 lan chay cung luc dam vao nhau khi co nhieu
@@ -526,10 +660,11 @@ function onChangeDedupTrigger_(e) {
     var ss = getDTSS_();
     var resBase = _autoDedupExactRowsInSheet_(ss.getSheetByName(DT_TONG_SHEET), DT_TONG_WIDTH);
     _autoDedupLog_(DT_TONG_SHEET, resBase.deleted);
-    var resPos = _autoDedupExactRowsInSheet_(ss.getSheetByName(DON_CHITIET_SHEET), DON_CHITIET_WIDTH);
+    // SUA 2026-10-22 (Duyen: don Pos trung): Pos dung quy tac moi _dedupePosRelaxedInSheet_ (bo qua STT/Trang thai/Ghi chu, ghi de TT/ghi chu moi nhat) thay cho 'giong y het moi cot'.
+    var resPos = _dedupePosRelaxedInSheet_(ss.getSheetByName(DON_CHITIET_SHEET));
     _autoDedupLog_(DON_CHITIET_SHEET, resPos.deleted);
     if (resBase.deleted) sbMarkOrdersDirty_('dt', 'autoDedup');   // Supabase buoc 4b
-    if (resPos.deleted) sbMarkOrdersDirty_('don', 'autoDedup');
+    if (resPos.deleted || resPos.updatedCells) sbMarkOrdersDirty_('don', 'autoDedup');
     try {
       var cache = CacheService.getScriptCache();
       // SUA 2026-10-07: key cache dung truoc day la 'donChiTiet_v3_n' nhung readDonChiTiet_ da doi
@@ -538,7 +673,7 @@ function onChangeDedupTrigger_(e) {
       // 90s TTL du sheet Pos vua bi xoa dong trung, khien bao cao B/E/F/G co the tam thoi van hien
       // dong da bi xoa. _cacheGetBig_ chi can mat key "<key>_n" la coi nhu cache rong (xem ham do),
       // nen chi can xoa dung '_n' cua key HIEN TAI 'donChiTiet_v4' la du, khong can xoa tung manh.
-      if (resPos.deleted) cache.removeAll(['donChiTiet_v4_n', 'don_phones_v6_n']); // force doc lai sheet Pos ngay, khong doi het 90s cache
+      if (resPos.deleted || resPos.updatedCells) cache.removeAll(['donChiTiet_v4_n', 'don_phones_v6_n']); // force doc lai sheet Pos ngay, khong doi het 90s cache
       if (resBase.deleted) cache.removeAll(['srptOptions_v3', 'orders_v1_n']);
     } catch (ecCache) {}
   } finally {
@@ -602,7 +737,10 @@ function _impOrderKeyParts_(sheetKey, row) {
       kb = !ph ? 'x|' + _rowKeyExact_(row) : 'f|' + ph + '|' + normOrderDate_(row[DT_COL_NGAYTAO]) + '|' + normOrderDate_(row[DT_COL_THOIGIANHT]) + '|' +
         _normMoney_(row[DT_COL_GIATRIDON]) + '|' + _normTxt_(row[DT_COL_SANPHAM]);
     }
-    return { k: kb, hm: '', full: kb };
+    // alt = khoa theo SDT+ngay+tien+SP: dung de khop dong cu CHUA co ID (cot T rong) voi dong file co ID — tranh coi la don moi roi them TRUNG (don cu van 'Dang xu ly').
+    var ph2 = normPhone_(String(row[DT_COL_PHONE] || ''));
+    var alt = (id && ph2) ? 'f|' + ph2 + '|' + normOrderDate_(row[DT_COL_NGAYTAO]) + '|' + normOrderDate_(row[DT_COL_THOIGIANHT]) + '|' + _normMoney_(row[DT_COL_GIATRIDON]) + '|' + _normTxt_(row[DT_COL_SANPHAM]) : '';
+    return { k: kb, hm: '', full: kb, id: id, alt: alt };
   }
   var phP = normPhone_(String(row[4] || ''));
   var nameP = _normTxt_(row[3]), spP = _normTxt_(row[8]);
@@ -706,7 +844,7 @@ function doImportSheetRowsLocked_(sheetKey, sheetName, sh, rows, dryRun, updateE
   // Sheet (khong tin cache) trong luc dang giu khoa.
   var keyW = (sheetKey === 'pos') ? DON_CHITIET_WIDTH : DT_TONG_WIDTH;
   var _impT0 = Date.now();   // PERF (xem Apps Script -> Executions): do thoi gian doc+doi chieu de truy nguyen nhan neu nhap file cham
-  var existIdx = {}, updPlan = [], updDone = {}, updCells = 0, updOverLimit = 0;
+  var existIdx = {}, updPlan = [], updDone = {}, updCells = 0, updOverLimit = 0, matchedRows = {};
   var lastNow = sh.getLastRow();
   if (lastNow >= 2) {
     var readW = Math.min(Math.max(keyW, width), sh.getMaxColumns());
@@ -716,7 +854,9 @@ function doImportSheetRowsLocked_(sheetKey, sheetName, sh, rows, dryRun, updateE
       if (_rowIsBlank_(er)) continue;
       while (er.length < keyW) er.push('');
       var pe0 = _impOrderKeyParts_(sheetKey, er);
-      (existIdx[pe0.k] = existIdx[pe0.k] || []).push({ hm: pe0.hm, r: e + 2, vals: updateExisting ? er : null });   // moi dong cua khoa; khop theo khoa + gio (_impFindExist_)
+      var ent0 = { hm: pe0.hm, r: e + 2, vals: updateExisting ? er : null };   // moi dong cua khoa; khop theo khoa + gio (_impFindExist_)
+      (existIdx[pe0.k] = existIdx[pe0.k] || []).push(ent0);
+      if (sheetKey === 'base' && !pe0.id && pe0.k.indexOf('f|') === 0) ent0.noId = true;   // dong cu chua co ID: file co ID van khop duoc qua khoa 'f|' (xem alt)
     }
   }
   var _impTRead = Date.now() - _impT0;
@@ -725,8 +865,13 @@ function doImportSheetRowsLocked_(sheetKey, sheetName, sh, rows, dryRun, updateE
     var kr = toWrite[w].slice(0);
     while (kr.length < keyW) kr.push('');
     var pk2 = _impOrderKeyParts_(sheetKey, kr), k2 = pk2.full, hit = _impFindExist_(existIdx, pk2);
+    if (!hit && pk2.alt && existIdx[pk2.alt]) {   // dong cu khong co ID -> khop theo SDT+ngay+tien+SP (chi dong cu THIEU ID)
+      var al = existIdx[pk2.alt];
+      for (var ai = 0; ai < al.length; ai++) if (al[ai].noId) { hit = al[ai]; break; }
+    }
     if (hit) {
       skippedExisting++;
+      matchedRows[hit.r] = true;   // 2026-10-22: dong file Pos khop -> gia tri dong nay la moi nhat khi don trung (xem _dedupePosRelaxedInSheet_ preferRows)
       if (updateExisting && hit.vals && !updDone[hit.r]) {
         updDone[hit.r] = true;
         var df = _impDiffRow_(sheetKey, hit.vals, toWrite[w], width);
@@ -772,7 +917,8 @@ function doImportSheetRowsLocked_(sheetKey, sheetName, sh, rows, dryRun, updateE
   if (!toWrite.length) {
     if (updatedRows) { sbMarkOrdersDirty_(sheetName === DON_CHITIET_SHEET ? 'don' : 'dt', 'import'); try { var c0 = CacheService.getScriptCache(); if (sheetName === DON_CHITIET_SHEET) c0.removeAll(['donChiTiet_v4_n', 'don_phones_v6_n']); else c0.removeAll(['srptOptions_v3', 'orders_v1_n']); } catch (e0) {} }
     var batchId0 = updatedRows ? _impBatchLog_(sheetName, sheetKey, 0, [], updLogFrom, updLogCount, who) : '';
-    return jsonOut_({ ok: true, written: 0, skippedDupInFile: skippedDupInFile, skippedExisting: skippedExisting, dedupedAfter: 0, updatedRows: updatedRows, updatedCells: updatedCells, updateOverLimit: updOverLimit, batchId: batchId0 });
+    var ddPos0 = _impPosCleanup_(sheetKey, sh, matchedRows);   // 2026-10-22: Pos -> don them don trung con sot (khac nhau chi o STT/Trang thai/Ghi chu), ke ca khi khong co dong moi
+    return jsonOut_({ ok: true, written: 0, skippedDupInFile: skippedDupInFile, skippedExisting: skippedExisting, dedupedAfter: ddPos0.deleted, updatedRows: updatedRows, updatedCells: updatedCells, updateOverLimit: updOverLimit, batchId: batchId0 });
   }
 
   var rowsBefore = sh.getLastRow();
@@ -799,7 +945,8 @@ function doImportSheetRowsLocked_(sheetKey, sheetName, sh, rows, dryRun, updateE
   } catch (ec) {}
 
   var batchId = _impBatchLog_(sheetName, sheetKey, rowsBefore + 1, toWrite.map(function (wr) { var pr = wr.slice(0); while (pr.length < keyW) pr.push(''); return pr; }), updLogFrom, updLogCount, who);
-  return jsonOut_({ ok: true, written: toWrite.length, skippedDupInFile: skippedDupInFile, skippedExisting: skippedExisting, dedupedAfter: dedupRes.deleted, updatedRows: updatedRows, updatedCells: updatedCells, updateOverLimit: updOverLimit, batchId: batchId });
+  var ddPos = _impPosCleanup_(sheetKey, sh, matchedRows);   // 2026-10-22: sau khi ghi + nhat ky lan nhap (undo dinh vi theo DAU VAN, khong theo vi tri)
+  return jsonOut_({ ok: true, written: toWrite.length, skippedDupInFile: skippedDupInFile, skippedExisting: skippedExisting, dedupedAfter: dedupRes.deleted + ddPos.deleted, updatedRows: updatedRows, updatedCells: updatedCells, updateOverLimit: updOverLimit, batchId: batchId });
 }
 
 // ═══════════════════════════════════════════════════════════════

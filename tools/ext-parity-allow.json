@@ -19,6 +19,7 @@
     }
   },
   "onlyPancake": {
+    "scanBanned": {"status": "gap", "note": "Nut \"Quet tu cam\" truoc khi gui (2026-10-21, Duyen yeu cau rieng cho Pancake AI); Zalo AI chua co — cho Duyen chot co lam khong (docs/crm-kb/04-extension-pancake.md)"},
     "saveCannedResponse": {
       "status": "platform",
       "note": "Cau tra loi nhanh (canned) la tinh nang cua nen tang Pancake"
@@ -43,21 +44,13 @@
       "status": "gap",
       "note": "U3d: nut Ap CT tu dong trong gio hang Pancake AI doc promoConfig — Zalo AI chua co gio hang/Soan don, lam bu cung U6a-2 (docs/ROADMAP-CRM-UPDATE.md)"
     },
-    "ctkmCatalog": {
-      "status": "gap",
-      "note": "Danh muc CTKM — Zalo chua co"
-    },
     "getKnowledge": {
       "status": "gap",
       "note": "Kien thuc san pham — Zalo chua doc truc tiep"
     },
     "priceCatalogTree": {
-      "status": "gap",
-      "note": "Cay danh muc bang gia (Soan don) — Zalo chi co tim phang"
-    },
-    "priceCatalogFlat": {
-      "status": "gap",
-      "note": "Bang gia phang cho Soan don — Zalo chua"
+      "status": "legacy",
+      "note": "Handler GET_PRICE_TREE o pancake-background.js KHONG con noi nao gui (content.js dung priceCatalogFlat) — ma cu, khong can lam bu"
     },
     "donOrdersByPhone": {
       "status": "gap",

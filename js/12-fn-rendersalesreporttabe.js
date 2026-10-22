@@ -71,8 +71,10 @@ function _daysSinceStart_(startYmd, dateYmd){
 // tên/bí danh, xem _acctNamesOf) — dùng chung nguồn "accounts" (đã tải sẵn toàn cục).
 function _saleStartDate_(name){
   if (!name || typeof accounts === 'undefined') return '';
+  var al = _cfgAliasesOf(name);   // tên chính trên báo cáo có thể khác tên đã lưu trong tài khoản -> tra theo MỌI tên cùng người
   for (var i = 0; i < accounts.length; i++){
-    if (_acctNamesOf(accounts[i]).indexOf(name) !== -1) return accounts[i].startDate || '';
+    var ns = _acctNamesOf(accounts[i]);
+    for (var j = 0; j < al.length; j++) if (ns.indexOf(al[j]) !== -1) return accounts[i].startDate || '';
   }
   return '';
 }
@@ -189,7 +191,7 @@ function _computeBonusData_(orders){
   });
   Object.keys(bySaleDay).forEach(function(key){
     var g = bySaleDay[key];
-    var channel = SALE_CHANNELS[g.name] || '';
+    var channel = _saleChannelOf_(g.name);
     // 3 nhóm riêng theo phạm vi "theo ngày" — CỘNG DỒN giữa các nhóm, trong 1 nhóm chỉ lấy cao nhất.
     var bestTier = null, bestRevDay = null, bestFirstOrder = null;
     BONUS_PROGRAMS.forEach(function(p){
@@ -238,7 +240,7 @@ function _computeBonusData_(orders){
     var orderNames = Object.keys(_bonusNamesOfOrder_(o)).filter(Boolean), nParts = orderNames.length || 1;
     orderNames.forEach(function(name){ // mọi sale tham gia; tiền thưởng chia đều nParts
       if (!name) return;
-      var channel = SALE_CHANNELS[name] || '';
+      var channel = _saleChannelOf_(name);
       var best = null;
       var extra = [];   // CT thưởng theo SẢN PHẨM (mã): cộng dồn, không tranh "best" với CT khác
       BONUS_PROGRAMS.forEach(function(p){
@@ -393,7 +395,7 @@ function _srRenderE_(d){
     bonusRows.forEach(function(s, i){
       var rid = 'bn_'+i;
       var expanded = _srState.bonusExpandedRow === rid;
-      html += '<tr><td>'+esc(s.name)+(SALE_CHANNELS[s.name] ? ' <span style="font-size:10px;color:var(--muted)">('+(SALE_CHANNELS[s.name]==='online'?'Online':(SALE_CHANNELS[s.name]==='probation'?'Thử việc':'Offline'))+')</span>' : ' <span style="font-size:10px;color:var(--red)">(chưa phân loại)</span>')+'</td>'+
+      html += '<tr><td>'+esc(s.name)+(_saleChannelOf_(s.name) ? ' <span style="font-size:10px;color:var(--muted)">('+(_saleChannelOf_(s.name)==='online'?'Online':(_saleChannelOf_(s.name)==='probation'?'Thử việc':'Offline'))+')</span>' : ' <span style="font-size:10px;color:var(--red)">(chưa phân loại)</span>')+'</td>'+
         '<td style="text-align:right">'+fmt(s.items.length)+'</td>'+
         '<td style="text-align:right"><b>'+_srMoney(s.total)+'</b></td>'+
         '<td><button class="btn sm" onclick="_srState.bonusExpandedRow='+(expanded?"''":"'"+rid+"'")+';renderSalesReportTab()">'+(expanded?'Ẩn':'Chi tiết')+'</button></td></tr>';
@@ -580,18 +582,26 @@ function _srRenderF_(d){
 //  Backend action failedOrderReport giữ nguyên (không còn tab nào gọi), chỉ bỏ giao diện.
 // ════════════════════════════════════════════════════════════════════
 function _srGSaleTypeLabel_(name){
-  var c = SALE_CHANNELS[name];
+  var c = _saleChannelOf_(name);
   return c === 'probation' ? 'Thử việc' : (c === 'online' ? 'Online' : (c === 'offline' ? 'Offline' : 'Chưa phân loại'));
 }
 function _srGDecode_(s){
   return String(s == null ? '' : s).replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#0?39;/g,"'").replace(/&amp;/g,'&');
 }
 // Tách kết quả _computeBonusData_ thành 2 nhóm + tổng hợp theo chương trình.
+// Thưởng Thử việc / Chính thức CHỈ tính cho đội Sale Online + Văn phòng (đều thuộc phòng Kinh doanh) và Sale Thử việc.
+// Người chưa phân loại hoặc thuộc đội khác (CSKH, quầy…) không nhận thưởng ở báo cáo này (yêu cầu Duyên 2026-10-22).
+function _srGEligible_(name){
+  var c = _saleChannelOf_(name);
+  return c === 'online' || c === 'offline' || c === 'probation';
+}
 function _srGBuildGroups_(orders){
   var bonus = _computeBonusData_(orders || []);
-  var g = { tv: { rows: [], total: 0 }, ct: { rows: [], total: 0 }, total: bonus.total, programs: {} };
+  var g = { tv: { rows: [], total: 0 }, ct: { rows: [], total: 0 }, total: 0, programs: {}, skipped: [] };
   bonus.bySale.forEach(function(r){
-    var isTv = SALE_CHANNELS[r.name] === 'probation';
+    if (!_srGEligible_(r.name)) { g.skipped.push(r.name); return; }
+    g.total += r.total;
+    var isTv = _saleChannelOf_(r.name) === 'probation';
     var grp = isTv ? g.tv : g.ct;
     grp.rows.push(r); grp.total += r.total;
     r.items.forEach(function(it){
@@ -609,7 +619,7 @@ function _srRenderG_(d){
   }
   var g = _srGBuildGroups_(d.orders || []);
   var html = '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Thưởng tính theo đúng các chương trình đã cài ở "🏆 Chương trình thưởng" (cùng cách tính với mục c) của Báo cáo E), '+
-    'trên đơn Pos trong khoảng ngày lọc. <b>Thử việc</b> = Sale phân loại "Thử việc"; <b>Chính thức</b> = Sale Online/Offline/chưa phân loại. '+
+    'trên đơn Pos trong khoảng ngày lọc. <b>Thử việc</b> = Sale phân loại "Thử việc"; <b>Chính thức</b> = Sale đội Online / Văn phòng (phòng Kinh doanh). Sale chưa phân loại hoặc thuộc đội khác không được tính thưởng.'+
     'Nhóm cơ chế "theo ngày" chỉ lấy mức cao nhất; các nhóm khác nhau cộng dồn.</div>';
 
   html += '<div class="kpi-grid" style="margin-bottom:16px">'+
@@ -618,6 +628,7 @@ function _srRenderG_(d){
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(g.ct.total)+'</div><div class="kpi-label">Thưởng Chính thức ('+fmt(g.ct.rows.length)+' Sale)</div></div>'+
     '<div class="kpi-card"><div class="kpi-val">'+fmt((d.orders||[]).length)+'</div><div class="kpi-label">Đơn Pos dùng để tính</div></div>'+
     '</div>';
+  if (g.skipped.length) html += '<div style="font-size:11.5px;color:#9a3412;margin-bottom:10px">Không tính thưởng cho '+g.skipped.length+' Sale chưa thuộc đội Online/Văn phòng: '+esc(g.skipped.slice(0,8).join(', '))+(g.skipped.length>8?'…':'')+' — phân loại ở Báo cáo E → "Phân loại Sale" nếu cần.</div>';
   html += '<div style="margin-bottom:14px"><button class="btn sm" onclick="_srSetSub(\'K\')">📋 Chi tiết đơn thưởng (đếm sản phẩm)</button></div>';
 
   function groupTable(title, key, grp, isTv){
@@ -893,7 +904,7 @@ function _renderIndividualRatesModal(){
   html += '<table class="dash-table"><thead><tr><th>Tên</th><th>Team</th><th style="width:130px">% ≥'+_commThrLabel_()+' (riêng)</th><th style="width:130px">% &lt;'+_commThrLabel_()+' (riêng)</th></tr></thead><tbody>';
   filtered.forEach(function(name){
     var teamInfo = _teamRateForName_(name);
-    var indiv = INDIVIDUAL_RATES[name] || {};
+    var indiv = _cfgByAlias(INDIVIDUAL_RATES, name) || {};
     html += '<tr><td>'+esc(name)+'</td>'+
       '<td style="color:var(--muted);font-size:11.5px">'+(teamInfo.team ? esc(teamInfo.team.name)+' ('+(teamInfo.rate.above15||0)+'% / '+(teamInfo.rate.below15||0)+'%)' : '<span style="color:var(--red)">chưa có team</span>')+'</td>'+
       '<td><input type="number" step="0.1" min="0" max="100" placeholder="theo team" value="'+(indiv.above15!==undefined&&indiv.above15!==null&&indiv.above15!==''?indiv.above15:'')+'" style="width:90px" onchange="_setIndividualRate(\''+esc(name).replace(/'/g,"\\'")+'\',\'above15\',this.value)"></td>'+
@@ -963,7 +974,7 @@ function _renderSaleChannelsModal(){
   html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên..." value="'+esc(_scSearch||'')+'" oninput="_scSearch=this.value;_renderSaleChannelsModal()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:240px;margin-bottom:10px">';
   html += '<table class="dash-table"><thead><tr><th>Tên</th><th style="width:220px">Đội</th></tr></thead><tbody>';
   filtered.forEach(function(name){
-    var cur = SALE_CHANNELS[name] || '';
+    var cur = _saleChannelOf_(name);
     html += '<tr><td>'+esc(name)+'</td><td>'+
       '<select onchange="_setSaleChannel(\''+esc(name).replace(/'/g,"\\'")+'\',this.value)" style="width:200px">'+
       '<option value=""'+(cur===''?' selected':'')+'>— Chưa phân loại —</option>'+

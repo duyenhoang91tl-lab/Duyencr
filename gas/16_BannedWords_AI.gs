@@ -184,6 +184,9 @@ function _buildAISystemPrompt_(userMsg, withProducts) {
   // Q&A tu sheet FAQ (khop tu khoa cau hoi khach) — de AI hoc cach xu ly cau hoi kho theo team
   var faq = readFaqSheet_(userMsg);
   if (faq) parts.push('\n\nCAC CAU HOI KHO & CACH TRA LOI MAU CUA TEAM (uu tien bam sat cach xu ly / giong dieu nay khi tra loi cau tuong tu; dieu chinh cho hop ngu canh khach, KHONG copy nguyen van neu khong khop hoan toan):\n' + faq);
+  // Mau tu van DA DUYET (CS 'tao mau luu san') — nap LUON (khong can bat 'Tra cuu san pham') nhung chi khi co mau khop san pham/nhom
+  var tplBlock = ''; try { tplBlock = _tplPromptBlock_(userMsg); } catch (eT) {}
+  if (tplBlock) parts.push('\n\nMAU TU VAN DA DUYET CUA TEAM (khop san pham/nhom trong yeu cau — hoc theo GIONG DIEU, cach xung ho, cach chia y; KHONG copy nguyen van, dieu chinh cho hop khach va KHONG bia gia/thong tin ngoai bang gia):\n' + tplBlock);
   // CTKM: chi nap khi cau hoi cua khach co tu khoa khuyen mai/giam gia (xem readCTKMPromotions_)
   var ctkm = readCTKMPromotions_(userMsg);
   if (ctkm) parts.push('\n\nCHUONG TRINH KHUYEN MAI (CTKM) DANG AP DUNG (chi dung khi khach hoi ve khuyen mai/giam gia, KHONG tu bia them neu khong co trong danh sach nay):\n' + ctkm);
@@ -308,13 +311,13 @@ function callAI_(data) {
     }
     // Kem theo dau key dang dung (da che) de phan biet ngay 2 truong hop rat de nham:
     // key SAI vs key DUNG nhung het quota/het han — truoc day chi thay "401" nen kho doan.
-    errors.push(pv.name + ' [' + _maskKey_(pv.key) + ']: ' + (r.error || 'rong'));
+    var _m = String(r.error || '').match(/\b[1-5]\d\d\b/);   // chi lay ma loi HTTP (401/402/429...) — khong tra ve noi dung dai
+    errors.push(pv.name + ' ' + (_m ? _m[0] : 'loi'));
   }
   if (!anyKey) {
     return jsonOut_({ error: 'Chua co API Key nao trong sheet Settings. Mo extension → banh rang ⚙ → nhap it nhat 1 key (Groq/Cerebras/Gemini/OpenRouter) roi bam Luu. Thieu: ' + missing.join(', ') });
   }
-  var msg = 'Tat ca API deu loi: ' + errors.join(' | ');
-  if (missing.length) msg += ' || Chua cau hinh: ' + missing.join(', ');
+  var msg = 'Lỗi API: ' + errors.join(' · ');
   return jsonOut_({ error: msg });
 }
 
