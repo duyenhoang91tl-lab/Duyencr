@@ -13,12 +13,13 @@ w.toast = m => log.push({ toast: m });
 w.eval(R('js/41-fn-pkchat.js')); w.eval(R('js/42-fn-socialchat.js'));
 const $ = id => w.document.getElementById(id);
 const TAGS = [{ id: '5', t: 'Trả hàng', c: '#bd2727' }, { id: '7', t: 'Hết hàng', c: '#38a6f4' }, { id: '26', t: 'L1. Chuẩn', c: '#0a7a3a' }, { id: '30', t: '<img src=x onerror=window.__xss=1>', c: 'red;background:url(x)' }];
-const conv = () => ({ id: 'C1', pageId: 'P1', name: 'Mến Hoàng', phone: '0867321246', lastAt: '2026-10-13T02:00:00+00:00', lastText: 'Sao v c', seen: true, replied: true, type: 'INBOX', tags: [{ id: '26', t: 'L1. Chuẩn', c: '#0a7a3a' }], assignees: ['Le Ninh'], lastStaff: 'Le Ninh' });
-const MSGS = [{ id: 'm1', c: 'C1', dir: 'in', text: 'Cho m xin giá', at: '2026-10-13T01:00:00+00:00', from: 'Mến Hoàng', att: [] },
-  { id: 'm2', c: 'C1', dir: 'out', text: 'Dạ vâng', at: '2026-10-13T01:01:00+00:00', from: 'Page', staff: 'Le Ninh', att: [] },
-  { id: 'm3', c: 'C1', dir: 'out', text: 'Em gửi giá', at: '2026-10-13T01:02:00+00:00', from: 'Page', staff: 'Le Ninh', att: [] },
-  { id: 'm4', c: 'C1', dir: 'out', text: 'Chị cần gì ạ', at: '2026-10-13T01:03:00+00:00', from: 'Page', staff: 'Lan', crm: true, att: [] },
-  { id: 'm5', c: 'C1', dir: 'out', text: 'Tin tên page', at: '2026-10-13T01:04:00+00:00', from: 'Hiền Tour', staff: '', att: [] }];
+const conv = () => ({ id: 'C1', pageId: 'P1', name: 'Mến Hoàng', phone: '0867321246', lastAt: ago(5), lastText: 'Sao v c', seen: true, replied: true, type: 'INBOX', tags: [{ id: '26', t: 'L1. Chuẩn', c: '#0a7a3a' }], assignees: ['Le Ninh'], lastStaff: 'Le Ninh' });
+const ago = (min) => new Date(Date.now() - min * 60000).toISOString();   // moc TUONG DOI: dong "Da chat" chi tinh 72 gio gan nhat
+const MSGS = [{ id: 'm1', c: 'C1', dir: 'in', text: 'Cho m xin giá', at: ago(10), from: 'Mến Hoàng', att: [] },
+  { id: 'm2', c: 'C1', dir: 'out', text: 'Dạ vâng', at: ago(9), from: 'Page', staff: 'Le Ninh', att: [] },
+  { id: 'm3', c: 'C1', dir: 'out', text: 'Em gửi giá', at: ago(8), from: 'Page', staff: 'Le Ninh', att: [] },
+  { id: 'm4', c: 'C1', dir: 'out', text: 'Chị cần gì ạ', at: ago(7), from: 'Page', staff: 'Lan', crm: true, att: [] },
+  { id: 'm5', c: 'C1', dir: 'out', text: 'Tin tên page', at: ago(6), from: 'Hiền Tour', staff: '', att: [] }];
 (async () => {
   let serverTags = [{ id: '26', t: 'L1. Chuẩn', c: '#0a7a3a' }], tagPosts = [], tagsGets = 0, postDelay = 0, postFail = null;
   routes = {
@@ -106,5 +107,23 @@ const MSGS = [{ id: 'm1', c: 'C1', dir: 'in', text: 'Cho m xin giá', at: '2026-
   // ---- khong co hoi thoai -> an thanh the ----
   routes['action=pkChat&'] = () => ({ ok: true, phone: '0867321246', conversations: [], messages: [] }); await w.pkcLoad(true); await sleep(20);
   t('khong co hoi thoai -> an thanh the', $('pkc-tags').style.display === 'none');
+  // ---- "Da chat" chi tinh 72 GIO GAN NHAT (Duyen yeu cau 2026-10-18) ----
+  const hAgo = (h) => new Date(Date.now() - h * 3600000).toISOString();
+  const mk = (id, staff, at, extra) => Object.assign({ id, c: 'C1', dir: 'out', text: 'x', at, from: 'Page', staff, att: [] }, extra || {});
+  const who = (msgs) => { const o = {}; msgs.forEach(m => { o[m.id] = m; }); return w._pkcWhoHtml(o); };
+  let h = who([mk('a', 'Con Moi', hAgo(2)), mk('b', 'Con Moi', hAgo(40)), mk('c', 'Moc 71h', hAgo(71)), mk('d', 'Qua 73h', hAgo(73)), mk('e', 'Tu 100h', hAgo(100)), mk('f', 'Tu 200h', hAgo(200))]);
+  t('72h: nguoi chat trong 72h hien (Con Moi 2 tin, Moc 71h 1 tin)', /Con Moi\s*<i>2<\/i>/.test(h) && /Moc 71h\s*<i>1<\/i>/.test(h));
+  t('72h: nguoi chat tu 73h tro len KHONG hien (73h, 100h, 200h)', !/Qua 73h|Tu 100h|Tu 200h/.test(h));
+  t('72h: nhan ghi ro "(72h)" va tieu de noi 72 gio gan nhat', h.includes('Đã chat (72h):') && h.includes('72 giờ gần nhất'));
+  h = who([mk('a', 'Chi Cu', hAgo(80)), mk('b', 'Cung Cu', hAgo(500))]);
+  t('72h: khong ai chat trong 72h -> khong hien dong "Da chat"', h === '');
+  h = who([mk('a', 'Nguoi Cu', hAgo(90)), mk('b', '', hAgo(1)), mk('c', 'Khach Noi', hAgo(1), { dir: 'in' })]);
+  t('72h: tin khach / tin chi co ten page khong tinh la nguoi', h === '');
+  h = who([mk('a', 'Gio Hong', 'khong-phai-ngay'), mk('b', 'Khong Gio', '')]);
+  t('72h: tin khong ro gio -> khong tinh (tranh dem nham tin cu)', h === '');
+  h = who([mk('t1', '', '', { tmp: true, from: '' })]);
+  t('72h: tin tam vua gui tinh la BAY GIO (hien ten nguoi dang dang nhap)', /<i>1<\/i>/.test(h));
+  h = who([mk('a', 'A', hAgo(1)), mk('b', 'B', hAgo(1)), mk('c', 'B', hAgo(2))]);
+  t('72h: sap xep theo so tin giam dan (B 2 dung truoc A 1)', h.indexOf('B <i>2') < h.indexOf('A <i>1') && h.indexOf('B <i>2') > 0);
   console.log(ok + ' OK, ' + fail + ' FAIL'); process.exit(fail ? 1 : 0);
 })();

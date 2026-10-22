@@ -316,7 +316,7 @@ function _srRenderE_(d){
   if (!d) return _srNoDataHtml_();
   var c = _computeCommissionData_(d.orders || []);
   var html = '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">'+
-    'Ngưỡng phân loại đơn: <b>'+_srMoney(COMMISSION_THRESHOLD)+'</b> — đơn từ mức này trở lên tính "≥15tr", thấp hơn tính "&lt;15tr". '+
+    'Ngưỡng phân loại đơn: <b>'+_srMoney(COMMISSION_THRESHOLD)+'</b> — đơn từ mức này trở lên tính "≥'+_commThrLabel_()+'", thấp hơn tính "&lt;'+_commThrLabel_()+'". '+
     'Doanh thu của mỗi người trong 1 đơn = <b>giá trị đơn ÷ số sale đứng tên trên đơn đó</b> (chia đều).</div>';
 
   // a) Doanh thu tổng theo mức đơn hàng
@@ -324,16 +324,16 @@ function _srRenderE_(d){
   if (_srState.eBucketView === 'table'){
     html += '<div class="kpi-grid" style="margin-bottom:16px">' +
       '<div class="kpi-card" style="border:1.5px solid var(--text)"><div class="kpi-val">'+_srMoney(c.totalRevenueAbove15+c.totalRevenueBelow15+c.totalRevenueChannel)+'</div><div class="kpi-label"><b>Tổng doanh thu</b></div></div>' +
-      '<div class="kpi-card"><div class="kpi-val">'+fmt(c.totalOrdersAbove15)+'</div><div class="kpi-label">Số đơn ≥15tr</div></div>' +
-      '<div class="kpi-card"><div class="kpi-val">'+fmt(c.totalOrdersBelow15)+'</div><div class="kpi-label">Số đơn &lt;15tr</div></div>' +
-      '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+_srMoney(c.totalRevenueAbove15)+'</div><div class="kpi-label">Doanh thu đơn ≥15tr</div></div>' +
-      '<div class="kpi-card"><div class="kpi-val">'+_srMoney(c.totalRevenueBelow15)+'</div><div class="kpi-label">Doanh thu đơn &lt;15tr</div></div>' +
+      '<div class="kpi-card"><div class="kpi-val">'+fmt(c.totalOrdersAbove15)+'</div><div class="kpi-label">Số đơn ≥'+_commThrLabel_()+'</div></div>' +
+      '<div class="kpi-card"><div class="kpi-val">'+fmt(c.totalOrdersBelow15)+'</div><div class="kpi-label">Số đơn &lt;'+_commThrLabel_()+'</div></div>' +
+      '<div class="kpi-card" style="border:1.5px solid #16a34a"><div class="kpi-val" style="color:#16a34a">'+_srMoney(c.totalRevenueAbove15)+'</div><div class="kpi-label">Doanh thu đơn ≥'+_commThrLabel_()+'</div></div>' +
+      '<div class="kpi-card"><div class="kpi-val">'+_srMoney(c.totalRevenueBelow15)+'</div><div class="kpi-label">Doanh thu đơn &lt;'+_commThrLabel_()+'</div></div>' +
       (c.totalOrdersChannel ? '<div class="kpi-card"><div class="kpi-val">'+_srMoney(c.totalRevenueChannel)+'</div><div class="kpi-label">DT kênh % riêng ('+fmt(c.totalOrdersChannel)+' đơn)</div></div>' : '') +
       '</div>';
   } else {
     var bucketRows = [
-      { name: 'Đơn ≥15tr', value: c.totalRevenueAbove15, orders: c.totalOrdersAbove15 },
-      { name: 'Đơn <15tr', value: c.totalRevenueBelow15, orders: c.totalOrdersBelow15 }
+      { name: 'Đơn ≥'+_commThrLabel_()+'', value: c.totalRevenueAbove15, orders: c.totalOrdersAbove15 },
+      { name: 'Đơn <'+_commThrLabel_()+'', value: c.totalRevenueBelow15, orders: c.totalOrdersBelow15 }
     ];
     if (c.totalOrdersChannel) bucketRows.push({ name: 'Kênh % riêng', value: c.totalRevenueChannel, orders: c.totalOrdersChannel });
     html += _srChartSvg(bucketRows, 'name', 'value', _srState.eBucketView, true, 'orders');
@@ -347,9 +347,9 @@ function _srRenderE_(d){
   html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.eSaleSearch)+'" oninput="_srState.eSaleSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
   if (_srState.eSaleView === 'table'){
     html += '<table class="dash-table"><thead><tr>'+
-      _srColTh_('eSale','name','Sale',_SR_COLTH_ROWSFN_['eSale'],_SR_COLTH_GETTER_['eSale'].name)+'<th style="text-align:right">Số đơn ≥15tr</th><th style="text-align:right">Số đơn &lt;15tr</th>'+
-      '<th style="text-align:right">DT ≥15tr</th><th style="text-align:right">DT &lt;15tr</th>'+
-      '<th style="text-align:right">% ≥15tr</th><th style="text-align:right">% &lt;15tr</th>'+
+      _srColTh_('eSale','name','Sale',_SR_COLTH_ROWSFN_['eSale'],_SR_COLTH_GETTER_['eSale'].name)+'<th style="text-align:right">Số đơn ≥'+_commThrLabel_()+'</th><th style="text-align:right">Số đơn &lt;'+_commThrLabel_()+'</th>'+
+      '<th style="text-align:right">DT ≥'+_commThrLabel_()+'</th><th style="text-align:right">DT &lt;'+_commThrLabel_()+'</th>'+
+      '<th style="text-align:right">% ≥'+_commThrLabel_()+'</th><th style="text-align:right">% &lt;'+_commThrLabel_()+'</th>'+
       '<th style="text-align:right">DT kênh riêng</th>'+
       '<th style="text-align:right"><b>Hoa hồng</b></th></tr></thead><tbody>';
     rows.forEach(function(s){
@@ -892,7 +892,7 @@ function _renderIndividualRatesModal(){
   var q = (_irSearch||'').toLowerCase();
   var filtered = names.filter(function(n){ return !q || n.toLowerCase().indexOf(q)!==-1; });
   var html = '<input type="text" id="ir-search" placeholder="🔍 Tìm nhanh theo tên..." value="'+esc(_irSearch||'')+'" oninput="_irSearch=this.value;_renderIndividualRatesModal()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:240px;margin-bottom:10px">';
-  html += '<table class="dash-table"><thead><tr><th>Tên</th><th>Team</th><th style="width:130px">% ≥15tr (riêng)</th><th style="width:130px">% &lt;15tr (riêng)</th></tr></thead><tbody>';
+  html += '<table class="dash-table"><thead><tr><th>Tên</th><th>Team</th><th style="width:130px">% ≥'+_commThrLabel_()+' (riêng)</th><th style="width:130px">% &lt;'+_commThrLabel_()+' (riêng)</th></tr></thead><tbody>';
   filtered.forEach(function(name){
     var teamInfo = _teamRateForName_(name);
     var indiv = _cfgByAlias(INDIVIDUAL_RATES, name) || {};
@@ -1004,7 +1004,7 @@ function _renderChannelRatesModal(){
   if (!body) return;
   var keys = Object.keys(CHANNEL_COMMISSION_RATES).sort(function(a,b){ return a.localeCompare(b,'vi'); });
   var nguonOptions = (_srState && _srState.nguonOptions) || [];
-  var html = '<div class="guide-text" style="font-size:12px;color:var(--muted);margin-bottom:10px">Đơn có Nguồn đơn khớp đúng (không phân biệt hoa/thường) 1 trong các tên dưới đây sẽ tính hoa hồng theo % cố định này, bỏ qua ngưỡng 15tr và % cá nhân/team. Mặc định (khi chưa cài): nguồn chỉ ghi "Facebook" = 1%.</div>';
+  var html = '<div class="guide-text" style="font-size:12px;color:var(--muted);margin-bottom:10px">Đơn có Nguồn đơn khớp đúng (không phân biệt hoa/thường) 1 trong các tên dưới đây sẽ tính hoa hồng theo % cố định này, bỏ qua ngưỡng '+_commThrLabel_()+' và % cá nhân/team. Mặc định (khi chưa cài): nguồn chỉ ghi "Facebook" = 1%.</div>';
   html += '<table class="dash-table"><thead><tr><th>Nguồn đơn</th><th style="width:140px">% hoa hồng</th><th style="width:60px"></th></tr></thead><tbody>';
   keys.forEach(function(k){
     html += '<tr><td>'+esc(k)+'</td>'+

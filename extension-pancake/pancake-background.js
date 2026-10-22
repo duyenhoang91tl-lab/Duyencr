@@ -1223,7 +1223,7 @@ async function _postGas_(body) {
 async function handleSaveMessageTemplate(t) {
   return _postGas_({ action: "saveMessageTemplate", template: {
     id: t?.id || "", title: t?.title || "", content: t?.content || "", tags: t?.tags || "",
-    product: t?.product || "", topic: t?.topic || "", createdBy: t?.createdBy || ""
+    product: t?.product || "", nhom: t?.nhom || "", topic: t?.topic || "", createdBy: t?.createdBy || ""
   } });
 }
 async function handleDeleteMessageTemplate(p) {

@@ -352,19 +352,30 @@
       style:'margin:0 0 8px;padding:6px 8px;border:1px solid #dbeafe;background:#f0f7ff;border-radius:8px;'});
     addEl(priceWrap, 'div', {style:'font-weight:700;font-size:12px;color:#1e3a8a;margin-bottom:6px;',
       textContent:'💰 Tìm sản phẩm & tin nhắn gợi ý'});
-    const priceRow = addEl(priceWrap, 'div', {style:'display:flex;gap:6px;margin-bottom:6px;'});
+    const priceTabs = addEl(priceWrap, 'div', {id:'zai-price-mode-tabs', style:'display:flex;gap:6px;margin-bottom:6px;'});
+    addEl(priceTabs, 'button', {type:'button', className:'zai-price-mode-btn active', textContent:'🔎 Gõ tìm'}).dataset.mode = 'search';
+    addEl(priceTabs, 'button', {type:'button', className:'zai-price-mode-btn', textContent:'🧩 Soạn đơn (chọn từng bước)'}).dataset.mode = 'builder';
+    const stoneRow = addEl(priceWrap, 'div', {id:'zai-stone-row', title:'Không tick gì = báo giá mặc định (cột G). Tick 1 loại nếu khách hỏi đá SAPHIA/RUBY — nhớ luôn cho lần sau, khỏi phải gõ lại.'});
+    stoneRow.innerHTML = '<span class="zai-stone-label">💎 Loại đá:</span>' +
+      '<label><input type="radio" name="zai-stone" id="zai-stone-none" value="" checked /> Mặc định</label>' +
+      '<label><input type="radio" name="zai-stone" id="zai-stone-saphia" value="SAPHIA" /> SAPHIA</label>' +
+      '<label><input type="radio" name="zai-stone" id="zai-stone-ruby" value="RUBY" /> RUBY</label>';
+    const priceSearchMode = addEl(priceWrap, 'div', {id:'zai-price-search-mode'});
+    const priceRow = addEl(priceSearchMode, 'div', {style:'display:flex;gap:6px;margin-bottom:6px;'});
     addEl(priceRow, 'input', {id:'zai-price-q', type:'text', placeholder:'Tên sản phẩm, kiểu/size... (Enter hoặc Tìm)',
       style:'flex:1;padding:5px 8px;border:1px solid #bfdbfe;border-radius:6px;font-size:12px;box-sizing:border-box;'});
     addEl(priceRow, 'button', {className:'zai-btn zai-btn-primary zai-btn-sm', id:'zai-price-btn', textContent:'Tìm'});
     addEl(priceRow, 'button', {className:'zai-btn zai-btn-secondary zai-btn-sm', id:'zai-price-ai-btn', type:'button',
       title:'Hỏi AI về giá — trả lời văn ngắn (giá lấy từ bảng giá)', textContent:'🤖 Hỏi AI'});
-    addEl(priceWrap, 'div', {id:'zai-price-ai', style:'display:none;'});
-    addEl(priceWrap, 'div', {id:'zai-price-result', style:'max-height:340px;overflow-y:auto;'});
+    addEl(priceSearchMode, 'div', {id:'zai-price-ai', style:'display:none;'});
+    addEl(priceSearchMode, 'div', {id:'zai-price-result', style:'max-height:340px;overflow-y:auto;'});
+    const priceBuilderMode = addEl(priceWrap, 'div', {id:'zai-price-builder-mode', style:'display:none;'});
+    addEl(priceBuilderMode, 'div', {id:'zai-builder-steps'});
 
-    // 🧾 Đơn hàng đang tính (giỏ hàng theo SĐT) — giống Pancake AI. S1: luôn hiện sẵn để dùng "＋ Thêm dòng thủ công"; S2 (bộ chọn sản phẩm) sẽ chuyển sang kiểu ẩn-cho-đến-khi-dùng.
+    // 🧾 Đơn hàng đang tính (giỏ hàng theo SĐT) — giống Pancake AI: ẩn cho tới khi thêm sản phẩm từ bộ chọn "🧩 Soạn đơn" (hoặc có sẵn giỏ của khách này).
     const cartSection = document.createElement('div');
     cartSection.id = 'zai-cart-section';
-    cartSection.dataset.everOpened = '1';
+    cartSection.style.display = 'none';
     cartSection.innerHTML = `          <div id="zai-cart-header" style="display:flex;justify-content:space-between;align-items:center">
             <span>🧾 Đơn hàng đang tính (<span id="zai-cart-count">0</span>)</span>
             <label style="font-size:10.5px;font-weight:400;color:#831843;display:flex;align-items:center;gap:3px">
@@ -559,6 +570,8 @@
     document.getElementById('zai-price-btn').addEventListener('click', doPriceSearchZai_);
     document.getElementById('zai-price-ai-btn').addEventListener('click', askPriceAiZai_);
     bindCartZai_();   // sau khi panel da nam trong tai lieu (cac listener dung document.getElementById)
+    bindPriceModeZai_();
+    bindStoneZai_();
     document.getElementById('zai-price-q').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') doPriceSearchZai_();
     });
@@ -1609,6 +1622,405 @@
     const unitTxt = _zaiGoldUnitAmount.toLocaleString('vi-VN') + 'đ';
     if (label) label.textContent = `Thêm vàng (SL × ${unitTxt})`;
     if (input) input.title = `Nhập số lượng — mỗi đơn vị = ${unitTxt} (VD: 2 = ${(2 * _zaiGoldUnitAmount).toLocaleString('vi-VN')}đ). Đơn giá do admin cài trên CRM.`;
+  }
+
+  // ── SOAN DON — S2: BO CHON SAN PHAM (tab "🧩 Soan don (chon tung buoc)" + CTKM theo san pham + 💎 Loai da) — y het Pancake AI (quy tac song song) ──
+  // Chon Nhom > Ten > Kieu/Size > Chat lieu (cha/con) > Mau (hoac go tim truc tiep) -> "Them vao don" (gio hang S1). GAS: priceCatalogFlat (danh muc phang), priceSearch (che do go tim truc tiep
+  // khi GAS cu chua co danh muc phang), ctkmCatalog (CTKM theo san pham, cache 10 phut). Gia theo "Loai da" (Mac dinh/SAPHIA/RUBY, nho theo may qua chrome.storage.local).
+  // Ma ham ben duoi DAN XUAT CO HOC tu Pancake. Khac biet: "Loai da" o Zalo hien trong khoi gia; ket qua tab "Go tim" CHUA doi gia theo loai da (gap — xem KB 08).
+  const ZAI_FLAT_TTL_MS = 15 * 60 * 1000;
+  // ══════════════════════════ SOẠN ĐƠN (gõ tên → lọc → dropdown thu hẹp dần) ══════════════════════════
+  // Luồng: gõ tên (VD "tỳ hưu") → hiện TẤT CẢ tên thương mại/tên sản phẩm liên quan → chọn Tên →
+  // Nhóm SP / Kiểu-Size / Chất liệu (chỉ gồm lựa chọn có thật của sản phẩm đó) → Màu, Đậm/nhạt (ghi chú
+  // tự do) → Số lượng, Giá (tự nhảy theo Loại đá đang tick, sửa được), CTKM → "+ Thêm vào đơn".
+  // Xong sản phẩm 1 thì form tự về trắng để soạn tiếp sản phẩm 2.
+  // Dữ liệu: danh mục PHẲNG từ GAS (action priceCatalogFlat). GAS chưa cập nhật → tự lùi về "tìm trực
+  // tiếp" qua priceSearch (tối đa 50 dòng/lần) để vẫn dùng được.
+  const ZAI_COLOR_OPTS = ['Xanh rêu', 'Đen', 'Tím', 'Đỏ', 'Hồng', 'Trắng', 'Vàng', 'Xanh lá', 'Xanh da trời'];
+  const ZAI_SHADE_OPTS = ['Đậm', 'Nhạt'];
+  let _zaiStonePref = '';   // '' = mac dinh | 'SAPHIA' | 'RUBY'
+  // Tuong duong handleGetPriceFlat / handleGetCtkm / handleGetPrice o pancake-background.js
+  async function _zaiBldCall_(type, p) {
+    try {
+      if (!GAS_URL) throw new Error('Chưa cài đặt URL GAS. Nhấn ⚙.');
+      const sep = GAS_URL.includes('?') ? '&' : '?';
+      let url;
+      if (type === 'GET_PRICE_FLAT') url = GAS_URL + sep + 'action=priceCatalogFlat';
+      else if (type === 'GET_CTKM') url = GAS_URL + sep + 'action=ctkmCatalog';
+      else { const q = p?.q || ''; url = GAS_URL + sep + 'action=priceSearch' + (q ? '&q=' + encodeURIComponent(q) : ''); }
+      const res = await fetch(url, { redirect: 'follow' });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      if (type === 'GET_PRICE_FLAT') { if (!Array.isArray(data.items)) throw new Error('GAS_NO_FLAT'); return { ok: true, data: { items: data.items } }; }
+      if (type === 'GET_CTKM') { if (!Array.isArray(data.rows)) throw new Error('GAS_NO_CTKM'); return { ok: true, data: { rows: data.rows } }; }
+      return { ok: true, data: { rows: data.rows || [], total: data.total || 0 } };
+    } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+  }
+  // Chuyen che do trong khoi gia: "🔎 Go tim" <-> "🧩 Soan don (chon tung buoc)"
+  function bindPriceModeZai_() {
+    document.querySelectorAll('.zai-price-mode-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.zai-price-mode-btn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        const isBuilder = btn.dataset.mode === 'builder';
+        document.getElementById('zai-price-search-mode').style.display = isBuilder ? 'none' : 'block';
+        document.getElementById('zai-price-builder-mode').style.display = isBuilder ? 'block' : 'none';
+        if (isBuilder) initBuilderZai_();
+      });
+    });
+  }
+  // 💎 Loai da: nho theo may; doi loai da -> bo chon san pham tinh lai gia
+  function bindStoneZai_() {
+    chrome.storage.local.get(['ome_stone_pref'], (res) => {
+      _zaiStonePref = (res && res.ome_stone_pref) || '';
+      const target = document.querySelector(`input[name="zai-stone"][value="${_zaiStonePref}"]`);
+      if (target) target.checked = true;
+    });
+    document.querySelectorAll('input[name="zai-stone"]').forEach((r) => {
+      r.addEventListener('change', () => {
+        if (!r.checked) return;
+        _zaiStonePref = r.value;
+        chrome.storage.local.set({ ome_stone_pref: _zaiStonePref });
+        renderBuilderDynZai_();
+      });
+    });
+  }
+    const ZAI_CTKM_TTL_MS = 15 * 60 * 1000;
+
+  const _zaiBldBlank_ = () => ({ q: '', nhom: '', ten: '', size: '', cl: '', cand: '', mau: '', dam: '', qty: 1,
+    priceK: '', priceEdited: false, promoType: 'none', promoVal: '' });
+
+  const _zaiPriceOfItem_ = (it) => {
+    if (_zaiStonePref === 'RUBY' && it.r) return it.r;
+    if (_zaiStonePref === 'SAPHIA' && it.sp) return it.sp;
+    return it.p || 0;
+  };
+
+  const _zaiStoneLabel_ = (it) => {
+    if (_zaiStonePref === 'RUBY') return it.r ? 'giá RUBY' : 'giá thường (SP này không có giá RUBY)';
+    if (_zaiStonePref === 'SAPHIA') return it.sp ? 'giá SAPHIA' : 'giá thường (SP này không có giá SAPHIA)';
+    return 'giá thường';
+  };
+
+  let _zaiFlatItems = null;
+
+  let _zaiFlatMode = 'full';
+
+  let _zaiFlatLoading = false;
+
+  let _zaiLiveTimer = null;
+
+  let _zaiCtkmRows = null;
+
+  let _zaiCtkmLoading = false;
+
+  let _zaiBld = _zaiBldBlank_();
+
+  let _zaiShowCtkmInfo = false;
+
+  function _zaiNormPriceRow_(row) {
+    const find = (re) => Object.keys(row).find((k) => re.test(_zaiLocalStripVN_(k)));
+    const val = (k) => (k ? String(row[k]).trim() : '');
+    const num = (v) => { if (v === '' || v === null || v === undefined) return 0; if (typeof v === 'number') return v; const n = Number(String(v).replace(/[^\d]/g, '')); return isNaN(n) ? 0 : n; };
+    const it = { n: val(find(/nhom\s*san\s*pham/)), t: val(find(/^ten\s*san\s*pham/)), m: val(find(/ten\s*thuong\s*mai/)),
+      s: val(find(/size|kieu/)), c: val(find(/chat\s*lieu/)), p: 0, sp: 0, r: 0 };
+    Object.keys(row).forEach((k) => {
+      const s = _zaiLocalStripVN_(k);
+      if (!/gia|price/.test(s)) return;
+      const v = num(row[k]);
+      if (s.indexOf('saphia') !== -1) it.sp = v; else if (s.indexOf('ruby') !== -1) it.r = v; else if (!it.p) it.p = v;
+    });
+    return it;
+  }
+
+  function _zaiSetBldMsg_(html) {
+    const el = document.getElementById('zaib-msg');
+    if (el) { el.innerHTML = html || ''; el.style.display = html ? 'block' : 'none'; }
+  }
+
+  function initBuilderZai_() {
+    const host = document.getElementById('zai-builder-steps');
+    if (!host.dataset.ready) {
+      host.dataset.ready = '1';
+      host.innerHTML = `
+        <div class="zai-builder-row"><label>🔎 Gõ tên sản phẩm (VD: tỳ hưu, nhẫn, charm)</label>
+          <input type="text" id="zaib-q" placeholder="Gõ để lọc — bỏ trống thì chọn theo Nhóm sản phẩm" autocomplete="off" /></div>
+        <div id="zaib-msg" class="zai-price-loading" style="display:none"></div>
+        <div id="zaib-dyn"></div>`;
+      host.querySelector('#zaib-q').addEventListener('input', (e) => {
+        _zaiBld = Object.assign(_zaiBldBlank_(), { q: e.target.value });   // đổi từ khoá → chọn lại từ đầu
+        if (_zaiFlatMode === 'live') {
+          clearTimeout(_zaiLiveTimer);
+          _zaiLiveTimer = setTimeout(() => _zaiLiveSearch_(_zaiBld.q), 350);
+        } else {
+          clearTimeout(_zaiLiveTimer);
+          _zaiLiveTimer = setTimeout(renderBuilderDynZai_, 120);
+        }
+      });
+    }
+    if (_zaiFlatItems === null && !_zaiFlatLoading) loadFlatZai_();
+    if (_zaiCtkmRows === null && !_zaiCtkmLoading) loadCtkmZai_();
+    renderBuilderDynZai_();
+  }
+
+  function loadFlatZai_() {
+    _zaiFlatLoading = true;
+    _zaiSetBldMsg_('Đang tải danh mục sản phẩm...');
+    chrome.storage.local.get(['zaiPriceFlat'], (res) => {
+      const c = res && res.zaiPriceFlat;
+      if (c && Array.isArray(c.items) && c.items.length && (Date.now() - c.ts) < ZAI_FLAT_TTL_MS) {
+        _zaiFlatItems = c.items; _zaiFlatMode = 'full'; _zaiFlatLoading = false; _zaiSetBldMsg_(''); renderBuilderDynZai_(); return;
+      }
+      _zaiBldCall_('GET_PRICE_FLAT').then((resp) => {
+        _zaiFlatLoading = false;
+        if (resp?.ok && resp.data?.items?.length) {
+          _zaiFlatItems = resp.data.items; _zaiFlatMode = 'full'; _zaiSetBldMsg_('');
+          try { chrome.storage.local.set({ zaiPriceFlat: { ts: Date.now(), items: _zaiFlatItems } }); } catch (e) {}
+        } else if (resp?.ok) {
+          _zaiFlatItems = []; _zaiFlatMode = 'full';
+          _zaiSetBldMsg_('Đọc được sheet giá nhưng không nhận diện được cột "Tên sản phẩm"/"Tên thương mại" — dùng tạm tab "Gõ tìm".');
+        } else if (String(resp?.error || '').indexOf('GAS_NO_FLAT') !== -1) {
+          _zaiFlatMode = 'live'; _zaiFlatItems = [];
+          _zaiSetBldMsg_('⚠ GAS chưa cập nhật bản mới (thiếu <b>priceCatalogFlat</b>) — đang dùng chế độ tìm trực tiếp, tối đa 50 dòng mỗi lần gõ. Deploy lại <b>gas_v13.js</b> để có đủ danh mục.');
+        } else {
+          _zaiFlatItems = null;   // lỗi mạng/GAS → lần mở tab sau tự thử lại
+          _zaiSetBldMsg_('Lỗi tải danh mục: ' + escAttrZai_(resp?.error || 'không rõ') + ' — chuyển tab rồi quay lại để thử lại.');
+        }
+        renderBuilderDynZai_();
+      });
+    });
+  }
+
+  function loadCtkmZai_() {
+    if (_zaiCtkmLoading || _zaiCtkmRows !== null) return;
+    _zaiCtkmLoading = true;
+    chrome.storage.local.get(['zaiCtkm'], (res) => {
+      const c = res && res.zaiCtkm;
+      if (c && Array.isArray(c.rows) && (Date.now() - c.ts) < ZAI_CTKM_TTL_MS) {
+        _zaiCtkmRows = c.rows; _zaiCtkmLoading = false; renderBuilderDynZai_(); return;
+      }
+      _zaiBldCall_('GET_CTKM').then((resp) => {
+        _zaiCtkmLoading = false;
+        // GAS bản cũ chưa có action ctkmCatalog, hoặc lỗi mạng → coi như KHÔNG có CTKM (ẩn
+        // panel đi), không chặn/không báo lỗi giữa form đang soạn đơn — tính năng phụ trợ,
+        // không được làm gián đoạn luồng chính lên đơn.
+        _zaiCtkmRows = (resp?.ok && Array.isArray(resp.data?.rows)) ? resp.data.rows : [];
+        if (_zaiCtkmRows.length) { try { chrome.storage.local.set({ zaiCtkm: { ts: Date.now(), rows: _zaiCtkmRows } }); } catch (e) {} }
+        renderBuilderDynZai_();
+      });
+    });
+  }
+
+  function _zaiCtkmRowText_(row) {
+    const exclKey = row.__ctkmExclusionKey || '';
+    const parts = [];
+    Object.keys(row || {}).forEach((k) => {
+      if (k.indexOf('__ctkm') === 0 || k === exclKey) return;
+      const v = row[k];
+      if (v === '' || v === null || v === undefined) return;
+      parts.push(k + ': ' + v);
+    });
+    let text = parts.join(' | ');
+    if (row.__ctkmStatusLabel) text = row.__ctkmStatusLabel + ' — ' + text;
+    if (row.__ctkmExclusionNote) text += ' | ⚠️ Không áp dụng: ' + row.__ctkmExclusionNote;
+    return text;
+  }
+
+  function _zaiCtkmForProduct_(ten, tm) {
+    if (!Array.isArray(_zaiCtkmRows) || !_zaiCtkmRows.length) return [];
+    const validRows = _zaiCtkmRows.filter((row) => !row.__ctkmExpired && !row.__ctkmUpcoming);
+    const nameFold = _zaiItemFold_(ten || tm || '');
+    if (!nameFold) return validRows.slice(0, 5).map(_zaiCtkmRowText_);
+    const nameToks = nameFold.split(' ').filter((w) => w.length >= 2);
+    const hits = [];
+    validRows.forEach((row) => {
+      const text = _zaiItemFold_(_zaiCtkmRowText_(row));
+      if (nameToks.some((w) => text.indexOf(w) !== -1)) hits.push(_zaiCtkmRowText_(row));
+    });
+    return hits.slice(0, 5);
+  }
+
+  function _zaiLiveSearch_(q) {
+    if (_zaiItemFold_(q).length < 2) { _zaiFlatItems = []; renderBuilderDynZai_(); return; }
+    _zaiBldCall_('GET_PRICE', { q }).then((resp) => {
+      if (q !== _zaiBld.q) return; // đã gõ tiếp, bỏ kết quả cũ
+      if (!resp?.ok) { _zaiSetBldMsg_('Lỗi tìm: ' + escAttrZai_(resp?.error || 'không rõ')); return; }
+      _zaiFlatItems = (resp.data.rows || []).map(_zaiNormPriceRow_).filter((it) => it.t || it.m);
+      renderBuilderDynZai_();
+    });
+  }
+
+  function renderBuilderDynZai_() {
+    const dyn = document.getElementById('zaib-dyn');
+    if (!dyn) return;
+    const items = _zaiFlatItems || [];
+    if (!items.length) {
+      dyn.innerHTML = (_zaiFlatMode === 'live' && _zaiItemFold_(_zaiBld.q).length >= 2) ? '<div class="zai-price-loading">Không tìm thấy sản phẩm nào khớp.</div>'
+        : (_zaiFlatMode === 'live' ? '<div class="zai-price-loading">Gõ ít nhất 2 chữ để tìm.</div>' : '');
+      return;
+    }
+    const words = _zaiItemFold_(_zaiBld.q).split(' ').filter(Boolean);
+    const pool = (_zaiFlatMode === 'live' || !words.length) ? items
+      : items.filter((it) => { const h = _zaiItemFold_(it.n + ' ' + it.t + ' ' + it.m); return words.every((w) => h.indexOf(w) !== -1); });
+    if (!pool.length) { dyn.innerHTML = '<div class="zai-price-loading">Không tìm thấy sản phẩm nào khớp.</div>'; return; }
+
+    const opt = (v, label, sel) => `<option value="${escAttrZai_(v)}"${sel ? ' selected' : ''}>${escAttrZai_(label)}</option>`;
+    const row = (label, inner) => `<div class="zai-builder-row"><label>${label}</label>${inner}</div>`;
+    // Cac danh sach dai (ten nhom, ten san pham, mau, dam nhat) doi tu <select> sang
+    // <input list> + <datalist>: van bam chon binh thuong tu dropdown nhu cu, nhung them
+    // duoc go chu de loc/tim nhanh ngay trong o do (khong phai keo chuot lot qua het danh
+    // sach dai nhu anh CS gui). Chi ap dung cho cac muc ma value===label (khong co code an
+    // nhu '__def__'/'__none__'/index) de khong pha logic cascading phia duoi — Kieu/Size,
+    // Chat lieu, Chon muc gia van giu <select> thuong vi it lua chon hon va co gia tri
+    // ngam khac voi nhan hien thi.
+    const searchInput = (id, values, curVal, placeholder) =>
+      `<input type="text" id="${id}" list="${id}-dl" autocomplete="off" placeholder="${escAttrZai_(placeholder)}" value="${escAttrZai_(curVal || '')}" />` +
+      `<datalist id="${id}-dl">${values.map((v) => `<option value="${escAttrZai_(v)}"></option>`).join('')}</datalist>`;
+    let html = '';
+    let cand = null;
+
+    // 1) Nhóm sản phẩm
+    const groups = [...new Set(pool.map((it) => it.n).filter(Boolean))].sort(_zaiVnSort_);
+    if (_zaiBld.nhom && groups.indexOf(_zaiBld.nhom) === -1) _zaiBld.nhom = '';
+    if (groups.length === 1 && !_zaiBld.nhom) _zaiBld.nhom = groups[0];
+    if (groups.length) html += row(`Nhóm sản phẩm (${groups.length})`, searchInput('zaib-nhom', groups, _zaiBld.nhom, '— Tất cả nhóm — (gõ để tìm hoặc bấm chọn)'));
+    const pool2 = _zaiBld.nhom ? pool.filter((it) => it.n === _zaiBld.nhom) : pool;
+
+    // 2) Tên sản phẩm / tên thương mại (gộp, bỏ trùng)
+    if (!words.length && _zaiFlatMode !== 'live' && !_zaiBld.nhom) {
+      dyn.innerHTML = html + '<div class="zai-price-loading">Gõ tên ở ô trên hoặc chọn Nhóm sản phẩm để hiện danh sách tên.</div>';
+      _bindBuilderZai_(dyn, null); return;
+    }
+    const nameMap = {};
+    pool2.forEach((it) => _zaiItemNames_(it).forEach((nm) => { const f = _zaiItemFold_(nm); if (!nameMap[f]) nameMap[f] = nm; }));
+    const names = Object.keys(nameMap).map((f) => nameMap[f]).sort(_zaiVnSort_);
+    if (_zaiBld.ten && !nameMap[_zaiItemFold_(_zaiBld.ten)]) _zaiBld.ten = '';
+    if (!_zaiBld.ten && names.length === 1) _zaiBld.ten = names[0];
+    html += row(`Tên sản phẩm (${names.length})`, searchInput('zaib-ten', names, _zaiBld.ten, '— Chọn — (gõ để tìm hoặc bấm chọn)'));
+
+    if (_zaiBld.ten) {
+      const tf = _zaiItemFold_(_zaiBld.ten);
+      const poolT = pool2.filter((it) => _zaiItemNames_(it).some((nm) => _zaiItemFold_(nm) === tf));
+
+      // 3) Kiểu / Size
+      const sizeVal = (it) => it.s || '__def__';
+      const sizes = [...new Set(poolT.map(sizeVal))].sort(_zaiVnSort_);
+      if (_zaiBld.size && sizes.indexOf(_zaiBld.size) === -1) _zaiBld.size = '';
+      if (!_zaiBld.size && sizes.length === 1) _zaiBld.size = sizes[0];
+      html += row(`Kiểu / Size (${sizes.length})`, `<select id="zaib-size"><option value="">— Chọn —</option>${sizes.map((v) => opt(v, v === '__def__' ? '(mặc định)' : v, v === _zaiBld.size)).join('')}</select>`);
+
+      if (_zaiBld.size) {
+        const poolS = poolT.filter((it) => sizeVal(it) === _zaiBld.size);
+        // 4) Chất liệu (chỉ hiện khi sheet có ghi chất liệu)
+        const clVal = (it) => it.c || '__none__';
+        const cls = [...new Set(poolS.map(clVal))].sort(_zaiVnSort_);
+        if (_zaiBld.cl && cls.indexOf(_zaiBld.cl) === -1) _zaiBld.cl = '';
+        if (!_zaiBld.cl && cls.length === 1) _zaiBld.cl = cls[0];
+        if (cls.length > 1 || (cls.length === 1 && cls[0] !== '__none__')) {
+          html += row(`Chất liệu (${cls.length})`, `<select id="zaib-cl"><option value="">— Chọn —</option>${cls.map((v) => opt(v, v === '__none__' ? '(không ghi)' : v, v === _zaiBld.cl)).join('')}</select>`);
+        }
+        if (_zaiBld.cl) {
+          const cands = poolS.filter((it) => clVal(it) === _zaiBld.cl);
+          // 5) Còn nhiều dòng khác giá → Sale tự tích đúng dòng
+          const distinct = new Set(cands.map(_zaiPriceOfItem_));
+          if (cands.length > 1 && distinct.size > 1) {
+            html += row('Chọn đúng mức giá', `<select id="zaib-cand"><option value="">— Chọn —</option>${cands.map((it, i) => opt(String(i), (_zaiPriceOfItem_(it) ? _zaiPriceOfItem_(it).toLocaleString('vi-VN') + 'k' : 'chưa có giá') + ' — ' + (it.t || it.m), String(i) === String(_zaiBld.cand))).join('')}</select>`);
+            cand = cands[Number(_zaiBld.cand)] || null;
+          } else {
+            cand = cands[0] || null;
+          }
+        }
+      }
+    }
+
+    if (cand) {
+      const autoK = _zaiPriceOfItem_(cand);
+      if (!_zaiBld.priceEdited) _zaiBld.priceK = autoK ? String(autoK) : '';
+      html += row('Màu (ghi chú, bỏ trống được)', searchInput('zaib-mau', ZAI_COLOR_OPTS, _zaiBld.mau, '— Bỏ trống — (gõ để tìm hoặc bấm chọn)'));
+      html += row('Đậm / nhạt', searchInput('zaib-dam', ZAI_SHADE_OPTS, _zaiBld.dam, '— Bỏ trống — (gõ để tìm hoặc bấm chọn)'));
+      html += `<div class="zai-builder-inline">
+        <div><label>Số lượng</label><input type="number" id="zaib-qty" min="1" value="${escAttrZai_(_zaiBld.qty)}" /></div>
+        <div><label>Giá (nghìn đ) — ${escAttrZai_(_zaiStoneLabel_(cand))}</label><input type="number" id="zaib-price" min="0" value="${escAttrZai_(_zaiBld.priceK)}" placeholder="tự nhập nếu chưa có giá" /></div>
+      </div>`;
+      html += `<div class="zai-builder-inline">
+        <div><label>CTKM cho sản phẩm này</label><select id="zaib-promotype">
+          ${opt('none', 'Không', _zaiBld.promoType === 'none')}${opt('amount', 'Giảm tiền (k)', _zaiBld.promoType === 'amount')}${opt('percent', 'Giảm %', _zaiBld.promoType === 'percent')}${opt('gift', 'Tặng quà', _zaiBld.promoType === 'gift')}
+        </select></div>
+        <div id="zaib-promoval-wrap" style="${_zaiBld.promoType === 'none' ? 'display:none' : ''}"><label>&nbsp;</label><input type="text" id="zaib-promoval" value="${escAttrZai_(_zaiBld.promoVal)}" placeholder="${_zaiBld.promoType === 'gift' ? 'Quà tặng (VD: dây đeo)' : (_zaiBld.promoType === 'percent' ? '% giảm' : 'Số tiền giảm (k)')}" /></div>
+      </div>`;
+      {
+        // Panel tham khảo: các dòng CTKM (sheet CTKM, nằm cạnh sheet giá) có nhắc tới sản phẩm
+        // đang soạn — CHỈ để CS xem/đối chiếu, KHÔNG tự điền vào ô Giảm tiền/Giảm % ở trên (cấu
+        // trúc sheet CTKM tự do, không đoán chắc được số tiền/% để tự áp — tránh áp nhầm).
+        // Rieng KHOI nay co the AN/HIEN qua 1 o tich nho (khac voi muc "CTKM cho sản phẩm này" ở
+        // trên, muc do luon hien de Sale ap CTKM binh thuong) — mac dinh AN cho gon, tich moi hien.
+        html += `<label class="zai-ctkm-info-toggle"><input type="checkbox" id="zaib-ctkm-info-toggle" ${_zaiShowCtkmInfo ? 'checked' : ''} /> 🎁 Hiện thông tin CTKM tham khảo cho sản phẩm này</label>`;
+        if (_zaiShowCtkmInfo) {
+          const ctkmMatches = _zaiCtkmForProduct_(cand.t, cand.m);
+          if (ctkmMatches.length) {
+            html += `<div class="zai-builder-ctkm-box">
+              <div class="zai-builder-ctkm-title">🎉 CTKM đang có, liên quan sản phẩm này (tham khảo — không tự áp vào giá):</div>
+              ${ctkmMatches.map((t) => `<div class="zai-builder-ctkm-row">${escAttrZai_(t)}</div>`).join('')}
+            </div>`;
+          } else if (Array.isArray(_zaiCtkmRows) && _zaiCtkmRows.length) {
+            html += `<div class="zai-builder-ctkm-box zai-builder-ctkm-empty">🎉 Sheet CTKM hiện không có chương trình nào nhắc tới sản phẩm này.</div>`;
+          }
+        }
+      }
+      html += `<div class="zai-builder-summary"><div id="zaib-line-total"></div><button id="zaib-add-btn" class="zai-price-addbtn">+ Thêm vào đơn</button></div>`;
+    }
+    dyn.innerHTML = html;
+    _bindBuilderZai_(dyn, cand);
+    if (cand) _zaiRefreshBldTotal_();
+  }
+
+  function _zaiRefreshBldTotal_() {
+    const el = document.getElementById('zaib-line-total');
+    if (!el) return;
+    const qty = Math.max(1, Number(_zaiBld.qty) || 1);
+    const base = qty * (Number(_zaiBld.priceK) || 0) * 1000;
+    const total = _zaiApplyPromo_(base, _zaiBld.promoType, _zaiBld.promoVal);
+    el.innerHTML = `Thành tiền: <b>${total.toLocaleString('vi-VN')}đ</b>` +
+      (total !== base ? ` <span class="zai-builder-was">(trước CTKM ${base.toLocaleString('vi-VN')}đ)</span>` : '') +
+      (_zaiBld.promoType === 'gift' && _zaiBld.promoVal ? ` · 🎁 ${escAttrZai_(_zaiBld.promoVal)}` : '');
+  }
+
+  function _bindBuilderZai_(dyn, cand) {
+    const on = (id, fn) => { const el = dyn.querySelector('#' + id); if (el) el.addEventListener('change', fn); };
+    on('zaib-nhom', (e) => { _zaiBld.nhom = e.target.value; _zaiBld.ten = ''; _zaiBld.size = ''; _zaiBld.cl = ''; _zaiBld.cand = ''; _zaiBld.priceEdited = false; renderBuilderDynZai_(); });
+    on('zaib-ten', (e) => { _zaiBld.ten = e.target.value; _zaiBld.size = ''; _zaiBld.cl = ''; _zaiBld.cand = ''; _zaiBld.priceEdited = false; renderBuilderDynZai_(); });
+    on('zaib-size', (e) => { _zaiBld.size = e.target.value; _zaiBld.cl = ''; _zaiBld.cand = ''; _zaiBld.priceEdited = false; renderBuilderDynZai_(); });
+    on('zaib-cl', (e) => { _zaiBld.cl = e.target.value; _zaiBld.cand = ''; _zaiBld.priceEdited = false; renderBuilderDynZai_(); });
+    on('zaib-cand', (e) => { _zaiBld.cand = e.target.value; _zaiBld.priceEdited = false; renderBuilderDynZai_(); });
+    on('zaib-mau', (e) => { _zaiBld.mau = e.target.value; });
+    on('zaib-dam', (e) => { _zaiBld.dam = e.target.value; });
+    on('zaib-promotype', (e) => { _zaiBld.promoType = e.target.value; _zaiBld.promoVal = ''; renderBuilderDynZai_(); });
+    on('zaib-ctkm-info-toggle', (e) => { _zaiShowCtkmInfo = e.target.checked; renderBuilderDynZai_(); });
+    const typing = (id, fn) => { const el = dyn.querySelector('#' + id); if (el) el.addEventListener('input', (e) => { fn(e.target.value); _zaiRefreshBldTotal_(); }); };
+    typing('zaib-qty', (v) => { _zaiBld.qty = v; });
+    typing('zaib-price', (v) => { _zaiBld.priceK = v; _zaiBld.priceEdited = v !== ''; }); // xoá trống → quay lại giá tự động
+    typing('zaib-promoval', (v) => { _zaiBld.promoVal = v; });
+    const addBtn = dyn.querySelector('#zaib-add-btn');
+    if (addBtn && cand) addBtn.addEventListener('click', () => {
+      const qty = Math.max(1, Number(_zaiBld.qty) || 1);
+      const type = _zaiBld.promoType;
+      addToCartZai_({
+        name: _zaiBld.ten,
+        note: '',
+        price: (Number(_zaiBld.priceK) || 0) * 1000,
+        chatLieu: cand.c || '',
+        mauSac: [_zaiBld.mau, _zaiBld.dam].filter(Boolean).join(' '),
+        size: cand.s || '',
+        qty,
+        promoType: type,
+        promoValue: type === 'gift' ? String(_zaiBld.promoVal || '').trim() : (type === 'none' ? '' : (Number(_zaiBld.promoVal) || 0))
+      });
+      _zaiCartStatus_('✅ Đã thêm "' + _zaiBld.ten + '" vào đơn — chọn tiếp sản phẩm tiếp theo.');
+      _zaiBld = _zaiBldBlank_();
+      const q = document.getElementById('zaib-q'); if (q) q.value = '';
+      if (_zaiFlatMode === 'live') _zaiFlatItems = [];
+      renderBuilderDynZai_();
+    });
   }
 
   // ── TIM ANH SAN PHAM (anh trong thu muc Drive, link o cot "Link anh" cua DANH_MUC) — y het muc "Tim anh san pham" cua Pancake AI (quy tac song song) ──
