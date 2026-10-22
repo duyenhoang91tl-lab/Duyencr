@@ -2347,6 +2347,10 @@
     return !!me && t.status && t.status !== 'approved' && String(t.createdBy || '').trim().toLowerCase() === me;
   }
 
+  // Tach mau thanh tung DOAN: moi dong (xuong dong) = 1 tin nhan rieng (giong Pancake AI: tplLines_).
+  function zaiTplLines_(content) {
+    return String(content || '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+  }
   function renderMsgTemplateRowsZai_() {
     const box = document.getElementById('zai-tpl-result');
     if (!box) return;
@@ -2356,25 +2360,33 @@
       return;
     }
     box.innerHTML = rows.map((t) => {
-      const chips = String(t.product || '').split(/[,;|\n]/).map((x) => x.trim()).filter(Boolean).map((p) => `<span class="zai-ctkm-field">📦 ${escHtml(p)}</span>`).join(' ')
+      const chips = (t.nhom ? `<span class="zai-ctkm-field">🗂 ${escHtml(t.nhom)}</span> ` : '') + String(t.product || '').split(/[,;|\n]/).map((x) => x.trim()).filter(Boolean).map((p) => `<span class="zai-ctkm-field">📦 ${escHtml(p)}</span>`).join(' ')
         + (t.topic ? ` <span class="zai-ctkm-field">💬 ${escHtml(t.topic)}</span>` : '')
         + String(t.tags || '').split(',').map((x) => x.trim()).filter(Boolean).map((tg) => ` <span class="zai-ctkm-field">#${escHtml(tg)}</span>`).join('');
       const preview = t.content.length > 160 ? t.content.slice(0, 160) + '…' : t.content;
       const mine = isMyOpenTplZai_(t);
-      const badge = !mine ? '' : (t.status === 'rejected'
+      const others = !mine && t.status === 'pending';   // 21/10/2026: CS xem duoc ca mau CHUA DUYET cua nguoi khac (tham khao) — AI chi hoc mau DA DUYET
+      const badge = others ? `<div style="color:#92400e;font-size:11px">⏳ Chưa duyệt${t.createdBy ? ' — ' + escHtml(t.createdBy) + ' đề xuất' : ''} (tham khảo, chờ admin duyệt)</div>` : !mine ? '' : (t.status === 'rejected'
         ? `<div style="color:#991b1b;font-size:11px">❌ Bị từ chối${t.rejectReason ? ': ' + escHtml(t.rejectReason) : ''} — sửa lại để gửi duyệt lại</div>`
         : '<div style="color:#92400e;font-size:11px">⏳ Chờ quản lý duyệt — chưa dùng được cho người khác</div>');
       return `<div class="zai-ctkm-item zai-tpl-item" data-tid="${escAttrZai_(t.id)}" title="Bấm để dán vào ô chat">` +
         `<div class="zai-ctkm-title">${escHtml(t.title)}</div>` + badge +
         `<div>${escHtml(preview)}</div>` +
         (chips ? `<div style="margin-top:3px">${chips}</div>` : '') +
-        `<div class="zai-tpl-acts"><button type="button" class="zai-btn zai-btn-secondary zai-btn-sm" data-cid="${escAttrZai_(t.id)}">📋 Copy</button>` +
+        `<div class="zai-tpl-acts"><button type="button" class="zai-btn zai-btn-secondary zai-btn-sm" data-cid="${escAttrZai_(t.id)}" title="Copy nguyên cả mẫu (cả đoạn dài)">📋 Copy cả câu</button>` +
+        `<button type="button" class="zai-btn zai-btn-secondary zai-btn-sm" data-iid="${escAttrZai_(t.id)}" title="Dán nguyên cả mẫu vào ô chat">➡ Chèn cả câu</button>` +
+        (zaiTplLines_(t.content).length > 1 ? `<button type="button" class="zai-btn zai-btn-secondary zai-btn-sm" data-ltog="${escAttrZai_(t.id)}" title="Tách mỗi dòng thành 1 tin nhắn riêng">📑 Từng đoạn (${zaiTplLines_(t.content).length})</button>` : '') +
         (mine ? `<button type="button" class="zai-btn zai-btn-secondary zai-btn-sm" data-eid="${escAttrZai_(t.id)}">✏️ Sửa</button><button type="button" class="zai-btn zai-btn-secondary zai-btn-sm" data-did="${escAttrZai_(t.id)}">🗑 Xoá</button>` : '') +
-        `</div></div>`;
+        `</div>` +
+        (zaiTplLines_(t.content).length > 1 ? `<div class="zai-tpl-lines" data-lbox="${escAttrZai_(t.id)}" style="display:none">` + zaiTplLines_(t.content).map((ln, k) =>
+          `<div class="zai-tpl-line"><span class="zai-tpl-line-txt">${escHtml(ln)}</span>` +
+          `<button type="button" class="zai-btn zai-btn-secondary zai-btn-sm" data-lc="${escAttrZai_(t.id)}|${k}" title="Copy đoạn này (1 tin nhắn)">📋 Copy đoạn</button>` +
+          `<button type="button" class="zai-btn zai-btn-secondary zai-btn-sm" data-li="${escAttrZai_(t.id)}|${k}" title="Dán đoạn này vào ô chat">➡ Chèn</button></div>`).join('') + `</div>` : '') +
+        `</div>`;
     }).join('');
     box.querySelectorAll('[data-tid]').forEach((el) => {
       el.addEventListener('click', (e) => {
-        if (e.target.closest('button')) return; // bam nut thi khong chen vao o tra loi
+        if (e.target.closest('button') || e.target.closest('.zai-tpl-lines')) return; // bam nut / vung tung doan thi khong chen ca mau vao o chat
         const t = _zaiMsgTemplates.find((x) => x.id === el.dataset.tid);
         if (t) fillZaloInput_(t.content, _zaiTplFlashProxy_); // dan vao o chat Zalo (khong tu gui); phan hoi hien o dong trang thai cua muc
       });
@@ -2386,6 +2398,24 @@
       const done = () => { const old = b.textContent; b.textContent = '✅ Đã copy'; setTimeout(() => { b.textContent = old; }, 1200); };
       navigator.clipboard.writeText(t.content).then(done).catch(() => _zaiTplStatus_('Không copy được — bấm vào thẻ để dán thẳng vào ô chat.'));
     }));
+    const zLineOf_ = (key) => { const [id, k] = String(key).split('|'); const t = _zaiMsgTemplates.find((x) => x.id === id); return t ? (zaiTplLines_(t.content)[Number(k)] || '') : ''; };
+    box.querySelectorAll('[data-iid]').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const t = _zaiMsgTemplates.find((x) => x.id === b.dataset.iid);
+      if (t) fillZaloInput_(t.content, b);
+    }));
+    box.querySelectorAll('[data-ltog]').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const lb = box.querySelector(`[data-lbox="${CSS.escape(b.dataset.ltog)}"]`);
+      if (lb) lb.style.display = lb.style.display === 'none' ? '' : 'none';
+    }));
+    box.querySelectorAll('[data-lc]').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const ln = zLineOf_(b.dataset.lc); if (!ln) return;
+      const done = () => { const old = b.textContent; b.textContent = '✅ Đã copy'; setTimeout(() => { b.textContent = old; }, 1200); };
+      navigator.clipboard.writeText(ln).then(done).catch(() => _zaiTplStatus_('Không copy được — dùng nút ➡ Chèn để dán thẳng vào ô chat.'));
+    }));
+    box.querySelectorAll('[data-li]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); const ln = zLineOf_(b.dataset.li); if (ln) fillZaloInput_(ln, b); }));
     box.querySelectorAll('[data-eid]').forEach((b) => b.addEventListener('click', (e) => {
       e.stopPropagation();
       openTplFormZai_(_zaiMsgTemplates.find((x) => x.id === b.dataset.eid) || null);
@@ -2696,12 +2726,13 @@
     const words = zaiFold_(query).split(' ').filter(Boolean);
     const out = [];
     list.forEach((t, idx) => {
-      const f = { product: zaiFold_(t.product), topic: zaiFold_(t.topic), tags: zaiFold_(t.tags), title: zaiFold_(t.title), content: zaiFold_(t.content) };
+      const f = { nhom: zaiFold_(t.nhom), product: zaiFold_(t.product), topic: zaiFold_(t.topic), tags: zaiFold_(t.tags), title: zaiFold_(t.title), content: zaiFold_(t.content) };
       const parts = String(t.product || '').split(/[,;|\n]/).map(x => zaiFold_(x)).filter(Boolean);
       let score = 0, all = true;
       for (const w of words) {
         let hit = 0;
         if (f.product.indexOf(w) >= 0) hit = Math.max(hit, 5);
+        if (f.nhom.indexOf(w) >= 0) hit = Math.max(hit, 4);
         if (f.topic.indexOf(w) >= 0) hit = Math.max(hit, 3);
         if (f.tags.indexOf(w) >= 0) hit = Math.max(hit, 3);
         if (f.title.indexOf(w) >= 0) hit = Math.max(hit, 2);
