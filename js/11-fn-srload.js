@@ -1606,7 +1606,7 @@ async function _impUpload(kind){
     }
     if (d.error) throw new Error(d.error);
     _impState.result = Object.assign({ kind: kind }, d);
-    toast('✓ Đã nhập '+fmt(d.written)+' dòng mới'+(d.skippedExisting?', '+fmt(d.skippedExisting)+' đơn ĐÃ CÓ'+(d.updatedRows?' (cập nhật '+fmt(d.updatedRows)+' đơn có thông tin đổi, còn lại bỏ qua)':' (bỏ qua)'):'')+(d.dedupedAfter?' (tự loại '+fmt(d.dedupedAfter)+' dòng trùng tuyệt đối)':'')+' vào '+(kind==='base'?'DT TỔNG':'dữ liệu đơn')+'.');
+    toast('✓ Đã nhập '+fmt(d.written)+' dòng mới'+(d.skippedExisting?', '+fmt(d.skippedExisting)+' đơn ĐÃ CÓ'+(d.updatedRows?' (cập nhật '+fmt(d.updatedRows)+' đơn có thông tin đổi, còn lại bỏ qua)':' (bỏ qua)'):'')+(d.dedupedAfter?' (tự dọn '+fmt(d.dedupedAfter)+' dòng trùng'+(kind==='pos'?' — giống nhau trừ STT/Trạng thái/Ghi chú, đã ghi đè Trạng thái/Ghi chú mới nhất':'')+')':'')+' vào '+(kind==='base'?'DT TỔNG':'dữ liệu đơn')+'.');
     logAudit('import_'+kind, '', '', 'Nhập dữ liệu '+(kind==='base'?'Base':'Pos')+' từ file: +'+d.written+' dòng, cập nhật '+(d.updatedRows||0)+' đơn/'+(d.updatedCells||0)+' ô, loại trùng '+(d.dedupedAfter||0));
     if (kind === 'base'){ _impState.baseRows = null; _impState.baseFileName = ''; _impState.baseWarn = ''; }
     else { _impState.posRows = null; _impState.posFileName = ''; _impState.posWarn = ''; }
