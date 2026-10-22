@@ -3511,22 +3511,31 @@ function _userAliasGroups_() {
 //  (3) PancakeNameMap: ten Pancake -> DUNG 1 ten Sale. Dong gan 'saleA|saleB' (1 ten Pancake chia nhieu Sale) BO QUA,
 //      vi noi qua ten Pancake se gop nham 2 NGUOI KHAC NHAU thanh 1.
 // Union-find, goc = khoa nho nhat theo thu tu chu cai -> ket qua on dinh, khong phu thuoc thu tu doc sheet.
-function _salePersonKeyFn_() {
-  var parent = {};
+function _salePersonKeyFn_() { return _salePersonIdentity_().key; }
+// DANH TINH CHUAN: key(name) = khoa cung nguoi; members(name) = MOI ten da biet cua nguoi do (de tra cau hinh theo ten, vd % hoa hong/kenh dat duoi 1 ten khac);
+// primary(name) = TEN CHINH on dinh de hien thi/tinh hoa hong-thuong (E/G): uu tien (1) khoa 'ten chinh' cua The (salePersonTags), (2) ten dau tien cua tai khoan Sale,
+// (3) 'user Base' cua SaleDirectory, (4) neu van chua co: ten nho nhat theo thu tu chu cai trong cac ten da biet + cac ten truyen vao (observed).
+function _salePersonIdentity_(observed) {
+  var parent = {}, disp = {};
   function find(x) {
     var r = x;
     while (parent[r] !== undefined && parent[r] !== r) r = parent[r];
     while (x !== r && parent[x] !== undefined) { var nx = parent[x]; parent[x] = r; x = nx; }
     return r;
   }
+  function note(raw) { var k = _normTxt_(raw); if (k && !disp[k]) disp[k] = String(raw).trim(); }
   function union(a, b) {
+    note(a); note(b);
     a = _normTxt_(a); b = _normTxt_(b);
     if (!a || !b) return;
     var ra = find(a), rb = find(b);
     if (ra === rb) return;
     if (ra < rb) parent[rb] = ra; else parent[ra] = rb;
   }
-  function unionAll(arr) { for (var i = 1; i < arr.length; i++) union(arr[0], arr[i]); }
+  function unionAll(arr) { for (var i = 1; i < arr.length; i++) union(arr[0], arr[i]); if (arr.length === 1) note(arr[0]); }
+  var prim = {};   // goc nhom -> ten chinh
+  function setPrim(name) { var k = _normTxt_(name); if (!k) return; note(name); var r = find(k); if (!prim[r]) prim[r] = disp[k]; }
+  var tagPrimaries = [];
   try {
     var groups = _userAliasGroups_();
     Object.keys(groups).forEach(function(k) { unionAll(groups[k] || []); });
@@ -3543,7 +3552,25 @@ function _salePersonKeyFn_() {
       if (t.length === 1) union(pn, t[0]);
     });
   } catch (e3) {}
-  return function(name) { return find(_normTxt_(name)); };
+  // ten chinh theo thu tu uu tien (cac quy tac chay SAU khi da gop xong nen khoa 'find' la khoa cuoi cung)
+  try { var tg = JSON.parse(getSetting_('salePersonTags') || '{}') || {}; Object.keys(tg).forEach(function(p) { if ((tg[p] || []).length) setPrim(p); }); } catch (e4) {}
+  try { readUsers_(getCrmSS_().getSheetByName(SH_USER)).forEach(function(u) { if (String(u.role || 'cs') !== 'cs') return; var first = (u.names && u.names[0]) || u.name; if (first) setPrim(first); }); } catch (e5) {}
+  try { (readSaleDirectory_().list || []).forEach(function(rec) { if (rec.userBase) setPrim(rec.userBase); }); } catch (e6) {}
+  // quy tac cuoi: chua co ten chinh -> ten nho nhat (chu cai) trong cac ten da biet + ten quan sat duoc
+  (observed || []).forEach(function(n) { note(n); });
+  var minOf = {};
+  Object.keys(disp).forEach(function(k) { var r = find(k); if (prim[r]) return; if (!minOf[r] || k < _normTxt_(minOf[r])) minOf[r] = disp[k]; });
+  return {
+    key: function(name) { return find(_normTxt_(name)); },
+    members: function(name) {
+      var k = _normTxt_(name), r = find(k), out = [], seen = {};
+      function add(n) { var nk = _normTxt_(n); if (nk && !seen[nk]) { seen[nk] = 1; out.push(n); } }
+      add(String(name).trim());
+      Object.keys(disp).forEach(function(x) { if (find(x) === r) add(disp[x]); });
+      return out;
+    },
+    primary: function(name) { var raw = String(name == null ? '' : name).trim(); if (!raw) return raw; var r = find(_normTxt_(raw)); return prim[r] || minOf[r] || raw; }
+  };
 }
 // Gop them cac ten "mo coi" theo QUY UOC SAN CO cua _resolveBonusSale_ (tinh thuong): ten co DON nhung KHONG co tuong tac Pancake
 // nao (vd POS ghi 'thuydinh95', Pancake/CRM ghi 'thuydinh1995') duoc gop vao ten co tuong tac neu phan CHU (bo so duoi, >= 4 ky tu)
@@ -5631,6 +5658,31 @@ function _acctSharesOf_(rows) {
   return { total: total, shares: shares };
 }
 
+// Chuan hoa ten Sale tren cac don cua Bao cao B ve TEN CHINH (xem _salePersonIdentity_). list(): doi + bo trung (giu thu tu); shares(): gop ty le cua cac ten cung
+// nguoi (tong khong doi); aliasMap: ten chinh -> moi ten cung nguoi (chi nguoi co >= 2 ten).
+function _saleCanonOrders_(orders) {
+  var observed = [];
+  (orders || []).forEach(function(m) {
+    (m.ghepShares ? m.ghepShares.map(function(x) { return x.name; }) : _donSaleNamesFromThe_(m.theSale)).forEach(function(n) { if (n) observed.push(n); });
+  });
+  var id = _salePersonIdentity_(observed), aliasMap = {}, seenPrim = {};
+  observed.forEach(function(n) {
+    var c = id.primary(n), ck = _normTxt_(c); if (!c || seenPrim[ck]) return; seenPrim[ck] = 1;
+    var mem = id.members(c); if (mem.length > 1) aliasMap[c] = mem.slice(0, 20);
+  });
+  return {
+    aliasMap: aliasMap,
+    list: function(arr) { var seen = {}, out = []; (arr || []).forEach(function(n) { var c = id.primary(n), k = _normTxt_(c); if (c && !seen[k]) { seen[k] = 1; out.push(c); } }); return out; },
+    shares: function(sh) {
+      var idx = {}, out = [];
+      (sh || []).forEach(function(x) {
+        var c = id.primary(x.name), k = _normTxt_(c), f = Number(x.frac) || 0;
+        if (idx[k] === undefined) { idx[k] = out.length; var cp = {}; Object.keys(x).forEach(function(kk) { cp[kk] = x[kk]; }); cp.name = c; cp.frac = f; out.push(cp); } else out[idx[k]].frac += f;
+      });
+      return out;
+    }
+  };
+}
 function buildSalesReportB_(filters) {
   filters = filters || {};
   // Ho tro CA mang (multi-select) LAN chuoi don (tuong thich nguoc) cho ca 3 bo loc.
@@ -5957,7 +6009,13 @@ function buildSalesReportB_(filters) {
 
   var mismatchCount = products['__MISMATCH__'] ? products['__MISMATCH__'].mismatchRows : 0;
 
+  // CHUAN HOA DANH TINH (Duyen 2026-10-15): moi ten cua CUNG 1 nguoi (2 the Pos, ten Base khac ten Pos...) -> 1 TEN CHINH ngay trong don tra ve cho
+  // Bao cao E/G (hoa hong + thuong) va csStats: 1 nguoi = 1 dong, bac thuong theo ngay tinh tren TONG, don co 2 ten cua cung 1 nguoi khong bi chia doi.
+  // % hoa hong/kenh/ngay bat dau/team dat theo TEN nao cung duoc tra theo moi ten cung nguoi (client: saleIdentity -> _cfgAliasesOf).
+  var _cn = _saleCanonOrders_(matched);
+
   return {
+    saleIdentity: _cn.aliasMap,   // ten chinh -> moi ten cung nguoi (client tra cau hinh % hoa hong/kenh/ngay bat dau theo ten bat ky)
     totalOrders: matched.length,
     totalGiaTri: totalGiaTri,
     totalCod: totalCod,
@@ -5988,12 +6046,12 @@ function buildSalesReportB_(filters) {
         // Don GHEP voi Base: giaTriSauGiam o tren = tong doanh thu cac don goc Base (da thay gia tri Pos); giaTriPos = gia tri Pos
         // goc (de doi chieu); saleShares = ty le chia cho tung sale cua don goc (tong = 1); ghepCodes = ma bo dem da khop.
         giaTriPos: m.ghepShares ? m.giaTriPos : undefined,
-        saleShares: m.ghepShares || undefined,
+        saleShares: m.ghepShares ? _cn.shares(m.ghepShares) : undefined,
         saleRatio: m.saleRatio || undefined, // 0.3 = don Quay Hao Nam gan the sale + note 30/70
         ghepCodes: m.ghepCodes || undefined,
         // BAO CAO TINH DON THUAN (20/10/2026, Duyen): saleThe = sale theo DUNG cot "Thẻ" (chia deu) — KHONG ghep Base / KHONG file ke toan / KHONG quay 30/70.
         // dieuChinh = 'acct' (chia theo file ke toan) | 'base' (ghep don Base); don co saleRatio cung la don da dieu chinh (client xuat Excel doi chieu).
-        saleThe: _donSaleNamesFromThe_(m.theSale).join(','),
+        saleThe: _cn.list(_donSaleNamesFromThe_(m.theSale)).join(','),
         dieuChinh: m.acctStatus ? 'acct' : (m.ghepShares ? 'base' : undefined),
         // Don Pos TACH da gop (xem _mergeTachDon_): tachKey = ma goc, tachSoDon = so phan, tachGiaTri = gia tri tung phan; giaTriSauGiam o tren = TONG cac phan.
         tachKey: m.tachKey || undefined, tachSoDon: m.tachSoDon || undefined, tachGiaTri: m.tachGiaTri || undefined,
@@ -6002,7 +6060,7 @@ function buildSalesReportB_(filters) {
         // cot "Thẻ", co the dinh ghi chu/ten sai chinh ta). Bao cao E (Hoa hong + Chuong trinh
         // thuong) phai dung field nay (khong dung theSale truc tiep) de khop CHINH XAC voi cach
         // ke toan tinh — xem _computeCommissionData_/_computeBonusData_ o index.html.
-        saleBanValid: m.ghepShares ? m.ghepShares.map(function(x){ return x.name; }).join(',') : _donSaleNamesFromThe_(m.theSale).join(','),
+        saleBanValid: _cn.list(m.ghepShares ? m.ghepShares.map(function(x){ return x.name; }) : _donSaleNamesFromThe_(m.theSale)).join(','),
         // (thuong nay chia deu cho moi sale tren don — bonusSale/nguoi tao khong con dung de tinh thuong)
         bonusSale: undefined,
         nguoiTaoBase: m.ghepCreators ? m.ghepCreators.join(',') : undefined,

@@ -397,11 +397,37 @@ async function saveBonusPrograms() {
   if (typeof _srState !== 'undefined' && _srState.sub === 'E') renderSalesReportTab();
 }
 
-// Team mà 1 sale thuộc về (leader hoặc thành viên) — dùng để fallback rate khi cá nhân chưa cài
+// DANH TÍNH CHUẨN cho CẤU HÌNH theo tên (% hoa hồng cá nhân, kênh Online/Offline, ngày bắt đầu, team): báo cáo E/G đã quy mọi tên của 1 người về TÊN CHÍNH
+// (backend: saleIdentity = tên chính -> mọi tên cùng người), còn cấu hình có thể đang lưu dưới tên KHÁC của người đó -> tra theo MỌI tên cùng người
+// (tên chính trước, rồi tên backend trả về, rồi bí danh trong tài khoản/Thẻ). Ghi cấu hình vẫn ghi theo tên đang hiển thị.
+var _SALE_ALIAS_MAP = {};
+function _srRegisterIdentity_(d) {
+  if (!d || !d.saleIdentity) return;
+  Object.keys(d.saleIdentity).forEach(function(k){ _SALE_ALIAS_MAP[String(k).toLowerCase()] = d.saleIdentity[k]; });
+}
+function _cfgAliasesOf(name) {
+  var out = [], seen = {};
+  function add(n){ var k = String(n == null ? '' : n).toLowerCase(); if (k && !seen[k]) { seen[k] = 1; out.push(n); } }
+  add(name);
+  (_SALE_ALIAS_MAP[String(name == null ? '' : name).toLowerCase()] || []).forEach(add);
+  ((typeof _personAliases === 'function') ? _personAliases(name) : []).forEach(add);
+  return out;
+}
+function _cfgByAlias(map, name) {
+  if (!map) return undefined;
+  var al = _cfgAliasesOf(name);
+  for (var i = 0; i < al.length; i++) { var v = map[al[i]]; if (v !== undefined && v !== null && v !== '') return v; }
+  return undefined;
+}
+function _saleChannelOf_(name) { return _cfgByAlias(SALE_CHANNELS, name) || ''; }
+// Team mà 1 sale thuộc về (leader hoặc thành viên) — dùng để fallback rate khi cá nhân chưa cài. Khớp theo MỌI tên cùng người.
 function _teamRateForName_(name) {
+  var al = _cfgAliasesOf(name);
   for (var i = 0; i < teams.length; i++) {
     var t = teams[i];
-    if (t.leader === name || (t.members||[]).indexOf(name) !== -1) return { team: t, rate: t.ratePct || {above15:0, below15:0} };
+    for (var j = 0; j < al.length; j++) {
+      if (t.leader === al[j] || (t.members||[]).indexOf(al[j]) !== -1) return { team: t, rate: t.ratePct || {above15:0, below15:0} };
+    }
   }
   return { team: null, rate: {above15:0, below15:0} };
 }
@@ -410,7 +436,7 @@ function _teamRateForName_(name) {
 // mà để trống <15tr, khi đó <15tr vẫn lấy theo team) — hết thì lấy theo team đang thuộc về —
 // không thuộc team nào và chưa cài cá nhân thì 0%.
 function _resolveCommissionRate_(name) {
-  var indiv = INDIVIDUAL_RATES[name] || {};
+  var indiv = _cfgByAlias(INDIVIDUAL_RATES, name) || {};
   var teamInfo = _teamRateForName_(name);
   var hasA = indiv.above15 !== undefined && indiv.above15 !== null && indiv.above15 !== '';
   var hasB = indiv.below15 !== undefined && indiv.below15 !== null && indiv.below15 !== '';
@@ -419,7 +445,7 @@ function _resolveCommissionRate_(name) {
   // Team chi tinh la "da cai" khi % > 0 (ratePct mac dinh 0/0 = chua cai).
   var tr = teamInfo.rate || {};
   var teamA = teamInfo.team && Number(tr.above15) > 0, teamB = teamInfo.team && Number(tr.below15) > 0;
-  var chn = SALE_CHANNELS[name];
+  var chn = _saleChannelOf_(name);
   var def = chn === 'online' ? { above15: 1.5, below15: 1, label: 'Mặc định Online' }
           : chn === 'offline' ? { above15: 1, below15: 0.8, label: 'Mặc định Offline' } : null;
   function _src(has, teamHas){ return has ? 'Cá nhân' : (teamHas ? 'Team ' + teamInfo.team.name : (def ? def.label : 'Chưa cài')); }

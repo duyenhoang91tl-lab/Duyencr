@@ -74,6 +74,7 @@ async function _srLoad(){
     // rong vi o.ngayTao undefined o moi don Pos, du da map dung saleBan/giaTriDon. Dung
     // saleBanValid (ten sale da loc hop le, xem _donSaleNamesFromThe_) thay vi theSale tho de
     // tranh ghi chu/ten sai chinh ta trong cot Thẻ bi tinh nham thanh 1 "sale" ao.
+    _srRegisterIdentity_(dPos);
     if (dPos && dPos.orders) dPos.orders = dPos.orders.map(function(o){ return Object.assign({}, o, { saleBan: (o.saleBanValid !== undefined ? o.saleBanValid : o.theSale), giaTriDon: o.giaTriSauGiam, ngayTao: o.ngayTaoDon }); });
     _srState.dataE = dPos;
   } else if (_srState.sub === 'F') {
@@ -108,6 +109,7 @@ async function _srLoad(){
       dateFrom: _srState.gDateFrom, dateTo: _srState.gDateTo,
       sale: (_srState.gSale||[]).join(',')
     });
+    _srRegisterIdentity_(dPosG);
     if (dPosG && dPosG.orders) dPosG.orders = dPosG.orders.map(function(o){ return Object.assign({}, o, { saleBan: (o.saleBanValid !== undefined ? o.saleBanValid : o.theSale), giaTriDon: o.giaTriSauGiam, ngayTao: o.ngayTaoDon }); });
     _srState.dataG = dPosG;
   }

@@ -733,22 +733,31 @@ function _userAliasGroups_() {
 //  (3) PancakeNameMap: ten Pancake -> DUNG 1 ten Sale. Dong gan 'saleA|saleB' (1 ten Pancake chia nhieu Sale) BO QUA,
 //      vi noi qua ten Pancake se gop nham 2 NGUOI KHAC NHAU thanh 1.
 // Union-find, goc = khoa nho nhat theo thu tu chu cai -> ket qua on dinh, khong phu thuoc thu tu doc sheet.
-function _salePersonKeyFn_() {
-  var parent = {};
+function _salePersonKeyFn_() { return _salePersonIdentity_().key; }
+// DANH TINH CHUAN: key(name) = khoa cung nguoi; members(name) = MOI ten da biet cua nguoi do (de tra cau hinh theo ten, vd % hoa hong/kenh dat duoi 1 ten khac);
+// primary(name) = TEN CHINH on dinh de hien thi/tinh hoa hong-thuong (E/G): uu tien (1) khoa 'ten chinh' cua The (salePersonTags), (2) ten dau tien cua tai khoan Sale,
+// (3) 'user Base' cua SaleDirectory, (4) neu van chua co: ten nho nhat theo thu tu chu cai trong cac ten da biet + cac ten truyen vao (observed).
+function _salePersonIdentity_(observed) {
+  var parent = {}, disp = {};
   function find(x) {
     var r = x;
     while (parent[r] !== undefined && parent[r] !== r) r = parent[r];
     while (x !== r && parent[x] !== undefined) { var nx = parent[x]; parent[x] = r; x = nx; }
     return r;
   }
+  function note(raw) { var k = _normTxt_(raw); if (k && !disp[k]) disp[k] = String(raw).trim(); }
   function union(a, b) {
+    note(a); note(b);
     a = _normTxt_(a); b = _normTxt_(b);
     if (!a || !b) return;
     var ra = find(a), rb = find(b);
     if (ra === rb) return;
     if (ra < rb) parent[rb] = ra; else parent[ra] = rb;
   }
-  function unionAll(arr) { for (var i = 1; i < arr.length; i++) union(arr[0], arr[i]); }
+  function unionAll(arr) { for (var i = 1; i < arr.length; i++) union(arr[0], arr[i]); if (arr.length === 1) note(arr[0]); }
+  var prim = {};   // goc nhom -> ten chinh
+  function setPrim(name) { var k = _normTxt_(name); if (!k) return; note(name); var r = find(k); if (!prim[r]) prim[r] = disp[k]; }
+  var tagPrimaries = [];
   try {
     var groups = _userAliasGroups_();
     Object.keys(groups).forEach(function(k) { unionAll(groups[k] || []); });
@@ -765,7 +774,25 @@ function _salePersonKeyFn_() {
       if (t.length === 1) union(pn, t[0]);
     });
   } catch (e3) {}
-  return function(name) { return find(_normTxt_(name)); };
+  // ten chinh theo thu tu uu tien (cac quy tac chay SAU khi da gop xong nen khoa 'find' la khoa cuoi cung)
+  try { var tg = JSON.parse(getSetting_('salePersonTags') || '{}') || {}; Object.keys(tg).forEach(function(p) { if ((tg[p] || []).length) setPrim(p); }); } catch (e4) {}
+  try { readUsers_(getCrmSS_().getSheetByName(SH_USER)).forEach(function(u) { if (String(u.role || 'cs') !== 'cs') return; var first = (u.names && u.names[0]) || u.name; if (first) setPrim(first); }); } catch (e5) {}
+  try { (readSaleDirectory_().list || []).forEach(function(rec) { if (rec.userBase) setPrim(rec.userBase); }); } catch (e6) {}
+  // quy tac cuoi: chua co ten chinh -> ten nho nhat (chu cai) trong cac ten da biet + ten quan sat duoc
+  (observed || []).forEach(function(n) { note(n); });
+  var minOf = {};
+  Object.keys(disp).forEach(function(k) { var r = find(k); if (prim[r]) return; if (!minOf[r] || k < _normTxt_(minOf[r])) minOf[r] = disp[k]; });
+  return {
+    key: function(name) { return find(_normTxt_(name)); },
+    members: function(name) {
+      var k = _normTxt_(name), r = find(k), out = [], seen = {};
+      function add(n) { var nk = _normTxt_(n); if (nk && !seen[nk]) { seen[nk] = 1; out.push(n); } }
+      add(String(name).trim());
+      Object.keys(disp).forEach(function(x) { if (find(x) === r) add(disp[x]); });
+      return out;
+    },
+    primary: function(name) { var raw = String(name == null ? '' : name).trim(); if (!raw) return raw; var r = find(_normTxt_(raw)); return prim[r] || minOf[r] || raw; }
+  };
 }
 // Gop them cac ten "mo coi" theo QUY UOC SAN CO cua _resolveBonusSale_ (tinh thuong): ten co DON nhung KHONG co tuong tac Pancake
 // nao (vd POS ghi 'thuydinh95', Pancake/CRM ghi 'thuydinh1995') duoc gop vao ten co tuong tac neu phan CHU (bo so duoi, >= 4 ky tu)
