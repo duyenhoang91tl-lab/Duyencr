@@ -33,5 +33,6 @@ r = F.res(['17T09/2026'], idx, 700000);
 ok(r.status === 'khongKhop', 'don goc Base da Thất bại -> khong dung chia, roi ve The Pos (khong bo don bao hanh)');
 r = F.res(['395T09/2026', '17T09/2026'], idx, 900000);
 ok(r.status === 'ok' && r.shares.length === 2 && r.total === 900000, '2 goc, 1 goc thất bại: chia theo goc con song');
-ok(/bhOrigByRow\[pj\]\s*\?\s*_resolveBhOrigin_/.test(src) && /bhSp\.bh\.length && !bhSp\.normal\.length/.test(src), 'buildSalesReportB_ da noi cac ham BH');
+ok(/bhHasSale\s*\?\s*_resolveBhOrigin_/.test(src) && /bhSp\.bh\.length && !bhSp\.normal\.length/.test(src), 'buildSalesReportB_ da noi cac ham BH');
+ok(/bhHasSale = !!bhOrigByRow\[pj\] && _donSaleNamesFromThe_\(rowP\.theSale\)\.length > 0/.test(src) && /bhHasSale \? _resolveBhOrigin_/.test(src) && /bhOrigByRow\[pj\] \? null/.test(src), 'don BH: CHI tra goc/chia sale khi The co ten sale; khong co ten sale -> khong chia (gh = null, khong roi ve ghep thuong)');
 console.log(fail ? 'CO LOI' : 'ALL BH TESTS PASSED'); process.exit(fail ? 1 : 0);

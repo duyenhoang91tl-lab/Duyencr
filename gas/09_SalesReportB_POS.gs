@@ -560,8 +560,10 @@ function buildSalesReportB_(filters) {
   var matched = [];
   for (var pj = 0; pj < pre.length; pj++) {
     var rowP = pre[pj];
-    var gh = bhOrigByRow[pj] ? _resolveBhOrigin_(bhOrigByRow[pj], baseIdx, Number(rowP.giaTriSauGiam) || 0)
-      : (codesByRow[pj].length ? _resolveGhepDon_(codesByRow[pj], baseIdx, usedBaseRows) : null);
+    // Don BH (21/10/2026, Duyen): CHI chia cho sale khi don CO TEN SALE tren cot The; khong co ten sale -> KHONG chia cho ai (gh = null, giu nguyen don tinh theo The = chua gan sale).
+    var bhHasSale = !!bhOrigByRow[pj] && _donSaleNamesFromThe_(rowP.theSale).length > 0;
+    var gh = bhHasSale ? _resolveBhOrigin_(bhOrigByRow[pj], baseIdx, Number(rowP.giaTriSauGiam) || 0)
+      : (bhOrigByRow[pj] ? null : (codesByRow[pj].length ? _resolveGhepDon_(codesByRow[pj], baseIdx, usedBaseRows) : null));
     var effRow = rowP;
     if (gh) {
       ghepStats.donCoMa++;
