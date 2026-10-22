@@ -779,7 +779,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
         <div id="mt-suggest" style="margin-bottom:16px"></div>
 
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;border-top:1px dashed var(--border);padding-top:12px">
-          <div class="zai-label" style="margin:0;font-size:13px;font-weight:700">📚 Quản lý mẫu tin nhắn</div>
+          <div class="zai-label" style="margin:0;font-size:13px;font-weight:700">📚 Kho mẫu lưu sẵn <span style="font-weight:400;font-size:11px;color:var(--muted)">(đã duyệt + chưa duyệt — mọi CS xem được; AI chỉ học mẫu đã duyệt)</span></div>
           <button id="mt-pending-badge" class="btn sm" style="display:none;background:#fef3c7;color:#92400e" onclick="mtShowPending()" title="Lọc các mẫu đang chờ duyệt"></button>
           <select id="mt-status-filter" class="assign-input" onchange="renderMsgTemplateList()" style="font-size:12px;padding:4px 8px">
             <option value="">Tất cả trạng thái</option>
@@ -789,20 +789,26 @@ window.addEventListener('load',function(){var s=document.createElement('script')
             <option value="mine">Của tôi</option>
           </select>
           <input id="mt-search" class="zai-input" placeholder="Tìm theo sản phẩm / chủ đề / tag / nội dung..." style="flex:1;min-width:180px" oninput="renderMsgTemplateList()">
-          <button class="btn sm primary" onclick="openMsgTemplateForm()">+ Thêm mẫu</button>
+          <button class="btn sm primary" onclick="openMsgTemplateForm()">+ Tạo mẫu lưu sẵn</button>
         </div>
         <div id="mt-form-wrap" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:12px;margin-bottom:10px">
           <input type="hidden" id="mt-f-id">
           <div id="mt-form-hint" style="font-size:11px;color:var(--muted);margin-bottom:8px"></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-            <input id="mt-f-title" class="zai-input" placeholder="Tiêu đề mẫu (VD: Báo giá nhẫn vàng)" style="flex:1;min-width:200px">
-            <input id="mt-f-product" class="zai-input" placeholder="📦 Sản phẩm áp dụng, cách nhau dấu phẩy (VD: Nhẫn vàng 9999, Lắc tay)" style="flex:1;min-width:200px">
+            <input id="mt-f-nhom" class="zai-input" list="mt-nhom-dl" oninput="mtFormLists()" autocomplete="off" placeholder="🗂 Nhóm sản phẩm (chọn từ bảng giá hoặc gõ)" style="flex:1;min-width:200px">
+            <datalist id="mt-nhom-dl"></datalist>
+            <input id="mt-f-product" class="zai-input" list="mt-prod-dl" oninput="mtFormDetect()" onchange="mtFormDetect()" autocomplete="off" placeholder="📦 Tên sản phẩm, cách nhau dấu phẩy (VD: Nhẫn vàng 9999, Lắc tay)" style="flex:1;min-width:200px">
+            <datalist id="mt-prod-dl"></datalist>
+          </div>
+          <div id="mt-f-autohint" style="font-size:11px;color:#047857;min-height:14px;margin-bottom:6px"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+            <input id="mt-f-title" class="zai-input" placeholder="Tiêu đề mẫu (bỏ trống = tự đặt theo sản phẩm + tình huống)" style="flex:1;min-width:200px">
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
             <input id="mt-f-topic" class="zai-input" placeholder="💬 Nội dung hội thoại / tình huống (VD: Khách hỏi giá, Khách phân vân)" style="flex:1;min-width:200px">
             <input id="mt-f-tags" class="zai-input" placeholder="Tag, phân cách bằng dấu phẩy (VD: giu-khach, bao-hanh)" style="flex:1;min-width:200px">
           </div>
-          <textarea id="mt-f-content" class="zai-textarea" placeholder="Nội dung mẫu tin nhắn..." rows="4" style="width:100%;margin-bottom:8px"></textarea>
+          <textarea id="mt-f-content" class="zai-textarea" placeholder="Mẫu câu tư vấn — mỗi dòng (xuống dòng) sẽ là 1 tin nhắn riêng khi gửi cho khách" rows="6" style="width:100%;margin-bottom:8px"></textarea>
           <div style="display:flex;gap:8px;justify-content:flex-end">
             <button class="btn sm" onclick="closeMsgTemplateForm()">Hủy</button>
             <button class="btn sm primary" id="mt-f-save-btn" onclick="saveMsgTemplateUI()">Lưu mẫu</button>
@@ -1280,7 +1286,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 
 <script src="js/19-opentiertooltip.js"></script>
 
-<script src="js/20-loadaiexamples.js"></script>
+<script src="js/20-loadaiexamples.js?v=20261021a"></script>
 
 <!-- ═══ BROADCAST COMPOSE MODAL (Gửi tin hàng loạt qua Zalo AI extension) ═══ -->
 <div id="bc-compose-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;">
