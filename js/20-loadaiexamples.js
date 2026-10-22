@@ -96,6 +96,7 @@ var _msgTemplates = [];
 var _msgTplCanApprove = false;   // server quyet dinh (vai tro that trong sheet Users qua token), KHONG tin currentUser phia trinh duyet
 var _msgTplPending = 0;
 var _msgTplLoadedAt = 0;
+var _msgTplGroups = [];   // nhom san pham (DANH_MUC) do server tra ve cung danh sach mau — dung cho dropdown form + bo loc
 async function loadMsgTemplates() {
   var listEl = document.getElementById('mt-list');   // co the khong co (khi goi tu khung chat) -> van tai du lieu, chi bo qua phan ve danh sach quan ly
   if (listEl) listEl.innerHTML = '<div style="font-size:12px;color:var(--muted)">Đang tải mẫu...</div>';
@@ -106,12 +107,14 @@ async function loadMsgTemplates() {
     _msgTemplates = (d && d.templates) || [];
     _msgTplCanApprove = !!(d && d.canApprove);
     _msgTplPending = (d && d.pendingCount) || 0;
+    _msgTplGroups = (d && d.groups) || [];
     _msgTplLoadedAt = Date.now();
   } catch (e) {
     if (listEl) listEl.innerHTML = '<div style="font-size:12px;color:#dc2626">Lỗi tải thư viện mẫu, thử lại.</div>';
     return;
   }
   _tplUpdateBadge();
+  _tplFillGroupSelects();
   renderMsgTemplateList();
   _tplSuggestRefreshAll();
 }
@@ -148,8 +151,18 @@ function tplSearch(list, query, topic) {
   out.sort(function (a, b) { return (b.score - a.score) || (a.idx - b.idx); });   // idx nho = moi hon (server da sap moi nhat truoc)
   return out.map(function (x) { return x.t; });
 }
+// Do lai cac o chon nhom (bo loc danh sach + form) tu _msgTplGroups; giu nguyen lua chon dang co neu van con trong danh sach.
+function _tplFillGroupSelects() {
+  var groups = _msgTplGroups.slice();
+  _msgTemplates.forEach(function (t) { if (t.nhom && groups.indexOf(t.nhom) < 0) groups.push(t.nhom); });
+  var f = document.getElementById('mt-group-filter');
+  if (f) { var cur = f.value; f.innerHTML = '<option value="">Tất cả nhóm</option>' + groups.map(function (g) { return '<option value="' + esc(g) + '">' + esc(g) + '</option>'; }).join('') + '<option value="__none__">Chung (chưa phân nhóm)</option>'; f.value = cur; if (f.value !== cur) f.value = ''; }
+  var s = document.getElementById('mt-f-group');
+  if (s) { var cs = s.value; s.innerHTML = '<option value="">🗂 Nhóm sản phẩm: tự phân loại</option>' + groups.map(function (g) { return '<option value="' + esc(g) + '">' + esc(g) + '</option>'; }).join(''); s.value = cs; if (s.value !== cs) s.value = ''; }
+}
 function _tplChips(t) {
   var h = '';
+  if (t.nhom) h += '<span class="zi-chip" style="background:#dcfce7;color:#166534" title="' + (t.nhomAuto ? 'Hệ thống tự phân loại theo tên sản phẩm / nội dung' : 'Nhóm sản phẩm do người soạn chọn') + '">🗂 ' + esc(t.nhom) + (t.nhomAuto ? ' · tự phân loại' : '') + '</span>';
   String(t.product || '').split(/[,;|\n]/).map(function (x) { return x.trim(); }).filter(Boolean).forEach(function (p) { h += '<span class="zi-chip" style="background:#fef3c7;color:#92400e" title="Sản phẩm">📦 ' + esc(p) + '</span>'; });
   if (t.topic) h += '<span class="zi-chip" style="background:#dbeafe;color:#1e40af" title="Nội dung hội thoại">💬 ' + esc(t.topic) + '</span>';
   String(t.tags || '').split(',').forEach(function (tg) { tg = tg.trim(); if (tg) h += '<span class="zi-chip">#' + esc(tg) + '</span>'; });
@@ -258,6 +271,8 @@ function renderMsgTemplateList() {
   var q = (document.getElementById('mt-search').value || '').trim();
   var stF = (document.getElementById('mt-status-filter') || {}).value || '';
   var base = _msgTemplates.filter(function (t) {
+    var gF = (document.getElementById('mt-group-filter') || {}).value || '';
+    if (gF === '__none__' ? !!t.nhom : (gF && t.nhom !== gF)) return false;
     if (stF === 'mine') return _tplMine(t);
     return !stF || t.status === stF;
   });
@@ -291,6 +306,8 @@ function openMsgTemplateForm(id) {
   document.getElementById('mt-f-id').value = t ? t.id : '';
   document.getElementById('mt-f-title').value = t ? t.title : '';
   document.getElementById('mt-f-product').value = t ? (t.product || '') : '';
+  _tplFillGroupSelects();
+  document.getElementById('mt-f-group').value = (t && t.nhom && !t.nhomAuto) ? t.nhom : '';   // nhom tu phan loai KHONG dien san: de trong = tiep tuc tu phan loai
   document.getElementById('mt-f-topic').value = t ? (t.topic || '') : '';
   document.getElementById('mt-f-tags').value = t ? t.tags : '';
   document.getElementById('mt-f-content').value = t ? t.content : '';
@@ -309,6 +326,7 @@ async function saveMsgTemplateUI() {
   var tags = (document.getElementById('mt-f-tags').value || '').trim();
   var product = (document.getElementById('mt-f-product').value || '').trim();
   var topic = (document.getElementById('mt-f-topic').value || '').trim();
+  var nhom = (document.getElementById('mt-f-group').value || '').trim();   // '' = de he thong tu phan loai
   var id = (document.getElementById('mt-f-id').value || '').trim();
   if (!title || !content) { alert('Vui lòng nhập tiêu đề và nội dung mẫu.'); return; }
   var btn = document.getElementById('mt-f-save-btn');
@@ -316,7 +334,7 @@ async function saveMsgTemplateUI() {
   var d = null;
   try {
     var body = { action: 'saveMessageTemplate', template: {
-      id: id || undefined, title: title, content: content, tags: tags, product: product, topic: topic,
+      id: id || undefined, title: title, content: content, tags: tags, product: product, topic: topic, nhom: nhom,
       createdBy: (typeof currentUser !== 'undefined' && currentUser && currentUser.name) || ''
     } };
     var r = await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify(body) });

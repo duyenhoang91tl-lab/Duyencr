@@ -817,7 +817,8 @@ var SH_MSG_TPL = 'MessageTemplates';
 // (approved | pending | rejected) + nguoi duyet. Hang CU (khong co status) coi la 'approved' de mau dang dung khong bi mat.
 // getSheet_ tu bo sung cac cot header con thieu o cuoi sheet cu, KHONG dung toi du lieu san co.
 var MSG_TPL_HEADERS = ['id', 'title', 'content', 'tags', 'createdBy', 'createdAt', 'updatedAt', 'product', 'topic', 'status', 'approvedBy', 'approvedAt', 'rejectReason', 'nhom'];
-// nhom = NHOM SAN PHAM (lay tu cot Nhom SP bang gia DANH_MUC) — Duyen 21/10/2026 "tao mau luu san": CS chon nhom/ten SP roi them mau tu van de AI hoc.
+// nhom = NHOM SAN PHAM (cot 'Nhom SP' bang gia DANH_MUC) — Duyen 21/10/2026 "tao mau luu san": CS chon nhom/ten SP roi them mau tu van de AI hoc.
+// Nhom do nguoi soan CHON tay -> ghi vao cot; de TRONG = he thong TU PHAN LOAI khi doc (khong ghi vao sheet: doi danh muc thi mau tu nhay theo nhom moi). Xem _tplClassify_.
 // Ai duoc duyet / sua / xoa MAU DA DUYET / tao mau thang o trang thai da duyet. Doi danh sach nay neu muon them vai tro (vd 'leader').
 var MSG_TPL_APPROVER_ROLES_ = ['admin'];   // 4c-3: CHI admin duyet/sua/xoa mau chuan (truoc day co 'manager')
 var MSG_TPL_STATUS_ = { approved: 1, pending: 1, rejected: 1 };
@@ -846,8 +847,69 @@ function _tplRowToObj_(row) {
     id: String(row[0]), title: String(row[1] || ''), content: String(row[2] || ''), tags: String(row[3] || ''),
     createdBy: String(row[4] || ''), createdAt: row[5] || '', updatedAt: row[6] || '',
     product: String(row[7] || ''), topic: String(row[8] || ''), status: st,
-    approvedBy: String(row[10] || ''), approvedAt: row[11] || '', rejectReason: String(row[12] || ''), nhom: String(row[13] || '')
+    approvedBy: String(row[10] || ''), approvedAt: row[11] || '', rejectReason: String(row[12] || ''),
+    nhom: String(row[13] || '').trim()   // nhom do nguoi soan chon ('' = chua chon; readMessageTemplates_ se dien nhom tu phan loai)
   };
+}
+// ── Nhom san pham cua mau tin (2026-10-16) ──
+// Danh sach nhom + ten san pham lay tu DANH_MUC (buildPriceCatalogFlat_). Chi so nho (khoang vai chuc KB) duoc cache 10 phut
+// de moi lan doc mau khong phai doc lai ca sheet gia. Loi doc DANH_MUC KHONG duoc lam hong viec doc mau -> chi so rong, mau hien nhu 'chung'.
+var _tplCatIdxMemo_ = null;
+var MSG_TPL_CAT_CACHE_KEY_ = 'tplcat_v1';
+// Chuan hoa GIU DAU (chu thuong, bo ky tu la): 'nhan' (nhan vien) va 'nhan' (nhan vang) khac nhau -> khong phan loai nham mau ve nhan vien vao nhom Nhan.
+function _tplFoldAcc_(s) { return String(s == null ? '' : s).toLowerCase().normalize('NFC').replace(/[^a-z0-9\u00e0-\u1ef9]+/g, ' ').trim(); }
+function _tplCatalogIndex_() {
+  if (_tplCatIdxMemo_) return _tplCatIdxMemo_;
+  var idx = null;
+  try { var c = CacheService.getScriptCache().get(MSG_TPL_CAT_CACHE_KEY_); if (c) idx = JSON.parse(c); } catch (e0) { idx = null; }
+  if (!idx || !idx.groups) {
+    idx = { groups: [], names: [] };
+    try {
+      var items = (buildPriceCatalogFlat_().items) || [], gIdx = {}, nameMap = {};
+      items.forEach(function (it) {
+        var g = String(it.n || '').trim(); if (!g) return;
+        if (gIdx[g] === undefined) { gIdx[g] = idx.groups.length; idx.groups.push(g); }
+        [it.t, it.m].forEach(function (nm) {
+          var f = _tplFoldAcc_(nm); if (f.length < 3) return;
+          if (!nameMap[f]) nameMap[f] = {}; nameMap[f][gIdx[g]] = 1;
+        });
+      });
+      // Ten san pham xuat hien o >= 2 nhom la mo ho -> khong dung de phan loai (tranh doan sai)
+      Object.keys(nameMap).forEach(function (f) { var gs = Object.keys(nameMap[f]); if (gs.length === 1) idx.names.push([f, +gs[0]]); });
+      try { CacheService.getScriptCache().put(MSG_TPL_CAT_CACHE_KEY_, JSON.stringify(idx), 600); } catch (e1) {}   // qua 100KB thi bo qua cache
+    } catch (e2) { idx = { groups: [], names: [] }; }
+  }
+  _tplCatIdxMemo_ = idx;
+  return idx;
+}
+// Tu phan loai: cham diem moi nhom = tong do dai cac ten san pham (va ten nhom, nhan doi) xuat hien NGUYEN TU trong tieu de/tag/san pham/chu de/noi dung.
+// Khop GIU DAU; chi ten >= 2 tu moi duoc khop khi bo dau (nguoi go 'lac tay bac' khong dau). Hoa diem (2 nhom bang nhau) hoac khong khop gi -> ''
+// (mau 'chung') — thua con hon phan loai sai. Mau chao hoi chung khong nhac san pham nao -> chung.
+function _tplClassify_(t, idx) {
+  idx = idx || _tplCatalogIndex_();
+  if (!idx.groups.length) return '';
+  var acc = ' ' + _tplFoldAcc_([t.title, t.tags, t.product, t.topic, t.content].join(' ')) + ' ';
+  var plain = ' ' + _stripVN_(acc).trim() + ' ';
+  function hit(name) {
+    if (acc.indexOf(' ' + name + ' ') !== -1) return true;
+    var pl = _stripVN_(name);
+    return pl.indexOf(' ') !== -1 && plain.indexOf(' ' + pl + ' ') !== -1;
+  }
+  var score = {};
+  idx.groups.forEach(function (g, gi) { var f = _tplFoldAcc_(g); if (f.length >= 3 && hit(f)) score[gi] = (score[gi] || 0) + f.length * 2; });
+  idx.names.forEach(function (p) { if (hit(p[0])) score[p[1]] = (score[p[1]] || 0) + p[0].length; });
+  var best = -1, bestSc = 0, tie = false;
+  Object.keys(score).forEach(function (k) {
+    if (score[k] > bestSc) { best = +k; bestSc = score[k]; tie = false; } else if (score[k] === bestSc) tie = true;
+  });
+  return (best >= 0 && !tie) ? idx.groups[best] : '';
+}
+// Danh sach nhom cho dropdown: nhom trong DANH_MUC (thu tu A-Z) + nhom da chon tay ma DANH_MUC khong con (de van sua/loc duoc)
+function _tplGroupList_(list) {
+  var idx = _tplCatalogIndex_(), seen = {}, out = [];
+  idx.groups.forEach(function (g) { var k = _tplFoldAcc_(g); if (!seen[k]) { seen[k] = 1; out.push(g); } });
+  (list || []).forEach(function (t) { if (t.nhom && !t.nhomAuto) { var k = _tplFoldAcc_(t.nhom); if (!seen[k]) { seen[k] = 1; out.push(t.nhom); } } });
+  return out.sort(function (a, b) { return String(a).localeCompare(String(b), 'vi'); });
 }
 function _tplOwns_(t, c) { return !!(c && c.name) && String(t.createdBy || '').trim().toLowerCase() === c.name.toLowerCase(); }
 
@@ -865,6 +927,15 @@ function readMessageTemplates_(caller) {
     var seePending = caller.role && caller.role !== 'anon';
     if (caller.priv || t.status === 'approved' || (seePending && t.status === 'pending') || _tplOwns_(t, caller)) out.push(t);
   }
+  // Nhom: nguoi soan chon tay thi giu; de trong thi he thong tu phan loai (nhomAuto=true de UI ghi chu '(tu phan loai)')
+  var cidx = null;
+  out.forEach(function (t) {
+    t.nhomAuto = false;
+    if (t.nhom) return;
+    if (!cidx) cidx = _tplCatalogIndex_();
+    var g = _tplClassify_(t, cidx);
+    if (g) { t.nhom = g; t.nhomAuto = true; }
+  });
   // Moi nhat len dau. Dung getTime() (khong dung String(Date)) vi Date.toString() chi chinh xac den giay va
   // khong sap xep dung theo thoi gian thuc -> 2 mau luu cung giay se bi sap xep SAI thu tu neu so sanh chuoi.
   function tplTime_(t) { var d = t.updatedAt || t.createdAt; var ms = d ? new Date(d).getTime() : 0; return isNaN(ms) ? 0 : ms; }
@@ -884,7 +955,9 @@ function saveMessageTemplate_(data, caller) {
   var tags = String(data.tags || '').trim().slice(0, 300);
   var product = String(data.product || '').trim().slice(0, 300);
   var topic = String(data.topic || '').trim().slice(0, 200);
-  var nhom = String(data.nhom || '').trim().slice(0, 200);
+  // nhom: chuoi (ke ca rong = ve 'tu phan loai') -> ghi; KHONG gui truong nay (extension cu) -> giu nguyen nhom hien co.
+  var nhomSet = (data.nhom !== undefined && data.nhom !== null);
+  var nhom = nhomSet ? String(data.nhom).trim().slice(0, 200) : '';
   // Tai khoan web: nguoi tao = ten that trong token (khong tin client). Extension: ten tu khai.
   var author = caller.via === 'web' ? caller.name : (caller.name || String(data.createdBy || '').trim().slice(0, 60));
   var sh = getSheet_(SH_MSG_TPL, MSG_TPL_HEADERS);
@@ -899,7 +972,7 @@ function saveMessageTemplate_(data, caller) {
         sh.getRange(i + 1, 2, 1, 3).setValues([[title, content, tags]]);
         sh.getRange(i + 1, 5).setValue(cur.createdBy || author);
         sh.getRange(i + 1, 7, 1, 4).setValues([[now, product, topic, cur.status]]);
-        sh.getRange(i + 1, 14).setValue(nhom);
+        if (nhomSet) sh.getRange(i + 1, MSG_TPL_HEADERS.indexOf('nhom') + 1).setValue(nhom);
         return jsonOut_({ ok: true, id: cur.id, status: cur.status });
       }
       if (cur.status === 'approved' || !_tplOwns_(cur, caller)) {
@@ -908,7 +981,7 @@ function saveMessageTemplate_(data, caller) {
       sh.getRange(i + 1, 2, 1, 3).setValues([[title, content, tags]]);
       sh.getRange(i + 1, 7, 1, 4).setValues([[now, product, topic, 'pending']]);
       sh.getRange(i + 1, 11, 1, 3).setValues([['', '', '']]);
-      sh.getRange(i + 1, 14).setValue(nhom);
+      if (nhomSet) sh.getRange(i + 1, MSG_TPL_HEADERS.indexOf('nhom') + 1).setValue(nhom);
       return jsonOut_({ ok: true, id: cur.id, status: 'pending' });
     }
   }
