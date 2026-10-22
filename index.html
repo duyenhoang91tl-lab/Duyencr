@@ -1739,7 +1739,7 @@ function openBcLogModal(phone){
 // cuộn ngang trong khung riêng của nó thay vì đẩy tràn cả trang trên điện thoại.
 (function(){
   function wrapTable(t){
-    if (!t || t.closest('.table-scroll')) return;
+    if (!t || !t.parentNode || t.closest('.table-scroll')) return;   // bang da bi ve lai/go khoi DOM truoc khi observer chay -> parentNode null (loi "reading 'insertBefore'")
     var wrap = document.createElement('div');
     wrap.className = 'table-scroll';
     t.parentNode.insertBefore(wrap, t);
