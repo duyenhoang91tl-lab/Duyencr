@@ -326,3 +326,6 @@ Chuẩn: chọn/ghi tên nào của 1 người cũng ra đủ dữ liệu của 
 
 ## Báo cáo G (thưởng Thử việc/Chính thức) chỉ cho đội Online + Văn phòng
 - `_srGEligible_` (js/12): chỉ Sale có phân loại online/offline/probation mới nhận thưởng; người chưa phân loại/đội khác bị bỏ khỏi bảng, tổng, CSV/Excel và được liệt kê trong dòng cảnh báo. Test: tools/test-bonus-g-eligible.js.
+
+## Pancake AI: báo lỗi API gọn
+- Khi mọi API AI lỗi, backend chỉ trả "Lỗi API: Groq 401 · Cerebras 402 · Gemini 401" (bỏ nội dung JSON dài/key che/phần chưa cấu hình). Cần deploy lại Apps Script.
