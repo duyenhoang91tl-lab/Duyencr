@@ -16,10 +16,100 @@ html[data-theme="dark"] {
 html[data-theme="dark"] .btn.primary { color:#0b1a12; }
 html[data-theme="dark"] input, html[data-theme="dark"] select, html[data-theme="dark"] textarea { background:var(--surface2); color:var(--text); border-color:var(--border-md); }
 
-/* ── NGOẠI LỆ THỦ CÔNG (chế độ tối): phần tử gán style bằng JS `el.style.cssText='…'` — trình duyệt chuẩn hoá thành rgb(...) nên
-      tools/gen-dark-theme.js (khớp theo mã hex trong chuỗi style) không bắt được. Cần !important vì style gán thẳng lên phần tử.
-      Thêm chỗ mới kiểu `x.style.cssText='background:#...'` thì thêm id + quy tắc ở đây (tools/test-dark-theme.js kiểm các id này). ── */
-html[data-theme="dark"] #sync-err-banner,html[data-theme="dark"] #row-err-banner{background:#3a1b1b!important;border-bottom-color:#7f2d2d!important;color:#fca5a5!important;}
-html[data-theme="dark"] #sync-err-banner button,html[data-theme="dark"] #row-err-banner button{background:var(--surface2)!important;color:#fca5a5!important;border-color:#7f2d2d!important;}
-html[data-theme="dark"] #dp-refresh-hint{background:#3a3213!important;border-color:#6b5a1e!important;color:#fcd34d!important;}
-html[data-theme="dark"] #deploy-guide-banner{background:var(--surface)!important;border-color:#c2570c!important;box-shadow:0 6px 28px rgba(0,0,0,.55)!important;}
+/* ── css/11-roles.css ── */
+html[data-theme="dark"] .rl-feat,
+html[data-theme="dark"] .rl-top,
+html[data-theme="dark"] .rl-btn,
+html[data-theme="dark"] .rl-in,
+html[data-theme="dark"] .rl-rc,
+html[data-theme="dark"] .rl-det,
+html[data-theme="dark"] .rl-scroll,
+html[data-theme="dark"] .rl-recent,
+html[data-theme="dark"] .rl-pl,
+html[data-theme="dark"] .rl-dc { background:var(--surface); }
+html[data-theme="dark"] .rl-feat { border-bottom-color:var(--border); }
+html[data-theme="dark"] .rl-cell { border-bottom-color:var(--border); }
+html[data-theme="dark"] .rl-ev { border-top-color:var(--border); }
+html[data-theme="dark"] .rl-lock { background:var(--surface2); }
+html[data-theme="dark"] .rl-sel { background:var(--blue-bg); }
+html[data-theme="dark"] .rl-mx thead th.rl-sel { background:var(--blue-bg); }
+html[data-theme="dark"] .rl-mx thead th.rl-lock { background:var(--surface3); }
+html[data-theme="dark"] .rl-tg.on { background:var(--blue-bg); border-color:var(--blue-b); color:var(--blue); }
+html[data-theme="dark"] .rl-chip { background:var(--blue-bg); color:var(--blue); }
+html[data-theme="dark"] .rl-pi:hover { background:var(--surface2); }
+html[data-theme="dark"] .rl-pi.on { background:var(--blue-bg); border-color:var(--blue-b); }
+html[data-theme="dark"] .rl-back:hover { background:var(--surface2); }
+html[data-theme="dark"] .rl-link { color:var(--red); }
+html[data-theme="dark"] .rl-dirty { color:var(--tn); }
+
+/* ── css/01-base.css — nickzalo / zalophone / pkc / bday / remind / cs-* / tf-* ── */
+html[data-theme="dark"] .nickzalo-field { background:var(--green-bg); border-color:var(--green-mid); }
+html[data-theme="dark"] .nickzalo-label-text { color:var(--green); }
+html[data-theme="dark"] .nickzalo-select,
+html[data-theme="dark"] .nickzalo-input { background:var(--surface2); border-color:var(--green-mid); }
+html[data-theme="dark"] .nickzalo-chip { background:var(--green-bg); color:var(--green); border-color:var(--green-mid); }
+html[data-theme="dark"] .nickzalo-chip .nz-x { color:var(--green); }
+html[data-theme="dark"] .zalophone-field { background:var(--blue-bg); border-color:var(--blue-b); }
+html[data-theme="dark"] .zalophone-label-text { color:var(--blue); }
+html[data-theme="dark"] .zalophone-select,
+html[data-theme="dark"] .zalophone-input { background:var(--surface2); border-color:var(--blue-b); }
+html[data-theme="dark"] .zalophone-chip { background:var(--blue-bg); color:var(--blue); border-color:var(--blue-b); }
+html[data-theme="dark"] .zalophone-chip .zp-x { color:var(--blue); }
+html[data-theme="dark"] .pkc-b { background:var(--surface2); border-color:var(--border-md); }
+html[data-theme="dark"] .pkc-m.out .pkc-b { background:var(--green-bg); border-color:var(--green-mid); }
+html[data-theme="dark"] .bday-field { background:rgba(190,24,93,.12); border-color:rgba(190,24,93,.4); }
+html[data-theme="dark"] .bday-field .form-label { color:#f472b6; }
+html[data-theme="dark"] .bday-upcoming { background:rgba(190,24,93,.18); color:#f472b6; }
+html[data-theme="dark"] .remind-panel { background:rgba(3,105,161,.14); border-color:rgba(3,105,161,.4); }
+html[data-theme="dark"] .remind-panel .form-label { color:#38bdf8; }
+html[data-theme="dark"] .rp-bday { border-color:rgba(190,24,93,.4); background:rgba(190,24,93,.12); }
+html[data-theme="dark"] .rp-custom { border-color:rgba(139,92,246,.4); background:rgba(139,92,246,.12); }
+html[data-theme="dark"] .assign-badge-pill.has-assign { background:var(--tn-bg); color:var(--tn); border-color:var(--tn-b); }
+html[data-theme="dark"] .cs-chot { background:var(--green-bg); color:var(--green); border-color:var(--green-mid); }
+html[data-theme="dark"] .cs-pv  { background:var(--tn-bg);    color:var(--tn);    border-color:var(--tn-b); }
+html[data-theme="dark"] .cs-hen { background:var(--blue-bg);  color:var(--blue);  border-color:var(--blue-b); }
+html[data-theme="dark"] .cs-knm { background:var(--surface3); color:var(--muted); border-color:var(--border-md); }
+html[data-theme="dark"] .cs-kcnc{ background:var(--red-bg);   color:var(--red);   border-color:var(--red-b); }
+html[data-theme="dark"] .cs-ngung{ background:var(--tn-bg);   color:var(--tn);    border-color:var(--tn-b); }
+html[data-theme="dark"] .cs-sd  { background:var(--green-bg); color:var(--green); border-color:var(--green-mid); }
+html[data-theme="dark"] .login-err { background:var(--red-bg); color:var(--red); }
+html[data-theme="dark"] .tf-badge { background:var(--tn-bg); color:var(--tn); }
+html[data-theme="dark"] .tf-badge-st { background:var(--blue-bg); color:var(--blue); }
+html[data-theme="dark"] .tf-step.tf-current { background:var(--blue-bg); color:var(--blue); }
+html[data-theme="dark"] .tf-cur { border-color:var(--blue-b); background:var(--blue-bg); }
+html[data-theme="dark"] .tf-req { border-color:var(--tn-b); background:var(--tn-bg); }
+html[data-theme="dark"] .tf-sys-req { background:var(--tn-bg); color:var(--tn); }
+html[data-theme="dark"] .rank-badge.r1,
+html[data-theme="dark"] .rank-badge.rank-1 { background:var(--tn-bg); color:var(--tn); }
+html[data-theme="dark"] .rank-badge.r2,
+html[data-theme="dark"] .rank-badge.rank-2 { background:var(--surface3); color:var(--muted); }
+html[data-theme="dark"] .rank-badge.r3,
+html[data-theme="dark"] .rank-badge.rank-3 { background:rgba(154,52,18,.25); color:#fb923c; }
+html[data-theme="dark"] .dp-autosave.warn { color:var(--tn); }
+
+/* ── css/05-sidenav.css ── */
+html[data-theme="dark"] .rs-dirty { color:var(--tn); }
+html[data-theme="dark"] .nt-it.unread { background:rgba(59,130,246,.12); border-left-color:var(--blue); }
+html[data-theme="dark"] .dpg-banner.err { background:var(--red-bg); border-color:var(--red-b); color:var(--red); }
+html[data-theme="dark"] .dpg-banner.ok  { background:var(--green-bg); border-color:var(--green-mid); color:var(--green); }
+html[data-theme="dark"] .rs-pv-i.ok { background:rgba(52,178,123,.16); color:var(--green); }
+html[data-theme="dark"] .rs-pv-i.no { background:rgba(248,113,113,.12); color:var(--red); }
+
+/* ── css/09-profile.css ── */
+html[data-theme="dark"] .sp-err { background:var(--red-bg); color:var(--red); }
+html[data-theme="dark"] .sp-spin { border-color:rgba(167,139,250,.22); border-top-color:var(--vip); }
+
+/* ── css/12-salematch.css ── */
+html[data-theme="dark"] .sm-b-x { background:var(--tn-bg); color:var(--tn); }
+
+/* ── css/06-pro.css — pro theme + dark combo ── */
+html[data-theme="dark"] html.ui-pro,
+html.ui-pro[data-theme="dark"] { --bg:#0f1a12; --pro-soft:#0f1a12; }
+html.ui-pro[data-theme="dark"] .sc-main { background:#0e0d0b; }
+html.ui-pro[data-theme="dark"] .pkc-msgs { background:#0e0d0b; }
+html.ui-pro[data-theme="dark"] .pkc-day { background:rgba(255,255,255,.08); color:var(--muted); }
+html.ui-pro[data-theme="dark"] .pkc-m.out .pkc-b { background:#1a3020; border-top-right-radius:6px; }
+html.ui-pro[data-theme="dark"] .sc-conv.on { background:var(--blue-bg); }
+html.ui-pro[data-theme="dark"] .khd-log { background:var(--surface); }
+html.ui-pro[data-theme="dark"] .khd-b { background:var(--surface2); box-shadow:none; }
+html.ui-pro[data-theme="dark"] .khd-m.out .khd-b { background:#1a3020; }
