@@ -7184,6 +7184,9 @@ function doPostCore_(e) {
     // ── MESSENGER/PHONG THUY AI: doc bang tra menh + mau canned response (Sheet Menh/CannedResponses,
     //    tu tao voi du lieu mac dinh neu chua co). Them 2026-09, KHONG dung chung sheet/cot voi CareData. ──
     if (action === 'getKnowledge') return jsonOut_(getMessengerKnowledge_());
+    // ── QUET TU CAM truoc khi gui (nut "Quet tu cam" tren Pancake AI, Duyen yeu cau 2026-10-21): dung CHUNG bo phat hien + danh sach + ds bo qua voi giam sat chat
+    //    (cvDetect_/_cvBannedCompiled_) -> nut bao sach thi giam sat chat cung khong bat. Chi doc, khong ghi gi. ──
+    if (action === 'scanBanned')   return jsonOut_(scanBannedText_(data.text));
     // ── MAU TIN NHAN TU VAN KHACH: them/sua (form tren CRM tab ZALO AI) / xoa 1 mau ──
     if (action === 'saveMessageTemplate')   return saveMessageTemplate_(data.template || data, _tplCaller_(data.token, data.ek, (data.template || data).createdBy));
     if (action === 'deleteMessageTemplate') return deleteMessageTemplate_(data.id, _tplCaller_(data.token, data.ek, data.createdBy));
@@ -18503,6 +18506,14 @@ function _cvStaff_(m) {
   return String((m && (m.crm_user || m.staff_name)) || adm || '').trim();
 }
 // msgs: [{id, text, sent_at, conversation_id, page_id, staff_name, crm_user, fromraw}] -> vi pham [{id, sentAt, convId, pageId, staff, words:[raw], snippet}]
+// Quet 1 doan chat NHAN VIEN DANG SOAN. Tra { ok, hits:[{word, thayThe}] }. Cat tai 5000 ky tu (tin nhan chat khong dai hon).
+function scanBannedText_(text) {
+  try {
+    var t = String(text == null ? '' : text).slice(0, 5000);
+    var hits = cvDetect_(t, _cvBannedCompiled_());
+    return { ok: true, hits: hits.map(function (h) { return { word: h.raw, thayThe: h.thayThe || '' }; }) };
+  } catch (e) { return { ok: false, error: 'Khong quet duoc tu cam: ' + (e && e.message || e) }; }
+}
 function cvScanMessages_(msgs, compiled) {
   var out = [];
   (msgs || []).forEach(function (m) {

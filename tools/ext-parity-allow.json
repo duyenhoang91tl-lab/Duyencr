@@ -19,6 +19,7 @@
     }
   },
   "onlyPancake": {
+    "scanBanned": {"status": "gap", "note": "Nut \"Quet tu cam\" truoc khi gui (2026-10-21, Duyen yeu cau rieng cho Pancake AI); Zalo AI chua co — cho Duyen chot co lam khong (docs/crm-kb/04-extension-pancake.md)"},
     "saveCannedResponse": {
       "status": "platform",
       "note": "Cau tra loi nhanh (canned) la tinh nang cua nen tang Pancake"
