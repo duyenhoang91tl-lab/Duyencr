@@ -17,9 +17,12 @@ const fail = m => { console.error('FAIL: ' + m + (errs.length ? '\n' + errs.slic
 setTimeout(() => {
   const d = w.document, byId = id => d.getElementById(id);
   if (!d.querySelector('[id*=zai-panel]')) fail('panel khong dung len');
-  for (const id of ['zai-cart-section', 'zai-cart-add-manual', 'zai-ctkm-body', 'zai-stats-body', 'zai-img-body', 'zai-tpl-body', 'zai-price-ai-btn', 'zai-cart-gold-label']) if (!byId(id)) fail('thieu #' + id);
+  for (const id of ['zai-cart-section', 'zai-cart-add-manual', 'zai-ctkm-body', 'zai-stats-body', 'zai-img-body', 'zai-tpl-body', 'zai-price-ai-btn', 'zai-cart-gold-label', 'zai-price-mode-tabs', 'zai-price-search-mode', 'zai-price-builder-mode', 'zai-builder-steps', 'zai-stone-row']) if (!byId(id)) fail('thieu #' + id);
   const opts = [...byId('zai-ctkm-body').parentElement.parentElement.querySelectorAll('select option')].map(o => o.value);
   for (const v of ['ctkm', 'img', 'tpl', 'stats']) if (!opts.includes(v)) fail('thieu muc menu ' + v + ' (co: ' + opts + ')');
+  if (byId('zai-cart-section').style.display !== 'none') fail('gio hang phai AN cho toi khi dung');
+  byId('zai-price-mode-tabs').querySelectorAll('button')[1].click();   // mo "Soan don (chon tung buoc)"
+  if (byId('zai-price-builder-mode').style.display === 'none' || byId('zai-price-search-mode').style.display !== 'none') fail('tab Soan don khong chuyen che do');
   byId('zai-cart-add-manual').click();
   setTimeout(() => {
     if (d.querySelectorAll('.zai-cart-row').length !== 1) fail('Them dong thu cong khong tao dong');
