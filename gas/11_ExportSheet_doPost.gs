@@ -228,6 +228,7 @@ function doPost(e) {
     if (d0.action === 'saveUsers') { var _ua = _usersWriteAuth_(d0.token); if (!_ua.ok) return jsonOut_({ error: _ua.error, code: 'AUTH' }); }
     if (d0.action === 'setGasSource' && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de dong bo ma nguon GAS.' });
     if (d0.action === 'setSetting' && _isSensitiveWriteKey_(d0.key) && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Khong duoc ghi key nay.' });
+    if (d0.action === 'setSetting' && (String(d0.key || '').trim() === 'bizRules' || String(d0.key || '').trim() === 'reportsConfig' || String(d0.key || '').trim() === 'bannedWordsCfg')) { var _bizDen = _bizRulesWriteDenied_(d0.token); if (_bizDen) return jsonOut_(_bizDen); }
   }
   if (d0 && typeof d0 === 'object') {
     _AUDIT_TOKEN_ = String(d0.token || '');
@@ -299,7 +300,8 @@ function doPostCore_(e) {
     if (action === 'saveUsers')           return saveUsers_(data.users);
     if (action === 'saveAudit')           return saveAudit_(data.rows);
     // ── Nhap du lieu Base/Pos tu file export (thay copy tay vao Google Sheet) ──
-    if (action === 'importSheetRows')     return doImportSheetRows_(data.sheet, data.rows, data.dryRun, data.updateExisting);
+    if (action === 'importSheetRows')     return doImportSheetRows_(data.sheet, data.rows, data.dryRun, data.updateExisting, _impWho_(data.token));
+    if (action === 'importUndo')          return doImportUndo_(data.batchId, data.dryRun, _impWho_(data.token));
     // ── Bao cao Pancake ──
     if (action === 'savePancakeStats')    return savePancakeStats_(data.rows);
     if (action === 'savePancakeNameMap')  return savePancakeNameMap_(data.pancakeName, data.saleName);

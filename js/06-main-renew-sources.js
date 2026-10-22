@@ -119,7 +119,88 @@ setTimeout(_syncCustomFieldsFromGAS, 0);
 //  Ô nào để trống ('' / undefined) thì dùng % của TEAM mà người đó thuộc về
 //  (xem _resolveCommissionRate_).
 // ════════════════════════════════════════════════════════════════════
-const COMMISSION_THRESHOLD = 15000000; // 15 triệu — ngưỡng phân loại đơn "≥15tr" / "<15tr"
+let COMMISSION_THRESHOLD = 15000000; // MẶC ĐỊNH 15 triệu — ngưỡng phân loại đơn "≥ ngưỡng" / "< ngưỡng". Admin đổi được ở Cấu hình (Settings 'bizRules'), xem _bizApply_ bên dưới.
+// ── QUY TẮC TÍNH DOANH THU/HOA HỒNG CẤU HÌNH ĐƯỢC (bizRules) — CRM sẽ mở rộng/bán cho công ty khác nên không cứng trong code ──
+// Nguồn thật = Settings 'bizRules' (JSON) trên GAS; client giữ bản sao ở BIZ_RULES + localStorage 'ome_biz_rules'. Trống/sai kiểu => mặc định = hành vi cũ.
+// Phải khớp BIZ_RULES_DEFAULT_ / _bizRules_ ở gas_v13.js. Hiện client chỉ DÙNG commissionThreshold (hoa hồng ở Báo cáo E); các khóa còn lại
+// (trạng thái đơn bị loại, tỷ lệ quầy) do backend áp khi dựng báo cáo — client giữ để hiển thị/sửa ở trang Cấu hình.
+var _BIZ_DEFAULT_ = { commissionThreshold: 15000000, baseExcludedStatuses: ['Thất bại'], posExcludedStatuses: ['Hủy đơn', 'Hoàn đơn', 'Đã hoàn', 'Đang hoàn'], quayRatio: 0.3, quayKeywords: ['Quầy Hào Nam', 'Cửa hàng'] };
+var BIZ_RULES = JSON.parse(JSON.stringify(_BIZ_DEFAULT_));
+function _bizApply_(raw) {
+  var D = _BIZ_DEFAULT_; if (!raw || typeof raw !== 'object') raw = {};
+  function list(v, fb) { if (!Array.isArray(v)) return fb.slice(); var o = [], seen = {}; v.forEach(function(x){ x = String(x == null ? '' : x).replace(/\s+/g, ' ').trim(); var k = x.toLowerCase(); if (x && !seen[k]) { seen[k] = 1; o.push(x); } }); return o; }
+  var thr = Number(raw.commissionThreshold), ratio = Number(raw.quayRatio);
+  var before = JSON.stringify(BIZ_RULES);
+  BIZ_RULES = {
+    commissionThreshold: (isFinite(thr) && thr > 0) ? thr : D.commissionThreshold,
+    baseExcludedStatuses: list(raw.baseExcludedStatuses, D.baseExcludedStatuses),
+    posExcludedStatuses: list(raw.posExcludedStatuses, D.posExcludedStatuses),
+    quayRatio: (isFinite(ratio) && ratio > 0 && ratio <= 1) ? ratio : D.quayRatio,
+    quayKeywords: list(raw.quayKeywords, D.quayKeywords)
+  };
+  COMMISSION_THRESHOLD = BIZ_RULES.commissionThreshold;
+  return before !== JSON.stringify(BIZ_RULES);
+}
+// Nhãn ngắn của ngưỡng cho chữ trên giao diện: 15000000 -> "15tr", 12500000 -> "12,5tr". Thay cho chữ "15tr" cứng.
+function _commThrLabel_() { var m = Math.round(COMMISSION_THRESHOLD / 10000) / 100; return String(m).replace('.', ',') + 'tr'; }
+try { var _bizLs = loadLS('ome_biz_rules'); if (_bizLs) _bizApply_(_bizLs); } catch(e) {}
+async function _syncBizRulesFromGAS() {
+  if (!gsUrl) return;
+  try {
+    var r = await fetch(gsUrl + '?action=getSetting&key=bizRules', { redirect: 'follow' });
+    var data = await r.json();
+    var obj = (data && data.value) ? JSON.parse(data.value) : {};   // chưa cài => {} => mặc định
+    var changed = _bizApply_(obj);
+    saveLS('ome_biz_rules', obj);
+    if (changed && typeof _srState !== 'undefined' && _srState.sub === 'E' && typeof renderSalesReportTab === 'function') renderSalesReportTab();
+  } catch(e) { /* giữ bản local nếu lỗi mạng/parse */ }
+}
+setTimeout(_syncBizRulesFromGAS, 0);
+
+// ── DANH SÁCH BÁO CÁO CẤU HÌNH ĐƯỢC (Settings 'reportsConfig') — mỗi công ty bật/tắt + đặt tên báo cáo riêng (CRM bán ra ngoài). ──
+// { "<mã A-L>": { enabled: false, label: "tên hiển thị" } }. Chưa cài = bật hết, tên mặc định. Chỉ ẨN trên giao diện chọn báo cáo; quyền xem dữ liệu
+// vẫn theo phân quyền tab/backend. Admin vẫn thấy báo cáo đang ẩn (gắn "(đang ẩn)") để bật lại. Luôn giữ ít nhất 1 báo cáo bật.
+var _SR_DEFAULT_ITEMS_ = [['A','Báo cáo A — Base'],['B','Báo cáo B — Pos'],['C','Báo cáo C — So sánh kỳ Base'],['D','Báo cáo D — Sale tự thêm'],
+  ['E','Báo cáo E — Hoa hồng nhân viên Pos'],['F','Báo cáo F — KPI Sale'],['G','Báo cáo G — Thưởng thử việc / chính thức'],
+  ['H','Báo cáo H — Tổng quan data đã chia'],['I','Báo cáo I — Chia data Renew'],['L','Báo cáo L — KH qua cửa hàng']];
+var REPORTS_CFG = {};
+function _rcApply_(raw) {
+  var out = {}, before = JSON.stringify(REPORTS_CFG);
+  if (raw && typeof raw === 'object') _SR_DEFAULT_ITEMS_.forEach(function(it){
+    var o = raw[it[0]]; if (!o || typeof o !== 'object') return;
+    var e = { enabled: o.enabled !== false, label: String(o.label || '').replace(/\s+/g, ' ').trim().slice(0, 60) };
+    if (!e.enabled || e.label) out[it[0]] = e;
+  });
+  if (_SR_DEFAULT_ITEMS_.every(function(it){ return out[it[0]] && out[it[0]].enabled === false; })) out = {};   // tắt hết = cấu hình hỏng => bật lại hết
+  REPORTS_CFG = out;
+  return before !== JSON.stringify(REPORTS_CFG);
+}
+// [[mã, tên, đangẨn], ...] — tên theo cấu hình (trống = mặc định)
+function _srItems_() {
+  return _SR_DEFAULT_ITEMS_.map(function(it){ var c = REPORTS_CFG[it[0]] || {}; return [it[0], c.label || it[1], c.enabled === false]; });
+}
+// Người không phải admin đang đứng ở báo cáo bị ẩn => chuyển sang báo cáo bật đầu tiên. Trả true nếu đã đổi.
+function _srEnsureSubAllowed_() {
+  if (typeof _srIsAdmin === 'function' && _srIsAdmin()) return false;
+  var cur = _srState.sub === 'K' ? 'G' : _srState.sub;
+  var items = _srItems_(), hit = items.filter(function(it){ return it[0] === cur; })[0];
+  if (!hit || !hit[2]) return false;
+  var first = items.filter(function(it){ return !it[2]; })[0];
+  if (!first) return false;
+  _srState.sub = first[0]; return true;
+}
+try { var _rcLs = loadLS('ome_reports_cfg'); if (_rcLs) _rcApply_(_rcLs); } catch(e) {}
+async function _syncReportsCfgFromGAS() {
+  if (!gsUrl) return;
+  try {
+    var r = await fetch(gsUrl + '?action=getSetting&key=reportsConfig', { redirect: 'follow' });
+    var data = await r.json();
+    var obj = (data && data.value) ? JSON.parse(data.value) : {};
+    var changed = _rcApply_(obj); saveLS('ome_reports_cfg', obj);
+    if (changed && typeof _activeV9Tab !== 'undefined' && _activeV9Tab === 'salesreport' && typeof renderSalesReportTab === 'function') renderSalesReportTab();
+  } catch(e) { /* giữ bản local nếu lỗi mạng/parse */ }
+}
+setTimeout(_syncReportsCfgFromGAS, 0);
 let INDIVIDUAL_RATES = (function(){
   try { var v = loadLS('ome_individual_rates'); return (v && typeof v === 'object') ? v : {}; } catch(e){ return {}; }
 })();
@@ -280,6 +361,11 @@ let gsUrl = FIXED_GS_URL || loadLS('ome_gs_url') || '';
           if (tok && u.indexOf('action=users') === -1) add.push('demo=' + encodeURIComponent(tok));
           if (!/[?&]src=/.test(u)) add.push('src=web');
           if (st && !/[?&]token=/.test(u)) add.push('token=' + encodeURIComponent(st));
+          // Khach nap qua o tim kiem (ngoai pham vi, js/29 _pullSearchCustomer_): mo ho so can lookup/donOrdersByPhone/cskhDetail -> kem via=search de server khong chan
+          if (window._oosPhones && /[?&]action=(lookup|donOrdersByPhone|cskhDetail)(&|$)/.test(u) && !/[?&]via=/.test(u)) {
+            var _mm = u.match(/[?&]phone=([^&]*)/);
+            if (_mm) { var _pp0 = decodeURIComponent(_mm[1]), _pp = (typeof normPhone === 'function' ? normPhone(_pp0) : '') || _pp0; if (window._oosPhones[_pp]) add.push('via=search'); }
+          }
           if (add.length) u += (u.indexOf('?') > -1 ? '&' : '?') + add.join('&');
         }
       }

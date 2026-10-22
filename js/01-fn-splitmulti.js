@@ -710,6 +710,31 @@ function _csFilterList(){
   if (!sel) return [];
   return Array.from(sel.selectedOptions || []).map(o => o.value).filter(v => v && v !== 'all');
 }
+// KHỚP DANH TÍNH: danh sách CS dùng để SO KHỚP khách = các CS đã chọn + MỌI tên khác của cùng người (tài khoản Sale nhiều tên, Thẻ, "Khớp sale"),
+// quy về đúng cách viết đang có trong dữ liệu (các <option> của ô lọc CS) để so khớp chính xác. Chọn tên A ra cả khách ghi dưới tên B của cùng người (và ngược lại).
+// _csFilterList() vẫn là lựa chọn THÔ trên màn hình (dùng cho giao diện/lưu trạng thái) — chỉ chỗ SO KHỚP mới dùng hàm này. Có nhớ tạm theo lựa chọn + bộ khớp.
+var _csMatchMemo = { key: '', list: null };
+function _csFilterListMatch(){
+  var raw = _csFilterList();
+  if (!raw.length) return raw;
+  var tagSig = (typeof SALE_PERSON_TAGS !== 'undefined' && SALE_PERSON_TAGS) ? JSON.stringify(SALE_PERSON_TAGS) : '';
+  var accSig = (typeof accounts !== 'undefined' && accounts) ? accounts.map(function(a){ return (a && a.role === 'cs') ? (a.names || []).join(',') + '/' + (a.name || '') : ''; }).join(';') : '';
+  var sel = document.getElementById('cs-staff-filter');
+  var optSig = sel ? sel.options.length : 0;
+  var key = raw.join('|') + '#' + tagSig.length + '#' + accSig.length + '#' + optSig + '#' + _hashStr_(tagSig + accSig);
+  if (_csMatchMemo.key === key) return _csMatchMemo.list;
+  var want = {};
+  raw.forEach(function(n){
+    want[String(n).toLowerCase()] = 1;
+    ((typeof _personAliases === 'function') ? _personAliases(n) : [n]).forEach(function(a){ if (a) want[String(a).toLowerCase()] = 1; });
+  });
+  var out = raw.slice(), seen = {};
+  raw.forEach(function(n){ seen[String(n).toLowerCase()] = 1; });
+  if (sel) Array.from(sel.options).forEach(function(o){ var v = o.value, k = String(v).toLowerCase(); if (v && v !== 'all' && want[k] && !seen[k]) { seen[k] = 1; out.push(v); } });
+  _csMatchMemo = { key: key, list: out };
+  return out;
+}
+function _hashStr_(str){ var h = 0; for (var i = 0; i < str.length; i++) h = ((h << 5) - h + str.charCodeAt(i)) | 0; return h; }
 // Đặt lại toàn bộ lựa chọn multi cho đúng danh sách tên truyền vào (thay hết, không cộng dồn)
 function _csSetFilterSelection(names){
   const sel = document.getElementById('cs-staff-filter');
@@ -719,7 +744,7 @@ function _csSetFilterSelection(names){
 }
 // name có khớp với BẤT KỲ CS nào đang chọn không (case-insensitive) — [] = không lọc = luôn khớp
 function _csFilterHas(name){
-  const list = _csFilterList();
+  const list = _csFilterListMatch();
   if (!list.length) return true;
   const n = String(name||'').toLowerCase();
   return list.some(x => x.toLowerCase() === n);
@@ -733,7 +758,7 @@ function _csModeMatch(inSeller, inCare, inAssign){
 function _inCSScope(c, _preList){
   // _preList: danh sách CS đã đọc SẴN 1 lần bởi nơi gọi (vòng lặp 136k khách). TRƯỚC ĐÂY mỗi khách đều gọi lại
   // _csFilterList() = đọc DOM <select multiple>.selectedOptions -> nhân với 136k khách x 3-4 lần/lượt đổi CS = rất lag.
-  const list = _preList || _csFilterList();
+  const list = _preList || _csFilterListMatch();
   if (!list.length) return true;
   // Multi: khách khớp phạm vi nếu thuộc về BẤT KỲ CS nào trong danh sách đã chọn (OR)
   const allH = (typeof _assignAllIndex !== 'undefined') ? _assignAllIndex[c.phone] : null;
@@ -751,7 +776,7 @@ function _inCSScope(c, _preList){
 var _scopedMemo = { key: null, list: null, arr: null, idx: null };
 function scopedCustomers(){
   const all = (typeof allCustomers !== 'undefined' ? allCustomers : []);
-  const csl = _csFilterList();
+  const csl = _csFilterListMatch();
   const u = (typeof currentUser !== 'undefined' && currentUser) ? currentUser : {};
   const key = [(typeof _dataVersion !== 'undefined' ? _dataVersion : 0), all.length, _csFilterMode, csl.join('|'),
     u.role || '', u.name || '', u.team || '', (u.names || []).join(',')].join('#');

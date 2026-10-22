@@ -40,7 +40,8 @@ const PARTS = [
   ['27_PancakeHistory', 'var PK_HIST_SECTION_ ='],
   ['28_StaffProfile', 'var SH_PROFILE ='],
   ['29_MediaLib', 'var SH_MLIB_ ='],
-  ['30_KhDiscuss', 'var SH_KHD_ =']
+  ['30_KhDiscuss', 'var SH_KHD_ ='],
+  ['31_SplitOrders', 'var SPLIT_ORDER_MAX_ROWS_ =']
 ];
 const src = fs.readFileSync(SRC, 'utf8');
 const lines = src.split('\n');

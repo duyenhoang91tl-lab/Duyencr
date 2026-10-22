@@ -44,6 +44,15 @@ var BANNED_WORDS_FALLBACK = [
 ];
 
 function readBannedWords_() {
+  var cfg = _bannedCfg_(), base = cfg.useSheet ? (readBannedWordsSheet_() || []) : [], pos = {}, out = [];
+  base.forEach(function (it) { pos[_stripVN_(it.tuCam).toLowerCase()] = out.length; out.push({ tuCam: it.tuCam, thayThe: it.thayThe }); });
+  cfg.items.forEach(function (it) {
+    var k = _stripVN_(it.tuCam).toLowerCase();
+    if (pos[k] !== undefined) out[pos[k]] = { tuCam: it.tuCam, thayThe: it.thayThe }; else { pos[k] = out.length; out.push({ tuCam: it.tuCam, thayThe: it.thayThe }); }
+  });
+  return out;
+}
+function readBannedWordsSheet_() {
   try {
     var ss = SpreadsheetApp.openById(REPORT_SALE_SS_ID);
     var sh = ss.getSheetByName(BANNED_WORDS_SHEET_NAME);
@@ -392,10 +401,14 @@ function buildMktChecklistReport_(from, to) {
     });
 
   var saleDirM = readSaleDirectory_();
-  var nhomOf = function(name) { var rec = saleDirM.byName[_normTxt_(name)]; return rec ? rec.nhom : '(ngoài danh sách)'; };
+  // KHOP DANH TINH: ten Sale (Pancake/Base/nguoi tao) khong co trong SaleDirectory nhung la ten khac cua 1 nguoi co trong do -> van vao dung nhom (Van phong/Online…)
+  var pkeyMC = _salePersonKeyFn_(), dirPkMC = {};
+  Object.keys(saleDirM.byName).forEach(function(k) { var q = pkeyMC(k); if (q && !dirPkMC[q]) dirPkMC[q] = saleDirM.byName[k]; });
+  var nhomOf = function(name) { var rec = saleDirM.byName[_normTxt_(name)] || dirPkMC[pkeyMC(name)]; return rec ? rec.nhom : '(ngoài danh sách)'; };
   var saleG = {};
   var getSG = function(nh) { return saleG[nh] || (saleG[nh] = { nhom: nh, soSale: 0, tt: 0, sdt: 0, ttMoi: 0, ttCu: 0, orders: 0, ordersForRate: 0, donFb: 0, revenue: 0, xct: 0 }); };
-  pInt.byCS.forEach(function(r) { var g = getSG(nhomOf(r.name)); g.soSale++; g.tt += r.tongTT; g.ttMoi += r.khMoi || 0; g.ttCu += r.khCu || 0; });
+  var seenSaleMC = {};   // 1 nguoi nhieu ten tren Pancake chi tinh 1 Sale
+  pInt.byCS.forEach(function(r) { var g = getSG(nhomOf(r.name)); var skMC = g.nhom + '|' + pkeyMC(r.name); if (!seenSaleMC[skMC]) { seenSaleMC[skMC] = 1; g.soSale++; } g.tt += r.tongTT; g.ttMoi += r.khMoi || 0; g.ttCu += r.khCu || 0; });
   pSdt.byCS.forEach(function(r) { getSG(nhomOf(r.name)).sdt += r.sdtMangVe; });
   Object.keys(saleOrders).forEach(function(nm) {
     var sg = getSG(nhomOf(nm)); sg.orders += saleOrders[nm]; sg.revenue += (saleRevenue[nm] || 0);

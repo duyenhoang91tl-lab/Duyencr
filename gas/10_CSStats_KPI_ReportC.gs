@@ -255,7 +255,7 @@ function buildCsStats_(cs, dateFrom, dateTo) {
   }
 
   // 4) Duyet don: so don, doanh thu (phan cua toi), hoa hong
-  var T = CS_COMMISSION_THRESHOLD_;
+  var T = _bizRules_().commissionThreshold; // cau hinh duoc (bizRules), mac dinh = CS_COMMISSION_THRESHOLD_ — phai khop COMMISSION_THRESHOLD o client (js/06)
   var totalOrders = 0, revenue = 0;
   var ordA = 0, ordB = 0, revA = 0, revB = 0, ordCh = 0, revCh = 0, commCh = 0, chBreak = {};
   var mine = []; // don cua toi (de cham thuong)
@@ -643,10 +643,11 @@ function buildCareLeadReport_(filters) {
   var csFilterArr = Array.isArray(filters.cs) ? filters.cs.filter(function(s){return s;})
     : (filters.cs ? [String(filters.cs).trim()] : []);
   var rows = readCareLeads_();
+  var csFilterSet = csFilterArr.length ? _saleFilterNameSet_(csFilterArr) : null;   // chon ten nao trong nhom Khop Sale cung ra du ca nhom
   var matched = rows.filter(function(r) {
     var dt = r.createdAt ? new Date(r.createdAt) : null;
     if (!dateInRange_(dt, filters.dateFrom, filters.dateTo)) return false;
-    if (csFilterArr.length && csFilterArr.indexOf(String(r.cs||'')) === -1) return false;
+    if (csFilterSet && !csFilterSet[_normTxt_(String(r.cs||''))]) return false;
     return true;
   });
   var byCS = {};

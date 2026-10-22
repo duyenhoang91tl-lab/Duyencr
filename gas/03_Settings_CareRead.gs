@@ -206,6 +206,7 @@ function setSetting_(key, value) {
   // Duyen 2026-09: 1 nguon phan loai Online/Offline dung chung MOI NOI, ke ca tai khoan dang nhap),
   // khong chi rieng cac bao cao doanh so.
   if (key === 'saleChannels') { try { _syncSaleChannelsToUsers_(value); } catch (eSync) {} }
+  if (key === 'bannedWordsCfg') _bannedCacheClear_(); // cache tu cam (AI + quet chat) 30 phut -> bo ngay de ap dung liền
   return jsonOut_({ ok: true });
 }
 function _syncSaleChannelsToUsers_(rawValue) {
@@ -348,11 +349,12 @@ function _remindersFromRows_(rows, csFilter) {
   // Ngay hom nay dang YYYY-MM-DD (gio dia phuong) de loc nhanh cot schedules truoc khi JSON.parse (ham nay chay moi ~5 phut/may).
   var todayYmd = today.getFullYear() + '-' + ('0' + (today.getMonth()+1)).slice(-2) + '-' + ('0' + today.getDate()).slice(-2);
   var reminders = [], byPhone = {};
+  var csSetR = csFilter ? _saleFilterNameSet_([csFilter]) : null;   // KHOP SALE: lich hen cua nguoi nay ke ca khi cot CS ghi bang ten khac cua ho
   for (var ri = 0; ri < rows.length; ri++) {
     var rw = rows[ri];
     if (!rw[0]) continue;
     var rcs = String(rw[3]||'').trim();
-    if (csFilter && rcs !== csFilter) continue;
+    if (csSetR && !csSetR[_normTxt_(rcs)]) continue;
     var npR = normPhone_(String(rw[0]));
     // (1) Hen chinh (cot schedHen) — CHI hen TRONG NGAY hom nay (khong lay qua han), nhu cu.
     var rhen = rw[12];
@@ -854,7 +856,7 @@ function _featureAllowed_(user, fid, cfg, skipUserPerms) {
   return ok;
 }
 // Chan o backend: action bao cao -> hang muc. Chi chan khi co token hop le va admin da gioi han.
-var ACTION_FEATURE_ = { salesReportA:'salesreport', salesReportB:'salesreport', salesReportC:'salesreport', saleKpiReport:'salesreport', failedOrderReport:'salesreport', careLeadReport:'salesreport', kpiReport:'kpipancake', pancakeReport:'pancake', pancakeSdtReport:'pancake', mktChecklist:'mktchecklist', orgOverview:'overview', teamAnalysis:'overview', audit:'audit' };
+var ACTION_FEATURE_ = { salesReportA:'salesreport', salesReportB:'salesreport', salesReportC:'salesreport', splitOrderReport:'salesreport', saleKpiReport:'salesreport', failedOrderReport:'salesreport', careLeadReport:'salesreport', kpiReport:'kpipancake', pancakeReport:'pancake', pancakeSdtReport:'pancake', mktChecklist:'mktchecklist', orgOverview:'overview', teamAnalysis:'overview', audit:'audit' };
 function _featureGate_(action, token) {
   var f = ACTION_FEATURE_[action];
   if (!f || !token) return null;
@@ -1071,7 +1073,7 @@ function tatChanKhac() { return _enfSet_('other', false); }
 //  (khong doi hanh vi cu). Cai: chay datChuSoHuu('ten_dang_nhap') trong Editor; xem: xemChuSoHuu. Chi chan khi co token hop le
 //  (token thieu/het han do cong tac 4b xu ly) va KHONG chan khoa extension (extension dung `ek`, xem EXT_ALLOWED_).
 // ═══════════════════════════════════════════════════════════════
-var OWNER_ONLY_ACTIONS_ = { patchOrder: 1, deleteOrder: 1, deleteDuplicateOrders: 1, replaceOrders: 1, importSheetRows: 1, dedupeCare: 1, findDuplicateOrders: 1 };   // findDuplicateOrders (quet don trung, chi menu admin) di cung deleteDuplicateOrders (4c-3)
+var OWNER_ONLY_ACTIONS_ = { patchOrder: 1, deleteOrder: 1, deleteDuplicateOrders: 1, replaceOrders: 1, importSheetRows: 1, dedupeCare: 1, findDuplicateOrders: 1, importUndo: 1, importBatches: 1 };   // findDuplicateOrders (quet don trung, chi menu admin) di cung deleteDuplicateOrders (4c-3)
 function _ownerUsers_() {
   var a = [];
   try { a = JSON.parse(PropertiesService.getScriptProperties().getProperty('ownerUsers') || '[]') || []; } catch (e) { a = []; }
@@ -1186,13 +1188,21 @@ function _scopeNote_(user, action, phone, verdict) {
     cache.put(key, JSON.stringify(m), 21600);
   } catch (e) {}
 }
-function _scopeGate_(action, token, phone) {
+function _scopeGate_(action, token, phone, via) {
   if (!SCOPE_ACTIONS_[action] || !token || !phone) return null;
   var mode = _scopeMode_();
   if (mode === 'off') return null;
   try {
     var u = _sessUser_(token);
     if (!u) return null;
+    // TRA CUU CHU DICH (Duyen yeu cau 2026-10-21): sale go DUNG SDT / ma don vao o tim kiem thi duoc xem ho so khach du khach khong thuoc ten minh.
+    // Chi bo qua cho request do client danh dau via=search; moi truong hop khac (mo ho so tu danh sach, extension...) van bi chan nhu cu.
+    // Van ghi log 'search-out' de admin biet ai tra cuu khach ngoai pham vi (xemLogPhamVi).
+    if (via === 'search') {
+      var vs = _scopeVerdict_(u, phone);
+      _scopeNote_(u, action, phone, vs === false ? 'search-out' : 'search-in');
+      return null;
+    }
     var v = _scopeVerdict_(u, phone);
     _scopeNote_(u, action, phone, v === true ? 'in' : (v === false ? 'OUT' : 'unchecked'));
     if (v === false && mode === 'enforce') return { error: 'Khach nay khong thuoc pham vi cua ban.', code: 'FORBIDDEN', action: action };
@@ -1309,6 +1319,9 @@ function _scopeListServe_(action, p, e) {
   if (!SCOPE_LIST_ACTIONS_[action] || !p.token) return null;
   var mode = _scopeMode_();
   if (mode === 'off') return null;
+  // searchOrder = TIM THEO MA DON (Duyen yeu cau 2026-10-21): sale tim ma don bat ky van thay ket qua (de nhay toi khach), khong loc theo pham vi.
+  // Nguyen nhan goc khong ra: action nay nam trong SCOPE_LIST_ACTIONS_ nen enforce loc het dong co SDT ngoai ten sale. Toi da 30 dong/lan, chuoi >= 3 ky tu.
+  if (action === 'searchOrder') { try { _scopeNote_(_sessUser_(p.token), action, '', 'search-unfiltered'); } catch (eS) {} return null; }
   var user, allowed, resp, obj;
   try {
     user = _sessUser_(p.token);
