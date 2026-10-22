@@ -26,13 +26,14 @@ function _cfgEnsurePanel(){
 async function _cfgLoad(){
   if (!gsUrl) return;
   try {
-    var keys = _CFG_FIELDS.map(function(f){ return f.key; }).concat(['ttLastTrackedMs', 'bizRules', 'reportsConfig']).join(',');
+    var keys = _CFG_FIELDS.map(function(f){ return f.key; }).concat(['ttLastTrackedMs', 'bizRules', 'reportsConfig', 'bannedWordsCfg']).join(',');
     var r = await fetch(gsUrl + (gsUrl.indexOf('?') < 0 ? '?' : '&') + 'action=getSettings&keys=' + keys, { redirect:'follow' });
     var d = await r.json(), v = (d && d.values) || {};
     _CFG_FIELDS.forEach(function(f){ _cfg.vals[f.key] = (v[f.key] !== undefined && v[f.key] !== null && String(v[f.key]) !== '') ? Number(v[f.key]) : f.def; });
     _cfg.last = Number(v.ttLastTrackedMs) || 0; _cfg.loaded = true;
     try { if (v.bizRules) _bizApply_(JSON.parse(v.bizRules)); } catch(eB){}   // quy tắc tính doanh thu/hoa hồng (js/06)
-    try { _rcApply_(v.reportsConfig ? JSON.parse(v.reportsConfig) : {}); } catch(eR){}   // danh sách báo cáo bật/tắt + tên (js/06)
+    try { _rcApply_(v.reportsConfig ? JSON.parse(v.reportsConfig) : {}); } catch(eR){}
+    try { _cfgBannedApply_(v.bannedWordsCfg ? JSON.parse(v.bannedWordsCfg) : {}); } catch(eW){}   // từ cấm cấu hình được (mục 🚫 Từ cấm bên dưới)   // danh sách báo cáo bật/tắt + tên (js/06)
   } catch(e){ _CFG_FIELDS.forEach(function(f){ if (_cfg.vals[f.key] == null) _cfg.vals[f.key] = f.def; }); }
 }
 function _cfgFmtTime(ms){
@@ -53,6 +54,7 @@ function _cfgRender(){
     '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn primary" id="cfg-save" onclick="_cfgSave()">💾 Lưu cấu hình</button><span style="font-size:11.5px;color:var(--muted)">Lưu lên server — mọi máy dùng chung; mỗi thay đổi ghi vào Nhật ký.</span></div></div>' +
     _cfgBizHtml_() +
     _cfgRptHtml_() +
+    _cfgBannedHtml_() +
     '<div class="dash-section" style="margin-top:14px"><div style="font-weight:700;margin-bottom:6px">🤖 Chạy tự động</div><div style="font-size:13px">Lần theo dõi giai đoạn đơn Base gần nhất: <b>' + esc(_cfgFmtTime(_cfg.last)) + '</b></div>' +
     '<div style="font-size:11.5px;color:var(--muted);margin-top:3px">Chạy mỗi giờ trên máy chủ (trong Apps Script chạy <code>ttCaiTrigger</code> một lần để bật). Quá 2 giờ chưa chạy nghĩa là trigger đang tắt.</div></div>' +
     '<div class="dash-section" style="margin-top:14px"><div style="font-weight:700;margin-bottom:8px">🔗 Lối tắt cài đặt</div><div style="display:flex;flex-wrap:wrap;gap:8px">' +
@@ -99,6 +101,60 @@ async function _cfgBizSave(reset){
     if (oldStr !== newStr) fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'saveAudit', rows: [{ timestamp: new Date().toISOString(), user: (currentUser && currentUser.name) || '', action: 'Cấu hình: Quy tắc tính doanh thu/hoa hồng' + (reset ? ' (về mặc định)' : ''), phone: '', oldValue: oldStr, newValue: newStr }] }) }).catch(function(){});
     toast(oldStr === newStr ? 'Không có thay đổi' : '✓ Đã lưu quy tắc — báo cáo sẽ tính theo quy tắc mới');
     if (typeof _srState !== 'undefined' && _srState.sub === 'E' && typeof renderSalesReportTab === 'function') renderSalesReportTab();
+  } catch(e){ toast('Lưu lỗi: ' + (e && e.message || e)); }
+  _cfgRender();
+}
+// ── TỪ CẤM (Settings 'bannedWordsCfg') — admin thêm/bớt từ cấm ngay tại đây, không cần mở Google Sheet "Lưu ý từ cấm". ──
+// Backend (gas_v13.js _bannedCfg_) HỢP NHẤT với sheet cho cả nhắc AI + quét chat + extension; từ trùng sheet → dòng ở đây ghi đè. Giới hạn phải khớp backend: 500 từ, từ ≤100 ký tự, thay thế ≤300.
+var _cfgBanned = { useSheet: true, items: [] };
+function _cfgBannedFold_(s){ return String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'd').toLowerCase().replace(/\s+/g, ' ').trim(); }
+function _cfgBannedParse_(text){   // mỗi dòng: "từ cấm" hoặc "từ cấm → từ thay thế" (cũng nhận -> => |)
+  var items = [], seen = {}, dup = 0;
+  String(text || '').split(/\r?\n/).forEach(function(line){
+    line = line.trim(); if (!line) return;
+    var m = line.split(/\s*(?:→|->|=>|\|)\s*/), w = (m[0] || '').replace(/\s+/g, ' ').trim(), t = m.slice(1).join(' → ').replace(/\s+/g, ' ').trim();
+    if (!w) return;
+    var k = _cfgBannedFold_(w); if (seen[k]){ dup++; return; } seen[k] = 1;
+    items.push({ tuCam: w, thayThe: t });
+  });
+  return { items: items, dup: dup };
+}
+function _cfgBannedLines_(items){ return (items || []).map(function(it){ return it.tuCam + (it.thayThe ? ' → ' + it.thayThe : ''); }).join('\n'); }
+function _cfgBannedApply_(raw){
+  var r = (raw && typeof raw === 'object') ? raw : {}, items = [];
+  (Array.isArray(r.items) ? r.items : []).forEach(function(it){ if (it && typeof it === 'object' && String(it.tuCam || '').trim()) items.push({ tuCam: String(it.tuCam).replace(/\s+/g, ' ').trim(), thayThe: String(it.thayThe || '').replace(/\s+/g, ' ').trim() }); });
+  _cfgBanned = { useSheet: r.useSheet !== false, items: items };
+}
+function _cfgBannedHtml_(){
+  var B = _cfgBanned, ta = 'width:100%;min-height:150px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font:inherit;box-sizing:border-box';
+  return '<div class="dash-section" style="margin-top:14px"><div style="font-weight:700;margin-bottom:2px">🚫 Từ cấm</div>' +
+    '<div style="font-size:11.5px;color:var(--muted);margin-bottom:6px">Từ/cụm từ nhân viên KHÔNG được dùng khi chat với khách. Áp cho: (1) AI soạn câu trả lời — cả Zalo AI và Pancake AI, qua máy chủ; (2) quét chat Pancake báo vi phạm; (3) Pancake AI tự sửa tên sản phẩm khi sao chép đơn (extension tải danh sách mới trong tối đa ~20 phút). Zalo AI không tự sửa tên sản phẩm theo danh sách này (có chủ ý). Máy chủ áp dụng ngay sau khi lưu. <b>Tránh từ quá ngắn/quá phổ biến</b> (vd "an", "mua") vì sẽ bị cắt cả trong tên sản phẩm.</div>' +
+    '<div style="font-weight:600;margin-bottom:5px">Danh sách từ cấm thêm tại đây <span style="font-weight:400;color:var(--muted)">(' + B.items.length + ' từ)</span></div>' +
+    '<textarea id="cfg-ban-list" style="' + ta + '" placeholder="cam kết&#10;chắc chắn → nên cân nhắc&#10;bảo hành trọn đời → bảo hành theo chính sách">' + esc(_cfgBannedLines_(B.items)) + '</textarea>' +
+    '<div style="font-size:11.5px;color:var(--muted);margin-top:4px">Mỗi dòng 1 từ hoặc cụm từ. Muốn gợi ý cách nói thay thế thì thêm <b>→</b> rồi chữ thay thế (vd <code>tài lộc → thuận lợi công việc</code>). Không phân biệt hoa/thường/dấu khi bắt trùng.</div>' +
+    '<label style="display:flex;align-items:center;gap:6px;margin-top:10px;font-weight:600"><input type="checkbox" id="cfg-ban-sheet"' + (B.useSheet ? ' checked' : '') + '> Dùng thêm danh sách trong Google Sheet "Lưu ý từ cấm"</label>' +
+    '<div style="font-size:11.5px;color:var(--muted);margin-top:3px">Bật (mặc định): từ ở sheet + từ ở đây cùng áp dụng; từ trùng thì dòng ở đây thắng (đổi được chữ thay thế). Tắt: CHỈ dùng danh sách ở trên — để trống nghĩa là không có từ cấm nào.</div>' +
+    '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn primary" id="cfg-ban-save" onclick="_cfgBannedSave()">💾 Lưu từ cấm</button>' +
+    '<button class="btn" onclick="_cfgBannedSave(true)">↺ Về mặc định</button><span style="font-size:11.5px;color:var(--muted)">Chỉ Admin lưu được; ghi vào Nhật ký (giá trị cũ → mới).</span></div></div>';
+}
+async function _cfgBannedSave(reset){
+  var g = function(id){ return document.getElementById(id); }, out = {};
+  if (!reset){
+    var P = _cfgBannedParse_((g('cfg-ban-list') || {}).value), bad = P.items.filter(function(it){ return it.tuCam.length > 100 || it.thayThe.length > 300; })[0];
+    if (bad){ toast('Dòng quá dài: "' + bad.tuCam.slice(0, 30) + '…" (từ tối đa 100 ký tự, chữ thay thế tối đa 300)'); return; }
+    if (P.items.length > 500){ toast('Tối đa 500 từ cấm (đang có ' + P.items.length + ')'); return; }
+    out = { useSheet: !!(g('cfg-ban-sheet') || {}).checked, items: P.items };
+    if (!out.useSheet && !out.items.length && !confirm('Bạn đang TẮT sheet và để trống danh sách → sẽ KHÔNG còn từ cấm nào. Vẫn lưu?')) return;
+    if (P.dup) toast('Đã bỏ ' + P.dup + ' dòng trùng');
+  }
+  var oldStr = JSON.stringify(_cfgBanned), btn = g('cfg-ban-save'); if (btn){ btn.disabled = true; btn.textContent = '⏳ Đang lưu…'; }
+  try {
+    var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'setSetting', key:'bannedWordsCfg', value: JSON.stringify(out) }) });
+    var d = await r.json().catch(function(){ return {}; }); if (d && d.error) throw new Error(d.error);
+    _cfgBannedApply_(out);
+    var newStr = JSON.stringify(_cfgBanned);
+    if (oldStr !== newStr) fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'saveAudit', rows: [{ timestamp: new Date().toISOString(), user: (currentUser && currentUser.name) || '', action: 'Cấu hình: Từ cấm' + (reset ? ' (về mặc định)' : ''), phone: '', oldValue: oldStr, newValue: newStr }] }) }).catch(function(){});
+    toast(oldStr === newStr ? 'Không có thay đổi' : '✓ Đã lưu từ cấm — áp dụng ngay cho AI, quét chat và extension');
   } catch(e){ toast('Lưu lỗi: ' + (e && e.message || e)); }
   _cfgRender();
 }

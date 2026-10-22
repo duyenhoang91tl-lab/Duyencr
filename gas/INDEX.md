@@ -55,8 +55,8 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hàm: `exportSalesReportToSheet_`, `doPost`, `doPostCore_`
 
 ## 12_SaveCare_Orders_Dedupe.gs
-- Hàm: `invalidateLookupCache_`, `saveAllCare_`, `saveSingleCare_`, `saveBatchCare_`, `syncZaloFriendStatus_`, `saveOrders_`, `patchOrder_`, `deleteOrder_`, `normOrderDate_`, `_normTxt_`, `findDuplicateOrders_`, `deleteDuplicateOrders_`, `_rowKeyExact_`, `_rowIsBlank_`, `_autoDedupExactRowsInSheet_`, `_autoDedupLog_`, `onChangeDedupTrigger_`, `installAutoDedupTrigger_`, `_impHm_`, `_impHmUnknown_`, `_impHmCompat_`, `_impOrderKeyParts_`, `_impOrderKey_`, `_impFindExist_`, `_impColName_`, `_impCellStr_`, `_impCellEq_`, `_impDiffRow_`, `doImportSheetRows_`, `doImportSheetRowsLocked_`, `replaceOrders_`, `setOrderCareCS_`, `setOrderCareCSBatch_`, `_auditTeamSig_`, `_auditTeamMap_`
-- Hằng/biến: `SH_AUTO_DEDUP_LOG`, `AUTO_DEDUP_LOG_HEADERS`, `SH_IMPORT_UPD_LOG`, `IMPORT_UPD_LOG_HEADERS`, `IMPORT_UPD_MAX_ROWS`
+- Hàm: `invalidateLookupCache_`, `saveAllCare_`, `saveSingleCare_`, `saveBatchCare_`, `syncZaloFriendStatus_`, `saveOrders_`, `patchOrder_`, `deleteOrder_`, `normOrderDate_`, `_normTxt_`, `findDuplicateOrders_`, `deleteDuplicateOrders_`, `_rowKeyExact_`, `_rowIsBlank_`, `_autoDedupExactRowsInSheet_`, `_autoDedupLog_`, `onChangeDedupTrigger_`, `installAutoDedupTrigger_`, `_impHm_`, `_impHmUnknown_`, `_impHmCompat_`, `_impOrderKeyParts_`, `_impOrderKey_`, `_impFindExist_`, `_impColName_`, `_impCellStr_`, `_impCellEq_`, `_impDiffRow_`, `doImportSheetRows_`, `doImportSheetRowsLocked_`, `_impWho_`, `_impFp_`, `_impKeyDropHm_`, `_impColIdx_`, `_impCellFromStr_`, `_impBatchLog_`, `_impReadBatch_`, `importBatchesList_`, `_impScanSheet_`, `_impNearest_`, `_impLocateAppended_`, `_impPlanRestore_`, `doImportUndo_`, `_impUndoLocked_`, `replaceOrders_`, `setOrderCareCS_`, `setOrderCareCSBatch_`, `_auditTeamSig_`, `_auditTeamMap_`
+- Hằng/biến: `SH_AUTO_DEDUP_LOG`, `AUTO_DEDUP_LOG_HEADERS`, `SH_IMPORT_UPD_LOG`, `IMPORT_UPD_LOG_HEADERS`, `IMPORT_UPD_MAX_ROWS`, `SH_IMPORT_BATCH`, `IMPORT_BATCH_HEADERS`, `SH_IMPORT_UNDO_BACKUP`, `IMPORT_UNDO_MAX_ROWS`
 
 ## 13_Teams_Pancake.gs
 - Hàm: `saveTeams_`, `readMktTeams_`, `saveMktTeams_`, `_mktPageWeights_`, `_mktKenhWeights_`, `savePancakeStats_`, `readPancakeMapCI_`, `readPancakeMap_`, `pancakeAllNames_`, `savePancakeNameMap_`, `_pkStatsRowsMemo_`, `buildPancakeReport_`, `savePancakeSdtStats_`, `buildPancakeSdtReport_`, `readPancakePageMap_`, `readPancakePageMapByName_`, `pancakeAllPages_`, `savePancakePageMap_`, `classifyPancakeTag_`, `savePancakeTagStats_`, `buildPancakeTagReport_`, `_tagFunnelRates_`, `_pkSheetDateSpan_`, `saveSaleDirectory_`, `readSaleDirectory_`, `_pkTrackedDatesByPageAndSale_`, `_sumOrdersOnDates_`
@@ -71,7 +71,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `_PSHEET_STOPWORDS_`, `DEPT_LIST_DEFAULT_`, `_DRIVE_IMG_MAX_BYTES_`
 
 ## 16_BannedWords_AI.gs
-- Hàm: `readBannedWordsList_`, `_bannedWordsPromptBlock_`, `_priceCatalogRowsCached_`, `priceAsk_`, `_priceQaSystemPrompt_`, `priceQa_`, `_crmAskPriceBlock_`, `_buildAISystemPrompt_`, `_aiOpenAICompat_`, `_aiGemini_`, `_crmAskSystemPrompt_`, `callAI_`, `_maskKey_`, `diagApiKeys`, `testScript`
+- Hàm: `_bannedCfg_`, `_bannedCacheClear_`, `readBannedWordsList_`, `readBannedWordsListSheet_`, `_bannedWordsPromptBlock_`, `_priceCatalogRowsCached_`, `priceAsk_`, `_priceQaSystemPrompt_`, `priceQa_`, `_crmAskPriceBlock_`, `_buildAISystemPrompt_`, `_aiOpenAICompat_`, `_aiGemini_`, `_crmAskSystemPrompt_`, `callAI_`, `_maskKey_`, `diagApiKeys`, `testScript`
 - Hằng/biến: `BANNED_WORDS_SS_ID`, `BANNED_WORDS_GID`
 
 ## 17_Broadcast_FollowUp.gs
@@ -83,7 +83,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `SH_TASK`, `TASK_HEADERS`, `SH_TASK_COMMENT`, `TASK_COMMENT_HEADERS`, `SH_NOTIF`, `NOTIF_HEADERS`, `SH_TASK_FLOW`, `TASK_FLOW_HEADERS`, `SH_TASK_REQ`, `TASK_REQ_HEADERS`, `SH_MENH`, `SH_CANNED`, `MENH_DEFAULT_ROWS`, `MENH_SHEET_MARK`, `CANNED_DEFAULT_ROWS`, `SH_MSG_TPL`, `MSG_TPL_HEADERS`, `MSG_TPL_APPROVER_ROLES_`, `MSG_TPL_STATUS_`
 
 ## 19_BannedList_MktChecklist.gs
-- Hàm: `readBannedWords_`, `_mktMonthOf_`, `readMktConfigAll_`, `mktConfigForMonth_`, `_mktCleanCfgEntry_`, `_mktCheckPass_`, `saveMktChecklistConfig_`, `_mktTagNum_`, `_mktTagRows_`, `buildMktChecklistReport_`
+- Hàm: `readBannedWords_`, `readBannedWordsSheet_`, `_mktMonthOf_`, `readMktConfigAll_`, `mktConfigForMonth_`, `_mktCleanCfgEntry_`, `_mktCheckPass_`, `saveMktChecklistConfig_`, `_mktTagNum_`, `_mktTagRows_`, `buildMktChecklistReport_`
 - Hằng/biến: `REPORT_SALE_SS_ID`, `BANNED_WORDS_SHEET_NAME`, `BANNED_WORDS_FALLBACK`, `MKT_DEFAULT_CFG_`, `MKT_EXTRA_CODES_`, `MKT_EXTRA_DEFAULT_`, `MKT_EXTRA_TAGS_`, `MKT_MIN_TAGS_`
 
 ## 20_ExportLog_AutoAssign.gs

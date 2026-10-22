@@ -230,12 +230,28 @@
   function isExtContextValid_() {
     try { return !!(chrome.runtime && chrome.runtime.id); } catch (e) { return false; }
   }
+  // MỌI lỗi từ API/backend (GAS, AI, mạng, Pancake...) hiện cho CS DUY NHẤT 1 câu "Lỗi API" (yêu cầu Duyên 22/10/2026) — không còn đoạn lỗi kỹ thuật dài.
+  // Chi tiết gốc vẫn có ở resp.errorRaw + Console (F12) để người hỗ trợ tra. Giữ nguyên: đăng nhập (VERIFY_LOGIN: sai mật khẩu...), thiếu cấu hình (CS cần biết
+  // phải làm gì) và mã nội bộ GAS_NO_FLAT (code so khớp chuỗi này).
+  const PK_API_ERR = 'Lỗi API';
+  function normalizeApiResp_(message, resp) {
+    try {
+      if (resp && typeof resp === 'object' && resp.ok === false) {
+        const raw = String(resp.error || '');
+        if ((message && message.type === 'VERIFY_LOGIN') || /GAS_NO_FLAT|Chưa cấu hình URL|Thiếu Provider|API Key/i.test(raw)) return resp;
+        resp.errorRaw = raw;
+        resp.error = PK_API_ERR;
+        console.warn('[Pancake AI] ' + PK_API_ERR + ' —', message && message.type, raw);
+      }
+    } catch (e) {}
+    return resp;
+  }
   function safeSendMessage_(message, callback) {
     if (_extInvalidated || !isExtContextValid_()) { handleExtInvalidated_(); return; }
     try {
       chrome.runtime.sendMessage(message, (resp) => {
         if (chrome.runtime.lastError) { handleExtInvalidated_(); return; }
-        callback && callback(resp);
+        callback && callback(normalizeApiResp_(message, resp));
       });
     } catch (e) {
       handleExtInvalidated_();
@@ -1334,7 +1350,7 @@
     box.innerHTML = `<div class="pk-ai-cust-loading">Đang tra cứu ${phone}...</div>`;
     safeSendMessage_({ type: "LOOKUP_CUSTOMER", payload: { phone } }, (resp) => {
       if (!resp?.ok) {
-        box.innerHTML = `<div class="pk-ai-cust-loading">Không tra cứu được: ${resp?.error || "lỗi không rõ"}</div>`;
+        box.innerHTML = `<div class="pk-ai-cust-loading">${resp?.error || PK_API_ERR}</div>`;
         return;
       }
       _currentPhone = phone;
@@ -1540,7 +1556,7 @@
       safeSendMessage_({ type: 'POS_ORDERS', payload: { phone } }, (resp) => {
         if (!resp?.ok) {
           // Không tải được Pos → vẫn cho xem đơn Base đã có sẵn, kèm báo lỗi để CS biết
-          out.innerHTML = `<div class="pk-hist-note" style="color:#b91c1c">Không tải được đơn Pos: ${escapeHtml(resp?.error || 'lỗi không rõ')}</div>` + _pkHistHtml_([], baseOrders);
+          out.innerHTML = `<div class="pk-hist-note" style="color:#b91c1c">${escapeHtml(resp?.error || PK_API_ERR)}</div>` + _pkHistHtml_([], baseOrders);
           return;
         }
         loaded = true;
@@ -1877,7 +1893,7 @@
     box.innerHTML = '<div class="pk-ai-cust-loading">AI đang soạn tin...</div>';
     safeSendMessage_({ type: 'FETCH_OPENER', payload: { custLines: buildCustLines(), tone: _activeTone, angleInstr: _nbaCur.angle, withProducts: _useProducts, stonePref: _stonePref } }, (resp) => {
       if (req !== _nbaMsgReq || phone !== _currentPhone) return; // đã đổi khách/bấm lại → bỏ kết quả cũ
-      if (!resp?.ok) { box.innerHTML = `<div class="pk-ai-cust-loading">Lỗi: ${escapeHtml(resp?.error || 'không rõ')}</div>`; return; }
+      if (!resp?.ok) { box.innerHTML = `<div class="pk-ai-cust-loading">${escapeHtml(resp?.error || PK_API_ERR)}</div>`; return; }
       box.innerHTML = '<textarea id="pk-nba-ta" rows="4"></textarea><div class="pk-nba-btns"><button type="button" class="pk-btn-outline" id="pk-nba-insert">📥 Chèn vào ô trả lời</button><button type="button" class="pk-btn-outline" id="pk-nba-redo">🔄 Soạn lại</button></div>';
       box.querySelector('#pk-nba-ta').value = resp.data.suggestion || '';
       box.querySelector('#pk-nba-insert').addEventListener('click', () => insertReply(box.querySelector('#pk-nba-ta').value));
@@ -2057,7 +2073,7 @@
       const { row, kept, addedNotes } = _mergeRowKeepOld_(serverCare || {}, localRow);
       safeSendMessage_({ type: 'SAVE_CARE', payload: Object.assign({}, row, { isNewCustomer: isTrulyNew }) }, (resp) => {
         if (btn) { btn.disabled = false; btn.textContent = '💾 Lưu vào Sasum'; }
-        if (!resp?.ok) { setStatus('Lưu thất bại: ' + (resp?.error || 'lỗi không rõ')); return; }
+        if (!resp?.ok) { setStatus('Lưu thất bại: ' + (resp?.error || PK_API_ERR)); return; }
         _currentCare = row;
         _currentPhone = phone;
         _currentOrders = serverOrders;
@@ -2134,7 +2150,7 @@
     const isNewCustomer = !_currentCare && (!_currentOrders || !_currentOrders.length);
     safeSendMessage_({ type: 'SAVE_CARE', payload: Object.assign({}, row, { isNewCustomer }) }, (resp) => {
       if (btn) { btn.disabled = false; btn.textContent = '💾 Lưu vào Sasum'; }
-      if (!resp?.ok) { setStatus('Lưu thất bại: ' + (resp?.error || 'lỗi không rõ')); return; }
+      if (!resp?.ok) { setStatus('Lưu thất bại: ' + (resp?.error || PK_API_ERR)); return; }
       _currentCare = row;
       _currentPhone = phone;
       _lastServerCare = Object.assign({}, row);
@@ -2208,7 +2224,7 @@
       const row = _buildRow(phone, { schedules: JSON.stringify(arr) });
       safeSendMessage_({ type: 'SAVE_CARE', payload: row }, (resp) => {
         if (btn) btn.disabled = false;
-        if (!resp?.ok) { setStatus('Thêm lịch thất bại: ' + (resp?.error || 'lỗi không rõ')); return; }
+        if (!resp?.ok) { setStatus('Thêm lịch thất bại: ' + (resp?.error || PK_API_ERR)); return; }
         _currentCare = Object.assign({}, _currentCare, { schedules: row.schedules });
         _lastServerCare = Object.assign({}, _currentCare);
         const listEl = panelEl.querySelector('#pk-remind-list');
@@ -2226,7 +2242,7 @@
   function doneAppointment_(phone) {
     const row = _buildRow(phone, { schedHen: '', schedHenNote: '' });
     safeSendMessage_({ type: 'SAVE_CARE', payload: row }, (resp) => {
-      if (!resp?.ok) { setStatus('Không xoá được lịch hẹn: ' + (resp?.error || '')); return; }
+      if (!resp?.ok) { setStatus('Không xoá được lịch hẹn: ' + (resp?.error || PK_API_ERR)); return; }
       _currentCare = row;
       _lastServerCare = Object.assign({}, row);
       const henDateEl = panelEl.querySelector('#pk-hen-date');
@@ -2380,7 +2396,7 @@
       _statsState.loading = false;
       if (!resp?.ok) {
         _statsState.data = null;
-        resEl.innerHTML = `<div class="pk-stats-note pk-stats-err">⚠️ ${escapeHtml(resp?.error || 'Không tải được số liệu. Thử bấm Xem lại.')}</div>`;
+        resEl.innerHTML = `<div class="pk-stats-note pk-stats-err">⚠️ ${escapeHtml(resp?.error || PK_API_ERR)}</div>`;
         return;
       }
       _statsState.data = resp.data;
@@ -2428,7 +2444,7 @@
         b.activePrograms.map((p) => `<div class="pk-stats-prog"><b>${escapeHtml(p.name)}</b>${p.dateFrom || p.dateTo ? ` <span class="pk-stats-mut">(${p.dateFrom ? _statsDmy_(p.dateFrom) : '…'} → ${p.dateTo ? _statsDmy_(p.dateTo) : '…'})</span>` : ''}<div class="pk-stats-mut">${escapeHtml(p.summary || 'Xem chi tiết ở CRM')}</div></div>`).join('') + '</details>';
     }
     h += '<div class="pk-stats-mut" style="margin-top:6px">Số liệu tạm tính theo Pos (đã ghép Base) — đối chiếu kế toán trước khi chi trả. Thưởng theo SP là ước lượng số lượng.</div>';
-    if (d.ghepLoi) h += `<div class="pk-stats-note pk-stats-err">⚠️ Lỗi khi đối chiếu Base (đã chia theo Pos): ${escapeHtml(d.ghepLoi)}</div>`;
+    if (d.ghepLoi) h += `<div class="pk-stats-note pk-stats-err">⚠️ Lỗi API (đã chia theo Pos)</div>`;
     resEl.innerHTML = h;
   }
 
@@ -2485,7 +2501,7 @@
     safeSendMessage_(
       { type: 'FETCH_FOLLOWUP_SUGGESTION', payload: { phone: r.phone, status: r.status, note: r.schedHenNote } },
       (resp) => {
-        if (!resp?.ok) { setStatus('Lỗi: ' + (resp?.error || 'không rõ')); return; }
+        if (!resp?.ok) { setStatus(resp?.error || PK_API_ERR); return; }
         renderSuggestions({ suggestions: [resp.data.suggestion], provider: resp.data.provider });
         setStatus('Nhớ tự mở đúng đoạn chat của ' + r.phone + ' trên Pancake trước khi bấm gợi ý để chèn.');
       }
@@ -2539,7 +2555,7 @@
     if (!info || info.isDone) return;
     const cs = (panelEl?.querySelector('#pk-cs-sel')?.value) || settings?.csName || '';
     safeSendMessage_({ type: 'TOGGLE_ASSIGN_DONE', payload: { cs, phone, done: true } }, (resp) => {
-      if (!resp?.ok) { setStatus('✓ Đã lưu — nhưng chưa tự tick "Đã gọi" được (' + (resp?.error || 'lỗi') + '), tick tay giúp mình.'); return; }
+      if (!resp?.ok) { setStatus('✓ Đã lưu — nhưng chưa tự tick "Đã gọi" được (' + (resp?.error || PK_API_ERR) + '), tick tay giúp mình.'); return; }
       for (const h of _assignState.assignHistory) {
         if (!(h.phones || []).includes(phone)) continue;
         if (!h.donePhones) h.donePhones = [];
@@ -2609,7 +2625,7 @@
     safeSendMessage_({ type: 'GET_ASSIGNED_DATA', payload: { cs } }, (resp) => {
       _assignState.loading = false;
       if (!resp?.ok) {
-        if (listEl) listEl.innerHTML = '<div class="pk-rem-empty">Lỗi tải data: ' + escapeHtml(resp?.error || 'không rõ') + '</div>';
+        if (listEl) listEl.innerHTML = '<div class="pk-rem-empty">' + escapeHtml(resp?.error || PK_API_ERR) + '</div>';
         return;
       }
       _assignState.assignHistory = resp.data.assignHistory || [];
@@ -2699,7 +2715,7 @@
           chk.disabled = false;
           if (!resp?.ok) {
             chk.checked = !done; // rollback neu loi
-            setStatus('Lỗi cập nhật: ' + (resp?.error || 'không rõ'));
+            setStatus(resp?.error || PK_API_ERR);
             return;
           }
           // Cap nhat lac quan ngay trong state cuc bo (khong doi tai lai server) de UI muot.
@@ -2744,7 +2760,7 @@
     box.innerHTML = '<div class="pk-price-loading">🤖 Đang hỏi AI…</div>';
     safeSendMessage_({ type: 'ASK_PRICE', payload: { q } }, (resp) => {
       if (seq !== _priceAiSeq) return;   // đã hỏi câu khác trong lúc chờ
-      if (!resp?.ok) { box.innerHTML = `<div class="pk-price-ai-err">⚠ ${escapeHtml(resp?.error || 'không rõ')}</div>`; return; }
+      if (!resp?.ok) { box.innerHTML = `<div class="pk-price-ai-err">⚠ ${escapeHtml(resp?.error || PK_API_ERR)}</div>`; return; }
       const d = resp.data || {};
       if (!d.found) {
         const sg = (d.suggestions || []).slice(0, 8);
@@ -2756,7 +2772,7 @@
         return;
       }
       box.innerHTML = `<div class="pk-price-ai-txt">${escapeHtml(d.text)}</div>` +
-        `<div class="pk-price-ai-foot">Giá lấy từ bảng giá DANH_MUC${d.provider ? ' · AI: ' + escapeHtml(d.provider) : ''}${d.aiError ? ' · ⚠ AI đang lỗi nên hiện danh sách giá gốc' : ''} <button type="button" class="pk-price-ai-copy">📋 Copy</button></div>`;
+        `<div class="pk-price-ai-foot">Giá lấy từ bảng giá DANH_MUC${d.provider ? ' · AI: ' + escapeHtml(d.provider) : ''}${d.aiError ? ' · ⚠ Lỗi API — hiện danh sách giá gốc' : ''} <button type="button" class="pk-price-ai-copy">📋 Copy</button></div>`;
       const cp = box.querySelector('.pk-price-ai-copy');
       cp.addEventListener('click', () => {
         try { navigator.clipboard.writeText(d.text).then(() => { cp.textContent = '✓ Đã copy'; }).catch(() => { cp.textContent = 'Không copy được'; }); } catch (e) { cp.textContent = 'Không copy được'; }
@@ -2780,7 +2796,7 @@
     let pending = 2, priceResp = null;
     const done = () => {
       if (--pending) return;
-      if (!priceResp?.ok) { box.innerHTML = `<div class="pk-price-loading">Lỗi: ${escapeHtml(priceResp?.error || 'không rõ')}</div>`; return; }
+      if (!priceResp?.ok) { box.innerHTML = `<div class="pk-price-loading">${escapeHtml(priceResp?.error || PK_API_ERR)}</div>`; return; }
       renderPriceRows_(priceResp.data.rows || [], q);
     };
     safeSendMessage_({ type: 'GET_PRICE', payload: { q } }, (resp) => { priceResp = resp; done(); });
@@ -2890,7 +2906,7 @@
     const box = panelEl.querySelector('#pk-ctkm-result');
     box.innerHTML = '<div class="pk-price-loading">Đang tìm...</div>';
     safeSendMessage_({ type: 'GET_CTKM_SEARCH', payload: { q } }, (resp) => {
-      if (!resp?.ok) { box.innerHTML = `<div class="pk-price-loading">Lỗi: ${escapeHtml(resp?.error || 'không rõ')}</div>`; return; }
+      if (!resp?.ok) { box.innerHTML = `<div class="pk-price-loading">${escapeHtml(resp?.error || PK_API_ERR)}</div>`; return; }
       renderCtkmRows_(resp.data.rows || [], q);
     });
   }
@@ -2938,7 +2954,7 @@
     const box = panelEl.querySelector('#pk-tpl-result');
     box.innerHTML = '<div class="pk-price-loading">Đang tải thư viện mẫu...</div>';
     safeSendMessage_({ type: 'GET_MESSAGE_TEMPLATES' }, (resp) => {
-      if (!resp?.ok) { box.innerHTML = `<div class="pk-price-loading">Lỗi: ${escapeHtml(resp?.error || 'không rõ')}</div>`; return; }
+      if (!resp?.ok) { box.innerHTML = `<div class="pk-price-loading">${escapeHtml(resp?.error || PK_API_ERR)}</div>`; return; }
       _msgTemplates = resp.data.templates || []; _msgTplTs = Date.now();
       renderMsgTemplateRows_();
     });
@@ -3027,7 +3043,7 @@
       b.disabled = true;
       safeSendMessage_({ type: 'DELETE_MESSAGE_TEMPLATE', payload: { id: t.id, createdBy: settings.csName || '' } }, (resp) => {
         if (resp?.ok) { setStatus('Đã xoá mẫu.'); loadMsgTemplates_(); }
-        else { b.disabled = false; setStatus('Lỗi xoá mẫu: ' + (resp?.error || 'không rõ')); }
+        else { b.disabled = false; setStatus(resp?.error || PK_API_ERR); }
       });
     }));
   }
@@ -3070,7 +3086,7 @@
         product: $('#pk-tpl-f-product').value.trim(), topic: $('#pk-tpl-f-topic').value.trim(), createdBy: settings.csName || ''
       } }, (resp) => {
         if (resp?.ok) { host.innerHTML = ''; setStatus('Đã gửi đề xuất — quản lý duyệt xong mẫu mới dùng được cho mọi người.'); loadMsgTemplates_(); }
-        else { btn.disabled = false; btn.innerText = '📨 Gửi đề xuất'; setStatus('Lỗi gửi đề xuất: ' + (resp?.error || 'không rõ')); }
+        else { btn.disabled = false; btn.innerText = '📨 Gửi đề xuất'; setStatus(resp?.error || PK_API_ERR); }
       });
     });
   }
@@ -3110,7 +3126,7 @@
         _imgFlatItems = resp.data.items || [];
       } else {
         _imgFlatItems = [];
-        if (dyn) dyn.innerHTML = `<div class="pk-price-loading">Lỗi: ${escapeHtml(resp?.error || 'không tải được danh mục')}</div>`;
+        if (dyn) dyn.innerHTML = `<div class="pk-price-loading">${escapeHtml(resp?.error || PK_API_ERR)}</div>`;
         return;
       }
       renderImgDyn_();
@@ -3235,7 +3251,7 @@
     safeSendMessage_({ type: 'GET_DRIVE_IMAGE', payload: { link } }, (resp) => {
       const slot = panelEl.querySelector(`#pkimg-slot-${i}`);
       if (!slot) return;
-      if (!resp?.ok) { slot.innerHTML = `<div class="pk-price-loading">Lỗi: ${escapeHtml(resp?.error || 'không đọc được ảnh')}</div>`; return; }
+      if (!resp?.ok) { slot.innerHTML = `<div class="pk-price-loading">${escapeHtml(resp?.error || PK_API_ERR)}</div>`; return; }
       const data = resp.data;
       if (data.image && data.image.base64) {
         slot.innerHTML = `<img src="data:${data.image.mimeType};base64,${data.image.base64}" style="max-width:100%;border-radius:8px;border:1px solid var(--pk-border,#e5e7eb)" />` +
@@ -3467,12 +3483,12 @@
         } else if (resp?.ok) {
           _flatItems = []; _flatMode = 'full';
           _setBldMsg_('Đọc được sheet giá nhưng không nhận diện được cột "Tên sản phẩm"/"Tên thương mại" — dùng tạm tab "Gõ tìm".');
-        } else if (String(resp?.error || '').indexOf('GAS_NO_FLAT') !== -1) {
+        } else if (String(resp?.error || PK_API_ERR).indexOf('GAS_NO_FLAT') !== -1) {
           _flatMode = 'live'; _flatItems = [];
           _setBldMsg_('⚠ GAS chưa cập nhật bản mới (thiếu <b>priceCatalogFlat</b>) — đang dùng chế độ tìm trực tiếp, tối đa 50 dòng mỗi lần gõ. Deploy lại <b>gas_v13.js</b> để có đủ danh mục.');
         } else {
           _flatItems = null;   // lỗi mạng/GAS → lần mở tab sau tự thử lại
-          _setBldMsg_('Lỗi tải danh mục: ' + escapeHtml(resp?.error || 'không rõ') + ' — chuyển tab rồi quay lại để thử lại.');
+          _setBldMsg_(escapeHtml(resp?.error || PK_API_ERR) + ' — chuyển tab rồi quay lại để thử lại.');
         }
         renderBuilderDyn_();
       });
@@ -3539,7 +3555,7 @@
     if (_fold_(q).length < 2) { _flatItems = []; renderBuilderDyn_(); return; }
     safeSendMessage_({ type: 'GET_PRICE', payload: { q } }, (resp) => {
       if (q !== _bld.q) return; // đã gõ tiếp, bỏ kết quả cũ
-      if (!resp?.ok) { _setBldMsg_('Lỗi tìm: ' + escapeHtml(resp?.error || 'không rõ')); return; }
+      if (!resp?.ok) { _setBldMsg_(escapeHtml(resp?.error || PK_API_ERR)); return; }
       _flatItems = (resp.data.rows || []).map(_normPriceRow_).filter((it) => it.t || it.m);
       renderBuilderDyn_();
     });
@@ -3952,7 +3968,7 @@
   function _loadPromoCfg_(cb) {
     if (_promoCfg) { cb(null); return; }
     safeSendMessage_({ type: 'GET_PROMO_CONFIG' }, (resp) => {
-      if (!resp?.ok) { cb(resp?.error || 'không tải được cấu hình khuyến mãi'); return; }
+      if (!resp?.ok) { cb(resp?.error || PK_API_ERR); return; }
       _promoCfg = promoNormalize_(resp.data?.promoConfig || '[]');
       cb(null);
     });
@@ -4172,7 +4188,7 @@
       },
       (resp) => {
         if (!resp?.ok) {
-          setStatus("Lỗi: " + (resp?.error || "không rõ nguyên nhân"));
+          setStatus(resp?.error || PK_API_ERR);
           showAiFallbackHint_();
           return;
         }
@@ -4201,7 +4217,7 @@
       const data = await new Promise((resolve) => {
         safeSendMessage_(
           { type: "FETCH_OPENER", payload: { custLines, tone: _activeTone, angleInstr: angle.instr, withProducts: _useProducts, stonePref: _stonePref } },
-          (resp) => resolve(resp?.ok ? resp.data : { error: resp?.error || "lỗi không rõ" })
+          (resp) => resolve(resp?.ok ? resp.data : { error: resp?.error || PK_API_ERR })
         );
       });
       results.push({ angle, ...data });
@@ -4216,7 +4232,7 @@
       const box = document.createElement("div");
       box.className = "pk-opener-box";
       if (r.error) {
-        box.innerHTML = `<div class="pk-opener-label">${escapeHtml(r.angle.label)}</div><div style="color:#dc2626;font-size:12px">Lỗi: ${escapeHtml(r.error)}</div>`;
+        box.innerHTML = `<div class="pk-opener-label">${escapeHtml(r.angle.label)}</div><div style="color:#dc2626;font-size:12px">${escapeHtml(r.error)}</div>`;
         sug.appendChild(box);
         return;
       }
@@ -4322,7 +4338,7 @@
           setTimeout(() => { ed.remove(); item.style.display = ""; bar.style.display = ""; }, 1200);
         } else {
           saveBtn.disabled = false; saveBtn.innerText = "💾 Lưu để AI học";
-          setStatus("Lỗi lưu mẫu: " + (resp?.error || "không rõ nguyên nhân"));
+          setStatus(resp?.error || PK_API_ERR);
         }
       });
     });
@@ -4414,7 +4430,7 @@
       b.disabled = true;
       safeSendMessage_({ type: 'DELETE_CANNED', payload: { id: c.id } }, (resp) => {
         if (resp?.ok) { setStatus('Đã xoá mẫu có sẵn.'); _cannedResponses = _cannedResponses.filter(x => x.id !== c.id); loadPhongThuyKnowledge_(); }
-        else { b.disabled = false; setStatus('Lỗi xoá mẫu: ' + (resp?.error || 'không rõ')); }
+        else { b.disabled = false; setStatus(resp?.error || PK_API_ERR); }
       });
     }));
   }
@@ -4448,7 +4464,7 @@
       btn.disabled = true; btn.innerText = 'Đang lưu...';
       safeSendMessage_({ type: 'SAVE_CANNED', payload: { id: c ? c.id : '', nhom: $('#pk-cf-nhom').value.trim(), label, text } }, (resp) => {
         if (resp?.ok) { host.innerHTML = ''; setStatus('Đã lưu mẫu có sẵn — CRM và mọi máy sẽ thấy bản mới.'); loadPhongThuyKnowledge_(); }
-        else { btn.disabled = false; btn.innerText = '💾 Lưu về CRM'; setStatus('Lỗi lưu mẫu: ' + (resp?.error || 'không rõ')); }
+        else { btn.disabled = false; btn.innerText = '💾 Lưu về CRM'; setStatus(resp?.error || PK_API_ERR); }
       });
     });
   }
@@ -4488,4 +4504,304 @@
     const el = panelEl?.querySelector("#pk-ai-status");
     if (el) el.innerText = text;
   }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // MODULE: PHÍM TẮT GÕ NHANH (slash-command "/" trong ô chat)
+  // ══════════════════════════════════════════════════════════════════════════
+  // CS gõ "/" vào ô chat → popup nổi hiện danh sách mẫu tin nhắn (từ _cannedResponses +
+  // _msgTemplates). Tiếp tục gõ để lọc nhanh. Chọn mẫu → text được chèn vào ô chat;
+  // nếu mẫu có ảnh đính kèm thì tự copy ảnh vào clipboard đồng thời.
+  //
+  // Cú pháp phím tắt:
+  //   /          → mở popup, hiện TẤT CẢ mẫu (tối đa 30)
+  //   /giá       → lọc mẫu chứa "giá"
+  //   /ship      → lọc mẫu chứa "ship"
+  //   Escape     → đóng popup
+  //   ↑ ↓ Enter  → điều hướng + chọn trong popup
+  // ══════════════════════════════════════════════════════════════════════════
+
+  let _slashPopupEl = null;      // DOM node của popup
+  let _slashActiveIdx = -1;      // index mục đang highlight
+  let _slashItems = [];          // mảng { label, text, image? } đang hiển thị
+
+  // Lấy ô chat đang active (textarea hoặc contenteditable Pancake)
+  function _slashGetChatBox_() {
+    const sel = settings?.selectors?.[PLATFORM];
+    if (sel?.replyBox) {
+      const box = document.querySelector(sel.replyBox);
+      if (box) return box;
+    }
+    // Fallback: tìm contenteditable đang focused
+    const focused = document.activeElement;
+    if (focused && (focused.isContentEditable || focused.tagName === 'TEXTAREA' || focused.tagName === 'INPUT')) {
+      return focused;
+    }
+    return null;
+  }
+
+  // Tập hợp TẤT CẢ mẫu: _cannedResponses (local) + _msgTemplates (từ CRM, status=approved)
+  function _slashAllTemplates_() {
+    const all = [];
+    // 1. Mẫu có sẵn local (_cannedResponses)
+    (_cannedResponses || []).forEach((c) => {
+      if (c && c.text) all.push({ label: c.label || c.id, text: c.text, image: null, src: 'local' });
+    });
+    // 2. Mẫu từ CRM (đã duyệt)
+    (_msgTemplates || []).forEach((t) => {
+      if (t && t.content && t.status === 'approved') {
+        all.push({ label: t.title || t.id, text: t.content, image: t.image || null, src: 'crm' });
+      }
+    });
+    return all;
+  }
+
+  // Lọc mẫu theo query (không dấu, không phân biệt hoa/thường)
+  function _slashFilter_(q) {
+    const norm = (s) => _stripVN_((s || '').toLowerCase());
+    const nq = norm(q);
+    const all = _slashAllTemplates_();
+    if (!nq) return all.slice(0, 30);
+    return all.filter((item) =>
+      norm(item.label).includes(nq) || norm(item.text).includes(nq)
+    ).slice(0, 30);
+  }
+
+  // Tạo popup DOM (lần đầu) hoặc trả về cái đã có
+  function _slashEnsurePopup_() {
+    if (_slashPopupEl && document.body.contains(_slashPopupEl)) return _slashPopupEl;
+    const el = document.createElement('div');
+    el.id = 'pk-slash-popup';
+    el.style.cssText = [
+      'position:fixed','z-index:2147483647','background:#fff','border:1px solid #e5e7eb',
+      'border-radius:10px','box-shadow:0 8px 32px rgba(0,0,0,.18)','padding:4px 0',
+      'min-width:280px','max-width:480px','max-height:320px','overflow-y:auto',
+      'font-size:13px','font-family:inherit','display:none'
+    ].join(';');
+    document.body.appendChild(el);
+    _slashPopupEl = el;
+    return el;
+  }
+
+  // Hiển thị popup với danh sách items, định vị cạnh ô chat
+  function _slashShow_(chatBox, items) {
+    _slashItems = items;
+    _slashActiveIdx = items.length ? 0 : -1;
+    const popup = _slashEnsurePopup_();
+    popup.innerHTML = items.length
+      ? items.map((item, i) =>
+          `<div class="pk-slash-item${i === 0 ? ' pk-slash-active' : ''}" data-idx="${i}" style="` +
+          `padding:7px 12px;cursor:pointer;border-radius:6px;margin:1px 4px;` +
+          `${i === 0 ? 'background:#f0f9ff;' : ''}` +
+          `display:flex;flex-direction:column;gap:1px">` +
+          `<span style="font-weight:600;color:#1d4ed8">${escapeHtml(item.label)}</span>` +
+          `<span style="color:#6b7280;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:440px">${escapeHtml(item.text.slice(0, 100))}${item.text.length > 100 ? '…' : ''}</span>` +
+          `${item.image ? '<span style="font-size:10px;color:#059669">📷 Kèm ảnh</span>' : ''}` +
+          `</div>`
+        ).join('')
+      : '<div style="padding:10px 14px;color:#9ca3af;font-style:italic">Không tìm thấy mẫu nào</div>';
+
+    // Định vị phía trên ô chat
+    const rect = chatBox.getBoundingClientRect();
+    const popupH = Math.min(320, items.length * 54 + 8);
+    let top = rect.top - popupH - 6;
+    if (top < 8) top = rect.bottom + 6;
+    popup.style.left = Math.max(8, rect.left) + 'px';
+    popup.style.top = top + 'px';
+    popup.style.display = 'block';
+
+    // Click để chọn
+    popup.querySelectorAll('.pk-slash-item').forEach((row) => {
+      row.addEventListener('mousedown', (e) => {
+        e.preventDefault(); // tránh blur ô chat
+        const idx = parseInt(row.dataset.idx, 10);
+        _slashApply_(chatBox, idx);
+      });
+      row.addEventListener('mouseenter', () => {
+        _slashSetActive_(parseInt(row.dataset.idx, 10));
+      });
+    });
+  }
+
+  function _slashHide_() {
+    if (_slashPopupEl) _slashPopupEl.style.display = 'none';
+    _slashItems = [];
+    _slashActiveIdx = -1;
+  }
+
+  function _slashSetActive_(idx) {
+    _slashActiveIdx = idx;
+    if (!_slashPopupEl) return;
+    _slashPopupEl.querySelectorAll('.pk-slash-item').forEach((row, i) => {
+      const active = i === idx;
+      row.style.background = active ? '#f0f9ff' : '';
+      row.classList.toggle('pk-slash-active', active);
+      if (active) row.scrollIntoView({ block: 'nearest' });
+    });
+  }
+
+  // Áp dụng mẫu: chèn text vào ô chat + copy ảnh nếu có
+  function _slashApply_(chatBox, idx) {
+    const item = _slashItems[idx];
+    if (!item) return;
+    _slashHide_();
+
+    // Xoá phần "/..." CS đã gõ trước khi chèn mẫu
+    _slashClearSlashText_(chatBox);
+
+    // Chèn text
+    if (chatBox.tagName === 'TEXTAREA' || chatBox.tagName === 'INPUT') {
+      const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+      nativeSetter?.call(chatBox, item.text);
+      chatBox.dispatchEvent(new Event('input', { bubbles: true }));
+    } else if (chatBox.isContentEditable) {
+      chatBox.focus();
+      document.execCommand('insertText', false, item.text);
+    }
+
+    // Copy ảnh kèm vào clipboard nếu có
+    if (item.image) {
+      copyProductImage_(item.image, null);
+      setStatus(`Đã chèn mẫu "${item.label}" + copy ảnh vào clipboard — Ctrl+V để dán ảnh vào chat.`);
+    } else {
+      setStatus(`Đã chèn mẫu "${item.label}".`);
+    }
+  }
+
+  // Xoá đoạn "/query" CS đã gõ trong ô chat
+  function _slashClearSlashText_(chatBox) {
+    try {
+      if (chatBox.isContentEditable) {
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return;
+        const range = sel.getRangeAt(0);
+        const node = range.startContainer;
+        if (node.nodeType === Node.TEXT_NODE) {
+          const text = node.textContent;
+          const pos = range.startOffset;
+          // Tìm vị trí "/" gần nhất trước cursor
+          let slashPos = -1;
+          for (let i = pos - 1; i >= 0; i--) {
+            if (text[i] === '/') { slashPos = i; break; }
+          }
+          if (slashPos >= 0) {
+            node.textContent = text.slice(0, slashPos) + text.slice(pos);
+            const newRange = document.createRange();
+            newRange.setStart(node, slashPos);
+            newRange.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+            chatBox.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
+      } else if (chatBox.tagName === 'TEXTAREA') {
+        const v = chatBox.value, cur = chatBox.selectionStart;
+        let slashPos = -1;
+        for (let i = cur - 1; i >= 0; i--) {
+          if (v[i] === '/') { slashPos = i; break; }
+        }
+        if (slashPos >= 0) {
+          const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+          nativeSetter?.call(chatBox, v.slice(0, slashPos) + v.slice(cur));
+          chatBox.setSelectionRange(slashPos, slashPos);
+          chatBox.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+    } catch (_) { /* bỏ qua nếu lỗi DOM */ }
+  }
+
+  // Lấy phần query sau "/" tại vị trí cursor hiện tại
+  function _slashGetQuery_(chatBox) {
+    try {
+      if (chatBox.isContentEditable) {
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return null;
+        const range = sel.getRangeAt(0);
+        const node = range.startContainer;
+        if (node.nodeType !== Node.TEXT_NODE) return null;
+        const text = node.textContent;
+        const pos = range.startOffset;
+        // Tìm "/" gần nhất trước cursor
+        for (let i = pos - 1; i >= 0; i--) {
+          if (text[i] === '/') return text.slice(i + 1, pos);
+          if (text[i] === ' ' || text[i] === '\n') break; // chỉ tìm trong từ hiện tại
+        }
+      } else if (chatBox.tagName === 'TEXTAREA') {
+        const v = chatBox.value, cur = chatBox.selectionStart;
+        for (let i = cur - 1; i >= 0; i--) {
+          if (v[i] === '/') return v.slice(i + 1, cur);
+          if (v[i] === ' ' || v[i] === '\n') break;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  // Lắng nghe input trên TẤT CẢ ô chat trong trang (dùng event delegation)
+  function _slashInitListener_() {
+    document.addEventListener('input', (e) => {
+      const box = e.target;
+      if (!box) return;
+      // Chỉ xử lý ô chat (contenteditable hoặc textarea trong vùng chat Pancake)
+      if (!box.isContentEditable && box.tagName !== 'TEXTAREA' && box.tagName !== 'INPUT') return;
+      if (box.closest('#pk-panel, #pk-slash-popup, .pk-panel-container')) return; // bỏ qua ô input trong panel
+
+      const q = _slashGetQuery_(box);
+      if (q === null) { _slashHide_(); return; }
+
+      // Nạp mẫu từ CRM nếu chưa có (không block UI — dùng callback)
+      const showNow = () => {
+        const items = _slashFilter_(q);
+        if (items.length === 0 && q.length === 0) return; // tránh hiện popup rỗng khi gõ "/" lúc chưa có mẫu
+        _slashShow_(box, items);
+      };
+      if (!_msgTemplates.length) {
+        safeSendMessage_({ type: 'GET_MESSAGE_TEMPLATES' }, (resp) => {
+          if (resp?.ok) { _msgTemplates = resp.data.templates || []; _msgTplTs = Date.now(); }
+          showNow();
+        });
+      } else {
+        showNow();
+      }
+    }, true);
+
+    document.addEventListener('keydown', (e) => {
+      if (!_slashPopupEl || _slashPopupEl.style.display === 'none') return;
+      if (e.key === 'Escape') { e.preventDefault(); _slashHide_(); return; }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        _slashSetActive_(Math.min(_slashActiveIdx + 1, _slashItems.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        _slashSetActive_(Math.max(_slashActiveIdx - 1, 0));
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        if (_slashActiveIdx >= 0) {
+          e.preventDefault();
+          e.stopPropagation();
+          const box = _slashGetChatBox_();
+          if (box) _slashApply_(box, _slashActiveIdx);
+        }
+      }
+    }, true);
+
+    // Đóng popup khi click ra ngoài
+    document.addEventListener('click', (e) => {
+      if (_slashPopupEl && !_slashPopupEl.contains(e.target)) _slashHide_();
+    }, true);
+  }
+
+  // Khởi động module sau khi settings và panel đã sẵn sàng
+  (function _slashBoot_() {
+    // Đợi settings load xong rồi mới init (settings load async ở initPanel_)
+    const tryInit = () => {
+      if (settings) { _slashInitListener_(); return; }
+      setTimeout(tryInit, 500);
+    };
+    tryInit();
+  })();
+  // ── kết thúc MODULE PHÍM TẮT GÕ NHANH ──
+
 })();

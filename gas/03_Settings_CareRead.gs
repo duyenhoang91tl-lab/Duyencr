@@ -206,6 +206,7 @@ function setSetting_(key, value) {
   // Duyen 2026-09: 1 nguon phan loai Online/Offline dung chung MOI NOI, ke ca tai khoan dang nhap),
   // khong chi rieng cac bao cao doanh so.
   if (key === 'saleChannels') { try { _syncSaleChannelsToUsers_(value); } catch (eSync) {} }
+  if (key === 'bannedWordsCfg') _bannedCacheClear_(); // cache tu cam (AI + quet chat) 30 phut -> bo ngay de ap dung liền
   return jsonOut_({ ok: true });
 }
 function _syncSaleChannelsToUsers_(rawValue) {
@@ -1072,7 +1073,7 @@ function tatChanKhac() { return _enfSet_('other', false); }
 //  (khong doi hanh vi cu). Cai: chay datChuSoHuu('ten_dang_nhap') trong Editor; xem: xemChuSoHuu. Chi chan khi co token hop le
 //  (token thieu/het han do cong tac 4b xu ly) va KHONG chan khoa extension (extension dung `ek`, xem EXT_ALLOWED_).
 // ═══════════════════════════════════════════════════════════════
-var OWNER_ONLY_ACTIONS_ = { patchOrder: 1, deleteOrder: 1, deleteDuplicateOrders: 1, replaceOrders: 1, importSheetRows: 1, dedupeCare: 1, findDuplicateOrders: 1 };   // findDuplicateOrders (quet don trung, chi menu admin) di cung deleteDuplicateOrders (4c-3)
+var OWNER_ONLY_ACTIONS_ = { patchOrder: 1, deleteOrder: 1, deleteDuplicateOrders: 1, replaceOrders: 1, importSheetRows: 1, dedupeCare: 1, findDuplicateOrders: 1, importUndo: 1, importBatches: 1 };   // findDuplicateOrders (quet don trung, chi menu admin) di cung deleteDuplicateOrders (4c-3)
 function _ownerUsers_() {
   var a = [];
   try { a = JSON.parse(PropertiesService.getScriptProperties().getProperty('ownerUsers') || '[]') || []; } catch (e) { a = []; }
