@@ -5473,41 +5473,16 @@ function _pickBaseRowsForCode_(code, idx) {
   return null;
 }
 
-// ── MA BAO HANH "BH..." (yeu cau Duyen 21/10/2026) ──
-// Ma BH (vd "BH108T10/2026") = don GOC khach mang di gui BAO HANH: BO chu "BH" -> "108T10/2026" la don goc tren Base, dung de BIET TINH CHO SALE NAO. Doanh thu cua don bao hanh van
-// la gia Pos cua chinh don do (neu co doanh thu) — KHONG lay gia tri don goc Base (tranh cong doanh thu don goc lan nua). Chi ap khi ghi chu chi co ma BH (khong lan ma don thuong).
+// ── MA BAO HANH "BH..." (Duyen chot lai 21/10/2026) ──
+// Don co ma "BH395T09/2026" la DON DOC LAP (khach mang don goc di gui bao hanh): KHONG tra don goc tren Base, KHONG tham gia ghep. Tinh nhu moi don Pos khac theo cot The:
+// co ten sale tren The -> chia cho sale do; khong co ten sale -> khong chia cho ai (chua gan sale). Doanh thu = gia Pos cua chinh don bao hanh.
 function _splitBhCodes_(codes) {
-  var normal = [], bh = [], bhOrig = [], seen = {};
+  var normal = [], bh = [];
   (codes || []).forEach(function(c) {
     var n = _normCounterCode_(c);
-    if (/^BH\d/.test(n)) { bh.push(n); var o = n.replace(/^BH/, ''); if (!seen[o]) { seen[o] = true; bhOrig.push(o); } }
-    else normal.push(n);
+    if (/^BH\d/.test(n)) bh.push(n); else normal.push(n);
   });
-  return { normal: normal, bh: bh, bhOrig: bhOrig };
-}
-function _resolveBhOrigin_(origins, idx, posValue) {
-  var picked = [], missing = [], seenRow = {};
-  origins.forEach(function(c) {
-    var rows = _pickBaseRowsForCode_(c, idx);
-    if (!rows || !rows.length) { missing.push(c); return; }
-    rows.forEach(function(r) { if (!seenRow[r.rowIndex]) { seenRow[r.rowIndex] = true; picked.push(r); } });
-  });
-  if (missing.length) return { status: 'khongKhop', codes: origins, missing: missing };
-  var total = 0, shareAmt = {}, names = [], baseOrders = [];
-  picked.forEach(function(br) {
-    var excl = _isExcludedOrderStatus_(br.trangThai), d0 = parseVNDate_(br.ngayTao);
-    baseOrders.push({ dong: br.rowIndex, ma: br.code || '', ngay: d0 ? _vnYmd_(d0) : '', nguoiTao: br.creator || '', saleBan: String(br.saleBan || ''),
-      trangThai: String(br.trangThai || ''), giaTri: Number(br.giaTriDon) || 0, tinh: !excl });
-    if (excl) return;   // don goc Base 'Thất bại' -> khong dung de chia (roi ve chia theo The Pos, khong mat doanh thu cua don bao hanh)
-    var rv = Number(br.giaTriDon) || 0;
-    var sales = String(br.saleBan || '').split(',').map(function(x) { return x.trim(); }).filter(Boolean);
-    if (!sales.length) sales = ['(chưa gán sale)'];
-    total += rv;
-    sales.forEach(function(sn) { if (shareAmt[sn] === undefined) { shareAmt[sn] = 0; names.push(sn); } shareAmt[sn] += rv / sales.length; });
-  });
-  if (!names.length) return { status: 'khongKhop', codes: origins, missing: origins };
-  var shares = names.map(function(sn) { return { name: sn, frac: total > 0 ? shareAmt[sn] / total : 1 / names.length }; });
-  return { status: 'ok', total: Number(posValue) || 0, shares: shares, codes: origins, baseRows: picked.length, creators: [], baseNgayTao: '', baseOrders: baseOrders, bh: true };
+  return { normal: normal, bh: bh };
 }
 
 // Tinh GHEP cho 1 don Pos. usedBaseRows: set (cap request) cac dong Base da duoc 1 don Pos khac nhan —
@@ -5859,15 +5834,12 @@ function buildSalesReportB_(filters) {
   }
 
   // GHEP DON POS <-> BASE (cot Q ghi chu): tach ma bo dem tu ghi chu, chi doc "DT TỔNG " khi THUC SU co ma.
-  var codesByRow = [], bhOrigByRow = [], wantedCodes = {}, anyCodes = false;
+  var codesByRow = [], wantedCodes = {}, anyCodes = false;
   for (var pi = 0; pi < pre.length; pi++) {
-    var cds = POS_GHEP_BASE_ENABLED_ ? _extractCounterCodes_(pre[pi].ghiChu) : [];
-    var bhSp = _splitBhCodes_(cds), bhOrig = null;
-    if (bhSp.bh.length && !bhSp.normal.length) { bhOrig = bhSp.bhOrig; cds = []; }   // don BAO HANH: tra don goc (bo chu BH) de biet sale; doanh thu giu theo Pos
-    else { cds = (cds.length >= POS_GHEP_MIN_CODES_) ? bhSp.normal : []; }            // chi don ghep (>=2 ma) moi check nguoc Base; 1 ma -> tinh thuan Pos; ma BH lan ma thuong khong dung de ghep
-    codesByRow.push(cds); bhOrigByRow.push(bhOrig);
+    var cds = POS_GHEP_BASE_ENABLED_ ? _splitBhCodes_(_extractCounterCodes_(pre[pi].ghiChu)).normal : [];   // ma BH = don doc lap, khong tham gia ghep
+    if (cds.length < POS_GHEP_MIN_CODES_) cds = []; // chi don ghep (>=2 ma thuong) moi check nguoc Base; 0-1 ma -> tinh thuan Pos theo The
+    codesByRow.push(cds);
     if (cds.length) { anyCodes = true; cds.forEach(function(c) { wantedCodes[c] = true; }); }
-    if (bhOrig) { anyCodes = true; bhOrig.forEach(function(c) { wantedCodes[c] = true; }); }
   }
   var baseIdx = null;
   var ghepErr = '', ghepMs = 0;
@@ -5895,10 +5867,7 @@ function buildSalesReportB_(filters) {
   var matched = [];
   for (var pj = 0; pj < pre.length; pj++) {
     var rowP = pre[pj];
-    // Don BH (21/10/2026, Duyen): CHI chia cho sale khi don CO TEN SALE tren cot The; khong co ten sale -> KHONG chia cho ai (gh = null, giu nguyen don tinh theo The = chua gan sale).
-    var bhHasSale = !!bhOrigByRow[pj] && _donSaleNamesFromThe_(rowP.theSale).length > 0;
-    var gh = bhHasSale ? _resolveBhOrigin_(bhOrigByRow[pj], baseIdx, Number(rowP.giaTriSauGiam) || 0)
-      : (bhOrigByRow[pj] ? null : (codesByRow[pj].length ? _resolveGhepDon_(codesByRow[pj], baseIdx, usedBaseRows) : null));
+    var gh = codesByRow[pj].length ? _resolveGhepDon_(codesByRow[pj], baseIdx, usedBaseRows) : null;
     var effRow = rowP;
     if (gh) {
       ghepStats.donCoMa++;
