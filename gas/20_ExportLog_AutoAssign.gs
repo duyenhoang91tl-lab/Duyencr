@@ -144,7 +144,7 @@ function exportDailyReportLogs_(from, to) {
 // cho Base + Pos (xem _autoDedupExactRowsInSheet_/onChangeDedupTrigger_ o tren). Khong can chay
 // lai moi lan Deploy sau — trigger installable ton tai doc lap voi cac lan deploy Web App.
 function chayCaiDatTrigger() {
-  installAutoDedupTrigger_();
+  Logger.log(installAutoDedupTrigger_());   // truoc day bo mat ket qua (return khong hien o Editor)
 }
 
 
@@ -155,7 +155,7 @@ function chayCaiDatTrigger() {
 //  _aaBuckets/_aaPlan PHAI GIONG HET ban trong index.html (khoi "CHIA DATA TU DONG (engine)") — sua 1 ben nho sua ben kia.
 //  Cau hinh: Settings 'autoAssignCfg' (UI luu). Trang thai chay: Settings 'autoAssignState' {lastRun,lastResult,by} CHI do
 //  nguoi chay (server/trinh duyet) ghi — tach rieng de UI luu cau hinh khong bao gio ghi de lastRun (tranh chia 2 lan/ngay).
-//  CACH CAI: Apps Script Editor -> chon ham installAutoAssignTrigger_ -> Run (1 lan, cap quyen). Go: removeAutoAssignTrigger_.
+//  CACH CAI: Apps Script Editor -> chon ham caiTriggerChiaTuDong (KHONG co dau _ cuoi) -> Run (1 lan, cap quyen). Go: goTriggerChiaTuDong. Kiem tra: kiemTraChiaTuDong. Chia THAT ngay: chayThuChiaTuDong.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 var AA_TZ = 'Asia/Ho_Chi_Minh';
 var _AA_SRC_KEYS = ['dt','don','cs','cskh'];
@@ -551,7 +551,7 @@ function caiTriggerChiaTuDong() {
   Logger.log(installAutoAssignTrigger_());
 }
 function chayThuChiaTuDong() {   // CHIA THẬT ngay, không phải chạy thử
-  Logger.log(JSON.stringify(autoAssignRun_(true)));
+  Logger.log(JSON.stringify(autoAssignRunNow_()));   // autoAssignRunNow_ = autoAssignRun_(true); gọi qua nó để hàm có lối vào công khai
 }
 function goTriggerChiaTuDong() {
   Logger.log(removeAutoAssignTrigger_());

@@ -19,6 +19,9 @@
     }
   },
   "onlyPancake": {
+    "webLogin": {"status": "gap", "note": "Duyet mau tin ngay tren Pancake AI (2026-10-15, Duyen yeu cau rieng cho Pancake AI: admin dang nhap CRM o Cai dat extension, thong bao + nut Duyet/Tu choi tren Pancake). Zalo AI chua co - cho Duyen chot co lam khong (docs/crm-kb/04-extension-pancake.md)"},
+    "tplPending": {"status": "gap", "note": "Danh sach mau cho duyet cho extension Pancake AI (xem webLogin)"},
+    "approveMessageTemplate": {"status": "gap", "note": "Duyet/tu choi mau tin tu extension Pancake AI (xem webLogin)"},
     "scanBanned": {"status": "gap", "note": "Nut \"Quet tu cam\" truoc khi gui (2026-10-21, Duyen yeu cau rieng cho Pancake AI); Zalo AI chua co — cho Duyen chot co lam khong (docs/crm-kb/04-extension-pancake.md)"},
     "saveCannedResponse": {
       "status": "platform",

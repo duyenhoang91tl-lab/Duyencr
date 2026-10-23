@@ -11,7 +11,7 @@ const psrc = fs.readFileSync(path.join(__dirname, '..', 'extension-pancake', 'pa
 function fnSrc(src, name) { const i = src.indexOf('function ' + name); if (i < 0) throw new Error('khong thay ' + name); let d = 0, k = src.indexOf('{', i); for (let m = k; m < src.length; m++) { if (src[m] === '{') d++; else if (src[m] === '}') { d--; if (d === 0) return src.slice(i, m + 1); } } }
 const zchunk = zsrc.slice(zsrc.indexOf('  let _zaiMsgTemplates = []'), zsrc.indexOf('  // ── DOANH SO & HOA HONG CUA TOI'));
 const zhelp = fnSrc(zsrc, 'zaiFold_') + '\n' + fnSrc(zsrc, 'zaiRankTpls_');
-const phelp = ['_stripVNlocal_', 'isMyOpenTpl_', 'tplLines_', 'rankMsgTemplates_', 'renderMsgTemplateRows_', 'openTplForm_', 'loadMsgTemplates_'].map(n => fnSrc(psrc, n)).join('\n');
+const phelp = ['_stripVNlocal_', 'isMyOpenTpl_', 'tplLines_', 'rankMsgTemplates_', 'renderMsgTemplateRows_', 'openTplForm_', 'loadMsgTemplates_'].map(n => fnSrc(psrc, n)).join('\n') + '\n' + fnSrc(psrc, 'ensureTplCatalog_') + '\nconst _fold_ = (s) => _stripVNlocal_(String(s || \'\').normalize(\'NFC\')).replace(/\\s+/g, \' \').trim();\nconst _vnSort_ = (a, b) => String(a).localeCompare(String(b), \'vi\', { numeric: true });\nconst _itemNames_ = (it) => { const o = []; if (it.t) o.push(it.t); if (it.m && _fold_(it.m) !== _fold_(it.t)) o.push(it.m); return o; };\nlet _imgFlatItems = null, _imgFlatLoading = false;';
 const esc1 = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const esc2 = s => String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -22,8 +22,8 @@ const TPLS = [
   { id: 't4', title: 'Của người khác chờ duyệt', content: 'abc', product: 'Nhẫn', status: 'pending', createdBy: 'Bình' },
   { id: 'a"b\'c', title: 'ID có <dấu> "nháy"', content: 'Nội dung <img src=x onerror=1> & "kèm"', product: 'Tỷ hưu', topic: 'T"1', tags: 't<g>', status: 'approved', createdBy: 'An' }
 ];
-const CANON_P = [['pk-price-item pk-ai-suggestion-item', 'ITEM'], ['pk-ctkm-title', 'TITLE'], ['pk-price-field', 'FIELD'], ['pk-btn-outline', 'BTN'], ['pk-tpl-acts', 'ACTS'], ['pk-price-loading', 'LOADING'], ['Bấm để chèn vào ô trả lời', 'TIP'], ['pk-tpl-form-box', 'FBOX'], ['pk-tpl-form-title', 'FTITLE'], ['pk-ai-sug-bar', 'BAR'], ['pk-ai-sug-save', 'SAVE'], ['pk-tpl-f-', 'f-']];
-const CANON_Z = [['zai-ctkm-item zai-tpl-item', 'ITEM'], ['zai-ctkm-title', 'TITLE'], ['zai-ctkm-field', 'FIELD'], ['zai-btn zai-btn-primary zai-btn-sm zai-tpl-save', 'BTN SAVE'], ['zai-btn zai-btn-secondary zai-btn-sm', 'BTN'], ['zai-tpl-acts', 'ACTS'], ['zai-ctkm-loading', 'LOADING'], ['Bấm để dán vào ô chat', 'TIP'], ['zai-tpl-form-box', 'FBOX'], ['zai-tpl-form-title', 'FTITLE'], ['zai-tpl-bar', 'BAR'], ['zai-tpl-f-', 'f-']];
+const CANON_P = [['pk-tpl-nhom-dl', 'NHOMDL'], ['pk-tpl-prod-dl', 'PRODDL'], ['pk-tpl-line-txt', 'LINETXT'], ['pk-tpl-lines', 'LINES'], ['pk-tpl-line', 'LINE'], ['pk-price-item pk-ai-suggestion-item', 'ITEM'], ['pk-ctkm-title', 'TITLE'], ['pk-price-field', 'FIELD'], ['pk-btn-outline', 'BTN'], ['pk-tpl-acts', 'ACTS'], ['pk-price-loading', 'LOADING'], ['Bấm để chèn vào ô trả lời', 'TIP'], ['pk-tpl-form-box', 'FBOX'], ['pk-tpl-form-title', 'FTITLE'], ['pk-ai-sug-bar', 'BAR'], ['pk-ai-sug-save', 'SAVE'], ['pk-tpl-f-', 'f-']];
+const CANON_Z = [['zai-tpl-nhom-dl', 'NHOMDL'], ['zai-tpl-prod-dl', 'PRODDL'], ['zai-tpl-line-txt', 'LINETXT'], ['zai-tpl-lines', 'LINES'], ['zai-tpl-line', 'LINE'], ['zai-ctkm-item zai-tpl-item', 'ITEM'], ['zai-ctkm-title', 'TITLE'], ['zai-ctkm-field', 'FIELD'], ['zai-btn zai-btn-primary zai-btn-sm zai-tpl-save', 'BTN SAVE'], ['zai-btn zai-btn-secondary zai-btn-sm', 'BTN'], ['zai-tpl-acts', 'ACTS'], ['zai-ctkm-loading', 'LOADING'], ['Bấm để dán vào ô chat', 'TIP'], ['zai-tpl-form-box', 'FBOX'], ['zai-tpl-form-title', 'FTITLE'], ['zai-tpl-bar', 'BAR'], ['zai-tpl-f-', 'f-']];
 const canon = (h, map) => { let x = h; for (const [a, b] of map) x = x.split(a).join(b); return x.replace(/BTN SAVE/g, 'BTN SAVE').replace(/class="BTN SAVE"/g, 'class="BTN SAVE"').replace(/\s+/g, ' '); };
 const normP = h => canon(h, CANON_P).replace(/class="BTN SAVE"/g, 'class="BTN SAVE"');
 
@@ -41,8 +41,9 @@ function pancake(cs) {
   w.navigator.clipboard = { writeText: async t => { if (env.clipFail) throw new Error('no'); env.clip.push(t); } };
   w.confirm = () => env.confirmAns;
   const safeSendMessage_ = (msg, cb) => { let r;
-    if (msg.type === 'GET_MESSAGE_TEMPLATES') { env.calls.push({ GET: 'list' }); r = { ok: true, data: env.listReply }; }
-    else if (msg.type === 'SAVE_MESSAGE_TEMPLATE') { const t = msg.payload; env.calls.push({ action: 'saveMessageTemplate', template: { id: t?.id || '', title: t?.title || '', content: t?.content || '', tags: t?.tags || '', product: t?.product || '', topic: t?.topic || '', createdBy: t?.createdBy || '' } }); r = env.reply; }
+    if (msg.type === 'GET_PRODUCT_IMAGE_FLAT') { r = { ok: false, error: 'khong co bang gia (test)' }; }
+    else if (msg.type === 'GET_MESSAGE_TEMPLATES') { env.calls.push({ GET: 'list' }); r = { ok: true, data: env.listReply }; }
+    else if (msg.type === 'SAVE_MESSAGE_TEMPLATE') { const t = msg.payload; env.calls.push({ action: 'saveMessageTemplate', template: { id: t?.id || '', title: t?.title || '', content: t?.content || '', tags: t?.tags || '', product: t?.product || '', nhom: t?.nhom, topic: t?.topic || '', createdBy: t?.createdBy || '' } }); r = env.reply; }
     else { env.calls.push({ action: 'deleteMessageTemplate', id: msg.payload?.id || '', createdBy: msg.payload?.createdBy || '' }); r = env.reply; }
     setTimeout(() => cb(r), 0); };
   const f = new w.Function('panelEl', 'settings', 'safeSendMessage_', 'escapeHtml', 'insertReply', 'setStatus', 'navigator', 'confirm', 'let _msgTemplates = [], _msgTplTs = 0;\n' + phelp + '\nreturn { setTpls: (l) => { _msgTemplates = l; }, render: renderMsgTemplateRows_, form: openTplForm_, load: loadMsgTemplates_ };');
@@ -76,23 +77,24 @@ const body = S => S.box.innerHTML;
     // sua -> form dien san
     S.box.querySelector('[data-eid="t2"]').click(); await sleep(5);
     const F = id => S.host.querySelector('#' + S.pre + id);
-    ok(F('title').value === 'Mẫu CỦA TÔI chờ duyệt' && F('product').value === 'Dây chuyền' && F('content').value === 'x'.repeat(200) && /Sửa mẫu đề xuất/.test(S.host.textContent) && S.env.inserted.length === 1, N + ': Sua -> form dien san, khong chen');
+    ok(F('title').value === 'Mẫu CỦA TÔI chờ duyệt' && F('product').value === 'Dây chuyền' && F('content').value === 'x'.repeat(200) && /Sửa mẫu lưu sẵn/.test(S.host.textContent) && S.env.inserted.length === 1, N + ': Sua -> form dien san, khong chen');
     // xoa: huy -> khong goi; dong y -> goi dung + thong bao + tai lai
     S.env.confirmAns = false; S.box.querySelector('[data-did="t2"]').click(); await sleep(10); ok(!S.env.calls.some(c => c.action === 'deleteMessageTemplate'), N + ': huy xoa -> khong goi');
     S.env.confirmAns = true; S.env.reply = { ok: false, error: 'Khong co quyen' }; S.box.querySelector('[data-did="t2"]').click(); await sleep(20);
-    ok(S.env.calls.find(c => c.action === 'deleteMessageTemplate').createdBy === 'Hoa' && /Lỗi xoá mẫu: Khong co quyen/.test(S.status()), N + ': xoa loi -> thong bao');
+    ok(S.env.calls.find(c => c.action === 'deleteMessageTemplate').createdBy === 'Hoa' && (N === 'Zalo' ? /Lỗi xoá mẫu: Khong co quyen/ : /^Khong co quyen$/).test(S.status()), N + ': xoa loi -> thong bao');
     S.env.calls.length = 0; S.env.reply = { ok: true }; S.box.querySelector('[data-did="t2"]').click(); await sleep(30);
     ok(JSON.stringify(S.env.calls[0]) === JSON.stringify({ action: 'deleteMessageTemplate', id: 't2', createdBy: 'Hoa' }) && /Đã xoá mẫu/.test(S.status()) && S.env.calls.some(c => c.GET), N + ': xoa OK -> payload dung + thong bao + tai lai danh sach: ' + JSON.stringify(S.env.calls));
     // form de xuat moi
     S.host.innerHTML = ''; S.form(null); await sleep(5);
-    ok(/Đề xuất mẫu mới/.test(S.host.textContent) && F('title').value === '', N + ': form moi trong');
-    F('save').click(); ok(/Cần nhập đủ tiêu đề và nội dung mẫu/.test(S.status()), N + ': thieu tieu de/noi dung -> nhac');
+    ok(/Tạo mẫu lưu sẵn/.test(S.host.textContent) && F('title').value === '', N + ': form moi trong');
+    F('save').click(); ok(/Cần nhập nội dung mẫu câu tư vấn/.test(S.status()), N + ': thieu noi dung -> nhac');
+    F('content').value = 'x'; F('save').click(); ok(/Chọn nhóm sản phẩm, gõ tên sản phẩm hoặc nhập tình huống/.test(S.status()), N + ': thieu nhom/SP/tinh huong -> nhac'); F('content').value = '';
     F('title').value = '  Tiêu đề mới '; F('content').value = ' Nội dung mới '; F('product').value = 'Nhẫn'; F('topic').value = 'Hỏi giá'; F('tags').value = 'a, b';
     S.env.calls.length = 0; S.env.reply = { ok: false, error: 'Server bận' }; F('save').click(); await sleep(20);
-    ok(!F('save').disabled && /Lỗi gửi đề xuất: Server bận/.test(S.status()) && S.host.querySelector('#' + S.pre + 'title'), N + ': gui loi -> mo lai nut, giu form, thong bao');
+    ok(!F('save').disabled && /Server bận/.test(S.status()) && S.host.querySelector('#' + S.pre + 'title'), N + ': gui loi -> mo lai nut, giu form, thong bao');
     S.env.calls.length = 0; S.env.reply = { ok: true }; F('save').click(); await sleep(30);
-    ok(JSON.stringify(S.env.calls[0]) === JSON.stringify({ action: 'saveMessageTemplate', template: { id: '', title: 'Tiêu đề mới', content: 'Nội dung mới', tags: 'a, b', product: 'Nhẫn', topic: 'Hỏi giá', createdBy: 'Hoa' } }), N + ': payload gui dung (da trim): ' + JSON.stringify(S.env.calls[0]));
-    ok(S.host.innerHTML === '' && /Đã gửi đề xuất — quản lý duyệt xong/.test(S.status()) && S.env.calls.some(c => c.GET), N + ': gui OK -> dong form, thong bao, tai lai');
+    ok(JSON.stringify(S.env.calls[0]) === JSON.stringify({ action: 'saveMessageTemplate', template: { id: '', title: 'Tiêu đề mới', content: 'Nội dung mới', tags: 'a, b', product: 'Nhẫn', nhom: '', topic: 'Hỏi giá', createdBy: 'Hoa' } }), N + ': payload gui dung (da trim): ' + JSON.stringify(S.env.calls[0]));
+    ok(S.host.innerHTML === '' && /Đã lưu mẫu \(chờ duyệt\)/.test(S.status()) && S.env.calls.some(c => c.GET), N + ': gui OK -> dong form, thong bao, tai lai');
     // sua mau co san -> gui kem id
     S.form(TPLS[2]); await sleep(5); S.env.calls.length = 0; F('save').click(); await sleep(30); ok(S.env.calls[0].template.id === 't3' && S.env.calls[0].template.createdBy === 'Hoa', N + ': sua -> gui kem id mau');
     // huy form
@@ -114,7 +116,7 @@ const body = S => S.box.innerHTML;
   Z1.env.listReply = { error: 'Khong doc duoc' }; await Z1.load(); ok(/Lỗi: Khong doc duoc/.test(Z1.box.textContent), 'Zalo: loi backend');
   const ZD = zalo('Hoa'); ZD.w.document.getElementById('zai-tpl-q'); ZD.env.listReply = null; await ZD.load(); ok(/Lỗi:/.test(ZD.box.textContent), 'Zalo: phan hoi hong -> bao loi, khong nem');
   // ── noi vao menu ──
-  ok(/\{ v: 'tpl', label: '📚 Mẫu tin nhắn tư vấn' \}/.test(zsrc) && /tplBody\.style\.display = v === 'tpl'/.test(zsrc) && /if \(v === 'tpl' && !_zaiTplLoadedOnce\) \{ _zaiTplLoadedOnce = true; loadMsgTemplatesZai_\(\)/.test(zsrc) && /id="zai-tpl-add"/.test(zsrc) && /#zai-tpl-q'\)\.addEventListener\('input'/.test(zsrc), 'Zalo: muc menu + nap lan dau + nut tai lai/them + go tim');
-  ok(/<option value="tpl">📚 Mẫu tin nhắn tư vấn<\/option>/.test(psrc), 'ten muc menu giong het Pancake');
+  ok(/\{ v: 'tpl', label: '📚 Tạo mẫu lưu sẵn \/ Mẫu tư vấn' \}/.test(zsrc) && /tplBody\.style\.display = v === 'tpl'/.test(zsrc) && /if \(v === 'tpl' && !_zaiTplLoadedOnce\) \{ _zaiTplLoadedOnce = true; loadMsgTemplatesZai_\(\)/.test(zsrc) && /id="zai-tpl-add"/.test(zsrc) && /#zai-tpl-q'\)\.addEventListener\('input'/.test(zsrc), 'Zalo: muc menu + nap lan dau + nut tai lai/them + go tim');
+  ok(/<option value="tpl">📚 Tạo mẫu lưu sẵn \/ Mẫu tư vấn<\/option>/.test(psrc), 'ten muc menu giong het Pancake');
   console.log('ALL TPL UI TESTS PASSED');
 })().catch(er => { console.error('FAIL (ngoai le): ' + (er && er.stack || er)); process.exit(1); });

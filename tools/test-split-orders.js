@@ -3,7 +3,7 @@ const fs=require('fs'),vm=require('vm');let bad=0;const ok=(c,t)=>{if(!c){bad++;
 const src=fs.readFileSync('gas_v13.js','utf8');
 function fn(name){const i=src.indexOf('function '+name+'(');if(i<0)throw new Error('thiếu '+name);let d=0,j=src.indexOf('{',i);for(let k=j;k<src.length;k++){if(src[k]=='{')d++;else if(src[k]=='}'){d--;if(!d)return src.slice(i,k+1)}}}
 const consts=src.slice(src.indexOf('var SPLIT_ORDER_MAX_ROWS_ ='),src.indexOf('// [{name, frac}] cac sale THAT'));
-const code=consts+['_posSaleFractions_','_splitSales_','_splitScope_','_splitCSV_','_splitRange_','_splitFilters_','_splitRound_','splitOrderReport_','splitOrderMine_','splitDoGet_','_userDeptKeys_','_profNames_','_normTxt_','normPhone_','_reportCacheKey_'].map(fn).join('\n');
+const code=consts+['_posSaleFractions_','_splitSales_','_splitIdentityFor_','_splitRowFinder_','_splitScope_','_splitCSV_','_splitRange_','_splitFilters_','_splitRound_','splitOrderReport_','splitOrderMine_','splitDoGet_','_userDeptKeys_','_profNames_','_normTxt_','normPhone_','_reportCacheKey_'].map(fn).join('\n');
 const O=[ // đơn giả: giá trị đầy đủ, người chia
  {ngayTaoDon:'02/10/2026',khachHang:'Khách 1',soDienThoai:'0911000001',sanPham:'Combo A',giaTriSauGiam:1000000,saleBanValid:'An,Bình'},
  {ngayTaoDon:'03/10/2026',khachHang:'Khách 2',soDienThoai:'0911000002',sanPham:'SP B',giaTriSauGiam:2000000,saleBanValid:'An'},
@@ -26,7 +26,7 @@ function mk(){const calls=[],cacheStore={};
    const sales=o=>ctx._posSaleFractions_(o).map(x=>x);const matched=O.filter(o=>{const ss=ctx._posSaleFractions_(o);if(!want.length)return true;return ss.some(x=>want.indexOf(ctx._normTxt_(x.name))>=0)});
    const bySale={};let tg=0;matched.forEach(o=>{tg+=o.giaTriSauGiam;const ss=ctx._posSaleFractions_(o);const list=ss.length?ss:[{name:'(chưa gán sale)',frac:1}];list.forEach(s=>{if(want.length&&want.indexOf(ctx._normTxt_(s.name))<0)return;const b=bySale[s.name]||(bySale[s.name]={orders:0,giaTri:0});b.orders+=1;b.giaTri+=o.giaTriSauGiam*s.frac})});
    return {totalOrders:matched.length,totalGiaTri:tg,bySale:Object.keys(bySale).filter(k=>k!=='(chưa gán sale)').map(k=>({name:k,orders:bySale[k].orders,giaTri:bySale[k].giaTri})),orders:matched}},
-  _userDeptKeys_:null,_profNames_:null,normPhone_:null,_posSaleFractions_:null,_reportCacheKey_:null};
+  _salePersonIdentity_:obs=>({key:n=>ctx._normTxt_(n),primary:n=>String(n).trim(),members:n=>[n]}),_userDeptKeys_:null,_profNames_:null,normPhone_:null,_posSaleFractions_:null,_reportCacheKey_:null};
  vm.createContext(ctx);vm.runInContext(code,ctx);
  // _profNames_ thật phụ thuộc alias Pancake → dùng bản đơn giản cho test (tên + names)
  vm.runInContext("_profNames_=function(u){var a=[u.name].concat(u.names||[]);var o=[],s={};a.forEach(function(n){var k=_normTxt_(n);if(n&&k&&!s[k]){s[k]=1;o.push(n)}});return o};",ctx);

@@ -98,7 +98,7 @@ var SET_HEADERS    = ['key','value'];
 var ASSIGN_HEADERS = ['id','date','csName','label','phones','donePhones','part'];
 // 1 o Google Sheet toi da 50.000 ky tu; JSON 1 SDT ~13 ky tu => 3000 SDT ~39k. Dot chia lon hon se duoc tach nhieu dong (cot 'part').
 var ASSIGN_CHUNK = 3000;
-var USER_HEADERS   = ['username','passHash','role','name','team','active','names','perms','saleType','startDate'];
+var USER_HEADERS   = ['username','passHash','role','name','team','active','names','perms','saleType','startDate','joinDate'];
 // PK_STATS_HEADERS: 1 dong = 1 "Nhan vien" (ten hien thi tren Pancake) trong 1 Page, 1 ngay —
 // nhap tu file Excel "Thong ke tuong tac" (pages_statistics_engagements) Pancake xuat ra.
 // Khoa duy nhat = date+pageId+nhanVien -> nap lai file CUNG 1 ngay se GHI DE (khong nhan doi).

@@ -81,6 +81,11 @@ Mọi câu **hướng dẫn cách dùng / giải thích cách tính / "bấm… 
 - Tỷ lệ chốt A = B do hàm dùng chung `_srCloseRateSectionsFromBase_` (đơn Base, bỏ đơn BH không doanh thu) — xem mục "TỶ LỆ CHỐT" phía trên/dưới. Chạy tay `xemTyLeChotAB` để so kênh + sale của A và B tháng này (log KHOP/LECH).
 - Test: `node tools/test-closerate-ab.js` (hàm thật + chạy `buildSalesReportB_` thật với dữ liệu giả).
 
+## Bảng đơn theo giai đoạn: BỘ LỌC + chip khách — 2026-10-23
+- Action GAS `stageBoard` nhận `dateFrom`/`dateTo` (ngày TẠO), `depts`/`teams`/`sales`/`kenh` (cách nhau `|`); AND giữa các bộ lọc, OR trong 1 bộ lọc; lọc ở server (`_ttBoardFilterCompile_`) nên số đếm cột đúng. Có lọc ngày ⇒ bỏ giới hạn mặc định (60 ngày / Đóng hàng 7 ngày). Phòng = sale HOẶC người đang xử lý thuộc phòng (`saleDepts`, theo danh tính người); `__none` = chưa phân phòng. Trả `options` để dựng ô chọn (không bị chính bộ lọc thu hẹp).
+- SĐT khách chỉ lấy khi `readDTTong_(true, true)` (opt-in) — KHÔNG thêm SĐT vào `readDTTong_` mặc định (các báo cáo khác trả dữ liệu đơn ra client). Thẻ có chip 📞 bấm = `_bdOpenCustomer_` → `openDp` (ngăn hồ sơ bên phải).
+- Test: `tools/test-stageboard-filter.js` (backend), `tools/test-stageboard-filter-ui.js` (jsdom).
+
 ## Bảng đơn theo giai đoạn: hiện MÃ BỘ ĐẾM, bấm để sao chép — 2026-10-16
 - Thẻ và tiêu đề modal hiện **mã bộ đếm** (cột U của DT TỔNG, vd `196T10/2026`, `BH196T10/2026`) thay cho id số của Base; đơn chưa có mã bộ đếm lùi về `#id`. Modal còn hàng "Mã đơn Base #id" để tra trên Base. Tìm kiếm khớp cả mã bộ đếm lẫn id.
 - GAS: `ttStageBoard_` gọi `readDTTong_(true)` (đọc thêm cột U) và `_ttBoardBuild_` thêm `maBoDem` vào từng thẻ. Danh sách "Đơn kẹt" ở trang chủ (`ttTodayTasks_`/`_ttStuckFromRows_`) vẫn hiện id số vì không đọc DT TỔNG — nếu cần đổi theo thì phải map id→maBoDem ở đó (tốn thêm 1 lần đọc DT TỔNG).
@@ -134,3 +139,9 @@ Công thức (Duyên chốt): **Tỷ lệ chốt = số đơn Base do Sale TẠO
 - **Ô tìm kiếm tên/mã LUÔN tìm trên TẤT CẢ sản phẩm** (không bị top N / danh sách đã chọn chặn), kể cả khi cột Mã đang ẩn.
 - Code: khối `BPRD-CFG BEGIN/END` trên `_srRenderB` (js/11-fn-srload.js), hàm tiền tố `_bprd*`; container `#bprd-cfg` (panel) và `#bprd-body` (bảng/biểu đồ, vẽ lại riêng khi gõ). Lưu trình duyệt: localStorage `ome_bprd_cfg` = `{mode:'top'|'pick'|'all', n, pick:[mã SP], showCode}` — KHÔNG đồng bộ giữa máy.
 - Chỉ đổi hiển thị ở client: `d.products` từ GAS (đã sắp giảm dần) và nút xuất Excel (js/13) vẫn là TẤT CẢ sản phẩm. Không đổi GAS. Test: `node tools/test-bprd-cfg.js` (52 ca).
+
+## Vì sao "Số lượng đơn" ≠ "Tổng lượt đơn theo sale" ≠ số đơn của Tỷ lệ chốt (giải thích 2026-10-17)
+Báo cáo A có 3 cách đếm khác nhau, KHÔNG phải lỗi: (1) **Số lượng đơn** (thẻ đầu trang) = số đơn thật khớp bộ lọc, mỗi đơn 1 lần (`matched.length`). (2) **Tổng lượt đơn theo sale** (khung "Theo Sale bán") = cộng số đơn của TỪNG sale: đơn bán chung N sale tính cho cả N người (số đơn giữ nguyên, tiền chia đều `/n`) nên lớn hơn (1); khi đang lọc Sale bảng chỉ liệt kê người trong bộ lọc nên tổng tiền nhỏ hơn tổng đơn (phần của người đồng bán ngoài bộ lọc không hiện). Trung bình/đơn khác nhau vì mẫu số khác nhau. (3) **Tỷ lệ chốt** chỉ đếm đơn Base không phải BH không doanh thu (`bhZero`) và có kênh khớp Page Pancake + có dữ liệu Pancake ngày đó (`_srOrderCovered_` trong `_srCloseRateSections_`) — kênh chưa khớp Page (Quầy, Zalo, TikTok…) không vào tử số.
+- UI: bảng Theo Sale (A khi không tick "tính theo người tạo", và B) ghi nhãn "Tổng lượt đơn theo sale" + dòng ℹ️ giải thích (`_srChartSvg(..., opts)`); các bảng Kênh/MKT giữ "Tổng số đơn".
+- Chẩn đoán: chạy tay `xemChenhLechSoDon` trong Apps Script Editor — liệt kê đơn thuộc A nhưng KHÔNG vào tỷ lệ chốt kèm lý do (BH 0đ / kênh chưa khớp Page / chưa có dữ liệu Pancake ngày đó). Muốn xem theo nhóm Sale: sửa `sale: []` trong hàm. Test: `tools/test-diag-sodon.js`, `tools/test-sr-sale-label.js`.
+

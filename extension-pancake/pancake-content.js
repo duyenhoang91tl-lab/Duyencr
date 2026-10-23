@@ -3073,7 +3073,7 @@
       b.disabled = true;
       safeSendMessage_({ type: 'DELETE_MESSAGE_TEMPLATE', payload: { id: t.id, createdBy: settings.csName || '' } }, (resp) => {
         if (resp?.ok) { setStatus('Đã xoá mẫu.'); loadMsgTemplates_(); }
-        else { b.disabled = false; setStatus(resp?.error || PK_API_ERR); }
+        else { b.disabled = false; setStatus(resp?.error || PK_API_ERR); }   // Pancake: KHONG them tien to 'Loi ...:' truoc loi API (test-pancake-apierr)
       });
     }));
   }
@@ -3101,7 +3101,7 @@
       <div class="pk-tpl-form-box">
         <div class="pk-tpl-form-title">${t ? '✏️ Sửa mẫu lưu sẵn' : '➕ Tạo mẫu lưu sẵn'}</div>
         <div style="font-size:11px;color:#6b7280;margin-bottom:4px">Chọn <b>nhóm sản phẩm</b> (có sẵn ở bảng giá) hoặc gõ <b>tên sản phẩm</b> — hệ thống tự nhận nhóm. Mẫu của bạn ở trạng thái <b>Chờ duyệt</b>; AI chỉ học sau khi admin duyệt trên CRM.</div>
-        <input type="text" id="pk-tpl-f-nhom" list="pk-tpl-nhom-dl" placeholder="🗂 Nhóm sản phẩm (chọn từ bảng giá hoặc gõ)" autocomplete="off" />
+        <input type="text" id="pk-tpl-f-nhom" list="pk-tpl-nhom-dl" placeholder="🗂 Nhóm sản phẩm (chọn từ bảng giá hoặc gõ; để trống = hệ thống tự phân loại)" autocomplete="off" />
         <datalist id="pk-tpl-nhom-dl"></datalist>
         <input type="text" id="pk-tpl-f-product" list="pk-tpl-prod-dl" placeholder="📦 Tên sản phẩm, cách nhau dấu phẩy (VD: Nhẫn vàng, Lắc tay)" autocomplete="off" />
         <datalist id="pk-tpl-prod-dl"></datalist>
@@ -3116,7 +3116,7 @@
         </div>
       </div>`;
     const $ = (id) => host.querySelector(id);
-    $('#pk-tpl-f-nhom').value = t ? (t.nhom || '') : '';
+    $('#pk-tpl-f-nhom').value = (t && t.nhom && !t.nhomAuto) ? t.nhom : '';   // nhom tu phan loai (server) KHONG dien san: de trong = tiep tuc tu phan loai
     $('#pk-tpl-f-product').value = t ? (t.product || '') : '';
     $('#pk-tpl-f-topic').value = t ? (t.topic || '') : '';
     $('#pk-tpl-f-title').value = t ? t.title : '';

@@ -270,8 +270,11 @@ function _acctDetailHtml(a){
     saleTypeHtml = '<div style="margin-top:10px;border-top:1px dashed var(--border);padding-top:9px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">'+
       '<div><div style="font-size:10.5px;color:var(--hint);margin-bottom:2px">Đội (áp dụng chương trình thưởng)</div>'+
         '<select onchange="acctSetSaleType(\''+uk+'\',this.value)" style="font-size:12px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+stOpts+'</select></div>'+
-      '<div><div style="font-size:10.5px;color:var(--hint);margin-bottom:2px">Ngày bắt đầu (mốc tính thưởng theo ngày thử việc)</div>'+
+      '<div><div style="font-size:10.5px;color:var(--hint);margin-bottom:2px">Ngày vào (bắt đầu nhận việc)</div>'+
+        '<input type="date" value="'+esc(a.joinDate||'')+'" onchange="acctSetJoinDate(\''+uk+'\',this.value)" style="font-size:12px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"></div>'+
+      '<div><div style="font-size:10.5px;color:var(--hint);margin-bottom:2px">Ngày nhận tin (bắt đầu nhận tin — mốc tính thưởng)</div>'+
         '<input type="date" value="'+esc(a.startDate||'')+'" onchange="acctSetStartDate(\''+uk+'\',this.value)" style="font-size:12px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"></div>'+
+      (a.startDate ? '<div style="font-size:11.5px;color:var(--muted);padding-bottom:5px">🎯 Mốc thưởng sau 1 tháng: <b>'+esc(_acctYmdToDmy(_acctAddMonthsYmd(a.startDate,1)))+'</b></div>' : '')+
     '</div>';
   }
 
@@ -337,7 +340,24 @@ function acctSetSaleType(u, val){
 function acctSetStartDate(u, val){
   var acct = _findAccount(u); if (!acct) return;
   acct.startDate = val || '';
-  _acctPersist(acct, 'Đặt ngày bắt đầu: ' + (val || '(bỏ trống)'));
+  _acctPersist(acct, 'Đặt ngày nhận tin: ' + (val || '(bỏ trống)'));
+}
+function acctSetJoinDate(u, val){
+  var acct = _findAccount(u); if (!acct) return;
+  acct.joinDate = val || '';
+  _acctPersist(acct, 'Đặt ngày vào: ' + (val || '(bỏ trống)'));
+}
+// Cộng n tháng vào "yyyy-MM-dd" (ngày vượt quá cuối tháng đích thì lấy ngày cuối tháng, vd 31/01 + 1 tháng = 28/02).
+function _acctAddMonthsYmd(ymd, n){
+  var m = String(ymd||'').match(/^(\d{4})-(\d{2})-(\d{2})/); if (!m) return '';
+  var y = +m[1], mo = +m[2] - 1 + n, d = +m[3];
+  y += Math.floor(mo / 12); mo = ((mo % 12) + 12) % 12;
+  var last = new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
+  if (d > last) d = last;
+  return y + '-' + ('0'+(mo+1)).slice(-2) + '-' + ('0'+d).slice(-2);
+}
+function _acctYmdToDmy(ymd){
+  var m = String(ymd||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3]+'/'+m[2]+'/'+m[1] : '';
 }
 
 // Mở / đóng khối chi tiết của 1 tài khoản

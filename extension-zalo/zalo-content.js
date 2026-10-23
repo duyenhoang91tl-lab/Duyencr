@@ -234,7 +234,7 @@
       { v: 'remind', label: '🔔 Lịch hẹn (0)' },
       { v: 'ctkm', label: '🎁 Tra cứu khuyến mãi' },
       { v: 'img', label: '🖼 Tìm ảnh sản phẩm' },
-      { v: 'tpl', label: '📚 Mẫu tin nhắn tư vấn' },
+      { v: 'tpl', label: '📚 Tạo mẫu lưu sẵn / Mẫu tư vấn' },
       { v: 'stats', label: '📊 Doanh số & hoa hồng của tôi' }
     ].forEach(o => { const op = document.createElement('option'); op.value = o.v; op.textContent = o.label; menuSel.appendChild(op); });
     menuWrap.appendChild(menuSel);
@@ -299,7 +299,7 @@
     tplBody.style.display = 'none';
     tplBody.innerHTML =
       '<div id="zai-tpl-row"><input type="text" id="zai-tpl-q" placeholder="🔎 Gõ tên sản phẩm / nội dung hội thoại để gợi ý tin nhắn..." autocomplete="off" />' +
-      '<button id="zai-tpl-refresh" type="button" title="Tải lại từ CRM">🔄</button><button id="zai-tpl-add" type="button" title="Đề xuất mẫu mới (chờ quản lý duyệt)">➕</button></div>' +
+      '<button id="zai-tpl-refresh" type="button" title="Tải lại từ CRM">🔄</button><button id="zai-tpl-add" type="button" title="Tạo mẫu lưu sẵn để AI học (CS: chờ admin duyệt)">➕ Tạo mẫu lưu sẵn</button></div>' +
       '<div id="zai-tpl-status"></div><div id="zai-tpl-form"></div><div id="zai-tpl-result"></div>';
     menuContent.appendChild(tplBody);
     tplBody.querySelector('#zai-tpl-refresh').addEventListener('click', () => loadMsgTemplatesZai_());
@@ -2320,7 +2320,7 @@
     try {
       if (!GAS_URL) throw new Error('Chưa cài đặt URL GAS. Nhấn ⚙.');
       const body = type === 'SAVE_MESSAGE_TEMPLATE'
-        ? { action: 'saveMessageTemplate', template: { id: p?.id || '', title: p?.title || '', content: p?.content || '', tags: p?.tags || '', product: p?.product || '', topic: p?.topic || '', createdBy: p?.createdBy || '' } }
+        ? { action: 'saveMessageTemplate', template: { id: p?.id || '', title: p?.title || '', content: p?.content || '', tags: p?.tags || '', product: p?.product || '', nhom: p?.nhom, topic: p?.topic || '', createdBy: p?.createdBy || '' } }
         : { action: 'deleteMessageTemplate', id: p?.id || '', createdBy: p?.createdBy || '' };
       const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'text/plain' } });
       const data = await res.json();
@@ -2374,14 +2374,14 @@
         `<div>${escHtml(preview)}</div>` +
         (chips ? `<div style="margin-top:3px">${chips}</div>` : '') +
         `<div class="zai-tpl-acts"><button type="button" class="zai-btn zai-btn-secondary zai-btn-sm" data-cid="${escAttrZai_(t.id)}" title="Copy nguyên cả mẫu (cả đoạn dài)">📋 Copy cả câu</button>` +
-        `<button type="button" class="zai-btn zai-btn-secondary zai-btn-sm" data-iid="${escAttrZai_(t.id)}" title="Dán nguyên cả mẫu vào ô chat">➡ Chèn cả câu</button>` +
+        `<button type="button" class="zai-btn zai-btn-secondary zai-btn-sm" data-iid="${escAttrZai_(t.id)}" title="Chèn nguyên cả mẫu vào ô chat">➡ Chèn cả câu</button>` +
         (zaiTplLines_(t.content).length > 1 ? `<button type="button" class="zai-btn zai-btn-secondary zai-btn-sm" data-ltog="${escAttrZai_(t.id)}" title="Tách mỗi dòng thành 1 tin nhắn riêng">📑 Từng đoạn (${zaiTplLines_(t.content).length})</button>` : '') +
         (mine ? `<button type="button" class="zai-btn zai-btn-secondary zai-btn-sm" data-eid="${escAttrZai_(t.id)}">✏️ Sửa</button><button type="button" class="zai-btn zai-btn-secondary zai-btn-sm" data-did="${escAttrZai_(t.id)}">🗑 Xoá</button>` : '') +
         `</div>` +
         (zaiTplLines_(t.content).length > 1 ? `<div class="zai-tpl-lines" data-lbox="${escAttrZai_(t.id)}" style="display:none">` + zaiTplLines_(t.content).map((ln, k) =>
           `<div class="zai-tpl-line"><span class="zai-tpl-line-txt">${escHtml(ln)}</span>` +
           `<button type="button" class="zai-btn zai-btn-secondary zai-btn-sm" data-lc="${escAttrZai_(t.id)}|${k}" title="Copy đoạn này (1 tin nhắn)">📋 Copy đoạn</button>` +
-          `<button type="button" class="zai-btn zai-btn-secondary zai-btn-sm" data-li="${escAttrZai_(t.id)}|${k}" title="Dán đoạn này vào ô chat">➡ Chèn</button></div>`).join('') + `</div>` : '') +
+          `<button type="button" class="zai-btn zai-btn-secondary zai-btn-sm" data-li="${escAttrZai_(t.id)}|${k}" title="Chèn đoạn này vào ô chat">➡ Chèn</button></div>`).join('') + `</div>` : '') +
         `</div>`;
     }).join('');
     box.querySelectorAll('[data-tid]').forEach((el) => {
@@ -2432,43 +2432,90 @@
     }));
   }
 
+  // Danh muc san pham (cot Nhom SP / Ten SP bang gia DANH_MUC, action productImageFlat) cho form "Tao mau luu san" — loi thi form van go tay duoc, lan sau thu lai.
+  let _zaiTplCatalog_ = null, _zaiTplCatalogLoading_ = false;
+  function zaiEnsureTplCatalog_(cb) {
+    if (_zaiTplCatalog_) { cb(); return; }
+    if (_zaiTplCatalogLoading_) { setTimeout(() => zaiEnsureTplCatalog_(cb), 400); return; }
+    if (!GAS_URL) { cb(); return; }
+    _zaiTplCatalogLoading_ = true;
+    fetch(GAS_URL + (GAS_URL.includes('?') ? '&' : '?') + 'action=productImageFlat', { redirect: 'follow' })
+      .then((r) => r.json()).then((d) => { if (d && d.ok && d.items) _zaiTplCatalog_ = d.items; })
+      .catch(() => {}).then(() => { _zaiTplCatalogLoading_ = false; cb(); });
+  }
+
+  // Form "TAO MAU LUU SAN" (song song voi Pancake AI): chon NHOM SP (bang gia) va/hoac go TEN SP (co goi y; tu nhan nhom khi ten khop), them mau cau tu van — moi dong = 1 tin.
+  // Mau cua CS luon "Cho duyet"; AI CHI hoc mau DA DUYET. Nhom de trong = server tu phan loai (nhom gui '' ), khong dien san nhom tu phan loai khi sua.
   function openTplFormZai_(t) {
     const host = document.getElementById('zai-tpl-form');
-    if (!_currentCS) { _zaiTplStatus_('Chọn tên CS của bạn trước (ô tên CS ở trên) để đề xuất mẫu.'); return; }
+    if (!_currentCS) { _zaiTplStatus_('Chọn tên CS của bạn trước (ô tên CS ở trên) để tạo mẫu.'); return; }
     host.innerHTML = `
       <div class="zai-tpl-form-box">
-        <div class="zai-tpl-form-title">${t ? '✏️ Sửa mẫu đề xuất' : '➕ Đề xuất mẫu mới'}</div>
-        <div style="font-size:11px;color:#6b7280;margin-bottom:4px">Mẫu sẽ ở trạng thái "Chờ duyệt" cho đến khi quản lý duyệt trên CRM.</div>
-        <input type="text" id="zai-tpl-f-title" placeholder="Tiêu đề mẫu" autocomplete="off" />
-        <input type="text" id="zai-tpl-f-product" placeholder="📦 Sản phẩm áp dụng, cách nhau dấu phẩy (VD: Nhẫn vàng, Lắc tay)" autocomplete="off" />
-        <input type="text" id="zai-tpl-f-topic" placeholder="💬 Nội dung hội thoại / tình huống (VD: Khách hỏi giá)" autocomplete="off" />
-        <textarea id="zai-tpl-f-content" rows="5" placeholder="Nội dung tin nhắn mẫu"></textarea>
+        <div class="zai-tpl-form-title">${t ? '✏️ Sửa mẫu lưu sẵn' : '➕ Tạo mẫu lưu sẵn'}</div>
+        <div style="font-size:11px;color:#6b7280;margin-bottom:4px">Chọn <b>nhóm sản phẩm</b> (có sẵn ở bảng giá) hoặc gõ <b>tên sản phẩm</b> — hệ thống tự nhận nhóm. Mẫu của bạn ở trạng thái <b>Chờ duyệt</b>; AI chỉ học sau khi admin duyệt trên CRM.</div>
+        <input type="text" id="zai-tpl-f-nhom" list="zai-tpl-nhom-dl" placeholder="🗂 Nhóm sản phẩm (chọn từ bảng giá hoặc gõ; để trống = hệ thống tự phân loại)" autocomplete="off" />
+        <datalist id="zai-tpl-nhom-dl"></datalist>
+        <input type="text" id="zai-tpl-f-product" list="zai-tpl-prod-dl" placeholder="📦 Tên sản phẩm, cách nhau dấu phẩy (VD: Nhẫn vàng, Lắc tay)" autocomplete="off" />
+        <datalist id="zai-tpl-prod-dl"></datalist>
+        <div id="zai-tpl-f-hint" style="font-size:11px;color:#047857;min-height:14px"></div>
+        <input type="text" id="zai-tpl-f-topic" placeholder="💬 Tình huống / nội dung hội thoại (VD: Khách hỏi giá)" autocomplete="off" />
+        <input type="text" id="zai-tpl-f-title" placeholder="Tiêu đề mẫu (bỏ trống = tự đặt theo sản phẩm + tình huống)" autocomplete="off" />
+        <textarea id="zai-tpl-f-content" rows="6" placeholder="Mẫu câu tư vấn — mỗi dòng (xuống dòng) sẽ là 1 tin nhắn riêng khi gửi cho khách"></textarea>
         <input type="text" id="zai-tpl-f-tags" placeholder="Tag, cách nhau dấu phẩy (VD: chào hỏi, bảo hành)" autocomplete="off" />
         <div class="zai-tpl-bar">
-          <button type="button" class="zai-btn zai-btn-primary zai-btn-sm zai-tpl-save" id="zai-tpl-f-save">📨 Gửi đề xuất</button>
+          <button type="button" class="zai-btn zai-btn-primary zai-btn-sm zai-tpl-save" id="zai-tpl-f-save">📨 Lưu mẫu (chờ duyệt)</button>
           <button type="button" class="zai-btn zai-btn-secondary zai-btn-sm" id="zai-tpl-f-cancel">Huỷ</button>
         </div>
       </div>`;
     const $ = (id) => host.querySelector(id);
-    $('#zai-tpl-f-title').value = t ? t.title : '';
+    $('#zai-tpl-f-nhom').value = (t && t.nhom && !t.nhomAuto) ? t.nhom : '';   // nhom tu phan loai KHONG dien san: de trong = tiep tuc tu phan loai
     $('#zai-tpl-f-product').value = t ? (t.product || '') : '';
     $('#zai-tpl-f-topic').value = t ? (t.topic || '') : '';
+    $('#zai-tpl-f-title').value = t ? t.title : '';
     $('#zai-tpl-f-content').value = t ? t.content : '';
     $('#zai-tpl-f-tags').value = t ? (t.tags || '') : '';
-    $('#zai-tpl-f-title').focus();
+    $('#zai-tpl-f-nhom').focus();
+
+    const fillLists = () => {
+      const items = _zaiTplCatalog_ || [];
+      const nhomVal = $('#zai-tpl-f-nhom').value.trim();
+      const groups = [...new Set(items.map((it) => it.n).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), 'vi'));
+      $('#zai-tpl-nhom-dl').innerHTML = groups.map((g) => `<option value="${escAttrZai_(g)}"></option>`).join('');
+      const pool = nhomVal && groups.indexOf(nhomVal) >= 0 ? items.filter((it) => it.n === nhomVal) : items;
+      const nm = {}; pool.forEach((it) => _zaiItemNames_(it).forEach((n) => { const f = zaiFold_(n); if (!nm[f]) nm[f] = n; }));
+      $('#zai-tpl-prod-dl').innerHTML = Object.keys(nm).map((f) => nm[f]).sort((a, b) => String(a).localeCompare(String(b), 'vi')).slice(0, 400).map((n) => `<option value="${escAttrZai_(n)}"></option>`).join('');
+    };
+    const detectGroup = () => {
+      const items = _zaiTplCatalog_ || [];
+      if (!items.length) return;
+      const toks = $('#zai-tpl-f-product').value.split(/[,;|\n]/).map((x) => zaiFold_(x)).filter(Boolean);
+      if (!toks.length) { $('#zai-tpl-f-hint').textContent = ''; return; }
+      const found = new Set(); let matched = 0;
+      toks.forEach((tk) => { const g = items.filter((it) => _zaiItemNames_(it).some((n) => zaiFold_(n) === tk)).map((it) => it.n).filter(Boolean); if (g.length) matched++; g.forEach((x) => found.add(x)); });
+      const gs = [...found], cur = $('#zai-tpl-f-nhom').value.trim();
+      if (gs.length === 1 && !cur) { $('#zai-tpl-f-nhom').value = gs[0]; $('#zai-tpl-f-hint').textContent = '🤖 Đã tự nhận nhóm: ' + gs[0]; }
+      else if (gs.length > 1 && !cur) $('#zai-tpl-f-hint').textContent = '🤖 Sản phẩm thuộc nhiều nhóm (' + gs.slice(0, 3).join(', ') + ') — chọn nhóm ở ô trên nếu muốn.';
+      else if (!matched) $('#zai-tpl-f-hint').textContent = 'Tên này chưa có trong bảng giá — vẫn lưu được, AI sẽ nhận diện theo tên bạn gõ.';
+      else $('#zai-tpl-f-hint').textContent = '';
+    };
+    zaiEnsureTplCatalog_(() => { if (!$('#zai-tpl-f-nhom')) return; fillLists(); detectGroup(); });
+    $('#zai-tpl-f-nhom').addEventListener('input', fillLists);
+    $('#zai-tpl-f-product').addEventListener('input', detectGroup);
+    $('#zai-tpl-f-product').addEventListener('change', detectGroup);
     $('#zai-tpl-f-cancel').addEventListener('click', () => { host.innerHTML = ''; });
     $('#zai-tpl-f-save').addEventListener('click', () => {
-      const title = $('#zai-tpl-f-title').value.trim();
+      const nhom = $('#zai-tpl-f-nhom').value.trim(), product = $('#zai-tpl-f-product').value.trim(), topic = $('#zai-tpl-f-topic').value.trim();
       const content = $('#zai-tpl-f-content').value.trim();
-      if (!title || !content) { _zaiTplStatus_('Cần nhập đủ tiêu đề và nội dung mẫu.'); return; }
+      if (!content) { _zaiTplStatus_('Cần nhập nội dung mẫu câu tư vấn.'); return; }
+      if (!nhom && !product && !topic) { _zaiTplStatus_('Chọn nhóm sản phẩm, gõ tên sản phẩm hoặc nhập tình huống để AI biết mẫu này dùng cho đâu.'); return; }
+      const title = $('#zai-tpl-f-title').value.trim() || ((product || nhom || 'Mẫu tư vấn') + (topic ? ' — ' + topic : ''));
       const btn = $('#zai-tpl-f-save');
-      btn.disabled = true; btn.innerText = 'Đang gửi...';
+      btn.disabled = true; btn.innerText = 'Đang lưu...';
       _zaiTplCall_('SAVE_MESSAGE_TEMPLATE', {
-        id: t ? t.id : '', title, content, tags: $('#zai-tpl-f-tags').value.trim(),
-        product: $('#zai-tpl-f-product').value.trim(), topic: $('#zai-tpl-f-topic').value.trim(), createdBy: _currentCS || ''
+        id: t ? t.id : '', title, content, tags: $('#zai-tpl-f-tags').value.trim(), product, nhom, topic, createdBy: _currentCS || ''
       }).then((resp) => {
-        if (resp?.ok) { host.innerHTML = ''; _zaiTplStatus_('Đã gửi đề xuất — quản lý duyệt xong mẫu mới dùng được cho mọi người.'); loadMsgTemplatesZai_(); }
-        else { btn.disabled = false; btn.innerText = '📨 Gửi đề xuất'; _zaiTplStatus_('Lỗi gửi đề xuất: ' + (resp?.error || 'không rõ')); }
+        if (resp?.ok) { host.innerHTML = ''; _zaiTplStatus_('Đã lưu mẫu (chờ duyệt) — admin duyệt xong AI mới học và mọi người dùng như mẫu chuẩn.'); loadMsgTemplatesZai_(); }
+        else { btn.disabled = false; btn.innerText = '📨 Lưu mẫu (chờ duyệt)'; _zaiTplStatus_('Lỗi lưu mẫu: ' + (resp?.error || 'không rõ')); }
       });
     });
   }
@@ -2697,7 +2744,7 @@
       return;
     }
     box.innerHTML = note(d.text || '') +
-      '<div class="zai-price-ai-foot">Giá lấy từ bảng giá DANH_MUC' + (d.provider ? ' · AI: ' + escHtml(d.provider) : '') + (d.aiError ? ' · ⚠ AI đang lỗi nên hiện danh sách giá gốc' : '') + ' </div>';
+      '<div class="zai-price-ai-foot">Giá lấy từ bảng giá DANH_MUC' + (d.provider ? ' · AI: ' + escHtml(d.provider) : '') + (d.aiError ? ' · ⚠ Lỗi API — hiện danh sách giá gốc' : '') + ' </div>';
     const cp = document.createElement('button'); cp.type = 'button'; cp.className = 'zai-price-ai-chip'; cp.textContent = '📋 Copy';
     cp.addEventListener('click', () => {
       try { navigator.clipboard.writeText(d.text || '').then(() => { cp.textContent = '✓ Đã copy'; }).catch(() => { cp.textContent = 'Không copy được'; }); } catch (e) { cp.textContent = 'Không copy được'; }

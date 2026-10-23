@@ -437,9 +437,79 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // ── DUYET MAU TIN NGAY TREN PANCAKE (chi admin; token dang nhap CHI nam o background, khong gui ra trang Pancake) ──
+  if (msg?.type === "APPROVER_LOGIN" || msg?.type === "APPROVER_LOGOUT" || msg?.type === "APPROVER_STATUS" || msg?.type === "TPL_PENDING" || msg?.type === "TPL_DECIDE") {
+    const run = msg.type === "APPROVER_LOGIN" ? handleApproverLogin(msg.payload)
+      : msg.type === "APPROVER_LOGOUT" ? handleApproverLogout()
+      : msg.type === "APPROVER_STATUS" ? handleApproverStatus()
+      : msg.type === "TPL_PENDING" ? handleTplPending()
+      : handleTplDecide(msg.payload);
+    run.then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
 });
 
 // Tra cứu khách theo SĐT — GET GAS_URL?action=lookup&phone=... y hệt doLookup() bên Zalo AI.
+
+// ── DUYET MAU TIN: dang nhap admin + danh sach cho duyet + duyet/tu choi ──
+// NGUYEN NHAN GOC them: mau tin nhan vien de xuat chi duyet duoc tren CRM, admin dang lam viec o Pancake khong biet co mau moi.
+// Mat khau KHONG luu: dang nhap = POST webLogin (cung ham voi web CRM) -> luu token phien (het han theo server, ~7 ngay) o storage.local (khong dong bo giua may).
+const APPROVER_KEY = "pkApprover";
+async function _apprGet_() {
+  const o = await chrome.storage.local.get(APPROVER_KEY), a = o[APPROVER_KEY];
+  if (!a || !a.token) return null;
+  if (a.expiresAt && Date.now() > a.expiresAt) { await chrome.storage.local.remove(APPROVER_KEY); return null; }
+  return a;
+}
+async function handleApproverLogin(p) {
+  const username = String(p?.username || "").trim(), password = String(p?.password || "");
+  if (!username || !password) throw new Error("Nh\u1eadp t\u00e0i kho\u1ea3n v\u00e0 m\u1eadt kh\u1ea9u CRM.");
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Ch\u01b0a c\u1ea5u h\u00ecnh URL Web App GAS.");
+  const res = await fetch(cfg.gasUrl, { method: "POST", body: JSON.stringify({ action: "webLogin", username, password }), headers: { "Content-Type": "text/plain" } });
+  const data = await res.json();
+  if (!data || !data.ok || !data.token) throw new Error((data && data.error) || "\u0110\u0103ng nh\u1eadp kh\u00f4ng th\u00e0nh c\u00f4ng.");
+  const role = String(data.user?.role || "");
+  if (role !== "admin") throw new Error("T\u00e0i kho\u1ea3n n\u00e0y kh\u00f4ng ph\u1ea3i admin n\u00ean kh\u00f4ng c\u00f3 quy\u1ec1n duy\u1ec7t m\u1eabu tin.");
+  const rec = { token: data.token, username: String(data.user?.username || username), name: String(data.user?.name || data.user?.username || username),
+                role, expiresAt: Date.now() + Math.max(60000, Number(data.expiresInMs || 6048e5) - 120000) };
+  await chrome.storage.local.set({ [APPROVER_KEY]: rec });
+  return { name: rec.name, expiresAt: rec.expiresAt };
+}
+async function handleApproverLogout() { await chrome.storage.local.remove(APPROVER_KEY); return { loggedIn: false }; }
+async function handleApproverStatus() {
+  const a = await _apprGet_();
+  return a ? { loggedIn: true, name: a.name, username: a.username, expiresAt: a.expiresAt } : { loggedIn: false };
+}
+async function handleTplPending() {
+  const a = await _apprGet_();
+  if (!a) return { loggedIn: false };
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Ch\u01b0a c\u1ea5u h\u00ecnh URL Web App GAS.");
+  const sep = cfg.gasUrl.includes("?") ? "&" : "?";
+  const res = await fetch(cfg.gasUrl + sep + "action=tplPending&token=" + encodeURIComponent(a.token), { redirect: "follow" });
+  const data = await res.json();
+  if (data && data.code === "FORBIDDEN") { await chrome.storage.local.remove(APPROVER_KEY); return { loggedIn: false, expired: true }; }   // phien het han / mat quyen admin
+  if (data.error) throw new Error(data.error);
+  return { loggedIn: true, name: a.name, count: Number(data.count) || 0, items: Array.isArray(data.items) ? data.items : [] };
+}
+async function handleTplDecide(p) {
+  const a = await _apprGet_();
+  if (!a) throw new Error("Phi\u00ean \u0111\u0103ng nh\u1eadp duy\u1ec7t m\u1eabu \u0111\u00e3 h\u1ebft. V\u00e0o C\u00e0i \u0111\u1eb7t extension \u0111\u0103ng nh\u1eadp l\u1ea1i.");
+  const decision = p?.decision === "reject" ? "reject" : p?.decision === "approve" ? "approve" : "";
+  if (!decision || !p?.id) throw new Error("Thi\u1ebfu m\u00e3 m\u1eabu ho\u1eb7c quy\u1ebft \u0111\u1ecbnh.");
+  try {
+    return await _postGas_({ action: "approveMessageTemplate", id: String(p.id), decision, reason: String(p.reason || "").slice(0, 300), token: a.token });
+  } catch (e) {
+    if (/FORBIDDEN|Chi admin/i.test(String(e?.message || e))) { await chrome.storage.local.remove(APPROVER_KEY); throw new Error("Phi\u00ean \u0111\u0103ng nh\u1eadp h\u1ebft h\u1ea1n ho\u1eb7c kh\u00f4ng c\u00f2n quy\u1ec1n admin. \u0110\u0103ng nh\u1eadp l\u1ea1i trong C\u00e0i \u0111\u1eb7t extension."); }
+    throw e;
+  }
+}
+
 // Trả về { care: {...}|null, orders: [...] }.
 async function handleLookupCustomer(payload) {
   const settings = await chrome.storage.sync.get(null);
