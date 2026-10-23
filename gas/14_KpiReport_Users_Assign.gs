@@ -324,7 +324,7 @@ function saveUsers_(users) {
                  namesArr[0]||u.name||'', u.team||'', (u.active===false?false:true),
                  JSON.stringify(namesArr),
                  (Array.isArray(u.perms) ? JSON.stringify(u.perms) : ''),
-                 u.saleType||'', u.startDate||'']);
+                 u.saleType||'', u.startDate||'', u.joinDate||'']);
   }
   sh.getRange(1, 1, matrix.length, USER_HEADERS.length).setValues(matrix);
   _auditCfg_(_uAudit);

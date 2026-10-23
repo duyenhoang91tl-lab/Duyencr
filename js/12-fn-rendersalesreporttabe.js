@@ -1198,7 +1198,7 @@ function _bpEditFormHtml_(p){
       '<input type="number" min="1" value="'+esc(p.probationDay.from)+'" style="width:70px" onchange="_bpDraft.probationDay.from=this.value" placeholder="1">'+
       '<span style="font-size:11.5px;color:var(--muted)">đến ngày thứ (bỏ trống = không giới hạn)</span>'+
       '<input type="number" min="1" value="'+esc(p.probationDay.to)+'" style="width:70px" onchange="_bpDraft.probationDay.to=this.value" placeholder="30">'+
-      '</div><div class="guide-text" style="font-size:10.5px;color:var(--hint);margin-bottom:14px">Tính từ "Ngày bắt đầu" đặt riêng cho từng Sale ở 👤 Quản lý tài khoản (mốc tính thưởng theo ngày thử việc) — Ngày bắt đầu = ngày thứ 1. Sale chưa được đặt Ngày bắt đầu sẽ KHÔNG được tính chương trình có bật mục này.</div>') : '<div style="margin-bottom:10px"></div>')+
+      '</div><div class="guide-text" style="font-size:10.5px;color:var(--hint);margin-bottom:14px">Tính từ "Ngày nhận tin" đặt riêng cho từng Sale ở 👤 Quản lý tài khoản (mốc tính thưởng theo ngày thử việc) — Ngày nhận tin = ngày thứ 1. Sale chưa được đặt Ngày nhận tin sẽ KHÔNG được tính chương trình có bật mục này.</div>') : '<div style="margin-bottom:10px"></div>')+
 
     '<div style="display:flex;gap:8px">'+
       '<button class="btn" onclick="_bpSave()">💾 Lưu chương trình</button>'+

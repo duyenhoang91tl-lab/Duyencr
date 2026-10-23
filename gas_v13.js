@@ -98,7 +98,7 @@ var SET_HEADERS    = ['key','value'];
 var ASSIGN_HEADERS = ['id','date','csName','label','phones','donePhones','part'];
 // 1 o Google Sheet toi da 50.000 ky tu; JSON 1 SDT ~13 ky tu => 3000 SDT ~39k. Dot chia lon hon se duoc tach nhieu dong (cot 'part').
 var ASSIGN_CHUNK = 3000;
-var USER_HEADERS   = ['username','passHash','role','name','team','active','names','perms','saleType','startDate'];
+var USER_HEADERS   = ['username','passHash','role','name','team','active','names','perms','saleType','startDate','joinDate'];
 // PK_STATS_HEADERS: 1 dong = 1 "Nhan vien" (ten hien thi tren Pancake) trong 1 Page, 1 ngay —
 // nhap tu file Excel "Thong ke tuong tac" (pages_statistics_engagements) Pancake xuat ra.
 // Khoa duy nhat = date+pageId+nhanVien -> nap lai file CUNG 1 ngay se GHI DE (khong nhan doi).
@@ -1378,7 +1378,8 @@ function readUsers_(sh) {
       names: namesArr,
       perms: permsArr,
       saleType: v[i][8] || '',   // 'online' | 'offline' | '' — dung de tinh Bao cao hoa hong dung chuong trinh thuong
-      startDate: v[i][9] || ''   // YYYY-MM-DD — moc "ngay bat dau" de tinh cac muc thuong theo "ngay thu N" (sale thu viec)
+      startDate: v[i][9] || '',  // YYYY-MM-DD — "NGAY NHAN TIN" (bat dau nhan tin): moc tinh thuong theo "ngay thu N" / thuong sau 1 thang (sale thu viec)
+      joinDate: v[i][10] || ''   // YYYY-MM-DD — "NGAY VAO" (bat dau nhan viec); chi de theo doi, KHONG dung tinh thuong
     });
   }
   return out;
@@ -1579,7 +1580,7 @@ function _sessUser_(tok) {
 function _usersForClient_(users, full) {
   return (users || []).map(function(u) {
     var o = { username: u.username, name: u.name, names: u.names, team: u.team, role: u.role, active: u.active };
-    if (full) { o.perms = u.perms; o.saleType = u.saleType; o.startDate = u.startDate; o.hasPass = !!u.passHash; }
+    if (full) { o.perms = u.perms; o.saleType = u.saleType; o.startDate = u.startDate; o.joinDate = u.joinDate; o.hasPass = !!u.passHash; }
     return o;
   });
 }
@@ -9433,7 +9434,7 @@ function saveUsers_(users) {
                  namesArr[0]||u.name||'', u.team||'', (u.active===false?false:true),
                  JSON.stringify(namesArr),
                  (Array.isArray(u.perms) ? JSON.stringify(u.perms) : ''),
-                 u.saleType||'', u.startDate||'']);
+                 u.saleType||'', u.startDate||'', u.joinDate||'']);
   }
   sh.getRange(1, 1, matrix.length, USER_HEADERS.length).setValues(matrix);
   _auditCfg_(_uAudit);

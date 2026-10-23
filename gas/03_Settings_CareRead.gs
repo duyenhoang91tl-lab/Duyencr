@@ -556,7 +556,8 @@ function readUsers_(sh) {
       names: namesArr,
       perms: permsArr,
       saleType: v[i][8] || '',   // 'online' | 'offline' | '' — dung de tinh Bao cao hoa hong dung chuong trinh thuong
-      startDate: v[i][9] || ''   // YYYY-MM-DD — moc "ngay bat dau" de tinh cac muc thuong theo "ngay thu N" (sale thu viec)
+      startDate: v[i][9] || '',  // YYYY-MM-DD — "NGAY NHAN TIN" (bat dau nhan tin): moc tinh thuong theo "ngay thu N" / thuong sau 1 thang (sale thu viec)
+      joinDate: v[i][10] || ''   // YYYY-MM-DD — "NGAY VAO" (bat dau nhan viec); chi de theo doi, KHONG dung tinh thuong
     });
   }
   return out;
@@ -757,7 +758,7 @@ function _sessUser_(tok) {
 function _usersForClient_(users, full) {
   return (users || []).map(function(u) {
     var o = { username: u.username, name: u.name, names: u.names, team: u.team, role: u.role, active: u.active };
-    if (full) { o.perms = u.perms; o.saleType = u.saleType; o.startDate = u.startDate; o.hasPass = !!u.passHash; }
+    if (full) { o.perms = u.perms; o.saleType = u.saleType; o.startDate = u.startDate; o.joinDate = u.joinDate; o.hasPass = !!u.passHash; }
     return o;
   });
 }
