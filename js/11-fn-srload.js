@@ -847,7 +847,7 @@ function _srRenderA(d){
     }
     saleHtml += '</tbody></table>';
   } else {
-    saleHtml += _srChartSvg(saleRows, 'name', 'giaTri', _srState.aSaleView, true, 'orders');
+    saleHtml += _srChartSvg(saleRows, 'name', 'giaTri', _srState.aSaleView, true, 'orders', _srState.byCreator ? null : { ordersLabel: 'Tổng lượt đơn theo sale', ordersHint: 'Đơn bán chung nhiều sale được tính cho TỪNG sale (số đơn giữ nguyên, tiền chia đều) nên con số này có thể lớn hơn “Số lượng đơn” thật ở các thẻ phía trên. Khi đang lọc Sale, bảng chỉ liệt kê người trong bộ lọc nên tổng tiền ở đây có thể nhỏ hơn tổng đơn.' });
   }
   // Tỷ lệ chốt theo Sale — đặt BÊN CẠNH biểu đồ doanh thu theo Sale (2 cột, tự xuống dòng trên màn hẹp)
   // Công thức: Số đơn trong kỳ / Tổng tương tác Pancake trong kỳ (byCS), tính THEO TỪNG SALE
@@ -1160,7 +1160,7 @@ function _srRenderB(d){
       saleHtmlB_ += _srTotalRowHtml_(['Tổng', fmt(bSOrd), _srMoney(bSGt), _srMoney(bSOrd?Math.round(bSGt/bSOrd):0), _srMoney(saleRows.reduce(function(s,r){return s+(r.cod||0);},0))]); }
     saleHtmlB_ += '</tbody></table>';
   } else {
-    saleHtmlB_ += _srChartSvg(saleRows, 'name', 'giaTri', _srState.bSaleView, true, 'orders');
+    saleHtmlB_ += _srChartSvg(saleRows, 'name', 'giaTri', _srState.bSaleView, true, 'orders', { ordersLabel: 'Tổng lượt đơn theo sale', ordersHint: 'Đơn bán chung nhiều sale được tính cho TỪNG sale (số đơn giữ nguyên, tiền chia đều) nên con số này có thể lớn hơn “Số lượng đơn” thật ở các thẻ phía trên. Khi đang lọc Sale, bảng chỉ liệt kê người trong bộ lọc nên tổng tiền ở đây có thể nhỏ hơn tổng đơn.' });
   }
   // Tỷ lệ chốt theo Sale — đặt bên cạnh "Theo Sale", cùng công thức/hàm dùng chung với Báo cáo A.
   var bSaleCloseNote = d.saleCloseRateFrom ? ' — tính từ '+esc(d.saleCloseRateFrom) : '';

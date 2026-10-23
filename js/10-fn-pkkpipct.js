@@ -1045,7 +1045,9 @@ function _srColFilterClear_(tableKey, colKey){
   renderSalesReportTab();
 }
 
-function _srChartSvg(rows, nameKey, valueKey, type, moneyFmt, ordersKey){
+// opts (tuỳ chọn): { ordersLabel, ordersHint } — bảng "Theo Sale" cộng số đơn của TỪNG sale (đơn bán chung N sale tính cho cả N người) nên KHÔNG bằng "Số lượng đơn" thật ở thẻ trên cùng:
+// đổi nhãn + ghi chú để khỏi hiểu nhầm là lệch (Duyên hỏi 2026-10-17: 705 đơn ở thẻ trên vs 830 ở bảng Theo Sale bán).
+function _srChartSvg(rows, nameKey, valueKey, type, moneyFmt, ordersKey, opts){
   var data = (rows||[]).map(function(r){ return {name: (r[nameKey]||'(chưa gán)'), value: Math.abs(Number(r[valueKey])||0), orders: ordersKey?(Number(r[ordersKey])||0):0}; })
     .filter(function(d){ return d.value>0; });
   if (!data.length) return '<div style="color:var(--muted);text-align:center;padding:30px">Không có dữ liệu để vẽ biểu đồ</div>';
@@ -1060,12 +1062,13 @@ function _srChartSvg(rows, nameKey, valueKey, type, moneyFmt, ordersKey){
   // ngay, khong phai crop/ghep nhieu anh: Tong so don | Tong tien | TB don.
   var totalOrders = ordersKey ? data.reduce(function(s,d){ return s+d.orders; }, 0) : 0;
   var avgOrder = totalOrders ? total/totalOrders : 0;
-  var summaryStrip = (ordersKey && _pro) ? _proKpiStrip_(totalOrders, total, avgOrder, moneyFmt) : ordersKey ? (
+  var _ordLbl = (opts && opts.ordersLabel) || 'Tổng số đơn', _ordHint = (opts && opts.ordersHint) ? '<div style="font-size:11.5px;color:var(--muted);margin:-6px 0 12px">ℹ️ ' + esc(opts.ordersHint) + '</div>' : '';
+  var summaryStrip = (ordersKey && _pro) ? _proKpiStrip_(totalOrders, total, avgOrder, moneyFmt, _ordLbl) + _ordHint : ordersKey ? (
     '<div style="display:flex;gap:28px;flex-wrap:wrap;margin-bottom:14px;padding:12px 18px;background:var(--surface2);border-radius:10px;border:1px solid var(--border)">'+
-      '<div><div style="font-size:10.5px;color:var(--muted);font-weight:700;letter-spacing:.3px">📦 TỔNG SỐ ĐƠN</div><div style="font-size:19px;font-weight:800;margin-top:2px">'+fmt(totalOrders)+'</div></div>'+
+      '<div><div style="font-size:10.5px;color:var(--muted);font-weight:700;letter-spacing:.3px">📦 '+esc(_ordLbl.toUpperCase())+'</div><div style="font-size:19px;font-weight:800;margin-top:2px">'+fmt(totalOrders)+'</div></div>'+
       '<div><div style="font-size:10.5px;color:var(--muted);font-weight:700;letter-spacing:.3px">'+(moneyFmt?'💰 TỔNG DOANH THU':'💰 TỔNG SỐ LƯỢNG')+'</div><div style="font-size:19px;font-weight:800;margin-top:2px;color:var(--green)">'+fmtVal(total)+'</div></div>'+
       '<div><div style="font-size:10.5px;color:var(--muted);font-weight:700;letter-spacing:.3px">📊 TRUNG BÌNH / ĐƠN</div><div style="font-size:19px;font-weight:800;margin-top:2px">'+fmtVal(avgOrder)+'</div></div>'+
-    '</div>'
+    '</div>' + _ordHint
   ) : '';
   var legend = data.map(function(d,i){
     var pct = total ? (d.value/total*100) : 0;
