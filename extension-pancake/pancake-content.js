@@ -3073,7 +3073,7 @@
       b.disabled = true;
       safeSendMessage_({ type: 'DELETE_MESSAGE_TEMPLATE', payload: { id: t.id, createdBy: settings.csName || '' } }, (resp) => {
         if (resp?.ok) { setStatus('Đã xoá mẫu.'); loadMsgTemplates_(); }
-        else { b.disabled = false; setStatus('Lỗi xoá mẫu: ' + (resp?.error || PK_API_ERR)); }   // giong Zalo AI (quy tac song song)
+        else { b.disabled = false; setStatus(resp?.error || PK_API_ERR); }   // Pancake: KHONG them tien to 'Loi ...:' truoc loi API (test-pancake-apierr)
       });
     }));
   }

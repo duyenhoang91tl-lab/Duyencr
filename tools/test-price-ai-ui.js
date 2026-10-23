@@ -52,7 +52,7 @@ const FOUND = { ok: true, found: true, text: 'Nhẫn Bạc Trơn size 12 giá 45
     cp.click(); await sleep(20); ok(T.env.clip[0] === FOUND.text && /Đã copy/.test(cp.textContent), N + ': Copy dung noi dung tra loi');
     // 2. AI loi nhung gia van dung
     T.env.reply = { ok: true, found: true, text: 'Giá theo bảng giá (nghìn đồng):\nBạc 925 - 450', aiError: '429' }; await T.click(); await sleep(30);
-    ok(/AI đang lỗi nên hiện danh sách giá gốc/.test(T.box.textContent) && /Bạc 925 - 450/.test(T.box.textContent), N + ': AI loi -> van hien gia + ghi chu');
+    ok(/(AI đang lỗi nên|Lỗi API —) hiện danh sách giá gốc/.test(T.box.textContent) && /Bạc 925 - 450/.test(T.box.textContent), N + ': AI loi -> van hien gia + ghi chu');
     // 3. khong tim thay + goi y (ten co dau nhay/ky tu dac biet -> khong vo giao dien, bam duoc)
     const odd = 'Nhẫn "925" <b>x</b> \'Ý\''; T.env.reply = { ok: true, found: false, suggestions: [odd, 'Dây chuyền'] }; await T.click(); await sleep(30);
     ok(/Chưa tìm thấy/.test(T.box.textContent) && T.box.querySelectorAll('button').length === 2 && !T.box.querySelector('b'), N + ': khong thay -> 2 goi y, khong chen HTML tu ten san pham');

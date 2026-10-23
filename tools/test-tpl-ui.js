@@ -81,7 +81,7 @@ const body = S => S.box.innerHTML;
     // xoa: huy -> khong goi; dong y -> goi dung + thong bao + tai lai
     S.env.confirmAns = false; S.box.querySelector('[data-did="t2"]').click(); await sleep(10); ok(!S.env.calls.some(c => c.action === 'deleteMessageTemplate'), N + ': huy xoa -> khong goi');
     S.env.confirmAns = true; S.env.reply = { ok: false, error: 'Khong co quyen' }; S.box.querySelector('[data-did="t2"]').click(); await sleep(20);
-    ok(S.env.calls.find(c => c.action === 'deleteMessageTemplate').createdBy === 'Hoa' && /Lỗi xoá mẫu: Khong co quyen/.test(S.status()), N + ': xoa loi -> thong bao');
+    ok(S.env.calls.find(c => c.action === 'deleteMessageTemplate').createdBy === 'Hoa' && (N === 'Zalo' ? /Lỗi xoá mẫu: Khong co quyen/ : /^Khong co quyen$/).test(S.status()), N + ': xoa loi -> thong bao');
     S.env.calls.length = 0; S.env.reply = { ok: true }; S.box.querySelector('[data-did="t2"]').click(); await sleep(30);
     ok(JSON.stringify(S.env.calls[0]) === JSON.stringify({ action: 'deleteMessageTemplate', id: 't2', createdBy: 'Hoa' }) && /Đã xoá mẫu/.test(S.status()) && S.env.calls.some(c => c.GET), N + ': xoa OK -> payload dung + thong bao + tai lai danh sach: ' + JSON.stringify(S.env.calls));
     // form de xuat moi
