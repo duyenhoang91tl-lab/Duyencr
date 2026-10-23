@@ -1,6 +1,12 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+
+## 2026-10-23 — Báo cáo tính đơn thuần: sale tên "8", "10" (không phải người) + tách thành báo cáo riêng
+Yêu cầu Duyên: (1) bảng thuần đang chia doanh số cho "8", "10" — chỉ được tính theo thẻ sale thật; (2) tách "Báo cáo tính đơn thuần" khỏi cuối Báo cáo B thành 1 báo cáo riêng. Làm 2 bước, mỗi bước push riêng.
+- [x] **Bước 1 — Sale "8"/"10" (commit này):** NGUYÊN NHÂN GỐC: `_donSaleNamesFromThe_` (gas_v13.js) nhận mọi token Thẻ "không khoảng trắng + có chữ số" (quy tắc 2026-10-05 để bắt tên đăng nhập kiểu `ninhnga99`) nên tag/số thứ tự Pancake thuần số như `8`, `10` cũng thành "người". Sửa: thêm `_isNumericTag_` (token chỉ gồm chữ số/dấu chấm/phẩy/khoảng trắng bị loại TRƯỚC mọi kiểm tra, kể cả khi lỡ nằm trong danh sách known); client `_srOrdNames_` (js/11) lọc y hệt để đúng ngay cả khi GAS chưa deploy. Hàm dùng chung (grep ~20 nơi gọi: báo cáo A/B/E/F/G, lookup extension, danh sách tên sale) nên mọi nơi cùng hết "8"/"10"; đơn chỉ có thẻ 8/10 vào mục "chưa gán sale". Test: `node tools/test-sale-the-numeric.js`.
+- [ ] Giới hạn: tên đăng nhập sale CHỈ gồm số (vd `123456`) cũng bị loại — Pancake luôn dạng chữ+số nên coi là chấp nhận được; nếu có ngoại lệ thật thì thêm vào `POS_EXTRA_SALE_NAMES_` KHÔNG đủ (vì lọc trước) → cần đổi `_isNumericTag_`.
+
 ## 2026-10-23 — Chế độ tối: chữ/ô tìm nhanh bị chìm (Duyên báo kèm ảnh chụp)
 - [x] **Nguyên nhân gốc:** (1) `#qs-input` (ô tìm nhanh trên header, css/05-sidenav.css) có nền TRẮNG cố định `rgba(255,255,255,.95)` nhưng chế độ tối ép `color:var(--text)!important` (sáng — css/99-dark-auto.css dòng ~81) → chữ sáng trên nền trắng, tàng hình. (2) `--hint:#77746e` / `--muted:#a3a09a` ở css/10-dark.css quá tối trên nền xanh đậm của ui-pro (tương phản chỉ 3,1–3,9:1) → nhãn sidebar (Lọc theo CS, LOẠI KHÁCH…), số đếm, dấu —, SĐT, placeholder gần như chìm.
 - [x] **Sửa:** css/10-dark.css: `--muted:#c4c1ba`, `--hint:#a3a09a` (≥5,5:1 trên mọi nền tối), `#qs-input` nền `--surface2` + viền sáng, placeholder dùng `--muted`. index.html: link `10-dark.css?v=20261023a` (tránh cache bản cũ). Chế độ sáng KHÔNG đổi. Test: khối mục 6 trong `tools/test-dark-theme.js` (độ tương phản + rule ô tìm nhanh).

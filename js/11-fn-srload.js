@@ -1286,7 +1286,8 @@ function _srRenderB(d){
 //  Đang lọc Sale/Team: chỉ gồm các đơn máy chủ đã giữ lại (đơn lọc theo sale SAU điều chỉnh) và các dòng thuộc người đã chọn.
 // ═══════════════════════════════════════════════════════════════════════════
 var _SR_UNASSIGNED_ = '(chưa gán sale)';
-function _srOrdNames_(csv){ return String(csv || '').split(',').map(function(x){ return x.trim(); }).filter(Boolean); }
+// Bỏ token chỉ gồm chữ số ("8", "10"): là tag/số thứ tự Pancake, KHÔNG phải tên sale (cùng quy tắc với _isNumericTag_ ở gas_v13.js — lọc cả ở client để đúng ngay khi GAS chưa deploy).
+function _srOrdNames_(csv){ return String(csv || '').split(',').map(function(x){ return x.trim(); }).filter(function(x){ return x && !/^[\d\s.,]+$/.test(x); }); }
 // Phần tiền của từng sale trên 1 đơn. mode 'pure' = theo cột Thẻ, giá Pos gốc, chia đều; mode 'adj' = như bảng chính (ghép Base/kế toán, quầy 30/70).
 function _srOrderShares_(o, mode){
   var out = [], i;
