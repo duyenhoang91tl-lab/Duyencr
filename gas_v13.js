@@ -5513,7 +5513,10 @@ function _splitBhCodes_(codes) {
 //   { status:'ok', total, shares:[{name,frac}], codes, baseRows:n }  — da ghep xong
 //   { status:'gocBiLoai', codes }                                    — moi don goc Base deu Huy/Hoan -> bo don Pos
 //   { status:'khongKhop'|'trungDonGoc', codes, missing:[...] }       — co ma nhung KHONG ghep duoc (fallback Pos)
-function _resolveGhepDon_(codes, idx, usedBaseRows) {
+// QUY TAC (Duyen chot 2026-10-21): doanh thu don ghep = TUNG DON GOC Base chia deu cho nguoi tham gia don goc do (nhu cu) + PHAN CON LAI cua don Pos
+// (gia Pos - tong cac don goc, neu > 1.000d) tinh cho sale ghi tren the Pos NEU CO THE (chia deu giua cac sale tren the). Khong co the -> phan du khong tinh (giu nhu cu:
+// total = tong don goc). Phan du am (Pos < tong goc) khong dieu chinh. posVal/theNames = gia tri Pos va ten sale tren the Pos cua don (tuy chon; bo qua = hanh vi cu).
+function _resolveGhepDon_(codes, idx, usedBaseRows, posVal, theNames) {
   if (!codes || !codes.length) return null;
   var picked = [], missing = [], seenRow = {};
   for (var i = 0; i < codes.length; i++) {
@@ -5553,9 +5556,22 @@ function _resolveGhepDon_(codes, idx, usedBaseRows) {
   }
   // TAT CA don goc deu da Huy/Hoan (Base) -> don Pos ghep nay coi nhu bi loai (khong tinh doanh thu, khong dem don).
   if (!liveRows) return { status: 'gocBiLoai', codes: codes, missing: [] };
+  var remainder = 0, remNames = [];
+  var pv = Number(posVal) || 0;
+  if (pv > 0 && theNames && theNames.length && pv - total > 1000) {
+    remNames = theNames.filter(function(x) { return x && !_isNumericTag_(x) && x !== '(chưa gán sale)'; });
+    if (remNames.length) {
+      remainder = pv - total;
+      remNames.forEach(function(sn) {
+        if (shareAmt[sn] === undefined) { shareAmt[sn] = 0; names.push(sn); }
+        shareAmt[sn] += remainder / remNames.length;
+      });
+      total += remainder;
+    } else remNames = [];
+  }
   var shares = [];
   names.forEach(function(sn) { shares.push({ name: sn, frac: total > 0 ? shareAmt[sn] / total : 1 / names.length }); });
-  return { status: 'ok', total: total, shares: shares, codes: codes, baseRows: picked.length, creators: creators, baseNgayTao: baseYmd, baseOrders: baseOrders };
+  return { status: 'ok', total: total, shares: shares, codes: codes, baseRows: picked.length, creators: creators, baseNgayTao: baseYmd, baseOrders: baseOrders, remainder: remainder, remainderSales: remNames };
 }
 
 
@@ -5889,7 +5905,7 @@ function buildSalesReportB_(filters) {
   var matched = [];
   for (var pj = 0; pj < pre.length; pj++) {
     var rowP = pre[pj];
-    var gh = codesByRow[pj].length ? _resolveGhepDon_(codesByRow[pj], baseIdx, usedBaseRows) : null;
+    var gh = codesByRow[pj].length ? _resolveGhepDon_(codesByRow[pj], baseIdx, usedBaseRows, Number(rowP.giaTriSauGiam) || 0, _donSaleNamesFromThe_(rowP.theSale)) : null;
     var effRow = rowP;
     if (gh) {
       ghepStats.donCoMa++;
@@ -5899,7 +5915,7 @@ function buildSalesReportB_(filters) {
         _donSaleNamesFromThe_(rowP.theSale).forEach(function(nm) { if (candSales.indexOf(nm) === -1) candSales.push(nm); });
         var bonusList = _resolveBonusSale_(gh.creators, candSales, aliasMemoB_);
         effRow = Object.assign({}, rowP, { giaTriPos: rowP.giaTriSauGiam, giaTriSauGiam: gh.total, ghepShares: gh.shares, ghepCodes: gh.codes,
-          ghepCreators: gh.creators || [], ghepBase: gh.baseOrders || [], baseNgayTao: gh.baseNgayTao || '', bonusSale: bonusList.join(',') }); // bonusSale = '' -> nguoi tao khong phai sale -> khong ai nhan thuong
+          ghepCreators: gh.creators || [], ghepDu: gh.remainder || undefined, ghepDuSale: (gh.remainderSales && gh.remainderSales.length) ? gh.remainderSales.join(',') : undefined, ghepBase: gh.baseOrders || [], baseNgayTao: gh.baseNgayTao || '', bonusSale: bonusList.join(',') }); // bonusSale = '' -> nguoi tao khong phai sale -> khong ai nhan thuong
       } else if (gh.status === 'gocBiLoai') {
         ghepStats.gocBiLoai++;
         if (ghepStats.gocBiLoaiList.length < 100) ghepStats.gocBiLoaiList.push({ ngay: rowP.ngayTaoDon, sdt: rowP.soDienThoai, khach: rowP.khachHang, theSale: rowP.theSale, giaPos: Number(rowP.giaTriSauGiam) || 0, ma: gh.codes, ghiChu: String(rowP.ghiChu || '').substring(0, 120) }); // vi du (toi da 100) de ke toan biet don Pos nao bi bo vi don goc Base da Huy/Hoan
