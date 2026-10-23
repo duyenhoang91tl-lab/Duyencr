@@ -131,6 +131,6 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `SH_KHD_`, `KHD_HEADERS_`, `KHD_MAX_TEXT_`, `KHD_LIMIT_`, `KHD_TAIL_ROWS_`, `KHD_RATE_MS_`, `KHD_GET_ACTIONS_`, `KHD_POST_ACTIONS_`, `KHD_FORBIDDEN_MSG_`, `CV_SHEET`, `CV_HEADERS`, `CV_DEFAULT_ADMINS`, `CV_NOTIF_MAX_GROUPS_`
 
 ## 31_SplitOrders.gs
-- Hàm: `_splitSales_`, `_splitScope_`, `_splitCSV_`, `_splitRange_`, `_splitFilters_`, `_splitRound_`, `splitOrderReport_`, `splitOrderMine_`, `_splitDmy_`, `splitOrderDetail_`, `splitDoGet_`
+- Hàm: `_splitSales_`, `_splitIdentityFor_`, `_splitRowFinder_`, `_splitScope_`, `_splitCSV_`, `_splitRange_`, `_splitFilters_`, `_splitRound_`, `splitOrderReport_`, `splitOrderMine_`, `_splitDmy_`, `splitOrderDetail_`, `splitDoGet_`
 - Hằng/biến: `SPLIT_ORDER_MAX_ROWS_`, `SPLIT_GET_ACTIONS_`, `SPLIT_UNASSIGNED_`
 

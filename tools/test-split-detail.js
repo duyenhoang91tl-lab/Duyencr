@@ -3,7 +3,7 @@ const fs = require('fs'), vm = require('vm'); let bad = 0; const ok = (c, t) => 
 const src = fs.readFileSync(__dirname + '/../gas_v13.js', 'utf8');
 function fn(name) { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('thieu ' + name); let d = 0; for (let k = src.indexOf('{', i); k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}' && --d === 0) return src.slice(i, k + 1); } }
 const consts = src.slice(src.indexOf('var SPLIT_ORDER_MAX_ROWS_ ='), src.indexOf('// [{name, frac}] cac sale THAT'));
-const names = ['_posSaleFractions_', '_splitSales_', '_splitScope_', '_splitCSV_', '_splitRange_', '_splitFilters_', '_splitRound_', '_splitDmy_', 'splitOrderDetail_', 'splitDoGet_', '_dateStrToVnYmd_'];
+const names = ['_posSaleFractions_', '_splitSales_', '_splitIdentityFor_', '_splitRowFinder_', '_splitScope_', '_splitCSV_', '_splitRange_', '_splitFilters_', '_splitRound_', '_splitDmy_', 'splitOrderDetail_', 'splitDoGet_', '_dateStrToVnYmd_'];
 const code = consts + names.map(fn).join('\n');
 // Don 1: ghep Base 2 don goc (An+Binh ban don goc 1; An ban don goc 2) ; Don 2: the chia deu An,Binh (khong co Base) ; Don 3: An+Chi 70/30 file ke toan ; Don 4: don Base thu 2 da Huy
 const O = [
@@ -26,7 +26,7 @@ const ctx = { Math, JSON, String, Number, Object, Array, RegExp, Date, parseInt,
   _normTxt_: s => String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').toLowerCase().trim(),
   _profNames_: u => [u.name].concat(u.names || []).filter(Boolean), normPhone_: p => String(p || '').replace(/\D/g, ''), _userDeptKeys_: null,
   _reportCacheKey_: (p, f) => p + JSON.stringify(f),
-  _salePersonIdentity_: obs => ({ primary: n => String(n).trim(), members: n => [n] }),
+  _salePersonIdentity_: obs => ({ key: n => String(n).trim().toLowerCase(), primary: n => String(n).trim(), members: n => [n] }),
   buildSalesReportB_: f => { calls.push(f); const want = (f.sale || []).map(n => ctx._normTxt_(n)); return { totalOrders: O.length, totalGiaTri: 0, bySale: [], orders: O.filter(o => { const ss = ctx._posSaleFractions_(o); return ss.some(x => want.indexOf(ctx._normTxt_(x.name)) >= 0); }) }; } };
 vm.createContext(ctx); vm.runInContext(code, ctx);
 const get = (tok, p) => ctx.splitDoGet_('splitOrderDetail', Object.assign({ token: tok }, p || {}));
