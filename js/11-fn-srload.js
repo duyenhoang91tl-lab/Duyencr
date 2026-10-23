@@ -976,6 +976,80 @@ function _srRenderA(d){
   return html;
 }
 
+// ═══ BPRD-CFG BEGIN — Báo cáo B › "Báo cáo sản phẩm" (Duyên yêu cầu 2026-10-23) ═══
+// Mặc định chỉ hiện TOP 10 sản phẩm bán chạy nhất (trước đây hiện hết) + ẨN cột "Mã sản phẩm"; bấm 👁 để cài số lượng muốn hiện / bật lại cột Mã.
+// Ô tìm kiếm tên/mã LUÔN tìm trên TẤT CẢ sản phẩm (không bị giới hạn bởi top). Cài đặt lưu theo trình duyệt (localStorage 'ome_bprd_cfg').
+// Chỉ đổi cách HIỂN THỊ ở trình duyệt — d.products từ máy chủ (đã sắp theo số lượng giảm dần) và nút xuất Excel (js/13) giữ nguyên, KHÔNG đổi GAS.
+var _BPRD_KEY_ = 'ome_bprd_cfg';
+function _bprdCfg_(){
+  var c = {};
+  try { c = JSON.parse(localStorage.getItem(_BPRD_KEY_) || '{}') || {}; } catch(e){ c = {}; }
+  var n = parseInt(c.n, 10);
+  return { n: (n >= 1 && n <= 9999) ? n : 10, showCode: c.showCode === true };
+}
+function _bprdSave_(c){ try { localStorage.setItem(_BPRD_KEY_, JSON.stringify(c)); } catch(e){} }
+// Dòng sản phẩm sẽ hiện: đang tìm kiếm → khớp tên/mã trên TOÀN BỘ danh sách; không tìm → top N bán chạy nhất.
+function _bprdRows_(products, cfg, q){
+  var all = (products || []).slice().sort(function(a,b){ return (b.soLuong||0) - (a.soLuong||0); });
+  q = String(q || '').trim().toLowerCase();
+  if (q) return all.filter(function(p){ return (p.name||'').toLowerCase().indexOf(q) !== -1 || (p.code||'').toLowerCase().indexOf(q) !== -1; });
+  return all.slice(0, cfg.n);
+}
+function _bprdBodyHtml_(d){
+  var cfg = _bprdCfg_(), all = (d && d.products) || [], q = _srState.productSearch || '';
+  var rows = _bprdRows_(all, cfg, q), searching = !!String(q).trim();
+  var totalAll = all.reduce(function(s,r){ return s + (r.soLuong||0); }, 0);
+  var shown = rows.reduce(function(s,r){ return s + (r.soLuong||0); }, 0);
+  var html = '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">' + (searching
+    ? 'Tìm trên tất cả ' + fmt(all.length) + ' sản phẩm: ' + fmt(rows.length) + ' khớp'
+    : 'Đang hiện ' + fmt(rows.length) + '/' + fmt(all.length) + ' sản phẩm bán chạy nhất · tổng số lượng tất cả sản phẩm: ' + fmt(totalAll)) + '</div>';
+  if (_srState.bProductView === 'table'){
+    html += '<table class="dash-table"><thead><tr>' + (cfg.showCode ? '<th>Mã sản phẩm</th>' : '') + '<th>Tên sản phẩm</th><th style="text-align:right">Tổng số lượng</th></tr></thead><tbody>';
+    rows.forEach(function(p){
+      html += '<tr>' + (cfg.showCode ? '<td style="font-family:monospace;font-size:12px">'+esc(p.code)+'</td>' : '') + '<td>'+esc(p.name)+'</td><td style="text-align:right">'+fmt(p.soLuong)+'</td></tr>';
+    });
+    if (!rows.length) html += '<tr><td colspan="'+(cfg.showCode?3:2)+'" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+    else html += _srTotalRowHtml_(cfg.showCode ? ['Tổng', '', fmt(shown)] : [searching ? 'Tổng (kết quả tìm)' : 'Tổng (đang hiện)', fmt(shown)]);
+    html += '</tbody></table>';
+  } else {
+    html += _srChartSvg(rows, 'name', 'soLuong', _srState.bProductView, false);
+  }
+  return html;
+}
+function _bprdPanelHtml_(d){
+  var cfg = _bprdCfg_(), total = ((d && d.products) || []).length;
+  return '<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin:0 0 8px;background:var(--surface2);font-size:12px">' +
+    '<div style="display:flex;flex-wrap:wrap;gap:14px;align-items:center">' +
+      '<label>Hiện top <input type="number" min="1" max="9999" value="'+cfg.n+'" oninput="_bprdSetN_(this.value)" style="width:72px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px"> sản phẩm bán chạy nhất <span style="color:var(--muted)">(hiện có '+fmt(total)+' sản phẩm)</span></label>' +
+      '<label style="cursor:pointer"><input type="checkbox" '+(cfg.showCode?'checked ':'')+'onchange="_bprdSetShowCode_(this.checked)"> Hiện cột Mã sản phẩm</label>' +
+      '<button type="button" class="btn sm" style="padding:3px 9px;font-size:11px" onclick="_bprdReset_()">↺ Mặc định (top 10, ẩn mã)</button>' +
+    '</div>' +
+    '<div style="margin-top:6px;color:var(--muted);font-size:11px">Ô tìm kiếm theo tên/mã luôn tìm trên tất cả sản phẩm, không bị giới hạn bởi top. Cài đặt lưu theo trình duyệt này.</div>' +
+  '</div>';
+}
+function _bprdEyeBtnHtml_(){
+  return '<button type="button" class="btn sm" style="padding:3px 9px;font-size:11px;margin-left:10px;vertical-align:middle" title="Cài số lượng sản phẩm muốn hiện" onclick="_bprdTogglePanel_()">' +
+    (_srState.bprdOpen ? '🙈 Đóng cài đặt' : '👁 Cài đặt hiển thị') + '</button>';
+}
+function _bprdTogglePanel_(){ _srState.bprdOpen = !_srState.bprdOpen; renderSalesReportTab(); }
+// Vẽ lại CHỈ phần bảng/biểu đồ (không vẽ lại cả tab) để ô nhập số / ô tìm kiếm không mất con trỏ khi gõ.
+function _bprdRefresh_(){
+  var el = document.getElementById('bprd-body');
+  if (el) el.innerHTML = _bprdBodyHtml_(_srState.dataB);
+}
+function _bprdSetN_(v){
+  var n = parseInt(v, 10);
+  if (!(n >= 1)) return;   // đang xoá/gõ dở → giữ giá trị cũ, chưa lưu
+  var c = _bprdCfg_(); c.n = Math.min(n, 9999); _bprdSave_(c); _bprdRefresh_();
+}
+function _bprdSetShowCode_(on){ var c = _bprdCfg_(); c.showCode = !!on; _bprdSave_(c); _bprdRefresh_(); }
+function _bprdReset_(){
+  try { localStorage.removeItem(_BPRD_KEY_); } catch(e){}
+  var el = document.getElementById('bprd-cfg'); if (el) el.innerHTML = _srState.bprdOpen ? _bprdPanelHtml_(_srState.dataB) : '';
+  _bprdRefresh_();
+}
+// ═══ BPRD-CFG END ═══
+
 function _srRenderB(d){
   if (!d) return _srNoDataHtml_();
   var bTb = d.totalOrders ? Math.round(d.totalGiaTri/d.totalOrders) : 0;
@@ -1113,20 +1187,11 @@ function _srRenderB(d){
       html += _srChartSvg(bMktRows, 'name', 'giaTri', _srState.bMktView, true, 'orders');
     }
 
-    var productRows = (d.products||[]).filter(function(p){ return !_srState.productSearch || (p.name||'').toLowerCase().indexOf(_srState.productSearch.toLowerCase())!==-1 || (p.code||'').toLowerCase().indexOf(_srState.productSearch.toLowerCase())!==-1; });
-    html += '<div class="dash-section-title" style="margin-top:18px">Báo cáo sản phẩm'+_srViewToggleHtml('bProductView')+'</div>';
-    html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên/mã sản phẩm..." value="'+esc(_srState.productSearch)+'" oninput="_srState.productSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:240px;margin-bottom:6px">';
-    if (_srState.bProductView === 'table'){
-      html += '<table class="dash-table"><thead><tr><th>Mã sản phẩm</th><th>Tên sản phẩm</th><th style="text-align:right">Tổng số lượng</th></tr></thead><tbody>';
-      productRows.forEach(function(p){
-        html += '<tr><td style="font-family:monospace;font-size:12px">'+esc(p.code)+'</td><td>'+esc(p.name)+'</td><td style="text-align:right">'+fmt(p.soLuong)+'</td></tr>';
-      });
-      if (!productRows.length) html += '<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
-      else html += _srTotalRowHtml_(['Tổng', '', fmt(productRows.reduce(function(s,r){return s+(r.soLuong||0);},0))]);
-      html += '</tbody></table>';
-    } else {
-      html += _srChartSvg(productRows, 'name', 'soLuong', _srState.bProductView, false);
-    }
+    // Báo cáo sản phẩm: mặc định top 10 bán chạy, ẩn cột Mã, 👁 cài đặt — xem khối BPRD-CFG phía trên (Duyên yêu cầu 2026-10-23).
+    html += '<div class="dash-section-title" style="margin-top:18px">Báo cáo sản phẩm'+_srViewToggleHtml('bProductView')+_bprdEyeBtnHtml_()+'</div>';
+    html += '<div id="bprd-cfg">'+(_srState.bprdOpen ? _bprdPanelHtml_(d) : '')+'</div>';
+    html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên/mã sản phẩm (tìm trên tất cả)..." value="'+esc(_srState.productSearch)+'" oninput="_srState.productSearch=this.value;_bprdRefresh_()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:300px;margin-bottom:6px">';
+    html += '<div id="bprd-body">'+_bprdBodyHtml_(d)+'</div>';
   }
   html += _srBaseCheckPanelHtml_(d);   // Báo cáo check ngược Base (đơn Pos ghép đơn gốc Base) + nút xuất Excel cho kế toán
   html += _srPosMonthPanelHtml_();

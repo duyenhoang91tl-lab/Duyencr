@@ -1,6 +1,13 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+## 2026-10-23 — Báo cáo B › "Báo cáo sản phẩm": top N bán chạy + ẩn cột Mã + 👁 cài đặt (Duyên yêu cầu)
+Yêu cầu Duyên: chỉ hiện 10 SP bán chạy nhất (tự ẩn phần còn lại); bấm con mắt để cài số lượng muốn hiện; tắt cột mã SP nhưng tìm theo tên/mã vẫn ra; cài được SP nào hiện.
+- [x] **Mục 1 (xong):** `js/11-fn-srload.js` khối `BPRD-CFG BEGIN/END` (ngay trên `_srRenderB`): `_bprdCfg_` (đọc/ghi localStorage `ome_bprd_cfg` = {n, showCode}), `_bprdRows_` (không tìm → top N; CÓ tìm → khớp tên/mã trên TẤT CẢ SP), `_bprdBodyHtml_` (bảng/biểu đồ + chú thích "Đang hiện 10/87"), `_bprdPanelHtml_` + nút `_bprdEyeBtnHtml_` ("👁 Cài đặt hiển thị"). Mặc định: top 10, ẨN cột Mã. Chỉ vẽ lại vùng `#bprd-body` khi gõ → ô nhập không mất con trỏ.
+- Lý do thiết kế: `d.products` do máy chủ đã sắp giảm dần theo số lượng (gas `09_SalesReportB_POS.gs`) nên chỉ cần cắt ở trình duyệt — KHÔNG đổi GAS (không cần deploy). Nút xuất Excel (js/13 ~dòng 1401) vẫn xuất TẤT CẢ SP. Cài đặt lưu THEO TRÌNH DUYỆT (không đồng bộ giữa máy).
+- Test: `node tools/test-bprd-cfg.js` (30 ca: top 10 mặc định, ẩn mã, search tên/mã ngoài top, đổi N, lưu bền, dữ liệu hỏng).
+- [ ] **CẦN LÀM TIẾP (mục 2):** thêm chế độ "Chọn sản phẩm cụ thể" (tick từng SP, có ô lọc tên/mã trong danh sách) + chế độ "Tất cả" vào panel 👁; lưu `mode` + `pick[]` trong cùng khoá `ome_bprd_cfg`. Sau đó Duyên Ctrl+F5 vào Báo cáo B kiểm tra.
+
 ## 2026-10-21 — Pancake AI: nút "🚫 Quét từ cấm" (Duyên yêu cầu)
 - [x] **Nguyên nhân gốc khi thiết kế:** danh sách `_bannedWords` ở extension thực tế rỗng (chỉ nạp cho Messenger + background `handleGetKnowledge` không trả `bannedWords`) → quét ở SERVER cho chắc: gas_v13.js `scanBannedText_` + doPost action `scanBanned` (dùng `cvDetect_`/`_cvBannedCompiled_` như giám sát chat). extension-pancake: `SCAN_BANNED` (background), nút `#pk-ban-btn` + `scanBannedDraft_` (content), CSS `#pk-ban-*`. Cảnh báo: `Từ cấm “X” không được phép sử dụng nhé!`.
 - [x] Test: `node tools/test-pancake-banned-scan.js` (21 ca; phần UI cần jsdom). `tools/ext-parity-allow.json`: `scanBanned` = gap (Zalo AI chưa có). Chi tiết: docs/crm-kb/04-extension-pancake.md.
