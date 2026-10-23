@@ -99,7 +99,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `SB_BATCH_`, `SB_TIME_BUDGET_MS_`, `SB_CARE_COLS_`, `SB_MIRROR_MAX_`, `SB_DIRTY_MAX_`, `SB_READ_FALLBACK_ON_MISS_`, `SB_DT_COLS_`, `SB_DON_COLS_`, `SB_DT_NUM_`, `SB_ORD_BLOCK_`, `SB_ORD_MAX_BLOCKS_`, `SB_ORD_RUN_TTL_MS_`, `SB_ORD_TICK_MINUTES_`, `SB_CARE_SYNC_BLOCK_`, `SB_CARE_SYNC_MAX_BLOCKS_`, `SB_CARE_SYNC_TICK_MINUTES_`, `SB_ORD_MAX_AGE_MS_`, `SB_PAGE_`, `SB_PAR_`, `SB_CARE_DELTA_MAX_`, `SB_SOAK_DAYS_`, `SB_CARE_MAX_AGE_MS_`, `SB_STEP5_MANUAL_`, `SB_BACKUP_TABLES_`, `SB_BACKUP_PAGE_`, `SB_BACKUP_KEEP_`, `SB_BACKUP_FOLDER_NAME_`, `SB_BACKUP_MAX_AGE_MS_`, `SB_BACKUP_RUN_TTL_MS_`, `SB_BACKUP_STALE_RUN_MS_`, `SB_PRUNE_MAX_ABS_`, `SB_PRUNE_MAX_PCT_`, `SB_PRUNE_GRACE_MS_`, `SB_PRUNE_CHUNK_`, `STORE_CASE_SS_ID_DEFAULT_`
 
 ## 23_TodayTasks.gs
-- Hàm: `_ttFold_`, `_ttParseVn_`, `_ttSkipSet_`, `_ttBuildRows_`, `ttTrackStages_`, `ttChayNgay`, `ttCaiTrigger`, `_ttStuckFromRows_`, `ttTodayTasks_`, `_ttBoardBuild_`, `ttStageBoard_`
+- Hàm: `_ttFold_`, `_ttParseVn_`, `_ttSkipSet_`, `_ttBuildRows_`, `ttTrackStages_`, `ttChayNgay`, `ttCaiTrigger`, `_ttStuckFromRows_`, `ttTodayTasks_`, `_ttParseFilterDate_`, `_ttSplitList_`, `_ttNameTokens_`, `_ttBoardFilterCompile_`, `_ttBoardBuild_`, `_ttBoardOptions_`, `ttStageBoard_`
 - Hằng/biến: `TT_TRACK_SHEET_`, `TT_TRACK_HEADERS_`, `TT_DEFAULT_HOURS_`, `TT_LOOKBACK_DAYS_`, `TT_REFRESH_MIN_`, `TT_STAGE_ORDER_`, `TT_BOARD_DONE_DAYS_`, `TT_BOARD_CAP_`
 
 ## 24_TonKho.gs
