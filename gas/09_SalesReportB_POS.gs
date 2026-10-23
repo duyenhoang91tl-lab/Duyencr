@@ -64,7 +64,7 @@ function _detectBaseCounterCol_(sh, last) {
 // Chi doc 5 CAT can dung (ma bo dem, trang thai, sale, gia tri) thay vi ca 20 cot, va chi chay regex tren o
 // NGAN co dang "..T<so>" (bo qua o dai/so/ngay) -> nhanh hon rat nhieu. Khong xac dinh duoc cot -> colIdx = -1.
 // Tra ve { exact: {code: [row]}, fuzzy: {code: [row]}, colIdx } — fuzzy = lech dung phan "/nam" (1 ben co, 1 ben khong).
-function _readBaseRowsByCounterCodes_(wantedCodes) {
+function _readBaseRowsByCounterCodes_(wantedCodes, withProduct) {
   var res = { exact: {}, fuzzy: {}, colIdx: -1 };
   var wantedList = Object.keys(wantedCodes);
   if (!wantedList.length) return res;
@@ -81,7 +81,7 @@ function _readBaseRowsByCounterCodes_(wantedCodes) {
   if (colIdx < 0) return res;
   var n = last - 1;
   function col_(ci) { return sh.getRange(2, ci + 1, n, 1).getValues(); }
-  var cCode = col_(colIdx), cTT = col_(DT_COL_TRANGTHAI), cSale = col_(DT_COL_SALEBAN), cGT = col_(DT_COL_GIATRIDON), cCreator = col_(1), cNgay = col_(DT_COL_NGAYTAO); // cot B "Người tạo" cua DT TONG = NGUOI LEN DON (dung de tinh THUONG, xem _resolveGhepDon_)
+  var cCode = col_(colIdx), cTT = col_(DT_COL_TRANGTHAI), cSale = col_(DT_COL_SALEBAN), cGT = col_(DT_COL_GIATRIDON), cCreator = col_(1), cNgay = col_(DT_COL_NGAYTAO), cSP = withProduct ? col_(DT_COL_SANPHAM) : null;   // cSP: chi doc khi bao cao chi tiet don chia (splitOrderDetail) can "san pham" tren Base // cot B "Người tạo" cua DT TONG = NGUOI LEN DON (dung de tinh THUONG, xem _resolveGhepDon_)
   var re = new RegExp(COUNTER_CODE_RE_SRC_, 'g'), quick = /[Tt]\d/;
   function addHit_(bucket, key, rowObj) {
     var arr = bucket[key] || (bucket[key] = []);
@@ -115,7 +115,8 @@ function _readBaseRowsByCounterCodes_(wantedCodes) {
           creator: cCreator[i][0] ? String(cCreator[i][0]).trim() : '',
           ngayTao: cNgay[i][0], // NGAY TAO DON tren Base (doanh thu NGAY / thuong tinh theo ngay nay, khong theo ngay Pos)
           giaTriDon: _normMoney_(cGT[i][0]),
-          code: bc
+          code: bc,
+          sanPham: cSP ? String(cSP[i][0] || '') : undefined
         };
       }
       if (isWanted) addHit_(res.exact, bc, rowObj);
@@ -179,7 +180,7 @@ function _resolveGhepDon_(codes, idx, usedBaseRows) {
     // baseOrders = TUNG don goc Base da khop (ke ca don bi loai) de ke toan do lai tung don (Bao cao check nguoc Base). CHI THEM FIELD, khong doi cach tinh.
     var exclB = _isExcludedOrderStatus_(br.trangThai), bDt0 = parseVNDate_(br.ngayTao);
     baseOrders.push({ dong: br.rowIndex, ma: br.code || '', ngay: bDt0 ? _vnYmd_(bDt0) : '', nguoiTao: br.creator || '', saleBan: String(br.saleBan || ''),
-      trangThai: String(br.trangThai || ''), giaTri: Number(br.giaTriDon) || 0, tinh: !exclB });
+      trangThai: String(br.trangThai || ''), giaTri: Number(br.giaTriDon) || 0, tinh: !exclB, sanPham: br.sanPham });
     if (exclB) continue; // don goc da Huy/Hoan (theo dinh nghia Base) -> khong tinh
     liveRows++;
     var bDt = parseVNDate_(br.ngayTao), bYmd = bDt ? _vnYmd_(bDt) : '';
@@ -511,7 +512,7 @@ function buildSalesReportB_(filters) {
   if (anyCodes) {
     // Loi/khong doc duoc Base -> KHONG lam hong ca bao cao: roi ve cach chia Pos nhu cu va bao trong ghep.loi.
     var tG0 = Date.now();
-    try { baseIdx = _readBaseRowsByCounterCodes_(wantedCodes); ghepMs = Date.now() - tG0; }
+    try { baseIdx = _readBaseRowsByCounterCodes_(wantedCodes, !!filters.withBaseProduct); ghepMs = Date.now() - tG0; }
     catch (eG) { ghepErr = String(eG && eG.message || eG); baseIdx = { exact: {}, fuzzy: {}, colIdx: -2 }; }
   }
   var acctInfo = _loadAcctSplit_();
