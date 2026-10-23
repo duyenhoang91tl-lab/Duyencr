@@ -37,6 +37,24 @@
     <span>🔍 Tra cứu sản phẩm (nạp dữ liệu Google Sheet sản phẩm/FAQ khi soạn gợi ý — giống checkbox bên Zalo AI)</span>
   </div>
 
+  <h2>📝 Duyệt mẫu tin ngay trên Pancake (chỉ admin)</h2>
+  <div class="hint">
+    Khi nhân viên đề xuất <b>mẫu tin mới</b>, nếu bạn đăng nhập ở đây, trên Pancake sẽ hiện nút <b>📝 N mẫu tin chờ duyệt</b> và thông báo — bấm <b>✓ Duyệt</b> / <b>✗ Từ chối</b> ngay, không cần mở CRM.
+    Dùng <b>tài khoản + mật khẩu CRM của admin</b>. Mật khẩu <b>không được lưu</b>; extension chỉ giữ phiên đăng nhập (khoảng 7 ngày, trên máy này) rồi hỏi lại. Tài khoản không phải admin sẽ bị từ chối.
+  </div>
+  <div id="apprLoggedOut">
+    <label>Tài khoản CRM (admin)</label>
+    <input type="text" id="apprUser" placeholder="vd: duyenht" autocomplete="username" />
+    <label>Mật khẩu CRM</label>
+    <input type="password" id="apprPass" autocomplete="current-password" />
+    <button id="apprLogin" type="button">Đăng nhập để duyệt mẫu</button>
+  </div>
+  <div id="apprLoggedIn" style="display:none">
+    <div>✅ Đang đăng nhập duyệt mẫu: <b id="apprName"></b> <span id="apprExp" style="color:#6b7280;font-size:12px"></span></div>
+    <button id="apprLogout" type="button" style="background:#6b7280;margin-top:8px">Đăng xuất</button>
+  </div>
+  <span id="apprMsg" style="display:block;margin-top:8px;font-size:13px"></span>
+
   <h2>💰 Đơn giá vàng (mục "Thêm vàng" trong Soạn đơn)</h2>
   <div class="hint">
     Ô "Thêm vàng" trong giỏ hàng giờ nhập theo <b>số lượng</b> (1, 2, 3...), không phải tiền trực tiếp nữa.

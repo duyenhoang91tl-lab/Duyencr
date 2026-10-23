@@ -195,3 +195,27 @@ document.getElementById("saveCrmExtKey").addEventListener("click", () => {
     setTimeout(() => { el.textContent = ""; }, 2000);
   });
 });
+
+
+// ── Duyệt mẫu tin (admin): đăng nhập CRM -> token chỉ lưu ở background (pancake-background.js, APPROVER_*) ──
+(function apprInit() {
+  const $ = (id) => document.getElementById(id);
+  const ask = (msg) => new Promise((res) => { try { chrome.runtime.sendMessage(msg, (r) => res(chrome.runtime.lastError ? null : r)); } catch (e) { res(null); } });
+  const say = (t, ok) => { const m = $("apprMsg"); m.textContent = t || ""; m.style.color = ok ? "#15803d" : "#b91c1c"; };
+  async function refresh() {
+    const r = await ask({ type: "APPROVER_STATUS" }), d = r && r.ok ? r.data : null;
+    const on = !!(d && d.loggedIn);
+    $("apprLoggedIn").style.display = on ? "" : "none"; $("apprLoggedOut").style.display = on ? "none" : "";
+    if (on) { $("apprName").textContent = d.name || d.username || ""; $("apprExp").textContent = d.expiresAt ? "(hết hạn " + new Date(d.expiresAt).toLocaleDateString("vi-VN") + ")" : ""; }
+  }
+  $("apprLogin").addEventListener("click", async () => {
+    const btn = $("apprLogin"); btn.disabled = true; say("Đang đăng nhập...", true);
+    const r = await ask({ type: "APPROVER_LOGIN", payload: { username: $("apprUser").value, password: $("apprPass").value } });
+    btn.disabled = false; $("apprPass").value = "";   // xoá mật khẩu khỏi ô nhập ngay
+    if (r && r.ok) { say("Đăng nhập thành công. Mẫu tin chờ duyệt sẽ hiện trên Pancake (tải lại tab Pancake nếu chưa thấy).", true); await refresh(); }
+    else say((r && r.error) || "Không kết nối được tới extension. Thử lại.", false);
+  });
+  $("apprPass").addEventListener("keydown", (e) => { if (e.key === "Enter") $("apprLogin").click(); });
+  $("apprLogout").addEventListener("click", async () => { await ask({ type: "APPROVER_LOGOUT" }); say("Đã đăng xuất.", true); await refresh(); });
+  refresh();
+})();
