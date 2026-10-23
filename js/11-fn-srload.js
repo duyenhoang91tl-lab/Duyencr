@@ -977,38 +977,51 @@ function _srRenderA(d){
 }
 
 // ═══ BPRD-CFG BEGIN — Báo cáo B › "Báo cáo sản phẩm" (Duyên yêu cầu 2026-10-23) ═══
-// Mặc định chỉ hiện TOP 10 sản phẩm bán chạy nhất (trước đây hiện hết) + ẨN cột "Mã sản phẩm"; bấm 👁 để cài số lượng muốn hiện / bật lại cột Mã.
-// Ô tìm kiếm tên/mã LUÔN tìm trên TẤT CẢ sản phẩm (không bị giới hạn bởi top). Cài đặt lưu theo trình duyệt (localStorage 'ome_bprd_cfg').
+// Mặc định chỉ hiện TOP 10 sản phẩm bán chạy nhất (trước đây hiện hết) + ẨN cột "Mã sản phẩm"; bấm 👁 để chọn cách hiện:
+//   • top N bán chạy nhất (cài N)  • CHỌN SẢN PHẨM CỤ THỂ (tick từng SP)  • tất cả; và bật/tắt cột Mã.
+// Ô tìm kiếm tên/mã LUÔN tìm trên TẤT CẢ sản phẩm (không bị giới hạn bởi top / danh sách đã chọn). Cài đặt lưu theo trình duyệt (localStorage 'ome_bprd_cfg' = {mode,n,pick[],showCode}).
 // Chỉ đổi cách HIỂN THỊ ở trình duyệt — d.products từ máy chủ (đã sắp theo số lượng giảm dần) và nút xuất Excel (js/13) giữ nguyên, KHÔNG đổi GAS.
 var _BPRD_KEY_ = 'ome_bprd_cfg';
+function _bprdKey_(p){ return String((p && (p.code || p.name)) || ''); }   // khoá nhận diện 1 SP (mã; thiếu mã thì dùng tên)
 function _bprdCfg_(){
   var c = {};
   try { c = JSON.parse(localStorage.getItem(_BPRD_KEY_) || '{}') || {}; } catch(e){ c = {}; }
-  var n = parseInt(c.n, 10);
-  return { n: (n >= 1 && n <= 9999) ? n : 10, showCode: c.showCode === true };
+  var n = parseInt(c.n, 10), seen = {}, pick = [];
+  (Array.isArray(c.pick) ? c.pick : []).forEach(function(k){ k = String(k); if (k && !seen[k]){ seen[k] = 1; pick.push(k); } });
+  return { mode: (c.mode === 'pick' || c.mode === 'all') ? c.mode : 'top', n: (n >= 1 && n <= 9999) ? n : 10, pick: pick, showCode: c.showCode === true };
 }
 function _bprdSave_(c){ try { localStorage.setItem(_BPRD_KEY_, JSON.stringify(c)); } catch(e){} }
-// Dòng sản phẩm sẽ hiện: đang tìm kiếm → khớp tên/mã trên TOÀN BỘ danh sách; không tìm → top N bán chạy nhất.
+function _bprdSorted_(products){ return (products || []).slice().sort(function(a,b){ return (b.soLuong||0) - (a.soLuong||0); }); }
+function _bprdMatch_(p, q){ return (p.name||'').toLowerCase().indexOf(q) !== -1 || (p.code||'').toLowerCase().indexOf(q) !== -1; }
+// Dòng sản phẩm sẽ hiện: đang tìm kiếm → khớp tên/mã trên TOÀN BỘ danh sách; không tìm → theo chế độ (top N / đã chọn / tất cả).
 function _bprdRows_(products, cfg, q){
-  var all = (products || []).slice().sort(function(a,b){ return (b.soLuong||0) - (a.soLuong||0); });
+  var all = _bprdSorted_(products);
   q = String(q || '').trim().toLowerCase();
-  if (q) return all.filter(function(p){ return (p.name||'').toLowerCase().indexOf(q) !== -1 || (p.code||'').toLowerCase().indexOf(q) !== -1; });
+  if (q) return all.filter(function(p){ return _bprdMatch_(p, q); });
+  if (cfg.mode === 'all') return all;
+  if (cfg.mode === 'pick'){ var set = {}; cfg.pick.forEach(function(k){ set[k] = 1; }); return all.filter(function(p){ return set[_bprdKey_(p)]; }); }
   return all.slice(0, cfg.n);
+}
+// Khoá các SP khớp ô lọc trong danh sách tick (rỗng = tất cả) — dùng cho nút "Chọn tất cả".
+function _bprdPickKeys_(products, q){
+  q = String(q || '').trim().toLowerCase();
+  return _bprdSorted_(products).filter(function(p){ return !q || _bprdMatch_(p, q); }).map(_bprdKey_);
 }
 function _bprdBodyHtml_(d){
   var cfg = _bprdCfg_(), all = (d && d.products) || [], q = _srState.productSearch || '';
   var rows = _bprdRows_(all, cfg, q), searching = !!String(q).trim();
   var totalAll = all.reduce(function(s,r){ return s + (r.soLuong||0); }, 0);
   var shown = rows.reduce(function(s,r){ return s + (r.soLuong||0); }, 0);
+  var what = cfg.mode === 'pick' ? 'sản phẩm đã chọn' : (cfg.mode === 'all' ? 'sản phẩm' : 'sản phẩm bán chạy nhất');
   var html = '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">' + (searching
     ? 'Tìm trên tất cả ' + fmt(all.length) + ' sản phẩm: ' + fmt(rows.length) + ' khớp'
-    : 'Đang hiện ' + fmt(rows.length) + '/' + fmt(all.length) + ' sản phẩm bán chạy nhất · tổng số lượng tất cả sản phẩm: ' + fmt(totalAll)) + '</div>';
+    : 'Đang hiện ' + fmt(rows.length) + '/' + fmt(all.length) + ' ' + what + ' · tổng số lượng tất cả sản phẩm: ' + fmt(totalAll)) + '</div>';
   if (_srState.bProductView === 'table'){
     html += '<table class="dash-table"><thead><tr>' + (cfg.showCode ? '<th>Mã sản phẩm</th>' : '') + '<th>Tên sản phẩm</th><th style="text-align:right">Tổng số lượng</th></tr></thead><tbody>';
     rows.forEach(function(p){
       html += '<tr>' + (cfg.showCode ? '<td style="font-family:monospace;font-size:12px">'+esc(p.code)+'</td>' : '') + '<td>'+esc(p.name)+'</td><td style="text-align:right">'+fmt(p.soLuong)+'</td></tr>';
     });
-    if (!rows.length) html += '<tr><td colspan="'+(cfg.showCode?3:2)+'" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+    if (!rows.length) html += '<tr><td colspan="'+(cfg.showCode?3:2)+'" style="text-align:center;color:var(--muted);padding:14px">' + (!searching && cfg.mode === 'pick' && all.length ? 'Chưa chọn sản phẩm nào (hoặc sản phẩm đã chọn không có trong kỳ này) — bấm 👁 Cài đặt hiển thị để chọn' : 'Không có dữ liệu') + '</td></tr>';
     else html += _srTotalRowHtml_(cfg.showCode ? ['Tổng', '', fmt(shown)] : [searching ? 'Tổng (kết quả tìm)' : 'Tổng (đang hiện)', fmt(shown)]);
     html += '</tbody></table>';
   } else {
@@ -1016,19 +1029,50 @@ function _bprdBodyHtml_(d){
   }
   return html;
 }
+function _bprdPickCountText_(d){
+  var cfg = _bprdCfg_(), set = {}; cfg.pick.forEach(function(k){ set[k] = 1; });
+  var all = (d && d.products) || [], n = all.filter(function(p){ return set[_bprdKey_(p)]; }).length;
+  return 'Đã chọn ' + fmt(n) + '/' + fmt(all.length) + ' sản phẩm';
+}
 function _bprdPanelHtml_(d){
-  var cfg = _bprdCfg_(), total = ((d && d.products) || []).length;
-  return '<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin:0 0 8px;background:var(--surface2);font-size:12px">' +
-    '<div style="display:flex;flex-wrap:wrap;gap:14px;align-items:center">' +
-      '<label>Hiện top <input type="number" min="1" max="9999" value="'+cfg.n+'" oninput="_bprdSetN_(this.value)" style="width:72px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px"> sản phẩm bán chạy nhất <span style="color:var(--muted)">(hiện có '+fmt(total)+' sản phẩm)</span></label>' +
+  var cfg = _bprdCfg_(), all = _bprdSorted_((d && d.products) || []), total = all.length, lq = String(_srState.bprdListQ || '').trim().toLowerCase();
+  function radio(v, labelHtml){ return '<label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px"><input type="radio" name="bprd-mode" '+(cfg.mode===v?'checked ':'')+'onchange="_bprdSetMode_(\''+v+'\')"> '+labelHtml+'</label>'; }
+  var sel = {}; cfg.pick.forEach(function(k){ sel[k] = 1; });
+  var h = '<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin:0 0 8px;background:var(--surface2);font-size:12px">' +
+    '<div style="display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center">' +
+      radio('top', 'Hiện top <input type="number" min="1" max="9999" value="'+cfg.n+'" '+(cfg.mode==='top'?'':'disabled ')+'oninput="_bprdSetN_(this.value)" style="width:72px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px"> sản phẩm bán chạy nhất') +
+      radio('pick', 'Chọn sản phẩm cụ thể') +
+      radio('all', 'Hiện tất cả <span style="color:var(--muted)">(' + fmt(total) + ' sản phẩm)</span>') +
+    '</div>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin-top:8px">' +
       '<label style="cursor:pointer"><input type="checkbox" '+(cfg.showCode?'checked ':'')+'onchange="_bprdSetShowCode_(this.checked)"> Hiện cột Mã sản phẩm</label>' +
       '<button type="button" class="btn sm" style="padding:3px 9px;font-size:11px" onclick="_bprdReset_()">↺ Mặc định (top 10, ẩn mã)</button>' +
-    '</div>' +
-    '<div style="margin-top:6px;color:var(--muted);font-size:11px">Ô tìm kiếm theo tên/mã luôn tìm trên tất cả sản phẩm, không bị giới hạn bởi top. Cài đặt lưu theo trình duyệt này.</div>' +
-  '</div>';
+    '</div>';
+  if (cfg.mode === 'pick'){
+    h += '<div style="margin-top:10px;border-top:1px dashed var(--border);padding-top:8px">' +
+      '<div style="display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-bottom:6px">' +
+        '<input type="text" placeholder="🔍 Lọc danh sách theo tên/mã..." value="'+esc(_srState.bprdListQ || '')+'" oninput="_bprdFilterList_(this.value)" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:230px">' +
+        '<button type="button" class="btn sm" style="padding:3px 9px;font-size:11px" onclick="_bprdPickTopN_()">Chọn top '+cfg.n+'</button>' +
+        '<button type="button" class="btn sm" style="padding:3px 9px;font-size:11px" onclick="_bprdPickAll_()">Chọn tất cả'+(lq?' (đang lọc)':'')+'</button>' +
+        '<button type="button" class="btn sm" style="padding:3px 9px;font-size:11px" onclick="_bprdPickNone_()">Bỏ chọn hết</button>' +
+        '<span id="bprd-pick-count" style="color:var(--muted)">'+_bprdPickCountText_(d)+'</span>' +
+      '</div>' +
+      '<div id="bprd-pick-list" style="max-height:240px;overflow:auto;border:1px solid var(--border);border-radius:6px;background:var(--surface);padding:4px 8px">';
+    all.forEach(function(p){
+      var k = _bprdKey_(p), s = ((p.name||'') + ' ' + (p.code||'')).toLowerCase();
+      h += '<label data-s="'+esc(s)+'" style="display:'+(lq && s.indexOf(lq) === -1 ? 'none' : 'flex')+';align-items:center;gap:6px;padding:2px 0;cursor:pointer">' +
+        '<input type="checkbox" data-k="'+esc(k)+'" '+(sel[k]?'checked ':'')+'onchange="_bprdTogglePick_(this)">' +
+        '<span style="flex:1">'+esc(p.name)+(p.code ? ' <span style="color:var(--muted);font-family:monospace;font-size:11px">('+esc(p.code)+')</span>' : '')+'</span>' +
+        '<span style="color:var(--muted)">'+fmt(p.soLuong)+'</span></label>';
+    });
+    if (!all.length) h += '<div style="color:var(--muted);padding:8px 0">Chưa có sản phẩm nào trong kỳ đang xem.</div>';
+    h += '</div><div style="margin-top:4px;color:var(--muted);font-size:11px">Danh sách gồm các sản phẩm có bán trong kỳ/bộ lọc đang xem (xếp theo số lượng giảm dần). Sản phẩm đã chọn nhưng kỳ này không bán thì không hiện trong bảng.</div></div>';
+  }
+  h += '<div style="margin-top:6px;color:var(--muted);font-size:11px">Ô tìm kiếm theo tên/mã luôn tìm trên tất cả sản phẩm, không bị giới hạn. Cài đặt lưu theo trình duyệt này.</div></div>';
+  return h;
 }
 function _bprdEyeBtnHtml_(){
-  return '<button type="button" class="btn sm" style="padding:3px 9px;font-size:11px;margin-left:10px;vertical-align:middle" title="Cài số lượng sản phẩm muốn hiện" onclick="_bprdTogglePanel_()">' +
+  return '<button type="button" class="btn sm" style="padding:3px 9px;font-size:11px;margin-left:10px;vertical-align:middle" title="Cài số lượng / chọn sản phẩm muốn hiện" onclick="_bprdTogglePanel_()">' +
     (_srState.bprdOpen ? '🙈 Đóng cài đặt' : '👁 Cài đặt hiển thị') + '</button>';
 }
 function _bprdTogglePanel_(){ _srState.bprdOpen = !_srState.bprdOpen; renderSalesReportTab(); }
@@ -1037,16 +1081,50 @@ function _bprdRefresh_(){
   var el = document.getElementById('bprd-body');
   if (el) el.innerHTML = _bprdBodyHtml_(_srState.dataB);
 }
+function _bprdRefreshPanel_(){
+  var el = document.getElementById('bprd-cfg');
+  if (el) el.innerHTML = _srState.bprdOpen ? _bprdPanelHtml_(_srState.dataB) : '';
+}
+function _bprdSetMode_(m){
+  var c = _bprdCfg_(); c.mode = (m === 'pick' || m === 'all') ? m : 'top'; _bprdSave_(c);
+  _bprdRefreshPanel_(); _bprdRefresh_();
+}
 function _bprdSetN_(v){
   var n = parseInt(v, 10);
   if (!(n >= 1)) return;   // đang xoá/gõ dở → giữ giá trị cũ, chưa lưu
   var c = _bprdCfg_(); c.n = Math.min(n, 9999); _bprdSave_(c); _bprdRefresh_();
 }
 function _bprdSetShowCode_(on){ var c = _bprdCfg_(); c.showCode = !!on; _bprdSave_(c); _bprdRefresh_(); }
+function _bprdUpdatePickUi_(){
+  var cnt = document.getElementById('bprd-pick-count'); if (cnt) cnt.textContent = _bprdPickCountText_(_srState.dataB);
+}
+function _bprdTogglePick_(el){
+  var k = el.getAttribute('data-k'), c = _bprdCfg_(), i = c.pick.indexOf(k);
+  if (el.checked && i === -1) c.pick.push(k); else if (!el.checked && i !== -1) c.pick.splice(i, 1);
+  _bprdSave_(c); _bprdUpdatePickUi_(); _bprdRefresh_();
+}
+function _bprdSyncChecks_(){
+  var set = {}; _bprdCfg_().pick.forEach(function(k){ set[k] = 1; });
+  var list = document.querySelectorAll('#bprd-pick-list input[type=checkbox]');
+  for (var i = 0; i < list.length; i++) list[i].checked = !!set[list[i].getAttribute('data-k')];
+}
+function _bprdSetPick_(keys){ var c = _bprdCfg_(); c.pick = keys; _bprdSave_(c); _bprdSyncChecks_(); _bprdUpdatePickUi_(); _bprdRefresh_(); }
+function _bprdPickTopN_(){ _bprdSetPick_(_bprdSorted_((_srState.dataB || {}).products).slice(0, _bprdCfg_().n).map(_bprdKey_)); }
+function _bprdPickAll_(){   // gộp thêm các SP đang hiện trong danh sách (đang lọc thì chỉ gộp SP khớp ô lọc), không bỏ các SP đã chọn
+  var c = _bprdCfg_(), keys = c.pick.slice();
+  _bprdPickKeys_((_srState.dataB || {}).products, _srState.bprdListQ).forEach(function(k){ if (keys.indexOf(k) === -1) keys.push(k); });
+  _bprdSetPick_(keys);
+}
+function _bprdPickNone_(){ _bprdSetPick_([]); }
+function _bprdFilterList_(v){
+  _srState.bprdListQ = String(v || '');
+  var q = _srState.bprdListQ.trim().toLowerCase(), list = document.querySelectorAll('#bprd-pick-list label[data-s]');
+  for (var i = 0; i < list.length; i++) list[i].style.display = (!q || (list[i].getAttribute('data-s') || '').indexOf(q) !== -1) ? 'flex' : 'none';
+}
 function _bprdReset_(){
   try { localStorage.removeItem(_BPRD_KEY_); } catch(e){}
-  var el = document.getElementById('bprd-cfg'); if (el) el.innerHTML = _srState.bprdOpen ? _bprdPanelHtml_(_srState.dataB) : '';
-  _bprdRefresh_();
+  _srState.bprdListQ = '';
+  _bprdRefreshPanel_(); _bprdRefresh_();
 }
 // ═══ BPRD-CFG END ═══
 
