@@ -4381,6 +4381,22 @@ function searchOrderCode_(q) {
   }
   try {
     var all = readAllOrders_();
+    // 2026-10-23: TIM THEO "MA BO DEM" (cot U DT TONG, vd 1011T09/2026) — Duyen bao ma co tren Base ma search CRM khong ra.
+    // NGUYEN NHAN GOC: ham nay chi do cot ID (cot T) va ghi chu don Pos; ma bo dem nam o cot U (NGOAI vung A:T cua readAllOrders_)
+    // nen khong bao gio duoc so khop. Doc 1 cot U (_dtBoDemCol_, nho 5s) roi khop theo rowIndex voi don vua doc.
+    var bd = _dtBoDemCol_();
+    if (bd) {
+      var byRow = {};
+      for (var b = 0; b < all.length; b++) byRow[all[b].rowIndex] = all[b];
+      for (var bi = 0; bi < bd.length && out.length < 30; bi++) {
+        var bc = String(bd[bi] || '');
+        if (!bc || bc.toLowerCase().indexOf(q) === -1) continue;
+        var od = byRow[bi + 2];
+        if (!od) continue;   // dong khong co SDT/ID (dong rong) -> bo qua
+        push({ src: 'Mã bộ đếm (Base)', code: bc, phone: od.phone || '', date: od.orderDate || od.date || '',
+               product: String(od.product || '').slice(0, 80), revenue: od.revenue || 0, note: '' });
+      }
+    }
     for (var i = 0; i < all.length && out.length < 30; i++) {
       var id = String(all[i].id || '');
       if (id && id.toLowerCase().indexOf(q) !== -1) {

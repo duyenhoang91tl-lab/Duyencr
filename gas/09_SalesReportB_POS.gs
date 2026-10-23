@@ -187,7 +187,7 @@ function _resolveGhepDon_(codes, idx, usedBaseRows) {
     if (bYmd && (!baseYmd || bYmd < baseYmd)) baseYmd = bYmd;
     if (br.creator && !seenCreator[_normTxt_(br.creator)]) { seenCreator[_normTxt_(br.creator)] = true; creators.push(br.creator); }
     var rv = Number(br.giaTriDon) || 0;
-    var sales = String(br.saleBan || '').split(',').map(function(x) { return x.trim(); }).filter(Boolean);
+    var sales = String(br.saleBan || '').split(',').map(function(x) { return x.trim(); }).filter(function(x) { return x && !_isNumericTag_(x); }); // loai token toan so (STT, so thu tu Pancake) — khong phai ten sale
     if (!sales.length) sales = ['(chưa gán sale)'];
     total += rv;
     sales.forEach(function(sn) {
