@@ -2744,7 +2744,7 @@
       return;
     }
     box.innerHTML = note(d.text || '') +
-      '<div class="zai-price-ai-foot">Giá lấy từ bảng giá DANH_MUC' + (d.provider ? ' · AI: ' + escHtml(d.provider) : '') + (d.aiError ? ' · ⚠ AI đang lỗi nên hiện danh sách giá gốc' : '') + ' </div>';
+      '<div class="zai-price-ai-foot">Giá lấy từ bảng giá DANH_MUC' + (d.provider ? ' · AI: ' + escHtml(d.provider) : '') + (d.aiError ? ' · ⚠ Lỗi API — hiện danh sách giá gốc' : '') + ' </div>';
     const cp = document.createElement('button'); cp.type = 'button'; cp.className = 'zai-price-ai-chip'; cp.textContent = '📋 Copy';
     cp.addEventListener('click', () => {
       try { navigator.clipboard.writeText(d.text || '').then(() => { cp.textContent = '✓ Đã copy'; }).catch(() => { cp.textContent = 'Không copy được'; }); } catch (e) { cp.textContent = 'Không copy được'; }
