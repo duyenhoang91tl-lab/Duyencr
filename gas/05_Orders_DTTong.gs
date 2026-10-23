@@ -957,8 +957,11 @@ function saleMatchCandidates_(p) {
   return { ok: true, names: names, tags: tags, errors: errors };
 }
 
+// Token CHI GOM CHU SO (vd "8", "10", "2.5") la TAG/so thu tu cua Pancake, KHONG phai ten sale. SUA 2026-10-23 (Duyen thay bang Bao cao tinh don thuan co 2 "sale" ten 8 va 10
+// duoc chia doanh so): NGUYEN NHAN GOC = quy tac nhan token "khong khoang trang + co chu so" (de bat ten dang nhap kieu ninhnga99) vo tinh nhan ca "8"/"10" vi chung cung co chu so.
+function _isNumericTag_(tok) { return /^[\d\s.,]+$/.test(String(tok == null ? '' : tok)); }
 function _donSaleNamesFromThe_(theStr) {
-  var tokens = splitMulti_(theStr, ',');
+  var tokens = splitMulti_(theStr, ',').filter(function(t) { return !_isNumericTag_(t); });
   if (!tokens.length) return [];
   var known = _pancakeKnownSaleNameSet_();
   // SUA 2026-10-05 (loi lech doanh thu Pos vs ke toan, vd ninhnga99 906.411.333 vs 816.953.667): TRUOC DAY chi giu token

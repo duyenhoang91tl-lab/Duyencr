@@ -128,3 +128,9 @@ Công thức (Duyên chốt): **Tỷ lệ chốt = số đơn Base do Sale TẠO
 - Lỗi (Duyên báo: lọc 16 Sale nhưng bảng vẫn có `menbui2002`, `phongketoan`): bộ lọc Sale chọn **đơn** có ÍT NHẤT 1 sale trong danh sách, rồi các bảng Theo Sale/Theo Team cộng dồn **mọi sale có trên đơn** → người đồng bán (kế toán…) lọt vào. Sửa ở Báo cáo A, B (POS), C và Đơn thất bại bằng hàm chung `_saleWantedFn_` (so khớp tên + tên khác của cùng người): khi có lọc Sale, vòng cộng bỏ qua người ngoài bộ lọc.
 - KHÔNG đổi: tiền vẫn chia đều theo TỔNG số sale trên đơn (phần của từng người giữ nguyên); các thẻ KPI tổng (tổng đơn/tổng tiền) vẫn là tổng các đơn khớp bộ lọc — nên tổng của bảng có thể nhỏ hơn thẻ KPI khi đơn có người đồng bán ngoài bộ lọc.
 - Test: `node tools/test-sale-filter-cosellers.js` (A và C chạy hàm thật, có đối chứng âm tính trên mã cũ; B và Đơn thất bại kiểm tra tĩnh).
+
+## Báo cáo B › "Báo cáo sản phẩm": top N bán chạy + ẩn cột Mã + 👁 cài đặt (2026-10-23, Duyên yêu cầu)
+- Trước đây bảng in HẾT sản phẩm. Nay mặc định chỉ **top 10 bán chạy nhất**, **ẨN cột Mã sản phẩm**; nút **👁 Cài đặt hiển thị** (cạnh Bảng/Tròn/Cột) mở panel: Hiện top N · Chọn sản phẩm cụ thể (tick) · Hiện tất cả · bật cột Mã · ↺ Mặc định.
+- **Ô tìm kiếm tên/mã LUÔN tìm trên TẤT CẢ sản phẩm** (không bị top N / danh sách đã chọn chặn), kể cả khi cột Mã đang ẩn.
+- Code: khối `BPRD-CFG BEGIN/END` trên `_srRenderB` (js/11-fn-srload.js), hàm tiền tố `_bprd*`; container `#bprd-cfg` (panel) và `#bprd-body` (bảng/biểu đồ, vẽ lại riêng khi gõ). Lưu trình duyệt: localStorage `ome_bprd_cfg` = `{mode:'top'|'pick'|'all', n, pick:[mã SP], showCode}` — KHÔNG đồng bộ giữa máy.
+- Chỉ đổi hiển thị ở client: `d.products` từ GAS (đã sắp giảm dần) và nút xuất Excel (js/13) vẫn là TẤT CẢ sản phẩm. Không đổi GAS. Test: `node tools/test-bprd-cfg.js` (52 ca).

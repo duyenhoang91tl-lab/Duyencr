@@ -76,4 +76,13 @@ const base = R('css/01-base.css');
 ok(/--font:'Be Vietnam Pro',system-ui/.test(base) && /body\{font-family:var\(--font\)/.test(base), 'body dung var(--font) = Be Vietnam Pro, co font he thong du phong');
 ok(/button,input,select,textarea,optgroup\{font-family:inherit/.test(base), 'o nhap/nut ke thua font (mac dinh trinh duyet dung font he thong rieng)');
 ok(!/body\{font-family:-apple-system/.test(base), 'khong con font he thong cu o body');
+// 6) (2026-10-23) chữ phụ KHÔNG được chìm: --muted/--hint đạt >= 4.5:1 trên nền tối + xanh đậm của ui-pro; ô tìm nhanh #qs-input có nền tối khi chữ sáng
+{
+  const dk = R('css/10-dark.css'); const v = n => (dk.match(new RegExp('--' + n + ':(#[0-9a-fA-F]{6})')) || [])[1];
+  const bgs = [v('surface'), v('bg'), v('surface2'), '#0f1a12', '#12301f'];
+  ok(bgs.every(Boolean), 'doc duoc cac mau nen toi tu css/10-dark.css');
+  for (const n of ['muted', 'hint']) ok(v(n) && bgs.every(b => contrast(v(n), b) >= 4.5), '--' + n + ' (' + v(n) + ') phai >= 4.5:1 tren moi nen toi (chu phu khong duoc chim)');
+  ok(/html\[data-theme="dark"\] #qs-input\s*\{[^}]*background:var\(--surface2\)!important/.test(dk), 'o tim nhanh #qs-input co nen toi (khong con chu sang tren nen trang)');
+  ok(/html\[data-theme="dark"\] input::placeholder[^}]*color:var\(--muted\)/.test(dk), 'placeholder o che do toi dung --muted (doc duoc)');
+}
 console.log('ALL DARK THEME TESTS PASSED');
