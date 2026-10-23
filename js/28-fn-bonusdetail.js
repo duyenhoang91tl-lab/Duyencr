@@ -146,7 +146,7 @@ function _bdRenderBody_(d){
     x.info.lines.forEach(function(l){
       stt++;
       var isV = l.cls === 'vong', isC = l.cls === 'charm';
-      html += '<tr><td>'+stt+'</td><td>'+esc(x.sale)+'</td><td>'+esc(x.date)+'</td><td>'+esc(c)+'</td>'+
+      html += '<tr><td>'+stt+'</td><td>'+esc(x.sale)+'</td><td>'+esc(x.date)+'</td><td>'+_bdCodeCellHtml_(c)+'</td>'+
         '<td title="'+esc(l.name)+'">'+esc(l.code)+(l.name ? '<div style="font-size:10.5px;color:var(--muted);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(l.name)+'</div>' : '')+(l.auto ? ' <i style="color:#9a3412;font-size:10.5px">(tự đoán: '+esc(_BD_CLS_LABEL[l.cls])+')</i>' : '')+'</td>'+
         '<td style="text-align:right">'+fmt(l.qty)+'</td><td style="text-align:right">'+(l.rev !== null ? _srMoney(l.rev) : '')+'</td>'+
         '<td>'+_bdSelectHtml_(c, l.code, l)+'</td>'+
@@ -187,7 +187,7 @@ function _bdOrderModalHtml_(x){
     return '<div style="padding:4px 0;border-top:1px dashed var(--border)"><b>'+esc(l.code || '')+'</b>'+(l.name ? ' — '+esc(l.name) : '')+' · SL '+fmt(l.qty)+(l.rev != null ? ' · '+_srMoney(l.rev) : '')+' · <span style="color:var(--muted)">'+esc(_BD_CLS_LABEL[l.cls] || '')+'</span></div>';
   }).join('');
   return '<div style="font-size:13px;line-height:1.5">'+
-    row('Mã bộ đếm', '<b>'+esc(info.counter)+'</b>')+
+    row('Mã bộ đếm', '<b>'+esc(info.counter)+'</b> <button class="btn sm" title="Copy mã" data-counter="'+esc(info.counter)+'" onclick="_bdCopyCode(this.dataset.counter)">📋 Copy</button>')+
     row('Ngày lên đơn (Base)', esc(x.date || ''))+
     row('Ngày tạo đơn Pos', esc(o.ngayTaoDon || ''))+
     row('Khách hàng', esc(o.khachHang || '')+(phone ? ' · '+esc(phone) : ''))+
@@ -199,7 +199,38 @@ function _bdOrderModalHtml_(x){
     row('Ghi chú đơn', esc(o.ghiChu || ''))+
     (info.reasons && info.reasons.length ? row('Cần kiểm tra', '<span style="color:#9a3412">⚠ '+esc(info.reasons.join(' / '))+'</span>') : '')+
     '</div>'+
-    (phone && typeof openDp === 'function' ? '<div style="margin-top:12px"><button class="btn sm" data-phone="'+esc(phone)+'" onclick="_bdCloseOrder();openDp(this.dataset.phone)">👤 Mở hồ sơ khách</button></div>' : '');
+    (phone && typeof openDp === 'function' ? '<div style="margin-top:12px"><button class="btn sm" data-phone="'+esc(phone)+'" onclick="_bdCloseOrder();_bdOpenCustomer_(this.dataset.phone)">👤 Mở hồ sơ khách</button></div>' : '');
+}
+// 2026-10-23 (Duyên yêu cầu): mã bộ đếm trong bảng bấm được — bấm mã = mở chi tiết đơn (kèm nút "Mở hồ sơ khách"), nút 📋 = copy mã.
+function _bdCodeCellHtml_(c){
+  return '<span style="color:var(--green);cursor:pointer;text-decoration:underline dotted" title="Bấm xem chi tiết đơn" data-counter="'+esc(c)+'" onclick="_bdOpenOrder(this.dataset.counter)">'+esc(c)+'</span>'+
+    ' <button class="btn sm" style="padding:0 5px;line-height:1.4" title="Copy mã" data-counter="'+esc(c)+'" onclick="event.stopPropagation();_bdCopyCode(this.dataset.counter)">📋</button>';
+}
+function _bdCopyFallback_(t, done){
+  var ta = document.createElement('textarea'); ta.value = t; ta.style.cssText = 'position:fixed;opacity:0;left:-999px';
+  document.body.appendChild(ta); ta.select();
+  var okc = false; try { okc = document.execCommand('copy'); } catch(e){}
+  ta.remove();
+  if (okc) done(); else toast('Không copy tự động được — mã đơn: ' + t);
+}
+function _bdCopyCode(code){
+  var t = String(code == null ? '' : code); if (!t) return;
+  var done = function(){ toast('📋 Đã copy mã ' + t); };
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(t).then(done, function(){ _bdCopyFallback_(t, done); }); return; }
+  } catch(e){}
+  _bdCopyFallback_(t, done);
+}
+// Mở hồ sơ khách từ popup đơn: khách ngoài phạm vi (chưa có trong danh sách đang tải) thì nạp riêng khách đó (js/29 _pullSearchCustomer_) rồi mới mở; tài khoản test không nạp ngoài danh sách.
+async function _bdOpenCustomer_(phone){
+  var ph = (typeof normPhone === 'function' ? normPhone(phone) : '') || String(phone || '').replace(/\D/g, '');
+  if (!ph || typeof customerMap === 'undefined' || typeof openDp !== 'function') return;
+  if (!customerMap[ph]) {
+    if (document.body.classList.contains('demo-mode')) { toast('Tài khoản test chỉ xem được khách có sẵn trong danh sách'); return; }
+    ph = (typeof _pullSearchCustomer_ === 'function') ? await _pullSearchCustomer_(ph) : null;
+    if (!ph) return;
+  }
+  try { openDp(ph); } catch(e){}
 }
 function _bdOpenOrder(counter){
   var x = _bdFindOrder_(counter);
