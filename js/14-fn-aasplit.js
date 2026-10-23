@@ -906,7 +906,8 @@ function _rptModeBuildBar_(current){
   bar.innerHTML = '<select id="rpt-mode-sel" onchange="_rptModeGo_(this.value)" title="Chọn báo cáo">'
     + opts.map(function(id){ return '<option value="'+id+'"'+(id===current?' selected':'')+'>'+_RPT_MODE_LABELS[id]+'</option>'; }).join('')
     + '</select>'
-    + '<button class="btn sm" onclick="_rptModeBack_()" title="Hiện lại đầy đủ menu, bộ lọc">← Về màn hình chính</button>';
+    + '<button class="btn sm" onclick="_rptModeBack_()" title="Hiện lại đầy đủ menu, bộ lọc">← Về màn hình chính</button>'
+    + '<input id="rpt-qs-input" type="search" placeholder="🔍 Tra khách: tên, SĐT, mã đơn… (Enter mở hồ sơ bên phải)" autocomplete="off">';   // 2026-10-23: logic ở js/29 (_qs*)
 }
 function _rptModeGo_(id){
   var el = document.getElementById('v9tab-' + id);
