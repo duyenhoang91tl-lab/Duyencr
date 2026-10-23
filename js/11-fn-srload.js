@@ -126,11 +126,11 @@ function _srSubSelectHtml_(){
   var admin = _srIsAdmin();   // danh sách + tên + bật/tắt theo Cấu hình (_srItems_ ở js/06); admin vẫn thấy báo cáo đang ẩn
   var items = _srItems_().filter(function(it){ return admin || !it[2]; }).map(function(it){ return [it[0], it[1] + (it[2] ? ' (đang ẩn)' : '')]; });
   if (_srIsAdmin()) items.push(['J','📤 Nhập dữ liệu Base/Pos']);
-  var cur = _srState.sub === 'K' ? 'G' : _srState.sub;
+  var cur = _srCurCode_();
   return '<select onchange="_srSetSub(this.value)" title="Chọn báo cáo" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-weight:600;font-size:13px;max-width:100%">' +
     items.map(function(it){ return '<option value="' + it[0] + '"' + (it[0] === cur ? ' selected' : '') + '>' + it[1] + '</option>'; }).join('') + '</select>';
 }
-function _srSetSub(sub){ _srState.sub = sub; _srLoad(); }
+function _srSetSub(sub){ _srApplySub_(sub); _srLoad(); }
 function _srSetField(key, val){ _srState[key] = val; }
 // Bo loc nhanh khoang ngay dung chung cho A/D/E cua Bao cao doanh so — quickKey la ten field
 // luu lua chon dropdown ('dateQuick'/'dDateQuick'/'eDateQuick'), fromKey/toKey la 2 field ngay
@@ -610,6 +610,8 @@ function renderSalesReportTab(){
     body = '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>';
   } else if (_srState.sub === 'A'){
     body = _srRenderA(_srState.dataA);
+  } else if (_srState.bView === 'pure') {
+    body = _srRenderPure_(_srState.dataB);   // Báo cáo N — Tính đơn thuần (cùng dữ liệu + bộ lọc với B)
   } else {
     body = _srRenderB(_srState.dataB);
   }
@@ -1273,7 +1275,6 @@ function _srRenderB(d){
   }
   html += _srBaseCheckPanelHtml_(d);   // Báo cáo check ngược Base (đơn Pos ghép đơn gốc Base) + nút xuất Excel cho kế toán
   html += _srPosMonthPanelHtml_();
-  html += _srPurePanelHtml_(d);   // CUỐI CÙNG: báo cáo tính đơn thuần theo Thẻ + nút xuất Excel đối chiếu Base / chia quầy
   return html;
 }
 
@@ -1335,6 +1336,11 @@ function _srPureOrders_(d){
   var keep = {}; _srKeepSelectedSales_(_srPureCalc_(all, 'pure').rows, sel).forEach(function(r){ keep[r.name] = 1; });
   return all.filter(function(o){ return _srOrderShares_(o, 'pure').some(function(x){ return keep[x.name]; }); });
 }
+// Báo cáo N — Tính đơn thuần: đứng riêng (trước đây là mục cuối của Báo cáo B). Lọc/ngày/sale dùng thanh lọc của B phía trên.
+function _srRenderPure_(d){
+  if (!d || !d.orders) return _srNoDataHtml_();
+  return _srPurePanelHtml_(d);
+}
 function _srPurePanelHtml_(d){
   if (!d || !d.orders) return '';
   var orders = _srPureOrders_(d);
@@ -1343,7 +1349,7 @@ function _srPurePanelHtml_(d){
   var adj = { base: 0, acct: 0, quay: 0, any: 0 };
   orders.forEach(function(o){ var t = _srAdjTypes_(o); if (!t.length) return; adj.any++; if (o.dieuChinh === 'base') adj.base++; if (o.dieuChinh === 'acct') adj.acct++; if (o.saleRatio && Number(o.saleRatio) !== 1) adj.quay++; });
   var tOrd = rows.reduce(function(s, r){ return s + r.orders; }, 0), tGt = rows.reduce(function(s, r){ return s + r.giaTri; }, 0), tCod = rows.reduce(function(s, r){ return s + r.cod; }, 0);
-  var h = '<div class="dash-section-title" style="margin-top:26px">🧮 Báo cáo tính đơn thuần <span style="font-weight:400;color:var(--muted);font-size:11px">(chỉ theo cột "Thẻ" + giá Pos gốc — CHƯA ghép Base, CHƯA chia file kế toán, CHƯA chia quầy 30/70)</span></div>';
+  var h = '<div class="dash-section-title" style="margin-top:4px">🧮 Báo cáo tính đơn thuần <span style="font-weight:400;color:var(--muted);font-size:11px">(chỉ theo cột "Thẻ" + giá Pos gốc — CHƯA ghép Base, CHƯA chia file kế toán, CHƯA chia quầy 30/70)</span></div>';
   h += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Trong kỳ có <b>' + fmt(adj.any) + '</b> đơn đã bị điều chỉnh ở bảng chính: ghép Base <b>' + fmt(adj.base) + '</b> · file kế toán <b>' + fmt(adj.acct) + '</b> · quầy 30/70 <b>' + fmt(adj.quay) + '</b>. ' +
        'Bấm nút để tải Excel đối chiếu từng đơn (thuần ↔ sau điều chỉnh) + danh sách cần kiểm tra tay. ' +
        '<button class="btn sm" onclick="_srPureExport_()">📥 Xuất Excel đối chiếu Base / quầy</button></div>';

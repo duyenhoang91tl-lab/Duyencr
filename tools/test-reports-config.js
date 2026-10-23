@@ -12,19 +12,19 @@ const ctx = { loadLS: () => null, saveLS() {}, gsUrl: '', fetch: async () => ({}
 vm.createContext(ctx); vm.runInContext(j06.slice(a, b) + '\n' + j37.slice(c1, c2), ctx);
 const run = e => vm.runInContext(e, ctx);
 const names = () => run('_srItems_().map(function(i){return i[0]+(i[2]?"!":"")}).join(",")');
-ok(names() === 'A,B,C,D,E,F,G,H,I,L,M', 'mac dinh: bat het (A-I, L, M)');
+ok(names() === 'A,B,C,D,E,F,G,H,I,L,M,N', 'mac dinh: bat het (A-I, L, M, N)');
 ok(run('_srEnsureSubAllowed_()') === false, 'mac dinh: khong ep chuyen bao cao');
 ok(run('_rcApply_({ A: { enabled: false }, E: { label: "  Hoa hồng   NV " } })') === true, 'co thay doi');
-ok(names() === 'A!,B,C,D,E,F,G,H,I,L,M' && run('_srItems_()[4][1]') === 'Hoa hồng NV', 'A bi an; E doi ten (gon khoang trang)');
+ok(names() === 'A!,B,C,D,E,F,G,H,I,L,M,N' && run('_srItems_()[4][1]') === 'Hoa hồng NV', 'A bi an; E doi ten (gon khoang trang)');
 ok(run('_srEnsureSubAllowed_()') === true && run('_srState.sub') === 'B', 'nguoi thuong dang o A (bi an) => chuyen sang bao cao bat dau tien (B)');
 run('_srState.sub = "K"'); ok(run('_srEnsureSubAllowed_()') === false, 'K (con cua G) khong bi anh huong');
 ctx._srIsAdmin = () => true; run('_srState.sub = "A"'); ok(run('_srEnsureSubAllowed_()') === false, 'admin khong bi ep chuyen');
 ctx._srIsAdmin = () => false;
 // tat het / du lieu hong => bat lai het
-run('_rcApply_({ A:{enabled:false},B:{enabled:false},C:{enabled:false},D:{enabled:false},E:{enabled:false},F:{enabled:false},G:{enabled:false},H:{enabled:false},I:{enabled:false},L:{enabled:false},M:{enabled:false} })');
-ok(names() === 'A,B,C,D,E,F,G,H,I,L,M', 'tat het => coi la hong, bat lai het');
-run('_rcApply_("rac")'); ok(names() === 'A,B,C,D,E,F,G,H,I,L,M', 'chuoi rac => mac dinh');
-run('_rcApply_({ ZZ: { enabled: false }, B: 5, C: { enabled: true, label: "" } })'); ok(names() === 'A,B,C,D,E,F,G,H,I,L,M' && run('JSON.stringify(REPORTS_CFG)') === '{}', 'ma la / sai kieu / dong mac dinh khong luu');
+run('_rcApply_({ A:{enabled:false},B:{enabled:false},C:{enabled:false},D:{enabled:false},E:{enabled:false},F:{enabled:false},G:{enabled:false},H:{enabled:false},I:{enabled:false},L:{enabled:false},M:{enabled:false},N:{enabled:false} })');
+ok(names() === 'A,B,C,D,E,F,G,H,I,L,M,N', 'tat het => coi la hong, bat lai het');
+run('_rcApply_("rac")'); ok(names() === 'A,B,C,D,E,F,G,H,I,L,M,N', 'chuoi rac => mac dinh');
+run('_rcApply_({ ZZ: { enabled: false }, B: 5, C: { enabled: true, label: "" } })'); ok(names() === 'A,B,C,D,E,F,G,H,I,L,M,N' && run('JSON.stringify(REPORTS_CFG)') === '{}', 'ma la / sai kieu / dong mac dinh khong luu');
 // UI
 run('_rcApply_({ D: { enabled: false, label: "Sale ngoài" } })');
 const h = run('_cfgRptHtml_()');
