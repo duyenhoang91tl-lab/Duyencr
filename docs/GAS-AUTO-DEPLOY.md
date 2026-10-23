@@ -32,7 +32,7 @@ Actions → Deploy GAS to Apps Script → Run workflow. Job xanh là xong; bư�
 ## Lưu ý quan trọng
 - **Dự án Apps Script sẽ bị thay toàn bộ** bằng 20 file `gas/*.gs` + `appsscript.json` lấy từ chính dự án (giữ nguyên cấu hình Web App). File cũ trong Editor (vd `Code.gs`, `gas_v13`) sẽ bị xoá để khỏi trùng hàm. Bản trước khi deploy được lưu ở Artifact `gas-backup-truoc-khi-deploy` (giữ 7 ngày) trong lần chạy đó.
 - Lần đầu chạy, `clasp` có thể xin quyền (scope) mới nếu manifest thay đổi — nếu job báo lỗi quyền thì mở Apps Script chạy tay 1 hàm bất kỳ để cấp quyền, rồi chạy lại.
-- Trigger hẹn giờ (`installAutoAssignTrigger_`, `chayCaiDatTrigger`) tạo trong Apps Script vẫn giữ nguyên, không bị xoá khi đẩy code.
+- Trigger hẹn giờ (`caiTriggerChiaTuDong`, `chayCaiDatTrigger` / `installAutoDedupTrigger`) tạo trong Apps Script vẫn giữ nguyên, không bị xoá khi đẩy code.
 - Hết hạn đăng nhập (hiếm, khi đổi mật khẩu Google/thu hồi quyền): làm lại Bước 2–3.
 - Chỉ sửa `gas_v13.js` (nguồn chính). `gas/*.gs` do `node tools/split-gas.js` sinh ra, CI cũng tự sinh lại.
 

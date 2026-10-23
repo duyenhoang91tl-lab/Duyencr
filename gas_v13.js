@@ -7872,7 +7872,9 @@ function _impPosCleanup_(sheetKey, sh, preferRows) {
   } catch (e) { try { Logger.log('_impPosCleanup_ loi: ' + e); } catch (e2) {} }
   return r;
 }
-// CHAY TAY (Apps Script Editor -> chon dedupePosNow_ -> Run) de don trung Pos CO SAN ngay, khong cho nhap file/trigger. Chay lai nhieu lan van an toan.
+// Don trung Pos CO SAN ngay, khong cho nhap file/trigger. Chay lai nhieu lan van an toan.
+// CHAY TAY: Apps Script Editor -> chon ham dedupePosNow (KHONG co dau _ cuoi) -> Run -> xem "Execution log". LUU Y: ham co dau _ o cuoi ten la ham RIENG TU cua Apps Script — bi AN khoi danh sach chon ham,
+// khong chon/Run duoc tu Editor; vi vay moi ham can chay tay phai co 1 ham cong khai KHONG co _ o cuoi goi no (xem tools/test-gas-run-entrypoints.js).
 function dedupePosNow_() {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(25000)) return 'Dang co thao tac khac ghi du lieu — doi vai giay roi chay lai.';
@@ -7881,6 +7883,7 @@ function dedupePosNow_() {
     return 'Da xoa ' + r.deleted + ' dong trung Pos, cap nhat ' + r.updatedCells + ' o (trang thai/ghi chu). Neu con du, chay lai (toi da ' + POS_DEDUP_MAX_DELETE + ' dong/lan).';
   } finally { lock.releaseLock(); }
 }
+function dedupePosNow() { Logger.log(dedupePosNow_()); }   // CHAY TAY tu Editor (ham cong khai — xem ghi chu o tren)
 // Ham duoc Google Sheets TU GOI khi spreadsheet DT_SS_ID (chua ca Base + Pos) co bat ky thay
 // doi nao (dan/nhap/xoa dong, sua 1 o...) — xem installAutoDedupTrigger_ o duoi de cai dat
 // trigger nay 1 LAN. Dung LockService de tranh 2 lan chay cung luc dam vao nhau khi co nhieu
@@ -7912,7 +7915,7 @@ function onChangeDedupTrigger_(e) {
     lock.releaseLock();
   }
 }
-// CHAY 1 LAN DUY NHAT tu Apps Script Editor (chon ham "installAutoDedupTrigger_" trong dropdown
+// CHAY 1 LAN DUY NHAT tu Apps Script Editor (chon ham "installAutoDedupTrigger" — KHONG co dau _ cuoi, hoac "chayCaiDatTrigger" — trong dropdown
 // -> bam Run, lan dau se hoi cap quyen thi Allow) de cai dat trigger "On change" cho spreadsheet
 // DT_SS_ID. Trigger nay la installable trigger, TON TAI DOC LAP voi cac lan deploy Web App ve
 // sau (khong bi mat khi dan de code moi + Deploy New version) — nen KHONG can chay lai ham nay
@@ -7927,6 +7930,14 @@ function installAutoDedupTrigger_() {
   ScriptApp.newTrigger('onChangeDedupTrigger_').forSpreadsheet(ss).onChange().create();
   return 'Da tao trigger "On change" cho spreadsheet DT_SS_ID (' + ss.getId() + ') thanh cong.';
 }
+function removeAutoDedupTrigger_() {
+  var n = 0;
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'onChangeDedupTrigger_') { ScriptApp.deleteTrigger(t); n++; } });
+  return 'Da go ' + n + ' trigger "On change" don trung.';
+}
+// Ham CONG KHAI (khong co _ cuoi) de chay tay tu Editor — ket qua ghi vao Execution log.
+function installAutoDedupTrigger() { Logger.log(installAutoDedupTrigger_()); }
+function removeAutoDedupTrigger() { Logger.log(removeAutoDedupTrigger_()); }
 
 // ═══ NHAP DU LIEU BASE/POS TU FILE EXPORT (thay copy tay vao Google Sheet) — them 2026-10-07 theo
 // yeu cau Duyen: "tạo 1 mục up data base pos lên CRM, nối tiếp vào 2 sheet [...] base là DT tổng
@@ -13630,7 +13641,7 @@ function exportDailyReportLogs_(from, to) {
 // cho Base + Pos (xem _autoDedupExactRowsInSheet_/onChangeDedupTrigger_ o tren). Khong can chay
 // lai moi lan Deploy sau — trigger installable ton tai doc lap voi cac lan deploy Web App.
 function chayCaiDatTrigger() {
-  installAutoDedupTrigger_();
+  Logger.log(installAutoDedupTrigger_());   // truoc day bo mat ket qua (return khong hien o Editor)
 }
 
 
@@ -13641,7 +13652,7 @@ function chayCaiDatTrigger() {
 //  _aaBuckets/_aaPlan PHAI GIONG HET ban trong index.html (khoi "CHIA DATA TU DONG (engine)") — sua 1 ben nho sua ben kia.
 //  Cau hinh: Settings 'autoAssignCfg' (UI luu). Trang thai chay: Settings 'autoAssignState' {lastRun,lastResult,by} CHI do
 //  nguoi chay (server/trinh duyet) ghi — tach rieng de UI luu cau hinh khong bao gio ghi de lastRun (tranh chia 2 lan/ngay).
-//  CACH CAI: Apps Script Editor -> chon ham installAutoAssignTrigger_ -> Run (1 lan, cap quyen). Go: removeAutoAssignTrigger_.
+//  CACH CAI: Apps Script Editor -> chon ham caiTriggerChiaTuDong (KHONG co dau _ cuoi) -> Run (1 lan, cap quyen). Go: goTriggerChiaTuDong. Kiem tra: kiemTraChiaTuDong. Chia THAT ngay: chayThuChiaTuDong.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 var AA_TZ = 'Asia/Ho_Chi_Minh';
 var _AA_SRC_KEYS = ['dt','don','cs','cskh'];
@@ -14037,7 +14048,7 @@ function caiTriggerChiaTuDong() {
   Logger.log(installAutoAssignTrigger_());
 }
 function chayThuChiaTuDong() {   // CHIA THẬT ngay, không phải chạy thử
-  Logger.log(JSON.stringify(autoAssignRun_(true)));
+  Logger.log(JSON.stringify(autoAssignRunNow_()));   // autoAssignRunNow_ = autoAssignRun_(true); gọi qua nó để hàm có lối vào công khai
 }
 function goTriggerChiaTuDong() {
   Logger.log(removeAutoAssignTrigger_());
