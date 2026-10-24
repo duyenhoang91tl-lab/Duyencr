@@ -186,13 +186,57 @@ function renderSalesReportTabM_(wrap, subTabs){
     +'<input type="date" value="'+splitEsc_(_srState.mDateTo)+'" onchange="_srState.mDateTo=this.value;_srState.mDateQuick=\'custom\'" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px">'
     +'<button type="button" class="btn sm primary" onclick="_srLoad()">Lọc</button>'
     +'<input type="text" value="'+splitEsc_(_srState.mSearch)+'" placeholder="🔍 Tìm tên sale…" oninput="_srState.mSearch=this.value;_srMRerender_()" style="padding:5px 9px;border:1px solid var(--border);border-radius:6px;min-width:160px">'
-    +'<button type="button" class="btn sm" onclick="_srMExportCsv_()">⬇ CSV</button></div>';
+    +'<button type="button" class="btn sm" onclick="_srMExportCsv_()">⬇ CSV</button>'
+    +'<button type="button" class="btn sm" onclick="_srMExportAllXlsx_()" title="Tải chi tiết từng sale có đơn chia rồi gộp 1 file Excel: Tổng hợp · Pos · Base (có cột Sale, đối chiếu Base, Sale phản hồi)">📥 Excel đối soát TẤT CẢ sale</button></div>';
   wrap.innerHTML = bar + '<div id="sr-m-body">' + (_srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải…</div>' : splitReportHtml_(_srState.dataM, _srState.mSearch, _srState.mSel&&_srState.mSel.sale)+splitDetailPanelHtml_(_srState.mSel)) + '</div>';
   var bd = document.getElementById('sr-m-body'); if (bd){ bd.onclick = _srMClick_; bd.onchange = _srMFbChange_; }
 }
 function _srMRerender_(){ var el = document.getElementById('sr-m-body'); if (el) el.innerHTML = splitReportHtml_(_srState.dataM, _srState.mSearch, _srState.mSel&&_srState.mSel.sale)+splitDetailPanelHtml_(_srState.mSel); }
 function splitDetailXlsxSheets_(det){   // [{name, rows:[[header],[...]]}] — sheet 1 = Base, sheet 2 = Pos
   return [{ name:'Base', rows:[SPLIT_DET_BASE_HEAD].concat(splitDetRows_(det,'base')) }, { name:'Pos', rows:[SPLIT_DET_POS_HEAD].concat(splitDetRows_(det,'pos')) }];
+}
+// ── Xuất Excel đối soát cho TẤT CẢ sale 1 lần (Duyên yêu cầu 2026-10-24) ──
+// list = [{sale, data}] (data = kết quả splitOrderDetail của từng sale), errors = [{sale, error}]. Sheet: Tổng hợp (mỗi sale 1 dòng) · Pos · Base (thêm cột "Sale" đầu bảng) · Lỗi (nếu có sale tải hỏng).
+var SPLIT_ALL_SUM_HEAD = ['Sale','Số đơn Pos chia','Phần chia (Pos)','Số dòng Base ghép','Phần chia (Base ghép)','LỆCH Base','Khớp Base','Không có Base','Gợi ý theo SĐT','Có Sale phản hồi'];
+function splitAllXlsxSheets_(list, errors){
+  var sum = [SPLIT_ALL_SUM_HEAD], pos = [['Sale'].concat(SPLIT_DET_POS_HEAD)], base = [['Sale'].concat(SPLIT_DET_BASE_HEAD)];
+  (list||[]).forEach(function(it){
+    var d = it.data || {}, sm = d.summary || {}, ck = sm.check || {}, fb = (d.pos||[]).filter(function(x){ return x.feedback; }).length;
+    sum.push([it.sale, sm.posOrders||0, sm.posShare||0, sm.baseOrders||0, sm.baseShare||0, ck.lech||0, ck.khop||0, ck.khongCoBase||0, ck.goiY||0, fb]);
+    splitDetRows_(d,'pos').forEach(function(r){ pos.push([it.sale].concat(r)); });
+    splitDetRows_(d,'base').forEach(function(r){ base.push([it.sale].concat(r)); });
+  });
+  var out = [{ name:'Tong hop', rows:sum }, { name:'Pos', rows:pos }, { name:'Base', rows:base }];
+  if (errors && errors.length) out.push({ name:'Loi', rows:[['Sale','Lỗi']].concat(errors.map(function(e){ return [e.sale, e.error]; })) });
+  return out;
+}
+var _srAllBusy = false;
+async function _srMExportAllXlsx_(){
+  var dm = _srState.dataM; if (!dm || !dm.bySale){ if (typeof toast==='function') toast('Chưa có dữ liệu — bấm "Lọc" trước.'); return; }
+  if (typeof XLSX==='undefined'){ if (typeof toast==='function') toast('Thư viện Excel chưa tải xong — đợi vài giây rồi bấm lại.'); return; }
+  if (_srAllBusy) return;
+  var sales = (dm.bySale||[]).filter(function(r){ return (Number(r.splitOrders)||0) > 0; }).map(function(r){ return r.name; });
+  if (!sales.length){ if (typeof toast==='function') toast('Không có sale nào có đơn chia trong kỳ này.'); return; }
+  _srAllBusy = true;
+  var list = [], errors = [], done = 0, next = 0, from = dm.from||_srState.mDateFrom, to = dm.to||_srState.mDateTo;
+  var say = function(){ if (typeof toast==='function') toast('Đang tải đối soát '+done+'/'+sales.length+' sale…'); };
+  async function worker(){
+    while (next < sales.length){
+      var sale = sales[next++];
+      try { var d = await _srFetch('splitOrderDetail', { dateFrom:from, dateTo:to, sale:sale });
+        if (!d || d.ok===false || d.error) errors.push({ sale:sale, error:(d && d.error) || _srState.lastFetchError || 'Không tải được' }); else list.push({ sale:sale, data:d });
+      } catch (e) { errors.push({ sale:sale, error:String(e && e.message || e) }); }
+      done++; if (done % 3 === 0 || done === sales.length) say();
+    }
+  }
+  try {
+    say(); await Promise.all([worker(), worker()]);
+    list.sort(function(a,b){ return sales.indexOf(a.sale) - sales.indexOf(b.sale); });
+    var wb = XLSX.utils.book_new(), widths = { 'Tong hop':[22,14,18,16,20,12,12,14,14,16], Pos:[20].concat([12,12,22,14,34,24,40,16,16,18,26,26,26,26,18,30]), Base:[20].concat([12,12,22,14,16,26,40,16,16,28]) };
+    splitAllXlsxSheets_(list, errors).forEach(function(sh){ var ws = XLSX.utils.aoa_to_sheet(sh.rows); ws['!cols'] = (widths[sh.name]||[24,60]).map(function(w){ return { wch:w }; }); XLSX.utils.book_append_sheet(wb, ws, sh.name); });
+    XLSX.writeFile(wb, 'DoiSoat_DonChia_TatCaSale_'+(from||'')+'_'+(to||'')+'.xlsx');
+    if (typeof toast==='function') toast('Đã xuất đối soát '+list.length+' sale'+(errors.length?(' — '+errors.length+' sale lỗi (xem sheet Loi)'):'')+'.');
+  } finally { _srAllBusy = false; }
 }
 function _srMExportXlsx_(){
   var m = _srState.mSel, d = m && m.data;
@@ -252,4 +296,4 @@ function _srMExportCsv_(){
   var d = _srState.dataM; if (!d || !d.bySale){ if (typeof toast==='function') toast('Chưa có dữ liệu — bấm "Lọc" trước.'); return; }
   if (typeof _srGDownloadCsv_==='function') _srGDownloadCsv_('Bao-cao-don-chia_'+(d.from||'')+'_'+(d.to||'')+'.csv', splitCsvRows_(d));
 }
-if (typeof module!=='undefined') module.exports = { _srMFbChange_, splitPhoneKey_, splitBannerHtml_, splitDetailHtml_, splitReportHtml_, splitCsvRows_, splitCustomerPass_, splitDetailPanelHtml_, splitDetailXlsxSheets_, _split };
+if (typeof module!=='undefined') module.exports = { splitAllXlsxSheets_, _srMExportAllXlsx_, _srMFbChange_, splitPhoneKey_, splitBannerHtml_, splitDetailHtml_, splitReportHtml_, splitCsvRows_, splitCustomerPass_, splitDetailPanelHtml_, splitDetailXlsxSheets_, _split };

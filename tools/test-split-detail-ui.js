@@ -66,6 +66,19 @@ const wrap = $('wrap'); w.renderSalesReportTabM_(wrap, '<span>tabs</span>');
   saved.length = 0; det.querySelector('[data-m-xlsx]').click(); ok(saved[0].wb.sheets[1].rows[1][15] === 'Đã xác nhận', 'Excel Pos cot Sale phan hoi = noi dung vua nhap');
   w.fetch = async () => ({ json: async () => ({ ok: false, error: 'Ban khong co quyen' }) }); toasts.length = 0; fbIn[0].value = 'x'; fbIn[0].dispatchEvent(new w.Event('change', { bubbles: true })); await sleep(20);
   ok(toasts.length === 1 && toasts[0].includes('Ban khong co quyen') && fbIn[0].value === 'x', 'loi luu -> bao loi, giu chu de thu lai');
+  // ---- XUAT EXCEL TAT CA SALE (2026-10-24) ----
+  const origSrFetch = w._srFetch; w.eval("window.__dm0 = _srState.dataM; window.__le0 = _srState.lastFetchError");
+  w.eval("_srState.dataM = { from:'2026-10-01', to:'2026-10-31', bySale:[{name:'An',splitOrders:2},{name:'Bình',splitOrders:1},{name:'Chi',splitOrders:0},{name:'Hỏng',splitOrders:3}] }");
+  const asked = []; w._srFetch = async (act, body) => { asked.push(body.sale); if (body.sale === 'Hỏng') { w.eval("_srState.lastFetchError='timeout'"); return null; } return Object.assign({}, DET, { sale: body.sale }); };
+  saved.length = 0; await w._srMExportAllXlsx_(); await sleep(20);
+  ok(asked.length === 3 && !asked.includes('Chi'), 'tat ca sale: chi tai sale co don chia (bo Chi 0 don) — 3 sale');
+  const ash = saved[0].wb.sheets; ok(saved[0].fn === 'DoiSoat_DonChia_TatCaSale_2026-10-01_2026-10-31.xlsx' && ash.map(x => x.name).join() === 'Tong hop,Pos,Base,Loi', 'file gop: Tong hop, Pos, Base, Loi (sale tai hong)');
+  ok(ash[0].rows[0][0] === 'Sale' && ash[0].rows.length === 3 && ash[0].rows[1][0] === 'An' && ash[0].rows[2][0] === 'Bình' && ash[0].rows[1][5] === 1, 'Tong hop: moi sale 1 dong, dem don LECH Base');
+  ok(ash[1].rows[0][0] === 'Sale' && ash[1].rows[0][11] === 'Đối chiếu Base' && ash[1].rows.length === 5 && ash[1].rows[1][0] === 'An' && ash[1].rows[3][0] === 'Bình', 'Pos: them cot Sale dau bang, du dong cua 2 sale (2 + 2)');
+  ok(ash[2].rows[0][0] === 'Sale' && ash[2].rows[1][0] === 'An', 'Base: them cot Sale dau bang');
+  ok(ash[3].rows[1][0] === 'Hỏng' && ash[3].rows[1][1] === 'timeout', 'sheet Loi ghi ro sale tai hong va ly do');
+  const asked2 = asked.length; await w._srMExportAllXlsx_(); await sleep(20); ok(asked.length === asked2 + 3 && saved.length === 2, 'bam lai chay lai binh thuong (khong ket co busy)');
+  w._srFetch = origSrFetch; w.eval("_srState.dataM = window.__dm0; _srState.lastFetchError = window.__le0"); saved.length = 0;
   // doi sale / dong / loc lai
   respFn = p => Object.assign({}, DET, { sale: p.sale, pos: [], base: [], summary: { posOrders: 0, posTotal: 0, posShare: 0, baseOrders: 0, baseTotal: 0, baseShare: 0, noBaseOrders: 0 } });
   wrap.querySelector('tr[data-m-sale^="Bình"] [data-m-view="base"]').click(); await sleep(30);
