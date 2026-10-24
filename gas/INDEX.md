@@ -45,7 +45,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 
 ## 09_SalesReportB_POS.gs
 - Hàm: `_posGhepMinCodes_`, `_normCounterCode_`, `_counterCodeNoYear_`, `_counterCodeHasYear_`, `_extractCounterCodes_`, `_detectBaseCounterCol_`, `_readBaseRowsByCounterCodes_`, `_pickBaseRowsForCode_`, `_splitBhCodes_`, `_resolveGhepDon_`, `_isOriginalCounterNote_`, `_tachDonParse_`, `_tachDonKey_`, `_mergeTachDon_`, `_quaySaleRatio_`, `_foldSaleKey_`, `_resolveBonusSale_`, `_acctCodeNoYear_`, `_loadAcctSplit_`, `_acctMatchCodes_`, `_acctSharesOf_`, `_saleCanonOrders_`, `buildSalesReportB_`
-- Hằng/biến: `POS_GHEP_BASE_ENABLED_`, `POS_GHEP_MIN_CODES_`, `COUNTER_CODE_INNER_`, `COUNTER_CODE_RE_SRC_`, `TACH_DON_RE_SRC_`, `QUAY_SALE_RATIO_`, `ACCT_SPLIT_SS_ID_`
+- Hằng/biến: `POS_GHEP_BASE_ENABLED_`, `POS_GHEP_MIN_CODES_`, `_posGhepMinMemo_`, `COUNTER_CODE_INNER_`, `COUNTER_CODE_RE_SRC_`, `TACH_DON_RE_SRC_`, `QUAY_SALE_RATIO_`, `ACCT_SPLIT_SS_ID_`
 
 ## 10_CSStats_KPI_ReportC.gs
 - Hàm: `_csJsonSetting_`, `_csYmdFromDmy_`, `_csDaysSinceStart_`, `_csBonusProductQty_`, `_csBonusApplies_`, `_csRequireProductOk_`, `_csMoney_`, `_csBonusSummary_`, `_bcFold_`, `_bcCounterOf_`, `_bcGuess_`, `_bcLineCls_`, `_bcOrderLines_`, `_bcOrderInfo_`, `_bcMinProducts_`, `_bcIsVongProgram_`, `_bcRequireKw_`, `buildCsStats_`, `ensureKPISheet_`, `readKPITargets_`, `getKPI_`, `_getMonday_`, `_isoWeekRange_`, `_isoWeekKey_`, `_monthRange_`, `_monthKey_`, `_quarterRange_`, `_yearRange_`, `_yearKey_`, `_quarterKey_`, `_ymdLocal_`, `_labelVN_`, `_resolvePeriods_`, `buildSalesReportC_`, `buildCareLeadReport_`

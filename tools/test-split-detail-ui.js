@@ -79,6 +79,20 @@ const wrap = $('wrap'); w.renderSalesReportTabM_(wrap, '<span>tabs</span>');
   ok(ash[3].rows[1][0] === 'Hỏng' && ash[3].rows[1][1] === 'timeout', 'sheet Loi ghi ro sale tai hong va ly do');
   const asked2 = asked.length; await w._srMExportAllXlsx_(); await sleep(20); ok(asked.length === asked2 + 3 && saved.length === 2, 'bam lai chay lai binh thuong (khong ket co busy)');
   w._srFetch = origSrFetch; w.eval("_srState.dataM = window.__dm0; _srState.lastFetchError = window.__le0"); saved.length = 0;
+  // ---- CONG TAC DON 1 MA CHIA THEO BASE (2026-10-24) ----
+  ok(w.splitGhepBtnHtml_(false, true) === '', 'khong phai Admin: KHONG hien nut cong tac');
+  ok(/TẮT/.test(w.splitGhepBtnHtml_(true, false)) && !/primary/.test(w.splitGhepBtnHtml_(true, false)) && /BẬT/.test(w.splitGhepBtnHtml_(true, true)) && /primary/.test(w.splitGhepBtnHtml_(true, true)), 'Admin: nut hien dung trang thai TAT/BAT');
+  const sets = []; let loads = 0, conf = true, confMsg = '';
+  w.confirm = m => { confMsg = m; return conf; }; w._srLoad = () => { loads++; };
+  w.fetch = async (u, o) => { sets.push(JSON.parse(o.body)); return { json: async () => ({ ok: true }) }; };
+  w.eval("_srState.ghepMin1 = false"); conf = false; await w._srMToggleGhep_(); ok(sets.length === 0 && loads === 0, 'huy hop xac nhan -> khong ghi gi');
+  conf = true; await w._srMToggleGhep_(); await sleep(5);
+  ok(sets.length === 1 && sets[0].action === 'setSetting' && sets[0].key === 'POS_GHEP_MIN_CODES' && sets[0].value === '1' && /18\.986\.000/.test(confMsg) && w.eval('_srState.ghepMin1') === true && loads === 1, 'BAT: canh bao 18.986.000d + ghi POS_GHEP_MIN_CODES=1 + tinh lai bao cao');
+  await w._srMToggleGhep_(); await sleep(5);
+  ok(sets[1].value === '2' && w.eval('_srState.ghepMin1') === false && loads === 2, 'TAT: ghi gia tri 2 (quy tac cu) + tinh lai bao cao');
+  w.fetch = async () => ({ json: async () => ({ error: 'Chi admin', code: 'FORBIDDEN' }) }); toasts.length = 0; await w._srMToggleGhep_(); await sleep(5);
+  ok(toasts.length === 1 && /Chi admin/.test(toasts[0]) && w.eval('_srState.ghepMin1') === false && loads === 2, 'server tu choi (khong phai admin) -> bao loi, giu nguyen trang thai, khong tinh lai');
+  w.eval("_srState.ghepMin1 = false");
   // doi sale / dong / loc lai
   respFn = p => Object.assign({}, DET, { sale: p.sale, pos: [], base: [], summary: { posOrders: 0, posTotal: 0, posShare: 0, baseOrders: 0, baseTotal: 0, baseShare: 0, noBaseOrders: 0 } });
   wrap.querySelector('tr[data-m-sale^="Bình"] [data-m-view="base"]').click(); await sleep(30);

@@ -174,10 +174,35 @@ function splitBannerSync_(srcValue){
 
 // ── Báo cáo M ──
 if (typeof _srState!=='undefined'){ _srState.mDateQuick = _srState.mDateQuick || 'thisMonth'; _srState.mDateFrom = _srState.mDateFrom || ''; _srState.mDateTo = _srState.mDateTo || ''; _srState.mSearch = _srState.mSearch || ''; if (_srState.dataM===undefined) _srState.dataM = null; if (_srState.mSel===undefined) _srState.mSel = null; }
+// Công tắc "Đơn Pos 1 mã chia theo Base" (Settings POS_GHEP_MIN_CODES, chỉ Admin bật/tắt; mặc định TẮT = chỉ đơn ≥2 mã ghép Base).
+function splitGhepBtnHtml_(isAdmin, on){
+  if (!isAdmin) return '';
+  return '<button type="button" class="btn sm'+(on?' primary':'')+'" onclick="_srMToggleGhep_()" title="BẬT: đơn Pos từ 1 mã bộ đếm cũng chia tiền theo sale + giá đơn gốc Base (tháng 9 từng làm lệch tổng so với file kế toán — bật xong phải đối chiếu lại). TẮT: chỉ đơn ≥2 mã ghép Base (quy tắc hiện hành)">⚙ Đơn 1 mã chia theo Base: '+(on?'BẬT':'TẮT')+'</button>';
+}
+function _srIsAdmin_(){ return typeof currentUser!=='undefined' && !!currentUser && currentUser.role==='admin'; }
+async function _srMToggleGhep_(){
+  var turnOn = !_srState.ghepMin1;
+  var msg = turnOn
+    ? 'BẬT: đơn Pos có từ 1 mã bộ đếm trở lên sẽ chia tiền theo sale và giá của đơn gốc Base.\n\nLưu ý: tháng 9 ghép cả đơn 1 mã từng làm tổng lệch 18.986.000đ so với file kế toán. Sau khi bật hãy đối chiếu lại tổng với file kế toán.\n\nBật?'
+    : 'TẮT: chỉ đơn Pos có từ 2 mã bộ đếm trở lên mới ghép Base (quy tắc chốt tháng 10), đơn 0–1 mã chia theo thẻ Pos.\n\nTắt?';
+  if (typeof confirm==='function' && !confirm(msg)) return;
+  try{
+    var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'setSetting', key:'POS_GHEP_MIN_CODES', value: turnOn ? '1' : '2' }) });
+    var j = await r.json();
+    if (!j || j.ok===false || j.error) throw new Error((j && j.error) || 'Không lưu được.');
+    _srState.ghepMin1 = turnOn;
+    if (typeof toast==='function') toast(turnOn ? '✅ Đã BẬT: đơn 1 mã chia theo Base — đang tính lại báo cáo…' : '✅ Đã TẮT: về quy tắc ≥2 mã — đang tính lại báo cáo…');
+    if (typeof _srLoad==='function') _srLoad(); else if (typeof renderSalesReportTabM_==='function') _srMRerender_();
+  }catch(err){
+    if (typeof toast==='function') toast('⚠ Chưa đổi được công tắc: '+(err && err.message || err));
+  }
+}
 async function splitReportLoad_(){
   if (_srState.mDateQuick && _srState.mDateQuick!=='custom' && typeof _pkQuickRange==='function'){ var r = _pkQuickRange(_srState.mDateQuick); if (r){ _srState.mDateFrom = r.from; _srState.mDateTo = r.to; } }
   _srState.mSel = null;   // đổi kỳ/lọc lại -> chi tiết cũ không còn đúng kỳ, đóng lại
+  var gp = _srIsAdmin_() ? _srFetch('getSetting', { key:'POS_GHEP_MIN_CODES' }).catch(function(){ return null; }) : Promise.resolve(null);
   _srState.dataM = await _srFetch('splitOrderReport', { dateFrom:_srState.mDateFrom, dateTo:_srState.mDateTo });
+  var g = await gp; if (_srIsAdmin_()) _srState.ghepMin1 = String((g && g.value) || '').trim()==='1';
 }
 function renderSalesReportTabM_(wrap, subTabs){
   var quick = (typeof _quickRangeSelectHtml==='function') ? _quickRangeSelectHtml(_srState.mDateQuick, "_srApplyQuickRange('mDateQuick','mDateFrom','mDateTo',this.value)") : '';
@@ -187,6 +212,7 @@ function renderSalesReportTabM_(wrap, subTabs){
     +'<button type="button" class="btn sm primary" onclick="_srLoad()">Lọc</button>'
     +'<input type="text" value="'+splitEsc_(_srState.mSearch)+'" placeholder="🔍 Tìm tên sale…" oninput="_srState.mSearch=this.value;_srMRerender_()" style="padding:5px 9px;border:1px solid var(--border);border-radius:6px;min-width:160px">'
     +'<button type="button" class="btn sm" onclick="_srMExportCsv_()">⬇ CSV</button>'
+    +splitGhepBtnHtml_(_srIsAdmin_(), !!_srState.ghepMin1)
     +'<button type="button" class="btn sm" onclick="_srMExportAllXlsx_()" title="Tải chi tiết từng sale có đơn chia rồi gộp 1 file Excel: Tổng hợp · Pos · Base (có cột Sale, đối chiếu Base, Sale phản hồi)">📥 Excel đối soát TẤT CẢ sale</button></div>';
   wrap.innerHTML = bar + '<div id="sr-m-body">' + (_srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải…</div>' : splitReportHtml_(_srState.dataM, _srState.mSearch, _srState.mSel&&_srState.mSel.sale)+splitDetailPanelHtml_(_srState.mSel)) + '</div>';
   var bd = document.getElementById('sr-m-body'); if (bd){ bd.onclick = _srMClick_; bd.onchange = _srMFbChange_; }
@@ -296,4 +322,4 @@ function _srMExportCsv_(){
   var d = _srState.dataM; if (!d || !d.bySale){ if (typeof toast==='function') toast('Chưa có dữ liệu — bấm "Lọc" trước.'); return; }
   if (typeof _srGDownloadCsv_==='function') _srGDownloadCsv_('Bao-cao-don-chia_'+(d.from||'')+'_'+(d.to||'')+'.csv', splitCsvRows_(d));
 }
-if (typeof module!=='undefined') module.exports = { splitAllXlsxSheets_, _srMExportAllXlsx_, _srMFbChange_, splitPhoneKey_, splitBannerHtml_, splitDetailHtml_, splitReportHtml_, splitCsvRows_, splitCustomerPass_, splitDetailPanelHtml_, splitDetailXlsxSheets_, _split };
+if (typeof module!=='undefined') module.exports = { splitGhepBtnHtml_, _srMToggleGhep_, splitAllXlsxSheets_, _srMExportAllXlsx_, _srMFbChange_, splitPhoneKey_, splitBannerHtml_, splitDetailHtml_, splitReportHtml_, splitCsvRows_, splitCustomerPass_, splitDetailPanelHtml_, splitDetailXlsxSheets_, _split };
