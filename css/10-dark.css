@@ -113,3 +113,11 @@ html.ui-pro[data-theme="dark"] .sc-conv.on { background:var(--blue-bg); }
 html.ui-pro[data-theme="dark"] .khd-log { background:var(--surface); }
 html.ui-pro[data-theme="dark"] .khd-b { background:var(--surface2); box-shadow:none; }
 html.ui-pro[data-theme="dark"] .khd-m.out .khd-b { background:#1a3020; }
+
+/* ── NGOẠI LỆ THỦ CÔNG (chế độ tối): phần tử gán style bằng JS `el.style.cssText='…'` — trình duyệt chuẩn hoá thành rgb(...) nên
+      tools/gen-dark-theme.js (khớp theo mã hex trong chuỗi style) không bắt được. Cần !important vì style gán thẳng lên phần tử.
+      Thêm chỗ mới kiểu `x.style.cssText='background:#...'` thì thêm id + quy tắc ở đây (tools/test-dark-theme.js kiểm các id này). ── */
+html[data-theme="dark"] #sync-err-banner,html[data-theme="dark"] #row-err-banner{background:#3a1b1b!important;border-bottom-color:#7f2d2d!important;color:#fca5a5!important;}
+html[data-theme="dark"] #sync-err-banner button,html[data-theme="dark"] #row-err-banner button{background:var(--surface2)!important;color:#fca5a5!important;border-color:#7f2d2d!important;}
+html[data-theme="dark"] #dp-refresh-hint{background:#3a3213!important;border-color:#6b5a1e!important;color:#fcd34d!important;}
+html[data-theme="dark"] #deploy-guide-banner{background:var(--surface)!important;border-color:#c2570c!important;box-shadow:0 6px 28px rgba(0,0,0,.55)!important;}

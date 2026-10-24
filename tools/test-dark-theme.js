@@ -42,7 +42,9 @@ const grad = g.darkDecls([['background', 'linear-gradient(180deg,#7fbf93 0%,#d3e
 ok(!/#7fbf93|#d3ecd9|#eef1f5/.test(grad) && (grad.match(/#[0-9a-f]{6}|var\(--[a-z0-9]+\)/g) || []).length === 3, 'gradient: doi CA diem trung binh (#7fbf93) khi co diem sang, khong con dau sang: ' + grad);
 // 6) bien mau tuy chinh theo ten + bien "muc" dung lam nen thuong hieu
 const vars = g.darkDecls([['--pro-line', '#e6e3ee'], ['--pro-soft', '#f5f3fa'], ['--pro-grey', '#c9c6d1'], ['--pro-ink', '#1b1740'], ['--accent', '#1d4ed8']]);
-const vm = Object.fromEntries(vars); ok(vm['--pro-line'] === 'var(--border-md)' && vm['--pro-soft'] === 'var(--surface2)' && vm['--pro-grey'] === 'var(--surface3)', 'bien --pro-line/soft/grey doi theo vai tro');
+const vm = Object.fromEntries(vars); ok(vm['--pro-line'] === 'var(--border-md)' && vm['--pro-grey'] === 'var(--surface3)', 'bien --pro-line/grey doi theo vai tro');
+// --pro-soft: da CHINH TAY trong css/10-dark.css (html.ui-pro[data-theme=dark] { --pro-soft:#0f1a12 }) -> bo sinh tu dong KHONG ghi de (HAND_VARS), tranh 2 nguon mau xung dot
+ok(vm['--pro-soft'] === undefined && /--pro-soft\s*:/.test(fs.readFileSync(path.join(__dirname, '..', 'css', '10-dark.css'), 'utf8')), 'bien --pro-soft da chinh tay o 10-dark.css -> khong sinh them');
 ok(!('--pro-ink' in vm) && !('--accent' in vm), '--pro-ink KHONG doi gia tri (dang lam nen thanh tab); bien khong ro vai tro khong dong vao');
 ok(g.darkDecls([['color', 'var(--pro-ink)']])[0][1] === 'var(--text)' && g.darkDecls([['color', 'var(--pro-blue)']])[0][1] === '#7eb0ff' && g.darkDecls([['fill', 'var(--pro-ink)']])[0][1] === 'var(--text)', 'DUNG bien muc lam mau chu -> mau chu sang');
 ok(g.darkDecls([['background', 'linear-gradient(90deg,var(--pro-ink),var(--pro-purple))']]).length === 0, 'DUNG bien muc lam NEN (gradient thanh tab) khong bi doi');
