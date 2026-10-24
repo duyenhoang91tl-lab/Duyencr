@@ -131,3 +131,6 @@ body.rs-open{overflow:hidden;}
 #qs-res .qs-i b{color:var(--green);}
 #qs-res .qs-s{color:var(--muted);font-size:11px;margin-top:1px;}
 
+/* 2026-10-23: SĐT / tên khách trong bảng đơn bấm được -> mở hồ sơ khách (js/29 _custLinkHtml_) */
+.cust-link{color:var(--green);cursor:pointer;text-decoration:underline dotted;}
+.cust-link:hover{text-decoration:underline;}

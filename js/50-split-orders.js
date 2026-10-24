@@ -89,7 +89,7 @@ function splitDetailPanelHtml_(m){
   if (!rows.length) h += '<div class="split-msg">'+(m.tab==='base' ? 'Không có đơn gốc Base nào trong kỳ này (đơn chia của sale này không ghép với đơn Base).' : 'Không có đơn chia nào trong kỳ này.')+'</div>';
   else {
     h += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr>'+head.map(function(t,i){ return '<th'+(i===7||i===8||i===9?' class="r"':'')+'>'+splitEsc_(t)+'</th>'; }).join('')+'</tr></thead><tbody>';
-    rows.forEach(function(r){ h += '<tr>'+r.map(function(c,i){ return (i===7||i===8||i===9) ? '<td class="r">'+(c===''||c==null?'':(i===8?'<b>'+splitMoney_(c)+'</b>':splitMoney_(c)))+'</td>' : '<td>'+splitEsc_(c)+'</td>'; }).join('')+'</tr>'; });
+    rows.forEach(function(r){ h += '<tr>'+r.map(function(c,i){ return (i===7||i===8||i===9) ? '<td class="r">'+(c===''||c==null?'':(i===8?'<b>'+splitMoney_(c)+'</b>':splitMoney_(c)))+'</td>' : '<td>'+((i===2||i===3) && typeof _custLinkHtml_==='function' ? _custLinkHtml_(r[3], splitEsc_(c)) : splitEsc_(c))+'</td>'; }).join('')+'</tr>'; });
     h += '<tr style="font-weight:700;background:var(--surface2)"><td colspan="7">Tổng ('+splitNum_(rows.length)+' dòng)</td><td class="r">'+splitMoney_(m.tab==='base'?sm.baseTotal:sm.posTotal)+'</td><td class="r">'+splitMoney_(m.tab==='base'?sm.baseShare:sm.posShare)+'</td>'+(m.tab==='base'?'':'<td></td>')+'</tr></tbody></table></div>';
   }
   h += '<div style="font-size:10.5px;color:var(--hint);margin-top:6px">'
@@ -138,6 +138,7 @@ function splitBannerEl_(create){
   if (!el && create){ var tb = document.querySelector('#tab-list .toolbar'); if (!tb) return null; el = document.createElement('div'); el.id = 'split-banner'; el.className = 'split-banner'; tb.parentNode.insertBefore(el, tb.nextSibling);
     el.onclick = function(e){ var tr = e.target.closest && e.target.closest('[data-split-phone]'); if (!tr) return; var ph = tr.getAttribute('data-split-phone'), k = splitPhoneKey_(ph);
       var c = (typeof allCustomers!=='undefined') ? allCustomers.find(function(x){ return x.phone===ph || splitPhoneKey_(x.phone)===k; }) : null;
+      if (typeof _openCustomerByPhone_==='function'){ _openCustomerByPhone_(c ? c.phone : ph); return; }   // 2026-10-23: nạp được cả khách ngoài danh sách
       if (c && typeof openDp==='function'){ var ov = document.getElementById('dp-overlay'); if (ov) ov.classList.add('open'); openDp(c.phone); } }; }
   return el;
 }
