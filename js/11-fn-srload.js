@@ -1770,7 +1770,10 @@ async function _impUpload(kind){
     // xoa de buoc tai lai tu server khi nguoi dung xem lai cac tab bao cao.
     _srState.dataA = _srState.dataB = _srState.dataC = _srState.dataE = _srState.dataF = _srState.dataG = _srState.dataH = null;
   } catch(e){
-    toast('❌ Nhập lỗi: ' + e.message);
+    // 2026-10-24: 'Failed to fetch' = may chu Apps Script khong tra loi kip (qua thoi gian) -> Google tra trang loi khong co CORS. Viec ghi CO THE da xong 1 phan.
+    var _m = String(e && e.message || e);
+    if (/failed to fetch|networkerror|load failed/i.test(_m)) _m = 'Máy chủ không trả lời kịp (file nhiều ngày có thể làm Apps Script quá thời gian). Dữ liệu có thể đã ghi MỘT PHẦN — bấm lưu lại ĐÚNG file này (an toàn: đơn đã có sẽ được bỏ qua, không ghi trùng).';
+    toast('❌ Nhập lỗi: ' + _m);
   } finally {
     _impState.uploading = false; _impRender_();
   }
