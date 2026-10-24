@@ -5,7 +5,7 @@ function getSalesReportOptions_() {
   var rows0 = readDTTong_();
   var saleSet = {}, kenhSet = {};
   for (var i0 = 0; i0 < rows0.length; i0++) {
-    var salesList0 = splitMulti_(rows0[i0].saleBan, ',');
+    var salesList0 = splitMulti_(rows0[i0].saleBan, ',').filter(function(x){ return !_isNumericTag_(x); }); // loai STT Pancake
     for (var j0 = 0; j0 < salesList0.length; j0++) saleSet[salesList0[j0]] = true;
     if (rows0[i0].kenhBan) kenhSet[rows0[i0].kenhBan] = true;
   }
@@ -74,7 +74,7 @@ function _srCloseRateSections_(normRows, filters) {
     var pAnchor = buildPancakeReport_(filters.dateFrom, filters.dateTo, 'equal');
     var anchorNames = pAnchor.byCS.filter(function(r) { return (r.tongTT || 0) > 0; }).map(function(r) { return r.name; });
     var orderNamesAll = [];
-    for (var oi0 = 0; oi0 < normRows.length; oi0++) splitMulti_(normRows[oi0].saleBanRaw, ',').forEach(function(n) { orderNamesAll.push(n); });
+    for (var oi0 = 0; oi0 < normRows.length; oi0++) splitMulti_(normRows[oi0].saleBanRaw, ',').filter(function(x){ return !_isNumericTag_(x); }).forEach(function(n) { orderNamesAll.push(n); }); // loai STT Pancake
     personKey = _salePersonKeyWithOrphanFold_(_salePersonKeyFn_(), anchorNames, orderNamesAll);
   }
   if (hasAnyPkData) {
@@ -86,7 +86,7 @@ function _srCloseRateSections_(normRows, filters) {
       var mcYmd = _vnYmd_(mcDt);
       if (!_srOrderCovered_(mc.kenhBan, mcYmd)) continue;
       if (!closeFrom || mcYmd < closeFrom) closeFrom = mcYmd;
-      var salesOnOrderC = splitMulti_(mc.saleBanRaw, ',');
+      var salesOnOrderC = splitMulti_(mc.saleBanRaw, ',').filter(function(x){ return !_isNumericTag_(x); }); // loai STT Pancake
       if (!salesOnOrderC.length) salesOnOrderC = [UNASSIGNED];
       salesOnOrderC.forEach(function(sn) {
         var pk = personKey(sn);
@@ -188,7 +188,7 @@ function _srCloseRateSections_(normRows, filters) {
       var mcpYmd = _vnYmd_(mcpDt);
       var kenhP = mcp.kenhBan || '(chưa có kênh)';
       if (!_srOrderCovered_(kenhP, mcpYmd)) continue;
-      var salesOnP = splitMulti_(mcp.saleBanRaw, ',');
+      var salesOnP = splitMulti_(mcp.saleBanRaw, ',').filter(function(x){ return !_isNumericTag_(x); }); // loai STT Pancake
       if (!salesOnP.length) salesOnP = [UNASSIGNED];
       salesOnP.forEach(function(spn2) {
         var pkS2 = personKeyP(spn2); if (!pgDisp[pkS2]) pgDisp[pkS2] = spn2;
@@ -286,7 +286,7 @@ function buildSalesReportA_(filters) {
     dg.notExcluded++;
     if (kenhFilterArr.length && kenhFilterArr.indexOf(row.kenhBan) === -1) continue;
     dg.afterKenh++;
-    var salesOnOrder = splitMulti_(row.saleBan, ',');
+    var salesOnOrder = splitMulti_(row.saleBan, ',').filter(function(x){ return !_isNumericTag_(x); }); // loai STT Pancake
     if (saleFilterFoldA.length && !salesOnOrder.some(function(s){ return saleFilterFoldA.indexOf(_normTxt_(s)) !== -1; })) {
       salesOnOrder.forEach(function(sn) { if (Object.keys(dg.miss).length < 300 || dg.miss[sn]) dg.miss[sn] = (dg.miss[sn] || 0) + 1; });
       continue;
@@ -318,7 +318,7 @@ function buildSalesReportA_(filters) {
     // duoc chon (don co 3 sale, chon 1 nguoi -> 1/3), khop bang Theo Sale / bieu do. So DON van dem nguyen don. Khong loc Sale (hoac tinh theo nguoi tao) -> selFrac = 1 nhu cu.
     var selFrac = 1;
     if (!byCreator && saleFilterFoldA.length) {
-      var sl0 = splitMulti_(m.saleBan, ',');
+      var sl0 = splitMulti_(m.saleBan, ',').filter(function(x){ return !_isNumericTag_(x); }); // loai STT Pancake
       selFrac = sl0.length ? sl0.filter(wantSaleA_).length / sl0.length : 0;
     }
     var revenueSel = revenue * selFrac, cocSel = m.giaTriCoc * selFrac;
@@ -350,7 +350,7 @@ function buildSalesReportA_(filters) {
       byTeamSale[creatorTeam].coc += m.giaTriCoc;
       byTeamSale[creatorTeam].giaTri += revenue;
     } else {
-      var salesList = splitMulti_(m.saleBan, ',');
+      var salesList = splitMulti_(m.saleBan, ',').filter(function(x){ return !_isNumericTag_(x); }); // loai STT Pancake
       if (salesList.length === 0) salesList = [UNASSIGNED];
       var n = salesList.length;
       // So don theo Team: dem 1 lan cho moi TEAM KHAC NHAU xuat hien tren don (tranh 1 don co

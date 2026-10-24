@@ -1039,7 +1039,7 @@ function _hiddenPageSaleSets_() {
 function _isDTRowHidden_(kenhBan, saleBan, sets) {
   if (sets.channels.length && kenhBan && sets.channels.indexOf(kenhBan) !== -1) return true;
   if (sets.sales.length && saleBan) {
-    var names = String(saleBan).split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+    var names = String(saleBan).split(',').map(function(s){ return s.trim(); }).filter(function(s){ return s && !_isNumericTag_(s); }); // loai token toan so (STT Pancake)
     if (names.length && names.every(function(n){ return sets.sales.indexOf(n) !== -1; })) return true;
   }
   return false;

@@ -276,7 +276,7 @@ function _mergeTachDon_(rows) {
     var best = null, bestT = null;
     parts.forEach(function(p) {
       total += Number(p.giaTriSauGiam) || 0; cod += Number(p.cod) || 0; vals.push(Number(p.giaTriSauGiam) || 0);
-      String(p.theSale || '').split(',').forEach(function(x) { x = x.trim(); var f = _normTxt_(x); if (x && !seenSale[f]) { seenSale[f] = true; sales.push(x); } });
+      String(p.theSale || '').split(',').forEach(function(x) { x = x.trim(); var f = _normTxt_(x); if (x && !_isNumericTag_(x) && !seenSale[f]) { seenSale[f] = true; sales.push(x); } }); // loai STT Pancake
       if (p.sanPham) sp.push(String(p.sanPham)); if (p.maSanPham) ma.push(String(p.maSanPham)); if (p.soLuong) sl.push(String(p.soLuong));
       var nt = String(p.ghiChu || '').trim(); if (nt && !seenNote[nt]) { seenNote[nt] = true; notes.push(nt); }
       if (!m.nguonDon && p.nguonDon) m.nguonDon = p.nguonDon;
