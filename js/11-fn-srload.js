@@ -60,7 +60,7 @@ async function _srLoad(){
       if (dAllE && dAllE.orders && dAllE.orders.length) {
         var cntE = {};
         dAllE.orders.forEach(function(o){
-          String(o.saleBanValid !== undefined ? o.saleBanValid : (o.theSale || '')).split(',').forEach(function(x){ x = x.trim(); if (x) cntE[x] = (cntE[x] || 0) + 1; });
+          String(o.saleBanValid !== undefined ? o.saleBanValid : (o.theSale || '')).split(',').forEach(function(x){ x = x.trim(); if (x && !isNumTagSale_(x)) cntE[x] = (cntE[x] || 0) + 1; });
         });
         _srState.eMismatch = {
           total: dAllE.orders.length, selected: _saleSelE.slice(),
@@ -1288,7 +1288,7 @@ function _srRenderB(d){
 // ═══════════════════════════════════════════════════════════════════════════
 var _SR_UNASSIGNED_ = '(chưa gán sale)';
 // Bỏ token chỉ gồm chữ số ("8", "10"): là tag/số thứ tự Pancake, KHÔNG phải tên sale (cùng quy tắc với _isNumericTag_ ở gas_v13.js — lọc cả ở client để đúng ngay khi GAS chưa deploy).
-function _srOrdNames_(csv){ return String(csv || '').split(',').map(function(x){ return x.trim(); }).filter(function(x){ return x && !/^[\d\s.,]+$/.test(x); }); }
+function _srOrdNames_(csv){ return String(csv || '').split(',').map(function(x){ return x.trim(); }).filter(function(x){ return x && !isNumTagSale_(x); }); }
 // Phần tiền của từng sale trên 1 đơn. mode 'pure' = theo cột Thẻ, giá Pos gốc, chia đều; mode 'adj' = như bảng chính (ghép Base/kế toán, quầy 30/70).
 function _srOrderShares_(o, mode){
   var out = [], i;

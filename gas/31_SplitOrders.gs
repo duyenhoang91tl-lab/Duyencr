@@ -292,7 +292,7 @@ function splitOrderDetail_(p, user) {
     // Don KHONG ghep Base (0-1 ma bo dem) nhung tim thay don Base de doi chieu: dua vao tab Base de THAM CHIEU (ref=true, share=0, KHONG cong vao tong phan chia).
     if (!gb.length && chkRows.length) chkRows.forEach(function (b) {
       var bd2 = _splitDmy_(b.ngay);
-      base.push({ date: bd2.dmy, month: bd2.month, ymd: bd2.ymd, name: String(o.khachHang || ''), phone: ph, code: b.ma, sales: b.saleBan, product: b.sanPham.substring(0, 300), total: _splitRound_(b.giaTri), share: 0, ref: true, nguon: chkSrc });
+      base.push({ date: bd2.dmy, month: bd2.month, ymd: bd2.ymd, name: String(o.khachHang || ''), phone: ph, code: b.ma, sales: _saleNamesClean_(b.saleBan).join(', '), product: b.sanPham.substring(0, 300), total: _splitRound_(b.giaTri), share: 0, ref: true, nguon: chkSrc });
       refCnt += 1;
     });
   });

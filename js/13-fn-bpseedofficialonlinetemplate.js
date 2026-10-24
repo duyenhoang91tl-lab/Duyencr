@@ -775,7 +775,7 @@ function _srRenderCTable(rows, entType, search, searchKey){
   html += '</tbody></table>';
   return html;
 }
-function splitSaleNames_(s){ return (s||'').split(',').map(function(x){return x.trim();}).filter(Boolean); }
+function splitSaleNames_(s){ return (s||'').split(',').map(function(x){return x.trim();}).filter(function(x){ return x && !isNumTagSale_(x); }); }
 function _srMiniOrderTable(orders){
   if (!orders.length) return '<div style="color:var(--muted);font-size:11px">Không có đơn</div>';
   var html = '<table class="dash-table" style="font-size:11px"><thead><tr><th>Ngày tạo</th><th>Kênh</th><th>Sale</th><th style="text-align:right">Giá trị</th></tr></thead><tbody>';

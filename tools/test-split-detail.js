@@ -3,7 +3,7 @@ const fs = require('fs'), vm = require('vm'); let bad = 0; const ok = (c, t) => 
 const src = fs.readFileSync(__dirname + '/../gas_v13.js', 'utf8');
 function fn(name) { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('thieu ' + name); let d = 0; for (let k = src.indexOf('{', i); k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}' && --d === 0) return src.slice(i, k + 1); } }
 const consts = src.slice(src.indexOf('var SPLIT_ORDER_MAX_ROWS_ ='), src.indexOf('// [{name, frac}] cac sale THAT'));
-const names = ['_posSaleFractions_', '_splitSales_', '_splitIdentityFor_', '_splitRowFinder_', '_splitScope_', '_splitCSV_', '_splitRange_', '_splitFilters_', '_splitRound_', '_splitDmy_', 'splitOrderDetail_', 'splitDoGet_', '_dateStrToVnYmd_', '_splitSaleSet_', '_splitCompareSales_', '_splitDayDiff_', '_splitPhoneCandidates_', '_isNumericTag_', '_splitFbKey_', '_splitFbRead_', '_splitAttachFeedback_'];
+const names = ['_posSaleFractions_', '_splitSales_', '_splitIdentityFor_', '_splitRowFinder_', '_splitScope_', '_splitCSV_', '_splitRange_', '_splitFilters_', '_splitRound_', '_splitDmy_', 'splitOrderDetail_', 'splitDoGet_', '_dateStrToVnYmd_', '_splitSaleSet_', '_splitCompareSales_', '_splitDayDiff_', '_splitPhoneCandidates_', '_isNumericTag_', '_saleNamesClean_', '_splitFbKey_', '_splitFbRead_', '_splitAttachFeedback_'];
 const code = "var SH_SPLIT_FB_='PhanHoiDonChia', SPLIT_FB_HEADERS_=['key','sale','text','by','at'];\n" + consts + names.map(fn).join('\n');
 // Don 1: ghep Base 2 don goc (An+Binh ban don goc 1; An ban don goc 2) ; Don 2: the chia deu An,Binh (khong co Base) ; Don 3: An+Chi 70/30 file ke toan ; Don 4: don Base thu 2 da Huy
 const O = [
