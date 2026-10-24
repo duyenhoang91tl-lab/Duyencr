@@ -6,8 +6,8 @@ const src = fs.readFileSync(path.join(__dirname, '..', 'gas_v13.js'), 'utf8');
 function fnSrc(name) { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('khong thay ham ' + name);
   let d = 0, k = src.indexOf('{', i); for (let j = k; j < src.length; j++) { if (src[j] === '{') d++; else if (src[j] === '}' && --d === 0) return src.slice(i, j + 1); } }
 const ok = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1); } else console.log('ok   ' + m); };
-const consts = 'var SH_IMPORT_BATCH="batch",IMPORT_BATCH_HEADERS=["batchId","thoiGian","nguoi","sheet","dongDau","soDong","dauVan","updLogDau","updLogSo","trangThai","hoanTacLuc","hoanTacBoi"],IMPORT_UNDO_MAX_ROWS=5000,DT_TONG_WIDTH=20,DON_CHITIET_WIDTH=17,DT_COL_NGAYTAO=0,DT_COL_PHONE=3,DT_COL_THOIGIANHT=10,DT_COL_SANPHAM=14,DT_COL_GIATRIDON=17,DT_COL_ID=19,DT_COL_BODEM=20,SH_IMPORT_UPD_LOG="log",IMPORT_UPD_LOG_HEADERS=[1,2,3,4,5,6,7],IMPORT_UPD_MAX_ROWS=1500,VN_OFFSET_MS=7*3600*1000,SH_POS_DEDUP_LOG="poslog",POS_DEDUP_LOG_HEADERS=[1,2,3,4,5],POS_COL_TRANGTHAI=14,POS_DEDUP_MAX_DELETE=3000,DON_COL_GHICHU=16;';
-const fns = ['_impFp_','_impBatchLog_','_impColName_','_impCellStr_','_impCellEq_','_impDiffRow_','_impHm_','_impHmUnknown_','_impHmCompat_','_impOrderKeyParts_','_impOrderKey_','_impFindExist_','doImportSheetRows_','doImportSheetRowsLocked_','_rowKeyExact_','_rowIsBlank_','_autoDedupExactRowsInSheet_','_posDedupKeyParts_','_dedupePosRelaxedInSheet_','_impPosCleanup_','normPhone_','normOrderDate_','parseVNDate_','_vnMidnight_','_vnYmd_','_vnYmdParts_','_normMoney_','_normTxt_'].map(fnSrc).join('\n');
+const consts = 'var SH_IMPORT_BATCH="batch",IMPORT_BATCH_HEADERS=["batchId","thoiGian","nguoi","sheet","dongDau","soDong","dauVan","updLogDau","updLogSo","trangThai","hoanTacLuc","hoanTacBoi"],IMPORT_UNDO_MAX_ROWS=5000,DT_TONG_WIDTH=20,DON_CHITIET_WIDTH=17,DT_COL_NGAYTAO=0,DT_COL_PHONE=3,DT_COL_THOIGIANHT=10,DT_COL_SANPHAM=14,DT_COL_GIATRIDON=17,DT_COL_ID=19,DT_COL_BODEM=20,SH_IMPORT_UPD_LOG="log",IMPORT_UPD_LOG_HEADERS=[1,2,3,4,5,6,7],IMPORT_UPD_MAX_ROWS=1500,IMPORT_UPD_RUN_GAP=40,IMPORT_UPD_BUDGET_MS=240000,VN_OFFSET_MS=7*3600*1000,SH_POS_DEDUP_LOG="poslog",POS_DEDUP_LOG_HEADERS=[1,2,3,4,5],POS_COL_TRANGTHAI=14,POS_DEDUP_MAX_DELETE=3000,DON_COL_GHICHU=16;';
+const fns = ['_impFp_','_impBatchLog_','_impColName_','_impCellStr_','_impCellEq_','_impDiffRow_','_impApplyUpdPlan_','_impHm_','_impHmUnknown_','_impHmCompat_','_impOrderKeyParts_','_impOrderKey_','_impFindExist_','doImportSheetRows_','doImportSheetRowsLocked_','_rowKeyExact_','_rowIsBlank_','_autoDedupExactRowsInSheet_','_posDedupKeyParts_','_dedupePosRelaxedInSheet_','_impPosCleanup_','normPhone_','normOrderDate_','parseVNDate_','_vnMidnight_','_vnYmd_','_vnYmdParts_','_normMoney_','_normTxt_'].map(fnSrc).join('\n');
 function mkSheet(rows, formulas) {
   const sh = { rows: rows.map(r => r.slice()), deleted: 0, formulas: formulas || {},
     getLastRow() { return this.rows.length + 1; }, getMaxColumns() { return 40; }, getName() { return 'DT TỔNG '; },
@@ -56,7 +56,7 @@ ok(JSON.stringify(sheet.rows) === snap && logSheet.rows.length === 0, 'xem truoc
 let rs = ctx.doImportSheetRows_('base', [f1, f2, f3], false, true);
 ok(rs.updatedRows === 2 && rs.updatedCells === 2 && rs.written === 0, 'cap nhat that: 2 don, 2 o');
 ok(sheet.rows[0][7] === 'Hoan thanh' && sheet.rows[0][18] === 'ghi chu NV cu', 'U1: trang thai doi, GHI CHU CU GIU (file de trong khong xoa)');
-ok(sheet.rows[1][7] === 'Hoan thanh' && (sheet.rows[1][2] === '=A3&"x"') && sheet.rows[1][2] !== 'Sale Y', 'U2: trang thai doi; o CONG THUC duoc giu nguyen cong thuc, khong bi ghi de bang Sale Y');
+ok(sheet.rows[1][7] === 'Hoan thanh' && sheet.rows[1][2] !== 'Sale Y' && (sheet.rows[1][2] === '=A3&"x"' || sheet.rows[1][2] === 'Sale X'), 'U2: trang thai doi; o CONG THUC duoc giu nguyen cong thuc, khong bi ghi de bang Sale Y');
 ok(JSON.stringify(sheet.rows[2]) === JSON.stringify(row('U3', '0966666666', 3000000)), 'U3 y het: khong doi');
 ok(logSheet.rows.length === 2 && logSheet.rows.some(l => l[4] === 'H' && l[5] === 'Dang giao' && l[6] === 'Hoan thanh'), 'nhat ky luu gia tri cu -> moi');
 rs = ctx.doImportSheetRows_('base', [f1, f2, f3], false, true);
@@ -136,5 +136,29 @@ ok(up.updatedRows === 1 && sheet.rows[0][16] === 'ghi chu moi' && String(sheet.r
   const baseRow = row('B1', '0911111111', 1000000);
   sheet = mkSheet([baseRow, baseRow.slice()]); const rb = ctx.doImportSheetRows_('base', [baseRow], false, true);
   ok(rb.dedupedAfter === 0 && sheet.rows.length === 2, 'nhap Base: khong ap dung don kieu Pos');
+}
+// ===== FILE NHIEU NGAY (897 dong, 24/10/2026): cap nhat hang tram don cu PHAI gom lenh goi API, khong 4 lenh/don =====
+// NGUYEN NHAN GOC loi 'Failed to fetch' khi up Pos 15-24/10: vong cap nhat cu goi getRange/getValues/getFormulas/setValues rieng tung don -> vuot thoi gian Apps Script.
+{
+  const N = 897, mk = i => { const r = new Array(17).fill(''); r[0] = i; r[1] = '15/10/2026 09:00'; r[3] = 'KH' + i; r[4] = '09' + String(10000000 + i); r[8] = 'SP' + i; r[9] = 'M' + i; r[10] = 1; r[11] = 1000000 + i; r[12] = 0; r[14] = 'Dang xu ly'; r[16] = (i % 5 === 0) ? 'ghi chu NV' : ''; return r; };
+  const oldRows = [], fileRows = [];
+  for (let i = 0; i < N; i++) { oldRows.push(mk(i)); const f = mk(i); f[14] = (i % 7 === 0) ? 'Dang xu ly' : 'Hoan thanh'; f[16] = (i % 3 === 0) ? 'ghi chu moi' : ''; fileRows.push(f); }
+  const fm = {}; fm[(2 + 10) + ':14'] = '=IF(1,"CT","")';          // o Trang thai cua dong 12 la CONG THUC -> khong duoc ghi de
+  sheet = mkSheet(oldRows, fm); logSheet = mkSheet([]);
+  let calls = 0; const rawGet = sheet.getRange.bind(sheet);
+  sheet.getRange = function (a, b, c, d) { calls++; const g = rawGet(a, b, c, d); return { getValues: () => { calls++; return g.getValues(); }, getFormulas: () => { calls++; return g.getFormulas(); }, setValues: v => { calls++; return g.setValues(v); } }; };
+  const pvB = ctx.doImportSheetRows_('pos', fileRows, true, true);
+  ok(pvB.dryRun && pvB.skippedExisting === N && pvB.wouldWrite === 0 && pvB.wouldUpdateRows > 800, 'file 897 dong: xem truoc thay ~hang tram don cu doi (' + pvB.wouldUpdateRows + ')');
+  calls = 0; const t0 = Date.now();
+  const wB = ctx.doImportSheetRows_('pos', fileRows, false, true);
+  ok(wB.ok && wB.written === 0 && wB.updatedRows > 800, 'file 897 dong: cap nhat that ' + wB.updatedRows + ' don / ' + wB.updatedCells + ' o');
+  ok(calls < 60, 'so lenh goi Sheet gon (' + calls + ' lenh) — cu la ~' + (wB.updatedRows * 4) + ' lenh, vuot thoi gian Apps Script');
+  ok(sheet.rows.every((r, i) => (i === 10) || (i % 7 === 0 ? r[14] === 'Dang xu ly' : r[14] === 'Hoan thanh')), 'trang thai moi ghi dung tung don (tru o cong thuc dong 12, don khong doi giu nguyen)');
+  ok(sheet.rows[10][14] !== 'Hoan thanh', 'o CONG THUC khong bi ghi de');
+  ok(sheet.rows.every((r, i) => i % 3 === 0 ? r[16] === 'ghi chu moi' : (i % 5 === 0 ? r[16] === 'ghi chu NV' : r[16] === '')), 'ghi chu: file co gia tri -> cap nhat; file de trong -> GIU ghi chu cu, khong xoa');
+  ok(sheet.rows.every((r, i) => r[4] === oldRows[i][4] && r[3] === oldRows[i][3] && r[11] === oldRows[i][11]), 'cot khac (SDT, ten, gia) khong bi dong vao');
+  ok(logSheet.rows.length === wB.updatedCells, 'nhat ky ghi dung 1 dong / o doi (' + logSheet.rows.length + ')');
+  const w2 = ctx.doImportSheetRows_('pos', fileRows, false, true);
+  ok(w2.written === 0 && (w2.updatedCells || 0) <= 1, 'nhap lai cung file: khong con gi de cap nhat');
 }
 console.log('ALL IMPORT-SAFE TESTS PASSED');

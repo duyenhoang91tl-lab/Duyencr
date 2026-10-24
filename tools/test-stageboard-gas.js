@@ -4,7 +4,7 @@ const src = fs.readFileSync(path.join(__dirname, '..', 'gas_v13.js'), 'utf8');
 const grab = (name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('khong thay ham ' + name); let d = 0, j = src.indexOf('{', i); for (let k = j; k < src.length; k++) { if (src[k] === '{') d++; if (src[k] === '}') { d--; if (!d) return src.slice(i, k + 1); } } };
 const grabVar = (name) => { const m = src.match(new RegExp('^var ' + name + '\\s*=[^;]*;', 'm')); if (!m) throw new Error('khong thay bien ' + name); return m[0]; };
 const ctx = {}; vm.createContext(ctx);
-['_stripVN_', '_normTxt_', '_ttFold_', '_ttParseVn_', '_isExcludedOrderStatus_', '_ttBoardBuild_'].forEach((n) => vm.runInContext(grab(n), ctx));
+['_stripVN_', '_normTxt_', '_ttFold_', '_ttParseVn_', '_isExcludedOrderStatus_', '_ttNameTokens_', '_ttBoardBuild_'].forEach((n) => vm.runInContext(grab(n), ctx));
 ['TT_STAGE_ORDER_', 'TT_LOOKBACK_DAYS_', 'TT_BOARD_DONE_DAYS_', 'TT_BOARD_CAP_'].forEach((n) => vm.runInContext(grabVar(n), ctx));
 let fails = 0; const eq = (a, b, m) => { if (JSON.stringify(a) !== JSON.stringify(b)) { fails++; console.log('FAIL', m, '\n  co :', JSON.stringify(a), '\n  can:', JSON.stringify(b)); } else console.log('ok  ', m); };
 const now = Date.now(), fmt = (t) => { const d = new Date(t); return d.getDate() + '/' + (d.getMonth() + 1) + '/' + d.getFullYear() + ' 00:00:00'; };

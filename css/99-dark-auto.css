@@ -85,7 +85,7 @@ html[data-theme="dark"] .rs-pv-i.no{color:#ec8383!important}
 html[data-theme="dark"] .dpg-banner.err{background:var(--surface2)!important;border-color:#653434!important;color:#ea8686!important}
 html[data-theme="dark"] .dpg-banner.ok{background:var(--surface2)!important;border-color:#346545!important;color:#8ae5ad!important}
 /* ── 06-pro.css ── */
-html[data-theme="dark"].ui-pro{--pro-line:var(--border-md)!important;--pro-soft:var(--surface2)!important;--pro-grey:var(--surface3)!important}
+html[data-theme="dark"].ui-pro{--pro-line:var(--border-md)!important;--pro-grey:var(--surface3)!important}
 html[data-theme="dark"].ui-pro .pro-card-h{color:var(--text)!important}
 html[data-theme="dark"].ui-pro .pro-stage>li{color:var(--muted)!important}
 html[data-theme="dark"].ui-pro .pro-next .n-pct{color:#7fd98a!important}
@@ -100,7 +100,6 @@ html[data-theme="dark"].ui-pro #pro-ai .pro-ai-h{color:var(--text)!important}
 html[data-theme="dark"].ui-pro #pro-ai .pro-ai-m.bot{color:var(--text)!important}
 html[data-theme="dark"].ui-pro #data-view .tabs .sn-gh .sn-car::before,html[data-theme="dark"].ui-pro #data-view .tabs .sn-gh .sn-car::after{background:var(--surface)!important}
 html[data-theme="dark"].ui-pro .sidebar{background:linear-gradient(180deg,#24422d 0%,#285234 28%,var(--surface3) 62%,var(--surface2) 100%)!important}
-html[data-theme="dark"].ui-pro{--pro-soft:var(--surface3)!important}
 html[data-theme="dark"].ui-pro body,html[data-theme="dark"].ui-pro .main{background:linear-gradient(180deg,#285234 0%,var(--surface3) 30%,var(--surface2) 65%,var(--surface2) 100%) fixed!important}
 html[data-theme="dark"].ui-pro .sc-av{background:var(--surface3)!important;color:#7fd98a!important}
 html[data-theme="dark"].ui-pro .sc-conv.on{background:#18293f!important}
@@ -120,6 +119,9 @@ html[data-theme="dark"].ui-pro .khd-tm a{color:#ff8a80!important}
 html[data-theme="dark"].ui-pro .khd-at{color:#7eb0ff!important;background:var(--surface3)!important}
 html[data-theme="dark"].ui-pro .khd-err{color:#ff8a80!important}
 html[data-theme="dark"].ui-pro .khd-lock{color:var(--text)!important;background:var(--surface2)!important}
+html[data-theme="dark"].ui-pro .split-h{color:var(--text)!important}
+html[data-theme="dark"].ui-pro .split-err{color:#ff8a80!important}
+html[data-theme="dark"].ui-pro .split-d summary{color:#b9a8f5!important}
 /* ── 07-teamchat.css ── */
 /* ── 08-kho.css ── */
 html[data-theme="dark"] .tk-lowtxt{color:#ea8b85!important}
