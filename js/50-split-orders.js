@@ -78,8 +78,9 @@ function splitDetRows_(det, tab){
   var onlyLech = arguments[2];
   return (det.pos||[]).filter(function(x){ return !onlyLech || (x.baseCheck && x.baseCheck.status==='lech'); }).map(function(x){
     var c = x.baseCheck||{}, J = function(a){ return (a||[]).join(', '); };
-    return [x.date,x.month,x.name,x.phone,x.note,x.sales,x.product,x.total,x.share,(x.posValue!=null&&x.posValue!==x.total)?x.posValue:'',
+    var row = [x.date,x.month,x.name,x.phone,x.note,x.sales,x.product,x.total,x.share,(x.posValue!=null&&x.posValue!==x.total)?x.posValue:'',
       splitCheckLabel_(c),J(c.baseSales),J(c.missing),J(c.extra),J(c.baseCodes),x.feedback||''];
+    row.fbKey = x.fbKey||''; return row;   // fbKey chỉ để ô nhập "Sale phản hồi" biết lưu vào dòng nào (không đưa vào Excel)
   });
 }
 function splitDetailPanelHtml_(m){
@@ -107,6 +108,7 @@ function splitDetailPanelHtml_(m){
       if (money[i]) return '<td class="r">'+(c===''||c==null?'':(i===8?'<b>'+splitMoney_(c)+'</b>':splitMoney_(c)))+'</td>';
       if (m.tab==='pos' && i===10) return '<td style="font-weight:700;color:'+(/^LỆCH/.test(c)?'var(--red)':/^Khớp/.test(c)?'var(--green,#15803d)':'var(--muted)')+'">'+splitEsc_(c)+'</td>';
       if (m.tab==='pos' && (i===12||i===13) && c) return '<td style="color:var(--red);font-weight:600">'+splitEsc_(c)+'</td>';
+      if (m.tab==='pos' && i===15) return '<td>'+(r.fbKey ? '<input type="text" class="split-fb" data-fb-key="'+splitEsc_(r.fbKey)+'" value="'+splitEsc_(c)+'" maxlength="500" placeholder="Sale phản hồi…" style="min-width:220px;width:100%">' : splitEsc_(c))+'</td>';
       if (m.tab==='base' && i===9) return '<td style="color:'+(/^Tham chiếu/.test(c)?'var(--muted)':'inherit')+'">'+splitEsc_(c)+'</td>';
       return '<td>'+((i===2||i===3) && typeof _custLinkHtml_==='function' ? _custLinkHtml_(r[3], splitEsc_(c)) : splitEsc_(c))+'</td>'; }).join('')+'</tr>'; });
     h += '<tr style="font-weight:700;background:var(--surface2)"><td colspan="7">Tổng ('+splitNum_(rows.length)+' dòng'+(m.tab==='base'&&sm.baseRefOrders?' — dòng "Tham chiếu" không cộng vào tổng':'')+')</td><td class="r">'+splitMoney_(m.tab==='base'?sm.baseTotal:sm.posTotal)+'</td><td class="r">'+splitMoney_(m.tab==='base'?sm.baseShare:sm.posShare)+'</td>'+new Array(head.length-8).join('<td></td>')+'</tr></tbody></table></div>';
@@ -186,7 +188,7 @@ function renderSalesReportTabM_(wrap, subTabs){
     +'<input type="text" value="'+splitEsc_(_srState.mSearch)+'" placeholder="🔍 Tìm tên sale…" oninput="_srState.mSearch=this.value;_srMRerender_()" style="padding:5px 9px;border:1px solid var(--border);border-radius:6px;min-width:160px">'
     +'<button type="button" class="btn sm" onclick="_srMExportCsv_()">⬇ CSV</button></div>';
   wrap.innerHTML = bar + '<div id="sr-m-body">' + (_srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải…</div>' : splitReportHtml_(_srState.dataM, _srState.mSearch, _srState.mSel&&_srState.mSel.sale)+splitDetailPanelHtml_(_srState.mSel)) + '</div>';
-  var bd = document.getElementById('sr-m-body'); if (bd) bd.onclick = _srMClick_;
+  var bd = document.getElementById('sr-m-body'); if (bd){ bd.onclick = _srMClick_; bd.onchange = _srMFbChange_; }
 }
 function _srMRerender_(){ var el = document.getElementById('sr-m-body'); if (el) el.innerHTML = splitReportHtml_(_srState.dataM, _srState.mSearch, _srState.mSel&&_srState.mSel.sale)+splitDetailPanelHtml_(_srState.mSel); }
 function splitDetailXlsxSheets_(det){   // [{name, rows:[[header],[...]]}] — sheet 1 = Base, sheet 2 = Pos
@@ -217,6 +219,24 @@ async function _srMLoadDetail_(){
   else cur.data = d;
   _srMRerender_();
 }
+// Ô "Sale phản hồi" (tab Pos): lưu khi rời ô / Enter. Lỗi (không đủ quyền, mất mạng) → báo + giữ chữ để thử lại.
+async function _srMFbChange_(e){
+  var t = e && e.target; if (!t || !t.classList || !t.classList.contains('split-fb')) return;
+  var m = _srState.mSel, d = m && m.data; if (!d) return;
+  var key = t.getAttribute('data-fb-key'), text = t.value, item = (d.pos||[]).filter(function(x){ return x.fbKey===key; })[0];
+  t.style.outline = '2px solid #f59e0b';
+  try{
+    var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'splitFeedbackSave', key:key, sale:m.sale, text:text }) });
+    var j = await r.json();
+    if (!j || j.ok===false || j.error) throw new Error((j && j.error) || 'Không lưu được.');
+    if (item){ item.feedback = j.text; item.feedbackBy = j.by; item.feedbackAt = j.at; }
+    t.value = j.text; t.style.outline = '2px solid #16a34a'; t.title = 'Đã lưu bởi '+(j.by||'')+' lúc '+(j.at||'');
+    setTimeout(function(){ if (t.style) t.style.outline = ''; }, 1500);
+  }catch(err){
+    t.style.outline = '2px solid #dc2626';
+    if (typeof toast==='function') toast('⚠ Chưa lưu được phản hồi: '+(err && err.message || err));
+  }
+}
 function _srMClick_(e){
   var t = e.target; if (!t || !t.closest) return;
   var x = t.closest('[data-m-xlsx]'); if (x){ _srMExportXlsx_(); return; }
@@ -232,4 +252,4 @@ function _srMExportCsv_(){
   var d = _srState.dataM; if (!d || !d.bySale){ if (typeof toast==='function') toast('Chưa có dữ liệu — bấm "Lọc" trước.'); return; }
   if (typeof _srGDownloadCsv_==='function') _srGDownloadCsv_('Bao-cao-don-chia_'+(d.from||'')+'_'+(d.to||'')+'.csv', splitCsvRows_(d));
 }
-if (typeof module!=='undefined') module.exports = { splitPhoneKey_, splitBannerHtml_, splitDetailHtml_, splitReportHtml_, splitCsvRows_, splitCustomerPass_, splitDetailPanelHtml_, splitDetailXlsxSheets_, _split };
+if (typeof module!=='undefined') module.exports = { _srMFbChange_, splitPhoneKey_, splitBannerHtml_, splitDetailHtml_, splitReportHtml_, splitCsvRows_, splitCustomerPass_, splitDetailPanelHtml_, splitDetailXlsxSheets_, _split };

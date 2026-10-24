@@ -3,8 +3,8 @@ const fs = require('fs'), vm = require('vm'); let bad = 0; const ok = (c, t) => 
 const src = fs.readFileSync(__dirname + '/../gas_v13.js', 'utf8');
 function fn(name) { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('thieu ' + name); let d = 0; for (let k = src.indexOf('{', i); k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}' && --d === 0) return src.slice(i, k + 1); } }
 const consts = src.slice(src.indexOf('var SPLIT_ORDER_MAX_ROWS_ ='), src.indexOf('// [{name, frac}] cac sale THAT'));
-const names = ['_posSaleFractions_', '_splitSales_', '_splitIdentityFor_', '_splitRowFinder_', '_splitScope_', '_splitCSV_', '_splitRange_', '_splitFilters_', '_splitRound_', '_splitDmy_', 'splitOrderDetail_', 'splitDoGet_', '_dateStrToVnYmd_', '_splitSaleSet_', '_splitCompareSales_', '_splitDayDiff_', '_splitPhoneCandidates_', '_isNumericTag_'];
-const code = consts + names.map(fn).join('\n');
+const names = ['_posSaleFractions_', '_splitSales_', '_splitIdentityFor_', '_splitRowFinder_', '_splitScope_', '_splitCSV_', '_splitRange_', '_splitFilters_', '_splitRound_', '_splitDmy_', 'splitOrderDetail_', 'splitDoGet_', '_dateStrToVnYmd_', '_splitSaleSet_', '_splitCompareSales_', '_splitDayDiff_', '_splitPhoneCandidates_', '_isNumericTag_', '_splitFbKey_', '_splitFbRead_', '_splitAttachFeedback_'];
+const code = "var SH_SPLIT_FB_='PhanHoiDonChia', SPLIT_FB_HEADERS_=['key','sale','text','by','at'];\n" + consts + names.map(fn).join('\n');
 // Don 1: ghep Base 2 don goc (An+Binh ban don goc 1; An ban don goc 2) ; Don 2: the chia deu An,Binh (khong co Base) ; Don 3: An+Chi 70/30 file ke toan ; Don 4: don Base thu 2 da Huy
 const O = [
   { ngayTaoDon: '02/10/2026', khachHang: 'Khách 1', soDienThoai: '0911000001', ghiChu: '17T10/2026 + 18T10/2026', theSale: 'An', saleThe: 'An', sanPham: 'Combo A', giaTriSauGiam: 3000000, giaTriPos: 2800000, dieuChinh: 'base',
@@ -25,7 +25,7 @@ const ctx = { Math, JSON, String, Number, Object, Array, RegExp, Date, parseInt,
   _profFold_: ns => { const f = {}; (ns || []).forEach(n => f[String(n).trim().toLowerCase()] = true); return f; }, readTeams_: () => [], readSaleDepts_: () => ({ byNorm: {} }),
   _normTxt_: s => String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').toLowerCase().trim(),
   _profNames_: u => [u.name].concat(u.names || []).filter(Boolean), normPhone_: p => String(p || '').replace(/\D/g, ''), _userDeptKeys_: null,
-  _reportCacheKey_: (p, f) => p + JSON.stringify(f),
+  _reportCacheKey_: (p, f) => p + JSON.stringify(f), getSheet_: () => ({ getLastRow: () => 2, getRange: () => ({ getValues: () => [['12|0911000001|2026-10-02|3000000#an', 'An', 'ok da xac nhan', 'An', '24/10 10:00']] }) }),
   _extractCounterCodes_: t => (String(t || '').match(/\d+T\d+\/\d+/g) || []), _splitBhCodes_: c => ({ normal: c, bh: [] }), _isExcludedOrderStatus_: t => /huy|hoan/i.test(String(t || '')),
   _donSaleNamesFromThe_: t => String(t || '').split(',').map(x => x.trim()).filter(Boolean), _pickBaseRowsForCode_: (c, idx) => idx.exact[c] || null,
   _readBaseRowsByCounterCodes_: w => ({ exact: { '700T10/2026': [{ rowIndex: 9, trangThai: 'Thành công', saleBan: 'An,Chi,Dung', code: '700T10/2026', ngayTao: new Date(2026, 9, 9), giaTriDon: 1000000, sanPham: 'Quầy SP' }] }, fuzzy: {} }),
@@ -77,4 +77,6 @@ const c1 = ctx._splitCompareSales_(['An', 'Chi'], ['chi', 'AN'], id0, true); ok(
 ok(ctx._splitCompareSales_(['An', '8', '(chưa gán sale)'], ['An'], id0, true).status === 'khop', 'bo the toan so / chua gan sale khi so sanh');
 ok(ctx._splitCompareSales_(['An'], [], id0, false).status === 'khongCoBase', 'khong co Base -> khongCoBase');
 ok(ctx._splitDayDiff_('2026-10-01', '2026-10-04') === 3 && ctx._splitDayDiff_('x', '2026-10-04') === null, 'chenh lech ngay');
+ok(r.pos[0].fbKey.endsWith('#an') && r.pos.every(x => typeof x.fbKey === 'string' && typeof x.feedback === 'string'), 'moi dong Pos co fbKey + feedback (gan tu sheet, ke ca khi lay tu cache)');
+ok(r.pos[0].feedback === '' || r.pos[0].feedback === 'ok da xac nhan', 'feedback hien o dong co khoa tuong ung');
 process.exit(bad ? 1 : 0);

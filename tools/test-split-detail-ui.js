@@ -6,7 +6,7 @@ const dom = new JSDOM('<!doctype html><html><body><div id="wrap"></div></body></
 const M = { ok: true, from: '2026-10-01', to: '2026-10-31', scope: 'all', total: { orders: 10, revenue: 9e6, aov: 9e5, splitOrders: 3, splitRevenue: 3e6, splitAov: 1e6, splitPctOrders: 30, splitPctRevenue: 33.3 },
   bySale: [{ name: 'An', orders: 5, revenue: 4e6, aov: 8e5, splitOrders: 3, splitRevenue: 3e6, splitAov: 1e6, splitPct: 75 }, { name: 'Bình <b>x</b>', orders: 2, revenue: 1e6, aov: 5e5, splitOrders: 1, splitRevenue: 5e5, splitAov: 5e5, splitPct: 50 }], warnings: [] };
 const DET = { ok: true, from: '2026-10-01', to: '2026-10-31', sale: 'An', truncated: false,
-  pos: [{ date: '02/10/2026', month: '10/2026', name: 'Khách 1', phone: '0911000001', note: '17T10/2026 + 18T10/2026', sales: 'An', product: 'Combo A', total: 3000000, posValue: 2800000, share: 2000000, kind: 'base', baseCheck: { status: 'lech', nguon: 'ma', posSales: ['An'], baseSales: ['An', 'Bình'], missing: ['Bình'], extra: [], baseCodes: ['17T10/2026', '18T10/2026'] }, feedback: 'An làm đúng, Bình quên gắn thẻ' },
+  pos: [{ date: '02/10/2026', month: '10/2026', name: 'Khách 1', phone: '0911000001', note: '17T10/2026 + 18T10/2026', sales: 'An', product: 'Combo A', total: 3000000, posValue: 2800000, share: 2000000, kind: 'base', baseCheck: { status: 'lech', nguon: 'ma', posSales: ['An'], baseSales: ['An', 'Bình'], missing: ['Bình'], extra: [], baseCodes: ['17T10/2026', '18T10/2026'] }, feedback: 'An làm đúng, Bình quên gắn thẻ', fbKey: '12|0911000001|2026-10-02|3000000#an' },
         { date: '03/10/2026', month: '10/2026', name: 'Khách <i>2</i>', phone: '0911000002', note: 'chia đều', sales: 'An,Bình', product: 'SP B', total: 2000000, posValue: null, share: 1000000, kind: 'the', baseCheck: { status: 'khongCoBase', nguon: '', posSales: ['An', 'Bình'], baseSales: [], missing: [], extra: [], baseCodes: [] } }],
   base: [{ date: '30/09/2026', month: '09/2026', name: 'Khách 1', phone: '0911000001', code: '17T10/2026', sales: 'An, Bình', product: 'Nhẫn vàng', total: 2000000, share: 1000000 },
          { date: '01/10/2026', month: '10/2026', name: 'Khách 1', phone: '0911000001', code: '18T10/2026', sales: 'An', product: 'Lắc tay', total: 1000000, share: 1000000 }],
@@ -57,6 +57,15 @@ const wrap = $('wrap'); w.renderSalesReportTabM_(wrap, '<span>tabs</span>');
   ok(det.querySelectorAll('tbody tr').length === 2 && det.textContent.includes('Khách 1') && !det.textContent.includes('Khách <i>2</i>'), 'loc "Chi don lech Base": chi con don lech (+ dong tong)');
   det.querySelector('[data-m-lech]').click(); await sleep(5); det = $('sr-m-detail');
   ok(det.querySelectorAll('tbody tr').length === 3, 'bo loc lech -> hien lai tat ca');
+  // ---- SALE PHAN HOI (buoc 3) ----
+  const fbIn = det.querySelectorAll('input.split-fb'); ok(fbIn.length === 1 && fbIn[0].value === 'An làm đúng, Bình quên gắn thẻ' && fbIn[0].getAttribute('data-fb-key') === '12|0911000001|2026-10-02|3000000#an', 'tab Pos: o nhap Sale phan hoi (chi dong co khoa) co gia tri da luu');
+  const posts = []; w.fetch = async (u, o) => { posts.push(JSON.parse(o.body)); return { json: async () => ({ ok: true, text: 'Đã xác nhận', by: 'An', at: '24/10/2026 10:00' }) }; };
+  fbIn[0].value = 'Đã xác nhận'; fbIn[0].dispatchEvent(new w.Event('change', { bubbles: true })); await sleep(20);
+  ok(posts.length === 1 && posts[0].action === 'splitFeedbackSave' && posts[0].sale === 'An' && posts[0].text === 'Đã xác nhận' && posts[0].key === '12|0911000001|2026-10-02|3000000#an', 'doi o phan hoi -> POST splitFeedbackSave dung khoa/sale/noi dung');
+  ok(w.eval('_srState.mSel.data.pos[0].feedback') === 'Đã xác nhận', 'cap nhat lai du lieu cuc bo -> Excel xuat dung phan hoi moi');
+  saved.length = 0; det.querySelector('[data-m-xlsx]').click(); ok(saved[0].wb.sheets[1].rows[1][15] === 'Đã xác nhận', 'Excel Pos cot Sale phan hoi = noi dung vua nhap');
+  w.fetch = async () => ({ json: async () => ({ ok: false, error: 'Ban khong co quyen' }) }); toasts.length = 0; fbIn[0].value = 'x'; fbIn[0].dispatchEvent(new w.Event('change', { bubbles: true })); await sleep(20);
+  ok(toasts.length === 1 && toasts[0].includes('Ban khong co quyen') && fbIn[0].value === 'x', 'loi luu -> bao loi, giu chu de thu lai');
   // doi sale / dong / loc lai
   respFn = p => Object.assign({}, DET, { sale: p.sale, pos: [], base: [], summary: { posOrders: 0, posTotal: 0, posShare: 0, baseOrders: 0, baseTotal: 0, baseShare: 0, noBaseOrders: 0 } });
   wrap.querySelector('tr[data-m-sale^="Bình"] [data-m-view="base"]').click(); await sleep(30);
