@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: 20px auto; padding: 0 12px; color: #222; }
+    h2 { margin-bottom: 4px; }
+    .hint { color: #666; font-size: 13px; margin-bottom: 14px; }
+    label { display: block; margin-top: 12px; font-weight: bold; font-size: 14px; }
+    input[type=text], textarea { width: 100%; box-sizing: border-box; padding: 8px; font-size: 14px; border: 1px solid #bbb; border-radius: 6px; }
+    textarea { height: 340px; font-family: Consolas, monospace; font-size: 13px; }
+    .row { display: flex; gap: 12px; }
+    .row > div { flex: 1; }
+    button { margin-top: 16px; padding: 10px 22px; font-size: 15px; background: #1a7f37; color: #fff; border: 0; border-radius: 6px; cursor: pointer; }
+    button:disabled { background: #999; cursor: wait; }
+    #status { margin-top: 14px; padding: 10px; border-radius: 6px; display: none; font-size: 14px; word-break: break-all; }
+    .ok { background: #e6f4ea; color: #0b5d1e; }
+    .err { background: #fdecea; color: #a1190f; }
+  </style>
+</head>
+<body>
+  <h2>Cứu hộ push GitHub</h2>
+  <div class="hint">Dán nội dung file Claude đã viết, nhập đường dẫn và nhánh, bấm Push.</div>
+
+  <div class="row">
+    <div>
+      <label for="path">Đường dẫn file trong repo</label>
+      <input type="text" id="path" placeholder="vd: src/portal.html">
+    </div>
+    <div>
+      <label for="branch">Nhánh</label>
+      <input type="text" id="branch" placeholder="vd: wip/ten-viec">
+    </div>
+  </div>
+
+  <label for="message">Nội dung commit (có thể bỏ trống)</label>
+  <input type="text" id="message" placeholder="vd: Them chuc nnang loc don">
+
+  <label for="content">Nội dung file</label>
+  <textarea id="content" placeholder="Dán toàn bộ nội dung file vào đây"></textarea>
+
+  <label style="font-weight:normal">
+    <input type="checkbox" id="allowMain"> Cho phép push thẳng main/master
+  </label>
+
+  <button id="btn" onclick="doPush()">Push lên GitHub</button>
+  <div id="status"></div>
+
+  <script>
+    try {
+      document.getElementById('branch').value = localStorage.getItem('rescue_branch') || '';
+    } catch (e) {}
+
+    function show(msg, ok) {
+      var s = document.getElementById('status');
+      s.style.display = 'block';
+      s.className = ok ? 'ok' : 'err';
+      s.innerHTML = msg;
+    }
+
+    function doPush() {
+      var form = {
+        path: document.getElementById('path').value,
+        branch: document.getElementById('branch').value,
+        message: document.getElementById('message').value,
+        content: document.getElementById('content').value,
+        allowMain: document.getElementById('allowMain').checked
+      };
+      var btn = document.getElementById('btn');
+      btn.disabled = true;
+      btn.textContent = 'Đang push...';
+      try { localStorage.setItem('rescue_branch', form.branch); } catch (e) {}
+
+      google.script.run
+        .withSuccessHandler(function (r) {
+          btn.disabled = false;
+          btn.textContent = 'Push lên GitHub';
+          var note = r.createdBranch ? ' (đã tạo nhánh mới)' : '';
+          show('Đã push thành công' + note + '. <a href="' + r.url + '" target="_blank">Mở file trên GitHub</a>', true);
+        })
+        .withFailureHandler(function (e) {
+          btn.disabled = false;
+          btn.textContent = 'Push lên GitHub';
+          show('Lỗi: ' + (e && e.message ? e.message : e), false);
+        })
+        .rescuePush(form);
+    }
+  </script>
+</body>
+</html>
