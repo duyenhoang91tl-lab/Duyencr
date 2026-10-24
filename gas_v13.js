@@ -3833,7 +3833,7 @@ function _hiddenPageSaleSets_() {
 function _isDTRowHidden_(kenhBan, saleBan, sets) {
   if (sets.channels.length && kenhBan && sets.channels.indexOf(kenhBan) !== -1) return true;
   if (sets.sales.length && saleBan) {
-    var names = String(saleBan).split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+    var names = String(saleBan).split(',').map(function(s){ return s.trim(); }).filter(function(s){ return s && !_isNumericTag_(s); }); // loai token toan so (STT Pancake)
     if (names.length && names.every(function(n){ return sets.sales.indexOf(n) !== -1; })) return true;
   }
   return false;
@@ -4559,7 +4559,7 @@ function getSalesReportOptions_() {
   var rows0 = readDTTong_();
   var saleSet = {}, kenhSet = {};
   for (var i0 = 0; i0 < rows0.length; i0++) {
-    var salesList0 = splitMulti_(rows0[i0].saleBan, ',');
+    var salesList0 = splitMulti_(rows0[i0].saleBan, ',').filter(function(x){ return !_isNumericTag_(x); }); // loai STT Pancake
     for (var j0 = 0; j0 < salesList0.length; j0++) saleSet[salesList0[j0]] = true;
     if (rows0[i0].kenhBan) kenhSet[rows0[i0].kenhBan] = true;
   }
@@ -4628,7 +4628,7 @@ function _srCloseRateSections_(normRows, filters) {
     var pAnchor = buildPancakeReport_(filters.dateFrom, filters.dateTo, 'equal');
     var anchorNames = pAnchor.byCS.filter(function(r) { return (r.tongTT || 0) > 0; }).map(function(r) { return r.name; });
     var orderNamesAll = [];
-    for (var oi0 = 0; oi0 < normRows.length; oi0++) splitMulti_(normRows[oi0].saleBanRaw, ',').forEach(function(n) { orderNamesAll.push(n); });
+    for (var oi0 = 0; oi0 < normRows.length; oi0++) splitMulti_(normRows[oi0].saleBanRaw, ',').filter(function(x){ return !_isNumericTag_(x); }).forEach(function(n) { orderNamesAll.push(n); }); // loai STT Pancake
     personKey = _salePersonKeyWithOrphanFold_(_salePersonKeyFn_(), anchorNames, orderNamesAll);
   }
   if (hasAnyPkData) {
@@ -4640,7 +4640,7 @@ function _srCloseRateSections_(normRows, filters) {
       var mcYmd = _vnYmd_(mcDt);
       if (!_srOrderCovered_(mc.kenhBan, mcYmd)) continue;
       if (!closeFrom || mcYmd < closeFrom) closeFrom = mcYmd;
-      var salesOnOrderC = splitMulti_(mc.saleBanRaw, ',');
+      var salesOnOrderC = splitMulti_(mc.saleBanRaw, ',').filter(function(x){ return !_isNumericTag_(x); }); // loai STT Pancake
       if (!salesOnOrderC.length) salesOnOrderC = [UNASSIGNED];
       salesOnOrderC.forEach(function(sn) {
         var pk = personKey(sn);
@@ -4742,7 +4742,7 @@ function _srCloseRateSections_(normRows, filters) {
       var mcpYmd = _vnYmd_(mcpDt);
       var kenhP = mcp.kenhBan || '(chưa có kênh)';
       if (!_srOrderCovered_(kenhP, mcpYmd)) continue;
-      var salesOnP = splitMulti_(mcp.saleBanRaw, ',');
+      var salesOnP = splitMulti_(mcp.saleBanRaw, ',').filter(function(x){ return !_isNumericTag_(x); }); // loai STT Pancake
       if (!salesOnP.length) salesOnP = [UNASSIGNED];
       salesOnP.forEach(function(spn2) {
         var pkS2 = personKeyP(spn2); if (!pgDisp[pkS2]) pgDisp[pkS2] = spn2;
@@ -4840,7 +4840,7 @@ function buildSalesReportA_(filters) {
     dg.notExcluded++;
     if (kenhFilterArr.length && kenhFilterArr.indexOf(row.kenhBan) === -1) continue;
     dg.afterKenh++;
-    var salesOnOrder = splitMulti_(row.saleBan, ',');
+    var salesOnOrder = splitMulti_(row.saleBan, ',').filter(function(x){ return !_isNumericTag_(x); }); // loai STT Pancake
     if (saleFilterFoldA.length && !salesOnOrder.some(function(s){ return saleFilterFoldA.indexOf(_normTxt_(s)) !== -1; })) {
       salesOnOrder.forEach(function(sn) { if (Object.keys(dg.miss).length < 300 || dg.miss[sn]) dg.miss[sn] = (dg.miss[sn] || 0) + 1; });
       continue;
@@ -4872,7 +4872,7 @@ function buildSalesReportA_(filters) {
     // duoc chon (don co 3 sale, chon 1 nguoi -> 1/3), khop bang Theo Sale / bieu do. So DON van dem nguyen don. Khong loc Sale (hoac tinh theo nguoi tao) -> selFrac = 1 nhu cu.
     var selFrac = 1;
     if (!byCreator && saleFilterFoldA.length) {
-      var sl0 = splitMulti_(m.saleBan, ',');
+      var sl0 = splitMulti_(m.saleBan, ',').filter(function(x){ return !_isNumericTag_(x); }); // loai STT Pancake
       selFrac = sl0.length ? sl0.filter(wantSaleA_).length / sl0.length : 0;
     }
     var revenueSel = revenue * selFrac, cocSel = m.giaTriCoc * selFrac;
@@ -4904,7 +4904,7 @@ function buildSalesReportA_(filters) {
       byTeamSale[creatorTeam].coc += m.giaTriCoc;
       byTeamSale[creatorTeam].giaTri += revenue;
     } else {
-      var salesList = splitMulti_(m.saleBan, ',');
+      var salesList = splitMulti_(m.saleBan, ',').filter(function(x){ return !_isNumericTag_(x); }); // loai STT Pancake
       if (salesList.length === 0) salesList = [UNASSIGNED];
       var n = salesList.length;
       // So don theo Team: dem 1 lan cho moi TEAM KHAC NHAU xuat hien tren don (tranh 1 don co
@@ -5632,7 +5632,7 @@ function _mergeTachDon_(rows) {
     var best = null, bestT = null;
     parts.forEach(function(p) {
       total += Number(p.giaTriSauGiam) || 0; cod += Number(p.cod) || 0; vals.push(Number(p.giaTriSauGiam) || 0);
-      String(p.theSale || '').split(',').forEach(function(x) { x = x.trim(); var f = _normTxt_(x); if (x && !seenSale[f]) { seenSale[f] = true; sales.push(x); } });
+      String(p.theSale || '').split(',').forEach(function(x) { x = x.trim(); var f = _normTxt_(x); if (x && !_isNumericTag_(x) && !seenSale[f]) { seenSale[f] = true; sales.push(x); } }); // loai STT Pancake
       if (p.sanPham) sp.push(String(p.sanPham)); if (p.maSanPham) ma.push(String(p.maSanPham)); if (p.soLuong) sl.push(String(p.soLuong));
       var nt = String(p.ghiChu || '').trim(); if (nt && !seenNote[nt]) { seenNote[nt] = true; notes.push(nt); }
       if (!m.nguonDon && p.nguonDon) m.nguonDon = p.nguonDon;
@@ -6783,7 +6783,7 @@ function buildSalesReportC_(filters) {
       if (!dateInRange_(dt, fromStr, toStr)) continue;
       if (_isExcludedOrderStatus_(row.trangThai)) continue; // bo don Huy/Tra lai/Hoan tien/Thai bai/Khieu nai (Quy che thu lao Sale)
       if (kenhFilterArr.length && kenhFilterArr.indexOf(row.kenhBan) === -1) continue;
-      var salesOnRow = splitMulti_(row.saleBan, ',');
+      var salesOnRow = splitMulti_(row.saleBan, ',').filter(function(x){ return !_isNumericTag_(x); }); // loai STT Pancake
       if (saleFilterFoldC.length && !salesOnRow.some(function(s){ return saleFilterFoldC.indexOf(_normTxt_(s)) !== -1; })) continue;
       if (!_pMatchAny_(row.sanPham, sanPhamTerms)) continue;
       matchedOrders.push(row);
@@ -6793,7 +6793,7 @@ function buildSalesReportC_(filters) {
         var creatorName = row.nguoiTao || UNASSIGNED;
         bySale[creatorName] = (bySale[creatorName] || 0) + row.giaTriDon;
       } else {
-        var salesList = splitMulti_(row.saleBan, ',');
+        var salesList = splitMulti_(row.saleBan, ',').filter(function(x){ return !_isNumericTag_(x); }); // loai STT Pancake
         if (salesList.length === 0) salesList = [UNASSIGNED];
         var n = salesList.length;
         for (var k = 0; k < salesList.length; k++) {
@@ -13388,7 +13388,7 @@ function buildMktChecklistReport_(from, to) {
       kenhRevenue[kk] = (kenhRevenue[kk] || 0) + rev;
       if (!kenhOrdersByDate[kk]) kenhOrdersByDate[kk] = {};
       kenhOrdersByDate[kk][dKeyM] = (kenhOrdersByDate[kk][dKeyM] || 0) + 1;
-      splitMulti_(rowsDt[i].saleBan, ',').forEach(function(sn) {
+      splitMulti_(rowsDt[i].saleBan, ',').filter(function(x){ return !_isNumericTag_(x); }).forEach(function(sn) { // loai STT Pancake
         saleOrders[sn] = (saleOrders[sn] || 0) + 1;
         saleRevenue[sn] = (saleRevenue[sn] || 0) + rev;
         if (!saleOrdersByDate[sn]) saleOrdersByDate[sn] = {};
@@ -13404,7 +13404,7 @@ function buildMktChecklistReport_(from, to) {
       }
       if (fbKenh[kk]) {
         donFbTotal++;
-        splitMulti_(rowsDt[i].saleBan, ',').forEach(function(sn) { saleOrdersFb[sn] = (saleOrdersFb[sn] || 0) + 1; });
+        splitMulti_(rowsDt[i].saleBan, ',').filter(function(x){ return !_isNumericTag_(x); }).forEach(function(sn) { saleOrdersFb[sn] = (saleOrdersFb[sn] || 0) + 1; }); // loai STT Pancake
       }
     }
   }
@@ -15300,9 +15300,9 @@ function _tlcDiagnose_(filters) {
   inRange.forEach(function (r) {
     var dt = parseVNDate_(r.ngayTao), ymd = dt ? _vnYmd_(dt) : '';
     var kn = r.kenhBan || '(chưa có kênh)', pids = kenhPages[r.kenhBan] || [];
-    splitMulti_(r.saleBan, ',').forEach(function (sn) { var k = personKey(sn); disp[k] = disp[k] || sn; bySaleBan[k] = (bySaleBan[k] || 0) + 1; });
+    splitMulti_(r.saleBan, ',').filter(function(x){ return !_isNumericTag_(x); }).forEach(function (sn) { var k = personKey(sn); disp[k] = disp[k] || sn; bySaleBan[k] = (bySaleBan[k] || 0) + 1; }); // loai STT Pancake
     var isCov = pids.some(function (pid) { return covered[pid] && covered[pid][ymd]; });
-    if (isCov) splitMulti_(r.saleBan, ',').forEach(function (sn) { var k2 = personKey(sn); bySaleBanCov[k2] = (bySaleBanCov[k2] || 0) + 1; });
+    if (isCov) splitMulti_(r.saleBan, ',').filter(function(x){ return !_isNumericTag_(x); }).forEach(function (sn) { var k2 = personKey(sn); bySaleBanCov[k2] = (bySaleBanCov[k2] || 0) + 1; }); // loai STT Pancake
     if (!isCov) {
       var why = pids.length ? 'kênh có Page nhưng Page chưa nạp tương tác ngày đơn' : 'kênh CHƯA gán Page Pancake';
       var key = kn + ' — ' + why; notCovered[key] = (notCovered[key] || 0) + 1; return;
@@ -15357,7 +15357,7 @@ function _diagSoDonAvsChot_(f) {
     var r = rows[i], dt = parseVNDate_(r.ngayTao);
     if (!dateInRange_(dt, f.dateFrom, f.dateTo)) continue;
     if (_isExcludedOrderStatus_(r.trangThai)) continue;
-    if (saleFold.length && !splitMulti_(r.saleBan, ',').some(function(x) { return saleFold.indexOf(_normTxt_(x)) !== -1; })) continue;
+    if (saleFold.length && !splitMulti_(r.saleBan, ',').filter(function(x){ return !_isNumericTag_(x); }).some(function(x) { return saleFold.indexOf(_normTxt_(x)) !== -1; })) continue; // loai STT Pancake
     out.matched++;
     var why = [], ymd = dt ? _vnYmd_(dt) : '';
     if (r.bhZero) why.push('Đơn bảo hành BH không doanh thu');
@@ -19102,7 +19102,7 @@ function splitOrderDetail_(p, user) {
   var rb = buildSalesReportB_(f), key = _normTxt_(sale), pos = [], base = [], noBase = 0, sm = { pt: 0, ps: 0, bt: 0, bs: 0 };
   var observed = [sale];
   (rb.orders || []).forEach(function (o) { _splitSales_(o).forEach(function (s) { observed.push(s.name); }); });
-  (rb.orders || []).forEach(function (o) { (o.ghepBase || []).forEach(function (b) { String(b.saleBan || '').split(',').forEach(function (n) { n = n.trim(); if (n) observed.push(n); }); }); });
+  (rb.orders || []).forEach(function (o) { (o.ghepBase || []).forEach(function (b) { String(b.saleBan || '').split(',').forEach(function (n) { n = n.trim(); if (n && !_isNumericTag_(n)) observed.push(n); }); }); }); // loai STT Pancake
   var id = _salePersonIdentity_(observed), me = _normTxt_(id.primary(sale));
   (rb.orders || []).forEach(function (o) {
     var ss = _splitSales_(o); if (ss.length < 2) return;
@@ -19118,7 +19118,7 @@ function splitOrderDetail_(p, user) {
     var gb = o.ghepBase || [], any = false;
     gb.forEach(function (b) {
       if (!b.tinh) return;   // don goc Base da Huy/Hoan: khong tinh doanh thu
-      var names = String(b.saleBan || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+      var names = String(b.saleBan || '').split(',').map(function (x) { return x.trim(); }).filter(function(x){ return x && !_isNumericTag_(x); }); // loai STT Pancake
       if (!names.length) names = ['(chưa gán sale)'];
       var cnt = 0; names.forEach(function (n) { if (_normTxt_(id.primary(n)) === me) cnt++; });
       if (!cnt) return;
