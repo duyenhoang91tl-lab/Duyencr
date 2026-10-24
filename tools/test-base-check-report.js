@@ -46,4 +46,18 @@ ok(/check ngược Base/.test(html) && /K1/.test(html) && /K2/.test(html) && !/K
 ok(/bị loại: Thất bại/.test(html), 'Panel ghi rõ đơn gốc bị loại');
 ok(C._srBaseCheckPanelHtml_({ orders: [{ posRow: 1, giaTriSauGiam: 1 }], ghep: {}, ghepCheck: {} }).indexOf('không có đơn Pos nào ghép') > 0, 'Không có đơn ghép → báo rõ, không lỗi');
 ok(C._srBaseCheckPanelHtml_(null) === '' && C._srBaseCheckPanelHtml_({}) === '', 'Chưa có dữ liệu → trả rỗng, không lỗi');
+// ===== QUY TAC 21/10/2026: phan CON LAI cua don ghep (gia Pos - tong goc) tinh cho sale tren the Pos -> co cot rieng trong Excel =====
+const O2 = [{ posRow: 21, ngayTaoDon: '08/10/2026', khachHang: 'K9', soDienThoai: '0900000009', nguonDon: 'Page', theSale: 'S9', giaTriPos: 5000000, giaTriSauGiam: 5000000, cod: 0, ghiChu: '9T10/2026 + 10T10/2026',
+  ghepCodes: ['9T10/2026', '10T10/2026'], ghepBase: [B(30, '9T10/2026', 'cr9', 'A', 'Hoàn thành', 3000000, true)], ghepDu: 2000000, ghepDuSale: 'S9',
+  saleShares: [{ name: 'A', frac: 0.6 }, { name: 'S9', frac: 0.4 }], dieuChinh: 'base' }];
+const r2 = C._srBcBuild_(C._srBcOrders_({ orders: O2 }));
+const hd = r2.detail[0], row = r2.detail[1];
+const ci = n => hd.findIndex(x => String(x).indexOf(n) === 0);
+ok(ci('Phần còn lại tính theo Thẻ Pos') >= 0 && ci('Sale nhận phần còn lại') >= 0 && ci('Doanh thu tính = Base + phần còn lại') >= 0, 'Excel chi tiet co 3 cot moi (phan con lai / sale nhan / doanh thu tinh)');
+ok(row[ci('Phần còn lại tính theo Thẻ Pos')] === 2000000 && row[ci('Sale nhận phần còn lại')] === 'S9' && row[ci('Doanh thu tính = Base + phần còn lại')] === 5000000, 'dong dau: phan con lai 2tr cho S9, doanh thu tinh = 3tr Base + 2tr = 5tr');
+ok(r2.tot.du === 2000000, 'tong phan con lai (tot.du) = 2tr');
+ok(r2.chia.length === 3 && Math.round(r2.chia[1][7] + r2.chia[2][7]) === 5000000, 'sheet chia sale: tong tien chia = 5tr (gom ca phan con lai)');
+const r1 = C._srBcBuild_(orders);
+ok(r1.detail[1][ci('Phần còn lại tính theo Thẻ Pos')] === '' && r1.tot.du === 0, 'don khong co phan con lai: o de trong, tong = 0 (khong doi hanh vi cu)');
+ok(C._srBaseCheckPanelHtml_({ orders: O2, ghep: {} }).indexOf('Phần còn lại tính theo Thẻ Pos') >= 0, 'man hinh hien tong phan con lai khi co');
 console.log(fail ? ('\n' + fail + ' LỖI') : '\nTẤT CẢ ĐẠT'); process.exit(fail ? 1 : 0);
