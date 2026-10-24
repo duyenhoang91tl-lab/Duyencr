@@ -6,11 +6,11 @@ const dom = new JSDOM('<!doctype html><html><body><div id="wrap"></div></body></
 const M = { ok: true, from: '2026-10-01', to: '2026-10-31', scope: 'all', total: { orders: 10, revenue: 9e6, aov: 9e5, splitOrders: 3, splitRevenue: 3e6, splitAov: 1e6, splitPctOrders: 30, splitPctRevenue: 33.3 },
   bySale: [{ name: 'An', orders: 5, revenue: 4e6, aov: 8e5, splitOrders: 3, splitRevenue: 3e6, splitAov: 1e6, splitPct: 75 }, { name: 'Bình <b>x</b>', orders: 2, revenue: 1e6, aov: 5e5, splitOrders: 1, splitRevenue: 5e5, splitAov: 5e5, splitPct: 50 }], warnings: [] };
 const DET = { ok: true, from: '2026-10-01', to: '2026-10-31', sale: 'An', truncated: false,
-  pos: [{ date: '02/10/2026', month: '10/2026', name: 'Khách 1', phone: '0911000001', note: '17T10/2026 + 18T10/2026', sales: 'An', product: 'Combo A', total: 3000000, posValue: 2800000, share: 2000000, kind: 'base' },
-        { date: '03/10/2026', month: '10/2026', name: 'Khách <i>2</i>', phone: '0911000002', note: 'chia đều', sales: 'An,Bình', product: 'SP B', total: 2000000, posValue: null, share: 1000000, kind: 'the' }],
+  pos: [{ date: '02/10/2026', month: '10/2026', name: 'Khách 1', phone: '0911000001', note: '17T10/2026 + 18T10/2026', sales: 'An', product: 'Combo A', total: 3000000, posValue: 2800000, share: 2000000, kind: 'base', baseCheck: { status: 'lech', nguon: 'ma', posSales: ['An'], baseSales: ['An', 'Bình'], missing: ['Bình'], extra: [], baseCodes: ['17T10/2026', '18T10/2026'] }, feedback: 'An làm đúng, Bình quên gắn thẻ' },
+        { date: '03/10/2026', month: '10/2026', name: 'Khách <i>2</i>', phone: '0911000002', note: 'chia đều', sales: 'An,Bình', product: 'SP B', total: 2000000, posValue: null, share: 1000000, kind: 'the', baseCheck: { status: 'khongCoBase', nguon: '', posSales: ['An', 'Bình'], baseSales: [], missing: [], extra: [], baseCodes: [] } }],
   base: [{ date: '30/09/2026', month: '09/2026', name: 'Khách 1', phone: '0911000001', code: '17T10/2026', sales: 'An, Bình', product: 'Nhẫn vàng', total: 2000000, share: 1000000 },
          { date: '01/10/2026', month: '10/2026', name: 'Khách 1', phone: '0911000001', code: '18T10/2026', sales: 'An', product: 'Lắc tay', total: 1000000, share: 1000000 }],
-  summary: { posOrders: 2, posTotal: 5000000, posShare: 3000000, baseOrders: 2, baseTotal: 3000000, baseShare: 2000000, noBaseOrders: 1 }, warnings: [] };
+  summary: { posOrders: 2, posTotal: 5000000, posShare: 3000000, baseOrders: 2, baseTotal: 3000000, baseShare: 2000000, noBaseOrders: 1, check: { khop: 0, lech: 1, khongCoBase: 1, goiY: 0 } }, warnings: [] };
 const reqs = [], toasts = [], saved = []; let respFn = () => DET;
 w.eval('var gsUrl="https://gs.example/exec"; var _srState={loading:false,lastFetchError:"",mDateQuick:"custom",mDateFrom:"2026-10-01",mDateTo:"2026-10-31",mSearch:"",dataM:null,sub:"M"};');
 w._srFetch = async (action, p) => { reqs.push({ action, p }); await sleep(5); return respFn(p); };
@@ -28,7 +28,7 @@ const wrap = $('wrap'); w.renderSalesReportTabM_(wrap, '<span>tabs</span>');
   wrap.querySelector('tr[data-m-sale="An"] td').click(); await sleep(30);
   ok(reqs.length === 1 && reqs[0].action === 'splitOrderDetail' && reqs[0].p.sale === 'An' && reqs[0].p.dateFrom === '2026-10-01' && reqs[0].p.dateTo === '2026-10-31', 'bam dong sale -> goi splitOrderDetail dung sale + dung ky cua bang M');
   let det = $('sr-m-detail'); ok(det && det.textContent.includes('Chi tiết đơn chia — An'), 'hien panel chi tiet ben duoi bang');
-  ok(det.textContent.includes('Sale tham gia (thẻ Pos)') && det.textContent.includes('Sản phẩm (Pos)') && det.textContent.includes('Ghi chú') && !det.textContent.includes('Mã bộ đếm'), 'mac dinh tab POS: cot ghi chu / sale the / san pham Pos');
+  ok(det.textContent.includes('Sale tham gia (thẻ Pos)') && det.textContent.includes('Sản phẩm (Pos)') && det.textContent.includes('Ghi chú') && !det.textContent.includes('Sale tham gia (bán trên Base)'), 'mac dinh tab POS: cot ghi chu / sale the / san pham Pos');
   ok(det.textContent.includes('Combo A') && det.textContent.includes('3.000.000₫') && det.textContent.includes('2.000.000₫') && det.textContent.includes('2.800.000₫'), 'Pos: tong doanh thu, doanh thu sau chia, gia Pos goc khi khac');
   ok(det.textContent.includes('Tổng (2 dòng)') && det.textContent.includes('5.000.000₫') && det.textContent.includes('3.000.000₫'), 'Pos: dong tong cong dung (5.000.000 / 3.000.000)');
   ok(det.innerHTML.includes('Khách &lt;i&gt;2&lt;/i&gt;') && !det.innerHTML.includes('<i>2</i>'), 'ten KH duoc escape');
@@ -43,9 +43,20 @@ const wrap = $('wrap'); w.renderSalesReportTabM_(wrap, '<span>tabs</span>');
   det.querySelector('[data-m-xlsx]').click();
   ok(saved.length === 1 && /^DoiSoat_DonChia_An_2026-10-01_2026-10-31\.xlsx$/.test(saved[0].fn), 'xuat Excel: ten file co ten sale + ky');
   const sh = saved[0].wb.sheets; ok(sh.length === 2 && sh[0].name === 'Base' && sh[1].name === 'Pos', 'Excel co dung 2 sheet: Base roi Pos');
-  ok(sh[0].rows[0].join('|') === 'Ngày lên đơn|Tháng lên đơn|Tên KH|Số điện thoại|Mã bộ đếm|Sale tham gia (bán trên Base)|Sản phẩm (Base)|Tổng doanh thu|Doanh thu sau chia', 'sheet Base: tieu de cot dung yeu cau');
+  ok(sh[0].rows[0].slice(0, 9).join('|') === 'Ngày lên đơn|Tháng lên đơn|Tên KH|Số điện thoại|Mã bộ đếm|Sale tham gia (bán trên Base)|Sản phẩm (Base)|Tổng doanh thu|Doanh thu sau chia', 'sheet Base: tieu de cot dung yeu cau');
   ok(sh[1].rows[0].slice(0, 9).join('|') === 'Ngày lên đơn|Tháng lên đơn|Tên KH|Số điện thoại|Ghi chú|Sale tham gia (thẻ Pos)|Sản phẩm (Pos)|Tổng doanh thu|Doanh thu sau chia', 'sheet Pos: tieu de cot dung yeu cau');
   ok(sh[0].rows.length === 3 && sh[1].rows.length === 3 && sh[0].rows[1][3] === '0911000001' && sh[0].rows[1][7] === 2000000 && sh[1].rows[1][8] === 2000000 && sh[1].rows[1][9] === 2800000 && sh[1].rows[2][9] === '', 'Excel: so tien la SO (cong duoc), SDT giu so 0 dau, gia Pos goc chi khi khac');
+  // ---- CHECK NGUOC BASE (UI, 2026-10-24) ----
+  ok(sh[1].rows[0].slice(10).join('|') === 'Đối chiếu Base|Sale trên Base|Thiếu trên Pos (có trên Base)|Thừa trên Pos (không có trên Base)|Mã bộ đếm Base|Sale phản hồi', 'sheet Pos: them 6 cot doi chieu Base + Sale phan hoi');
+  ok(sh[1].rows[1].slice(10).join('|') === 'LỆCH Base|An, Bình|Bình||17T10/2026, 18T10/2026|An làm đúng, Bình quên gắn thẻ' && sh[1].rows[2][10] === 'Không có đơn Base để đối chiếu', 'Excel Pos: dong lech co sale tren Base, thieu tren Pos, ma bo dem, sale phan hoi; dong khong co Base ghi ro');
+  ok(sh[0].rows[0][9] === 'Loại dòng' && sh[0].rows[1][9] === 'Đã ghép (tính vào doanh thu)', 'sheet Base: cot Loai dong');
+  det.querySelector('[data-m-tab="pos"]').click(); await sleep(5); det = $('sr-m-detail');
+  ok(det.textContent.includes('1 đơn LỆCH Base') && det.textContent.includes('LỆCH Base') && det.textContent.includes('Thiếu trên Pos'), 'tab Pos: banner dem lech + cot doi chieu');
+  ok(det.querySelectorAll('tbody tr').length === 3, 'tab Pos: 2 don + dong tong');
+  det.querySelector('[data-m-lech]').click(); await sleep(5); det = $('sr-m-detail');
+  ok(det.querySelectorAll('tbody tr').length === 2 && det.textContent.includes('Khách 1') && !det.textContent.includes('Khách <i>2</i>'), 'loc "Chi don lech Base": chi con don lech (+ dong tong)');
+  det.querySelector('[data-m-lech]').click(); await sleep(5); det = $('sr-m-detail');
+  ok(det.querySelectorAll('tbody tr').length === 3, 'bo loc lech -> hien lai tat ca');
   // doi sale / dong / loc lai
   respFn = p => Object.assign({}, DET, { sale: p.sale, pos: [], base: [], summary: { posOrders: 0, posTotal: 0, posShare: 0, baseOrders: 0, baseTotal: 0, baseShare: 0, noBaseOrders: 0 } });
   wrap.querySelector('tr[data-m-sale^="Bình"] [data-m-view="base"]').click(); await sleep(30);
