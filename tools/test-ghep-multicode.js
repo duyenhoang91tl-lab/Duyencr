@@ -37,4 +37,12 @@ ok(g.shares.length===1&&g.shares[0].name==='saleA'&&g.shares[0].frac===1,'2 don 
 const r4=Object.assign({},r1,{saleBan:'saleA, 8, 13'});
 g=ctx._resolveGhepDon_(codes,{exact:{'937T10/2026':[r2]},fuzzy:{'681T10':[r4]}},{},3000000,['saleA','saleB']);
 ok(g.shares.map(x=>x.name).sort().join()==='saleA,saleB','sale ban tren Base "saleA, 8, 13": 8 va 13 la STT, khong thanh sale');
+// Cong tac don 1 ma (Settings POS_GHEP_MIN_CODES): mac dinh 2; chi '1' moi bat
+let setv=null;const mk=()=>new Function('getSetting_','POS_GHEP_MIN_CODES_',fn('_posGhepMinCodes_')+'\nreturn _posGhepMinCodes_;')(()=>{if(setv==='THROW')throw new Error('x');return setv},2);
+const mc=mk();
+ok(mc()===2,'khong cai Settings -> 2 (quy tac cu, so lieu khong doi)');
+setv='1';ok(mc()===1,'Settings POS_GHEP_MIN_CODES=1 -> don 1 ma cung ghep Base');
+setv=' 1 ';ok(mc()===1,'chiu khoang trang');
+setv='0';ok(mc()===2,'gia tri la (0) -> van 2 (khong cho ghep ca don 0 ma)');setv='abc';ok(mc()===2,'gia tri sai -> 2');
+setv='THROW';ok(mc()===2,'loi doc Settings -> 2, khong lam hong bao cao');
 console.log(bad?'FAILED '+bad:'ALL PASS');process.exit(bad?1:0);
