@@ -1,6 +1,7 @@
 package com.duyen.vietat
 
 import android.content.Context
+import android.util.Base64
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -48,7 +49,8 @@ object Sync {
             val (mc, mb) = call(c, "GET", "/api/media")
             if (mc == 200) {
                 val remote = JSONArray(String(mb)).let { a -> (0 until a.length()).map { a.getString(it) }.toSet() }
-                val need = Store.snippets.flatMap { it.options }.filter { kindOf(it) != null }.map { mediaNameOf(it) }.toSet()
+                // Chỉ đồng bộ ảnh của mục TỰ TẠO trên máy; ảnh lấy từ CRM (crm_…) tải từ CRM, không đẩy lên server đồng bộ riêng
+                val need = Store.snippets.filter { !Store.isCrm(it.id) }.flatMap { it.options }.filter { kindOf(it) != null }.map { mediaNameOf(it) }.toSet()
                 for (n in need) {
                     val f = File(Store.mediaDir, n)
                     if (f.exists() && n !in remote) call(c, "PUT", "/api/media/$n", f.readBytes(), "application/octet-stream")
@@ -72,6 +74,26 @@ object Crm {
     fun name(c: Context) = prefs(c).getString("name", "").orEmpty().trim()
     fun configured(c: Context) = name(c).isNotEmpty()
 
+    /** Tải 1 ảnh CRM (Drive) về thư mục media dưới tên crm_<id>.<đuôi>; đã có thì dùng lại, không tải lại. Trả về tên file hoặc null nếu lỗi. */
+    private fun fetchImage(base: String, c: Context, id: String): String? {
+        Store.mediaDir.listFiles()?.firstOrNull { it.name.startsWith("crm_$id.") && it.length() > 0 }?.let { return it.name }
+        return try {
+            val full = base + (if (base.contains('?')) "&" else "?") + "action=vietTatImage&id=" + URLEncoder.encode(id, "UTF-8") + "&by=" + URLEncoder.encode(name(c), "UTF-8")
+            val con = URL(full).openConnection() as HttpURLConnection
+            con.requestMethod = "GET"; con.connectTimeout = 15000; con.readTimeout = 60000; con.instanceFollowRedirects = true
+            val code = con.responseCode
+            val body = (if (code < 400) con.inputStream else con.errorStream)?.use { String(it.readBytes()) }.orEmpty()
+            con.disconnect()
+            if (code != 200) return null
+            val j = JSONObject(body)
+            if (!j.optBoolean("ok")) return null
+            val ext = when (j.optString("mimeType")) { "image/png" -> "png"; "image/webp" -> "webp"; "image/gif" -> "gif"; else -> "jpg" }
+            val fname = "crm_$id.$ext"
+            File(Store.mediaDir, fname).writeBytes(Base64.decode(j.getString("base64"), Base64.DEFAULT))
+            fname
+        } catch (e: Exception) { null }
+    }
+
     /** Chạy trên luồng nền. Trả về thông báo trạng thái ("" nếu đang chạy dở). */
     fun pull(c: Context): String {
         if (!busy.compareAndSet(false, true)) return ""
@@ -86,8 +108,15 @@ object Crm {
             if (code != 200) return "Lỗi CRM ($code)"
             val r = JSONObject(body)
             if (r.has("error")) return "CRM báo lỗi: " + r.optString("error")
-            val n = Store.replaceCrm(r.getJSONArray("snippets"))
-            "Đã cập nhật từ CRM ($n mục)"
+            val arr = r.getJSONArray("snippets")
+            val ids = LinkedHashSet<String>()
+            for (i in 0 until arr.length()) arr.getJSONObject(i).optJSONArray("images")?.let { ia ->
+                for (k in 0 until ia.length()) ia.optJSONObject(k)?.optString("id")?.takeIf { it.isNotEmpty() }?.let { ids += it }
+            }
+            val files = HashMap<String, String>(); var failed = 0
+            for (id in ids) { val f = fetchImage(base, c, id); if (f != null) files[id] = f else failed++ }
+            val n = Store.replaceCrm(arr, files)
+            "Đã cập nhật từ CRM ($n mục" + (if (ids.isNotEmpty()) ", ${files.size} hình" else "") + (if (failed > 0) ", $failed hình lỗi" else "") + ")"
         } catch (e: Exception) {
             "Lỗi cập nhật CRM: ${e.message}"
         } finally { busy.set(false) }
