@@ -2,6 +2,12 @@
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
 
+## 2026-10-25 — Báo cáo N (Tính đơn thuần): bấm dòng Sale / dòng Tổng → xem ĐƠN CHI TIẾT; Báo cáo M đã có sẵn
+- [x] **N:** `js/59-report-drill.js` thêm kind `nSale`/`nAll` (`_srDrillComputeN_`): dùng ĐÚNG `_srPureOrders_` + `_srOrderShares_(o,'pure')` của bảng N (chia đều theo Thẻ, giá Pos gốc) nên tổng cửa sổ = số trên bảng N. `js/11` gắn `_srDrillAttr_('nSale'|'nAll')` ở `_srPurePanelHtml_`. Cột giá hiện "Giá Pos gốc".
+- [x] **M:** các dòng sale ở Báo cáo M ĐÃ mở bảng chi tiết (`_srMOpen_`, có Excel) từ trước nên không đổi; ô KPI/dòng Tổng của M chưa có (cần GAS trả đơn theo toàn kỳ).
+- Test: `node tools/test-report-drill.js` (44 ca, thêm 5 ca N). Không đổi GAS.
+- [ ] CẦN LÀM TIẾP: Duyên Ctrl+F5, vào Báo cáo N bấm thử dòng Sale. Còn lại: ô KPI/Tổng của M, báo cáo C/D/E/F/G, ô tìm trong cửa sổ chi tiết.
+
 ## 2026-10-25 — Báo cáo A + B: bấm vào ô/dòng → xem ĐƠN CHI TIẾT trong cửa sổ nổi (Duyên yêu cầu; chọn A+B trước, dạng cửa sổ nổi)
 - [x] **Cách dùng:** Báo cáo A (Base) / B (Pos) → bấm ô đầu trang (Số lượng đơn, Tổng doanh thu) hoặc 1 dòng ở các bảng Theo Sale / Team / Kênh / MKT (A) · Theo Sale / Team / Nguồn / MKT / Sản phẩm (B) → cửa sổ liệt kê đơn của ô đó (ngày, mã/ghi chú đơn, khách + SĐT bấm mở hồ sơ, kênh, sale, sản phẩm, trạng thái, giá trị, phần tính vào ô) + dòng tổng đối chiếu "✓ khớp bảng" / "⚠ lệch" + **📥 Xuất Excel**. Esc / bấm nền / ✕ để đóng; cửa sổ z-index 290 nên hồ sơ khách (300) hiện TRÊN nó.
 - [x] **GAS (gas_v13.js, đã `split-gas`):** để tổng ở cửa sổ KHỚP bảng, mỗi đơn trả thêm phần nó đóng góp tính ngay tại vòng tổng hợp: A `bs` (theo Sale, chia đều `revenue/n` hoặc nguyên cho người tạo khi tích "theo người tạo"), `bt` (theo Team), `rs` (doanh thu đơn sau bộ lọc Sale), `soDienThoai` (A nay gọi `readDTTong_(true, true)`), và `mktKenh` (MKT → [[kênh, trọng số]]); B `bs`/`bt` (tiền × tỷ lệ chia gồm ghép Base / file kế toán / quầy 30-70). Helper `_drillPairs_`/`_drillPairsObj_` ngay trên `buildSalesReportA_`. Kênh / Nguồn / Marketer (B) / Sản phẩm suy trực tiếp từ trường của đơn ở web.
