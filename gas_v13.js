@@ -2420,6 +2420,7 @@ function doGetCore_(e) {
     // portal/Sasum/Pancake. Tim khong dau, khop tren MOI cot dang text cua sheet, khong
     // can biet truoc ten cot (tu doc dong tieu de dong 1). ──
     if (action === 'priceAsk') return jsonOut_(priceAsk_(e && e.parameter ? e.parameter.q : ''));   // tro ly noi bo hoi gia (js/38-pro-dock.js)
+    if (action === 'goldWeightList') return jsonOut_(goldWeightList_(String((e && e.parameter && e.parameter.refresh) || '') === '1'));   // Check phan vang (CRM + Pancake AI)
     if (action === 'priceSearch') {
       var q = (e && e.parameter && e.parameter.q) ? String(e.parameter.q) : '';
       var cachePS = CacheService.getScriptCache();
@@ -10908,6 +10909,79 @@ function _driveImageBase64_(fileId) {
 // tren) tu 1 file Google Sheet KHAC voi PRICE_SS_ID (file "Report Sale" rieng cua team Sale).
 var BANNED_WORDS_SS_ID = '1qyyG2Pj8QOVNTb4B9JX8VQsrjFlZX-WhpovX1qDkvzM';
 var BANNED_WORDS_GID = 1343060455; // tab "Lưu ý từ cấm"
+
+// ═══ CHECK PHAN VANG (them 2026-10-23, yeu cau Duyen) ═══
+// CS (Pancake AI + CRM) go TEN SAN PHAM -> thay SO PHAN VANG. Nguon: tab "Trọng lượng vàng" cua file "Report Sale" (cung file voi Tu cam):
+//   STT | Nhóm sản phẩm | Tên thương mại | Chất liệu | Kiểu/Size | Giá | Lượng vàng      (don vi cot Luong vang: PHAN; 1 chi = 10 phan)
+// Doc theo TEN TIEU DE cot (khong co dinh vi tri) nen them/doi thu tu cot khong sao. KHONG tra cot "Giá" (CS chi can phan vang; gia lay o bang gia DANH_MUC).
+// Tra ve TOAN BO bang (vai chuc dong) de client loc ngay khi go chu, khong bat them yeu cau moi lan go (han muc UrlFetch). Cache 10 phut.
+// Cau hinh doi file/tab khong can sua code: Settings 'goldWeightSheetId' / 'goldWeightGid' (mac dinh nhu duoi).
+var GOLD_WEIGHT_SS_ID = '1qyyG2Pj8QOVNTb4B9JX8VQsrjFlZX-WhpovX1qDkvzM';
+var GOLD_WEIGHT_GID = 637853981;     // tab "Trọng lượng vàng"
+var GOLD_CACHE_KEY_ = 'gold_weight_v1';
+function _goldCfg_() {
+  var id = GOLD_WEIGHT_SS_ID, gid = GOLD_WEIGHT_GID;
+  try { var a = String(getSetting_('goldWeightSheetId') || '').trim(); if (a) id = a; } catch (e) {}
+  try { var b = String(getSetting_('goldWeightGid') || '').trim(); if (/^\d+$/.test(b)) gid = parseInt(b, 10); } catch (e) {}
+  return { id: id, gid: gid };
+}
+// O so (vd 2.5) -> kieu Viet "2,5" nhu CS nhin tren sheet; o chu giu nguyen ("2,5 - 2,7", "7-8").
+function _goldCell_(v) {
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'number') return String(v).replace('.', ',');
+  return String(v).replace(/\s+/g, ' ').trim();
+}
+function _goldNum_(t) { var n = parseFloat(String(t).replace(',', '.')); return isNaN(n) ? null : n; }
+function readGoldWeights_() {
+  var cfg = _goldCfg_();
+  var ss = SpreadsheetApp.openById(cfg.id);
+  var sh = ss.getSheetById(cfg.gid);
+  if (!sh) { var all = ss.getSheets(); for (var i = 0; i < all.length; i++) { if (_stripVN_(all[i].getName()).indexOf('trong luong vang') !== -1) { sh = all[i]; break; } } }
+  if (!sh) throw new Error('Khong thay tab "Trong luong vang" trong file Report Sale (gid ' + cfg.gid + ').');
+  if (sh.getLastRow() < 2) return [];
+  var lastRow = sh.getLastRow(), lastCol = Math.max(sh.getLastColumn(), 8);
+  var vals = sh.getRange(1, 1, lastRow, lastCol).getValues();
+  var hIdx = _detectHeaderRow_(vals, 12);
+  var col = { nhom: -1, ten: -1, chat: -1, size: -1, vang: -1 };
+  (vals[hIdx] || []).forEach(function (h, c) {
+    var t = _stripVN_(String(h == null ? '' : h));
+    if (!t) return;
+    if (col.vang < 0 && (t.indexOf('luong vang') !== -1 || t.indexOf('phan vang') !== -1 || t.indexOf('trong luong') !== -1)) col.vang = c;
+    else if (col.ten < 0 && (t.indexOf('ten thuong mai') !== -1 || t.indexOf('ten san pham') !== -1 || t === 'ten')) col.ten = c;
+    else if (col.nhom < 0 && t.indexOf('nhom') !== -1) col.nhom = c;
+    else if (col.chat < 0 && t.indexOf('chat lieu') !== -1) col.chat = c;
+    else if (col.size < 0 && (t.indexOf('size') !== -1 || t.indexOf('kieu') !== -1)) col.size = c;
+  });
+  if (col.vang < 0 || (col.ten < 0 && col.nhom < 0)) throw new Error('Tab "Trong luong vang": khong tim thay cot "Luong vang" / "Ten thuong mai" o dong tieu de.');
+  var get = function (row, c) { return c < 0 ? '' : _goldCell_(row[c]); };
+  var out = [];
+  for (var r = hIdx + 1; r < vals.length; r++) {
+    var row = vals[r] || [];
+    var it = { nhom: get(row, col.nhom), ten: get(row, col.ten), chatLieu: get(row, col.chat), size: get(row, col.size), luongVang: get(row, col.vang) };
+    if (!it.nhom && !it.ten && !it.chatLieu && !it.size && !it.luongVang) continue;   // dong trong (chi co STT danh san)
+    if (!it.nhom && !it.ten) continue;                                                   // co so ma khong ro san pham nao
+    var parts = it.luongVang.split(/\s*[-–—]\s*/).map(_goldNum_).filter(function (n) { return n !== null; });
+    it.min = parts.length ? Math.min.apply(null, parts) : null;
+    it.max = parts.length ? Math.max.apply(null, parts) : null;
+    out.push(it);
+  }
+  return out;
+}
+function goldWeightList_(refresh) {
+  try {
+    var cache = CacheService.getScriptCache(), items = null;
+    if (!refresh) { try { var c = cache.get(GOLD_CACHE_KEY_); if (c) items = JSON.parse(c); } catch (e) { items = null; } }
+    if (!items) {
+      items = readGoldWeights_();
+      try { cache.put(GOLD_CACHE_KEY_, JSON.stringify(items), 600); } catch (e) {}
+    }
+    return { ok: true, total: items.length, items: items, unit: 'phan' };
+  } catch (err) {
+    var msg = String(err && err.message || err);
+    if (/permission|access|denied|quyen|not found|Unexpected error/i.test(msg)) msg += ' — chia se file "Report Sale" (quyen Xem) cho tai khoan dang chay GAS.';
+    return { error: 'Doc bang phan vang loi: ' + msg.slice(0, 220) };
+  }
+}
 
 // ─── TU CAM CAU HINH DUOC (Settings 'bannedWordsCfg') — yeu cau Duyen 2026-10-22: them/bot tu cam NGAY TRONG CRM > Cau hinh, khong can mo Google Sheet.
 // JSON: { useSheet: true|false (mac dinh true = van doc them sheet "Luu y tu cam"), items: [ { tuCam, thayThe } ] }.
