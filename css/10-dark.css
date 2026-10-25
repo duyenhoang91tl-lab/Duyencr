@@ -4,7 +4,7 @@ html[data-theme="dark"] {
   color-scheme: dark;
   --bg:#14151a; --surface:#1d1f26; --surface2:#262932; --surface3:#30343f;
   --border:rgba(255,255,255,0.10); --border-md:rgba(255,255,255,0.16); --border-strong:rgba(255,255,255,0.26);
-  --text:#e8e6e1; --muted:#a3a09a; --hint:#77746e;
+  --text:#e8e6e1; --muted:#c4c1ba; --hint:#a3a09a;
   --green:#3ecf8e; --green-bg:#12301f; --green-mid:#34b27b;
   --vip:#a78bfa; --vip-bg:#2a2147; --vip-b:#5b4b9b;
   --tt:#60a5fa; --tt-bg:#15283f; --tt-b:#2c5a96;
@@ -121,3 +121,9 @@ html[data-theme="dark"] #sync-err-banner,html[data-theme="dark"] #row-err-banner
 html[data-theme="dark"] #sync-err-banner button,html[data-theme="dark"] #row-err-banner button{background:var(--surface2)!important;color:#fca5a5!important;border-color:#7f2d2d!important;}
 html[data-theme="dark"] #dp-refresh-hint{background:#3a3213!important;border-color:#6b5a1e!important;color:#fcd34d!important;}
 html[data-theme="dark"] #deploy-guide-banner{background:var(--surface)!important;border-color:#c2570c!important;box-shadow:0 6px 28px rgba(0,0,0,.55)!important;}
+
+/* 2026-10-23 (Duyên báo "chế độ tối nhìn chả thấy gì"): LỖI GỐC — (1) #qs-input (ô tìm nhanh trên header, css/05) có nền trắng cố định nhưng chữ ở chế độ tối bị ép var(--text) (sáng) → chữ sáng trên nền trắng, tàng hình;
+   (2) --hint #77746e / --muted #a3a09a quá tối trên nền xanh đậm (tương phản ~3:1) → nhãn sidebar, số đếm, dấu —, SĐT, chữ gợi ý gần như chìm. Đã nâng --muted/--hint ở khối biến phía trên (≥4.5:1) và sửa ô tìm nhanh + placeholder. */
+html[data-theme="dark"] #qs-input { background:var(--surface2)!important; color:var(--text)!important; border-color:var(--border-strong)!important; }
+html[data-theme="dark"] #qs-input:focus { border-color:var(--green)!important; }
+html[data-theme="dark"] input::placeholder, html[data-theme="dark"] textarea::placeholder { color:var(--muted); opacity:1; }

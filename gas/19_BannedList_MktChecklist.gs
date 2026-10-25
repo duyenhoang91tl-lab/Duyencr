@@ -291,7 +291,7 @@ function buildMktChecklistReport_(from, to) {
       kenhRevenue[kk] = (kenhRevenue[kk] || 0) + rev;
       if (!kenhOrdersByDate[kk]) kenhOrdersByDate[kk] = {};
       kenhOrdersByDate[kk][dKeyM] = (kenhOrdersByDate[kk][dKeyM] || 0) + 1;
-      splitMulti_(rowsDt[i].saleBan, ',').forEach(function(sn) {
+      splitMulti_(rowsDt[i].saleBan, ',').filter(function(x){ return !_isNumericTag_(x); }).forEach(function(sn) { // loai STT Pancake
         saleOrders[sn] = (saleOrders[sn] || 0) + 1;
         saleRevenue[sn] = (saleRevenue[sn] || 0) + rev;
         if (!saleOrdersByDate[sn]) saleOrdersByDate[sn] = {};
@@ -307,7 +307,7 @@ function buildMktChecklistReport_(from, to) {
       }
       if (fbKenh[kk]) {
         donFbTotal++;
-        splitMulti_(rowsDt[i].saleBan, ',').forEach(function(sn) { saleOrdersFb[sn] = (saleOrdersFb[sn] || 0) + 1; });
+        splitMulti_(rowsDt[i].saleBan, ',').filter(function(x){ return !_isNumericTag_(x); }).forEach(function(sn) { saleOrdersFb[sn] = (saleOrdersFb[sn] || 0) + 1; }); // loai STT Pancake
       }
     }
   }

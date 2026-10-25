@@ -28,6 +28,7 @@ Push `main` là GitHub Actions tự đưa lên chỗ chạy thật (xem tab Acti
 **Vì vậy KHÔNG nhắc Duyên:** dán code vào Apps Script, Manage deployments → New version, dán `worker.mjs`, chạy SQL trong Supabase, hay bấm "🔄 Đồng bộ mã GAS mới nhất" (nút Copy mã GAS chỉ là đường dự phòng thủ công; không ai còn dán tay). Chỉ cần: push → nói "đã đẩy, workflow tự deploy" + nếu đổi web thì "Ctrl+F5". Chỉ nhắc khi workflow ĐỎ/không chạy (xem Actions) — khi đó mới hướng dẫn xử lý.
 Vẫn phải nhắc những việc workflow KHÔNG làm được: chạy hàm cần bấm tay trong Apps Script Editor (vd `xemKhoaExtension`, backfill/đối chiếu Supabase, `xoaSdtLoiThat`), đổi Script Properties, **reload extension** trong `chrome://extensions` khi sửa extension.
 Sau khi sửa `gas_v13.js` vẫn PHẢI chạy `node tools/split-gas.js` rồi `--check` (workflow cũng tự sinh lại, nhưng commit phải khớp).
+`gas/NN_*.gs` + `gas/INDEX.md` là file TỰ SINH từ `gas_v13.js` (nguồn chính): KHÔNG sửa tay (bị ghi đè, `--check` báo lệch). Tra hàm nằm file nào: `node tools/split-gas.js --where <tên_hàm>` hoặc mở `gas/INDEX.md`.
 
 **Sau khi sửa JS/CSS của extension:** nhắc reload extension trong `chrome://extensions` (không cần deploy riêng).
 
@@ -75,3 +76,9 @@ Cả 2 extension gọi chung 1 URL GAS.
 Instruction của Project (rule 2 và 13) cần SỬA cho khớp: "Deploy GAS/Worker/Supabase đã tự động qua GitHub Actions — không nhắc deploy/đồng bộ mã nữa; chỉ nhắc reload extension, Ctrl+F5 web, hoặc hàm cần chạy tay." (Claude không sửa được Instruction — Duyên cập nhật ở Project settings.) Nên thêm vào Instruction của Project quy tắc 14: "Chỉ sửa theo yêu cầu mới nhất; chỉ chỉnh mục cũ khi Duyên báo xoá/chỉnh liên quan."
 
 **Thêm vào Instruction của Project (quy tắc 15, Duyên dán vào Project settings):** "15. QUY TẮC SONG SONG: tính năng nào có ở Pancake AI thì Zalo AI cũng phải có và ngược lại — khi thêm/sửa tính năng cho 1 extension phải làm luôn cho extension còn lại trong cùng lần làm (cùng backend GAS, cùng câu chữ). Tính năng đặc thù nền tảng thì ghi lý do vào tools/ext-parity-allow.json. Trước khi báo xong chạy `node tools/check-ext-parity.js`. Chi tiết: docs/crm-kb/08-extension-parity.md."
+
+## Quy ước: hàm admin CHẠY TAY trong Apps Script Editor phải là hàm CÔNG KHAI (không có `_` ở cuối tên)
+**Nguyên nhân gốc (14/10/2026, Duyên không chạy được `dedupePosNow_` / `installAutoDedupTrigger_`):** trong Google Apps Script, hàm có dấu `_` ở cuối tên là **hàm riêng tư** — bị **ẩn khỏi danh sách chọn hàm** ở thanh công cụ nên không chọn để bấm "Chạy" được. Code cũ vẫn hướng dẫn người dùng chạy thẳng bằng tên có `_` (sai) cho `dedupePosNow_` và `installAutoDedupTrigger_`.
+- Hàm cần chạy tay: viết **hàm công khai không có `_`** gọi hàm riêng tư và `Logger.log(kết quả)` (giá trị `return` không hiện ở Editor). Ví dụ: `dedupePosNow()` → `dedupePosNow_()`, `installAutoDedupTrigger()` / `removeAutoDedupTrigger()`, `caiTriggerChiaTuDong` / `goTriggerChiaTuDong` / `chayThuChiaTuDong` / `kiemTraChiaTuDong`, `sbDonHangCaiTrigger`…
+- Hàm riêng tư vẫn dùng bình thường cho code và làm handler của trigger (`onChangeDedupTrigger_`, `*Tick_`); chỉ cấm **hướng dẫn người dùng chọn** chúng.
+- Khi viết hướng dẫn trong code/giao diện/tài liệu: ghi tên hàm CÔNG KHAI. Test chặn tái diễn: `node tools/test-gas-run-entrypoints.js` (không còn câu hướng dẫn người dùng chọn tên hàm riêng tư; mọi hàm `install*/remove*/…Now_` riêng tư phải có hàm công khai gọi nó).

@@ -4,6 +4,8 @@ const fs = require('fs');
 const src = fs.readFileSync(__dirname + '/../js/11-fn-srload.js', 'utf8');
 const names = ['_srOrdNames_', '_srOrderShares_', '_srPureCalc_', '_srBcOrders_', '_srBcBaseSum_', '_srBcPosVal_', '_srBcQuayTxt_', '_srBcBuild_', '_srBcCheckRows_', '_srBaseCheckPanelHtml_'];
 let code = "var _SR_UNASSIGNED_='(chưa gán sale)'; function fmt(n){return (n||0).toLocaleString('vi-VN');} function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');} function _srMoney(n){return fmt(Math.round(n||0))+'đ';}\n";
+// _custLinkHtml_ (js/29-sidenav.js, 'bam SDT mo ho so khach'): lay ham THAT de bang check render dung
+const _sn = fs.readFileSync(__dirname + '/../js/29-sidenav.js', 'utf8'); { const i = _sn.indexOf('function _custLinkHtml_('); let d = 0, j = _sn.indexOf('{', i); for (let k = j; k < _sn.length; k++) { if (_sn[k] === '{') d++; else if (_sn[k] === '}' && --d === 0) { code += _sn.slice(i, k + 1) + '\n'; break; } } }
 for (const n of names) {
   const i = src.indexOf('function ' + n + '(');
   if (i < 0) throw new Error('thiếu hàm ' + n);

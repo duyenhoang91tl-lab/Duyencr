@@ -13,7 +13,8 @@ const sheet = { getDataRange: () => ({ getValues: () => data.map(r => r.slice())
   getRange: (r, c, nr, nc) => ({ setValues: m => { m.forEach((row, i) => { data[r - 1 + i] = data[r - 1 + i] || []; row.forEach((v, j) => { data[r - 1 + i][c - 1 + j] = v; }); }); }, setValue: v => { data[r - 1][c - 1] = v; } }),
   deleteRow: r => { data.splice(r - 1, 1); } };
 const users = { tok_admin: { username: 'ad', name: 'Admin', role: 'admin' }, tok_mgr: { username: 'qm', name: 'Quản Lý', role: 'manager' }, tok_lead: { username: 'ld', name: 'Trưởng Nhóm', role: 'leader' }, tok_cs: { username: 'lan', name: 'Lan', role: 'cs' }, tok_cs2: { username: 'mai', name: 'Mai', role: 'cs' } };
-const ctx = { jsonOut_: o => o, getSheet_: () => sheet, _sessUser_: t => users[t] || null, _extKeyWho_: ek => ek === 'KEYZ' ? 'zalo' : (ek === 'KEYP' ? 'pancake' : (ek ? 'sai' : '')), Date, JSON, Math, String, isNaN };
+const notified = [];
+const ctx = { _tplNotifClear_: () => {}, _tplNotifyPending_: (id, title, who) => { notified.push([id, title, who]); }, jsonOut_: o => o, getSheet_: () => sheet, _sessUser_: t => users[t] || null, _extKeyWho_: ek => ek === 'KEYZ' ? 'zalo' : (ek === 'KEYP' ? 'pancake' : (ek ? 'sai' : '')), Date, JSON, Math, String, isNaN };
 // Nhom san pham (2026-10-16): readMessageTemplates_ nay goi _tplCatalogIndex_ -> gia lap DANH_MUC rong (test nay chi kiem quyen/trang thai; phan nhom: tools/test-msgtpl-group.js)
 // _tplNotifyPending_ (them 2026-10-21): bao admin khi co mau cho duyet — gia lap, ghi lai cac lan goi de kiem tra o cuoi test (khong doc sheet that)
 const NOTIFIED = [], CLEARED = [];

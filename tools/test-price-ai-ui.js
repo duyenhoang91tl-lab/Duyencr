@@ -52,7 +52,7 @@ const FOUND = { ok: true, found: true, text: 'Nhẫn Bạc Trơn size 12 giá 45
     cp.click(); await sleep(20); ok(T.env.clip[0] === FOUND.text && /Đã copy/.test(cp.textContent), N + ': Copy dung noi dung tra loi');
     // 2. AI loi nhung gia van dung
     T.env.reply = { ok: true, found: true, text: 'Giá theo bảng giá (nghìn đồng):\nBạc 925 - 450', aiError: '429' }; await T.click(); await sleep(30);
-    ok((/^Zalo/.test(N) ? /AI đang lỗi nên hiện danh sách giá gốc/ : /Lỗi API — hiện danh sách giá gốc/).test(T.box.textContent) && /Bạc 925 - 450/.test(T.box.textContent), N + ': AI loi -> van hien gia + ghi chu (Pancake dung cau chuan "Lỗi API" tu commit ddaf130)');
+    ok(/Lỗi API — hiện danh sách giá gốc/.test(T.box.textContent) && /Bạc 925 - 450/.test(T.box.textContent), N + ': AI loi -> van hien gia + ghi chu');
     // 3. khong tim thay + goi y (ten co dau nhay/ky tu dac biet -> khong vo giao dien, bam duoc)
     const odd = 'Nhẫn "925" <b>x</b> \'Ý\''; T.env.reply = { ok: true, found: false, suggestions: [odd, 'Dây chuyền'] }; await T.click(); await sleep(30);
     ok(/Chưa tìm thấy/.test(T.box.textContent) && T.box.querySelectorAll('button').length === 2 && !T.box.querySelector('b'), N + ': khong thay -> 2 goi y, khong chen HTML tu ten san pham');
@@ -79,10 +79,7 @@ const FOUND = { ok: true, found: true, text: 'Nhẫn Bạc Trơn size 12 giá 45
   // rieng Zalo: chua cai URL GAS
   const Z = zalo(''); Z.input.value = 'giá a'; await Z.click(); ok(/Chưa cài đặt URL GAS/.test(Z.box.textContent) && Z.env.calls.length === 0, 'Zalo: chua cai URL GAS -> nhac, khong goi');
   // dong bo 2 ben: cung chuoi thong bao nguoi dung thay
-  for (const s of ['Gõ câu hỏi về giá trước (vd: giá nhẫn bạc trơn size 12).', '🤖 Đang hỏi AI…', 'Giá lấy từ bảng giá DANH_MUC', 'Chưa tìm thấy sản phẩm khớp rõ trong bảng giá. Gõ rõ TÊN sản phẩm (kèm chất liệu / size nếu có).', 'Có thể bạn muốn hỏi', '📋 Copy', "GAS chưa lên bản có 'Hỏi AI về giá' — chờ deploy xong rồi thử lại"])
+  for (const s of ['Gõ câu hỏi về giá trước (vd: giá nhẫn bạc trơn size 12).', '🤖 Đang hỏi AI…', 'Giá lấy từ bảng giá DANH_MUC', 'Lỗi API — hiện danh sách giá gốc', 'Chưa tìm thấy sản phẩm khớp rõ trong bảng giá. Gõ rõ TÊN sản phẩm (kèm chất liệu / size nếu có).', 'Có thể bạn muốn hỏi', '📋 Copy', "GAS chưa lên bản có 'Hỏi AI về giá' — chờ deploy xong rồi thử lại"])
     ok(zchunk.includes(s) && (pchunk + fs.readFileSync(path.join(__dirname, '..', 'extension-pancake', 'pancake-background.js'), 'utf8')).includes(s), 'cau chu giong nhau o 2 extension: ' + s);
-  // QUY TAC SONG SONG — DANG LECH CO CHU DICH: Pancake AI da chuan hoa moi loi API thanh 'Lỗi API' (ddaf130); Zalo AI van noi 'AI đang lỗi nên hiện danh sách giá gốc'.
-  ok(zchunk.includes('AI đang lỗi nên hiện danh sách giá gốc') && (pchunk).includes('Lỗi API — hiện danh sách giá gốc'), 'moi ben giu dung cau loi cua minh');
-  console.log('!!   CANH BAO: cau bao loi AI cua Zalo CHUA giong Pancake ("Lỗi API") — can lam Zalo song song');
   console.log('ALL PRICE-AI UI TESTS PASSED');
 })().catch(er => { console.error('FAIL (ngoai le): ' + (er && er.stack || er)); process.exit(1); });

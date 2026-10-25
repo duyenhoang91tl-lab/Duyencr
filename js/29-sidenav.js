@@ -295,3 +295,150 @@ document.addEventListener('click', function(e){
   var box = document.getElementById('ord-search-res');
   if (box && box.style.display !== 'none' && !e.target.closest('.search-wrap')) box.style.display = 'none';
 });
+
+// ═══════════════════════════════════════════════════════
+//  TÌM NHANH → MỞ THẺ KHÁCH BÊN PHẢI, dùng được ở MỌI màn (2026-10-23, Duyên yêu cầu)
+//  Dùng chung cho ô header (#qs-input) và ô trên thanh Báo cáo (#rpt-qs-input).
+//  LÝ DO GỐC phải mở 2 tab CRM: màn Báo cáo (body.rpt-mode) ẩn cả header nên không còn ô tìm; và khung kết quả mã đơn cũ (#ord-search-res)
+//  nằm trong Sidebar đang thu gọn nên không thấy. Nay: khung kết quả riêng (#qs-res) hiện ngay dưới ô đang gõ; chọn 1 dòng hoặc Enter
+//  => openDp(SĐT) mở ngăn hồ sơ khách trượt từ phải, KHÔNG chuyển tab / không rời báo cáo đang xem.
+//  Tìm: SĐT (>=5 số) · tên (không dấu) · mã đơn / mã bộ đếm (>=4 ký tự có số, hỏi GAS searchOrder). Tài khoản test (demo-mode): chỉ khách đã có sẵn.
+// ═══════════════════════════════════════════════════════
+var _qs = { seq: 0, items: [], idx: -1, timer: null, q: '' };
+function _qsFold_(s){ return String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/\s+/g, ' ').trim(); }
+function _qsIsInp_(t){ return !!t && (t.id === 'qs-input' || t.id === 'rpt-qs-input'); }
+function _qsBox_(){
+  var b = document.getElementById('qs-res');
+  if (!b) { b = document.createElement('div'); b.id = 'qs-res'; b.style.display = 'none'; document.body.appendChild(b); }
+  return b;
+}
+function _qsHide_(){ var b = document.getElementById('qs-res'); if (b) b.style.display = 'none'; }
+function _qsPlace_(inp){
+  var b = _qsBox_(), r = inp.getBoundingClientRect(), w = Math.min(380, window.innerWidth - 12);
+  b.style.width = w + 'px';
+  b.style.left = Math.max(6, Math.min(r.left, window.innerWidth - w - 6)) + 'px';
+  b.style.top = (r.bottom + 2) + 'px';
+}
+function _qsCustomers_(q){
+  var list = (typeof allCustomers !== 'undefined' && allCustomers) || [], out = [];
+  var digits = q.replace(/\D/g, ''), isNum = /^[\d\s.+-]+$/.test(q) && digits.length >= 5;
+  var nd = isNum ? ((typeof normPhone === 'function' ? normPhone(q) : '') || digits) : '', f = _qsFold_(q);
+  for (var i = 0; i < list.length && out.length < 8; i++) {
+    var c = list[i]; if (!c) continue;
+    if (isNum) { if (String(c.phone || '').indexOf(nd) !== -1) out.push(c); }
+    else if (f.length >= 2) {
+      if (c._qsn === undefined) c._qsn = _qsFold_(c.name);   // nhớ tên đã bỏ dấu (136k KH: chỉ chuẩn hoá 1 lần)
+      if (c._qsn.indexOf(f) !== -1) out.push(c);
+    }
+  }
+  return out;
+}
+function _qsRender_(inp, loadingOrd, orderErr){
+  var b = _qsBox_(), h = '', it = _qs.items;
+  it.forEach(function(x, i){
+    var cls = 'qs-i' + (i === _qs.idx ? ' on' : '');
+    if (x.t === 'c') h += '<div class="' + cls + '" data-i="' + i + '">👤 <b>' + esc(x.name || x.phone) + '</b> · ' + esc(x.phone) + (x.sub ? '<div class="qs-s">' + esc(x.sub) + '</div>' : '') + '</div>';
+    else if (x.t === 'p') h += '<div class="' + cls + '" data-i="' + i + '">🔎 Tra cứu khách theo SĐT <b>' + esc(x.phone) + '</b><div class="qs-s">Khách ngoài danh sách đang tải</div></div>';
+    else h += '<div class="' + cls + '" data-i="' + i + '">📦 <b>' + esc(x.code) + '</b> · ' + esc(x.phone || 'không có SĐT') + (x.name ? ' · ' + esc(x.name) : '') +
+      '<div class="qs-s">' + esc(x.src) + (x.date ? ' · ' + esc(x.date) : '') + (x.product ? ' · ' + esc(x.product) : '') + '</div></div>';
+  });
+  if (loadingOrd) h += '<div class="qs-h">Đang tìm mã đơn…</div>';
+  else if (orderErr) h += '<div class="qs-h">' + esc(orderErr) + '</div>';
+  else if (!it.length) h = '<div class="qs-h">Không có khách / đơn nào khớp "' + esc(_qs.q) + '"</div>';
+  b.innerHTML = h; _qsPlace_(inp); b.style.display = 'block';
+}
+async function _qsRun_(inp){
+  var q = String(inp.value || '').trim(), seq = ++_qs.seq;
+  _qs.q = q; _qs.idx = -1; _qs.items = [];
+  if (q.length < 2) { _qsHide_(); return; }
+  var demo = document.body.classList.contains('demo-mode');
+  var items = [];
+  _qsCustomers_(q).forEach(function(c){ items.push({ t: 'c', phone: c.phone, name: c.name, sub: ((typeof careData !== 'undefined' && careData[c.phone]) || {}).cs || '' }); });
+  var digits = q.replace(/\D/g, ''), isPhone = /^[\d\s.+-]+$/.test(q) && digits.length >= 9 && digits.length <= 11;
+  if (isPhone && !items.length && !demo) items.push({ t: 'p', phone: (typeof normPhone === 'function' ? normPhone(q) : '') || digits });
+  _qs.items = items;
+  var needOrd = !demo && q.length >= 4 && /\d/.test(q) && !/^[\d\s.+-]+$/.test(q) && typeof gsUrl !== 'undefined' && !!gsUrl;
+  _qsRender_(inp, needOrd);
+  if (!needOrd) return;
+  try {
+    var sep = gsUrl.indexOf('?') > -1 ? '&' : '?';
+    var r = await fetch(gsUrl + sep + 'action=searchOrder&q=' + encodeURIComponent(q), { redirect: 'follow' });
+    var j = await r.json();
+    if (seq !== _qs.seq) return;   // đã gõ tiếp -> bỏ kết quả cũ
+    if (j && j.error) { _qsRender_(inp, false, j.error); return; }
+    ((j && j.results) || []).forEach(function(o){
+      var nm = (typeof customerMap !== 'undefined' && customerMap[o.phone]) ? customerMap[o.phone].name : '';
+      _qs.items.push({ t: 'o', phone: o.phone, code: o.code, src: o.src, date: o.date, product: o.product, name: nm });
+    });
+    _qsRender_(inp, false);
+  } catch (e) { if (seq === _qs.seq) _qsRender_(inp, false, 'Lỗi tìm mã đơn: ' + (e && e.message || e)); }
+}
+async function _qsPick_(i){
+  var it = _qs.items[i]; if (!it) return;
+  _qsHide_();
+  var ph = (typeof normPhone === 'function' ? normPhone(it.phone) : '') || String(it.phone || '').replace(/\D/g, '');
+  if (!ph) { if (typeof toast === 'function') toast('Đơn này không có SĐT khách để mở hồ sơ'); return; }
+  if (typeof customerMap === 'undefined') return;
+  if (!customerMap[ph] && !customerMap[it.phone]) {
+    if (document.body.classList.contains('demo-mode')) { if (typeof toast === 'function') toast('Tài khoản test chỉ xem được khách có sẵn trong danh sách'); return; }
+    ph = await _pullSearchCustomer_(ph);   // khách ngoài phạm vi: nạp riêng khách này (có toast lỗi bên trong)
+    if (!ph) return;
+  }
+  var key = customerMap[it.phone] ? it.phone : ph;
+  if (typeof openDp === 'function' && customerMap[key]) { try { openDp(key); } catch (e) {} }
+}
+document.addEventListener('input', function(e){
+  if (!_qsIsInp_(e.target)) return;
+  var inp = e.target; clearTimeout(_qs.timer);
+  _qs.timer = setTimeout(function(){ _qsRun_(inp); }, 300);
+});
+document.addEventListener('keydown', async function(e){
+  if (!_qsIsInp_(e.target)) return;
+  var inp = e.target, box = document.getElementById('qs-res'), open = !!box && box.style.display !== 'none';
+  if (e.key === 'Escape') { _qsHide_(); return; }
+  if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && open && _qs.items.length) {
+    e.preventDefault();
+    _qs.idx = (_qs.idx + (e.key === 'ArrowDown' ? 1 : -1) + _qs.items.length) % _qs.items.length;
+    _qsRender_(inp, false); return;
+  }
+  if (e.key === 'Enter') {
+    e.preventDefault(); clearTimeout(_qs.timer);
+    if (String(inp.value || '').trim() !== _qs.q || !open) await _qsRun_(inp);   // chưa tìm xong / đổi từ khoá -> tìm ngay rồi mới chọn
+    if (_qs.items.length) _qsPick_(_qs.idx >= 0 ? _qs.idx : 0);
+  }
+});
+document.addEventListener('click', function(e){
+  var it = e.target.closest && e.target.closest('#qs-res .qs-i');
+  if (it) { _qsPick_(+it.getAttribute('data-i')); return; }
+  if (!(e.target.closest && e.target.closest('#qs-res')) && !_qsIsInp_(e.target)) _qsHide_();
+});
+
+// ═══════════════════════════════════════════════════════
+//  MỞ HỒ SƠ KHÁCH TỪ BẤT KỲ BẢNG ĐƠN NÀO (2026-10-23, Duyên yêu cầu: "chỗ nào check đơn có mã đơn/SĐT đều mở được hồ sơ khách")
+//  Cách dùng ở chỗ vẽ bảng: _custLinkHtml_(sdt, 'nội dung hiển thị') -> chữ bấm được; click (bắt ở document, 1 chỗ duy nhất) -> _openCustomerByPhone_.
+//  Khách ngoài danh sách đang tải => nạp riêng bằng _pullSearchCustomer_ rồi openDp (openDp im lặng không mở nếu khách chưa có trong allCustomers — lý do
+//  các nút gọi openDp trực tiếp "bấm không ra gì"). Tài khoản test (demo-mode) chỉ mở khách có sẵn. (js/28 _bdOpenCustomer_ là bản riêng cùng logic cho popup đơn K.)
+// ═══════════════════════════════════════════════════════
+async function _openCustomerByPhone_(phone){
+  var ph = (typeof normPhone === 'function' ? normPhone(phone) : '') || String(phone || '').replace(/\D/g, '');
+  if (!ph || typeof customerMap === 'undefined' || typeof openDp !== 'function') return;
+  if (!customerMap[ph] && customerMap[phone]) ph = String(phone);
+  if (!customerMap[ph]) {
+    if (document.body.classList.contains('demo-mode')) { if (typeof toast === 'function') toast('Tài khoản test chỉ xem được khách có sẵn trong danh sách'); return; }
+    ph = await _pullSearchCustomer_(ph);
+    if (!ph) return;
+  }
+  try { openDp(ph); } catch (e) {}
+}
+function _custLinkHtml_(phone, inner, tip){
+  var p = String(phone == null ? '' : phone).trim();
+  if (p.replace(/\D/g, '').length < 6) return inner;   // không có SĐT hợp lệ -> chữ thường
+  return '<span class="cust-link" data-cust-phone="' + esc(p) + '" title="' + esc(tip || 'Bấm để mở hồ sơ khách') + '">' + inner + '</span>';
+}
+document.addEventListener('click', function(e){
+  var t = e.target.closest && e.target.closest('[data-cust-phone]');
+  if (!t) return;
+  e.stopPropagation(); e.preventDefault();   // capture: không kích hoạt onclick của dòng/ô cha (vd mở popup đơn)
+  _openCustomerByPhone_(t.getAttribute('data-cust-phone'));
+}, true);
+

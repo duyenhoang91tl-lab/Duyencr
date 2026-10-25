@@ -119,6 +119,9 @@ html[data-theme="dark"].ui-pro .khd-tm a{color:#ff8a80!important}
 html[data-theme="dark"].ui-pro .khd-at{color:#7eb0ff!important;background:var(--surface3)!important}
 html[data-theme="dark"].ui-pro .khd-err{color:#ff8a80!important}
 html[data-theme="dark"].ui-pro .khd-lock{color:var(--text)!important;background:var(--surface2)!important}
+html[data-theme="dark"].ui-pro .split-h{color:var(--text)!important}
+html[data-theme="dark"].ui-pro .split-err{color:#ff8a80!important}
+html[data-theme="dark"].ui-pro .split-d summary{color:#b9a8f5!important}
 /* ── 07-teamchat.css ── */
 /* ── 08-kho.css ── */
 html[data-theme="dark"] .tk-lowtxt{color:#ea8b85!important}
@@ -267,6 +270,7 @@ html[data-theme="dark"] [style^="color:#be185d;" i],html[data-theme="dark"] [sty
 html[data-theme="dark"] [style^="color:#c0392b;" i],html[data-theme="dark"] [style="color:#c0392b" i],html[data-theme="dark"] [style*=";color:#c0392b;" i],html[data-theme="dark"] [style$=";color:#c0392b" i],html[data-theme="dark"] [style*=" color:#c0392b;" i],html[data-theme="dark"] [style$=" color:#c0392b" i]{color:#e5938a!important}
 html[data-theme="dark"] [style^="color:#c2410c;" i],html[data-theme="dark"] [style="color:#c2410c" i],html[data-theme="dark"] [style*=";color:#c2410c;" i],html[data-theme="dark"] [style$=";color:#c2410c" i],html[data-theme="dark"] [style*=" color:#c2410c;" i],html[data-theme="dark"] [style$=" color:#c2410c" i]{color:#eda182!important}
 html[data-theme="dark"] [style^="color:#dc2626;" i],html[data-theme="dark"] [style="color:#dc2626" i],html[data-theme="dark"] [style*=";color:#dc2626;" i],html[data-theme="dark"] [style$=";color:#dc2626" i],html[data-theme="dark"] [style*=" color:#dc2626;" i],html[data-theme="dark"] [style$=" color:#dc2626" i]{color:#eb8484!important}
+html[data-theme="dark"] [style^="color:var(--accent,#2563eb);" i],html[data-theme="dark"] [style="color:var(--accent,#2563eb)" i],html[data-theme="dark"] [style*=";color:var(--accent,#2563eb);" i],html[data-theme="dark"] [style$=";color:var(--accent,#2563eb)" i],html[data-theme="dark"] [style*=" color:var(--accent,#2563eb);" i],html[data-theme="dark"] [style$=" color:var(--accent,#2563eb)" i]{color:var(--accent,#82a4ed)!important}
 html[data-theme="dark"] [style^="color:var(--orange,#e8a04a);" i],html[data-theme="dark"] [style="color:var(--orange,#e8a04a)" i],html[data-theme="dark"] [style*=";color:var(--orange,#e8a04a);" i],html[data-theme="dark"] [style$=";color:var(--orange,#e8a04a)" i],html[data-theme="dark"] [style*=" color:var(--orange,#e8a04a);" i],html[data-theme="dark"] [style$=" color:var(--orange,#e8a04a)" i]{color:var(--orange,#edbc82)!important}
 html[data-theme="dark"] [style^="color:var(--primary,#2563eb);" i],html[data-theme="dark"] [style="color:var(--primary,#2563eb)" i],html[data-theme="dark"] [style*=";color:var(--primary,#2563eb);" i],html[data-theme="dark"] [style$=";color:var(--primary,#2563eb)" i],html[data-theme="dark"] [style*=" color:var(--primary,#2563eb);" i],html[data-theme="dark"] [style$=" color:var(--primary,#2563eb)" i]{color:var(--primary,#82a4ed)!important}
 html[data-theme="dark"] [style^="color:var(--pro-ink);" i],html[data-theme="dark"] [style="color:var(--pro-ink)" i],html[data-theme="dark"] [style*=";color:var(--pro-ink);" i],html[data-theme="dark"] [style$=";color:var(--pro-ink)" i],html[data-theme="dark"] [style*=" color:var(--pro-ink);" i],html[data-theme="dark"] [style$=" color:var(--pro-ink)" i]{color:var(--text)!important}

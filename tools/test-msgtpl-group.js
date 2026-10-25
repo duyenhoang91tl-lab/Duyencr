@@ -16,8 +16,7 @@ const CAT = [
   { n: 'Tỳ hưu', t: 'Tỳ hưu ngọc', m: '' },
   { n: 'Charm', t: 'Hoa sen', m: '' }, { n: 'Mặt dây', t: 'Hoa sen', m: '' }   // 'Hoa sen' o 2 nhom -> mo ho
 ];
-const ctx = { jsonOut_: o => o, getSheet_: () => sheet, Date, _stripVN_: null,
-  _tplNotifyPending_: () => 1, _tplNotifClear_: () => {},   // them 2026-10-21 (bao admin duyet) — khong lien quan phan nhom, gia lap
+const ctx = { _tplNotifClear_: () => {}, _tplNotifyPending_: () => {}, jsonOut_: o => o, getSheet_: () => sheet, Date, _stripVN_: null,
   buildPriceCatalogFlat_: () => { catalogCalls++; if (catalogFail) throw new Error('khong doc duoc DANH_MUC'); return { ok: true, items: CAT }; },
   CacheService: { getScriptCache: () => ({ get: k => cache[k] || null, put: (k, v) => { cache[k] = v; } }) } };
 vm.createContext(ctx);

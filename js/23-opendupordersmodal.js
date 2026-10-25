@@ -42,7 +42,7 @@ function renderDupOrdersTable(){
       var isKeepRow = hasRecommendation && !extraRowIdx[ri];
       var defaultChecked = !!extraRowIdx[ri]; // tick san dong duoc de xuat xoa (dong du thua, hoac dong doanh thu nho hon nghi loi mat so 0)
       html += '<tr style="'+(isKeepRow?'background:#f0fdf4':'border-bottom:1px solid #f3f4f6')+'">'
-        + '<td style="padding:6px 4px">'+(ri===0?esc(row.name||row.phone)+' <span style="color:#9ca3af">'+esc(row.phone)+'</span>':'<span style="color:#9ca3af">↳ trùng</span>')+'</td>'
+        + '<td style="padding:6px 4px">'+(ri===0?_custLinkHtml_(row.phone, esc(row.name||row.phone))+' <span style="color:#9ca3af">'+esc(row.phone)+'</span>':'<span style="color:#9ca3af">↳ trùng</span>')+'</td>'
         + '<td>'+esc(fmtDupDate_(row.date))+'</td>'
         + '<td>'+esc((row.product||'')+(row.productDetail?' — '+row.productDetail:''))+'</td>'
         + '<td style="font-weight:600">'+Number(row.revenue||0).toLocaleString('vi-VN')+'đ</td>'

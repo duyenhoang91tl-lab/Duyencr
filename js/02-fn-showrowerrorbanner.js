@@ -505,6 +505,7 @@ function applyFilters() {
   const sort = document.querySelector('.srt').value;
   const csFList = _csFilterListMatch();
   const dataSrcF = document.getElementById('datasrc-filter')?.value || 'all';
+  if (typeof splitBannerSync_ === 'function') splitBannerSync_(dataSrcF);   // "Danh sách đơn chia": bật/tắt banner tổng kết + tự tải (js/50)
   const ymYear = document.getElementById('ymf-year')?.value || '';
   const ymMonth = document.getElementById('ymf-month')?.value || '';
   const hourFrom = document.getElementById('ymf-hour-from')?.value;
@@ -592,6 +593,8 @@ function applyFilters() {
       if (dataSrcF === 'cs'  && !src.cs)  return false;
       if (dataSrcF === 'don' && !src.don) return false;
       if (dataSrcF === 'cskh' && !src.cskh) return false;
+      // "Danh sách đơn chia": chỉ khách có đơn mà BẠN được sale khác chia (hoặc mọi đơn chia với Admin/CEO) — danh sách phones do js/50 tải từ GAS splitOrderMine
+      if (dataSrcF === 'split' && !(typeof splitCustomerPass_ === 'function' && splitCustomerPass_(c))) return false;
       // "Chia data": KH đang nằm trong (các) đợt phân công (sheet AssignData) của CHÍNH tài
       // khoản đang đăng nhập — tra qua _assignAllIndex (phone -> Set<csName>) giống hệt cách
       // bộ lọc CS ở trên đang dùng, không bake vào c.dataSrc vì AssignData có thể được tải/đổi

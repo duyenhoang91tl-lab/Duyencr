@@ -578,7 +578,7 @@ function buildSalesReportC_(filters) {
       if (!dateInRange_(dt, fromStr, toStr)) continue;
       if (_isExcludedOrderStatus_(row.trangThai)) continue; // bo don Huy/Tra lai/Hoan tien/Thai bai/Khieu nai (Quy che thu lao Sale)
       if (kenhFilterArr.length && kenhFilterArr.indexOf(row.kenhBan) === -1) continue;
-      var salesOnRow = splitMulti_(row.saleBan, ',');
+      var salesOnRow = splitMulti_(row.saleBan, ',').filter(function(x){ return !_isNumericTag_(x); }); // loai STT Pancake
       if (saleFilterFoldC.length && !salesOnRow.some(function(s){ return saleFilterFoldC.indexOf(_normTxt_(s)) !== -1; })) continue;
       if (!_pMatchAny_(row.sanPham, sanPhamTerms)) continue;
       matchedOrders.push(row);
@@ -588,7 +588,7 @@ function buildSalesReportC_(filters) {
         var creatorName = row.nguoiTao || UNASSIGNED;
         bySale[creatorName] = (bySale[creatorName] || 0) + row.giaTriDon;
       } else {
-        var salesList = splitMulti_(row.saleBan, ',');
+        var salesList = splitMulti_(row.saleBan, ',').filter(function(x){ return !_isNumericTag_(x); }); // loai STT Pancake
         if (salesList.length === 0) salesList = [UNASSIGNED];
         var n = salesList.length;
         for (var k = 0; k < salesList.length; k++) {

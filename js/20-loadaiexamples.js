@@ -282,7 +282,9 @@ function renderMsgTemplateList() {
     return;
   }
   listEl.innerHTML = items.map(function (t) {
-    var acts = '<button class="btn sm" onclick="copyMsgTemplate(\'' + t.id + '\')" title="Copy nội dung">📋 Copy</button>';
+    var lines = _tplLines(t.content);
+    var acts = '<button class="btn sm" onclick="copyMsgTemplate(\'' + t.id + '\')" title="Copy nguyên cả mẫu (cả đoạn dài)">📋 Copy cả câu</button>';
+    if (lines.length > 1) acts += '<button class="btn sm" onclick="mtToggleLines(\'' + t.id + '\')" title="Tách mỗi dòng thành 1 tin nhắn riêng">📑 Từng đoạn (' + lines.length + ')</button>';
     if (_msgTplCanApprove && t.status !== 'approved') acts += '<button class="btn sm primary" onclick="approveMsgTemplateUI(\'' + t.id + '\',\'approve\')" title="Duyệt mẫu">✅ Duyệt</button>';
     if (_msgTplCanApprove && t.status === 'pending') acts += '<button class="btn sm" onclick="approveMsgTemplateUI(\'' + t.id + '\',\'reject\')" title="Từ chối">❌ Từ chối</button>';
     if (_tplCanEdit(t)) acts += '<button class="btn sm" onclick="openMsgTemplateForm(\'' + t.id + '\')" title="Sửa">✏️</button><button class="btn sm" onclick="deleteMsgTemplateUI(\'' + t.id + '\')" title="Xóa">🗑</button>';
@@ -295,6 +297,10 @@ function renderMsgTemplateList() {
         '<div style="display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">' + acts + '</div>' +
       '</div>' +
       '<div style="font-size:12px;color:var(--text);white-space:pre-wrap;margin-bottom:6px">' + esc(t.content) + '</div>' +
+      (lines.length > 1 ? '<div class="mt-lines" data-lbox="' + esc(t.id) + '" style="display:none;margin:0 0 8px;border-top:1px dashed var(--border);padding-top:4px">' + lines.map(function (ln, k) {
+        return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid var(--border)"><span style="flex:1;min-width:0;font-size:12px;white-space:pre-wrap;word-break:break-word">' + esc(ln) + '</span>' +
+          '<button class="btn sm" style="flex:none" onclick="copyMsgLine(this,\'' + esc(t.id) + '\',' + k + ')" title="Copy đoạn này (1 tin nhắn)">📋 Copy đoạn</button></div>';
+      }).join('') + '</div>' : '') +
       '<div class="zi-row">' + _tplChips(t) + '</div>' + meta +
     '</div>';
   }).join('');
@@ -373,6 +379,17 @@ async function deleteMsgTemplateUI(id) {
   loadMsgTemplates();
 }
 
+// Tach mau thanh tung DOAN: moi dong (xuong dong) = 1 tin nhan rieng. Bo dong trong, cat khoang trang 2 dau (giong Pancake AI: tplLines_).
+function _tplLines(content) { return String(content || '').split(/\r?\n/).map(function (x) { return x.trim(); }).filter(Boolean); }
+function mtToggleLines(id) {
+  var boxes = document.querySelectorAll('#mt-list .mt-lines');
+  for (var i = 0; i < boxes.length; i++) if (boxes[i].getAttribute('data-lbox') === id) boxes[i].style.display = boxes[i].style.display === 'none' ? '' : 'none';
+}
+function copyMsgLine(btn, id, k) {
+  var t = _msgTemplates.find(function (x) { return x.id === id; });
+  var ln = t ? _tplLines(t.content)[k] : '';
+  if (ln) _tplCopyText(ln, btn);
+}
 function copyMsgTemplate(id) {
   var t = _msgTemplates.find(function (x) { return x.id === id; });
   if (!t) return;

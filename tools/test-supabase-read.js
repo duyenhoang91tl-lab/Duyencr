@@ -15,7 +15,7 @@ function between(a, b) { const i = src.indexOf(a), j = src.indexOf(b, i); if (i 
 const consts = between("var DT_TONG_SHEET", "// SUA 2026-10-04: 15") + between("var DON_CHITIET_WIDTH = 17;", "// ─── DT TỔNG = nguon") + between("var DT_COL_NGAYTAO", "// Sentinel dung thay cho");
 const bhConst = (/var BH_ORDER_RE_ = [^\n]*;/.exec(src) || [''])[0];   // _isBhZeroOrder_ (readDTTong_) dung hang so nay
 const NAMES = ['_vnYmdParts_', '_vnMidnight_', 'normPhone_', '_dtCellToVnStr_', '_normMoney_', 'parseVNDate_', 'splitMulti_', '_donConvertRows_', 'dtRowToOrder_',
-  '_hiddenPageSaleSets_', '_isDTRowHidden_', '_donSaleNamesFromThe_', '_psheetNoAccent_', '_dtIsExchangeOrder_', '_isBhZeroOrder_', 'readDTTong_', 'readOrdersByPhone_', '_dedupeSameOrders_', '_readOrdersByPhoneSheets_',
+  '_hiddenPageSaleSets_', '_isDTRowHidden_', '_isNumericTag_', '_donSaleNamesFromThe_', '_psheetNoAccent_', '_dtIsExchangeOrder_', '_isBhZeroOrder_', 'readDTTong_', 'readOrdersByPhone_', '_dedupeSameOrders_', '_readOrdersByPhoneSheets_',
   'findDonRowsByPhone_', 'readDonChiTiet_', 'readRemindersToday_', '_remindersFromRows_'];
 const code = [consts, bhConst, 'var VN_OFFSET_MS = 7 * 3600 * 1000; var SH_CARE = "CareData"; function _saleFilterNameSet_(arr) { var o = {}; (arr || []).forEach(function(n) { o[_normTxt_(n)] = true; }); return o; }', NAMES.map(fnSrc).join('\n'), src.slice(src.indexOf('var SB_BATCH_ ='))].join('\n');
 

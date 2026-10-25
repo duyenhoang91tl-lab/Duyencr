@@ -14,7 +14,7 @@ function parseVNDate_(v){ var m = /^(\\d+)\\/(\\d+)\\/(\\d+)$/.exec(String(v)); 
 function _vnYmd_(d){ return d.toISOString().slice(0,10); }
 function _normTxt_(s){ return String(s).toLowerCase(); }
 `;
-const f = new Function(stubs + grab('_resolveGhepDon_') + '; return _resolveGhepDon_;')();
+const f = new Function(stubs + grab('_isNumericTag_') + '\n' + grab('_resolveGhepDon_') + '; return _resolveGhepDon_;')();
 let fail = 0; const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) fail++; };
 const mk = (rowIndex, code, tt, sale, gt, creator, ngay) => ({ rowIndex, code, trangThai: tt, saleBan: sale, giaTriDon: gt, creator, ngayTao: ngay });
 const idx = { exact: {
@@ -33,4 +33,27 @@ r = f(['A1T10/2026', 'ZZ9T10/2026'], idx, {});
 ok(r.status === 'khongKhop' && r.missing[0] === 'ZZ9T10/2026', 'ma khong tim thay -> khongKhop (khong doi)');
 r = f(['A1T10/2026'], idx, { 10: true });
 ok(r.status === 'trungDonGoc', 'dong Base da dung -> trungDonGoc (khong doi)');
+// ===== QUY TAC MOI 21/10/2026: phan CON LAI cua don Pos (gia Pos - tong don goc) tinh cho sale tren THE Pos neu co the =====
+// A1T10/2026 = 3.000.000 (sale1, sale2); A2T10/2026 la don Th b (khong tinh)
+r = f(['A1T10/2026'], idx, {}, 5000000, ['sale9']);
+ok(r.status === 'ok' && r.total === 5000000 && r.remainder === 2000000 && r.remainderSales.join() === 'sale9', 'Pos 5tr > goc 3tr + co the sale9 -> phan du 2tr cho sale9, total = gia Pos');
+const sh = {}; r.shares.forEach(x => { sh[x.name] = x.frac * r.total; });
+ok(Math.round(sh.sale1) === 1500000 && Math.round(sh.sale2) === 1500000 && Math.round(sh.sale9) === 2000000, 'don goc chia deu sale1/sale2 (1,5tr/1,5tr) + the Pos sale9 nhan 2tr');
+r = f(['A1T10/2026'], idx, {}, 5000000, ['sale1', 'sale9']);
+const sh2 = {}; r.shares.forEach(x => { sh2[x.name] = x.frac * r.total; });
+ok(Math.round(sh2.sale1) === 2500000 && Math.round(sh2.sale2) === 1500000 && Math.round(sh2.sale9) === 1000000 && r.shares.length === 3, 'the Pos co 2 sale (1 trung nguoi goc): phan du 2tr chia deu -> sale1 1,5+1=2,5tr, sale9 1tr');
+r = f(['A1T10/2026'], idx, {}, 5000000, []);
+ok(r.total === 3000000 && !r.remainder, 'KHONG co the -> phan du khong tinh (total = tong goc, nhu cu)');
+r = f(['A1T10/2026'], idx, {}, 5000000, ['123456', '(chưa gán sale)']);
+ok(r.total === 3000000 && !r.remainder, 'the chi co so (STT) / chua gan sale -> khong coi la sale, khong tinh phan du');
+r = f(['A1T10/2026'], idx, {}, 2500000, ['sale9']);
+ok(r.total === 3000000 && !r.remainder, 'Pos < goc (phan du am) -> giu total = tong goc, khong dieu chinh');
+r = f(['A1T10/2026'], idx, {}, 3000500, ['sale9']);
+ok(r.total === 3000000 && !r.remainder, 'chenh <= 1.000d (lam tron) -> bo qua');
+r = f(['A1T10/2026', 'A2T10/2026'], idx, {}, 4000000, ['sale9']);
+ok(r.total === 4000000 && r.remainder === 1000000, 'don ghep co 1 goc bi loai: phan du = gia Pos - tong goc CON SONG (4tr - 3tr)');
+r = f(['A3T10/2026'], idx, {}, 9000000, ['sale9']);
+ok(r.status === 'gocBiLoai', 'moi goc bi loai -> van bo don (khong tinh phan du)');
+r = f(['A1T10/2026'], idx, {});
+ok(r.total === 3000000 && !r.remainder, 'goi kieu cu (khong truyen gia Pos/the) -> hanh vi cu');
 console.log(fail ? ('\n' + fail + ' LOI') : '\nTAT CA DAT'); process.exit(fail ? 1 : 0);

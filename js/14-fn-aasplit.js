@@ -493,7 +493,7 @@ function renderAssignAuto(){
     '<div style="font-size:12px;margin-top:10px">Chỉ lấy KH POS/Base có <b>ngày đơn</b> từ <input type="date" value="'+esc(cfg.dateFrom||'')+'" onchange="_aaSet(\'dateFrom\',this.value)"> đến <input type="date" value="'+esc(cfg.dateTo||'')+'" onchange="_aaSet(\'dateTo\',this.value)"> '+((cfg.dateFrom||cfg.dateTo)?'<button class="btn sm" onclick="_aaSet(\'dateFrom\',\'\',false);_aaSet(\'dateTo\',\'\')">✕ Bỏ</button>':'')+'<div class="guide-text" style="font-size:11px;color:var(--muted);margin-top:3px">Ví dụ chia khách tháng 9: 01/09 → 30/09. Để trống = không giới hạn. Chỉ áp cho nguồn POS/Base (DT tổng, Dữ liệu đơn, Chăm sóc); CSKH-Duyên chia riêng ở mục ③ và không có ngày đơn.</div></div>'+
     '<label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:10px"><input type="checkbox" '+(cfg.onlyUnassigned?'checked':'')+' onchange="_aaSet(\'onlyUnassigned\',this.checked)"> Chỉ lấy KH <b>chưa chia lần nào</b> (nên bật, nếu không ngày nào cũng có thể chia lại đúng KH cũ)</label>'+
     '<label style="font-size:12px;display:block;margin-top:10px">Chia từ <input type="number" min="0" max="23" style="width:56px" value="'+(cfg.runHour==null?7:cfg.runHour)+'" onchange="_aaSet(\'runHour\',this.value)"> giờ sáng (giờ VN) — trước giờ này không chia</label>'+
-    _aaStatusHtml(cfg)+'<div style="font-size:11px;color:var(--hint);margin-top:8px">Chạy tự động bằng <b>trigger trên Google Apps Script</b> (không cần mở CRM): admin cài 1 lần — mở Apps Script Editor, chọn hàm <b>installAutoAssignTrigger_</b>, bấm Run. Chưa cài trigger thì hệ thống chỉ chia khi có admin mở CRM vào ngày đó. Sau khi sửa ở đây nhớ bấm <b>💾 Lưu cấu hình</b> (server dùng bản đã lưu).</div></div>';
+    _aaStatusHtml(cfg)+'<div style="font-size:11px;color:var(--hint);margin-top:8px">Chạy tự động bằng <b>trigger trên Google Apps Script</b> (không cần mở CRM): admin cài 1 lần — mở Apps Script Editor, chọn hàm <b>caiTriggerChiaTuDong</b>, bấm Run. Chưa cài trigger thì hệ thống chỉ chia khi có admin mở CRM vào ngày đó. Sau khi sửa ở đây nhớ bấm <b>💾 Lưu cấu hình</b> (server dùng bản đã lưu).</div></div>';
 
   h += '<div class="assign-section"><div class="assign-section-title">① Chia cho các Team <span style="font-weight:400;font-size:12px;color:var(--muted)">— nguồn POS</span></div>'+
     '<label style="font-size:12px">Tổng KH/ngày (dùng cho Team chia theo %): <input type="number" min="0" style="width:90px" value="'+(cfg.dailyTotal||'')+'" placeholder="0" onchange="_aaSet(\'dailyTotal\',this.value)"></label>';
@@ -906,7 +906,8 @@ function _rptModeBuildBar_(current){
   bar.innerHTML = '<select id="rpt-mode-sel" onchange="_rptModeGo_(this.value)" title="Chọn báo cáo">'
     + opts.map(function(id){ return '<option value="'+id+'"'+(id===current?' selected':'')+'>'+_RPT_MODE_LABELS[id]+'</option>'; }).join('')
     + '</select>'
-    + '<button class="btn sm" onclick="_rptModeBack_()" title="Hiện lại đầy đủ menu, bộ lọc">← Về màn hình chính</button>';
+    + '<button class="btn sm" onclick="_rptModeBack_()" title="Hiện lại đầy đủ menu, bộ lọc">← Về màn hình chính</button>'
+    + '<input id="rpt-qs-input" type="search" placeholder="🔍 Tra khách: tên, SĐT, mã đơn… (Enter mở hồ sơ bên phải)" autocomplete="off">';   // 2026-10-23: logic ở js/29 (_qs*)
 }
 function _rptModeGo_(id){
   var el = document.getElementById('v9tab-' + id);
