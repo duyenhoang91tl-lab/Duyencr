@@ -12,6 +12,9 @@
   if (window.__pkVietTatLoaded) return; window.__pkVietTatLoaded = true;
   const STALE_MS = 5 * 60 * 1000;
   let snippets = [], enabled = true, picks = {}, state = null, host = null, box = null, tbox = null, fbox = null, fetching = false;
+  let pbox = null, pstate = null;               // màn chọn LỚN (chọn nhiều chữ + hình)
+  const imgUrl = new Map();                      // id ảnh → blob URL hiển thị trong màn chọn
+  const COARSE = (() => { try { return matchMedia('(pointer:coarse)').matches; } catch (_) { return false; } })();   // màn cảm ứng (điện thoại) → mở thẳng màn chọn lớn
   const imgCache = new Map();   // id → File (giữ trong phiên trang, tránh gọi GAS lại mỗi lần dùng cùng viết tắt)
 
   // chrome.* ném lỗi "Extension context invalidated" sau khi reload extension → bọc để trang không bị lỗi
@@ -134,10 +137,11 @@
       '.t{position:fixed;display:none;left:50%;bottom:24px;transform:translateX(-50%);background:#333;color:#fff;padding:8px 14px;border-radius:20px;font:14px system-ui}' +
       '@media(prefers-color-scheme:dark){.b,.f{background:#222;color:#eee;border-color:#444}.o{border-color:#333}.o.a,.o:hover{background:#2b3a55}}</style><div class="b"></div><div class="f"></div><div class="t"></div>';
     box = root.querySelector('.b'); fbox = root.querySelector('.f'); tbox = root.querySelector('.t');
+    pickerUi(root);
     box.addEventListener('mousedown', (e) => {
       e.preventDefault();
       const o = e.target.closest ? e.target.closest('.o') : null;
-      if (o) choose(+o.dataset.i); else if (e.target.id === 'pk') pick();
+      if (o) choose(+o.dataset.i); else if (e.target.id === 'pk') pick(); else if (e.target.id === 'pkm' && state) openPicker(state);
     });
     fbox.addEventListener('mousedown', (e) => {
       e.preventDefault();   // giữ con trỏ trong ô chat
@@ -148,13 +152,13 @@
     document.documentElement.appendChild(host);
   }
   function toast(t) { ui(); tbox.textContent = t; tbox.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => { tbox.style.display = 'none'; }, 2600); }
-  function hide() { state = null; if (box) box.style.display = 'none'; }
+  function hide() { state = null; pstate = null; if (box) box.style.display = 'none'; if (pbox) pbox.style.display = 'none'; }
 
   function show(st) {
     ui(); state = st;
     st.items = st.hits.flatMap((s) => s.options.map((o) => ({ text: o, abbr: s.abbr, nhom: s.nhom || '', images: Array.isArray(s.images) ? s.images : [] }))).slice(0, 8); st.idx = 0;
     const head = '<div class="h"><span>' + (st.uses ? (st.name ? 'Khách: <b>' + esc(given(st.name)) + '</b> ' : 'Chưa thấy tên khách ') + '<a id="pk">✎ chọn tên</a>' : 'Viết tắt') +
-      '</span><span>Tab · ↑↓ · Esc</span></div>';
+      '</span><span><a id="pkm">🗂 Chọn nhiều + ảnh</a> · Tab · ↑↓ · Esc</span></div>';
     box.innerHTML = head + st.items.map((o, i) => '<div class="o' + (i ? '' : ' a') + '" data-i="' + i + '"><i>' + (i < 8 ? 'Alt+' + (i + 1) : '') + '</i><span>' + esc(resolve(o.text, st.name)) + '</span>' + (o.nhom ? '<em>' + esc(o.nhom.split('/').join(' › ')) + '</em>' : '') + (o.images.length ? '<b class="im">🖼 ' + o.images.length + '</b>' : '') + '</div>').join('');
     box.style.display = 'block';
     const r = st.el.getBoundingClientRect();
@@ -165,6 +169,71 @@
   function move(d) {
     const n = state.items.length; state.idx = (state.idx + d + n) % n;
     box.querySelectorAll('.o').forEach((e, i) => e.classList.toggle('a', i === state.idx));
+  }
+
+  // ---------- MÀN CHỌN LỚN (Duyên yêu cầu 2026-10-25) ----------
+  // Bấm viết tắt → danh sách CUỘN mọi chữ + hình của mục; bấm 1 lần = chọn/bỏ chọn (nhiều cái 1 lúc); bấm đúp hình = phóng to xem full, đúp lần nữa = thu nhỏ;
+  // hình hiện chính hình (không nhãn chữ). "Chèn (n)": chữ đã chọn nối bằng xuống dòng chèn vào ô chat (thay viết tắt), hình đã chọn dán vào ô chat (cơ chế sendImages cũ).
+  function pickerUi(root) {
+    const css = document.createElement('style');
+    css.textContent = '.p{position:fixed;display:none;left:50%;bottom:0;transform:translateX(-50%);width:min(560px,100vw);height:min(86vh,calc(100vh - 12px));background:#f6f7f9;color:#111;border:1px solid #ccc;border-radius:16px 16px 0 0;box-shadow:0 -4px 24px #0005;font:16px/1.4 system-ui;flex-direction:column;overflow:hidden}' +
+      '.p .ph{padding:12px 16px 6px;font-size:13px;color:#444;display:flex;justify-content:space-between;gap:8px}.p .pl{flex:1;overflow-y:auto;padding:4px 10px 10px;-webkit-overflow-scrolling:touch}' +
+      '.p .c{position:relative;display:flex;gap:12px;align-items:flex-start;background:#fff;border:1px solid #d0d0d0;border-radius:12px;margin:8px 0;padding:14px 12px;user-select:none;-webkit-user-select:none;white-space:pre-wrap;word-break:break-word;cursor:pointer}' +
+      '.p .c.on{border:3px solid #1e66f5;background:#e8f0fe;padding:12px 10px}.p .k{flex:none;width:28px;height:28px;border-radius:14px;border:2px solid #9e9e9e;background:#fff8;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center}.p .c.on .k{background:#1e66f5;border-color:#1e66f5}' +
+      '.p .c.im{display:block;padding:0;overflow:hidden;background:#000}.p .c.im.on{padding:0}.p .c.im .k{position:absolute;top:8px;right:8px;z-index:2}' +
+      '.p .c.im img,.p .c.im .w{display:block;width:100%;height:170px;object-fit:cover;background:#222;color:#bbb;font-size:13px;text-align:center;line-height:170px}.p .c.im.z img{height:auto;max-height:70vh;object-fit:contain;background:#000}' +
+      '.p .pf{display:flex;gap:8px;padding:8px 10px 12px;background:#fff;border-top:1px solid #ddd}.p .pf button{flex:1;border:0;border-radius:10px;padding:13px 8px;font:inherit;background:#e0e0e0;color:#333;cursor:pointer}.p .pf button.go{background:#1e66f5;color:#fff;flex:1.4}.p .pf button:disabled{opacity:.45}';
+    root.appendChild(css);
+    pbox = document.createElement('div'); pbox.className = 'p'; root.appendChild(pbox);
+    pbox.addEventListener('click', (e) => {
+      const b = e.target.closest ? e.target.closest('button') : null;
+      if (b) { if (b.dataset.a === 'x') hide(); else if (b.dataset.a === 'ins') insertPicked(); return; }
+      const c = e.target.closest ? e.target.closest('.c') : null; if (!c || !pstate) return;
+      const i = +c.dataset.i, P = pstate;
+      if (P.items[i].type === 'txt') { toggleSel(i); return; }
+      const T = P.tap;   // hình: bấm 1 lần = chọn (chờ 300ms để phân biệt bấm đúp), bấm đúp = phóng/thu (không đổi trạng thái chọn)
+      if (T.i === i && Date.now() - T.t < 300) { clearTimeout(T.h); T.i = -1; c.classList.toggle('z'); return; }
+      clearTimeout(T.h); T.i = i; T.t = Date.now(); T.h = setTimeout(() => { T.i = -1; toggleSel(i); }, 300);
+    });
+  }
+  function toggleSel(i) { const P = pstate; if (!P) return; if (!P.sel.delete(i)) P.sel.add(i); updPicker(); }
+  function updPicker() {
+    const P = pstate; if (!P) return;
+    pbox.querySelectorAll('.c').forEach((c) => { const on = P.sel.has(+c.dataset.i); c.classList.toggle('on', on); c.querySelector('.k').textContent = on ? '✓' : ''; });
+    const n = P.sel.size, go = pbox.querySelector('[data-a=ins]');
+    pbox.querySelector('.pt').innerHTML = (P.st.name ? 'Khách: <b>' + esc(given(P.st.name)) + '</b> · ' : '') + (n ? 'Đã chọn ' + n : 'Bấm để chọn (chọn được nhiều)');
+    go.disabled = !n; go.textContent = n ? 'Chèn (' + n + ')' : 'Chèn';
+  }
+  function loadThumb(im, c) {
+    const done = (url) => { if (!c.isConnected) return; const w = c.querySelector('.w'); if (!w) return; const g = document.createElement('img'); g.src = url; g.draggable = false; g.alt = ''; w.replaceWith(g); };
+    if (imgUrl.has(im.id)) return done(imgUrl.get(im.id));
+    getImageFile(im).then((f) => { const u = URL.createObjectURL(f); imgUrl.set(im.id, u); done(u); }, () => { const w = c.querySelector('.w'); if (w) w.textContent = '⚠ Không tải được hình'; });
+  }
+  function openPicker(st) {
+    ui(); state = st; if (box) box.style.display = 'none';
+    const items = [];
+    st.hits.forEach((s) => {
+      s.options.forEach((o) => items.push({ type: 'txt', text: o }));
+      (Array.isArray(s.images) ? s.images : []).forEach((im) => items.push({ type: 'img', im }));
+    });
+    pstate = { st, items, sel: new Set(), tap: { i: -1, t: 0, h: 0 } };
+    pbox.innerHTML = '<div class="ph"><span class="pt"></span><span>1 lần: chọn · đúp hình: phóng/thu</span></div><div class="pl"></div><div class="pf"><button data-a="x">✕ Đóng</button><button class="go" data-a="ins" disabled>Chèn</button></div>';
+    const list = pbox.querySelector('.pl');
+    items.forEach((it, i) => {
+      const c = document.createElement('div'); c.dataset.i = i;
+      if (it.type === 'txt') { c.className = 'c'; c.innerHTML = '<div class="k"></div><div></div>'; c.lastChild.textContent = resolve(it.text, st.name); }
+      else { c.className = 'c im'; c.innerHTML = '<div class="k"></div><div class="w">Đang tải hình…</div>'; loadThumb(it.im, c); }
+      list.appendChild(c);
+    });
+    pbox.style.display = 'flex'; updPicker();
+  }
+  function insertPicked() {
+    const P = pstate; if (!P || !P.sel.size) return;
+    const st = P.st, its = [...P.sel].sort((a, b) => a - b).map((i) => P.items[i]);
+    const texts = its.filter((x) => x.type === 'txt').map((x) => resolve(x.text, st.name)), imgs = its.filter((x) => x.type === 'img').map((x) => x.im);
+    hide();
+    if (!put(st, texts.join('\n'))) { toast('Vị trí gõ đã thay đổi, hãy thử lại'); return; }
+    if (imgs.length) sendImages(st.el, imgs);
   }
 
   // ---------- chèn nội dung ----------
@@ -270,11 +339,13 @@
     const c = ctx(el); if (!c) return hide();
     const a = analyze(c.before); if (!a) return hide();
     const uses = a.hits.some(usesName);
-    show({ ...c, ...a, uses, name: a.typed || (uses ? findName() : null) });
+    const st = { ...c, ...a, uses, name: a.typed || (uses ? findName() : null) };
+    if (COARSE) openPicker(st); else show(st);   // điện thoại/cảm ứng: màn chọn lớn; máy tính: thanh gợi ý Tab/↑↓ (có nút "Chọn nhiều + ảnh")
   }, true);
   addEventListener('keydown', (e) => {
     if (!state) return;
     if (e.key === 'Escape') return hide();
+    if (pstate) return;   // màn chọn lớn đang mở: chỉ dùng chuột/cảm ứng
     if (e.key === 'Tab' || (e.altKey && /^[1-8]$/.test(e.key))) {
       e.preventDefault(); e.stopPropagation(); choose(e.key === 'Tab' ? state.idx : +e.key - 1);
     } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {

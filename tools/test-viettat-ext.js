@@ -33,6 +33,8 @@ async function boot(opts) {
   w.DataTransfer = class { constructor() { this.files = []; this.items = { add: (f) => this.files.push(f) }; } };
   w.ClipboardEvent = class extends w.Event { constructor(t, i) { super(t, i); this.clipboardData = i && i.clipboardData; } };
   calls.pastes = []; w.document.addEventListener('paste', (e) => calls.pastes.push([...e.clipboardData.files]), true);
+  if (opts.coarse) w.matchMedia = () => ({ matches: true });
+  w.URL.createObjectURL = () => 'blob:img' + Math.random();
   w.eval(code); await sleep(30);
   const popup = () => { const h = w.document.getElementById('pk-viettat-host'); const b = h && h.shadowRoot.querySelector('.b'); return b && b.style.display === 'block' ? [...b.querySelectorAll('.o span')].map((x) => x.textContent) : null; };
   const head = () => { const h = w.document.getElementById('pk-viettat-host'); return h ? h.shadowRoot.querySelector('.h').textContent : ''; };
@@ -132,5 +134,45 @@ async function boot(opts) {
   ceI.textContent = 'tt'; const r0 = Ce.w.document.createRange(); r0.setStart(ceI.firstChild, 2); r0.collapse(true); const sl = Ce.w.getSelection(); sl.removeAllRanges(); sl.addRange(r0);
   ceI.dispatchEvent(new Ce.w.InputEvent('input', { bubbles: true, inputType: 'insertText', data: 't' })); Ce.key(ceI, 'Tab'); await sleep(30);
   ok(/Túi tiền cổ nè/.test(ceI.textContent) && Ce.calls.pastes.length === 1 && Ce.calls.pastes[0].length === 2, 'o contenteditable (kieu o chat Pancake): chen chu + dan 2 anh');
+
+  // ===== MAN CHON LON: chon nhieu chu + hinh, bam dup phong/thu (2026-10-25) =====
+  {
+    const SP = [{ id: 'p1', abbr: 'tt', keyword: '', options: ['Túi tiền cổ nè', 'Dòng thứ hai'], scope: 'team', nhom: '', images: IM }];
+    const P = await boot({ local: { vtData: SP } }); const D = P.w.document, pta = D.getElementById('t');
+    const root = () => D.getElementById('pk-viettat-host').shadowRoot, pk = () => root().querySelector('.p');
+    const click = (el) => el.dispatchEvent(new P.w.MouseEvent('click', { bubbles: true, composed: true }));
+    const down = (el) => el.dispatchEvent(new P.w.MouseEvent('mousedown', { bubbles: true, composed: true, cancelable: true }));   // thanh goi y dung mousedown (giu con tro trong o chat)
+    P.typeTA(pta, 'xin tt');
+    ok(/Chọn nhiều/.test(P.head()) && P.popup() !== null, 'may tinh: van hien thanh goi y Tab/↑↓ co nut "Chon nhieu + anh"');
+    down(root().querySelector('#pkm')); await sleep(40);
+    ok(pk().style.display === 'flex' && root().querySelector('.b').style.display === 'none', 'bam "Chon nhieu + anh" -> mo man chon lon, an thanh goi y');
+    const cs = () => [...pk().querySelectorAll('.c')];
+    ok(cs().length === 4 && cs().filter((c) => c.classList.contains('im')).length === 2, 'liet ke du 4 muc: 2 chu + 2 hinh');
+    ok(pk().querySelectorAll('img').length === 2 && P.calls.msgs.filter((m) => m.type === 'GET_VIETTAT_IMAGE').length === 2, 'hinh tai qua GET_VIETTAT_IMAGE va hien chinh hinh');
+    ok(!/Hình ảnh|Hinh anh|🖼/.test(pk().textContent), 'KHONG co nhan chu "Hinh anh" tren the hinh');
+    click(cs()[0]); ok(cs()[0].classList.contains('on') && /Đã chọn 1/.test(pk().textContent), 'bam 1 lan vao chu = chon (ngay lap tuc)');
+    click(cs()[1]); ok(cs()[0].classList.contains('on') && cs()[1].classList.contains('on') && /Chèn \(2\)/.test(pk().textContent), 'chon duoc nhieu chu 1 luc, nut hien so luong');
+    click(cs()[2]); await sleep(80); ok(!cs()[2].classList.contains('on'), 'bam 1 lan vao hinh: cho 300ms moi chon (de nhan ra bam dup)');
+    await sleep(320); ok(cs()[2].classList.contains('on') && !cs()[2].classList.contains('z'), 'sau 300ms hinh duoc chon, chua phong');
+    click(cs()[3]); click(cs()[3]); await sleep(10); ok(cs()[3].classList.contains('z') && !cs()[3].classList.contains('on'), 'bam dup hinh = phong full, KHONG doi trang thai chon');
+    await sleep(340); ok(cs()[3].classList.contains('z') && !cs()[3].classList.contains('on'), 'bam dup khong bi chon xen vao sau 300ms');
+    click(cs()[3]); click(cs()[3]); await sleep(10); ok(!cs()[3].classList.contains('z'), 'bam dup lan nua = thu nho');
+    click(cs()[1]); ok(!cs()[1].classList.contains('on'), 'bam lai chu = bo chon');
+    click(cs()[1]);
+    P.calls.pastes.length = 0;
+    click(pk().querySelector('[data-a=ins]')); await sleep(60);
+    ok(pta.value === 'xin Túi tiền cổ nè\nDòng thứ hai', 'Chen: chu da chon noi bang xuong dong, thay dung viet tat: ' + JSON.stringify(pta.value));
+    ok(P.calls.pastes.length === 1 && P.calls.pastes[0].length === 1 && pk().style.display === 'none', 'hinh da chon dan vao o chat (1 hinh), dong man chon');
+    P.typeTA(pta, 'xin tt'); down(root().querySelector('#pkm')); await sleep(40);
+    click(cs()[2]); await sleep(340); P.calls.pastes.length = 0; click(pk().querySelector('[data-a=ins]')); await sleep(60);
+    ok(pta.value === 'xin ' && P.calls.pastes.length === 1, 'chi chon hinh: xoa viet tat, dan hinh: ' + JSON.stringify(pta.value));
+    P.typeTA(pta, 'xin tt'); down(root().querySelector('#pkm')); await sleep(40); P.key(pta, 'Escape'); ok(pk().style.display === 'none', 'Esc dong man chon');
+    const C = await boot({ local: { vtData: SP }, coarse: true }); const cd = C.w.document, cta = cd.getElementById('t');
+    C.typeTA(cta, 'chao tt'); await sleep(40);
+    const cp = cd.getElementById('pk-viettat-host').shadowRoot;
+    ok(cp.querySelector('.p').style.display === 'flex' && cp.querySelector('.b').style.display !== 'block', 'man cam ung: go viet tat -> mo thang man chon lon');
+    const C2 = await boot({ local: { vtData: [{ id: 'z', abbr: 'zz', keyword: '', options: ['A', 'B'], scope: 'team', nhom: '', images: [] }] }, coarse: true }); const c2 = C2.w.document.getElementById('t');
+    C2.typeTA(c2, 'zz'); await sleep(30); ok(C2.w.document.getElementById('pk-viettat-host').shadowRoot.querySelectorAll('.p .c').length === 2, 'muc chi co chu: man chon chi co 2 the chu');
+  }
 console.log(bad ? ('\n' + bad + ' LOI') : '\nALL VIETTAT-EXT TESTS PASSED'); process.exit(bad ? 1 : 0);
 })();
