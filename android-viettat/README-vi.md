@@ -11,6 +11,7 @@ Gõ từ viết tắt/từ khoá trong bất kỳ ô chat nào (Zalo, Messenger,
 
 ## Mục tự tạo trên máy
 Vẫn tạo được (nút **+**), lưu riêng trong điện thoại, KHÔNG lên CRM. Mục lấy từ CRM có thư mục tên "CRM · …" và bị ghi đè mỗi lần cập nhật.
+Thư mục con trên CRM (vd `Túi tiền/Cổ`, `Túi tiền/Lắc`) hiện thành các thư mục riêng "CRM · Túi tiền › Cổ", "CRM · Túi tiền › Lắc"… xếp cạnh nhau. Ảnh kèm của mục CRM chưa dùng trên Android (chỉ chèn chữ).
 
 ## Build
 Tự động bằng GitHub Actions (`.github/workflows/build-android.yml`). Tự build trên máy: Android Studio mở thư mục này (hoặc `gradle assembleDebug` với Gradle 8.7 + JDK 17).
