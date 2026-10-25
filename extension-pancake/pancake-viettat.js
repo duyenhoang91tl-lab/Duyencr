@@ -12,6 +12,7 @@
   if (window.__pkVietTatLoaded) return; window.__pkVietTatLoaded = true;
   const STALE_MS = 5 * 60 * 1000;
   let snippets = [], enabled = true, picks = {}, state = null, host = null, box = null, tbox = null, fbox = null, fetching = false;
+  const IMG_WORKERS = 4, IMG_CACHE_MAX = 60;   // 4 ảnh cùng lúc; nhớ tối đa 60 ảnh (1 mục có thể có 50)
   const imgCache = new Map();   // id → File (giữ trong phiên trang, tránh gọi GAS lại mỗi lần dùng cùng viết tắt)
 
   // chrome.* ném lỗi "Extension context invalidated" sau khi reload extension → bọc để trang không bị lỗi
@@ -211,7 +212,7 @@
     const resp = await new Promise((res) => { try { chrome.runtime.sendMessage({ type: 'GET_VIETTAT_IMAGE', id: im.id }, (r) => res(r)); } catch (_) { res(null); } });
     if (!resp || !resp.ok || !resp.data) throw new Error((resp && resp.error) || 'không kết nối được extension');
     const f = b64ToFile(resp.data.base64, resp.data.mimeType, im.name);
-    if (imgCache.size >= 30) imgCache.delete(imgCache.keys().next().value);
+    if (imgCache.size >= IMG_CACHE_MAX) imgCache.delete(imgCache.keys().next().value);
     imgCache.set(im.id, f); return f;
   }
   // 1 sự kiện paste chứa TẤT CẢ ảnh (nhiều file trong DataTransfer) → ô chat nhận như khi người dùng dán nhiều ảnh
@@ -224,8 +225,17 @@
     } catch (_) { return false; }
   }
   async function sendImages(el, imgs) {
-    toast('Đang lấy ' + imgs.length + ' ảnh...');
-    const got = await Promise.all(imgs.map((im) => getImageFile(im).then((f) => ({ f }), (e) => ({ err: (im.name || im.id) + ': ' + String((e && e.message) || e) }))));
+    // Mục có thể có tới 50 ảnh: lấy tối đa 4 ảnh cùng lúc (không dội 50 request GAS một lượt), giữ đúng thứ tự ảnh khi dán.
+    let fin = 0; const upd = () => toast('Đang lấy ảnh ' + fin + '/' + imgs.length + '...'); upd();
+    const got = new Array(imgs.length); let nx = 0;
+    const worker = async () => {
+      while (nx < imgs.length) {
+        const k = nx++, im = imgs[k];
+        try { got[k] = { f: await getImageFile(im) }; } catch (e) { got[k] = { err: (im.name || im.id) + ': ' + String((e && e.message) || e) }; }
+        fin++; upd();
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(IMG_WORKERS, imgs.length) }, worker));
     const files = got.filter((x) => x.f).map((x) => x.f), errs = got.filter((x) => x.err).map((x) => x.err);
     if (!files.length) { toast('Không lấy được ảnh — ' + errs[0]); return; }
     const done = pasteFiles(el, files);
