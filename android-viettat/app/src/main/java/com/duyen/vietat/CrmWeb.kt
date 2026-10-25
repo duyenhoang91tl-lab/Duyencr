@@ -124,7 +124,14 @@ class CrmWeb(private val act: Activity) {
   var cover=[]; document.querySelectorAll('body *').forEach(function(e){ var cs=getComputedStyle(e);
     if((cs.position==='fixed'||cs.position==='absolute')&&cs.display!=='none'&&cs.visibility!=='hidden'){ var r=e.getBoundingClientRect(); if(r.width>w*0.6&&r.height>h*0.4) cover.push(d(e)); } });
   o.push('phủ lớn: '+(cover.length ? '\n  '+cover.slice(0,5).join('\n  ') : 'không'));
-  [].slice.call(document.body.children).slice(0,14).forEach(function(e){ o.push('body> '+d(e)+' con='+e.children.length+' chữ='+(e.innerText||'').length); });
+  o.push('html.class='+document.documentElement.className+' | body.class='+document.body.className);
+  o.push('HTML '+d(document.documentElement)); o.push('BODY '+d(document.body));
+  var vis=[].slice.call(document.body.children).filter(function(e){ return e.tagName!=='SCRIPT'&&e.tagName!=='STYLE'&&getComputedStyle(e).display!=='none'; });
+  vis.slice(0,10).forEach(function(e){ o.push('body> '+d(e)+' con='+e.children.length+' chữ='+(e.innerText||'').length); });
+  var app=document.querySelector('.app');
+  if(app){ o.push('APP con='+app.children.length); [].slice.call(app.children).slice(0,8).forEach(function(e){ o.push('  app> '+d(e)+' con='+e.children.length+' chữ='+(e.innerText||'').length); }); }
+  var dv=document.getElementById('data-view');
+  if(dv){ o.push('DATA-VIEW '+d(dv)+' con='+dv.children.length); [].slice.call(dv.children).slice(0,10).forEach(function(e){ o.push('  dv> '+d(e)+' chữ='+(e.innerText||'').length); }); }
   return o.join('\n');
 })()
 """
