@@ -1,0 +1,95 @@
+package com.duyen.vietat
+
+import android.content.Context
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
+import java.net.URLEncoder
+import java.util.concurrent.atomic.AtomicBoolean
+
+object Sync {
+    private val busy = AtomicBoolean(false)
+
+    fun configured(c: Context) = c.getSharedPreferences("sync", 0).let {
+        it.getString("url", "").orEmpty().startsWith("http") && it.getString("key", "").orEmpty().length >= 16
+    }
+
+    private fun call(c: Context, method: String, path: String, body: ByteArray? = null, type: String = "application/json"): Pair<Int, ByteArray> {
+        val p = c.getSharedPreferences("sync", 0)
+        val con = URL(p.getString("url", "")!!.trim().trimEnd('/') + path).openConnection() as HttpURLConnection
+        con.requestMethod = method; con.connectTimeout = 15000; con.readTimeout = 60000
+        con.setRequestProperty("Authorization", "Bearer " + p.getString("key", ""))
+        if (body != null) {
+            con.doOutput = true; con.setRequestProperty("Content-Type", type); con.setFixedLengthStreamingMode(body.size)
+            con.outputStream.use { it.write(body) }
+        }
+        val code = con.responseCode
+        val data = (if (code < 400) con.inputStream else con.errorStream)?.use { it.readBytes() } ?: ByteArray(0)
+        con.disconnect()
+        return code to data
+    }
+
+    /** Chạy trên luồng nền. Trả về thông báo trạng thái. */
+    fun run(c: Context): String {
+        if (!busy.compareAndSet(false, true)) return ""
+        return try {
+            val p = c.getSharedPreferences("sync", 0)
+            val start = System.currentTimeMillis()
+            val out = Store.changesSince(p.getLong("pushed", 0))
+            val req = JSONObject().put("since", p.getLong("since", 0)).put("changes", out)
+            val (code, bytes) = call(c, "POST", "/api/sync", req.toString().toByteArray())
+            if (code == 401) return "Mã đồng bộ không hợp lệ (cần ≥ 16 ký tự)"
+            if (code != 200) return "Lỗi server ($code)"
+            val r = JSONObject(String(bytes))
+            val got = Store.applyRemote(r.getJSONArray("changes"))
+
+            val (mc, mb) = call(c, "GET", "/api/media")
+            if (mc == 200) {
+                val remote = JSONArray(String(mb)).let { a -> (0 until a.length()).map { a.getString(it) }.toSet() }
+                val need = Store.snippets.flatMap { it.options }.filter { kindOf(it) != null }.map { mediaNameOf(it) }.toSet()
+                for (n in need) {
+                    val f = File(Store.mediaDir, n)
+                    if (f.exists() && n !in remote) call(c, "PUT", "/api/media/$n", f.readBytes(), "application/octet-stream")
+                    else if (!f.exists() && n in remote) call(c, "GET", "/api/media/$n").let { (k, b) -> if (k == 200) f.writeBytes(b) }
+                }
+            }
+            p.edit().putLong("since", r.getLong("now") - 2000).putLong("pushed", start).apply()
+            "Đã đồng bộ (↑${out.length()} ↓$got)"
+        } catch (e: Exception) {
+            "Lỗi đồng bộ: ${e.message}"
+        } finally { busy.set(false) }
+    }
+}
+
+/** ĐỌC kho "Viết tắt" của CRM (sheet VietTat qua Google Apps Script): mục CHUNG của team + mục RIÊNG của chính mình (theo tên CS). Chỉ đọc — sửa trên CRM. */
+object Crm {
+    const val DEFAULT_URL = "https://script.google.com/macros/s/AKfycbx3QT6YIzQ7SQEwQPkljVeEdmTSBQQSxtTp2hTFYOeCKB_K4BHcUTSLi54LlmB9q_E6sQ/exec"
+    private val busy = AtomicBoolean(false)
+    fun prefs(c: Context) = c.getSharedPreferences("crm", 0)
+    fun url(c: Context) = prefs(c).getString("url", "").orEmpty().trim().ifEmpty { DEFAULT_URL }
+    fun name(c: Context) = prefs(c).getString("name", "").orEmpty().trim()
+    fun configured(c: Context) = name(c).isNotEmpty()
+
+    /** Chạy trên luồng nền. Trả về thông báo trạng thái ("" nếu đang chạy dở). */
+    fun pull(c: Context): String {
+        if (!busy.compareAndSet(false, true)) return ""
+        return try {
+            val base = url(c)
+            val full = base + (if (base.contains('?')) "&" else "?") + "action=vietTat&by=" + URLEncoder.encode(name(c), "UTF-8")
+            val con = URL(full).openConnection() as HttpURLConnection
+            con.requestMethod = "GET"; con.connectTimeout = 15000; con.readTimeout = 60000; con.instanceFollowRedirects = true
+            val code = con.responseCode
+            val body = (if (code < 400) con.inputStream else con.errorStream)?.use { String(it.readBytes()) }.orEmpty()
+            con.disconnect()
+            if (code != 200) return "Lỗi CRM ($code)"
+            val r = JSONObject(body)
+            if (r.has("error")) return "CRM báo lỗi: " + r.optString("error")
+            val n = Store.replaceCrm(r.getJSONArray("snippets"))
+            "Đã cập nhật từ CRM ($n mục)"
+        } catch (e: Exception) {
+            "Lỗi cập nhật CRM: ${e.message}"
+        } finally { busy.set(false) }
+    }
+}
