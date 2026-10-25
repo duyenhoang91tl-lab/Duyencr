@@ -34,7 +34,7 @@ function _c2Rows(){
   var r = hmCompute(), rows = [];
   var cs = function(p){ var c = (typeof customerMap !== 'undefined' && customerMap) ? customerMap[p] : null, k = (typeof careData !== 'undefined' && careData) ? careData[p] : null; return String((k && k.cs) || (c && c.cs) || ''); };
   var noPromo = function(p){ var k = (typeof careData !== 'undefined' && careData) ? careData[p] : null; return !!(k && k.custom && k.custom.noPromo); };
-  r.overdue.concat(r.today).forEach(function(x){ rows.push({ type: x.phone ? 'call' : 'order', phone:x.phone, name:x.name, detail:x.sub, cs:cs(x.phone), sort:0 }); });
+  r.overdue.concat(r.today).forEach(function(x){ rows.push({ type: (x.kind === 'order' || !x.phone) ? 'order' : 'call', phone:x.phone, orderId:x.orderId || '', name:x.name, detail:x.sub, cs:cs(x.phone), sort:0 }); });
   r.rebuy.forEach(function(x){ if (!noPromo(x.phone)) rows.push({ type:'rebuy', phone:x.phone, name:x.name, detail:x.sub, cs:cs(x.phone), sort:1 }); });
   r.idle.forEach(function(x){ if (!noPromo(x.phone)) rows.push({ type:'idle', phone:x.phone, name:x.name, detail:x.sub, cs:cs(x.phone), sort:2 }); });
   return rows;
@@ -54,7 +54,7 @@ function _c2Render(){
     '<button class="btn sm" onclick="_c2Refresh()">↻ Làm mới</button><button class="btn sm" onclick="_c2Csv()">⬇ Xuất CSV</button></div>' +
     '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Loại</th><th>Khách</th><th>Chi tiết</th><th>Phụ trách</th></tr></thead><tbody>' +
     list.slice(0, _c2.limit).map(function(x){
-      return '<tr' + (x.phone ? ' data-phone="' + esc(x.phone) + '" onclick="openDp(this.dataset.phone)" style="cursor:pointer"' : '') + '><td>' + _C2_LABEL[x.type] + '</td><td><b>' + esc(x.name) + '</b>' + (x.phone ? '<div style="font-size:11px;color:var(--muted)">' + esc(x.phone) + '</div>' : '') + '</td><td>' + esc(x.detail) + '</td><td>' + esc(x.cs) + '</td></tr>'; }).join('') +
+      return '<tr' + ((x.phone || x.orderId) ? ' data-phone="' + esc(x.phone || '') + '"' + (x.orderId ? ' data-order="' + esc(x.orderId) + '"' : '') + ' onclick="ttOpenCustomer_(this.dataset.phone,this.dataset.order)" style="cursor:pointer"' : '') + '><td>' + _C2_LABEL[x.type] + '</td><td><b>' + esc(x.name) + '</b>' + (x.phone ? '<div style="font-size:11px;color:var(--muted)">' + esc(x.phone) + '</div>' : '') + '</td><td>' + esc(x.detail) + '</td><td>' + esc(x.cs) + '</td></tr>'; }).join('') +
     (list.length ? '' : '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:16px">Không có mục nào 🎉</td></tr>') + '</tbody></table></div>' +
     (list.length > _c2.limit ? '<div style="text-align:center;margin-top:8px"><button class="btn sm" onclick="_c2.limit+=100;_c2Render()">Hiện thêm (' + (list.length - _c2.limit) + ' còn lại)</button></div>' : '');
 }

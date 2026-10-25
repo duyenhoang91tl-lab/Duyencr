@@ -3,7 +3,9 @@
 Mở bằng trình duyệt (Safari trên iPhone, Chrome trên Android): **https://duyenhoang91tl-lab.github.io/Duyencr/viettat.html**
 Dùng chung kho với CRM (tab Zalo AI → ⌨️ Viết tắt): mục CHUNG của team + mục RIÊNG của bạn. Chỉ ĐỌC; sửa trên CRM rồi bấm 🔄 trong trang.
 
-## Cài lên màn hình chính (như một app)
+## Cài lên màn hình chính (như một app) — bản iOS chính thức là PWA
+Trang là PWA đầy đủ (`viettat.webmanifest`, `viettat-sw.js`, biểu tượng `viettat-icon-*.png`): có biểu tượng riêng "VT", mở toàn màn hình, xem được khi mất mạng; lần đầu mở trang hiện khung hướng dẫn cài (iPhone: Chia sẻ → Thêm vào MH chính; Android/Chrome: nút Cài ngay). **Vì sao không có file .ipa:** iPhone chỉ cài app ngoài App Store khi có Mac + tài khoản Apple Developer (99$/năm) để ký; PWA là cách tải về dùng được ngay. Test: `node tools/test-viettat-pwa.js`.
+
 - **iPhone (Safari):** nút Chia sẻ → *Thêm vào MH chính*.
 - **Android (Chrome):** menu ⋮ → *Thêm vào màn hình chính*.
 

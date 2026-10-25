@@ -174,5 +174,11 @@ async function boot(opts) {
     const C2 = await boot({ local: { vtData: [{ id: 'z', abbr: 'zz', keyword: '', options: ['A', 'B'], scope: 'team', nhom: '', images: [] }] }, coarse: true }); const c2 = C2.w.document.getElementById('t');
     C2.typeTA(c2, 'zz'); await sleep(30); ok(C2.w.document.getElementById('pk-viettat-host').shadowRoot.querySelectorAll('.p .c').length === 2, 'muc chi co chu: man chon chi co 2 the chu');
   }
+  // ===== 50 ANH: lay song song toi da 4, dan dung thu tu (2026-10-25) =====
+  const IM50 = []; for (let i = 0; i < 50; i++) IM50.push({ id: 'BIG' + String(i).padStart(13, '0') + 'ZZ', name: 'a' + String(i).padStart(2, '0') });
+  const B = await boot({ local: { vtData: [{ id: 'b1', abbr: 'bb', keyword: '', options: ['nhieu anh'], scope: 'team', nhom: 'A/B', images: IM50 }] } });
+  const tB = B.w.document.getElementById('t'); B.typeTA(tB, 'bb'); B.key(tB, 'Tab'); await sleep(300);
+  ok(B.calls.msgs.filter((m) => m.type === 'GET_VIETTAT_IMAGE').length === 50 && B.calls.pastes.length === 1 && B.calls.pastes[0].length === 50, '50 anh: lay du 50 va dan 1 lan');
+  ok(B.calls.pastes[0].every((f, i) => f.name.replace(/\.\w+$/, '') === 'a' + String(i).padStart(2, '0')), '50 anh: dan DUNG THU TU du lay song song');
 console.log(bad ? ('\n' + bad + ' LOI') : '\nALL VIETTAT-EXT TESTS PASSED'); process.exit(bad ? 1 : 0);
 })();

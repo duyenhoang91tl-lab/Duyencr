@@ -37,7 +37,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `CSKH_DUYEN_SHEET_KEY_`, `CSKH_DUYEN_FIELDS_`, `XOA_SDT_BUDGET_MS_`
 
 ## 07_SalesReportA.gs
-- Hàm: `getSalesReportOptions_`, `_dtIsExchangeOrder_`, `_dtOrderRevenue_`, `_srCloseRateSections_`, `_extractPageIdFromNguonDon_`, `_extractPageNameFromNguonDon_`, `buildSalesReportA_`
+- Hàm: `getSalesReportOptions_`, `_dtIsExchangeOrder_`, `_dtOrderRevenue_`, `_srCloseRateSections_`, `_extractPageIdFromNguonDon_`, `_extractPageNameFromNguonDon_`, `_drillPairs_`, `_drillPairsObj_`, `buildSalesReportA_`
 
 ## 08_SaleKPI_FailedOrders.gs
 - Hàm: `readSaleKpiConfig_`, `_ymAdd_`, `_ymMonthsBetween_`, `_ymFirstDay_`, `_ymLastDay_`, `_todayYm_`, `_computeSaleMonthlyRevenue_`, `_computeSaleTierTimeline_`, `buildSaleKpiReport_`, `buildFailedOrderReport_`
@@ -132,9 +132,9 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 
 ## 31_SplitOrders.gs
 - Hàm: `_splitSales_`, `_splitIdentityFor_`, `_splitRowFinder_`, `_splitSaleSet_`, `_splitCompareSales_`, `_splitDayDiff_`, `_splitPhoneCandidates_`, `_splitFbKey_`, `_splitFbRead_`, `_splitAttachFeedback_`, `saveSplitFeedback_`, `_splitScope_`, `_splitCSV_`, `_splitRange_`, `_splitFilters_`, `_splitRound_`, `splitOrderReport_`, `splitOrderMine_`, `_splitDmy_`, `splitOrderDetail_`, `splitDoGet_`
-- Hằng/biến: `SPLIT_ORDER_MAX_ROWS_`, `SPLIT_GET_ACTIONS_`, `SPLIT_UNASSIGNED_`, `SH_SPLIT_FB_`
+- Hằng/biến: `SPLIT_ORDER_MAX_ROWS_`, `SPLIT_DETAIL_MAX_`, `SPLIT_GET_ACTIONS_`, `SPLIT_POST_ACTIONS_`, `SPLIT_UNASSIGNED_`, `SH_SPLIT_FB_`
 
 ## 32_ChatCoach.gs
-- Hàm: `_coachNorm_`, `_coachRe_`, `_coachAttOk_`, `_coachSpecOk_`, `_coachAge_`, `coachRules_`, `coachCtkm_`, `coachEval_`, `coachBuildResult_`, `chatCoach_`
+- Hàm: `_coachNorm_`, `_coachRe_`, `_coachAttOk_`, `_coachSpecOk_`, `_coachAge_`, `coachRules_`, `coachCtkm_`, `coachEval_`, `coachBuildResult_`, `chatCoach_`, `splitOrderExportSheet_`, `splitDoPost_`
 - Hằng/biến: `CHAT_COACH_SECTION_`, `COACH_STEPS_`, `COACH_RE_PRICE_`, `COACH_RE_PROMO_`, `COACH_RE_BIRTH_`, `COACH_RE_ORDER_`, `COACH_RE_SIZE_ASK_`, `COACH_RE_SIZE_GIVE_`, `COACH_RULES_`
 
