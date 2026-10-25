@@ -139,15 +139,15 @@ class CrmWeb(private val act: Activity) {
                 runCatching { act.startActivity(Intent(Intent.ACTION_VIEW, u)) }
                 return true
             }
-            override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) { error = null }
-            override fun onPageFinished(view: WebView, url: String?) { view.evaluateJavascript(hookJs, null); canBack = view.canGoBack() }
-            override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) { canBack = view.canGoBack() }
+            override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) { this@CrmWeb.error = null }
+            override fun onPageFinished(view: WebView, url: String?) { view.evaluateJavascript(hookJs, null); this@CrmWeb.canBack = view.canGoBack() }
+            override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) { this@CrmWeb.canBack = view.canGoBack() }
             override fun onReceivedError(view: WebView, request: WebResourceRequest, e: WebResourceError) {
-                if (request.isForMainFrame) error = "Không tải được CRM (${e.description}). Kiểm tra mạng rồi bấm Tải lại."
+                if (request.isForMainFrame) this@CrmWeb.error = "Không tải được CRM (${e.description}). Kiểm tra mạng rồi bấm Tải lại."
             }
         }
         webChromeClient = object : WebChromeClient() {
-            override fun onProgressChanged(view: WebView, newProgress: Int) { progress = newProgress }
+            override fun onProgressChanged(view: WebView, newProgress: Int) { this@CrmWeb.progress = newProgress }
             override fun onShowFileChooser(w: WebView, cb: ValueCallback<Array<Uri>>, p: FileChooserParams): Boolean {
                 fileCb?.onReceiveValue(null); fileCb = cb
                 return try { launchChooser?.invoke(p.createIntent()); launchChooser != null } catch (e: Exception) { fileCb = null; false }
