@@ -19,7 +19,7 @@ async function boot(o) {
   const dom = new JSDOM('<!doctype html><body>' + m[0] + '<textarea id="t"></textarea><textarea id="off" data-vt="off"></textarea><input id="inp" type="text"></body>', { runScripts: 'outside-only', url: 'https://crm.test/', pretendToBeVisual: true });
   const w = dom.window, calls = [];
   w.gsUrl = 'https://gas.test/exec'; w.toast = () => {}; w.alert = (t) => { calls.push({ alert: t }); }; w.confirm = () => (o.confirm !== false);
-  w.fetch = async (u, init) => { calls.push({ u, body: init && init.body }); if (/action=vietTat/.test(u)) { if (o.fail) throw new Error('mang'); return { json: async () => (o.resp || { ok: true, snippets: SN, canTeam: !!o.admin, me: 'Hoa' }) }; } return { json: async () => (o.save || { ok: true, id: 'vt_new' }) }; };
+  w.fetch = async (u, init) => { calls.push({ u, body: init && init.body }); if (/action=vietTatResolveImages/.test(u)) return { json: async () => (o.resolveResp || { ok: true, images: [], errors: [] }) }; if (/action=vietTat/.test(u)) { if (o.fail) throw new Error('mang'); return { json: async () => (o.resp || { ok: true, snippets: SN, canTeam: !!o.admin, me: 'Hoa' }) }; } return { json: async () => (o.save || { ok: true, id: 'vt_new' }) }; };
   w.switchTab = function (t) { calls.push({ tab: t }); };
   w.eval('var currentPhone=' + JSON.stringify(o.phone || '') + ';var allCustomers=' + JSON.stringify(o.phone ? [{ phone: o.phone, name: 'Trần Thu Hà' }] : []) + ';');
   w.eval(code); await sleep(10);
@@ -82,5 +82,40 @@ async function boot(o) {
   const f = E.$('vt-f-opts'); E.w.vtOpenForm(); E.typeTA(f.querySelector('textarea'), 'ch'); ok(E.popup() === null, 'dang SOAN viet tat (o noi dung) -> khong tu bung');
   const C = await boot({ admin: true, phone: '0912345678' }); await C.w.loadVietTat(true); C.typeTA(C.$('t'), 'ch'); ok(C.popup() && C.popup()[0] === 'Chào Hà ạ', 'khach dang mo o ngan ho so -> tu lay ten: ' + JSON.stringify(C.popup()));
   const Z = await boot({ resp: { ok: true, snippets: [], canTeam: false, me: '' } }); await Z.w.loadVietTat(true); Z.typeTA(Z.$('t'), 'ch'); ok(Z.popup() === null, 'chua co viet tat -> im lang');
+
+  // ===== THU MUC CON + ANH (2026-10-25) =====
+  const IMA = 'IMG_AAAAAAAAAAAAAAAA', IMB = 'IMG_BBBBBBBBBBBBBBBB';
+  const TREE = [
+    { id: 'v1', abbr: 'tt', keyword: '', options: ['Túi tiền cổ'], scope: 'team', nhom: 'Túi tiền/Cổ', images: [{ id: IMA, name: 'fiole 1.jpg' }, { id: IMB, name: 'bang <gia>.png' }] },
+    { id: 'v2', abbr: 'tl', keyword: '', options: ['Túi tiền lắc'], scope: 'team', nhom: 'Túi tiền/Lắc', images: [] },
+    { id: 'v3', abbr: 'xx', keyword: '', options: ['khac'], scope: 'team', nhom: '', images: [] }
+  ];
+  const T = await boot({ admin: true, resp: { ok: true, snippets: TREE, canTeam: true, me: 'Duyen' } }); T.w.switchTab('zaloai'); await sleep(20);
+  const lh = T.$('vt-list').textContent;
+  ok(/Túi tiền/.test(lh) && /└ 🗂 Cổ/.test(lh) && /└ 🗂 Lắc/.test(lh) && /Chưa phân nhóm/.test(lh), 'cay thu muc: cha "Túi tiền" + con Cổ/Lắc + nhom trong');
+  ok((lh.match(/🗂 Túi tiền/g) || []).length === 1, 'thu muc cha chi hien 1 lan (khong lap theo tung con)');
+  ok(T.$('vt-list').querySelectorAll('img').length === 2 && /2 ảnh/.test(lh), 'the muc hien 2 anh nho + so luong');
+  ok(T.$('vt-list').querySelector('gia') === null && [...T.$('vt-list').querySelectorAll('img')].some((i) => i.alt === 'bang <gia>.png'), 'ten anh nam trong thuoc tinh da ESCAPE (khong sinh the HTML)');
+  ok([...T.$('vt-list').querySelectorAll('img')].every((i) => /drive\.google\.com\/thumbnail\?id=IMG_/.test(i.src)), 'anh nho lay tu Drive theo ID (khong tai len)');
+  ok([...T.$('vt-nhom-list').querySelectorAll('option')].map((o) => o.value).sort().join('|') === 'Túi tiền|Túi tiền/Cổ|Túi tiền/Lắc', 'goi y nhom gom ca thu muc cha lan con');
+  // mo form sua: nap anh cua muc
+  T.w.vtOpenForm('v1');
+  ok(T.$('vt-f-imgs').querySelectorAll('img').length === 2 && /2\/10/.test(T.$('vt-f-imgcount').textContent), 'form sua: nap san 2 anh cua muc');
+  T.w.vtRemoveImg(0); ok(T.$('vt-f-imgs').querySelectorAll('img').length === 1, 'bo tung anh');
+  T.calls.length = 0; await T.w.vtSave(); await sleep(10);
+  const ps = JSON.parse(T.calls.find((c) => c.body && /saveVietTat/.test(c.body)).body);
+  ok(ps.snippet.id === 'v1' && ps.snippet.nhom === 'Túi tiền/Cổ' && ps.snippet.images.length === 1 && ps.snippet.images[0].id === IMB, 'luu: gui nhom con + danh sach anh con lai: ' + JSON.stringify(ps.snippet.images));
+  // them anh tu link
+  const R = await boot({ admin: true, resp: { ok: true, snippets: TREE, canTeam: true, me: 'Duyen' }, resolveResp: { ok: true, images: [{ id: IMA, name: 'a.jpg' }, { id: IMB, name: 'b.jpg' }], errors: ['rac: khong nhan ra link Drive'] } });
+  R.w.vtOpenForm(); R.$('vt-f-imglinks').value = 'https://drive.google.com/drive/folders/XYZ\nrac'; R.calls.length = 0; await R.w.vtFetchImgs();
+  const rc = R.calls.find((c) => c.u && /action=vietTatResolveImages/.test(c.u));
+  ok(rc && decodeURIComponent(rc.u).indexOf('links=https://drive.google.com/drive/folders/XYZ\nrac') > 0, 'goi vietTatResolveImages kem link (moi dong 1 link)');
+  ok(R.$('vt-f-imgs').querySelectorAll('img').length === 2 && /Đã thêm 2 ảnh/.test(R.$('vt-f-imgmsg').textContent) && /1 link lỗi/.test(R.$('vt-f-imgmsg').textContent) && R.$('vt-f-imglinks').value === '', 'them 2 anh, bao link loi, xoa o link');
+  R.$('vt-f-imglinks').value = 'https://drive.google.com/drive/folders/XYZ'; await R.w.vtFetchImgs(); ok(R.$('vt-f-imgs').querySelectorAll('img').length === 2 && /Không thêm được/.test(R.$('vt-f-imgmsg').textContent), 'link trung -> khong them lap anh');
+  R.$('vt-f-imglinks').value = ''; R.calls.length = 0; await R.w.vtFetchImgs(); ok(!R.calls.some((c) => c.u && /ResolveImages/.test(c.u)), 'o link trong -> khong goi server');
+  const RE = await boot({ admin: true, resolveResp: { error: 'Can dang nhap' } }); RE.w.vtOpenForm(); RE.$('vt-f-imglinks').value = 'x'; await RE.w.vtFetchImgs(); ok(/Lỗi: Can dang nhap/.test(RE.$('vt-f-imgmsg').textContent) && RE.$('vt-f-imgs').children.length === 0, 'server bao loi -> hien loi, khong them anh');
+  R.$('vt-f-abbr').value = 'ab'; R.$('vt-f-opts').querySelector('textarea').value = 'x'; R.$('vt-f-nhom').value = 'Túi tiền/Nhẫn'; R.calls.length = 0; await R.w.vtSave(); await sleep(10);
+  const pr = JSON.parse(R.calls.find((c) => c.body && /saveVietTat/.test(c.body)).body); ok(pr.snippet.images.length === 2 && pr.snippet.nhom === 'Túi tiền/Nhẫn', 'them moi: gui anh da lay + nhom con');
+  R.w.vtOpenForm(); ok(R.$('vt-f-imgs').children.length === 0, 'mo form moi: khong con anh cua lan truoc');
   console.log(bad ? ('\n' + bad + ' LOI') : '\nALL VIETTAT-CRM TESTS PASSED'); process.exit(bad ? 1 : 0);
 })();

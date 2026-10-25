@@ -834,11 +834,15 @@ window.addEventListener('load',function(){var s=document.createElement('script')
             <input id="vt-f-keyword" class="zai-input" placeholder="Từ khoá, cách nhau dấu phẩy (VD: chào, xin chào) — gõ đầu từ khoá cũng gợi ý" style="flex:1;min-width:220px">
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-            <input id="vt-f-nhom" class="zai-input" list="vt-nhom-list" placeholder="🗂 Nhóm (VD: Chào hỏi, Báo giá)" style="flex:1;min-width:180px"><datalist id="vt-nhom-list"></datalist>
+            <input id="vt-f-nhom" class="zai-input" list="vt-nhom-list" placeholder="🗂 Nhóm / thư mục con (VD: Chào hỏi · Túi tiền/Cổ · Túi tiền/Lắc)" title="Dùng dấu / để chia thư mục con, tối đa 3 cấp" style="flex:1;min-width:180px"><datalist id="vt-nhom-list"></datalist>
             <select id="vt-f-scope" class="assign-input" style="min-width:170px" title="Chung: cả team dùng (chỉ admin tạo). Của tôi: chỉ mình bạn thấy"><option value="me">🙋 Của tôi (chỉ mình tôi)</option><option value="team">👥 Chung (cả team)</option></select>
           </div>
           <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Nội dung chèn (thêm nhiều lựa chọn nếu muốn — chọn bằng ↑↓ hoặc Alt+số). Biến: <code>{tên}</code> <code>{tên khách}</code> <code>{tên đầy đủ}</code> <code>{ngày}</code> <code>{ngày mai}</code> <code>{giờ}</code> <code>{thứ}</code></div>
           <div id="vt-f-opts"></div>
+          <div style="margin:8px 0 6px;font-size:11px;color:var(--muted)"><b>🖼 Ảnh kèm theo</b> <span id="vt-f-imgcount"></span> — dùng ảnh ĐÃ CÓ trên Google Drive (không cần tải lên lại). Dán link ảnh hoặc link thư mục (mỗi dòng 1 link, thư mục lấy tối đa 10 ảnh). Ảnh phải chia sẻ cho tài khoản chạy GAS hoặc "ai có link". Khi gõ tắt, nội dung chèn trước rồi ảnh dán lần lượt.</div>
+          <div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:6px"><textarea id="vt-f-imglinks" class="zai-textarea" rows="2" data-vt="off" placeholder="https://drive.google.com/drive/folders/... hoặc https://drive.google.com/file/d/..." style="flex:1;min-width:0"></textarea><button type="button" class="btn sm" id="vt-f-imgbtn" onclick="vtFetchImgs()">➕ Lấy ảnh từ link</button></div>
+          <div id="vt-f-imgmsg" style="font-size:11px;color:var(--muted);margin-bottom:4px"></div>
+          <div id="vt-f-imgs" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px"></div>
           <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:4px">
             <button type="button" class="btn sm" onclick="vtAddOpt()">+ Thêm lựa chọn</button>
             <div style="display:flex;gap:8px"><button class="btn sm" onclick="vtCloseForm()">Hủy</button><button class="btn sm primary" id="vt-f-save-btn" onclick="vtSave()">Lưu</button></div>
@@ -1741,7 +1745,7 @@ function openBcLogModal(phone){
 <script src="js/54-fn-promo-admin.js"></script>
 <script src="js/55-fn-shell.js?v=20261019c"></script>
 <script src="js/56-fn-qrpills.js"></script>
-<script src="js/57-viettat.js?v=20261025a"></script>
+<script src="js/57-viettat.js?v=20261025b"></script>
 
 
 <div class="modal-overlay" id="quick-add-modal" style="display:none;align-items:flex-start;justify-content:center;padding-top:60px;z-index:800">
