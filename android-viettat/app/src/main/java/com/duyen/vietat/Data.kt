@@ -90,23 +90,32 @@ object Store {
 
     fun isCrm(id: String) = id.startsWith("crm_")
 
-    /** Thay TOÀN BỘ mục lấy từ CRM (id bắt đầu "crm_") bằng danh sách mới; mục tự tạo trên máy giữ nguyên. Trả về số mục. */
+    /** Thay TOÀN BỘ mục lấy từ CRM (id bắt đầu "crm_") bằng danh sách mới; mục tự tạo trên máy giữ nguyên. Trả về số mục.
+     *  Thư mục con (2026-10-25): CRM lưu nhóm dạng đường dẫn "Túi tiền/Cổ" → mỗi đường dẫn là 1 thư mục "CRM · Túi tiền › Cổ" (xếp theo tên nên
+     *  các thư mục con đứng cạnh thư mục cha); mục "Của tôi" cũng chia theo nhóm. Ảnh kèm (images) của CRM được tải về và hiện cùng các lựa chọn chữ (xem imgFiles). */
     @Synchronized
-    fun replaceCrm(a: JSONArray): Int {
+    fun replaceCrm(a: JSONArray, imgFiles: Map<String, String> = emptyMap()): Int {
         folders.removeAll { isCrm(it.id) }; snippets.removeAll { isCrm(it.id) }
         var n = 0
+        val fresh = mutableListOf<Folder>()
         for (i in 0 until a.length()) {
             val j = a.getJSONObject(i)
             val oa = j.optJSONArray("options") ?: continue
             val abbr = j.optString("abbr").trim(); if (abbr.isEmpty() || oa.length() == 0) continue
             val mine = j.optString("scope") == "me"
             val nhom = j.optString("nhom").trim()
-            val fid = if (mine) "crm_me" else "crm_team_" + nhom
-            if (folders.none { it.id == fid }) folders += Folder(fid, if (mine) "CRM · Của tôi" else "CRM · " + nhom.ifEmpty { "Chung" }, 1)
+            val label = nhom.split('/').map { it.trim() }.filter { it.isNotEmpty() }.joinToString(" › ")
+            val fid = if (mine) (if (nhom.isEmpty()) "crm_me" else "crm_me_" + nhom) else "crm_team_" + nhom
+            val fname = if (mine) "CRM · Của tôi" + (if (label.isEmpty()) "" else " · " + label) else "CRM · " + label.ifEmpty { "Chung" }
+            if (fresh.none { it.id == fid }) fresh += Folder(fid, fname, 1)
+            // Ảnh của mục CRM (2026-10-25): CRM lưu tham chiếu file Drive [{id,name}] → Sync.Crm.pull đã tải về thành file crm_<id>.<đuôi>; ở đây nối vào cuối danh sách
+            // lựa chọn dưới dạng [[img:tên_file]] như ảnh tự tạo trên máy (ảnh chưa tải được thì bỏ qua, lần cập nhật sau thử lại).
+            val imgs = j.optJSONArray("images")?.let { ia -> (0 until ia.length()).mapNotNull { k -> imgFiles[ia.optJSONObject(k)?.optString("id").orEmpty()]?.let { f -> "[[img:$f]]" } } } ?: emptyList()
             snippets += Snippet("crm_" + j.optString("id", abbr), fid, abbr, j.optString("keyword"),
-                (0 until oa.length()).map { oa.getString(it) }, j.optLong("updatedAt", 1))
+                (0 until oa.length()).map { oa.getString(it) } + imgs, j.optLong("updatedAt", 1))
             n++
         }
+        folders.addAll(fresh.sortedBy { it.name })
         save(); return n
     }
 

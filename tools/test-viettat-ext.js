@@ -29,7 +29,10 @@ async function boot(opts) {
   const area = (k) => ({ get: (keys, cb) => { const o = {}; if (typeof keys === 'string') keys = [keys]; if (Array.isArray(keys)) keys.forEach((x) => { if (x in store[k]) o[x] = store[k][x]; }); else Object.keys(keys).forEach((x) => { o[x] = x in store[k] ? store[k][x] : keys[x]; }); cb(o); },
     set: (o, cb) => { calls.sets.push(o); const ch = {}; Object.keys(o).forEach((x) => { ch[x] = { newValue: o[x] }; store[k][x] = o[x]; }); listeners.forEach((l) => l(ch, k)); cb && cb(); } });
   w.chrome = { storage: { local: area('local'), sync: area('sync'), onChanged: { addListener: (f) => listeners.push(f) } },
-    runtime: { sendMessage: (m, cb) => { calls.msgs.push(m); cb({ ok: true, data: { snippets: opts.server || [{ id: 'z', abbr: 'zz', keyword: '', options: ['Từ server'], scope: 'team' }] } }); } } };
+    runtime: { sendMessage: (m, cb) => { calls.msgs.push(m); if (m.type === 'GET_VIETTAT_IMAGE') { cb(opts.imgResp ? opts.imgResp(m) : { ok: true, data: { base64: 'QUJD', mimeType: 'image/png' } }); return; } cb({ ok: true, data: { snippets: opts.server || [{ id: 'z', abbr: 'zz', keyword: '', options: ['Từ server'], scope: 'team' }] } }); } } };
+  w.DataTransfer = class { constructor() { this.files = []; this.items = { add: (f) => this.files.push(f) }; } };
+  w.ClipboardEvent = class extends w.Event { constructor(t, i) { super(t, i); this.clipboardData = i && i.clipboardData; } };
+  calls.pastes = []; w.document.addEventListener('paste', (e) => calls.pastes.push([...e.clipboardData.files]), true);
   w.eval(code); await sleep(30);
   const popup = () => { const h = w.document.getElementById('pk-viettat-host'); const b = h && h.shadowRoot.querySelector('.b'); return b && b.style.display === 'block' ? [...b.querySelectorAll('.o span')].map((x) => x.textContent) : null; };
   const head = () => { const h = w.document.getElementById('pk-viettat-host'); return h ? h.shadowRoot.querySelector('.h').textContent : ''; };
@@ -95,5 +98,39 @@ async function boot(opts) {
   ok(E.calls.msgs.length === 1, 'doi CS trong khi dang mo trang -> nap lai ngay');
   E = await boot({ stale: true, server: 'khong phai mang' }); ok(E.store.local.vtData.length === 3, 'server tra sai dinh dang -> giu ban cu, khong ghi de');
 
-  console.log(bad ? ('\n' + bad + ' LOI') : '\nALL VIETTAT-EXT TESTS PASSED'); process.exit(bad ? 1 : 0);
+  
+  // ===== ANH KEM + THU MUC CON (2026-10-25) =====
+  const IM = [{ id: 'IMG_AAAAAAAAAAAAAAAA', name: 'fiole 1.jpg' }, { id: 'IMG_BBBBBBBBBBBBBBBB', name: 'bang gia' }];
+  const SI = [{ id: 'i1', abbr: 'tt', keyword: '', options: ['Túi tiền cổ nè'], scope: 'team', nhom: 'Túi tiền/Cổ', images: IM }, { id: 'i2', abbr: 'tn', keyword: '', options: ['Chỉ chữ'], scope: 'team', nhom: '', images: [] }];
+  const fbar = (E) => { const h = E.w.document.getElementById('pk-viettat-host'); const f = h && h.shadowRoot.querySelector('.f'); return f && f.style.display === 'block' ? f.textContent : null; };
+  let I = await boot({ local: { vtData: SI } });
+  let tI = I.w.document.getElementById('t'); I.typeTA(tI, 'tt');
+  let bhtml = I.w.document.getElementById('pk-viettat-host').shadowRoot.querySelector('.b').innerHTML;
+  ok(/Túi tiền › Cổ/.test(bhtml) && /🖼 2/.test(bhtml), 'goi y hien thu muc con "Túi tiền › Cổ" va so anh');
+  I.typeTA(tI, 'tn'); bhtml = I.w.document.getElementById('pk-viettat-host').shadowRoot.querySelector('.b').innerHTML; ok(!/🖼/.test(bhtml) && !/<em>/.test(bhtml), 'muc khong anh/khong nhom: khong hien huy hieu');
+  I.typeTA(tI, 'tt'); I.key(tI, 'Tab'); await sleep(30);
+  ok(tI.value === 'Túi tiền cổ nè', 'Tab chen chu truoc: ' + JSON.stringify(tI.value));
+  const imgMsgs = I.calls.msgs.filter((m) => m.type === 'GET_VIETTAT_IMAGE');
+  ok(imgMsgs.length === 2 && imgMsgs[0].id === IM[0].id && imgMsgs[1].id === IM[1].id, 'lay byte 2 anh qua background');
+  ok(I.calls.pastes.length === 1 && I.calls.pastes[0].length === 2 && I.calls.pastes[0][0].name === 'fiole 1.jpg' && I.calls.pastes[0][1].name === 'bang gia.png' && I.calls.pastes[0][1].type === 'image/png', 'dan 2 anh trong 1 su kien paste (ten giu, them duoi theo mime): ' + JSON.stringify(I.calls.pastes.map((x) => x.map((f) => f.name))));
+  ok(/Chưa hiện|chưa hiện/.test(fbar(I) || '') && /Copy ảnh 1\/2/.test(fbar(I) || ''), 'hien thanh du phong "Copy anh 1/2"');
+  I.w.document.getElementById('pk-viettat-host').shadowRoot.querySelector('.f button[data-a="x"]').dispatchEvent(new I.w.MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+  ok(fbar(I) === null, 'nut Dong tat thanh du phong');
+  I.calls.msgs.length = 0; I.calls.pastes.length = 0; I.typeTA(tI, 'tt'); I.key(tI, 'Tab'); await sleep(30);
+  ok(I.calls.msgs.filter((m) => m.type === 'GET_VIETTAT_IMAGE').length === 0 && I.calls.pastes.length === 1, 'dung lai viet tat: anh lay tu bo nho tam, khong goi server lan nua');
+  I.w.document.getElementById('pk-viettat-host').shadowRoot.querySelector('.f button[data-a="x"]').dispatchEvent(new I.w.MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+  I.calls.pastes.length = 0; I.typeTA(tI, 'tn'); I.key(tI, 'Tab'); await sleep(30);
+  ok(I.calls.pastes.length === 0 && fbar(I) === null, 'muc khong co anh: khong dan, khong hien thanh');
+
+  const P = await boot({ local: { vtData: SI }, imgResp: (m) => m.id === IM[0].id ? { ok: false, error: 'Khong doc duoc anh' } : { ok: true, data: { base64: 'QUJD', mimeType: 'image/jpeg' } } });
+  let tP = P.w.document.getElementById('t'); P.typeTA(tP, 'tt'); P.key(tP, 'Tab'); await sleep(30);
+  ok(tP.value === 'Túi tiền cổ nè' && P.calls.pastes.length === 1 && P.calls.pastes[0].length === 1 && P.calls.pastes[0][0].name === 'bang gia.jpg', '1 anh loi: van dan cac anh con lai, chu van duoc chen');
+  const Q = await boot({ local: { vtData: SI }, imgResp: () => ({ ok: false, error: 'FORBIDDEN' }) });
+  let tQ = Q.w.document.getElementById('t'); Q.typeTA(tQ, 'tt'); Q.key(tQ, 'Tab'); await sleep(30);
+  ok(tQ.value === 'Túi tiền cổ nè' && Q.calls.pastes.length === 0 && fbar(Q) === null, 'tat ca anh loi: khong dan, khong hien thanh, chu van chen');
+  const Ce = await boot({ local: { vtData: SI } }); const ceI = Ce.w.document.getElementById('ce'); ceI.focus();
+  ceI.textContent = 'tt'; const r0 = Ce.w.document.createRange(); r0.setStart(ceI.firstChild, 2); r0.collapse(true); const sl = Ce.w.getSelection(); sl.removeAllRanges(); sl.addRange(r0);
+  ceI.dispatchEvent(new Ce.w.InputEvent('input', { bubbles: true, inputType: 'insertText', data: 't' })); Ce.key(ceI, 'Tab'); await sleep(30);
+  ok(/Túi tiền cổ nè/.test(ceI.textContent) && Ce.calls.pastes.length === 1 && Ce.calls.pastes[0].length === 2, 'o contenteditable (kieu o chat Pancake): chen chu + dan 2 anh');
+console.log(bad ? ('\n' + bad + ' LOI') : '\nALL VIETTAT-EXT TESTS PASSED'); process.exit(bad ? 1 : 0);
 })();
