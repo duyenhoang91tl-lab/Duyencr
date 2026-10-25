@@ -5,7 +5,7 @@ const fs = require('fs'), vm = require('vm');
 const src = fs.readFileSync(__dirname + '/../gas_v13.js', 'utf8');
 function fn(name) { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('thieu ' + name); let d = 0, j = src.indexOf('{', i); for (let k = j; k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}' && --d === 0) return src.slice(i, k + 1); } }
 let bad = 0; const ok = (c, t) => { if (!c) { bad++; console.log('FAIL', t); } else console.log('ok  ', t); };
-const code = 'var SH_VIETTAT="VietTat",VIETTAT_HEADERS=["id","nhom","abbr","keyword","options","owner","createdBy","updatedAt"];\n' + ['_vtSame_', '_vtRowToObj_', 'readVietTat_', 'saveVietTat_', 'deleteVietTat_'].map(fn).join('\n');
+const code = 'var SH_VIETTAT="VietTat",VIETTAT_HEADERS=["id","nhom","abbr","keyword","options","owner","createdBy","updatedAt","images"],VIETTAT_MAX_IMAGES=10,VIETTAT_NHOM_MAX=100;\n' + ['_vtNhom_', '_vtImgsFromCell_', '_vtSame_', '_vtRowToObj_', 'readVietTat_', 'saveVietTat_', 'deleteVietTat_', '_vtCheckImage_', 'vietTatResolveImages_', 'vietTatImage_'].map(fn).join('\n');
 const rows = [];   // khong gom header
 const sheet = {
   getLastRow: () => rows.length + 1,
@@ -13,7 +13,12 @@ const sheet = {
     setValues: v => { v.forEach((x, i) => x.forEach((y, q) => { rows[r - 2 + i][c - 1 + q] = y; })); }, setValue: v => { rows[r - 2][c - 1] = v; } }; },
   getDataRange: () => ({ getValues: () => [['id'], ...rows.map(x => x.slice())] }),
   appendRow: r => rows.push(r), deleteRow: n => rows.splice(n - 2, 1) };
-const ctx = { JSON, Object, Array, String, Number, Date, Math, jsonOut_: o => o, getSheet_: () => sheet };
+const IMG = 'IMG_AAAAAAAAAAAAAAAA', IMG2 = 'IMG_BBBBBBBBBBBBBBBB', PDF = 'PDF_CCCCCCCCCCCCCCCC', FOL = 'FOLDERDDDDDDDDDDDDDD';
+const mk = (id, name, mime) => ({ getId: () => id, getName: () => name, getMimeType: () => mime });
+const files = { [IMG]: mk(IMG, 'fiole 1.jpg', 'image/jpeg'), [IMG2]: mk(IMG2, 'bang gia.png', 'image/png'), [PDF]: mk(PDF, 'x.pdf', 'application/pdf') };
+const DriveApp = { getFileById(id) { if (!files[id]) throw new Error('no'); return files[id]; },
+  getFolderById(id) { if (id !== FOL) throw new Error('no'); const l = [files[IMG2], files[PDF], files[IMG]]; let i = 0; return { getFiles: () => ({ hasNext: () => i < l.length, next: () => l[i++] }) }; } };
+const ctx = { JSON, Object, Array, String, Number, Date, Math, DriveApp, jsonOut_: o => o, getSheet_: () => sheet, _driveImageBase64_: id => id === IMG ? { base64: 'QUJD', mimeType: 'image/jpeg' } : null };
 vm.createContext(ctx); vm.runInContext(code, ctx);
 const admin = { priv: true, name: 'Duyen' }, hoa = { priv: false, name: 'Hoa' }, binh = { priv: false, name: 'Binh' }, anon = { priv: false, name: '' };
 const save = (d, c) => ctx.saveVietTat_(d, c), list = c => ctx.readVietTat_(c);
@@ -49,4 +54,33 @@ ok(ctx.deleteVietTat_(teamId, admin).ok && rows.length === 0, 'admin xoa muc chu
 ok(ctx.deleteVietTat_('vt_khong_co', admin).ok, 'xoa id khong con: khong loi');
 rows.push(['bad1', '', 'zz', '', '{khong phai json', '', '', 0], ['bad2', '', '', '', '["a"]', '', '', 0], ['bad3', '', 'yy', '', '[]', '', '', 0], ['ok1', '', 'oo', '', '["hi"]', '', '', new Date(5)]);
 const L = list(hoa); ok(L.length === 1 && L[0].abbr === 'oo' && L[0].updatedAt === 5, 'dong hong (JSON loi / thieu viet tat / khong noi dung) bi bo qua, khong lam hong danh sach');
+
+// ===== THU MUC CON + ANH THAM CHIEU (2026-10-25) =====
+rows.length = 0;
+ok(ctx._vtNhom_(' Túi tiền / Cổ ') === 'Túi tiền/Cổ' && ctx._vtNhom_('A\\B > C > D > E') === 'A/B/C' && ctx._vtNhom_('') === '' && ctx._vtNhom_('//') === '', 'nhom thu muc con: chuan hoa duong dan, toi da 3 cap');
+r = save({ abbr: 'tt', options: ['Túi tiền cổ'], scope: 'team', nhom: 'Túi tiền / Cổ', images: [{ id: IMG, name: '' }, { id: IMG2, name: 'bg' }, { id: IMG }] }, admin);
+ok(r.ok, 'luu muc co thu muc con + 2 anh (trung ID bi loai)');
+let g = list(hoa).find(x => x.id === r.id);
+ok(g.nhom === 'Túi tiền/Cổ' && g.images.length === 2 && g.images[0].name === 'fiole 1.jpg' && g.images[1].name === 'bg', 'doc lai: nhom con + anh (ten tu Drive neu thieu)');
+ok(save({ abbr: 'bad', options: ['a'], scope: 'me', images: [{ id: PDF }] }, hoa).error, 'tep khong phai anh bi tu choi');
+ok(save({ abbr: 'bad', options: ['a'], scope: 'me', images: [{ id: 'KHONGCOFILEAAAAAAAAA' }] }, hoa).error, 'ID khong mo duoc bi tu choi (khong luu ID tuy y)');
+ok(save({ abbr: 'bad2', options: ['a'], scope: 'me', images: [{ id: 'x/../etc' }] }, hoa).ok === true && list(hoa).filter(x => x.abbr === 'bad2')[0].images.length === 0, 'ID sai dinh dang bi bo qua im lang');
+rows.length = 0; const many = []; for (let i = 0; i < 15; i++) many.push({ id: IMG });
+ok(save({ abbr: 'm', options: ['a'], scope: 'me', images: many }, hoa).ok && list(hoa)[0].images.length === 1, 'trung ID chi giu 1');
+ok(save({ id: list(hoa)[0].id, abbr: 'm', options: ['a'], scope: 'me', images: [] }, hoa).ok && list(hoa)[0].images.length === 0, 'sua: bo het anh');
+rows.length = 0; rows.push(['old1', 'Chào hỏi', 'cc', '', '["hi"]', '', '', 5]);
+ok(list(hoa)[0].images.length === 0 && list(hoa)[0].nhom === 'Chào hỏi', 'dong CU (8 cot, chua co images) van doc dung');
+rows[0][8] = '{hong'; ok(list(hoa)[0].images.length === 0, 'cot images hong -> bo qua, khong lam hong muc');
+let rs = ctx.vietTatResolveImages_('https://drive.google.com/file/d/' + IMG + '/view?usp=sharing');
+ok(rs.images.length === 1 && rs.images[0].id === IMG, 'resolve: link FILE anh');
+rs = ctx.vietTatResolveImages_('https://drive.google.com/drive/folders/' + FOL + '?usp=sharing');
+ok(rs.images.length === 2 && rs.images.every(x => x.id !== PDF) && rs.images[0].name === 'bang gia.png', 'resolve: link THU MUC -> chi lay anh (bo PDF), xep theo ten');
+rs = ctx.vietTatResolveImages_(['https://drive.google.com/file/d/' + PDF + '/view', 'rac']);
+ok(rs.images.length === 0 && rs.errors.length === 2, 'resolve: PDF + chuoi rac -> bao loi tung dong');
+ok(ctx.vietTatResolveImages_('').images.length === 0, 'resolve: rong');
+rows.length = 0; save({ abbr: 'tt', options: ['a'], scope: 'me', images: [{ id: IMG }] }, hoa);
+ok(ctx.vietTatImage_(IMG, hoa).base64 === 'QUJD', 'lay byte anh: chu muc duoc phep');
+ok(ctx.vietTatImage_(IMG, binh).code === 'FORBIDDEN', 'lay byte anh: nguoi khac KHONG doc duoc anh trong muc rieng cua Hoa');
+ok(ctx.vietTatImage_(IMG2, hoa).code === 'FORBIDDEN', 'lay byte anh: ID khong thuoc muc nao -> tu choi (chong doc Drive tuy y)');
+ok(ctx.vietTatImage_('../x', hoa).ok === false, 'lay byte anh: ID sai dinh dang');
 console.log(bad ? ('\n' + bad + ' LOI') : '\nALL VIETTAT-GAS TESTS PASSED'); process.exit(bad ? 1 : 0);

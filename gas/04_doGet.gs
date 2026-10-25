@@ -534,6 +534,12 @@ function doGetCore_(e) {
       var _vc = _tplCaller_(e.parameter.token, e.parameter.ek, e.parameter.by);
       return jsonOut_({ ok: true, snippets: readVietTat_(_vc), canTeam: !!_vc.priv, me: _vc.name || '' });
     }
+    if (action === 'vietTatImage') return jsonOut_(vietTatImage_(e.parameter.id, _tplCaller_(e.parameter.token, e.parameter.ek, e.parameter.by)));
+    if (action === 'vietTatResolveImages') {   // CRM: doi link file/thu muc Drive thanh danh sach anh co san (can dang nhap)
+      var _vr = _tplCaller_(e.parameter.token, e.parameter.ek, e.parameter.by);
+      if (!String(_vr.name || '').trim()) return jsonOut_({ error: 'Can dang nhap CRM (hoac nhap ten CS) de chon anh.', code: 'FORBIDDEN' });
+      return jsonOut_(vietTatResolveImages_(e.parameter.links));
+    }
 
     // ── MAU AI DA HOC (sheet AIContext, type combo_template): CRM xem/sua/xoa ──
     if (action === 'tplPending') return tplPendingList_(_tplCaller_(e.parameter.token, '', ''));   // extension Pancake AI hoi dinh ky: chi admin (theo token phien)

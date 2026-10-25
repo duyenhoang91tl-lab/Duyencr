@@ -2783,6 +2783,12 @@ function doGetCore_(e) {
       var _vc = _tplCaller_(e.parameter.token, e.parameter.ek, e.parameter.by);
       return jsonOut_({ ok: true, snippets: readVietTat_(_vc), canTeam: !!_vc.priv, me: _vc.name || '' });
     }
+    if (action === 'vietTatImage') return jsonOut_(vietTatImage_(e.parameter.id, _tplCaller_(e.parameter.token, e.parameter.ek, e.parameter.by)));
+    if (action === 'vietTatResolveImages') {   // CRM: doi link file/thu muc Drive thanh danh sach anh co san (can dang nhap)
+      var _vr = _tplCaller_(e.parameter.token, e.parameter.ek, e.parameter.by);
+      if (!String(_vr.name || '').trim()) return jsonOut_({ error: 'Can dang nhap CRM (hoac nhap ten CS) de chon anh.', code: 'FORBIDDEN' });
+      return jsonOut_(vietTatResolveImages_(e.parameter.links));
+    }
 
     // ── MAU AI DA HOC (sheet AIContext, type combo_template): CRM xem/sua/xoa ──
     if (action === 'tplPending') return tplPendingList_(_tplCaller_(e.parameter.token, '', ''));   // extension Pancake AI hoi dinh ky: chi admin (theo token phien)
@@ -13085,14 +13091,25 @@ function approveMessageTemplate_(id, decision, reason, caller) {
 //  nhan vien tao muc rieng cua minh. Bien trong noi dung ({ten}, {ngay}...) do client thay khi chen. Chua ho tro hinh/ghi am cua app goc.
 // ═══════════════════════════════════════════════════════════════
 var SH_VIETTAT = 'VietTat';
-var VIETTAT_HEADERS = ['id', 'nhom', 'abbr', 'keyword', 'options', 'owner', 'createdBy', 'updatedAt'];
+var VIETTAT_HEADERS = ['id', 'nhom', 'abbr', 'keyword', 'options', 'owner', 'createdBy', 'updatedAt', 'images'];
+// Thu muc con: nhom luu dang duong dan 'Tui tien/Co' (toi da 3 cap). Anh: cot 'images' = JSON [{id,name}] = THAM CHIEU file Drive co san (KHONG tai len lai).
+var VIETTAT_MAX_IMAGES = 10, VIETTAT_NHOM_MAX = 100;
+function _vtNhom_(s) {
+  var parts = String(s == null ? '' : s).split(/[\/\\>]+/).map(function (x) { return x.replace(/\s+/g, ' ').trim(); }).filter(function (x) { return x; }).slice(0, 3);
+  return parts.join('/').slice(0, VIETTAT_NHOM_MAX);
+}
+function _vtImgsFromCell_(v) {
+  var out = [];
+  try { var a = JSON.parse(String(v || '[]')); if (Array.isArray(a)) a.forEach(function (x) { if (x && /^[A-Za-z0-9_-]{15,}$/.test(String(x.id || ''))) out.push({ id: String(x.id), name: String(x.name || '').slice(0, 120) }); }); } catch (e) { out = []; }
+  return out.slice(0, VIETTAT_MAX_IMAGES);
+}
 function _vtSame_(a, b) { return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase() && String(a || '').trim() !== ''; }
 function _vtRowToObj_(r) {
   var opts = [];
   try { var o = JSON.parse(String(r[4] || '[]')); if (Array.isArray(o)) opts = o.map(function (x) { return String(x == null ? '' : x); }).filter(function (x) { return x.trim(); }); } catch (e) { opts = []; }
   var owner = String(r[5] || '').trim();
   var up = r[7] instanceof Date ? r[7].getTime() : (Number(r[7]) || 0);
-  return { id: String(r[0] || ''), nhom: String(r[1] || '').trim(), abbr: String(r[2] || '').trim(), keyword: String(r[3] || '').trim(), options: opts,
+  return { id: String(r[0] || ''), nhom: _vtNhom_(r[1]), abbr: String(r[2] || '').trim(), keyword: String(r[3] || '').trim(), options: opts, images: _vtImgsFromCell_(r[8]),
            scope: owner ? 'me' : 'team', owner: owner, createdBy: String(r[6] || ''), updatedAt: up };
 }
 function readVietTat_(caller) {
@@ -13116,7 +13133,19 @@ function saveVietTat_(data, caller) {
   if (!abbr || /\s/.test(abbr) || abbr.length > 30) return jsonOut_({ error: 'Viet tat phai la 1 tu (khong co khoang trang, toi da 30 ky tu).' });
   var options = (Array.isArray(data.options) ? data.options : []).map(function (x) { return String(x == null ? '' : x).trim().slice(0, 4000); }).filter(function (x) { return x; }).slice(0, 10);
   if (!options.length) return jsonOut_({ error: 'Thieu noi dung de chen.' });
-  var nhom = String(data.nhom || '').trim().slice(0, 60), keyword = String(data.keyword || '').trim().slice(0, 200);
+  var nhom = _vtNhom_(data.nhom), keyword = String(data.keyword || '').trim().slice(0, 200);
+  var imgs = [];
+  if (Array.isArray(data.images)) {
+    var seen = {};
+    for (var q = 0; q < data.images.length && imgs.length < VIETTAT_MAX_IMAGES; q++) {
+      var im = data.images[q] || {}, iid = String(im.id || '').trim();
+      if (!/^[A-Za-z0-9_-]{15,}$/.test(iid) || seen[iid]) continue;
+      var chk = _vtCheckImage_(iid);   // phai la anh that + GAS doc duoc (chong luu ID tuy y)
+      if (!chk.ok) return jsonOut_({ error: 'Anh "' + String(im.name || iid) + '" khong dung duoc: ' + chk.error });
+      seen[iid] = 1; imgs.push({ id: iid, name: String(im.name || chk.name || '').slice(0, 120) });
+    }
+  }
+  var imgsJson = JSON.stringify(imgs);
   var scope = String(data.scope || 'me') === 'team' ? 'team' : 'me';
   if (scope === 'team' && !caller.priv) return jsonOut_({ error: 'Chi admin moi duoc tao/sua muc viet tat CHUNG cho ca team. Hay luu thanh muc rieng cua ban.', code: 'FORBIDDEN' });
   if (scope === 'me' && !String(caller.name || '').trim()) return jsonOut_({ error: 'Chua biet ban la ai — dang nhap CRM (hoac nhap ten CS trong Cai dat extension) de luu muc rieng.', code: 'FORBIDDEN' });
@@ -13131,13 +13160,13 @@ function saveVietTat_(data, caller) {
       if (!(mine || (cur.scope === 'team' && caller.priv))) return jsonOut_({ error: 'Ban khong co quyen sua muc nay.', code: 'FORBIDDEN' });
       if (cur.scope !== scope) return jsonOut_({ error: 'Khong doi duoc muc rieng <-> chung: hay tao muc moi roi xoa muc cu.' });
       sh.getRange(i + 1, 2, 1, 4).setValues([[nhom, abbr, keyword, JSON.stringify(options)]]);
-      sh.getRange(i + 1, 8).setValue(now);
+      sh.getRange(i + 1, 8, 1, 2).setValues([[now, imgsJson]]);
       return jsonOut_({ ok: true, id: cur.id });
     }
     return jsonOut_({ error: 'Khong tim thay muc can sua (co the da bi xoa).' });
   }
   var id = 'vt_' + now + '_' + Math.floor(Math.random() * 1000);
-  sh.appendRow([id, nhom, abbr, keyword, JSON.stringify(options), owner, String(caller.name || ''), now]);
+  sh.appendRow([id, nhom, abbr, keyword, JSON.stringify(options), owner, String(caller.name || ''), now, imgsJson]);
   return jsonOut_({ ok: true, id: id });
 }
 function deleteVietTat_(id, caller) {
@@ -13153,6 +13182,54 @@ function deleteVietTat_(id, caller) {
     return jsonOut_({ ok: true });
   }
   return jsonOut_({ ok: true, note: 'Khong tim thay id (co the da bi xoa truoc do)' });
+}
+// Kiem tra 1 file Drive la anh + GAS doc duoc. Tra {ok,name} hoac {ok:false,error}.
+function _vtCheckImage_(id) {
+  try {
+    var f = DriveApp.getFileById(id);
+    if (String(f.getMimeType() || '').toLowerCase().indexOf('image/') !== 0) return { ok: false, error: 'khong phai tep anh' };
+    return { ok: true, name: f.getName() };
+  } catch (e) { return { ok: false, error: 'khong mo duoc tep (hay chia se cho tai khoan chay GAS hoac \"ai co link\")' }; }
+}
+// Doi cac link/ID Drive (file HOAC thu muc) thanh danh sach anh [{id,name}] — de CRM chon anh co san, khong phai tai len.
+// links: mang hoac chuoi (moi dong 1 link). Thu muc -> lay toi da VIETTAT_MAX_IMAGES anh trong thu muc (khong de quy).
+function vietTatResolveImages_(links) {
+  var arr = Array.isArray(links) ? links : String(links || '').split(/[\n,\s]+/);
+  var out = [], errs = [], seen = {};
+  for (var i = 0; i < arr.length && out.length < VIETTAT_MAX_IMAGES; i++) {
+    var s = String(arr[i] || '').trim(); if (!s) continue;
+    var m = s.match(/\/file\/d\/([A-Za-z0-9_-]{15,})/) || s.match(/[?&]id=([A-Za-z0-9_-]{15,})/);
+    var fm = s.match(/\/folders\/([A-Za-z0-9_-]{15,})/);
+    var bare = /^[A-Za-z0-9_-]{15,}$/.test(s) ? s : '';
+    if (m && !fm) { var c = _vtCheckImage_(m[1]); if (c.ok) { if (!seen[m[1]]) { seen[m[1]] = 1; out.push({ id: m[1], name: c.name }); } } else errs.push(s + ': ' + c.error); continue; }
+    var fid = fm ? fm[1] : bare;
+    if (!fid) { errs.push(s + ': khong nhan ra link Drive'); continue; }
+    var folder = null;
+    try { folder = DriveApp.getFolderById(fid); } catch (e1) { folder = null; }
+    if (folder) {
+      var it = folder.getFiles(), n = 0;
+      while (it.hasNext() && out.length < VIETTAT_MAX_IMAGES && n < 300) {
+        var f = it.next(); n++;
+        if (String(f.getMimeType() || '').toLowerCase().indexOf('image/') !== 0) continue;
+        if (!seen[f.getId()]) { seen[f.getId()] = 1; out.push({ id: f.getId(), name: f.getName() }); }
+      }
+      continue;
+    }
+    var c2 = _vtCheckImage_(fid);   // ID tran: thu coi nhu file
+    if (c2.ok) { if (!seen[fid]) { seen[fid] = 1; out.push({ id: fid, name: c2.name }); } } else errs.push(s + ': ' + c2.error);
+  }
+  return { ok: true, images: out.sort(function (a, b) { return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0); }), errors: errs, max: VIETTAT_MAX_IMAGES };
+}
+// Tra byte 1 anh (base64) cho extension — CHI cho anh nam trong muc ma nguoi goi duoc phep thay (chong doc Drive tuy y qua ID).
+function vietTatImage_(id, caller) {
+  id = String(id || '').trim();
+  if (!/^[A-Za-z0-9_-]{15,}$/.test(id)) return { ok: false, error: 'ID anh khong hop le' };
+  var list = readVietTat_(caller), allowed = false;
+  for (var i = 0; i < list.length && !allowed; i++) for (var j = 0; j < list[i].images.length; j++) if (list[i].images[j].id === id) { allowed = true; break; }
+  if (!allowed) return { ok: false, error: 'Anh nay khong thuoc muc viet tat nao ban duoc dung', code: 'FORBIDDEN' };
+  var img = _driveImageBase64_(id);
+  if (!img) return { ok: false, error: 'Khong doc duoc anh (qua 3MB hoac chua chia se cho tai khoan chay GAS)' };
+  return { ok: true, id: id, base64: img.base64, mimeType: img.mimeType };
 }
 // ── THONG BAO MAU TIN CHO DUYET (kind 'tplpending', refType 'tpl', refId = id mau) ──
 // NGUYEN NHAN GOC them: admin chi biet co mau cho duyet khi tu mo tab Quan ly mau (huy hieu 'n mau cho duyet'), nen mau cua nhan vien nam cho lau.
