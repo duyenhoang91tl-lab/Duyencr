@@ -22,3 +22,6 @@ Tự động bằng GitHub Actions (`.github/workflows/build-android.yml`). Tự
 
 ## Dùng trên iPhone / không muốn cài APK
 Mở web CRM bằng Chrome (Android) hoặc Safari (iPhone) → menu → **Thêm vào màn hình chính / Cài đặt ứng dụng**. CRM đã có manifest + biểu tượng nên mở như app (không thanh địa chỉ).
+
+## Cập nhật app
+Từ bản có khóa ký cố định (versionCode 3 trở đi), tải VietTat.apk mới và cài ĐÈ lên bản cũ (giữ nguyên dữ liệu). Nếu đang dùng bản cũ hơn (ký bằng khóa tạm), phải **gỡ app cũ một lần** rồi cài bản mới — Android không cho cài đè khác chữ ký. Khóa ký nằm trong repo (`app/keystore/`), chỉ để cài thủ công; muốn lên Play Store thì đổi sang keystore riêng đặt trong GitHub Secrets.
