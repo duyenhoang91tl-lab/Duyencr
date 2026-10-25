@@ -31,6 +31,13 @@
   #bar { position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:1px solid var(--line); padding:8px 10px calc(10px + env(safe-area-inset-bottom)); display:flex; gap:8px; z-index:6; }
   #bar .btn { flex:1; padding:13px 8px; }
   #bar .btn:disabled { opacity:.45; }
+  body { touch-action: manipulation; }
+  .card.img { display:block; padding:0; overflow:hidden; background:#000; }
+  .card.img.on { padding:0; border:3px solid var(--blue); }
+  .card.img .mark { position:absolute; top:8px; right:8px; z-index:2; }
+  .pic { display:block; width:100%; height:170px; object-fit:cover; background:#222; color:#bbb; text-align:center; font-size:13px; }
+  .card.zoom .pic { height:auto; max-height:78vh; object-fit:contain; background:#000; }
+  .pic-wait { height:170px; display:flex; align-items:center; justify-content:center; color:#bbb; font-size:13px; }
   #toast { position:fixed; left:50%; bottom:calc(96px + env(safe-area-inset-bottom)); transform:translateX(-50%); background:#222; color:#fff; padding:10px 16px; border-radius:10px; max-width:88vw; z-index:9; display:none; }
   #setup { padding:24px 16px; }
 </style>
@@ -47,7 +54,8 @@
 <main id="list"></main>
 <div id="bar" style="display:none">
   <button class="btn" id="clear">✕ Bỏ chọn</button>
-  <button class="btn" id="copy" disabled>Sao chép</button>
+  <button class="btn" id="share" disabled>Chia sẻ</button>
+  <button class="btn pri" id="copy" disabled>Sao chép</button>
 </div>
 <div id="toast"></div>
 <script>
@@ -55,7 +63,7 @@
 // Trang "Viết tắt" cho ĐIỆN THOẠI (iPhone + Android, mở bằng trình duyệt / thêm vào màn hình chính). Cùng kho với CRM (sheet VietTat qua GAS action=vietTat).
 // Khác app Android: không tự hiện khi gõ trong Zalo/Messenger (iPhone không cho) — bạn mở trang này, chọn nội dung rồi Sao chép/Chia sẻ và dán vào ô chat.
 var GAS = 'https://script.google.com/macros/s/AKfycbx3QT6YIzQ7SQEwQPkljVeEdmTSBQQSxtTp2hTFYOeCKB_K4BHcUTSLi54LlmB9q_E6sQ/exec';
-var S = { name: '', snaps: [], sel: new Set(), q: '', nhom: '', items: [] };
+var S = { name: '', snaps: [], sel: new Set(), zoom: new Set(), q: '', nhom: '', items: [] };
 function $(id) { return document.getElementById(id); }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function ls(k, v) { try { if (v === undefined) return localStorage.getItem(k) || ''; localStorage.setItem(k, v); } catch (e) {} return ''; }
@@ -121,17 +129,25 @@ function render() {
   S.snaps.filter(function (s) { return matches(s, q); }).forEach(function (s) {
     html += '<div class="grp">' + esc(s.abbr) + (s.nhom ? ' · ' + esc(nhomLabel(s.nhom)) : '') + (s.scope === 'me' ? ' · của tôi' : '') + '</div>';
     (s.options || []).forEach(function (o, i) {
-      var it = { key: s.id + '#' + i, text: o }; S.items.push(it); n++;
+      var it = { key: s.id + '#' + i, type: 'txt', text: o }; S.items.push(it); n++;
       html += '<div class="card' + (S.sel.has(it.key) ? ' on' : '') + '" data-k="' + esc(it.key) + '"><div class="mark">' + (S.sel.has(it.key) ? '✓' : '') + '</div><div class="txt">' + esc(resolve(o, $('cust').value)) + '</div></div>';
+    });
+    // Hình của mục (tham chiếu Drive): hiện CHÍNH hình (không nhãn chữ), tải khi cuộn tới; bấm 1 lần = chọn, bấm đúp = phóng/thu
+    (s.images || []).forEach(function (im) {
+      var it = { key: s.id + '@' + im.id, type: 'img', imgId: im.id, name: im.name || '' }; S.items.push(it); n++;
+      var on = S.sel.has(it.key), v = IMG[im.id] && IMG[im.id].v;
+      html += '<div class="card img' + (on ? ' on' : '') + (S.zoom.has(it.key) ? ' zoom' : '') + '" data-k="' + esc(it.key) + '"><div class="mark">' + (on ? '✓' : '') + '</div>' +
+        (v ? '<img class="pic" data-id="' + esc(im.id) + '" src="' + esc(v.url) + '" draggable="false" alt="">' : '<div class="pic-wait" data-id="' + esc(im.id) + '">Đang tải hình…</div>') + '</div>';
     });
   });
   list.innerHTML = html || '<div class="hint">Không có kết quả cho “' + esc(q) + '”.</div>';
-  bar();
+  bar(); watchImages();
 }
 function bar() {
   var n = S.sel.size;
   $('bar').style.display = 'flex';
   $('copy').disabled = n === 0; $('copy').textContent = n ? 'Sao chép (' + n + ')' : 'Sao chép';
+  $('share').disabled = n === 0; $('share').textContent = n ? 'Chia sẻ (' + n + ')' : 'Chia sẻ';
   $('clear').disabled = n === 0;
 }
 function toggle(k) { if (!S.sel.delete(k)) S.sel.add(k); render(); }
@@ -141,10 +157,92 @@ async function copyText(t) {
   try { await navigator.clipboard.writeText(t); return true; } catch (e) {}
   try { var ta = document.createElement('textarea'); ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.focus(); ta.select(); var ok = document.execCommand('copy'); document.body.removeChild(ta); return ok; } catch (e2) { return false; }
 }
+function toggleZoom(k) { if (!S.zoom.delete(k)) S.zoom.add(k); render(); }
+
+// ── tải hình (Drive qua GAS vietTatImage, base64) — hàng đợi 2 luồng, nhớ trong phiên ──
+var IMG = {}, Q = [], running = 0;
+function ensureImage(id) {
+  if (IMG[id] && IMG[id].p) return IMG[id].p;
+  var rec = IMG[id] = {};
+  rec.p = new Promise(function (res, rej) { Q.push({ id: id, res: res, rej: rej }); pump(); });
+  return rec.p;
+}
+function pump() {
+  while (running < 2 && Q.length) {
+    var j = Q.shift(); running++;
+    (function (job) { fetchImg(job.id).then(job.res, function (e) { delete IMG[job.id]; job.rej(e); }).then(function () { running--; pump(); }); })(j);
+  }
+}
+async function fetchImg(id) {
+  var r = await fetch(GAS + '?action=vietTatImage&id=' + encodeURIComponent(id) + '&by=' + encodeURIComponent(S.name), { redirect: 'follow' });
+  var j = await r.json();
+  if (!j || !j.ok) throw new Error((j && j.error) || 'không tải được hình');
+  var bin = atob(j.base64), u8 = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  var blob = new Blob([u8], { type: j.mimeType || 'image/jpeg' });
+  var v = { url: URL.createObjectURL(blob), blob: blob };
+  IMG[id].v = v; return v;
+}
+function showImage(id, v) {
+  document.querySelectorAll('.pic-wait[data-id="' + id + '"]').forEach(function (el) {
+    var im = document.createElement('img'); im.className = 'pic'; im.setAttribute('data-id', id); im.src = v.url; im.alt = ''; im.draggable = false;
+    el.parentNode.replaceChild(im, el);
+  });
+}
+function loadVisible(id, el) {
+  ensureImage(id).then(function (v) { showImage(id, v); }, function () { if (el && el.isConnected) el.textContent = '⚠ Không tải được hình — bấm 🔄 để thử lại'; });
+}
+var io = null;
+function watchImages() {
+  var els = document.querySelectorAll('.pic-wait');
+  if (!els.length) return;
+  if (typeof IntersectionObserver === 'undefined') { els.forEach(function (el) { loadVisible(el.getAttribute('data-id'), el); }); return; }
+  if (!io) io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) { io.unobserve(e.target); loadVisible(e.target.getAttribute('data-id'), e.target); } }); }, { rootMargin: '400px' });
+  els.forEach(function (el) { io.observe(el); });
+}
+
+// ── sao chép / chia sẻ ──
+function toPng(blob) {
+  if (blob.type === 'image/png') return Promise.resolve(blob);
+  return new Promise(function (res, rej) {
+    var u = URL.createObjectURL(blob), im = new Image();
+    im.onload = function () { var c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight; c.getContext('2d').drawImage(im, 0, 0); c.toBlob(function (b) { b ? res(b) : rej(new Error('không đổi được sang PNG')); }, 'image/png'); };
+    im.onerror = function () { rej(new Error('không đọc được hình')); }; im.src = u;
+  });
+}
+function textsOf(its) { return its.filter(function (i) { return i.type === 'txt'; }).map(function (i) { return resolve(i.text, $('cust').value); }); }
 async function doCopy() {
   var its = selectedItems(); if (!its.length) return;
-  var t = its.map(function (i) { return resolve(i.text, $('cust').value); }).join('\n');
-  toast((await copyText(t)) ? 'Đã sao chép ' + its.length + ' nội dung — dán vào ô chat' : 'Không sao chép được — nhấn giữ chữ để chép tay');
+  var texts = textsOf(its), imgs = its.filter(function (i) { return i.type === 'img'; });
+  if (imgs.length === 1 && !texts.length) {
+    try {
+      var v = await ensureImage(imgs[0].imgId);
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': toPng(v.blob) })]);
+      toast('Đã sao chép hình — dán vào ô chat'); return;
+    } catch (e) { toast('Máy không cho sao chép hình — bấm Chia sẻ để gửi hình'); return; }
+  }
+  if (!texts.length) { toast('Nhiều hình cùng lúc: bấm Chia sẻ'); return; }
+  var ok = await copyText(texts.join('\n'));
+  toast(ok ? ('Đã sao chép ' + texts.length + ' nội dung' + (imgs.length ? ' — hình thì bấm Chia sẻ' : ' — dán vào ô chat')) : 'Không sao chép được — nhấn giữ chữ để chép tay');
+}
+async function doShare() {
+  var its = selectedItems(); if (!its.length) return;
+  var text = textsOf(its).join('\n'), files = [], imgs = its.filter(function (i) { return i.type === 'img'; });
+  try {
+    for (var k = 0; k < imgs.length; k++) {
+      var v = await ensureImage(imgs[k].imgId), ext = (v.blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+      files.push(new File([v.blob], (imgs[k].name || ('hinh' + (k + 1))).replace(/\.[A-Za-z0-9]+$/, '') + '.' + ext, { type: v.blob.type }));
+    }
+  } catch (e) { toast('Không tải được hình: ' + (e && e.message || e)); return; }
+  var data = {}; if (text) data.text = text; if (files.length) data.files = files;
+  if (navigator.share && (!files.length || (navigator.canShare && navigator.canShare({ files: files })))) {
+    try { await navigator.share(data); } catch (e) { if (e && e.name !== 'AbortError') toast('Không mở được bảng chia sẻ: ' + (e.message || e)); }
+    return;
+  }
+  // Máy không chia sẻ được file: chép chữ, tải hình về máy (rồi gửi từ thư viện ảnh)
+  if (text) await copyText(text);
+  files.forEach(function (f) { var a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name; document.body.appendChild(a); a.click(); document.body.removeChild(a); });
+  toast((text ? 'Đã chép chữ. ' : '') + (files.length ? 'Đã tải ' + files.length + ' hình về máy — gửi từ thư viện ảnh.' : ''));
 }
 
 // ── khởi động ──
@@ -156,7 +254,7 @@ function showSetup() {
 }
 function start() {
   $('setup').style.display = 'none'; $('top').style.display = 'block';
-  $('who').innerHTML = 'Đang dùng: <b>' + esc(S.name) + '</b> · <a href="#" id="chg">đổi tên</a> · bấm 1 lần để chọn nhiều nội dung';
+  $('who').innerHTML = 'Đang dùng: <b>' + esc(S.name) + '</b> · <a href="#" id="chg">đổi tên</a> · bấm 1 lần để chọn nhiều nội dung · bấm đúp hình để phóng to';
   $('chg').onclick = function (e) { e.preventDefault(); showSetup(); };
   loadData(false);
 }
@@ -166,10 +264,18 @@ $('cust').addEventListener('input', function () { ls('vt_cust', this.value); ren
 $('reload').onclick = function () { loadData(true); };
 $('clear').onclick = function () { S.sel.clear(); render(); };
 $('copy').onclick = doCopy;
+$('share').onclick = doShare;
 $('list').addEventListener('click', function (e) {
   var ch = e.target.closest('[data-nhom]'); if (ch) { S.nhom = ch.getAttribute('data-nhom'); $('nhom').value = S.nhom; render(); return; }
-  var c = e.target.closest('.card'); if (c) toggle(c.getAttribute('data-k'));
+  var c = e.target.closest('.card'); if (!c) return;
+  var k = c.getAttribute('data-k');
+  if (!c.classList.contains('img')) { toggle(k); return; }
+  // Hình: bấm 1 lần = chọn (chờ 300ms để biết có phải bấm đúp không), bấm đúp = phóng full / thu nhỏ (không đổi trạng thái chọn)
+  if (TAP.k === k && Date.now() - TAP.t < 300) { clearTimeout(TAP.h); TAP.k = ''; toggleZoom(k); return; }
+  clearTimeout(TAP.h); TAP.k = k; TAP.t = Date.now();
+  TAP.h = setTimeout(function () { TAP.k = ''; toggle(k); }, 300);
 });
+var TAP = { k: '', t: 0, h: 0 };
 S.name = ls('vt_name'); $('cust').value = ls('vt_cust');
 if (S.name) start(); else showSetup();
 </script>
