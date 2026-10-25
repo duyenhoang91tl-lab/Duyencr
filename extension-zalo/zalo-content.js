@@ -353,7 +353,7 @@
     const priceWrap = addEl(body, 'div', {id:'zai-price-wrap',
       style:'margin:0 0 8px;padding:6px 8px;border:1px solid #dbeafe;background:#f0f7ff;border-radius:8px;'});
     addEl(priceWrap, 'div', {style:'font-weight:700;font-size:12px;color:#1e3a8a;margin-bottom:6px;',
-      textContent:'💰 Tìm sản phẩm & tin nhắn gợi ý'});
+      textContent:'💰 Tra cứu bảng giá'});
     const priceTabs = addEl(priceWrap, 'div', {id:'zai-price-mode-tabs', style:'display:flex;gap:6px;margin-bottom:6px;'});
     addEl(priceTabs, 'button', {type:'button', className:'zai-price-mode-btn active', textContent:'🔎 Gõ tìm'}).dataset.mode = 'search';
     addEl(priceTabs, 'button', {type:'button', className:'zai-price-mode-btn', textContent:'🧩 Soạn đơn (chọn từng bước)'}).dataset.mode = 'builder';
@@ -364,7 +364,7 @@
       '<label><input type="radio" name="zai-stone" id="zai-stone-ruby" value="RUBY" /> RUBY</label>';
     const priceSearchMode = addEl(priceWrap, 'div', {id:'zai-price-search-mode'});
     const priceRow = addEl(priceSearchMode, 'div', {style:'display:flex;gap:6px;margin-bottom:6px;'});
-    addEl(priceRow, 'input', {id:'zai-price-q', type:'text', placeholder:'Tên sản phẩm, kiểu/size... (Enter hoặc Tìm)',
+    addEl(priceRow, 'input', {id:'zai-price-q', type:'text', placeholder:'Tên sản phẩm, kiểu/size...',
       style:'flex:1;padding:5px 8px;border:1px solid #bfdbfe;border-radius:6px;font-size:12px;box-sizing:border-box;'});
     addEl(priceRow, 'button', {className:'zai-btn zai-btn-primary zai-btn-sm', id:'zai-price-btn', textContent:'Tìm'});
     addEl(priceRow, 'button', {className:'zai-btn zai-btn-secondary zai-btn-sm', id:'zai-price-ai-btn', type:'button',
@@ -3431,18 +3431,20 @@
     finally { btn.disabled=false; btn.textContent=label; }
   }
 
-  // AI khong dung duoc (chua co API key / het luot / loi mang): chi sang khung "Tim san pham & tin nhan goi y" — khong can key.
+  // AI khong dung duoc (chua co API key / het luot / loi mang): chi sang muc "Mau tin nhan tu van" (tin nhan co san, khong can key).
+  // (Truoc day nut nay bam Tim o khung gia — nhung tra gia nay chi con gia, khong con tin nhan nen khong con huu ich.)
   function _zaiAiFallbackHint_(sug) {
     if (!sug) return;
     const ctx = (document.getElementById('zai-ctx') || {}).value || '';
     sug.innerHTML = '<div style="margin-top:6px;padding:8px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;font-size:12px;color:#92400e">' +
-      '⚠️ AI chưa dùng được lúc này (chưa có API key hoặc hết lượt). Bạn vẫn lấy được tin nhắn: gõ tên sản phẩm rồi bấm <b>Tìm</b> — danh sách sản phẩm kèm tin nhắn mẫu để chọn dán vào ô chat.' +
-      '<div style="margin-top:6px"><button type="button" class="zai-btn zai-btn-primary zai-btn-sm" id="zai-fallback-go">🔎 Tìm sản phẩm & tin nhắn mẫu</button></div></div>';
+      '⚠️ AI chưa dùng được lúc này (chưa có API key hoặc hết lượt). Bạn vẫn lấy được tin nhắn: mở mục <b>Mẫu tư vấn</b> để chọn tin nhắn mẫu có sẵn dán vào ô chat.' +
+      '<div style="margin-top:6px"><button type="button" class="zai-btn zai-btn-primary zai-btn-sm" id="zai-fallback-go">📚 Mở mẫu tin nhắn</button></div></div>';
     const go = document.getElementById('zai-fallback-go');
     if (go) go.addEventListener('click', () => {
-      const qi = document.getElementById('zai-price-q');
-      if (qi) { if (!qi.value.trim() && ctx.trim()) qi.value = ctx.trim().slice(0, 60); qi.focus(); qi.scrollIntoView({block:'center'}); }
-      if (qi && qi.value.trim()) doPriceSearchZai_();
+      const sel = document.getElementById('zai-menu-sel');
+      if (sel) { sel.value = 'tpl'; sel.dispatchEvent(new Event('change', { bubbles: true })); }
+      const qi = document.getElementById('zai-tpl-q');
+      if (qi) { if (!qi.value.trim() && ctx.trim()) qi.value = ctx.trim().slice(0, 60); qi.focus(); qi.scrollIntoView({block:'center'}); if (_zaiMsgTemplates.length) renderMsgTemplateRowsZai_(); }
     });
   }
 

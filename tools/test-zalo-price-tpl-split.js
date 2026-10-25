@@ -11,10 +11,10 @@ function fnSrc(name) {
   let d = 0; for (let j = src.indexOf('{', i); j < src.length; j++) { if (src[j] === '{') d++; else if (src[j] === '}' && --d === 0) return src.slice(i, j + 1); }
   throw new Error('khong khop ngoac ' + name);
 }
-const NAMES = ['escHtml', 'zaiFold_', 'zaiRankTpls_', 'zaiTplLines_', 'isMyOpenTplZai_', '_zaiTplStatus_', 'fillTplGroupSelectZai_', 'renderMsgTemplateRowsZai_', 'loadMsgTemplatesZai_', 'doPriceSearchZai_', 'renderPriceRowsZai_'];
+const NAMES = ['escHtml', 'zaiFold_', 'zaiRankTpls_', 'zaiTplLines_', 'isMyOpenTplZai_', '_zaiTplStatus_', 'fillTplGroupSelectZai_', 'renderMsgTemplateRowsZai_', 'loadMsgTemplatesZai_', 'doPriceSearchZai_', 'renderPriceRowsZai_', '_zaiAiFallbackHint_'];
 const chunk = "let _zaiMsgTemplates = [], _zaiMsgTplGroups = [], _currentCS = 'Mai'; const GAS_URL = 'https://gas.test/exec';\n" +
   "const escAttrZai_ = (s) => escHtml(s).replace(/\"/g, '&quot;').replace(/'/g, '&#39;'); const _zaiTplFlashProxy_ = {}; const fillZaloInput_ = () => {}; const openTplFormZai_ = () => {}; const deleteTplZai_ = () => {};\n" +
-  NAMES.map(fnSrc).join('\n') + "\nreturn { doPriceSearchZai_, renderPriceRowsZai_, loadMsgTemplatesZai_, renderMsgTemplateRowsZai_, fillTplGroupSelectZai_, getTpls: () => _zaiMsgTemplates };";
+  NAMES.map(fnSrc).join('\n') + "\nreturn { doPriceSearchZai_, renderPriceRowsZai_, loadMsgTemplatesZai_, renderMsgTemplateRowsZai_, fillTplGroupSelectZai_, _zaiAiFallbackHint_, getTpls: () => _zaiMsgTemplates };";
 const T = [
   { id: 't1', status: 'approved', title: 'Báo giá nhẫn', product: 'Nhẫn vàng', topic: 'Hỏi giá', tags: '', content: 'Dạ nhẫn vàng giá từ 2tr ạ.', nhom: 'Nhẫn', nhomAuto: true, createdBy: 'Admin' },
   { id: 't2', status: 'approved', title: 'Bảo hành lắc', product: '', topic: 'Bảo hành', tags: '', content: 'Bảo hành 12 tháng.\nMiễn phí.', nhom: 'Lắc tay', nhomAuto: false, createdBy: 'Admin' },
@@ -22,13 +22,13 @@ const T = [
 const ROWS = [{ 'Tên sản phẩm': 'Nhẫn vàng 10K Type B', 'Giá': '4450' }, { 'Tên sản phẩm': 'Lắc tay bạc', 'Giá': '900' }];
 function mk(opts) {
   opts = opts || {};
-  const dom = new JSDOM('<!doctype html><body><input id="zai-price-q"><div id="zai-price-result"></div><input id="zai-tpl-q"><select id="zai-tpl-group"><option value="">🗂 Tất cả nhóm</option></select><div id="zai-tpl-status"></div><div id="zai-tpl-result"></div></body>', { runScripts: 'outside-only', url: 'https://x.test/' });
-  const w = dom.window, urls = [];
+  const dom = new JSDOM('<!doctype html><body><select id="zai-menu-sel"><option value=""></option><option value="tpl">t</option></select><input id="zai-ctx"><div id="zai-sug"></div><input id="zai-price-q"><div id="zai-price-result"></div><input id="zai-tpl-q"><select id="zai-tpl-group"><option value="">🗂 Tất cả nhóm</option></select><div id="zai-tpl-status"></div><div id="zai-tpl-result"></div></body>', { runScripts: 'outside-only', url: 'https://x.test/' });
+  const w = dom.window, urls = []; w.HTMLElement.prototype.scrollIntoView = () => {};
   const fetch = async (u) => { urls.push(u); await sleep(1);
     if (/action=priceSearch/.test(u)) return { json: async () => (opts.priceFail ? { error: 'sheet loi' } : { rows: ROWS }) };
     if (/action=messageTemplates/.test(u)) return { json: async () => ({ templates: T, groups: ['Nhẫn', 'Lắc tay', 'Vòng'] }) };
     return { json: async () => ({}) }; };
-  const api = new w.Function('document', 'fetch', 'navigator', 'setTimeout', chunk)(w.document, fetch, { clipboard: { writeText: async () => {} } }, setTimeout);
+  const api = new w.Function('document', 'fetch', 'navigator', 'setTimeout', 'Event', chunk)(w.document, fetch, { clipboard: { writeText: async () => {} } }, setTimeout, w.Event);
   return { w, d: w.document, api, urls };
 }
 (async () => {
@@ -54,5 +54,12 @@ function mk(opts) {
   d.getElementById('zai-tpl-q').value = ''; sel.value = 'Lắc tay'; await api.loadMsgTemplatesZai_(); ok(d.getElementById('zai-tpl-group').value === 'Lắc tay' && cards() === 't2', 'tai lai (🔄) giu lua chon nhom dang co');
   sel.value = ''; api.renderMsgTemplateRowsZai_();
   ok(/tự phân loại/.test(d.querySelector('[data-tid="t1"]').innerHTML) && !/tự phân loại/.test(d.querySelector('[data-tid="t2"]').innerHTML), 'chip nhom ghi "tu phan loai" chi voi mau he thong tu xep nhom');
+  // ===== AI loi -> nhac + nut mo muc Mau tu van (KHONG con bam Tim o khung gia vi gia khong con tin nhan) =====
+  ({ d, api, urls } = mk()); d.getElementById('zai-ctx').value = 'nhẫn vàng'; api._zaiAiFallbackHint_(d.getElementById('zai-sug'));
+  ok(/chưa có API key/.test(d.getElementById('zai-sug').textContent) && !/Tìm sản phẩm/.test(d.getElementById('zai-sug').textContent), 'nhac AI chua dung duoc, tro sang muc Mau tu van');
+  await api.loadMsgTemplatesZai_(); urls.length = 0;
+  d.getElementById('zai-fallback-go').click(); await sleep(20);
+  ok(d.getElementById('zai-menu-sel').value === 'tpl' && d.getElementById('zai-tpl-q').value === 'nhẫn vàng' && !urls.some(u => /priceSearch/.test(u)), 'nut mo muc Mau tu van + dien san tu khoa, KHONG goi tra gia');
+  ok(/Báo giá nhẫn/.test(d.getElementById('zai-tpl-result').textContent), 'danh sach mau hien theo tu khoa vua dien');
   console.log(bad ? 'FAILED ' + bad : 'ALL PASS'); process.exit(bad ? 1 : 0);
 })();
