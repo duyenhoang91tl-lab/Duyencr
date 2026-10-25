@@ -134,3 +134,7 @@ body.rs-open{overflow:hidden;}
 /* 2026-10-23: SĐT / tên khách trong bảng đơn bấm được -> mở hồ sơ khách (js/29 _custLinkHtml_) */
 .cust-link{color:var(--green);cursor:pointer;text-decoration:underline dotted;}
 .cust-link:hover{text-decoration:underline;}
+/* Báo cáo: ô/dòng bấm được để xem đơn chi tiết (js/59-report-drill.js) */
+[data-drill]{cursor:pointer}
+tr[data-drill]:hover td{background:var(--surface2,#f3f4f6)}
+.kpi-card[data-drill]:hover{box-shadow:0 0 0 2px var(--green,#16a34a)}

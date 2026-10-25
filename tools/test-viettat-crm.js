@@ -182,5 +182,15 @@ async function boot(o) {
   U8.w.switchTab('zaloai'); await sleep(20); U8.w.vtOpenForm('v30'); U8.$('vt-f-imglinks').value = 'x'; await U8.w.vtFetchImgs();
   ok(U8.$('vt-f-imgs').querySelectorAll('img').length === 50 && /Đã thêm 20 ảnh/.test(U8.$('vt-f-imgmsg').textContent), 'link Drive: ảnh trùng với ảnh đã có không tính, chỉ thêm 20 ảnh mới');
   U8.$('vt-f-imglinks').value = 'y'; U8.calls.length = 0; await U8.w.vtFetchImgs(); ok(/tối đa 50/.test(U8.$('vt-f-imgmsg').textContent) && !U8.calls.some((c) => c.u && /ResolveImages/.test(c.u)), 'da du 50 anh -> khong goi server lay them, bao tran');
+  // ===== SAFARI iOS / CAM UNG (2026-10-25): cham de chon, khong chon khi cuon, khong chon 2 lan =====
+  const TC = await boot({ admin: true, resp: { ok: true, snippets: SN, canTeam: true, me: 'Hoa' } }); TC.w.switchTab('zaloai'); await sleep(20);
+  const tt = TC.$('t'); TC.typeTA(tt, 'gb');
+  const row = () => TC.w.document.getElementById('vt-host').shadowRoot.querySelector('.o');
+  const touch = (type, y) => { const e = new TC.w.Event(type, { bubbles: true, cancelable: true }); e.touches = y === undefined ? [] : [{ clientY: y }]; row().dispatchEvent(e); return e; };
+  touch('touchstart', 100); touch('touchmove', 140); const e1 = touch('touchend');
+  ok(tt.value === 'gb' && e1.defaultPrevented, 'keo ngon tay (cuon danh sach) KHONG chon, nhung chan click gia');
+  touch('touchstart', 100); touch('touchmove', 103); const e2 = touch('touchend');
+  ok(/Giá nhẫn bạc/.test(tt.value) && e2.defaultPrevented, 'cham 1 lan = chen noi dung (touchend), preventDefault de khong mat focus / khong bi chon 2 lan');
+  ok(/#vt-section input/.test(TC.w.document.head.innerHTML) && /16px/.test(TC.w.document.head.innerHTML), 'o nhap khu Viet tat co co chu 16px tren man cam ung (chong Safari tu phong to)');
   console.log(bad ? ('\n' + bad + ' LOI') : '\nALL VIETTAT-CRM TESTS PASSED'); process.exit(bad ? 1 : 0);
 })();
