@@ -68,7 +68,18 @@ JSDOM.fromFile(path.join(__dirname, '..', 'index.html'), { runScripts: 'dangerou
     ok(chip('offline').classList.contains('on') && !chip('online').classList.contains('on'), 'nut doi dang chon sang len');
     chip('online').click(); await wait(80);
     ok(JSON.stringify(S()) === '["dungnguyen1995"]', 'bam doi Online -> chi con 1 Sale (ten ghost khong co trong du lieu)');
-    // doi khong co ten nao khop -> khong tai lai, bao ro
+    // "Tat ca doi" = hop cac doi co Sale (Van phong + Online = toan phong kinh doanh) — Duyen 18/10/2026
+    w.eval("SALE_CHANNELS = { yenNTH2004:'offline', ANHNP1999:'offline', thuNH1986:'offline', dungnguyen1995:'online' }; _srState.sale = []; __calls.length = 0; renderSalesReportTab();"); await wait(20);
+    const all = chip('__all__'); ok(all && /Tất cả đội/.test(all.textContent) && /Văn phòng/.test(all.textContent) && /Online/.test(all.textContent) && /4 sale/.test(all.textContent), 'co muc "Tat ca doi (Van phong + Online)" = 4 Sale');
+    all.click(); await wait(80);
+    ok(JSON.stringify(S().slice().sort()) === JSON.stringify(['anhNP1999', 'dungnguyen1995', 'thuNH1986', 'yenNTH2004']), 'bam "Tat ca doi" -> loc dung 4 Sale cua ca 2 doi — ' + JSON.stringify(S()));
+    const ca = w.eval('__calls').filter(x => x.action === 'salesReportA').pop(); ok(ca && ca.params.sale.split(',').length === 4, 'tai lai bao cao voi du 4 Sale');
+    ok(chip('__all__').classList.contains('on') && !chip('offline').classList.contains('on'), 'muc "Tat ca doi" sang, tung doi khong sang');
+    w.eval("SALE_CHANNELS = { zzz:'online' };"); // chi 0 doi co Sale -> khong co muc Tat ca doi
+    w.eval("renderSalesReportTab();"); await wait(20); ok(!chip('__all__'), 'it hon 2 doi co Sale -> khong hien "Tat ca doi"');
+    w.eval("SALE_CHANNELS = { yenNTH2004:'offline', ANHNP1999:'offline', thuNH1986:'offline', dungnguyen1995:'online', ghost:'online' }; renderSalesReportTab();"); await wait(20);
+    w.eval("SALE_CHANNELS = { zzz:'online' }; __calls.length = 0; __toasts.length = 0; renderSalesReportTab();"); await wait(20);
+    // (tiep) doi khong co ten nao khop -> khong tai lai, bao ro
     w.eval("SALE_CHANNELS = { zzz:'online' }; renderSalesReportTab(); __calls.length = 0; __toasts.length = 0;"); await wait(20);
     ok(chip('online').classList.contains('off'), 'doi khong khop ten nao -> nut mo');
     chip('online').click(); await wait(40);

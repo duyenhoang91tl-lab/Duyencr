@@ -528,6 +528,12 @@ function doGetCore_(e) {
       return jsonOut_({ templates: _tl, groups: _tplGroupList_(_tl), canApprove: !!_tc.priv, pendingCount: _tc.priv ? _tl.filter(function (t) { return t.status === 'pending'; }).length : 0 });
     }
 
+    // ── VIET TAT (go tat -> chen noi dung; 2026-10-25): danh sach cho CRM (quan ly) va extension Pancake AI (go tat trong o chat). Chi tra muc CHUNG team + muc CUA MINH. ──
+    if (action === 'vietTat') {
+      var _vc = _tplCaller_(e.parameter.token, e.parameter.ek, e.parameter.by);
+      return jsonOut_({ ok: true, snippets: readVietTat_(_vc), canTeam: !!_vc.priv, me: _vc.name || '' });
+    }
+
     // ── MAU AI DA HOC (sheet AIContext, type combo_template): CRM xem/sua/xoa ──
     if (action === 'tplPending') return tplPendingList_(_tplCaller_(e.parameter.token, '', ''));   // extension Pancake AI hoi dinh ky: chi admin (theo token phien)
     if (action === 'aiExamples') {

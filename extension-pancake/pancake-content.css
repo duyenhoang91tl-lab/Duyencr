@@ -1427,3 +1427,7 @@
 .pk-appr-acts button:disabled{opacity:.55;cursor:default}
 .pk-appr-ok{background:#16a34a;color:#fff}.pk-appr-no{background:#fee2e2;color:#991b1b}
 .pk-appr-empty{text-align:center;color:#6b7280;padding:24px 0}
+
+/* Muc "Mau tin nhan tu van": o loc nhom san pham duoi o tim kiem */
+#pk-tpl-filter-row { margin:4px 0 6px; }
+#pk-tpl-filter-row select { width:100%; box-sizing:border-box; padding:4px 6px; font-size:12px; border:1px solid #d1d5db; border-radius:6px; }

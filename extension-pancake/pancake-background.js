@@ -430,6 +430,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // Viet tat (go tat -> chen noi dung): doc danh sach tu sheet VietTat cua CRM (muc chung + muc rieng cua CS dang dung may nay).
+  if (msg?.type === "GET_VIETTAT") {
+    handleGetVietTat()
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
   if (msg?.type === "GET_MESSAGE_TEMPLATES") {
     handleGetMessageTemplates()
       .then((data) => sendResponse({ ok: true, data }))
@@ -1307,6 +1315,18 @@ async function handleSaveMessageTemplate(t) {
 async function handleDeleteMessageTemplate(p) {
   // createdBy: server chi cho xoa mau CHUA DUYET cua chinh nguoi do (mau da duyet chi admin/quan ly xoa tren CRM).
   return _postGas_({ action: "deleteMessageTemplate", id: p?.id || "", createdBy: p?.createdBy || "" });
+}
+
+// Viet tat — action:'vietTat' (GET, chi doc). Them/sua/xoa o CRM (tab Zalo AI). by=<ten CS> de lay them cac muc RIENG cua nguoi dung nay (server chi tra muc chung + muc cua chinh ten do).
+async function handleGetVietTat() {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+  const sep = cfg.gasUrl.includes("?") ? "&" : "?";
+  const res = await fetch(cfg.gasUrl + sep + "action=vietTat&by=" + encodeURIComponent(cfg.csName || ""), { redirect: "follow" });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return { snippets: Array.isArray(data.snippets) ? data.snippets : [] };
 }
 
 // Thu vien mau tin nhan tu van khach — action:'messageTemplates' (GET, chi doc). Form them/sua/

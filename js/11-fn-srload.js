@@ -60,7 +60,7 @@ async function _srLoad(){
       if (dAllE && dAllE.orders && dAllE.orders.length) {
         var cntE = {};
         dAllE.orders.forEach(function(o){
-          String(o.saleBanValid !== undefined ? o.saleBanValid : (o.theSale || '')).split(',').forEach(function(x){ x = x.trim(); if (x) cntE[x] = (cntE[x] || 0) + 1; });
+          String(o.saleBanValid !== undefined ? o.saleBanValid : (o.theSale || '')).split(',').forEach(function(x){ x = x.trim(); if (x && !isNumTagSale_(x)) cntE[x] = (cntE[x] || 0) + 1; });
         });
         _srState.eMismatch = {
           total: dAllE.orders.length, selected: _saleSelE.slice(),
@@ -1288,7 +1288,7 @@ function _srRenderB(d){
 // ═══════════════════════════════════════════════════════════════════════════
 var _SR_UNASSIGNED_ = '(chưa gán sale)';
 // Bỏ token chỉ gồm chữ số ("8", "10"): là tag/số thứ tự Pancake, KHÔNG phải tên sale (cùng quy tắc với _isNumericTag_ ở gas_v13.js — lọc cả ở client để đúng ngay khi GAS chưa deploy).
-function _srOrdNames_(csv){ return String(csv || '').split(',').map(function(x){ return x.trim(); }).filter(function(x){ return x && !/^[\d\s.,]+$/.test(x); }); }
+function _srOrdNames_(csv){ return String(csv || '').split(',').map(function(x){ return x.trim(); }).filter(function(x){ return x && !isNumTagSale_(x); }); }
 // Phần tiền của từng sale trên 1 đơn. mode 'pure' = theo cột Thẻ, giá Pos gốc, chia đều; mode 'adj' = như bảng chính (ghép Base/kế toán, quầy 30/70).
 function _srOrderShares_(o, mode){
   var out = [], i;
@@ -1477,7 +1477,7 @@ function _srBaseCheckPanelHtml_(d){
     var posV = _srBcPosVal_(o), baseV = _srBcBaseSum_(o), lech = baseV - posV;
     var src = (o.ghepBase || []).map(function(x){ return esc((x.ma || '') + ' · ' + (x.nguoiTao || '?') + ' · ' + (x.saleBan || '(chưa gán)') + ' · ' + fmt(Math.round(Number(x.giaTri) || 0)) + (x.tinh ? '' : ' (bị loại: ' + (x.trangThai || '') + ')')); }).join('<br>');
     var sh = _srOrderShares_(o, 'adj').map(function(x){ return esc(x.name) + ' ' + fmt(Math.round(x.giaTri)) + ' (' + (Math.round(x.frac * 1000) / 10) + '%)'; }).join('<br>') + (_srBcQuayTxt_(o) ? '<br><i>' + esc(_srBcQuayTxt_(o)) + '</i>' : '');
-    h += '<tr><td>' + esc(o.ngayTaoDon || '') + '</td><td>' + esc(o.khachHang || '') + '<br><span style="color:var(--muted)">' + esc(o.soDienThoai || '') + '</span></td><td>' + esc(o.theSale || '') + '</td>' +
+    h += '<tr><td>' + esc(o.ngayTaoDon || '') + '</td><td>' + _custLinkHtml_(o.soDienThoai, esc(o.khachHang || '') + '<br><span style="color:var(--muted)">' + esc(o.soDienThoai || '') + '</span>') + '</td><td>' + esc(o.theSale || '') + '</td>' +
       '<td style="text-align:right">' + _srMoney(posV) + '</td><td style="text-align:right">' + _srMoney(baseV) + '</td><td style="text-align:right;' + (Math.abs(lech) > 1 ? 'color:#c00;font-weight:600' : '') + '">' + _srMoney(lech) + '</td><td style="font-size:11.5px">' + src + '</td><td style="font-size:11.5px">' + sh + '</td></tr>';
   });
   h += '</tbody></table></div>';
@@ -1771,7 +1771,10 @@ async function _impUpload(kind){
     // xoa de buoc tai lai tu server khi nguoi dung xem lai cac tab bao cao.
     _srState.dataA = _srState.dataB = _srState.dataC = _srState.dataE = _srState.dataF = _srState.dataG = _srState.dataH = null;
   } catch(e){
-    toast('❌ Nhập lỗi: ' + e.message);
+    // 2026-10-24: 'Failed to fetch' = may chu Apps Script khong tra loi kip (qua thoi gian) -> Google tra trang loi khong co CORS. Viec ghi CO THE da xong 1 phan.
+    var _m = String(e && e.message || e);
+    if (/failed to fetch|networkerror|load failed/i.test(_m)) _m = 'Máy chủ không trả lời kịp (file nhiều ngày có thể làm Apps Script quá thời gian). Dữ liệu có thể đã ghi MỘT PHẦN — bấm lưu lại ĐÚNG file này (an toàn: đơn đã có sẽ được bỏ qua, không ghi trùng).';
+    toast('❌ Nhập lỗi: ' + _m);
   } finally {
     _impState.uploading = false; _impRender_();
   }
@@ -1918,7 +1921,7 @@ function renderSalesReportTabD_(wrap, subTabs){
       dAll_.slice(0, dShow_).forEach(function(r){
         var latestNote = r.note || '';
         try { var arr = JSON.parse(r.note||'[]'); if (Array.isArray(arr) && arr.length) latestNote = arr[0].text || ''; } catch(eN){}
-        html += '<tr><td>'+esc(r.phone)+'</td><td><a href="javascript:void(0)" onclick="openDp(\''+esc(r.phone)+'\')">'+esc(r.name)+'</a></td><td>'+esc(latestNote)+'</td><td>'+esc(r.cs)+'</td><td>'+esc(String(r.createdAt||'').slice(0,16).replace('T',' '))+'</td></tr>';
+        html += '<tr><td>'+_custLinkHtml_(r.phone, esc(r.phone))+'</td><td>'+_custLinkHtml_(r.phone, esc(r.name))+'</td><td>'+esc(latestNote)+'</td><td>'+esc(r.cs)+'</td><td>'+esc(String(r.createdAt||'').slice(0,16).replace('T',' '))+'</td></tr>';
       });
       if (!dAll_.length) html += '<tr><td colspan="5" style="text-align:center;color:var(--muted)">Không có dữ liệu</td></tr>';
       else html += _moreRowsBtn_(dKey_, dShow_, dAll_.length, 5, 'renderSalesReportTab');
@@ -2010,7 +2013,7 @@ function _srLDetailTable_(rows){
     var cr = valid.reduce(function(s,o){ return s + (o.credits||[]).reduce(function(s2,c){ return s2 + (c.amount||0); }, 0); }, 0);
     h += '<tr'+(r.koDen?' style="opacity:.6"':'')+'>'+
       '<td style="white-space:nowrap">'+esc((r.visitDates||[]).map(_srLDmy_).join(', ') || esc(r.ngayHen))+'<div style="font-size:10px;color:var(--hint)">sheet dòng '+esc(r.row)+(r.stt?' · STT '+esc(r.stt):'')+'</div></td>'+
-      '<td><b>'+esc(r.tenKh||'—')+'</b><div style="font-size:11px;color:var(--muted)">'+esc(r.phone||'')+(r.kenh?' · '+esc(r.kenh):'')+'</div></td>'+
+      '<td>'+_custLinkHtml_(r.phone, '<b>'+esc(r.tenKh||'—')+'</b>')+'<div style="font-size:11px;color:var(--muted)">'+_custLinkHtml_(r.phone, esc(r.phone||''))+(r.kenh?' · '+esc(r.kenh):'')+'</div></td>'+
       '<td>'+((r.sales||[]).map(function(x){ return '<b>'+esc(x.name)+'</b>'+(x.raw!==x.name?'<span style="font-size:10px;color:var(--hint)"> ('+esc(x.raw)+')</span>':''); }).join('<br>') || '<span style="color:var(--muted)">—</span>')+'</td>'+
       '<td style="font-size:11px;max-width:200px">'+esc([r.tinhTrang, r.capNhat].filter(Boolean).join(' · ')).substring(0,220)+'</td>'+
       '<td>'+((r.orders||[]).map(_srLOrderHtml_).join('') || '<span style="color:var(--muted);font-size:11px">— chưa có đơn Pos khớp —</span>')+'</td>'+

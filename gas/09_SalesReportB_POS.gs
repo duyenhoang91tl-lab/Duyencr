@@ -10,6 +10,15 @@
 // day chinh la nguyen nhan lech 18.986.000d truoc kia (ghep ca don 1 ma). Don goc Base chi bi loai khi 'Thất bại' (cot H).
 var POS_GHEP_BASE_ENABLED_ = true;
 var POS_GHEP_MIN_CODES_ = 2;
+// CONG TAC (Duyen chon "123" 2026-10-24, viec 2: don Pos 1 ma cung chia tien theo Base): sheet Settings key POS_GHEP_MIN_CODES = 1 -> don Pos co tu 1 ma tro len deu GHEP Base
+// (chia tien theo sale tren don goc Base, gia theo Base nhu don ghep). Mac dinh/khac 1 = 2 (nhu quy tac chot thang 10). CANH BAO: thang 9 ghep ca don 1 ma lam Sasum lech 18.986.000d so voi file ke toan
+// (9 don doi gia theo Base, 2 don goc Base Huy/Hoan bi loai) — bat xong phai doi chieu lai tong voi file ke toan. Doi gia tri trong Settings la co hieu luc o lan tinh bao cao ke tiep (cache bao cao ngan).
+var _posGhepMinMemo_ = null;   // nho trong 1 lan chay (moi lan goi doGet/doPost la 1 execution moi) de khong doc sheet Settings nhieu lan
+function _posGhepMinCodes_() {
+  if (_posGhepMinMemo_ !== null) return _posGhepMinMemo_;
+  var v = ''; try { v = String(getSetting_('POS_GHEP_MIN_CODES') || '').trim(); } catch (e) {}
+  return (_posGhepMinMemo_ = (v === '1' ? 1 : POS_GHEP_MIN_CODES_));
+}
 var COUNTER_CODE_INNER_ = '[A-Za-z]{0,3}\\d{1,6}[A-Za-z]{0,3}T\\d{1,2}(?:\\/\\d{2,4})?';
 var COUNTER_CODE_RE_SRC_ = '(^|[^A-Za-z0-9])(' + COUNTER_CODE_INNER_ + ')(?![A-Za-z0-9])';
 function _normCounterCode_(c) { return String(c || '').replace(/\s+/g, '').toUpperCase(); }
@@ -276,7 +285,7 @@ function _mergeTachDon_(rows) {
     var best = null, bestT = null;
     parts.forEach(function(p) {
       total += Number(p.giaTriSauGiam) || 0; cod += Number(p.cod) || 0; vals.push(Number(p.giaTriSauGiam) || 0);
-      String(p.theSale || '').split(',').forEach(function(x) { x = x.trim(); var f = _normTxt_(x); if (x && !seenSale[f]) { seenSale[f] = true; sales.push(x); } });
+      String(p.theSale || '').split(',').forEach(function(x) { x = x.trim(); var f = _normTxt_(x); if (x && !_isNumericTag_(x) && !seenSale[f]) { seenSale[f] = true; sales.push(x); } }); // loai STT Pancake
       if (p.sanPham) sp.push(String(p.sanPham)); if (p.maSanPham) ma.push(String(p.maSanPham)); if (p.soLuong) sl.push(String(p.soLuong));
       var nt = String(p.ghiChu || '').trim(); if (nt && !seenNote[nt]) { seenNote[nt] = true; notes.push(nt); }
       if (!m.nguonDon && p.nguonDon) m.nguonDon = p.nguonDon;
@@ -516,10 +525,10 @@ function buildSalesReportB_(filters) {
   }
 
   // GHEP DON POS <-> BASE (cot Q ghi chu): tach ma bo dem tu ghi chu, chi doc "DT TỔNG " khi THUC SU co ma.
-  var codesByRow = [], wantedCodes = {}, anyCodes = false;
+  var codesByRow = [], wantedCodes = {}, anyCodes = false, minCodesG = _posGhepMinCodes_();
   for (var pi = 0; pi < pre.length; pi++) {
     var cds = POS_GHEP_BASE_ENABLED_ ? _splitBhCodes_(_extractCounterCodes_(pre[pi].ghiChu)).normal : [];   // ma BH = don doc lap, khong tham gia ghep
-    if (cds.length < POS_GHEP_MIN_CODES_) cds = []; // chi don ghep (>=2 ma thuong) moi check nguoc Base; 0-1 ma -> tinh thuan Pos theo The
+    if (cds.length < minCodesG) cds = []; // mac dinh chi don ghep (>=2 ma thuong) moi check nguoc Base; 0-1 ma -> tinh thuan Pos theo The (Settings POS_GHEP_MIN_CODES=1 de don 1 ma cung ghep)
     codesByRow.push(cds);
     if (cds.length) { anyCodes = true; cds.forEach(function(c) { wantedCodes[c] = true; }); }
   }

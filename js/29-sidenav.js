@@ -412,3 +412,33 @@ document.addEventListener('click', function(e){
   if (it) { _qsPick_(+it.getAttribute('data-i')); return; }
   if (!(e.target.closest && e.target.closest('#qs-res')) && !_qsIsInp_(e.target)) _qsHide_();
 });
+
+// ═══════════════════════════════════════════════════════
+//  MỞ HỒ SƠ KHÁCH TỪ BẤT KỲ BẢNG ĐƠN NÀO (2026-10-23, Duyên yêu cầu: "chỗ nào check đơn có mã đơn/SĐT đều mở được hồ sơ khách")
+//  Cách dùng ở chỗ vẽ bảng: _custLinkHtml_(sdt, 'nội dung hiển thị') -> chữ bấm được; click (bắt ở document, 1 chỗ duy nhất) -> _openCustomerByPhone_.
+//  Khách ngoài danh sách đang tải => nạp riêng bằng _pullSearchCustomer_ rồi openDp (openDp im lặng không mở nếu khách chưa có trong allCustomers — lý do
+//  các nút gọi openDp trực tiếp "bấm không ra gì"). Tài khoản test (demo-mode) chỉ mở khách có sẵn. (js/28 _bdOpenCustomer_ là bản riêng cùng logic cho popup đơn K.)
+// ═══════════════════════════════════════════════════════
+async function _openCustomerByPhone_(phone){
+  var ph = (typeof normPhone === 'function' ? normPhone(phone) : '') || String(phone || '').replace(/\D/g, '');
+  if (!ph || typeof customerMap === 'undefined' || typeof openDp !== 'function') return;
+  if (!customerMap[ph] && customerMap[phone]) ph = String(phone);
+  if (!customerMap[ph]) {
+    if (document.body.classList.contains('demo-mode')) { if (typeof toast === 'function') toast('Tài khoản test chỉ xem được khách có sẵn trong danh sách'); return; }
+    ph = await _pullSearchCustomer_(ph);
+    if (!ph) return;
+  }
+  try { openDp(ph); } catch (e) {}
+}
+function _custLinkHtml_(phone, inner, tip){
+  var p = String(phone == null ? '' : phone).trim();
+  if (p.replace(/\D/g, '').length < 6) return inner;   // không có SĐT hợp lệ -> chữ thường
+  return '<span class="cust-link" data-cust-phone="' + esc(p) + '" title="' + esc(tip || 'Bấm để mở hồ sơ khách') + '">' + inner + '</span>';
+}
+document.addEventListener('click', function(e){
+  var t = e.target.closest && e.target.closest('[data-cust-phone]');
+  if (!t) return;
+  e.stopPropagation(); e.preventDefault();   // capture: không kích hoạt onclick của dòng/ô cha (vd mở popup đơn)
+  _openCustomerByPhone_(t.getAttribute('data-cust-phone'));
+}, true);
+

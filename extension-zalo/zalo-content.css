@@ -631,6 +631,8 @@ textarea {
 /* Mẫu tin nhắn tư vấn — đồng bộ với Pancake AI (.pk-tpl-*, .pk-ai-suggestion-item) */
 #zai-tpl-row { display: flex; gap: 6px; margin-bottom: 6px; }
 #zai-tpl-q { flex: 1; min-width: 0; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; }
+#zai-tpl-filter-row { margin-bottom: 6px; }
+#zai-tpl-group { width: 100%; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; background: #fff; }
 #zai-tpl-refresh, #zai-tpl-add { border: 1px solid #ccc; background: #fff; border-radius: 6px; padding: 4px 8px; cursor: pointer; }
 #zai-tpl-status { font-size: 11px; color: #1e3a8a; margin-bottom: 4px; }
 #zai-tpl-result { max-height: 340px; overflow-y: auto; }

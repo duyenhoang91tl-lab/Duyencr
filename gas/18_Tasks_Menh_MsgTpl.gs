@@ -1056,6 +1056,83 @@ function approveMessageTemplate_(id, decision, reason, caller) {
   }
   return jsonOut_({ error: 'Khong tim thay mau tin' });
 }
+// ═══════════════════════════════════════════════════════════════
+//  VIET TAT (go tat / tu khoa -> chen noi dung) — them 2026-10-25, Duyen yeu cau tich hop app "Viet Tat" (Chrome + Android) vao Pancake AI + CRM.
+//  NGUON DU LIEU DUY NHAT: sheet 'VietTat' (thay server dong bo rieng cua app Viet Tat). CRM quan ly (tab Zalo AI), extension Pancake AI doc qua action 'vietTat'.
+//  Moi dong = 1 muc: abbr (viet tat, khong khoang trang), keyword (tu khoa cach nhau dau phay), options (JSON mang noi dung; co the nhieu lua chon),
+//  nhom (thu muc), owner ('' = CHUNG cho ca team; khac rong = ten nguoi tao, chi nguoi do thay). Muc chung CHI admin tao/sua/xoa (cung vai tro duyet mau tin);
+//  nhan vien tao muc rieng cua minh. Bien trong noi dung ({ten}, {ngay}...) do client thay khi chen. Chua ho tro hinh/ghi am cua app goc.
+// ═══════════════════════════════════════════════════════════════
+var SH_VIETTAT = 'VietTat';
+var VIETTAT_HEADERS = ['id', 'nhom', 'abbr', 'keyword', 'options', 'owner', 'createdBy', 'updatedAt'];
+function _vtSame_(a, b) { return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase() && String(a || '').trim() !== ''; }
+function _vtRowToObj_(r) {
+  var opts = [];
+  try { var o = JSON.parse(String(r[4] || '[]')); if (Array.isArray(o)) opts = o.map(function (x) { return String(x == null ? '' : x); }).filter(function (x) { return x.trim(); }); } catch (e) { opts = []; }
+  var owner = String(r[5] || '').trim();
+  var up = r[7] instanceof Date ? r[7].getTime() : (Number(r[7]) || 0);
+  return { id: String(r[0] || ''), nhom: String(r[1] || '').trim(), abbr: String(r[2] || '').trim(), keyword: String(r[3] || '').trim(), options: opts,
+           scope: owner ? 'me' : 'team', owner: owner, createdBy: String(r[6] || ''), updatedAt: up };
+}
+function readVietTat_(caller) {
+  var sh = getSheet_(SH_VIETTAT, VIETTAT_HEADERS), last = sh.getLastRow(), out = [];
+  if (last < 2) return out;
+  var vals = sh.getRange(2, 1, last - 1, VIETTAT_HEADERS.length).getValues();
+  for (var i = 0; i < vals.length; i++) {
+    if (!vals[i][0]) continue;
+    var o = _vtRowToObj_(vals[i]);
+    if (!o.abbr || !o.options.length) continue;
+    if (o.scope === 'me' && !_vtSame_(o.owner, caller && caller.name)) continue;   // muc rieng nguoi khac: khong tra ve
+    out.push(o);
+  }
+  return out;
+}
+// data: {id?, nhom, abbr, keyword, options[], scope:'team'|'me'}
+function saveVietTat_(data, caller) {
+  caller = caller || { priv: false, name: '' };
+  data = data || {};
+  var abbr = String(data.abbr || '').trim();
+  if (!abbr || /\s/.test(abbr) || abbr.length > 30) return jsonOut_({ error: 'Viet tat phai la 1 tu (khong co khoang trang, toi da 30 ky tu).' });
+  var options = (Array.isArray(data.options) ? data.options : []).map(function (x) { return String(x == null ? '' : x).trim().slice(0, 4000); }).filter(function (x) { return x; }).slice(0, 10);
+  if (!options.length) return jsonOut_({ error: 'Thieu noi dung de chen.' });
+  var nhom = String(data.nhom || '').trim().slice(0, 60), keyword = String(data.keyword || '').trim().slice(0, 200);
+  var scope = String(data.scope || 'me') === 'team' ? 'team' : 'me';
+  if (scope === 'team' && !caller.priv) return jsonOut_({ error: 'Chi admin moi duoc tao/sua muc viet tat CHUNG cho ca team. Hay luu thanh muc rieng cua ban.', code: 'FORBIDDEN' });
+  if (scope === 'me' && !String(caller.name || '').trim()) return jsonOut_({ error: 'Chua biet ban la ai — dang nhap CRM (hoac nhap ten CS trong Cai dat extension) de luu muc rieng.', code: 'FORBIDDEN' });
+  var owner = scope === 'team' ? '' : String(caller.name).trim().slice(0, 60);
+  var sh = getSheet_(SH_VIETTAT, VIETTAT_HEADERS), now = Date.now();
+  if (data.id) {
+    var vals = sh.getDataRange().getValues();
+    for (var i = 1; i < vals.length; i++) {
+      if (String(vals[i][0]) !== String(data.id)) continue;
+      var cur = _vtRowToObj_(vals[i]);
+      var mine = cur.scope === 'me' && _vtSame_(cur.owner, caller.name);
+      if (!(mine || (cur.scope === 'team' && caller.priv))) return jsonOut_({ error: 'Ban khong co quyen sua muc nay.', code: 'FORBIDDEN' });
+      if (cur.scope !== scope) return jsonOut_({ error: 'Khong doi duoc muc rieng <-> chung: hay tao muc moi roi xoa muc cu.' });
+      sh.getRange(i + 1, 2, 1, 4).setValues([[nhom, abbr, keyword, JSON.stringify(options)]]);
+      sh.getRange(i + 1, 8).setValue(now);
+      return jsonOut_({ ok: true, id: cur.id });
+    }
+    return jsonOut_({ error: 'Khong tim thay muc can sua (co the da bi xoa).' });
+  }
+  var id = 'vt_' + now + '_' + Math.floor(Math.random() * 1000);
+  sh.appendRow([id, nhom, abbr, keyword, JSON.stringify(options), owner, String(caller.name || ''), now]);
+  return jsonOut_({ ok: true, id: id });
+}
+function deleteVietTat_(id, caller) {
+  caller = caller || { priv: false, name: '' };
+  if (!id) return jsonOut_({ error: 'Thieu id muc can xoa' });
+  var sh = getSheet_(SH_VIETTAT, VIETTAT_HEADERS), vals = sh.getDataRange().getValues();
+  for (var i = 1; i < vals.length; i++) {
+    if (String(vals[i][0]) !== String(id)) continue;
+    var cur = _vtRowToObj_(vals[i]);
+    var mine = cur.scope === 'me' && _vtSame_(cur.owner, caller.name);
+    if (!(mine || (cur.scope === 'team' && caller.priv))) return jsonOut_({ error: 'Ban khong co quyen xoa muc nay.', code: 'FORBIDDEN' });
+    sh.deleteRow(i + 1);
+    return jsonOut_({ ok: true });
+  }
+  return jsonOut_({ ok: true, note: 'Khong tim thay id (co the da bi xoa truoc do)' });
+}
 // ── THONG BAO MAU TIN CHO DUYET (kind 'tplpending', refType 'tpl', refId = id mau) ──
 // NGUYEN NHAN GOC them: admin chi biet co mau cho duyet khi tu mo tab Quan ly mau (huy hieu 'n mau cho duyet'), nen mau cua nhan vien nam cho lau.
 // Nay: nhan vien de xuat/sua mau -> moi admin (MSG_TPL_APPROVER_ROLES_) nhan thong bao tren CRM (chuong); extension Pancake AI doc cung nguon qua action tplPending.
