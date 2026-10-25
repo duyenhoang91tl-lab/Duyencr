@@ -1,16 +1,26 @@
-// zalo-viettat.js — VIẾT TẮT trong ô chat Zalo Web (2026-10-25). DẪN XUẤT CƠ HỌC từ extension-pancake/pancake-viettat.js (quy tắc song song Zalo AI ⇄ Pancake AI):
-// chỉ khác cách lấy dữ liệu (gọi thẳng GAS như zalo-content.js, không qua background), tên CS/URL/khóa lấy từ chrome.storage.local của Zalo AI, và id panel Zalo AI.
+// zalo-viettat.js — VIẾT TẮT trong ô chat Zalo Web (2026-10-25). *** FILE TỰ SINH — KHÔNG SỬA TAY: sửa extension-pancake/pancake-viettat.js rồi chạy `node tools/derive-zalo-viettat.js` ***
+// Dẫn xuất cơ học từ pancake-viettat.js (quy tắc song song Zalo AI ⇄ Pancake AI). Khác: gọi THẲNG GAS như zalo-content.js (không có background), tên CS/URL/khóa đọc từ chrome.storage.local của Zalo AI, id panel Zalo AI.
 // Gõ viết tắt (hoặc từ khoá) → hiện gợi ý ngay dưới/trên ô chat → Tab chèn nội dung (↑↓ đổi lựa chọn, Alt+1…8 chọn nhanh, Esc đóng).
 // Nguồn dữ liệu: sheet "VietTat" của CRM qua GAS (action 'vietTat' → background GET_VIETTAT); quản lý (thêm/sửa/xoá) ở CRM → tab Zalo AI → "⌨️ Viết tắt".
 // Biến trong nội dung: {tên} {tên khách} (tên gọi = chữ cuối) · {tên đầy đủ} · {ngày} {ngày mai} {giờ} {thứ}.
 // Kiểu gõ có tên: "ch Thanh Huyền" (viết tắt + tên khách) hoặc để tự lấy tên từ ô "Tên khách" của panel Zalo AI / bấm "✎ chọn tên" 1 lần.
-// KHÔNG tự gửi tin: chỉ chèn chữ vào ô soạn, CS đọc lại rồi tự bấm Gửi.
+// ẢNH KÈM (2026-10-25): mục có `images` (ID ảnh Drive có sẵn, chọn ở CRM) → chèn chữ XONG thì lấy byte từng ảnh qua background (GET_VIETTAT_IMAGE) rồi dán TẤT CẢ vào ô chat
+//   bằng 1 sự kiện paste (DataTransfer nhiều file). Nếu Zalo không nhận paste giả → hiện thanh "Ảnh chưa hiện?" để copy từng ảnh vào clipboard rồi Ctrl+V.
+// Nhóm: `nhom` dạng "Túi tiền/Cổ" hiện dưới dạng "Túi tiền › Cổ" ngay trong dòng gợi ý.
+// KHÔNG tự gửi tin: chỉ chèn chữ/ảnh vào ô soạn, CS đọc lại rồi tự bấm Gửi.
 (function () {
   'use strict';
   if (window.__zaiVietTatLoaded) return; window.__zaiVietTatLoaded = true;
   const STALE_MS = 5 * 60 * 1000;
   const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbx3QT6YIzQ7SQEwQPkljVeEdmTSBQQSxtTp2hTFYOeCKB_K4BHcUTSLi54LlmB9q_E6sQ/exec';   // = DEFAULT_GAS_URL của zalo-content.js
-  let snippets = [], enabled = true, picks = {}, state = null, host = null, box = null, tbox = null, fetching = false;
+  // URL GAS kèm src=zalo + khóa extension `ek` (giống wrapper fetch của zalo-content.js) + by=<CS đang dùng>
+  async function gasUrl(q) {
+    const l = await sget('local', { ome_gas_url: '', ome_current_cs: '', ome_ext_key: '' });
+    const gas = l.ome_gas_url || DEFAULT_GAS_URL;
+    return { url: gas + (gas.indexOf('?') >= 0 ? '&' : '?') + q + '&by=' + encodeURIComponent(String(l.ome_current_cs || '')) + '&src=zalo' + (l.ome_ext_key ? '&ek=' + encodeURIComponent(l.ome_ext_key) : ''), by: String(l.ome_current_cs || '') };
+  }
+  let snippets = [], enabled = true, picks = {}, state = null, host = null, box = null, tbox = null, fbox = null, fetching = false;
+  const imgCache = new Map();   // id → File (giữ trong phiên trang, tránh gọi GAS lại mỗi lần dùng cùng viết tắt)
 
   // chrome.* ném lỗi "Extension context invalidated" sau khi reload extension → bọc để trang không bị lỗi
   const safe = (f, d) => { try { return f(); } catch (_) { return d; } };
@@ -29,13 +39,11 @@
   async function refresh(force) {
     if (fetching) return; fetching = true;
     try {
-      const l = await sget('local', { vtAt: 0, vtBy: null, ome_gas_url: '', ome_current_cs: '', ome_ext_key: '' });
-      const by = String(l.ome_current_cs || ''), gas = l.ome_gas_url || DEFAULT_GAS_URL;
-      if (!force && l.vtBy === by && Date.now() - (l.vtAt || 0) < STALE_MS) return;
-      const sep = gas.indexOf('?') >= 0 ? '&' : '?';
-      const url = gas + sep + 'action=vietTat&by=' + encodeURIComponent(by) + '&src=zalo' + (l.ome_ext_key ? '&ek=' + encodeURIComponent(l.ome_ext_key) : '');
-      const d = await (await fetch(url, { redirect: 'follow' })).json();
-      if (d && Array.isArray(d.snippets)) safe(() => chrome.storage.local.set({ vtData: d.snippets, vtAt: Date.now(), vtBy: by }));
+      const l = await sget('local', { vtAt: 0, vtBy: null });
+      const g = await gasUrl('action=vietTat');
+      if (!force && l.vtBy === g.by && Date.now() - (l.vtAt || 0) < STALE_MS) return;
+      const d = await (await fetch(g.url, { redirect: 'follow' })).json();
+      if (d && Array.isArray(d.snippets)) safe(() => chrome.storage.local.set({ vtData: d.snippets, vtAt: Date.now(), vtBy: g.by }));
     } catch (_) { /* mất mạng / chưa cấu hình: dùng bản đã lưu */ } finally { fetching = false; }
   }
   loadLocal().then(() => refresh(false));
@@ -126,13 +134,21 @@
       '.h{padding:6px 12px;font-size:12px;color:#888;display:flex;justify-content:space-between;gap:12px}.h a{color:#1a73e8;cursor:pointer}' +
       '.o{display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-top:1px solid #eee;white-space:pre-wrap;max-height:3.6em;overflow:hidden}' +
       '.o.a,.o:hover{background:#e8f0fe}.o i{font-style:normal;font-size:11px;color:#1a73e8;background:#e8f0fe;border-radius:6px;padding:1px 6px;flex:none}' +
+      '.o em{font-style:normal;font-size:11px;color:#888;margin-left:auto;flex:none;padding-left:8px}.o .im{font-size:11px;color:#188038;flex:none}' +
+      '.f{position:fixed;display:none;right:16px;bottom:72px;max-width:min(340px,90vw);background:#fff;color:#111;border:1px solid #ccc;border-radius:12px;box-shadow:0 4px 20px #0004;font:13px system-ui;padding:10px 12px}.f button{font:inherit;cursor:pointer;border:1px solid #1a73e8;background:#e8f0fe;color:#1a73e8;border-radius:8px;padding:4px 10px;margin:6px 6px 0 0}.f small{color:#888;display:block}' +
       '.t{position:fixed;display:none;left:50%;bottom:24px;transform:translateX(-50%);background:#333;color:#fff;padding:8px 14px;border-radius:20px;font:14px system-ui}' +
-      '@media(prefers-color-scheme:dark){.b{background:#222;color:#eee;border-color:#444}.o{border-color:#333}.o.a,.o:hover{background:#2b3a55}}</style><div class="b"></div><div class="t"></div>';
-    box = root.querySelector('.b'); tbox = root.querySelector('.t');
+      '@media(prefers-color-scheme:dark){.b,.f{background:#222;color:#eee;border-color:#444}.o{border-color:#333}.o.a,.o:hover{background:#2b3a55}}</style><div class="b"></div><div class="f"></div><div class="t"></div>';
+    box = root.querySelector('.b'); fbox = root.querySelector('.f'); tbox = root.querySelector('.t');
     box.addEventListener('mousedown', (e) => {
       e.preventDefault();
       const o = e.target.closest ? e.target.closest('.o') : null;
       if (o) choose(+o.dataset.i); else if (e.target.id === 'pk') pick();
+    });
+    fbox.addEventListener('mousedown', (e) => {
+      e.preventDefault();   // giữ con trỏ trong ô chat
+      const b = e.target.closest ? e.target.closest('button') : null; if (!b || !fstate) return;
+      if (b.dataset.a === 'x') return hideFallback();
+      if (b.dataset.a === 'copy') copyNext();
     });
     document.documentElement.appendChild(host);
   }
@@ -141,10 +157,10 @@
 
   function show(st) {
     ui(); state = st;
-    st.items = st.hits.flatMap((s) => s.options.map((o) => ({ text: o, abbr: s.abbr }))).slice(0, 8); st.idx = 0;
+    st.items = st.hits.flatMap((s) => s.options.map((o) => ({ text: o, abbr: s.abbr, nhom: s.nhom || '', images: Array.isArray(s.images) ? s.images : [] }))).slice(0, 8); st.idx = 0;
     const head = '<div class="h"><span>' + (st.uses ? (st.name ? 'Khách: <b>' + esc(given(st.name)) + '</b> ' : 'Chưa thấy tên khách ') + '<a id="pk">✎ chọn tên</a>' : 'Viết tắt') +
       '</span><span>Tab · ↑↓ · Esc</span></div>';
-    box.innerHTML = head + st.items.map((o, i) => '<div class="o' + (i ? '' : ' a') + '" data-i="' + i + '"><i>' + (i < 8 ? 'Alt+' + (i + 1) : '') + '</i><span>' + esc(resolve(o.text, st.name)) + '</span></div>').join('');
+    box.innerHTML = head + st.items.map((o, i) => '<div class="o' + (i ? '' : ' a') + '" data-i="' + i + '"><i>' + (i < 8 ? 'Alt+' + (i + 1) : '') + '</i><span>' + esc(resolve(o.text, st.name)) + '</span>' + (o.nhom ? '<em>' + esc(o.nhom.split('/').join(' › ')) + '</em>' : '') + (o.images.length ? '<b class="im">🖼 ' + o.images.length + '</b>' : '') + '</div>').join('');
     box.style.display = 'block';
     const r = st.el.getBoundingClientRect();
     box.style.left = Math.max(8, Math.min(r.left, innerWidth - box.offsetWidth - 8)) + 'px';
@@ -183,7 +199,74 @@
   function choose(i) {
     const st = state; if (!st) return;
     const o = st.items[i]; hide();
-    if (!o || !put(st, resolve(o.text, st.name))) toast('Vị trí gõ đã thay đổi, hãy thử lại');
+    if (!o || !put(st, resolve(o.text, st.name))) { toast('Vị trí gõ đã thay đổi, hãy thử lại'); return; }
+    if (o.images && o.images.length) sendImages(st.el, o.images);
+  }
+
+  // ---------- ảnh kèm ----------
+  const extOf = (mime) => ({ 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' }[mime] || 'jpg');
+  function b64ToFile(b64, mime, name) {
+    const bin = atob(b64), u = new Uint8Array(bin.length);
+    for (let k = 0; k < bin.length; k++) u[k] = bin.charCodeAt(k);
+    const nm = /\.[a-z0-9]{2,4}$/i.test(name || '') ? name : (name || 'anh') + '.' + extOf(mime);
+    return new File([u], nm, { type: mime || 'image/jpeg' });
+  }
+  async function getImageFile(im) {
+    if (imgCache.has(im.id)) return imgCache.get(im.id);
+    let r = null;
+    try { const g = await gasUrl('action=vietTatImage&id=' + encodeURIComponent(im.id)); r = await (await fetch(g.url, { redirect: 'follow' })).json(); } catch (_) { r = null; }
+    if (!r || r.error || r.ok === false || !r.base64) throw new Error((r && r.error) || 'không kết nối được máy chủ');
+    const f = b64ToFile(r.base64, r.mimeType || 'image/jpeg', im.name);
+    if (imgCache.size >= 30) imgCache.delete(imgCache.keys().next().value);
+    imgCache.set(im.id, f); return f;
+  }
+  // 1 sự kiện paste chứa TẤT CẢ ảnh (nhiều file trong DataTransfer) → ô chat nhận như khi người dùng dán nhiều ảnh
+  function pasteFiles(el, files) {
+    try {
+      const dt = new DataTransfer(); files.forEach((f) => dt.items.add(f));
+      el.focus();
+      el.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dt }));
+      return true;
+    } catch (_) { return false; }
+  }
+  async function sendImages(el, imgs) {
+    toast('Đang lấy ' + imgs.length + ' ảnh...');
+    const got = await Promise.all(imgs.map((im) => getImageFile(im).then((f) => ({ f }), (e) => ({ err: (im.name || im.id) + ': ' + String((e && e.message) || e) }))));
+    const files = got.filter((x) => x.f).map((x) => x.f), errs = got.filter((x) => x.err).map((x) => x.err);
+    if (!files.length) { toast('Không lấy được ảnh — ' + errs[0]); return; }
+    const done = pasteFiles(el, files);
+    toast((done ? 'Đã dán ' + files.length + ' ảnh' : 'Không dán tự động được') + (errs.length ? ' · lỗi ' + errs.length + ' ảnh (' + errs[0] + ')' : '') + ' — kiểm tra rồi bấm Gửi');
+    showFallback(files);
+  }
+  // Dự phòng: Zalo có thể không nhận paste giả → copy từng ảnh vào clipboard, CS tự Ctrl+V
+  let fstate = null;
+  function showFallback(files) {
+    ui(); clearTimeout(showFallback.t); fstate = { files, i: 0 }; renderFallback();
+    showFallback.t = setTimeout(hideFallback, 45000);
+  }
+  function hideFallback() { fstate = null; clearTimeout(showFallback.t); if (fbox) fbox.style.display = 'none'; }
+  function renderFallback() {
+    const s = fstate; if (!s) return;
+    fbox.innerHTML = '<div>🖼 <b>Ảnh chưa hiện trong ô chat?</b><small>Bấm để copy ảnh vào clipboard rồi nhấn Ctrl+V trong ô chat — lần lượt từng ảnh.</small></div>' +
+      (s.i < s.files.length ? '<button data-a="copy">📋 Copy ảnh ' + (s.i + 1) + '/' + s.files.length + '</button>' : '<span>✓ Đã copy hết ' + s.files.length + ' ảnh</span> ') + '<button data-a="x">Đóng</button>';
+    fbox.style.display = 'block';
+  }
+  function toPng(blob) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(blob), img = new Image();
+      img.onload = () => { const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext('2d').drawImage(img, 0, 0); c.toBlob((b) => { URL.revokeObjectURL(url); b ? resolve(b) : reject(new Error('không tạo được PNG')); }, 'image/png'); };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('không đọc được ảnh')); };
+      img.src = url;
+    });
+  }
+  async function copyNext() {
+    const s = fstate; if (!s || s.i >= s.files.length) return;
+    try {
+      const png = await toPng(s.files[s.i]);
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
+      toast('Đã copy ảnh ' + (s.i + 1) + '/' + s.files.length + ' — bấm Ctrl+V trong ô chat');
+      s.i++; renderFallback();
+    } catch (e) { toast('Copy ảnh thất bại: ' + String((e && e.message) || e)); }
   }
 
   // ---------- sự kiện ----------
