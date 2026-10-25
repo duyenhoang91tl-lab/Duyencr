@@ -22,7 +22,7 @@ function hmCompute(now){
   } catch(e){}
   try {
     if (typeof _ttCards === 'function') _ttCards().forEach(function(t){
-      (t.items || []).forEach(function(o){ out.today.push({ phone:'', name:'Đơn ' + o.id, sub: o.stage + ' · kẹt ' + o.hours + ' giờ' }); });
+      (t.items || []).forEach(function(o){ out.today.push({ phone: o.phone || '', orderId: o.id, kind: 'order', name:'Đơn ' + o.id, sub: o.stage + ' · kẹt ' + o.hours + ' giờ' }); });
     });
   } catch(e){}
   var map = (typeof customerMap !== 'undefined' && customerMap) ? customerMap : {};
@@ -79,7 +79,7 @@ function hmOpenList(key){
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="font-size:15px">' + esc(_HM_TITLES[key] || '') + ' (' + list.length + ')</b><button class="btn sm" onclick="hmCloseList()">✕</button></div>' +
     (hint ? '<div style="font-size:11.5px;color:var(--muted);margin-bottom:6px">' + esc(hint) + '</div>' : '') +
     (list.length ? list.slice(0, 100).map(function(it){
-      return '<div ' + (it.phone ? 'data-phone="' + esc(it.phone) + '" onclick="hmCloseList();_openCustomerByPhone_(this.dataset.phone)" style="cursor:pointer;' : 'style="') + 'padding:7px 2px;border-top:1px solid var(--border)"><b>' + esc(it.name) + '</b>' + (it.phone ? ' · ' + esc(it.phone) : '') + '<div style="font-size:11.5px;color:var(--muted)">' + esc(it.sub || '') + '</div></div>';
+      return '<div ' + ((it.phone || it.orderId) ? 'data-phone="' + esc(it.phone || '') + '"' + (it.orderId ? ' data-order="' + esc(it.orderId) + '"' : '') + ' onclick="hmCloseList();ttOpenCustomer_(this.dataset.phone,this.dataset.order)" style="cursor:pointer;' : 'style="') + 'padding:7px 2px;border-top:1px solid var(--border)"><b>' + esc(it.name) + '</b>' + (it.phone ? ' · ' + esc(it.phone) : '') + '<div style="font-size:11.5px;color:var(--muted)">' + esc(it.sub || '') + '</div></div>';
     }).join('') + (list.length > 100 ? '<div style="color:var(--muted);padding-top:6px">… và ' + (list.length - 100) + ' mục nữa</div>' : '') : '<div style="padding:14px;text-align:center;color:var(--muted)">Không có mục nào 🎉</div>') + '</div>';
   document.body.appendChild(m);
 }
