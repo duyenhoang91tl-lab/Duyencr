@@ -436,6 +436,15 @@ function _chiaDataAlerts(){
 }
 function goMyData(){ if (typeof switchTab==='function'){ var el=document.querySelector('[onclick*="mydata"]'); switchTab('mydata', el); } }
 
+// Bấm thẻ nhắc hẹn -> mở hồ sơ khách. NGUYÊN NHÂN GỐC lỗi "bấm không ra gì": thẻ gọi thẳng openDp(phone), mà openDp
+// im lặng thoát khi khách chưa có trong allCustomers (khách ngoài phạm vi / SĐT lệch số 0 — chính loại khách thẻ hiện tên = SĐT).
+// Dùng _openCustomerByPhone_ (js/29): chuẩn hoá SĐT, nạp riêng khách đó nếu chưa có rồi mới openDp. Chưa nạp được thì báo, không im lặng.
+function _remOpenCustomer_(phone){
+  var ph = (typeof normPhone === 'function' ? normPhone(phone) : '') || String(phone || '').replace(/\D/g, '');
+  if (typeof _openCustomerByPhone_ !== 'function') { if (typeof openDp === 'function') openDp(phone); return; }
+  if (typeof customerMap !== 'undefined' && !customerMap[ph] && !customerMap[phone] && typeof toast === 'function') toast('Đang tải hồ sơ khách…');
+  return _openCustomerByPhone_(phone);
+}
 function renderReminderPanel(){
   var wrap = document.getElementById('reminder-panel');
   var bell = document.getElementById('reminder-bell');
@@ -474,7 +483,7 @@ function renderReminderPanel(){
     var doneAction = rm.careField
       ? 'event.stopPropagation();markCareSchedDone(this.dataset.phone,\''+rm.careField+'\')'
       : (rm.schedId ? 'event.stopPropagation();markDone(\''+rm.schedId+'\')' : 'event.stopPropagation();_dismissReminder(\''+rm.id+'\')');
-    html += '<div class="'+cardClass+'"><div class="rp-card-main" data-phone="'+esc(rm.phone)+'" onclick="openDp(this.dataset.phone)">'+
+    html += '<div class="'+cardClass+'"><div class="rp-card-main" data-phone="'+esc(rm.phone)+'" onclick="_remOpenCustomer_(this.dataset.phone)">'+
       '<div class="rp-type" style="background:'+st.color+'">'+esc(typeLabel)+'</div>'+
       '<div class="rp-cust">'+esc(rm.name)+'</div>'+
       '<div class="rp-note" style="color:'+(over?'var(--red)':'var(--muted)')+'">'+(over?'⚠ Quá hạn · ':'📅 ')+fmtDate(rm.date)+(rm.note?(' · '+esc(rm.note)):'')+'</div>'+
