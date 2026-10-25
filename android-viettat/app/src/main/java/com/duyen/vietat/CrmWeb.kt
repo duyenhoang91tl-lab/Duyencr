@@ -112,6 +112,21 @@ class CrmWeb(private val act: Activity) {
     }
 
     // Móc vào thẻ <a download href="blob:...">.click()/dispatchEvent (cách SheetJS/XLSX.writeFile xuất file) để chuyển file sang app.
+    // SỬA TRANG TRẮNG (21-25/10/2026): CRM đặt `.app{height:calc(100vh - 50px)}`; trang được nạp lúc WebView chưa có kích thước (chưa gắn lên màn hình) nên
+    // đơn vị vh bị kẹt = 0 -> .app/.main cao 0, nội dung trắng (quét trang: `.app [0,50 411x0]` dù innerHeight=410..722). Ép chiều cao theo innerHeight THẬT và cập nhật khi đổi kích thước.
+    private val vhFixJs = """
+(function(){
+  if (window.__vhFix) { window.__vhFixRun && window.__vhFixRun(); return; } window.__vhFix = 1;
+  var st = document.createElement('style'); st.id = '__vhfix'; document.head.appendChild(st);
+  function run(){ var h = window.innerHeight; if (!h || h < 120) return;
+    st.textContent = '.app{height:' + (h - 50) + 'px!important}body.rpt-mode .app{height:' + h + 'px!important}'; }
+  window.__vhFixRun = run; run();
+  window.addEventListener('resize', run); window.addEventListener('orientationchange', run);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', run);
+  setTimeout(run, 500); setTimeout(run, 1500); setTimeout(run, 4000);
+})();
+"""
+
     // QUÉT TRANG (chẩn đoán): kích thước, phần tử đang nằm ở giữa màn hình (phát hiện lớp phủ trắng/loading), phần tử phủ lớn, các thẻ con của body.
     private val probeJs = """
 (function(){
@@ -188,8 +203,9 @@ class CrmWeb(private val act: Activity) {
                 return true
             }
             override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) { this@CrmWeb.error = null }
+            override fun onPageCommitVisible(view: WebView, url: String?) { view.evaluateJavascript(vhFixJs, null) }
             override fun onPageFinished(view: WebView, url: String?) {
-                view.evaluateJavascript(hookJs, null); this@CrmWeb.canBack = view.canGoBack()
+                view.evaluateJavascript(hookJs, null); view.evaluateJavascript(vhFixJs, null); this@CrmWeb.canBack = view.canGoBack()
                 view.postDelayed({ probe() }, 7000)   // 7 giây sau khi tải: tự quét trang để biết vì sao trắng
             }
             override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) { this@CrmWeb.canBack = view.canGoBack() }
