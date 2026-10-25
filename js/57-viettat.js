@@ -339,3 +339,107 @@ async function vtDelete(id) {
   }, true);
   document.addEventListener('mousedown', function (e) { if (host && e.composedPath().indexOf(host) >= 0) return; hide(); }, true);
 })();
+
+// ===== NHẬP TỪ APP "VIẾT TẮT" CŨ (Chrome/Android): file data.json hoặc .zip (data.json + media/) =====
+// Mỗi thư mục của app cũ → 1 nhóm (nhom); mỗi mục → 1 viết tắt. Hình [[img:tên]] → tải lên Drive (nén như chọn ảnh từ máy) rồi gắn vào mục.
+// Ghi âm [[aud:...]] CHƯA hỗ trợ → bỏ qua và báo số lượng. Mục trùng (cùng viết tắt + cùng Chung/Của tôi) bị bỏ qua, không ghi đè.
+var _vtImporting = false;
+function _vtMimeOf(n) { var e = String(n || '').toLowerCase().replace(/^.*\./, ''); return { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', heic: 'image/heic', heif: 'image/heif', bmp: 'image/bmp' }[e] || 'image/jpeg'; }
+async function _vtInflateRaw(u8) {
+  if (typeof DecompressionStream !== 'function') throw new Error('Trình duyệt quá cũ để đọc file zip — dùng Chrome/Safari mới, hoặc giải nén rồi chọn data.json');
+  var ds = new DecompressionStream('deflate-raw'), w = ds.writable.getWriter();
+  w.write(u8); w.close();
+  return new Uint8Array(await new Response(ds.readable).arrayBuffer());
+}
+// Đọc zip tối thiểu: trả { 'đường/dẫn': Uint8Array } cho data.json + media/*. Hỗ trợ lưu thẳng (0) và deflate (8).
+async function _vtUnzip(buf) {
+  var u8 = new Uint8Array(buf), dv = new DataView(buf), eocd = -1, i;
+  for (i = u8.length - 22; i >= Math.max(0, u8.length - 65557); i--) { if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; } }
+  if (eocd < 0) throw new Error('File zip không hợp lệ');
+  var n = dv.getUint16(eocd + 10, true), p = dv.getUint32(eocd + 16, true), out = {}, dec = new TextDecoder();
+  for (i = 0; i < n; i++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) throw new Error('File zip hỏng');
+    var method = dv.getUint16(p + 10, true), csz = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true), el = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), lo = dv.getUint32(p + 42, true);
+    var name = dec.decode(u8.subarray(p + 46, p + 46 + nl)); p += 46 + nl + el + cl;
+    if (/\/$/.test(name) || !(name === 'data.json' || /^media\//.test(name))) continue;
+    var ds0 = lo + 30 + dv.getUint16(lo + 26, true) + dv.getUint16(lo + 28, true), raw = u8.subarray(ds0, ds0 + csz);
+    out[name] = method === 0 ? raw : method === 8 ? await _vtInflateRaw(raw) : null;
+    if (!out[name]) throw new Error('Kiểu nén zip không hỗ trợ (' + method + ')');
+  }
+  return out;
+}
+// Tách file thành kế hoạch nhập (thuần dữ liệu, test được): items[{abbr,keyword,nhom,texts,imgs[],aud}], bỏ qua mục rỗng.
+function _vtPlanImport(json, files) {
+  var o = typeof json === 'string' ? JSON.parse(json) : json;
+  if (!o || !Array.isArray(o.snippets)) throw new Error('Không phải file của app Viết Tắt (thiếu "snippets")');
+  var fname = {}; (o.folders || []).forEach(function (f) { fname[f.id] = String(f.name || '').trim(); });
+  var items = [], audio = 0, missing = 0;
+  o.snippets.forEach(function (s) {
+    var abbr = String(s.abbr || '').trim().replace(/\s+/g, '_').slice(0, 30); if (!abbr) return;
+    var texts = [], imgs = [];
+    (s.options || []).forEach(function (op) {
+      op = String(op == null ? '' : op);
+      var m = /^\[\[(img|aud):(.+)\]\]$/.exec(op);
+      if (!m) { if (op.trim()) texts.push(op); return; }
+      if (m[1] === 'aud') { audio++; return; }
+      if (files && !files['media/' + m[2]]) { missing++; return; }
+      imgs.push(m[2]);
+    });
+    var nhom = fname[s.folderId] || ''; if (/^(chung|default)$/i.test(nhom)) nhom = '';
+    if (!texts.length && !imgs.length) return;
+    items.push({ abbr: abbr, keyword: String(s.keyword || '').trim(), nhom: nhom.replace(/[\/\\>]+/g, '-'), texts: texts, imgs: imgs.slice(0, _VT_MAX_IMGS) });
+  });
+  return { items: items, audio: audio, missing: missing };
+}
+async function vtImportFile(file) {
+  var msg = document.getElementById('vt-imp-msg'), say = function (t) { if (msg) msg.textContent = t; };
+  if (!file) return;
+  if (_vtImporting) { say('Đang nhập, đợi xong đã.'); return; }
+  var plan, files = null;
+  try {
+    var buf = await file.arrayBuffer(), b = new Uint8Array(buf), json;
+    if (b.length > 1 && b[0] === 0x50 && b[1] === 0x4B) { files = await _vtUnzip(buf); if (!files['data.json']) throw new Error('Trong zip không có data.json'); json = new TextDecoder().decode(files['data.json']); }
+    else json = new TextDecoder().decode(b);
+    plan = _vtPlanImport(json, files);
+  } catch (e) { say('❌ ' + String((e && e.message) || e)); return; }
+  if (!files && plan.items.some(function (x) { return x.imgs.length; })) { plan.items.forEach(function (x) { x.imgs = []; }); plan.noMedia = true; }   // file .json trần không có hình
+  if (!plan.items.length) { say('Không có mục nào để nhập.'); return; }
+  var scope = 'me';
+  if (_vtSt.canTeam && confirm('Nhập ' + plan.items.length + ' mục làm mục CHUNG cho cả team?\n\nOK = Chung (cả team)\nHủy = Của tôi (chỉ mình bạn)')) scope = 'team';
+  var have = {}; (_vtSt.list || []).forEach(function (s) { if (s.scope === scope) have[_vtFold(s.abbr)] = 1; });
+  var todo = plan.items.filter(function (x) { var k = _vtFold(x.abbr); if (have[k]) return false; have[k] = 1; return true; });
+  var dup = plan.items.length - todo.length;
+  if (!todo.length) { say('Tất cả ' + plan.items.length + ' mục đã có sẵn (trùng viết tắt) — không nhập gì.'); return; }
+  if (!confirm('Nhập ' + todo.length + ' mục (' + (scope === 'team' ? 'CHUNG' : 'của tôi') + ')' + (dup ? ', bỏ ' + dup + ' mục trùng' : '') + (plan.audio ? ', bỏ ' + plan.audio + ' ghi âm (chưa hỗ trợ)' : '') + '?')) return;
+  _vtImporting = true;
+  var done = 0, okN = 0, imgN = 0, errs = [], next = 0, cache = {};
+  async function upImg(name) {
+    if (cache[name]) return cache[name];
+    cache[name] = (async function () {
+      var f = new File([files['media/' + name]], name, { type: _vtMimeOf(name) });
+      var c = await _vtCompress(f), b64 = await _vtBlobToB64(c.blob);
+      var r = await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify({ action: 'vietTatUploadImage', name: c.name, mimeType: c.mime, base64: b64 }) });
+      var d = await r.json(); if (!d || !d.ok || !d.id) throw new Error((d && d.error) || 'tải ảnh thất bại');
+      return { id: d.id, name: d.name || c.name };
+    })();
+    return cache[name];
+  }
+  async function worker() {
+    while (next < todo.length) {
+      var it = todo[next++], imgs = [], ierr = 0;
+      for (var j = 0; j < it.imgs.length; j++) { try { var im = await upImg(it.imgs[j]); if (!imgs.some(function (x) { return x.id === im.id; })) imgs.push(im); } catch (e) { ierr++; cache[it.imgs[j]] = null; } }
+      try {
+        var snip = { abbr: it.abbr, keyword: it.keyword, nhom: it.nhom, scope: scope, options: it.texts.length ? it.texts : ['[Ảnh] ' + it.abbr], images: imgs };
+        var r = await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify({ action: 'saveVietTat', snippet: snip }) });
+        var d = await r.json(); if (d && d.error) throw new Error(d.error);
+        okN++; imgN += imgs.length; if (ierr) errs.push(it.abbr + ': ' + ierr + ' ảnh lỗi');
+      } catch (e) { errs.push(it.abbr + ': ' + String((e && e.message) || e)); }
+      done++; say('Đang nhập ' + done + '/' + todo.length + '...');
+    }
+  }
+  say('Đang nhập 0/' + todo.length + '...');
+  await Promise.all([worker(), worker()]);
+  _vtImporting = false;
+  say('✓ Đã nhập ' + okN + '/' + todo.length + ' mục, ' + imgN + ' ảnh' + (dup ? ' · bỏ ' + dup + ' mục trùng' : '') + (plan.audio ? ' · bỏ ' + plan.audio + ' ghi âm' : '') + (plan.missing ? ' · ' + plan.missing + ' ảnh thiếu trong zip' : '') + (plan.noMedia ? ' · file .json không có hình (muốn nhập hình hãy chọn file .zip)' : '') + (errs.length ? ' · LỖI ' + errs.length + ': ' + errs.slice(0, 3).join(' | ') + (errs.length > 3 ? ' ...' : '') : ''));
+  loadVietTat(true);
+}

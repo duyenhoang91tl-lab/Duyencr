@@ -832,7 +832,10 @@ window.addEventListener('load',function(){var s=document.createElement('script')
           <select id="vt-scope-filter" class="assign-input" onchange="vtRender()" style="font-size:12px;padding:4px 8px"><option value="">Tất cả</option><option value="team">👥 Chung (cả team)</option><option value="me">🙋 Của tôi</option></select>
           <input id="vt-search" class="zai-input" placeholder="Tìm viết tắt / từ khoá / nội dung..." style="flex:1;min-width:180px" oninput="vtRender()">
           <button class="btn sm primary" onclick="vtOpenForm()">+ Thêm viết tắt</button>
+          <input type="file" id="vt-imp-file" accept=".json,.zip,application/json,application/zip" data-vt="off" style="display:none" onchange="vtImportFile(this.files[0]); this.value=''">
+          <button class="btn sm" onclick="document.getElementById('vt-imp-file').click()" title="Chọn file data.json hoặc .zip xuất từ app Viết Tắt cũ (Chrome/Android)">📥 Nhập từ app Viết Tắt cũ</button>
         </div>
+        <div id="vt-imp-msg" style="font-size:11px;color:var(--muted);margin:-4px 0 8px"></div>
         <div id="vt-form-wrap" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:12px;margin-bottom:10px">
           <input type="hidden" id="vt-f-id">
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
@@ -1756,7 +1759,7 @@ function openBcLogModal(phone){
 <script src="js/54-fn-promo-admin.js"></script>
 <script src="js/55-fn-shell.js?v=20261019c"></script>
 <script src="js/56-fn-qrpills.js"></script>
-<script src="js/57-viettat.js?v=20261025d"></script>
+<script src="js/57-viettat.js?v=20261025e"></script>
 <script src="js/58-auto-cust-link.js"></script>
 
 
