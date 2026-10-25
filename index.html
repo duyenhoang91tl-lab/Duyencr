@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0f766e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Duyên CRM">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>Thu Hiền CRM 10.55.22.8.26</title>
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
 <style>
@@ -1750,7 +1756,7 @@ function openBcLogModal(phone){
 <script src="js/54-fn-promo-admin.js"></script>
 <script src="js/55-fn-shell.js?v=20261019c"></script>
 <script src="js/56-fn-qrpills.js"></script>
-<script src="js/57-viettat.js?v=20261025d"></script>
+<script src="js/57-viettat.js?v=20261025e"></script>
 <script src="js/58-auto-cust-link.js"></script>
 <script src="js/59-report-drill.js"></script>
 
@@ -1811,5 +1817,6 @@ function openBcLogModal(phone){
   obs.observe(document.body, { childList: true, subtree: true });
 })();
 </script>
+<script>if ('serviceWorker' in navigator && location.protocol === 'https:') window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); });</script>
 </body>
 </html>
