@@ -70,6 +70,8 @@ object Crm {
     fun prefs(c: Context) = c.getSharedPreferences("crm", 0)
     fun url(c: Context) = prefs(c).getString("url", "").orEmpty().trim().ifEmpty { DEFAULT_URL }
     fun name(c: Context) = prefs(c).getString("name", "").orEmpty().trim()
+    const val DEFAULT_WEB = "https://duyen-crm-web.duyenhoang91-tl.workers.dev"
+    fun webUrl(c: Context) = prefs(c).getString("web", "").orEmpty().trim().ifEmpty { DEFAULT_WEB }
     fun configured(c: Context) = name(c).isNotEmpty()
 
     /** Chạy trên luồng nền. Trả về thông báo trạng thái ("" nếu đang chạy dở). */
