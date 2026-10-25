@@ -112,6 +112,26 @@ class CrmWeb(private val act: Activity) {
     }
 
     // Móc vào thẻ <a download href="blob:...">.click()/dispatchEvent (cách SheetJS/XLSX.writeFile xuất file) để chuyển file sang app.
+    // QUÉT TRANG (chẩn đoán): kích thước, phần tử đang nằm ở giữa màn hình (phát hiện lớp phủ trắng/loading), phần tử phủ lớn, các thẻ con của body.
+    private val probeJs = """
+(function(){
+  function d(e){ if(!e) return 'null'; var r=e.getBoundingClientRect(); var cs=getComputedStyle(e);
+    return e.tagName+'#'+e.id+'.'+String(e.className && e.className.baseVal === undefined ? e.className : '').slice(0,50)+' ['+Math.round(r.left)+','+Math.round(r.top)+' '+Math.round(r.width)+'x'+Math.round(r.height)+'] disp='+cs.display+' pos='+cs.position+' z='+cs.zIndex+' bg='+cs.backgroundColor+' op='+cs.opacity+' vis='+cs.visibility; }
+  var w=innerWidth,h=innerHeight,o=[];
+  o.push('viewport '+w+'x'+h+' dpr='+devicePixelRatio+' scrollW='+document.documentElement.scrollWidth+' scrollH='+document.documentElement.scrollHeight);
+  o.push('online='+navigator.onLine+' chữ-trong-trang='+document.body.innerText.length+' số-phần-tử='+document.getElementsByTagName('*').length);
+  [[w/2,h*0.35],[w/2,h*0.65],[30,h*0.5]].forEach(function(p){ o.push('tại ('+Math.round(p[0])+','+Math.round(p[1])+'): '+d(document.elementFromPoint(p[0],p[1]))); });
+  var cover=[]; document.querySelectorAll('body *').forEach(function(e){ var cs=getComputedStyle(e);
+    if((cs.position==='fixed'||cs.position==='absolute')&&cs.display!=='none'&&cs.visibility!=='hidden'){ var r=e.getBoundingClientRect(); if(r.width>w*0.6&&r.height>h*0.4) cover.push(d(e)); } });
+  o.push('phủ lớn: '+(cover.length ? '\n  '+cover.slice(0,5).join('\n  ') : 'không'));
+  [].slice.call(document.body.children).slice(0,14).forEach(function(e){ o.push('body> '+d(e)+' con='+e.children.length+' chữ='+(e.innerText||'').length); });
+  return o.join('\n');
+})()
+"""
+
+    private fun probeDecode(raw: String?): String = try { org.json.JSONTokener(raw ?: "null").nextValue()?.toString() ?: "(rỗng)" } catch (e: Exception) { raw ?: "(lỗi đọc)" }
+    fun probe() { web.evaluateJavascript(probeJs) { r -> log("QUÉT TRANG:\n" + probeDecode(r)) } }
+
     private val hookJs = """
 (function(){
   if (window.__dlHook) return; window.__dlHook = 1;
@@ -161,7 +181,10 @@ class CrmWeb(private val act: Activity) {
                 return true
             }
             override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) { this@CrmWeb.error = null }
-            override fun onPageFinished(view: WebView, url: String?) { view.evaluateJavascript(hookJs, null); this@CrmWeb.canBack = view.canGoBack() }
+            override fun onPageFinished(view: WebView, url: String?) {
+                view.evaluateJavascript(hookJs, null); this@CrmWeb.canBack = view.canGoBack()
+                view.postDelayed({ probe() }, 7000)   // 7 giây sau khi tải: tự quét trang để biết vì sao trắng
+            }
             override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) { this@CrmWeb.canBack = view.canGoBack() }
             override fun onReceivedError(view: WebView, request: WebResourceRequest, e: WebResourceError) {
                 if (request.isForMainFrame) this@CrmWeb.error = "Không tải được CRM (${e.description}). Kiểm tra mạng rồi bấm Tải lại."
@@ -211,7 +234,10 @@ fun CrmWebScreen(crm: CrmWeb) {
     if (showLog) {
         val text = crm.info() + "\n\n" + crm.logs.joinToString("\n")
         AlertDialog(onDismissRequest = { showLog = false }, title = { Text("Chẩn đoán trang CRM") },
-            text = { Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState())) { Text(text, style = MaterialTheme.typography.bodySmall) } },
+            text = { Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
+                TextButton({ crm.probe() }) { Text("🔍 Quét lại trang") }
+                Text(text, style = MaterialTheme.typography.bodySmall)
+            } },
             confirmButton = {
                 val ctx = androidx.compose.ui.platform.LocalContext.current
                 TextButton({
