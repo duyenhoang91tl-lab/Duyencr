@@ -8,10 +8,16 @@
 //      server action vietTatResolveImages trả danh sách; CHỈ lưu ID tham chiếu, không tải lên lại). Ảnh phải chia sẻ cho tài khoản chạy GAS.
 //  (4) THÊM ẢNH (2026-10-25, Duyên): 2 cách — (a) dán link Google Drive (ảnh/thư mục có sẵn, không tải lại); (b) "📷 Chọn ảnh từ máy / điện thoại": CHỌN NHIỀU ảnh 1 lúc
 //      (Chrome máy tính, Safari iOS, Chrome Android), tự NÉN (cạnh dài ≤1600px, JPEG) rồi tải từng ảnh qua action vietTatUploadImage (2 luồng). Tối đa 50 ảnh/mục.
+//  (5) SAFARI iPHONE/iPAD + điện thoại (2026-10-25): iPhone KHÔNG có phím Tab/Alt → gợi ý gõ tắt CHẠM để chọn (touchend), hàng gợi ý cao ≥44px, đặt theo visualViewport (không bị bàn phím che),
+//      ô nhập cỡ chữ 16px (Safari không tự phóng to khi chạm), giải phóng canvas sau khi nén ảnh (Safari giới hạn bộ nhớ canvas). Dùng: Safari → Chia sẻ → Thêm vào MH chính (chạy như app).
 //  Biến: {tên} {tên khách} (chữ cuối) · {tên đầy đủ} · {ngày} {ngày mai} {giờ} {thứ}. Tên khách = khách đang mở ở ngăn hồ sơ (nếu có) hoặc gõ kèm sau viết tắt (ch Huyền).
 // ═══════════════════════════════════════════════════════
 var _vtSt = { list: [], canTeam: false, me: '', at: 0, loading: null, err: '' };
 var _VT_STALE_MS = 5 * 60 * 1000;
+var _vtTouch = (function () { try { return !!(window.matchMedia && matchMedia('(pointer:coarse)').matches); } catch (e) { return false; } })();   // iPhone/iPad/Android: không có phím Tab/Alt/mũi tên
+(function () {   // ô nhập trong khu Viết tắt: cỡ chữ 16px trên màn cảm ứng (iOS Safari tự phóng to trang khi chạm vào ô <16px); nút ≥40px dễ chạm
+  try { var st = document.createElement('style'); st.textContent = '@media (pointer:coarse){#vt-section input,#vt-section textarea,#vt-section select{font-size:16px!important}#vt-section .btn{min-height:40px}}'; document.head.appendChild(st); } catch (e) {}
+})();
 var _vtDraftImgs = [];   // ảnh của mục đang mở trong form: [{id,name}]
 var _VT_MAX_IMGS = 50, _VT_MAX_SIDE = 1600, _VT_MAX_BYTES = 3 * 1024 * 1024, _VT_UPLOAD_WORKERS = 2;   // 50 ảnh/mục; ảnh tải lên ≤3MB (extension chỉ đọc được ≤3MB)
 var _vtUploadSeq = 0, _vtUploading = 0;   // seq đổi mỗi lần mở/đóng form → tải dở của mục cũ không chui sang mục mới
@@ -190,7 +196,7 @@ function _vtCompress(file) {
     var k = Math.min(1, _VT_MAX_SIDE / Math.max(w, h)), cw = Math.max(1, Math.round(w * k)), ch = Math.max(1, Math.round(h * k));
     var c = document.createElement('canvas'); c.width = cw; c.height = ch;
     var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cw, ch); g.drawImage(im, 0, 0, cw, ch);
-    return new Promise(function (res, rej) { c.toBlob(function (b) { b ? res({ blob: b, name: base + '.jpg', mime: 'image/jpeg' }) : rej(new Error('không nén được ảnh')); }, 'image/jpeg', 0.85); });
+    return new Promise(function (res, rej) { c.toBlob(function (b) { c.width = c.height = 0; /* trả bộ nhớ canvas ngay: Safari iOS giới hạn tổng bộ nhớ canvas, chọn nhiều ảnh lớn sẽ lỗi nếu không giải phóng */ b ? res({ blob: b, name: base + '.jpg', mime: 'image/jpeg' }) : rej(new Error('không nén được ảnh')); }, 'image/jpeg', 0.85); });
   }).then(function (r) {
     if (r.blob.size > _VT_MAX_BYTES) throw new Error('ảnh vẫn quá lớn sau khi nén');
     return r;
@@ -292,9 +298,18 @@ async function vtDelete(id) {
       '.h{padding:6px 12px;font-size:12px;color:#888;display:flex;justify-content:space-between;gap:12px}' +
       '.o{display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-top:1px solid #eee;white-space:pre-wrap;max-height:3.6em;overflow:hidden}' +
       '.o.a,.o:hover{background:#e8f0fe}.o i{font-style:normal;font-size:11px;color:#1a73e8;background:#e8f0fe;border-radius:6px;padding:1px 6px;flex:none}' +
+      '@media(pointer:coarse){.o{min-height:44px;padding:11px 14px;max-height:4.8em;font-size:15px}.o i{display:none}.h{padding:8px 14px}.b{max-width:min(460px,94vw);-webkit-overflow-scrolling:touch}}' +
       '@media(prefers-color-scheme:dark){.b{background:#222;color:#eee;border-color:#444}.o{border-color:#333}.o.a,.o:hover{background:#2b3a55}}</style><div class="b"></div>';
     box = root.querySelector('.b');
     box.addEventListener('mousedown', function (e) { e.preventDefault(); var o = e.target.closest ? e.target.closest('.o') : null; if (o) choose(+o.dataset.i); });
+    // Cảm ứng (iPhone/iPad): chạm = chọn. touchend + preventDefault để (1) ô đang gõ KHÔNG mất focus/đóng bàn phím, (2) không bị bắn thêm mousedown (chọn 2 lần). Kéo ngón tay (cuộn danh sách) thì không chọn.
+    var ty = 0, moved = false;
+    box.addEventListener('touchstart', function (e) { moved = false; ty = (e.touches && e.touches[0]) ? e.touches[0].clientY : 0; }, { passive: true });
+    box.addEventListener('touchmove', function (e) { var y = (e.touches && e.touches[0]) ? e.touches[0].clientY : ty; if (Math.abs(y - ty) > 8) moved = true; }, { passive: true });
+    box.addEventListener('touchend', function (e) {
+      e.preventDefault(); if (moved) return;
+      var o = e.target.closest ? e.target.closest('.o') : null; if (o) choose(+o.dataset.i);
+    });
     document.documentElement.appendChild(host);
   }
   function hide() { st = null; if (box) box.style.display = 'none'; }
@@ -302,12 +317,15 @@ async function vtDelete(id) {
   function show(s) {
     ui(); st = s;
     s.items = s.hits.reduce(function (a, x) { return a.concat(x.options); }, []).slice(0, 8); s.idx = 0;
-    box.innerHTML = '<div class="h"><span>' + (s.uses ? (s.name ? 'Khách: <b>' + _vtEsc(_vtGiven(s.name)) + '</b>' : 'Chưa có tên khách — gõ kèm tên: ch Huyền') : 'Viết tắt') + '</span><span>Tab · ↑↓ · Esc</span></div>' +
+    box.innerHTML = '<div class="h"><span>' + (s.uses ? (s.name ? 'Khách: <b>' + _vtEsc(_vtGiven(s.name)) + '</b>' : 'Chưa có tên khách — gõ kèm tên: ch Huyền') : 'Viết tắt') + '</span><span>' + (_vtTouch ? 'Chạm để chọn' : 'Tab · ↑↓ · Esc') + '</span></div>' +
       s.items.map(function (o, i) { return '<div class="o' + (i ? '' : ' a') + '" data-i="' + i + '"><i>Alt+' + (i + 1) + '</i><span>' + _vtEsc(_vtResolve(o, s.name)) + '</span></div>'; }).join('');
     box.style.display = 'block';
     var r = s.el.getBoundingClientRect();
     box.style.left = Math.max(8, Math.min(r.left, innerWidth - box.offsetWidth - 8)) + 'px';
-    if (r.top > 220) { box.style.top = 'auto'; box.style.bottom = (innerHeight - r.top + 8) + 'px'; } else { box.style.bottom = 'auto'; box.style.top = (r.bottom + 8) + 'px'; }
+    // visualViewport: trên iOS bàn phím KHÔNG làm innerHeight nhỏ lại → đặt theo vùng nhìn thấy thật để gợi ý không nằm sau bàn phím.
+    var vv = window.visualViewport, vvTop = vv ? vv.offsetTop : 0, vvBottom = vv ? vv.offsetTop + vv.height : innerHeight;
+    if (r.top - vvTop > 220) { box.style.top = 'auto'; box.style.bottom = (innerHeight - r.top + 8) + 'px'; }
+    else { box.style.bottom = 'auto'; box.style.top = Math.max(vvTop + 8, Math.min(r.bottom + 8, vvBottom - box.offsetHeight - 8)) + 'px'; }
   }
   function choose(i) {
     var s = st; if (!s) return; var o = s.items[i]; hide(); if (!o) return;
