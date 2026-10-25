@@ -6,11 +6,15 @@
 //      Chỉ textarea (không đụng ô tên/SĐT/ô tìm); ô muốn tắt: thêm thuộc tính data-vt="off". Logic khớp/biến PHẢI giống pancake-viettat.js.
 //  (3) THƯ MỤC CON + ẢNH (2026-10-25): nhóm = đường dẫn "Túi tiền/Cổ" (tối đa 3 cấp, hiện dạng cây); mỗi mục gắn được ẢNH CÓ SẴN trên Drive (dán link file/thư mục →
 //      server action vietTatResolveImages trả danh sách; CHỈ lưu ID tham chiếu, không tải lên lại). Ảnh phải chia sẻ cho tài khoản chạy GAS.
+//  (4) THÊM ẢNH (2026-10-25, Duyên): 2 cách — (a) dán link Google Drive (ảnh/thư mục có sẵn, không tải lại); (b) "📷 Chọn ảnh từ máy / điện thoại": CHỌN NHIỀU ảnh 1 lúc
+//      (Chrome máy tính, Safari iOS, Chrome Android), tự NÉN (cạnh dài ≤1600px, JPEG) rồi tải từng ảnh qua action vietTatUploadImage (2 luồng). Tối đa 50 ảnh/mục.
 //  Biến: {tên} {tên khách} (chữ cuối) · {tên đầy đủ} · {ngày} {ngày mai} {giờ} {thứ}. Tên khách = khách đang mở ở ngăn hồ sơ (nếu có) hoặc gõ kèm sau viết tắt (ch Huyền).
 // ═══════════════════════════════════════════════════════
 var _vtSt = { list: [], canTeam: false, me: '', at: 0, loading: null, err: '' };
 var _VT_STALE_MS = 5 * 60 * 1000;
 var _vtDraftImgs = [];   // ảnh của mục đang mở trong form: [{id,name}]
+var _VT_MAX_IMGS = 50, _VT_MAX_SIDE = 1600, _VT_MAX_BYTES = 3 * 1024 * 1024, _VT_UPLOAD_WORKERS = 2;   // 50 ảnh/mục; ảnh tải lên ≤3MB (extension chỉ đọc được ≤3MB)
+var _vtUploadSeq = 0, _vtUploading = 0;   // seq đổi mỗi lần mở/đóng form → tải dở của mục cũ không chui sang mục mới
 function _vtThumb(id) { return 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(id) + '&sz=w120'; }
 
 function _vtFold(s) { return String(s || '').toLowerCase().replace(/đ/g, 'd').normalize('NFD').replace(/[̀-ͯ]/g, ''); }
@@ -90,7 +94,7 @@ function vtRender() {
       var can = _vtCanEdit(s);
       var kw = String(s.keyword || '').split(',').map(function (k) { return k.trim(); }).filter(Boolean).map(function (k) { return '<span class="zi-chip">' + _vtEsc(k) + '</span>'; }).join(' ');
       var imgs = (s.images || []).length ? '<div class="vt-imgs" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;align-items:center"><span style="font-size:11px;color:var(--muted)">🖼 ' + s.images.length + ' ảnh</span>' +
-        s.images.map(function (im) { return '<img src="' + _vtEsc(_vtThumb(im.id)) + '" alt="' + _vtEsc(im.name) + '" title="' + _vtEsc(im.name) + '" loading="lazy" referrerpolicy="no-referrer" style="width:38px;height:38px;object-fit:cover;border-radius:5px;border:1px solid var(--border)" onerror="this.style.display=\'none\'">'; }).join('') + '</div>' : '';
+        s.images.slice(0, 12).map(function (im) { return '<img src="' + _vtEsc(_vtThumb(im.id)) + '" alt="' + _vtEsc(im.name) + '" title="' + _vtEsc(im.name) + '" loading="lazy" referrerpolicy="no-referrer" style="width:38px;height:38px;object-fit:cover;border-radius:5px;border:1px solid var(--border)" onerror="this.style.display=\'none\'">'; }).join('') + (s.images.length > 12 ? '<span style="font-size:11px;color:var(--muted)">+' + (s.images.length - 12) + ' ảnh nữa</span>' : '') + '</div>' : '';
       return '<div style="margin-left:' + (depth * 16) + 'px;border:1px solid var(--border);border-radius:9px;padding:8px 10px;background:var(--surface);display:flex;gap:10px;align-items:flex-start;margin-bottom:4px">' +
         '<div style="min-width:70px"><code style="font-size:13px;font-weight:700">' + _vtEsc(s.abbr) + '</code><div style="font-size:10.5px;color:var(--muted)">' + (s.scope === 'team' ? '👥 Chung' : '🙋 Của tôi') + '</div></div>' +
         '<div style="flex:1;min-width:0"><div style="margin-bottom:3px">' + kw + '</div>' +
@@ -123,6 +127,7 @@ function vtOpenForm(id) {
   _vtDraftImgs = s && s.images ? s.images.map(function (x) { return { id: x.id, name: x.name }; }) : [];
   var il = document.getElementById('vt-f-imglinks'); if (il) il.value = '';
   var im = document.getElementById('vt-f-imgmsg'); if (im) im.textContent = '';
+  _vtUploadSeq++; _vtUploading = 0; _vtSetUploadBusy(false);   // mở form mục khác: bỏ tải dở của mục trước
   vtRenderDraftImgs();
   var w = document.getElementById('vt-f-opts'); w.innerHTML = '';
   (s && s.options.length ? s.options : ['']).forEach(function (o) { w.appendChild(_vtOptRow(o)); });
@@ -136,7 +141,7 @@ function vtRenderDraftImgs() {
       '<button type="button" class="btn sm" data-i="' + i + '" onclick="vtRemoveImg(+this.dataset.i)" style="position:absolute;top:-6px;right:-6px;padding:0 5px;line-height:16px" title="Bỏ ảnh này">✕</button>' +
       '<div style="font-size:10px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _vtEsc(im.name || '') + '</div></div>';
   }).join('');
-  var c = document.getElementById('vt-f-imgcount'); if (c) c.textContent = _vtDraftImgs.length ? ('(' + _vtDraftImgs.length + '/10 ảnh)') : '';
+  var c = document.getElementById('vt-f-imgcount'); if (c) c.textContent = _vtDraftImgs.length ? ('(' + _vtDraftImgs.length + '/' + _VT_MAX_IMGS + ' ảnh)') : '';
 }
 function vtRemoveImg(i) { _vtDraftImgs.splice(i, 1); vtRenderDraftImgs(); }
 // Dán link FILE ảnh hoặc THƯ MỤC Drive (mỗi dòng 1 link) → server trả danh sách ảnh; chỉ lưu ID tham chiếu, không tải lên lại.
@@ -144,28 +149,109 @@ async function vtFetchImgs() {
   var ta = document.getElementById('vt-f-imglinks'), msg = document.getElementById('vt-f-imgmsg'), btn = document.getElementById('vt-f-imgbtn');
   var links = String((ta && ta.value) || '').split(/[\n,]+/).map(function (x) { return x.trim(); }).filter(Boolean);
   if (!links.length) { if (msg) msg.textContent = 'Dán link ảnh hoặc thư mục Google Drive vào ô trên.'; return; }
-  if (_vtDraftImgs.length >= 10) { if (msg) msg.textContent = 'Mỗi mục tối đa 10 ảnh.'; return; }
+  if (_vtDraftImgs.length >= _VT_MAX_IMGS) { if (msg) msg.textContent = 'Mỗi mục tối đa ' + _VT_MAX_IMGS + ' ảnh — bỏ bớt ảnh cũ hoặc tạo mục / thư mục con khác.'; return; }
   if (btn) { btn.disabled = true; btn.textContent = 'Đang lấy...'; } if (msg) msg.textContent = '';
   try {
     var sep = gsUrl.indexOf('?') >= 0 ? '&' : '?';
     var r = await fetch(gsUrl + sep + 'action=vietTatResolveImages&links=' + encodeURIComponent(links.join('\n')), { redirect: 'follow' });
     var d = await r.json();
     if (d && d.error) { if (msg) msg.textContent = 'Lỗi: ' + d.error; return; }
-    var have = {}, added = 0; _vtDraftImgs.forEach(function (x) { have[x.id] = 1; });
-    (d.images || []).forEach(function (im) { if (!have[im.id] && _vtDraftImgs.length < 10) { have[im.id] = 1; _vtDraftImgs.push({ id: im.id, name: im.name }); added++; } });
+    var have = {}, added = 0, skippedFull = 0; _vtDraftImgs.forEach(function (x) { have[x.id] = 1; });
+    (d.images || []).forEach(function (im) { if (have[im.id]) return; if (_vtDraftImgs.length < _VT_MAX_IMGS) { have[im.id] = 1; _vtDraftImgs.push({ id: im.id, name: im.name }); added++; } else skippedFull++; });
     vtRenderDraftImgs();
     var errs = (d.errors || []).length ? ' · ' + d.errors.length + ' link lỗi (hãy chia sẻ thư mục/ảnh cho tài khoản chạy GAS hoặc "ai có link"): ' + d.errors.slice(0, 2).join(' | ') : '';
-    if (msg) msg.textContent = (added ? 'Đã thêm ' + added + ' ảnh.' : 'Không thêm được ảnh nào.') + errs;
+    var capNote = (skippedFull ? ' · Mục đã đủ ' + _VT_MAX_IMGS + ' ảnh, bỏ qua ' + skippedFull + ' ảnh còn lại.' : '') + (d.truncated ? ' · Thư mục có nhiều hơn ' + _VT_MAX_IMGS + ' ảnh — chỉ lấy ' + _VT_MAX_IMGS + ' ảnh đầu theo tên.' : '');
+    if (msg) msg.textContent = (added ? 'Đã thêm ' + added + ' ảnh.' : 'Không thêm được ảnh nào.') + capNote + errs;
     if (added && ta) ta.value = '';
   } catch (e) { if (msg) msg.textContent = 'Lỗi kết nối, thử lại.'; }
   finally { if (btn) { btn.disabled = false; btn.textContent = '➕ Lấy ảnh từ link'; } }
 }
-function vtCloseForm() { document.getElementById('vt-form-wrap').style.display = 'none'; }
+// ---------- tải ảnh từ máy / điện thoại (chọn nhiều ảnh 1 lúc) ----------
+function _vtIsImageFile(f) { return /^image\//i.test(f.type || '') || /\.(jpe?g|png|gif|webp|heic|heif|bmp)$/i.test(f.name || ''); }
+function _vtLoadImg(file) {
+  return new Promise(function (resolve, reject) {
+    var url = '';
+    try {
+      url = URL.createObjectURL(file); var im = new Image();
+      im.onload = function () { URL.revokeObjectURL(url); resolve(im); };
+      im.onerror = function () { URL.revokeObjectURL(url); reject(new Error('không đọc được ảnh')); };
+      im.src = url;   // thẻ <img> tự xoay đúng chiều theo EXIF (ảnh chụp điện thoại)
+    } catch (e) { reject(new Error('không đọc được ảnh')); }   // trình duyệt không hỗ trợ → coi như không giải mã được (rơi xuống nhánh gửi nguyên bản nếu nhỏ)
+  });
+}
+// Nén: cạnh dài ≤1600px, JPEG 0.85 (nền trắng cho PNG trong suốt) → ảnh điện thoại 4–8MB còn vài trăm KB, lọt giới hạn 3MB của server/extension. GIF giữ nguyên (nếu ≤3MB).
+function _vtCompress(file) {
+  var isGif = /gif/i.test(file.type || '') || /\.gif$/i.test(file.name || '');
+  var base = String(file.name || 'anh').replace(/\.[A-Za-z0-9]{1,5}$/, '') || 'anh';
+  if (isGif) return file.size <= _VT_MAX_BYTES ? Promise.resolve({ blob: file, name: file.name || (base + '.gif'), mime: 'image/gif' }) : Promise.reject(new Error('GIF quá lớn (tối đa 3MB)'));
+  return _vtLoadImg(file).then(function (im) {
+    var w = im.naturalWidth || im.width, h = im.naturalHeight || im.height;
+    if (!w || !h) throw new Error('không đọc được ảnh');
+    var k = Math.min(1, _VT_MAX_SIDE / Math.max(w, h)), cw = Math.max(1, Math.round(w * k)), ch = Math.max(1, Math.round(h * k));
+    var c = document.createElement('canvas'); c.width = cw; c.height = ch;
+    var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cw, ch); g.drawImage(im, 0, 0, cw, ch);
+    return new Promise(function (res, rej) { c.toBlob(function (b) { b ? res({ blob: b, name: base + '.jpg', mime: 'image/jpeg' }) : rej(new Error('không nén được ảnh')); }, 'image/jpeg', 0.85); });
+  }).then(function (r) {
+    if (r.blob.size > _VT_MAX_BYTES) throw new Error('ảnh vẫn quá lớn sau khi nén');
+    return r;
+  }, function (err) {   // không giải mã được (VD HEIC trên Chrome máy tính): gửi nguyên bản nếu nhỏ và là định dạng web
+    if (/^image\/(jpeg|png|webp)$/i.test(file.type || '') && file.size <= _VT_MAX_BYTES) return { blob: file, name: file.name || (base + '.jpg'), mime: String(file.type).toLowerCase() };
+    throw err;
+  });
+}
+function _vtBlobToB64(blob) {
+  return new Promise(function (res, rej) {
+    var fr = new FileReader();
+    fr.onload = function () { var s = String(fr.result || ''), i = s.indexOf(','); res(i >= 0 ? s.slice(i + 1) : ''); };
+    fr.onerror = function () { rej(new Error('không đọc được tệp')); };
+    fr.readAsDataURL(blob);
+  });
+}
+function _vtSetUploadBusy(on) {
+  var b = document.getElementById('vt-f-filebtn'); if (b) { b.disabled = !!on; b.textContent = on ? 'Đang tải ảnh...' : '📷 Chọn ảnh từ máy / điện thoại'; }
+}
+// PHẢI sao danh sách tệp ra mảng ngay: ô chọn tệp bị xoá giá trị (để chọn lại cùng ảnh được) ngay sau khi gọi hàm này.
+function vtUploadFiles(list) { return _vtUploadFiles(Array.prototype.slice.call(list || [])); }
+async function _vtUploadFiles(files) {
+  var msg = document.getElementById('vt-f-imgmsg'), say = function (t) { if (msg) msg.textContent = t; };
+  if (_vtUploading > 0) { say('Đang tải ảnh, đợi xong rồi chọn thêm nhé.'); return; }
+  var imgs = files.filter(_vtIsImageFile), notImg = files.length - imgs.length;
+  if (!imgs.length) { say(files.length ? 'Các tệp đã chọn không phải ảnh.' : ''); return; }
+  var room = _VT_MAX_IMGS - _vtDraftImgs.length;
+  if (room <= 0) { say('Mỗi mục tối đa ' + _VT_MAX_IMGS + ' ảnh — bỏ bớt ảnh cũ hoặc tạo mục / thư mục con khác.'); return; }
+  var over = Math.max(0, imgs.length - room); imgs = imgs.slice(0, room);
+  var seq = _vtUploadSeq, total = imgs.length, done = 0, okN = 0, errs = [], next = 0;
+  _vtUploading = total; _vtSetUploadBusy(true); say('Đang tải ảnh 0/' + total + '...');
+  async function worker() {
+    while (next < imgs.length && seq === _vtUploadSeq) {
+      var f = imgs[next++];
+      try {
+        var c = await _vtCompress(f), b64 = await _vtBlobToB64(c.blob);
+        var r = await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify({ action: 'vietTatUploadImage', name: c.name, mimeType: c.mime, base64: b64 }) });
+        var d = await r.json();
+        if (!d || !d.ok || !d.id) throw new Error((d && d.error) || 'tải lên thất bại');
+        if (seq === _vtUploadSeq && _vtDraftImgs.length < _VT_MAX_IMGS && !_vtDraftImgs.some(function (x) { return x.id === d.id; })) { _vtDraftImgs.push({ id: d.id, name: d.name || c.name }); okN++; vtRenderDraftImgs(); }
+      } catch (e) { errs.push((f.name || 'ảnh') + ': ' + String((e && e.message) || e)); }
+      done++; if (seq === _vtUploadSeq) { _vtUploading = Math.max(0, total - done); say('Đang tải ảnh ' + done + '/' + total + '...'); }
+    }
+  }
+  var ws = []; for (var i = 0; i < _VT_UPLOAD_WORKERS; i++) ws.push(worker());
+  await Promise.all(ws);
+  if (seq !== _vtUploadSeq) return;   // form đã đóng / mở mục khác: không ghi kết quả sang mục mới
+  _vtUploading = 0; _vtSetUploadBusy(false);
+  say((okN ? 'Đã tải lên ' + okN + ' ảnh.' : 'Không tải được ảnh nào.') +
+    (errs.length ? ' · ' + errs.length + ' ảnh lỗi: ' + errs.slice(0, 2).join(' | ') + (errs.length > 2 ? ' ...' : '') : '') +
+    (over ? ' · Bỏ qua ' + over + ' ảnh vì mỗi mục tối đa ' + _VT_MAX_IMGS + ' ảnh.' : '') + (notImg ? ' · Bỏ qua ' + notImg + ' tệp không phải ảnh.' : '') +
+    (okN ? ' Nhớ bấm Lưu.' : ''));
+}
+function vtCloseForm() { _vtUploadSeq++; _vtUploading = 0; _vtSetUploadBusy(false); document.getElementById('vt-form-wrap').style.display = 'none'; }
 async function vtSave() {
   var abbr = (document.getElementById('vt-f-abbr').value || '').trim();
   var opts = Array.prototype.map.call(document.querySelectorAll('#vt-f-opts textarea'), function (t) { return t.value.trim(); }).filter(Boolean);
   if (!abbr || /\s/.test(abbr)) { alert('Viết tắt phải là 1 từ, không có khoảng trắng (VD: ch, gb, ship).'); return; }
   if (!opts.length) { alert('Nhập ít nhất 1 nội dung để chèn.'); return; }
+  if (_vtUploading > 0) { alert('Đang tải ảnh lên — đợi tải xong rồi bấm Lưu nhé (nếu bấm Lưu bây giờ sẽ mất các ảnh chưa tải xong).'); return; }
+  if (_vtDraftImgs.length > _VT_MAX_IMGS) { alert('Mỗi mục tối đa ' + _VT_MAX_IMGS + ' ảnh.'); return; }
   var btn = document.getElementById('vt-f-save-btn'); btn.disabled = true; btn.textContent = 'Đang lưu...';
   try {
     var snippet = { id: document.getElementById('vt-f-id').value || undefined, abbr: abbr, keyword: (document.getElementById('vt-f-keyword').value || '').trim(),
