@@ -836,6 +836,13 @@ window.addEventListener('load',function(){var s=document.createElement('script')
           <button class="btn sm" onclick="document.getElementById('vt-imp-file').click()" title="Chọn file data.json hoặc .zip xuất từ app Viết Tắt cũ (Chrome/Android)">📥 Nhập từ app Viết Tắt cũ</button>
         </div>
         <div id="vt-imp-msg" style="font-size:11px;color:var(--muted);margin:-4px 0 8px"></div>
+        <details style="font-size:12px;margin:0 0 10px"><summary style="cursor:pointer;color:var(--accent,#1e66f5);font-weight:600">📱 Cài Viết tắt về điện thoại (iPhone / Android)</summary>
+          <div style="margin-top:6px;line-height:1.6;color:var(--muted)">
+            <b>iPhone / iPad:</b> mở link <a href="https://duyenhoang91tl-lab.github.io/Duyencr/viettat.html" target="_blank" rel="noopener">duyenhoang91tl-lab.github.io/Duyencr/viettat.html</a> bằng <b>Safari</b> → nút <b>Chia sẻ</b> → <b>Thêm vào MH chính</b>. Mở từ biểu tượng "Viết tắt" như một app (xem được khi mất mạng).<br>
+            <b>Android:</b> mở link trên bằng Chrome → <b>Cài ngay</b>; hoặc tải <a href="https://github.com/duyenhoang91tl-lab/Duyencr/releases/tag/viettat-latest" target="_blank" rel="noopener">VietTat.apk</a> (app tự hiện gợi ý khi gõ trong Zalo/Messenger).<br>
+            iPhone không cho app gõ-tự-hiện trong Zalo/Messenger: mở app Viết tắt → chọn tin/hình → <b>Sao chép</b> hoặc <b>Chia sẻ</b> → dán vào ô chat. Lần đầu nhập <b>Tên CS</b> giống trong CRM.
+          </div>
+        </details>
         <div id="vt-form-wrap" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:12px;margin-bottom:10px">
           <input type="hidden" id="vt-f-id">
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
@@ -1759,7 +1766,7 @@ function openBcLogModal(phone){
 <script src="js/54-fn-promo-admin.js"></script>
 <script src="js/55-fn-shell.js?v=20261019c"></script>
 <script src="js/56-fn-qrpills.js"></script>
-<script src="js/57-viettat.js?v=20261025e"></script>
+<script src="js/57-viettat.js?v=20261025f"></script>
 <script src="js/58-auto-cust-link.js"></script>
 <script src="js/59-report-drill.js"></script>
 

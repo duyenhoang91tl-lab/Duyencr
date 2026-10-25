@@ -7,6 +7,10 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Viết tắt">
 <meta name="theme-color" content="#1e66f5">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="viettat.webmanifest">
+<link rel="apple-touch-icon" href="viettat-icon-180.png">
+<link rel="icon" type="image/png" href="viettat-icon-192.png">
 <title>Viết tắt — Duyên AI CRM</title>
 <style>
   :root { --bg:#f6f7f9; --card:#fff; --line:#d0d0d0; --blue:#1e66f5; --txt:#111; --muted:#667085; }
@@ -40,6 +44,8 @@
   .pic-wait { height:170px; display:flex; align-items:center; justify-content:center; color:#bbb; font-size:13px; }
   #toast { position:fixed; left:50%; bottom:calc(96px + env(safe-area-inset-bottom)); transform:translateX(-50%); background:#222; color:#fff; padding:10px 16px; border-radius:10px; max-width:88vw; z-index:9; display:none; }
   #setup { padding:24px 16px; }
+  #inst { display:none; margin:8px 10px 0; padding:10px 12px; background:#fff8e1; border:1px solid #f1d98a; border-radius:10px; font-size:14px; }
+  #inst b { font-weight:700; } #inst .x { float:right; border:0; background:none; font-size:18px; color:#888; }
 </style>
 </head>
 <body>
@@ -51,6 +57,7 @@
     <div class="hint" id="who"></div>
   </div>
 </header>
+<div id="inst"><button class="x" id="instx" aria-label="Đóng">✕</button><span id="insttxt"></span> <button class="btn pri" id="instbtn" style="display:none;padding:6px 12px;margin-left:6px">Cài ngay</button></div>
 <main id="list"></main>
 <div id="bar" style="display:none">
   <button class="btn" id="clear">✕ Bỏ chọn</button>
@@ -276,6 +283,20 @@ $('list').addEventListener('click', function (e) {
   TAP.h = setTimeout(function () { TAP.k = ''; toggle(k); }, 300);
 });
 var TAP = { k: '', t: 0, h: 0 };
+// ===== Cài như app (PWA): iPhone phải tự bấm Chia sẻ → Thêm vào MH chính; Android/Chrome có nút Cài ngay =====
+(function () {
+  var standalone = (window.navigator.standalone === true) || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('viettat-sw.js').catch(function () {});
+  var box = document.getElementById('inst'), txt = document.getElementById('insttxt'), btn = document.getElementById('instbtn'), dp = null;
+  var hide = function () { try { localStorage.setItem('vt_inst_hide', '1'); } catch (e) {} box.style.display = 'none'; };
+  if (standalone || (function () { try { return localStorage.getItem('vt_inst_hide') === '1'; } catch (e) { return false; } })()) return;
+  document.getElementById('instx').onclick = hide;
+  var ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (ios) { txt.innerHTML = '📲 Cài thành app: bấm nút <b>Chia sẻ</b> (ô vuông có mũi tên ↑) ở thanh Safari → <b>Thêm vào MH chính</b>. (Phải mở bằng <b>Safari</b>.)'; box.style.display = 'block'; }
+  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); dp = e; txt.textContent = '📲 Cài thành app trên màn hình chính:'; btn.style.display = 'inline-block'; box.style.display = 'block'; });
+  btn.onclick = function () { if (!dp) return; dp.prompt(); dp.userChoice.then(function () { dp = null; hide(); }); };
+  window.addEventListener('appinstalled', hide);
+})();
 S.name = ls('vt_name'); $('cust').value = ls('vt_cust');
 if (S.name) start(); else showSetup();
 </script>
