@@ -6,7 +6,9 @@
 //      nen khop so lieu bao cao hien co. Phan quyen LAY TU PHIEN (token), bo qua tham so sale client gui khi khong du quyen. Khong token -> tu choi.
 // ═══════════════════════════════════════════════════════
 var SPLIT_ORDER_MAX_ROWS_ = 3000;
+var SPLIT_DETAIL_MAX_ = 1500;
 var SPLIT_GET_ACTIONS_ = { splitOrderReport: 1, splitOrderMine: 1, splitOrderDetail: 1 };
+var SPLIT_POST_ACTIONS_ = { exportSplitOrderSheet: 1 };
 var SPLIT_UNASSIGNED_ = '(chưa gán sale)';
 
 // [{name, frac}] cac sale THAT cua don (frac da nhan saleRatio quay 30/70); don chia khi co >=2 nguoi khac nhau.
@@ -139,31 +141,38 @@ function _splitRange_(p) {
   var today = _vnYmd_(new Date());
   return { from: p.dateFrom || (today.substring(0, 8) + '01'), to: p.dateTo || today };
 }
-function _splitFilters_(from, to, saleNames) {
-  return { dateFrom: from, dateTo: to, sale: saleNames || [], nguon: [], marketer: [], sanPham: '', careStatus: [], khStatus: [], zaloStatus: [], nickZalo: '' };
+function _splitFilters_(from, to, saleNames, nguon) {
+  return { dateFrom: from, dateTo: to, sale: saleNames || [], nguon: nguon || [], marketer: [], sanPham: '', careStatus: [], khStatus: [], zaloStatus: [], nickZalo: '' };
 }
 function _splitRound_(n) { return Math.round(Number(n) || 0); }
 
 // ---- BAO CAO M ----
 function splitOrderReport_(p, user) {
-  var sc = _splitScope_(user), r = _splitRange_(p), want = _splitCSV_(p.sale), names;
+  var sc = _splitScope_(user), r = _splitRange_(p), want = _splitCSV_(p.sale), nguon = _splitCSV_(p.nguon), names;
   if (sc.all) names = want;
   else {
     var inScope = {}; sc.names.forEach(function (n) { inScope[_normTxt_(n)] = 1; });
     names = want.length ? want.filter(function (n) { return inScope[_normTxt_(n)]; }) : sc.names;   // khong vuot pham vi du client gui sale khac
-    if (!names.length) return { ok: true, from: r.from, to: r.to, scope: 'own', total: { orders: 0, revenue: 0, aov: 0, splitOrders: 0, splitRevenue: 0, splitValue: 0, splitPctOrders: null, splitPctRevenue: null }, bySale: [], warnings: [want.length ? 'Ban khong co quyen xem sale da chon (chi xem duoc pham vi cua minh).' : 'Tai khoan chua gan ten sale nen khong co so lieu.'] };
+    if (!names.length) return { ok: true, from: r.from, to: r.to, scope: 'own', total: { orders: 0, revenue: 0, aov: 0, splitOrders: 0, splitRevenue: 0, splitValue: 0, splitPctOrders: null, splitPctRevenue: null }, bySale: [], detail: [], detailTruncated: false, warnings: [want.length ? 'Ban khong co quyen xem sale da chon (chi xem duoc pham vi cua minh).' : 'Tai khoan chua gan ten sale nen khong co so lieu.'] };
   }
-  var cache = CacheService.getScriptCache(), ck = _reportCacheKey_('splitrep1_', { f: _splitFilters_(r.from, r.to, names), a: sc.all ? 1 : 0 }), hit = cache.get(ck);
+  var cache = CacheService.getScriptCache(), ck = _reportCacheKey_('splitrep2_', { f: _splitFilters_(r.from, r.to, names, nguon), a: sc.all ? 1 : 0 }), hit = cache.get(ck);
   if (hit) { try { return JSON.parse(hit); } catch (e0) {} }
-  var rb = buildSalesReportB_(_splitFilters_(r.from, r.to, names));
-  var by = {};
+  var rb = buildSalesReportB_(_splitFilters_(r.from, r.to, names, nguon));
+  var by = {}, detail = [], scopeFold = null;
+  if (!sc.all) { scopeFold = {}; sc.names.forEach(function (n) { scopeFold[_normTxt_(n)] = 1; }); }
   (rb.bySale || []).forEach(function (s) { by[s.name] = { name: s.name, orders: s.orders, revenue: _splitRound_(s.giaTri), aov: s.orders ? _splitRound_(s.giaTri / s.orders) : 0, splitOrders: 0, splitRevenue: 0 }; });
   var splitOrders = 0, splitValue = 0, rowOf = _splitRowFinder_(by, rb.orders);
   (rb.orders || []).forEach(function (o) {
     var ss = _splitSales_(o); if (ss.length < 2) return;
     var v = Number(o.giaTriSauGiam) || 0; splitOrders += 1; splitValue += v;
     ss.forEach(function (s) { var row = rowOf(s.name); if (!row) return; row.splitOrders += 1; row.splitRevenue += v * s.frac; });
+    // chi tiet tung don chia: nhan vien/truong team/quan ly chi thay TEN + PHAN cua sale trong pham vi minh; sale ngoai pham vi chi hien ten (khong lo phan tien)
+    var mine = [], others = [];
+    ss.forEach(function (s) { if (!scopeFold || scopeFold[_normTxt_(s.name)]) mine.push({ name: s.name, share: _splitRound_(v * s.frac) }); else others.push(s.name); });
+    detail.push({ date: String(o.ngayTaoDon || ''), name: String(o.khachHang || ''), phone: normPhone_(o.soDienThoai), nguon: String(o.nguonDon || ''), product: String(o.sanPham || '').substring(0, 80), value: _splitRound_(v), sales: mine, others: others });
   });
+  detail.sort(function (a, b) { var da = parseVNDate_(a.date), db = parseVNDate_(b.date); return (db ? db.getTime() : 0) - (da ? da.getTime() : 0); });
+  var detailTruncated = detail.length > SPLIT_DETAIL_MAX_;
   var rows = Object.keys(by).map(function (k) {
     var x = by[k]; x.splitRevenue = _splitRound_(x.splitRevenue);
     x.splitAov = x.splitOrders ? _splitRound_(x.splitRevenue / x.splitOrders) : 0;
@@ -175,8 +184,8 @@ function splitOrderReport_(p, user) {
     total: { orders: orders, revenue: revenue, aov: orders ? _splitRound_(revenue / orders) : 0, splitOrders: splitOrders, splitRevenue: splitRevenue, splitValue: _splitRound_(splitValue),
       splitAov: splitOrders ? _splitRound_(splitRevenue / splitOrders) : 0,
       splitPctOrders: orders ? Math.round(splitOrders / orders * 1000) / 10 : null, splitPctRevenue: revenue ? Math.round(splitRevenue / revenue * 1000) / 10 : null },
-    bySale: rows, warnings: [] };
-  try { cache.put(ck, JSON.stringify(out), 120); } catch (e1) {}
+    bySale: rows, detail: detailTruncated ? detail.slice(0, SPLIT_DETAIL_MAX_) : detail, detailTruncated: detailTruncated, warnings: [] };
+  try { var js = JSON.stringify(out); if (js.length < 90000) cache.put(ck, js, 120); } catch (e1) {}
   return out;
 }
 

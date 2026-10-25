@@ -132,9 +132,9 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 
 ## 31_SplitOrders.gs
 - Hàm: `_splitSales_`, `_splitIdentityFor_`, `_splitRowFinder_`, `_splitSaleSet_`, `_splitCompareSales_`, `_splitDayDiff_`, `_splitPhoneCandidates_`, `_splitFbKey_`, `_splitFbRead_`, `_splitAttachFeedback_`, `saveSplitFeedback_`, `_splitScope_`, `_splitCSV_`, `_splitRange_`, `_splitFilters_`, `_splitRound_`, `splitOrderReport_`, `splitOrderMine_`, `_splitDmy_`, `splitOrderDetail_`, `splitDoGet_`
-- Hằng/biến: `SPLIT_ORDER_MAX_ROWS_`, `SPLIT_GET_ACTIONS_`, `SPLIT_UNASSIGNED_`, `SH_SPLIT_FB_`
+- Hằng/biến: `SPLIT_ORDER_MAX_ROWS_`, `SPLIT_DETAIL_MAX_`, `SPLIT_GET_ACTIONS_`, `SPLIT_POST_ACTIONS_`, `SPLIT_UNASSIGNED_`, `SH_SPLIT_FB_`
 
 ## 32_ChatCoach.gs
-- Hàm: `_coachNorm_`, `_coachRe_`, `_coachAttOk_`, `_coachSpecOk_`, `_coachAge_`, `coachRules_`, `coachCtkm_`, `coachEval_`, `coachBuildResult_`, `chatCoach_`
+- Hàm: `_coachNorm_`, `_coachRe_`, `_coachAttOk_`, `_coachSpecOk_`, `_coachAge_`, `coachRules_`, `coachCtkm_`, `coachEval_`, `coachBuildResult_`, `chatCoach_`, `splitOrderExportSheet_`, `splitDoPost_`
 - Hằng/biến: `CHAT_COACH_SECTION_`, `COACH_STEPS_`, `COACH_RE_PRICE_`, `COACH_RE_PROMO_`, `COACH_RE_BIRTH_`, `COACH_RE_ORDER_`, `COACH_RE_SIZE_ASK_`, `COACH_RE_SIZE_GIVE_`, `COACH_RULES_`
 

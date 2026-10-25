@@ -2685,7 +2685,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.60-coach' });   // PHAI la chuoi viet thang (test-crm-ask/test-kh-discuss doi chieu); giu = PK_GAS_VER_
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.61-split-detail' });   // PHAI la chuoi viet thang (test-crm-ask/test-kh-discuss doi chieu); giu = PK_GAS_VER_
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -7168,6 +7168,7 @@ function doPostCore_(e) {
     var action = data.action;
     if (MLIB_POST_ACTIONS_[action] === 1) return mlibDoPost_(action, data);   // thu vien anh/ghi am/mau tin
     if (KHD_POST_ACTIONS_[action] === 1) return khdDoPost_(action, data);   // thao luan khach (noi bo)
+    if (SPLIT_POST_ACTIONS_[action] === 1) return splitDoPost_(action, data);   // xuat bao cao M (don chia) ra Sheet: Admin
     if (CHAT_POST_ACTIONS_[action] === 1) return chatDoPost_(action, data);   // chat noi bo
     if (action === 'save')                return saveAllCare_(data.rows);
     if (action === 'saveSingle')          return saveSingleCare_(data.row);
@@ -19285,7 +19286,9 @@ function cvList_(p) {
 //      nen khop so lieu bao cao hien co. Phan quyen LAY TU PHIEN (token), bo qua tham so sale client gui khi khong du quyen. Khong token -> tu choi.
 // ═══════════════════════════════════════════════════════
 var SPLIT_ORDER_MAX_ROWS_ = 3000;
+var SPLIT_DETAIL_MAX_ = 1500;
 var SPLIT_GET_ACTIONS_ = { splitOrderReport: 1, splitOrderMine: 1, splitOrderDetail: 1 };
+var SPLIT_POST_ACTIONS_ = { exportSplitOrderSheet: 1 };
 var SPLIT_UNASSIGNED_ = '(chưa gán sale)';
 
 // [{name, frac}] cac sale THAT cua don (frac da nhan saleRatio quay 30/70); don chia khi co >=2 nguoi khac nhau.
@@ -19418,31 +19421,38 @@ function _splitRange_(p) {
   var today = _vnYmd_(new Date());
   return { from: p.dateFrom || (today.substring(0, 8) + '01'), to: p.dateTo || today };
 }
-function _splitFilters_(from, to, saleNames) {
-  return { dateFrom: from, dateTo: to, sale: saleNames || [], nguon: [], marketer: [], sanPham: '', careStatus: [], khStatus: [], zaloStatus: [], nickZalo: '' };
+function _splitFilters_(from, to, saleNames, nguon) {
+  return { dateFrom: from, dateTo: to, sale: saleNames || [], nguon: nguon || [], marketer: [], sanPham: '', careStatus: [], khStatus: [], zaloStatus: [], nickZalo: '' };
 }
 function _splitRound_(n) { return Math.round(Number(n) || 0); }
 
 // ---- BAO CAO M ----
 function splitOrderReport_(p, user) {
-  var sc = _splitScope_(user), r = _splitRange_(p), want = _splitCSV_(p.sale), names;
+  var sc = _splitScope_(user), r = _splitRange_(p), want = _splitCSV_(p.sale), nguon = _splitCSV_(p.nguon), names;
   if (sc.all) names = want;
   else {
     var inScope = {}; sc.names.forEach(function (n) { inScope[_normTxt_(n)] = 1; });
     names = want.length ? want.filter(function (n) { return inScope[_normTxt_(n)]; }) : sc.names;   // khong vuot pham vi du client gui sale khac
-    if (!names.length) return { ok: true, from: r.from, to: r.to, scope: 'own', total: { orders: 0, revenue: 0, aov: 0, splitOrders: 0, splitRevenue: 0, splitValue: 0, splitPctOrders: null, splitPctRevenue: null }, bySale: [], warnings: [want.length ? 'Ban khong co quyen xem sale da chon (chi xem duoc pham vi cua minh).' : 'Tai khoan chua gan ten sale nen khong co so lieu.'] };
+    if (!names.length) return { ok: true, from: r.from, to: r.to, scope: 'own', total: { orders: 0, revenue: 0, aov: 0, splitOrders: 0, splitRevenue: 0, splitValue: 0, splitPctOrders: null, splitPctRevenue: null }, bySale: [], detail: [], detailTruncated: false, warnings: [want.length ? 'Ban khong co quyen xem sale da chon (chi xem duoc pham vi cua minh).' : 'Tai khoan chua gan ten sale nen khong co so lieu.'] };
   }
-  var cache = CacheService.getScriptCache(), ck = _reportCacheKey_('splitrep1_', { f: _splitFilters_(r.from, r.to, names), a: sc.all ? 1 : 0 }), hit = cache.get(ck);
+  var cache = CacheService.getScriptCache(), ck = _reportCacheKey_('splitrep2_', { f: _splitFilters_(r.from, r.to, names, nguon), a: sc.all ? 1 : 0 }), hit = cache.get(ck);
   if (hit) { try { return JSON.parse(hit); } catch (e0) {} }
-  var rb = buildSalesReportB_(_splitFilters_(r.from, r.to, names));
-  var by = {};
+  var rb = buildSalesReportB_(_splitFilters_(r.from, r.to, names, nguon));
+  var by = {}, detail = [], scopeFold = null;
+  if (!sc.all) { scopeFold = {}; sc.names.forEach(function (n) { scopeFold[_normTxt_(n)] = 1; }); }
   (rb.bySale || []).forEach(function (s) { by[s.name] = { name: s.name, orders: s.orders, revenue: _splitRound_(s.giaTri), aov: s.orders ? _splitRound_(s.giaTri / s.orders) : 0, splitOrders: 0, splitRevenue: 0 }; });
   var splitOrders = 0, splitValue = 0, rowOf = _splitRowFinder_(by, rb.orders);
   (rb.orders || []).forEach(function (o) {
     var ss = _splitSales_(o); if (ss.length < 2) return;
     var v = Number(o.giaTriSauGiam) || 0; splitOrders += 1; splitValue += v;
     ss.forEach(function (s) { var row = rowOf(s.name); if (!row) return; row.splitOrders += 1; row.splitRevenue += v * s.frac; });
+    // chi tiet tung don chia: nhan vien/truong team/quan ly chi thay TEN + PHAN cua sale trong pham vi minh; sale ngoai pham vi chi hien ten (khong lo phan tien)
+    var mine = [], others = [];
+    ss.forEach(function (s) { if (!scopeFold || scopeFold[_normTxt_(s.name)]) mine.push({ name: s.name, share: _splitRound_(v * s.frac) }); else others.push(s.name); });
+    detail.push({ date: String(o.ngayTaoDon || ''), name: String(o.khachHang || ''), phone: normPhone_(o.soDienThoai), nguon: String(o.nguonDon || ''), product: String(o.sanPham || '').substring(0, 80), value: _splitRound_(v), sales: mine, others: others });
   });
+  detail.sort(function (a, b) { var da = parseVNDate_(a.date), db = parseVNDate_(b.date); return (db ? db.getTime() : 0) - (da ? da.getTime() : 0); });
+  var detailTruncated = detail.length > SPLIT_DETAIL_MAX_;
   var rows = Object.keys(by).map(function (k) {
     var x = by[k]; x.splitRevenue = _splitRound_(x.splitRevenue);
     x.splitAov = x.splitOrders ? _splitRound_(x.splitRevenue / x.splitOrders) : 0;
@@ -19454,8 +19464,8 @@ function splitOrderReport_(p, user) {
     total: { orders: orders, revenue: revenue, aov: orders ? _splitRound_(revenue / orders) : 0, splitOrders: splitOrders, splitRevenue: splitRevenue, splitValue: _splitRound_(splitValue),
       splitAov: splitOrders ? _splitRound_(splitRevenue / splitOrders) : 0,
       splitPctOrders: orders ? Math.round(splitOrders / orders * 1000) / 10 : null, splitPctRevenue: revenue ? Math.round(splitRevenue / revenue * 1000) / 10 : null },
-    bySale: rows, warnings: [] };
-  try { cache.put(ck, JSON.stringify(out), 120); } catch (e1) {}
+    bySale: rows, detail: detailTruncated ? detail.slice(0, SPLIT_DETAIL_MAX_) : detail, detailTruncated: detailTruncated, warnings: [] };
+  try { var js = JSON.stringify(out); if (js.length < 90000) cache.put(ck, js, 120); } catch (e1) {}
   return out;
 }
 
@@ -19775,4 +19785,39 @@ function chatCoach_(e) {
     res.ok = true; res.found = true; res.conv = conv; res.gv = PK_GAS_VER_; res.customer = ci.customer_name || ''; res.ctkm = coachCtkm_();
     return jsonOut_(res);
   } catch (err) { return jsonOut_({ ok: false, error: 'Lỗi nhắc quy trình: ' + String(err && err.message || err).slice(0, 160) }); }
+}
+
+// ---- XUAT BAO CAO M RA GOOGLE SHEET (Admin): tao 1 tab moi BC_M_<thoi gian> trong file CRM (giong cac bao cao B/C/D) ----
+function splitOrderExportSheet_(d, user) {
+  if (user.role !== 'admin') return { ok: false, error: 'Chi Admin duoc xuat bao cao ra Google Sheet.' };
+  var arr = function (x) { return Array.isArray(x) ? x : (x ? String(x).split(',') : []); };
+  var rep = splitOrderReport_({ dateFrom: d.dateFrom, dateTo: d.dateTo, sale: arr(d.sale).join(','), nguon: arr(d.nguon).join(',') }, user);
+  if (!rep.ok) return rep;
+  var tz = Session.getScriptTimeZone() || 'Etc/GMT-7', t = rep.total || {};
+  var rows = [['BAO CAO M — TONG QUAN DON CHIA'], ['Xuat luc', Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy HH:mm:ss')],
+    ['Bo loc', 'Ky: ' + rep.from + ' → ' + rep.to + ' | Sale: ' + (arr(d.sale).join(', ') || '(tat ca)') + ' | Kenh: ' + (arr(d.nguon).join(', ') || '(tat ca)')], [],
+    ['TONG QUAN'], ['Tong so don (thuc te)', t.orders], ['Doanh thu', t.revenue], ['Trung binh don', t.aov], [],
+    ['DON CHIA (>=2 sale cung chia)'], ['So don chia', t.splitOrders], ['% tren tong so don', t.splitPctOrders === null ? '' : t.splitPctOrders],
+    ['Doanh thu tu don chia (tong phan cac sale)', t.splitRevenue], ['% tren doanh thu', t.splitPctRevenue === null ? '' : t.splitPctRevenue], ['TB don chia', t.splitAov], ['Gia tri don goc cua cac don chia', t.splitValue], [],
+    ['THEO SALE'], ['Sale', 'Tong don', 'Doanh thu', 'TB/don', 'So don chia', 'Doanh thu tu don chia', 'TB/don chia', '% doanh thu tu don chia']];
+  (rep.bySale || []).forEach(function (x) { rows.push([x.name, x.orders, x.revenue, x.aov, x.splitOrders, x.splitRevenue, x.splitAov, x.splitPct === null ? '' : x.splitPct]); });
+  rows.push([]); rows.push(['CHI TIET DON CHIA' + (rep.detailTruncated ? ' (chi ' + SPLIT_DETAIL_MAX_ + ' don moi nhat)' : '')]);
+  rows.push(['Ngay', 'Khach', 'SDT', 'Nguon don', 'San pham', 'Gia tri don', 'Cac sale chia (ten: phan)']);
+  (rep.detail || []).forEach(function (o) {
+    rows.push([o.date, o.name, o.phone, o.nguon, o.product, o.value, o.sales.map(function (x) { return x.name + ': ' + x.share; }).concat(o.others).join('; ')]);
+  });
+  var ss = getCrmSS_(), tabName = 'BC_M_' + Utilities.formatDate(new Date(), tz, 'yyyyMMdd_HHmmss'), sh = ss.insertSheet(tabName);
+  var maxCols = rows.reduce(function (m, r) { return Math.max(m, r.length); }, 1);
+  var padded = rows.map(function (r) { var rr = r.map(function (c) { return typeof c === 'string' ? _chatSafeCell_(c) : c; }); while (rr.length < maxCols) rr.push(''); return rr; });
+  sh.getRange(1, 1, padded.length, maxCols).setValues(padded);
+  sh.getRange(1, 1).setFontWeight('bold').setFontSize(13);
+  try { sh.autoResizeColumns(1, maxCols); } catch (ecw) {}
+  return { ok: true, tabName: tabName, sheetUrl: ss.getUrl() + '#gid=' + sh.getSheetId(), rows: padded.length };
+}
+function splitDoPost_(action, d) {
+  try {
+    var u = d && d.token ? _sessUser_(d.token) : null;
+    if (!u) return jsonOut_({ ok: false, code: 'AUTH', error: 'Can dang nhap (tai khoan that) de xuat bao cao.' });
+    return jsonOut_(splitOrderExportSheet_(d, u));
+  } catch (err) { return jsonOut_({ ok: false, error: 'Loi xuat don chia: ' + (err && err.message || err) }); }
 }
