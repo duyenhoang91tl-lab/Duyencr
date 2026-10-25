@@ -69,6 +69,8 @@ class CrmWeb(private val act: Activity) {
     var error by mutableStateOf<String?>(null)
     /** Nhật ký chẩn đoán: lỗi JavaScript / lỗi tải file của trang (hiện trong app khi có lỗi, để biết vì sao trang trắng). */
     val logs = mutableStateListOf<String>()
+    /** Cắt token đăng nhập khỏi URL trước khi ghi nhật ký (người dùng hay sao chép nhật ký gửi cho người khác). */
+    private fun safeUrl(u: String) = u.replace(Regex("(token|demo|adminKey)=[^&]*"), "$1=…")
     fun log(msg: String) { act.runOnUiThread { if (logs.size >= 40) logs.removeAt(0); logs.add(msg) } }
     fun info(): String {
         val wv = try { WebView.getCurrentWebViewPackage()?.let { it.packageName + " " + it.versionName } ?: "?" } catch (e: Exception) { "?" }
@@ -211,10 +213,10 @@ class CrmWeb(private val act: Activity) {
             override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) { this@CrmWeb.canBack = view.canGoBack() }
             override fun onReceivedError(view: WebView, request: WebResourceRequest, e: WebResourceError) {
                 if (request.isForMainFrame) this@CrmWeb.error = "Không tải được CRM (${e.description}). Kiểm tra mạng rồi bấm Tải lại."
-                this@CrmWeb.log("MẠNG ${e.description}: ${request.url}")
+                this@CrmWeb.log("MẠNG ${e.description}: ${safeUrl(request.url.toString())}")
             }
             override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, r: WebResourceResponse) {
-                this@CrmWeb.log("HTTP ${r.statusCode}: ${request.url}")
+                this@CrmWeb.log("HTTP ${r.statusCode}: ${safeUrl(request.url.toString())}")
             }
             override fun onRenderProcessGone(view: WebView, d: RenderProcessGoneDetail): Boolean {
                 this@CrmWeb.log("WebView bị dừng (hết bộ nhớ/lỗi: crash=${d.didCrash()}). Mở lại app.")
