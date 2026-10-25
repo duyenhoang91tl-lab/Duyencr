@@ -19,8 +19,6 @@
     }
   },
   "onlyPancake": {
-    "vietTatImage": {"status": "gap", "note": "Lay byte 1 anh Drive de dan kem khi go tat (Pancake AI, 2026-10-25). Zalo AI chua co go tat nen chua can — Duyen chot lam Zalo AI SAU; khi lam Zalo thi dung lai action nay (Zalo co san co che DataTransfer gan anh vao input file, zalo-content.js ~4554)"},
-    "vietTat": {"status": "gap", "note": "Go tat (viet tat -> Tab chen noi dung) trong o chat Pancake AI (2026-10-25, Duyen yeu cau tich hop app Viet Tat vao Pancake AI + CRM). Zalo AI chua co — cho Duyen chot co lam khong (file pancake-viettat.js dung lai duoc gan nguyen cho Zalo Web; docs/crm-kb/04-extension-pancake.md)"},
     "webLogin": {"status": "gap", "note": "Duyet mau tin ngay tren Pancake AI (2026-10-15, Duyen yeu cau rieng cho Pancake AI: admin dang nhap CRM o Cai dat extension, thong bao + nut Duyet/Tu choi tren Pancake). Zalo AI chua co - cho Duyen chot co lam khong (docs/crm-kb/04-extension-pancake.md)"},
     "tplPending": {"status": "gap", "note": "Danh sach mau cho duyet cho extension Pancake AI (xem webLogin)"},
     "approveMessageTemplate": {"status": "gap", "note": "Duyet/tu choi mau tin tu extension Pancake AI (xem webLogin)"},

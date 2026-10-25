@@ -2,4 +2,5 @@ build/
 .gradle/
 local.properties
 *.apk
+!app/keystore/*.jks
 .idea/

@@ -16673,7 +16673,7 @@ function buildStoreCaseReport_(filters) {
 //  Chay trong Apps Script Editor: ttChayNgay (chup ngay 1 lan), ttCaiTrigger (hen gio moi gio).
 // ═══════════════════════════════════════════════════════════════
 var TT_TRACK_SHEET_ = 'Theo dõi giai đoạn Base';
-var TT_TRACK_HEADERS_ = ['id', 'giaiDoan', 'giaiDoanTu', 'lanCuoiThay', 'saleBan', 'ngayTao'];
+var TT_TRACK_HEADERS_ = ['id', 'giaiDoan', 'giaiDoanTu', 'lanCuoiThay', 'saleBan', 'ngayTao', 'soDienThoai'];   // cot 7 soDienThoai (them 2026-10-25): de bam o don ket mo duoc ho so khach; dong cu de trong -> tu dien o lan chup ke tiep (moi gio)
 var TT_DEFAULT_HOURS_ = 24;
 var TT_LOOKBACK_DAYS_ = 60;
 var TT_REFRESH_MIN_ = 60;
@@ -16714,7 +16714,7 @@ function _ttBuildRows_(orders, prevRows, nowMs, skip) {
     if (p && _ttFold_(p[1]) === _ttFold_(stage)) { since = _ttParseVn_(p[2]) || (p[2] && p[2].getTime ? p[2].getTime() : 0) || nowMs; }
     else if (!p && created && _ttFold_(stage).indexOf('tiep nhan') === 0) since = created;
     else since = nowMs;
-    out.push([id, stage, new Date(since), new Date(nowMs), String(o.saleBan || ''), String(o.ngayTao || '')]);
+    out.push([id, stage, new Date(since), new Date(nowMs), String(o.saleBan || ''), String(o.ngayTao || ''), String(o.soDienThoai || '')]);
   });
   return out;
 }
@@ -16727,7 +16727,7 @@ function ttTrackStages_() {
     var sh = getSheet_(TT_TRACK_SHEET_, TT_TRACK_HEADERS_);
     var last = sh.getLastRow();
     var old = last >= 2 ? sh.getRange(2, 1, last - 1, TT_TRACK_HEADERS_.length).getValues() : [];
-    var rows = _ttBuildRows_(readDTTong_(), old, nowMs, _ttSkipSet_());
+    var rows = _ttBuildRows_(readDTTong_(false, true), old, nowMs, _ttSkipSet_());   // withPhone=true: lay SDT khach de ghi vao sheet theo doi (don ket bam mo duoc khach)
     if (last >= 2) sh.getRange(2, 1, last - 1, TT_TRACK_HEADERS_.length).clearContent();
     if (rows.length) sh.getRange(2, 1, rows.length, TT_TRACK_HEADERS_.length).setValues(rows);
     setSetting_('ttLastTrackedMs', String(nowMs));
@@ -16758,7 +16758,8 @@ function _ttStuckFromRows_(rows, namesCsv, hours, nowMs) {
       var toks = String(r[4] || '').split(',').map(_normTxt_);
       if (!toks.some(function(t) { return want[t]; })) return;
     }
-    items.push({ id: String(r[0]), stage: String(r[1]), hours: Math.floor(h), sale: String(r[4] || ''), ngayTao: String(r[5] || '') });
+    items.push({ id: String(r[0]), stage: String(r[1]), hours: Math.floor(h), sale: String(r[4] || ''), ngayTao: String(r[5] || ''),
+      phone: normPhone_(String(r[6] || '')) });   // sheet co the luu SDT dang so (mat so 0 dau) -> normPhone_ bu lai; rong neu dong cu chua duoc chup lai
   });
   items.sort(function(a, b) { return b.hours - a.hours; });
   return items;
