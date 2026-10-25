@@ -171,6 +171,7 @@ function doGetCore_(e) {
     // portal/Sasum/Pancake. Tim khong dau, khop tren MOI cot dang text cua sheet, khong
     // can biet truoc ten cot (tu doc dong tieu de dong 1). ──
     if (action === 'priceAsk') return jsonOut_(priceAsk_(e && e.parameter ? e.parameter.q : ''));   // tro ly noi bo hoi gia (js/38-pro-dock.js)
+    if (action === 'goldWeightList') return jsonOut_(goldWeightList_(String((e && e.parameter && e.parameter.refresh) || '') === '1'));   // Check phan vang (CRM + Pancake AI)
     if (action === 'priceSearch') {
       var q = (e && e.parameter && e.parameter.q) ? String(e.parameter.q) : '';
       var cachePS = CacheService.getScriptCache();
