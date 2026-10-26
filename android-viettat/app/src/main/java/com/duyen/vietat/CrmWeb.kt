@@ -90,6 +90,9 @@ class CrmWeb(private val act: Activity) {
     /** Lưu file do trang tạo ra (blob/data) vào bộ nhớ đệm rồi mở bảng chia sẻ để lưu/mở (Excel, Drive, Zalo…). */
     inner class Bridge {
         @JavascriptInterface
+        fun report(msg: String) { log(msg.take(600)) }
+
+        @JavascriptInterface
         fun save(name: String, mime: String, b64: String) {
             try {
                 val bytes = Base64.decode(b64, Base64.DEFAULT)
@@ -153,6 +156,44 @@ class CrmWeb(private val act: Activity) {
 })()
 """
 
+    /** KIỂM TRA KẾT NỐI DỮ LIỆU: tải đúng URL danh sách khách của CRM (a) trực tiếp từ app, (b) từ trong trang — để biết lỗi do mạng/Worker hay do WebView. */
+    fun netTest() {
+        val base = "https://duyen-crm-cache.duyenhoang91-tl.workers.dev"
+        val url = "$base/?action=customers&src=web"
+        log("KIỂM TRA KẾT NỐI: đang tải $url …")
+        kotlin.concurrent.thread {
+            val t0 = System.currentTimeMillis()
+            try {
+                val c = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+                c.connectTimeout = 20000; c.readTimeout = 120000; c.requestMethod = "GET"
+                val code = c.responseCode
+                val hdr = "cache=" + c.getHeaderField("x-crm-cache") + " len=" + c.getHeaderField("Content-Length") + " enc=" + c.getHeaderField("Content-Encoding") + " type=" + c.getHeaderField("Content-Type")
+                var n = 0L
+                (if (code < 400) c.inputStream else c.errorStream)?.use { ins -> val buf = ByteArray(65536); while (true) { val r = ins.read(buf); if (r < 0) break; n += r } }
+                log("APP→CRM: HTTP $code, $n byte, ${System.currentTimeMillis() - t0}ms, $hdr")
+            } catch (e: Exception) { log("APP→CRM LỖI sau ${System.currentTimeMillis() - t0}ms: ${e.javaClass.simpleName}: ${e.message}") }
+        }
+        act.runOnUiThread {
+            web.evaluateJavascript("""
+(function(){ var t=Date.now(); fetch('$url').then(function(r){ return r.text().then(function(x){ AndroidDl.report('TRONG TRANG: HTTP '+r.status+', '+x.length+' ký tự, '+(Date.now()-t)+'ms'); }); })
+ .catch(function(e){ AndroidDl.report('TRONG TRANG LỖI sau '+(Date.now()-t)+'ms: '+(e&&e.message)); }); })()
+""", null)
+        }
+    }
+
+    // TỰ THỬ LẠI NẠP DỮ LIỆU: nếu 30 giây sau khi tải trang mà CRM vẫn ở màn hình "chưa có dữ liệu" (lần đồng bộ đầu bị ngắt mạng, vd ERR_CONNECTION_ABORTED trên máy Asus),
+    // gọi lại đúng hàm đồng bộ của CRM một lần. Không làm gì nếu CRM đã có dữ liệu hoặc đang ở màn hình đăng nhập.
+    private val retryJs = """
+(function(){
+  try {
+    var ev = document.getElementById('empty-view'), dv = document.getElementById('data-view'), lg = document.getElementById('login-overlay');
+    if (lg && lg.classList.contains('show')) return 'đang đăng nhập';
+    if (ev && dv && getComputedStyle(ev).display !== 'none' && getComputedStyle(dv).display === 'none' && typeof syncFromGS === 'function') { syncFromGS({ manual: true }); return 'đã gọi lại đồng bộ'; }
+    return 'không cần';
+  } catch (e) { return 'lỗi ' + e.message; }
+})()
+"""
+
     private fun probeDecode(raw: String?): String = try { org.json.JSONTokener(raw ?: "null").nextValue()?.toString() ?: "(rỗng)" } catch (e: Exception) { raw ?: "(lỗi đọc)" }
     fun probe() { web.evaluateJavascript(probeJs) { r -> log("QUÉT TRANG:\n" + probeDecode(r)) } }
 
@@ -168,6 +209,10 @@ class CrmWeb(private val act: Activity) {
     });
   }
   function isDl(a){ return a && a.hasAttribute && a.hasAttribute('download') && /^(blob:|data:)/.test(a.href); }
+  var of = window.fetch;
+  if (of) window.fetch = function(u, o){ var t = Date.now(), name = String(u && u.url ? u.url : u).slice(0, 140);
+    return of.apply(this, arguments).then(function(r){ if (!r.ok) AndroidDl.report('FETCH ' + r.status + ' (' + (Date.now()-t) + 'ms): ' + name); return r; },
+      function(e){ AndroidDl.report('FETCH LỖI ' + (e && e.message) + ' sau ' + (Date.now()-t) + 'ms: ' + name); throw e; }); };
   var oc = HTMLAnchorElement.prototype.click;
   HTMLAnchorElement.prototype.click = function(){ if (isDl(this)) { grab(this); return; } return oc.apply(this, arguments); };
   var od = HTMLAnchorElement.prototype.dispatchEvent;
@@ -209,6 +254,7 @@ class CrmWeb(private val act: Activity) {
             override fun onPageFinished(view: WebView, url: String?) {
                 view.evaluateJavascript(hookJs, null); view.evaluateJavascript(vhFixJs, null); this@CrmWeb.canBack = view.canGoBack()
                 view.postDelayed({ probe() }, 7000)   // 7 giây sau khi tải: tự quét trang để biết vì sao trắng
+                view.postDelayed({ view.evaluateJavascript(retryJs) { r -> val m = probeDecode(r); if (!m.contains("không cần")) log("TỰ THỬ LẠI (30 giây): $m") } }, 30000)
             }
             override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) { this@CrmWeb.canBack = view.canGoBack() }
             override fun onReceivedError(view: WebView, request: WebResourceRequest, e: WebResourceError) {
@@ -232,7 +278,14 @@ class CrmWeb(private val act: Activity) {
             }
             override fun onShowFileChooser(w: WebView, cb: ValueCallback<Array<Uri>>, p: FileChooserParams): Boolean {
                 fileCb?.onReceiveValue(null); fileCb = cb
-                return try { launchChooser?.invoke(p.createIntent()); launchChooser != null } catch (e: Exception) { fileCb = null; false }
+                return try {
+                    val intent = p.createIntent()
+                    // NGUYEN NHAN GOC khong chon duoc NHIEU anh: FileChooserParams.createIntent() chi dung ACTION_GET_CONTENT + loai file,
+                    // KHONG tu dat EXTRA_ALLOW_MULTIPLE (du o <input> co "multiple" va p.mode = MODE_OPEN_MULTIPLE) nen bo chon anh chi cho chon 1.
+                    // parseResult() o onChooserResult da doc duoc ca ClipData nhieu anh, chi thieu buoc bat chon nhieu nay.
+                    if (p.mode == WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE) intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                    launchChooser?.invoke(intent); launchChooser != null
+                } catch (e: Exception) { fileCb = null; false }
             }
             override fun onJsAlert(v: WebView, url: String?, message: String?, r: JsResult): Boolean {
                 AlertDialog.Builder(act).setMessage(message).setCancelable(false).setPositiveButton("OK") { _, _ -> r.confirm() }.show(); return true
@@ -261,6 +314,7 @@ fun CrmWebScreen(crm: CrmWeb) {
         AlertDialog(onDismissRequest = { showLog = false }, title = { Text("Chẩn đoán trang CRM") },
             text = { Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
                 TextButton({ crm.probe() }) { Text("🔍 Quét lại trang") }
+                TextButton({ crm.netTest() }) { Text("🌐 Kiểm tra kết nối dữ liệu") }
                 Text(text, style = MaterialTheme.typography.bodySmall)
             } },
             confirmButton = {

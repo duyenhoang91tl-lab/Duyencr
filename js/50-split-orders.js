@@ -127,6 +127,31 @@ function splitCsvRows_(d){
   return rows;
 }
 
+// ── Danh sách chi tiết TẤT CẢ đơn chia trong kỳ (có ô tìm + CSV) — bổ sung cho panel đối soát từng sale ở dưới ──
+function splitSalesText_(o){ return (o.sales||[]).map(function(x){ return x.name+': '+splitMoney_(x.share); }).concat(o.others||[]).join('; '); }
+function splitDetailFilter_(detail, sale, q){
+  var qq = String(q||'').trim().toLowerCase();
+  return (detail||[]).filter(function(o){
+    if (sale){ var has = (o.sales||[]).some(function(x){ return x.name===sale; }) || (o.others||[]).indexOf(sale)!==-1; if (!has) return false; }
+    if (!qq) return true;
+    var hay = [o.name,o.phone,o.product,o.nguon,(o.sales||[]).map(function(x){ return x.name; }).join(' '),(o.others||[]).join(' ')].join(' ').toLowerCase();
+    return hay.indexOf(qq)!==-1;
+  });
+}
+function splitReportDetailHtml_(d, sale, q, max){
+  var all = d.detail||[], list = splitDetailFilter_(all, sale, q);
+  var head = '<div class="pro-card-h" style="margin:14px 0 6px">Danh sách đơn chia trong kỳ <span class="split-sub">'+splitNum_(list.length)+(list.length!==all.length?' / '+splitNum_(all.length):'')+' đơn · bấm dòng để mở hồ sơ khách</span></div>';
+  var trunc = d.detailTruncated ? '<div class="split-msg split-err">Chỉ có '+splitNum_(all.length)+' đơn chia mới nhất trong danh sách — thu hẹp khoảng ngày để xem đủ (bảng theo sale ở trên vẫn tính đủ).</div>' : '';
+  if (!list.length) return head+trunc+'<div class="split-msg">Không có đơn chia nào khớp.</div>';
+  var rows = list.slice(0,max).map(function(o){
+    return '<tr data-split-phone="'+splitEsc_(o.phone)+'"><td>'+splitEsc_(String(o.date).split(' ')[0])+'</td><td><b>'+splitEsc_(o.name||'—')+'</b><div class="split-ph">'+splitEsc_(o.phone)+'</div></td><td>'+splitEsc_(o.nguon)+'</td><td>'+splitEsc_(o.product)+'</td><td class="r">'+splitMoney_(o.value)+'</td><td>'+splitEsc_(splitSalesText_(o))+'</td></tr>'; }).join('');
+  return head+trunc+'<div style="overflow-x:auto"><table class="dash-table split-dtl"><thead><tr><th>Ngày</th><th>Khách</th><th>Kênh</th><th>Sản phẩm</th><th class="r">Giá trị đơn</th><th>Các sale chia (tên: phần)</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+(list.length>max?'<div class="split-msg">Hiện '+max+' đơn đầu — xuất CSV chi tiết để lấy đủ.</div>':'');
+}
+function splitDetailCsvRows_(d, sale, q){
+  var rows = [['Ngày','Khách','SĐT','Kênh (nguồn đơn)','Sản phẩm','Giá trị đơn','Các sale chia (tên: phần)']];
+  splitDetailFilter_(d.detail, sale, q).forEach(function(o){ rows.push([String(o.date).split(' ')[0],o.name,o.phone,o.nguon,o.product,o.value,(o.sales||[]).map(function(x){ return x.name+': '+x.share; }).concat(o.others||[]).join('; ')]); });
+  return rows;
+}
 // ── Danh sách đơn chia (lọc nguồn dữ liệu) ──
 var _split = { quick:'thisMonth', from:'', to:'', data:null, phones:null, loading:false, loaded:false, error:'' };
 function splitRangeFromQuick_(){
@@ -174,6 +199,7 @@ function splitBannerSync_(srcValue){
 
 // ── Báo cáo M ──
 if (typeof _srState!=='undefined'){ _srState.mDateQuick = _srState.mDateQuick || 'thisMonth'; _srState.mDateFrom = _srState.mDateFrom || ''; _srState.mDateTo = _srState.mDateTo || ''; _srState.mSearch = _srState.mSearch || ''; if (_srState.dataM===undefined) _srState.dataM = null; if (_srState.mSel===undefined) _srState.mSel = null; }
+if (typeof _srState!=='undefined'){ _srState.mSale = _srState.mSale || []; _srState.mNguon = _srState.mNguon || []; }
 // Công tắc "Đơn Pos 1 mã chia theo Base" (Settings POS_GHEP_MIN_CODES, chỉ Admin bật/tắt; mặc định TẮT = chỉ đơn ≥2 mã ghép Base).
 function splitGhepBtnHtml_(isAdmin, on){
   if (!isAdmin) return '';
@@ -201,23 +227,25 @@ async function splitReportLoad_(){
   if (_srState.mDateQuick && _srState.mDateQuick!=='custom' && typeof _pkQuickRange==='function'){ var r = _pkQuickRange(_srState.mDateQuick); if (r){ _srState.mDateFrom = r.from; _srState.mDateTo = r.to; } }
   _srState.mSel = null;   // đổi kỳ/lọc lại -> chi tiết cũ không còn đúng kỳ, đóng lại
   var gp = _srIsAdmin_() ? _srFetch('getSetting', { key:'POS_GHEP_MIN_CODES' }).catch(function(){ return null; }) : Promise.resolve(null);
-  _srState.dataM = await _srFetch('splitOrderReport', { dateFrom:_srState.mDateFrom, dateTo:_srState.mDateTo });
+  _srState.dataM = await _srFetch('splitOrderReport', { dateFrom:_srState.mDateFrom, dateTo:_srState.mDateTo, sale:(_srState.mSale||[]).join(','), nguon:(_srState.mNguon||[]).join(',') });
   var g = await gp; if (_srIsAdmin_()) _srState.ghepMin1 = String((g && g.value) || '').trim()==='1';
 }
+// Thân báo cáo: KPI + bảng theo sale (bấm dòng → panel đối soát Base/Pos) + panel + danh sách chi tiết TẤT CẢ đơn chia (có ô tìm)
+function splitMBodyHtml_(d, search, sel){
+  var ok = d && d.ok!==false && !d.error;
+  return splitReportHtml_(d, search, sel&&sel.sale) + splitDetailPanelHtml_(sel) + (ok ? splitReportDetailHtml_(d, '', search, 300) : '');
+}
+// Thanh lọc CHUNG của các báo cáo (ngày nhanh + 🔎 Bộ lọc Sale/Kênh + Lọc + ⚙ Tác vụ) + hàng nút đối soát + ô tìm + nội dung
 function renderSalesReportTabM_(wrap, subTabs){
-  var quick = (typeof _quickRangeSelectHtml==='function') ? _quickRangeSelectHtml(_srState.mDateQuick, "_srApplyQuickRange('mDateQuick','mDateFrom','mDateTo',this.value)") : '';
-  var bar = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">'+subTabs+quick
-    +'<input type="date" value="'+splitEsc_(_srState.mDateFrom)+'" onchange="_srState.mDateFrom=this.value;_srState.mDateQuick=\'custom\'" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px"> – '
-    +'<input type="date" value="'+splitEsc_(_srState.mDateTo)+'" onchange="_srState.mDateTo=this.value;_srState.mDateQuick=\'custom\'" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px">'
-    +'<button type="button" class="btn sm primary" onclick="_srLoad()">Lọc</button>'
-    +'<input type="text" value="'+splitEsc_(_srState.mSearch)+'" placeholder="🔍 Tìm tên sale…" oninput="_srState.mSearch=this.value;_srMRerender_()" style="padding:5px 9px;border:1px solid var(--border);border-radius:6px;min-width:160px">'
-    +'<button type="button" class="btn sm" onclick="_srMExportCsv_()">⬇ CSV</button>'
+  var bar = (typeof _srBarHtml_==='function') ? _srBarHtml_() : subTabs;
+  var tools = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:4px 0 12px">'
+    +'<input type="text" id="sr-m-search" value="'+splitEsc_(_srState.mSearch)+'" placeholder="🔍 Tìm sale / khách / SĐT / sản phẩm…" oninput="_srState.mSearch=this.value;_srMRerender_()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;min-width:260px">'
     +splitGhepBtnHtml_(_srIsAdmin_(), !!_srState.ghepMin1)
-    +'<button type="button" class="btn sm" onclick="_srMExportAllXlsx_()" title="Tải chi tiết từng sale có đơn chia rồi gộp 1 file Excel: Tổng hợp · Pos · Base (có cột Sale, đối chiếu Base, Sale phản hồi)">📥 Excel đối soát TẤT CẢ sale</button></div>';
-  wrap.innerHTML = bar + '<div id="sr-m-body">' + (_srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải…</div>' : splitReportHtml_(_srState.dataM, _srState.mSearch, _srState.mSel&&_srState.mSel.sale)+splitDetailPanelHtml_(_srState.mSel)) + '</div>';
+    +'<button type="button" class="btn sm" onclick="_srMExportAllXlsx_()" title="Tải chi tiết từng sale có đơn chia rồi gộp 1 file Excel: Tổng hợp · Pos · Base (có cột Sale, đối chiếu Base, Sale phản hồi)">⬇ Excel đối soát TẤT CẢ sale</button></div>';
+  wrap.innerHTML = bar + tools + '<div id="sr-m-body">' + (_srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải…</div>' : splitMBodyHtml_(_srState.dataM, _srState.mSearch, _srState.mSel)) + '</div>';
   var bd = document.getElementById('sr-m-body'); if (bd){ bd.onclick = _srMClick_; bd.onchange = _srMFbChange_; }
 }
-function _srMRerender_(){ var el = document.getElementById('sr-m-body'); if (el) el.innerHTML = splitReportHtml_(_srState.dataM, _srState.mSearch, _srState.mSel&&_srState.mSel.sale)+splitDetailPanelHtml_(_srState.mSel); }
+function _srMRerender_(){ var el = document.getElementById('sr-m-body'); if (el) el.innerHTML = splitMBodyHtml_(_srState.dataM, _srState.mSearch, _srState.mSel); }
 function splitDetailXlsxSheets_(det){   // [{name, rows:[[header],[...]]}] — sheet 1 = Base, sheet 2 = Pos
   return [{ name:'Base', rows:[SPLIT_DET_BASE_HEAD].concat(splitDetRows_(det,'base')) }, { name:'Pos', rows:[SPLIT_DET_POS_HEAD].concat(splitDetRows_(det,'pos')) }];
 }
@@ -309,6 +337,8 @@ async function _srMFbChange_(e){
 }
 function _srMClick_(e){
   var t = e.target; if (!t || !t.closest) return;
+  var pr = t.closest('[data-split-phone]');   // dòng trong danh sách chi tiết đơn chia → mở hồ sơ khách
+  if (pr){ var ph = pr.getAttribute('data-split-phone'), k = splitPhoneKey_(ph); var c = (typeof allCustomers!=='undefined') ? allCustomers.find(function(x){ return x.phone===ph || splitPhoneKey_(x.phone)===k; }) : null; if (c && typeof openDp==='function'){ var ov = document.getElementById('dp-overlay'); if (ov) ov.classList.add('open'); openDp(c.phone); } return; }
   var x = t.closest('[data-m-xlsx]'); if (x){ _srMExportXlsx_(); return; }
   if (t.closest('[data-m-lech]') && _srState.mSel){ _srState.mSel.onlyLech = !_srState.mSel.onlyLech; _srMRerender_(); return; }
   if (t.closest('[data-m-close]')){ _srState.mSel = null; _srMRerender_(); return; }
@@ -318,8 +348,23 @@ function _srMClick_(e){
   _srMOpen_(tr.getAttribute('data-m-sale'), vb ? vb.getAttribute('data-m-view') : 'pos');
   var el = document.getElementById('sr-m-detail'); if (el && el.scrollIntoView) { try { el.scrollIntoView({ behavior:'smooth', block:'nearest' }); } catch(e0){} }
 }
-function _srMExportCsv_(){
+function _srMExportCsv_(kind){
   var d = _srState.dataM; if (!d || !d.bySale){ if (typeof toast==='function') toast('Chưa có dữ liệu — bấm "Lọc" trước.'); return; }
-  if (typeof _srGDownloadCsv_==='function') _srGDownloadCsv_('Bao-cao-don-chia_'+(d.from||'')+'_'+(d.to||'')+'.csv', splitCsvRows_(d));
+  var detail = kind==='detail', tag = (d.from||'')+'_'+(d.to||'');
+  if (typeof _srGDownloadCsv_==='function') _srGDownloadCsv_((detail?'Chi-tiet-don-chia_':'Bao-cao-don-chia_')+tag+'.csv', detail ? splitDetailCsvRows_(d, '', _srState.mSearch) : splitCsvRows_(d));
 }
-if (typeof module!=='undefined') module.exports = { splitGhepBtnHtml_, _srMToggleGhep_, splitAllXlsxSheets_, _srMExportAllXlsx_, _srMFbChange_, splitPhoneKey_, splitBannerHtml_, splitDetailHtml_, splitReportHtml_, splitCsvRows_, splitCustomerPass_, splitDetailPanelHtml_, splitDetailXlsxSheets_, _split };
+// Xuất ra Google Sheet (Admin): tạo 1 tab mới BC_M_… trong file CRM (tổng quan + theo sale + chi tiết đơn chia)
+async function splitExportSheet_(){
+  if (!gsUrl){ alert('Chưa kết nối Google Apps Script (gsUrl trống).'); return; }
+  var btn = document.getElementById('sr-export-sheet-btn'), tok = '';
+  try { tok = localStorage.getItem('ome_sess_token') || ''; } catch(e){}
+  if (btn) btn.style.opacity = '.5';
+  try {
+    var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'exportSplitOrderSheet', token:tok, dateFrom:_srState.mDateFrom, dateTo:_srState.mDateTo, sale:_srState.mSale||[], nguon:_srState.mNguon||[] }) });
+    var res = await r.json();
+    if (res && res.ok && res.tabName) alert('Đã xuất báo cáo đơn chia ra tab "'+res.tabName+'" trong Google Sheet.'+(res.sheetUrl?'\n'+res.sheetUrl:''));
+    else alert('Xuất thất bại: '+(res && res.error ? res.error : 'không rõ lỗi'));
+  } catch(e){ alert('Lỗi khi xuất ra Sheet: '+e.message); }
+  finally { if (btn) btn.style.opacity = ''; }
+}
+if (typeof module!=='undefined') module.exports = { splitDetailCsvRows_, splitDetailFilter_, splitReportDetailHtml_, splitMBodyHtml_, splitGhepBtnHtml_, _srMToggleGhep_, splitAllXlsxSheets_, _srMExportAllXlsx_, _srMFbChange_, splitPhoneKey_, splitBannerHtml_, splitDetailHtml_, splitReportHtml_, splitCsvRows_, splitCustomerPass_, splitDetailPanelHtml_, splitDetailXlsxSheets_, _split };

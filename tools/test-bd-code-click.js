@@ -18,7 +18,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   w.openDp = p => log.open.push(p);
   w._pullSearchCustomer_ = async p => { log.pull.push(p); w.customerMap[p] = { phone: p }; return p; };
   Object.defineProperty(w.navigator, 'clipboard', { value: { writeText: t => { log.clip.push(t); return Promise.resolve(); } }, configurable: true });
-  w.eval(rd('27-fn-bonuscore.js')); w.eval(rd('28-fn-bonusdetail.js'));
+  w.eval(rd('01-fn-splitmulti.js').match(/function isNumTagSale_\(x\)\{[^\n]*\}/)[0]); w.eval(rd('27-fn-bonuscore.js')); w.eval(rd('28-fn-bonusdetail.js'));   // isNumTagSale_: loai STT Pancake
   // du lieu theo anh cua Duyen: don 1011T09/2026 cua ninhnga99, 4 dong san pham
   const d = { orders: [{ baseNgayTao: '2026-10-01', donGoc: true, ghiChu: '1011T09/2026', soDienThoai: '0901111222', khachHang: 'Bich', saleBan: 'ninhnga99, Nguyễn Thị Bích',
     maSanPham: 'HN-LT-Tr-4.5li;CRTT-LT;HDD-LT;CV10K-BV-SIZE 3', sanPham: 'HAT NG LAM THUY,CHARM ROI,HAT DONG DIEU,CHARM BI', soLuong: '1,1,5,4', giaTriDon: 9016000 }] };

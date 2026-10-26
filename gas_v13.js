@@ -4682,17 +4682,24 @@ function _srCloseRateSections_(normRows, filters) {
     }
     pInt2.byCS.forEach(function(r) {
       var k = personKey(r.name);
-      if (!closeAgg[k]) closeAgg[k] = { name: r.name, tongTT: 0, orders: 0 };
+      if (!closeAgg[k]) closeAgg[k] = { name: r.name, tongTT: 0, orders: 0, khMoi: 0, khCu: 0, ttAll: 0, dayMap: {} };
       closeAgg[k].tongTT += useMappedTT ? (r.tongTTMapped || 0) : (r.tongTT || 0);
+      closeAgg[k].khMoi += r.khMoi || 0; closeAgg[k].khCu += r.khCu || 0; closeAgg[k].ttAll += r.tongTT || 0;   // cho cac cot phu cua bieu do: % khach moi / cu, khach TB/ngay
+      (r.dayList || []).forEach(function(dk) { closeAgg[k].dayMap[dk] = true; });
     });
     Object.keys(closeOrdersBySale).forEach(function(k) {
-      if (!closeAgg[k]) closeAgg[k] = { name: orderDisp[k], tongTT: 0, orders: 0 };
+      if (!closeAgg[k]) closeAgg[k] = { name: orderDisp[k], tongTT: 0, orders: 0, khMoi: 0, khCu: 0, ttAll: 0, dayMap: {} };
       closeAgg[k].orders += closeOrdersBySale[k];
     });
     saleCloseRate = Object.keys(closeAgg).map(function(k) {
       var r = closeAgg[k];
+      var days = Object.keys(r.dayMap).length, kh2 = r.khMoi + r.khCu;
       return { name: r.name, held: Math.round(r.tongTT * 100) / 100, closed: r.orders,
-               closeRate: r.tongTT ? Math.round(r.orders / r.tongTT * 1000) / 10 : 0 };
+               closeRate: r.tongTT ? Math.round(r.orders / r.tongTT * 1000) / 10 : 0,
+               // Cot phu (Duyen yeu cau 2026-10-26): % tuong tac la KHACH MOI / KHACH CU (tren khMoi+khCu), so khach tuong tac TB moi ngay (ngay co tuong tac)
+               khMoi: Math.round(r.khMoi * 100) / 100, khCu: Math.round(r.khCu * 100) / 100, days: days,
+               pctMoi: kh2 ? Math.round(r.khMoi / kh2 * 1000) / 10 : 0, pctCu: kh2 ? Math.round(r.khCu / kh2 * 1000) / 10 : 0,
+               perDay: days ? Math.round(r.ttAll / days * 10) / 10 : 0 };
     });
   }
 
@@ -8765,9 +8772,10 @@ function buildPancakeReport_(from, to, split) {
         // "biichnguyen1993" va "Biichnguyen1993 "). Ten hien thi = ban DAU TIEN gap.
         var csKey = _normTxt_(saleName);
         if (!salesCanon[csKey]) salesCanon[csKey] = saleName;
-        if (!byCS[csKey]) byCS[csKey] = { name: salesCanon[csKey], pancakeNames: {}, mapped: mapped, shared: false, khCu:0, khMoi:0, tongTT:0, tongTTMapped:0, tinNhan:0, binhLuan:0, hoiThoaiMoi:0, dhKhMoi:0, dhKhCu:0, tongDH:0 };
+        if (!byCS[csKey]) byCS[csKey] = { name: salesCanon[csKey], pancakeNames: {}, dayKeys: {}, mapped: mapped, shared: false, khCu:0, khMoi:0, tongTT:0, tongTTMapped:0, tinNhan:0, binhLuan:0, hoiThoaiMoi:0, dhKhMoi:0, dhKhCu:0, tongDH:0 };
         var bc = byCS[csKey];
         bc.pancakeNames[nhanVien] = true;
+        if (tongTT > 0) bc.dayKeys[d] = true;   // ngay CO tuong tac cua Sale nay (de tinh khach tuong tac TB/ngay)
         if (mapped) bc.mapped = true; // neu >=1 nguon da khop thi coi la mapped (hiem khi trung ten CS voi ten chua khop)
         if (sales.length > 1) bc.shared = true;
         bc.khCu+=khCu*w; bc.khMoi+=khMoi*w; bc.tongTT+=tongTT*w; bc.tinNhan+=tinNhan*w; bc.binhLuan+=binhLuan*w;
@@ -8783,6 +8791,7 @@ function buildPancakeReport_(from, to, split) {
       r.tyLeCD = r.tongTT ? Math.round(r.tongDH / r.tongTT * 1000) / 10 : 0;
       ['khCu','khMoi','tongTT','tongTTMapped','tinNhan','binhLuan','hoiThoaiMoi','dhKhMoi','dhKhCu','tongDH'].forEach(function(f) { if (r[f] !== undefined) r[f] = Math.round(r[f] * 100) / 100; });
       if (r.pancakeNames) r.pancakeNames = Object.keys(r.pancakeNames);
+      if (r.dayKeys) { r.dayList = Object.keys(r.dayKeys).sort(); r.days = r.dayList.length; delete r.dayKeys; }   // dayList de gop nhieu ten Pancake cua cung 1 nguoi (hop ngay, khong cong don)
       return r;
     });
     // An Page/Sale theo cai dat admin (setSetting hiddenChannels/hiddenSales) — cung 1 danh
