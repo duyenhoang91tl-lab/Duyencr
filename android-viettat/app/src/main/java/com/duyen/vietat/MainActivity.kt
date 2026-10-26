@@ -244,9 +244,9 @@ fun CrmDialog(onDone: () -> Unit, onSave: () -> Unit) {
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Nhập đúng tên CS của bạn (giống tên trong CRM) để thấy cả mục viết tắt riêng của bạn. Mục chung của team luôn có.", style = MaterialTheme.typography.bodySmall)
-                OutlinedTextField(name, { name = it }, singleLine = true, label = { Text("Tên CS của bạn") })
-                OutlinedTextField(web, { web = it }, label = { Text("Địa chỉ web CRM (đã điền sẵn)") })
-                OutlinedTextField(url, { url = it }, label = { Text("Địa chỉ dữ liệu Viết tắt (đã điền sẵn, thường không cần đổi)") })
+                OutlinedTextField(name, { name = it }, singleLine = true, label = { Text("Tên CS của bạn") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(web, { web = it }, label = { Text("Địa chỉ web CRM (đã điền sẵn)") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(url, { url = it }, label = { Text("Địa chỉ dữ liệu Viết tắt (đã điền sẵn, thường không cần đổi)") }, modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = {

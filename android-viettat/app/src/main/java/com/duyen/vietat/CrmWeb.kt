@@ -181,6 +181,19 @@ class CrmWeb(private val act: Activity) {
         }
     }
 
+    // TỰ THỬ LẠI NẠP DỮ LIỆU: nếu 30 giây sau khi tải trang mà CRM vẫn ở màn hình "chưa có dữ liệu" (lần đồng bộ đầu bị ngắt mạng, vd ERR_CONNECTION_ABORTED trên máy Asus),
+    // gọi lại đúng hàm đồng bộ của CRM một lần. Không làm gì nếu CRM đã có dữ liệu hoặc đang ở màn hình đăng nhập.
+    private val retryJs = """
+(function(){
+  try {
+    var ev = document.getElementById('empty-view'), dv = document.getElementById('data-view'), lg = document.getElementById('login-overlay');
+    if (lg && lg.classList.contains('show')) return 'đang đăng nhập';
+    if (ev && dv && getComputedStyle(ev).display !== 'none' && getComputedStyle(dv).display === 'none' && typeof syncFromGS === 'function') { syncFromGS({ manual: true }); return 'đã gọi lại đồng bộ'; }
+    return 'không cần';
+  } catch (e) { return 'lỗi ' + e.message; }
+})()
+"""
+
     private fun probeDecode(raw: String?): String = try { org.json.JSONTokener(raw ?: "null").nextValue()?.toString() ?: "(rỗng)" } catch (e: Exception) { raw ?: "(lỗi đọc)" }
     fun probe() { web.evaluateJavascript(probeJs) { r -> log("QUÉT TRANG:\n" + probeDecode(r)) } }
 
@@ -241,6 +254,7 @@ class CrmWeb(private val act: Activity) {
             override fun onPageFinished(view: WebView, url: String?) {
                 view.evaluateJavascript(hookJs, null); view.evaluateJavascript(vhFixJs, null); this@CrmWeb.canBack = view.canGoBack()
                 view.postDelayed({ probe() }, 7000)   // 7 giây sau khi tải: tự quét trang để biết vì sao trắng
+                view.postDelayed({ view.evaluateJavascript(retryJs) { r -> val m = probeDecode(r); if (!m.contains("không cần")) log("TỰ THỬ LẠI (30 giây): $m") } }, 30000)
             }
             override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) { this@CrmWeb.canBack = view.canGoBack() }
             override fun onReceivedError(view: WebView, request: WebResourceRequest, e: WebResourceError) {
