@@ -37,7 +37,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `CSKH_DUYEN_SHEET_KEY_`, `CSKH_DUYEN_FIELDS_`, `XOA_SDT_BUDGET_MS_`
 
 ## 07_SalesReportA.gs
-- Hàm: `getSalesReportOptions_`, `_dtIsExchangeOrder_`, `_dtOrderRevenue_`, `_srCloseRateSections_`, `_extractPageIdFromNguonDon_`, `_extractPageNameFromNguonDon_`, `buildSalesReportA_`
+- Hàm: `getSalesReportOptions_`, `_dtIsExchangeOrder_`, `_dtOrderRevenue_`, `_srCloseRateSections_`, `_extractPageIdFromNguonDon_`, `_extractPageNameFromNguonDon_`, `_drillPairs_`, `_drillPairsObj_`, `buildSalesReportA_`
 
 ## 08_SaleKPI_FailedOrders.gs
 - Hàm: `readSaleKpiConfig_`, `_ymAdd_`, `_ymMonthsBetween_`, `_ymFirstDay_`, `_ymLastDay_`, `_todayYm_`, `_computeSaleMonthlyRevenue_`, `_computeSaleTierTimeline_`, `buildSaleKpiReport_`, `buildFailedOrderReport_`
@@ -71,16 +71,16 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `_PSHEET_STOPWORDS_`, `DEPT_LIST_DEFAULT_`, `PHONGBAN_NHANSU_NEW_`, `PHONGBAN_NHANSU_`, `SH_HOSO_NS`, `HOSO_NS_HEADERS`, `_DRIVE_IMG_MAX_BYTES_`
 
 ## 16_BannedWords_AI.gs
-- Hàm: `_bannedCfg_`, `_bannedCacheClear_`, `readBannedWordsList_`, `readBannedWordsListSheet_`, `_bannedWordsPromptBlock_`, `_priceCatalogRowsCached_`, `priceAsk_`, `_priceQaSystemPrompt_`, `priceQa_`, `_crmAskPriceBlock_`, `_buildAISystemPrompt_`, `_aiOpenAICompat_`, `_aiGemini_`, `_crmAskSystemPrompt_`, `callAI_`, `_maskKey_`, `diagApiKeys`, `testScript`
-- Hằng/biến: `BANNED_WORDS_SS_ID`, `BANNED_WORDS_GID`
+- Hàm: `_goldCfg_`, `_goldCell_`, `_goldNum_`, `readGoldWeights_`, `goldWeightList_`, `_bannedCfg_`, `_bannedCacheClear_`, `readBannedWordsList_`, `readBannedWordsListSheet_`, `_bannedWordsPromptBlock_`, `_priceCatalogRowsCached_`, `priceAsk_`, `_priceQaSystemPrompt_`, `priceQa_`, `_crmAskPriceBlock_`, `_buildAISystemPrompt_`, `_aiOpenAICompat_`, `_aiGemini_`, `_crmAskSystemPrompt_`, `callAI_`, `_maskKey_`, `diagApiKeys`, `testScript`
+- Hằng/biến: `BANNED_WORDS_SS_ID`, `BANNED_WORDS_GID`, `GOLD_WEIGHT_SS_ID`, `GOLD_WEIGHT_GID`, `GOLD_CACHE_KEY_`
 
 ## 17_Broadcast_FollowUp.gs
 - Hàm: `getBroadcastSheet_`, `readBroadcasts_`, `_noPromoSet_`, `_dropNoPromoPhones_`, `saveBroadcast_`, `broadcastMark_`, `broadcastQueueForCS_`, `uploadBroadcastImage_`, `broadcastSetStatus_`, `broadcastCancel_`, `fuSourceAllowed_`, `_fuConfig_`, `readProductCodeMapFromSheet_`, `getProductCodeMap_`, `productCodeFromText_`, `readFollowUpTemplates_`, `listFollowUpTemplates_`, `saveFollowUpTemplates_`, `renderFollowUpTemplate_`, `_fuResultClean_`, `saveFuResults_`, `readFuResults_`, `readFollowUpLogKeys_`, `appendFollowUpLogRows_`, `readZaloScanByPhone_`, `dedupeCare_`, `runDedupeCare`, `saveZaloScan_`, `runFollowUpScan_`, `runFollowUpScanTrigger`
 - Hằng/biến: `SH_BROADCAST`, `BROADCAST_HEADERS`, `BROADCAST_FOLDER_ID`, `SH_FU_TEMPLATE`, `FU_TEMPLATE_HEADERS`, `SH_FU_LOG`, `FU_LOG_HEADERS`, `SH_ZALO_SCAN`, `ZALO_SCAN_HEADERS`, `FU_CHECKPOINTS`, `FU_START`, `FU_SOURCES`, `PRODUCT_CODE_MAP_`, `_productCodeMapCache_`, `SH_FU_RESULTS`, `FU_RESULT_HEADERS`, `FU_RESULT_KEYS_`
 
 ## 18_Tasks_Menh_MsgTpl.gs
-- Hàm: `_taskJson_`, `_taskFromRow_`, `_taskToRow_`, `_taskFind_`, `readTasks_`, `saveTaskEntry_`, `deleteTask_`, `readTaskComments_`, `_notifIsWordCh_`, `_notifParseMentions_`, `_notifyMentions_`, `readNotifications_`, `markNotifRead_`, `saveTaskComment_`, `_taskActor_`, `_taskCancelPending_`, `_taskInList_`, `_taskMentionNames_`, `_notifyTaskEvent_`, `_taskSysComment_`, `_taskFlowSeed_`, `readTaskFlows_`, `_taskFlowById_`, `saveTaskFlow_`, `deleteTaskFlow_`, `readTaskRequests_`, `_taskDoAdvance_`, `taskAdvance_`, `taskReassign_`, `taskRequestDecide_`, `menhFromYear_`, `buildMenhRows_`, `ensureMenhSheedSeeded_`, `ensureCannedSheetSeeded_`, `getMessengerKnowledge_`, `_aiExId_`, `readAIExamples_`, `saveAIExample_`, `deleteAIExample_`, `saveCannedResponse_`, `deleteCannedResponse_`, `_tplCaller_`, `_tplRowToObj_`, `_tplFoldAcc_`, `_tplCatalogIndex_`, `_tplClassify_`, `_tplGroupList_`, `_tplOwns_`, `readMessageTemplates_`, `saveMessageTemplate_`, `_tplPromptBlock_`, `deleteMessageTemplate_`, `approveMessageTemplate_`, `_vtSame_`, `_vtRowToObj_`, `readVietTat_`, `saveVietTat_`, `deleteVietTat_`, `_tplNotifyPending_`, `_tplNotifClear_`, `tplPendingList_`
-- Hằng/biến: `SH_TASK`, `TASK_HEADERS`, `SH_TASK_COMMENT`, `TASK_COMMENT_HEADERS`, `SH_NOTIF`, `NOTIF_HEADERS`, `SH_TASK_FLOW`, `TASK_FLOW_HEADERS`, `SH_TASK_REQ`, `TASK_REQ_HEADERS`, `SH_MENH`, `SH_CANNED`, `MENH_DEFAULT_ROWS`, `MENH_SHEET_MARK`, `CANNED_DEFAULT_ROWS`, `SH_MSG_TPL`, `MSG_TPL_HEADERS`, `MSG_TPL_APPROVER_ROLES_`, `MSG_TPL_STATUS_`, `_tplCatIdxMemo_`, `MSG_TPL_CAT_CACHE_KEY_`, `SH_VIETTAT`, `VIETTAT_HEADERS`
+- Hàm: `_taskJson_`, `_taskFromRow_`, `_taskToRow_`, `_taskFind_`, `readTasks_`, `saveTaskEntry_`, `deleteTask_`, `readTaskComments_`, `_notifIsWordCh_`, `_notifParseMentions_`, `_notifyMentions_`, `readNotifications_`, `markNotifRead_`, `saveTaskComment_`, `_taskActor_`, `_taskCancelPending_`, `_taskInList_`, `_taskMentionNames_`, `_notifyTaskEvent_`, `_taskSysComment_`, `_taskFlowSeed_`, `readTaskFlows_`, `_taskFlowById_`, `saveTaskFlow_`, `deleteTaskFlow_`, `readTaskRequests_`, `_taskDoAdvance_`, `taskAdvance_`, `taskReassign_`, `taskRequestDecide_`, `menhFromYear_`, `buildMenhRows_`, `ensureMenhSheedSeeded_`, `ensureCannedSheetSeeded_`, `getMessengerKnowledge_`, `_aiExId_`, `readAIExamples_`, `saveAIExample_`, `deleteAIExample_`, `saveCannedResponse_`, `deleteCannedResponse_`, `_tplCaller_`, `_tplRowToObj_`, `_tplFoldAcc_`, `_tplCatalogIndex_`, `_tplClassify_`, `_tplGroupList_`, `_tplOwns_`, `readMessageTemplates_`, `saveMessageTemplate_`, `_tplPromptBlock_`, `deleteMessageTemplate_`, `approveMessageTemplate_`, `_vtNhom_`, `_vtImgsFromCell_`, `_vtSame_`, `_vtRowToObj_`, `readVietTat_`, `saveVietTat_`, `deleteVietTat_`, `_vtKnownImageIds_`, `_vtFolder_`, `vietTatUploadImage_`, `_vtCheckImage_`, `vietTatResolveImages_`, `vietTatImage_`, `_tplNotifyPending_`, `_tplNotifClear_`, `tplPendingList_`
+- Hằng/biến: `SH_TASK`, `TASK_HEADERS`, `SH_TASK_COMMENT`, `TASK_COMMENT_HEADERS`, `SH_NOTIF`, `NOTIF_HEADERS`, `SH_TASK_FLOW`, `TASK_FLOW_HEADERS`, `SH_TASK_REQ`, `TASK_REQ_HEADERS`, `SH_MENH`, `SH_CANNED`, `MENH_DEFAULT_ROWS`, `MENH_SHEET_MARK`, `CANNED_DEFAULT_ROWS`, `SH_MSG_TPL`, `MSG_TPL_HEADERS`, `MSG_TPL_APPROVER_ROLES_`, `MSG_TPL_STATUS_`, `_tplCatIdxMemo_`, `MSG_TPL_CAT_CACHE_KEY_`, `SH_VIETTAT`, `VIETTAT_HEADERS`, `VIETTAT_MAX_IMAGES`
 
 ## 19_BannedList_MktChecklist.gs
 - Hàm: `readBannedWords_`, `readBannedWordsSheet_`, `_mktMonthOf_`, `readMktConfigAll_`, `mktConfigForMonth_`, `_mktCleanCfgEntry_`, `_mktCheckPass_`, `saveMktChecklistConfig_`, `_mktTagNum_`, `_mktTagRows_`, `buildMktChecklistReport_`
@@ -132,5 +132,9 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 
 ## 31_SplitOrders.gs
 - Hàm: `_splitSales_`, `_splitIdentityFor_`, `_splitRowFinder_`, `_splitSaleSet_`, `_splitCompareSales_`, `_splitDayDiff_`, `_splitPhoneCandidates_`, `_splitFbKey_`, `_splitFbRead_`, `_splitAttachFeedback_`, `saveSplitFeedback_`, `_splitScope_`, `_splitCSV_`, `_splitRange_`, `_splitFilters_`, `_splitRound_`, `splitOrderReport_`, `splitOrderMine_`, `_splitDmy_`, `splitOrderDetail_`, `splitDoGet_`
-- Hằng/biến: `SPLIT_ORDER_MAX_ROWS_`, `SPLIT_GET_ACTIONS_`, `SPLIT_UNASSIGNED_`, `SH_SPLIT_FB_`
+- Hằng/biến: `SPLIT_ORDER_MAX_ROWS_`, `SPLIT_DETAIL_MAX_`, `SPLIT_GET_ACTIONS_`, `SPLIT_POST_ACTIONS_`, `SPLIT_UNASSIGNED_`, `SH_SPLIT_FB_`
+
+## 32_ChatCoach.gs
+- Hàm: `_coachNorm_`, `_coachRe_`, `_coachAttOk_`, `_coachSpecOk_`, `_coachAge_`, `coachRules_`, `coachCtkm_`, `coachEval_`, `coachBuildResult_`, `chatCoach_`, `splitOrderExportSheet_`, `splitDoPost_`
+- Hằng/biến: `CHAT_COACH_SECTION_`, `COACH_STEPS_`, `COACH_RE_PRICE_`, `COACH_RE_PROMO_`, `COACH_RE_BIRTH_`, `COACH_RE_ORDER_`, `COACH_RE_SIZE_ASK_`, `COACH_RE_SIZE_GIVE_`, `COACH_RULES_`
 

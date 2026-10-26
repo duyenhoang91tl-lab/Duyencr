@@ -32,9 +32,31 @@ import java.util.UUID
 import kotlin.concurrent.thread
 
 class MainActivity : ComponentActivity() {
+    private lateinit var crm: CrmWeb
     override fun onCreate(b: Bundle?) {
         super.onCreate(b); Store.init(this)
-        setContent { MaterialTheme { App() } }
+        crm = CrmWeb(this)
+        if (Crm.configured(this)) thread { Crm.pull(this) }   // nạp sẵn kho Viết tắt từ CRM để gõ tắt dùng được ngay
+        if (b == null) crm.load() else crm.web.restoreState(b)
+        setContent { MaterialTheme { Root(crm) } }
+    }
+    override fun onSaveInstanceState(out: Bundle) { super.onSaveInstanceState(out); crm.web.saveState(out) }
+    override fun onPause() { super.onPause(); crm.web.onPause() }
+    override fun onResume() { super.onResume(); crm.web.onResume() }
+    override fun onDestroy() { crm.web.destroy(); super.onDestroy() }
+}
+
+/** App "Duyên CRM": tab CRM (web CRM trong app) + tab Viết tắt (gõ tắt, dữ liệu lấy từ CRM). */
+@Composable
+fun Root(crm: CrmWeb) {
+    var tab by remember { mutableStateOf(0) }
+    Scaffold(bottomBar = {
+        NavigationBar {
+            NavigationBarItem(tab == 0, { tab = 0 }, { Text("🏠") }, label = { Text("CRM") })
+            NavigationBarItem(tab == 1, { tab = 1 }, { Text("⌨") }, label = { Text("Viết tắt") })
+        }
+    }) { pad ->
+        Box(Modifier.padding(pad).fillMaxSize()) { if (tab == 0) CrmWebScreen(crm) else App() }
     }
 }
 
@@ -217,17 +239,19 @@ fun CrmDialog(onDone: () -> Unit, onSave: () -> Unit) {
     val p = Crm.prefs(ctx)
     var url by remember { mutableStateOf(Crm.url(ctx)) }
     var name by remember { mutableStateOf(Crm.name(ctx)) }
+    var web by remember { mutableStateOf(Crm.webUrl(ctx)) }
     AlertDialog(onDismissRequest = onDone, title = { Text("Kết nối CRM") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Nhập đúng tên CS của bạn (giống tên trong CRM) để thấy cả mục viết tắt riêng của bạn. Mục chung của team luôn có.", style = MaterialTheme.typography.bodySmall)
                 OutlinedTextField(name, { name = it }, singleLine = true, label = { Text("Tên CS của bạn") })
-                OutlinedTextField(url, { url = it }, label = { Text("Địa chỉ CRM (đã điền sẵn, thường không cần đổi)") })
+                OutlinedTextField(web, { web = it }, label = { Text("Địa chỉ web CRM (đã điền sẵn)") })
+                OutlinedTextField(url, { url = it }, label = { Text("Địa chỉ dữ liệu Viết tắt (đã điền sẵn, thường không cần đổi)") })
             }
         },
         confirmButton = {
             TextButton({
-                if (name.isNotBlank()) { p.edit().putString("url", url.trim()).putString("name", name.trim()).apply(); onSave() }
+                if (name.isNotBlank()) { p.edit().putString("url", url.trim()).putString("web", web.trim()).putString("name", name.trim()).apply(); onSave() }
                 onDone()
             }) { Text("Lưu & cập nhật") }
         },

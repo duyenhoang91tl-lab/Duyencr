@@ -1,0 +1,17 @@
+{
+  "name": "Viết tắt — Duyên CRM",
+  "short_name": "Viết tắt",
+  "description": "Tin nhắn viết tắt của team (cùng kho với CRM), chọn nhiều tin + hình rồi chép/chia sẻ",
+  "start_url": "viettat.html",
+  "scope": "./viettat.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f6f7f9",
+  "theme_color": "#1e66f5",
+  "lang": "vi",
+  "icons": [
+    { "src": "viettat-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "viettat-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "viettat-icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

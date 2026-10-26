@@ -83,55 +83,28 @@ class ExpanderService : AccessibilityService() {
             .firstOrNull { !(it.desc && it.click) }?.s
     }
 
+    /** Màn chọn TO (Picker): cuộn, chọn nhiều chữ + hình, bấm đúp hình để phóng/thu. Không giới hạn số lựa chọn như popup cũ (≤8). */
     private fun show(n: AccessibilityNodeInfo, text: String, word: String, hits: List<Snippet>, name: String?) {
         hide()
         val d = resources.displayMetrics.density
         fun dp(v: Int) = (v * d).toInt()
-        val box = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = GradientDrawable().apply { setColor(0xFFFFFFFF.toInt()); cornerRadius = 16 * d; setStroke(dp(1), 0xFFCCCCCC.toInt()) }
-            elevation = 8 * d
-        }
-        box.addView(TextView(this).apply {
-            this.text = (if (name != null) "Khách: ${Store.given(name)}  ·  " else "") + "Chọn nội dung  ·  ✕"; textSize = 12f; setTextColor(0xFF888888.toInt())
-            setPadding(dp(16), dp(8), dp(16), dp(4)); setOnClickListener { hide() }
-        })
-        hits.flatMap { it.options }.take(8).forEach { opt ->
-            val kind = kindOf(opt)
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(16), dp(10), dp(16), dp(10))
-            }
-            if (kind == "img") {
-                val bmp = runCatching {
-                    BitmapFactory.decodeFile(File(Store.mediaDir, mediaNameOf(opt)).absolutePath,
-                        BitmapFactory.Options().apply { inSampleSize = 8 })
-                }.getOrNull()
-                row.addView(ImageView(this).apply {
-                    setImageBitmap(bmp); scaleType = ImageView.ScaleType.CENTER_CROP
-                    layoutParams = LinearLayout.LayoutParams(dp(48), dp(48)).apply { rightMargin = dp(12) }
-                })
-            }
-            row.addView(TextView(this).apply {
-                this.text = if (kind == null) Store.resolve(opt, name) else labelOf(opt); maxLines = 2; ellipsize = TextUtils.TruncateAt.END
-                textSize = 15f; setTextColor(0xFF111111.toInt())
-            })
-            row.setOnClickListener {
-                if (kind == null) insertText(n, text, word, opt, name) else sendMedia(n, text, word, opt, share = kind == "aud")
-                hide()
-            }
-            if (kind != null) row.setOnLongClickListener { sendMedia(n, text, word, opt, share = true); hide(); true }
-            box.addView(row)
-        }
+        val sh = resources.displayMetrics.heightPixels
         val r = Rect().also { n.getBoundsInScreen(it) }
+        // Cao hết cỡ phần màn hình nằm TRÊN ô gõ (để không che ô gõ), tối thiểu 260dp, tối đa 80% màn hình
+        val heightPx = (r.top - dp(24)).coerceIn(dp(260), (sh * 0.8f).toInt())
+        val picker = Picker(this, hits.flatMap { it.options }, name, heightPx,
+            onInsert = { sel -> applySelection(n, text, word, sel, name, share = false); hide() },
+            onShare = { sel -> applySelection(n, text, word, sel, name, share = true); hide() },
+            onClose = { hide() })
+        val box = picker.build()
         val lp = WindowManager.LayoutParams(
-            (resources.displayMetrics.widthPixels * 0.92).toInt(), WindowManager.LayoutParams.WRAP_CONTENT,
+            (resources.displayMetrics.widthPixels * 0.96).toInt(), heightPx,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-            y = (resources.displayMetrics.heightPixels - r.top + dp(8)).coerceAtLeast(dp(80))
+            y = (sh - r.top + dp(8)).coerceAtLeast(dp(80))
         }
         wm.addView(box, lp); popup = box
     }
@@ -155,26 +128,35 @@ class ExpanderService : AccessibilityService() {
         })
     }
 
-    /** share=false: sao chép + dán vào ô chat. share=true: mở bảng chia sẻ của Android. */
-    private fun sendMedia(n: AccessibilityNodeInfo, text: String, word: String, opt: String, share: Boolean) {
-        val f = File(Store.mediaDir, mediaNameOf(opt))
-        if (!f.exists()) { Toast.makeText(this, "Không tìm thấy file", Toast.LENGTH_SHORT).show(); return }
-        val uri = FileProvider.getUriForFile(this, "$packageName.files", f)
-        val isImg = kindOf(opt) == "img"
-        setText(n, text.dropLast(word.length))
-        (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager)
-            .setPrimaryClip(ClipData.newUri(contentResolver, "viettat", uri))
-        if (share) {
-            val send = Intent(Intent.ACTION_SEND).apply {
-                type = if (isImg) "image/*" else "audio/*"
-                putExtra(Intent.EXTRA_STREAM, uri); clipData = ClipData.newRawUri("", uri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            startActivity(Intent.createChooser(send, "Gửi qua").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        } else {
+    /**
+     * Áp các lựa chọn đã chọn (theo thứ tự trong danh sách). Chữ: 1 lựa chọn chữ → chèn như cũ (con trỏ nhảy vào chỗ {…} còn trống);
+     * nhiều chữ → nối bằng xuống dòng. Hình/ghi âm: Android chỉ dán được 1 hình vào ô chat nên 1 hình (nút Chèn) → sao chép + dán;
+     * nhiều hình, có ghi âm, hoặc bấm Chia sẻ → mở bảng chia sẻ của Android (ACTION_SEND / ACTION_SEND_MULTIPLE).
+     */
+    private fun applySelection(n: AccessibilityNodeInfo, text: String, word: String, sel: List<String>, name: String?, share: Boolean) {
+        val texts = sel.filter { kindOf(it) == null }
+        val media = sel.filter { kindOf(it) != null }
+        if (texts.size == 1 && media.isEmpty()) { insertText(n, text, word, texts[0], name); return }
+        setText(n, text.dropLast(word.length) + texts.joinToString("\n") { Store.resolve(it, name) })
+        if (media.isEmpty()) return
+        val uris = media.mapNotNull { m ->
+            File(Store.mediaDir, mediaNameOf(m)).takeIf { it.exists() }?.let { FileProvider.getUriForFile(this, "$packageName.files", it) }
+        }
+        if (uris.isEmpty()) { Toast.makeText(this, "Không tìm thấy file", Toast.LENGTH_SHORT).show(); return }
+        val allImg = media.all { kindOf(it) == "img" }
+        (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newUri(contentResolver, "viettat", uris[0]))
+        if (uris.size == 1 && allImg && !share) {
             n.performAction(AccessibilityNodeInfo.ACTION_PASTE)
             Toast.makeText(this, "Đã dán. Nếu chưa thấy, nhấn giữ ô chat > Dán", Toast.LENGTH_LONG).show()
+            return
         }
+        val send = Intent(if (uris.size == 1) Intent.ACTION_SEND else Intent.ACTION_SEND_MULTIPLE).apply {
+            type = if (allImg) "image/*" else if (media.all { kindOf(it) == "aud" }) "audio/*" else "*/*"
+            if (uris.size == 1) putExtra(Intent.EXTRA_STREAM, uris[0]) else putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+            clipData = ClipData.newRawUri("", uris[0]).also { cd -> for (k in 1 until uris.size) cd.addItem(ClipData.Item(uris[k])) }
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        startActivity(Intent.createChooser(send, "Gửi qua").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
     private fun hide() { popup?.let { runCatching { wm.removeView(it) } }; popup = null; lastText = "" }

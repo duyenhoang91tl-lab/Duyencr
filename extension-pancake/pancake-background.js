@@ -438,6 +438,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // Viet tat kem ANH: lay byte 1 anh Drive co san (server chi tra anh thuoc muc viet tat nguoi nay duoc thay).
+  if (msg?.type === "GET_VIETTAT_IMAGE") {
+    handleGetVietTatImage(msg.id)
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
   if (msg?.type === "GET_MESSAGE_TEMPLATES") {
     handleGetMessageTemplates()
       .then((data) => sendResponse({ ok: true, data }))
@@ -1327,6 +1335,20 @@ async function handleGetVietTat() {
   const data = await res.json();
   if (data.error) throw new Error(data.error);
   return { snippets: Array.isArray(data.snippets) ? data.snippets : [] };
+}
+
+async function handleGetVietTatImage(id) {
+  id = String(id || "");
+  if (!/^[A-Za-z0-9_-]{15,}$/.test(id)) throw new Error("ID ảnh không hợp lệ.");
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+  const sep = cfg.gasUrl.includes("?") ? "&" : "?";
+  const res = await fetch(cfg.gasUrl + sep + "action=vietTatImage&id=" + encodeURIComponent(id) + "&by=" + encodeURIComponent(cfg.csName || ""), { redirect: "follow" });
+  const data = await res.json();
+  if (data.error || data.ok === false) throw new Error(data.error || "Không lấy được ảnh.");
+  if (!data.base64) throw new Error("Máy chủ không trả dữ liệu ảnh.");
+  return { base64: data.base64, mimeType: data.mimeType || "image/jpeg" };
 }
 
 // Thu vien mau tin nhan tu van khach — action:'messageTemplates' (GET, chi doc). Form them/sua/
