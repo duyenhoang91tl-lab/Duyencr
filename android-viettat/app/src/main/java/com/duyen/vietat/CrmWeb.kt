@@ -232,7 +232,14 @@ class CrmWeb(private val act: Activity) {
             }
             override fun onShowFileChooser(w: WebView, cb: ValueCallback<Array<Uri>>, p: FileChooserParams): Boolean {
                 fileCb?.onReceiveValue(null); fileCb = cb
-                return try { launchChooser?.invoke(p.createIntent()); launchChooser != null } catch (e: Exception) { fileCb = null; false }
+                return try {
+                    val intent = p.createIntent()
+                    // NGUYEN NHAN GOC khong chon duoc NHIEU anh: FileChooserParams.createIntent() chi dung ACTION_GET_CONTENT + loai file,
+                    // KHONG tu dat EXTRA_ALLOW_MULTIPLE (du o <input> co "multiple" va p.mode = MODE_OPEN_MULTIPLE) nen bo chon anh chi cho chon 1.
+                    // parseResult() o onChooserResult da doc duoc ca ClipData nhieu anh, chi thieu buoc bat chon nhieu nay.
+                    if (p.mode == WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE) intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                    launchChooser?.invoke(intent); launchChooser != null
+                } catch (e: Exception) { fileCb = null; false }
             }
             override fun onJsAlert(v: WebView, url: String?, message: String?, r: JsResult): Boolean {
                 AlertDialog.Builder(act).setMessage(message).setCancelable(false).setPositiveButton("OK") { _, _ -> r.confirm() }.show(); return true
