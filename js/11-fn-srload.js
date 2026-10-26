@@ -554,6 +554,19 @@ function srPickTeam(teamId, saleField, domId){
   renderSalesReportTab();
 }
 
+// Tỷ lệ chốt CHUNG của từng Page (cộng đơn chốt ÷ cộng tương tác của MỌI sale trên Page đó) — hiện ngay trên tiêu đề cột của bảng "Tỷ lệ chốt theo Sale — từng Page"
+// (Duyên yêu cầu 2026-10-25). Lấy cả sale đang bị ô tìm kiếm ẩn để tỷ lệ Page không đổi theo bộ lọc tên. Trả {pages:[{closed,held,rate}], all:{closed,held,rate}}.
+function _srPageTotals_(scbp){
+  var rate = function(c,h){ return h ? Math.round(c / h * 1000) / 10 : 0; };
+  var pg = scbp.pages.map(function(p){ var c = 0, h = 0; (scbp.rows||[]).forEach(function(r){ var x = r.perPage && r.perPage[p.kenhBan]; if (x && x.held){ c += Number(x.closed)||0; h += Number(x.held)||0; } }); return { closed:c, held:h, rate:rate(c,h) }; });
+  var ac = 0, ah = 0; (scbp.rows||[]).forEach(function(r){ if (r.total){ ac += Number(r.total.closed)||0; ah += Number(r.total.held)||0; } });
+  return { pages: pg, all: { closed:ac, held:ah, rate:rate(ac,ah) } };
+}
+function _srPageThHtml_(scbp){
+  var T = _srPageTotals_(scbp), sub = function(t){ return t.held ? '<div style="font-weight:600;color:var(--green,#15803d);white-space:nowrap">'+t.rate+'% <span style="font-weight:400;color:var(--muted);font-size:10.5px">('+t.closed+'/'+t.held+')</span></div>' : '<div style="font-weight:400;color:var(--muted)">—</div>'; };
+  return scbp.pages.map(function(p,i){ return '<th style="text-align:right">'+esc(p.pageName)+sub(T.pages[i])+'</th>'; }).join('') +
+    '<th style="text-align:right"><b>Tổng cá nhân</b>'+sub(T.all)+'</th>';
+}
 function renderSalesReportTab(){
   var wrap = document.getElementById('salesreport-wrap');
   if (!wrap) return;
@@ -688,14 +701,29 @@ function _srCloseRateBarHtml_(rows, searchTerm, unitLabel, excluded){
   function colorFor(p){ return _crColorFor_(p); }
   // Độ dài cột tính theo TỶ LỆ SO VỚI NGƯỜI CAO NHẤT (không phải so với 100%): tỷ lệ chốt thật chỉ 0–3% nên trước đây mọi cột chỉ rộng 1–3% khung → chỉ còn chấm tròn nhỏ.
   var maxRate = filtered.reduce(function(m,r){ return Math.max(m, r.closeRate||0); }, 0);
+  // Cột phụ (Duyên yêu cầu 2026-10-26): chỉ biểu đồ theo SALE mới có (dữ liệu từ backend: pctMoi/pctCu/perDay). Cột chốt ngắn lại để nhường chỗ; dòng "TB TOÀN TEAM" luôn ở trên cùng để so sánh.
+  var extra = filtered.some(function(r){ return r.days > 0; });
+  var GRID = 'display:grid;grid-template-columns:112px minmax(70px,1fr) 100px 54px 54px 62px;align-items:center;gap:8px;margin-bottom:7px';
   var bars = filtered.map(function(r){
     var w = maxRate > 0 ? Math.max(r.closeRate > 0 ? 3 : 0, Math.min(100, r.closeRate/maxRate*100)) : 0;
-    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">'+
-      '<div style="width:112px;font-size:11.5px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(r.name)+'">'+esc(r.name)+'</div>'+
-      '<div style="flex:1;background:var(--surface2);border-radius:4px;overflow:hidden;height:15px">'+
-      '<div style="width:'+w+'%;height:100%;background:'+colorFor(r.closeRate)+';border-radius:4px"></div></div>'+
-      '<div style="width:104px;font-size:11px;color:var(--muted);white-space:nowrap"><b style="color:var(--text)">'+r.closeRate+'%</b> ('+r.closed+'/'+r.held+')</div></div>';
+    var nameCell = '<div style="font-size:11.5px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(r.name)+'">'+esc(r.name)+'</div>';
+    var barCell = '<div style="background:var(--surface2);border-radius:4px;overflow:hidden;height:15px"><div style="width:'+w+'%;height:100%;background:'+colorFor(r.closeRate)+';border-radius:4px"></div></div>';
+    var numCell = '<div style="font-size:11px;color:var(--muted);white-space:nowrap"><b style="color:var(--text)">'+r.closeRate+'%</b> ('+r.closed+'/'+r.held+')</div>';
+    if (!extra) return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><div style="width:112px;font-size:11.5px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(r.name)+'">'+esc(r.name)+'</div><div style="flex:1;background:var(--surface2);border-radius:4px;overflow:hidden;height:15px"><div style="width:'+w+'%;height:100%;background:'+colorFor(r.closeRate)+';border-radius:4px"></div></div><div style="width:104px;font-size:11px;color:var(--muted);white-space:nowrap"><b style="color:var(--text)">'+r.closeRate+'%</b> ('+r.closed+'/'+r.held+')</div></div>';
+    return '<div style="'+GRID+'">'+nameCell+barCell+numCell+_srCrExtraCells_(r)+'</div>';
   }).join('');
+  if (extra) {
+    var kn = filtered.reduce(function(a,r){ return a + (r.khMoi||0); }, 0), kc = filtered.reduce(function(a,r){ return a + (r.khCu||0); }, 0);
+    var withDays = filtered.filter(function(r){ return r.days > 0; });
+    var team = { pctMoi: (kn+kc) ? Math.round(kn/(kn+kc)*1000)/10 : 0, pctCu: (kn+kc) ? Math.round(kc/(kn+kc)*1000)/10 : 0,
+      perDay: withDays.length ? Math.round(withDays.reduce(function(a,r){ return a + (r.perDay||0); }, 0)/withDays.length*10)/10 : 0, days: 1 };
+    var wT = maxRate > 0 ? Math.min(100, avgRate/maxRate*100) : 0;
+    var head = '<div style="'+GRID.replace('align-items:center','align-items:end').replace('margin-bottom:7px','margin-bottom:4px')+';font-size:10.5px;color:var(--muted);line-height:1.15"><div></div><div></div><div>Tỷ lệ chốt</div><div style="text-align:right" title="Số tương tác là KHÁCH MỚI ÷ (khách mới + khách cũ)">% khách mới</div><div style="text-align:right" title="Số tương tác là KHÁCH CŨ ÷ (khách mới + khách cũ)">% khách cũ</div><div style="text-align:right" title="Tổng tương tác Pancake ÷ số ngày có tương tác của Sale đó">Khách/ ngày</div></div>';
+    var teamRow = '<div style="'+GRID+';background:var(--surface2);border-radius:6px;padding:5px 0;margin-bottom:9px"><div style="font-size:11.5px;font-weight:700;text-align:right">TB TOÀN TEAM</div>'+
+      '<div style="background:var(--surface);border-radius:4px;overflow:hidden;height:15px"><div style="width:'+wT+'%;height:100%;background:#334155;border-radius:4px"></div></div>'+
+      '<div style="font-size:11px;color:var(--muted);white-space:nowrap"><b style="color:var(--text)">'+avgRate+'%</b> ('+totClosed+'/'+totHeld+')</div>'+_srCrExtraCells_(team, true)+'</div>';
+    bars = '<div style="overflow-x:auto"><div style="min-width:560px">'+head+teamRow+bars+'</div></div>';
+  }
   var isAdmin = currentUser.role === 'admin' || currentUser.role === 'demo';
   var legend = _srCrLegendHtml_(lv);
   var editBtn = isAdmin ? ' &nbsp;<a href="javascript:void(0)" onclick="_srToggleCloseRateEdit(this)" style="font-size:10.5px;color:var(--muted);text-decoration:underline">✎ sửa mốc</a>' : '';
@@ -704,6 +732,10 @@ function _srCloseRateBarHtml_(rows, searchTerm, unitLabel, excluded){
     (isAdmin ? _srCrFormHtml_(lv) : '')+
     orphanHtml+
     bars+'</div>';
+}
+function _srCrExtraCells_(r, bold){
+  var st = 'font-size:11px;text-align:right;white-space:nowrap;'+(bold ? 'font-weight:700;color:var(--text)' : 'color:var(--text)'), d = r.days > 0;
+  return '<div style="'+st+'">'+(d ? r.pctMoi+'%' : '–')+'</div><div style="'+st+'">'+(d ? r.pctCu+'%' : '–')+'</div><div style="'+st+'" title="'+(bold ? 'Trung bình khách/ngày của mỗi Sale' : 'Trên '+r.days+' ngày có tương tác')+'">'+(d ? r.perDay : '–')+'</div>';
 }
 function _srCrLegendHtml_(lv){
   return lv.map(function(l,i){
@@ -875,8 +907,7 @@ function _srRenderA(d){
     scbpRows.sort(function(a,b){ return b.total.rate - a.total.rate; });
     html += '<div class="dash-section-title" style="margin-top:18px">Tỷ lệ chốt theo Sale — từng Page<span style="font-weight:400;color:var(--muted);font-size:11px">'+saleCloseNote+'</span></div>';
     html += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Sale</th>'+
-      scbp.pages.map(function(p){ return '<th style="text-align:right">'+esc(p.pageName)+'</th>'; }).join('')+
-      '<th style="text-align:right"><b>Tổng cá nhân</b></th></tr></thead><tbody>';
+      _srPageThHtml_(scbp)+'</tr></thead><tbody>';   // tiêu đề cột: tên Page + tỷ lệ chốt chung của Page
     if (!scbpRows.length){
       html += '<tr><td colspan="'+(scbp.pages.length+2)+'" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
     } else {
@@ -1184,8 +1215,7 @@ function _srRenderB(d){
     scbpRowsB_.sort(function(a,b){ return b.total.rate - a.total.rate; });
     html += '<div class="dash-section-title" style="margin-top:18px">Tỷ lệ chốt theo Sale — từng Page<span style="font-weight:400;color:var(--muted);font-size:11px"> (Số đơn Base ÷ Tổng tương tác Pancake'+bSaleCloseNote+')</span></div>';
     html += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Sale</th>'+
-      scbpB_.pages.map(function(p){ return '<th style="text-align:right">'+esc(p.pageName)+'</th>'; }).join('')+
-      '<th style="text-align:right"><b>Tổng cá nhân</b></th></tr></thead><tbody>';
+      _srPageThHtml_(scbpB_)+'</tr></thead><tbody>';   // tiêu đề cột: tên Page + tỷ lệ chốt chung của Page
     if (!scbpRowsB_.length){
       html += '<tr><td colspan="'+(scbpB_.pages.length+2)+'" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
     } else {
