@@ -1093,7 +1093,7 @@ async function _pullCskhLiteOnce_(isManual){
   _cskhLastTry = now;
   try {
     const sepChar = gsUrl.includes('?') ? '&' : '?';
-    const ckR = await fetch(gsUrl + sepChar + 'action=cskhDuyenLite', { redirect: 'follow' });
+    const ckR = await _gsFetchTO_(gsUrl + sepChar + 'action=cskhDuyenLite', 60000);
     const ckText = await ckR.text();
     if (ckText === _lastCkText && !_isEmptyObj(cskhData)) { _cskhPulledAt = Date.now(); _cskhFailCount = 0; return false; }
     let ckJson;
@@ -1116,6 +1116,18 @@ async function _pullCskhLiteOnce_(isManual){
     return true;
   } catch (ckErr) { return _cskhFail_(ckErr.message || 'lỗi mạng'); }
 }
+// fetch co GIOI HAN THOI GIAN cho cac lan keo du lieu cua syncFromGS (2026-10-26). NGUYEN NHAN: cac lan keo (customers/orders/donPhones/cskhDuyenLite/careLeads) chay NOI TIEP nhau
+// va khong co timeout; 1 yeu cau treo (Worker/GAS cham, mang di dong chap chon) lam ca lan dong bo dau tien khong bao gio xong => khung 'Dang tai du lieu' dung mai, khong hien khach.
+// Het gio -> fetch/text() nem loi -> roi vao khoi catch san co (tinh vao bo dem loi dong bo, nhip sau tu thu lai) thay vi treo.
+function _gsFetchTO_(url, ms) {
+  if (typeof AbortController === 'undefined') return fetch(url, { redirect: 'follow' });
+  const ac = new AbortController(), t = setTimeout(function () { try { ac.abort(); } catch (e) {} }, ms);
+  return fetch(url, { redirect: 'follow', signal: ac.signal }).then(function (r) {
+    const ot = r.text.bind(r);
+    r.text = function () { return ot().then(function (x) { clearTimeout(t); return x; }, function (e) { clearTimeout(t); throw e; }); };   // giu dong ho cho toi khi doc xong than phan hoi
+    return r;
+  }, function (e) { clearTimeout(t); throw e; });
+}
 async function syncFromGS(opts) {
   opts = opts || {};
   const pullOrders = opts.pullOrders !== undefined ? opts.pullOrders : _isEmptyObj(customerMap);
@@ -1128,7 +1140,7 @@ async function syncFromGS(opts) {
     const sepChar = gsUrl.includes('?') ? '&' : '?';
     const _wantCareFull = !_careSince || isManual || (Date.now() - _careFullAt) > CARE_FULL_EVERY_MS;
     const careUrl = gsUrl + sepChar + 'action=customers' + (_wantCareFull ? '' : '&since=' + encodeURIComponent(_careSince));
-    const careR = await fetch(careUrl, { redirect: 'follow' });
+    const careR = await _gsFetchTO_(careUrl, 60000);
     const careText = await careR.text();
     let _careSame = false, _isDelta = false;   // _careSame: khong ai sua CareData tu nhip truoc
     let d;
@@ -1163,7 +1175,7 @@ async function syncFromGS(opts) {
     if (pullOrders) {
       try {
         if (isManual) txt('ltext', 'Đang tải đơn hàng từ Google Sheets...');
-        const ordR = await fetch(gsUrl + sepChar + 'action=orders', { redirect: 'follow' });
+        const ordR = await _gsFetchTO_(gsUrl + sepChar + 'action=orders', 75000);
         const ordText = await ordR.text();
         // Chi coi la "khong doi" khi da co khach trong customerMap (sau khi bam xoa du lieu phai nap lai that su)
         const _ordSame = (ordText === _lastOrdersText) && !_isEmptyObj(customerMap);
@@ -1236,7 +1248,7 @@ async function syncFromGS(opts) {
       }
       // ── Tập SĐT có trong "dữ liệu đơn" (chỉ để lọc nguồn, không kéo chi tiết) ──
       try {
-        const dpR = await fetch(gsUrl + sepChar + 'action=donPhones', { redirect: 'follow' });
+        const dpR = await _gsFetchTO_(gsUrl + sepChar + 'action=donPhones', 40000);
         const dpText = await dpR.text();
         // NGUYÊN NHÂN GỐC lag định kỳ: trước đây khối này JSON.parse + dựng lại Set + saveLS (JSON.stringify ghi
         // localStorage, đồng bộ trên luồng chính) 5 map lớn theo SĐT MỖI lần kéo, kể cả khi server trả y hệt lần trước.
@@ -1277,7 +1289,7 @@ async function syncFromGS(opts) {
     // không hiện luôn cho tới khi F5. Giờ kéo độc lập mỗi 3s + phát hiện SĐT mới để ép
     // buildCustomers() đầy đủ ngay khi cần, không phụ thuộc orderCount.
     try {
-      const clR = await fetch(gsUrl + sepChar + 'action=careLeads', { redirect: 'follow' });
+      const clR = await _gsFetchTO_(gsUrl + sepChar + 'action=careLeads', 30000);
       const clText = await clR.text();
       // NGUYÊN NHÂN GỐC lag nền mỗi tick: trước đây mỗi tick đều parse + dựng lại careLeads + saveLS (ghi localStorage đồng bộ)
       // + quét _assignCustMap() dù sheet "KH Chăm sóc mới" không đổi. Nay so chuỗi trả về, y hệt lần trước thì bỏ qua.

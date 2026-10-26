@@ -1040,6 +1040,9 @@ function _srbMenuCats_(){
     saleTeam({state:'gSale', leader:true}, null, function(){ return _srState.saleBOptions || []; });
   } else if (sub === 'L'){
     saleTeam({state:'lSale'}, null, function(){ return _srState.saleBOptions || []; });
+  } else if (sub === 'M'){   // Tổng quan đơn chia (js/50): lọc Sale + Kênh bán (nguồn đơn)
+    saleTeam({state:'mSale', leader:true}, null, function(){ return _srState.saleBOptions || []; });
+    flat('mNguon', 'Kênh bán (nguồn đơn)', '🏷', 'Tìm kênh...', 'mNguon', function(){ return _srState.nguonOptions || []; });
   } else if (sub === 'H'){
     if (_srIsAdmin() || (currentUser && currentUser.role === 'leader')){
       radio('hTeam', 'Team', '👥', 'hTeam', '', function(){ return [['','Tất cả team']].concat((teams||[]).map(function(t){ return t.name || '(chưa đặt tên)'; }).concat(['Chưa có team']).map(function(n){ return [n,n]; })); }, true);
@@ -1074,9 +1077,9 @@ function _srbMenuCats_(){
 function _srbSubCfg_(){
   var sub = (_srState.sub === 'K') ? 'G' : _srState.sub, admin = _srIsAdmin();
   var P = {A:['dateQuick','dateFrom','dateTo'], B:['dateQuick','dateFrom','dateTo'], D:['dDateQuick','dDateFrom','dDateTo'], E:['eDateQuick','eDateFrom','eDateTo'],
-    F:['fDateQuick','fDateFrom','fDateTo'], G:['gDateQuick','gDateFrom','gDateTo'], H:['hDateQuick','hDateFrom','hDateTo'], I:['iDateQuick','iDateFrom','iDateTo'], L:['lDateQuick','lDateFrom','lDateTo']};
-  var lockKey = {A:'sale',B:'bSale',C:'cSale',E:'eSale',F:'fSale',G:'gSale',L:'lSale'}[sub];
-  var c = { sub:sub, date:P[sub] || null, lockKey:lockKey, extra:'', tasks:[], dateAfter:'', leader:(sub === 'E' || sub === 'F' || sub === 'G') };
+    F:['fDateQuick','fDateFrom','fDateTo'], G:['gDateQuick','gDateFrom','gDateTo'], H:['hDateQuick','hDateFrom','hDateTo'], I:['iDateQuick','iDateFrom','iDateTo'], L:['lDateQuick','lDateFrom','lDateTo'], M:['mDateQuick','mDateFrom','mDateTo']};
+  var lockKey = {A:'sale',B:'bSale',C:'cSale',E:'eSale',F:'fSale',G:'gSale',L:'lSale',M:'mSale'}[sub];
+  var c = { sub:sub, date:P[sub] || null, lockKey:lockKey, extra:'', tasks:[], dateAfter:'', leader:(sub === 'E' || sub === 'F' || sub === 'G' || sub === 'M') };
   function t(label, js, title, id){ c.tasks.push('<div'+(id?' id="'+id+'"':'')+(title?' title="'+esc(title)+'"':'')+' onclick="closeGearMenus();'+js+'">'+label+'</div>'); }
   if (sub === 'A' || sub === 'B'){
     t('📊 Xuất Excel', 'exportSalesReport()');
@@ -1103,6 +1106,9 @@ function _srbSubCfg_(){
     t('⬇️ Xuất CSV', 'exportRenewReport_()');
   } else if (sub === 'L'){
     t('🧾 CSV Chi tiết từng đơn (mã bộ đếm + dòng Pos)', "_srLExportCsv_('detail')"); t('📊 CSV Tổng hợp theo Sale', "_srLExportCsv_('summary')");
+  } else if (sub === 'M'){
+    t('⬇ CSV Tổng hợp theo sale', "_srMExportCsv_('summary')"); t('⬇ CSV Danh sách đơn chia (chi tiết)', "_srMExportCsv_('detail')");
+    if (admin) t('📤 Xuất ra Sheet', 'exportSalesReportToSheet()', 'Tạo 1 tab mới BC_M_… trong Google Sheet CRM (tổng quan + theo sale + chi tiết đơn chia)', 'sr-export-sheet-btn');
   }
   t(_srSidebarHidden ? '📂 Hiện bộ lọc KH' : '📁 Ẩn bộ lọc KH — chụp màn hình', '_srToggleSidebar()');
   // Phần phụ nằm ngay trên thanh

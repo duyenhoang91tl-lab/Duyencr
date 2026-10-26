@@ -7,7 +7,7 @@ const ok = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1); }
 const posts = [];
 JSDOM.fromFile(path.join(__dirname, '..', 'index.html'), { runScripts: 'dangerously', resources: 'usable', pretendToBeVisual: true,
   beforeParse(w) { const st = {}; try { Object.defineProperty(w, 'localStorage', { value: { getItem: k => (k in st ? st[k] : null), setItem: (k, v) => { st[k] = String(v); }, removeItem: k => { delete st[k]; }, clear() {} }, configurable: true }); } catch (e) {}
-    w.fetch = (u, o) => { if (/action=mktChecklist/.test(String(u))) return Promise.resolve({ json: () => Promise.resolve(w.__lastReport) });
+    w.fetch = (u, o) => { if (/action=mktChecklist/.test(String(u))) return Promise.resolve({ ok: true, json: () => Promise.resolve(w.__lastReport) });   // ok:true nhu Response that (js/06 ghi log khi !r.ok va goi r.clone())
       if (o && o.body) posts.push(JSON.parse(o.body)); return Promise.resolve({ json: () => Promise.resolve({ ok: true }), ok: true }); }; } }).then(dom => {
   const w = dom.window, D = w.document;
   setTimeout(async () => {
