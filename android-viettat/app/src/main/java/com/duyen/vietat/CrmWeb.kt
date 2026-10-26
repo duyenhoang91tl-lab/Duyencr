@@ -88,6 +88,9 @@ class CrmWeb(private val act: Activity) {
     /** Lưu file do trang tạo ra (blob/data) vào bộ nhớ đệm rồi mở bảng chia sẻ để lưu/mở (Excel, Drive, Zalo…). */
     inner class Bridge {
         @JavascriptInterface
+        fun report(msg: String) { log(msg.take(600)) }
+
+        @JavascriptInterface
         fun save(name: String, mime: String, b64: String) {
             try {
                 val bytes = Base64.decode(b64, Base64.DEFAULT)
@@ -151,6 +154,31 @@ class CrmWeb(private val act: Activity) {
 })()
 """
 
+    /** KIỂM TRA KẾT NỐI DỮ LIỆU: tải đúng URL danh sách khách của CRM (a) trực tiếp từ app, (b) từ trong trang — để biết lỗi do mạng/Worker hay do WebView. */
+    fun netTest() {
+        val base = "https://duyen-crm-cache.duyenhoang91-tl.workers.dev"
+        val url = "$base/?action=customers&src=web"
+        log("KIỂM TRA KẾT NỐI: đang tải $url …")
+        kotlin.concurrent.thread {
+            val t0 = System.currentTimeMillis()
+            try {
+                val c = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+                c.connectTimeout = 20000; c.readTimeout = 120000; c.requestMethod = "GET"
+                val code = c.responseCode
+                val hdr = "cache=" + c.getHeaderField("x-crm-cache") + " len=" + c.getHeaderField("Content-Length") + " enc=" + c.getHeaderField("Content-Encoding") + " type=" + c.getHeaderField("Content-Type")
+                var n = 0L
+                (if (code < 400) c.inputStream else c.errorStream)?.use { ins -> val buf = ByteArray(65536); while (true) { val r = ins.read(buf); if (r < 0) break; n += r } }
+                log("APP→CRM: HTTP $code, $n byte, ${System.currentTimeMillis() - t0}ms, $hdr")
+            } catch (e: Exception) { log("APP→CRM LỖI sau ${System.currentTimeMillis() - t0}ms: ${e.javaClass.simpleName}: ${e.message}") }
+        }
+        act.runOnUiThread {
+            web.evaluateJavascript("""
+(function(){ var t=Date.now(); fetch('$url').then(function(r){ return r.text().then(function(x){ AndroidDl.report('TRONG TRANG: HTTP '+r.status+', '+x.length+' ký tự, '+(Date.now()-t)+'ms'); }); })
+ .catch(function(e){ AndroidDl.report('TRONG TRANG LỖI sau '+(Date.now()-t)+'ms: '+(e&&e.message)); }); })()
+""", null)
+        }
+    }
+
     private fun probeDecode(raw: String?): String = try { org.json.JSONTokener(raw ?: "null").nextValue()?.toString() ?: "(rỗng)" } catch (e: Exception) { raw ?: "(lỗi đọc)" }
     fun probe() { web.evaluateJavascript(probeJs) { r -> log("QUÉT TRANG:\n" + probeDecode(r)) } }
 
@@ -166,6 +194,10 @@ class CrmWeb(private val act: Activity) {
     });
   }
   function isDl(a){ return a && a.hasAttribute && a.hasAttribute('download') && /^(blob:|data:)/.test(a.href); }
+  var of = window.fetch;
+  if (of) window.fetch = function(u, o){ var t = Date.now(), name = String(u && u.url ? u.url : u).slice(0, 140);
+    return of.apply(this, arguments).then(function(r){ if (!r.ok) AndroidDl.report('FETCH ' + r.status + ' (' + (Date.now()-t) + 'ms): ' + name); return r; },
+      function(e){ AndroidDl.report('FETCH LỖI ' + (e && e.message) + ' sau ' + (Date.now()-t) + 'ms: ' + name); throw e; }); };
   var oc = HTMLAnchorElement.prototype.click;
   HTMLAnchorElement.prototype.click = function(){ if (isDl(this)) { grab(this); return; } return oc.apply(this, arguments); };
   var od = HTMLAnchorElement.prototype.dispatchEvent;
@@ -259,6 +291,7 @@ fun CrmWebScreen(crm: CrmWeb) {
         AlertDialog(onDismissRequest = { showLog = false }, title = { Text("Chẩn đoán trang CRM") },
             text = { Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
                 TextButton({ crm.probe() }) { Text("🔍 Quét lại trang") }
+                TextButton({ crm.netTest() }) { Text("🌐 Kiểm tra kết nối dữ liệu") }
                 Text(text, style = MaterialTheme.typography.bodySmall)
             } },
             confirmButton = {
