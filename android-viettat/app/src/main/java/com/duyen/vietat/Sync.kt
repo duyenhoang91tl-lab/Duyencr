@@ -2,6 +2,9 @@ package com.duyen.vietat
 
 import android.content.Context
 import android.util.Base64
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -68,19 +71,49 @@ object Sync {
 /** ĐỌC kho "Viết tắt" của CRM (sheet VietTat qua Google Apps Script): mục CHUNG của team + mục RIÊNG của chính mình (theo tên CS). Chỉ đọc — sửa trên CRM. */
 object Crm {
     const val DEFAULT_URL = "https://script.google.com/macros/s/AKfycbx3QT6YIzQ7SQEwQPkljVeEdmTSBQQSxtTp2hTFYOeCKB_K4BHcUTSLi54LlmB9q_E6sQ/exec"
+    const val DEFAULT_WEB = "https://duyen-crm-web.duyenhoang91-tl.workers.dev"
     private val busy = AtomicBoolean(false)
     fun prefs(c: Context) = c.getSharedPreferences("crm", 0)
-    fun url(c: Context) = prefs(c).getString("url", "").orEmpty().trim().ifEmpty { DEFAULT_URL }
+
+    /** Trạng thái hiện trên tab Viết tắt (Compose theo dõi được): kết quả lần cập nhật gần nhất + tài khoản CRM đang kết nối. */
+    var lastStatus by mutableStateOf("")
+    var who by mutableStateOf("")
+
+    // KẾT NỐI TỰ ĐỘNG (2026-10-26): không còn nhập tên CS / địa chỉ web. Web CRM luôn là DEFAULT_WEB; địa chỉ dữ liệu lấy thẳng từ CRM đang chạy trong app
+    // (biến gsUrl của web) — chưa đọc được thì dùng DEFAULT_URL; tên + quyền lấy từ PHIÊN ĐĂNG NHẬP CRM (token) nên mục "của tôi" khớp đúng chủ sở hữu.
+    fun webUrl(c: Context) = DEFAULT_WEB
+    fun url(c: Context) = prefs(c).getString("gs", "").orEmpty().trim().let { if (it.startsWith("https://script.google.com/")) it else DEFAULT_URL }
     fun name(c: Context) = prefs(c).getString("name", "").orEmpty().trim()
-    const val DEFAULT_WEB = "https://duyen-crm-web.duyenhoang91-tl.workers.dev"
-    fun webUrl(c: Context) = prefs(c).getString("web", "").orEmpty().trim().ifEmpty { DEFAULT_WEB }
-    fun configured(c: Context) = name(c).isNotEmpty()
+    /** Token phiên CRM còn hạn (rỗng nếu chưa đăng nhập / hết hạn — web CRM tự yêu cầu đăng nhập lại). */
+    fun token(c: Context): String {
+        val p = prefs(c); val t = p.getString("token", "").orEmpty().trim(); val x = p.getLong("tokenExp", 0L)
+        return if (t.isNotEmpty() && (x <= 0L || x > System.currentTimeMillis())) t else ""
+    }
+    /** Đã kết nối = có phiên CRM còn hạn (hoặc, bản cũ, đã lưu tên CS). */
+    fun configured(c: Context) = token(c).isNotEmpty() || name(c).isNotEmpty()
+
+    /** Lưu danh tính đọc được từ web CRM. Trả về true nếu có thay đổi (đăng nhập lần đầu, đổi tài khoản, đổi token). */
+    fun setIdentity(c: Context, token: String, exp: Long, name: String, gs: String): Boolean {
+        val p = prefs(c)
+        val changed = p.getString("token", "") != token || p.getString("name", "") != name.trim()
+        if (changed || p.getLong("tokenExp", 0L) != exp || p.getString("gs", "") != gs.trim()) {
+            p.edit().putString("token", token).putLong("tokenExp", exp).putString("name", name.trim()).putString("gs", gs.trim()).apply()
+        }
+        if (name.trim().isNotEmpty()) who = name.trim()
+        return changed
+    }
+
+    /** Phần định danh gắn vào địa chỉ gọi CRM: ưu tiên token phiên (CRM tự biết bạn là ai), không có thì dùng tên đã lưu từ bản cũ. */
+    private fun authQuery(c: Context): String {
+        val t = token(c)
+        return if (t.isNotEmpty()) "&token=" + URLEncoder.encode(t, "UTF-8") else "&by=" + URLEncoder.encode(name(c), "UTF-8")
+    }
 
     /** Tải 1 ảnh CRM (Drive) về thư mục media dưới tên crm_<id>.<đuôi>; đã có thì dùng lại, không tải lại. Trả về tên file hoặc null nếu lỗi. */
     private fun fetchImage(base: String, c: Context, id: String): String? {
         Store.mediaDir.listFiles()?.firstOrNull { it.name.startsWith("crm_$id.") && it.length() > 0 }?.let { return it.name }
         return try {
-            val full = base + (if (base.contains('?')) "&" else "?") + "action=vietTatImage&id=" + URLEncoder.encode(id, "UTF-8") + "&by=" + URLEncoder.encode(name(c), "UTF-8")
+            val full = base + (if (base.contains('?')) "&" else "?") + "action=vietTatImage&id=" + URLEncoder.encode(id, "UTF-8") + authQuery(c)
             val con = URL(full).openConnection() as HttpURLConnection
             con.requestMethod = "GET"; con.connectTimeout = 15000; con.readTimeout = 60000; con.instanceFollowRedirects = true
             val code = con.responseCode
@@ -97,11 +130,13 @@ object Crm {
     }
 
     /** Chạy trên luồng nền. Trả về thông báo trạng thái ("" nếu đang chạy dở). */
-    fun pull(c: Context): String {
+    fun pull(c: Context): String = pullImpl(c).also { if (it.isNotEmpty()) lastStatus = it }
+
+    private fun pullImpl(c: Context): String {
         if (!busy.compareAndSet(false, true)) return ""
         return try {
             val base = url(c)
-            val full = base + (if (base.contains('?')) "&" else "?") + "action=vietTat&by=" + URLEncoder.encode(name(c), "UTF-8")
+            val full = base + (if (base.contains('?')) "&" else "?") + "action=vietTat" + authQuery(c)
             val con = URL(full).openConnection() as HttpURLConnection
             con.requestMethod = "GET"; con.connectTimeout = 15000; con.readTimeout = 60000; con.instanceFollowRedirects = true
             val code = con.responseCode
@@ -110,6 +145,7 @@ object Crm {
             if (code != 200) return "Lỗi CRM ($code)"
             val r = JSONObject(body)
             if (r.has("error")) return "CRM báo lỗi: " + r.optString("error")
+            if (r.optString("me").isNotEmpty()) who = r.optString("me")
             val arr = r.getJSONArray("snippets")
             val ids = LinkedHashSet<String>()
             for (i in 0 until arr.length()) arr.getJSONObject(i).optJSONArray("images")?.let { ia ->

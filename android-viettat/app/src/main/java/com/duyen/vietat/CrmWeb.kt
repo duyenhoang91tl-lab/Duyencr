@@ -4,6 +4,10 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import org.json.JSONObject
+import org.json.JSONTokener
 import android.util.Base64
 import android.view.ViewGroup
 import android.content.ClipData
@@ -80,6 +84,47 @@ class CrmWeb(private val act: Activity) {
     private var fileCb: ValueCallback<Array<Uri>>? = null
 
     private fun home() = Crm.webUrl(act)
+
+    // ── KẾT NỐI TỰ ĐỘNG VỚI TÀI KHOẢN CRM (2026-10-26) ──
+    // Web CRM chạy trong WebView nên đọc được phiên đăng nhập của chính nó: token phiên (localStorage ome_sess_token), tên tài khoản (_authAccount) và địa chỉ dữ liệu (gsUrl).
+    // App dùng token này để lấy kho Viết tắt (chung + của tôi) — không cần nhập tên CS hay địa chỉ web. Đăng nhập trong web xong là app tự kết nối và tự cập nhật.
+    private val identityJs = "(function(){try{return JSON.stringify({t:localStorage.getItem('ome_sess_token')||'',x:Number(localStorage.getItem('ome_sess_exp')||0)," +
+        "n:(typeof _authAccount!=='undefined'&&_authAccount)?String(_authAccount.name||_authAccount.username||''):'',g:(typeof gsUrl!=='undefined'&&gsUrl)?String(gsUrl):''});}catch(e){return '';}})()"
+    private val handler = Handler(Looper.getMainLooper())
+    private var watching = false
+
+    /** Đọc danh tính từ web; có thay đổi (đăng nhập lần đầu / đổi tài khoản) thì gọi onChanged. Chạy trên luồng UI. */
+    fun readIdentity(onChanged: () -> Unit) {
+        web.evaluateJavascript(identityJs) { raw -> handleIdentity(raw, onChanged) }
+    }
+
+    private fun handleIdentity(raw: String?, onChanged: () -> Unit) {
+        try {
+            if (raw.isNullOrEmpty() || raw == "null") return
+            val s = JSONTokener(raw).nextValue() as? String ?: return
+            if (s.isEmpty()) return
+            val j = JSONObject(s)
+            val t = j.optString("t")
+            if (t.isEmpty()) return
+            if (Crm.setIdentity(act, t, j.optLong("x"), j.optString("n"), j.optString("g"))) onChanged()
+        } catch (e: Exception) { /* trang chưa tải xong / chưa đăng nhập: lần kiểm tra sau */ }
+    }
+
+    /** Kiểm tra định kỳ: chưa kết nối thì 2 giây/lần (để đăng nhập xong là nối ngay), đã kết nối thì 20 giây/lần (bắt đổi tài khoản). */
+    fun startIdentityWatch(onChanged: () -> Unit) {
+        if (watching) return
+        watching = true
+        val tick = object : Runnable {
+            override fun run() {
+                if (!watching) return
+                readIdentity(onChanged)
+                handler.postDelayed(this, if (Crm.token(act).isEmpty()) 2000L else 20000L)
+            }
+        }
+        handler.post(tick)
+    }
+
+    fun stopIdentityWatch() { watching = false; handler.removeCallbacksAndMessages(null) }
 
     fun load() { error = null; web.loadUrl(home()) }
 

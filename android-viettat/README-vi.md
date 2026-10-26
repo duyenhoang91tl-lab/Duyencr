@@ -9,7 +9,7 @@ Gõ từ viết tắt/từ khoá trong bất kỳ ô chat nào (Zalo, Messenger,
 
 ## Cài đặt
 1. Tải **VietTat.apk** (tên file giữ nguyên, app hiện tên **Duyên CRM**) ở trang Release `viettat-latest` của repo (hoặc mục Artifacts của lần chạy "Build Android VietTat") → mở file trên điện thoại → cho phép "Cài từ nguồn không rõ".
-2. Mở app, nhập **Tên CS** (giống tên trong CRM) → *Lưu & cập nhật*.
+2. Mở app → tab **CRM** → **đăng nhập bằng tài khoản CRM của bạn**. Xong là app **tự kết nối** (không phải nhập tên CS hay địa chỉ web): tên + quyền lấy từ phiên đăng nhập CRM, kho Viết tắt (chung + của bạn) tự tải về; bấm **☁ CRM** ở tab Viết tắt khi muốn cập nhật ngay. Đổi tài khoản trong CRM thì app tự đổi theo (trong ~20 giây).
 3. Bấm **Bật dịch vụ "Viết Tắt" trong Trợ năng** → bật dịch vụ. (Android sẽ cảnh báo vì dịch vụ Trợ năng đọc được ô gõ — app chỉ dùng để nhận diện từ viết tắt.)
 4. Mở ô chat, gõ viết tắt → hiện **màn chọn to**: cuộn xem hết chữ + hình; **bấm 1 lần = chọn/bỏ chọn** (chọn được nhiều cái 1 lúc), **bấm đúp vào hình = phóng to xem full, bấm đúp lần nữa = thu nhỏ**; cuối màn có ✕ Đóng · Chia sẻ · Chèn. *Chèn*: chữ nối bằng xuống dòng vào ô chat; 1 hình thì dán thẳng, nhiều hình/ghi âm thì mở bảng chia sẻ của Android (Android không dán được nhiều hình cùng lúc). *Chia sẻ*: luôn mở bảng chia sẻ. Biến: `{ngày} {ngày mai} {giờ} {thứ} {tên} {tên khách}`.
 

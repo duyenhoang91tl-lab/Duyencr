@@ -575,3 +575,9 @@ Chuẩn: chọn/ghi tên nào của 1 người cũng ra đủ dữ liệu của 
 - Giao diện (`js/50`, `js/13`, `js/11`): Báo cáo M dùng thanh lọc CHUNG `_srBarHtml_` (🔎 Bộ lọc: Sale `mSale` + Kênh bán `mNguon`; ⚙ Tác vụ: CSV tổng hợp, CSV danh sách đơn chia, 📤 Xuất ra Sheet cho Admin), GIỮ nguyên phần của phiên đối soát (bấm dòng sale → panel Base/Pos, Excel đối soát, nút ghép Base) nằm ở hàng nút dưới thanh lọc; thêm danh sách chi tiết TẤT CẢ đơn chia có ô tìm, bấm dòng mở hồ sơ khách. Test `tools/test-split-orders-ui.js` (57 ca).
 - Lưu ý vận hành: môi trường sandbox của Claude có thể bị đặt lại giữa chừng làm mất commit CHƯA push → push từng bước nhỏ.
 
+
+## 2026-10-26 — App Android (1.8): KẾT NỐI CRM TỰ ĐỘNG theo tài khoản đăng nhập (Duyên: bỏ nhập web/tên CS)
+- Yêu cầu Duyên: hộp "Kết nối CRM" (nhập Tên CS + địa chỉ web + địa chỉ dữ liệu) → mặc định, không nhập; tên CS lấy từ tài khoản CRM đã đăng nhập.
+- **Làm:** `CrmWeb.kt` `readIdentity/startIdentityWatch`: đọc từ web CRM trong WebView `localStorage.ome_sess_token` (+ `ome_sess_exp`), `_authAccount.name/username`, `gsUrl` (2 giây/lần khi chưa kết nối, 20 giây/lần sau đó); `Crm` (Sync.kt): `token()`, `setIdentity()`, `authQuery()` — gọi GAS `vietTat`/`vietTatImage` bằng `&token=` (backend `_tplCaller_` đọc tên/vai trò từ phiên → mục "của tôi" khớp đúng chủ sở hữu như trên web), không có token thì dùng `by=<tên>` đã lưu từ bản cũ. `webUrl()` luôn là `DEFAULT_WEB` (bỏ giá trị cũ lưu trong máy), địa chỉ dữ liệu lấy từ `gsUrl` của CRM (mặc định `DEFAULT_URL`). Bỏ `CrmDialog`; tab Viết tắt chỉ hiện "Đã kết nối CRM: <tên>" + nút ☁ CRM cập nhật. versionCode 9 / 1.8.
+- Máy làm việc KHÔNG có Android SDK → xác minh bằng Actions `check-android.yml` (nhánh `wip/**`) rồi mới merge main; xem kết quả ở tab Actions.
+- [ ] CẦN LÀM TIẾP (Duyên thử máy thật): cài APK 1.8 (Release `viettat-latest`), đăng nhập CRM ở tab CRM → sang tab Viết tắt xem "Đã kết nối CRM: …" và mục chung/của tôi.
