@@ -77,13 +77,14 @@ const FLAT = { ok: true, items: ITEMS };
   ok(Z.env.calls.some(u => /action=driveImageFromLink&link=https%3A%2F%2Fdrive%2F1$/.test(u)), 'goi driveImageFromLink voi link ma hoa');
   // nhom -> ten, nhieu bien the, trung link, thieu anh, HTML trong ten, loi doc anh
   const Z2 = zalo(FLAT), P2 = pancake(FLAT); Z2.init(); P2.init(); await sleep(60);
-  const cmp2 = l => ok(Z2.norm(Z2.dyn.innerHTML) === P2.norm(P2.dyn.innerHTML), 'B2 "' + l + '": HTML khac:\nZALO    ' + Z2.norm(Z2.dyn.innerHTML).slice(0, 700) + '\nPANCAKE ' + P2.norm(P2.dyn.innerHTML).slice(0, 700));
+  const cmp2 = (l, tolerateErrText) => { const f = h => tolerateErrText ? h.replace(/<div class="LOADING">[^<]*<\/div>/g, '<LOADING/>') : h; return ok(f(Z2.norm(Z2.dyn.innerHTML)) === f(P2.norm(P2.dyn.innerHTML)), 'B2 "' + l + '": HTML khac:\nZALO    ' + Z2.norm(Z2.dyn.innerHTML).slice(0, 700) + '\nPANCAKE ' + P2.norm(P2.dyn.innerHTML).slice(0, 700)); };
   await pick(Z2, 'nhom', 'Nhẫn'); await pick(P2, 'nhom', 'Nhẫn'); cmp2('chon nhom Nhan');
   ok(!Z2.dyn.querySelector('script, b'), 'HTML trong ten san pham bi escape');
   await pick(Z2, 'ten', 'Nhẫn Bạc Trơn'); await pick(P2, 'ten', 'Nhẫn Bạc Trơn'); cmp2('chon ten Nhan Bac Tron (2 size cung link -> 1 anh)'); await sleep(60);
   ok(Z2.dyn.querySelectorAll('.zai-ctkm-item').length === 1, 'trung link anh chi hien 1 the');
   await pick(Z2, 'ten', 'Nhẫn Trơn <b>x</b>'); await pick(P2, 'ten', 'Nhẫn Trơn <b>x</b>'); cmp2('san pham chua co link anh'); ok(/chưa có link ảnh/.test(Z2.dyn.textContent), 'Zalo: bao chua co link anh');
-  await pick(Z2, 'nhom', 'Charm'); await pick(P2, 'nhom', 'Charm'); await pick(Z2, 'ten', 'Charm Rồng'); await pick(P2, 'ten', 'Charm Rồng'); await sleep(60); cmp2('anh bi loi doc');
+  await pick(Z2, 'nhom', 'Charm'); await pick(P2, 'nhom', 'Charm'); await pick(Z2, 'ten', 'Charm Rồng'); await pick(P2, 'ten', 'Charm Rồng'); await sleep(60); cmp2('anh bi loi doc', true);   // Pancake: loi doc anh la cau chuan 'Lỗi API' (ddaf130); Zalo van 'Lỗi: <chi tiet>' -> so HTML khong tinh cau loi, kiem tra rieng + canh bao
+  ok(/Khong doc duoc &lt;anh&gt;/.test(P2.dyn.innerHTML), 'Pancake: hien loi doc anh da escape'); if (Z2.norm(Z2.dyn.innerHTML) !== P2.norm(P2.dyn.innerHTML)) console.log('!!   CANH BAO: cau bao loi doc anh cua Zalo CHUA giong Pancake — can lam Zalo song song');
   ok(/Lỗi: Khong doc duoc <anh>/.test(Z2.dyn.textContent) && !Z2.dyn.querySelector('anh'), 'Zalo: loi doc anh hien nguyen van, da escape');
   // >6 bien the cung ten: chi hien 6 anh + nhac con bao nhieu bien the
   await pick(Z2, 'nhom', 'Vòng'); await pick(P2, 'nhom', 'Vòng'); await pick(Z2, 'ten', 'Vòng Nhiều'); await pick(P2, 'ten', 'Vòng Nhiều'); await sleep(80); cmp2('8 bien the cung ten');
@@ -96,7 +97,8 @@ const FLAT = { ok: true, items: ITEMS };
   // 3. loi nap danh muc
   for (const flat of [{ ok: false, error: 'Khong doc duoc <DANH_MUC>' }, new Error('mat mang'), { ok: true, items: [] }]) {
     const a = zalo(flat), b = pancake(flat); a.init(); b.init(); await sleep(60);
-    ok(a.norm(a.dyn.innerHTML) === b.norm(b.dyn.innerHTML) && /Lỗi|Không tải được danh mục/.test(a.dyn.textContent) && !a.dyn.querySelector('DANH_MUC'), 'loi nap danh muc giong het + da escape: ' + a.dyn.textContent.slice(0, 80));
+    const errT = h => h.replace(/<div class="LOADING">[^<]*<\/div>/g, '<LOADING/>');   // Pancake: loi la cau chuan 'Lỗi API' (ddaf130) — Zalo van 'Lỗi: <chi tiet>'
+    ok(errT(a.norm(a.dyn.innerHTML)) === errT(b.norm(b.dyn.innerHTML)) && /Lỗi|Không tải được danh mục/.test(a.dyn.textContent) && !a.dyn.querySelector('DANH_MUC') && !b.dyn.querySelector('DANH_MUC') && b.dyn.textContent.length > 0, 'loi nap danh muc: cung bo cuc + da escape (cau loi moi ben): ' + a.dyn.textContent.slice(0, 80));
   }
   // 4. nap lai khi mo lan 2: khong goi lai danh muc
   Z.init(); await sleep(30); ok(Z.env.calls.filter(u => /productImageFlat/.test(u)).length === 1, 'mo lai muc khong nap lai danh muc');

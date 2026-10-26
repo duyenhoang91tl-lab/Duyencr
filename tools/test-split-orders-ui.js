@@ -107,8 +107,9 @@ ok(w.splitBannerHtml_(Object.assign({},D1,{truncated:true}),{}).includes('thu h�
  const idx=read('index.html'),s02=read('js/02-fn-showrowerrorbanner.js'),s06=read('js/06-main-renew-sources.js'),s11=read('js/11-fn-srload.js');
  ok(idx.includes('<option value="split">Danh sách đơn chia')&&idx.indexOf('js/50-split-orders.js')>idx.indexOf('js/49-pro-discuss.js'),'index.html: có mục "Danh sách đơn chia" trong lọc nguồn dữ liệu + nạp js/50');
  ok(s02.includes("splitBannerSync_(dataSrcF)")&&s02.includes("dataSrcF === 'split' && !(typeof splitCustomerPass_ === 'function' && splitCustomerPass_(c))"),'js/02: applyFilters gọi banner + điều kiện lọc split');
- ok(s06.includes("['M','Báo cáo M – Tổng quan đơn chia']"),'js/06: Báo cáo M nằm trong danh sách báo cáo (Admin bật/tắt/đổi tên được)');
- ok(s11.includes("_srState.sub === 'M'")&&s11.includes("if (_srState.sub === 'M') { renderSalesReportTabM_(wrap, subTabs); return; }"),'js/11: _srLoad có nhánh M + renderSalesReportTab điều hướng sang màn M');
+ ok(/\['M','Báo cáo M – Tổng quan đơn chia'\](,\['[A-Z]','[^']+'\])*\];/.test(s06),   // M khong con la bao cao CUOI (da co N — Tinh don thuan)
+    'js/06: Báo cáo M nằm trong danh sách báo cáo (Admin bật/tắt/đổi tên được)');
+ ok(s11.includes("_srState.sub === 'M') {\n    // Tổng quan đơn chia")&&s11.includes("if (_srState.sub === 'M') { renderSalesReportTabM_(wrap, subTabs); return; }"),'js/11: _srLoad có nhánh M + renderSalesReportTab điều hướng sang màn M');
  ok(s11.includes("if (_srState.sub === 'M') return splitExportSheet_();"),'js/11: nút "Xuất ra Sheet" chung chuyển sang splitExportSheet_ khi đang ở báo cáo M');
  process.exit(bad?1:0);
 })();

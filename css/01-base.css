@@ -777,8 +777,17 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
 .role-opt.active{border-color:var(--green-mid);background:var(--green-bg);color:var(--green);}
 .audit-act.team{background:var(--tn-bg);color:var(--tn);}
 /* ===== V9.2 Đăng nhập / Tài khoản ===== */
-#login-overlay{position:fixed;inset:0;z-index:3000;background:linear-gradient(135deg,#0e3a2b,#16553c 60%,#0e3a2b);display:none;align-items:center;justify-content:center;padding:18px;}
+#login-overlay{position:fixed;inset:0;z-index:3000;background:linear-gradient(135deg,#0e3a2b,#16553c 60%,#0e3a2b);display:none;align-items:flex-start;justify-content:center;padding:18px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
 #login-overlay.show{display:flex;}
+/* SUA 2026-10-26 (app Android Duyên CRM, màn hình thấp: điện thoại nằm ngang / cửa sổ nhỏ, quét trang: viewport 577x248, thẻ đăng nhập 317px cao -> top=-34, nút Đăng nhập bị cắt, KHÔNG cuộn được => không đăng nhập được).
+   NGUYÊN NHÂN GỐC: lớp phủ cố định căn GIỮA (align-items:center) và không có overflow nên phần tràn bị cắt cả 2 đầu, không cuộn tới được. Nay: căn đầu + margin:auto cho thẻ (đủ chỗ thì vẫn nằm giữa, thiếu chỗ thì dính trên cùng và cuộn được). */
+#login-overlay .login-card{margin:auto;flex:none}
+@media (max-height:520px){
+  #login-overlay{padding:10px}
+  #login-overlay .login-card{padding:14px 20px}
+  #login-overlay .login-logo{margin-bottom:6px}
+  #login-overlay .login-sub{margin:2px 0 8px}
+}
 /* Trang RIENG Bao cao ngay (?view=dailybrief): an toan bo khung CRM, chi con bao cao ngay day trang */
 html.db-standalone header,html.db-standalone .sidebar,html.db-standalone .sidebar-backdrop,html.db-standalone .tabs,html.db-standalone #files-bar,html.db-standalone #sync-banner{display:none!important}
 html.db-standalone #tab-dailybrief{position:fixed!important;inset:0;z-index:2500;background:var(--bg);display:flex!important;flex-direction:column;overflow:auto!important;padding:18px 20px}
