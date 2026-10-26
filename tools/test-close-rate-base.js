@@ -33,7 +33,7 @@ vm.runInContext(`
   readPancakeMap_ = function() { return {}; };
   _pkStatsRowsMemo_ = function() { return []; };
   _pkTrackedDatesByPageAndSale_ = function() { return { datesByPage: { P1: { '2026-10-05': true, '2026-10-06': true } }, datesBySale: {} }; };
-  buildPancakeReport_ = function() { return { byCS: [{ name: 'saleA', tongTT: 100 }, { name: 'saleB', tongTT: 50 }], byPage: [{ pageId: 'P1', tongTT: 150 }] }; };
+  buildPancakeReport_ = function() { return { byCS: [{ name: 'saleA', tongTT: 100, khMoi: 30, khCu: 70, dayList: ['2026-10-01', '2026-10-02'] }, { name: 'saleB', tongTT: 50 }], byPage: [{ pageId: 'P1', tongTT: 150 }] }; };
   _expandSaleFilterWithPancakeAliases_ = function(a) { return a; };
   readTeams_ = function() { return []; };
   readMktTeams_ = function() { return []; };
@@ -48,8 +48,8 @@ const A = (f) => vm.runInContext('buildSalesReportA_(' + JSON.stringify(Object.a
 let r = B();
 const sale = n => r.saleCloseRate.find(x => x.name === n);
 eq(r.totalOrders, 0, 'so don/doanh thu cua B van tinh tu Pos (Pos trong -> 0 don)');
-eq(sale('saleA'), { name: 'saleA', held: 100, closed: 7, closeRate: 7 }, 'saleA: 7 don Base / 100 tuong tac = 7%, KHONG bi keo thap boi Pos');
-eq(sale('saleB'), { name: 'saleB', held: 50, closed: 3, closeRate: 6 }, 'saleB: 3 don Base / 50 tuong tac = 6%');
+eq(sale('saleA'), { name: 'saleA', held: 100, closed: 7, closeRate: 7, khMoi: 30, khCu: 70, days: 2, pctMoi: 30, pctCu: 70, perDay: 50 }, 'saleA: 7 don Base / 100 tuong tac = 7%, KHONG bi keo thap boi Pos; 30% khach moi / 70% khach cu; 100 tuong tac / 2 ngay = 50 khach/ngay');
+eq(sale('saleB'), { name: 'saleB', held: 50, closed: 3, closeRate: 6, khMoi: 0, khCu: 0, days: 0, pctMoi: 0, pctCu: 0, perDay: 0 }, 'saleB: 3 don Base / 50 tuong tac = 6%');
 eq(sale('(chưa gán sale)').closed, 1, 'nguoi tao khong phai sale (mktX) -> don do vao "(chua gan sale)", khong tinh cho sale nao');
 const k1 = r.kenhCloseRate.find(x => x.name === 'K1'); eq([k1.held, k1.closed, k1.closeRate], [150, 11, 7.3], 'kenh K1 dem moi don Base (ke ca nguoi tao khong phai sale): 11 / 150 = 7.3%');
 ok(!r.kenhCloseRate.some(x => x.name === 'K2' && x.closed), 'don kenh/ngay khong co du lieu Pancake bi bo qua');
