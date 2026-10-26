@@ -57,3 +57,10 @@ Nguồn: clip 2 phút 53 giây, app "CustomerCare CRM" (dữ liệu demo). Bổ 
 - [x] `css/11-roles.css` (class `rl-*`, tông navy + xanh), nạp trong `index.html`. Test: `node tools/test-roles-page.js` (cần jsdom), `tools/test-roles-ui.js` (đã cập nhật nhãn mới), `tools/test-roles.js`.
 - [ ] **Việc cần Duyên:** mở CRM (Ctrl+F5) → Menu → Phân quyền → gửi ảnh chụp 3 tab để chỉnh khoảng cách/màu (chưa tự nhìn được hình dáng thật).
 - [ ] Còn lại: L0 (biến thiết kế + áp phông Be Vietnam Pro toàn app), L1 (khung navy: thanh trên + menu nhóm con mở/đóng + Thu gọn), L2 (thanh `Hôm nay | Tuần này | Tháng này`, thẻ số, bảng + phân trang, trạng thái rỗng/đang tải), L4 (áp từng màn), L5 (chế độ tối), L6 (điện thoại).
+
+## 7. Vừa màn điện thoại (14/10/2026, từ ảnh chụp app Android "Duyên CRM")
+**Triệu chứng:** thanh trên xanh bị cắt ("Thu Hiền…" mất chữ), nút robot AI ở góc phải bị cắt nửa — trang rộng hơn màn hình.
+**Nguyên nhân gốc:** `<header>` là 1 hàng ngang cao cố định 50px KHÔNG xuống dòng, trên điện thoại chứa quá nhiều phần tử (Menu · tên màn, Tìm nhanh, ☰ lọc, tên CRM + nhãn phiên bản + Admin + nút tài khoản) → tràn; vì trang rộng hơn màn hình nên các phần tử `position:fixed; right:16px` (nút robot) cũng lệch ra mép phải.
+- [x] `css/15-mobile.css` (CHỈ trong `@media (max-width:640px)`): thanh trên xuống dòng (hàng 1: Menu · tên màn + Tìm nhanh + ☰; hàng 2: tên CRM + nút tài khoản), ẩn nhãn phiên bản + dòng trạng thái; menu kéo / lớp phủ / khung chính / khung AI dùng biến `--hdr-h` (chiều cao thật của thanh trên, do `js/59-fn-mobilefit.js` đo; mặc định 50px); nút robot `right:12px`; lưới an toàn (ảnh/video/modal không vượt bề ngang, `.sc-dock` 100%). **Không đụng overflow của `html`/`body`** (đã có `body{overflow-x:hidden}` ≤768px; chạm `html` làm hỏng cuộn trang). Quét tĩnh CSS: các khung cố định > 360px còn lại đều đã có `max-width` an toàn hoặc nằm trong vùng tự cuộn (`#main-table`, `.dash-table`, `.rl-mx`).
+- Test: `node tools/test-mobile-fit.js` (kiểm luật CSS + logic + đo chiều cao bằng jsdom; **không đo được bố cục thật** — cần ảnh chụp sau khi Duyên tải lại trang trên điện thoại).
+
