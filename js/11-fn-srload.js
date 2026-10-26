@@ -148,6 +148,7 @@ function _srApplyQuickRange(quickKey, fromKey, toKey, key){
 // Xuat bao cao dang loc (dung filter hien tai tren UI) ra 1 tab moi trong Google Sheet CRM.
 // Tai su dung dung filter payload nhu _srLoad() de so lieu tren Sheet khop 100% voi UI dang xem.
 async function exportSalesReportToSheet(){
+  if (_srState.sub === 'M') return splitExportSheet_();   // Báo cáo M (đơn chia): xuất riêng, js/50
   if (!gsUrl){ alert('Chưa kết nối Google Apps Script (gsUrl trống).'); return; }
   var filters;
   if (_srState.sub === 'A') {
