@@ -66,6 +66,15 @@
   </label>
   <span id="goldUnitStatus" class="hint" style="display:inline-block;margin-left:8px"></span>
 
+  <h2>⌨️ Viết tắt (gõ tắt trong ô chat)</h2>
+  <div class="hint">
+    Gõ <b>viết tắt</b> (hoặc từ khoá) trong ô chat → hiện gợi ý → <b>Tab</b> để chèn, <b>↑ ↓</b> đổi lựa chọn, <b>Alt+1…8</b> chọn nhanh, <b>Esc</b> đóng.
+    Nội dung có <code>{tên}</code>: gõ thêm tên sau viết tắt (vd <code>ch Huyền</code>) hoặc để tự lấy từ ô "Tên khách" của panel. Chỉ <b>chèn chữ</b>, không tự gửi.
+    Thêm / sửa / xoá viết tắt ở <b>CRM → tab Zalo AI → ⌨️ Viết tắt</b>. Tự cập nhật mỗi 5 phút; bấm nút dưới để cập nhật ngay.
+  </div>
+  <label class="checkbox-row" style="margin-top:10px"><input type="checkbox" id="vtOn" /> Bật gõ tắt trên Pancake / Messenger</label>
+  <button id="vtSync" type="button" style="margin-top:8px">🔄 Cập nhật viết tắt ngay</button> <span id="vtStatus" style="font-size:13px"></span>
+
   <h2>Nền tảng áp dụng</h2>
   <label><input type="checkbox" id="platformPancake" /> Kích hoạt trên Pancake (pancake.vn / pages.fm)</label>
   <label><input type="checkbox" id="platformMessenger" /> Kích hoạt trên Messenger (messenger.com)</label>

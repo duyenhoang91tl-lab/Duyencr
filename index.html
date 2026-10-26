@@ -815,6 +815,38 @@ window.addEventListener('load',function(){var s=document.createElement('script')
         <div id="mt-list" style="display:flex;flex-direction:column;gap:8px"></div>
       </div>
 
+      <!-- VIET TAT (2026-10-25): go tat -> Tab chen noi dung. Cung nguon (sheet VietTat) voi extension Pancake AI; logic o js/57-viettat.js -->
+      <div id="vt-section" style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px" data-vt="off">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+          <div class="zai-label" style="margin:0;font-size:13px;font-weight:700">⌨️ Viết tắt</div>
+          <span class="guide-text" style="font-size:11px;color:var(--muted)">Gõ viết tắt hoặc từ khoá trong ô chat Pancake AI (hoặc ô ghi chú CRM) → <b>Tab</b> để chèn · ↑↓ đổi · Alt+1…8 chọn nhanh · Esc đóng</span>
+        </div>
+        <div id="vt-hint" style="font-size:11px;color:var(--muted);margin-bottom:8px"></div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+          <select id="vt-scope-filter" class="assign-input" onchange="vtRender()" style="font-size:12px;padding:4px 8px"><option value="">Tất cả</option><option value="team">👥 Chung (cả team)</option><option value="me">🙋 Của tôi</option></select>
+          <input id="vt-search" class="zai-input" placeholder="Tìm viết tắt / từ khoá / nội dung..." style="flex:1;min-width:180px" oninput="vtRender()">
+          <button class="btn sm primary" onclick="vtOpenForm()">+ Thêm viết tắt</button>
+        </div>
+        <div id="vt-form-wrap" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:12px;margin-bottom:10px">
+          <input type="hidden" id="vt-f-id">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+            <input id="vt-f-abbr" class="zai-input" placeholder="Viết tắt (1 từ, VD: ch)" maxlength="30" style="width:150px">
+            <input id="vt-f-keyword" class="zai-input" placeholder="Từ khoá, cách nhau dấu phẩy (VD: chào, xin chào) — gõ đầu từ khoá cũng gợi ý" style="flex:1;min-width:220px">
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+            <input id="vt-f-nhom" class="zai-input" list="vt-nhom-list" placeholder="🗂 Nhóm (VD: Chào hỏi, Báo giá)" style="flex:1;min-width:180px"><datalist id="vt-nhom-list"></datalist>
+            <select id="vt-f-scope" class="assign-input" style="min-width:170px" title="Chung: cả team dùng (chỉ admin tạo). Của tôi: chỉ mình bạn thấy"><option value="me">🙋 Của tôi (chỉ mình tôi)</option><option value="team">👥 Chung (cả team)</option></select>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Nội dung chèn (thêm nhiều lựa chọn nếu muốn — chọn bằng ↑↓ hoặc Alt+số). Biến: <code>{tên}</code> <code>{tên khách}</code> <code>{tên đầy đủ}</code> <code>{ngày}</code> <code>{ngày mai}</code> <code>{giờ}</code> <code>{thứ}</code></div>
+          <div id="vt-f-opts"></div>
+          <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:4px">
+            <button type="button" class="btn sm" onclick="vtAddOpt()">+ Thêm lựa chọn</button>
+            <div style="display:flex;gap:8px"><button class="btn sm" onclick="vtCloseForm()">Hủy</button><button class="btn sm primary" id="vt-f-save-btn" onclick="vtSave()">Lưu</button></div>
+          </div>
+        </div>
+        <div id="vt-list" style="display:flex;flex-direction:column;gap:6px"></div>
+      </div>
+
       <!-- Mau AI da hoc: cac cau tra loi CS da sua + bam "Luu de AI hoc" (Pancake AI / Zalo AI) -> sheet AIContext,
            AI dua 5 mau MOI NHAT vao prompt. Quan ly o day: xem / sua / xoa mau sai. -->
       <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px">
@@ -877,7 +909,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 </div>
 </div>
 
-<script src="js/01-fn-splitmulti.js"></script>
+<script src="js/01-fn-splitmulti.js?v=20261024c"></script>
 <script src="js/02-fn-showrowerrorbanner.js"></script>
 <script src="js/03-fn-refreshopendptab.js"></script>
 <script src="js/04-fn-synczalophonesettingsfromgas.js"></script>
@@ -962,9 +994,9 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 <script src="js/08-fn-invalidatefiltercache.js"></script>
 <script src="js/09-fn-deleteteam.js"></script>
 <script src="js/10-fn-pkkpipct.js"></script>
-<script src="js/11-fn-srload.js?v=20261024b"></script>
-<script src="js/12-fn-rendersalesreporttabe.js"></script>
-<script src="js/13-fn-bpseedofficialonlinetemplate.js"></script>
+<script src="js/11-fn-srload.js?v=20261024c"></script>
+<script src="js/12-fn-rendersalesreporttabe.js?v=20261024c"></script>
+<script src="js/13-fn-bpseedofficialonlinetemplate.js?v=20261024c"></script>
 <script src="js/14-fn-aasplit.js?v=20261023a"></script>
 <script src="js/15-fn-hidelogin.js"></script>
 <script src="js/16-main-currentuser.js"></script>
@@ -1670,7 +1702,7 @@ function openBcLogModal(phone){
 <script src="js/44-fn-taskflow.js"></script>
 <script src="js/45-fn-taskflow-admin.js"></script>
 <script src="js/27-fn-bonuscore.js"></script>
-<script src="js/28-fn-bonusdetail.js?v=20261023a"></script>
+<script src="js/28-fn-bonusdetail.js?v=20261024c"></script>
 <script src="js/34-fn-todaytasks.js"></script>
 <script src="js/35-fn-deptsettings.js"></script>
 <script src="js/36-fn-homechips.js"></script>
@@ -1701,7 +1733,7 @@ function openBcLogModal(phone){
 <script src="js/48-filter-presets.js?v=20261017"></script>
 <script src="js/48-pro-chatinfo.js"></script>
 <script src="js/49-pro-discuss.js"></script>
-<script src="js/50-split-orders.js?v=20261023a"></script>
+<script src="js/50-split-orders.js?v=20261024e"></script>
 <script src="js/50-person-tags.js"></script>
 <script src="js/51-demo-guard.js"></script>
 <script src="js/52-fn-salematch.js"></script>
@@ -1709,6 +1741,7 @@ function openBcLogModal(phone){
 <script src="js/54-fn-promo-admin.js"></script>
 <script src="js/55-fn-shell.js?v=20261019c"></script>
 <script src="js/56-fn-qrpills.js"></script>
+<script src="js/57-viettat.js?v=20261025a"></script>
 
 
 <div class="modal-overlay" id="quick-add-modal" style="display:none;align-items:flex-start;justify-content:center;padding-top:60px;z-index:800">

@@ -12,7 +12,7 @@ ok(fa > 0 && fb > fa, 'tim thay _computeCommissionData_ trong js/01');
 const ctx = { loadLS: () => null, saveLS() {}, gsUrl: '', fetch: async () => ({}), _channelCommissionRate_: () => null,
   _resolveCommissionRate_: () => ({ above15: 2, below15: 1, sourceAbove15: 'x', sourceBelow15: 'x' }), splitMulti_: (s) => String(s || '').split(',').map(x => x.trim()).filter(Boolean) };
 vm.createContext(ctx);
-vm.runInContext(j06.slice(a, b) + '\n' + j01.slice(fa, fb), ctx);
+vm.runInContext(j06.slice(a, b) + '\n' + j01.match(/function isNumTagSale_\(x\)\{[^\n]*\}/)[0] + '\n' + j01.slice(fa, fb), ctx);   // isNumTagSale_: loai STT Pancake
 const run = e => vm.runInContext(e, ctx);
 const orders = [{ giaTriDon: 16000000, saleBan: 'An' }, { giaTriDon: 12000000, saleBan: 'An' }, { giaTriDon: 25000000, saleBan: 'An' }];
 const comm = () => { ctx.__o = orders; return run('_computeCommissionData_(__o)'); };

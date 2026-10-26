@@ -65,11 +65,23 @@ function splitReportHtml_(d, search, selSale){
 }
 // ── Chi tiết đối soát của 1 sale (bấm dòng sale / nút Base, Pos ở Báo cáo M) — GAS splitOrderDetail (Duyên yêu cầu 2026-10-21) ──
 // Pos = mỗi đơn Pos chia cho sale; Base = mỗi đơn gốc Base đã ghép với đơn Pos đó. Cột "doanh thu sau chia" Pos khớp cột "Doanh thu từ đơn chia" của dòng sale ở bảng M.
-var SPLIT_DET_POS_HEAD = ['Ngày lên đơn','Tháng lên đơn','Tên KH','Số điện thoại','Ghi chú','Sale tham gia (thẻ Pos)','Sản phẩm (Pos)','Tổng doanh thu','Doanh thu sau chia','Giá đơn Pos gốc (nếu khác)'];
-var SPLIT_DET_BASE_HEAD = ['Ngày lên đơn','Tháng lên đơn','Tên KH','Số điện thoại','Mã bộ đếm','Sale tham gia (bán trên Base)','Sản phẩm (Base)','Tổng doanh thu','Doanh thu sau chia'];
+var SPLIT_DET_POS_HEAD = ['Ngày lên đơn','Tháng lên đơn','Tên KH','Số điện thoại','Ghi chú','Sale tham gia (thẻ Pos)','Sản phẩm (Pos)','Tổng doanh thu','Doanh thu sau chia','Giá đơn Pos gốc (nếu khác)','Đối chiếu Base','Sale trên Base','Thiếu trên Pos (có trên Base)','Thừa trên Pos (không có trên Base)','Mã bộ đếm Base','Sale phản hồi'];
+var SPLIT_DET_BASE_HEAD = ['Ngày lên đơn','Tháng lên đơn','Tên KH','Số điện thoại','Mã bộ đếm','Sale tham gia (bán trên Base)','Sản phẩm (Base)','Tổng doanh thu','Doanh thu sau chia','Loại dòng'];
+function splitBaseKind_(x){ return x.ref ? (x.nguon==='sdt' ? 'Tham chiếu — gợi ý theo SĐT' : 'Tham chiếu — theo mã bộ đếm') : 'Đã ghép (tính vào doanh thu)'; }
+function splitCheckLabel_(c){
+  if (!c || !c.status) return '';
+  var g = c.nguon==='sdt' ? ' (gợi ý theo SĐT)' : '';
+  return c.status==='khop' ? 'Khớp Base'+g : c.status==='lech' ? 'LỆCH Base'+g : 'Không có đơn Base để đối chiếu';
+}
 function splitDetRows_(det, tab){
-  if (tab==='base') return (det.base||[]).map(function(x){ return [x.date,x.month,x.name,x.phone,x.code,x.sales,x.product,x.total,x.share]; });
-  return (det.pos||[]).map(function(x){ return [x.date,x.month,x.name,x.phone,x.note,x.sales,x.product,x.total,x.share,(x.posValue!=null&&x.posValue!==x.total)?x.posValue:'']; });
+  if (tab==='base') return (det.base||[]).map(function(x){ return [x.date,x.month,x.name,x.phone,x.code,x.sales,x.product,x.total,x.share,splitBaseKind_(x)]; });
+  var onlyLech = arguments[2];
+  return (det.pos||[]).filter(function(x){ return !onlyLech || (x.baseCheck && x.baseCheck.status==='lech'); }).map(function(x){
+    var c = x.baseCheck||{}, J = function(a){ return (a||[]).join(', '); };
+    var row = [x.date,x.month,x.name,x.phone,x.note,x.sales,x.product,x.total,x.share,(x.posValue!=null&&x.posValue!==x.total)?x.posValue:'',
+      splitCheckLabel_(c),J(c.baseSales),J(c.missing),J(c.extra),J(c.baseCodes),x.feedback||''];
+    row.fbKey = x.fbKey||''; return row;   // fbKey chỉ để ô nhập "Sale phản hồi" biết lưu vào dòng nào (không đưa vào Excel)
+  });
 }
 function splitDetailPanelHtml_(m){
   if (!m) return '';
@@ -77,24 +89,33 @@ function splitDetailPanelHtml_(m){
   var h = '<div id="sr-m-detail" style="margin-top:14px;border:1px solid var(--border);border-radius:10px;padding:12px;background:var(--surface)">'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px"><b style="font-size:14px">Chi tiết đơn chia — '+splitEsc_(m.sale)+'</b>'
     + tabBtn('base','📘 Chi tiết Base')+tabBtn('pos','🧾 Chi tiết Pos')
+    + (m.tab==='pos' ? '<button type="button" class="btn sm'+(m.onlyLech?' primary':'')+'" data-m-lech="1" title="Chỉ hiện đơn Pos lệch thẻ sale so với Base">🔴 Chỉ đơn lệch Base</button>' : '')
     + '<button type="button" class="btn sm" data-m-xlsx="1"'+(m.data?'':' disabled')+'>📥 Xuất Excel đối soát (Base + Pos)</button>'
     + '<button type="button" class="btn sm" data-m-close="1" style="margin-left:auto">✕ Đóng</button></div>';
   if (m.loading) return h+'<div style="color:var(--muted);padding:20px;text-align:center">Đang tải chi tiết…</div></div>';
   if (m.error) return h+'<div style="color:var(--red);padding:12px">⚠ '+splitEsc_(m.error)+'</div></div>';
-  var d = m.data||{}, sm = d.summary||{}, rows = splitDetRows_(d, m.tab), head = m.tab==='base'?SPLIT_DET_BASE_HEAD:SPLIT_DET_POS_HEAD;
+  var d = m.data||{}, sm = d.summary||{}, rows = splitDetRows_(d, m.tab, m.onlyLech), head = m.tab==='base'?SPLIT_DET_BASE_HEAD:SPLIT_DET_POS_HEAD;
   (d.warnings||[]).forEach(function(w){ h += '<div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:12px">⚠ '+splitEsc_(w)+'</div>'; });
   h += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Kỳ '+splitEsc_(d.from)+' → '+splitEsc_(d.to)+' · '
     + (m.tab==='base' ? '<b>'+splitNum_(sm.baseOrders)+'</b> đơn gốc Base · tổng '+splitMoney_(sm.baseTotal)+' · phần của sale <b>'+splitMoney_(sm.baseShare)+'</b>'
                       : '<b>'+splitNum_(sm.posOrders)+'</b> đơn Pos chia · tổng '+splitMoney_(sm.posTotal)+' · phần của sale <b>'+splitMoney_(sm.posShare)+'</b>')+'</div>';
-  if (!rows.length) h += '<div class="split-msg">'+(m.tab==='base' ? 'Không có đơn gốc Base nào trong kỳ này (đơn chia của sale này không ghép với đơn Base).' : 'Không có đơn chia nào trong kỳ này.')+'</div>';
+  if (m.tab==='pos' && sm.check){ var ck = sm.check; h += '<div style="font-size:12px;margin-bottom:8px;display:flex;gap:12px;flex-wrap:wrap"><span style="color:var(--red);font-weight:700">🔴 '+splitNum_(ck.lech)+' đơn LỆCH Base</span><span style="color:var(--green,#15803d)">🟢 '+splitNum_(ck.khop)+' khớp</span><span style="color:var(--muted)">⚪ '+splitNum_(ck.khongCoBase)+' không có đơn Base để đối chiếu</span>'+(ck.goiY?'<span style="color:var(--muted)">('+splitNum_(ck.goiY)+' đơn đối chiếu theo gợi ý SĐT + ngày, cần kế toán xác nhận)</span>':'')+'</div>'; }
+  if (!rows.length) h += '<div class="split-msg">'+(m.tab==='base' ? 'Không có đơn gốc Base nào trong kỳ này (đơn chia của sale này không ghép với đơn Base).' : (m.onlyLech ? 'Không có đơn nào lệch Base.' : 'Không có đơn chia nào trong kỳ này.'))+'</div>';
   else {
-    h += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr>'+head.map(function(t,i){ return '<th'+(i===7||i===8||i===9?' class="r"':'')+'>'+splitEsc_(t)+'</th>'; }).join('')+'</tr></thead><tbody>';
-    rows.forEach(function(r){ h += '<tr>'+r.map(function(c,i){ return (i===7||i===8||i===9) ? '<td class="r">'+(c===''||c==null?'':(i===8?'<b>'+splitMoney_(c)+'</b>':splitMoney_(c)))+'</td>' : '<td>'+((i===2||i===3) && typeof _custLinkHtml_==='function' ? _custLinkHtml_(r[3], splitEsc_(c)) : splitEsc_(c))+'</td>'; }).join('')+'</tr>'; });
-    h += '<tr style="font-weight:700;background:var(--surface2)"><td colspan="7">Tổng ('+splitNum_(rows.length)+' dòng)</td><td class="r">'+splitMoney_(m.tab==='base'?sm.baseTotal:sm.posTotal)+'</td><td class="r">'+splitMoney_(m.tab==='base'?sm.baseShare:sm.posShare)+'</td>'+(m.tab==='base'?'':'<td></td>')+'</tr></tbody></table></div>';
+    var money = m.tab==='base' ? {7:1,8:1} : {7:1,8:1,9:1};
+    h += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr>'+head.map(function(t,i){ return '<th'+(money[i]?' class="r"':'')+'>'+splitEsc_(t)+'</th>'; }).join('')+'</tr></thead><tbody>';
+    rows.forEach(function(r){ h += '<tr>'+r.map(function(c,i){
+      if (money[i]) return '<td class="r">'+(c===''||c==null?'':(i===8?'<b>'+splitMoney_(c)+'</b>':splitMoney_(c)))+'</td>';
+      if (m.tab==='pos' && i===10) return '<td style="font-weight:700;color:'+(/^LỆCH/.test(c)?'var(--red)':/^Khớp/.test(c)?'var(--green,#15803d)':'var(--muted)')+'">'+splitEsc_(c)+'</td>';
+      if (m.tab==='pos' && (i===12||i===13) && c) return '<td style="color:var(--red);font-weight:600">'+splitEsc_(c)+'</td>';
+      if (m.tab==='pos' && i===15) return '<td>'+(r.fbKey ? '<input type="text" class="split-fb" data-fb-key="'+splitEsc_(r.fbKey)+'" value="'+splitEsc_(c)+'" maxlength="500" placeholder="Sale phản hồi…" style="min-width:220px;width:100%">' : splitEsc_(c))+'</td>';
+      if (m.tab==='base' && i===9) return '<td style="color:'+(/^Tham chiếu/.test(c)?'var(--muted)':'inherit')+'">'+splitEsc_(c)+'</td>';
+      return '<td>'+((i===2||i===3) && typeof _custLinkHtml_==='function' ? _custLinkHtml_(r[3], splitEsc_(c)) : splitEsc_(c))+'</td>'; }).join('')+'</tr>'; });
+    h += '<tr style="font-weight:700;background:var(--surface2)"><td colspan="7">Tổng ('+splitNum_(rows.length)+' dòng'+(m.tab==='base'&&sm.baseRefOrders?' — dòng "Tham chiếu" không cộng vào tổng':'')+')</td><td class="r">'+splitMoney_(m.tab==='base'?sm.baseTotal:sm.posTotal)+'</td><td class="r">'+splitMoney_(m.tab==='base'?sm.baseShare:sm.posShare)+'</td>'+new Array(head.length-8).join('<td></td>')+'</tr></tbody></table></div>';
   }
   h += '<div style="font-size:10.5px;color:var(--hint);margin-top:6px">'
     + (m.tab==='base' ? 'Mỗi dòng = 1 đơn gốc Base đã ghép với đơn Pos (ngày/tháng = ngày lên đơn trên Base; tên KH, SĐT lấy từ đơn Pos). Doanh thu sau chia = giá trị đơn Base ÷ số sale bán đơn đó (đơn quầy 30/70 nhân 30%). '
-        + (sm.noBaseOrders?'<b>'+splitNum_(sm.noBaseOrders)+'</b> đơn chia của sale này KHÔNG có đơn gốc Base (chia theo thẻ sale / file kế toán / quầy) — xem ở Chi tiết Pos.':'')
+        + (sm.baseRefOrders?'<b>'+splitNum_(sm.baseRefOrders)+'</b> dòng "Tham chiếu" = đơn Base tìm thấy cho đơn Pos không ghép (theo mã bộ đếm hoặc gợi ý theo SĐT + ngày) chỉ để đối chiếu thẻ sale, KHÔNG tính vào doanh thu chia. ':'')+(sm.noBaseOrders?'<b>'+splitNum_(sm.noBaseOrders)+'</b> đơn chia của sale này KHÔNG có đơn gốc Base (chia theo thẻ sale / file kế toán / quầy) — xem ở Chi tiết Pos.':'')
       : 'Mỗi dòng = 1 đơn Pos có ≥2 sale cùng chia. Tổng doanh thu = số được tính trong báo cáo (đơn ghép Base dùng tổng các đơn gốc Base; cột "Giá đơn Pos gốc" hiện giá Pos khi khác). Doanh thu sau chia khớp cột "Doanh thu từ đơn chia" ở bảng trên.')
     + (d.truncated?' · Danh sách quá dài nên chỉ hiện '+splitNum_(3000)+' dòng đầu — thu hẹp khoảng ngày.':'')+'</div></div>';
   return h;
@@ -153,10 +174,35 @@ function splitBannerSync_(srcValue){
 
 // ── Báo cáo M ──
 if (typeof _srState!=='undefined'){ _srState.mDateQuick = _srState.mDateQuick || 'thisMonth'; _srState.mDateFrom = _srState.mDateFrom || ''; _srState.mDateTo = _srState.mDateTo || ''; _srState.mSearch = _srState.mSearch || ''; if (_srState.dataM===undefined) _srState.dataM = null; if (_srState.mSel===undefined) _srState.mSel = null; }
+// Công tắc "Đơn Pos 1 mã chia theo Base" (Settings POS_GHEP_MIN_CODES, chỉ Admin bật/tắt; mặc định TẮT = chỉ đơn ≥2 mã ghép Base).
+function splitGhepBtnHtml_(isAdmin, on){
+  if (!isAdmin) return '';
+  return '<button type="button" class="btn sm'+(on?' primary':'')+'" onclick="_srMToggleGhep_()" title="BẬT: đơn Pos từ 1 mã bộ đếm cũng chia tiền theo sale + giá đơn gốc Base (tháng 9 từng làm lệch tổng so với file kế toán — bật xong phải đối chiếu lại). TẮT: chỉ đơn ≥2 mã ghép Base (quy tắc hiện hành)">⚙ Đơn 1 mã chia theo Base: '+(on?'BẬT':'TẮT')+'</button>';
+}
+function _srIsAdmin_(){ return typeof currentUser!=='undefined' && !!currentUser && currentUser.role==='admin'; }
+async function _srMToggleGhep_(){
+  var turnOn = !_srState.ghepMin1;
+  var msg = turnOn
+    ? 'BẬT: đơn Pos có từ 1 mã bộ đếm trở lên sẽ chia tiền theo sale và giá của đơn gốc Base.\n\nLưu ý: tháng 9 ghép cả đơn 1 mã từng làm tổng lệch 18.986.000đ so với file kế toán. Sau khi bật hãy đối chiếu lại tổng với file kế toán.\n\nBật?'
+    : 'TẮT: chỉ đơn Pos có từ 2 mã bộ đếm trở lên mới ghép Base (quy tắc chốt tháng 10), đơn 0–1 mã chia theo thẻ Pos.\n\nTắt?';
+  if (typeof confirm==='function' && !confirm(msg)) return;
+  try{
+    var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'setSetting', key:'POS_GHEP_MIN_CODES', value: turnOn ? '1' : '2' }) });
+    var j = await r.json();
+    if (!j || j.ok===false || j.error) throw new Error((j && j.error) || 'Không lưu được.');
+    _srState.ghepMin1 = turnOn;
+    if (typeof toast==='function') toast(turnOn ? '✅ Đã BẬT: đơn 1 mã chia theo Base — đang tính lại báo cáo…' : '✅ Đã TẮT: về quy tắc ≥2 mã — đang tính lại báo cáo…');
+    if (typeof _srLoad==='function') _srLoad(); else if (typeof renderSalesReportTabM_==='function') _srMRerender_();
+  }catch(err){
+    if (typeof toast==='function') toast('⚠ Chưa đổi được công tắc: '+(err && err.message || err));
+  }
+}
 async function splitReportLoad_(){
   if (_srState.mDateQuick && _srState.mDateQuick!=='custom' && typeof _pkQuickRange==='function'){ var r = _pkQuickRange(_srState.mDateQuick); if (r){ _srState.mDateFrom = r.from; _srState.mDateTo = r.to; } }
   _srState.mSel = null;   // đổi kỳ/lọc lại -> chi tiết cũ không còn đúng kỳ, đóng lại
+  var gp = _srIsAdmin_() ? _srFetch('getSetting', { key:'POS_GHEP_MIN_CODES' }).catch(function(){ return null; }) : Promise.resolve(null);
   _srState.dataM = await _srFetch('splitOrderReport', { dateFrom:_srState.mDateFrom, dateTo:_srState.mDateTo });
+  var g = await gp; if (_srIsAdmin_()) _srState.ghepMin1 = String((g && g.value) || '').trim()==='1';
 }
 function renderSalesReportTabM_(wrap, subTabs){
   var quick = (typeof _quickRangeSelectHtml==='function') ? _quickRangeSelectHtml(_srState.mDateQuick, "_srApplyQuickRange('mDateQuick','mDateFrom','mDateTo',this.value)") : '';
@@ -165,19 +211,64 @@ function renderSalesReportTabM_(wrap, subTabs){
     +'<input type="date" value="'+splitEsc_(_srState.mDateTo)+'" onchange="_srState.mDateTo=this.value;_srState.mDateQuick=\'custom\'" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px">'
     +'<button type="button" class="btn sm primary" onclick="_srLoad()">Lọc</button>'
     +'<input type="text" value="'+splitEsc_(_srState.mSearch)+'" placeholder="🔍 Tìm tên sale…" oninput="_srState.mSearch=this.value;_srMRerender_()" style="padding:5px 9px;border:1px solid var(--border);border-radius:6px;min-width:160px">'
-    +'<button type="button" class="btn sm" onclick="_srMExportCsv_()">⬇ CSV</button></div>';
+    +'<button type="button" class="btn sm" onclick="_srMExportCsv_()">⬇ CSV</button>'
+    +splitGhepBtnHtml_(_srIsAdmin_(), !!_srState.ghepMin1)
+    +'<button type="button" class="btn sm" onclick="_srMExportAllXlsx_()" title="Tải chi tiết từng sale có đơn chia rồi gộp 1 file Excel: Tổng hợp · Pos · Base (có cột Sale, đối chiếu Base, Sale phản hồi)">📥 Excel đối soát TẤT CẢ sale</button></div>';
   wrap.innerHTML = bar + '<div id="sr-m-body">' + (_srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải…</div>' : splitReportHtml_(_srState.dataM, _srState.mSearch, _srState.mSel&&_srState.mSel.sale)+splitDetailPanelHtml_(_srState.mSel)) + '</div>';
-  var bd = document.getElementById('sr-m-body'); if (bd) bd.onclick = _srMClick_;
+  var bd = document.getElementById('sr-m-body'); if (bd){ bd.onclick = _srMClick_; bd.onchange = _srMFbChange_; }
 }
 function _srMRerender_(){ var el = document.getElementById('sr-m-body'); if (el) el.innerHTML = splitReportHtml_(_srState.dataM, _srState.mSearch, _srState.mSel&&_srState.mSel.sale)+splitDetailPanelHtml_(_srState.mSel); }
 function splitDetailXlsxSheets_(det){   // [{name, rows:[[header],[...]]}] — sheet 1 = Base, sheet 2 = Pos
   return [{ name:'Base', rows:[SPLIT_DET_BASE_HEAD].concat(splitDetRows_(det,'base')) }, { name:'Pos', rows:[SPLIT_DET_POS_HEAD].concat(splitDetRows_(det,'pos')) }];
 }
+// ── Xuất Excel đối soát cho TẤT CẢ sale 1 lần (Duyên yêu cầu 2026-10-24) ──
+// list = [{sale, data}] (data = kết quả splitOrderDetail của từng sale), errors = [{sale, error}]. Sheet: Tổng hợp (mỗi sale 1 dòng) · Pos · Base (thêm cột "Sale" đầu bảng) · Lỗi (nếu có sale tải hỏng).
+var SPLIT_ALL_SUM_HEAD = ['Sale','Số đơn Pos chia','Phần chia (Pos)','Số dòng Base ghép','Phần chia (Base ghép)','LỆCH Base','Khớp Base','Không có Base','Gợi ý theo SĐT','Có Sale phản hồi'];
+function splitAllXlsxSheets_(list, errors){
+  var sum = [SPLIT_ALL_SUM_HEAD], pos = [['Sale'].concat(SPLIT_DET_POS_HEAD)], base = [['Sale'].concat(SPLIT_DET_BASE_HEAD)];
+  (list||[]).forEach(function(it){
+    var d = it.data || {}, sm = d.summary || {}, ck = sm.check || {}, fb = (d.pos||[]).filter(function(x){ return x.feedback; }).length;
+    sum.push([it.sale, sm.posOrders||0, sm.posShare||0, sm.baseOrders||0, sm.baseShare||0, ck.lech||0, ck.khop||0, ck.khongCoBase||0, ck.goiY||0, fb]);
+    splitDetRows_(d,'pos').forEach(function(r){ pos.push([it.sale].concat(r)); });
+    splitDetRows_(d,'base').forEach(function(r){ base.push([it.sale].concat(r)); });
+  });
+  var out = [{ name:'Tong hop', rows:sum }, { name:'Pos', rows:pos }, { name:'Base', rows:base }];
+  if (errors && errors.length) out.push({ name:'Loi', rows:[['Sale','Lỗi']].concat(errors.map(function(e){ return [e.sale, e.error]; })) });
+  return out;
+}
+var _srAllBusy = false;
+async function _srMExportAllXlsx_(){
+  var dm = _srState.dataM; if (!dm || !dm.bySale){ if (typeof toast==='function') toast('Chưa có dữ liệu — bấm "Lọc" trước.'); return; }
+  if (typeof XLSX==='undefined'){ if (typeof toast==='function') toast('Thư viện Excel chưa tải xong — đợi vài giây rồi bấm lại.'); return; }
+  if (_srAllBusy) return;
+  var sales = (dm.bySale||[]).filter(function(r){ return (Number(r.splitOrders)||0) > 0; }).map(function(r){ return r.name; });
+  if (!sales.length){ if (typeof toast==='function') toast('Không có sale nào có đơn chia trong kỳ này.'); return; }
+  _srAllBusy = true;
+  var list = [], errors = [], done = 0, next = 0, from = dm.from||_srState.mDateFrom, to = dm.to||_srState.mDateTo;
+  var say = function(){ if (typeof toast==='function') toast('Đang tải đối soát '+done+'/'+sales.length+' sale…'); };
+  async function worker(){
+    while (next < sales.length){
+      var sale = sales[next++];
+      try { var d = await _srFetch('splitOrderDetail', { dateFrom:from, dateTo:to, sale:sale });
+        if (!d || d.ok===false || d.error) errors.push({ sale:sale, error:(d && d.error) || _srState.lastFetchError || 'Không tải được' }); else list.push({ sale:sale, data:d });
+      } catch (e) { errors.push({ sale:sale, error:String(e && e.message || e) }); }
+      done++; if (done % 3 === 0 || done === sales.length) say();
+    }
+  }
+  try {
+    say(); await Promise.all([worker(), worker()]);
+    list.sort(function(a,b){ return sales.indexOf(a.sale) - sales.indexOf(b.sale); });
+    var wb = XLSX.utils.book_new(), widths = { 'Tong hop':[22,14,18,16,20,12,12,14,14,16], Pos:[20].concat([12,12,22,14,34,24,40,16,16,18,26,26,26,26,18,30]), Base:[20].concat([12,12,22,14,16,26,40,16,16,28]) };
+    splitAllXlsxSheets_(list, errors).forEach(function(sh){ var ws = XLSX.utils.aoa_to_sheet(sh.rows); ws['!cols'] = (widths[sh.name]||[24,60]).map(function(w){ return { wch:w }; }); XLSX.utils.book_append_sheet(wb, ws, sh.name); });
+    XLSX.writeFile(wb, 'DoiSoat_DonChia_TatCaSale_'+(from||'')+'_'+(to||'')+'.xlsx');
+    if (typeof toast==='function') toast('Đã xuất đối soát '+list.length+' sale'+(errors.length?(' — '+errors.length+' sale lỗi (xem sheet Loi)'):'')+'.');
+  } finally { _srAllBusy = false; }
+}
 function _srMExportXlsx_(){
   var m = _srState.mSel, d = m && m.data;
   if (!d){ if (typeof toast==='function') toast('Chưa có chi tiết — bấm vào 1 sale để tải.'); return; }
   if (typeof XLSX==='undefined'){ if (typeof toast==='function') toast('Thư viện Excel chưa tải xong — đợi vài giây rồi bấm lại.'); return; }
-  var wb = XLSX.utils.book_new(), widths = { Base:[12,12,22,14,16,26,40,16,16], Pos:[12,12,22,14,34,24,40,16,16,18] };
+  var wb = XLSX.utils.book_new(), widths = { Base:[12,12,22,14,16,26,40,16,16,28], Pos:[12,12,22,14,34,24,40,16,16,18,26,26,26,26,18,30] };
   splitDetailXlsxSheets_(d).forEach(function(sh){ var ws = XLSX.utils.aoa_to_sheet(sh.rows); ws['!cols'] = (widths[sh.name]||[]).map(function(w){ return { wch:w }; }); XLSX.utils.book_append_sheet(wb, ws, sh.name); });
   var nm = String(m.sale||'sale').replace(/[\\/:*?"<>|]+/g,'_').trim();
   XLSX.writeFile(wb, 'DoiSoat_DonChia_'+nm+'_'+(d.from||'')+'_'+(d.to||'')+'.xlsx');
@@ -198,9 +289,28 @@ async function _srMLoadDetail_(){
   else cur.data = d;
   _srMRerender_();
 }
+// Ô "Sale phản hồi" (tab Pos): lưu khi rời ô / Enter. Lỗi (không đủ quyền, mất mạng) → báo + giữ chữ để thử lại.
+async function _srMFbChange_(e){
+  var t = e && e.target; if (!t || !t.classList || !t.classList.contains('split-fb')) return;
+  var m = _srState.mSel, d = m && m.data; if (!d) return;
+  var key = t.getAttribute('data-fb-key'), text = t.value, item = (d.pos||[]).filter(function(x){ return x.fbKey===key; })[0];
+  t.style.outline = '2px solid #f59e0b';
+  try{
+    var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'splitFeedbackSave', key:key, sale:m.sale, text:text }) });
+    var j = await r.json();
+    if (!j || j.ok===false || j.error) throw new Error((j && j.error) || 'Không lưu được.');
+    if (item){ item.feedback = j.text; item.feedbackBy = j.by; item.feedbackAt = j.at; }
+    t.value = j.text; t.style.outline = '2px solid #16a34a'; t.title = 'Đã lưu bởi '+(j.by||'')+' lúc '+(j.at||'');
+    setTimeout(function(){ if (t.style) t.style.outline = ''; }, 1500);
+  }catch(err){
+    t.style.outline = '2px solid #dc2626';
+    if (typeof toast==='function') toast('⚠ Chưa lưu được phản hồi: '+(err && err.message || err));
+  }
+}
 function _srMClick_(e){
   var t = e.target; if (!t || !t.closest) return;
   var x = t.closest('[data-m-xlsx]'); if (x){ _srMExportXlsx_(); return; }
+  if (t.closest('[data-m-lech]') && _srState.mSel){ _srState.mSel.onlyLech = !_srState.mSel.onlyLech; _srMRerender_(); return; }
   if (t.closest('[data-m-close]')){ _srState.mSel = null; _srMRerender_(); return; }
   var tb = t.closest('[data-m-tab]'); if (tb && _srState.mSel){ _srState.mSel.tab = tb.getAttribute('data-m-tab'); _srMRerender_(); return; }
   var tr = t.closest('[data-m-sale]'); if (!tr) return;
@@ -212,4 +322,4 @@ function _srMExportCsv_(){
   var d = _srState.dataM; if (!d || !d.bySale){ if (typeof toast==='function') toast('Chưa có dữ liệu — bấm "Lọc" trước.'); return; }
   if (typeof _srGDownloadCsv_==='function') _srGDownloadCsv_('Bao-cao-don-chia_'+(d.from||'')+'_'+(d.to||'')+'.csv', splitCsvRows_(d));
 }
-if (typeof module!=='undefined') module.exports = { splitPhoneKey_, splitBannerHtml_, splitDetailHtml_, splitReportHtml_, splitCsvRows_, splitCustomerPass_, splitDetailPanelHtml_, splitDetailXlsxSheets_, _split };
+if (typeof module!=='undefined') module.exports = { splitGhepBtnHtml_, _srMToggleGhep_, splitAllXlsxSheets_, _srMExportAllXlsx_, _srMFbChange_, splitPhoneKey_, splitBannerHtml_, splitDetailHtml_, splitReportHtml_, splitCsvRows_, splitCustomerPass_, splitDetailPanelHtml_, splitDetailXlsxSheets_, _split };

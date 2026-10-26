@@ -9,6 +9,8 @@ var _srSidebarHidden, _posOrdersCache, _posOrdersState, _cskhDetailCache, _cskhD
 // trong ban sao code backend (khoi tham khao "Copy Apps Script Code", khong thuc thi trong
 // trinh duyet) — gay loi "splitMulti_ is not defined" khi Auto-sync chay. Dinh nghia lai
 // dung y het logic ben backend de dung o day.
+// Token chỉ gồm số/dấu ("8", "13", "#8") hoặc "STT 8" là số thứ tự Pancake, KHÔNG phải tên sale — cùng quy tắc với _isNumericTag_ ở gas_v13.js.
+function isNumTagSale_(x){ var t = String(x == null ? '' : x).trim(); return /^[#\d\s.,\-\/()]+$/.test(t) || /^stt\s*[#\d.\s]+$/i.test(t); }
 function splitMulti_(str, delimiter) {
   if (!str && str !== 0) return [];
   var s = String(str);
@@ -482,7 +484,7 @@ function _computeCommissionData_(orders) {
       shareMap = {};
       salesList = m.saleShares.map(function(x){ shareMap[x.name] = x.frac; return x.name; });
     } else {
-      salesList = splitMulti_(m.saleBan, ',');
+      salesList = splitMulti_(m.saleBan, ',').filter(function(x){ return !isNumTagSale_(x); });   // loai STT Pancake (8, 13…): không có sale nào tên toàn số
       if (!salesList.length) salesList = ['(chưa gán sale)'];
     }
     var n = salesList.length;
