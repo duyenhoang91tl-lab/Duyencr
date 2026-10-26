@@ -2,6 +2,12 @@
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
 
+## 2026-10-26 — App viết tắt: log báo 502/404 + màn hình đăng nhập bị cắt (Duyên gửi log)
+
+- **Đăng nhập bị cắt (viewport 577x248)**: đã được sửa ở commit ad79e9f (session khác); phiên này tái hiện lỗi cũ (thẻ đăng nhập lệch −34px, nút không bấm được) và xác nhận bản sửa trong Chromium thật ở 577x248 và 412x220.
+- **502/404 ở orders/donPhones/cskhDuyenLite/staffOverview**: KHÔNG xác minh được nguyên nhân gốc từ đây (không gọi được server thật, không xem được Actions). Nghi ngờ GAS quá tải/timeout khi nhiều máy cùng gọi action nặng. Giảm nhẹ ở `cloudflare/worker.mjs`: cache `donPhones` 30s (dùng chung) + `staffOverview` 60s (khoá theo người xem, thêm vào GATED_ACTIONS); thử lại 1 lần khi 502/404/đứt kết nối nếu chưa có bản cũ (có bản cũ thì trả STALE ngay). Test: `tools/test-cloudflare-worker.js`.
+- **VIỆC CẦN LÀM TIẾP**: (1) kiểm tra Actions deploy-worker đã chạy xong; (2) Duyên mở lại app, gửi log mới từ app 1.7; nếu vẫn 502 → kiểm tra GAS_URL của Worker, bản triển khai GAS còn sống, hạn mức Apps Script; (3) log cũ có token phiên → nên đăng xuất/đăng nhập lại.
+
 ## 2026-10-25 — App Duyên CRM: kiểm chứng (3)/(2-xuất file) + chờ Duyên chọn hướng (thông báo nhắc hẹn hay sửa tiếp trang trắng)
 - [x] ĐÃ PUSH: ghi kết quả xác minh vào mục "APP DUYÊN CRM" (Actions xanh tới 1.6; CRM đăng nhập user/mật khẩu → không vướng OAuth WebView; mọi đường xuất file khớp hook). KHÔNG sửa mã.
 - ĐANG LÀM: không có việc dở, không có file lớn đang sửa.
