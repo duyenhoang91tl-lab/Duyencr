@@ -26,7 +26,7 @@ html.ev-boot #empty-view .ev-spin{display:flex}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="css/01-base.css?v=20261020a">
+<link rel="stylesheet" href="css/01-base.css?v=20261026a">
 <link rel="stylesheet" href="css/02-style.css">
 </head>
 <body>
@@ -832,7 +832,17 @@ window.addEventListener('load',function(){var s=document.createElement('script')
           <select id="vt-scope-filter" class="assign-input" onchange="vtRender()" style="font-size:12px;padding:4px 8px"><option value="">Tất cả</option><option value="team">👥 Chung (cả team)</option><option value="me">🙋 Của tôi</option></select>
           <input id="vt-search" class="zai-input" placeholder="Tìm viết tắt / từ khoá / nội dung..." style="flex:1;min-width:180px" oninput="vtRender()">
           <button class="btn sm primary" onclick="vtOpenForm()">+ Thêm viết tắt</button>
+          <input type="file" id="vt-imp-file" accept=".json,.zip,application/json,application/zip" data-vt="off" style="display:none" onchange="vtImportFile(this.files[0]); this.value=''">
+          <button class="btn sm" onclick="document.getElementById('vt-imp-file').click()" title="Chọn file data.json hoặc .zip xuất từ app Viết Tắt cũ (Chrome/Android)">📥 Nhập từ app Viết Tắt cũ</button>
         </div>
+        <div id="vt-imp-msg" style="font-size:11px;color:var(--muted);margin:-4px 0 8px"></div>
+        <details style="font-size:12px;margin:0 0 10px"><summary style="cursor:pointer;color:var(--accent,#1e66f5);font-weight:600">📱 Cài Viết tắt về điện thoại (iPhone / Android)</summary>
+          <div style="margin-top:6px;line-height:1.6;color:var(--muted)">
+            <b>iPhone / iPad:</b> mở link <a href="https://duyenhoang91tl-lab.github.io/Duyencr/viettat.html" target="_blank" rel="noopener">duyenhoang91tl-lab.github.io/Duyencr/viettat.html</a> bằng <b>Safari</b> → nút <b>Chia sẻ</b> → <b>Thêm vào MH chính</b>. Mở từ biểu tượng "Viết tắt" như một app (xem được khi mất mạng).<br>
+            <b>Android:</b> mở link trên bằng Chrome → <b>Cài ngay</b>; hoặc tải <a href="https://github.com/duyenhoang91tl-lab/Duyencr/releases/tag/viettat-latest" target="_blank" rel="noopener">VietTat.apk</a> (app tự hiện gợi ý khi gõ trong Zalo/Messenger).<br>
+            iPhone không cho app gõ-tự-hiện trong Zalo/Messenger: mở app Viết tắt → chọn tin/hình → <b>Sao chép</b> hoặc <b>Chia sẻ</b> → dán vào ô chat. Lần đầu nhập <b>Tên CS</b> giống trong CRM.
+          </div>
+        </details>
         <div id="vt-form-wrap" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:12px;margin-bottom:10px">
           <input type="hidden" id="vt-f-id">
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
@@ -924,12 +934,12 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 </div>
 </div>
 
-<script src="js/01-fn-splitmulti.js?v=20261024c"></script>
+<script src="js/01-fn-splitmulti.js?v=20261026a"></script>
 <script src="js/02-fn-showrowerrorbanner.js"></script>
 <script src="js/03-fn-refreshopendptab.js"></script>
 <script src="js/04-fn-synczalophonesettingsfromgas.js"></script>
 <script src="js/05-fn-saveeditphone.js"></script>
-<script src="js/06-main-renew-sources.js"></script>
+<script src="js/06-main-renew-sources.js?v=20261026a"></script>
 
 <!-- ASSIGN DATA MODAL -->
 <div class="assign-modal-overlay" id="assign-modal">
@@ -1756,7 +1766,7 @@ function openBcLogModal(phone){
 <script src="js/54-fn-promo-admin.js"></script>
 <script src="js/55-fn-shell.js?v=20261019c"></script>
 <script src="js/56-fn-qrpills.js"></script>
-<script src="js/57-viettat.js?v=20261025e"></script>
+<script src="js/57-viettat.js?v=20261025f"></script>
 <script src="js/58-auto-cust-link.js"></script>
 <script src="js/59-report-drill.js"></script>
 
