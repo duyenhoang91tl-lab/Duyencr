@@ -23,6 +23,28 @@ object Diag {
         lastEventAt = System.currentTimeMillis(); lastPkg = pkg; lastTail = tail.takeLast(40); lastWhy = why
     }
 
+    /**
+     * GÕ THỬ ngay trong app (không cần mở Zalo/Messenger): mô phỏng ĐÚNG cách ExpanderService khớp mục từ chữ đang gõ
+     * (kiểu "viết tắt + tên" trước, rồi từ cuối cùng) và nói rõ khớp mục nào hoặc vì sao không khớp. Không chèn gì, chỉ trả lời.
+     */
+    fun trial(text: String): String {
+        if (text.isBlank()) return "Gõ thử một viết tắt (vd: ch) để xem app khớp mục nào."
+        if (text.last().isWhitespace()) return "Chữ cuối là khoảng trắng → dịch vụ sẽ BỎ QUA. Gõ viết tắt xong KHÔNG bấm cách."
+        if (Store.snippets.isEmpty()) return "Trên máy chưa có mục viết tắt nào → bấm ☁ CRM để tải về (cần đúng Tên CS)."
+        val toks = Regex("\\S+").findAll(text).toList()
+        var span = ""; var typed: String? = null; var hits: List<Snippet> = emptyList()
+        for (k in 1..2) {   // kiểu "viết tắt + tên", ví dụ: ch Thanh Huyền (chỉ với nội dung có {tên})
+            if (toks.size <= k) break
+            val a = toks[toks.size - 1 - k]
+            val h = Store.snippets.filter { it.abbr.equals(a.value, true) && it.options.any { o -> o.contains("{tên") } }
+            if (h.isNotEmpty()) { hits = h; span = text.substring(a.range.first); typed = toks.takeLast(k).joinToString(" ") { it.value }; break }
+        }
+        if (hits.isEmpty()) { span = toks.last().value; hits = Store.match(span) }
+        if (hits.isEmpty()) return "❌ KHÔNG khớp mục nào với \"$span\" (máy có ${Store.snippets.size} mục). Kiểm tra: viết tắt đã tạo/đã tải về chưa, gõ đúng chữ chưa."
+        val names = hits.joinToString(", ") { it.abbr + if (Store.isCrm(it.id)) " (CRM)" else "" }
+        return "✅ Khớp ${hits.size} mục với \"$span\": $names" + (typed?.let { " · tên khách: $it" } ?: "") + " → ngoài app chat sẽ hiện màn chọn."
+    }
+
     fun report(): String {
         val total = Store.snippets.size
         val crm = Store.snippets.count { Store.isCrm(it.id) }
