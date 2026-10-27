@@ -26,15 +26,16 @@ const reset=(cfg)=>{Object.keys(settings).forEach(k=>delete settings[k]);setting
 custs=[1,2,3,4,5,6].map(n=>mk(n,['2026-09-10']));reset(cfgOf());
 let r=ctx.api.run(false);
 t('KH ngoai khoang ngay don: khong chia ca nao',r.people===0&&saved.length===0);
-t('co canh bao NOI RO ly do + so KH sau tung buoc loc',r.warn.length===1&&/khoang 2026-01-01 den 2026-08-31/.test(r.warn[0])&&r.diag.total===6&&r.diag.validPhone===6&&r.diag.afterDate===0);
+t('co canh bao NOI RO ly do + so KH sau tung buoc loc',r.warn.length===1&&/GOI Y: neu BO khoang ngay.*con 6 KH POS\/Base chua chia/.test(r.warn[0])&&r.diag.unassignedAnyDate===6&&r.diag.noDate===0&&/khoang 2026-01-01 den 2026-08-31/.test(r.warn[0])&&r.diag.total===6&&r.diag.validPhone===6&&r.diag.afterDate===0);
 // 2) trong khoang -> chia duoc
 custs=[1,2,3,4,5,6].map(n=>mk(n,['2026-05-10']));reset(cfgOf());
 r=ctx.api.run(false);
 t('KH trong khoang ngay don: chia duoc (quota 5/nguoi)',r.people>0&&r.total>0&&saved.length===r.people&&cared.length===1);
 t('danh dau da chay hom nay (khong chia lai)',JSON.parse(settings.autoAssignState).lastRun==='2026-10-14'&&ctx.api.run(false).skipped==='hom nay da chia');
 // 3) tat ca da tung chia -> ly do
-custs=[1,2,3].map(n=>mk(n,['2026-05-10']));reset(cfgOf());ctx._aaLoadCustomers_=()=>({custs:custs,ever:{[custs[0].phone]:1,[custs[1].phone]:1,[custs[2].phone]:1}});
+custs=[1,2,3].map(n=>mk(n,['2026-05-10'])).concat([mk(8,['2026-09-10']),mk(9,[])]);reset(cfgOf());ctx._aaLoadCustomers_=()=>({custs:custs,ever:{[custs[0].phone]:1,[custs[1].phone]:1,[custs[2].phone]:1}});
 r=ctx.api.run(false);t('da chia het: bao ro "da tung duoc chia"',r.people===0&&/da tung duoc chia/.test(r.warn[0])&&r.diag.unassigned===0);
+t('...kem GOI Y: bo khoang ngay thi con 2 KH chua chia (1 KH khong co ngay don)',r.diag.unassignedAnyDate===2&&r.diag.noDate===1&&/con 2 KH POS\/Base chua chia lan nao \(trong do 1 KH khong co ngay don/.test(r.warn[0]));
 ctx._aaLoadCustomers_=()=>{if(loadThrow)throw new Error(loadThrow);return{custs:custs,ever:{}}};
 // 4) khong co nguoi nhan (team chua tich) -> ly do
 custs=[1,2,3].map(n=>mk(n,['2026-05-10']));reset(cfgOf({teams:{T1:{on:false,mode:'count',val:5}}}));
