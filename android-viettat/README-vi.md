@@ -1,7 +1,7 @@
 # Duyên CRM (Android) — CRM + gõ tắt trên điện thoại
 
 App gồm 2 tab:
-- **CRM**: chạy web CRM ngay trong app (đăng nhập giữ nguyên, nút Back quay lại, chọn file để nhập, xuất Excel qua bảng chia sẻ của Android). Mọi tính năng mới của CRM có ngay, không cần cài lại app.
+- **CRM**: chạy web CRM ngay trong app (đăng nhập giữ nguyên, nút Back quay lại, chọn file để nhập, **đính kèm như Claude: 📷 Máy ảnh / 🖼 Ảnh / 📁 Tệp / 🎙 Ghi âm mới / 🎵 chọn file ghi âm** (hiện khi bấm ô tải tệp của CRM, tự lọc theo loại tệp ô đó cho phép; chọn được nhiều tệp nếu ô cho phép), xuất Excel qua bảng chia sẻ của Android). Mọi tính năng mới của CRM có ngay, không cần cài lại app.
 - **Viết tắt**: gõ tắt trong mọi ô chat (mô tả bên dưới).
 
 Gõ từ viết tắt/từ khoá trong bất kỳ ô chat nào (Zalo, Messenger, Pancake…) → hiện popup chọn nội dung → chèn. Dữ liệu **lấy từ CRM**

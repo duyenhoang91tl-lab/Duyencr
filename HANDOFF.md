@@ -2,6 +2,13 @@
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
 
+## 2026-10-27 — App Duyên CRM 1.9: đính kèm Máy ảnh / Ảnh / Tệp / Ghi âm (Duyên yêu cầu, như bảng "Thêm vào phiên" của Claude)
+
+- [x] ĐÃ PUSH: Worker cache donPhones/staffOverview + thử lại 1 lần (commit 1241e7a, đã merge cùng bản tự lùi về GAS trực tiếp của session khác).
+- [x] `android-viettat/.../CrmWeb.kt`: `onShowFileChooser` giờ mở bảng chọn theo `accept` của ô tải tệp (`showAttachMenu`): Máy ảnh (ACTION_IMAGE_CAPTURE + FileProvider), Ảnh (PICK_IMAGES API33+, dự phòng GET_CONTENT image/*), Tệp (GET_CONTENT, lọc MIME theo accept), Ghi âm mới (MediaRecorder m4a trong app, xin quyền RECORD_AUDIO runtime qua `launchPerm`), Chọn file ghi âm (audio/*). Chỉ 1 lựa chọn thì mở thẳng (vd ô chỉ nhận .xlsx → vào thẳng bộ chọn tệp như cũ). `file_paths.xml` thêm `cap/`. Bản 1.9 (versionCode 10).
+- ⚠ CHƯA BIÊN DỊCH Kotlin (máy chat không có Android SDK) → CẦN xem Actions `build-android` xanh; nếu đỏ, sửa lỗi cú pháp ở CrmWeb.kt (khối `showAttachMenu`/`recordDialog`).
+- [ ] CẦN LÀM TIẾP: Duyên cài APK 1.9, thử ô tải tệp trong CRM: chụp ảnh, chọn nhiều ảnh, ghi âm (cho phép micro lần đầu), chọn file ghi âm. Lưu ý: chỉ hiện được ở những chỗ CRM CÓ ô tải tệp (<input type=file>); nếu muốn đính kèm ở chỗ chưa có ô tải (vd ghi chú khách) thì phải thêm ô đó ở phía web.
+
 ## 2026-10-26 — App viết tắt: log báo 502/404 + màn hình đăng nhập bị cắt (Duyên gửi log)
 
 - **Đăng nhập bị cắt (viewport 577x248)**: đã được sửa ở commit ad79e9f (session khác); phiên này tái hiện lỗi cũ (thẻ đăng nhập lệch −34px, nút không bấm được) và xác nhận bản sửa trong Chromium thật ở 577x248 và 412x220.
