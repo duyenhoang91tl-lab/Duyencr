@@ -642,3 +642,8 @@ Chuẩn: chọn/ghi tên nào của 1 người cũng ra đủ dữ liệu của 
 - `tools/test-android-multi-pick.js` viết lại cho khớp mã mới (15 ca, kiểm tra mã nguồn: Photo Picker chỉ ≥ SDK 33, thứ tự thử picker trước rồi dự phòng, `multi` lấy từ `MODE_OPEN_MULTIPLE`, `pickedUris` đọc ClipData, 4 ô web có `multiple`, `vtUploadFiles` copy FileList). Chưa chạy thử trên máy thật (sandbox không có Android SDK/thiết bị).
 - Chưa làm (tuỳ chọn): Android 11–12 dùng Photo Picker qua Google Play services (`ActivityResultContracts.PickVisualMedia.isPhotoPickerAvailable`); hiện máy 11–12 dùng bộ chọn GET_CONTENT (vẫn chọn nhiều được).
 
+
+## 2026-10-27 — App Android: kết nối CRM tự động (2 phiên làm trùng; đã chốt giữ bản đã có trên main)
+- Bản đang chạy trên main (APK `viettat-latest` build từ 71fc961, versionCode 10): `CrmWeb.detectName()` lấy tên CS từ `localStorage.ome_user` của web CRM trong WebView (gọi ở onResume + khi vào tab Viết tắt + nút ☁ CRM) → `Crm.pull` gọi GAS `vietTat&by=<tên>`; địa chỉ web/dữ liệu mặc định, không còn hộp nhập tay.
+- Nhánh `wip/viettat-auto-login` (đã qua Check Android, KHÔNG merge vì trùng): bản thay thế **dùng token phiên** (`ome_sess_token`/`ome_sess_exp`) + địa chỉ dữ liệu từ `gsUrl` + kiểm tra định kỳ 2s/20s (nối ngay sau khi đăng nhập, không cần mở lại tab) và gọi `vietTat/vietTatImage` bằng `&token=` (backend `_tplCaller_` lấy tên+vai trò từ Users → không lệch nếu tài khoản không có tên hiển thị). Muốn nâng cấp: lấy `readIdentity/startIdentityWatch` + `authQuery/setIdentity` từ nhánh đó, gộp vào `detectName`.
+- Lỗi cũ trong ảnh Duyên gửi (hộp "Kết nối CRM" bắt nhập Tên CS) là APK CŨ (trước versionCode 10) — cần cài lại APK mới (cài đè được, ký khoá cố định).
