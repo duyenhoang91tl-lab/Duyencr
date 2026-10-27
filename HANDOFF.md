@@ -2,6 +2,12 @@
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
 
+## 2026-10-27 — App Duyên CRM (Android), tab Viết tắt: bỏ chữ "Kết nối" (Duyên yêu cầu)
+- [x] **Nguyên nhân:** nút `☁ CRM` ở tab Viết tắt mở hộp thoại tiêu đề "Kết nối CRM" kèm 2 ô địa chỉ (web CRM + dữ liệu Viết tắt) dù đã điền sẵn mặc định (`Crm.DEFAULT_WEB` / `Crm.DEFAULT_URL`) → gây hiểu nhầm phải tự kết nối.
+- [x] `MainActivity.kt` `CrmDialog`: tiêu đề đổi thành "Cập nhật viết tắt", BỎ 2 ô địa chỉ, chỉ còn ô "Tên CS của bạn". Lưu chỉ ghi `name` — địa chỉ riêng đã lưu trên máy (nếu từng đổi) giữ nguyên, mặc định vẫn nối sẵn CRM. Bản app: versionCode 10 / versionName 1.9 (để cài đè được bản 1.8).
+- KHÔNG đổi: nút `🌐 Kiểm tra kết nối dữ liệu` ở tab CRM (CrmWeb.kt) và mục 🩺 Chẩn đoán kết nối (đó là công cụ chẩn đoán của tab CRM, không thuộc Viết tắt). Chưa build thử trên máy (không có Gradle) — CI "Build Android VietTat" là bước xác nhận biên dịch.
+- [ ] CẦN LÀM TIẾP: Duyên tải VietTat.apk mới (Release `viettat-latest`) cài đè, vào tab Viết tắt bấm ☁ CRM kiểm tra; nếu muốn bỏ luôn việc hỏi Tên CS (tự lấy theo tài khoản đăng nhập CRM) thì báo để làm bước riêng.
+
 ## 2026-10-25 — App Duyên CRM: kiểm chứng (3)/(2-xuất file) + chờ Duyên chọn hướng (thông báo nhắc hẹn hay sửa tiếp trang trắng)
 - [x] ĐÃ PUSH: ghi kết quả xác minh vào mục "APP DUYÊN CRM" (Actions xanh tới 1.6; CRM đăng nhập user/mật khẩu → không vướng OAuth WebView; mọi đường xuất file khớp hook). KHÔNG sửa mã.
 - ĐANG LÀM: không có việc dở, không có file lớn đang sửa.
