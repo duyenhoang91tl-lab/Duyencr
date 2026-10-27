@@ -1,6 +1,12 @@
 # ⛔ ĐỌC TRƯỚC KHI PUSH — GIT MERGE-ONLY (2026-10-12)
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
+
+## 2026-10-27 (tối) — App Android 1.12: thẻ "Kiểm tra gõ tắt" tự cập nhật
+- [x] Video Duyên gửi: gõ "tuitie" ở Zalo → màn chọn HIỆN (gõ tắt chạy), nhưng thẻ 🩺 trong app vẫn báo "❌ Android CHƯA gửi sự kiện gõ nào". NGUYÊN NHÂN GỐC: `report` chỉ tính 1 lần lúc mở thẻ nên đứng yên khi sang Zalo rồi quay lại. Sửa: `LaunchedEffect` đọc lại `Diag.report()` mỗi giây khi thẻ mở (MainActivity.kt). versionCode 13 / 1.12. Chưa biên dịch cục bộ (không có SDK) → chờ Actions "Build Android VietTat" xanh.
+- [ ] CHƯA RÕ / CẦN HỎI LẠI DUYÊN: trong video, chọn "oki" + 2 hình rồi Chèn/Chia sẻ → hiện bảng chia sẻ Android, Duyên đóng lại, chữ "oki" nằm trong ô chat nhưng 2 hình KHÔNG vào hội thoại Zalo (Android chỉ dán được 1 hình/lần; chia sẻ sang Zalo mở lại danh sách chọn người nhận). Chưa sửa vì chưa rõ Duyên muốn gì (xem tin nhắn cuối phiên).
+- [ ] File "Quét trang" gửi kèm: ở màn Danh sách KH khi mở bộ chọn ngày (`#dp-overlay open`) trang bị đẩy lên 43px (html y=-43, scrollH 765 > 722). Chưa xử lý.
+
 ## 2026-10-27 — Chia tự động POS/Base "không chia được": ĐÃ XÁC ĐỊNH NGUYÊN NHÂN (Log `kiemTraChiaTuDong` của Duyên) + gợi ý sửa cấu hình
 - **Nguyên nhân gốc (từ Log thật 27/10 16:45):** hệ thống KHÔNG lỗi — hết KH để chia theo cấu hình hiện tại. 142.843 KH → 142.278 có SĐT hợp lệ → chỉ **1.240** KH có ngày đơn trong khoảng `01/01/2026–31/08/2026` → **0** KH chưa từng được chia (cả 1.240 đã chia trước đó). Trigger đã cài (1), cấu hình bật, không có lỗi (`loi: null`), hạn mức UrlFetch không liên quan.
 - [x] ĐÃ PUSH (bước 1/2): `gas_v13.js` (+ `gas/*.gs` sinh lại, test `tools/test-auto-assign-gas.js`), `ver` = `v13.62-aa-hint`. `_aaPlanAll` thêm `diag.unassignedAnyDate` (số KH POS/Base chưa chia lần nào NẾU BỎ khoảng ngày) + `diag.noDate` (KH không có ngày đơn → luôn bị loại khi đặt khoảng ngày); `_aaWhyEmpty_` in thêm **GỢI Ý** kèm 2 con số đó → hiện trong ô trạng thái tab Chia tự động và trong Log `kiemTraChiaTuDong`.
