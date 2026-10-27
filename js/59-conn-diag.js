@@ -13,16 +13,49 @@ var _gsNetLog = [];
     if (typeof gsUrl === 'undefined' || !gsUrl || url.indexOf(gsUrl) !== 0) return f.apply(this, arguments);
     var t0 = Date.now(), act = (url.match(/[?&]action=([A-Za-z0-9_]+)/) || [])[1] || (((o && o.method) || 'GET') + ''), rec = { t: t0, a: act };
     _gsNetLog.push(rec); if (_gsNetLog.length > 40) _gsNetLog.shift();
-    return f.apply(this, arguments).then(function (r) {
-      rec.ms = Date.now() - t0; rec.st = r.status; try { rec.cache = r.headers.get('x-crm-cache') || ''; } catch (e) {} return r;
-    }, function (e) { rec.ms = Date.now() - t0; rec.err = String((e && e.message) || e); throw e; });
+    var self = this, args = arguments;
+    return f.apply(self, args).then(function (r) {
+      rec.ms = Date.now() - t0; rec.st = r.status; try { rec.cache = r.headers.get('x-crm-cache') || ''; } catch (e) {}
+      if (_wkShouldFallback_(url, o, r.status)) return _wkRetryDirect_(f, self, url, o, rec, 'HTTP ' + r.status, r);
+      return r;
+    }, function (e) {
+      rec.ms = Date.now() - t0; rec.err = String((e && e.message) || e);
+      if (_wkShouldFallback_(url, o, 0)) return _wkRetryDirect_(f, self, url, o, rec, 'lỗi mạng', null, e);
+      throw e;
+    });
   };
 })();
+
+// TỰ LÙI VỀ APPS SCRIPT TRỰC TIẾP khi Worker cache lỗi (2026-10-27, bản quét app Duyên CRM trên Xiaomi/Android 16: Worker trả 502 cho orders/donPhones/cskhDuyenLite
+// và 404 cho staffOverview/donPhones → danh sách khách rỗng, màn "chưa có dữ liệu"). NGUYÊN NHÂN GỐC: chỉ ĐĂNG NHẬP có đường dự phòng (js/14), còn mọi request dữ liệu
+// đều đi Worker và không thử lại khi Worker lỗi. Nay: GET đọc-dữ-liệu qua Worker mà gặp 5xx/404/lỗi mạng → gọi lại đúng request đó THẲNG Apps Script; thành công thì
+// các request sau trong phiên này đi thẳng luôn (KHÔNG ghi nhớ: Worker sống lại thì lần mở sau tự dùng lại). Không thử lại POST và các action ghi (tránh ghi 2 lần).
+var _wkFellBack = false;
+function _wkShouldFallback_(url, o, st) {
+  try {
+    if (typeof WORKER_URL === 'undefined' || typeof GAS_URL_DIRECT === 'undefined' || !GAS_URL_DIRECT || gsUrl !== WORKER_URL || url.indexOf(WORKER_URL) !== 0) return false;
+    if (o && (o._noFb || (o.method && String(o.method).toUpperCase() !== 'GET'))) return false;
+    var act = (url.match(/[?&]action=([A-Za-z0-9_]+)/) || [])[1] || '';
+    if (/^(save|add|delete|set|update|replace|broadcastMark|sync|import|merge|upload|remove|create|clear)/i.test(act)) return false;
+    return st === 0 || st === 404 || st >= 500;
+  } catch (e) { return false; }
+}
+function _wkRetryDirect_(f, self, url, o, rec, why, origRes, origErr) {
+  var direct = GAS_URL_DIRECT + url.slice(WORKER_URL.length);
+  if (!_wkFellBack) gsUrl = GAS_URL_DIRECT;   // đổi cả phiên để request sau khỏi qua Worker lỗi; chỉ khi thử lại thành công mới giữ (xem dưới)
+  var prevUrl = WORKER_URL;
+  return f.call(self, direct, o).then(function (r2) {
+    if (r2.status >= 500 || r2.status === 404) { gsUrl = prevUrl; if (origRes) return origRes; throw origErr || new Error('HTTP ' + r2.status); }
+    rec.fb = 1;
+    if (!_wkFellBack) { _wkFellBack = true; try { if (typeof toast === 'function') toast('⚠ Worker cache đang lỗi (' + why + ') — tạm gọi thẳng Apps Script.'); } catch (e) {} }
+    return r2;
+  }, function (e2) { gsUrl = prevUrl; if (origRes) return origRes; throw origErr || e2; });
+}
 
 function _cdFmtLog() {
   return _gsNetLog.slice(-12).map(function (r) {
     var when = new Date(r.t).toTimeString().slice(0, 8);
-    return '  ' + when + ' ' + r.a + ' → ' + (r.err ? 'LỖI MẠNG: ' + r.err : ('HTTP ' + r.st + (r.cache ? ' (' + r.cache + ')' : ''))) + (r.ms != null ? ' · ' + r.ms + 'ms' : ' · đang chờ…');
+    return '  ' + when + ' ' + r.a + ' → ' + (r.err ? 'LỖI MẠNG: ' + r.err : ('HTTP ' + r.st + (r.cache ? ' (' + r.cache + ')' : ''))) + (r.fb ? ' [đã thử lại thẳng Apps Script]' : '') + (r.ms != null ? ' · ' + r.ms + 'ms' : ' · đang chờ…');
   }).join('\n') || '  (chưa có request)';
 }
 function _cdState() {
@@ -43,7 +76,7 @@ function _cdState() {
 async function _cdTest(label, url, opts) {
   opts = opts || {}; var ctl = new AbortController(), t0 = Date.now(), tm = setTimeout(function () { ctl.abort(); }, opts.timeout || 45000);
   try {
-    var r = await fetch(url, { redirect: 'follow', signal: ctl.signal }), ms1 = Date.now() - t0, text = await r.text(), ms = Date.now() - t0, j = null, jerr = '';
+    var r = await fetch(url, { redirect: 'follow', signal: ctl.signal, _noFb: true }), ms1 = Date.now() - t0, text = await r.text(), ms = Date.now() - t0, j = null, jerr = '';
     try { j = JSON.parse(text); } catch (e) { jerr = 'KHÔNG phải JSON (' + text.slice(0, 80).replace(/\s+/g, ' ') + '…)'; }
     var extra = j ? (j.error ? ' · BÁO LỖI: ' + j.error : (j.rows ? ' · rows=' + j.rows.length : '') + (j.ver ? ' · ver=' + j.ver : '') + (j.orders ? ' · orders=' + j.orders.length : '')) : ' · ' + jerr;
     var out = { ok: r.ok && !!j && !j.error, line: label + ': HTTP ' + r.status + ' · ' + ms + 'ms (có phản hồi sau ' + ms1 + 'ms) · ' + (text.length > 1048576 ? (text.length / 1048576).toFixed(1) + 'MB' : Math.round(text.length / 1024) + 'KB') + (r.headers.get('x-crm-cache') ? ' · cache=' + r.headers.get('x-crm-cache') : '') + extra };

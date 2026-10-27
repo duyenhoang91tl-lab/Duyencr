@@ -233,23 +233,21 @@ fun SnippetDialog(s: Snippet, onDone: () -> Unit) {
 
 @Composable
 fun CrmDialog(onDone: () -> Unit, onSave: () -> Unit) {
+    // Viết tắt đã MẶC ĐỊNH nối sẵn với CRM (Crm.DEFAULT_URL / DEFAULT_WEB) nên hộp này chỉ còn hỏi Tên CS — không còn chữ "Kết nối" và 2 ô địa chỉ.
+    // Địa chỉ đã lưu riêng trên máy (nếu từng đổi) vẫn được giữ nguyên: Lưu chỉ ghi "name", không đụng "url"/"web".
     val ctx = LocalContext.current
     val p = Crm.prefs(ctx)
-    var url by remember { mutableStateOf(Crm.url(ctx)) }
     var name by remember { mutableStateOf(Crm.name(ctx)) }
-    var web by remember { mutableStateOf(Crm.webUrl(ctx)) }
-    AlertDialog(onDismissRequest = onDone, title = { Text("Kết nối CRM") },
+    AlertDialog(onDismissRequest = onDone, title = { Text("Cập nhật viết tắt") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Nhập đúng tên CS của bạn (giống tên trong CRM) để thấy cả mục viết tắt riêng của bạn. Mục chung của team luôn có.", style = MaterialTheme.typography.bodySmall)
                 OutlinedTextField(name, { name = it }, singleLine = true, label = { Text("Tên CS của bạn") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(web, { web = it }, label = { Text("Địa chỉ web CRM (đã điền sẵn)") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(url, { url = it }, label = { Text("Địa chỉ dữ liệu Viết tắt (đã điền sẵn, thường không cần đổi)") }, modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = {
             TextButton({
-                if (name.isNotBlank()) { p.edit().putString("url", url.trim()).putString("web", web.trim()).putString("name", name.trim()).apply(); onSave() }
+                if (name.isNotBlank()) { p.edit().putString("name", name.trim()).apply(); onSave() }
                 onDone()
             }) { Text("Lưu & cập nhật") }
         },

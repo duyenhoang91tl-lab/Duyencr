@@ -1,5 +1,6 @@
 package com.duyen.vietat
 
+import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
@@ -9,6 +10,17 @@ import android.view.ViewGroup
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.pm.PackageManager
+import android.media.MediaRecorder
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
+import android.provider.MediaStore
+import android.webkit.MimeTypeMap
+import android.widget.TextView
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import android.os.Build
 import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
@@ -77,7 +89,11 @@ class CrmWeb(private val act: Activity) {
         return "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT}) · ${Build.MANUFACTURER} ${Build.MODEL}\nWebView: $wv\nURL: ${Crm.webUrl(act)}"
     }
     var launchChooser: ((Intent) -> Unit)? = null
+    /** Xin quyền ghi âm (đặt bởi CrmWebScreen vì cần ActivityResult launcher của Compose). */
+    var launchPerm: (() -> Unit)? = null
     private var fileCb: ValueCallback<Array<Uri>>? = null
+    private var resultHandler: ((Int, Intent?) -> Unit)? = null
+    private var permHandler: ((Boolean) -> Unit)? = null
 
     private fun home() = Crm.webUrl(act)
 
@@ -98,8 +114,111 @@ class CrmWeb(private val act: Activity) {
         }
     }
 
-    fun onChooserResult(code: Int, data: Intent?) {
-        fileCb?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(code, data)); fileCb = null
+    fun onChooserResult(code: Int, data: Intent?) { val h = resultHandler; resultHandler = null; h?.invoke(code, data) }
+    fun onPermResult(ok: Boolean) { val h = permHandler; permHandler = null; h?.invoke(ok) }
+
+    // ===== ĐÍNH KÈM NHƯ "THÊM VÀO PHIÊN" CỦA CLAUDE: Máy ảnh / Ảnh / Tệp / Ghi âm (27/10/2026) =====
+    // NGUYÊN NHÂN GỐC: trước đây mọi ô <input type=file> của CRM chỉ mở 1 bộ chọn tệp hệ thống (createIntent = GET_CONTENT) nên không chụp ảnh
+    // tại chỗ, không có bộ chọn Ảnh (Google Photos) riêng và không ghi âm được. Nay hiện bảng chọn theo loại tệp trang yêu cầu (accept).
+    private fun finishPick(u: Array<Uri>?) { fileCb?.onReceiveValue(u); fileCb = null }
+    private fun launch(intent: Intent, h: (Int, Intent?) -> Unit): Boolean {
+        val l = launchChooser ?: return false
+        resultHandler = h
+        return try { l(intent); true } catch (e: Exception) { resultHandler = null; false }
+    }
+    private fun pickedUris(code: Int, d: Intent?): Array<Uri>? {
+        if (code != Activity.RESULT_OK || d == null) return null
+        val cd = d.clipData
+        if (cd != null && cd.itemCount > 0) return Array(cd.itemCount) { cd.getItemAt(it).uri }
+        return d.data?.let { arrayOf(it) }
+    }
+    private fun capDir(): File {
+        val dir = File(act.cacheDir, "cap").also { it.mkdirs() }
+        dir.listFiles()?.forEach { if (System.currentTimeMillis() - it.lastModified() > 86_400_000L) it.delete() }
+        return dir
+    }
+    private fun fileUri(f: File): Uri = FileProvider.getUriForFile(act, act.packageName + ".files", f)
+    private fun stamp(): String = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
+    private fun toastShort(m: String) { Toast.makeText(act, m, Toast.LENGTH_LONG).show() }
+
+    private fun pickFiles(mimes: List<String>, multi: Boolean) {
+        val i = Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE)
+        i.type = "*/*"
+        if (multi) i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        if (mimes.isNotEmpty()) i.putExtra(Intent.EXTRA_MIME_TYPES, mimes.toTypedArray())
+        if (!launch(i) { c, d -> finishPick(pickedUris(c, d)) }) { toastShort("Không mở được bộ chọn tệp"); finishPick(null) }
+    }
+    private fun pickPhotos(multi: Boolean) {
+        val fallback = Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*")
+        if (multi) fallback.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        val done = { c: Int, d: Intent? -> finishPick(pickedUris(c, d)) }
+        if (Build.VERSION.SDK_INT >= 33) {
+            val i = Intent(MediaStore.ACTION_PICK_IMAGES)
+            if (multi) i.putExtra(MediaStore.EXTRA_PICK_IMAGES_MAX, MediaStore.getPickImagesMaxLimit())
+            if (launch(i, done)) return
+        }
+        if (!launch(fallback, done)) { toastShort("Không mở được bộ chọn ảnh"); finishPick(null) }
+    }
+    private fun pickAudioFiles(multi: Boolean) {
+        val i = Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE).setType("audio/*")
+        if (multi) i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        if (!launch(i) { c, d -> finishPick(pickedUris(c, d)) }) { toastShort("Không mở được bộ chọn ghi âm"); finishPick(null) }
+    }
+    private fun takePhoto() {
+        try {
+            val f = File(capDir(), "anh-" + stamp() + ".jpg"); val uri = fileUri(f)
+            val i = Intent(MediaStore.ACTION_IMAGE_CAPTURE).putExtra(MediaStore.EXTRA_OUTPUT, uri)
+                .addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            i.clipData = ClipData.newRawUri("", uri)
+            if (!launch(i) { c, _ -> finishPick(if (c == Activity.RESULT_OK && f.length() > 0) arrayOf(uri) else null) }) { toastShort("Máy không có ứng dụng chụp ảnh"); finishPick(null) }
+        } catch (e: Exception) { toastShort("Không mở được máy ảnh: ${e.message}"); finishPick(null) }
+    }
+    private fun startRecording() {
+        if (act.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) { recordDialog(); return }
+        val lp = launchPerm
+        if (lp == null) { finishPick(null); return }
+        permHandler = { ok -> if (ok) recordDialog() else { toastShort("Cần cho phép ghi âm (Cài đặt → Ứng dụng → Duyên CRM → Quyền) để ghi âm"); finishPick(null) } }
+        lp()
+    }
+    private fun recordDialog() {
+        val f = File(capDir(), "ghi-am-" + stamp() + ".m4a")
+        @Suppress("DEPRECATION")
+        val rec = if (Build.VERSION.SDK_INT >= 31) MediaRecorder(act) else MediaRecorder()
+        try {
+            rec.setAudioSource(MediaRecorder.AudioSource.MIC); rec.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            rec.setAudioEncoder(MediaRecorder.AudioEncoder.AAC); rec.setAudioEncodingBitRate(96000); rec.setAudioSamplingRate(44100)
+            rec.setOutputFile(f.absolutePath); rec.prepare(); rec.start()
+        } catch (e: Exception) { runCatching { rec.release() }; toastShort("Không bắt đầu ghi âm được: ${e.message}"); finishPick(null); return }
+        val tv = TextView(act).apply { text = "● Đang ghi âm…  00:00"; textSize = 20f; setPadding(56, 40, 56, 16) }
+        val t0 = SystemClock.elapsedRealtime(); val h = Handler(Looper.getMainLooper())
+        val tick = object : Runnable { override fun run() { val sec = (SystemClock.elapsedRealtime() - t0) / 1000; tv.text = "● Đang ghi âm…  %02d:%02d".format(sec / 60, sec % 60); h.postDelayed(this, 500) } }
+        h.post(tick)
+        var done = false
+        fun stop(use: Boolean) {
+            if (done) return; done = true; h.removeCallbacks(tick)
+            val ok = try { rec.stop(); true } catch (e: Exception) { false }
+            runCatching { rec.release() }
+            if (use && ok && f.length() > 0) finishPick(arrayOf(fileUri(f))) else { f.delete(); finishPick(null) }
+        }
+        AlertDialog.Builder(act).setTitle("🎙 Ghi âm").setView(tv).setCancelable(false)
+            .setPositiveButton("Dừng & dùng") { _, _ -> stop(true) }.setNegativeButton("Huỷ") { _, _ -> stop(false) }.show()
+    }
+
+    /** Bảng chọn đính kèm theo loại tệp ô tải lên cho phép (accept). Chỉ có 1 lựa chọn thì mở thẳng. */
+    private fun showAttachMenu(p: WebChromeClient.FileChooserParams) {
+        val acc = p.acceptTypes.map { it.trim().lowercase() }.filter { it.isNotEmpty() }
+        val multi = p.mode == WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE
+        val any = acc.isEmpty() || acc.any { it == "*/*" || it == "*" }
+        val mimes = acc.mapNotNull { t -> if (t.contains("/")) t else MimeTypeMap.getSingleton().getMimeTypeFromExtension(t.removePrefix(".")) }.distinct()
+        val wantImg = any || acc.any { it.startsWith("image") }
+        val wantAud = any || acc.any { it.startsWith("audio") }
+        val labels = ArrayList<String>(); val acts = ArrayList<() -> Unit>()
+        if (wantImg) { labels.add("📷  Máy ảnh"); acts.add { takePhoto() }; labels.add("🖼  Ảnh"); acts.add { pickPhotos(multi) } }
+        labels.add("📁  Tệp"); acts.add { pickFiles(if (any) emptyList() else mimes, multi) }
+        if (wantAud) { labels.add("🎙  Ghi âm mới"); acts.add { startRecording() }; labels.add("🎵  Chọn file ghi âm"); acts.add { pickAudioFiles(multi) } }
+        if (acts.size == 1) { acts[0](); return }
+        AlertDialog.Builder(act).setTitle("Thêm vào CRM").setItems(labels.toTypedArray()) { _, i -> acts[i]() }
+            .setNegativeButton("Huỷ") { _, _ -> finishPick(null) }.setOnCancelListener { finishPick(null) }.show()
     }
 
     /** Lưu file do trang tạo ra (blob/data) vào bộ nhớ đệm rồi mở bảng chia sẻ để lưu/mở (Excel, Drive, Zalo…). */
@@ -250,7 +369,7 @@ class CrmWeb(private val act: Activity) {
             javaScriptCanOpenWindowsAutomatically = false
             mediaPlaybackRequiresUserGesture = true
             cacheMode = WebSettings.LOAD_DEFAULT
-            userAgentString = userAgentString + " DuyenCRM-Android/1.1"
+            userAgentString = userAgentString + " DuyenCRM-Android/1.9"
         }
         WebView.setWebContentsDebuggingEnabled(true)   // chrome://inspect trên máy tính khi cần soi sâu
         addJavascriptInterface(Bridge(), "AndroidDl")
@@ -294,14 +413,9 @@ class CrmWeb(private val act: Activity) {
             }
             override fun onShowFileChooser(w: WebView, cb: ValueCallback<Array<Uri>>, p: FileChooserParams): Boolean {
                 fileCb?.onReceiveValue(null); fileCb = cb
-                return try {
-                    val intent = p.createIntent()
-                    // NGUYEN NHAN GOC khong chon duoc NHIEU anh: FileChooserParams.createIntent() chi dung ACTION_GET_CONTENT + loai file,
-                    // KHONG tu dat EXTRA_ALLOW_MULTIPLE (du o <input> co "multiple" va p.mode = MODE_OPEN_MULTIPLE) nen bo chon anh chi cho chon 1.
-                    // parseResult() o onChooserResult da doc duoc ca ClipData nhieu anh, chi thieu buoc bat chon nhieu nay.
-                    if (p.mode == WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE) intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
-                    launchChooser?.invoke(intent); launchChooser != null
-                } catch (e: Exception) { fileCb = null; false }
+                if (launchChooser == null) { fileCb = null; return false }
+                showAttachMenu(p)
+                return true
             }
             override fun onJsAlert(v: WebView, url: String?, message: String?, r: JsResult): Boolean {
                 AlertDialog.Builder(act).setMessage(message).setCancelable(false).setPositiveButton("OK") { _, _ -> r.confirm() }.show(); return true
@@ -322,7 +436,8 @@ class CrmWeb(private val act: Activity) {
 @Composable
 fun CrmWebScreen(crm: CrmWeb) {
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { crm.onChooserResult(it.resultCode, it.data) }
-    DisposableEffect(Unit) { crm.launchChooser = { launcher.launch(it) }; onDispose { } }
+    val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { crm.onPermResult(it) }
+    DisposableEffect(Unit) { crm.launchChooser = { launcher.launch(it) }; crm.launchPerm = { permLauncher.launch(Manifest.permission.RECORD_AUDIO) }; onDispose { } }
     BackHandler(enabled = crm.canBack) { crm.web.goBack() }
     var showLog by remember { mutableStateOf(false) }
     if (showLog) {
