@@ -83,6 +83,21 @@ class CrmWeb(private val act: Activity) {
 
     fun load() { error = null; web.loadUrl(home()) }
 
+    /**
+     * Tên CS = người đang đăng nhập CRM trong tab CRM của app (localStorage "ome_user" của web CRM) — không bắt nhập tay nữa (Duyên 2026-10-25: kết nối đã mặc định).
+     * Đổi tên (đăng nhập người khác) thì lưu lại và kéo lại kho Viết tắt (mục chung + mục riêng của người đó). Chưa đăng nhập → bỏ qua (vẫn có mục chung).
+     */
+    private val whoJs = "(function(){try{var u=JSON.parse(localStorage.getItem('ome_user')||'null');return u&&u.name?String(u.name):'';}catch(e){return '';}})()"
+    fun detectName() {
+        web.evaluateJavascript(whoJs) { r ->
+            val n = try { org.json.JSONTokener(r ?: "null").nextValue()?.toString()?.trim().orEmpty() } catch (e: Exception) { "" }
+            if (n.isNotEmpty() && n != "null" && n != Crm.name(act)) {
+                Crm.prefs(act).edit().putString("name", n).apply()
+                Thread { Crm.pull(act) }.start()
+            }
+        }
+    }
+
     fun onChooserResult(code: Int, data: Intent?) {
         fileCb?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(code, data)); fileCb = null
     }
@@ -253,6 +268,7 @@ class CrmWeb(private val act: Activity) {
             override fun onPageCommitVisible(view: WebView, url: String?) { view.evaluateJavascript(vhFixJs, null) }
             override fun onPageFinished(view: WebView, url: String?) {
                 view.evaluateJavascript(hookJs, null); view.evaluateJavascript(vhFixJs, null); this@CrmWeb.canBack = view.canGoBack()
+                view.postDelayed({ detectName() }, 2500); view.postDelayed({ detectName() }, 12000)   // đăng nhập xong mới có tên → thử 2 lần
                 view.postDelayed({ probe() }, 7000)   // 7 giây sau khi tải: tự quét trang để biết vì sao trắng
                 view.postDelayed({ view.evaluateJavascript(retryJs) { r -> val m = probeDecode(r); if (!m.contains("không cần")) log("TỰ THỬ LẠI (30 giây): $m") } }, 30000)
             }
