@@ -71,6 +71,19 @@ let JSDOM; try { ({ JSDOM } = require('jsdom')); } catch (e) { console.log('SKIP
   r = cmp('bProd', 'V1'); ok(r.ok && r.rows.length === 1 && r.rows[0].extra === 2, 'client B Theo San pham: tim theo ma, kem so luong cua SP do (2)');
   r = cmp('bSale', 'menbui2002'); ok(r.ok && r.rows.length === 1 && r.rows[0].share === 500000, 'client B Theo Sale: don 2 sale -> phan cua menbui2002 = 500.000');
   r = cmp('bMkt', '(chưa gán MKT)'); ok(r.ok && r.rows.length === 1, 'client B Theo MKT: don khong marketer vao dong "(chua gan MKT)"');
+  // ── Báo cáo N (tính đơn thuần): nạp đúng các hàm thật của js/11, kiểm tra chia đều theo Thẻ + tổng khớp bảng N ──
+  { const j11s = R('js/11-fn-srload.js');
+    const grab = n => { const i = j11s.indexOf('function ' + n + '('); let d = 0, k = j11s.indexOf('{', i); for (let e = k; e < j11s.length; e++) { if (j11s[e] === '{') d++; else if (j11s[e] === '}' && --d === 0) return j11s.slice(i, e + 1); } };
+    w.eval(R('js/01-fn-splitmulti.js').split('\n').filter(l => /^function isNumTagSale_/.test(l)).join('\n'));
+    w.eval("var _SR_UNASSIGNED_='(chưa gán sale)';" + ['_srKeepSelectedSales_', '_srOrdNames_', '_srOrderShares_', '_srPureCalc_', '_srPureOrders_'].map(grab).join('\n'));
+    w._srState.bSale = []; w._srState.byCreator = false;
+    const nOrders = w._srPureOrders_(B), calc = w._srPureCalc_(nOrders, 'pure');
+    let rn = cmp('nSale', 'anhtrinh1995'); const row1 = calc.rows.find(x => x.name === 'anhtrinh1995');
+    ok(rn.ok && rn.rows.length === 2 && Math.abs(rn.rows.reduce((s, x) => s + x.share, 0) - row1.giaTri) <= 1, 'client N Theo Sale: 2 don, tong = dong cua bang N');
+    rn = cmp('nSale', 'menbui2002'); ok(rn.ok && rn.rows.length === 1 && rn.rows[0].share === 500000, 'client N: don 2 sale chia deu -> menbui2002 = 500.000');
+    rn = cmp('nAll', ''); ok(rn.ok && Math.abs(rn.rows.reduce((s, x) => s + x.share, 0) - calc.rows.reduce((s, r) => s + r.giaTri, 0)) <= 1 && /Báo cáo N/.test(String(w._srDrillOpen_('nAll', '') || w.document.getElementById('srd-modal').innerHTML)), 'client N o Tong: tong = tong bang N, cua so ghi Bao cao N');
+    w._srDrillClose_();
+    ok(/_srDrillAttr_\('nSale'/.test(j11s) && /_srDrillAttr_\('nAll'/.test(j11s), 'js/11 gan o bam duoc: nSale, nAll'); }
   // báo cáo cũ (chưa có bs) -> thông báo rõ, không im lặng/sai số
   const old = J(A); old.orders.forEach(o => { delete o.bs; delete o.bt; delete o.rs; }); w._srState.dataA = old;
   r = cmp('aSale', 'anhtrinh1995'); ok(!r.ok && /Bấm "Lọc"/.test(r.msg), 'du lieu cu (chua co bs): bao bam Loc tai lai, khong hien sai');

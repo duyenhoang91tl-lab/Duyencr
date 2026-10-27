@@ -1389,9 +1389,9 @@ function _srPurePanelHtml_(d){
        'Bấm nút để tải Excel đối chiếu từng đơn (thuần ↔ sau điều chỉnh) + danh sách cần kiểm tra tay. ' +
        '<button class="btn sm" onclick="_srPureExport_()">📥 Xuất Excel đối chiếu Base / quầy</button></div>';
   h += '<table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Giá trị (Pos gốc)</th><th style="text-align:right">TB đơn</th><th style="text-align:right">COD</th></tr></thead><tbody>';
-  rows.forEach(function(r){ h += '<tr><td>' + esc(r.name) + '</td><td style="text-align:right">' + fmt(r.orders) + '</td><td style="text-align:right">' + _srMoney(r.giaTri) + '</td><td style="text-align:right">' + _srMoney(r.orders ? r.giaTri / r.orders : 0) + '</td><td style="text-align:right">' + _srMoney(r.cod) + '</td></tr>'; });
+  rows.forEach(function(r){ h += '<tr' + (typeof _srDrillAttr_ === 'function' ? _srDrillAttr_('nSale', r.name) : '') + '><td>' + esc(r.name) + '</td><td style="text-align:right">' + fmt(r.orders) + '</td><td style="text-align:right">' + _srMoney(r.giaTri) + '</td><td style="text-align:right">' + _srMoney(r.orders ? r.giaTri / r.orders : 0) + '</td><td style="text-align:right">' + _srMoney(r.cod) + '</td></tr>'; });
   if (!rows.length) h += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
-  else h += _srTotalRowHtml_(['Tổng', fmt(tOrd), _srMoney(tGt), _srMoney(tOrd ? tGt / tOrd : 0), _srMoney(tCod)]);
+  else h += _srTotalRowHtml_(['Tổng', fmt(tOrd), _srMoney(tGt), _srMoney(tOrd ? tGt / tOrd : 0), _srMoney(tCod)]).replace('<tr ', '<tr' + (typeof _srDrillAttr_ === 'function' ? _srDrillAttr_('nAll', '') : '') + ' ');
   h += '</tbody></table>';
   if (calc.unassigned.orders) h += '<div style="font-size:11.5px;color:var(--muted);margin-top:6px">Không nằm trong bảng: ' + fmt(calc.unassigned.orders) + ' đơn không có sale trên cột "Thẻ" (' + _srMoney(calc.unassigned.giaTri) + ') — vd đơn Quầy Hào Nam không gắn sale, giống bảng "Theo Sale" chính.</div>';
   return h;

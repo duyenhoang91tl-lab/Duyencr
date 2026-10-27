@@ -16,8 +16,9 @@ function _srDrillSplit_(v, sep){ return String(v == null ? '' : v).split(sep).ma
 
 // Tính danh sách đơn của 1 ô. Trả { ok, rows:[{o, share, extra}], msg, tableRow, label }.
 function _srDrillCompute_(kind, key){
-  var isB = kind.charAt(0) === 'b', d = isB ? _srState.dataB : _srState.dataA;
+  var isN = kind.charAt(0) === 'n', isB = kind.charAt(0) === 'b' || isN, d = isB ? _srState.dataB : _srState.dataA;
   if (!d || !d.orders) return { ok: false, msg: 'Chưa có dữ liệu — bấm "Lọc" để tải báo cáo rồi bấm lại.' };
+  if (isN) return _srDrillComputeN_(kind, key, d);
   var orders = d.orders, out = [], need = '', tableRow = null, label = '';
   var what = kind.slice(1);
   var shareAll = function(o){ return isB ? (Number(o.giaTriSauGiam) || 0) : (o.rs != null ? Number(o.rs) : (Number(o.giaTriDon) || 0)); };
@@ -54,9 +55,27 @@ function _srDrillCompute_(kind, key){
   return { ok: true, isB: isB, rows: out, tableRow: tableRow, label: label, what: what };
 }
 
+// Báo cáo N (Tính đơn thuần): mỗi đơn chia đều theo "Thẻ", giá Pos gốc — dùng đúng _srOrderShares_(o,'pure') + _srPureOrders_ như bảng N nên tổng khớp.
+function _srDrillComputeN_(kind, key, d){
+  var what = kind.slice(1), orders = _srPureOrders_(d), calc = _srPureCalc_(orders, 'pure'), rowsT = _srKeepSelectedSales_(calc.rows, _srState.bSale);
+  var keep = {}; rowsT.forEach(function(r){ keep[r.name] = r; });
+  var out = [], tableRow = null, label;
+  if (what === 'All') {
+    label = 'Tất cả đơn (tính thuần)';
+    tableRow = { giaTri: rowsT.reduce(function(s, r){ return s + r.giaTri; }, 0) };
+    orders.forEach(function(o){ var s = 0, any = false; _srOrderShares_(o, 'pure').forEach(function(x){ if (keep[x.name]) { s += x.giaTri; any = true; } }); if (any) out.push({ o: o, share: s }); });
+  } else if (what === 'Sale') {
+    label = 'Sale ' + key; tableRow = keep[key] || null;
+    orders.forEach(function(o){ var s = null; _srOrderShares_(o, 'pure').forEach(function(x){ if (x.name === key) s = (s || 0) + x.giaTri; }); if (s !== null) out.push({ o: o, share: s }); });
+  } else return { ok: false, msg: 'Ô này chưa hỗ trợ xem chi tiết.' };
+  var tsx = function(x){ var m = String(x || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m ? Date.UTC(+m[3], +m[2] - 1, +m[1]) : 0; };
+  out.sort(function(a, b){ return tsx(b.o.ngayTaoDon) - tsx(a.o.ngayTaoDon); });
+  return { ok: true, isB: true, isN: true, rows: out, tableRow: tableRow, label: label, what: what };
+}
+
 function _srDrillCols_(r){
   if (r.isB) {
-    var c = ['Ngày tạo', 'Khách hàng', 'SĐT', 'Nguồn đơn', 'Thẻ sale', 'Sản phẩm', 'Trạng thái', 'Giá trị sau giảm', 'COD', 'Ghi chú Pos'];
+    var c = ['Ngày tạo', 'Khách hàng', 'SĐT', 'Nguồn đơn', 'Thẻ sale', 'Sản phẩm', 'Trạng thái', r.isN ? 'Giá Pos gốc' : 'Giá trị sau giảm', 'COD', 'Ghi chú Pos'];
     if (r.what === 'Prod') c.push('SL sản phẩm này');
     c.push(r.what === 'All' ? 'Giá trị tính' : 'Tính vào ô này');
     return c;
@@ -67,7 +86,7 @@ function _srDrillCells_(r, x){
   var o = x.o, ph = String(o.soDienThoai || ''), cm = (typeof customerMap !== 'undefined' && customerMap) ? customerMap[(typeof normPhone === 'function' ? normPhone(ph) : '') || ph] : null;
   var name = r.isB ? (o.khachHang || '') : (cm && cm.name ? cm.name : '');
   if (r.isB) {
-    var cells = [o.ngayTaoDon || '', name, ph, o.nguonDon || '', o.theSale || '', o.sanPham || '', o.trangThai || '', Number(o.giaTriSauGiam) || 0, Number(o.cod) || 0, o.ghiChu || ''];
+    var cells = [o.ngayTaoDon || '', name, ph, o.nguonDon || '', o.theSale || '', o.sanPham || '', o.trangThai || '', r.isN && o.giaTriPos != null ? Number(o.giaTriPos) || 0 : Number(o.giaTriSauGiam) || 0, Number(o.cod) || 0, o.ghiChu || ''];
     if (r.what === 'Prod') cells.push(x.extra || 0);
     cells.push(Math.round(x.share)); return cells;
   }
@@ -121,7 +140,7 @@ function _srDrillOpen_(kind, key){
   // z-index 290 < ngăn hồ sơ khách (.dp-overlay 300): bấm SĐT trong bảng thì hồ sơ hiện lên TRÊN cửa sổ này, đóng hồ sơ là quay lại bảng.
   m.style.cssText = 'position:fixed;inset:0;z-index:290;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:14px';
   m.onclick = function(e){ if (e.target === m) _srDrillClose_(); };
-  var title = (kind.charAt(0) === 'b' ? 'Báo cáo B (Pos)' : 'Báo cáo A (Base)') + ' · ' + (r.label || 'Chi tiết');
+  var title = (kind.charAt(0) === 'n' ? 'Báo cáo N (Tính đơn thuần)' : kind.charAt(0) === 'b' ? 'Báo cáo B (Pos)' : 'Báo cáo A (Base)') + ' · ' + (r.label || 'Chi tiết');
   m.innerHTML = '<div style="background:var(--surface,#fff);color:var(--text,#111);border-radius:12px;max-width:1180px;width:100%;max-height:92vh;overflow:hidden;padding:14px 16px;box-shadow:0 10px 40px rgba(0,0,0,.3);display:flex;flex-direction:column">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap"><b style="font-size:15px">📋 ' + esc(title) + '</b><span>' +
     (r.ok && r.rows.length ? '<button class="btn sm" onclick="_srDrillXlsx_()">📥 Xuất Excel</button> ' : '') + '<button class="btn sm" onclick="_srDrillClose_()">✕ Đóng</button></span></div>' +
@@ -136,7 +155,7 @@ function _srDrillXlsx_(){
   var wb = XLSX.utils.book_new(), ws = XLSX.utils.aoa_to_sheet(rows);
   XLSX.utils.book_append_sheet(wb, ws, 'Chi tiết đơn');
   var nm = String(r.label || 'chi-tiet').replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 60);
-  XLSX.writeFile(wb, 'ChiTiet_' + (r.isB ? 'B_' : 'A_') + nm + '.xlsx');
+  XLSX.writeFile(wb, 'ChiTiet_' + (r.isN ? 'N_' : r.isB ? 'B_' : 'A_') + nm + '.xlsx');
 }
 
 document.addEventListener('click', function(e){

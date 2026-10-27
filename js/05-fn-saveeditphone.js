@@ -1212,3 +1212,9 @@ async function autoSyncLoop() {
   _autoSyncTimer = setTimeout(autoSyncLoop, AUTO_SYNC_MS);
 }
 
+// Bảng Danh sách KH trên điện thoại (css/15-mobile.css): cột TÊN KHÁCH được ghim khi vuốt ngang. Nền đặc CHỈ cần khi đã vuốt (lúc chưa vuốt, ô tên trong suốt để cùng màu nền với cả hàng) → đánh dấu class x-scrolled.
+(function () {
+  var t = document.getElementById('main-table'), w = t && t.closest ? t.closest('.table-wrap') : null; if (!w) return;
+  var on = false;
+  w.addEventListener('scroll', function () { var s = w.scrollLeft > 2; if (s !== on) { on = s; w.classList.toggle('x-scrolled', s); } }, { passive: true });
+})();

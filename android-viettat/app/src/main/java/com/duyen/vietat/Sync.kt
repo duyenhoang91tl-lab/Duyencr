@@ -74,7 +74,8 @@ object Crm {
     fun name(c: Context) = prefs(c).getString("name", "").orEmpty().trim()
     const val DEFAULT_WEB = "https://duyen-crm-web.duyenhoang91-tl.workers.dev"
     fun webUrl(c: Context) = prefs(c).getString("web", "").orEmpty().trim().ifEmpty { DEFAULT_WEB }
-    fun configured(c: Context) = name(c).isNotEmpty()
+    // Địa chỉ web CRM + địa chỉ dữ liệu đều có mặc định sẵn → luôn sẵn sàng; Tên CS tự lấy từ tài khoản đang đăng nhập trong tab CRM (CrmWeb.detectName), chưa có thì chỉ lấy mục CHUNG của team.
+    fun configured(c: Context) = url(c).isNotEmpty()
 
     /** Tải 1 ảnh CRM (Drive) về thư mục media dưới tên crm_<id>.<đuôi>; đã có thì dùng lại, không tải lại. Trả về tên file hoặc null nếu lỗi. */
     private fun fetchImage(base: String, c: Context, id: String): String? {
