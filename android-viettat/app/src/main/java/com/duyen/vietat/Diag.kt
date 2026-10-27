@@ -1,0 +1,42 @@
+package com.duyen.vietat
+
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+/**
+ * Nhật ký CHẨN ĐOÁN gõ tắt (trong bộ nhớ, cùng tiến trình với Dịch vụ Trợ năng). Màn "Viết tắt" → 🩺 Kiểm tra gõ tắt hiện nội dung này để biết
+ * gõ tắt hỏng ở bước nào: dịch vụ chưa chạy / chưa có mục nào / Android không gửi sự kiện / không khớp mục / chèn chữ thất bại.
+ */
+object Diag {
+    @Volatile var connectedAt = 0L
+    @Volatile var events = 0
+    @Volatile var lastEventAt = 0L
+    @Volatile var lastPkg = ""
+    @Volatile var lastTail = ""
+    @Volatile var lastWhy = ""
+    @Volatile var lastInsert = ""
+
+    private fun t(ms: Long): String = if (ms <= 0L) "chưa có" else SimpleDateFormat("HH:mm:ss", Locale("vi", "VN")).format(Date(ms))
+
+    fun note(pkg: String, tail: String, why: String) {
+        lastEventAt = System.currentTimeMillis(); lastPkg = pkg; lastTail = tail.takeLast(40); lastWhy = why
+    }
+
+    fun report(): String {
+        val total = Store.snippets.size
+        val crm = Store.snippets.count { Store.isCrm(it.id) }
+        val sb = StringBuilder()
+        sb.append(if (connectedAt > 0L) "✅ Dịch vụ Trợ năng đang chạy (kết nối lúc ${t(connectedAt)})"
+                  else "❌ Dịch vụ Trợ năng CHƯA chạy → vào Cài đặt > Trợ năng > \"Viết Tắt\": bật (nếu đang bật thì TẮT rồi BẬT lại; Xiaomi: bật Tự khởi động + Pin \"Không hạn chế\" cho Duyên CRM)")
+        sb.append("\n")
+        sb.append(if (total == 0) "❌ Trên máy chưa có mục viết tắt nào → bấm ☁ CRM để tải về (cần đúng Tên CS)"
+                  else "✅ Mục viết tắt trên máy: $total (từ CRM $crm, tự tạo ${total - crm})")
+        sb.append("\n")
+        sb.append(if (events == 0) "❌ Android CHƯA gửi sự kiện gõ nào cho app → mở Zalo/Messenger/Pancake (KHÔNG phải app này), gõ vài chữ, rồi bấm Làm mới"
+                  else "Sự kiện gõ đã nhận: $events (gần nhất ${t(lastEventAt)}, app: ${lastPkg.ifEmpty { "?" }})")
+        if (lastWhy.isNotEmpty()) sb.append("\nLần gõ gần nhất: \"$lastTail\" → $lastWhy")
+        if (lastInsert.isNotEmpty()) sb.append("\nLần chèn gần nhất: $lastInsert")
+        return sb.toString()
+    }
+}

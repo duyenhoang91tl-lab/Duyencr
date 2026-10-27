@@ -108,10 +108,14 @@ object Crm {
             val code = con.responseCode
             val body = (if (code < 400) con.inputStream else con.errorStream)?.use { String(it.readBytes()) }.orEmpty()
             con.disconnect()
-            if (code != 200) return "Lỗi CRM ($code)"
+            if (code != 200) return "Lỗi CRM ($code) — máy chủ CRM (Apps Script) đang lỗi hoặc quá tải, thử lại sau ít phút"
+            // Apps Script lỗi thường trả TRANG HTML thay vì JSON → trước đây hiện thông báo khó hiểu "Value <!DOCTYPE… cannot be converted to JSONObject"
+            if (body.trimStart().startsWith("<")) return "Máy chủ CRM trả trang lỗi thay vì dữ liệu (mã $code) — Apps Script đang lỗi hoặc chưa triển khai xong. Thử lại sau vài phút."
             val r = JSONObject(body)
             if (r.has("error")) return "CRM báo lỗi: " + r.optString("error")
             val arr = r.getJSONArray("snippets")
+            var teamN = 0; var mineN = 0
+            for (i in 0 until arr.length()) { if (arr.getJSONObject(i).optString("scope") == "me") mineN++ else teamN++ }
             val ids = LinkedHashSet<String>()
             for (i in 0 until arr.length()) arr.getJSONObject(i).optJSONArray("images")?.let { ia ->
                 for (k in 0 until ia.length()) ia.optJSONObject(k)?.optString("id")?.takeIf { it.isNotEmpty() }?.let { ids += it }
@@ -119,7 +123,10 @@ object Crm {
             val files = HashMap<String, String>(); var failed = 0
             for (id in ids) { val f = fetchImage(base, c, id); if (f != null) files[id] = f else failed++ }
             val n = Store.replaceCrm(arr, files)
-            "Đã cập nhật từ CRM ($n mục" + (if (ids.isNotEmpty()) ", ${files.size} hình" else "") + (if (failed > 0) ", $failed hình lỗi" else "") + ")"
+            // Báo rõ chung/riêng: nếu đã lưu mục RIÊNG trên CRM mà riêng = 0 thì Tên CS trong app chưa khớp tên tài khoản CRM (mục riêng chỉ gửi cho đúng chủ).
+            "Đã cập nhật từ CRM ($n mục: chung $teamN, riêng $mineN" + (if (ids.isNotEmpty()) ", ${files.size} hình" else "") + (if (failed > 0) ", $failed hình lỗi" else "") + ")" +
+                (if (n == 0) " ⚠ CRM chưa có mục viết tắt nào cho bạn (tạo ở CRM → Zalo AI → ⌨️ Viết tắt)" else "") +
+                (if (n > 0 && mineN == 0) " ⚠ Chưa thấy mục RIÊNG của \"${name(c)}\": nếu bạn đã lưu mục riêng trên CRM thì Tên CS (☁ CRM) chưa giống tên tài khoản CRM" else "")
         } catch (e: Exception) {
             "Lỗi cập nhật CRM: ${e.message}"
         } finally { busy.set(false) }

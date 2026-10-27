@@ -26,19 +26,23 @@ class ExpanderService : AccessibilityService() {
     private var popup: View? = null
     private val wm get() = getSystemService(WINDOW_SERVICE) as WindowManager
 
-    override fun onServiceConnected() { Store.init(this) }
+    override fun onServiceConnected() { Store.init(this); Diag.connectedAt = System.currentTimeMillis() }
 
     private var lastText = ""
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
         if (e.eventType != AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED &&
             e.eventType != AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED) return
-        if (e.packageName == packageName) { hide(); return }
-        val n = e.source ?: rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return
-        if (n.isPassword || n.isShowingHintText) { hide(); return }
+        val pkg = e.packageName?.toString().orEmpty()
+        Diag.events++
+        if (e.packageName == packageName) { Diag.note(pkg, "", "bỏ qua vì đang gõ TRONG app Duyên CRM — hãy gõ ở app chat khác (Zalo/Messenger/Pancake)"); hide(); return }
+        val n = e.source ?: rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        if (n == null) { Diag.note(pkg, "", "KHÔNG lấy được ô gõ (app này chặn Trợ năng đọc ô nhập)"); return }
+        if (n.isPassword || n.isShowingHintText) { Diag.note(pkg, "", "bỏ qua: ô mật khẩu hoặc ô đang hiện chữ gợi ý"); hide(); return }
         var text = n.text?.toString().orEmpty()
         if (text.isEmpty() && e.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) text = e.text.joinToString("")
-        if (text.isEmpty() || text.last().isWhitespace()) { hide(); return }
+        if (text.isEmpty()) { Diag.note(pkg, "", "ô gõ trống (app không đưa chữ cho Trợ năng đọc?)"); hide(); return }
+        if (text.last().isWhitespace()) { Diag.note(pkg, text, "chữ cuối là khoảng trắng — gõ viết tắt xong KHÔNG bấm cách"); hide(); return }
         val toks = Regex("\\S+").findAll(text).toList()
         var span = ""; var typed: String? = null; var hits: List<Snippet> = emptyList()
         // Kiểu "viết tắt + tên", ví dụ: ch Thanh Huyền (chỉ với nội dung có {tên})
@@ -49,11 +53,16 @@ class ExpanderService : AccessibilityService() {
             if (h.isNotEmpty()) { hits = h; span = text.substring(a.range.first); typed = toks.takeLast(k).joinToString(" ") { it.value }; break }
         }
         if (hits.isEmpty()) { span = toks.last().value; hits = Store.match(span) }
-        if (hits.isEmpty()) { hide(); return }
+        if (hits.isEmpty()) {
+            Diag.note(pkg, text, "không khớp mục nào với \"$span\" (máy có ${Store.snippets.size} mục viết tắt)")
+            hide(); return
+        }
         if (popup != null && text == lastText) return
         lastText = text
         val name = typed ?: if (hits.any { s -> s.options.any { it.contains("{tên") } }) findName() else null
-        show(n, text, span, hits, name)
+        Diag.note(pkg, text, "khớp ${hits.size} mục với \"$span\" → hiện màn chọn")
+        try { show(n, text, span, hits, name) }
+        catch (ex: Exception) { Diag.note(pkg, text, "KHÔNG hiện được màn chọn: ${ex.javaClass.simpleName} ${ex.message.orEmpty()}") }
     }
 
     /** Lấy tên khách từ màn hình: dòng "Tới: <tên>" (bình luận) hoặc tiêu đề phía trên (tin nhắn). */
@@ -109,10 +118,40 @@ class ExpanderService : AccessibilityService() {
         wm.addView(box, lp); popup = box
     }
 
-    private fun setText(n: AccessibilityNodeInfo, t: String) =
-        n.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, Bundle().apply {
+    private fun setText(n: AccessibilityNodeInfo, t: String): Boolean {
+        fun go() = n.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, Bundle().apply {
             putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, t)
         })
+        if (go()) return true
+        n.refresh()   // node có thể đã cũ sau khi màn chọn hiện → làm mới rồi thử lại 1 lần
+        return go()
+    }
+
+    /**
+     * NGUYÊN NHÂN GỐC "bấm mà không ra gì" (Duyên 2026-10-27): nhiều app chat (Zalo/Messenger/Pancake…) KHÔNG nhận ACTION_SET_TEXT —
+     * performAction trả false nhưng code cũ bỏ qua kết quả nên không chèn gì và không báo gì. Dự phòng: chọn đúng đoạn viết tắt rồi DÁN
+     * (clipboard); nếu app cũng không cho dán thì để nội dung trong clipboard + báo để người dùng nhấn giữ > Dán.
+     */
+    private fun pasteFallback(n: AccessibilityNodeInfo, text: String, word: String, filled: String): Boolean {
+        (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("viettat", filled))
+        val base = (text.length - word.length).coerceAtLeast(0)
+        n.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, Bundle().apply {
+            putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, base)
+            putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, text.length)
+        })
+        val ok = n.performAction(AccessibilityNodeInfo.ACTION_PASTE)
+        if (!ok) Toast.makeText(this, "Đã sao chép nội dung — nhấn giữ ô chat > Dán", Toast.LENGTH_LONG).show()
+        return ok
+    }
+
+    /** Thay đoạn viết tắt cuối ô bằng nội dung `filled`; thử SET_TEXT trước, thất bại thì dán. Ghi kết quả vào Diag. */
+    private fun replaceTail(n: AccessibilityNodeInfo, text: String, word: String, filled: String): Boolean {
+        val full = text.dropLast(word.length) + filled
+        if (setText(n, full)) { Diag.lastInsert = "SET_TEXT thành công (${filled.length} ký tự)"; return true }
+        val ok = pasteFallback(n, text, word, filled)
+        Diag.lastInsert = if (ok) "SET_TEXT bị app từ chối → đã DÁN thành công" else "SET_TEXT và DÁN đều bị app từ chối → nội dung đã nằm trong clipboard (nhấn giữ ô > Dán)"
+        return ok
+    }
 
     private fun insertText(n: AccessibilityNodeInfo, text: String, word: String, opt: String, name: String?) {
         val filled = Store.resolve(opt, name)
@@ -121,7 +160,7 @@ class ExpanderService : AccessibilityService() {
         val base = text.length - word.length
         val st = if (m != null) base + m.range.first else newText.length
         val en = if (m != null) base + m.range.last + 1 else newText.length
-        setText(n, newText)
+        if (!replaceTail(n, text, word, filled)) return   // đã dán/sao chép → không đặt vùng chọn theo nội dung cũ
         n.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, Bundle().apply {
             putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, st)
             putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, en)
@@ -137,7 +176,7 @@ class ExpanderService : AccessibilityService() {
         val texts = sel.filter { kindOf(it) == null }
         val media = sel.filter { kindOf(it) != null }
         if (texts.size == 1 && media.isEmpty()) { insertText(n, text, word, texts[0], name); return }
-        setText(n, text.dropLast(word.length) + texts.joinToString("\n") { Store.resolve(it, name) })
+        replaceTail(n, text, word, texts.joinToString("\n") { Store.resolve(it, name) })
         if (media.isEmpty()) return
         val uris = media.mapNotNull { m ->
             File(Store.mediaDir, mediaNameOf(m)).takeIf { it.exists() }?.let { FileProvider.getUriForFile(this, "$packageName.files", it) }
@@ -161,5 +200,5 @@ class ExpanderService : AccessibilityService() {
 
     private fun hide() { popup?.let { runCatching { wm.removeView(it) } }; popup = null; lastText = "" }
     override fun onInterrupt() = hide()
-    override fun onDestroy() { hide(); super.onDestroy() }
+    override fun onDestroy() { Diag.connectedAt = 0L; hide(); super.onDestroy() }
 }
