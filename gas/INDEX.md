@@ -71,7 +71,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `_PSHEET_STOPWORDS_`, `DEPT_LIST_DEFAULT_`, `PHONGBAN_NHANSU_NEW_`, `PHONGBAN_NHANSU_`, `SH_HOSO_NS`, `HOSO_NS_HEADERS`, `_DRIVE_IMG_MAX_BYTES_`
 
 ## 16_BannedWords_AI.gs
-- Hàm: `_goldCfg_`, `_goldCell_`, `_goldNum_`, `readGoldWeights_`, `goldWeightList_`, `_bannedCfg_`, `_bannedCacheClear_`, `readBannedWordsList_`, `readBannedWordsListSheet_`, `_bannedWordsPromptBlock_`, `_priceCatalogRowsCached_`, `priceAsk_`, `_priceQaSystemPrompt_`, `priceQa_`, `_crmAskPriceBlock_`, `_buildAISystemPrompt_`, `_aiOpenAICompat_`, `_aiGemini_`, `_crmAskSystemPrompt_`, `callAI_`, `_maskKey_`, `diagApiKeys`, `testScript`
+- Hàm: `_goldCfg_`, `_goldCell_`, `_goldNum_`, `readGoldWeights_`, `goldWeightList_`, `_bannedCfg_`, `_bannedCacheClear_`, `readBannedWordsList_`, `readBannedWordsListSheet_`, `_bannedWordsPromptBlock_`, `_priceCatalogRowsCached_`, `priceAsk_`, `priceItem_`, `_priceQaSystemPrompt_`, `priceQa_`, `_crmAskPriceBlock_`, `_buildAISystemPrompt_`, `_aiOpenAICompat_`, `_aiGemini_`, `_crmAskSystemPrompt_`, `callAI_`, `_maskKey_`, `diagApiKeys`, `testScript`
 - Hằng/biến: `BANNED_WORDS_SS_ID`, `BANNED_WORDS_GID`, `GOLD_WEIGHT_SS_ID`, `GOLD_WEIGHT_GID`, `GOLD_CACHE_KEY_`
 
 ## 17_Broadcast_FollowUp.gs

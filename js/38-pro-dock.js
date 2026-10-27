@@ -92,6 +92,50 @@ function proPriceFormat_(r){
   var sg = (r.suggestions||[]).slice(0,8);
   return 'Chưa tìm thấy sản phẩm khớp rõ trong bảng giá.' + (sg.length ? '\nCó thể bạn muốn hỏi:\n' + sg.map(function(x){ return '• '+x; }).join('\n') : '') + '\nHãy gõ rõ TÊN sản phẩm (kèm chất liệu / size / SAPHIA / RUBY nếu có).';
 }
+// ── CHI TIẾT SẢN PHẨM (Duyên yêu cầu 2026-10-27): bấm 1 gợi ý → thông tin + các nút chọn (chất liệu → size/kiểu) → giá. GAS action=priceItem. ──
+async function proPriceItemRequest_(gsUrl, name, fetchFn, timeoutMs){
+  if (!gsUrl) return { ok:false, error:'Chưa kết nối Google Sheets (chưa có link GAS).' };
+  var ac = (typeof AbortController!=='undefined') ? new AbortController() : null, timer = ac ? setTimeout(function(){ ac.abort(); }, timeoutMs||30000) : null;
+  try {
+    var url = gsUrl + (String(gsUrl).indexOf('?')>=0 ? '&' : '?') + 'action=priceItem&name=' + encodeURIComponent(String(name||'').slice(0,200));
+    var r = await fetchFn(url, { method:'GET', redirect:'follow', signal: ac ? ac.signal : undefined });
+    var d = await r.json();
+    if (d && d.ok) return { ok:true, found:!!d.found, name:d.name||name, info:Array.isArray(d.info)?d.info:[], variants:Array.isArray(d.variants)?d.variants:[] };
+    var err = (d && (d.error||d.message)) || 'Không tra được chi tiết sản phẩm';
+    if (/unknown action|priceItem/i.test(err)) err += ' (backend GAS có thể chưa lên bản có chi tiết sản phẩm — xem tab Actions của repo)';
+    return { ok:false, error:String(err) };
+  } catch(e){ return { ok:false, error: e && e.name==='AbortError' ? 'Quá thời gian chờ — thử lại.' : String(e&&e.message||e) }; }
+  finally { if (timer) clearTimeout(timer); }
+}
+// Giá trong bảng tính bằng NGHÌN đồng (2.310 = 2.310.000đ) → hiện đủ đồng. Không đọc được thì giữ nguyên chữ gốc + ghi chú đơn vị.
+function proPriceMoney_(v){
+  if (typeof v==='number' && isFinite(v)) return Math.round(v*1000).toLocaleString('vi-VN')+'đ';
+  var t = String(v==null?'':v).trim();
+  if (/^\d{1,3}([.,]\d{3})*$|^\d+$/.test(t)) return (parseInt(t.replace(/[.,]/g,''),10)*1000).toLocaleString('vi-VN')+'đ';
+  return t+' (nghìn đồng)';
+}
+var PRO_PRICE_FIELD = { mat:'Chất liệu', size:'Kiểu / Size' }, PRO_PRICE_EMPTY = { mat:'(không ghi chất liệu)', size:'(mặc định)' };
+// Bước kế tiếp sau khi đã chọn sel={mat,size} (null = chưa chọn): hỏi chất liệu nếu còn >1, rồi size/kiểu nếu còn >1, hết thì ra giá.
+function proPriceNext_(item, sel){
+  sel = sel || {};
+  var vs = ((item && item.variants) || []).filter(function(v){ return (sel.mat==null || v.mat===sel.mat) && (sel.size==null || v.size===sel.size); });
+  function uniq(f){ var o = [], seen = {}; vs.forEach(function(v){ var k = v[f]||''; if (!Object.prototype.hasOwnProperty.call(seen,k)){ seen[k] = 1; o.push(k); } }); return o; }
+  if (sel.mat==null){ var m = uniq('mat'); if (m.length>1) return { step:'mat', options:m }; }
+  if (sel.size==null){ var z = uniq('size'); if (z.length>1) return { step:'size', options:z }; }
+  return { step:'price', variants:vs };
+}
+function proPriceInfoText_(item){
+  return '📦 ' + item.name + ((item.info||[]).length ? '\n' + item.info.map(function(x){ return '• '+x.k+': '+x.v; }).join('\n') : '');
+}
+function proPricePriceText_(item, vs, sel){
+  var crumb = [item.name, sel && sel.mat ? sel.mat : '', sel && sel.size ? sel.size : ''].filter(Boolean).join(' › ');
+  var out = vs.map(function(v){
+    var d = [v.mat ? 'Chất liệu '+v.mat : '', v.size ? 'Size/Kiểu '+v.size : ''].filter(Boolean).join(' · ');
+    return (d ? '▸ '+d+'\n' : '') + (v.prices||[]).map(function(p){ return '💰 '+p.label+': '+proPriceMoney_(p.value); }).join('\n');
+  });
+  return '✅ ' + crumb + '\n' + out.join('\n\n');
+}
+function proPriceNotFoundText_(){ return 'Chưa tìm thấy sản phẩm khớp rõ trong bảng giá.\nBấm vào sản phẩm bạn muốn xem (thông tin + giá), hoặc gõ rõ hơn TÊN sản phẩm:'; }
 var PRO_AI_SUGGEST = {
   customer: ['Tóm tắt khách này', 'Nên làm gì tiếp với khách này?', 'Gợi ý tin nhắn chăm sóc'],
   sales: ['Tóm tắt doanh số kỳ này', 'Ai cần hỗ trợ nhất và vì sao?', 'Điểm đáng chú ý nhất là gì?'],
@@ -187,7 +231,7 @@ function proRuleAnswer_(mode, question, X){
 function proAiNote_(){ return PRO_AI_ENGINE==='rule' ? 'Trả lời THÔ theo quy tắc từ số liệu hệ thống (không dùng AI, không cần key, không gửi dữ liệu đi đâu). Bấm gợi ý bên dưới.' : 'AI chỉ thấy số liệu bạn được phép xem, đã ẩn SĐT. Chỉ là gợi ý — hãy đối chiếu trước khi dùng.'; }
 
 // ── Giao diện (chỉ khi html.ui-pro) ──
-var _proDock = { tabs:[], mode:'', log:[], busy:false };
+var _proDock = { tabs:[], mode:'', log:[], busy:false, items:{} };
 function proDockOn_(){ return typeof document!=='undefined' && document.documentElement.classList.contains('ui-pro'); }
 function proTabsLoad_(){ try { var v = JSON.parse(sessionStorage.getItem('pro_tabs')||'[]'); if (Array.isArray(v)) _proDock.tabs = v.filter(function(t){ return t && t.phone; }).slice(-PRO_TABS_MAX); } catch(e){} }
 function proTabsSave_(){ try { sessionStorage.setItem('pro_tabs', JSON.stringify(_proDock.tabs)); } catch(e){} }
@@ -229,6 +273,7 @@ function proDockEnsure_(){
   p.onclick = function(e){ var t = e.target; if (!t.closest) return;
     if (t.closest('[data-ai="close"]')) { proAiToggle_(false); return; }
     var m = t.closest('[data-mode]'); if (m){ proAiMode_(m.getAttribute('data-mode')); return; }
+    var pc = t.closest('[data-pc]'); if (pc){ var pa = pc.getAttribute('data-pc').split(':'); proPriceChip_(+pa[0], +pa[1]); return; }
     var s = t.closest('[data-sug]'); if (s){ document.getElementById('pro-ai-q').value = s.getAttribute('data-sug'); proAiSend_(); return; }
     if (t.closest('#pro-ai-send')) proAiSend_(); };
   document.getElementById('pro-ai-q').onkeydown = function(e){ if (e.key==='Enter' && !e.shiftKey){ e.preventDefault(); proAiSend_(); } };
@@ -252,8 +297,9 @@ function proAiMode_(m){
 function proAiLogRender_(){
   var el = document.getElementById('pro-ai-log'); if (!el) return;
   var hint = _proDock.mode==='price' ? 'Gõ tên sản phẩm để tra giá trong bảng giá (có thể kèm chất liệu, size, SAPHIA/RUBY). Giá lấy trực tiếp từ DANH_MUC, không do AI tự nghĩ.' : _proDock.mode==='customer' ? 'Hỏi về khách đang mở trong hồ sơ ('+proEsc_((function(){ try { var c = allCustomers.find(function(x){ return x.phone===currentPhone; }); return c ? c.name : 'chưa mở khách nào'; } catch(e){ return 'chưa mở khách nào'; } })())+').' : 'Hỏi về doanh số theo phạm vi bạn được xem (dữ liệu màn 🏠 Tổng quan).';
-  el.innerHTML = (_proDock.log.length ? '' : '<div class="pro-ai-hint">'+hint+'</div>') + _proDock.log.map(function(m){
-    return '<div class="pro-ai-m '+m.role+'">'+proAnswerHtml_(m.text)+(m.provider?'<div class="pro-ai-by">AI: '+proEsc_(m.provider)+'</div>':'')+'</div>'; }).join('');
+  el.innerHTML = (_proDock.log.length ? '' : '<div class="pro-ai-hint">'+hint+'</div>') + _proDock.log.map(function(m, mi){
+    var chips = (m.chips && m.chips.length) ? '<div class="pro-ai-chips">'+m.chips.map(function(c, ci){ return '<button type="button" class="pro-pc'+(c.kind==='reset'?' alt':'')+'" data-pc="'+mi+':'+ci+'">'+proEsc_(c.label)+'</button>'; }).join('')+'</div>' : '';
+    return '<div class="pro-ai-m '+m.role+'">'+proAnswerHtml_(m.text)+chips+(m.provider?'<div class="pro-ai-by">AI: '+proEsc_(m.provider)+'</div>':'')+'</div>'; }).join('');
   el.scrollTop = el.scrollHeight;
 }
 function proAiContext_(){
@@ -268,6 +314,39 @@ function proAiContext_(){
   var sc = _ovScope(d);
   return { text: proSalesContext_(sc, d), raw: { s:sc, d:d } };
 }
+// Hiện 1 bước: chưa đủ lựa chọn → nút chọn; đủ → giá. Thêm nút "↩ Chọn lại" ở bước giá.
+function proPriceShow_(item, sel){
+  var nx = proPriceNext_(item, sel), first = !sel || (sel.mat==null && sel.size==null), key = item.name;
+  _proDock.items[key] = item;
+  if (nx.step==='price'){
+    var txt = (first ? proPriceInfoText_(item) + '\n\n' : '') + proPricePriceText_(item, nx.variants, sel);
+    _proDock.log.push({ role:'bot', text:txt, chips: first ? [] : [{ kind:'reset', label:'↩ Chọn lại', item:key }], provider:'Bảng giá DANH_MUC (tra trực tiếp, không dùng AI)' });
+    return;
+  }
+  var base = first ? proPriceInfoText_(item) + '\n\n' : item.name + (sel.mat ? ' › '+sel.mat : '') + '\n';
+  _proDock.log.push({ role:'bot', text: base + 'Chọn ' + PRO_PRICE_FIELD[nx.step].toLowerCase() + ':',
+    chips: nx.options.map(function(o){ return { kind:'opt', field:nx.step, val:o, label:o || PRO_PRICE_EMPTY[nx.step], item:key, sel:{ mat:sel.mat==null?null:sel.mat, size:sel.size==null?null:sel.size } }; }) });
+}
+async function proPriceChip_(mi, ci){
+  if (_proDock.busy) return;
+  var m = _proDock.log[mi], c = m && m.chips && m.chips[ci]; if (!c) return;
+  if (c.kind==='name'){
+    _proDock.log.push({ role:'user', text:c.label }); _proDock.busy = true;
+    _proDock.log.push({ role:'bot', text:'⏳ Đang lấy thông tin sản phẩm…' }); proAiLogRender_();
+    var r = await proPriceItemRequest_(typeof gsUrl!=='undefined' ? gsUrl : '', c.label, fetch);
+    _proDock.log.pop();
+    if (!r.ok) _proDock.log.push({ role:'bot', text:'⚠ '+r.error });
+    else if (!r.found) _proDock.log.push({ role:'bot', text:'Không có dòng chi tiết nào cho "'+c.label+'" trong bảng giá. Thử gõ lại tên sản phẩm.' });
+    else proPriceShow_(r, { mat:null, size:null });
+    _proDock.busy = false; proAiLogRender_(); return;
+  }
+  var item = _proDock.items[c.item]; if (!item) return;
+  if (c.kind==='reset'){ _proDock.log.push({ role:'user', text:'↩ Chọn lại' }); proPriceShow_(item, { mat:null, size:null }); proAiLogRender_(); return; }
+  if (c.kind==='opt'){
+    var sel = { mat:c.sel.mat, size:c.sel.size }; sel[c.field] = c.val;
+    _proDock.log.push({ role:'user', text:c.label }); proPriceShow_(item, sel); proAiLogRender_();
+  }
+}
 async function proAiSend_(){
   if (_proDock.busy) return;
   var q = document.getElementById('pro-ai-q'), question = (q.value||'').trim(); if (!question) return;
@@ -276,7 +355,10 @@ async function proAiSend_(){
     _proDock.log.push({ role:'user', text:question }); q.value = ''; _proDock.busy = true;
     _proDock.log.push({ role:'bot', text:'⏳ Đang tra bảng giá…' }); proAiLogRender_();
     var pr = await proPriceRequest_(typeof gsUrl!=='undefined' ? gsUrl : '', proScrub_(question), fetch);
-    _proDock.log.pop(); _proDock.log.push({ role:'bot', text:proPriceFormat_(pr), provider:'Bảng giá DANH_MUC (tra trực tiếp, không dùng AI)' });
+    _proDock.log.pop();
+    var pm = { role:'bot', text:proPriceFormat_(pr), provider:'Bảng giá DANH_MUC (tra trực tiếp, không dùng AI)' };
+    if (pr.ok && !pr.found && (pr.suggestions||[]).length){ pm.text = proPriceNotFoundText_(); pm.chips = pr.suggestions.slice(0,8).map(function(n){ return { kind:'name', label:n }; }); }   // gợi ý thành nút bấm → xem thông tin + giá
+    _proDock.log.push(pm);
     _proDock.busy = false; proAiLogRender_(); return;
   }
   var ctx = proAiContext_();
@@ -299,4 +381,4 @@ async function proAiSend_(){
   var init = function(){ try { proTabsLoad_(); proDockEnsure_(); proTabsRender_(); } catch(e){ console.warn('[ui-pro]',e); } };
   if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
-if (typeof module!=='undefined') module.exports = { proIntent_, proRuleCustomer_, proRuleSales_, proRuleAnswer_, proNorm_, proTabsAdd_, proTabsRemove_, proScrub_, proClip_, proCustomerContext_, proSalesContext_, proAskPrompt_, proAskRequest_, proAnswerHtml_, proPriceIntent_, proPriceRequest_, proPriceFormat_ };
+if (typeof module!=='undefined') module.exports = { proIntent_, proRuleCustomer_, proRuleSales_, proRuleAnswer_, proNorm_, proTabsAdd_, proTabsRemove_, proScrub_, proClip_, proCustomerContext_, proSalesContext_, proAskPrompt_, proAskRequest_, proAnswerHtml_, proPriceIntent_, proPriceRequest_, proPriceFormat_, proPriceItemRequest_, proPriceMoney_, proPriceNext_, proPriceInfoText_, proPricePriceText_ };

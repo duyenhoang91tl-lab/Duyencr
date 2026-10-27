@@ -123,6 +123,8 @@ html[data-theme="dark"].ui-pro .khd-lock{color:var(--text)!important;background:
 html[data-theme="dark"].ui-pro .split-h{color:var(--text)!important}
 html[data-theme="dark"].ui-pro .split-err{color:#ff8a80!important}
 html[data-theme="dark"].ui-pro .split-d summary{color:#b9a8f5!important}
+html[data-theme="dark"].ui-pro #pro-ai .pro-pc{background:var(--surface)!important;color:#b9a8f5!important}
+html[data-theme="dark"].ui-pro #pro-ai .pro-pc.alt{color:var(--text)!important}
 /* ── 07-teamchat.css ── */
 /* ── 08-kho.css ── */
 html[data-theme="dark"] .tk-lowtxt{color:#ea8b85!important}
