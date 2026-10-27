@@ -1,5 +1,5 @@
 /* TỰ SINH bởi tools/gen-dark-theme.js — ĐỪNG SỬA TAY (sửa tool rồi chạy lại: node tools/gen-dark-theme.js). Chỉ có hiệu lực ở chế độ tối.
-   Nguồn: 01-base.css, 02-style.css, 03-style.css, 04-style.css, 05-sidenav.css, 06-pro.css, 07-teamchat.css, 08-kho.css, 09-profile.css, 10-filter-presets.css, 11-roles.css, 12-salematch.css, 13-shell.css, 14-qrpills.css, 15-mobile.css, <style> + style="…" trong index.html và js/*.js. Ngoại lệ thủ công: css/10-dark.css. */
+   Nguồn: 01-base.css, 02-style.css, 03-style.css, 04-style.css, 05-sidenav.css, 06-pro.css, 07-teamchat.css, 08-kho.css, 09-profile.css, 10-filter-presets.css, 11-roles.css, 12-salematch.css, 13-shell.css, 14-qrpills.css, 15-mobile.css, 16-mobile-list.css, <style> + style="…" trong index.html và js/*.js. Ngoại lệ thủ công: css/10-dark.css. */
 /* ── 01-base.css ── */
 html[data-theme="dark"] .btn.secondary:hover{background:#18293f!important}
 html[data-theme="dark"] .assign-badge-pill.has-assign{background:#3f3718!important;color:#edab82!important;border-color:#655a34!important}
@@ -192,6 +192,7 @@ html[data-theme="dark"] .qr-pills .qr-b,html[data-theme="dark"] .qr-pills .qr-mo
 html[data-theme="dark"] .qr-pills .qr-b:hover,html[data-theme="dark"] .qr-pills .qr-more:hover{color:var(--text,var(--text))!important}
 html[data-theme="dark"] .qr-pills .qr-b.on,html[data-theme="dark"] .qr-pills .qr-more.on{background:var(--surface,var(--surface))!important;color:var(--blue,#82a4ed)!important}
 /* ── 15-mobile.css ── */
+/* ── 16-mobile-list.css ── */
 html[data-theme="dark"] #qs-input::placeholder{color:var(--muted)!important}
 /* ── <style> trong index.html ── */
 html[data-theme="dark"] #boot-splash i{border-top-color:var(--border-md)!important}

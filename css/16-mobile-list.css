@@ -1,0 +1,38 @@
+/* ═══════════════════════════════════════════════════════════════════════════════════════════════
+   TỐI ƯU MÀN HÌNH ĐIỆN THOẠI (CRM web / app Android / Safari iPhone) — 2026-10-26, Duyên yêu cầu "tối ưu màn hình hiển thị trên CRM web".
+   Ảnh chụp thực tế (Chrome Android ~411px): phần trên danh sách khách chiếm ~43% màn hình (thanh header 2 hàng, 3 hàng lọc ngày, 4 hàng "Cột hiển thị"),
+   chỉ thấy ~6 dòng khách và khi vuốt ngang thì mất cột tên khách. Ô "Tìm nhanh" trên header có CHỮ GỢI Ý TRẮNG TRÊN NỀN TRẮNG (không đọc được).
+   File này CHỈ chứa quy tắc trong @media (hoặc sửa lỗi màu chữ gợi ý) → màn máy tính KHÔNG đổi. Nạp sau các css khác (trước 99-dark-auto).
+   LƯU Ý: KHÔNG đổi chiều cao dòng bảng (#main-table tr = 58px): cuộn ảo VT_ROW_H trong js/02 tính theo con số này.
+   ═══════════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* Lỗi màu: css/06-pro.css đặt chữ gợi ý của mọi input trong header màu TRẮNG, nhưng #qs-input (css/05) có nền trắng đặc → gợi ý "Tìm nhanh…" vô hình. (Chế độ tối: css/99-dark-auto.css tự đổi màu cứng này sang biến sáng.) */
+#qs-input::placeholder{color:#6b7280;opacity:1;}
+
+@media (max-width:900px){
+  /* 1) Bộ lọc ngày/giờ: 3 hàng xuống dòng → 1 hàng vuốt ngang */
+  #ymf-bar{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:4px 10px;gap:5px;scrollbar-width:none;}
+  #ymf-bar::-webkit-scrollbar{display:none;}
+  #ymf-bar > *{flex:0 0 auto;}
+  #ymf-bar .ymf-label{white-space:nowrap;}
+
+  /* 2) "Cột hiển thị" chiếm 4 hàng chỉ vì nhãn xuống dòng; ít khi dùng → ẩn cùng khối "Tổng quan & tác vụ" (bấm thanh đó để mở, như 6 ô thống kê và thanh tác vụ) */
+  body.lov-on-list:not(.lov-open) #tab-list > .col-toggle-bar{display:none !important;}
+  .col-toggle-bar{padding:4px 10px;}
+  .col-toggle-bar .ymf-label{white-space:nowrap;}
+
+  /* 3) Bảng khách: cột TÊN KHÁCH ghim bên trái khi vuốt ngang (trước đây vuốt là mất tên, không biết dòng nào của ai).
+        sticky left:0 chỉ có tác dụng KHI cột đã bị cuộn tới mép trái (cột "Ngày mua gần nhất" đứng trước vẫn hiện bình thường lúc chưa vuốt). Nền đặc để chữ cột khác không lòi qua. */
+  #main-table th.col-name,#main-table td.col-name{position:sticky;left:0;}
+  #main-table th.col-name{background-color:var(--surface);}
+  .table-wrap.x-scrolled #main-table td.col-name{background-color:var(--surface);box-shadow:2px 0 4px -2px rgba(0,0,0,.18);}   /* nền đặc chỉ khi đã vuốt (js/05 đặt class x-scrolled) */
+  #main-table td.col-name{z-index:2;}
+  #main-table th.col-name{z-index:12;}   /* cao hơn thead (10) và các th khác */
+  #main-table th.col-name,#main-table td.col-name{width:132px;min-width:132px;max-width:132px;}
+  .table-wrap{-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;}
+}
+
+@media (max-width:768px){
+  /* 5) Thanh "Tổng quan & tác vụ": gọn hơn */
+  .lov-bar{padding:6px 10px;}
+}

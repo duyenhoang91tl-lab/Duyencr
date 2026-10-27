@@ -1,46 +1,32 @@
-/* ═══════════════════════════════════════════════════════════════════════════════════════════════
-   TỐI ƯU MÀN HÌNH ĐIỆN THOẠI (CRM web / app Android / Safari iPhone) — 2026-10-26, Duyên yêu cầu "tối ưu màn hình hiển thị trên CRM web".
-   Ảnh chụp thực tế (Chrome Android ~411px): phần trên danh sách khách chiếm ~43% màn hình (thanh header 2 hàng, 3 hàng lọc ngày, 4 hàng "Cột hiển thị"),
-   chỉ thấy ~6 dòng khách và khi vuốt ngang thì mất cột tên khách. Ô "Tìm nhanh" trên header có CHỮ GỢI Ý TRẮNG TRÊN NỀN TRẮNG (không đọc được).
-   File này CHỈ chứa quy tắc trong @media (hoặc sửa lỗi màu chữ gợi ý) → màn máy tính KHÔNG đổi. Nạp sau các css khác (trước 99-dark-auto).
-   LƯU Ý: KHÔNG đổi chiều cao dòng bảng (#main-table tr = 58px): cuộn ảo VT_ROW_H trong js/02 tính theo con số này.
-   ═══════════════════════════════════════════════════════════════════════════════════════════════ */
-
-/* Lỗi màu: css/06-pro.css đặt chữ gợi ý của mọi input trong header màu TRẮNG, nhưng #qs-input (css/05) có nền trắng đặc → gợi ý "Tìm nhanh…" vô hình. (Chế độ tối: css/99-dark-auto.css tự đổi màu cứng này sang biến sáng.) */
-#qs-input::placeholder{color:#6b7280;opacity:1;}
-
-@media (max-width:900px){
-  /* 1) Bộ lọc ngày/giờ: 3 hàng xuống dòng → 1 hàng vuốt ngang */
-  #ymf-bar{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:4px 10px;gap:5px;scrollbar-width:none;}
-  #ymf-bar::-webkit-scrollbar{display:none;}
-  #ymf-bar > *{flex:0 0 auto;}
-  #ymf-bar .ymf-label{white-space:nowrap;}
-
-  /* 2) "Cột hiển thị" chiếm 4 hàng chỉ vì nhãn xuống dòng; ít khi dùng → ẩn cùng khối "Tổng quan & tác vụ" (bấm thanh đó để mở, như 6 ô thống kê và thanh tác vụ) */
-  body.lov-on-list:not(.lov-open) #tab-list > .col-toggle-bar{display:none !important;}
-  .col-toggle-bar{padding:4px 10px;}
-  .col-toggle-bar .ymf-label{white-space:nowrap;}
-
-  /* 3) Bảng khách: cột TÊN KHÁCH ghim bên trái khi vuốt ngang (trước đây vuốt là mất tên, không biết dòng nào của ai).
-        sticky left:0 chỉ có tác dụng KHI cột đã bị cuộn tới mép trái (cột "Ngày mua gần nhất" đứng trước vẫn hiện bình thường lúc chưa vuốt). Nền đặc để chữ cột khác không lòi qua. */
-  #main-table th.col-name,#main-table td.col-name{position:sticky;left:0;}
-  #main-table th.col-name{background-color:var(--surface);}
-  .table-wrap.x-scrolled #main-table td.col-name{background-color:var(--surface);box-shadow:2px 0 4px -2px rgba(0,0,0,.18);}   /* nền đặc chỉ khi đã vuốt (js/05 đặt class x-scrolled) */
-  #main-table td.col-name{z-index:2;}
-  #main-table th.col-name{z-index:12;}   /* cao hơn thead (10) và các th khác */
-  #main-table th.col-name,#main-table td.col-name{width:132px;min-width:132px;max-width:132px;}
-  .table-wrap{-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;}
-}
-
-@media (max-width:768px){
-  /* 4) Header 1 hàng gọn: nút Menu chỉ còn "☰ Menu" (tên mục dài làm tràn), ô tìm nhanh co giãn theo chỗ còn lại, tên người dùng cắt chữ thay vì tràn ra ngoài màn */
-  #sn-toggle{padding:0 8px;}
-  #sn-toggle .sn-cur{display:none;}
-  #qs-wrap{flex:1 1 0;min-width:70px;max-width:none;}
-  #qs-input{padding:0 8px;font-size:13px;}
-  header .role-pill{max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  header{gap:5px;}
-
-  /* 5) Thanh "Tổng quan & tác vụ": gọn hơn */
-  .lov-bar{padding:6px 10px;}
+/* VỪA MÀN ĐIỆN THOẠI (≤ 640px) — thanh trên không còn tràn ra ngoài (14/10/2026).
+   NGUYÊN NHÂN GỐC: <header> là 1 hàng ngang cao cố định 50px KHÔNG xuống dòng, trong khi trên điện thoại nó chứa: nút Menu · tên màn, ô Tìm nhanh, nút ☰ lọc, tên CRM + nhãn phiên bản + nhãn Admin + các nút tài khoản
+   → rộng hơn màn hình: chữ "Thu Hiền CRM" bị cắt, và vì trang rộng hơn màn hình nên các phần tử đặt `position:fixed; right:16px` (nút robot AI) cũng lệch ra ngoài mép phải.
+   CÁCH SỬA: thanh trên xuống dòng (hàng 1: Menu · tên màn + Tìm nhanh + ☰; hàng 2: tên CRM + các nút tài khoản), ẩn nhãn phiên bản + dòng trạng thái; mọi lớp đang giả định "thanh trên cao 50px" (menu kéo, lớp phủ, khung chính, khung AI)
+   dùng biến --hdr-h do js/59-fn-mobilefit.js đo thật. KHÔNG đụng overflow của html/body (đã có body{overflow-x:hidden} ở ≤768px; chạm vào html sẽ làm cuộn trang hỏng). Toàn bộ luật nằm trong 1 khối @media nên máy tính không bị ảnh hưởng. Test: node tools/test-mobile-fit.js */
+@media (max-width:640px){
+  header{flex-wrap:wrap;height:auto;min-height:50px;padding:6px 10px;row-gap:6px;column-gap:6px;}
+  header>*{min-width:0;}
+  #sn-toggle{order:1;flex:1 1 0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #qs-wrap{order:2;flex:0 0 42%;max-width:42%;}
+  #qs-wrap input{width:100%;min-width:0;}
+  header .mobile-menu-btn{order:3;flex:0 0 auto;}
+  header .logo{order:4;flex:0 1 auto;max-width:46%;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  header .logo span{display:none;}
+  header .hdr-r{order:5;flex:1 1 0;min-width:0;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;}
+  header .hdr-r>*{max-width:100%;font-size:12px;}
+  header .fstatus{display:none;}
+  /* mọi thứ từng giả định thanh trên cao 50px → theo chiều cao thật (--hdr-h, mặc định 50px) */
+  .app{height:calc(100vh - var(--hdr-h,50px));height:calc(100dvh - var(--hdr-h,50px));}
+  .sidebar-backdrop,#sn-backdrop{top:var(--hdr-h,50px);}
+  .sidebar{top:var(--hdr-h,50px);}
+  #data-view .tabs{top:var(--hdr-h,50px);}
+  html.ui-pro #pro-ai{top:var(--hdr-h,50px);}
+  /* nút robot AI nằm gọn trong mép phải */
+  html.ui-pro #pro-dock{right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));}
+  /* lưới an toàn: không phần tử nào vượt bề ngang màn hình */
+  #data-view,.app{max-width:100%;min-width:0;}
+  img,video,canvas,iframe{max-width:100%;}
+  .modal{max-width:96vw;}
+  /* Social > Chat: cột hồ sơ khách cạnh khung chat (css/01-base.css .sc-dock rộng cố định 380–440px) → vừa bề ngang điện thoại */
+  .sc-dock{width:100%;max-width:100%;border-left:0;}
 }

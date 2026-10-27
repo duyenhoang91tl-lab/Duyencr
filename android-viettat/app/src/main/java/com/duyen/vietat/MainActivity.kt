@@ -36,13 +36,13 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(b: Bundle?) {
         super.onCreate(b); Store.init(this)
         crm = CrmWeb(this)
-        if (Crm.configured(this)) thread { Crm.pull(this) }   // nạp sẵn kho Viết tắt từ CRM để gõ tắt dùng được ngay
+        thread { Crm.pull(this) }   // nạp sẵn kho Viết tắt từ CRM để gõ tắt dùng được ngay (kết nối mặc định, không hỏi gì)
         if (b == null) crm.load() else crm.web.restoreState(b)
         setContent { MaterialTheme { Root(crm) } }
     }
     override fun onSaveInstanceState(out: Bundle) { super.onSaveInstanceState(out); crm.web.saveState(out) }
     override fun onPause() { super.onPause(); crm.web.onPause() }
-    override fun onResume() { super.onResume(); crm.web.onResume() }
+    override fun onResume() { super.onResume(); crm.web.onResume(); crm.detectName() }
     override fun onDestroy() { crm.web.destroy(); super.onDestroy() }
 }
 
@@ -56,23 +56,22 @@ fun Root(crm: CrmWeb) {
             NavigationBarItem(tab == 1, { tab = 1 }, { Text("⌨") }, label = { Text("Viết tắt") })
         }
     }) { pad ->
-        Box(Modifier.padding(pad).fillMaxSize()) { if (tab == 0) CrmWebScreen(crm) else App() }
+        Box(Modifier.padding(pad).fillMaxSize()) { if (tab == 0) CrmWebScreen(crm) else App(crm) }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun App() {
+fun App(crm: CrmWeb) {
     val ctx = LocalContext.current
     var sel by remember { mutableStateOf<String?>(null) }
     var editing by remember { mutableStateOf<Snippet?>(null) }
     var newFolder by remember { mutableStateOf(false) }
     var q by remember { mutableStateOf("") }
-    var showSync by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("") }
-    // Đọc kho Viết tắt của CRM (chung + của tôi). Lần đầu chưa nhập tên CS thì mở hộp cài đặt.
-    val doSync = { if (Crm.configured(ctx)) thread { status = Crm.pull(ctx) }; Unit }
-    LaunchedEffect(Unit) { if (Crm.configured(ctx)) doSync() else showSync = true }
+    // Đọc kho Viết tắt của CRM (chung + của tôi) — kết nối mặc định, không còn hộp cài đặt; tên CS tự lấy từ tài khoản đăng nhập CRM.
+    val doSync = { thread { status = Crm.pull(ctx) }; Unit }
+    LaunchedEffect(Unit) { crm.detectName(); doSync() }
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { u ->
         if (u != null) runCatching { ctx.contentResolver.openOutputStream(u)?.use { Store.exportZip(it) } }
             .onSuccess { Toast.makeText(ctx, "Đã xuất file", Toast.LENGTH_SHORT).show() }
@@ -95,7 +94,7 @@ fun App() {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton({ exporter.launch("viettat-backup.zip") }, Modifier.weight(1f)) { Text("Xuất file") }
                 OutlinedButton({ importer.launch(arrayOf("application/json", "text/*", "*/*")) }, Modifier.weight(1f)) { Text("Nhập file") }
-                OutlinedButton({ showSync = true }, Modifier.weight(1f)) { Text("☁ CRM") }
+                OutlinedButton({ crm.detectName(); doSync() }, Modifier.weight(1f)) { Text("☁ CRM") }
             }
             if (status.isNotEmpty()) Text(status, style = MaterialTheme.typography.bodySmall)
             OutlinedTextField(q, { q = it }, Modifier.fillMaxWidth().padding(top = 8.dp), singleLine = true,
@@ -128,7 +127,6 @@ fun App() {
         }
     }
     editing?.let { SnippetDialog(it) { editing = null; doSync() } }
-    if (showSync) CrmDialog({ showSync = false }, { doSync() })
     if (newFolder) {
         var name by remember { mutableStateOf("") }
         AlertDialog(onDismissRequest = { newFolder = false }, title = { Text("Thư mục mới") },
@@ -235,23 +233,21 @@ fun SnippetDialog(s: Snippet, onDone: () -> Unit) {
 
 @Composable
 fun CrmDialog(onDone: () -> Unit, onSave: () -> Unit) {
+    // Viết tắt đã MẶC ĐỊNH nối sẵn với CRM (Crm.DEFAULT_URL / DEFAULT_WEB) nên hộp này chỉ còn hỏi Tên CS — không còn chữ "Kết nối" và 2 ô địa chỉ.
+    // Địa chỉ đã lưu riêng trên máy (nếu từng đổi) vẫn được giữ nguyên: Lưu chỉ ghi "name", không đụng "url"/"web".
     val ctx = LocalContext.current
     val p = Crm.prefs(ctx)
-    var url by remember { mutableStateOf(Crm.url(ctx)) }
     var name by remember { mutableStateOf(Crm.name(ctx)) }
-    var web by remember { mutableStateOf(Crm.webUrl(ctx)) }
-    AlertDialog(onDismissRequest = onDone, title = { Text("Kết nối CRM") },
+    AlertDialog(onDismissRequest = onDone, title = { Text("Cập nhật viết tắt") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Nhập đúng tên CS của bạn (giống tên trong CRM) để thấy cả mục viết tắt riêng của bạn. Mục chung của team luôn có.", style = MaterialTheme.typography.bodySmall)
-                OutlinedTextField(name, { name = it }, singleLine = true, label = { Text("Tên CS của bạn") })
-                OutlinedTextField(web, { web = it }, label = { Text("Địa chỉ web CRM (đã điền sẵn)") })
-                OutlinedTextField(url, { url = it }, label = { Text("Địa chỉ dữ liệu Viết tắt (đã điền sẵn, thường không cần đổi)") })
+                OutlinedTextField(name, { name = it }, singleLine = true, label = { Text("Tên CS của bạn") }, modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = {
             TextButton({
-                if (name.isNotBlank()) { p.edit().putString("url", url.trim()).putString("web", web.trim()).putString("name", name.trim()).apply(); onSave() }
+                if (name.isNotBlank()) { p.edit().putString("name", name.trim()).apply(); onSave() }
                 onDone()
             }) { Text("Lưu & cập nhật") }
         },

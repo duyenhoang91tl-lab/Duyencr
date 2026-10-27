@@ -134,8 +134,20 @@ jobs:
             exit $RC
           fi
 
-      - name: Kiểm tra bản đang chạy
-        if: steps.cmp.outputs.same != 'true'
+      # TRUOC DAY buoc nay la `curl ... | head -c 400 || true` => LUON xanh du Google tra trang loi => 'Actions xanh' khong chung minh URL con song
+      # (26/10/2026: URL /exec tra trang Google "Rat tiec, khong the mo tep" ma deploy van xanh). Nay phai nhan JSON co "ver", neu khong => DO + ghi ma HTTP/doan dau
+      # noi dung vao annotation (doc duoc qua API). Chay CA khi 'same=true' (bo qua deploy) vi muc dich la kiem tra URL CRM dang goi.
+      - name: Kiểm tra bản đang chạy (phải trả JSON có "ver", nếu không => đỏ)
         run: |
           sleep 5
-          curl -sL "https://script.google.com/macros/s/${DEPLOYMENT_ID}/exec?action=count" | head -c 400 || true
+          URL="https://script.google.com/macros/s/${DEPLOYMENT_ID}/exec?action=count"
+          LAST=""
+          for i in 1 2 3; do
+            LAST=$(curl -sL --max-time 60 -o /tmp/gas_body.txt -w 'HTTP %{http_code} | type=%{content_type} | url_cuoi=%{url_effective}' "$URL" || echo "curl loi")
+            BODY=$(head -c 300 /tmp/gas_body.txt 2>/dev/null | tr '\n\r' '  ')
+            echo "Lần $i: $LAST"; echo "   nội dung: $BODY"
+            if grep -q '"ver"' /tmp/gas_body.txt 2>/dev/null; then echo "OK: Web App trả JSON có ver."; exit 0; fi
+            sleep 10
+          done
+          echo "::error title=Web App Apps Script KHÔNG trả JSON (CRM/Worker sẽ lỗi 404/502)::$LAST | nội dung: $BODY | deployment=${DEPLOYMENT_ID:0:12}…"
+          exit 1
