@@ -261,6 +261,36 @@ const W = 'https://crm.example.workers.dev/';
     arm(); await nat('action=pkChatConv&token=' + T + '&conv=x&after=2026-10-13;drop'); ok(sb().every(c => c.url.indexOf('sent_at=gt') === -1), 'tham so after sai dinh dang bi bo (chong chen loc)');
     arm(); r = await nat('action=pkChatConv&token=' + T); ok(JSON.parse(await r.text()).error === 'Thieu conv.', 'thieu conv -> bao loi giong GAS');
   }
+  // ===== 2026-10-26: donPhones/staffOverview co cache + THU LAI 1 LAN khi GAS tra 502/404 thoang qua (app Android bao 502/404 o action nang) =====
+  {
+    const nodeCrypto = require('crypto'), SEC = 'bi-mat-phien-2';
+    const b64w = b => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(/\//g, '_');
+    const mkTok = (u, e) => { const b = b64w(JSON.stringify({ u: u, e: e })); return b + '.' + b64w(nodeCrypto.createHmac('sha256', SEC).update(b).digest()); };
+    const tA = mkTok('duyen', Date.now() + 1e6), tB = mkTok('hoa', Date.now() + 1e6), senv2 = { GAS_URL: GAS, SESS_SECRET: SEC };
+    ok(P('GET', 'action=donPhones').ttl === 30 && P('GET', 'action=staffOverview&username=a').ttl === 60, 'donPhones 30s, staffOverview 60s duoc cache');
+    ok(mod.GATED_ACTIONS.indexOf('staffOverview') !== -1 && mod.GATED_ACTIONS.indexOf('donPhones') === -1, 'staffOverview khoa theo user; donPhones (GAS khong loc theo user) dung chung');
+    reset(); await go('action=donPhones&src=web&token=' + tA, undefined, senv2); let rr = await go('action=donPhones&src=web&token=' + tB, undefined, senv2);
+    ok(rr.headers.get('x-crm-cache') === 'HIT' && calls.length === 1, 'donPhones: nguoi thu 2 dung chung ban cache (chi 1 lan goi GAS)');
+    reset(); rr = await go('action=donPhones', undefined, senv2); ok(rr.headers.get('x-crm-cache') === 'BYPASS:no-valid-token' && putCount === 0, 'donPhones khong token hop le -> chuyen thang, khong cache');
+    reset(); await go('action=staffOverview&username=duyenht&from=2026-10-01&to=2026-10-31&token=' + tA, undefined, senv2);
+    rr = await go('action=staffOverview&username=duyenht&from=2026-10-01&to=2026-10-31&token=' + tA, undefined, senv2); ok(rr.headers.get('x-crm-cache') === 'HIT' && calls.length === 1, 'staffOverview: cung nguoi xem -> HIT');
+    rr = await go('action=staffOverview&username=duyenht&from=2026-10-01&to=2026-10-31&token=' + tB, undefined, senv2); ok(rr.headers.get('x-crm-cache') === 'MISS' && calls.length === 2, 'staffOverview: nguoi xem khac KHONG an cache cua nguoi truoc (GAS kiem quyen theo nguoi xem)');
+    rr = await go('action=staffOverview&username=hoa&from=2026-10-01&to=2026-10-31&token=' + tA, undefined, senv2); ok(rr.headers.get('x-crm-cache') === 'MISS' && calls.length === 3, 'staffOverview: khac username = khac muc cache');
+    // --- thu lai ---
+    let n = 0; reset(); originFn = () => (++n === 1 ? { status: 502, body: '<html>Bad Gateway</html>' } : { status: 200, body: { ok: true, n: 2 } });
+    rr = await go('action=donPhones'); ok(rr.status === 200 && rr.headers.get('x-crm-cache') === 'MISS' && calls.length === 2 && JSON.parse(await rr.text()).n === 2, '502 thoang qua -> tu thu lai 1 lan, tra du lieu that (client khong thay loi)');
+    n = 0; reset(); originFn = () => (++n === 1 ? { status: 404, body: '<html>Sorry, unable to open the file</html>' } : { status: 200, body: { ok: true } });
+    rr = await go('action=donPhones'); ok(rr.status === 200 && calls.length === 2, '404 thoang qua cua Google cung duoc thu lai');
+    n = 0; reset(); originFn = () => { if (++n === 1) return { throw: true }; return { status: 200, body: { ok: true } }; };
+    rr = await go('action=donPhones'); ok(rr.status === 200 && calls.length === 2, 'dut ket noi lan 1 -> thu lai lan 2 duoc');
+    reset(); originFn = () => ({ status: 502, body: '<html>Bad Gateway</html>' }); rr = await go('action=donPhones');
+    ok(rr.status === 502 && calls.length === 2, 'loi that su keo dai: chi thu lai DUNG 1 lan (khong vong lap), tra nguyen ma loi');
+    reset(); originFn = () => ({ throw: true }); rr = await go('action=donPhones'); ok(rr.status === 502 && calls.length === 2 && JSON.parse(await rr.text()).error, 'mat ket noi keo dai -> 502 co thong bao, dung 2 lan goi');
+    reset(); originFn = () => ({ status: 200, body: { error: 'Can dang nhap' } }); rr = await go('action=donPhones'); ok(calls.length === 1, '{"error"} 200 cua GAS KHONG thu lai (khong phai loi ha tang)');
+    reset(); await go('action=donPhones'); now += 200000; originFn = () => ({ status: 502, body: '<html>x</html>' }); const c0 = calls.length; rr = await go('action=donPhones');
+    ok(rr.headers.get('x-crm-cache') === 'STALE' && calls.length === c0 + 1, 'con ban cu: tra STALE ngay, KHONG thu lai (khong bat nguoi dung cho them)');
+    reset(); originFn = () => ({ status: 502, body: '<html>x</html>' }); const c1 = calls.length; await go('action=saveSingle&phone=0900000000'); ok(calls.length === 1, 'action ghi (khong cache) khong bao gio bi thu lai');
+  }
   console.log('ALL CLOUDFLARE WORKER TESTS PASSED');
 })().catch(e => { console.error('LOI:', e); process.exit(1); });
 function J(x) { return JSON.stringify(x); }
