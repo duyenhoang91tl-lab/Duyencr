@@ -60,6 +60,29 @@ fun Root(crm: CrmWeb) {
     }
 }
 
+/**
+ * Thẻ "🩺 Kiểm tra gõ tắt": cho biết gõ tắt hỏng ở bước nào (dịch vụ Trợ năng chưa chạy / chưa có mục / Android không gửi sự kiện gõ /
+ * không khớp mục / chèn chữ bị từ chối) bằng `Diag.report()`, và có ô GÕ THỬ viết tắt (`Diag.trial`) để biết app khớp mục nào mà không cần mở app chat.
+ */
+@Composable
+fun DiagCard() {
+    var open by remember { mutableStateOf(false) }
+    var report by remember { mutableStateOf("") }
+    var test by remember { mutableStateOf("") }
+    OutlinedButton({ open = !open; if (open) report = Diag.report() }, Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        Text(if (open) "🩺 Kiểm tra gõ tắt ▲" else "🩺 Kiểm tra gõ tắt ▼")
+    }
+    if (open) Card(Modifier.fillMaxWidth().padding(top = 6.dp)) {
+        Column(Modifier.padding(12.dp).heightIn(max = 300.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(report, style = MaterialTheme.typography.bodySmall)
+            OutlinedButton({ report = Diag.report() }) { Text("Làm mới") }
+            OutlinedTextField(test, { test = it }, singleLine = true, label = { Text("Gõ thử viết tắt (vd: ch)") }, modifier = Modifier.fillMaxWidth())
+            Text(Diag.trial(test), style = MaterialTheme.typography.bodySmall)
+            Text("Mẹo: gõ viết tắt ở app chat khác (Zalo/Messenger/Pancake), KHÔNG bấm cách; quay lại đây bấm Làm mới để xem app nhận được gì.", style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun App(crm: CrmWeb) {
@@ -97,6 +120,7 @@ fun App(crm: CrmWeb) {
                 OutlinedButton({ crm.detectName(); doSync() }, Modifier.weight(1f)) { Text("☁ CRM") }
             }
             if (status.isNotEmpty()) Text(status, style = MaterialTheme.typography.bodySmall)
+            DiagCard()
             OutlinedTextField(q, { q = it }, Modifier.fillMaxWidth().padding(top = 8.dp), singleLine = true,
                 label = { Text("Tìm viết tắt, từ khoá, nội dung") })
             Spacer(Modifier.height(8.dp))
