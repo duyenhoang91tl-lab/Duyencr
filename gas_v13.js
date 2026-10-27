@@ -13246,7 +13246,11 @@ function _vtImgsFromCell_(v) {
   try { var a = JSON.parse(String(v || '[]')); if (Array.isArray(a)) a.forEach(function (x) { if (x && /^[A-Za-z0-9_-]{15,}$/.test(String(x.id || ''))) out.push({ id: String(x.id), name: String(x.name || '').slice(0, 120) }); }); } catch (e) { out = []; }
   return out.slice(0, VIETTAT_MAX_IMAGES);
 }
-function _vtSame_(a, b) { return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase() && String(a || '').trim() !== ''; }
+// So TEN nguoi dung (chu muc rieng) LINH HOAT: bo dau / khoang trang / ky tu la / hoa-thuong -> 'Duyên HT' == 'duyenht' == 'Duyen  HT'.
+// NGUYEN NHAN GOC (2026-10-27): app Android Viet Tat khong co token nen gui by=<Ten CS go tay> (vd 'duyenht') trong khi muc rieng luu owner = ten tai khoan CRM
+// (vd 'Duyên HT'); so sanh CHINH XAC khong khop -> server khong tra muc rieng nao -> go tat 'bam khong ra gi'. Dung chung cho doc / sua / xoa muc rieng.
+function _vtKey_(v) { return _stripVN_(String(v == null ? '' : v).trim().toLowerCase()).replace(/đ/g, 'd').replace(/[^a-z0-9]/g, ''); }
+function _vtSame_(a, b) { var ka = _vtKey_(a); return ka !== '' && ka === _vtKey_(b); }
 function _vtRowToObj_(r) {
   var opts = [];
   try { var o = JSON.parse(String(r[4] || '[]')); if (Array.isArray(o)) opts = o.map(function (x) { return String(x == null ? '' : x); }).filter(function (x) { return x.trim(); }); } catch (e) { opts = []; }
