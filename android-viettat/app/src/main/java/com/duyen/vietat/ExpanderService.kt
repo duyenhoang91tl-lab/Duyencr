@@ -90,15 +90,15 @@ class ExpanderService : AccessibilityService() {
         fun dp(v: Int) = (v * d).toInt()
         val sh = resources.displayMetrics.heightPixels
         val r = Rect().also { n.getBoundsInScreen(it) }
-        // Cao hết cỡ phần màn hình nằm TRÊN ô gõ (để không che ô gõ), tối thiểu 260dp, tối đa 80% màn hình
-        val heightPx = (r.top - dp(24)).coerceIn(dp(260), (sh * 0.8f).toInt())
+        // Bảng chọn GỌN: cao tối đa 50% màn hình, nằm TRÊN ô gõ (không che ô gõ), tối thiểu 260dp
+        val heightPx = (r.top - dp(24)).coerceIn(dp(260), (sh * 0.5f).toInt())
         val picker = Picker(this, hits.flatMap { it.options }, name, heightPx,
             onInsert = { sel -> applySelection(n, text, word, sel, name, share = false); hide() },
             onShare = { sel -> applySelection(n, text, word, sel, name, share = true); hide() },
             onClose = { hide() })
         val box = picker.build()
         val lp = WindowManager.LayoutParams(
-            (resources.displayMetrics.widthPixels * 0.96).toInt(), heightPx,
+            resources.displayMetrics.widthPixels, heightPx,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
             PixelFormat.TRANSLUCENT
@@ -137,14 +137,18 @@ class ExpanderService : AccessibilityService() {
         val texts = sel.filter { kindOf(it) == null }
         val media = sel.filter { kindOf(it) != null }
         if (texts.size == 1 && media.isEmpty()) { insertText(n, text, word, texts[0], name); return }
-        setText(n, text.dropLast(word.length) + texts.joinToString("\n") { Store.resolve(it, name) })
+        val joined = texts.joinToString("\n") { Store.resolve(it, name) }
+        // Chia sẻ (có hình): chữ đi kèm bảng chia sẻ (EXTRA_TEXT + bộ nhớ tạm), không để lại ô gõ; Chèn: chữ vào ô gõ
+        val shareText = share && media.isNotEmpty() && joined.isNotEmpty()
+        setText(n, text.dropLast(word.length) + if (shareText) "" else joined)
         if (media.isEmpty()) return
         val uris = media.mapNotNull { m ->
             File(Store.mediaDir, mediaNameOf(m)).takeIf { it.exists() }?.let { FileProvider.getUriForFile(this, "$packageName.files", it) }
         }
         if (uris.isEmpty()) { Toast.makeText(this, "Không tìm thấy file", Toast.LENGTH_SHORT).show(); return }
         val allImg = media.all { kindOf(it) == "img" }
-        (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newUri(contentResolver, "viettat", uris[0]))
+        (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(
+            if (shareText) ClipData.newPlainText("viettat", joined) else ClipData.newUri(contentResolver, "viettat", uris[0]))
         if (uris.size == 1 && allImg && !share) {
             n.performAction(AccessibilityNodeInfo.ACTION_PASTE)
             Toast.makeText(this, "Đã dán. Nếu chưa thấy, nhấn giữ ô chat > Dán", Toast.LENGTH_LONG).show()
@@ -154,9 +158,11 @@ class ExpanderService : AccessibilityService() {
             type = if (allImg) "image/*" else if (media.all { kindOf(it) == "aud" }) "audio/*" else "*/*"
             if (uris.size == 1) putExtra(Intent.EXTRA_STREAM, uris[0]) else putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
             clipData = ClipData.newRawUri("", uris[0]).also { cd -> for (k in 1 until uris.size) cd.addItem(ClipData.Item(uris[k])) }
+            if (shareText) putExtra(Intent.EXTRA_TEXT, joined)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         startActivity(Intent.createChooser(send, "Gửi qua").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        if (shareText) Toast.makeText(this, "Đã sao chép chữ. Nếu ứng dụng nhận không kèm chữ, hãy dán vào tin nhắn", Toast.LENGTH_LONG).show()
     }
 
     private fun hide() { popup?.let { runCatching { wm.removeView(it) } }; popup = null; lastText = "" }

@@ -1,14 +1,18 @@
 package com.duyen.vietat
 
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.Outline
+import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
-import android.view.GestureDetector
+import android.text.TextUtils
 import android.view.Gravity
-import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
+import android.view.ViewOutlineProvider
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -17,11 +21,11 @@ import android.widget.TextView
 import java.io.File
 
 /**
- * Màn chọn nội dung khi bấm viết tắt (Duyên yêu cầu 2026-10-25):
- *  - danh sách CUỘN, hiện hết mọi lựa chọn (chữ + hình), chọn NHIỀU cái 1 lúc;
- *  - hình hiện bằng chính hình (không còn chữ "Hình ảnh"), thẻ to dễ nhìn;
- *  - bấm 1 lần = chọn / bỏ chọn; bấm ĐÚP vào hình = phóng to xem full, bấm đúp lần nữa = thu nhỏ lại;
- *  - nút cuối: Đóng · Chia sẻ · Chèn (n).
+ * Bảng chọn nội dung GỌN kiểu bảng chọn ảnh của Android/Google Photos (Duyên yêu cầu 2026-10-27):
+ *  - chữ: thẻ gọn (tối đa 3 dòng); hình + ghi âm: LƯỚI 3 cột ô vuông nhỏ, dấu tích tròn ở góc trên trái;
+ *  - chạm = chọn / bỏ chọn, chọn NHIỀU chữ + nhiều hình cùng lúc; NHẤN GIỮ một hình = xem to (chạm để đóng);
+ *  - thanh nổi phía dưới: ✕ đóng · "Đã chọn n" · Chia sẻ · Chèn;
+ *  - cao tối đa ~50% màn hình (do ExpanderService quyết định qua [heightPx]); tự đổi sáng/tối theo hệ thống.
  * Chỉ dựng giao diện; việc chèn/gửi do [onInsert]/[onShare] (ExpanderService) làm, nhận các lựa chọn đã chọn theo đúng thứ tự trong danh sách.
  */
 class Picker(
@@ -35,17 +39,28 @@ class Picker(
 ) {
     private val d = ctx.resources.displayMetrics.density
     private fun dp(v: Int) = (v * d).toInt()
+    private val MP = ViewGroup.LayoutParams.MATCH_PARENT
+    private val WC = ViewGroup.LayoutParams.WRAP_CONTENT
+
+    private val dark = (ctx.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+    private val cBg = if (dark) 0xFF1F1F21.toInt() else 0xFFF8F7F5.toInt()
+    private val cCard = if (dark) 0xFF2A2A2D.toInt() else Color.WHITE
+    private val cLine = if (dark) 0xFF3C3C40.toInt() else 0xFFDDDDDD.toInt()
+    private val cText = if (dark) 0xFFEEEEEE.toInt() else 0xFF111111.toInt()
+    private val cSub = if (dark) 0xFFAAAAAA.toInt() else 0xFF666666.toInt()
+    private val cAccent = if (dark) 0xFF6FA0FF.toInt() else 0xFF1E66F5.toInt()
+    private val cBar = if (dark) 0xFF38383B.toInt() else 0xFFECEAF0.toInt()
+    private val cTint = if (dark) 0xFF2B3A55.toInt() else 0xFFDCE8FE.toInt()
 
     private val selected = LinkedHashSet<Int>()
-    private val cards = HashMap<Int, View>()
+    private val frames = HashMap<Int, View>()
     private val marks = HashMap<Int, TextView>()
-    private val zoomed = HashSet<Int>()
-    private val imgViews = HashMap<Int, ImageView>()
-    private val thumbs = HashMap<Int, Bitmap?>()
-    private val bigs = HashMap<Int, Bitmap?>()
+    private val tiles = HashSet<Int>()
     private lateinit var title: TextView
+    private lateinit var count: TextView
     private lateinit var btnInsert: TextView
     private lateinit var btnShare: TextView
+    private lateinit var preview: ImageView
 
     fun selectedOptions(): List<String> = selected.sorted().map { options[it] }
 
@@ -63,123 +78,143 @@ class Picker(
         setColor(fill); cornerRadius = radiusDp * d; setStroke(dp(strokeDp), stroke)
     }
 
-    private fun button(label: String, fill: Int, textColor: Int, weight: Float) = TextView(ctx).apply {
-        text = label; textSize = 15f; setTextColor(textColor); gravity = Gravity.CENTER
-        background = box(fill, fill, 1, 12)
-        setPadding(dp(8), dp(12), dp(8), dp(12))
-        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, weight).apply { leftMargin = dp(4); rightMargin = dp(4) }
+    private fun round(v: View, radiusDp: Int) {
+        v.clipToOutline = true
+        v.outlineProvider = object : ViewOutlineProvider() {
+            override fun getOutline(view: View, outline: Outline) {
+                outline.setRoundRect(0, 0, view.width, view.height, radiusDp * d)
+            }
+        }
+    }
+
+    private fun styleMark(mk: TextView, on: Boolean) {
+        mk.text = if (on) "✓" else ""
+        mk.background = if (on) box(cAccent, Color.WHITE, 2, 12) else box(0x33000000, Color.WHITE, 2, 12)
     }
 
     private fun refresh() {
         val n = selected.size
-        title.text = (if (name != null) "Khách: ${Store.given(name)}  ·  " else "") +
-            (if (n == 0) "Bấm để chọn (chọn được nhiều)" else "Đã chọn $n")
-        btnInsert.text = if (n == 0) "Chèn" else "Chèn ($n)"
-        btnShare.text = if (n == 0) "Chia sẻ" else "Chia sẻ ($n)"
-        btnInsert.alpha = if (n == 0) 0.45f else 1f
-        btnShare.alpha = if (n == 0) 0.45f else 1f
-        for ((i, v) in cards) {
+        title.text = if (name != null) "Khách: ${Store.given(name)}  ·  chạm để chọn nhiều mục" else "Chạm để chọn nhiều mục"
+        count.text = if (n == 0) "Chưa chọn" else "Đã chọn $n"
+        count.setTextColor(if (n == 0) cSub else cText)
+        btnShare.alpha = if (n == 0) 0.4f else 1f
+        btnInsert.alpha = if (n == 0) 0.4f else 1f
+        for ((i, v) in frames) {
             val on = i in selected
-            v.background = box(if (on) 0xFFE8F0FE.toInt() else Color.WHITE, if (on) 0xFF1E66F5.toInt() else 0xFFD0D0D0.toInt(), if (on) 3 else 1, 12)
-            marks[i]?.apply {
-                text = if (on) "✓" else ""
-                background = box(if (on) 0xFF1E66F5.toInt() else 0x66FFFFFF.toInt(), if (on) 0xFF1E66F5.toInt() else 0xFF9E9E9E.toInt(), 2, 14)
+            if (i in tiles) {
+                val p = if (on) dp(6) else 0
+                v.setPadding(p, p, p, p)
+                v.setBackgroundColor(if (on) cTint else cCard)
+            } else {
+                v.background = box(if (on) cTint else cCard, if (on) cAccent else cLine, if (on) 2 else 1, 12)
             }
+            marks[i]?.let { styleMark(it, on) }
         }
     }
 
     private fun toggle(i: Int) { if (!selected.add(i)) selected.remove(i); refresh() }
 
-    /** Phóng/thu hình ở thẻ i: phóng = hiện NGUYÊN hình (vừa khung, nền đen) cao gần hết màn chọn; thu = ô thu nhỏ cắt giữa. */
-    private fun toggleZoom(i: Int) {
-        val iv = imgViews[i] ?: return
-        if (zoomed.remove(i)) {
-            iv.scaleType = ImageView.ScaleType.CENTER_CROP
-            iv.layoutParams = iv.layoutParams.apply { height = dp(170) }
-            iv.setImageBitmap(thumbs[i])
-        } else {
-            zoomed += i
-            val big = bigs.getOrPut(i) { decode(pathOf(options[i]), 1600) } ?: thumbs[i]
-            iv.scaleType = ImageView.ScaleType.FIT_CENTER
-            iv.layoutParams = iv.layoutParams.apply { height = (heightPx * 0.78f).toInt() }
-            iv.setImageBitmap(big)
-        }
-        iv.requestLayout()
+    private fun showPreview(opt: String) {
+        preview.setImageBitmap(decode(pathOf(opt), 1600))
+        preview.visibility = View.VISIBLE
     }
 
-    private fun gestures(v: View, i: Int, canZoom: Boolean) {
-        val gd = GestureDetector(ctx, object : GestureDetector.SimpleOnGestureListener() {
-            override fun onDown(e: MotionEvent) = true
-            override fun onSingleTapConfirmed(e: MotionEvent): Boolean { toggle(i); return true }
-            override fun onDoubleTap(e: MotionEvent): Boolean { if (canZoom) toggleZoom(i) else toggle(i); return true }
+    private fun textCard(i: Int, opt: String): View {
+        val row = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+        }
+        val mk = TextView(ctx).apply {
+            textSize = 14f; setTextColor(Color.WHITE); gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(dp(24), dp(24)).apply { rightMargin = dp(10) }
+        }
+        marks[i] = mk; row.addView(mk)
+        row.addView(TextView(ctx).apply {
+            text = Store.resolve(opt, name); textSize = 15f; setTextColor(cText)
+            maxLines = 3; ellipsize = TextUtils.TruncateAt.END
+            layoutParams = LinearLayout.LayoutParams(0, WC, 1f)
         })
-        v.setOnTouchListener { _, ev -> gd.onTouchEvent(ev); true }
+        row.layoutParams = LinearLayout.LayoutParams(MP, WC).apply { topMargin = dp(6) }
+        row.setOnClickListener { toggle(i) }
+        frames[i] = row
+        return row
+    }
+
+    private fun tile(i: Int, opt: String, cell: Int, col: Int): View {
+        val f = FrameLayout(ctx)
+        if (kindOf(opt) == "img") {
+            val iv = ImageView(ctx).apply { scaleType = ImageView.ScaleType.CENTER_CROP; setImageBitmap(decode(pathOf(opt), 320)) }
+            f.addView(iv, FrameLayout.LayoutParams(MP, MP))
+            f.setOnLongClickListener { showPreview(opt); true }
+        } else {
+            f.addView(TextView(ctx).apply {
+                text = "🎤\nGhi âm"; textSize = 13f; setTextColor(cSub); gravity = Gravity.CENTER
+            }, FrameLayout.LayoutParams(MP, MP))
+        }
+        val mk = TextView(ctx).apply { textSize = 14f; setTextColor(Color.WHITE); gravity = Gravity.CENTER }
+        f.addView(mk, FrameLayout.LayoutParams(dp(24), dp(24), Gravity.TOP or Gravity.START).apply { topMargin = dp(6); leftMargin = dp(6) })
+        marks[i] = mk; frames[i] = f; tiles += i
+        round(f, 8)
+        f.setOnClickListener { toggle(i) }
+        f.layoutParams = LinearLayout.LayoutParams(cell, cell).apply { rightMargin = if (col < 2) dp(4) else 0; topMargin = dp(4) }
+        return f
     }
 
     fun build(): View {
-        val root = LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            background = box(0xFFF6F7F9.toInt(), 0xFFCCCCCC.toInt(), 1, 16)
-            elevation = 10 * d
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, heightPx)
-        }
+        val root = FrameLayout(ctx).apply { background = box(cBg, cBg, 0, 20); elevation = 12 * d }
+        round(root, 20)
+
+        val col = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
+        col.addView(View(ctx).apply { background = box(0x55888888, 0x55888888, 0, 2) },
+            LinearLayout.LayoutParams(dp(36), dp(4)).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(8) })
         title = TextView(ctx).apply {
-            textSize = 14f; setTextColor(0xFF444444.toInt()); setPadding(dp(16), dp(12), dp(16), dp(6))
+            textSize = 13f; setTextColor(cSub); setPadding(dp(16), dp(8), dp(16), dp(4))
         }
-        root.addView(title)
+        col.addView(title)
 
-        val list = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(10), dp(4), dp(10), dp(10)) }
-        options.forEachIndexed { i, opt ->
-            val kind = kindOf(opt)
-            val card: View
-            if (kind == "img") {
-                val frame = FrameLayout(ctx)
-                val iv = ImageView(ctx).apply {
-                    scaleType = ImageView.ScaleType.CENTER_CROP; setBackgroundColor(Color.BLACK)
-                    layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, dp(170))
-                }
-                thumbs[i] = decode(pathOf(opt), 640)
-                iv.setImageBitmap(thumbs[i]); imgViews[i] = iv
-                frame.addView(iv)
-                val mk = TextView(ctx).apply {
-                    textSize = 16f; setTextColor(Color.WHITE); gravity = Gravity.CENTER
-                    layoutParams = FrameLayout.LayoutParams(dp(30), dp(30), Gravity.TOP or Gravity.END).apply { topMargin = dp(8); rightMargin = dp(8) }
-                }
-                marks[i] = mk; frame.addView(mk)
-                card = frame
-            } else {
-                val row = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(12), dp(14), dp(12), dp(14)) }
-                val mk = TextView(ctx).apply {
-                    textSize = 16f; setTextColor(Color.WHITE); gravity = Gravity.CENTER
-                    layoutParams = LinearLayout.LayoutParams(dp(30), dp(30)).apply { rightMargin = dp(12) }
-                }
-                marks[i] = mk; row.addView(mk)
-                row.addView(TextView(ctx).apply {
-                    text = if (kind == null) Store.resolve(opt, name) else labelOf(opt)
-                    textSize = 16f; setTextColor(0xFF111111.toInt()); maxLines = 8
-                })
-                card = row
-            }
-            card.layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(8) }
-            cards[i] = card
-            gestures(card, i, canZoom = kind == "img")
-            list.addView(card)
+        val list = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(10), dp(2), dp(10), dp(84)) }
+        options.indices.filter { kindOf(options[it]) == null }.forEach { list.addView(textCard(it, options[it])) }
+        val cell = (ctx.resources.displayMetrics.widthPixels - dp(20) - dp(8)) / 3
+        options.indices.filter { kindOf(options[it]) != null }.chunked(3).forEach { idx ->
+            val row = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
+            idx.forEachIndexed { c, i -> row.addView(tile(i, options[i], cell, c)) }
+            list.addView(row)
         }
-        root.addView(ScrollView(ctx).apply {
-            addView(list)
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
-        })
+        col.addView(ScrollView(ctx).apply { addView(list) }, LinearLayout.LayoutParams(MP, 0, 1f))
+        root.addView(col, FrameLayout.LayoutParams(MP, MP))
 
-        val bar = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; setPadding(dp(8), dp(6), dp(8), dp(10)) }
-        val close = button("✕ Đóng", 0xFFE0E0E0.toInt(), 0xFF333333.toInt(), 0.8f).apply { setOnClickListener { onClose() } }
-        btnShare = button("Chia sẻ", 0xFF5F6B7A.toInt(), Color.WHITE, 1f).apply {
+        val bar = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+            background = box(cBar, cBar, 0, 28); elevation = 6 * d
+            setPadding(dp(6), dp(6), dp(8), dp(6))
+        }
+        bar.addView(TextView(ctx).apply {
+            text = "✕"; textSize = 20f; setTextColor(cText); gravity = Gravity.CENTER
+            setOnClickListener { onClose() }
+        }, LinearLayout.LayoutParams(dp(44), dp(44)))
+        count = TextView(ctx).apply { textSize = 16f; typeface = Typeface.DEFAULT_BOLD }
+        bar.addView(count, LinearLayout.LayoutParams(0, WC, 1f).apply { leftMargin = dp(6) })
+        btnShare = TextView(ctx).apply {
+            text = "Chia sẻ"; textSize = 15f; setTextColor(cAccent); typeface = Typeface.DEFAULT_BOLD
+            setPadding(dp(14), dp(10), dp(14), dp(10))
             setOnClickListener { if (selected.isNotEmpty()) onShare(selectedOptions()) }
         }
-        btnInsert = button("Chèn", 0xFF1E66F5.toInt(), Color.WHITE, 1.2f).apply {
+        bar.addView(btnShare)
+        btnInsert = TextView(ctx).apply {
+            text = "Chèn"; textSize = 15f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER
+            background = box(cAccent, cAccent, 0, 22)
+            setPadding(dp(22), dp(10), dp(22), dp(10))
             setOnClickListener { if (selected.isNotEmpty()) onInsert(selectedOptions()) }
         }
-        bar.addView(close); bar.addView(btnShare); bar.addView(btnInsert)
-        root.addView(bar)
+        bar.addView(btnInsert)
+        root.addView(bar, FrameLayout.LayoutParams(MP, WC, Gravity.BOTTOM).apply { setMargins(dp(10), 0, dp(10), dp(10)) })
+
+        preview = ImageView(ctx).apply {
+            visibility = View.GONE; setBackgroundColor(0xEE000000.toInt()); scaleType = ImageView.ScaleType.FIT_CENTER
+            setOnClickListener { visibility = View.GONE }
+        }
+        root.addView(preview, FrameLayout.LayoutParams(MP, MP))
+
         refresh()
         return root
     }
