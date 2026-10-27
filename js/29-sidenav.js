@@ -159,7 +159,7 @@
     hdr.insertBefore(b, hdr.firstChild);
     // Ô tìm nhanh cạnh nút Menu: dùng được ở MỌI màn; gõ xong tự chuyển về "Danh sách KH" và lọc theo từ khoá
     var qw = document.createElement('div'); qw.id = 'qs-wrap';
-    qw.innerHTML = '<input id="qs-input" type="search" placeholder="🔍 Tìm nhanh: tên, SĐT, mã đơn..." autocomplete="off">';
+    qw.innerHTML = '<input id="qs-input" type="search" placeholder="' + ((window.matchMedia && window.matchMedia('(max-width:768px)').matches) ? '🔍 Tìm khách' : '🔍 Tìm nhanh: tên, SĐT, mã đơn...') + '" autocomplete="off">';
     hdr.insertBefore(qw, b.nextSibling);
     var qt;
     qw.firstChild.addEventListener('input', function(){
