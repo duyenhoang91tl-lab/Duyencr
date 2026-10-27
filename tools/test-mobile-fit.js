@@ -4,13 +4,18 @@
 const fs = require('fs'), path = require('path');
 const ROOT = path.join(__dirname, '..');
 const ok = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1); } };
-const { mobileFitHeaderH_, MOBILE_FIT_MAX_W } = require(path.join(ROOT, 'js', '59-fn-mobilefit.js'));
+const { mobileFitHeaderH_, mobileFitAppH_, MOBILE_FIT_MAX_W } = require(path.join(ROOT, 'js', '59-fn-mobilefit.js'));
 
 // ===== logic thuần =====
 ok(MOBILE_FIT_MAX_W === 640, 'ngưỡng 640px (khớp @media của CSS)');
 ok(mobileFitHeaderH_(360, 118) === 118 && mobileFitHeaderH_(412, 117.6) === 118 && mobileFitHeaderH_(640, 50) === 50, 'điện thoại: lấy chiều cao thật (làm tròn)');
 ok(mobileFitHeaderH_(641, 118) === null && mobileFitHeaderH_(1400, 50) === null, 'màn rộng: không đặt biến (dùng 50px mặc định)');
 ok(mobileFitHeaderH_(360, 0) === null && mobileFitHeaderH_(360, NaN) === null && mobileFitHeaderH_(360, 900) === null && mobileFitHeaderH_(0, 100) === null && mobileFitHeaderH_(undefined, 100) === null, 'chưa đo được / bất thường: không đặt');
+
+// ===== chiều cao khung .app =====
+ok(mobileFitAppH_(360, 722, 118) === 604 && mobileFitAppH_(411, 410, 50) === 360 && mobileFitAppH_(360, 700, 0) === 700, '.app = innerHeight - chiều cao thanh trên thật (thanh trên ẩn -> đủ innerHeight)');
+ok(mobileFitAppH_(360, 0, 118) === null && mobileFitAppH_(360, 119, 50) === null && mobileFitAppH_(1280, 800, 50) === null && mobileFitAppH_(0, 800, 50) === null, 'WebView chưa có kích thước (innerHeight 0) / màn rộng: không đặt — để luật của app/CSS lo');
+ok(mobileFitAppH_(360, 400, 500) === 400 && mobileFitAppH_(360, 150, 100) === null, 'thanh trên đo bất thường -> bỏ qua; còn quá thấp (<80px) -> không đặt');
 
 // ===== CSS =====
 const raw = fs.readFileSync(path.join(ROOT, 'css', '15-mobile.css'), 'utf8');
@@ -40,10 +45,11 @@ ok(pos('css/15-mobile.css') > pos('css/13-shell.css') && pos('css/15-mobile.css'
 let JSDOM; try { ({ JSDOM } = require('jsdom')); } catch (e) { console.log('(bỏ qua phần DOM: chưa cài jsdom)'); console.log('ALL MOBILE FIT TESTS PASSED (chỉ logic + CSS)'); process.exit(0); }
 const src = fs.readFileSync(path.join(ROOT, 'js', '59-fn-mobilefit.js'), 'utf8');
 const wait = (ms) => new Promise(r => setTimeout(r, ms || 20));
-function boot(width, h, withRO) {
-  const dom = new JSDOM('<html><body><header></header></body></html>', { url: 'http://localhost/', runScripts: 'dangerously', pretendToBeVisual: true });
+function boot(width, h, withRO, innerH) {
+  const dom = new JSDOM('<html><body><header></header><div class="app"></div></body></html>', { url: 'http://localhost/', runScripts: 'dangerously', pretendToBeVisual: true });
   const w = dom.window; let height = h;
   Object.defineProperty(w, 'innerWidth', { value: width, configurable: true, writable: true });
+  Object.defineProperty(w, 'innerHeight', { value: innerH === undefined ? 700 : innerH, configurable: true, writable: true });
   Object.defineProperty(w.document.querySelector('header'), 'offsetHeight', { get: () => height });
   w.__setH = v => { height = v; };
   w.__roCalls = 0;
@@ -60,5 +66,16 @@ const val = w => w.document.documentElement.style.getPropertyValue('--hdr-h');
   w = boot(1400, 50, false); await wait(); ok(val(w) === '', 'máy tính: không đặt biến');
   w = boot(360, 96, false); await wait(); ok(val(w) === '96px', 'không có ResizeObserver: vẫn đo lúc nạp'); w.__setH(130); await wait(900); ok(val(w) === '130px', 'không có ResizeObserver: đo lại sau 0.8s');
   w = boot(360, 118, true); w.document.querySelector('header').remove(); w.mobileFitApply(); ok(val(w) === '', 'không có thanh trên (chưa dựng xong): không lỗi, không đặt');
+  // khung .app: inline !important, thắng luật !important của app Android (.app{height:(innerHeight-50)px!important})
+  w = boot(360, 118, true, 722); await wait(); const app = () => w.document.querySelector('.app');
+  ok(app().style.getPropertyValue('height') === '604px' && app().style.getPropertyPriority('height') === 'important', '.app = 722 - 118 = 604px, inline !important');
+  const st = w.document.createElement('style'); st.textContent = '.app{height:672px!important}'; w.document.head.appendChild(st);   // luật app chèn: innerHeight-50
+  w.mobileFitApply(); ok(app().style.getPropertyValue('height') === '604px', 'luật app (672px, giả định thanh trên 50px) KHÔNG đè được: vẫn 604px');
+  w.__setH(150); w.__roCb(); ok(app().style.getPropertyValue('height') === '572px', 'thanh trên cao thêm: khung co lại cho khớp');
+  w.innerHeight = 500; w.dispatchEvent(new w.Event('resize')); ok(app().style.getPropertyValue('height') === '350px', 'xoay/đổi kích thước: cập nhật');
+  w.innerHeight = 0; w.dispatchEvent(new w.Event('resize')); ok(app().style.getPropertyValue('height') === '', 'WebView chưa có kích thước (innerHeight 0): không đặt, để luật khác lo');
+  w.innerHeight = 800; w.innerWidth = 1280; w.dispatchEvent(new w.Event('resize')); ok(app().style.getPropertyValue('height') === '', 'màn rộng: bỏ style inline');
+  w = boot(1400, 50, false, 900); await wait(); ok(w.document.querySelector('.app').style.getPropertyValue('height') === '', 'máy tính: không đặt chiều cao');
+  w = boot(360, 118, true, 722); w.document.querySelector('.app').remove(); w.mobileFitApply(); ok(true, 'chưa có .app: không lỗi');
   console.log('ALL MOBILE FIT TESTS PASSED');
 })().catch(e => { console.error('LOI:', e); process.exit(1); });
