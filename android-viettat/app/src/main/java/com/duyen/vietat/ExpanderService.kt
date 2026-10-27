@@ -183,14 +183,37 @@ class ExpanderService : AccessibilityService() {
         }
         if (uris.isEmpty()) { Toast.makeText(this, "Không tìm thấy file", Toast.LENGTH_SHORT).show(); return }
         val allImg = media.all { kindOf(it) == "img" }
+        // "Chèn" + chỉ có hình (1 hoặc NHIỀU) → dán lần lượt từng hình vào ĐÚNG khung chat đang mở (như chọn nhiều ảnh khi gửi Zalo).
+        // Ghi âm/tệp lẫn vào, hoặc bấm "Chia sẻ" → mở bảng chia sẻ Android như cũ.
+        if (allImg && !share) { pasteImages(uris, 0, n); return }
         (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newUri(contentResolver, "viettat", uris[0]))
-        if (uris.size == 1 && allImg && !share) {
-            n.performAction(AccessibilityNodeInfo.ACTION_PASTE)
-            Toast.makeText(this, "Đã dán. Nếu chưa thấy, nhấn giữ ô chat > Dán", Toast.LENGTH_LONG).show()
+        shareChooser(uris, allImg, media.all { kindOf(it) == "aud" })
+    }
+
+    private val ui = android.os.Handler(android.os.Looper.getMainLooper())
+
+    /**
+     * NGUYÊN NHÂN GỐC "chọn nhiều hình mà không vào khung chat" (Duyên 2026-10-27): Android chỉ dán được MỘT hình mỗi lần, nên code cũ với ≥2 hình
+     * mở bảng chia sẻ chung (sang Zalo lại phải chọn người nhận). Nay dán TUẦN TỰ: đặt hình i vào clipboard → ACTION_PASTE ở ô gõ đang lấy nét → chờ
+     * app chat nhận xong (1,6 giây) → hình kế tiếp. Hình đầu bị từ chối → dự phòng bảng chia sẻ; hình sau bị từ chối → báo còn bao nhiêu hình chưa dán.
+     */
+    private fun pasteImages(uris: List<android.net.Uri>, i: Int, first: AccessibilityNodeInfo) {
+        if (i >= uris.size) { Toast.makeText(this, "Đã dán ${uris.size} hình", Toast.LENGTH_SHORT).show(); return }
+        (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newUri(contentResolver, "viettat", uris[i]))
+        val node = rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: first.also { it.refresh() }
+        val ok = node.performAction(AccessibilityNodeInfo.ACTION_PASTE)
+        Diag.lastInsert = "dán hình ${i + 1}/${uris.size}: " + if (ok) "app nhận" else "app TỪ CHỐI dán"
+        if (!ok) {
+            if (i == 0) { Toast.makeText(this, "App chat không cho dán hình → mở bảng chia sẻ", Toast.LENGTH_LONG).show(); shareChooser(uris, true, false) }
+            else Toast.makeText(this, "Đã dán $i hình, còn ${uris.size - i} hình app chat không nhận → bấm Chia sẻ để gửi nốt", Toast.LENGTH_LONG).show()
             return
         }
+        ui.postDelayed({ pasteImages(uris, i + 1, node) }, 1600)
+    }
+
+    private fun shareChooser(uris: List<android.net.Uri>, allImg: Boolean, allAud: Boolean) {
         val send = Intent(if (uris.size == 1) Intent.ACTION_SEND else Intent.ACTION_SEND_MULTIPLE).apply {
-            type = if (allImg) "image/*" else if (media.all { kindOf(it) == "aud" }) "audio/*" else "*/*"
+            type = if (allImg) "image/*" else if (allAud) "audio/*" else "*/*"
             if (uris.size == 1) putExtra(Intent.EXTRA_STREAM, uris[0]) else putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
             clipData = ClipData.newRawUri("", uris[0]).also { cd -> for (k in 1 until uris.size) cd.addItem(ClipData.Item(uris[k])) }
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

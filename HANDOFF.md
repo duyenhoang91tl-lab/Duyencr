@@ -2,6 +2,11 @@
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
 
+
+## 2026-10-27 (tối, tiếp) — App Android 1.13: Chèn NHIỀU hình vào đúng khung chat
+- [x] Duyên yêu cầu: gõ tắt → chọn nhiều hình như gửi thường trên Zalo, hình vào khung chat. NGUYÊN NHÂN GỐC trước đó: Android chỉ dán được 1 hình/lần nên ≥2 hình mở bảng chia sẻ chung (sang Zalo phải chọn lại người nhận). Sửa (ExpanderService.kt): nút "Chèn" với toàn hình → `pasteImages` dán TUẦN TỰ (clipboard hình i → ACTION_PASTE ở ô lấy nét → chờ 1,6s → hình kế). Hình đầu bị từ chối → dự phòng bảng chia sẻ; hình sau bị từ chối → báo còn mấy hình. "Chia sẻ" hoặc có ghi âm/tệp → bảng chia sẻ như cũ. versionCode 14 / 1.13. Lỗi/kết quả dán ghi ở thẻ 🩺 "Lần chèn gần nhất".
+- [ ] CHƯA KIỂM CHỨNG: không có SDK/máy thật → chưa biên dịch, chưa thử trên Zalo. Zalo có thể hiện bản xem trước/hỏi xác nhận mỗi hình (khi đó tăng thời gian chờ 1600ms hoặc chỉ dán hình đầu); chờ Actions "Build Android VietTat" xanh rồi Duyên thử và báo kết quả (thẻ 🩺 cho biết app chat nhận/từ chối).
+
 ## 2026-10-27 (tối) — App Android 1.12: thẻ "Kiểm tra gõ tắt" tự cập nhật
 - [x] Video Duyên gửi: gõ "tuitie" ở Zalo → màn chọn HIỆN (gõ tắt chạy), nhưng thẻ 🩺 trong app vẫn báo "❌ Android CHƯA gửi sự kiện gõ nào". NGUYÊN NHÂN GỐC: `report` chỉ tính 1 lần lúc mở thẻ nên đứng yên khi sang Zalo rồi quay lại. Sửa: `LaunchedEffect` đọc lại `Diag.report()` mỗi giây khi thẻ mở (MainActivity.kt). versionCode 13 / 1.12. Chưa biên dịch cục bộ (không có SDK) → chờ Actions "Build Android VietTat" xanh.
 - [ ] CHƯA RÕ / CẦN HỎI LẠI DUYÊN: trong video, chọn "oki" + 2 hình rồi Chèn/Chia sẻ → hiện bảng chia sẻ Android, Duyên đóng lại, chữ "oki" nằm trong ô chat nhưng 2 hình KHÔNG vào hội thoại Zalo (Android chỉ dán được 1 hình/lần; chia sẻ sang Zalo mở lại danh sách chọn người nhận). Chưa sửa vì chưa rõ Duyên muốn gì (xem tin nhắn cuối phiên).
