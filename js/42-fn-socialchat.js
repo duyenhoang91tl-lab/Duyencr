@@ -13,7 +13,7 @@ function renderSocialChatTab() {
     w.innerHTML = '<div class="sc-list"><div class="sc-find"><input id="sc-q" type="search" placeholder="🔍 Tìm hội thoại: tên hoặc SĐT…" oninput="_scQSoon()"></div>'
       + '<div class="sc-ftools" id="sc-ftools"><button type="button" class="btn sm" id="sc-fbtn" onclick="scToggleFilters()">🔎 Bộ lọc<span id="sc-fn"></span> ▾</button><button type="button" class="btn sm" id="sc-folbtn" onclick="scToggleFolders()">🏷 Thư mục<span id="sc-foln"></span> ▾</button><a class="sc-fx" id="sc-fx" href="javascript:void(0)" onclick="scClearFilters()" style="display:none">✕ Xoá lọc</a></div>'
       + '<div class="sc-fpanel" id="sc-fpanel" style="display:none"></div><div id="sc-convs" class="sc-convs"></div></div>'
-      + '<div class="sc-main" id="sc-main"><div class="sc-head" id="sc-head"></div><div class="pkc-who" id="sc-who"></div><div class="pkc-msgs sc-msgs" id="sc-msgs"><div class="pkc-note">Chọn một hội thoại bên trái.</div></div>'
+      + '<div class="sc-main" id="sc-main"><div class="sc-head" id="sc-head"></div><div class="pkc-who" id="sc-who"></div><div class="pkc-coach" id="sc-coach"></div><div class="pkc-msgs sc-msgs" id="sc-msgs"><div class="pkc-note">Chọn một hội thoại bên trái.</div></div>'
       + '<div class="pkc-status" id="sc-status"></div>'
       + '<div class="pkt-bar" id="sc-tags" style="display:none"></div>'
       + '<div class="pkc-compose" id="sc-compose" style="display:none"><button class="btn sm" type="button" title="Gợi ý tin nhắn theo sản phẩm" onclick="tplChatToggle(\'sc-compose\',\'sc-input\')">💡</button><textarea id="sc-input" rows="2" placeholder="Nhập tin trả lời… (Ctrl+Enter để gửi)" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key===\'Enter\'){event.preventDefault();scSend();}"></textarea><button class="save-btn pkc-send" id="sc-send" onclick="scSend()">Gửi</button></div></div>';
@@ -177,7 +177,7 @@ function scPick(id) {
   if (h) h.innerHTML = '<button class="btn sm sc-back" onclick="scBack()">←</button><b>' + _pkcEsc(c.name || 'Khách Pancake') + '</b>' + (c.phone ? ' <span class="pkc-ph">' + _pkcEsc(c.phone) + '</span> <button class="btn sm" onclick="scOpenProfile()">👤 Mở hồ sơ</button>' : ' <span class="pkc-ph">chưa gắn SĐT</span>') + (typeof _ovIsAdmin === 'function' && _ovIsAdmin() ? ' <button class="btn sm" onclick="scDiag()" title="Chẩn đoán thẻ / tên nhân viên (chỉ admin)">🔍 Chẩn đoán</button>' : '') + (_scPancakeUrl(c) ? ' <a class="btn sm" href="' + _pkcEsc(_scPancakeUrl(c)) + '" target="_blank" rel="noopener" title="Mở đúng hội thoại này trên Pancake">↗ Pancake</a>' : '') + '<div class="sc-head-m" id="sc-head-m">' + _pkcMetaRow(c) + '</div>';
   if (typeof pkSeenRender === 'function') pkSeenRender('sc');   // nut Danh dau chua doc/da doc o dau khung chat
   var cp = document.getElementById('sc-compose'); if (cp) cp.style.display = (c.type === 'COMMENT') ? 'none' : '';
-  var wh0 = document.getElementById('sc-who'); if (wh0) wh0.innerHTML = '';
+  var wh0 = document.getElementById('sc-who'); if (wh0) wh0.innerHTML = ''; var ch0 = document.getElementById('sc-coach'); if (ch0) ch0.innerHTML = '';
   var box = document.getElementById('sc-main'); if (box) box.classList.add('has-conv');
   if (typeof proChatInfoRender_ === 'function') { try { proChatInfoRender_(c); } catch (e) { console.warn('[ui-pro] chat info', e); } }
   scLoadMsgs(true);
@@ -279,6 +279,7 @@ function _scRenderMsgs(forceBottom) {
   });
   box.innerHTML = html || '<div class="pkc-note">Hội thoại chưa có tin nhắn nào được lưu.</div>';
   var wh = document.getElementById('sc-who'); if (wh) wh.innerHTML = _pkcWhoHtml(_sc.msgs[_sc.active]);
+  if (typeof pkCoachSync === 'function') pkCoachSync('sc', _sc.active, _sc.msgs[_sc.active]);
   if (forceBottom || near) box.scrollTop = box.scrollHeight;
   // Mở từ thông báo từ cấm (js/39 _ntOpenChat_): cuộn tới + nháy sáng đúng tin có từ cấm; tin cũ hơn đoạn đang tải thì báo rõ.
   if (_sc.focus && _sc.focus.conv === _sc.active && list.length) {

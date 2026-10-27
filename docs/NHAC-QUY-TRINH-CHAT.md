@@ -40,6 +40,6 @@ Trường `when`/`needs`: `who` = `in`|`out`|`any`; `re` = regex **không dấu*
 
 ## Lộ trình
 1. ✅ Bộ máy + endpoint + test (`tools/test-chat-coach.js`, 69 ca).
-2. CRM: thẻ "📋 Nhắc quy trình" ở Social > Chat và tab Chat trong hồ sơ khách (checklist 9 bước + nút chèn câu mẫu vào ô soạn tin).
+2. ✅ CRM (`js/58-fn-chatcoach.js`, test `tools/test-chat-coach-ui.js` 27 ca): thẻ **"📋 Nhắc quy trình"** ở Social > Chat (`#sc-coach`) và tab Chat trong hồ sơ khách (`#pkc-coach`), nằm dưới dòng "Đã chat". Hiện badge "N việc cần làm" (hoặc "✓ Đang đi đúng quy trình"), các bước đã áp dụng (✓ đã làm / ⚠ cần làm / ⏳ đang chờ), và từng việc quá hạn kèm lý do + câu mẫu của sheet; nút **✍️ Chèn câu mẫu** thêm vào ô soạn tin (KHÔNG tự gửi, không ghi đè nội dung đang soạn). Bấm tiêu đề để thu gọn (nhớ ở localStorage `ome_coach_collapsed`). Chỉ hỏi server khi có tin mới hoặc quá 60 giây (`PK_COACH_REFRESH_MS`); lỗi mạng/chưa đăng nhập/GAS cũ chưa có action → thẻ ẩn im lặng. Cần deploy GAS v13.60-coach thì thẻ mới có dữ liệu.
 3. Extension Pancake AI: đọc `c_id` từ URL Pancake → hiện cùng thẻ ngay trong panel.
 4. Quét định kỳ + báo chuông 🔔 cho đúng sale (dùng hạ tầng giám sát chat `docs/GIAM-SAT-CHAT.md`), màn cấu hình quy tắc.
