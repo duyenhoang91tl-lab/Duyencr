@@ -245,3 +245,6 @@ html.ui-pro #pro-ai .pro-ai-chips{display:flex;flex-direction:column;gap:6px;mar
 html.ui-pro #pro-ai .pro-pc{text-align:left;padding:9px 11px;border:1px solid var(--pro-purple);border-radius:9px;background:#fff;color:var(--pro-purple);font-size:13px;line-height:1.35;cursor:pointer;}
 html.ui-pro #pro-ai .pro-pc:active{background:var(--pro-purple);color:#fff;}
 html.ui-pro #pro-ai .pro-pc.alt{border-color:var(--pro-line);color:var(--pro-ink);background:var(--surface);}
+html.ui-pro #pro-dock{touch-action:none;user-select:none;-webkit-user-select:none;}
+html.ui-pro #pro-dock button{touch-action:none;cursor:grab;}
+html.ui-pro #pro-dock.dragging button{cursor:grabbing;box-shadow:0 6px 20px rgba(0,0,0,.35);}

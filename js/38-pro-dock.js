@@ -256,13 +256,51 @@ function proTabsTrack_(){
   var c = allCustomers.find(function(x){ return x.phone===currentPhone; }); if (!c) return;
   _proDock.tabs = proTabsAdd_(_proDock.tabs, { phone:c.phone, name:c.name }, PRO_TABS_MAX); proTabsSave_(); proTabsRender_();
 }
+// ── KÉO THẢ icon 🤖 tới góc bất kỳ (Duyên yêu cầu 2026-10-27: icon cố định che mất kết quả đang xem). Vị trí nhớ trên máy (localStorage). ──
+// Giữ icon trong khung nhìn (chừa lề), kể cả khi xoay/đổi cỡ màn hình hoặc vị trí lưu sai/NaN.
+function proDockClamp_(x, y, w, h, vw, vh, m){
+  m = m==null ? 4 : m; x = Number(x); y = Number(y);
+  if (!isFinite(x)) x = vw - w - 16; if (!isFinite(y)) y = vh - h - 88;
+  return { x: Math.round(Math.max(m, Math.min(x, vw - w - m))), y: Math.round(Math.max(m, Math.min(y, vh - h - m))) };
+}
+function proDockPlace_(dock, x, y){
+  var r = dock.getBoundingClientRect(), vw = window.innerWidth || document.documentElement.clientWidth, vh = window.innerHeight || document.documentElement.clientHeight;
+  var c = proDockClamp_(x, y, r.width || 48, r.height || 48, vw, vh);
+  dock.style.setProperty('left', c.x+'px', 'important'); dock.style.setProperty('top', c.y+'px', 'important');
+  dock.style.setProperty('right', 'auto', 'important'); dock.style.setProperty('bottom', 'auto', 'important'); dock.style.setProperty('transform', 'none', 'important');
+  return c;
+}
+function proDockDragInit_(dock){
+  var st = null, moved = false, KEY = 'pro_dock_pos';
+  try { var sv = JSON.parse(localStorage.getItem(KEY)||'null'); if (sv && isFinite(sv.x) && isFinite(sv.y)) proDockPlace_(dock, sv.x, sv.y); } catch(e){}
+  window.addEventListener('resize', function(){ if (dock.style.left){ var r = dock.getBoundingClientRect(); proDockPlace_(dock, r.left, r.top); } });
+  dock.addEventListener('pointerdown', function(e){
+    if (e.button!=null && e.button!==0) return;
+    var r = dock.getBoundingClientRect(); st = { px:e.clientX, py:e.clientY, ox:r.left, oy:r.top, id:e.pointerId }; moved = false;
+  });
+  dock.addEventListener('pointermove', function(e){
+    if (!st || e.pointerId!==st.id) return;
+    var dx = e.clientX-st.px, dy = e.clientY-st.py;
+    if (!moved && Math.abs(dx)+Math.abs(dy) < 6) return;   // dưới 6px coi là bấm, không phải kéo
+    if (!moved){ moved = true; try { dock.setPointerCapture(e.pointerId); } catch(x){} dock.classList.add('dragging'); }
+    e.preventDefault(); proDockPlace_(dock, st.ox+dx, st.oy+dy);
+  });
+  function end(e){
+    if (!st || (e && e.pointerId!==st.id)) return;
+    if (moved){ var r = dock.getBoundingClientRect(); try { localStorage.setItem(KEY, JSON.stringify({ x:Math.round(r.left), y:Math.round(r.top) })); } catch(x){} dock.classList.remove('dragging'); dock._proMovedAt = Date.now(); }
+    st = null; moved = false;
+  }
+  dock.addEventListener('pointerup', end); dock.addEventListener('pointercancel', end);
+  dock.addEventListener('dblclick', function(){ try { localStorage.removeItem(KEY); } catch(e){} ['left','top','right','bottom','transform'].forEach(function(k){ dock.style.removeProperty(k); }); });   // bấm đúp = về chỗ mặc định
+}
 // Dock phải + panel trợ lý
 function proDockEnsure_(){
   if (!proDockOn_() || document.getElementById('pro-dock')) return;
   var dock = document.createElement('div'); dock.id = 'pro-dock';
-  dock.innerHTML = '<button type="button" id="pro-dock-ai" title="Trợ lý AI" aria-label="Trợ lý AI">🤖</button>';
+  dock.innerHTML = '<button type="button" id="pro-dock-ai" title="Trợ lý AI — giữ và kéo để di chuyển, bấm đúp để về chỗ cũ" aria-label="Trợ lý AI">🤖</button>';
   document.body.appendChild(dock);
-  dock.querySelector('#pro-dock-ai').onclick = function(){ proAiToggle_(); };
+  try { proDockDragInit_(dock); } catch(e){ console.warn('[ui-pro] drag', e); }
+  dock.querySelector('#pro-dock-ai').onclick = function(){ if (dock._proMovedAt && Date.now()-dock._proMovedAt < 350) return; proAiToggle_(); };   // vừa kéo xong thì không mở panel
   var p = document.createElement('div'); p.id = 'pro-ai';
   p.innerHTML = '<div class="pro-ai-h"><b>🤖 Trợ lý AI</b><span class="pro-sp"></span><button type="button" data-ai="close" aria-label="Đóng">×</button></div>'
     + '<div class="pro-ai-modes"><button type="button" data-mode="customer">👤 Khách đang mở</button><button type="button" data-mode="sales">📊 Doanh số</button><button type="button" data-mode="price">💰 Giá sản phẩm</button></div>'
@@ -381,4 +419,4 @@ async function proAiSend_(){
   var init = function(){ try { proTabsLoad_(); proDockEnsure_(); proTabsRender_(); } catch(e){ console.warn('[ui-pro]',e); } };
   if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
-if (typeof module!=='undefined') module.exports = { proIntent_, proRuleCustomer_, proRuleSales_, proRuleAnswer_, proNorm_, proTabsAdd_, proTabsRemove_, proScrub_, proClip_, proCustomerContext_, proSalesContext_, proAskPrompt_, proAskRequest_, proAnswerHtml_, proPriceIntent_, proPriceRequest_, proPriceFormat_, proPriceItemRequest_, proPriceMoney_, proPriceNext_, proPriceInfoText_, proPricePriceText_ };
+if (typeof module!=='undefined') module.exports = { proIntent_, proRuleCustomer_, proRuleSales_, proRuleAnswer_, proNorm_, proTabsAdd_, proTabsRemove_, proScrub_, proClip_, proCustomerContext_, proSalesContext_, proAskPrompt_, proAskRequest_, proAnswerHtml_, proPriceIntent_, proPriceRequest_, proPriceFormat_, proDockClamp_, proPriceItemRequest_, proPriceMoney_, proPriceNext_, proPriceInfoText_, proPricePriceText_ };
