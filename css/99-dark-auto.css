@@ -220,6 +220,7 @@ html[data-theme="dark"] [style*="background:var(--tn-bg,#fff7ed);" i],html[data-
 html[data-theme="dark"] [style*="border-bottom:1px solid #e5e7eb;" i],html[data-theme="dark"] [style$="border-bottom:1px solid #e5e7eb" i]{border-bottom-color:var(--border-md)!important}
 html[data-theme="dark"] [style*="border-bottom:1px solid #f3f4f6;" i],html[data-theme="dark"] [style$="border-bottom:1px solid #f3f4f6" i]{border-bottom-color:var(--border-md)!important}
 html[data-theme="dark"] [style*="border-bottom:1px solid #fed7aa;" i],html[data-theme="dark"] [style$="border-bottom:1px solid #fed7aa" i]{border-bottom-color:#654e34!important}
+html[data-theme="dark"] [style*="border-bottom:1px solid var(--border,#ddd);" i],html[data-theme="dark"] [style$="border-bottom:1px solid var(--border,#ddd)" i]{border-bottom-color:var(--border-md)!important}
 html[data-theme="dark"] [style*="border-bottom:1px solid var(--border,#eee);" i],html[data-theme="dark"] [style$="border-bottom:1px solid var(--border,#eee)" i]{border-bottom-color:var(--border-md)!important}
 html[data-theme="dark"] [style*="border-color:#86efac;" i],html[data-theme="dark"] [style$="border-color:#86efac" i]{border-color:#346546!important}
 html[data-theme="dark"] [style*="border-color:#e5e7eb;" i],html[data-theme="dark"] [style$="border-color:#e5e7eb" i]{border-color:var(--border-md)!important}

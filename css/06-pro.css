@@ -239,3 +239,5 @@ html.ui-pro .split-d tbody tr{cursor:pointer;}
 html.ui-pro .split-d tbody tr:hover{background:var(--pro-soft);}
 html.ui-pro .split-ph{font-size:11px;color:var(--muted);}
 html.ui-pro .dash-table .r,html.ui-pro .split-d .r{text-align:right;}
+html.ui-pro .split-dtl tbody tr{cursor:pointer;}
+html.ui-pro .split-dtl tbody tr:hover{background:var(--pro-soft);}
