@@ -26,8 +26,8 @@ function _ttCardHtml(t){
     '<div class="rp-note" style="color:var(--red)">' + t.count + ' đơn · ' + (open ? 'bấm để thu gọn' : 'bấm để xem danh sách') + '</div>';
   if (open){
     h += '<div style="margin-top:6px;font-size:11.5px;line-height:1.5">' + (t.items || []).map(function(it){
-      return '<div style="padding:3px 0;border-top:1px dashed var(--border)"><b>' + esc(it.id) + '</b> · ' + esc(it.stage) +
-        ' · <span style="color:var(--red)">' + it.hours + ' giờ</span>' + (it.sale ? ' · ' + esc(it.sale) : '') + '</div>';
+      return '<div data-oid="' + esc(it.id) + '" onclick="event.stopPropagation();stuckOpen(this.dataset.oid)" style="padding:3px 0;border-top:1px dashed var(--border);cursor:pointer" title="Bấm để xem khách + đơn và theo dõi"><b>' + esc(it.maBoDem || it.id) + '</b> · ' + esc(it.stage) +
+        ' · <span style="color:var(--red)">' + it.hours + ' giờ</span>' + (it.sale ? ' · ' + esc(it.sale) : '') + (typeof stuckFollowBadge_ === 'function' ? stuckFollowBadge_(it.follow) : '') + '</div>';
     }).join('') + (t.count > (t.items || []).length ? '<div style="color:var(--muted);padding-top:4px">… và ' + (t.count - t.items.length) + ' đơn nữa</div>' : '') + '</div>';
   }
   return h + '</div></div>';

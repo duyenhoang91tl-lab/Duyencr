@@ -1078,6 +1078,7 @@ function readDTTong_(withBoDem) {   // withBoDem=true: đọc thêm cột U (mã
       out.push({
         ngayTao:        _dtCellToVnStr_(r[0]),
         nguoiTao:       r[1] ? String(r[1]).trim() : '',
+        phone:          normPhone_(String(r[3] || '')),   // cot D "SĐT khach" — de man Don ket / Kanban mo duoc ho so khach
         giaoCho:        r[2],
         giaiDoan:       r[6],
         trangThai:      r[7],
