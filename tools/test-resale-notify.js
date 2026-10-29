@@ -48,4 +48,13 @@ ok(n === 0 && sheet.length === 1, 'quet lai KHONG ghi trung (chong bao lai)');
 ev = F([row('10/10/2026', '0901234567', 'anhNP1999', 2000000, 'Page A'), row('28/10/2026', '0901234567', 'dungnguyen1995', 3500000, 'Page B'), row('29/10/2026', '0901234567', 'khac99', 1000000, 'Page D')]);
 n = ctx._rbNotify_(ev, users);
 ok(n >= 1 && sheet.some((r) => r[6] === '2026-10-29' && r[1] === 'lanA'), 'don moi o ngay khac -> thong bao moi (khoa theo ngay)');
+// 5) Mac dinh 2 thang (60 ngay) + gioi han cai dat
+ok(ctx.RB_LOOKBACK_DEF_ === 60, 'mac dinh nhin lai 60 ngay (2 thang)');
+ctx.getSetting_ = (k) => ({}[k]); ok(ctx._rbSettingNum_('resaleNotifyLookback', 60, 7, 1500) === 60, 'chua cai dat -> 60');
+ctx.getSetting_ = () => '90'; ok(ctx._rbSettingNum_('resaleNotifyLookback', 60, 7, 1500) === 90, 'admin dat 90 -> 90');
+ctx.getSetting_ = () => '3'; ok(ctx._rbSettingNum_('resaleNotifyLookback', 60, 7, 1500) === 60, 'gia tri < 7 -> ve mac dinh');
+ctx.getSetting_ = () => 'abc'; ok(ctx._rbSettingNum_('resaleNotifyLookback', 60, 7, 1500) === 60, 'gia tri sai -> ve mac dinh');
+ok(F([row('20/08/2026', '0901234567', 'anhNP1999', 1, 'x'), row('28/10/2026', '0901234567', 'dungnguyen1995', 1, 'x')], 2, 60).length === 0, 'don cu 69 ngay truoc, han 60 -> KHONG bao');
+ok(F([row('20/09/2026', '0901234567', 'anhNP1999', 1, 'x'), row('28/10/2026', '0901234567', 'dungnguyen1995', 1, 'x')], 2, 60).length === 1, 'don cu 38 ngay truoc, han 60 -> bao');
+ok(F([row('20/08/2026', '0901234567', 'anhNP1999', 1, 'x'), row('28/10/2026', '0901234567', 'dungnguyen1995', 1, 'x')], 2, 90).length === 1, 'admin doi han 90 -> don cu 69 ngay duoc bao');
 console.log(fail ? '\nFAIL: ' + fail : '\nTAT CA DAT'); process.exit(fail ? 1 : 0);

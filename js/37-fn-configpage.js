@@ -26,13 +26,14 @@ function _cfgEnsurePanel(){
 async function _cfgLoad(){
   if (!gsUrl) return;
   try {
-    var keys = _CFG_FIELDS.map(function(f){ return f.key; }).concat(['ttLastTrackedMs', 'bizRules', 'reportsConfig', 'bannedWordsCfg']).join(',');
+    var keys = _CFG_FIELDS.map(function(f){ return f.key; }).concat(['ttLastTrackedMs', 'bizRules', 'reportsConfig', 'bannedWordsCfg', 'resaleNotifyLookback']).join(',');
     var r = await fetch(gsUrl + (gsUrl.indexOf('?') < 0 ? '?' : '&') + 'action=getSettings&keys=' + keys, { redirect:'follow' });
     var d = await r.json(), v = (d && d.values) || {};
     _CFG_FIELDS.forEach(function(f){ _cfg.vals[f.key] = (v[f.key] !== undefined && v[f.key] !== null && String(v[f.key]) !== '') ? Number(v[f.key]) : f.def; });
     _cfg.last = Number(v.ttLastTrackedMs) || 0; _cfg.loaded = true;
     try { if (v.bizRules) _bizApply_(JSON.parse(v.bizRules)); } catch(eB){}   // quy tắc tính doanh thu/hoa hồng (js/06)
     try { _rcApply_(v.reportsConfig ? JSON.parse(v.reportsConfig) : {}); } catch(eR){}
+    try { _cfgResaleApply_(v.resaleNotifyLookback); } catch(eS){}   // thời gian báo sale cũ khi khách mua lại (mục 🔁 bên dưới)
     try { _cfgBannedApply_(v.bannedWordsCfg ? JSON.parse(v.bannedWordsCfg) : {}); } catch(eW){}   // từ cấm cấu hình được (mục 🚫 Từ cấm bên dưới)   // danh sách báo cáo bật/tắt + tên (js/06)
   } catch(e){ _CFG_FIELDS.forEach(function(f){ if (_cfg.vals[f.key] == null) _cfg.vals[f.key] = f.def; }); }
 }
@@ -54,6 +55,7 @@ function _cfgRender(){
     '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn primary" id="cfg-save" onclick="_cfgSave()">💾 Lưu cấu hình</button><span style="font-size:11.5px;color:var(--muted)">Lưu lên server — mọi máy dùng chung; mỗi thay đổi ghi vào Nhật ký.</span></div></div>' +
     _cfgBizHtml_() +
     _cfgRptHtml_() +
+    _cfgResaleHtml_() +
     _cfgBannedHtml_() +
     '<div class="dash-section" style="margin-top:14px"><div style="font-weight:700;margin-bottom:6px">🤖 Chạy tự động</div><div style="font-size:13px">Lần theo dõi giai đoạn đơn Base gần nhất: <b>' + esc(_cfgFmtTime(_cfg.last)) + '</b></div>' +
     '<div style="font-size:11.5px;color:var(--muted);margin-top:3px">Chạy mỗi giờ trên máy chủ (trong Apps Script chạy <code>ttCaiTrigger</code> một lần để bật). Quá 2 giờ chưa chạy nghĩa là trigger đang tắt.</div></div>' +
@@ -101,6 +103,35 @@ async function _cfgBizSave(reset){
     if (oldStr !== newStr) fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'saveAudit', rows: [{ timestamp: new Date().toISOString(), user: (currentUser && currentUser.name) || '', action: 'Cấu hình: Quy tắc tính doanh thu/hoa hồng' + (reset ? ' (về mặc định)' : ''), phone: '', oldValue: oldStr, newValue: newStr }] }) }).catch(function(){});
     toast(oldStr === newStr ? 'Không có thay đổi' : '✓ Đã lưu quy tắc — báo cáo sẽ tính theo quy tắc mới');
     if (typeof _srState !== 'undefined' && _srState.sub === 'E' && typeof renderSalesReportTab === 'function') renderSalesReportTab();
+  } catch(e){ toast('Lưu lỗi: ' + (e && e.message || e)); }
+  _cfgRender();
+}
+// ── THÔNG BÁO KHÁCH MUA LẠI Ở SALE KHÁC: thời gian báo sale cũ (Settings 'resaleNotifyLookback', 2026-10-29, Duyên yêu cầu). Backend: gas_v13.js _rbFindEvents_/rbScan_. ──
+var _CFG_RESALE_DEF = 60, _CFG_RESALE_MIN = 7, _CFG_RESALE_MAX = 1500, _cfgResaleDays = _CFG_RESALE_DEF;
+function _cfgResaleParse_(raw){ var n = Math.floor(Number(String(raw == null ? '' : raw).trim())); return (isFinite(n) && n >= _CFG_RESALE_MIN && n <= _CFG_RESALE_MAX) ? n : null; }
+function _cfgResaleApply_(raw){ var n = _cfgResaleParse_(raw); _cfgResaleDays = n === null ? _CFG_RESALE_DEF : n; }
+function _cfgResaleLabel_(n){ var m = n / 30; return n + ' ngày ≈ ' + (Math.round(m * 10) / 10).toString().replace('.', ',') + ' tháng'; }
+function _cfgResaleHtml_(){
+  var chips = [30, 60, 90, 180, 365].map(function(d){ return '<button class="btn sm" type="button" onclick="document.getElementById(\'cfg-rs-days\').value=' + d + '">' + d + ' ngày</button>'; }).join(' ');
+  return '<div class="dash-section" style="margin-top:14px"><div style="font-weight:700;margin-bottom:2px">🔁 Thông báo khách mua lại ở sale khác</div>' +
+    '<div style="font-size:11.5px;color:var(--muted);margin-bottom:6px">Khách đã có đơn của Sale A, nay mua lại do sale khác bán: nếu đơn cũ của Sale A cách đơn mới <b>không quá</b> số ngày dưới đây thì Sale A nhận thông báo (bấm vào xem được đơn đó). Đơn cũ hơn mức này thì coi như khách không còn thuộc Sale A và không báo. Áp dụng cho các lần quét mới (thông báo đã gửi giữ nguyên).</div>' +
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input type="number" id="cfg-rs-days" min="' + _CFG_RESALE_MIN + '" max="' + _CFG_RESALE_MAX + '" step="1" value="' + _cfgResaleDays + '" style="width:90px;padding:5px 8px;border:1px solid var(--border);border-radius:6px"> <b>ngày</b> <span style="color:var(--muted);font-size:12px">(hiện: ' + esc(_cfgResaleLabel_(_cfgResaleDays)) + ')</span> ' + chips + '</div>' +
+    '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn primary" id="cfg-rs-save" onclick="_cfgResaleSave()">💾 Lưu</button>' +
+    '<button class="btn" onclick="_cfgResaleSave(true)">↺ Về mặc định (60 ngày = 2 tháng)</button><span style="font-size:11.5px;color:var(--muted)">Chỉ Admin lưu được; ghi vào Nhật ký (giá trị cũ → mới). Cho phép ' + _CFG_RESALE_MIN + '–' + _CFG_RESALE_MAX + ' ngày.</span></div></div>';
+}
+async function _cfgResaleSave(reset){
+  var g = function(id){ return document.getElementById(id); }, n = _CFG_RESALE_DEF;
+  if (!reset){
+    n = _cfgResaleParse_((g('cfg-rs-days') || {}).value);
+    if (n === null){ toast('Nhập số ngày nguyên từ ' + _CFG_RESALE_MIN + ' đến ' + _CFG_RESALE_MAX); return; }
+  }
+  var oldN = _cfgResaleDays, btn = g('cfg-rs-save'); if (btn){ btn.disabled = true; btn.textContent = '⏳ Đang lưu…'; }
+  try {
+    var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'setSetting', key:'resaleNotifyLookback', value: String(n) }) });
+    var d = await r.json().catch(function(){ return {}; }); if (d && d.error) throw new Error(d.error);
+    _cfgResaleApply_(n);
+    if (oldN !== n) fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'saveAudit', rows: [{ timestamp: new Date().toISOString(), user: (currentUser && currentUser.name) || '', action: 'Cấu hình: Thời gian báo sale cũ khi khách mua lại' + (reset ? ' (về mặc định)' : ''), phone: '', oldValue: oldN + ' ngày', newValue: n + ' ngày' }] }) }).catch(function(){});
+    toast(oldN === n ? 'Không có thay đổi' : '✓ Đã lưu: báo sale cũ khi khách mua lại trong ' + _cfgResaleLabel_(n));
   } catch(e){ toast('Lưu lỗi: ' + (e && e.message || e)); }
   _cfgRender();
 }
