@@ -1176,6 +1176,9 @@ function _applyAuthIdentity(acct){
   var namesArr = (acct.names && acct.names.length) ? acct.names.slice() : (acct.name ? [acct.name] : []);
   var primaryName = acct.role==='admin' ? 'Admin' : (namesArr[0] || acct.username);
   currentUser = { name: primaryName, names: (acct.role==='admin' || _roleBaseOf(acct.role)==='viewer') ? [] : namesArr, role: _roleBaseOf(acct.role || 'cs'), roleKey: acct.role || 'cs', team: acct.team || '', perms: (Array.isArray(acct.perms) ? acct.perms : null) };
+  // Doi sale Online/Van phong duoc XEM THEM khach/don cua nhom Sale "Quay" + phong CSKH (2026-10-29): may chu tra user.viewNames (_usersForClient_ full).
+  // _inUserScope cong cac ten nay vao pham vi; vai tro admin/viewer khong gioi han nen bo qua.
+  currentUser.viewNames = (acct.role==='admin' || _roleBaseOf(acct.role)==='viewer' || !Array.isArray(acct.viewNames)) ? [] : acct.viewNames.filter(function(n){ return n && currentUser.names.indexOf(n) === -1; });
   if (acct.role === 'demo' && _demoPurgeAndReload_()) return;   // don cache day du + tai lai trang (xem _demoPurgeAndReload_)
   if (acct.role === 'demo') {
     // Tai khoan test: chi thay cac tab bao cao (khong the nang quyen qua perms). Du lieu chi tiet da bi may chu cat con 5 dong.
@@ -1198,8 +1201,13 @@ function _applyAuthIdentity(acct){
         var has = Array.prototype.some.call(csFilter.options, function(o){ return o.value === n; });
         if (!has){ var op=document.createElement('option'); op.value=n; op.textContent=n; csFilter.appendChild(op); }
       });
+      // Sale duoc xem them Quay/CSKH: them ten vao o loc de CHON XEM, mac dinh van chi chon ten minh; chi khi co viewNames moi mo khoa o loc.
+      (currentUser.viewNames || []).forEach(function(n){
+        var has2 = Array.prototype.some.call(csFilter.options, function(o){ return o.value === n; });
+        if (!has2){ var op2=document.createElement('option'); op2.value=n; op2.textContent=n; csFilter.appendChild(op2); }
+      });
       if (typeof _csSetFilterSelection === 'function') _csSetFilterSelection(currentUser.names);
-      csFilter.disabled = true;
+      csFilter.disabled = !(currentUser.viewNames && currentUser.viewNames.length);
     } else {
       csFilter.disabled = false;
     }

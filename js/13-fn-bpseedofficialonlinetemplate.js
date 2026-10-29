@@ -994,6 +994,8 @@ var _srbMenu = { open:false, cat:null, q:'', exp:{} };
 
 // ── Cấu hình từng báo cáo: ngày, các mục lọc trong menu, tác vụ, phần phụ ──
 function _srbSaleOpts_(){ return (_srState.sub === 'B' || _srState.sub === 'E' || _srState.sub === 'F' || _srState.sub === 'G' || _srState.sub === 'K' || _srState.sub === 'L') ? (_srState.saleBOptions || []) : (_srState.saleOptions || []); }
+// Sale Online/Van phong duoc chon them ten nhom Quay + phong CSKH o bo loc Sale (viewNames tu may chu; xem _srViewNames o js/10). false neu khong co.
+function _srbHasViewScope_(){ return typeof _srViewNames === 'function' && !_srIsAdmin() && _srViewNames().length > 0; }
 function _srbIsLeaderScope_(){ return !_srIsAdmin() && currentUser && currentUser.role === 'leader' && (_srState.leaderTeamOptions || []).length > 0; }
 function _srbMenuCats_(){
   var cfg = _SRB_COMBO_CFG, cats = [], sub = (_srState.sub === 'K') ? 'G' : _srState.sub;
@@ -1013,6 +1015,9 @@ function _srbMenuCats_(){
     if (_srIsAdmin()){
       flat('sale', saleKey.label || 'Sale', '👤', 'Tìm sale...', saleKey.state, saleOpt);
       if (teamKey) flat('team', 'Team', '👥', 'Tìm team...', teamKey, function(){ return _srState.teamOptions || []; });
+    } else if (_srbHasViewScope_()){
+      // Sale Online/Van phong: chon them ten nhom Quay + phong CSKH (2026-10-29); mac dinh van la ten minh/team
+      flat('sale', 'Tên (của bạn + Quầy/CSKH)', '👤', 'Tìm tên...', saleKey.state, function(){ return _srState.viewScopeOptions || []; });
     } else if (_srbIsLeaderScope_() && saleKey.leader){
       flat('sale', 'Tên (team của bạn)', '👤', 'Tìm tên trong team...', saleKey.state, function(){ return _srState.leaderTeamOptions || []; });
     }
@@ -1060,6 +1065,8 @@ function _srbMenuCats_(){
     if (_srIsAdmin()){
       flatB('sale', 'Sale', '👤', 'Tìm sale...');
       flatB('team', 'Team', '👥', 'Tìm team...');
+    } else if (_srbHasViewScope_()){
+      flat('sale', 'Tên (của bạn + Quầy/CSKH)', '👤', 'Tìm tên...', 'bSale', function(){ return _srState.viewScopeOptions || []; });
     }
     flatB('nguon', 'Nguồn đơn', '🛒', 'Tìm nguồn...');
     flatB('mkt', 'Marketer', '📣', 'Tìm marketer...');
@@ -1133,7 +1140,7 @@ function _srBarHtml_(customDateHtml){
     h += '<span class="srb-bar-arrow">→</span>';
     h += '<input type="date" value="'+esc(_srState[t]||'')+'" onchange="_srSetField(\''+t+'\',this.value);_srState.'+q+'=\'custom\''+c.dateAfter+'" title="Đến ngày">';
   }
-  if (!admin && c.lockKey && !(c.leader && _srbIsLeaderScope_())){
+  if (!admin && c.lockKey && !(c.leader && _srbIsLeaderScope_()) && !_srbHasViewScope_()){
     h += '<span class="srb-bar-lock" title="Bạn chỉ xem được số liệu của mình">🔒 ' + esc((_srState[c.lockKey]||[]).join(', ') || (currentUser && currentUser.name) || '') + '</span>';
   }
   h += c.extra;

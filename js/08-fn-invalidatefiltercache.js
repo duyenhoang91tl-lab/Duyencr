@@ -180,6 +180,12 @@ function _inUserScope(c){
   // danh) — currentUser.names là mảng; currentUser.name (đơn) chỉ còn để tương thích ngược.
   var myNames = (currentUser.names && currentUser.names.length) ? currentUser.names : (currentUser.name ? [currentUser.name] : []);
   if (!myNames.length) return false;
+  // Doi sale Online/Van phong: cong them ten nhom Sale "Quay" + phong CSKH (currentUser.viewNames, 2026-10-29). Mang gop tinh 1 lan / lan dat currentUser (duong nong 136k khach).
+  var _vn = currentUser.viewNames;
+  if (_vn && _vn.length && (currentUser.role === 'cs' || currentUser.role === 'manager')){
+    if (currentUser._scopeNamesSrc !== _vn || currentUser._scopeNamesBase !== myNames){ currentUser._scopeNamesAll = myNames.concat(_vn); currentUser._scopeNamesSrc = _vn; currentUser._scopeNamesBase = myNames; }
+    myNames = currentUser._scopeNamesAll;
+  }
   if (currentUser.role === 'cs' || currentUser.role === 'manager'){   // manager: pham vi = cac ten Admin gan cho tai khoan (nhu CS), khong tu nhin toan bo
     // Duong nong (goi cho tung khach trong 136k): vong for thay .some(closure) + khong cap phat.
     // Thuộc phạm vi nếu: là CS chăm sóc (careCS), được chia campaign, HOẶC là CS phụ trách đơn
@@ -202,8 +208,9 @@ function _inUserScope(c){
       if (myNames.indexOf(teams[i].leader) !== -1 || teams[i].name === currentUser.team){ team = teams[i]; break; }
     }
     var holder2 = _heldBy(c);
-    if (!team) return myNames.indexOf(holder2) !== -1;
+    if (!team && !(_vn && _vn.length)) return myNames.indexOf(holder2) !== -1;
     var teamSet = _teamMemberSet(team);
+    if (_vn && _vn.length){ myNames.forEach(function(n0){ teamSet.add(n0); }); _vn.forEach(function(n1){ teamSet.add(n1); }); }   // truong team sale: team + Quay + CSKH
     if (teamSet.has(holder2)) return true;
     // Kiểm tra toàn bộ chiến dịch cho leader
     if (c.careCSSet) { for (var m1 of c.careCSSet) { if (teamSet.has(m1)) return true; } }

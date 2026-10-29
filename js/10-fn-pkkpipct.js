@@ -1171,7 +1171,39 @@ function _srLeaderTeamNames(){
   }
   return [];
 }
+// ── DOI SALE (Online/Van phong) XEM THEM BAO CAO CUA NHOM SALE "QUAY" + PHONG CSKH (Duyen yeu cau 2026-10-29) ──
+// Nguyen nhan goc: bao cao doanh so khoa bo loc Sale ve ten minh (CS) hoac ten team (leader) nen sale khong the chon xem Quay/CSKH.
+// May chu tra currentUser.viewNames (ten nhom Quay + phong CSKH, chi cho sale Online/Van phong). Nay nhung tai khoan do duoc CHON them
+// cac ten nay o bo loc Sale (mac dinh van la ten minh / team). Admin khong bi gioi han; tai khoan khong co viewNames giu nguyen hanh vi cu.
+var _SR_VIEW_KEYS_ = ['sale','bSale','cSale','eSale','fSale','gSale','lSale','mSale'];
+function _srViewNames(){
+  if (_srIsAdmin() || !currentUser || !Array.isArray(currentUser.viewNames)) return [];
+  return currentUser.viewNames.filter(function(n){ return n; });
+}
+// Danh sach ten duoc phep chon: (leader: team, con lai: ten minh) + viewNames. [] = khong co quyen xem them.
+function _srViewScopeOptions(){
+  var vn = _srViewNames(); if (!vn.length) return [];
+  var base = _srMyNames();
+  if (currentUser && currentUser.role === 'leader'){ var t = _srLeaderTeamNames(); if (t.length) base = t; }
+  var out = [], seen = {};
+  base.concat(vn).forEach(function(n){ if (n && !seen[n]){ seen[n] = 1; out.push(n); } });
+  return out;
+}
 function _srEnforceScope(){
+  if (_srIsAdmin()) return;
+  var vopt = _srViewScopeOptions();
+  if (!vopt.length){ _srState.viewScopeOptions = []; return _srEnforceScopeBase_(); }
+  // Giu lai lua chon co ten Quay/CSKH cua nguoi dung (ham goc se ghi de ve mac dinh), loc ve trong pham vi cho phep.
+  var prev = {}; _SR_VIEW_KEYS_.forEach(function(k){ prev[k] = (_srState[k] || []).slice(); });
+  _srEnforceScopeBase_();
+  _srState.viewScopeOptions = vopt;
+  _SR_VIEW_KEYS_.forEach(function(k){
+    var def = _srState[k] || [], pick = prev[k].filter(function(n){ return vopt.indexOf(n) !== -1; });
+    var hasExtra = pick.some(function(n){ return def.indexOf(n) === -1; });
+    if (pick.length && hasExtra) _srState[k] = pick;
+  });
+}
+function _srEnforceScopeBase_(){
   if (_srIsAdmin()) return;
   var my = _srMyNames();
   _srState.sale = my.slice();

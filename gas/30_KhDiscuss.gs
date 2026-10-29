@@ -276,6 +276,120 @@ function _cvStaffUsers_(users, staff) {
   });
   return out;
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  THONG BAO "KHACH MUA LAI O SALE KHAC" (Duyen yeu cau 2026-10-29) — Notifications kind='resale', refType='resale'.
+//  Y/c: KH da tung co don cua Sale A, sau do khach mua lai nhung KHONG phai Sale A ban -> Sale A van xem duoc don do va co thong bao
+//  "Khach X dang mua lai don doanh thu Y tai kenh Z, Sale W ban"; bam vao thong bao -> hien thong tin don/khach do (client js/39 _ntOpenResale_).
+//  Nguon: sheet "dữ liệu đơn" (Pos). Sale cua don = _donSaleNamesFromThe_(cot The). Kenh = cot Nguon don. Doanh thu = giaTriSauGiam.
+//  Quy uoc: (1) chi tinh don hop le (khong bi loai _donHasExcludedStatus_); (2) don "moi" = don trong RB_NEW_DAYS ngay gan day (mac dinh 2),
+//  "truoc do" = don CUA CUNG SDT, NGAY TRUOC ngay don moi (cung ngay khong tinh — giong _posIsResale_), trong RB_LOOKBACK ngay (mac dinh 60 = 2 thang, admin chinh duoc);
+//  (3) gom theo (SDT, ngay) de don TACH (/1, /2) hay nhieu dong cung ngay chi ra 1 thong bao; (4) bao cho moi Sale co don truoc do ma
+//  KHONG nam trong sale cua don moi, chi cho tai khoan CRM con hoat dong KHONG phai admin (admin da thay het); (5) khong bao lai:
+//  khoa (nguoi nhan | SDT | ngay) da co thong bao 'resale' thi bo qua.
+//  Cai dat (Settings, tuy chon): resaleNotify=0 de TAT; resaleNotifyDays (1-14, mac dinh 2); resaleNotifyLookback (7-1500 ngay, mac dinh 60 = 2 thang; Duyen chot 2026-10-29, admin chinh o ⚙ Cau hinh > Thong bao khach mua lai — js/37).
+//  Quet: tu dong khi co nguoi mo CRM (action notifications, toi da 10 phut/lan — _rbScanMaybe_) + co the cai trigger 10 phut: chay caiTriggerMuaLai trong Editor.
+// ═══════════════════════════════════════════════════════════════
+var RB_NEW_DAYS_DEF_ = 2, RB_LOOKBACK_DEF_ = 60, RB_LOOKBACK_MIN_ = 7, RB_LOOKBACK_MAX_ = 1500, RB_SCAN_EVERY_SEC_ = 600;
+function _rbSettingNum_(key, def, min, max) {
+  var raw = ''; try { raw = String(getSetting_(key) || '').trim(); } catch (e) {}
+  var v = raw === '' ? NaN : Number(raw);
+  return (isFinite(v) && v >= min && v <= max) ? Math.floor(v) : def;
+}
+function _rbEnabled_() {
+  var fl = ''; try { fl = String(getSetting_('resaleNotify') || '').trim().toLowerCase(); } catch (e) {}
+  return !(fl === '0' || fl === 'false' || fl === 'off' || fl === 'tat');
+}
+function _rbShiftYmd_(ymd, days) {
+  var p = String(ymd).split('-'), d = new Date(Date.UTC(Number(p[0]), Number(p[1]) - 1, Number(p[2])) + days * 86400000);
+  return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+}
+function _rbMoney_(n) { return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + 'đ'; }
+// Ham THUAN (khong doc sheet) de test bang Node. rows = readDonChiTiet_(); todayYmd = 'YYYY-MM-DD'.
+// Tra ve [{phone, customer, date, revenue, source, curSales[], prevSales[]}]: prevSales = sale co don TRUOC do cua khach nhung KHONG ban don moi.
+function _rbFindEvents_(rows, todayYmd, newDays, lookbackDays) {
+  var minNew = _rbShiftYmd_(todayYmd, -(newDays - 1)), byPhone = {}, out = [];
+  (rows || []).forEach(function (r) {
+    if (_donHasExcludedStatus_(r.trangThai)) return;
+    var ph = normPhone_(String(r.soDienThoai || '')); if (!ph) return;
+    var d = _vnYmd_(parseVNDate_(r.ngayTaoDon)); if (!d || d > todayYmd) return;
+    (byPhone[ph] || (byPhone[ph] = [])).push({ d: d, rev: Number(r.giaTriSauGiam) || 0, src: String(r.nguonDon || '').trim(), sales: _donSaleNamesFromThe_(r.theSale), name: String(r.khachHang || '').trim() });
+  });
+  Object.keys(byPhone).forEach(function (ph) {
+    var list = byPhone[ph], days = {};
+    list.forEach(function (o) { if (o.d >= minNew) days[o.d] = 1; });
+    Object.keys(days).sort().forEach(function (d) {
+      var oldest = _rbShiftYmd_(d, -lookbackDays), cur = list.filter(function (o) { return o.d === d; }), prev = list.filter(function (o) { return o.d < d && o.d >= oldest; });
+      if (!prev.length) return;
+      var curSales = [], curKey = {}, prevSales = [], prevKey = {}, srcs = [], rev = 0, name = '';
+      cur.forEach(function (o) {
+        rev += o.rev; if (o.name && !name) name = o.name;
+        if (o.src && srcs.indexOf(o.src) < 0) srcs.push(o.src);
+        o.sales.forEach(function (n) { var k = _normTxt_(n); if (k && !curKey[k]) { curKey[k] = 1; curSales.push(n); } });
+      });
+      prev.forEach(function (o) {
+        if (!name && o.name) name = o.name;
+        o.sales.forEach(function (n) { var k = _normTxt_(n); if (k && !curKey[k] && !prevKey[k]) { prevKey[k] = 1; prevSales.push(n); } });
+      });
+      if (!prevSales.length) return;
+      out.push({ phone: ph, customer: name, date: d, revenue: rev, source: srcs.join(', '), curSales: curSales, prevSales: prevSales });
+    });
+  });
+  return out;
+}
+function _rbText_(ev) {
+  var s = 'Khách ' + (ev.customer || ev.phone) + ' đang mua lại đơn doanh thu ' + _rbMoney_(ev.revenue) + ' tại kênh ' + (ev.source || '(chưa rõ)') + ', Sale ' + (ev.curSales.length ? ev.curSales.join(', ') : '(chưa rõ)') + ' bán';
+  return s.length > 200 ? s.slice(0, 199) + '…' : s;
+}
+// Ghi thong bao: moi (nguoi nhan CRM x SDT x ngay) 1 dong, chua tung co. Tra so dong moi.
+function _rbNotify_(events, users) {
+  if (!events.length) return 0;
+  var byUser = {}; (users || []).forEach(function (u) { if (u && u.username) byUser[String(u.username)] = u; });
+  var sh = getSheet_(SH_NOTIF, NOTIF_HEADERS), v = sh.getLastRow() >= 2 ? sh.getDataRange().getValues() : [], has = {}, rows = [], now = new Date().toISOString(), seq = 0;
+  for (var i = 1; i < v.length; i++) { if (String(v[i][4]) === 'resale') has[String(v[i][1]).toLowerCase() + '|' + String(v[i][5]) + '|' + String(v[i][6])] = 1; }
+  events.forEach(function (ev) {
+    var curUsers = {}; ev.curSales.forEach(function (n) { _cvStaffUsers_(users, n).forEach(function (un) { curUsers[un.toLowerCase()] = 1; }); });
+    var text = _rbText_(ev), sent = {};
+    ev.prevSales.forEach(function (n) {
+      _cvStaffUsers_(users, n).forEach(function (un) {
+        var low = un.toLowerCase(), u = byUser[un], key = low + '|' + ev.phone + '|' + ev.date;
+        if (curUsers[low] || sent[low] || has[key]) return;
+        if (u && String(u.role || '') === 'admin') return;   // admin xem het, khong can bao
+        sent[low] = 1; has[key] = 1;
+        rows.push(['nt_' + Date.now() + '_rb' + (seq++) + '_' + Math.floor(Math.random() * 1000), un, 'Hệ thống', 'resale', 'resale', ev.phone, ev.date, text, now, '']);
+      });
+    });
+  });
+  if (rows.length) sh.getRange(sh.getLastRow() + 1, 1, rows.length, NOTIF_HEADERS.length).setValues(rows);
+  return rows.length;
+}
+function rbScan_() {
+  if (!_rbEnabled_()) return { ok: true, skipped: 'off' };
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(3000)) return { ok: true, skipped: 'busy' };   // 2 luot quet cung luc se ghi trung thong bao
+  try {
+    var events = _rbFindEvents_(readDonChiTiet_(), _vnYmd_(new Date()), _rbSettingNum_('resaleNotifyDays', RB_NEW_DAYS_DEF_, 1, 14), _rbSettingNum_('resaleNotifyLookback', RB_LOOKBACK_DEF_, RB_LOOKBACK_MIN_, RB_LOOKBACK_MAX_));
+    var users = readUsers_(getCrmSS_().getSheetByName(SH_USER)) || [];
+    return { ok: true, events: events.length, notified: _rbNotify_(events, users) };
+  } finally { try { lock.releaseLock(); } catch (e) {} }
+}
+// Goi tu action 'notifications' (client hoi moi 60s): chi quet that toi da 1 lan / RB_SCAN_EVERY_SEC_ giay (co trong CacheService). Loi bi nuot — khong duoc lam hong viec doc thong bao.
+function _rbScanMaybe_() {
+  try {
+    var c = CacheService.getScriptCache();
+    if (c.get('rb_last')) return;
+    c.put('rb_last', '1', RB_SCAN_EVERY_SEC_);
+    rbScan_();
+  } catch (e) { Logger.log('_rbScanMaybe_: ' + e); }
+}
+function rbScanTick_() { try { Logger.log('rbScan ' + JSON.stringify(rbScan_())); } catch (e) { Logger.log('rbScanTick loi: ' + e); } }
+function installRbTrigger_() {
+  var ex = ScriptApp.getProjectTriggers().filter(function (t) { return t.getHandlerFunction() === 'rbScanTick_'; });
+  if (ex.length) return 'Trigger "rbScanTick_" da ton tai (' + ex.length + '), khong tao them.';
+  ScriptApp.newTrigger('rbScanTick_').timeBased().everyMinutes(10).create();
+  return 'Da tao trigger rbScanTick_ chay moi 10 phut (thong bao khach mua lai o sale khac).';
+}
+function caiTriggerMuaLai() { Logger.log(installRbTrigger_()); }
 var CV_NOTIF_MAX_GROUPS_ = 15;   // toi da so thong bao / nhan vien / luot quet (phan du gop vao thong bao cuoi) — tranh don dap
 // THONG BAO (20/10/2026, Duyen): moi (nhan vien x HOI THOAI) 1 thong bao; gui cho admin VA cho CHINH sale do (neu khop tai khoan CRM; tat bang Settings chatAuditNotifySale = 0).
 // refType='chatviolation', refId = ID hoi thoai (bam vao thong bao mo dung doan chat), refId2 = "SDT|ten khach|ID tin dau tien".

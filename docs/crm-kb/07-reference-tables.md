@@ -58,3 +58,10 @@ phone, status, zalo, cs, note, schedules, schedGoi, schedGoiNote, schedSP, sched
 - `fuSources` = từ khoá nguồn đơn cách nhau dấu phẩy (khớp chứa-chuỗi, không phân biệt hoa thường), vd `landipage,messenger,web,renew` (rỗng → mặc định landipage,landing,messenger,mess,web). Test: `node tools/test-fu-config.js`.
 
 Trường lưu TRONG cột `custom` (không có cột riêng): các trường tự tạo theo id, `zaloReply` (bool), `tag` (chuỗi nhãn phân loại).
+## Thông báo "KH mua lại ở sale khác" (gas v13.63-resale, 2026-10-29) — kind/refType `resale`
+- Ý nghĩa: khách từng có đơn Pos của Sale A, nay có đơn mới do sale KHÁC bán → Sale A nhận thông báo "Khách X đang mua lại đơn doanh thu Y tại kênh Z, Sale W bán"; bấm → modal đơn của khách (client `js/39-fn-notify.js` `_ntOpenResale_`, API `donOrdersByPhone`, tô sáng đơn ngày `refId2`).
+- Dòng `Notifications`: `refId` = SĐT chuẩn hoá, `refId2` = ngày đơn mới `YYYY-MM-DD`, `fromUser` = "Hệ thống". Chống báo trùng theo (người nhận | SĐT | ngày).
+- Backend (sau `_cvStaffUsers_` trong `gas_v13.js`): `_rbFindEvents_` (hàm thuần, test `tools/test-resale-notify.js`), `_rbNotify_`, `rbScan_`, `_rbScanMaybe_` (gọi từ action `notifications`, tối đa 10 phút/lần), trigger tuỳ chọn `caiTriggerMuaLai`. Client test: `tools/test-nt-resale.js`.
+- Quy ước: đơn hợp lệ (không bị `_donHasExcludedStatus_`); đơn "trước đó" = cùng SĐT, NGÀY TRƯỚC ngày đơn mới (cùng ngày không tính, giống `_posIsResale_`); gom theo SĐT+ngày (đơn tách chỉ 1 thông báo); chỉ báo tài khoản CRM đang hoạt động, KHÔNG phải admin; tên sale lấy qua `_donSaleNamesFromThe_`.
+- Settings (tuỳ chọn): `resaleNotify`=0/off để TẮT; `resaleNotifyDays` (1–14, mặc định 2 = cửa sổ "đơn mới"); `resaleNotifyLookback` (7–1500, mặc định **60 ngày = 2 tháng**, Duyên chốt 2026-10-29: khách mua lại trong chừng này ngày kể từ đơn cũ thì báo sale cũ; chỉ admin ghi, chỉnh ở ⚙ Cấu hình).
+- "Sale cũ vẫn xem được đơn đó": KHÔNG cần mã riêng — phạm vi xem đã cộng dồn sale của MỌI đơn của khách (client `_inUserScope` qua `csSet`, server `_scopeNamesForPhone_`); `donOrdersByPhone` không lọc theo sale.

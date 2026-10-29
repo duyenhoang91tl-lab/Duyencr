@@ -1131,6 +1131,11 @@ function _pkEnforceScope(){
   } else {
     _pkState.kpiSaleScope = my;
   }
+  // Doi sale Online/Van phong xem them KPI nhom Sale "Quay" + phong CSKH (2026-10-29, xem _srViewNames js/10)
+  if (typeof _srViewNames === 'function'){
+    var vn = _srViewNames();
+    if (vn.length) _pkState.kpiSaleScope = (_pkState.kpiSaleScope || []).concat(vn.filter(function(n){ return (_pkState.kpiSaleScope || []).indexOf(n) === -1; }));
+  }
 }
 
 async function _expLogRun(){

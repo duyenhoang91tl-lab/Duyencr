@@ -72,13 +72,16 @@ fun DiagCard() {
     OutlinedButton({ open = !open; if (open) report = Diag.report() }, Modifier.fillMaxWidth().padding(top = 8.dp)) {
         Text(if (open) "🩺 Kiểm tra gõ tắt ▲" else "🩺 Kiểm tra gõ tắt ▼")
     }
+    // NGUYÊN NHÂN GỐC báo cáo "❌ CHƯA gửi sự kiện gõ nào" dù gõ tắt ở Zalo đã hiện màn chọn (video Duyên 2026-10-27): `report` chỉ được tính 1 LẦN lúc mở thẻ,
+    // rồi đứng yên khi Duyên sang Zalo gõ và quay lại → hiện số liệu CŨ (0 sự kiện). Nay tự đọc lại mỗi giây khi thẻ đang mở.
+    if (open) LaunchedEffect(Unit) { while (true) { report = Diag.report(); kotlinx.coroutines.delay(1000) } }
     if (open) Card(Modifier.fillMaxWidth().padding(top = 6.dp)) {
         Column(Modifier.padding(12.dp).heightIn(max = 300.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(report, style = MaterialTheme.typography.bodySmall)
             OutlinedButton({ report = Diag.report() }) { Text("Làm mới") }
             OutlinedTextField(test, { test = it }, singleLine = true, label = { Text("Gõ thử viết tắt (vd: ch)") }, modifier = Modifier.fillMaxWidth())
             Text(Diag.trial(test), style = MaterialTheme.typography.bodySmall)
-            Text("Mẹo: gõ viết tắt ở app chat khác (Zalo/Messenger/Pancake), KHÔNG bấm cách; quay lại đây bấm Làm mới để xem app nhận được gì.", style = MaterialTheme.typography.bodySmall)
+            Text("Mẹo: gõ viết tắt ở app chat khác (Zalo/Messenger/Pancake), KHÔNG bấm cách; quay lại đây, báo cáo trên tự cập nhật mỗi giây.", style = MaterialTheme.typography.bodySmall)
         }
     }
 }
