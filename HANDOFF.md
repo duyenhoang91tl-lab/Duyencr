@@ -3,6 +3,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-10-29 — Phân quyền: đội Sale (Online + Văn phòng) xem thêm data kênh Quầy + phòng CSKH
+Yêu cầu Duyên: đội Sale xem được **hồ sơ khách + đơn VÀ báo cáo** của kênh Quầy và CSKH. Chốt với Duyên: "Quầy" = nhóm Sale tên Quầy (Phân loại đội Sale / `saleChannels`, khớp không dấu key/nhãn `quay`/`kenhquay`); "CSKH" = phòng CSKH (Cài đặt > Phòng ban, `saleDepts`); áp cho tài khoản sale thuộc nhóm **Online hoặc Văn phòng** (tên trong `saleChannels` hoặc cột `saleType`). Sale Thử việc và nhân viên CSKH KHÔNG được thêm.
+- [x] **Bước 1/3 — Backend (ĐÃ PUSH, commit 0f57816):** `gas_v13.js` thêm `_viewExtraNames_(user)` (+ `_VIEW_EXTRA_SALE_KEYS_`), nối vào `_scopeAllowedNames_` (lọc server: lookup/donOrdersByPhone/cskhDetail + customers/orders/careLeads/reminders/cskhDuyen*) và `_splitScope_` (báo cáo đơn chia); `webLogin_` trả thêm `user.viewNames`. Test `node tools/test-view-extra.js` (mới) + test-roles/test-enforce/test-search-scope đều pass. NGUYÊN NHÂN GỐC: phạm vi cs/manager/leader chỉ = tên mình (+ team).
+- [ ] **Bước 2/3 — Web hồ sơ khách (ĐANG LÀM):** `js/08` `_inUserScope` cộng `currentUser.viewNames`; `js/14` lưu `viewNames` vào `currentUser` lúc đăng nhập.
+- [ ] **Bước 3/3 — Web báo cáo (CHƯA LÀM):** `js/10` `_srMyNames`/`_srEnforceScope` cho phép chọn thêm tên Quầy/CSKH ở bộ lọc Sale.
+- [ ] CẦN LÀM TIẾP / Duyên làm tay: GAS tự deploy (xem tab Actions xanh); sau khi web xong → Ctrl+F5 và **đăng xuất/đăng nhập lại** (để nhận `viewNames`). Điều kiện cần: ở Cài đặt phải có nhóm Sale tên "Quầy" (đã gán người) và phòng "CSKH" (đã gán người), nếu chưa có thì chưa thấy thêm gì.
+
 ## 2026-10-27 (tối, tiếp) — App Android 1.13: Chèn NHIỀU hình vào đúng khung chat
 - [x] Duyên yêu cầu: gõ tắt → chọn nhiều hình như gửi thường trên Zalo, hình vào khung chat. NGUYÊN NHÂN GỐC trước đó: Android chỉ dán được 1 hình/lần nên ≥2 hình mở bảng chia sẻ chung (sang Zalo phải chọn lại người nhận). Sửa (ExpanderService.kt): nút "Chèn" với toàn hình → `pasteImages` dán TUẦN TỰ (clipboard hình i → ACTION_PASTE ở ô lấy nét → chờ 1,6s → hình kế). Hình đầu bị từ chối → dự phòng bảng chia sẻ; hình sau bị từ chối → báo còn mấy hình. "Chia sẻ" hoặc có ghi âm/tệp → bảng chia sẻ như cũ. versionCode 14 / 1.13. Lỗi/kết quả dán ghi ở thẻ 🩺 "Lần chèn gần nhất".
 - [ ] CHƯA KIỂM CHỨNG: không có SDK/máy thật → chưa biên dịch, chưa thử trên Zalo. Zalo có thể hiện bản xem trước/hỏi xác nhận mỗi hình (khi đó tăng thời gian chờ 1600ms hoặc chỉ dán hình đầu); chờ Actions "Build Android VietTat" xanh rồi Duyên thử và báo kết quả (thẻ 🩺 cho biết app chat nhận/từ chối).
