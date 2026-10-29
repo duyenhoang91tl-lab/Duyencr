@@ -1581,6 +1581,7 @@ function _usersForClient_(users, full) {
   return (users || []).map(function(u) {
     var o = { username: u.username, name: u.name, names: u.names, team: u.team, role: u.role, active: u.active };
     if (full) { o.perms = u.perms; o.saleType = u.saleType; o.startDate = u.startDate; o.joinDate = u.joinDate; o.hasPass = !!u.passHash; }
+    if (full) { try { o.viewNames = _viewExtraNames_(u).names; } catch (eVn) { o.viewNames = []; } }   // ten nhom Sale "Quay" + phong CSKH ma doi sale Online/Van phong duoc xem them (web: _inUserScope + bao cao)
     return o;
   });
 }
@@ -1755,7 +1756,6 @@ function webLogin_(d) {
   var r = _checkLogin_(d && d.username, d && d.password);
   if (r.error) return jsonOut_({ ok: false, error: r.error });
   var out = { ok: true, token: _sessIssue_(r.acct), expiresInMs: SESS_TTL_MS_, user: _usersForClient_([r.acct], true)[0] };
-  try { out.user.viewNames = _viewExtraNames_(r.acct).names; } catch (eVn) { out.user.viewNames = []; }   // ten nhom Sale "Quay" + phong CSKH doi sale Online/Van phong duoc xem them (web dung o _inUserScope/bao cao)
   if (r.acct.role === 'demo') out.demoToken = _demoToken_();   // tai khoan test: client van can demoToken nhu cu
   return jsonOut_(out);
 }
@@ -2082,36 +2082,43 @@ var SCOPE_LIST_KEY_ = { orders: 'orders', reminders: 'reminders', searchOrder: '
 // Tieu chi nhom/phong khop theo KHONG DAU, khong khoang trang: nhom co key hoac nhan "quay"/"kenh quay"; phong co key hoac nhan "cskh".
 // Tra { sale: true/false, names: [...] }. Nho trong 1 lan chay script (memo theo username).
 var _VIEW_EXTRA_SALE_KEYS_ = { online: 1, offline: 1 };
-var __viewExtraMemo_ = {};
+var __viewExtraMemo_ = {}, __viewExtraShared_ = null;
+// Phan DUNG CHUNG cho moi tai khoan (doc Settings 1 lan / lan chay script): ban do ten->nhom Sale (da fold) + danh sach ten nhom "Quay" + phong CSKH.
+function _viewExtraShared_() {
+  if (__viewExtraShared_) return __viewExtraShared_;
+  var sh = { chanByFold: {}, names: [] };
+  try {
+    var chan = _csJsonSetting_('saleChannels', {});
+    if (!chan || typeof chan !== 'object') chan = {};
+    Object.keys(chan).forEach(function (n) { var f = _foldSaleKey_(n); if (f && chan[n]) sh.chanByFold[f] = String(chan[n]); });
+    var seen = {}, add = function (n) { n = String(n || '').trim(); if (n && !seen[n]) { seen[n] = 1; sh.names.push(n); } };
+    // (a) nhom Sale "Quay": key hoac nhan (khong dau, khong khoang trang) bat dau bang "quay" / "kenhquay"
+    var quayKeys = {};
+    readSaleGroups_().forEach(function (g) {
+      if (/^(kenh)?quay/.test(_foldSaleKey_(g.key)) || /^(kenh)?quay/.test(_foldSaleKey_(g.label))) quayKeys[String(g.key)] = 1;
+    });
+    Object.keys(chan).forEach(function (n) { if (quayKeys[String(chan[n])]) add(n); });
+    // (b) phong CSKH: key hoac nhan = "cskh"
+    var cskhKeys = {};
+    readDeptList_().forEach(function (d) { if (_foldSaleKey_(d.key) === 'cskh' || _foldSaleKey_(d.label) === 'cskh') cskhKeys[String(d.key)] = 1; });
+    var sd = readSaleDepts_().raw || {};
+    Object.keys(sd).forEach(function (n) { if (cskhKeys[String(sd[n])]) add(n); });
+  } catch (e) { Logger.log('_viewExtraShared_: ' + e); }
+  __viewExtraShared_ = sh;
+  return sh;
+}
 function _viewExtraNames_(user) {
   var res = { sale: false, names: [] };
   if (!user) return res;
   var mk = String(user.username || user.name || '').toLowerCase();
   if (mk && __viewExtraMemo_[mk]) return __viewExtraMemo_[mk];
   try {
-    var chan = _csJsonSetting_('saleChannels', {});
-    if (!chan || typeof chan !== 'object') chan = {};
-    var fold = function (s) { return _foldSaleKey_(s); };
-    var chanByFold = {}; Object.keys(chan).forEach(function (n) { var f = fold(n); if (f && chan[n]) chanByFold[f] = String(chan[n]); });
+    var sh = _viewExtraShared_();
     // Tai khoan co phai sale Online/Van phong? (ten nao trong saleChannels thuoc online/offline, hoac cot saleType)
     var isSale = !!_VIEW_EXTRA_SALE_KEYS_[String(user.saleType || '')];
-    _profNames_(user).forEach(function (n) { var g = chanByFold[fold(n)]; if (g && _VIEW_EXTRA_SALE_KEYS_[g]) isSale = true; });
+    _profNames_(user).forEach(function (n) { var g = sh.chanByFold[_foldSaleKey_(n)]; if (g && _VIEW_EXTRA_SALE_KEYS_[g]) isSale = true; });
     res.sale = isSale;
-    if (isSale) {
-      var seen = {}, add = function (n) { n = String(n || '').trim(); if (n && !seen[n]) { seen[n] = 1; res.names.push(n); } };
-      // (a) nhom Sale "Quay"
-      var quayKeys = {};
-      readSaleGroups_().forEach(function (g) {
-        var fk = fold(g.key), fl = fold(g.label);
-        if (/^(kenh)?quay/.test(fk) || /^(kenh)?quay/.test(fl)) quayKeys[String(g.key)] = 1;
-      });
-      Object.keys(chan).forEach(function (n) { if (quayKeys[String(chan[n])]) add(n); });
-      // (b) phong CSKH
-      var cskhKeys = {};
-      readDeptList_().forEach(function (d) { if (fold(d.key) === 'cskh' || fold(d.label) === 'cskh') cskhKeys[String(d.key)] = 1; });
-      var sd = readSaleDepts_().raw || {};
-      Object.keys(sd).forEach(function (n) { if (cskhKeys[String(sd[n])]) add(n); });
-    }
+    if (isSale) res.names = sh.names.slice();
   } catch (e) { Logger.log('_viewExtraNames_: ' + e); }
   if (mk) __viewExtraMemo_[mk] = res;
   return res;
