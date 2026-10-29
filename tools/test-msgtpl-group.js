@@ -29,7 +29,8 @@ const reset = () => { data = [H.slice()]; vm.runInContext('_tplCatIdxMemo_ = nul
 const T = o => Object.assign({ title: 'x', content: 'x' }, o);
 const readAll = () => ctx.readMessageTemplates_(ADMIN);
 
-eq(H[H.length - 1], 'nhom', 'sheet them cot cuoi "group" (getSheet_ tu them vao sheet cu)');
+eq(H[13], 'nhom', 'cot nhom (group) van o vi tri 13 (getSheet_ tu them vao sheet cu)');
+eq(H[H.length - 1], 'images', 'cot cuoi la "images" (them 2026-10-29: toi da 4 anh/mau) — nhom khong con la cot cuoi');
 // 1) chon tay -> ghi + doc ra dung, nhomAuto=false
 reset(); let r = ctx.saveMessageTemplate_(T({ title: 'Bao hanh', content: 'Bao hanh 12 thang', nhom: 'Lắc tay' }), ADMIN);
 let t = readAll()[0]; eq([t.nhom, t.nhomAuto, data[1][13]], ['Lắc tay', false, 'Lắc tay'], 'admin chon tay "Lắc tay" -> luu cot group, nhomAuto=false');

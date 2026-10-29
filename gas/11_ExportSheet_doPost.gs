@@ -382,12 +382,10 @@ function doPostCore_(e) {
     //    (cvDetect_/_cvBannedCompiled_) -> nut bao sach thi giam sat chat cung khong bat. Chi doc, khong ghi gi. ──
     if (action === 'scanBanned')   return jsonOut_(scanBannedText_(data.text));
     // ── MAU TIN NHAN TU VAN KHACH: them/sua (form tren CRM tab ZALO AI) / xoa 1 mau ──
+    if (action === 'uploadTemplateImage')    return uploadTemplateImage_(data.imageBase64, data.filename, data.mimeType, _tplCaller_(data.token, data.ek, ''));
     if (action === 'saveMessageTemplate')   return saveMessageTemplate_(data.template || data, _tplCaller_(data.token, data.ek, (data.template || data).createdBy));
     if (action === 'deleteMessageTemplate') return deleteMessageTemplate_(data.id, _tplCaller_(data.token, data.ek, data.createdBy));
     if (action === 'approveMessageTemplate') return approveMessageTemplate_(data.id, data.decision, data.reason, _tplCaller_(data.token, data.ek, ''));
-    if (action === 'saveVietTat')           return saveVietTat_(data.snippet || data, _tplCaller_(data.token, data.ek, data.by));
-    if (action === 'deleteVietTat')         return deleteVietTat_(data.id, _tplCaller_(data.token, data.ek, data.by));
-    if (action === 'vietTatUploadImage')    return jsonOut_(vietTatUploadImage_(data, _tplCaller_(data.token, data.ek, data.by)));   // CRM: tai 1 anh tu may len Drive (chon nhieu anh -> goi lan luot)
     if (action === 'saveCannedResponse')    return saveCannedResponse_(data.canned || data);
     if (action === 'saveAIExample')         return saveAIExample_(data.id, data.content);
     if (action === 'deleteAIExample')       return deleteAIExample_(data.id);

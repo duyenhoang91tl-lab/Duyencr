@@ -16,6 +16,16 @@ syntax_check() {   # quy tắc 4: không push code chưa syntax-check (bỏ qua 
   return 0
 }
 
+big_delete_check() {   # chặn "ghi đè bằng bản cũ": sự cố 2026-10-29 — 1 commit làm trên gas_v13.js CŨ xoá 938 dòng (mất Viết tắt, Trọng lượng vàng, mua lại, đơn chia, chat coach) rồi tự deploy
+  [ "${ALLOW_BIG_DELETE:-0}" = "1" ] && return 0
+  local a d f bad=0
+  while read -r a d f; do
+    case "$a$d" in *-*) continue;; esac          # file nhị phân: bỏ qua
+    if [ "$d" -ge 300 ] && [ "$d" -ge $((a * 4)) ]; then echo "!! $f: push này XÓA $d dòng, chỉ THÊM $a dòng so với origin/$BR"; bad=1; fi
+  done < <(git diff --numstat "origin/$BR" HEAD)
+  return $bad
+}
+
 for i in 1 2 3; do
   g fetch origin "$BR" || { echo "fetch lỗi"; exit 1; }
   if ! git merge-base --is-ancestor "origin/$BR" HEAD; then
@@ -28,6 +38,7 @@ for i in 1 2 3; do
     echo ">> Đã merge. Kiểm tra lại thay đổi của mình còn nguyên trước khi tin kết quả."
   fi
   syntax_check || { echo "!! Syntax lỗi sau merge — sửa rồi chạy lại (chưa push gì)"; exit 4; }
+  big_delete_check || { echo "!! Nghi GHI ĐÈ BẰNG BẢN CŨ (xóa hàng loạt). Bạn có đang làm trên file cũ không? Chạy 'git fetch && git merge origin/$BR' rồi áp lại thay đổi NHỎ của mình lên bản mới nhất. Nếu xóa là CÓ CHỦ Ý: ALLOW_BIG_DELETE=1 TK=... bash tools/safe-push.sh"; exit 6; }
   if g push origin "HEAD:$BR"; then
     g fetch origin "$BR" >/dev/null 2>&1
     if git merge-base --is-ancestor HEAD "origin/$BR"; then echo "✅ ĐÃ LÊN origin/$BR: $(git rev-parse --short HEAD)"; exit 0; fi
