@@ -8,6 +8,15 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 - [ ] **BƯỚC KẾ TIẾP (Duyên làm, KHÔNG phải sửa code):** (1) deploy GAS `v13.62-aa-hint` (Actions "Deploy GAS to Apps Script" xanh) rồi chạy lại `kiemTraChiaTuDong`, đọc dòng GỢI Ý: sẽ cho biết còn bao nhiêu KH chưa chia nếu bỏ khoảng ngày. (2) Vào Chia data nâng cao → Chia tự động: bấm **✕ Bỏ** ở khoảng ngày (hoặc đổi "đến" thành hôm nay) rồi **💾 Lưu cấu hình**; GIỮ tích "Chỉ lấy KH chưa chia lần nào" để không chia lại KH cũ. (3) Hôm nay đã đánh dấu "đã chia" (lastRun 2026-10-27) nên muốn chia ngay: bấm chạy tay/"Chia ngay" trong tab, nếu không sẽ chia từ sáng mai (sau 7h). Nhu cầu mỗi ngày ≈ 211 KH (Văn Phòng 120 + CSKH 71 + quầy 20): nếu số KH chưa chia ít hơn thì ô trạng thái sẽ báo "Thiếu KH cho N người".
 - Lưu ý quy trình: phiên này dùng `git pull --rebase` cho commit CỤC BỘ chưa push ở các lượt trước (trái quy tắc merge-only đầu file) — từ lượt này dùng `TK=... bash tools/safe-push.sh`.
 
+## 2026-10-27 — SẮP XẾP LẠI "Chia data nâng cao > Chia tự động" cho dễ dùng (Duyên: "nhìn khá rối, chỉnh cho khoa học")
+**Kế hoạch 3 bước, mỗi bước 1 file chính + push + cập nhật mục này:** (1) CSS `.aa-*` → (2) `js/14-fn-aasplit.js` bố cục mới + phễu lọc KH → (3) rà tab "Chia data mới" (`js/07`).
+**Vấn đề đã đo trong mã cũ:** trang dài không thứ tự (khối đầu không đánh số, sau đó ①②③); HAI ô "Lần chạy gần nhất" trùng nhau; kết quả Xem trước/Chạy nằm tận CUỐI trang; hướng dẫn trigger dài chen giữa form; bảng Team 6 cột; ô "Tổng KH/ngày" luôn hiện dù không dùng %; không biết "chưa lưu".
+**Thiết kế mới (giữ nguyên logic chia, chỉ đổi bố cục):** đầu trang = Tóm tắt (Bật/Tắt, 1 câu cấu hình, nhãn chưa lưu, Xem trước, KẾT QUẢ ngay tại đó) → thanh bước ①–⑤ bấm để nhảy → ① Lịch chạy → ② Lọc khách (+ phễu: tổng → SĐT hợp lệ → trong khoảng ngày → chưa chia) → ③ Chia cho ai (bảng 5 cột + dòng tổng) → ④ Tỷ lệ nâng cao (thu gọn) → ⑤ CSKH-Duyên (thu gọn). Hướng dẫn trigger thu gọn.
+- [x] BƯỚC 1/3 ĐÃ PUSH: `css/01-base.css` (+ `css/99-dark-auto.css` sinh lại bằng `node tools/gen-dark-theme.js`): lớp `.aa-sum .aa-card .aa-badge .aa-nav .aa-sec .aa-funnel .aa-table .aa-help…`, chỉ dùng biến màu có sẵn nên chế độ tối tự đúng. Chưa có code dùng các lớp này (bước 2).
+- ĐANG LÀM: bước 2/3 = `js/14-fn-aasplit.js` (renderAssignAuto + phễu `diag` cho `_aaPlanAll` phía trình duyệt + test `tools/test-aa-ui.js`).
+- [ ] BƯỚC KẾ TIẾP: bước 3/3 rà tab "Chia data mới" (`js/07-openassignmodal.js`); sau đó Duyên Ctrl+F5 CRM để xem.
+
+
 
 ## 2026-10-27 — TỔNG HỢP (bổ sung): Hộp thư Pancake + duyệt mẫu tin trên Pancake AI + đọc hộp thư thẳng từ Worker + chia data (phiên Hộp thư Pancake, 11–27/10)
 Chi tiết kỹ thuật từng bước: `docs/PANCAKE-INBOX.md` (bước 1–7), `docs/MESSAGE-SUGGEST.md` (mục "Thông báo + duyệt ngay trên Pancake AI"). Ở đây chỉ ghi cái cần để tiếp tục.
