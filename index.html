@@ -3,6 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0f766e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Duyên CRM">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>Thu Hiền CRM 10.55.22.8.26</title>
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
 <style>
@@ -20,7 +27,7 @@ html.ev-boot #empty-view .ev-spin{display:flex}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="css/01-base.css?v=20261020a">
+<link rel="stylesheet" href="css/01-base.css?v=20261026a">
 <link rel="stylesheet" href="css/02-style.css">
 </head>
 <body>
@@ -822,6 +829,57 @@ window.addEventListener('load',function(){var s=document.createElement('script')
         <div id="mt-list" style="display:flex;flex-direction:column;gap:8px"></div>
       </div>
 
+      <!-- VIET TAT (2026-10-25): go tat -> Tab chen noi dung. Cung nguon (sheet VietTat) voi extension Pancake AI; logic o js/57-viettat.js -->
+      <div id="vt-section" style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px" data-vt="off">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+          <div class="zai-label" style="margin:0;font-size:13px;font-weight:700">⌨️ Viết tắt</div>
+          <span class="guide-text" style="font-size:11px;color:var(--muted)">Gõ viết tắt hoặc từ khoá trong ô chat Pancake AI (hoặc ô ghi chú CRM) → <b>Tab</b> để chèn · ↑↓ đổi · Alt+1…8 chọn nhanh · Esc đóng</span>
+        </div>
+        <div id="vt-hint" style="font-size:11px;color:var(--muted);margin-bottom:8px"></div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+          <select id="vt-scope-filter" class="assign-input" onchange="vtRender()" style="font-size:12px;padding:4px 8px"><option value="">Tất cả</option><option value="team">👥 Chung (cả team)</option><option value="me">🙋 Của tôi</option></select>
+          <input id="vt-search" class="zai-input" placeholder="Tìm viết tắt / từ khoá / nội dung..." style="flex:1;min-width:180px" oninput="vtRender()">
+          <button class="btn sm primary" onclick="vtOpenForm()">+ Thêm viết tắt</button>
+          <input type="file" id="vt-imp-file" accept=".json,.zip,application/json,application/zip" data-vt="off" style="display:none" onchange="vtImportFile(this.files[0]); this.value=''">
+          <button class="btn sm" onclick="document.getElementById('vt-imp-file').click()" title="Chọn file data.json hoặc .zip xuất từ app Viết Tắt cũ (Chrome/Android)">📥 Nhập từ app Viết Tắt cũ</button>
+        </div>
+        <div id="vt-imp-msg" style="font-size:11px;color:var(--muted);margin:-4px 0 8px"></div>
+        <details style="font-size:12px;margin:0 0 10px"><summary style="cursor:pointer;color:var(--accent,#1e66f5);font-weight:600">📱 Cài Viết tắt về điện thoại (iPhone / Android)</summary>
+          <div style="margin-top:6px;line-height:1.6;color:var(--muted)">
+            <b>iPhone / iPad:</b> mở link <a href="https://duyenhoang91tl-lab.github.io/Duyencr/viettat.html" target="_blank" rel="noopener">duyenhoang91tl-lab.github.io/Duyencr/viettat.html</a> bằng <b>Safari</b> → nút <b>Chia sẻ</b> → <b>Thêm vào MH chính</b>. Mở từ biểu tượng "Viết tắt" như một app (xem được khi mất mạng).<br>
+            <b>Android:</b> mở link trên bằng Chrome → <b>Cài ngay</b>; hoặc tải <a href="https://github.com/duyenhoang91tl-lab/Duyencr/releases/tag/viettat-latest" target="_blank" rel="noopener">VietTat.apk</a> (app tự hiện gợi ý khi gõ trong Zalo/Messenger).<br>
+            iPhone không cho app gõ-tự-hiện trong Zalo/Messenger: mở app Viết tắt → chọn tin/hình → <b>Sao chép</b> hoặc <b>Chia sẻ</b> → dán vào ô chat. Lần đầu nhập <b>Tên CS</b> giống trong CRM.
+          </div>
+        </details>
+        <div id="vt-form-wrap" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:12px;margin-bottom:10px">
+          <input type="hidden" id="vt-f-id">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+            <input id="vt-f-abbr" class="zai-input" placeholder="Viết tắt (1 từ, VD: ch)" maxlength="30" style="width:150px">
+            <input id="vt-f-keyword" class="zai-input" placeholder="Từ khoá, cách nhau dấu phẩy (VD: chào, xin chào) — gõ đầu từ khoá cũng gợi ý" style="flex:1;min-width:220px">
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+            <input id="vt-f-nhom" class="zai-input" list="vt-nhom-list" placeholder="🗂 Nhóm / thư mục con (VD: Chào hỏi · Túi tiền/Cổ · Túi tiền/Lắc)" title="Dùng dấu / để chia thư mục con, tối đa 3 cấp" style="flex:1;min-width:180px"><datalist id="vt-nhom-list"></datalist>
+            <select id="vt-f-scope" class="assign-input" style="min-width:170px" title="Chung: cả team dùng (chỉ admin tạo). Của tôi: chỉ mình bạn thấy"><option value="me">🙋 Của tôi (chỉ mình tôi)</option><option value="team">👥 Chung (cả team)</option></select>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Nội dung chèn (thêm nhiều lựa chọn nếu muốn — chọn bằng ↑↓ hoặc Alt+số). Biến: <code>{tên}</code> <code>{tên khách}</code> <code>{tên đầy đủ}</code> <code>{ngày}</code> <code>{ngày mai}</code> <code>{giờ}</code> <code>{thứ}</code></div>
+          <div id="vt-f-opts"></div>
+          <div style="margin:8px 0 6px;font-size:11px;color:var(--muted)"><b>🖼 Ảnh kèm theo</b> <span id="vt-f-imgcount"></span> — tối đa <b>50 ảnh</b> cho mỗi mục. Thêm ảnh bằng 1 trong 2 cách: <b>(1)</b> dán link <b>Google Drive</b> (ảnh hoặc thư mục, mỗi dòng 1 link; thư mục lấy tối đa 50 ảnh đầu theo tên) để dùng ảnh ĐÃ CÓ, không tải lại — ảnh phải chia sẻ cho tài khoản chạy GAS hoặc "ai có link"; <b>(2)</b> <b>📷 Chọn ảnh từ máy / điện thoại</b> — chọn nhiều ảnh 1 lúc (máy tính, iPhone/iPad, Android), ảnh tự nén nhỏ trước khi tải lên. Khi gõ tắt, nội dung chèn trước rồi ảnh dán lần lượt. Nhớ bấm <b>Lưu</b> sau khi thêm ảnh.</div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+            <input type="file" id="vt-f-files" accept="image/*" multiple data-vt="off" style="display:none" onchange="vtUploadFiles(this.files); this.value=''">
+            <button type="button" class="btn sm" id="vt-f-filebtn" onclick="document.getElementById('vt-f-files').click()">📷 Chọn ảnh từ máy / điện thoại</button>
+            <span style="font-size:11px;color:var(--muted)">chọn được nhiều ảnh cùng lúc</span>
+          </div>
+          <div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:6px"><textarea id="vt-f-imglinks" class="zai-textarea" rows="2" data-vt="off" placeholder="https://drive.google.com/drive/folders/... hoặc https://drive.google.com/file/d/..." style="flex:1;min-width:0"></textarea><button type="button" class="btn sm" id="vt-f-imgbtn" onclick="vtFetchImgs()">➕ Lấy ảnh từ link</button></div>
+          <div id="vt-f-imgmsg" style="font-size:11px;color:var(--muted);margin-bottom:4px"></div>
+          <div id="vt-f-imgs" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px"></div>
+          <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:4px">
+            <button type="button" class="btn sm" onclick="vtAddOpt()">+ Thêm lựa chọn</button>
+            <div style="display:flex;gap:8px"><button class="btn sm" onclick="vtCloseForm()">Hủy</button><button class="btn sm primary" id="vt-f-save-btn" onclick="vtSave()">Lưu</button></div>
+          </div>
+        </div>
+        <div id="vt-list" style="display:flex;flex-direction:column;gap:6px"></div>
+      </div>
+
       <!-- Mau AI da hoc: cac cau tra loi CS da sua + bam "Luu de AI hoc" (Pancake AI / Zalo AI) -> sheet AIContext,
            AI dua 5 mau MOI NHAT vao prompt. Quan ly o day: xem / sua / xoa mau sai. -->
       <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px">
@@ -884,12 +942,12 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 </div>
 </div>
 
-<script src="js/01-fn-splitmulti.js"></script>
+<script src="js/01-fn-splitmulti.js?v=20261026a"></script>
 <script src="js/02-fn-showrowerrorbanner.js"></script>
 <script src="js/03-fn-refreshopendptab.js"></script>
 <script src="js/04-fn-synczalophonesettingsfromgas.js"></script>
-<script src="js/05-fn-saveeditphone.js"></script>
-<script src="js/06-main-renew-sources.js"></script>
+<script src="js/05-fn-saveeditphone.js?v=20261026a"></script>
+<script src="js/06-main-renew-sources.js?v=20261026a"></script>
 
 <!-- ASSIGN DATA MODAL -->
 <div class="assign-modal-overlay" id="assign-modal">
@@ -966,13 +1024,13 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 
 
 <!-- ════════════ V9 FEATURE LAYER ════════════ -->
-<script src="js/08-fn-invalidatefiltercache.js"></script>
-<script src="js/09-fn-deleteteam.js"></script>
-<script src="js/10-fn-pkkpipct.js"></script>
-<script src="js/11-fn-srload.js?v=20261024b"></script>
-<script src="js/12-fn-rendersalesreporttabe.js"></script>
-<script src="js/13-fn-bpseedofficialonlinetemplate.js"></script>
-<script src="js/14-fn-aasplit.js?v=20261023a"></script>
+<script src="js/08-fn-invalidatefiltercache.js?v=20261029a"></script>
+<script src="js/09-fn-deleteteam.js?v=20261029a"></script>
+<script src="js/10-fn-pkkpipct.js?v=20261029a"></script>
+<script src="js/11-fn-srload.js?v=20261026a"></script>
+<script src="js/12-fn-rendersalesreporttabe.js?v=20261024c"></script>
+<script src="js/13-fn-bpseedofficialonlinetemplate.js?v=20261029a"></script>
+<script src="js/14-fn-aasplit.js?v=20261029a"></script>
 <script src="js/15-fn-hidelogin.js"></script>
 <script src="js/16-main-currentuser.js"></script>
 
@@ -1177,7 +1235,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 
 <link rel="stylesheet" href="css/04-style.css">
 <link rel="stylesheet" href="css/05-sidenav.css?v=20261023b">
-<link rel="stylesheet" href="css/06-pro.css">
+<link rel="stylesheet" href="css/06-pro.css?v=20261027b">
 <link rel="stylesheet" href="css/07-teamchat.css">
 <link rel="stylesheet" href="css/08-kho.css">
 <link rel="stylesheet" href="css/09-profile.css">
@@ -1187,6 +1245,8 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 <link rel="stylesheet" href="css/12-salematch.css">
 <link rel="stylesheet" href="css/13-shell.css?v=20261019c">
 <link rel="stylesheet" href="css/14-qrpills.css">
+<link rel="stylesheet" href="css/15-mobile.css">
+<link rel="stylesheet" href="css/16-mobile-list.css?v=20261026a">
 <link rel="stylesheet" href="css/99-dark-auto.css"><!-- TỰ SINH (tools/gen-dark-theme.js): lớp chế độ tối cho màu cứng; chỉ có hiệu lực khi html[data-theme="dark"]; PHẢI nạp sau cùng -->
 
 <script src="js/18-openkhstatusmodal.js"></script>
@@ -1677,7 +1737,7 @@ function openBcLogModal(phone){
 <script src="js/44-fn-taskflow.js"></script>
 <script src="js/45-fn-taskflow-admin.js"></script>
 <script src="js/27-fn-bonuscore.js"></script>
-<script src="js/28-fn-bonusdetail.js?v=20261023a"></script>
+<script src="js/28-fn-bonusdetail.js?v=20261024c"></script>
 <script src="js/34-fn-todaytasks.js"></script>
 <script src="js/35-fn-deptsettings.js"></script>
 <script src="js/36-fn-homechips.js"></script>
@@ -1688,18 +1748,19 @@ function openBcLogModal(phone){
 <script src="js/42-fn-homesummary.js"></script>
 <script src="js/43-fn-uxtools.js"></script>
 <script src="js/30-fn-teamanalysis.js"></script>
-<script src="js/29-sidenav.js?v=20261023b"></script>
+<script src="js/29-sidenav.js?v=20261026a"></script>
 <script src="js/31-fn-orgoverview.js"></script>
 <script src="js/32-fn-furesult.js"></script>
 <script src="js/33-fn-tierconfig.js"></script>
 <script src="js/33-pro-profile.js"></script>
 <script src="js/34-pro-charts.js"></script>
 <script src="js/36-pro-home.js"></script>
-<script src="js/38-pro-dock.js"></script>
+<script src="js/38-pro-dock.js?v=20261027b"></script>
 <script src="js/39-fn-notify.js?v=20261020a"></script>
 <script src="js/40-fn-rolesettings.js"></script>
-<script src="js/41-fn-pkchat.js"></script>
-<script src="js/42-fn-socialchat.js?v=20261020a"></script>
+<script src="js/41-fn-pkchat.js?v=20261025c"></script>
+<script src="js/42-fn-socialchat.js?v=20261025c"></script>
+<script src="js/58-fn-chatcoach.js?v=20261025c"></script>
 <script src="js/43-teamchat.js"></script>
 <script src="js/40-main-restorenav.js"></script>
 <script src="js/43-fn-viewstate.js"></script>
@@ -1708,7 +1769,7 @@ function openBcLogModal(phone){
 <script src="js/48-filter-presets.js?v=20261017"></script>
 <script src="js/48-pro-chatinfo.js"></script>
 <script src="js/49-pro-discuss.js"></script>
-<script src="js/50-split-orders.js?v=20261023a"></script>
+<script src="js/50-split-orders.js?v=20261024e"></script>
 <script src="js/50-person-tags.js"></script>
 <script src="js/51-demo-guard.js"></script>
 <script src="js/52-fn-salematch.js"></script>
@@ -1716,6 +1777,11 @@ function openBcLogModal(phone){
 <script src="js/54-fn-promo-admin.js"></script>
 <script src="js/55-fn-shell.js?v=20261019c"></script>
 <script src="js/56-fn-qrpills.js"></script>
+<script src="js/59-fn-mobilefit.js"></script>
+<script src="js/57-viettat.js?v=20261025f"></script>
+<script src="js/58-auto-cust-link.js"></script>
+<script src="js/59-conn-diag.js"></script>
+<script src="js/59-report-drill.js"></script>
 
 
 <div class="modal-overlay" id="quick-add-modal" style="display:none;align-items:flex-start;justify-content:center;padding-top:60px;z-index:800">
@@ -1774,5 +1840,6 @@ function openBcLogModal(phone){
   obs.observe(document.body, { childList: true, subtree: true });
 })();
 </script>
+<script>if ('serviceWorker' in navigator && location.protocol === 'https:') window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); });</script>
 </body>
 </html>
