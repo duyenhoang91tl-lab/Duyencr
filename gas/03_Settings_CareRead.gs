@@ -933,6 +933,7 @@ function webLogin_(d) {
   var r = _checkLogin_(d && d.username, d && d.password);
   if (r.error) return jsonOut_({ ok: false, error: r.error });
   var out = { ok: true, token: _sessIssue_(r.acct), expiresInMs: SESS_TTL_MS_, user: _usersForClient_([r.acct], true)[0] };
+  try { out.user.viewNames = _viewExtraNames_(r.acct).names; } catch (eVn) { out.user.viewNames = []; }   // ten nhom Sale "Quay" + phong CSKH doi sale Online/Van phong duoc xem them (web dung o _inUserScope/bao cao)
   if (r.acct.role === 'demo') out.demoToken = _demoToken_();   // tai khoan test: client van can demoToken nhu cu
   return jsonOut_(out);
 }
@@ -1252,6 +1253,47 @@ function xemLogPhamVi() {
 // ═══════════════════════════════════════════════════════════════
 var SCOPE_LIST_ACTIONS_ = { customers: 1, orders: 1, careLeads: 1, reminders: 1, cskhDuyenLite: 1, cskhDuyen: 1, searchOrder: 1 };   // 4c-2c them 3 action cuoi
 var SCOPE_LIST_KEY_ = { orders: 'orders', reminders: 'reminders', searchOrder: 'results' };   // mac dinh mang = 'rows'
+// ── DOI SALE (Online + Van phong) XEM THEM DATA KENH QUAY + PHONG CSKH (Duyen yeu cau 2026-10-29) ──
+// Nguyen nhan goc: pham vi cs/manager/leader chi la TEN MINH (+ team), nen sale Online/Van phong khong thay khach/don cua nhom Sale "Quay"
+// va cua nhan vien phong CSKH. Nay: neu tai khoan la sale thuoc nhom Online hoac Van phong (setting saleChannels / cot saleType) thi pham vi
+// duoc CONG THEM ten (a) moi nguoi xep nhom Sale "Quay" trong saleChannels, (b) moi nguoi thuoc phong CSKH trong saleDepts.
+// Tieu chi nhom/phong khop theo KHONG DAU, khong khoang trang: nhom co key hoac nhan "quay"/"kenh quay"; phong co key hoac nhan "cskh".
+// Tra { sale: true/false, names: [...] }. Nho trong 1 lan chay script (memo theo username).
+var _VIEW_EXTRA_SALE_KEYS_ = { online: 1, offline: 1 };
+var __viewExtraMemo_ = {};
+function _viewExtraNames_(user) {
+  var res = { sale: false, names: [] };
+  if (!user) return res;
+  var mk = String(user.username || user.name || '').toLowerCase();
+  if (mk && __viewExtraMemo_[mk]) return __viewExtraMemo_[mk];
+  try {
+    var chan = _csJsonSetting_('saleChannels', {});
+    if (!chan || typeof chan !== 'object') chan = {};
+    var fold = function (s) { return _foldSaleKey_(s); };
+    var chanByFold = {}; Object.keys(chan).forEach(function (n) { var f = fold(n); if (f && chan[n]) chanByFold[f] = String(chan[n]); });
+    // Tai khoan co phai sale Online/Van phong? (ten nao trong saleChannels thuoc online/offline, hoac cot saleType)
+    var isSale = !!_VIEW_EXTRA_SALE_KEYS_[String(user.saleType || '')];
+    _profNames_(user).forEach(function (n) { var g = chanByFold[fold(n)]; if (g && _VIEW_EXTRA_SALE_KEYS_[g]) isSale = true; });
+    res.sale = isSale;
+    if (isSale) {
+      var seen = {}, add = function (n) { n = String(n || '').trim(); if (n && !seen[n]) { seen[n] = 1; res.names.push(n); } };
+      // (a) nhom Sale "Quay"
+      var quayKeys = {};
+      readSaleGroups_().forEach(function (g) {
+        var fk = fold(g.key), fl = fold(g.label);
+        if (/^(kenh)?quay/.test(fk) || /^(kenh)?quay/.test(fl)) quayKeys[String(g.key)] = 1;
+      });
+      Object.keys(chan).forEach(function (n) { if (quayKeys[String(chan[n])]) add(n); });
+      // (b) phong CSKH
+      var cskhKeys = {};
+      readDeptList_().forEach(function (d) { if (fold(d.key) === 'cskh' || fold(d.label) === 'cskh') cskhKeys[String(d.key)] = 1; });
+      var sd = readSaleDepts_().raw || {};
+      Object.keys(sd).forEach(function (n) { if (cskhKeys[String(sd[n])]) add(n); });
+    }
+  } catch (e) { Logger.log('_viewExtraNames_: ' + e); }
+  if (mk) __viewExtraMemo_[mk] = res;
+  return res;
+}
 function _scopeAllowedNames_(user) {   // null = khong gioi han; object ten->1 = gioi han
   if (!user) return null;
   var role = String(user.role || '');
@@ -1269,6 +1311,8 @@ function _scopeAllowedNames_(user) {   // null = khong gioi han; object ten->1 =
       });
     } catch (e) {}
   }
+  // Doi sale Online/Van phong: them ten nhom Sale "Quay" + phong CSKH (xem _viewExtraNames_)
+  try { _viewExtraNames_(user).names.forEach(function (n) { out[n] = 1; }); } catch (eVx) {}
   return out;
 }
 function _scopeHit_(str, allowed) {
