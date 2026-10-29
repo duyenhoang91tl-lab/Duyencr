@@ -145,10 +145,18 @@ function _aaDateOk(cfg, c){
 }
 // Ke hoach ca ngay = CSKH (rieng) + POS (tu dt/don/cs). opts: {pos:bool, cskh:bool} (mac dinh ca hai). CHIEN DICH 1 = POS/Base chay TRUOC (theo yeu cau Duyen 2026-10-10), roi toi CSKH-Duyen (rieng): KH co ca 2 nguon thuoc ve POS/Base.
 function _aaPlanAll(cfg, teamsArr, membersOf, custs, everSet, opts){
+  var _total = (custs || []).length;
   custs = (custs || []).filter(function(c){ return c && isValidVnPhone(c.phone); });   // chỉ chia SĐT di động VN hợp lệ
-  opts = opts || {}; var taken = new Set(), out = { entries:[], short:[], warn:[] };
+  opts = opts || {}; var taken = new Set(), out = { entries:[], short:[], warn:[], diag:{ total:_total, validPhone:custs.length } };
   if (opts.pos !== false){
-    var p = _aaPlan(cfg, teamsArr, membersOf, (cfg.dateFrom || cfg.dateTo) ? custs.filter(function(c){ return _aaDateOk(cfg, c); }) : custs, everSet, taken);
+    // Phễu lọc (giống GAS _aaPlanAll): tổng → SĐT hợp lệ → trong khoảng ngày → chưa chia. Cho biết VÌ SAO không chia được.
+    var _pool = (cfg.dateFrom || cfg.dateTo) ? custs.filter(function(c){ return _aaDateOk(cfg, c); }) : custs;
+    var _isPos = function(c){ var d = c.dataSrc || {}; return !!(d.dt || d.don || d.cs); };
+    out.diag.afterDate = _pool.length;
+    out.diag.unassigned = cfg.onlyUnassigned ? _pool.filter(function(c){ return !(everSet && everSet.has(c.phone)); }).length : _pool.length;
+    out.diag.unassignedAnyDate = custs.filter(function(c){ return _isPos(c) && !(everSet && everSet.has(c.phone)); }).length;
+    out.diag.noDate = custs.filter(function(c){ return _isPos(c) && !((c.ds && c.ds.length) || (c.ymList && c.ymList.length)); }).length;
+    var p = _aaPlan(cfg, teamsArr, membersOf, _pool, everSet, taken);
     p.entries.forEach(function(e){ e.src = 'pos'; }); p.short.forEach(function(x){ x.src = 'pos'; });
     out.entries = out.entries.concat(p.entries); out.short = out.short.concat(p.short); out.warn = out.warn.concat(p.warn);
   }
@@ -419,14 +427,14 @@ function _aaCkMemberField(tid, name, f, v){
   if (f === 'on') o.on = !!v; else o.val = Math.max(0, Number(v) || 0);
   _aaRerender();
 }
-function _aaCkHtml(){
+function _aaCkHtml(inner){
   var cfg = _aaCfg, ck = { teams: cfg.cskhTeams || {}, dailyTotal: cfg.cskhTotal || 0, memberMode: cfg.cskhMemberMode || {}, members: cfg.cskhMembers || {} };
   var rc = _aaRecipients(ck, teams, _aaMembersOf), qmap = {}, totalQ = rc.list.reduce(function(s, r){ return s + r.quota; }, 0);
   var ckUi = Object.assign({}, ck, { teams: {} });   // ≈ KH/ngày tính như thể Team đã bật (đổi số là thấy nhảy ngay)
   teams.forEach(function(t){ ckUi.teams[t.id] = Object.assign({ mode:'count', val:0 }, ck.teams[t.id], { on:true }); });
   _aaRecipients(ckUi, teams, _aaMembersOf).list.forEach(function(r){ qmap[r.team + '|' + r.name] = r.quota; });
   var nCk = 0; (allCustomers || []).forEach(function(c){ if (c && c.dataSrc && c.dataSrc.cskh) nCk++; });
-  var h = '<div class="assign-section"><div class="assign-section-title">③ Data CSKH-Duyên — chia RIÊNG</div>'+
+  var h = (inner ? '<div>' : '<div class="assign-section"><div class="assign-section-title">③ Data CSKH-Duyên — chia RIÊNG</div>')+
     '<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Mục riêng, không dính tỷ lệ nguồn/ưu tiên/hạng ở trên: mỗi người nhận số KH CSKH-Duyên bạn cài dưới đây, lấy lần lượt từ danh sách KH nguồn CSKH-Duyên (hiện có <b>'+nCk+'</b> KH). 1 SĐT không bị chia 2 lần trong cùng 1 ngày (CSKH được chia trước POS).</div>'+
     '<label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;margin-bottom:10px"><input type="checkbox" '+(cfg.cskhEnabled?'checked':'')+' onchange="_aaSet(\'cskhEnabled\',this.checked)"> Bật chia tự động CSKH-Duyên mỗi ngày</label>'+
     '<div style="font-size:12px;color:var(--muted);margin-bottom:5px">Chia vào các thứ được tích:</div><div class="assign-sort-row">'+
@@ -465,67 +473,144 @@ function _aaCkHtml(){
 // (khoảng ngày loại hết KH, đã chia hết, thiếu người nhận, lỗi hạn mức...) admin không biết hệ thống đã chạy chưa và vì sao không chia.
 function _aaStatusHtml(cfg){
   var r = cfg.lastResult, e = cfg.lastError, rows = [];
-  if (!cfg.lastRun && !r && !e) return '<div style="font-size:12px;margin-top:10px;color:var(--muted)">Chưa có lần chạy tự động nào được ghi nhận.</div>';
+  if (!cfg.lastRun && !r && !e) return '<div class="aa-line" style="color:var(--muted)">Chưa có lần chạy tự động nào được ghi nhận.</div>';
   var by = cfg.lastBy === 'server' ? 'tự động (server)' : (cfg.lastBy ? 'trình duyệt' : '');
-  rows.push('<b>Lần chạy gần nhất:</b> ' + esc(cfg.lastRun || (r && r.date) || '—') + (by ? ' · ' + by : ''));
+  rows.push('<div class="aa-line"><b>Lần chạy gần nhất:</b> ' + esc(cfg.lastRun || (r && r.date) || '—') + (r && r.forced ? ' (chạy thử)' : '') + (by ? ' · ' + by : '') + '</div>');
   if (r) {
-    if (r.total > 0) rows.push('<span style="color:#15803d">✓ Đã chia ' + esc(String(r.total)) + ' KH cho ' + esc(String(r.people)) + ' người.</span>');
-    else rows.push('<span style="color:#b45309">Không chia được KH nào.</span>');
-    (r.warn || []).forEach(function(w){ rows.push('<span style="color:#b45309">⚠ ' + esc(String(w)) + '</span>'); });
-    if ((r.short || []).length && r.total > 0) rows.push('<span style="color:#b45309">Thiếu KH cho ' + r.short.length + ' người (không đủ KH thoả điều kiện).</span>');
+    if (r.total > 0) rows.push('<div class="aa-line aa-run-ok">✓ Đã chia ' + esc(String(r.total)) + ' KH cho ' + esc(String(r.people)) + ' người.</div>');
+    else rows.push('<div class="aa-line aa-run-warn"><b>Không chia được KH nào.</b></div>');
+    (r.warn || []).forEach(function(w){ rows.push('<div class="aa-warn">⚠ ' + esc(String(w)) + '</div>'); });
+    var sh = r.short || [];
+    if (sh.length && r.total > 0) rows.push('<div class="aa-warn">Thiếu KH cho ' + sh.length + ' người (không đủ KH thoả điều kiện): ' + sh.slice(0, 4).map(function(x){ return esc(x.name) + ' thiếu ' + x.missing; }).join(', ') + (sh.length > 4 ? ', …' : '') + '</div>');
   }
-  if (e) rows.push('<span style="color:#b91c1c">✗ Lỗi lần chạy ' + esc(String((e.at || '').slice(0, 16).replace('T', ' '))) + ': ' + esc(String(e.msg || '')) + ' — ' + (e.partial ? 'đã chia một phần, không tự chạy lại hôm nay để tránh chia trùng.' : 'chưa chia ca nào, hệ thống sẽ tự thử lại ở lần kiểm tra sau.') + '</span>');
-  return '<div style="font-size:12px;margin-top:10px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;line-height:1.6">' + rows.join('<br>') + '</div>';
+  if (e) rows.push('<div class="aa-err">✗ Lỗi lần chạy ' + esc(String((e.at || '').slice(0, 16).replace('T', ' '))) + ': ' + esc(String(e.msg || '')) + ' — ' + (e.partial ? 'đã chia một phần, không tự chạy lại hôm nay để tránh chia trùng.' : 'chưa chia ca nào, hệ thống sẽ tự thử lại ở lần kiểm tra sau.') + '</div>');
+  return rows.join('');
+}
+var _aaSec = { adv:false, ck:false, help:false };   // trạng thái thu/mở các khối ④ ⑤ và hướng dẫn (không phải cấu hình → không đánh dấu "chưa lưu")
+var _aaLastDiag = null;                                // phễu lọc của lần Xem trước / Chạy gần nhất (trong phiên)
+function _aaSecToggle(k){ _aaSec[k] = !_aaSec[k]; var b = document.getElementById('assign-body'), st = b ? b.scrollTop : 0; renderAssignAuto(); if (b) b.scrollTop = st; }
+function _aaGoSec(id){
+  if (id === 'aa-s4' && !_aaSec.adv) _aaSec.adv = true; if (id === 'aa-s5' && !_aaSec.ck) _aaSec.ck = true;
+  var b = document.getElementById('assign-body'), st = b ? b.scrollTop : 0; renderAssignAuto(); if (b) b.scrollTop = st;
+  var el = document.getElementById(id); if (el && el.scrollIntoView) el.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+// "T2–T7", "T2, T4, CN"… từ mảng thứ (0=CN)
+function _aaDaysLabel(days){
+  var ord = [1,2,3,4,5,6,0], lab = { 0:'CN', 1:'T2', 2:'T3', 3:'T4', 4:'T5', 5:'T6', 6:'T7' }, on = ord.filter(function(d){ return (days || []).indexOf(d) >= 0; });
+  if (!on.length) return 'chưa chọn ngày nào';
+  var runs = [], cur = [on[0]];
+  for (var i = 1; i < on.length; i++){ if (ord.indexOf(on[i]) === ord.indexOf(cur[cur.length - 1]) + 1) cur.push(on[i]); else { runs.push(cur); cur = [on[i]]; } }
+  runs.push(cur);
+  return runs.map(function(r){ return r.length >= 3 ? lab[r[0]] + '–' + lab[r[r.length - 1]] : r.map(function(d){ return lab[d]; }).join(', '); }).join(', ');
+}
+function _aaFmt(n){ return (Number(n) || 0).toLocaleString('vi-VN'); }
+// Phễu lọc KH: mỗi bước còn lại bao nhiêu KH; bước đầu tiên về 0 được tô đỏ; kèm gợi ý khi cấu hình ngày là thủ phạm.
+function _aaFunnelHtml(d, cfg){
+  if (!d) return '';
+  var st = [['Tổng KH', d.total], ['SĐT hợp lệ', d.validPhone]];
+  if (cfg.dateFrom || cfg.dateTo) st.push(['Trong khoảng ngày đơn', d.afterDate]);
+  if (cfg.onlyUnassigned) st.push(['Chưa chia lần nào', d.unassigned]);
+  var zeroAt = -1; st.forEach(function(x, i){ if (zeroAt < 0 && !x[1]) zeroAt = i; });
+  var h = '<div class="aa-funnel">' + st.map(function(x, i){ return '<div class="st'+(i === zeroAt ? ' zero' : '')+'"><b>'+_aaFmt(x[1])+'</b><span>'+esc(x[0])+'</span></div>'; }).join('') + '</div>';
+  var any = d.unassignedAnyDate || 0;
+  if ((cfg.dateFrom || cfg.dateTo) && any > 0 && zeroAt >= 2)
+    h += '<div class="aa-warn">💡 Nếu <b>bỏ khoảng ngày</b> (nút ✕ Bỏ) hoặc mở rộng đến hôm nay thì còn <b>'+_aaFmt(any)+'</b> KH POS/Base chưa chia lần nào'+(d.noDate ? ' (trong đó '+_aaFmt(d.noDate)+' KH không có ngày đơn nên luôn bị loại khi đặt khoảng ngày)' : '')+'.</div>';
+  return h;
+}
+function _aaAdvCustom(c){
+  var any = function(o){ return o && Object.keys(o).some(function(k){ var v = o[k]; return v && (typeof v !== 'object' || Object.keys(v).length); }); };
+  var vals = function(o){ return o && o.vals && Object.keys(o.vals).some(function(k){ return Number(o.vals[k]) > 0; }); };
+  return !!(vals(c.src) || vals(c.prio) || vals(c.hang) || any(c.teamSrc) || any(c.teamPrio) || any(c.teamHang) || any(c.memberSrc) || any(c.memberPrio) || any(c.memberHang));
+}
+// Tiêu đề khối: số thứ tự + tên + mô tả ngắn (+ nhãn bên phải); khối thu gọn được bấm để mở.
+function _aaSecHead(n, title, sub, right, key){
+  return '<div class="aa-sec-h'+(key?' click':'')+'"'+(key?' onclick="_aaSecToggle(\''+key+'\')"':'')+'><span class="n">'+n+'</span><span>'+title+'</span>'+(sub?'<span class="sub">'+sub+'</span>':'')+'<span class="sp"></span>'+(right||'')+(key?'<span style="color:var(--muted)">'+(_aaSec[key]?'▴':'▾')+'</span>':'')+'</div>';
 }
 function renderAssignAuto(){
   var body = document.getElementById('assign-body'); if (!body) return;
   var cfg = _aaCfg, rc = _aaRecipients(cfg, teams, _aaMembersOf), qmap = {};
   // Số "≈ KH/ngày" của từng người tính như thể Team đã bật → đổi % / số KH là thấy số nhảy ngay, kể cả khi Team chưa tích.
-  // (Tổng hạn mức thật ở dưới — totalQ — vẫn chỉ tính Team đã tích.)
+  // (Tổng hạn mức thật — totalQ — vẫn chỉ tính Team đã tích.)
   var cfgUi = Object.assign({}, cfg, { teams: {} });
   teams.forEach(function(t){ cfgUi.teams[t.id] = Object.assign({ mode:'count', val:0 }, cfg.teams[t.id], { on:true }); });
   _aaRecipients(cfgUi, teams, _aaMembersOf).list.forEach(function(r){ qmap[r.team + '|' + r.name] = r.quota; });
-  var totalQ = rc.list.reduce(function(s,r){ return s + r.quota; }, 0);
-  var h = '<div class="assign-section"><div class="assign-section-title">⏰ Lịch chia tự động</div>'+
-    '<label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;margin-bottom:10px"><input type="checkbox" '+(cfg.enabled?'checked':'')+' onchange="_aaSet(\'enabled\',this.checked)"> Bật chia tự động mỗi ngày <span style="font-weight:400;color:var(--muted)">(nguồn POS: DT tổng, Dữ liệu đơn, Chăm sóc)</span></label>'+
-    '<div style="font-size:12px;color:var(--muted);margin-bottom:5px">Chia vào các thứ được tích (ngày bỏ tích = không chia):</div><div class="assign-sort-row">'+
-    _AA_DOW.map(function(d){ return '<div class="assign-sort-btn '+((cfg.days||[]).indexOf(parseInt(d[0]))>=0?'active':'')+'" onclick="_aaToggleDay('+d[0]+')">'+d[1]+'</div>'; }).join('')+'</div>'+
-    '<div style="font-size:12px;margin-top:10px">Chỉ lấy KH POS/Base có <b>ngày đơn</b> từ <input type="date" value="'+esc(cfg.dateFrom||'')+'" onchange="_aaSet(\'dateFrom\',this.value)"> đến <input type="date" value="'+esc(cfg.dateTo||'')+'" onchange="_aaSet(\'dateTo\',this.value)"> '+((cfg.dateFrom||cfg.dateTo)?'<button class="btn sm" onclick="_aaSet(\'dateFrom\',\'\',false);_aaSet(\'dateTo\',\'\')">✕ Bỏ</button>':'')+'<div class="guide-text" style="font-size:11px;color:var(--muted);margin-top:3px">Ví dụ chia khách tháng 9: 01/09 → 30/09. Để trống = không giới hạn. Chỉ áp cho nguồn POS/Base (DT tổng, Dữ liệu đơn, Chăm sóc); CSKH-Duyên chia riêng ở mục ③ và không có ngày đơn.</div></div>'+
-    '<label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:10px"><input type="checkbox" '+(cfg.onlyUnassigned?'checked':'')+' onchange="_aaSet(\'onlyUnassigned\',this.checked)"> Chỉ lấy KH <b>chưa chia lần nào</b> (nên bật, nếu không ngày nào cũng có thể chia lại đúng KH cũ)</label>'+
-    '<label style="font-size:12px;display:block;margin-top:10px">Chia từ <input type="number" min="0" max="23" style="width:56px" value="'+(cfg.runHour==null?7:cfg.runHour)+'" onchange="_aaSet(\'runHour\',this.value)"> giờ sáng (giờ VN) — trước giờ này không chia</label>'+
-    _aaStatusHtml(cfg)+'<div style="font-size:11px;color:var(--hint);margin-top:8px">Chạy tự động bằng <b>trigger trên Google Apps Script</b> (không cần mở CRM): admin cài 1 lần — mở Apps Script Editor, chọn hàm <b>caiTriggerChiaTuDong</b>, bấm Run. Chưa cài trigger thì hệ thống chỉ chia khi có admin mở CRM vào ngày đó. Sau khi sửa ở đây nhớ bấm <b>💾 Lưu cấu hình</b> (server dùng bản đã lưu).</div></div>';
+  var totalQ = rc.list.reduce(function(s, r){ return s + r.quota; }, 0);
+  var teamsOn = teams.filter(function(t){ return cfg.teams[t.id] && cfg.teams[t.id].on; }).length;
+  var ckCfg = { teams: cfg.cskhTeams || {}, dailyTotal: cfg.cskhTotal || 0, memberMode: cfg.cskhMemberMode || {}, members: cfg.cskhMembers || {} };
+  var ckQ = _aaRecipients(ckCfg, teams, _aaMembersOf).list.reduce(function(s, r){ return s + r.quota; }, 0);
+  var hasDate = !!(cfg.dateFrom || cfg.dateTo), anyPct = teams.some(function(t){ var c = cfg.teams[t.id]; return c && c.mode === 'pct'; });
+  var h = '';
 
-  h += '<div class="assign-section"><div class="assign-section-title">① Chia cho các Team <span style="font-weight:400;font-size:12px;color:var(--muted)">— nguồn POS</span></div>'+
-    '<label style="font-size:12px">Tổng KH/ngày (dùng cho Team chia theo %): <input type="number" min="0" style="width:90px" value="'+(cfg.dailyTotal||'')+'" placeholder="0" onchange="_aaSet(\'dailyTotal\',this.value)"></label>';
+  // ── ĐẦU TRANG: tóm tắt + lần chạy gần nhất (+ kết quả Xem trước / Chạy ngay hiện NGAY dưới đây) ──
+  h += '<div class="aa-sum"><div class="aa-card"><div class="aa-card-t">Tóm tắt cấu hình '+
+    '<span class="aa-badge '+(cfg.enabled?'on':'off')+'">'+(cfg.enabled?'● ĐANG BẬT':'○ ĐANG TẮT')+'</span>'+
+    (_aaDirty?'<span class="aa-badge dirty" title="Bấm 💾 Lưu cấu hình ở cuối cửa sổ — server chỉ dùng bản đã lưu">● Chưa lưu</span>':'<span class="aa-badge saved">✓ Đã lưu</span>')+'</div>'+
+    '<div class="aa-line">⏰ Chia mỗi ngày <b>'+esc(_aaDaysLabel(cfg.days))+'</b>, từ <b>'+(cfg.runHour == null ? 7 : cfg.runHour)+'h</b> sáng (giờ VN)</div>'+
+    '<div class="aa-line">👥 Khách POS/Base: '+(hasDate ? 'ngày đơn <b>'+esc(cfg.dateFrom ? cfg.dateFrom.split('-').reverse().join('/') : '…')+' → '+esc(cfg.dateTo ? cfg.dateTo.split('-').reverse().join('/') : 'nay')+'</b>' : '<b>không giới hạn ngày</b>')+' · '+(cfg.onlyUnassigned ? 'chỉ KH <b>chưa chia lần nào</b>' : '<b>có thể chia lại KH cũ</b>')+'</div>'+
+    '<div class="aa-line">🎯 Người nhận: <b>'+rc.list.length+' người</b> / '+teamsOn+' team · hạn mức <b>'+_aaFmt(totalQ)+' KH/ngày</b>'+(cfg.cskhEnabled ? ' · CSKH-Duyên: <b>'+_aaFmt(ckQ)+' KH/ngày</b>' : '')+'</div>'+
+    '<div class="aa-actions"><button class="btn sm" onclick="_aaShowPreview()">👁 Xem trước kết quả</button></div></div>'+
+    '<div class="aa-card"><div class="aa-card-t">Kết quả lần chạy gần nhất</div>'+_aaStatusHtml(cfg)+'</div></div>';
+  h += '<div id="aa-preview"></div>';
+
+  // ── THANH BƯỚC ──
+  h += '<div class="aa-nav">'+[['aa-s1','1','Lịch chạy'],['aa-s2','2','Lọc khách'],['aa-s3','3','Chia cho ai'],['aa-s4','4','Tỷ lệ nâng cao'],['aa-s5','5','CSKH-Duyên']].map(function(x){ return '<button type="button" onclick="_aaGoSec(\''+x[0]+'\')"><span class="n">'+x[1]+'</span>'+x[2]+'</button>'; }).join('')+'</div>';
+
+  // ── ① LỊCH CHẠY ──
+  h += '<div class="aa-sec" id="aa-s1">'+_aaSecHead('1','Lịch chạy','Khi nào hệ thống tự chia')+'<div class="aa-sec-b">'+
+    '<label class="aa-sw"><input type="checkbox" '+(cfg.enabled?'checked':'')+' onchange="_aaSet(\'enabled\',this.checked)"> Bật chia tự động mỗi ngày <span class="sub" style="font-weight:400;color:var(--muted);font-size:12px">(nguồn POS: DT tổng, Dữ liệu đơn, Chăm sóc)</span></label>'+
+    '<div class="aa-hint" style="margin-top:10px">Chia vào các thứ được tích (ngày bỏ tích = không chia):</div><div class="assign-sort-row">'+
+    _AA_DOW.map(function(d){ return '<div class="assign-sort-btn '+((cfg.days||[]).indexOf(parseInt(d[0]))>=0?'active':'')+'" onclick="_aaToggleDay('+d[0]+')">'+d[1]+'</div>'; }).join('')+'</div>'+
+    '<div class="aa-row"><label>Chia từ <input type="number" min="0" max="23" style="width:56px" value="'+(cfg.runHour==null?7:cfg.runHour)+'" onchange="_aaSet(\'runHour\',this.value)"> giờ sáng (giờ VN) — trước giờ này không chia</label></div>'+
+    '</div></div>';
+
+  // ── ② LỌC KHÁCH ──
+  var funnel = _aaFunnelHtml(_aaLastDiag || (cfg.lastResult && cfg.lastResult.diag), cfg);
+  h += '<div class="aa-sec" id="aa-s2">'+_aaSecHead('2','Lọc khách','Ai được đưa vào danh sách chia (nguồn POS/Base)')+'<div class="aa-sec-b">'+
+    '<div class="aa-row">Chỉ lấy KH có <b>ngày đơn</b> từ <input type="date" value="'+esc(cfg.dateFrom||'')+'" onchange="_aaSet(\'dateFrom\',this.value)"> đến <input type="date" value="'+esc(cfg.dateTo||'')+'" onchange="_aaSet(\'dateTo\',this.value)"> '+(hasDate?'<button class="btn sm" onclick="_aaSet(\'dateFrom\',\'\',false);_aaSet(\'dateTo\',\'\')">✕ Bỏ giới hạn</button>':'')+'</div>'+
+    '<div class="aa-hint">Để trống = không giới hạn ngày. Ví dụ chia khách tháng 9: 01/09 → 30/09. KH không có ngày đơn sẽ bị loại khi đã đặt khoảng ngày. CSKH-Duyên chia riêng ở khối ⑤, không dùng ngày đơn.</div>'+
+    '<label class="aa-row" style="cursor:pointer"><input type="checkbox" '+(cfg.onlyUnassigned?'checked':'')+' onchange="_aaSet(\'onlyUnassigned\',this.checked)"> Chỉ lấy KH <b>chưa chia lần nào</b> <span class="aa-hint" style="margin:0">(nên bật, nếu không ngày nào cũng có thể chia lại đúng KH cũ)</span></label>'+
+    (funnel ? '<div class="aa-hint" style="margin-top:12px"><b>Còn lại bao nhiêu KH sau mỗi bước lọc</b> (theo lần Xem trước / chạy gần nhất):</div>'+funnel : '<div class="aa-hint" style="margin-top:12px">💡 Bấm <b>👁 Xem trước kết quả</b> ở đầu trang để thấy còn bao nhiêu KH sau mỗi bước lọc.</div>')+
+    '</div></div>';
+
+  // ── ③ CHIA CHO AI ──
+  h += '<div class="aa-sec" id="aa-s3">'+_aaSecHead('3','Chia cho ai','Tích Team nhận data và đặt số KH mỗi ngày')+'<div class="aa-sec-b">';
   if (!teams.length) h += '<div style="color:var(--muted);padding:14px;text-align:center">Chưa có Team — tạo ở tab <b>Quản lý Team</b> trước.</div>';
   else {
     var pctSum = 0;
     teams.forEach(function(t){ var c = cfg.teams[t.id]; if (c && c.on && c.mode === 'pct') pctSum += Number(c.val) || 0; });
-    h += '<table class="dash-table" style="margin-top:8px"><thead><tr><th style="width:36px"></th><th>Team</th><th style="width:150px">Cách chia</th><th style="width:100px">Giá trị</th><th style="width:100px;text-align:right">≈ KH/ngày</th><th style="width:90px"></th></tr></thead><tbody>';
+    if (anyPct) h += '<div class="aa-row"><label>Tổng KH/ngày để chia theo %: <input type="number" min="0" style="width:90px" value="'+(cfg.dailyTotal||'')+'" placeholder="0" onchange="_aaSet(\'dailyTotal\',this.value)"></label><span class="aa-hint" style="margin:0">(chỉ cần khi có Team chia theo %)</span></div>';
+    h += '<table class="aa-table"><thead><tr><th style="width:34px"></th><th>Team</th><th>Cách chia</th><th class="r" style="width:96px">≈ KH/ngày</th><th style="width:92px"></th></tr></thead><tbody>';
     teams.forEach(function(t){
-      var c = cfg.teams[t.id] || { on:false, mode:'count', val:0 }, members = _aaMembersOf(t);
-      var tq = rc.list.filter(function(r){ return r.team === t.id; }).reduce(function(s,r){ return s + r.quota; }, 0);
-      h += '<tr><td><input type="checkbox" '+(c.on?'checked':'')+' onchange="_aaTeamField(\''+esc(t.id)+'\',\'on\',this.checked)"></td>'+
+      var c = cfg.teams[t.id] || { on:false, mode:'count', val:0 }, members = _aaMembersOf(t), tid = esc(t.id);
+      var tq = rc.list.filter(function(r){ return r.team === t.id; }).reduce(function(s, r){ return s + r.quota; }, 0);
+      h += '<tr class="'+(c.on?'':'off')+'"><td><input type="checkbox" '+(c.on?'checked':'')+' onchange="_aaTeamField(\''+tid+'\',\'on\',this.checked)"></td>'+
         '<td><b>'+esc(t.name)+'</b> <span style="color:var(--muted);font-size:11px">('+members.length+' người)</span></td>'+
-        '<td><select onchange="_aaTeamField(\''+esc(t.id)+'\',\'mode\',this.value)"><option value="count" '+(c.mode!=='pct'?'selected':'')+'>Số KH / ngày</option><option value="pct" '+(c.mode==='pct'?'selected':'')+'>% tổng / ngày</option></select></td>'+
-        '<td><input type="number" min="0" style="width:70px" value="'+(c.val||'')+'" placeholder="0" onchange="_aaTeamField(\''+esc(t.id)+'\',\'val\',this.value)"> '+(c.mode==='pct'?'%':'KH')+'</td>'+
-        '<td style="text-align:right;font-weight:700">'+(c.on?tq:'—')+'</td>'+
-        '<td><button class="btn sm" onclick="_aaOpenToggle(\''+esc(t.id)+'\')">'+(_aaOpen[t.id]?'▴ Thu':'▾ Chi tiết')+'</button></td></tr>';
-      if (_aaOpen[t.id]) h += '<tr><td></td><td colspan="5">'+_aaTeamDetailHtml(t, members, qmap)+'</td></tr>';
+        '<td><span class="aa-qty"><input type="number" min="0" style="width:70px" value="'+(c.val||'')+'" placeholder="0" onchange="_aaTeamField(\''+tid+'\',\'val\',this.value)">'+
+        '<select onchange="_aaTeamField(\''+tid+'\',\'mode\',this.value)"><option value="count" '+(c.mode!=='pct'?'selected':'')+'>KH / ngày</option><option value="pct" '+(c.mode==='pct'?'selected':'')+'>% tổng / ngày</option></select></span></td>'+
+        '<td class="r"><b>'+(c.on?_aaFmt(tq):'—')+'</b></td>'+
+        '<td><button class="btn sm" onclick="_aaOpenToggle(\''+tid+'\')">'+(_aaOpen[t.id]?'▴ Thu':'▾ Chi tiết')+'</button></td></tr>';
+      if (_aaOpen[t.id]) h += '<tr><td></td><td colspan="4">'+_aaTeamDetailHtml(t, members, qmap)+'</td></tr>';
     });
-    h += '</tbody></table>';
-    h += '<div style="font-size:12px;margin-top:6px;color:var(--muted)">Tổng hạn mức mỗi ngày: <b style="color:var(--green)">'+totalQ+' KH</b>'+
-      (pctSum ? ' · Tổng % Team: <b style="color:'+(pctSum>100?'var(--red)':'var(--green)')+'">'+pctSum+'%</b>'+(pctSum>100?' — vượt 100%!':'') : '')+'</div>';
+    h += '<tr class="tot"><td></td><td>Tổng</td><td>'+teamsOn+' team · '+rc.list.length+' người nhận</td><td class="r">'+_aaFmt(totalQ)+'</td><td></td></tr></tbody></table>';
+    if (pctSum) h += '<div class="aa-total">Tổng % các Team: <b style="color:'+(pctSum>100?'var(--red)':'var(--green)')+'">'+pctSum+'%</b>'+(pctSum>100?' <span style="color:var(--red)">— vượt 100%!</span>':'')+'</div>';
   }
-  h += '</div>';
-  h += '<div class="assign-section"><div class="assign-section-title">② Tỷ lệ chung theo nguồn &amp; ưu tiên <span style="font-weight:400;font-size:12px;color:var(--muted)">— chỉ áp dụng nguồn POS</span></div>'+
-    '<div class="guide-text" style="font-size:11px;color:var(--muted)">Áp dụng cho mọi người, trừ chỗ bạn cài riêng theo Team / từng người (bấm “Chi tiết” ở Team). Mỗi người: hạn mức → chia theo nguồn → mỗi nguồn chia tiếp theo ưu tiên.</div>'+
-    _aaRatioHtml('src') + _aaRatioHtml('prio') + _aaRatioHtml('hang') + _aaRatioTeamsHtml() + '</div>';
-  h += _aaCkHtml();
-  var lr = cfg.lastResult;
-  if (lr) h += '<div class="assign-section"><div class="assign-section-title">Lần chạy gần nhất</div><div style="font-size:12px">'+esc(lr.date)+(lr.forced?' (chạy thử)':'')+(lr.by?' · bởi '+(lr.by==='server'?'server (trigger)':'trình duyệt'):'')+': đã chia <b>'+lr.total+' KH</b> cho '+(lr.people||0)+' CS'+
-    ((lr.short||[]).length ? '<div style="color:var(--red);margin-top:4px">Thiếu data: '+lr.short.map(function(s){ return esc(s.name)+' thiếu '+s.missing; }).join(', ')+'</div>' : '')+'</div></div>';
-  h += '<div id="aa-preview"></div>';
+  h += '</div></div>';
+
+  // ── ④ TỶ LỆ NÂNG CAO (thu gọn) ──
+  var custom = _aaAdvCustom(cfg);
+  h += '<div class="aa-sec'+(_aaSec.adv?'':' collapsed')+'" id="aa-s4">'+_aaSecHead('4','Tỷ lệ nâng cao','Chia theo nguồn / ưu tiên / hạng — chỉ nguồn POS', '<span class="aa-badge '+(custom?'warn':'off')+'">'+(custom?'đã tuỳ chỉnh':'mặc định')+'</span>', 'adv')+'<div class="aa-sec-b">'+
+    '<div class="aa-hint">Không cần đụng nếu chưa muốn. Áp dụng cho mọi người, trừ chỗ bạn cài riêng theo Team / từng người (bấm “Chi tiết” ở khối ③). Mỗi người: hạn mức → chia theo nguồn → mỗi nguồn chia tiếp theo ưu tiên.</div>'+
+    (_aaSec.adv ? _aaRatioHtml('src') + _aaRatioHtml('prio') + _aaRatioHtml('hang') + _aaRatioTeamsHtml() : '')+'</div></div>';
+
+  // ── ⑤ CSKH-DUYÊN (thu gọn) ──
+  h += '<div class="aa-sec'+(_aaSec.ck?'':' collapsed')+'" id="aa-s5">'+_aaSecHead('5','CSKH-Duyên','Chia RIÊNG, không dính tỷ lệ ở khối ④', '<span class="aa-badge '+(cfg.cskhEnabled?'on':'off')+'">'+(cfg.cskhEnabled?'đang bật · '+_aaFmt(ckQ)+' KH/ngày':'đang tắt')+'</span>', 'ck')+'<div class="aa-sec-b">'+(_aaSec.ck ? _aaCkHtml(true) : '')+'</div></div>';
+
+  // ── HƯỚNG DẪN (thu gọn) ──
+  h += '<div class="aa-sec'+(_aaSec.help?'':' collapsed')+'" id="aa-s6">'+_aaSecHead('i','Cách hoạt động &amp; cài chạy tự động','', '', 'help')+'<div class="aa-sec-b"><div class="aa-help">'+
+    'Chạy tự động bằng <b>trigger trên Google Apps Script</b> (không cần mở CRM): admin cài 1 lần — mở Apps Script Editor, chọn hàm <b>caiTriggerChiaTuDong</b>, bấm Run. Chưa cài trigger thì hệ thống chỉ chia khi có admin mở CRM vào ngày đó.<br>'+
+    'Sau khi sửa ở đây nhớ bấm <b>💾 Lưu cấu hình</b> — server chỉ dùng bản đã lưu. Muốn kiểm tra không ghi gì: chạy hàm <b>kiemTraChiaTuDong</b> trong Apps Script (cho biết trigger đã cài chưa và hôm nay còn bao nhiêu KH sau mỗi bước lọc).<br>'+
+    'Thứ tự ưu tiên khi chia: CSKH-Duyên chia trước POS; 1 SĐT không bị chia 2 lần trong cùng 1 ngày.</div></div></div>';
+
   body.innerHTML = h;
 }
 function _aaTeamDetailHtml(t, members, qmap){
@@ -565,14 +650,14 @@ function _aaTeamDetailHtml(t, members, qmap){
 // Xem trước (không ghi gì) — tính trên toàn bộ KH nên bấm mới chạy
 function _aaShowPreview(){
   var el = document.getElementById('aa-preview'); if (!el) return;
-  var p = _aaPreview(), total = p.entries.reduce(function(s,e){ return s + e.phones.length; }, 0);
-  var h = '<div class="assign-section"><div class="assign-section-title">👁 Xem trước (chưa chia thật)</div><div style="font-size:13px;margin-bottom:6px">Nếu chạy bây giờ: <b>'+total+' KH</b> → '+p.entries.length+' CS</div>';
-  if (p.warn.length) h += '<div style="color:var(--red);font-size:12px">'+p.warn.map(esc).join('<br>')+'</div>';
+  var p = _aaPreview(), total = p.entries.reduce(function(s, e){ return s + e.phones.length; }, 0); _aaLastDiag = p.diag || _aaLastDiag;
+  var h = '<div class="aa-card" style="margin-bottom:12px"><div class="aa-card-t">👁 Xem trước (chưa chia thật)</div><div class="aa-line">Nếu chạy bây giờ: <b>'+total+' KH</b> → '+p.entries.length+' CS</div>';
+  if (p.warn.length) h += '<div class="aa-warn">'+p.warn.map(esc).join('<br>')+'</div>';
+  h += _aaFunnelHtml(p.diag, _aaCfg);
   if (p.entries.length){
     var sh = {}; p.short.forEach(function(s){ sh[s.name + '|' + (s.src || 'pos')] = s.missing; });
-    h += '<table class="dash-table"><thead><tr><th>Team</th><th>CS</th><th style="text-align:right">Hạn mức</th><th style="text-align:right">Có data</th><th>Ghi chú</th></tr></thead><tbody>'+
-      p.entries.map(function(e){ return '<tr><td>'+esc(e.team)+(e.src==='cskh'?' <b style="color:#b45309">· CSKH</b>':'')+'</td><td>'+esc(e.name)+'</td><td style="text-align:right">'+e.quota+'</td><td style="text-align:right;font-weight:700">'+e.phones.length+'</td><td style="color:var(--red)">'+(sh[e.name+'|'+(e.src||'pos')]?'thiếu '+sh[e.name+'|'+(e.src||'pos')]:'')+'</td></tr>'; }).join('')+'</tbody></table>';
-  } else h += '<div style="color:var(--muted);font-size:12px">Chưa có ai có hạn mức &gt; 0 hoặc không có KH phù hợp — kiểm tra lại Team đã tích, giá trị, nguồn.</div>';
+    h += _aaResultTable(p, sh, 'Có data', '');
+  } else h += '<div class="aa-hint">Chưa có ai có hạn mức &gt; 0 hoặc không có KH phù hợp — kiểm tra lại Team đã tích, giá trị, nguồn.</div>';
   el.innerHTML = h + '</div>';
   el.scrollIntoView({ behavior:'smooth', block:'nearest' });
 }
@@ -582,24 +667,29 @@ function _aaShowRunResult(r){
   var el = document.getElementById('aa-preview'); if (!el) return;
   var hhmm = new Date().toTimeString().slice(0,5), h;
   if (r.error){
-    h = '<div class="assign-section" style="border:1px solid #fecaca;background:#fef2f2"><div class="assign-section-title">❌ Chưa chia được ('+hhmm+')</div><div style="font-size:13px">'+esc(r.error)+'</div></div>';
+    h = '<div class="aa-card" style="margin-bottom:12px;border-color:var(--red-b);background:var(--red-bg)"><div class="aa-card-t" style="color:var(--red)">❌ Chưa chia được ('+hhmm+')</div><div class="aa-line">'+esc(r.error)+'</div></div>';
   } else {
     var p = r.plan, sh = {}; p.short.forEach(function(x){ sh[x.name+'|'+(x.src||'pos')] = x.missing; });
-    var ok = r.total > 0;
-    h = '<div class="assign-section" style="border:1px solid '+(ok?'#bbf7d0':'#fed7aa')+';background:'+(ok?'#f0fdf4':'#fff7ed')+'">'+
-      '<div class="assign-section-title">'+(ok ? '✅ Đã chia xong lúc '+hhmm : '⚠ Không chia được KH nào ('+hhmm+')')+'</div>'+
-      '<div style="font-size:14px;margin-bottom:6px"><b>'+r.total+' KH</b> → '+r.entries.length+' CS'+(ok ? ' · đã ghi vào tab <b>Lịch sử chia</b> và đang đồng bộ lên server.' : '')+'</div>';
-    if (p.warn.length) h += '<div style="color:var(--red);font-size:12px;margin-bottom:4px">'+p.warn.map(esc).join('<br>')+'</div>';
+    var ok = r.total > 0; _aaLastDiag = p.diag || _aaLastDiag;
+    h = '<div class="aa-card" style="margin-bottom:12px;border-color:'+(ok?'var(--green-mid)':'var(--tn-b)')+';background:'+(ok?'var(--green-bg)':'var(--tn-bg)')+'">'+
+      '<div class="aa-card-t">'+(ok ? '✅ Đã chia xong lúc '+hhmm : '⚠ Không chia được KH nào ('+hhmm+')')+'</div>'+
+      '<div class="aa-line"><b>'+r.total+' KH</b> → '+r.entries.length+' CS'+(ok ? ' · đã ghi vào tab <b>Lịch sử chia</b> và đang đồng bộ lên server.' : '')+'</div>';
+    if (p.warn.length) h += '<div class="aa-warn">'+p.warn.map(esc).join('<br>')+'</div>';
+    h += _aaFunnelHtml(p.diag, _aaCfg);
     if (ok){
-      h += '<table class="dash-table"><thead><tr><th>Team</th><th>CS</th><th style="text-align:right">Hạn mức</th><th style="text-align:right">Đã chia</th><th>Ghi chú</th></tr></thead><tbody>'+
-        p.entries.map(function(e){ return '<tr><td>'+esc(e.team)+(e.src==='cskh'?' <b style="color:#b45309">· CSKH</b>':'')+'</td><td>'+esc(e.name)+'</td><td style="text-align:right">'+e.quota+'</td><td style="text-align:right;font-weight:700">'+e.phones.length+'</td><td style="color:var(--red)">'+(sh[e.name+'|'+(e.src||'pos')]?'thiếu '+sh[e.name+'|'+(e.src||'pos')]+' KH (hết data phù hợp)':'')+'</td></tr>'; }).join('')+'</tbody></table>';
+      h += _aaResultTable(p, sh, 'Đã chia', ' KH (hết data phù hợp)');
     } else {
-      h += '<div class="guide-text" style="font-size:12px;color:var(--muted)">Kiểm tra: Team đã tích chưa · hạn mức &gt; 0 chưa · nguồn/ưu tiên có KH phù hợp không · bật "Chỉ lấy KH chưa chia lần nào" thì có thể đã chia hết KH chưa từng chia.'+(p.short.length ? '<br>Thiếu data: '+p.short.map(function(x){ return esc(x.name)+' thiếu '+x.missing; }).join(', ') : '')+'</div>';
+      h += '<div class="aa-hint">Kiểm tra: Team đã tích chưa · hạn mức &gt; 0 chưa · nguồn/ưu tiên có KH phù hợp không · bật "Chỉ lấy KH chưa chia lần nào" thì có thể đã chia hết KH chưa từng chia.'+(p.short.length ? '<br>Thiếu data: '+p.short.map(function(x){ return esc(x.name)+' thiếu '+x.missing; }).join(', ') : '')+'</div>';
     }
     h += '</div>';
   }
   el.innerHTML = h;
   el.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+// Bảng kết quả dùng chung cho Xem trước / Chạy ngay
+function _aaResultTable(p, sh, haveLabel, missSuffix){
+  return '<table class="aa-table"><thead><tr><th>Team</th><th>CS</th><th class="r">Hạn mức</th><th class="r">'+haveLabel+'</th><th>Ghi chú</th></tr></thead><tbody>'+
+    p.entries.map(function(e){ var m = sh[e.name+'|'+(e.src||'pos')]; return '<tr><td>'+esc(e.team)+(e.src==='cskh'?' <b style="color:var(--tn)">· CSKH</b>':'')+'</td><td>'+esc(e.name)+'</td><td class="r">'+e.quota+'</td><td class="r"><b>'+e.phones.length+'</b></td><td style="color:var(--red)">'+(m?'thiếu '+m+missSuffix:'')+'</td></tr>'; }).join('')+'</tbody></table>';
 }
 async function _aaRunNow(){
   if (!confirm('Chia NGAY theo cấu hình hiện tại?\nViệc này chia thật (ghi lịch sử + đổi CS chăm sóc) và không ảnh hưởng lịch tự động ngày mai.')) return;
