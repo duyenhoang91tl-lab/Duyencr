@@ -283,14 +283,14 @@ function _cvStaffUsers_(users, staff) {
 //  "Khach X dang mua lai don doanh thu Y tai kenh Z, Sale W ban"; bam vao thong bao -> hien thong tin don/khach do (client js/39 _ntOpenResale_).
 //  Nguon: sheet "dữ liệu đơn" (Pos). Sale cua don = _donSaleNamesFromThe_(cot The). Kenh = cot Nguon don. Doanh thu = giaTriSauGiam.
 //  Quy uoc: (1) chi tinh don hop le (khong bi loai _donHasExcludedStatus_); (2) don "moi" = don trong RB_NEW_DAYS ngay gan day (mac dinh 2),
-//  "truoc do" = don CUA CUNG SDT, NGAY TRUOC ngay don moi (cung ngay khong tinh — giong _posIsResale_), trong RB_LOOKBACK ngay (mac dinh 365);
+//  "truoc do" = don CUA CUNG SDT, NGAY TRUOC ngay don moi (cung ngay khong tinh — giong _posIsResale_), trong RB_LOOKBACK ngay (mac dinh 60 = 2 thang, admin chinh duoc);
 //  (3) gom theo (SDT, ngay) de don TACH (/1, /2) hay nhieu dong cung ngay chi ra 1 thong bao; (4) bao cho moi Sale co don truoc do ma
 //  KHONG nam trong sale cua don moi, chi cho tai khoan CRM con hoat dong KHONG phai admin (admin da thay het); (5) khong bao lai:
 //  khoa (nguoi nhan | SDT | ngay) da co thong bao 'resale' thi bo qua.
-//  Cai dat (Settings, tuy chon): resaleNotify=0 de TAT; resaleNotifyDays (1-14, mac dinh 2); resaleNotifyLookback (30-1500, mac dinh 365).
+//  Cai dat (Settings, tuy chon): resaleNotify=0 de TAT; resaleNotifyDays (1-14, mac dinh 2); resaleNotifyLookback (7-1500 ngay, mac dinh 60 = 2 thang; Duyen chot 2026-10-29, admin chinh o ⚙ Cau hinh > Thong bao khach mua lai — js/37).
 //  Quet: tu dong khi co nguoi mo CRM (action notifications, toi da 10 phut/lan — _rbScanMaybe_) + co the cai trigger 10 phut: chay caiTriggerMuaLai trong Editor.
 // ═══════════════════════════════════════════════════════════════
-var RB_NEW_DAYS_DEF_ = 2, RB_LOOKBACK_DEF_ = 365, RB_SCAN_EVERY_SEC_ = 600;
+var RB_NEW_DAYS_DEF_ = 2, RB_LOOKBACK_DEF_ = 60, RB_LOOKBACK_MIN_ = 7, RB_LOOKBACK_MAX_ = 1500, RB_SCAN_EVERY_SEC_ = 600;
 function _rbSettingNum_(key, def, min, max) {
   var raw = ''; try { raw = String(getSetting_(key) || '').trim(); } catch (e) {}
   var v = raw === '' ? NaN : Number(raw);
@@ -368,7 +368,7 @@ function rbScan_() {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(3000)) return { ok: true, skipped: 'busy' };   // 2 luot quet cung luc se ghi trung thong bao
   try {
-    var events = _rbFindEvents_(readDonChiTiet_(), _vnYmd_(new Date()), _rbSettingNum_('resaleNotifyDays', RB_NEW_DAYS_DEF_, 1, 14), _rbSettingNum_('resaleNotifyLookback', RB_LOOKBACK_DEF_, 30, 1500));
+    var events = _rbFindEvents_(readDonChiTiet_(), _vnYmd_(new Date()), _rbSettingNum_('resaleNotifyDays', RB_NEW_DAYS_DEF_, 1, 14), _rbSettingNum_('resaleNotifyLookback', RB_LOOKBACK_DEF_, RB_LOOKBACK_MIN_, RB_LOOKBACK_MAX_));
     var users = readUsers_(getCrmSS_().getSheetByName(SH_USER)) || [];
     return { ok: true, events: events.length, notified: _rbNotify_(events, users) };
   } finally { try { lock.releaseLock(); } catch (e) {} }
