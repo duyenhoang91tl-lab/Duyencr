@@ -1128,3 +1128,8 @@ body:not(.show-guides) .pro-ai-hint{display:none !important;}
 .aa-total{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;font-size:13px;color:var(--muted)}
 .aa-total b{color:var(--green)}
 .aa-help{margin-top:10px;font-size:12px;line-height:1.6;color:var(--muted);background:var(--surface2);border-radius:var(--rsm);padding:9px 12px}
+
+/* ── Chia data > Chia data mới: nhãn con đồng nhất + thanh bước (dùng chung .aa-nav / .aa-badge ở trên) ── */
+.as-lbl{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.03em;text-transform:uppercase;margin:14px 0 6px}
+.as-lbl .as-sub{font-weight:400;text-transform:none;letter-spacing:0}
+.assign-preview + .as-lbl{margin-top:4px}
