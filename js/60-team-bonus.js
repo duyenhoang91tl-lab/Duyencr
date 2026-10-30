@@ -155,3 +155,29 @@ async function _tbDeletePenalty(id){
   try { await _tbPost_({ action: 'teamPenaltyDelete', id: id }); await _tbLoad(true); }
   catch (e) { _tbState.err = 'Không xoá được: ' + e.message; _tbRepaint_(); }
 }
+
+// ── Xuất Excel (dữ liệu tháng đang xem) — 5 sheet: Tổng hợp, Thưởng ngày, Tuần-tháng, Nhật ký phạt, Quy định. Dùng XLSX (SheetJS) như các báo cáo khác. ──
+function _tbExportRows_(d){
+  var cfg = d.cfg || {}, sum = [['Sale', 'Thưởng ngày (đ)', 'Số ngày thắng', 'Thưởng tuần (đ)', 'Số tuần thắng', 'Thưởng tháng (đ)', 'Tổng thưởng (đ)', 'Phạt (đ)', 'Số lần phạt', 'Thực nhận (đ)']];
+  var byName = {}; (d.rewards || []).forEach(function(r){ var o = byName[r.name] || (byName[r.name] = { day: 0, week: 0, month: 0 }); o[r.kind] += r.amount; });
+  (d.totals || []).forEach(function(t){ var o = byName[t.name] || { day: 0, week: 0, month: 0 }; sum.push([t.name, o.day, t.dayWins, o.week, t.weekWins, o.month, t.reward, t.penalty, t.penaltyCount, t.net]); });
+  var day = [['Ngày', 'Trạng thái', 'Sale đạt thưởng', 'Số đơn cao nhất', 'Top trong ngày', 'Đơn bị loại (đổi trả/BH/huỷ…)', 'Thưởng (đ)']];
+  (d.daily || []).forEach(function(r){ day.push([r.date, r.partial ? 'Tạm tính' : (r.qualified ? 'Đạt' : 'Chưa đủ ' + (cfg.dailyMinOrders || 6) + ' đơn'), r.qualified ? r.winners.map(function(w){ return w.name; }).join(', ') : '', r.top || 0, (r.list || []).slice(0, 5).map(function(x){ return x.name + ' ' + x.orders; }).join(' · '), r.excluded || 0, (r.qualified && !r.partial) ? r.winners.length * (cfg.dailyReward || 0) : 0]); });
+  var per = [['Loại kỳ', 'Kỳ', 'Trạng thái', 'Sale', 'Tương tác', 'Đơn Base', 'Tỷ lệ chốt (%)', 'TB tương tác đội', 'Đủ điều kiện', 'Top (x)', 'Thưởng (đ)']];
+  function addP(kind, label, p, amt){ var win = {}; (p.winners || []).forEach(function(w){ win[w.name] = 1; }); (p.rows || []).forEach(function(r){ per.push([kind, label, p.partial ? 'Tạm tính' : 'Đã kết thúc', r.name, r.held, r.closed, r.closeRate, p.avgHeld, r.eligible ? 'Đủ' : 'Không đủ', win[r.name] ? 'x' : '', (win[r.name] && !p.partial) ? amt : 0]); }); }
+  (d.weekly || []).forEach(function(w){ addP('Tuần', w.label, w, cfg.weeklyReward || 0); });
+  if (d.monthly) addP('Tháng', d.month, d.monthly, cfg.monthlyReward || 0);
+  var pen = [['Ngày', 'Sale', 'Mã lỗi', 'Nội dung', 'Số tiền (đ)', 'Ghi chú', 'Người ghi']];
+  (d.penalties || []).forEach(function(e){ pen.push([e.date, e.sale, e.type, _tbPenLabel_(cfg, e.type), e.amount, e.note, e.by]); });
+  var rule = [['Mục', 'Nội dung', 'Số tiền (đ)'], ['Thưởng ngày', 'Nhiều đơn Base nhất trong ngày, tối thiểu ' + (cfg.dailyMinOrders || 6) + ' đơn (không tính đổi trả/bảo hành/thay dây)', cfg.dailyReward], ['Thưởng tuần', 'Tỷ lệ chốt cao nhất tuần (tương tác ≥ TB đội)', cfg.weeklyReward], ['Thưởng tháng', 'Tỷ lệ chốt cao nhất tháng (tương tác ≥ TB đội)', cfg.monthlyReward]];
+  (cfg.penalties || []).forEach(function(p){ rule.push(['Phạt ' + p.type, p.label, p.amount]); });
+  return { sum: sum, day: day, per: per, pen: pen, rule: rule };
+}
+function _tbExportXlsx(){
+  var d = _tbState.data;
+  if (!d) { alert('Chưa có dữ liệu — đợi tải xong rồi bấm lại.'); return; }
+  if (typeof XLSX === 'undefined') { alert('Thư viện xuất Excel chưa tải xong — thử lại sau vài giây.'); return; }
+  var x = _tbExportRows_(d), wb = XLSX.utils.book_new();
+  [['Tong hop', x.sum], ['Thuong ngay', x.day], ['Thuong tuan-thang', x.per], ['Nhat ky phat', x.pen], ['Quy dinh', x.rule]].forEach(function(s){ XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s[1]), s[0]); });
+  XLSX.writeFile(wb, 'ThuongPhat_DoiSale_' + d.month + '.xlsx');
+}
