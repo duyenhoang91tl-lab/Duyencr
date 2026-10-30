@@ -138,3 +138,7 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hàm: `_coachNorm_`, `_coachRe_`, `_coachAttOk_`, `_coachSpecOk_`, `_coachAge_`, `coachRules_`, `coachCtkm_`, `coachEval_`, `coachBuildResult_`, `chatCoach_`, `splitOrderExportSheet_`, `splitDoPost_`
 - Hằng/biến: `CHAT_COACH_SECTION_`, `COACH_STEPS_`, `COACH_RE_PRICE_`, `COACH_RE_PROMO_`, `COACH_RE_BIRTH_`, `COACH_RE_ORDER_`, `COACH_RE_SIZE_ASK_`, `COACH_RE_SIZE_GIVE_`, `COACH_RULES_`
 
+## 33_TeamBonus.gs
+- Hàm: `teamBonusCfg_`, `_tbPad_`, `_tbYmdAdd_`, `_tbDow_`, `_tbMonthEnd_`, `_tbFmtDm_`, `_tbTeam_`, `_tbOrderCounts_`, `_tbDailyCounts_`, `_tbPickClose_`, `_tbCloseFor_`, `_tbComputeRewards_`, `_tbReadPenalties_`, `_tbAccess_`, `teamBonusReport_`, `teamBonusDoGet_`, `teamBonusDoPost_`
+- Hằng/biến: `TEAM_BONUS_SECTION_`, `SH_TEAM_PENALTY_`, `TEAM_PENALTY_HEADERS_`, `TEAMBONUS_GET_ACTIONS_`, `TEAMBONUS_POST_ACTIONS_`, `TEAM_BONUS_DEFAULT_`
+
