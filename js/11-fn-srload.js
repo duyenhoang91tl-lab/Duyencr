@@ -1308,6 +1308,7 @@ function _srRenderB(d){
     html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên/mã sản phẩm (tìm trên tất cả)..." value="'+esc(_srState.productSearch)+'" oninput="_srState.productSearch=this.value;_bprdRefresh_()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:300px;margin-bottom:6px">';
     html += '<div id="bprd-body">'+_bprdBodyHtml_(d)+'</div>';
   }
+  if (typeof _tbPanelHtml_ === 'function') html += _tbPanelHtml_();   // Thưởng phạt đội Sale Online + Văn phòng (js/60-team-bonus.js): riêng, không cộng vào các chương trình thưởng công ty
   html += _srBaseCheckPanelHtml_(d);   // Báo cáo check ngược Base (đơn Pos ghép đơn gốc Base) + nút xuất Excel cho kế toán
   html += _srPosMonthPanelHtml_();
   return html;

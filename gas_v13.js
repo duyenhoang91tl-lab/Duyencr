@@ -20283,7 +20283,7 @@ function teamBonusDoPost_(action, d) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return jsonOut_({ ok: false, error: 'Ngay khong hop le (yyyy-mm-dd).' });
       if (!sale) return jsonOut_({ ok: false, error: 'Chua chon sale.' });
       var tm = _tbTeam_(); sale = tm.memberOf[_normTxt_(sale)] || sale;
-      var amount = Number(d.amount); if (!isFinite(amount) || amount < 0) amount = def.amount;
+      var amount = (d.amount === '' || d.amount == null) ? NaN : Number(d.amount); if (!isFinite(amount) || amount < 0) amount = def.amount;   // de trong = so tien mac dinh cua loai phat
       var note = String(d.note == null ? '' : d.note).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').trim().slice(0, 300);
       var eid = String(d.id || '').trim();
       if (eid) {   // sua dong co san
