@@ -749,3 +749,17 @@ Chuẩn: chọn/ghi tên nào của 1 người cũng ra đủ dữ liệu của 
 - Đã làm trong `js/48-filter-presets.js`: mô hình v2 (`sales` + `extras` theo từng báo cáo); `mapSales` đổi tên Sale của mẫu sang đúng tên có trong báo cáo đang xem (khớp không phân biệt hoa/thường/dấu + bí danh `_cfgAliasesOf`), báo số tên không có trong báo cáo; mục "Tất cả đội (Văn phòng + Online…)" trong menu Mẫu (`__all__`); K = G. Mẫu cũ v1 tự chuyển (cùng tên → gộp, giữ nguyên dữ liệu v1). Đổi mẫu thì gỡ bộ lọc riêng (Kênh…) do mẫu trước đặt.
 - **Chưa có thanh mẫu**: H (Tổng quan data đã chia), I (Chia data Renew) — ô CS là chọn 1 người (radio), M — không có ô lọc Sale; KPI Pancake/Checklist MKT/Phân tích Team không nằm trong tab Báo cáo doanh số (KPI Pancake chỉ có phạm vi theo quyền). Muốn thêm: cần đổi ô CS của H/I sang chọn nhiều.
 - Test: `node tools/test-filter-presets.js`, `tools/test-filter-presets-migrate.js`, `tools/test-team-filter.js`.
+
+## QUY TẮC LÀM VIỆC (Duyên đặt 2026-10-31)
+- Chia việc thành các bước nhỏ, mỗi bước là một file hoàn chỉnh; **xong một file là push main ngay**; **cuối mỗi bước cập nhật HANDOFF.md**: đã xong gì / đang làm gì / bước kế tiếp (để phiên khác tiếp tục được). Vẫn theo quy tắc Git merge-only + tools/safe-push.sh.
+
+## Báo cáo L (khách qua cửa hàng) — QUY TẮC TÍNH NGÀY (đã đọc code, CHƯA sửa; Duyên hỏi 2026-10-31)
+Nguồn: Google Sheet "Khách Sale qua cửa hàng" (tab đầu) — `_storeCaseReadSheet_`, ngày tách ở `_storeCaseVisitDates_(thang, ngayHen, today)`, lọc + ghép đơn ở `buildStoreCaseReport_` (gas_v13.js, khối "BAO CAO L").
+1. **Ngày của 1 dòng** = các ngày liệt kê ở cột C "Ngày KH hẹn qua CH" + cột B "Tháng": mỗi con số 1–31 là MỘT ngày riêng ("10-11"→10 và 11; "25-26-27"; "28/29"; "3,4"). **"25-27" = ngày 25 và 27, KHÔNG có 26** (không hiểu là khoảng). Ô C có đủ năm (10/10/2026 hoặc 2026-10-10) → đúng 1 ngày đó, bỏ qua cột Tháng. Ô trống → không có ngày (cờ "Thiếu ngày hẹn"). Cột B không ra số 1–12 → không có ngày. Ngày không tồn tại (31/9) bị bỏ.
+2. **Năm**: lấy năm hiện tại; nếu ngày đó nằm trong TƯƠNG LAI xa hơn **45 ngày** thì lùi 1 năm (vd hẹn 25/12 mà nhập từ 31/10 → bị hiểu là 25/12 NĂM TRƯỚC).
+3. **Lọc theo khoảng ngày** (ô Từ–Đến, mặc định "tháng này"): giữ dòng nếu **bất kỳ** ngày hẹn nào rơi trong khoảng; chỉ các ngày trong khoảng được dùng để ghép đơn. Dòng KHÔNG có ngày: chỉ hiện khi KHÔNG lọc ngày.
+4. **Ghép đơn Pos**: SĐT chuẩn hoá + **ngày tạo đơn Pos** (giờ VN) phải TRÙNG ĐÚNG ngày hẹn (không ±1 ngày). Dòng "Ko đến" (cột Cập nhật/Tình trạng có ko/không/chưa đến) không ghép đơn và không vào thống kê.
+5. **Tiền**: 30% giá trị sau giảm của đơn (cài được `storeCaseSharePct` / ô %), chia đều các sale của dòng; sale đã có thẻ trên đơn Pos → "trùng", bỏ qua.
+6. **Không dùng** cột N "Ngày KH đến" (ngày khách THỰC SỰ đến): được đọc (`ngayDen`) nhưng không đưa vào tính ngày hay hiển thị.
+- Điểm dễ sai đã nhận diện: (a) khách hẹn ngày A nhưng đến/mua ngày B → "Chưa có đơn Pos khớp SĐT + ngày"; (b) Pos lên số chậm 1 ngày (cuối tuần) → không khớp; (c) "25-27" thiếu ngày 26; (d) hẹn xa >45 ngày bị lùi sang năm trước.
+- [ ] CHỜ Duyên chọn: dùng "Ngày KH đến" khi có / cho lệch ±1 ngày / hiểu "a-b" là khoảng / đổi mốc 45 ngày — chưa làm gì cho tới khi có yêu cầu.
