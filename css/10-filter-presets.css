@@ -42,3 +42,18 @@
 .fp-grp.off{opacity:.55;}
 .fp-info{margin:0 0 10px;padding:8px 10px;border:1px dashed var(--border-md,#d4d0e0);border-radius:8px;background:var(--surface2,#f7f6fb);font-size:12px;color:var(--muted);line-height:1.5;}
 .fp-bad{color:#b45309;}
+
+/* (31/10/2026) ĐIỆN THOẠI: bộ lọc nhanh bị cắt lề trái / khó chạm (Duyên báo). Việc kẹp menu ⚙ vào màn hình do JS (_srFitGearMenu_ ở js/12); phần này lo kích thước + bố cục. */
+.fp-gear{max-width:calc(100vw - 16px);box-sizing:border-box;}
+.fp-gear .fp-mrow{min-width:0;}
+@media (max-width:640px){
+  .fp-ctl{flex:1 1 100%;width:100%;min-width:0;}                       /* cụm mẫu chiếm trọn 1 hàng riêng, không bị đẩy tràn */
+  .fp-sel{flex:1 1 150px;min-width:0;max-width:none;min-height:36px;font-size:13px;}   /* ô chọn mẫu rộng, dễ chạm */
+  .fp-ctl .btn{min-height:36px;}
+  .fp-gear{min-width:0;width:max-content;}                              /* không ép tối thiểu 250px: thu theo nội dung nhưng ≤ màn hình */
+  .fp-gear .fp-mn{max-width:62vw;}                                      /* tên mẫu dài cắt bằng "…" thay vì đẩy nút ✎/🗑 ra ngoài màn */
+}
+@media (pointer:coarse){
+  .fp-gear .fp-mrow .fp-ic{padding:9px 11px;font-size:14px;}            /* nút ✎ 🗑 đủ to cho ngón tay */
+  .fp-gear.gear-menu-list div,.fp-gear div{padding-top:10px;padding-bottom:10px;}
+}
