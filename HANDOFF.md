@@ -5,6 +5,12 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-10-31 (tối) — Báo cáo L: hiện "KT chưa ghi" + xuất file đối chiếu kế toán (bước 2/2 của mục đối chiếu; Duyên cho link file kế toán)
+- [x] **ĐÃ PUSH — `js/11-fn-srload.js`:** (a) ô KPI "Đơn KT chưa ghi" (đỏ khi >0); (b) khung "🧾 Đối chiếu file kế toán" trên đầu báo cáo: số đơn chưa ghi + tiền Sale chia, đã ghi, thiếu mã, bảng đơn chưa ghi (ngày, SĐT, khách, Sale, mã bộ đếm, giá trị, phần Sale/Quầy), nút **📥 Xuất file đối chiếu kế toán**; (c) nhãn cạnh MỖI đơn Pos trong bảng chi tiết: ❌ KT chưa ghi / ⚠ Thiếu mã bộ đếm / ✔ KT đã ghi; (d) `_srLExportAcct_`: Excel `DoiChieuKeToan_<từ>_<đến>.xlsx` — sheet "KT chưa ghi" (theo mã bộ đếm) + sheet "Thiếu mã bộ đếm" (CSV nếu thiếu thư viện XLSX). File kế toán lỗi quyền → báo rõ, KHÔNG báo nhầm "chưa ghi".
+- Quy ước đối chiếu (backend đã push trước đó): cột R "Mã đơn hàng" trang tính cửa hàng (+ mã trong ghi chú Pos) ↔ cột "Mã bộ đếm" (cột G) của file kế toán `ACCT_SPLIT_SS_ID_` (1gJtyOfd…, đọc MỌI tab theo TIÊU ĐỀ "Mã bộ đếm"). Chỉ xét đơn có Sale được chia 30%.
+- Test: `node tools/test-store-acct-ui.js` (9 ca) + `test-store-acct-check.js` + `test-store-case-dates.js` 0 lỗi.
+- [ ] **BƯỚC KẾ (nếu Duyên muốn):** (1) nút xuất cũng ở thanh nút CSV của js/13 (hiện nút nằm trong khung đối chiếu, đủ dùng); (2) so SỐ TIỀN kế toán ghi với Pos (hiện chỉ so sự có mặt của mã); (3) cần cửa hàng điền cột R đầy đủ — dòng không mã chỉ hiện ở nhóm "thiếu mã".
+
 ## 2026-10-31 — Báo cáo L: chỉnh QUY TẮC NGÀY theo Duyên (3 việc: dùng "Ngày KH đến" / "25-27" là khoảng / lệch ±1 ngày)
 - [x] **BƯỚC 1/3 ĐÃ PUSH — gas_v13.js (+ `gas/*.gs`):** (a) `_storeCaseDayList_`: dấu gạch nối giữa 2 số = KHOẢNG liên tục ("25-27" → 25,26,27; "25-26-27" không lặp); `/ , ;` và khoảng trắng vẫn là LIỆT KÊ ("28/29", "3,4"); khoảng ngược hoặc >30 ngày → liệt kê. (b) `_storeCaseArrivalDates_`: cột N "Ngày KH đến" CÓ giá trị thì dùng làm ngày của dòng (thay ngày hẹn); hiểu "25/10/2026", "25/10", "26", "25-27"; cột Tháng trống thì lấy tháng của ngày hẹn. Dòng trả thêm `ngayDen`, `dateSrc` ('den'|'hen'). Lọc khoảng ngày + ghép đơn Pos dùng ngày này. Quy tắc năm (lùi 1 năm khi >45 ngày tương lai) giữ nguyên.
 - Test: `node tools/test-store-case-dates.js` (19 ca) + `test-store-acct-check.js` vẫn 0 lỗi. GAS tự deploy bằng workflow.
