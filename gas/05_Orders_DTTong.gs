@@ -113,11 +113,11 @@ function datTyLeChotTheo(mode) {
   Logger.log('Ty le chot theo Sale gan don theo: ' + (mode === 'saleban' ? 'SALE BAN (moi sale ghi tren don)' : 'NGUOI TAO (cot B DT TONG)') + '. Bao cao co the cache vai phut: bam Loc lai / doi them.');
   return mode;
 }
-function _srCloseRateSectionsFromBase_(filters) {
+function _srCloseRateSectionsFromBase_(filters, preRows, forceBy) {   // preRows (tuy chon) = readDTTong_(true) da doc san, de tinh nhieu ky (tuan/thang) ma khong doc lai sheet; forceBy (tuy chon) = 'nguoitao'|'saleban' ep cach gan don, KHONG phu thuoc Settings closeRateBy (Thuong phat doi Sale dung 'nguoitao'; Bao cao A/B khong truyen => theo Settings nhu cu)
   var tracked = _pkTrackedDatesByPageAndSale_(_dateStrToVnYmd_(filters.dateFrom), _dateStrToVnYmd_(filters.dateTo));
   if (!Object.keys(tracked.datesByPage).length) return _srCloseRateSections_([], filters);   // chưa có dữ liệu Pancake → không cần đọc Base
-  var by = _closeRateBy_();
-  var rows = readDTTong_(true), inRange = [], i;
+  var by = (forceBy === 'nguoitao' || forceBy === 'saleban') ? forceBy : _closeRateBy_();
+  var rows = preRows || readDTTong_(true), inRange = [], i;
   for (i = 0; i < rows.length; i++) {
     var r = rows[i];
     if (r.bhZero || _isExcludedOrderStatus_(r.trangThai)) continue;

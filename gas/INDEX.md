@@ -37,7 +37,8 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 - Hằng/biến: `CSKH_DUYEN_SHEET_KEY_`, `CSKH_DUYEN_FIELDS_`, `XOA_SDT_BUDGET_MS_`
 
 ## 07_SalesReportA.gs
-- Hàm: `getSalesReportOptions_`, `_dtIsExchangeOrder_`, `_dtOrderRevenue_`, `_srCloseRateSections_`, `_extractPageIdFromNguonDon_`, `_extractPageNameFromNguonDon_`, `_drillPairs_`, `_drillPairsObj_`, `buildSalesReportA_`
+- Hàm: `getSalesReportOptions_`, `_dtIsExchangeOrder_`, `_dtOrderRevenue_`, `_srCloseRateSections_`, `_extractPageIdFromNguonDon_`, `_extractPageNameFromNguonDon_`, `_drillPairs_`, `_drillPairsObj_`, `_srKenhExcluded_`, `_srSaleRevExKenh_`, `buildSalesReportA_`
+- Hằng/biến: `SALE_REV_EXCLUDE_KENH_`
 
 ## 08_SaleKPI_FailedOrders.gs
 - Hàm: `readSaleKpiConfig_`, `_ymAdd_`, `_ymMonthsBetween_`, `_ymFirstDay_`, `_ymLastDay_`, `_todayYm_`, `_computeSaleMonthlyRevenue_`, `_computeSaleTierTimeline_`, `buildSaleKpiReport_`, `buildFailedOrderReport_`
@@ -137,4 +138,8 @@ Tìm nhanh: `node tools/split-gas.js --where <tên hàm>`
 ## 32_ChatCoach.gs
 - Hàm: `_coachNorm_`, `_coachRe_`, `_coachAttOk_`, `_coachSpecOk_`, `_coachAge_`, `coachRules_`, `coachCtkm_`, `coachEval_`, `coachBuildResult_`, `chatCoach_`, `splitOrderExportSheet_`, `splitDoPost_`
 - Hằng/biến: `CHAT_COACH_SECTION_`, `COACH_STEPS_`, `COACH_RE_PRICE_`, `COACH_RE_PROMO_`, `COACH_RE_BIRTH_`, `COACH_RE_ORDER_`, `COACH_RE_SIZE_ASK_`, `COACH_RE_SIZE_GIVE_`, `COACH_RULES_`
+
+## 33_TeamBonus.gs
+- Hàm: `teamBonusCfg_`, `_tbPad_`, `_tbYmdAdd_`, `_tbDow_`, `_tbMonthEnd_`, `_tbFmtDm_`, `_tbTeam_`, `_tbOrderCounts_`, `_tbDailyCounts_`, `_tbPickClose_`, `_tbCloseFor_`, `_tbComputeRewards_`, `_tbReadPenalties_`, `_tbAccess_`, `teamBonusReport_`, `teamBonusDoGet_`, `teamBonusDoPost_`, `_tbScanMsgs_`, `_tbParseTs_`, `_tbScanMergedOrders_`, `_tbReadDayMsgs_`, `_tbIgnored_`, `teamPenaltySuggest_`, `teamPenaltyIgnore_`
+- Hằng/biến: `TEAM_BONUS_SECTION_`, `SH_TEAM_PENALTY_`, `TEAM_PENALTY_HEADERS_`, `TEAMBONUS_GET_ACTIONS_`, `TEAMBONUS_POST_ACTIONS_`, `TEAM_BONUS_DEFAULT_`, `TB_MSG_SCAN_MAX_ROWS_`
 
