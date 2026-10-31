@@ -42,3 +42,24 @@
 .fp-grp.off{opacity:.55;}
 .fp-info{margin:0 0 10px;padding:8px 10px;border:1px dashed var(--border-md,#d4d0e0);border-radius:8px;background:var(--surface2,#f7f6fb);font-size:12px;color:var(--muted);line-height:1.5;}
 .fp-bad{color:#b45309;}
+
+/* ĐIỆN THOẠI (31/10/2026 — Duyên báo menu "⚙ Mẫu" / "🧰 Tác vụ" bị cắt lề trái, khó chạm). Bước 1 (js/12 _srFitGearMenu_) đã KẸP menu vào màn hình;
+   bước 2 = bố cục cho ngón tay: ô chọn mẫu chiếm trọn 1 hàng, vùng chạm ≥38–40px, chữ 16px (iOS không tự phóng to khi chạm), tên mẫu dài cắt bằng "…".
+   Chỉ áp cho màn ≤640px (cùng mốc điện thoại ở css/01-base.css); máy tính giữ nguyên bố cục cũ ở trên. */
+@media (max-width:640px){
+  .fp-ctl{flex:1 1 100%;width:100%;min-width:0;}
+  .srb-bar .fp-sel{flex:1 1 0;width:auto;min-width:0;max-width:none;min-height:38px;font-size:16px !important;padding:6px 10px !important;text-overflow:ellipsis;}
+  .fp-ctl .btn.sm{min-height:38px;}
+  .fp-one{flex:1 1 0;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .fp-gear{min-width:0;width:min(320px,calc(100vw - 16px));}
+  .fp-gear > div:not(.fp-mrow){white-space:normal;padding:11px 14px;font-size:14px;}
+  .fp-gear .fp-mh{padding:8px 14px 2px;}
+  .fp-gear .fp-mrow{padding:0 4px 0 14px;font-size:14px;}
+  .fp-gear .fp-mn{padding:11px 0;}
+  .fp-gear .fp-mrow .fp-ic{min-width:40px;min-height:40px;display:inline-flex;align-items:center;justify-content:center;font-size:16px;padding:0;}
+  .fp-bar{padding:8px;}
+  .fp-go{padding:9px 12px;font-size:13.5px;max-width:60vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .fp-chip .fp-ic{padding:0 12px;font-size:14px;}
+  .fp-overlay{padding:2vh 6px 0;}
+  .fp-in{font-size:16px;}
+}
