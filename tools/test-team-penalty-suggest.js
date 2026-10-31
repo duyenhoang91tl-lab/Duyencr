@@ -4,7 +4,8 @@ const src = fs.readFileSync(__dirname + '/../gas_v13.js', 'utf8');
 function grab(name) { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('khong thay ' + name); let d = 0, j = src.indexOf('{', i);
   for (let k = j; k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}') { d--; if (d === 0) return src.slice(i, k + 1); } } }
 const ctx = { _normTxt_: s => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase() };
-vm.createContext(ctx); vm.runInContext(grab('_tbScanMsgs_'), ctx);
+Object.assign(ctx, { splitMulti_: (s, sep) => String(s || '').split(sep).map(x => x.trim()).filter(Boolean), _isNumericTag_: s => /^\d+$/.test(String(s).trim()), _tbOrderCounts_: r => !r.excl });
+vm.createContext(ctx); ['_tbScanMsgs_', '_tbParseTs_', '_tbScanMergedOrders_'].forEach(n => vm.runInContext(grab(n), ctx));
 let fail = 0; const ok = (c, m) => { if (!c) { fail++; console.log('FAIL', m); } else console.log('ok  ', m); };
 const T = (h, m) => new Date(Date.UTC(2026, 9, 30, h, m)).toISOString();
 const mo = { hoa: 'Hoa', nam: 'Nam' };
@@ -40,4 +41,21 @@ ok(r.length === 2 && r[0].gapMin === 120 && /^m:b:2026-10-30T09:00$/.test(r[0].k
 // 9) nhieu luot trong 1 hoi thoai
 r = ctx._tbScanMsgs_([M('a', 'in', T(8, 0)), M('a', 'out', T(9, 0), 'Hoa'), M('a', 'in', T(13, 0)), M('a', 'out', T(14, 0), 'Hoa')], now, end, 30, {}, mo);
 ok(r.length === 2, 'hai luot tre trong cung hoi thoai');
+// ── Loai 4: don gop 72h ──
+const mem = { hoa: 'Hoa', nam: 'Nam' };
+const O = (id, ts, sales, creator, ph, extra) => Object.assign({ id, ngayTao: ts, saleBan: sales, nguoiTao: creator, soDienThoai: ph || '0901234567' }, extra || {});
+let o4 = ctx._tbScanMergedOrders_([O('A1', '28/10/2026 09:00', 'Hoa', 'Hoa'), O('A2', '30/10/2026 08:00', 'Nam', 'Nam')], '2026-10-30', mem, /x/, 72);
+ok(o4.length === 1 && o4[0].type === 4 && o4[0].sale === 'Nam' && o4[0].missing[0] === 'Hoa' && o4[0].key === 'o:A2', 'don gop 47h: Nam len don khong chia Hoa -> phat Nam');
+o4 = ctx._tbScanMergedOrders_([O('A1', '28/10/2026 09:00', 'Hoa', 'Hoa'), O('A2', '30/10/2026 08:00', 'Hoa, Nam', 'Nam')], '2026-10-30', mem, /x/, 72);
+ok(o4.length === 0, 'da chia du Sale -> khong goi y');
+o4 = ctx._tbScanMergedOrders_([O('A1', '26/10/2026 09:00', 'Hoa', 'Hoa'), O('A2', '30/10/2026 08:00', 'Nam', 'Nam')], '2026-10-30', mem, /x/, 72);
+ok(o4.length === 0, 'cach >72h -> khong goi y');
+o4 = ctx._tbScanMergedOrders_([O('A1', '29/10/2026 09:00', 'Hoa', 'Hoa', '0911111111'), O('A2', '30/10/2026 08:00', 'Nam', 'Nam')], '2026-10-30', mem, /x/, 72);
+ok(o4.length === 0, 'khac SDT -> khong goi y');
+o4 = ctx._tbScanMergedOrders_([O('A1', '29/10/2026 09:00', 'Hoa', 'Hoa', '', { excl: true }), O('A2', '30/10/2026 08:00', 'Nam', 'Nam')], '2026-10-30', mem, /x/, 72);
+ok(o4.length === 0 || o4[0] === undefined, 'don truoc bi loai (doi tra/BH/huy) khong tinh');
+o4 = ctx._tbScanMergedOrders_([O('A1', '29/10/2026 09:00', 'Hoa', 'Hoa'), O('A2', '31/10/2026 08:00', 'Nam', 'Nam')], '2026-10-30', mem, /x/, 72);
+ok(o4.length === 0, 'chi xet don tao dung ngay chon');
+o4 = ctx._tbScanMergedOrders_([O('X/1 2', '29/10/2026', 'Hoa', 'Hoa'), O('X/2 3', '30/10/2026', 'Nam', 'Lan')], '2026-10-30', mem, /x/, 72);
+ok(o4.length === 1 && o4[0].sale === 'Nam' && /^o:[A-Za-z0-9_\-:.]+$/.test(o4[0].key), 'khong co gio -> van tinh; khoa duoc lam sach; creator khong thuoc doi -> lay sale dau tien');
 console.log(fail ? fail + ' FAIL' : 'ALL OK'); process.exit(fail ? 1 : 0);

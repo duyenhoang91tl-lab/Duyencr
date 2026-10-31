@@ -20339,6 +20339,49 @@ function _tbScanMsgs_(rows, nowMs, endMs, thrMin, staffNames, memberOf) {
   out.sort(function (a, b) { return b.gapMin - a.gapMin; });
   return out;
 }
+// Loai 4 "Don gop Sale ban chung trong 72 gio" (Duyen 2026-10-31): cung 1 SDT co don o NHIEU Sale trong vong 72 gio; don SAU (don gop) do Sale A len ma cot "Sale ban"
+// khong ghi Sale B cua don TRUOC => goi y phat Sale A (nguoi len don). Chi xet don tinh thuong (khong doi tra/BH/huy) va Sale thuoc doi Online/Van phong. Chi la GOI Y.
+function _tbParseTs_(v) {
+  var m = String(v || '').trim().match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?/);
+  if (!m) return NaN;
+  var y = +m[3]; if (y < 100) y += 2000;
+  return Date.UTC(y, +m[2] - 1, +m[1], m[4] ? +m[4] : 0, m[5] ? +m[5] : 0);   // gio VN coi nhu UTC: chi dung de tinh KHOANG CACH
+}
+function _tbScanMergedOrders_(dtRows, ymd, memberOf, re, hours) {
+  var lim = (hours || 72) * 3600000, by = {}, out = [];
+  function members(r) {
+    var seen = {}, list = [];
+    splitMulti_(r.saleBan ? String(r.saleBan).trim() : '', ',').forEach(function (n) { n = String(n).trim(); if (!n || _isNumericTag_(n)) return; var m = memberOf[_normTxt_(n)]; if (m && !seen[m]) { seen[m] = 1; list.push(m); } });
+    return list;
+  }
+  (dtRows || []).forEach(function (r) {
+    var ph = String(r.soDienThoai || ''); if (ph.length < 9 || !_tbOrderCounts_(r, re)) return;
+    var t = _tbParseTs_(r.ngayTao); if (!isFinite(t)) return;
+    (by[ph] || (by[ph] = [])).push({ r: r, t: t, mem: members(r) });
+  });
+  Object.keys(by).forEach(function (ph) {
+    var list = by[ph].sort(function (a, b) { return a.t - b.t; });
+    list.forEach(function (o, i) {
+      var d = new Date(o.t); var oy = d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+      if (oy !== ymd || !o.mem.length) return;
+      var miss = {}, refs = [], maxGap = 0;
+      for (var j = 0; j < i; j++) {
+        var p = list[j], gap = o.t - p.t; if (gap > lim) continue;
+        var lack = p.mem.filter(function (m) { return o.mem.indexOf(m) < 0; });
+        if (!lack.length) continue;
+        lack.forEach(function (m) { miss[m] = 1; }); refs.push({ id: String(p.r.id || ''), ngayTao: String(p.r.ngayTao || ''), sales: p.mem.join(', ') });
+        maxGap = Math.max(maxGap, gap / 3600000);
+      }
+      var names = Object.keys(miss); if (!names.length) return;
+      var creator = memberOf[_normTxt_(o.r.nguoiTao || '')] || o.mem[0];
+      out.push({ key: 'o:' + String(o.r.id || ph + ':' + o.t).replace(/[^A-Za-z0-9_\-:.]/g, '_').slice(0, 100), type: 4, orderId: String(o.r.id || ''), customer: '', phone: ph, inAt: null, outAt: null, gapMin: Math.round(maxGap * 60), open: false,
+        sale: creator, saleRaw: String(o.r.nguoiTao || ''), page: '', ngayTao: String(o.r.ngayTao || ''), orderSales: o.mem.join(', '), missing: names, refs: refs.slice(0, 5),
+        detail: 'Don ' + String(o.r.id || '') + ' (' + String(o.r.ngayTao || '') + ', Sale ban: ' + o.mem.join(', ') + ') thieu ' + names.join(', ') + ' cua don truoc ' + refs.map(function (x) { return x.id + ' ' + x.ngayTao; }).join('; ') });
+    });
+  });
+  out.sort(function (a, b) { return b.gapMin - a.gapMin; });
+  return out;
+}
 // Doc tin 1 ngay (gio VN) tu Supabase theo trang 1000 dong. Tra { rows, truncated }.
 function _tbReadDayMsgs_(ymd) {
   var from = new Date(Date.UTC(+ymd.slice(0, 4), +ymd.slice(5, 7) - 1, +ymd.slice(8, 10)) - VN_OFFSET_MS), to = new Date(from.getTime() + 86400000);
@@ -20363,15 +20406,20 @@ function teamPenaltySuggest_(p, acc) {
   if (!hit || p.nocache === '1') {
     var day = _tbReadDayMsgs_(ymd), tm = _tbTeam_();
     hit = { items: _tbScanMsgs_(day.rows, Date.now(), day.endMs, 30, _pkStaffNames_(), tm.memberOf), truncated: day.truncated, scanned: day.rows.length };
+    try {
+      var cfg0 = teamBonusCfg_(), re0; try { re0 = new RegExp(cfg0.excludeRe, 'i'); } catch (eR) { re0 = new RegExp(TEAM_BONUS_DEFAULT_.excludeRe, 'i'); }
+      var od = _tbScanMergedOrders_(readDTTong_(true, true), ymd, tm.memberOf, re0, 72);
+      hit.items = hit.items.concat(od); hit.orderHits = od.length;
+    } catch (eO) { hit.orderErr = String(eO && eO.message || eO); }
     try { _cachePutBig_(ck, JSON.stringify(hit), 600); } catch (e1) {}
   }
   var done = {}, ig = {}; _tbReadPenalties_(ymd.slice(0, 8) + '01', _tbMonthEnd_(ymd.slice(0, 7))).forEach(function (e) { var m = /\[pk:([^\]]+)\]/.exec(e.note || ''); if (m) done[m[1]] = 1; });
   _tbIgnored_().forEach(function (k) { ig[k] = 1; });
-  var items = hit.items.filter(function (x) { return !done[x.key] && !ig[x.key]; }).slice(0, 300);
-  return { ok: true, date: ymd, items: items, hidden: hit.items.length - items.length, truncated: !!hit.truncated, scanned: hit.scanned, note: 'Chi la GOI Y tu du lieu Pancake. Admin kiem tra roi moi ghi phat; khong phan biet duoc tin nhay tu Sale khac.' };
+  var items = hit.items.filter(function (x) { return !done[x.key] && !ig[x.key]; }).sort(function (a, b) { return (a.type === 4 ? 1 : 0) - (b.type === 4 ? 1 : 0) || b.gapMin - a.gapMin; }).slice(0, 300);
+  return { ok: true, date: ymd, items: items, hidden: hit.items.length - items.length, truncated: !!hit.truncated, orderErr: hit.orderErr || '', scanned: hit.scanned, note: 'Chi la GOI Y tu du lieu Pancake. Admin kiem tra roi moi ghi phat; khong phan biet duoc tin nhay tu Sale khac.' };
 }
 function teamPenaltyIgnore_(d) {
-  var key = String(d.key || '').trim(); if (!/^m:[A-Za-z0-9_\-:.]{1,120}$/.test(key)) return jsonOut_({ ok: false, error: 'Khoa khong hop le.' });
+  var key = String(d.key || '').trim(); if (!/^[mo]:[A-Za-z0-9_\-:.]{1,120}$/.test(key)) return jsonOut_({ ok: false, error: 'Khoa khong hop le.' });
   var a = _tbIgnored_(); if (a.indexOf(key) < 0) a.push(key); if (a.length > 1500) a = a.slice(a.length - 1500);
   setSetting_('tbPenIgnore', JSON.stringify(a));
   return jsonOut_({ ok: true, key: key });

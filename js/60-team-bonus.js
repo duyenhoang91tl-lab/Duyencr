@@ -157,7 +157,7 @@ function _tbSuggestHtml_(d){
   var h = '<div style="border:1px dashed #d97706;border-radius:10px;padding:10px;margin-bottom:10px"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><b style="font-size:13px">🤖 Gợi ý phạt từ tin nhắn Pancake</b>' +
     '<input type="date" id="tb-sg-date" value="' + _tbEsc_(date) + '" onchange="_tbState.sg.date=this.value;_tbState.sg.data=null">' +
     '<button class="btn sm" onclick="_tbSuggestLoad()"' + (g.loading ? ' disabled' : '') + '>' + (g.loading ? 'Đang quét…' : '🔍 Quét ngày này') + '</button>' +
-    '<span style="font-size:11px;color:var(--muted)">Chỉ là gợi ý (tính cả ngày đêm). Không phát hiện được tin "nhảy từ Sale khác" — kiểm tra trước khi ghi.</span></div>';
+    '<span style="font-size:11px;color:var(--muted)">Chỉ là gợi ý (tính cả ngày đêm). Không phát hiện được tin "nhảy từ Sale khác"; đơn gộp 72h đối chiếu theo SĐT trên đơn Base — kiểm tra trước khi ghi.</span></div>';
   if (g.err) h += '<div style="color:#b91c1c;font-size:12px;margin-top:6px">⚠️ ' + _tbEsc_(g.err) + '</div>';
   var sd = g.data;
   if (sd) {
@@ -165,12 +165,12 @@ function _tbSuggestHtml_(d){
     if (sd.truncated) h += '<div style="font-size:12px;color:#b45309;margin-top:6px">⚠️ Ngày này nhiều tin, mới quét một phần — kết quả có thể thiếu.</div>';
     h += '<div style="font-size:12px;color:var(--muted);margin:6px 0">' + items.length + ' gợi ý' + (sd.hidden ? ' (đã ẩn ' + sd.hidden + ' dòng đã ghi/bỏ qua)' : '') + ' · đã quét ' + (sd.scanned || 0) + ' tin</div>';
     if (items.length) {
-      h += '<div style="overflow-x:auto;max-height:340px;overflow-y:auto"><table class="sr-table" style="width:100%"><thead><tr><th>Lỗi</th><th>Khách</th><th>Khách nhắn</th><th>Chờ</th><th>Sale</th><th></th></tr></thead><tbody>';
+      h += '<div style="overflow-x:auto;max-height:340px;overflow-y:auto"><table class="sr-table" style="width:100%"><thead><tr><th>Lỗi</th><th>Khách</th><th>Khách nhắn / Chi tiết đơn</th><th>Chờ</th><th>Sale</th><th></th></tr></thead><tbody>';
       items.forEach(function(x, i){
         var hm = function(iso){ var t = new Date(Date.parse(iso) + 7 * 3600 * 1000); return String(t.getUTCHours()).padStart(2, '0') + ':' + String(t.getUTCMinutes()).padStart(2, '0'); };
         var cur = g.sale[x.key] != null ? g.sale[x.key] : x.sale;
         h += '<tr><td>' + x.type + '. ' + _tbEsc_(_tbPenShort_(x.type)) + '</td><td style="font-size:12px">' + _tbEsc_(x.customer) + (x.phone ? '<br><span style="color:var(--muted)">' + _tbEsc_(x.phone) + '</span>' : '') + '</td>' +
-          '<td>' + hm(x.inAt) + (x.open ? ' <span style="color:#dc2626;font-size:11px">(chưa trả lời)</span>' : ' → ' + hm(x.outAt)) + '</td><td style="text-align:right">' + x.gapMin + 'p</td>' +
+          (x.orderId ? '<td colspan="2" style="font-size:12px">Đơn <b>' + _tbEsc_(x.orderId) + '</b> (' + _tbEsc_(x.ngayTao) + ', Sale bán: ' + _tbEsc_(x.orderSales) + ') <span style="color:#dc2626">thiếu ' + _tbEsc_((x.missing || []).join(', ')) + '</span> so với đơn trước: ' + _tbEsc_((x.refs || []).map(function(q){ return q.id + ' ' + q.ngayTao + ' (' + q.sales + ')'; }).join('; ')) + '</td>' : '<td>' + hm(x.inAt) + (x.open ? ' <span style="color:#dc2626;font-size:11px">(chưa trả lời)</span>' : ' → ' + hm(x.outAt)) + '</td><td style="text-align:right">' + x.gapMin + 'p</td>') +
           '<td><select onchange="_tbState.sg.sale[_tbState.sg.data.items[' + i + '].key]=this.value"><option value="">— chọn —</option>' + teamOpts(cur) + '</select>' + (x.saleRaw && !x.sale ? '<div style="font-size:11px;color:var(--muted)">' + _tbEsc_(x.saleRaw) + '</div>' : '') + '</td>' +
           '<td style="white-space:nowrap"><button class="btn sm" onclick="_tbSuggestAccept(' + i + ')">Ghi phạt</button> <button class="btn sm secondary" onclick="_tbSuggestIgnore(' + i + ')">Bỏ qua</button></td></tr>';
       });
@@ -194,7 +194,7 @@ async function _tbSuggestAccept(i){
   var g = _tbState.sg, x = g.data && g.data.items[i]; if (!x) return;
   var sale = g.sale[x.key] != null ? g.sale[x.key] : x.sale;
   if (!sale) { alert('Chọn sale bị phạt cho dòng này.'); return; }
-  var note = (x.customer || x.phone || 'Khách') + (x.phone ? ' ' + x.phone : '') + ': chờ ' + x.gapMin + ' phút' + (x.open ? ' chưa trả lời' : '') + ' [pk:' + x.key + ']';
+  var note = x.orderId ? ('Đơn gộp ' + x.orderId + ' thiếu chia cho ' + (x.missing || []).join(', ') + ' (đơn trước ' + (x.refs || []).map(function(q){ return q.id; }).join(', ') + ') [pk:' + x.key + ']') : ((x.customer || x.phone || 'Khách') + (x.phone ? ' ' + x.phone : '') + ': chờ ' + x.gapMin + ' phút' + (x.open ? ' chưa trả lời' : '') + ' [pk:' + x.key + ']');
   try {
     await _tbPost_({ action: 'teamPenaltySave', date: g.date || _tbToday_(), sale: sale, type: x.type, amount: '', note: note.slice(0, 300) });
     g.data.items.splice(i, 1); g.data.hidden = (g.data.hidden || 0) + 1;
