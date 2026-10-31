@@ -1853,10 +1853,10 @@ function _storeCodesFromNote_(text) {   // ma trong ghi chu Pos: dang 17T10/2026
   return out;
 }
 // Doc MA BO DEM tu MOI tab cua file ke toan (moi thang co the 1 tab: "tháng 10", "tháng 11"...). O gop: chi o tren cung co gia tri — du de lay tap ma.
-function _loadAcctCodeSet_() {
+function _loadAcctCodeSet_(fresh) {
   var out = { codes: {}, noYear: {}, tabs: [], err: '' };
   try {
-    var cache = CacheService.getScriptCache(), cached = cache.get('acct_codes_v1'), data;
+    var cache = CacheService.getScriptCache(), cached = fresh ? null : cache.get('acct_codes_v1'), data;
     if (cached) { data = JSON.parse(cached); }
     else {
       data = { rows: [], tabs: [] };
@@ -1893,8 +1893,9 @@ function _storeAcctClassify_(codes, acct) {
   return { status: 'chua-ghi' };
 }
 // Doc tab dau cua trang tinh cua hang. Tim cot theo TEN TIEU DE (khong theo vi tri cung) nen them/doi cot khong hong.
-function _storeCaseReadSheet_() {
-  var cached = _cacheGetBig_('storeCaseRows_v2');
+function _colLetterStore_(i) { var s = '', n = i + 1; while (n > 0) { var m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; }
+function _storeCaseReadSheet_(fresh) {
+  var cached = fresh ? null : _cacheGetBig_('storeCaseRows_v2');
   if (cached) { try { return JSON.parse(cached); } catch (eP) {} }
   var id = '';
   try { id = String(getSetting_('storeCaseSheetId') || '').trim(); } catch (e0) {}
@@ -1905,7 +1906,7 @@ function _storeCaseReadSheet_() {
   catch (eOpen) { return { error: 'Không mở được trang tính "Khách Sale qua cửa hàng" (' + String(eOpen && eOpen.message || eOpen) + ') — kiểm tra quyền truy cập của tài khoản chạy Apps Script.', rows: [] }; }
   if (!sh) return { error: 'Trang tính không có tab nào.', rows: [] };
   var lastRow = sh.getLastRow(), lastCol = Math.min(sh.getLastColumn(), 26);
-  var res = { sheetId: id, sheetName: sh.getName(), rows: [] };
+  var res = { sheetId: id, sheetName: sh.getName(), rows: [], maDonCol: '' };
   if (lastRow < 2 || lastCol < 1) return res;
   var vals = sh.getRange(1, 1, lastRow, lastCol).getDisplayValues(); // doc dang HIEN THI: "10-11" khong bi Sheets doi thanh ngay
   var hdr = vals[0].map(function(h) { return _stripVN_(String(h || '')).replace(/\s+/g, ' ').trim(); });
@@ -1926,6 +1927,7 @@ function _storeCaseReadSheet_() {
     doanhThu: col(['doanh thu'], 15), nvCh: col(['nhan vien ch'], 16),
     maDon: col(['ma don'], 17)   // cot R "Mã đơn hàng" (Duyên thêm 2026-10-31) = Ma bo dem cua don khach mua khi qua cua hang (vd M44756) — khoa doi chieu voi file ke toan
   };
+  res.maDonCol = _colLetterStore_(C.maDon) + ' «' + String(vals[0][C.maDon] || '').trim() + '»';
   function g(r, k) { var v = r[C[k]]; return v === undefined || v === null ? '' : String(v).trim(); }
   for (var i = 1; i < vals.length; i++) {
     var r = vals[i];
@@ -2010,11 +2012,12 @@ function buildStoreCaseReport_(filters) {
   var from = _dateStrToVnYmd_(filters.dateFrom), to = _dateStrToVnYmd_(filters.dateTo);
   var saleFilter = (filters.sale || []).filter(Boolean);
 
-  var sheet = _storeCaseReadSheet_();
+  var fresh = !!filters.fresh;   // Duyen bam Loc sau khi cua hang dien cot R: bo qua cache 60s de thay ngay
+  var sheet = _storeCaseReadSheet_(fresh);
   if (sheet.error) return { ok: false, error: sheet.error };
 
   // Chat luong du lieu tren TOAN trang tinh (khong phu thuoc bo loc ngay) — de nhac cua hang bo sung thong tin
-  var dq = { tongDong: sheet.rows.length, thieuSdt: 0, thieuNgay: 0, thieuSale: 0 };
+  var dq = { tongDong: sheet.rows.length, thieuSdt: 0, thieuNgay: 0, thieuSale: 0, coMaDon: 0, cotMaDon: sheet.maDonCol || '' };
 
   // 1) Dong trang tinh -> ngay qua cua hang, loc theo khoang ngay
   var kept = [], wanted = {};
@@ -2024,6 +2027,7 @@ function buildStoreCaseReport_(filters) {
     r.dateSrc = denD.length ? 'den' : 'hen';
     r.phoneNorm = normPhone_(r.phone);
     r.maDonCodes = _storeCodeTokens_(r.maDon);
+    if (r.maDonCodes.length) dq.coMaDon++;
     if (!r.phoneNorm) dq.thieuSdt++;
     if (!r.visitDates.length) dq.thieuNgay++;
     if (!String(r.saleRaw || '').trim()) dq.thieuSale++;
@@ -2052,7 +2056,7 @@ function buildStoreCaseReport_(filters) {
   }
 
   var ctx = _storeCaseBuildCtx_(posNameSet);
-  var acct = _loadAcctCodeSet_();   // file ke toan: tap Ma bo dem da ghi (moi tab)
+  var acct = _loadAcctCodeSet_(fresh);   // file ke toan: tap Ma bo dem da ghi (moi tab)
 
   // 3) Ghep tung dong + tinh chia
   var stats = {}, unresolved = {}, uniqueOrders = {}, totals = { dongHen: 0, dongCoDon: 0, soDon: 0, doanhThuDon: 0, daTinh: 0, trungBoQua: 0 };

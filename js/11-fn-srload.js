@@ -96,6 +96,7 @@ async function _srLoad(){
     }
     _srState.dataL = await _srFetch('storeCaseReport', {
       dateFrom: _srState.lDateFrom, dateTo: _srState.lDateTo,
+      fresh: '1',
       sale: (_srState.lSale||[]).join(',')
     });
   } else if (_srState.sub === 'M') {
@@ -2004,7 +2005,7 @@ function _srLAcctHtml_(d){
     '<span style="color:var(--green);font-weight:600">✔ đã ghi '+fmt(sm.daGhi||0)+'</span>'+(sm.thieuMa?'<span style="color:#92400e;font-weight:600">⚠ thiếu mã '+fmt(sm.thieuMa)+'</span>':'')+
     (miss.length?'<button class="btn sm" onclick="_srLExportAcct_()">📥 Xuất file đối chiếu kế toán</button>':'')+
     '<a href="'+esc(ac.sheetUrl||'#')+'" target="_blank" rel="noopener" style="font-size:11px">mở file kế toán</a></div>'+
-    '<div style="font-size:10.5px;color:var(--hint);margin-bottom:6px">Đối chiếu: mã đơn cột R trang tính cửa hàng (+ mã trong ghi chú Pos) ↔ cột "Mã bộ đếm" của file kế toán (đọc '+fmt(ac.soMa||0)+' mã ở '+fmt((ac.tabs||[]).length)+' tab). Chỉ xét đơn có Sale được chia ('+esc(d.sharePct)+'%).</div>';
+    '<div style="font-size:10.5px;color:var(--hint);margin-bottom:6px">Đọc cột mã đơn: <b>'+esc((d.dataQuality||{}).cotMaDon||'?')+'</b> — <b>'+fmt((d.dataQuality||{}).coMaDon||0)+'</b>/'+fmt((d.dataQuality||{}).tongDong||0)+' dòng trang tính cửa hàng có mã. Đối chiếu:'+' mã đơn cột R trang tính cửa hàng (+ mã trong ghi chú Pos) ↔ cột "Mã bộ đếm" của file kế toán (đọc '+fmt(ac.soMa||0)+' mã ở '+fmt((ac.tabs||[]).length)+' tab). Chỉ xét đơn có Sale được chia ('+esc(d.sharePct)+'%).</div>';
   if (miss.length){
     h += '<div style="overflow-x:auto;max-height:340px;overflow-y:auto"><table class="dash-table"><thead><tr><th>Ngày đơn</th><th>SĐT</th><th>Khách</th><th>Sale</th><th>Mã bộ đếm</th><th style="text-align:right">Giá trị đơn</th><th style="text-align:right">Sale '+esc(d.sharePct)+'%</th><th style="text-align:right">Quầy</th><th>Trạng thái</th></tr></thead><tbody>';
     miss.slice(0, 300).forEach(function(e){

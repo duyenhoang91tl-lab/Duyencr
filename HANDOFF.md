@@ -5,6 +5,12 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-10-31 (tối, 2) — Báo cáo L: "mã bộ đếm cột R có rồi mà vẫn chưa thấy" → bỏ cache + hiện cột/số dòng có mã
+- [x] **ĐÃ PUSH:** (gas) `storeCaseReport` nhận `fresh=1`: bỏ cache 60 giây của trang tính cửa hàng (`storeCaseRows_v2`) và của file kế toán (`acct_codes_v1`) → sau khi cửa hàng điền cột R, bấm Lọc là thấy ngay. `dataQuality` thêm `coMaDon` (số dòng có mã) + `cotMaDon` (chữ cột + tiêu đề đang đọc, vd `R «Mã đơn hàng»`). (client js/11) nút Lọc Báo cáo L luôn gửi `fresh=1`; khung "Đối chiếu file kế toán" hiện "Đọc cột mã đơn: R «…» — N/M dòng có mã" để biết ngay đọc đúng cột chưa.
+- NGUYÊN NHÂN GỐC nghi ngờ (chưa xác minh được vì không mở được sheet từ môi trường này): cache 60 giây + (nếu chưa deploy) GAS cũ. Nếu khung ghi sai cột (không phải R) hoặc số dòng có mã = 0 dù sheet đã điền → báo lại tên tiêu đề cột R để chỉnh `_storeCaseReadSheet_`.
+- Test: test-store-acct-check.js (thêm ca fresh), test-store-acct-ui, test-store-case-dates: 0 lỗi.
+- [ ] CẦN LÀM TIẾP: Duyên Ctrl+F5 + Lọc, xem dòng "Đọc cột mã đơn".
+
 ## 2026-10-31 (tối) — Báo cáo L: hiện "KT chưa ghi" + xuất file đối chiếu kế toán (bước 2/2 của mục đối chiếu; Duyên cho link file kế toán)
 - [x] **ĐÃ PUSH — `js/11-fn-srload.js`:** (a) ô KPI "Đơn KT chưa ghi" (đỏ khi >0); (b) khung "🧾 Đối chiếu file kế toán" trên đầu báo cáo: số đơn chưa ghi + tiền Sale chia, đã ghi, thiếu mã, bảng đơn chưa ghi (ngày, SĐT, khách, Sale, mã bộ đếm, giá trị, phần Sale/Quầy), nút **📥 Xuất file đối chiếu kế toán**; (c) nhãn cạnh MỖI đơn Pos trong bảng chi tiết: ❌ KT chưa ghi / ⚠ Thiếu mã bộ đếm / ✔ KT đã ghi; (d) `_srLExportAcct_`: Excel `DoiChieuKeToan_<từ>_<đến>.xlsx` — sheet "KT chưa ghi" (theo mã bộ đếm) + sheet "Thiếu mã bộ đếm" (CSV nếu thiếu thư viện XLSX). File kế toán lỗi quyền → báo rõ, KHÔNG báo nhầm "chưa ghi".
 - Quy ước đối chiếu (backend đã push trước đó): cột R "Mã đơn hàng" trang tính cửa hàng (+ mã trong ghi chú Pos) ↔ cột "Mã bộ đếm" (cột G) của file kế toán `ACCT_SPLIT_SS_ID_` (1gJtyOfd…, đọc MỌI tab theo TIÊU ĐỀ "Mã bộ đếm"). Chỉ xét đơn có Sale được chia 30%.

@@ -118,4 +118,6 @@ ok(R(4).orders.length === 1 && R(4).orders[0].lech === 1 && /lệch \+1/.test(R(
 ok(R(5).orders.length === 1 && R(5).orders[0].posRow === 204 && R(5).orders[0].lech === 0, 'co don dung ngay thi KHONG lay them don lech');
 ok(R(6).orders.length === 0 && R(6).flags.some(f => /Chưa có đơn Pos/.test(f)), 'lech 3 ngay -> khong ghep');
 ok(r3.totals.soDon === 4, 'tong so don duy nhat dung (4)');
+{ const rf = makeCtx().buildStoreCaseReport_({ dateFrom: '2026-10-01', dateTo: '2026-10-31', fresh: true });
+  ok(rf.ok && typeof rf.dataQuality.coMaDon === 'number' && rf.dataQuality.coMaDon === 0 && rf.dataQuality.tongDong === 0, 'fresh=true van chay; dataQuality co coMaDon / cotMaDon (du lieu rong -> 0)'); }
 process.exit(bad ? 1 : 0);
