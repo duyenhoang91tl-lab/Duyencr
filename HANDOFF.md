@@ -9,7 +9,7 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 - [x] **BƯỚC 1/3 ĐÃ PUSH — gas_v13.js (+ `gas/*.gs`):** (a) `_storeCaseDayList_`: dấu gạch nối giữa 2 số = KHOẢNG liên tục ("25-27" → 25,26,27; "25-26-27" không lặp); `/ , ;` và khoảng trắng vẫn là LIỆT KÊ ("28/29", "3,4"); khoảng ngược hoặc >30 ngày → liệt kê. (b) `_storeCaseArrivalDates_`: cột N "Ngày KH đến" CÓ giá trị thì dùng làm ngày của dòng (thay ngày hẹn); hiểu "25/10/2026", "25/10", "26", "25-27"; cột Tháng trống thì lấy tháng của ngày hẹn. Dòng trả thêm `ngayDen`, `dateSrc` ('den'|'hen'). Lọc khoảng ngày + ghép đơn Pos dùng ngày này. Quy tắc năm (lùi 1 năm khi >45 ngày tương lai) giữ nguyên.
 - Test: `node tools/test-store-case-dates.js` (19 ca) + `test-store-acct-check.js` vẫn 0 lỗi. GAS tự deploy bằng workflow.
 - [x] **BƯỚC 2/3 ĐÃ PUSH — ghép đơn Pos lệch ±1 ngày** (gas_v13.js `buildStoreCaseReport_`, `_storeCaseYmdAdd_`): mỗi ngày của dòng: có đơn Pos ĐÚNG ngày → chỉ lấy đơn đó; KHÔNG có thì mới lấy đơn ngày −1/+1 (SĐT trùng). Mỗi đơn chỉ ghép 1 lần/dòng (khử trùng theo `posRow`). Đơn lệch có `o.lech` = −1/+1 và ghi chú "Ngày đơn Pos lệch …". Lệch ≥2 ngày vẫn KHÔNG ghép. Test: thêm 6 ca đầu-cuối vào `tools/test-store-acct-check.js` (khoảng 25-27, ngày đến, lệch +1, ưu tiên đúng ngày, lệch 3 ngày).
-- [ ] **BƯỚC 3/3:** `js/11-fn-srload.js` Báo cáo L: hiện nguồn ngày ("Ngày đến" vs "Ngày hẹn") + dấu "lệch 1 ngày" ở bảng chi tiết & Excel; cập nhật mục "QUY TẮC TÍNH NGÀY" bên dưới (đang ghi quy tắc CŨ, mục 1, 4, 6 đã lỗi thời sau bước 1–2); test jsdom.
+- [x] **BƯỚC 3/3 ĐÃ PUSH:** (client js/11) bảng chi tiết hiện nhãn "✔ ngày khách đến" khi dùng cột N; CSV thêm "(ngày KH đến)"; ghi chú lệch ±1 đã nằm sẵn trong cột ghi chú đơn. Đã viết lại mục quy tắc ngày bên dưới. (Bản cũ của bước này:) `js/11-fn-srload.js` Báo cáo L: hiện nguồn ngày ("Ngày đến" vs "Ngày hẹn") + dấu "lệch 1 ngày" ở bảng chi tiết & Excel; cập nhật mục "QUY TẮC TÍNH NGÀY" bên dưới (đang ghi quy tắc CŨ, mục 1, 4, 6 đã lỗi thời sau bước 1–2); test jsdom.
 - Việc cũ "BƯỚC 2/2 đối chiếu kế toán" (ô KPI "KT chưa ghi" + Excel theo mã bộ đếm ở js/11) vẫn CHƯA làm — làm sau 3 bước trên.
 
 ## 2026-10-31 — Báo cáo L: đối chiếu với file kế toán "THEO DÕI ĐƠN CHIA SALE" → đơn nào KẾ TOÁN CHƯA GHI + xuất Excel theo mã bộ đếm (Duyên yêu cầu) — bước 1/2 đã push
@@ -760,13 +760,11 @@ Chuẩn: chọn/ghi tên nào của 1 người cũng ra đủ dữ liệu của 
 ## QUY TẮC LÀM VIỆC (Duyên đặt 2026-10-31)
 - Chia việc thành các bước nhỏ, mỗi bước là một file hoàn chỉnh; **xong một file là push main ngay**; **cuối mỗi bước cập nhật HANDOFF.md**: đã xong gì / đang làm gì / bước kế tiếp (để phiên khác tiếp tục được). Vẫn theo quy tắc Git merge-only + tools/safe-push.sh.
 
-## Báo cáo L (khách qua cửa hàng) — QUY TẮC TÍNH NGÀY (đã đọc code, CHƯA sửa; Duyên hỏi 2026-10-31)
-Nguồn: Google Sheet "Khách Sale qua cửa hàng" (tab đầu) — `_storeCaseReadSheet_`, ngày tách ở `_storeCaseVisitDates_(thang, ngayHen, today)`, lọc + ghép đơn ở `buildStoreCaseReport_` (gas_v13.js, khối "BAO CAO L").
-1. **Ngày của 1 dòng** = các ngày liệt kê ở cột C "Ngày KH hẹn qua CH" + cột B "Tháng": mỗi con số 1–31 là MỘT ngày riêng ("10-11"→10 và 11; "25-26-27"; "28/29"; "3,4"). **"25-27" = ngày 25 và 27, KHÔNG có 26** (không hiểu là khoảng). Ô C có đủ năm (10/10/2026 hoặc 2026-10-10) → đúng 1 ngày đó, bỏ qua cột Tháng. Ô trống → không có ngày (cờ "Thiếu ngày hẹn"). Cột B không ra số 1–12 → không có ngày. Ngày không tồn tại (31/9) bị bỏ.
-2. **Năm**: lấy năm hiện tại; nếu ngày đó nằm trong TƯƠNG LAI xa hơn **45 ngày** thì lùi 1 năm (vd hẹn 25/12 mà nhập từ 31/10 → bị hiểu là 25/12 NĂM TRƯỚC).
-3. **Lọc theo khoảng ngày** (ô Từ–Đến, mặc định "tháng này"): giữ dòng nếu **bất kỳ** ngày hẹn nào rơi trong khoảng; chỉ các ngày trong khoảng được dùng để ghép đơn. Dòng KHÔNG có ngày: chỉ hiện khi KHÔNG lọc ngày.
-4. **Ghép đơn Pos**: SĐT chuẩn hoá + **ngày tạo đơn Pos** (giờ VN) phải TRÙNG ĐÚNG ngày hẹn (không ±1 ngày). Dòng "Ko đến" (cột Cập nhật/Tình trạng có ko/không/chưa đến) không ghép đơn và không vào thống kê.
-5. **Tiền**: 30% giá trị sau giảm của đơn (cài được `storeCaseSharePct` / ô %), chia đều các sale của dòng; sale đã có thẻ trên đơn Pos → "trùng", bỏ qua.
-6. **Không dùng** cột N "Ngày KH đến" (ngày khách THỰC SỰ đến): được đọc (`ngayDen`) nhưng không đưa vào tính ngày hay hiển thị.
-- Điểm dễ sai đã nhận diện: (a) khách hẹn ngày A nhưng đến/mua ngày B → "Chưa có đơn Pos khớp SĐT + ngày"; (b) Pos lên số chậm 1 ngày (cuối tuần) → không khớp; (c) "25-27" thiếu ngày 26; (d) hẹn xa >45 ngày bị lùi sang năm trước.
-- [ ] CHỜ Duyên chọn: dùng "Ngày KH đến" khi có / cho lệch ±1 ngày / hiểu "a-b" là khoảng / đổi mốc 45 ngày — chưa làm gì cho tới khi có yêu cầu.
+## Báo cáo L (khách qua cửa hàng) — QUY TẮC TÍNH NGÀY (CẬP NHẬT 2026-10-31 theo yêu cầu Duyên)
+Nguồn: Google Sheet "Khách Sale qua cửa hàng" (tab đầu) — `_storeCaseReadSheet_`; ngày ở `_storeCaseVisitDates_` / `_storeCaseArrivalDates_` / `_storeCaseDayList_`; lọc + ghép đơn ở `buildStoreCaseReport_` (gas_v13.js, khối "BAO CAO L").
+1. **Ngày của 1 dòng:** nếu cột N "Ngày KH đến" CÓ giá trị → dùng nó (`dateSrc='den'`); không thì dùng cột C "Ngày KH hẹn" + cột B "Tháng" (`'hen'`). Gạch nối giữa 2 số = KHOẢNG ("25-27" = 25,26,27); `/ , ;` = liệt kê ("28/29" = 28 và 29). Có năm đầy đủ → đúng ngày đó. Ô trống → không có ngày (cờ "Thiếu ngày hẹn"). Ngày không tồn tại bị bỏ.
+2. **Năm:** năm hiện tại; ngày nằm trong TƯƠNG LAI >45 ngày thì lùi 1 năm.
+3. **Lọc khoảng ngày:** giữ dòng nếu bất kỳ ngày nào rơi trong khoảng; dòng không có ngày chỉ hiện khi không lọc ngày.
+4. **Ghép đơn Pos:** SĐT chuẩn hoá + ngày tạo đơn Pos: có đơn ĐÚNG ngày thì lấy đơn đó; không có thì cho lệch ±1 ngày (đánh dấu `lech`, ghi chú). Lệch ≥2 ngày không ghép. Dòng "Ko đến" không ghép đơn.
+5. **Tiền:** 30% giá trị sau giảm (`storeCaseSharePct`), chia đều các sale của dòng; sale đã có thẻ trên đơn Pos → "trùng", bỏ qua.
+- Điểm còn dễ sai: hẹn xa >45 ngày bị lùi sang năm trước; "Ngày KH đến" ghi chữ lạ không ra ngày → rơi về ngày hẹn.

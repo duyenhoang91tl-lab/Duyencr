@@ -2048,7 +2048,7 @@ function _srLDetailTable_(rows){
     var dt = valid.reduce(function(s,o){ return s + (o.giaTri||0); }, 0);
     var cr = valid.reduce(function(s,o){ return s + (o.credits||[]).reduce(function(s2,c){ return s2 + (c.amount||0); }, 0); }, 0);
     h += '<tr'+(r.koDen?' style="opacity:.6"':'')+'>'+
-      '<td style="white-space:nowrap">'+esc((r.visitDates||[]).map(_srLDmy_).join(', ') || esc(r.ngayHen))+'<div style="font-size:10px;color:var(--hint)">sheet dòng '+esc(r.row)+(r.stt?' · STT '+esc(r.stt):'')+'</div></td>'+
+      '<td style="white-space:nowrap">'+esc((r.visitDates||[]).map(_srLDmy_).join(', ') || esc(r.ngayHen))+(r.dateSrc==='den'?'<div style="font-size:10px;color:var(--green)" title="Dùng cột N Ngày KH đến'+(r.ngayHen?' (ngày hẹn ghi: '+esc(r.ngayHen)+')':'')+'">✔ ngày khách đến</div>':'')+'<div style="font-size:10px;color:var(--hint)">sheet dòng '+esc(r.row)+(r.stt?' · STT '+esc(r.stt):'')+'</div></td>'+
       '<td>'+_custLinkHtml_(r.phone, '<b>'+esc(r.tenKh||'—')+'</b>')+'<div style="font-size:11px;color:var(--muted)">'+_custLinkHtml_(r.phone, esc(r.phone||''))+(r.kenh?' · '+esc(r.kenh):'')+'</div></td>'+
       '<td>'+((r.sales||[]).map(function(x){ return '<b>'+esc(x.name)+'</b>'+(x.raw!==x.name?'<span style="font-size:10px;color:var(--hint)"> ('+esc(x.raw)+')</span>':''); }).join('<br>') || '<span style="color:var(--muted)">—</span>')+'</td>'+
       '<td style="font-size:11px;max-width:200px">'+esc([r.tinhTrang, r.capNhat].filter(Boolean).join(' · ')).substring(0,220)+'</td>'+
@@ -2096,7 +2096,7 @@ function _srLExportCsv_(kind){
   var out = [head];
   var statusLbl = { 'tinh':'Tính thêm cho Sale', 'trung':'Trùng thẻ Pos - bỏ qua', 'mot-phan':'Trùng một phần', 'hoan':'Đơn hoàn - không tính', 'khong-sale':'Chưa khớp tên Sale' };
   (d.rows||[]).forEach(function(r){
-    var base = [r.row, r.stt, (r.visitDates||[]).join(' ; '), r.tenKh, r.phone, r.kenh, r.saleRaw, (r.sales||[]).map(function(x){return x.name;}).join(', '), [r.tinhTrang, r.capNhat].filter(Boolean).join(' · '), r.doanhThuSheet, r.nvCh];
+    var base = [r.row, r.stt, (r.visitDates||[]).join(' ; ') + (r.dateSrc==='den' ? ' (ngày KH đến)' : ''), r.tenKh, r.phone, r.kenh, r.saleRaw, (r.sales||[]).map(function(x){return x.name;}).join(', '), [r.tinhTrang, r.capNhat].filter(Boolean).join(' · '), r.doanhThuSheet, r.nvCh];
     var flags = (r.flags||[]).join(' · ');
     if (!(r.orders||[]).length){ out.push(base.concat(['','','','','','','','','','','','','','','', flags])); return; }
     r.orders.forEach(function(o){
