@@ -37,7 +37,7 @@
     { k:'kh',  t:'👤 Hồ sơ',                ids:['tab-kh','care2','stageboard','tab-schedule','tab-overdue','tab-mydata','tab-task','act:profile'] },   // gộp hồ sơ khách hàng + hồ sơ nhân viên
     { k:'sc',  t:'💬 Social',               ids:['tab-chat','tab-teamchat'] },
     { k:'kho', t:'📦 Kho',                 ids:['act:kho'] },
-    { k:'tv',  t:'🧰 Tác vụ',               ids:['tab-zaloai','act:bc','act:bct','act:bcstat','act:futpl','act:bday'] },
+    { k:'tv',  t:'🧰 Tác vụ',               ids:['tab-zaloai','act:bc','act:bct','act:bcstat','act:futpl','act:bday','act:conndiag'] },
     { k:'rp',  t:'📊 Báo cáo',              ids:['salesreport','pancake','kpipancake','mktchecklist','dailybrief','dashboard','act:fureport','act:teamai'] },
     { k:'cs',  t:'🔀 Cài đặt chia số',      ids:['act:assign','act:autoassign','act:assignhist'] },
     { k:'tm',  t:'👥 Cài đặt team',         ids:['team','act:salematch','act:acct'] },
@@ -53,6 +53,7 @@
     errlog:     { t:'🐞 Nhật ký lỗi (máy này)', f:'openErrLogModal', admin:true },
     notif:      { t:function(){ return (typeof _ntLabel==='function') ? _ntLabel() : '🔔 Thông báo'; }, f:'openNotifModal' },
     kho:        { t:'📦 Tồn kho', f:'openKhoModal' },
+    conndiag:   { t:'🩺 Chẩn đoán kết nối', f:'openConnDiag' },
     profile:    { t:'🪪 Hồ sơ nhân viên', f:'openProfileModal' },
     salematch:  { t:'🔗 Khớp sale', f:'openSaleMatchModal', admin:true },
     acct:       { t:'🔑 Tài khoản đăng nhập', f:'openAcctModal', admin:true },
@@ -158,7 +159,7 @@
     hdr.insertBefore(b, hdr.firstChild);
     // Ô tìm nhanh cạnh nút Menu: dùng được ở MỌI màn; gõ xong tự chuyển về "Danh sách KH" và lọc theo từ khoá
     var qw = document.createElement('div'); qw.id = 'qs-wrap';
-    qw.innerHTML = '<input id="qs-input" type="search" placeholder="🔍 Tìm nhanh: tên, SĐT, mã đơn..." autocomplete="off">';
+    qw.innerHTML = '<input id="qs-input" type="search" placeholder="' + ((window.matchMedia && window.matchMedia('(max-width:768px)').matches) ? '🔍 Tìm khách' : '🔍 Tìm nhanh: tên, SĐT, mã đơn...') + '" autocomplete="off">';
     hdr.insertBefore(qw, b.nextSibling);
     var qt;
     qw.firstChild.addEventListener('input', function(){

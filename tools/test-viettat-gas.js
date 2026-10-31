@@ -5,7 +5,7 @@ const fs = require('fs'), vm = require('vm');
 const src = fs.readFileSync(__dirname + '/../gas_v13.js', 'utf8');
 function fn(name) { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('thieu ' + name); let d = 0, j = src.indexOf('{', i); for (let k = j; k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}' && --d === 0) return src.slice(i, k + 1); } }
 let bad = 0; const ok = (c, t) => { if (!c) { bad++; console.log('FAIL', t); } else console.log('ok  ', t); };
-const code = 'var SH_VIETTAT="VietTat",VIETTAT_HEADERS=["id","nhom","abbr","keyword","options","owner","createdBy","updatedAt","images"],VIETTAT_MAX_IMAGES=50,VIETTAT_NHOM_MAX=100,VIETTAT_UPLOAD_MAX_BYTES=3*1024*1024,VIETTAT_FOLDER_SCAN=600;\n' + ['_vtNhom_', '_vtImgsFromCell_', '_vtSame_', '_vtRowToObj_', 'readVietTat_', 'saveVietTat_', 'deleteVietTat_', '_vtKnownImageIds_', '_vtFolder_', 'vietTatUploadImage_', '_vtCheckImage_', 'vietTatResolveImages_', 'vietTatImage_'].map(fn).join('\n');
+const code = 'var SH_VIETTAT="VietTat",VIETTAT_HEADERS=["id","nhom","abbr","keyword","options","owner","createdBy","updatedAt","images"],VIETTAT_MAX_IMAGES=50,VIETTAT_NHOM_MAX=100,VIETTAT_UPLOAD_MAX_BYTES=3*1024*1024,VIETTAT_FOLDER_SCAN=600;\n' + ['_stripVN_', '_vtKey_', '_vtNhom_', '_vtImgsFromCell_', '_vtSame_', '_vtRowToObj_', 'readVietTat_', 'saveVietTat_', 'deleteVietTat_', '_vtKnownImageIds_', '_vtFolder_', 'vietTatUploadImage_', '_vtCheckImage_', 'vietTatResolveImages_', 'vietTatImage_'].map(fn).join('\n');
 const rows = [];   // khong gom header
 const sheet = {
   getLastRow: () => rows.length + 1,

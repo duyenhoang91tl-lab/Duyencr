@@ -1,5 +1,5 @@
 /* TỰ SINH bởi tools/gen-dark-theme.js — ĐỪNG SỬA TAY (sửa tool rồi chạy lại: node tools/gen-dark-theme.js). Chỉ có hiệu lực ở chế độ tối.
-   Nguồn: 01-base.css, 02-style.css, 03-style.css, 04-style.css, 05-sidenav.css, 06-pro.css, 07-teamchat.css, 08-kho.css, 09-profile.css, 10-filter-presets.css, 11-roles.css, 12-salematch.css, 13-shell.css, 14-qrpills.css, <style> + style="…" trong index.html và js/*.js. Ngoại lệ thủ công: css/10-dark.css. */
+   Nguồn: 01-base.css, 02-style.css, 03-style.css, 04-style.css, 05-sidenav.css, 06-pro.css, 07-teamchat.css, 08-kho.css, 09-profile.css, 10-filter-presets.css, 11-roles.css, 12-salematch.css, 13-shell.css, 14-qrpills.css, 15-mobile.css, 16-mobile-list.css, <style> + style="…" trong index.html và js/*.js. Ngoại lệ thủ công: css/10-dark.css. */
 /* ── 01-base.css ── */
 html[data-theme="dark"] .btn.secondary:hover{background:#18293f!important}
 html[data-theme="dark"] .assign-badge-pill.has-assign{background:#3f3718!important;color:#edab82!important;border-color:#655a34!important}
@@ -66,6 +66,15 @@ html[data-theme="dark"] .tf-mention{color:#829eed!important}
 html[data-theme="dark"] .tf-link{color:#829eed!important}
 html[data-theme="dark"] .sc-lerr{border-color:#653a34!important;background:var(--surface3)!important;color:#e79288!important}
 html[data-theme="dark"] .sc-lerr-h{color:#d7a199!important}
+html[data-theme="dark"] .coach-card{border-color:var(--border-md)!important;background:var(--surface,var(--surface))!important}
+html[data-theme="dark"] .coach-badge.due{background:var(--surface3)!important;color:#eda182!important;border-color:#654d34!important}
+html[data-theme="dark"] .coach-badge.ok{background:var(--surface2)!important;color:#82edcf!important;border-color:#34654e!important}
+html[data-theme="dark"] .coach-st{background:var(--surface2,var(--surface3))!important}
+html[data-theme="dark"] .coach-st.done{background:var(--surface2)!important;color:#82edcf!important}
+html[data-theme="dark"] .coach-st.due{background:var(--surface3)!important;color:#eda182!important}
+html[data-theme="dark"] .coach-st.pending{background:var(--surface2)!important;color:#edc182!important}
+html[data-theme="dark"] .coach-item{border-top-color:var(--border-md)!important}
+html[data-theme="dark"] .coach-sc{background:var(--surface2,var(--surface2))!important}
 html[data-theme="dark"] .pkc-who-n{background:var(--surface2,var(--surface3))!important}
 html[data-theme="dark"] .sc-conv.unseen .sc-seenbtn{color:#edb082!important}
 html[data-theme="dark"] .pk-seen-btn.unseen{color:#edb082!important}
@@ -123,6 +132,8 @@ html[data-theme="dark"].ui-pro .khd-lock{color:var(--text)!important;background:
 html[data-theme="dark"].ui-pro .split-h{color:var(--text)!important}
 html[data-theme="dark"].ui-pro .split-err{color:#ff8a80!important}
 html[data-theme="dark"].ui-pro .split-d summary{color:#b9a8f5!important}
+html[data-theme="dark"].ui-pro #pro-ai .pro-pc{background:var(--surface)!important;color:#b9a8f5!important}
+html[data-theme="dark"].ui-pro #pro-ai .pro-pc.alt{color:var(--text)!important}
 /* ── 07-teamchat.css ── */
 /* ── 08-kho.css ── */
 html[data-theme="dark"] .tk-lowtxt{color:#ea8b85!important}
@@ -191,6 +202,9 @@ html[data-theme="dark"] .qr-pills{background:var(--surface2,var(--surface2))!imp
 html[data-theme="dark"] .qr-pills .qr-b,html[data-theme="dark"] .qr-pills .qr-more{color:var(--muted,var(--muted))!important}
 html[data-theme="dark"] .qr-pills .qr-b:hover,html[data-theme="dark"] .qr-pills .qr-more:hover{color:var(--text,var(--text))!important}
 html[data-theme="dark"] .qr-pills .qr-b.on,html[data-theme="dark"] .qr-pills .qr-more.on{background:var(--surface,var(--surface))!important;color:var(--blue,#82a4ed)!important}
+/* ── 15-mobile.css ── */
+/* ── 16-mobile-list.css ── */
+html[data-theme="dark"] #qs-input::placeholder{color:var(--muted)!important}
 /* ── <style> trong index.html ── */
 html[data-theme="dark"] #boot-splash i{border-top-color:var(--border-md)!important}
 html[data-theme="dark"] .ev-spin{color:#a992dd!important}
@@ -220,6 +234,7 @@ html[data-theme="dark"] [style*="background:var(--tn-bg,#fff7ed);" i],html[data-
 html[data-theme="dark"] [style*="border-bottom:1px solid #e5e7eb;" i],html[data-theme="dark"] [style$="border-bottom:1px solid #e5e7eb" i]{border-bottom-color:var(--border-md)!important}
 html[data-theme="dark"] [style*="border-bottom:1px solid #f3f4f6;" i],html[data-theme="dark"] [style$="border-bottom:1px solid #f3f4f6" i]{border-bottom-color:var(--border-md)!important}
 html[data-theme="dark"] [style*="border-bottom:1px solid #fed7aa;" i],html[data-theme="dark"] [style$="border-bottom:1px solid #fed7aa" i]{border-bottom-color:#654e34!important}
+html[data-theme="dark"] [style*="border-bottom:1px solid var(--border,#ddd);" i],html[data-theme="dark"] [style$="border-bottom:1px solid var(--border,#ddd)" i]{border-bottom-color:var(--border-md)!important}
 html[data-theme="dark"] [style*="border-bottom:1px solid var(--border,#eee);" i],html[data-theme="dark"] [style$="border-bottom:1px solid var(--border,#eee)" i]{border-bottom-color:var(--border-md)!important}
 html[data-theme="dark"] [style*="border-color:#86efac;" i],html[data-theme="dark"] [style$="border-color:#86efac" i]{border-color:#346546!important}
 html[data-theme="dark"] [style*="border-color:#e5e7eb;" i],html[data-theme="dark"] [style$="border-color:#e5e7eb" i]{border-color:var(--border-md)!important}
@@ -270,6 +285,7 @@ html[data-theme="dark"] [style^="color:#b91c1c;" i],html[data-theme="dark"] [sty
 html[data-theme="dark"] [style^="color:#be185d;" i],html[data-theme="dark"] [style="color:#be185d" i],html[data-theme="dark"] [style*=";color:#be185d;" i],html[data-theme="dark"] [style$=";color:#be185d" i],html[data-theme="dark"] [style*=" color:#be185d;" i],html[data-theme="dark"] [style$=" color:#be185d" i]{color:#ed82af!important}
 html[data-theme="dark"] [style^="color:#c0392b;" i],html[data-theme="dark"] [style="color:#c0392b" i],html[data-theme="dark"] [style*=";color:#c0392b;" i],html[data-theme="dark"] [style$=";color:#c0392b" i],html[data-theme="dark"] [style*=" color:#c0392b;" i],html[data-theme="dark"] [style$=" color:#c0392b" i]{color:#e5938a!important}
 html[data-theme="dark"] [style^="color:#c2410c;" i],html[data-theme="dark"] [style="color:#c2410c" i],html[data-theme="dark"] [style*=";color:#c2410c;" i],html[data-theme="dark"] [style$=";color:#c2410c" i],html[data-theme="dark"] [style*=" color:#c2410c;" i],html[data-theme="dark"] [style$=" color:#c2410c" i]{color:#eda182!important}
+html[data-theme="dark"] [style^="color:#d97706;" i],html[data-theme="dark"] [style="color:#d97706" i],html[data-theme="dark"] [style*=";color:#d97706;" i],html[data-theme="dark"] [style$=";color:#d97706" i],html[data-theme="dark"] [style*=" color:#d97706;" i],html[data-theme="dark"] [style$=" color:#d97706" i]{color:#edbb82!important}
 html[data-theme="dark"] [style^="color:#dc2626;" i],html[data-theme="dark"] [style="color:#dc2626" i],html[data-theme="dark"] [style*=";color:#dc2626;" i],html[data-theme="dark"] [style$=";color:#dc2626" i],html[data-theme="dark"] [style*=" color:#dc2626;" i],html[data-theme="dark"] [style$=" color:#dc2626" i]{color:#eb8484!important}
 html[data-theme="dark"] [style^="color:var(--accent,#1e66f5);" i],html[data-theme="dark"] [style="color:var(--accent,#1e66f5)" i],html[data-theme="dark"] [style*=";color:var(--accent,#1e66f5);" i],html[data-theme="dark"] [style$=";color:var(--accent,#1e66f5)" i],html[data-theme="dark"] [style*=" color:var(--accent,#1e66f5);" i],html[data-theme="dark"] [style$=" color:var(--accent,#1e66f5)" i]{color:var(--accent,#82a6ed)!important}
 html[data-theme="dark"] [style^="color:var(--accent,#2563eb);" i],html[data-theme="dark"] [style="color:var(--accent,#2563eb)" i],html[data-theme="dark"] [style*=";color:var(--accent,#2563eb);" i],html[data-theme="dark"] [style$=";color:var(--accent,#2563eb)" i],html[data-theme="dark"] [style*=" color:var(--accent,#2563eb);" i],html[data-theme="dark"] [style$=" color:var(--accent,#2563eb)" i]{color:var(--accent,#82a4ed)!important}

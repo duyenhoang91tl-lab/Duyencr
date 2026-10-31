@@ -47,8 +47,8 @@ function _ntAgo(iso){
   return new Date(t).toLocaleDateString('vi-VN');
 }
 // Sự kiện quy trình công việc: kind = task_assign | task_turn | task_request | task_decision | task_done (js/44-fn-taskflow.js, GAS _notifyTaskEvent_)
-function _ntIsTaskEvt(it){ var k = String((it && it.kind) || ''); return k.indexOf('task_') === 0 || k === 'chatviolation' || k === 'tplpending'; }   // chatviolation = cảnh báo giám sát chat (GAS _cvNotify_): text là câu hoàn chỉnh
-function _ntTaskIcon(it){ return ({ task_assign:'📌', task_turn:'➡️', task_request:'✋', task_decision:'⚖️', task_done:'🏁', chatviolation:'⚠️' , tplpending:'📝' })[it.kind] || '🔔'; }
+function _ntIsTaskEvt(it){ var k = String((it && it.kind) || ''); return k.indexOf('task_') === 0 || k === 'chatviolation' || k === 'tplpending' || k === 'resale'; }   // resale = KH mua lại ở sale khác (GAS _rbNotify_): text là câu hoàn chỉnh   // chatviolation = cảnh báo giám sát chat (GAS _cvNotify_): text là câu hoàn chỉnh
+function _ntTaskIcon(it){ return ({ task_assign:'📌', task_turn:'➡️', task_request:'✋', task_decision:'⚖️', task_done:'🏁', chatviolation:'⚠️' , tplpending:'📝', resale:'🔁' })[it.kind] || '🔔'; }
 function _ntWhere(it){
   if (it.kind === 'note') return 'trong ghi chú khách ' + (it.refId || '');
   if (it.kind === 'khthread') return 'trong thảo luận về khách ' + (it.refId || '');
@@ -99,7 +99,9 @@ function ntOpenItem(id){
   if (!it.read) _ntMark([id], false);
   ntClose();
   try {
-    if (it.kind === 'chatviolation' && it.refType === 'chatviolation' && it.refId) {
+    if (it.refType === 'resale') {
+      _ntOpenResale_(it.refId, it.refId2, it.text);   // KH mua lại ở sale khác -> hiện đơn của khách (refId = SĐT, refId2 = ngày đơn mới)
+    } else if (it.kind === 'chatviolation' && it.refType === 'chatviolation' && it.refId) {
       var _ci = String(it.refId2 || '').split('|'), _mid = '', _nm = '';
       if (_ci.length >= 3) { _mid = _ci[_ci.length - 1]; _nm = _ci.slice(1, -1).join('|'); } else { _nm = _ci.slice(1).join('|'); }   // định dạng cũ: SĐT|tên (không có mã tin)
       _ntOpenChat_(it.refId, _ci[0] || '', _nm, _mid);   // mở thẳng đoạn chat (Social > Chat) của hội thoại bị cảnh báo
@@ -149,6 +151,48 @@ function _ntOpenChat_(convId, phone, name, msgId){
     if (++tries > 30) { toast('Không mở được tab Chat — bạn có thể chưa được cấp quyền xem Chat (Social)'); return; }
     setTimeout(wait, 200);
   })();
+}
+// ── KH MUA LẠI Ở SALE KHÁC (2026-10-29, Duyên yêu cầu): bấm thông báo kind 'resale' -> modal các đơn của khách đó, tô sáng đơn mới (ngày = refId2).
+//    Dữ liệu: action donOrdersByPhone (mọi đơn của SĐT, không lọc theo sale -> sale cũ xem được đơn do sale khác bán). Backend: gas_v13.js _rbNotify_.
+function _ntRsDate_(ymd){ var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || '')); return m ? m[3] + '/' + m[2] + '/' + m[1] : String(ymd || ''); }
+function _ntRsHtml_(orders, day, text){
+  var list = (orders || []).slice(0, 40), isNew = function(o){ return o.date === day; };
+  var nNew = list.filter(isNew).length, rev = list.filter(isNew).reduce(function(a, o){ return a + (Number(o.revenue) || 0); }, 0);
+  var h = '<div class="nt-rs-sum">' + esc(text || '') + '</div>';
+  if (!list.length) return h + '<div class="nt-empty">Không tìm thấy đơn của khách này (đơn có thể đã bị hoàn/hủy hoặc chưa đồng bộ).</div>';
+  h += '<div class="nt-rs-meta">Đơn mới ngày <b>' + esc(_ntRsDate_(day)) + '</b>: ' + nNew + ' dòng, tổng <b>' + esc(fmt(rev)) + 'đ</b> · bên dưới là toàn bộ lịch sử đơn của khách (mới nhất trước)</div>';
+  h += '<div class="nt-rs-wrap"><table class="nt-rs-tbl"><thead><tr><th>Ngày</th><th>Sản phẩm</th><th>SL</th><th>Doanh thu</th><th>Kênh</th><th>Sale</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead><tbody>';
+  list.forEach(function(o){
+    h += '<tr' + (isNew(o) ? ' class="nt-rs-new"' : '') + '><td>' + esc(_ntRsDate_(o.date)) + (isNew(o) ? ' <span class="nt-rs-tag">MỚI</span>' : '') + '</td><td>' + esc(o.product || '') + '</td><td>' + esc(o.qty || '') + '</td><td>' + esc(fmt(Number(o.revenue) || 0)) + 'đ</td><td>' + esc(o.source || '') + '</td><td>' + esc(o.sale || '') + '</td><td>' + esc(o.status || '') + '</td><td>' + esc(o.note || '') + '</td></tr>';
+  });
+  return h + '</tbody></table></div>';
+}
+function _ntOpenResale_(phone, day, text){
+  var ov = document.getElementById('nt-rs-overlay');
+  if (!ov) {
+    ov = document.createElement('div'); ov.id = 'nt-rs-overlay'; ov.className = 'nt-overlay';
+    ov.innerHTML = '<div class="nt-box nt-rs-box"><div class="nt-head"><b>🔁 Đơn mua lại</b><span class="nt-sp"></span><button type="button" class="btn secondary sm" id="nt-rs-open">👤 Mở hồ sơ khách</button><button type="button" class="btn secondary sm" id="nt-rs-close">✕</button></div><div class="nt-list" id="nt-rs-body"></div></div>';
+    document.body.appendChild(ov);
+    ov.addEventListener('click', function(e){ if (e.target === ov) ov.classList.remove('open'); });
+    document.getElementById('nt-rs-close').addEventListener('click', function(){ ov.classList.remove('open'); });
+    document.addEventListener('keydown', function(e){ if (e.key === 'Escape') ov.classList.remove('open'); });
+  }
+  var body = document.getElementById('nt-rs-body'), openBtn = document.getElementById('nt-rs-open');
+  openBtn.onclick = function(){
+    ov.classList.remove('open');
+    if (typeof openDp !== 'function') { toast('Chưa mở được khách'); return; }
+    if (typeof customerMap !== 'undefined' && !customerMap[phone]) toast('Không thấy khách ' + phone + ' trong danh sách đang tải');
+    openDp(phone);
+  };
+  body.innerHTML = '<div class="nt-empty">Đang tải đơn của khách…</div>'; ov.classList.add('open');
+  var sep = gsUrl.indexOf('?') > -1 ? '&' : '?';
+  fetch(gsUrl + sep + 'action=donOrdersByPhone&phone=' + encodeURIComponent(phone), { redirect:'follow' })
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (j && j.ok) body.innerHTML = _ntRsHtml_(j.orders, day, text);
+      else body.innerHTML = '<div class="nt-rs-sum">' + esc(text || '') + '</div><div class="nt-empty">' + esc((j && j.error) || 'Không tải được đơn của khách') + '</div>';
+    })
+    .catch(function(e){ body.innerHTML = '<div class="nt-rs-sum">' + esc(text || '') + '</div><div class="nt-empty">Lỗi tải đơn: ' + esc(e && e.message || e) + '</div>'; });
 }
 function _ntOpenTask(taskId, discuss){
   var tab = document.querySelector('#data-view .tabs .tab[data-bar-id="tab-task"]');

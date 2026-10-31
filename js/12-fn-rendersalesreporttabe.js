@@ -879,7 +879,25 @@ function _srToggleGearMenu(e, id){
   var el = document.getElementById(id);
   var willOpen = el && el.style.display !== 'block';
   closeGearMenus();
-  if (willOpen && el) el.style.display = 'block';
+  if (willOpen && el) { el.style.display = 'block'; _srFitGearMenu_(el); }
+}
+// Menu ⚙ (🧰 Tác vụ / ⚙ Mẫu lọc nhanh…) mở bằng position:absolute;right:0 (căn mép PHẢI của nút). Nút nằm sát mép TRÁI màn điện thoại -> danh sách tràn ra ngoài mép trái, bị cắt,
+// không bấm được mẫu lọc nhanh (Duyên báo 31/10/2026). Sửa: đo vùng nhìn thấy (màn hình + khung cuộn cha có overflow) rồi KẸP danh sách vào trong, chừa lề 8px; quá rộng thì thu max-width.
+function _srFitGearMenu_(el){
+  if (!el || !el.getBoundingClientRect || !el.parentNode) return;
+  el.style.left = ''; el.style.right = ''; el.style.maxWidth = '';          // về mặc định (right:0) trước khi đo
+  var pad = 8, vw = document.documentElement.clientWidth || window.innerWidth || 360, minL = pad, maxR = vw - pad;
+  for (var a = el.parentNode; a && a.nodeType === 1 && a !== document.body && a !== document.documentElement; a = a.parentNode) {
+    var cs = window.getComputedStyle ? window.getComputedStyle(a) : null;
+    if (cs && /(hidden|auto|scroll|clip)/.test(cs.overflowX || '')) { var ar = a.getBoundingClientRect(); minL = Math.max(minL, ar.left + pad); maxR = Math.min(maxR, ar.right - pad); }
+  }
+  var room = Math.max(120, maxR - minL);
+  el.style.maxWidth = room + 'px';
+  var r = el.getBoundingClientRect();
+  if (r.left >= minL - 0.5 && r.right <= maxR + 0.5) return;               // đã nằm gọn -> giữ căn phải như cũ
+  var h = el.parentNode.getBoundingClientRect(), w = Math.min(r.width, room);
+  var left = Math.min(Math.max(r.left, minL), maxR - w);                    // kẹp trái/phải vào vùng nhìn thấy
+  el.style.right = 'auto'; el.style.left = (left - h.left) + 'px';
 }
 function closeGearMenus(){
   document.querySelectorAll('.gear-menu-list').forEach(function(el){ el.style.display = 'none'; });

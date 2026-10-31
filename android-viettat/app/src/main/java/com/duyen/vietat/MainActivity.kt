@@ -36,13 +36,13 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(b: Bundle?) {
         super.onCreate(b); Store.init(this)
         crm = CrmWeb(this)
-        if (Crm.configured(this)) thread { Crm.pull(this) }   // nạp sẵn kho Viết tắt từ CRM để gõ tắt dùng được ngay
+        thread { Crm.pull(this) }   // nạp sẵn kho Viết tắt từ CRM để gõ tắt dùng được ngay (kết nối mặc định, không hỏi gì)
         if (b == null) crm.load() else crm.web.restoreState(b)
         setContent { MaterialTheme { Root(crm) } }
     }
     override fun onSaveInstanceState(out: Bundle) { super.onSaveInstanceState(out); crm.web.saveState(out) }
     override fun onPause() { super.onPause(); crm.web.onPause() }
-    override fun onResume() { super.onResume(); crm.web.onResume() }
+    override fun onResume() { super.onResume(); crm.web.onResume(); crm.detectName() }
     override fun onDestroy() { crm.web.destroy(); super.onDestroy() }
 }
 
@@ -56,23 +56,48 @@ fun Root(crm: CrmWeb) {
             NavigationBarItem(tab == 1, { tab = 1 }, { Text("⌨") }, label = { Text("Viết tắt") })
         }
     }) { pad ->
-        Box(Modifier.padding(pad).fillMaxSize()) { if (tab == 0) CrmWebScreen(crm) else App() }
+        Box(Modifier.padding(pad).fillMaxSize()) { if (tab == 0) CrmWebScreen(crm) else App(crm) }
+    }
+}
+
+/**
+ * Thẻ "🩺 Kiểm tra gõ tắt": cho biết gõ tắt hỏng ở bước nào (dịch vụ Trợ năng chưa chạy / chưa có mục / Android không gửi sự kiện gõ /
+ * không khớp mục / chèn chữ bị từ chối) bằng `Diag.report()`, và có ô GÕ THỬ viết tắt (`Diag.trial`) để biết app khớp mục nào mà không cần mở app chat.
+ */
+@Composable
+fun DiagCard() {
+    var open by remember { mutableStateOf(false) }
+    var report by remember { mutableStateOf("") }
+    var test by remember { mutableStateOf("") }
+    OutlinedButton({ open = !open; if (open) report = Diag.report() }, Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        Text(if (open) "🩺 Kiểm tra gõ tắt ▲" else "🩺 Kiểm tra gõ tắt ▼")
+    }
+    // NGUYÊN NHÂN GỐC báo cáo "❌ CHƯA gửi sự kiện gõ nào" dù gõ tắt ở Zalo đã hiện màn chọn (video Duyên 2026-10-27): `report` chỉ được tính 1 LẦN lúc mở thẻ,
+    // rồi đứng yên khi Duyên sang Zalo gõ và quay lại → hiện số liệu CŨ (0 sự kiện). Nay tự đọc lại mỗi giây khi thẻ đang mở.
+    if (open) LaunchedEffect(Unit) { while (true) { report = Diag.report(); kotlinx.coroutines.delay(1000) } }
+    if (open) Card(Modifier.fillMaxWidth().padding(top = 6.dp)) {
+        Column(Modifier.padding(12.dp).heightIn(max = 300.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(report, style = MaterialTheme.typography.bodySmall)
+            OutlinedButton({ report = Diag.report() }) { Text("Làm mới") }
+            OutlinedTextField(test, { test = it }, singleLine = true, label = { Text("Gõ thử viết tắt (vd: ch)") }, modifier = Modifier.fillMaxWidth())
+            Text(Diag.trial(test), style = MaterialTheme.typography.bodySmall)
+            Text("Mẹo: gõ viết tắt ở app chat khác (Zalo/Messenger/Pancake), KHÔNG bấm cách; quay lại đây, báo cáo trên tự cập nhật mỗi giây.", style = MaterialTheme.typography.bodySmall)
+        }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun App() {
+fun App(crm: CrmWeb) {
     val ctx = LocalContext.current
     var sel by remember { mutableStateOf<String?>(null) }
     var editing by remember { mutableStateOf<Snippet?>(null) }
     var newFolder by remember { mutableStateOf(false) }
     var q by remember { mutableStateOf("") }
-    var showSync by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("") }
-    // Đọc kho Viết tắt của CRM (chung + của tôi). Lần đầu chưa nhập tên CS thì mở hộp cài đặt.
-    val doSync = { if (Crm.configured(ctx)) thread { status = Crm.pull(ctx) }; Unit }
-    LaunchedEffect(Unit) { if (Crm.configured(ctx)) doSync() else showSync = true }
+    // Đọc kho Viết tắt của CRM (chung + của tôi) — kết nối mặc định, không còn hộp cài đặt; tên CS tự lấy từ tài khoản đăng nhập CRM.
+    val doSync = { thread { status = Crm.pull(ctx) }; Unit }
+    LaunchedEffect(Unit) { crm.detectName(); doSync() }
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { u ->
         if (u != null) runCatching { ctx.contentResolver.openOutputStream(u)?.use { Store.exportZip(it) } }
             .onSuccess { Toast.makeText(ctx, "Đã xuất file", Toast.LENGTH_SHORT).show() }
@@ -95,9 +120,10 @@ fun App() {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton({ exporter.launch("viettat-backup.zip") }, Modifier.weight(1f)) { Text("Xuất file") }
                 OutlinedButton({ importer.launch(arrayOf("application/json", "text/*", "*/*")) }, Modifier.weight(1f)) { Text("Nhập file") }
-                OutlinedButton({ showSync = true }, Modifier.weight(1f)) { Text("☁ CRM") }
+                OutlinedButton({ crm.detectName(); doSync() }, Modifier.weight(1f)) { Text("☁ CRM") }
             }
             if (status.isNotEmpty()) Text(status, style = MaterialTheme.typography.bodySmall)
+            DiagCard()
             OutlinedTextField(q, { q = it }, Modifier.fillMaxWidth().padding(top = 8.dp), singleLine = true,
                 label = { Text("Tìm viết tắt, từ khoá, nội dung") })
             Spacer(Modifier.height(8.dp))
@@ -128,7 +154,6 @@ fun App() {
         }
     }
     editing?.let { SnippetDialog(it) { editing = null; doSync() } }
-    if (showSync) CrmDialog({ showSync = false }, { doSync() })
     if (newFolder) {
         var name by remember { mutableStateOf("") }
         AlertDialog(onDismissRequest = { newFolder = false }, title = { Text("Thư mục mới") },
@@ -235,23 +260,21 @@ fun SnippetDialog(s: Snippet, onDone: () -> Unit) {
 
 @Composable
 fun CrmDialog(onDone: () -> Unit, onSave: () -> Unit) {
+    // Viết tắt đã MẶC ĐỊNH nối sẵn với CRM (Crm.DEFAULT_URL / DEFAULT_WEB) nên hộp này chỉ còn hỏi Tên CS — không còn chữ "Kết nối" và 2 ô địa chỉ.
+    // Địa chỉ đã lưu riêng trên máy (nếu từng đổi) vẫn được giữ nguyên: Lưu chỉ ghi "name", không đụng "url"/"web".
     val ctx = LocalContext.current
     val p = Crm.prefs(ctx)
-    var url by remember { mutableStateOf(Crm.url(ctx)) }
     var name by remember { mutableStateOf(Crm.name(ctx)) }
-    var web by remember { mutableStateOf(Crm.webUrl(ctx)) }
-    AlertDialog(onDismissRequest = onDone, title = { Text("Kết nối CRM") },
+    AlertDialog(onDismissRequest = onDone, title = { Text("Cập nhật viết tắt") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Nhập đúng tên CS của bạn (giống tên trong CRM) để thấy cả mục viết tắt riêng của bạn. Mục chung của team luôn có.", style = MaterialTheme.typography.bodySmall)
-                OutlinedTextField(name, { name = it }, singleLine = true, label = { Text("Tên CS của bạn") })
-                OutlinedTextField(web, { web = it }, label = { Text("Địa chỉ web CRM (đã điền sẵn)") })
-                OutlinedTextField(url, { url = it }, label = { Text("Địa chỉ dữ liệu Viết tắt (đã điền sẵn, thường không cần đổi)") })
+                OutlinedTextField(name, { name = it }, singleLine = true, label = { Text("Tên CS của bạn") }, modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = {
             TextButton({
-                if (name.isNotBlank()) { p.edit().putString("url", url.trim()).putString("web", web.trim()).putString("name", name.trim()).apply(); onSave() }
+                if (name.isNotBlank()) { p.edit().putString("name", name.trim()).apply(); onSave() }
                 onDone()
             }) { Text("Lưu & cập nhật") }
         },

@@ -11,7 +11,7 @@ const sorted = (a) => a.slice().sort();
 function mk(o) {
   const ctx = Object.assign({ Logger: { log() {} }, readPancakeMap_: () => ({}), readSaleDirectory_: () => ({ list: [] }), _userAliasGroups_: () => ({}) }, o || {});
   vm.createContext(ctx);
-  ['_normTxt_', '_stripVN_', '_expandSaleFilterWithPancakeAliases_', '_foldSaleKey_', '_salePersonKeyFn_', '_salePersonIdentity_', '_psheetNoAccent_', 'saleMatchCandidates_'].forEach((n) => { try { vm.runInContext(grab(n), ctx); } catch (e) { if (!/khong thay ham/.test(e.message)) throw e; } });
+  ['_isNumericTag_', '_normTxt_', '_stripVN_', '_expandSaleFilterWithPancakeAliases_', '_foldSaleKey_', '_salePersonKeyFn_', '_salePersonIdentity_', '_psheetNoAccent_', 'saleMatchCandidates_'].forEach((n) => { try { vm.runInContext(grab(n), ctx); } catch (e) { if (!/khong thay ham/.test(e.message)) throw e; } });
   return ctx;
 }
 const grp = (arrs) => { const m = {}; arrs.forEach((a) => a.forEach((n) => { m[n.toLowerCase()] = a.slice(); })); return m; };   // dang _userAliasGroups_: key chuan hoa -> cac ten

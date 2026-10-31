@@ -1119,14 +1119,36 @@ async function _pullCskhLiteOnce_(isManual){
 // fetch co GIOI HAN THOI GIAN cho cac lan keo du lieu cua syncFromGS (2026-10-26). NGUYEN NHAN: cac lan keo (customers/orders/donPhones/cskhDuyenLite/careLeads) chay NOI TIEP nhau
 // va khong co timeout; 1 yeu cau treo (Worker/GAS cham, mang di dong chap chon) lam ca lan dong bo dau tien khong bao gio xong => khung 'Dang tai du lieu' dung mai, khong hien khach.
 // Het gio -> fetch/text() nem loi -> roi vao khoi catch san co (tinh vao bo dem loi dong bo, nhip sau tu thu lai) thay vi treo.
+// TU THU LAI nhanh (2026-10-26): loi THOANG QUA (Apps Script vua deploy phien ban moi => /exec tra 404 trang Google 'Rat tiec, khong the mo tep' vai chuc giay;
+// Worker khong goi duoc GAS => 502; qua tai => 503/504; mat mang chop) truoc day lam ca lan keo that bai roi cho 'nhip sau' (banner loi cat phut).
+// Nay thu lai toi da 2 lan (cach _GS_RETRY_DELAYS_ = 1.5s roi 4s). KHONG thu lai khi HET GIO (AbortError: da cho 30-75s) hay ma khac (400/401/403/200...).
+// Ham TU DU (mac dinh nam trong ham) de test cu (tools/test-gs-fetch-timeout.js chi cat than ham nay) van chay; test/dev co the ghi de bang bien toan cuc _GS_RETRY_DELAYS_.
 function _gsFetchTO_(url, ms) {
-  if (typeof AbortController === 'undefined') return fetch(url, { redirect: 'follow' });
-  const ac = new AbortController(), t = setTimeout(function () { try { ac.abort(); } catch (e) {} }, ms);
-  return fetch(url, { redirect: 'follow', signal: ac.signal }).then(function (r) {
-    const ot = r.text.bind(r);
-    r.text = function () { return ot().then(function (x) { clearTimeout(t); return x; }, function (e) { clearTimeout(t); throw e; }); };   // giu dong ho cho toi khi doc xong than phan hoi
-    return r;
-  }, function (e) { clearTimeout(t); throw e; });
+  var delays = (typeof _GS_RETRY_DELAYS_ !== 'undefined' && _GS_RETRY_DELAYS_) || [1500, 4000];
+  var retryStatus = [404, 502, 503, 504];
+  function once() {
+    if (typeof AbortController === 'undefined') return fetch(url, { redirect: 'follow' });
+    const ac = new AbortController(), t = setTimeout(function () { try { ac.abort(); } catch (e) {} }, ms);
+    return fetch(url, { redirect: 'follow', signal: ac.signal }).then(function (r) {
+      const ot = r.text.bind(r);
+      r.text = function () { return ot().then(function (x) { clearTimeout(t); return x; }, function (e) { clearTimeout(t); throw e; }); };   // giu dong ho cho toi khi doc xong than phan hoi
+      return r;
+    }, function (e) { clearTimeout(t); throw e; });
+  }
+  function pause(i) { return new Promise(function (res) { setTimeout(res, delays[i]); }); }
+  function attempt(i) {
+    return once().then(function (r) {
+      if (i < delays.length && retryStatus.indexOf(r.status) !== -1) {
+        try { r.text().catch(function () {}); } catch (e) {}   // xa than phan hoi bi bo + tat dong ho cua lan nay
+        return pause(i).then(function () { return attempt(i + 1); });
+      }
+      return r;
+    }, function (e) {
+      if (i < delays.length && !(e && e.name === 'AbortError')) return pause(i).then(function () { return attempt(i + 1); });
+      throw e;
+    });
+  }
+  return attempt(0);
 }
 async function syncFromGS(opts) {
   opts = opts || {};

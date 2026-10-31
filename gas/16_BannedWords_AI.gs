@@ -196,6 +196,41 @@ function priceAsk_(q) {
   }
   return { ok: true, found: false, suggestions: names };
 }
+// GET action=priceItem&name=<TEN san pham chinh xac (lay tu goi y cua priceAsk)>.
+// Tra { ok, found, name, info:[{k,v}], variants:[{mat,size,prices:[{label,value,stone}]}] } de giao dien cho nhan vien BAM tung buoc (chat lieu -> size/kieu -> gia),
+// KHONG de AI nghi ra gia: moi so lay thang tu DANH_MUC. stone = '' (gia thuong/mac dinh) | 'SAPHIA' | 'RUBY'. Don vi gia: nghin dong.
+function priceItem_(name) {
+  name = String(name || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+  if (!name) return { ok: false, error: 'Thieu ten san pham (name)' };
+  var rows;
+  try { rows = _priceCatalogRowsCached_(); } catch (e) { return { ok: false, error: 'Khong doc duoc bang gia (DANH_MUC): ' + String(e && e.message || e) }; }
+  var want = _stripVN_(name), variants = [], infoSeen = {}, info = [], shown = name;
+  for (var i = 0; i < rows.length && variants.length < 60; i++) {
+    var r = rows[i], fn = _priceFieldPick_(r, ['ten san pham', 'ten thuong mai']);
+    if (!fn || !fn.val || _stripVN_(fn.val) !== want) continue;
+    shown = String(fn.val).trim();
+    var mat = _priceFieldPick_(r, ['chat lieu']), sz = _priceFieldPick_(r, ['kieu', 'size']), prices = [];
+    for (var k in r) {
+      var nk = _stripVN_(k);
+      if (nk.indexOf('gia') === -1 && nk.indexOf('price') === -1) continue;
+      var v = r[k]; if (v === '' || v === null || v === undefined) continue;
+      prices.push({ label: String(k).replace(/\s*\(.*?\)\s*/g, '').trim(), value: v, stone: nk.indexOf('saphia') !== -1 ? 'SAPHIA' : nk.indexOf('ruby') !== -1 ? 'RUBY' : '' });
+    }
+    if (!prices.length) continue;
+    variants.push({ mat: (mat && mat.val) ? String(mat.val).trim() : '', size: (sz && sz.val) ? String(sz.val).trim() : '', prices: prices });
+    // thong tin chung cua san pham: cac cot KHAC (khong phai ten/chat lieu/size/gia), lay gia tri dau tien gap cua moi cot, toi da 6 muc
+    for (var k2 in r) {
+      var n2 = _stripVN_(k2);
+      if (n2.indexOf('gia') !== -1 || n2.indexOf('price') !== -1 || n2.indexOf('chat lieu') !== -1 || n2.indexOf('kieu') !== -1 || n2.indexOf('size') !== -1 || /^cot [a-z]+$/.test(n2)) continue;
+      var v2 = String(r[k2]).replace(/\s+/g, ' ').trim();
+      if (!v2 || infoSeen[n2] || info.length >= 6 || n2.indexOf('link') !== -1 || /^https?:/i.test(v2)) continue;
+      if (_stripVN_(v2) === want) continue;   // chinh la cot ten
+      infoSeen[n2] = 1; info.push({ k: String(k2).trim(), v: v2.slice(0, 160) });
+    }
+  }
+  if (!variants.length) return { ok: true, found: false, name: name, info: [], variants: [] };
+  return { ok: true, found: true, name: shown, info: info, variants: variants, unit: 'nghin dong (vd 2.310 = 2.310.000d)' };
+}
 // Prompt he thong cho cau hoi GIA cua NHAN VIEN (Pancake AI "Hoi AI"): van ngan, CHI dung bang gia that, cam bia.
 function _priceQaSystemPrompt_(q) {
   var info = '';

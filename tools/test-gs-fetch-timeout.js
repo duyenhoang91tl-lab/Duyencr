@@ -6,7 +6,8 @@ const i = src.indexOf('function _gsFetchTO_('); let d = 0, j = src.indexOf('{', 
 for (let k = j; k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}' && --d === 0) { end = k + 1; break; } }
 const code = src.slice(i, end);
 let bad = 0; const ok = (c, t) => { if (!c) { bad++; console.log('FAIL', t); } else console.log('ok  ', t); };
-const mkCtx = (fetchImpl) => { const c = { setTimeout, clearTimeout, AbortController, fetch: fetchImpl, Promise }; vm.createContext(c); vm.runInContext(code, c); return c; };
+// 26/10: _gsFetchTO_ nay con tu thu lai loi thoang qua -> do tre ngan (ghi de _GS_RETRY_DELAYS_) de ca 'loi mang' khong phai cho 5.5s.
+const mkCtx = (fetchImpl) => { const c = { setTimeout, clearTimeout, AbortController, fetch: fetchImpl, Promise, _GS_RETRY_DELAYS_: [1, 1] }; vm.createContext(c); vm.runInContext(code, c); return c; };
 const hang = (url, o) => new Promise((res, rej) => { o.signal.addEventListener('abort', () => rej(Object.assign(new Error('aborted'), { name: 'AbortError' }))); });
 const fast = (body) => (url, o) => Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve(body) });
 const slowBody = (url, o) => Promise.resolve({ ok: true, status: 200, text: () => new Promise((res, rej) => { o.signal.addEventListener('abort', () => rej(new Error('body aborted'))); }) });

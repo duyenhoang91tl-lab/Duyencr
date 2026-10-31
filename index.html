@@ -8,6 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Duyên CRM">
+<link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>Thu Hiền CRM 10.55.22.8.26</title>
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
@@ -26,7 +27,7 @@ html.ev-boot #empty-view .ev-spin{display:flex}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="css/01-base.css?v=20261026a">
+<link rel="stylesheet" href="css/01-base.css?v=20261030a">
 <link rel="stylesheet" href="css/02-style.css">
 </head>
 <body>
@@ -813,6 +814,13 @@ window.addEventListener('load',function(){var s=document.createElement('script')
           </div>
           <div style="font-size:11px;color:var(--muted);margin:-2px 0 8px">🗂 Chọn nhóm sản phẩm hoặc <b>để "tự phân loại"</b> — hệ thống tự xếp nhóm theo tên sản phẩm / nội dung mẫu; mẫu chung (chào hỏi...) không thuộc nhóm nào.</div>
           <textarea id="mt-f-content" class="zai-textarea" placeholder="Nội dung mẫu tin nhắn..." rows="4" style="width:100%;margin-bottom:8px"></textarea>
+          <div style="margin-bottom:8px">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">🖼 Ảnh đính kèm mẫu (tối đa 4 ảnh, mỗi ảnh ≤ 5MB)</div>
+            <input type="file" id="mt-f-imgs" accept="image/*" multiple style="display:none" onchange="mtHandleImgPick(this.files)">
+            <div id="mt-f-img-previews" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px"></div>
+            <button type="button" class="btn sm" onclick="document.getElementById('mt-f-imgs').click()" id="mt-f-img-btn">➕ Chọn ảnh</button>
+            <span id="mt-f-img-status" style="font-size:11px;color:var(--muted);margin-left:8px"></span>
+          </div>
           <div style="display:flex;gap:8px;justify-content:flex-end">
             <button class="btn sm" onclick="closeMsgTemplateForm()">Hủy</button>
             <button class="btn sm primary" id="mt-f-save-btn" onclick="saveMsgTemplateUI()">Lưu mẫu</button>
@@ -938,7 +946,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 <script src="js/02-fn-showrowerrorbanner.js"></script>
 <script src="js/03-fn-refreshopendptab.js"></script>
 <script src="js/04-fn-synczalophonesettingsfromgas.js"></script>
-<script src="js/05-fn-saveeditphone.js"></script>
+<script src="js/05-fn-saveeditphone.js?v=20261026a"></script>
 <script src="js/06-main-renew-sources.js?v=20261026a"></script>
 
 <!-- ASSIGN DATA MODAL -->
@@ -1016,13 +1024,13 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 
 
 <!-- ════════════ V9 FEATURE LAYER ════════════ -->
-<script src="js/08-fn-invalidatefiltercache.js"></script>
-<script src="js/09-fn-deleteteam.js"></script>
-<script src="js/10-fn-pkkpipct.js"></script>
-<script src="js/11-fn-srload.js?v=20261024c"></script>
-<script src="js/12-fn-rendersalesreporttabe.js?v=20261024c"></script>
-<script src="js/13-fn-bpseedofficialonlinetemplate.js?v=20261024c"></script>
-<script src="js/14-fn-aasplit.js?v=20261023a"></script>
+<script src="js/08-fn-invalidatefiltercache.js?v=20261029a"></script>
+<script src="js/09-fn-deleteteam.js?v=20261029a"></script>
+<script src="js/10-fn-pkkpipct.js?v=20261029a"></script>
+<script src="js/11-fn-srload.js?v=20261031a"></script>
+<script src="js/12-fn-rendersalesreporttabe.js?v=20261031a"></script>
+<script src="js/13-fn-bpseedofficialonlinetemplate.js?v=20261031a"></script>
+<script src="js/14-fn-aasplit.js?v=20261029a"></script>
 <script src="js/15-fn-hidelogin.js"></script>
 <script src="js/16-main-currentuser.js"></script>
 
@@ -1227,16 +1235,18 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 
 <link rel="stylesheet" href="css/04-style.css">
 <link rel="stylesheet" href="css/05-sidenav.css?v=20261023b">
-<link rel="stylesheet" href="css/06-pro.css">
+<link rel="stylesheet" href="css/06-pro.css?v=20261027b">
 <link rel="stylesheet" href="css/07-teamchat.css">
 <link rel="stylesheet" href="css/08-kho.css">
 <link rel="stylesheet" href="css/09-profile.css">
-<link rel="stylesheet" href="css/10-filter-presets.css?v=20261017">
+<link rel="stylesheet" href="css/10-filter-presets.css?v=20261031a">
 <link rel="stylesheet" href="css/10-dark.css?v=20261023a">
 <link rel="stylesheet" href="css/11-roles.css">
 <link rel="stylesheet" href="css/12-salematch.css">
 <link rel="stylesheet" href="css/13-shell.css?v=20261019c">
 <link rel="stylesheet" href="css/14-qrpills.css">
+<link rel="stylesheet" href="css/15-mobile.css">
+<link rel="stylesheet" href="css/16-mobile-list.css?v=20261026a">
 <link rel="stylesheet" href="css/99-dark-auto.css"><!-- TỰ SINH (tools/gen-dark-theme.js): lớp chế độ tối cho màu cứng; chỉ có hiệu lực khi html[data-theme="dark"]; PHẢI nạp sau cùng -->
 
 <script src="js/18-openkhstatusmodal.js"></script>
@@ -1738,18 +1748,19 @@ function openBcLogModal(phone){
 <script src="js/42-fn-homesummary.js"></script>
 <script src="js/43-fn-uxtools.js"></script>
 <script src="js/30-fn-teamanalysis.js"></script>
-<script src="js/29-sidenav.js?v=20261023b"></script>
+<script src="js/29-sidenav.js?v=20261026a"></script>
 <script src="js/31-fn-orgoverview.js"></script>
 <script src="js/32-fn-furesult.js"></script>
 <script src="js/33-fn-tierconfig.js"></script>
 <script src="js/33-pro-profile.js"></script>
 <script src="js/34-pro-charts.js"></script>
 <script src="js/36-pro-home.js"></script>
-<script src="js/38-pro-dock.js"></script>
+<script src="js/38-pro-dock.js?v=20261027b"></script>
 <script src="js/39-fn-notify.js?v=20261020a"></script>
 <script src="js/40-fn-rolesettings.js"></script>
-<script src="js/41-fn-pkchat.js"></script>
-<script src="js/42-fn-socialchat.js?v=20261020a"></script>
+<script src="js/41-fn-pkchat.js?v=20261025c"></script>
+<script src="js/42-fn-socialchat.js?v=20261025c"></script>
+<script src="js/58-fn-chatcoach.js?v=20261025c"></script>
 <script src="js/43-teamchat.js"></script>
 <script src="js/40-main-restorenav.js"></script>
 <script src="js/43-fn-viewstate.js"></script>
@@ -1766,9 +1777,12 @@ function openBcLogModal(phone){
 <script src="js/54-fn-promo-admin.js"></script>
 <script src="js/55-fn-shell.js?v=20261019c"></script>
 <script src="js/56-fn-qrpills.js"></script>
+<script src="js/59-fn-mobilefit.js"></script>
 <script src="js/57-viettat.js?v=20261025f"></script>
 <script src="js/58-auto-cust-link.js"></script>
+<script src="js/59-conn-diag.js"></script>
 <script src="js/59-report-drill.js"></script>
+<script src="js/60-team-bonus.js?v=20261031c"></script>
 
 
 <div class="modal-overlay" id="quick-add-modal" style="display:none;align-items:flex-start;justify-content:center;padding-top:60px;z-index:800">

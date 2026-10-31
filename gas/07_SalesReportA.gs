@@ -110,17 +110,24 @@ function _srCloseRateSections_(normRows, filters) {
     }
     pInt2.byCS.forEach(function(r) {
       var k = personKey(r.name);
-      if (!closeAgg[k]) closeAgg[k] = { name: r.name, tongTT: 0, orders: 0 };
+      if (!closeAgg[k]) closeAgg[k] = { name: r.name, tongTT: 0, orders: 0, khMoi: 0, khCu: 0, ttAll: 0, dayMap: {} };
       closeAgg[k].tongTT += useMappedTT ? (r.tongTTMapped || 0) : (r.tongTT || 0);
+      closeAgg[k].khMoi += r.khMoi || 0; closeAgg[k].khCu += r.khCu || 0; closeAgg[k].ttAll += r.tongTT || 0;   // cho cac cot phu cua bieu do: % khach moi / cu, khach TB/ngay
+      (r.dayList || []).forEach(function(dk) { closeAgg[k].dayMap[dk] = true; });
     });
     Object.keys(closeOrdersBySale).forEach(function(k) {
-      if (!closeAgg[k]) closeAgg[k] = { name: orderDisp[k], tongTT: 0, orders: 0 };
+      if (!closeAgg[k]) closeAgg[k] = { name: orderDisp[k], tongTT: 0, orders: 0, khMoi: 0, khCu: 0, ttAll: 0, dayMap: {} };
       closeAgg[k].orders += closeOrdersBySale[k];
     });
     saleCloseRate = Object.keys(closeAgg).map(function(k) {
       var r = closeAgg[k];
+      var days = Object.keys(r.dayMap).length, kh2 = r.khMoi + r.khCu;
       return { name: r.name, held: Math.round(r.tongTT * 100) / 100, closed: r.orders,
-               closeRate: r.tongTT ? Math.round(r.orders / r.tongTT * 1000) / 10 : 0 };
+               closeRate: r.tongTT ? Math.round(r.orders / r.tongTT * 1000) / 10 : 0,
+               // Cot phu (Duyen yeu cau 2026-10-26): % tuong tac la KHACH MOI / KHACH CU (tren khMoi+khCu), so khach tuong tac TB moi ngay (ngay co tuong tac)
+               khMoi: Math.round(r.khMoi * 100) / 100, khCu: Math.round(r.khCu * 100) / 100, days: days,
+               pctMoi: kh2 ? Math.round(r.khMoi / kh2 * 1000) / 10 : 0, pctCu: kh2 ? Math.round(r.khCu / kh2 * 1000) / 10 : 0,
+               perDay: days ? Math.round(r.ttAll / days * 10) / 10 : 0 };
     });
   }
 
@@ -258,6 +265,38 @@ function _extractPageNameFromNguonDon_(nguonDon) {
 // tinh DUNG tai vong tong hop de cong lai khop 100% so tren bang): [[ten, so tien]]. Lam tron dong de payload gon.
 function _drillPairs_(arr) { return (arr || []).map(function(x) { return [x[0], Math.round(x[1])]; }); }
 function _drillPairsObj_(o) { return Object.keys(o || {}).map(function(k) { return [k, Math.round(o[k])]; }); }
+// ── DOANH THU THEO SALE — LOAI KENH "FACEBOOK" (Duyen yeu cau 2026-10-31): muc moi ngay duoi "Theo Sale ban" cua bao cao doanh so (Base). ──
+// "Kenh Facebook" o day = kenh ban DUNG CHU "Facebook" (kenh my pham). Ten khac chi chua chu facebook (vd "Facebook Phạm Thu Hiền") KHONG bi loai.
+// So khop sau khi bo dau + chu thuong + gop khoang trang. Doi/them kenh loai: sua SALE_REV_EXCLUDE_KENH_ (viet thuong, khong dau).
+// Quy uoc chia tien/dem don GIONG HET bang "Theo Sale ban": mac dinh moi sale tren don +1 don, tien chia deu N sale; byCreator: tinh tron cho nguoi tao.
+var SALE_REV_EXCLUDE_KENH_ = ['facebook'];
+function _srKenhExcluded_(kenhBan) {
+  var k = _stripVN_(String(kenhBan || '')).toLowerCase().replace(/\s+/g, ' ').trim();
+  return SALE_REV_EXCLUDE_KENH_.indexOf(k) >= 0;
+}
+// matched = don da qua bo loc cua bao cao A; wantSale(ten) = ham loc Sale; tra { rows:[{name,orders,coc,giaTri,trungBinhDon}], excludedOrders, excludedRevenue, keptOrders, keptRevenue }
+function _srSaleRevExKenh_(matched, byCreator, wantSale, unassigned) {
+  var by = {}, exOrders = 0, exRev = 0, keptOrders = 0, keptRev = 0;
+  (matched || []).forEach(function (m) {
+    var rev = _dtOrderRevenue_(m), ex = _srKenhExcluded_(m.kenhBan), shares = [];
+    if (byCreator) shares.push([m.nguoiTao || unassigned, rev, m.giaTriCoc || 0]);
+    else {
+      var sl = splitMulti_(m.saleBan, ',').filter(function (x) { return !_isNumericTag_(x); });
+      if (!sl.length) sl = [unassigned];
+      sl.forEach(function (n) { if (wantSale(n)) shares.push([n, rev / sl.length, (m.giaTriCoc || 0) / sl.length]); });
+    }
+    if (!shares.length) return;
+    if (ex) { exOrders++; shares.forEach(function (x) { exRev += x[1]; }); return; }
+    keptOrders++; shares.forEach(function (x) {
+      keptRev += x[1];
+      var o = by[x[0]] || (by[x[0]] = { orders: 0, coc: 0, giaTri: 0 });
+      o.orders += 1; o.coc += x[2]; o.giaTri += x[1];
+    });
+  });
+  var rows = Object.keys(by).map(function (k) { var o = by[k]; return { name: k, orders: o.orders, coc: o.coc, giaTri: o.giaTri, trungBinhDon: o.orders ? Math.round(o.giaTri / o.orders) : 0 }; });
+  rows.sort(function (a, b) { return b.giaTri - a.giaTri; });
+  return { rows: rows, excludedOrders: exOrders, excludedRevenue: exRev, keptOrders: keptOrders, keptRevenue: keptRev };
+}
 function buildSalesReportA_(filters) {
   filters = filters || {};
   var dateField = filters.dateField === 'thoiGianHT' ? 'thoiGianHT' : 'ngayTao';
@@ -385,6 +424,8 @@ function buildSalesReportA_(filters) {
     }
   }
 
+  var saleRevNoFb_ = _srSaleRevExKenh_(matched, byCreator, wantSaleA_, UNASSIGNED);   // doanh thu theo Sale bo kenh "Facebook" (Duyen 2026-10-31)
+
   function toArr(obj) {
     var arr = [];
     for (var key in obj) {
@@ -431,6 +472,8 @@ function buildSalesReportA_(filters) {
     totalGiaTri: totalGiaTri,
     totalGiaTriChenh: totalGiaTriChenh,
     bySale: toArr(bySale),
+    bySaleNoFb: saleRevNoFb_.rows,   // doanh thu theo Sale LOAI kenh "Facebook" (muc moi duoi Theo Sale ban)
+    noFb: { kenh: SALE_REV_EXCLUDE_KENH_, excludedOrders: saleRevNoFb_.excludedOrders, excludedRevenue: saleRevNoFb_.excludedRevenue, keptOrders: saleRevNoFb_.keptOrders, keptRevenue: saleRevNoFb_.keptRevenue },
     byKenh: toArr(byKenh),
     byTeamSale: toArr(byTeamSale),
     byMkt: byMktArr,

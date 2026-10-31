@@ -134,6 +134,8 @@ function _splitScope_(user) {
     var by = readSaleDepts_().byNorm;
     Object.keys(by).forEach(function (n) { var h = by[n]; if (h && h.key && keys[_normTxt_(h.key)]) add(h.name || n); });
   }
+  // Doi sale Online/Van phong xem them nhom Sale "Quay" + phong CSKH (2026-10-29, xem _viewExtraNames_)
+  try { _viewExtraNames_(user).names.forEach(add); } catch (eVx) {}
   return { all: false, names: list };
 }
 function _splitCSV_(s) { return s ? String(s).split(',').map(function (x) { return x.trim(); }).filter(Boolean) : []; }
