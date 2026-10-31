@@ -1680,7 +1680,7 @@ function _featureAllowed_(user, fid, cfg, skipUserPerms) {
   return ok;
 }
 // Chan o backend: action bao cao -> hang muc. Chi chan khi co token hop le va admin da gioi han.
-var ACTION_FEATURE_ = { teamBonusReport:'salesreport', salesReportA:'salesreport', salesReportB:'salesreport', salesReportC:'salesreport', splitOrderReport:'salesreport', splitOrderDetail:'salesreport', saleKpiReport:'salesreport', failedOrderReport:'salesreport', careLeadReport:'salesreport', kpiReport:'kpipancake', pancakeReport:'pancake', pancakeSdtReport:'pancake', mktChecklist:'mktchecklist', orgOverview:'overview', teamAnalysis:'overview', audit:'audit' };
+var ACTION_FEATURE_ = { teamBonusReport:'salesreport', teamPenaltySuggest:'salesreport', salesReportA:'salesreport', salesReportB:'salesreport', salesReportC:'salesreport', splitOrderReport:'salesreport', splitOrderDetail:'salesreport', saleKpiReport:'salesreport', failedOrderReport:'salesreport', careLeadReport:'salesreport', kpiReport:'kpipancake', pancakeReport:'pancake', pancakeSdtReport:'pancake', mktChecklist:'mktchecklist', orgOverview:'overview', teamAnalysis:'overview', audit:'audit' };
 function _featureGate_(action, token) {
   var f = ACTION_FEATURE_[action];
   if (!f || !token) return null;
@@ -20087,8 +20087,8 @@ function splitDoPost_(action, d) {
 var TEAM_BONUS_SECTION_ = 1;
 var SH_TEAM_PENALTY_ = 'ThuongPhatDoiSale';
 var TEAM_PENALTY_HEADERS_ = ['id', 'date', 'sale', 'type', 'amount', 'note', 'by', 'at'];
-var TEAMBONUS_GET_ACTIONS_ = { teamBonusReport: 1 };
-var TEAMBONUS_POST_ACTIONS_ = { teamPenaltySave: 1, teamPenaltyDelete: 1 };
+var TEAMBONUS_GET_ACTIONS_ = { teamBonusReport: 1, teamPenaltySuggest: 1 };
+var TEAMBONUS_POST_ACTIONS_ = { teamPenaltySave: 1, teamPenaltyDelete: 1, teamPenaltyIgnore: 1 };
 var TEAM_BONUS_DEFAULT_ = {
   dailyMinOrders: 6, dailyReward: 50000, weeklyReward: 50000, monthlyReward: 100000,
   excludeRe: 'doi tra|doi hang|bao hanh|thay day',   // so khop KHONG DAU voi Phan loai / Kenh ban / Giai doan cua don Base (don bhZero = BH khong doanh thu luon bi loai)
@@ -20259,6 +20259,7 @@ function teamBonusReport_(p, acc) {
 function teamBonusDoGet_(action, p) {
   try {
     var acc = _tbAccess_(p && p.token); if (!acc.ok) return jsonOut_(acc);
+    if (action === 'teamPenaltySuggest') return acc.admin ? jsonOut_(teamPenaltySuggest_(p, acc)) : jsonOut_({ ok: false, code: 'FORBIDDEN', error: 'Chi admin xem goi y phat.' });
     return jsonOut_(teamBonusReport_(p, acc));
   } catch (err) { return jsonOut_({ ok: false, error: 'Loi thuong phat doi Sale: ' + (err && err.message || err) }); }
 }
@@ -20270,6 +20271,7 @@ function teamBonusDoPost_(action, d) {
     try {
       var sh = getSheet_(SH_TEAM_PENALTY_, TEAM_PENALTY_HEADERS_), by = String(acc.u.name || acc.u.username || ''), at = Utilities.formatDate(new Date(), 'Asia/Ho_Chi_Minh', 'dd/MM/yyyy HH:mm');
       try { sh.getRange('B:B').setNumberFormat('@'); } catch (eF) {}
+      if (action === 'teamPenaltyIgnore') return teamPenaltyIgnore_(d);
       if (action === 'teamPenaltyDelete') {
         var id = String(d.id || '').trim(), last = sh.getLastRow();
         if (!id || last < 2) return jsonOut_({ ok: false, error: 'Khong co dong de xoa.' });
@@ -20296,4 +20298,81 @@ function teamBonusDoPost_(action, d) {
       return jsonOut_({ ok: true, id: nid, sale: sale, amount: amount });
     } finally { try { lock.releaseLock(); } catch (eU) {} }
   } catch (err) { return jsonOut_({ ok: false, error: 'Loi ghi phat doi Sale: ' + (err && err.message || err) }); }
+}
+
+// ── GOI Y PHAT TU DONG tu tin nhan Pancake (Duyen 2026-10-31): CHI GOI Y, Admin duyet moi ghi vao Nhat ky phat; tinh ca ngay dem. ──
+// Loai 1 "Tin troi qua 30 phut khong phan hoi": tin khach (direction 'in') cho lau hon 30 phut moi co tin tra loi ('out'), hoac den gio van chua tra loi (chua doc).
+// Loai 3 "Da doc nhung khong phan hoi": hoi thoai da doc (seen) nhung chua tra loi qua 30 phut. Chi xet hoi thoai INBOX (khong tinh binh luan).
+// GIOI HAN DA BIET (admin xem xet truoc khi ghi): (a) khong phan biet duoc "tin nhay tu Sale khac" (chuyen hoi thoai) — Pancake khong gui co nay; (b) ten nhan vien tra loi
+// la ten Pancake co the thieu (xem docs/PANCAKE-INBOX.md) nen sale co the de trong de Admin chon; (c) tra loi tu dong (chatbot) van tinh la da tra loi.
+var TB_MSG_SCAN_MAX_ROWS_ = 6000;
+function _tbScanMsgs_(rows, nowMs, endMs, thrMin, staffNames, memberOf) {
+  var by = {};
+  (rows || []).forEach(function (r) {
+    var t = Date.parse(r && r.sent_at); if (!r || !r.conversation_id || !isFinite(t)) return;
+    var c = r.pk_conversations || {}; if (String(c.conv_type || 'INBOX').toUpperCase() === 'COMMENT') return;
+    (by[r.conversation_id] || (by[r.conversation_id] = { conv: c, msgs: [] })).msgs.push({ t: t, dir: String(r.direction || ''), staff: String(r.crm_user || r.staff_name || '').trim() });
+  });
+  var out = [], cut = Math.min(nowMs, endMs);
+  function who(name) { var k = _normTxt_(name); return (k && memberOf[k]) || ''; }
+  function iso(t) { return new Date(t).toISOString().slice(0, 16); }
+  Object.keys(by).forEach(function (cid) {
+    var g = by[cid], c = g.conv; g.msgs.sort(function (a, b) { return a.t - b.t; });
+    var pend = null, cust = String(c.customer_name || ''), ph = String(c.customer_phone || '');
+    var ass = []; (c.assignee_ids || []).forEach(function (id) { var n = staffNames[String(id)]; if (n) ass.push(n); });
+    g.msgs.forEach(function (m) {
+      if (m.dir === 'in') { if (pend === null) pend = m.t; }
+      else if (m.dir === 'out' && pend !== null) {
+        var gap = (m.t - pend) / 60000;
+        if (gap > thrMin) out.push({ key: 'm:' + cid + ':' + iso(pend), type: 1, convId: cid, customer: cust, phone: ph, inAt: new Date(pend).toISOString(), outAt: new Date(m.t).toISOString(), gapMin: Math.round(gap), open: false, sale: who(m.staff), saleRaw: m.staff, page: c.page_id || '' });
+        pend = null;
+      }
+    });
+    if (pend !== null && !(c.is_replied === true)) {
+      var gap2 = (cut - pend) / 60000;
+      if (gap2 > thrMin) {
+        var sr = ass.join(', '), sl = ''; ass.forEach(function (n) { if (!sl) sl = who(n); });
+        out.push({ key: 'm:' + cid + ':' + iso(pend), type: c.seen === true ? 3 : 1, convId: cid, customer: cust, phone: ph, inAt: new Date(pend).toISOString(), outAt: null, gapMin: Math.round(gap2), open: true, sale: sl, saleRaw: sr, page: c.page_id || '' });
+      }
+    }
+  });
+  out.sort(function (a, b) { return b.gapMin - a.gapMin; });
+  return out;
+}
+// Doc tin 1 ngay (gio VN) tu Supabase theo trang 1000 dong. Tra { rows, truncated }.
+function _tbReadDayMsgs_(ymd) {
+  var from = new Date(Date.UTC(+ymd.slice(0, 4), +ymd.slice(5, 7) - 1, +ymd.slice(8, 10)) - VN_OFFSET_MS), to = new Date(from.getTime() + 86400000);
+  var sel = 'conversation_id,direction,sent_at,staff_name,crm_user,pk_conversations(conv_type,customer_name,customer_phone,seen,is_replied,assignee_ids,page_id)';
+  var base = 'pk_messages?select=' + sel + '&sent_at=gte.' + _pkEnc_(from.toISOString()) + '&sent_at=lt.' + _pkEnc_(to.toISOString()) + '&order=sent_at.asc', rows = [], off = 0, truncated = false;
+  for (;;) {
+    var page = sb_('GET', base + '&limit=1000&offset=' + off).json || [];
+    rows = rows.concat(page);
+    if (page.length < 1000) break;
+    off += 1000;
+    if (rows.length >= TB_MSG_SCAN_MAX_ROWS_) { truncated = true; break; }
+  }
+  return { rows: rows, truncated: truncated, endMs: to.getTime() };
+}
+function _tbIgnored_() { try { var a = JSON.parse(getSetting_('tbPenIgnore') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+// GET teamPenaltySuggest&date=yyyy-mm-dd (Admin): danh sach goi y, da loai nhung dong da ghi phat (ghi chu co [pk:<key>]) va nhung dong da bo qua.
+function teamPenaltySuggest_(p, acc) {
+  var ymd = String(p.date || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) ymd = _vnYmd_(new Date());
+  var ck = 'tb_sg_v1_' + ymd, hit = null;
+  try { var raw = _cacheGetBig_(ck); if (raw) hit = JSON.parse(raw); } catch (e0) {}
+  if (!hit || p.nocache === '1') {
+    var day = _tbReadDayMsgs_(ymd), tm = _tbTeam_();
+    hit = { items: _tbScanMsgs_(day.rows, Date.now(), day.endMs, 30, _pkStaffNames_(), tm.memberOf), truncated: day.truncated, scanned: day.rows.length };
+    try { _cachePutBig_(ck, JSON.stringify(hit), 600); } catch (e1) {}
+  }
+  var done = {}, ig = {}; _tbReadPenalties_(ymd.slice(0, 8) + '01', _tbMonthEnd_(ymd.slice(0, 7))).forEach(function (e) { var m = /\[pk:([^\]]+)\]/.exec(e.note || ''); if (m) done[m[1]] = 1; });
+  _tbIgnored_().forEach(function (k) { ig[k] = 1; });
+  var items = hit.items.filter(function (x) { return !done[x.key] && !ig[x.key]; }).slice(0, 300);
+  return { ok: true, date: ymd, items: items, hidden: hit.items.length - items.length, truncated: !!hit.truncated, scanned: hit.scanned, note: 'Chi la GOI Y tu du lieu Pancake. Admin kiem tra roi moi ghi phat; khong phan biet duoc tin nhay tu Sale khac.' };
+}
+function teamPenaltyIgnore_(d) {
+  var key = String(d.key || '').trim(); if (!/^m:[A-Za-z0-9_\-:.]{1,120}$/.test(key)) return jsonOut_({ ok: false, error: 'Khoa khong hop le.' });
+  var a = _tbIgnored_(); if (a.indexOf(key) < 0) a.push(key); if (a.length > 1500) a = a.slice(a.length - 1500);
+  setSetting_('tbPenIgnore', JSON.stringify(a));
+  return jsonOut_({ ok: true, key: key });
 }
