@@ -4,6 +4,11 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+
+## 2026-10-31 (tiếp) — Chữ bị mất trên tab CRM trong app điện thoại (css/16-mobile-list.css)
+- [x] Duyên báo "hiển thị trên app chữ vẫn bị mất" (tab CRM trong app). NGUYÊN NHÂN GỐC (dựng lại Playwright 411px): css/15 đặt `#sn-toggle`/logo/.hdr-r `flex:1 1 0` trong header `flex-wrap` → cơ sở 0 nên mọi thứ "vừa" 1 hàng, không xuống dòng mà bị bóp: nút Menu chỉ còn "☰ M", tên CRM/vai trò bị cắt; tiêu đề cột bảng khách `nowrap` + ô cố định 112px → "NGÀY MUA GẦN NHẤT" mất "NHẤT"; cột tên 132px cắt "Phạm Minh Ch…". Sửa trong css/16 (chỉ @media): Menu rộng đúng "☰ Menu", ngắt hàng cứng `header::after{order:3;flex-basis:100%}` → hàng 1 Menu·Tìm·☰, hàng 2 tên CRM + tài khoản; th cho xuống dòng; cột tên 158px. Test dark/mobile-fit/dist OK.
+- [ ] CHƯA RÕ màn nào khác còn mất chữ: file "Quét trang" Duyên gửi không chỉ ra chữ mất ở đâu (chỉ có toạ độ). Nếu còn, nhờ Duyên chụp màn hình đúng chỗ.
+
 ## 2026-10-31 — App Android 1.14: nhiều hình + ghi âm → mở bộ chọn ảnh CỦA ZALO (thay cho dán tuần tự 1.13)
 - [x] Duyên test "tt": 1.13 dán tuần tự vẫn không vào nhiều ảnh; Duyên muốn chọn ảnh kiểu Zalo + gửi kèm ghi âm. NGUYÊN NHÂN GỐC: Zalo/Android chỉ nhận dán 1 hình qua clipboard, không có đường nào đẩy NHIỀU hình thẳng vào khung chat; chia sẻ chung bắt chọn lại người nhận. Sửa (ExpanderService.kt `sendViaChatGallery`): lưu hình vào album Pictures/VietTat (hình 1 = mới nhất = đầu danh sách), ghi âm vào Download/VietTat (MediaStore, Android 10+, không cần quyền), rồi `clickChatGalleryButton` bấm hộ nút ảnh của app chat (tìm nút ở 25% dưới màn hình có mô tả/chữ ảnh|hình|photo|gallery|image…, ngoài cùng bên phải) → Zalo hiện bộ chọn nhiều ảnh của chính nó. Đúng 1 hình + Chèn vẫn dán thẳng; "Chia sẻ" / chỉ ghi âm vẫn bảng chia sẻ. versionCode 15 / 1.14.
 - [ ] CHƯA KIỂM CHỨNG (không có SDK/máy thật): nhãn nút ảnh của Zalo là đoán. Nếu toast báo "KHÔNG thấy nút ảnh", mở thẻ 🩺 Kiểm tra gõ tắt → dòng "Lần chèn gần nhất" liệt kê các nút ở dải dưới + vị trí → sửa regex trong `clickChatGalleryButton`. Chưa tự tick ảnh (Duyên tự tick trong bộ chọn Zalo); ghi âm phải gửi bằng nút Tệp của Zalo, chưa tự động.
