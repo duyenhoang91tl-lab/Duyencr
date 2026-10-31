@@ -298,7 +298,7 @@ function doGetCore_(e) {
     if (action === 'storeCaseReport') {
       var pK = e.parameter || {};
       return jsonOut_(buildStoreCaseReport_({
-        dateFrom: pK.dateFrom || '', dateTo: pK.dateTo || '', pct: pK.pct || '',
+        dateFrom: pK.dateFrom || '', dateTo: pK.dateTo || '', pct: pK.pct || '', fresh: pK.fresh === '1',
         sale: pK.sale ? pK.sale.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : []
       }));
     }
