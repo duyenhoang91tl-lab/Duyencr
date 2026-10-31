@@ -791,7 +791,10 @@ select.ymf-sel.ymf-active{background:var(--green-bg);color:var(--green);}
 /* Trang RIENG Bao cao ngay (?view=dailybrief): an toan bo khung CRM, chi con bao cao ngay day trang */
 html.db-standalone header,html.db-standalone .sidebar,html.db-standalone .sidebar-backdrop,html.db-standalone .tabs,html.db-standalone #files-bar,html.db-standalone #sync-banner{display:none!important}
 html.db-standalone #tab-dailybrief{position:fixed!important;inset:0;z-index:2500;background:var(--bg);display:flex!important;flex-direction:column;overflow:auto!important;padding:18px 20px}
-html.db-standalone #dailybrief-wrap{width:100%;max-width:1120px;margin:0 auto}
+/* FULL MAN (Duyen 2026-10-30): truoc day khoa max-width:1120px + canh giua -> 2 ben trong tron. Nay trai het chieu ngang man hinh; the KPI gian deu theo hang. */
+html.db-standalone #tab-dailybrief{padding:18px 24px}
+html.db-standalone #dailybrief-wrap{width:100%;max-width:none;margin:0}
+html.db-standalone #dailybrief-wrap .kpi-grid{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
 .login-card{background:var(--surface);border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.35);width:360px;max-width:94vw;padding:26px 24px;animation:loginIn .2s ease;}
 @keyframes loginIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .login-logo{display:flex;align-items:center;justify-content:center;gap:7px;font-weight:700;font-size:15px;color:var(--green);margin-bottom:12px;}
