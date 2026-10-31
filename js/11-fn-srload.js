@@ -96,6 +96,7 @@ async function _srLoad(){
     }
     _srState.dataL = await _srFetch('storeCaseReport', {
       dateFrom: _srState.lDateFrom, dateTo: _srState.lDateTo,
+      fresh: '1',
       sale: (_srState.lSale||[]).join(',')
     });
   } else if (_srState.sub === 'M') {
@@ -2006,13 +2007,64 @@ function _srLRowMatchesSearch_(r, q){
   var hay = [r.tenKh, r.phone, r.saleRaw, (r.sales||[]).map(function(x){return x.name;}).join(' '), r.kenh, r.tinhTrang, r.capNhat].join(' ').toLowerCase();
   return hay.indexOf(q) !== -1;
 }
+// Nhan doi chieu file ke toan canh don (2026-10-31, Duyen: ke toan chua ghi thi hien "KT chua ghi" de Sale xuat file doi chieu). Chi don co Sale duoc chia moi co o.acct.
+function _srLAcctBadge_(o){
+  var a = o && o.acct; if (!a) return '';
+  var m = { 'chua-ghi': ['❌ KT chưa ghi', '#b91c1c', '#fee2e2', 'Mã bộ đếm của đơn KHÔNG có trong file kế toán "THEO DÕI ĐƠN CHIA SALE"'],
+            'thieu-ma': ['⚠ Thiếu mã bộ đếm', '#92400e', '#fef3c7', 'Chưa có mã (cột R trang tính cửa hàng / ghi chú Pos) nên chưa đối chiếu được với kế toán'],
+            'da-ghi': ['✔ KT đã ghi', '#166534', '#dcfce7', 'Đã có trong file kế toán' + (a.sheet ? ' (tab ' + a.sheet + ', dòng ' + a.line + ')' : '')] }[a.status];
+  return m ? ' <span title="'+esc(m[3])+'" style="display:inline-block;padding:1px 7px;border-radius:10px;font-weight:700;background:'+m[2]+';color:'+m[1]+'">'+m[0]+'</span>' : '';
+}
+function _srLAcctHtml_(d){
+  var ac = d.acctCheck; if (!ac) return '';
+  if (ac.ok === false) return '<div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px">⚠️ '+esc(ac.error||'Không đọc được file kế toán')+' — chưa đối chiếu được, KHÔNG có nghĩa là kế toán đã ghi đủ.</div>';
+  var sm = ac.summary || {}, miss = ac.missing || [], chua = miss.filter(function(e){ return e.status === 'chua-ghi'; }), thieu = miss.filter(function(e){ return e.status === 'thieu-ma'; });
+  var h = '<div style="border:1px solid '+(chua.length?'#fecaca':'var(--border)')+';border-radius:10px;padding:10px 12px;margin-bottom:14px">'+
+    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px"><span style="font-weight:700;font-size:13px">🧾 Đối chiếu file kế toán</span>'+
+    '<span style="padding:1px 9px;border-radius:10px;font-weight:700;background:'+(chua.length?'#fee2e2':'#dcfce7')+';color:'+(chua.length?'#b91c1c':'#166534')+'">❌ KT chưa ghi: '+fmt(sm.chuaGhi||0)+' đơn'+(sm.chuaGhi?' · '+_srMoney(sm.chuaGhiChia)+' chia Sale':'')+'</span>'+
+    '<span style="color:var(--green);font-weight:600">✔ đã ghi '+fmt(sm.daGhi||0)+'</span>'+(sm.thieuMa?'<span style="color:#92400e;font-weight:600">⚠ thiếu mã '+fmt(sm.thieuMa)+'</span>':'')+
+    (miss.length?'<button class="btn sm" onclick="_srLExportAcct_()">📥 Xuất file đối chiếu kế toán</button>':'')+
+    '<a href="'+esc(ac.sheetUrl||'#')+'" target="_blank" rel="noopener" style="font-size:11px">mở file kế toán</a></div>'+
+    '<div style="font-size:10.5px;color:var(--hint);margin-bottom:6px">Đọc cột mã đơn: <b>'+esc((d.dataQuality||{}).cotMaDon||'?')+'</b> — <b>'+fmt((d.dataQuality||{}).coMaDon||0)+'</b>/'+fmt((d.dataQuality||{}).tongDong||0)+' dòng trang tính cửa hàng có mã. Đối chiếu:'+' mã đơn cột R trang tính cửa hàng (+ mã trong ghi chú Pos) ↔ cột "Mã bộ đếm" của file kế toán (đọc '+fmt(ac.soMa||0)+' mã ở '+fmt((ac.tabs||[]).length)+' tab). Chỉ xét đơn có Sale được chia ('+esc(d.sharePct)+'%).</div>';
+  if (miss.length){
+    h += '<div style="overflow-x:auto;max-height:340px;overflow-y:auto"><table class="dash-table"><thead><tr><th>Ngày đơn</th><th>SĐT</th><th>Khách</th><th>Sale</th><th>Mã bộ đếm</th><th style="text-align:right">Giá trị đơn</th><th style="text-align:right">Sale '+esc(d.sharePct)+'%</th><th style="text-align:right">Quầy</th><th>Trạng thái</th></tr></thead><tbody>';
+    miss.slice(0, 300).forEach(function(e){
+      h += '<tr><td style="white-space:nowrap">'+esc(e.ngay||'')+'</td><td>'+esc(e.phone||'')+'</td><td>'+esc(e.khachHang||e.tenKh||'')+'</td><td>'+esc((e.sales||[]).join(', '))+'</td><td>'+esc((e.codes||[]).join(', ')||'—')+
+        '</td><td style="text-align:right">'+_srMoney(e.giaTri)+'</td><td style="text-align:right">'+_srMoney(e.chiaSale)+'</td><td style="text-align:right">'+_srMoney(e.phanQuay)+'</td><td>'+
+        (e.status==='chua-ghi'?'<b style="color:#b91c1c">❌ KT chưa ghi</b>':'<span style="color:#92400e">⚠ thiếu mã bộ đếm</span>')+'</td></tr>';
+    });
+    h += '</tbody></table></div>'+(miss.length>300?'<div style="font-size:11px;color:var(--muted)">Hiện 300/'+miss.length+' đơn — xuất file để xem đủ.</div>':'');
+  } else h += '<div style="color:var(--green);font-size:12px">✔ Mọi đơn có Sale được chia đều đã có trong file kế toán.</div>';
+  return h + '</div>';
+}
+// Xuat file doi chieu cho Sale gui ke toan: sheet "KT chưa ghi" (theo ma bo dem, bo cuc giong file ke toan: cap dong Quay + Sale) + sheet "Thiếu mã bộ đếm".
+function _srLExportAcct_(){
+  var d = _srState.dataL, ac = d && d.acctCheck;
+  if (!ac || !(ac.missing||[]).length){ toast('Không có đơn nào cần xuất.'); return; }
+  var tag = (d.dateFrom || _srState.lDateFrom || 'tu-dau') + '_' + (d.dateTo || _srState.lDateTo || 'den-nay');
+  var head = ['Mã bộ đếm','Ngày đơn','SĐT','Khách','Kênh bán','Sale bán','Giá trị đơn','Phần Sale ('+d.sharePct+'%)','Phần Quầy','Dòng Pos','Dòng trang tính cửa hàng','Cách xử lý (Báo cáo L)'];
+  var lbl = { 'tinh':'Tính thêm cho Sale', 'trung':'Trùng thẻ Pos', 'mot-phan':'Trùng một phần' };
+  var chua = [head], thieu = [head];
+  (ac.missing||[]).forEach(function(e){
+    var base = [(e.codes||[]).join(' ; '), e.ngay||'', e.phone||'', e.khachHang||e.tenKh||'', 'Quầy Hào Nam / ' + (e.nguonDon||''), (e.sales||[]).join(', '), Math.round(e.giaTri||0), e.chiaSale||0, e.phanQuay||0, e.posRow, (e.storeRows||[]).join(', '), lbl[e.loaiXuLy]||e.loaiXuLy||''];
+    (e.status === 'chua-ghi' ? chua : thieu).push(base);
+  });
+  if (typeof XLSX === 'undefined'){
+    if (typeof _srGDownloadCsv_ === 'function') _srGDownloadCsv_('KT-chua-ghi_'+tag+'.csv', chua);
+    return;
+  }
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(chua.length > 1 ? chua : [head, ['(không có đơn nào)']]), 'KT chưa ghi');
+  if (thieu.length > 1) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(thieu), 'Thiếu mã bộ đếm');
+  XLSX.writeFile(wb, 'DoiChieuKeToan_'+tag+'.xlsx');
+}
 function _srLOrderHtml_(o){
   var st = _SR_L_STATUS_[o.status] || ['', '#6b7280', '#f3f4f6'];
   var codes = (o.codes||[]).join(', ');
   var credit = (o.credits||[]).reduce(function(s,c){ return s + (c.amount||0); }, 0);
   return '<div style="border-top:1px dashed var(--border);padding:4px 0;font-size:11px;line-height:1.45">'+
     '<span style="display:inline-block;padding:1px 7px;border-radius:10px;font-weight:600;background:'+st[2]+';color:'+st[1]+'">'+st[0]+'</span> '+
-    '<b>'+_srMoney(o.giaTri)+'</b> · '+esc(o.ngay||'')+' · '+esc(o.nguonDon||'')+
+    '<b>'+_srMoney(o.giaTri)+'</b> · '+esc(o.ngay||'')+' · '+esc(o.nguonDon||'')+_srLAcctBadge_(o)+
     '<br><span style="color:var(--muted)">Mã bộ đếm: <b>'+esc(codes||'—')+'</b> · Dòng Pos: <b>'+esc(o.posRow)+'</b> · Thẻ Pos: '+esc(o.theSale||'(trống)')+'</span>'+
     (o.credits && o.credits.length ? '<br>'+o.credits.map(function(c){ return esc(c.sale)+': '+(c.dup?'<span style="color:#92400e">đã có thẻ (bỏ qua '+_srMoney(c.wouldBe)+')</span>':'<b style="color:var(--green)">+'+_srMoney(c.amount)+'</b>'); }).join(' · ') : '')+
     (o.note ? '<br><span style="color:var(--hint)">'+esc(o.note)+'</span>' : '')+
@@ -2032,7 +2084,9 @@ function _srRenderL_(d){
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(t.doanhThuDon)+'</div><div class="kpi-label">Doanh thu bán được khi khách qua</div></div>'+
     '<div class="kpi-card" style="border-color:var(--green)"><div class="kpi-val" style="color:var(--green)">'+_srMoney(t.daTinh)+'</div><div class="kpi-label">Doanh thu chia thêm cho Sale ('+esc(d.sharePct)+'%)</div></div>'+
     '<div class="kpi-card"><div class="kpi-val" style="color:#92400e">'+_srMoney(t.trungBoQua)+'</div><div class="kpi-label">Đã có thẻ trên Pos (bỏ qua, tránh trùng)</div></div>'+
+    (d.acctCheck && d.acctCheck.ok ? '<div class="kpi-card" style="border-color:'+(d.acctCheck.summary.chuaGhi?'#dc2626':'var(--green)')+'"><div class="kpi-val" style="color:'+(d.acctCheck.summary.chuaGhi?'#dc2626':'var(--green)')+'">'+fmt(d.acctCheck.summary.chuaGhi)+'</div><div class="kpi-label">Đơn KT chưa ghi</div></div>' : '')+
   '</div>';
+  h += _srLAcctHtml_(d);
   h += '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">'+esc(d.note||'')+' · Nguồn: tab "'+esc(d.sheetName||'')+'" · <a href="https://docs.google.com/spreadsheets/d/'+esc(d.sheetId)+'" target="_blank" rel="noopener">mở trang tính</a></div>';
 
   var warns = [];
@@ -2068,7 +2122,7 @@ function _srLDetailTable_(rows){
     var dt = valid.reduce(function(s,o){ return s + (o.giaTri||0); }, 0);
     var cr = valid.reduce(function(s,o){ return s + (o.credits||[]).reduce(function(s2,c){ return s2 + (c.amount||0); }, 0); }, 0);
     h += '<tr'+(r.koDen?' style="opacity:.6"':'')+'>'+
-      '<td style="white-space:nowrap">'+esc((r.visitDates||[]).map(_srLDmy_).join(', ') || esc(r.ngayHen))+'<div style="font-size:10px;color:var(--hint)">sheet dòng '+esc(r.row)+(r.stt?' · STT '+esc(r.stt):'')+'</div></td>'+
+      '<td style="white-space:nowrap">'+esc((r.visitDates||[]).map(_srLDmy_).join(', ') || esc(r.ngayHen))+(r.dateSrc==='den'?'<div style="font-size:10px;color:var(--green)" title="Dùng cột N Ngày KH đến'+(r.ngayHen?' (ngày hẹn ghi: '+esc(r.ngayHen)+')':'')+'">✔ ngày khách đến</div>':'')+'<div style="font-size:10px;color:var(--hint)">sheet dòng '+esc(r.row)+(r.stt?' · STT '+esc(r.stt):'')+'</div></td>'+
       '<td>'+_custLinkHtml_(r.phone, '<b>'+esc(r.tenKh||'—')+'</b>')+'<div style="font-size:11px;color:var(--muted)">'+_custLinkHtml_(r.phone, esc(r.phone||''))+(r.kenh?' · '+esc(r.kenh):'')+'</div></td>'+
       '<td>'+((r.sales||[]).map(function(x){ return '<b>'+esc(x.name)+'</b>'+(x.raw!==x.name?'<span style="font-size:10px;color:var(--hint)"> ('+esc(x.raw)+')</span>':''); }).join('<br>') || '<span style="color:var(--muted)">—</span>')+'</td>'+
       '<td style="font-size:11px;max-width:200px">'+esc([r.tinhTrang, r.capNhat].filter(Boolean).join(' · ')).substring(0,220)+'</td>'+
@@ -2116,7 +2170,7 @@ function _srLExportCsv_(kind){
   var out = [head];
   var statusLbl = { 'tinh':'Tính thêm cho Sale', 'trung':'Trùng thẻ Pos - bỏ qua', 'mot-phan':'Trùng một phần', 'hoan':'Đơn hoàn - không tính', 'khong-sale':'Chưa khớp tên Sale' };
   (d.rows||[]).forEach(function(r){
-    var base = [r.row, r.stt, (r.visitDates||[]).join(' ; '), r.tenKh, r.phone, r.kenh, r.saleRaw, (r.sales||[]).map(function(x){return x.name;}).join(', '), [r.tinhTrang, r.capNhat].filter(Boolean).join(' · '), r.doanhThuSheet, r.nvCh];
+    var base = [r.row, r.stt, (r.visitDates||[]).join(' ; ') + (r.dateSrc==='den' ? ' (ngày KH đến)' : ''), r.tenKh, r.phone, r.kenh, r.saleRaw, (r.sales||[]).map(function(x){return x.name;}).join(', '), [r.tinhTrang, r.capNhat].filter(Boolean).join(' · '), r.doanhThuSheet, r.nvCh];
     var flags = (r.flags||[]).join(' · ');
     if (!(r.orders||[]).length){ out.push(base.concat(['','','','','','','','','','','','','','','', flags])); return; }
     r.orders.forEach(function(o){
