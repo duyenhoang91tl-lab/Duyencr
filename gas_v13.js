@@ -2977,10 +2977,10 @@ function datTyLeChotTheo(mode) {
   Logger.log('Ty le chot theo Sale gan don theo: ' + (mode === 'saleban' ? 'SALE BAN (moi sale ghi tren don)' : 'NGUOI TAO (cot B DT TONG)') + '. Bao cao co the cache vai phut: bam Loc lai / doi them.');
   return mode;
 }
-function _srCloseRateSectionsFromBase_(filters, preRows) {   // preRows (tuy chon) = readDTTong_(true) da doc san, de tinh nhieu ky (tuan/thang) ma khong doc lai sheet
+function _srCloseRateSectionsFromBase_(filters, preRows, forceBy) {   // preRows (tuy chon) = readDTTong_(true) da doc san, de tinh nhieu ky (tuan/thang) ma khong doc lai sheet; forceBy (tuy chon) = 'nguoitao'|'saleban' ep cach gan don, KHONG phu thuoc Settings closeRateBy (Thuong phat doi Sale dung 'nguoitao'; Bao cao A/B khong truyen => theo Settings nhu cu)
   var tracked = _pkTrackedDatesByPageAndSale_(_dateStrToVnYmd_(filters.dateFrom), _dateStrToVnYmd_(filters.dateTo));
   if (!Object.keys(tracked.datesByPage).length) return _srCloseRateSections_([], filters);   // chưa có dữ liệu Pancake → không cần đọc Base
-  var by = _closeRateBy_();
+  var by = (forceBy === 'nguoitao' || forceBy === 'saleban') ? forceBy : _closeRateBy_();
   var rows = preRows || readDTTong_(true), inRange = [], i;
   for (i = 0; i < rows.length; i++) {
     var r = rows[i];
@@ -20142,7 +20142,9 @@ function _tbOrderCounts_(r, re) {
   if (re.test(blob)) return false;
   return true;
 }
-// Dem don theo ngay + theo sale doi (moi sale ghi o "Sale ban" +1 don, dung cach 'saleban' cua ty le chot). Tra { 'yyyy-MM-dd': { counts:{ten:n}, total:n, excluded:n } }
+// Dem don theo ngay + theo sale doi. DUYEN CHOT 2026-10-31: SO DON THUONG chi tinh theo NGUOI TAO DON (cot B "Nguoi tao" cua DT TONG, field nguoiTao) — moi don +1 cho dung 1 nguoi tao,
+// KHONG chia theo cot "Sale ban" nua (truoc day don nhieu sale thi moi sale +1). DOANH THU o cac bao cao van chia nhu cu (khong dung toi o day). Nguoi tao ngoai doi/khong co -> khong tinh.
+// Tra { 'yyyy-MM-dd': { counts:{ten:n}, total:n, excluded:n } }
 function _tbDailyCounts_(dtRows, from, to, memberOf, cfg) {
   var re; try { re = new RegExp(cfg.excludeRe, 'i'); } catch (e) { re = new RegExp(TEAM_BONUS_DEFAULT_.excludeRe, 'i'); }
   var out = {};
@@ -20151,12 +20153,9 @@ function _tbDailyCounts_(dtRows, from, to, memberOf, cfg) {
     var ymd = _vnYmd_(dt); if (ymd < from || ymd > to) continue;
     var day = out[ymd] || (out[ymd] = { counts: {}, total: 0, excluded: 0 });
     if (!_tbOrderCounts_(r, re)) { day.excluded++; continue; }
-    var seen = {}, any = false;
-    splitMulti_(r.saleBan ? String(r.saleBan).trim() : '', ',').filter(function (x) { return x && !_isNumericTag_(x); }).forEach(function (n) {
-      var m = memberOf[_normTxt_(n)]; if (!m || seen[m]) return; seen[m] = 1; any = true;
-      day.counts[m] = (day.counts[m] || 0) + 1;
-    });
-    if (any) day.total++;
+    var creator = r.nguoiTao ? String(r.nguoiTao).trim() : '', m = creator ? memberOf[_normTxt_(creator)] : '';
+    if (!m) continue;   // nguoi tao khong thuoc doi Online/Van phong (hoac trong) -> khong tinh
+    day.counts[m] = (day.counts[m] || 0) + 1; day.total++;
   }
   return out;
 }
@@ -20179,7 +20178,7 @@ function _tbPickClose_(rows, memberOf) {
 }
 function _tbCloseFor_(dtRows, from, to, memberOf) {
   try {
-    var sec = _srCloseRateSectionsFromBase_({ dateFrom: from, dateTo: to }, dtRows);
+    var sec = _srCloseRateSectionsFromBase_({ dateFrom: from, dateTo: to }, dtRows, 'nguoitao');   // ep dem don Base theo NGUOI TAO (Duyen 2026-10-31), bat ke Settings closeRateBy cua bao cao A/B
     var pick = _tbPickClose_(sec && sec.saleCloseRate, memberOf);
     pick.noData = !(sec && sec.saleCloseRate && sec.saleCloseRate.length);
     return pick;

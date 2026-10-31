@@ -2,6 +2,7 @@
 //  THƯỞNG PHẠT ĐỘI SALE ONLINE + VĂN PHÒNG (phòng kinh doanh) — mục cuối Báo cáo B (Duyên yêu cầu 2026-10-29)
 //  TÁCH RIÊNG các chương trình thưởng của công ty (Báo cáo E/F/G…): không cộng chung, không đổi số của các báo cáo đó.
 //  Số liệu từ máy chủ: action teamBonusReport (gas_v13.js, gas/33_TeamBonus.gs). Thưởng tính trên ĐƠN GỐC BASE (ngày tạo), không tính trên Pos.
+//  Số đơn (thưởng ngày + đơn Base của tỷ lệ chốt tuần/tháng) tính theo NGƯỜI TẠO ĐƠN (Duyên 2026-10-31); doanh thu ở báo cáo vẫn chia như cũ.
 //  Thưởng ngày: nhiều đơn nhất ngày, tối thiểu 6 đơn, không tính đổi trả/bảo hành/thay dây. Thưởng tuần/tháng: tỷ lệ chốt cao nhất,
 //  tương tác ≥ trung bình đội. Phạt 5 loại nhập tay (chỉ Admin ghi/xoá). Panel tự tải theo tháng chọn, không phụ thuộc bộ lọc của Báo cáo B.
 //  Test: node tools/test-team-bonus-ui.js
@@ -33,7 +34,7 @@ function _tbTotalsHtml_(d){
 }
 function _tbDailyHtml_(d){
   var cfg = d.cfg || {}, rows = (d.daily || []).slice().reverse();
-  var h = '<div style="font-size:12px;color:var(--muted);margin-bottom:6px">Sale nhiều đơn Base nhất trong ngày, tối thiểu <b>' + (cfg.dailyMinOrders || 6) + ' đơn</b> (không tính đổi trả, bảo hành, thay dây, đơn huỷ/hoàn) — thưởng <b>' + _tbMoney_(cfg.dailyReward) + '</b>/ngày. Bằng nhau thì cùng nhận.</div>' +
+  var h = '<div style="font-size:12px;color:var(--muted);margin-bottom:6px">Sale (người tạo đơn) có nhiều đơn Base nhất trong ngày — đếm theo <b>người tạo đơn</b>, không chia theo Sale bán —, tối thiểu <b>' + (cfg.dailyMinOrders || 6) + ' đơn</b> (không tính đổi trả, bảo hành, thay dây, đơn huỷ/hoàn) — thưởng <b>' + _tbMoney_(cfg.dailyReward) + '</b>/ngày. Bằng nhau thì cùng nhận.</div>' +
     '<div style="overflow-x:auto"><table class="sr-table" style="width:100%"><thead><tr><th>Ngày</th><th>Sale đạt thưởng</th><th style="text-align:right">Số đơn cao nhất</th><th>Top trong ngày</th><th style="text-align:right">Đơn bị loại*</th></tr></thead><tbody>';
   rows.forEach(function(r){
     var st = r.partial ? '<span style="color:#d97706">⏳ tạm tính</span> ' : '';
@@ -225,7 +226,7 @@ function _tbExportRows_(d){
   if (d.monthly) addP('Tháng', d.month, d.monthly, cfg.monthlyReward || 0);
   var pen = [['Ngày', 'Sale', 'Mã lỗi', 'Nội dung', 'Số tiền (đ)', 'Ghi chú', 'Người ghi']];
   (d.penalties || []).forEach(function(e){ pen.push([e.date, e.sale, e.type, _tbPenLabel_(cfg, e.type), e.amount, e.note, e.by]); });
-  var rule = [['Mục', 'Nội dung', 'Số tiền (đ)'], ['Thưởng ngày', 'Nhiều đơn Base nhất trong ngày, tối thiểu ' + (cfg.dailyMinOrders || 6) + ' đơn (không tính đổi trả/bảo hành/thay dây)', cfg.dailyReward], ['Thưởng tuần', 'Tỷ lệ chốt cao nhất tuần (tương tác ≥ TB đội)', cfg.weeklyReward], ['Thưởng tháng', 'Tỷ lệ chốt cao nhất tháng (tương tác ≥ TB đội)', cfg.monthlyReward]];
+  var rule = [['Mục', 'Nội dung', 'Số tiền (đ)'], ['Thưởng ngày', 'Nhiều đơn Base nhất trong ngày (đếm theo NGƯỜI TẠO ĐƠN), tối thiểu ' + (cfg.dailyMinOrders || 6) + ' đơn (không tính đổi trả/bảo hành/thay dây)', cfg.dailyReward], ['Thưởng tuần', 'Tỷ lệ chốt cao nhất tuần (tương tác ≥ TB đội)', cfg.weeklyReward], ['Thưởng tháng', 'Tỷ lệ chốt cao nhất tháng (tương tác ≥ TB đội)', cfg.monthlyReward]];
   (cfg.penalties || []).forEach(function(p){ rule.push(['Phạt ' + p.type, p.label, p.amount]); });
   return { sum: sum, day: day, per: per, pen: pen, rule: rule };
 }

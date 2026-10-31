@@ -24,7 +24,7 @@ rows=[('Số đơn tối thiểu để được thưởng ngày (đơn)',6,'Min6
 for i,(l,v,_) in enumerate(rows,5):
     q.cell(row=i,column=1,value=l).font=font(); c=q.cell(row=i,column=2,value=v); c.font=font(color='0000FF',bold=True); c.fill=INP; c.number_format='#,##0'; c.border=BOX
 q['A9']='Đơn tính thưởng = ĐƠN GỐC BASE (theo ngày tạo), không tính theo Pos. Không tính đơn đổi trả, bảo hành, thay dây, huỷ/hoàn.'; q['A9'].font=font(italic=True,color='666666')
-q['A10']='Thưởng tuần/tháng: chỉ xét sale có số tương tác trong kỳ ≥ tương tác trung bình của đội. Tỷ lệ chốt = đơn Base ÷ tương tác Pancake.'; q['A10'].font=font(italic=True,color='666666')
+q['A10']='Thưởng tuần/tháng: chỉ xét sale có số tương tác trong kỳ ≥ tương tác trung bình của đội. Tỷ lệ chốt = đơn Base ÷ tương tác Pancake. Số đơn tính theo NGƯỜI TẠO ĐƠN (không chia theo Sale bán).'; q['A10'].font=font(italic=True,color='666666')
 q['A12']='PHẠT'; q['A12'].font=font(bold=True,size=11)
 for i,h in enumerate(['Mã lỗi','Nội dung vi phạm','Số tiền phạt (đ)'],1):
     c=q.cell(row=13,column=i,value=h); c.font=font(bold=True,color='FFFFFF'); c.fill=HDR; c.border=BOX; c.alignment=Alignment(horizontal='center')
@@ -74,7 +74,7 @@ p.freeze_panes='A5'
 
 # ---- Thuong ngay ----
 t=wb.create_sheet('Thuong ngay')
-title(t,'THƯỞNG NGÀY — SALE NHIỀU ĐƠN NHẤT TRONG NGÀY','Mỗi ngày ghi sale có nhiều đơn Base nhất + số đơn đó (không tính đổi trả, bảo hành, thay dây). Ngày có nhiều người bằng nhau → ghi mỗi người 1 dòng. Đủ tối thiểu thì tự ra tiền thưởng.')
+title(t,'THƯỞNG NGÀY — SALE NHIỀU ĐƠN NHẤT TRONG NGÀY','Mỗi ngày ghi sale có nhiều đơn Base nhất (đếm theo NGƯỜI TẠO ĐƠN) + số đơn đó (không tính đổi trả, bảo hành, thay dây). Ngày có nhiều người bằng nhau → ghi mỗi người 1 dòng. Đủ tối thiểu thì tự ra tiền thưởng.')
 head(t,4,['Ngày','Sale đạt cao nhất','Số đơn Base','Đạt tối thiểu?','Tiền thưởng (đ)','Ghi chú','Tháng'],[14,30,14,16,16,40,10])
 T0,T1=5,404
 for r in range(T0,T1+1):
