@@ -4,7 +4,7 @@ const fs = require('fs'), vm = require('vm'); let bad = 0; const ok = (c, t) => 
 const src = fs.readFileSync(__dirname + '/../gas_v13.js', 'utf8');
 function fn(n) { const i = src.indexOf('function ' + n + '('); if (i < 0) throw new Error('thieu ' + n); let d = 0; for (let k = src.indexOf('{', i); k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}' && --d === 0) return src.slice(i, k + 1); } }
 const c = vm.createContext({ parseVNDate_: s => { const m = String(s).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m ? new Date(Date.UTC(+m[3], +m[2] - 1, +m[1])) : null; }, _vnYmd_: d => d.toISOString().slice(0, 10) });
-vm.runInContext(['_storeCaseDayList_', '_storeCaseDaysToYmd_', '_storeCaseVisitDates_', '_storeCaseArrivalDates_'].map(fn).join('\n'), c);
+vm.runInContext(['_storeCaseYmdAdd_', '_storeCaseDayList_', '_storeCaseDaysToYmd_', '_storeCaseVisitDates_', '_storeCaseArrivalDates_'].map(fn).join('\n'), c);
 const T = '2026-10-31', V = (m, d) => c._storeCaseVisitDates_(m, d, T).join(','), A = (a, m, h) => c._storeCaseArrivalDates_(a, m, h, T).join(',');
 ok(V('10', '25-27') === '2026-10-25,2026-10-26,2026-10-27', '"25-27" = ca khoang 25,26,27');
 ok(V('10', '10-11') === '2026-10-10,2026-10-11', '"10-11" = 10 va 11');

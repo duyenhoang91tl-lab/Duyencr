@@ -5,7 +5,7 @@ const src = fs.readFileSync(__dirname + '/../gas_v13.js', 'utf8');
 function fn(n) { const i = src.indexOf('function ' + n + '('); if (i < 0) throw new Error('thieu ' + n); let d = 0; for (let k = src.indexOf('{', i); k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}' && --d === 0) return src.slice(i, k + 1); } }
 function line(prefix) { const i = src.indexOf(prefix); return src.slice(i, src.indexOf('\n', i)); }
 const code = [line("var COUNTER_CODE_INNER_ ="), line("var COUNTER_CODE_RE_SRC_ ="), line("var STORE_M_CODE_RE_ ="), line("var ACCT_SPLIT_SS_ID_ ="),
-  ...['_stripVN_', '_normCounterCode_', '_counterCodeNoYear_', '_counterCodeHasYear_', '_extractCounterCodes_', '_storeCodeTokens_', '_storeCodesFromNote_', '_loadAcctCodeSet_', '_storeAcctClassify_', '_storeCaseDayList_', '_storeCaseDaysToYmd_', '_storeCaseVisitDates_', '_storeCaseArrivalDates_', 'buildStoreCaseReport_'].map(fn)].join('\n');
+  ...['_stripVN_', '_normCounterCode_', '_counterCodeNoYear_', '_counterCodeHasYear_', '_extractCounterCodes_', '_storeCodeTokens_', '_storeCodesFromNote_', '_loadAcctCodeSet_', '_storeAcctClassify_', '_storeCaseYmdAdd_', '_storeCaseDayList_', '_storeCaseDaysToYmd_', '_storeCaseVisitDates_', '_storeCaseArrivalDates_', 'buildStoreCaseReport_'].map(fn)].join('\n');
 // ---- du lieu gia ----
 const ACCT_TABS = {   // file ke toan: nhieu tab; o gop -> dong thu 2 cua cap de trong
   'tháng 10': [['', '', ''], ['', 'Kênh bán', 'Sale bán', 'Giá trị cọc', 'Tổng giá trị', 'SDT', 'Mã bộ đếm', ''],
@@ -99,4 +99,23 @@ ok(rep.rows.every(r => r.maDon !== undefined), 'moi dong tra ve cot R (maDon)');
 // ke toan loi quyen -> khong bao nham
 const rep2 = makeCtx({ denied: true }).buildStoreCaseReport_({ dateFrom: '2026-10-01', dateTo: '2026-10-31' });
 ok(rep2.ok && rep2.acctCheck.ok === false && rep2.acctCheck.missing.length === 0 && rep2.acctCheck.summary.chuaGhi === 0, 'khong doc duoc file ke toan: bao loi trong acctCheck, KHONG liet ke don nao la "chua ghi"');
+// ---- Bao cao L: ngay KH den + khoang "a-b" + lech +-1 ngay (Duyen chinh 2026-10-31) ----
+CASE_ROWS.length = 0; POS.length = 0;
+const mk = (row, ngayHen, ngayDen, phone) => ({ row, thang: '10', ngayHen, ngayDen, saleRaw: 'ninhnga99', phone, tenKh: 'K' + row, maDon: '', capNhat: '', tinhTrang: '' });
+const pos = (posRow, phone, ngay) => ({ posRow, soDienThoai: phone, ngayTaoDon: ngay, nguonDon: 'Fb', khachHang: 'x', sanPham: 'SP', trangThai: 'Thành công', theSale: '', ghiChu: '', giaTriSauGiam: 1000000 });
+CASE_ROWS.push(mk(2, '25-27', '', '900000001'), mk(3, '10', '14', '900000002'), mk(4, '20', '', '900000003'), mk(5, '20', '', '900000004'), mk(6, '5', '', '900000005'));
+POS.push(pos(201, '0900000001', '26/10/2026'),        // giua khoang 25-27 (thieu ngay 26 truoc day)
+  pos(202, '0900000002', '14/10/2026'),               // khach hen 10 nhung DEN 14 -> ngay den
+  pos(203, '0900000003', '21/10/2026'),               // lech +1
+  pos(204, '0900000004', '20/10/2026'), pos(205, '0900000004', '21/10/2026'),   // co don dung ngay -> KHONG lay them don lech
+  pos(206, '0900000005', '8/10/2026'));               // lech 3 ngay -> khong ghep
+c = makeCtx();
+const r3 = c.buildStoreCaseReport_({ dateFrom: '2026-10-01', dateTo: '2026-10-31' });
+const R = n => r3.rows.find(r => r.row === n);
+ok(R(2).orders.length === 1 && R(2).orders[0].posRow === 201 && R(2).visitDates.length === 3, '"25-27": don ngay 26 duoc ghep (ca khoang)');
+ok(R(3).dateSrc === 'den' && R(3).visitDates[0] === '2026-10-14' && R(3).orders.length === 1, 'co "Ngay KH den" -> dung ngay den, ghep don ngay 14');
+ok(R(4).orders.length === 1 && R(4).orders[0].lech === 1 && /lệch \+1/.test(R(4).orders[0].note), 'lech +1 ngay van ghep, danh dau lech + ghi chu');
+ok(R(5).orders.length === 1 && R(5).orders[0].posRow === 204 && R(5).orders[0].lech === 0, 'co don dung ngay thi KHONG lay them don lech');
+ok(R(6).orders.length === 0 && R(6).flags.some(f => /Chưa có đơn Pos/.test(f)), 'lech 3 ngay -> khong ghep');
+ok(r3.totals.soDon === 4, 'tong so don duy nhat dung (4)');
 process.exit(bad ? 1 : 0);
