@@ -3,6 +3,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-10-31 (chiều) — Điện thoại: menu bộ lọc nhanh / Tác vụ bị CẮT LỀ TRÁI, không bấm được (Duyên báo) — làm từng bước nhỏ, mỗi bước 1 file + push + cập nhật mục này
+- **Nguyên nhân gốc:** menu `⚙ Mẫu` / `🧰 Tác vụ` (`.gear-menu-list`, css/01-base.css) mở bằng `position:absolute; right:0` = căn theo mép PHẢI của nút. Nút nằm sát mép TRÁI màn điện thoại (hàng 2 của thanh công cụ) → danh sách rộng ≥250px tràn ra ngoài mép trái, bị cắt, không chạm được mẫu lọc nhanh. Trước đó không có đo vùng nhìn thấy.
+- [x] **Bước 1 (file `js/12-fn-rendersalesreporttabe.js`, `?v=20261031a` trong index.html):** `_srToggleGearMenu` gọi hàm mới `_srFitGearMenu_(el)` — đo vùng nhìn thấy (màn hình + khung cuộn cha có overflow) và KẸP menu vào trong, lề 8px; quá rộng thì thu `max-width`; vừa sẵn thì giữ căn phải như cũ. Áp cho MỌI menu `.gear-menu-list` (Tác vụ, Mẫu, các menu ⚙ khác). Test mới `tools/test-gear-menu-fit.js` (9 ca: điện thoại 360px, vừa sẵn, rộng hơn màn, khung cha lệch, mép phải, mở nhiều lần, máy tính).
+- [ ] **Bước 2 (file `css/10-filter-presets.css`):** bố cục điện thoại cho thanh công cụ + ô chọn mẫu (`.fp-ctl`, `.fp-sel`, `.fp-gear`): ô chọn đủ rộng/dễ chạm, danh sách mẫu thu theo màn, tên mẫu dài cắt bằng "…".
+- [ ] **Bước 3:** cập nhật mục này sau khi push từng bước + Duyên thử trên điện thoại (Ctrl+F5 / kéo tải lại; PWA: đóng mở lại app).
+- Môi trường không có trình duyệt thật: mới kiểm bằng jsdom giả lập kích thước. Cần Duyên bấm thử trên máy.
+
 ## 2026-10-31 — Rà các mục dở trong HANDOFF + dọn nợ test (Duyên: "xử lý các mục còn dang dở"; làm từng bước nhỏ, mỗi bước push riêng)
 - [x] Bước 1 (`a2b6b24`): xoá 3 dòng marker xung đột merge sót đầu HANDOFF.md (`<<<<<<< HEAD` / `=======` / `>>>>>>> origin/main`); giữ nguyên nội dung 2 nhánh.
 - [x] Bước 2: `css/99-dark-auto.css` CŨ so với nguồn (`tools/test-dark-theme.js` đỏ: thiếu 2 luật chế độ tối cho inline `color:#d97706` và `color:var(--accent,#1e66f5)` do các phiên khác thêm màu inline mà không sinh lại). NGUYÊN NHÂN GỐC: file này là SẢN PHẨM SINH TỰ ĐỘNG (`node tools/gen-dark-theme.js`, cũng chạy trong `build-dist.js`) nhưng không ai commit lại sau khi đổi màu inline. Đã sinh lại + commit (chỉ +2 dòng). **Quy ước:** sau khi thêm màu inline mới ở js/*.js phải chạy `node tools/gen-dark-theme.js` rồi commit css/99.
