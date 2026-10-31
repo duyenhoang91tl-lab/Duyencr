@@ -2,7 +2,6 @@
 Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push / reset / rebase / amend commit đã push / clone-mới-chép-đè. Dùng `TK=<token> bash tools/safe-push.sh`. Lý do: 7 commit đã push biến mất khỏi `main` vì ghi đè lịch sử. Quy tắc đầy đủ + cách khoá cứng trên GitHub: `docs/crm-kb/01-rules-and-deploy.md` mục "QUY TẮC GIT".
 
 
-<<<<<<< HEAD
 
 ## 2026-10-26 (tiếp) — CRM tự thử lại nhanh khi gặp lỗi thoảng qua (đã push `b9d1146`)
 - [x] ĐÃ PUSH: `b9d1146` — `_gsFetchTO_` (js/01) tự thử lại 404/502/503/504 + lỗi mạng chớp (tối đa 2 lần, 1,5s rồi 4s), không thử lại khi hết giờ; bước kế tiếp (c) của mục chẩn đoán 502/404 đã xong. Bản web tự deploy xanh.
@@ -254,14 +253,12 @@ Gói gốc (VietTat-Chrome.zip / VietTat-Android.zip): extension gõ viết tắ
 - [x] **Bước 2 — Pancake AI:** `extension-pancake/pancake-viettat.js` (content script mới, manifest bump 2026.10.25.1), background `GET_VIETTAT`, công tắc + nút cập nhật ở Options. Chi tiết + cách dùng: `docs/crm-kb/04-extension-pancake.md` mục "⌨️ Viết tắt". Test: `NODE_PATH=<jsdom> node tools/test-viettat-ext.js`. `check-ext-parity` đã ghi `vietTat` là `gap` (Zalo AI chưa có). **PHẢI reload extension Pancake AI trong chrome://extensions.**
 - [x] **Bước 3 — CRM:** `js/57-viettat.js` (+ khối `#vt-section` trong tab Zalo AI của index.html, bump `?v=20261025a`): trang quản lý (thêm/sửa/xoá, nhiều lựa chọn/mục, nhóm, từ khoá, Chung/Của tôi, tìm kiếm không dấu) và gõ tắt trong mọi `<textarea>` của CRM (ghi chú, tin nhắn; ô tắt bằng `data-vt="off"`; tự lấy tên khách đang mở ở ngăn hồ sơ). Test: `NODE_PATH=<jsdom> node tools/test-viettat-crm.js` (35 ca, nạp NGUYÊN file + index.html thật).
 - [ ] CẦN LÀM TIẾP / Duyên làm tay: (1) chờ Actions deploy GAS xanh (sheet `VietTat` tự tạo ở lần lưu đầu), Ctrl+F5 CRM; (2) **reload extension Pancake AI** trong chrome://extensions (bản 2026.10.25.1); (3) CRM → tab Zalo AI → ⌨️ Viết tắt → thêm vài mục chung (admin), vào Pancake gõ thử; nhân viên cần ĐÃ chọn tên CS trong panel Pancake AI thì mới thấy mục riêng của mình; (4) **Zalo AI gõ tắt: ĐÃ LÀM 2026-10-25** (`extension-zalo/zalo-viettat.js` — chữ + thư mục con + ảnh, TỰ SINH từ bản Pancake bằng `node tools/derive-zalo-viettat.js`, đừng sửa tay; manifest 2026.10.25.1 — reload extension Zalo AI; test `NODE_PATH=<jsdom> node tools/test-viettat-zalo.js`; chưa thử trên chat.zalo.me thật: ô chat Zalo có nhận paste ảnh giả không — nếu không thì dùng thanh "Ảnh chưa hiện?"); **chưa làm:** nhập danh sách từ app Viết Tắt cũ (file data.json xuất từ app → cần nút "Nhập" ở CRM); hình/ghi âm; app Android không nối được vào sheet CRM (gốc dùng server riêng).
-=======
 ## 2026-10-29 — Fix mẫu tin nhắn: mẫu bị mất sau khi lưu + thêm upload 4 ảnh/mẫu (commit 8b0ee21, đã push)
 Yêu cầu: (1) mẫu biến mất sau khi lưu/duyệt/xóa; (2) chỉ chọn được 1 ảnh, cần chọn tối đa 4 ảnh.
 - [x] **Bug 1 — Mẫu bị mất:** NGUYÊN NHÂN GỐC: Cloudflare Worker cache action `messageTemplates` 60 giây. Sau khi POST lưu (bypass cache), GET reload vẫn trả dữ liệu cũ từ cache → mẫu mới "biến mất". Sửa: thêm `bustCache` param vào `loadMsgTemplates()`; khi `true` thêm `&_bust=<timestamp>` vào URL → cache key mới → Worker bắt buộc gọi GAS. Tất cả hàm write (`saveMsgTemplateUI`, `approveMsgTemplateUI`, `deleteMsgTemplateUI`) gọi `loadMsgTemplates(true)` sau khi xong.
 - [x] **Bug 2 — Upload ảnh:** Feature chưa có. Xây từ đầu: GAS handler `uploadTemplateImage_` (upload base64 → Drive folder `CRM_MauTinAnh` → URL công khai), cột `images` trong `MSG_TPL_HEADERS` (JSON mảng URL, tối đa 4), `getSheet_()` tự thêm cột → an toàn dữ liệu cũ. Frontend: input `multiple`, preview thumbnail với nút ×, ẩn nút "Chọn ảnh" khi đủ 4, upload từng ảnh riêng trước khi save template. Thumbnail hiện trong danh sách mẫu.
 - Files thay đổi: `gas_v13.js`, `index.html`, `js/20-loadaiexamples.js`
 - [ ] Sau push: GAS tự deploy qua Actions (chờ xanh). Ctrl+F5 CRM. Test: lưu mẫu mới → còn trong danh sách; thêm 4 ảnh → nút "Chọn ảnh" ẩn; ảnh hiện thumbnail trong form + danh sách mẫu.
->>>>>>> origin/main
 
 ## 2026-10-24 — Pancake AI: tra giá về như cũ + mẫu tin nhắn thành ô riêng có nhóm SP; CRM chọn nhóm khi soạn mẫu
 Yêu cầu Duyên: tra cứu giá để như cũ; "tin nhắn gợi ý" tách thành ô riêng chỉ hiện danh sách mẫu; trên CRM khi soạn mẫu chọn được nhóm sản phẩm (không chọn thì hệ thống tự phân loại).
