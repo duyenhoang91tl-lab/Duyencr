@@ -16579,23 +16579,30 @@ function _storeCaseShare_() {
   return _bizRules_().quayRatio;
 }
 
-// Tach "10-11" / "25-26-27" / "28/29" / "3,4" thanh cac NGAY (yyyy-MM-dd). Thang lay o cot Thang; nam suy ra:
+// Tach cot "Ngay KH hen qua CH" thanh cac NGAY (yyyy-MM-dd). Thang lay o cot Thang; nam suy ra:
 // nam hien tai, neu ngay do con xa hon 45 ngay trong TUONG LAI thi lui 1 nam. Ngay khong ton tai (31/9) bo qua.
-function _storeCaseVisitDates_(monthCell, dayCell, todayYmd) {
-  var out = [], seen = {};
-  var dayStr = String(dayCell || '').trim();
-  if (!dayStr) return out;
-  if (/\d{4}/.test(dayStr)) { // co nam day du (vd 10/10/2026 hoac 2026-10-10)
-    var full = /^\d{4}-\d{2}-\d{2}/.test(dayStr) ? dayStr.substring(0, 10) : (function() { var d0 = parseVNDate_(dayStr); return d0 ? _vnYmd_(d0) : ''; })();
-    if (full) out.push(full);
-    return out;
+// QUY TAC (Duyen chinh 2026-10-31): dau GACH NOI giua 2 so = KHOANG lien tuc ("25-27" = 25,26,27; "10-11" = 10,11; "25-26-27" = 25..27);
+// dau / , ; & hoac khoang trang = LIET KE tung ngay ("28/29" = 28 va 29; "3,4"). Khoang nguoc/qua 30 ngay -> coi la liet ke.
+function _storeCaseDayList_(dayStr) {
+  var s = String(dayStr == null ? '' : dayStr).replace(/[\u2013\u2014\u2212]/g, '-').replace(/->|\u2192|\u0111\u1ebfn|den/gi, '-');
+  var re = /\d{1,2}/g, m, nums = [], seps = [], last = -1;
+  while ((m = re.exec(s)) !== null) {
+    if (last >= 0) seps.push(s.slice(last, m.index));
+    nums.push(parseInt(m[0], 10)); last = m.index + m[0].length;
   }
-  var mo = parseInt(String(monthCell || '').replace(/\D/g, ''), 10);
+  var out = [];
+  nums.forEach(function(n, i) {
+    if (i > 0 && /^\s*-+\s*$/.test(seps[i - 1]) && nums[i - 1] <= n && n - nums[i - 1] <= 30) {
+      for (var d = nums[i - 1] + 1; d <= n; d++) out.push(d);
+    } else out.push(n);
+  });
+  return out;
+}
+function _storeCaseDaysToYmd_(mo, days, todayYmd) {
+  var out = [], seen = {};
   if (!(mo >= 1 && mo <= 12)) return out;
   var tp = todayYmd.split('-'), yNow = +tp[0], todayUtc = Date.UTC(+tp[0], +tp[1] - 1, +tp[2]);
-  var toks = dayStr.match(/\d{1,2}/g) || [];
-  toks.forEach(function(t) {
-    var d = parseInt(t, 10);
+  days.forEach(function(d) {
     if (!(d >= 1 && d <= 31)) return;
     var y = yNow;
     if (Date.UTC(y, mo - 1, d) - todayUtc > 45 * 86400000) y -= 1;
@@ -16604,6 +16611,27 @@ function _storeCaseVisitDates_(monthCell, dayCell, todayYmd) {
     if (!seen[ymd]) { seen[ymd] = true; out.push(ymd); }
   });
   return out;
+}
+function _storeCaseVisitDates_(monthCell, dayCell, todayYmd) {
+  var dayStr = String(dayCell || '').trim();
+  if (!dayStr) return [];
+  if (/\d{4}/.test(dayStr)) { // co nam day du (vd 10/10/2026 hoac 2026-10-10)
+    var full = /^\d{4}-\d{2}-\d{2}/.test(dayStr) ? dayStr.substring(0, 10) : (function() { var d0 = parseVNDate_(dayStr); return d0 ? _vnYmd_(d0) : ''; })();
+    return full ? [full] : [];
+  }
+  return _storeCaseDaysToYmd_(parseInt(String(monthCell || '').replace(/\D/g, ''), 10), _storeCaseDayList_(dayStr), todayYmd);
+}
+// Cot N "Ngay KH den" = ngay khach THUC SU den (Duyen chon 2026-10-31: co thi dung thay cho ngay hen). Chap nhan: 25/10/2026, 25/10, "25", "25-27" (khoang), "25/26".
+// Dang "d/m" (hai so, cach nhau / hoac ., so sau <= 12) hieu la ngay/thang; con lai hieu la ngay trong thang o cot Thang (neu cot Thang trong thi lay thang cua ngay hen).
+function _storeCaseArrivalDates_(arrivalCell, monthCell, hen, todayYmd) {
+  var a = String(arrivalCell || '').trim();
+  if (!a) return [];
+  if (/\d{4}/.test(a)) return _storeCaseVisitDates_('', a, todayYmd);
+  var dm = a.match(/^(\d{1,2})\s*[\/.]\s*(\d{1,2})$/);
+  if (dm && +dm[2] >= 1 && +dm[2] <= 12) return _storeCaseDaysToYmd_(+dm[2], [+dm[1]], todayYmd);
+  var mo = parseInt(String(monthCell || '').replace(/\D/g, ''), 10);
+  if (!(mo >= 1 && mo <= 12) && hen && hen.length) mo = +hen[0].split('-')[1];
+  return _storeCaseDaysToYmd_(mo, _storeCaseDayList_(a), todayYmd);
 }
 
 // ── DOI CHIEU VOI FILE KE TOAN "THEO DOI DON CHIA SALE" (Duyen yeu cau 2026-10-31) ──
@@ -16799,7 +16827,9 @@ function buildStoreCaseReport_(filters) {
   // 1) Dong trang tinh -> ngay qua cua hang, loc theo khoang ngay
   var kept = [], wanted = {};
   sheet.rows.forEach(function(r) {
-    r.visitDates = _storeCaseVisitDates_(r.thang, r.ngayHen, todayYmd);
+    var henD = _storeCaseVisitDates_(r.thang, r.ngayHen, todayYmd), denD = _storeCaseArrivalDates_(r.ngayDen, r.thang, henD, todayYmd);
+    r.visitDates = denD.length ? denD : henD;   // co "Ngay KH den" thi dung ngay khach THUC SU den; khong thi ngay hen
+    r.dateSrc = denD.length ? 'den' : 'hen';
     r.phoneNorm = normPhone_(r.phone);
     r.maDonCodes = _storeCodeTokens_(r.maDon);
     if (!r.phoneNorm) dq.thieuSdt++;
@@ -16916,7 +16946,7 @@ function buildStoreCaseReport_(filters) {
         o.credits.forEach(function(cr) { if (cr.dup) totals.trungBoQua += cr.wouldBe; else totals.daTinh += cr.amount; });
       });
     }
-    outRows.push({ row: r.row, stt: r.stt, thang: r.thang, ngayHen: r.ngayHen, visitDates: r.activeDates.length ? r.activeDates : r.visitDates,
+    outRows.push({ row: r.row, stt: r.stt, thang: r.thang, ngayHen: r.ngayHen, ngayDen: r.ngayDen, dateSrc: r.dateSrc, visitDates: r.activeDates.length ? r.activeDates : r.visitDates,
       kenh: r.kenh, saleRaw: r.saleRaw, sales: sales, tenKh: r.tenKh, phone: r.phoneNorm || r.phone, thongTin: r.thongTin, spOrder: r.spOrder,
       capNhat: r.capNhat, tinhTrang: r.tinhTrang, spMua: r.spMua, doanhThuSheet: r.doanhThuSheet, nvCh: r.nvCh, maDon: r.maDon,
       koDen: koDen, flags: flags, orders: orders });

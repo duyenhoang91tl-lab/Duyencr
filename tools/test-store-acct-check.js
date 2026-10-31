@@ -5,7 +5,7 @@ const src = fs.readFileSync(__dirname + '/../gas_v13.js', 'utf8');
 function fn(n) { const i = src.indexOf('function ' + n + '('); if (i < 0) throw new Error('thieu ' + n); let d = 0; for (let k = src.indexOf('{', i); k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}' && --d === 0) return src.slice(i, k + 1); } }
 function line(prefix) { const i = src.indexOf(prefix); return src.slice(i, src.indexOf('\n', i)); }
 const code = [line("var COUNTER_CODE_INNER_ ="), line("var COUNTER_CODE_RE_SRC_ ="), line("var STORE_M_CODE_RE_ ="), line("var ACCT_SPLIT_SS_ID_ ="),
-  ...['_stripVN_', '_normCounterCode_', '_counterCodeNoYear_', '_counterCodeHasYear_', '_extractCounterCodes_', '_storeCodeTokens_', '_storeCodesFromNote_', '_loadAcctCodeSet_', '_storeAcctClassify_', '_storeCaseVisitDates_', 'buildStoreCaseReport_'].map(fn)].join('\n');
+  ...['_stripVN_', '_normCounterCode_', '_counterCodeNoYear_', '_counterCodeHasYear_', '_extractCounterCodes_', '_storeCodeTokens_', '_storeCodesFromNote_', '_loadAcctCodeSet_', '_storeAcctClassify_', '_storeCaseDayList_', '_storeCaseDaysToYmd_', '_storeCaseVisitDates_', '_storeCaseArrivalDates_', 'buildStoreCaseReport_'].map(fn)].join('\n');
 // ---- du lieu gia ----
 const ACCT_TABS = {   // file ke toan: nhieu tab; o gop -> dong thu 2 cua cap de trong
   'tháng 10': [['', '', ''], ['', 'Kênh bán', 'Sale bán', 'Giá trị cọc', 'Tổng giá trị', 'SDT', 'Mã bộ đếm', ''],
