@@ -1397,6 +1397,12 @@ function exportSalesReport(){
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Tổng quan');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(bySaleRows), _srState.byCreator ? 'Theo người tạo đơn' : 'Theo Sale bán');
+    if (d.bySaleNoFb && d.noFb){   // Doanh thu theo Sale LOẠI kênh "Facebook" (Duyên 2026-10-31) — cùng số liệu mục "💰 Doanh thu theo Sale" trên web
+      var noFbRows = [['Sale','Số đơn','Doanh thu (loại kênh Facebook)','TB đơn']];
+      d.bySaleNoFb.forEach(function(s){ noFbRows.push([s.name, s.orders, s.giaTri, s.trungBinhDon]); });
+      noFbRows.push([]); noFbRows.push(['Đã loại: ' + (d.noFb.excludedOrders || 0) + ' đơn kênh ' + (d.noFb.kenh || []).join(', '), '', d.noFb.excludedRevenue || 0, '']);
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(noFbRows), 'Doanh thu sale (bỏ Facebook)');
+    }
     if (_srIsAdmin()) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(byTeamRows), 'Theo Team Sale');
     if (_srIsAdmin()) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(byKenhRows), 'Theo Kênh bán');
     if (_srIsAdmin()) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(byMktRows), 'Theo MKT');

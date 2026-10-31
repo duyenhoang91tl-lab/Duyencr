@@ -23,4 +23,7 @@ ok(/Chưa có số liệu mục này — máy chủ \(GAS\) chưa cập nhật/.
 h = F({ bySaleNoFb: [{ name: '<b>x</b>', orders: 1, giaTri: 1, trungBinhDon: 1 }], noFb: d.noFb }); ctx._srState.aSaleNoFbView = 'table'; h = F({ bySaleNoFb: [{ name: '<b>x</b>', orders: 1, giaTri: 1, trungBinhDon: 1 }], noFb: d.noFb }); ok(h.indexOf('<b>x</b>') < 0 && h.indexOf('&lt;b>x') > 0, 'chong XSS ten sale');
 ok(/saleHtml\+_srSaleNoFbHtml_\(d\)\+'<\/div>'/.test(src), '_srRenderA gan muc moi NGAY DUOI saleHtml (cot trai)');
 ok(/js\/11-fn-srload\.js\?v=20261031a/.test(fs.readFileSync(__dirname + '/../index.html', 'utf8')), 'index.html da doi ?v= cua js/11');
+const x13 = fs.readFileSync(__dirname + '/../js/13-fn-bpseedofficialonlinetemplate.js', 'utf8');
+ok(/if \(d\.bySaleNoFb && d\.noFb\)/.test(x13) && /'Doanh thu sale \(bỏ Facebook\)'/.test(x13) && 'Doanh thu sale (bỏ Facebook)'.length <= 31, 'Excel bao cao A co sheet "Doanh thu sale (bo Facebook)" (ten <=31 ky tu), chi them khi GAS tra du lieu');
+ok(/js\/13-fn-bpseedofficialonlinetemplate\.js\?v=20261031a/.test(fs.readFileSync(__dirname + '/../index.html', 'utf8')), 'index.html da doi ?v= cua js/13');
 process.exit(fail ? 1 : 0);
