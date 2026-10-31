@@ -3,6 +3,12 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+
+## 2026-10-31 — App Android 1.14: nhiều hình + ghi âm → mở bộ chọn ảnh CỦA ZALO (thay cho dán tuần tự 1.13)
+- [x] Duyên test "tt": 1.13 dán tuần tự vẫn không vào nhiều ảnh; Duyên muốn chọn ảnh kiểu Zalo + gửi kèm ghi âm. NGUYÊN NHÂN GỐC: Zalo/Android chỉ nhận dán 1 hình qua clipboard, không có đường nào đẩy NHIỀU hình thẳng vào khung chat; chia sẻ chung bắt chọn lại người nhận. Sửa (ExpanderService.kt `sendViaChatGallery`): lưu hình vào album Pictures/VietTat (hình 1 = mới nhất = đầu danh sách), ghi âm vào Download/VietTat (MediaStore, Android 10+, không cần quyền), rồi `clickChatGalleryButton` bấm hộ nút ảnh của app chat (tìm nút ở 25% dưới màn hình có mô tả/chữ ảnh|hình|photo|gallery|image…, ngoài cùng bên phải) → Zalo hiện bộ chọn nhiều ảnh của chính nó. Đúng 1 hình + Chèn vẫn dán thẳng; "Chia sẻ" / chỉ ghi âm vẫn bảng chia sẻ. versionCode 15 / 1.14.
+- [ ] CHƯA KIỂM CHỨNG (không có SDK/máy thật): nhãn nút ảnh của Zalo là đoán. Nếu toast báo "KHÔNG thấy nút ảnh", mở thẻ 🩺 Kiểm tra gõ tắt → dòng "Lần chèn gần nhất" liệt kê các nút ở dải dưới + vị trí → sửa regex trong `clickChatGalleryButton`. Chưa tự tick ảnh (Duyên tự tick trong bộ chọn Zalo); ghi âm phải gửi bằng nút Tệp của Zalo, chưa tự động.
+- [ ] Android < 10: không dùng đường này (rơi về bảng chia sẻ).
+
 ## 2026-10-31 (tối, tiếp) — Báo cáo doanh số: THÊM mục "Doanh thu theo Sale — loại kênh Facebook (mỹ phẩm)" ngay dưới "Theo Sale bán" (Duyên yêu cầu)
 **Yêu cầu:** thêm 1 báo cáo doanh thu của Sale ngay dưới mục "Theo Sale bán", loại doanh thu kênh **Facebook** (chỉ kênh đúng chữ "Facebook"; "Facebook Phạm Thu Hiền" KHÔNG loại) = loại kênh mỹ phẩm.
 - **Giả định quan trọng (Duyên xác nhận):** Duyên gọi "báo cáo B" nhưng ảnh chụp là mục **"Theo Sale bán" của Báo cáo A — Base** (`js/11` `_srRenderA`, `kenhBan` chỉ có ở A). Báo cáo B — Pos (`_srRenderB`) mục tên "Theo Sale" và KHÔNG có trường kênh (chỉ có "Nguồn đơn") nên chưa làm. Nếu Duyên muốn cả B thì báo (cần quyết định cột nào của Pos tương ứng "kênh Facebook").

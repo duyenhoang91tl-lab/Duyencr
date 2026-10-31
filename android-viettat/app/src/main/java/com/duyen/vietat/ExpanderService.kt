@@ -12,6 +12,7 @@ import androidx.core.content.FileProvider
 import java.io.File
 import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.os.Bundle
 import android.text.TextUtils
 import android.view.Gravity
@@ -178,16 +179,89 @@ class ExpanderService : AccessibilityService() {
         if (texts.size == 1 && media.isEmpty()) { insertText(n, text, word, texts[0], name); return }
         replaceTail(n, text, word, texts.joinToString("\n") { Store.resolve(it, name) })
         if (media.isEmpty()) return
+        // Nhiều hình (+ ghi âm) mà KHÔNG bấm "Chia sẻ" → đưa vào Thư viện máy rồi mở BỘ CHỌN ẢNH của app chat (Zalo…): chọn nhiều ảnh như gửi thường, gửi thẳng vào khung chat đang mở.
+        if (!share && Build.VERSION.SDK_INT >= 29 && media.any { kindOf(it) == "img" } && media.size > 1) { sendViaChatGallery(media); return }
         val uris = media.mapNotNull { m ->
             File(Store.mediaDir, mediaNameOf(m)).takeIf { it.exists() }?.let { FileProvider.getUriForFile(this, "$packageName.files", it) }
         }
         if (uris.isEmpty()) { Toast.makeText(this, "Không tìm thấy file", Toast.LENGTH_SHORT).show(); return }
         val allImg = media.all { kindOf(it) == "img" }
-        // "Chèn" + chỉ có hình (1 hoặc NHIỀU) → dán lần lượt từng hình vào ĐÚNG khung chat đang mở (như chọn nhiều ảnh khi gửi Zalo).
-        // Ghi âm/tệp lẫn vào, hoặc bấm "Chia sẻ" → mở bảng chia sẻ Android như cũ.
-        if (allImg && !share) { pasteImages(uris, 0, n); return }
+        // Đúng 1 hình + "Chèn" → dán thẳng vào ô chat. Ghi âm/tệp lẫn vào, hoặc bấm "Chia sẻ" → bảng chia sẻ Android.
+        if (allImg && !share && uris.size == 1) { pasteImages(uris, 0, n); return }
         (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newUri(contentResolver, "viettat", uris[0]))
         shareChooser(uris, allImg, media.all { kindOf(it) == "aud" })
+    }
+
+    /**
+     * NGUYÊN NHÂN GỐC "dán nhiều ảnh vẫn không được" (Duyên 2026-10-31): Android/Zalo chỉ nhận dán 1 hình qua clipboard, và ACTION_PASTE nối tiếp không đưa nhiều hình
+     * vào khung chat; bảng chia sẻ chung thì bắt chọn lại người nhận. Cách làm: lưu các hình (đúng thứ tự, hình 1 mới nhất → nằm đầu danh sách) vào album "VietTat" của Thư viện,
+     * ghi âm vào Tải xuống/VietTat, rồi BẤM HỘ nút ảnh của app chat → hiện bộ chọn nhiều ảnh quen thuộc của chính Zalo (tick, "Gửi (n)") và gửi vào đúng cuộc trò chuyện đang mở.
+     */
+    private fun sendViaChatGallery(media: List<String>) {
+        Thread {
+            val imgs = media.filter { kindOf(it) == "img" }.map { File(Store.mediaDir, mediaNameOf(it)) }.filter { it.exists() }
+            val auds = media.filter { kindOf(it) == "aud" }.map { File(Store.mediaDir, mediaNameOf(it)) }.filter { it.exists() }
+            val okImg = saveMedia(imgs, true); val okAud = saveMedia(auds, false)
+            ui.post {
+                if (okImg == 0) { Toast.makeText(this, "Không lưu được hình vào Thư viện", Toast.LENGTH_LONG).show(); return@post }
+                ui.postDelayed({
+                    val clicked = clickChatGalleryButton()
+                    val msg = (if (clicked) "Chọn $okImg hình đầu danh sách (album VietTat) rồi bấm Gửi" else "Bấm nút ẢNH của app chat, chọn $okImg hình đầu danh sách (album VietTat)") +
+                        (if (okAud > 0) ".\nGhi âm ($okAud): Tải xuống/VietTat — gửi bằng nút Tệp." else "")
+                    Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+                }, 500)
+            }
+        }.start()
+    }
+
+    /** Lưu file vào MediaStore (không cần quyền từ Android 10). Hình k có ngày chụp = now − k giây → hình 1 mới nhất = đầu danh sách, tick từ trái sang phải đúng thứ tự. */
+    private fun saveMedia(files: List<File>, image: Boolean): Int {
+        var ok = 0
+        val nowMs = System.currentTimeMillis()
+        files.forEachIndexed { k, f ->
+            try {
+                val ext = f.extension.lowercase()
+                val mime = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: if (image) "image/jpeg" else "audio/mp4"
+                val v = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, "vt_${nowMs}_${k}.${ext.ifEmpty { if (image) "jpg" else "m4a" }}")
+                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE, mime)
+                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, if (image) "Pictures/VietTat" else "Download/VietTat")
+                    if (image) {
+                        put(android.provider.MediaStore.Images.Media.DATE_TAKEN, nowMs - k * 1000L)
+                        put(android.provider.MediaStore.MediaColumns.DATE_ADDED, (nowMs / 1000) - k)
+                    }
+                }
+                val base = if (image) android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI else android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
+                val u = contentResolver.insert(base, v) ?: return@forEachIndexed
+                contentResolver.openOutputStream(u)?.use { o -> f.inputStream().use { it.copyTo(o) } }
+                ok++
+            } catch (ex: Exception) { Diag.lastInsert = "lưu Thư viện lỗi: ${ex.javaClass.simpleName} ${ex.message.orEmpty()}" }
+        }
+        return ok
+    }
+
+    /** Bấm hộ nút "ảnh" của app chat: tìm nút ở dải dưới màn hình có mô tả/chữ chứa ảnh|hình|photo|gallery|image… (rightmost). Ghi các nút thấy được vào Diag để chỉnh lại nếu app đổi nhãn. */
+    private fun clickChatGalleryButton(): Boolean {
+        val root = rootInActiveWindow ?: run { Diag.lastInsert = "mở bộ chọn ảnh: không đọc được màn hình"; return false }
+        val h = resources.displayMetrics.heightPixels
+        val re = Regex("ảnh|hình|photo|gallery|image|picture|media|thư viện|album", RegexOption.IGNORE_CASE)
+        val seen = ArrayList<String>(); var best: AccessibilityNodeInfo? = null; var bestLeft = -1
+        fun walk(n: AccessibilityNodeInfo?, d: Int) {
+            if (n == null || d > 30) return
+            val r = Rect().also { n.getBoundsInScreen(it) }
+            val str = listOfNotNull(n.contentDescription?.toString(), n.text?.toString(), n.viewIdResourceName).joinToString("|")
+            if (r.top > h * 0.75 && !n.isEditable && r.width() > 0) {
+                if (str.isNotEmpty() && seen.size < 14) seen += "${str.take(30)}@${r.left}"
+                if (str.isNotEmpty() && re.containsMatchIn(str) && r.left > bestLeft) { best = n; bestLeft = r.left }
+            }
+            for (i in 0 until n.childCount) walk(n.getChild(i), d + 1)
+        }
+        walk(root, 0)
+        var t: AccessibilityNodeInfo? = best
+        while (t != null && !t.isClickable) t = t.parent
+        val ok = t?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
+        Diag.lastInsert = "mở bộ chọn ảnh: " + (if (ok) "đã bấm nút ảnh" else "KHÔNG thấy nút ảnh") + " · nút ở dải dưới: " + seen.joinToString(" ; ")
+        return ok
     }
 
     private val ui = android.os.Handler(android.os.Looper.getMainLooper())
