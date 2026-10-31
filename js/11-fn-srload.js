@@ -895,7 +895,7 @@ function _srRenderA(d){
     (d.saleCloseRateFrom ? _srCloseRateBarHtml_(d.saleCloseRate, _srState.saleSearch, 'tương tác', d.saleCloseRateExcluded) :
       '<div style="color:var(--muted);text-align:center;padding:20px;font-size:12px">Chưa nạp báo cáo tương tác Pancake ngày nào — vào tab "📥 Báo cáo Pancake" để nạp trước khi xem tỷ lệ chốt theo Sale.</div>');
   html += '<div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">'+
-    '<div style="flex:1 1 380px;min-width:320px">'+saleHtml+'</div>'+
+    '<div style="flex:1 1 380px;min-width:320px">'+saleHtml+_srSaleNoFbHtml_(d)+'</div>'+
     '<div style="flex:1 1 320px;min-width:280px">'+saleCloseHtml+'</div>'+
     '</div>';
 
@@ -1166,6 +1166,26 @@ function _bprdReset_(){
 }
 // ═══ BPRD-CFG END ═══
 
+// ── Báo cáo A: mục "Doanh thu theo Sale — loại kênh Facebook" NGAY DƯỚI "Theo Sale bán" (Duyên yêu cầu 2026-10-31). Dữ liệu d.bySaleNoFb / d.noFb do GAS
+//    buildSalesReportA_ tính (kênh đúng chữ "Facebook" = kênh mỹ phẩm bị loại; "Facebook Phạm Thu Hiền"… vẫn tính). Chia tiền/đếm đơn giống bảng Theo Sale bán. ──
+function _srSaleNoFbHtml_(d){
+  var nf = (d && d.noFb) || null, q = String(_srState.saleSearch || '').toLowerCase();
+  var kenhTxt = nf && nf.kenh && nf.kenh.length ? nf.kenh.map(function(k){ return '“' + esc(k.charAt(0).toUpperCase() + k.slice(1)) + '”'; }).join(', ') : '“Facebook”';
+  var h = '<div class="dash-section-title" style="margin-top:20px">💰 Doanh thu theo Sale <span style="font-weight:400;color:var(--muted);font-size:11px">(loại kênh ' + kenhTxt + ' — kênh mỹ phẩm; cách chia như bảng trên)</span>' + _srViewToggleHtml('aSaleNoFbView') + '</div>';
+  if (!d || !d.bySaleNoFb || !nf) return h + '<div style="color:var(--muted);font-size:12px;padding:10px 0">Chưa có số liệu mục này — máy chủ (GAS) chưa cập nhật bản mới. Deploy lại GAS rồi bấm Lọc lại.</div>';
+  var rows = d.bySaleNoFb.filter(function(r){ return !q || String(r.name || '').toLowerCase().indexOf(q) !== -1; });
+  if (_srState.aSaleNoFbView === 'table' || !_srState.aSaleNoFbView){
+    h += '<table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">Số đơn</th><th style="text-align:right"><b>Doanh thu</b></th><th style="text-align:right">TB đơn</th></tr></thead><tbody>';
+    rows.forEach(function(r){ h += '<tr><td>' + esc(r.name) + '</td><td style="text-align:right">' + fmt(r.orders) + '</td><td style="text-align:right"><b>' + _srMoney(r.giaTri) + '</b></td><td style="text-align:right">' + _srMoney(r.trungBinhDon) + '</td></tr>'; });
+    if (!rows.length) h += '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+    else { var o = rows.reduce(function(a, r){ return a + (r.orders || 0); }, 0), g = rows.reduce(function(a, r){ return a + (r.giaTri || 0); }, 0); h += _srTotalRowHtml_(['Tổng', fmt(o), _srMoney(g), _srMoney(o ? Math.round(g / o) : 0)]); }
+    h += '</tbody></table>';
+  } else {
+    h += _srChartSvg(rows, 'name', 'giaTri', _srState.aSaleNoFbView, true, 'orders', { ordersLabel: 'Tổng lượt đơn theo sale (không gồm kênh Facebook)', ordersHint: 'Đơn bán chung nhiều sale được tính cho TỪNG sale (số đơn giữ nguyên, tiền chia đều).' });
+  }
+  h += '<div style="font-size:11px;color:var(--muted);margin-top:6px">Đã loại khỏi mục này: <b>' + fmt(nf.excludedOrders || 0) + ' đơn</b>, <b>' + _srMoney(nf.excludedRevenue || 0) + '</b> của kênh ' + kenhTxt + ' (chỉ kênh đúng tên này; kênh khác có chữ Facebook như “Facebook Phạm Thu Hiền” vẫn được tính). Còn lại: ' + fmt(nf.keptOrders || 0) + ' đơn, ' + _srMoney(nf.keptRevenue || 0) + '.</div>';
+  return h;
+}
 function _srRenderB(d){
   if (!d) return _srNoDataHtml_();
   var bTb = d.totalOrders ? Math.round(d.totalGiaTri/d.totalOrders) : 0;
