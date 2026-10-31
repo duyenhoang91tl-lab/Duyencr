@@ -3,6 +3,12 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-10-31 — Rà các mục dở trong HANDOFF + dọn nợ test (Duyên: "xử lý các mục còn dang dở"; làm từng bước nhỏ, mỗi bước push riêng)
+- [x] Bước 1 (`a2b6b24`): xoá 3 dòng marker xung đột merge sót đầu HANDOFF.md (`<<<<<<< HEAD` / `=======` / `>>>>>>> origin/main`); giữ nguyên nội dung 2 nhánh.
+- [x] Bước 2: `css/99-dark-auto.css` CŨ so với nguồn (`tools/test-dark-theme.js` đỏ: thiếu 2 luật chế độ tối cho inline `color:#d97706` và `color:var(--accent,#1e66f5)` do các phiên khác thêm màu inline mà không sinh lại). NGUYÊN NHÂN GỐC: file này là SẢN PHẨM SINH TỰ ĐỘNG (`node tools/gen-dark-theme.js`, cũng chạy trong `build-dist.js`) nhưng không ai commit lại sau khi đổi màu inline. Đã sinh lại + commit (chỉ +2 dòng). **Quy ước:** sau khi thêm màu inline mới ở js/*.js phải chạy `node tools/gen-dark-theme.js` rồi commit css/99.
+- [x] Đã rà, KHÔNG còn lỗi: toàn bộ 205 `tools/test-*.js` chạy đạt (cần `NODE_PATH` có jsdom/terser/clean-css; `test-dist-equivalence` phải chạy SAU `node tools/build-dist.js`). Các ghi chú cũ "test hỏng sẵn" (test-split-orders-ui, test-msgtpl-group, test-supabase-read, test-staff-profile-ui, test-img-ui, test-price-ai-ui, test-stats-ui, test-tpl-ui) và "openDp trực tiếp ở js/02/36/40" đã được phiên khác xử lý — bỏ qua.
+- [ ] BƯỚC KẾ TIẾP: các mục còn lại ĐỀU là việc Duyên thử/chốt (Ctrl+F5 + thử tay, hoặc quyết định: xuất Excel tất cả sale, `total`↔`posValue` ở `splitOrderDetail_`, Zalo AI nút Quét từ cấm, bậc KPI/hoa hồng cấu hình, nhập hồ sơ nhân sự `nhapHoSoNhanSu`, dọn trùng Pos `dedupePosNow_`...). Muốn làm mục nào thì nói tên mục; mình không tự quyết thay.
+
 ## 2026-10-26 (tiếp) — CRM tự thử lại nhanh khi gặp lỗi thoảng qua (đã push `b9d1146`)
 - [x] ĐÃ PUSH: `b9d1146` — `_gsFetchTO_` (js/01) tự thử lại 404/502/503/504 + lỗi mạng chớp (tối đa 2 lần, 1,5s rồi 4s), không thử lại khi hết giờ; bước kế tiếp (c) của mục chẩn đoán 502/404 đã xong. Bản web tự deploy xanh.
 - ĐANG LÀM: không có việc dở. Chỉ sửa js/01 + 2 test; KHÔNG sửa GAS/extension.
