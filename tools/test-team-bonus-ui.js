@@ -76,6 +76,25 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   w.eval('_tbExportXlsx()');
   ok(saved && saved.n === 'ThuongPhat_DoiSale_2026-10.xlsx' && saved.b.s.join(',') === 'Tong hop,Thuong ngay,Thuong tuan-thang,Nhat ky phat,Quy dinh', 'xuat: ten file + 5 sheet');
   ok(/onclick="_tbExportXlsx\(\)"/.test(w.eval('_tbPanelHtml_()')), 'panel co nut Xuat Excel');
+  // goi y phat tu tin nhan
+  w.eval("_tbTab('pen')"); reqs.length = 0;
+  ok(/Quét ngày này/.test(body()) && /Chỉ là gợi ý/.test(body()), 'tab phat: co khung goi y');
+  const SG = { ok: true, date: '2026-10-30', scanned: 120, hidden: 0, truncated: false, items: [
+    { key: 'm:c1:2026-10-30T01:00', type: 1, convId: 'c1', customer: 'An<i>', phone: '0901', inAt: '2026-10-30T01:00:00.000Z', outAt: '2026-10-30T01:45:00.000Z', gapMin: 45, open: false, sale: 'Hoa', saleRaw: 'Hoa' },
+    { key: 'm:c2:2026-10-30T03:00', type: 3, convId: 'c2', customer: 'Bo', phone: '', inAt: '2026-10-30T03:00:00.000Z', outAt: null, gapMin: 90, open: true, sale: '', saleRaw: 'Zed' }] };
+  resp = SG; await w.eval('_tbSuggestLoad()');
+  ok(reqs.length === 1 && /action=teamPenaltySuggest&date=\d{4}-\d{2}-\d{2}&token=TOK123/.test(reqs[0].u), 'quet: goi teamPenaltySuggest kem token');
+  ok(/2 gợi ý/.test(body()) && body().includes('An&lt;i&gt;') && /chưa trả lời/.test(body()) && /08:00 → 08:45/.test(body()), 'goi y: hien 2 dong, escape ten, gio VN');
+  reqs.length = 0; let alerted = 0; w.alert = () => { alerted++; };
+  await w.eval('_tbSuggestAccept(1)');
+  ok(alerted === 1 && reqs.length === 0, 'ghi phat khi chua chon sale -> chan');
+  resp = D; await w.eval('_tbSuggestAccept(0)');
+  const psg = JSON.parse(reqs[0].o.body);
+  ok(psg.action === 'teamPenaltySave' && psg.sale === 'Hoa' && psg.type === 1 && psg.amount === '' && /\[pk:m:c1:2026-10-30T01:00\]/.test(psg.note) && psg.date === w.eval('_tbState.sg.date'), 'ghi phat: gui type/sale + khoa [pk:] trong ghi chu');
+  ok(w.eval('_tbState.sg.data.items.length') === 1, 'ghi phat xong: dong bien khoi danh sach');
+  reqs.length = 0; resp = { ok: true }; await w.eval('_tbSuggestIgnore(0)');
+  const ig = JSON.parse(reqs[0].o.body);
+  ok(ig.action === 'teamPenaltyIgnore' && ig.key === 'm:c2:2026-10-30T03:00' && w.eval('_tbState.sg.data.items.length') === 0, 'bo qua: gui khoa, dong bien mat');
   // moc ma nguon: gan vao bao cao B, sau cac muc cua B
   const s11 = R('js/11-fn-srload.js'), idx = R('index.html');
   ok(/html \+= _tbPanelHtml_\(\);[^\n]*\n\s*html \+= _srBaseCheckPanelHtml_\(d\);/.test(s11), 'js/11: _srRenderB gan panel truoc muc check Base');
