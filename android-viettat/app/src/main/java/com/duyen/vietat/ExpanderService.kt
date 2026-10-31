@@ -240,27 +240,53 @@ class ExpanderService : AccessibilityService() {
         return ok
     }
 
-    /** Bấm hộ nút "ảnh" của app chat: tìm nút ở dải dưới màn hình có mô tả/chữ chứa ảnh|hình|photo|gallery|image… (rightmost). Ghi các nút thấy được vào Diag để chỉnh lại nếu app đổi nhãn. */
+    /**
+     * Bấm hộ nút "ảnh" của app chat. NGUYÊN NHÂN GỐC "KHÔNG thấy nút ảnh · nút ở dải dưới: (trống)" (Duyên quay video Zalo 2026-10-31): bản cũ chỉ quét 25% DƯỚI CÙNG màn hình,
+     * nhưng khi bàn phím đang mở hàng nhập tin của Zalo nằm ở ~54% chiều cao (nút ảnh ở ngay cuối hàng đó) nên không quét tới. Nay tìm ô soạn tin rồi quét
+     * ĐÚNG HÀNG đó (± 2 lần chiều cao ô), nút khớp nhãn ảnh|hình|photo|gallery|image… nằm phải nhất; không có ô soạn thì quét nửa dưới màn hình.
+     * Mọi nút thấy được trong dải được ghi vào Diag (để chỉnh nhãn nếu Zalo đổi).
+     */
     private fun clickChatGalleryButton(): Boolean {
         val root = rootInActiveWindow ?: run { Diag.lastInsert = "mở bộ chọn ảnh: không đọc được màn hình"; return false }
         val h = resources.displayMetrics.heightPixels
+        // 1) ô soạn tin: ô đang lấy nét, không có thì ô gõ được nằm thấp nhất
+        var input: AccessibilityNodeInfo? = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.takeIf { it.isEditable }
+        if (input == null) {
+            var lowTop = -1
+            fun findEd(n: AccessibilityNodeInfo?, d: Int) {
+                if (n == null || d > 30) return
+                if (n.isEditable) { val r = Rect().also { n.getBoundsInScreen(it) }; if (r.width() > 0 && r.top > lowTop) { lowTop = r.top; input = n } }
+                for (k in 0 until n.childCount) findEd(n.getChild(k), d + 1)
+            }
+            findEd(root, 0)
+        }
+        val ir = Rect(); input?.getBoundsInScreen(ir)
+        val bandTop = if (input != null) ir.top - ir.height() * 2 else (h * 0.5).toInt()
+        val bandBottom = if (input != null) ir.bottom + ir.height() * 2 else h
         val re = Regex("ảnh|hình|photo|gallery|image|picture|media|thư viện|album", RegexOption.IGNORE_CASE)
         val seen = ArrayList<String>(); var best: AccessibilityNodeInfo? = null; var bestLeft = -1
         fun walk(n: AccessibilityNodeInfo?, d: Int) {
             if (n == null || d > 30) return
             val r = Rect().also { n.getBoundsInScreen(it) }
-            val str = listOfNotNull(n.contentDescription?.toString(), n.text?.toString(), n.viewIdResourceName).joinToString("|")
-            if (r.top > h * 0.75 && !n.isEditable && r.width() > 0) {
-                if (str.isNotEmpty() && seen.size < 14) seen += "${str.take(30)}@${r.left}"
-                if (str.isNotEmpty() && re.containsMatchIn(str) && r.left > bestLeft) { best = n; bestLeft = r.left }
+            val cy = (r.top + r.bottom) / 2
+            if (cy in bandTop..bandBottom && !n.isEditable && r.width() > 0 && r.width() < 600) {
+                val label = listOfNotNull(n.contentDescription?.toString(), n.text?.toString()).joinToString("|")
+                val id = n.viewIdResourceName.orEmpty().substringAfterLast('/')
+                val str = listOf(label, id).filter { it.isNotEmpty() }.joinToString("|")
+                if (str.isNotEmpty() && seen.size < 20) seen += "${str.take(32)}@${r.left}"
+                // nhãn chữ phải NGẮN (≤ 25 ký tự) để khỏi bấm nhầm bong bóng tin nhắn có chữ "ảnh"; id thì không giới hạn
+                val textHit = label.isNotEmpty() && label.length <= 25 && re.containsMatchIn(label)
+                val idHit = id.isNotEmpty() && re.containsMatchIn(id)
+                if ((textHit || idHit) && r.left > bestLeft) { best = n; bestLeft = r.left }
             }
-            for (i in 0 until n.childCount) walk(n.getChild(i), d + 1)
+            for (k in 0 until n.childCount) walk(n.getChild(k), d + 1)
         }
         walk(root, 0)
         var t: AccessibilityNodeInfo? = best
         while (t != null && !t.isClickable) t = t.parent
         val ok = t?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
-        Diag.lastInsert = "mở bộ chọn ảnh: " + (if (ok) "đã bấm nút ảnh" else "KHÔNG thấy nút ảnh") + " · nút ở dải dưới: " + seen.joinToString(" ; ")
+        Diag.lastInsert = "mở bộ chọn ảnh: " + (if (ok) "đã bấm nút ảnh" else "KHÔNG thấy nút ảnh") + " · ô soạn tin " + (if (input != null) "y=${ir.top}-${ir.bottom}" else "không thấy") +
+            " · nút trên hàng đó: " + (if (seen.isEmpty()) "(trống)" else seen.joinToString(" ; "))
         return ok
     }
 
