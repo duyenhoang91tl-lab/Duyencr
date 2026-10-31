@@ -3,6 +3,14 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-10-31 (tối, tiếp) — Báo cáo doanh số: THÊM mục "Doanh thu theo Sale — loại kênh Facebook (mỹ phẩm)" ngay dưới "Theo Sale bán" (Duyên yêu cầu)
+**Yêu cầu:** thêm 1 báo cáo doanh thu của Sale ngay dưới mục "Theo Sale bán", loại doanh thu kênh **Facebook** (chỉ kênh đúng chữ "Facebook"; "Facebook Phạm Thu Hiền" KHÔNG loại) = loại kênh mỹ phẩm.
+- **Giả định quan trọng (Duyên xác nhận):** Duyên gọi "báo cáo B" nhưng ảnh chụp là mục **"Theo Sale bán" của Báo cáo A — Base** (`js/11` `_srRenderA`, `kenhBan` chỉ có ở A). Báo cáo B — Pos (`_srRenderB`) mục tên "Theo Sale" và KHÔNG có trường kênh (chỉ có "Nguồn đơn") nên chưa làm. Nếu Duyên muốn cả B thì báo (cần quyết định cột nào của Pos tương ứng "kênh Facebook").
+- [x] **Bước 1/3 — BACKEND (đã push):** `gas_v13.js` hàm mới `_srKenhExcluded_` + `_srSaleRevExKenh_` (ngay trước `buildSalesReportA_`; danh sách kênh loại ở hằng `SALE_REV_EXCLUDE_KENH_ = ['facebook']`, viết thường không dấu; khớp sau khi bỏ dấu/chữ thường/gộp khoảng trắng, nên "Facebook Phạm Thu Hiền" được giữ). `buildSalesReportA_` trả thêm `bySaleNoFb` (name, orders, coc, giaTri, trungBinhDon) và `noFb` (`kenh`, `excludedOrders`, `excludedRevenue`, `keptOrders`, `keptRevenue`). Cách chia tiền/đếm đơn GIỐNG bảng "Theo Sale bán" (nhiều sale: +1 đơn mỗi sale, tiền chia đều; chế độ "theo người tạo": trọn vẹn; bộ lọc Sale áp như cũ). Test `node tools/test-sale-rev-nofb.js` (12 ca) + test báo cáo A cũ đạt.
+- [ ] **Bước 2/3 — WEB:** `js/11-fn-srload.js` `_srRenderA`: dưới `saleHtml` (cột trái, cạnh "Tỷ lệ chốt theo Sale") thêm mục "💰 Doanh thu theo Sale — loại kênh Facebook" dùng `d.bySaleNoFb` (Bảng/Tròn/Cột qua `_srViewToggleHtml('aSaleNoFbView')`, ô tìm dùng chung `_srState.saleSearch`), ghi chú số đơn/tiền đã loại từ `d.noFb`. Bump `?v=` js/11 trong index.html.
+- [ ] **Bước 3/3:** xuất Excel báo cáo A (js/13 ~dòng 1399) thêm sheet "Doanh thu sale (bỏ Facebook)"; KB `docs/crm-kb`.
+- **Việc Duyên:** GAS tự deploy (Actions xanh) + Ctrl+F5.
+
 ## 2026-10-31 (tối) — Rà HANDOFF lần 2: việc còn lại KHÔNG còn mục code nào tự làm được
 - [x] Dọn HANDOFF: các dòng `[ ]` lỗi thời do merge ở mục "Thông báo KH mua lại" (Bước 2/3 CLIENT, 3/3 KB, và "Web báo cáo" thuộc Phân quyền Quầy/CSKH) đã tick xong sau khi chạy lại test `test-view-extra*.js`, `test-nt-resale.js`, `test-resale-notify.js` (đều đạt).
 - [x] Điện thoại: menu Mẫu/Tác vụ — bước 2 (CSS) đã push `f8dfbbc`; còn Bước 3 = Duyên thử trên máy thật.
