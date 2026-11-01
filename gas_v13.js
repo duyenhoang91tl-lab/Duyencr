@@ -4890,6 +4890,8 @@ function _extractPageNameFromNguonDon_(nguonDon) {
 // BAM O BAO CAO -> XEM DON CHI TIET (2026-10-25, Duyen yeu cau). Moi don tra ve kem "no dong gop bao nhieu cho tung dong bang" (bs = theo Sale, bt = theo Team,
 // tinh DUNG tai vong tong hop de cong lai khop 100% so tren bang): [[ten, so tien]]. Lam tron dong de payload gon.
 function _drillPairs_(arr) { return (arr || []).map(function(x) { return [x[0], Math.round(x[1])]; }); }
+// Phan chia CHINH XAC (2 chu so thap phan, KHONG lam tron nguyen) cho Excel doi chieu ke toan: cong lai theo tung sale = DUNG bang "Theo Sale" (bs lam tron nguyen tung don nen cong lai co the lech vai dong).
+function _drillPairs2_(arr) { return (arr || []).map(function(x) { return [x[0], Math.round(x[1] * 100) / 100]; }); }
 function _drillPairsObj_(o) { return Object.keys(o || {}).map(function(k) { return [k, Math.round(o[k])]; }); }
 // ── DOANH THU THEO SALE — LOAI KENH "FACEBOOK" (Duyen yeu cau 2026-10-31): muc moi ngay duoi "Theo Sale ban" cua bao cao doanh so (Base). ──
 // "Kenh Facebook" o day = kenh ban DUNG CHU "Facebook" (kenh my pham). Ten khac chi chua chu facebook (vd "Facebook Phạm Thu Hiền") KHONG bi loai.
@@ -6146,8 +6148,8 @@ function buildSalesReportB_(filters) {
     var m = matched[j];
     totalGiaTri += m.giaTriSauGiam;
     totalCod += m.cod;
-    var drillBs = [], drillBt = {};   // dong gop cua don nay vao bang Theo Sale / Theo Team (cho cua so chi tiet — cong lai khop bang)
-    m.bs = drillBs; m.bt = drillBt;
+    var drillBs = [], drillBt = {}, drillBc = [];   // dong gop cua don nay vao bang Theo Sale / Theo Team (cho cua so chi tiet — cong lai khop bang); drillBc = phan COD theo sale
+    m.bs = drillBs; m.bt = drillBt; m.bc = drillBc;
 
     // Breakdown theo Sale (cot "Thẻ") — dung dung quy uoc da chot o Bao cao A: so don giu
     // nguyen (khong chia), tien (Gia tri sau giam + COD) chia deu cho so sale/don de tranh cong
@@ -6174,6 +6176,7 @@ function buildSalesReportB_(filters) {
       bySale[sName].orders += 1;
       bySale[sName].giaTri += m.giaTriSauGiam * fr;
       drillBs.push([sName, m.giaTriSauGiam * fr]);
+      drillBc.push([sName, m.cod * fr]);
       bySale[sName].cod += m.cod * fr;
       if (filters.withDaily) { var ddB = _vnYmd_(parseVNDate_(m.ngayTaoDon)); if (ddB) { var sdB = bySaleDay[sName] || (bySaleDay[sName] = {}); var cB = sdB[ddB] || (sdB[ddB] = [0, 0]); cB[0] += 1; cB[1] += m.giaTriSauGiam * fr; } }
 
@@ -6310,6 +6313,7 @@ function buildSalesReportB_(filters) {
     orders: matched.map(function(m){
       return {
         bs: _drillPairs_(m.bs), bt: _drillPairsObj_(m.bt),   // dong gop vao bang Theo Sale / Team (cua so chi tiet khi bam o bao cao)
+        bsx: _drillPairs2_(m.bs), bcx: _drillPairs2_(m.bc),   // phan chia CHINH XAC (gia tri / COD theo tung sale) — Excel doi chieu ke toan cong lai khop bang "Theo Sale"
         ngayTaoDon: m.ngayTaoDon, khachHang: m.khachHang, soDienThoai: m.soDienThoai,
         posRow: m.posRow || undefined,   // dong that trong sheet "dữ liệu đơn" (de doi chieu tung don voi file Pancake goc — xem sheet chi tiet cua nut Xuat Excel doi chieu Bao cao B)
         nguonDon: m.nguonDon, theSale: m.theSale, trangThai: m.trangThai, sanPham: m.sanPham, maSanPham: m.maSanPham, soLuong: m.soLuong,

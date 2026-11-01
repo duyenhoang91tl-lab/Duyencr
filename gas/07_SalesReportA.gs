@@ -264,6 +264,8 @@ function _extractPageNameFromNguonDon_(nguonDon) {
 // BAM O BAO CAO -> XEM DON CHI TIET (2026-10-25, Duyen yeu cau). Moi don tra ve kem "no dong gop bao nhieu cho tung dong bang" (bs = theo Sale, bt = theo Team,
 // tinh DUNG tai vong tong hop de cong lai khop 100% so tren bang): [[ten, so tien]]. Lam tron dong de payload gon.
 function _drillPairs_(arr) { return (arr || []).map(function(x) { return [x[0], Math.round(x[1])]; }); }
+// Phan chia CHINH XAC (2 chu so thap phan, KHONG lam tron nguyen) cho Excel doi chieu ke toan: cong lai theo tung sale = DUNG bang "Theo Sale" (bs lam tron nguyen tung don nen cong lai co the lech vai dong).
+function _drillPairs2_(arr) { return (arr || []).map(function(x) { return [x[0], Math.round(x[1] * 100) / 100]; }); }
 function _drillPairsObj_(o) { return Object.keys(o || {}).map(function(k) { return [k, Math.round(o[k])]; }); }
 // ── DOANH THU THEO SALE — LOAI KENH "FACEBOOK" (Duyen yeu cau 2026-10-31): muc moi ngay duoi "Theo Sale ban" cua bao cao doanh so (Base). ──
 // "Kenh Facebook" o day = kenh ban DUNG CHU "Facebook" (kenh my pham). Ten khac chi chua chu facebook (vd "Facebook Phạm Thu Hiền") KHONG bi loai.
