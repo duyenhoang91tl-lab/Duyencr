@@ -159,7 +159,7 @@ var MLIB = (function () {
   }
   function pickRender() {
     var d = $('ml-pick'); if (!d) return; var type = S.pickType, list = visible(type);
-    d.innerHTML = '<div class="ml-box"><div class="ml-bar"><b>' + (type === 'image' ? '🖼️ Chọn ảnh' : type === 'audio' ? '🎙️ Chọn ghi âm' : '💬 Chọn mẫu tin') + '</b><input class="ml-q" placeholder="🔍 Tìm…" value="' + esc(S.q) + '" oninput="MLIB.search(this.value)"><button class="btn sm" onclick="document.getElementById(\'ml-pick\').remove()">✕ Đóng</button></div>'
+    d.innerHTML = '<div class="ml-box"><div class="ml-bar"><div class="ml-seg">' + [['image', '🖼️ Ảnh'], ['audio', '🎙️ Ghi âm'], ['template', '💬 Mẫu tin']].map(function (t) { return '<button class="' + (type === t[0] ? 'on' : '') + '" onclick="MLIB.pickTab(\'' + t[0] + '\')">' + t[1] + '</button>'; }).join('') + '</div><input class="ml-q" placeholder="🔍 Tìm…" value="' + esc(S.q) + '" oninput="MLIB.search(this.value)"><button class="btn sm" onclick="document.getElementById(\'ml-pick\').remove()">✕ Đóng</button></div>'
       + '<div id="ml-pick-out">' + gridHtml(list, true) + '</div></div>';
   }
   function _pickId(id) { var it = byId(id), d = $('ml-pick'); if (d) d.remove(); if (it && _cb) _cb(it); }
@@ -172,7 +172,18 @@ var MLIB = (function () {
       else { var o = $('ml-out'); if (o) o.innerHTML = gridHtml(visible(S.type), false); }
     },
     upload: upload, fromDrive: fromDrive, recStart: recStart, recStop: recStop, editTpl: editTpl, cancelTpl: cancelTpl, saveTpl: saveTpl, del: del, copy: copy,
+    pickTab: function (t) { S.pickType = t; pickRender(); },
     pick: pick, _pickId: _pickId, _render: render, _load: load
   };
 })();
 async function renderMediaLibTab() { MLIB._render(); await MLIB._load(false); MLIB._render(); }
+
+// Nút 📎 trong khung soạn tin của chat: chọn ảnh/ghi âm/mẫu tin từ thư viện rồi chèn vào ô soạn (chưa gửi — người dùng bấm Gửi).
+// Ảnh/ghi âm chèn dạng LINK (Pancake API đang gửi văn bản); mẫu tin chèn nội dung.
+function mlibChatPick(inputId, type) {
+  MLIB.pick(type || 'template', function (it) {
+    var ta = document.getElementById(inputId); if (!ta) return;
+    var add = it.type === 'template' ? it.text : (it.name ? it.name + ': ' : '') + it.url;
+    ta.value = ta.value ? ta.value.replace(/\s+$/, '') + '\n' + add : add; ta.focus();
+  });
+}
