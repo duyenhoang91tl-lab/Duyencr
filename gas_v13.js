@@ -2739,7 +2739,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.63-resale' });   // PHAI la chuoi viet thang (test-crm-ask/test-kh-discuss doi chieu); giu = PK_GAS_VER_
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.64-nguon-gold' });   // PHAI la chuoi viet thang (test-crm-ask/test-kh-discuss doi chieu); giu = PK_GAS_VER_
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──
@@ -6355,6 +6355,26 @@ function buildSalesReportB_(filters) {
 //  da tinh 30/70), ty le chot tu saleCloseRate cua B; hoa hong/thuong la BAN PORT CUA _computeCommissionData_ /
 //  _computeBonusData_ trong index.html (CRM) — NEU SUA QUY TAC HOA HONG/THUONG O CRM THI PHAI SUA CA O DAY.
 // ═══════════════════════════════════════════════════════════════
+// ── LUAT HOA HONG KENH "NGUON" THEO CHAT LIEU VANG (Duyen yeu cau 2026-10): don co nguon don la kenh Nguon thi TU DONG tinh theo chat lieu trong ten san pham:
+//    vang 10k = 1,5%, vang 14k = 1% — KHONG phu thuoc gia tri don (khong xet moc 15 trieu nhu cac kenh con lai). Don Nguon khong co 10k/14k -> rieng tinh nhu cu.
+//    Don co CA 10k va 14k (khong tach duoc gia tri tung mon) -> lay muc THAP (1%) va ghi 'mixed' de doi chieu. PHAI khop _goldChannelRule_ o client js/01.
+var GOLD_RULE_CHANNELS_ = ['nguon'];   // ten kenh (nguon don) KHONG DAU, chu thuong; khop nguyen ten hoac bat dau bang 'nguon '
+var GOLD_RULE_MATERIALS_ = [ { key: '14', rate: 1, label: 'vàng 14k' }, { key: '10', rate: 1.5, label: 'vàng 10k' } ];
+function _goldChannelRule_(nguonDon, sanPham) {
+  var ch = _bcFold_(nguonDon);   // bo dau + chu thuong (_normTxt_ KHONG bo dau nen "Nguon" co dau khong khop)
+  if (!ch || !GOLD_RULE_CHANNELS_.some(function (c) { return ch === c || ch.indexOf(c + ' ') === 0; })) return null;
+  var txt = _bcFold_(sanPham), hits = GOLD_RULE_MATERIALS_.filter(function (m) { return new RegExp('(^|[^0-9])' + m.key + ' ?k(?![a-z0-9])').test(txt); });   // "10k" / "10 k" / "vang10k"; khong nhan 110k, 10kg, 10kx
+  if (!hits.length) return null;
+  hits.sort(function (a, b) { return a.rate - b.rate; });
+  return { rate: hits[0].rate, label: hits[0].label, mixed: hits.length > 1 };
+}
+// % hoa hong "rieng theo kenh" cua 1 don: luat vang cua kenh Nguon (neu co) truoc, roi den % kenh admin da cai (channelRateFn). null = tinh theo moc 15tr.
+function _csChannelCommissionOf_(o, channelRateFn) {
+  var gr = _goldChannelRule_(o.nguonDon, o.sanPham);
+  if (gr) return { rate: gr.rate, key: String(o.nguonDon || '').trim() + ' · ' + gr.label + (gr.mixed ? ' (đơn có cả 10k & 14k → mức thấp)' : '') };
+  var r = channelRateFn(o.nguonDon);
+  return r === null ? null : { rate: r, key: String(o.nguonDon || '').trim() };
+}
 var CS_COMMISSION_THRESHOLD_ = 15000000; // phai khop COMMISSION_THRESHOLD o index.html
 
 function _csJsonSetting_(key, fallback) {
@@ -6627,11 +6647,11 @@ function buildCsStats_(cs, dateFrom, dateTo) {
     var bInfo = _bcOrderInfo_(Object.assign({}, o, { giaTriDon: giaTri }), prodMap, orderOvr);
     mine.push({ date: o.baseNgayTao || _csYmdFromDmy_(o.ngayTaoDon), time: (String(o.ngayTaoDon || '').match(/(\d{1,2}):(\d{2})/) || [''])[0], giaTri: giaTri, share: share, nSales: nSales, sanPham: o.sanPham,
       goc: !hasGocField || !!o.donGoc, info: bInfo });
-    var chR = channelRate(o.nguonDon);
-    if (chR !== null) {
-      ordCh++; revCh += share; commCh += share * chR / 100;
-      var kk = String(o.nguonDon || '').trim();
-      if (!chBreak[kk]) chBreak[kk] = { revenue: 0, rate: chR };
+    var chC = _csChannelCommissionOf_(o, channelRate);   // luat vang kenh Nguon (10k 1,5% / 14k 1%) hoac % kenh admin cai; null = theo moc 15tr
+    if (chC !== null) {
+      ordCh++; revCh += share; commCh += share * chC.rate / 100;
+      var kk = chC.key;
+      if (!chBreak[kk]) chBreak[kk] = { revenue: 0, rate: chC.rate };
       chBreak[kk].revenue += share;
     } else if (giaTri >= T) { ordA++; revA += share; }
     else { ordB++; revB += share; }

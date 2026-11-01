@@ -1,10 +1,3 @@
-// ═══════════════════════════════════════════════════════════════
-//  SO LIEU CA NHAN CUA 1 CS cho Pancake AI (action 'csStats') — yeu cau Duyen 2026-10-05:
-//  tong so don, doanh thu, ty le chot, hoa hong (don >=15tr / <15tr + kenh co % rieng), tong hoa hong, chuong
-//  trinh thuong. DUNG CHUNG nguon so lieu voi CRM: don + chia sale lay tu buildSalesReportB_ (Pos, da ghep Base,
-//  da tinh 30/70), ty le chot tu saleCloseRate cua B; hoa hong/thuong la BAN PORT CUA _computeCommissionData_ /
-//  _computeBonusData_ trong index.html (CRM) — NEU SUA QUY TAC HOA HONG/THUONG O CRM THI PHAI SUA CA O DAY.
-// ═══════════════════════════════════════════════════════════════
 var CS_COMMISSION_THRESHOLD_ = 15000000; // phai khop COMMISSION_THRESHOLD o index.html
 
 function _csJsonSetting_(key, fallback) {
@@ -277,11 +270,11 @@ function buildCsStats_(cs, dateFrom, dateTo) {
     var bInfo = _bcOrderInfo_(Object.assign({}, o, { giaTriDon: giaTri }), prodMap, orderOvr);
     mine.push({ date: o.baseNgayTao || _csYmdFromDmy_(o.ngayTaoDon), time: (String(o.ngayTaoDon || '').match(/(\d{1,2}):(\d{2})/) || [''])[0], giaTri: giaTri, share: share, nSales: nSales, sanPham: o.sanPham,
       goc: !hasGocField || !!o.donGoc, info: bInfo });
-    var chR = channelRate(o.nguonDon);
-    if (chR !== null) {
-      ordCh++; revCh += share; commCh += share * chR / 100;
-      var kk = String(o.nguonDon || '').trim();
-      if (!chBreak[kk]) chBreak[kk] = { revenue: 0, rate: chR };
+    var chC = _csChannelCommissionOf_(o, channelRate);   // luat vang kenh Nguon (10k 1,5% / 14k 1%) hoac % kenh admin cai; null = theo moc 15tr
+    if (chC !== null) {
+      ordCh++; revCh += share; commCh += share * chC.rate / 100;
+      var kk = chC.key;
+      if (!chBreak[kk]) chBreak[kk] = { revenue: 0, rate: chC.rate };
       chBreak[kk].revenue += share;
     } else if (giaTri >= T) { ordA++; revA += share; }
     else { ordB++; revB += share; }

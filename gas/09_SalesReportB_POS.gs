@@ -863,3 +863,30 @@ function buildSalesReportB_(filters) {
   };
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  SO LIEU CA NHAN CUA 1 CS cho Pancake AI (action 'csStats') — yeu cau Duyen 2026-10-05:
+//  tong so don, doanh thu, ty le chot, hoa hong (don >=15tr / <15tr + kenh co % rieng), tong hoa hong, chuong
+//  trinh thuong. DUNG CHUNG nguon so lieu voi CRM: don + chia sale lay tu buildSalesReportB_ (Pos, da ghep Base,
+//  da tinh 30/70), ty le chot tu saleCloseRate cua B; hoa hong/thuong la BAN PORT CUA _computeCommissionData_ /
+//  _computeBonusData_ trong index.html (CRM) — NEU SUA QUY TAC HOA HONG/THUONG O CRM THI PHAI SUA CA O DAY.
+// ═══════════════════════════════════════════════════════════════
+// ── LUAT HOA HONG KENH "NGUON" THEO CHAT LIEU VANG (Duyen yeu cau 2026-10): don co nguon don la kenh Nguon thi TU DONG tinh theo chat lieu trong ten san pham:
+//    vang 10k = 1,5%, vang 14k = 1% — KHONG phu thuoc gia tri don (khong xet moc 15 trieu nhu cac kenh con lai). Don Nguon khong co 10k/14k -> rieng tinh nhu cu.
+//    Don co CA 10k va 14k (khong tach duoc gia tri tung mon) -> lay muc THAP (1%) va ghi 'mixed' de doi chieu. PHAI khop _goldChannelRule_ o client js/01.
+var GOLD_RULE_CHANNELS_ = ['nguon'];   // ten kenh (nguon don) KHONG DAU, chu thuong; khop nguyen ten hoac bat dau bang 'nguon '
+var GOLD_RULE_MATERIALS_ = [ { key: '14', rate: 1, label: 'vàng 14k' }, { key: '10', rate: 1.5, label: 'vàng 10k' } ];
+function _goldChannelRule_(nguonDon, sanPham) {
+  var ch = _bcFold_(nguonDon);   // bo dau + chu thuong (_normTxt_ KHONG bo dau nen "Nguon" co dau khong khop)
+  if (!ch || !GOLD_RULE_CHANNELS_.some(function (c) { return ch === c || ch.indexOf(c + ' ') === 0; })) return null;
+  var txt = _bcFold_(sanPham), hits = GOLD_RULE_MATERIALS_.filter(function (m) { return new RegExp('(^|[^0-9])' + m.key + ' ?k(?![a-z0-9])').test(txt); });   // "10k" / "10 k" / "vang10k"; khong nhan 110k, 10kg, 10kx
+  if (!hits.length) return null;
+  hits.sort(function (a, b) { return a.rate - b.rate; });
+  return { rate: hits[0].rate, label: hits[0].label, mixed: hits.length > 1 };
+}
+// % hoa hong "rieng theo kenh" cua 1 don: luat vang cua kenh Nguon (neu co) truoc, roi den % kenh admin da cai (channelRateFn). null = tinh theo moc 15tr.
+function _csChannelCommissionOf_(o, channelRateFn) {
+  var gr = _goldChannelRule_(o.nguonDon, o.sanPham);
+  if (gr) return { rate: gr.rate, key: String(o.nguonDon || '').trim() + ' · ' + gr.label + (gr.mixed ? ' (đơn có cả 10k & 14k → mức thấp)' : '') };
+  var r = channelRateFn(o.nguonDon);
+  return r === null ? null : { rate: r, key: String(o.nguonDon || '').trim() };
+}
