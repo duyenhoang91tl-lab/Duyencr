@@ -6,6 +6,10 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-10-26 — Đối chiếu CRM ↔ file kế toán T10 + sửa "8" thành tên sale trong danh tính (Duyên gửi file xuất `DoiSoat_DonChia_TatCaSale_2026-10-01_2026-10-31.xlsx`)
+- [x] **Kết quả đối chiếu (đã trừ lỗi của KT):** 381 cặp (đơn chia × sale) → 373 khớp đến 1đ, 8 cặp lệch (4 đơn): KT chia không đều (416T10, 525T10, 765T10, 681T10+937T10) mà CRM chia đều; + đơn 1222T10/2026 (Pos chỉ thẻ menbui2002, KT chia menbui2002 20.432.000 / phuongthao2000 42.950.000). 9 đơn chia có ở Pos nhưng không có trong CRM (3 đơn MP, đơn TÁCH 1121T10/2026/1-2 & NG13T10/2026/1-2, 1069T10/2026). 5 sale xuất lỗi mạng (trangbeCSKH1995, ngocNB2003saleoff, haPTN, thanhNP, mainguyen97) → cần xuất lại. 14 đơn CRM báo LỆCH Base. File trả Duyên: `DOI_SOAT_CRM_VS_KETOAN_T10.xlsx`. Việc còn lại của Duyên: nhập tỷ lệ chia tay của KT vào bảng THEO DÕI ĐƠN CHIA SALE (tổng = giá Pos); kiểm tra 9 đơn chưa vào CRM; xuất lại 5 sale.
+- [x] **Sửa lỗi hiển thị "8" (gas_v13.js, hàm `_salePersonIdentity_`):** file CRM in `ninhnga99,8` thay cho huyenmaii1990 (139 dòng). NGUYÊN NHÂN GỐC: hàm gom token số "8"/"13" (từ profile/SaleDirectory/Pancake) vào nhóm tên của huyenmaii1990 rồi quy tắc "tên nhỏ nhất theo chữ cái" chọn "8" làm tên chính (số xếp trước chữ). Sửa: `note/union/unionAll/setPrim` bỏ token số (`_isNumericTag_`), `user.names[0]` là số thì lấy tên chữ đầu tiên. Tiền chia vốn vẫn đúng (chỉ tên hiển thị sai). Test: `node tools/test-sale-identity-numeric.js` (6 ca). CẦN: dán gas mới + Deploy New version rồi xuất lại.
+
 ## 2026-11-01 — Trang bị đẩy lên 43px khi mở bảng chi tiết khách (js/59-fn-mobilefit.js)
 - [x] NGUYÊN NHÂN GỐC (file Quét trang: html y=-43, scrollH 765 > 722; `dp-overlay` thực ra là bảng chi tiết khách, KHÔNG phải bộ chọn ngày): css/06 `body.pro-has-tabs{padding-bottom:44px}` + `.app` đã cao đúng (innerHeight − thanh trên) → tổng vượt màn hình 44px → trang cuộn được, bị trượt lên. Sửa: `mobileFitAppH_` nhận thêm `bottomPad` (đọc padding-bottom thật của body), MutationObserver theo class body để tính lại khi thanh tab dưới bật/tắt. Test thêm trong tools/test-mobile-fit.js.
 
