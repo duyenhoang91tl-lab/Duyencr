@@ -180,10 +180,10 @@ async function renderMediaLibTab() { MLIB._render(); await MLIB._load(false); ML
 
 // Nút 📎 trong khung soạn tin của chat: chọn ảnh/ghi âm/mẫu tin từ thư viện rồi chèn vào ô soạn (chưa gửi — người dùng bấm Gửi).
 // Ảnh/ghi âm chèn dạng LINK (Pancake API đang gửi văn bản); mẫu tin chèn nội dung.
-function mlibChatPick(inputId, type) {
+function mlibChatPick(inputId, type, asMarker) {
   MLIB.pick(type || 'template', function (it) {
     var ta = document.getElementById(inputId); if (!ta) return;
-    var add = it.type === 'template' ? it.text : (it.name ? it.name + ': ' : '') + it.url;
+    var add = it.type === 'template' ? it.text : asMarker ? '[[ml:' + it.type + '|' + it.url + '|' + String(it.name || '').replace(/[\]|\n]/g, ' ').slice(0, 80) + ']]' : (it.name ? it.name + ': ' : '') + it.url;
     ta.value = ta.value ? ta.value.replace(/\s+$/, '') + '\n' + add : add; ta.focus();
   });
 }
