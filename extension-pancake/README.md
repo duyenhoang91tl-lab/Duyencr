@@ -113,3 +113,10 @@ Menu "— Chọn mục —" → **📊 Doanh số & hoa hồng của tôi**: CS 
 
 ## Khối "Người lên đơn & sale bán" (2026.10.7.1)
 Khi tra SĐT, thẻ khách hiện thêm khối 👥: **Người lên đơn** (cột B "Người tạo" của DT TỔNG → `orders[].creator`), **Sale tham gia bán** (cột "Sale bán" của DT TỔNG → `orders[].cs`, và cột "Thẻ" của "dữ liệu đơn" → `lookup.don[].sales`), kèm 5 đơn gần nhất. Cần GAS ≥ `v13.15-order-people` (kiểm tra `action=count`); GAS cũ thì khối này tự ẩn. Sửa thêm: `parseDateSafe` hiểu ngày `dd/MM/yyyy` (trước đây `Date.parse` đọc nhầm thành tháng/ngày nên đơn "gần nhất" có thể sai). Zalo AI chưa hiện khối này.
+
+## 🤖 Hỏi AI về giá (tab 💰 Tra cứu bảng giá → "🔎 Gõ tìm")
+Nhân viên gõ câu hỏi (vd: `giá nhẫn bạc trơn size 12`) rồi bấm **🤖 Hỏi AI** → nhận câu trả lời VĂN NGẮN (tối đa ~3 câu; nhiều lựa chọn chất liệu/size thì mỗi lựa chọn 1 dòng). Có nút 📋 Copy.
+- Giá luôn lấy từ bảng giá DANH_MUC ở backend (GAS action `priceQa`, POST) — AI chỉ diễn đạt lại ngắn gọn, KHÔNG tự nghĩ giá; đơn vị trong bảng là nghìn đồng, AI quy ra đồng.
+- Không tìm thấy sản phẩm khớp → KHÔNG gọi AI, chỉ gợi ý tên sản phẩm gần đúng (bấm để hỏi lại). AI lỗi (hết quota/429…) → hiện danh sách giá chính xác thay vì báo lỗi.
+- Luôn đi qua GAS (cần đọc Sheet giá), kể cả khi CS cấu hình "AI cá nhân" trong Options.
+- Sau khi cập nhật: reload extension ở `chrome://extensions`; GAS tự deploy qua GitHub Actions. Test: `node tools/test-pancake-price-ai.js`, `node tools/test-price-ask.js`.

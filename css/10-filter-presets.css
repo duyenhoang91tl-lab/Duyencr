@@ -1,0 +1,65 @@
+/* Mẫu lọc nhanh Báo cáo doanh số (js/48-filter-presets.js) */
+.fp-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 12px;padding:8px 10px;border:1px dashed var(--border-md,#d4d0e0);border-radius:10px;background:var(--surface2,#f7f6fb);}
+.fp-lb{font-size:12px;font-weight:700;color:#4a2c8f;}
+.fp-mu{font-size:12px;color:var(--muted);}
+.fp-chip{display:inline-flex;align-items:stretch;border:1px solid var(--border-md,#d4d0e0);border-radius:999px;background:var(--surface,#fff);overflow:hidden;}
+.fp-chip.on{border-color:#4a2c8f;background:#efeafa;}
+.fp-go{border:0;background:transparent;padding:6px 10px;font-size:12.5px;font-weight:600;cursor:pointer;color:inherit;}
+.fp-go:hover{background:rgba(74,44,143,.08);}
+.fp-n{font-weight:500;color:var(--muted);font-size:11px;margin-left:2px;}
+.fp-ic{border:0;border-left:1px solid var(--border,#e6e3ee);background:transparent;padding:0 7px;font-size:12px;cursor:pointer;color:var(--muted);}
+.fp-ic:hover{background:rgba(0,0,0,.06);color:inherit;}
+.fp-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:710;display:none;align-items:flex-start;justify-content:center;padding:4vh 8px 0;}
+.fp-overlay.open{display:flex;}
+.fp-box{width:min(520px,100%);max-height:92vh;display:flex;flex-direction:column;background:var(--surface,#fff);border:1px solid var(--border-md,#d4d0e0);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.25);overflow:hidden;}
+.fp-eh{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border,#e6e3ee);font-size:15px;}
+.fp-eb{padding:12px 14px;overflow:auto;-webkit-overflow-scrolling:touch;}
+.fp-l{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:8px 0 4px;}
+.fp-in{width:100%;box-sizing:border-box;padding:9px 10px;border:1px solid var(--border,#e6e3ee);border-radius:8px;background:var(--surface,#fff);font-size:14px;color:inherit;}
+.fp-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0;}
+.fp-list{max-height:38vh;overflow:auto;border:1px solid var(--border,#e6e3ee);border-radius:8px;}
+.fp-row{display:flex;align-items:center;gap:8px;padding:8px 10px;font-size:13.5px;border-bottom:1px solid var(--border,#f0eef6);cursor:pointer;}
+.fp-row:last-child{border-bottom:0;}
+.fp-row:hover{background:rgba(74,44,143,.06);}
+.fp-warn{margin-top:8px;padding:8px 10px;border-radius:8px;background:#fef3c7;color:#92400e;font-size:12px;}
+.fp-ef{display:flex;justify-content:flex-end;gap:8px;padding:10px 14px;border-top:1px solid var(--border,#e6e3ee);}
+
+/* (16/10/2026) Ô mẫu nằm trong thanh công cụ .srb-bar, cùng hàng 🧰 Tác vụ */
+.fp-ctl{display:inline-flex;align-items:center;flex-wrap:wrap;gap:6px 8px;}
+.fp-sel{max-width:210px;font-size:12px;padding:5px 8px;border:1px solid var(--border-md,#d4d0e0);border-radius:6px;background:var(--surface,#fff);color:inherit;font-weight:600;}
+.fp-sel.on,.fp-one.on{border-color:#4a2c8f;background:#efeafa;color:#4a2c8f;}
+.fp-off{color:#b42318;border-color:#f3b8b0;}
+.fp-gear{min-width:250px;}
+.fp-gear .fp-mh{padding:6px 13px 2px;font-size:11px;font-weight:700;color:var(--muted);cursor:default;text-transform:uppercase;letter-spacing:.04em;}
+.fp-gear .fp-mrow{display:flex;align-items:center;gap:2px;cursor:default;}
+.fp-gear .fp-mn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;font-weight:600;}
+.fp-gear .fp-mrow .fp-ic{border:0;padding:3px 7px;border-radius:6px;cursor:pointer;color:var(--muted);}
+.fp-gear .fp-mrow .fp-ic:hover{background:rgba(0,0,0,.08);color:inherit;}
+
+/* Lọc nhanh theo đội + bảng đối chiếu Team → Sale */
+.fp-grp{cursor:pointer;}
+.fp-grp.on{font-weight:700;color:#4a2c8f;}
+.fp-grp.off{opacity:.55;}
+.fp-info{margin:0 0 10px;padding:8px 10px;border:1px dashed var(--border-md,#d4d0e0);border-radius:8px;background:var(--surface2,#f7f6fb);font-size:12px;color:var(--muted);line-height:1.5;}
+.fp-bad{color:#b45309;}
+
+/* ĐIỆN THOẠI (31/10/2026 — Duyên báo menu "⚙ Mẫu" / "🧰 Tác vụ" bị cắt lề trái, khó chạm). Bước 1 (js/12 _srFitGearMenu_) đã KẸP menu vào màn hình;
+   bước 2 = bố cục cho ngón tay: ô chọn mẫu chiếm trọn 1 hàng, vùng chạm ≥38–40px, chữ 16px (iOS không tự phóng to khi chạm), tên mẫu dài cắt bằng "…".
+   Chỉ áp cho màn ≤640px (cùng mốc điện thoại ở css/01-base.css); máy tính giữ nguyên bố cục cũ ở trên. */
+@media (max-width:640px){
+  .fp-ctl{flex:1 1 100%;width:100%;min-width:0;}
+  .srb-bar .fp-sel{flex:1 1 0;width:auto;min-width:0;max-width:none;min-height:38px;font-size:16px !important;padding:6px 10px !important;text-overflow:ellipsis;}
+  .fp-ctl .btn.sm{min-height:38px;}
+  .fp-one{flex:1 1 0;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .fp-gear{min-width:0;width:min(320px,calc(100vw - 16px));}
+  .fp-gear > div:not(.fp-mrow){white-space:normal;padding:11px 14px;font-size:14px;}
+  .fp-gear .fp-mh{padding:8px 14px 2px;}
+  .fp-gear .fp-mrow{padding:0 4px 0 14px;font-size:14px;}
+  .fp-gear .fp-mn{padding:11px 0;}
+  .fp-gear .fp-mrow .fp-ic{min-width:40px;min-height:40px;display:inline-flex;align-items:center;justify-content:center;font-size:16px;padding:0;}
+  .fp-bar{padding:8px;}
+  .fp-go{padding:9px 12px;font-size:13.5px;max-width:60vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .fp-chip .fp-ic{padding:0 12px;font-size:14px;}
+  .fp-overlay{padding:2vh 6px 0;}
+  .fp-in{font-size:16px;}
+}

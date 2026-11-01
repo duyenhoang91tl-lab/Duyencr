@@ -564,3 +564,437 @@ textarea {
 /* Ô năm sinh + khối Mệnh dưới ô Sinh nhật */
 .zai-field-col #zai-birthyear { margin-top: 4px; }
 .zai-field-col #zai-birthyear[readonly] { background: #f3f4f6; color: #6b7280; }
+
+/* Hỏi AI về giá (văn ngắn) — đồng bộ với Pancake AI (#pk-price-ai) */
+#zai-price-ai {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+  color: #0f172a;
+}
+.zai-price-ai-txt { white-space: pre-wrap; line-height: 1.45; }
+.zai-price-ai-foot { margin-top: 6px; font-size: 11px; color: #1e3a8a; }
+.zai-price-ai-err { color: #b91c1c; font-size: 12px; }
+.zai-price-ai-chip {
+  margin-left: 4px;
+  padding: 2px 8px;
+  border: 1px solid #2563eb;
+  background: #fff;
+  color: #2563eb;
+  border-radius: 12px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+/* Tra cứu khuyến mãi (CTKM) — đồng bộ với Pancake AI (.pk-ctkm-*) */
+#zai-ctkm-row { display: flex; gap: 6px; margin-bottom: 6px; }
+#zai-ctkm-q { flex: 1; min-width: 0; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; }
+#zai-ctkm-result { max-height: 340px; overflow-y: auto; }
+.zai-ctkm-loading { color: #1e3a8a; font-size: 11.5px; font-style: italic; padding: 4px 0; }
+.zai-ctkm-item { border-bottom: 1px solid #dbeafe; padding: 6px 0; font-size: 12px; }
+.zai-ctkm-item:last-child { border-bottom: none; }
+.zai-ctkm-item-expired { opacity: 0.6; }
+.zai-ctkm-field { display: inline-block; margin-right: 8px; color: #1e3a8a; }
+.zai-ctkm-title { font-weight: 700; color: #831843; margin-bottom: 3px; }
+.zai-ctkm-status { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 4px; margin-bottom: 4px; }
+.zai-ctkm-status-active { background: #dcfce7; color: #15803d; }
+.zai-ctkm-status-upcoming { background: #fef9c3; color: #a16207; }
+.zai-ctkm-status-expired { background: #fee2e2; color: #b91c1c; }
+.zai-ctkm-excl { margin-top: 4px; font-size: 11.5px; color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; border-radius: 4px; padding: 3px 6px; }
+
+/* Doanh số & hoa hồng (csStats) — đồng bộ với Pancake AI (.pk-stats-*) */
+.zai-stats-toolbar { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; margin-bottom: 6px; font-size: 11px; }
+.zai-stats-toolbar select, .zai-stats-toolbar input[type=date] { font-size: 11px; padding: 2px 4px; border: 1px solid #d1d5db; border-radius: 5px; background: #fff; max-width: 118px; }
+.zai-stats-toolbar button { background: #2563eb; color: #fff; border: none; border-radius: 5px; font-size: 11px; padding: 3px 10px; cursor: pointer; }
+.zai-stats-toolbar button:hover { background: #1d4ed8; }
+.zai-stats-range { font-size: 11px; color: #374151; margin-bottom: 6px; }
+.zai-stats-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+.zai-stats-card { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 6px 8px; }
+.zai-stats-card-l { font-size: 10px; color: #6b7280; }
+.zai-stats-card-v { font-size: 14px; font-weight: 700; color: #111827; word-break: break-word; }
+.zai-stats-card-s { font-size: 10px; color: #6b7280; }
+.zai-stats-sec { font-size: 12px; font-weight: 700; margin: 8px 0 4px; color: #111827; }
+.zai-stats-tbl { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 4px; }
+.zai-stats-tbl th { text-align: left; font-weight: 600; color: #6b7280; border-bottom: 1px solid #e5e7eb; padding: 2px 3px; }
+.zai-stats-tbl td { border-bottom: 1px solid #f3f4f6; padding: 3px; vertical-align: top; }
+.zai-stats-total td { font-weight: 700; border-top: 1px solid #d1d5db; }
+.zai-stats-mut { font-size: 10px; color: #6b7280; }
+.zai-stats-note { font-size: 11px; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 6px 8px; margin-top: 4px; }
+.zai-stats-err { color: #b91c1c; background: #fef2f2; border-color: #fecaca; }
+.zai-stats-det { margin: 4px 0; font-size: 11px; }
+.zai-stats-det summary { cursor: pointer; color: #2563eb; }
+.zai-stats-prog { padding: 3px 0; border-bottom: 1px dashed #e5e7eb; }
+
+/* Mẫu tin nhắn tư vấn — đồng bộ với Pancake AI (.pk-tpl-*, .pk-ai-suggestion-item) */
+#zai-tpl-row { display: flex; gap: 6px; margin-bottom: 6px; }
+#zai-tpl-q { flex: 1; min-width: 0; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; }
+#zai-tpl-filter-row { margin-bottom: 6px; }
+#zai-tpl-group { width: 100%; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; background: #fff; }
+#zai-tpl-refresh, #zai-tpl-add { border: 1px solid #ccc; background: #fff; border-radius: 6px; padding: 4px 8px; cursor: pointer; }
+#zai-tpl-status { font-size: 11px; color: #1e3a8a; margin-bottom: 4px; }
+#zai-tpl-result { max-height: 340px; overflow-y: auto; }
+.zai-tpl-item { border: 1px solid #dbeafe; background: #f0f7ff; padding: 8px; border-radius: 6px; cursor: pointer; line-height: 1.4; margin-bottom: 6px; }
+.zai-tpl-item:hover { background: #dbeafe; }
+.zai-tpl-acts { display: flex; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
+.zai-tpl-lines { margin-top: 6px; border-top: 1px dashed #cbd5e1; padding-top: 4px; }
+.zai-tpl-line { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-bottom: 1px solid #f1f5f9; }
+.zai-tpl-line-txt { flex: 1; min-width: 0; font-size: 12px; white-space: pre-wrap; word-break: break-word; }
+.zai-tpl-line .zai-btn { flex: none; }
+.zai-tpl-form-box { border: 1px solid #93c5fd; background: #f8fbff; border-radius: 6px; padding: 8px; margin: 6px 0; }
+.zai-tpl-form-title { font-weight: 700; font-size: 12px; margin-bottom: 6px; }
+.zai-tpl-form-box input, .zai-tpl-form-box textarea { width: 100%; box-sizing: border-box; padding: 5px 8px; margin-bottom: 6px; border: 1px solid #ccc; border-radius: 6px; font-size: 12px; line-height: 1.4; resize: vertical; }
+.zai-tpl-bar { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+.zai-tpl-save:disabled { opacity: .7; }
+
+
+/* Tìm ảnh sản phẩm — đồng bộ với Pancake AI (#pk-img-*, .pk-builder-row) */
+.zai-builder-row { margin-bottom: 6px; }
+.zai-builder-row > label,
+.pk-builder-inline label {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #1e3a8a;
+  margin-bottom: 2px;
+}
+.zai-builder-row select,
+.zai-builder-row input[type="text"],
+.pk-builder-inline select,
+.pk-builder-inline input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 12px;
+  padding: 4px 6px;
+  border: 1px solid #93c5fd;
+  border-radius: 5px;
+  background: #fff;
+}
+#zai-img-status { font-size: 11px; color: #1e3a8a; margin: 4px 0; }
+
+
+/* Soạn đơn — giỏ hàng (đồng bộ với Pancake AI #pk-cart-*) */
+#zai-cart-section {
+  border: 1px solid #fbcfe8;
+  border-left: 3px solid #db2777;
+  background: #fdf2f8;
+  border-radius: 6px;
+  padding: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+#zai-cart-header {
+  font-weight: 700;
+  color: #9d174d;
+  margin-bottom: 6px;
+}
+#zai-cart-list { max-height: 220px; overflow-y: auto; }
+.zai-cart-empty {
+  color: #6b7280;
+  font-style: italic;
+  font-size: 11.5px;
+  padding: 4px 0;
+}
+.zai-cart-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 0;
+  border-bottom: 1px dashed #fbcfe8;
+}
+.zai-cart-row:last-child { border-bottom: none; }
+.zai-cart-chk { flex: 0 0 auto; }
+.zai-cart-name {
+  flex: 1 1 120px;
+  min-width: 90px;
+  font-size: 11.5px;
+  padding: 3px 5px;
+  border: 1px solid #f0abfc;
+  border-radius: 4px;
+}
+.zai-cart-qty {
+  flex: 0 0 46px;
+  width: 46px;
+  font-size: 11.5px;
+  padding: 3px 4px;
+  border: 1px solid #f0abfc;
+  border-radius: 4px;
+}
+.zai-cart-price {
+  flex: 0 0 84px;
+  width: 84px;
+  font-size: 11.5px;
+  padding: 3px 4px;
+  border: 1px solid #f0abfc;
+  border-radius: 4px;
+}
+.zai-cart-del {
+  flex: 0 0 auto;
+  border: none;
+  background: transparent;
+  color: #be123c;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0 3px;
+}
+.zai-cart-note {
+  flex: 1 0 100%;
+  font-size: 10.5px;
+  color: #9d174d;
+  opacity: 0.8;
+}
+.zai-cart-detail-row {
+  flex: 1 0 100%;
+  display: flex;
+  gap: 4px;
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+.zai-cart-chatlieu,
+.zai-cart-mausac,
+.zai-cart-size {
+  flex: 1;
+  min-width: 0;
+  font-size: 10.5px;
+  padding: 3px 5px;
+  border: 1px solid #fbcfe8;
+  border-radius: 4px;
+  background: #fffafc;
+}
+.zai-cart-chatlieu-multi {
+  flex: 1 0 100%;
+  background: #fffafc;
+  border: 1px solid #fbcfe8;
+  border-radius: 4px;
+  padding: 5px 7px;
+}
+.zai-cl-multi-label {
+  font-size: 9.5px;
+  color: #9d174d;
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+.zai-cl-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
+  margin: 0 10px 4px 0;
+  cursor: pointer;
+  color: #374151;
+}
+.zai-cl-opt input {
+  margin: 0;
+  cursor: pointer;
+}
+#zai-cart-addrow { margin: 6px 0; }
+#zai-cart-add-manual {
+  font-size: 11px;
+  padding: 4px 8px;
+  border: 1px dashed #db2777;
+  background: transparent;
+  color: #9d174d;
+  border-radius: 5px;
+  cursor: pointer;
+}
+#zai-cart-extra {
+  border-top: 1px solid #fbcfe8;
+  padding-top: 6px;
+  margin-top: 4px;
+}
+.zai-cart-extra-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
+  font-size: 11.5px;
+}
+.zai-cart-extra-row label { flex: 0 0 auto; color: #831843; }
+.zai-cart-extra-row input[type="text"],
+.zai-cart-extra-row input[type="number"],
+.zai-cart-extra-row select {
+  flex: 1 1 auto;
+  font-size: 11.5px;
+  padding: 3px 5px;
+  border: 1px solid #f0abfc;
+  border-radius: 4px;
+}
+#zai-cart-total {
+  border-top: 1px solid #fbcfe8;
+  padding-top: 6px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #831843;
+}
+.zai-cart-total-final {
+  font-size: 14px;
+  margin-top: 2px;
+}
+.zai-cart-freeship-tag {
+  background: #16a34a;
+  color: #fff;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  margin-left: 4px;
+}
+#zai-cart-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+#zai-cart-copy, #zai-cart-clear {
+  flex: 1;
+  font-size: 11.5px;
+  padding: 6px 0;
+  border-radius: 5px;
+  cursor: pointer;
+  border: none;
+}
+#zai-cart-copy { background: #db2777; color: #fff; }
+#zai-cart-copy:hover { background: #be185d; }
+#zai-cart-clear { background: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb; }
+#zai-cart-clear:hover { background: #e5e7eb; }
+.zai-cart-promotype,
+.zai-cart-promoval {
+  font-size: 10.5px;
+  padding: 3px 5px;
+  border: 1px solid #fbcfe8;
+  border-radius: 4px;
+  background: #fffafc;
+  min-width: 0;
+}
+.zai-cart-promotype { flex: 0 0 auto; }
+.zai-cart-promoval { flex: 1; }
+.zai-cart-linetotal { margin-left: auto; font-size: 11px; font-weight: 700; color: #b45309; white-space: nowrap; }
+.zai-cart-noteextra-row { flex: 1 0 100%; margin-top: 3px; }
+.zai-cart-noteextra {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 10.5px;
+  padding: 3px 5px;
+  border: 1px solid #fbcfe8;
+  border-radius: 4px;
+  background: #fffafc;
+}
+.zai-cart-total-disc-chk {
+  flex: 1 0 100%;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+  font-size: 10px;
+  color: #9d174d;
+  opacity: .85;
+}
+#zai-cart-msg { font-size: 11px; color: #831843; margin-top: 4px; min-height: 0; }
+
+
+/* Soạn đơn — bộ chọn sản phẩm (đồng bộ với Pancake AI #pkb-*, .pk-price-mode-btn, .pk-stone-*) */
+.zai-price-loading {
+  color: #1e3a8a;
+  font-size: 11.5px;
+  font-style: italic;
+  padding: 4px 0;
+}
+.zai-price-addbtn {
+  font-size: 10.5px;
+  padding: 3px 7px;
+  border: 1px solid #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.zai-price-addbtn:hover { background: #dbeafe; }
+.zai-stone-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 5px 7px;
+  background: #fdf4ff;
+  border: 1px solid #f0abfc;
+  border-radius: 5px;
+  font-size: 11px;
+  color: #701a75;
+}
+.zai-stone-label { font-weight: 700; flex: 0 0 auto; }
+.zai-stone-row label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.zai-price-mode-btn {
+  flex: 1;
+  font-size: 11.5px;
+  padding: 5px 6px;
+  border: 1px solid #93c5fd;
+  border-radius: 6px;
+  background: #fff;
+  color: #1e40af;
+  cursor: pointer;
+}
+.zai-price-mode-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; font-weight: 600; }
+#zai-price-builder-mode { font-size: 11.5px; }
+.zai-builder-inline label {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #1e3a8a;
+  margin-bottom: 2px;
+}
+.zai-builder-inline input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 12px;
+  padding: 4px 6px;
+  border: 1px solid #93c5fd;
+  border-radius: 5px;
+  background: #fff;
+}
+.zai-builder-inline { display: flex; gap: 6px; margin-bottom: 6px; }
+.zai-builder-inline > div { flex: 1; min-width: 0; }
+.zai-builder-summary {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px dashed #93c5fd;
+  border-radius: 6px;
+  background: #eff6ff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+#zaib-line-total { color: #b45309; font-size: 12px; }
+.zai-builder-was { color: #6b7280; font-size: 10.5px; text-decoration: line-through; }
+.zai-builder-ctkm-box {
+  margin-top: 6px;
+  padding: 7px 9px;
+  border: 1px dashed #f59e0b;
+  border-radius: 6px;
+  background: #fffbeb;
+  font-size: 11px;
+  color: #78350f;
+}
+.zai-ctkm-info-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #92400e;
+  cursor: pointer;
+}
+.zai-ctkm-info-toggle input { margin: 0; }
+.zai-builder-ctkm-title { font-weight: 600; margin-bottom: 4px; }
+.zai-builder-ctkm-row { padding: 2px 0; line-height: 1.4; word-break: break-word; }
+.zai-builder-ctkm-row + .zai-builder-ctkm-row { border-top: 1px dotted #fde68a; }
+.zai-builder-ctkm-empty { color: #92400e; font-style: italic; }

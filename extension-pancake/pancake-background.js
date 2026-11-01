@@ -141,6 +141,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // Nhan vien hoi AI ve gia -> tra loi van ngan (xem handleAskPrice)
+  if (msg?.type === "ASK_PRICE") {
+    handleAskPrice(msg.payload)
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
   // Soan 1 trong 3 "cau mo dau" chu dong (goc nhin khac nhau) — giong het OPENER_ANGLES ben
   // Zalo AI. Dung khi CS muon chu dong nhan truoc cho khach (khong phai tra loi tin khach gui).
   if (msg?.type === "FETCH_OPENER") {
@@ -333,6 +341,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // U3d: cấu hình khuyến mãi do admin cài trên CRM (Settings 'promoConfig'), dùng cho nút "Áp CT tự động" ở giỏ hàng.
+  if (msg?.type === "GET_PROMO_CONFIG") {
+    handleGetPromoConfig()
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
   // Cay "Tinh trang CS" dong (co optgroup) — dung chung voi Zalo AI/appweb, de dropdown
   // Trang thai CS ben Pancake AI hien dung nhom giong het cac noi khac.
   if (msg?.type === "GET_CARE_STATUS_TREE") {
@@ -406,6 +422,30 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // Nut "Quet tu cam": gui doan chat dang soan len GAS (action scanBanned, dung chung danh sach tu cam voi giam sat chat) -> { hits:[{word,thayThe}] }
+  if (msg?.type === "SCAN_BANNED") {
+    _postGas_({ action: "scanBanned", text: String(msg.payload?.text || "") })
+      .then((data) => sendResponse({ ok: true, data: { hits: data.hits || [] } }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
+  // Viet tat (go tat -> chen noi dung): doc danh sach tu sheet VietTat cua CRM (muc chung + muc rieng cua CS dang dung may nay).
+  if (msg?.type === "GET_VIETTAT") {
+    handleGetVietTat()
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
+  // Viet tat kem ANH: lay byte 1 anh Drive co san (server chi tra anh thuoc muc viet tat nguoi nay duoc thay).
+  if (msg?.type === "GET_VIETTAT_IMAGE") {
+    handleGetVietTatImage(msg.id)
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
   if (msg?.type === "GET_MESSAGE_TEMPLATES") {
     handleGetMessageTemplates()
       .then((data) => sendResponse({ ok: true, data }))
@@ -413,9 +453,79 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // ── DUYET MAU TIN NGAY TREN PANCAKE (chi admin; token dang nhap CHI nam o background, khong gui ra trang Pancake) ──
+  if (msg?.type === "APPROVER_LOGIN" || msg?.type === "APPROVER_LOGOUT" || msg?.type === "APPROVER_STATUS" || msg?.type === "TPL_PENDING" || msg?.type === "TPL_DECIDE") {
+    const run = msg.type === "APPROVER_LOGIN" ? handleApproverLogin(msg.payload)
+      : msg.type === "APPROVER_LOGOUT" ? handleApproverLogout()
+      : msg.type === "APPROVER_STATUS" ? handleApproverStatus()
+      : msg.type === "TPL_PENDING" ? handleTplPending()
+      : handleTplDecide(msg.payload);
+    run.then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
 });
 
 // Tra cứu khách theo SĐT — GET GAS_URL?action=lookup&phone=... y hệt doLookup() bên Zalo AI.
+
+// ── DUYET MAU TIN: dang nhap admin + danh sach cho duyet + duyet/tu choi ──
+// NGUYEN NHAN GOC them: mau tin nhan vien de xuat chi duyet duoc tren CRM, admin dang lam viec o Pancake khong biet co mau moi.
+// Mat khau KHONG luu: dang nhap = POST webLogin (cung ham voi web CRM) -> luu token phien (het han theo server, ~7 ngay) o storage.local (khong dong bo giua may).
+const APPROVER_KEY = "pkApprover";
+async function _apprGet_() {
+  const o = await chrome.storage.local.get(APPROVER_KEY), a = o[APPROVER_KEY];
+  if (!a || !a.token) return null;
+  if (a.expiresAt && Date.now() > a.expiresAt) { await chrome.storage.local.remove(APPROVER_KEY); return null; }
+  return a;
+}
+async function handleApproverLogin(p) {
+  const username = String(p?.username || "").trim(), password = String(p?.password || "");
+  if (!username || !password) throw new Error("Nh\u1eadp t\u00e0i kho\u1ea3n v\u00e0 m\u1eadt kh\u1ea9u CRM.");
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Ch\u01b0a c\u1ea5u h\u00ecnh URL Web App GAS.");
+  const res = await fetch(cfg.gasUrl, { method: "POST", body: JSON.stringify({ action: "webLogin", username, password }), headers: { "Content-Type": "text/plain" } });
+  const data = await res.json();
+  if (!data || !data.ok || !data.token) throw new Error((data && data.error) || "\u0110\u0103ng nh\u1eadp kh\u00f4ng th\u00e0nh c\u00f4ng.");
+  const role = String(data.user?.role || "");
+  if (role !== "admin") throw new Error("T\u00e0i kho\u1ea3n n\u00e0y kh\u00f4ng ph\u1ea3i admin n\u00ean kh\u00f4ng c\u00f3 quy\u1ec1n duy\u1ec7t m\u1eabu tin.");
+  const rec = { token: data.token, username: String(data.user?.username || username), name: String(data.user?.name || data.user?.username || username),
+                role, expiresAt: Date.now() + Math.max(60000, Number(data.expiresInMs || 6048e5) - 120000) };
+  await chrome.storage.local.set({ [APPROVER_KEY]: rec });
+  return { name: rec.name, expiresAt: rec.expiresAt };
+}
+async function handleApproverLogout() { await chrome.storage.local.remove(APPROVER_KEY); return { loggedIn: false }; }
+async function handleApproverStatus() {
+  const a = await _apprGet_();
+  return a ? { loggedIn: true, name: a.name, username: a.username, expiresAt: a.expiresAt } : { loggedIn: false };
+}
+async function handleTplPending() {
+  const a = await _apprGet_();
+  if (!a) return { loggedIn: false };
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Ch\u01b0a c\u1ea5u h\u00ecnh URL Web App GAS.");
+  const sep = cfg.gasUrl.includes("?") ? "&" : "?";
+  const res = await fetch(cfg.gasUrl + sep + "action=tplPending&token=" + encodeURIComponent(a.token), { redirect: "follow" });
+  const data = await res.json();
+  if (data && data.code === "FORBIDDEN") { await chrome.storage.local.remove(APPROVER_KEY); return { loggedIn: false, expired: true }; }   // phien het han / mat quyen admin
+  if (data.error) throw new Error(data.error);
+  return { loggedIn: true, name: a.name, count: Number(data.count) || 0, items: Array.isArray(data.items) ? data.items : [] };
+}
+async function handleTplDecide(p) {
+  const a = await _apprGet_();
+  if (!a) throw new Error("Phi\u00ean \u0111\u0103ng nh\u1eadp duy\u1ec7t m\u1eabu \u0111\u00e3 h\u1ebft. V\u00e0o C\u00e0i \u0111\u1eb7t extension \u0111\u0103ng nh\u1eadp l\u1ea1i.");
+  const decision = p?.decision === "reject" ? "reject" : p?.decision === "approve" ? "approve" : "";
+  if (!decision || !p?.id) throw new Error("Thi\u1ebfu m\u00e3 m\u1eabu ho\u1eb7c quy\u1ebft \u0111\u1ecbnh.");
+  try {
+    return await _postGas_({ action: "approveMessageTemplate", id: String(p.id), decision, reason: String(p.reason || "").slice(0, 300), token: a.token });
+  } catch (e) {
+    if (/FORBIDDEN|Chi admin/i.test(String(e?.message || e))) { await chrome.storage.local.remove(APPROVER_KEY); throw new Error("Phi\u00ean \u0111\u0103ng nh\u1eadp h\u1ebft h\u1ea1n ho\u1eb7c kh\u00f4ng c\u00f2n quy\u1ec1n admin. \u0110\u0103ng nh\u1eadp l\u1ea1i trong C\u00e0i \u0111\u1eb7t extension."); }
+    throw e;
+  }
+}
+
 // Trả về { care: {...}|null, orders: [...] }.
 async function handleLookupCustomer(payload) {
   const settings = await chrome.storage.sync.get(null);
@@ -1060,6 +1170,27 @@ async function handleGetPrice(payload) {
   return { rows: data.rows || [], total: data.total || 0 };
 }
 
+// Hoi AI ve GIA (van ngan) — GAS action:'priceQa' (POST). Gia luon lay tu bang gia DANH_MUC (backend), AI chi dien dat lai ngan gon;
+// khong tim thay san pham thi backend KHONG goi AI (tra goi y ten); AI loi thi backend tra danh sach gia chinh xac (aiError). Luon di qua GAS
+// (can doc Sheet gia) — KHONG dung AI rieng cua CS (aiProvider/aiApiKey) vi AI rieng khong co du lieu gia.
+async function handleAskPrice(payload) {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+  const q = String(payload?.q || "").trim().slice(0, 200);
+  if (!q) throw new Error("Thiếu câu hỏi.");
+  let data;
+  try {
+    const res = await fetch(cfg.gasUrl, { method: "POST", body: JSON.stringify({ action: "priceQa", q }), headers: { "Content-Type": "text/plain" } });
+    data = await res.json();
+  } catch (e) { throw new Error("Không gọi được GAS: " + e.message); }
+  if (!data || data.ok === false || data.error) {
+    const err = String((data && (data.error || data.message)) || "Lỗi GAS không rõ");
+    throw new Error(/unknown action|priceQa/i.test(err) ? err + " (GAS chưa lên bản có 'Hỏi AI về giá' — chờ deploy xong rồi thử lại)" : err);
+  }
+  return { found: !!data.found, text: data.text || "", provider: data.provider || "", aiError: data.aiError || "", suggestions: Array.isArray(data.suggestions) ? data.suggestions : [] };
+}
+
 // Tra cuu CTKM theo tu khoa — action:'ctkmSearch' (GET, chi doc). Cung co che voi
 // handleGetPrice o tren, chi doi sang sheet CTKM. Ten rieng (khac handleGetCtkm() ben duoi,
 // vom load nguyen van cho "Soan don") de tranh dam ten ham (function hoisting se de 1 ham
@@ -1149,6 +1280,17 @@ async function handleGetCtkm() {
   return { rows: data.rows };
 }
 
+async function handleGetPromoConfig() {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+  const sep = cfg.gasUrl.includes("?") ? "&" : "?";
+  const res = await fetch(cfg.gasUrl + sep + "action=getSettings&keys=promoConfig", { redirect: "follow" });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return { promoConfig: (data.values || {}).promoConfig || null };
+}
+
 async function handleGetKnowledge() {
   const settings = await chrome.storage.sync.get(null);
   const cfg = { ...DEFAULT_SETTINGS, ...settings };
@@ -1175,12 +1317,38 @@ async function _postGas_(body) {
 async function handleSaveMessageTemplate(t) {
   return _postGas_({ action: "saveMessageTemplate", template: {
     id: t?.id || "", title: t?.title || "", content: t?.content || "", tags: t?.tags || "",
-    product: t?.product || "", topic: t?.topic || "", createdBy: t?.createdBy || ""
+    product: t?.product || "", nhom: t?.nhom || "", topic: t?.topic || "", createdBy: t?.createdBy || ""
   } });
 }
 async function handleDeleteMessageTemplate(p) {
   // createdBy: server chi cho xoa mau CHUA DUYET cua chinh nguoi do (mau da duyet chi admin/quan ly xoa tren CRM).
   return _postGas_({ action: "deleteMessageTemplate", id: p?.id || "", createdBy: p?.createdBy || "" });
+}
+
+// Viet tat — action:'vietTat' (GET, chi doc). Them/sua/xoa o CRM (tab Zalo AI). by=<ten CS> de lay them cac muc RIENG cua nguoi dung nay (server chi tra muc chung + muc cua chinh ten do).
+async function handleGetVietTat() {
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+  const sep = cfg.gasUrl.includes("?") ? "&" : "?";
+  const res = await fetch(cfg.gasUrl + sep + "action=vietTat&by=" + encodeURIComponent(cfg.csName || ""), { redirect: "follow" });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return { snippets: Array.isArray(data.snippets) ? data.snippets : [] };
+}
+
+async function handleGetVietTatImage(id) {
+  id = String(id || "");
+  if (!/^[A-Za-z0-9_-]{15,}$/.test(id)) throw new Error("ID ảnh không hợp lệ.");
+  const settings = await chrome.storage.sync.get(null);
+  const cfg = { ...DEFAULT_SETTINGS, ...settings };
+  if (!cfg.gasUrl) throw new Error("Chưa cấu hình URL Web App GAS.");
+  const sep = cfg.gasUrl.includes("?") ? "&" : "?";
+  const res = await fetch(cfg.gasUrl + sep + "action=vietTatImage&id=" + encodeURIComponent(id) + "&by=" + encodeURIComponent(cfg.csName || ""), { redirect: "follow" });
+  const data = await res.json();
+  if (data.error || data.ok === false) throw new Error(data.error || "Không lấy được ảnh.");
+  if (!data.base64) throw new Error("Máy chủ không trả dữ liệu ảnh.");
+  return { base64: data.base64, mimeType: data.mimeType || "image/jpeg" };
 }
 
 // Thu vien mau tin nhan tu van khach — action:'messageTemplates' (GET, chi doc). Form them/sua/

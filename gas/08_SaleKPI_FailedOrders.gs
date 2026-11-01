@@ -290,6 +290,7 @@ function buildFailedOrderReport_(filters) {
   function toArr(v){ return Array.isArray(v) ? v.filter(Boolean) : (v ? [String(v).trim()] : []); }
   var saleFilterArr = _expandSaleFilterWithPancakeAliases_(toArr(filters.sale));
   var saleFilterFold = saleFilterArr.map(_normTxt_);
+  var wantSaleF_ = _saleWantedFn_(saleFilterFold);
   var nguonFilterArr = toArr(filters.nguon);
   var marketerFilterArr = toArr(filters.marketer);
   var sanPhamTerms = _foldTermsCSV_(filters.sanPham);
@@ -328,7 +329,7 @@ function buildFailedOrderReport_(filters) {
     add_(byLyDo, String(m.trangThai || '(không ghi rõ)').trim() || '(không ghi rõ)', m);
     var salesList = _donSaleNamesFromThe_(m.theSale);
     if (salesList.length === 0) salesList = [UNASSIGNED];
-    for (var k = 0; k < salesList.length; k++) add_(bySale, salesList[k], m);
+    for (var k = 0; k < salesList.length; k++) { if (!wantSaleF_(salesList[k])) continue; add_(bySale, salesList[k], m); }   // dang loc Sale: khong liet ke nguoi dong ban nam ngoai bo loc
   }
   function toArrG(obj) {
     var arr = [];

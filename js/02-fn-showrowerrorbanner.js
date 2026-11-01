@@ -442,7 +442,7 @@ function updateCampaignFilter() {
   const sel = document.getElementById('campaign-filter');
   if (!sel) return;
   const cur = sel.value;
-  const csFList = _csFilterList();
+  const csFList = _csFilterListMatch();
 
   // Lọc chiến dịch theo CS đang chọn (nếu có) — multi: khớp BẤT KỲ CS nào trong danh sách
   const batches = (typeof assignHistory !== 'undefined' ? assignHistory : [])
@@ -503,8 +503,9 @@ function debouncedApplyFilters() {
 function applyFilters() {
   const q = s(document.getElementById('search-input').value).toLowerCase();
   const sort = document.querySelector('.srt').value;
-  const csFList = _csFilterList();
+  const csFList = _csFilterListMatch();
   const dataSrcF = document.getElementById('datasrc-filter')?.value || 'all';
+  if (typeof splitBannerSync_ === 'function') splitBannerSync_(dataSrcF);   // "Danh sách đơn chia": bật/tắt banner tổng kết + tự tải (js/50)
   const ymYear = document.getElementById('ymf-year')?.value || '';
   const ymMonth = document.getElementById('ymf-month')?.value || '';
   const hourFrom = document.getElementById('ymf-hour-from')?.value;
@@ -545,6 +546,10 @@ function applyFilters() {
   const isPhoneSearch = q && /^\d{4,}$/.test(q);
   if (isPhoneSearch) {
     const pList = allCustomers.filter(c => c.phone.includes(q));
+    // SDT day du (9-11 so) khong co trong danh sach (khach ngoai pham vi bi server loc): tra cuu rieng khach do (js/29), xong ve lai bo loc
+    if (!pList.length && /^\d{9,11}$/.test(q) && typeof _pullSearchCustomer_ === 'function') {
+      _pullSearchCustomer_(q).then(function(ph){ if (ph && typeof applyFilters === 'function') applyFilters(); });
+    }
     renderTable(pList);
     txt('result-count', fmt(pList.length));
     txt('tb-list', fmt(pList.length));
@@ -554,6 +559,7 @@ function applyFilters() {
   let list = allCustomers.filter(c => {
     if (!_inUserScope(c)) return false;            // V9: phân quyền theo vai trò
     if (currentTier !== 'all' && c.tier !== currentTier) return false;
+    if (typeof currentBuy !== 'undefined' && currentBuy !== 'all' && (currentBuy === 'bought') !== _isBoughtCustomer(c)) return false;   // Loại khách (js/39)
     if (currentCare !== 'all' && c.careStatus !== currentCare) return false;
     if (currentZalo !== 'all') {
       if (currentZalo === 'block') { if (!['Chặn','Hủy kết bạn'].includes(c.zaloStatus)) return false; }
@@ -587,6 +593,8 @@ function applyFilters() {
       if (dataSrcF === 'cs'  && !src.cs)  return false;
       if (dataSrcF === 'don' && !src.don) return false;
       if (dataSrcF === 'cskh' && !src.cskh) return false;
+      // "Danh sách đơn chia": chỉ khách có đơn mà BẠN được sale khác chia (hoặc mọi đơn chia với Admin/CEO) — danh sách phones do js/50 tải từ GAS splitOrderMine
+      if (dataSrcF === 'split' && !(typeof splitCustomerPass_ === 'function' && splitCustomerPass_(c))) return false;
       // "Chia data": KH đang nằm trong (các) đợt phân công (sheet AssignData) của CHÍNH tài
       // khoản đang đăng nhập — tra qua _assignAllIndex (phone -> Set<csName>) giống hệt cách
       // bộ lọc CS ở trên đang dùng, không bake vào c.dataSrc vì AssignData có thể được tải/đổi
@@ -932,7 +940,7 @@ function _rowHtml(c) {
   }
   return `<tr data-phone="${esc(c.phone)}" onclick="openDp(this.dataset.phone)">
     <td class="col-lastpos" style="${lastPosDisp}">${lastPosHtml}</td>
-    <td class="col-name"><div class="cname">${esc(c.name)}</div><div class="cphone" style="display:flex;align-items:center;gap:4px">${c.phone}<button data-phone="${esc(c.phone)}" onclick="event.stopPropagation();copyPhone(this.dataset.phone)" title="Copy SĐT" style="background:none;border:none;cursor:pointer;font-size:11px;padding:0 2px;color:var(--hint);line-height:1;opacity:.6" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'">📋</button></div></td>
+    <td class="col-name"><div class="cname">${esc(c.name)}${typeof _noPromoBadge_==='function'?_noPromoBadge_(c.phone):''}</div><div class="cphone" style="display:flex;align-items:center;gap:4px">${c.phone}<button data-phone="${esc(c.phone)}" onclick="event.stopPropagation();copyPhone(this.dataset.phone)" title="Copy SĐT" style="background:none;border:none;cursor:pointer;font-size:11px;padding:0 2px;color:var(--hint);line-height:1;opacity:.6" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'">📋</button></div></td>
     <td class="col-tier">${tb}</td>
     <td class="col-hang">${hangBadge(c.hangKey)}</td>
     <td class="col-care">${cb}${khb ? '<br>'+khb : ''}</td>
@@ -1084,7 +1092,7 @@ function _schedResponsibleCS(it) {
 }
 function _schedCsFilter(it, _preList) {
   // Đọc filter từ DOM (currentCS không bao giờ được cập nhật). _preList: nơi gọi đã đọc sẵn 1 lần cho cả vòng lặp.
-  let filterList = _preList ? _preList.slice() : _csFilterList();
+  let filterList = _preList ? _preList.slice() : _csFilterListMatch();
   // Khi đăng nhập role=cs mà chưa chọn filter → tự dùng (các) tên CS đăng nhập
   if (!filterList.length && typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'cs' || currentUser.role === 'manager')) {
     filterList = (currentUser.names && currentUser.names.length) ? currentUser.names.slice() : (currentUser.name ? [currentUser.name] : []);
@@ -1139,7 +1147,7 @@ function _schedToggleDay(dayStr) {
 }
 
 function renderScheduleTab() {
-  const _schedFl = _csFilterList();   // đọc DOM 1 lần/lượt vẽ, không đọc lại cho từng lịch hẹn
+  const _schedFl = _csFilterListMatch();   // đọc DOM 1 lần/lượt vẽ, không đọc lại cho từng lịch hẹn
   const base = new Date(); base.setHours(0,0,0,0);
   const todayStr = _ymd(base);
   const grid = document.getElementById('sched-grid');
@@ -1175,7 +1183,7 @@ function renderScheduleTab() {
           const c = _customerByPhone(it.phone);
           const st = SCHED_TYPES.find(x=>x.key===it.type)||SCHED_TYPES[0];
           const _nsh = _schedNoteShort(it);
-          html += `<div class="sched-item" data-phone="${esc(it.phone)}" onclick="openDp(this.dataset.phone)">
+          html += `<div class="sched-item" data-phone="${esc(it.phone)}" onclick="_openCustomerByPhone_(this.dataset.phone)">
             <div class="sched-dot" style="background:${st.color}"></div>
             <div class="sched-type" style="font-weight:700;color:${st.color}">${_schedShortCode(it)}</div>
             <div class="sched-name">${c?esc(_lastWord(c.name)):it.phone}</div>
@@ -1205,7 +1213,7 @@ function schedSeg(which) {
 
 function renderOverdueTab() {
   const today = _ymd(new Date());
-  const _ovFl = _csFilterList();   // đọc DOM 1 lần, không đọc lại cho từng lịch quá hạn
+  const _ovFl = _csFilterListMatch();   // đọc DOM 1 lần, không đọc lại cho từng lịch quá hạn
   const items = schedules.filter(x => x.date < today && !x.done && _schedCsFilter(x, _ovFl)).sort((a,b)=>a.date.localeCompare(b.date));
   txt('tb-over', fmt(items.length));
   txt('s-over', fmt(items.length));
@@ -1221,7 +1229,7 @@ function renderOverdueTab() {
       const c = _customerByPhone(it.phone);
       const st = SCHED_TYPES.find(x=>x.key===it.type)||SCHED_TYPES[0];
       const _nsh2 = _schedNoteShort(it);
-      html += `<div class="sched-item sched-overdue" data-phone="${esc(it.phone)}" onclick="openDp(this.dataset.phone)">
+      html += `<div class="sched-item sched-overdue" data-phone="${esc(it.phone)}" onclick="_openCustomerByPhone_(this.dataset.phone)">
         <div class="sched-dot" style="background:${st.color}"></div>
         <div class="sched-type" style="font-weight:700;color:${st.color}">${_schedShortCode(it)}</div>
         <div class="sched-name">${c?esc(_lastWord(c.name)):it.phone}</div>

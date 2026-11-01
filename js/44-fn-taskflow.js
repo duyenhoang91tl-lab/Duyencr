@@ -141,6 +141,10 @@ function _tfCollect(){
 })();
 
 // ═══ M3 — Modal chi tiết: thanh giai đoạn, nút Chuyển tiếp, yêu cầu duyệt ═══
+// Admin: cùng cách nhận diện với menu trái (js/29-sidenav isAdm). Chỉ để HIỆN nút — server mới là nơi kiểm quyền thật.
+function _tfIsAdmin(){
+  try { return (typeof _authAccount !== 'undefined' && _authAccount && _authAccount.role === 'admin') || (typeof _bootstrapAdmin !== 'undefined' && !!_bootstrapAdmin); } catch(e){ return false; }
+}
 function _tfMe(){ return (typeof currentUser !== 'undefined' && currentUser && currentUser.name) || ''; }
 
 // Mô hình hiển thị thuần (không đụng DOM → test được). Trả null nếu việc không có quy trình.
@@ -158,7 +162,7 @@ function _tfStageModel(t, flow, me, nowMs){
       hours = Math.max(0, (end - new Date(lg.startedAt).getTime()) / 3600000);
     }
     return { id: s.id, name: s.name, approval: !!s.approval, state: st,
-      assignees: (t.stageAssignees || {})[s.id] || [],
+      assignees: (t.stageAssignees || {})[s.id] || [], approvers: (t.stageApprovers || {})[s.id] || [],
       startedAt: lg && lg.startedAt || '', doneAt: lg && lg.doneAt || '', by: lg && lg.by || '', approvedBy: lg && lg.approvedBy || '', hours: hours };
   });
   var curRow = finished ? null : rows[cur];
@@ -195,12 +199,16 @@ function _tfDetailHtml(t){
     } else if (!m.pending.length){
       html += '<div class="tf-sub">Chỉ người phụ trách giai đoạn này mới bấm được “Chuyển tiếp”.</div>';
     }
+    if (_tfIsAdmin() && !m.canAdvance){
+      html += '<div class="tf-adv"><button class="btn secondary sm" onclick="_tfAdvance(\''+esc(t.id)+'\', true)">⚡ Ép chuyển tiếp (admin)</button></div>';
+    }
     html += '</div>';
   }
   html += '<div class="tf-tl">'+m.rows.map(function(r, i){
     var tm = r.startedAt ? ('Bắt đầu '+_tfFmtTime(r.startedAt)+(r.doneAt ? ' · xong '+_tfFmtTime(r.doneAt) : '')+(r.hours!=null ? ' · '+r.hours.toFixed(2)+'h' : '')) : 'Chưa tới';
     return '<div class="tf-tl-row tf-'+r.state+'"><span class="tf-no">'+(i+1)+'</span><div><b>'+esc(r.name)+'</b>'+
-      '<div class="tf-sub">'+esc(r.assignees.join(', ') || '—')+'</div><div class="tf-sub">'+esc(tm)+(r.approvedBy ? ' · duyệt bởi '+esc(r.approvedBy) : '')+'</div></div></div>';
+      '<div class="tf-sub">'+esc(r.assignees.join(', ') || '—')+(r.state!=='done' && _tfCanReassign(t,m) ? ' <a class="tf-link" onclick="_tfReassignOpen(\''+esc(t.id)+'\',\''+esc(r.id)+'\')">✏️ đổi người</a>' : '')+'</div>'+
+      (r.approval ? '<div class="tf-sub">Duyệt: '+esc(r.approvers.join(', ') || 'người nhận giai đoạn kế tiếp')+'</div>' : '')+'<div class="tf-sub">'+esc(tm)+(r.approvedBy ? ' · duyệt bởi '+esc(r.approvedBy) : '')+'</div></div></div>';
   }).join('')+'</div>';
   return html;
 }
@@ -228,11 +236,12 @@ async function _tfPost(payload){
   var r = await fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify(payload) });
   return await r.json();
 }
-async function _tfAdvance(id){
+async function _tfAdvance(id, force){
+  if (force && !confirm('Ép chuyển công việc sang giai đoạn kế tiếp? Mọi yêu cầu duyệt đang chờ sẽ bị hủy.')) return;
   var btn = document.getElementById('tf-adv-btn'); if (btn){ btn.disabled = true; btn.textContent = 'Đang xử lý...'; }
   try{
     var note = (document.getElementById('tf-note') || {}).value || '';
-    var d = await _tfPost({ action:'taskAdvance', taskId:id, by:_tfMe(), note:note.trim() });
+    var d = await _tfPost({ action:'taskAdvance', taskId:id, by:_tfMe(), note:note.trim(), force:!!force });
     if (d && d.error){ alert(d.error); }
     else if (d && d.pending){ alert('Đã gửi yêu cầu duyệt. Công việc sẽ chuyển tiếp khi người duyệt chấp nhận.'); }
   }catch(e){ alert('Lỗi kết nối, thử lại'); }
@@ -246,6 +255,62 @@ async function _tfDecide(reqId, decision){
     if (d && d.error) alert(d.error);
   }catch(e){ alert('Lỗi kết nối, thử lại'); }
   if (typeof _taskDetailId !== 'undefined' && _taskDetailId) await _tfRefreshDetail(_taskDetailId);
+}
+// Ai được đổi người phụ trách/người duyệt (chỉ để hiện link — server kiểm quyền thật): admin | người tạo | người đang phụ trách giai đoạn hiện tại
+function _tfCanReassign(t, m){
+  if (!t || !m || m.finished) return false;
+  var me = _tfMe();
+  return _tfIsAdmin() || (!!me && (t.createdBy === me || (m.current && m.current.assignees.indexOf(me) !== -1)));
+}
+var _tfRe = { taskId:'', stageId:'', approval:false, chosen:[], chosenAp:[] };
+function _tfReassignOpen(taskId, stageId){
+  var t = allTasks.find(function(x){ return x.id === taskId; }); if (!t) return;
+  var f = _tfFlowById(t.flowId), st = f && f.stages.find(function(x){ return x.id === stageId; });
+  _tfRe = { taskId:taskId, stageId:stageId, approval:!!(st && st.approval), chosen:((t.stageAssignees||{})[stageId]||[]).slice(), chosenAp:((t.stageApprovers||{})[stageId]||[]).slice() };
+  var ov = document.getElementById('tf-re-overlay');
+  if (!ov){
+    ov = document.createElement('div'); ov.className = 'assign-modal-overlay'; ov.id = 'tf-re-overlay'; ov.style.zIndex = 10050;
+    ov.innerHTML = '<div class="assign-modal" style="width:420px;max-height:85vh"><div class="assign-modal-hdr"><div class="assign-modal-title">✏️ Đổi người phụ trách</div>'+
+      '<button class="close-btn" onclick="document.getElementById(\'tf-re-overlay\').classList.remove(\'open\')">✕</button></div>'+
+      '<div class="assign-body" id="tf-re-body"></div></div>';
+    document.body.appendChild(ov);
+  }
+  _tfReassignRender(); ov.classList.add('open');
+}
+function _tfReassignList(kind, label, chosen){
+  var chips = _tfChipsHtml(kind, 'x', chosen).replace(/onclick="_tfRemoveEl\(this\)"/g, 'onclick="_tfReassignDel(this)"');
+  return '<div class="tf-lbl">'+label+'</div><div class="tf-chips">'+chips+'</div>'+
+    '<select class="assign-input tf-sel" data-k="'+kind+'" onchange="_tfReassignAdd(this)"><option value="">+ Thêm người…</option>'+
+    _tfUserNames().filter(function(n){ return chosen.indexOf(n) === -1; }).map(function(n){ return '<option value="'+esc(n)+'">'+esc(n)+'</option>'; }).join('')+'</select>';
+}
+function _tfReassignRender(){
+  var body = document.getElementById('tf-re-body'); if (!body) return;
+  body.innerHTML = _tfReassignList('as', 'Người thực hiện', _tfRe.chosen) +
+    (_tfRe.approval ? _tfReassignList('ap', 'Người duyệt <span class="tf-hint">(để trống = người nhận giai đoạn kế tiếp)</span>', _tfRe.chosenAp) : '')+
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="document.getElementById(\'tf-re-overlay\').classList.remove(\'open\')">Hủy</button>'+
+    '<button class="btn primary" id="tf-re-save" onclick="_tfReassignSave()">Lưu</button></div>';
+}
+function _tfReassignAdd(sel){
+  var arr = sel.getAttribute('data-k') === 'ap' ? _tfRe.chosenAp : _tfRe.chosen;
+  if (sel.value && arr.indexOf(sel.value) === -1){ arr.push(sel.value); _tfReassignRender(); }
+}
+function _tfReassignDel(el){
+  var k = el.getAttribute('data-k'), n = el.getAttribute('data-n');
+  if (k === 'ap') _tfRe.chosenAp = _tfRe.chosenAp.filter(function(x){ return x !== n; });
+  else _tfRe.chosen = _tfRe.chosen.filter(function(x){ return x !== n; });
+  _tfReassignRender();
+}
+async function _tfReassignSave(){
+  if (!_tfRe.chosen.length){ alert('Cần ít nhất 1 người thực hiện'); return; }
+  var btn = document.getElementById('tf-re-save'); if (btn){ btn.disabled = true; btn.textContent = 'Đang lưu...'; }
+  var payload = { action:'taskReassign', taskId:_tfRe.taskId, stageId:_tfRe.stageId, assignees:_tfRe.chosen, by:_tfMe() };
+  if (_tfRe.approval) payload.approvers = _tfRe.chosenAp;
+  try{
+    var d = await _tfPost(payload);
+    if (d && d.error){ alert(d.error); if (btn){ btn.disabled = false; btn.textContent = 'Lưu'; } return; }
+  }catch(e){ alert('Lỗi kết nối, thử lại'); if (btn){ btn.disabled = false; btn.textContent = 'Lưu'; } return; }
+  document.getElementById('tf-re-overlay').classList.remove('open');
+  await _tfRefreshDetail(_tfRe.taskId);
 }
 // Nhãn giai đoạn trong bảng danh sách công việc
 function _tfListBadge(t){

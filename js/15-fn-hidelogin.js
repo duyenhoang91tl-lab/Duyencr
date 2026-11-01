@@ -185,9 +185,9 @@ function _acctRoleChange(){
   var role = _aval('acct-role');
   var nameWrap = document.getElementById('acct-name-wrap'), teamWrap = document.getElementById('acct-team-wrap');
   if (nameWrap) nameWrap.style.display = (role==='admin') ? 'none' : '';
-  if (teamWrap) teamWrap.style.display = (role==='leader') ? '' : 'none';
+  if (teamWrap) teamWrap.style.display = (_roleBaseOf(role)==='leader') ? '' : 'none';
   var deptWrap = document.getElementById('acct-dept-wrap');
-  if (deptWrap) deptWrap.style.display = (role==='manager') ? '' : 'none';
+  if (deptWrap) deptWrap.style.display = (_roleBaseOf(role)==='manager') ? '' : 'none';
 }
 function _acctKey(u){ return String(u == null ? '' : u).trim().toLowerCase(); }
 
@@ -200,7 +200,7 @@ function _acctNamesOf(a){
 function _acctApplyNames(acct, arr){
   acct.names = arr.slice();
   acct.name  = arr[0] || '';
-  if (acct.role === 'cs'){
+  if (_roleBaseOf(acct.role) === 'cs'){
     var t = null;
     for (var i = 0; i < arr.length && !t; i++){ t = (typeof _teamOf === 'function' ? _teamOf(arr[i]) : null); }
     acct.team = t ? t.name : '';
@@ -241,11 +241,11 @@ function _acctDetailHtml(a){
   }).join('') : '<span style="font-size:12px;color:var(--red)">Chưa gán sale nào — tài khoản này sẽ không thấy dữ liệu.</span>';
 
   var teamNote = '';
-  if (a.role === 'manager'){
+  if (_roleBaseOf(a.role) === 'manager'){
     var dl = String(a.team||'').split(',').map(function(k){ k=k.trim(); return k ? (typeof saleGroupLabel==='function' ? saleGroupLabel(k) : k) : ''; }).filter(Boolean);
     teamNote = '<div style="margin-top:8px;font-size:11px;color:var(--muted);border-top:1px dashed var(--border);padding-top:7px">🏢 Phòng phụ trách: <b>'+(dl.length ? esc(dl.join(', ')) : '—')+'</b> — xem nhân viên &amp; leader của các phòng này ở màn Tổng quan / Hồ sơ nhân sự. Các màn dữ liệu khách/báo cáo khác chỉ theo danh sách sale được gán ở trên.</div>';
   }
-  if (a.role === 'leader'){
+  if (_roleBaseOf(a.role) === 'leader'){
     var tm = (typeof teams !== 'undefined' ? teams : []).filter(function(t){ return t.name === a.team; })[0];
     var mem = tm ? [].concat(tm.leader ? [tm.leader] : [], tm.members || []).filter(Boolean) : [];
     teamNote = '<div style="margin-top:8px;font-size:11px;color:var(--muted);border-top:1px dashed var(--border);padding-top:7px">'+
@@ -257,7 +257,7 @@ function _acctDetailHtml(a){
   // Báo cáo hoa hồng tự áp đúng chương trình thưởng online/offline và các mốc "ngày thứ N
   // kể từ ngày bắt đầu" (thưởng sale thử việc).
   var saleTypeHtml = '';
-  if (a.role === 'cs') {
+  if (_roleBaseOf(a.role) === 'cs') {
     // Nguon HIEN THI = SALE_CHANNELS (cung 1 nguon voi "🏆 Chương trình thưởng" + Báo cáo F —
     // theo yeu cau Duyen: "mỗi sale chỉ có on/off, phân loại ở đâu thì báo cáo cũng tính theo
     // đó"), khong con doc rieng a.saleType nua (van giu cot do tren Users lam du phong khi
@@ -270,8 +270,11 @@ function _acctDetailHtml(a){
     saleTypeHtml = '<div style="margin-top:10px;border-top:1px dashed var(--border);padding-top:9px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">'+
       '<div><div style="font-size:10.5px;color:var(--hint);margin-bottom:2px">Đội (áp dụng chương trình thưởng)</div>'+
         '<select onchange="acctSetSaleType(\''+uk+'\',this.value)" style="font-size:12px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+stOpts+'</select></div>'+
-      '<div><div style="font-size:10.5px;color:var(--hint);margin-bottom:2px">Ngày bắt đầu (mốc tính thưởng theo ngày thử việc)</div>'+
+      '<div><div style="font-size:10.5px;color:var(--hint);margin-bottom:2px">Ngày vào (bắt đầu nhận việc)</div>'+
+        '<input type="date" value="'+esc(a.joinDate||'')+'" onchange="acctSetJoinDate(\''+uk+'\',this.value)" style="font-size:12px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"></div>'+
+      '<div><div style="font-size:10.5px;color:var(--hint);margin-bottom:2px">Ngày nhận tin (bắt đầu nhận tin — mốc tính thưởng)</div>'+
         '<input type="date" value="'+esc(a.startDate||'')+'" onchange="acctSetStartDate(\''+uk+'\',this.value)" style="font-size:12px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"></div>'+
+      (a.startDate ? '<div style="font-size:11.5px;color:var(--muted);padding-bottom:5px">🎯 Mốc thưởng sau 1 tháng: <b>'+esc(_acctYmdToDmy(_acctAddMonthsYmd(a.startDate,1)))+'</b></div>' : '')+
     '</div>';
   }
 
@@ -290,7 +293,7 @@ function _acctDetailHtml(a){
           '</label>';
         }).join('')+
       '</div>'+
-      '<div style="font-size:10.5px;color:var(--muted);margin-top:5px">Bỏ tick = tài khoản này sẽ KHÔNG thấy mục đó ở đâu cả (kể cả trong "☰ Menu").</div>'
+      '<div class="guide-text" style="font-size:10.5px;color:var(--muted);margin-top:5px">Bỏ tick = tài khoản này sẽ KHÔNG thấy mục đó ở đâu cả (kể cả trong "☰ Menu").</div>'
     : '<div style="font-size:10.5px;color:var(--muted);margin-top:4px">Đang KHÔNG giới hạn — tài khoản xem đủ menu theo đúng vai trò hiện tại.</div>')+
   '</div>';
 
@@ -337,7 +340,24 @@ function acctSetSaleType(u, val){
 function acctSetStartDate(u, val){
   var acct = _findAccount(u); if (!acct) return;
   acct.startDate = val || '';
-  _acctPersist(acct, 'Đặt ngày bắt đầu: ' + (val || '(bỏ trống)'));
+  _acctPersist(acct, 'Đặt ngày nhận tin: ' + (val || '(bỏ trống)'));
+}
+function acctSetJoinDate(u, val){
+  var acct = _findAccount(u); if (!acct) return;
+  acct.joinDate = val || '';
+  _acctPersist(acct, 'Đặt ngày vào: ' + (val || '(bỏ trống)'));
+}
+// Cộng n tháng vào "yyyy-MM-dd" (ngày vượt quá cuối tháng đích thì lấy ngày cuối tháng, vd 31/01 + 1 tháng = 28/02).
+function _acctAddMonthsYmd(ymd, n){
+  var m = String(ymd||'').match(/^(\d{4})-(\d{2})-(\d{2})/); if (!m) return '';
+  var y = +m[1], mo = +m[2] - 1 + n, d = +m[3];
+  y += Math.floor(mo / 12); mo = ((mo % 12) + 12) % 12;
+  var last = new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
+  if (d > last) d = last;
+  return y + '-' + ('0'+(mo+1)).slice(-2) + '-' + ('0'+d).slice(-2);
+}
+function _acctYmdToDmy(ymd){
+  var m = String(ymd||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3]+'/'+m[2]+'/'+m[1] : '';
 }
 
 // Mở / đóng khối chi tiết của 1 tài khoản
@@ -399,7 +419,7 @@ function renderAcctModal(){
   var edRole  = ed ? (ed.role || 'cs') : '';
   var edNames = ed ? _acctNamesOf(ed) : [];
 
-  var roleOpts = ['admin','manager','leader','cs','demo'].map(function(r){
+  var roleOpts = _roleKeysForSelect().map(function(r){
     return '<option value="'+r+'"'+(ed && edRole===r ? ' selected' : '')+'>'+_roleLabel(r)+'</option>';
   }).join('');
 
@@ -427,8 +447,8 @@ function renderAcctModal(){
   }).join('') || '<span style="font-size:12px;color:var(--muted)">Chưa có phòng nào (cài đặt ở Tổng quan → ⚙ Cài đặt phòng).</span>';
 
   var list = accounts.length ? accounts.map(function(a){
-    var badgeCls = a.role==='admin' ? 'vip-bg' : ((a.role==='leader'||a.role==='manager') ? 'blue-bg' : 'green-bg');
-    var badgeCol = a.role==='admin' ? 'var(--vip)' : ((a.role==='leader'||a.role==='manager') ? 'var(--blue)' : 'var(--green)');
+    var badgeCls = a.role==='admin' ? 'vip-bg' : ((_roleBaseOf(a.role)==='leader'||_roleBaseOf(a.role)==='manager'||_roleBaseOf(a.role)==='viewer') ? 'blue-bg' : 'green-bg');
+    var badgeCol = a.role==='admin' ? 'var(--vip)' : ((_roleBaseOf(a.role)==='leader'||_roleBaseOf(a.role)==='manager'||_roleBaseOf(a.role)==='viewer') ? 'var(--blue)' : 'var(--green)');
     var namesArr = _acctNamesOf(a);
     var namesDisp = namesArr.join(', ');
     var uk = esc(a.username);
@@ -545,12 +565,12 @@ async function addAccount(){
   if (!u){ toast('Nhập tên tài khoản.'); return; }
   if (/\s/.test(u)){ toast('Tên tài khoản không nên có dấu cách.'); return; }
   if (role === 'admin'){ name = name || 'Admin'; namesArr = ['Admin']; team = ''; }
-  if (role === 'manager'){   // Quan ly: phong phu trach luu o cot team (key phong, cach nhau dau phay); ten sale la TUY CHON
+  if (_roleBaseOf(role) === 'manager'){   // Quan ly: phong phu trach luu o cot team (key phong, cach nhau dau phay); ten sale la TUY CHON
     team = Array.prototype.slice.call(document.querySelectorAll('.acct-dept-chk:checked')).map(function(o){ return o.getAttribute('data-key'); }).join(',');
     if (!team){ toast('Chọn ít nhất 1 phòng phụ trách cho tài khoản Quản lý.'); return; }
   }
-  if (role !== 'admin' && role !== 'manager' && !namesArr.length){ toast('Chọn hoặc nhập ít nhất 1 Tên CS cho tài khoản này.'); return; }
-  if (role === 'cs'){
+  if (role !== 'admin' && _roleBaseOf(role) !== 'manager' && _roleBaseOf(role) !== 'viewer' && !namesArr.length){ toast('Chọn hoặc nhập ít nhất 1 Tên CS cho tài khoản này.'); return; }
+  if (_roleBaseOf(role) === 'cs'){
     var t = null;
     for (var ni=0; ni<namesArr.length && !t; ni++){ t = (typeof _teamOf==='function' ? _teamOf(namesArr[ni]) : null); }
     team = t ? t.name : '';

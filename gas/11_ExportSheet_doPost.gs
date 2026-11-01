@@ -228,12 +228,17 @@ function doPost(e) {
     if (d0.action === 'saveUsers') { var _ua = _usersWriteAuth_(d0.token); if (!_ua.ok) return jsonOut_({ error: _ua.error, code: 'AUTH' }); }
     if (d0.action === 'setGasSource' && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de dong bo ma nguon GAS.' });
     if (d0.action === 'setSetting' && _isSensitiveWriteKey_(d0.key) && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Khong duoc ghi key nay.' });
+    if (d0.action === 'setSetting' && (String(d0.key || '').trim() === 'bizRules' || String(d0.key || '').trim() === 'reportsConfig' || String(d0.key || '').trim() === 'bannedWordsCfg' || String(d0.key || '').trim() === 'POS_GHEP_MIN_CODES' || String(d0.key || '').trim() === 'resaleNotifyLookback' || String(d0.key || '').trim() === 'resaleNotifyDays' || String(d0.key || '').trim() === 'resaleNotify')) { var _bizDen = _bizRulesWriteDenied_(d0.token); if (_bizDen) return jsonOut_(_bizDen); }
   }
   if (d0 && typeof d0 === 'object') {
     _AUDIT_TOKEN_ = String(d0.token || '');
     _ntlNote_('POST', d0.action, d0.token, d0.src, d0.ek);
     var _denP = _enforceCheck_(d0.action, d0.token, d0.ek, d0.src);
     if (_denP) return jsonOut_(_denP);
+    var _ownP = _ownerGate_(d0.action, d0.token);
+    if (_ownP) return jsonOut_(_ownP);
+    var _cfgP = _cfgGate_(d0.action, d0.token);
+    if (_cfgP) return jsonOut_(_cfgP);
   }
   return doPostCore_(e);
 }
@@ -247,6 +252,9 @@ function doPostCore_(e) {
     var data = JSON.parse(e.postData.contents);
     var action = data.action;
     if (MLIB_POST_ACTIONS_[action] === 1) return mlibDoPost_(action, data);   // thu vien anh/ghi am/mau tin
+    if (KHD_POST_ACTIONS_[action] === 1) return khdDoPost_(action, data);   // thao luan khach (noi bo)
+    if (SPLIT_POST_ACTIONS_[action] === 1) return splitDoPost_(action, data);   // xuat bao cao M (don chia) ra Sheet: Admin
+    if (TEAMBONUS_POST_ACTIONS_[action] === 1) return teamBonusDoPost_(action, data);   // ghi/xoa nhat ky phat doi Sale (chi admin)
     if (CHAT_POST_ACTIONS_[action] === 1) return chatDoPost_(action, data);   // chat noi bo
     if (action === 'save')                return saveAllCare_(data.rows);
     if (action === 'saveSingle')          return saveSingleCare_(data.row);
@@ -285,11 +293,17 @@ function doPostCore_(e) {
     if (action === 'tonKhoItemSave')      return tonKhoItemSave_(data);
     if (action === 'tonKhoItemDelete')    return tonKhoItemDelete_(data);
     if (action === 'tonKhoImport')        return tonKhoImport_(data);
+    if (action === 'khoComboSave')        return khoComboSave_(data);
+    if (action === 'tonKhoTruDonCauHinh') return tonKhoTruDonCauHinh_(data);
+    if (action === 'tonKhoTruDonXemTruoc') return tonKhoTruDonXemTruoc_(data);
+    if (action === 'tonKhoTruDonChay')    return tonKhoTruDonChay_(data);
+    if (action === 'tonKhoTruDonHoanTay') return tonKhoTruDonHoanTay_(data);
     if (action === 'saveMktTeams')        return saveMktTeams_(data.teams);
     if (action === 'saveUsers')           return saveUsers_(data.users);
     if (action === 'saveAudit')           return saveAudit_(data.rows);
     // ── Nhap du lieu Base/Pos tu file export (thay copy tay vao Google Sheet) ──
-    if (action === 'importSheetRows')     return doImportSheetRows_(data.sheet, data.rows);
+    if (action === 'importSheetRows')     return doImportSheetRows_(data.sheet, data.rows, data.dryRun, data.updateExisting, _impWho_(data.token));
+    if (action === 'importUndo')          return doImportUndo_(data.batchId, data.dryRun, _impWho_(data.token));
     // ── Bao cao Pancake ──
     if (action === 'savePancakeStats')    return savePancakeStats_(data.rows);
     if (action === 'savePancakeNameMap')  return savePancakeNameMap_(data.pancakeName, data.saleName);
@@ -299,6 +313,7 @@ function doPostCore_(e) {
     if (action === 'savePancakePageMap')  return savePancakePageMap_(data.pageId, data.pageName, data.kenhBan);
     if (action === 'setSetting')          return setSetting_(data.key, data.value);
     if (action === 'saveSaleGroups')      return saveSaleGroups_(data.groups);
+    if (action === 'closePosMonth')       return jsonOut_(closePosMonth_(data.month, data.force));
     // ── Dong bo lai ma nguon gas_v13.js cho nut "Copy Apps Script Code" (xem getGasSource, doGet)
     // — chia thanh cac manh <=45.000 ky tu (o tinh Sheet gioi han 50.000), xoa manh cu thua neu
     // ban moi it manh hon ban truoc, roi ghi "gasSourceUpdatedAt" de UI hien luc dong bo gan nhat.
@@ -317,7 +332,11 @@ function doPostCore_(e) {
     // ── Chat Pancake trong CRM: gan hoi thoai voi SDT khach, gui tin tra loi ──
     if (action === 'pkChatLink') return pkChatLink_(data);
     if (action === 'pkChatSend') return pkChatSend_(data);
+    if (action === 'pkChatTag') return pkChatTag_(data);
+    if (action === 'pkChatRead') return pkChatRead_(data);
     if (action === 'profileSave') return profileSave_(data);
+    if (action === 'splitFeedbackSave') return jsonOut_(saveSplitFeedback_(data));   // Sale phan hoi o Chi tiet don chia (Bao cao M)
+    if (action === 'saveRoleConfig') return saveRoleConfig_(data.config, data.token);
     if (action === 'notifRead') { var _nu = _sessUser_(data.token); if (!_nu) return jsonOut_({ error: 'Can dang nhap.', code: 'AUTH' }); return jsonOut_(markNotifRead_(_nu.username, data.ids, !!data.all)); }
     if (action === 'notifMention') {
       var _nm = _sessUser_(data.token); if (!_nm) return jsonOut_({ error: 'Can dang nhap.', code: 'AUTH' });
@@ -329,11 +348,13 @@ function doPostCore_(e) {
     if (action === 'deleteTaskFlow')      return deleteTaskFlow_(data.id);
     if (action === 'taskAdvance')         return taskAdvance_(data);
     if (action === 'taskRequestDecide')   return taskRequestDecide_(data);
+    if (action === 'taskReassign')        return taskReassign_(data);
     if (action === 'saveCareStatus')      return saveCareStatus_(data.careStatus);
     if (action === 'saveAIContext')        return saveAIContext_(data.type, data.content, data.context);
     // Xac thuc tai khoan (Pancake AI doi CS) — kiem tra mat khau PHIA SERVER, khong tra passHash ve client
     if (action === 'verifyLogin')          return verifyLogin_(data.username, data.password);
     if (action === 'ai')                  return callGroqAI_(data);
+    if (action === 'priceQa')             return jsonOut_(priceQa_(data.q || data.prompt));   // Pancake AI: nhan vien hoi gia, tra loi van ngan
     // ── BROADCAST: tao/cap nhat 1 chien dich gui tin hang loat ──
     if (action === 'saveBroadcast')        return saveBroadcast_(data.broadcast || data);
     // ── BROADCAST: danh dau 1 SDT da gui/loi/bo qua trong 1 chien dich ──
@@ -353,12 +374,16 @@ function doPostCore_(e) {
     // Dọn dòng CareData bị nhân bản (giữ dòng đầy đủ nhất cho mỗi SĐT)
     if (action === 'dedupeCare')           return dedupeCare_();
     // ── HOI THAM TU DONG: luu bang mau tin (UI Sasum) ──
-    if (action === 'saveFollowUpTemplates') return saveFollowUpTemplates_(data.templates);
+    if (action === 'saveFollowUpTemplates') return saveFollowUpTemplates_(data.templates, (function () { try { return data.token ? _sessUser_(data.token) : null; } catch (e) { return null; } })());
     if (action === 'saveFuResults')         return saveFuResults_(data.results);
     // ── MESSENGER/PHONG THUY AI: doc bang tra menh + mau canned response (Sheet Menh/CannedResponses,
     //    tu tao voi du lieu mac dinh neu chua co). Them 2026-09, KHONG dung chung sheet/cot voi CareData. ──
     if (action === 'getKnowledge') return jsonOut_(getMessengerKnowledge_());
+    // ── QUET TU CAM truoc khi gui (nut "Quet tu cam" tren Pancake AI, Duyen yeu cau 2026-10-21): dung CHUNG bo phat hien + danh sach + ds bo qua voi giam sat chat
+    //    (cvDetect_/_cvBannedCompiled_) -> nut bao sach thi giam sat chat cung khong bat. Chi doc, khong ghi gi. ──
+    if (action === 'scanBanned')   return jsonOut_(scanBannedText_(data.text));
     // ── MAU TIN NHAN TU VAN KHACH: them/sua (form tren CRM tab ZALO AI) / xoa 1 mau ──
+    if (action === 'uploadTemplateImage')    return uploadTemplateImage_(data.imageBase64, data.filename, data.mimeType, _tplCaller_(data.token, data.ek, ''));
     if (action === 'saveMessageTemplate')   return saveMessageTemplate_(data.template || data, _tplCaller_(data.token, data.ek, (data.template || data).createdBy));
     if (action === 'deleteMessageTemplate') return deleteMessageTemplate_(data.id, _tplCaller_(data.token, data.ek, data.createdBy));
     if (action === 'approveMessageTemplate') return approveMessageTemplate_(data.id, data.decision, data.reason, _tplCaller_(data.token, data.ek, ''));

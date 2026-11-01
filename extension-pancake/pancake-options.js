@@ -195,3 +195,50 @@ document.getElementById("saveCrmExtKey").addEventListener("click", () => {
     setTimeout(() => { el.textContent = ""; }, 2000);
   });
 });
+
+
+// ── Duyệt mẫu tin (admin): đăng nhập CRM -> token chỉ lưu ở background (pancake-background.js, APPROVER_*) ──
+(function apprInit() {
+  const $ = (id) => document.getElementById(id);
+  const ask = (msg) => new Promise((res) => { try { chrome.runtime.sendMessage(msg, (r) => res(chrome.runtime.lastError ? null : r)); } catch (e) { res(null); } });
+  const say = (t, ok) => { const m = $("apprMsg"); m.textContent = t || ""; m.style.color = ok ? "#15803d" : "#b91c1c"; };
+  async function refresh() {
+    const r = await ask({ type: "APPROVER_STATUS" }), d = r && r.ok ? r.data : null;
+    const on = !!(d && d.loggedIn);
+    $("apprLoggedIn").style.display = on ? "" : "none"; $("apprLoggedOut").style.display = on ? "none" : "";
+    if (on) { $("apprName").textContent = d.name || d.username || ""; $("apprExp").textContent = d.expiresAt ? "(hết hạn " + new Date(d.expiresAt).toLocaleDateString("vi-VN") + ")" : ""; }
+  }
+  $("apprLogin").addEventListener("click", async () => {
+    const btn = $("apprLogin"); btn.disabled = true; say("Đang đăng nhập...", true);
+    const r = await ask({ type: "APPROVER_LOGIN", payload: { username: $("apprUser").value, password: $("apprPass").value } });
+    btn.disabled = false; $("apprPass").value = "";   // xoá mật khẩu khỏi ô nhập ngay
+    if (r && r.ok) { say("Đăng nhập thành công. Mẫu tin chờ duyệt sẽ hiện trên Pancake (tải lại tab Pancake nếu chưa thấy).", true); await refresh(); }
+    else say((r && r.error) || "Không kết nối được tới extension. Thử lại.", false);
+  });
+  $("apprPass").addEventListener("keydown", (e) => { if (e.key === "Enter") $("apprLogin").click(); });
+  $("apprLogout").addEventListener("click", async () => { await ask({ type: "APPROVER_LOGOUT" }); say("Đã đăng xuất.", true); await refresh(); });
+  refresh();
+})();
+
+
+// ── Viet tat (go tat trong o chat) — bat/tat luu NGAY (storage.local, khong can bam Luu); cap nhat ngay = hoi lai CRM qua background (GET_VIETTAT) ──
+(function () {
+  const on = document.getElementById("vtOn"), btn = document.getElementById("vtSync"), st = document.getElementById("vtStatus");
+  if (!on || !btn) return;
+  const say = (t, bad) => { st.textContent = t; st.style.color = bad ? "#b91c1c" : "#166534"; };
+  chrome.storage.local.get({ vtOn: true, vtData: [], vtAt: 0 }, (v) => {
+    on.checked = v.vtOn !== false;
+    if (v.vtAt) say("Đã có " + (v.vtData || []).length + " mục (cập nhật " + new Date(v.vtAt).toLocaleString("vi-VN") + ")");
+  });
+  on.addEventListener("change", () => chrome.storage.local.set({ vtOn: on.checked }));
+  btn.addEventListener("click", () => {
+    btn.disabled = true; say("Đang cập nhật...");
+    chrome.runtime.sendMessage({ type: "GET_VIETTAT" }, (r) => {
+      btn.disabled = false;
+      if (chrome.runtime.lastError || !r || !r.ok) { say("Không cập nhật được: " + ((r && r.error) || (chrome.runtime.lastError && chrome.runtime.lastError.message) || "lỗi mạng"), true); return; }
+      chrome.storage.sync.get({ csName: "" }, (sy) => {
+        chrome.storage.local.set({ vtData: r.data.snippets, vtAt: Date.now(), vtBy: String(sy.csName || "") }, () => say("✓ Đã cập nhật " + r.data.snippets.length + " mục."));
+      });
+    });
+  });
+})();

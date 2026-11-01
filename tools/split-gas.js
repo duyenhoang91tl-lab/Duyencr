@@ -39,7 +39,11 @@ const PARTS = [
   ['26_Chat', 'var SH_CHAT_CH_ ='],
   ['27_PancakeHistory', 'var PK_HIST_SECTION_ ='],
   ['28_StaffProfile', 'var SH_PROFILE ='],
-  ['29_MediaLib', 'var SH_MLIB_ =']
+  ['29_MediaLib', 'var SH_MLIB_ ='],
+  ['30_KhDiscuss', 'var SH_KHD_ ='],
+  ['31_SplitOrders', 'var SPLIT_ORDER_MAX_ROWS_ ='],
+  ['32_ChatCoach', 'var CHAT_COACH_SECTION_ ='],
+  ['33_TeamBonus', 'var TEAM_BONUS_SECTION_ =']
 ];
 const src = fs.readFileSync(SRC, 'utf8');
 const lines = src.split('\n');

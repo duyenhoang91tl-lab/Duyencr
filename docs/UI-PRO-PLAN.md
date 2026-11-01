@@ -13,3 +13,5 @@ CRM ĐÃ có mục tiêu doanh số (`target`/`pct` trong `orgOverview`) nên đ
 | P4 / P4b | Thanh tab hồ sơ đang mở + dock phải + Trợ lý hỏi đáp khách/doanh số (trả lời THÔ theo quy tắc, không cần key AI) — `js/38-pro-dock.js`, GAS `crmAsk` | ✅ |
 
 Chưa làm (đã đề xuất, chưa được chọn): chấm điểm & xếp ưu tiên khách cần gọi; cảnh báo khách nguội / sắp mất. Kiểm thử bản nén: `npm i --no-save terser@5 clean-css@5 jsdom@24 && node tools/build-dist.js && node tools/test-dist-equivalence.js` (CI deploy-web.yml triển khai bản nén).
+
+- **Hỏi giá sản phẩm (trợ lý 🤖, chế độ 💰 Giá sản phẩm):** tra TRỰC TIẾP bảng giá DANH_MUC qua GAS GET `action=priceAsk&q=` (`priceAsk_`, dùng lại `_priceVariantsForPrompt_`: bỏ từ thừa, chấm điểm trên cột TÊN, gom đủ biến thể chất liệu/size, lọc SAPHIA/RUBY) — giá KHÔNG do AI tự nghĩ; đơn vị nghìn đồng. Câu có từ "giá" mà chế độ Khách/Doanh số "chưa hiểu" tự chuyển sang tra giá (không cần mở khách). Engine `ai` + `withPrices:true` ở `callAI_` crmAsk nối thêm khối bảng giá thật vào prompt (`_crmAskPriceBlock_`, cấm bịa). Test: `node tools/test-price-ask.js`.

@@ -1,5 +1,27 @@
 function _pkKpiPct(v){ return (v||v===0) ? (v+'%') : '—'; }
 
+// ═══ CẢNH BÁO TRONG BÁO CÁO: MẶC ĐỊNH ẨN, bấm biểu tượng 👁 mới hiện (Duyên yêu cầu 2026-10-12) ═══
+// Các dòng ⚠️ ("N đơn chưa gán…", "tên chưa khớp Sale/Page…", cảnh báo chung) làm rối báo cáo khi chụp gửi sếp → thu gọn thành 1 nút nhỏ.
+// _warnBox(key, boxHtml, label): boxHtml = khung cảnh báo cũ (giữ nguyên nội dung/kiểu); key = định danh để NHỚ trạng thái đã mở khi
+// báo cáo vẽ lại (mặc định luôn đóng). Dùng chung cho js/10 + js/11. Test: node tools/test-warn-eye.js
+var _warnOpen = {};
+function _warnBox(key, boxHtml, label){
+  if (!boxHtml) return '';
+  var open = !!_warnOpen[key];
+  return '<div class="warn-wrap" style="margin:0 0 10px">'+
+    '<a href="javascript:void(0)" class="warn-eye" data-warn="'+key+'" data-label="'+String(label||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'" onclick="_warnToggle(this)" '+
+    'title="Bấm để xem / ẩn cảnh báo" style="display:inline-block;font-size:11px;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:2px 10px;cursor:pointer;user-select:none;text-decoration:none">'+
+    (open ? '🙈 Ẩn cảnh báo' : '👁 '+(label ? String(label).replace(/&/g,'&amp;').replace(/</g,'&lt;') : 'Xem cảnh báo'))+'</a>'+
+    '<div class="warn-body" style="display:'+(open ? 'block' : 'none')+';margin-top:6px">'+boxHtml+'</div></div>';
+}
+function _warnToggle(a){
+  var wrap = a.parentNode, body = wrap && wrap.querySelector('.warn-body'); if (!body) return;
+  var show = body.style.display === 'none';
+  body.style.display = show ? 'block' : 'none';
+  _warnOpen[a.getAttribute('data-warn')] = show;
+  a.textContent = show ? '🙈 Ẩn cảnh báo' : '👁 ' + (a.getAttribute('data-label') || 'Xem cảnh báo');
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  BO LOC CO CAO CUA CAC BANG "Theo Page"/"Theo Sale" (tab Bao cao KPI Pancake) — dang GENERIC,
 //  KHONG dung chung state/co che voi bang "Danh sach KH" chinh (colFilters/openColDropdown), vi
@@ -168,7 +190,7 @@ function _pkRenderKpiPancake(){
   // ── Xuất nhật ký báo cáo hàng ngày (Sale/Kênh/MKT/Tag) ra Google Sheet riêng ──
   html += '<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:16px;background:var(--surface2)">'+
     '<div style="font-weight:700;font-size:13px;margin-bottom:2px">📅 Xuất nhật ký báo cáo hàng ngày</div>'+
-    '<div style="font-size:11.5px;color:var(--muted);margin-bottom:8px">Xuất báo cáo Sale bán + Kênh bán (theo Base/DT TỔNG) và MKT + Tag (tổng hợp từ Pancake) ra 4 sheet cố định trong 1 Google Sheet riêng — mỗi loại 1 sheet, mỗi ngày 1 dòng. Xuất lại trùng ngày sẽ tự thay thế dòng cũ của đúng ngày đó (tối đa 31 ngày/lần).</div>'+
+    '<div class="guide-text" style="font-size:11.5px;color:var(--muted);margin-bottom:8px">Xuất báo cáo Sale bán + Kênh bán (theo Base/DT TỔNG) và MKT + Tag (tổng hợp từ Pancake) ra 4 sheet cố định trong 1 Google Sheet riêng — mỗi loại 1 sheet, mỗi ngày 1 dòng. Xuất lại trùng ngày sẽ tự thay thế dòng cũ của đúng ngày đó (tối đa 31 ngày/lần).</div>'+
     '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
       '<span style="font-size:11px;color:var(--muted)">Từ:</span>'+
       '<input type="date" value="'+esc(_expLogState.from)+'" onchange="_expLogState.from=this.value" style="'+st+'">'+
@@ -186,22 +208,22 @@ function _pkRenderKpiPancake(){
   }
 
   if (rep.warnings && rep.warnings.length){
-    html += '<div style="margin:0 0 14px;padding:8px 10px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;font-size:12px;color:#92400e">'+
-      rep.warnings.map(function(w){ return '⚠️ '+esc(w); }).join('<br>')+'</div>';
+    html += _warnBox('kpi-warnings', '<div style="margin:0;padding:8px 10px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;font-size:12px;color:#92400e">'+
+      rep.warnings.map(function(w){ return '⚠️ '+esc(w); }).join('<br>')+'</div>', rep.warnings.length+' cảnh báo dữ liệu');
   }
 
   if (rep.unmappedSales && rep.unmappedSales.length){
-    html += '<div style="margin:0 0 14px;padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412">'+
+    html += _warnBox('kpi-unmapped-sales', '<div style="margin:0;padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412">'+
       '⚠️ '+rep.unmappedSales.length+' tên Nhân viên Pancake chưa khớp Sale CRM (nên đơn/doanh thu của họ đang tính = 0): '+
       rep.unmappedSales.map(function(n){ return esc(n); }).join(', ')+
-      ' — vào tab "📥 Báo cáo Pancake" → mục "Khớp tên" để khớp.</div>';
+      ' — vào tab "📥 Báo cáo Pancake" → mục "Khớp tên" để khớp.</div>', rep.unmappedSales.length+' tên Nhân viên chưa khớp Sale CRM');
   }
 
   if (rep.unmappedPages && rep.unmappedPages.length){
-    html += '<div style="margin:0 0 14px;padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412">'+
+    html += _warnBox('kpi-unmapped-pages', '<div style="margin:0;padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412">'+
       '⚠️ '+rep.unmappedPages.length+' Page chưa khớp Kênh bán (nên đơn/doanh thu của Page này đang tính = 0): '+
       rep.unmappedPages.map(function(p){ return esc(p.pageName||p.pageId); }).join(', ')+
-      ' — vào tab "📥 Báo cáo Pancake" → mục "🔗 Khớp Page Pancake ↔ Kênh bán CRM" để khớp.</div>';
+      ' — vào tab "📥 Báo cáo Pancake" → mục "🔗 Khớp Page Pancake ↔ Kênh bán CRM" để khớp.</div>', rep.unmappedPages.length+' Page chưa khớp Kênh bán');
   }
 
   // ── Tổng quan: tách khối "Kết quả bán hàng" nổi bật (chụp gửi sếp) khỏi khối phễu tương tác ──
@@ -222,7 +244,7 @@ function _pkRenderKpiPancake(){
   // ── Phễu tag L1-L8 toàn hệ thống ──
   if (rep.tagFunnelTotal){
     html += '<div class="dash-section-title">Phễu chuyển đổi L1 → L8 (toàn hệ thống)</div>';
-    html += '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">L1=Tổng tương tác · L2=Tổng SĐT thu thập (mẫu số riêng) · L3→L6=so với bước liền trước · L7=Tổng tương tác · L8=chỉ đếm số lượng (chưa có mẫu số tỷ lệ chuẩn). Di chuột vào tên tag để xem đầy đủ tiêu chí/điều kiện đạt chuẩn.</div>';
+    html += '<div class="guide-text" style="font-size:11px;color:var(--muted);margin-bottom:6px">L1=Tổng tương tác · L2=Tổng SĐT thu thập (mẫu số riêng) · L3→L6=so với bước liền trước · L7=Tổng tương tác · L8=chỉ đếm số lượng (chưa có mẫu số tỷ lệ chuẩn). Di chuột vào tên tag để xem đầy đủ tiêu chí/điều kiện đạt chuẩn.</div>';
     html += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Chỉ số</th>'+
       _PK_KPI_TAG_ORDER.map(function(k){ return '<th style="text-align:right;white-space:nowrap" title="'+esc(_PK_STATUS_LABEL[k]+' — '+(_PK_STATUS_DESC[k]||''))+'">'+esc(_PK_STATUS_LABEL[k]||_PK_KPI_TAG_SHORT[k])+'</th>'; }).join('')+
       '</tr></thead><tbody>'+
@@ -264,7 +286,7 @@ function _pkRenderKpiPancake(){
   // ── Theo MKT ──
   if (rep.byMkt){
     html += '<div class="dash-section-title" style="margin-top:18px">Theo MKT</div>';
-    html += '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Nhóm MKT chọn ở tab Team → "Nhóm MKT". Page chạy chung nhiều MKT được chia theo tỷ lệ đã nhập; đơn/doanh thu của 1 Kênh bán chỉ tính 1 lần.</div>';
+    html += '<div class="guide-text" style="font-size:11px;color:var(--muted);margin-bottom:6px">Nhóm MKT chọn ở tab Team → "Nhóm MKT". Page chạy chung nhiều MKT được chia theo tỷ lệ đã nhập; đơn/doanh thu của 1 Kênh bán chỉ tính 1 lần.</div>';
     html += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>MKT</th><th>Page</th>'+
       '<th style="text-align:right">Tương tác</th><th style="text-align:right">SĐT thu thập</th>'+
       '<th style="text-align:right">Đơn</th><th style="text-align:right">Doanh thu</th><th style="text-align:right">TB/đơn</th><th style="text-align:right">Tỷ lệ chốt</th>'+
@@ -368,7 +390,20 @@ function _pkExportKpiOrdersDetail(){
   XLSX.writeFile(wb, 'ChiTietDonKpiPancake_'+_pkState.kpiFrom+'_'+_pkState.kpiTo+'.xlsx');
 }
 
-function _mktLabel(code){ return _PK_STATUS_LABEL[code] || ('L' + code.substring(1) + '. (tag mới)'); }
+function _mktLabel(code){ return _MKT_EXTRA_LABEL[code] || _PK_STATUS_LABEL[code] || ('L' + code.substring(1) + '. (tag mới)'); }
+// 3 CHỈ SỐ BỔ SUNG (tuỳ chọn xem thêm, chỉ ở Checklist MKT — báo cáo KPI Pancake giữ nguyên công thức cũ). Công thức do Duyên chốt 12/10/2026.
+var _MKT_EXTRA_LABEL = {
+  XCT: 'Tỷ lệ chốt Pancake — đơn có người tạo là sale trên Base ÷ tổng tương tác',
+  XL5: 'Chốt trong ngày (L5 + L5.1 + L5.2) ÷ tương tác khách mới',
+  XL9: 'Chốt đơn hôm trước (L9 + L9.1 + L9.2) ÷ tương tác khách cũ'
+};
+function _mktIsExtra(code){ return !!_MKT_EXTRA_LABEL[code]; }
+function _mktRowName(code){ return _mktIsExtra(code) ? '<span style="color:#4a2c8f">➕</span> '+esc(_mktLabel(code)) : '<b>'+esc(code)+'</b>. '+esc(_mktLabel(code)); }
+function _mktToggleExtra(on){
+  _mktState.showExtra = !!on;
+  try { localStorage.setItem('mkt_show_extra', on ? '1' : '0'); } catch(e){}
+  _mktRender();
+}
 
 async function renderMktChecklistTab(){
   var wrap = document.getElementById('mktchecklist-wrap');
@@ -422,7 +457,7 @@ function _mktDaysInRange_(from, to){
 function _mktOpenCfgEditor(){
   var rep = _mktState.report; if (!rep) return;
   var draft = {};
-  rep.tags.forEach(function(t){ draft[t.code] = { target: t.target===null ? '' : Math.round(t.target*1000)/10, denom: t.denom, op: t.op||'gte' }; });
+  rep.tags.concat(rep.extra||[]).forEach(function(t){ draft[t.code] = { target: t.target===null ? '' : Math.round(t.target*1000)/10, denom: t.denom, op: t.op||'gte' }; });
   _mktState.cfgDraft = draft;
   _mktRender();
 }
@@ -463,7 +498,7 @@ async function _mktSaveCfg(){
 
 function _mktGroupMatrixHtml_(title, rep, groups, note, nameFn, hintFn){
   var h = '<div class="dash-section-title" style="margin-top:22px">'+title+'</div>'+
-    '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">'+esc(note)+'</div>';
+    '<div class="guide-text" style="font-size:11px;color:var(--muted);margin-bottom:6px">'+esc(note)+'</div>';
   if (!groups.length) return h + '<div style="color:var(--muted);font-size:12px;padding:10px">Chưa có dữ liệu nhóm.</div>';
   var cols = [{ name:'Tổng', hint:'', ref: rep }].concat(groups.map(function(g){ return { name: nameFn(g), hint: hintFn(g), ref: g }; }));
   h += '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Chỉ số</th>'+
@@ -489,6 +524,17 @@ function _mktGroupMatrixHtml_(title, rep, groups, note, nameFn, hintFn){
         (t.rate!==null && t.rate!==undefined ? ' <span style="font-weight:700;color:'+_mktPctColor(t.passed)+'">('+t.rate+'%)</span>' : '')+'</td>';
     }).join('')+'</tr>';
   });
+  if (_mktState.showExtra && (rep.extra||[]).length){
+    h += '<tr><td colspan="'+(cols.length+1)+'" style="background:var(--surface2);font-weight:700;font-size:11px;color:var(--muted)">➕ Chỉ số bổ sung (tuỳ chọn)</td></tr>';
+    rep.extra.forEach(function(t0, i){
+      h += '<tr><td>'+_mktRowName(t0.code)+'</td>'+cols.map(function(c){
+        var t = (c.ref.extra||[])[i];
+        if (!t || t.count===null || t.count===undefined) return '<td style="text-align:right;color:var(--muted)">—</td>';
+        return '<td style="text-align:right">'+fmt(Math.round(t.count*100)/100)+
+          (t.rate!==null && t.rate!==undefined ? ' <span style="font-weight:700;color:'+_mktPctColor(t.passed)+'">('+t.rate+'%)</span>' : '')+'</td>';
+      }).join('')+'</tr>';
+    });
+  }
   return h + '</tbody></table></div>';
 }
 
@@ -507,6 +553,7 @@ function _mktRender(){
     '<span style="font-size:11px;color:var(--muted)">→</span>'+
     '<input type="date" value="'+esc(_mktState.to)+'" onchange="_mktSetCustomDate(\'to\',this.value)" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
     (rep ? '<button class="btn sm secondary" onclick="_mktOpenCfgEditor()">🎯 Sửa mục tiêu & mẫu số (tháng '+esc(rep.month)+')</button>' : '')+
+    (rep && rep.extra ? '<label style="font-size:12px;display:inline-flex;gap:5px;align-items:center;cursor:pointer" title="Tỷ lệ chốt Pancake theo người tạo đơn, chốt trong ngày (L5, L5.1, L5.2), chốt đơn hôm trước (L9, L9.1, L9.2)"><input type="checkbox" '+(_mktState.showExtra?'checked ':'')+'onchange="_mktToggleExtra(this.checked)"> ➕ Xem thêm chỉ số bổ sung</label>' : '')+
   '</div>';
 
   if (!rep){ wrap.innerHTML = html; return; }
@@ -550,9 +597,9 @@ function _mktRender(){
       '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>'+
         '<th style="text-align:left;padding:4px 6px">Tag</th><th style="text-align:left;padding:4px 6px">Toán tử</th><th style="text-align:right;padding:4px 6px">Mục tiêu (%)</th><th style="text-align:left;padding:4px 6px">Mẫu số</th>'+
       '</tr></thead><tbody>'+
-      rep.tags.map(function(t){
+      rep.tags.concat(_mktState.showExtra ? (rep.extra||[]) : []).map(function(t){
         var d = _mktState.cfgDraft[t.code];
-        return '<tr><td style="padding:4px 6px">'+esc(t.code)+'. '+esc(_mktLabel(t.code))+'</td>'+
+        return '<tr><td style="padding:4px 6px">'+(_mktIsExtra(t.code) ? _mktRowName(t.code) : esc(t.code)+'. '+esc(_mktLabel(t.code)))+'</td>'+
           '<td style="padding:4px 6px"><select onchange="_mktCfgSetOp(\''+t.code+'\',this.value)" style="font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
             opOpts.map(function(o){ return '<option value="'+o[0]+'"'+(d.op===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')+
           '</select></td>'+
@@ -581,13 +628,15 @@ function _mktRender(){
     '<th>Tag</th><th style="text-align:right">Số lượng</th><th style="text-align:right">TB/ngày</th><th>Mẫu số</th><th style="text-align:right">Giá trị mẫu số</th>'+
     '<th style="text-align:right">Tỷ lệ</th><th style="text-align:right">Mục tiêu</th><th>Trạng thái</th>'+
   '</tr></thead><tbody>';
-  rep.tags.forEach(function(t){
+  var _extraSep = false;
+  rep.tags.concat(_mktState.showExtra ? (rep.extra||[]) : []).forEach(function(t){
+    if (_mktIsExtra(t.code) && !_extraSep){ _extraSep = true; html += '<tr><td colspan="8" style="background:var(--surface2);font-weight:700;font-size:11px;color:var(--muted)">➕ Chỉ số bổ sung (tuỳ chọn — báo cáo KPI Pancake vẫn giữ công thức cũ)</td></tr>'; }
     var statusHtml = '<span style="color:var(--muted)">—</span>';
     if (t.passed === true) statusHtml = '<span style="color:var(--green);font-weight:700">✓ Đạt</span>';
     else if (t.passed === false) statusHtml = '<span style="color:var(--red,#d33);font-weight:700">✗ Chưa đạt</span>';
     var tbNgay = (t.count===null || t.count===undefined) ? null : Math.round((t.count/mktDays)*10)/10;
     html += '<tr>'+
-      '<td><b>'+esc(t.code)+'</b>. '+esc(_mktLabel(t.code))+(t.code==='L5'?' <span style="font-size:10px;color:var(--muted)">(Base)</span>':'')+'</td>'+
+      '<td>'+_mktRowName(t.code)+(t.code==='L5'?' <span style="font-size:10px;color:var(--muted)">(Base)</span>':'')+'</td>'+
       '<td style="text-align:right;font-weight:700">'+fmt(t.count)+'</td>'+
       '<td style="text-align:right;color:var(--muted)">'+(tbNgay!==null?fmt(tbNgay):'—')+'</td>'+
       '<td style="color:var(--muted);font-size:11px">'+(t.denomLabel||'—')+'</td>'+
@@ -798,7 +847,7 @@ function _pkRenderReportHtml(){
   '</div>';
 
   if (d.unmapped && d.unmapped.length){
-    html += '<div style="margin-bottom:10px;padding:8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412">⚠️ '+d.unmapped.length+' tên chưa khớp Sale CRM đang tính riêng theo tên Pancake gốc trong bảng "Theo CS" bên dưới: '+d.unmapped.map(esc).join(', ')+'</div>';
+    html += _warnBox('kpi-dash-unmapped', '<div style="margin:0;padding:8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412">⚠️ '+d.unmapped.length+' tên chưa khớp Sale CRM đang tính riêng theo tên Pancake gốc trong bảng "Theo CS" bên dưới: '+d.unmapped.map(esc).join(', ')+'</div>', d.unmapped.length+' tên chưa khớp Sale CRM');
   }
 
   html += '<div class="dash-section-title">Theo Page</div>';
@@ -996,7 +1045,9 @@ function _srColFilterClear_(tableKey, colKey){
   renderSalesReportTab();
 }
 
-function _srChartSvg(rows, nameKey, valueKey, type, moneyFmt, ordersKey){
+// opts (tuỳ chọn): { ordersLabel, ordersHint } — bảng "Theo Sale" cộng số đơn của TỪNG sale (đơn bán chung N sale tính cho cả N người) nên KHÔNG bằng "Số lượng đơn" thật ở thẻ trên cùng:
+// đổi nhãn + ghi chú để khỏi hiểu nhầm là lệch (Duyên hỏi 2026-10-17: 705 đơn ở thẻ trên vs 830 ở bảng Theo Sale bán).
+function _srChartSvg(rows, nameKey, valueKey, type, moneyFmt, ordersKey, opts){
   var data = (rows||[]).map(function(r){ return {name: (r[nameKey]||'(chưa gán)'), value: Math.abs(Number(r[valueKey])||0), orders: ordersKey?(Number(r[ordersKey])||0):0}; })
     .filter(function(d){ return d.value>0; });
   if (!data.length) return '<div style="color:var(--muted);text-align:center;padding:30px">Không có dữ liệu để vẽ biểu đồ</div>';
@@ -1011,12 +1062,13 @@ function _srChartSvg(rows, nameKey, valueKey, type, moneyFmt, ordersKey){
   // ngay, khong phai crop/ghep nhieu anh: Tong so don | Tong tien | TB don.
   var totalOrders = ordersKey ? data.reduce(function(s,d){ return s+d.orders; }, 0) : 0;
   var avgOrder = totalOrders ? total/totalOrders : 0;
-  var summaryStrip = (ordersKey && _pro) ? _proKpiStrip_(totalOrders, total, avgOrder, moneyFmt) : ordersKey ? (
+  var _ordLbl = (opts && opts.ordersLabel) || 'Tổng số đơn', _ordHint = (opts && opts.ordersHint) ? '<div style="font-size:11.5px;color:var(--muted);margin:-6px 0 12px">ℹ️ ' + esc(opts.ordersHint) + '</div>' : '';
+  var summaryStrip = (ordersKey && _pro) ? _proKpiStrip_(totalOrders, total, avgOrder, moneyFmt, _ordLbl) + _ordHint : ordersKey ? (
     '<div style="display:flex;gap:28px;flex-wrap:wrap;margin-bottom:14px;padding:12px 18px;background:var(--surface2);border-radius:10px;border:1px solid var(--border)">'+
-      '<div><div style="font-size:10.5px;color:var(--muted);font-weight:700;letter-spacing:.3px">📦 TỔNG SỐ ĐƠN</div><div style="font-size:19px;font-weight:800;margin-top:2px">'+fmt(totalOrders)+'</div></div>'+
+      '<div><div style="font-size:10.5px;color:var(--muted);font-weight:700;letter-spacing:.3px">📦 '+esc(_ordLbl.toUpperCase())+'</div><div style="font-size:19px;font-weight:800;margin-top:2px">'+fmt(totalOrders)+'</div></div>'+
       '<div><div style="font-size:10.5px;color:var(--muted);font-weight:700;letter-spacing:.3px">'+(moneyFmt?'💰 TỔNG DOANH THU':'💰 TỔNG SỐ LƯỢNG')+'</div><div style="font-size:19px;font-weight:800;margin-top:2px;color:var(--green)">'+fmtVal(total)+'</div></div>'+
       '<div><div style="font-size:10.5px;color:var(--muted);font-weight:700;letter-spacing:.3px">📊 TRUNG BÌNH / ĐƠN</div><div style="font-size:19px;font-weight:800;margin-top:2px">'+fmtVal(avgOrder)+'</div></div>'+
-    '</div>'
+    '</div>' + _ordHint
   ) : '';
   var legend = data.map(function(d,i){
     var pct = total ? (d.value/total*100) : 0;
@@ -1119,7 +1171,39 @@ function _srLeaderTeamNames(){
   }
   return [];
 }
+// ── DOI SALE (Online/Van phong) XEM THEM BAO CAO CUA NHOM SALE "QUAY" + PHONG CSKH (Duyen yeu cau 2026-10-29) ──
+// Nguyen nhan goc: bao cao doanh so khoa bo loc Sale ve ten minh (CS) hoac ten team (leader) nen sale khong the chon xem Quay/CSKH.
+// May chu tra currentUser.viewNames (ten nhom Quay + phong CSKH, chi cho sale Online/Van phong). Nay nhung tai khoan do duoc CHON them
+// cac ten nay o bo loc Sale (mac dinh van la ten minh / team). Admin khong bi gioi han; tai khoan khong co viewNames giu nguyen hanh vi cu.
+var _SR_VIEW_KEYS_ = ['sale','bSale','cSale','eSale','fSale','gSale','lSale','mSale'];
+function _srViewNames(){
+  if (_srIsAdmin() || !currentUser || !Array.isArray(currentUser.viewNames)) return [];
+  return currentUser.viewNames.filter(function(n){ return n; });
+}
+// Danh sach ten duoc phep chon: (leader: team, con lai: ten minh) + viewNames. [] = khong co quyen xem them.
+function _srViewScopeOptions(){
+  var vn = _srViewNames(); if (!vn.length) return [];
+  var base = _srMyNames();
+  if (currentUser && currentUser.role === 'leader'){ var t = _srLeaderTeamNames(); if (t.length) base = t; }
+  var out = [], seen = {};
+  base.concat(vn).forEach(function(n){ if (n && !seen[n]){ seen[n] = 1; out.push(n); } });
+  return out;
+}
 function _srEnforceScope(){
+  if (_srIsAdmin()) return;
+  var vopt = _srViewScopeOptions();
+  if (!vopt.length){ _srState.viewScopeOptions = []; return _srEnforceScopeBase_(); }
+  // Giu lai lua chon co ten Quay/CSKH cua nguoi dung (ham goc se ghi de ve mac dinh), loc ve trong pham vi cho phep.
+  var prev = {}; _SR_VIEW_KEYS_.forEach(function(k){ prev[k] = (_srState[k] || []).slice(); });
+  _srEnforceScopeBase_();
+  _srState.viewScopeOptions = vopt;
+  _SR_VIEW_KEYS_.forEach(function(k){
+    var def = _srState[k] || [], pick = prev[k].filter(function(n){ return vopt.indexOf(n) !== -1; });
+    var hasExtra = pick.some(function(n){ return def.indexOf(n) === -1; });
+    if (pick.length && hasExtra) _srState[k] = pick;
+  });
+}
+function _srEnforceScopeBase_(){
   if (_srIsAdmin()) return;
   var my = _srMyNames();
   _srState.sale = my.slice();
@@ -1169,7 +1253,14 @@ async function _srFetch(action, params){
     }
     var txt = await r.text();
     try {
-      return JSON.parse(txt);
+      var _obj = JSON.parse(txt);
+      // Máy chủ trả {error:...} (hết phiên / không đủ quyền / lỗi GAS) cho báo cáo doanh số: trước đây giao diện vẽ toàn số 0 vì thiếu field -> trông như "không có đơn".
+      // Nay báo thẳng lỗi (qua _srNoDataHtml_) để biết đó là lỗi chứ không phải dữ liệu rỗng. Chỉ áp cho các action báo cáo (salesReport*).
+      if (_obj && typeof _obj === 'object' && typeof _obj.error === 'string' && /^salesReport/.test(action)) {
+        _srState.lastFetchError = 'Máy chủ báo lỗi: ' + _obj.error + (_obj.code ? ' [' + _obj.code + ']' : '') + (_obj.code === 'AUTH' || /đăng nhập|dang nhap/i.test(_obj.error) ? ' — đăng xuất rồi đăng nhập lại.' : '');
+        return null;
+      }
+      return _obj;
     } catch (eParse) {
       // GAS thuong tra ve 1 trang HTML loi (vd "Exceeded maximum execution time") thay vi JSON
       // khi script chay qua 6 phut hoac gap loi khong bat duoc — rat hay gap khi khoang ngay loc

@@ -7,7 +7,8 @@ Gồm: 1 backend Google Apps Script (`gas_v13.js`) + web app (`index.html`) + 2 
 1. Đọc file này xong → CHỈ mở thêm đúng 1–2 file theo bảng định tuyến bên dưới. KHÔNG đọc hết mọi file.
 2. Chỉ đọc đúng phần code liên quan trong repo (grep/view theo hàm), không đọc nguyên file lớn.
 3. Đừng hỏi lại người dùng những gì đã có trong các file KB này.
-4. Luôn đọc `01-rules-and-deploy.md` trước khi commit/push hoặc khi sửa `gas_v13.js`.
+4. Luôn đọc `01-rules-and-deploy.md` (đặc biệt mục **QUY TẮC GIT: merge-only**) trước khi commit/push hoặc khi sửa `gas_v13.js`.
+5. **Chỉ sửa theo YÊU CẦU MỚI NHẤT của Duyên** (quy tắc 14 trong `01-rules-and-deploy.md`): không tự sửa/dọn/xoá mục cũ; chỉ chỉnh mục cũ khi Duyên báo xoá/chỉnh liên quan. Thấy lỗi ở mục cũ ngoài phạm vi thì chỉ BÁO, không tự sửa.
 
 ## Bảng định tuyến: sửa gì → đọc file KB nào → sửa file nào trong repo
 | Việc cần làm | Đọc file KB | Sửa trong repo |
@@ -17,11 +18,16 @@ Gồm: 1 backend Google Apps Script (`gas_v13.js`) + web app (`index.html`) + 2 
 | Extension Zalo AI (panel, tra cứu, kết bạn, gửi hàng loạt, quét trạng thái) | `03-extension-zalo.md` | `extension-zalo/zalo-content.js`, `zalo-content.css`, `zalo-options.*`, `zalo-popup.*`, `manifest.json` |
 | Extension Pancake AI (panel, selector DOM, giỏ hàng, Soạn đơn, bảng giá) | `04-extension-pancake.md` | `extension-pancake/pancake-content.js`, `pancake-background.js`, `pancake-content.css`, `pancake-options.*`, `pancake-popup.*`, `manifest.json` |
 | Deploy, commit, push, rebase, quy tắc bắt buộc, checklist | `01-rules-and-deploy.md` | — |
+| Tìm hàm GAS nằm file `gas/*.gs` nào (file tự sinh, không sửa tay) | `gas/INDEX.md` hoặc `node tools/split-gas.js --where <hàm>` | `gas_v13.js` là nguồn chính |
+| CI deploy GAS bị đỏ / cài secret `CLASPRC_JSON`, `GAS_SCRIPT_ID` | `docs/GAS-AUTO-DEPLOY.md` (mục "Xử lý lỗi thường gặp") | `.github/workflows/deploy-gas.yml` |
+| Thêm/sửa tính năng cho Zalo AI hoặc Pancake AI (QUY TẮC SONG SONG: bên này có thì bên kia cũng có) | `08-extension-parity.md` | cả `extension-zalo/*` VÀ `extension-pancake/*` + `tools/ext-parity-allow.json` |
+
 | Tra bảng nhanh: action GAS, 20 cột CareData, storage key, tiền tố CSS, quyền manifest | `07-reference-tables.md` | — |
 | Báo lỗi lặp lại / dò lịch sử lỗi đã sửa | `06-bug-history.md` | — |
 | Bảo mật backend: đăng nhập server/token, việc còn lại (bước 3-4) | `docs/SECURITY-PLAN.md` | — |
 | Chuyển HẲN sang Supabase (kế hoạch 6 giai đoạn, đã được Duyên đồng ý 2026-10-11) | `docs/MIGRATE-SUPABASE-FULL.md` (+ `docs/SUPABASE-PLAN.md`) | `gas_v13.js` (khối Supabase), `cloudflare/worker.mjs`, `supabase/schema.sql` |
 | Lộ trình thực hiện file yêu cầu CRM (8 mục: mốc sau mua, resale, hạng, AI tóm tắt, hồ sơ sale, hộp thư chung, quy trình đơn) | `docs/ROADMAP-YEU-CAU.md` | — |
+| Kế hoạch bổ sung CRM 2026-10-16 (phân quyền theo bộ phận/trường, đơn hàng 5 bước, khuyến mãi, tích điểm, báo cáo 30/70, UI nhập đơn; phần API tạm bỏ) — việc U1–U6, mỗi việc có issue GitHub nhãn `crm-update` | `docs/ROADMAP-CRM-UPDATE.md` | — |
 
 ## Web app Sasum đã TÁCH FILE (2026-10-08, chống lag)
 `index.html` (~112KB) chỉ còn khung HTML; CSS ở `css/01..04`, JS ở `js/NN-*.js` (nạp bằng `<script src>` đúng thứ tự cũ). Tra hàm → file: `js/INDEX.md` hoặc `grep -n "function tenHam" js/*.js`. KHÔNG đổi thứ tự thẻ `<script>` trong `index.html`. Chi tiết quy ước (file `fn-*` / `main-*`) ở đầu `js/INDEX.md`.
@@ -29,7 +35,7 @@ Gồm: 1 backend Google Apps Script (`gas_v13.js`) + web app (`index.html`) + 2 
 ## Tuyệt đối không
 - Không sửa thư mục `extension/` (bản gộp cũ, chỉ để tham khảo).
 - Không lưu Personal Access Token vào file/memory/tài liệu nào. Token mỗi tin nhắn chỉ dùng cho đúng thao tác đó.
-- Không force-push.
+- **Không force-push, không `reset --hard` rồi push, không `rebase`/`amend` commit đã push. Push bị rejected ⇒ BẮT BUỘC `git merge origin/main` rồi push thường** (dùng `TK=… bash tools/safe-push.sh`). Đã có sự cố mất 7 commit vì ghi đè lịch sử `main` (2026-10-12) — chi tiết ở `01-rules-and-deploy.md` mục "QUY TẮC GIT".
 - Không commit khi chưa syntax-check.
 - Không dò lại chuyện `gas-code-v9` / "2 cơ chế đồng bộ mã GAS": đã xác minh 2026-10-08 chỉ còn cơ chế `getGasSource`/`setGasSource` (chi tiết ở `01-rules-and-deploy.md`).
 

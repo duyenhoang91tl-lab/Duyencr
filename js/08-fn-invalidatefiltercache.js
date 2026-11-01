@@ -180,6 +180,12 @@ function _inUserScope(c){
   // danh) — currentUser.names là mảng; currentUser.name (đơn) chỉ còn để tương thích ngược.
   var myNames = (currentUser.names && currentUser.names.length) ? currentUser.names : (currentUser.name ? [currentUser.name] : []);
   if (!myNames.length) return false;
+  // Doi sale Online/Van phong: cong them ten nhom Sale "Quay" + phong CSKH (currentUser.viewNames, 2026-10-29). Mang gop tinh 1 lan / lan dat currentUser (duong nong 136k khach).
+  var _vn = currentUser.viewNames;
+  if (_vn && _vn.length && (currentUser.role === 'cs' || currentUser.role === 'manager')){
+    if (currentUser._scopeNamesSrc !== _vn || currentUser._scopeNamesBase !== myNames){ currentUser._scopeNamesAll = myNames.concat(_vn); currentUser._scopeNamesSrc = _vn; currentUser._scopeNamesBase = myNames; }
+    myNames = currentUser._scopeNamesAll;
+  }
   if (currentUser.role === 'cs' || currentUser.role === 'manager'){   // manager: pham vi = cac ten Admin gan cho tai khoan (nhu CS), khong tu nhin toan bo
     // Duong nong (goi cho tung khach trong 136k): vong for thay .some(closure) + khong cap phat.
     // Thuộc phạm vi nếu: là CS chăm sóc (careCS), được chia campaign, HOẶC là CS phụ trách đơn
@@ -202,8 +208,9 @@ function _inUserScope(c){
       if (myNames.indexOf(teams[i].leader) !== -1 || teams[i].name === currentUser.team){ team = teams[i]; break; }
     }
     var holder2 = _heldBy(c);
-    if (!team) return myNames.indexOf(holder2) !== -1;
+    if (!team && !(_vn && _vn.length)) return myNames.indexOf(holder2) !== -1;
     var teamSet = _teamMemberSet(team);
+    if (_vn && _vn.length){ myNames.forEach(function(n0){ teamSet.add(n0); }); _vn.forEach(function(n1){ teamSet.add(n1); }); }   // truong team sale: team + Quay + CSKH
     if (teamSet.has(holder2)) return true;
     // Kiểm tra toàn bộ chiến dịch cho leader
     if (c.careCSSet) { for (var m1 of c.careCSSet) { if (teamSet.has(m1)) return true; } }
@@ -1109,6 +1116,7 @@ function renderTeamTab(){
       var label = esc(g.names[0]) + (multi ? ' <span style="color:var(--muted);font-size:11px">+ '+g.names.slice(1).map(esc).join(', ')+'</span>' : '');
       html += '<span class="member-chip'+(isLeader?' leader':'')+'"'+(multi?' title="Cùng 1 người (nhiều tên): '+esc(g.names.join(', '))+'"':'')+'>'+(isLeader?'★ ':'')+label+
         (isAdmin ? ' <span class="chip-x" data-name="'+esc(m)+'" title="'+(isLeader?'Bỏ làm leader sẽ vẫn còn là thành viên':(multi?'Xoá người này (cả '+g.names.length+' tên) khỏi team':'Xoá khỏi team'))+'" onclick="removeTeamMember(\''+t.id+'\',this.dataset.name)">✕</span>' : '')+
+        (isAdmin ? ' <span class="chip-tag" data-name="'+esc(m)+'" title="Thẻ của người này (tên trong Base/Pos)" style="cursor:pointer" onclick="openPersonTagsModal(this.dataset.name)">🏷️</span>' : '')+
         (isAdmin && !isLeader ? ' <span class="chip-star" data-name="'+esc(m)+'" title="Đặt làm leader" onclick="setTeamLeader(\''+t.id+'\',this.dataset.name)">★</span>' : '')+
       '</span>';
     });

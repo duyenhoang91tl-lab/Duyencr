@@ -1,0 +1,34 @@
+# Chẩn đoán kết nối CRM từ xa (từ máy chủ GitHub, người dùng ẩn danh): Worker cache, Web CRM, Apps Script trực tiếp.
+# Dùng khi app/CRM báo HTTP 404/502 hoặc "không kết nối được GAS". Kết quả nằm ở phần ANNOTATIONS của lần chạy (Actions -> Chẩn đoán kết nối).
+# KHÔNG dùng token/secret, KHÔNG in nội dung dữ liệu (chỉ mã HTTP, thời gian, dung lượng và ~160 ký tự đầu của phản hồi).
+# Chạy tay: Actions -> "Chẩn đoán kết nối" -> Run workflow. Cũng tự chạy khi sửa chính file này.
+name: Chẩn đoán kết nối
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/diag-connect.yml'
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    env:
+      WORKER: https://duyen-crm-cache.duyenhoang91-tl.workers.dev
+      WEB: https://duyen-crm-web.duyenhoang91-tl.workers.dev
+      GAS: https://script.google.com/macros/s/AKfycbx3QT6YIzQ7SQEwQPkljVeEdmTSBQQSxtTp2hTFYOeCKB_K4BHcUTSLi54LlmB9q_E6sQ/exec
+    steps:
+      - name: Thử từng địa chỉ
+        run: |
+          probe() {  # $1=nhãn  $2=url
+            r=$(curl -sL --max-time 120 -o /tmp/b.txt -w '%{http_code}|%{time_total}|%{size_download}|%{content_type}' "$2" 2>&1 || echo "curl-loi")
+            b=$(head -c 160 /tmp/b.txt 2>/dev/null | tr '\n\r' '  ')
+            echo "[$1] HTTP/giây/byte/loại = $r | $b"
+            echo "::notice title=$1::HTTP|giây|byte|loại = $r | đầu phản hồi: $b"
+          }
+          probe "1 GAS truc tiep count"      "$GAS?action=count"
+          probe "2 Worker count"             "$WORKER/?action=count"
+          probe "3 GAS truc tiep orders"     "$GAS?action=orders&src=web"
+          probe "4 Worker orders"            "$WORKER/?action=orders&src=web"
+          probe "5 Worker donPhones"         "$WORKER/?action=donPhones&src=web"
+          probe "6 Web CRM trang chu"        "$WEB/"
+          probe "7 Web CRM index.html"       "$WEB/index.html"

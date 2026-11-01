@@ -647,6 +647,43 @@
   background: #eff6ff;
 }
 
+#pk-price-ai {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+  color: #0f172a;
+}
+
+.pk-price-ai-txt {
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+
+.pk-price-ai-foot, .pk-price-ai-sg {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #1e3a8a;
+}
+
+.pk-price-ai-err {
+  color: #b91c1c;
+  font-size: 12px;
+}
+
+.pk-price-ai-copy, .pk-price-ai-chip {
+  margin-left: 4px;
+  padding: 2px 8px;
+  border: 1px solid #2563eb;
+  background: #fff;
+  color: #2563eb;
+  border-radius: 12px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
 #pk-price-result {
   max-height: 200px;
   overflow-y: auto;
@@ -1300,7 +1337,11 @@
 .pk-ai-sug-save:disabled { opacity: .7; }
 
 /* Them/sua/xoa mau tin tren Pancake (thu vien mau chung voi CRM) */
-.pk-tpl-acts { display: flex; gap: 6px; margin-top: 5px; }
+.pk-tpl-acts { display: flex; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
+.pk-tpl-lines { margin-top: 6px; border-top: 1px dashed #cbd5e1; padding-top: 4px; }
+.pk-tpl-line { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-bottom: 1px solid #f1f5f9; }
+.pk-tpl-line-txt { flex: 1; min-width: 0; font-size: 12px; white-space: pre-wrap; word-break: break-word; }
+.pk-tpl-line .pk-btn-outline { font-size: 11px; padding: 2px 6px; flex: none; }
 .pk-tpl-acts button { font-size: 11px; padding: 2px 8px; }
 .pk-tpl-form-box { border: 1px solid #93c5fd; background: #f8fbff; border-radius: 6px; padding: 8px; margin: 6px 0; }
 .pk-tpl-form-title { font-weight: 700; font-size: 12px; margin-bottom: 6px; }
@@ -1352,3 +1393,41 @@
 .pk-nba-why { font-size:11px; color:#64748b; margin:2px 0 5px; }
 .pk-nba-btns { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
 #pk-nba-msg textarea { width:100%; box-sizing:border-box; margin-top:6px; font-size:12px; }
+
+/* 🚫 Quét từ cấm (2026-10-21) */
+#pk-ban-row { padding: 6px 10px 0; }
+#pk-ban-btn { width: 100%; padding: 7px 10px; border: 1px solid #dc2626; background: #fff; color: #b91c1c; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+#pk-ban-btn:hover:not(:disabled) { background: #fef2f2; }
+#pk-ban-btn:disabled { opacity: .6; cursor: wait; }
+#pk-ban-result { margin: 6px 10px 0; padding: 8px 10px; border-radius: 6px; font-size: 12px; line-height: 1.45; }
+#pk-ban-result.pk-ban-warn { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; font-weight: 600; }
+#pk-ban-result.pk-ban-ok { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
+#pk-ban-result.pk-ban-info { background: #f3f4f6; border: 1px solid #e5e7eb; color: #374151; }
+#pk-ban-result .pk-ban-sug { margin-top: 4px; font-weight: 400; font-size: 11px; }
+
+/* ── Duyệt mẫu tin ngay trên Pancake (pancake-approver.js) ── */
+.pk-appr-pill{position:fixed;left:14px;bottom:78px;z-index:2147483647;background:#f59e0b;color:#fff;border:0;border-radius:999px;padding:8px 14px;font:600 13px/1.2 system-ui,sans-serif;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.pk-appr-pill:hover{background:#d97706}
+.pk-appr-toast{position:fixed;left:14px;bottom:124px;z-index:2147483647;max-width:340px;background:#1f2937;color:#fff;border-radius:10px;padding:10px 14px;font:13px/1.4 system-ui,sans-serif;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+.pk-appr-modal{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font:13px/1.45 system-ui,sans-serif}
+.pk-appr-box{background:#fff;color:#111827;width:min(560px,94vw);max-height:88vh;border-radius:12px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.4)}
+.pk-appr-h{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #e5e7eb;font-size:15px}
+.pk-appr-x{border:0;background:none;font-size:22px;cursor:pointer;color:#6b7280;line-height:1}
+.pk-appr-list{overflow:auto;padding:12px 16px;display:flex;flex-direction:column;gap:12px}
+.pk-appr-card{border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;background:#fafafa}
+.pk-appr-title{font-weight:700;font-size:14px}
+.pk-appr-meta{color:#6b7280;font-size:12px;margin:2px 0 6px}
+.pk-appr-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.pk-appr-chip{background:#e0e7ff;color:#3730a3;border-radius:6px;padding:1px 8px;font-size:11px}
+.pk-appr-content{white-space:pre-wrap;word-break:break-word;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;max-height:170px;overflow:auto}
+.pk-appr-reason input{width:100%;box-sizing:border-box;margin-top:8px;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font:inherit}
+.pk-appr-err{color:#b91c1c;margin-top:6px;font-size:12px}
+.pk-appr-acts{display:flex;gap:8px;margin-top:10px}
+.pk-appr-acts button{border:0;border-radius:8px;padding:7px 14px;font:600 13px system-ui,sans-serif;cursor:pointer}
+.pk-appr-acts button:disabled{opacity:.55;cursor:default}
+.pk-appr-ok{background:#16a34a;color:#fff}.pk-appr-no{background:#fee2e2;color:#991b1b}
+.pk-appr-empty{text-align:center;color:#6b7280;padding:24px 0}
+
+/* Muc "Mau tin nhan tu van": o loc nhom san pham duoi o tim kiem */
+#pk-tpl-filter-row { margin:4px 0 6px; }
+#pk-tpl-filter-row select { width:100%; box-sizing:border-box; padding:4px 6px; font-size:12px; border:1px solid #d1d5db; border-radius:6px; }

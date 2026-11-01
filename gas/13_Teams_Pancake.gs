@@ -157,15 +157,22 @@ function readPancakeMapCI_() {
   return { map: map, mapCI: mapCI };
 }
 
+// Memo trong PHAM VI 1 LAN THUC THI (1 request doGet/doPost) — tranh doc lai sheet PancakeNameMap
+// nhieu lan khi _expandSaleFilterWithPancakeAliases_ duoc goi lap lai cho tung ten/don (xem cac noi
+// goi readPancakeMap_ ben duoi). GAS khoi tao lai bien global cho MOI request nen khong lo du lieu cu.
+var _pancakeMapMemo_ = null;
 function readPancakeMap_() {
+  if (_pancakeMapMemo_) return _pancakeMapMemo_;
   var sh = getSheet_(SH_PK_MAP, PK_MAP_HEADERS);
   var out = {};
-  if (sh.getLastRow() < 2) return out;
-  var v = sh.getRange(2, 1, sh.getLastRow() - 1, PK_MAP_HEADERS.length).getValues();
-  for (var i = 0; i < v.length; i++) {
-    if (!v[i][0]) continue;
-    out[String(v[i][0])] = String(v[i][1] || '');
+  if (sh.getLastRow() >= 2) {
+    var v = sh.getRange(2, 1, sh.getLastRow() - 1, PK_MAP_HEADERS.length).getValues();
+    for (var i = 0; i < v.length; i++) {
+      if (!v[i][0]) continue;
+      out[String(v[i][0])] = String(v[i][1] || '');
+    }
   }
+  _pancakeMapMemo_ = out;
   return out;
 }
 
@@ -242,6 +249,8 @@ function buildPancakeReport_(from, to, split) {
     return _pkReportMemoCache_.data;
   }
   var mapPair = readPancakeMapCI_(), map = mapPair.map, mapCI = mapPair.mapCI;
+  // Page -> Kenh ban (PancakePageMap): de tinh them MAU SO "chi tuong tac o Page DA khop kenh" cho ty le chot (tongTTMapped). Loi doc map khong duoc lam hong bao cao.
+  var kenhOfPage = {}; try { kenhOfPage = readPancakePageMap_() || {}; } catch (eKm) { kenhOfPage = {}; }
   var byPage = {}, byCS = {};
   var unmappedSet = {}, unmappedCanon = {}; // ci-key -> ten hien thi (giu ban DAU TIEN gap)
   var salesCanon = {}; // ci-key -> ten hien thi DAU TIEN gap, danh cho ten Sale DA khop qua PancakeNameMap
@@ -258,7 +267,7 @@ function buildPancakeReport_(from, to, split) {
       var khCu=+v[i][4]||0, khMoi=+v[i][5]||0, tongTT=+v[i][6]||0, tinNhan=+v[i][7]||0,
           binhLuan=+v[i][8]||0, hoiThoaiMoi=+v[i][9]||0, dhKhMoi=+v[i][10]||0, dhKhCu=+v[i][11]||0, tongDH=+v[i][12]||0;
 
-      if (!byPage[pageId]) byPage[pageId] = { pageId: pageId, pageName: pageName, khCu:0, khMoi:0, tongTT:0, tinNhan:0, binhLuan:0, hoiThoaiMoi:0, dhKhMoi:0, dhKhCu:0, tongDH:0 };
+      if (!byPage[pageId]) byPage[pageId] = { pageId: pageId, pageName: pageName, kenh: kenhOfPage[pageId] || '', khCu:0, khMoi:0, tongTT:0, tinNhan:0, binhLuan:0, hoiThoaiMoi:0, dhKhMoi:0, dhKhCu:0, tongDH:0 };
       var bp = byPage[pageId];
       bp.khCu+=khCu; bp.khMoi+=khMoi; bp.tongTT+=tongTT; bp.tinNhan+=tinNhan; bp.binhLuan+=binhLuan;
       bp.hoiThoaiMoi+=hoiThoaiMoi; bp.dhKhMoi+=dhKhMoi; bp.dhKhCu+=dhKhCu; bp.tongDH+=tongDH;
@@ -282,12 +291,14 @@ function buildPancakeReport_(from, to, split) {
         // "biichnguyen1993" va "Biichnguyen1993 "). Ten hien thi = ban DAU TIEN gap.
         var csKey = _normTxt_(saleName);
         if (!salesCanon[csKey]) salesCanon[csKey] = saleName;
-        if (!byCS[csKey]) byCS[csKey] = { name: salesCanon[csKey], pancakeNames: {}, mapped: mapped, shared: false, khCu:0, khMoi:0, tongTT:0, tinNhan:0, binhLuan:0, hoiThoaiMoi:0, dhKhMoi:0, dhKhCu:0, tongDH:0 };
+        if (!byCS[csKey]) byCS[csKey] = { name: salesCanon[csKey], pancakeNames: {}, dayKeys: {}, mapped: mapped, shared: false, khCu:0, khMoi:0, tongTT:0, tongTTMapped:0, tinNhan:0, binhLuan:0, hoiThoaiMoi:0, dhKhMoi:0, dhKhCu:0, tongDH:0 };
         var bc = byCS[csKey];
         bc.pancakeNames[nhanVien] = true;
+        if (tongTT > 0) bc.dayKeys[d] = true;   // ngay CO tuong tac cua Sale nay (de tinh khach tuong tac TB/ngay)
         if (mapped) bc.mapped = true; // neu >=1 nguon da khop thi coi la mapped (hiem khi trung ten CS voi ten chua khop)
         if (sales.length > 1) bc.shared = true;
         bc.khCu+=khCu*w; bc.khMoi+=khMoi*w; bc.tongTT+=tongTT*w; bc.tinNhan+=tinNhan*w; bc.binhLuan+=binhLuan*w;
+        if (kenhOfPage[pageId]) bc.tongTTMapped += tongTT*w;   // chi Page da khop Kenh ban (mau so ty le chot)
         bc.hoiThoaiMoi+=hoiThoaiMoi*w; bc.dhKhMoi+=dhKhMoi*w; bc.dhKhCu+=dhKhCu*w; bc.tongDH+=tongDH*w;
       }
     }
@@ -297,8 +308,9 @@ function buildPancakeReport_(from, to, split) {
     var arr = Object.keys(obj).map(function(k) {
       var r = obj[k];
       r.tyLeCD = r.tongTT ? Math.round(r.tongDH / r.tongTT * 1000) / 10 : 0;
-      ['khCu','khMoi','tongTT','tinNhan','binhLuan','hoiThoaiMoi','dhKhMoi','dhKhCu','tongDH'].forEach(function(f) { r[f] = Math.round(r[f] * 100) / 100; });
+      ['khCu','khMoi','tongTT','tongTTMapped','tinNhan','binhLuan','hoiThoaiMoi','dhKhMoi','dhKhCu','tongDH'].forEach(function(f) { if (r[f] !== undefined) r[f] = Math.round(r[f] * 100) / 100; });
       if (r.pancakeNames) r.pancakeNames = Object.keys(r.pancakeNames);
+      if (r.dayKeys) { r.dayList = Object.keys(r.dayKeys).sort(); r.days = r.dayList.length; delete r.dayKeys; }   // dayList de gop nhieu ten Pancake cua cung 1 nguoi (hop ngay, khong cong don)
       return r;
     });
     // An Page/Sale theo cai dat admin (setSetting hiddenChannels/hiddenSales) — cung 1 danh
@@ -310,7 +322,8 @@ function buildPancakeReport_(from, to, split) {
   }
 
   var hiddenSets2 = _hiddenPageSaleSets_();
-  var _pkReportResult_ = { byPage: finalize(byPage, hiddenSets2.channels, 'pageName'), byCS: finalize(byCS, hiddenSets2.sales, 'name'), unmapped: Object.keys(unmappedSet).sort(), split: split };
+  var _pkReportResult_ = { byPage: finalize(byPage, hiddenSets2.channels, 'pageName'), byCS: finalize(byCS, hiddenSets2.sales, 'name'), unmapped: Object.keys(unmappedSet).sort(), split: split,
+    pageMapped: Object.keys(kenhOfPage).some(function(pid) { return !!kenhOfPage[pid]; }) };   // co it nhat 1 Page da khop Kenh ban
   _pkReportMemoCache_ = { key: _pkMemoKey_, time: _pkMemoNow_, data: _pkReportResult_ };
   return _pkReportResult_;
 }
@@ -648,10 +661,15 @@ function saveSaleDirectory_(rows) {
   return jsonOut_({ ok: true, written: rows.length });
 }
 
+// Memo trong PHAM VI 1 LAN THUC THI — cung ly do/an toan nhu _pancakeMapMemo_ o readPancakeMap_
+// (ham nay se duoc goi THEM trong _expandSaleFilterWithPancakeAliases_, co the lap lai nhieu lan
+// cho tung ten/don trong 1 bao cao).
+var _saleDirMemo_ = null;
 function readSaleDirectory_() {
+  if (_saleDirMemo_) return _saleDirMemo_;
   var sh = getSheet_(SH_SALE_DIR, SALE_DIR_HEADERS);
   var list = [], byName = {};
-  if (sh.getLastRow() < 2) return { list: list, byName: byName };
+  if (sh.getLastRow() < 2) { _saleDirMemo_ = { list: list, byName: byName }; return _saleDirMemo_; }
   // Doc chung 1 nguon Van phong/Online voi Bao cao E/F ("🏷️ Phân loại Online/Offline", setting
   // 'saleChannels') THEO YEU CAU DUYEN 2026-09 (ap dung dong bo cho MOI bao cao, ke ca tai khoan
   // dang nhap qua _syncSaleChannelsToUsers_ trong setSetting_) — chi fallback ve tag Pancake S#/O#
@@ -687,7 +705,8 @@ function readSaleDirectory_() {
       if (k) byName[_normTxt_(k)] = rec;
     });
   }
-  return { list: list, byName: byName };
+  _saleDirMemo_ = { list: list, byName: byName };
+  return _saleDirMemo_;
 }
 
 // Xac dinh cac NGAY (trong khoang from-to) THUC SU co du lieu tuong tac Pancake (sheet

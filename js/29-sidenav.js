@@ -34,21 +34,28 @@
   // Nhóm menu mẹ -> các mục con (theo data-bar-id). Mục chưa khai báo vẫn hiện, dồn vào nhóm "Khác".
   var GROUPS = [
     { k:'ov',  t:'🏠 Tổng quan',           ids:['act:notif','overview'] },
-    { k:'kh',  t:'👤 Hồ sơ',                ids:['tab-kh','tab-schedule','tab-overdue','tab-mydata','tab-task','act:profile'] },   // gộp hồ sơ khách hàng + hồ sơ nhân viên
+    { k:'kh',  t:'👤 Hồ sơ',                ids:['tab-kh','care2','stageboard','tab-schedule','tab-overdue','tab-mydata','tab-task','act:profile'] },   // gộp hồ sơ khách hàng + hồ sơ nhân viên
     { k:'sc',  t:'💬 Social',               ids:['tab-chat','tab-teamchat','tab-media'] },
     { k:'kho', t:'📦 Kho',                 ids:['act:kho'] },
-    { k:'tv',  t:'🧰 Tác vụ',               ids:['tab-zaloai','act:bc','act:bct','act:bcstat','act:futpl','act:bday'] },
+    { k:'tv',  t:'🧰 Tác vụ',               ids:['tab-zaloai','act:bc','act:bct','act:bcstat','act:futpl','act:bday','act:conndiag'] },
     { k:'rp',  t:'📊 Báo cáo',              ids:['salesreport','pancake','kpipancake','mktchecklist','dailybrief','dashboard','act:fureport','act:teamai'] },
     { k:'cs',  t:'🔀 Cài đặt chia số',      ids:['act:assign','act:autoassign','act:assignhist'] },
-    { k:'tm',  t:'👥 Cài đặt team',         ids:['team','act:acct'] },
+    { k:'tm',  t:'👥 Cài đặt team',         ids:['team','act:salematch','act:acct'] },
     { k:'up',  t:'📤 Up data',              ids:['uploaddata','act:upload','act:sync','act:fullsync','act:dup'] },
-    { k:'st',  t:'⚙ Settings',              ids:['config','act:cstatus','act:khstatus','act:cfield','act:tier','audit','act:clear','act:taskflow'] }
+    { k:'st',  t:'⚙ Settings',              ids:['act:roles','act:dept','act:help','act:theme','act:errlog','config','act:cstatus','act:khstatus','act:cfield','act:tier','act:promo','audit','act:clear','act:taskflow'] }
   ];
   // Mục "hành động" (mở modal có sẵn, không phải tab). admin:true = chỉ tài khoản admin thấy.
   var ACTS = {
+    roles:      { t:'🛡 Phân quyền', f:'openRoleSettings', admin:true },
+    dept:       { t:'🏢 Phòng ban', f:'openDeptSettings', admin:true },
+    help:       { t:'❓ Hướng dẫn sử dụng', f:'openHelpModal', open:true },
+    theme:      { t:function(){ return (typeof _themeIsDark==='function' && _themeIsDark()) ? '☀ Chế độ sáng' : '🌙 Chế độ tối'; }, f:'toggleTheme', open:true },
+    errlog:     { t:'🐞 Nhật ký lỗi (máy này)', f:'openErrLogModal', admin:true },
     notif:      { t:function(){ return (typeof _ntLabel==='function') ? _ntLabel() : '🔔 Thông báo'; }, f:'openNotifModal' },
     kho:        { t:'📦 Tồn kho', f:'openKhoModal' },
+    conndiag:   { t:'🩺 Chẩn đoán kết nối', f:'openConnDiag' },
     profile:    { t:'🪪 Hồ sơ nhân viên', f:'openProfileModal' },
+    salematch:  { t:'🔗 Khớp sale', f:'openSaleMatchModal', admin:true },
     acct:       { t:'🔑 Tài khoản đăng nhập', f:'openAcctModal', admin:true },
     taskflow:   { t:'🧩 Quy trình công việc', f:'openTaskFlowManager', admin:true },
     assign:     { t:'👥 Chia data', f:'openAssignModal', admin:true },
@@ -68,9 +75,11 @@
     cstatus:    { t:function(){ return '⚙ ' + (typeof FIELD_LABEL_CS!=='undefined'?FIELD_LABEL_CS:'Tình trạng chăm sóc'); }, f:'openCareStatusModal', admin:true },
     khstatus:   { t:function(){ return '⚙ ' + (typeof FIELD_LABEL_KH!=='undefined'?FIELD_LABEL_KH:'Trạng thái KH'); }, f:'openKhStatusModal', admin:true },
     tier:       { t:'🏅 Cấu hình hạng KH', f:'openTierConfig', admin:true },
+    promo:      { t:'🎁 Cấu hình khuyến mãi', f:'openPromoConfig', admin:true },
     cfield:     { t:'➕ Trường tự tạo', f:'openCustomFieldsModal', admin:true },
     clear:      { t:'🧹 Xóa data trên máy', f:'clearData', admin:true }
   };
+  window._SN_GROUPS = GROUPS; window._SN_ACTS = ACTS;   // cho trang Phân quyền (js/40-fn-rolesettings.js) liệt kê hạng mục
   function isAdm(){ try { return (typeof _authAccount!=='undefined' && _authAccount && _authAccount.role==='admin') || (typeof _bootstrapAdmin!=='undefined' && _bootstrapAdmin); } catch(e){ return false; } }
   function runAct(k){
     var a = ACTS[k]; if (!a) return;
@@ -116,7 +125,7 @@
       var r = gOf('act:'+k), g = GROUPS[r.g];
       el.setAttribute('data-sn-g', g.k);
       el.style.order = String(r.g*100 + 1 + r.j);
-      var ok = !demo && (!ACTS[k].admin || isAdm());
+      var ok = !demo && (!ACTS[k].admin || isAdm()) && (isAdm() || ACTS[k].admin || ACTS[k].open || typeof _featAllowed !== 'function' || _featAllowed('act:' + k));   // phân quyền theo vai trò/bộ phận (js/40)
       if (ok) cnt[g.k] = (cnt[g.k]||0) + 1;
       el.classList.toggle('sn-hide', !ok || (!!closed[g.k]));
     });
@@ -150,7 +159,7 @@
     hdr.insertBefore(b, hdr.firstChild);
     // Ô tìm nhanh cạnh nút Menu: dùng được ở MỌI màn; gõ xong tự chuyển về "Danh sách KH" và lọc theo từ khoá
     var qw = document.createElement('div'); qw.id = 'qs-wrap';
-    qw.innerHTML = '<input id="qs-input" type="search" placeholder="🔍 Tìm nhanh: tên, SĐT, mã đơn..." autocomplete="off">';
+    qw.innerHTML = '<input id="qs-input" type="search" placeholder="' + ((window.matchMedia && window.matchMedia('(max-width:768px)').matches) ? '🔍 Tìm khách' : '🔍 Tìm nhanh: tên, SĐT, mã đơn...') + '" autocomplete="off">';
     hdr.insertBefore(qw, b.nextSibling);
     var qt;
     qw.firstChild.addEventListener('input', function(){
@@ -179,6 +188,7 @@
     new MutationObserver(syncVisible).observe(dv, { attributes:true, attributeFilter:['style'] });
     var t = tabsEl();
     if (t) new MutationObserver(refreshLabel).observe(t, { subtree:true, attributes:true, attributeFilter:['class'] });
+    window._snLayout = layout;   // js/40-fn-rolesettings.js gọi lại khi quyền đổi
     layout(); refreshLabel(); syncVisible();
     if (t) new MutationObserver(function(m){ if (m.some(function(x){return !x.target.classList||!x.target.classList.contains('sn-gh');}) ) { clearTimeout(init._lt); init._lt=setTimeout(layout,30); } }).observe(t, { childList:true, subtree:true, attributes:true, attributeFilter:['class','style'] });
   }
@@ -221,15 +231,215 @@ async function _ordSearchRun(q){
     }).join('');
   } catch(e){ if (seq === _ordSearchSeq) box.innerHTML = '<div class="ors-h">Lỗi tìm mã đơn: ' + esc(e.message) + '</div>'; }
 }
-function _ordSearchPick(i){
+// ── TRA CUU KHACH NGOAI PHAM VI (Duyen yeu cau 2026-10-21) ──
+// Sale go DUNG SDT (9-11 so) hoac chon 1 ma don trong o tim kiem thi xem duoc ho so khach du khach khong thuoc ten minh.
+// Nguyen nhan goc khong xem duoc: server (scopeMode=enforce) chi tra danh sach khach/don thuoc pham vi cua sale -> khach khac khong co trong
+// customerMap, va lookup/searchOrder bi chan/loc. Nay: lookup kem via=search (server bo qua chan + ghi log 'search-out'), nap 1 khach do
+// vao customerMap/careData roi dung lai luong cu (mergeRows + buildCustomers). Danh sach khach van loc theo pham vi nhu cu; chi tra cuu tung khach.
+window._oosPhones = window._oosPhones || {};   // phone -> true: khach nap qua tim kiem (js/06 wrapper fetch them via=search cho lookup/donOrdersByPhone/cskhDetail)
+var _oosState = {};
+async function _pullSearchCustomer_(raw){
+  var ph = (typeof normPhone === 'function' ? normPhone(raw) : '') || String(raw || '').replace(/\D/g, '');
+  if (!ph || typeof gsUrl === 'undefined' || !gsUrl || typeof customerMap === 'undefined') return null;
+  if (customerMap[ph]) return ph;
+  if (_oosState[ph] === 'loading' || _oosState[ph] === 'fail') return null;
+  _oosState[ph] = 'loading';
+  try {
+    var sep = gsUrl.indexOf('?') > -1 ? '&' : '?';
+    var r = await fetch(gsUrl + sep + 'action=lookup&via=search&phone=' + encodeURIComponent(ph), { redirect:'follow' });
+    var j = await r.json();
+    if (!j || j.error || j.ok === false) { _oosState[ph] = 'fail'; if (typeof toast === 'function') toast((j && j.error) || 'Không tra cứu được khách này'); return null; }
+    var care = j.care || null, ords = j.orders || [], ck = j.cskh || [], don = j.don || [];
+    if (!care && !ords.length && !ck.length && !don.length) { _oosState[ph] = 'fail'; if (typeof toast === 'function') toast('Không tìm thấy khách với SĐT ' + ph); return null; }
+    window._oosPhones[ph] = true;
+    if (ords.length && typeof mergeRows === 'function') {
+      mergeRows(ords.map(function(o){ return {
+        date: o.date ? parseVNDate_(o.date) : null,
+        year: parseNum(o.year), month: parseNum(o.month),
+        cs: o.cs||'', name: o.name||'', phone: o.phone||ph,
+        source: o.source||'', revenue: _normRev(o.revenue),
+        product: o.product||'', productDetail: o.productDetail||'',
+        status: o.status||'', zalo: o.zalo||'', note: o.note||''
+      }; }));
+    }
+    if (care) {
+      careData[ph] = {
+        status: care.status||'', zalo: care.zalo||'', cs: care.cs||'', note: care.note||'',
+        schedGoi: care.schedGoi||'', schedGoiNote: care.schedGoiNote||'', schedSP: care.schedSP||'', schedSPNote: care.schedSPNote||'',
+        schedCS: care.schedCS||'', schedCSNote: care.schedCSNote||'', schedHen: care.schedHen||'', schedHenNote: care.schedHenNote||'',
+        updated: care.updated||'', khStatus: care.khStatus||'', nickZalos: care.nickZalos||[], zaloPhones: care.zaloPhones||[],
+        birthday: care.birthday||'', tag: care.tag||'', custom: (care.custom && typeof care.custom === 'object') ? care.custom : {}
+      };
+    }
+    if (ck.length && typeof cskhData !== 'undefined' && cskhData) { cskhData[ph] = ck; if (typeof _cskhDetailCache !== 'undefined') _cskhDetailCache[ph] = ck; }
+    if (!customerMap[ph]) {   // khach chi co o CareData/CSKH/du lieu don (khong co don DT TONG) -> tao dong toi thieu de hien trong danh sach
+      customerMap[ph] = { phone: ph, name: (care && care.name) || (ck.find(function(x){ return x && x.name; }) || {}).name || ph, orders: [],
+        sources: new Set(), brands: new Set(), _keys: new Set(), _rawStatus: (care && care.status) || '', _rawZalo: (care && care.zalo) || '', _rawNote: (care && care.note) || '' };
+    }
+    buildCustomers();
+    _oosState[ph] = 'done';
+    return customerMap[ph] ? ph : null;
+  } catch (e) { _oosState[ph] = 'fail'; if (typeof toast === 'function') toast('Lỗi tra cứu khách: ' + (e && e.message || e)); return null; }
+}
+async function _ordSearchPick(i){
   var o = (window.__ordSearchRes || [])[i], inp = document.getElementById('search-input'), box = document.getElementById('ord-search-res');
   if (box) box.style.display = 'none';
   if (!o || !o.phone || !inp) return;
-  inp.value = o.phone;
+  var ph = (typeof normPhone === 'function' ? normPhone(o.phone) : '') || o.phone;
+  if (typeof customerMap !== 'undefined' && !customerMap[ph] && !customerMap[o.phone]) await _pullSearchCustomer_(ph);   // khach ngoai pham vi: nap rieng khach nay
+  var key = (typeof customerMap !== 'undefined' && customerMap[o.phone]) ? o.phone : ph;
+  inp.value = key;
   if (typeof applyFilters === 'function') applyFilters();
-  if (typeof openDp === 'function' && typeof customerMap !== 'undefined' && customerMap[o.phone]) { try { openDp(o.phone); } catch(e){} }
+  if (typeof openDp === 'function' && typeof customerMap !== 'undefined' && customerMap[key]) { try { openDp(key); } catch(e){} }
 }
 document.addEventListener('click', function(e){
   var box = document.getElementById('ord-search-res');
   if (box && box.style.display !== 'none' && !e.target.closest('.search-wrap')) box.style.display = 'none';
 });
+
+// ═══════════════════════════════════════════════════════
+//  TÌM NHANH → MỞ THẺ KHÁCH BÊN PHẢI, dùng được ở MỌI màn (2026-10-23, Duyên yêu cầu)
+//  Dùng chung cho ô header (#qs-input) và ô trên thanh Báo cáo (#rpt-qs-input).
+//  LÝ DO GỐC phải mở 2 tab CRM: màn Báo cáo (body.rpt-mode) ẩn cả header nên không còn ô tìm; và khung kết quả mã đơn cũ (#ord-search-res)
+//  nằm trong Sidebar đang thu gọn nên không thấy. Nay: khung kết quả riêng (#qs-res) hiện ngay dưới ô đang gõ; chọn 1 dòng hoặc Enter
+//  => openDp(SĐT) mở ngăn hồ sơ khách trượt từ phải, KHÔNG chuyển tab / không rời báo cáo đang xem.
+//  Tìm: SĐT (>=5 số) · tên (không dấu) · mã đơn / mã bộ đếm (>=4 ký tự có số, hỏi GAS searchOrder). Tài khoản test (demo-mode): chỉ khách đã có sẵn.
+// ═══════════════════════════════════════════════════════
+var _qs = { seq: 0, items: [], idx: -1, timer: null, q: '' };
+function _qsFold_(s){ return String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/\s+/g, ' ').trim(); }
+function _qsIsInp_(t){ return !!t && (t.id === 'qs-input' || t.id === 'rpt-qs-input'); }
+function _qsBox_(){
+  var b = document.getElementById('qs-res');
+  if (!b) { b = document.createElement('div'); b.id = 'qs-res'; b.style.display = 'none'; document.body.appendChild(b); }
+  return b;
+}
+function _qsHide_(){ var b = document.getElementById('qs-res'); if (b) b.style.display = 'none'; }
+function _qsPlace_(inp){
+  var b = _qsBox_(), r = inp.getBoundingClientRect(), w = Math.min(380, window.innerWidth - 12);
+  b.style.width = w + 'px';
+  b.style.left = Math.max(6, Math.min(r.left, window.innerWidth - w - 6)) + 'px';
+  b.style.top = (r.bottom + 2) + 'px';
+}
+function _qsCustomers_(q){
+  var list = (typeof allCustomers !== 'undefined' && allCustomers) || [], out = [];
+  var digits = q.replace(/\D/g, ''), isNum = /^[\d\s.+-]+$/.test(q) && digits.length >= 5;
+  var nd = isNum ? ((typeof normPhone === 'function' ? normPhone(q) : '') || digits) : '', f = _qsFold_(q);
+  for (var i = 0; i < list.length && out.length < 8; i++) {
+    var c = list[i]; if (!c) continue;
+    if (isNum) { if (String(c.phone || '').indexOf(nd) !== -1) out.push(c); }
+    else if (f.length >= 2) {
+      if (c._qsn === undefined) c._qsn = _qsFold_(c.name);   // nhớ tên đã bỏ dấu (136k KH: chỉ chuẩn hoá 1 lần)
+      if (c._qsn.indexOf(f) !== -1) out.push(c);
+    }
+  }
+  return out;
+}
+function _qsRender_(inp, loadingOrd, orderErr){
+  var b = _qsBox_(), h = '', it = _qs.items;
+  it.forEach(function(x, i){
+    var cls = 'qs-i' + (i === _qs.idx ? ' on' : '');
+    if (x.t === 'c') h += '<div class="' + cls + '" data-i="' + i + '">👤 <b>' + esc(x.name || x.phone) + '</b> · ' + esc(x.phone) + (x.sub ? '<div class="qs-s">' + esc(x.sub) + '</div>' : '') + '</div>';
+    else if (x.t === 'p') h += '<div class="' + cls + '" data-i="' + i + '">🔎 Tra cứu khách theo SĐT <b>' + esc(x.phone) + '</b><div class="qs-s">Khách ngoài danh sách đang tải</div></div>';
+    else h += '<div class="' + cls + '" data-i="' + i + '">📦 <b>' + esc(x.code) + '</b> · ' + esc(x.phone || 'không có SĐT') + (x.name ? ' · ' + esc(x.name) : '') +
+      '<div class="qs-s">' + esc(x.src) + (x.date ? ' · ' + esc(x.date) : '') + (x.product ? ' · ' + esc(x.product) : '') + '</div></div>';
+  });
+  if (loadingOrd) h += '<div class="qs-h">Đang tìm mã đơn…</div>';
+  else if (orderErr) h += '<div class="qs-h">' + esc(orderErr) + '</div>';
+  else if (!it.length) h = '<div class="qs-h">Không có khách / đơn nào khớp "' + esc(_qs.q) + '"</div>';
+  b.innerHTML = h; _qsPlace_(inp); b.style.display = 'block';
+}
+async function _qsRun_(inp){
+  var q = String(inp.value || '').trim(), seq = ++_qs.seq;
+  _qs.q = q; _qs.idx = -1; _qs.items = [];
+  if (q.length < 2) { _qsHide_(); return; }
+  var demo = document.body.classList.contains('demo-mode');
+  var items = [];
+  _qsCustomers_(q).forEach(function(c){ items.push({ t: 'c', phone: c.phone, name: c.name, sub: ((typeof careData !== 'undefined' && careData[c.phone]) || {}).cs || '' }); });
+  var digits = q.replace(/\D/g, ''), isPhone = /^[\d\s.+-]+$/.test(q) && digits.length >= 9 && digits.length <= 11;
+  if (isPhone && !items.length && !demo) items.push({ t: 'p', phone: (typeof normPhone === 'function' ? normPhone(q) : '') || digits });
+  _qs.items = items;
+  var needOrd = !demo && q.length >= 4 && /\d/.test(q) && !/^[\d\s.+-]+$/.test(q) && typeof gsUrl !== 'undefined' && !!gsUrl;
+  _qsRender_(inp, needOrd);
+  if (!needOrd) return;
+  try {
+    var sep = gsUrl.indexOf('?') > -1 ? '&' : '?';
+    var r = await fetch(gsUrl + sep + 'action=searchOrder&q=' + encodeURIComponent(q), { redirect: 'follow' });
+    var j = await r.json();
+    if (seq !== _qs.seq) return;   // đã gõ tiếp -> bỏ kết quả cũ
+    if (j && j.error) { _qsRender_(inp, false, j.error); return; }
+    ((j && j.results) || []).forEach(function(o){
+      var nm = (typeof customerMap !== 'undefined' && customerMap[o.phone]) ? customerMap[o.phone].name : '';
+      _qs.items.push({ t: 'o', phone: o.phone, code: o.code, src: o.src, date: o.date, product: o.product, name: nm });
+    });
+    _qsRender_(inp, false);
+  } catch (e) { if (seq === _qs.seq) _qsRender_(inp, false, 'Lỗi tìm mã đơn: ' + (e && e.message || e)); }
+}
+async function _qsPick_(i){
+  var it = _qs.items[i]; if (!it) return;
+  _qsHide_();
+  var ph = (typeof normPhone === 'function' ? normPhone(it.phone) : '') || String(it.phone || '').replace(/\D/g, '');
+  if (!ph) { if (typeof toast === 'function') toast('Đơn này không có SĐT khách để mở hồ sơ'); return; }
+  if (typeof customerMap === 'undefined') return;
+  if (!customerMap[ph] && !customerMap[it.phone]) {
+    if (document.body.classList.contains('demo-mode')) { if (typeof toast === 'function') toast('Tài khoản test chỉ xem được khách có sẵn trong danh sách'); return; }
+    ph = await _pullSearchCustomer_(ph);   // khách ngoài phạm vi: nạp riêng khách này (có toast lỗi bên trong)
+    if (!ph) return;
+  }
+  var key = customerMap[it.phone] ? it.phone : ph;
+  if (typeof openDp === 'function' && customerMap[key]) { try { openDp(key); } catch (e) {} }
+}
+document.addEventListener('input', function(e){
+  if (!_qsIsInp_(e.target)) return;
+  var inp = e.target; clearTimeout(_qs.timer);
+  _qs.timer = setTimeout(function(){ _qsRun_(inp); }, 300);
+});
+document.addEventListener('keydown', async function(e){
+  if (!_qsIsInp_(e.target)) return;
+  var inp = e.target, box = document.getElementById('qs-res'), open = !!box && box.style.display !== 'none';
+  if (e.key === 'Escape') { _qsHide_(); return; }
+  if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && open && _qs.items.length) {
+    e.preventDefault();
+    _qs.idx = (_qs.idx + (e.key === 'ArrowDown' ? 1 : -1) + _qs.items.length) % _qs.items.length;
+    _qsRender_(inp, false); return;
+  }
+  if (e.key === 'Enter') {
+    e.preventDefault(); clearTimeout(_qs.timer);
+    if (String(inp.value || '').trim() !== _qs.q || !open) await _qsRun_(inp);   // chưa tìm xong / đổi từ khoá -> tìm ngay rồi mới chọn
+    if (_qs.items.length) _qsPick_(_qs.idx >= 0 ? _qs.idx : 0);
+  }
+});
+document.addEventListener('click', function(e){
+  var it = e.target.closest && e.target.closest('#qs-res .qs-i');
+  if (it) { _qsPick_(+it.getAttribute('data-i')); return; }
+  if (!(e.target.closest && e.target.closest('#qs-res')) && !_qsIsInp_(e.target)) _qsHide_();
+});
+
+// ═══════════════════════════════════════════════════════
+//  MỞ HỒ SƠ KHÁCH TỪ BẤT KỲ BẢNG ĐƠN NÀO (2026-10-23, Duyên yêu cầu: "chỗ nào check đơn có mã đơn/SĐT đều mở được hồ sơ khách")
+//  Cách dùng ở chỗ vẽ bảng: _custLinkHtml_(sdt, 'nội dung hiển thị') -> chữ bấm được; click (bắt ở document, 1 chỗ duy nhất) -> _openCustomerByPhone_.
+//  Khách ngoài danh sách đang tải => nạp riêng bằng _pullSearchCustomer_ rồi openDp (openDp im lặng không mở nếu khách chưa có trong allCustomers — lý do
+//  các nút gọi openDp trực tiếp "bấm không ra gì"). Tài khoản test (demo-mode) chỉ mở khách có sẵn. (js/28 _bdOpenCustomer_ là bản riêng cùng logic cho popup đơn K.)
+// ═══════════════════════════════════════════════════════
+async function _openCustomerByPhone_(phone){
+  var ph = (typeof normPhone === 'function' ? normPhone(phone) : '') || String(phone || '').replace(/\D/g, '');
+  if (!ph || typeof customerMap === 'undefined' || typeof openDp !== 'function') return;
+  if (!customerMap[ph] && customerMap[phone]) ph = String(phone);
+  if (!customerMap[ph]) {
+    if (document.body.classList.contains('demo-mode')) { if (typeof toast === 'function') toast('Tài khoản test chỉ xem được khách có sẵn trong danh sách'); return; }
+    ph = await _pullSearchCustomer_(ph);
+    if (!ph) return;
+  }
+  try { openDp(ph); } catch (e) {}
+}
+function _custLinkHtml_(phone, inner, tip){
+  var p = String(phone == null ? '' : phone).trim();
+  if (p.replace(/\D/g, '').length < 6) return inner;   // không có SĐT hợp lệ -> chữ thường
+  return '<span class="cust-link" data-cust-phone="' + esc(p) + '" title="' + esc(tip || 'Bấm để mở hồ sơ khách') + '">' + inner + '</span>';
+}
+document.addEventListener('click', function(e){
+  var t = e.target.closest && e.target.closest('[data-cust-phone]');
+  if (!t) return;
+  e.stopPropagation(); e.preventDefault();   // capture: không kích hoạt onclick của dòng/ô cha (vd mở popup đơn)
+  _openCustomerByPhone_(t.getAttribute('data-cust-phone'));
+}, true);
+

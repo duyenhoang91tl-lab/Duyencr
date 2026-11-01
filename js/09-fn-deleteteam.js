@@ -305,7 +305,7 @@ function _pkRenderAll(){
 
   html += '<details'+(_pkState.nameMapSectionOpen?' open':'')+' ontoggle="_pkState.nameMapSectionOpen=this.open" style="margin-top:22px">'+
     '<summary class="dash-section-title" style="cursor:pointer;display:inline-block">🔗 Khớp tên Nhân viên Pancake ↔ Sale CRM</summary>'+
-    '<div style="font-size:12px;color:var(--muted);margin:8px 0">Tên "Nhân viên" trên Pancake là tên Facebook cá nhân, thường không khớp tên đăng nhập (Sale) trong CRM — khớp 1 lần, dùng lại cho mọi lần nạp báo cáo sau.</div>'+
+    '<div class="guide-text" style="font-size:12px;color:var(--muted);margin:8px 0">Tên "Nhân viên" trên Pancake là tên Facebook cá nhân, thường không khớp tên đăng nhập (Sale) trong CRM — khớp 1 lần, dùng lại cho mọi lần nạp báo cáo sau.</div>'+
     _pkRenderMapTableHtml(isAdmin)+
   '</details>';
 
@@ -1130,6 +1130,11 @@ function _pkEnforceScope(){
     _pkState.kpiSaleScope = teamNames.length ? teamNames : my;
   } else {
     _pkState.kpiSaleScope = my;
+  }
+  // Doi sale Online/Van phong xem them KPI nhom Sale "Quay" + phong CSKH (2026-10-29, xem _srViewNames js/10)
+  if (typeof _srViewNames === 'function'){
+    var vn = _srViewNames();
+    if (vn.length) _pkState.kpiSaleScope = (_pkState.kpiSaleScope || []).concat(vn.filter(function(n){ return (_pkState.kpiSaleScope || []).indexOf(n) === -1; }));
   }
 }
 

@@ -8,6 +8,8 @@ const fs = require('fs'), path = require('path');
 const { minify } = require('terser');
 const CleanCSS = require('clean-css');
 const root = path.join(__dirname, '..'), out = path.join(root, 'dist');
+// Lớp CHẾ ĐỘ TỐI tự sinh (css/99-dark-auto.css): luôn sinh lại trước khi nén để bản phát hành không bao giờ dùng bản lỗi thời nếu ai đó quên chạy tools/gen-dark-theme.js.
+require('./gen-dark-theme.js').write();
 fs.rmSync(out, { recursive: true, force: true });
 for (const d of ['js', 'css']) fs.mkdirSync(path.join(out, d), { recursive: true });
 (async () => {
@@ -29,6 +31,10 @@ for (const d of ['js', 'css']) fs.mkdirSync(path.join(out, d), { recursive: true
     before += Buffer.byteLength(src); after += Buffer.byteLength(r.styles);
   }
   fs.copyFileSync(path.join(root, 'index.html'), path.join(out, 'index.html'));
+// PWA (cai nhu ung dung tren dien thoai): manifest + service worker + icon nam o goc, copy nguyen vao dist
+for (const f of ['manifest.webmanifest', 'sw.js', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png']) {
+  if (fs.existsSync(path.join(root, f))) fs.copyFileSync(path.join(root, f), path.join(out, f));
+}
   fs.writeFileSync(path.join(out, '.assetsignore'), '');
   console.log('dist OK: js+css ' + (before / 1024 | 0) + ' KB -> ' + (after / 1024 | 0) + ' KB');
 })().catch(e => { console.error(e); process.exit(1); });

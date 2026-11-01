@@ -1,0 +1,31 @@
+# Kiểm tra BIÊN DỊCH app Android "Viết Tắt" trên nhánh wip/** (không đưa APK lên Release — việc đó chỉ làm ở build-android.yml khi push main).
+name: Check Android VietTat (wip)
+
+on:
+  push:
+    branches: ['wip/**']
+    paths:
+      - 'android-viettat/**'
+      - '.github/workflows/check-android.yml'
+  workflow_dispatch:
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - name: Build APK (debug) — chỉ để kiểm tra biên dịch
+        working-directory: android-viettat
+        run: gradle assembleDebug --no-daemon --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VietTat-wip-apk
+          path: android-viettat/app/build/outputs/apk/debug/app-debug.apk

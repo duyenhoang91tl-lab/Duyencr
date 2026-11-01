@@ -27,3 +27,9 @@ nhưng **dòng dữ liệu chi tiết (đơn / khách / lead) chỉ thấy tối
 ## Đăng nhập test: dọn cache + tải lại trang 1 lần (2026-10-10)
 Lúc đang ở màn hình đăng nhập CHƯA có `demoToken`, vòng đồng bộ lúc mở trang gọi GAS không kèm token → máy chủ trả ĐẦY ĐỦ (~134k SĐT CSKH-Duyên) vào bộ nhớ trang (`allCustomers`/`customerMap`/`cskhData`) và cache máy. Trước đây đăng nhập test chỉ xoá `cskhData` nên danh sách đầy đủ vẫn hiện. Nay `_demoPurgeAndReload_` (js/14-fn-aasplit.js) xoá cache dữ liệu (localStorage `ome_care*`, `ome_cskh_duyen*`, `ome_don_*`; IndexedDB `cskh_lite_v1`, `orders_v1`) rồi reload 1 lần mỗi phiên đăng nhập (cờ sessionStorage `ome_demo_clean` = token; xoá khi đăng xuất). Sau reload token đã có sẵn trong localStorage nên mọi request đều kèm token → máy chủ cắt 5 dòng/nguồn + che SĐT.
 
+
+## Hiển thị '••••' + mã hóa file tải về của tài khoản test (2026-10-15)
+- Máy chủ che SĐT bằng cách đổi 4 số cuối thành `0000` (giữ đúng độ dài để `normPhone()` không làm rơi/gộp dòng). `js/51-demo-guard.js` (nạp sau `js/50`) chỉ thay đoạn `…0000` cuối đó bằng `••••` trên giao diện khi có `ome_demo_token` — không đổi dữ liệu, tài khoản thường không bị ảnh hưởng.
+- Mọi file tài khoản test tải về (`a.download` blob/data, `XLSX.writeFile`) bị MÃ HÓA AES-256-GCM, đuôi `.enc` (khóa PBKDF2 từ `demoToken`). Giải mã (admin): `node tools/decrypt-demo-file.js <file.enc> <demoToken> [file_ra]`; `demoToken` ở sheet Settings. Định dạng: `DEMOENC1`(8) | salt(16) | iv(12) | ciphertext+tag.
+- Giới hạn trung thực: người test giữ `demoToken` trong localStorage của trình duyệt họ nên người rành kỹ thuật vẫn tự giải mã được — nhưng nội dung file vốn chỉ là dữ liệu đã cắt 5 dòng/nguồn + che SĐT. Chưa chặn copy chữ/chụp màn hình. Chưa che tên, địa chỉ.
+- Test: giữ `tools/test-dist-equivalence.js` (build nén vẫn tương đương); đã thử jsdom: che hiển thị, mã hóa↔giải mã khớp, sai token bị từ chối, không rò plaintext.

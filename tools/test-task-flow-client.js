@@ -50,6 +50,13 @@ const R=c=>vm.runInContext(c,ctx);
  ok(!M('Oanh',t0).canAdvance&&M('Kế toán Oanh',t0).myApprovals.length===1&&M('Oanh',t0).myApprovals.length===0,'dang cho duyet: an nut chuyen tiep; chi nguoi duyet thay Chap nhan/Tu choi');
  ctx.allTaskFlows=[flow]; ctx._tfLoaded=true; ctx.currentUser={name:'Kế toán Oanh'};
  ok(/Chấp nhận/.test(R('_tfDetailHtml(__t)'))&&/chờ duyệt/.test(R('_tfListBadge(__t)')),'HTML chi tiet cho nguoi duyet + nhan danh sach');
+ ctx.currentUser={name:'My'}; ctx._authAccount={role:'admin'}; t.stageIdx=1; t.pendingReq=[];
+ ok(/Ép chuyển tiếp/.test(R('_tfDetailHtml(__t)')),'admin thay nut Ep chuyen tiep khi khong phai nguoi phu trach');
+ ctx._authAccount={role:'staff'}; ok(!/Ép chuyển/.test(R('_tfDetailHtml(__t)')),'nhan vien thuong khong thay nut Ep chuyen');
+ ctx.currentUser={name:'Oanh'}; ok(/đổi người/.test(R('_tfDetailHtml(__t)')),'nguoi dang phu trach thay link doi nguoi (buoc chua xong)');
+ ctx.currentUser={name:'My'}; ok(!/đổi người/.test(R('_tfDetailHtml(__t)')),'nguoi khong lien quan khong thay link doi nguoi');
+ t.stageApprovers={b:['Kế toán Oanh']}; ctx.currentUser={name:'Oanh'}; ok(/Duyệt: Kế toán Oanh/.test(R('_tfDetailHtml(__t)')),'timeline hien nguoi duyet cua giai doan can duyet');
+ ctx.currentUser={name:'Kế toán Oanh'};
  t.stageIdx=3; t.pendingReq=[]; m=M('Oanh',t0); ok(m.finished&&!m.canAdvance&&m.rows.every(r=>r.state==='done'),'hoan thanh: het nut');
  ok(R('_tfStageModel(null,__f,"x")')===null,'viec khong quy trinh -> null');
  // ── M4: thao luan ──

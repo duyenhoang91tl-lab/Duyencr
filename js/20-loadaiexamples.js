@@ -96,22 +96,27 @@ var _msgTemplates = [];
 var _msgTplCanApprove = false;   // server quyet dinh (vai tro that trong sheet Users qua token), KHONG tin currentUser phia trinh duyet
 var _msgTplPending = 0;
 var _msgTplLoadedAt = 0;
-async function loadMsgTemplates() {
+var _msgTplGroups = [];   // nhom san pham (DANH_MUC) do server tra ve cung danh sach mau — dung cho dropdown form + bo loc
+async function loadMsgTemplates(bustCache) {
   var listEl = document.getElementById('mt-list');   // co the khong co (khi goi tu khung chat) -> van tai du lieu, chi bo qua phan ve danh sach quan ly
   if (listEl) listEl.innerHTML = '<div style="font-size:12px;color:var(--muted)">Đang tải mẫu...</div>';
   try {
     var sep = gsUrl.indexOf('?') >= 0 ? '&' : '?';
-    var r = await fetch(gsUrl + sep + 'action=messageTemplates', { redirect: 'follow' });
+    // bustCache=true: them _bust=<timestamp> de Cloudflare Worker khong tra cache cu ngay sau khi luu/sua/xoa mau.
+    var bustSuffix = bustCache ? '&_bust=' + Date.now() : '';
+    var r = await fetch(gsUrl + sep + 'action=messageTemplates' + bustSuffix, { redirect: 'follow' });
     var d = await r.json();
     _msgTemplates = (d && d.templates) || [];
     _msgTplCanApprove = !!(d && d.canApprove);
     _msgTplPending = (d && d.pendingCount) || 0;
+    _msgTplGroups = (d && d.groups) || [];
     _msgTplLoadedAt = Date.now();
   } catch (e) {
     if (listEl) listEl.innerHTML = '<div style="font-size:12px;color:#dc2626">Lỗi tải thư viện mẫu, thử lại.</div>';
     return;
   }
   _tplUpdateBadge();
+  _tplFillGroupSelects();
   renderMsgTemplateList();
   _tplSuggestRefreshAll();
 }
@@ -148,8 +153,18 @@ function tplSearch(list, query, topic) {
   out.sort(function (a, b) { return (b.score - a.score) || (a.idx - b.idx); });   // idx nho = moi hon (server da sap moi nhat truoc)
   return out.map(function (x) { return x.t; });
 }
+// Do lai cac o chon nhom (bo loc danh sach + form) tu _msgTplGroups; giu nguyen lua chon dang co neu van con trong danh sach.
+function _tplFillGroupSelects() {
+  var groups = _msgTplGroups.slice();
+  _msgTemplates.forEach(function (t) { if (t.nhom && groups.indexOf(t.nhom) < 0) groups.push(t.nhom); });
+  var f = document.getElementById('mt-group-filter');
+  if (f) { var cur = f.value; f.innerHTML = '<option value="">Tất cả nhóm</option>' + groups.map(function (g) { return '<option value="' + esc(g) + '">' + esc(g) + '</option>'; }).join('') + '<option value="__none__">Chung (chưa phân nhóm)</option>'; f.value = cur; if (f.value !== cur) f.value = ''; }
+  var s = document.getElementById('mt-f-group');
+  if (s) { var cs = s.value; s.innerHTML = '<option value="">🗂 Nhóm sản phẩm: tự phân loại</option>' + groups.map(function (g) { return '<option value="' + esc(g) + '">' + esc(g) + '</option>'; }).join(''); s.value = cs; if (s.value !== cs) s.value = ''; }
+}
 function _tplChips(t) {
   var h = '';
+  if (t.nhom) h += '<span class="zi-chip" style="background:#dcfce7;color:#166534" title="' + (t.nhomAuto ? 'Hệ thống tự phân loại theo tên sản phẩm / nội dung' : 'Nhóm sản phẩm do người soạn chọn') + '">🗂 ' + esc(t.nhom) + (t.nhomAuto ? ' · tự phân loại' : '') + '</span>';
   String(t.product || '').split(/[,;|\n]/).map(function (x) { return x.trim(); }).filter(Boolean).forEach(function (p) { h += '<span class="zi-chip" style="background:#fef3c7;color:#92400e" title="Sản phẩm">📦 ' + esc(p) + '</span>'; });
   if (t.topic) h += '<span class="zi-chip" style="background:#dbeafe;color:#1e40af" title="Nội dung hội thoại">💬 ' + esc(t.topic) + '</span>';
   String(t.tags || '').split(',').forEach(function (tg) { tg = tg.trim(); if (tg) h += '<span class="zi-chip">#' + esc(tg) + '</span>'; });
@@ -258,6 +273,8 @@ function renderMsgTemplateList() {
   var q = (document.getElementById('mt-search').value || '').trim();
   var stF = (document.getElementById('mt-status-filter') || {}).value || '';
   var base = _msgTemplates.filter(function (t) {
+    var gF = (document.getElementById('mt-group-filter') || {}).value || '';
+    if (gF === '__none__' ? !!t.nhom : (gF && t.nhom !== gF)) return false;
     if (stF === 'mine') return _tplMine(t);
     return !stF || t.status === stF;
   });
@@ -267,7 +284,9 @@ function renderMsgTemplateList() {
     return;
   }
   listEl.innerHTML = items.map(function (t) {
-    var acts = '<button class="btn sm" onclick="copyMsgTemplate(\'' + t.id + '\')" title="Copy nội dung">📋 Copy</button>';
+    var lines = _tplLines(t.content);
+    var acts = '<button class="btn sm" onclick="copyMsgTemplate(\'' + t.id + '\')" title="Copy nguyên cả mẫu (cả đoạn dài)">📋 Copy cả câu</button>';
+    if (lines.length > 1) acts += '<button class="btn sm" onclick="mtToggleLines(\'' + t.id + '\')" title="Tách mỗi dòng thành 1 tin nhắn riêng">📑 Từng đoạn (' + lines.length + ')</button>';
     if (_msgTplCanApprove && t.status !== 'approved') acts += '<button class="btn sm primary" onclick="approveMsgTemplateUI(\'' + t.id + '\',\'approve\')" title="Duyệt mẫu">✅ Duyệt</button>';
     if (_msgTplCanApprove && t.status === 'pending') acts += '<button class="btn sm" onclick="approveMsgTemplateUI(\'' + t.id + '\',\'reject\')" title="Từ chối">❌ Từ chối</button>';
     if (_tplCanEdit(t)) acts += '<button class="btn sm" onclick="openMsgTemplateForm(\'' + t.id + '\')" title="Sửa">✏️</button><button class="btn sm" onclick="deleteMsgTemplateUI(\'' + t.id + '\')" title="Xóa">🗑</button>';
@@ -280,9 +299,66 @@ function renderMsgTemplateList() {
         '<div style="display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">' + acts + '</div>' +
       '</div>' +
       '<div style="font-size:12px;color:var(--text);white-space:pre-wrap;margin-bottom:6px">' + esc(t.content) + '</div>' +
-      '<div class="zi-row">' + _tplChips(t) + '</div>' + meta +
+      (lines.length > 1 ? '<div class="mt-lines" data-lbox="' + esc(t.id) + '" style="display:none;margin:0 0 8px;border-top:1px dashed var(--border);padding-top:4px">' + lines.map(function (ln, k) {
+        return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid var(--border)"><span style="flex:1;min-width:0;font-size:12px;white-space:pre-wrap;word-break:break-word">' + esc(ln) + '</span>' +
+          '<button class="btn sm" style="flex:none" onclick="copyMsgLine(this,\'' + esc(t.id) + '\',' + k + ')" title="Copy đoạn này (1 tin nhắn)">📋 Copy đoạn</button></div>';
+      }).join('') + '</div>' : '') +
+      '<div class="zi-row">' + _tplChips(t) + '</div>' +
+      (t.images && t.images.length ? '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">' + t.images.map(function(url) {
+        return '<a href="' + url + '" target="_blank" rel="noopener"><img src="' + url + '" style="width:56px;height:56px;object-fit:cover;border-radius:5px;border:1px solid var(--border)" loading="lazy"></a>';
+      }).join('') + '</div>' : '') +
+      meta +
     '</div>';
   }).join('');
+}
+
+// ── ANH MAU TIN NHAN ──
+var _mtImgUrls = [];   // mang URL anh da upload (toi da 4)
+
+function _mtImgRender() {
+  var el = document.getElementById('mt-f-img-previews'); if (!el) return;
+  el.innerHTML = _mtImgUrls.map(function(url, i) {
+    return '<div style="position:relative;display:inline-block">' +
+      '<img src="' + url + '" style="width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" onerror="this.src=\'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2264%22 height=%2264%22><rect fill=%22%23eee%22 width=%2264%22 height=%2264%22/><text x=%228%22 y=%2236%22 font-size=%2210%22>lỗi ảnh</text></svg>\'">' +
+      '<button type="button" onclick="_mtImgRemove(' + i + ')" title="Xóa ảnh" style="position:absolute;top:-6px;right:-6px;background:#ef4444;color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;line-height:1;padding:0">×</button>' +
+      '</div>';
+  }).join('');
+  var btn = document.getElementById('mt-f-img-btn');
+  if (btn) btn.style.display = _mtImgUrls.length >= 4 ? 'none' : '';
+}
+
+function _mtImgRemove(i) {
+  _mtImgUrls.splice(i, 1);
+  _mtImgRender();
+}
+
+async function mtHandleImgPick(files) {
+  var input = document.getElementById('mt-f-imgs');
+  var statusEl = document.getElementById('mt-f-img-status');
+  var remaining = 4 - _mtImgUrls.length;
+  var toUpload = Array.from(files).slice(0, remaining);
+  if (!toUpload.length) return;
+  if (input) input.value = '';   // reset de co the chon lai cung file
+  for (var i = 0; i < toUpload.length; i++) {
+    var file = toUpload[i];
+    if (file.size > 5 * 1024 * 1024) { alert('Ảnh "' + file.name + '" vượt quá 5MB, bỏ qua.'); continue; }
+    if (statusEl) statusEl.textContent = 'Đang upload ảnh ' + (i + 1) + '/' + toUpload.length + '...';
+    try {
+      var base64 = await new Promise(function(resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function(e) { resolve(e.target.result.split(',')[1]); };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      var resp = await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify({
+        action: 'uploadTemplateImage', imageBase64: base64, filename: file.name, mimeType: file.type || 'image/jpeg'
+      }) });
+      var d = await resp.json();
+      if (d && d.ok && d.url) { _mtImgUrls.push(d.url); _mtImgRender(); }
+      else { alert('Lỗi upload ảnh: ' + ((d && d.error) || 'thử lại')); }
+    } catch(e) { alert('Lỗi kết nối khi upload ảnh, thử lại.'); }
+  }
+  if (statusEl) statusEl.textContent = _mtImgUrls.length ? (_mtImgUrls.length + ' ảnh đã tải lên') : '';
 }
 
 function openMsgTemplateForm(id) {
@@ -291,9 +367,16 @@ function openMsgTemplateForm(id) {
   document.getElementById('mt-f-id').value = t ? t.id : '';
   document.getElementById('mt-f-title').value = t ? t.title : '';
   document.getElementById('mt-f-product').value = t ? (t.product || '') : '';
+  _tplFillGroupSelects();
+  document.getElementById('mt-f-group').value = (t && t.nhom && !t.nhomAuto) ? t.nhom : '';   // nhom tu phan loai KHONG dien san: de trong = tiep tuc tu phan loai
   document.getElementById('mt-f-topic').value = t ? (t.topic || '') : '';
   document.getElementById('mt-f-tags').value = t ? t.tags : '';
   document.getElementById('mt-f-content').value = t ? t.content : '';
+  // Khoi tao anh: khi sua thi nap URLs cu; khi them moi thi xoa trang
+  _mtImgUrls = (t && Array.isArray(t.images)) ? t.images.slice() : [];
+  _mtImgRender();
+  var statusEl = document.getElementById('mt-f-img-status');
+  if (statusEl) statusEl.textContent = _mtImgUrls.length ? (_mtImgUrls.length + ' ảnh hiện có') : '';
   _tplUpdateBadge();
   wrap.style.display = 'block';
   document.getElementById('mt-f-title').focus();
@@ -309,6 +392,7 @@ async function saveMsgTemplateUI() {
   var tags = (document.getElementById('mt-f-tags').value || '').trim();
   var product = (document.getElementById('mt-f-product').value || '').trim();
   var topic = (document.getElementById('mt-f-topic').value || '').trim();
+  var nhom = (document.getElementById('mt-f-group').value || '').trim();   // '' = de he thong tu phan loai
   var id = (document.getElementById('mt-f-id').value || '').trim();
   if (!title || !content) { alert('Vui lòng nhập tiêu đề và nội dung mẫu.'); return; }
   var btn = document.getElementById('mt-f-save-btn');
@@ -316,7 +400,8 @@ async function saveMsgTemplateUI() {
   var d = null;
   try {
     var body = { action: 'saveMessageTemplate', template: {
-      id: id || undefined, title: title, content: content, tags: tags, product: product, topic: topic,
+      id: id || undefined, title: title, content: content, tags: tags, product: product, topic: topic, nhom: nhom,
+      images: _mtImgUrls.slice(),   // mang URL anh da upload (co the rong)
       createdBy: (typeof currentUser !== 'undefined' && currentUser && currentUser.name) || ''
     } };
     var r = await fetch(gsUrl, { method: 'POST', redirect: 'follow', body: JSON.stringify(body) });
@@ -327,7 +412,7 @@ async function saveMsgTemplateUI() {
   closeMsgTemplateForm();
   if (d && d.status === 'pending') toast('✓ Đã gửi mẫu — chờ quản lý duyệt mới dùng được');
   else toast('✓ Đã lưu mẫu');
-  loadMsgTemplates();
+  loadMsgTemplates(true);  // bust cache: xem mau vua luu ngay, khong doi Worker het TTL 60s
 }
 
 async function approveMsgTemplateUI(id, decision) {
@@ -342,7 +427,7 @@ async function approveMsgTemplateUI(id, decision) {
     if (d && d.error) { alert('Lỗi: ' + d.error); return; }
   } catch (e) { alert('Lỗi kết nối, thử lại.'); return; }
   toast(decision === 'approve' ? '✓ Đã duyệt — nhân viên dùng được ngay' : '✓ Đã từ chối mẫu');
-  loadMsgTemplates();
+  loadMsgTemplates(true);  // bust cache
 }
 
 async function deleteMsgTemplateUI(id) {
@@ -352,9 +437,20 @@ async function deleteMsgTemplateUI(id) {
     var d = await r.json();
     if (d && d.error) { alert('Lỗi: ' + d.error); return; }
   } catch (e) { alert('Lỗi kết nối, thử lại.'); return; }
-  loadMsgTemplates();
+  loadMsgTemplates(true);  // bust cache
 }
 
+// Tach mau thanh tung DOAN: moi dong (xuong dong) = 1 tin nhan rieng. Bo dong trong, cat khoang trang 2 dau (giong Pancake AI: tplLines_).
+function _tplLines(content) { return String(content || '').split(/\r?\n/).map(function (x) { return x.trim(); }).filter(Boolean); }
+function mtToggleLines(id) {
+  var boxes = document.querySelectorAll('#mt-list .mt-lines');
+  for (var i = 0; i < boxes.length; i++) if (boxes[i].getAttribute('data-lbox') === id) boxes[i].style.display = boxes[i].style.display === 'none' ? '' : 'none';
+}
+function copyMsgLine(btn, id, k) {
+  var t = _msgTemplates.find(function (x) { return x.id === id; });
+  var ln = t ? _tplLines(t.content)[k] : '';
+  if (ln) _tplCopyText(ln, btn);
+}
 function copyMsgTemplate(id) {
   var t = _msgTemplates.find(function (x) { return x.id === id; });
   if (!t) return;

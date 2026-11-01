@@ -154,6 +154,8 @@
   let _ctkmLoadedOnce = false; // mo tab "Tra cuu khuyen mai" lan dau la tu nap toan bo danh sach
   let _tplLoadedOnce = false; // mo tab "Mau tin nhan tu van" lan dau la tu nap toan bo thu vien
   let _msgTemplates = []; // cache trong phien lam viec (tai lai khi bam 🔄 hoac mo lai panel)
+  let _msgTplGroups = []; // nhom san pham (DANH_MUC) server tra kem danh sach mau — cho o loc nhom
+  let _msgTplTs = 0; // luc nap thu vien mau gan nhat (o Tim san pham dung lai neu < 60 giay)
   let CS_NAMES = [];
   let CARE_STATUS_TREE = null; // cay "Tinh trang CS" load dong tu GAS (dong bo voi appweb/Zalo AI)
   let CUSTOM_FIELDS = []; // "truong tu tao" (admin them ben app web chinh) — load dong tu GAS
@@ -229,12 +231,28 @@
   function isExtContextValid_() {
     try { return !!(chrome.runtime && chrome.runtime.id); } catch (e) { return false; }
   }
+  // MỌI lỗi từ API/backend (GAS, AI, mạng, Pancake...) hiện cho CS DUY NHẤT 1 câu "Lỗi API" (yêu cầu Duyên 22/10/2026) — không còn đoạn lỗi kỹ thuật dài.
+  // Chi tiết gốc vẫn có ở resp.errorRaw + Console (F12) để người hỗ trợ tra. Giữ nguyên: đăng nhập (VERIFY_LOGIN: sai mật khẩu...), thiếu cấu hình (CS cần biết
+  // phải làm gì) và mã nội bộ GAS_NO_FLAT (code so khớp chuỗi này).
+  const PK_API_ERR = 'Lỗi API';
+  function normalizeApiResp_(message, resp) {
+    try {
+      if (resp && typeof resp === 'object' && resp.ok === false) {
+        const raw = String(resp.error || '');
+        if ((message && message.type === 'VERIFY_LOGIN') || /GAS_NO_FLAT|Chưa cấu hình URL|Thiếu Provider|API Key/i.test(raw)) return resp;
+        resp.errorRaw = raw;
+        resp.error = PK_API_ERR;
+        console.warn('[Pancake AI] ' + PK_API_ERR + ' —', message && message.type, raw);
+      }
+    } catch (e) {}
+    return resp;
+  }
   function safeSendMessage_(message, callback) {
     if (_extInvalidated || !isExtContextValid_()) { handleExtInvalidated_(); return; }
     try {
       chrome.runtime.sendMessage(message, (resp) => {
         if (chrome.runtime.lastError) { handleExtInvalidated_(); return; }
-        callback && callback(resp);
+        callback && callback(normalizeApiResp_(message, resp));
       });
     } catch (e) {
       handleExtInvalidated_();
@@ -385,7 +403,7 @@
             <option value="price">💰 Tra cứu bảng giá</option>
             <option value="ctkm">🎁 Tra cứu khuyến mãi</option>
             <option value="img">🖼 Tìm ảnh sản phẩm</option>
-            <option value="tpl">📚 Mẫu tin nhắn tư vấn</option>
+            <option value="tpl">📚 Tạo mẫu lưu sẵn / Mẫu tư vấn</option>
             <option value="stats">📊 Doanh số & hoa hồng của tôi</option>
             <option value="assign">📋 Data được chia (0)</option>
           </select>
@@ -403,7 +421,9 @@
                 <div id="pk-price-row">
                   <input type="text" id="pk-price-q" placeholder="Tên sản phẩm, kiểu/size..." />
                   <button id="pk-price-btn">Tìm</button>
+                  <button id="pk-price-ai-btn" type="button" title="Hỏi AI về giá — trả lời văn ngắn (giá lấy từ bảng giá)">🤖 Hỏi AI</button>
                 </div>
+                <div id="pk-price-ai" style="display:none"></div>
                 <div id="pk-price-result"></div>
               </div>
               <div id="pk-price-builder-mode" style="display:none">
@@ -437,8 +457,9 @@
               <div id="pk-tpl-row">
                 <input type="text" id="pk-tpl-q" placeholder="🔎 Gõ tên sản phẩm / nội dung hội thoại để gợi ý tin nhắn..." autocomplete="off" />
                 <button id="pk-tpl-refresh" title="Tải lại từ CRM">🔄</button>
-                <button id="pk-tpl-add" title="Đề xuất mẫu mới (chờ quản lý duyệt)">➕</button>
+                <button id="pk-tpl-add" title="Tạo mẫu lưu sẵn để AI học (CS: chờ admin duyệt)">➕ Tạo mẫu lưu sẵn</button>
               </div>
+              <div id="pk-tpl-filter-row"><select id="pk-tpl-group" title="Lọc theo nhóm sản phẩm (hệ thống tự phân loại mẫu chưa chọn nhóm)"><option value="">🗂 Tất cả nhóm</option></select></div>
               <div id="pk-tpl-form"></div>
               <div id="pk-tpl-result"></div>
             </div>
@@ -482,6 +503,12 @@
               <label>🎁 Quà tặng kèm</label>
               <input type="text" id="pk-cart-gift" placeholder="VD: tặng 1 vòng phong thủy nhỏ..." />
             </div>
+            <div class="pk-cart-extra-row" id="pk-cart-promo-row">
+              <label>🎁 CT tự động</label>
+              <input type="text" id="pk-cart-voucher" placeholder="Mã voucher (nếu có)" style="flex:1" />
+              <button id="pk-cart-promo-calc" title="Tính khuyến mãi theo cấu hình admin (combo, %, số tiền, quà, voucher)">Tính CT</button>
+              <div id="pk-cart-promo-out" style="display:none;width:100%;font-size:11.5px;line-height:1.5"></div>
+            </div>
             <div class="pk-cart-extra-row">
               <label>Giảm giá tổng</label>
               <select id="pk-cart-discount-type">
@@ -520,6 +547,8 @@
           <div id="pk-canned-body" style="display:none"></div>
         </div>` : ''}
 
+        <div id="pk-ban-row"><button id="pk-ban-btn" type="button" title="Quét tin đang soạn trong ô trả lời — báo nếu có từ cấm (trước khi bấm gửi)">🚫 Quét từ cấm</button></div>
+        <div id="pk-ban-result" style="display:none"></div>
         <div id="pk-ai-status">Chưa có hội thoại nào được chọn.</div>
 
         <div class="pk-tones" id="pk-tones">
@@ -656,7 +685,9 @@
       if (v === "assign") initAssignTab_();
     });
     panelEl.querySelector("#pk-rem-refresh").addEventListener("click", () => loadReminders_());
+    panelEl.querySelector("#pk-ban-btn").addEventListener("click", scanBannedDraft_);
     panelEl.querySelector("#pk-price-btn").addEventListener("click", doPriceSearch_);
+    panelEl.querySelector("#pk-price-ai-btn").addEventListener("click", askPriceAi_);
     panelEl.querySelector("#pk-price-q").addEventListener("keydown", (e) => {
       if (e.key === "Enter") doPriceSearch_();
     });
@@ -719,6 +750,7 @@
     panelEl.querySelector('#pk-cart-price-k').addEventListener('change', (e) => {
       _cartExtra.priceInK = e.target.checked; saveCart_(); renderCart_(); // render lai de doi hien thi cac dong gia da co
     });
+    panelEl.querySelector('#pk-cart-promo-calc').addEventListener('click', () => { _calcAutoPromo_(); });
     panelEl.querySelector('#pk-cart-copy').addEventListener('click', () => {
       const text = _buildCartSummaryText_();
       if (!text.trim()) { setStatus('Chưa có sản phẩm nào được tick trong đơn.'); return; }
@@ -1140,19 +1172,36 @@
   // Pancake/Messenger tự nhận diện SĐT trong tin nhắn rồi bọc bằng <span class="phone-tag ...">
   // (đôi khi span cha còn có id dạng "m_<hash>_<sđt>"). Đọc từ đây đáng tin hơn quét chữ tự do
   // vì nền tảng đã xác nhận đó thực sự là SĐT (khỏi nhầm mã đơn/mã vận đơn).
+  // Cấu trúc thật của Pancake (xác nhận bằng payload webhook 2026-10-13): SĐT trong tin khách nằm ở
+  //   <Copy id="m_<hash>_<sđt>" text="<sđt>"><span class="phone-tag phone-tag-trusted">sđt</span></Copy>
+  // => đọc đủ 3 nguồn: chữ trong .phone-tag, thuộc tính text của <Copy>, đuôi id "_<sđt>".
+  // CHỈ lấy SĐT trong tin của KHÁCH (customerMsgSelector) và xếp MỚI NHẤT TRƯỚC — khớp cách CRM/Supabase tách
+  // (chỉ nhận SĐT từ tin khách, không nhầm SĐT page/sale tự gõ). Không có tin khách nào có SĐT mới quét cả khung chat.
+  function phonesInNode_(root) {
+    const out = [];
+    const add = (raw) => { const p = normPhone(raw); if (/^0[3-9]\d{8}$/.test(p) && out.indexOf(p) === -1) out.push(p); };
+    const nodes = [];
+    if (root.matches && (root.matches('.phone-tag') || root.hasAttribute('text') || root.id)) nodes.push(root);
+    root.querySelectorAll('.phone-tag, copy[text], [id]').forEach((el) => nodes.push(el));
+    nodes.forEach((el) => {
+      if (el.classList && el.classList.contains('phone-tag')) add(el.textContent);
+      const t = el.getAttribute && el.getAttribute('text'); if (t) add(t);
+      const m = (el.id || '').match(/_(\d{9,11})$/); if (m) add(m[1]);
+    });
+    return out;
+  }
   function extractTaggedPhones_(scope) {
-    const found = new Set();
-    scope.querySelectorAll('.phone-tag').forEach((el) => {
-      const p = normPhone(el.textContent);
-      if (/^0[3-9]\d{8}$/.test(p)) found.add(p);
-    });
-    scope.querySelectorAll('[id]').forEach((el) => {
-      const m = el.id.match(/_(\d{9,11})$/);
-      if (!m) return;
-      const p = normPhone(m[1]);
-      if (/^0[3-9]\d{8}$/.test(p)) found.add(p);
-    });
-    return Array.from(found);
+    const sel = settings.selectors?.[PLATFORM];
+    const found = [];
+    const push = (arr) => arr.forEach((p) => { if (found.indexOf(p) === -1) found.push(p); });
+    if (sel?.customerMsgSelector) {
+      let items = [];
+      try { items = Array.from(scope.querySelectorAll(sel.customerMsgSelector)); } catch (e) { items = []; }
+      for (let i = items.length - 1; i >= 0; i--) push(phonesInNode_(items[i]));   // tin khách mới nhất trước
+      if (found.length) return found;
+    }
+    push(phonesInNode_(scope));   // fallback: cả khung chat (chưa phân biệt được tin khách)
+    return found;
   }
 
   // Trả về DANH SÁCH sđt tìm được trong đoạn chat hiện tại (có thể là 1, 2, hoặc nhiều).
@@ -1306,7 +1355,7 @@
     box.innerHTML = `<div class="pk-ai-cust-loading">Đang tra cứu ${phone}...</div>`;
     safeSendMessage_({ type: "LOOKUP_CUSTOMER", payload: { phone } }, (resp) => {
       if (!resp?.ok) {
-        box.innerHTML = `<div class="pk-ai-cust-loading">Không tra cứu được: ${resp?.error || "lỗi không rõ"}</div>`;
+        box.innerHTML = `<div class="pk-ai-cust-loading">${resp?.error || PK_API_ERR}</div>`;
         return;
       }
       _currentPhone = phone;
@@ -1512,7 +1561,7 @@
       safeSendMessage_({ type: 'POS_ORDERS', payload: { phone } }, (resp) => {
         if (!resp?.ok) {
           // Không tải được Pos → vẫn cho xem đơn Base đã có sẵn, kèm báo lỗi để CS biết
-          out.innerHTML = `<div class="pk-hist-note" style="color:#b91c1c">Không tải được đơn Pos: ${escapeHtml(resp?.error || 'lỗi không rõ')}</div>` + _pkHistHtml_([], baseOrders);
+          out.innerHTML = `<div class="pk-hist-note" style="color:#b91c1c">${escapeHtml(resp?.error || PK_API_ERR)}</div>` + _pkHistHtml_([], baseOrders);
           return;
         }
         loaded = true;
@@ -1849,7 +1898,7 @@
     box.innerHTML = '<div class="pk-ai-cust-loading">AI đang soạn tin...</div>';
     safeSendMessage_({ type: 'FETCH_OPENER', payload: { custLines: buildCustLines(), tone: _activeTone, angleInstr: _nbaCur.angle, withProducts: _useProducts, stonePref: _stonePref } }, (resp) => {
       if (req !== _nbaMsgReq || phone !== _currentPhone) return; // đã đổi khách/bấm lại → bỏ kết quả cũ
-      if (!resp?.ok) { box.innerHTML = `<div class="pk-ai-cust-loading">Lỗi: ${escapeHtml(resp?.error || 'không rõ')}</div>`; return; }
+      if (!resp?.ok) { box.innerHTML = `<div class="pk-ai-cust-loading">${escapeHtml(resp?.error || PK_API_ERR)}</div>`; return; }
       box.innerHTML = '<textarea id="pk-nba-ta" rows="4"></textarea><div class="pk-nba-btns"><button type="button" class="pk-btn-outline" id="pk-nba-insert">📥 Chèn vào ô trả lời</button><button type="button" class="pk-btn-outline" id="pk-nba-redo">🔄 Soạn lại</button></div>';
       box.querySelector('#pk-nba-ta').value = resp.data.suggestion || '';
       box.querySelector('#pk-nba-insert').addEventListener('click', () => insertReply(box.querySelector('#pk-nba-ta').value));
@@ -2029,7 +2078,7 @@
       const { row, kept, addedNotes } = _mergeRowKeepOld_(serverCare || {}, localRow);
       safeSendMessage_({ type: 'SAVE_CARE', payload: Object.assign({}, row, { isNewCustomer: isTrulyNew }) }, (resp) => {
         if (btn) { btn.disabled = false; btn.textContent = '💾 Lưu vào Sasum'; }
-        if (!resp?.ok) { setStatus('Lưu thất bại: ' + (resp?.error || 'lỗi không rõ')); return; }
+        if (!resp?.ok) { setStatus('Lưu thất bại: ' + (resp?.error || PK_API_ERR)); return; }
         _currentCare = row;
         _currentPhone = phone;
         _currentOrders = serverOrders;
@@ -2106,7 +2155,7 @@
     const isNewCustomer = !_currentCare && (!_currentOrders || !_currentOrders.length);
     safeSendMessage_({ type: 'SAVE_CARE', payload: Object.assign({}, row, { isNewCustomer }) }, (resp) => {
       if (btn) { btn.disabled = false; btn.textContent = '💾 Lưu vào Sasum'; }
-      if (!resp?.ok) { setStatus('Lưu thất bại: ' + (resp?.error || 'lỗi không rõ')); return; }
+      if (!resp?.ok) { setStatus('Lưu thất bại: ' + (resp?.error || PK_API_ERR)); return; }
       _currentCare = row;
       _currentPhone = phone;
       _lastServerCare = Object.assign({}, row);
@@ -2180,7 +2229,7 @@
       const row = _buildRow(phone, { schedules: JSON.stringify(arr) });
       safeSendMessage_({ type: 'SAVE_CARE', payload: row }, (resp) => {
         if (btn) btn.disabled = false;
-        if (!resp?.ok) { setStatus('Thêm lịch thất bại: ' + (resp?.error || 'lỗi không rõ')); return; }
+        if (!resp?.ok) { setStatus('Thêm lịch thất bại: ' + (resp?.error || PK_API_ERR)); return; }
         _currentCare = Object.assign({}, _currentCare, { schedules: row.schedules });
         _lastServerCare = Object.assign({}, _currentCare);
         const listEl = panelEl.querySelector('#pk-remind-list');
@@ -2198,7 +2247,7 @@
   function doneAppointment_(phone) {
     const row = _buildRow(phone, { schedHen: '', schedHenNote: '' });
     safeSendMessage_({ type: 'SAVE_CARE', payload: row }, (resp) => {
-      if (!resp?.ok) { setStatus('Không xoá được lịch hẹn: ' + (resp?.error || '')); return; }
+      if (!resp?.ok) { setStatus('Không xoá được lịch hẹn: ' + (resp?.error || PK_API_ERR)); return; }
       _currentCare = row;
       _lastServerCare = Object.assign({}, row);
       const henDateEl = panelEl.querySelector('#pk-hen-date');
@@ -2352,7 +2401,7 @@
       _statsState.loading = false;
       if (!resp?.ok) {
         _statsState.data = null;
-        resEl.innerHTML = `<div class="pk-stats-note pk-stats-err">⚠️ ${escapeHtml(resp?.error || 'Không tải được số liệu. Thử bấm Xem lại.')}</div>`;
+        resEl.innerHTML = `<div class="pk-stats-note pk-stats-err">⚠️ ${escapeHtml(resp?.error || PK_API_ERR)}</div>`;
         return;
       }
       _statsState.data = resp.data;
@@ -2400,7 +2449,7 @@
         b.activePrograms.map((p) => `<div class="pk-stats-prog"><b>${escapeHtml(p.name)}</b>${p.dateFrom || p.dateTo ? ` <span class="pk-stats-mut">(${p.dateFrom ? _statsDmy_(p.dateFrom) : '…'} → ${p.dateTo ? _statsDmy_(p.dateTo) : '…'})</span>` : ''}<div class="pk-stats-mut">${escapeHtml(p.summary || 'Xem chi tiết ở CRM')}</div></div>`).join('') + '</details>';
     }
     h += '<div class="pk-stats-mut" style="margin-top:6px">Số liệu tạm tính theo Pos (đã ghép Base) — đối chiếu kế toán trước khi chi trả. Thưởng theo SP là ước lượng số lượng.</div>';
-    if (d.ghepLoi) h += `<div class="pk-stats-note pk-stats-err">⚠️ Lỗi khi đối chiếu Base (đã chia theo Pos): ${escapeHtml(d.ghepLoi)}</div>`;
+    if (d.ghepLoi) h += `<div class="pk-stats-note pk-stats-err">⚠️ Lỗi API (đã chia theo Pos)</div>`;
     resEl.innerHTML = h;
   }
 
@@ -2457,7 +2506,7 @@
     safeSendMessage_(
       { type: 'FETCH_FOLLOWUP_SUGGESTION', payload: { phone: r.phone, status: r.status, note: r.schedHenNote } },
       (resp) => {
-        if (!resp?.ok) { setStatus('Lỗi: ' + (resp?.error || 'không rõ')); return; }
+        if (!resp?.ok) { setStatus(resp?.error || PK_API_ERR); return; }
         renderSuggestions({ suggestions: [resp.data.suggestion], provider: resp.data.provider });
         setStatus('Nhớ tự mở đúng đoạn chat của ' + r.phone + ' trên Pancake trước khi bấm gợi ý để chèn.');
       }
@@ -2511,7 +2560,7 @@
     if (!info || info.isDone) return;
     const cs = (panelEl?.querySelector('#pk-cs-sel')?.value) || settings?.csName || '';
     safeSendMessage_({ type: 'TOGGLE_ASSIGN_DONE', payload: { cs, phone, done: true } }, (resp) => {
-      if (!resp?.ok) { setStatus('✓ Đã lưu — nhưng chưa tự tick "Đã gọi" được (' + (resp?.error || 'lỗi') + '), tick tay giúp mình.'); return; }
+      if (!resp?.ok) { setStatus('✓ Đã lưu — nhưng chưa tự tick "Đã gọi" được (' + (resp?.error || PK_API_ERR) + '), tick tay giúp mình.'); return; }
       for (const h of _assignState.assignHistory) {
         if (!(h.phones || []).includes(phone)) continue;
         if (!h.donePhones) h.donePhones = [];
@@ -2581,7 +2630,7 @@
     safeSendMessage_({ type: 'GET_ASSIGNED_DATA', payload: { cs } }, (resp) => {
       _assignState.loading = false;
       if (!resp?.ok) {
-        if (listEl) listEl.innerHTML = '<div class="pk-rem-empty">Lỗi tải data: ' + escapeHtml(resp?.error || 'không rõ') + '</div>';
+        if (listEl) listEl.innerHTML = '<div class="pk-rem-empty">' + escapeHtml(resp?.error || PK_API_ERR) + '</div>';
         return;
       }
       _assignState.assignHistory = resp.data.assignHistory || [];
@@ -2671,7 +2720,7 @@
           chk.disabled = false;
           if (!resp?.ok) {
             chk.checked = !done; // rollback neu loi
-            setStatus('Lỗi cập nhật: ' + (resp?.error || 'không rõ'));
+            setStatus(resp?.error || PK_API_ERR);
             return;
           }
           // Cap nhat lac quan ngay trong state cuc bo (khong doi tai lai server) de UI muot.
@@ -2705,12 +2754,44 @@
 
   let _lastPriceRows = []; let _lastPriceQ = '';
 
+  // ── HỎI AI VỀ GIÁ (văn ngắn): GAS action 'priceQa' — giá lấy từ bảng giá DANH_MUC, AI chỉ diễn đạt lại ngắn gọn ──
+  let _priceAiSeq = 0;
+  function askPriceAi_() {
+    const q = (panelEl.querySelector('#pk-price-q').value || '').trim();
+    const box = panelEl.querySelector('#pk-price-ai');
+    box.style.display = '';
+    if (!q) { box.innerHTML = '<div class="pk-price-loading">Gõ câu hỏi về giá trước (vd: giá nhẫn bạc trơn size 12).</div>'; return; }
+    const seq = ++_priceAiSeq;
+    box.innerHTML = '<div class="pk-price-loading">🤖 Đang hỏi AI…</div>';
+    safeSendMessage_({ type: 'ASK_PRICE', payload: { q } }, (resp) => {
+      if (seq !== _priceAiSeq) return;   // đã hỏi câu khác trong lúc chờ
+      if (!resp?.ok) { box.innerHTML = `<div class="pk-price-ai-err">⚠ ${escapeHtml(resp?.error || PK_API_ERR)}</div>`; return; }
+      const d = resp.data || {};
+      if (!d.found) {
+        const sg = (d.suggestions || []).slice(0, 8);
+        box.innerHTML = '<div class="pk-price-ai-txt">Chưa tìm thấy sản phẩm khớp rõ trong bảng giá. Gõ rõ TÊN sản phẩm (kèm chất liệu / size nếu có).</div>' +
+          (sg.length ? '<div class="pk-price-ai-sg">Có thể bạn muốn hỏi: ' + sg.map((x) => `<button type="button" class="pk-price-ai-chip" data-s="${escapeHtml(x)}">${escapeHtml(x)}</button>`).join(' ') + '</div>' : '');
+        box.querySelectorAll('.pk-price-ai-chip').forEach((b) => b.addEventListener('click', () => {
+          panelEl.querySelector('#pk-price-q').value = b.getAttribute('data-s') || ''; askPriceAi_();
+        }));
+        return;
+      }
+      box.innerHTML = `<div class="pk-price-ai-txt">${escapeHtml(d.text)}</div>` +
+        `<div class="pk-price-ai-foot">Giá lấy từ bảng giá DANH_MUC${d.provider ? ' · AI: ' + escapeHtml(d.provider) : ''}${d.aiError ? ' · ⚠ Lỗi API — hiện danh sách giá gốc' : ''} <button type="button" class="pk-price-ai-copy">📋 Copy</button></div>`;
+      const cp = box.querySelector('.pk-price-ai-copy');
+      cp.addEventListener('click', () => {
+        try { navigator.clipboard.writeText(d.text).then(() => { cp.textContent = '✓ Đã copy'; }).catch(() => { cp.textContent = 'Không copy được'; }); } catch (e) { cp.textContent = 'Không copy được'; }
+      });
+    });
+  }
+
+  // TRA CUU GIA: chi hien san pham + gia (DANH_MUC) nhu ban dau. Tin nhan goi y/mau tach rieng o muc "📚 Mau tin nhan tu van" (khong tron vao ket qua gia).
   function doPriceSearch_() {
     const q = (panelEl.querySelector('#pk-price-q').value || '').trim();
     const box = panelEl.querySelector('#pk-price-result');
     box.innerHTML = '<div class="pk-price-loading">Đang tìm...</div>';
     safeSendMessage_({ type: 'GET_PRICE', payload: { q } }, (resp) => {
-      if (!resp?.ok) { box.innerHTML = `<div class="pk-price-loading">Lỗi: ${escapeHtml(resp?.error || 'không rõ')}</div>`; return; }
+      if (!resp?.ok) { box.innerHTML = `<div class="pk-price-loading">${escapeHtml(resp?.error || PK_API_ERR)}</div>`; return; }   // KHONG them tien to "Loi:" — thong bao API da la cau hoan chinh (test-pancake-apierr)
       renderPriceRows_(resp.data.rows || [], q);
     });
   }
@@ -2784,7 +2865,7 @@
     const box = panelEl.querySelector('#pk-ctkm-result');
     box.innerHTML = '<div class="pk-price-loading">Đang tìm...</div>';
     safeSendMessage_({ type: 'GET_CTKM_SEARCH', payload: { q } }, (resp) => {
-      if (!resp?.ok) { box.innerHTML = `<div class="pk-price-loading">Lỗi: ${escapeHtml(resp?.error || 'không rõ')}</div>`; return; }
+      if (!resp?.ok) { box.innerHTML = `<div class="pk-price-loading">${escapeHtml(resp?.error || PK_API_ERR)}</div>`; return; }
       renderCtkmRows_(resp.data.rows || [], q);
     });
   }
@@ -2832,10 +2913,21 @@
     const box = panelEl.querySelector('#pk-tpl-result');
     box.innerHTML = '<div class="pk-price-loading">Đang tải thư viện mẫu...</div>';
     safeSendMessage_({ type: 'GET_MESSAGE_TEMPLATES' }, (resp) => {
-      if (!resp?.ok) { box.innerHTML = `<div class="pk-price-loading">Lỗi: ${escapeHtml(resp?.error || 'không rõ')}</div>`; return; }
-      _msgTemplates = resp.data.templates || [];
+      if (!resp?.ok) { box.innerHTML = `<div class="pk-price-loading">${escapeHtml(resp?.error || PK_API_ERR)}</div>`; return; }
+      _msgTemplates = resp.data.templates || []; _msgTplTs = Date.now();
+      _msgTplGroups = resp.data.groups || [];
+      fillTplGroupSelect_();
       renderMsgTemplateRows_();
     });
+  }
+  // O loc nhom san pham cua danh sach mau: nhom DANH_MUC (server tra ve) + nhom cua mau + "Chung" (mau khong thuoc nhom nao). Giu lua chon dang co.
+  function fillTplGroupSelect_() {
+    const sel = panelEl.querySelector('#pk-tpl-group'); if (!sel) return;
+    const groups = _msgTplGroups.slice();
+    _msgTemplates.forEach((t) => { if (t.nhom && groups.indexOf(t.nhom) < 0) groups.push(t.nhom); });
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">🗂 Tất cả nhóm</option>' + groups.map((g) => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('') + '<option value="__none__">Chung (chưa phân nhóm)</option>';
+    sel.value = cur; if (sel.value !== cur) sel.value = '';
   }
 
   // Xep hang: san pham 5 (khop nguyen 1 san pham +3), chu de 3, tag 3, tieu de 2, noi dung 1; moi tu khoa phai khop it nhat 1 truong. Y het CRM (tplSearch).
@@ -2843,13 +2935,14 @@
     const words = _stripVNlocal_((query || '').trim().toLowerCase()).split(/\s+/).filter(Boolean);
     const out = [];
     list.forEach((t, idx) => {
-      const f = { product: _stripVNlocal_((t.product || '').toLowerCase()), topic: _stripVNlocal_((t.topic || '').toLowerCase()), tags: _stripVNlocal_((t.tags || '').toLowerCase()),
+      const f = { nhom: _stripVNlocal_((t.nhom || '').toLowerCase()), product: _stripVNlocal_((t.product || '').toLowerCase()), topic: _stripVNlocal_((t.topic || '').toLowerCase()), tags: _stripVNlocal_((t.tags || '').toLowerCase()),
         title: _stripVNlocal_((t.title || '').toLowerCase()), content: _stripVNlocal_((t.content || '').toLowerCase()) };
       const parts = String(t.product || '').split(/[,;|\n]/).map((x) => _stripVNlocal_(x.toLowerCase()).trim()).filter(Boolean);
       let score = 0, all = true;
       for (const w of words) {
         let hit = 0;
         if (f.product.indexOf(w) >= 0) hit = Math.max(hit, 5);
+        if (f.nhom.indexOf(w) >= 0) hit = Math.max(hit, 4);
         if (f.topic.indexOf(w) >= 0) hit = Math.max(hit, 3);
         if (f.tags.indexOf(w) >= 0) hit = Math.max(hit, 3);
         if (f.title.indexOf(w) >= 0) hit = Math.max(hit, 2);
@@ -2871,45 +2964,73 @@
     return !!me && t.status && t.status !== 'approved' && String(t.createdBy || '').trim().toLowerCase() === me;
   }
 
+  // Tach mau thanh tung DOAN: moi dong (xuong dong) = 1 tin nhan rieng. Bo dong trong, cat khoang trang 2 dau.
+  function tplLines_(content) {
+    return String(content || '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+  }
+
   function renderMsgTemplateRows_() {
     const box = panelEl.querySelector('#pk-tpl-result');
     if (!box) return;
-    const rows = rankMsgTemplates_(_msgTemplates, panelEl.querySelector('#pk-tpl-q').value || '').slice(0, 40);
+    const gF = (panelEl.querySelector('#pk-tpl-group') || {}).value || '';
+    const pool = gF ? _msgTemplates.filter((t) => (gF === '__none__' ? !t.nhom : t.nhom === gF)) : _msgTemplates;
+    const rows = rankMsgTemplates_(pool, panelEl.querySelector('#pk-tpl-q').value || '').slice(0, 40);
     if (!rows.length) {
       box.innerHTML = `<div class="pk-price-loading">${_msgTemplates.length ? 'Không tìm thấy mẫu phù hợp. Thử tên sản phẩm ngắn hơn, hoặc bấm ➕ để đề xuất mẫu mới.' : 'Chưa có mẫu nào được duyệt — admin/quản lý thêm mẫu trên CRM (tab "Zalo AI"), hoặc bấm ➕ để đề xuất.'}</div>`;
       return;
     }
     box.innerHTML = rows.map((t) => {
-      const chips = String(t.product || '').split(/[,;|\n]/).map((x) => x.trim()).filter(Boolean).map((p) => `<span class="pk-price-field">📦 ${escapeHtml(p)}</span>`).join(' ')
+      const chips = (t.nhom ? `<span class="pk-price-field" title="${t.nhomAuto ? 'Hệ thống tự phân loại theo tên sản phẩm / nội dung' : 'Nhóm sản phẩm do người soạn chọn'}">🗂 ${escapeHtml(t.nhom)}${t.nhomAuto ? ' · tự phân loại' : ''}</span> ` : '') + String(t.product || '').split(/[,;|\n]/).map((x) => x.trim()).filter(Boolean).map((p) => `<span class="pk-price-field">📦 ${escapeHtml(p)}</span>`).join(' ')
         + (t.topic ? ` <span class="pk-price-field">💬 ${escapeHtml(t.topic)}</span>` : '')
         + String(t.tags || '').split(',').map((x) => x.trim()).filter(Boolean).map((tg) => ` <span class="pk-price-field">#${escapeHtml(tg)}</span>`).join('');
       const preview = t.content.length > 160 ? t.content.slice(0, 160) + '…' : t.content;
       const mine = isMyOpenTpl_(t);
-      const badge = !mine ? '' : (t.status === 'rejected'
+      const others = !mine && t.status === 'pending';   // 21/10/2026: CS xem duoc ca mau CHUA DUYET cua nguoi khac (tham khao) — AI chi hoc mau DA DUYET
+      const badge = others ? `<div style="color:#92400e;font-size:11px">⏳ Chưa duyệt${t.createdBy ? ' — ' + escapeHtml(t.createdBy) + ' đề xuất' : ''} (tham khảo, chờ admin duyệt)</div>` : !mine ? '' : (t.status === 'rejected'
         ? `<div style="color:#991b1b;font-size:11px">❌ Bị từ chối${t.rejectReason ? ': ' + escapeHtml(t.rejectReason) : ''} — sửa lại để gửi duyệt lại</div>`
         : '<div style="color:#92400e;font-size:11px">⏳ Chờ quản lý duyệt — chưa dùng được cho người khác</div>');
       return `<div class="pk-price-item pk-ai-suggestion-item" data-tid="${escapeHtml(t.id)}" title="Bấm để chèn vào ô trả lời">` +
         `<div class="pk-ctkm-title">${escapeHtml(t.title)}</div>` + badge +
         `<div>${escapeHtml(preview)}</div>` +
         (chips ? `<div style="margin-top:3px">${chips}</div>` : '') +
-        `<div class="pk-tpl-acts"><button type="button" class="pk-btn-outline" data-cid="${escapeHtml(t.id)}">📋 Copy</button>` +
+        `<div class="pk-tpl-acts"><button type="button" class="pk-btn-outline" data-cid="${escapeHtml(t.id)}" title="Copy nguyên cả mẫu (cả đoạn dài)">📋 Copy cả câu</button>` +
+        `<button type="button" class="pk-btn-outline" data-iid="${escapeHtml(t.id)}" title="Chèn nguyên cả mẫu vào ô chat">➡ Chèn cả câu</button>` +
+        (tplLines_(t.content).length > 1 ? `<button type="button" class="pk-btn-outline" data-ltog="${escapeHtml(t.id)}" title="Tách mỗi dòng thành 1 tin nhắn riêng">📑 Từng đoạn (${tplLines_(t.content).length})</button>` : '') +
         (mine ? `<button type="button" class="pk-btn-outline" data-eid="${escapeHtml(t.id)}">✏️ Sửa</button><button type="button" class="pk-btn-outline" data-did="${escapeHtml(t.id)}">🗑 Xoá</button>` : '') +
-        `</div></div>`;
+        `</div>` +
+        (tplLines_(t.content).length > 1 ? `<div class="pk-tpl-lines" data-lbox="${escapeHtml(t.id)}" style="display:none">` + tplLines_(t.content).map((ln, k) =>
+          `<div class="pk-tpl-line"><span class="pk-tpl-line-txt">${escapeHtml(ln)}</span>` +
+          `<button type="button" class="pk-btn-outline" data-lc="${escapeHtml(t.id)}|${k}" title="Copy đoạn này (1 tin nhắn)">📋 Copy đoạn</button>` +
+          `<button type="button" class="pk-btn-outline" data-li="${escapeHtml(t.id)}|${k}" title="Đưa đoạn này vào ô chat">➡ Chèn</button></div>`).join('') + `</div>` : '') +
+        `</div>`;
     }).join('');
     box.querySelectorAll('[data-tid]').forEach((el) => {
       el.addEventListener('click', (e) => {
-        if (e.target.closest('button')) return; // bam nut thi khong chen vao o tra loi
+        if (e.target.closest('button') || e.target.closest('.pk-tpl-lines')) return; // bam nut / vung tung doan thi khong chen ca mau vao o tra loi
         const t = _msgTemplates.find((x) => x.id === el.dataset.tid);
         if (t) insertReply(t.content); // dung lai ham co san — tu dong xu ly ca contenteditable lan textarea
       });
     });
+    const flashBtn_ = (b, txt) => { const old = b.textContent; b.textContent = txt; setTimeout(() => { b.textContent = old; }, 1200); };
+    const copyBtn_ = (b, text) => navigator.clipboard.writeText(text).then(() => flashBtn_(b, '✅ Đã copy')).catch(() => setStatus('Không copy được — bấm vào thẻ để chèn thẳng vào ô trả lời.'));
+    const lineOf_ = (key) => { const [id, k] = String(key).split('|'); const t = _msgTemplates.find((x) => x.id === id); return t ? (tplLines_(t.content)[Number(k)] || '') : ''; };
     box.querySelectorAll('[data-cid]').forEach((b) => b.addEventListener('click', (e) => {
       e.stopPropagation();
       const t = _msgTemplates.find((x) => x.id === b.dataset.cid);
-      if (!t) return;
-      const done = () => { const old = b.textContent; b.textContent = '✅ Đã copy'; setTimeout(() => { b.textContent = old; }, 1200); };
-      navigator.clipboard.writeText(t.content).then(done).catch(() => setStatus('Không copy được — bấm vào thẻ để chèn thẳng vào ô trả lời.'));
+      if (t) copyBtn_(b, t.content);   // Copy CA CAU: giu nguyen xuong dong, dan duoc ca doan dai
     }));
+    box.querySelectorAll('[data-iid]').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const t = _msgTemplates.find((x) => x.id === b.dataset.iid);
+      if (t) { insertReply(t.content); flashBtn_(b, '✅ Đã chèn'); }
+    }));
+    box.querySelectorAll('[data-ltog]').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const lb = box.querySelector(`[data-lbox="${CSS.escape(b.dataset.ltog)}"]`);
+      if (lb) lb.style.display = lb.style.display === 'none' ? '' : 'none';
+    }));
+    box.querySelectorAll('[data-lc]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); const ln = lineOf_(b.dataset.lc); if (ln) copyBtn_(b, ln); }));
+    box.querySelectorAll('[data-li]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); const ln = lineOf_(b.dataset.li); if (ln) { insertReply(ln); flashBtn_(b, '✅ Đã chèn'); } }));
     box.querySelectorAll('[data-eid]').forEach((b) => b.addEventListener('click', (e) => {
       e.stopPropagation();
       openTplForm_(_msgTemplates.find((x) => x.id === b.dataset.eid) || null);
@@ -2921,50 +3042,100 @@
       b.disabled = true;
       safeSendMessage_({ type: 'DELETE_MESSAGE_TEMPLATE', payload: { id: t.id, createdBy: settings.csName || '' } }, (resp) => {
         if (resp?.ok) { setStatus('Đã xoá mẫu.'); loadMsgTemplates_(); }
-        else { b.disabled = false; setStatus('Lỗi xoá mẫu: ' + (resp?.error || 'không rõ')); }
+        else { b.disabled = false; setStatus(resp?.error || PK_API_ERR); }   // Pancake: KHONG them tien to 'Loi ...:' truoc loi API (test-pancake-apierr)
       });
     }));
   }
 
-  // Form DE XUAT mau tin ngay tren Pancake. Mau moi o trang thai "cho duyet" — chi dung duoc cho nguoi khac sau khi admin/quan ly duyet tren CRM.
+  // Danh muc san pham (cot Nhom SP / Ten SP bang gia DANH_MUC) cho form "Tao mau luu san": dung CHUNG cache voi "Tim anh san pham" (_imgFlatItems).
+  // Loi tai KHONG lam hong form (van go tay duoc) va KHONG khoa tab tim anh (de null de tab do tu tai lai).
+  function ensureTplCatalog_(cb) {
+    if (_imgFlatItems !== null) { cb(); return; }
+    if (_imgFlatLoading) { setTimeout(() => ensureTplCatalog_(cb), 400); return; }
+    _imgFlatLoading = true;
+    safeSendMessage_({ type: 'GET_PRODUCT_IMAGE_FLAT' }, (resp) => {
+      _imgFlatLoading = false;
+      if (resp?.ok) _imgFlatItems = resp.data.items || [];
+      cb();
+    });
+  }
+
+  // Form "TAO MAU LUU SAN" (Duyen 21/10/2026): CS chon NHOM SP (co san o bang gia) va/hoac go TEN SP (co goi y; AI tu nhan nhom khi ten khop bang gia),
+  // roi them mau cau tu van — moi dong = 1 tin nhan. Mau cua CS luon o trang thai "Cho duyet" (admin duyet tren CRM); AI CHI hoc mau DA DUYET.
   // Extension khong co tai khoan dang nhap nen KHONG duyet/sua mau da duyet tai day (server cung chan).
   function openTplForm_(t) {
     const host = panelEl.querySelector('#pk-tpl-form');
-    if (!settings.csName) { setStatus('Chọn tên CS của bạn trước (ô tên CS ở trên) để đề xuất mẫu.'); return; }
+    if (!settings.csName) { setStatus('Chọn tên CS của bạn trước (ô tên CS ở trên) để tạo mẫu.'); return; }
     host.innerHTML = `
       <div class="pk-tpl-form-box">
-        <div class="pk-tpl-form-title">${t ? '✏️ Sửa mẫu đề xuất' : '➕ Đề xuất mẫu mới'}</div>
-        <div style="font-size:11px;color:#6b7280;margin-bottom:4px">Mẫu sẽ ở trạng thái "Chờ duyệt" cho đến khi quản lý duyệt trên CRM.</div>
-        <input type="text" id="pk-tpl-f-title" placeholder="Tiêu đề mẫu" autocomplete="off" />
-        <input type="text" id="pk-tpl-f-product" placeholder="📦 Sản phẩm áp dụng, cách nhau dấu phẩy (VD: Nhẫn vàng, Lắc tay)" autocomplete="off" />
-        <input type="text" id="pk-tpl-f-topic" placeholder="💬 Nội dung hội thoại / tình huống (VD: Khách hỏi giá)" autocomplete="off" />
-        <textarea id="pk-tpl-f-content" rows="5" placeholder="Nội dung tin nhắn mẫu"></textarea>
+        <div class="pk-tpl-form-title">${t ? '✏️ Sửa mẫu lưu sẵn' : '➕ Tạo mẫu lưu sẵn'}</div>
+        <div style="font-size:11px;color:#6b7280;margin-bottom:4px">Chọn <b>nhóm sản phẩm</b> (có sẵn ở bảng giá) hoặc gõ <b>tên sản phẩm</b> — hệ thống tự nhận nhóm. Mẫu của bạn ở trạng thái <b>Chờ duyệt</b>; AI chỉ học sau khi admin duyệt trên CRM.</div>
+        <input type="text" id="pk-tpl-f-nhom" list="pk-tpl-nhom-dl" placeholder="🗂 Nhóm sản phẩm (chọn từ bảng giá hoặc gõ; để trống = hệ thống tự phân loại)" autocomplete="off" />
+        <datalist id="pk-tpl-nhom-dl"></datalist>
+        <input type="text" id="pk-tpl-f-product" list="pk-tpl-prod-dl" placeholder="📦 Tên sản phẩm, cách nhau dấu phẩy (VD: Nhẫn vàng, Lắc tay)" autocomplete="off" />
+        <datalist id="pk-tpl-prod-dl"></datalist>
+        <div id="pk-tpl-f-hint" style="font-size:11px;color:#047857;min-height:14px"></div>
+        <input type="text" id="pk-tpl-f-topic" placeholder="💬 Tình huống / nội dung hội thoại (VD: Khách hỏi giá)" autocomplete="off" />
+        <input type="text" id="pk-tpl-f-title" placeholder="Tiêu đề mẫu (bỏ trống = tự đặt theo sản phẩm + tình huống)" autocomplete="off" />
+        <textarea id="pk-tpl-f-content" rows="6" placeholder="Mẫu câu tư vấn — mỗi dòng (xuống dòng) sẽ là 1 tin nhắn riêng khi gửi cho khách"></textarea>
         <input type="text" id="pk-tpl-f-tags" placeholder="Tag, cách nhau dấu phẩy (VD: chào hỏi, bảo hành)" autocomplete="off" />
         <div class="pk-ai-sug-bar">
-          <button type="button" class="pk-btn-outline pk-ai-sug-save" id="pk-tpl-f-save">📨 Gửi đề xuất</button>
+          <button type="button" class="pk-btn-outline pk-ai-sug-save" id="pk-tpl-f-save">📨 Lưu mẫu (chờ duyệt)</button>
           <button type="button" class="pk-btn-outline" id="pk-tpl-f-cancel">Huỷ</button>
         </div>
       </div>`;
     const $ = (id) => host.querySelector(id);
-    $('#pk-tpl-f-title').value = t ? t.title : '';
+    $('#pk-tpl-f-nhom').value = (t && t.nhom && !t.nhomAuto) ? t.nhom : '';   // nhom tu phan loai (server) KHONG dien san: de trong = tiep tuc tu phan loai
     $('#pk-tpl-f-product').value = t ? (t.product || '') : '';
     $('#pk-tpl-f-topic').value = t ? (t.topic || '') : '';
+    $('#pk-tpl-f-title').value = t ? t.title : '';
     $('#pk-tpl-f-content').value = t ? t.content : '';
     $('#pk-tpl-f-tags').value = t ? (t.tags || '') : '';
-    $('#pk-tpl-f-title').focus();
+    $('#pk-tpl-f-nhom').focus();
+
+    // Goi y nhom / ten SP tu bang gia + tu nhan nhom khi ten SP khop
+    const fillLists = () => {
+      const items = _imgFlatItems || [];
+      const nhomVal = $('#pk-tpl-f-nhom').value.trim();
+      const groups = [...new Set(items.map((it) => it.n).filter(Boolean))].sort(_vnSort_);
+      $('#pk-tpl-nhom-dl').innerHTML = groups.map((g) => `<option value="${escapeHtml(g)}"></option>`).join('');
+      const pool = nhomVal && groups.indexOf(nhomVal) >= 0 ? items.filter((it) => it.n === nhomVal) : items;
+      const nm = {}; pool.forEach((it) => _itemNames_(it).forEach((n) => { const f = _fold_(n); if (!nm[f]) nm[f] = n; }));
+      $('#pk-tpl-prod-dl').innerHTML = Object.keys(nm).map((f) => nm[f]).sort(_vnSort_).slice(0, 400).map((n) => `<option value="${escapeHtml(n)}"></option>`).join('');
+    };
+    const detectGroup = () => {
+      const items = _imgFlatItems || [];
+      if (!items.length) return;
+      const toks = $('#pk-tpl-f-product').value.split(/[,;|\n]/).map((x) => _fold_(x)).filter(Boolean);
+      if (!toks.length) { $('#pk-tpl-f-hint').textContent = ''; return; }
+      const found = new Set(); let matched = 0;
+      toks.forEach((tk) => { const g = items.filter((it) => _itemNames_(it).some((n) => _fold_(n) === tk)).map((it) => it.n).filter(Boolean); if (g.length) matched++; g.forEach((x) => found.add(x)); });
+      const gs = [...found];
+      const cur = $('#pk-tpl-f-nhom').value.trim();
+      if (gs.length === 1 && !cur) { $('#pk-tpl-f-nhom').value = gs[0]; $('#pk-tpl-f-hint').textContent = '🤖 Đã tự nhận nhóm: ' + gs[0]; }
+      else if (gs.length > 1 && !cur) $('#pk-tpl-f-hint').textContent = '🤖 Sản phẩm thuộc nhiều nhóm (' + gs.slice(0, 3).join(', ') + ') — chọn nhóm ở ô trên nếu muốn.';
+      else if (!matched) $('#pk-tpl-f-hint').textContent = 'Tên này chưa có trong bảng giá — vẫn lưu được, AI sẽ nhận diện theo tên bạn gõ.';
+      else $('#pk-tpl-f-hint').textContent = '';
+    };
+    ensureTplCatalog_(() => { if (!host.contains($('#pk-tpl-f-nhom') || null)) return; fillLists(); detectGroup(); });
+    $('#pk-tpl-f-nhom').addEventListener('input', fillLists);
+    $('#pk-tpl-f-product').addEventListener('input', detectGroup);
+    $('#pk-tpl-f-product').addEventListener('change', detectGroup);
     $('#pk-tpl-f-cancel').addEventListener('click', () => { host.innerHTML = ''; });
     $('#pk-tpl-f-save').addEventListener('click', () => {
-      const title = $('#pk-tpl-f-title').value.trim();
+      const nhom = $('#pk-tpl-f-nhom').value.trim(), product = $('#pk-tpl-f-product').value.trim(), topic = $('#pk-tpl-f-topic').value.trim();
       const content = $('#pk-tpl-f-content').value.trim();
-      if (!title || !content) { setStatus('Cần nhập đủ tiêu đề và nội dung mẫu.'); return; }
+      if (!content) { setStatus('Cần nhập nội dung mẫu câu tư vấn.'); return; }
+      if (!nhom && !product && !topic) { setStatus('Chọn nhóm sản phẩm, gõ tên sản phẩm hoặc nhập tình huống để AI biết mẫu này dùng cho đâu.'); return; }
+      const title = $('#pk-tpl-f-title').value.trim() || ((product || nhom || 'Mẫu tư vấn') + (topic ? ' — ' + topic : ''));
       const btn = $('#pk-tpl-f-save');
-      btn.disabled = true; btn.innerText = 'Đang gửi...';
+      btn.disabled = true; btn.innerText = 'Đang lưu...';
       safeSendMessage_({ type: 'SAVE_MESSAGE_TEMPLATE', payload: {
         id: t ? t.id : '', title, content, tags: $('#pk-tpl-f-tags').value.trim(),
-        product: $('#pk-tpl-f-product').value.trim(), topic: $('#pk-tpl-f-topic').value.trim(), createdBy: settings.csName || ''
+        product, nhom, topic, createdBy: settings.csName || ''
       } }, (resp) => {
-        if (resp?.ok) { host.innerHTML = ''; setStatus('Đã gửi đề xuất — quản lý duyệt xong mẫu mới dùng được cho mọi người.'); loadMsgTemplates_(); }
-        else { btn.disabled = false; btn.innerText = '📨 Gửi đề xuất'; setStatus('Lỗi gửi đề xuất: ' + (resp?.error || 'không rõ')); }
+        if (resp?.ok) { host.innerHTML = ''; setStatus('Đã lưu mẫu (chờ duyệt) — admin duyệt xong AI mới học và mọi người dùng như mẫu chuẩn.'); loadMsgTemplates_(); }
+        else { btn.disabled = false; btn.innerText = '📨 Lưu mẫu (chờ duyệt)'; setStatus(resp?.error || PK_API_ERR); }
       });
     });
   }
@@ -3004,7 +3175,7 @@
         _imgFlatItems = resp.data.items || [];
       } else {
         _imgFlatItems = [];
-        if (dyn) dyn.innerHTML = `<div class="pk-price-loading">Lỗi: ${escapeHtml(resp?.error || 'không tải được danh mục')}</div>`;
+        if (dyn) dyn.innerHTML = `<div class="pk-price-loading">${escapeHtml(resp?.error || PK_API_ERR)}</div>`;
         return;
       }
       renderImgDyn_();
@@ -3129,7 +3300,7 @@
     safeSendMessage_({ type: 'GET_DRIVE_IMAGE', payload: { link } }, (resp) => {
       const slot = panelEl.querySelector(`#pkimg-slot-${i}`);
       if (!slot) return;
-      if (!resp?.ok) { slot.innerHTML = `<div class="pk-price-loading">Lỗi: ${escapeHtml(resp?.error || 'không đọc được ảnh')}</div>`; return; }
+      if (!resp?.ok) { slot.innerHTML = `<div class="pk-price-loading">${escapeHtml(resp?.error || PK_API_ERR)}</div>`; return; }
       const data = resp.data;
       if (data.image && data.image.base64) {
         slot.innerHTML = `<img src="data:${data.image.mimeType};base64,${data.image.base64}" style="max-width:100%;border-radius:8px;border:1px solid var(--pk-border,#e5e7eb)" />` +
@@ -3361,12 +3532,12 @@
         } else if (resp?.ok) {
           _flatItems = []; _flatMode = 'full';
           _setBldMsg_('Đọc được sheet giá nhưng không nhận diện được cột "Tên sản phẩm"/"Tên thương mại" — dùng tạm tab "Gõ tìm".');
-        } else if (String(resp?.error || '').indexOf('GAS_NO_FLAT') !== -1) {
+        } else if (String(resp?.error || PK_API_ERR).indexOf('GAS_NO_FLAT') !== -1) {
           _flatMode = 'live'; _flatItems = [];
           _setBldMsg_('⚠ GAS chưa cập nhật bản mới (thiếu <b>priceCatalogFlat</b>) — đang dùng chế độ tìm trực tiếp, tối đa 50 dòng mỗi lần gõ. Deploy lại <b>gas_v13.js</b> để có đủ danh mục.');
         } else {
           _flatItems = null;   // lỗi mạng/GAS → lần mở tab sau tự thử lại
-          _setBldMsg_('Lỗi tải danh mục: ' + escapeHtml(resp?.error || 'không rõ') + ' — chuyển tab rồi quay lại để thử lại.');
+          _setBldMsg_(escapeHtml(resp?.error || PK_API_ERR) + ' — chuyển tab rồi quay lại để thử lại.');
         }
         renderBuilderDyn_();
       });
@@ -3433,7 +3604,7 @@
     if (_fold_(q).length < 2) { _flatItems = []; renderBuilderDyn_(); return; }
     safeSendMessage_({ type: 'GET_PRICE', payload: { q } }, (resp) => {
       if (q !== _bld.q) return; // đã gõ tiếp, bỏ kết quả cũ
-      if (!resp?.ok) { _setBldMsg_('Lỗi tìm: ' + escapeHtml(resp?.error || 'không rõ')); return; }
+      if (!resp?.ok) { _setBldMsg_(escapeHtml(resp?.error || PK_API_ERR)); return; }
       _flatItems = (resp.data.rows || []).map(_normPriceRow_).filter((it) => it.t || it.m);
       renderBuilderDyn_();
     });
@@ -3839,6 +4010,56 @@
     return { checked, subtotal, discBase, discountAmt, gold, ship, total };
   }
 
+  // ── U3d: CT KHUYẾN MÃI TỰ ĐỘNG (admin cài ở CRM → Settings 'promoConfig'; engine calcPromo_ ở pancake-promo.js) ──
+  // Chỉ tính trên các dòng đã tick VÀ chưa có CTKM riêng (promoType = none) để không giảm 2 lần. Kết quả chỉ ĐỀ XUẤT:
+  // Sale bấm "Áp vào đơn" mới ghi vào Giảm giá tổng + Quà tặng kèm (không tự đổi gì khi chưa bấm).
+  let _promoCfg = null;
+  function _loadPromoCfg_(cb) {
+    if (_promoCfg) { cb(null); return; }
+    safeSendMessage_({ type: 'GET_PROMO_CONFIG' }, (resp) => {
+      if (!resp?.ok) { cb(resp?.error || PK_API_ERR); return; }
+      _promoCfg = promoNormalize_(resp.data?.promoConfig || '[]');
+      cb(null);
+    });
+  }
+  function _calcAutoPromo_() {
+    const out = panelEl.querySelector('#pk-cart-promo-out');
+    out.style.display = 'block';
+    out.textContent = 'Đang tính...';
+    _loadPromoCfg_((err) => {
+      if (err) { out.innerHTML = `<span style="color:#b91c1c">${escapeHtml(String(err))}</span>`; return; }
+      if (!_promoCfg.length) { out.textContent = 'Admin chưa cài chương trình khuyến mãi nào (CRM → Settings → 🎁 Cấu hình khuyến mãi).'; return; }
+      const rows = _cartItems.filter((i) => i.checked && (!i.promoType || i.promoType === 'none'));
+      if (!rows.length) { out.textContent = 'Chưa có dòng nào để tính (tick sản phẩm và để trống CTKM riêng của dòng).'; return; }
+      const voucher = String(panelEl.querySelector('#pk-cart-voucher').value || '').split(',').map((x) => x.trim()).filter(Boolean);
+      const r = calcPromo_(rows.map((i) => ({ name: i.name, qty: Number(i.qty) || 0, price: Number(i.price) || 0 })), _promoCfg, { vouchers: voucher });
+      const vnd = (n) => Number(n).toLocaleString('vi-VN') + 'đ';
+      const giftText = r.gifts.map((g) => g.name + (g.qty > 1 ? ' x' + g.qty : '')).join(', ');
+      let h = `<div>Tạm tính: <b>${vnd(r.subtotal)}</b> · Giảm: <b>-${vnd(r.discount)}</b> · Còn: <b>${vnd(r.total)}</b></div>`;
+      if (r.applied.length) h += `<div>✅ ${r.applied.map((a) => escapeHtml(a.name)).join('; ')}</div>`;
+      if (giftText) h += `<div>🎁 Quà: ${escapeHtml(giftText)}</div>`;
+      if (!r.applied.length) h += '<div>Không có chương trình nào áp dụng được cho giỏ này.</div>';
+      if (r.applied.length) h += '<button id="pk-cart-promo-apply">Áp vào đơn</button>';
+      out.innerHTML = h;
+      const btn = out.querySelector('#pk-cart-promo-apply');
+      if (btn) btn.addEventListener('click', () => {
+        if (_cartExtra.discountType !== 'none' && Number(_cartExtra.discountValue) > 0 &&
+            !confirm('Đơn đang có Giảm giá tổng nhập tay. Thay bằng kết quả CT tự động?')) return;
+        _cartExtra.discountType = r.discount > 0 ? 'amount' : 'none';
+        _cartExtra.discountValue = r.discount;
+        // Dòng không dùng CT tự động (có CTKM riêng) không được tính vào giảm giá tổng
+        _cartItems.forEach((i) => { if (i.checked && i.promoType && i.promoType !== 'none') i.inTotalDiscount = false; });
+        if (giftText) {
+          const cur = String(_cartExtra.gift || '').trim();
+          if (cur.indexOf(giftText) === -1) _cartExtra.gift = cur ? cur + ', ' + giftText : giftText;
+        }
+        saveCart_(); renderCart_();
+        setStatus('🎁 Đã áp CT tự động vào đơn.');
+      });
+    });
+  }
+
+
   function _renderCartTotal_() {
     const t = _cartTotals_();
     const fmt = (n) => n.toLocaleString('vi-VN') + 'đ';
@@ -3975,6 +4196,22 @@
     return "unknown";
   }
 
+  // AI khong dung duoc (chua co API key / het luot / loi mang): chi sang muc "Mau tin nhan tu van" (tin nhan co san, khong can key).
+  function showAiFallbackHint_() {
+    const box = panelEl.querySelector("#pk-ai-suggestions");
+    if (!box) return;
+    box.innerHTML = '<div style="margin-top:6px;padding:8px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;font-size:12px;color:#92400e">' +
+      '⚠️ AI chưa dùng được lúc này (chưa có API key hoặc hết lượt). Bạn vẫn lấy được tin nhắn: mở mục <b>Mẫu tin nhắn tư vấn</b> để chọn tin nhắn mẫu có sẵn chèn vào ô trả lời.' +
+      '<div style="margin-top:6px"><button type="button" class="pk-btn-outline" id="pk-ai-fallback-go">📚 Mở mẫu tin nhắn</button></div></div>';
+    box.querySelector('#pk-ai-fallback-go').addEventListener('click', () => {
+      const sel = panelEl.querySelector('#pk-menu-sel');
+      sel.value = 'tpl'; sel.dispatchEvent(new Event('change', { bubbles: true }));
+      const qi = panelEl.querySelector('#pk-tpl-q'), ctx = (panelEl.querySelector('#pk-ctx-input')?.value || '').trim();
+      if (qi && !qi.value.trim() && ctx) qi.value = ctx.slice(0, 60);
+      if (qi) { qi.focus(); qi.scrollIntoView?.({ block: 'center' }); if (_msgTemplates.length) renderMsgTemplateRows_(); }
+    });
+  }
+
   async function requestSuggestion(manual) {
     const messages = extractMessages();
     if (!messages.length) {
@@ -4000,7 +4237,8 @@
       },
       (resp) => {
         if (!resp?.ok) {
-          setStatus("Lỗi: " + (resp?.error || "không rõ nguyên nhân"));
+          setStatus(resp?.error || PK_API_ERR);
+          showAiFallbackHint_();
           return;
         }
         renderSuggestions(resp.data);
@@ -4028,7 +4266,7 @@
       const data = await new Promise((resolve) => {
         safeSendMessage_(
           { type: "FETCH_OPENER", payload: { custLines, tone: _activeTone, angleInstr: angle.instr, withProducts: _useProducts, stonePref: _stonePref } },
-          (resp) => resolve(resp?.ok ? resp.data : { error: resp?.error || "lỗi không rõ" })
+          (resp) => resolve(resp?.ok ? resp.data : { error: resp?.error || PK_API_ERR })
         );
       });
       results.push({ angle, ...data });
@@ -4043,7 +4281,7 @@
       const box = document.createElement("div");
       box.className = "pk-opener-box";
       if (r.error) {
-        box.innerHTML = `<div class="pk-opener-label">${escapeHtml(r.angle.label)}</div><div style="color:#dc2626;font-size:12px">Lỗi: ${escapeHtml(r.error)}</div>`;
+        box.innerHTML = `<div class="pk-opener-label">${escapeHtml(r.angle.label)}</div><div style="color:#dc2626;font-size:12px">${escapeHtml(r.error)}</div>`;
         sug.appendChild(box);
         return;
       }
@@ -4149,7 +4387,7 @@
           setTimeout(() => { ed.remove(); item.style.display = ""; bar.style.display = ""; }, 1200);
         } else {
           saveBtn.disabled = false; saveBtn.innerText = "💾 Lưu để AI học";
-          setStatus("Lỗi lưu mẫu: " + (resp?.error || "không rõ nguyên nhân"));
+          setStatus(resp?.error || PK_API_ERR);
         }
       });
     });
@@ -4241,7 +4479,7 @@
       b.disabled = true;
       safeSendMessage_({ type: 'DELETE_CANNED', payload: { id: c.id } }, (resp) => {
         if (resp?.ok) { setStatus('Đã xoá mẫu có sẵn.'); _cannedResponses = _cannedResponses.filter(x => x.id !== c.id); loadPhongThuyKnowledge_(); }
-        else { b.disabled = false; setStatus('Lỗi xoá mẫu: ' + (resp?.error || 'không rõ')); }
+        else { b.disabled = false; setStatus(resp?.error || PK_API_ERR); }
       });
     }));
   }
@@ -4275,7 +4513,7 @@
       btn.disabled = true; btn.innerText = 'Đang lưu...';
       safeSendMessage_({ type: 'SAVE_CANNED', payload: { id: c ? c.id : '', nhom: $('#pk-cf-nhom').value.trim(), label, text } }, (resp) => {
         if (resp?.ok) { host.innerHTML = ''; setStatus('Đã lưu mẫu có sẵn — CRM và mọi máy sẽ thấy bản mới.'); loadPhongThuyKnowledge_(); }
-        else { btn.disabled = false; btn.innerText = '💾 Lưu về CRM'; setStatus('Lỗi lưu mẫu: ' + (resp?.error || 'không rõ')); }
+        else { btn.disabled = false; btn.innerText = '💾 Lưu về CRM'; setStatus(resp?.error || PK_API_ERR); }
       });
     });
   }
@@ -4311,8 +4549,349 @@
     setStatus("Đã chèn gợi ý vào ô trả lời.");
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // MODULE: 🚫 QUÉT TỪ CẤM (Duyên yêu cầu 2026-10-21)
+  // Sale gõ xong tin trong ô trả lời → bấm nút → quét nội dung đang soạn; có từ cấm thì cảnh báo
+  // 'Từ cấm “X” không được phép sử dụng nhé!'. Quét ở GAS (action scanBanned) bằng ĐÚNG danh sách + bộ phát hiện của giám sát chat
+  // → nút báo sạch thì giám sát chat cũng không bắt. Không tự sửa/không tự gửi tin, chỉ báo.
+  // ══════════════════════════════════════════════════════════════════════════
+  let _lastEditableEl_ = null;   // ô soạn tin cuối cùng được focus (bấm nút trong panel làm ô chat mất focus)
+  document.addEventListener('focusin', (e) => {
+    const t = e.target;
+    if (!t || (panelEl && panelEl.contains(t))) return;
+    if (t.isContentEditable || t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && (t.type === 'text' || t.type === 'search'))) _lastEditableEl_ = t;
+  }, true);
+  function _readDraftText_() {
+    let box = null;
+    try { box = _slashGetChatBox_(); } catch (e) { box = null; }
+    if (!box || (panelEl && panelEl.contains(box))) box = (_lastEditableEl_ && document.body.contains(_lastEditableEl_)) ? _lastEditableEl_ : null;
+    if (!box) return null;
+    return (box.tagName === 'TEXTAREA' || box.tagName === 'INPUT') ? (box.value || '') : (box.innerText || box.textContent || '');
+  }
+  function _banWarnHtml_(hits) {
+    const words = hits.map((h) => '“' + escapeHtml(h.word) + '”').join(', ');
+    const sug = hits.filter((h) => h.thayThe).map((h) => '“' + escapeHtml(h.word) + '” → ' + escapeHtml(h.thayThe));
+    return '⚠️ Từ cấm ' + words + ' không được phép sử dụng nhé!' + (sug.length ? '<div class="pk-ban-sug">Gợi ý thay: ' + sug.join('; ') + '</div>' : '');
+  }
+  function scanBannedDraft_() {
+    const out = panelEl?.querySelector('#pk-ban-result'), btn = panelEl?.querySelector('#pk-ban-btn');
+    if (!out || !btn) return;
+    const show = (cls, html) => { out.className = cls; out.innerHTML = html; out.style.display = ''; };
+    const text = _readDraftText_();
+    if (text === null) { show('pk-ban-info', 'Không tìm thấy ô soạn tin — bấm vào ô trả lời, gõ tin rồi bấm lại.'); return; }
+    if (!text.trim()) { show('pk-ban-info', 'Ô trả lời đang trống — gõ tin rồi bấm quét.'); return; }
+    btn.disabled = true; const old = btn.textContent; btn.textContent = 'Đang quét…';
+    safeSendMessage_({ type: 'SCAN_BANNED', payload: { text } }, (resp) => {
+      btn.disabled = false; btn.textContent = old;
+      if (!resp?.ok) { show('pk-ban-info', 'Không quét được từ cấm: ' + escapeHtml(resp?.error || PK_API_ERR)); return; }
+      const hits = resp.data?.hits || [];
+      if (hits.length) show('pk-ban-warn', _banWarnHtml_(hits));
+      else show('pk-ban-ok', '✅ Không có từ cấm trong tin đang soạn.');
+    });
+  }
+
   function setStatus(text) {
     const el = panelEl?.querySelector("#pk-ai-status");
     if (el) el.innerText = text;
   }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // MODULE: PHÍM TẮT GÕ NHANH (slash-command "/" trong ô chat)
+  // ══════════════════════════════════════════════════════════════════════════
+  // CS gõ "/" vào ô chat → popup nổi hiện danh sách mẫu tin nhắn (từ _cannedResponses +
+  // _msgTemplates). Tiếp tục gõ để lọc nhanh. Chọn mẫu → text được chèn vào ô chat;
+  // nếu mẫu có ảnh đính kèm thì tự copy ảnh vào clipboard đồng thời.
+  //
+  // Cú pháp phím tắt:
+  //   /          → mở popup, hiện TẤT CẢ mẫu (tối đa 30)
+  //   /giá       → lọc mẫu chứa "giá"
+  //   /ship      → lọc mẫu chứa "ship"
+  //   Escape     → đóng popup
+  //   ↑ ↓ Enter  → điều hướng + chọn trong popup
+  // ══════════════════════════════════════════════════════════════════════════
+
+  let _slashPopupEl = null;      // DOM node của popup
+  let _slashActiveIdx = -1;      // index mục đang highlight
+  let _slashItems = [];          // mảng { label, text, image? } đang hiển thị
+
+  // Lấy ô chat đang active (textarea hoặc contenteditable Pancake)
+  function _slashGetChatBox_() {
+    const sel = settings?.selectors?.[PLATFORM];
+    if (sel?.replyBox) {
+      const box = document.querySelector(sel.replyBox);
+      if (box) return box;
+    }
+    // Fallback: tìm contenteditable đang focused
+    const focused = document.activeElement;
+    if (focused && (focused.isContentEditable || focused.tagName === 'TEXTAREA' || focused.tagName === 'INPUT')) {
+      return focused;
+    }
+    return null;
+  }
+
+  // Tập hợp TẤT CẢ mẫu: _cannedResponses (local) + _msgTemplates (từ CRM, status=approved)
+  function _slashAllTemplates_() {
+    const all = [];
+    // 1. Mẫu có sẵn local (_cannedResponses)
+    (_cannedResponses || []).forEach((c) => {
+      if (c && c.text) all.push({ label: c.label || c.id, text: c.text, image: null, src: 'local' });
+    });
+    // 2. Mẫu từ CRM (đã duyệt)
+    (_msgTemplates || []).forEach((t) => {
+      if (t && t.content && t.status === 'approved') {
+        all.push({ label: t.title || t.id, text: t.content, image: t.image || null, src: 'crm' });
+      }
+    });
+    return all;
+  }
+
+  // Lọc mẫu theo query (không dấu, không phân biệt hoa/thường)
+  function _slashFilter_(q) {
+    const norm = (s) => _stripVN_((s || '').toLowerCase());
+    const nq = norm(q);
+    const all = _slashAllTemplates_();
+    if (!nq) return all.slice(0, 30);
+    return all.filter((item) =>
+      norm(item.label).includes(nq) || norm(item.text).includes(nq)
+    ).slice(0, 30);
+  }
+
+  // Tạo popup DOM (lần đầu) hoặc trả về cái đã có
+  function _slashEnsurePopup_() {
+    if (_slashPopupEl && document.body.contains(_slashPopupEl)) return _slashPopupEl;
+    const el = document.createElement('div');
+    el.id = 'pk-slash-popup';
+    el.style.cssText = [
+      'position:fixed','z-index:2147483647','background:#fff','border:1px solid #e5e7eb',
+      'border-radius:10px','box-shadow:0 8px 32px rgba(0,0,0,.18)','padding:4px 0',
+      'min-width:280px','max-width:480px','max-height:320px','overflow-y:auto',
+      'font-size:13px','font-family:inherit','display:none'
+    ].join(';');
+    document.body.appendChild(el);
+    _slashPopupEl = el;
+    return el;
+  }
+
+  // Hiển thị popup với danh sách items, định vị cạnh ô chat
+  function _slashShow_(chatBox, items) {
+    _slashItems = items;
+    _slashActiveIdx = items.length ? 0 : -1;
+    const popup = _slashEnsurePopup_();
+    popup.innerHTML = items.length
+      ? items.map((item, i) =>
+          `<div class="pk-slash-item${i === 0 ? ' pk-slash-active' : ''}" data-idx="${i}" style="` +
+          `padding:7px 12px;cursor:pointer;border-radius:6px;margin:1px 4px;` +
+          `${i === 0 ? 'background:#f0f9ff;' : ''}` +
+          `display:flex;flex-direction:column;gap:1px">` +
+          `<span style="font-weight:600;color:#1d4ed8">${escapeHtml(item.label)}</span>` +
+          `<span style="color:#6b7280;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:440px">${escapeHtml(item.text.slice(0, 100))}${item.text.length > 100 ? '…' : ''}</span>` +
+          `${item.image ? '<span style="font-size:10px;color:#059669">📷 Kèm ảnh</span>' : ''}` +
+          `</div>`
+        ).join('')
+      : '<div style="padding:10px 14px;color:#9ca3af;font-style:italic">Không tìm thấy mẫu nào</div>';
+
+    // Định vị phía trên ô chat
+    const rect = chatBox.getBoundingClientRect();
+    const popupH = Math.min(320, items.length * 54 + 8);
+    let top = rect.top - popupH - 6;
+    if (top < 8) top = rect.bottom + 6;
+    popup.style.left = Math.max(8, rect.left) + 'px';
+    popup.style.top = top + 'px';
+    popup.style.display = 'block';
+
+    // Click để chọn
+    popup.querySelectorAll('.pk-slash-item').forEach((row) => {
+      row.addEventListener('mousedown', (e) => {
+        e.preventDefault(); // tránh blur ô chat
+        const idx = parseInt(row.dataset.idx, 10);
+        _slashApply_(chatBox, idx);
+      });
+      row.addEventListener('mouseenter', () => {
+        _slashSetActive_(parseInt(row.dataset.idx, 10));
+      });
+    });
+  }
+
+  function _slashHide_() {
+    if (_slashPopupEl) _slashPopupEl.style.display = 'none';
+    _slashItems = [];
+    _slashActiveIdx = -1;
+  }
+
+  function _slashSetActive_(idx) {
+    _slashActiveIdx = idx;
+    if (!_slashPopupEl) return;
+    _slashPopupEl.querySelectorAll('.pk-slash-item').forEach((row, i) => {
+      const active = i === idx;
+      row.style.background = active ? '#f0f9ff' : '';
+      row.classList.toggle('pk-slash-active', active);
+      if (active) row.scrollIntoView({ block: 'nearest' });
+    });
+  }
+
+  // Áp dụng mẫu: chèn text vào ô chat + copy ảnh nếu có
+  function _slashApply_(chatBox, idx) {
+    const item = _slashItems[idx];
+    if (!item) return;
+    _slashHide_();
+
+    // Xoá phần "/..." CS đã gõ trước khi chèn mẫu
+    _slashClearSlashText_(chatBox);
+
+    // Chèn text
+    if (chatBox.tagName === 'TEXTAREA' || chatBox.tagName === 'INPUT') {
+      const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+      nativeSetter?.call(chatBox, item.text);
+      chatBox.dispatchEvent(new Event('input', { bubbles: true }));
+    } else if (chatBox.isContentEditable) {
+      chatBox.focus();
+      document.execCommand('insertText', false, item.text);
+    }
+
+    // Copy ảnh kèm vào clipboard nếu có
+    if (item.image) {
+      copyProductImage_(item.image, null);
+      setStatus(`Đã chèn mẫu "${item.label}" + copy ảnh vào clipboard — Ctrl+V để dán ảnh vào chat.`);
+    } else {
+      setStatus(`Đã chèn mẫu "${item.label}".`);
+    }
+  }
+
+  // Xoá đoạn "/query" CS đã gõ trong ô chat
+  function _slashClearSlashText_(chatBox) {
+    try {
+      if (chatBox.isContentEditable) {
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return;
+        const range = sel.getRangeAt(0);
+        const node = range.startContainer;
+        if (node.nodeType === Node.TEXT_NODE) {
+          const text = node.textContent;
+          const pos = range.startOffset;
+          // Tìm vị trí "/" gần nhất trước cursor
+          let slashPos = -1;
+          for (let i = pos - 1; i >= 0; i--) {
+            if (text[i] === '/') { slashPos = i; break; }
+          }
+          if (slashPos >= 0) {
+            node.textContent = text.slice(0, slashPos) + text.slice(pos);
+            const newRange = document.createRange();
+            newRange.setStart(node, slashPos);
+            newRange.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+            chatBox.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
+      } else if (chatBox.tagName === 'TEXTAREA') {
+        const v = chatBox.value, cur = chatBox.selectionStart;
+        let slashPos = -1;
+        for (let i = cur - 1; i >= 0; i--) {
+          if (v[i] === '/') { slashPos = i; break; }
+        }
+        if (slashPos >= 0) {
+          const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+          nativeSetter?.call(chatBox, v.slice(0, slashPos) + v.slice(cur));
+          chatBox.setSelectionRange(slashPos, slashPos);
+          chatBox.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+    } catch (_) { /* bỏ qua nếu lỗi DOM */ }
+  }
+
+  // Lấy phần query sau "/" tại vị trí cursor hiện tại
+  function _slashGetQuery_(chatBox) {
+    try {
+      if (chatBox.isContentEditable) {
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return null;
+        const range = sel.getRangeAt(0);
+        const node = range.startContainer;
+        if (node.nodeType !== Node.TEXT_NODE) return null;
+        const text = node.textContent;
+        const pos = range.startOffset;
+        // Tìm "/" gần nhất trước cursor
+        for (let i = pos - 1; i >= 0; i--) {
+          if (text[i] === '/') return text.slice(i + 1, pos);
+          if (text[i] === ' ' || text[i] === '\n') break; // chỉ tìm trong từ hiện tại
+        }
+      } else if (chatBox.tagName === 'TEXTAREA') {
+        const v = chatBox.value, cur = chatBox.selectionStart;
+        for (let i = cur - 1; i >= 0; i--) {
+          if (v[i] === '/') return v.slice(i + 1, cur);
+          if (v[i] === ' ' || v[i] === '\n') break;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  // Lắng nghe input trên TẤT CẢ ô chat trong trang (dùng event delegation)
+  function _slashInitListener_() {
+    document.addEventListener('input', (e) => {
+      const box = e.target;
+      if (!box) return;
+      // Chỉ xử lý ô chat (contenteditable hoặc textarea trong vùng chat Pancake)
+      if (!box.isContentEditable && box.tagName !== 'TEXTAREA' && box.tagName !== 'INPUT') return;
+      if (box.closest('#pk-panel, #pk-slash-popup, .pk-panel-container')) return; // bỏ qua ô input trong panel
+
+      const q = _slashGetQuery_(box);
+      if (q === null) { _slashHide_(); return; }
+
+      // Nạp mẫu từ CRM nếu chưa có (không block UI — dùng callback)
+      const showNow = () => {
+        const items = _slashFilter_(q);
+        if (items.length === 0 && q.length === 0) return; // tránh hiện popup rỗng khi gõ "/" lúc chưa có mẫu
+        _slashShow_(box, items);
+      };
+      if (!_msgTemplates.length) {
+        safeSendMessage_({ type: 'GET_MESSAGE_TEMPLATES' }, (resp) => {
+          if (resp?.ok) { _msgTemplates = resp.data.templates || []; _msgTplTs = Date.now(); }
+          showNow();
+        });
+      } else {
+        showNow();
+      }
+    }, true);
+
+    document.addEventListener('keydown', (e) => {
+      if (!_slashPopupEl || _slashPopupEl.style.display === 'none') return;
+      if (e.key === 'Escape') { e.preventDefault(); _slashHide_(); return; }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        _slashSetActive_(Math.min(_slashActiveIdx + 1, _slashItems.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        _slashSetActive_(Math.max(_slashActiveIdx - 1, 0));
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        if (_slashActiveIdx >= 0) {
+          e.preventDefault();
+          e.stopPropagation();
+          const box = _slashGetChatBox_();
+          if (box) _slashApply_(box, _slashActiveIdx);
+        }
+      }
+    }, true);
+
+    // Đóng popup khi click ra ngoài
+    document.addEventListener('click', (e) => {
+      if (_slashPopupEl && !_slashPopupEl.contains(e.target)) _slashHide_();
+    }, true);
+  }
+
+  // Khởi động module sau khi settings và panel đã sẵn sàng
+  (function _slashBoot_() {
+    // Đợi settings load xong rồi mới init (settings load async ở initPanel_)
+    const tryInit = () => {
+      if (settings) { _slashInitListener_(); return; }
+      setTimeout(tryInit, 500);
+    };
+    tryInit();
+  })();
+  // ── kết thúc MODULE PHÍM TẮT GÕ NHANH ──
+
 })();

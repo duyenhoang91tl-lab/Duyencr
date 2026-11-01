@@ -9,6 +9,8 @@ var _srSidebarHidden, _posOrdersCache, _posOrdersState, _cskhDetailCache, _cskhD
 // trong ban sao code backend (khoi tham khao "Copy Apps Script Code", khong thuc thi trong
 // trinh duyet) — gay loi "splitMulti_ is not defined" khi Auto-sync chay. Dinh nghia lai
 // dung y het logic ben backend de dung o day.
+// Token chỉ gồm số/dấu ("8", "13", "#8") hoặc "STT 8" là số thứ tự Pancake, KHÔNG phải tên sale — cùng quy tắc với _isNumericTag_ ở gas_v13.js.
+function isNumTagSale_(x){ var t = String(x == null ? '' : x).trim(); return /^[#\d\s.,\-\/()]+$/.test(t) || /^stt\s*[#\d.\s]+$/i.test(t); }
 function splitMulti_(str, delimiter) {
   if (!str && str !== 0) return [];
   var s = String(str);
@@ -64,6 +66,34 @@ async function _syncKhStatusTreeFromGAS() {
     }
   } catch(e) { /* giữ nguyên bản local nếu lỗi mạng/parse */ }
 }
+// ── Mốc màu "Tỷ lệ chốt" nhiều mức (yêu cầu Duyên 2026-10-14: tự thêm/bớt, vd 5 mức 5 màu theo % khác nhau) ──
+// Dạng lưu: { levels: [ {from:0,color:'#dc2626'}, {from:2,color:'#d97706'}, {from:11,color:'#16a34a'} ] } — mức i áp dụng cho tỷ lệ >= from của nó
+// (và < from của mức kế tiếp); mức đầu luôn từ 0; 2–8 mức. Dạng CŨ { red, green } (đỏ < red, vàng red..green, xanh > green) được đổi tự động:
+// tỷ lệ hiển thị là SỐ NGUYÊN nên "> green" = ">= floor(green)+1" → kết quả màu y hệt trước đây.
+var CLOSE_RATE_DEFAULT_LEVELS = [{ from: 0, color: '#dc2626' }, { from: 2, color: '#d97706' }, { from: 11, color: '#16a34a' }];
+var CLOSE_RATE_MAX_LEVELS = 8, CLOSE_RATE_MIN_LEVELS = 2;
+function _crLevelsDefault_() { return JSON.parse(JSON.stringify(CLOSE_RATE_DEFAULT_LEVELS)); }
+function _crNormalize_(t) {
+  var raw = null;
+  if (t && Array.isArray(t.levels)) raw = t.levels;
+  else if (t && typeof t.red === 'number' && typeof t.green === 'number') {
+    raw = [{ from: 0, color: '#dc2626' }, { from: t.red, color: '#d97706' }, { from: Math.floor(t.green) + 1, color: '#16a34a' }];
+    if (t.red <= 0) raw.shift();   // mốc đỏ = 0 nghĩa là KHÔNG có mức đỏ (không tỷ lệ nào < 0): bỏ mức đỏ rỗng, vàng bắt đầu từ 0
+  }
+  if (!raw) return { levels: _crLevelsDefault_() };
+  var lv = raw.map(function (x) { return { from: Number(x && x.from), color: String((x && x.color) || '') }; })
+    .filter(function (x) { return isFinite(x.from) && x.from >= 0 && x.from <= 100 && /^#[0-9a-fA-F]{6}$/.test(x.color); })
+    .sort(function (a, b) { return a.from - b.from; });
+  var uniq = []; lv.forEach(function (x) { if (!uniq.length || x.from > uniq[uniq.length - 1].from) uniq.push(x); });
+  if (uniq.length < CLOSE_RATE_MIN_LEVELS || uniq.length > CLOSE_RATE_MAX_LEVELS) return { levels: _crLevelsDefault_() };
+  uniq[0].from = 0;
+  return { levels: uniq };
+}
+function _crColorFor_(p) {
+  var lv = (CLOSE_RATE_THRESHOLDS && CLOSE_RATE_THRESHOLDS.levels) || CLOSE_RATE_DEFAULT_LEVELS;
+  for (var i = lv.length - 1; i >= 0; i--) if (p >= lv[i].from) return lv[i].color;
+  return lv[0].color;
+}
 async function _syncCloseRateThresholdsFromGAS() {
   if (!gsUrl) return;
   try {
@@ -71,8 +101,8 @@ async function _syncCloseRateThresholdsFromGAS() {
     var data = await r.json();
     if (data && data.value) {
       var t = JSON.parse(data.value);
-      if (t && typeof t.red === 'number' && typeof t.green === 'number') {
-        CLOSE_RATE_THRESHOLDS = t;
+      if (t && (Array.isArray(t.levels) || (typeof t.red === 'number' && typeof t.green === 'number'))) {
+        CLOSE_RATE_THRESHOLDS = _crNormalize_(t);
         saveLS('ome_close_rate_thresholds', CLOSE_RATE_THRESHOLDS);
         if (typeof renderSalesReportTab === 'function' && _activeV9Tab === 'salesreport') renderSalesReportTab();
         if (typeof renderKpiPancakeTab === 'function' && _activeV9Tab === 'kpipancake') renderKpiPancakeTab();
@@ -80,13 +110,13 @@ async function _syncCloseRateThresholdsFromGAS() {
     }
   } catch(e) { /* giữ nguyên bản local nếu lỗi mạng/parse */ }
 }
-async function _saveCloseRateThresholds(red, green){
-  CLOSE_RATE_THRESHOLDS = { red: red, green: green };
+async function _saveCloseRateThresholds(levels){
+  CLOSE_RATE_THRESHOLDS = _crNormalize_({ levels: levels });
   saveLS('ome_close_rate_thresholds', CLOSE_RATE_THRESHOLDS);
   if (!gsUrl) return;
   try {
     await fetch(gsUrl, { method:'POST', body: JSON.stringify({ action:'setSetting', key:'closeRateThresholds', value: JSON.stringify(CLOSE_RATE_THRESHOLDS) }) });
-    logAudit('setting','', '', 'Đổi mốc màu Tỷ lệ chốt: đỏ <'+red+'%, vàng '+red+'–'+green+'%, xanh >'+green+'%');
+    logAudit('setting','', '', 'Đổi mốc màu Tỷ lệ chốt: ' + CLOSE_RATE_THRESHOLDS.levels.map(function(l){ return '≥'+l.from+'% '+l.color; }).join(', '));
   } catch(e){ toast('❌ Lưu mốc màu lỗi: ' + e.message); }
 }
 
@@ -327,6 +357,21 @@ async function saveChannelCommissionRates() {
   }
 }
 
+// ── LUAT HOA HONG KENH "NGUON" THEO CHAT LIEU VANG (Duyen yeu cau 2026-10) — PHAI khop _goldChannelRule_ o GAS (gas_v13.js) ──
+// Don co nguon don la kenh Nguon: vang 10k = 1,5%, vang 14k = 1%, KHONG phu thuoc gia tri don (khong xet moc 15 trieu nhu cac kenh con lai).
+// Don Nguon khong co 10k/14k -> tinh nhu cu. Don co CA 10k va 14k (khong tach duoc gia tri tung mon) -> lay muc THAP (1%), danh dau mixed.
+var GOLD_RULE_CHANNELS = ['nguon'];   // ten kenh KHONG DAU, chu thuong; khop nguyen ten hoac bat dau bang 'nguon '
+var GOLD_RULE_MATERIALS = [ { key: '14', rate: 1, label: 'vàng 14k' }, { key: '10', rate: 1.5, label: 'vàng 10k' } ];
+function _goldFold_(v){ return String(v == null ? '' : v).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'd').toLowerCase().replace(/\s+/g, ' ').trim(); }
+function _goldChannelRule_(nguonDon, sanPham){
+  var ch = _goldFold_(nguonDon);
+  if (!ch || !GOLD_RULE_CHANNELS.some(function(c){ return ch === c || ch.indexOf(c + ' ') === 0; })) return null;
+  var txt = _goldFold_(sanPham), hits = GOLD_RULE_MATERIALS.filter(function(m){ return new RegExp('(^|[^0-9])' + m.key + ' ?k(?![a-z0-9])').test(txt); });   // "10k" / "10 k" / "vang10k"; khong nhan 110k, 10kg, 10kx
+  if (!hits.length) return null;
+  hits.sort(function(a, b){ return a.rate - b.rate; });
+  return { rate: hits[0].rate, label: hits[0].label, mixed: hits.length > 1 };
+}
+
 function _channelCommissionRate_(kenh){
   if (!kenh) return null;
   var k = String(kenh).trim().toLowerCase();
@@ -369,11 +414,37 @@ async function saveBonusPrograms() {
   if (typeof _srState !== 'undefined' && _srState.sub === 'E') renderSalesReportTab();
 }
 
-// Team mà 1 sale thuộc về (leader hoặc thành viên) — dùng để fallback rate khi cá nhân chưa cài
+// DANH TÍNH CHUẨN cho CẤU HÌNH theo tên (% hoa hồng cá nhân, kênh Online/Offline, ngày bắt đầu, team): báo cáo E/G đã quy mọi tên của 1 người về TÊN CHÍNH
+// (backend: saleIdentity = tên chính -> mọi tên cùng người), còn cấu hình có thể đang lưu dưới tên KHÁC của người đó -> tra theo MỌI tên cùng người
+// (tên chính trước, rồi tên backend trả về, rồi bí danh trong tài khoản/Thẻ). Ghi cấu hình vẫn ghi theo tên đang hiển thị.
+var _SALE_ALIAS_MAP = {};
+function _srRegisterIdentity_(d) {
+  if (!d || !d.saleIdentity) return;
+  Object.keys(d.saleIdentity).forEach(function(k){ _SALE_ALIAS_MAP[String(k).toLowerCase()] = d.saleIdentity[k]; });
+}
+function _cfgAliasesOf(name) {
+  var out = [], seen = {};
+  function add(n){ var k = String(n == null ? '' : n).toLowerCase(); if (k && !seen[k]) { seen[k] = 1; out.push(n); } }
+  add(name);
+  (_SALE_ALIAS_MAP[String(name == null ? '' : name).toLowerCase()] || []).forEach(add);
+  ((typeof _personAliases === 'function') ? _personAliases(name) : []).forEach(add);
+  return out;
+}
+function _cfgByAlias(map, name) {
+  if (!map) return undefined;
+  var al = _cfgAliasesOf(name);
+  for (var i = 0; i < al.length; i++) { var v = map[al[i]]; if (v !== undefined && v !== null && v !== '') return v; }
+  return undefined;
+}
+function _saleChannelOf_(name) { return _cfgByAlias(SALE_CHANNELS, name) || ''; }
+// Team mà 1 sale thuộc về (leader hoặc thành viên) — dùng để fallback rate khi cá nhân chưa cài. Khớp theo MỌI tên cùng người.
 function _teamRateForName_(name) {
+  var al = _cfgAliasesOf(name);
   for (var i = 0; i < teams.length; i++) {
     var t = teams[i];
-    if (t.leader === name || (t.members||[]).indexOf(name) !== -1) return { team: t, rate: t.ratePct || {above15:0, below15:0} };
+    for (var j = 0; j < al.length; j++) {
+      if (t.leader === al[j] || (t.members||[]).indexOf(al[j]) !== -1) return { team: t, rate: t.ratePct || {above15:0, below15:0} };
+    }
   }
   return { team: null, rate: {above15:0, below15:0} };
 }
@@ -382,7 +453,7 @@ function _teamRateForName_(name) {
 // mà để trống <15tr, khi đó <15tr vẫn lấy theo team) — hết thì lấy theo team đang thuộc về —
 // không thuộc team nào và chưa cài cá nhân thì 0%.
 function _resolveCommissionRate_(name) {
-  var indiv = INDIVIDUAL_RATES[name] || {};
+  var indiv = _cfgByAlias(INDIVIDUAL_RATES, name) || {};
   var teamInfo = _teamRateForName_(name);
   var hasA = indiv.above15 !== undefined && indiv.above15 !== null && indiv.above15 !== '';
   var hasB = indiv.below15 !== undefined && indiv.below15 !== null && indiv.below15 !== '';
@@ -391,7 +462,7 @@ function _resolveCommissionRate_(name) {
   // Team chi tinh la "da cai" khi % > 0 (ratePct mac dinh 0/0 = chua cai).
   var tr = teamInfo.rate || {};
   var teamA = teamInfo.team && Number(tr.above15) > 0, teamB = teamInfo.team && Number(tr.below15) > 0;
-  var chn = SALE_CHANNELS[name];
+  var chn = _saleChannelOf_(name);
   var def = chn === 'online' ? { above15: 1.5, below15: 1, label: 'Mặc định Online' }
           : chn === 'offline' ? { above15: 1, below15: 0.8, label: 'Mặc định Offline' } : null;
   function _src(has, teamHas){ return has ? 'Cá nhân' : (teamHas ? 'Team ' + teamInfo.team.name : (def ? def.label : 'Chưa cài')); }
@@ -416,7 +487,9 @@ function _computeCommissionData_(orders) {
     var isAbove = giaTri >= COMMISSION_THRESHOLD;
     // Nguồn đơn đã được admin cài % riêng (vd "facebook" = 1%) -> BỎ QUA hoàn toàn ngưỡng
     // 15tr + % cá nhân/team, tính thẳng theo đúng % kênh đó cho phần doanh thu chia của sale.
-    var chRate = _channelCommissionRate_(m.nguonDon);
+    // Kenh Nguon + vang 10k/14k: luat vang DUNG TRUOC % kenh admin cai va moc 15tr (khong phu thuoc gia tri don)
+    var gold = _goldChannelRule_(m.nguonDon, m.sanPham);
+    var chRate = gold ? gold.rate : _channelCommissionRate_(m.nguonDon);
     if (chRate === null) {
       if (isAbove) { totalOrdersAbove15++; totalRevenueAbove15 += giaTri; }
       else { totalOrdersBelow15++; totalRevenueBelow15 += giaTri; }
@@ -428,7 +501,7 @@ function _computeCommissionData_(orders) {
       shareMap = {};
       salesList = m.saleShares.map(function(x){ shareMap[x.name] = x.frac; return x.name; });
     } else {
-      salesList = splitMulti_(m.saleBan, ',');
+      salesList = splitMulti_(m.saleBan, ',').filter(function(x){ return !isNumTagSale_(x); });   // loai STT Pancake (8, 13…): không có sale nào tên toàn số
       if (!salesList.length) salesList = ['(chưa gán sale)'];
     }
     var n = salesList.length;
@@ -437,7 +510,7 @@ function _computeCommissionData_(orders) {
       var share = (shareMap ? giaTri * shareMap[sName] : giaTri / n) * (Number(m.saleRatio) || 1);
       if (!bySale[sName]) bySale[sName] = { ordersAbove15:0, ordersBelow15:0, revenueAbove15:0, revenueBelow15:0, channelRevenue:0, channelCommission:0, channelBreakdown:{} };
       if (chRate !== null) {
-        var kenhKey = String(m.nguonDon||'').trim();
+        var kenhKey = String(m.nguonDon||'').trim() + (gold ? ' · ' + gold.label + (gold.mixed ? ' (đơn có cả 10k & 14k → mức thấp)' : '') : '');
         bySale[sName].channelRevenue += share;
         bySale[sName].channelCommission += share * (chRate/100);
         if (!bySale[sName].channelBreakdown[kenhKey]) bySale[sName].channelBreakdown[kenhKey] = { revenue:0, rate:chRate };
@@ -682,6 +755,31 @@ function _csFilterList(){
   if (!sel) return [];
   return Array.from(sel.selectedOptions || []).map(o => o.value).filter(v => v && v !== 'all');
 }
+// KHỚP DANH TÍNH: danh sách CS dùng để SO KHỚP khách = các CS đã chọn + MỌI tên khác của cùng người (tài khoản Sale nhiều tên, Thẻ, "Khớp sale"),
+// quy về đúng cách viết đang có trong dữ liệu (các <option> của ô lọc CS) để so khớp chính xác. Chọn tên A ra cả khách ghi dưới tên B của cùng người (và ngược lại).
+// _csFilterList() vẫn là lựa chọn THÔ trên màn hình (dùng cho giao diện/lưu trạng thái) — chỉ chỗ SO KHỚP mới dùng hàm này. Có nhớ tạm theo lựa chọn + bộ khớp.
+var _csMatchMemo = { key: '', list: null };
+function _csFilterListMatch(){
+  var raw = _csFilterList();
+  if (!raw.length) return raw;
+  var tagSig = (typeof SALE_PERSON_TAGS !== 'undefined' && SALE_PERSON_TAGS) ? JSON.stringify(SALE_PERSON_TAGS) : '';
+  var accSig = (typeof accounts !== 'undefined' && accounts) ? accounts.map(function(a){ return (a && a.role === 'cs') ? (a.names || []).join(',') + '/' + (a.name || '') : ''; }).join(';') : '';
+  var sel = document.getElementById('cs-staff-filter');
+  var optSig = sel ? sel.options.length : 0;
+  var key = raw.join('|') + '#' + tagSig.length + '#' + accSig.length + '#' + optSig + '#' + _hashStr_(tagSig + accSig);
+  if (_csMatchMemo.key === key) return _csMatchMemo.list;
+  var want = {};
+  raw.forEach(function(n){
+    want[String(n).toLowerCase()] = 1;
+    ((typeof _personAliases === 'function') ? _personAliases(n) : [n]).forEach(function(a){ if (a) want[String(a).toLowerCase()] = 1; });
+  });
+  var out = raw.slice(), seen = {};
+  raw.forEach(function(n){ seen[String(n).toLowerCase()] = 1; });
+  if (sel) Array.from(sel.options).forEach(function(o){ var v = o.value, k = String(v).toLowerCase(); if (v && v !== 'all' && want[k] && !seen[k]) { seen[k] = 1; out.push(v); } });
+  _csMatchMemo = { key: key, list: out };
+  return out;
+}
+function _hashStr_(str){ var h = 0; for (var i = 0; i < str.length; i++) h = ((h << 5) - h + str.charCodeAt(i)) | 0; return h; }
 // Đặt lại toàn bộ lựa chọn multi cho đúng danh sách tên truyền vào (thay hết, không cộng dồn)
 function _csSetFilterSelection(names){
   const sel = document.getElementById('cs-staff-filter');
@@ -691,7 +789,7 @@ function _csSetFilterSelection(names){
 }
 // name có khớp với BẤT KỲ CS nào đang chọn không (case-insensitive) — [] = không lọc = luôn khớp
 function _csFilterHas(name){
-  const list = _csFilterList();
+  const list = _csFilterListMatch();
   if (!list.length) return true;
   const n = String(name||'').toLowerCase();
   return list.some(x => x.toLowerCase() === n);
@@ -705,7 +803,7 @@ function _csModeMatch(inSeller, inCare, inAssign){
 function _inCSScope(c, _preList){
   // _preList: danh sách CS đã đọc SẴN 1 lần bởi nơi gọi (vòng lặp 136k khách). TRƯỚC ĐÂY mỗi khách đều gọi lại
   // _csFilterList() = đọc DOM <select multiple>.selectedOptions -> nhân với 136k khách x 3-4 lần/lượt đổi CS = rất lag.
-  const list = _preList || _csFilterList();
+  const list = _preList || _csFilterListMatch();
   if (!list.length) return true;
   // Multi: khách khớp phạm vi nếu thuộc về BẤT KỲ CS nào trong danh sách đã chọn (OR)
   const allH = (typeof _assignAllIndex !== 'undefined') ? _assignAllIndex[c.phone] : null;
@@ -723,7 +821,7 @@ function _inCSScope(c, _preList){
 var _scopedMemo = { key: null, list: null, arr: null, idx: null };
 function scopedCustomers(){
   const all = (typeof allCustomers !== 'undefined' ? allCustomers : []);
-  const csl = _csFilterList();
+  const csl = _csFilterListMatch();
   const u = (typeof currentUser !== 'undefined' && currentUser) ? currentUser : {};
   const key = [(typeof _dataVersion !== 'undefined' ? _dataVersion : 0), all.length, _csFilterMode, csl.join('|'),
     u.role || '', u.name || '', u.team || '', (u.names || []).join(',')].join('#');
@@ -1012,7 +1110,7 @@ async function _pullCskhLiteOnce_(isManual){
   _cskhLastTry = now;
   try {
     const sepChar = gsUrl.includes('?') ? '&' : '?';
-    const ckR = await fetch(gsUrl + sepChar + 'action=cskhDuyenLite', { redirect: 'follow' });
+    const ckR = await _gsFetchTO_(gsUrl + sepChar + 'action=cskhDuyenLite', 60000);
     const ckText = await ckR.text();
     if (ckText === _lastCkText && !_isEmptyObj(cskhData)) { _cskhPulledAt = Date.now(); _cskhFailCount = 0; return false; }
     let ckJson;
@@ -1035,6 +1133,40 @@ async function _pullCskhLiteOnce_(isManual){
     return true;
   } catch (ckErr) { return _cskhFail_(ckErr.message || 'lỗi mạng'); }
 }
+// fetch co GIOI HAN THOI GIAN cho cac lan keo du lieu cua syncFromGS (2026-10-26). NGUYEN NHAN: cac lan keo (customers/orders/donPhones/cskhDuyenLite/careLeads) chay NOI TIEP nhau
+// va khong co timeout; 1 yeu cau treo (Worker/GAS cham, mang di dong chap chon) lam ca lan dong bo dau tien khong bao gio xong => khung 'Dang tai du lieu' dung mai, khong hien khach.
+// Het gio -> fetch/text() nem loi -> roi vao khoi catch san co (tinh vao bo dem loi dong bo, nhip sau tu thu lai) thay vi treo.
+// TU THU LAI nhanh (2026-10-26): loi THOANG QUA (Apps Script vua deploy phien ban moi => /exec tra 404 trang Google 'Rat tiec, khong the mo tep' vai chuc giay;
+// Worker khong goi duoc GAS => 502; qua tai => 503/504; mat mang chop) truoc day lam ca lan keo that bai roi cho 'nhip sau' (banner loi cat phut).
+// Nay thu lai toi da 2 lan (cach _GS_RETRY_DELAYS_ = 1.5s roi 4s). KHONG thu lai khi HET GIO (AbortError: da cho 30-75s) hay ma khac (400/401/403/200...).
+// Ham TU DU (mac dinh nam trong ham) de test cu (tools/test-gs-fetch-timeout.js chi cat than ham nay) van chay; test/dev co the ghi de bang bien toan cuc _GS_RETRY_DELAYS_.
+function _gsFetchTO_(url, ms) {
+  var delays = (typeof _GS_RETRY_DELAYS_ !== 'undefined' && _GS_RETRY_DELAYS_) || [1500, 4000];
+  var retryStatus = [404, 502, 503, 504];
+  function once() {
+    if (typeof AbortController === 'undefined') return fetch(url, { redirect: 'follow' });
+    const ac = new AbortController(), t = setTimeout(function () { try { ac.abort(); } catch (e) {} }, ms);
+    return fetch(url, { redirect: 'follow', signal: ac.signal }).then(function (r) {
+      const ot = r.text.bind(r);
+      r.text = function () { return ot().then(function (x) { clearTimeout(t); return x; }, function (e) { clearTimeout(t); throw e; }); };   // giu dong ho cho toi khi doc xong than phan hoi
+      return r;
+    }, function (e) { clearTimeout(t); throw e; });
+  }
+  function pause(i) { return new Promise(function (res) { setTimeout(res, delays[i]); }); }
+  function attempt(i) {
+    return once().then(function (r) {
+      if (i < delays.length && retryStatus.indexOf(r.status) !== -1) {
+        try { r.text().catch(function () {}); } catch (e) {}   // xa than phan hoi bi bo + tat dong ho cua lan nay
+        return pause(i).then(function () { return attempt(i + 1); });
+      }
+      return r;
+    }, function (e) {
+      if (i < delays.length && !(e && e.name === 'AbortError')) return pause(i).then(function () { return attempt(i + 1); });
+      throw e;
+    });
+  }
+  return attempt(0);
+}
 async function syncFromGS(opts) {
   opts = opts || {};
   const pullOrders = opts.pullOrders !== undefined ? opts.pullOrders : _isEmptyObj(customerMap);
@@ -1047,7 +1179,7 @@ async function syncFromGS(opts) {
     const sepChar = gsUrl.includes('?') ? '&' : '?';
     const _wantCareFull = !_careSince || isManual || (Date.now() - _careFullAt) > CARE_FULL_EVERY_MS;
     const careUrl = gsUrl + sepChar + 'action=customers' + (_wantCareFull ? '' : '&since=' + encodeURIComponent(_careSince));
-    const careR = await fetch(careUrl, { redirect: 'follow' });
+    const careR = await _gsFetchTO_(careUrl, 60000);
     const careText = await careR.text();
     let _careSame = false, _isDelta = false;   // _careSame: khong ai sua CareData tu nhip truoc
     let d;
@@ -1082,7 +1214,7 @@ async function syncFromGS(opts) {
     if (pullOrders) {
       try {
         if (isManual) txt('ltext', 'Đang tải đơn hàng từ Google Sheets...');
-        const ordR = await fetch(gsUrl + sepChar + 'action=orders', { redirect: 'follow' });
+        const ordR = await _gsFetchTO_(gsUrl + sepChar + 'action=orders', 75000);
         const ordText = await ordR.text();
         // Chi coi la "khong doi" khi da co khach trong customerMap (sau khi bam xoa du lieu phai nap lai that su)
         const _ordSame = (ordText === _lastOrdersText) && !_isEmptyObj(customerMap);
@@ -1155,7 +1287,7 @@ async function syncFromGS(opts) {
       }
       // ── Tập SĐT có trong "dữ liệu đơn" (chỉ để lọc nguồn, không kéo chi tiết) ──
       try {
-        const dpR = await fetch(gsUrl + sepChar + 'action=donPhones', { redirect: 'follow' });
+        const dpR = await _gsFetchTO_(gsUrl + sepChar + 'action=donPhones', 40000);
         const dpText = await dpR.text();
         // NGUYÊN NHÂN GỐC lag định kỳ: trước đây khối này JSON.parse + dựng lại Set + saveLS (JSON.stringify ghi
         // localStorage, đồng bộ trên luồng chính) 5 map lớn theo SĐT MỖI lần kéo, kể cả khi server trả y hệt lần trước.
@@ -1196,7 +1328,7 @@ async function syncFromGS(opts) {
     // không hiện luôn cho tới khi F5. Giờ kéo độc lập mỗi 3s + phát hiện SĐT mới để ép
     // buildCustomers() đầy đủ ngay khi cần, không phụ thuộc orderCount.
     try {
-      const clR = await fetch(gsUrl + sepChar + 'action=careLeads', { redirect: 'follow' });
+      const clR = await _gsFetchTO_(gsUrl + sepChar + 'action=careLeads', 30000);
       const clText = await clR.text();
       // NGUYÊN NHÂN GỐC lag nền mỗi tick: trước đây mỗi tick đều parse + dựng lại careLeads + saveLS (ghi localStorage đồng bộ)
       // + quét _assignCustMap() dù sheet "KH Chăm sóc mới" không đổi. Nay so chuỗi trả về, y hệt lần trước thì bỏ qua.

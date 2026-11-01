@@ -268,6 +268,7 @@ function _computeMemberCountDist(members, countMap) {
   return dist;
 }
 
+function _advDistLabel_(){ return _advAssign.distMode === 'custom' ? 'tuỳ chỉnh' : 'chia đều'; }
 function renderAssignCreate() {
   // TỰ CHỮA: nếu danh sách rỗng nhưng bảng đang hiển thị có KH → lấy lại NGAY từ bảng (nguồn sự thật)
   if ((!_assignFilteredList || !_assignFilteredList.length)
@@ -308,34 +309,38 @@ function renderAssignCreate() {
   });
 
   const html = `
+  <!-- THANH BƯỚC: biết đã làm đủ chưa, bấm để nhảy -->
+  <div class="aa-nav">
+    ${[['as-s1','1','Nguồn data', `<span class="aa-badge ${totalFiltered>0?'on':'warn'}">${totalFiltered} KH</span>`],
+       ['as-s2','2','Nơi nhận', `<span class="aa-badge ${selectedCount>0?'on':'warn'}">${selectedCount>0 ? selectedCount+(isTeamMode?' Team':' CS') : 'chưa chọn'}</span>`],
+       ['as-s3','3','Phân phối', selectedCount>0 ? `<span class="aa-badge on">${_advDistLabel_()}</span>` : '<span class="aa-badge off">chọn nơi nhận trước</span>'],
+       ['as-s4','4','Ghi chú', `<span class="aa-badge off">${(_advAssign.label||'').trim()?'đã nhập':'tuỳ chọn'}</span>`]
+      ].map(([id,n,l,b])=>`<button type="button" onclick="document.getElementById('${id}')&&document.getElementById('${id}').scrollIntoView({behavior:'smooth',block:'start'})"><span class="n">${n}</span>${l} ${b}</button>`).join('')}
+  </div>
   <!-- STEP 1: SOURCE -->
-  <div class="assign-section">
+  <div class="assign-section" id="as-s1" style="scroll-margin-top:46px">
     <div class="assign-section-title" style="display:flex;justify-content:space-between;align-items:center">
       <span>① Nguồn data</span>
       <button class="btn sm secondary" onclick="_advAssignOpenAdvFilter()" title="Mở Lọc nâng cao (CS, sản phẩm, nguồn, trạng thái CS/Zalo, trường tự tạo...) để chọn đúng data muốn chia">⚙ Lọc nâng cao${countAdvFilters()>0?` <span class="adv-filter-active-badge">${countAdvFilters()}</span>`:''}</button>
     </div>
     <div class="assign-preview" style="margin-bottom:10px">
       Bộ lọc hiện tại: <strong>${totalFiltered} KH</strong>${(_assignFilteredList.length - _advAssignValidBase().length) > 0 ? ` <span style="color:#92400e;font-size:11px" title="Chỉ chia SĐT di động Việt Nam hợp lệ (10 số, đầu số 03/05/07/08/09)">(đã loại ${_assignFilteredList.length - _advAssignValidBase().length} SĐT không hợp lệ)</span>` : ''} &nbsp;|&nbsp;
-      <span style="color:var(--vip)">VIP: ${tierCount.VIP}</span> &nbsp;·&nbsp;
-      <span style="color:var(--tt)">Thân thiết: ${tierCount['Thân thiết']}</span> &nbsp;·&nbsp;
-      <span style="color:var(--tn)">Tiềm năng: ${tierCount['Tiềm năng']}</span><br>
-      <span style="color:var(--muted)">Phân hạng KH (doanh thu): ${HANG_KEYS.map(k=>`${HANG_LABEL[k]} ${hangCount[k]}`).join(' &nbsp;·&nbsp; ')}</span><br>
       <span style="color:var(--green)">✓ Chưa chia: <strong>${neverAssigned.length}</strong></span> &nbsp;|&nbsp;
       <span style="color:#92400e">⚠ Đã chia: <strong>${alreadyAssigned.length}</strong></span>
       ${totalFiltered === 0 ? '<br><span style="color:var(--red)">⚠ Không có KH nào khớp (bộ lọc bảng + nguồn + khoảng ngày bên dưới). Hãy xoá bớt bộ lọc / nới khoảng ngày / đổi nguồn rồi thử lại.</span>' : ''}
     </div>
 
-    <div style="font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:500">Chiến dịch <span style="font-weight:400">(chọn nhanh nguồn; chia lần lượt từng chiến dịch):</span></div>
+    <div class="as-lbl">Chiến dịch <span class="as-sub">(chọn nhanh nguồn; chia lần lượt từng chiến dịch):</span></div>
     <div class="assign-sort-row" style="margin-bottom:10px">
-      <div class="assign-sort-btn ${(_advAssign.srcSet.size===3&&['dt','don','cs'].every(k=>_advAssign.srcSet.has(k)))?'active':''}" onclick="_advAssignCampaign('pos')">① POS / Base (DT tổng + Dữ liệu đơn + Chăm sóc)</div>
-      <div class="assign-sort-btn ${(_advAssign.srcSet.size===1&&_advAssign.srcSet.has('cskh'))?'active':''}" onclick="_advAssignCampaign('cskh')">② CSKH-Duyên — chiến dịch riêng (${srcCount.cskh})</div>
+      <div class="assign-sort-btn ${(_advAssign.srcSet.size===3&&['dt','don','cs'].every(k=>_advAssign.srcSet.has(k)))?'active':''}" onclick="_advAssignCampaign('pos')">POS / Base (DT tổng + Dữ liệu đơn + Chăm sóc)</div>
+      <div class="assign-sort-btn ${(_advAssign.srcSet.size===1&&_advAssign.srcSet.has('cskh'))?'active':''}" onclick="_advAssignCampaign('cskh')">CSKH-Duyên — chiến dịch riêng (${srcCount.cskh})</div>
     </div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:500">Nguồn dữ liệu <span style="font-weight:400">(bấm để chọn, chọn được nhiều — không chọn = mọi nguồn; khách chưa có ngày đơn như CSKH-Duyên vẫn lấy theo nguồn)</span>:</div>
+    <div class="as-lbl">Nguồn dữ liệu <span class="as-sub">(bấm để chọn, chọn được nhiều — không chọn = mọi nguồn; khách chưa có ngày đơn như CSKH-Duyên vẫn lấy theo nguồn)</span>:</div>
     <div class="assign-sort-row" style="margin-bottom:10px">
       ${[['dt','DT tổng'],['don','Dữ liệu đơn'],['cs','Chăm sóc'],['cskh','CSKH-Duyên']].map(([k,l])=>`<div class="assign-sort-btn ${_advAssign.srcSet.has(k)?'active':''}" onclick="_advAssignToggleSrc('${k}')">${l} (${srcCount[k]})</div>`).join('')}
     </div>
 
-    <div style="font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:500">Khoảng thời gian lấy data <span style="font-weight:400">(theo ngày đơn hàng — để trống = không giới hạn)</span>:</div>
+    <div class="as-lbl">Khoảng thời gian lấy data <span class="as-sub">(theo ngày đơn hàng — để trống = không giới hạn)</span>:</div>
     <div class="assign-sort-row" style="margin-bottom:6px">
       ${[['today','Hôm nay'],['yesterday','Hôm qua'],['thisweek','Tuần này'],['lastweek','Tuần trước'],['month','Tháng này'],['lastmonth','Tháng trước'],['quarter','Quý này'],['lastquarter','Quý trước'],['year','Năm nay'],['lastyear','Năm trước']].map(([k,l])=>`<div class="assign-sort-btn" onclick="_advAssignPreset('${k}')">${l}</div>`).join('')}
     </div>
@@ -346,7 +351,7 @@ function renderAssignCreate() {
       ${(_advAssign.dateFrom || _advAssign.dateTo) ? `<button class="btn sm" onclick="_advAssign.dateFrom='';_advAssign.dateTo='';renderAssignCreate()">✕ Xoá khoảng ngày</button>` : ''}
     </div>
 
-    <div style="font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:500">Lấy từ:</div>
+    <div class="as-lbl">Lấy từ:</div>
     <div class="assign-mode-row">
       <div class="assign-mode-btn ${_advAssign.sourceMode==='filter'?'active':''}" onclick="_advAssign.sourceMode='filter';renderAssignCreate()">
         📋 Toàn bộ bộ lọc <span style="font-size:10px;display:block;font-weight:400;margin-top:2px">${totalFiltered} khách hàng</span>
@@ -364,7 +369,7 @@ function renderAssignCreate() {
       <span style="font-size:11px;color:var(--hint)">/ ${totalFiltered} KH</span>
     </div>` : ''}
 
-    <div style="font-size:11px;color:var(--muted);margin-bottom:5px;margin-top:10px;font-weight:500">Ưu tiên lấy:</div>
+    <div class="as-lbl">Ưu tiên lấy:</div>
     <div class="assign-sort-row">
       ${[
         ['default','Mặc định (theo bộ lọc)'],
@@ -381,7 +386,7 @@ function renderAssignCreate() {
   </div>
 
   <!-- STEP 2: CS / TEAM SELECTION -->
-  <div class="assign-section">
+  <div class="assign-section" id="as-s2" style="scroll-margin-top:46px">
     <div class="assign-section-title">② Chọn nơi nhận data</div>
     <div class="assign-mode-row" style="margin-bottom:10px">
       <div class="assign-mode-btn ${!isTeamMode?'active':''}" onclick="_advAssign.selectMode='cs';renderAssignCreate()">
@@ -393,7 +398,7 @@ function renderAssignCreate() {
     </div>
 
     ${!isTeamMode ? `
-    <div style="font-size:10px;font-weight:400;color:var(--muted);margin-bottom:6px">(gõ tên để tìm, bấm để chọn — chọn được nhiều CS)</div>
+    <div class="guide-text" style="font-size:10px;font-weight:400;color:var(--muted);margin-bottom:6px">(gõ tên để tìm, bấm để chọn — chọn được nhiều CS)</div>
     <input class="assign-input" id="assign-cs-search" placeholder="🔍 Gõ tên CS để tìm nhanh..." style="width:100%;margin-bottom:8px;box-sizing:border-box"
       oninput="_filterAssignCSChips(this.value)">
     <div class="assign-cs-list" id="assign-cs-chips" style="margin-bottom:8px">
@@ -408,7 +413,7 @@ function renderAssignCreate() {
     </div>
     ${_advAssign.selectedCS.size===0?'<div style="font-size:11px;color:var(--hint);margin-top:6px">⬆ Chọn ít nhất 1 CS</div>':''}
     ` : `
-    <div style="font-size:10px;font-weight:400;color:var(--muted);margin-bottom:6px">(bấm để chọn Team — chọn được nhiều Team, tỷ lệ % cho từng thành viên nhập ở bước ③ bên dưới)</div>
+    <div class="guide-text" style="font-size:10px;font-weight:400;color:var(--muted);margin-bottom:6px">(bấm để chọn Team — chọn được nhiều Team, tỷ lệ % cho từng thành viên nhập ở bước ③ bên dưới)</div>
     <div class="assign-cs-list" id="assign-team-chips" style="margin-bottom:8px">
       ${teams.map(t => `<div class="assign-cs-chip-multi ${_advAssign.selectedTeams.has(t.id)?'selected':''}" data-team="${esc(t.id)}" onclick="_advAssignToggleTeam(this.dataset.team)">${esc(t.name)} <span style="opacity:.6">(${(t.members||[]).length})</span></div>`).join('')}
       ${teams.length===0?'<span style="color:var(--hint);font-size:12px">Chưa có Team nào — vào tab "Quản lý Team" để tạo Team trước.</span>':''}
@@ -419,7 +424,7 @@ function renderAssignCreate() {
 
   <!-- STEP 3: DISTRIBUTION -->
   ${selectedCount > 0 ? `
-  <div class="assign-section">
+  <div class="assign-section" id="as-s3" style="scroll-margin-top:46px">
     <div class="assign-section-title">③ Phân phối data</div>
     <div class="assign-mode-row" style="margin-bottom:10px">
       <div class="assign-mode-btn ${_advAssign.distMode==='equal'?'active':''}" onclick="_advAssign.distMode='equal';renderAssignCreate()">
@@ -435,7 +440,7 @@ function renderAssignCreate() {
   </div>` : ''}
 
   <!-- STEP 4: LABEL -->
-  <div class="assign-section">
+  <div class="assign-section" id="as-s4" style="scroll-margin-top:46px">
     <div class="assign-section-title">④ Ghi chú đợt chia (tuỳ chọn)</div>
     <input class="assign-input" id="assign-label" placeholder="VD: VIP tháng 6, Tiềm năng Q2..." style="width:100%" value="${esc(_advAssign.label||'')}" oninput="_advAssign.label=this.value">
   </div>`;
@@ -1469,7 +1474,7 @@ function renderMyDataTab() {
   const noAction = document.getElementById('mydata-no-action')?.checked || false;
   const body = document.getElementById('mydata-body');
   if (!csName) {
-    body.innerHTML = '<div style="padding:40px;text-align:center;color:var(--hint)">Chọn tên CS của bạn để xem data được chia</div>';
+    body.innerHTML = '<div class="guide-text" style="padding:40px;text-align:center;color:var(--hint)">Chọn tên CS của bạn để xem data được chia</div>';
     return;
   }
   const myBatches = assignHistory.filter(h => h.csName === csName);

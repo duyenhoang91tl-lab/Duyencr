@@ -301,8 +301,9 @@ function _taMedian_(arr) {
 // pos (tuy chon) = ket qua posMetrics_ da co san: lay don huy/hoan tu do (cung so voi Bao cao G) thay vi goi G lan nua.
 function buildTeamMetrics_(from, to, pos) {
   var warnings = [], people = {};
+  var pkeyTM = _salePersonKeyFn_();   // KHOP SALE: KPI Sale (Pos/Base), KPI Pancake, don huy, CS them KH co the goi CUNG 1 nguoi bang cac ten khac nhau -> gom ve 1 nguoi
   function P(name) {
-    var k = _normTxt_(name); if (!k) return null;
+    var k = pkeyTM(name); if (!k) return null;
     if (!people[k]) people[k] = { name: String(name).trim(), nhom: '', tier: '', revenue: 0, orders: 0, target: 0, pct: null, commit: 0, pctCommit: null,
       tongTT: 0, sdtMangVe: 0, tyLeChot: null, failedOrders: 0, careLeads: 0, deptKey: '', dept: '' };
     return people[k];
@@ -311,31 +312,41 @@ function buildTeamMetrics_(from, to, pos) {
     var k1 = buildSaleKpiReport_({ dateFrom: from, dateTo: to, dateField: 'ngayTao', sale: [], kenh: [], sanPham: '', byCreator: false });
     (k1.rows || []).forEach(function(r) {
       var p = P(r.name); if (!p) return;
-      p.nhom = r.nhomChung || r.nhom || ''; p.tier = r.tier || '';
-      p.deptKey = r.nhomChungKey || ''; p.dept = r.nhomChung || '';
-      p.revenue = _taNum_(r.revenue); p.orders = _taNum_(r.orders);
-      p.target = _taNum_(r.target); p.pct = (r.pct === null || r.pct === undefined) ? null : _taNum_(r.pct);
-      p.commit = _taNum_(r.commit); p.pctCommit = (r.pctCommit === null || r.pctCommit === undefined) ? null : _taNum_(r.pctCommit);
+      // 1 nguoi co the co NHIEU dong KPI (moi ten 1 dong) -> CONG don doanh thu/so don; nhom/bac/muc tieu lay dong dau co gia tri (1 nguoi chi co 1 muc tieu)
+      if (!p.nhom) p.nhom = r.nhomChung || r.nhom || ''; if (!p.tier) p.tier = r.tier || '';
+      if (!p.deptKey) { p.deptKey = r.nhomChungKey || ''; p.dept = r.nhomChung || ''; }
+      p.revenue += _taNum_(r.revenue); p.orders += _taNum_(r.orders);
+      var tg = _taNum_(r.target), cm = _taNum_(r.commit);
+      if (!p.target && tg) p.target = tg; if (!p.commit && cm) p.commit = cm;
+    });
+    // pct tinh lai tu doanh thu DA GOP (cung cong thuc buildSaleKpiReport_)
+    Object.keys(people).forEach(function(k) {
+      var q = people[k];
+      q.pct = (q.target && q.target > 0) ? Math.round(q.revenue / q.target * 1000) / 10 : null;
+      q.pctCommit = (q.commit && q.commit > 0) ? Math.round(q.revenue / q.commit * 1000) / 10 : null;
     });
   } catch (e1) { warnings.push('Không đọc được KPI Sale: ' + e1.message); }
   try {
     var k2 = buildKpiReport_(from, to, []);
+    var tcW = {};   // tong (ty le chot x tuong tac) de tinh trung binh co trong so khi 1 nguoi co nhieu ten tren Pancake
     (k2.bySale || []).forEach(function(r) {
       var p = P(r.name); if (!p) return;
-      p.tongTT = _taNum_(r.tongTT); p.sdtMangVe = _taNum_(r.sdtMangVe);
-      p.tyLeChot = p.tongTT ? _taNum_(r.tyLeChot) : null;
+      var tt = _taNum_(r.tongTT), kk = pkeyTM(r.name);
+      p.tongTT += tt; p.sdtMangVe += _taNum_(r.sdtMangVe);
+      tcW[kk] = (tcW[kk] || 0) + (tt ? _taNum_(r.tyLeChot) * tt : 0);
+      p.tyLeChot = p.tongTT ? Math.round(tcW[kk] / p.tongTT * 100) / 100 : null;
       // KHONG con lay doanh thu/so don tu Pancake khi Pos chua co (Duyen chot 2026-10-12: bao cao tinh tu Pos; Base chi check nguoc cho don GHEP/TACH, viec do nam trong buildSalesReportB_). Pancake chi cho chi so hoi thoai (tongTT/sdtMangVe/tyLeChot).
     });
   } catch (e2) { warnings.push('Không đọc được KPI Pancake: ' + e2.message); }
   if (pos && pos.total && pos.total.failedOrders !== null && pos.total.failedOrders !== undefined) {
-    (pos.bySale || []).forEach(function(r) { if (!r.failedOrders) return; var p = P(r.name); if (p) p.failedOrders = _taNum_(r.failedOrders); });   // chi nguoi CO don huy/hoan, giong G (khong tao them nguoi chi co doanh thu)
+    (pos.bySale || []).forEach(function(r) { if (!r.failedOrders) return; var p = P(r.name); if (p) p.failedOrders += _taNum_(r.failedOrders); });   // chi nguoi CO don huy/hoan, giong G (khong tao them nguoi chi co doanh thu)
   } else try {
     var k3 = buildFailedOrderReport_({ dateFrom: from, dateTo: to, sale: [], nguon: [], marketer: [], sanPham: '' });
-    (k3.bySale || []).forEach(function(r) { var p = P(r.name); if (p) p.failedOrders = _taNum_(r.orders); });
+    (k3.bySale || []).forEach(function(r) { var p = P(r.name); if (p) p.failedOrders += _taNum_(r.orders); });
   } catch (e3) { warnings.push('Không đọc được báo cáo đơn thất bại: ' + e3.message); }
   try {
     var k4 = buildCareLeadReport_({ dateFrom: from, dateTo: to, cs: [] });
-    (k4.byCS || []).forEach(function(r) { var p = P(r.name); if (p) p.careLeads = _taNum_(r.count); });
+    (k4.byCS || []).forEach(function(r) { var p = P(r.name); if (p) p.careLeads += _taNum_(r.count); });
   } catch (e4) { warnings.push('Không đọc được báo cáo CS thêm KH: ' + e4.message); }
   return { list: Object.keys(people).map(function(k) { return people[k]; }), warnings: warnings };
 }
@@ -512,16 +523,197 @@ function readSaleDepts_() {
 // ma chua co so lieu thi them vao danh sach voi so lieu 0 de dem dau nguoi cua phong.
 function _orgApplyDepts_(people, byKey, sd, deptList, UNK) {
   var lbl = {}; deptList.forEach(function(g) { lbl[g.key] = g.label; });
-  Object.keys(sd.byNorm).forEach(function(k) {
+  var pkeyOD = _salePersonKeyFn_(), byPk = {};   // cau hinh phong luu theo TEN Sale; doi sang khoa danh tinh de ten khac cua cung nguoi cung ra phong do
+  Object.keys(sd.byNorm).forEach(function(k0) { var pk0 = pkeyOD(k0); if (!byPk[pk0]) byPk[pk0] = sd.byNorm[k0]; });
+  Object.keys(byPk).forEach(function(k) {
     if (byKey[k]) return;
-    byKey[k] = { name: sd.byNorm[k].name, nhom: '', tier: '', deptKey: '', dept: '', revenue: 0, orders: 0, target: 0, pct: null, tongTT: 0, sdtMangVe: 0, tyLeChot: null, failedOrders: 0, careLeads: 0, score: null, rating: 'chuadu', strengths: [], issues: [], comment: 'Chưa có số liệu trong kỳ này.' };
+    byKey[k] = { name: byPk[k].name, nhom: '', tier: '', deptKey: '', dept: '', revenue: 0, orders: 0, target: 0, pct: null, tongTT: 0, sdtMangVe: 0, tyLeChot: null, failedOrders: 0, careLeads: 0, score: null, rating: 'chuadu', strengths: [], issues: [], comment: 'Chưa có số liệu trong kỳ này.' };
     people.push(byKey[k]);
   });
   people.forEach(function(x) {
-    var dm = sd.byNorm[_normTxt_(x.name)];
+    var dm = byPk[pkeyOD(x.name)];
     if (dm && lbl[dm.key]) { x.deptKey = dm.key; x.dept = lbl[dm.key]; } else { x.deptKey = ''; x.dept = UNK; }
   });
 }
+// ── PHAN BO PHONG BAN THEO FILE NHAN SU (Duyen yeu cau 2026-10-21) ──
+// Nguon: FILE_NHAN_SU_TONG_HOP.xlsx (cot BO PHAN + TEN NHAN VIEN; KHONG luu CCCD/ngay sinh/SDT/dia chi). Ghi 2 Settings: deptList (them phong con thieu) + saleDepts (ten -> key phong).
+// CHAY TAY 1 LAN trong Apps Script Editor: datPhongBanTuFileNhanSu() = XEM TRUOC (chi ghi Logger, khong ghi gi); datPhongBanTuFileNhanSu(true) = GHI THAT.
+// GOP, khong de: giu moi phong/nguoi dang co ngoai file; nguoi da co (khop ten khong phan biet hoa/thuong) thi doi sang phong theo file, khong tao khoa trung.
+// Ten xuat hien o 2 bo phan khac nhau trong file (cung ten 2 nguoi) -> BO QUA va bao trong Logger de gan tay o Settings > Phong ban.
+var PHONGBAN_NHANSU_NEW_ = [
+  { key: 'banlanhdao', label: 'Ban lãnh đạo' }, { key: 'cskh', label: 'CSKH' }, { key: 'khobaohanh', label: 'Kho bảo hành' },
+  { key: 'khoncc', label: 'Kho NCC + SX' }, { key: 'khonhacungcap', label: 'Kho nhà cung cấp' }
+];
+var PHONGBAN_NHANSU_ = [
+  ['Lại Thị Thảo', 'banlanhdao'],
+  ['Nguyễn Thị Diệu My', 'hr'],
+  ['Nguyễn Thị Mậu', 'hr'],
+  ['Lê Xuân Cảnh', 'hr'],
+  ['Nguyễn Thị Thúy Hoàn', 'cuahang'],
+  ['Lê Trà My', 'cuahang'],
+  ['Nguyễn Thùy Trang', 'cuahang'],
+  ['Nguyễn Lan Hương', 'cuahang'],
+  ['Trần Tú Anh', 'cuahang'],
+  ['Hà Thị Kim Thúy', 'cuahang'],
+  ['Dương Thị Thanh Tâm', 'nguon'],
+  ['Nguyễn Thanh Hồng', 'nguon'],
+  ['Hoàng Ngọc Tuấn Tú', 'khobaohanh'],
+  ['Vương Minh Anh', 'khobaohanh'],
+  ['Võ Hoàng Lan', 'khobaohanh'],
+  ['Nguyễn Thị Xoan', 'thanhpham'],
+  ['Nguyễn Thị Hồng Vân', 'thanhpham'],
+  ['Nghiêm Thị Thu Hằng', 'thanhpham'],
+  ['Nguyễn Thu Huyền', 'thanhpham'],
+  ['Trần Thị Thơm', 'thanhpham'],
+  ['Lê Thị Thanh Hoa', 'thanhpham'],
+  ['Vương Thị Trang', 'thanhpham'],
+  ['Nguyễn Thị Kim Thu', 'khoncc'],
+  ['Phạm Thu Hà', 'sanxuat'],
+  ['Nguyễn Thị Lan', 'sanxuat'],
+  ['Nguyễn Thu Thủy', 'sanxuat'],
+  ['Nguyễn Thị Nhung', 'sanxuat'],
+  ['Ngô Trung Thành', 'khonhacungcap'],
+  ['Lê Hồng Vân', 'khonhacungcap'],
+  ['Ngô Duy Nguyện', 'khonhacungcap'],
+  ['Nguyễn Khánh Ly', 'ketoan'],
+  ['Nguyễn Thu Huyền', 'ketoan'],
+  ['Vương Thúy Anh', 'ketoan'],
+  ['Phạm Thị Oanh', 'ketoan'],
+  ['Đào Thị Hồng Hạnh', 'ketoan'],
+  ['Kiều Mai Thanh Thùy', 'ketoan'],
+  ['Âu Thị Hải Yến', 'ketoan'],
+  ['Phạm Thị Hồng', 'ketoan'],
+  ['Trịnh Tuấn Anh', 'ketoan'],
+  ['Nguyễn Lâm Yến Nhi', 'ketoan'],
+  ['Nguyễn Thế Anh', 'ketoan'],
+  ['Trần Văn Trường', 'media'],
+  ['Trần Anh Tuấn', 'media'],
+  ['Trần Huy Hoàng', 'media'],
+  ['Nguyễn Thúy Quỳnh', 'cskh'],
+  ['Bùi Đoàn Thùy Mến', 'cskh'],
+  ['Vũ Thị Thu Trang', 'cskh'],
+  ['Trịnh Hằng Nga', 'cskh'],
+  ['Nguyễn Mỹ Linh', 'cskh'],
+  ['Ngô Việt Huy', 'marketing'],
+  ['Nguyễn Văn Hưng', 'marketing'],
+  ['Hoàng Thị Duyên', 'sale'],
+  ['Trịnh Phương Anh', 'sale'],
+  ['Nguyễn Thị Hải Yến', 'sale'],
+  ['Nguyễn Phương Anh', 'sale'],
+  ['Nguyễn Huyền Trang', 'sale'],
+  ['Lê Kiều Ninh', 'sale'],
+  ['Phan Thị Ngọc Hà', 'sale'],
+  ['Nguyễn Phương Thanh', 'sale'],
+  ['NguyễN Bích Ngọc', 'sale'],
+  ['Đinh Thị Thu Thủy', 'sale'],
+  ['Ninh Thị Ngà', 'sale'],
+  ['Nguyễn Thị Phương Thảo', 'sale'],
+  ['Mai Thi Thu Huyền', 'sale'],
+  ['Nguyễn Thị Bích', 'sale'],
+  ['Nguyễn Thị Thùy Dung', 'sale'],
+  ['Tạ Thúy Hà', 'sale'],
+  ['Quách Thị Minh', 'sale'],
+  ['Phạm Thị Hoàng Tươi', 'sale'],
+  ['Nguyễn Thị Tuyết Mai', 'sale']
+];
+function _phongBanNhanSuPlan_(deptListCur, saleDeptsCur) {
+  var list = (deptListCur || []).map(function (g) { return { key: g.key, label: g.label }; });
+  var haveKey = {}; list.forEach(function (g) { haveKey[g.key] = 1; });
+  var addDepts = [];
+  // Them MOI phong ma file dung ma deptList dang chay chua co (ke ca phong mac dinh da bi xoa/sua tren CRM) — thieu key thi nguoi duoc gan se hien '(chua phan phong)'.
+  var used = {}; PHONGBAN_NHANSU_.forEach(function (r) { used[r[1]] = 1; });
+  DEPT_LIST_DEFAULT_.concat(PHONGBAN_NHANSU_NEW_).forEach(function (g) { if (used[g.key] && !haveKey[g.key]) { haveKey[g.key] = 1; list.push({ key: g.key, label: g.label }); addDepts.push(g.key); } });
+  var cnt = {}; PHONGBAN_NHANSU_.forEach(function (r) { var k = _normTxt_(r[0]); cnt[k] = (cnt[k] || {}); cnt[k][r[1]] = 1; });
+  var map = {}; Object.keys(saleDeptsCur || {}).forEach(function (n) { map[n] = saleDeptsCur[n]; });
+  var byNorm = {}; Object.keys(map).forEach(function (n) { byNorm[_normTxt_(n)] = n; });
+  var added = [], changed = [], same = [], skipped = [];
+  PHONGBAN_NHANSU_.forEach(function (r) {
+    var k = _normTxt_(r[0]);
+    if (Object.keys(cnt[k]).length > 1) { if (skipped.indexOf(r[0]) < 0) skipped.push(r[0]); return; }
+    var exist = byNorm[k];
+    if (exist === undefined) { map[r[0]] = r[1]; byNorm[k] = r[0]; added.push(r[0] + ' -> ' + r[1]); }
+    else if (map[exist] !== r[1]) { changed.push(exist + ': ' + map[exist] + ' -> ' + r[1]); map[exist] = r[1]; }
+    else same.push(exist);
+  });
+  return { deptList: list, saleDepts: map, addDepts: addDepts, added: added, changed: changed, same: same, skipped: skipped };
+}
+function datPhongBanTuFileNhanSu(apply) {
+  var cur = {}; try { cur = JSON.parse(getSetting_('saleDepts') || '{}') || {}; } catch (e) { cur = {}; }
+  var plan = _phongBanNhanSuPlan_(readDeptList_(), cur);
+  Logger.log('Phong moi them vao danh sach: ' + (plan.addDepts.join(', ') || '(khong)'));
+  Logger.log('Nguoi THEM MOI (' + plan.added.length + '): ' + plan.added.join(' | '));
+  Logger.log('Nguoi DOI PHONG (' + plan.changed.length + '): ' + (plan.changed.join(' | ') || '(khong)'));
+  Logger.log('Nguoi da dung phong (' + plan.same.length + ') — giu nguyen');
+  Logger.log('BO QUA vi trung ten o nhieu bo phan (' + plan.skipped.length + '): ' + (plan.skipped.join(', ') || '(khong)') + ' — gan tay o Settings > Phong ban');
+  if (apply !== true) { Logger.log('=> XEM TRUOC, chua ghi gi. Chay datPhongBanTuFileNhanSu(true) de ghi that.'); return plan; }
+  setSetting_('deptList', JSON.stringify(plan.deptList));
+  setSetting_('saleDepts', JSON.stringify(plan.saleDepts));
+  try { CacheService.getScriptCache().remove('orgOv_v2_'); } catch (e2) {}
+  Logger.log('=> DA GHI deptList + saleDepts. Vao CRM Ctrl+F5 > Settings > Phong ban de kiem tra (hoac bam Lam moi o Tong quan).');
+  return plan;
+}
+
+// ── HO SO NHAN SU: luu NGAY SINH + SDT + DIA CHI (Duyen yeu cau 2026-10-21) ──
+// DU LIEU CA NHAN => KHONG dua vao repo (repo GitHub dang CONG KHAI). Nguon la 1 TAB trong chinh Google Sheet CRM do Duyen tu nhap file xlsx vao
+// (Google Sheets > File > Nhap > tai file > "Chen trang tinh moi", dat ten tab = NhanSuImport). CHAY TAY trong Apps Script Editor:
+// nhapHoSoNhanSu() = XEM TRUOC (khong ghi); nhapHoSoNhanSu(true) = ghi vao sheet 'HoSoNhanSu'. Sheet nay KHONG co action GAS nao doc/tra ra
+// (chi mo truc tiep bang Google Sheets) nen chi nguoi co quyen sua Sheet moi thay. KHONG nhap CCCD (co chu y bo qua cot CCCD).
+// Khoa dong = ten + bo phan (khong phan biet hoa/thuong/dau) nen 2 nguoi trung ten o 2 bo phan van la 2 dong. Chay lai = cap nhat dong cu, khong nhan doi.
+var SH_HOSO_NS = 'HoSoNhanSu';
+var HOSO_NS_HEADERS = ['name', 'dept', 'position', 'birthday', 'phone', 'address', 'updatedAt'];
+function _nsFold_(s) { return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/\s+/g, ' ').trim(); }
+function _nsDate_(v) {
+  if (v instanceof Date) return Utilities.formatDate(v, 'GMT+7', 'dd/MM/yyyy');
+  return String(v == null ? '' : v).trim();
+}
+function _nsPhone_(v) {
+  var d = String(v == null ? '' : v).replace(/[\s.\-()]/g, '');
+  if (/^\d{9}$/.test(d)) d = '0' + d;   // Sheets bo so 0 dau khi doc SDT thanh so
+  return d;
+}
+// values = mang 2 chieu cua tab nguon (dong 1 = tieu de). Tra { rows:[{name,dept,position,birthday,phone,address}], missing:[cot thieu] }. Khong bao gio doc cot CCCD.
+function _nsBuildRows_(values) {
+  var hdr = (values && values[0] || []).map(_nsFold_), col = {};
+  [['name', 'ten nhan vien'], ['dept', 'bo phan'], ['position', 'vi tri'], ['birthday', 'ngay sinh'], ['phone', 'so dien thoai'], ['address', 'dia chi hien tai']]
+    .forEach(function (x) { col[x[0]] = hdr.indexOf(x[1]); });
+  var missing = []; Object.keys(col).forEach(function (k) { if (col[k] < 0) missing.push(k); });
+  var rows = [];
+  if (col.name < 0) return { rows: rows, missing: missing };
+  for (var i = 1; i < values.length; i++) {
+    var r = values[i], nm = String(r[col.name] == null ? '' : r[col.name]).replace(/\s+/g, ' ').trim();
+    if (!nm) continue;
+    rows.push({ name: nm, dept: col.dept >= 0 ? String(r[col.dept] || '').replace(/\s+/g, ' ').trim() : '',
+      position: col.position >= 0 ? String(r[col.position] || '').trim() : '', birthday: col.birthday >= 0 ? _nsDate_(r[col.birthday]) : '',
+      phone: col.phone >= 0 ? _nsPhone_(r[col.phone]) : '', address: col.address >= 0 ? String(r[col.address] || '').replace(/\s+/g, ' ').trim() : '' });
+  }
+  return { rows: rows, missing: missing };
+}
+function nhapHoSoNhanSu(apply, tenTabNguon) {
+  var src = getCrmSS_().getSheetByName(tenTabNguon || 'NhanSuImport');
+  if (!src) throw new Error('Chua co tab "' + (tenTabNguon || 'NhanSuImport') + '" trong Google Sheet CRM. Nhap file xlsx vao thanh tab moi voi ten do (File > Nhap) roi chay lai.');
+  var b = _nsBuildRows_(src.getDataRange().getValues());
+  if (b.missing.length) Logger.log('CANH BAO thieu cot: ' + b.missing.join(', ') + ' (cot thieu se de trong)');
+  var sh = getSheet_(SH_HOSO_NS, HOSO_NS_HEADERS), last = sh.getLastRow();
+  var cur = last >= 2 ? sh.getRange(2, 1, last - 1, HOSO_NS_HEADERS.length).getValues() : [], idx = {};
+  cur.forEach(function (r, i) { idx[_nsFold_(r[0]) + '|' + _nsFold_(r[1])] = i; });
+  var now = Utilities.formatDate(new Date(), 'GMT+7', 'yyyy-MM-dd HH:mm'), add = 0, upd = 0, same = 0;
+  b.rows.forEach(function (x) {
+    var line = [x.name, x.dept, x.position, x.birthday, x.phone, x.address, now], k = _nsFold_(x.name) + '|' + _nsFold_(x.dept);
+    if (idx[k] === undefined) { idx[k] = cur.length; cur.push(line); add++; return; }
+    var o = cur[idx[k]];
+    if (o.slice(0, 6).join('\u0001') === line.slice(0, 6).join('\u0001')) { same++; return; }
+    cur[idx[k]] = line; upd++;
+  });
+  Logger.log('Doc ' + b.rows.length + ' nguoi tu tab nguon: THEM MOI ' + add + ' · CAP NHAT ' + upd + ' · khong doi ' + same + '. Tong dong sau khi ghi: ' + cur.length);
+  if (apply !== true) { Logger.log('=> XEM TRUOC, chua ghi gi. Chay nhapHoSoNhanSu(true) de ghi that.'); return { add: add, upd: upd, same: same }; }
+  if (!cur.length) return { add: 0, upd: 0, same: 0 };
+  var rng = sh.getRange(2, 1, cur.length, HOSO_NS_HEADERS.length);
+  rng.setNumberFormat('@');   // luu dang CHU: giu so 0 dau cua SDT, ngay sinh khong bi Sheets doi thanh Date, chu dau = + - @ khong thanh cong thuc
+  rng.setValues(cur);
+  Logger.log('=> DA GHI sheet ' + SH_HOSO_NS + '. Nen XOA tab nguon sau khi kiem tra (de khong con ban sao CCCD) va chi chia se Sheet cho nguoi can.');
+  return { add: add, upd: upd, same: same };
+}
+
 function orgOverview_(p) {
   var today = _vnYmd_(new Date());
   var from = p.from || p.dateFrom || (today.substring(0, 8) + '01'), to = p.to || p.dateTo || today;
@@ -531,6 +723,7 @@ function orgOverview_(p) {
     var hit = _cacheGetBig_(cacheKey);
     if (hit) { try { var o = JSON.parse(hit); o.cached = true; return jsonOut_(o); } catch (eh) {} }
   }
+  var pkeyOrg = _salePersonKeyFn_(); function nkOrg(n) { return pkeyOrg(n); }   // KHOP SALE: ten khac nhau cua cung 1 nguoi (KPI, Pancake, Teams, ngay) -> 1 nguoi
   var effTo = to > today ? today : to;
   var days = Math.max(1, Math.round((Date.parse(effTo + 'T00:00:00Z') - Date.parse(from + 'T00:00:00Z')) / 86400000) + 1);
   // Chi so Pos (don huy/hoan + don theo ngay tung nguoi) lay qua posMetrics_ DUNG CHUNG (P0d) — 1 lan doc Pos thay vi tu goi B/G rieng. Doanh thu/so don/KPI van tu KPI Sale (Base), KHONG doi.
@@ -540,10 +733,10 @@ function orgOverview_(p) {
   if (pos) posWarn = posWarn.concat(pos.warnings || []);
   var m = buildTeamMetrics_(from, to, pos && pos.ok ? pos : null), sc = scoreTeam_(m.list), warnings = m.warnings.concat(posWarn);
   var people = sc.people, byKey = {};
-  people.forEach(function(x) { byKey[_normTxt_(x.name)] = x; });
+  people.forEach(function(x) { byKey[nkOrg(x.name)] = x; });
   // Don theo ngay tung nguoi (chi khi ky <= 93 ngay de payload gon)
   if (!dailySkipped) {
-    if (pos && pos.bySaleDay) Object.keys(pos.bySaleDay).forEach(function(nm) { daily[_normTxt_(nm)] = pos.bySaleDay[nm]; });
+    if (pos && pos.bySaleDay) Object.keys(pos.bySaleDay).forEach(function(nm) { daily[nkOrg(nm)] = pos.bySaleDay[nm]; });
     else { warnings.push('Không đọc được đơn theo ngày.'); dailySkipped = true; }
   }
   // Team + thanh vien (ke ca nguoi chua co so lieu -> hien o "Chua du du lieu" de quan ly thay)
@@ -552,22 +745,22 @@ function orgOverview_(p) {
   var teamsOf = {}, leaderOf = {};
   teams.forEach(function(t) {
     var names = [], seen = {};
-    function add(n) { var k = _normTxt_(n); if (!k || seen[k]) return; seen[k] = true; names.push(String(n).trim());
+    function add(n) { var k = nkOrg(n); if (!k || seen[k]) return; seen[k] = true; names.push(String(n).trim());
       if (!byKey[k]) { byKey[k] = { name: String(n).trim(), nhom: '', tier: '', deptKey: '', dept: '', revenue: 0, orders: 0, target: 0, pct: null, tongTT: 0, sdtMangVe: 0, tyLeChot: null, failedOrders: 0, careLeads: 0, score: null, rating: 'chuadu', strengths: [], issues: [], comment: 'Chưa có số liệu trong kỳ này.' }; people.push(byKey[k]); }
       (teamsOf[k] = teamsOf[k] || []).push(t.name); }
     add(t.leader); (t.members || []).forEach(add);
     t._names = names;
-    if (_normTxt_(t.leader)) (leaderOf[_normTxt_(t.leader)] = leaderOf[_normTxt_(t.leader)] || []).push(t.name);
+    if (nkOrg(t.leader)) (leaderOf[nkOrg(t.leader)] = leaderOf[nkOrg(t.leader)] || []).push(t.name);
   });
   var UNK = '(chưa phân phòng)';
   var deptList = readDeptList_(), saleDeptsCfg = readSaleDepts_();
   _orgApplyDepts_(people, byKey, saleDeptsCfg, deptList, UNK);   // phong = cai dat rieng (deptList/saleDepts), KHONG dung doi Online/Offline
   people.forEach(function(x) {
-    var k = _normTxt_(x.name);
+    var k = nkOrg(x.name);
     x.ordersPerDay = Math.round(x.orders / days * 10) / 10;
     x.aov = x.orders ? Math.round(x.revenue / x.orders) : 0;
     x.teams = teamsOf[k] || []; x.leaderOf = leaderOf[k] || []; x.isLeader = x.leaderOf.length > 0;
-    var ls = {}; teams.forEach(function(t) { if ((teamsOf[k] || []).indexOf(t.name) !== -1 && t.leader && _normTxt_(t.leader) !== k) ls[String(t.leader).trim()] = true; });
+    var ls = {}; teams.forEach(function(t) { if ((teamsOf[k] || []).indexOf(t.name) !== -1 && t.leader && nkOrg(t.leader) !== k) ls[String(t.leader).trim()] = true; });
     x.leaders = Object.keys(ls);
     var d = daily[k] || {}, ds = Object.keys(d).sort();
     x.activeDays = ds.length;
@@ -575,7 +768,7 @@ function orgOverview_(p) {
     x.daily = dailySkipped ? null : ds.map(function(dd) { return [dd, d[dd][0], Math.round(d[dd][1])]; });
   });
   var teamOut = teams.map(function(t) {
-    var pl = t._names.map(function(n) { return byKey[_normTxt_(n)]; }).filter(Boolean), cnt = {};
+    var pl = t._names.map(function(n) { return byKey[nkOrg(n)]; }).filter(Boolean), cnt = {};
     pl.forEach(function(x) { if (x.deptKey) { cnt[x.deptKey] = cnt[x.deptKey] || { n: 0, rev: 0, label: x.dept }; cnt[x.deptKey].n++; cnt[x.deptKey].rev += x.revenue; } });
     var best = Object.keys(cnt).sort(function(a, b) { return (cnt[b].n - cnt[a].n) || (cnt[b].rev - cnt[a].rev); })[0];
     var o = _orgAgg_(pl, days);

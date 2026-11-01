@@ -198,6 +198,7 @@ function _notifyMentions_(opts) {
     var selfUn = {};
     users.forEach(function (u) { [u.name, u.username].concat(u.names || []).forEach(function (n) { if (me[String(n || '').trim().toLowerCase()]) selfUn[String(u.username)] = 1; }); });
     tos = tos.filter(function (x) { return !selfUn[x]; });
+    if (opts.onlyUsers) tos = tos.filter(function (x) { return opts.onlyUsers[x] === 1; });   // vd. thao luan khach: chi bao cho nguoi co quyen xem
     if (!tos.length) return 0;
     var sh = getSheet_(SH_NOTIF, NOTIF_HEADERS), now = new Date().toISOString();
     var snip = String(opts.text || '').replace(/\s+/g, ' ').trim().slice(0, 160);
@@ -271,10 +272,22 @@ function _taskActor_(p) {
   try { su = (p && p.token) ? _sessUser_(p.token) : null; } catch (e) { su = null; }
   if (su) {
     var al = [su.name, su.username].filter(function (x) { return x; }).map(String);
-    return { name: String(su.name || su.username), aliases: al, username: String(su.username || ''), verified: true };
+    return { name: String(su.name || su.username), aliases: al, username: String(su.username || ''), verified: true, role: String(su.role || '') };
   }
   var by = String((p && p.by) || '').trim();
-  return by ? { name: by, aliases: [by], username: '', verified: false } : null;
+  return by ? { name: by, aliases: [by], username: '', verified: false, role: '' } : null;
+}
+// Admin ep chuyen tiep: HUY moi yeu cau duyet dang cho cua viec (status=cancelled) de viec khong ket
+function _taskCancelPending_(taskId, actor) {
+  var rsh = getSheet_(SH_TASK_REQ, TASK_REQ_HEADERS), last = rsh.getLastRow(), n = 0;
+  if (last < 2) return 0;
+  var v = rsh.getRange(2, 1, last - 1, TASK_REQ_HEADERS.length).getValues();
+  for (var i = 0; i < v.length; i++) {
+    if (String(v[i][1]) === String(taskId) && String(v[i][6]) === 'pending') {
+      rsh.getRange(i + 2, 7, 1, 4).setValues([['cancelled', actor.name, new Date().toISOString(), 'Admin ép chuyển']]); n++;
+    }
+  }
+  return n;
 }
 function _taskInList_(list, actor) {
   if (!actor) return false;
@@ -488,6 +501,13 @@ function taskAdvance_(p) {
     if (t.stageIdx >= flow.stages.length) return jsonOut_({ error: 'Cong viec da hoan thanh' });
     var cur = flow.stages[t.stageIdx];
     var assignees = (t.stageAssignees || {})[cur.id] || [];
+    // ADMIN EP CHUYEN: chi khi co token phien that cua admin (khong tin co `force`/`by` tu client): bo qua quyen phu trach + buoc duyet
+    if (p.force) {
+      if (!(actor.verified && actor.role === 'admin')) return jsonOut_({ error: 'Chi admin (dang dang nhap) moi duoc ep chuyen tiep' });
+      var cancelled = _taskCancelPending_(t.id, actor);
+      var ntF = _taskDoAdvance_(sh, found, flow, actor.name, 'ADMIN ÉP CHUYỂN' + (cancelled ? ' (đã hủy ' + cancelled + ' yêu cầu duyệt đang chờ)' : '') + (p.note ? '. ' + p.note : ''), '', actor);
+      return jsonOut_({ ok: true, forced: true, stageIdx: ntF.stageIdx, status: ntF.status });
+    }
     if (!_taskInList_(assignees, actor) && !_taskInList_([t.createdBy], actor)) {
       return jsonOut_({ error: 'Ban khong phai nguoi phu trach giai doan "' + cur.name + '"' });
     }
@@ -508,6 +528,73 @@ function taskAdvance_(p) {
     }
     var nt = _taskDoAdvance_(sh, found, flow, actor.name, p.note || '', '', actor);
     return jsonOut_({ ok: true, stageIdx: nt.stageIdx, status: nt.status });
+  } finally { lock.releaseLock(); }
+}
+
+// DOI NGUOI PHU TRACH (assignees) va/hoac NGUOI DUYET (approvers) cua 1 giai doan CHUA XONG (nguoi nghi/qua tai).
+// Quyen: admin (token that) | nguoi tao viec | nguoi dang phu trach giai doan HIEN TAI. Giai doan da xong khong doi (giu lich su).
+// Neu giai doan hien tai dang co YEU CAU DUYET cho -> cap nhat luon danh sach nguoi duyet cua yeu cau do (khong de viec ket
+// vi nguoi duyet cu nghi). Nguoi MOI duoc thong bao.
+function taskReassign_(p) {
+  var actor = _taskActor_(p);
+  if (!p || !p.taskId || !p.stageId || !actor) return jsonOut_({ error: 'Thieu taskId/stageId' });
+  var hasAs = Array.isArray(p.assignees), hasAp = Array.isArray(p.approvers);
+  if (!hasAs && !hasAp) return jsonOut_({ error: 'Thieu danh sach nguoi' });
+  function clean(a) { var o = []; (a || []).forEach(function (n) { n = String(n || '').trim(); if (n && o.indexOf(n) < 0) o.push(n); }); return o; }
+  var names = hasAs ? clean(p.assignees) : null, aps = hasAp ? clean(p.approvers) : null;
+  if (hasAs && !names.length) return jsonOut_({ error: 'Giai doan can it nhat 1 nguoi phu trach' });
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(15000); } catch (e) { return jsonOut_({ error: 'He thong ban, thu lai' }); }
+  try {
+    var sh = getSheet_(SH_TASK, TASK_HEADERS);
+    var found = _taskFind_(sh, p.taskId);
+    if (!found) return jsonOut_({ error: 'Khong tim thay cong viec' });
+    var t = found.task, flow = t.flowId ? _taskFlowById_(t.flowId) : null;
+    if (!flow) return jsonOut_({ error: 'Cong viec khong co quy trinh' });
+    var idx = -1; flow.stages.forEach(function (x, i) { if (x.id === String(p.stageId)) idx = i; });
+    if (idx < 0) return jsonOut_({ error: 'Khong tim thay giai doan' });
+    if (idx < t.stageIdx || t.stageIdx >= flow.stages.length) return jsonOut_({ error: 'Giai doan nay da xong, khong doi nguoi duoc' });
+    var st = flow.stages[idx], curStage = flow.stages[t.stageIdx];
+    if (hasAp && !st.approval) return jsonOut_({ error: 'Giai doan "' + st.name + '" khong can nguoi duyet' });
+    var isAdmin = actor.verified && actor.role === 'admin';
+    if (!isAdmin && !_taskInList_([t.createdBy], actor) && !_taskInList_((t.stageAssignees || {})[curStage.id] || [], actor)) {
+      return jsonOut_({ error: 'Chi admin, nguoi tao viec hoac nguoi dang phu trach moi duoc doi nguoi phu trach' });
+    }
+    t.stageAssignees = t.stageAssignees || {}; t.stageApprovers = t.stageApprovers || {};
+    var oldNames = t.stageAssignees[st.id] || [], oldAps = t.stageApprovers[st.id] || [];
+    if (hasAs) t.stageAssignees[st.id] = names;
+    // yeu cau duyet DANG CHO cua giai doan nay -> doi nguoi duyet cua yeu cau (tinh truoc khi ghi bat ky thu gi)
+    var pend = null, effAps = null;
+    if (hasAp && idx === t.stageIdx) {
+      readTaskRequests_(t.id, true).forEach(function (q) { if (q.fromStageId === st.id) pend = q; });
+      if (pend) {
+        effAps = aps.slice();
+        if (!effAps.length && idx < flow.stages.length - 1) effAps = (t.stageAssignees[flow.stages[idx + 1].id] || []).slice();
+        effAps = effAps.filter(function (n) { return String(n).toLowerCase() !== String(pend.requestedBy).toLowerCase(); });
+        if (!effAps.length) return jsonOut_({ error: 'Dang co yeu cau cho duyet — phai co it nhat 1 nguoi duyet (khac nguoi gui)' });
+      }
+    }
+    if (hasAp) t.stageApprovers[st.id] = aps;
+    var all = {}; Object.keys(t.stageAssignees).forEach(function (k) { (t.stageAssignees[k] || []).forEach(function (n) { all[n] = 1; }); });
+    t.csAssigned = Object.keys(all); t.updatedAt = new Date().toISOString();
+    sh.getRange(found.rowIdx, 1, 1, TASK_HEADERS.length).setValues([_taskToRow_(t)]);
+    var parts = [];
+    if (hasAs) parts.push('người phụ trách: ' + (oldNames.join(', ') || '—') + ' → ' + names.join(', '));
+    if (hasAp) parts.push('người duyệt: ' + (oldAps.join(', ') || '—') + ' → ' + (aps.join(', ') || '—'));
+    _taskSysComment_(t.id, actor.name, 'đổi ' + parts.join('; ') + ' (giai đoạn "' + st.name + '")', 'system', '');
+    if (hasAs) {
+      var added = names.filter(function (n) { return oldNames.indexOf(n) < 0; });
+      _notifyTaskEvent_(added, actor, idx === t.stageIdx ? 'task_turn' : 'task_assign', t,
+        (idx === t.stageIdx ? 'giao bạn xử lý ngay giai đoạn "' : 'giao bạn phụ trách giai đoạn "') + st.name + '" của việc "' + t.title + '"');
+    }
+    if (pend) {
+      var rsh = getSheet_(SH_TASK_REQ, TASK_REQ_HEADERS), lr = rsh.getLastRow();
+      var cell = lr >= 2 ? rsh.getRange(2, 1, lr - 1, 1).createTextFinder(String(pend.id)).matchEntireCell(true).findNext() : null;
+      if (cell) rsh.getRange(cell.getRow(), 6).setValue(JSON.stringify(effAps));
+      var addedAp = effAps.filter(function (n) { return (pend.approvers || []).indexOf(n) < 0; });
+      _notifyTaskEvent_(addedAp, actor, 'task_request', t, 'xin bạn duyệt chuyển tiếp giai đoạn "' + st.name + '" của việc "' + t.title + '" (đổi người duyệt)');
+    }
+    return jsonOut_({ ok: true, assignees: t.stageAssignees[st.id], approvers: t.stageApprovers[st.id] || [] });
   } finally { lock.releaseLock(); }
 }
 
@@ -729,9 +816,12 @@ var SH_MSG_TPL = 'MessageTemplates';
 // 2026-10-12: them product (san pham, nhieu san pham cach nhau dau phay/;), topic (noi dung hoi thoai / tinh huong), status
 // (approved | pending | rejected) + nguoi duyet. Hang CU (khong co status) coi la 'approved' de mau dang dung khong bi mat.
 // getSheet_ tu bo sung cac cot header con thieu o cuoi sheet cu, KHONG dung toi du lieu san co.
-var MSG_TPL_HEADERS = ['id', 'title', 'content', 'tags', 'createdBy', 'createdAt', 'updatedAt', 'product', 'topic', 'status', 'approvedBy', 'approvedAt', 'rejectReason'];
+var MSG_TPL_HEADERS = ['id', 'title', 'content', 'tags', 'createdBy', 'createdAt', 'updatedAt', 'product', 'topic', 'status', 'approvedBy', 'approvedAt', 'rejectReason', 'nhom', 'images'];
+// images: chuoi JSON mang URL anh (toi da 4), vd '["https://drive.google.com/uc?...","..."]'. Cot nay them sau (getSheet_ tu bo sung).
+// nhom = NHOM SAN PHAM (cot 'Nhom SP' bang gia DANH_MUC) — Duyen 21/10/2026 "tao mau luu san": CS chon nhom/ten SP roi them mau tu van de AI hoc.
+// Nhom do nguoi soan CHON tay -> ghi vao cot; de TRONG = he thong TU PHAN LOAI khi doc (khong ghi vao sheet: doi danh muc thi mau tu nhay theo nhom moi). Xem _tplClassify_.
 // Ai duoc duyet / sua / xoa MAU DA DUYET / tao mau thang o trang thai da duyet. Doi danh sach nay neu muon them vai tro (vd 'leader').
-var MSG_TPL_APPROVER_ROLES_ = ['admin', 'manager'];
+var MSG_TPL_APPROVER_ROLES_ = ['admin'];   // 4c-3: CHI admin duyet/sua/xoa mau chuan (truoc day co 'manager')
 var MSG_TPL_STATUS_ = { approved: 1, pending: 1, rejected: 1 };
 
 // Danh tinh nguoi goi: token phien web (that, doc vai tro tu sheet Users) > khoa extension (chi biet la extension, TEN tu khai) > an danh.
@@ -758,12 +848,75 @@ function _tplRowToObj_(row) {
     id: String(row[0]), title: String(row[1] || ''), content: String(row[2] || ''), tags: String(row[3] || ''),
     createdBy: String(row[4] || ''), createdAt: row[5] || '', updatedAt: row[6] || '',
     product: String(row[7] || ''), topic: String(row[8] || ''), status: st,
-    approvedBy: String(row[10] || ''), approvedAt: row[11] || '', rejectReason: String(row[12] || '')
+    approvedBy: String(row[10] || ''), approvedAt: row[11] || '', rejectReason: String(row[12] || ''),
+    nhom: String(row[13] || '').trim(),   // nhom do nguoi soan chon ('' = chua chon; readMessageTemplates_ se dien nhom tu phan loai)
+    images: (function(){ try { return JSON.parse(String(row[14] || '[]')); } catch(e){ return []; } })()
   };
+}
+// ── Nhom san pham cua mau tin (2026-10-16) ──
+// Danh sach nhom + ten san pham lay tu DANH_MUC (buildPriceCatalogFlat_). Chi so nho (khoang vai chuc KB) duoc cache 10 phut
+// de moi lan doc mau khong phai doc lai ca sheet gia. Loi doc DANH_MUC KHONG duoc lam hong viec doc mau -> chi so rong, mau hien nhu 'chung'.
+var _tplCatIdxMemo_ = null;
+var MSG_TPL_CAT_CACHE_KEY_ = 'tplcat_v1';
+// Chuan hoa GIU DAU (chu thuong, bo ky tu la): 'nhan' (nhan vien) va 'nhan' (nhan vang) khac nhau -> khong phan loai nham mau ve nhan vien vao nhom Nhan.
+function _tplFoldAcc_(s) { return String(s == null ? '' : s).toLowerCase().normalize('NFC').replace(/[^a-z0-9\u00e0-\u1ef9]+/g, ' ').trim(); }
+function _tplCatalogIndex_() {
+  if (_tplCatIdxMemo_) return _tplCatIdxMemo_;
+  var idx = null;
+  try { var c = CacheService.getScriptCache().get(MSG_TPL_CAT_CACHE_KEY_); if (c) idx = JSON.parse(c); } catch (e0) { idx = null; }
+  if (!idx || !idx.groups) {
+    idx = { groups: [], names: [] };
+    try {
+      var items = (buildPriceCatalogFlat_().items) || [], gIdx = {}, nameMap = {};
+      items.forEach(function (it) {
+        var g = String(it.n || '').trim(); if (!g) return;
+        if (gIdx[g] === undefined) { gIdx[g] = idx.groups.length; idx.groups.push(g); }
+        [it.t, it.m].forEach(function (nm) {
+          var f = _tplFoldAcc_(nm); if (f.length < 3) return;
+          if (!nameMap[f]) nameMap[f] = {}; nameMap[f][gIdx[g]] = 1;
+        });
+      });
+      // Ten san pham xuat hien o >= 2 nhom la mo ho -> khong dung de phan loai (tranh doan sai)
+      Object.keys(nameMap).forEach(function (f) { var gs = Object.keys(nameMap[f]); if (gs.length === 1) idx.names.push([f, +gs[0]]); });
+      try { CacheService.getScriptCache().put(MSG_TPL_CAT_CACHE_KEY_, JSON.stringify(idx), 600); } catch (e1) {}   // qua 100KB thi bo qua cache
+    } catch (e2) { idx = { groups: [], names: [] }; }
+  }
+  _tplCatIdxMemo_ = idx;
+  return idx;
+}
+// Tu phan loai: cham diem moi nhom = tong do dai cac ten san pham (va ten nhom, nhan doi) xuat hien NGUYEN TU trong tieu de/tag/san pham/chu de/noi dung.
+// Khop GIU DAU; chi ten >= 2 tu moi duoc khop khi bo dau (nguoi go 'lac tay bac' khong dau). Hoa diem (2 nhom bang nhau) hoac khong khop gi -> ''
+// (mau 'chung') — thua con hon phan loai sai. Mau chao hoi chung khong nhac san pham nao -> chung.
+function _tplClassify_(t, idx) {
+  idx = idx || _tplCatalogIndex_();
+  if (!idx.groups.length) return '';
+  var acc = ' ' + _tplFoldAcc_([t.title, t.tags, t.product, t.topic, t.content].join(' ')) + ' ';
+  var plain = ' ' + _stripVN_(acc).trim() + ' ';
+  function hit(name) {
+    if (acc.indexOf(' ' + name + ' ') !== -1) return true;
+    var pl = _stripVN_(name);
+    return pl.indexOf(' ') !== -1 && plain.indexOf(' ' + pl + ' ') !== -1;
+  }
+  var score = {};
+  idx.groups.forEach(function (g, gi) { var f = _tplFoldAcc_(g); if (f.length >= 3 && hit(f)) score[gi] = (score[gi] || 0) + f.length * 2; });
+  idx.names.forEach(function (p) { if (hit(p[0])) score[p[1]] = (score[p[1]] || 0) + p[0].length; });
+  var best = -1, bestSc = 0, tie = false;
+  Object.keys(score).forEach(function (k) {
+    if (score[k] > bestSc) { best = +k; bestSc = score[k]; tie = false; } else if (score[k] === bestSc) tie = true;
+  });
+  return (best >= 0 && !tie) ? idx.groups[best] : '';
+}
+// Danh sach nhom cho dropdown: nhom trong DANH_MUC (thu tu A-Z) + nhom da chon tay ma DANH_MUC khong con (de van sua/loc duoc)
+function _tplGroupList_(list) {
+  var idx = _tplCatalogIndex_(), seen = {}, out = [];
+  idx.groups.forEach(function (g) { var k = _tplFoldAcc_(g); if (!seen[k]) { seen[k] = 1; out.push(g); } });
+  (list || []).forEach(function (t) { if (t.nhom && !t.nhomAuto) { var k = _tplFoldAcc_(t.nhom); if (!seen[k]) { seen[k] = 1; out.push(t.nhom); } } });
+  return out.sort(function (a, b) { return String(a).localeCompare(String(b), 'vi'); });
 }
 function _tplOwns_(t, c) { return !!(c && c.name) && String(t.createdBy || '').trim().toLowerCase() === c.name.toLowerCase(); }
 
-// caller: admin/manager thay TAT CA; nguoi khac chi thay mau DA DUYET + mau cua CHINH MINH (dang cho duyet / bi tu choi). Khong truyen caller = chi mau da duyet.
+// caller: admin thay TAT CA; nhan vien (web/extension, caller.role != 'anon') thay mau DA DUYET + mau CHO DUYET cua MOI NGUOI (Duyen 21/10/2026: cs khac xem duoc ca kho da duyet va chua duyet)
+// + mau BI TU CHOI cua chinh minh. An danh / khong truyen caller = chi mau da duyet.
 function readMessageTemplates_(caller) {
   caller = caller || { priv: false, name: '' };
   var sh = getSheet_(SH_MSG_TPL, MSG_TPL_HEADERS);
@@ -773,8 +926,18 @@ function readMessageTemplates_(caller) {
     var row = vals[i];
     if (!row[0]) continue; // bo dong trong (id rong)
     var t = _tplRowToObj_(row);
-    if (caller.priv || t.status === 'approved' || _tplOwns_(t, caller)) out.push(t);
+    var seePending = caller.role && caller.role !== 'anon';
+    if (caller.priv || t.status === 'approved' || (seePending && t.status === 'pending') || _tplOwns_(t, caller)) out.push(t);
   }
+  // Nhom: nguoi soan chon tay thi giu; de trong thi he thong tu phan loai (nhomAuto=true de UI ghi chu '(tu phan loai)')
+  var cidx = null;
+  out.forEach(function (t) {
+    t.nhomAuto = false;
+    if (t.nhom) return;
+    if (!cidx) cidx = _tplCatalogIndex_();
+    var g = _tplClassify_(t, cidx);
+    if (g) { t.nhom = g; t.nhomAuto = true; }
+  });
   // Moi nhat len dau. Dung getTime() (khong dung String(Date)) vi Date.toString() chi chinh xac den giay va
   // khong sap xep dung theo thoi gian thuc -> 2 mau luu cung giay se bi sap xep SAI thu tu neu so sanh chuoi.
   function tplTime_(t) { var d = t.updatedAt || t.createdAt; var ms = d ? new Date(d).getTime() : 0; return isNaN(ms) ? 0 : ms; }
@@ -794,6 +957,12 @@ function saveMessageTemplate_(data, caller) {
   var tags = String(data.tags || '').trim().slice(0, 300);
   var product = String(data.product || '').trim().slice(0, 300);
   var topic = String(data.topic || '').trim().slice(0, 200);
+  // nhom: chuoi (ke ca rong = ve 'tu phan loai') -> ghi; KHONG gui truong nay (extension cu) -> giu nguyen nhom hien co.
+  var nhomSet = (data.nhom !== undefined && data.nhom !== null);
+  var nhom = nhomSet ? String(data.nhom).trim().slice(0, 200) : '';
+  // images: mang URL anh da upload truoc (toi da 4). Neu truyen mang thi ghi de; neu khong truyen (undefined) thi giu nguyen.
+  var imagesSet = Array.isArray(data.images);
+  var images = imagesSet ? JSON.stringify(data.images.slice(0, 4).map(function(u){ return String(u).trim(); }).filter(Boolean)) : '';
   // Tai khoan web: nguoi tao = ten that trong token (khong tin client). Extension: ten tu khai.
   var author = caller.via === 'web' ? caller.name : (caller.name || String(data.createdBy || '').trim().slice(0, 60));
   var sh = getSheet_(SH_MSG_TPL, MSG_TPL_HEADERS);
@@ -808,6 +977,8 @@ function saveMessageTemplate_(data, caller) {
         sh.getRange(i + 1, 2, 1, 3).setValues([[title, content, tags]]);
         sh.getRange(i + 1, 5).setValue(cur.createdBy || author);
         sh.getRange(i + 1, 7, 1, 4).setValues([[now, product, topic, cur.status]]);
+        if (nhomSet) sh.getRange(i + 1, MSG_TPL_HEADERS.indexOf('nhom') + 1).setValue(nhom);
+        if (imagesSet) sh.getRange(i + 1, MSG_TPL_HEADERS.indexOf('images') + 1).setValue(images);
         return jsonOut_({ ok: true, id: cur.id, status: cur.status });
       }
       if (cur.status === 'approved' || !_tplOwns_(cur, caller)) {
@@ -816,14 +987,44 @@ function saveMessageTemplate_(data, caller) {
       sh.getRange(i + 1, 2, 1, 3).setValues([[title, content, tags]]);
       sh.getRange(i + 1, 7, 1, 4).setValues([[now, product, topic, 'pending']]);
       sh.getRange(i + 1, 11, 1, 3).setValues([['', '', '']]);
+      if (nhomSet) sh.getRange(i + 1, MSG_TPL_HEADERS.indexOf('nhom') + 1).setValue(nhom);
+      if (imagesSet) sh.getRange(i + 1, MSG_TPL_HEADERS.indexOf('images') + 1).setValue(images);
+      _tplNotifyPending_(cur.id, title, author);   // mau da sua -> cho duyet lai: bao admin
       return jsonOut_({ ok: true, id: cur.id, status: 'pending' });
     }
   }
   // Tao moi. Chi admin/quan ly moi duoc tu dat id (dong bo cu); nguoi khac luon nhan id moi (khong chiem id).
   var newId = (caller.priv && data.id) ? String(data.id) : 'mt_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
   var status = caller.priv ? 'approved' : 'pending';
-  sh.appendRow([newId, title, content, tags, author, now, now, product, topic, status, caller.priv ? author : '', caller.priv ? now : '', '']);
+  sh.appendRow([newId, title, content, tags, author, now, now, product, topic, status, caller.priv ? author : '', caller.priv ? now : '', '', nhom, images]);
+  if (status === 'pending') _tplNotifyPending_(newId, title, author);   // de xuat mau moi -> bao admin duyet
   return jsonOut_({ ok: true, id: newId, status: status });
+}
+
+// AI HOC TU MAU DA LUU (Duyen 21/10/2026): chi mau DA DUYET (admin luu hoac admin duyet) moi vao prompt. Khop khi TEN SAN PHAM / NHOM SP / CHU DE / TAG cua mau
+// xuat hien trong yeu cau (khong dau, khong phan biet hoa thuong). Toi da 3 mau, moi mau cat 500 ky tu -> prompt van nhe. Loi doc sheet KHONG lam hong AI.
+function _tplPromptBlock_(userMsg) {
+  var q = ' ' + _psheetNoAccent_(userMsg).replace(/\s+/g, ' ') + ' ';
+  if (q.length < 4) return '';
+  var list;
+  try { list = readMessageTemplates_({ priv: false, name: '' }); } catch (e) { return ''; }
+  var scored = [];
+  list.forEach(function (t) {
+    if (t.status !== 'approved') return;
+    var keys = String(t.product || '').split(/[,;|\n]/).concat(String(t.nhom || '').split(/[,;|\n]/), String(t.topic || ''), String(t.tags || '').split(','));
+    var sc = 0;
+    keys.forEach(function (k) {
+      k = _psheetNoAccent_(k).replace(/\s+/g, ' ').trim();
+      if (k.length >= 3 && q.indexOf(' ' + k) >= 0) sc += k.length;   // dau ' ' truoc: khop dau tu, tranh khop giua tu
+    });
+    if (sc) scored.push({ t: t, sc: sc });
+  });
+  if (!scored.length) return '';
+  scored.sort(function (a, b) { return b.sc - a.sc; });
+  return scored.slice(0, 3).map(function (x, i) {
+    var c = String(x.t.content || ''); if (c.length > 500) c = c.substring(0, 500) + '...';
+    return 'Mau ' + (i + 1) + ' (' + (x.t.product || x.t.nhom || x.t.title) + (x.t.topic ? ' - ' + x.t.topic : '') + '):\n' + c;
+  }).join('\n\n');
 }
 
 function deleteMessageTemplate_(id, caller) {
@@ -838,10 +1039,33 @@ function deleteMessageTemplate_(id, caller) {
         return jsonOut_({ error: 'Chi admin/quan ly moi duoc xoa mau da duyet (nhan vien chi xoa duoc mau cua minh chua duyet).', code: 'FORBIDDEN' });
       }
       sh.deleteRow(i + 1);
+      _tplNotifClear_(id);   // mau bi xoa -> khong con gi de duyet
       return jsonOut_({ ok: true });
     }
   }
   return jsonOut_({ ok: true, note: 'Khong tim thay id (co the da bi xoa truoc do)' });
+}
+
+// Upload 1 anh cho mau tin nhan (base64 -> Drive folder rieng, public link). Toi da 4 anh/mau.
+// caller khong can priv: nhân vien cung upload duoc (anh se duyet cung mau).
+var MSG_TPL_IMG_FOLDER_NAME_ = 'CRM_MauTinAnh';
+function uploadTemplateImage_(base64, filename, mimeType, caller) {
+  if (!base64) return jsonOut_({ ok: false, error: 'Thieu du lieu anh' });
+  if (!caller || caller.role === 'anon') return jsonOut_({ ok: false, error: 'Can dang nhap de upload anh' });
+  try {
+    var folder;
+    var it = DriveApp.getFoldersByName(MSG_TPL_IMG_FOLDER_NAME_);
+    folder = it.hasNext() ? it.next() : DriveApp.createFolder(MSG_TPL_IMG_FOLDER_NAME_);
+    var bytes = Utilities.base64Decode(base64);
+    var safeFilename = String(filename || '').replace(/[^a-zA-Z0-9._-]/g, '_') || ('img_' + Date.now() + '.jpg');
+    var blob = Utilities.newBlob(bytes, mimeType || 'image/jpeg', safeFilename);
+    var file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    var url = 'https://drive.google.com/uc?export=view&id=' + file.getId();
+    return jsonOut_({ ok: true, url: url });
+  } catch (e) {
+    return jsonOut_({ ok: false, error: e.message });
+  }
 }
 
 // decision: 'approve' | 'reject'. CHI admin/quan ly (theo vai tro that trong sheet Users, qua token phien).
@@ -856,8 +1080,263 @@ function approveMessageTemplate_(id, decision, reason, caller) {
     if (String(vals[i][0]) !== String(id)) continue;
     var st = decision === 'approve' ? 'approved' : 'rejected';
     sh.getRange(i + 1, 10, 1, 4).setValues([[st, caller.name, new Date(), decision === 'reject' ? String(reason || '').trim().slice(0, 300) : '']]);
+    _tplNotifClear_(id);   // da xu ly (o CRM HOAC o extension) -> thong bao cua MOI admin chuyen 'da doc'
     return jsonOut_({ ok: true, id: String(id), status: st });
   }
   return jsonOut_({ error: 'Khong tim thay mau tin' });
+}
+// ═══════════════════════════════════════════════════════════════
+//  VIET TAT (go tat / tu khoa -> chen noi dung) — them 2026-10-25, Duyen yeu cau tich hop app "Viet Tat" (Chrome + Android) vao Pancake AI + CRM.
+//  NGUON DU LIEU DUY NHAT: sheet 'VietTat' (thay server dong bo rieng cua app Viet Tat). CRM quan ly (tab Zalo AI), extension Pancake AI doc qua action 'vietTat'.
+//  Moi dong = 1 muc: abbr (viet tat, khong khoang trang), keyword (tu khoa cach nhau dau phay), options (JSON mang noi dung; co the nhieu lua chon),
+//  nhom (thu muc), owner ('' = CHUNG cho ca team; khac rong = ten nguoi tao, chi nguoi do thay). Muc chung CHI admin tao/sua/xoa (cung vai tro duyet mau tin);
+//  nhan vien tao muc rieng cua minh. Bien trong noi dung ({ten}, {ngay}...) do client thay khi chen. Chua ho tro hinh/ghi am cua app goc.
+// ═══════════════════════════════════════════════════════════════
+var SH_VIETTAT = 'VietTat';
+var VIETTAT_HEADERS = ['id', 'nhom', 'abbr', 'keyword', 'options', 'owner', 'createdBy', 'updatedAt', 'images'];
+// Thu muc con: nhom luu dang duong dan 'Tui tien/Co' (toi da 3 cap). Anh: cot 'images' = JSON [{id,name}] = THAM CHIEU file Drive co san (KHONG tai len lai).
+// 2026-10-25 (Duyen): moi muc (trong 1 thu muc con) toi da 50 anh (truoc day 10). Anh them theo 2 cach: (1) link Drive co san -> lay tu do (khong tai len lai);
+// (2) tai tu may/dien thoai (chon nhieu anh 1 lan) -> action vietTatUploadImage luu vao Drive roi cung chi luu ID tham chieu. Anh tai len toi da 3MB/anh
+// vi extension doc byte anh qua _driveImageBase64_ (gioi han 3MB) — client tu nen anh truoc khi gui.
+var VIETTAT_MAX_IMAGES = 50, VIETTAT_NHOM_MAX = 100, VIETTAT_UPLOAD_MAX_BYTES = 3 * 1024 * 1024, VIETTAT_FOLDER_SCAN = 600;
+function _vtNhom_(s) {
+  var parts = String(s == null ? '' : s).split(/[\/\\>]+/).map(function (x) { return x.replace(/\s+/g, ' ').trim(); }).filter(function (x) { return x; }).slice(0, 3);
+  return parts.join('/').slice(0, VIETTAT_NHOM_MAX);
+}
+function _vtImgsFromCell_(v) {
+  var out = [];
+  try { var a = JSON.parse(String(v || '[]')); if (Array.isArray(a)) a.forEach(function (x) { if (x && /^[A-Za-z0-9_-]{15,}$/.test(String(x.id || ''))) out.push({ id: String(x.id), name: String(x.name || '').slice(0, 120) }); }); } catch (e) { out = []; }
+  return out.slice(0, VIETTAT_MAX_IMAGES);
+}
+// So TEN nguoi dung (chu muc rieng) LINH HOAT: bo dau / khoang trang / ky tu la / hoa-thuong -> 'Duyên HT' == 'duyenht' == 'Duyen  HT'.
+// NGUYEN NHAN GOC (2026-10-27): app Android Viet Tat khong co token nen gui by=<Ten CS go tay> (vd 'duyenht') trong khi muc rieng luu owner = ten tai khoan CRM
+// (vd 'Duyên HT'); so sanh CHINH XAC khong khop -> server khong tra muc rieng nao -> go tat 'bam khong ra gi'. Dung chung cho doc / sua / xoa muc rieng.
+function _vtKey_(v) { return _stripVN_(String(v == null ? '' : v).trim().toLowerCase()).replace(/đ/g, 'd').replace(/[^a-z0-9]/g, ''); }
+function _vtSame_(a, b) { var ka = _vtKey_(a); return ka !== '' && ka === _vtKey_(b); }
+function _vtRowToObj_(r) {
+  var opts = [];
+  try { var o = JSON.parse(String(r[4] || '[]')); if (Array.isArray(o)) opts = o.map(function (x) { return String(x == null ? '' : x); }).filter(function (x) { return x.trim(); }); } catch (e) { opts = []; }
+  var owner = String(r[5] || '').trim();
+  var up = r[7] instanceof Date ? r[7].getTime() : (Number(r[7]) || 0);
+  return { id: String(r[0] || ''), nhom: _vtNhom_(r[1]), abbr: String(r[2] || '').trim(), keyword: String(r[3] || '').trim(), options: opts, images: _vtImgsFromCell_(r[8]),
+           scope: owner ? 'me' : 'team', owner: owner, createdBy: String(r[6] || ''), updatedAt: up };
+}
+function readVietTat_(caller) {
+  var sh = getSheet_(SH_VIETTAT, VIETTAT_HEADERS), last = sh.getLastRow(), out = [];
+  if (last < 2) return out;
+  var vals = sh.getRange(2, 1, last - 1, VIETTAT_HEADERS.length).getValues();
+  for (var i = 0; i < vals.length; i++) {
+    if (!vals[i][0]) continue;
+    var o = _vtRowToObj_(vals[i]);
+    if (!o.abbr || !o.options.length) continue;
+    if (o.scope === 'me' && !_vtSame_(o.owner, caller && caller.name)) continue;   // muc rieng nguoi khac: khong tra ve
+    out.push(o);
+  }
+  return out;
+}
+// data: {id?, nhom, abbr, keyword, options[], scope:'team'|'me'}
+function saveVietTat_(data, caller) {
+  caller = caller || { priv: false, name: '' };
+  data = data || {};
+  var abbr = String(data.abbr || '').trim();
+  if (!abbr || /\s/.test(abbr) || abbr.length > 30) return jsonOut_({ error: 'Viet tat phai la 1 tu (khong co khoang trang, toi da 30 ky tu).' });
+  var options = (Array.isArray(data.options) ? data.options : []).map(function (x) { return String(x == null ? '' : x).trim().slice(0, 4000); }).filter(function (x) { return x; }).slice(0, 10);
+  if (!options.length) return jsonOut_({ error: 'Thieu noi dung de chen.' });
+  var nhom = _vtNhom_(data.nhom), keyword = String(data.keyword || '').trim().slice(0, 200);
+  var imgs = [], cand = [];
+  if (Array.isArray(data.images)) {
+    var seen = {};
+    for (var q = 0; q < data.images.length; q++) {
+      var im = data.images[q] || {}, iid = String(im.id || '').trim();
+      if (!/^[A-Za-z0-9_-]{15,}$/.test(iid) || seen[iid]) continue;   // ID sai dinh dang / trung: bo qua
+      seen[iid] = 1; cand.push({ id: iid, name: String(im.name || '').slice(0, 120) });
+    }
+  }
+  // Tran 50 anh/muc: BAO LOI thay vi am tham cat bot (cat im lang se lam mat anh nguoi dung vua chon).
+  if (cand.length > VIETTAT_MAX_IMAGES) return jsonOut_({ error: 'Moi muc toi da ' + VIETTAT_MAX_IMAGES + ' anh (ban dang gui ' + cand.length + ' anh). Hay bot bot anh hoac chia sang muc / thu muc con khac.' });
+  if (cand.length) {
+    // Anh DA luu tren chinh muc nay thi khong kiem tra lai Drive: 50 lan DriveApp.getFileById moi lan bam Luu rat cham, ma anh do da qua kiem tra o lan luu truoc.
+    var known = _vtKnownImageIds_(data.id);
+    for (var q2 = 0; q2 < cand.length; q2++) {
+      var c0 = cand[q2];
+      if (Object.prototype.hasOwnProperty.call(known, c0.id)) { imgs.push({ id: c0.id, name: (c0.name || String(known[c0.id] || '')).slice(0, 120) }); continue; }
+      var chk = _vtCheckImage_(c0.id);   // phai la anh that + GAS doc duoc (chong luu ID tuy y)
+      if (!chk.ok) return jsonOut_({ error: 'Anh "' + String(c0.name || c0.id) + '" khong dung duoc: ' + chk.error });
+      imgs.push({ id: c0.id, name: String(c0.name || chk.name || '').slice(0, 120) });
+    }
+  }
+  var imgsJson = JSON.stringify(imgs);
+  var scope = String(data.scope || 'me') === 'team' ? 'team' : 'me';
+  if (scope === 'team' && !caller.priv) return jsonOut_({ error: 'Chi admin moi duoc tao/sua muc viet tat CHUNG cho ca team. Hay luu thanh muc rieng cua ban.', code: 'FORBIDDEN' });
+  if (scope === 'me' && !String(caller.name || '').trim()) return jsonOut_({ error: 'Chua biet ban la ai — dang nhap CRM (hoac nhap ten CS trong Cai dat extension) de luu muc rieng.', code: 'FORBIDDEN' });
+  var owner = scope === 'team' ? '' : String(caller.name).trim().slice(0, 60);
+  var sh = getSheet_(SH_VIETTAT, VIETTAT_HEADERS), now = Date.now();
+  if (data.id) {
+    var vals = sh.getDataRange().getValues();
+    for (var i = 1; i < vals.length; i++) {
+      if (String(vals[i][0]) !== String(data.id)) continue;
+      var cur = _vtRowToObj_(vals[i]);
+      var mine = cur.scope === 'me' && _vtSame_(cur.owner, caller.name);
+      if (!(mine || (cur.scope === 'team' && caller.priv))) return jsonOut_({ error: 'Ban khong co quyen sua muc nay.', code: 'FORBIDDEN' });
+      if (cur.scope !== scope) return jsonOut_({ error: 'Khong doi duoc muc rieng <-> chung: hay tao muc moi roi xoa muc cu.' });
+      sh.getRange(i + 1, 2, 1, 4).setValues([[nhom, abbr, keyword, JSON.stringify(options)]]);
+      sh.getRange(i + 1, 8, 1, 2).setValues([[now, imgsJson]]);
+      return jsonOut_({ ok: true, id: cur.id });
+    }
+    return jsonOut_({ error: 'Khong tim thay muc can sua (co the da bi xoa).' });
+  }
+  var id = 'vt_' + now + '_' + Math.floor(Math.random() * 1000);
+  sh.appendRow([id, nhom, abbr, keyword, JSON.stringify(options), owner, String(caller.name || ''), now, imgsJson]);
+  return jsonOut_({ ok: true, id: id });
+}
+function deleteVietTat_(id, caller) {
+  caller = caller || { priv: false, name: '' };
+  if (!id) return jsonOut_({ error: 'Thieu id muc can xoa' });
+  var sh = getSheet_(SH_VIETTAT, VIETTAT_HEADERS), vals = sh.getDataRange().getValues();
+  for (var i = 1; i < vals.length; i++) {
+    if (String(vals[i][0]) !== String(id)) continue;
+    var cur = _vtRowToObj_(vals[i]);
+    var mine = cur.scope === 'me' && _vtSame_(cur.owner, caller.name);
+    if (!(mine || (cur.scope === 'team' && caller.priv))) return jsonOut_({ error: 'Ban khong co quyen xoa muc nay.', code: 'FORBIDDEN' });
+    sh.deleteRow(i + 1);
+    return jsonOut_({ ok: true });
+  }
+  return jsonOut_({ ok: true, note: 'Khong tim thay id (co the da bi xoa truoc do)' });
+}
+// ID cac anh DANG luu tren 1 muc (de bo qua kiem tra Drive lai khi sua muc). Khong co id / khong thay -> {}.
+function _vtKnownImageIds_(id) {
+  var known = {};
+  if (!id) return known;
+  try {
+    var vals = getSheet_(SH_VIETTAT, VIETTAT_HEADERS).getDataRange().getValues();
+    for (var i = 1; i < vals.length; i++) {
+      if (String(vals[i][0]) !== String(id)) continue;
+      _vtImgsFromCell_(vals[i][8]).forEach(function (x) { known[x.id] = x.name; });
+      break;
+    }
+  } catch (e) { known = {}; }
+  return known;
+}
+// Thu muc Drive chua anh TAI LEN tu may (folder con 'VietTat' trong folder thu vien CRM_ThuVien; tu tao, nho ID trong Script Property).
+function _vtFolder_() {
+  var pr = PropertiesService.getScriptProperties(), id = pr.getProperty('VIETTAT_FOLDER_ID');
+  if (id) { try { return DriveApp.getFolderById(id); } catch (e) {} }
+  var root = _mlibFolder_(), it = root.getFoldersByName('VietTat'), f = it.hasNext() ? it.next() : root.createFolder('VietTat');
+  pr.setProperty('VIETTAT_FOLDER_ID', f.getId());
+  return f;
+}
+// Tai 1 anh tu may/dien thoai len Drive (CRM goi tung anh mot de chon nhieu anh 1 lan ma moi request van nho). Tra {ok,id,name}.
+// data: {name, mimeType, base64}. Can biet nguoi dung (token phien hoac ten CS). Chi nhan image/*, toi da 3MB (extension doc anh toi da 3MB).
+// Tep khong nam trong muc nao cho den khi bam Luu muc; anh bo do dang cho trong folder VietTat (khong anh huong ai).
+function vietTatUploadImage_(data, caller) {
+  data = data || {}; caller = caller || {};
+  if (!String(caller.name || '').trim()) return { ok: false, error: 'Can dang nhap CRM (hoac nhap ten CS) de tai anh len.', code: 'FORBIDDEN' };
+  var mime = String(data.mimeType || '').toLowerCase().split(';')[0].trim();
+  if (mime.indexOf('image/') !== 0) return { ok: false, error: 'Chi nhan tep anh.' };
+  if (!data.base64) return { ok: false, error: 'Thieu du lieu anh.' };
+  var bytes;
+  try { bytes = Utilities.base64Decode(String(data.base64)); } catch (e) { return { ok: false, error: 'Du lieu anh khong hop le.' }; }
+  if (!bytes || !bytes.length) return { ok: false, error: 'Anh rong.' };
+  if (bytes.length > VIETTAT_UPLOAD_MAX_BYTES) return { ok: false, error: 'Anh qua lon (toi da ' + Math.round(VIETTAT_UPLOAD_MAX_BYTES / 1048576) + 'MB).' };
+  var name = String(data.name || '').replace(/[\u0000-\u001F\/\\]/g, '').replace(/\s+/g, ' ').trim().slice(0, 120) || ('anh_' + Date.now());
+  var file = _vtFolder_().createFile(Utilities.newBlob(bytes, mime, name));
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);   // de CRM hien anh xem truoc (drive.google.com/thumbnail) giong thu vien anh
+  return { ok: true, id: file.getId(), name: name };
+}
+// Kiem tra 1 file Drive la anh + GAS doc duoc. Tra {ok,name} hoac {ok:false,error}.
+function _vtCheckImage_(id) {
+  try {
+    var f = DriveApp.getFileById(id);
+    if (String(f.getMimeType() || '').toLowerCase().indexOf('image/') !== 0) return { ok: false, error: 'khong phai tep anh' };
+    return { ok: true, name: f.getName() };
+  } catch (e) { return { ok: false, error: 'khong mo duoc tep (hay chia se cho tai khoan chay GAS hoac \"ai co link\")' }; }
+}
+// Doi cac link/ID Drive (file HOAC thu muc) thanh danh sach anh [{id,name}] — de CRM chon anh co san, khong phai tai len.
+// links: mang hoac chuoi (moi dong 1 link). Thu muc -> lay toi da VIETTAT_MAX_IMAGES anh trong thu muc (khong de quy).
+function vietTatResolveImages_(links) {
+  var arr = Array.isArray(links) ? links : String(links || '').split(/[\n,\s]+/);
+  var out = [], errs = [], seen = {}, truncated = false;
+  for (var i = 0; i < arr.length && out.length < VIETTAT_MAX_IMAGES; i++) {
+    var s = String(arr[i] || '').trim(); if (!s) continue;
+    var m = s.match(/\/file\/d\/([A-Za-z0-9_-]{15,})/) || s.match(/[?&]id=([A-Za-z0-9_-]{15,})/);
+    var fm = s.match(/\/folders\/([A-Za-z0-9_-]{15,})/);
+    var bare = /^[A-Za-z0-9_-]{15,}$/.test(s) ? s : '';
+    if (m && !fm) { var c = _vtCheckImage_(m[1]); if (c.ok) { if (!seen[m[1]]) { seen[m[1]] = 1; out.push({ id: m[1], name: c.name }); } } else errs.push(s + ': ' + c.error); continue; }
+    var fid = fm ? fm[1] : bare;
+    if (!fid) { errs.push(s + ': khong nhan ra link Drive'); continue; }
+    var folder = null;
+    try { folder = DriveApp.getFolderById(fid); } catch (e1) { folder = null; }
+    if (folder) {
+      // Gom HET anh trong thu muc (quet toi da VIETTAT_FOLDER_SCAN tep), xep theo ten roi moi cat 50 anh dau — de tap anh lay ra on dinh (khong phu thuoc thu tu Drive tra ve).
+      var it = folder.getFiles(), n = 0, fimgs = [];
+      while (it.hasNext() && n < VIETTAT_FOLDER_SCAN) {
+        var f = it.next(); n++;
+        if (String(f.getMimeType() || '').toLowerCase().indexOf('image/') !== 0) continue;
+        if (!seen[f.getId()]) fimgs.push({ id: f.getId(), name: f.getName() });
+      }
+      fimgs.sort(function (a, b) { return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0); });
+      for (var fi = 0; fi < fimgs.length; fi++) {
+        if (out.length >= VIETTAT_MAX_IMAGES) { truncated = true; break; }
+        seen[fimgs[fi].id] = 1; out.push(fimgs[fi]);
+      }
+      continue;
+    }
+    var c2 = _vtCheckImage_(fid);   // ID tran: thu coi nhu file
+    if (c2.ok) { if (!seen[fid]) { seen[fid] = 1; out.push({ id: fid, name: c2.name }); } } else errs.push(s + ': ' + c2.error);
+  }
+  return { ok: true, images: out.sort(function (a, b) { return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0); }), errors: errs, max: VIETTAT_MAX_IMAGES, truncated: truncated };
+}
+// Tra byte 1 anh (base64) cho extension — CHI cho anh nam trong muc ma nguoi goi duoc phep thay (chong doc Drive tuy y qua ID).
+function vietTatImage_(id, caller) {
+  id = String(id || '').trim();
+  if (!/^[A-Za-z0-9_-]{15,}$/.test(id)) return { ok: false, error: 'ID anh khong hop le' };
+  var list = readVietTat_(caller), allowed = false;
+  for (var i = 0; i < list.length && !allowed; i++) for (var j = 0; j < list[i].images.length; j++) if (list[i].images[j].id === id) { allowed = true; break; }
+  if (!allowed) return { ok: false, error: 'Anh nay khong thuoc muc viet tat nao ban duoc dung', code: 'FORBIDDEN' };
+  var img = _driveImageBase64_(id);
+  if (!img) return { ok: false, error: 'Khong doc duoc anh (qua 3MB hoac chua chia se cho tai khoan chay GAS)' };
+  return { ok: true, id: id, base64: img.base64, mimeType: img.mimeType };
+}
+// ── THONG BAO MAU TIN CHO DUYET (kind 'tplpending', refType 'tpl', refId = id mau) ──
+// NGUYEN NHAN GOC them: admin chi biet co mau cho duyet khi tu mo tab Quan ly mau (huy hieu 'n mau cho duyet'), nen mau cua nhan vien nam cho lau.
+// Nay: nhan vien de xuat/sua mau -> moi admin (MSG_TPL_APPROVER_ROLES_) nhan thong bao tren CRM (chuong); extension Pancake AI doc cung nguon qua action tplPending.
+// Dung 1 thong bao CHUA DOC cho moi (admin, mau) -> sua mau nhieu lan khong spam. Duyet/tu choi xong (o dau cung duoc) -> don het thong bao cua mau do.
+function _tplNotifyPending_(id, title, author) {
+  try {
+    var users = readUsers_(getCrmSS_().getSheetByName(SH_USER)) || [], me = String(author || '').trim().toLowerCase(), to = [];
+    users.forEach(function (u) {
+      if (!u || u.active === false || MSG_TPL_APPROVER_ROLES_.indexOf(String(u.role || '')) < 0) return;
+      if ([u.name, u.username].some(function (x) { return String(x || '').trim().toLowerCase() === me && me; })) return;   // khong tu bao minh
+      to.push(String(u.username));
+    });
+    if (!to.length) return 0;
+    var sh = getSheet_(SH_NOTIF, NOTIF_HEADERS), v = sh.getLastRow() >= 2 ? sh.getDataRange().getValues() : [], has = {};
+    for (var i = 1; i < v.length; i++) { if (String(v[i][4]) === 'tpl' && String(v[i][5]) === String(id) && !v[i][9]) has[String(v[i][1]).toLowerCase()] = 1; }
+    var now = new Date().toISOString(), txt = ('Mau tin cho duyet: ' + String(title || '').replace(/\s+/g, ' ').trim()).slice(0, 160), rows = [];
+    to.forEach(function (u, k) {
+      if (has[u.toLowerCase()]) return;
+      rows.push(['nt_' + Date.now() + '_tpl' + k + '_' + Math.floor(Math.random() * 1000), u, String(author || 'Nhan vien'), 'tplpending', 'tpl', String(id), '', txt, now, '']);
+    });
+    if (rows.length) sh.getRange(sh.getLastRow() + 1, 1, rows.length, NOTIF_HEADERS.length).setValues(rows);
+    return rows.length;
+  } catch (e) { return 0; }   // thong bao hong khong duoc lam hong viec luu mau
+}
+function _tplNotifClear_(id) {
+  try {
+    var sh = getCrmSS_().getSheetByName(SH_NOTIF); if (!sh || sh.getLastRow() < 2) return 0;
+    var v = sh.getDataRange().getValues(), now = new Date().toISOString(), n = 0;
+    for (var i = 1; i < v.length; i++) {
+      if (String(v[i][4]) === 'tpl' && String(v[i][5]) === String(id) && !v[i][9]) { sh.getRange(i + 1, 10).setValue(now); n++; }
+    }
+    return n;
+  } catch (e) { return 0; }
+}
+// Danh sach mau CHO DUYET (nhe, cho extension Pancake AI hoi dinh ky). Chi admin/quan ly (theo token phien).
+function tplPendingList_(caller) {
+  if (!caller || !caller.priv) return jsonOut_({ error: 'Chi admin / quan ly moi xem duoc mau cho duyet.', code: 'FORBIDDEN' });
+  var list = readMessageTemplates_(caller).filter(function (t) { return t.status === 'pending'; });
+  list.sort(function (a, b) { return String(b.createdAt || '').localeCompare(String(a.createdAt || '')); });
+  return jsonOut_({ ok: true, count: list.length, serverTime: new Date().toISOString(),
+    items: list.slice(0, 30).map(function (t) { return { id: t.id, title: t.title, content: String(t.content || '').slice(0, 1200), product: t.product || '', topic: t.topic || '', createdBy: t.createdBy || '', createdAt: t.createdAt || '' }; }) });
 }
 

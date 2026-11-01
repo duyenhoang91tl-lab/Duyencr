@@ -440,37 +440,14 @@ function _srRenderH_(d){
   });
   html += totalRow('TỔNG CỘNG', _hSum_(d.rows, groups), true);
   html += '</tbody></table></div>';
-  html += '<div style="margin-top:8px;font-size:11px;color:var(--muted);line-height:1.5">'+
+  html += '<div class="guide-text" style="margin-top:8px;font-size:11px;color:var(--muted);line-height:1.5">'+
     'ℹ️ Tình trạng CS / Zalo tính theo <b>trạng thái HIỆN TẠI</b> của từng SĐT trong data đã chia (không phải trạng thái tại ngày chia). '+
     'Kết nối = Chốt + Phân vân + Đang liên hệ + Từ chối + Khiếu nại. Đã tương tác/đã liên hệ = SĐT đã có Tình trạng CS. Zalo phản hồi = Đã kết bạn; đã xin kết bạn/nhắn tin = Đã kết bạn + Chưa đồng ý + Không nhận tn lạ + Chặn + Hủy kết bạn. '+'Số đơn chốt / Doanh thu = tổng hợp tự động từ báo cáo CS nhập ở form chăm sóc khi chọn Chốt (chỉ tính SĐT thuộc data đã chia cho chính CS đó, đơn tạo từ ngày chia trở đi).'+'</div>';
   return html;
 }
 function renderSalesReportTabH_(wrap, subTabs){
   var d = _hBuild_();
-  var sel = 'padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)';
-  var filters = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
-  // Báo cáo H: bỏ tiêu đề + dải nút tab A–H cho gọn (bảng H rộng, cần chỗ). Để vẫn chuyển được sang
-  // báo cáo khác mà không bị kẹt ở H (menu trên cùng chỉ đổi giữa các tab lớn), thay bằng 1 ô chọn nhỏ.
-  filters += _srSubSelectHtml_();
-  filters += _quickRangeSelectHtml(_srState.hDateQuick, "_srApplyQuickRange('hDateQuick','hDateFrom','hDateTo',this.value)");
-  filters += '<input type="date" value="'+esc(_srState.hDateFrom)+'" onchange="_srSetField(\'hDateFrom\',this.value);_srState.hDateQuick=\'custom\';_srApply()" title="Từ ngày" style="'+sel+'">';
-  filters += '<span style="color:var(--muted)">→</span>';
-  filters += '<input type="date" value="'+esc(_srState.hDateTo)+'" onchange="_srSetField(\'hDateTo\',this.value);_srState.hDateQuick=\'custom\';_srApply()" title="Đến ngày" style="'+sel+'">';
-  var teamNames = (teams||[]).map(function(t){ return t.name || '(chưa đặt tên)'; });
-  if (_srIsAdmin() || (currentUser && currentUser.role === 'leader')){
-    filters += '<select onchange="_srState.hTeam=this.value;renderSalesReportTab()" style="'+sel+'" title="Lọc theo Team (CSKH / Quầy / Sale...)"><option value="">Tất cả team</option>'+
-      teamNames.concat(['Chưa có team']).map(function(n){ return '<option value="'+esc(n)+'"'+(_srState.hTeam===n?' selected':'')+'>'+esc(n)+'</option>'; }).join('')+'</select>';
-    filters += '<select onchange="_srState.hCs=this.value;renderSalesReportTab()" style="'+sel+'" title="Lọc theo tên CS"><option value="">Tất cả CS</option>'+
-      d.csOptions.map(function(n){ return '<option value="'+esc(n)+'"'+(_srState.hCs===n?' selected':'')+'>'+esc(n)+'</option>'; }).join('')+'</select>';
-  }
-  filters += '<select onchange="_srState.hGroup=this.value;renderSalesReportTab()" style="'+sel+'">'+
-    '<option value="dayCs"'+(_srState.hGroup!=='cs'?' selected':'')+'>Theo ngày × CS</option>'+
-    '<option value="cs"'+(_srState.hGroup==='cs'?' selected':'')+'>Gộp theo CS</option></select>';
-  filters += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
-  filters += '<button class="btn sm" onclick="_hExportCsv_()">⬇️ Xuất CSV</button>';
-  if (_srIsAdmin()) filters += '<button class="btn sm" onclick="openHKhMapModal_()" title="Gán Trạng thái KH tự nhảy theo từng nhóm Tình trạng CS">⚙ Trạng thái KH tự nhảy</button>';
-  filters += '</div>';
-  wrap.innerHTML = filters + _srRenderH_(d);
+  wrap.innerHTML = _srBarHtml_() + _srRenderH_(d);
 }
 function renderSalesReportTabI_(wrap, subTabs) {
   // ═══ Báo cáo I — Chia data Renew (nguồn CSKH-Duyên) ═══
@@ -560,19 +537,7 @@ function renderSalesReportTabI_(wrap, subTabs) {
   // ── Filters UI ──
   var isAdminOrLeader = _srIsAdmin() || (currentUser && currentUser.role === 'leader');
   var allCSNames = Array.from(new Set((typeof assignHistory!=='undefined'?assignHistory:[]).map(function(h){return h.csName;}))).sort();
-  var filtersHtml = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
-  filtersHtml += _quickRangeSelectHtml(_srState.iDateQuick||'', "_srApplyQuickRange('iDateQuick','iDateFrom','iDateTo',this.value)");
-  filtersHtml += '<input type="date" value="'+esc(from)+'" onchange="_srSetField(\'iDateFrom\',this.value);_srState.iDateQuick=\'custom\';renderSalesReportTab()" title="Từ ngày" style="'+sel+'">';
-  filtersHtml += '<span style="color:var(--muted)">→</span>';
-  filtersHtml += '<input type="date" value="'+esc(to)+'" onchange="_srSetField(\'iDateTo\',this.value);_srState.iDateQuick=\'custom\';renderSalesReportTab()" title="Đến ngày" style="'+sel+'">';
-  if (isAdminOrLeader) {
-    filtersHtml += '<select onchange="_srState.iTeam=this.value;renderSalesReportTab()" style="'+sel+'"><option value="">Tất cả team</option>'+
-      teamNames.map(function(n){ return '<option value="'+esc(n)+'"'+(teamF===n?' selected':'')+'>'+esc(n)+'</option>'; }).join('')+'</select>';
-    filtersHtml += '<select onchange="_srState.iCs=this.value;renderSalesReportTab()" style="'+sel+'"><option value="">Tất cả CS</option>'+
-      allCSNames.map(function(n){ return '<option value="'+esc(n)+'"'+(csF===n?' selected':'')+'>'+esc(n)+'</option>'; }).join('')+'</select>';
-  }
-  filtersHtml += '<button class="btn sm" onclick="exportRenewReport_()">⬇️ Xuất CSV</button>';
-  filtersHtml += '</div>';
+  var filtersHtml = _srBarHtml_();
 
   // ── KPI cards ──
   var kpiHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:8px;margin-bottom:16px">';
@@ -669,8 +634,7 @@ function renderSalesReportTabI_(wrap, subTabs) {
     '<td style="text-align:right">'+(totalAssigned?Math.round(allChot.size/totalAssigned*100):0)+'%</td>' +
   '</tr></tbody></table></div></div>';
 
-  wrap.innerHTML = '<div class="dash-section-title" style="margin-top:0">📈 Báo cáo doanh số</div>' +
-    subTabs + filtersHtml + kpiHtml + barHtml + tierHtml + tableHtml;
+  wrap.innerHTML = filtersHtml + kpiHtml + barHtml + tierHtml + tableHtml;
 }
 
 function exportRenewReport_() {
@@ -730,7 +694,7 @@ function openHKhMapModal_(){
   m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;align-items:center;justify-content:center';
   m.innerHTML = '<div style="background:var(--surface);border-radius:10px;padding:18px;max-width:520px;width:92%;max-height:86vh;overflow:auto">'+
     '<div style="font-weight:700;margin-bottom:6px">⚙ Trạng thái KH tự nhảy theo Tình trạng CS</div>'+
-    '<div style="font-size:12px;color:var(--muted);margin-bottom:12px">Chọn Trạng thái KH sẽ tự điền khi CS chọn Tình trạng CS thuộc nhóm đó. Để "— Chọn —" = tự khớp theo tên (VD: Chốt → Chốt). CS vẫn tự đổi tay được.</div>'+
+    '<div class="guide-text" style="font-size:12px;color:var(--muted);margin-bottom:12px">Chọn Trạng thái KH sẽ tự điền khi CS chọn Tình trạng CS thuộc nhóm đó. Để "— Chọn —" = tự khớp theo tên (VD: Chốt → Chốt). CS vẫn tự đổi tay được.</div>'+
     groups.map(function(g, i){
       return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><div style="flex:1;font-size:13px">'+esc(g.label)+'</div>'+
         '<select data-glabel="'+esc(g.label)+'" class="form-select" style="flex:1">'+_buildCustStatusOptions(_hKhMapOverride[g.label]||'')+'</select></div>';
@@ -811,7 +775,7 @@ function _srRenderCTable(rows, entType, search, searchKey){
   html += '</tbody></table>';
   return html;
 }
-function splitSaleNames_(s){ return (s||'').split(',').map(function(x){return x.trim();}).filter(Boolean); }
+function splitSaleNames_(s){ return (s||'').split(',').map(function(x){return x.trim();}).filter(function(x){ return x && !isNumTagSale_(x); }); }
 function _srMiniOrderTable(orders){
   if (!orders.length) return '<div style="color:var(--muted);font-size:11px">Không có đơn</div>';
   var html = '<table class="dash-table" style="font-size:11px"><thead><tr><th>Ngày tạo</th><th>Kênh</th><th>Sale</th><th style="text-align:right">Giá trị</th></tr></thead><tbody>';
@@ -870,7 +834,7 @@ function _srRenderC(d){
     }
   }
 
-  html += '<div style="font-size:11px;color:var(--hint);margin-top:8px">Chỉ tiêu KPI lấy từ tab "'+esc('KPI_ChiTieu')+'" trong Google Sheet CRM — tự vào Sheet điền/sửa số. Bấm vào 1 dòng để xem chi tiết đơn của kỳ này/kỳ trước.</div>';
+  html += '<div class="guide-text" style="font-size:11px;color:var(--hint);margin-top:8px">Chỉ tiêu KPI lấy từ tab "'+esc('KPI_ChiTieu')+'" trong Google Sheet CRM — tự vào Sheet điền/sửa số. Bấm vào 1 dòng để xem chi tiết đơn của kỳ này/kỳ trước.</div>';
   return html;
 }
 
@@ -965,7 +929,7 @@ function srbComboToggleItem(key, e, value){
 function srbComboRemove(key, value){
   var cfg = _SRB_COMBO_CFG[key];
   _srState[cfg.stateKey] = (_srState[cfg.stateKey]||[]).filter(function(v){ return v!==value; });
-  if (_srTeamFieldToSaleField_[cfg.stateKey]){ renderSalesReportTab(); return; }
+  if (_srTeamFieldToSaleField_[cfg.stateKey]){ _srSyncTeamToSale_(cfg.stateKey); renderSalesReportTab(); return; }
   srbRenderChips(key);
   var l = document.getElementById(cfg.id+'-list');
   if (l && l.classList.contains('open')){ var ci=document.getElementById(cfg.id+'-input'); srbComboRender(key, ci?ci.value:''); }
@@ -974,7 +938,7 @@ function srbComboClear(key, e){
   if (e) e.stopPropagation();
   var cfg = _SRB_COMBO_CFG[key];
   _srState[cfg.stateKey] = [];
-  if (_srTeamFieldToSaleField_[cfg.stateKey]){ renderSalesReportTab(); return; }
+  if (_srTeamFieldToSaleField_[cfg.stateKey]){ _srSyncTeamToSale_(cfg.stateKey); renderSalesReportTab(); return; }
   var ci = document.getElementById(cfg.id+'-input'); if (ci) ci.value = '';
   srbRenderChips(key);
   var l = document.getElementById(cfg.id+'-list');
@@ -1019,6 +983,388 @@ function _srbComboHTML(key){
     '</div></div>';
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  MENU LỌC DUY NHẤT cho Báo cáo B (thay 9 ô lọc rời: Sale/Team/Nguồn đơn/Marketer/Sản phẩm/
+//  Tình trạng CS/Trạng thái KH/Kết bạn Zalo/Nick Zalo). Bấm nút "🔎 Bộ lọc" → chọn MỤC → chọn
+//  MỤC CON (tick nhiều) → với Tình trạng CS / Trạng thái KH (dạng cây) mở tiếp NHÓM → mục con.
+//  KHÔNG đổi state key cũ (bSale, bTeam, bNguon, bMarketer, bCareStatus, bKhStatus, bZaloStatus,
+//  bSanPham, bNickZalo) nên _srLoad / xuất Excel / phân quyền giữ nguyên.
+// ═══════════════════════════════════════════════════════════════════════════
+var _srbMenu = { open:false, cat:null, q:'', exp:{} };
+
+// ── Cấu hình từng báo cáo: ngày, các mục lọc trong menu, tác vụ, phần phụ ──
+function _srbSaleOpts_(){ return (_srState.sub === 'B' || _srState.sub === 'E' || _srState.sub === 'F' || _srState.sub === 'G' || _srState.sub === 'K' || _srState.sub === 'L') ? (_srState.saleBOptions || []) : (_srState.saleOptions || []); }
+// Sale Online/Van phong duoc chon them ten nhom Quay + phong CSKH o bo loc Sale (viewNames tu may chu; xem _srViewNames o js/10). false neu khong co.
+function _srbHasViewScope_(){ return typeof _srViewNames === 'function' && !_srIsAdmin() && _srViewNames().length > 0; }
+function _srbIsLeaderScope_(){ return !_srIsAdmin() && currentUser && currentUser.role === 'leader' && (_srState.leaderTeamOptions || []).length > 0; }
+function _srbMenuCats_(){
+  var cfg = _SRB_COMBO_CFG, cats = [], sub = (_srState.sub === 'K') ? 'G' : _srState.sub;
+  function flat(key, label, icon, ph, stateKey, optFn){
+    cats.push({ key:key, label:label, icon:icon, type:'flat', stateKey:stateKey, ph:ph, opts:optFn });
+  }
+  function flatB(key, label, icon, ph){
+    var c = cfg[key];
+    flat(key, label, icon, ph, c.stateKey, function(){ return (c.getOptions ? c.getOptions() : (_srState[c.optKey]||[])) || []; });
+  }
+  function text(key, label, icon, stateKey, ph, hint){ cats.push({ key:key, label:label, icon:icon, type:'text', stateKey:stateKey, ph:ph, hint:hint }); }
+  function radio(key, label, icon, stateKey, def, options, render){ cats.push({ key:key, label:label, icon:icon, type:'radio', stateKey:stateKey, def:def, options:options, render:render }); }
+  var HINT_SP = 'Nhiều sản phẩm cách nhau bằng dấu phẩy';
+  var HINT_CREATOR = 'Bật: mỗi đơn tính toàn bộ kết quả cho người tạo đơn (không chia đều cho các sale đứng tên).';
+  // Sale / Team theo quyền: admin = tất cả; leader (E/F/G) = tên trong team mình
+  function saleTeam(saleKey, teamKey, saleOpt){
+    if (_srIsAdmin()){
+      flat('sale', saleKey.label || 'Sale', '👤', 'Tìm sale...', saleKey.state, saleOpt);
+      if (teamKey) flat('team', 'Team', '👥', 'Tìm team...', teamKey, function(){ return _srState.teamOptions || []; });
+    } else if (_srbHasViewScope_()){
+      // Sale Online/Van phong: chon them ten nhom Quay + phong CSKH (2026-10-29); mac dinh van la ten minh/team
+      flat('sale', 'Tên (của bạn + Quầy/CSKH)', '👤', 'Tìm tên...', saleKey.state, function(){ return _srState.viewScopeOptions || []; });
+    } else if (_srbIsLeaderScope_() && saleKey.leader){
+      flat('sale', 'Tên (team của bạn)', '👤', 'Tìm tên trong team...', saleKey.state, function(){ return _srState.leaderTeamOptions || []; });
+    }
+  }
+  if (sub === 'A'){
+    saleTeam({state:'sale'}, 'team', function(){ return _srState.saleOptions || []; });
+    flat('kenh', 'Kênh', '🛒', 'Tìm kênh...', 'kenh', function(){ return _srState.kenhOptions || []; });
+    text('aSanPham', 'Sản phẩm', '💍', 'aSanPham', 'vd: tỳ hưu, nhẫn 10k', HINT_SP);
+    radio('dateField', 'Tính theo ngày', '📅', 'dateField', 'ngayTao', [['ngayTao','Ngày tạo'],['thoiGianHT','Thời gian hoàn thành']]);
+    cats.push({ key:'byCreator', label:'Tính theo người tạo đơn', icon:'🧾', type:'toggle', stateKey:'byCreator', apply:true, hint:HINT_CREATOR });
+  } else if (sub === 'C'){
+    radio('cDateField', 'Tính theo ngày', '📅', 'cDateField', 'ngayTao', [['ngayTao','Ngày tạo'],['thoiGianHT','Thời gian hoàn thành']]);
+    saleTeam({state:'cSale'}, 'cTeam', function(){ return _srState.saleOptions || []; });
+    flat('cKenh', 'Kênh bán', '🛒', 'Tìm kênh bán...', 'cKenh', function(){ return _srState.kenhOptions || []; });
+    text('cSanPham', 'Sản phẩm', '💍', 'cSanPham', 'vd: tỳ hưu, nhẫn 10k', HINT_SP);
+    cats.push({ key:'byCreator', label:'Tính theo người tạo đơn', icon:'🧾', type:'toggle', stateKey:'byCreator', apply:true, hint:HINT_CREATOR });
+  } else if (sub === 'D'){
+    flat('dCs', 'CS', '🎧', 'Tìm CS...', 'dCs', function(){ return _srState.saleOptions || []; });
+    flat('dTeam', 'Team', '👥', 'Tìm team...', 'dTeam', function(){ return _srState.teamOptions || []; });
+  } else if (sub === 'E'){
+    saleTeam({state:'eSale', leader:true}, 'eTeam', function(){ return _srState.saleBOptions || []; });
+  } else if (sub === 'F'){
+    saleTeam({state:'fSale', leader:true}, 'fTeam', function(){ return _srState.saleBOptions || []; });
+  } else if (sub === 'G'){
+    saleTeam({state:'gSale', leader:true}, null, function(){ return _srState.saleBOptions || []; });
+  } else if (sub === 'L'){
+    saleTeam({state:'lSale'}, null, function(){ return _srState.saleBOptions || []; });
+  } else if (sub === 'M'){   // Tổng quan đơn chia (js/50): lọc Sale + Kênh bán (nguồn đơn)
+    saleTeam({state:'mSale', leader:true}, null, function(){ return _srState.saleBOptions || []; });
+    flat('mNguon', 'Kênh bán (nguồn đơn)', '🏷', 'Tìm kênh...', 'mNguon', function(){ return _srState.nguonOptions || []; });
+  } else if (sub === 'H'){
+    if (_srIsAdmin() || (currentUser && currentUser.role === 'leader')){
+      radio('hTeam', 'Team', '👥', 'hTeam', '', function(){ return [['','Tất cả team']].concat((teams||[]).map(function(t){ return t.name || '(chưa đặt tên)'; }).concat(['Chưa có team']).map(function(n){ return [n,n]; })); }, true);
+      radio('hCs', 'CS', '🎧', 'hCs', '', function(){ return [['','Tất cả CS']].concat((_hBuild_().csOptions||[]).map(function(n){ return [n,n]; })); }, true);
+    }
+    radio('hGroup', 'Cách nhóm', '🗂️', 'hGroup', 'dayCs', [['dayCs','Theo ngày × CS'],['cs','Gộp theo CS']], true);
+  } else if (sub === 'I'){
+    if (_srIsAdmin() || (currentUser && currentUser.role === 'leader')){
+      radio('iTeam', 'Team', '👥', 'iTeam', '', function(){ return [['','Tất cả team']].concat((teams||[]).map(function(t){ return t.name || '(chưa đặt tên)'; }).map(function(n){ return [n,n]; })); }, true);
+      radio('iCs', 'CS', '🎧', 'iCs', '', function(){
+        var names = Array.from(new Set((typeof assignHistory!=='undefined'?assignHistory:[]).map(function(h){return h.csName;}))).filter(Boolean).sort();
+        return [['','Tất cả CS']].concat(names.map(function(n){ return [n,n]; })); }, true);
+    }
+  } else {   // B — Pos
+    if (_srIsAdmin()){
+      flatB('sale', 'Sale', '👤', 'Tìm sale...');
+      flatB('team', 'Team', '👥', 'Tìm team...');
+    } else if (_srbHasViewScope_()){
+      flat('sale', 'Tên (của bạn + Quầy/CSKH)', '👤', 'Tìm tên...', 'bSale', function(){ return _srState.viewScopeOptions || []; });
+    }
+    flatB('nguon', 'Nguồn đơn', '🛒', 'Tìm nguồn...');
+    flatB('mkt', 'Marketer', '📣', 'Tìm marketer...');
+    cats.push({ key:'cs', label:(cfg.cs.getLabel ? cfg.cs.getLabel() : 'Tình trạng CS'), icon:'🩺', type:'tree', stateKey:'bCareStatus', ph:'Tìm tình trạng...',
+      tree:function(){ return (typeof CARE_STATUS_TREE !== 'undefined' && CARE_STATUS_TREE) ? CARE_STATUS_TREE : []; } });
+    cats.push({ key:'kh', label:(cfg.kh.getLabel ? cfg.kh.getLabel() : 'Trạng thái KH'), icon:'🏷️', type:'tree', stateKey:'bKhStatus', ph:'Tìm trạng thái...',
+      tree:function(){ return (typeof CUSTOMER_STATUS_TREE !== 'undefined' && CUSTOMER_STATUS_TREE) ? CUSTOMER_STATUS_TREE : []; } });
+    flatB('zalo', 'Kết bạn Zalo', '💬', 'Tìm trạng thái Zalo...');
+    text('sanpham', 'Sản phẩm', '💍', 'bSanPham', 'vd: tỳ hưu, nhẫn 10k', HINT_SP);
+    text('nickzalo', 'Nick Zalo', '🔖', 'bNickZalo', 'Tìm nick...', 'Gõ một phần tên nick Zalo');
+  }
+  return cats;
+}
+// Tên khoá state ngày / phần phụ / tác vụ của từng báo cáo
+function _srbSubCfg_(){
+  var sub = (_srState.sub === 'K') ? 'G' : _srState.sub, admin = _srIsAdmin();
+  var P = {A:['dateQuick','dateFrom','dateTo'], B:['dateQuick','dateFrom','dateTo'], D:['dDateQuick','dDateFrom','dDateTo'], E:['eDateQuick','eDateFrom','eDateTo'],
+    F:['fDateQuick','fDateFrom','fDateTo'], G:['gDateQuick','gDateFrom','gDateTo'], H:['hDateQuick','hDateFrom','hDateTo'], I:['iDateQuick','iDateFrom','iDateTo'], L:['lDateQuick','lDateFrom','lDateTo'], M:['mDateQuick','mDateFrom','mDateTo']};
+  var lockKey = {A:'sale',B:'bSale',C:'cSale',E:'eSale',F:'fSale',G:'gSale',L:'lSale',M:'mSale'}[sub];
+  var c = { sub:sub, date:P[sub] || null, lockKey:lockKey, extra:'', tasks:[], dateAfter:'', leader:(sub === 'E' || sub === 'F' || sub === 'G' || sub === 'M') };
+  function t(label, js, title, id){ c.tasks.push('<div'+(id?' id="'+id+'"':'')+(title?' title="'+esc(title)+'"':'')+' onclick="closeGearMenus();'+js+'">'+label+'</div>'); }
+  if (sub === 'A' || sub === 'B'){
+    t('📊 Xuất Excel', 'exportSalesReport()');
+    if (admin) t(sub === 'A' ? '📌 Cập nhật Sheet Base' : '📄 Xuất ra Sheet', 'exportSalesReportToSheet()', sub === 'A' ? 'Ghi đè vào ĐÚNG 1 tab cố định (BC_A_Base) — không tạo tab mới mỗi lần xuất' : 'Tạo 1 tab mới có timestamp, giữ lại lịch sử các lần xuất trước', 'sr-export-sheet-btn');
+    if (admin) t('👁 Ẩn/Hiện Page &amp; Sale', '_srToggleHiddenPanel()', 'Chọn Page/kênh và Sale không thuộc phạm vi quản lý để ẩn khỏi mọi báo cáo chung');
+  } else if (sub === 'C'){
+    t('📊 Xuất Excel', 'exportSalesReportC()');
+    if (admin) t('📄 Xuất ra Sheet', 'exportSalesReportToSheet()', '', 'sr-export-sheet-btn');
+  } else if (sub === 'D'){
+    t('📄 Xuất ra Sheet', 'exportSalesReportToSheet()', '', 'sr-export-sheet-btn');
+  } else if (sub === 'E' && admin){
+    t('⚙ % hoa hồng cá nhân', 'openIndividualRatesModal()'); t('🏆 Chương trình thưởng', 'openBonusProgramsModal()');
+    t('🏷️ Phân loại đội Sale', 'openSaleChannelsModal()'); t('💰 Đơn giá vàng (Pancake AI)', 'openGoldUnitModal()'); t('📡 % hoa hồng theo Kênh', 'openChannelRatesModal()');
+  } else if (sub === 'F' && admin){
+    t('🎯 Cài đặt KPI (bậc / commit riêng)', 'openSaleKpiConfigModal_()'); t('🏷️ Phân loại đội Sale', 'openSaleChannelsModal()');
+  } else if (sub === 'G'){
+    t('<b>📗 Excel đầy đủ (gửi kế toán) — 3 sheet</b>', "_srGExportXlsx_()"); t('📊 CSV Tổng hợp (theo Sale + chương trình)', "_srGExportCsv_('summary')");
+    t('🧾 CSV Chi tiết từng lượt thưởng', "_srGExportCsv_('detail')"); t('📦 CSV Đơn Pos dùng để tính (đối chiếu)', "_srGExportCsv_('orders')");
+    if (admin){ t('🏆 Chương trình thưởng', 'openBonusProgramsModal()'); t('🏷️ Phân loại Online/Offline/Thử việc', 'openSaleChannelsModal()'); }
+  } else if (sub === 'H'){
+    t('⬇️ Xuất CSV', '_hExportCsv_()');
+    if (admin) t('⚙ Trạng thái KH tự nhảy', 'openHKhMapModal_()', 'Gán Trạng thái KH tự nhảy theo từng nhóm Tình trạng CS');
+  } else if (sub === 'I'){
+    t('⬇️ Xuất CSV', 'exportRenewReport_()');
+  } else if (sub === 'L'){
+    t('🧾 CSV Chi tiết từng đơn (mã bộ đếm + dòng Pos)', "_srLExportCsv_('detail')"); t('📊 CSV Tổng hợp theo Sale', "_srLExportCsv_('summary')");
+  } else if (sub === 'M'){
+    t('⬇ CSV Tổng hợp theo sale', "_srMExportCsv_('summary')"); t('⬇ CSV Danh sách đơn chia (chi tiết)', "_srMExportCsv_('detail')");
+    if (admin) t('📤 Xuất ra Sheet', 'exportSalesReportToSheet()', 'Tạo 1 tab mới BC_M_… trong Google Sheet CRM (tổng quan + theo sale + chi tiết đơn chia)', 'sr-export-sheet-btn');
+  }
+  t(_srSidebarHidden ? '📂 Hiện bộ lọc KH' : '📁 Ẩn bộ lọc KH — chụp màn hình', '_srToggleSidebar()');
+  // Phần phụ nằm ngay trên thanh
+  if (_srbIsLeaderScope_() && (sub === 'E' || sub === 'F' || sub === 'G')){
+    var f = {E:'eSale',F:'fSale',G:'gSale'}[sub], z = {E:'eSaleCustomized',F:'fSaleCustomized',G:'gSaleCustomized'}[sub];
+    c.extra += '<button class="btn sm" title="Xem lại cả team (bỏ hết lựa chọn riêng)" onclick="_srState.'+f+'=_srState.leaderTeamOptions.slice();_srState.'+z+'=false;_srApply()">🔄 Cả team</button>';
+  }
+  if (sub === 'L' && admin) c.extra += '<span class="srb-pct">Tỷ lệ chia <input id="sr-l-pct" type="number" min="1" max="100" step="0.5" value="'+esc((_srState.dataL && _srState.dataL.sharePct) || 30)+'">%<button class="btn sm" onclick="_srLSavePct_()">Lưu</button></span>';
+  if (sub === 'H') c.dateAfter = ';_srApply()';
+  if (sub === 'I') c.dateAfter = ';renderSalesReportTab()';
+  return c;
+}
+// THANH CÔNG CỤ GỌN dùng chung cho mọi báo cáo: chọn báo cáo · ngày · 🔎 Bộ lọc · Lọc · 🧰 Tác vụ
+function _srBarHtml_(customDateHtml){
+  var c = _srbSubCfg_(), admin = _srIsAdmin();
+  var h = '<div class="srb-bar">' + _srSubSelectHtml_();
+  if (customDateHtml) h += customDateHtml;
+  else if (c.date){
+    var q = c.date[0], f = c.date[1], t = c.date[2];
+    h += _quickRangeSelectHtml(_srState[q] || '', "_srApplyQuickRange('"+q+"','"+f+"','"+t+"',this.value)");
+    h += '<input type="date" value="'+esc(_srState[f]||'')+'" onchange="_srSetField(\''+f+'\',this.value);_srState.'+q+'=\'custom\''+c.dateAfter+'" title="Từ ngày">';
+    h += '<span class="srb-bar-arrow">→</span>';
+    h += '<input type="date" value="'+esc(_srState[t]||'')+'" onchange="_srSetField(\''+t+'\',this.value);_srState.'+q+'=\'custom\''+c.dateAfter+'" title="Đến ngày">';
+  }
+  if (!admin && c.lockKey && !(c.leader && _srbIsLeaderScope_()) && !_srbHasViewScope_()){
+    h += '<span class="srb-bar-lock" title="Bạn chỉ xem được số liệu của mình">🔒 ' + esc((_srState[c.lockKey]||[]).join(', ') || (currentUser && currentUser.name) || '') + '</span>';
+  }
+  h += c.extra;
+  if (_srbMenuCats_().length) h += _srbMenuHTML_();
+  h += '<button class="btn secondary sm" onclick="_srApply()">Lọc</button>';
+  h += '<div class="gear-menu"><button class="btn sm" onclick="_srToggleGearMenu(event,\'sr-gear-ab\')">🧰 Tác vụ ▾</button>' +
+    '<div class="gear-menu-list" id="sr-gear-ab" onclick="event.stopPropagation()">' + c.tasks.join('') + '</div></div>';
+  return h + '</div>';
+}
+function _srbMenuCat_(key){ return _srbMenuCats_().filter(function(c){ return c.key === key; })[0] || null; }
+function _srbLeaves_(n){
+  if (n && n.children && n.children.length){
+    var out = []; n.children.forEach(function(c){ out = out.concat(_srbLeaves_(c)); }); return out;
+  }
+  return (n && n.value) ? [n.value] : [];
+}
+function _srbNodeAt_(tree, path){
+  var node = null, list = tree;
+  String(path).split('.').forEach(function(i){ node = list ? list[Number(i)] : null; list = node && node.children; });
+  return node;
+}
+function _srbRadioOpts_(c){ return (typeof c.options === 'function') ? c.options() : c.options; }
+function _srbMenuCount_(cat){
+  var v = _srState[cat.stateKey];
+  if (cat.type === 'text') return String(v||'').trim() ? 1 : 0;
+  if (cat.type === 'radio') return (v && v !== cat.def) ? 1 : 0;
+  if (cat.type === 'toggle') return v ? 1 : 0;
+  return (v || []).length;
+}
+function _srbMenuReset_(c){ _srState[c.stateKey] = (c.type === 'text') ? '' : (c.type === 'radio' ? c.def : (c.type === 'toggle' ? false : [])); }
+function _srbMenuTotal_(){ return _srbMenuCats_().reduce(function(s,c){ return s + _srbMenuCount_(c); }, 0); }
+function _srbMenuSummary_(){
+  return _srbMenuCats_().filter(function(c){ return _srbMenuCount_(c) > 0; }).map(function(c){
+    if (c.type === 'radio'){ var o = (typeof c.options === 'function') ? null : c.options.filter(function(x){ return x[0] === _srState[c.stateKey]; })[0]; return esc(c.label) + ': ' + esc(o ? o[1] : _srState[c.stateKey]); }
+    return esc(c.label) + ((c.type === 'text' || c.type === 'toggle') ? '' : ' (' + _srbMenuCount_(c) + ')');
+  }).join(' · ');
+}
+
+// Danh sách ở cấp 2 (mục phẳng) hoặc cấp 2+3 (cây: nhóm → mục con)
+function _srbMenuListHtml_(cat){
+  var q = _foldVi(_srbMenu.q || ''), sel = _srState[cat.stateKey] || [];
+  if (cat.type === 'radio'){
+    return _srbRadioOpts_(cat).map(function(o){
+      var on = _srState[cat.stateKey] === o[0];
+      return '<div class="srb-m-opt' + (on ? ' on' : '') + '" data-k="' + cat.key + '" data-v="' + esc(o[0]) + '" onclick="srbMenuRadio(this)">' +
+        '<span class="srb-m-chk">' + (on ? '◉' : '○') + '</span><span class="srb-m-t">' + esc(o[1]) + '</span></div>';
+    }).join('');
+  }
+  if (cat.type === 'flat'){
+    var items = (cat.opts() || []).filter(function(v){ return !q || _foldVi(v).indexOf(q) !== -1; });
+    if (!items.length) return '<div class="srb-m-empty">' + (q ? 'Không tìm thấy' : 'Chưa có dữ liệu (đang tải…)') + '</div>';
+    return items.map(function(v){
+      var on = sel.indexOf(v) !== -1;
+      return '<div class="srb-m-opt' + (on ? ' on' : '') + '" data-k="' + cat.key + '" data-v="' + esc(v) + '" onclick="srbMenuPick(this)">' +
+        '<span class="srb-m-chk">' + (on ? '☑' : '☐') + '</span><span class="srb-m-t">' + esc(v) + '</span></div>';
+    }).join('');
+  }
+  // cây
+  var tree = cat.tree();
+  function vis(n){ return !q || _foldVi(n.label || n.value || '').indexOf(q) !== -1 || (n.children || []).some(vis); }
+  function walk(nodes, path, depth, showAll){
+    var h = '';
+    nodes.forEach(function(n, i){
+      var p = path === '' ? String(i) : path + '.' + i;
+      if (!showAll && !vis(n)) return;
+      if (n.children && n.children.length){
+        var leaves = _srbLeaves_(n), nSel = leaves.filter(function(v){ return sel.indexOf(v) !== -1; }).length;
+        var st = nSel === 0 ? '☐' : (nSel === leaves.length ? '☑' : '◪');
+        var open = !!q || !!_srbMenu.exp[cat.key + ':' + p];
+        var all = showAll || !q || _foldVi(n.label || '').indexOf(q) !== -1;
+        h += '<div class="srb-m-grp" style="padding-left:' + (10 + depth * 14) + 'px">' +
+          '<span class="srb-m-chk" data-k="' + cat.key + '" data-p="' + p + '" onclick="srbMenuPickGroup(this)" title="Chọn / bỏ cả nhóm">' + st + '</span>' +
+          '<span class="srb-m-t" data-k="' + cat.key + '" data-p="' + p + '" onclick="srbMenuExpand(this)">' + esc(n.label || '') + ' <small>(' + nSel + '/' + leaves.length + ')</small></span>' +
+          '<span class="srb-m-car" data-k="' + cat.key + '" data-p="' + p + '" onclick="srbMenuExpand(this)">' + (open ? '▾' : '›') + '</span></div>';
+        if (open) h += walk(n.children, p, depth + 1, all);
+      } else if (n.value){
+        var on = sel.indexOf(n.value) !== -1;
+        h += '<div class="srb-m-opt' + (on ? ' on' : '') + '" style="padding-left:' + (10 + depth * 14) + 'px" data-k="' + cat.key + '" data-v="' + esc(n.value) + '" onclick="srbMenuPick(this)">' +
+          '<span class="srb-m-chk">' + (on ? '☑' : '☐') + '</span><span class="srb-m-t">' + esc(n.label || n.value) + '</span></div>';
+      }
+    });
+    return h;
+  }
+  var out = walk(tree, '', 0, false);
+  return out || '<div class="srb-m-empty">' + (q ? 'Không tìm thấy' : 'Chưa có dữ liệu') + '</div>';
+}
+function _srbMenuPanelHtml_(){
+  var cat = _srbMenu.cat ? _srbMenuCat_(_srbMenu.cat) : null;
+  if (!cat){
+    var rows = _srbMenuCats_().map(function(c){
+      var n = _srbMenuCount_(c);
+      if (c.type === 'toggle') return '<div class="srb-m-cat" data-k="' + c.key + '" onclick="srbMenuToggleBool(this.getAttribute(\'data-k\'))" title="' + esc(c.hint || '') + '">' +
+        '<span class="srb-m-ic">' + c.icon + '</span><span class="srb-m-t">' + esc(c.label) + '</span><span class="srb-m-chk">' + (n ? '☑' : '☐') + '</span></div>';
+      return '<div class="srb-m-cat" data-k="' + c.key + '" onclick="srbMenuOpenCat(this.getAttribute(\'data-k\'))">' +
+        '<span class="srb-m-ic">' + c.icon + '</span><span class="srb-m-t">' + esc(c.label) + '</span>' +
+        (n ? '<span class="srb-m-badge">' + (c.type === 'text' ? '✓' : n) + '</span>' : '') + '<span class="srb-m-car">›</span></div>';
+    }).join('');
+    return '<div class="srb-m-head"><b>Bộ lọc</b>' + (_srbMenuTotal_() ? '<a href="javascript:void(0)" onclick="srbMenuClearAll()">Xoá tất cả</a>' : '') + '</div>' + rows;
+  }
+  var n = _srbMenuCount_(cat);
+  var head = '<div class="srb-m-head"><a href="javascript:void(0)" onclick="srbMenuBack()">‹ Bộ lọc</a><b>' + esc(cat.label) + '</b>' +
+    (n ? '<a href="javascript:void(0)" onclick="srbMenuClearCat(\'' + cat.key + '\')">Bỏ chọn</a>' : '<span></span>') + '</div>';
+  if (cat.type === 'radio') return head + '<div class="srb-m-list" id="srb-menu-list">' + _srbMenuListHtml_(cat) + '</div>';
+  if (cat.type === 'text'){
+    return head + '<div class="srb-m-textwrap"><input type="text" id="srb-menu-text" value="' + esc(_srState[cat.stateKey] || '') + '" placeholder="' + esc(cat.ph) + '" ' +
+      'oninput="srbMenuText(\'' + cat.key + '\', this.value)" autocomplete="off"><div class="srb-m-hint">' + esc(cat.hint || '') + '</div></div>';
+  }
+  return head + '<div class="srb-m-searchwrap"><input type="text" id="srb-menu-q" value="' + esc(_srbMenu.q || '') + '" placeholder="🔍 ' + esc(cat.ph) + '" ' +
+    'oninput="srbMenuSearch(this.value)" onkeydown="srbMenuKey(event)" autocomplete="off"></div>' +
+    '<div class="srb-m-list" id="srb-menu-list">' + _srbMenuListHtml_(cat) + '</div>';
+}
+function _srbMenuHTML_(){
+  var mode = (_srState.sub === 'K') ? 'G' : _srState.sub;
+  if (_srbMenu.mode !== mode){ _srbMenu.mode = mode; _srbMenu.open = false; _srbMenu.cat = null; _srbMenu.q = ''; _srbMenu.exp = {}; }
+  var total = _srbMenuTotal_();
+  return '<div class="srb-menu" id="srb-menu">' +
+    '<button type="button" class="btn sm" id="srb-menu-btn" onclick="srbMenuToggle(event)">🔎 Bộ lọc <span id="srb-menu-n">' + (total ? '(' + total + ')' : '') + '</span> ▾</button>' +
+    '<span class="srb-m-sum" id="srb-menu-sum">' + _srbMenuSummary_() + '</span>' +
+    (total ? '<a class="srb-m-x" id="srb-menu-x" href="javascript:void(0)" onclick="srbMenuClearAll()">✕ Xoá lọc</a>' : '<a class="srb-m-x" id="srb-menu-x" href="javascript:void(0)" style="display:none" onclick="srbMenuClearAll()">✕ Xoá lọc</a>') +
+    '<div class="srb-menu-panel" id="srb-menu-panel" onclick="event.stopPropagation()" style="display:' + (_srbMenu.open ? 'block' : 'none') + '">' + (_srbMenu.open ? _srbMenuPanelHtml_() : '') + '</div></div>';
+}
+function _srbMenuRefresh_(){   // cập nhật nút + dòng tóm tắt (không đụng ô đang gõ)
+  if (typeof _fpRefresh === 'function') _fpRefresh();   // ô Mẫu lọc nhanh (js/48) biết bộ lọc còn khớp mẫu không
+  var total = _srbMenuTotal_();
+  var n = document.getElementById('srb-menu-n'); if (n) n.textContent = total ? '(' + total + ')' : '';
+  var s = document.getElementById('srb-menu-sum'); if (s) s.innerHTML = _srbMenuSummary_();
+  var x = document.getElementById('srb-menu-x'); if (x) x.style.display = total ? '' : 'none';
+}
+function _srbMenuPaint_(){      // vẽ lại cả panel (đổi cấp)
+  var p = document.getElementById('srb-menu-panel'); if (!p) return;
+  p.style.display = _srbMenu.open ? 'block' : 'none';
+  p.innerHTML = _srbMenu.open ? _srbMenuPanelHtml_() : '';
+}
+function _srbMenuRepaintList_(){
+  var cat = _srbMenu.cat ? _srbMenuCat_(_srbMenu.cat) : null, l = document.getElementById('srb-menu-list');
+  if (cat && l) l.innerHTML = _srbMenuListHtml_(cat);
+  var head = document.querySelector('#srb-menu-panel .srb-m-head');
+  if (cat && head){ // nút "Bỏ chọn" phụ thuộc số đã chọn → vẽ lại panel khi trạng thái có/không đổi
+    var has = !!head.querySelector('a[onclick^="srbMenuClearCat"]');
+    if (has !== (_srbMenuCount_(cat) > 0)){ var q = document.getElementById('srb-menu-q'), pos = q ? q.selectionStart : 0; _srbMenuPaint_(); q = document.getElementById('srb-menu-q'); if (q){ q.focus(); try{ q.setSelectionRange(pos,pos); }catch(e){} } }
+  }
+  _srbMenuRefresh_();
+}
+function srbMenuToggle(e){
+  if (e) e.stopPropagation();
+  _srbMenu.open = !_srbMenu.open;
+  if (_srbMenu.open){ _srbMenu.cat = null; _srbMenu.q = ''; }
+  _srbMenuPaint_();
+}
+function srbMenuClose(){ if (!_srbMenu.open) return; _srbMenu.open = false; _srbMenuPaint_(); }
+function srbMenuOpenCat(key){
+  _srbMenu.cat = key; _srbMenu.q = '';
+  _srbMenuPaint_();
+  var i = document.getElementById('srb-menu-q') || document.getElementById('srb-menu-text'); if (i) i.focus();
+}
+function srbMenuBack(){ _srbMenu.cat = null; _srbMenu.q = ''; _srbMenuPaint_(); }
+function srbMenuSearch(v){ _srbMenu.q = v || ''; var cat = _srbMenuCat_(_srbMenu.cat); var l = document.getElementById('srb-menu-list'); if (cat && l) l.innerHTML = _srbMenuListHtml_(cat); }
+function srbMenuKey(e){
+  if (e.key === 'Escape'){ srbMenuClose(); return; }
+  if (e.key === 'Enter'){
+    e.preventDefault();
+    var o = document.querySelectorAll('#srb-menu-list .srb-m-opt');
+    if (o.length === 1) srbMenuPick(o[0]);
+  }
+}
+function _srbMenuAfterChange_(key){
+  if (_srTeamFieldToSaleField_[_srbMenuCat_(key).stateKey]){ _srSyncTeamToSale_(_srbMenuCat_(key).stateKey); renderSalesReportTab(); return; }
+  _srbMenuRepaintList_();
+}
+function srbMenuPick(el){
+  var key = el.getAttribute('data-k'), v = el.getAttribute('data-v'), cat = _srbMenuCat_(key); if (!cat) return;
+  var arr = (_srState[cat.stateKey] || []).slice(), i = arr.indexOf(v);
+  if (i !== -1) arr.splice(i, 1); else arr.push(v);
+  _srState[cat.stateKey] = arr;
+  _srbMenuAfterChange_(key);
+}
+function srbMenuPickGroup(el){
+  var key = el.getAttribute('data-k'), cat = _srbMenuCat_(key); if (!cat) return;
+  var node = _srbNodeAt_(cat.tree(), el.getAttribute('data-p')); if (!node) return;
+  var leaves = _srbLeaves_(node), arr = (_srState[cat.stateKey] || []).slice();
+  var allOn = leaves.length && leaves.every(function(v){ return arr.indexOf(v) !== -1; });
+  if (allOn) arr = arr.filter(function(v){ return leaves.indexOf(v) === -1; });
+  else leaves.forEach(function(v){ if (arr.indexOf(v) === -1) arr.push(v); });
+  _srState[cat.stateKey] = arr;
+  _srbMenuAfterChange_(key);
+}
+function srbMenuExpand(el){
+  var k = el.getAttribute('data-k') + ':' + el.getAttribute('data-p');
+  _srbMenu.exp[k] = !_srbMenu.exp[k];
+  var cat = _srbMenuCat_(el.getAttribute('data-k')), l = document.getElementById('srb-menu-list');
+  if (cat && l) l.innerHTML = _srbMenuListHtml_(cat);
+}
+function srbMenuRadio(el){
+  var cat = _srbMenuCat_(el.getAttribute('data-k')); if (!cat) return;
+  _srState[cat.stateKey] = el.getAttribute('data-v');
+  if (cat.render){ renderSalesReportTab(); return; }
+  _srbMenuPaint_(); _srbMenuRefresh_();
+}
+function srbMenuToggleBool(key){
+  var cat = _srbMenuCat_(key); if (!cat) return;
+  _srState[cat.stateKey] = !_srState[cat.stateKey];
+  if (cat.apply){ _srbMenu.open = false; _srApply(); return; }   // đổi cách tính → tải lại ngay như checkbox cũ
+  _srbMenuPaint_(); _srbMenuRefresh_();
+}
+function srbMenuText(key, v){ var cat = _srbMenuCat_(key); if (!cat) return; _srState[cat.stateKey] = v; _srbMenuRefresh_(); }
+function srbMenuClearCat(key){
+  var cat = _srbMenuCat_(key); if (!cat) return;
+  _srbMenuReset_(cat);
+  if (_srTeamFieldToSaleField_[cat.stateKey]){ _srSyncTeamToSale_(cat.stateKey); renderSalesReportTab(); return; }
+  _srbMenuPaint_(); _srbMenuRefresh_();
+}
+function srbMenuClearAll(){
+  _srbMenuCats_().forEach(_srbMenuReset_);
+  _srbMenu.cat = null; _srbMenu.q = '';
+  renderSalesReportTab();
+}
+document.addEventListener('click', function(e){
+  if (!_srbMenu.open) return;
+  var t = e.target;
+  if (t && t.isConnected === false) return;      // phần tử vừa bị vẽ lại trong panel → không phải click ra ngoài
+  if (t && t.closest && t.closest('#srb-menu')) return;
+  srbMenuClose();
+});
+
 function exportSalesReport(){
   if (_srState.sub === 'A'){
     var d = _srState.dataA;
@@ -1035,6 +1381,7 @@ function exportSalesReport(){
       ['Trong đó: chênh lệch đơn đổi', d.totalGiaTriChenh||0],
       ['Tổng đơn (doanh thu, ko ship)', d.totalGiaTri],
       ['Trung bình đơn', d.trungBinhDon]];
+    (function(){ var cr = (typeof _srCloseRateAvg_ === 'function' && d.saleCloseRateFrom) ? _srCloseRateAvg_(d.saleCloseRate) : null; if (cr && cr.has) summary.push(['Tỷ lệ chốt TB (%)', cr.avg], ['Đơn chốt ÷ tương tác Pancake', cr.closed + ' / ' + cr.held]); })();
     var bySaleRows = [['Sale','Số đơn','Cọc','Tổng đơn','TB đơn']];
     (d.bySale||[]).forEach(function(s){ bySaleRows.push([s.name, s.orders, s.coc, s.giaTri, s.trungBinhDon]); });
     var byTeamRows = [['Team Sale','Số đơn','Cọc','Tổng đơn','TB đơn']];
@@ -1050,6 +1397,12 @@ function exportSalesReport(){
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Tổng quan');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(bySaleRows), _srState.byCreator ? 'Theo người tạo đơn' : 'Theo Sale bán');
+    if (d.bySaleNoFb && d.noFb){   // Doanh thu theo Sale LOẠI kênh "Facebook" (Duyên 2026-10-31) — cùng số liệu mục "💰 Doanh thu theo Sale" trên web
+      var noFbRows = [['Sale','Số đơn','Doanh thu (loại kênh Facebook)','TB đơn']];
+      d.bySaleNoFb.forEach(function(s){ noFbRows.push([s.name, s.orders, s.giaTri, s.trungBinhDon]); });
+      noFbRows.push([]); noFbRows.push(['Đã loại: ' + (d.noFb.excludedOrders || 0) + ' đơn kênh ' + (d.noFb.kenh || []).join(', '), '', d.noFb.excludedRevenue || 0, '']);
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(noFbRows), 'Doanh thu sale (bỏ Facebook)');
+    }
     if (_srIsAdmin()) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(byTeamRows), 'Theo Team Sale');
     if (_srIsAdmin()) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(byKenhRows), 'Theo Kênh bán');
     if (_srIsAdmin()) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(byMktRows), 'Theo MKT');
@@ -1062,6 +1415,7 @@ function exportSalesReport(){
       ['Số lượng đơn', dB.totalOrders],
       ['Tổng giá trị sau giảm giá', dB.totalGiaTri],
       ['Tổng COD', dB.totalCod]];
+    (function(){ var cr = (typeof _srCloseRateAvg_ === 'function' && dB.saleCloseRateFrom) ? _srCloseRateAvg_(dB.saleCloseRate) : null; if (cr && cr.has) summaryB.push(['Tỷ lệ chốt TB (%)', cr.avg], ['Đơn chốt ÷ tương tác Pancake', cr.closed + ' / ' + cr.held]); })();
     var productRows = [['Mã sản phẩm','Tên sản phẩm','Tổng số lượng']];
     (dB.products||[]).forEach(function(p){ productRows.push([p.code, p.name, p.soLuong]); });
     var bySaleRowsB = [['Sale','Số đơn','Giá trị sau giảm giá','COD']];
@@ -1105,7 +1459,7 @@ function renderAssignTeam(){
     return;
   }
   var html = '<div style="margin-bottom:10px;font-size:13px">Tổng data sẽ chia: <b>'+fmt(pool.length)+' KH</b> '+
-    '<span style="color:var(--muted)">(nhập % cho từng team; data của team sẽ chia đều cho các thành viên đã set up trong team)</span></div>';
+    '<span class="guide-text" style="color:var(--muted)">(nhập % cho từng team; data của team sẽ chia đều cho các thành viên đã set up trong team)</span></div>';
   html += '<table class="dash-table"><thead><tr><th>Team</th><th>Thành viên</th><th style="width:120px">% nhận</th><th style="width:90px;text-align:right">≈ KH</th></tr></thead><tbody>';
   teams.forEach(function(t){
     var members = _teamMembersList(t);

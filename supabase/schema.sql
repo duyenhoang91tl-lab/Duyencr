@@ -158,6 +158,8 @@ alter table pk_messages add column if not exists sender_name text default '';
 alter table pk_messages add column if not exists direction   text default '';   -- 'in' = khách nhắn, 'out' = page/sale trả lời
 alter table pk_messages add column if not exists text        text default '';
 alter table pk_messages add column if not exists sent_at     timestamptz;
+alter table pk_messages add column if not exists staff_name  text default '';   -- tên nhân viên Pancake gửi tin 'out' (lấy từ conversation.last_sent_by LÚC WEBHOOK NHẬN TIN — lúc đó đúng là người vừa gửi)
+alter table pk_messages add column if not exists crm_user    text default '';    -- tên nhân viên CRM đã gửi tin này từ CRM (Pancake chỉ biết token page); webhook vọng lại KHÔNG ghi đè cột này
 create index if not exists pk_messages_conv_idx on pk_messages (conversation_id, sent_at);
 
 alter table pk_conversations enable row level security;
@@ -272,7 +274,7 @@ declare
   c jsonb; m jsonb;
   v_conv text; v_psid text; v_cname text; v_cid text; v_snip text; v_ver int;
   v_tags jsonb; v_ass text[]; v_seen boolean; v_rep boolean; v_type text;
-  v_mid text; v_from text; v_dir text; v_text text; v_ins text; v_ts timestamptz; v_phone text; v_pi jsonb;
+  v_mid text; v_from text; v_dir text; v_staff text; v_text text; v_ins text; v_ts timestamptz; v_phone text; v_pi jsonb;
   v_n int := 0;
 begin
   if d is null or jsonb_typeof(d) <> 'object' then return 0; end if;
@@ -298,6 +300,8 @@ begin
   if v_evt = 'messaging' and v_mid <> '' then
     v_from := coalesce(m #>> '{from,id}', '');
     v_dir  := case when v_from <> '' and v_from = v_page then 'out' else 'in' end;
+    -- Tên nhân viên đã gửi tin 'out': last_sent_by của hội thoại ngay lúc này (Pancake trả kèm trong cùng webhook), hoặc admin_name nằm sẵn trong message.from.
+    v_staff := case when v_dir = 'out' then coalesce(nullif(c #>> '{last_sent_by,admin_name}', ''), nullif(m #>> '{from,admin_name}', ''), nullif(c #>> '{last_sent_by,name}', ''), '') else '' end;
     v_text := coalesce(nullif(m->>'original_message', ''), regexp_replace(coalesce(m->>'message', ''), '<[^>]*>', '', 'g'), '');
     v_ins  := coalesce(m->>'inserted_at', '');
     v_ts   := case when v_ins ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T' then (v_ins::timestamp) at time zone 'UTC' else r.received_at end;   -- Pancake trả giờ UTC không kèm múi giờ
@@ -337,9 +341,10 @@ begin
   v_n := 1;
 
   if v_evt = 'messaging' and v_mid <> '' then
-    insert into pk_messages (id, conversation_id, page_id, sender_id, sender_name, direction, text, sent_at, raw)
-      values (v_mid, v_conv, v_page, v_from, coalesce(m #>> '{from,name}', ''), v_dir, v_text, v_ts, m)
-      on conflict (id) do update set text = excluded.text, raw = excluded.raw;   -- Pancake gửi lại khi tin sửa/xoá: cập nhật, không nhân đôi
+    insert into pk_messages (id, conversation_id, page_id, sender_id, sender_name, staff_name, direction, text, sent_at, raw)
+      values (v_mid, v_conv, v_page, v_from, coalesce(m #>> '{from,name}', ''), v_staff, v_dir, v_text, v_ts, m)
+      on conflict (id) do update set text = excluded.text, raw = excluded.raw,
+        staff_name = coalesce(nullif(excluded.staff_name, ''), pk_messages.staff_name);   -- không xoá tên đã biết khi webhook gửi lại không kèm tên   -- Pancake gửi lại khi tin sửa/xoá: cập nhật, không nhân đôi
     v_n := v_n + 1;
   end if;
   return v_n;
@@ -376,3 +381,30 @@ do $$ begin
     revoke all on function pk_norm_phone(text) from authenticated;
   end if;
 end $$;
+
+-- 10) pk_staff — nhân viên Pancake (id uuid trong pk_conversations.assignee_ids -> tên). Do GAS pkNhanVienDongBo ghi (service_role).
+--     NGUYÊN NHÂN GỐC: webhook/API chỉ trả mã nhân viên (uuid), không kèm tên nên khung chat không hiện được "sale nào phụ trách".
+--     Khung chat vẫn chạy bình thường khi bảng này trống/chưa tạo (GAS bắt lỗi, trả danh sách tên rỗng).
+create table if not exists pk_staff (
+  id         text primary key,
+  name       text default '',
+  page_id    text default '',
+  raw        jsonb,
+  updated_at timestamptz default now()
+);
+alter table pk_staff enable row level security;   -- bật RLS, KHÔNG policy: chỉ service_role đọc/ghi (có tên + dữ liệu nhân viên)
+
+-- 11) pk_tags — danh mục THẺ Pancake (tags trong hội thoại chỉ là MÃ SỐ, vd [109]) để Worker đọc thẳng Supabase đổi mã -> tên/màu.
+--     Do GAS pkDanhMucDongBo ghi (GET /pages/{page}/tags). NGUYÊN NHÂN GỐC: Worker không giữ token Pancake, và không nên gọi API Pancake mỗi lần poll
+--     -> đồng bộ vài giờ/lần vào bảng này. RLS bật, KHÔNG policy: chỉ service_role đọc/ghi.
+create table if not exists pk_tags (
+  id         text primary key,            -- '<page_id>:<tag_id>'
+  page_id    text not null default '',
+  tag_id     text not null default '',
+  text       text default '',
+  color      text default '',
+  raw        jsonb,
+  updated_at timestamptz default now()
+);
+create index if not exists pk_tags_page_idx on pk_tags (page_id);
+alter table pk_tags enable row level security;

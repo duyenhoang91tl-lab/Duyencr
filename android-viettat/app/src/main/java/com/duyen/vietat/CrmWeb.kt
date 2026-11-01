@@ -1,0 +1,477 @@
+package com.duyen.vietat
+
+import android.Manifest
+import android.app.Activity
+import android.app.AlertDialog
+import android.content.Intent
+import android.net.Uri
+import android.util.Base64
+import android.view.ViewGroup
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.pm.PackageManager
+import android.media.MediaRecorder
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
+import android.provider.MediaStore
+import android.webkit.MimeTypeMap
+import android.widget.TextView
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import android.os.Build
+import android.webkit.ConsoleMessage
+import android.webkit.JavascriptInterface
+import android.webkit.RenderProcessGoneDetail
+import android.webkit.WebResourceResponse
+import android.webkit.JsPromptResult
+import android.webkit.JsResult
+import android.webkit.ValueCallback
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.EditText
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.FileProvider
+import java.io.File
+
+/**
+ * Chạy web CRM (https://…workers.dev) trong app: đăng nhập/phiên giữ nguyên, nút Back quay lại trang trước, chọn file để nhập,
+ * hộp thoại xác nhận/thông báo của CRM (alert/confirm/prompt), XUẤT FILE (Excel…) qua bảng chia sẻ của Android.
+ * Dữ liệu 100% là của CRM trên web — app chỉ là "vỏ" nên mọi tính năng mới của CRM có ngay, không cần cài lại app.
+ */
+class CrmWeb(private val act: Activity) {
+    var progress by mutableStateOf(0)
+    var canBack by mutableStateOf(false)
+    var error by mutableStateOf<String?>(null)
+    /** Nhật ký chẩn đoán: lỗi JavaScript / lỗi tải file của trang (hiện trong app khi có lỗi, để biết vì sao trang trắng). */
+    val logs = mutableStateListOf<String>()
+    /** Cắt token đăng nhập khỏi URL trước khi ghi nhật ký (người dùng hay sao chép nhật ký gửi cho người khác). */
+    private fun safeUrl(u: String) = u.replace(Regex("(token|demo|adminKey)=[^&]*"), "$1=…")
+    fun log(msg: String) { act.runOnUiThread { if (logs.size >= 40) logs.removeAt(0); logs.add(msg) } }
+    fun info(): String {
+        val wv = try { WebView.getCurrentWebViewPackage()?.let { it.packageName + " " + it.versionName } ?: "?" } catch (e: Exception) { "?" }
+        return "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT}) · ${Build.MANUFACTURER} ${Build.MODEL}\nWebView: $wv\nURL: ${Crm.webUrl(act)}"
+    }
+    var launchChooser: ((Intent) -> Unit)? = null
+    /** Xin quyền ghi âm (đặt bởi CrmWebScreen vì cần ActivityResult launcher của Compose). */
+    var launchPerm: (() -> Unit)? = null
+    private var fileCb: ValueCallback<Array<Uri>>? = null
+    private var resultHandler: ((Int, Intent?) -> Unit)? = null
+    private var permHandler: ((Boolean) -> Unit)? = null
+
+    private fun home() = Crm.webUrl(act)
+
+    fun load() { error = null; web.loadUrl(home()) }
+
+    /**
+     * Tên CS = người đang đăng nhập CRM trong tab CRM của app (localStorage "ome_user" của web CRM) — không bắt nhập tay nữa (Duyên 2026-10-25: kết nối đã mặc định).
+     * Đổi tên (đăng nhập người khác) thì lưu lại và kéo lại kho Viết tắt (mục chung + mục riêng của người đó). Chưa đăng nhập → bỏ qua (vẫn có mục chung).
+     */
+    private val whoJs = "(function(){try{var u=JSON.parse(localStorage.getItem('ome_user')||'null');return u&&u.name?String(u.name):'';}catch(e){return '';}})()"
+    fun detectName() {
+        web.evaluateJavascript(whoJs) { r ->
+            val n = try { org.json.JSONTokener(r ?: "null").nextValue()?.toString()?.trim().orEmpty() } catch (e: Exception) { "" }
+            if (n.isNotEmpty() && n != "null" && n != Crm.name(act)) {
+                Crm.prefs(act).edit().putString("name", n).apply()
+                Thread { Crm.pull(act) }.start()
+            }
+        }
+    }
+
+    fun onChooserResult(code: Int, data: Intent?) { val h = resultHandler; resultHandler = null; h?.invoke(code, data) }
+    fun onPermResult(ok: Boolean) { val h = permHandler; permHandler = null; h?.invoke(ok) }
+
+    // ===== ĐÍNH KÈM NHƯ "THÊM VÀO PHIÊN" CỦA CLAUDE: Máy ảnh / Ảnh / Tệp / Ghi âm (27/10/2026) =====
+    // NGUYÊN NHÂN GỐC: trước đây mọi ô <input type=file> của CRM chỉ mở 1 bộ chọn tệp hệ thống (createIntent = GET_CONTENT) nên không chụp ảnh
+    // tại chỗ, không có bộ chọn Ảnh (Google Photos) riêng và không ghi âm được. Nay hiện bảng chọn theo loại tệp trang yêu cầu (accept).
+    private fun finishPick(u: Array<Uri>?) { fileCb?.onReceiveValue(u); fileCb = null }
+    private fun launch(intent: Intent, h: (Int, Intent?) -> Unit): Boolean {
+        val l = launchChooser ?: return false
+        resultHandler = h
+        return try { l(intent); true } catch (e: Exception) { resultHandler = null; false }
+    }
+    private fun pickedUris(code: Int, d: Intent?): Array<Uri>? {
+        if (code != Activity.RESULT_OK || d == null) return null
+        val cd = d.clipData
+        if (cd != null && cd.itemCount > 0) return Array(cd.itemCount) { cd.getItemAt(it).uri }
+        return d.data?.let { arrayOf(it) }
+    }
+    private fun capDir(): File {
+        val dir = File(act.cacheDir, "cap").also { it.mkdirs() }
+        dir.listFiles()?.forEach { if (System.currentTimeMillis() - it.lastModified() > 86_400_000L) it.delete() }
+        return dir
+    }
+    private fun fileUri(f: File): Uri = FileProvider.getUriForFile(act, act.packageName + ".files", f)
+    private fun stamp(): String = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
+    private fun toastShort(m: String) { Toast.makeText(act, m, Toast.LENGTH_LONG).show() }
+
+    private fun pickFiles(mimes: List<String>, multi: Boolean) {
+        val i = Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE)
+        i.type = "*/*"
+        if (multi) i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        if (mimes.isNotEmpty()) i.putExtra(Intent.EXTRA_MIME_TYPES, mimes.toTypedArray())
+        if (!launch(i) { c, d -> finishPick(pickedUris(c, d)) }) { toastShort("Không mở được bộ chọn tệp"); finishPick(null) }
+    }
+    private fun pickPhotos(multi: Boolean) {
+        val fallback = Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*")
+        if (multi) fallback.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        val done = { c: Int, d: Intent? -> finishPick(pickedUris(c, d)) }
+        if (Build.VERSION.SDK_INT >= 33) {
+            val i = Intent(MediaStore.ACTION_PICK_IMAGES)
+            if (multi) i.putExtra(MediaStore.EXTRA_PICK_IMAGES_MAX, MediaStore.getPickImagesMaxLimit())
+            if (launch(i, done)) return
+        }
+        if (!launch(fallback, done)) { toastShort("Không mở được bộ chọn ảnh"); finishPick(null) }
+    }
+    private fun pickAudioFiles(multi: Boolean) {
+        val i = Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE).setType("audio/*")
+        if (multi) i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        if (!launch(i) { c, d -> finishPick(pickedUris(c, d)) }) { toastShort("Không mở được bộ chọn ghi âm"); finishPick(null) }
+    }
+    private fun takePhoto() {
+        try {
+            val f = File(capDir(), "anh-" + stamp() + ".jpg"); val uri = fileUri(f)
+            val i = Intent(MediaStore.ACTION_IMAGE_CAPTURE).putExtra(MediaStore.EXTRA_OUTPUT, uri)
+                .addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            i.clipData = ClipData.newRawUri("", uri)
+            if (!launch(i) { c, _ -> finishPick(if (c == Activity.RESULT_OK && f.length() > 0) arrayOf(uri) else null) }) { toastShort("Máy không có ứng dụng chụp ảnh"); finishPick(null) }
+        } catch (e: Exception) { toastShort("Không mở được máy ảnh: ${e.message}"); finishPick(null) }
+    }
+    private fun startRecording() {
+        if (act.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) { recordDialog(); return }
+        val lp = launchPerm
+        if (lp == null) { finishPick(null); return }
+        permHandler = { ok -> if (ok) recordDialog() else { toastShort("Cần cho phép ghi âm (Cài đặt → Ứng dụng → Duyên CRM → Quyền) để ghi âm"); finishPick(null) } }
+        lp()
+    }
+    private fun recordDialog() {
+        val f = File(capDir(), "ghi-am-" + stamp() + ".m4a")
+        @Suppress("DEPRECATION")
+        val rec = if (Build.VERSION.SDK_INT >= 31) MediaRecorder(act) else MediaRecorder()
+        try {
+            rec.setAudioSource(MediaRecorder.AudioSource.MIC); rec.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            rec.setAudioEncoder(MediaRecorder.AudioEncoder.AAC); rec.setAudioEncodingBitRate(96000); rec.setAudioSamplingRate(44100)
+            rec.setOutputFile(f.absolutePath); rec.prepare(); rec.start()
+        } catch (e: Exception) { runCatching { rec.release() }; toastShort("Không bắt đầu ghi âm được: ${e.message}"); finishPick(null); return }
+        val tv = TextView(act).apply { text = "● Đang ghi âm…  00:00"; textSize = 20f; setPadding(56, 40, 56, 16) }
+        val t0 = SystemClock.elapsedRealtime(); val h = Handler(Looper.getMainLooper())
+        val tick = object : Runnable { override fun run() { val sec = (SystemClock.elapsedRealtime() - t0) / 1000; tv.text = "● Đang ghi âm…  %02d:%02d".format(sec / 60, sec % 60); h.postDelayed(this, 500) } }
+        h.post(tick)
+        var done = false
+        fun stop(use: Boolean) {
+            if (done) return; done = true; h.removeCallbacks(tick)
+            val ok = try { rec.stop(); true } catch (e: Exception) { false }
+            runCatching { rec.release() }
+            if (use && ok && f.length() > 0) finishPick(arrayOf(fileUri(f))) else { f.delete(); finishPick(null) }
+        }
+        AlertDialog.Builder(act).setTitle("🎙 Ghi âm").setView(tv).setCancelable(false)
+            .setPositiveButton("Dừng & dùng") { _, _ -> stop(true) }.setNegativeButton("Huỷ") { _, _ -> stop(false) }.show()
+    }
+
+    /** Bảng chọn đính kèm theo loại tệp ô tải lên cho phép (accept). Chỉ có 1 lựa chọn thì mở thẳng. */
+    private fun showAttachMenu(p: WebChromeClient.FileChooserParams) {
+        val acc = p.acceptTypes.map { it.trim().lowercase() }.filter { it.isNotEmpty() }
+        val multi = p.mode == WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE
+        val any = acc.isEmpty() || acc.any { it == "*/*" || it == "*" }
+        val mimes = acc.mapNotNull { t -> if (t.contains("/")) t else MimeTypeMap.getSingleton().getMimeTypeFromExtension(t.removePrefix(".")) }.distinct()
+        val wantImg = any || acc.any { it.startsWith("image") }
+        val wantAud = any || acc.any { it.startsWith("audio") }
+        val labels = ArrayList<String>(); val acts = ArrayList<() -> Unit>()
+        if (wantImg) { labels.add("📷  Máy ảnh"); acts.add { takePhoto() }; labels.add("🖼  Ảnh"); acts.add { pickPhotos(multi) } }
+        labels.add("📁  Tệp"); acts.add { pickFiles(if (any) emptyList() else mimes, multi) }
+        if (wantAud) { labels.add("🎙  Ghi âm mới"); acts.add { startRecording() }; labels.add("🎵  Chọn file ghi âm"); acts.add { pickAudioFiles(multi) } }
+        if (acts.size == 1) { acts[0](); return }
+        AlertDialog.Builder(act).setTitle("Thêm vào CRM").setItems(labels.toTypedArray()) { _, i -> acts[i]() }
+            .setNegativeButton("Huỷ") { _, _ -> finishPick(null) }.setOnCancelListener { finishPick(null) }.show()
+    }
+
+    /** Lưu file do trang tạo ra (blob/data) vào bộ nhớ đệm rồi mở bảng chia sẻ để lưu/mở (Excel, Drive, Zalo…). */
+    inner class Bridge {
+        @JavascriptInterface
+        fun report(msg: String) { log(msg.take(600)) }
+
+        @JavascriptInterface
+        fun save(name: String, mime: String, b64: String) {
+            try {
+                val bytes = Base64.decode(b64, Base64.DEFAULT)
+                val safe = name.replace(Regex("[\\\\/:*?\"<>|]"), "_").ifBlank { "file" }
+                val dir = File(act.cacheDir, "dl").also { it.mkdirs() }
+                dir.listFiles()?.forEach { if (System.currentTimeMillis() - it.lastModified() > 86_400_000L) it.delete() }
+                val f = File(dir, safe); f.writeBytes(bytes)
+                val uri = FileProvider.getUriForFile(act, act.packageName + ".files", f)
+                act.runOnUiThread {
+                    val i = Intent(Intent.ACTION_SEND).apply {
+                        type = mime.ifBlank { "application/octet-stream" }
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    Toast.makeText(act, "Đã tạo file $safe — chọn nơi lưu/mở", Toast.LENGTH_LONG).show()
+                    runCatching { act.startActivity(Intent.createChooser(i, "Lưu / mở: $safe")) }
+                }
+            } catch (e: Exception) {
+                act.runOnUiThread { Toast.makeText(act, "Không lưu được file: ${e.message}", Toast.LENGTH_LONG).show() }
+            }
+        }
+    }
+
+    // Móc vào thẻ <a download href="blob:...">.click()/dispatchEvent (cách SheetJS/XLSX.writeFile xuất file) để chuyển file sang app.
+    // SỬA TRANG TRẮNG (21-25/10/2026): CRM đặt `.app{height:calc(100vh - 50px)}`; trang được nạp lúc WebView chưa có kích thước (chưa gắn lên màn hình) nên
+    // đơn vị vh bị kẹt = 0 -> .app/.main cao 0, nội dung trắng (quét trang: `.app [0,50 411x0]` dù innerHeight=410..722). Ép chiều cao theo innerHeight THẬT và cập nhật khi đổi kích thước.
+    private val vhFixJs = """
+(function(){
+  if (window.__vhFix) { window.__vhFixRun && window.__vhFixRun(); return; } window.__vhFix = 1;
+  var st = document.createElement('style'); st.id = '__vhfix'; document.head.appendChild(st);
+  function run(){ var h = window.innerHeight; if (!h || h < 120) return;
+    st.textContent = '.app{height:' + (h - 50) + 'px!important}body.rpt-mode .app{height:' + h + 'px!important}'; }
+  window.__vhFixRun = run; run();
+  window.addEventListener('resize', run); window.addEventListener('orientationchange', run);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', run);
+  setTimeout(run, 500); setTimeout(run, 1500); setTimeout(run, 4000);
+})();
+"""
+
+    // QUÉT TRANG (chẩn đoán): kích thước, phần tử đang nằm ở giữa màn hình (phát hiện lớp phủ trắng/loading), phần tử phủ lớn, các thẻ con của body.
+    private val probeJs = """
+(function(){
+  function d(e){ if(!e) return 'null'; var r=e.getBoundingClientRect(); var cs=getComputedStyle(e);
+    return e.tagName+'#'+e.id+'.'+String(e.className && e.className.baseVal === undefined ? e.className : '').slice(0,50)+' ['+Math.round(r.left)+','+Math.round(r.top)+' '+Math.round(r.width)+'x'+Math.round(r.height)+'] disp='+cs.display+' pos='+cs.position+' z='+cs.zIndex+' bg='+cs.backgroundColor+' op='+cs.opacity+' vis='+cs.visibility; }
+  var w=innerWidth,h=innerHeight,o=[];
+  o.push('viewport '+w+'x'+h+' dpr='+devicePixelRatio+' scrollW='+document.documentElement.scrollWidth+' scrollH='+document.documentElement.scrollHeight);
+  o.push('online='+navigator.onLine+' chữ-trong-trang='+document.body.innerText.length+' số-phần-tử='+document.getElementsByTagName('*').length);
+  [[w/2,h*0.35],[w/2,h*0.65],[30,h*0.5]].forEach(function(p){ o.push('tại ('+Math.round(p[0])+','+Math.round(p[1])+'): '+d(document.elementFromPoint(p[0],p[1]))); });
+  var cover=[]; document.querySelectorAll('body *').forEach(function(e){ var cs=getComputedStyle(e);
+    if((cs.position==='fixed'||cs.position==='absolute')&&cs.display!=='none'&&cs.visibility!=='hidden'){ var r=e.getBoundingClientRect(); if(r.width>w*0.6&&r.height>h*0.4) cover.push(d(e)); } });
+  o.push('phủ lớn: '+(cover.length ? '\n  '+cover.slice(0,5).join('\n  ') : 'không'));
+  o.push('html.class='+document.documentElement.className+' | body.class='+document.body.className);
+  o.push('HTML '+d(document.documentElement)); o.push('BODY '+d(document.body));
+  var vis=[].slice.call(document.body.children).filter(function(e){ return e.tagName!=='SCRIPT'&&e.tagName!=='STYLE'&&getComputedStyle(e).display!=='none'; });
+  vis.slice(0,10).forEach(function(e){ o.push('body> '+d(e)+' con='+e.children.length+' chữ='+(e.innerText||'').length); });
+  var app=document.querySelector('.app');
+  if(app){ o.push('APP con='+app.children.length); [].slice.call(app.children).slice(0,8).forEach(function(e){ o.push('  app> '+d(e)+' con='+e.children.length+' chữ='+(e.innerText||'').length); }); }
+  var dv=document.getElementById('data-view');
+  if(dv){ o.push('DATA-VIEW '+d(dv)+' con='+dv.children.length); [].slice.call(dv.children).slice(0,10).forEach(function(e){ o.push('  dv> '+d(e)+' chữ='+(e.innerText||'').length); }); }
+  return o.join('\n');
+})()
+"""
+
+    /** KIỂM TRA KẾT NỐI DỮ LIỆU: tải đúng URL danh sách khách của CRM (a) trực tiếp từ app, (b) từ trong trang — để biết lỗi do mạng/Worker hay do WebView. */
+    fun netTest() {
+        val base = "https://duyen-crm-cache.duyenhoang91-tl.workers.dev"
+        val url = "$base/?action=customers&src=web"
+        log("KIỂM TRA KẾT NỐI: đang tải $url …")
+        kotlin.concurrent.thread {
+            val t0 = System.currentTimeMillis()
+            try {
+                val c = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+                c.connectTimeout = 20000; c.readTimeout = 120000; c.requestMethod = "GET"
+                val code = c.responseCode
+                val hdr = "cache=" + c.getHeaderField("x-crm-cache") + " len=" + c.getHeaderField("Content-Length") + " enc=" + c.getHeaderField("Content-Encoding") + " type=" + c.getHeaderField("Content-Type")
+                var n = 0L
+                (if (code < 400) c.inputStream else c.errorStream)?.use { ins -> val buf = ByteArray(65536); while (true) { val r = ins.read(buf); if (r < 0) break; n += r } }
+                log("APP→CRM: HTTP $code, $n byte, ${System.currentTimeMillis() - t0}ms, $hdr")
+            } catch (e: Exception) { log("APP→CRM LỖI sau ${System.currentTimeMillis() - t0}ms: ${e.javaClass.simpleName}: ${e.message}") }
+        }
+        act.runOnUiThread {
+            web.evaluateJavascript("""
+(function(){ var t=Date.now(); fetch('$url').then(function(r){ return r.text().then(function(x){ AndroidDl.report('TRONG TRANG: HTTP '+r.status+', '+x.length+' ký tự, '+(Date.now()-t)+'ms'); }); })
+ .catch(function(e){ AndroidDl.report('TRONG TRANG LỖI sau '+(Date.now()-t)+'ms: '+(e&&e.message)); }); })()
+""", null)
+        }
+    }
+
+    // TỰ THỬ LẠI NẠP DỮ LIỆU: nếu 30 giây sau khi tải trang mà CRM vẫn ở màn hình "chưa có dữ liệu" (lần đồng bộ đầu bị ngắt mạng, vd ERR_CONNECTION_ABORTED trên máy Asus),
+    // gọi lại đúng hàm đồng bộ của CRM một lần. Không làm gì nếu CRM đã có dữ liệu hoặc đang ở màn hình đăng nhập.
+    private val retryJs = """
+(function(){
+  try {
+    var ev = document.getElementById('empty-view'), dv = document.getElementById('data-view'), lg = document.getElementById('login-overlay');
+    if (lg && lg.classList.contains('show')) return 'đang đăng nhập';
+    if (ev && dv && getComputedStyle(ev).display !== 'none' && getComputedStyle(dv).display === 'none' && typeof syncFromGS === 'function') { syncFromGS({ manual: true }); return 'đã gọi lại đồng bộ'; }
+    return 'không cần';
+  } catch (e) { return 'lỗi ' + e.message; }
+})()
+"""
+
+    private fun probeDecode(raw: String?): String = try { org.json.JSONTokener(raw ?: "null").nextValue()?.toString() ?: "(rỗng)" } catch (e: Exception) { raw ?: "(lỗi đọc)" }
+    fun probe() { web.evaluateJavascript(probeJs) { r -> log("QUÉT TRANG:\n" + probeDecode(r)) } }
+
+    private val hookJs = """
+(function(){
+  if (window.__dlHook) return; window.__dlHook = 1;
+  function grab(a){
+    var name = a.getAttribute('download') || 'file';
+    fetch(a.href).then(function(r){ return r.blob(); }).then(function(b){
+      var fr = new FileReader();
+      fr.onload = function(){ AndroidDl.save(name, b.type || 'application/octet-stream', String(fr.result).split(',')[1] || ''); };
+      fr.readAsDataURL(b);
+    });
+  }
+  function isDl(a){ return a && a.hasAttribute && a.hasAttribute('download') && /^(blob:|data:)/.test(a.href); }
+  var of = window.fetch;
+  if (of) window.fetch = function(u, o){ var t = Date.now(), name = String(u && u.url ? u.url : u).slice(0, 140);
+    return of.apply(this, arguments).then(function(r){ if (!r.ok) AndroidDl.report('FETCH ' + r.status + ' (' + (Date.now()-t) + 'ms): ' + name); return r; },
+      function(e){ AndroidDl.report('FETCH LỖI ' + (e && e.message) + ' sau ' + (Date.now()-t) + 'ms: ' + name); throw e; }); };
+  var oc = HTMLAnchorElement.prototype.click;
+  HTMLAnchorElement.prototype.click = function(){ if (isDl(this)) { grab(this); return; } return oc.apply(this, arguments); };
+  var od = HTMLAnchorElement.prototype.dispatchEvent;
+  HTMLAnchorElement.prototype.dispatchEvent = function(e){ if (e && e.type === 'click' && isDl(this)) { grab(this); return true; } return od.apply(this, arguments); };
+  document.addEventListener('click', function(e){
+    var a = e.target && e.target.closest ? e.target.closest('a[download]') : null;
+    if (isDl(a)) { e.preventDefault(); grab(a); }
+  }, true);
+})();
+"""
+
+    val web: WebView = WebView(act).apply {
+        settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            databaseEnabled = true
+            useWideViewPort = true
+            loadWithOverviewMode = true
+            setSupportZoom(true); builtInZoomControls = true; displayZoomControls = false
+            javaScriptCanOpenWindowsAutomatically = false
+            mediaPlaybackRequiresUserGesture = true
+            cacheMode = WebSettings.LOAD_DEFAULT
+            userAgentString = userAgentString + " DuyenCRM-Android/1.9"
+        }
+        WebView.setWebContentsDebuggingEnabled(true)   // chrome://inspect trên máy tính khi cần soi sâu
+        addJavascriptInterface(Bridge(), "AndroidDl")
+        webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                val u = request.url
+                val scheme = u.scheme.orEmpty()
+                if (scheme == "blob" || scheme == "data" || scheme == "about" || scheme == "javascript") return false
+                if ((scheme == "http" || scheme == "https") && u.host == Uri.parse(home()).host) return false
+                // tel:, zalo:, mailto:, link web khác… -> mở bằng app tương ứng
+                runCatching { act.startActivity(Intent(Intent.ACTION_VIEW, u)) }
+                return true
+            }
+            override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) { this@CrmWeb.error = null }
+            override fun onPageCommitVisible(view: WebView, url: String?) { view.evaluateJavascript(vhFixJs, null) }
+            override fun onPageFinished(view: WebView, url: String?) {
+                view.evaluateJavascript(hookJs, null); view.evaluateJavascript(vhFixJs, null); this@CrmWeb.canBack = view.canGoBack()
+                view.postDelayed({ detectName() }, 2500); view.postDelayed({ detectName() }, 12000)   // đăng nhập xong mới có tên → thử 2 lần
+                view.postDelayed({ probe() }, 7000)   // 7 giây sau khi tải: tự quét trang để biết vì sao trắng
+                view.postDelayed({ view.evaluateJavascript(retryJs) { r -> val m = probeDecode(r); if (!m.contains("không cần")) log("TỰ THỬ LẠI (30 giây): $m") } }, 30000)
+            }
+            override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) { this@CrmWeb.canBack = view.canGoBack() }
+            override fun onReceivedError(view: WebView, request: WebResourceRequest, e: WebResourceError) {
+                if (request.isForMainFrame) this@CrmWeb.error = "Không tải được CRM (${e.description}). Kiểm tra mạng rồi bấm Tải lại."
+                this@CrmWeb.log("MẠNG ${e.description}: ${safeUrl(request.url.toString())}")
+            }
+            override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, r: WebResourceResponse) {
+                this@CrmWeb.log("HTTP ${r.statusCode}: ${safeUrl(request.url.toString())}")
+            }
+            override fun onRenderProcessGone(view: WebView, d: RenderProcessGoneDetail): Boolean {
+                this@CrmWeb.log("WebView bị dừng (hết bộ nhớ/lỗi: crash=${d.didCrash()}). Mở lại app.")
+                this@CrmWeb.error = "Trình duyệt web của máy bị dừng. Đóng app rồi mở lại."
+                return true
+            }
+        }
+        webChromeClient = object : WebChromeClient() {
+            override fun onProgressChanged(view: WebView, newProgress: Int) { this@CrmWeb.progress = newProgress }
+            override fun onConsoleMessage(m: ConsoleMessage): Boolean {
+                if (m.messageLevel() == ConsoleMessage.MessageLevel.ERROR) this@CrmWeb.log("JS: ${m.message()} (${m.sourceId().substringAfterLast('/')}:${m.lineNumber()})")
+                return true
+            }
+            override fun onShowFileChooser(w: WebView, cb: ValueCallback<Array<Uri>>, p: FileChooserParams): Boolean {
+                fileCb?.onReceiveValue(null); fileCb = cb
+                if (launchChooser == null) { fileCb = null; return false }
+                showAttachMenu(p)
+                return true
+            }
+            override fun onJsAlert(v: WebView, url: String?, message: String?, r: JsResult): Boolean {
+                AlertDialog.Builder(act).setMessage(message).setCancelable(false).setPositiveButton("OK") { _, _ -> r.confirm() }.show(); return true
+            }
+            override fun onJsConfirm(v: WebView, url: String?, message: String?, r: JsResult): Boolean {
+                AlertDialog.Builder(act).setMessage(message).setCancelable(false)
+                    .setPositiveButton("OK") { _, _ -> r.confirm() }.setNegativeButton("Huỷ") { _, _ -> r.cancel() }.show(); return true
+            }
+            override fun onJsPrompt(v: WebView, url: String?, message: String?, def: String?, r: JsPromptResult): Boolean {
+                val et = EditText(act); et.setText(def.orEmpty())
+                AlertDialog.Builder(act).setMessage(message).setView(et).setCancelable(false)
+                    .setPositiveButton("OK") { _, _ -> r.confirm(et.text.toString()) }.setNegativeButton("Huỷ") { _, _ -> r.cancel() }.show(); return true
+            }
+        }
+    }
+}
+
+@Composable
+fun CrmWebScreen(crm: CrmWeb) {
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { crm.onChooserResult(it.resultCode, it.data) }
+    val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { crm.onPermResult(it) }
+    DisposableEffect(Unit) { crm.launchChooser = { launcher.launch(it) }; crm.launchPerm = { permLauncher.launch(Manifest.permission.RECORD_AUDIO) }; onDispose { } }
+    BackHandler(enabled = crm.canBack) { crm.web.goBack() }
+    var showLog by remember { mutableStateOf(false) }
+    if (showLog) {
+        val text = crm.info() + "\n\n" + crm.logs.joinToString("\n")
+        AlertDialog(onDismissRequest = { showLog = false }, title = { Text("Chẩn đoán trang CRM") },
+            text = { Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
+                TextButton({ crm.probe() }) { Text("🔍 Quét lại trang") }
+                TextButton({ crm.netTest() }) { Text("🌐 Kiểm tra kết nối dữ liệu") }
+                Text(text, style = MaterialTheme.typography.bodySmall)
+            } },
+            confirmButton = {
+                val ctx = androidx.compose.ui.platform.LocalContext.current
+                TextButton({
+                    (ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("chuan-doan", text))
+                    Toast.makeText(ctx, "Đã sao chép — dán gửi cho người hỗ trợ", Toast.LENGTH_SHORT).show()
+                }) { Text("Sao chép") }
+            },
+            dismissButton = { TextButton({ crm.logs.clear(); showLog = false }) { Text("Xoá & đóng") } })
+    }
+    Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Duyên CRM", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+            if (crm.logs.isNotEmpty()) TextButton({ showLog = true }) { Text("⚠ ${crm.logs.size} lỗi") }
+            TextButton({ crm.error = null; crm.web.reload() }) { Text("↻ Tải lại") }
+        }
+        if (crm.progress in 1..99) LinearProgressIndicator(progress = { crm.progress / 100f }, modifier = Modifier.fillMaxWidth())
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            AndroidView(factory = { crm.web.also { (it.parent as? ViewGroup)?.removeView(it) } }, modifier = Modifier.fillMaxSize())
+            crm.error?.let { msg ->
+                Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(msg)
+                    Button({ crm.load() }, Modifier.padding(top = 12.dp)) { Text("Tải lại") }
+                }
+            }
+        }
+    }
+}

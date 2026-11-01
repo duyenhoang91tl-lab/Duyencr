@@ -23,6 +23,10 @@ function boot(dir) {
   const ka = Object.keys(a.g), kb = Object.keys(b.g);
   const miss = ka.filter(k => !(k in b.g)), extra = kb.filter(k => !(k in a.g)), diff = ka.filter(k => k in b.g && a.g[k] !== b.g[k]);
   console.log('toàn cục gốc/dist:', ka.length, kb.length, '| thiếu:', miss.length, '| thừa:', extra.length, '| khác kiểu/số tham số:', diff.length);
+  // Lỗi cú pháp toàn cục (vd 'Identifier ... has already been declared' do 2 file js khai báo trùng tên let/function) làm CẢ FILE js không chạy được —
+  // các lỗi khác (jsdom thiếu API) là bình thường nên chỉ chặn đúng loại này.
+  const syn = a.errs.concat(b.errs).filter(m => /SyntaxError|has already been declared/i.test(m));
+  if (syn.length) { console.error('LỖI CÚ PHÁP khi nạp trang:', syn.join(' | ')); process.exit(1); }
   console.log('lỗi chạy gốc:', a.errs.length, '| dist:', b.errs.length, '| splash còn:', a.splash, b.splash);
   if (miss.length) console.log('THIẾU', miss.slice(0, 20)); if (diff.length) console.log('KHÁC', diff.slice(0, 20).map(k => k + ' ' + a.g[k] + '->' + b.g[k]));
   if (JSON.stringify(a.errs) !== JSON.stringify(b.errs)) { console.log('LỖI KHÁC\n gốc:', a.errs, '\n dist:', b.errs); process.exit(1); }

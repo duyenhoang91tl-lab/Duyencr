@@ -112,7 +112,7 @@ function updateSchedBadges() {
 
 function _maybeRefreshOpenDp() {
   const ov = document.getElementById('dp-overlay');
-  if (!ov || !ov.classList.contains('open') || !currentPhone) return;
+  if (!ov || !(ov.classList.contains('open') || window._scDocked) || !currentPhone) return;   // _scDocked: hồ sơ gắn cạnh chat Social cũng phải tự cập nhật khi dữ liệu đổi
   if (_dpDirty) {
     // Đang gõ dở → không ghi đè, chỉ báo nhẹ để người dùng chủ động tải lại
     const body = document.getElementById('dp-body');
@@ -131,6 +131,8 @@ function _maybeRefreshOpenDp() {
 }
 
 function openDp(phone) {
+  // Mở hồ sơ từ nơi khác (Danh sách KH...) khi ngăn đang gắn cạnh khung chat Social > Chat -> trả ngăn về dạng trượt từ phải trước (js/42 _scUndock).
+  if (window._scDocked && !window._scDockOpening && typeof _scUndock === 'function') _scUndock();
   if (typeof _dpAutoFlush_ === 'function') _dpAutoFlush_(true);   // lưu nốt KH đang mở (nếu còn thay đổi chờ lưu) TRƯỚC khi đổi sang KH khác
   currentPhone = phone;
   _dpDirty = false;
@@ -150,7 +152,7 @@ function openDp(phone) {
     ${zaloBadge(c.zaloStatus)}
     ${custStatusBadge((careData[c.phone]||{}).khStatus||'')}${cfBadges(c.phone)}`;
   renderDpTab('care');
-  document.getElementById('dp-overlay').classList.add('open');
+  if (!window._scDockOpening) document.getElementById('dp-overlay').classList.add('open');   // gắn cạnh chat thì không bật lớp phủ mờ
 }
 
 function renderDpTab(tab) {
@@ -165,9 +167,10 @@ function renderDpTab(tab) {
   else if (tab==='schedule') body.innerHTML = renderSchedTabHtml(c);
   else if (tab==='history') { body.innerHTML = renderHistTab(c); _initHistExpand(); }
   else if (tab==='chat' && typeof renderPkChatTab === 'function') body.innerHTML = renderPkChatTab(c);
+  else if (tab==='discuss' && typeof renderKhdTab === 'function') body.innerHTML = renderKhdTab(c);   // thảo luận nội bộ (js/49)
   else body.innerHTML = renderInfoTab(c);
   // Đồng bộ highlight tab (KH mới luôn render lại đúng nội dung, không còn dính dữ liệu KH trước)
-  const _order = ['care','schedule','history','info','chat'];
+  const _order = ['care','schedule','history','info','chat','discuss'];
   document.querySelectorAll('.dp-tab').forEach((t,i)=>t.classList.toggle('active', _order[i]===tab));
 }
 
@@ -185,12 +188,22 @@ function switchDpTab(tab, el) {
   else if (tab==='schedule') body.innerHTML = renderSchedTabHtml(c);
   else if (tab==='history') { body.innerHTML = renderHistTab(c); _initHistExpand(); }
   else if (tab==='chat' && typeof renderPkChatTab === 'function') body.innerHTML = renderPkChatTab(c);
+  else if (tab==='discuss' && typeof renderKhdTab === 'function') body.innerHTML = renderKhdTab(c);   // thảo luận nội bộ (js/49)
   else body.innerHTML = renderInfoTab(c);
 }
 
+function _csPickList_(customers, teamsArr, isAdmin){
+  const set = new Set();
+  (customers || []).forEach(x => (x.orders || []).forEach(o => { if (o && o.cs) set.add(String(o.cs).trim()); }));
+  if (isAdmin) (teamsArr || []).forEach(t => { [t && t.leader].concat((t && t.members) || []).forEach(n => { n = String(n || '').trim(); if (n) set.add(n); }); });
+  set.delete('');
+  return [...set].sort();
+}
 function renderCareTab(c) {
   const care = careData[c.phone] || {};
-  const allCS = [...new Set(allCustomers.flatMap(x=>x.orders.map(o=>o.cs)).filter(Boolean))].sort();
+  // Danh sách CS để chọn: CS đã có trong đơn + (admin) mọi thành viên/trưởng nhóm các Team. NGUYÊN NHÂN GỐC thêm: trước đây chỉ lấy CS xuất hiện trong ĐƠN
+  // nên CS mới (chưa có đơn nào) không chọn được -> admin không chia được KH cho họ ở hồ sơ khách.
+  const allCS = _csPickList_(allCustomers, (typeof teams !== 'undefined' ? teams : []), (typeof currentUser === 'undefined' || !currentUser || currentUser.role === 'admin'))   // cùng quy ước admin với nút Xóa đơn bên dưới;
   const today = _ymd(new Date());
   // MENU gập (yêu cầu Duyên 2026-10-11): "Thông tin chăm sóc" + "Lịch chăm sóc nhanh" là 2 mục của 1 menu, chỉ mở 1 mục một lúc (dpAccToggle)
   const _schedCnt = [care.schedGoi, care.schedSP, care.schedCS, care.schedHen].filter(Boolean).length;
@@ -213,6 +226,9 @@ function renderCareTab(c) {
         </label>
         <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;cursor:pointer;color:#b91c1c" title="Tích khi khách yêu cầu không nhận tin quảng bá. Mọi chiến dịch gửi hàng loạt và hỏi thăm tự động sẽ BỎ khách này (chặn ở máy chủ).">
           <input type="checkbox" id="cs-nopromo" ${((care.custom||c.custom||{}).noPromo)?'checked':''}> 🚫 Không nhận quảng bá
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px">⭐ Kênh ưu tiên
+          <select id="cs-prefchannel" style="padding:3px 6px;border:1px solid var(--border);border-radius:6px"><option value="">— chưa chọn —</option>${(typeof PRO_PREF_CHANNELS!=='undefined'?PRO_PREF_CHANNELS:[]).map(x=>`<option value="${x.v}" ${((care.custom||c.custom||{}).prefChannel===x.v)?'selected':''}>${x.t}</option>`).join('')}</select>
         </label>
       </div>
     </div>
@@ -466,7 +482,7 @@ function _renderPosHistoryHtml_(c, rows) {
   const total = rows.reduce(function(sum, o){ return sum + (Number(o.revenue) || 0); }, 0);
   const fmtD = function(iso){ const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? (m[3] + '/' + m[2] + '/' + m[1]) : '—'; };
   return `<div class="dp-stitle">Lịch sử đặt hàng · Pos (${rows.length} đơn — ${fmtVND(total)})</div>
-    <div style="font-size:11px;color:var(--hint);margin:-2px 0 8px">Khách đã có đơn trên Pos nên lịch sử lấy theo Pos (chuẩn); các đơn Base đã nằm trong Pos nên không hiển thị lại.</div>
+    <div class="guide-text" style="font-size:11px;color:var(--hint);margin:-2px 0 8px">Khách đã có đơn trên Pos nên lịch sử lấy theo Pos (chuẩn); các đơn Base đã nằm trong Pos nên không hiển thị lại.</div>
     ${rows.slice(0,60).map(function(o){
       return `<div class="hist-item" style="border-left:3px solid var(--blue,#2563eb);padding-left:8px">
         <div class="hist-top"><span class="hist-date">${fmtD(o.date)}</span><span class="hist-price">${fmtVND(o.revenue)}</span></div>
@@ -977,6 +993,9 @@ function saveCare(phone, opts) {
   if (_zrEl) { if (_zrEl.checked) newCustom.zaloReply = true; else delete newCustom.zaloReply; }   // bỏ tích = xoá khoá (không lưu false)
   const _npEl = document.getElementById('cs-nopromo');
   if (_npEl) { if (_npEl.checked) newCustom.noPromo = true; else delete newCustom.noPromo; }   // bỏ tích = xoá khoá
+  const _pcEl = document.getElementById('cs-prefchannel');
+  if (_pcEl) { if (_pcEl.value) newCustom.prefChannel = _pcEl.value; else delete newCustom.prefChannel; }
+  if (((existing.custom||{}).prefChannel||'') !== (newCustom.prefChannel||'')) logAudit('status', phone, 'Kênh ưu tiên: '+((existing.custom||{}).prefChannel||'—'), 'Kênh ưu tiên: '+(newCustom.prefChannel||'—'));
   if (!!(existing.custom||{}).noPromo !== !!newCustom.noPromo) logAudit('status', phone, 'Quảng bá: '+((existing.custom||{}).noPromo?'Không nhận':'Nhận'), 'Quảng bá: '+(newCustom.noPromo?'Không nhận':'Nhận'));
   if (!!(existing.custom||{}).zaloReply !== !!newCustom.zaloReply) logAudit('status', phone, 'Phản hồi Zalo: '+((existing.custom||{}).zaloReply?'Có':'Chưa'), 'Phản hồi Zalo: '+(newCustom.zaloReply?'Có':'Chưa'));
   // V9 audit: ghi lại thay đổi trạng thái / CS / Zalo
@@ -1171,7 +1190,7 @@ function openNickZaloModal(phone) {
             '<button class="close-btn" onclick="closeNickZaloModal()">✕</button>' +
           '</div>' +
           '<div class="nz-modal-body">' +
-            '<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Tạo danh sách tên Nick Zalo dùng chung. CS chọn nick phù hợp khi chăm sóc từng khách.</div>' +
+            '<div class="guide-text" style="font-size:11px;color:var(--muted);margin-bottom:10px">Tạo danh sách tên Nick Zalo dùng chung. CS chọn nick phù hợp khi chăm sóc từng khách.</div>' +
             '<div class="nz-add-row">' +
               '<input class="nz-add-input" id="nz-new-input" placeholder="Nhập tên nick (vd: Zalo 1 Diệp...)" onkeydown="if(event.key===\'Enter\')addNickZaloToList()">' +
               '<button class="nz-add-confirm" onclick="addNickZaloToList()">+ Thêm</button>' +

@@ -1,0 +1,31 @@
+// Test: doanh thu theo Sale LOAI kenh "Facebook" (gas _srKenhExcluded_/_srSaleRevExKenh_). Chay: node tools/test-sale-rev-nofb.js
+const fs = require('fs'), vm = require('vm');
+const src = fs.readFileSync(__dirname + '/../gas_v13.js', 'utf8');
+function grab(name) { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('khong thay ' + name); let d = 0, j = src.indexOf('{', i);
+  for (let k = j; k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}') { d--; if (d === 0) return src.slice(i, k + 1); } } }
+const strip = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
+const ctx = { _stripVN_: strip, splitMulti_: (s, sep) => String(s || '').split(sep).map(x => x.trim()).filter(Boolean), _isNumericTag_: s => /^\d+$/.test(String(s).trim()), _dtOrderRevenue_: m => m.rev };
+vm.createContext(ctx); vm.runInContext("var SALE_REV_EXCLUDE_KENH_ = ['facebook'];" + grab('_srKenhExcluded_') + grab('_srSaleRevExKenh_'), ctx);
+let fail = 0; const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) fail++; };
+const X = vm.runInContext('_srKenhExcluded_', ctx), F = vm.runInContext('_srSaleRevExKenh_', ctx);
+ok(X('Facebook') && X('facebook') && X('FACEBOOK') && X('  Facebook  ') && X('Face​book'.replace('​', '')), 'kenh dung chu "Facebook" (khong phan biet hoa/thuong, thua khoang trang) bi loai');
+ok(!X('Facebook Phạm Thu Hiền') && !X('Facebook Thu Hien') && !X('Page Facebook') && !X('Zalo') && !X('') && !X(null), 'ten khac chi chua chu facebook (vd "Facebook Phạm Thu Hiền") KHONG bi loai; Zalo/rong khong loai');
+const o = (kenh, sale, rev, extra) => Object.assign({ kenhBan: kenh, saleBan: sale, rev, giaTriCoc: 0, nguoiTao: 'Tao1' }, extra || {});
+const all = () => true;
+let r = F([o('Facebook', 'A', 1000), o('Facebook Phạm Thu Hiền', 'A', 500), o('Zalo', 'A, B', 400), o('Facebook', 'B', 300)], false, all, '(chua)');
+ok(r.rows.length === 2 && r.rows[0].name === 'A' && r.rows[0].giaTri === 700 && r.rows[0].orders === 2 && r.rows[1].name === 'B' && r.rows[1].giaTri === 200 && r.rows[1].orders === 1, 'A: 500 (FB Pham Thu Hien giu) + 200 (1/2 don Zalo) = 700 / 2 don; B: 200 / 1 don; don Facebook loai');
+ok(r.excludedOrders === 2 && r.excludedRevenue === 1300 && r.keptOrders === 2 && r.keptRevenue === 900, 'tong: loai 2 don 1.300; giu 2 don 900 (tong dung 2.200 = 1.300 + 900)');
+ok(r.rows[0].trungBinhDon === 350, 'TB don = giaTri / so don (700/2)');
+r = F([o('Zalo', 'A, B, C', 900), o('Zalo', 'A', 100)], false, all, '(chua)');
+ok(r.rows.find(x => x.name === 'A').giaTri === 400 && r.rows.find(x => x.name === 'B').giaTri === 300 && r.rows.find(x => x.name === 'A').orders === 2, 'chia deu N sale/don, so don giu nguyen (giong bang Theo Sale ban)');
+r = F([o('Zalo', 'A, 12', 600)], false, all, '(chua)');
+ok(r.rows.length === 1 && r.rows[0].giaTri === 600 && r.rows[0].name === 'A', 'STT Pancake (so) bi bo, khong chia cho "12"');
+r = F([o('Zalo', '', 250)], false, all, '(chua gan sale)');
+ok(r.rows[0].name === '(chua gan sale)' && r.rows[0].giaTri === 250, 'don khong co sale -> (chua gan sale)');
+r = F([o('Zalo', 'A, B', 1000), o('Facebook', 'A', 700)], false, n => n === 'A', '(chua)');
+ok(r.rows.length === 1 && r.rows[0].name === 'A' && r.rows[0].giaTri === 500 && r.excludedRevenue === 700, 'dang loc Sale A: chi liet ke A, tien chia van theo tong sale tren don (1000/2), khong dem phan cua B');
+r = F([o('Zalo', 'A, B', 1000, { nguoiTao: 'Tao1' }), o('Facebook', 'A', 700, { nguoiTao: 'Tao2' })], true, all, '(chua)');
+ok(r.rows.length === 1 && r.rows[0].name === 'Tao1' && r.rows[0].giaTri === 1000 && r.excludedRevenue === 700, 'che do tinh theo nguoi tao: tron ven cho nguoi tao, van loai kenh Facebook');
+r = F([o('Facebook', 'A', 100)], false, all, 'x'); ok(r.rows.length === 0 && r.keptOrders === 0 && r.excludedOrders === 1, 'toan don Facebook -> bang rong, khong loi');
+ok(/bySaleNoFb: saleRevNoFb_\.rows/.test(src) && /_srSaleRevExKenh_\(matched, byCreator, wantSaleA_, UNASSIGNED\)/.test(src), 'buildSalesReportA_ tra bySaleNoFb + noFb');
+process.exit(fail ? 1 : 0);

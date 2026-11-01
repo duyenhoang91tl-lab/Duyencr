@@ -1,0 +1,63 @@
+{
+  "_doc": "QUY TAC SONG SONG (docs/crm-kb/08-extension-parity.md): action GAS dung o CA Zalo AI va Pancake AI thi khong can ghi o day. Action chi o MOT ben PHAI co dong o day: 'platform' = dac thu nen tang (co ly do), 'gap' = ben kia CHUA co, can Duyen chot co lam khong. tools/check-ext-parity.js bao LOI khi co action lech ma chua ghi o day. LUU Y: script chi thay lech o muc ACTION GAS; lech trong NOI DUNG phan hoi (vd Pancake AI hien anh san pham kem goi y tra loi) khong bi bat — theo doi bang tay o docs/crm-kb/08-extension-parity.md muc 'Lech khong do duoc bang script'.",
+  "onlyZalo": {
+    "broadcastQueue": {
+      "status": "platform",
+      "note": "Gui hang loat qua ban be Zalo — Pancake khong co kenh nay"
+    },
+    "broadcastMark": {
+      "status": "platform",
+      "note": "Danh dau tien do chien dich gui hang loat Zalo"
+    },
+    "syncZaloFriendStatus": {
+      "status": "platform",
+      "note": "Trang thai ket ban Zalo (cot zalo CareData) — chi co o Zalo"
+    },
+    "count": {
+      "status": "platform",
+      "note": "Chi dung de chan doan loi \"Unknown action\" khi dong bo trang thai ket ban Zalo (syncZaloFriendStatus) — tinh nang chi co o Zalo, Pancake khong co cho nao can"
+    }
+  },
+  "onlyPancake": {
+    "webLogin": {"status": "gap", "note": "Duyet mau tin ngay tren Pancake AI (2026-10-15, Duyen yeu cau rieng cho Pancake AI: admin dang nhap CRM o Cai dat extension, thong bao + nut Duyet/Tu choi tren Pancake). Zalo AI chua co - cho Duyen chot co lam khong (docs/crm-kb/04-extension-pancake.md)"},
+    "tplPending": {"status": "gap", "note": "Danh sach mau cho duyet cho extension Pancake AI (xem webLogin)"},
+    "approveMessageTemplate": {"status": "gap", "note": "Duyet/tu choi mau tin tu extension Pancake AI (xem webLogin)"},
+    "scanBanned": {"status": "gap", "note": "Nut \"Quet tu cam\" truoc khi gui (2026-10-21, Duyen yeu cau rieng cho Pancake AI); Zalo AI chua co — cho Duyen chot co lam khong (docs/crm-kb/04-extension-pancake.md)"},
+    "saveCannedResponse": {
+      "status": "platform",
+      "note": "Cau tra loi nhanh (canned) la tinh nang cua nen tang Pancake"
+    },
+    "deleteCannedResponse": {
+      "status": "platform",
+      "note": "nt"
+    },
+    "verifyLogin": {
+      "status": "gap",
+      "note": "Pancake co dang nhap xac minh nhan vien; Zalo chua — doi chieu voi docs/SECURITY-PLAN.md"
+    },
+    "assign": {
+      "status": "gap",
+      "note": "Pancake co giao/nhan viec (assign); Zalo chua"
+    },
+    "toggleAssignDone": {
+      "status": "gap",
+      "note": "Pancake danh dau viec xong; Zalo chua"
+    },
+    "getSettings": {
+      "status": "gap",
+      "note": "U3d: nut Ap CT tu dong trong gio hang Pancake AI doc promoConfig — Zalo AI chua co gio hang/Soan don, lam bu cung U6a-2 (docs/ROADMAP-CRM-UPDATE.md)"
+    },
+    "getKnowledge": {
+      "status": "gap",
+      "note": "Kien thuc san pham — Zalo chua doc truc tiep"
+    },
+    "priceCatalogTree": {
+      "status": "legacy",
+      "note": "Handler GET_PRICE_TREE o pancake-background.js KHONG con noi nao gui (content.js dung priceCatalogFlat) — ma cu, khong can lam bu"
+    },
+    "donOrdersByPhone": {
+      "status": "gap",
+      "note": "Tra don theo SDT — Zalo chua dung action nay"
+    }
+  }
+}

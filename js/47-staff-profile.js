@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════
-//  HỒ SƠ NHÂN VIÊN — hộp thoại: nhân viên tự cập nhật họ tên / SĐT / email / link Facebook;
+//  HỒ SƠ NHÂN VIÊN — MÀN HÌNH ĐẦY ĐỦ (không phải hộp thoại nhỏ; nút ← Quay lại): nhân viên tự cập nhật họ tên / SĐT / email / link Facebook;
 //  admin sửa hộ; quản lý + leader xem hồ sơ kèm tổng quan kết quả làm việc theo kỳ.
 //  Backend: gas/28_StaffProfile.gs (action profileGet / profileSave / staffOverview) — SERVER kiểm quyền thật; client chỉ ẩn/hiện.
 //  Token phiên do bộ bọc fetch ở js/06 tự gắn. Số đơn/doanh thu/hoa hồng/thưởng/Pancake/xếp hạng do server tính (cùng nguồn báo cáo);
@@ -51,9 +51,8 @@
   function ensure(){
     var ov = document.getElementById('sp-overlay'); if (ov) return ov;
     ov = document.createElement('div'); ov.id = 'sp-overlay'; ov.className = 'sp-overlay';
-    ov.innerHTML = '<div class="sp-box"><div class="sp-head"><b>🪪 Hồ sơ nhân viên</b><span class="sp-sp"></span><button type="button" class="btn secondary sm" id="sp-close" aria-label="Đóng">✕</button></div><div class="sp-body" id="sp-body"></div></div>';
+    ov.innerHTML = '<div class="sp-box" role="dialog" aria-modal="true" aria-label="Hồ sơ nhân viên"><div class="sp-head"><button type="button" class="btn secondary sm" id="sp-close" aria-label="Quay lại">← Quay lại</button><b>🪪 Hồ sơ nhân viên</b><span class="sp-sp"></span></div><div class="sp-body" id="sp-body"></div></div>';
     document.body.appendChild(ov);
-    ov.addEventListener('click', function(ev){ if (ev.target === ov) close(); });
     document.getElementById('sp-close').addEventListener('click', close);
     document.addEventListener('keydown', function(ev){ if (ev.key === 'Escape') close(); });
     ov.addEventListener('change', function(ev){
@@ -65,7 +64,7 @@
     ov.addEventListener('click', function(ev){ var b = ev.target.closest && ev.target.closest('#sp-save'); if (b) save(); });
     return ov;
   }
-  function close(){ var ov = document.getElementById('sp-overlay'); if (ov) ov.classList.remove('open'); }
+  function close(){ var ov = document.getElementById('sp-overlay'); if (ov) ov.classList.remove('open'); document.documentElement.classList.remove('sp-lock'); }
   function money(n){ return (n === null || n === undefined) ? '—' : fmt(Math.round(n)) + 'đ'; }
   function pct(n){ return (n === null || n === undefined || !isFinite(n)) ? '—' : (Math.round(n * 10) / 10) + '%'; }
   function card(icon, label, val, sub){ return '<div class="sp-card"><div class="sp-cl">' + icon + ' ' + e(label) + '</div><div class="sp-cv">' + val + '</div><div class="sp-cs">' + sub + '</div></div>'; }
@@ -85,6 +84,7 @@
     if (S.loading && !d){ body.innerHTML = h + '<div class="sp-load"><i class="sp-spin"></i><span>Đang tải hồ sơ…</span></div>'; return; }
     if (S.err && !d){ body.innerHTML = h + '<div class="sp-err">' + e(S.err) + '</div>'; return; }
     if (!d){ body.innerHTML = h; return; }
+    var top = h; h = '';   // top = o chon nhan vien (admin/quan ly/leader); phan tiep theo = cot trai (ho so)
     var p = d.profile || {}, ed = !!d.canEdit, dis = ed ? '' : ' disabled';
     var shown = p.fullName || d.accountName || d.username;
     h += '<div class="sp-info"><div class="sp-av">' + initials(shown) + '</div><div class="sp-who"><div class="sp-nm">' + e(shown) + '</div>' +
@@ -99,7 +99,8 @@
     h += '</div>';
     if (ed) h += '<div class="sp-act"><button type="button" class="btn" id="sp-save">💾 Lưu hồ sơ</button><span class="sp-mu" id="sp-upd">' + (p.updatedAt ? 'Cập nhật lần cuối: ' + e(new Date(p.updatedAt).toLocaleString('vi-VN')) : 'Chưa có hồ sơ — hãy điền và bấm Lưu') + '</span></div>';
     else h += '<div class="sp-act"><span class="sp-mu">' + (p.updatedAt ? 'Cập nhật lần cuối: ' + e(new Date(p.updatedAt).toLocaleString('vi-VN')) : 'Nhân viên chưa cập nhật hồ sơ') + '</span></div>';
-    // ── Kết quả làm việc ──
+    // ── Kết quả làm việc ── (cot phai tren man rong)
+    var left = h; h = '';
     h += '<div class="sp-sec"><div class="sp-st">📊 Kết quả làm việc</div><div class="sp-rg">' +
       ((typeof _quickRangeSelectHtml === 'function') ? _quickRangeSelectHtml(S.quick, 'void 0').replace('<select ', '<select id="sp-quick" ').replace(/onchange="[^"]*"/, '') : '') +
       (S.quick === 'custom' ? '<input type="date" id="sp-from" class="sp-in sp-dt" value="' + e(S.from) + '"><input type="date" id="sp-to" class="sp-in sp-dt" value="' + e(S.to) + '">' : '<span class="sp-mu">' + e(S.from) + ' → ' + e(S.to) + '</span>') + '</div>';
@@ -116,15 +117,18 @@
         card('🎁', 'Thưởng', money(o.bonus), 'theo chương trình thưởng') +
         card('👥', 'Khách đang giữ', fmt(cs.held), cs.total ? 'trong danh sách KH đã tải' : 'chưa tải danh sách KH') +
         card('💬', 'Đã kết bạn Zalo', fmt(cs.friends), cs.held ? pct(cs.friends / cs.held * 100) + ' khách đang giữ' : 'chưa có khách') +
-        card('🎯', 'Tỷ lệ chốt (Pancake)', pct(o.closeRatePancake), o.pancakeConversations ? 'trên ' + fmt(o.pancakeConversations) + ' hội thoại' : 'chưa có dữ liệu Pancake') +
+        card('🎯', 'Tỷ lệ chốt (Pancake)', pct(o.closeRatePancake), o.pancakeConversations ? fmt(o.creatorOrders || 0) + ' đơn do sale tạo trên Base ÷ ' + fmt(o.pancakeConversations) + ' tương tác Pancake' : 'chưa có dữ liệu Pancake') +
+        card('🌅', 'Chốt trong ngày (khách mới)', pct(o.closeRateNewDay), o.interactionsNew ? fmt(o.ordersNewCustomer || 0) + ' đơn ÷ ' + fmt(o.interactionsNew) + ' tương tác khách mới' : 'chưa có dữ liệu khách mới') +
+        card('🔁', 'Chốt đơn hôm trước (khách cũ)', pct(o.closeRateOldCustomer), o.interactionsOld ? fmt(o.ordersOldCustomer || 0) + ' đơn ÷ ' + fmt(o.interactionsOld) + ' tương tác khách cũ' : 'chưa có dữ liệu khách cũ') +
         card('📈', 'Chốt / khách đang giữ', pct(closeHeld), cs.held ? fmt(o.totalOrders || 0) + ' đơn ÷ ' + fmt(cs.held) + ' khách' : 'chưa có khách đang giữ') +
         card('📞', 'Kết nối điện thoại', pct(o.phoneConnectRate), o.pancakeConversations ? fmt(o.phoneCollected || 0) + ' SĐT ÷ ' + fmt(o.pancakeConversations) + ' hội thoại' : 'chưa có dữ liệu Pancake') +
         rankCard('🏆', 'Xếp hạng team', o.rankTeam, 'chưa thuộc team nào') +
         rankCard('🏅', 'Xếp hạng phòng KD', o.rankDept, 'chưa thuộc phòng nào') + '</div>';
+      h += '<div class="sp-mu sp-wn">Chốt trong ngày / khách cũ tính theo số đơn Pancake ghi nhận cho khách mới / khách cũ của từng nhân viên (tag L5, L5.1, L5.2, L9… chỉ thống kê theo Page nên chưa tách được theo người).</div>';
       if (o.warnings && o.warnings.length) h += '<div class="sp-mu sp-wn">⚠ ' + o.warnings.map(e).join(' · ') + '</div>';
     }
     h += '</div>';
-    body.innerHTML = h;
+    body.innerHTML = top + '<div class="sp-layout"><div class="sp-colL">' + left + '</div><div class="sp-colR">' + h + '</div></div>';
   }
   function loadOverview(){
     if (!S.username || !S.from || !S.to || S.from > S.to) return;
@@ -159,7 +163,7 @@
   window.openProfileModal = function(username){
     if (typeof gsUrl === 'undefined' || !gsUrl){ toastS('Chưa kết nối Google Sheets.'); return; }
     if (!myUser()){ toastS('Hãy đăng nhập bằng tài khoản của bạn để dùng hồ sơ.'); return; }
-    var ov = ensure(); ov.classList.add('open');
+    var ov = ensure(); ov.classList.add('open'); document.documentElement.classList.add('sp-lock');
     load(typeof username === 'string' && username ? username : (S.username || myUser()));
   };
   window._spCustStats = custStats;   // dùng cho test

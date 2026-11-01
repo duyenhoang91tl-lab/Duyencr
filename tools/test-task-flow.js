@@ -31,7 +31,7 @@ vm.runInContext(src,ctx);
 ctx.jsonOut_=o=>o;
 const USERS=[['thuyanh','Thúy Anh'],['oanh','Oanh'],['ketoan','Kế toán Oanh'],['dieumy','Diệu My'],['duyen','Duyên'],['hung','Hùng']].map(([u,n])=>({username:u,name:n,active:true,names:[]}));
 ctx.readUsers_=()=>USERS; ctx.getCrmSS_=()=>({getSheetByName:()=>null});
-ctx._sessUser_=tok=>({tokThuy:USERS[0],tokOanh:USERS[1]})[tok]||null;
+ctx._sessUser_=tok=>({tokThuy:USERS[0],tokOanh:USERS[1],tokAdmin:{username:'admin',name:'Quản trị',role:'admin'}})[tok]||null;
 ctx.getSheet_=(name,headers)=>{ if(!sheets[name]){sheets[name]=mkSheet(); if(headers)sheets[name].appendRow(headers);} return sheets[name]; };
 let fail=0; const ok=(c,m)=>{ if(!c){console.log('FAIL:',m);fail++;} else console.log('ok  :',m); };
 const run=(f,...a)=>vm.runInContext(f+'(...__a)',Object.assign(ctx,{__a:a}));
@@ -113,4 +113,45 @@ ok(JSON.stringify(run('readTasks_',sheets.Tasks).find(x=>x.id===id2).mentions.sl
 ok(nk('oanh','comment')>=1&&nk('ketoan','comment')>=1,'thong bao @tag cua he thong cu van chay');
 run('saveTaskComment_',{taskId:id2,author:'Duyên',content:'@oanh lan nua'});
 ok(run('readTasks_',sheets.Tasks).find(x=>x.id===id2).mentions.length===2,'tag lap khong nhan doi');
+// 15) Admin ep chuyen tiep
+r=run('taskAdvance_',{taskId:id2,by:'Quản trị',force:true}); ok(/chi admin/i.test(r.error||''),'force khong token -> bi chan (khong tin by)');
+r=run('taskAdvance_',{taskId:id2,token:'tokOanh',force:true}); ok(/chi admin/i.test(r.error||''),'force voi token nhan vien thuong -> bi chan');
+const HT=run('readTaskFlows_').find(f=>f.id==='flow_hoantien').stages.map(x=>x.id);
+r=run('saveTaskEntry_',{title:'Viec 3',flowId:'flow_hoantien',createdBy:'Duyên',stageAssignees:Object.fromEntries(HT.map((sid,i)=>[sid,[i<2?'Thúy Anh':'Oanh']])),stageApprovers:{}});
+const id3=r.id; run('taskAdvance_',{taskId:id3,by:'Thúy Anh'});
+const rq=run('taskAdvance_',{taskId:id3,by:'Thúy Anh'}); ok(rq.pending,'viec 3 dang cho duyet (nguoi duyet = nguoi buoc ke tiep: Oanh)');
+r=run('taskAdvance_',{taskId:id3,token:'tokAdmin',force:true,note:'gap'}); ok(r.ok&&r.forced&&r.stageIdx===2,'admin ep chuyen: bo qua nguoi phu trach + dang cho duyet');
+ok(run('readTaskRequests_',id3,false).every(q=>q.status!=='pending')&&run('readTaskRequests_',id3,false).some(q=>q.status==='cancelled'),'yeu cau duyet dang cho bi HUY');
+ok(run('readTaskComments_',sheets.TaskComments,id3).some(c=>/ADMIN ÉP CHUYỂN/.test(c.content)&&/hủy 1 yêu cầu/.test(c.content)),'luong thao luan ghi ro admin ep chuyen');
+r=run('taskRequestDecide_',{requestId:rq.requestId,by:'Oanh',decision:'approve'}); ok(r.error,'yeu cau da huy khong duyet duoc nua');
+// 16) Doi nguoi phu trach / nguoi duyet giua chung
+const DH=run('readTaskFlows_').find(f=>f.id==='flow_donhang').stages.map(x=>x.id);
+r=run('saveTaskEntry_',{title:'Viec 4',flowId:'flow_donhang',createdBy:'Duyên',stageAssignees:Object.fromEntries(DH.map(sid=>[sid,['Thúy Anh']]))});
+const id4=r.id, sid=DH;
+r=run('taskReassign_',{taskId:id4,stageId:sid[0],assignees:['Hùng'],by:'Hùng'}); ok(/chi admin/i.test(r.error||''),'nguoi ngoai khong doi duoc');
+r=run('taskReassign_',{taskId:id4,stageId:sid[0],assignees:[],by:'Duyên'}); ok(r.error,'khong cho de trong nguoi phu trach');
+const before=nk('hung','task_turn');
+r=run('taskReassign_',{taskId:id4,stageId:sid[0],assignees:['Hùng','Thúy Anh'],by:'Duyên'}); ok(r.ok,'nguoi tao doi duoc buoc hien tai');
+ok(nk('hung','task_turn')===before+1,'nguoi MOI cua buoc hien tai duoc bao');
+r=run('taskReassign_',{taskId:id4,stageId:sid[3],assignees:['Diệu My'],token:'tokThuy'}); ok(r.ok,'nguoi dang phu trach doi duoc buoc tuong lai');
+ok(nk('dieumy','task_assign')>=1,'nguoi moi cua buoc tuong lai duoc bao "giao ban phu trach"');
+let t4=run('readTasks_',sheets.Tasks).find(x=>x.id===id4); ok(t4.stageAssignees[sid[3]][0]==='Diệu My'&&t4.csAssigned.indexOf('Diệu My')>=0&&t4.csAssigned.indexOf('Hùng')>=0,'stageAssignees + csAssigned cap nhat');
+run('taskAdvance_',{taskId:id4,by:'Thúy Anh'});
+r=run('taskReassign_',{taskId:id4,stageId:sid[0],assignees:['Oanh'],by:'Duyên'}); ok(/da xong/i.test(r.error||''),'giai doan DA XONG khong doi duoc');
+r=run('taskReassign_',{taskId:id4,stageId:sid[2],assignees:['Oanh'],token:'tokAdmin'}); ok(r.ok,'admin (token that) doi duoc');
+ok(run('readTaskComments_',sheets.TaskComments,id4).some(c=>/người phụ trách:/.test(c.content)&&/→/.test(c.content)),'thao luan ghi "ai -> ai"');
+r=run('taskReassign_',{taskId:id4,stageId:sid[1],approvers:['Oanh'],by:'Duyên'}); ok(/khong can nguoi duyet/i.test(r.error||''),'buoc khong can duyet -> khong gan nguoi duyet');
+// nguoi duyet: viec 5 (hoan tien), nguoi duyet ban dau = Ke toan Oanh, dang cho duyet -> doi sang Hung
+r=run('saveTaskEntry_',{title:'Viec 5',flowId:'flow_hoantien',createdBy:'Duyên',stageAssignees:Object.fromEntries(HT.map((x,i)=>[x,[i<2?'Thúy Anh':'Oanh']])),stageApprovers:{[HT[1]]:['Kế toán Oanh']}});
+const id5=r.id; run('taskAdvance_',{taskId:id5,by:'Thúy Anh'}); const rq5=run('taskAdvance_',{taskId:id5,by:'Thúy Anh'}); ok(rq5.pending&&nk('ketoan','task_request')>=1,'viec 5 dang cho Ke toan Oanh duyet');
+r=run('taskReassign_',{taskId:id5,stageId:HT[1],approvers:[],by:'Duyên'}); ok(r.ok,'de trong nguoi duyet -> dung nguoi buoc ke tiep (Oanh) lam nguoi duyet');
+let q5=run('readTaskRequests_',id5,true)[0]; ok(JSON.stringify(q5.approvers)==='["Oanh"]','yeu cau dang cho duoc cap nhat nguoi duyet');
+const nh=nk('hung','task_request'); r=run('taskReassign_',{taskId:id5,stageId:HT[1],approvers:['Hùng'],by:'Duyên'});
+q5=run('readTaskRequests_',id5,true)[0]; ok(r.ok&&JSON.stringify(q5.approvers)==='["Hùng"]'&&nk('hung','task_request')===nh+1,'doi sang Hung: yeu cau cap nhat + Hung duoc bao "xin ban duyet"');
+r=run('taskRequestDecide_',{requestId:q5.id,by:'Kế toán Oanh',decision:'approve'}); ok(/khong nam trong/i.test(r.error||''),'nguoi duyet CU het quyen duyet');
+r=run('taskRequestDecide_',{requestId:q5.id,by:'Hùng',decision:'approve'}); ok(r.ok&&r.stageIdx===2,'nguoi duyet MOI duyet duoc, viec chuyen buoc');
+// yeu cau cho + nguoi duyet duy nhat la chinh nguoi gui -> khong de trong
+r=run('saveTaskEntry_',{title:'Viec 6',flowId:'flow_hoantien',createdBy:'Duyên',stageAssignees:Object.fromEntries(HT.map((x,i)=>[x,[i<2?'Thúy Anh':'Oanh']])),stageApprovers:{[HT[1]]:['Kế toán Oanh']}});
+const id6=r.id; run('taskAdvance_',{taskId:id6,by:'Thúy Anh'}); run('taskAdvance_',{taskId:id6,by:'Thúy Anh'});
+r=run('taskReassign_',{taskId:id6,stageId:HT[1],approvers:['Thúy Anh'],by:'Duyên'}); ok(/it nhat 1 nguoi duyet/i.test(r.error||''),'khong cho nguoi duyet chi la chinh nguoi gui yeu cau');
 console.log(fail?('\n'+fail+' FAIL'):'\nALL PASS'); process.exit(fail?1:0);

@@ -35,6 +35,12 @@ Tab **💬 Chat nội bộ** trong menu trái (nhóm "Social", cạnh "Chat (Soc
 2. Ctrl+F5 trên web (GitHub Pages cache). Sheet `Chat_Kenh`/`Chat_TinNhan` tự tạo khi có tin đầu tiên.
 3. Không cần reload extension (chat chỉ có trên web Sasum).
 
+## Dock chat nhỏ: kéo-thả + thu nhỏ hẳn (2026-10-16)
+- Kéo cả dock bằng thanh tiêu đề (danh sách hoặc cửa sổ hội thoại); nút `–` ở thanh tiêu đề danh sách thu nhỏ HẲN thành bong bóng 💬 (có huy hiệu chưa đọc, cũng kéo được; bấm để mở lại).
+- Lưu theo máy + tài khoản: `ome_chat_pos_<user>` = `{d:{r,b}, b:{r,b}}` (khoảng cách tới mép PHẢI/DƯỚI — giữ cách neo cũ nên cửa sổ mới vẫn mở rộng sang trái/lên trên), cờ thu nhỏ `h` trong `ome_chat_mini_<user>`. Chưa kéo = vị trí mặc định theo CSS và vẫn tự nhường Trợ lý AI; đã kéo = dùng đúng chỗ người dùng chọn (không tự dịch).
+- Kéo < 5px = coi là click; sau 1 lần kéo thật chặn đúng 1 click kế tiếp (tránh bấm nhầm thu/mở). Vị trí bị chặn trong màn hình (dock luôn còn thanh tiêu đề rộng 280px để kéo lại). Khi thu nhỏ hẳn, tin mới vẫn tính chưa đọc (`miniViewing` = false).
+- Test: `node tools/test-chat-drag.js` (jsdom).
+
 ## Giới hạn đã biết / việc có thể làm tiếp
 - Chưa có gửi ảnh/file, sửa tin, tìm kiếm tin, thông báo đẩy khi đóng trình duyệt.
 - Poll là mô hình kéo (GAS không đẩy được): độ trễ tối đa ≈ 4 s khi mở tab Chat, ≈ 12 s ở tab khác.
