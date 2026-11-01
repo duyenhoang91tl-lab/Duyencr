@@ -10,7 +10,7 @@ import java.util.Locale
  */
 object Diag {
     /** Số phiên bản hiện trong "Kiểm tra gõ tắt" để biết đã cài đúng bản (cập nhật cùng versionName). */
-    const val BUILD = "1.18"
+    const val BUILD = "1.19"
 
     @Volatile var connectedAt = 0L
     @Volatile var events = 0
