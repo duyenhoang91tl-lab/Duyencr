@@ -474,6 +474,7 @@ var _PERM_TAB_DEFS = [
   { id:'tab-mydata',   label:'Data của tôi' },
   { id:'tab-zaloai',   label:'Zalo AI' },
   { id:'tab-chat',     label:'Chat (Social)' },
+  { id:'tab-media',    label:'Thư viện (ảnh/ghi âm/mẫu tin)' },
   { id:'tab-teamchat', label:'Chat nội bộ' },
   { id:'tab-task',     label:'Công việc' },
   { id:'dashboard',    label:'Dashboard' },
