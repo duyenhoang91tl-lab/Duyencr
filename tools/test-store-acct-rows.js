@@ -11,7 +11,7 @@ const pad = n => String(n).padStart(2, '0'), FIXED = new Date(2026, 9, 31);
 class FDate extends Date { constructor(...a) { if (a.length === 0) super(FIXED.getTime()); else super(...a); } }
 const R = (o) => Object.assign({ stt: '', thang: '10', ngayHen: '', kenh: '', saleRaw: '', tenKh: '', phone: '', thongTin: '', spOrder: '', capNhat: '', tinhTrang: '', ngayDen: '', spMua: '', doanhThuSheet: '', nvCh: '', maDon: '' }, o);
 const pos = (posRow, phone, ngay, extra) => Object.assign({ posRow, soDienThoai: phone, ngayTaoDon: ngay, nguonDon: 'Quầy Hào Nam', khachHang: 'K' + posRow, sanPham: 'SP', trangThai: 'Thành công', theSale: 'Lê Trà My', ghiChu: '', giaTriSauGiam: 1000000 }, extra || {});
-function run(rows, posRows) {
+function run(rows, posRows, acctTab) {
   const ctx = { Date: FDate, Math, JSON, String, Number, Object, Array, RegExp, parseInt, parseFloat, isNaN, Error,
     _vnYmd_: d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()),
     parseVNDate_: s => { const m = /^(\d+)\/(\d+)\/(\d+)/.exec(s || ''); return m ? new FDate(+m[3], +m[2] - 1, +m[1]) : null; },
@@ -21,7 +21,7 @@ function run(rows, posRows) {
     _donHasExcludedStatus_: s => /hoàn/i.test(s || ''), _quaySaleRatio_: () => 0.3, _foldSaleKey_: s => String(s || '').toLowerCase().replace(/\s+/g, ''),
     _storeCaseBuildCtx_: () => ({ resolve: raw => ({ raw, name: String(raw).trim(), how: 'x' }), same: (a, b) => String(a).toLowerCase().replace(/\s+/g, '') === String(b).toLowerCase().replace(/\s+/g, '') }),
     CacheService: { getScriptCache: () => ({ get: () => null, put: () => {} }) },
-    SpreadsheetApp: { openById: () => ({ getSheets: () => [{ getName: () => 'tháng 10', getDataRange: () => ({ getValues: () => ACCT }) }] }) } };
+    SpreadsheetApp: { openById: () => ({ getSheets: () => [{ getName: () => 'tháng 10', getDataRange: () => ({ getValues: () => (acctTab || ACCT) }) }] }) } };
   vm.createContext(ctx); vm.runInContext(code, ctx); return ctx;
 }
 // ---- gop dong noi tiep (ham thuan) ----
@@ -78,4 +78,23 @@ const S = ac.summary;
 ok(S.chuaGhi === 5 && S.daGhi === 2 && S.thieuMa === 0 && S.chuaGhiGiaTri === 6000000 && S.chuaGhiChia === 1800000, 'tong hop: chua ghi 5 (don 201, 203, 210, 212 + ma M70001), da ghi 2 (202, 211), tien 6.000.000 / sale 1.800.000 — thuc te ' + JSON.stringify(S));
 // dong khong con trung 2 lan neu ca ma o R lan chua don
 ok(ac.missing.filter(x => x.codes.indexOf('M46228') !== -1).length === 1, 'M46228 chi xuat hien 1 lan (khong lap giua don Pos va dong theo ma)');
+// ---- DU PHONG khop theo SDT file ke toan khi don chua co ma (Duyen chot 2026-10-31) ----
+const rows2 = [R({ row: 2, stt: '1', saleRaw: 'yenNTH2004', phone: '912468474', tenKh: 'X', ngayHen: '25' }),    // SDT co trong file KT, chua co ma -> co-sdt
+  R({ row: 3, stt: '2', saleRaw: 'yenNTH2004', phone: '900000015', tenKh: 'Y', ngayHen: '25' }),                 // SDT khong co trong file KT, chua ma -> thieu-ma
+  R({ row: 4, stt: '3', saleRaw: 'yenNTH2004', phone: '979687852', tenKh: 'Z', ngayHen: '25', maDon: 'M77777' })]; // co ma (thieu) -> chua-ghi du SDT co trong file KT
+const POS2 = [pos(301, '0912468474', '25/10/2026'), pos(302, '0900000015', '25/10/2026'), pos(303, '0979687852', '25/10/2026')];
+c = run(rows2, POS2);
+const r2 = c.buildStoreCaseReport_({ dateFrom: '2026-10-01', dateTo: '2026-10-31' }), a2 = r2.acctCheck;
+const ord = n => r2.rows.find(r => r.row === n).orders[0];
+ok(ord(2).acct.status === 'co-sdt' && ord(2).acct.sheet === 'tháng 10' && ord(2).acct.line === 2, 'don chua co ma + SDT khach co trong file KT -> "co-sdt" (kem tab + dong)');
+ok(ord(3).acct.status === 'thieu-ma', 'don chua co ma + SDT khong co trong file KT -> van "thieu-ma"');
+ok(ord(4).acct.status === 'chua-ghi' && ord(4).acct.missingCodes.join() === 'M77777', 'don CO ma (thieu): SDT co trong file KT cung KHONG cuu duoc -> van chua ghi');
+ok(a2.summary.coSdt === 1 && a2.summary.thieuMa === 1 && a2.summary.chuaGhi === 1 && a2.summary.daGhi === 0, 'tong hop co dem rieng coSdt: ' + JSON.stringify(a2.summary));
+ok(!a2.missing.some(x => x.posRow === 301) && a2.missing.some(x => x.posRow === 302 && x.status === 'thieu-ma'), '"co-sdt" KHONG nam trong danh sach thieu / chua ghi; thieu-ma van nam');
+ok(r2.rows.find(r => r.row === 2).flags.some(f => f.indexOf('KT có SĐT khách này nhưng đơn chưa có mã bộ đếm') === 0), 'dong co canh bao "KT có SĐT... điền cột R"');
+const noPh = run(rows2, POS2, [['', 'Kênh', 'Sale', 'Tổng', 'Mã bộ đếm'], ['', 'Q', 'a', 1, 'M44756']]);   // tab cu khong co cot SDT
+ok(noPh.buildStoreCaseReport_({ dateFrom: '2026-10-01', dateTo: '2026-10-31' }).rows.find(r => r.row === 2).orders[0].acct.status === 'thieu-ma', 'file KT khong co cot SDT -> khong khop duoc, thieu-ma (khong loi)');
+ok(c._storeAcctClassify_([], { codes: {}, noYear: {}, phones: { '0912468474': { sheet: 't', line: 9 } } }, false, '0912468474').status === 'co-sdt' && c._storeAcctClassify_([], { codes: {}, noYear: {}, phones: {} }, false, '0912468474').status === 'thieu-ma' && c._storeAcctClassify_([], { codes: {}, noYear: {} }, false, '0912468474').status === 'thieu-ma', 'classify: co-sdt / thieu-ma / acct cu khong co phones');
+const loaded = c._loadAcctCodeSet_();
+ok(loaded.phones['0912468474'] && loaded.phones['0912468474'].line === 2 && loaded.phones['0979687852'].line === 4 && Object.keys(loaded.phones).length === 2, 'doc cot SDT: 2 so khac nhau (so lap chi lay dong dau), chuan hoa them so 0 dau');
 process.exit(bad ? 1 : 0);

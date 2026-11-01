@@ -1876,26 +1876,29 @@ function _storeCodesFromNote_(text) {   // ma trong ghi chu Pos: dang 17T10/2026
 }
 // Doc MA BO DEM tu MOI tab cua file ke toan (moi thang co the 1 tab: "tháng 10", "tháng 11"...). O gop: chi o tren cung co gia tri — du de lay tap ma.
 function _loadAcctCodeSet_(fresh) {
-  var out = { codes: {}, noYear: {}, tabs: [], err: '' };
+  var out = { codes: {}, noYear: {}, phones: {}, tabs: [], err: '' };
   try {
-    var cache = CacheService.getScriptCache(), cached = fresh ? null : cache.get('acct_codes_v1'), data;
+    var cache = CacheService.getScriptCache(), cached = fresh ? null : cache.get('acct_codes_v2'), data;
     if (cached) { data = JSON.parse(cached); }
     else {
-      data = { rows: [], tabs: [] };
+      data = { rows: [], ph: [], tabs: [] };
       SpreadsheetApp.openById(ACCT_SPLIT_SS_ID_).getSheets().forEach(function (sh) {
-        var vals = sh.getDataRange().getValues(), hi = -1, cc = -1;
+        var vals = sh.getDataRange().getValues(), hi = -1, cc = -1, pc = -1;
         for (var i = 0; i < Math.min(vals.length, 8) && hi < 0; i++) {
           for (var c = 0; c < vals[i].length; c++) { if (_stripVN_(String(vals[i][c] || '')).indexOf('ma bo dem') !== -1) { hi = i; cc = c; break; } }
         }
         if (hi < 0) return;
         data.tabs.push(sh.getName());
+        for (var c2 = 0; c2 < vals[hi].length; c2++) { var hh = _stripVN_(String(vals[hi][c2] || '')).replace(/\s+/g, ' ').trim(); if (hh === 'sdt' || hh.indexOf('so dien thoai') !== -1) { pc = c2; break; } }   // cot SDT (du phong khop khi don chua co ma)
         for (var r = hi + 1; r < vals.length; r++) {
           _storeCodeTokens_(vals[r][cc]).forEach(function (code) { data.rows.push([code, sh.getName(), r + 1]); });
+          if (pc >= 0) { var ph = normPhone_(vals[r][pc]); if (ph) data.ph.push([ph, sh.getName(), r + 1]); }
         }
       });
-      try { cache.put('acct_codes_v1', JSON.stringify(data), 60); } catch (ec) {}
+      try { cache.put('acct_codes_v2', JSON.stringify(data), 60); } catch (ec) {}
     }
     out.tabs = data.tabs || [];
+    (data.ph || []).forEach(function (x) { if (!out.phones[x[0]]) out.phones[x[0]] = { sheet: x[1], line: x[2] }; });
     (data.rows || []).forEach(function (x) {
       if (!out.codes[x[0]]) out.codes[x[0]] = { sheet: x[1], line: x[2] };
       var ny = _counterCodeNoYear_(x[0]); if (!out.noYear[ny]) out.noYear[ny] = out.codes[x[0]];
@@ -1905,9 +1908,13 @@ function _loadAcctCodeSet_(fresh) {
 }
 // 1 don: da-ghi (co >= 1 ma trong file ke toan) | chua-ghi (co ma nhung KHONG ma nao co) | thieu-ma (khong biet ma nao) | khong-ro (khong doc duoc file ke toan).
 // Ma KHONG co nam (ghi chu "17T10") khop duoc ma ke toan co nam ("17T10/2026"); ma CO nam khac nam thi KHONG khop.
-function _storeAcctClassify_(codes, acct, strict) {
+function _storeAcctClassify_(codes, acct, strict, phone) {
   if (!acct || acct.err) return { status: 'khong-ro' };
-  if (!codes || !codes.length) return { status: 'thieu-ma' };
+  if (!codes || !codes.length) {
+    // DU PHONG (Duyen chot 2026-10-31): don CHUA co ma nhung SDT khach da co trong file ke toan -> 'co-sdt' (khong tinh la chua ghi; chua chac dung don -> dien ma cot R de doi chieu chac chan)
+    var hp = phone && acct.phones && acct.phones[phone];
+    return hp ? { status: 'co-sdt', sheet: hp.sheet, line: hp.line } : { status: 'thieu-ma' };
+  }
   var hits = [], missing = [];
   codes.forEach(function (c) {
     var hit = acct.codes[c] || (!_counterCodeHasYear_(c) ? acct.noYear[c] : null);
@@ -2152,9 +2159,10 @@ function buildStoreCaseReport_(filters) {
       var byR = (r.maDonCodes || []).length > 0, all = byR ? r.maDonCodes.slice() : _storeCodesFromNote_(o.ghiChu);   // cot R la khoa chinh thuc; ghi chu Pos chi khi R trong
       o.codesAll = all;
       if (o.excluded || (o.status !== 'tinh' && o.status !== 'trung' && o.status !== 'mot-phan')) return;
-      o.acct = _storeAcctClassify_(all, acct, byR);
+      o.acct = _storeAcctClassify_(all, acct, byR, r.phoneNorm);
       if (o.acct.status === 'chua-ghi') flags.push('KT chưa ghi: ' + (o.acct.missingCodes || all).join(', '));
       else if (o.acct.status === 'thieu-ma') flags.push('Thiếu mã bộ đếm (điền cột R) — chưa đối chiếu được với kế toán');
+      else if (o.acct.status === 'co-sdt') flags.push('KT có SĐT khách này nhưng đơn chưa có mã bộ đếm — điền cột R để đối chiếu chắc chắn');
     });
     // Ma cot R KHONG co trong file ke toan nhung khong nam o don Pos nao cua dong (khong SDT / khong ghep duoc don) -> van liet ke de ke toan bo sung
     var onlyRefund = orders.length > 0 && !orders.some(function(o) { return !o.excluded; });   // chi co don hoan -> khong co doanh thu de ghi
@@ -2194,7 +2202,7 @@ function buildStoreCaseReport_(filters) {
   outRows.sort(function(x, y) { var dx = (x.visitDates[0] || ''), dy = (y.visitDates[0] || ''); if (dx !== dy) return dx < dy ? 1 : -1; return y.row - x.row; });
   var bySale = Object.keys(stats).map(function(k) { return stats[k]; }).sort(function(a, b) { return b.credited - a.credited; });
   // Tong hop doi chieu ke toan theo DON POS DUY NHAT (1 don co the nam o nhieu dong trang tinh): chua-ghi / thieu-ma + dem da-ghi
-  var acctSum = { daGhi: 0, chuaGhi: 0, thieuMa: 0, chuaGhiGiaTri: 0, chuaGhiChia: 0 }, uniq = {}, missing = [];
+  var acctSum = { daGhi: 0, chuaGhi: 0, thieuMa: 0, coSdt: 0, chuaGhiGiaTri: 0, chuaGhiChia: 0 }, uniq = {}, missing = [];
   outRows.forEach(function(r) {
     (r.orders || []).forEach(function(o) {
       if (!o.acct || o.acct.status === 'khong-ro') return;
@@ -2216,6 +2224,7 @@ function buildStoreCaseReport_(filters) {
   Object.keys(uniq).forEach(function(k) {
     var e = uniq[k];
     if (e.status === 'da-ghi') { acctSum.daGhi++; return; }
+    if (e.status === 'co-sdt') { acctSum.coSdt++; return; }   // co SDT trong file KT, chua co ma: khong tinh la chua ghi, khong dua vao danh sach thieu
     if (e.status === 'thieu-ma') acctSum.thieuMa++; else { acctSum.chuaGhi++; acctSum.chuaGhiGiaTri += e.giaTri || 0; }
     e.chiaSale = Math.round((e.giaTri || 0) * share); e.phanQuay = Math.round(e.giaTri || 0) - e.chiaSale;   // sale online ~30% / quay ~70% (cung cach ke toan ghi cap dong)
     if (e.status === 'chua-ghi') acctSum.chuaGhiChia += e.chiaSale;
