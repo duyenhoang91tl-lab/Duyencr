@@ -1,5 +1,5 @@
 // Test luật hoa hồng kênh NGUỒN theo chất liệu vàng (Duyên yêu cầu 2026-10): Nguồn + vàng 10k = 1,5%, vàng 14k = 1%, KHÔNG phụ thuộc giá trị đơn.
-// Phần 1 = backend GAS (hàm thật trong gas_v13.js). Phần 2 = web (js/01-fn-splitmulti.js: _computeCommissionData_ của Báo cáo E).
+// Phần 1 = backend GAS (hàm thật trong gas_v13.js). Phần 2 = web (js/01-fn-splitmulti.js: _computeCommissionData_ của Báo cáo E). Phần 3 = giao diện (js/12: ghi chú luật).
 const fs=require('fs'),vm=require('vm');let bad=0;const ok=(c,t)=>{if(!c){bad++;console.log('FAIL',t)}else console.log('ok  ',t)};
 function fn(src,name){const i=src.indexOf('function '+name+'(');if(i<0)throw new Error('thiếu '+name);let d=0,j=src.indexOf('{',i);for(let k=j;k<src.length;k++){if(src[k]=='{')d++;else if(src[k]=='}'){d--;if(!d)return src.slice(i,k+1)}}}
 const gas=fs.readFileSync('gas_v13.js','utf8');
@@ -60,5 +60,21 @@ const bk=r.channelBreakdown;ok(bk['Nguồn · vàng 10k'].rate===1.5&&bk['Nguồ
 d=wctx._computeCommissionData_([mk('An,Bình',10000000,'Nguồn','Nhẫn vàng 10k')]);ok(d.bySale.length===2&&d.bySale.every(x=>Math.round(x.channelCommission)===75000),'E·đơn chia 2 sale (An, Bình): mỗi người nửa doanh thu 5tr × 1,5% = 75.000đ');
 d=wctx._computeCommissionData_([mk('An',10000000,'Nguồn','Nhẫn vàng 10k',{saleRatio:0.3})]);ok(Math.round(d.bySale[0].channelCommission)===45000,'E·đơn quầy 30/70 (saleRatio 0,3): 10tr × 30% × 1,5% = 45.000đ');
 d=wctx._computeCommissionData_([mk('An',10000000,'Nguồn','Nhẫn vàng 10k'),mk('An',5000000,'Zalo','x')]);ok(d.totalOrdersChannel===1&&d.totalRevenueChannel===10000000&&d.totalOrdersBelow15===1,'E·các thẻ TỔNG: đơn Nguồn vàng tính vào nhóm "kênh có % riêng", không lẫn nhóm <15tr');
+
+
+// ── Phần 3: GIAO DIỆN (js/12): ghi chú trong bảng "% hoa hồng theo kênh" + dòng ghi chú ở Báo cáo E ──
+const j12=fs.readFileSync('js/12-fn-rendersalesreporttabe.js','utf8');
+const uctx={String,Object,Array,_crNewKey:'',CHANNEL_COMMISSION_RATES:{},_srState:{nguonOptions:['Nguồn','Facebook']},esc:v=>String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'),_commThrLabel_:()=>'15tr',document:{getElementById:id=>id==='cr-body'?uctx.__body:null},__body:{innerHTML:''}};
+vm.createContext(uctx);
+vm.runInContext(js.match(/var GOLD_RULE_MATERIALS = [^\n]*/)[0]+'\n'+['_goldRuleLabelHtml_','_goldRuleNoteHtml_','_renderChannelRatesModal'].map(n=>fn(j12,n)).join('\n'),uctx);
+ok(uctx._goldRuleLabelHtml_()==='<b>vàng 10k = 1,5%</b>, <b>vàng 14k = 1%</b>','UI: nhãn luật lấy từ hằng số (mức cao trước): "vàng 10k = 1,5%, vàng 14k = 1%"');
+ok(uctx._goldRuleNoteHtml_({bySale:[{channelBreakdown:{Facebook:{revenue:1,rate:1}}}]})===''&&uctx._goldRuleNoteHtml_({bySale:[]})===''&&uctx._goldRuleNoteHtml_(null)==='','UI·Báo cáo E: không có đơn áp luật vàng → KHÔNG hiện ghi chú (không làm rối báo cáo)');
+const nt=uctx._goldRuleNoteHtml_({bySale:[{channelBreakdown:{'Nguồn · vàng 10k':{revenue:1,rate:1.5}}}]});
+ok(nt.includes('kênh Nguồn')&&nt.includes('vàng 10k = 1,5%')&&nt.includes('vàng 14k = 1%')&&nt.includes('không phụ thuộc giá trị đơn'),'UI·Báo cáo E: có đơn áp luật → ghi chú nêu kênh Nguồn, 10k 1,5%, 14k 1%, không phụ thuộc giá trị đơn');
+uctx._renderChannelRatesModal();const mh=uctx.__body.innerHTML;
+ok(mh.includes('Luật cố định cho kênh Nguồn')&&mh.includes('vàng 10k = 1,5%')&&mh.includes('vàng 14k = 1%')&&mh.includes('không phụ thuộc giá trị đơn')&&mh.includes('luôn ưu tiên')&&mh.includes('mức thấp'),'UI·Modal "% hoa hồng theo kênh": hộp luật cố định kênh Nguồn (10k/14k, ưu tiên hơn % cài, đơn lẫn → mức thấp)');
+ok(mh.indexOf('Luật cố định cho kênh Nguồn')<mh.indexOf('<table'),'UI·Modal: hộp ghi chú nằm TRÊN bảng % để người cài thấy trước');
+vm.runInContext("GOLD_RULE_MATERIALS[0].rate=2",uctx);ok(uctx._goldRuleLabelHtml_().includes('vàng 14k = 2%'),'UI: đổi hằng số luật → ghi chú đổi theo (nội dung không gõ cứng, không lệch cách tính)');
+ok(j12.indexOf('html += _goldRuleNoteHtml_(c);')>0&&j12.indexOf('html += _goldRuleNoteHtml_(c);')<j12.indexOf('// b) Hoa h'),'UI: Báo cáo E gọi ghi chú ngay trước mục b) Hoa hồng nhân viên');
 
 process.exit(bad?1:0);
