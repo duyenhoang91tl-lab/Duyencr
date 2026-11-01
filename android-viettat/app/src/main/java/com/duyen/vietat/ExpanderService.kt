@@ -284,6 +284,8 @@ class ExpanderService : AccessibilityService() {
                 val id = n.viewIdResourceName.orEmpty().substringAfterLast('/')
                 val str = listOf(label, id).filter { it.isNotEmpty() }.joinToString("|")
                 if (str.isNotEmpty() && seen.size < 20) seen += "${str.take(32)}@${r.left}"
+                else if (str.isEmpty() && (n.isClickable || n.isFocusable) && seen.size < 20)
+                    seen += "[${n.className?.toString()?.substringAfterLast('.').orEmpty().take(12)}${if (n.isClickable) "*" else ""}]@${r.left},${r.top} ${r.width()}x${r.height()}"
                 // nhãn chữ phải NGẮN (≤ 25 ký tự) để khỏi bấm nhầm bong bóng tin nhắn có chữ "ảnh"; id thì không giới hạn
                 val textHit = label.isNotEmpty() && label.length <= 25 && re.containsMatchIn(label)
                 val idHit = id.isNotEmpty() && re.containsMatchIn(id)
@@ -301,7 +303,7 @@ class ExpanderService : AccessibilityService() {
                 if (n == null || d > 30) return
                 val r = Rect().also { n.getBoundsInScreen(it) }
                 val cy = (r.top + r.bottom) / 2
-                if (n.isClickable && !n.isEditable && cy in bandTop..bandBottom && r.width() in 1..(sw * 0.2).toInt() && r.left > sw * 0.45) cands += n to r.left
+                if ((n.isClickable || n.actionList.any { it.id == AccessibilityNodeInfo.ACTION_CLICK }) && !n.isEditable && cy in bandTop..bandBottom && r.width() in 1..(sw * 0.2).toInt() && r.left > sw * 0.45) cands += n to r.left
                 for (k in 0 until n.childCount) walk2(n.getChild(k), d + 1)
             }
             walk2(root, 0)

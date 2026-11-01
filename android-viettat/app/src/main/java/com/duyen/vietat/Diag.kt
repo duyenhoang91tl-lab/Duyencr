@@ -9,6 +9,9 @@ import java.util.Locale
  * gõ tắt hỏng ở bước nào: dịch vụ chưa chạy / chưa có mục nào / Android không gửi sự kiện / không khớp mục / chèn chữ thất bại.
  */
 object Diag {
+    /** Số phiên bản hiện trong "Kiểm tra gõ tắt" để biết đã cài đúng bản (cập nhật cùng versionName). */
+    const val BUILD = "1.18"
+
     @Volatile var connectedAt = 0L
     @Volatile var events = 0
     @Volatile var lastEventAt = 0L
@@ -48,7 +51,7 @@ object Diag {
     fun report(): String {
         val total = Store.snippets.size
         val crm = Store.snippets.count { Store.isCrm(it.id) }
-        val sb = StringBuilder()
+        val sb = StringBuilder("ℹ Bản app: $BUILD\n")
         sb.append(if (connectedAt > 0L) "✅ Dịch vụ Trợ năng đang chạy (kết nối lúc ${t(connectedAt)})"
                   else "❌ Dịch vụ Trợ năng CHƯA chạy → vào Cài đặt > Trợ năng > \"Viết Tắt\": bật (nếu đang bật thì TẮT rồi BẬT lại; Xiaomi: bật Tự khởi động + Pin \"Không hạn chế\" cho Duyên CRM)")
         sb.append("\n")
