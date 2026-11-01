@@ -28,11 +28,27 @@
   .table-wrap.x-scrolled #main-table td.col-name{background-color:var(--surface);box-shadow:2px 0 4px -2px rgba(0,0,0,.18);}   /* nền đặc chỉ khi đã vuốt (js/05 đặt class x-scrolled) */
   #main-table td.col-name{z-index:2;}
   #main-table th.col-name{z-index:12;}   /* cao hơn thead (10) và các th khác */
-  #main-table th.col-name,#main-table td.col-name{width:132px;min-width:132px;max-width:132px;}
+  #main-table th.col-name,#main-table td.col-name{width:158px;min-width:158px;max-width:158px;}
   .table-wrap{-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;}
 }
 
 @media (max-width:768px){
   /* 5) Thanh "Tổng quan & tác vụ": gọn hơn */
   .lov-bar{padding:6px 10px;}
+}
+
+/* ═══ CHỮ BỊ MẤT TRÊN APP (Duyên 2026-10-31: "hiển thị trên app chữ vẫn bị mất") ═══
+   NGUYÊN NHÂN GỐC (dựng lại bằng Playwright 411px): (1) css/15 đặt #sn-toggle / logo / .hdr-r là `flex:1 1 0` (cơ sở = 0) trong header flex-wrap → mọi phần tử "vừa" 1 hàng
+   nên KHÔNG bao giờ xuống dòng, bị bóp co: nút Menu chỉ còn "☰ M", tên CRM/vai trò bị cắt "…". (2) Tiêu đề cột bảng khách `white-space:nowrap` + ô rộng cố định + overflow:hidden
+   → "NGÀY MUA GẦN NHẤT" mất chữ "NHẤT". CÁCH SỬA: nút Menu rộng đúng chữ "☰ Menu" (ẩn tên màn dài), ô tìm co giãn, ngắt hàng CỨNG sau nút ☰ lọc (::after order 3, basis 100%)
+   → hàng 1 = Menu · Tìm · ☰, hàng 2 = tên CRM + nút tài khoản (js/59 vẫn đo --hdr-h thật); tiêu đề cột cho xuống dòng. Chỉ trong @media nên máy tính không đổi. */
+@media (max-width:640px){
+  header #sn-toggle{flex:0 0 auto;max-width:none;overflow:visible;text-overflow:clip;}
+  header #sn-toggle .sn-cur{display:none;}
+  header #qs-wrap{flex:1 1 90px;max-width:none;min-width:90px;}
+  header::after{content:"";order:3;flex:0 0 100%;height:0;}
+  header .logo{max-width:none;flex:0 0 auto;}
+}
+@media (max-width:900px){
+  #main-table th{white-space:normal;line-height:1.25;overflow:visible;}
 }
