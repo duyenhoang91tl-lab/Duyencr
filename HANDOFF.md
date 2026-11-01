@@ -1484,15 +1484,6 @@ Chuẩn: chọn/ghi tên nào của 1 người cũng ra đủ dữ liệu của 
 - **Chưa có thanh mẫu**: H (Tổng quan data đã chia), I (Chia data Renew) — ô CS là chọn 1 người (radio), M — không có ô lọc Sale; KPI Pancake/Checklist MKT/Phân tích Team không nằm trong tab Báo cáo doanh số (KPI Pancake chỉ có phạm vi theo quyền). Muốn thêm: cần đổi ô CS của H/I sang chọn nhiều.
 - Test: `node tools/test-filter-presets.js`, `tools/test-filter-presets-migrate.js`, `tools/test-team-filter.js`.
 
-<<<<<<< HEAD
-## Hoa hồng kênh NGUỒN theo chất liệu vàng (Duyên yêu cầu 31/10/2026) — làm từng bước, push từng file
-**Yêu cầu:** đơn thuộc kênh **Nguồn** (cột Nguồn đơn của Pos) → TỰ ĐỘNG tính hoa hồng theo chất liệu trong tên sản phẩm: **vàng 10k = 1,5%**, **vàng 14k = 1%**, **KHÔNG phụ thuộc giá trị đơn** (không xét mốc 15 triệu như các kênh còn lại).
-- [x] **Bước 1/3 — Backend `gas_v13.js` (v13.64-nguon-gold)**: `_goldChannelRule_(nguonDon, sanPham)` + `_csChannelCommissionOf_` (luật vàng ĐỨNG TRƯỚC % kênh admin cài và mốc 15tr) dùng trong tính hoa hồng CS (`channelRate` cũ → `_csChannelCommissionOf_`). Khoá thống kê tách riêng: `Nguồn · vàng 10k` / `Nguồn · vàng 14k`. Test `tools/test-gold-channel.js` (18 ca). Lỗi bắt được khi test: `_normTxt_` của GAS KHÔNG bỏ dấu → dùng `_bcFold_`.
-- [ ] **Bước 2/3 — Web `js/01-fn-splitmulti.js`**: cùng luật trong `_computeCommissionData_` (Báo cáo E hoa hồng) + hiện khoá `Nguồn · vàng 10k/14k` trong chi tiết kênh; thêm ca test phía web vào `tools/test-gold-channel.js`.
-- [ ] **Bước 3/3 — Ghi chú giao diện** ở Báo cáo E / modal "% hoa hồng theo kênh": nêu rõ luật vàng của kênh Nguồn (không sửa được ở modal).
-- **Giả định cần Duyên xác nhận:** (1) "kênh nguồn" = Nguồn đơn tên **Nguồn** (so khớp không dấu, không phân biệt hoa thường; chấp nhận cả "Nguồn hàng…" — bắt đầu bằng "Nguồn "); (2) chất liệu nhận biết bằng chữ **10k / 14k** trong TÊN SẢN PHẨM (cả "10 K", "vang10k"; không nhận 110k / 10kg); (3) đơn có CẢ 10k và 14k (không tách được giá trị từng món) → lấy mức **thấp (1%)**, ghi chú "mức thấp" trong khoá thống kê; (4) đơn Nguồn KHÔNG có 10k/14k → tính như cũ (% kênh admin cài nếu có, không thì mốc 15tr).
-
-=======
 ## QUY TẮC LÀM VIỆC (Duyên đặt 2026-10-31)
 - Chia việc thành các bước nhỏ, mỗi bước là một file hoàn chỉnh; **xong một file là push main ngay**; **cuối mỗi bước cập nhật HANDOFF.md**: đã xong gì / đang làm gì / bước kế tiếp (để phiên khác tiếp tục được). Vẫn theo quy tắc Git merge-only + tools/safe-push.sh.
 
@@ -1504,4 +1495,3 @@ Nguồn: Google Sheet "Khách Sale qua cửa hàng" (tab đầu) — `_storeCase
 4. **Ghép đơn Pos:** SĐT chuẩn hoá + ngày tạo đơn Pos: có đơn ĐÚNG ngày thì lấy đơn đó; không có thì cho lệch ±1 ngày (đánh dấu `lech`, ghi chú). Lệch ≥2 ngày không ghép. Dòng "Ko đến" không ghép đơn.
 5. **Tiền:** 30% giá trị sau giảm (`storeCaseSharePct`), chia đều các sale của dòng; sale đã có thẻ trên đơn Pos → "trùng", bỏ qua.
 - Điểm còn dễ sai: hẹn xa >45 ngày bị lùi sang năm trước; "Ngày KH đến" ghi chữ lạ không ra ngày → rơi về ngày hẹn.
->>>>>>> origin/main
