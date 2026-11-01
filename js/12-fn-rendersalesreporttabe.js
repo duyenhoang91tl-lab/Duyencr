@@ -339,6 +339,8 @@ function _srRenderE_(d){
     html += _srChartSvg(bucketRows, 'name', 'value', _srState.eBucketView, true, 'orders');
   }
 
+  html += _goldRuleNoteHtml_(c);   // ghi chu luat vang kenh Nguon (chi hien khi co don ap dung)
+
   // b) Hoa hồng từng nhân viên
   _SR_COLTH_ROWSFN_['eSale'] = function(){ return _computeCommissionData_((_srState.dataE&&_srState.dataE.orders)||[]).bySale || []; };
   _SR_COLTH_GETTER_['eSale'] = { name: function(r){ return r.name; } };
@@ -1026,12 +1028,23 @@ function closeChannelRatesModal(){
   var m = document.getElementById('cr-modal');
   if (m) m.style.display = 'none';
 }
+// Ghi chu luat vang cua kenh Nguon (Duyen yeu cau 2026-10) — noi dung lay tu GOLD_RULE_MATERIALS (js/01) nen KHONG BAO GIO lech voi cach tinh
+function _goldRuleLabelHtml_(){
+  var m = (typeof GOLD_RULE_MATERIALS !== 'undefined' ? GOLD_RULE_MATERIALS : []).slice().sort(function(a, b){ return b.rate - a.rate; });
+  return m.map(function(x){ return '<b>' + esc(x.label) + ' = ' + String(x.rate).replace('.', ',') + '%</b>'; }).join(', ');
+}
+function _goldRuleNoteHtml_(c){
+  var has = (c && c.bySale || []).some(function(r){ return Object.keys(r.channelBreakdown || {}).some(function(k){ return k.indexOf(' · ') !== -1; }); });
+  if (!has) return '';
+  return '<div style="font-size:11.5px;color:var(--muted);margin:6px 0 10px">⭐ Đã áp luật <b>kênh Nguồn</b> theo chất liệu: ' + _goldRuleLabelHtml_() + ' — không phụ thuộc giá trị đơn (xem chi tiết từng kênh ở cột “DT kênh riêng”, rê chuột vào số).</div>';
+}
 function _renderChannelRatesModal(){
   var body = document.getElementById('cr-body');
   if (!body) return;
   var keys = Object.keys(CHANNEL_COMMISSION_RATES).sort(function(a,b){ return a.localeCompare(b,'vi'); });
   var nguonOptions = (_srState && _srState.nguonOptions) || [];
   var html = '<div class="guide-text" style="font-size:12px;color:var(--muted);margin-bottom:10px">Đơn có Nguồn đơn khớp đúng (không phân biệt hoa/thường) 1 trong các tên dưới đây sẽ tính hoa hồng theo % cố định này, bỏ qua ngưỡng '+_commThrLabel_()+' và % cá nhân/team. Mặc định (khi chưa cài): nguồn chỉ ghi "Facebook" = 1%.</div>';
+  html += '<div style="margin-bottom:10px;padding:8px 10px;border:1px solid #fed7aa;background:#fff7ed;border-radius:8px;font-size:12px;color:#9a3412">⭐ <b>Luật cố định cho kênh Nguồn</b> (tự động, không cài ở bảng này): đơn có chất liệu trong tên sản phẩm tính '+_goldRuleLabelHtml_()+', <b>không phụ thuộc giá trị đơn</b> và <b>luôn ưu tiên</b> hơn % cài bên dưới cho kênh Nguồn. Đơn có cả 10k &amp; 14k tính mức thấp. Đơn Nguồn không có 10k/14k vẫn theo bảng bên dưới (nếu đã cài) hoặc mốc '+_commThrLabel_()+'.</div>';
   html += '<table class="dash-table"><thead><tr><th>Nguồn đơn</th><th style="width:140px">% hoa hồng</th><th style="width:60px"></th></tr></thead><tbody>';
   keys.forEach(function(k){
     html += '<tr><td>'+esc(k)+'</td>'+
