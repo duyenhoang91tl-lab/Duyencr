@@ -2012,6 +2012,7 @@ function _srLAcctBadge_(o){
   var a = o && o.acct; if (!a) return '';
   var m = { 'chua-ghi': ['❌ KT chưa ghi', '#b91c1c', '#fee2e2', 'Mã bộ đếm của đơn KHÔNG có trong file kế toán "THEO DÕI ĐƠN CHIA SALE"'],
             'thieu-ma': ['⚠ Thiếu mã bộ đếm', '#92400e', '#fef3c7', 'Chưa có mã (cột R trang tính cửa hàng / ghi chú Pos) nên chưa đối chiếu được với kế toán'],
+            'co-sdt': ['🔎 KT có SĐT (chưa có mã)', '#1e40af', '#dbeafe', 'SĐT khách này đã có trong file kế toán nhưng đơn chưa có mã bộ đếm (cột R) → chưa chắc đúng đơn. Điền mã bộ đếm vào cột R để đối chiếu chắc chắn' + (a.sheet ? ' (tab ' + a.sheet + ', dòng ' + a.line + ')' : '')],
             'da-ghi': ['✔ KT đã ghi', '#166534', '#dcfce7', 'Đã có trong file kế toán' + (a.sheet ? ' (tab ' + a.sheet + ', dòng ' + a.line + ')' : '')] }[a.status];
   return m ? ' <span title="'+esc(m[3])+'" style="display:inline-block;padding:1px 7px;border-radius:10px;font-weight:700;background:'+m[2]+';color:'+m[1]+'">'+m[0]+'</span>' : '';
 }
@@ -2022,7 +2023,7 @@ function _srLAcctHtml_(d){
   var h = '<div style="border:1px solid '+(chua.length?'#fecaca':'var(--border)')+';border-radius:10px;padding:10px 12px;margin-bottom:14px">'+
     '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px"><span style="font-weight:700;font-size:13px">🧾 Đối chiếu file kế toán</span>'+
     '<span style="padding:1px 9px;border-radius:10px;font-weight:700;background:'+(chua.length?'#fee2e2':'#dcfce7')+';color:'+(chua.length?'#b91c1c':'#166534')+'">❌ KT chưa ghi: '+fmt(sm.chuaGhi||0)+' đơn'+(sm.chuaGhi?' · '+_srMoney(sm.chuaGhiChia)+' chia Sale':'')+'</span>'+
-    '<span style="color:var(--green);font-weight:600">✔ đã ghi '+fmt(sm.daGhi||0)+'</span>'+(sm.thieuMa?'<span style="color:#92400e;font-weight:600">⚠ thiếu mã '+fmt(sm.thieuMa)+'</span>':'')+
+    '<span style="color:var(--green);font-weight:600">✔ đã ghi '+fmt(sm.daGhi||0)+'</span>'+(sm.thieuMa?'<span style="color:#92400e;font-weight:600">⚠ thiếu mã '+fmt(sm.thieuMa)+'</span>':'')+(sm.coSdt?'<span style="color:#1e40af;font-weight:600" title="SĐT khách có trong file kế toán nhưng đơn chưa có mã bộ đếm — chưa chắc đúng đơn">🔎 có SĐT, chưa mã '+fmt(sm.coSdt)+'</span>':'')+
     (miss.length?'<button class="btn sm" onclick="_srLExportAcct_()">📥 Xuất file đối chiếu kế toán</button>':'')+
     '<a href="'+esc(ac.sheetUrl||'#')+'" target="_blank" rel="noopener" style="font-size:11px">mở file kế toán</a></div>'+
     '<div style="font-size:10.5px;color:var(--hint);margin-bottom:6px">Đọc cột mã đơn: <b>'+esc((d.dataQuality||{}).cotMaDon||'?')+'</b> — <b>'+fmt((d.dataQuality||{}).coMaDon||0)+'</b>/'+fmt((d.dataQuality||{}).tongDong||0)+' dòng trang tính cửa hàng có mã. Đối chiếu:'+' mã đơn cột R trang tính cửa hàng (+ mã trong ghi chú Pos) ↔ cột "Mã bộ đếm" của file kế toán (đọc '+fmt(ac.soMa||0)+' mã ở '+fmt((ac.tabs||[]).length)+' tab). Chỉ xét đơn có Sale được chia ('+esc(d.sharePct)+'%).</div>';
@@ -2043,7 +2044,7 @@ function _srLExportAcct_(){
   if (!ac || !(ac.missing||[]).length){ toast('Không có đơn nào cần xuất.'); return; }
   var tag = (d.dateFrom || _srState.lDateFrom || 'tu-dau') + '_' + (d.dateTo || _srState.lDateTo || 'den-nay');
   var head = ['Mã bộ đếm','Ngày đơn','SĐT','Khách','Kênh bán','Sale bán','Giá trị đơn','Phần Sale ('+d.sharePct+'%)','Phần Quầy','Dòng Pos','Dòng trang tính cửa hàng','Cách xử lý (Báo cáo L)'];
-  var lbl = { 'tinh':'Tính thêm cho Sale', 'trung':'Trùng thẻ Pos', 'mot-phan':'Trùng một phần' };
+  var lbl = { 'tinh':'Tính thêm cho Sale', 'trung':'Trùng thẻ Pos', 'mot-phan':'Trùng một phần', 'chua-ghep-don':'Chưa ghép được đơn Pos (giá trị lấy từ cột Doanh thu trang tính cửa hàng)' };
   var chua = [head], thieu = [head];
   (ac.missing||[]).forEach(function(e){
     var base = [(e.codes||[]).join(' ; '), e.ngay||'', e.phone||'', e.khachHang||e.tenKh||'', 'Quầy Hào Nam / ' + (e.nguonDon||''), (e.sales||[]).join(', '), Math.round(e.giaTri||0), e.chiaSale||0, e.phanQuay||0, e.posRow, (e.storeRows||[]).join(', '), lbl[e.loaiXuLy]||e.loaiXuLy||''];

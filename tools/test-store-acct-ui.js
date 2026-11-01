@@ -26,4 +26,13 @@ ok(!/KT/.test(c._srLOrderHtml_(o(null))) && !/KT chưa ghi/.test(c._srLOrderHtml
 c._srState.dataL = d; c._srLExportAcct_();
 ok(files[0] === 'DoiChieuKeToan_2026-10-01_2026-10-31.xlsx' && sheets[0][0] === 'KT chưa ghi' && sheets[0][1].length === 2 && sheets[0][1][1][0] === 'M99999' && sheets[1][0] === 'Thiếu mã bộ đếm' && sheets[1][1].length === 2, 'xuat Excel: sheet KT chua ghi (theo ma bo dem) + sheet thieu ma');
 c._srState.dataL = { acctCheck: { missing: [] } }; c._srLExportAcct_(); ok(toasts.length === 1 && files.length === 1, 'khong co don: bao, khong xuat file rong');
+// ---- 2026-10-31: du phong khop theo SDT ("co-sdt") + dong theo ma chua ghep duoc don Pos ----
+ok(/🔎 KT có SĐT \(chưa có mã\)/.test(c._srLOrderHtml_(o('co-sdt'))) && /tab t10, dòng 3/.test(c._srLOrderHtml_(o('co-sdt'))) && !/KT chưa ghi/.test(c._srLOrderHtml_(o('co-sdt'))), 'nhan canh don: co-sdt (xanh, kem tab + dong), KHONG nham la chua ghi');
+h = c._srLAcctHtml_({ sharePct: 30, acctCheck: { ok: true, soMa: 5, tabs: ['t'], summary: { daGhi: 2, chuaGhi: 0, thieuMa: 0, coSdt: 4 }, missing: [] } });
+ok(/có SĐT, chưa mã 4/.test(h) && /Mọi đơn có Sale được chia đều đã có/.test(h), 'panel: dem rieng "co SDT, chua ma" va khong tinh la thieu');
+h = c._srLAcctHtml_({ sharePct: 30, acctCheck: { ok: true, soMa: 5, tabs: ['t'], summary: { daGhi: 0, chuaGhi: 1, thieuMa: 0, chuaGhiChia: 600000 }, missing: [{ posRow: null, ngay: '19-20', phone: '0900000009', tenKh: 'KH', sales: ['phuongthao2000'], codes: ['M70001'], giaTri: 2000000, chiaSale: 600000, phanQuay: 1400000, status: 'chua-ghi', loaiXuLy: 'chua-ghep-don', storeRows: [9, 10], nguonDon: 'Trang tính cửa hàng (chưa ghép đơn Pos)' }] } });
+ok(/M70001/.test(h) && /phuongthao2000/.test(h) && /KT chưa ghi: 1 đơn/.test(h), 'dong theo ma chua ghep duoc don Pos (posRow null) van hien trong bang');
+c._srState.dataL = { sharePct: 30, dateFrom: 'a', dateTo: 'b', acctCheck: { missing: [{ posRow: null, ngay: '19-20', phone: '0900000009', tenKh: 'KH', sales: ['phuongthao2000'], codes: ['M70001'], giaTri: 2000000, chiaSale: 600000, phanQuay: 1400000, status: 'chua-ghi', loaiXuLy: 'chua-ghep-don', storeRows: [9, 10], nguonDon: 'Trang tính cửa hàng (chưa ghép đơn Pos)' }] } };
+sheets.length = 0; files.length = 0; c._srLExportAcct_();
+ok(sheets[0][1][1][0] === 'M70001' && /Chưa ghép được đơn Pos/.test(sheets[0][1][1][11]) && sheets[0][1][1][6] === 2000000, 'Excel: dong theo ma co nhan "Chưa ghép được đơn Pos" va gia tri tu cot Doanh thu');
 process.exit(bad ? 1 : 0);
