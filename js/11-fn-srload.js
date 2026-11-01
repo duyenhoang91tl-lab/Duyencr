@@ -2008,23 +2008,32 @@ function _srLRowMatchesSearch_(r, q){
   return hay.indexOf(q) !== -1;
 }
 // Nhan doi chieu file ke toan canh don (2026-10-31, Duyen: ke toan chua ghi thi hien "KT chua ghi" de Sale xuat file doi chieu). Chi don co Sale duoc chia moi co o.acct.
+// KHỚP TIỀN với kế toán (backend `_storeAcctMoney_`): nhãn từng loại lệch
+function _srLTienLbl_(st){
+  return { 'lech-tong':'Tổng KT ≠ giá trị đơn Pos', 'lech-chia':'Phần sale KT ≠ tỷ lệ chia', 'thieu-dong-sale':'KT thiếu dòng sale (chỉ ghi dòng Quầy)', 'sai-sale':'Tên sale KT ≠ Sale báo cáo L' }[st] || st || '';
+}
 function _srLAcctBadge_(o){
   var a = o && o.acct; if (!a) return '';
   var m = { 'chua-ghi': ['❌ KT chưa ghi', '#b91c1c', '#fee2e2', 'Mã bộ đếm của đơn KHÔNG có trong file kế toán "THEO DÕI ĐƠN CHIA SALE"'],
             'thieu-ma': ['⚠ Thiếu mã bộ đếm', '#92400e', '#fef3c7', 'Chưa có mã (cột R trang tính cửa hàng / ghi chú Pos) nên chưa đối chiếu được với kế toán'],
             'co-sdt': ['🔎 KT có SĐT (chưa có mã)', '#1e40af', '#dbeafe', 'SĐT khách này đã có trong file kế toán nhưng đơn chưa có mã bộ đếm (cột R) → chưa chắc đúng đơn. Điền mã bộ đếm vào cột R để đối chiếu chắc chắn' + (a.sheet ? ' (tab ' + a.sheet + ', dòng ' + a.line + ')' : '')],
             'da-ghi': ['✔ KT đã ghi', '#166534', '#dcfce7', 'Đã có trong file kế toán' + (a.sheet ? ' (tab ' + a.sheet + ', dòng ' + a.line + ')' : '')] }[a.status];
-  return m ? ' <span title="'+esc(m[3])+'" style="display:inline-block;padding:1px 7px;border-radius:10px;font-weight:700;background:'+m[2]+';color:'+m[1]+'">'+m[0]+'</span>' : '';
+  var main = m ? ' <span title="'+esc(m[3])+'" style="display:inline-block;padding:1px 7px;border-radius:10px;font-weight:700;background:'+m[2]+';color:'+m[1]+'">'+m[0]+'</span>' : '';
+  var tn = a.tien;   // da ghi nhung SO TIEN lech so voi Pos
+  if (a.status === 'da-ghi' && tn && tn.status !== 'khop' && tn.status !== 'khong-ro')
+    main += ' <span title="'+esc(_srLTienLbl_(tn.status)+' — KT ghi sale '+_srMoney(tn.ktSale)+' / dự kiến '+_srMoney(tn.saleDuKien)+' · tổng KT '+_srMoney(tn.ktTong)+' / Pos '+_srMoney(tn.posTong))+'" style="display:inline-block;padding:1px 7px;border-radius:10px;font-weight:700;background:#ffedd5;color:#9a3412">💸 KT lệch tiền</span>';
+  return main;
 }
 function _srLAcctHtml_(d){
   var ac = d.acctCheck; if (!ac) return '';
   if (ac.ok === false) return '<div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px">⚠️ '+esc(ac.error||'Không đọc được file kế toán')+' — chưa đối chiếu được, KHÔNG có nghĩa là kế toán đã ghi đủ.</div>';
-  var sm = ac.summary || {}, miss = ac.missing || [], chua = miss.filter(function(e){ return e.status === 'chua-ghi'; }), thieu = miss.filter(function(e){ return e.status === 'thieu-ma'; });
+  var sm = ac.summary || {}, miss = ac.missing || [], lech = ac.lech || [], chua = miss.filter(function(e){ return e.status === 'chua-ghi'; }), thieu = miss.filter(function(e){ return e.status === 'thieu-ma'; });
   var h = '<div style="border:1px solid '+(chua.length?'#fecaca':'var(--border)')+';border-radius:10px;padding:10px 12px;margin-bottom:14px">'+
     '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px"><span style="font-weight:700;font-size:13px">🧾 Đối chiếu file kế toán</span>'+
     '<span style="padding:1px 9px;border-radius:10px;font-weight:700;background:'+(chua.length?'#fee2e2':'#dcfce7')+';color:'+(chua.length?'#b91c1c':'#166534')+'">❌ KT chưa ghi: '+fmt(sm.chuaGhi||0)+' đơn'+(sm.chuaGhi?' · '+_srMoney(sm.chuaGhiChia)+' chia Sale':'')+'</span>'+
     '<span style="color:var(--green);font-weight:600">✔ đã ghi '+fmt(sm.daGhi||0)+'</span>'+(sm.thieuMa?'<span style="color:#92400e;font-weight:600">⚠ thiếu mã '+fmt(sm.thieuMa)+'</span>':'')+(sm.coSdt?'<span style="color:#1e40af;font-weight:600" title="SĐT khách có trong file kế toán nhưng đơn chưa có mã bộ đếm — chưa chắc đúng đơn">🔎 có SĐT, chưa mã '+fmt(sm.coSdt)+'</span>':'')+
-    (miss.length?'<button class="btn sm" onclick="_srLExportAcct_()">📥 Xuất file đối chiếu kế toán</button>':'')+
+    (sm.lechTien?'<span style="padding:1px 9px;border-radius:10px;font-weight:700;background:#ffedd5;color:#9a3412" title="Đã ghi nhưng SỐ TIỀN lệch so với Pos (tổng / phần sale / thiếu dòng sale / sai sale)">💸 KT ghi lệch tiền: '+fmt(sm.lechTien)+' đơn · lệch phần sale '+_srMoney(sm.lechSaleTong||0)+'</span>':'')+(sm.khopTien?'<span style="color:var(--green);font-weight:600" title="Tổng và phần sale khớp Pos">✔ tiền khớp '+fmt(sm.khopTien)+'</span>':'')+
+    ((miss.length||lech.length)?'<button class="btn sm" onclick="_srLExportAcct_()">📥 Xuất file đối chiếu kế toán</button>':'')+
     '<a href="'+esc(ac.sheetUrl||'#')+'" target="_blank" rel="noopener" style="font-size:11px">mở file kế toán</a></div>'+
     '<div style="font-size:10.5px;color:var(--hint);margin-bottom:6px">Đọc cột mã đơn: <b>'+esc((d.dataQuality||{}).cotMaDon||'?')+'</b> — <b>'+fmt((d.dataQuality||{}).coMaDon||0)+'</b>/'+fmt((d.dataQuality||{}).tongDong||0)+' dòng trang tính cửa hàng có mã. Đối chiếu:'+' mã đơn cột R trang tính cửa hàng (+ mã trong ghi chú Pos) ↔ cột "Mã bộ đếm" của file kế toán (đọc '+fmt(ac.soMa||0)+' mã ở '+fmt((ac.tabs||[]).length)+' tab). Chỉ xét đơn có Sale được chia ('+esc(d.sharePct)+'%).</div>';
   if (miss.length){
@@ -2036,12 +2045,33 @@ function _srLAcctHtml_(d){
     });
     h += '</tbody></table></div>'+(miss.length>300?'<div style="font-size:11px;color:var(--muted)">Hiện 300/'+miss.length+' đơn — xuất file để xem đủ.</div>':'');
   } else h += '<div style="color:var(--green);font-size:12px">✔ Mọi đơn có Sale được chia đều đã có trong file kế toán.</div>';
+  if (lech.length){   // ĐÃ GHI nhưng SỐ TIỀN lệch: sắp theo mức lệch phần sale giảm dần (âm = KT ghi THIẾU cho sale)
+    var ls = lech.slice().sort(function(a, b){ return Math.abs((b.tien||{}).lechSale||0) - Math.abs((a.tien||{}).lechSale||0); });
+    h += '<div style="margin-top:12px;font-weight:700;font-size:13px;color:#9a3412">💸 KT ghi LỆCH TIỀN — '+fmt(lech.length)+' đơn (lệch phần sale cộng lại '+_srMoney(sm.lechSaleTong||0)+'; âm = KT ghi thiếu cho Sale)</div>'+
+      '<div style="overflow-x:auto;max-height:340px;overflow-y:auto"><table class="dash-table"><thead><tr><th>Mã bộ đếm</th><th>Loại lệch</th><th>Sale (báo cáo L)</th><th>Sale (KT ghi)</th><th style="text-align:right">Giá trị Pos</th><th style="text-align:right">Tổng KT</th><th style="text-align:right">Sale dự kiến</th><th style="text-align:right">Sale KT ghi</th><th style="text-align:right">Lệch sale</th><th>Dòng trong file KT</th></tr></thead><tbody>';
+    ls.slice(0, 300).forEach(function(e){
+      var t = e.tien || {};
+      h += '<tr><td style="white-space:nowrap"><b>'+esc((e.codes||[]).join(' ; ')||'—')+'</b></td><td>'+esc(_srLTienLbl_(t.status))+'</td><td>'+esc((e.sales||[]).join(', '))+'</td><td>'+esc((t.salesKT||[]).join(', ')||'—')+'</td>'+
+        '<td style="text-align:right">'+_srMoney(t.posTong||0)+'</td><td style="text-align:right">'+_srMoney(t.ktTong||0)+'</td><td style="text-align:right">'+_srMoney(t.saleDuKien||0)+'</td><td style="text-align:right">'+_srMoney(t.ktSale||0)+'</td>'+
+        '<td style="text-align:right;font-weight:700;color:'+((t.lechSale||0)<0?'#b91c1c':'#9a3412')+'">'+_srMoney(t.lechSale||0)+'</td><td style="font-size:11px;color:var(--muted)">'+esc((e.sheet||'')+(t.lines&&t.lines.length?' · dòng '+t.lines.join(', '):''))+'</td></tr>';
+    });
+    h += '</tbody></table></div>'+(ls.length>300?'<div style="font-size:11px;color:var(--muted)">Hiện 300/'+ls.length+' đơn — xuất file để xem đủ.</div>':'');
+  }
   return h + '</div>';
 }
 // Xuat file doi chieu cho Sale gui ke toan: sheet "KT chưa ghi" (theo ma bo dem, bo cuc giong file ke toan: cap dong Quay + Sale) + sheet "Thiếu mã bộ đếm".
+function _srLLechSheet_(d){   // [header, ...dong] cho sheet "KT ghi lệch tiền"; so tien la SO
+  var ac = (d && d.acctCheck) || {}, pct = d && d.sharePct != null ? d.sharePct : 30;
+  var head = ['Mã bộ đếm','Loại lệch','Ngày đơn Pos','SĐT','Khách','Sale (báo cáo L)','Sale (KT ghi)','Giá trị đơn Pos','Tổng KT','Lệch tổng','Sale dự kiến ('+pct+'%)','Sale KT ghi','Lệch sale','Quầy dự kiến','Quầy KT ghi','Tab KT','Dòng trong file KT','Dòng Pos','Dòng trang tính cửa hàng'];
+  var rows = (ac.lech || []).slice().sort(function(a, b){ var ca = (a.codes||[])[0] || '', cb = (b.codes||[])[0] || ''; return ca < cb ? -1 : ca > cb ? 1 : 0; }).map(function(e){
+    var t = e.tien || {};
+    return [(e.codes||[]).join(' ; '), _srLTienLbl_(t.status), e.ngay||'', e.phone||'', e.khachHang||e.tenKh||'', (e.sales||[]).join(', '), (t.salesKT||[]).join(', '), t.posTong||0, t.ktTong||0, t.lechTong||0, t.saleDuKien||0, t.ktSale||0, t.lechSale||0, t.quayDuKien||0, t.ktQuay||0, e.sheet||'', (t.lines||[]).join(', '), e.posRow, (e.storeRows||[]).join(', ')];
+  });
+  return [head].concat(rows);
+}
 function _srLExportAcct_(){
   var d = _srState.dataL, ac = d && d.acctCheck;
-  if (!ac || !(ac.missing||[]).length){ toast('Không có đơn nào cần xuất.'); return; }
+  if (!ac || !((ac.missing||[]).length || (ac.lech||[]).length)){ toast('Không có đơn nào cần xuất.'); return; }
   var tag = (d.dateFrom || _srState.lDateFrom || 'tu-dau') + '_' + (d.dateTo || _srState.lDateTo || 'den-nay');
   var head = ['Mã bộ đếm','Ngày đơn','SĐT','Khách','Kênh bán','Sale bán','Giá trị đơn','Phần Sale ('+d.sharePct+'%)','Phần Quầy','Dòng Pos','Dòng trang tính cửa hàng','Cách xử lý (Báo cáo L)'];
   var lbl = { 'tinh':'Tính thêm cho Sale', 'trung':'Trùng thẻ Pos', 'mot-phan':'Trùng một phần', 'chua-ghep-don':'Chưa ghép được đơn Pos (giá trị lấy từ cột Doanh thu trang tính cửa hàng)' };
@@ -2057,6 +2087,8 @@ function _srLExportAcct_(){
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(chua.length > 1 ? chua : [head, ['(không có đơn nào)']]), 'KT chưa ghi');
   if (thieu.length > 1) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(thieu), 'Thiếu mã bộ đếm');
+  var lechRows = _srLLechSheet_(d);   // KT đã ghi nhưng SỐ TIỀN lệch so với Pos
+  if (lechRows.length > 1) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(lechRows), 'KT ghi lệch tiền');
   XLSX.writeFile(wb, 'DoiChieuKeToan_'+tag+'.xlsx');
 }
 function _srLOrderHtml_(o){
