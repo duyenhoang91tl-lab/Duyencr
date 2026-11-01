@@ -214,6 +214,7 @@ function renderPkChatTab(c) {
     + '<div class="pkt-bar" id="pkc-tags" style="display:none"></div>'
     + '<div class="pkc-compose" id="pkc-compose">'
     +   '<button class="btn sm" type="button" title="Gợi ý tin nhắn theo sản phẩm" onclick="tplChatToggle(\'pkc-compose\',\'pkc-input\')">💡</button>'
+    +   '<button class="btn sm" type="button" title="Chèn ảnh / ghi âm / mẫu tin từ thư viện" onclick="mlibChatPick(\'pkc-input\')">📎</button>'
     +   '<textarea id="pkc-input" rows="2" placeholder="Nhập tin trả lời… (Ctrl+Enter để gửi)" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key===\'Enter\'){event.preventDefault();pkcSend();}"></textarea>'
     +   '<button class="save-btn pkc-send" id="pkc-send" onclick="pkcSend()">Gửi</button>'
     + '</div>'

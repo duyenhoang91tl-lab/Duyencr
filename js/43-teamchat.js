@@ -57,7 +57,25 @@
     return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear();
   }
   // Van ban -> HTML an toan: tach URL ra truoc, escape tung phan, roi to mau @nhac-ten.
+  // Ảnh/ghi âm từ Thư viện được gửi dạng dấu hiệu [[ml:image|URL|tên]] / [[ml:audio|URL|tên]] (URL CHỈ nhận link Drive do thư viện tạo) → vẽ ảnh/trình phát; mọi thứ khác đi đường cũ.
+  var ML_RE = /\[\[ml:(image|audio)\|(https:\/\/drive\.google\.com\/uc\?export=(?:view|download)&id=([A-Za-z0-9_-]{10,}))\|([^\]|]{0,80})\]\]/g;
   function fmtText(t) {
+    t = String(t);
+    if (t.indexOf('[[ml:') > -1) {
+      var out2 = '', last = 0, mm;
+      ML_RE.lastIndex = 0;
+      while ((mm = ML_RE.exec(t))) {
+        out2 += fmtText0(t.slice(last, mm.index));
+        out2 += mm[1] === 'image'
+          ? '<a href="' + esc(mm[2]) + '" target="_blank" rel="noopener noreferrer"><img class="tc-img" loading="lazy" alt="' + esc(mm[4]) + '" src="https://drive.google.com/thumbnail?id=' + esc(mm[3]) + '&sz=w600"></a>'
+          : '<div class="tc-aud">🎙️ ' + esc(mm[4]) + '<audio controls preload="none" src="' + esc(mm[2]) + '"></audio></div>';
+        last = mm.index + mm[0].length;
+      }
+      return out2 + fmtText0(t.slice(last));
+    }
+    return fmtText0(t);
+  }
+  function fmtText0(t) {
     var parts = String(t).split(/(https?:\/\/[^\s<>"']+)/g), out = '';
     for (var i = 0; i < parts.length; i++) {
       if (i % 2 === 1) out += '<a href="' + esc(parts[i]) + '" target="_blank" rel="noopener noreferrer">' + esc(parts[i]) + '</a>';
@@ -201,7 +219,7 @@
           '<button class="btn sm" id="tc-manage" onclick="tcManage()" style="display:none" title="Thành viên / cài đặt">⚙</button></div>' +
           '<div class="tc-msgs" id="tc-msgs"></div><div class="tc-reply" id="tc-reply" style="display:none"></div>' +
           '<div class="tc-comp"><textarea id="tc-input" rows="1" maxlength="' + MAX_LEN + '" placeholder="Nhập tin nhắn… (Enter gửi, Shift+Enter xuống dòng)"></textarea>' +
-          '<button class="btn primary" id="tc-send" onclick="tcSend()">Gửi</button></div></div>' +
+          '<button class="btn" type="button" title="Chèn ảnh / ghi âm / mẫu tin từ thư viện" onclick="mlibChatPick(\'tc-input\',\'image\',true)">📎</button><button class="btn primary" id="tc-send" onclick="tcSend()">Gửi</button></div></div>' +
       '</div>';
     dv.appendChild(p);
     var ta = $('tc-input');

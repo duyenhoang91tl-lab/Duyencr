@@ -412,6 +412,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
       <div class="tab" data-bar-id="tab-mydata" data-bar-home=".tabs" onclick="switchTab('mydata',this)">📋 Data của tôi <span class="tab-badge" id="tb-mydata">0</span></div>
       <div class="tab" data-bar-id="tab-zaloai" data-bar-home=".tabs" onclick="switchTab('zaloai',this)">🤖 Zalo AI</div>
       <div class="tab" data-bar-id="tab-chat" data-bar-home=".tabs" onclick="switchTab('chat',this)">💬 Chat</div>
+      <div class="tab" data-bar-id="tab-media" data-bar-home=".tabs" onclick="switchTab('media',this)">🖼️ Thư viện</div>
       <div class="tab" data-bar-id="tab-teamchat" data-bar-home=".tabs" onclick="switchTab('teamchat',this)">💬 Chat nội bộ <span class="tab-badge" id="tb-teamchat" style="display:none">0</span></div>
       <div class="tab" data-bar-id="tab-task" data-bar-home=".tabs" onclick="switchTab('task',this)">🗂️ Công việc <span class="tab-badge" id="tb-task">0</span></div>
       <div class="tabs-mobile-toggle" onclick="event.stopPropagation();this.closest('.tabs').classList.toggle('mobile-tabs-open')">☰ Mục ▾</div>
@@ -892,6 +893,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
       </div>
     </div>
 
+    <div id="tab-media" style="display:none;flex:1;overflow:auto;flex-direction:column" class="main"><div id="mlib-wrap" style="padding:14px 18px"></div></div>
     <div id="tab-chat" style="display:none;flex:1;overflow:hidden;flex-direction:row" class="main"><div id="chat-wrap" style="flex:1;overflow:hidden;display:flex;min-width:0"></div><div id="sc-dock" class="sc-dock"></div></div>
     <div id="tab-mydata" style="display:none;flex:1;overflow:hidden;flex-direction:column" class="main">
       <div class="toolbar">
@@ -1236,9 +1238,10 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 <link rel="stylesheet" href="css/04-style.css">
 <link rel="stylesheet" href="css/05-sidenav.css?v=20261023b">
 <link rel="stylesheet" href="css/06-pro.css?v=20261027b">
-<link rel="stylesheet" href="css/07-teamchat.css">
+<link rel="stylesheet" href="css/07-teamchat.css?v=20261101a">
 <link rel="stylesheet" href="css/08-kho.css">
 <link rel="stylesheet" href="css/09-profile.css">
+<link rel="stylesheet" href="css/10-medialib.css">
 <link rel="stylesheet" href="css/10-filter-presets.css?v=20261031a">
 <link rel="stylesheet" href="css/10-dark.css?v=20261023a">
 <link rel="stylesheet" href="css/11-roles.css">
@@ -1758,10 +1761,11 @@ function openBcLogModal(phone){
 <script src="js/38-pro-dock.js?v=20261027b"></script>
 <script src="js/39-fn-notify.js?v=20261020a"></script>
 <script src="js/40-fn-rolesettings.js"></script>
-<script src="js/41-fn-pkchat.js?v=20261025c"></script>
-<script src="js/42-fn-socialchat.js?v=20261025c"></script>
+<script src="js/41-fn-pkchat.js?v=20261101a"></script>
+<script src="js/42-fn-socialchat.js?v=20261101a"></script>
 <script src="js/58-fn-chatcoach.js?v=20261025c"></script>
-<script src="js/43-teamchat.js"></script>
+<script src="js/48-fn-medialib.js?v=20261101b"></script>
+<script src="js/43-teamchat.js?v=20261101a"></script>
 <script src="js/40-main-restorenav.js"></script>
 <script src="js/43-fn-viewstate.js"></script>
 <script src="js/46-fn-kho.js"></script>
