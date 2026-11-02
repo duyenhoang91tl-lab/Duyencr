@@ -6,6 +6,17 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+
+## 2026-11-02 (tối) — PHÂN LOẠI SALE THEO MỐC NGÀY + chương trình thưởng áp dụng theo từng mốc (Duyên yêu cầu) — BƯỚC 1/4 đã push
+- **Yêu cầu của Duyên:** cài cho TỪNG Sale: Online/Offline/Thử việc **từ ngày nào** (VD Sale A thử việc 10/09→10/10, chính thức từ 11/10) và chương trình thưởng tương ứng tự áp dụng theo loại tại đúng ngày đơn.
+- **NGUYÊN NHÂN GỐC:** `SALE_CHANNELS` chỉ có 1 phân loại HIỆN TẠI/Sale → đổi Thử việc→Chính thức là MỌI đơn cũ cũng bị tính theo loại mới (báo cáo E/G tháng cũ sai).
+- **Thiết kế (chốt):** `SALE_CHANNEL_PERIODS = {tên: [{from:'yyyy-MM-dd', channel}]}`; mốc có hiệu lực từ `from` tới ngày liền trước mốc kế; trước mốc đầu / Sale không có mốc → dùng `SALE_CHANNELS` hiện tại (KHÔNG đổi hành vi cũ). Lưu localStorage `ome_sale_channel_periods` + Settings key `saleChannelPeriods` (getSetting/setSetting có sẵn → KHÔNG sửa gas_v13.js, KHÔNG cần deploy GAS).
+- [x] **BƯỚC 1/4 ĐÃ PUSH:** file mới `js/62-sale-channel-periods.js` (`_saleChannelOn_(name, ymd)`, `_scpListOf_`, `_scpSet_`, `_scpEndOf_`, `saveSaleChannelPeriods`, sync từ server) + script tag trong index.html + `node tools/test-sale-channel-periods.js` (ALL PASS, gồm đúng ví dụ Duyên).
+- [ ] **BƯỚC 2/4:** js/12 `_computeBonusData_` (2 chỗ `_saleChannelOf_(...)` ở nhóm "theo ngày" ~dòng 194 và "theo đơn" ~243) đổi sang `_saleChannelOn_(name, ngày)` → chương trình thưởng áp dụng theo loại TẠI NGÀY ĐƠN; thêm test.
+- [ ] **BƯỚC 3/4:** js/12 Báo cáo G (`_srGEligible_`/`_srGSaleTypeLabel_`/`_srGBuildGroups_`): nhóm Thử việc/Chính thức theo loại tại ngày (Sale đổi loại giữa kỳ có thể nằm ở cả 2 nhóm).
+- [ ] **BƯỚC 4/4:** giao diện modal "🏷️ Phân loại đội Sale" (`_renderSaleChannelsModal`): mỗi Sale có nút "🗓 Mốc theo ngày" thêm/sửa/xoá mốc (ngày + loại), hiện "đến hết ngày…" tự tính.
+- **ĐANG LÀM:** bước 2. Lưu ý: backend (gas_v13.js, vd `saleChannels` ở báo cáo server-side) vẫn dùng phân loại hiện tại — mốc ngày chỉ áp dụng ở phần tính thưởng phía web (E/G).
+
 ## 2026-11-02 (chiều) — MẪU LỌC NHANH dùng được ở TẤT CẢ báo cáo (Duyên yêu cầu) — XONG 3/3 bước
 - **Yêu cầu của Duyên:** mọi báo cáo đều dùng được bộ lọc nhanh; sửa/lưu mẫu ở đâu thì đổi cho TẤT CẢ báo cáo (chỉ báo cáo đặc thù không áp dụng được mới tạo riêng).
 - **Hiện trạng đã đọc (js/48-filter-presets.js):** mẫu ĐÃ dùng chung (localStorage `ome_sr_filter_presets_v2:<user>`; sửa ✎ / ghi đè ⟳ / xoá ✕ một mẫu = đổi ở mọi báo cáo; tên Sale tự đổi sang đúng tên của báo cáo đang xem). Có thanh mẫu: A,B(+N),C,D,E,F,G(+K),L. THIẾU: **M** (đơn chia), **H**, **I**; J = nhập dữ liệu (admin) không có bộ lọc.
