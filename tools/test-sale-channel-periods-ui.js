@@ -28,7 +28,15 @@ ok(toasts.some(m => /cần chọn ngày/.test(m)), 'chặn mốc thiếu ngày')
 run('_scpDraft.pop(); _scpDraft.push({from:"", channel:""})'); run('_scpSaveDraft()');   // dòng trống hoàn toàn → bỏ qua
 ok(run('_scpOpenName') === '' && run('_saleChannelOn_("Chi","2026-09-20")') === 'probation' && run('_saleChannelOn_("Chi","2026-10-11")') === 'online', 'lưu thành công, tra theo ngày đúng');
 ok(saved.some(s => s[0] === 'ome_sale_channel_periods' && /2026-09-10/.test(s[1])), 'ghi localStorage');
-ok(/Sửa mốc \(2\)/.test(run('_scpCellHtml_("Chi")')) && /10\/09\/2026 → 10\/10\/2026: <b>Thử việc/.test(run('_scpCellHtml_("Chi")')), 'tóm tắt trong ô');
+ok(/Sửa mốc \(2\)/.test(run('_scpCellHtml_("Chi")')) && /10\/09\/2026 → 10\/10\/2026: <b>Thử việc/.test(run('_scpCellHtml_("Chi")')) && /<b>Chính thức — Online/.test(run('_scpCellHtml_("Chi")')), 'tóm tắt trong ô');
+// chọn giai đoạn Thử việc / Chính thức (+ đội) trong editor
+run('_scpToggle("Chi")'); run('_scpDraft[0]={from:"2026-11-01",channel:""}');
+run('_scpSetStage(0,"tv")'); ok(run('_scpDraft[0].channel') === 'probation' && !/Văn phòng/.test(run('_scpEditorRowHtml_("Chi",3)')), 'Thử việc → channel probation, không hiện ô chọn đội');
+run('_scpSetStage(0,"ct")'); ok(run('_scpDraft[0].channel') === 'online' && /Chính thức<\/option>/.test(run('_scpEditorRowHtml_("Chi",3)')) && /Văn phòng/.test(run('_scpEditorRowHtml_("Chi",3)')), 'Chính thức → mặc định Online, hiện ô chọn đội (không có Thử việc trong ô đội)');
+ok(!/value="probation"/.test(run('_scpEditorRowHtml_("Chi",3)')), 'ô đội không chứa probation');
+run('_scpDraft[0].channel="offline"'); run('_scpSetStage(0,"ct")'); ok(run('_scpDraft[0].channel') === 'offline', 'đổi lại Chính thức giữ đội đã chọn');
+run('_scpSetStage(0,"")'); ok(run('_scpDraft[0].channel') === '', 'Chưa phân loại');
+run('_scpToggle("Chi")');
 // xoá hết mốc → quay lại phân loại hiện tại
 run('_scpToggle("Chi")'); run('_scpDraft.length = 0'); run('_scpSaveDraft()');
 ok(run('_saleChannelOn_("Chi","2026-09-20")') === 'online', 'xoá hết mốc → loại hiện tại');

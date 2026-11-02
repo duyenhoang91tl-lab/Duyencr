@@ -8,6 +8,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+
+## 2026-11-02 (tối 3) — Mốc theo ngày: chọn GIAI ĐOẠN Thử việc / Chính thức (+ đội) (Duyên yêu cầu) — XONG 1/1
+- **Yêu cầu:** mỗi mốc phải có lựa chọn "Thử việc" và "Chính thức".
+- **NGUYÊN NHÂN GỐC:** dropdown mốc (bước 4) chỉ liệt kê `SALE_GROUPS` (Online/Văn phòng/đội tự tạo) nên không có nhãn "Chính thức", và "Thử việc" chỉ hiện khi ai đó đã tạo đội `probation`.
+- [x] **ĐÃ PUSH (js/62):** mỗi mốc có ô **Giai đoạn** (— Chưa phân loại — / Thử việc / Chính thức); chọn **Chính thức** thì hiện thêm ô **Đội** (Online / Văn phòng / đội tự tạo, không có Thử việc). Dữ liệu KHÔNG đổi: Thử việc = `channel:'probation'`, Chính thức = channel là key đội (`online`/`offline`/…) → báo cáo E/G và mốc đã lưu trước đó chạy nguyên. Tóm tắt trong ô hiện "Chính thức — Online". Hàm mới `_scpSetStage`, `_scpStageOf_`, `_scpTeamGroups_`. Test: `node tools/test-sale-channel-periods-ui.js` (thêm ca chọn giai đoạn). Bump js/62 `?v=20261102c`. Không đổi gas_v13.js (không cần deploy GAS).
+- **ĐANG LÀM: không có việc dở.** Duyên làm: Ctrl+F5 → modal Phân loại đội Sale → "Thêm mốc" → chọn Thử việc / Chính thức.
+
 ## 2026-11-02 (tối 2) — Modal "🏷️ Phân loại đội Sale" (cài mốc theo ngày) mở TOÀN MÀN HÌNH (Duyên yêu cầu) — XONG 1/1
 - **Vấn đề:** modal rộng 520px, cột "🗓 Mốc theo ngày" và khung sửa mốc bị cắt ngang (ảnh Duyên gửi).
 - **NGUYÊN NHÂN GỐC:** `#sc-modal` trong index.html đặt `max-width:520px;max-height:86vh` từ khi chỉ có 2 cột (Tên, Đội); thêm cột mốc ở bước 4 nhưng không nới khung.

@@ -84,9 +84,20 @@ let _scpOpenName = '', _scpDraft = null;
 function _scpFmtDate_(ymd){ var m = String(ymd || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3] + '/' + m[2] + '/' + m[1] : ''; }
 function _scpChanLabel_(ch){
   if (!ch) return 'Chưa phân loại';
+  if (ch === 'probation') return 'Thử việc';
   var gs = (typeof SALE_GROUPS !== 'undefined' && SALE_GROUPS) || [];
-  for (var i = 0; i < gs.length; i++) if (gs[i].key === ch) return gs[i].label;
-  return ch === 'probation' ? 'Thử việc' : ch;
+  for (var i = 0; i < gs.length; i++) if (gs[i].key === ch) return 'Chính thức — ' + gs[i].label;
+  return 'Chính thức — ' + ch;
+}
+// Giai đoạn của 1 mốc: '' (chưa phân loại) | 'tv' (Thử việc = channel 'probation') | 'ct' (Chính thức = channel là 1 đội Online/Văn phòng/…)
+function _scpStageOf_(ch){ return !ch ? '' : (ch === 'probation' ? 'tv' : 'ct'); }
+function _scpTeamGroups_(){ return ((typeof SALE_GROUPS !== 'undefined' && SALE_GROUPS) || []).filter(function(g){ return g.key !== 'probation'; }); }
+function _scpSetStage(i, stage){
+  var e = _scpDraft[i]; if (!e) return;
+  if (stage === 'tv') e.channel = 'probation';
+  else if (stage === 'ct'){ var tg = _scpTeamGroups_(); if (e.channel === 'probation' || !e.channel) e.channel = tg.length ? tg[0].key : 'online'; }
+  else e.channel = '';
+  _renderSaleChannelsModal();
 }
 function _scpCellHtml_(name){
   var list = _scpListOf_(name);
@@ -112,8 +123,10 @@ function _scpEditorRowHtml_(name, colspan){
     var end = (/^\d{4}-\d{2}-\d{2}$/.test(e.from || '') && nxt) ? _scpEndOf_([{ from: e.from }, { from: nxt }], 0) : '';
     h += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">' +
       '<span style="font-size:12px">Từ ngày</span><input type="date" value="' + esc(e.from || '') + '" onchange="_scpDraft[' + i + '].from=this.value;_renderSaleChannelsModal()" style="padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">' +
-      '<select onchange="_scpDraft[' + i + '].channel=this.value;_renderSaleChannelsModal()" style="width:170px"><option value=""' + (e.channel === '' ? ' selected' : '') + '>— Chưa phân loại —</option>' +
-      gs.map(function(g){ return '<option value="' + esc(g.key) + '"' + (e.channel === g.key ? ' selected' : '') + '>' + esc(g.label) + '</option>'; }).join('') + '</select>' +
+      '<select onchange="_scpSetStage(' + i + ',this.value)" style="width:150px"><option value=""' + (!e.channel ? ' selected' : '') + '>— Chưa phân loại —</option>' +
+      '<option value="tv"' + (e.channel === 'probation' ? ' selected' : '') + '>Thử việc</option><option value="ct"' + (e.channel && e.channel !== 'probation' ? ' selected' : '') + '>Chính thức</option></select>' +
+      (e.channel && e.channel !== 'probation' ? '<select onchange="_scpDraft[' + i + '].channel=this.value;_renderSaleChannelsModal()" style="width:140px">' +
+        _scpTeamGroups_().map(function(g){ return '<option value="' + esc(g.key) + '"' + (e.channel === g.key ? ' selected' : '') + '>' + esc(g.label) + '</option>'; }).join('') + '</select>' : '') +
       '<span style="font-size:11.5px;color:var(--muted)">' + (e.from ? (end ? 'đến hết ' + esc(_scpFmtDate_(end)) : 'không giới hạn (đến khi có mốc mới)') : 'chọn ngày') + '</span>' +
       '<button class="btn xs danger" onclick="_scpDraft.splice(' + i + ',1);_renderSaleChannelsModal()" title="Xoá mốc">🗑</button></div>';
   });
