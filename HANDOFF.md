@@ -11,6 +11,14 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-03 (phiên 8) — Bảng màu HỒNG HOÀNG HÔN pastel đồng nhất toàn CRM (Duyên yêu cầu) — ĐANG LÀM 1/3 (nhánh `wip/pink-sunset-theme`)
+- **Yêu cầu Duyên:** "chỉnh màu sắc đồng nhất, chuyên nghiệp, màu hồng — hồng pastel kiểu ánh hoàng hôn".
+- **NGUYÊN NHÂN GỐC lộn xộn màu:** màu chính là biến `--green*` (xanh lá) + nhiều gradient xanh lá/tím/navy viết cứng trong `css/06-pro.css`, `13-shell.css`, `01-base.css` (#login-overlay) + vài hex cứng trong `index.html`. Header xanh lá, menu trái xanh/tím, nền trang xanh nhạt, nút phụ xanh dương → 3-4 tông khác nhau.
+- **Cách làm (không sửa file cũ, dễ gỡ):** thêm `css/18-theme-sunset.css` (nạp SAU 17, TRƯỚC 99-dark-auto), mọi rule bắt đầu `html.ui-pro:not([data-theme="dark"])` → chế độ tối KHÔNG đổi. Đổi giá trị biến (`--green`=#b8325f rose, `--green-bg`=#fde8ee, `--green-mid`=#d6477a; `--blue/--tt`→tím mận #8a3fb0; bộ `--pro-*` cho thẻ KPI) + gradient header/menu/tab hồ sơ/nền trang/sidebar/đăng nhập/vòng xoay tải. Tên biến `--green` GIỮ NGUYÊN (đổi tên = sửa hàng trăm chỗ). Gỡ = xoá 1 dòng `<link>` trong index.html. Đổi thêm `theme-color` meta + `manifest.webmanifest` → #c0407a.
+- [x] **BƯỚC 1 ĐÃ PUSH (nhánh wip):** file 18 + gắn index.html (`?v=20261103a`). Đã render Chromium 1280px + 390px (header, menu, KPI, nút, đăng nhập). `node tools/test-ui-pro.js` qua, `node -c js/*.js` qua. KHÔNG đổi js/gas/extension → không cần deploy GAS, không reload extension; chỉ Ctrl+F5 web.
+- [ ] **BƯỚC 2 (làm tiếp):** quét màu CỨNG còn sót (xanh dương `#1d4ed8`/`#eff6ff`/`#dbeafe` ~30 chỗ trong css + vài chỗ js; xanh lá `#2d9464` ở index.html dòng 288; `rgba(20,98,69` ở 01-base). Lưu ý `css/99-dark-auto.css` TỰ SINH từ `tools/gen-dark-theme.js` — nếu sửa hex nguồn phải chạy lại generator. Duyên gửi ảnh chụp màn nào còn lệch để sửa đúng chỗ.
+- [ ] **BƯỚC 3:** Duyên duyệt trên web → merge `wip/pink-sunset-theme` vào `main` (merge, không rebase/force). Extension Zalo/Pancake (panel riêng, prefix zai-/pk-) CHƯA đổi màu — hỏi Duyên có muốn đồng bộ không (quy tắc 15 song song 2 extension).
+
 ## 2026-11-03 (phiên 7) — Thiết kế lại giao diện chuyên nghiệp, bắt đầu từ tab Báo cáo doanh số A–N (Duyên yêu cầu) — ĐANG LÀM 1/4
 - **Yêu cầu Duyên:** "thiết kế lại CRM như CRM chuyên nghiệp, mọi thứ còn hỗn độn". Duyên chọn làm TRƯỚC: các tab Báo cáo doanh số (A–L). Sau đó: khung chung (menu trái/thanh trên) → màn tra cứu & chăm sóc KH.
 - **Cách làm (không viết lại từ đầu):** thêm 1 lớp CSS `css/17-reports-pro.css`, phạm vi CHỈ `#salesreport-wrap`, chỉ dùng biến `:root` (chế độ tối vẫn đúng), nạp trước `99-dark-auto.css`. Gỡ = bỏ 1 dòng `<link>`. **NGUYÊN NHÂN GỐC hỗn độn:** 19 file CSS chồng nhau + mỗi báo cáo ghi style inline riêng (padding/viền/cỡ chữ lệch nhau); ô chọn báo cáo cũng là style inline nên lớp mới dùng `!important` cho đúng ô đó.

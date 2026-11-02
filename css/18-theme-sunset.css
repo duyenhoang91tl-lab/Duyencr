@@ -1,0 +1,100 @@
+/* ════════════════════════════════════════════════════════════════════
+   18-theme-sunset.css — BẢNG MÀU "HỒNG HOÀNG HÔN" PASTEL (Duyên yêu cầu 2026-11-03)
+   Mục tiêu: màu đồng nhất, chuyên nghiệp, tông hồng pastel chuyển cam đào/tím nhạt như ánh hoàng hôn.
+   CÁCH LÀM: chỉ ĐỔI GIÁ TRỊ BIẾN MÀU (--green* = màu chính, nay là hồng rose) + các gradient chrome
+   (header, menu trái, thanh tab, nền trang, sidebar). Toàn bộ chỗ dùng var(--green...) tự đổi theo.
+   PHẠM VI: chỉ chế độ SÁNG (html.ui-pro:not([data-theme="dark"])) nên chế độ tối giữ nguyên.
+   Nạp SAU 17-reports-pro, TRƯỚC 99-dark-auto. GỠ = bỏ 1 dòng <link> trong index.html.
+   Màu cứng (hex) nằm sẵn trong css/js khác chưa đổi ở bước này — xem HANDOFF.md "bước 2".
+   Bảng màu: rose-700 #b8325f (chính/chữ nhấn) · rose-600 #d6477a · rose-100 #fde8ee (nền nhạt)
+             coral #f08a7e · peach #fde0d4 · plum #8a3fb0 (thông tin) · amber/đỏ giữ nghĩa cảnh báo.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. BIẾN MÀU GỐC ── */
+html.ui-pro:not([data-theme="dark"]){
+  --bg:#fff2f1; --pro-soft:#fff2f1;
+  --surface:#fff; --surface2:#fcf3f5; --surface3:#f6e4ea;
+  --border:rgba(122,31,69,.10); --border-md:rgba(122,31,69,.17); --border-strong:rgba(122,31,69,.28);
+  --text:#2b1a22; --muted:#7a5f6b; --hint:#ad97a1;
+  /* màu chính (tên biến cũ --green giữ nguyên để không phải sửa hàng trăm chỗ dùng) */
+  --green:#b8325f; --green-bg:#fde8ee; --green-mid:#d6477a;
+  /* thông tin (trước là xanh dương) → tím mận cho cùng tông hoàng hôn */
+  --tt:#8a3fb0; --tt-bg:#f6eafb; --tt-b:#d9b8ec;
+  --blue:#8a3fb0; --blue-bg:#f6eafb; --blue-b:#d9b8ec;
+  --vip:#6d28d9; --vip-bg:#f0ebff; --vip-b:#c4b5fd;
+  /* cảnh báo: giữ nghĩa (cam đào = chú ý, đỏ = lỗi) nhưng ấm hơn */
+  --tn:#b4570f; --tn-bg:#fff1e3; --tn-b:#f7c48f;
+  --red:#b91c3c; --red-bg:#fff0f2; --red-b:#f5a3b1;
+  --shadow:0 1px 3px rgba(122,31,69,.06), 0 1px 2px rgba(122,31,69,.04);
+  --shadow-md:0 4px 14px rgba(122,31,69,.11), 0 1px 3px rgba(122,31,69,.06);
+  /* bộ biến "pro" (thẻ KPI, đường kẻ, bóng) */
+  --pro-ink:#5c1740; --pro-purple:#8f2a5e; --pro-purple2:#c0407a;
+  --pro-line:#f1dde4;
+  --pro-blue:#d6477a; --pro-blue2:#ef7d9f;
+  --pro-green:#8a3fb0; --pro-green2:#b36bd6;
+  --pro-orange:#e8731a; --pro-orange2:#f59e6a;
+  --pro-red:#d93025; --pro-grey:#d9c9d0;
+  --pro-shadow:0 1px 2px rgba(122,31,69,.06),0 4px 14px rgba(122,31,69,.08);
+}
+
+/* ── 2. NỀN TRANG + SIDEBAR LỌC KH: hồng pastel đậm→nhạt rồi sang kem đào ── */
+html.ui-pro:not([data-theme="dark"]) body,
+html.ui-pro:not([data-theme="dark"]) .main{
+  background:linear-gradient(180deg,#f8d4e4 0%,#fde0e6 30%,#ffeee8 65%,#fff8f3 100%) fixed;
+}
+html.ui-pro:not([data-theme="dark"]) .sidebar{
+  background:linear-gradient(180deg,#f2a9c4 0%,#f8c6d4 28%,#fde0e0 62%,#fff1ec 100%);
+  border-right-color:#ecaac0;
+}
+
+/* ── 3. HEADER: hồng rose → hồng san hô (hoàng hôn), chữ trắng ── */
+html.ui-pro:not([data-theme="dark"]) header{
+  background:linear-gradient(120deg,#a8326c 0%,#d24f82 48%,#ef8a7f 100%);
+  box-shadow:0 2px 10px rgba(168,50,108,.28);
+}
+html.ui-pro:not([data-theme="dark"]) header .btn.primary{color:#a12f66;}
+html.ui-pro:not([data-theme="dark"]) header select option{color:#2b1a22;}
+
+/* ── 4. MENU TRÁI (ngăn kéo + khung .ui-shell) + THANH TAB HỒ SƠ ──
+   Đáy menu đủ đậm (#d95f7c) để chữ trắng 13px vẫn đọc rõ. */
+html.ui-pro:not([data-theme="dark"]) #data-view .tabs,
+html.ui-pro.ui-shell:not([data-theme="dark"]) #data-view .tabs{
+  background:linear-gradient(180deg,#8f2a5e 0%,#bf3f74 55%,#d95f7c 100%);
+  box-shadow:6px 0 26px rgba(120,24,70,.30);
+}
+html.ui-pro.ui-shell:not([data-theme="dark"]) #data-view .tabs{box-shadow:none;}
+html.ui-pro.ui-shell:not([data-theme="dark"]) #data-view .tabs .tab,
+html.ui-pro.ui-shell:not([data-theme="dark"]) #data-view .tabs .sn-act,
+html.ui-pro.ui-shell:not([data-theme="dark"]) #data-view .tabs #reportsgroup-list .tab{color:#fff1f5;}
+html.ui-pro.ui-shell:not([data-theme="dark"]) #data-view .tabs .sn-gh{color:#fbd5e1;}
+html.ui-pro.ui-shell:not([data-theme="dark"]) #data-view .tabs .sh-foot button{color:#fff1f5;}
+html.ui-pro.ui-shell:not([data-theme="dark"]) header .logo span{color:#fde0ea!important;}
+html.ui-pro:not([data-theme="dark"]) #pro-tabbar,
+html.ui-pro.ui-shell:not([data-theme="dark"]) #pro-tabbar{
+  background:linear-gradient(90deg,#a8326c,#e0607a);
+  box-shadow:0 -2px 10px rgba(168,50,108,.22);
+}
+html.ui-pro.ui-shell:not([data-theme="dark"]) #sh-edge{background:#c0407a;box-shadow:2px 0 8px rgba(168,50,108,.3);}
+html.ui-pro.ui-shell:not([data-theme="dark"]) #sh-edge:hover{background:#8f2a5e;}
+
+/* ── 5. NÚT / CHỌN / PILL: dùng màu chính hồng ── */
+html.ui-pro:not([data-theme="dark"]) .btn.primary:hover{background:#9c2750;}
+html.ui-pro:not([data-theme="dark"]) .btn.secondary:hover{background:#efd9f7;}
+html.ui-pro:not([data-theme="dark"]) .gs-pill{border-color:rgba(184,50,95,.20);}
+html.ui-pro:not([data-theme="dark"]) ::selection{background:var(--green-bg);color:var(--green);}
+html.ui-pro:not([data-theme="dark"]) .sc-av{background:#fde8ee;color:var(--green);}
+html.ui-pro:not([data-theme="dark"]) input:focus,
+html.ui-pro:not([data-theme="dark"]) select:focus,
+html.ui-pro:not([data-theme="dark"]) textarea:focus{
+  outline:none; border-color:var(--green-mid); box-shadow:0 0 0 3px rgba(214,71,122,.16);
+}
+
+/* ── 6. MÀN ĐĂNG NHẬP + KHUNG CHỜ F5: nền hoàng hôn thay nền xanh lá cứng (css/01-base.css #login-overlay) ── */
+html.ui-pro:not([data-theme="dark"]) #login-overlay{
+  background:linear-gradient(135deg,#a8326c 0%,#d24f82 55%,#f08a7e 100%);
+}
+html.ui-pro:not([data-theme="dark"]) #login-overlay .login-card{box-shadow:0 24px 70px rgba(92,23,64,.35);}
+html.ui-pro:not([data-theme="dark"]) #boot-splash > div:first-child{border-top-color:#d6477a !important;}
+/* vòng xoay "Đang tải dữ liệu" (index.html <style> dòng 22-23 đặt tím #4a2c8f cứng) */
+html.ui-pro:not([data-theme="dark"]) .ev-spin{color:#a8326c;}
+html.ui-pro:not([data-theme="dark"]) .ev-spin i{border-color:rgba(214,71,122,.18);border-top-color:#d6477a;}
