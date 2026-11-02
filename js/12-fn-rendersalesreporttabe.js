@@ -191,7 +191,7 @@ function _computeBonusData_(orders){
   });
   Object.keys(bySaleDay).forEach(function(key){
     var g = bySaleDay[key];
-    var channel = _saleChannelOf_(g.name);
+    var channel = _saleChannelOn_(g.name, g.date);   // loại Sale TẠI NGÀY (mốc ngày ở js/62), không phải loại hiện tại
     // 3 nhóm riêng theo phạm vi "theo ngày" — CỘNG DỒN giữa các nhóm, trong 1 nhóm chỉ lấy cao nhất.
     var bestTier = null, bestRevDay = null, bestFirstOrder = null;
     BONUS_PROGRAMS.forEach(function(p){
@@ -240,7 +240,7 @@ function _computeBonusData_(orders){
     var orderNames = Object.keys(_bonusNamesOfOrder_(o)).filter(Boolean), nParts = orderNames.length || 1;
     orderNames.forEach(function(name){ // mọi sale tham gia; tiền thưởng chia đều nParts
       if (!name) return;
-      var channel = _saleChannelOf_(name);
+      var channel = _saleChannelOn_(name, dateStr);   // loại Sale TẠI NGÀY ĐƠN (mốc ngày ở js/62)
       var best = null;
       var extra = [];   // CT thưởng theo SẢN PHẨM (mã): cộng dồn, không tranh "best" với CT khác
       BONUS_PROGRAMS.forEach(function(p){
