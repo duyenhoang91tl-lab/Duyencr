@@ -11,6 +11,15 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-02 (đêm 2) — Thưởng T10 ghi THẲNG vào file đối soát (Duyên yêu cầu) — XONG 3/3 bước nhỏ
+- **Yêu cầu:** đưa bảng thưởng vào file đối soát đã gửi (file đã check CRM↔KT mới nhất), cập nhật từng hàng sheet ĐƠN PT; CHỈ đội Online/Offline (18 sale đã phân loại), sale khác bỏ qua; **đơn MP (mỹ phẩm) KHÔNG tính thưởng**.
+- **NGUYÊN NHÂN GỐC:** bản trước tính cả 63 đơn MP (làm lệch thưởng theo đơn/doanh số ngày) và nằm ở file Excel riêng; recalc bằng LibreOffice còn làm hỏng autofilter gốc (`operator="**none**"`).
+- [x] **4a:** `calc_bonus.js` bỏ đơn MP + bảo hành → 1.220 đơn, tổng **5.773.338đ** (Online 4.986.670 / Offline 786.668).
+- [x] **4b:** `build_into_source.py <DOI_SOAT.xlsx> <work> <ra.xlsx>` thêm 5 cột cuối mỗi hàng ĐƠN PT (Kênh, Thưởng THEO ĐƠN, THEO SẢN PHẨM, Tổng, Chi tiết) + sheet `THUONG_Tong_theo_sale`, `THUONG_Chi_tiet`. Sheet ĐƠN MP giữ nguyên. Thưởng DOANH SỐ NGÀY tính theo sale-ngày nên chỉ ở THUONG_Chi_tiet.
+- [x] **4c:** `fix_filters.py <file>` chạy SAU `recalc.py` (trả autofilter gốc). Quy trình: extract_orders.py → calc_bonus.js → build_into_source.py → recalc.py → fix_filters.py. Đã so sánh: mọi sheet gốc không đổi dữ liệu (Trang_tính1 chỉ được tính ra giá trị công thức vốn chưa có cache).
+- **ĐANG LÀM: không có việc dở.** Không đổi gas/js (không cần deploy). File Excel KHÔNG commit (tiền thưởng từng người).
+- **Việc kế tiếp:** (a) 18 sale chưa phân loại On/Off (menbui2002, kieuHT1997…) bị bỏ qua theo yêu cầu — nếu cần tính thì cài "Phân loại đội Sale" rồi chạy lại. (b) Tỳ Hưu Ngọc/Ruby/Saphire + đơn huỷ chưa tự loại. (c) Sale thử việc chưa tính. (d) Đối chiếu Báo cáo G (CT bật thật có thể khác 12 CT mẫu).
+
 ## 2026-11-02 (đêm) — Bảng thưởng ONLINE/OFFLINE T10/2026 từ file đối soát (Duyên yêu cầu) — XONG 3/3 bước
 - **Yêu cầu:** gửi bảng tính thưởng Online/Offline trong tháng, phân rõ thưởng theo SẢN PHẨM / theo ĐƠN / theo DOANH SỐ.
 - **NGUYÊN NHÂN GỐC:** file `DOI_SOAT_FINAL_T10` chỉ là đối soát doanh thu KT↔CRM (không có tiền thưởng); Báo cáo G chỉ hiện tổng, không tách 3 loại. Tính tay dễ lệch quy tắc CRM → nạp THẲNG `_computeBonusData_` (js/12) bằng `vm` trong Node.
