@@ -8,7 +8,7 @@ const W = process.argv[2] || '.';
 const R = p => fs.readFileSync(path.join(__dirname, '..', '..', p), 'utf8');
 const fn = (src, n) => { const i = src.indexOf('\nfunction ' + n + '('); if (i < 0) throw new Error('khong thay ' + n); return src.slice(i + 1, src.indexOf('\n}\n', i) + 3); };
 const j12 = R('js/12-fn-rendersalesreporttabe.js'), j01 = R('js/01-fn-splitmulti.js'), j05 = R('js/05-fn-saveeditphone.js'), j27 = R('js/27-fn-bonuscore.js'), j62 = R('js/62-sale-channel-periods.js');
-const orders = JSON.parse(fs.readFileSync(W + '/orders.json', 'utf8')).filter(o => !o.baoHanh && o.sheet !== 'ĐƠN MP');   // bao hanh + don MP (my pham) khong tinh thuong (quy tac Duyen)
+const orders = JSON.parse(fs.readFileSync(W + '/orders.json', 'utf8')).filter(o => !o.baoHanh && o.sheet !== 'ĐƠN MP' && !/\/\s*NGUỒN\s*\(/i.test(o.nguonDon || ''));   // bao hanh + don MP (my pham) + nguon don 'Facebook / NGUỒN (715661768577683)' khong tinh thuong (quy tac Duyen)
 const chRaw = JSON.parse(fs.readFileSync(W + '/channels.json', 'utf8'));
 const base = () => ({ id: '', name: '', dateFrom: '', dateTo: '', audience: { online: true, offline: true }, product: '', requireProduct: '', extraNote: '', exclusionNote: '',
   tier: { enabled: false, rows: [] }, revenue: { enabled: false, scope: 'order', min: '', max: '' }, firstOrder: { enabled: false, amount: '' }, probationDay: { enabled: false, from: '', to: '' }, sources: [], prodRules: { enabled: false, items: [] }, bonusAmount: '' });
