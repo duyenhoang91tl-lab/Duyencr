@@ -53,7 +53,7 @@ const js13 = fs.readFileSync(path.join(__dirname, '..', 'js', '13-fn-bpseedoffic
 const js11 = fs.readFileSync(path.join(__dirname, '..', 'js', '11-fn-srload.js'), 'utf8');
 const fnSrc = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('khong thay ' + name); let d = 0, k = src.indexOf('{', i); for (let j = k; j < src.length; j++) { if (src[j] === '{') d++; else if (src[j] === '}' && --d === 0) return src.slice(i, j + 1); } };
 const cctx = vm.createContext({ Math, Number, Array, Object, String, JSON, Date });
-vm.runInContext([fnSrc(js11, '_srCloseRateAvg_'), fnSrc(js13, '_srExportBLabel_'), fnSrc(js13, '_srBuildExportB_')].join('\n'), cctx);
+vm.runInContext([fnSrc(js11, '_srCloseRateAvg_'), fnSrc(js13, '_srExportBLabel_'), fnSrc(js13, '_srBuildExportB_'), fnSrc(js13, '_srBuildExportBSheets_')].join('\n'), cctx);
 const X = cctx._srBuildExportB_(B, { dateFrom: '2026-10-01', dateTo: '2026-10-31', filters: ['Sale: menbui2002'], at: 'luc test' });
 ok(X.detailRows.length === B.orders.length + 1 && X.detailRows.every(r => r.length === 20), 'Chi tiet don: dong/don + 20 cot (dong Pos, ghi chu, Pos goc, tinh bao cao, cach tinh...)');
 ok(X.allocRows.length === 1 + B.orders.reduce((n, o) => n + o.bsx.length, 0) && X.allocRows.every(r => r.length === 12), 'Chia theo Sale: 1 dong = 1 don x 1 sale (tong ' + (X.allocRows.length - 1) + ' dong)');
@@ -102,6 +102,17 @@ if (XLSX) {
   ok(cs['C2'] && /^SUMIF\('Chia theo Sale'!\$G:\$G,A2,'Chia theo Sale'!\$I:\$I\)$/.test(cs['C2'].f) && typeof cs['C2'].v === 'number', 'file .xlsx doc lai: o C2 con cong thuc SUMIF + gia tri da tinh san');
   ok(rb.Sheets['Chia theo Sale']['I2'] && typeof rb.Sheets['Chia theo Sale']['I2'].v === 'number', 'file .xlsx doc lai: cot "Gia tri chia" la SO (cong duoc), khong phai chu');
 } else console.log('(bo qua kiem tra file .xlsx that: chua cai thu vien xlsx)');
-ok(/_srIsAdmin\(\)\) XLSX\.utils\.book_append_sheet\(wbB, XLSX\.utils\.aoa_to_sheet\(productRows\), 'Báo cáo sản phẩm'\)/.test(js13), 'KHONG lam mat sheet "Bao cao san pham" (chi admin) vom co o xuat Excel B');
-ok(/_srBuildExportB_\(dB, \{ dateFrom: _srState\.dateFrom/.test(js13) && /BaoCaoDoanhSo_B_DoiChieu_/.test(js13) && /'Chia theo Sale'/.test(js13) && /'Đối chiếu tổng'/.test(js13), 'exportSalesReport nhanh B goi _srBuildExportB_ va them 2 sheet moi');
+// --- Tach danh sach sheet (_srBuildExportBSheets_) dung chung cho nut "Xuat Excel" cua B va file gop "Excel doi soat" ---
+const SH = (adm, pre) => cctx._srBuildExportBSheets_(B, { dateFrom: '2026-10-01', dateTo: '2026-10-31', at: 'luc test' }, pre, adm);
+const namesOf = r => r.sheets.map(x => x.name).join('|');
+ok(namesOf(SH(true, '')) === 'Tổng quan|Theo Sale|Báo cáo sản phẩm|Chi tiết đơn|Chia theo Sale|Đối chiếu tổng', 'admin: GIU sheet "Bao cao san pham" (dung thu tu cu)');
+ok(namesOf(SH(false, '')) === 'Tổng quan|Theo Sale|Chi tiết đơn|Chia theo Sale|Đối chiếu tổng', 'khong admin: KHONG co sheet "Bao cao san pham"');
+const SHp = SH(true, 'B ');
+ok(namesOf(SHp) === 'B Tổng quan|B Theo Sale|B Báo cáo sản phẩm|B Chi tiết đơn|B Chia theo Sale|B Đối chiếu tổng' && SHp.sheets.every(x => x.name.length <= 31), 'file gop: tien to "B " cho moi sheet, ten <= 31 ky tu');
+const chkP = SHp.sheets.find(x => x.name === 'B Đối chiếu tổng').rows;
+ok(chkP.slice(1).filter(r => r[2] && r[2].f && /^SUMIF/.test(r[2].f)).length > 0 && chkP.slice(1).filter(r => r[2] && r[2].f && /^SUMIF/.test(r[2].f)).every(r => /SUMIF\('B Chia theo Sale'!\$G:\$G,A\d+,'B Chia theo Sale'!\$[IJ]:\$[IJ]\)/.test(r[2].f)) && !JSON.stringify(chkP).includes("'Chia theo Sale'!"), 'file gop: cong thuc SUMIF tro dung ten sheet co tien to (khong con tro ten cu)');
+ok(JSON.stringify(SH(true, '').sheets.find(x => x.name === 'Đối chiếu tổng').rows) === JSON.stringify(X.checkRows), 'khong tien to: sheet Doi chieu tong GIONG HET ban truoc khi tach');
+// exportSalesReport nhanh B: van dung ten file + canh bao thieu bsx/bcx va chi truyen admin cho sheet san pham
+ok(/_srBuildExportBSheets_\(dB, \{ dateFrom: _srState\.dateFrom[^\n]*'', _srIsAdmin\(\)\)/.test(js13) && /BaoCaoDoanhSo_B_DoiChieu_/.test(js13) && /xb\.missing/.test(js13), 'exportSalesReport nhanh B goi _srBuildExportBSheets_ (truyen _srIsAdmin) + giu ten file + canh bao thieu bsx/bcx');
+
 console.log(fails ? '\nFAILED ' + fails : '\nALL REPORT-B-EXPORT (GAS) TESTS PASSED'); process.exit(fails ? 1 : 0);
