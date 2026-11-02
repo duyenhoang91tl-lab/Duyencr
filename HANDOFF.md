@@ -6,14 +6,15 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
-## 2026-11-02 (chiều) — MẪU LỌC NHANH dùng được ở TẤT CẢ báo cáo (Duyên yêu cầu) — BƯỚC 1+2 đã push
+## 2026-11-02 (chiều) — MẪU LỌC NHANH dùng được ở TẤT CẢ báo cáo (Duyên yêu cầu) — XONG 3/3 bước
 - **Yêu cầu của Duyên:** mọi báo cáo đều dùng được bộ lọc nhanh; sửa/lưu mẫu ở đâu thì đổi cho TẤT CẢ báo cáo (chỉ báo cáo đặc thù không áp dụng được mới tạo riêng).
 - **Hiện trạng đã đọc (js/48-filter-presets.js):** mẫu ĐÃ dùng chung (localStorage `ome_sr_filter_presets_v2:<user>`; sửa ✎ / ghi đè ⟳ / xoá ✕ một mẫu = đổi ở mọi báo cáo; tên Sale tự đổi sang đúng tên của báo cáo đang xem). Có thanh mẫu: A,B(+N),C,D,E,F,G(+K),L. THIẾU: **M** (đơn chia), **H**, **I**; J = nhập dữ liệu (admin) không có bộ lọc.
 - **NGUYÊN NHÂN GỐC M thiếu:** bảng `CFG` trong js/48 viết trước khi M có ô Sale+Kênh nhiều lựa chọn (`mSale`, `mNguon`, js/13 `_srbSubCfg_`), chú thích cũ ghi "M không có ô lọc nhiều Sale" nên không ai thêm lại.
 - [x] **BƯỚC 1 ĐÃ PUSH:** thêm `M: { keys:['mSale','mNguon'], sale:'mSale', opts:'saleBOptions' }` vào `CFG` (js/48), bump `?v=20261102`, test `tools/test-filter-presets.js` thêm ca M (bấm mẫu → `mSale` đổi, `mNguon` giữ nguyên). Không đụng gas_v13.js (không cần deploy GAS).
 - [x] **BƯỚC 2 ĐÃ PUSH (H và I):** ô CS của H/I đổi từ chọn 1 (`hCs`/`iCs`) sang chọn NHIỀU (`hCsList`/`iCsList`, mảng; menu Bộ lọc → CS, js/13) — chọn 1 CS vẫn lọc đúng như cũ; lọc ở `_hBuild_`, render I và `exportRenewReport_`; helper `_hAssignCsNames_` (CS trong lịch sử chia data, theo phạm vi người xem). js/48 `CFG.H/I` (`optsFn`, `reset:['hTeam','hCs'|'iTeam','iCs']` — áp mẫu thì xoá ô chọn 1 Team/1 CS cũ). Test: `test-filter-presets.js` (H/I có thanh mẫu + `_hBuild_` chỉ còn CS trong mẫu), `test-srb-filter-menu.js` (chọn 2 CS). LƯU Ý: mẫu chứa tên Sale (username Pancake) — H/I so với TÊN CS trong lịch sử chia nên chỉ khớp tên trùng/bí danh; tên không khớp sẽ báo "N tên không có trong báo cáo này" (không lỗi).
 - **J (Nhập dữ liệu Base/Pos, admin) = không có bộ lọc → không áp mẫu (đặc thù).** Sau bước 2: MỌI báo cáo có bộ lọc đều có thanh mẫu dùng chung.
-- [ ] BƯỚC 3: soát lại xem sửa/lưu mẫu có cần đồng bộ giữa các máy/tài khoản không (hiện mẫu lưu theo trình trình duyệt + tài khoản, không lên GAS) — hỏi Duyên trước khi làm.
+- [x] **BƯỚC 3 ĐÃ PUSH — ĐỒNG BỘ MẪU LÊN SERVER (js/48):** danh sách mẫu của từng tài khoản lưu thêm ở sheet Settings, key `filterPresets_<username>` (dùng `getSetting`/`setSetting` CÓ SẴN → KHÔNG sửa gas_v13.js, KHÔNG cần deploy GAS). Lưu/sửa/ghi đè/xoá → đẩy lên (cờ `ome_sr_filter_presets_dirty:<user>` giữ đến khi ghi được); mở báo cáo lần đầu mỗi phiên → máy không có thay đổi chưa đẩy thì LẤY bản server về, server rỗng mà máy có mẫu thì đẩy lên. Quy tắc: bản sau ghi đè bản trước CẢ DANH SÁCH (chưa gộp từng mẫu; 2 máy sửa cùng lúc → bản lưu sau thắng). Test: `node tools/test-filter-presets-sync.js` (9 ca: lấy về / đẩy lên / lỗi mạng giữ dirty / xoá / đổi từ máy khác).
+- **XONG CẢ 3 BƯỚC mẫu lọc nhanh. ĐANG LÀM: không có việc dở.** Có thể làm thêm: gộp từng mẫu theo `created`/id thay vì ghi đè cả danh sách; mẫu dùng chung cho cả team (hiện theo từng tài khoản).
 - **Duyên làm sau bước 1:** Ctrl+F5 → vào Báo cáo M → thấy ô "⚡ Mẫu lọc nhanh" cạnh 🧰 Tác vụ, bấm mẫu đã tạo ở báo cáo khác.
 
 ## 2026-11-02 — Báo cáo B: nút "Excel đối soát" GỘP 1 FILE (B + E + G + L + N) (Duyên yêu cầu) — BƯỚC 1/3 đã push

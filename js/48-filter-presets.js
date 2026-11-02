@@ -55,7 +55,45 @@
       var v = JSON.parse(raw); return Array.isArray(v) ? v : [];
     } catch(err){ return []; }
   }
-  function saveAll(list){ try { localStorage.setItem(storeKey(), JSON.stringify(list)); return true; } catch(err){ toastF('⚠ Không lưu được mẫu (trình duyệt chặn lưu dữ liệu).'); return false; } }
+  function saveAll(list){ try { localStorage.setItem(storeKey(), JSON.stringify(list)); markDirty(true); pushSoon(); return true; } catch(err){ toastF('⚠ Không lưu được mẫu (trình duyệt chặn lưu dữ liệu).'); return false; } }
+
+  // ── ĐỒNG BỘ LÊN SERVER (02/11/2026, Duyên: dùng được ở máy/trình duyệt khác) ──
+  //  Danh sách mẫu của từng tài khoản lưu ở sheet Settings, key `filterPresets_<username>` (action getSetting/setSetting có sẵn — KHÔNG cần sửa/deploy GAS).
+  //  Cơ chế "bản sau ghi đè bản trước" cho cả danh sách: lưu/sửa/xoá → ghi lên server (cờ "dirty" giữ đến khi ghi được); mở báo cáo lần đầu mỗi phiên →
+  //  nếu máy này không có thay đổi chưa đẩy thì LẤY bản server về (server rỗng mà máy có mẫu → đẩy lên lần đầu).
+  var PULLED = {}, _pushT = null;
+  function srvKey(){ return 'filterPresets_' + userKey(); }
+  function dirtyKey(){ return 'ome_sr_filter_presets_dirty:' + userKey(); }
+  function markDirty(on){ try { if (on) localStorage.setItem(dirtyKey(), '1'); else localStorage.removeItem(dirtyKey()); } catch(err){} }
+  function isDirty(){ try { return localStorage.getItem(dirtyKey()) === '1'; } catch(err){ return false; } }
+  function haveSrv(){ return typeof gsUrl !== 'undefined' && gsUrl && userKey() && typeof fetch === 'function'; }
+  function pushSoon(){ if (_pushT) clearTimeout(_pushT); _pushT = setTimeout(pushNow, 400); }
+  function pushNow(){
+    _pushT = null; if (!haveSrv()) return;
+    var val = JSON.stringify(loadAll()), uk = userKey();
+    fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'setSetting', key: srvKey(), value: val }) })
+      .then(function(r){ return r.json(); })
+      .then(function(j){ if (j && !j.error && j.ok !== false && uk === userKey() && JSON.stringify(loadAll()) === val) markDirty(false); })
+      .catch(function(){ /* giữ cờ dirty, lần mở sau thử lại */ });
+  }
+  function pullOnce(){
+    var uk = userKey(); if (!haveSrv() || PULLED[uk]) return; PULLED[uk] = 1;
+    if (isDirty()) { pushNow(); return; }   // máy này có thay đổi chưa đẩy lên (lần trước lỗi mạng) → đẩy trước, không lấy về đè
+    var sep = gsUrl.indexOf('?') === -1 ? '?' : '&';
+    fetch(gsUrl + sep + 'action=getSetting&key=' + encodeURIComponent(srvKey()), { redirect:'follow' })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if (uk !== userKey() || isDirty()) return;   // đổi tài khoản / vừa sửa trong lúc chờ → bỏ
+        var raw = j && j.value, local = loadAll();
+        if (raw === null || raw === undefined || raw === '') { if (local.length) pushNow(); return; }   // server chưa có → đẩy bản máy này lên
+        var arr; try { arr = JSON.parse(raw); } catch(err){ return; }
+        if (!Array.isArray(arr)) return;
+        if (JSON.stringify(arr) === JSON.stringify(local)) return;
+        try { localStorage.setItem(storeKey(), JSON.stringify(arr)); } catch(err2){ return; }
+        try { inject(); } catch(err3){}
+      })
+      .catch(function(){});
+  }
   function forSub(sub){ return CFG[sub] ? loadAll().filter(function(p){ return p; }) : []; }   // MỌI báo cáo có ô Sale đều thấy MỌI mẫu
   function emptyLike(v){ return Array.isArray(v) ? [] : (typeof v === 'boolean' ? false : ''); }
   // Bộ lọc riêng (không Sale) của báo cáo đang xem — chỉ khoá có giá trị
@@ -198,6 +236,7 @@
     var wrap = document.getElementById('salesreport-wrap'); if (!wrap) return;
     ['fp-ctl','fp-bar','fp-info'].forEach(function(id){ var old = document.getElementById(id); if (old && old.parentNode) old.parentNode.removeChild(old); });
     var sub = curSub(); if (!CFG[sub]) return;
+    pullOnce();
     var bar = wrap.querySelector('.srb-bar'); if (!bar) return;
     var anchor = null; for (var i = bar.children.length - 1; i >= 0; i--) { if (bar.children[i].classList.contains('gear-menu')) { anchor = bar.children[i]; break; } }
     // (18/10/2026) Cụm mẫu đặt SAU 🧰 Tác vụ: thanh công cụ dài quá thì chip mẫu xuống dòng, còn Tác vụ luôn ở hàng đầu cùng ô chọn báo cáo/ngày/Bộ lọc/Lọc.
@@ -351,5 +390,6 @@
   if (typeof _orig === 'function') {
     window.renderSalesReportTab = renderSalesReportTab = function(){ var r = _orig.apply(this, arguments); try { inject(); } catch(err){} return r; };
   }
+  window._fpSync = { pull: pullOnce, push: pushNow, reset: function(){ PULLED = {}; } };   // dùng cho test
   window._fpApplyGroup = applyGroup; window._fpGroups = groupsFor; window._fpApply = applyPreset; window._fpList = loadAll;   // dùng cho test
 })();
