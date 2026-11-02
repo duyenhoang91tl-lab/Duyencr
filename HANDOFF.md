@@ -11,6 +11,12 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-02 (tối 6) — Báo cáo G: Ngày bắt đầu thử việc TỰ LẤY từ mốc "Phân loại đội Sale" (Duyên yêu cầu) — XONG 1/1
+- **Vấn đề:** Ngọc (Offline/Văn phòng) cài Thử việc từ 14/10 ở modal Phân loại nhưng Báo cáo G mục Thử việc = 0 Sale; Duyên không tìm thấy mục Quản lý tài khoản của Ngọc để đặt Ngày bắt đầu.
+- **NGUYÊN NHÂN GỐC:** `_bonusProgramApplies_` (CT bật "Giới hạn theo ngày thử việc") chỉ đọc `_saleStartDate_` = trường startDate của TÀI KHOẢN; mốc ngày ở js/62 không cấp ngày này nên Sale chưa có startDate bị bỏ qua mọi CT thử việc.
+- [x] **ĐÃ PUSH (js/12):** `_saleStartDate_` ưu tiên startDate tài khoản; nếu trống thì lấy `from` của mốc Thử việc ĐẦU TIÊN (mốc không ngày thì không có). Dùng chung cho bảng/xuất CSV G (cột "Ngày bắt đầu"). Test: `node tools/test-sale-start-from-period.js`. Bump js/12 `?v=20261102f`. Không đổi gas_v13.js (không cần deploy GAS).
+- **ĐANG LÀM: không có việc dở.** Duyên làm: Ctrl+F5 → Báo cáo G → xem Ngọc có vào mục Thử việc. Nếu vẫn 0: kiểm tra (a) tên Sale trên đơn Pos có khớp tên/bí danh Ngọc không, (b) bộ lọc "Phòng kinh doanh" có loại Ngọc không, (c) CT thưởng thử việc có đúng đối tượng/ngày hiệu lực.
+
 ## 2026-11-02 (tối 5) — Modal Phân loại đội Sale: GOM THEO NGƯỜI (1 người cài 1 lần) (Duyên yêu cầu) — XONG 1/1
 - **Vấn đề:** biichnguyen1993 / Biichnguyen1993, dungnguyen1995 / Dungnguyen1995 là cùng 1 người nhưng hiện 2 dòng → phải cài 4 lần (ảnh Duyên gửi).
 - **NGUYÊN NHÂN GỐC:** `_renderSaleChannelsModal` lặp thẳng `_allCSNames()` (mỗi tên 1 dòng), không dùng cách "khớp Sale" `_groupNamesByPerson` (gom hoa/thường + bí danh tài khoản CS) mà báo cáo đã dùng; `_setSaleChannel`/`_scpSet_` chỉ ghi 1 tên.

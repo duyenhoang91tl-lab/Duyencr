@@ -70,11 +70,18 @@ function _daysSinceStart_(startYmd, dateYmd){
 // Tra "Ngày bắt đầu" đã đặt cho 1 tên Sale (qua Quản lý tài khoản — 1 tài khoản có thể có nhiều
 // tên/bí danh, xem _acctNamesOf) — dùng chung nguồn "accounts" (đã tải sẵn toàn cục).
 function _saleStartDate_(name){
-  if (!name || typeof accounts === 'undefined') return '';
-  var al = _cfgAliasesOf(name);   // tên chính trên báo cáo có thể khác tên đã lưu trong tài khoản -> tra theo MỌI tên cùng người
-  for (var i = 0; i < accounts.length; i++){
-    var ns = _acctNamesOf(accounts[i]);
-    for (var j = 0; j < al.length; j++) if (ns.indexOf(al[j]) !== -1) return accounts[i].startDate || '';
+  if (!name) return '';
+  if (typeof accounts !== 'undefined'){
+    var al = _cfgAliasesOf(name);   // tên chính trên báo cáo có thể khác tên đã lưu trong tài khoản -> tra theo MỌI tên cùng người
+    for (var i = 0; i < accounts.length; i++){
+      var ns = _acctNamesOf(accounts[i]);
+      for (var j = 0; j < al.length; j++) if (ns.indexOf(al[j]) !== -1){ if (accounts[i].startDate) return accounts[i].startDate; i = accounts.length; break; }
+    }
+  }
+  // Tài khoản chưa đặt Ngày bắt đầu -> lấy ngày của mốc "Thử việc" ĐẦU TIÊN ở modal "Phân loại đội Sale" (js/62), khỏi nhập 2 nơi (Duyên yêu cầu 2026-11-02).
+  if (typeof _scpListOf_ === 'function'){
+    var l = _scpListOf_(name);
+    for (var k = 0; k < l.length; k++) if (l[k].channel === 'probation' && l[k].from) return l[k].from;
   }
   return '';
 }
