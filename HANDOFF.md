@@ -11,6 +11,14 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-03 (phiên 2) — File đối soát T10 bản KT đã đối soát: khớp CRM + bảng thưởng final từng sale — XONG 2/2 (file Excel đã gửi, không commit)
+- **Yêu cầu Duyên:** file `DOI_SOAT_FINAL_T10_CO_THUONG_1.xlsx` (đã lấy dữ liệu mới nhất, đối soát KT) → khớp CRM, gửi bảng thưởng final từng sale + file đối soát chuẩn.
+- **ĐÃ KIỂM (chạy lại extract_orders + calc_bonus):** 1.452 đơn, 0 đơn đổi so với bản trước; tổng DT 8.174.116.800đ khớp cột CRM; thưởng tính lại **4.401.673đ = đúng bảng "total thưởng sale" (pivot) của KT**, từng sale khớp.
+- **NGUYÊN NHÂN GỐC các ô dở:** KT thêm tay hàng Ninhltk1984 vào sheet 4b nhưng ô Lệch để trống và dòng TỔNG (giá trị gõ cứng) không gồm hàng này → tổng lệch 2.055.000 sai; sheet 1 ô Lệch của ngocNB2003saleoff để trống.
+- [x] **File đối soát:** 4b: Lệch Ninhltk1984 = −700.000đ (KT 525.000 vs CRM 1.225.000, đơn M46228 1.750.000đ) + TỔNG thành công thức SUM (KT 61.440.300 / CRM 60.085.300 / lệch 1.355.000); sheet 1: Lệch ngocNB2003saleoff = 0. Recalc 0 lỗi (8.798 CT), filter đã sửa, pivot giữ nguyên (LibreOffice đổi nhãn "Grand Total" → "Total Result").
+- [x] **ĐÃ PUSH:** `tools/bonus-t10/build_payroll.py <file đối soát> <ra.xlsx>` — dựng "BANG_THUONG_FINAL_SALE_T10.xlsx" (1 sheet, tổng bằng công thức) từ sheet THUONG_Tong_theo_sale.
+- **Chưa làm / CHỜ Duyên:** (a) tỷ lệ đơn M46228 (30% hay 70% cho sale) — KT/Duyên xác nhận; (b) "lương" ở đây = bảng THƯỞNG; chưa có dữ liệu lương cứng/hoa hồng nên không tính; (c) CRM thật chưa sửa điều kiện sản phẩm Tourmaline cao cấp (xem mục bên dưới, BƯỚC 3); (d) cột CRM từng sale ở sheet 1 dùng luật chia đơn riêng của CRM (đơn chia tay, thẻ bảo hành) nên chưa tự dựng lại độc lập từng sale — chỉ đối chiếu được tổng.
+
 ## 2026-11-03 — Thưởng "Tourmaline cao cấp" (ca thuyha88): đơn PHẢI có "TRANG SỨC NHẪN TOUR TRƠN CAO CẤP" — XONG 2/3 (bước 3 chờ Duyên)
 - **Yêu cầu Duyên:** xem mục thưởng thuyha88 "Tourmaline cao cấp — đơn từ 21tr500 +100.000, đơn từ 31tr500 +200.000" → sản phẩm phải là TRANG SỨC NHẪN TOUR TRƠN CAO CẤP; chỉnh và gửi lại file đối soát.
 - **NGUYÊN NHÂN GỐC:** 2 CT "Tourmaline cao cấp" trong `tools/bonus-t10/calc_bonus.js` chỉ xét giá trị đơn (không có `requireProduct`) → đơn PT850 của thuyha88 (24.947.000đ: nhẫn túi tiền cẩm thạch, lắc, mặt cổ… KHÔNG có nhẫn tour trơn cao cấp) vẫn ăn 100.000đ. Tương tự các Sale khác.
