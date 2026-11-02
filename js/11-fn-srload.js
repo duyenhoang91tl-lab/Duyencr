@@ -1443,10 +1443,8 @@ function _srPureDetailRows_(orders){
   });
   return rows;
 }
-function _srPureExport_(){
-  var d = _srState.dataB;
-  if (!d || !d.orders){ alert('Chưa có dữ liệu Báo cáo B — hãy tải báo cáo trước.'); return; }
-  if (typeof XLSX === 'undefined'){ alert('Thiếu thư viện Excel (XLSX).'); return; }
+// Dựng 4 bảng của file Excel đối chiếu Báo cáo N. Tách khỏi _srPureExport_ để nút "Excel đối soát" gộp ở Báo cáo B dùng lại ĐÚNG số liệu này (xuất lẻ không đổi).
+function _srPureBuildSheets_(d){
   var orders = _srPureOrders_(d);
   var pure = _srPureCalc_(orders, 'pure'), adjC = _srPureCalc_(orders, 'adj');
   var srv = {}; (d.bySale || []).forEach(function(r){ srv[r.name] = r; });
@@ -1478,11 +1476,18 @@ function _srPureExport_(){
   (ac.needConfirm || []).forEach(function(x){ chk.push(['File kế toán lệch giá Pos — chưa xác nhận', x.ngay, x.sdt, x.theSale, x.ma, x.giaPos, 'Giá kế toán ' + x.giaKeToan + ' · chênh ' + x.chenh + ' · dòng KT ' + (x.dongKeToan || []).join(',')]); });
   (ac.unmatched || []).forEach(function(x){ chk.push(['Dòng kế toán chưa khớp đơn Pos nào', '', '', x.sale, x.ma, x.tong, 'Dòng ' + x.dong + ' · kênh ' + (x.kenh || '')]); });
   if (chk.length === 1) chk.push(['(không có mục nào cần kiểm tra tay)', '', '', '', '', '', '']);
+  return { sum: sum, det: det, chk: chk, detail: _srPureDetailRows_(orders), orders: orders, pure: pure, adj: adjC };
+}
+function _srPureExport_(){
+  var d = _srState.dataB;
+  if (!d || !d.orders){ alert('Chưa có dữ liệu Báo cáo B — hãy tải báo cáo trước.'); return; }
+  if (typeof XLSX === 'undefined'){ alert('Thiếu thư viện Excel (XLSX).'); return; }
+  var x = _srPureBuildSheets_(d);
   var wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sum), 'Tổng hợp theo Sale');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(det), 'Đơn đã điều chỉnh');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(chk), 'Cần kiểm tra tay');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(_srPureDetailRows_(orders)), 'Chi tiết thuần từng đơn');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(x.sum), 'Tổng hợp theo Sale');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(x.det), 'Đơn đã điều chỉnh');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(x.chk), 'Cần kiểm tra tay');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(x.detail), 'Chi tiết thuần từng đơn');
   XLSX.writeFile(wb, 'BaoCao_Pos_DonThuan_DoiChieu_' + _ymd(new Date()) + '.xlsx');
 }
 
@@ -2083,10 +2088,9 @@ function _srLLechSheet_(d){   // [header, ...dong] cho sheet "KT ghi lệch ti�
   });
   return [head].concat(rows);
 }
-function _srLExportAcct_(){
-  var d = _srState.dataL, ac = d && d.acctCheck;
-  if (!ac || !((ac.missing||[]).length || (ac.lech||[]).length)){ toast('Không có đơn nào cần xuất.'); return; }
-  var tag = (d.dateFrom || _srState.lDateFrom || 'tu-dau') + '_' + (d.dateTo || _srState.lDateTo || 'den-nay');
+// Dựng 3 bảng đối chiếu kế toán của Báo cáo L (KT chưa ghi / Thiếu mã bộ đếm / KT ghi lệch tiền). Tách khỏi _srLExportAcct_ để "Excel đối soát" gộp ở Báo cáo B dùng lại (xuất lẻ không đổi).
+function _srLBuildAcctSheets_(d){
+  var ac = (d && d.acctCheck) || {};
   var head = ['Mã bộ đếm','Ngày đơn','SĐT','Khách','Kênh bán','Sale bán','Giá trị đơn','Phần Sale ('+d.sharePct+'%)','Phần Quầy','Dòng Pos','Dòng trang tính cửa hàng','Cách xử lý (Báo cáo L)'];
   var lbl = { 'tinh':'Tính thêm cho Sale', 'trung':'Trùng thẻ Pos', 'mot-phan':'Trùng một phần', 'chua-ghep-don':'Chưa ghép được đơn Pos (giá trị lấy từ cột Doanh thu trang tính cửa hàng)' };
   var chua = [head], thieu = [head];
@@ -2094,6 +2098,13 @@ function _srLExportAcct_(){
     var base = [(e.codes||[]).join(' ; '), e.ngay||'', e.phone||'', e.khachHang||e.tenKh||'', 'Quầy Hào Nam / ' + (e.nguonDon||''), (e.sales||[]).join(', '), Math.round(e.giaTri||0), e.chiaSale||0, e.phanQuay||0, e.posRow, (e.storeRows||[]).join(', '), lbl[e.loaiXuLy]||e.loaiXuLy||''];
     (e.status === 'chua-ghi' ? chua : thieu).push(base);
   });
+  return { head: head, chua: chua, thieu: thieu, lech: _srLLechSheet_(d) };
+}
+function _srLExportAcct_(){
+  var d = _srState.dataL, ac = d && d.acctCheck;
+  if (!ac || !((ac.missing||[]).length || (ac.lech||[]).length)){ toast('Không có đơn nào cần xuất.'); return; }
+  var tag = (d.dateFrom || _srState.lDateFrom || 'tu-dau') + '_' + (d.dateTo || _srState.lDateTo || 'den-nay');
+  var xa = _srLBuildAcctSheets_(d), head = xa.head, chua = xa.chua, thieu = xa.thieu;
   if (typeof XLSX === 'undefined'){
     if (typeof _srGDownloadCsv_ === 'function') _srGDownloadCsv_('KT-chua-ghi_'+tag+'.csv', chua);
     return;
@@ -2101,7 +2112,7 @@ function _srLExportAcct_(){
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(chua.length > 1 ? chua : [head, ['(không có đơn nào)']]), 'KT chưa ghi');
   if (thieu.length > 1) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(thieu), 'Thiếu mã bộ đếm');
-  var lechRows = _srLLechSheet_(d);   // KT đã ghi nhưng SỐ TIỀN lệch so với Pos
+  var lechRows = xa.lech;   // KT đã ghi nhưng SỐ TIỀN lệch so với Pos
   if (lechRows.length > 1) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(lechRows), 'KT ghi lệch tiền');
   XLSX.writeFile(wb, 'DoiChieuKeToan_'+tag+'.xlsx');
 }
@@ -2201,16 +2212,13 @@ function renderSalesReportTabL_(wrap, subTabs){
   var body = _srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _srRenderL_(_srState.dataL);
   wrap.innerHTML = filters + body;
 }
-function _srLExportCsv_(kind){
-  var d = _srState.dataL;
-  if (!d || !d.rows){ toast('Chưa có dữ liệu — bấm "Lọc" trước.'); return; }
-  var tag = (d.dateFrom || _srState.lDateFrom || 'tu-dau') + '_' + (d.dateTo || _srState.lDateTo || 'den-nay');
+// Dựng bảng "tổng hợp theo Sale" (kind='summary') hoặc "chi tiết từng đơn" (mặc định) của Báo cáo L. Tách khỏi _srLExportCsv_ để "Excel đối soát" gộp ở Báo cáo B dùng lại (xuất CSV lẻ không đổi).
+function _srLBuildRows_(d, kind){
   if (kind === 'summary'){
     var rs = [['Sale','KH hẹn qua CH','KH có đơn','Số đơn','Doanh thu đơn (đầy đủ)','Doanh thu chia thêm ('+d.sharePct+'%)','Đã có thẻ trên Pos (bỏ qua)']];
     (d.bySale||[]).forEach(function(x){ rs.push([x.sale, x.khHen, x.khCoDon, x.soDon, x.doanhThuDon, x.credited, x.dupSkipped]); });
     rs.push(['Tổng đơn duy nhất', d.totals.dongHen, d.totals.dongCoDon, d.totals.soDon, d.totals.doanhThuDon, d.totals.daTinh, d.totals.trungBoQua]);
-    _srGDownloadCsv_('KH-qua-cua-hang_tong-hop_'+tag+'.csv', rs);
-    return;
+    return rs;
   }
   var head = ['Dòng trang tính','STT','Ngày qua CH','Tên KH','SĐT','Kênh','Sale ghi trên sheet','Sale (đã khớp)','Tình trạng KH (sheet)','Doanh thu NV cửa hàng ghi (sheet)','NV cửa hàng lên đơn',
     'Ngày đơn Pos','Nguồn đơn','Mã bộ đếm','Dòng sheet Pos (dữ liệu đơn)','Ghi chú đơn Pos (cột Q)','Sản phẩm','Giá trị đơn (sau giảm giá)','Thẻ Pos hiện tại','Trạng thái xử lý','Sale nhận','% chia','Doanh thu chia cho Sale','Sale đã có thẻ (bỏ qua)','Ghi chú / lý do','Cảnh báo dòng sheet'];
@@ -2228,5 +2236,11 @@ function _srLExportCsv_(kind){
       });
     });
   });
-  _srGDownloadCsv_('KH-qua-cua-hang_chi-tiet_'+tag+'.csv', out);
+  return out;
+}
+function _srLExportCsv_(kind){
+  var d = _srState.dataL;
+  if (!d || !d.rows){ toast('Chưa có dữ liệu — bấm "Lọc" trước.'); return; }
+  var tag = (d.dateFrom || _srState.lDateFrom || 'tu-dau') + '_' + (d.dateTo || _srState.lDateTo || 'den-nay');
+  _srGDownloadCsv_((kind === 'summary' ? 'KH-qua-cua-hang_tong-hop_' : 'KH-qua-cua-hang_chi-tiet_')+tag+'.csv', _srLBuildRows_(d, kind));
 }

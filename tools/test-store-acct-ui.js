@@ -7,7 +7,7 @@ const line = p => { const i = src.indexOf(p); return src.slice(i, src.indexOf('}
 const sheets = [], files = [], toasts = [];
 const c = vm.createContext({ esc: s => String(s == null ? '' : s).replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m])), fmt: n => String(n || 0), _srMoney: n => (Math.round(n || 0)) + '₫',
   _srState: { dataL: null }, toast: m => toasts.push(m), XLSX: { utils: { book_new: () => ({ s: [] }), aoa_to_sheet: a => a, book_append_sheet: (wb, ws, nm) => sheets.push([nm, ws]) }, writeFile: (wb, n) => files.push(n) } });
-vm.runInContext(line('var _SR_L_STATUS_') + '\n' + ['_srLTienLbl_', '_srLAcctBadge_', '_srLAcctHtml_', '_srLLechSheet_', '_srLExportAcct_', '_srLOrderHtml_'].map(fn).join('\n'), c);
+vm.runInContext(line('var _SR_L_STATUS_') + '\n' + ['_srLTienLbl_', '_srLAcctBadge_', '_srLAcctHtml_', '_srLLechSheet_', '_srLBuildAcctSheets_', '_srLExportAcct_', '_srLOrderHtml_'].map(fn).join('\n'), c);
 const miss = [
   { posRow: 5, ngay: '10/10/2026', phone: '0900000001', khachHang: 'A', sales: ['ninhnga99'], codes: ['M99999'], giaTri: 1000000, chiaSale: 300000, phanQuay: 700000, status: 'chua-ghi', loaiXuLy: 'tinh', storeRows: [3], nguonDon: 'Quầy Hào Nam' },
   { posRow: 6, ngay: '11/10/2026', phone: '0900000002', khachHang: 'B', sales: ['x'], codes: [], giaTri: 500000, chiaSale: 150000, phanQuay: 350000, status: 'thieu-ma', loaiXuLy: 'tinh', storeRows: [4], nguonDon: 'Fb' }];

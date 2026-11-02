@@ -6,6 +6,15 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-02 — Báo cáo B: nút "Excel đối soát" GỘP 1 FILE (B + E + G + L + N) (Duyên yêu cầu) — BƯỚC 1/3 đã push
+- **Yêu cầu của Duyên:** các mục báo cáo đều xuất được Excel đối soát; riêng nút **"Excel đối soát" ở Báo cáo B** tải ĐÚNG 1 file gồm luôn Báo cáo B, E, G, L, N.
+- **Hiện trạng đã đọc:** B có `_srBuildExportB_` (6 sheet, xong từ 10-31/11-02); G có `_srGBuildExport_` (builder tách được); E CHƯA có xuất (tính client: `_computeCommissionData_` + `_computeBonusData_` từ cùng dữ liệu `salesReportB`); N = chế độ xem của B (`_srPureExport_`); L lấy từ GAS `storeCaseReport`.
+- **Thiết kế (chốt):** file gộp dùng **khoảng ngày + bộ lọc của Báo cáo B đang xem** cho cả 5 báo cáo (E/G/N tính từ cùng `dataB`; L gọi `storeCaseReport` cùng khoảng ngày). Tên sheet có tiền tố báo cáo: `B …`, `E …`, `G …`, `L …`, `N …` + sheet đầu "Mục lục" (cách đọc + số tổng đối chiếu chéo giữa các báo cáo).
+- [x] **BƯỚC 1/3 ĐÃ PUSH (js/11-fn-srload.js):** TÁCH phần dựng dữ liệu khỏi các hàm xuất lẻ để file gộp dùng lại đúng số liệu, KHÔNG đổi hành vi xuất lẻ: `_srPureBuildSheets_(d)` (N), `_srLBuildAcctSheets_(d)` + `_srLBuildRows_(d, kind)` (L). Test: các test N/L/B hiện có đều qua; so CSV Báo cáo L bản mới ↔ bản cũ (git HEAD) GIỐNG HỆT.
+- [ ] **BƯỚC 2/3:** file mới `js/61-recon-export.js` — builder sheet cho E và G + ghép 5 báo cáo (chưa có nút) + `tools/test-recon-export.js`.
+- [ ] **BƯỚC 3/3:** nút "📗 Excel đối soát (B+E+G+L+N)" ở menu Tác vụ Báo cáo B (`js/13`), tải L, ghi file, thông báo thiếu dữ liệu.
+- **ĐANG LÀM:** bước 2.
+
 ## 2026-11-02 — Chốt tháng Pos cuối tháng → bảng "Theo Sale" Báo cáo B tự nhảy theo mốc chốt (Duyên yêu cầu) — BƯỚC 1/3 (backend GAS) đã push
 - **Yêu cầu của Duyên:** cuối tháng bấm "Chốt tháng này làm mốc" thì doanh thu theo Sale ở Báo cáo B (bảng "Theo Sale", ảnh Duyên gửi) phải nhảy đúng theo số của khung "Chốt tháng Pos & trừ hoàn/hủy" (số "Sau trừ").
 - **NGUYÊN NHÂN GỐC:** (1) `closePosMonth_` chặn `month >= tháng hiện tại` nên cuối tháng bấm chốt tháng này bị báo "chưa kết thúc"; (2) số trừ hoàn/hủy chỉ nằm ở khung riêng cuối trang (`posMonthAdjust_`), còn bảng Theo Sale/thẻ Tổng giá trị của `salesReportB` luôn trả số GỐC → không khớp báo cáo đã chốt.
