@@ -16699,6 +16699,14 @@ function _storeCaseVisitDates_(monthCell, dayCell, todayYmd) {
   if (!dayStr) return [];
   if (/\d{4}/.test(dayStr)) { // co nam day du (vd 10/10/2026 hoac 2026-10-10)
     var full = /^\d{4}-\d{2}-\d{2}/.test(dayStr) ? dayStr.substring(0, 10) : (function() { var d0 = parseVNDate_(dayStr); return d0 ? _vnYmd_(d0) : ''; })();
+    // NGUYEN NHAN GOC (Duyen bao 2026-11-02): Google Sheets tu doi \"3-4\" / \"10-11\" (ngay 3-4, 10-11 cua thang o cot Thang) thanh NGAY 03/04/2026 / 10/11/2026
+    // (ngay-thang). Khi o co nam day du ma THANG cua ngay do KHAC cot Thang => do la khoang ngay bi doi, khong phai ngay that:
+    // doc lai thanh \"<ngay>-<thang cua o>\" trong thang o cot Thang (03/04/2026 + Thang 10 => 3,4/10; 10/11/2026 + Thang 10 => 10,11/10).
+    var moCol = parseInt(String(monthCell || '').replace(/\D/g, ''), 10);
+    if (full && moCol >= 1 && moCol <= 12) {
+      var fp = full.split('-'), fMo = +fp[1], fDay = +fp[2];
+      if (fMo !== moCol) return _storeCaseDaysToYmd_(moCol, _storeCaseDayList_(fDay + '-' + fMo), todayYmd);
+    }
     return full ? [full] : [];
   }
   return _storeCaseDaysToYmd_(parseInt(String(monthCell || '').replace(/\D/g, ''), 10), _storeCaseDayList_(dayStr), todayYmd);
