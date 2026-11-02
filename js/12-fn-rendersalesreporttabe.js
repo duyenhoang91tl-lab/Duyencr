@@ -78,10 +78,11 @@ function _saleStartDate_(name){
       for (var j = 0; j < al.length; j++) if (ns.indexOf(al[j]) !== -1){ if (accounts[i].startDate) return accounts[i].startDate; i = accounts.length; break; }
     }
   }
-  // Tài khoản chưa đặt Ngày bắt đầu -> lấy ngày của mốc "Thử việc" ĐẦU TIÊN ở modal "Phân loại đội Sale" (js/62), khỏi nhập 2 nơi (Duyên yêu cầu 2026-11-02).
-  if (typeof _scpListOf_ === 'function'){
-    var l = _scpListOf_(name);
-    for (var k = 0; k < l.length; k++) if (l[k].channel === 'probation' && l[k].from) return l[k].from;
+  // Tài khoản chưa đặt Ngày bắt đầu -> lấy "Ngày bắt đầu tính thưởng" (bonusFrom) của mốc Thử việc ở modal "Phân loại đội Sale" (js/62).
+  // KHÔNG dùng ngày `from` của mốc: thử việc tính tròn 1 tháng, còn ngày bắt đầu tính thưởng là SAU thời gian học việc (Duyên 2026-11-02).
+  if (typeof _scpGroupListOf_ === 'function' || typeof _scpListOf_ === 'function'){
+    var l = (typeof _scpGroupListOf_ === 'function') ? _scpGroupListOf_(name) : _scpListOf_(name);
+    for (var k = 0; k < l.length; k++) if (l[k].channel === 'probation' && l[k].bonusFrom) return l[k].bonusFrom;
   }
   return '';
 }

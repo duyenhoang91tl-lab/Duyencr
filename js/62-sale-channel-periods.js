@@ -19,8 +19,10 @@ function _scpNorm_(arr){
   var byFrom = {};
   (Array.isArray(arr) ? arr : []).forEach(function(e){
     if (!e || !/^(\d{4}-\d{2}-\d{2})?$/.test(String(e.from || ''))) return;   // from rỗng = "từ trước đến nay" (không cần chọn ngày)
-    e = { from: String(e.from || ''), channel: e.channel };
-    byFrom[e.from] = { from: e.from, channel: String(e.channel == null ? '' : e.channel) };
+    var bf = (String(e.channel || '') === 'probation' && /^\d{4}-\d{2}-\d{2}$/.test(String(e.bonusFrom || ''))) ? String(e.bonusFrom) : '';   // bonusFrom = ngày BẮT ĐẦU TÍNH THƯỞNG (sau học việc), khác ngày bắt đầu thử việc `from`; chỉ có ở mốc Thử việc
+    var ne = { from: String(e.from || ''), channel: String(e.channel == null ? '' : e.channel) };
+    if (bf) ne.bonusFrom = bf;
+    byFrom[ne.from] = ne;
   });
   return Object.keys(byFrom).sort().map(function(k){ return byFrom[k]; });
 }
@@ -52,7 +54,7 @@ function _scpSet_(name, arr, names){
   var targets = (names && names.length) ? names : [name];   // names = mọi tên cùng 1 người (modal gom theo người) → lưu dưới TẤT CẢ để báo cáo tra tên nào cũng ra
   ((typeof _cfgAliasesOf === 'function') ? _cfgAliasesOf(name) : [name]).forEach(function(n){ if (targets.indexOf(n) === -1) delete SALE_CHANNEL_PERIODS[n]; });
   targets.forEach(function(n){
-    if (clean.length) SALE_CHANNEL_PERIODS[n] = clean.map(function(e){ return { from: e.from, channel: e.channel }; }); else delete SALE_CHANNEL_PERIODS[n];
+    if (clean.length) SALE_CHANNEL_PERIODS[n] = clean.map(function(e){ var o = { from: e.from, channel: e.channel }; if (e.bonusFrom) o.bonusFrom = e.bonusFrom; return o; }); else delete SALE_CHANNEL_PERIODS[n];
   });
 }
 // Mọi tên cùng 1 người với `name` (cùng cách gom của modal: hoa/thường + bí danh tài khoản). Không gom được → chỉ [name].
@@ -116,6 +118,7 @@ function _scpSetStage(i, stage){
   if (stage === 'tv') e.channel = 'probation';
   else if (stage === 'ct'){ var tg = _scpTeamGroups_(); if (e.channel === 'probation' || !e.channel) e.channel = tg.length ? tg[0].key : 'online'; }
   else e.channel = '';
+  if (e.channel !== 'probation') e.bonusFrom = '';
   _renderSaleChannelsModal();
 }
 function _scpCellHtml_(name){
@@ -128,7 +131,7 @@ function _scpCellHtml_(name){
 }
 function _scpToggle(name){
   if (_scpOpenName === name){ _scpOpenName = ''; _scpDraft = null; }
-  else { _scpOpenName = name; _scpDraft = _scpGroupListOf_(name).map(function(e){ return { from: e.from, channel: e.channel }; }); if (!_scpDraft.length) _scpDraft.push({ from: '', channel: '' }); }
+  else { _scpOpenName = name; _scpDraft = _scpGroupListOf_(name).map(function(e){ return { from: e.from, channel: e.channel, bonusFrom: e.bonusFrom || '' }; }); if (!_scpDraft.length) _scpDraft.push({ from: '', channel: '' }); }
   _renderSaleChannelsModal();
 }
 function _scpEditorRowHtml_(name, colspan){
