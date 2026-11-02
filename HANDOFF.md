@@ -1578,3 +1578,8 @@ Nguồn: Google Sheet "Khách Sale qua cửa hàng" (tab đầu) — `_storeCase
 4. **Ghép đơn Pos:** SĐT chuẩn hoá + ngày tạo đơn Pos: có đơn ĐÚNG ngày thì lấy đơn đó; không có thì cho lệch ±1 ngày (đánh dấu `lech`, ghi chú). Lệch ≥2 ngày không ghép. Dòng "Ko đến" không ghép đơn.
 5. **Tiền:** 30% giá trị sau giảm (`storeCaseSharePct`), chia đều các sale của dòng; sale đã có thẻ trên đơn Pos → "trùng", bỏ qua.
 - Điểm còn dễ sai: hẹn xa >45 ngày bị lùi sang năm trước; "Ngày KH đến" ghi chữ lạ không ra ngày → rơi về ngày hẹn.
+
+## 2026-11-02 — ĐỐI SOÁT T10: kiểm phần chia CỬA HÀNG (Quầy Hào Nam) trong DOI_SOAT_FINAL_T10.xlsx
+- [x] **Đã xong:** thêm sheet `4_Đối soát cửa hàng` vào file đối soát (sheets 1/2/3 + TÓM TẮT giữ NGUYÊN, không chạy lại số). Kết quả kiểm: trong 1.428 đơn Pos (ĐƠN PT + ĐƠN MP) có **0 đơn** nguồn Quầy/Cửa hàng/Hào Nam; kho chỉ KHO ONLINE và PHẠM THU HIỀN - MP; Trang_tính1 cũng không có dòng quầy → **file đối soát CHƯA đủ phần chia cửa hàng** (chia 30/70 với quầy chưa được đối soát). 9 đơn chỉ có ghi chú nhắc quầy/cửa hàng nhưng nguồn là online (CRM tính 100% cho sale) → sheet 4 liệt kê để xem tay.
+- NGUYÊN NHÂN GỐC: đơn quầy nằm ở tab riêng "quầy t10" của file kế toán (mỗi đơn = cặp dòng Quầy ≈70% + sale ≈30%) và ở Pos nguồn "Quầy Hào Nam"; 2 nguồn này không có trong file Pos/Trang_tính1 đã dùng để đối soát.
+- [ ] **BƯỚC KẾ:** Duyên gửi tab "quầy t10" của file KT + Pos đơn nguồn Quầy Hào Nam/Cửa hàng T10 (hoặc xuất Báo cáo L tháng 10) → đối soát theo Mã bộ đếm: tổng 2 dòng KT = giá Pos, sale 30% / quầy 70%, thẻ sale khớp Pos; rồi bổ sung số cửa hàng vào sheet 1. File xlsx KHÔNG đưa lên repo (có SĐT/địa chỉ khách); chỉ giao qua chat. Không sửa code GAS/extension ở bước này nên không cần deploy/reload.
