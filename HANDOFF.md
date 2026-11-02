@@ -11,6 +11,12 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-03 (phiên 6) — File đối soát CHUẨN gửi kế toán (thưởng đã sửa Ngọc + sheet hoa hồng phiên 5) — XONG
+- **Quy trình chạy lại đủ:** extract_orders.py → calc_bonus.js → build_into_source.py → recalc.py → fix_filters.py → calc_commission.js → build_commission_sheet.py → recalc.py → fix_filters.py. (build_commission_sheet đọc cột **H** = TỔNG THƯỞNG của THUONG_Tong_theo_sale — đừng đổi thứ tự cột.)
+- [x] File cuối 14 sheet, recalc 0 lỗi (9.229 CT): TONG_THUONG_HOA_HONG_SALE (đầu file) + THUONG_Tong_theo_sale + THUONG_Chi_tiet + sheet gốc giữ nguyên. Thưởng 18 sale = **5.946.671đ** (gồm Ngọc thử việc 190.000đ); thực nhận 18 sale = **73.768.867đ** (hoa hồng 68.996.076 + thưởng 5.946.671 − trừ huỷ T09 1.173.880). Số cũ 72.223.869 / thưởng 4.401.673 của phiên 5 là trước khi sửa Ngọc + loại đơn MP/nguồn.
+- **Còn mở:** Ngọc hoa hồng % tạm mức Offline (520.392đ); hoa hồng đơn chia cửa hàng (4b) chưa gồm; 8 sale chưa phân loại chỉ có hoa hồng ngoài bảng thưởng.
+- **ĐANG LÀM: không có việc dở.** File Excel KHÔNG commit.
+
 ## 2026-11-03 (phiên 4) — Báo cáo E: bảng THU NHẬP TỪNG SALE (hoa hồng đủ nguồn + thưởng) + bấm Chi tiết + xuất Excel (Duyên yêu cầu) — XONG 3/3 (chờ Duyên kiểm trên web)
 - **Yêu cầu:** mỗi Sale có 1 dòng tổng gồm: hoa hồng các kênh + nguồn + Facebook + thưởng thử việc/chính thức + hoa hồng từ đơn chia với cửa hàng + thưởng khác nếu có; KHÔNG tính thưởng/phạt đội (js/60). Bấm Chi tiết xem nhận từ nguồn nào; xuất Excel để kiểm.
 - **Cách hiểu (nếu sai báo Duyên chỉnh):** "đơn chia cửa hàng" = doanh thu chia 30% của Báo cáo L (đã bỏ đơn Trùng/chưa đến/hoàn) × % theo mức đơn gốc của người đó; thử việc/chính thức = chương trình thưởng có/không bật "ngày thứ mấy kể từ ngày bắt đầu". "Thưởng khác": hiện KHÔNG có nguồn dữ liệu riêng nên chưa có cột (mọi CT thưởng đã nằm ở thử việc/chính thức).
