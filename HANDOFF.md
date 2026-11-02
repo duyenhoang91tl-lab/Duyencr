@@ -7,6 +7,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+
+## 2026-11-02 (tối 2) — Modal "🏷️ Phân loại đội Sale" (cài mốc theo ngày) mở TOÀN MÀN HÌNH (Duyên yêu cầu) — XONG 1/1
+- **Vấn đề:** modal rộng 520px, cột "🗓 Mốc theo ngày" và khung sửa mốc bị cắt ngang (ảnh Duyên gửi).
+- **NGUYÊN NHÂN GỐC:** `#sc-modal` trong index.html đặt `max-width:520px;max-height:86vh` từ khi chỉ có 2 cột (Tên, Đội); thêm cột mốc ở bước 4 nhưng không nới khung.
+- [x] **ĐÃ PUSH (index.html):** overlay `padding:0;align-items:stretch`, hộp `width:100%;height:100vh;max-width:none;border-radius:0`. Chỉ đổi CSS inline, không đổi JS/GAS (không cần deploy GAS).
+- **ĐANG LÀM: không có việc dở.** Duyên làm: Ctrl+F5 → mở lại modal. Có thể làm thêm: bảng rộng tối đa ~1100px ở giữa nếu màn hình quá lớn.
+
 ## 2026-11-02 (tối) — PHÂN LOẠI SALE THEO MỐC NGÀY + chương trình thưởng áp dụng theo từng mốc (Duyên yêu cầu) — BƯỚC 1/4 đã push
 - **Yêu cầu của Duyên:** cài cho TỪNG Sale: Online/Offline/Thử việc **từ ngày nào** (VD Sale A thử việc 10/09→10/10, chính thức từ 11/10) và chương trình thưởng tương ứng tự áp dụng theo loại tại đúng ngày đơn.
 - **NGUYÊN NHÂN GỐC:** `SALE_CHANNELS` chỉ có 1 phân loại HIỆN TẠI/Sale → đổi Thử việc→Chính thức là MỌI đơn cũ cũng bị tính theo loại mới (báo cáo E/G tháng cũ sai).
