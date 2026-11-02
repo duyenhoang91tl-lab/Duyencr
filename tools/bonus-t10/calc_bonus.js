@@ -28,9 +28,20 @@ const PROGRAMS = [
   rev('order', 21.5e6, 100000, { name: 'Tourmaline cao cấp — đơn từ 21tr500', dateFrom: '2026-09-21' }),
   rev('order', 31.5e6, 200000, { name: 'Tourmaline cao cấp — đơn từ 31tr500', dateFrom: '2026-09-21' })
 ];
+// 5 CT mau "Co che thuong kich hoat Sale moi" (js/12 _bpSeedProbationTemplate_): GD1 don dau trong ngay (ngay 1-3), GD2 bac so don + doanh so ngay (tu ngay 4)
+const PM = (o) => mk(Object.assign({ dateFrom: '2026-08-11', dateTo: '2026-12-31', audience: { online: false, offline: false } }, o));
+PROGRAMS.push(
+  PM({ name: 'GĐ1 — Đơn đầu tiên trong ngày (ngày 1-3 thử việc)', probationDay: { enabled: true, from: 1, to: 3 }, firstOrder: { enabled: true, amount: 50000 } }),
+  PM({ name: 'GĐ2 — Bậc số đơn/ngày (từ ngày 4 thử việc)', probationDay: { enabled: true, from: 4, to: '' }, tier: { enabled: true, rows: [{ count: 2, bonus: 30000 }, { count: 3, bonus: 50000 }, { count: 5, bonus: 100000 }] } }),
+  PM({ name: 'GĐ2 — Doanh số ≥25 triệu/ngày (từ ngày 4 thử việc)', probationDay: { enabled: true, from: 4, to: '' }, revenue: { enabled: true, scope: 'day', min: 25e6, max: '' }, bonusAmount: 30000 }),
+  PM({ name: 'GĐ2 — Doanh số ≥50 triệu/ngày (từ ngày 4 thử việc)', probationDay: { enabled: true, from: 4, to: '' }, revenue: { enabled: true, scope: 'day', min: 50e6, max: '' }, bonusAmount: 50000 }),
+  PM({ name: 'GĐ2 — Doanh số ≥80 triệu/ngày (từ ngày 4 thử việc)', probationDay: { enabled: true, from: 4, to: '' }, revenue: { enabled: true, scope: 'day', min: 80e6, max: '' }, bonusAmount: 100000 }));
+// Sale THU VIEC (Duyen 2026-11-02): Ngoc bat dau tinh thuong 14/10/2026 (don dau 14/10) -> ngay 1-3 = 14,15,16/10 (don dau trong ngay van duoc thuong), tu 17/10 = ngay 4.
+const PROBATION = { 'ngocNB2003saleoff': '2026-10-14' };
 // kenh theo ten: khop khong phan biet hoa/thuong voi the Pos
 const SC = {}; Object.keys(chRaw).forEach(k => { SC[k] = chRaw[k]; });
-const ctx = { loadLS: () => null, SALE_CHANNELS: SC, SALE_CHANNEL_PERIODS: {}, BONUS_PROGRAMS: PROGRAMS, _srMoney: n => String(Math.round(n)), accounts: [], _acctNamesOf: () => [] };
+const SCP = {}; Object.keys(PROBATION).forEach(k => { SC[k] = 'probation'; chRaw[k] = 'probation'; SCP[k] = [{ from: PROBATION[k], channel: 'probation', bonusFrom: PROBATION[k] }]; });
+const ctx = { loadLS: () => null, SALE_CHANNELS: SC, SALE_CHANNEL_PERIODS: SCP, BONUS_PROGRAMS: PROGRAMS, _srMoney: n => String(Math.round(n)), accounts: [], _acctNamesOf: () => [] };
 vm.createContext(ctx);
 vm.runInContext(j27 + '\n' + fn(j05, 'esc') + fn(j01, 'splitMulti_') + j01.match(/function isNumTagSale_\(x\)\{[^\n]*\}/)[0] + '\nvar _SALE_ALIAS_MAP = {};\n' + fn(j01, '_cfgAliasesOf') + fn(j01, '_cfgByAlias') + fn(j01, '_saleChannelOf_') +
   ['_scpNorm_', '_scpListOf_', '_saleChannelOn_'].map(n => fn(j62, n)).join('\n') +
