@@ -1,10 +1,9 @@
 // ═══════════════════════════════════════════════════════
-//  MẪU LỌC NHANH cho Báo cáo doanh số (A, B, C, D, E, F, G, L) — Duyên yêu cầu 12/10/2026 (lọc theo Team hay lỗi → tự tạo mẫu).
+//  MẪU LỌC NHANH cho Báo cáo doanh số (A, B, C, D, E, F, G, L, M) — Duyên yêu cầu 12/10/2026 (lọc theo Team hay lỗi → tự tạo mẫu).
 //  Mẫu = tên + danh sách Sale (+ các bộ lọc khác của báo cáo đó như Kênh/Nguồn/Sản phẩm…) — KHÔNG gồm ngày (ngày vẫn chọn riêng).
 //  Bấm mẫu → gán thẳng bộ lọc rồi tải lại báo cáo, KHÔNG đi qua "Lọc theo Team" (_srSyncTeamToSale_).
 //  (18/10/2026, Duyên) MẪU DÙNG CHUNG MỌI BÁO CÁO: mẫu = tên + danh sách Sale (+ bộ lọc riêng của từng báo cáo nếu lưu từ báo cáo đó) — tạo ở 1 báo cáo thì
-//  báo cáo nào có ô Sale cũng bấm được; tên Sale tự đổi sang đúng tên có trong báo cáo đang xem (khớp theo danh tính/bí danh). H, I (chọn 1 CS) và M không có ô
-//  lọc nhiều Sale nên không có thanh mẫu. Mẫu theo TỪNG tài khoản; lưu ở trình duyệt (localStorage, khoá v2; mẫu cũ theo từng báo cáo (v1) tự gộp sang v2).
+//  báo cáo nào có ô Sale cũng bấm được; tên Sale tự đổi sang đúng tên có trong báo cáo đang xem (khớp theo danh tính/bí danh). H, I (chọn 1 CS, không phải nhiều Sale) chưa có thanh mẫu; M đã có từ 02/11/2026. Mẫu theo TỪNG tài khoản; lưu ở trình duyệt (localStorage, khoá v2; mẫu cũ theo từng báo cáo (v1) tự gộp sang v2).
 //  (16/10/2026) Ô mẫu chuyển vào thanh công cụ chung .srb-bar, cùng hàng 🧰 Tác vụ: 1 mẫu = nút, ≥2 mẫu = dropdown, có nút ✕ Tắt lọc nhanh.
 // ═══════════════════════════════════════════════════════
 (function(){
@@ -18,7 +17,8 @@
     E: { keys:['eSale','eKenh'], sale:'eSale', team:'eTeam', opts:'saleBOptions', custom:'eSaleCustomized' },
     F: { keys:['fSale'], sale:'fSale', team:'fTeam', opts:'saleBOptions', custom:'fSaleCustomized' },
     G: { keys:['gSale','gNguon','gMarketer','gSanPham'], sale:'gSale', opts:'saleBOptions', custom:'gSaleCustomized' },
-    L: { keys:['lSale'], sale:'lSale', opts:'saleBOptions', custom:'lSaleCustomized' }
+    L: { keys:['lSale'], sale:'lSale', opts:'saleBOptions', custom:'lSaleCustomized' },
+    M: { keys:['mSale','mNguon'], sale:'mSale', opts:'saleBOptions' }   // (02/11/2026) Báo cáo M (đơn chia) có ô Sale + Kênh bán nhiều lựa chọn như các báo cáo khác
   };
   CFG.K = CFG.G;   // K = màn Thưởng (cùng bộ lọc với G; _srState.sub === 'K' khi xem theo kiểu khác)
   function curSub(){ return (typeof _srState !== 'undefined') ? _srState.sub : ''; }

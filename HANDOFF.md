@@ -6,6 +6,15 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-02 (chiều) — MẪU LỌC NHANH dùng được ở TẤT CẢ báo cáo (Duyên yêu cầu) — BƯỚC 1 đã push
+- **Yêu cầu của Duyên:** mọi báo cáo đều dùng được bộ lọc nhanh; sửa/lưu mẫu ở đâu thì đổi cho TẤT CẢ báo cáo (chỉ báo cáo đặc thù không áp dụng được mới tạo riêng).
+- **Hiện trạng đã đọc (js/48-filter-presets.js):** mẫu ĐÃ dùng chung (localStorage `ome_sr_filter_presets_v2:<user>`; sửa ✎ / ghi đè ⟳ / xoá ✕ một mẫu = đổi ở mọi báo cáo; tên Sale tự đổi sang đúng tên của báo cáo đang xem). Có thanh mẫu: A,B(+N),C,D,E,F,G(+K),L. THIẾU: **M** (đơn chia), **H**, **I**; J = nhập dữ liệu (admin) không có bộ lọc.
+- **NGUYÊN NHÂN GỐC M thiếu:** bảng `CFG` trong js/48 viết trước khi M có ô Sale+Kênh nhiều lựa chọn (`mSale`, `mNguon`, js/13 `_srbSubCfg_`), chú thích cũ ghi "M không có ô lọc nhiều Sale" nên không ai thêm lại.
+- [x] **BƯỚC 1 ĐÃ PUSH:** thêm `M: { keys:['mSale','mNguon'], sale:'mSale', opts:'saleBOptions' }` vào `CFG` (js/48), bump `?v=20261102`, test `tools/test-filter-presets.js` thêm ca M (bấm mẫu → `mSale` đổi, `mNguon` giữ nguyên). Không đụng gas_v13.js (không cần deploy GAS).
+- [ ] **BƯỚC 2 (kế tiếp):** H và I chỉ chọn 1 Team + 1 CS (chuỗi `hTeam/hCs`, `iTeam/iCs`, js/13 ~dòng 298 và 459/642) → chưa áp mẫu (nhiều Sale) được. Cần cho H/I lọc theo DANH SÁCH CS (khoá mới dạng mảng, vd `hCsList/iCsList`, lọc ở `_hBuild_` và renderSalesReportTabI_) rồi thêm `H`/`I` vào `CFG` (+ cập nhật `_srbSubCfg_` để ô CS đa chọn). Sau đó sửa test dòng "H/I không có ô mẫu" trong tools/test-filter-presets.js.
+- [ ] BƯỚC 3: soát lại xem sửa/lưu mẫu có cần đồng bộ giữa các máy/tài khoản không (hiện mẫu lưu theo trình trình duyệt + tài khoản, không lên GAS) — hỏi Duyên trước khi làm.
+- **Duyên làm sau bước 1:** Ctrl+F5 → vào Báo cáo M → thấy ô "⚡ Mẫu lọc nhanh" cạnh 🧰 Tác vụ, bấm mẫu đã tạo ở báo cáo khác.
+
 ## 2026-11-02 — Báo cáo B: nút "Excel đối soát" GỘP 1 FILE (B + E + G + L + N) (Duyên yêu cầu) — BƯỚC 1/3 đã push
 - **Yêu cầu của Duyên:** các mục báo cáo đều xuất được Excel đối soát; riêng nút **"Excel đối soát" ở Báo cáo B** tải ĐÚNG 1 file gồm luôn Báo cáo B, E, G, L, N.
 - **Hiện trạng đã đọc:** B có `_srBuildExportB_` (6 sheet, xong từ 10-31/11-02); G có `_srGBuildExport_` (builder tách được); E CHƯA có xuất (tính client: `_computeCommissionData_` + `_computeBonusData_` từ cùng dữ liệu `salesReportB`); N = chế độ xem của B (`_srPureExport_`); L lấy từ GAS `storeCaseReport`.
