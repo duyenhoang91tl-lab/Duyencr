@@ -17066,9 +17066,10 @@ function buildStoreCaseReport_(filters) {
     if (r.phoneNorm && !koDen) {
       var seenPos = {};
       r.activeDates.forEach(function(ymd) {
-        // Ghep don Pos: DUNG ngay thi lay; neu ngay do KHONG co don nao thi cho lech +-1 ngay (Duyen chon 2026-10-31: Pos len so cham/som 1 ngay). Moi don chi ghep 1 lan / dong.
+        // Ghep don Pos: DUNG ngay thi lay; neu ngay do KHONG co don nao thi cho lech. QUY TAC NGAY (Duyen chot 2026-11-02): ngay khach qua/hen TRUOC 03/11/2026 (thang 10) CHI cho don Pos +1 ngay (len don ngay sau ngay Sale dien);
+        // tu ngay 03/11/2026 tro di cho +-1 ngay (Pos len so cham/som 1 ngay). Moi don chi ghep 1 lan / dong.
         var exact = posByKey[r.phoneNorm + '|' + ymd] || [], near = [];
-        if (!exact.length) [-1, 1].forEach(function(dd) { (posByKey[r.phoneNorm + '|' + _storeCaseYmdAdd_(ymd, dd)] || []).forEach(function(h) { near.push({ pr: h.pr, ymd: h.ymd, lech: dd }); }); });
+        if (!exact.length) (ymd < '2026-11-03' ? [1] : [-1, 1]).forEach(function(dd) { (posByKey[r.phoneNorm + '|' + _storeCaseYmdAdd_(ymd, dd)] || []).forEach(function(h) { near.push({ pr: h.pr, ymd: h.ymd, lech: dd }); }); });
         exact.concat(near).forEach(function(hitO) {
           if (seenPos[hitO.pr.posRow]) return; seenPos[hitO.pr.posRow] = true;
           var pr2 = hitO.pr;
