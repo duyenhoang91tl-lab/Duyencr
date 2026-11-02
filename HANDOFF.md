@@ -11,6 +11,15 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-03 (phiên 7) — Thiết kế lại giao diện chuyên nghiệp, bắt đầu từ tab Báo cáo doanh số A–N (Duyên yêu cầu) — ĐANG LÀM 1/4
+- **Yêu cầu Duyên:** "thiết kế lại CRM như CRM chuyên nghiệp, mọi thứ còn hỗn độn". Duyên chọn làm TRƯỚC: các tab Báo cáo doanh số (A–L). Sau đó: khung chung (menu trái/thanh trên) → màn tra cứu & chăm sóc KH.
+- **Cách làm (không viết lại từ đầu):** thêm 1 lớp CSS `css/17-reports-pro.css`, phạm vi CHỈ `#salesreport-wrap`, chỉ dùng biến `:root` (chế độ tối vẫn đúng), nạp trước `99-dark-auto.css`. Gỡ = bỏ 1 dòng `<link>`. **NGUYÊN NHÂN GỐC hỗn độn:** 19 file CSS chồng nhau + mỗi báo cáo ghi style inline riêng (padding/viền/cỡ chữ lệch nhau); ô chọn báo cáo cũng là style inline nên lớp mới dùng `!important` cho đúng ô đó.
+- [x] **BƯỚC 1 ĐÃ PUSH:** thanh chọn/lọc (ô cùng cao 34px, nút Lọc màu chính), thẻ KPI đều, tiêu đề mục có thanh nhấn, bảng thoáng + số căn phải, khung cuộn bảng, bản điện thoại (lưới KPI 2 cột). Đã render thử bằng Chromium (390px + 1000px) với CSS thật. KHÔNG đổi js/gas/extension → không cần deploy GAS, không cần reload extension; chỉ cần Ctrl+F5 web.
+- [ ] **BƯỚC 2 (làm tiếp):** Duyên xem thực tế A/B/E rồi báo chỗ còn lệch (gửi ảnh chụp); gom style inline còn sót trong `_srRenderA/_srRenderB` (js/10-13) về class; thẻ KPI của từng báo cáo dùng viền màu riêng — thống nhất theo bảng màu token.
+- [ ] **BƯỚC 3:** khung chung (css/05-sidenav, 13-shell): menu trái, thanh trên, tiêu đề trang.
+- [ ] **BƯỚC 4:** màn tra cứu & chăm sóc KH (tab Danh sách KH, thẻ khách, form CS).
+- **Lưu ý:** tài liệu Project (Hd1/Hd2) đã cũ: index.html nay chỉ ~1.850 dòng, code tách ra `css/` + `js/` (xem `js/INDEX.md`, `docs/crm-kb/`); khối `gas-code-v9` và quy tắc deploy GAS thủ công không còn áp dụng theo `docs/crm-kb/01`.
+
 ## 2026-11-03 (phiên 6) — File đối soát CHUẨN gửi kế toán (thưởng đã sửa Ngọc + sheet hoa hồng phiên 5) — XONG
 - **Quy trình chạy lại đủ:** extract_orders.py → calc_bonus.js → build_into_source.py → recalc.py → fix_filters.py → calc_commission.js → build_commission_sheet.py → recalc.py → fix_filters.py. (build_commission_sheet đọc cột **H** = TỔNG THƯỞNG của THUONG_Tong_theo_sale — đừng đổi thứ tự cột.)
 - [x] File cuối 14 sheet, recalc 0 lỗi (9.229 CT): TONG_THUONG_HOA_HONG_SALE (đầu file) + THUONG_Tong_theo_sale + THUONG_Chi_tiet + sheet gốc giữ nguyên. Thưởng 18 sale = **5.946.671đ** (gồm Ngọc thử việc 190.000đ); thực nhận 18 sale = **73.768.867đ** (hoa hồng 68.996.076 + thưởng 5.946.671 − trừ huỷ T09 1.173.880). Số cũ 72.223.869 / thưởng 4.401.673 của phiên 5 là trước khi sửa Ngọc + loại đơn MP/nguồn.

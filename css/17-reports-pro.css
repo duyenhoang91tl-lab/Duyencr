@@ -1,0 +1,117 @@
+/* ════════════════════════════════════════════════════════════════════
+   17-reports-pro.css — LỚP THIẾT KẾ THỐNG NHẤT cho các tab Báo cáo doanh số (A–N)
+   Phạm vi: CHỈ trong #salesreport-wrap (không đụng màn khác). Chỉ dùng biến :root
+   (--surface/--border/--text/...) nên chế độ tối (10-dark, 99-dark-auto) vẫn đúng.
+   Nạp SAU 16-mobile-list, TRƯỚC 99-dark-auto. Gỡ toàn bộ = bỏ 1 dòng <link> trong index.html.
+   Lý do tồn tại: mỗi báo cáo tự ghi style inline (padding/viền/cỡ chữ khác nhau) + 19 file CSS
+   chồng nhau → các tab nhìn không đồng nhất. Lớp này chuẩn hoá: thanh chọn/lọc, thẻ KPI,
+   tiêu đề mục, bảng, nút. Màu nhấn inline của từng thẻ KPI (viền/số có màu riêng) được GIỮ.
+   ════════════════════════════════════════════════════════════════════ */
+
+#salesreport-wrap{
+  --rp-gap:14px; --rp-pad:14px; --rp-ctl-h:34px; --rp-radius:12px;
+  font-variant-numeric:tabular-nums;
+  line-height:1.45;
+}
+
+/* ── 1. Thanh chọn báo cáo + bộ lọc: 1 thẻ gọn, ô nhập cùng chiều cao ── */
+#salesreport-wrap .srb-bar{
+  gap:8px 10px; padding:10px 12px; margin-bottom:var(--rp-gap);
+  border:1px solid var(--border-md); border-radius:var(--rp-radius);
+  box-shadow:var(--shadow);
+}
+#salesreport-wrap .srb-bar select,
+#salesreport-wrap .srb-bar input[type=date],
+#salesreport-wrap .srb-bar input[type=text],
+#salesreport-wrap .srb-bar input[type=search]{
+  height:var(--rp-ctl-h); font-size:12.5px !important; padding:0 10px !important;
+  border:1px solid var(--border-md); border-radius:8px; background:var(--surface); color:var(--text);
+}
+#salesreport-wrap .srb-bar select:hover,
+#salesreport-wrap .srb-bar input:hover{border-color:var(--border-strong);}
+/* Ô "Chọn báo cáo" (nằm đầu thanh hoặc đầu tab con) — nổi bật hơn các ô lọc */
+#salesreport-wrap select[onchange^="_srSetSub"]{
+  height:var(--rp-ctl-h) !important; padding:0 12px !important; font-size:13px !important; font-weight:700 !important;
+  border:1px solid var(--green-mid) !important; border-radius:8px !important;
+  background:var(--green-bg) !important; color:var(--green) !important; min-width:190px; max-width:100% !important;
+}
+#salesreport-wrap .srb-bar-arrow{color:var(--hint);padding:0 2px;}
+#salesreport-wrap .srb-bar-lock{height:var(--rp-ctl-h);display:inline-flex;align-items:center;border-radius:8px;}
+
+/* ── 2. Nút: cùng chiều cao với ô nhập, "Lọc" là nút chính ── */
+#salesreport-wrap .btn{
+  height:var(--rp-ctl-h); padding:0 12px; border-radius:8px; font-size:12.5px; font-weight:600;
+  justify-content:center; white-space:nowrap;
+}
+#salesreport-wrap .btn.sm,#salesreport-wrap .btn.xs{height:30px;padding:0 10px;font-size:12px;}
+#salesreport-wrap .btn:hover{border-color:var(--border-strong);color:var(--text);}
+#salesreport-wrap .srb-bar > button[onclick="_srApply()"]{
+  background:var(--green); border-color:var(--green); color:#fff;
+}
+#salesreport-wrap .srb-bar > button[onclick="_srApply()"]:hover{background:var(--green-mid);color:#fff;}
+#salesreport-wrap .gear-menu-list{border-radius:10px;box-shadow:var(--shadow-md);border:1px solid var(--border-md);}
+
+/* ── 3. Thẻ KPI: lưới đều, thẻ cùng padding/bo góc, số lớn - nhãn nhỏ ── */
+#salesreport-wrap .kpi-grid{
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(168px,1fr));
+  gap:12px; margin:0 0 var(--rp-gap);
+}
+#salesreport-wrap .kpi-card{
+  display:flex; flex-direction:column; justify-content:center; gap:4px;
+  padding:14px 16px !important; border-radius:var(--rp-radius) !important;
+  box-shadow:var(--shadow); min-width:0;
+}
+#salesreport-wrap .kpi-card .kpi-val,#salesreport-wrap .kpi-val{
+  font-size:21px; font-weight:700; line-height:1.15; letter-spacing:-.01em;
+  overflow-wrap:anywhere;
+}
+#salesreport-wrap .kpi-card .kpi-label,#salesreport-wrap .kpi-label{
+  margin-top:0; font-size:11.5px; line-height:1.35; color:var(--muted); font-weight:500;
+}
+
+/* ── 4. Tiêu đề mục: thanh nhấn xanh bên trái, khoảng cách đều ── */
+#salesreport-wrap .dash-section-title{
+  font-size:14px; font-weight:700; margin:22px 0 10px; padding-left:10px; gap:8px;
+  position:relative; color:var(--text);
+}
+#salesreport-wrap .dash-section-title::before{
+  content:""; position:absolute; left:0; top:2px; bottom:2px; width:3px; border-radius:2px; background:var(--green-mid);
+}
+#salesreport-wrap .dash-section-title:first-child{margin-top:4px;}
+#salesreport-wrap .guide-text{font-size:12px;color:var(--muted);line-height:1.5;}
+
+/* ── 5. Bảng: đầu bảng dịu, dòng thoáng, số căn phải thẳng hàng ── */
+#salesreport-wrap .dash-table{
+  border:1px solid var(--border-md); border-radius:var(--rp-radius);
+  box-shadow:var(--shadow); font-size:12.5px;
+}
+#salesreport-wrap .dash-table thead th,
+#salesreport-wrap .dash-table th{
+  padding:10px 12px; font-size:11px; letter-spacing:.04em; white-space:nowrap;
+  background:var(--surface2); border-bottom:1px solid var(--border-md);
+}
+#salesreport-wrap .dash-table td{padding:9px 12px;vertical-align:middle;}
+#salesreport-wrap .dash-table tbody tr:hover td{background:var(--surface2);}
+#salesreport-wrap .dash-table td.r,#salesreport-wrap .dash-table th.r{text-align:right;}
+/* Dòng "Tổng" (_srTotalRowHtml_ ghi style inline) — thêm độ nổi bật nhất quán */
+#salesreport-wrap .dash-table tbody tr[style*="border-top:2px"] td{background:var(--surface2);}
+/* Bảng cuộn ngang trên màn nhỏ: khung bo góc, không tràn ra ngoài thẻ */
+#salesreport-wrap .table-scroll{
+  border:1px solid var(--border-md); border-radius:var(--rp-radius); background:var(--surface);
+  box-shadow:var(--shadow); overflow-x:auto; -webkit-overflow-scrolling:touch;
+}
+#salesreport-wrap .table-scroll .dash-table{border:none;box-shadow:none;border-radius:0;}
+
+/* ── 6. Điện thoại: thanh lọc xếp dọc dễ chạm, lưới KPI 2 cột ── */
+@media (max-width:640px){
+  #salesreport-wrap{--rp-gap:12px; --rp-ctl-h:38px;}
+  #salesreport-wrap .srb-bar{padding:10px;}
+  #salesreport-wrap .srb-bar > *{flex:1 1 140px;min-width:0;}
+  #salesreport-wrap .srb-bar > .srb-bar-arrow{flex:0 0 auto;}
+  #salesreport-wrap .srb-bar select,#salesreport-wrap .srb-bar input[type=date]{max-width:none;width:100%;}
+  #salesreport-wrap .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+  #salesreport-wrap .kpi-card{padding:12px !important;}
+  #salesreport-wrap .kpi-card .kpi-val{font-size:clamp(15px,4.4vw,18px);white-space:nowrap;overflow-wrap:normal;}
+  #salesreport-wrap .dash-table{font-size:12px;}
+  #salesreport-wrap .dash-table th,#salesreport-wrap .dash-table td{padding:8px 9px;}
+}
