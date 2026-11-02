@@ -1416,13 +1416,16 @@ function _bpSrcSectionHtml_(p){
   var h = '<div class="form-label">4c. Thưởng theo NGUỒN đơn <span style="font-weight:400;color:var(--muted);font-size:11px">(tích nguồn → chương trình CHỈ tính đơn thuộc các nguồn này, áp dụng CHUNG Online + Offline; cơ chế tính tạo ở các mục 6–10 như thường)</span></div>'+
     '<input type="text" id="bp-src-q" value="'+esc(_bpSrcQuery)+'" placeholder="🔍 Gõ để tìm nguồn..." oninput="_bpSrcQuery=this.value;_bpSrcRefresh_()" style="width:100%;margin-bottom:6px">'+
     '<div id="bp-src-list" style="max-height:150px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:6px;margin-bottom:6px">'+_bpSrcListHtml_()+'</div>'+
+    '<div style="display:flex;gap:6px;margin-bottom:6px"><input type="text" id="bp-src-add" placeholder="➕ Nguồn chưa có trong danh sách? Gõ đúng tên nguồn trên đơn (vd: Mỹ phẩm) rồi bấm Thêm" onkeydown="if(event.key===\'Enter\'){event.preventDefault();_bpSrcAdd()}" style="flex:1"><button class="btn sm secondary" type="button" onclick="_bpSrcAdd()">Thêm</button></div>'+
     '<div id="bp-src-sel" style="font-size:12px;margin-bottom:12px">'+_bpSrcSelHtml_()+'</div>';
   if (!(_srState && _srState.nguonOptions && _srState.nguonOptions.length) && typeof _srLoadOptions === 'function' && !_srState.optionsLoaded) setTimeout(function(){ _srLoadOptions().then(_bpSrcRefresh_).catch(function(){}); }, 0);
   return h;
 }
 function _bpSrcListHtml_(){
-  var opts = (_srState && _srState.nguonOptions) || [], q = _bpNorm_(_bpSrcQuery);
+  var opts = ((_srState && _srState.nguonOptions) || []).slice(), q = _bpNorm_(_bpSrcQuery);
   var picked = {}; (_bpDraft.sources||[]).forEach(function(x){ picked[_bonusNormSrc_(x)] = true; });
+  var known = {}; opts.forEach(function(n){ known[_bonusNormSrc_(n)] = true; });
+  (_bpDraft.sources||[]).forEach(function(x){ if (!known[_bonusNormSrc_(x)]){ opts.push(x); known[_bonusNormSrc_(x)] = true; } });   // nguồn gõ tay (chưa có trong dữ liệu đơn) vẫn hiện để bỏ tick được
   var list = opts.filter(function(n){ return !q || _bpNorm_(n).indexOf(q) !== -1; });
   if (!opts.length) return '<div style="color:var(--muted);font-size:12px;padding:6px">Đang tải danh sách nguồn… (hoặc mở Báo cáo doanh số rồi mở lại).</div>';
   if (!list.length) return '<div style="color:var(--muted);font-size:12px;padding:6px">Không có nguồn khớp.</div>';
@@ -1438,6 +1441,14 @@ function _bpSrcRefresh_(){
   var a = document.getElementById('bp-src-list'), b = document.getElementById('bp-src-sel');
   if (a) a.innerHTML = _bpSrcListHtml_();
   if (b) b.innerHTML = _bpSrcSelHtml_();
+}
+function _bpSrcAdd(){
+  var el = document.getElementById('bp-src-add'), v = el ? String(el.value || '').trim() : '';
+  if (!v) return;
+  _bpSrcToggle(v, true);
+  if (el) el.value = '';
+  _bpSrcQuery = ''; var q = document.getElementById('bp-src-q'); if (q) q.value = '';
+  _bpSrcRefresh_();
 }
 function _bpSrcToggle(name, on){
   var s = _bpDraft.sources = _bpDraft.sources || [];

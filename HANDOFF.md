@@ -29,6 +29,12 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 - **ĐANG LÀM: không có việc dở.** Không đổi gas_v13.js/js/css (không cần deploy, không cần Ctrl+F5).
 - **Việc kế tiếp (phiên khác làm được ngay):** (a) 18/36 sale chưa phân loại Online/Offline (menbui2002 490tr, kieuHT1997 245tr, hongnguyen1995…) → CRM cho 0đ thưởng; Duyên cài ở "Phân loại đội Sale" rồi chạy lại 2 script. (b) Tỳ Hưu chất liệu Ngọc/Ruby/Saphire và đơn huỷ chưa tự loại — kế toán đối chiếu. (c) Sale Thử việc (VD Ngọc theo mục "Báo cáo G" bên dưới) dùng mẫu "Thưởng Sale thử việc" — chưa tính trong bảng này. (d) Đối chiếu với Báo cáo G thật vì CT đang bật trong Settings có thể khác 12 CT mẫu. (e) Thưởng ngày ở đây theo ngày tạo đơn Pos, CRM thật theo ngày tạo Base.
 
+## 2026-11-02 (tối 7) — Chương trình thưởng mục 4c: THÊM NGUỒN GÕ TAY (Duyên yêu cầu) — XONG 1/1
+- **Vấn đề:** Duyên muốn cài thưởng theo nguồn "Mỹ phẩm" nhưng danh sách chỉ có "facebook" và "Nguồn ra".
+- **NGUYÊN NHÂN GỐC:** danh sách nguồn KHÔNG cố định: `getSalesReportOptions_` (gas_v13.js) lấy các giá trị khác nhau của cột H "Nguồn đơn" trong sheet "dữ liệu đơn" (cache `srptOptions_v3` 30 phút); `_bpSrcListHtml_` (js/12) chỉ liệt kê đúng danh sách đó → nguồn chưa xuất hiện trên đơn thì không chọn được.
+- [x] **ĐÃ PUSH (js/12):** ô "➕ Thêm nguồn" gõ tay + `_bpSrcAdd()` (cắt khoảng trắng, không trùng hoa/thường); nguồn gõ tay hiện trong danh sách để bỏ tick. Khớp đơn theo đúng tên nguồn không phân biệt hoa/thường (`_bonusSourceOk_`) nên phải gõ ĐÚNG tên ghi trên đơn. Test: `node tools/test-bonus-source-manual.js`. Bump js/12 `?v=20261102i`. Không đổi gas_v13.js (không cần deploy GAS).
+- **ĐANG LÀM: không có việc dở.** Việc cần xác nhận với Duyên: tên nguồn "Mỹ phẩm" ghi chính xác thế nào ở cột H "Nguồn đơn" của "dữ liệu đơn".
+
 ## 2026-11-02 (tối 6) — Báo cáo G: "Ngày bắt đầu tính thưởng" RIÊNG trong mốc Thử việc (Duyên yêu cầu) — XONG 2/2
 - **Vấn đề:** Ngọc (Offline) cài Thử việc ở modal Phân loại nhưng Báo cáo G mục Thử việc = 0 Sale; Duyên không tìm thấy Quản lý tài khoản của Ngọc.
 - **NGUYÊN NHÂN GỐC:** `_bonusProgramApplies_` (CT bật "Giới hạn theo ngày thử việc") chỉ đọc `_saleStartDate_` = startDate của TÀI KHOẢN → Sale chưa có startDate bị bỏ qua mọi CT thử việc. (Bản fix đầu lấy ngày `from` của mốc làm ngày bắt đầu là SAI: thử việc tính tròn 1 tháng, còn ngày bắt đầu tính thưởng là SAU thời gian học việc → 2 ngày khác nhau.)
