@@ -1,0 +1,17 @@
+const fs = require('fs'), vm = require('vm');
+const src = fs.readFileSync(__dirname + '/../js/12-fn-rendersalesreporttabe.js', 'utf8');
+const pick = n => { const i = src.indexOf('function ' + n + '('); return src.slice(i, src.indexOf('\n}\n', i) + 3); };
+const els = { 'bp-src-add': { value: '  Mỹ phẩm ' }, 'bp-src-q': { value: 'x' }, 'bp-src-list': {}, 'bp-src-sel': {} };
+const ctx = { document: { getElementById: id => els[id] }, esc: s => String(s), _srState: { nguonOptions: ['facebook', 'Nguồn ra'] }, _bpDraft: { sources: [] }, _bpSrcQuery: 'x', _bpNorm_: s => String(s).toLowerCase() };
+vm.createContext(ctx);
+vm.runInContext(['_bonusNormSrc_', '_bpSrcListHtml_', '_bpSrcSelHtml_', '_bpSrcRefresh_', '_bpSrcToggle', '_bpSrcAdd'].map(pick).join('\n'), ctx);
+let bad = 0; const ok = (c, m) => { if (!c){ bad++; console.log('FAIL', m); } };
+vm.runInContext('_bpSrcAdd()', ctx);
+ok(JSON.stringify(ctx._bpDraft.sources) === '["Mỹ phẩm"]', 'thêm tay, cắt khoảng trắng: ' + JSON.stringify(ctx._bpDraft.sources));
+ok(els['bp-src-add'].value === '' && ctx._bpSrcQuery === '', 'xoá ô nhập + ô tìm');
+ok(/data-src="Mỹ phẩm" checked/.test(els['bp-src-list'].innerHTML) && /data-src="facebook"/.test(els['bp-src-list'].innerHTML), 'nguồn gõ tay hiện trong danh sách, đã tick');
+els['bp-src-add'].value = 'MỸ PHẨM'; vm.runInContext('_bpSrcAdd()', ctx);
+ok(ctx._bpDraft.sources.length === 1, 'không thêm trùng (không phân biệt hoa/thường)');
+vm.runInContext('_bpSrcToggle("Mỹ phẩm", false)', ctx);
+ok(ctx._bpDraft.sources.length === 0, 'bỏ tick được nguồn gõ tay');
+console.log(bad ? 'FAIL' : 'ALL PASS'); process.exit(bad ? 1 : 0);
