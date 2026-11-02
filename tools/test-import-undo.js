@@ -7,10 +7,10 @@ function fnSrc(name) { const i = src.indexOf('function ' + name + '('); if (i < 
   let d = 0, k = src.indexOf('{', i); for (let j = k; j < src.length; j++) { if (src[j] === '{') d++; else if (src[j] === '}' && --d === 0) return src.slice(i, j + 1); } }
 let fail = 0; const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) fail++; };
 const consts = 'var DT_TONG_WIDTH=20,DON_CHITIET_WIDTH=17,DT_COL_NGAYTAO=0,DT_COL_PHONE=3,DT_COL_THOIGIANHT=10,DT_COL_SANPHAM=14,DT_COL_GIATRIDON=17,DT_COL_ID=19,DT_COL_BODEM=20,' +
-  'SH_IMPORT_UPD_LOG="Nhat ky cap nhat",IMPORT_UPD_LOG_HEADERS=["thoiGian","sheet","dong","khoaDon","cot","giaTriCu","giaTriMoi"],IMPORT_UPD_MAX_ROWS=1500,VN_OFFSET_MS=7*3600*1000,' +
+  'SH_IMPORT_UPD_LOG="Nhat ky cap nhat",IMPORT_UPD_LOG_HEADERS=["thoiGian","sheet","dong","khoaDon","cot","giaTriCu","giaTriMoi"],IMPORT_UPD_MAX_ROWS=1500,IMPORT_UPD_RUN_GAP=40,IMPORT_UPD_BUDGET_MS=240000,VN_OFFSET_MS=7*3600*1000,' +
   'DT_TONG_SHEET="DT TONG ",DON_CHITIET_SHEET="du lieu don",SH_IMPORT_BATCH="Nhat ky lan nhap",IMPORT_BATCH_HEADERS=["batchId","thoiGian","nguoi","sheet","dongDau","soDong","dauVan","updLogDau","updLogSo","trangThai","hoanTacLuc","hoanTacBoi"],' +
   'SH_IMPORT_UNDO_BACKUP="Sao luu hoan tac",IMPORT_UNDO_MAX_ROWS=5000,SH_POS_DEDUP_LOG="Nhat ky don trung Pos",POS_DEDUP_LOG_HEADERS=[1,2,3,4,5],POS_COL_TRANGTHAI=14,POS_DEDUP_MAX_DELETE=3000,DON_COL_GHICHU=16;';
-const names = ['_impColName_', '_impCellStr_', '_impCellEq_', '_impDiffRow_', '_impHm_', '_impHmUnknown_', '_impHmCompat_', '_impOrderKeyParts_', '_impOrderKey_', '_impFindExist_', 'doImportSheetRows_', 'doImportSheetRowsLocked_',
+const names = ['_impColName_', '_impCellStr_', '_impCellEq_', '_impDiffRow_', '_impApplyUpdPlan_', '_impHm_', '_impHmUnknown_', '_impHmCompat_', '_impOrderKeyParts_', '_impOrderKey_', '_impFindExist_', 'doImportSheetRows_', 'doImportSheetRowsLocked_',
   '_rowKeyExact_', '_rowIsBlank_', '_posDedupKeyParts_', '_dedupePosRelaxedInSheet_', '_impPosCleanup_', 'normPhone_', 'normOrderDate_', 'parseVNDate_', '_vnMidnight_', '_vnYmd_', '_vnYmdParts_', '_normMoney_', '_normTxt_',
   '_impWho_', '_impFp_', '_impKeyDropHm_', '_impColIdx_', '_impCellFromStr_', '_impBatchLog_', '_impReadBatch_', 'importBatchesList_', '_impScanSheet_', '_impNearest_', '_impLocateAppended_', '_impPlanRestore_', 'doImportUndo_', '_impUndoLocked_'];
 // ---- sheet gia: rows[0] = tieu de (dong 1) ----

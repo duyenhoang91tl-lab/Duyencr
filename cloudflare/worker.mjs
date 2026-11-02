@@ -14,6 +14,9 @@
 const TTL_SEC = {
   // doc chung, doi thuong xuyen — cache ngan
   customers: 15, orders: 15, careLeads: 15, cskhDuyenLite: 15,
+  // 2026-10-26 (app Android bao 502/404 o cac action NANG): donPhones doc ca sheet "du lieu don" (5 map theo SDT, GIONG HET cho moi nguoi — GAS khong loc theo user)
+  // va staffOverview (ho so nhan vien, nang) truoc day khong qua cache nen MOI may moi nhip dong bo deu bat Apps Script tinh lai -> qua tai -> 502/404. Nay co cache + SWR + STALE.
+  donPhones: 30, staffOverview: 60,
   // bao cao / danh muc nhom — GAS tinh lau, nhieu nguoi cung xem
   salesReportA: 60, salesReportB: 60, salesReportC: 60, saleKpiReport: 60, failedOrderReport: 60, careLeadReport: 60, kpiReport: 60,
   mktChecklist: 60, salesReportOptions: 60, pancakeReport: 60, pancakeSdtReport: 60, dashboard: 60,
@@ -24,7 +27,7 @@ const TTL_SEC = {
 };
 // Action GAS chan theo phan quyen (vai tro/bo phan) -> KHONG duoc dung chung cache giua cac nguoi (neu khong nguoi bi chan van doc duoc ban cache cua nguoi khac).
 // Khoa cache them user trong token; khong co SESS_SECRET (khong xac thuc duoc token) thi khong cache.
-export const GATED_ACTIONS = ['salesReportA', 'salesReportB', 'salesReportC', 'saleKpiReport', 'failedOrderReport', 'careLeadReport', 'kpiReport', 'mktChecklist', 'pancakeReport', 'pancakeSdtReport', 'customers', 'orders', 'careLeads', 'cskhDuyenLite'];
+export const GATED_ACTIONS = ['salesReportA', 'salesReportB', 'salesReportC', 'saleKpiReport', 'failedOrderReport', 'careLeadReport', 'kpiReport', 'mktChecklist', 'pancakeReport', 'pancakeSdtReport', 'customers', 'orders', 'careLeads', 'cskhDuyenLite', 'staffOverview'];   // staffOverview: GAS kiem quyen xem so lieu theo nguoi xem (_profScope_) -> khoa cache theo user
 export function tokenUser(tok) {
   try {
     tok = String(tok || ''); const i = tok.indexOf('.'); if (i < 1) return '';
@@ -348,7 +351,7 @@ export async function handle(request, env, ctx) {
     if (at && now - at < STALE_MAX_SEC * 1000) stale = hit;
   }
   try {
-    const out = await refresh(cache, key, keyUrl, originUrl.toString(), policy.ttl, now, ctx);
+    const out = await refresh(cache, key, keyUrl, originUrl.toString(), policy.ttl, now, ctx, !stale);
     if (out.good) return cors(mark(new Response(out.text, { status: 200, headers: out.headers }), 'MISS'));   // Response moi cho MOI nguoi goi (body chi doc 1 lan)
     if (stale) return cors(mark(stale, 'STALE'));
     return cors(mark(new Response(out.text, { status: out.status, headers: { 'content-type': out.ct || 'application/json; charset=utf-8' } }), 'BYPASS:not-cacheable'));
@@ -360,12 +363,23 @@ export async function handle(request, env, ctx) {
 
 // Goi GAS 1 lan va luu cache neu phan hoi tot. Trung khoa dang chay thi dung lai cung Promise (khong goi GAS them).
 // Tra { good, text, headers } (da luu cache) hoac { text, status, ct } (khong cache duoc). Nem loi neu khong ket noi duoc.
-function refresh(cache, key, keyUrl, originUrl, ttl, now, ctx) {
+// THU LAI 1 LAN (2026-10-26): GAS/Google hay tra 502/404 hoac dut ket noi THOANG QUA o cac action nang (nhieu may cung dong bo). Chi thu lai khi KHONG con ban cu de
+// tra thay (retry=true) — con ban cu thi tra STALE ngay, khong bat nguoi dung cho them. Chi ap cho action doc co cache (refresh chi duoc goi cho nhom nay), khong bao gio cho action ghi.
+export const RETRY_DELAY_MS = 600;
+const _isTransient = (r) => !!r && !r.ok && (r.status === 404 || r.status >= 500);
+function refresh(cache, key, keyUrl, originUrl, ttl, now, ctx, retry) {
   let p = _inflight.get(keyUrl);
   if (p) return p;
   p = (async () => {
-    const r = await fetch(originUrl, { redirect: 'follow' });
-    const text = await r.text();
+    const pull = async () => { const rr = await fetch(originUrl, { redirect: 'follow' }); return { r: rr, text: await rr.text() }; };
+    let got = null, firstErr = null;
+    try { got = await pull(); } catch (e) { firstErr = e; }
+    if (retry && (firstErr || _isTransient(got.r))) {
+      await new Promise(res => setTimeout(res, RETRY_DELAY_MS));
+      try { got = await pull(); firstErr = null; } catch (e2) { if (!got) firstErr = e2; }
+    }
+    if (firstErr || !got) throw firstErr || new Error('khong co phan hoi');
+    const r = got.r, text = got.text;
     if (r.ok && isGoodJson(text)) {
       const res = new Response(text, { status: 200, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'public, max-age=' + (ttl + STALE_MAX_SEC), 'x-crm-at': String(now) } });
       const put = cache.put(key, res.clone());

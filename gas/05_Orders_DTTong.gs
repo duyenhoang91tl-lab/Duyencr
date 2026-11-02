@@ -948,7 +948,7 @@ function saleMatchCandidates_(p) {
   safe('crm', function() { readUsers_(getCrmSS_().getSheetByName(SH_USER)).forEach(function(x) { add(x.username, 'crm_user'); add(x.name, 'crm_name'); (x.names || []).forEach(function(n) { add(n, 'crm_name'); }); }); });
   safe('directory', function() { (readSaleDirectory_().list || []).forEach(function(r) { add(r.maSale, 'dir_ma'); add(r.tenFacebook, 'facebook'); add(r.userBase, 'dir_base'); add(r.tenTagPancake, 'pancake'); }); });
   safe('pancake', function() { pancakeAllNames_().forEach(function(n) { add(n, 'pancake'); }); Object.keys(readPancakeMap_()).forEach(function(n) { add(n, 'pancake'); }); });
-  safe('base', function() { readDTTong_().forEach(function(r) { splitMulti_(r.saleBan, ',').forEach(function(n) { add(n, 'base'); }); if (r.nguoiTao) add(r.nguoiTao, 'base_creator'); }); });
+  safe('base', function() { readDTTong_().forEach(function(r) { splitMulti_(r.saleBan, ',').filter(function(n) { return !_isNumericTag_(n); }).forEach(function(n) { add(n, 'base'); }); if (r.nguoiTao) add(r.nguoiTao, 'base_creator'); }); });
   safe('pos', function() { readDonChiTiet_().forEach(function(r) { _donSaleNamesFromThe_(r.theSale).forEach(function(n) { add(n, 'pos'); }); }); });
   var keyFn = _salePersonKeyFn_();
   var names = Object.keys(byKey).map(function(k) { var r = byKey[k]; r.person = keyFn(r.name); return r; });
@@ -959,7 +959,9 @@ function saleMatchCandidates_(p) {
 
 // Token CHI GOM CHU SO (vd "8", "10", "2.5") la TAG/so thu tu cua Pancake, KHONG phai ten sale. SUA 2026-10-23 (Duyen thay bang Bao cao tinh don thuan co 2 "sale" ten 8 va 10
 // duoc chia doanh so): NGUYEN NHAN GOC = quy tac nhan token "khong khoang trang + co chu so" (de bat ten dang nhap kieu ninhnga99) vo tinh nhan ca "8"/"10" vi chung cung co chu so.
-function _isNumericTag_(tok) { return /^[\d\s.,]+$/.test(String(tok == null ? '' : tok)); }
+// Duyen chot 2026-10-24: KHONG co sale nao ten toan so (ten sale = ten trong profile: Base/Pos/Pancake/CRM). Token chi gom so/dau ("8", "13", "#8", "8.", "(13)") hoac "STT 8" la so thu tu Pancake.
+function _isNumericTag_(tok) { var t = String(tok == null ? '' : tok).trim(); return /^[#\d\s.,\-\/()]+$/.test(t) || /^stt\s*[#\d.\s]+$/i.test(t); }
+function _saleNamesClean_(csv) { return String(csv == null ? '' : csv).split(',').map(function(x) { return x.trim(); }).filter(function(x) { return x && !_isNumericTag_(x); }); }
 function _donSaleNamesFromThe_(theStr) {
   var tokens = splitMulti_(theStr, ',').filter(function(t) { return !_isNumericTag_(t); });
   if (!tokens.length) return [];
@@ -1039,13 +1041,13 @@ function _hiddenPageSaleSets_() {
 function _isDTRowHidden_(kenhBan, saleBan, sets) {
   if (sets.channels.length && kenhBan && sets.channels.indexOf(kenhBan) !== -1) return true;
   if (sets.sales.length && saleBan) {
-    var names = String(saleBan).split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+    var names = String(saleBan).split(',').map(function(s){ return s.trim(); }).filter(function(s){ return s && !_isNumericTag_(s); }); // loai token toan so (STT Pancake)
     if (names.length && names.every(function(n){ return sets.sales.indexOf(n) !== -1; })) return true;
   }
   return false;
 }
 
-function readDTTong_(withBoDem) {   // withBoDem=true: đọc thêm cột U (mã bộ đếm) để nhận đơn BH không doanh thu
+function readDTTong_(withBoDem, withPhone) {   // withBoDem=true: đọc thêm cột U (mã bộ đếm) để nhận đơn BH không doanh thu; withPhone=true: thêm soDienThoai (cột D) — CHỈ Bảng giai đoạn dùng, mặc định KHÔNG trả SĐT
   var _t0 = Date.now();
   var vals, rowNums = null;
   // Supabase buoc 4c: khi cho phep (SB_ORD_READ=on, ban sao dong bo moi, khong dirty) doc dt_tong thay vi quet ca sheet.
@@ -1078,7 +1080,6 @@ function readDTTong_(withBoDem) {   // withBoDem=true: đọc thêm cột U (mã
       out.push({
         ngayTao:        _dtCellToVnStr_(r[0]),
         nguoiTao:       r[1] ? String(r[1]).trim() : '',
-        phone:          normPhone_(String(r[3] || '')),   // cot D "SĐT khach" — de man Don ket / Kanban mo duoc ho so khach
         giaoCho:        r[2],
         giaiDoan:       r[6],
         trangThai:      r[7],
@@ -1092,6 +1093,7 @@ function readDTTong_(withBoDem) {   // withBoDem=true: đọc thêm cột U (mã
         giaTriChenh:    _normMoney_(r[18]),
         id:             r[19],
         maBoDem:        boDem ? (boDem[(rowNums ? rowNums[i] : i + 2) - 2] || '') : '',
+        soDienThoai:    withPhone ? (function (ph0) { return ph0.length >= 9 ? ph0 : ''; })(normPhone_(String(r[DT_COL_PHONE] || ''))) : undefined,
         bhZero:         _isBhZeroOrder_([r[19], r[14], r[15], r[6], r[2], boDem ? (boDem[(rowNums ? rowNums[i] : i + 2) - 2] || '') : ''].join(' '), _normMoney_(r[17]) + (_dtIsExchangeOrder_(r[15]) ? _normMoney_(r[18]) : 0))
       });
     } catch (eRow) {

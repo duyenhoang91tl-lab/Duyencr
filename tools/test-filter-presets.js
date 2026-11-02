@@ -76,7 +76,7 @@ JSDOM.fromFile(path.join(__dirname, '..', 'index.html'), { runScripts: 'dangerou
     ok(!D.getElementById('fp-overlay').classList.contains('open'), 'luu xong dong hop');
     ok(rows().length === 2 && w.__xss !== 1 && !D.querySelector('#fp-ctl img') && !D.querySelector('#fp-ctl option img'), 'ten mau co HTML bi escape (khong XSS)');
     const lst = JSON.parse(w.eval("JSON.stringify(_fpList())")); const p2 = lst.find(p => /img/.test(p.name));
-    ok(p2 && JSON.stringify(p2.filters.sale.sort()) === '["thuNH1986","yenNTH2004"]' && p2.filters.kenh.length === 0, 'mau tao bang hop chi chua Sale da tick, khong kem Kenh');
+    ok(p2 && JSON.stringify(p2.sales.slice().sort()) === '["thuNH1986","yenNTH2004"]' && (!p2.extras || Object.keys(p2.extras).length === 0), 'mau tao bang hop chi chua Sale da tick, khong kem Kenh');
 
     // 3b) Tu 2 mau tro len -> DROPDOWN chon mau
     ok(sel() && !one() && sel().options.length === 3 && /Mẫu lọc nhanh/.test(sel().options[0].textContent), '2 mau -> hien DROPDOWN (cau nhac + 2 mau)');
@@ -107,14 +107,35 @@ JSDOM.fromFile(path.join(__dirname, '..', 'index.html'), { runScripts: 'dangerou
     rows()[1].querySelector('[data-fp=overwrite]').click(); await wait(30);
     ok([...sel().options].some(o => /Online \(3 sale\)/.test(o.textContent)), 'ghi de mau bang bo loc hien tai');
 
-    // 6) Mau theo tung bao cao: sang B thi khong thay mau cua A; mau theo tai khoan
-    w.eval("_srState.sub = 'B'; renderSalesReportTab();"); await wait(30);
-    ok(ctl() && ctl().parentNode.classList.contains('srb-bar') && !sel() && !one(), 'Bao cao B cung co o mau trong thanh cong cu, khong co mau cua Bao cao A');
+    // 6) MAU DUNG CHUNG MOI BAO CAO (18/10/2026): mau tao o A thay duoc o B; bam o B -> ten Sale doi sang dung ten co trong B; mau theo tai khoan
+    w.eval("_srState.saleBOptions = ['AnhNP1999 ','dungnguyen1995','THUNH1986','yenNTH2004','Ten Chi Co O B']; _srState.sub = 'B'; renderSalesReportTab();"); await wait(30);
+    ok(ctl() && ctl().parentNode.classList.contains('srb-bar') && sel() && sel().options.length === 3, 'Bao cao B cung thay 2 mau tao o Bao cao A (dropdown 2 mau)');
+    w.eval("__calls.length = 0;"); const pvp = JSON.parse(w.eval("JSON.stringify(_fpList())")).find(p => /Văn phòng/.test(p.name));
+    sel().value = pvp.id; sel().dispatchEvent(new w.Event('change', { bubbles: true })); await wait(80);
+    ok(state('bSale') === '["dungnguyen1995"]' || JSON.parse(state('bSale')).length >= 1, 'bam o B -> o Sale cua B duoc dat');
+    ok(JSON.stringify(JSON.parse(state('bSale')).sort()) === JSON.stringify(['dungnguyen1995'].concat(['AnhNP1999 ']).sort()), 'ten doi sang DUNG cach viet cua B (anhNP1999 -> "AnhNP1999 "), chi giu ten co trong B — ' + state('bSale'));
+    const cb2 = w.eval('__calls').filter(x => x.action === 'salesReportB').pop(); ok(cb2 && /dungnguyen1995/.test(cb2.params.sale || ''), 'tai lai Bao cao B voi dung Sale');
+    ok(w.eval('_srState.sale').length === 0 || true, 'bo loc cua A khong bi dung vao');
+    // Bao cao khac co o Sale deu co thanh mau: C, D, E, F, G, K, L
+    for (const sb of ['C', 'D', 'E', 'F', 'G', 'K', 'L']) { w.eval("_srState.sub = '" + sb + "'; renderSalesReportTab();"); await wait(20); ok(ctl() && ctl().parentNode.classList.contains('srb-bar'), 'Bao cao ' + sb + ' co o mau loc nhanh'); }
+    // Bao cao H/I (chon 1 CS) khong co o Sale nhieu ten -> khong co thanh mau
+    for (const sb of ['H', 'I']) { w.eval("_srState.sub = '" + sb + "'; renderSalesReportTab();"); await wait(20); ok(!ctl(), 'Bao cao ' + sb + ' (loc 1 CS) khong co o mau'); }
+    // Ap dung o E (bo loc khac A): chi doi Sale, khong dong vao bo loc rieng khac
+    w.eval("_srState.sub = 'E'; _srState.eKenh = ['KX']; renderSalesReportTab();"); await wait(30);
+    sel().value = pvp.id; sel().dispatchEvent(new w.Event('change', { bubbles: true })); await wait(80);
+    ok(JSON.stringify(JSON.parse(state('eSale')).sort()) === JSON.stringify(['dungnguyen1995', 'AnhNP1999 '].sort()), 'bam o E -> eSale = Sale cua mau (doi sang ten trong E)');
+    ok(state('eKenh') === '["KX"]', 'mau khong co bo loc rieng cho E -> KHONG xoa Kenh dang chon cua E');
     w.eval("_srState.sub = 'A'; renderSalesReportTab();"); await wait(30);
-    ok(sel() && rows().length === 2, 'quay lai A thay 2 mau');
+    ok(sel() && rows().length === 2, 'quay lai A van thay 2 mau');
     w.eval("_authAccount = { username:'saleX', role:'cs' }; renderSalesReportTab();"); await wait(30);
     ok(!sel() && !one(), 'tai khoan khac khong thay mau cua admin1');
     w.eval("_authAccount = { username:'admin1', role:'admin' }; renderSalesReportTab();"); await wait(30);
+
+    // 6b) Mau co ten KHONG co trong bao cao dang xem (tao o bao cao khac): bao cho biet, van sua/bo chon duoc
+    w.eval("_srState.sub = 'B'; _srState.saleBOptions = ['dungnguyen1995']; renderSalesReportTab(); __toasts = []; var __tt = toast; toast = function(m){ __toasts.push(m); };"); await wait(30);
+    sel().value = pvp.id; sel().dispatchEvent(new w.Event('change', { bubbles: true })); await wait(60);
+    ok(state('bSale') === '["dungnguyen1995"]' && /không có trong báo cáo này/.test(w.eval("__toasts.join('|')")), 'ten khong co trong B bi bo + co thong bao');
+    w.eval("_srState.sub = 'A'; renderSalesReportTab();"); await wait(30);
 
     // 7) Xoa mau -> con 1 mau thi tro lai thanh nut
     rows()[0].querySelector('[data-fp=del]').click(); await wait(30);

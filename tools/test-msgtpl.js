@@ -16,7 +16,9 @@ const users = { tok_admin: { username: 'ad', name: 'Admin', role: 'admin' }, tok
 const notified = [];
 const ctx = { _tplNotifClear_: () => {}, _tplNotifyPending_: (id, title, who) => { notified.push([id, title, who]); }, jsonOut_: o => o, getSheet_: () => sheet, _sessUser_: t => users[t] || null, _extKeyWho_: ek => ek === 'KEYZ' ? 'zalo' : (ek === 'KEYP' ? 'pancake' : (ek ? 'sai' : '')), Date, JSON, Math, String, isNaN };
 // Nhom san pham (2026-10-16): readMessageTemplates_ nay goi _tplCatalogIndex_ -> gia lap DANH_MUC rong (test nay chi kiem quyen/trang thai; phan nhom: tools/test-msgtpl-group.js)
-Object.assign(ctx, { buildPriceCatalogFlat_: () => ({ ok: true, items: [] }), CacheService: { getScriptCache: () => ({ get: () => null, put: () => {} }) } });
+// _tplNotifyPending_ (them 2026-10-21): bao admin khi co mau cho duyet — gia lap, ghi lai cac lan goi de kiem tra o cuoi test (khong doc sheet that)
+const NOTIFIED = [], CLEARED = [];
+Object.assign(ctx, { buildPriceCatalogFlat_: () => ({ ok: true, items: [] }), CacheService: { getScriptCache: () => ({ get: () => null, put: () => {} }) }, _tplNotifyPending_: (id, title, author) => { NOTIFIED.push({ id, title, author }); return 1; }, _tplNotifClear_: id => { CLEARED.push(id); } });
 vm.createContext(ctx);
 vm.runInContext('var _tplCatIdxMemo_ = null; var MSG_TPL_CAT_CACHE_KEY_ = "tplcat_v1";' + fn('_stripVN_') + fn('_tplFoldAcc_') + fn('_tplCatalogIndex_') + fn('_tplClassify_') + fn('_tplGroupList_'), ctx);
 vm.runInContext(consts + fn('_tplCaller_') + fn('_tplRowToObj_') + fn('_tplOwns_') + fn('readMessageTemplates_') + fn('saveMessageTemplate_') + fn('deleteMessageTemplate_') + fn('approveMessageTemplate_'), ctx);
@@ -110,4 +112,17 @@ ok(ctx._tplPromptBlock_('khach hoi lac tay').indexOf('MAU-CHUA-DUYET-LAC') >= 0,
 for (let k = 0; k < 6; k++) save(T({ title: 'Nhan ' + k, product: 'Nhẫn Vàng 9999', content: 'X'.repeat(900) }), C('tok_admin', '', ''));
 blk = ctx._tplPromptBlock_('nhan vang 9999');
 ok((blk.match(/^Mau \d/gm) || []).length === 3 && blk.length < 2000, 'toi da 3 mau, moi mau cat 500 ky tu -> prompt khong phinh');
+// Bao admin duyet: de xuat (pending) -> goi 1 lan; admin tu luu (approved) -> KHONG goi
+reset(); NOTIFIED.length = 0;
+save(T({ title: 'De xuat moi', product: 'Nhẫn Vàng 9999', content: 'Noi dung' }), C('tok_cs', '', ''));
+ok(NOTIFIED.length === 1 && NOTIFIED[0].title === 'De xuat moi', 'nhan vien de xuat mau moi (cho duyet) -> bao admin dung 1 lan');
+NOTIFIED.length = 0;
+save(T({ title: 'Admin tu luu', product: 'Nhẫn Vàng 9999', content: 'Noi dung' }), C('tok_admin', '', ''));
+ok(NOTIFIED.length === 0, 'admin luu (tu duyet) -> khong bao ai');
+// Xoa mau -> go thong bao cho duyet (khong con gi de duyet)
+CLEARED.length = 0; reset();
+const r0 = save(T({ title: 'Se bi xoa', product: 'Nhẫn Vàng 9999', content: 'X' }), C('tok_cs', '', ''));
+const newId = data[1] && data[1][0];
+ctx.deleteMessageTemplate_(newId, C('tok_admin', '', ''));
+ok(newId && CLEARED.length === 1 && CLEARED[0] === newId, 'xoa mau -> go thong bao cho duyet cua dung mau do');
 console.log('ALL MSGTPL TESTS PASSED');

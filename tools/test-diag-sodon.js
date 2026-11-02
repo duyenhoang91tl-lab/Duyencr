@@ -15,7 +15,7 @@ const ctx = { Logger: { log() {} },
   dateInRange_: (dt, f, t) => { if (!dt) return false; const y = dt.toISOString().slice(0, 10); return (!f || y >= f) && (!t || y <= t); },
   _isExcludedOrderStatus_: (t) => /^huy/i.test(String(t || '')), splitMulti_: (x) => String(x || '').split(',').map((s) => s.trim()).filter(Boolean),
   _expandSaleFilterWithPancakeAliases_: (n) => n, _normTxt_: (s) => String(s || '').toLowerCase().trim(), _dtOrderRevenue_: (r) => r.giaTriDon };
-vm.createContext(ctx); vm.runInContext(grab('_diagSoDonAvsChot_'), ctx);
+vm.createContext(ctx); vm.runInContext(grab('_isNumericTag_') + '\n' + grab('_diagSoDonAvsChot_'), ctx);   // _isNumericTag_: loai STT Pancake (token toan so) khoi ten sale
 let d = ctx._diagSoDonAvsChot_({ dateFrom: '2026-10-01', dateTo: '2026-10-31', sale: [] });
 eq([d.matched, d.counted, d.notCounted], [5, 2, 3], 'don huy va ngoai ky bi loai khoi A (5 don); chi 2 don vao ty le chot');
 eq(d.byReason, { 'Đơn bảo hành BH không doanh thu': 1, 'Kênh "Quay" chưa khớp Page Pancake nào': 1, 'Chưa có dữ liệu Pancake ngày 2026-10-07 của kênh "FB"': 1 }, 'ly do tung don');

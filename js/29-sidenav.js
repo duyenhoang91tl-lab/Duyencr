@@ -37,7 +37,7 @@
     { k:'kh',  t:'👤 Hồ sơ',                ids:['tab-kh','care2','stageboard','tab-schedule','tab-overdue','tab-mydata','tab-task','act:profile'] },   // gộp hồ sơ khách hàng + hồ sơ nhân viên
     { k:'sc',  t:'💬 Social',               ids:['tab-chat','tab-teamchat'] },
     { k:'kho', t:'📦 Kho',                 ids:['act:kho'] },
-    { k:'tv',  t:'🧰 Tác vụ',               ids:['tab-zaloai','act:bc','act:bct','act:bcstat','act:futpl','act:bday'] },
+    { k:'tv',  t:'🧰 Tác vụ',               ids:['tab-zaloai','act:bc','act:bct','act:bcstat','act:futpl','act:bday','act:conndiag'] },
     { k:'rp',  t:'📊 Báo cáo',              ids:['salesreport','pancake','kpipancake','mktchecklist','dailybrief','dashboard','act:fureport','act:teamai'] },
     { k:'cs',  t:'🔀 Cài đặt chia số',      ids:['act:assign','act:autoassign','act:assignhist'] },
     { k:'tm',  t:'👥 Cài đặt team',         ids:['team','act:salematch','act:acct'] },
@@ -53,6 +53,7 @@
     errlog:     { t:'🐞 Nhật ký lỗi (máy này)', f:'openErrLogModal', admin:true },
     notif:      { t:function(){ return (typeof _ntLabel==='function') ? _ntLabel() : '🔔 Thông báo'; }, f:'openNotifModal' },
     kho:        { t:'📦 Tồn kho', f:'openKhoModal' },
+    conndiag:   { t:'🩺 Chẩn đoán kết nối', f:'openConnDiag' },
     profile:    { t:'🪪 Hồ sơ nhân viên', f:'openProfileModal' },
     salematch:  { t:'🔗 Khớp sale', f:'openSaleMatchModal', admin:true },
     acct:       { t:'🔑 Tài khoản đăng nhập', f:'openAcctModal', admin:true },
@@ -158,7 +159,7 @@
     hdr.insertBefore(b, hdr.firstChild);
     // Ô tìm nhanh cạnh nút Menu: dùng được ở MỌI màn; gõ xong tự chuyển về "Danh sách KH" và lọc theo từ khoá
     var qw = document.createElement('div'); qw.id = 'qs-wrap';
-    qw.innerHTML = '<input id="qs-input" type="search" placeholder="🔍 Tìm nhanh: tên, SĐT, mã đơn..." autocomplete="off">';
+    qw.innerHTML = '<input id="qs-input" type="search" placeholder="' + ((window.matchMedia && window.matchMedia('(max-width:768px)').matches) ? '🔍 Tìm khách' : '🔍 Tìm nhanh: tên, SĐT, mã đơn...') + '" autocomplete="off">';
     hdr.insertBefore(qw, b.nextSibling);
     var qt;
     qw.firstChild.addEventListener('input', function(){
@@ -412,3 +413,33 @@ document.addEventListener('click', function(e){
   if (it) { _qsPick_(+it.getAttribute('data-i')); return; }
   if (!(e.target.closest && e.target.closest('#qs-res')) && !_qsIsInp_(e.target)) _qsHide_();
 });
+
+// ═══════════════════════════════════════════════════════
+//  MỞ HỒ SƠ KHÁCH TỪ BẤT KỲ BẢNG ĐƠN NÀO (2026-10-23, Duyên yêu cầu: "chỗ nào check đơn có mã đơn/SĐT đều mở được hồ sơ khách")
+//  Cách dùng ở chỗ vẽ bảng: _custLinkHtml_(sdt, 'nội dung hiển thị') -> chữ bấm được; click (bắt ở document, 1 chỗ duy nhất) -> _openCustomerByPhone_.
+//  Khách ngoài danh sách đang tải => nạp riêng bằng _pullSearchCustomer_ rồi openDp (openDp im lặng không mở nếu khách chưa có trong allCustomers — lý do
+//  các nút gọi openDp trực tiếp "bấm không ra gì"). Tài khoản test (demo-mode) chỉ mở khách có sẵn. (js/28 _bdOpenCustomer_ là bản riêng cùng logic cho popup đơn K.)
+// ═══════════════════════════════════════════════════════
+async function _openCustomerByPhone_(phone){
+  var ph = (typeof normPhone === 'function' ? normPhone(phone) : '') || String(phone || '').replace(/\D/g, '');
+  if (!ph || typeof customerMap === 'undefined' || typeof openDp !== 'function') return;
+  if (!customerMap[ph] && customerMap[phone]) ph = String(phone);
+  if (!customerMap[ph]) {
+    if (document.body.classList.contains('demo-mode')) { if (typeof toast === 'function') toast('Tài khoản test chỉ xem được khách có sẵn trong danh sách'); return; }
+    ph = await _pullSearchCustomer_(ph);
+    if (!ph) return;
+  }
+  try { openDp(ph); } catch (e) {}
+}
+function _custLinkHtml_(phone, inner, tip){
+  var p = String(phone == null ? '' : phone).trim();
+  if (p.replace(/\D/g, '').length < 6) return inner;   // không có SĐT hợp lệ -> chữ thường
+  return '<span class="cust-link" data-cust-phone="' + esc(p) + '" title="' + esc(tip || 'Bấm để mở hồ sơ khách') + '">' + inner + '</span>';
+}
+document.addEventListener('click', function(e){
+  var t = e.target.closest && e.target.closest('[data-cust-phone]');
+  if (!t) return;
+  e.stopPropagation(); e.preventDefault();   // capture: không kích hoạt onclick của dòng/ô cha (vd mở popup đơn)
+  _openCustomerByPhone_(t.getAttribute('data-cust-phone'));
+}, true);
+

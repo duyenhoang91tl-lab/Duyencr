@@ -31,6 +31,10 @@ for (const d of ['js', 'css']) fs.mkdirSync(path.join(out, d), { recursive: true
     before += Buffer.byteLength(src); after += Buffer.byteLength(r.styles);
   }
   fs.copyFileSync(path.join(root, 'index.html'), path.join(out, 'index.html'));
+// PWA (cai nhu ung dung tren dien thoai): manifest + service worker + icon nam o goc, copy nguyen vao dist
+for (const f of ['manifest.webmanifest', 'sw.js', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png']) {
+  if (fs.existsSync(path.join(root, f))) fs.copyFileSync(path.join(root, f), path.join(out, f));
+}
   fs.writeFileSync(path.join(out, '.assetsignore'), '');
   console.log('dist OK: js+css ' + (before / 1024 | 0) + ' KB -> ' + (after / 1024 | 0) + ' KB');
 })().catch(e => { console.error(e); process.exit(1); });

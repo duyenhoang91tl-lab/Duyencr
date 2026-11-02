@@ -994,9 +994,9 @@ function _tlcDiagnose_(filters) {
   inRange.forEach(function (r) {
     var dt = parseVNDate_(r.ngayTao), ymd = dt ? _vnYmd_(dt) : '';
     var kn = r.kenhBan || '(chưa có kênh)', pids = kenhPages[r.kenhBan] || [];
-    splitMulti_(r.saleBan, ',').forEach(function (sn) { var k = personKey(sn); disp[k] = disp[k] || sn; bySaleBan[k] = (bySaleBan[k] || 0) + 1; });
+    splitMulti_(r.saleBan, ',').filter(function(x){ return !_isNumericTag_(x); }).forEach(function (sn) { var k = personKey(sn); disp[k] = disp[k] || sn; bySaleBan[k] = (bySaleBan[k] || 0) + 1; }); // loai STT Pancake
     var isCov = pids.some(function (pid) { return covered[pid] && covered[pid][ymd]; });
-    if (isCov) splitMulti_(r.saleBan, ',').forEach(function (sn) { var k2 = personKey(sn); bySaleBanCov[k2] = (bySaleBanCov[k2] || 0) + 1; });
+    if (isCov) splitMulti_(r.saleBan, ',').filter(function(x){ return !_isNumericTag_(x); }).forEach(function (sn) { var k2 = personKey(sn); bySaleBanCov[k2] = (bySaleBanCov[k2] || 0) + 1; }); // loai STT Pancake
     if (!isCov) {
       var why = pids.length ? 'kênh có Page nhưng Page chưa nạp tương tác ngày đơn' : 'kênh CHƯA gán Page Pancake';
       var key = kn + ' — ' + why; notCovered[key] = (notCovered[key] || 0) + 1; return;
@@ -1051,7 +1051,7 @@ function _diagSoDonAvsChot_(f) {
     var r = rows[i], dt = parseVNDate_(r.ngayTao);
     if (!dateInRange_(dt, f.dateFrom, f.dateTo)) continue;
     if (_isExcludedOrderStatus_(r.trangThai)) continue;
-    if (saleFold.length && !splitMulti_(r.saleBan, ',').some(function(x) { return saleFold.indexOf(_normTxt_(x)) !== -1; })) continue;
+    if (saleFold.length && !splitMulti_(r.saleBan, ',').filter(function(x){ return !_isNumericTag_(x); }).some(function(x) { return saleFold.indexOf(_normTxt_(x)) !== -1; })) continue; // loai STT Pancake
     out.matched++;
     var why = [], ymd = dt ? _vnYmd_(dt) : '';
     if (r.bhZero) why.push('Đơn bảo hành BH không doanh thu');

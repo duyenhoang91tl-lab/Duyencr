@@ -67,7 +67,8 @@ JSDOM.fromFile(path.join(__dirname, '..', 'index.html'), { runScripts: 'dangerou
     const n0 = calls.filter(c => /staffOverview/.test(c.url)).length;
     const q = D.getElementById('sp-quick'); q.value = 'lastMonth'; q.dispatchEvent(new w.Event('change', { bubbles: true })); await wait(300);
     ok(calls.filter(c => /staffOverview/.test(c.url)).length === n0 + 1, 'doi ky -> goi lai staffOverview');
-    ok(/from=\d{4}-\d{2}-01&to=\d{4}-\d{2}-\d{2}/.test(calls[calls.length - 1].url), 'tham so ngay dung dinh dang');
+    const soCalls = calls.filter(c => /staffOverview/.test(c.url));   // lay request staffOverview CUOI (khong phai request bat ky cuoi cung: co the co goi khac xen vao -> test chap chon)
+    ok(soCalls.length && /from=\d{4}-\d{2}-01&to=\d{4}-\d{2}-\d{2}/.test(soCalls[soCalls.length - 1].url), 'tham so ngay dung dinh dang: ' + (soCalls.length ? soCalls[soCalls.length - 1].url.slice(-80) : '(khong co)'));
     D.getElementById('sp-close').click();
     ok(!D.getElementById('sp-overlay').classList.contains('open') && !D.documentElement.classList.contains('sp-lock'), '← Quay lai dong man hinh va mo khoa cuon trang');
     w.openProfileModal(); await wait(100);

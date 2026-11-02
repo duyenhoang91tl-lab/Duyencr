@@ -342,8 +342,10 @@ let gsUrl = FIXED_GS_URL || loadLS('ome_gs_url') || '';
     return '{' + extra + (/^\s*\}/.test(rest) ? '' : ',') + rest;
   }
   window.fetch = function(u, o){
+    var _isGs = false;
     try {
       if (typeof u === 'string' && gsUrl && u.indexOf(gsUrl) === 0) {
+        _isGs = true;
         var tok = localStorage.getItem('ome_demo_token');
         var st = localStorage.getItem('ome_sess_token');
         // Token phien het han (7 ngay): khi GAS bat chan xac thuc, moi request se bi tu choi -> dua nguoi dung ve man hinh dang nhap 1 lan thay vi bao loi chung chung.
@@ -374,7 +376,13 @@ let gsUrl = FIXED_GS_URL || loadLS('ome_gs_url') || '';
         }
       }
     } catch(e0){}
-    return _origFetch(u, o);
+    var _p = _origFetch(u, o);
+    // CHAN DOAN (2026-10-26): moi phan hoi loi (502/404/...) tu Worker/GAS ghi 1 dong console.error KEM NOI DUNG loi (vd {"error":"Khong ket noi duoc GAS: ..."}),
+    // de app Android (onConsoleMessage -> o 'Chan doan') va F12 thay duoc LY DO that thay vi chi 'HTTP 502'. Da cat token khoi URL. Khong anh huong ket qua tra ve.
+    if (_isGs) _p.then(function(r){
+      if (r && !r.ok) r.clone().text().then(function(t){ console.error('HTTP ' + r.status + ' ' + String(u).replace(/(token|demo|adminKey)=[^&]*/g, '$1=…').slice(0, 200) + ' → ' + String(t).replace(/\s+/g, ' ').slice(0, 200)); }).catch(function(){});
+    }, function(){});
+    return _p;
   };
 })();
 // ── Tắt thông báo (toast) liên quan đồng bộ Google Sheets ──

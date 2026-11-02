@@ -40,7 +40,7 @@ function setup() {
   const e = makeGas(); e.settings = { ttLastTrackedMs: String(e.now), ttStageHours: '24' };
   const track = e.run("getSheet_(TT_TRACK_SHEET_, TT_TRACK_HEADERS_)");
   track.data.push(['3418875', 'Done', new Date(e.now - 284 * H), '', 'Hoa, Lan', '01/10/2026'], ['3418895', 'Done', new Date(e.now - 30 * H), '', 'Bình', '02/10/2026'], ['3419000', 'Done', new Date(e.now - 2 * H), '', 'Hoa', '14/10/2026']);
-  e.orders = [{ id: '3418875', phone: '0912000001', sanPham: 'Vòng Phong Thủy', giaTriDon: 1250000, giaoCho: 'Nam', maBoDem: 'BD-77', kenhBan: 'Zalo', trangThai: 'Done' }, { id: '3418895', phone: '', sanPham: 'Nhẫn', giaTriDon: 0, giaoCho: '', maBoDem: '', kenhBan: '', trangThai: 'Done' }, { id: '999', phone: '0900000000', sanPham: 'khac', giaTriDon: 5 }];
+  e.orders = [{ id: '3418875', soDienThoai: '0912000001', sanPham: 'Vòng Phong Thủy', giaTriDon: 1250000, giaoCho: 'Nam', maBoDem: 'BD-77', kenhBan: 'Zalo', trangThai: 'Done' }, { id: '3418895', soDienThoai: '', sanPham: 'Nhẫn', giaTriDon: 0, giaoCho: '', maBoDem: '', kenhBan: '', trangThai: 'Done' }, { id: '999', soDienThoai: '0900000000', sanPham: 'khac', giaTriDon: 5 }];
   e.users = { T_HOA: { name: 'Hoa', username: 'hoa', role: 'cs', names: ['Hoa'] }, T_LAN: { name: 'Lan Anh', username: 'lan', role: 'cs', names: ['Lan'] }, T_BINH: { name: 'Binh', username: 'binh', role: 'cs', names: ['BÌNH'] }, T_NAM: { name: 'Nam', username: 'nam', role: 'cs', names: ['Nam'] }, T_ADMIN: { name: 'Admin', username: 'ad', role: 'admin', names: [] } };
   return e;
 }
@@ -49,14 +49,14 @@ const items = e => e.run("ttTodayTasks_('')").tasks[0].items;
   // 1. readDTTong_ co phone
   { const e = makeGas(); const row = new Array(20).fill(''); row[0] = new Date(Date.UTC(2026, 9, 1, 3, 0)); row[3] = 912345678; row[6] = 'Done'; row[7] = 'x'; row[12] = 'Zalo'; row[13] = 'Hoa'; row[14] = 'Vòng'; row[17] = 100; row[19] = 'ID1';
     e.ctx.readDTTong_ = e.realReadDT; e.ctx.sbReadDTTongVals_ = () => ({ vals: [row], rowNums: [2] }); e.ctx._hiddenPageSaleSets_ = () => ({}); e.ctx._isDTRowHidden_ = () => false; e.ctx._dtBoDemCol_ = () => null;
-    const o = e.run('readDTTong_(true)'); ok(o.length === 1 && o[0].phone === '0912345678' && o[0].id === 'ID1' && o[0].saleBan === 'Hoa', 'readDTTong_: co phone chuan hoa (thieu so 0) va giu nguyen cac truong cu: ' + JSON.stringify(o[0])); }
+    const o = e.run('readDTTong_(true)'); ok(o.length === 1 && o[0].soDienThoai === undefined && o[0].id === 'ID1' && o[0].saleBan === 'Hoa', 'readDTTong_ mac dinh KHONG tra SDT (rieng tu) va giu nguyen truong cu'); const o2 = e.run('readDTTong_(true, true)'); ok(/^0?912345678$/.test(String(o2[0].soDienThoai)) && o2[0].id === 'ID1', 'readDTTong_(true,true): co soDienThoai: ' + JSON.stringify(o2[0].soDienThoai)); }
   // 2. todayTasks lam giau
   let e = setup(); let it = items(e);
   ok(it.length === 2 && it[0].id === '3418875' && it[0].hours === 284 && it[0].sale === 'Hoa, Lan', '2 don ket sap xep theo gio, bo don moi (2h)');
   ok(it[0].phone === '0912000001' && it[0].sanPham === 'Vòng Phong Thủy' && it[0].value === 1250000 && it[0].giaoCho === 'Nam' && it[0].maBoDem === 'BD-77' && it[0].kenhBan === 'Zalo' && it[0].trangThai === 'Done' && it[0].follow === null, 'don 1 duoc lam giau day du, chua ai theo doi');
   ok(it[1].phone === '' && it[1].follow === null, 'don 2 khong co SDT -> phone rong, van tra ve');
   ok(e.run("ttTodayTasks_('Hoa')").tasks[0].items.length === 1 && e.run("ttTodayTasks_('bình')").tasks[0].items[0].id === '3418895', 'loc theo ten CS nhu cu (khong phan biet hoa/thuong; khong bo dau)');
-  e.ordersThrow = true; it = items(e); ok(it.length === 2 && it[0].hours === 284 && it[0].phone === undefined && it[0].follow === null, 'loi doc DT TONG KHONG lam hong danh sach don ket (van tra truong goc)'); e.ordersThrow = false;
+  e.ordersThrow = true; it = items(e); ok(it.length === 2 && it[0].hours === 284 && it[0].sanPham === undefined && it[0].follow === null, 'loi doc DT TONG KHONG lam hong danh sach don ket (van tra truong goc)'); e.ordersThrow = false;
   // 3. theo doi: quyen
   const set = (tok, id, st, extra) => e.run('ttFollowSet_(' + JSON.stringify(Object.assign({ id, status: st, token: tok }, extra || {})) + ')');
   let r = set('T_BINH', '3418875', 'xem'); ok(!r.ok && r.code === 'FORBIDDEN' && e.run("getSheet_(TT_FOLLOW_SHEET_, TT_FOLLOW_HEADERS_)").data.length === 1, 'CS KHONG phu trach (Binh, don cua Hoa/Lan) bi tu choi, khong ghi gi: ' + JSON.stringify(r));
@@ -99,9 +99,9 @@ const items = e => e.run("ttTodayTasks_('')").tasks[0].items;
     const dom = new JSDOM('<!doctype html><body><div id="toast"></div></body>', { runScripts: 'outside-only' }), w = dom.window, env = { toasts: [], posts: [], reply: null, delay: 0, opened: [], dp: [], clip: [] };
     w.navigator.clipboard = { writeText: async t => { env.clip.push(t); } };
     const fetchFn = async (url, o) => { env.posts.push(JSON.parse(o.body)); if (env.delay) await sleep(env.delay); if (env.reply instanceof Error) throw env.reply; return { json: async () => env.reply }; };
-    const f = new w.Function('currentUser', 'customerMap', 'careData', '_ttState', 'gsUrl', 'fetch', 'toast', 'esc', 'fmt', 'openDp', 'document', 'navigator', pieces + '\nreturn { stuckRow_, hmCompute, _c2Rows, _c2OrderRow, stuckOpen, stuckSave, stuckClose, stuckFollowBadge_, stuckCopy, state: _stuck, find: _stuckFind, canAct: _stuckCanAct };');
+    const f = new w.Function('currentUser', 'customerMap', 'careData', '_ttState', 'gsUrl', 'fetch', 'toast', 'esc', 'fmt', 'openDp', 'ttOpenCustomer_', 'document', 'navigator', pieces + '\nreturn { stuckRow_, hmCompute, _c2Rows, _c2OrderRow, stuckOpen, stuckSave, stuckClose, stuckFollowBadge_, stuckCopy, state: _stuck, find: _stuckFind, canAct: _stuckCanAct };');
     const esc = s => (s || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'), fmt = n => (n || 0).toLocaleString('vi-VN');
-    const api = f(user, { '0912000001': { name: 'Chị Lan <Hà>', cs: 'Hoa', orders: [] } }, { '0912000001': { cs: 'Hoa', status: 's1', updated: '' } }, { tasks: tasks, open: {}, hours: 24, at: 0 }, 'https://gas.test/exec', fetchFn, t => env.toasts.push(t), esc, fmt, p => env.dp.push(p), w.document, w.navigator);
+    const api = f(user, { '0912000001': { name: 'Chị Lan <Hà>', cs: 'Hoa', orders: [] } }, { '0912000001': { cs: 'Hoa', status: 's1', updated: '' } }, { tasks: tasks, open: {}, hours: 24, at: 0 }, 'https://gas.test/exec', fetchFn, t => env.toasts.push(t), esc, fmt, p => env.dp.push(p), (ph, id) => env.opened.push([ph, id]), w.document, w.navigator);
     return Object.assign(api, { env, w, doc: w.document, ov: () => w.document.getElementById('stuck-ov') });
   }
   const T = () => [{ key: 'stuckStage', title: 'Đơn kẹt', count: 2, items: [
@@ -110,7 +110,7 @@ const items = e => e.run("ttTodayTasks_('')").tasks[0].items;
   const HOA = { name: 'Hoa', role: 'cs', names: ['Hoa'] }, BINH = { name: 'Binh', role: 'cs', names: ['Bình'] }, ADMIN = { name: 'Admin', role: 'admin', names: [] }, KHAC = { name: 'Khac', role: 'cs', names: ['Khac'] };
   // a. dong du lieu
   let W = web(HOA, T()); let row = W.stuckRow_(W.find('3418875'));
-  ok(row.order === true && row.oid === '3418875' && row.phone === '0912000001' && row.name === 'Đơn BD-77' && row.cs === 'Hoa, Lan' && /Chị Lan <Hà> · Done · kẹt 284 giờ · Vòng <i>x<\/i> Phong Thủy · 1\.250\.000đ/.test(row.sub), 'stuckRow_: co SDT, ma don, CS phu trach, ten khach + sp + gia tri: ' + JSON.stringify(row));
+  ok(row.order === true && row.kind === 'order' && row.orderId === '3418875' && row.oid === '3418875' && row.phone === '0912000001' && row.name === 'Đơn BD-77' && row.cs === 'Hoa, Lan' && /Chị Lan <Hà> · Done · kẹt 284 giờ · Vòng <i>x<\/i> Phong Thủy · 1\.250\.000đ/.test(row.sub), 'stuckRow_: co SDT, ma don, CS phu trach, ten khach + sp + gia tri: ' + JSON.stringify(row));
   ok(W.stuckRow_(W.find('3418895')).name === 'Đơn 3418895' && W.stuckRow_(W.find('3418895')).sub === 'Done · kẹt 30 giờ', 'don khong co ma bo dem/SDT/khach: lui ve id Base');
   const hm = W.hmCompute(); ok(hm.today.length === 2 && hm.today.every(x => x.order && x.oid) && hm.today[0].phone === '0912000001', 'hmCompute: don ket di kem order/oid/phone');
   const rows = W._c2Rows().filter(x => x.type === 'order'); ok(rows.length === 2 && rows[0].oid === '3418875' && rows[0].cs === 'Hoa, Lan' && rows[1].follow.status === 'xuly', '_c2Rows: dong "Don ket" co oid, CS phu trach, follow: ' + JSON.stringify(rows.map(r => [r.oid, r.cs])));
@@ -123,11 +123,11 @@ const items = e => e.run("ttTodayTasks_('')").tasks[0].items;
   W.stuckOpen('3418875'); ok(W.ov() && W.ov().style.display === 'flex', 'mo hop chi tiet'); let txt = W.ov().textContent;
   ok(/Chị Lan <Hà>/.test(txt) && /0912000001/.test(txt) && /Mã đơn Base3418875/.test(txt.replace(/\s+/g, '')) || /3418875/.test(txt), 'co khach + ma don');
   for (const s of ['Chị Lan <Hà>', '0912000001', '3418875', 'BD-77', 'Done', '284 giờ', 'Vòng <i>x</i> Phong Thủy', '1.250.000đ', 'Zalo', '01/10/2026', 'Nam', 'Hoa, Lan']) ok(txt.includes(s), 'hop chi tiet co: ' + s);
-  ok(!W.ov().querySelector('i') && W.ov().querySelector('button[onclick*="openDp"]') && /Chưa ai tích theo dõi/.test(txt), 'escape HTML trong du lieu; co nut Mo ho so khach; chua ai theo doi');
-  ok(W.ov().querySelectorAll('button[onclick^="stuckSave"]').length === 3 && W.ov().querySelector('#stuck-note'), 'CS PHU TRACH (Hoa) thay 3 nut tich + o ghi chu'); W.ov().querySelector('button[onclick*="openDp"]').click === undefined;
+  ok(!W.ov().querySelector('i') && W.ov().querySelector('button[onclick*="ttOpenCustomer_(\'0912000001\',\'3418875\')"]') && /Chưa ai tích theo dõi/.test(txt), 'escape HTML trong du lieu; co nut Mo ho so khach (ttOpenCustomer_ phone+ma don); chua ai theo doi');
+  ok(W.ov().querySelectorAll('button[onclick^="stuckSave"]').length === 3 && W.ov().querySelector('#stuck-note'), 'CS PHU TRACH (Hoa) thay 3 nut tich + o ghi chu');
   W.stuckClose(); ok(W.ov().style.display === 'none', 'dong hop');
   W = web(BINH, T()); W.stuckOpen('3418875'); ok(W.ov().querySelectorAll('button[onclick^="stuckSave"]').length === 0 && /Chỉ CS phụ trách đơn này \(Hoa, Lan\) hoặc quản trị mới tích được/.test(W.ov().textContent), 'CS KHAC (khong phai Hoa/Lan): khong co nut tich, co thong bao ro');
-  W.stuckOpen('3418895'); ok(W.ov().querySelectorAll('button[onclick^="stuckSave"]').length >= 3 && /Đang xử lý · Bình/.test(W.ov().textContent) && /↩ Bỏ theo dõi/.test(W.ov().textContent) && /Đơn chưa có SĐT khách/.test(W.ov().textContent) && !W.ov().querySelector('button[onclick*="openDp"]'), 'Binh tich don CUA MINH: co nut + Bo theo doi; don khong SDT: canh bao, khong co nut Mo ho so');
+  W.stuckOpen('3418895'); ok(W.ov().querySelectorAll('button[onclick^="stuckSave"]').length >= 3 && /Đang xử lý · Bình/.test(W.ov().textContent) && /↩ Bỏ theo dõi/.test(W.ov().textContent) && /Đơn chưa có SĐT khách/.test(W.ov().textContent) && W.ov().querySelector('button[onclick*="ttOpenCustomer_(\'\',\'3418895\')"]'), 'Binh tich don CUA MINH: co nut + Bo theo doi; don khong SDT: canh bao, nut Mo ho so van co (tra theo ma don)');
   W = web(ADMIN, T()); W.stuckOpen('3418875'); ok(W.ov().querySelectorAll('button[onclick^="stuckSave"]').length === 3, 'admin thay nut o moi don');
   W = web(KHAC, T()); ok(!W.canAct(W.find('3418875')) && !W.canAct(W.find('3418895')), 'canAct: nguoi la khong co quyen'); W = web({ name: 'x', role: 'cs', names: ['binh'] }, T()); ok(!W.canAct(W.find('3418895')), 'ten khac dau (binh vs Bình): web CUNG khong cho, giong server (khong bo dau)'); W = web({ name: 'x', role: 'cs', names: ['  BÌNH '] }, T()); ok(W.canAct(W.find('3418895')), 'khac hoa/thuong + khoang trang: cho');
   W = web(HOA, T()); W.stuckOpen('777'); ok(!W.ov() && /không còn trong danh sách kẹt/.test(W.env.toasts[0]), 'don khong con ket: bao, khong mo hop');
@@ -139,7 +139,8 @@ const items = e => e.run("ttTodayTasks_('')").tasks[0].items;
   W.env.delay = 0; W.env.reply = { ok: false, code: 'FORBIDDEN', error: 'Chi CS phu trach don nay (hoac quan tri) moi duoc danh dau theo doi.' }; await W.stuckSave('xong'); ok(W.find('3418875').follow.status === 'xuly' && /Không lưu được: Chi CS phu trach/.test(W.ov().textContent) && !W.state.busy, 'server tu choi (FORBIDDEN): giu nguyen, hien ly do');
   W.env.reply = new Error('mat mang'); await W.stuckSave('xong'); ok(/Không lưu được: mat mang/.test(W.ov().textContent), 'loi mang: hien thong bao');
   W.env.reply = { ok: true, follow: null }; await W.stuckSave('bo'); ok(W.find('3418875').follow === null && /Chưa ai tích theo dõi/.test(W.ov().textContent) && /Đã bỏ theo dõi/.test(W.env.toasts.join('|')), 'bo theo doi');
-  // e. cau noi vao
-  ok(/stuckOpen\(this\.dataset\.oid\)/.test(src36) && /stuckOpen\(this\.dataset\.oid\)/.test(src34) && /if \(x\.type === 'order'\) return _c2OrderRow\(x\);/.test(src40), 'noi vao: chip Tong quan, khung nhac viec, bang Cham soc & tai mua');
+  // d2. nut Mo ho so khach: dong hop roi goi ttOpenCustomer_(sdt, ma don) (ham cua phien khac, xu ly ca khach chua co trong danh sach)
+  W = web(HOA, T()); W.stuckOpen('3418875'); ok(W.ov().querySelector('button[onclick*="ttOpenCustomer_"]').getAttribute('onclick') === "stuckClose();ttOpenCustomer_('0912000001','3418875')", 'onclick: dong hop + ttOpenCustomer_(sdt, ma don)');
+  ok(/stuckOpen\(this\.dataset\.oid\)/.test(src36) && /stuckOpen\(this\.dataset\.oid\)/.test(src34) && /if \(x\.type === 'order' && x\.oid\) return _c2OrderRow\(x\);/.test(src40), 'noi vao: chip Tong quan, khung nhac viec, bang Cham soc & tai mua');
   console.log('ALL STUCK-ORDER TESTS PASSED');
 })().catch(er => { console.error('FAIL (ngoai le): ' + (er && er.stack || er)); process.exit(1); });

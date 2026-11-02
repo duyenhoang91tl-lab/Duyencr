@@ -84,7 +84,7 @@ function _bdBuild_(d){
     if (hasGoc && !o.donGoc) return;                 // chỉ đơn gốc có mã bộ đếm sale + có trên Pos
     var info = _bcOrderInfo_(Object.assign({}, o, { giaTriDon: o.giaTriDon != null ? o.giaTriDon : o.giaTriSauGiam }));
     if (!info.counter) return;
-    out.push({ o:o, info:info, date:(o.baseNgayTao || _ddmmyyyyToYmd_(o.ngayTaoDon || o.ngayTao)), sale:String(o.saleBanValid != null ? o.saleBanValid : (o.saleBan||'')).split(',').map(function(x){return x.trim();}).filter(Boolean).join(', ') });
+    out.push({ o:o, info:info, date:(o.baseNgayTao || _ddmmyyyyToYmd_(o.ngayTaoDon || o.ngayTao)), sale:String(o.saleBanValid != null ? o.saleBanValid : (o.saleBan||'')).split(',').map(function(x){return x.trim();}).filter(function(x){ return x && !isNumTagSale_(x); }).join(', ') });
   });
   out.sort(function(a,b){ return a.date < b.date ? -1 : a.date > b.date ? 1 : (a.info.counter < b.info.counter ? -1 : 1); });
   return out;

@@ -9,6 +9,8 @@ var _srSidebarHidden, _posOrdersCache, _posOrdersState, _cskhDetailCache, _cskhD
 // trong ban sao code backend (khoi tham khao "Copy Apps Script Code", khong thuc thi trong
 // trinh duyet) — gay loi "splitMulti_ is not defined" khi Auto-sync chay. Dinh nghia lai
 // dung y het logic ben backend de dung o day.
+// Token chỉ gồm số/dấu ("8", "13", "#8") hoặc "STT 8" là số thứ tự Pancake, KHÔNG phải tên sale — cùng quy tắc với _isNumericTag_ ở gas_v13.js.
+function isNumTagSale_(x){ var t = String(x == null ? '' : x).trim(); return /^[#\d\s.,\-\/()]+$/.test(t) || /^stt\s*[#\d.\s]+$/i.test(t); }
 function splitMulti_(str, delimiter) {
   if (!str && str !== 0) return [];
   var s = String(str);
@@ -482,7 +484,7 @@ function _computeCommissionData_(orders) {
       shareMap = {};
       salesList = m.saleShares.map(function(x){ shareMap[x.name] = x.frac; return x.name; });
     } else {
-      salesList = splitMulti_(m.saleBan, ',');
+      salesList = splitMulti_(m.saleBan, ',').filter(function(x){ return !isNumTagSale_(x); });   // loai STT Pancake (8, 13…): không có sale nào tên toàn số
       if (!salesList.length) salesList = ['(chưa gán sale)'];
     }
     var n = salesList.length;
@@ -1091,7 +1093,7 @@ async function _pullCskhLiteOnce_(isManual){
   _cskhLastTry = now;
   try {
     const sepChar = gsUrl.includes('?') ? '&' : '?';
-    const ckR = await fetch(gsUrl + sepChar + 'action=cskhDuyenLite', { redirect: 'follow' });
+    const ckR = await _gsFetchTO_(gsUrl + sepChar + 'action=cskhDuyenLite', 60000);
     const ckText = await ckR.text();
     if (ckText === _lastCkText && !_isEmptyObj(cskhData)) { _cskhPulledAt = Date.now(); _cskhFailCount = 0; return false; }
     let ckJson;
@@ -1114,6 +1116,40 @@ async function _pullCskhLiteOnce_(isManual){
     return true;
   } catch (ckErr) { return _cskhFail_(ckErr.message || 'lỗi mạng'); }
 }
+// fetch co GIOI HAN THOI GIAN cho cac lan keo du lieu cua syncFromGS (2026-10-26). NGUYEN NHAN: cac lan keo (customers/orders/donPhones/cskhDuyenLite/careLeads) chay NOI TIEP nhau
+// va khong co timeout; 1 yeu cau treo (Worker/GAS cham, mang di dong chap chon) lam ca lan dong bo dau tien khong bao gio xong => khung 'Dang tai du lieu' dung mai, khong hien khach.
+// Het gio -> fetch/text() nem loi -> roi vao khoi catch san co (tinh vao bo dem loi dong bo, nhip sau tu thu lai) thay vi treo.
+// TU THU LAI nhanh (2026-10-26): loi THOANG QUA (Apps Script vua deploy phien ban moi => /exec tra 404 trang Google 'Rat tiec, khong the mo tep' vai chuc giay;
+// Worker khong goi duoc GAS => 502; qua tai => 503/504; mat mang chop) truoc day lam ca lan keo that bai roi cho 'nhip sau' (banner loi cat phut).
+// Nay thu lai toi da 2 lan (cach _GS_RETRY_DELAYS_ = 1.5s roi 4s). KHONG thu lai khi HET GIO (AbortError: da cho 30-75s) hay ma khac (400/401/403/200...).
+// Ham TU DU (mac dinh nam trong ham) de test cu (tools/test-gs-fetch-timeout.js chi cat than ham nay) van chay; test/dev co the ghi de bang bien toan cuc _GS_RETRY_DELAYS_.
+function _gsFetchTO_(url, ms) {
+  var delays = (typeof _GS_RETRY_DELAYS_ !== 'undefined' && _GS_RETRY_DELAYS_) || [1500, 4000];
+  var retryStatus = [404, 502, 503, 504];
+  function once() {
+    if (typeof AbortController === 'undefined') return fetch(url, { redirect: 'follow' });
+    const ac = new AbortController(), t = setTimeout(function () { try { ac.abort(); } catch (e) {} }, ms);
+    return fetch(url, { redirect: 'follow', signal: ac.signal }).then(function (r) {
+      const ot = r.text.bind(r);
+      r.text = function () { return ot().then(function (x) { clearTimeout(t); return x; }, function (e) { clearTimeout(t); throw e; }); };   // giu dong ho cho toi khi doc xong than phan hoi
+      return r;
+    }, function (e) { clearTimeout(t); throw e; });
+  }
+  function pause(i) { return new Promise(function (res) { setTimeout(res, delays[i]); }); }
+  function attempt(i) {
+    return once().then(function (r) {
+      if (i < delays.length && retryStatus.indexOf(r.status) !== -1) {
+        try { r.text().catch(function () {}); } catch (e) {}   // xa than phan hoi bi bo + tat dong ho cua lan nay
+        return pause(i).then(function () { return attempt(i + 1); });
+      }
+      return r;
+    }, function (e) {
+      if (i < delays.length && !(e && e.name === 'AbortError')) return pause(i).then(function () { return attempt(i + 1); });
+      throw e;
+    });
+  }
+  return attempt(0);
+}
 async function syncFromGS(opts) {
   opts = opts || {};
   const pullOrders = opts.pullOrders !== undefined ? opts.pullOrders : _isEmptyObj(customerMap);
@@ -1126,7 +1162,7 @@ async function syncFromGS(opts) {
     const sepChar = gsUrl.includes('?') ? '&' : '?';
     const _wantCareFull = !_careSince || isManual || (Date.now() - _careFullAt) > CARE_FULL_EVERY_MS;
     const careUrl = gsUrl + sepChar + 'action=customers' + (_wantCareFull ? '' : '&since=' + encodeURIComponent(_careSince));
-    const careR = await fetch(careUrl, { redirect: 'follow' });
+    const careR = await _gsFetchTO_(careUrl, 60000);
     const careText = await careR.text();
     let _careSame = false, _isDelta = false;   // _careSame: khong ai sua CareData tu nhip truoc
     let d;
@@ -1161,7 +1197,7 @@ async function syncFromGS(opts) {
     if (pullOrders) {
       try {
         if (isManual) txt('ltext', 'Đang tải đơn hàng từ Google Sheets...');
-        const ordR = await fetch(gsUrl + sepChar + 'action=orders', { redirect: 'follow' });
+        const ordR = await _gsFetchTO_(gsUrl + sepChar + 'action=orders', 75000);
         const ordText = await ordR.text();
         // Chi coi la "khong doi" khi da co khach trong customerMap (sau khi bam xoa du lieu phai nap lai that su)
         const _ordSame = (ordText === _lastOrdersText) && !_isEmptyObj(customerMap);
@@ -1234,7 +1270,7 @@ async function syncFromGS(opts) {
       }
       // ── Tập SĐT có trong "dữ liệu đơn" (chỉ để lọc nguồn, không kéo chi tiết) ──
       try {
-        const dpR = await fetch(gsUrl + sepChar + 'action=donPhones', { redirect: 'follow' });
+        const dpR = await _gsFetchTO_(gsUrl + sepChar + 'action=donPhones', 40000);
         const dpText = await dpR.text();
         // NGUYÊN NHÂN GỐC lag định kỳ: trước đây khối này JSON.parse + dựng lại Set + saveLS (JSON.stringify ghi
         // localStorage, đồng bộ trên luồng chính) 5 map lớn theo SĐT MỖI lần kéo, kể cả khi server trả y hệt lần trước.
@@ -1275,7 +1311,7 @@ async function syncFromGS(opts) {
     // không hiện luôn cho tới khi F5. Giờ kéo độc lập mỗi 3s + phát hiện SĐT mới để ép
     // buildCustomers() đầy đủ ngay khi cần, không phụ thuộc orderCount.
     try {
-      const clR = await fetch(gsUrl + sepChar + 'action=careLeads', { redirect: 'follow' });
+      const clR = await _gsFetchTO_(gsUrl + sepChar + 'action=careLeads', 30000);
       const clText = await clR.text();
       // NGUYÊN NHÂN GỐC lag nền mỗi tick: trước đây mỗi tick đều parse + dựng lại careLeads + saveLS (ghi localStorage đồng bộ)
       // + quét _assignCustMap() dù sheet "KH Chăm sóc mới" không đổi. Nay so chuỗi trả về, y hệt lần trước thì bỏ qua.

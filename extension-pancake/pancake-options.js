@@ -219,3 +219,26 @@ document.getElementById("saveCrmExtKey").addEventListener("click", () => {
   $("apprLogout").addEventListener("click", async () => { await ask({ type: "APPROVER_LOGOUT" }); say("Đã đăng xuất.", true); await refresh(); });
   refresh();
 })();
+
+
+// ── Viet tat (go tat trong o chat) — bat/tat luu NGAY (storage.local, khong can bam Luu); cap nhat ngay = hoi lai CRM qua background (GET_VIETTAT) ──
+(function () {
+  const on = document.getElementById("vtOn"), btn = document.getElementById("vtSync"), st = document.getElementById("vtStatus");
+  if (!on || !btn) return;
+  const say = (t, bad) => { st.textContent = t; st.style.color = bad ? "#b91c1c" : "#166534"; };
+  chrome.storage.local.get({ vtOn: true, vtData: [], vtAt: 0 }, (v) => {
+    on.checked = v.vtOn !== false;
+    if (v.vtAt) say("Đã có " + (v.vtData || []).length + " mục (cập nhật " + new Date(v.vtAt).toLocaleString("vi-VN") + ")");
+  });
+  on.addEventListener("change", () => chrome.storage.local.set({ vtOn: on.checked }));
+  btn.addEventListener("click", () => {
+    btn.disabled = true; say("Đang cập nhật...");
+    chrome.runtime.sendMessage({ type: "GET_VIETTAT" }, (r) => {
+      btn.disabled = false;
+      if (chrome.runtime.lastError || !r || !r.ok) { say("Không cập nhật được: " + ((r && r.error) || (chrome.runtime.lastError && chrome.runtime.lastError.message) || "lỗi mạng"), true); return; }
+      chrome.storage.sync.get({ csName: "" }, (sy) => {
+        chrome.storage.local.set({ vtData: r.data.snippets, vtAt: Date.now(), vtBy: String(sy.csName || "") }, () => say("✓ Đã cập nhật " + r.data.snippets.length + " mục."));
+      });
+    });
+  });
+})();

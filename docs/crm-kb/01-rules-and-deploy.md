@@ -28,6 +28,7 @@ Push `main` là GitHub Actions tự đưa lên chỗ chạy thật (xem tab Acti
 **Vì vậy KHÔNG nhắc Duyên:** dán code vào Apps Script, Manage deployments → New version, dán `worker.mjs`, chạy SQL trong Supabase, hay bấm "🔄 Đồng bộ mã GAS mới nhất" (nút Copy mã GAS chỉ là đường dự phòng thủ công; không ai còn dán tay). Chỉ cần: push → nói "đã đẩy, workflow tự deploy" + nếu đổi web thì "Ctrl+F5". Chỉ nhắc khi workflow ĐỎ/không chạy (xem Actions) — khi đó mới hướng dẫn xử lý.
 Vẫn phải nhắc những việc workflow KHÔNG làm được: chạy hàm cần bấm tay trong Apps Script Editor (vd `xemKhoaExtension`, backfill/đối chiếu Supabase, `xoaSdtLoiThat`), đổi Script Properties, **reload extension** trong `chrome://extensions` khi sửa extension.
 Sau khi sửa `gas_v13.js` vẫn PHẢI chạy `node tools/split-gas.js` rồi `--check` (workflow cũng tự sinh lại, nhưng commit phải khớp).
+`gas/NN_*.gs` + `gas/INDEX.md` là file TỰ SINH từ `gas_v13.js` (nguồn chính): KHÔNG sửa tay (bị ghi đè, `--check` báo lệch). Tra hàm nằm file nào: `node tools/split-gas.js --where <tên_hàm>` hoặc mở `gas/INDEX.md`.
 
 **Sau khi sửa JS/CSS của extension:** nhắc reload extension trong `chrome://extensions` (không cần deploy riêng).
 

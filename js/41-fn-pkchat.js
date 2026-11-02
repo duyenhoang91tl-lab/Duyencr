@@ -208,6 +208,7 @@ function renderPkChatTab(c) {
      + '<div class="pkc-seen" id="pkc-seen"></div>'
      + '<div class="pkc-meta" id="pkc-meta"></div>'
      + '<div class="pkc-who" id="pkc-who"></div>'
+     + '<div class="pkc-coach" id="pkc-coach"></div>'
     + '<div class="pkc-msgs" id="pkc-msgs"><div class="pkc-note">Đang tải tin nhắn…</div></div>'
     + '<div class="pkc-status" id="pkc-status"></div>'
     + '<div class="pkt-bar" id="pkc-tags" style="display:none"></div>'
@@ -276,6 +277,7 @@ function _pkcRender(forceBottom) {
   var comp = document.getElementById('pkc-compose'), lk = document.getElementById('pkc-link'), mt = document.getElementById('pkc-meta');
   if (mt) mt.innerHTML = _pkcMetaRow(P.convs.filter(function (c) { return c.id === P.active; })[0]);
   pkSeenRender('pkc'); pkTagBarRender('pkc-tags'); var wh = document.getElementById('pkc-who'); if (wh) wh.innerHTML = _pkcWhoHtml(P.msgs[P.active]);
+  if (typeof pkCoachSync === 'function') pkCoachSync('pkc', P.active, P.msgs[P.active]);
   if (!P.active) {
     box.innerHTML = '<div class="pkc-note">Chưa có hội thoại Pancake nào gắn với SĐT này.<br>Nếu khách đã nhắn Pancake, bấm "Gắn hội thoại" bên dưới, tìm theo tên trên Pancake rồi gắn.</div>';
     if (comp) comp.style.display = 'none'; if (lk) lk.open = true; _pkcStatus(); return;

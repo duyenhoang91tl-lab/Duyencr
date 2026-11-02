@@ -813,6 +813,41 @@ function _impDiffRow_(sheetKey, oldVals, newRow, width) {
   return out;
 }
 
+// Ap ke hoach cap nhat o (xem doImportSheetRowsLocked_). GOM THEO COT: moi cot co o can doi -> chia thanh cac CUM dong gan nhau (khoang cach <= IMPORT_UPD_RUN_GAP),
+// moi cum doc values+formulas 1 lan, vá o can doi (BO QUA o la cong thuc), ghi lai ca cum 1 lan. Dong nam xen giua cum duoc ghi lai Y NGUYEN (cong thuc||gia tri) nen khong doi.
+// Chi dung 1 cot/lan de hep pham vi ghi lai (cot Trang thai/Ghi chu/Giai doan... deu la chu, khong dung toi cot SDT tru khi file doi dung cot do).
+// Ngan sach thoi gian: qua IMPORT_UPD_BUDGET_MS thi dung, so o chua ap tinh vao 'overTime' (nhap lai cung file de cap nhat tiep — an toan vi o da doi se khong con khac).
+var IMPORT_UPD_RUN_GAP = 40;
+var IMPORT_UPD_BUDGET_MS = 240000;
+function _impApplyUpdPlan_(sh, updPlan, t0) {
+  var out = { updatedRows: 0, updatedCells: 0, overTime: 0, logRows: [], now: new Date() };
+  var byCol = {};
+  updPlan.forEach(function (pl) { pl.diffs.forEach(function (d) { (byCol[d.j] = byCol[d.j] || []).push({ r: pl.r, key: pl.key, d: d }); }); });
+  var rowDone = {}, stopped = false;
+  Object.keys(byCol).map(Number).sort(function (a, b) { return a - b; }).forEach(function (j) {
+    var cells = byCol[j].sort(function (a, b) { return a.r - b.r; });
+    var runs = [], cur = null;
+    cells.forEach(function (c) {
+      if (cur && c.r - cur.last <= IMPORT_UPD_RUN_GAP) { cur.items.push(c); cur.last = c.r; }
+      else { cur = { first: c.r, last: c.r, items: [c] }; runs.push(cur); }
+    });
+    runs.forEach(function (run) {
+      if (stopped || (Date.now() - t0) > IMPORT_UPD_BUDGET_MS) { stopped = true; out.overTime += run.items.length; return; }
+      var n = run.last - run.first + 1, rng = sh.getRange(run.first, j + 1, n, 1);
+      var curV = rng.getValues(), curF = rng.getFormulas(), block = [], changed = 0, k;
+      for (k = 0; k < n; k++) block.push([curF[k][0] ? curF[k][0] : curV[k][0]]);
+      run.items.forEach(function (c) {
+        if (curF[c.r - run.first][0]) return;                 // o dang la cong thuc: KHONG ghi de
+        block[c.r - run.first][0] = c.d.newV; changed++;
+        out.logRows.push([out.now, sh.getName(), c.r, c.key, _impColName_(j), _impCellStr_(c.d.oldV), _impCellStr_(c.d.newV)]);
+        rowDone[c.r] = true;
+      });
+      if (changed) { rng.setValues(block); out.updatedCells += changed; }
+    });
+  });
+  out.updatedRows = Object.keys(rowDone).length;
+  return out;
+}
 function doImportSheetRows_(sheetKey, rows, dryRun, updateExisting, who) {
   if (!Array.isArray(rows) || !rows.length) return jsonOut_({ error: 'Không có dòng nào để nhập.' });
   var sheetName = sheetKey === 'pos' ? DON_CHITIET_SHEET : (sheetKey === 'base' ? DT_TONG_SHEET : '');
@@ -905,21 +940,13 @@ function doImportSheetRowsLocked_(sheetKey, sheetName, sh, rows, dryRun, updateE
   // CAP NHAT don cu (neu client bat updateExisting): chi ghi o doi, giu nguyen cong thuc, ghi nhat ky gia tri cu.
   var updatedRows = 0, updatedCells = 0, updLogFrom = 0, updLogCount = 0;
   if (updPlan.length) {
-    var logRows = [], nowU = new Date();
-    for (var u = 0; u < updPlan.length; u++) {
-      var pl = updPlan[u], minJ = 1e9, maxJ = -1;
-      pl.diffs.forEach(function (d) { if (d.j < minJ) minJ = d.j; if (d.j > maxJ) maxJ = d.j; });
-      var span = maxJ - minJ + 1;
-      var rng = sh.getRange(pl.r, minJ + 1, 1, span);
-      var curV = rng.getValues()[0], curF = rng.getFormulas()[0], outRow = [], changed = 0;
-      for (var q = 0; q < span; q++) outRow.push(curF[q] ? curF[q] : curV[q]);   // giu nguyen cong thuc / gia tri o khong doi
-      pl.diffs.forEach(function (d) {
-        if (curF[d.j - minJ]) return;                        // o dang la cong thuc: KHONG ghi de
-        outRow[d.j - minJ] = d.newV; changed++;
-        logRows.push([nowU, sh.getName(), pl.r, pl.key, _impColName_(d.j), _impCellStr_(d.oldV), _impCellStr_(d.newV)]);
-      });
-      if (changed) { rng.setValues([outRow]); updatedRows++; updatedCells += changed; }
-    }
+    // SUA 2026-10-24 (Duyen: up file Pos 15-24/10 = 897 dong bao 'Failed to fetch', up 1 ngay thi duoc): NGUYEN NHAN GOC = vong cap nhat cu goi
+    // getRange+getValues+getFormulas+setValues RIENG cho TUNG don (toi 1.500 don x 4 loi goi API ~ vai phut) -> vuot gioi han thoi gian Apps Script
+    // -> may chu tra trang loi cua Google (khong co header CORS) -> trinh duyet bao 'Failed to fetch'/CORS. File nhieu ngay co hang tram don CU doi trang thai
+    // nen moi lo; file 1 ngay chi vai don nen nhanh. Nay gom theo COT + cum dong lien nhau: doc/ghi ca cum bang 3 loi goi (xem _impApplyUpdPlan_), co ngan sach thoi gian.
+    var ap = _impApplyUpdPlan_(sh, updPlan, _impT0);
+    updatedRows = ap.updatedRows; updatedCells = ap.updatedCells; updOverLimit += ap.overTime;
+    var logRows = ap.logRows, nowU = ap.now;
     if (logRows.length) {
       try { var lgS = getSheet_(SH_IMPORT_UPD_LOG, IMPORT_UPD_LOG_HEADERS); updLogFrom = lgS.getLastRow() + 1; lgS.getRange(updLogFrom, 1, logRows.length, IMPORT_UPD_LOG_HEADERS.length).setValues(logRows); updLogCount = logRows.length; } catch (eLg) { updLogFrom = 0; updLogCount = 0; }
     }

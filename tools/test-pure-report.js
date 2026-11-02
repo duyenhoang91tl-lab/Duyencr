@@ -3,6 +3,7 @@ const fs = require('fs');
 const src = fs.readFileSync(__dirname + '/../js/11-fn-srload.js', 'utf8');
 const names = ['_srOrdNames_', '_srOrderShares_', '_srPureCalc_', '_srAdjTypes_', '_srPureDetailRows_'];
 let code = "var _SR_UNASSIGNED_='(chưa gán sale)';\n";
+code += require('fs').readFileSync(__dirname + '/../js/01-fn-splitmulti.js', 'utf8').match(/function isNumTagSale_\(x\)\{[^\n]*\}/)[0] + '\n';   // isNumTagSale_ (js/01): loai token toan so (STT Pancake) khoi ten sale
 for (const n of names) {
   const i = src.indexOf('function ' + n + '(');
   if (i < 0) throw new Error('thiếu hàm ' + n);

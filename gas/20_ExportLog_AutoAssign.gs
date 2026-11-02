@@ -342,6 +342,10 @@ function _aaPlanAll(cfg, teamsArr, membersOf, custs, everSet, opts){
     var _pool = (cfg.dateFrom || cfg.dateTo) ? custs.filter(function (c) { return _aaDateOk_(cfg, c); }) : custs;
     out.diag.afterDate = _pool.length;
     out.diag.unassigned = cfg.onlyUnassigned ? _pool.filter(function (c) { return !(everSet && everSet.has(c.phone)); }).length : _pool.length;
+    // So KH POS/Base CHUA chia lan nao NẾU BO khoang ngay + so KH khong co ngay don nao (bi loai khi dat khoang ngay): giup chon cach sua cau hinh.
+    var _isPos = function (c) { var d = c.dataSrc || {}; return !!(d.dt || d.don || d.cs); };
+    out.diag.unassignedAnyDate = custs.filter(function (c) { return _isPos(c) && !(everSet && everSet.has(c.phone)); }).length;
+    out.diag.noDate = custs.filter(function (c) { return _isPos(c) && !(c.ds && c.ds.length); }).length;
     var p = _aaPlan(cfg, teamsArr, membersOf, _pool, everSet, taken);
     p.entries.forEach(function(e){ e.src = 'pos'; }); p.short.forEach(function(x){ x.src = 'pos'; });
     out.entries = out.entries.concat(p.entries); out.short = out.short.concat(p.short); out.warn = out.warn.concat(p.warn);
@@ -511,8 +515,10 @@ function _aaWhyEmpty_(d, cfg) {
   d = d || {};
   var a = 'KH: tong ' + (d.total || 0) + ' -> SDT hop le ' + (d.validPhone || 0) + (cfg && (cfg.dateFrom || cfg.dateTo) ? ' -> trong khoang ngay don ' + (d.afterDate || 0) : '') + (cfg && cfg.onlyUnassigned ? ' -> chua chia lan nao ' + (d.unassigned || 0) : '') + '. ';
   if (!d.validPhone) return 'Khong chia duoc ca nao: khong co KH nao co SDT di dong hop le (kiem tra du lieu DT TONG / Du lieu don). ' + a;
-  if (cfg && (cfg.dateFrom || cfg.dateTo) && !d.afterDate) return 'Khong chia duoc ca nao: khong KH nao co ngay don trong khoang ' + (cfg.dateFrom || '...') + ' den ' + (cfg.dateTo || '...') + ' (ngay don lay tu DT TONG; KH khong co ngay don bi loai). Mo rong khoang ngay hoac bam Bo. ' + a;
-  if (cfg && cfg.onlyUnassigned && !d.unassigned) return 'Khong chia duoc ca nao: tat ca KH trong khoang da tung duoc chia truoc do (dang tich "Chi lay KH chua chia lan nao"). Bo tich neu muon chia lai. ' + a;
+  var hasDate = !!(cfg && (cfg.dateFrom || cfg.dateTo)), any = d.unassignedAnyDate;
+  var goiY = (hasDate && any > 0) ? ' GOI Y: neu BO khoang ngay (nut Bo) hoac mo rong den hom nay thi con ' + any + ' KH POS/Base chua chia lan nao' + (d.noDate ? ' (trong do ' + d.noDate + ' KH khong co ngay don nen luon bi loai khi dat khoang ngay)' : '') + '.' : '';
+  if (hasDate && !d.afterDate) return 'Khong chia duoc ca nao: khong KH nao co ngay don trong khoang ' + (cfg.dateFrom || '...') + ' den ' + (cfg.dateTo || '...') + ' (ngay don lay tu DT TONG; KH khong co ngay don bi loai). Mo rong khoang ngay hoac bam Bo.' + goiY + ' ' + a;
+  if (cfg && cfg.onlyUnassigned && !d.unassigned) return 'Khong chia duoc ca nao: tat ca KH trong khoang da tung duoc chia truoc do (dang tich "Chi lay KH chua chia lan nao"). Bo tich neu muon chia lai.' + goiY + ' ' + a;
   return 'Khong chia duoc ca nao: con KH nhung khong co nguoi nhan hoac han muc = 0 (kiem tra da tich Team/thanh vien va "So KH/ngay" > 0, va thanh vien co trong Team). ' + a;
 }
 function autoAssignTick_() { return autoAssignRun_(false); }

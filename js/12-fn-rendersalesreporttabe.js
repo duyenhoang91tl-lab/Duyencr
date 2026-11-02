@@ -107,7 +107,7 @@ function _bonusProductQty_(sanPham, keywordsStr){
 // không còn là điều kiện (quy tắc "chỉ người tạo" 07/10 đã thay thế).
 function _bonusNamesOfOrder_(o){
   var set = {};
-  splitMulti_(o.saleBan, ',').forEach(function(n){ if (n) set[n] = true; });
+  splitMulti_(o.saleBan, ',').forEach(function(n){ if (n && !isNumTagSale_(n)) set[n] = true; });
   return set;
 }
 // Doanh thu CHIA cho từng sale của 1 đơn — cùng quy ước với _computeCommissionData_ (saleShares nếu đơn ghép Base,
@@ -117,7 +117,7 @@ function _orderRevenueShares_(o){
   if (o.saleShares && o.saleShares.length){
     o.saleShares.forEach(function(x){ if (x.name) out.push({name:x.name, share:giaTri*(Number(x.frac)||0)*ratio}); });
   } else {
-    var list = splitMulti_(o.saleBan, ',').filter(Boolean);
+    var list = splitMulti_(o.saleBan, ',').filter(function(x){ return x && !isNumTagSale_(x); });
     list.forEach(function(n){ out.push({name:n, share:giaTri/list.length*ratio}); });
   }
   return out;

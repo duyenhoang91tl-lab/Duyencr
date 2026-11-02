@@ -34,7 +34,7 @@ function _c2Rows(){
   var r = hmCompute(), rows = [];
   var cs = function(p){ var c = (typeof customerMap !== 'undefined' && customerMap) ? customerMap[p] : null, k = (typeof careData !== 'undefined' && careData) ? careData[p] : null; return String((k && k.cs) || (c && c.cs) || ''); };
   var noPromo = function(p){ var k = (typeof careData !== 'undefined' && careData) ? careData[p] : null; return !!(k && k.custom && k.custom.noPromo); };
-  r.overdue.concat(r.today).forEach(function(x){ rows.push(x.order ? { type:'order', phone:x.phone, name:x.name, oid:x.oid, detail:x.sub, cs:x.cs, follow:x.follow, sort:0 } : { type:'call', phone:x.phone, name:x.name, detail:x.sub, cs:cs(x.phone), sort:0 }); });
+  r.overdue.concat(r.today).forEach(function(x){ rows.push(x.order ? { type:'order', phone:x.phone, orderId:x.orderId || x.oid, name:x.name, oid:x.oid, detail:x.sub, cs:x.cs, follow:x.follow, sort:0 } : { type: (x.kind === 'order' || !x.phone) ? 'order' : 'call', phone:x.phone, orderId:x.orderId || '', name:x.name, detail:x.sub, cs:cs(x.phone), sort:0 }); });
   r.rebuy.forEach(function(x){ if (!noPromo(x.phone)) rows.push({ type:'rebuy', phone:x.phone, name:x.name, detail:x.sub, cs:cs(x.phone), sort:1 }); });
   r.idle.forEach(function(x){ if (!noPromo(x.phone)) rows.push({ type:'idle', phone:x.phone, name:x.name, detail:x.sub, cs:cs(x.phone), sort:2 }); });
   return rows;
@@ -54,8 +54,8 @@ function _c2Render(){
     '<button class="btn sm" onclick="_c2Refresh()">↻ Làm mới</button><button class="btn sm" onclick="_c2Csv()">⬇ Xuất CSV</button></div>' +
     '<div style="overflow-x:auto"><table class="dash-table"><thead><tr><th>Loại</th><th>Khách</th><th>Chi tiết</th><th>Phụ trách</th></tr></thead><tbody>' +
     list.slice(0, _c2.limit).map(function(x){
-      if (x.type === 'order') return _c2OrderRow(x);
-      return '<tr' + (x.phone ? ' data-phone="' + esc(x.phone) + '" onclick="openDp(this.dataset.phone)" style="cursor:pointer"' : '') + '><td>' + _C2_LABEL[x.type] + '</td><td><b>' + esc(x.name) + '</b>' + (x.phone ? '<div style="font-size:11px;color:var(--muted)">' + esc(x.phone) + '</div>' : '') + '</td><td>' + esc(x.detail) + '</td><td>' + esc(x.cs) + '</td></tr>'; }).join('') +
+      if (x.type === 'order' && x.oid) return _c2OrderRow(x);
+      return '<tr' + ((x.phone || x.orderId) ? ' data-phone="' + esc(x.phone || '') + '"' + (x.orderId ? ' data-order="' + esc(x.orderId) + '"' : '') + ' onclick="ttOpenCustomer_(this.dataset.phone,this.dataset.order)" style="cursor:pointer"' : '') + '><td>' + _C2_LABEL[x.type] + '</td><td><b>' + esc(x.name) + '</b>' + (x.phone ? '<div style="font-size:11px;color:var(--muted)">' + esc(x.phone) + '</div>' : '') + '</td><td>' + esc(x.detail) + '</td><td>' + esc(x.cs) + '</td></tr>'; }).join('') +
     (list.length ? '' : '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:16px">Không có mục nào 🎉</td></tr>') + '</tbody></table></div>' +
     (list.length > _c2.limit ? '<div style="text-align:center;margin-top:8px"><button class="btn sm" onclick="_c2.limit+=100;_c2Render()">Hiện thêm (' + (list.length - _c2.limit) + ' còn lại)</button></div>' : '');
 }
@@ -89,7 +89,7 @@ function stuckFollowBadge_(f, block){
 function stuckRow_(o){
   var c = (typeof customerMap !== 'undefined' && customerMap && o.phone) ? customerMap[o.phone] : null;
   var sub = ((c && c.name) ? c.name + ' · ' : '') + o.stage + ' · kẹt ' + o.hours + ' giờ' + (o.sanPham ? ' · ' + o.sanPham : '') + (o.value ? ' · ' + _stMoney(o.value) : '');
-  return { phone: o.phone || '', order: true, oid: String(o.id), name: 'Đơn ' + (o.maBoDem || o.id), sub: sub, cs: o.sale || '', follow: o.follow || null };
+  return { phone: o.phone || '', order: true, kind: 'order', orderId: String(o.id), oid: String(o.id), name: 'Đơn ' + (o.maBoDem || o.id), sub: sub, cs: o.sale || '', follow: o.follow || null };
 }
 function _c2OrderRow(x){
   var c = (typeof customerMap !== 'undefined' && customerMap && x.phone) ? customerMap[x.phone] : null;
@@ -124,7 +124,7 @@ function _stuckRender(){
   var c = (typeof customerMap !== 'undefined' && customerMap && it.phone) ? customerMap[it.phone] : null, k = (typeof careData !== 'undefined' && careData && it.phone) ? careData[it.phone] : null;
   var row = function(l, v){ return v ? '<div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);font-size:13px"><div style="width:118px;color:var(--muted);flex:none">' + l + '</div><div style="flex:1;word-break:break-word">' + v + '</div></div>' : ''; };
   var sec = function(t){ return '<div style="font-weight:700;margin:12px 0 4px">' + t + '</div>'; };
-  var hasProfile = !!(c && typeof openDp === 'function');
+  var openFn = (typeof ttOpenCustomer_ === 'function') ? 'ttOpenCustomer_' : (c && typeof openDp === 'function' ? 'openDp' : ''), hasProfile = !!openFn;   // ttOpenCustomer_ (js/34) tra ca don chua co SDT / khach chua co trong danh sach
   var cust = row('Tên khách', (c && c.name) ? '<b>' + esc(c.name) + '</b>' : '<i style="color:var(--muted)">Chưa có trong danh sách khách</i>') +
     row('SĐT', it.phone ? '<b>' + esc(it.phone) + '</b> <button class="btn sm" onclick="stuckCopy(\'' + esc(it.phone) + '\')">📋 Copy</button>' : '<i style="color:var(--red)">Đơn chưa có SĐT khách — kiểm tra cột SĐT trong DT TỔNG</i>') +
     row('CS chăm khách', esc((k && k.cs) || (c && c.cs) || ''));
@@ -140,7 +140,7 @@ function _stuckRender(){
   else follow += '<div style="font-size:12px;color:var(--muted)">Chỉ CS phụ trách đơn này (' + esc(it.sale || '—') + ') hoặc quản trị mới tích được.</div>';
   ov.innerHTML = '<div style="background:var(--surface,#fff);border-radius:12px;max-width:560px;width:100%;max-height:92vh;overflow:auto;padding:16px 18px;box-shadow:0 12px 40px rgba(0,0,0,.3)">' +
     '<div style="display:flex;align-items:center;gap:8px"><div style="font-size:16px;font-weight:700;flex:1">📦 Đơn kẹt ' + esc(it.maBoDem || it.id) + '</div><button class="btn sm" onclick="stuckClose()">✕</button></div>' +
-    sec('👤 Khách hàng') + cust + (hasProfile ? '<div style="margin-top:6px"><button class="btn sm primary" onclick="stuckClose();openDp(\'' + esc(it.phone) + '\')">👤 Mở hồ sơ khách</button></div>' : '') +
+    sec('👤 Khách hàng') + cust + (hasProfile ? '<div style="margin-top:6px"><button class="btn sm primary" onclick="stuckClose();' + (openFn === 'ttOpenCustomer_' ? 'ttOpenCustomer_(\'' + esc(it.phone || '') + '\',\'' + esc(it.id) + '\')' : 'openDp(\'' + esc(it.phone) + '\')') + '">👤 Mở hồ sơ khách</button></div>' : '') +
     sec('📦 Đơn hàng') + order + sec('👁 Theo dõi xử lý') + follow +
     (_stuck.msg ? '<div style="margin-top:8px;color:var(--red);font-size:12.5px">' + esc(_stuck.msg) + '</div>' : '') + '</div>';
 }

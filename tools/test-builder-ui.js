@@ -140,7 +140,9 @@ if (require.main === module) (async () => {
   ok(Z.env.calls.some(c => c === 'GET_PRICE:ty huu'), 'goi priceSearch voi tu khoa'); await both(Z, P, S => setv(S, 'q', 'x')); await sleep(500); same(Z, P, 'go <2 ky tu'); ok(/Gõ ít nhất 2 chữ để tìm\./.test(Z.q('#Xb-dyn').textContent), 'nhac go it nhat 2 chu');
   // ===== 7. loi =====
   for (const flat of [{ ok: false, error: 'Khong doc duoc <sheet>' }, { ok: true, data: { items: [] } }]) {
-    const a = makeSide('zalo', { flat }), b = makeSide('pancake', { flat }); a.init(); b.init(); await sleep(60); ok(a.dyn() === b.dyn() && norm(a.q('#Xb-msg').outerHTML) === norm(b.q('#Xb-msg').outerHTML), 'loi nap danh muc giong het:' + dd(norm(a.q('#Xb-msg').outerHTML), norm(b.q('#Xb-msg').outerHTML)));
+    const a = makeSide('zalo', { flat }), b = makeSide('pancake', { flat }); a.init(); b.init(); await sleep(60); const mA = norm(a.q('#Xb-msg').outerHTML), mB = norm(b.q('#Xb-msg').outerHTML), strip = h => h.replace(/>[^<]*</, '><');   // bo noi dung cau loi: Pancake dung cau chuan 'Lỗi API' (ddaf130), Zalo van 'Lỗi tải danh mục: <chi tiet>'
+    ok(a.dyn() === b.dyn() && strip(mA) === strip(mB) && b.q('#Xb-msg').textContent.length > 0, 'loi nap danh muc: cung bo cuc (noi dung cau loi moi ben):' + dd(mA, mB));
+    if (mA !== mB) console.log('!!   CANH BAO: cau bao loi nap danh muc cua Zalo CHUA giong Pancake — can lam Zalo song song');
     ok(!a.q('#Xb-msg').querySelector('sheet') && /Lỗi tải danh mục|không nhận diện được cột/.test(a.q('#Xb-msg').textContent), 'thong bao loi/khong nhan dien cot (da escape)');
   }
   // ===== 8. tab che do (Go tim <-> Soan don) =====

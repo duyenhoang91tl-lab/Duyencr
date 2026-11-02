@@ -33,6 +33,15 @@
   <button id="save">Lưu cài đặt</button>
   <span id="saved"></span>
 
+  <h2>⌨️ Viết tắt (gõ tắt trong ô chat)</h2>
+  <div class="hint">
+    Gõ <b>viết tắt</b> (hoặc từ khoá) trong ô chat → hiện gợi ý → <b>Tab</b> để chèn, <b>↑ ↓</b> đổi lựa chọn, <b>Alt+1…8</b> chọn nhanh, <b>Esc</b> đóng. Chỉ <b>chèn chữ</b>, không tự gửi.
+    Nội dung có <code>{tên}</code>: gõ thêm tên sau viết tắt (vd <code>ch Huyền</code>) hoặc để tự lấy từ ô "Tên khách" của panel.
+    Thêm / sửa / xoá viết tắt ở <b>CRM → tab Zalo AI → ⌨️ Viết tắt</b> (dùng chung với Pancake AI). Tự cập nhật mỗi 5 phút.
+  </div>
+  <label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="vtOn" /> Bật gõ tắt trên Zalo Web</label>
+  <button id="vtSync" type="button" style="margin-top:8px">🔄 Cập nhật viết tắt ngay</button> <span id="vtStatus" style="font-size:13px"></span>
+
   <h2>Các cài đặt khác</h2>
   <div class="hint">
     API key (Groq / Cerebras / Gemini), tên CS đang trực, tự động trả lời AI theo từng khách…
