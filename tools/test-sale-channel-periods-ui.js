@@ -51,4 +51,13 @@ run('_scpToggle("Chi")'); run('_scpDraft.push({from:"2026-10-11", channel:"onlin
 ok(run('_saleChannelOn_("Chi","2026-10-10")') === 'offline' && run('_saleChannelOn_("Chi","2026-10-11")') === 'online' && /Từ đầu → 10\/10\/2026/.test(run('_scpCellHtml_("Chi")')), 'không ngày + có ngày');
 // không phải admin
 ctx.currentUser.role = 'cs'; run('_scpToggle("Chi")'); run('_scpSaveDraft()'); ok(toasts.some(m => /Chỉ Admin/.test(m)), 'chỉ admin lưu');
+// _setSaleChannel (js/12): đặt đội cho 1 dòng = ghi cho MỌI tên cùng 1 người
+{
+  const src12 = j12.slice(j12.indexOf('function _setSaleChannel('), j12.indexOf('\n}\n', j12.indexOf('function _setSaleChannel(')) + 3);
+  const c2 = { SALE_CHANNELS: { Bi: 'offline', bi: '' }, _scpGroupNames_: () => ['Bi', 'bi'], saveSaleChannels: () => {}, _renderSaleChannelsModal: () => { c2.rendered = 1; } };
+  vm.createContext(c2); vm.runInContext(src12 + '\n_setSaleChannel("Bi","online");', c2);
+  ok(c2.SALE_CHANNELS.Bi === 'online' && c2.SALE_CHANNELS.bi === 'online' && c2.rendered === 1, '_setSaleChannel ghi cả 2 tên');
+  vm.runInContext('_setSaleChannel("Bi","");', c2);
+  ok(!('Bi' in c2.SALE_CHANNELS) && !('bi' in c2.SALE_CHANNELS), '_setSaleChannel xoá cả 2 tên');
+}
 console.log(fails ? fails + ' FAIL' : 'ALL PASS'); process.exit(fails ? 1 : 0);

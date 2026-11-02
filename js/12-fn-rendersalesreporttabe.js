@@ -1012,12 +1012,15 @@ function _renderSaleChannelsModal(){
   // ── Bang phan loai tung Sale, dropdown dong theo SALE_GROUPS ──
   var names = (typeof _allCSNames === 'function' ? _allCSNames() : []).slice().sort(function(a,b){ return a.localeCompare(b,'vi'); });
   var q = (_scSearch||'').toLowerCase();
-  var filtered = names.filter(function(n){ return !q || n.toLowerCase().indexOf(q)!==-1; });
+  // GOM THEO NGƯỜI (cùng khớp Sale với báo cáo): biichnguyen1993 / Biichnguyen1993 hoặc nhiều tên của 1 tài khoản CS = 1 dòng, cài 1 lần áp dụng mọi tên
+  var groups = (typeof _groupNamesByPerson === 'function') ? _groupNamesByPerson(names) : names.map(function(n){ return { names: [n], primary: n }; });
+  var filtered = groups.filter(function(g){ return !q || g.names.some(function(n){ return n.toLowerCase().indexOf(q)!==-1; }); });
   html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên..." value="'+esc(_scSearch||'')+'" oninput="_scSearch=this.value;_renderSaleChannelsModal()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:240px;margin-bottom:10px">';
   html += '<table class="dash-table"><thead><tr><th>Tên</th><th style="width:220px">Đội hiện tại</th><th style="min-width:200px">🗓 Mốc theo ngày</th></tr></thead><tbody>';
-  filtered.forEach(function(name){
-    var cur = _saleChannelOf_(name);
-    html += '<tr><td>'+esc(name)+'</td><td>'+
+  filtered.forEach(function(grp){
+    var name = grp.primary;
+    var cur = ''; grp.names.some(function(n){ cur = _saleChannelOf_(n) || ''; return cur; });   // tên nào trong nhóm đã phân loại thì lấy
+    html += '<tr><td>'+esc(grp.names.join(' / '))+(grp.names.length > 1 ? ' <span style="font-size:10px;color:var(--muted)">('+grp.names.length+' tên = 1 người)</span>' : '')+'</td><td>'+
       '<select onchange="_setSaleChannel(\''+esc(name).replace(/'/g,"\\'")+'\',this.value)" style="width:200px">'+
       '<option value=""'+(cur===''?' selected':'')+'>— Chưa phân loại —</option>'+
       SALE_GROUPS.map(function(g){ return '<option value="'+esc(g.key)+'"'+(cur===g.key?' selected':'')+'>'+esc(g.label)+'</option>'; }).join('')+
@@ -1035,8 +1038,11 @@ function _scSaveGroups(){
   _renderSaleChannelsModal();
 }
 function _setSaleChannel(name, val){
-  if (val) SALE_CHANNELS[name] = val; else delete SALE_CHANNELS[name];
+  // Ghi cho MỌI tên cùng 1 người (hoa/thường, bí danh tài khoản) để báo cáo tra tên nào cũng ra
+  var ns = (typeof _scpGroupNames_ === 'function') ? _scpGroupNames_(name) : [name];
+  ns.forEach(function(n){ if (val) SALE_CHANNELS[n] = val; else delete SALE_CHANNELS[n]; });
   saveSaleChannels();
+  if (ns.length > 1) _renderSaleChannelsModal();
 }
 
 function openChannelRatesModal(){

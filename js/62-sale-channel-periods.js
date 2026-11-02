@@ -47,10 +47,27 @@ function _scpEndOf_(list, i){
   return d.getUTCFullYear() + '-' + ('0'+(d.getUTCMonth()+1)).slice(-2) + '-' + ('0'+d.getUTCDate()).slice(-2);
 }
 // Ghi danh sách mốc của 1 Sale (xoá các khoá bí danh khác của cùng người để không có 2 danh sách mâu thuẫn).
-function _scpSet_(name, arr){
+function _scpSet_(name, arr, names){
   var clean = _scpNorm_(arr);
-  ((typeof _cfgAliasesOf === 'function') ? _cfgAliasesOf(name) : [name]).forEach(function(n){ if (n !== name) delete SALE_CHANNEL_PERIODS[n]; });
-  if (clean.length) SALE_CHANNEL_PERIODS[name] = clean; else delete SALE_CHANNEL_PERIODS[name];
+  var targets = (names && names.length) ? names : [name];   // names = mọi tên cùng 1 người (modal gom theo người) → lưu dưới TẤT CẢ để báo cáo tra tên nào cũng ra
+  ((typeof _cfgAliasesOf === 'function') ? _cfgAliasesOf(name) : [name]).forEach(function(n){ if (targets.indexOf(n) === -1) delete SALE_CHANNEL_PERIODS[n]; });
+  targets.forEach(function(n){
+    if (clean.length) SALE_CHANNEL_PERIODS[n] = clean.map(function(e){ return { from: e.from, channel: e.channel }; }); else delete SALE_CHANNEL_PERIODS[n];
+  });
+}
+// Mọi tên cùng 1 người với `name` (cùng cách gom của modal: hoa/thường + bí danh tài khoản). Không gom được → chỉ [name].
+function _scpGroupNames_(name){
+  try {
+    var gs = _groupNamesByPerson(_allCSNames()), k = String(name == null ? '' : name).toLowerCase();
+    for (var i = 0; i < gs.length; i++) if (gs[i].names.some(function(x){ return String(x).toLowerCase() === k; })) return gs[i].names;
+  } catch(e) {}
+  return [name];
+}
+// Danh sách mốc của người (lấy từ tên đầu tiên trong nhóm có mốc).
+function _scpGroupListOf_(name){
+  var ns = _scpGroupNames_(name);
+  for (var i = 0; i < ns.length; i++){ var l = _scpListOf_(ns[i]); if (l.length) return l; }
+  return [];
 }
 
 async function _syncSaleChannelPeriodsFromGAS(){
@@ -102,7 +119,7 @@ function _scpSetStage(i, stage){
   _renderSaleChannelsModal();
 }
 function _scpCellHtml_(name){
-  var list = _scpListOf_(name);
+  var list = _scpGroupListOf_(name);
   var sum = list.map(function(e, i){
     var end = _scpEndOf_(list, i);
     return '<div style="font-size:11px;color:var(--muted)">' + (e.from ? esc(_scpFmtDate_(e.from)) : 'Từ đầu') + (end ? ' → ' + esc(_scpFmtDate_(end)) : ' →') + ': <b>' + esc(_scpChanLabel_(e.channel)) + '</b></div>';
@@ -111,7 +128,7 @@ function _scpCellHtml_(name){
 }
 function _scpToggle(name){
   if (_scpOpenName === name){ _scpOpenName = ''; _scpDraft = null; }
-  else { _scpOpenName = name; _scpDraft = _scpListOf_(name).map(function(e){ return { from: e.from, channel: e.channel }; }); if (!_scpDraft.length) _scpDraft.push({ from: '', channel: '' }); }
+  else { _scpOpenName = name; _scpDraft = _scpGroupListOf_(name).map(function(e){ return { from: e.from, channel: e.channel }; }); if (!_scpDraft.length) _scpDraft.push({ from: '', channel: '' }); }
   _renderSaleChannelsModal();
 }
 function _scpEditorRowHtml_(name, colspan){
@@ -141,7 +158,7 @@ function _scpSaveDraft(){
   var rows = _scpDraft.filter(function(e){ return e.from || e.channel; });   // bỏ dòng trống hoàn toàn
   var seen = {};
   for (var i = 0; i < rows.length; i++){ var f = rows[i].from; if (seen[f] === 1){ toast(f ? 'Có 2 mốc trùng ngày ' + _scpFmtDate_(f) + ' — mỗi ngày chỉ 1 mốc.' : 'Chỉ được 1 mốc không chọn ngày (từ trước đến nay).'); return; } seen[f] = 1; }
-  _scpSet_(_scpOpenName, rows);
+  _scpSet_(_scpOpenName, rows, _scpGroupNames_(_scpOpenName));
   _scpOpenName = ''; _scpDraft = null;
   saveSaleChannelPeriods();
   _renderSaleChannelsModal();

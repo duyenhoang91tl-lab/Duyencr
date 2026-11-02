@@ -10,6 +10,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+
+## 2026-11-02 (tối 5) — Modal Phân loại đội Sale: GOM THEO NGƯỜI (1 người cài 1 lần) (Duyên yêu cầu) — XONG 1/1
+- **Vấn đề:** biichnguyen1993 / Biichnguyen1993, dungnguyen1995 / Dungnguyen1995 là cùng 1 người nhưng hiện 2 dòng → phải cài 4 lần (ảnh Duyên gửi).
+- **NGUYÊN NHÂN GỐC:** `_renderSaleChannelsModal` lặp thẳng `_allCSNames()` (mỗi tên 1 dòng), không dùng cách "khớp Sale" `_groupNamesByPerson` (gom hoa/thường + bí danh tài khoản CS) mà báo cáo đã dùng; `_setSaleChannel`/`_scpSet_` chỉ ghi 1 tên.
+- [x] **ĐÃ PUSH:** js/12 modal gom theo người (1 dòng, hiện "A / a (2 tên = 1 người)", tìm theo bất kỳ tên nào); `_setSaleChannel` ghi cho MỌI tên cùng người; js/62 `_scpGroupNames_`, `_scpGroupListOf_`, `_scpSet_(name, arr, names)` lưu mốc dưới TẤT CẢ tên của người (báo cáo tra tên nào cũng ra). Dữ liệu đã cài riêng từng tên trước đó vẫn đọc được (lấy tên đầu có giá trị); bấm lưu lại 1 lần sẽ đồng bộ cả nhóm. Test: `test-sale-channel-periods.js` + `-ui.js` thêm ca gom người. Bump js/12 `?v=20261102e`, js/62 `?v=20261102e`. Không đổi gas_v13.js (không cần deploy GAS).
+- **ĐANG LÀM: không có việc dở.** Lưu ý: nếu 2 tên đã cài KHÁC nhau từ trước, dòng gộp hiện giá trị của tên đầu có phân loại — Duyên chọn lại 1 lần để đồng bộ. Phần gom dùng dữ liệu `_allCSNames()`/tài khoản đã tải — Duyên làm: Ctrl+F5 → mở lại modal.
+
 ## 2026-11-02 (tối 4) — Mốc theo ngày: NGÀY LÀ TUỲ CHỌN (Duyên yêu cầu) — XONG 1/1
 - **Yêu cầu:** nhiều Sale vốn đã chính thức, không muốn mất công chọn ngày; chọn ngày là tuỳ chọn.
 - **NGUYÊN NHÂN GỐC:** bước 4 bắt buộc mỗi mốc có ngày (`_scpNorm_` bỏ mốc không ngày, `_scpSaveDraft` báo "cần chọn ngày").
