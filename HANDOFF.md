@@ -11,6 +11,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-03 (phiên 3) — Duyên chốt: M46228 sale 30% = 525.000đ; bảng final = TỔNG THƯỞNG (không lương); chỉ gửi 1 file — XONG 1/1
+- **Duyên xác nhận:** (1) đơn M46228 sale hưởng 30% = 525.000đ là ĐÚNG; (2) bảng final chỉ là tổng thưởng, KHÔNG gồm lương; (3) điều kiện nhẫn của CT Tourmaline cao cấp Duyên TỰ thêm trong CRM (cài đặt chương trình, không có commit mới trong repo → code không cần sửa); (4) chỉ gửi 1 file Excel final.
+- **NGUYÊN NHÂN GỐC chỗ lệch cũ:** cột "CRM qua file CH" của hàng Ninhltk1984 ở sheet 4b ước tính nhầm 70% (=1750000*70% = 1.225.000đ) trong khi quy tắc đúng là sale 30% → sửa về =1750000*30% = 525.000đ, lệch 0 (mục phiên 2 ghi lệch −700.000đ nay HUỶ). 4b: KT 61.440.300 / CRM 59.385.300 / lệch 2.055.000đ (còn M44707 ninhnga99 −645.000đ và M47179 2 sale +1.350.000đ/người).
+- [x] **File final đã gửi (không commit):** `DOI_SOAT_FINAL_T10_CO_THUONG_FINAL.xlsx` — gồm sheet THUONG_Tong_theo_sale (tổng thưởng 4.401.673đ), THUONG_Chi_tiet, pivot "total thưởng sale" của KT; recalc 0 lỗi (8.798 CT), filter đã sửa. `build_payroll.py` vẫn trong repo nhưng Duyên không cần file riêng.
+- **ĐANG LÀM: không có việc dở.** Không đổi gas_v13.js/js/css → không cần deploy GAS, không cần reload extension.
+- **Việc kế tiếp (nếu Duyên cần):** đối chiếu Báo cáo G trên CRM với 4.401.673đ sau khi cài điều kiện nhẫn; M44707 (ninhnga99) KT ghi 690.000đ thay vì 1.335.000đ — chờ KT sửa.
+
 ## 2026-11-03 (phiên 2) — File đối soát T10 bản KT đã đối soát: khớp CRM + bảng thưởng final từng sale — XONG 2/2 (file Excel đã gửi, không commit)
 - **Yêu cầu Duyên:** file `DOI_SOAT_FINAL_T10_CO_THUONG_1.xlsx` (đã lấy dữ liệu mới nhất, đối soát KT) → khớp CRM, gửi bảng thưởng final từng sale + file đối soát chuẩn.
 - **ĐÃ KIỂM (chạy lại extract_orders + calc_bonus):** 1.452 đơn, 0 đơn đổi so với bản trước; tổng DT 8.174.116.800đ khớp cột CRM; thưởng tính lại **4.401.673đ = đúng bảng "total thưởng sale" (pivot) của KT**, từng sale khớp.
