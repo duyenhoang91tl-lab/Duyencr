@@ -671,12 +671,23 @@ function _srGProbationHints_(g, orders){
     var key = Object.keys(al).sort().join('|');
     if (seen[key]) return; seen[key] = 1;
     if (Object.keys(al).some(function(x){ return shown[x]; })) return;   // đã có dòng ở mục Thử việc
-    var cnt = (orders || []).filter(function(o){ return Object.keys(_bonusNamesOfOrder_(o)).some(function(x){ return al[String(x).toLowerCase()]; }); }).length;
+    var mine = (orders || []).filter(function(o){ return Object.keys(_bonusNamesOfOrder_(o)).some(function(x){ return al[String(x).toLowerCase()]; }); });
+    var cnt = mine.length;
     var sd = ''; for (var i = 0; i < grp.length && !sd; i++) sd = _saleStartDate_(grp[i]);
+    var rf = (typeof _srState !== 'undefined' && _srState.gDateFrom) || '', rt = (typeof _srState !== 'undefined' && _srState.gDateTo) || '';
+    var rng = (rf || rt) ? ' ('+esc(rf)+' → '+esc(rt)+')' : '';
+    // Thưởng tính theo ĐƠN GỐC, NGÀY LÊN ĐƠN TRÊN BASE (baseNgayTao), và đơn phải CÓ trên Pos (Duyên 02/11/2026).
+    var ymdOf = function(o){ return o.baseNgayTao || _ddmmyyyyToYmd_(o.ngayTao || o.ngayTaoDon); };
     var reason;
     if (!sd) reason = 'chưa đặt <b>Ngày bắt đầu tính thưởng</b> → các chương trình theo ngày thử việc không áp dụng (🏷️ Phân loại đội Sale → Sửa mốc → ô "Bắt đầu tính thưởng", rồi Lưu mốc)';
-    else if (!cnt) reason = 'Ngày bắt đầu '+esc(sd)+' nhưng <b>không thấy đơn Pos nào mang tên Sale này</b> trong khoảng lọc — kiểm tra tên trên đơn có khớp tên/bí danh tài khoản không';
-    else reason = 'Ngày bắt đầu '+esc(sd)+', có '+cnt+' đơn Pos nhưng chưa phát sinh thưởng — kiểm tra ngày đơn so với Ngày bắt đầu, khoảng ngày và đối tượng của chương trình thưởng thử việc';
+    else if (rt && rt < sd) reason = 'kỳ đang xem'+rng+' kết thúc <b>trước Ngày bắt đầu '+esc(sd)+'</b> — chọn kỳ có ngày từ '+esc(sd)+' trở đi (vd Tháng trước)';
+    else if (!cnt) reason = 'Ngày bắt đầu '+esc(sd)+' nhưng <b>không thấy đơn Pos nào mang tên Sale này</b> trong kỳ'+rng+' — kiểm tra tên trên đơn có khớp tên/bí danh tài khoản không, và bộ lọc Sale đang chọn có gồm Sale này không';
+    else {
+      var nBase = mine.filter(function(o){ return !!o.baseNgayTao; }).length, nGoc = mine.filter(function(o){ return !!o.donGoc; }).length;
+      var nSau = mine.filter(function(o){ var y = ymdOf(o); return y && y >= sd; }).length;
+      reason = 'Ngày bắt đầu '+esc(sd)+', có '+cnt+' đơn Pos: '+nBase+' đơn đã ghép Base (có ngày lên Base), '+nGoc+' đơn gốc, '+nSau+' đơn có ngày lên Base từ ngày bắt đầu. '+
+        'Thưởng chỉ tính đơn có ngày lên đơn trên Base từ ngày bắt đầu — nếu số này = 0 thì đơn chưa ghép được Base hoặc lên Base trước ngày bắt đầu; nếu > 0 thì kiểm tra khoảng ngày/đối tượng của chương trình thưởng thử việc';
+    }
     out.push({name: n, reason: reason});
   });
   return out;
