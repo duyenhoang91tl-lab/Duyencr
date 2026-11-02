@@ -4,6 +4,7 @@
 //  1 phân loại HIỆN TẠI (SALE_CHANNELS) nên đổi từ Thử việc sang Chính thức là MỌI đơn cũ
 //  cũng bị tính theo loại mới (báo cáo thưởng tháng cũ sai).
 //  Dữ liệu: SALE_CHANNEL_PERIODS = { "<tên sale>": [ {from:"yyyy-MM-dd", channel:"probation"|"online"|...|""} ] }
+//  `from` có thể để TRỐNG = áp dụng từ trước đến nay (Sale vốn đã chính thức, không cần chọn ngày).
 //  Mỗi mốc có hiệu lực từ ngày `from` cho tới ngày liền trước mốc kế tiếp (mốc cuối: không hết hạn).
 //  Ngày TRƯỚC mốc đầu tiên, hoặc Sale chưa có mốc nào → dùng phân loại hiện tại SALE_CHANNELS (giữ nguyên hành vi cũ).
 //  Lưu: localStorage `ome_sale_channel_periods` + sheet Settings key `saleChannelPeriods`
@@ -17,7 +18,8 @@ let SALE_CHANNEL_PERIODS = (function(){
 function _scpNorm_(arr){
   var byFrom = {};
   (Array.isArray(arr) ? arr : []).forEach(function(e){
-    if (!e || !/^\d{4}-\d{2}-\d{2}$/.test(String(e.from || ''))) return;
+    if (!e || !/^(\d{4}-\d{2}-\d{2})?$/.test(String(e.from || ''))) return;   // from rỗng = "từ trước đến nay" (không cần chọn ngày)
+    e = { from: String(e.from || ''), channel: e.channel };
     byFrom[e.from] = { from: e.from, channel: String(e.channel == null ? '' : e.channel) };
   });
   return Object.keys(byFrom).sort().map(function(k){ return byFrom[k]; });
@@ -103,7 +105,7 @@ function _scpCellHtml_(name){
   var list = _scpListOf_(name);
   var sum = list.map(function(e, i){
     var end = _scpEndOf_(list, i);
-    return '<div style="font-size:11px;color:var(--muted)">' + esc(_scpFmtDate_(e.from)) + (end ? ' → ' + esc(_scpFmtDate_(end)) : ' →') + ': <b>' + esc(_scpChanLabel_(e.channel)) + '</b></div>';
+    return '<div style="font-size:11px;color:var(--muted)">' + (e.from ? esc(_scpFmtDate_(e.from)) : 'Từ đầu') + (end ? ' → ' + esc(_scpFmtDate_(end)) : ' →') + ': <b>' + esc(_scpChanLabel_(e.channel)) + '</b></div>';
   }).join('');
   return '<button class="btn xs" data-name="' + esc(name) + '" onclick="_scpToggle(this.dataset.name)">🗓 ' + (list.length ? 'Sửa mốc (' + list.length + ')' : 'Thêm mốc') + '</button>' + sum;
 }
@@ -117,17 +119,17 @@ function _scpEditorRowHtml_(name, colspan){
   var gs = (typeof SALE_GROUPS !== 'undefined' && SALE_GROUPS) || [];
   var h = '<tr><td colspan="' + colspan + '" style="background:var(--surface2);padding:10px 14px">' +
     '<div style="font-size:12px;margin-bottom:8px"><b>Mốc phân loại theo ngày — ' + esc(name) + '</b><br><span style="color:var(--muted)">Mỗi mốc có hiệu lực <b>từ ngày chọn</b> đến hết ngày liền trước mốc kế tiếp. Ví dụ: <i>10/09 Thử việc</i> + <i>11/10 Online</i> → thử việc 10/09→10/10, chính thức từ 11/10. ' +
-    'Ngày trước mốc đầu tiên dùng cột "Đội hiện tại". Chương trình thưởng (Báo cáo E, G) tự áp dụng theo loại của Sale <b>tại đúng ngày tạo đơn</b>.</span></div>';
+    '<b>Ngày là tuỳ chọn</b>: Sale vốn đã chính thức thì chỉ cần chọn Chính thức + đội và để trống ngày (hoặc không thêm mốc, chỉ cần cột "Đội hiện tại"). Ngày trước mốc đầu tiên có ngày dùng cột "Đội hiện tại". Chương trình thưởng (Báo cáo E, G) tự áp dụng theo loại của Sale <b>tại đúng ngày tạo đơn</b>.</span></div>';
   _scpDraft.forEach(function(e, i){
     var nxt = ''; _scpDraft.forEach(function(x){ if (/^\d{4}-\d{2}-\d{2}$/.test(x.from || '') && x.from > (e.from || '') && (!nxt || x.from < nxt)) nxt = x.from; });
-    var end = (/^\d{4}-\d{2}-\d{2}$/.test(e.from || '') && nxt) ? _scpEndOf_([{ from: e.from }, { from: nxt }], 0) : '';
+    var end = nxt ? _scpEndOf_([{ from: e.from || '' }, { from: nxt }], 0) : '';
     h += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">' +
       '<span style="font-size:12px">Từ ngày</span><input type="date" value="' + esc(e.from || '') + '" onchange="_scpDraft[' + i + '].from=this.value;_renderSaleChannelsModal()" style="padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">' +
       '<select onchange="_scpSetStage(' + i + ',this.value)" style="width:150px"><option value=""' + (!e.channel ? ' selected' : '') + '>— Chưa phân loại —</option>' +
       '<option value="tv"' + (e.channel === 'probation' ? ' selected' : '') + '>Thử việc</option><option value="ct"' + (e.channel && e.channel !== 'probation' ? ' selected' : '') + '>Chính thức</option></select>' +
       (e.channel && e.channel !== 'probation' ? '<select onchange="_scpDraft[' + i + '].channel=this.value;_renderSaleChannelsModal()" style="width:140px">' +
         _scpTeamGroups_().map(function(g){ return '<option value="' + esc(g.key) + '"' + (e.channel === g.key ? ' selected' : '') + '>' + esc(g.label) + '</option>'; }).join('') + '</select>' : '') +
-      '<span style="font-size:11.5px;color:var(--muted)">' + (e.from ? (end ? 'đến hết ' + esc(_scpFmtDate_(end)) : 'không giới hạn (đến khi có mốc mới)') : 'chọn ngày') + '</span>' +
+      '<span style="font-size:11.5px;color:var(--muted)">' + (e.from ? (end ? 'đến hết ' + esc(_scpFmtDate_(end)) : 'không giới hạn (đến khi có mốc mới)') : (end ? 'không chọn ngày = từ trước đến hết ' + esc(_scpFmtDate_(end)) : 'không chọn ngày = áp dụng từ trước đến nay')) + '</span>' +
       '<button class="btn xs danger" onclick="_scpDraft.splice(' + i + ',1);_renderSaleChannelsModal()" title="Xoá mốc">🗑</button></div>';
   });
   h += '<div style="display:flex;gap:8px;margin-top:8px"><button class="btn sm secondary" onclick="_scpDraft.push({from:\'\',channel:\'\'});_renderSaleChannelsModal()">+ Thêm mốc</button>' +
@@ -137,9 +139,8 @@ function _scpEditorRowHtml_(name, colspan){
 function _scpSaveDraft(){
   if (typeof currentUser !== 'undefined' && currentUser.role !== 'admin'){ toast('Chỉ Admin mới cài mốc phân loại.'); return; }
   var rows = _scpDraft.filter(function(e){ return e.from || e.channel; });   // bỏ dòng trống hoàn toàn
-  if (rows.some(function(e){ return !/^\d{4}-\d{2}-\d{2}$/.test(e.from || ''); })){ toast('Mỗi mốc cần chọn ngày bắt đầu (hoặc xoá mốc trống).'); return; }
   var seen = {};
-  for (var i = 0; i < rows.length; i++){ var f = rows[i].from; if (seen[f]){ toast('Có 2 mốc trùng ngày ' + _scpFmtDate_(f) + ' — mỗi ngày chỉ 1 mốc.'); return; } seen[f] = 1; }
+  for (var i = 0; i < rows.length; i++){ var f = rows[i].from; if (seen[f] === 1){ toast(f ? 'Có 2 mốc trùng ngày ' + _scpFmtDate_(f) + ' — mỗi ngày chỉ 1 mốc.' : 'Chỉ được 1 mốc không chọn ngày (từ trước đến nay).'); return; } seen[f] = 1; }
   _scpSet_(_scpOpenName, rows);
   _scpOpenName = ''; _scpDraft = null;
   saveSaleChannelPeriods();

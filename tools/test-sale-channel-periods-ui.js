@@ -23,8 +23,9 @@ ok(html.indexOf('đến hết 10/10/2026') !== -1, 'mốc 1 hiện "đến hết
 // lưu: ngày trùng bị chặn, thiếu ngày bị chặn
 run('_scpDraft.push({from:"2026-10-11", channel:"offline"})'); run('_scpSaveDraft()');
 ok(toasts.some(m => /trùng ngày 11\/10\/2026/.test(m)) && run('_scpOpenName') === 'Chi', 'chặn mốc trùng ngày');
-run('_scpDraft.pop(); _scpDraft.push({from:"", channel:"offline"})'); run('_scpSaveDraft()');
-ok(toasts.some(m => /cần chọn ngày/.test(m)), 'chặn mốc thiếu ngày');
+run('_scpDraft.pop(); _scpDraft.push({from:"", channel:"offline"})'); run('_scpDraft.push({from:"", channel:"online"})'); run('_scpSaveDraft()');
+ok(toasts.some(m => /1 mốc không chọn ngày/.test(m)) && run('_scpOpenName') === 'Chi', 'chặn 2 mốc cùng không chọn ngày');
+run('_scpDraft.pop()');
 run('_scpDraft.pop(); _scpDraft.push({from:"", channel:""})'); run('_scpSaveDraft()');   // dòng trống hoàn toàn → bỏ qua
 ok(run('_scpOpenName') === '' && run('_saleChannelOn_("Chi","2026-09-20")') === 'probation' && run('_saleChannelOn_("Chi","2026-10-11")') === 'online', 'lưu thành công, tra theo ngày đúng');
 ok(saved.some(s => s[0] === 'ome_sale_channel_periods' && /2026-09-10/.test(s[1])), 'ghi localStorage');
@@ -40,6 +41,14 @@ run('_scpToggle("Chi")');
 // xoá hết mốc → quay lại phân loại hiện tại
 run('_scpToggle("Chi")'); run('_scpDraft.length = 0'); run('_scpSaveDraft()');
 ok(run('_saleChannelOn_("Chi","2026-09-20")') === 'online', 'xoá hết mốc → loại hiện tại');
+// MỐC KHÔNG NGÀY: Sale vốn đã chính thức → chỉ chọn Chính thức + đội, để trống ngày, vẫn lưu được và áp dụng mọi ngày
+ctx.currentUser.role = 'admin'; run('_scpToggle("Chi")'); run('_scpDraft.length=0; _scpDraft.push({from:"", channel:"offline"})');
+ok(/không chọn ngày = áp dụng từ trước đến nay/.test(run('_scpEditorRowHtml_("Chi",3)')), 'editor ghi rõ mốc không ngày');
+run('_scpSaveDraft()');
+ok(run('_scpOpenName') === '' && run('_saleChannelOn_("Chi","2020-01-01")') === 'offline' && run('_saleChannelOn_("Chi","2030-01-01")') === 'offline' && /Từ đầu →: <b>Chính thức — Văn phòng/.test(run('_scpCellHtml_("Chi")')), 'mốc không ngày lưu được, áp dụng mọi ngày');
+// mốc không ngày + mốc có ngày: không ngày = giai đoạn đầu
+run('_scpToggle("Chi")'); run('_scpDraft.push({from:"2026-10-11", channel:"online"})'); run('_scpSaveDraft()');
+ok(run('_saleChannelOn_("Chi","2026-10-10")') === 'offline' && run('_saleChannelOn_("Chi","2026-10-11")') === 'online' && /Từ đầu → 10\/10\/2026/.test(run('_scpCellHtml_("Chi")')), 'không ngày + có ngày');
 // không phải admin
 ctx.currentUser.role = 'cs'; run('_scpToggle("Chi")'); run('_scpSaveDraft()'); ok(toasts.some(m => /Chỉ Admin/.test(m)), 'chỉ admin lưu');
 console.log(fails ? fails + ' FAIL' : 'ALL PASS'); process.exit(fails ? 1 : 0);

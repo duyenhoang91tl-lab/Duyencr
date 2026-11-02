@@ -36,4 +36,10 @@ _scpSet_('a.alias', [{ from: '2026-05-01', channel: 'offline' }]);
 eq(Object.keys(SALE_CHANNEL_PERIODS).filter(function(k){ return k === 'A' || k === 'a.alias'; }), ['a.alias'], 'dọn khoá bí danh');
 _scpSet_('a.alias', []);
 eq(SALE_CHANNEL_PERIODS['a.alias'], undefined, 'xoá hết mốc');
+// Mốc không ngày (from rỗng) = từ trước đến nay, đứng đầu danh sách
+_scpSet_('B', [{ from: '2026-11-01', channel: 'online' }, { from: '', channel: 'probation' }]);
+eq(_scpListOf_('B').map(function(e){ return e.from; }), ['', '2026-11-01'], 'mốc không ngày đứng đầu');
+eq(_saleChannelOn_('B', '2019-01-01'), 'probation', 'mốc không ngày áp dụng mọi ngày trước mốc kế');
+eq(_saleChannelOn_('B', '2026-11-01'), 'online', 'đến mốc có ngày thì đổi');
+eq(_scpEndOf_(_scpListOf_('B'), 0), '2026-10-31', 'mốc không ngày hết hiệu lực trước mốc kế');
 console.log(fails ? fails + ' FAIL' : 'ALL PASS'); process.exit(fails ? 1 : 0);

@@ -9,6 +9,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+
+## 2026-11-02 (tối 4) — Mốc theo ngày: NGÀY LÀ TUỲ CHỌN (Duyên yêu cầu) — XONG 1/1
+- **Yêu cầu:** nhiều Sale vốn đã chính thức, không muốn mất công chọn ngày; chọn ngày là tuỳ chọn.
+- **NGUYÊN NHÂN GỐC:** bước 4 bắt buộc mỗi mốc có ngày (`_scpNorm_` bỏ mốc không ngày, `_scpSaveDraft` báo "cần chọn ngày").
+- [x] **ĐÃ PUSH (js/62):** mốc có thể **để trống ngày = áp dụng từ trước đến nay** (`from:''`, đứng đầu danh sách, hết hiệu lực trước mốc kế tiếp nếu có; chỉ 1 mốc không ngày/Sale). Sale vốn chính thức: chỉ cần chọn Chính thức + đội, hoặc KHÔNG thêm mốc (cột "Đội hiện tại" đã đủ — hành vi cũ). Ô hiện "không chọn ngày = áp dụng từ trước đến nay"; tóm tắt "Từ đầu → …". Dữ liệu cũ (mốc có ngày) chạy nguyên. Test: `test-sale-channel-periods.js` + `-ui.js` thêm ca mốc không ngày. Bump js/62 `?v=20261102d`. Không đổi gas_v13.js (không cần deploy GAS).
+- **ĐANG LÀM: không có việc dở.** Duyên làm: Ctrl+F5 → modal Phân loại đội Sale → Thêm mốc → chọn Thử việc/Chính thức, để trống ngày nếu không cần.
+
 ## 2026-11-02 (tối 3) — Mốc theo ngày: chọn GIAI ĐOẠN Thử việc / Chính thức (+ đội) (Duyên yêu cầu) — XONG 1/1
 - **Yêu cầu:** mỗi mốc phải có lựa chọn "Thử việc" và "Chính thức".
 - **NGUYÊN NHÂN GỐC:** dropdown mốc (bước 4) chỉ liệt kê `SALE_GROUPS` (Online/Văn phòng/đội tự tạo) nên không có nhãn "Chính thức", và "Thử việc" chỉ hiện khi ai đó đã tạo đội `probation`.
