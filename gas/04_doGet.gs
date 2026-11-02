@@ -336,10 +336,12 @@ function doGetCore_(e) {
                  careStatus: splitCSV_(pB.careStatus), khStatus: splitCSV_(pB.khStatus),
                  zaloStatus: splitCSV_(pB.zaloStatus), nickZalo: pB.nickZalo || '' };
       var cacheB = CacheService.getScriptCache();
-      var cKeyB = _reportCacheKey_('salesB4_', fB);
+      var snapB_ = _readPosSnapshots_();   // dau moc chot vao khoa cache: bam Chot/Chot lai la bang Theo Sale doi NGAY (khong doi het 120s cache cu)
+      var cKeyB = _reportCacheKey_('salesB5_' + Object.keys(snapB_).sort().map(function(k) { return k.slice(2).replace('-', '') + String((snapB_[k] || {}).closedAt || '').replace(/\D/g, ''); }).join('.') + '_', fB);   // salesB4_ -> salesB5_: ket qua gio co the da tru hoan/huy theo moc chot
       var cachedB = cacheB.get(cKeyB);
       if (cachedB) { try { return jsonOut_(JSON.parse(cachedB)); } catch(ec) {} }
       var resB = buildSalesReportB_(fB);
+      try { resB = applyPosMonthAdjustToReportB_(resB, fB); } catch (eAdj) { resB.posAdjust = { applied: false, reason: 'Lỗi trừ hoàn/hủy: ' + eAdj.message }; }
       try { cacheB.put(cKeyB, JSON.stringify(resB), 120); } catch(ec) {}
       return jsonOut_(resB);
     }

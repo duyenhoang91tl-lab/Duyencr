@@ -47,4 +47,61 @@ ok(B.orders[3].bsx.every(p => p[1] === 450000.5) , 'don 2 sale le: moi nguoi 450
 ok(B.orders[3].bs.every(p => Number.isInteger(p[1])), 'bs cu van la so nguyen (cua so chi tiet khong doi)');
 const Bf = J(vm.runInContext('buildSalesReportB_({ dateFrom: "2026-10-01", dateTo: "2026-10-31", sale: ["menbui2002"] })', ctx));
 ok(Bf.orders.every(o => o.bsx.every(p => p[0] === 'menbui2002')) && Math.abs(Bf.orders.reduce((s, o) => s + o.bsx.reduce((t, p) => t + p[1], 0), 0) - Bf.bySale.find(r => r.name === 'menbui2002').giaTri) < 0.05, 'dang loc Sale: bsx chi con sale duoc chon va khop bang');
+
+// ===== PHIA WEB: _srBuildExportB_ (js/13) dung dB THAT tu buildSalesReportB_ =====
+const js13 = fs.readFileSync(path.join(__dirname, '..', 'js', '13-fn-bpseedofficialonlinetemplate.js'), 'utf8');
+const js11 = fs.readFileSync(path.join(__dirname, '..', 'js', '11-fn-srload.js'), 'utf8');
+const fnSrc = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('khong thay ' + name); let d = 0, k = src.indexOf('{', i); for (let j = k; j < src.length; j++) { if (src[j] === '{') d++; else if (src[j] === '}' && --d === 0) return src.slice(i, j + 1); } };
+const cctx = vm.createContext({ Math, Number, Array, Object, String, JSON, Date });
+vm.runInContext([fnSrc(js11, '_srCloseRateAvg_'), fnSrc(js13, '_srExportBLabel_'), fnSrc(js13, '_srBuildExportB_')].join('\n'), cctx);
+const X = cctx._srBuildExportB_(B, { dateFrom: '2026-10-01', dateTo: '2026-10-31', filters: ['Sale: menbui2002'], at: 'luc test' });
+ok(X.detailRows.length === B.orders.length + 1 && X.detailRows.every(r => r.length === 20), 'Chi tiet don: dong/don + 20 cot (dong Pos, ghi chu, Pos goc, tinh bao cao, cach tinh...)');
+ok(X.allocRows.length === 1 + B.orders.reduce((n, o) => n + o.bsx.length, 0) && X.allocRows.every(r => r.length === 12), 'Chia theo Sale: 1 dong = 1 don x 1 sale (tong ' + (X.allocRows.length - 1) + ' dong)');
+const bySaleAlloc = {}; X.allocRows.slice(1).forEach(r => { bySaleAlloc[r[6]] = (bySaleAlloc[r[6]] || 0) + r[8]; });
+ok(B.bySale.every(r => Math.abs((bySaleAlloc[r.name] || 0) - r.giaTri) < 0.05), 'cong cot "Gia tri chia" theo sale = bang Theo Sale');
+ok(Math.abs(X.grandV - B.totalGiaTri) < 0.1 && Math.abs(X.grandC - B.totalCod) < 0.1, 'tong chi tiet = Tong gia tri / Tong COD cua bao cao');
+const chk = X.checkRows; const body = chk.slice(1, 1 + B.bySale.length);
+ok(body.every(r => r[2] && r[2].f && /^SUMIF\('Chia theo Sale'!\$G:\$G,A\d+,'Chia theo Sale'!\$I:\$I\)$/.test(r[2].f) && Math.abs(r[3].v) < 0.05 && /^ROUND\(B\d+-C\d+,2\)$/.test(r[3].f)), 'Doi chieu tong: moi sale co cong thuc SUMIF + chenh lech ~ 0');
+ok(chk.some(r => String(r[0]).indexOf('(chưa gán sale)') === 0 && r[2].v === 300000 && r[5].v === 50000), 'dong "(chua gan sale)" xuat hien o Doi chieu tong (don khong sale) du gia tri 300.000 + COD 50.000');
+ok(chk.some(r => String(r[0]).indexOf('✅ KHỚP') === 0), 'ket luan "KHOP" khi tong bang nhau');
+ok(X.summary[2][1] === '2026-10-01 → 2026-10-31' && X.summary[3][1] === 'Sale: menbui2002' && X.summary.some(r => r[0] === 'Tổng COD' && r[1] === B.totalCod), 'Tong quan ghi khoang ngay + bo loc + tong');
+ok(X.missing === false, 'khong thieu bsx/bcx -> khong canh bao');
+// nhan "cach tinh"
+const L = cctx._srExportBLabel_;
+ok(L({}) === 'Chia đều theo cột Thẻ' && L({ dieuChinh: 'acct' }) === 'Chia theo file kế toán' && L({ dieuChinh: 'base' }) === 'Ghép đơn Base' && L({ saleRatio: 0.3 }) === 'Quầy 30/70 (sale hưởng 30%)' && L({ dieuChinh: 'base', tachSoDon: 2 }) === 'Ghép đơn Base + Gộp đơn tách 2 phần', 'nhan "Cach tinh" cho tung truong hop');
+// ===== Chot thang Pos (2026-11-02): GAS da tru hoan/huy thang truoc vao bang Theo Sale -> Excel van phai KHOP ===== 
+ctx.__settings_snap = JSON.stringify({ '2026-09': { closedAt: '2026-09-30', total: 1300000, bySale: { anhtrinh1995: 1000000, yenNTH2004: 300000 } } });
+vm.runInContext('getSetting_ = function(k) { return k === "posMonthSnapshots" ? __settings_snap : null; }; _posRevenueBySale_ = function() { return { bySale: { anhtrinh1995: 850000, yenNTH2004: 300000 }, total: 1150000 }; };', ctx);
+const Badj = J(vm.runInContext('applyPosMonthAdjustToReportB_(buildSalesReportB_({ dateFrom: "2026-10-01", dateTo: "2026-10-31" }), { dateFrom: "2026-10-01", dateTo: "2026-10-31" })', ctx));
+ok(Badj.posAdjust && Badj.posAdjust.applied && Badj.posAdjust.totalDeduction === 150000 && Math.abs(Badj.totalGiaTri - (Badj.totalGiaTriGoc - 150000)) < 0.01, 'GAS: thang 10 da tru 150.000 hoan/huy thang 9 (tong sau tru = goc − 150.000)');
+const Xa = cctx._srBuildExportB_(Badj, { dateFrom: '2026-10-01', dateTo: '2026-10-31', at: 'luc test' });
+ok(Xa.bySaleRows[0].length === 6 && Xa.bySaleRows[0].slice(0, 4).join('|') === 'Sale|Số đơn|Giá trị sau giảm giá|COD' && /Trừ hoàn\/hủy tháng 2026-09/.test(Xa.bySaleRows[0][5]), 'Theo Sale: 4 cot dau giu nguyen + them cot Gia tri goc, Tru hoan/huy');
+const rowA = Xa.bySaleRows.find(r => r[0] === 'anhtrinh1995');
+ok(Math.abs(rowA[2] - Badj.bySale.find(r => r.name === 'anhtrinh1995').giaTri) < 0.01 && Math.abs(rowA[4] - rowA[2] - 150000) < 0.02 && rowA[5] === 150000, 'Theo Sale: anhtrinh1995 = gia tri sau tru; goc − sau tru = 150.000');
+ok(Xa.checkRows.some(r => String(r[0]).indexOf('✅ KHỚP: tổng báo cáo') === 0) && !Xa.checkRows.some(r => String(r[0]).indexOf('⚠ LỆCH') === 0), 'Doi chieu tong: so voi chi tiet (TRUOC tru) van KHOP — khong bao lech gia');
+ok(Xa.checkRows[0][1] === 'Giá trị — bảng web (TRƯỚC trừ hoàn/hủy)' && Xa.checkRows.slice(1, 1 + Badj.bySale.length).every(r => Math.abs(r[3].v) < 0.05), 'Doi chieu tong: moi sale chenh ~0 (so truoc tru)');
+ok(Xa.checkRows.some(r => String(r[0]).indexOf('✅ KHỚP: chi tiết − trừ hoàn/hủy') === 0), 'Doi chieu tong: dong noi chi tiet − tru hoan/huy = so sau tru tren web — KHOP');
+ok(Xa.summary.some(r => /TRƯỚC trừ hoàn\/hủy tháng 2026-09/.test(r[0]) && Math.abs(r[1] - Badj.totalGiaTriGoc) < 0.01) && Xa.summary.some(r => /Trừ hoàn\/hủy tháng 2026-09/.test(r[0]) && r[1] === -150000), 'Tong quan ghi so truoc tru + so tru');
+const Xn = cctx._srBuildExportB_(B, {});   // khong posAdjust -> Excel y nhu cu (4 cot, khong dong noi)
+ok(Xn.bySaleRows[0].length === 4 && Xn.checkRows[0][1] === 'Giá trị — bảng web' && !Xn.checkRows.some(r => String(r[0]).indexOf('Nối với số trên web') === 0), 'khong co posAdjust: Excel nhu cu (4 cot, khong dong noi)');
+// server cu (chua co bsx/bcx) -> canh bao, khong vo
+const old = JSON.parse(JSON.stringify(B)); old.orders.forEach(o => { delete o.bsx; delete o.bcx; });
+const Xo = cctx._srBuildExportB_(old, {});
+ok(Xo.missing === true && Xo.summary.some(r => String(r[0]).indexOf('chưa có phần chia chính xác') > -1) && Xo.allocRows.length === 1, 'GAS chua cap nhat (thieu bsx/bcx): bao ro trong Tong quan, khong bi loi');
+const Xe = cctx._srBuildExportB_({ orders: [], bySale: [], totalOrders: 0, totalGiaTri: 0, totalCod: 0 }, {});
+ok(Xe.detailRows.length === 1 && Xe.allocRows.length === 1 && Xe.checkRows.some(r => String(r[0]).indexOf('✅ KHỚP') === 0), 'khong co don nao: van xuat duoc, khong loi');
+// GHI RA FILE .xlsx THAT roi DOC LAI (cong thuc phai con nguyen)
+let XLSX = null; try { XLSX = require('xlsx'); } catch (e) {}
+if (XLSX) {
+  const wb = XLSX.utils.book_new();
+  [['Tổng quan', X.summary], ['Theo Sale', X.bySaleRows], ['Chi tiết đơn', X.detailRows], ['Chia theo Sale', X.allocRows], ['Đối chiếu tổng', X.checkRows]].forEach(([n, a]) => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(a), n));
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  const rb = XLSX.read(buf, { type: 'buffer' });
+  ok(rb.SheetNames.join('|') === 'Tổng quan|Theo Sale|Chi tiết đơn|Chia theo Sale|Đối chiếu tổng' && rb.SheetNames.every(n => n.length <= 31), 'file .xlsx: du 5 sheet, ten <= 31 ky tu');
+  const cs = rb.Sheets['Đối chiếu tổng'];
+  ok(cs['C2'] && /^SUMIF\('Chia theo Sale'!\$G:\$G,A2,'Chia theo Sale'!\$I:\$I\)$/.test(cs['C2'].f) && typeof cs['C2'].v === 'number', 'file .xlsx doc lai: o C2 con cong thuc SUMIF + gia tri da tinh san');
+  ok(rb.Sheets['Chia theo Sale']['I2'] && typeof rb.Sheets['Chia theo Sale']['I2'].v === 'number', 'file .xlsx doc lai: cot "Gia tri chia" la SO (cong duoc), khong phai chu');
+} else console.log('(bo qua kiem tra file .xlsx that: chua cai thu vien xlsx)');
+ok(/_srIsAdmin\(\)\) XLSX\.utils\.book_append_sheet\(wbB, XLSX\.utils\.aoa_to_sheet\(productRows\), 'Báo cáo sản phẩm'\)/.test(js13), 'KHONG lam mat sheet "Bao cao san pham" (chi admin) vom co o xuat Excel B');
+ok(/_srBuildExportB_\(dB, \{ dateFrom: _srState\.dateFrom/.test(js13) && /BaoCaoDoanhSo_B_DoiChieu_/.test(js13) && /'Chia theo Sale'/.test(js13) && /'Đối chiếu tổng'/.test(js13), 'exportSalesReport nhanh B goi _srBuildExportB_ va them 2 sheet moi');
 console.log(fails ? '\nFAILED ' + fails : '\nALL REPORT-B-EXPORT (GAS) TESTS PASSED'); process.exit(fails ? 1 : 0);

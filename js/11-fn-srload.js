@@ -1187,12 +1187,19 @@ function _srSaleNoFbHtml_(d){
   h += '<div style="font-size:11px;color:var(--muted);margin-top:6px">Đã loại khỏi mục này: <b>' + fmt(nf.excludedOrders || 0) + ' đơn</b>, <b>' + _srMoney(nf.excludedRevenue || 0) + '</b> của kênh ' + kenhTxt + ' (chỉ kênh đúng tên này; kênh khác có chữ Facebook như “Facebook Phạm Thu Hiền” vẫn được tính). Còn lại: ' + fmt(nf.keptOrders || 0) + ' đơn, ' + _srMoney(nf.keptRevenue || 0) + '.</div>';
   return h;
 }
+// Ghi chú "đã trừ hoàn/hủy tháng trước" ở đầu Báo cáo B (d.posAdjust do GAS trả khi xem đúng 1 tháng lịch). Không có posAdjust (xem khoảng ngày tuỳ ý) → không hiện gì.
+function _srPosAdjustBannerHtml_(a){
+  if (!a) return '';
+  if (a.applied) return '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:7px 10px;margin-bottom:10px;font-size:12px">🔒 <b>Đã trừ hoàn/hủy tháng '+esc(a.prevMonth)+'</b> (mốc chốt '+esc(a.closedAt)+'): '+(a.totalDeduction?'−'+_srMoney(a.totalDeduction):'không có đơn nào phát sinh hoàn/hủy sau khi chốt')+'. Bảng Theo Sale và thẻ Tổng giá trị là số SAU TRỪ; bảng Theo Team/Nguồn/MKT chưa trừ.</div>';
+  return '<div style="background:#f9fafb;border:1px solid var(--border);border-radius:6px;padding:6px 10px;margin-bottom:10px;font-size:11.5px;color:var(--muted)">🔓 '+esc(a.reason||'Chưa trừ hoàn/hủy tháng trước.')+'</div>';
+}
 function _srRenderB(d){
   if (!d) return _srNoDataHtml_();
   var bTb = d.totalOrders ? Math.round(d.totalGiaTri/d.totalOrders) : 0;
-  var html = '<div class="kpi-grid" style="margin-bottom:16px">' +
+  var pAdj = d.posAdjust || null, pAdjOn = !!(pAdj && pAdj.applied);   // Chốt tháng Pos: GAS đã trừ hoàn/hủy tháng trước vào bảng Theo Sale + tổng (gas_v13.js applyPosMonthAdjustToReportB_)
+  var html = _srPosAdjustBannerHtml_(pAdj) + '<div class="kpi-grid" style="margin-bottom:16px">' +
     '<div class="kpi-card" style="border:1.5px solid #16a34a"'+_srDrillAttr_('bAll','')+'><div class="kpi-val" style="color:#16a34a">'+fmt(d.totalOrders)+'</div><div class="kpi-label"><b>Số lượng đơn</b></div></div>' +
-    '<div class="kpi-card" style="border:1.5px solid #16a34a"'+_srDrillAttr_('bAll','')+'><div class="kpi-val" style="color:#16a34a">'+_srMoney(d.totalGiaTri)+'</div><div class="kpi-label"><b>Tổng giá trị đơn hàng sau giảm giá</b></div></div>' +
+    '<div class="kpi-card" style="border:1.5px solid #16a34a"'+_srDrillAttr_('bAll','')+'><div class="kpi-val" style="color:#16a34a">'+_srMoney(d.totalGiaTri)+'</div><div class="kpi-label"><b>Tổng giá trị đơn hàng sau giảm giá'+(pAdjOn?' <span style="font-weight:400">(đã trừ hoàn/hủy '+esc(pAdj.prevMonth)+')</span>':'')+'</b></div></div>' +
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(bTb)+'</div><div class="kpi-label">Trung bình đơn</div></div>' +
     _srCloseRateKpiCard_(d) +
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalCod)+'</div><div class="kpi-label">Tổng COD</div></div>' +
@@ -1207,14 +1214,17 @@ function _srRenderB(d){
   var saleHtmlB_ = '<div class="dash-section-title">Theo Sale <span style="font-weight:400;color:var(--muted);font-size:11px">(tiền chia đều cho số sale/đơn, số đơn giữ nguyên)</span>'+_srViewToggleHtml('bSaleView')+'</div>';
   saleHtmlB_ += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.bSaleSearch)+'" oninput="_srState.bSaleSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
   if (_srState.bSaleView === 'table'){
-    saleHtmlB_ += '<table class="dash-table"><thead><tr>'+_srColTh_('bSale','name','Sale',_SR_COLTH_ROWSFN_['bSale'],_SR_COLTH_GETTER_['bSale'].name)+'<th style="text-align:right">Số đơn</th><th style="text-align:right">Giá trị sau giảm giá</th><th style="text-align:right">TB đơn</th><th style="text-align:right">COD</th></tr></thead><tbody>';
+    saleHtmlB_ += '<table class="dash-table"><thead><tr>'+_srColTh_('bSale','name','Sale',_SR_COLTH_ROWSFN_['bSale'],_SR_COLTH_GETTER_['bSale'].name)+'<th style="text-align:right">Số đơn</th><th style="text-align:right">Giá trị sau giảm giá'+(pAdjOn?' <span style="font-weight:400;font-size:10.5px">(sau trừ)</span>':'')+'</th>'+(pAdjOn?'<th style="text-align:right" title="Phần hoàn/hủy của tháng '+esc(pAdj.prevMonth)+' phát sinh sau khi chốt">Trừ hoàn/hủy '+esc(pAdj.prevMonth)+'</th>':'')+'<th style="text-align:right">TB đơn</th><th style="text-align:right">COD</th></tr></thead><tbody>';
     saleRows.forEach(function(s){
       var tb = s.orders ? Math.round(s.giaTri/s.orders) : 0;
-      saleHtmlB_ += '<tr'+_srDrillAttr_('bSale',s.name)+'><td>'+esc(s.name)+'</td><td style="text-align:right">'+fmt(s.orders)+'</td><td style="text-align:right">'+_srMoney(s.giaTri)+'</td><td style="text-align:right">'+_srMoney(tb)+'</td><td style="text-align:right">'+_srMoney(s.cod)+'</td></tr>';
+      saleHtmlB_ += '<tr'+_srDrillAttr_('bSale',s.name)+'><td>'+esc(s.name)+'</td><td style="text-align:right">'+fmt(s.orders)+'</td><td style="text-align:right">'+_srMoney(s.giaTri)+'</td>'+(pAdjOn?'<td style="text-align:right;color:'+(s.truHoanHuy?'#dc2626':'var(--muted)')+'">'+(s.truHoanHuy?((s.truHoanHuy>0?'−':'+')+_srMoney(Math.abs(s.truHoanHuy))):'—')+'</td>':'')+'<td style="text-align:right">'+_srMoney(tb)+'</td><td style="text-align:right">'+_srMoney(s.cod)+'</td></tr>';
     });
-    if (!saleRows.length) saleHtmlB_ += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+    if (!saleRows.length) saleHtmlB_ += '<tr><td colspan="'+(pAdjOn?6:5)+'" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
     else { var bSOrd=saleRows.reduce(function(s,r){return s+(r.orders||0);},0), bSGt=saleRows.reduce(function(s,r){return s+(r.giaTri||0);},0);
-      saleHtmlB_ += _srTotalRowHtml_(['Tổng', fmt(bSOrd), _srMoney(bSGt), _srMoney(bSOrd?Math.round(bSGt/bSOrd):0), _srMoney(saleRows.reduce(function(s,r){return s+(r.cod||0);},0))]); }
+      var bSTotCells = ['Tổng', fmt(bSOrd), _srMoney(bSGt)];
+      if (pAdjOn) bSTotCells.push(_srMoney(saleRows.reduce(function(s,r){return s+(r.truHoanHuy||0);},0)));
+      bSTotCells.push(_srMoney(bSOrd?Math.round(bSGt/bSOrd):0), _srMoney(saleRows.reduce(function(s,r){return s+(r.cod||0);},0)));
+      saleHtmlB_ += _srTotalRowHtml_(bSTotCells); }
     saleHtmlB_ += '</tbody></table>';
   } else {
     saleHtmlB_ += _srChartSvg(saleRows, 'name', 'giaTri', _srState.bSaleView, true, 'orders', { ordersLabel: 'Tổng lượt đơn theo sale', ordersHint: 'Đơn bán chung nhiều sale được tính cho TỪNG sale (số đơn giữ nguyên, tiền chia đều) nên con số này có thể lớn hơn “Số lượng đơn” thật ở các thẻ phía trên. Khi đang lọc Sale, bảng chỉ liệt kê người trong bộ lọc nên tổng tiền ở đây có thể nhỏ hơn tổng đơn.' });
@@ -1587,12 +1597,15 @@ function _srPosMonthPanelHtml_(){
   var cur = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
   var pd = new Date(now.getFullYear(), now.getMonth()-1, 1);
   var prev = pd.getFullYear()+'-'+String(pd.getMonth()+1).padStart(2,'0');
+  // Cuối tháng (hôm nay là ngày cuối) → mặc định chốt CHÍNH tháng này (Duyên 2026-11-02); các ngày khác mặc định chốt tháng trước.
+  var isLastDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1).getDate() === 1;
+  var closeDef = isLastDay ? cur : prev;
   var st = 'padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)';
   return '<div class="dash-section-title" style="margin-top:22px">🔒 Chốt tháng Pos &amp; trừ hoàn/hủy tháng trước</div>'+
     '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Doanh thu Pos tháng M = doanh thu trong tháng − phần hoàn/hủy phát sinh của tháng M-1 <b>sau khi đã chốt</b>. '+
-    'Làm vào ngày mùng 1, sau khi cập nhật đủ dữ liệu tháng trước: bấm <b>Chốt tháng</b> để lưu mốc; những đơn tháng đó bị hoàn/hủy về sau sẽ tự được trừ vào tháng kế tiếp. Chưa chốt thì chưa trừ gì.</div>'+
+    'Làm vào <b>ngày cuối tháng</b> (hoặc mùng 1), sau khi cập nhật đủ dữ liệu: bấm <b>Chốt tháng</b> để lưu mốc; những đơn tháng đó bị hoàn/hủy về sau sẽ tự được trừ vào tháng kế tiếp — bảng <b>Theo Sale</b> của Báo cáo B khi xem đúng tháng đó sẽ tự hiện số sau trừ. Chưa chốt thì chưa trừ gì.</div>'+
     '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">'+
-      '<span style="font-size:12px">Chốt tháng:</span><input type="month" id="sr-posm-close" value="'+prev+'" style="'+st+'">'+
+      '<span style="font-size:12px">Chốt tháng:</span><input type="month" id="sr-posm-close" value="'+closeDef+'" style="'+st+'">'+
       '<button class="btn sm" onclick="_srPosMonthClose_()">🔒 Chốt tháng này làm mốc</button>'+
       '<span style="color:var(--border-md)">|</span>'+
       '<span style="font-size:12px">Xem doanh thu tháng:</span><input type="month" id="sr-posm-view" value="'+cur+'" style="'+st+'">'+
@@ -1609,6 +1622,7 @@ async function _srPosMonthClose_(force){
     if (d && d.needForce){ if (confirm(d.error+'\n\nGhi đè mốc cũ?')) return _srPosMonthClose_(true); return; }
     if (!d || !d.ok){ toast('❌ '+((d&&d.error)||'Chốt thất bại')); return; }
     toast('✓ Đã chốt tháng '+d.month+' — tổng '+_srMoney(d.total)+' ('+d.saleCount+' sale)');
+    try { _srLoad(); } catch(e2){}   // tải lại Báo cáo B để bảng Theo Sale nhảy theo mốc vừa chốt
   } catch(e){ toast('❌ Lỗi: '+e.message); }
 }
 async function _srPosMonthLoad_(){
