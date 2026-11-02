@@ -11,6 +11,12 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-02 (đêm 3) — Loại nguồn đơn "Facebook / NGUỒN (715661768577683)" khỏi thưởng T10 (Duyên yêu cầu "loại bỏ cả đơn nguồn: Nguồn ra") — XONG 1/1
+- **Hiểu yêu cầu:** "Nguồn ra" = nguồn đơn Facebook / NGUỒN (37 đơn PT) — KHÔNG có nguồn nào tên đúng "Nguồn ra"; nếu Duyên muốn nguồn khác thì sửa regex trong `calc_bonus.js` (dòng filter đơn).
+- **NGUYÊN NHÂN GỐC:** `calc_bonus.js` chỉ loại bảo hành + MP nên đơn nguồn này vẫn bị xét.
+- [x] **ĐÃ PUSH:** `calc_bonus.js` loại nguồn này → 1.183 đơn; tổng thưởng vẫn **5.773.338đ** (37 đơn đó vốn không đạt ngưỡng nào). Chạy lại quy trình 5 bước ở mục "đêm 2". Doanh thu cột "Doanh thu đơn PT" vẫn gồm các đơn này (chỉ thưởng bị loại).
+- **ĐANG LÀM: không có việc dở.** Việc kế tiếp như mục "đêm 2" (a–d).
+
 ## 2026-11-02 (đêm 2) — Thưởng T10 ghi THẲNG vào file đối soát (Duyên yêu cầu) — XONG 3/3 bước nhỏ
 - **Yêu cầu:** đưa bảng thưởng vào file đối soát đã gửi (file đã check CRM↔KT mới nhất), cập nhật từng hàng sheet ĐƠN PT; CHỈ đội Online/Offline (18 sale đã phân loại), sale khác bỏ qua; **đơn MP (mỹ phẩm) KHÔNG tính thưởng**.
 - **NGUYÊN NHÂN GỐC:** bản trước tính cả 63 đơn MP (làm lệch thưởng theo đơn/doanh số ngày) và nằm ở file Excel riêng; recalc bằng LibreOffice còn làm hỏng autofilter gốc (`operator="**none**"`).
