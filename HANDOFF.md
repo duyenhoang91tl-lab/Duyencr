@@ -35,6 +35,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 - **ĐANG LÀM: không có việc dở.** Không đổi gas_v13.js/js/css (không cần deploy, không cần Ctrl+F5).
 - **Việc kế tiếp (phiên khác làm được ngay):** (a) 18/36 sale chưa phân loại Online/Offline (menbui2002 490tr, kieuHT1997 245tr, hongnguyen1995…) → CRM cho 0đ thưởng; Duyên cài ở "Phân loại đội Sale" rồi chạy lại 2 script. (b) Tỳ Hưu chất liệu Ngọc/Ruby/Saphire và đơn huỷ chưa tự loại — kế toán đối chiếu. (c) Sale Thử việc (VD Ngọc theo mục "Báo cáo G" bên dưới) dùng mẫu "Thưởng Sale thử việc" — chưa tính trong bảng này. (d) Đối chiếu với Báo cáo G thật vì CT đang bật trong Settings có thể khác 12 CT mẫu. (e) Thưởng ngày ở đây theo ngày tạo đơn Pos, CRM thật theo ngày tạo Base.
 
+## 2026-11-02 (tối 9) — Báo cáo G: CẢNH BÁO LÝ DO Sale Thử việc không có thưởng (ca Ngọc "không được thưởng đơn đầu trong ngày") — BƯỚC 1/2 đã push
+- **Vấn đề:** Báo cáo G tháng 10 mục Thử việc vẫn trống, Ngọc không nhận thưởng đơn đầu (ngày 1-3 thử việc).
+- **ĐÃ KIỂM TRA:** mô phỏng đúng mẫu CT "GĐ1 đơn đầu/ngày (ngày 1-3)" + "GĐ2 bậc số đơn" với Ngọc (mốc Thử việc có `bonusFrom` 14/10, 7 đơn 14→17/10) → ra đủ: đơn đầu 14/15/16 (50k) + 2 đơn 17/10 (30k). Code tính ĐÚNG khi đủ cấu hình ⇒ nguyên nhân nằm ở cấu hình/dữ liệu của Duyên (chưa lưu "Bắt đầu tính thưởng", hoặc tên Sale trên đơn Pos không khớp tên/bí danh Ngọc, hoặc CT thưởng thử việc sai khoảng ngày/đối tượng).
+- **NGUYÊN NHÂN GỐC (gây khó dò):** Sale thử việc không có thưởng thì KHÔNG hiện ở đâu (bảng Thử việc chỉ liệt kê Sale có dòng thưởng), nên không biết thiếu cấu hình gì.
+- [x] **ĐÃ PUSH (js/12):** `_srGProbationHints_` + khung cảnh báo cam ở Báo cáo G cho từng Sale thử việc (SALE_CHANNELS hoặc có mốc Thử việc) chưa có dòng thưởng, nêu 1 trong 3 lý do: (1) chưa có Ngày bắt đầu tính thưởng, (2) không thấy đơn Pos mang tên Sale này, (3) có N đơn nhưng chưa phát sinh thưởng. Test: `node tools/test-bonus-g-hints.js`. Bump js/12 `?v=20261102k`. Không đổi gas_v13.js.
+- [ ] **BƯỚC 2 (CHỜ Duyên):** Duyên Ctrl+F5 → Báo cáo G tháng 10 → đọc cảnh báo cam về Ngọc, gửi lại nội dung cảnh báo (+ tên Sale của Ngọc trên đơn Pos, các CT thưởng thử việc đang cài) để sửa đúng chỗ.
+
 ## 2026-11-02 (tối 8) — Chương trình thưởng: LOẠI nguồn đơn (mục 4d) + chọn nguồn áp dụng (4c) ngay ở cài đặt CT (Duyên yêu cầu) — XONG 1/1
 - **Yêu cầu:** loại 2 nguồn "facebook" và "Nguồn ra" khỏi thưởng; tự chọn nguồn nào áp dụng / nguồn nào loại ngay trong cài đặt chương trình.
 - **NGUYÊN NHÂN GỐC:** CT chỉ có `p.sources` (danh sách nguồn ÁP DỤNG), không có cách LOẠI nguồn; muốn loại 2 nguồn phải tích hết nguồn còn lại.

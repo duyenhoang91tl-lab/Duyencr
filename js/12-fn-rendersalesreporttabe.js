@@ -655,6 +655,32 @@ function _srGBuildGroups_(orders){
   });
   return g;
 }
+// Sale đang/đã Thử việc (SALE_CHANNELS hoặc có mốc Thử việc) nhưng KHÔNG có dòng thưởng nào ở mục Thử việc → báo LÝ DO cụ thể
+// (chưa đặt Ngày bắt đầu tính thưởng / không thấy đơn Pos mang tên Sale này / có đơn nhưng không đạt CT). Trả về mảng {name, reason}.
+function _srGProbationHints_(g, orders){
+  var names = {};
+  Object.keys(typeof SALE_CHANNELS !== 'undefined' ? SALE_CHANNELS : {}).forEach(function(n){ if (SALE_CHANNELS[n] === 'probation') names[n] = 1; });
+  Object.keys(typeof SALE_CHANNEL_PERIODS !== 'undefined' ? SALE_CHANNEL_PERIODS : {}).forEach(function(n){
+    if ((SALE_CHANNEL_PERIODS[n] || []).some(function(e){ return e && e.channel === 'probation'; })) names[n] = 1;
+  });
+  var shown = {}; g.tv.rows.forEach(function(r){ shown[String(r.name).toLowerCase()] = 1; });
+  var seen = {}, out = [];
+  Object.keys(names).forEach(function(n){
+    var grp = (typeof _scpGroupNames_ === 'function') ? _scpGroupNames_(n) : [n];
+    var al = {}; grp.concat(typeof _cfgAliasesOf === 'function' ? _cfgAliasesOf(n) : [n]).forEach(function(x){ al[String(x).toLowerCase()] = 1; });
+    var key = Object.keys(al).sort().join('|');
+    if (seen[key]) return; seen[key] = 1;
+    if (Object.keys(al).some(function(x){ return shown[x]; })) return;   // đã có dòng ở mục Thử việc
+    var cnt = (orders || []).filter(function(o){ return Object.keys(_bonusNamesOfOrder_(o)).some(function(x){ return al[String(x).toLowerCase()]; }); }).length;
+    var sd = ''; for (var i = 0; i < grp.length && !sd; i++) sd = _saleStartDate_(grp[i]);
+    var reason;
+    if (!sd) reason = 'chưa đặt <b>Ngày bắt đầu tính thưởng</b> → các chương trình theo ngày thử việc không áp dụng (🏷️ Phân loại đội Sale → Sửa mốc → ô "Bắt đầu tính thưởng", rồi Lưu mốc)';
+    else if (!cnt) reason = 'Ngày bắt đầu '+esc(sd)+' nhưng <b>không thấy đơn Pos nào mang tên Sale này</b> trong khoảng lọc — kiểm tra tên trên đơn có khớp tên/bí danh tài khoản không';
+    else reason = 'Ngày bắt đầu '+esc(sd)+', có '+cnt+' đơn Pos nhưng chưa phát sinh thưởng — kiểm tra ngày đơn so với Ngày bắt đầu, khoảng ngày và đối tượng của chương trình thưởng thử việc';
+    out.push({name: n, reason: reason});
+  });
+  return out;
+}
 function _srRenderG_(d){
   if (!d) return _srNoDataHtml_();
   if (d.error) return '<div style="color:#dc2626;text-align:center;padding:30px">Lỗi: '+esc(d.error)+'</div>';
@@ -673,6 +699,9 @@ function _srRenderG_(d){
     '<div class="kpi-card"><div class="kpi-val">'+fmt((d.orders||[]).length)+'</div><div class="kpi-label">Đơn Pos dùng để tính</div></div>'+
     '</div>';
   if (g.skipped.length) html += '<div style="font-size:11.5px;color:#9a3412;margin-bottom:10px">Không tính thưởng cho '+g.skipped.length+' Sale chưa thuộc đội Online/Văn phòng: '+esc(g.skipped.slice(0,8).join(', '))+(g.skipped.length>8?'…':'')+' — phân loại ở Báo cáo E → "Phân loại Sale" nếu cần.</div>';
+  _srGProbationHints_(g, d.orders || []).forEach(function(h){
+    html += '<div style="font-size:11.5px;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:6px 10px;margin-bottom:8px">⚠️ Sale Thử việc <b>'+esc(h.name)+'</b> chưa có thưởng: '+h.reason+'.</div>';
+  });
   html += '<div style="margin-bottom:14px"><button class="btn sm" onclick="_srSetSub(\'K\')">📋 Chi tiết đơn thưởng (đếm sản phẩm)</button></div>';
 
   function groupTable(title, key, grp, isTv){
