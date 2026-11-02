@@ -11,11 +11,11 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
-## 2026-11-03 — Thưởng "Tourmaline cao cấp" (ca thuyha88): đơn PHẢI có "TRANG SỨC NHẪN TOUR TRƠN CAO CẤP" — BƯỚC 1/3 đã push
+## 2026-11-03 — Thưởng "Tourmaline cao cấp" (ca thuyha88): đơn PHẢI có "TRANG SỨC NHẪN TOUR TRƠN CAO CẤP" — XONG 2/3 (bước 3 chờ Duyên)
 - **Yêu cầu Duyên:** xem mục thưởng thuyha88 "Tourmaline cao cấp — đơn từ 21tr500 +100.000, đơn từ 31tr500 +200.000" → sản phẩm phải là TRANG SỨC NHẪN TOUR TRƠN CAO CẤP; chỉnh và gửi lại file đối soát.
 - **NGUYÊN NHÂN GỐC:** 2 CT "Tourmaline cao cấp" trong `tools/bonus-t10/calc_bonus.js` chỉ xét giá trị đơn (không có `requireProduct`) → đơn PT850 của thuyha88 (24.947.000đ: nhẫn túi tiền cẩm thạch, lắc, mặt cổ… KHÔNG có nhẫn tour trơn cao cấp) vẫn ăn 100.000đ. Tương tự các Sale khác.
 - [x] **BƯỚC 1 ĐÃ PUSH:** `calc_bonus.js` thêm `requireProduct: 'TRANG SỨC NHẪN TOUR TRƠN CAO CẤP'` cho cả 2 CT (khớp theo tên sản phẩm trên đơn, không phân biệt hoa/thường). Kết quả chạy lại: thuyha88 475.000đ → **275.000đ** (mất 100.000đ đơn PT850); chỉ còn 1 đơn đạt (PT40 thuydinh95, 29.925.000đ → 100.000đ); tổng thưởng 5.946.671đ → **4.401.673đ**.
-- [ ] **BƯỚC 2 (đang làm):** chạy lại quy trình 5 bước (tools/bonus-t10, xoá AE:AI cũ ở ĐƠN PT trước) → gửi file Excel mới cho Duyên (không commit file Excel).
+- [x] **BƯỚC 2 XONG (file Excel đã gửi Duyên, không commit):** xoá AE:AI cũ ở ĐƠN PT + 2 sheet THUONG_* rồi chạy lại đủ 5 bước → thuyha88 275.000đ; tổng 4.401.673đ (Online 3.581.672 / Offline 630.001 / Thử việc 190.000); recalc 0 lỗi công thức (8.791 CT), filter đã sửa. **LƯU Ý:** file Duyên gửi lần này KHÔNG có sheet "4_Đối soát cửa hàng"/TÓM TẮT và chưa có sửa ngày hẹn 3-4/10-11 của đêm 6 (là bản cũ hơn) — nếu cần bản đầy đủ phải dùng file Excel mới nhất từ phiên đêm 6.
 - [ ] **BƯỚC 3 (CHỜ Duyên đồng ý):** CRM thật chưa sửa — `js/13-fn-bpseedofficialonlinetemplate.js` (mẫu 2 CT Tourmaline cao cấp, dòng ~47-55) không đặt requireProduct; `js/12` `_bonusRequireKw_` không có dự phòng theo tên; `js/27` + `gas_v13.js` `_bcRequireKw_` đang dự phòng 'nhẫn tour' (rộng hơn, gồm cả TOUR GIÁC). Nếu sửa: grep mọi nơi gọi, đổi thành 'nhẫn tour trơn cao cấp', test, đồng bộ khối gas-code-v9 trong index.html và nhắc deploy GAS + Ctrl+F5.
 
 ## 2026-11-02 (đêm 6) — Ô "Ngày KH hẹn qua CH" bị Sheets đổi thành ngày (3-4 → 03/04/2026) — XONG 2/2 (code đã push, file Excel đã gửi)
