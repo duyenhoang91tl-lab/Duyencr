@@ -325,9 +325,9 @@ var _srState = {
   // G da doi thanh "Chuong trinh thuong Thu viec / Chinh thuc" (2026-10-04): dung nguon don Pos nhu E
   gSaleCustomized: false, gBonusExpanded: '',
   // H — Tong quan data da chia (client-only: assignHistory + careData; so don/doanh thu nhap tay)
-  hDateFrom: '', hDateTo: '', hDateQuick: 'today', hTeam: '', hCs: '', hGroup: 'dayCs',
+  hDateFrom: '', hDateTo: '', hDateQuick: 'today', hTeam: '', hCs: '', hCsList: [], hGroup: 'dayCs',
   // I — Bao cao chia data Renew (CSKH-Duyen)
-  iDateFrom: '', iDateTo: '', iDateQuick: 'custom', iCs: '', iTeam: ''
+  iDateFrom: '', iDateTo: '', iDateQuick: 'custom', iCs: '', iCsList: [], iTeam: ''
 };
 // Bao cao F/H mac dinh 'Tháng này' nhung fDateFrom/fDateTo (hay hDateFrom/hDateTo) truoc day de
 // rong -> dropdown hien 'Tháng này' trong khi request khong co ngay nao => backend cong DON CA

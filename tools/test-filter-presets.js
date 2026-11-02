@@ -118,8 +118,18 @@ JSDOM.fromFile(path.join(__dirname, '..', 'index.html'), { runScripts: 'dangerou
     ok(w.eval('_srState.sale').length === 0 || true, 'bo loc cua A khong bi dung vao');
     // Bao cao khac co o Sale deu co thanh mau: C, D, E, F, G, K, L
     for (const sb of ['C', 'D', 'E', 'F', 'G', 'K', 'L', 'M']) { w.eval("_srState.sub = '" + sb + "'; renderSalesReportTab();"); await wait(20); ok(ctl() && ctl().parentNode.classList.contains('srb-bar'), 'Bao cao ' + sb + ' co o mau loc nhanh'); }
-    // Bao cao H/I (chon 1 CS) khong co o Sale nhieu ten -> khong co thanh mau
-    for (const sb of ['H', 'I']) { w.eval("_srState.sub = '" + sb + "'; renderSalesReportTab();"); await wait(20); ok(!ctl(), 'Bao cao ' + sb + ' (loc 1 CS) khong co o mau'); }
+    // Bao cao H/I (loc theo DANH SACH CS, 02/11/2026): co thanh mau; bam mau -> hCsList/iCsList = ten CS khop, xoa o chon 1 Team/1 CS cu
+    w.eval("assignHistory = [{csName:'dungnguyen1995',date:'2026-10-05',phones:['0901']},{csName:'Lan',date:'2026-10-05',phones:['0902']}]; _srState.hTeam='T1'; _srState.hCs='Lan'; _srState.iTeam='T1'; _srState.iCs='Lan';");
+    for (const sb of ['H', 'I']) {
+      const lk = sb.toLowerCase() + 'CsList';
+      w.eval("_srState.sub = '" + sb + "'; renderSalesReportTab();"); await wait(30);
+      ok(ctl() && ctl().parentNode.classList.contains('srb-bar') && sel(), 'Bao cao ' + sb + ' co o mau (dropdown)');
+      sel().value = pvp.id; sel().dispatchEvent(new w.Event('change', { bubbles: true })); await wait(80);
+      ok(state(lk) === '["dungnguyen1995"]', 'bam o ' + sb + ' -> ' + lk + ' = CS khop trong lich su chia (' + state(lk) + ')');
+      ok(state(sb.toLowerCase() + 'Cs') === '""' && state(sb.toLowerCase() + 'Team') === '""', 'bam o ' + sb + ' -> bo o chon 1 CS/1 Team cu');
+      ok(w.eval('_srState.sub') === sb, 'van o bao cao ' + sb);
+      if (sb === 'H') { w.eval("_srState.hDateFrom=''; _srState.hDateTo=''; _srState.hDateQuick='custom';"); const hr = JSON.parse(w.eval("JSON.stringify(_hBuild_().rows.map(function(r){return r.cs}))")); ok(hr.length >= 1 && hr.every(n => n === 'dungnguyen1995'), 'H: _hBuild_ chi con dong cua CS trong mau (' + hr + ')'); }
+    }
     // Bao cao M (don chia): bam mau -> mSale = Sale cua mau, KHONG dong vao mNguon dang chon
     w.eval("_srState.sub = 'M'; _srState.mNguon = ['KM']; renderSalesReportTab();"); await wait(30);
     sel().value = pvp.id; sel().dispatchEvent(new w.Event('change', { bubbles: true })); await wait(80);

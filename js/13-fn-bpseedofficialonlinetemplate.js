@@ -292,10 +292,16 @@ function _hScopeNames_(){
   }
   return _srMyNames().concat([currentUser && currentUser.name]).filter(Boolean);
 }
+// Danh sách CS có trong lịch sử chia data, giới hạn theo phạm vi người xem (H/I + mẫu lọc nhanh dùng chung)
+function _hAssignCsNames_(){
+  var scope = _hScopeNames_(), seen = {};
+  (typeof assignHistory !== 'undefined' ? assignHistory : []).forEach(function(h){ var n = h && h.csName; if (n && (!scope || scope.indexOf(n) !== -1)) seen[n] = 1; });
+  return Object.keys(seen).sort(function(a,b){ return a.localeCompare(b, 'vi'); });
+}
 function _hAddMap_(a, b){ Object.keys(b||{}).forEach(function(k){ a[k] = (a[k]||0) + b[k]; }); }
 function _hBuild_(){
   var from = _srState.hDateFrom, to = _srState.hDateTo, scope = _hScopeNames_();
-  var teamF = _srState.hTeam || '', csF = _srState.hCs || '', byCs = (_srState.hGroup === 'cs');
+  var teamF = _srState.hTeam || '', csF = _srState.hCs || '', csList = _srState.hCsList || [], byCs = (_srState.hGroup === 'cs');
   var groups = _hGroups_(), gIdx = _hGroupIndex_(groups);
   var map = {}, csSeen = {};
   (typeof assignHistory !== 'undefined' ? assignHistory : []).forEach(function(e){
@@ -306,6 +312,7 @@ function _hBuild_(){
     if (scope && scope.indexOf(cs) === -1) return;
     csSeen[cs] = 1;
     if (csF && cs !== csF) return;
+    if (csList.length && csList.indexOf(cs) === -1) return;
     var tm = _teamOf(cs), tn = tm ? (tm.name || '(chưa đặt tên)') : 'Chưa có team';
     if (teamF && tn !== teamF) return;
     var key = byCs ? cs : (d + '|' + cs);
@@ -456,7 +463,7 @@ function renderSalesReportTabI_(wrap, subTabs) {
 
   var sel = 'padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)';
   var from = _srState.iDateFrom || '', to = _srState.iDateTo || '';
-  var csF = _srState.iCs || '', teamF = _srState.iTeam || '';
+  var csF = _srState.iCs || '', csList = _srState.iCsList || [], teamF = _srState.iTeam || '';
 
   // ── Build renew phone set (SDT có trong cskhData) ──
   var renewPhones = new Set(typeof cskhData !== 'undefined' ? Object.keys(cskhData) : []);
@@ -475,6 +482,7 @@ function renderSalesReportTabI_(wrap, subTabs) {
     var cs = e.csName || '(chưa rõ)';
     if (scope && scope.indexOf(cs) === -1) return;
     if (csF && cs !== csF) return;
+    if (csList.length && csList.indexOf(cs) === -1) return;
     var tm = _teamOf(cs), tn = tm ? (tm.name || '(chưa đặt tên)') : 'Chưa có team';
     if (teamF && tn !== teamF) return;
     var mo = d.slice(0, 7); monthSet.add(mo);
@@ -639,7 +647,7 @@ function renderSalesReportTabI_(wrap, subTabs) {
 
 function exportRenewReport_() {
   // Export CSV báo cáo I
-  var from = _srState.iDateFrom||'', to = _srState.iDateTo||'', csF = _srState.iCs||'', teamF = _srState.iTeam||'';
+  var from = _srState.iDateFrom||'', to = _srState.iDateTo||'', csF = _srState.iCs||'', csList = _srState.iCsList||[], teamF = _srState.iTeam||'';
   var renewPhones = new Set(typeof cskhData!=='undefined' ? Object.keys(cskhData) : []);
   var scope = _hScopeNames_(), groups = _hGroups_(), gIdx = _hGroupIndex_(groups);
   var csMap = {};
@@ -649,6 +657,7 @@ function exportRenewReport_() {
     var cs=e.csName||'(chưa rõ)';
     if(scope&&scope.indexOf(cs)===-1) return;
     if(csF&&cs!==csF) return;
+    if(csList.length&&csList.indexOf(cs)===-1) return;
     var tm=_teamOf(cs), tn=tm?(tm.name||'(chưa đặt tên)'):'Chưa có team';
     if(teamF&&tn!==teamF) return;
     (e.phones||[]).forEach(function(p){
@@ -1051,15 +1060,13 @@ function _srbMenuCats_(){
   } else if (sub === 'H'){
     if (_srIsAdmin() || (currentUser && currentUser.role === 'leader')){
       radio('hTeam', 'Team', '👥', 'hTeam', '', function(){ return [['','Tất cả team']].concat((teams||[]).map(function(t){ return t.name || '(chưa đặt tên)'; }).concat(['Chưa có team']).map(function(n){ return [n,n]; })); }, true);
-      radio('hCs', 'CS', '🎧', 'hCs', '', function(){ return [['','Tất cả CS']].concat((_hBuild_().csOptions||[]).map(function(n){ return [n,n]; })); }, true);
+      flat('hCs', 'CS', '🎧', 'Tìm CS...', 'hCsList', function(){ return _hAssignCsNames_(); });   // (02/11/2026) nhiều CS (mẫu lọc nhanh js/48 điền được); chọn 1 CS vẫn như cũ
     }
     radio('hGroup', 'Cách nhóm', '🗂️', 'hGroup', 'dayCs', [['dayCs','Theo ngày × CS'],['cs','Gộp theo CS']], true);
   } else if (sub === 'I'){
     if (_srIsAdmin() || (currentUser && currentUser.role === 'leader')){
       radio('iTeam', 'Team', '👥', 'iTeam', '', function(){ return [['','Tất cả team']].concat((teams||[]).map(function(t){ return t.name || '(chưa đặt tên)'; }).map(function(n){ return [n,n]; })); }, true);
-      radio('iCs', 'CS', '🎧', 'iCs', '', function(){
-        var names = Array.from(new Set((typeof assignHistory!=='undefined'?assignHistory:[]).map(function(h){return h.csName;}))).filter(Boolean).sort();
-        return [['','Tất cả CS']].concat(names.map(function(n){ return [n,n]; })); }, true);
+      flat('iCs', 'CS', '🎧', 'Tìm CS...', 'iCsList', function(){ return _hAssignCsNames_(); });
     }
   } else {   // B — Pos
     if (_srIsAdmin()){

@@ -18,7 +18,10 @@
     F: { keys:['fSale'], sale:'fSale', team:'fTeam', opts:'saleBOptions', custom:'fSaleCustomized' },
     G: { keys:['gSale','gNguon','gMarketer','gSanPham'], sale:'gSale', opts:'saleBOptions', custom:'gSaleCustomized' },
     L: { keys:['lSale'], sale:'lSale', opts:'saleBOptions', custom:'lSaleCustomized' },
-    M: { keys:['mSale','mNguon'], sale:'mSale', opts:'saleBOptions' }   // (02/11/2026) Báo cáo M (đơn chia) có ô Sale + Kênh bán nhiều lựa chọn như các báo cáo khác
+    M: { keys:['mSale','mNguon'], sale:'mSale', opts:'saleBOptions' },
+    // (02/11/2026) H/I lọc theo DANH SÁCH CS (hCsList/iCsList, mảng) — mẫu = danh sách tên; tên CS lấy từ lịch sử chia data (js/13 _hAssignCsNames_). hTeam/hCs/iTeam/iCs (chọn 1) được xoá khi áp mẫu để không loại nhầm.
+    H: { keys:['hCsList'], sale:'hCsList', optsFn:function(){ return _hAssignCsNames_(); }, reset:['hTeam','hCs'] },
+    I: { keys:['iCsList'], sale:'iCsList', optsFn:function(){ return _hAssignCsNames_(); }, reset:['iTeam','iCs'] }   // (02/11/2026) Báo cáo M (đơn chia) có ô Sale + Kênh bán nhiều lựa chọn như các báo cáo khác
   };
   CFG.K = CFG.G;   // K = màn Thưởng (cùng bộ lọc với G; _srState.sub === 'K' khi xem theo kiểu khác)
   function curSub(){ return (typeof _srState !== 'undefined') ? _srState.sub : ''; }
@@ -157,6 +160,7 @@
     var g = groupsFor(sub).filter(function(x){ return x.key === key; })[0]; if (!g) return;
     if (!g.sales.length) { toastF('⚠ Đội “' + g.label + '”: ' + (g.total ? 'không tên Sale nào khớp dữ liệu báo cáo đang xem' : 'chưa có Sale nào được phân loại (Báo cáo E → Phân loại Sale)')); return; }
     _srState[c.sale] = g.sales.slice();
+    (c.reset || []).forEach(function(k){ _srState[k] = ''; });
     if (c.team) _srState[c.team] = [];
     _srState['_autoSaleSig_' + c.sale] = '';
     if (c.custom) _srState[c.custom] = true;
@@ -211,6 +215,7 @@
     if (prev && prev.extras && prev.extras[sub]) Object.keys(prev.extras[sub]).forEach(function(k){ if (c.keys.indexOf(k) !== -1) _srState[k] = emptyLike(_srState[k]); });
     var ex = p.extras && p.extras[sub];
     if (ex) c.keys.forEach(function(k){ if (k === c.sale) return; var v = ex[k]; _srState[k] = (v === undefined) ? emptyLike(_srState[k]) : (Array.isArray(v) ? v.slice() : v); });   // bộ lọc riêng lưu từ chính báo cáo này
+    (c.reset || []).forEach(function(k){ _srState[k] = ''; });   // H/I: bỏ ô chọn 1 Team/1 CS cũ
     if (c.team) _srState[c.team] = [];          // ô "Lọc theo Team" chỉ là công cụ điền ô Sale — mẫu đã chứa sẵn danh sách Sale
     if (c.custom) _srState[c.custom] = true;     // E/F/G/L: đã tự chỉnh Sale → không bị ghi đè bởi mặc định theo vai trò
     var before = JSON.stringify(c.keys.map(function(k){ return _srState[k]; }));
@@ -224,6 +229,7 @@
   function turnOff(){
     var sub = curSub(), c = CFG[sub]; if (!c) return;
     c.keys.forEach(function(k){ _srState[k] = emptyLike(_srState[k]); });
+    (c.reset || []).forEach(function(k){ _srState[k] = ''; });
     if (c.team) _srState[c.team] = [];
     if (c.custom) _srState[c.custom] = false;     // E/F/G/L: về mặc định theo vai trò
     ACT[sub] = '';
@@ -259,7 +265,8 @@
 
   // ── Hộp "Tạo / sửa mẫu": đặt tên + tick các Sale ──
   function saleOptionsFor(sub){
-    var c = CFG[sub], arr = (_srState[c.opts] && _srState[c.opts].length) ? _srState[c.opts] : (_srState.saleOptions || _srState.saleBOptions || []);
+    var c = CFG[sub]; if (c.optsFn) { try { return (c.optsFn() || []).filter(Boolean).map(String); } catch(err0){ return []; } }
+    var arr = (_srState[c.opts] && _srState[c.opts].length) ? _srState[c.opts] : (_srState.saleOptions || _srState.saleBOptions || []);
     return arr.filter(Boolean).map(String);
   }
   function openEditor(id){
