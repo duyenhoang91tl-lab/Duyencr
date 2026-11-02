@@ -78,3 +78,58 @@ async function saveSaleChannelPeriods(){
   } catch(e) { toast('✓ Đã lưu local — chưa đồng bộ GSheets: ' + e.message); }
 }
 setTimeout(_syncSaleChannelPeriodsFromGAS, 0);
+
+// ── GIAO DIỆN: cột "🗓 Mốc theo ngày" trong modal "🏷️ Phân loại đội Sale" (js/12 `_renderSaleChannelsModal`) ──
+let _scpOpenName = '', _scpDraft = null;
+function _scpFmtDate_(ymd){ var m = String(ymd || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3] + '/' + m[2] + '/' + m[1] : ''; }
+function _scpChanLabel_(ch){
+  if (!ch) return 'Chưa phân loại';
+  var gs = (typeof SALE_GROUPS !== 'undefined' && SALE_GROUPS) || [];
+  for (var i = 0; i < gs.length; i++) if (gs[i].key === ch) return gs[i].label;
+  return ch === 'probation' ? 'Thử việc' : ch;
+}
+function _scpCellHtml_(name){
+  var list = _scpListOf_(name);
+  var sum = list.map(function(e, i){
+    var end = _scpEndOf_(list, i);
+    return '<div style="font-size:11px;color:var(--muted)">' + esc(_scpFmtDate_(e.from)) + (end ? ' → ' + esc(_scpFmtDate_(end)) : ' →') + ': <b>' + esc(_scpChanLabel_(e.channel)) + '</b></div>';
+  }).join('');
+  return '<button class="btn xs" data-name="' + esc(name) + '" onclick="_scpToggle(this.dataset.name)">🗓 ' + (list.length ? 'Sửa mốc (' + list.length + ')' : 'Thêm mốc') + '</button>' + sum;
+}
+function _scpToggle(name){
+  if (_scpOpenName === name){ _scpOpenName = ''; _scpDraft = null; }
+  else { _scpOpenName = name; _scpDraft = _scpListOf_(name).map(function(e){ return { from: e.from, channel: e.channel }; }); if (!_scpDraft.length) _scpDraft.push({ from: '', channel: '' }); }
+  _renderSaleChannelsModal();
+}
+function _scpEditorRowHtml_(name, colspan){
+  if (_scpOpenName !== name || !_scpDraft) return '';
+  var gs = (typeof SALE_GROUPS !== 'undefined' && SALE_GROUPS) || [];
+  var h = '<tr><td colspan="' + colspan + '" style="background:var(--surface2);padding:10px 14px">' +
+    '<div style="font-size:12px;margin-bottom:8px"><b>Mốc phân loại theo ngày — ' + esc(name) + '</b><br><span style="color:var(--muted)">Mỗi mốc có hiệu lực <b>từ ngày chọn</b> đến hết ngày liền trước mốc kế tiếp. Ví dụ: <i>10/09 Thử việc</i> + <i>11/10 Online</i> → thử việc 10/09→10/10, chính thức từ 11/10. ' +
+    'Ngày trước mốc đầu tiên dùng cột "Đội hiện tại". Chương trình thưởng (Báo cáo E, G) tự áp dụng theo loại của Sale <b>tại đúng ngày tạo đơn</b>.</span></div>';
+  _scpDraft.forEach(function(e, i){
+    var nxt = ''; _scpDraft.forEach(function(x){ if (/^\d{4}-\d{2}-\d{2}$/.test(x.from || '') && x.from > (e.from || '') && (!nxt || x.from < nxt)) nxt = x.from; });
+    var end = (/^\d{4}-\d{2}-\d{2}$/.test(e.from || '') && nxt) ? _scpEndOf_([{ from: e.from }, { from: nxt }], 0) : '';
+    h += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">' +
+      '<span style="font-size:12px">Từ ngày</span><input type="date" value="' + esc(e.from || '') + '" onchange="_scpDraft[' + i + '].from=this.value;_renderSaleChannelsModal()" style="padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">' +
+      '<select onchange="_scpDraft[' + i + '].channel=this.value;_renderSaleChannelsModal()" style="width:170px"><option value=""' + (e.channel === '' ? ' selected' : '') + '>— Chưa phân loại —</option>' +
+      gs.map(function(g){ return '<option value="' + esc(g.key) + '"' + (e.channel === g.key ? ' selected' : '') + '>' + esc(g.label) + '</option>'; }).join('') + '</select>' +
+      '<span style="font-size:11.5px;color:var(--muted)">' + (e.from ? (end ? 'đến hết ' + esc(_scpFmtDate_(end)) : 'không giới hạn (đến khi có mốc mới)') : 'chọn ngày') + '</span>' +
+      '<button class="btn xs danger" onclick="_scpDraft.splice(' + i + ',1);_renderSaleChannelsModal()" title="Xoá mốc">🗑</button></div>';
+  });
+  h += '<div style="display:flex;gap:8px;margin-top:8px"><button class="btn sm secondary" onclick="_scpDraft.push({from:\'\',channel:\'\'});_renderSaleChannelsModal()">+ Thêm mốc</button>' +
+    '<button class="btn sm primary" onclick="_scpSaveDraft()">💾 Lưu mốc</button><button class="btn sm" onclick="_scpToggle(_scpOpenName)">Hủy</button></div></td></tr>';
+  return h;
+}
+function _scpSaveDraft(){
+  if (typeof currentUser !== 'undefined' && currentUser.role !== 'admin'){ toast('Chỉ Admin mới cài mốc phân loại.'); return; }
+  var rows = _scpDraft.filter(function(e){ return e.from || e.channel; });   // bỏ dòng trống hoàn toàn
+  if (rows.some(function(e){ return !/^\d{4}-\d{2}-\d{2}$/.test(e.from || ''); })){ toast('Mỗi mốc cần chọn ngày bắt đầu (hoặc xoá mốc trống).'); return; }
+  var seen = {};
+  for (var i = 0; i < rows.length; i++){ var f = rows[i].from; if (seen[f]){ toast('Có 2 mốc trùng ngày ' + _scpFmtDate_(f) + ' — mỗi ngày chỉ 1 mốc.'); return; } seen[f] = 1; }
+  _scpSet_(_scpOpenName, rows);
+  _scpOpenName = ''; _scpDraft = null;
+  saveSaleChannelPeriods();
+  _renderSaleChannelsModal();
+  if (typeof _srState !== 'undefined' && (_srState.sub === 'E' || _srState.sub === 'G') && typeof renderSalesReportTab === 'function') renderSalesReportTab();
+}

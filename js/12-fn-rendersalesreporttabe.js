@@ -1014,16 +1014,16 @@ function _renderSaleChannelsModal(){
   var q = (_scSearch||'').toLowerCase();
   var filtered = names.filter(function(n){ return !q || n.toLowerCase().indexOf(q)!==-1; });
   html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên..." value="'+esc(_scSearch||'')+'" oninput="_scSearch=this.value;_renderSaleChannelsModal()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:240px;margin-bottom:10px">';
-  html += '<table class="dash-table"><thead><tr><th>Tên</th><th style="width:220px">Đội</th></tr></thead><tbody>';
+  html += '<table class="dash-table"><thead><tr><th>Tên</th><th style="width:220px">Đội hiện tại</th><th style="min-width:200px">🗓 Mốc theo ngày</th></tr></thead><tbody>';
   filtered.forEach(function(name){
     var cur = _saleChannelOf_(name);
     html += '<tr><td>'+esc(name)+'</td><td>'+
       '<select onchange="_setSaleChannel(\''+esc(name).replace(/'/g,"\\'")+'\',this.value)" style="width:200px">'+
       '<option value=""'+(cur===''?' selected':'')+'>— Chưa phân loại —</option>'+
       SALE_GROUPS.map(function(g){ return '<option value="'+esc(g.key)+'"'+(cur===g.key?' selected':'')+'>'+esc(g.label)+'</option>'; }).join('')+
-      '</select></td></tr>';
+      '</select></td><td>'+_scpCellHtml_(name)+'</td></tr>' + _scpEditorRowHtml_(name, 3);
   });
-  if (!filtered.length) html += '<tr><td colspan="2" style="text-align:center;color:var(--muted);padding:14px">Không có tên nào khớp</td></tr>';
+  if (!filtered.length) html += '<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:14px">Không có tên nào khớp</td></tr>';
   html += '</tbody></table>';
   body.innerHTML = html;
 }
