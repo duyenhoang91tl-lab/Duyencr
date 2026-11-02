@@ -508,15 +508,20 @@ function _computeCommissionData_(orders) {
     salesList.forEach(function(sName){
       // saleRatio 0.3 = don Quay Hao Nam gan the sale + note 30/70: chi 30% doanh thu chia cho sale (70% la cua quay)
       var share = (shareMap ? giaTri * shareMap[sName] : giaTri / n) * (Number(m.saleRatio) || 1);
-      if (!bySale[sName]) bySale[sName] = { ordersAbove15:0, ordersBelow15:0, revenueAbove15:0, revenueBelow15:0, channelRevenue:0, channelCommission:0, channelBreakdown:{} };
+      if (!bySale[sName]) bySale[sName] = { ordersAbove15:0, ordersBelow15:0, revenueAbove15:0, revenueBelow15:0, channelRevenue:0, channelCommission:0, channelBreakdown:{}, srcBreakdown:{} };
       if (chRate !== null) {
         var kenhKey = String(m.nguonDon||'').trim() + (gold ? ' · ' + gold.label + (gold.mixed ? ' (đơn có cả 10k & 14k → mức thấp)' : '') : '');
         bySale[sName].channelRevenue += share;
         bySale[sName].channelCommission += share * (chRate/100);
         if (!bySale[sName].channelBreakdown[kenhKey]) bySale[sName].channelBreakdown[kenhKey] = { revenue:0, rate:chRate };
         bySale[sName].channelBreakdown[kenhKey].revenue += share;
-      } else if (isAbove) { bySale[sName].ordersAbove15++; bySale[sName].revenueAbove15 += share; }
-      else { bySale[sName].ordersBelow15++; bySale[sName].revenueBelow15 += share; }
+      } else {
+        // Chi tiet THEO NGUON DON cho phan hoa hong theo muc don (>=15tr / <15tr): dung cho bang "Thu nhap tung Sale" (js/63) — chi THEM, khong doi cach tinh
+        var srcK = String(m.nguonDon||'').trim() || '(không có nguồn)';
+        var sb = bySale[sName].srcBreakdown[srcK] || (bySale[sName].srcBreakdown[srcK] = { revAbove:0, revBelow:0, nAbove:0, nBelow:0 });
+        if (isAbove) { bySale[sName].ordersAbove15++; bySale[sName].revenueAbove15 += share; sb.nAbove++; sb.revAbove += share; }
+        else { bySale[sName].ordersBelow15++; bySale[sName].revenueBelow15 += share; sb.nBelow++; sb.revBelow += share; }
+      }
     });
   });
   // Giong Bao cao B (Theo Sale): KHONG liet ke "(chưa gán sale)" — khong co nguoi nao de tra hoa hong.
@@ -531,7 +536,7 @@ function _computeCommissionData_(orders) {
       revenueAbove15: s.revenueAbove15, revenueBelow15: s.revenueBelow15,
       rateAbove15: rate.above15, rateBelow15: rate.below15,
       sourceAbove15: rate.sourceAbove15, sourceBelow15: rate.sourceBelow15,
-      channelRevenue: s.channelRevenue, channelCommission: s.channelCommission, channelBreakdown: s.channelBreakdown,
+      channelRevenue: s.channelRevenue, channelCommission: s.channelCommission, channelBreakdown: s.channelBreakdown, sourceBreakdown: s.srcBreakdown,
       commission: commission
     };
   });

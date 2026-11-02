@@ -11,6 +11,14 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-03 (phiên 4) — Báo cáo E: bảng THU NHẬP TỪNG SALE (hoa hồng đủ nguồn + thưởng) + bấm Chi tiết + xuất Excel (Duyên yêu cầu) — BƯỚC 1/3 đã push
+- **Yêu cầu:** mỗi Sale có 1 dòng tổng gồm: hoa hồng các kênh + nguồn + Facebook + thưởng thử việc/chính thức + hoa hồng từ đơn chia với cửa hàng + thưởng khác nếu có; KHÔNG tính thưởng/phạt đội (js/60). Bấm Chi tiết xem nhận từ nguồn nào; xuất Excel để kiểm.
+- **Cách hiểu (nếu sai báo Duyên chỉnh):** "đơn chia cửa hàng" = doanh thu chia 30% của Báo cáo L (đã bỏ đơn Trùng/chưa đến/hoàn) × % theo mức đơn gốc của người đó; thử việc/chính thức = chương trình thưởng có/không bật "ngày thứ mấy kể từ ngày bắt đầu". "Thưởng khác": hiện KHÔNG có nguồn dữ liệu riêng nên chưa có cột (mọi CT thưởng đã nằm ở thử việc/chính thức).
+- [x] **BƯỚC 1 ĐÃ PUSH:** `js/63-fn-saleincome.js` (hàm thuần `_computeSaleIncome_`) + `_computeCommissionData_` (js/01) THÊM `sourceBreakdown` theo nguồn (chỉ thêm field, không đổi cách tính) + `tools/test-sale-income.js` (14 ca, qua). Gắn vào index.html (js/01 `?v=20261103a`, js/63 mới).
+- [ ] **BƯỚC 2 (kế tiếp):** js/11 nhánh E tải thêm `storeCaseReport` cùng khoảng ngày/sale (lỗi L không làm hỏng E) + js/12 `_srRenderE_` thêm mục "Thu nhập từng Sale" (cột 5 nhóm + Tổng, nút Chi tiết gom theo nhóm/nguồn).
+- [ ] **BƯỚC 3:** nút Xuất Excel (SheetJS có sẵn, mẫu `_tbExportXlsx` js/60): sheet Tổng hợp + Chi tiết từng dòng; cập nhật docs/crm-kb/05; Ctrl+F5.
+- **Ghi chú:** `node tools/test-biz-rules-client.js` đang đỏ SẴN từ trước (thiếu stub `_goldChannelRule_` trong test) — ngoài phạm vi, chưa sửa.
+
 ## 2026-11-03 (phiên 3) — Duyên chốt: M46228 sale 30% = 525.000đ; bảng final = TỔNG THƯỞNG (không lương); chỉ gửi 1 file — XONG 1/1
 - **Duyên xác nhận:** (1) đơn M46228 sale hưởng 30% = 525.000đ là ĐÚNG; (2) bảng final chỉ là tổng thưởng, KHÔNG gồm lương; (3) điều kiện nhẫn của CT Tourmaline cao cấp Duyên TỰ thêm trong CRM (cài đặt chương trình, không có commit mới trong repo → code không cần sửa); (4) chỉ gửi 1 file Excel final.
 - **NGUYÊN NHÂN GỐC chỗ lệch cũ:** cột "CRM qua file CH" của hàng Ninhltk1984 ở sheet 4b ước tính nhầm 70% (=1750000*70% = 1.225.000đ) trong khi quy tắc đúng là sale 30% → sửa về =1750000*30% = 525.000đ, lệch 0 (mục phiên 2 ghi lệch −700.000đ nay HUỶ). 4b: KT 61.440.300 / CRM 59.385.300 / lệch 2.055.000đ (còn M44707 ninhnga99 −645.000đ và M47179 2 sale +1.350.000đ/người).
