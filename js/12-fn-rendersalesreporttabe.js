@@ -361,6 +361,7 @@ function _srRenderE_(d){
 
   html += _goldRuleNoteHtml_(c);   // ghi chu luat vang kenh Nguon (chi hien khi co don ap dung)
 
+  html += _srIncomeSectionHtml_(d);   // THU NHAP TUNG SALE (js/63): tong hoa hong + thuong, bam Chi tiet xem tung nguon
   // b) Hoa hồng từng nhân viên
   _SR_COLTH_ROWSFN_['eSale'] = function(){ return _computeCommissionData_((_srState.dataE&&_srState.dataE.orders)||[]).bySale || []; };
   _SR_COLTH_GETTER_['eSale'] = { name: function(r){ return r.name; } };

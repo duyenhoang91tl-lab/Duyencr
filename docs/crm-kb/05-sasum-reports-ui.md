@@ -145,3 +145,6 @@ Báo cáo A có 3 cách đếm khác nhau, KHÔNG phải lỗi: (1) **Số lư�
 - UI: bảng Theo Sale (A khi không tick "tính theo người tạo", và B) ghi nhãn "Tổng lượt đơn theo sale" + dòng ℹ️ giải thích (`_srChartSvg(..., opts)`); các bảng Kênh/MKT giữ "Tổng số đơn".
 - Chẩn đoán: chạy tay `xemChenhLechSoDon` trong Apps Script Editor — liệt kê đơn thuộc A nhưng KHÔNG vào tỷ lệ chốt kèm lý do (BH 0đ / kênh chưa khớp Page / chưa có dữ liệu Pancake ngày đó). Muốn xem theo nhóm Sale: sửa `sale: []` trong hàm. Test: `tools/test-diag-sodon.js`, `tools/test-sr-sale-label.js`.
 
+## Báo cáo E › "Thu nhập từng Sale" (2026-11-03, Duyên yêu cầu)
+`js/63-fn-saleincome.js` — `_computeSaleIncome_(orders, storeData)` gộp mỗi Sale: hoa hồng theo mức đơn (tách theo nguồn đơn, từ `sourceBreakdown` của `_computeCommissionData_`) + hoa hồng kênh/nguồn % riêng (Facebook, Nguồn…) + hoa hồng đơn chia cửa hàng (credits Báo cáo L, bỏ Trùng/chưa đến/hoàn, × % theo mức đơn gốc) + thưởng thử việc / chính thức (chương trình có/không bật `probationDay`). **KHÔNG gồm thưởng/phạt đội (js/60).** Chèn ở `_srRenderE_` trước mục b); E tải thêm `storeCaseReport` (`_srState.dataEStore`, lỗi → cảnh báo cam). Nút Chi tiết xem từng nguồn; nút Xuất Excel (`_srIncomeExportXlsx`: sheet Tong hop + Chi tiet). Test: `node tools/test-sale-income.js`. Chưa có cột "Thưởng khác" (chưa có nguồn dữ liệu riêng).
+
