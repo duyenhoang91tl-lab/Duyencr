@@ -85,6 +85,7 @@ function _srIncomeSectionHtml_(d) {
   var rows = inc.rows.filter(function (r) { return !q || r.name.toLowerCase().indexOf(q) !== -1; }), T = inc.totals;
   var h = '<div class="dash-section-title" style="margin-top:6px">Thu nhập từng Sale — hoa hồng + thưởng <span style="font-weight:400;color:var(--muted);font-size:11px">(không gồm thưởng/phạt đội ở Quản lý Team)</span></div>';
   if (!_srState.dataEStore) h += '<div style="background:#fff7ed;border:1px solid #fdba74;color:#9a3412;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:12px">⚠ Chưa tải được dữ liệu đơn chia với cửa hàng' + (_srState.dataEStoreErr ? ' (' + esc(_srState.dataEStoreErr) + ')' : '') + ' — cột "Đơn chia cửa hàng" đang là 0.</div>';
+  h += '<div style="margin-bottom:6px"><button class="btn sm" onclick="_srIncomeExportXlsx()">⬇ Xuất Excel (tổng hợp + chi tiết từng nguồn)</button></div>';
   h += '<table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">Hoa hồng mức đơn</th><th style="text-align:right">Kênh/nguồn %</th><th style="text-align:right">Đơn chia cửa hàng</th><th style="text-align:right">Thưởng thử việc</th><th style="text-align:right">Thưởng chính thức</th><th style="text-align:right"><b>Tổng nhận</b></th><th></th></tr></thead><tbody>';
   rows.forEach(function (r, i) {
     var rid = 'in_' + i, open = _srState.incomeOpen === rid, chn = r.channel === 'online' ? 'Online' : (r.channel === 'probation' ? 'Thử việc' : (r.channel === 'offline' ? 'Offline' : ''));
@@ -96,4 +97,30 @@ function _srIncomeSectionHtml_(d) {
   if (!rows.length) h += '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
   else h += _srTotalRowHtml_(['Tổng', _srMoney(T.tier), _srMoney(T.channelComm), _srMoney(T.store), _srMoney(T.trial), _srMoney(T.official), '<b>' + _srMoney(T.total) + '</b>', '']);
   return h + '</tbody></table><div class="guide-text" style="font-size:11px;color:var(--muted);margin:6px 0 16px">Đơn chia cửa hàng = doanh thu chia ở Báo cáo L (bỏ đơn Trùng/chưa đến/hoàn) × % theo mức đơn của người đó. Bấm "Chi tiết" để xem nhận từ nguồn nào.</div>';
+}
+
+// ── Xuất Excel: sheet "Tong hop" (mỗi Sale 1 dòng) + "Chi tiet" (từng nguồn/chương trình/đơn chia cửa hàng) — để kế toán/Sale đối chiếu ──
+function _incomeExportRows_(inc) {
+  var sum = [['Sale', 'Kênh', 'Hoa hồng theo mức đơn', 'Hoa hồng kênh/nguồn % riêng', 'Hoa hồng đơn chia cửa hàng', 'Thưởng thử việc', 'Thưởng chính thức', 'TỔNG NHẬN']];
+  var det = [['Sale', 'Nhóm', 'Nguồn / chương trình', 'Mức / phạm vi', 'Số đơn', 'Doanh thu tính (đ)', '% hoa hồng', 'Tiền (đ)', 'Ngày', 'Ghi chú']];
+  inc.rows.forEach(function (r) {
+    var chn = r.channel === 'online' ? 'Online' : (r.channel === 'probation' ? 'Thử việc' : (r.channel === 'offline' ? 'Offline' : ''));
+    sum.push([r.name, chn, r.tier, r.channelComm, r.store, r.trial, r.official, r.total]);
+    _INCOME_GROUPS_.forEach(function (g) {
+      r.lines.filter(function (l) { return l.kind === g[0]; }).sort(function (a, b) { return (a.date || '').localeCompare(b.date || '') || b.amount - a.amount; }).forEach(function (l) {
+        det.push([r.name, g[1], l.source, l.bucket, l.orders || '', l.revenue || '', l.rate || '', l.amount, l.date || '', l.ref || '']);
+      });
+    });
+  });
+  var t = inc.totals; sum.push(['TỔNG', '', t.tier, t.channelComm, t.store, t.trial, t.official, t.total]);
+  return { sum: sum, det: det };
+}
+function _srIncomeExportXlsx() {
+  var d = _srState.dataE;
+  if (!d) { alert('Chưa có dữ liệu — đợi tải xong rồi bấm lại.'); return; }
+  if (typeof XLSX === 'undefined') { alert('Thư viện xuất Excel chưa tải xong — thử lại sau vài giây.'); return; }
+  var x = _incomeExportRows_(_computeSaleIncome_(d.orders || [], _srState.dataEStore)), wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(x.sum), 'Tong hop');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(x.det), 'Chi tiet');
+  XLSX.writeFile(wb, 'ThuNhapSale_' + (_srState.eDateFrom || '') + '_' + (_srState.eDateTo || '') + '.xlsx');
 }

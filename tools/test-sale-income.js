@@ -49,4 +49,10 @@ const html1 = vm.runInContext('(function(o){ return _srIncomeSectionHtml_({order
 ok(/Hoa hồng kênh\/nguồn % riêng/.test(html1) && /Facebook/.test(html1) && /Thưởng chính thức/.test(html1), 'mo Chi tiet: hien nhom + nguon Facebook + thuong');
 ctx._srState.dataEStore = null; ctx._srState.dataEStoreErr = 'het phien';
 ok(/Chưa tải được dữ liệu đơn chia/.test(vm.runInContext('(function(o){ return _srIncomeSectionHtml_({orders:o}); })', ctx)(orders)), 'thieu du lieu cua hang -> canh bao');
+// Xuat Excel: tong hop = tung Sale + dong TONG; chi tiet = moi dong chi tiet 1 dong, tong tien khop
+const X = vm.runInContext('(function(o,s){ return _incomeExportRows_(_computeSaleIncome_(o,s)); })', ctx)(orders, store);
+ok(X.sum.length === 1 + R.rows.length + 1 && X.sum[X.sum.length - 1][7] === R.totals.total, 'Excel: Tong hop co header + tung Sale + dong TONG khop');
+ok(X.det.length - 1 === R.rows.reduce((s, r) => s + r.lines.length, 0), 'Excel: Chi tiet du so dong');
+ok(X.det.slice(1).reduce((s, r) => s + r[7], 0) === R.totals.total, 'Excel: tong tien sheet Chi tiet = tong nhan');
+ok(X.det[0].length === X.det[1].length, 'Excel: so cot header = so cot dong du lieu');
 process.exit(bad ? 1 : 0);
