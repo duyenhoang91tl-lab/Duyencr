@@ -11,11 +11,11 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
-## 2026-11-03 (phiên 4) — Báo cáo E: bảng THU NHẬP TỪNG SALE (hoa hồng đủ nguồn + thưởng) + bấm Chi tiết + xuất Excel (Duyên yêu cầu) — BƯỚC 1/3 đã push
+## 2026-11-03 (phiên 4) — Báo cáo E: bảng THU NHẬP TỪNG SALE (hoa hồng đủ nguồn + thưởng) + bấm Chi tiết + xuất Excel (Duyên yêu cầu) — BƯỚC 2/3 đã push
 - **Yêu cầu:** mỗi Sale có 1 dòng tổng gồm: hoa hồng các kênh + nguồn + Facebook + thưởng thử việc/chính thức + hoa hồng từ đơn chia với cửa hàng + thưởng khác nếu có; KHÔNG tính thưởng/phạt đội (js/60). Bấm Chi tiết xem nhận từ nguồn nào; xuất Excel để kiểm.
 - **Cách hiểu (nếu sai báo Duyên chỉnh):** "đơn chia cửa hàng" = doanh thu chia 30% của Báo cáo L (đã bỏ đơn Trùng/chưa đến/hoàn) × % theo mức đơn gốc của người đó; thử việc/chính thức = chương trình thưởng có/không bật "ngày thứ mấy kể từ ngày bắt đầu". "Thưởng khác": hiện KHÔNG có nguồn dữ liệu riêng nên chưa có cột (mọi CT thưởng đã nằm ở thử việc/chính thức).
 - [x] **BƯỚC 1 ĐÃ PUSH:** `js/63-fn-saleincome.js` (hàm thuần `_computeSaleIncome_`) + `_computeCommissionData_` (js/01) THÊM `sourceBreakdown` theo nguồn (chỉ thêm field, không đổi cách tính) + `tools/test-sale-income.js` (14 ca, qua). Gắn vào index.html (js/01 `?v=20261103a`, js/63 mới).
-- [ ] **BƯỚC 2 (kế tiếp):** js/11 nhánh E tải thêm `storeCaseReport` cùng khoảng ngày/sale (lỗi L không làm hỏng E) + js/12 `_srRenderE_` thêm mục "Thu nhập từng Sale" (cột 5 nhóm + Tổng, nút Chi tiết gom theo nhóm/nguồn).
+- [x] **BƯỚC 2 ĐÃ PUSH:** js/11 nhánh E tải thêm `storeCaseReport` (cùng khoảng ngày/sale; lỗi → cảnh báo cam, E vẫn chạy) → `_srState.dataEStore`; js/63 `_srIncomeSectionHtml_` (bảng 5 nhóm + Tổng nhận + nút Chi tiết gom theo nhóm/nguồn) chèn vào `_srRenderE_` (js/12) TRƯỚC mục b) Hoa hồng nhân viên (không xoá mục cũ). Test `node tools/test-sale-income.js` (+3 ca UI). Index.html bump js/11,12,63 `?v=20261103b`.
 - [ ] **BƯỚC 3:** nút Xuất Excel (SheetJS có sẵn, mẫu `_tbExportXlsx` js/60): sheet Tổng hợp + Chi tiết từng dòng; cập nhật docs/crm-kb/05; Ctrl+F5.
 - **Ghi chú:** `node tools/test-biz-rules-client.js` đang đỏ SẴN từ trước (thiếu stub `_goldChannelRule_` trong test) — ngoài phạm vi, chưa sửa.
 

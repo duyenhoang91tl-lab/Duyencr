@@ -77,6 +77,12 @@ async function _srLoad(){
     _srRegisterIdentity_(dPos);
     if (dPos && dPos.orders) dPos.orders = dPos.orders.map(function(o){ return Object.assign({}, o, { saleBan: (o.saleBanValid !== undefined ? o.saleBanValid : o.theSale), giaTriDon: o.giaTriSauGiam, ngayTao: o.ngayTaoDon }); });
     _srState.dataE = dPos;
+    // Don chia voi CUA HANG (Bao cao L) cho muc "Thu nhap tung Sale": cung khoang ngay/Sale; loi/thieu quyen KHONG lam hong Bao cao E.
+    _srState.dataEStore = null; _srState.dataEStoreErr = '';
+    try {
+      var dStoreE = await _srFetch('storeCaseReport', { dateFrom: _srState.eDateFrom, dateTo: _srState.eDateTo, sale: (_srState.eSale||[]).join(',') });
+      if (dStoreE && dStoreE.ok !== false && !dStoreE.error) _srState.dataEStore = dStoreE; else _srState.dataEStoreErr = String((dStoreE && (dStoreE.error || dStoreE.message)) || 'không có dữ liệu');
+    } catch (eStoreE) { _srState.dataEStoreErr = String((eStoreE && eStoreE.message) || eStoreE); }
   } else if (_srState.sub === 'F') {
     // Dropdown khong phai 'custom' -> khoang ngay PHAI khop dropdown (tranh dropdown 'Tháng này'
     // ma 2 o ngay rong / cu sang thang khac => bao cao tinh nham toan bo lich su don).

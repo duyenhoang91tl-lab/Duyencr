@@ -63,3 +63,37 @@ function _computeSaleIncome_(orders, storeData) {
   rows.forEach(function (r) { Object.keys(tot).forEach(function (k) { tot[k] += r[k]; }); });
   return { rows: rows, totals: tot };
 }
+
+// ── Giao diện mục "Thu nhập từng Sale" của Báo cáo E ──
+var _INCOME_GROUPS_ = [['tier', 'Hoa hồng theo mức đơn (theo nguồn đơn)'], ['channelComm', 'Hoa hồng kênh/nguồn % riêng (Facebook, Nguồn…)'], ['store', 'Hoa hồng đơn chia với cửa hàng'], ['trial', 'Thưởng thử việc'], ['official', 'Thưởng chính thức']];
+function _srIncomeLinesHtml_(r) {
+  var h = '<table class="dash-table" style="margin:0"><thead><tr><th>Nguồn / chương trình</th><th>Mức / phạm vi</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Doanh thu tính</th><th style="text-align:right">%</th><th style="text-align:right">Tiền</th><th>Ngày · ghi chú</th></tr></thead><tbody>';
+  _INCOME_GROUPS_.forEach(function (g) {
+    var ls = r.lines.filter(function (l) { return l.kind === g[0]; });
+    if (!ls.length) return;
+    ls.sort(function (a, b) { return (a.date || '').localeCompare(b.date || '') || b.amount - a.amount; });
+    h += '<tr style="background:var(--surface);font-weight:700"><td colspan="5">' + esc(g[1]) + '</td><td style="text-align:right">' + _srMoney(r[g[0]]) + '</td><td></td></tr>';
+    ls.forEach(function (l) {
+      h += '<tr><td>' + esc(l.source) + '</td><td>' + esc(l.bucket) + '</td><td style="text-align:right">' + (l.orders ? fmt(l.orders) : '') + '</td><td style="text-align:right">' + (l.revenue ? _srMoney(l.revenue) : '') + '</td><td style="text-align:right">' + (l.rate ? l.rate + '%' : '') + '</td><td style="text-align:right">' + _srMoney(l.amount) +
+        '</td><td style="font-size:11px;color:var(--muted)">' + esc([l.date, l.ref].filter(Boolean).join(' · ')) + '</td></tr>';
+    });
+  });
+  return h + '</tbody></table>';
+}
+function _srIncomeSectionHtml_(d) {
+  var inc = _computeSaleIncome_(d.orders || [], _srState.dataEStore), q = String(_srState.eSaleSearch || '').toLowerCase();
+  var rows = inc.rows.filter(function (r) { return !q || r.name.toLowerCase().indexOf(q) !== -1; }), T = inc.totals;
+  var h = '<div class="dash-section-title" style="margin-top:6px">Thu nhập từng Sale — hoa hồng + thưởng <span style="font-weight:400;color:var(--muted);font-size:11px">(không gồm thưởng/phạt đội ở Quản lý Team)</span></div>';
+  if (!_srState.dataEStore) h += '<div style="background:#fff7ed;border:1px solid #fdba74;color:#9a3412;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:12px">⚠ Chưa tải được dữ liệu đơn chia với cửa hàng' + (_srState.dataEStoreErr ? ' (' + esc(_srState.dataEStoreErr) + ')' : '') + ' — cột "Đơn chia cửa hàng" đang là 0.</div>';
+  h += '<table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">Hoa hồng mức đơn</th><th style="text-align:right">Kênh/nguồn %</th><th style="text-align:right">Đơn chia cửa hàng</th><th style="text-align:right">Thưởng thử việc</th><th style="text-align:right">Thưởng chính thức</th><th style="text-align:right"><b>Tổng nhận</b></th><th></th></tr></thead><tbody>';
+  rows.forEach(function (r, i) {
+    var rid = 'in_' + i, open = _srState.incomeOpen === rid, chn = r.channel === 'online' ? 'Online' : (r.channel === 'probation' ? 'Thử việc' : (r.channel === 'offline' ? 'Offline' : ''));
+    h += '<tr><td>' + esc(r.name) + (chn ? ' <span style="font-size:10px;color:var(--muted)">(' + chn + ')</span>' : '') + '</td>' +
+      [r.tier, r.channelComm, r.store, r.trial, r.official].map(function (v) { return '<td style="text-align:right">' + (v ? _srMoney(v) : '—') + '</td>'; }).join('') +
+      '<td style="text-align:right"><b>' + _srMoney(r.total) + '</b></td><td><button class="btn sm" onclick="_srState.incomeOpen=' + (open ? "''" : "'" + rid + "'") + ';renderSalesReportTab()">' + (open ? 'Ẩn' : 'Chi tiết') + '</button></td></tr>';
+    if (open) h += '<tr><td colspan="8" style="background:var(--surface2);padding:8px 14px">' + _srIncomeLinesHtml_(r) + '</td></tr>';
+  });
+  if (!rows.length) h += '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+  else h += _srTotalRowHtml_(['Tổng', _srMoney(T.tier), _srMoney(T.channelComm), _srMoney(T.store), _srMoney(T.trial), _srMoney(T.official), '<b>' + _srMoney(T.total) + '</b>', '']);
+  return h + '</tbody></table><div class="guide-text" style="font-size:11px;color:var(--muted);margin:6px 0 16px">Đơn chia cửa hàng = doanh thu chia ở Báo cáo L (bỏ đơn Trùng/chưa đến/hoàn) × % theo mức đơn của người đó. Bấm "Chi tiết" để xem nhận từ nguồn nào.</div>';
+}

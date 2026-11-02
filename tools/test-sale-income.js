@@ -39,4 +39,14 @@ R.rows.forEach(r => ok(r.lines.reduce((s, l) => s + l.amount, 0) === r.total, r.
 const c = vm.runInContext('(function(o){ return _computeCommissionData_(o); })', ctx)(orders);
 ok(Math.round(c.bySale.find(x => x.name === 'an').commission) === g('an').tier + g('an').channelComm, 'khong lech so voi cot Hoa hong hien co cua Bao cao E');
 ok(R.totals.total === R.rows.reduce((s, r) => s + r.total, 0), 'tong cot = tong cac Sale');
+// Giao dien: render khong loi, co dong Chi tiet khi mo, canh bao khi thieu du lieu cua hang
+Object.assign(ctx, { esc: x => String(x == null ? '' : x).replace(/&/g, '&amp;').replace(/</g, '&lt;'), fmt: n => (n || 0).toLocaleString('vi-VN'), _srMoney: n => Math.round(n || 0) + 'd',
+  _srTotalRowHtml_: c => '<tr class="tot">' + c.map(x => '<td>' + x + '</td>').join('') + '</tr>', _srState: { eSaleSearch: '', dataEStore: store, incomeOpen: '' } });
+const html0 = vm.runInContext('(function(o){ return _srIncomeSectionHtml_({orders:o}); })', ctx)(orders);
+ok(/Thu nhập từng Sale/.test(html0) && /Tổng nhận/.test(html0) && !/Hoa hồng kênh\/nguồn % riêng/.test(html0), 'render bang tong hop (chua mo chi tiet)');
+ctx._srState.incomeOpen = 'in_0';
+const html1 = vm.runInContext('(function(o){ return _srIncomeSectionHtml_({orders:o}); })', ctx)(orders);
+ok(/Hoa hồng kênh\/nguồn % riêng/.test(html1) && /Facebook/.test(html1) && /Thưởng chính thức/.test(html1), 'mo Chi tiet: hien nhom + nguon Facebook + thuong');
+ctx._srState.dataEStore = null; ctx._srState.dataEStoreErr = 'het phien';
+ok(/Chưa tải được dữ liệu đơn chia/.test(vm.runInContext('(function(o){ return _srIncomeSectionHtml_({orders:o}); })', ctx)(orders)), 'thieu du lieu cua hang -> canh bao');
 process.exit(bad ? 1 : 0);
