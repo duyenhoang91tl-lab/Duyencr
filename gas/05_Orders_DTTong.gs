@@ -795,8 +795,11 @@ function _salePersonIdentity_(observed) {
     while (x !== r && parent[x] !== undefined) { var nx = parent[x]; parent[x] = r; x = nx; }
     return r;
   }
-  function note(raw) { var k = _normTxt_(raw); if (k && !disp[k]) disp[k] = String(raw).trim(); }
+  // Duyen chot 2026-10-25: KHONG co sale nao ten toan so. Token so (STT Pancake "8", "13"...) lot vao danh sach ten/the cua 1 nguoi thi KHONG duoc gop vao nhom va KHONG bao gio thanh ten chinh
+  // (truoc day "8" nam trong nhom huyenmaii1990, quy tac 'ten nho nhat theo chu cai' chon "8" lam ten chinh nen file doi soat in "ninhnga99,8" thay cho huyenmaii1990).
+  function note(raw) { if (_isNumericTag_(raw)) return; var k = _normTxt_(raw); if (k && !disp[k]) disp[k] = String(raw).trim(); }
   function union(a, b) {
+    if (_isNumericTag_(a) || _isNumericTag_(b)) return;
     note(a); note(b);
     a = _normTxt_(a); b = _normTxt_(b);
     if (!a || !b) return;
@@ -804,9 +807,9 @@ function _salePersonIdentity_(observed) {
     if (ra === rb) return;
     if (ra < rb) parent[rb] = ra; else parent[ra] = rb;
   }
-  function unionAll(arr) { for (var i = 1; i < arr.length; i++) union(arr[0], arr[i]); if (arr.length === 1) note(arr[0]); }
+  function unionAll(arr) { arr = (arr || []).filter(function(x) { return !_isNumericTag_(x); }); for (var i = 1; i < arr.length; i++) union(arr[0], arr[i]); if (arr.length === 1) note(arr[0]); }
   var prim = {};   // goc nhom -> ten chinh
-  function setPrim(name) { var k = _normTxt_(name); if (!k) return; note(name); var r = find(k); if (!prim[r]) prim[r] = disp[k]; }
+  function setPrim(name) { if (_isNumericTag_(name)) return; var k = _normTxt_(name); if (!k) return; note(name); var r = find(k); if (!prim[r]) prim[r] = disp[k]; }
   var tagPrimaries = [];
   try {
     var groups = _userAliasGroups_();
@@ -826,7 +829,7 @@ function _salePersonIdentity_(observed) {
   } catch (e3) {}
   // ten chinh theo thu tu uu tien (cac quy tac chay SAU khi da gop xong nen khoa 'find' la khoa cuoi cung)
   try { var tg = JSON.parse(getSetting_('salePersonTags') || '{}') || {}; Object.keys(tg).forEach(function(p) { if ((tg[p] || []).length) setPrim(p); }); } catch (e4) {}
-  try { readUsers_(getCrmSS_().getSheetByName(SH_USER)).forEach(function(u) { if (String(u.role || 'cs') !== 'cs') return; var first = (u.names && u.names[0]) || u.name; if (first) setPrim(first); }); } catch (e5) {}
+  try { readUsers_(getCrmSS_().getSheetByName(SH_USER)).forEach(function(u) { if (String(u.role || 'cs') !== 'cs') return; var first = ((u.names || []).filter(function(x) { return !_isNumericTag_(x); })[0]) || u.name; if (first) setPrim(first); }); } catch (e5) {}
   try { (readSaleDirectory_().list || []).forEach(function(rec) { if (rec.userBase) setPrim(rec.userBase); }); } catch (e6) {}
   // quy tac cuoi: chua co ten chinh -> ten nho nhat (chu cai) trong cac ten da biet + ten quan sat duoc
   (observed || []).forEach(function(n) { note(n); });
