@@ -125,7 +125,7 @@ function _scpCellHtml_(name){
   var list = _scpGroupListOf_(name);
   var sum = list.map(function(e, i){
     var end = _scpEndOf_(list, i);
-    return '<div style="font-size:11px;color:var(--muted)">' + (e.from ? esc(_scpFmtDate_(e.from)) : 'Từ đầu') + (end ? ' → ' + esc(_scpFmtDate_(end)) : ' →') + ': <b>' + esc(_scpChanLabel_(e.channel)) + '</b></div>';
+    return '<div style="font-size:11px;color:var(--muted)">' + (e.from ? esc(_scpFmtDate_(e.from)) : 'Từ đầu') + (end ? ' → ' + esc(_scpFmtDate_(end)) : ' →') + ': <b>' + esc(_scpChanLabel_(e.channel)) + '</b>' + (e.bonusFrom ? ' · tính thưởng từ ' + esc(_scpFmtDate_(e.bonusFrom)) : '') + '</div>';
   }).join('');
   return '<button class="btn xs" data-name="' + esc(name) + '" onclick="_scpToggle(this.dataset.name)">🗓 ' + (list.length ? 'Sửa mốc (' + list.length + ')' : 'Thêm mốc') + '</button>' + sum;
 }
@@ -139,7 +139,7 @@ function _scpEditorRowHtml_(name, colspan){
   var gs = (typeof SALE_GROUPS !== 'undefined' && SALE_GROUPS) || [];
   var h = '<tr><td colspan="' + colspan + '" style="background:var(--surface2);padding:10px 14px">' +
     '<div style="font-size:12px;margin-bottom:8px"><b>Mốc phân loại theo ngày — ' + esc(name) + '</b><br><span style="color:var(--muted)">Mỗi mốc có hiệu lực <b>từ ngày chọn</b> đến hết ngày liền trước mốc kế tiếp. Ví dụ: <i>10/09 Thử việc</i> + <i>11/10 Online</i> → thử việc 10/09→10/10, chính thức từ 11/10. ' +
-    '<b>Ngày là tuỳ chọn</b>: Sale vốn đã chính thức thì chỉ cần chọn Chính thức + đội và để trống ngày (hoặc không thêm mốc, chỉ cần cột "Đội hiện tại"). Ngày trước mốc đầu tiên có ngày dùng cột "Đội hiện tại". Chương trình thưởng (Báo cáo E, G) tự áp dụng theo loại của Sale <b>tại đúng ngày tạo đơn</b>.</span></div>';
+    '<b>Ngày là tuỳ chọn</b>: Sale vốn đã chính thức thì chỉ cần chọn Chính thức + đội và để trống ngày (hoặc không thêm mốc, chỉ cần cột "Đội hiện tại"). Ngày trước mốc đầu tiên có ngày dùng cột "Đội hiện tại". Mốc <b>Thử việc</b> có thêm ô <b>Bắt đầu tính thưởng</b> (ngày sau học việc — khác ngày bắt đầu thử việc); các chương trình thưởng thử việc "theo ngày thứ mấy" tính từ ngày này. Chương trình thưởng (Báo cáo E, G) tự áp dụng theo loại của Sale <b>tại đúng ngày tạo đơn</b>.</span></div>';
   _scpDraft.forEach(function(e, i){
     var nxt = ''; _scpDraft.forEach(function(x){ if (/^\d{4}-\d{2}-\d{2}$/.test(x.from || '') && x.from > (e.from || '') && (!nxt || x.from < nxt)) nxt = x.from; });
     var end = nxt ? _scpEndOf_([{ from: e.from || '' }, { from: nxt }], 0) : '';
@@ -149,6 +149,7 @@ function _scpEditorRowHtml_(name, colspan){
       '<option value="tv"' + (e.channel === 'probation' ? ' selected' : '') + '>Thử việc</option><option value="ct"' + (e.channel && e.channel !== 'probation' ? ' selected' : '') + '>Chính thức</option></select>' +
       (e.channel && e.channel !== 'probation' ? '<select onchange="_scpDraft[' + i + '].channel=this.value;_renderSaleChannelsModal()" style="width:140px">' +
         _scpTeamGroups_().map(function(g){ return '<option value="' + esc(g.key) + '"' + (e.channel === g.key ? ' selected' : '') + '>' + esc(g.label) + '</option>'; }).join('') + '</select>' : '') +
+      (e.channel === 'probation' ? '<span style="font-size:12px" title="Thử việc tính tròn 1 tháng; ngày này là ngày được áp dụng chương trình thưởng (sau học việc)">Bắt đầu tính thưởng</span><input type="date" value="' + esc(e.bonusFrom || '') + '" onchange="_scpDraft[' + i + '].bonusFrom=this.value" style="padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">' : '') +
       '<span style="font-size:11.5px;color:var(--muted)">' + (e.from ? (end ? 'đến hết ' + esc(_scpFmtDate_(end)) : 'không giới hạn (đến khi có mốc mới)') : (end ? 'không chọn ngày = từ trước đến hết ' + esc(_scpFmtDate_(end)) : 'không chọn ngày = áp dụng từ trước đến nay')) + '</span>' +
       '<button class="btn xs danger" onclick="_scpDraft.splice(' + i + ',1);_renderSaleChannelsModal()" title="Xoá mốc">🗑</button></div>';
   });

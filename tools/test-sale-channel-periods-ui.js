@@ -49,6 +49,14 @@ ok(run('_scpOpenName') === '' && run('_saleChannelOn_("Chi","2020-01-01")') === 
 // mốc không ngày + mốc có ngày: không ngày = giai đoạn đầu
 run('_scpToggle("Chi")'); run('_scpDraft.push({from:"2026-10-11", channel:"online"})'); run('_scpSaveDraft()');
 ok(run('_saleChannelOn_("Chi","2026-10-10")') === 'offline' && run('_saleChannelOn_("Chi","2026-10-11")') === 'online' && /Từ đầu → 10\/10\/2026/.test(run('_scpCellHtml_("Chi")')), 'không ngày + có ngày');
+// NGÀY BẮT ĐẦU TÍNH THƯỞNG (bonusFrom): ô chỉ hiện ở mốc Thử việc, lưu được, hiện ở tóm tắt, mất khi đổi sang Chính thức
+ctx.currentUser.role = 'admin'; run('_scpToggle("Chi")'); run('_scpDraft.length=0; _scpDraft.push({from:"2026-10-01",channel:"probation"}); _scpDraft.push({from:"2026-11-01",channel:"online"})');
+{ const h = run('_scpEditorRowHtml_("Chi",3)'); ok((h.match(/Bắt đầu tính thưởng/g) || []).length === 2, 'ô Bắt đầu tính thưởng chỉ hiện ở mốc Thử việc (1 ô + 1 lần trong lời giải thích)'); }
+run('_scpDraft[0].bonusFrom="2026-10-14"'); run('_scpSaveDraft()');
+ok(run('_scpListOf_("Chi")[0].bonusFrom') === '2026-10-14' && run('_scpListOf_("Chi")[1].bonusFrom') === undefined, 'lưu bonusFrom cho mốc Thử việc');
+ok(/tính thưởng từ 14\/10\/2026/.test(run('_scpCellHtml_("Chi")')), 'tóm tắt hiện ngày tính thưởng');
+run('_scpToggle("Chi")'); ok(run('_scpDraft[0].bonusFrom') === '2026-10-14', 'mở lại editor giữ bonusFrom');
+run('_scpSetStage(0,"ct")'); ok(run('_scpDraft[0].bonusFrom') === '', 'đổi sang Chính thức → bỏ bonusFrom'); run('_scpToggle("Chi")');
 // không phải admin
 ctx.currentUser.role = 'cs'; run('_scpToggle("Chi")'); run('_scpSaveDraft()'); ok(toasts.some(m => /Chỉ Admin/.test(m)), 'chỉ admin lưu');
 // _setSaleChannel (js/12): đặt đội cho 1 dòng = ghi cho MỌI tên cùng 1 người

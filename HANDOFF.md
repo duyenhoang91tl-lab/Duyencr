@@ -11,11 +11,12 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
-## 2026-11-02 (tối 6) — Báo cáo G: "Ngày bắt đầu tính thưởng" RIÊNG trong mốc Thử việc (Duyên yêu cầu) — BƯỚC 1/2 đã push
+## 2026-11-02 (tối 6) — Báo cáo G: "Ngày bắt đầu tính thưởng" RIÊNG trong mốc Thử việc (Duyên yêu cầu) — XONG 2/2
 - **Vấn đề:** Ngọc (Offline) cài Thử việc ở modal Phân loại nhưng Báo cáo G mục Thử việc = 0 Sale; Duyên không tìm thấy Quản lý tài khoản của Ngọc.
 - **NGUYÊN NHÂN GỐC:** `_bonusProgramApplies_` (CT bật "Giới hạn theo ngày thử việc") chỉ đọc `_saleStartDate_` = startDate của TÀI KHOẢN → Sale chưa có startDate bị bỏ qua mọi CT thử việc. (Bản fix đầu lấy ngày `from` của mốc làm ngày bắt đầu là SAI: thử việc tính tròn 1 tháng, còn ngày bắt đầu tính thưởng là SAU thời gian học việc → 2 ngày khác nhau.)
 - [x] **BƯỚC 1 ĐÃ PUSH:** mốc Thử việc có thêm trường `bonusFrom` (yyyy-MM-dd, chỉ mốc Thử việc; `_scpNorm_`/`_scpSet_`/`_scpToggle`/`_scpSetStage` giữ nguyên trường này). `_saleStartDate_` (js/12): ưu tiên startDate tài khoản, nếu trống → `bonusFrom` của mốc Thử việc (KHÔNG dùng `from`). Test: `node tools/test-sale-start-from-period.js`. Bump js/12 + js/62 `?v=20261102g`. Không đổi gas_v13.js.
-- [ ] **BƯỚC 2 (ĐANG LÀM):** thêm ô "Bắt đầu tính thưởng" vào giao diện sửa mốc (js/62 `_scpEditorRowHtml_`, chỉ hiện khi Giai đoạn = Thử việc) + hiện trong tóm tắt ô mốc (`_scpCellHtml_`).
+- [x] **BƯỚC 2 ĐÃ PUSH (js/62):** ô "Bắt đầu tính thưởng" (date) ở `_scpEditorRowHtml_`, chỉ hiện khi Giai đoạn = Thử việc; tóm tắt ô mốc hiện "· tính thưởng từ dd/mm/yyyy"; đổi sang Chính thức thì xoá bonusFrom. Test UI thêm ca bonusFrom. Bump js/62 `?v=20261102h`.
+- **ĐANG LÀM: không có việc dở.** Lưu ý: ngày này chỉ có tác dụng với CT thưởng bật "Giới hạn theo ngày thử việc"; nếu Báo cáo G vẫn 0 sau khi điền → kiểm tra tên Sale trên đơn Pos khớp tên/bí danh Ngọc, bộ lọc Phòng kinh doanh, đối tượng/ngày hiệu lực CT.
 - Duyên làm sau bước 2: Ctrl+F5 → Phân loại đội Sale → Sửa mốc của Ngọc → điền "Bắt đầu tính thưởng" → Lưu → xem Báo cáo G.
 
 ## 2026-11-02 (tối 5) — Modal Phân loại đội Sale: GOM THEO NGƯỜI (1 người cài 1 lần) (Duyên yêu cầu) — XONG 1/1
