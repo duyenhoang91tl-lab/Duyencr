@@ -74,9 +74,58 @@ function _readPosSnapshots_() {
   try { var raw = getSetting_('posMonthSnapshots'); if (raw) { var o = JSON.parse(raw); if (o && typeof o === 'object') return o; } } catch (e) {}
   return {};
 }
+// Duyen 2026-11-02: "cuoi thang bam Chot thang nay lam moc" -> cho chot CA thang hien tai khi hom nay la NGAY CUOI THANG (truoc day chi chot duoc
+// thang da qua nen cuoi thang bam la bi tu choi "chua ket thuc"). Chua den ngay cuoi thang van bi chan (chot som se mat don den sau).
+function _isLastDayOfMonthVn_() {
+  var tz = Session.getScriptTimeZone() || 'Asia/Ho_Chi_Minh';
+  return Utilities.formatDate(new Date(Date.now() + 86400000), tz, 'yyyy-MM') !== Utilities.formatDate(new Date(), tz, 'yyyy-MM');
+}
+function _posCanCloseMonth_(month) {
+  var cur = _todayYm_();
+  if (month < cur) return { ok: true };
+  if (month === cur && _isLastDayOfMonthVn_()) return { ok: true };
+  return { ok: false, error: 'Chưa chốt được tháng ' + month + ': tháng này chưa kết thúc. Chỉ chốt vào NGÀY CUỐI THÁNG hoặc từ mùng 1 tháng sau, sau khi đã cập nhật đủ dữ liệu.' };
+}
+// Khoang ngay dateFrom..dateTo = DUNG 1 thang lich (ngay 1 -> ngay cuoi) thi tra 'YYYY-MM', nguoc lai ''.
+function _posFullMonthOfRange_(from, to) {
+  var m = /^(\d{4}-\d{2})-01$/.exec(String(from || ''));
+  return (m && String(to || '') === _ymLastDay_(m[1])) ? m[1] : '';
+}
+// BANG "THEO SALE" CUA BAO CAO B TU NHAY THEO MOC CHOT (Duyen 2026-11-02): khi xem DUNG 1 thang lich M va thang M-1 DA CHOT, giaTri tung sale = doanh thu M
+// − phan hoan/huy phat sinh cua M-1 SAU luc chot (cung so "Sau tru" cua nut Xem sau khi tru hoan/huy). Chua chot M-1 -> giu nguyen (applied:false + ly do).
+// NGUYEN NHAN GOC truoc day: so tru chi hien o khung rieng cuoi trang, con bang Theo Sale / the Tong gia tri van la so goc nen KHONG khop bao cao da chot.
+// CHI ap o lop tra ve cua action salesReportB — buildSalesReportB_ van tra so GOC, vi anh chup luc chot (_posRevenueBySale_) phai la so goc (khong tru long nhau).
+// Chi ap khi bo loc la ngay (+ danh sach sale); bo loc Nguon/MKT/San pham/Trang thai... thi khong ap vi so tru la so cua toan thang, khong loc theo cac chieu do.
+function applyPosMonthAdjustToReportB_(res, filters) {
+  filters = filters || {};
+  var month = _posFullMonthOfRange_(filters.dateFrom, filters.dateTo);
+  if (!res || !month) return res;
+  var prev = _ymAdd_(month, -1), snap = _readPosSnapshots_()[prev];
+  var info = { applied: false, month: month, prevMonth: prev };
+  res.posAdjust = info;
+  if (!snap) { info.reason = 'Chưa chốt tháng ' + prev + ' nên chưa trừ hoàn/hủy.'; return res; }
+  var other = ['nguon', 'marketer', 'careStatus', 'khStatus', 'zaloStatus'].some(function(k) { return filters[k] && filters[k].length; }) || filters.sanPham || filters.nickZalo;
+  if (other) { info.reason = 'Đang lọc theo Nguồn/MKT/Sản phẩm/Trạng thái nên không trừ hoàn/hủy (số trừ tính cho cả tháng). Bỏ các bộ lọc này để xem số sau trừ.'; return res; }
+  var now = _posRevenueBySale_(prev), want = null;
+  if (filters.sale && filters.sale.length) { want = {}; filters.sale.forEach(function(n) { want[n] = 1; }); }
+  var names = {}; Object.keys(snap.bySale || {}).forEach(function(n) { names[n] = 1; }); Object.keys(now.bySale).forEach(function(n) { names[n] = 1; });
+  var ded = {}; Object.keys(names).forEach(function(n) { if (!want || want[n]) { var d = Math.round(((Number(snap.bySale[n]) || 0) - (Number(now.bySale[n]) || 0)) * 100) / 100; if (d) ded[n] = d; } });
+  var totalDed = 0, rows = res.bySale || [], seen = {};
+  rows.forEach(function(r) { seen[r.name] = 1; r.giaTriGoc = r.giaTri; r.truHoanHuy = ded[r.name] || 0; r.giaTri = r.giaTri - r.truHoanHuy; totalDed += r.truHoanHuy; });
+  Object.keys(ded).forEach(function(n) { if (!seen[n]) { rows.push({ name: n, orders: 0, giaTri: -ded[n], cod: 0, giaTriGoc: 0, truHoanHuy: ded[n] }); totalDed += ded[n]; } });
+  rows.sort(function(a, b) { return b.giaTri - a.giaTri; });
+  res.bySale = rows;
+  res.totalGiaTriGoc = res.totalGiaTri;
+  res.totalGiaTri = res.totalGiaTri - totalDed;
+  res.trungBinhDon = res.totalOrders ? Math.round(res.totalGiaTri / res.totalOrders) : 0;
+  info.applied = true; info.closedAt = snap.closedAt; info.totalDeduction = totalDed;
+  info.note = 'Đã trừ phần hoàn/hủy của tháng ' + prev + ' (mốc chốt ' + snap.closedAt + ') vào bảng Theo Sale và tổng giá trị. Bảng Theo Team/Nguồn/MKT chưa trừ.';
+  return res;
+}
 function closePosMonth_(month, force) {
   if (!/^\d{4}-\d{2}$/.test(String(month || ''))) return { ok: false, error: 'Tháng không hợp lệ (cần dạng YYYY-MM)' };
-  if (month >= _todayYm_()) return { ok: false, error: 'Chỉ chốt được tháng đã qua (tháng ' + month + ' chưa kết thúc). Chốt vào ngày mùng 1 sau khi đã cập nhật đủ dữ liệu tháng đó.' };
+  var canClose = _posCanCloseMonth_(month);
+  if (!canClose.ok) return { ok: false, error: canClose.error };
   var snaps = _readPosSnapshots_();
   if (snaps[month] && !force) return { ok: false, needForce: true, closedAt: snaps[month].closedAt, error: 'Tháng ' + month + ' đã chốt lúc ' + snaps[month].closedAt + '. Chốt lại sẽ GHI ĐÈ mốc cũ (và làm đổi số trừ hoàn/hủy).' };
   var cur = _posRevenueBySale_(month);

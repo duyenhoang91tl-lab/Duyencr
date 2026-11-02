@@ -1,0 +1,78 @@
+#!/usr/bin/env node
+// Test CHOT THANG POS -> bang "Theo Sale" cua Bao cao B TU NHAY theo moc chot (Duyen 2026-11-02). Chay ham GAS THAT voi du lieu gia.
+// Chay: node tools/test-pos-month-adjust.js
+const fs = require('fs'), vm = require('vm'), path = require('path');
+const R = p => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
+let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL ' + m); } else console.log('OK   ' + m); };
+const J = x => JSON.parse(JSON.stringify(x));
+const handler = { get: (t, p) => (p in t ? t[p] : (p === 'then' ? undefined : new Proxy(function () {}, handler))), apply: () => new Proxy(function () {}, handler) };
+const svc = () => new Proxy(function () {}, handler);
+const ctx = { SpreadsheetApp: svc(), CacheService: svc(), PropertiesService: svc(), LockService: svc(), UrlFetchApp: svc(), Utilities: svc(), Session: svc(), DriveApp: svc(),
+  DocumentApp: svc(), ContentService: svc(), HtmlService: svc(), MailApp: svc(), ScriptApp: svc(), Logger: { log() {} }, console };
+vm.createContext(ctx); vm.runInContext(R('gas_v13.js'), ctx, { filename: 'gas_v13.js' });
+// Gia lap: bySale cua tung thang lay tu 1 bang cho truoc; setting luu o bien.
+vm.runInContext(`
+  var __settings = {}; getSetting_ = function(k) { return __settings[k] == null ? null : __settings[k]; }; setSetting_ = function(k, v) { __settings[k] = v; };
+  var __today = '2026-11', __last = false; _todayYm_ = function() { return __today; }; _isLastDayOfMonthVn_ = function() { return __last; };
+  _vnYmd_ = function() { return '2026-10-31'; };
+  var __data = {};   // ym -> { sale: giaTri }  (so HIEN TAI cua tung thang)
+  buildSalesReportB_ = function(f) { var ym = f.dateFrom.slice(0, 7), d = __data[ym] || {}; var bs = Object.keys(d).map(function(n) { return { name: n, orders: 5, giaTri: d[n], cod: 0 }; });
+    return { totalOrders: 5 * bs.length, totalGiaTri: bs.reduce(function(s, r) { return s + r.giaTri; }, 0), bySale: bs, trungBinhDon: 0 }; };
+`, ctx);
+const run = c => J(vm.runInContext(c, ctx));
+
+// ── 1. Cho chot thang hien tai CHI vao ngay cuoi thang ──
+ctx.__today = '2026-10'; ctx.__last = false;
+ok(run('_posCanCloseMonth_("2026-10")').ok === false, 'giua thang 10: chua chot duoc thang 10');
+ctx.__last = true;
+ok(run('_posCanCloseMonth_("2026-10")').ok === true, 'NGAY CUOI thang 10: chot duoc thang 10 (yeu cau cua Duyen)');
+ok(run('_posCanCloseMonth_("2026-11")').ok === false, 'thang tuong lai van bi chan');
+ok(run('_posCanCloseMonth_("2026-09")').ok === true, 'thang da qua chot binh thuong');
+
+// ── 2. Chot thang 10 vao cuoi thang, sau do thang 11 tru hoan/huy phat sinh sau luc chot ──
+ctx.__data = { '2026-10': { anhtrinh1995: 1000000, yenNTH2004: 600000 } };
+const c1 = run('closePosMonth_("2026-10")');
+ok(c1.ok && c1.total === 1600000 && c1.saleCount === 2, 'chot thang 10 luc cuoi thang: luu anh chup 1.600.000 / 2 sale');
+// sau chot: don thang 10 cua anhtrinh1995 bi hoan 150.000 -> so thang 10 tinh lai con 850.000
+ctx.__data = { '2026-10': { anhtrinh1995: 850000, yenNTH2004: 600000 }, '2026-11': { anhtrinh1995: 700000, yenNTH2004: 300000, menbui2002: 200000 } };
+ctx.__today = '2026-11'; ctx.__last = false;
+const F11 = { dateFrom: '2026-11-01', dateTo: '2026-11-30' };
+let r = run('applyPosMonthAdjustToReportB_(buildSalesReportB_({dateFrom:"2026-11-01",dateTo:"2026-11-30"}), ' + JSON.stringify(F11) + ')');
+const byN = n => r.bySale.find(x => x.name === n);
+ok(r.posAdjust && r.posAdjust.applied && r.posAdjust.prevMonth === '2026-10', 'thang 11: posAdjust.applied, tru hoan/huy cua thang 10');
+ok(byN('anhtrinh1995').giaTri === 550000 && byN('anhtrinh1995').giaTriGoc === 700000 && byN('anhtrinh1995').truHoanHuy === 150000, 'anhtrinh1995: 700.000 − 150.000 = 550.000');
+ok(byN('yenNTH2004').giaTri === 300000 && byN('menbui2002').giaTri === 200000, 'sale khong bi hoan: giu nguyen');
+ok(r.totalGiaTri === 1050000 && r.totalGiaTriGoc === 1200000 && r.posAdjust.totalDeduction === 150000, 'tong gia tri = 1.200.000 − 150.000 = 1.050.000');
+ok(r.bySale.map(x => x.name).join() === 'anhtrinh1995,yenNTH2004,menbui2002'.split(',').sort((a, b) => byN(b).giaTri - byN(a).giaTri).join(), 'sap xep lai theo gia tri sau tru');
+// khop voi nut "Xem sau khi tru hoan/huy" (posMonthAdjust_)
+const adj = run('posMonthAdjust_("2026-11")');
+ok(adj.rows.every(x => byN(x.name) && byN(x.name).giaTri === x.net) && adj.totalNet === r.totalGiaTri, 'bang Theo Sale = cot "Sau tru" cua nut Xem sau khi tru hoan/huy (cung 1 so)');
+
+// ── 3. Cac truong hop KHONG ap ──
+r = run('applyPosMonthAdjustToReportB_(buildSalesReportB_({dateFrom:"2026-12-01",dateTo:"2026-12-31"}), {dateFrom:"2026-12-01",dateTo:"2026-12-31"})');
+ok(r.posAdjust && !r.posAdjust.applied && /Chưa chốt/.test(r.posAdjust.reason), 'chua chot thang truoc (thang 12): giu nguyen + ly do');
+const rg = run('applyPosMonthAdjustToReportB_(buildSalesReportB_({dateFrom:"2026-11-05",dateTo:"2026-11-30"}), {dateFrom:"2026-11-05",dateTo:"2026-11-30"})');
+ok(rg.posAdjust === undefined && rg.bySale.length === 3 && rg.bySale[0].truHoanHuy === undefined, 'khoang ngay KHONG phai tron 1 thang: khong tru');
+r = run('applyPosMonthAdjustToReportB_(buildSalesReportB_({dateFrom:"2026-11-01",dateTo:"2026-11-30"}), {dateFrom:"2026-11-01",dateTo:"2026-11-30",nguon:["Zalo"]})');
+ok(r.posAdjust && !r.posAdjust.applied && /Nguồn/.test(r.posAdjust.reason), 'dang loc Nguon: khong tru, co ly do');
+// loc theo danh sach sale: chi tru cho sale trong danh sach
+r = run('applyPosMonthAdjustToReportB_(buildSalesReportB_({dateFrom:"2026-11-01",dateTo:"2026-11-30"}), {dateFrom:"2026-11-01",dateTo:"2026-11-30",sale:["yenNTH2004"]})');
+ok(r.posAdjust.applied && r.posAdjust.totalDeduction === 0, 'loc sale khong bi hoan: tong tru = 0 (khong tru nham cua sale khac)');
+r = run('applyPosMonthAdjustToReportB_(buildSalesReportB_({dateFrom:"2026-11-01",dateTo:"2026-11-30"}), {dateFrom:"2026-11-01",dateTo:"2026-11-30",sale:["anhtrinh1995"]})');
+ok(r.posAdjust.totalDeduction === 150000, 'loc dung sale bi hoan: tru 150.000');
+
+// ── 4. Sale chi co hoan/huy, thang M khong co don -> van hien dong am ──
+ctx.__data = { '2026-10': { anhtrinh1995: 850000, yenNTH2004: 600000 }, '2026-11': { yenNTH2004: 300000 } };
+r = run('applyPosMonthAdjustToReportB_(buildSalesReportB_({dateFrom:"2026-11-01",dateTo:"2026-11-30"}), {dateFrom:"2026-11-01",dateTo:"2026-11-30"})');
+ok(r.bySale.some(x => x.name === 'anhtrinh1995' && x.giaTri === -150000 && x.orders === 0), 'sale khong co don thang 11 nhung co hoan/huy thang 10: dong am −150.000');
+ok(r.totalGiaTri === 150000, 'tong = 300.000 − 150.000');
+
+// ── 5. Anh chup luc chot la so GOC (khong bi tru long nhau) ──
+ctx.__data = { '2026-10': { a: 100 }, '2026-11': { a: 80 } };
+vm.runInContext('__settings = {}', ctx);
+run('closePosMonth_("2026-10")'); ctx.__data['2026-10'].a = 90;
+run('closePosMonth_("2026-11", false)');   // thang 11 chua ket thuc -> bi chan
+const snaps = JSON.parse(vm.runInContext('__settings.posMonthSnapshots', ctx));
+ok(snaps['2026-10'] && snaps['2026-10'].bySale.a === 100 && !snaps['2026-11'], 'snapshot thang 10 = so goc 100; thang 11 chua ket thuc nen khong chot');
+console.log(fails ? '\n' + fails + ' LOI' : '\nTAT CA QUA');
+process.exit(fails ? 1 : 0);
