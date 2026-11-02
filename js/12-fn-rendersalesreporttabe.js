@@ -583,8 +583,8 @@ function _srRenderF_(d){
 //  Có xuất CSV (chi tiết từng lượt thưởng / tổng hợp / đơn đã dùng để tính) để kế toán đối chiếu.
 //  Backend action failedOrderReport giữ nguyên (không còn tab nào gọi), chỉ bỏ giao diện.
 // ════════════════════════════════════════════════════════════════════
-function _srGSaleTypeLabel_(name){
-  var c = _saleChannelOf_(name);
+function _srGSaleTypeLabel_(name, chan){
+  var c = (chan !== undefined && chan !== '') ? chan : _saleChannelOf_(name);   // chan = loại của HÀNG (theo mốc ngày), bỏ trống → loại hiện tại
   return c === 'probation' ? 'Thử việc' : (c === 'online' ? 'Online' : (c === 'offline' ? 'Offline' : 'Chưa phân loại'));
 }
 function _srGDecode_(s){
@@ -601,15 +601,37 @@ function _srGBuildGroups_(orders){
   var bonus = _computeBonusData_(orders || []);
   var g = { tv: { rows: [], total: 0 }, ct: { rows: [], total: 0 }, total: 0, programs: {}, skipped: [] };
   bonus.bySale.forEach(function(r){
-    if (!_srGEligible_(r.name)) { g.skipped.push(r.name); return; }
-    g.total += r.total;
-    var isTv = _saleChannelOf_(r.name) === 'probation';
-    var grp = isTv ? g.tv : g.ct;
-    grp.rows.push(r); grp.total += r.total;
-    r.items.forEach(function(it){
-      var p = g.programs[it.program] || (g.programs[it.program] = { name: it.program, tvCount: 0, tvAmount: 0, ctCount: 0, ctAmount: 0 });
-      if (isTv){ p.tvCount++; p.tvAmount += it.amount; } else { p.ctCount++; p.ctAmount += it.amount; }
+    // Nhóm theo loại Sale TẠI NGÀY của từng lượt thưởng (mốc ngày ở js/62): Sale đổi Thử việc → Chính thức giữa kỳ
+    // xuất hiện ở CẢ 2 nhóm, mỗi nhóm chỉ gồm các lượt thưởng thuộc giai đoạn đó. Không có mốc → như cũ (theo loại hiện tại).
+    var tvItems = [], ctItems = [], ctChan = '', dropped = 0;
+    (r.items || []).forEach(function(it){
+      var ch = _saleChannelOn_(r.name, it.date);
+      if (ch === 'probation') tvItems.push(it);
+      else if (ch === 'online' || ch === 'offline'){ ctItems.push(it); if (!ctChan) ctChan = ch; }
+      else dropped++;
     });
+    if (!(r.items || []).length){   // không có lượt thưởng nào: giữ cách xét cũ theo loại hiện tại
+      if (!_srGEligible_(r.name)) { g.skipped.push(r.name); return; }
+      var c0 = _saleChannelOf_(r.name);
+      var row0 = { name: r.name, total: r.total, items: [], chan: c0 };
+      g.total += r.total;
+      if (c0 === 'probation'){ g.tv.rows.push(row0); g.tv.total += r.total; } else { g.ct.rows.push(row0); g.ct.total += r.total; }
+      return;
+    }
+    if (!tvItems.length && !ctItems.length) { g.skipped.push(r.name); return; }
+    function sum(a){ return a.reduce(function(x, it){ return x + (Number(it.amount) || 0); }, 0); }
+    function push(grp, items, chan, isTv){
+      var total = (!dropped && (isTv ? !ctItems.length : !tvItems.length)) ? r.total : sum(items);   // 1 nhóm duy nhất, không rớt lượt nào → giữ đúng tổng gốc
+      var row = {}; Object.keys(r).forEach(function(k){ row[k] = r[k]; });
+      row.items = items; row.total = total; row.chan = chan;
+      grp.rows.push(row); grp.total += total; g.total += total;
+      items.forEach(function(it){
+        var p = g.programs[it.program] || (g.programs[it.program] = { name: it.program, tvCount: 0, tvAmount: 0, ctCount: 0, ctAmount: 0 });
+        if (isTv){ p.tvCount++; p.tvAmount += it.amount; } else { p.ctCount++; p.ctAmount += it.amount; }
+      });
+    }
+    if (tvItems.length) push(g.tv, tvItems, 'probation', true);
+    if (ctItems.length) push(g.ct, ctItems, ctChan, false);
   });
   return g;
 }
@@ -642,7 +664,7 @@ function _srRenderG_(d){
       var expanded = _srState.gBonusExpanded === rid;
       var sd = isTv ? _saleStartDate_(s.name) : '';
       h += '<tr><td>'+esc(s.name)+'</td>'+
-        '<td>'+(isTv ? (sd ? esc(sd) : '<span style="color:#9a3412">chưa đặt Ngày bắt đầu</span>') : esc(_srGSaleTypeLabel_(s.name)))+'</td>'+
+        '<td>'+(isTv ? (sd ? esc(sd) : '<span style="color:#9a3412">chưa đặt Ngày bắt đầu</span>') : esc(_srGSaleTypeLabel_(s.name, s.chan)))+'</td>'+
         '<td style="text-align:right">'+fmt(s.items.length)+'</td>'+
         '<td style="text-align:right"><b>'+_srMoney(s.total)+'</b></td>'+
         '<td style="white-space:nowrap"><button class="btn sm" data-sale="'+esc(s.name)+'" onclick="_bdOpenForSale(this.dataset.sale)" title="Xem danh sách đơn của sale này">Chi tiết</button> <button class="btn sm" onclick="_srState.gBonusExpanded='+(expanded ? "''" : "'"+rid+"'")+';renderSalesReportTab()" title="Các lượt thưởng">'+(expanded ? 'Ẩn' : 'Lượt thưởng')+'</button></td></tr>';
@@ -697,13 +719,13 @@ function _srGBuildExport_(d){
       var sd = pair[0] === 'Thử việc' ? _saleStartDate_(s.name) : '';
       s.items.forEach(function(it){
         var dn = sd ? _daysSinceStart_(sd, it.date) : '';
-        detail.push([pair[0], s.name, _srGSaleTypeLabel_(s.name), sd, it.date, dn === null ? '' : dn, it.scope, it.program, _srGDecode_(it.detail), it.maDonPos || it.orderId || '', it.amount, it.counter || '', it.nSP != null ? it.nSP : '', (it.vongRev != null ? it.vongRev : '')]);
+        detail.push([pair[0], s.name, _srGSaleTypeLabel_(s.name, s.chan), sd, it.date, dn === null ? '' : dn, it.scope, it.program, _srGDecode_(it.detail), it.maDonPos || it.orderId || '', it.amount, it.counter || '', it.nSP != null ? it.nSP : '', (it.vongRev != null ? it.vongRev : '')]);
       });
     });
   });
   var summary = [['Nhóm','Sale','Loại Sale','Ngày bắt đầu (Thử việc)','Số lượt thưởng','Tổng thưởng']];
   [['Thử việc', g.tv], ['Chính thức', g.ct]].forEach(function(pair){
-    pair[1].rows.forEach(function(s){ summary.push([pair[0], s.name, _srGSaleTypeLabel_(s.name), pair[0] === 'Thử việc' ? _saleStartDate_(s.name) : '', s.items.length, s.total]); });
+    pair[1].rows.forEach(function(s){ summary.push([pair[0], s.name, _srGSaleTypeLabel_(s.name, s.chan), pair[0] === 'Thử việc' ? _saleStartDate_(s.name) : '', s.items.length, s.total]); });
     summary.push([pair[0]+' — TỔNG','','','', pair[1].rows.reduce(function(a,r){return a+r.items.length;},0), pair[1].total]);
   });
   summary.push(['TỔNG CHUNG','','','','', g.total]);
