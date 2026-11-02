@@ -11,11 +11,11 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
-## 2026-11-02 (đêm 6) — Ô "Ngày KH hẹn qua CH" bị Sheets đổi thành ngày (3-4 → 03/04/2026) — BƯỚC 1/2 đã push (code), BƯỚC 2 đang làm (file Excel đối soát)
+## 2026-11-02 (đêm 6) — Ô "Ngày KH hẹn qua CH" bị Sheets đổi thành ngày (3-4 → 03/04/2026) — XONG 2/2 (code đã push, file Excel đã gửi)
 - **Duyên báo:** "3-4" ở cột Ngày KH hẹn qua CH là ngày 3 và 4 THÁNG 10, không phải 03/04/2026 (và "10-11" không phải 10/11/2026).
 - **NGUYÊN NHÂN GỐC:** Google Sheets tự đổi "3-4"/"10-11" thành ô kiểu NGÀY (ngày-tháng). Đọc qua getDisplayValues vẫn ra "3-4" nếu ô định dạng d-M (đúng), nhưng nếu ô hiện đủ năm (03/04/2026) hoặc file Excel xuất ra (openpyxl đọc datetime) thì ra ngày thật sai tháng → `_storeCaseVisitDates_` coi là 1 ngày 03/04/2026 → không ghép được đơn Pos.
 - [x] **BƯỚC 1 ĐÃ PUSH (gas_v13.js + gas/22_Supabase.gs tự sinh):** `_storeCaseVisitDates_`: ô có năm đầy đủ mà THÁNG khác cột Tháng → đọc lại thành khoảng "<ngày>-<tháng của ô>" trong tháng ở cột Tháng (03/04/2026 + Tháng 10 → 3,4/10; 10/11/2026 + Tháng 10 → 10,11/10). Không có cột Tháng thì giữ ngày thật. Test: `node tools/test-store-case-dates.js` (+4 ca) + test-store-acct-rows/check/money vẫn 0 lỗi. **CẦN deploy lại GAS thủ công** (dán đè → Deploy → Manage deployments → New version) + "Đồng bộ mã GAS mới nhất".
-- [ ] **BƯỚC 2 (đang làm):** sửa sheet 4c/4/4b trong file đối soát: dòng CH 19, 20 hẹn 3-4/10 (không phải 03/04/2026); dòng CH 28 hẹn 10-11/10 (KHÔNG sửa thành "11"); dòng CH 21 (M44707) trên Sheet hiện đã có ngày 2 (file cũ ghi THIẾU ngày hẹn). Gửi lại file qua present_files.
+- [x] **BƯỚC 2 XONG (file Excel gửi Duyên, không commit):** sửa sheet 4c/4/4b trong file đối soát: dòng CH 19, 20 hẹn 3-4/10 (không phải 03/04/2026); dòng CH 28 hẹn 10-11/10 (KHÔNG sửa thành "11"); dòng CH 21 (M44707) trên Sheet hiện đã có ngày 2 (file cũ ghi THIẾU ngày hẹn). Đã sửa thêm: sheet 4 (N13/O13, tổng N36/O36), 4b (C5/D5, tổng C14/D14: CRM ước tính ninhnga99 13.680.000đ, lệch −645.000đ), 4c (E4/E5 = 3-4), TÓM TẮT; thưởng vẫn 5.946.671đ, 0 lỗi công thức. **Chưa làm / bước kế tiếp:** chưa dò lại ngày đơn Pos từng đơn cửa hàng (file không có ngày Pos quầy); nếu Duyên gửi file Pos quầy thì kiểm theo quy tắc T10 +1 ngày.
 
 ## 2026-11-02 (đêm 5) — Quy tắc ngày ghép đơn Báo cáo L + thưởng Ngọc (Thử việc) + file đối soát chuẩn T10 (Duyên yêu cầu) — quy tắc ngày XONG 1/1; file đối soát CHỜ file nguồn
 - **Yêu cầu của Duyên:** (1) Ngọc: 3 ngày đầu thử việc vẫn được thưởng đơn đầu trong ngày; (2) quy tắc ngày khách qua: **CHỈ tháng 10** ghép đơn Pos đúng ngày Sale điền **+1 ngày** (không lùi 1 ngày); **từ ngày 03/11/2026** ghép **±1 ngày**; (3) gửi lại file đối soát chuẩn cho kế toán.
