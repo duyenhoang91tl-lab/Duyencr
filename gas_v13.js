@@ -7437,6 +7437,7 @@ function doPostCore_(e) {
     if (action === 'saveTaskFlow')        return saveTaskFlow_(data.flow);
     if (action === 'deleteTaskFlow')      return deleteTaskFlow_(data.id);
     if (action === 'taskAdvance')         return taskAdvance_(data);
+    if (action === 'stuckFollowSet')      return jsonOut_(ttFollowSet_(data));   // CS phu trach tich Da xem/Dang xu ly/Da xu ly xong cho don ket (man Cham soc & tai mua)
     if (action === 'taskRequestDecide')   return taskRequestDecide_(data);
     if (action === 'taskReassign')        return taskReassign_(data);
     if (action === 'saveCareStatus')      return saveCareStatus_(data.careStatus);
@@ -16699,6 +16700,14 @@ function _storeCaseVisitDates_(monthCell, dayCell, todayYmd) {
   if (!dayStr) return [];
   if (/\d{4}/.test(dayStr)) { // co nam day du (vd 10/10/2026 hoac 2026-10-10)
     var full = /^\d{4}-\d{2}-\d{2}/.test(dayStr) ? dayStr.substring(0, 10) : (function() { var d0 = parseVNDate_(dayStr); return d0 ? _vnYmd_(d0) : ''; })();
+    // NGUYEN NHAN GOC (Duyen bao 2026-11-02): Google Sheets tu doi \"3-4\" / \"10-11\" (ngay 3-4, 10-11 cua thang o cot Thang) thanh NGAY 03/04/2026 / 10/11/2026
+    // (ngay-thang). Khi o co nam day du ma THANG cua ngay do KHAC cot Thang => do la khoang ngay bi doi, khong phai ngay that:
+    // doc lai thanh \"<ngay>-<thang cua o>\" trong thang o cot Thang (03/04/2026 + Thang 10 => 3,4/10; 10/11/2026 + Thang 10 => 10,11/10).
+    var moCol = parseInt(String(monthCell || '').replace(/\D/g, ''), 10);
+    if (full && moCol >= 1 && moCol <= 12) {
+      var fp = full.split('-'), fMo = +fp[1], fDay = +fp[2];
+      if (fMo !== moCol) return _storeCaseDaysToYmd_(moCol, _storeCaseDayList_(fDay + '-' + fMo), todayYmd);
+    }
     return full ? [full] : [];
   }
   return _storeCaseDaysToYmd_(parseInt(String(monthCell || '').replace(/\D/g, ''), 10), _storeCaseDayList_(dayStr), todayYmd);
@@ -17066,9 +17075,10 @@ function buildStoreCaseReport_(filters) {
     if (r.phoneNorm && !koDen) {
       var seenPos = {};
       r.activeDates.forEach(function(ymd) {
-        // Ghep don Pos: DUNG ngay thi lay; neu ngay do KHONG co don nao thi cho lech +-1 ngay (Duyen chon 2026-10-31: Pos len so cham/som 1 ngay). Moi don chi ghep 1 lan / dong.
+        // Ghep don Pos: DUNG ngay thi lay; neu ngay do KHONG co don nao thi cho lech. QUY TAC NGAY (Duyen chot 2026-11-02): ngay khach qua/hen TRUOC 03/11/2026 (thang 10) CHI cho don Pos +1 ngay (len don ngay sau ngay Sale dien);
+        // tu ngay 03/11/2026 tro di cho +-1 ngay (Pos len so cham/som 1 ngay). Moi don chi ghep 1 lan / dong.
         var exact = posByKey[r.phoneNorm + '|' + ymd] || [], near = [];
-        if (!exact.length) [-1, 1].forEach(function(dd) { (posByKey[r.phoneNorm + '|' + _storeCaseYmdAdd_(ymd, dd)] || []).forEach(function(h) { near.push({ pr: h.pr, ymd: h.ymd, lech: dd }); }); });
+        if (!exact.length) (ymd < '2026-11-03' ? [1] : [-1, 1]).forEach(function(dd) { (posByKey[r.phoneNorm + '|' + _storeCaseYmdAdd_(ymd, dd)] || []).forEach(function(h) { near.push({ pr: h.pr, ymd: h.ymd, lech: dd }); }); });
         exact.concat(near).forEach(function(hitO) {
           if (seenPos[hitO.pr.posRow]) return; seenPos[hitO.pr.posRow] = true;
           var pr2 = hitO.pr;
@@ -17212,6 +17222,11 @@ var TT_TRACK_HEADERS_ = ['id', 'giaiDoan', 'giaiDoanTu', 'lanCuoiThay', 'saleBan
 var TT_DEFAULT_HOURS_ = 24;
 var TT_LOOKBACK_DAYS_ = 60;
 var TT_REFRESH_MIN_ = 60;
+// Theo doi DON KET (yeu cau Duyen 2026-10-14): CS PHU TRACH (sale cua don) hoac admin tich Da xem / Dang xu ly / Da xu ly xong + ghi chu; moi nguoi cung thay ai dang lo.
+// Luu o sheet rieng (khong dung Settings vi la du lieu cap don, co lich su). Hieu luc theo GIAI DOAN luc danh dau: don sang giai doan khac roi lai ket -> bat dau lai.
+var TT_FOLLOW_SHEET_ = 'Theo dõi đơn kẹt';
+var TT_FOLLOW_HEADERS_ = ['id', 'giaiDoan', 'trangThai', 'nguoi', 'luc', 'ghiChu', 'lichSu'];
+var TT_FOLLOW_VALID_ = { xem: 1, xuly: 1, xong: 1, bo: 1 };
 
 function _ttFold_(s) { return _stripVN_(String(s == null ? '' : s)).trim(); }
 
@@ -17309,8 +17324,94 @@ function ttTodayTasks_(namesCsv) {
   var last = sh.getLastRow();
   var rows = last >= 2 ? sh.getRange(2, 1, last - 1, TT_TRACK_HEADERS_.length).getValues() : [];
   var stuck = _ttStuckFromRows_(rows, namesCsv, hours, nowMs);
+  var shown = _ttEnrichStuck_(stuck.slice(0, 100));   // them SDT/san pham/gia tri/nguoi xu ly + trang thai theo doi
   return { ok: true, generatedAt: nowMs, trackedAt: Number(getSetting_('ttLastTrackedMs')) || 0, hours: hours,
-    tasks: [{ key: 'stuckStage', title: 'Đơn Base kẹt giai đoạn quá ' + hours + ' giờ — vào kiểm tra', count: stuck.length, items: stuck.slice(0, 100) }] };
+    tasks: [{ key: 'stuckStage', title: 'Đơn Base kẹt giai đoạn quá ' + hours + ' giờ — vào kiểm tra', count: stuck.length, items: shown }] };
+}
+
+function _ttFollowRead_() {
+  var out = {};
+  try {
+    var sh = getSheet_(TT_FOLLOW_SHEET_, TT_FOLLOW_HEADERS_), last = sh.getLastRow();
+    if (last < 2) return out;
+    sh.getRange(2, 1, last - 1, TT_FOLLOW_HEADERS_.length).getValues().forEach(function(r) {
+      var id = String(r[0] == null ? '' : r[0]).trim();
+      if (!id) return;
+      var h = [];
+      try { h = JSON.parse(String(r[6] || '[]')) || []; } catch (e) { h = []; }
+      out[id] = { stage: String(r[1] || ''), status: String(r[2] || ''), by: String(r[3] || ''), at: Number(r[4]) || 0, note: String(r[5] || ''), history: Array.isArray(h) ? h : [] };
+    });
+  } catch (e) { Logger.log('_ttFollowRead_: ' + e); }
+  return out;
+}
+// Thong tin don (SDT, san pham, gia tri, nguoi xu ly, ma bo dem) cho cac id dang ket — doc DT TONG (da cache) 1 lan.
+function _ttOrderInfo_(idSet) {
+  var out = {};
+  readDTTong_(true, true).forEach(function(o) {   // (withBoDem, withPhone): soDienThoai CHI tra khi withPhone=true
+    var id = String(o.id == null ? '' : o.id).trim();
+    if (!id || !idSet[id] || out[id]) return;
+    out[id] = { phone: String(o.soDienThoai || ''), sanPham: String(o.sanPham == null ? '' : o.sanPham).trim().slice(0, 160), value: Number(o.giaTriDon) || 0,
+      giaoCho: String(o.giaoCho == null ? '' : o.giaoCho).trim(), maBoDem: String(o.maBoDem == null ? '' : o.maBoDem).trim(), kenhBan: String(o.kenhBan || ''), trangThai: String(o.trangThai == null ? '' : o.trangThai).trim() };
+  });
+  return out;
+}
+// Loi lam giau KHONG lam hong danh sach don ket (van tra cac truong goc id/giai doan/gio/sale).
+function _ttEnrichStuck_(items) {
+  if (!items.length) return items;
+  var ids = {};
+  items.forEach(function(it) { ids[it.id] = true; });
+  var info = {}, fol = {};
+  try { info = _ttOrderInfo_(ids); } catch (e) { Logger.log('_ttOrderInfo_: ' + e); }
+  fol = _ttFollowRead_();
+  items.forEach(function(it) {
+    var i = info[it.id];
+    if (i) { if (i.phone && !it.phone) it.phone = i.phone; it.sanPham = i.sanPham;   // SDT tu sheet theo doi (cot soDienThoai) la nguon chinh; chi dien khi dong cu con trong
+       it.value = i.value; it.giaoCho = i.giaoCho; it.maBoDem = i.maBoDem; it.kenhBan = i.kenhBan; it.trangThai = i.trangThai; }
+    var f = fol[it.id];
+    it.follow = (f && f.status && _ttFold_(f.stage) === _ttFold_(it.stage)) ? { status: f.status, by: f.by, at: f.at, note: f.note, history: f.history.slice(-8) } : null;
+  });
+  return items;
+}
+// POST action=stuckFollowSet { id, status:'xem'|'xuly'|'xong'|'bo', note, by?, token } — chi CS PHU TRACH (ten trong cot "Sale ban" cua don) hoac admin.
+// Nguoi thao tac lay tu PHIEN DANG NHAP (token) — khong tin ten client gui khi co token; khong co token (extension cu) moi dung data.by.
+function ttFollowSet_(data) {
+  data = data || {};
+  var id = String(data.id == null ? '' : data.id).trim(), st = String(data.status || '').trim();
+  if (!id) return { ok: false, error: 'Thieu ma don.' };
+  if (!TT_FOLLOW_VALID_[st]) return { ok: false, error: "Trang thai phai la 'xem' | 'xuly' | 'xong' | 'bo'." };
+  var note = String(data.note == null ? '' : data.note).replace(/\s+/g, ' ').trim().slice(0, 300);
+  var user = null;
+  try { user = data.token ? _sessUser_(data.token) : null; } catch (eU) { user = null; }
+  var actor = user ? String(user.name || user.username || '').trim() : String(data.by || '').trim();
+  if (!actor) return { ok: false, error: 'Khong xac dinh duoc nguoi thao tac — dang nhap lai.' };
+  var tsh = getSheet_(TT_TRACK_SHEET_, TT_TRACK_HEADERS_), tl = tsh.getLastRow(), trow = null;
+  if (tl >= 2) {
+    var tv = tsh.getRange(2, 1, tl - 1, TT_TRACK_HEADERS_.length).getValues();
+    for (var i = 0; i < tv.length; i++) { if (String(tv[i][0] == null ? '' : tv[i][0]).trim() === id) { trow = tv[i]; break; } }
+  }
+  if (!trow) return { ok: false, error: 'Khong thay don ' + id + ' trong danh sach theo doi giai doan.' };
+  var names = user ? ((user.names && user.names.length) ? user.names : [user.name]) : [actor];
+  var toks = String(trow[4] || '').split(',').map(_normTxt_).filter(Boolean);
+  var mine = names.some(function(n) { var k = _normTxt_(n); return !!k && toks.indexOf(k) !== -1; });
+  var isAdmin = !!(user && user.role === 'admin');
+  if (!isAdmin && !mine) return { ok: false, code: 'FORBIDDEN', error: 'Chi CS phu trach don nay (hoac quan tri) moi duoc danh dau theo doi.' };
+  var lock = LockService.getScriptLock(), got = false;
+  try { got = lock.tryLock(8000); } catch (eL) { got = false; }
+  if (!got) return { ok: false, error: 'He thong dang ban — thu lai sau it giay.' };
+  try {
+    var sh = getSheet_(TT_FOLLOW_SHEET_, TT_FOLLOW_HEADERS_), last = sh.getLastRow(), rowNum = 0, hist = [];
+    if (last >= 2) {
+      var col = sh.getRange(2, 1, last - 1, 1).getValues();
+      for (var k = 0; k < col.length; k++) { if (String(col[k][0] == null ? '' : col[k][0]).trim() === id) { rowNum = k + 2; break; } }
+    }
+    if (rowNum) { try { hist = JSON.parse(String(sh.getRange(rowNum, 7).getValue() || '[]')) || []; } catch (eH) { hist = []; } }
+    var now = Date.now(), stage = String(trow[1] || '');
+    hist.push({ s: st, by: actor, at: now, note: note, stage: stage });
+    hist = hist.slice(-30);
+    var vals = [id, stage, st === 'bo' ? '' : st, actor, now, note, JSON.stringify(hist)];
+    if (rowNum) sh.getRange(rowNum, 1, 1, vals.length).setValues([vals]); else sh.getRange(last + 1, 1, 1, vals.length).setValues([vals]);
+    return { ok: true, follow: st === 'bo' ? null : { status: st, by: actor, at: now, note: note, history: hist.slice(-8) } };
+  } finally { try { lock.releaseLock(); } catch (eR) {} }
 }
 
 // ── B5 (ROADMAP-CRM-MAU): BANG KANBAN DON THEO GIAI DOAN BASE — chi doc, giai doan do Base quyet dinh (khong keo tha duoc).

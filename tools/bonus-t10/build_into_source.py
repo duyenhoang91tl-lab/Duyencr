@@ -20,7 +20,7 @@ for s in res['bySale']:
             e = per.setdefault(it['orderId'], {'don': 0, 'sp': 0, 'ct': []})
             e['sp' if it['scope'] == 'Theo sản phẩm' else 'don'] += it['amount']
             e['ct'].append(f"{s['name']}: {it['program']} +{it['amount']:,}".replace(',', '.'))
-KIND = {'Theo sản phẩm': 'Theo sản phẩm', 'Theo ngày (doanh số)': 'Theo doanh số ngày', 'Theo đơn': 'Theo đơn (giá trị đơn)'}
+KIND = {'Theo sản phẩm': 'Theo sản phẩm', 'Theo ngày (doanh số)': 'Theo doanh số ngày', 'Theo đơn': 'Theo đơn (giá trị đơn)', 'Theo ngày (đơn đầu tiên)': 'Thưởng thử việc (đơn đầu/số đơn)', 'Theo ngày (số đơn)': 'Thưởng thử việc (đơn đầu/số đơn)'}
 TYPE = {}
 for n in ('Tỳ Hưu Thiên Lộc Moon', 'Tỳ Hưu Thiên Lộc Tourmaline (Hồng/Xanh)', 'Tỳ Hưu Thiên Lộc Aquamarine'): TYPE[n] = 'Theo sản phẩm'
 def kind(it): return TYPE.get(it['program'], KIND.get(it['scope'], it['scope']))
@@ -38,7 +38,7 @@ for sh, pre in (('ĐƠN PT', 'PT'),):   # ĐƠN MP (my pham) KHONG tinh thuong
         the = ws.cell(row=r, column=2).value
         if the is None: continue
         names = [x.strip() for x in str(the).split(',') if x.strip()]
-        kenh = sorted({ {'online': 'On', 'offline': 'Off'}[ch[n]] for n in names if n in ch })
+        kenh = sorted({ {'online': 'On', 'offline': 'Off', 'probation': 'Thử việc'}[ch[n]] for n in names if n in ch })
         e = per.get(f'{pre}{r-2}')
         ws.cell(row=r, column=c0, value='/'.join(kenh))
         ws.cell(row=r, column=c0 + 1, value=e['don'] if e else 0); ws.cell(row=r, column=c0 + 2, value=e['sp'] if e else 0)
@@ -53,7 +53,7 @@ for sh, pre in (('ĐƠN PT', 'PT'),):   # ĐƠN MP (my pham) KHONG tinh thuong
 rows = []
 for s in res['bySale']:
     if s['name'] not in ch: continue
-    for it in s['items']: rows.append((it['date'], s['name'], {'online': 'Online', 'offline': 'Offline'}[ch[s['name']]], kind(it), it['program'], it['amount'], it.get('detail', ''), it.get('maDonPos', '')))
+    for it in s['items']: rows.append((it['date'], s['name'], {'online': 'Online', 'offline': 'Offline', 'probation': 'Thử việc'}[ch[s['name']]], kind(it), it['program'], it['amount'], it.get('detail', ''), it.get('maDonPos', '')))
 rows.sort(key=lambda r: (r[1].lower(), r[0]))
 def sheet(name, idx=None):
     if name in wb.sheetnames: del wb[name]
@@ -82,31 +82,31 @@ for r in wb['ĐƠN PT'].iter_rows(min_row=2, values_only=True):
 t = sheet('THUONG_Tong_theo_sale', 0)
 t['A1'] = 'BẢNG THƯỞNG ONLINE / OFFLINE — T10/2026'; t['A1'].font = f(bold=True, size=14, color='1F3A5F')
 t['A2'] = 'Chỉ đội Online + Offline (18 sale đã phân loại). Doanh thu = đơn PT chia đều theo thẻ (không gồm đơn MP mỹ phẩm). Thưởng tính bằng hàm _computeBonusData_ của CRM trên sheet ĐƠN PT (đã trừ bảo hành, KHÔNG tính đơn MP mỹ phẩm); cộng bằng SUMIFS từ THUONG_Chi_tiet.'; t['A2'].font = f(italic=True, color='666666')
-head(t, 4, ['Sale', 'Kênh', 'Doanh thu đơn PT T10 (đ, không MP)', 'Thưởng THEO ĐƠN (giá trị đơn)', 'Thưởng THEO DOANH SỐ NGÀY', 'Thưởng THEO SẢN PHẨM', 'TỔNG THƯỞNG'], [24, 10, 22, 20, 20, 20, 18])
-order = sorted(ch, key=lambda n: (ch[n] != 'online', -rev.get(n, 0)))
+head(t, 4, ['Sale', 'Kênh', 'Doanh thu đơn PT T10 (đ, không MP)', 'Thưởng THEO ĐƠN (giá trị đơn)', 'Thưởng THEO DOANH SỐ NGÀY', 'Thưởng THEO SẢN PHẨM', 'Thưởng THỬ VIỆC (đơn đầu / số đơn)', 'TỔNG THƯỞNG'], [24, 10, 22, 20, 20, 20, 22, 18])
+order = sorted(ch, key=lambda n: ({'online': 0, 'offline': 1, 'probation': 2}[ch[n]], -rev.get(n, 0)))
 row = 5
 for n in order:
-    t.cell(row=row, column=1, value=n); t.cell(row=row, column=2, value='Online' if ch[n] == 'online' else 'Offline'); t.cell(row=row, column=3, value=rev.get(n, 0))
-    for j, lab in zip((4, 5, 6), ('Theo đơn (giá trị đơn)', 'Theo doanh số ngày', 'Theo sản phẩm')):
+    t.cell(row=row, column=1, value=n); t.cell(row=row, column=2, value={'online': 'Online', 'offline': 'Offline', 'probation': 'Thử việc'}[ch[n]]); t.cell(row=row, column=3, value=rev.get(n, 0))
+    for j, lab in zip((4, 5, 6, 7), ('Theo đơn (giá trị đơn)', 'Theo doanh số ngày', 'Theo sản phẩm', 'Thưởng thử việc (đơn đầu/số đơn)')):
         t.cell(row=row, column=j, value=f'=SUMIFS(THUONG_Chi_tiet!$F${D0}:$F${D1},THUONG_Chi_tiet!$B${D0}:$B${D1},$A{row},THUONG_Chi_tiet!$D${D0}:$D${D1},"{lab}")')
-    t.cell(row=row, column=7, value=f'=SUM(D{row}:F{row})')
-    for j in range(1, 8):
-        c = t.cell(row=row, column=j); c.font = f(bold=(j == 7)); c.border = BOX
+    t.cell(row=row, column=8, value=f'=SUM(D{row}:G{row})')
+    for j in range(1, 9):
+        c = t.cell(row=row, column=j); c.font = f(bold=(j == 8)); c.border = BOX
         if j >= 3: c.number_format = MONEY
     row += 1
 last = row - 1
-for lab in ('Online', 'Offline'):
+for lab in ('Online', 'Offline', 'Thử việc'):
     t.cell(row=row, column=1, value='TỔNG ' + lab.upper())
-    for j in range(3, 8):
+    for j in range(3, 9):
         Lc = t.cell(row=row, column=j).column_letter; t.cell(row=row, column=j, value=f'=SUMIFS({Lc}$5:{Lc}${last},$B$5:$B${last},"{lab}")')
     row += 1
 t.cell(row=row, column=1, value='TỔNG CỘNG')
-for j in range(3, 8):
+for j in range(3, 9):
     Lc = t.cell(row=row, column=j).column_letter; t.cell(row=row, column=j, value=f'=SUM({Lc}5:{Lc}{last})')
 for r in range(last + 1, row + 1):
-    for j in range(1, 8):
+    for j in range(1, 9):
         c = t.cell(row=r, column=j); c.font = f(bold=True); c.border = BOX
         if j >= 3: c.number_format = MONEY
-for i, s in enumerate(['LƯU Ý:', '1) Ước tính theo 12 CT mẫu "Thưởng online chính thức" trong CRM — đối chiếu Báo cáo G (CT bật thật có thể khác).', '2) Không tự loại Tỳ Hưu Ngọc/Ruby/Saphire và đơn huỷ; đơn chia tay chưa có tỷ lệ tính chia đều theo thẻ.', '3) Thưởng THEO ĐƠN/SẢN PHẨM nằm ở 5 cột cuối từng hàng sheet ĐƠN PT; thưởng DOANH SỐ NGÀY tính theo sale-ngày nên chỉ có ở THUONG_Chi_tiet.']):
+for i, s in enumerate(['LƯU Ý:', '1) Ước tính theo 12 CT mẫu "Thưởng online chính thức" trong CRM — đối chiếu Báo cáo G (CT bật thật có thể khác).', '2) Không tự loại Tỳ Hưu Ngọc/Ruby/Saphire và đơn huỷ; đơn chia tay chưa có tỷ lệ tính chia đều theo thẻ.', '3) Ngọc (ngocNB2003saleoff) là Sale THỬ VIỆC, bắt đầu tính thưởng 14/10/2026: ngày 1-3 (14,15,16/10) thưởng ĐƠN ĐẦU TIÊN TRONG NGÀY 50.000đ; từ ngày 4 (17/10) thưởng bậc số đơn/ngày và doanh số ngày (mẫu "Cơ chế thưởng kích hoạt Sale mới"). Không dùng bảng thưởng chính thức.', '4) Thưởng THEO ĐƠN/SẢN PHẨM nằm ở 5 cột cuối từng hàng sheet ĐƠN PT; thưởng DOANH SỐ NGÀY tính theo sale-ngày nên chỉ có ở THUONG_Chi_tiet.']):
     t.cell(row=row + 2 + i, column=1, value=s).font = f(bold=(i == 0), italic=(i > 0), color='444444')
 wb.save(out); print('saved', out, len(rows), 'dong chi tiet')
