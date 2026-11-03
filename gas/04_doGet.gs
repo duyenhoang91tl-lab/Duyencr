@@ -11,6 +11,7 @@ function doGet(e) {
   }
   if (MLIB_GET_ACTIONS_[action] === 1) return mlibDoGet_(action, p);   // thu vien anh/ghi am/mau tin: tu kiem token
   if (KHD_GET_ACTIONS_[action] === 1) return khdDoGet_(p);   // thao luan khach (noi bo): tu kiem token
+  if (TEAMBONUS_GET_ACTIONS_[action] === 1) return teamBonusDoGet_(action, p);   // thuong phat doi Sale Online/Van phong (Bao cao B): token -> phan quyen
   if (SPLIT_GET_ACTIONS_[action] === 1) return splitDoGet_(action, p);   // don chia (bao cao M + danh sach don chia): token -> phan quyen theo vai tro
   if (CHAT_GET_ACTIONS_[action] === 1) return chatDoGet_(action, p);   // chat noi bo: tu kiem token, khong qua doGetCore_
   _ntlNote_('GET', action, p.token, p.src, p.ek);
@@ -297,7 +298,7 @@ function doGetCore_(e) {
     if (action === 'storeCaseReport') {
       var pK = e.parameter || {};
       return jsonOut_(buildStoreCaseReport_({
-        dateFrom: pK.dateFrom || '', dateTo: pK.dateTo || '', pct: pK.pct || '',
+        dateFrom: pK.dateFrom || '', dateTo: pK.dateTo || '', pct: pK.pct || '', fresh: pK.fresh === '1',
         sale: pK.sale ? pK.sale.split(',').map(function(s){return s.trim();}).filter(function(s){return s;}) : []
       }));
     }
@@ -335,10 +336,12 @@ function doGetCore_(e) {
                  careStatus: splitCSV_(pB.careStatus), khStatus: splitCSV_(pB.khStatus),
                  zaloStatus: splitCSV_(pB.zaloStatus), nickZalo: pB.nickZalo || '' };
       var cacheB = CacheService.getScriptCache();
-      var cKeyB = _reportCacheKey_('salesB4_', fB);
+      var snapB_ = _readPosSnapshots_();   // dau moc chot vao khoa cache: bam Chot/Chot lai la bang Theo Sale doi NGAY (khong doi het 120s cache cu)
+      var cKeyB = _reportCacheKey_('salesB5_' + Object.keys(snapB_).sort().map(function(k) { return k.slice(2).replace('-', '') + String((snapB_[k] || {}).closedAt || '').replace(/\D/g, ''); }).join('.') + '_', fB);   // salesB4_ -> salesB5_: ket qua gio co the da tru hoan/huy theo moc chot
       var cachedB = cacheB.get(cKeyB);
       if (cachedB) { try { return jsonOut_(JSON.parse(cachedB)); } catch(ec) {} }
       var resB = buildSalesReportB_(fB);
+      try { resB = applyPosMonthAdjustToReportB_(resB, fB); } catch (eAdj) { resB.posAdjust = { applied: false, reason: 'Lỗi trừ hoàn/hủy: ' + eAdj.message }; }
       try { cacheB.put(cKeyB, JSON.stringify(resB), 120); } catch(ec) {}
       return jsonOut_(resB);
     }
@@ -417,6 +420,7 @@ function doGetCore_(e) {
     if (action === 'notifications') {
       var _gu = _sessUser_(e && e.parameter && e.parameter.token);
       if (!_gu) return jsonOut_({ error: 'Can dang nhap.', code: 'AUTH' });
+      _rbScanMaybe_();   // thong bao khach mua lai o sale khac (toi da 10 phut/lan; loi bi nuot)
       return jsonOut_(readNotifications_(_gu.username));
     }
     if (action === 'importBatches') return jsonOut_(_impWho_(e && e.parameter && e.parameter.token) ? importBatchesList_() : { error: 'Cần đăng nhập.', code: 'AUTH' });   // OWNER_ONLY_ACTIONS_ da chan nguoi khong phai chu so huu o doGet
@@ -437,7 +441,7 @@ function doGetCore_(e) {
       var shC = ss.getSheetByName(SH_CARE);
       var shDT = getDTSS_().getSheetByName(DT_TONG_SHEET);
       var totalOrders = shDT ? Math.max(0, shDT.getLastRow() - 1) : 0;
-      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.62-aa-hint' });   // PHAI la chuoi viet thang (test-crm-ask/test-kh-discuss doi chieu); giu = PK_GAS_VER_
+      return jsonOut_({ orderRows: totalOrders, careRows: shC ? Math.max(0, shC.getLastRow()-1) : 0, ver: 'v13.64-nguon-gold' });   // PHAI la chuoi viet thang (test-crm-ask/test-kh-discuss doi chieu); giu = PK_GAS_VER_
     }
 
     // ── lich hen hom nay / qua han (ZaloAI extension) ──

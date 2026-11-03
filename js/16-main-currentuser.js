@@ -325,9 +325,9 @@ var _srState = {
   // G da doi thanh "Chuong trinh thuong Thu viec / Chinh thuc" (2026-10-04): dung nguon don Pos nhu E
   gSaleCustomized: false, gBonusExpanded: '',
   // H — Tong quan data da chia (client-only: assignHistory + careData; so don/doanh thu nhap tay)
-  hDateFrom: '', hDateTo: '', hDateQuick: 'today', hTeam: '', hCs: '', hGroup: 'dayCs',
+  hDateFrom: '', hDateTo: '', hDateQuick: 'today', hTeam: '', hCs: '', hCsList: [], hGroup: 'dayCs',
   // I — Bao cao chia data Renew (CSKH-Duyen)
-  iDateFrom: '', iDateTo: '', iDateQuick: 'custom', iCs: '', iTeam: ''
+  iDateFrom: '', iDateTo: '', iDateQuick: 'custom', iCs: '', iCsList: [], iTeam: ''
 };
 // Bao cao F/H mac dinh 'Tháng này' nhung fDateFrom/fDateTo (hay hDateFrom/hDateTo) truoc day de
 // rong -> dropdown hien 'Tháng này' trong khi request khong co ngay nao => backend cong DON CA
@@ -606,7 +606,7 @@ switchTab = function(tab, el){
   _activeV9Tab = tab;
   // Bộ lọc KH (sidebar) chỉ dành cho tab Danh sách KH → các tab khác ẩn đi để không bị kẹt màn bên trái (nhất là điện thoại)
   document.body.classList.toggle('no-kh-sidebar', tab !== 'list');
-  ['dashboard','team','audit','uploaddata','salesreport','pancake','kpipancake','mktchecklist','dailybrief','chat'].forEach(function(name){
+  ['dashboard','team','audit','uploaddata','salesreport','pancake','kpipancake','mktchecklist','dailybrief','chat','media'].forEach(function(name){
     var panel = document.getElementById('tab-'+name);
     if (panel) panel.style.display = (tab===name) ? 'flex' : 'none';
   });
@@ -620,6 +620,7 @@ switchTab = function(tab, el){
   else if (tab === 'mktchecklist') renderMktChecklistTab();
   else if (tab === 'dailybrief') renderDailyBriefTab();
   else if (tab === 'chat' && typeof renderSocialChatTab === 'function') renderSocialChatTab();
+  else if (tab === 'media' && typeof renderMediaLibTab === 'function') renderMediaLibTab();
 };
 
 // ═══════════════════════════════════════════════════════

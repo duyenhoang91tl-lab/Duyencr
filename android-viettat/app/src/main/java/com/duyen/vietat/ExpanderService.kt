@@ -12,6 +12,7 @@ import androidx.core.content.FileProvider
 import java.io.File
 import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.os.Bundle
 import android.text.TextUtils
 import android.view.Gravity
@@ -99,15 +100,15 @@ class ExpanderService : AccessibilityService() {
         fun dp(v: Int) = (v * d).toInt()
         val sh = resources.displayMetrics.heightPixels
         val r = Rect().also { n.getBoundsInScreen(it) }
-        // Cao hết cỡ phần màn hình nằm TRÊN ô gõ (để không che ô gõ), tối thiểu 260dp, tối đa 80% màn hình
-        val heightPx = (r.top - dp(24)).coerceIn(dp(260), (sh * 0.8f).toInt())
+        // Bảng chọn GỌN: cao tối đa 50% màn hình, nằm TRÊN ô gõ (không che ô gõ), tối thiểu 260dp
+        val heightPx = (r.top - dp(24)).coerceIn(dp(260), (sh * 0.5f).toInt())
         val picker = Picker(this, hits.flatMap { it.options }, name, heightPx,
             onInsert = { sel -> applySelection(n, text, word, sel, name, share = false); hide() },
             onShare = { sel -> applySelection(n, text, word, sel, name, share = true); hide() },
             onClose = { hide() })
         val box = picker.build()
         val lp = WindowManager.LayoutParams(
-            (resources.displayMetrics.widthPixels * 0.96).toInt(), heightPx,
+            resources.displayMetrics.widthPixels, heightPx,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
             PixelFormat.TRANSLUCENT
@@ -140,7 +141,7 @@ class ExpanderService : AccessibilityService() {
             putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, text.length)
         })
         val ok = n.performAction(AccessibilityNodeInfo.ACTION_PASTE)
-        if (!ok) Toast.makeText(this, "Đã sao chép nội dung — nhấn giữ ô chat > Dán", Toast.LENGTH_LONG).show()
+        if (!ok) say("Đã sao chép nội dung — nhấn giữ ô chat > Dán")
         return ok
     }
 
@@ -176,21 +177,246 @@ class ExpanderService : AccessibilityService() {
         val texts = sel.filter { kindOf(it) == null }
         val media = sel.filter { kindOf(it) != null }
         if (texts.size == 1 && media.isEmpty()) { insertText(n, text, word, texts[0], name); return }
-        replaceTail(n, text, word, texts.joinToString("\n") { Store.resolve(it, name) })
+        val joined = texts.joinToString("\n") { Store.resolve(it, name) }
+        // Chia sẻ (có hình): chữ đi kèm bảng chia sẻ (EXTRA_TEXT + bộ nhớ tạm), không để lại ô gõ; Chèn: chữ vào ô gõ
+        val shareText = share && media.isNotEmpty() && joined.isNotEmpty()
+        replaceTail(n, text, word, if (shareText) "" else joined)
         if (media.isEmpty()) return
+        // Nhiều hình (+ ghi âm) mà KHÔNG bấm "Chia sẻ" → đưa vào Thư viện máy rồi mở BỘ CHỌN ẢNH của app chat (Zalo…): chọn nhiều ảnh như gửi thường, gửi thẳng vào khung chat đang mở.
+        if (!share && Build.VERSION.SDK_INT >= 29 && media.any { kindOf(it) == "img" } && media.size > 1) { sendViaChatGallery(media); return }
         val uris = media.mapNotNull { m ->
             File(Store.mediaDir, mediaNameOf(m)).takeIf { it.exists() }?.let { FileProvider.getUriForFile(this, "$packageName.files", it) }
         }
-        if (uris.isEmpty()) { Toast.makeText(this, "Không tìm thấy file", Toast.LENGTH_SHORT).show(); return }
+        if (uris.isEmpty()) { say("Không tìm thấy file"); return }
         val allImg = media.all { kindOf(it) == "img" }
-        // "Chèn" + chỉ có hình (1 hoặc NHIỀU) → dán lần lượt từng hình vào ĐÚNG khung chat đang mở (như chọn nhiều ảnh khi gửi Zalo).
-        // Ghi âm/tệp lẫn vào, hoặc bấm "Chia sẻ" → mở bảng chia sẻ Android như cũ.
-        if (allImg && !share) { pasteImages(uris, 0, n); return }
-        (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newUri(contentResolver, "viettat", uris[0]))
-        shareChooser(uris, allImg, media.all { kindOf(it) == "aud" })
+        if (uris.size < media.size) say("Thiếu ${media.size - uris.size} file chưa có trên máy → mở app Viết Tắt, bấm ☁ Đồng bộ rồi thử lại", 9000)
+        // Đúng 1 hình + "Chèn" → dán thẳng vào ô chat. Ghi âm/tệp lẫn vào, hoặc bấm "Chia sẻ" → bảng chia sẻ Android.
+        if (allImg && !share && uris.size == 1) { pasteImages(uris, 0, n); return }
+        (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(
+            if (shareText) ClipData.newPlainText("viettat", joined) else ClipData.newUri(contentResolver, "viettat", uris[0]))
+        shareChooser(uris, allImg, media.all { kindOf(it) == "aud" }, if (shareText) joined else null)
+    }
+
+    /**
+     * NGUYÊN NHÂN GỐC "dán nhiều ảnh vẫn không được" (Duyên 2026-10-31): Android/Zalo chỉ nhận dán 1 hình qua clipboard, và ACTION_PASTE nối tiếp không đưa nhiều hình
+     * vào khung chat; bảng chia sẻ chung thì bắt chọn lại người nhận. Cách làm: lưu các hình (đúng thứ tự, hình 1 mới nhất → nằm đầu danh sách) vào album "VietTat" của Thư viện,
+     * ghi âm vào Tải xuống/VietTat, rồi BẤM HỘ nút ảnh của app chat → hiện bộ chọn nhiều ảnh quen thuộc của chính Zalo (tick, "Gửi (n)") và gửi vào đúng cuộc trò chuyện đang mở.
+     */
+    private fun sendViaChatGallery(media: List<String>) {
+        Thread {
+            val imgs = media.filter { kindOf(it) == "img" }.map { File(Store.mediaDir, mediaNameOf(it)) }.filter { it.exists() }
+            val auds = media.filter { kindOf(it) == "aud" }.map { File(Store.mediaDir, mediaNameOf(it)) }.filter { it.exists() }
+            if (imgs.size + auds.size < media.size) say("Thiếu ${media.size - imgs.size - auds.size} file chưa có trên máy → mở app Viết Tắt, bấm ☁ Đồng bộ rồi thử lại", 9000)
+            val okImg = saveMedia(imgs, true); val okAud = saveMedia(auds, false)
+            ui.post {
+                if (okImg == 0) { say("Không lưu được hình vào Thư viện"); return@post }
+                ui.postDelayed({
+                    val pk = rootInActiveWindow?.packageName?.toString().orEmpty()
+                    val clicked = clickChatGalleryButton()
+                    val auto = clicked && pk.contains("pancake", true)
+                    val msg = (if (clicked) "Chọn $okImg hình đầu danh sách (album VietTat) rồi bấm Gửi" else "Bấm nút ẢNH của app chat, chọn $okImg hình đầu danh sách (album VietTat)") +
+                        (if (okAud > 0) ".\nGhi âm ($okAud): Tải xuống/VietTat — gửi bằng nút Tệp." else "")
+                    if (clicked) {
+                        say(if (auto) "Tự mở bộ chọn ảnh của máy: bấm \"Tải ảnh lên\" → tick $okImg hình mới nhất (album VietTat) → Xong. Rồi bấm Gửi trong Pancake." else msg)
+                        if (auto) startAutoUpload(okImg)
+                    } else {
+                        val all = media.mapNotNull { m -> File(Store.mediaDir, mediaNameOf(m)).takeIf { it.exists() }?.let { FileProvider.getUriForFile(this, "$packageName.files", it) } }
+                        say("Không bấm được nút ảnh của app chat" + (if (all.isNotEmpty()) " → mở bảng chia sẻ với ${all.size} file" else "") + " (ảnh đã lưu trong album VietTat).\n" + Diag.lastInsert.take(240), 10000)
+                        if (all.isNotEmpty()) shareChooser(all, media.all { kindOf(it) == "img" }, media.all { kindOf(it) == "aud" })
+                    }
+                }, 500)
+            }
+        }.start()
+    }
+
+    private fun dlog(s: String) { Diag.lastInsert = Diag.lastInsert + " | " + s }
+    private fun autoLabel(n: AccessibilityNodeInfo) = listOfNotNull(n.text?.toString(), n.contentDescription?.toString()).joinToString("|")
+    private fun autoFind(root: AccessibilityNodeInfo, pred: (AccessibilityNodeInfo) -> Boolean): AccessibilityNodeInfo? {
+        fun go(n: AccessibilityNodeInfo?, d: Int): AccessibilityNodeInfo? {
+            if (n == null || d > 40) return null
+            if (pred(n)) return n
+            for (k in 0 until n.childCount) go(n.getChild(k), d + 1)?.let { return it }
+            return null
+        }
+        return go(root, 0)
+    }
+    private fun autoClickUp(n: AccessibilityNodeInfo?): Boolean {
+        var x = n; var hops = 0
+        while (x != null && hops < 4) { if (x.isClickable && x.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true; x = x.parent; hops++ }
+        return false
+    }
+
+    /** Chọn [count] ô ảnh ĐẦU (mới nhất) trong bộ chọn ảnh của máy. Trả "ok…" nếu đã bấm đủ, còn lại là lý do (hiện ở Kiểm tra gõ tắt). */
+    private fun autoPickPhotos(root: AccessibilityNodeInfo, count: Int): String {
+        val sh = resources.displayMetrics.heightPixels; val sw = resources.displayMetrics.widthPixels
+        val skip = Regex("camera|máy ảnh|chụp", RegexOption.IGNORE_CASE)
+        val tiles = ArrayList<Pair<AccessibilityNodeInfo, Rect>>(); var clickable = 0; val cls = ArrayList<String>()
+        fun go(n: AccessibilityNodeInfo?, d: Int) {
+            if (n == null || d > 40) return
+            val r = Rect().also { n.getBoundsInScreen(it) }
+            val w = r.width(); val h = r.height()
+            if (n.isClickable) { clickable++; if (cls.size < 4) cls += "${n.className?.toString()?.substringAfterLast('.')}${w}x$h" }
+            val square = w > sw * 0.12 && w < sw * 0.6 && h > w * 0.75 && h < w * 1.35
+            if (square && n.isClickable && r.top > sh * 0.12 && r.bottom < sh * 0.97 && !skip.containsMatchIn(autoLabel(n))) tiles += n to r
+            for (k in 0 until n.childCount) go(n.getChild(k), d + 1)
+        }
+        go(root, 0)
+        val uniq = tiles.distinctBy { (it.second.left / 12) to (it.second.top / 12) }.sortedWith(compareBy({ it.second.top / 12 }, { it.second.left }))
+        if (uniq.size < count) return "chưa đủ ô ảnh: thấy ${uniq.size}/$count, nút bấm được $clickable, mẫu ${cls.joinToString(",")}, gói ${root.packageName}"
+        var okc = 0
+        uniq.take(count).forEach { if (autoClickUp(it.first)) okc++ }
+        return if (okc == count) "ok: đã tick $count ô ảnh đầu" else "chỉ tick được $okc/$count ô"
+    }
+
+    /** Pancake: nút ảnh mở THƯ VIỆN ẢNH CỦA PANCAKE (không phải ảnh máy) → phải bấm "Tải ảnh lên" rồi tick ảnh trong bộ chọn ảnh của máy. Tự làm 2 bước đó. */
+    private fun startAutoUpload(count: Int) {
+        var stage = 0; var tries = 0; var pickTries = 0
+        fun tick() {
+            tries++
+            if (tries > 70) { dlog("auto: hết giờ ở bước $stage"); return }
+            val root = rootInActiveWindow
+            val pk = root?.packageName?.toString().orEmpty()
+            if (root != null) when (stage) {
+                0 -> if (pk.contains("pancake", true)) {
+                    val b = autoFind(root) { n -> val l = autoLabel(n); l.length < 40 && l.contains("tải ảnh lên", true) }
+                    if (b != null && autoClickUp(b)) { dlog("auto: đã bấm \"Tải ảnh lên\""); stage = 1; tries = 0 }
+                    else if (tries == 14) dlog("auto: chưa thấy nút \"Tải ảnh lên\"")
+                }
+                1 -> if (!pk.contains("pancake", true) && pk != packageName && Regex("photo|media|picker|gallery|documentsui|files", RegexOption.IGNORE_CASE).containsMatchIn(pk)) {
+                    pickTries++
+                    val r = autoPickPhotos(root, count)
+                    if (r.startsWith("ok")) { dlog("auto: $r"); stage = 2; tries = 0 } else if (pickTries == 6) dlog("auto: $r")
+                }
+                2 -> {
+                    val b = autoFind(root) { n -> val l = autoLabel(n); l.length <= 14 && n.isClickable && Regex("^(xong|done|thêm|add|chọn|select|ok)\\b.*", RegexOption.IGNORE_CASE).matches(l.trim()) }
+                    if (b != null && autoClickUp(b)) { dlog("auto: đã bấm Xong → chờ Pancake tải lên rồi bấm Gửi"); return }
+                    if (tries == 10) dlog("auto: không thấy nút Xong (bạn bấm Xong giúp)")
+                }
+            }
+            ui.postDelayed({ tick() }, 500)
+        }
+        ui.postDelayed({ tick() }, 900)
+    }
+
+    /** Lưu file vào MediaStore (không cần quyền từ Android 10). Hình k có ngày chụp = now − k giây → hình 1 mới nhất = đầu danh sách, tick từ trái sang phải đúng thứ tự. */
+    private fun saveMedia(files: List<File>, image: Boolean): Int {
+        var ok = 0
+        val nowMs = System.currentTimeMillis()
+        files.forEachIndexed { k, f ->
+            try {
+                val ext = f.extension.lowercase()
+                val mime = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: if (image) "image/jpeg" else "audio/mp4"
+                val v = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, "vt_${nowMs}_${k}.${ext.ifEmpty { if (image) "jpg" else "m4a" }}")
+                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE, mime)
+                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, if (image) "Pictures/VietTat" else "Download/VietTat")
+                    if (image) {
+                        put(android.provider.MediaStore.Images.Media.DATE_TAKEN, nowMs - k * 1000L)
+                        put(android.provider.MediaStore.MediaColumns.DATE_ADDED, (nowMs / 1000) - k)
+                    }
+                }
+                val base = if (image) android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI else android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
+                val u = contentResolver.insert(base, v) ?: return@forEachIndexed
+                contentResolver.openOutputStream(u)?.use { o -> f.inputStream().use { it.copyTo(o) } }
+                ok++
+            } catch (ex: Exception) { Diag.lastInsert = "lưu Thư viện lỗi: ${ex.javaClass.simpleName} ${ex.message.orEmpty()}" }
+        }
+        return ok
+    }
+
+    /**
+     * Bấm hộ nút "ảnh" của app chat. NGUYÊN NHÂN GỐC "KHÔNG thấy nút ảnh · nút ở dải dưới: (trống)" (Duyên quay video Zalo 2026-10-31): bản cũ chỉ quét 25% DƯỚI CÙNG màn hình,
+     * nhưng khi bàn phím đang mở hàng nhập tin của Zalo nằm ở ~54% chiều cao (nút ảnh ở ngay cuối hàng đó) nên không quét tới. Nay tìm ô soạn tin rồi quét
+     * ĐÚNG HÀNG đó (± 2 lần chiều cao ô), nút khớp nhãn ảnh|hình|photo|gallery|image… nằm phải nhất; không có ô soạn thì quét nửa dưới màn hình.
+     * Mọi nút thấy được trong dải được ghi vào Diag (để chỉnh nhãn nếu Zalo đổi).
+     */
+    private fun clickChatGalleryButton(): Boolean {
+        val root = rootInActiveWindow ?: run { Diag.lastInsert = "mở bộ chọn ảnh: không đọc được màn hình"; return false }
+        val h = resources.displayMetrics.heightPixels
+        // 1) ô soạn tin: ô đang lấy nét, không có thì ô gõ được nằm thấp nhất
+        var input: AccessibilityNodeInfo? = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.takeIf { it.isEditable }
+        if (input == null) {
+            var lowTop = -1
+            fun findEd(n: AccessibilityNodeInfo?, d: Int) {
+                if (n == null || d > 30) return
+                if (n.isEditable) { val r = Rect().also { n.getBoundsInScreen(it) }; if (r.width() > 0 && r.top > lowTop) { lowTop = r.top; input = n } }
+                for (k in 0 until n.childCount) findEd(n.getChild(k), d + 1)
+            }
+            findEd(root, 0)
+        }
+        val ir = Rect(); input?.getBoundsInScreen(ir)
+        val bandTop = if (input != null) ir.top - ir.height() * 2 else (h * 0.5).toInt()
+        val bandBottom = if (input != null) ir.bottom + ir.height() * 2 else h
+        val re = Regex("ảnh|hình|photo|gallery|image|picture|media|thư viện|album", RegexOption.IGNORE_CASE)
+        val seen = ArrayList<String>(); var best: AccessibilityNodeInfo? = null; var bestLeft = -1
+        fun walk(n: AccessibilityNodeInfo?, d: Int) {
+            if (n == null || d > 30) return
+            val r = Rect().also { n.getBoundsInScreen(it) }
+            val cy = (r.top + r.bottom) / 2
+            if (cy in bandTop..bandBottom && !n.isEditable && r.width() > 0 && r.width() < 600) {
+                val label = listOfNotNull(n.contentDescription?.toString(), n.text?.toString()).joinToString("|")
+                val id = n.viewIdResourceName.orEmpty().substringAfterLast('/')
+                val str = listOf(label, id).filter { it.isNotEmpty() }.joinToString("|")
+                if (str.isNotEmpty() && seen.size < 20) seen += "${str.take(32)}@${r.left}"
+                else if (str.isEmpty() && (n.isClickable || n.isFocusable) && seen.size < 20)
+                    seen += "[${n.className?.toString()?.substringAfterLast('.').orEmpty().take(12)}${if (n.isClickable) "*" else ""}]@${r.left},${r.top} ${r.width()}x${r.height()}"
+                // nhãn chữ phải NGẮN (≤ 25 ký tự) để khỏi bấm nhầm bong bóng tin nhắn có chữ "ảnh"; id thì không giới hạn
+                val textHit = label.isNotEmpty() && label.length <= 25 && re.containsMatchIn(label)
+                val idHit = id.isNotEmpty() && re.containsMatchIn(id)
+                if ((textHit || idHit) && r.left > bestLeft) { best = n; bestLeft = r.left }
+            }
+            for (k in 0 until n.childCount) walk(n.getChild(k), d + 1)
+        }
+        walk(root, 0)
+        // Dự phòng (không phải Zalo): nút ảnh Pancake KHÔNG có nhãn chữ/id → lấy nút bấm được NHỎ nằm ở nửa phải, TRÁI NHẤT trong cụm biểu tượng [ảnh][mẫu tin][gửi]
+        var geo = false
+        if (best == null && root.packageName?.toString()?.contains("zalo", true) != true) {
+            val sw = resources.displayMetrics.widthPixels
+            val cands = ArrayList<Pair<AccessibilityNodeInfo, Int>>()
+            fun walk2(n: AccessibilityNodeInfo?, d: Int) {
+                if (n == null || d > 30) return
+                val r = Rect().also { n.getBoundsInScreen(it) }
+                val cy = (r.top + r.bottom) / 2
+                if ((n.isClickable || n.actionList.any { it.id == AccessibilityNodeInfo.ACTION_CLICK }) && !n.isEditable && cy in bandTop..bandBottom && r.width() in 1..(sw * 0.2).toInt() && r.left > sw * 0.45) cands += n to r.left
+                for (k in 0 until n.childCount) walk2(n.getChild(k), d + 1)
+            }
+            walk2(root, 0)
+            if (cands.size >= 2) { best = cands.minByOrNull { it.second }?.first; geo = best != null }
+        }
+        var t: AccessibilityNodeInfo? = best
+        while (t != null && !t.isClickable) t = t.parent
+        val ok = t?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
+        Diag.lastInsert = "mở bộ chọn ảnh: " + (if (ok) "đã bấm nút ảnh" + (if (geo) " (đoán theo vị trí)" else "") else "KHÔNG thấy nút ảnh") + " · ô soạn tin " + (if (input != null) "y=${ir.top}-${ir.bottom}" else "không thấy") +
+            " · nút trên hàng đó: " + (if (seen.isEmpty()) "(trống)" else seen.joinToString(" ; "))
+        return ok
     }
 
     private val ui = android.os.Handler(android.os.Looper.getMainLooper())
+
+    /**
+     * Thông báo VẼ TRỰC TIẾP trên màn hình (overlay trợ năng) thay cho Toast. NGUYÊN NHÂN GỐC "bấm Chèn mà không thấy báo gì" (video Duyên 2026-11-01, Pancake):
+     * nhiều ROM (MIUI/ColorOS…) ẩn Toast của app không có quyền thông báo nên mọi lời nhắc/lỗi đều vô hình.
+     */
+    private var noteView: View? = null
+    private fun say(msg: String, ms: Long = 7000) {
+        ui.post {
+            noteView?.let { v -> runCatching { wm.removeView(v) } }
+            val d = resources.displayMetrics.density
+            val tv = TextView(this).apply {
+                text = msg; textSize = 14f; setTextColor(0xFFFFFFFF.toInt())
+                setPadding((14 * d).toInt(), (10 * d).toInt(), (14 * d).toInt(), (10 * d).toInt())
+                background = GradientDrawable().apply { setColor(0xEE222222.toInt()); cornerRadius = 14 * d }
+            }
+            val lp = WindowManager.LayoutParams(
+                (resources.displayMetrics.widthPixels * 0.92).toInt(), WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+                PixelFormat.TRANSLUCENT
+            ).apply { gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL; y = (96 * d).toInt() }
+            runCatching { wm.addView(tv, lp); noteView = tv }
+            ui.postDelayed({ if (noteView === tv) { runCatching { wm.removeView(tv) }; noteView = null } }, ms)
+        }
+    }
 
     /**
      * NGUYÊN NHÂN GỐC "chọn nhiều hình mà không vào khung chat" (Duyên 2026-10-27): Android chỉ dán được MỘT hình mỗi lần, nên code cũ với ≥2 hình
@@ -198,27 +424,29 @@ class ExpanderService : AccessibilityService() {
      * app chat nhận xong (1,6 giây) → hình kế tiếp. Hình đầu bị từ chối → dự phòng bảng chia sẻ; hình sau bị từ chối → báo còn bao nhiêu hình chưa dán.
      */
     private fun pasteImages(uris: List<android.net.Uri>, i: Int, first: AccessibilityNodeInfo) {
-        if (i >= uris.size) { Toast.makeText(this, "Đã dán ${uris.size} hình", Toast.LENGTH_SHORT).show(); return }
+        if (i >= uris.size) { say("Đã dán ${uris.size} hình"); return }
         (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newUri(contentResolver, "viettat", uris[i]))
         val node = rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: first.also { it.refresh() }
         val ok = node.performAction(AccessibilityNodeInfo.ACTION_PASTE)
         Diag.lastInsert = "dán hình ${i + 1}/${uris.size}: " + if (ok) "app nhận" else "app TỪ CHỐI dán"
         if (!ok) {
-            if (i == 0) { Toast.makeText(this, "App chat không cho dán hình → mở bảng chia sẻ", Toast.LENGTH_LONG).show(); shareChooser(uris, true, false) }
-            else Toast.makeText(this, "Đã dán $i hình, còn ${uris.size - i} hình app chat không nhận → bấm Chia sẻ để gửi nốt", Toast.LENGTH_LONG).show()
+            if (i == 0) { say("App chat không cho dán hình → mở bảng chia sẻ"); shareChooser(uris, true, false) }
+            else say("Đã dán $i hình, còn ${uris.size - i} hình app chat không nhận → bấm Chia sẻ để gửi nốt")
             return
         }
         ui.postDelayed({ pasteImages(uris, i + 1, node) }, 1600)
     }
 
-    private fun shareChooser(uris: List<android.net.Uri>, allImg: Boolean, allAud: Boolean) {
+    private fun shareChooser(uris: List<android.net.Uri>, allImg: Boolean, allAud: Boolean, caption: String? = null) {
         val send = Intent(if (uris.size == 1) Intent.ACTION_SEND else Intent.ACTION_SEND_MULTIPLE).apply {
             type = if (allImg) "image/*" else if (allAud) "audio/*" else "*/*"
             if (uris.size == 1) putExtra(Intent.EXTRA_STREAM, uris[0]) else putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
             clipData = ClipData.newRawUri("", uris[0]).also { cd -> for (k in 1 until uris.size) cd.addItem(ClipData.Item(uris[k])) }
+            if (caption != null) putExtra(Intent.EXTRA_TEXT, caption)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         startActivity(Intent.createChooser(send, "Gửi qua").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        if (caption != null) say("Đã sao chép chữ. Nếu ứng dụng nhận không kèm chữ, hãy dán vào tin nhắn")
     }
 
     private fun hide() { popup?.let { runCatching { wm.removeView(it) } }; popup = null; lastText = "" }

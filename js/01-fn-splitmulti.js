@@ -357,6 +357,21 @@ async function saveChannelCommissionRates() {
   }
 }
 
+// ── LUAT HOA HONG KENH "NGUON" THEO CHAT LIEU VANG (Duyen yeu cau 2026-10) — PHAI khop _goldChannelRule_ o GAS (gas_v13.js) ──
+// Don co nguon don la kenh Nguon: vang 10k = 1,5%, vang 14k = 1%, KHONG phu thuoc gia tri don (khong xet moc 15 trieu nhu cac kenh con lai).
+// Don Nguon khong co 10k/14k -> tinh nhu cu. Don co CA 10k va 14k (khong tach duoc gia tri tung mon) -> lay muc THAP (1%), danh dau mixed.
+var GOLD_RULE_CHANNELS = ['nguon'];   // ten kenh KHONG DAU, chu thuong; khop nguyen ten hoac bat dau bang 'nguon '
+var GOLD_RULE_MATERIALS = [ { key: '14', rate: 1, label: 'vàng 14k' }, { key: '10', rate: 1.5, label: 'vàng 10k' } ];
+function _goldFold_(v){ return String(v == null ? '' : v).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'd').toLowerCase().replace(/\s+/g, ' ').trim(); }
+function _goldChannelRule_(nguonDon, sanPham){
+  var ch = _goldFold_(nguonDon);
+  if (!ch || !GOLD_RULE_CHANNELS.some(function(c){ return ch === c || ch.indexOf(c + ' ') === 0; })) return null;
+  var txt = _goldFold_(sanPham), hits = GOLD_RULE_MATERIALS.filter(function(m){ return new RegExp('(^|[^0-9])' + m.key + ' ?k(?![a-z0-9])').test(txt); });   // "10k" / "10 k" / "vang10k"; khong nhan 110k, 10kg, 10kx
+  if (!hits.length) return null;
+  hits.sort(function(a, b){ return a.rate - b.rate; });
+  return { rate: hits[0].rate, label: hits[0].label, mixed: hits.length > 1 };
+}
+
 function _channelCommissionRate_(kenh){
   if (!kenh) return null;
   var k = String(kenh).trim().toLowerCase();
@@ -472,7 +487,9 @@ function _computeCommissionData_(orders) {
     var isAbove = giaTri >= COMMISSION_THRESHOLD;
     // Nguồn đơn đã được admin cài % riêng (vd "facebook" = 1%) -> BỎ QUA hoàn toàn ngưỡng
     // 15tr + % cá nhân/team, tính thẳng theo đúng % kênh đó cho phần doanh thu chia của sale.
-    var chRate = _channelCommissionRate_(m.nguonDon);
+    // Kenh Nguon + vang 10k/14k: luat vang DUNG TRUOC % kenh admin cai va moc 15tr (khong phu thuoc gia tri don)
+    var gold = _goldChannelRule_(m.nguonDon, m.sanPham);
+    var chRate = gold ? gold.rate : _channelCommissionRate_(m.nguonDon);
     if (chRate === null) {
       if (isAbove) { totalOrdersAbove15++; totalRevenueAbove15 += giaTri; }
       else { totalOrdersBelow15++; totalRevenueBelow15 += giaTri; }
@@ -491,15 +508,20 @@ function _computeCommissionData_(orders) {
     salesList.forEach(function(sName){
       // saleRatio 0.3 = don Quay Hao Nam gan the sale + note 30/70: chi 30% doanh thu chia cho sale (70% la cua quay)
       var share = (shareMap ? giaTri * shareMap[sName] : giaTri / n) * (Number(m.saleRatio) || 1);
-      if (!bySale[sName]) bySale[sName] = { ordersAbove15:0, ordersBelow15:0, revenueAbove15:0, revenueBelow15:0, channelRevenue:0, channelCommission:0, channelBreakdown:{} };
+      if (!bySale[sName]) bySale[sName] = { ordersAbove15:0, ordersBelow15:0, revenueAbove15:0, revenueBelow15:0, channelRevenue:0, channelCommission:0, channelBreakdown:{}, srcBreakdown:{} };
       if (chRate !== null) {
-        var kenhKey = String(m.nguonDon||'').trim();
+        var kenhKey = String(m.nguonDon||'').trim() + (gold ? ' · ' + gold.label + (gold.mixed ? ' (đơn có cả 10k & 14k → mức thấp)' : '') : '');
         bySale[sName].channelRevenue += share;
         bySale[sName].channelCommission += share * (chRate/100);
         if (!bySale[sName].channelBreakdown[kenhKey]) bySale[sName].channelBreakdown[kenhKey] = { revenue:0, rate:chRate };
         bySale[sName].channelBreakdown[kenhKey].revenue += share;
-      } else if (isAbove) { bySale[sName].ordersAbove15++; bySale[sName].revenueAbove15 += share; }
-      else { bySale[sName].ordersBelow15++; bySale[sName].revenueBelow15 += share; }
+      } else {
+        // Chi tiet THEO NGUON DON cho phan hoa hong theo muc don (>=15tr / <15tr): dung cho bang "Thu nhap tung Sale" (js/63) — chi THEM, khong doi cach tinh
+        var srcK = String(m.nguonDon||'').trim() || '(không có nguồn)';
+        var sb = bySale[sName].srcBreakdown[srcK] || (bySale[sName].srcBreakdown[srcK] = { revAbove:0, revBelow:0, nAbove:0, nBelow:0 });
+        if (isAbove) { bySale[sName].ordersAbove15++; bySale[sName].revenueAbove15 += share; sb.nAbove++; sb.revAbove += share; }
+        else { bySale[sName].ordersBelow15++; bySale[sName].revenueBelow15 += share; sb.nBelow++; sb.revBelow += share; }
+      }
     });
   });
   // Giong Bao cao B (Theo Sale): KHONG liet ke "(chưa gán sale)" — khong co nguoi nao de tra hoa hong.
@@ -514,7 +536,7 @@ function _computeCommissionData_(orders) {
       revenueAbove15: s.revenueAbove15, revenueBelow15: s.revenueBelow15,
       rateAbove15: rate.above15, rateBelow15: rate.below15,
       sourceAbove15: rate.sourceAbove15, sourceBelow15: rate.sourceBelow15,
-      channelRevenue: s.channelRevenue, channelCommission: s.channelCommission, channelBreakdown: s.channelBreakdown,
+      channelRevenue: s.channelRevenue, channelCommission: s.channelCommission, channelBreakdown: s.channelBreakdown, sourceBreakdown: s.srcBreakdown,
       commission: commission
     };
   });

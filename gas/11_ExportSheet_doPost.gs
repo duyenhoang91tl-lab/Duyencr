@@ -228,7 +228,7 @@ function doPost(e) {
     if (d0.action === 'saveUsers') { var _ua = _usersWriteAuth_(d0.token); if (!_ua.ok) return jsonOut_({ error: _ua.error, code: 'AUTH' }); }
     if (d0.action === 'setGasSource' && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Can khoa quan tri (adminKey) de dong bo ma nguon GAS.' });
     if (d0.action === 'setSetting' && _isSensitiveWriteKey_(d0.key) && !_adminKeyOk_(d0.adminKey)) return jsonOut_({ error: 'Khong duoc ghi key nay.' });
-    if (d0.action === 'setSetting' && (String(d0.key || '').trim() === 'bizRules' || String(d0.key || '').trim() === 'reportsConfig' || String(d0.key || '').trim() === 'bannedWordsCfg' || String(d0.key || '').trim() === 'POS_GHEP_MIN_CODES')) { var _bizDen = _bizRulesWriteDenied_(d0.token); if (_bizDen) return jsonOut_(_bizDen); }
+    if (d0.action === 'setSetting' && (String(d0.key || '').trim() === 'bizRules' || String(d0.key || '').trim() === 'reportsConfig' || String(d0.key || '').trim() === 'bannedWordsCfg' || String(d0.key || '').trim() === 'POS_GHEP_MIN_CODES' || String(d0.key || '').trim() === 'resaleNotifyLookback' || String(d0.key || '').trim() === 'resaleNotifyDays' || String(d0.key || '').trim() === 'resaleNotify')) { var _bizDen = _bizRulesWriteDenied_(d0.token); if (_bizDen) return jsonOut_(_bizDen); }
   }
   if (d0 && typeof d0 === 'object') {
     _AUDIT_TOKEN_ = String(d0.token || '');
@@ -254,6 +254,7 @@ function doPostCore_(e) {
     if (MLIB_POST_ACTIONS_[action] === 1) return mlibDoPost_(action, data);   // thu vien anh/ghi am/mau tin
     if (KHD_POST_ACTIONS_[action] === 1) return khdDoPost_(action, data);   // thao luan khach (noi bo)
     if (SPLIT_POST_ACTIONS_[action] === 1) return splitDoPost_(action, data);   // xuat bao cao M (don chia) ra Sheet: Admin
+    if (TEAMBONUS_POST_ACTIONS_[action] === 1) return teamBonusDoPost_(action, data);   // ghi/xoa nhat ky phat doi Sale (chi admin)
     if (CHAT_POST_ACTIONS_[action] === 1) return chatDoPost_(action, data);   // chat noi bo
     if (action === 'save')                return saveAllCare_(data.rows);
     if (action === 'saveSingle')          return saveSingleCare_(data.row);
@@ -383,12 +384,10 @@ function doPostCore_(e) {
     //    (cvDetect_/_cvBannedCompiled_) -> nut bao sach thi giam sat chat cung khong bat. Chi doc, khong ghi gi. ──
     if (action === 'scanBanned')   return jsonOut_(scanBannedText_(data.text));
     // ── MAU TIN NHAN TU VAN KHACH: them/sua (form tren CRM tab ZALO AI) / xoa 1 mau ──
+    if (action === 'uploadTemplateImage')    return uploadTemplateImage_(data.imageBase64, data.filename, data.mimeType, _tplCaller_(data.token, data.ek, ''));
     if (action === 'saveMessageTemplate')   return saveMessageTemplate_(data.template || data, _tplCaller_(data.token, data.ek, (data.template || data).createdBy));
     if (action === 'deleteMessageTemplate') return deleteMessageTemplate_(data.id, _tplCaller_(data.token, data.ek, data.createdBy));
     if (action === 'approveMessageTemplate') return approveMessageTemplate_(data.id, data.decision, data.reason, _tplCaller_(data.token, data.ek, ''));
-    if (action === 'saveVietTat')           return saveVietTat_(data.snippet || data, _tplCaller_(data.token, data.ek, data.by));
-    if (action === 'deleteVietTat')         return deleteVietTat_(data.id, _tplCaller_(data.token, data.ek, data.by));
-    if (action === 'vietTatUploadImage')    return jsonOut_(vietTatUploadImage_(data, _tplCaller_(data.token, data.ek, data.by)));   // CRM: tai 1 anh tu may len Drive (chon nhieu anh -> goi lan luot)
     if (action === 'saveCannedResponse')    return saveCannedResponse_(data.canned || data);
     if (action === 'saveAIExample')         return saveAIExample_(data.id, data.content);
     if (action === 'deleteAIExample')       return deleteAIExample_(data.id);

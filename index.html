@@ -27,7 +27,7 @@ html.ev-boot #empty-view .ev-spin{display:flex}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="css/01-base.css?v=20261026a">
+<link rel="stylesheet" href="css/01-base.css?v=20261030a">
 <link rel="stylesheet" href="css/02-style.css">
 </head>
 <body>
@@ -412,6 +412,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
       <div class="tab" data-bar-id="tab-mydata" data-bar-home=".tabs" onclick="switchTab('mydata',this)">📋 Data của tôi <span class="tab-badge" id="tb-mydata">0</span></div>
       <div class="tab" data-bar-id="tab-zaloai" data-bar-home=".tabs" onclick="switchTab('zaloai',this)">🤖 Zalo AI</div>
       <div class="tab" data-bar-id="tab-chat" data-bar-home=".tabs" onclick="switchTab('chat',this)">💬 Chat</div>
+      <div class="tab" data-bar-id="tab-media" data-bar-home=".tabs" onclick="switchTab('media',this)">🖼️ Thư viện</div>
       <div class="tab" data-bar-id="tab-teamchat" data-bar-home=".tabs" onclick="switchTab('teamchat',this)">💬 Chat nội bộ <span class="tab-badge" id="tb-teamchat" style="display:none">0</span></div>
       <div class="tab" data-bar-id="tab-task" data-bar-home=".tabs" onclick="switchTab('task',this)">🗂️ Công việc <span class="tab-badge" id="tb-task">0</span></div>
       <div class="tabs-mobile-toggle" onclick="event.stopPropagation();this.closest('.tabs').classList.toggle('mobile-tabs-open')">☰ Mục ▾</div>
@@ -814,6 +815,13 @@ window.addEventListener('load',function(){var s=document.createElement('script')
           </div>
           <div style="font-size:11px;color:var(--muted);margin:-2px 0 8px">🗂 Chọn nhóm sản phẩm hoặc <b>để "tự phân loại"</b> — hệ thống tự xếp nhóm theo tên sản phẩm / nội dung mẫu; mẫu chung (chào hỏi...) không thuộc nhóm nào.</div>
           <textarea id="mt-f-content" class="zai-textarea" placeholder="Nội dung mẫu tin nhắn..." rows="4" style="width:100%;margin-bottom:8px"></textarea>
+          <div style="margin-bottom:8px">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">🖼 Ảnh đính kèm mẫu (tối đa 4 ảnh, mỗi ảnh ≤ 5MB)</div>
+            <input type="file" id="mt-f-imgs" accept="image/*" multiple style="display:none" onchange="mtHandleImgPick(this.files)">
+            <div id="mt-f-img-previews" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px"></div>
+            <button type="button" class="btn sm" onclick="document.getElementById('mt-f-imgs').click()" id="mt-f-img-btn">➕ Chọn ảnh</button>
+            <span id="mt-f-img-status" style="font-size:11px;color:var(--muted);margin-left:8px"></span>
+          </div>
           <div style="display:flex;gap:8px;justify-content:flex-end">
             <button class="btn sm" onclick="closeMsgTemplateForm()">Hủy</button>
             <button class="btn sm primary" id="mt-f-save-btn" onclick="saveMsgTemplateUI()">Lưu mẫu</button>
@@ -885,6 +893,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
       </div>
     </div>
 
+    <div id="tab-media" style="display:none;flex:1;overflow:auto;flex-direction:column" class="main"><div id="mlib-wrap" style="padding:14px 18px"></div></div>
     <div id="tab-chat" style="display:none;flex:1;overflow:hidden;flex-direction:row" class="main"><div id="chat-wrap" style="flex:1;overflow:hidden;display:flex;min-width:0"></div><div id="sc-dock" class="sc-dock"></div></div>
     <div id="tab-mydata" style="display:none;flex:1;overflow:hidden;flex-direction:column" class="main">
       <div class="toolbar">
@@ -935,7 +944,7 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 </div>
 </div>
 
-<script src="js/01-fn-splitmulti.js?v=20261026a"></script>
+<script src="js/01-fn-splitmulti.js?v=20261103a"></script>
 <script src="js/02-fn-showrowerrorbanner.js"></script>
 <script src="js/03-fn-refreshopendptab.js"></script>
 <script src="js/04-fn-synczalophonesettingsfromgas.js"></script>
@@ -1017,15 +1026,15 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 
 
 <!-- ════════════ V9 FEATURE LAYER ════════════ -->
-<script src="js/08-fn-invalidatefiltercache.js"></script>
-<script src="js/09-fn-deleteteam.js"></script>
-<script src="js/10-fn-pkkpipct.js"></script>
-<script src="js/11-fn-srload.js?v=20261026a"></script>
-<script src="js/12-fn-rendersalesreporttabe.js?v=20261024c"></script>
-<script src="js/13-fn-bpseedofficialonlinetemplate.js?v=20261024c"></script>
-<script src="js/14-fn-aasplit.js?v=20261023a"></script>
+<script src="js/08-fn-invalidatefiltercache.js?v=20261029a"></script>
+<script src="js/09-fn-deleteteam.js?v=20261029a"></script>
+<script src="js/10-fn-pkkpipct.js?v=20261029a"></script>
+<script src="js/11-fn-srload.js?v=20261103b"></script>
+<script src="js/12-fn-rendersalesreporttabe.js?v=20261103b"></script>
+<script src="js/13-fn-bpseedofficialonlinetemplate.js?v=20261102a"></script>
+<script src="js/14-fn-aasplit.js?v=20261029a"></script>
 <script src="js/15-fn-hidelogin.js"></script>
-<script src="js/16-main-currentuser.js"></script>
+<script src="js/16-main-currentuser.js?v=20261102"></script>
 
 <!-- CARE STATUS MANAGER MODAL -->
 <div class="modal-overlay" id="care-status-modal" style="display:none;align-items:flex-start;justify-content:center;padding-top:40px;z-index:700">
@@ -1129,8 +1138,8 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 </div>
 
 <!-- ══ MODAL: Phân loại Sale Online/Offline ══ -->
-<div class="modal-overlay" id="sc-modal" style="display:none;align-items:flex-start;justify-content:center;padding-top:40px;z-index:700">
-<div class="modal" style="max-width:520px;width:94%;max-height:86vh;display:flex;flex-direction:column">
+<div class="modal-overlay" id="sc-modal" style="display:none;align-items:stretch;justify-content:center;padding:0;z-index:700">
+<div class="modal" style="max-width:none;width:100%;height:100vh;max-height:100vh;border-radius:0;display:flex;flex-direction:column">
   <div class="modal-header" style="flex-shrink:0">
     <div class="modal-title">🏷️ Phân loại đội Sale</div>
     <button class="modal-close" onclick="closeSaleChannelsModal()">✕</button>
@@ -1229,10 +1238,11 @@ window.addEventListener('load',function(){var s=document.createElement('script')
 <link rel="stylesheet" href="css/04-style.css">
 <link rel="stylesheet" href="css/05-sidenav.css?v=20261023b">
 <link rel="stylesheet" href="css/06-pro.css?v=20261027b">
-<link rel="stylesheet" href="css/07-teamchat.css">
+<link rel="stylesheet" href="css/07-teamchat.css?v=20261101a">
 <link rel="stylesheet" href="css/08-kho.css">
 <link rel="stylesheet" href="css/09-profile.css">
-<link rel="stylesheet" href="css/10-filter-presets.css?v=20261017">
+<link rel="stylesheet" href="css/10-medialib.css">
+<link rel="stylesheet" href="css/10-filter-presets.css?v=20261031a">
 <link rel="stylesheet" href="css/10-dark.css?v=20261023a">
 <link rel="stylesheet" href="css/11-roles.css">
 <link rel="stylesheet" href="css/12-salematch.css">
@@ -1751,15 +1761,16 @@ function openBcLogModal(phone){
 <script src="js/38-pro-dock.js?v=20261027b"></script>
 <script src="js/39-fn-notify.js?v=20261020a"></script>
 <script src="js/40-fn-rolesettings.js"></script>
-<script src="js/41-fn-pkchat.js?v=20261025c"></script>
-<script src="js/42-fn-socialchat.js?v=20261025c"></script>
+<script src="js/41-fn-pkchat.js?v=20261101a"></script>
+<script src="js/42-fn-socialchat.js?v=20261101a"></script>
 <script src="js/58-fn-chatcoach.js?v=20261025c"></script>
-<script src="js/43-teamchat.js"></script>
+<script src="js/48-fn-medialib.js?v=20261101b"></script>
+<script src="js/43-teamchat.js?v=20261101a"></script>
 <script src="js/40-main-restorenav.js"></script>
 <script src="js/43-fn-viewstate.js"></script>
 <script src="js/46-fn-kho.js"></script>
 <script src="js/47-staff-profile.js"></script>
-<script src="js/48-filter-presets.js?v=20261017"></script>
+<script src="js/48-filter-presets.js?v=20261102c"></script>
 <script src="js/48-pro-chatinfo.js"></script>
 <script src="js/49-pro-discuss.js"></script>
 <script src="js/50-split-orders.js?v=20261024e"></script>
@@ -1775,6 +1786,9 @@ function openBcLogModal(phone){
 <script src="js/58-auto-cust-link.js"></script>
 <script src="js/59-conn-diag.js"></script>
 <script src="js/59-report-drill.js"></script>
+<script src="js/60-team-bonus.js?v=20261031c"></script>
+<script src="js/62-sale-channel-periods.js?v=20261102h"></script>
+<script src="js/63-fn-saleincome.js?v=20261103c"></script>
 
 
 <div class="modal-overlay" id="quick-add-modal" style="display:none;align-items:flex-start;justify-content:center;padding-top:60px;z-index:800">

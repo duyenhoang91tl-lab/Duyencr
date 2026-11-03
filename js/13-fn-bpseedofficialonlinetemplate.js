@@ -292,10 +292,16 @@ function _hScopeNames_(){
   }
   return _srMyNames().concat([currentUser && currentUser.name]).filter(Boolean);
 }
+// Danh sách CS có trong lịch sử chia data, giới hạn theo phạm vi người xem (H/I + mẫu lọc nhanh dùng chung)
+function _hAssignCsNames_(){
+  var scope = _hScopeNames_(), seen = {};
+  (typeof assignHistory !== 'undefined' ? assignHistory : []).forEach(function(h){ var n = h && h.csName; if (n && (!scope || scope.indexOf(n) !== -1)) seen[n] = 1; });
+  return Object.keys(seen).sort(function(a,b){ return a.localeCompare(b, 'vi'); });
+}
 function _hAddMap_(a, b){ Object.keys(b||{}).forEach(function(k){ a[k] = (a[k]||0) + b[k]; }); }
 function _hBuild_(){
   var from = _srState.hDateFrom, to = _srState.hDateTo, scope = _hScopeNames_();
-  var teamF = _srState.hTeam || '', csF = _srState.hCs || '', byCs = (_srState.hGroup === 'cs');
+  var teamF = _srState.hTeam || '', csF = _srState.hCs || '', csList = _srState.hCsList || [], byCs = (_srState.hGroup === 'cs');
   var groups = _hGroups_(), gIdx = _hGroupIndex_(groups);
   var map = {}, csSeen = {};
   (typeof assignHistory !== 'undefined' ? assignHistory : []).forEach(function(e){
@@ -306,6 +312,7 @@ function _hBuild_(){
     if (scope && scope.indexOf(cs) === -1) return;
     csSeen[cs] = 1;
     if (csF && cs !== csF) return;
+    if (csList.length && csList.indexOf(cs) === -1) return;
     var tm = _teamOf(cs), tn = tm ? (tm.name || '(chưa đặt tên)') : 'Chưa có team';
     if (teamF && tn !== teamF) return;
     var key = byCs ? cs : (d + '|' + cs);
@@ -456,7 +463,7 @@ function renderSalesReportTabI_(wrap, subTabs) {
 
   var sel = 'padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)';
   var from = _srState.iDateFrom || '', to = _srState.iDateTo || '';
-  var csF = _srState.iCs || '', teamF = _srState.iTeam || '';
+  var csF = _srState.iCs || '', csList = _srState.iCsList || [], teamF = _srState.iTeam || '';
 
   // ── Build renew phone set (SDT có trong cskhData) ──
   var renewPhones = new Set(typeof cskhData !== 'undefined' ? Object.keys(cskhData) : []);
@@ -475,6 +482,7 @@ function renderSalesReportTabI_(wrap, subTabs) {
     var cs = e.csName || '(chưa rõ)';
     if (scope && scope.indexOf(cs) === -1) return;
     if (csF && cs !== csF) return;
+    if (csList.length && csList.indexOf(cs) === -1) return;
     var tm = _teamOf(cs), tn = tm ? (tm.name || '(chưa đặt tên)') : 'Chưa có team';
     if (teamF && tn !== teamF) return;
     var mo = d.slice(0, 7); monthSet.add(mo);
@@ -639,7 +647,7 @@ function renderSalesReportTabI_(wrap, subTabs) {
 
 function exportRenewReport_() {
   // Export CSV báo cáo I
-  var from = _srState.iDateFrom||'', to = _srState.iDateTo||'', csF = _srState.iCs||'', teamF = _srState.iTeam||'';
+  var from = _srState.iDateFrom||'', to = _srState.iDateTo||'', csF = _srState.iCs||'', csList = _srState.iCsList||[], teamF = _srState.iTeam||'';
   var renewPhones = new Set(typeof cskhData!=='undefined' ? Object.keys(cskhData) : []);
   var scope = _hScopeNames_(), groups = _hGroups_(), gIdx = _hGroupIndex_(groups);
   var csMap = {};
@@ -649,6 +657,7 @@ function exportRenewReport_() {
     var cs=e.csName||'(chưa rõ)';
     if(scope&&scope.indexOf(cs)===-1) return;
     if(csF&&cs!==csF) return;
+    if(csList.length&&csList.indexOf(cs)===-1) return;
     var tm=_teamOf(cs), tn=tm?(tm.name||'(chưa đặt tên)'):'Chưa có team';
     if(teamF&&tn!==teamF) return;
     (e.phones||[]).forEach(function(p){
@@ -994,6 +1003,8 @@ var _srbMenu = { open:false, cat:null, q:'', exp:{} };
 
 // ── Cấu hình từng báo cáo: ngày, các mục lọc trong menu, tác vụ, phần phụ ──
 function _srbSaleOpts_(){ return (_srState.sub === 'B' || _srState.sub === 'E' || _srState.sub === 'F' || _srState.sub === 'G' || _srState.sub === 'K' || _srState.sub === 'L') ? (_srState.saleBOptions || []) : (_srState.saleOptions || []); }
+// Sale Online/Van phong duoc chon them ten nhom Quay + phong CSKH o bo loc Sale (viewNames tu may chu; xem _srViewNames o js/10). false neu khong co.
+function _srbHasViewScope_(){ return typeof _srViewNames === 'function' && !_srIsAdmin() && _srViewNames().length > 0; }
 function _srbIsLeaderScope_(){ return !_srIsAdmin() && currentUser && currentUser.role === 'leader' && (_srState.leaderTeamOptions || []).length > 0; }
 function _srbMenuCats_(){
   var cfg = _SRB_COMBO_CFG, cats = [], sub = (_srState.sub === 'K') ? 'G' : _srState.sub;
@@ -1013,6 +1024,9 @@ function _srbMenuCats_(){
     if (_srIsAdmin()){
       flat('sale', saleKey.label || 'Sale', '👤', 'Tìm sale...', saleKey.state, saleOpt);
       if (teamKey) flat('team', 'Team', '👥', 'Tìm team...', teamKey, function(){ return _srState.teamOptions || []; });
+    } else if (_srbHasViewScope_()){
+      // Sale Online/Van phong: chon them ten nhom Quay + phong CSKH (2026-10-29); mac dinh van la ten minh/team
+      flat('sale', 'Tên (của bạn + Quầy/CSKH)', '👤', 'Tìm tên...', saleKey.state, function(){ return _srState.viewScopeOptions || []; });
     } else if (_srbIsLeaderScope_() && saleKey.leader){
       flat('sale', 'Tên (team của bạn)', '👤', 'Tìm tên trong team...', saleKey.state, function(){ return _srState.leaderTeamOptions || []; });
     }
@@ -1046,20 +1060,20 @@ function _srbMenuCats_(){
   } else if (sub === 'H'){
     if (_srIsAdmin() || (currentUser && currentUser.role === 'leader')){
       radio('hTeam', 'Team', '👥', 'hTeam', '', function(){ return [['','Tất cả team']].concat((teams||[]).map(function(t){ return t.name || '(chưa đặt tên)'; }).concat(['Chưa có team']).map(function(n){ return [n,n]; })); }, true);
-      radio('hCs', 'CS', '🎧', 'hCs', '', function(){ return [['','Tất cả CS']].concat((_hBuild_().csOptions||[]).map(function(n){ return [n,n]; })); }, true);
+      flat('hCs', 'CS', '🎧', 'Tìm CS...', 'hCsList', function(){ return _hAssignCsNames_(); });   // (02/11/2026) nhiều CS (mẫu lọc nhanh js/48 điền được); chọn 1 CS vẫn như cũ
     }
     radio('hGroup', 'Cách nhóm', '🗂️', 'hGroup', 'dayCs', [['dayCs','Theo ngày × CS'],['cs','Gộp theo CS']], true);
   } else if (sub === 'I'){
     if (_srIsAdmin() || (currentUser && currentUser.role === 'leader')){
       radio('iTeam', 'Team', '👥', 'iTeam', '', function(){ return [['','Tất cả team']].concat((teams||[]).map(function(t){ return t.name || '(chưa đặt tên)'; }).map(function(n){ return [n,n]; })); }, true);
-      radio('iCs', 'CS', '🎧', 'iCs', '', function(){
-        var names = Array.from(new Set((typeof assignHistory!=='undefined'?assignHistory:[]).map(function(h){return h.csName;}))).filter(Boolean).sort();
-        return [['','Tất cả CS']].concat(names.map(function(n){ return [n,n]; })); }, true);
+      flat('iCs', 'CS', '🎧', 'Tìm CS...', 'iCsList', function(){ return _hAssignCsNames_(); });
     }
   } else {   // B — Pos
     if (_srIsAdmin()){
       flatB('sale', 'Sale', '👤', 'Tìm sale...');
       flatB('team', 'Team', '👥', 'Tìm team...');
+    } else if (_srbHasViewScope_()){
+      flat('sale', 'Tên (của bạn + Quầy/CSKH)', '👤', 'Tìm tên...', 'bSale', function(){ return _srState.viewScopeOptions || []; });
     }
     flatB('nguon', 'Nguồn đơn', '🛒', 'Tìm nguồn...');
     flatB('mkt', 'Marketer', '📣', 'Tìm marketer...');
@@ -1133,7 +1147,7 @@ function _srBarHtml_(customDateHtml){
     h += '<span class="srb-bar-arrow">→</span>';
     h += '<input type="date" value="'+esc(_srState[t]||'')+'" onchange="_srSetField(\''+t+'\',this.value);_srState.'+q+'=\'custom\''+c.dateAfter+'" title="Đến ngày">';
   }
-  if (!admin && c.lockKey && !(c.leader && _srbIsLeaderScope_())){
+  if (!admin && c.lockKey && !(c.leader && _srbIsLeaderScope_()) && !_srbHasViewScope_()){
     h += '<span class="srb-bar-lock" title="Bạn chỉ xem được số liệu của mình">🔒 ' + esc((_srState[c.lockKey]||[]).join(', ') || (currentUser && currentUser.name) || '') + '</span>';
   }
   h += c.extra;
@@ -1358,6 +1372,105 @@ document.addEventListener('click', function(e){
   srbMenuClose();
 });
 
+// ── EXCEL BÁO CÁO B ĐỐI CHIẾU CHI TIẾT VỚI KẾ TOÁN (Duyên yêu cầu 2026-10-31) ──
+// Vấn đề cũ: sheet "Chi tiết đơn" chỉ có giá trị Pos gốc + cột "Thẻ" thô nên KHÔNG cộng lại khớp bảng "Theo Sale" (bảng đã ghép Base, theo tỉ lệ file kế toán,
+// đơn Quầy 30/70, gộp đơn tách). Nay: "Chi tiết đơn" đủ cột truy vết (dòng Pos, ghi chú/mã đơn, giá trị Pos gốc ↔ tính báo cáo, cách tính, đơn gốc Base) +
+// "Chia theo Sale" (1 dòng = 1 đơn × 1 sale, số CHÍNH XÁC bsx/bcx từ GAS) + "Đối chiếu tổng" (bảng web ↔ cộng lại từ chi tiết, có công thức SUMIF để kế toán tự kiểm).
+// Hàm thuần (không đụng DOM/XLSX) để test được: trả về các mảng-của-mảng.
+function _srExportBLabel_(o){
+  var t = [];
+  if (o.dieuChinh === 'acct') t.push('Chia theo file kế toán');
+  else if (o.dieuChinh === 'base') t.push('Ghép đơn Base');
+  if (o.saleRatio && o.saleRatio !== 1) t.push('Quầy 30/70 (sale hưởng ' + Math.round(o.saleRatio * 100) + '%)');
+  if (o.tachSoDon) t.push('Gộp đơn tách ' + o.tachSoDon + ' phần');
+  return t.length ? t.join(' + ') : 'Chia đều theo cột Thẻ';
+}
+function _srBuildExportB_(dB, info){
+  info = info || {};
+  var orders = dB.orders || [], r2 = function(n){ return Math.round((Number(n) || 0) * 100) / 100; };
+  var bsxOf = function(o){ return o.bsx || []; }, bcxOf = function(o){ return o.bcx || []; };
+  // Chốt tháng Pos (Duyên 2026-11-02): khi GAS đã trừ hoàn/hủy tháng trước vào bảng Theo Sale (dB.posAdjust.applied), "Chia theo Sale"/"Chi tiết đơn" vẫn là số GỐC
+  // (bsx/bcx không trừ) → sheet Đối chiếu tổng so với số TRƯỚC TRỪ (webV/totV) rồi ghi riêng dòng trừ hoàn/hủy để cộng lại ra đúng số sau trừ trên web.
+  var adj = (dB.posAdjust && dB.posAdjust.applied) ? dB.posAdjust : null;
+  var webV = function(x){ return (adj && x.giaTriGoc != null) ? x.giaTriGoc : x.giaTri; };
+  var totV = (adj && dB.totalGiaTriGoc != null) ? dB.totalGiaTriGoc : dB.totalGiaTri;
+  var missing = orders.length && !orders.every(function(o){ return Array.isArray(o.bsx) && Array.isArray(o.bcx); });
+  var cr = (typeof _srCloseRateAvg_ === 'function' && dB.saleCloseRateFrom) ? _srCloseRateAvg_(dB.saleCloseRate) : null;
+  var summary = [['Báo cáo B — Pos: Excel đối chiếu với kế toán'], ['Xuất lúc', info.at || ''], ['Khoảng ngày (theo ngày tạo đơn)', (info.dateFrom || '...') + ' → ' + (info.dateTo || '...')],
+    ['Bộ lọc', (info.filters && info.filters.length) ? info.filters.join(' | ') : '(không lọc thêm)'], [],
+    ['Chỉ số', 'Giá trị'], ['Số lượng đơn', dB.totalOrders], ['Tổng giá trị sau giảm giá (tính báo cáo)', dB.totalGiaTri], ['Tổng COD', dB.totalCod], ['Trung bình đơn', dB.trungBinhDon]];
+  if (adj) summary.push(['  ↳ Tổng giá trị TRƯỚC trừ hoàn/hủy tháng ' + adj.prevMonth, totV], ['  ↳ Trừ hoàn/hủy tháng ' + adj.prevMonth + ' (mốc chốt ' + adj.closedAt + ')', -(Number(adj.totalDeduction) || 0)]);
+  if (cr && cr.has) summary.push(['Tỷ lệ chốt TB (%)', cr.avg], ['Đơn chốt ÷ tương tác Pancake', cr.closed + ' / ' + cr.held]);
+  summary.push([], ['Cách đọc file'], ['• "Chi tiết đơn": mỗi đơn 1 dòng; cột "Dòng trong sheet Pos" + "Ghi chú" để dò lại file Pancake gốc; "Giá trị Pos gốc" so với "Giá trị tính báo cáo" (đơn ghép Base/file kế toán/gộp tách có thể khác nhau).'],
+    ['• "Chia theo Sale": mỗi đơn × mỗi sale 1 dòng — số CHÍNH XÁC (2 chữ số thập phân) cộng lại đúng bảng "Theo Sale" của web.'],
+    ['• "Đối chiếu tổng": so bảng web với tổng cộng lại từ "Chia theo Sale" (cột có công thức SUMIF — sửa dữ liệu sẽ tự tính lại).']);
+  if (missing) summary.push([], ['⚠ Dữ liệu chưa có phần chia chính xác theo sale (máy chủ chưa cập nhật) — bấm "Lọc" lại hoặc chờ deploy xong rồi xuất lại.']);
+
+  // Theo Sale (đúng bảng web) + dòng Tổng
+  var bySaleRows = [['Sale', 'Số đơn', 'Giá trị sau giảm giá', 'COD']];
+  if (adj) bySaleRows[0].push('Giá trị gốc (trước trừ hoàn/hủy)', 'Trừ hoàn/hủy tháng ' + adj.prevMonth);   // 4 cột đầu giữ nguyên; 2 cột thêm ở cuối
+  var tOrd = 0, tVal = 0, tCod = 0, tGoc = 0, tTru = 0;
+  (dB.bySale || []).forEach(function(x){ var row = [x.name, x.orders, r2(x.giaTri), r2(x.cod)]; if (adj) row.push(r2(webV(x)), r2(x.truHoanHuy || 0)); bySaleRows.push(row); tOrd += x.orders; tVal += x.giaTri; tCod += x.cod; tGoc += webV(x); tTru += (x.truHoanHuy || 0); });
+  var totRowS = ['TỔNG (các sale trong bảng — chưa gồm "(chưa gán sale)")', tOrd, r2(tVal), r2(tCod)]; if (adj) totRowS.push(r2(tGoc), r2(tTru));
+  bySaleRows.push(totRowS);
+
+  // Chi tiết đơn
+  var detailRows = [['STT', 'Ngày tạo đơn', 'Dòng trong sheet Pos', 'Ghi chú đơn (mã bộ đếm / mã đơn Pos)', 'Khách hàng', 'SĐT', 'Nguồn đơn', 'Thẻ sale (gốc)', 'Sale tính doanh thu', 'Trạng thái',
+    'Sản phẩm', 'Mã sản phẩm', 'Số lượng', 'Giá trị Pos gốc', 'Giá trị tính báo cáo', 'Chênh lệch (báo cáo − Pos)', 'COD', 'Marketer', 'Cách tính', 'Đơn gốc Base đã ghép (mã · giá trị)']];
+  orders.forEach(function(o, i){
+    var pos = (o.giaTriPos != null) ? Number(o.giaTriPos) : Number(o.giaTriSauGiam) || 0, val = Number(o.giaTriSauGiam) || 0;
+    var sales = (o.saleBanValid || bsxOf(o).map(function(p){ return p[0]; }).join(',')) || '';
+    var base = (o.ghepBase || []).map(function(b){ return (b.ma || ('dòng ' + b.dong)) + ' · ' + r2(b.giaTri) + (b.tinh === false ? ' (đã hủy/hoàn — không tính)' : ''); }).join(' ; ');
+    detailRows.push([i + 1, o.ngayTaoDon, o.posRow || '', o.ghiChu || '', o.khachHang, o.soDienThoai, o.nguonDon, o.theSale, sales, o.trangThai, o.sanPham, o.maSanPham, o.soLuong, r2(pos), r2(val), r2(val - pos), r2(o.cod), o.marketer, _srExportBLabel_(o), base]);
+  });
+
+  // Chia theo Sale (1 dòng = 1 đơn × 1 sale)
+  var allocHead = ['Ngày tạo đơn', 'Dòng trong sheet Pos', 'Ghi chú đơn', 'Khách hàng', 'SĐT', 'Nguồn đơn', 'Sale', 'Tỷ lệ chia', 'Giá trị chia', 'COD chia', 'Giá trị tính báo cáo (cả đơn)', 'Cách tính'];
+  var allocRows = [allocHead];
+  orders.forEach(function(o){
+    var cod = {}; bcxOf(o).forEach(function(p){ cod[p[0]] = (cod[p[0]] || 0) + p[1]; });
+    var val = Number(o.giaTriSauGiam) || 0;
+    bsxOf(o).forEach(function(p){
+      allocRows.push([o.ngayTaoDon, o.posRow || '', o.ghiChu || '', o.khachHang, o.soDienThoai, o.nguonDon, p[0], val ? Math.round(p[1] / val * 10000) / 10000 : '', r2(p[1]), r2(cod[p[0]] || 0), r2(val), _srExportBLabel_(o)]);
+    });
+  });
+
+  // Đối chiếu tổng: bảng web ↔ cộng lại từ "Chia theo Sale" (cột G = Sale, I = Giá trị chia, J = COD chia)
+  var sum = {}, sumCod = {}, cnt = {}, grandV = 0, grandC = 0;
+  allocRows.slice(1).forEach(function(r){ var k = r[6]; sum[k] = (sum[k] || 0) + r[8]; sumCod[k] = (sumCod[k] || 0) + r[9]; cnt[k] = (cnt[k] || 0) + 1; grandV += r[8]; grandC += r[9]; });
+  var AL = "'Chia theo Sale'!";
+  var checkRows = [['Sale', adj ? 'Giá trị — bảng web (TRƯỚC trừ hoàn/hủy)' : 'Giá trị — bảng web', 'Giá trị — cộng từ chi tiết', 'Chênh lệch giá trị', 'COD — bảng web', 'COD — cộng từ chi tiết', 'Chênh lệch COD', 'Số dòng chia']];
+  var seen = {};
+  (dB.bySale || []).forEach(function(x, i){
+    seen[x.name] = true; var row = i + 2;
+    checkRows.push([x.name, r2(webV(x)), { t: 'n', v: r2(sum[x.name] || 0), f: 'SUMIF(' + AL + '$G:$G,A' + row + ',' + AL + '$I:$I)' }, { t: 'n', v: r2(r2(webV(x)) - r2(sum[x.name] || 0)), f: 'ROUND(B' + row + '-C' + row + ',2)' },
+      r2(x.cod), { t: 'n', v: r2(sumCod[x.name] || 0), f: 'SUMIF(' + AL + '$G:$G,A' + row + ',' + AL + '$J:$J)' }, { t: 'n', v: r2(r2(x.cod) - r2(sumCod[x.name] || 0)), f: 'ROUND(E' + row + '-F' + row + ',2)' },
+      { t: 'n', v: cnt[x.name] || 0, f: 'COUNTIF(' + AL + '$G:$G,A' + row + ')' }]);
+  });
+  var extra = Object.keys(sum).filter(function(k){ return !seen[k]; }).sort();
+  extra.forEach(function(k){   // có trong chi tiết nhưng KHÔNG hiện ở bảng web (vd "(chưa gán sale)")
+    var row = checkRows.length + 1;
+    checkRows.push([k, 0, { t: 'n', v: r2(sum[k]), f: 'SUMIF(' + AL + '$G:$G,A' + row + ',' + AL + '$I:$I)' }, { t: 'n', v: r2(0 - sum[k]), f: 'ROUND(B' + row + '-C' + row + ',2)' },
+      0, { t: 'n', v: r2(sumCod[k]), f: 'SUMIF(' + AL + '$G:$G,A' + row + ',' + AL + '$J:$J)' }, { t: 'n', v: r2(0 - sumCod[k]), f: 'ROUND(E' + row + '-F' + row + ',2)' }, { t: 'n', v: cnt[k], f: 'COUNTIF(' + AL + '$G:$G,A' + row + ')' }]);
+  });
+  var last = checkRows.length;
+  checkRows.push([]);
+  var totRow = checkRows.length + 1;
+  checkRows.push(['TỔNG báo cáo ↔ tổng mọi dòng chia (gồm "(chưa gán sale)")', r2(totV), { t: 'n', v: r2(grandV), f: 'SUM(C2:C' + last + ')' }, { t: 'n', v: r2(r2(totV) - r2(grandV)), f: 'ROUND(B' + totRow + '-C' + totRow + ',2)' },
+    r2(dB.totalCod), { t: 'n', v: r2(grandC), f: 'SUM(F2:F' + last + ')' }, { t: 'n', v: r2(r2(dB.totalCod) - r2(grandC)), f: 'ROUND(E' + totRow + '-F' + totRow + ',2)' }, { t: 'n', v: allocRows.length - 1, f: 'SUM(H2:H' + last + ')' }]);
+  var diffs = Math.abs(r2(totV) - r2(grandV)) + Math.abs(r2(dB.totalCod) - r2(grandC));
+  checkRows.push([diffs < 1 ? '✅ KHỚP: tổng báo cáo = tổng cộng lại từ chi tiết (sai số < 1đ)' : '⚠ LỆCH ' + r2(diffs) + 'đ giữa tổng báo cáo và tổng chi tiết — kiểm tra "Chia theo Sale"']);
+  if (adj){   // nối số trước trừ → số SAU TRỪ đang hiện ở thẻ Tổng giá trị / bảng Theo Sale trên web
+    var tru = r2(adj.totalDeduction || 0);
+    checkRows.push([], ['Nối với số trên web (đã trừ hoàn/hủy tháng trước)', 'Giá trị'],
+      ['Tổng cộng lại từ chi tiết (trước trừ)', r2(grandV)],
+      ['Trừ hoàn/hủy tháng ' + adj.prevMonth + ' (mốc chốt ' + adj.closedAt + ') — đơn tháng ' + adj.prevMonth + ' bị hoàn/hủy SAU khi chốt', -tru],
+      ['= Tổng giá trị sau trừ (thẻ "Tổng giá trị" trên web)', r2(dB.totalGiaTri)],
+      [Math.abs(r2(grandV) - tru - r2(dB.totalGiaTri)) < 1 ? '✅ KHỚP: chi tiết − trừ hoàn/hủy = số sau trừ trên web' : '⚠ LỆCH ' + r2(Math.abs(r2(grandV) - tru - r2(dB.totalGiaTri))) + 'đ giữa (chi tiết − trừ) và số sau trừ trên web']);
+  }
+  checkRows.push(['Ghi chú: bảng "Theo Sale" của web ẩn dòng "(chưa gán sale)" nên tổng các sale trong bảng có thể nhỏ hơn Tổng giá trị; phần chênh = đơn không có sale (xem dòng "(chưa gán sale)" ở trên).']);
+  return { summary: summary, bySaleRows: bySaleRows, detailRows: detailRows, allocRows: allocRows, checkRows: checkRows, grandV: grandV, grandC: grandC, missing: !!missing };
+}
 function exportSalesReport(){
   if (_srState.sub === 'A'){
     var d = _srState.dataA;
@@ -1390,6 +1503,12 @@ function exportSalesReport(){
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Tổng quan');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(bySaleRows), _srState.byCreator ? 'Theo người tạo đơn' : 'Theo Sale bán');
+    if (d.bySaleNoFb && d.noFb){   // Doanh thu theo Sale LOẠI kênh "Facebook" (Duyên 2026-10-31) — cùng số liệu mục "💰 Doanh thu theo Sale" trên web
+      var noFbRows = [['Sale','Số đơn','Doanh thu (loại kênh Facebook)','TB đơn']];
+      d.bySaleNoFb.forEach(function(s){ noFbRows.push([s.name, s.orders, s.giaTri, s.trungBinhDon]); });
+      noFbRows.push([]); noFbRows.push(['Đã loại: ' + (d.noFb.excludedOrders || 0) + ' đơn kênh ' + (d.noFb.kenh || []).join(', '), '', d.noFb.excludedRevenue || 0, '']);
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(noFbRows), 'Doanh thu sale (bỏ Facebook)');
+    }
     if (_srIsAdmin()) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(byTeamRows), 'Theo Team Sale');
     if (_srIsAdmin()) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(byKenhRows), 'Theo Kênh bán');
     if (_srIsAdmin()) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(byMktRows), 'Theo MKT');
@@ -1398,25 +1517,28 @@ function exportSalesReport(){
   } else {
     var dB = _srState.dataB;
     if (!dB){ alert('Chưa có dữ liệu để xuất — bấm "Lọc" trước.'); return; }
-    var summaryB = [['Chỉ số','Giá trị'],
-      ['Số lượng đơn', dB.totalOrders],
-      ['Tổng giá trị sau giảm giá', dB.totalGiaTri],
-      ['Tổng COD', dB.totalCod]];
-    (function(){ var cr = (typeof _srCloseRateAvg_ === 'function' && dB.saleCloseRateFrom) ? _srCloseRateAvg_(dB.saleCloseRate) : null; if (cr && cr.has) summaryB.push(['Tỷ lệ chốt TB (%)', cr.avg], ['Đơn chốt ÷ tương tác Pancake', cr.closed + ' / ' + cr.held]); })();
+    var fB = [];
+    if ((_srState.bSale||[]).length) fB.push('Sale: ' + _srState.bSale.join(', '));
+    if ((_srState.bNguon||[]).length) fB.push('Nguồn đơn: ' + _srState.bNguon.join(', '));
+    if ((_srState.bMarketer||[]).length) fB.push('Marketer: ' + _srState.bMarketer.join(', '));
+    if (_srState.bSanPham) fB.push('Sản phẩm: ' + _srState.bSanPham);
+    if ((_srState.bCareStatus||[]).length) fB.push('Trạng thái CS: ' + _srState.bCareStatus.join(', '));
+    if ((_srState.bKhStatus||[]).length) fB.push('Trạng thái KH: ' + _srState.bKhStatus.join(', '));
+    if ((_srState.bZaloStatus||[]).length) fB.push('Zalo: ' + _srState.bZaloStatus.join(', '));
+    if (_srState.bNickZalo) fB.push('Nick Zalo: ' + _srState.bNickZalo);
+    var xb = _srBuildExportB_(dB, { dateFrom: _srState.dateFrom, dateTo: _srState.dateTo, filters: fB, at: new Date().toLocaleString('vi-VN') });
     var productRows = [['Mã sản phẩm','Tên sản phẩm','Tổng số lượng']];
     (dB.products||[]).forEach(function(p){ productRows.push([p.code, p.name, p.soLuong]); });
-    var bySaleRowsB = [['Sale','Số đơn','Giá trị sau giảm giá','COD']];
-    (dB.bySale||[]).forEach(function(s){ bySaleRowsB.push([s.name, s.orders, s.giaTri, s.cod]); });
-    var detailRowsB = [['Ngày tạo đơn','Khách hàng','SĐT','Nguồn đơn','Sale','Sản phẩm','Mã sản phẩm','Số lượng','Giá trị sau giảm','COD','Marketer']];
-    (dB.orders||[]).forEach(function(o){
-      detailRowsB.push([o.ngayTaoDon, o.khachHang, o.soDienThoai, o.nguonDon, o.theSale, o.sanPham, o.maSanPham, o.soLuong, o.giaTriSauGiam, o.cod, o.marketer]);
-    });
+    var mkWs = function(rows, widths){ var ws = XLSX.utils.aoa_to_sheet(rows); ws['!cols'] = widths.map(function(w){ return { wch: w }; }); return ws; };
     var wbB = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wbB, XLSX.utils.aoa_to_sheet(summaryB), 'Tổng quan');
-    XLSX.utils.book_append_sheet(wbB, XLSX.utils.aoa_to_sheet(bySaleRowsB), 'Theo Sale');
+    XLSX.utils.book_append_sheet(wbB, mkWs(xb.summary, [48, 60]), 'Tổng quan');
+    XLSX.utils.book_append_sheet(wbB, mkWs(xb.bySaleRows, [44, 10, 22, 18]), 'Theo Sale');
     if (_srIsAdmin()) XLSX.utils.book_append_sheet(wbB, XLSX.utils.aoa_to_sheet(productRows), 'Báo cáo sản phẩm');
-    XLSX.utils.book_append_sheet(wbB, XLSX.utils.aoa_to_sheet(detailRowsB), 'Chi tiết đơn');
-    XLSX.writeFile(wbB, `BaoCaoDoanhSo_B_${_ymd(new Date())}.xlsx`);
+    XLSX.utils.book_append_sheet(wbB, mkWs(xb.detailRows, [6, 12, 10, 30, 22, 14, 28, 26, 26, 14, 34, 18, 10, 16, 18, 16, 14, 16, 30, 40]), 'Chi tiết đơn');
+    XLSX.utils.book_append_sheet(wbB, mkWs(xb.allocRows, [12, 10, 28, 22, 14, 26, 22, 10, 18, 16, 20, 30]), 'Chia theo Sale');
+    XLSX.utils.book_append_sheet(wbB, mkWs(xb.checkRows, [46, 20, 24, 18, 18, 22, 16, 12]), 'Đối chiếu tổng');
+    if (xb.missing) toast('⚠ Máy chủ chưa trả phần chia chính xác theo sale — bấm "Lọc" lại (hoặc chờ deploy xong) rồi xuất lại để sheet "Chia theo Sale" đầy đủ.');
+    XLSX.writeFile(wbB, `BaoCaoDoanhSo_B_DoiChieu_${_ymd(new Date())}.xlsx`);
   }
 }
 

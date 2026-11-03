@@ -661,8 +661,8 @@ function buildSalesReportB_(filters) {
     var m = matched[j];
     totalGiaTri += m.giaTriSauGiam;
     totalCod += m.cod;
-    var drillBs = [], drillBt = {};   // dong gop cua don nay vao bang Theo Sale / Theo Team (cho cua so chi tiet — cong lai khop bang)
-    m.bs = drillBs; m.bt = drillBt;
+    var drillBs = [], drillBt = {}, drillBc = [];   // dong gop cua don nay vao bang Theo Sale / Theo Team (cho cua so chi tiet — cong lai khop bang); drillBc = phan COD theo sale
+    m.bs = drillBs; m.bt = drillBt; m.bc = drillBc;
 
     // Breakdown theo Sale (cot "Thẻ") — dung dung quy uoc da chot o Bao cao A: so don giu
     // nguyen (khong chia), tien (Gia tri sau giam + COD) chia deu cho so sale/don de tranh cong
@@ -689,6 +689,7 @@ function buildSalesReportB_(filters) {
       bySale[sName].orders += 1;
       bySale[sName].giaTri += m.giaTriSauGiam * fr;
       drillBs.push([sName, m.giaTriSauGiam * fr]);
+      drillBc.push([sName, m.cod * fr]);
       bySale[sName].cod += m.cod * fr;
       if (filters.withDaily) { var ddB = _vnYmd_(parseVNDate_(m.ngayTaoDon)); if (ddB) { var sdB = bySaleDay[sName] || (bySaleDay[sName] = {}); var cB = sdB[ddB] || (sdB[ddB] = [0, 0]); cB[0] += 1; cB[1] += m.giaTriSauGiam * fr; } }
 
@@ -825,6 +826,7 @@ function buildSalesReportB_(filters) {
     orders: matched.map(function(m){
       return {
         bs: _drillPairs_(m.bs), bt: _drillPairsObj_(m.bt),   // dong gop vao bang Theo Sale / Team (cua so chi tiet khi bam o bao cao)
+        bsx: _drillPairs2_(m.bs), bcx: _drillPairs2_(m.bc),   // phan chia CHINH XAC (gia tri / COD theo tung sale) — Excel doi chieu ke toan cong lai khop bang "Theo Sale"
         ngayTaoDon: m.ngayTaoDon, khachHang: m.khachHang, soDienThoai: m.soDienThoai,
         posRow: m.posRow || undefined,   // dong that trong sheet "dữ liệu đơn" (de doi chieu tung don voi file Pancake goc — xem sheet chi tiet cua nut Xuat Excel doi chieu Bao cao B)
         nguonDon: m.nguonDon, theSale: m.theSale, trangThai: m.trangThai, sanPham: m.sanPham, maSanPham: m.maSanPham, soLuong: m.soLuong,
@@ -863,3 +865,30 @@ function buildSalesReportB_(filters) {
   };
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  SO LIEU CA NHAN CUA 1 CS cho Pancake AI (action 'csStats') — yeu cau Duyen 2026-10-05:
+//  tong so don, doanh thu, ty le chot, hoa hong (don >=15tr / <15tr + kenh co % rieng), tong hoa hong, chuong
+//  trinh thuong. DUNG CHUNG nguon so lieu voi CRM: don + chia sale lay tu buildSalesReportB_ (Pos, da ghep Base,
+//  da tinh 30/70), ty le chot tu saleCloseRate cua B; hoa hong/thuong la BAN PORT CUA _computeCommissionData_ /
+//  _computeBonusData_ trong index.html (CRM) — NEU SUA QUY TAC HOA HONG/THUONG O CRM THI PHAI SUA CA O DAY.
+// ═══════════════════════════════════════════════════════════════
+// ── LUAT HOA HONG KENH "NGUON" THEO CHAT LIEU VANG (Duyen yeu cau 2026-10): don co nguon don la kenh Nguon thi TU DONG tinh theo chat lieu trong ten san pham:
+//    vang 10k = 1,5%, vang 14k = 1% — KHONG phu thuoc gia tri don (khong xet moc 15 trieu nhu cac kenh con lai). Don Nguon khong co 10k/14k -> rieng tinh nhu cu.
+//    Don co CA 10k va 14k (khong tach duoc gia tri tung mon) -> lay muc THAP (1%) va ghi 'mixed' de doi chieu. PHAI khop _goldChannelRule_ o client js/01.
+var GOLD_RULE_CHANNELS_ = ['nguon'];   // ten kenh (nguon don) KHONG DAU, chu thuong; khop nguyen ten hoac bat dau bang 'nguon '
+var GOLD_RULE_MATERIALS_ = [ { key: '14', rate: 1, label: 'vàng 14k' }, { key: '10', rate: 1.5, label: 'vàng 10k' } ];
+function _goldChannelRule_(nguonDon, sanPham) {
+  var ch = _bcFold_(nguonDon);   // bo dau + chu thuong (_normTxt_ KHONG bo dau nen "Nguon" co dau khong khop)
+  if (!ch || !GOLD_RULE_CHANNELS_.some(function (c) { return ch === c || ch.indexOf(c + ' ') === 0; })) return null;
+  var txt = _bcFold_(sanPham), hits = GOLD_RULE_MATERIALS_.filter(function (m) { return new RegExp('(^|[^0-9])' + m.key + ' ?k(?![a-z0-9])').test(txt); });   // "10k" / "10 k" / "vang10k"; khong nhan 110k, 10kg, 10kx
+  if (!hits.length) return null;
+  hits.sort(function (a, b) { return a.rate - b.rate; });
+  return { rate: hits[0].rate, label: hits[0].label, mixed: hits.length > 1 };
+}
+// % hoa hong "rieng theo kenh" cua 1 don: luat vang cua kenh Nguon (neu co) truoc, roi den % kenh admin da cai (channelRateFn). null = tinh theo moc 15tr.
+function _csChannelCommissionOf_(o, channelRateFn) {
+  var gr = _goldChannelRule_(o.nguonDon, o.sanPham);
+  if (gr) return { rate: gr.rate, key: String(o.nguonDon || '').trim() + ' · ' + gr.label + (gr.mixed ? ' (đơn có cả 10k & 14k → mức thấp)' : '') };
+  var r = channelRateFn(o.nguonDon);
+  return r === null ? null : { rate: r, key: String(o.nguonDon || '').trim() };
+}

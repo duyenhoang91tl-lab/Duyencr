@@ -77,6 +77,12 @@ async function _srLoad(){
     _srRegisterIdentity_(dPos);
     if (dPos && dPos.orders) dPos.orders = dPos.orders.map(function(o){ return Object.assign({}, o, { saleBan: (o.saleBanValid !== undefined ? o.saleBanValid : o.theSale), giaTriDon: o.giaTriSauGiam, ngayTao: o.ngayTaoDon }); });
     _srState.dataE = dPos;
+    // Don chia voi CUA HANG (Bao cao L) cho muc "Thu nhap tung Sale": cung khoang ngay/Sale; loi/thieu quyen KHONG lam hong Bao cao E.
+    _srState.dataEStore = null; _srState.dataEStoreErr = '';
+    try {
+      var dStoreE = await _srFetch('storeCaseReport', { dateFrom: _srState.eDateFrom, dateTo: _srState.eDateTo, sale: (_srState.eSale||[]).join(',') });
+      if (dStoreE && dStoreE.ok !== false && !dStoreE.error) _srState.dataEStore = dStoreE; else _srState.dataEStoreErr = String((dStoreE && (dStoreE.error || dStoreE.message)) || 'không có dữ liệu');
+    } catch (eStoreE) { _srState.dataEStoreErr = String((eStoreE && eStoreE.message) || eStoreE); }
   } else if (_srState.sub === 'F') {
     // Dropdown khong phai 'custom' -> khoang ngay PHAI khop dropdown (tranh dropdown 'Tháng này'
     // ma 2 o ngay rong / cu sang thang khac => bao cao tinh nham toan bo lich su don).
@@ -96,6 +102,7 @@ async function _srLoad(){
     }
     _srState.dataL = await _srFetch('storeCaseReport', {
       dateFrom: _srState.lDateFrom, dateTo: _srState.lDateTo,
+      fresh: '1',
       sale: (_srState.lSale||[]).join(',')
     });
   } else if (_srState.sub === 'M') {
@@ -895,7 +902,7 @@ function _srRenderA(d){
     (d.saleCloseRateFrom ? _srCloseRateBarHtml_(d.saleCloseRate, _srState.saleSearch, 'tương tác', d.saleCloseRateExcluded) :
       '<div style="color:var(--muted);text-align:center;padding:20px;font-size:12px">Chưa nạp báo cáo tương tác Pancake ngày nào — vào tab "📥 Báo cáo Pancake" để nạp trước khi xem tỷ lệ chốt theo Sale.</div>');
   html += '<div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">'+
-    '<div style="flex:1 1 380px;min-width:320px">'+saleHtml+'</div>'+
+    '<div style="flex:1 1 380px;min-width:320px">'+saleHtml+_srSaleNoFbHtml_(d)+'</div>'+
     '<div style="flex:1 1 320px;min-width:280px">'+saleCloseHtml+'</div>'+
     '</div>';
 
@@ -1166,12 +1173,39 @@ function _bprdReset_(){
 }
 // ═══ BPRD-CFG END ═══
 
+// ── Báo cáo A: mục "Doanh thu theo Sale — loại kênh Facebook" NGAY DƯỚI "Theo Sale bán" (Duyên yêu cầu 2026-10-31). Dữ liệu d.bySaleNoFb / d.noFb do GAS
+//    buildSalesReportA_ tính (kênh đúng chữ "Facebook" = kênh mỹ phẩm bị loại; "Facebook Phạm Thu Hiền"… vẫn tính). Chia tiền/đếm đơn giống bảng Theo Sale bán. ──
+function _srSaleNoFbHtml_(d){
+  var nf = (d && d.noFb) || null, q = String(_srState.saleSearch || '').toLowerCase();
+  var kenhTxt = nf && nf.kenh && nf.kenh.length ? nf.kenh.map(function(k){ return '“' + esc(k.charAt(0).toUpperCase() + k.slice(1)) + '”'; }).join(', ') : '“Facebook”';
+  var h = '<div class="dash-section-title" style="margin-top:20px">💰 Doanh thu theo Sale <span style="font-weight:400;color:var(--muted);font-size:11px">(loại kênh ' + kenhTxt + ' — kênh mỹ phẩm; cách chia như bảng trên)</span>' + _srViewToggleHtml('aSaleNoFbView') + '</div>';
+  if (!d || !d.bySaleNoFb || !nf) return h + '<div style="color:var(--muted);font-size:12px;padding:10px 0">Chưa có số liệu mục này — máy chủ (GAS) chưa cập nhật bản mới. Deploy lại GAS rồi bấm Lọc lại.</div>';
+  var rows = d.bySaleNoFb.filter(function(r){ return !q || String(r.name || '').toLowerCase().indexOf(q) !== -1; });
+  if (_srState.aSaleNoFbView === 'table' || !_srState.aSaleNoFbView){
+    h += '<table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">Số đơn</th><th style="text-align:right"><b>Doanh thu</b></th><th style="text-align:right">TB đơn</th></tr></thead><tbody>';
+    rows.forEach(function(r){ h += '<tr><td>' + esc(r.name) + '</td><td style="text-align:right">' + fmt(r.orders) + '</td><td style="text-align:right"><b>' + _srMoney(r.giaTri) + '</b></td><td style="text-align:right">' + _srMoney(r.trungBinhDon) + '</td></tr>'; });
+    if (!rows.length) h += '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+    else { var o = rows.reduce(function(a, r){ return a + (r.orders || 0); }, 0), g = rows.reduce(function(a, r){ return a + (r.giaTri || 0); }, 0); h += _srTotalRowHtml_(['Tổng', fmt(o), _srMoney(g), _srMoney(o ? Math.round(g / o) : 0)]); }
+    h += '</tbody></table>';
+  } else {
+    h += _srChartSvg(rows, 'name', 'giaTri', _srState.aSaleNoFbView, true, 'orders', { ordersLabel: 'Tổng lượt đơn theo sale (không gồm kênh Facebook)', ordersHint: 'Đơn bán chung nhiều sale được tính cho TỪNG sale (số đơn giữ nguyên, tiền chia đều).' });
+  }
+  h += '<div style="font-size:11px;color:var(--muted);margin-top:6px">Đã loại khỏi mục này: <b>' + fmt(nf.excludedOrders || 0) + ' đơn</b>, <b>' + _srMoney(nf.excludedRevenue || 0) + '</b> của kênh ' + kenhTxt + ' (chỉ kênh đúng tên này; kênh khác có chữ Facebook như “Facebook Phạm Thu Hiền” vẫn được tính). Còn lại: ' + fmt(nf.keptOrders || 0) + ' đơn, ' + _srMoney(nf.keptRevenue || 0) + '.</div>';
+  return h;
+}
+// Ghi chú "đã trừ hoàn/hủy tháng trước" ở đầu Báo cáo B (d.posAdjust do GAS trả khi xem đúng 1 tháng lịch). Không có posAdjust (xem khoảng ngày tuỳ ý) → không hiện gì.
+function _srPosAdjustBannerHtml_(a){
+  if (!a) return '';
+  if (a.applied) return '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:7px 10px;margin-bottom:10px;font-size:12px">🔒 <b>Đã trừ hoàn/hủy tháng '+esc(a.prevMonth)+'</b> (mốc chốt '+esc(a.closedAt)+'): '+(a.totalDeduction?'−'+_srMoney(a.totalDeduction):'không có đơn nào phát sinh hoàn/hủy sau khi chốt')+'. Bảng Theo Sale và thẻ Tổng giá trị là số SAU TRỪ; bảng Theo Team/Nguồn/MKT chưa trừ.</div>';
+  return '<div style="background:#f9fafb;border:1px solid var(--border);border-radius:6px;padding:6px 10px;margin-bottom:10px;font-size:11.5px;color:var(--muted)">🔓 '+esc(a.reason||'Chưa trừ hoàn/hủy tháng trước.')+'</div>';
+}
 function _srRenderB(d){
   if (!d) return _srNoDataHtml_();
   var bTb = d.totalOrders ? Math.round(d.totalGiaTri/d.totalOrders) : 0;
-  var html = '<div class="kpi-grid" style="margin-bottom:16px">' +
+  var pAdj = d.posAdjust || null, pAdjOn = !!(pAdj && pAdj.applied);   // Chốt tháng Pos: GAS đã trừ hoàn/hủy tháng trước vào bảng Theo Sale + tổng (gas_v13.js applyPosMonthAdjustToReportB_)
+  var html = _srPosAdjustBannerHtml_(pAdj) + '<div class="kpi-grid" style="margin-bottom:16px">' +
     '<div class="kpi-card" style="border:1.5px solid #16a34a"'+_srDrillAttr_('bAll','')+'><div class="kpi-val" style="color:#16a34a">'+fmt(d.totalOrders)+'</div><div class="kpi-label"><b>Số lượng đơn</b></div></div>' +
-    '<div class="kpi-card" style="border:1.5px solid #16a34a"'+_srDrillAttr_('bAll','')+'><div class="kpi-val" style="color:#16a34a">'+_srMoney(d.totalGiaTri)+'</div><div class="kpi-label"><b>Tổng giá trị đơn hàng sau giảm giá</b></div></div>' +
+    '<div class="kpi-card" style="border:1.5px solid #16a34a"'+_srDrillAttr_('bAll','')+'><div class="kpi-val" style="color:#16a34a">'+_srMoney(d.totalGiaTri)+'</div><div class="kpi-label"><b>Tổng giá trị đơn hàng sau giảm giá'+(pAdjOn?' <span style="font-weight:400">(đã trừ hoàn/hủy '+esc(pAdj.prevMonth)+')</span>':'')+'</b></div></div>' +
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(bTb)+'</div><div class="kpi-label">Trung bình đơn</div></div>' +
     _srCloseRateKpiCard_(d) +
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(d.totalCod)+'</div><div class="kpi-label">Tổng COD</div></div>' +
@@ -1186,14 +1220,17 @@ function _srRenderB(d){
   var saleHtmlB_ = '<div class="dash-section-title">Theo Sale <span style="font-weight:400;color:var(--muted);font-size:11px">(tiền chia đều cho số sale/đơn, số đơn giữ nguyên)</span>'+_srViewToggleHtml('bSaleView')+'</div>';
   saleHtmlB_ += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.bSaleSearch)+'" oninput="_srState.bSaleSearch=this.value;renderSalesReportTab()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:220px;margin-bottom:6px">';
   if (_srState.bSaleView === 'table'){
-    saleHtmlB_ += '<table class="dash-table"><thead><tr>'+_srColTh_('bSale','name','Sale',_SR_COLTH_ROWSFN_['bSale'],_SR_COLTH_GETTER_['bSale'].name)+'<th style="text-align:right">Số đơn</th><th style="text-align:right">Giá trị sau giảm giá</th><th style="text-align:right">TB đơn</th><th style="text-align:right">COD</th></tr></thead><tbody>';
+    saleHtmlB_ += '<table class="dash-table"><thead><tr>'+_srColTh_('bSale','name','Sale',_SR_COLTH_ROWSFN_['bSale'],_SR_COLTH_GETTER_['bSale'].name)+'<th style="text-align:right">Số đơn</th><th style="text-align:right">Giá trị sau giảm giá'+(pAdjOn?' <span style="font-weight:400;font-size:10.5px">(sau trừ)</span>':'')+'</th>'+(pAdjOn?'<th style="text-align:right" title="Phần hoàn/hủy của tháng '+esc(pAdj.prevMonth)+' phát sinh sau khi chốt">Trừ hoàn/hủy '+esc(pAdj.prevMonth)+'</th>':'')+'<th style="text-align:right">TB đơn</th><th style="text-align:right">COD</th></tr></thead><tbody>';
     saleRows.forEach(function(s){
       var tb = s.orders ? Math.round(s.giaTri/s.orders) : 0;
-      saleHtmlB_ += '<tr'+_srDrillAttr_('bSale',s.name)+'><td>'+esc(s.name)+'</td><td style="text-align:right">'+fmt(s.orders)+'</td><td style="text-align:right">'+_srMoney(s.giaTri)+'</td><td style="text-align:right">'+_srMoney(tb)+'</td><td style="text-align:right">'+_srMoney(s.cod)+'</td></tr>';
+      saleHtmlB_ += '<tr'+_srDrillAttr_('bSale',s.name)+'><td>'+esc(s.name)+'</td><td style="text-align:right">'+fmt(s.orders)+'</td><td style="text-align:right">'+_srMoney(s.giaTri)+'</td>'+(pAdjOn?'<td style="text-align:right;color:'+(s.truHoanHuy?'#dc2626':'var(--muted)')+'">'+(s.truHoanHuy?((s.truHoanHuy>0?'−':'+')+_srMoney(Math.abs(s.truHoanHuy))):'—')+'</td>':'')+'<td style="text-align:right">'+_srMoney(tb)+'</td><td style="text-align:right">'+_srMoney(s.cod)+'</td></tr>';
     });
-    if (!saleRows.length) saleHtmlB_ += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
+    if (!saleRows.length) saleHtmlB_ += '<tr><td colspan="'+(pAdjOn?6:5)+'" style="text-align:center;color:var(--muted);padding:14px">Không có dữ liệu</td></tr>';
     else { var bSOrd=saleRows.reduce(function(s,r){return s+(r.orders||0);},0), bSGt=saleRows.reduce(function(s,r){return s+(r.giaTri||0);},0);
-      saleHtmlB_ += _srTotalRowHtml_(['Tổng', fmt(bSOrd), _srMoney(bSGt), _srMoney(bSOrd?Math.round(bSGt/bSOrd):0), _srMoney(saleRows.reduce(function(s,r){return s+(r.cod||0);},0))]); }
+      var bSTotCells = ['Tổng', fmt(bSOrd), _srMoney(bSGt)];
+      if (pAdjOn) bSTotCells.push(_srMoney(saleRows.reduce(function(s,r){return s+(r.truHoanHuy||0);},0)));
+      bSTotCells.push(_srMoney(bSOrd?Math.round(bSGt/bSOrd):0), _srMoney(saleRows.reduce(function(s,r){return s+(r.cod||0);},0)));
+      saleHtmlB_ += _srTotalRowHtml_(bSTotCells); }
     saleHtmlB_ += '</tbody></table>';
   } else {
     saleHtmlB_ += _srChartSvg(saleRows, 'name', 'giaTri', _srState.bSaleView, true, 'orders', { ordersLabel: 'Tổng lượt đơn theo sale', ordersHint: 'Đơn bán chung nhiều sale được tính cho TỪNG sale (số đơn giữ nguyên, tiền chia đều) nên con số này có thể lớn hơn “Số lượng đơn” thật ở các thẻ phía trên. Khi đang lọc Sale, bảng chỉ liệt kê người trong bộ lọc nên tổng tiền ở đây có thể nhỏ hơn tổng đơn.' });
@@ -1308,6 +1345,7 @@ function _srRenderB(d){
     html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên/mã sản phẩm (tìm trên tất cả)..." value="'+esc(_srState.productSearch)+'" oninput="_srState.productSearch=this.value;_bprdRefresh_()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:300px;margin-bottom:6px">';
     html += '<div id="bprd-body">'+_bprdBodyHtml_(d)+'</div>';
   }
+  if (typeof _tbPanelHtml_ === 'function') html += _tbPanelHtml_();   // Thưởng phạt đội Sale Online + Văn phòng (js/60-team-bonus.js): riêng, không cộng vào các chương trình thưởng công ty
   html += _srBaseCheckPanelHtml_(d);   // Báo cáo check ngược Base (đơn Pos ghép đơn gốc Base) + nút xuất Excel cho kế toán
   html += _srPosMonthPanelHtml_();
   return html;
@@ -1411,10 +1449,8 @@ function _srPureDetailRows_(orders){
   });
   return rows;
 }
-function _srPureExport_(){
-  var d = _srState.dataB;
-  if (!d || !d.orders){ alert('Chưa có dữ liệu Báo cáo B — hãy tải báo cáo trước.'); return; }
-  if (typeof XLSX === 'undefined'){ alert('Thiếu thư viện Excel (XLSX).'); return; }
+// Dựng 4 bảng của file Excel đối chiếu Báo cáo N. Tách khỏi _srPureExport_ để nút "Excel đối soát" gộp ở Báo cáo B dùng lại ĐÚNG số liệu này (xuất lẻ không đổi).
+function _srPureBuildSheets_(d){
   var orders = _srPureOrders_(d);
   var pure = _srPureCalc_(orders, 'pure'), adjC = _srPureCalc_(orders, 'adj');
   var srv = {}; (d.bySale || []).forEach(function(r){ srv[r.name] = r; });
@@ -1446,11 +1482,18 @@ function _srPureExport_(){
   (ac.needConfirm || []).forEach(function(x){ chk.push(['File kế toán lệch giá Pos — chưa xác nhận', x.ngay, x.sdt, x.theSale, x.ma, x.giaPos, 'Giá kế toán ' + x.giaKeToan + ' · chênh ' + x.chenh + ' · dòng KT ' + (x.dongKeToan || []).join(',')]); });
   (ac.unmatched || []).forEach(function(x){ chk.push(['Dòng kế toán chưa khớp đơn Pos nào', '', '', x.sale, x.ma, x.tong, 'Dòng ' + x.dong + ' · kênh ' + (x.kenh || '')]); });
   if (chk.length === 1) chk.push(['(không có mục nào cần kiểm tra tay)', '', '', '', '', '', '']);
+  return { sum: sum, det: det, chk: chk, detail: _srPureDetailRows_(orders), orders: orders, pure: pure, adj: adjC };
+}
+function _srPureExport_(){
+  var d = _srState.dataB;
+  if (!d || !d.orders){ alert('Chưa có dữ liệu Báo cáo B — hãy tải báo cáo trước.'); return; }
+  if (typeof XLSX === 'undefined'){ alert('Thiếu thư viện Excel (XLSX).'); return; }
+  var x = _srPureBuildSheets_(d);
   var wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sum), 'Tổng hợp theo Sale');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(det), 'Đơn đã điều chỉnh');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(chk), 'Cần kiểm tra tay');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(_srPureDetailRows_(orders)), 'Chi tiết thuần từng đơn');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(x.sum), 'Tổng hợp theo Sale');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(x.det), 'Đơn đã điều chỉnh');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(x.chk), 'Cần kiểm tra tay');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(x.detail), 'Chi tiết thuần từng đơn');
   XLSX.writeFile(wb, 'BaoCao_Pos_DonThuan_DoiChieu_' + _ymd(new Date()) + '.xlsx');
 }
 
@@ -1565,12 +1608,15 @@ function _srPosMonthPanelHtml_(){
   var cur = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
   var pd = new Date(now.getFullYear(), now.getMonth()-1, 1);
   var prev = pd.getFullYear()+'-'+String(pd.getMonth()+1).padStart(2,'0');
+  // Cuối tháng (hôm nay là ngày cuối) → mặc định chốt CHÍNH tháng này (Duyên 2026-11-02); các ngày khác mặc định chốt tháng trước.
+  var isLastDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1).getDate() === 1;
+  var closeDef = isLastDay ? cur : prev;
   var st = 'padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)';
   return '<div class="dash-section-title" style="margin-top:22px">🔒 Chốt tháng Pos &amp; trừ hoàn/hủy tháng trước</div>'+
     '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Doanh thu Pos tháng M = doanh thu trong tháng − phần hoàn/hủy phát sinh của tháng M-1 <b>sau khi đã chốt</b>. '+
-    'Làm vào ngày mùng 1, sau khi cập nhật đủ dữ liệu tháng trước: bấm <b>Chốt tháng</b> để lưu mốc; những đơn tháng đó bị hoàn/hủy về sau sẽ tự được trừ vào tháng kế tiếp. Chưa chốt thì chưa trừ gì.</div>'+
+    'Làm vào <b>ngày cuối tháng</b> (hoặc mùng 1), sau khi cập nhật đủ dữ liệu: bấm <b>Chốt tháng</b> để lưu mốc; những đơn tháng đó bị hoàn/hủy về sau sẽ tự được trừ vào tháng kế tiếp — bảng <b>Theo Sale</b> của Báo cáo B khi xem đúng tháng đó sẽ tự hiện số sau trừ. Chưa chốt thì chưa trừ gì.</div>'+
     '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">'+
-      '<span style="font-size:12px">Chốt tháng:</span><input type="month" id="sr-posm-close" value="'+prev+'" style="'+st+'">'+
+      '<span style="font-size:12px">Chốt tháng:</span><input type="month" id="sr-posm-close" value="'+closeDef+'" style="'+st+'">'+
       '<button class="btn sm" onclick="_srPosMonthClose_()">🔒 Chốt tháng này làm mốc</button>'+
       '<span style="color:var(--border-md)">|</span>'+
       '<span style="font-size:12px">Xem doanh thu tháng:</span><input type="month" id="sr-posm-view" value="'+cur+'" style="'+st+'">'+
@@ -1587,6 +1633,7 @@ async function _srPosMonthClose_(force){
     if (d && d.needForce){ if (confirm(d.error+'\n\nGhi đè mốc cũ?')) return _srPosMonthClose_(true); return; }
     if (!d || !d.ok){ toast('❌ '+((d&&d.error)||'Chốt thất bại')); return; }
     toast('✓ Đã chốt tháng '+d.month+' — tổng '+_srMoney(d.total)+' ('+d.saleCount+' sale)');
+    try { _srLoad(); } catch(e2){}   // tải lại Báo cáo B để bảng Theo Sale nhảy theo mốc vừa chốt
   } catch(e){ toast('❌ Lỗi: '+e.message); }
 }
 async function _srPosMonthLoad_(){
@@ -1985,13 +2032,103 @@ function _srLRowMatchesSearch_(r, q){
   var hay = [r.tenKh, r.phone, r.saleRaw, (r.sales||[]).map(function(x){return x.name;}).join(' '), r.kenh, r.tinhTrang, r.capNhat].join(' ').toLowerCase();
   return hay.indexOf(q) !== -1;
 }
+// Nhan doi chieu file ke toan canh don (2026-10-31, Duyen: ke toan chua ghi thi hien "KT chua ghi" de Sale xuat file doi chieu). Chi don co Sale duoc chia moi co o.acct.
+// KHỚP TIỀN với kế toán (backend `_storeAcctMoney_`): nhãn từng loại lệch
+function _srLTienLbl_(st){
+  return { 'lech-tong':'Tổng KT ≠ giá trị đơn Pos', 'lech-chia':'Phần sale KT ≠ tỷ lệ chia', 'thieu-dong-sale':'KT thiếu dòng sale (chỉ ghi dòng Quầy)', 'sai-sale':'Tên sale KT ≠ Sale báo cáo L' }[st] || st || '';
+}
+function _srLAcctBadge_(o){
+  var a = o && o.acct; if (!a) return '';
+  var m = { 'chua-ghi': ['❌ KT chưa ghi', '#b91c1c', '#fee2e2', 'Mã bộ đếm của đơn KHÔNG có trong file kế toán "THEO DÕI ĐƠN CHIA SALE"'],
+            'thieu-ma': ['⚠ Thiếu mã bộ đếm', '#92400e', '#fef3c7', 'Chưa có mã (cột R trang tính cửa hàng / ghi chú Pos) nên chưa đối chiếu được với kế toán'],
+            'co-sdt': ['🔎 KT có SĐT (chưa có mã)', '#1e40af', '#dbeafe', 'SĐT khách này đã có trong file kế toán nhưng đơn chưa có mã bộ đếm (cột R) → chưa chắc đúng đơn. Điền mã bộ đếm vào cột R để đối chiếu chắc chắn' + (a.sheet ? ' (tab ' + a.sheet + ', dòng ' + a.line + ')' : '')],
+            'da-ghi': ['✔ KT đã ghi', '#166534', '#dcfce7', 'Đã có trong file kế toán' + (a.sheet ? ' (tab ' + a.sheet + ', dòng ' + a.line + ')' : '')] }[a.status];
+  var main = m ? ' <span title="'+esc(m[3])+'" style="display:inline-block;padding:1px 7px;border-radius:10px;font-weight:700;background:'+m[2]+';color:'+m[1]+'">'+m[0]+'</span>' : '';
+  var tn = a.tien;   // da ghi nhung SO TIEN lech so voi Pos
+  if (a.status === 'da-ghi' && tn && tn.status !== 'khop' && tn.status !== 'khong-ro')
+    main += ' <span title="'+esc(_srLTienLbl_(tn.status)+' — KT ghi sale '+_srMoney(tn.ktSale)+' / dự kiến '+_srMoney(tn.saleDuKien)+' · tổng KT '+_srMoney(tn.ktTong)+' / Pos '+_srMoney(tn.posTong))+'" style="display:inline-block;padding:1px 7px;border-radius:10px;font-weight:700;background:#ffedd5;color:#9a3412">💸 KT lệch tiền</span>';
+  return main;
+}
+function _srLAcctHtml_(d){
+  var ac = d.acctCheck; if (!ac) return '';
+  if (ac.ok === false) return '<div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px">⚠️ '+esc(ac.error||'Không đọc được file kế toán')+' — chưa đối chiếu được, KHÔNG có nghĩa là kế toán đã ghi đủ.</div>';
+  var sm = ac.summary || {}, miss = ac.missing || [], lech = ac.lech || [], chua = miss.filter(function(e){ return e.status === 'chua-ghi'; }), thieu = miss.filter(function(e){ return e.status === 'thieu-ma'; });
+  var h = '<div style="border:1px solid '+(chua.length?'#fecaca':'var(--border)')+';border-radius:10px;padding:10px 12px;margin-bottom:14px">'+
+    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px"><span style="font-weight:700;font-size:13px">🧾 Đối chiếu file kế toán</span>'+
+    '<span style="padding:1px 9px;border-radius:10px;font-weight:700;background:'+(chua.length?'#fee2e2':'#dcfce7')+';color:'+(chua.length?'#b91c1c':'#166534')+'">❌ KT chưa ghi: '+fmt(sm.chuaGhi||0)+' đơn'+(sm.chuaGhi?' · '+_srMoney(sm.chuaGhiChia)+' chia Sale':'')+'</span>'+
+    '<span style="color:var(--green);font-weight:600">✔ đã ghi '+fmt(sm.daGhi||0)+'</span>'+(sm.thieuMa?'<span style="color:#92400e;font-weight:600">⚠ thiếu mã '+fmt(sm.thieuMa)+'</span>':'')+(sm.coSdt?'<span style="color:#1e40af;font-weight:600" title="SĐT khách có trong file kế toán nhưng đơn chưa có mã bộ đếm — chưa chắc đúng đơn">🔎 có SĐT, chưa mã '+fmt(sm.coSdt)+'</span>':'')+
+    (sm.lechTien?'<span style="padding:1px 9px;border-radius:10px;font-weight:700;background:#ffedd5;color:#9a3412" title="Đã ghi nhưng SỐ TIỀN lệch so với Pos (tổng / phần sale / thiếu dòng sale / sai sale)">💸 KT ghi lệch tiền: '+fmt(sm.lechTien)+' đơn · lệch phần sale '+_srMoney(sm.lechSaleTong||0)+'</span>':'')+(sm.khopTien?'<span style="color:var(--green);font-weight:600" title="Tổng và phần sale khớp Pos">✔ tiền khớp '+fmt(sm.khopTien)+'</span>':'')+
+    ((miss.length||lech.length)?'<button class="btn sm" onclick="_srLExportAcct_()">📥 Xuất file đối chiếu kế toán</button>':'')+
+    '<a href="'+esc(ac.sheetUrl||'#')+'" target="_blank" rel="noopener" style="font-size:11px">mở file kế toán</a></div>'+
+    '<div style="font-size:10.5px;color:var(--hint);margin-bottom:6px">Đọc cột mã đơn: <b>'+esc((d.dataQuality||{}).cotMaDon||'?')+'</b> — <b>'+fmt((d.dataQuality||{}).coMaDon||0)+'</b>/'+fmt((d.dataQuality||{}).tongDong||0)+' dòng trang tính cửa hàng có mã. Đối chiếu:'+' mã đơn cột R trang tính cửa hàng (+ mã trong ghi chú Pos) ↔ cột "Mã bộ đếm" của file kế toán (đọc '+fmt(ac.soMa||0)+' mã ở '+fmt((ac.tabs||[]).length)+' tab). Chỉ xét đơn có Sale được chia ('+esc(d.sharePct)+'%).</div>';
+  if (miss.length){
+    h += '<div style="overflow-x:auto;max-height:340px;overflow-y:auto"><table class="dash-table"><thead><tr><th>Ngày đơn</th><th>SĐT</th><th>Khách</th><th>Sale</th><th>Mã bộ đếm</th><th style="text-align:right">Giá trị đơn</th><th style="text-align:right">Sale '+esc(d.sharePct)+'%</th><th style="text-align:right">Quầy</th><th>Trạng thái</th></tr></thead><tbody>';
+    miss.slice(0, 300).forEach(function(e){
+      h += '<tr><td style="white-space:nowrap">'+esc(e.ngay||'')+'</td><td>'+esc(e.phone||'')+'</td><td>'+esc(e.khachHang||e.tenKh||'')+'</td><td>'+esc((e.sales||[]).join(', '))+'</td><td>'+esc((e.codes||[]).join(', ')||'—')+
+        '</td><td style="text-align:right">'+_srMoney(e.giaTri)+'</td><td style="text-align:right">'+_srMoney(e.chiaSale)+'</td><td style="text-align:right">'+_srMoney(e.phanQuay)+'</td><td>'+
+        (e.status==='chua-ghi'?'<b style="color:#b91c1c">❌ KT chưa ghi</b>':'<span style="color:#92400e">⚠ thiếu mã bộ đếm</span>')+'</td></tr>';
+    });
+    h += '</tbody></table></div>'+(miss.length>300?'<div style="font-size:11px;color:var(--muted)">Hiện 300/'+miss.length+' đơn — xuất file để xem đủ.</div>':'');
+  } else h += '<div style="color:var(--green);font-size:12px">✔ Mọi đơn có Sale được chia đều đã có trong file kế toán.</div>';
+  if (lech.length){   // ĐÃ GHI nhưng SỐ TIỀN lệch: sắp theo mức lệch phần sale giảm dần (âm = KT ghi THIẾU cho sale)
+    var ls = lech.slice().sort(function(a, b){ return Math.abs((b.tien||{}).lechSale||0) - Math.abs((a.tien||{}).lechSale||0); });
+    h += '<div style="margin-top:12px;font-weight:700;font-size:13px;color:#9a3412">💸 KT ghi LỆCH TIỀN — '+fmt(lech.length)+' đơn (lệch phần sale cộng lại '+_srMoney(sm.lechSaleTong||0)+'; âm = KT ghi thiếu cho Sale)</div>'+
+      '<div style="overflow-x:auto;max-height:340px;overflow-y:auto"><table class="dash-table"><thead><tr><th>Mã bộ đếm</th><th>Loại lệch</th><th>Sale (báo cáo L)</th><th>Sale (KT ghi)</th><th style="text-align:right">Giá trị Pos</th><th style="text-align:right">Tổng KT</th><th style="text-align:right">Sale dự kiến</th><th style="text-align:right">Sale KT ghi</th><th style="text-align:right">Lệch sale</th><th>Dòng trong file KT</th></tr></thead><tbody>';
+    ls.slice(0, 300).forEach(function(e){
+      var t = e.tien || {};
+      h += '<tr><td style="white-space:nowrap"><b>'+esc((e.codes||[]).join(' ; ')||'—')+'</b></td><td>'+esc(_srLTienLbl_(t.status))+'</td><td>'+esc((e.sales||[]).join(', '))+'</td><td>'+esc((t.salesKT||[]).join(', ')||'—')+'</td>'+
+        '<td style="text-align:right">'+_srMoney(t.posTong||0)+'</td><td style="text-align:right">'+_srMoney(t.ktTong||0)+'</td><td style="text-align:right">'+_srMoney(t.saleDuKien||0)+'</td><td style="text-align:right">'+_srMoney(t.ktSale||0)+'</td>'+
+        '<td style="text-align:right;font-weight:700;color:'+((t.lechSale||0)<0?'#b91c1c':'#9a3412')+'">'+_srMoney(t.lechSale||0)+'</td><td style="font-size:11px;color:var(--muted)">'+esc((e.sheet||'')+(t.lines&&t.lines.length?' · dòng '+t.lines.join(', '):''))+'</td></tr>';
+    });
+    h += '</tbody></table></div>'+(ls.length>300?'<div style="font-size:11px;color:var(--muted)">Hiện 300/'+ls.length+' đơn — xuất file để xem đủ.</div>':'');
+  }
+  return h + '</div>';
+}
+// Xuat file doi chieu cho Sale gui ke toan: sheet "KT chưa ghi" (theo ma bo dem, bo cuc giong file ke toan: cap dong Quay + Sale) + sheet "Thiếu mã bộ đếm".
+function _srLLechSheet_(d){   // [header, ...dong] cho sheet "KT ghi lệch tiền"; so tien la SO
+  var ac = (d && d.acctCheck) || {}, pct = d && d.sharePct != null ? d.sharePct : 30;
+  var head = ['Mã bộ đếm','Loại lệch','Ngày đơn Pos','SĐT','Khách','Sale (báo cáo L)','Sale (KT ghi)','Giá trị đơn Pos','Tổng KT','Lệch tổng','Sale dự kiến ('+pct+'%)','Sale KT ghi','Lệch sale','Quầy dự kiến','Quầy KT ghi','Tab KT','Dòng trong file KT','Dòng Pos','Dòng trang tính cửa hàng'];
+  var rows = (ac.lech || []).slice().sort(function(a, b){ var ca = (a.codes||[])[0] || '', cb = (b.codes||[])[0] || ''; return ca < cb ? -1 : ca > cb ? 1 : 0; }).map(function(e){
+    var t = e.tien || {};
+    return [(e.codes||[]).join(' ; '), _srLTienLbl_(t.status), e.ngay||'', e.phone||'', e.khachHang||e.tenKh||'', (e.sales||[]).join(', '), (t.salesKT||[]).join(', '), t.posTong||0, t.ktTong||0, t.lechTong||0, t.saleDuKien||0, t.ktSale||0, t.lechSale||0, t.quayDuKien||0, t.ktQuay||0, e.sheet||'', (t.lines||[]).join(', '), e.posRow, (e.storeRows||[]).join(', ')];
+  });
+  return [head].concat(rows);
+}
+// Dựng 3 bảng đối chiếu kế toán của Báo cáo L (KT chưa ghi / Thiếu mã bộ đếm / KT ghi lệch tiền). Tách khỏi _srLExportAcct_ để "Excel đối soát" gộp ở Báo cáo B dùng lại (xuất lẻ không đổi).
+function _srLBuildAcctSheets_(d){
+  var ac = (d && d.acctCheck) || {};
+  var head = ['Mã bộ đếm','Ngày đơn','SĐT','Khách','Kênh bán','Sale bán','Giá trị đơn','Phần Sale ('+d.sharePct+'%)','Phần Quầy','Dòng Pos','Dòng trang tính cửa hàng','Cách xử lý (Báo cáo L)'];
+  var lbl = { 'tinh':'Tính thêm cho Sale', 'trung':'Trùng thẻ Pos', 'mot-phan':'Trùng một phần', 'chua-ghep-don':'Chưa ghép được đơn Pos (giá trị lấy từ cột Doanh thu trang tính cửa hàng)' };
+  var chua = [head], thieu = [head];
+  (ac.missing||[]).forEach(function(e){
+    var base = [(e.codes||[]).join(' ; '), e.ngay||'', e.phone||'', e.khachHang||e.tenKh||'', 'Quầy Hào Nam / ' + (e.nguonDon||''), (e.sales||[]).join(', '), Math.round(e.giaTri||0), e.chiaSale||0, e.phanQuay||0, e.posRow, (e.storeRows||[]).join(', '), lbl[e.loaiXuLy]||e.loaiXuLy||''];
+    (e.status === 'chua-ghi' ? chua : thieu).push(base);
+  });
+  return { head: head, chua: chua, thieu: thieu, lech: _srLLechSheet_(d) };
+}
+function _srLExportAcct_(){
+  var d = _srState.dataL, ac = d && d.acctCheck;
+  if (!ac || !((ac.missing||[]).length || (ac.lech||[]).length)){ toast('Không có đơn nào cần xuất.'); return; }
+  var tag = (d.dateFrom || _srState.lDateFrom || 'tu-dau') + '_' + (d.dateTo || _srState.lDateTo || 'den-nay');
+  var xa = _srLBuildAcctSheets_(d), head = xa.head, chua = xa.chua, thieu = xa.thieu;
+  if (typeof XLSX === 'undefined'){
+    if (typeof _srGDownloadCsv_ === 'function') _srGDownloadCsv_('KT-chua-ghi_'+tag+'.csv', chua);
+    return;
+  }
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(chua.length > 1 ? chua : [head, ['(không có đơn nào)']]), 'KT chưa ghi');
+  if (thieu.length > 1) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(thieu), 'Thiếu mã bộ đếm');
+  var lechRows = xa.lech;   // KT đã ghi nhưng SỐ TIỀN lệch so với Pos
+  if (lechRows.length > 1) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(lechRows), 'KT ghi lệch tiền');
+  XLSX.writeFile(wb, 'DoiChieuKeToan_'+tag+'.xlsx');
+}
 function _srLOrderHtml_(o){
   var st = _SR_L_STATUS_[o.status] || ['', '#6b7280', '#f3f4f6'];
   var codes = (o.codes||[]).join(', ');
   var credit = (o.credits||[]).reduce(function(s,c){ return s + (c.amount||0); }, 0);
   return '<div style="border-top:1px dashed var(--border);padding:4px 0;font-size:11px;line-height:1.45">'+
     '<span style="display:inline-block;padding:1px 7px;border-radius:10px;font-weight:600;background:'+st[2]+';color:'+st[1]+'">'+st[0]+'</span> '+
-    '<b>'+_srMoney(o.giaTri)+'</b> · '+esc(o.ngay||'')+' · '+esc(o.nguonDon||'')+
+    '<b>'+_srMoney(o.giaTri)+'</b> · '+esc(o.ngay||'')+' · '+esc(o.nguonDon||'')+_srLAcctBadge_(o)+
     '<br><span style="color:var(--muted)">Mã bộ đếm: <b>'+esc(codes||'—')+'</b> · Dòng Pos: <b>'+esc(o.posRow)+'</b> · Thẻ Pos: '+esc(o.theSale||'(trống)')+'</span>'+
     (o.credits && o.credits.length ? '<br>'+o.credits.map(function(c){ return esc(c.sale)+': '+(c.dup?'<span style="color:#92400e">đã có thẻ (bỏ qua '+_srMoney(c.wouldBe)+')</span>':'<b style="color:var(--green)">+'+_srMoney(c.amount)+'</b>'); }).join(' · ') : '')+
     (o.note ? '<br><span style="color:var(--hint)">'+esc(o.note)+'</span>' : '')+
@@ -2011,7 +2148,9 @@ function _srRenderL_(d){
     '<div class="kpi-card"><div class="kpi-val">'+_srMoney(t.doanhThuDon)+'</div><div class="kpi-label">Doanh thu bán được khi khách qua</div></div>'+
     '<div class="kpi-card" style="border-color:var(--green)"><div class="kpi-val" style="color:var(--green)">'+_srMoney(t.daTinh)+'</div><div class="kpi-label">Doanh thu chia thêm cho Sale ('+esc(d.sharePct)+'%)</div></div>'+
     '<div class="kpi-card"><div class="kpi-val" style="color:#92400e">'+_srMoney(t.trungBoQua)+'</div><div class="kpi-label">Đã có thẻ trên Pos (bỏ qua, tránh trùng)</div></div>'+
+    (d.acctCheck && d.acctCheck.ok ? '<div class="kpi-card" style="border-color:'+(d.acctCheck.summary.chuaGhi?'#dc2626':'var(--green)')+'"><div class="kpi-val" style="color:'+(d.acctCheck.summary.chuaGhi?'#dc2626':'var(--green)')+'">'+fmt(d.acctCheck.summary.chuaGhi)+'</div><div class="kpi-label">Đơn KT chưa ghi</div></div>' : '')+
   '</div>';
+  h += _srLAcctHtml_(d);
   h += '<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">'+esc(d.note||'')+' · Nguồn: tab "'+esc(d.sheetName||'')+'" · <a href="https://docs.google.com/spreadsheets/d/'+esc(d.sheetId)+'" target="_blank" rel="noopener">mở trang tính</a></div>';
 
   var warns = [];
@@ -2047,7 +2186,7 @@ function _srLDetailTable_(rows){
     var dt = valid.reduce(function(s,o){ return s + (o.giaTri||0); }, 0);
     var cr = valid.reduce(function(s,o){ return s + (o.credits||[]).reduce(function(s2,c){ return s2 + (c.amount||0); }, 0); }, 0);
     h += '<tr'+(r.koDen?' style="opacity:.6"':'')+'>'+
-      '<td style="white-space:nowrap">'+esc((r.visitDates||[]).map(_srLDmy_).join(', ') || esc(r.ngayHen))+'<div style="font-size:10px;color:var(--hint)">sheet dòng '+esc(r.row)+(r.stt?' · STT '+esc(r.stt):'')+'</div></td>'+
+      '<td style="white-space:nowrap">'+esc((r.visitDates||[]).map(_srLDmy_).join(', ') || esc(r.ngayHen))+(r.dateSrc==='den'?'<div style="font-size:10px;color:var(--green)" title="Dùng cột N Ngày KH đến'+(r.ngayHen?' (ngày hẹn ghi: '+esc(r.ngayHen)+')':'')+'">✔ ngày khách đến</div>':'')+'<div style="font-size:10px;color:var(--hint)">sheet dòng '+esc(r.row)+(r.stt?' · STT '+esc(r.stt):'')+'</div></td>'+
       '<td>'+_custLinkHtml_(r.phone, '<b>'+esc(r.tenKh||'—')+'</b>')+'<div style="font-size:11px;color:var(--muted)">'+_custLinkHtml_(r.phone, esc(r.phone||''))+(r.kenh?' · '+esc(r.kenh):'')+'</div></td>'+
       '<td>'+((r.sales||[]).map(function(x){ return '<b>'+esc(x.name)+'</b>'+(x.raw!==x.name?'<span style="font-size:10px;color:var(--hint)"> ('+esc(x.raw)+')</span>':''); }).join('<br>') || '<span style="color:var(--muted)">—</span>')+'</td>'+
       '<td style="font-size:11px;max-width:200px">'+esc([r.tinhTrang, r.capNhat].filter(Boolean).join(' · ')).substring(0,220)+'</td>'+
@@ -2079,23 +2218,20 @@ function renderSalesReportTabL_(wrap, subTabs){
   var body = _srState.loading ? '<div style="color:var(--muted);text-align:center;padding:40px">Đang tải...</div>' : _srRenderL_(_srState.dataL);
   wrap.innerHTML = filters + body;
 }
-function _srLExportCsv_(kind){
-  var d = _srState.dataL;
-  if (!d || !d.rows){ toast('Chưa có dữ liệu — bấm "Lọc" trước.'); return; }
-  var tag = (d.dateFrom || _srState.lDateFrom || 'tu-dau') + '_' + (d.dateTo || _srState.lDateTo || 'den-nay');
+// Dựng bảng "tổng hợp theo Sale" (kind='summary') hoặc "chi tiết từng đơn" (mặc định) của Báo cáo L. Tách khỏi _srLExportCsv_ để "Excel đối soát" gộp ở Báo cáo B dùng lại (xuất CSV lẻ không đổi).
+function _srLBuildRows_(d, kind){
   if (kind === 'summary'){
     var rs = [['Sale','KH hẹn qua CH','KH có đơn','Số đơn','Doanh thu đơn (đầy đủ)','Doanh thu chia thêm ('+d.sharePct+'%)','Đã có thẻ trên Pos (bỏ qua)']];
     (d.bySale||[]).forEach(function(x){ rs.push([x.sale, x.khHen, x.khCoDon, x.soDon, x.doanhThuDon, x.credited, x.dupSkipped]); });
     rs.push(['Tổng đơn duy nhất', d.totals.dongHen, d.totals.dongCoDon, d.totals.soDon, d.totals.doanhThuDon, d.totals.daTinh, d.totals.trungBoQua]);
-    _srGDownloadCsv_('KH-qua-cua-hang_tong-hop_'+tag+'.csv', rs);
-    return;
+    return rs;
   }
   var head = ['Dòng trang tính','STT','Ngày qua CH','Tên KH','SĐT','Kênh','Sale ghi trên sheet','Sale (đã khớp)','Tình trạng KH (sheet)','Doanh thu NV cửa hàng ghi (sheet)','NV cửa hàng lên đơn',
     'Ngày đơn Pos','Nguồn đơn','Mã bộ đếm','Dòng sheet Pos (dữ liệu đơn)','Ghi chú đơn Pos (cột Q)','Sản phẩm','Giá trị đơn (sau giảm giá)','Thẻ Pos hiện tại','Trạng thái xử lý','Sale nhận','% chia','Doanh thu chia cho Sale','Sale đã có thẻ (bỏ qua)','Ghi chú / lý do','Cảnh báo dòng sheet'];
   var out = [head];
   var statusLbl = { 'tinh':'Tính thêm cho Sale', 'trung':'Trùng thẻ Pos - bỏ qua', 'mot-phan':'Trùng một phần', 'hoan':'Đơn hoàn - không tính', 'khong-sale':'Chưa khớp tên Sale' };
   (d.rows||[]).forEach(function(r){
-    var base = [r.row, r.stt, (r.visitDates||[]).join(' ; '), r.tenKh, r.phone, r.kenh, r.saleRaw, (r.sales||[]).map(function(x){return x.name;}).join(', '), [r.tinhTrang, r.capNhat].filter(Boolean).join(' · '), r.doanhThuSheet, r.nvCh];
+    var base = [r.row, r.stt, (r.visitDates||[]).join(' ; ') + (r.dateSrc==='den' ? ' (ngày KH đến)' : ''), r.tenKh, r.phone, r.kenh, r.saleRaw, (r.sales||[]).map(function(x){return x.name;}).join(', '), [r.tinhTrang, r.capNhat].filter(Boolean).join(' · '), r.doanhThuSheet, r.nvCh];
     var flags = (r.flags||[]).join(' · ');
     if (!(r.orders||[]).length){ out.push(base.concat(['','','','','','','','','','','','','','','', flags])); return; }
     r.orders.forEach(function(o){
@@ -2106,5 +2242,11 @@ function _srLExportCsv_(kind){
       });
     });
   });
-  _srGDownloadCsv_('KH-qua-cua-hang_chi-tiet_'+tag+'.csv', out);
+  return out;
+}
+function _srLExportCsv_(kind){
+  var d = _srState.dataL;
+  if (!d || !d.rows){ toast('Chưa có dữ liệu — bấm "Lọc" trước.'); return; }
+  var tag = (d.dateFrom || _srState.lDateFrom || 'tu-dau') + '_' + (d.dateTo || _srState.lDateTo || 'den-nay');
+  _srGDownloadCsv_((kind === 'summary' ? 'KH-qua-cua-hang_tong-hop_' : 'KH-qua-cua-hang_chi-tiet_')+tag+'.csv', _srLBuildRows_(d, kind));
 }

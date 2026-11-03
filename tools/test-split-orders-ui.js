@@ -74,7 +74,7 @@ ok(w.splitBannerHtml_(Object.assign({},D1,{truncated:true}),{}).includes('thu h�
  ok(w.splitDetailCsvRows_(REP,'','facebook').length===3,'M·CSV chi tiết theo ô tìm đang gõ: lọc còn 2 đơn Facebook');
  // thanh lọc CHUNG (hàm thật js/13) với báo cáo M
  w.eval('_srState.sub="M"; _srState.saleBOptions=["An","Bình","Chi"]; _srState.nguonOptions=["Facebook","Zalo","Quầy"]; _srState.leaderTeamOptions=["An","Bình"];');
- w.eval('_srIsAdmin=function(){return window.__admin!==false}; _srbIsLeaderScope_=function(){return !!window.__leader}');
+ w.eval('_srIsAdmin=function(){return window.__admin!==false}; _srbIsLeaderScope_=function(){return !!window.__leader}; _srbHasViewScope_=function(){return false}');
  w.__admin=true;const cats=JSON.parse(w.eval('JSON.stringify(_srbMenuCats_().map(function(c){return {key:c.key,label:c.label,state:c.stateKey,opts:c.opts?c.opts():null}}))'));
  ok(cats.map(c=>c.key).join()==='sale,mNguon'&&cats[0].state==='mSale'&&cats[0].opts.join()==='An,Bình,Chi'&&cats[1].state==='mNguon'&&cats[1].opts.join()==='Facebook,Zalo,Quầy','M·menu Bộ lọc (Admin): Sale (mSale, đủ danh sách sale) + Kênh bán (mNguon, đủ danh sách nguồn đơn)');
  w.__admin=false;w.__leader=true;const cl=JSON.parse(w.eval('JSON.stringify(_srbMenuCats_().map(function(c){return {key:c.key,label:c.label,opts:c.opts?c.opts():null}}))'));

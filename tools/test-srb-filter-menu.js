@@ -126,9 +126,9 @@ ok(w.eval('_srbMenu.mode')==='B'&&w.eval('_srbMenu.open')===false,'đổi sang b
 w.eval(`var _srSidebarHidden=false;var currentUser={name:'Duyên',role:'admin'};
  var _srSubSelectHtml_=function(){return '<select class="subsel"></select>'};
  var _quickRangeSelectHtml=function(k,ex){return '<select class="qr" data-k="'+k+'"></select>'};
- var _hBuild_=function(){return {csOptions:['Hà','Lan']}};var assignHistory=[{csName:'Hà'},{csName:'Lan'}];
+ var _hBuild_=function(){return {csOptions:['Hà','Lan']}};var assignHistory=[{csName:'Hà'},{csName:'Lan'}]; var _hAssignCsNames_=function(){return ['Hà','Lan']};
  _srState.leaderTeamOptions=['An'];_srState.cSale=[];_srState.eSale=[];_srState.fSale=[];_srState.gSale=[];_srState.lSale=[];_srState.cTeam=[];_srState.eTeam=[];_srState.fTeam=[];_srState.dCs=[];_srState.dTeam=[];_srState.cKenh=[];
- _srState.cSanPham='';_srState.cDateField='ngayTao';_srState.hTeam='';_srState.hCs='';_srState.hGroup='dayCs';_srState.iTeam='';_srState.iCs='';`);
+ _srState.cSanPham='';_srState.cDateField='ngayTao';_srState.hTeam='';_srState.hCs='';_srState.hCsList=[];_srState.iCsList=[];_srState.hGroup='dayCs';_srState.iTeam='';_srState.iCs='';`);
 const barOf=sub=>{w.eval("_srState.sub='"+sub+"';_srbMenu.mode=null;_srbMenu.open=false");const h=w.eval('_srBarHtml_()');$('host').innerHTML=h;return $('host')};
 const lbls=()=>QA('#host .srb-m-cat .srb-m-t').map(x=>x.textContent);
 const tasks=()=>QA('#sr-gear-ab > div').map(x=>x.textContent.trim());
@@ -154,7 +154,9 @@ barOf('D');ok(!!$('sr-export-sheet-btn'),'D: mục "Xuất ra Sheet" giữ id sr
 w.eval("_srState.sub='H';var _rr=0;renderSalesReportTab=function(){_rr++;document.getElementById('host').innerHTML=_srBarHtml_()};_srbMenu.mode='H';_srbMenu.open=true;_srbMenu.cat='hCs'");
 $('host').innerHTML=w.eval('_srBarHtml_()');
 click(QA('.srb-m-opt').find(x=>x.textContent.includes('Lan')));
-ok(w.eval('_srState.hCs')==='Lan'&&w.eval('_rr')===1,'H: chọn CS "Lan" → state hCs + vẽ lại báo cáo ngay');
+ok(JSON.stringify(w.eval('_srState.hCsList'))==='["Lan"]','H: chọn CS "Lan" → state hCsList (nhiều CS, 02/11/2026); chọn 1 CS vẫn lọc đúng 1 CS');
+click(QA('.srb-m-opt').find(x=>x.textContent.includes('Hà')));
+ok(JSON.stringify(w.eval('_srState.hCsList'))==='["Lan","Hà"]','H: chọn thêm CS thứ 2 → hCsList có 2 tên')
 // phân quyền
 w.__admin=false;w.eval("currentUser={name:'Hà',role:'cs'};_srState.eSale=['Hà']");
 let el=barOf('E');ok(el.querySelector('.srb-bar-lock')&&el.querySelector('.srb-bar-lock').textContent.includes('Hà')&&!el.querySelector('#srb-menu-btn')&&tasks().length===1,'E (CS thường): chỉ chip 🔒 tên mình, không có menu lọc, Tác vụ chỉ còn "Ẩn bộ lọc KH"');

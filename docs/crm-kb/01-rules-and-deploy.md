@@ -82,3 +82,10 @@ Instruction của Project (rule 2 và 13) cần SỬA cho khớp: "Deploy GAS/Wo
 - Hàm cần chạy tay: viết **hàm công khai không có `_`** gọi hàm riêng tư và `Logger.log(kết quả)` (giá trị `return` không hiện ở Editor). Ví dụ: `dedupePosNow()` → `dedupePosNow_()`, `installAutoDedupTrigger()` / `removeAutoDedupTrigger()`, `caiTriggerChiaTuDong` / `goTriggerChiaTuDong` / `chayThuChiaTuDong` / `kiemTraChiaTuDong`, `sbDonHangCaiTrigger`…
 - Hàm riêng tư vẫn dùng bình thường cho code và làm handler của trigger (`onChangeDedupTrigger_`, `*Tick_`); chỉ cấm **hướng dẫn người dùng chọn** chúng.
 - Khi viết hướng dẫn trong code/giao diện/tài liệu: ghi tên hàm CÔNG KHAI. Test chặn tái diễn: `node tools/test-gas-run-entrypoints.js` (không còn câu hướng dẫn người dùng chọn tên hàm riêng tư; mọi hàm `install*/remove*/…Now_` riêng tư phải có hàm công khai gọi nó).
+
+## ⚠️ GHI ĐÈ BẰNG BẢN CŨ (sự cố 2026-10-29) — đọc trước khi sửa file lớn
+- Nhiều phiên cùng sửa `gas_v13.js`, `index.html`, `js/*.js`. **Trước khi sửa BẤT KỲ file nào: `git fetch && git merge origin/main`** (hoặc clone mới) rồi mới sửa. Tuyệt đối KHÔNG dán đè/ghi lại cả file từ bản đã tải/đã mở từ trước — sẽ xoá thay đổi của các phiên khác và TỰ DEPLOY lên production (sự cố: -938 dòng GAS, mất Viết tắt/Trọng lượng vàng/mua lại/đơn chia/chat coach).
+- Sửa **từng đoạn nhỏ** (str_replace / patch), không xuất lại toàn file. Sau khi sửa: `git diff --stat` — một file bị xoá hàng trăm dòng mà bạn không định xoá = dừng lại, kiểm tra.
+- `tools/safe-push.sh` chặn push xoá ≥300 dòng và ≥4× số dòng thêm (mã thoát 6). Chỉ đặt `ALLOW_BIG_DELETE=1` khi việc xoá là CÓ CHỦ Ý và đã nói rõ trong commit message.
+- Sau khi push thay đổi GAS: kiểm vài hàm/tính năng gần đây của phiên khác còn đủ (hoặc chạy bộ test: nhiều test sẽ đỏ nếu mất tính năng).
+

@@ -50,5 +50,5 @@ setv='THROW';ok(mc()===2,'loi doc Settings -> 2, khong lam hong bao cao');
   val=null;let A=mk2();ok(A.k('splitdet2_',{a:1})==='splitdet2_{"a":1}','cong tac TAT: khoa cache giu nguyen (khong lam mat cache cu)');
   val='1';calls=0;A=mk2();ok(A.k('splitdet2_',{a:1})==='splitdet2_g1_{"a":1}','cong tac BAT: khoa cache doi (g1_) => bat/tat co hieu luc NGAY');
   A.k('x',{});A.k('y',{});A.m();ok(calls===1,'doc Settings 1 lan / lan chay (memo): '+calls);
-  ok(/'POS_GHEP_MIN_CODES'\)\) \{ var _bizDen/.test(src),'setSetting POS_GHEP_MIN_CODES chi Admin (di qua _bizRulesWriteDenied_)'); }
+  ok(/'POS_GHEP_MIN_CODES'[^\n]*\)\) \{ var _bizDen/.test(src),'setSetting POS_GHEP_MIN_CODES chi Admin (di qua _bizRulesWriteDenied_)'); }
 console.log(bad?'FAILED '+bad:'ALL PASS');process.exit(bad?1:0);

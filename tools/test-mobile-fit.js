@@ -15,6 +15,7 @@ ok(mobileFitHeaderH_(360, 0) === null && mobileFitHeaderH_(360, NaN) === null &&
 // ===== chiều cao khung .app =====
 ok(mobileFitAppH_(360, 722, 118) === 604 && mobileFitAppH_(411, 410, 50) === 360 && mobileFitAppH_(360, 700, 0) === 700, '.app = innerHeight - chiều cao thanh trên thật (thanh trên ẩn -> đủ innerHeight)');
 ok(mobileFitAppH_(360, 0, 118) === null && mobileFitAppH_(360, 119, 50) === null && mobileFitAppH_(1280, 800, 50) === null && mobileFitAppH_(0, 800, 50) === null, 'WebView chưa có kích thước (innerHeight 0) / màn rộng: không đặt — để luật của app/CSS lo');
+ok(mobileFitAppH_(411, 722, 67, 44) === 611 && mobileFitAppH_(411, 722, 67, 0) === 655 && mobileFitAppH_(411, 722, 67, -5) === 655, '.app trừ thêm padding-bottom của body (pro-has-tabs 44px) → trang không cuộn được/không bị đẩy lên');
 ok(mobileFitAppH_(360, 400, 500) === 400 && mobileFitAppH_(360, 150, 100) === null, 'thanh trên đo bất thường -> bỏ qua; còn quá thấp (<80px) -> không đặt');
 
 // ===== CSS =====
