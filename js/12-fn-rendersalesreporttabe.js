@@ -362,6 +362,7 @@ function _srRenderE_(d){
   html += _goldRuleNoteHtml_(c);   // ghi chu luat vang kenh Nguon (chi hien khi co don ap dung)
 
   html += _srIncomeSectionHtml_(d);   // THU NHAP TUNG SALE (js/63): tong hoa hong + thuong, bam Chi tiet xem tung nguon
+  if (typeof _srThiDuaSectionHtml_ === 'function') html += _srThiDuaSectionHtml_(d);   // THI ĐUA THÁNG (js/64): thưởng/phạt từng Sale theo KPI/cam kết
   // b) Hoa hồng từng nhân viên
   _SR_COLTH_ROWSFN_['eSale'] = function(){ return _computeCommissionData_((_srState.dataE&&_srState.dataE.orders)||[]).bySale || []; };
   _SR_COLTH_GETTER_['eSale'] = { name: function(r){ return r.name; } };
@@ -617,6 +618,33 @@ function _srGDecode_(s){
 function _srGEligible_(name){
   var c = _saleChannelOf_(name);
   return c === 'online' || c === 'offline' || c === 'probation';
+}
+// ── KHUNG DU LIEU CUA BAO CAO G (thuong) THEO NGAY LEN DON TREN BASE (Duyen 2026-11-02): "ban chat chuong trinh thuong tinh theo DON GOC, NGAY LEN DON TREN BASE
+//    va don do phai co tren Pos". Truoc day G lay don Pos theo NGAY POS trong khoang loc -> don len Base trong ky nhung Pos nhap tre bi sot (canh bao
+//    "khong thay don Pos nao mang ten Sale"), don Base cu nhung Pos nhap trong ky lai bi xep nham ky. Nay: (1) keo Pos den hon BONUS_POS_LAG_DAYS ngay sau khoang loc,
+//    (2) giu don co baseNgayTao NAM TRONG khoang loc; don chua ghep duoc Base (khong co baseNgayTao) van lay theo ngay Pos nhu cu. Backend cu chua tra baseNgayTao -> giu cach cu.
+var BONUS_POS_LAG_DAYS = 30;   // don len Base trong ky co the duoc nhap len Pos muon toi ngan nay ngay
+function _srGAddDays_(ymd, n){
+  var m = String(ymd || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); if (!m) return ymd;
+  var d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3] + n));
+  return d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + d.getUTCDate()).slice(-2);
+}
+function _srGPosTo_(to){ return to ? _srGAddDays_(to, BONUS_POS_LAG_DAYS) : to; }
+function _srGFilterByBaseDate_(orders, from, to){
+  orders = orders || [];
+  var info = { basis: 'pos', total: orders.length, kept: orders.length, dropBefore: 0, dropAfter: 0, extra: 0 };
+  if (!orders.some(function(o){ return !!o.baseNgayTao; }) || (!from && !to)) return { orders: orders, info: info };   // backend cu / khong co don ghep Base / khong loc ngay
+  info.basis = 'base';
+  var out = [];
+  orders.forEach(function(o){
+    var ymd = o.baseNgayTao || _ddmmyyyyToYmd_(o.ngayTao);
+    if (from && ymd < from){ info.dropBefore++; return; }
+    if (to && ymd > to){ info.dropAfter++; return; }
+    out.push(o);
+    if (o.baseNgayTao && to && _ddmmyyyyToYmd_(o.ngayTao) > to) info.extra++;   // len Base trong ky nhung Pos nhap SAU ky: nho keo them moi thay
+  });
+  info.kept = out.length;
+  return { orders: out, info: info };
 }
 function _srGBuildGroups_(orders){
   var bonus = _computeBonusData_(orders || []);

@@ -347,6 +347,7 @@ function doPostCore_(e) {
     if (action === 'saveTaskFlow')        return saveTaskFlow_(data.flow);
     if (action === 'deleteTaskFlow')      return deleteTaskFlow_(data.id);
     if (action === 'taskAdvance')         return taskAdvance_(data);
+    if (action === 'stuckFollowSet')      return jsonOut_(ttFollowSet_(data));   // CS phu trach tich Da xem/Dang xu ly/Da xu ly xong cho don ket (man Cham soc & tai mua)
     if (action === 'taskRequestDecide')   return taskRequestDecide_(data);
     if (action === 'taskReassign')        return taskReassign_(data);
     if (action === 'saveCareStatus')      return saveCareStatus_(data.careStatus);

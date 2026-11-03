@@ -1097,6 +1097,7 @@ function _srbSubCfg_(){
   function t(label, js, title, id){ c.tasks.push('<div'+(id?' id="'+id+'"':'')+(title?' title="'+esc(title)+'"':'')+' onclick="closeGearMenus();'+js+'">'+label+'</div>'); }
   if (sub === 'A' || sub === 'B'){
     t('📊 Xuất Excel', 'exportSalesReport()');
+    if (sub === 'B' && typeof _reconAllowed_ === 'function' && _reconAllowed_()) t('<b>📗 Excel đối soát (B+E+G+L+N) — 1 file</b>', 'exportReconAll_()', 'Tải 1 file Excel duy nhất gồm Báo cáo B, E, G, L, N cùng khoảng ngày + bộ lọc đang xem, có sheet "Mục lục" đối chiếu chéo các báo cáo');
     if (admin) t(sub === 'A' ? '📌 Cập nhật Sheet Base' : '📄 Xuất ra Sheet', 'exportSalesReportToSheet()', sub === 'A' ? 'Ghi đè vào ĐÚNG 1 tab cố định (BC_A_Base) — không tạo tab mới mỗi lần xuất' : 'Tạo 1 tab mới có timestamp, giữ lại lịch sử các lần xuất trước', 'sr-export-sheet-btn');
     if (admin) t('👁 Ẩn/Hiện Page &amp; Sale', '_srToggleHiddenPanel()', 'Chọn Page/kênh và Sale không thuộc phạm vi quản lý để ẩn khỏi mọi báo cáo chung');
   } else if (sub === 'C'){
@@ -1438,7 +1439,7 @@ function _srBuildExportB_(dB, info){
   // Đối chiếu tổng: bảng web ↔ cộng lại từ "Chia theo Sale" (cột G = Sale, I = Giá trị chia, J = COD chia)
   var sum = {}, sumCod = {}, cnt = {}, grandV = 0, grandC = 0;
   allocRows.slice(1).forEach(function(r){ var k = r[6]; sum[k] = (sum[k] || 0) + r[8]; sumCod[k] = (sumCod[k] || 0) + r[9]; cnt[k] = (cnt[k] || 0) + 1; grandV += r[8]; grandC += r[9]; });
-  var AL = "'Chia theo Sale'!";
+  var AL = "'" + (info.allocSheet || 'Chia theo Sale') + "'!";   // file gộp "Excel đối soát" gắn tiền tố "B " vào tên sheet → công thức SUMIF phải trỏ đúng tên đó
   var checkRows = [['Sale', adj ? 'Giá trị — bảng web (TRƯỚC trừ hoàn/hủy)' : 'Giá trị — bảng web', 'Giá trị — cộng từ chi tiết', 'Chênh lệch giá trị', 'COD — bảng web', 'COD — cộng từ chi tiết', 'Chênh lệch COD', 'Số dòng chia']];
   var seen = {};
   (dB.bySale || []).forEach(function(x, i){
@@ -1470,6 +1471,33 @@ function _srBuildExportB_(dB, info){
   }
   checkRows.push(['Ghi chú: bảng "Theo Sale" của web ẩn dòng "(chưa gán sale)" nên tổng các sale trong bảng có thể nhỏ hơn Tổng giá trị; phần chênh = đơn không có sale (xem dòng "(chưa gán sale)" ở trên).']);
   return { summary: summary, bySaleRows: bySaleRows, detailRows: detailRows, allocRows: allocRows, checkRows: checkRows, grandV: grandV, grandC: grandC, missing: !!missing };
+}
+// Danh sách sheet của Excel đối chiếu Báo cáo B: [{name, rows, widths}] — DÙNG CHUNG cho nút "Xuất Excel" của B và file gộp "Excel đối soát" (B+E+G+L+N, js/61-recon-export.js).
+// prefix = tiền tố tên sheet khi gộp (vd 'B '); công thức SUMIF của "Đối chiếu tổng" tự trỏ đúng tên sheet "Chia theo Sale" đã gắn tiền tố. admin = có sheet "Báo cáo sản phẩm".
+function _srBuildExportBSheets_(dB, info, prefix, admin){
+  prefix = prefix || '';
+  var xb = _srBuildExportB_(dB, Object.assign({}, info || {}, { allocSheet: prefix + 'Chia theo Sale' }));
+  var productRows = [['Mã sản phẩm','Tên sản phẩm','Tổng số lượng']];
+  (dB.products||[]).forEach(function(p){ productRows.push([p.code, p.name, p.soLuong]); });
+  var sheets = [{ name: prefix + 'Tổng quan', rows: xb.summary, widths: [48, 60] }, { name: prefix + 'Theo Sale', rows: xb.bySaleRows, widths: [44, 10, 22, 18] }];
+  if (admin) sheets.push({ name: prefix + 'Báo cáo sản phẩm', rows: productRows });
+  sheets.push({ name: prefix + 'Chi tiết đơn', rows: xb.detailRows, widths: [6, 12, 10, 30, 22, 14, 28, 26, 26, 14, 34, 18, 10, 16, 18, 16, 14, 16, 30, 40] },
+    { name: prefix + 'Chia theo Sale', rows: xb.allocRows, widths: [12, 10, 28, 22, 14, 26, 22, 10, 18, 16, 20, 30] },
+    { name: prefix + 'Đối chiếu tổng', rows: xb.checkRows, widths: [46, 20, 24, 18, 18, 22, 16, 12] });
+  return { sheets: sheets, xb: xb };
+}
+// Mô tả bộ lọc Báo cáo B đang dùng (ghi vào sheet Tổng quan/Mục lục). DÙNG CHUNG cho nút "Xuất Excel" của B và "Excel đối soát" gộp (js/61).
+function _srBFilterDesc_(){
+  var f = [];
+  if ((_srState.bSale||[]).length) f.push('Sale: ' + _srState.bSale.join(', '));
+  if ((_srState.bNguon||[]).length) f.push('Nguồn đơn: ' + _srState.bNguon.join(', '));
+  if ((_srState.bMarketer||[]).length) f.push('Marketer: ' + _srState.bMarketer.join(', '));
+  if (_srState.bSanPham) f.push('Sản phẩm: ' + _srState.bSanPham);
+  if ((_srState.bCareStatus||[]).length) f.push('Trạng thái CS: ' + _srState.bCareStatus.join(', '));
+  if ((_srState.bKhStatus||[]).length) f.push('Trạng thái KH: ' + _srState.bKhStatus.join(', '));
+  if ((_srState.bZaloStatus||[]).length) f.push('Zalo: ' + _srState.bZaloStatus.join(', '));
+  if (_srState.bNickZalo) f.push('Nick Zalo: ' + _srState.bNickZalo);
+  return f;
 }
 function exportSalesReport(){
   if (_srState.sub === 'A'){
@@ -1517,26 +1545,14 @@ function exportSalesReport(){
   } else {
     var dB = _srState.dataB;
     if (!dB){ alert('Chưa có dữ liệu để xuất — bấm "Lọc" trước.'); return; }
-    var fB = [];
-    if ((_srState.bSale||[]).length) fB.push('Sale: ' + _srState.bSale.join(', '));
-    if ((_srState.bNguon||[]).length) fB.push('Nguồn đơn: ' + _srState.bNguon.join(', '));
-    if ((_srState.bMarketer||[]).length) fB.push('Marketer: ' + _srState.bMarketer.join(', '));
-    if (_srState.bSanPham) fB.push('Sản phẩm: ' + _srState.bSanPham);
-    if ((_srState.bCareStatus||[]).length) fB.push('Trạng thái CS: ' + _srState.bCareStatus.join(', '));
-    if ((_srState.bKhStatus||[]).length) fB.push('Trạng thái KH: ' + _srState.bKhStatus.join(', '));
-    if ((_srState.bZaloStatus||[]).length) fB.push('Zalo: ' + _srState.bZaloStatus.join(', '));
-    if (_srState.bNickZalo) fB.push('Nick Zalo: ' + _srState.bNickZalo);
-    var xb = _srBuildExportB_(dB, { dateFrom: _srState.dateFrom, dateTo: _srState.dateTo, filters: fB, at: new Date().toLocaleString('vi-VN') });
-    var productRows = [['Mã sản phẩm','Tên sản phẩm','Tổng số lượng']];
-    (dB.products||[]).forEach(function(p){ productRows.push([p.code, p.name, p.soLuong]); });
-    var mkWs = function(rows, widths){ var ws = XLSX.utils.aoa_to_sheet(rows); ws['!cols'] = widths.map(function(w){ return { wch: w }; }); return ws; };
+    var fB = _srBFilterDesc_();
+    var xbs = _srBuildExportBSheets_(dB, { dateFrom: _srState.dateFrom, dateTo: _srState.dateTo, filters: fB, at: new Date().toLocaleString('vi-VN') }, '', _srIsAdmin()), xb = xbs.xb;
     var wbB = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wbB, mkWs(xb.summary, [48, 60]), 'Tổng quan');
-    XLSX.utils.book_append_sheet(wbB, mkWs(xb.bySaleRows, [44, 10, 22, 18]), 'Theo Sale');
-    if (_srIsAdmin()) XLSX.utils.book_append_sheet(wbB, XLSX.utils.aoa_to_sheet(productRows), 'Báo cáo sản phẩm');
-    XLSX.utils.book_append_sheet(wbB, mkWs(xb.detailRows, [6, 12, 10, 30, 22, 14, 28, 26, 26, 14, 34, 18, 10, 16, 18, 16, 14, 16, 30, 40]), 'Chi tiết đơn');
-    XLSX.utils.book_append_sheet(wbB, mkWs(xb.allocRows, [12, 10, 28, 22, 14, 26, 22, 10, 18, 16, 20, 30]), 'Chia theo Sale');
-    XLSX.utils.book_append_sheet(wbB, mkWs(xb.checkRows, [46, 20, 24, 18, 18, 22, 16, 12]), 'Đối chiếu tổng');
+    xbs.sheets.forEach(function(s){
+      var ws = XLSX.utils.aoa_to_sheet(s.rows);
+      if (s.widths) ws['!cols'] = s.widths.map(function(w){ return { wch: w }; });
+      XLSX.utils.book_append_sheet(wbB, ws, s.name);
+    });
     if (xb.missing) toast('⚠ Máy chủ chưa trả phần chia chính xác theo sale — bấm "Lọc" lại (hoặc chờ deploy xong) rồi xuất lại để sheet "Chia theo Sale" đầy đủ.');
     XLSX.writeFile(wbB, `BaoCaoDoanhSo_B_DoiChieu_${_ymd(new Date())}.xlsx`);
   }

@@ -115,3 +115,23 @@
   #salesreport-wrap .dash-table{font-size:12px;}
   #salesreport-wrap .dash-table th,#salesreport-wrap .dash-table td{padding:8px 9px;}
 }
+
+/* ── Bước 2: class thay cho style inline lặp lại trong _srRenderA/_srRenderB (js/11) ── */
+#salesreport-wrap td.r,#salesreport-wrap th.r{text-align:right;}
+#salesreport-wrap .sr-empty{text-align:center;color:var(--muted);padding:14px;}
+#salesreport-wrap .sr-empty-lg{padding:20px;font-size:12px;}
+#salesreport-wrap .sr-sub{font-weight:400;color:var(--muted);font-size:11px;}
+#salesreport-wrap .sr-input{
+  height:var(--rp-ctl-h);padding:0 10px;border:1px solid var(--border);border-radius:8px;
+  background:var(--surface);color:var(--text);font-size:12px;margin-bottom:6px;box-sizing:border-box;
+}
+#salesreport-wrap .sr-input:hover{border-color:var(--border-strong);}
+#salesreport-wrap .sr-w220{width:220px;max-width:100%;}
+#salesreport-wrap .sr-w300{width:300px;max-width:100%;}
+#salesreport-wrap .sr-split{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start;}
+#salesreport-wrap .sr-col-lg{flex:1 1 380px;min-width:320px;}
+#salesreport-wrap .sr-col-md{flex:1 1 320px;min-width:280px;}
+@media (max-width:640px){
+  #salesreport-wrap .sr-col-lg,#salesreport-wrap .sr-col-md{flex-basis:100%;min-width:0;}
+  #salesreport-wrap .sr-split{gap:14px;}
+}
