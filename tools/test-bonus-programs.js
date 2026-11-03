@@ -5,10 +5,10 @@ const R = p => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
 const j12 = R('js/12-fn-rendersalesreporttabe.js'), g = R('gas_v13.js'), j01 = R('js/01-fn-splitmulti.js'), j05 = R('js/05-fn-saveeditphone.js');
 const fn = (src, n) => { const i = src.indexOf('\nfunction ' + n + '('); if (i < 0) throw new Error('khong thay ' + n); return src.slice(i + 1, src.indexOf('\n}\n', i) + 3); };
 const ok = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1); } };
-const j27 = R('js/27-fn-bonuscore.js');
-const ctx = { loadLS: () => null, SALE_CHANNELS: { An: 'online', Binh: 'offline' }, BONUS_PROGRAMS: [], _srMoney: n => String(n), accounts: [], _acctNamesOf: () => [] };
+const j27 = R('js/27-fn-bonuscore.js'), j62 = R('js/62-sale-channel-periods.js');
+const ctx = { loadLS: () => null, SALE_CHANNELS: { An: 'online', Binh: 'offline' }, SALE_CHANNEL_PERIODS: {}, BONUS_PROGRAMS: [], _srMoney: n => String(n), accounts: [], _acctNamesOf: () => [] };
 vm.createContext(ctx);
-vm.runInContext(j27 + '\n' + fn(j05, 'esc') + fn(j01, 'splitMulti_') + j01.match(/function isNumTagSale_\(x\)\{[^\n]*\}/)[0] + '\n' + 'var _SALE_ALIAS_MAP = {};\n' + fn(j01, '_cfgAliasesOf') + fn(j01, '_cfgByAlias') + fn(j01, '_saleChannelOf_') + ['_bonusProgramApplies_', '_ddmmyyyyToYmd_', '_daysSinceStart_', '_saleStartDate_', '_bonusProductQty_', '_bonusNamesOfOrder_', '_orderRevenueShares_',
+vm.runInContext(j27 + '\n' + fn(j05, 'esc') + fn(j01, 'splitMulti_') + j01.match(/function isNumTagSale_\(x\)\{[^\n]*\}/)[0] + '\n' + 'var _SALE_ALIAS_MAP = {};\n' + fn(j01, '_cfgAliasesOf') + fn(j01, '_cfgByAlias') + fn(j01, '_saleChannelOf_') + ['_scpNorm_', '_scpListOf_', '_saleChannelOn_'].map(n => fn(j62, n)).join('\n') + ['_bonusProgramApplies_', '_ddmmyyyyToYmd_', '_daysSinceStart_', '_saleStartDate_', '_bonusProductQty_', '_bonusNamesOfOrder_', '_orderRevenueShares_',
   '_bonusNormSrc_', '_bonusSourceOk_', '_bonusOrderProductQtys_', '_bonusAggSources_', '_bonusRequireKw_', '_bonusRequireProductOk_', '_computeBonusData_'].map(n => fn(j12, n)).join('\n'), ctx);
 const calc = (progs, orders) => { ctx.P = progs; ctx.O = orders; return JSON.parse(vm.runInContext('BONUS_PROGRAMS = P; JSON.stringify(_computeBonusData_(O))', ctx)); };
 const base = { dateFrom: '', dateTo: '', audience: { online: false, offline: false }, product: '', requireProduct: '', tier: { enabled: false, rows: [] }, revenue: { enabled: false, scope: 'order', min: '', max: '' }, firstOrder: { enabled: false, amount: '' }, probationDay: { enabled: false }, bonusAmount: '' };
@@ -60,8 +60,8 @@ console.log('ALL BONUS TESTS PASSED');
 // --- ve thu form modal (khong loi, co muc 4b/4c) ---
 const uctx = { esc: s => String(s == null ? '' : s), _srState: { nguonOptions: ['facebook', 'zalo'], optionsLoaded: true }, gsUrl: '', setTimeout: () => 0, document: { getElementById: () => null }, _bpDraft: null, BONUS_PROGRAMS: [] };
 vm.createContext(uctx);
-vm.runInContext(['_bonusNormSrc_', '_bonusRequireKw_', '_bpNewProgram', '_bpNormalize_', '_bpProdSectionHtml_', '_bpProdListHtml_', '_bpProdSelHtml_', '_bpSrcSectionHtml_', '_bpSrcListHtml_', '_bpSrcSelHtml_', '_bpNorm_', '_bpFacetHtml_', '_bpFilteredProducts_', '_bpProdPickAll', '_bpPickAllHtml_', '_bpFacetToggle', '_bpProdRefresh_', '_bpSrcRefresh_', '_bpProdToggle', '_bpSrcToggle'].map(n => fn(j12, n)).join('\n') +
-  '\nfunction _bpLoadFacets_(){}function _bpLoadProducts_(){}var _bpFacets=null,_bpFacetLoading=false,_bpSizeSel=[],_bpMatSel=[];var _bpProducts=[{code:"SP1",name:"Tỳ hưu Tourmaline 10mm",qty:5},{code:"SP2",name:"Tỳ hưu Thạch anh 12mm",qty:4},{code:"SP3",name:"Nhẫn bạc",qty:1}], _bpProdLoading=false,_bpProdErr="",_bpProdQuery="",_bpSrcQuery="";_bpDraft=_bpNormalize_(_bpNewProgram());_bpDraft.prodRules.enabled=true;', uctx);
+vm.runInContext(['_bonusNormSrc_', '_bonusRequireKw_', '_bpNewProgram', '_bpNormalize_', '_bpProdSectionHtml_', '_bpProdListHtml_', '_bpProdSelHtml_', '_bpSrcSectionHtml_', '_bpSrcListHtml_', '_bpSrcSelHtml_', '_bpNorm_', '_bpFacetHtml_', '_bpFilteredProducts_', '_bpProdPickAll', '_bpPickAllHtml_', '_bpFacetToggle', '_bpProdRefresh_', '_bpSrcRefresh_', '_bpProdToggle', '_bpSrcToggle', '_bpXSrcListHtml_', '_bpXSrcSelHtml_', '_bpXSrcRefresh_', '_bpXSrcToggle'].map(n => fn(j12, n)).join('\n') +
+  '\nfunction _bpLoadFacets_(){}function _bpLoadProducts_(){}var _bpFacets=null,_bpFacetLoading=false,_bpSizeSel=[],_bpMatSel=[];var _bpProducts=[{code:"SP1",name:"Tỳ hưu Tourmaline 10mm",qty:5},{code:"SP2",name:"Tỳ hưu Thạch anh 12mm",qty:4},{code:"SP3",name:"Nhẫn bạc",qty:1}], _bpProdLoading=false,_bpProdErr="",_bpProdQuery="",_bpSrcQuery="",_bpXSrcQuery="";_bpDraft=_bpNormalize_(_bpNewProgram());_bpDraft.prodRules.enabled=true;', uctx);
 const html = vm.runInContext('_bpProdSectionHtml_(_bpDraft)+_bpSrcSectionHtml_(_bpDraft)', uctx);
 ok(/Tỳ hưu/.test(html) && /facebook/.test(html) && /4b\./.test(html) && /4c\./.test(html), 'form render');
 vm.runInContext('_bpProdToggle("SP1",true);_bpSrcToggle("zalo",true);', uctx);
@@ -76,3 +76,17 @@ vm.runInContext('_bpSizeSel=[];_bpProdPickAll()', uctx);
 ok(vm.runInContext('_bpDraft.prodRules.items.length', uctx) === 2, 'tich tat ca ket qua');
 ok(/Lọc thêm theo Size/.test(vm.runInContext('_bpFacetHtml_()', uctx)), 'facet html');
 console.log('FORM OK');
+
+// --- MOC PHAN LOAI THEO NGAY (js/62): Sale doi tu Thu viec -> Online giua ky, CT theo doi tuong ap dung DUNG theo loai tai ngay don ---
+{
+  const onlineOnly = Object.assign({}, base, { id: 'pp', name: 'CT Online', audience: { online: true, offline: false }, bonusAmount: '10000', revenue: { enabled: true, scope: 'order', min: '1', max: '' } });
+  ctx.SALE_CHANNELS.Chi = 'online';   // hien tai = chinh thuc
+  ctx.SALE_CHANNEL_PERIODS = { Chi: [{ from: '2026-09-10', channel: 'probation' }, { from: '2026-10-11', channel: 'online' }] };
+  const rr = calc([onlineOnly], [o(1, 'Chi', 'fb', '', '1', 1000000, '15/09/2026 10:00'), o(2, 'Chi', 'fb', '', '1', 1000000, '10/10/2026 23:00'), o(3, 'Chi', 'fb', '', '1', 1000000, '11/10/2026 08:00')]);
+  const chi = rr.bySale.find(x => x.name === 'Chi');
+  ok(chi && chi.total === 10000 && chi.items.length === 1 && chi.items[0].date === '2026-10-11', 'chi don tu 11/10 (chinh thuc) nhan thuong CT Online: ' + JSON.stringify(chi));
+  ctx.SALE_CHANNEL_PERIODS = {};   // khong co moc -> nhu cu: ca 3 don theo loai hien tai (online)
+  const r0 = calc([onlineOnly], [o(1, 'Chi', 'fb', '', '1', 1000000, '15/09/2026 10:00'), o(3, 'Chi', 'fb', '', '1', 1000000, '11/10/2026 08:00')]);
+  ok(r0.bySale.find(x => x.name === 'Chi').total === 20000, 'khong co moc -> hanh vi cu');
+  console.log('moc phan loai theo ngay: PASS');
+}
