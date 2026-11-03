@@ -34,8 +34,8 @@ function _ttCardHtml(t){
     '<div class="rp-note" style="color:var(--red)">' + t.count + ' đơn · ' + (open ? 'bấm để thu gọn' : 'bấm để xem danh sách') + '</div>';
   if (open){
     h += '<div style="margin-top:6px;font-size:11.5px;line-height:1.5">' + (t.items || []).map(function(it){
-      return '<div data-phone="' + esc(it.phone || '') + '" data-order="' + esc(it.id) + '" title="Bấm để mở hồ sơ khách" onclick="event.stopPropagation();ttOpenCustomer_(this.dataset.phone,this.dataset.order)" style="padding:3px 0;border-top:1px dashed var(--border);cursor:pointer"><b style="color:var(--green)">' + esc(it.id) + '</b> · ' + esc(it.stage) +
-        ' · <span style="color:var(--red)">' + it.hours + ' giờ</span>' + (it.sale ? ' · ' + esc(it.sale) : '') + '</div>';
+      return '<div data-oid="' + esc(it.id) + '" data-phone="' + esc(it.phone || '') + '" data-order="' + esc(it.id) + '" title="Bấm để xem khách + đơn và theo dõi" onclick="event.stopPropagation();stuckOpen(this.dataset.oid)" style="padding:3px 0;border-top:1px dashed var(--border);cursor:pointer"><b style="color:var(--green)">' + esc(it.maBoDem || it.id) + '</b> · ' + esc(it.stage) +
+        ' · <span style="color:var(--red)">' + it.hours + ' giờ</span>' + (it.sale ? ' · ' + esc(it.sale) : '') + (typeof stuckFollowBadge_ === 'function' ? stuckFollowBadge_(it.follow) : '') + '</div>';
     }).join('') + (t.count > (t.items || []).length ? '<div style="color:var(--muted);padding-top:4px">… và ' + (t.count - t.items.length) + ' đơn nữa</div>' : '') + '</div>';
   }
   return h + '</div></div>';

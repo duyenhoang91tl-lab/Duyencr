@@ -24,13 +24,13 @@ const c={console,esc:s=>String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;',
   _openCustomerByPhone_:p=>calls.phone.push(p),_alkOpenOrder_:o=>calls.order.push(o)};
 vm.createContext(c); vm.runInContext(R('js/34-fn-todaytasks.js'),c);
 const html=vm.runInContext('(function(){_ttState.open.stuckStage=true;return _ttCardHtml({key:"stuckStage",title:"t",count:1,items:[{id:"D1",stage:"Tiếp nhận đơn",hours:30,sale:"a",phone:"0912345678"}]})})()',c);
-ok(/data-phone="0912345678" data-order="D1"[^>]*onclick="event\.stopPropagation\(\);ttOpenCustomer_\(this\.dataset\.phone,this\.dataset\.order\)"/.test(html),'the Viec can lam: dong don ket bam duoc, khong lam dong/mo the cha');
+ok(/data-phone="0912345678" data-order="D1"[^>]*onclick="event\.stopPropagation\(\);stuckOpen\(this\.dataset\.oid\)"/.test(html),'the Viec can lam: dong don ket bam duoc (mo hop chi tiet Khach+Don+Theo doi), khong lam dong/mo the cha');
 c.ttOpenCustomer_('0912345678','D1'); ok(calls.phone[0]==='0912345678'&&!calls.order.length,'co SDT -> mo thang khach');
 c.ttOpenCustomer_('','D2'); ok(calls.order[0]==='D2','chua co SDT -> tra theo ID don roi mo khach');
 c.ttOpenCustomer_('',''); ok(calls.toast.length===1,'khong co ca SDT lan ID -> bao ro, khong im lang');
 // ── js/36 + js/40 ──
 const h36=R('js/36-fn-homechips.js'), h40=R('js/40-fn-carepage.js');
-ok(/out\.today\.push\(\{ phone: o\.phone \|\| '', orderId: o\.id, kind: 'order'/.test(h36),'js/36: don ket mang phone + orderId + kind');
+ok(/typeof stuckRow_ === 'function' \? stuckRow_\(o\)/.test(h36) && /return \{ phone: o\.phone \|\| '', order: true, kind: 'order', orderId: String\(o\.id\)/.test(h40),'js/36+js/40: don ket di qua stuckRow_ mang phone + orderId + kind (+ order/oid/follow cho hop chi tiet)');
 ok(/data-order="' \+ esc\(it\.orderId\)[\s\S]*ttOpenCustomer_\(this\.dataset\.phone,this\.dataset\.order\)/.test(h36),'js/36: dong danh sach Viec hom nay bam duoc ca khi chua co SDT');
 const fn=h40.match(/function _c2Rows\(\)\{[\s\S]*?\n}\n/)[0];
 const c2={hmCompute:()=>({overdue:[{phone:'0900000001',name:'Khach A',sub:'hen'}],today:[{phone:'0912345678',orderId:'D1',kind:'order',name:'Đơn D1',sub:'kẹt'},{phone:'',orderId:'D2',kind:'order',name:'Đơn D2',sub:'kẹt'}],rebuy:[],idle:[]}),customerMap:{},careData:{}};
