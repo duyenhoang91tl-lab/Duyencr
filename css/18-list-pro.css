@@ -1,0 +1,67 @@
+/* ════════════════════════════════════════════════════════════════════
+   18-list-pro.css — LỚP THIẾT KẾ THỐNG NHẤT cho màn "Danh sách KH" (bước 3-4/4 thiết kế lại CRM)
+   Phạm vi: html.ui-pro, chỉ sidebar lọc + #tab-list (thanh lọc #ymf-bar, thanh cột #col-toggle-bar, bảng #main-table).
+   CHỈ đổi hiển thị (màu chữ, cỡ chữ, chiều cao ô, xuống dòng) — KHÔNG đổi hành vi/JS/dữ liệu.
+   Chỉ dùng biến :root nên chế độ tối (10-dark, 99-dark-auto) vẫn đúng. Nạp SAU 17-reports-pro, TRƯỚC 99-dark-auto.
+   Gỡ toàn bộ = bỏ 1 dòng <link> trong index.html.
+   NGUYÊN NHÂN GỐC lộn xộn (đo bằng Chrome thật 1440px): nhãn bộ lọc/tiêu đề cột đều dùng --hint (#9d9a94) cỡ 10px
+   trên nền xanh nhạt → tương phản ~2.4:1 (khó đọc); nhãn "Cột hiển thị" co thành 3 dòng làm thanh cột cao 73px;
+   tiêu đề "Ngày mua gần nhất" bị cắt vì min-width 104px; ô lọc cao 24px lẫn nút 26-30px nên hàng lọc lệch nhau.
+   ════════════════════════════════════════════════════════════════════ */
+
+html.ui-pro{--lp-ctl-h:30px;}
+
+/* ── 1. Sidebar lọc KH: nhãn mục đủ đậm/đủ to để đọc được ── */
+html.ui-pro .sidebar .cs-filter-label,
+html.ui-pro .sidebar .sb-label{
+  color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.04em;
+}
+html.ui-pro .sidebar .sb-label{text-transform:uppercase;padding-top:2px;}
+html.ui-pro .sidebar .fbadge{color:var(--muted);font-size:10.5px;font-weight:600;}
+
+/* ── 2. Thanh lọc đơn theo năm/tháng/ngày/giờ: ô cùng chiều cao, nhãn đọc được, không rớt dòng lẻ ── */
+html.ui-pro #ymf-bar{gap:6px 8px;padding:8px 14px;align-items:center;}
+html.ui-pro #ymf-bar .ymf-label{color:var(--muted);font-size:10.5px;font-weight:700;white-space:nowrap;}
+html.ui-pro #ymf-bar .ymf-sep{color:var(--border-strong);}
+html.ui-pro #ymf-bar select,
+html.ui-pro #ymf-bar input[type=date],
+html.ui-pro #ymf-bar .btn.sm{
+  height:var(--lp-ctl-h);box-sizing:border-box;font-size:12px;
+}
+html.ui-pro #ymf-bar select,
+html.ui-pro #ymf-bar input[type=date]{
+  padding:0 8px;border:1px solid var(--border-md);border-radius:8px;background:var(--surface);color:var(--text);
+}
+html.ui-pro #ymf-bar select:hover,
+html.ui-pro #ymf-bar input[type=date]:hover{border-color:var(--border-strong);}
+html.ui-pro #ymf-bar .btn.sm{display:inline-flex;align-items:center;white-space:nowrap;}
+
+/* ── 3. Thanh "Cột hiển thị": 1 hàng gọn, nhãn không bị bẻ 3 dòng, cuộn ngang mượt ── */
+html.ui-pro #col-toggle-bar{padding:6px 14px;gap:6px;align-items:center;scrollbar-width:thin;}
+html.ui-pro #col-toggle-bar .ymf-label{white-space:nowrap;flex-shrink:0;color:var(--muted);font-size:10.5px;font-weight:700;}
+html.ui-pro #col-toggle-bar .col-toggle-chip{flex-shrink:0;white-space:nowrap;padding:4px 10px;font-size:11.5px;}
+
+/* ── 4. Bảng: tiêu đề cột rõ, đồng cỡ; không cắt chữ; hàng dữ liệu thoáng ── */
+html.ui-pro #main-table thead th{
+  color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.03em;white-space:nowrap;
+  padding-top:10px;padding-bottom:10px;vertical-align:middle;
+}
+html.ui-pro #main-table thead th .th-inner{color:inherit;font-size:inherit;gap:4px;}
+html.ui-pro #main-table thead th .th-filter-icon{color:var(--hint);font-size:9px;}
+html.ui-pro #main-table thead th:hover .th-filter-icon{color:var(--green);}
+/* NGUYÊN NHÂN GỐC tiêu đề bị cắt: css/01-base.css đặt #main-table{table-layout:fixed} + .col-lastpos{width:112px} → với layout fixed
+   độ rộng cột lấy từ `width`, KHÔNG phải min-width (đo Chrome thật: th rộng 112px nhưng nội dung cần 152px). Nên nới `width`. */
+html.ui-pro #main-table th.col-lastpos{width:152px;}
+html.ui-pro #main-table th.col-hang{width:124px;}
+html.ui-pro #main-table th.col-lastact{width:140px;}
+html.ui-pro #main-table th.col-tacdong{width:152px;}
+html.ui-pro #main-table tbody td{vertical-align:middle;}
+html.ui-pro #main-table tbody tr:hover td{background:var(--green-bg);}
+
+/* ── 5. Điện thoại: thanh lọc/cột không đẩy rộng quá màn hình ── */
+@media (max-width:760px){
+  html.ui-pro #ymf-bar{padding:6px 10px;}
+  html.ui-pro #ymf-bar select,
+  html.ui-pro #ymf-bar input[type=date]{max-width:100%;}
+  html.ui-pro #col-toggle-bar{padding:5px 10px;}
+}
