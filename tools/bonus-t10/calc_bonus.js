@@ -8,10 +8,11 @@ const W = process.argv[2] || '.';
 const R = p => fs.readFileSync(path.join(__dirname, '..', '..', p), 'utf8');
 const fn = (src, n) => { const i = src.indexOf('\nfunction ' + n + '('); if (i < 0) throw new Error('khong thay ' + n); return src.slice(i + 1, src.indexOf('\n}\n', i) + 3); };
 const j12 = R('js/12-fn-rendersalesreporttabe.js'), j01 = R('js/01-fn-splitmulti.js'), j05 = R('js/05-fn-saveeditphone.js'), j27 = R('js/27-fn-bonuscore.js'), j62 = R('js/62-sale-channel-periods.js');
-const allOrders = JSON.parse(fs.readFileSync(W + '/orders.json', 'utf8')).filter(o => !o.baoHanh && o.sheet !== 'ĐƠN MP');   // bao hanh + don MP (my pham) bi loai. Nguon 'Facebook / NGUON (...)' KHONG con bi loai (Duyen 2026-11-03: kenh Facebook tinh cho tat ca)
+const allOrders = JSON.parse(fs.readFileSync(W + '/orders.json', 'utf8')).filter(o => !o.baoHanh && o.sheet !== 'ĐƠN MP' && !/\/\s*NGUỒN\s*\(/i.test(o.nguonDon || ''));   // bao hanh + don MP (my pham) + nguon don 'Facebook / NGUON (...)' van bi LOAI nhu cu (Duyen xac nhan 2026-11-03)
 const orders = allOrders;
-// Menh CSKH menbui2002 (chua phan loai On/Off) duoc tinh THEM thuong cho don nguon Facebook theo CT Online chinh thuc; sale khac tinh binh thuong nhu cu.
-const EXTRA_CSKH = 'menbui2002', isFbSrc = o => /^\s*facebook/i.test(o.nguonDon || ''), hasName = (o, n) => String(o.saleBan || '').toLowerCase().split(/[,;\s]+/).indexOf(n) >= 0;
+// CSKH menbui2002 (chua phan loai On/Off) duoc tinh THEM thuong theo CT Online chinh thuc CHI cho don co nguon don ten 'Facebook Pham Thu Hien'; sale khac tinh binh thuong nhu cu.
+const fold = v => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/\s+/g, ' ').trim();
+const EXTRA_CSKH = 'menbui2002', isFbSrc = o => fold(o.nguonDon) === 'facebook pham thu hien', hasName = (o, n) => String(o.saleBan || '').toLowerCase().split(/[,;\s]+/).indexOf(n) >= 0;
 const chRaw = JSON.parse(fs.readFileSync(W + '/channels.json', 'utf8'));
 const base = () => ({ id: '', name: '', dateFrom: '', dateTo: '', audience: { online: true, offline: true }, product: '', requireProduct: '', extraNote: '', exclusionNote: '',
   tier: { enabled: false, rows: [] }, revenue: { enabled: false, scope: 'order', min: '', max: '' }, firstOrder: { enabled: false, amount: '' }, probationDay: { enabled: false, from: '', to: '' }, sources: [], prodRules: { enabled: false, items: [] }, bonusAmount: '' });
@@ -51,7 +52,7 @@ vm.runInContext(j27 + '\n' + fn(j05, 'esc') + fn(j01, 'splitMulti_') + j01.match
   ['_bonusProgramApplies_', '_ddmmyyyyToYmd_', '_daysSinceStart_', '_saleStartDate_', '_bonusProductQty_', '_bonusNamesOfOrder_', '_orderRevenueShares_', '_bonusNormSrc_', '_bonusSourceOk_', '_bonusOrderProductQtys_', '_bonusAggSources_', '_bonusRequireKw_', '_bonusRequireProductOk_', '_computeBonusData_'].map(n => fn(j12, n)).join('\n'), ctx);
 ctx.O = orders;
 const res = JSON.parse(vm.runInContext('JSON.stringify(_computeBonusData_(O))', ctx));
-// Pass 2: chi don nguon Facebook co the cua menbui2002, coi la Online -> thuong "them" cho Men (khong dung vao thuong cua sale o pass 1)
+// Pass 2: chi don nguon 'Facebook Pham Thu Hien' co the cua menbui2002, coi la Online -> thuong "them" cho Men (khong dung vao thuong cua sale o pass 1)
 ctx.O = allOrders.filter(o => isFbSrc(o) && hasName(o, EXTRA_CSKH)); const hadCh = Object.prototype.hasOwnProperty.call(ctx.SALE_CHANNELS, EXTRA_CSKH);
 ctx.SALE_CHANNELS[EXTRA_CSKH] = 'online';
 const res2 = JSON.parse(vm.runInContext('JSON.stringify(_computeBonusData_(O))', ctx));
@@ -60,7 +61,7 @@ const men = res2.bySale.find(x => x.name === EXTRA_CSKH);
 res.extraCskh = { name: EXTRA_CSKH, nOrders: ctx.O.length, total: men ? men.total : 0, items: men ? men.items : [] };
 if (men && !res.bySale.some(x => x.name === EXTRA_CSKH)) { res.bySale.push(men); res.total += men.total; }
 res.nOrders = orders.length;
-console.log('them CSKH', EXTRA_CSKH, '| don Facebook:', ctx.O.length, '| thuong them:', res.extraCskh.total);
+console.log('them CSKH', EXTRA_CSKH, '| don Facebook Pham Thu Hien:', ctx.O.length, '| thuong them:', res.extraCskh.total);
 res.channels = chRaw; res.nOrders = orders.length; res.programs = PROGRAMS.map(p => p.name);
 fs.writeFileSync(W + '/bonus-result.json', JSON.stringify(res));
 console.log('don tinh:', orders.length, '| tong thuong:', res.total, '| sale co thuong:', res.bySale.length, '| don can kiem tay:', res.review.length);
