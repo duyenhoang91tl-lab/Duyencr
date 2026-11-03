@@ -16,6 +16,11 @@ ok(g('an').giaTri === 10e6 && g('an').storeAmt === undefined, 'khach KHONG den /
 ok(g('binh') && g('binh').giaTri === 1e6 && g('binh').cod === 0, 'sale chi co don quay -> them dong moi');
 ok(r.storeTotal === 4e6 && r.storeOrders === 2, 'storeTotal=4tr / 2 luot');
 ok(M([{ name: 'an', giaTri: 5 }], null).rows[0].giaTri === 5 && M(null, null).rows.length === 0, 'khong co du lieu quay -> giu nguyen');
+// 1b) ten khac cua CUNG nguoi (alias): don quay ghi 'Thuydinh1995' = tai khoan thuydinh95 -> gop vao dong thuydinh95, KHONG tach dong rieng
+vm.runInContext("_cfgAliasesOf = function(n){ return String(n).toLowerCase() === 'thuydinh1995' ? ['Thuydinh1995', 'thuydinh95'] : [n]; };", ctx);
+r = M([{ name: 'thuydinh95', orders: 5, giaTri: 859603750 }], { rows: [{ koDen: false, orders: [{ credits: [{ sale: 'Thuydinh1995', amount: 3960000 }] }] }] });
+ok(r.rows.length === 1 && r.rows[0].name === 'thuydinh95' && r.rows[0].giaTri === 859603750 + 3960000, 'Thuydinh1995 (alias) gop vao thuydinh95, khong tach dong');
+vm.runInContext("_cfgAliasesOf = undefined;", ctx);
 // 2) ca thuc T10: so Pos (anh CRM) + 24 dong don quay KT
 const SCREEN = { huyenmaii1990: 973566167, ninhnga99: 947635917, thuydinh95: 859603750, anhtrinh1995: 640341250, thuyha88: 454242500, biichnguyen1993: 441945333, phuongthao2000: 427128250, trangNH2005: 417218000, yenNTH2004: 362280000, anhNP1999: 284332833, dungnguyen1995: 176408667, minhquach1995: 164435500, ninhLTK1984: 149172500, ngocNB2003saleoff: 62232000, haPTN: 31444333, tuoipham1993: 16300000, mainguyen97: 14319000, thanhNP: 10340667 };
 const f = process.argv[2] || '/tmp/store_rows.json';

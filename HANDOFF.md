@@ -11,6 +11,14 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-03 (phiên 11) — Sau deploy: biểu đồ B đã gộp đơn quầy; gộp alias "Thuydinh1995"; xuất Check ngược Base 18:32 CHƯA cho kết luận — ĐÃ PUSH (js, chỉ Ctrl+F5)
+- **Deploy GAS bản sửa cột U ĐÃ THÀNH CÔNG** (workflow deploy-gas, commit a4cca7e, 11:29 UTC = 18:29 VN). File xuất 18:32:52 vẫn "cột −1, 428 ms" y hệt lần 18:28 ⇒ NGHI Cloudflare Worker trả bản cache cũ (báo cáo cache 60s + SWR trả bản cũ trước khi làm mới nền, xem cloudflare/worker.mjs `TTL_SEC`), KHÔNG kết luận được là sửa chưa ăn. **Việc cần làm: xuất lại lần nữa (sau ≥2 phút), nếu vẫn −1 mới là code chưa đủ** (khi đó nghi cột U của `DT TỔNG ` trống ở 400 dòng cuối → xem cuối mục).
+- **Ảnh Báo cáo B 18:33 (đã Ctrl+F5, có gộp đơn quầy):** tổng pie 6.487.907.867; dòng lạ **"Thuydinh1995" 3.960.000đ** = đơn quầy ghi tên khác của thuydinh95 → [x] **ĐÃ PUSH:** `js/63` `_srMergeStoreIntoBySale_` gộp theo `_cfgAliasesOf` vào dòng thuydinh95 (test `tools/test-store-share-b.js` thêm ca alias, qua; `?v=20261103e`).
+- **Đối chiếu CRM (ảnh, đã gộp quầy, gộp alias) − KT, 18 sale:** khớp 0 ở anhtrinh1995, thuyha88, phuongthao2000, anhNP1999, minhquach1995, ngocNB2003saleoff, haPTN, tuoipham1993, mainguyen97, thanhNP. Còn lệch: huyenmaii1990 −4.501.000 (= nửa M46575 chưa vào CRM), ninhnga99 −13.785.400 (4.501.000 M46575 + 9.284.400 khác — nghi đơn quầy M44756 9.300.000 KT tính, CRM chưa), thuydinh95 −735.000, biichnguyen1993 +1.335.000 (M44707 quầy), trangNH2005 +8.032.500, dungnguyen1995 −3.075.000, ninhLTK1984 +525.000, yenNTH2004 −52.200. Tổng CRM 6.487.907.867 vs KT 6.500.163.967 (−12.256.100).
+- **NGUYÊN NHÂN GỐC các lệch còn lại (chưa kiểm từng đơn):** đơn quầy trong Báo cáo L (CRM) ≠ 24 dòng KT thêm tay (số tiền/đơn/người khác nhau). Cần xuất Báo cáo L (cửa hàng) T10 để so từng đơn.
+- **Nếu xuất lại vẫn cột −1:** kiểm cột U của sheet `DT TỔNG ` có mã bộ đếm ở 400 dòng cuối không (hàm dò chỉ nhìn 400 dòng cuối; nếu cột U trống ở đó thì cần dò rộng hơn / quét cả cột).
+- **ĐANG LÀM:** chờ Duyên xuất lại Check ngược Base + gửi Báo cáo L T10. Không đổi gas_v13.js ở phiên này.
+
 ## 2026-11-03 (phiên 10) — TÌM RA & SỬA: Báo cáo B không ghép được đơn Pos với Base vì dò sai cột mã bộ đếm — ĐÃ PUSH (CẦN DEPLOY GAS)
 - **Bằng chứng (file Check ngược Base xuất lại, kỳ T10):** Đơn Pos có ≥2 mã = **1.446**, đã ghép = **0**, Chẩn đoán: **cột mã bộ đếm = −1**, lỗi đọc = không, đọc Base 428 ms (đọc được sheet, chỉ không thấy cột).
 - **NGUYÊN NHÂN GỐC:** mã bộ đếm trên Base nằm ở **cột U** (`DT_COL_BODEM` = 20, ngoài vùng A:T `DT_TONG_WIDTH` = 20) nhưng `_detectBaseCounterCol_` chỉ quét cột 0..19 → luôn −1 → chỉ mục Base rỗng → mọi đơn tính thuần theo Thẻ Pos. (Commit d381555 ngày 15/10 đã biết mã ở cột U nhưng hàm dò này chưa sửa.)

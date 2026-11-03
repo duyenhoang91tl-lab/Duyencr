@@ -146,6 +146,10 @@ function _srMergeStoreIntoBySale_(bySale, storeData) {
         var amt = Number(cr.amount) || 0;
         if (cr.dup || !(amt > 0) || !cr.sale) return;
         var k = String(cr.sale).toLowerCase(), i = idx[k];
+        if (i === undefined && typeof _cfgAliasesOf === 'function') {   // tên khác của CÙNG người (vd đơn quầy ghi 'Thuydinh1995' = tài khoản thuydinh95) → gộp vào dòng đã có, không tách dòng riêng
+          var als = _cfgAliasesOf(cr.sale) || [];
+          for (var ai = 0; ai < als.length && i === undefined; ai++) i = idx[String(als[ai]).toLowerCase()];
+        }
         if (i === undefined) { out.push({ name: cr.sale, orders: 0, giaTri: 0, cod: 0 }); i = idx[k] = out.length - 1; }
         out[i].giaTri = (out[i].giaTri || 0) + amt; out[i].orders = (out[i].orders || 0) + 1;
         out[i].storeAmt = (out[i].storeAmt || 0) + amt; out[i].storeOrders = (out[i].storeOrders || 0) + 1;
