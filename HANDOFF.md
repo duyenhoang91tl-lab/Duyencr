@@ -11,6 +11,14 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-03 (phiên 6) — Thưởng T10: kênh Facebook tính cho TẤT CẢ + tính THÊM cho CSKH menbui2002 (Duyên yêu cầu) — XONG bước 1/3
+- **Yêu cầu (Duyên đã chốt):** sale vẫn tính bình thường kể cả đơn nguồn Facebook; ngoài đội sale, **menbui2002 (CSKH, chưa phân loại On/Off) được tính THÊM thưởng theo CT Online chính thức nhưng CHỈ cho đơn nguồn Facebook**. Gửi Duyên file Excel thưởng của Mến.
+- **NGUYÊN NHÂN GỐC:** (a) phiên "đêm 3" đã loại nguồn "Facebook / NGUỒN (...)" khỏi `calc_bonus.js` → trái ý Duyên (kênh Facebook phải tính cho mọi người). (b) Mến chưa phân loại On/Off nên `_bonusProgramApplies_` (js/12) trả false mọi CT có audience → Mến luôn 0đ.
+- [x] **Bước 1/3 ĐÃ PUSH:** `tools/bonus-t10/calc_bonus.js` — bỏ filter loại nguồn Facebook (vẫn loại bảo hành + đơn MP); thêm pass 2: chỉ đơn nguồn bắt đầu bằng "Facebook" có thẻ menbui2002, coi Mến là online → `bonus-result.json` có `extraCskh {name,nOrders,total,items}` và Mến được thêm vào `bySale`. Test mô phỏng Node (3 đơn): Mến chỉ nhận 30.000đ từ đơn FB 22tr/3 SP, đơn Zalo của Mến bị bỏ, saleA đơn FB 16tr vẫn 30.000đ. Chỉ là script tool, KHÔNG cần deploy GAS / reload extension.
+- **Lưu ý:** doanh số ngày/số đơn ngày của Mến chỉ cộng đơn Facebook của Mến (không cộng đơn nguồn khác). Tiền chia đều theo số sale trên thẻ như cũ.
+- **ĐANG LÀM:** chờ Duyên gửi file đối soát `DoiSoat_...xlsx` T10 (chưa có trong phiên này) để chạy ra file Excel thưởng của Mến.
+- **Việc kế tiếp (phiên khác làm được ngay):** (2) chạy quy trình extract_orders.py → calc_bonus.js → build_into_source.py → recalc.py → fix_filters.py trên file Duyên gửi, trích riêng sheet thưởng Mến (KHÔNG commit Excel). (3) Đưa quy tắc vào CRM web: thêm cho CT thưởng trường kiểu `extraSales:[{name, sources}]` trong `_bpNewProgram` + `_bonusProgramApplies_` (js/12, nhận thêm nguồn đơn) và 2 chỗ gọi ở js/12 dòng ~216 và ~267; sau khi sửa phải grep mọi nơi gọi, test, nhắc Duyên reload web (Ctrl+F5). Nếu đụng gas_v13.js (khối BONUS CORE) → đồng bộ `gas-code-v9` trong index.html + nhắc deploy GAS.
+
 ## 2026-11-03 (phiên 7) — Thiết kế lại giao diện chuyên nghiệp, bắt đầu từ tab Báo cáo doanh số A–N (Duyên yêu cầu) — ĐANG LÀM 1/4
 - **Yêu cầu Duyên:** "thiết kế lại CRM như CRM chuyên nghiệp, mọi thứ còn hỗn độn". Duyên chọn làm TRƯỚC: các tab Báo cáo doanh số (A–L). Sau đó: khung chung (menu trái/thanh trên) → màn tra cứu & chăm sóc KH.
 - **Cách làm (không viết lại từ đầu):** thêm 1 lớp CSS `css/17-reports-pro.css`, phạm vi CHỈ `#salesreport-wrap`, chỉ dùng biến `:root` (chế độ tối vẫn đúng), nạp trước `99-dark-auto.css`. Gỡ = bỏ 1 dòng `<link>`. **NGUYÊN NHÂN GỐC hỗn độn:** 19 file CSS chồng nhau + mỗi báo cáo ghi style inline riêng (padding/viền/cỡ chữ lệch nhau); ô chọn báo cáo cũng là style inline nên lớp mới dùng `!important` cho đúng ô đó.
