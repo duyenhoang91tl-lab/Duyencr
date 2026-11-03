@@ -21,6 +21,14 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 - [ ] **BƯỚC 4:** màn tra cứu & chăm sóc KH (tab Danh sách KH, thẻ khách, form CS).
 - **Lưu ý:** tài liệu Project (Hd1/Hd2) đã cũ: index.html nay chỉ ~1.850 dòng, code tách ra `css/` + `js/` (xem `js/INDEX.md`, `docs/crm-kb/`); khối `gas-code-v9` và quy tắc deploy GAS thủ công không còn áp dụng theo `docs/crm-kb/01`.
 
+## 2026-11-03 (phiên 7) — Vì sao CRM Báo cáo B (biểu đồ tròn Theo Sale) lệch file KT Huyền — ĐÃ TÌM RA NGUYÊN NHÂN, chờ Duyên quyết định hướng sửa
+- **Câu hỏi Duyên:** biểu đồ tròn phải là full doanh thu của sale, chỉ "tỷ lệ" mới tính theo kênh? (ảnh Báo cáo B 01–31/10: 1.008 đơn, tổng 6.497.591.000, pie 6.432.946.667).
+- **NGUYÊN NHÂN GỐC (khớp từng đồng, 18 sale On/Off):** KT 6.500.163.967 − CRM 6.432.946.667 = 67.217.300 = (A) **58.215.300** phần SALE 30% của 24 đơn quầy KT thêm ở cuối sheet ĐƠN PT (ngày/trạng thái trống; Pos KHÔNG có nên Báo cáo B không có — phần này thuộc Báo cáo L/E) + (B) **9.002.000** đơn Pos **M46575** (24/10, huyenmaii1990+ninhnga99) CHƯA vào CRM (bảng THEO DÕI ĐƠN CHIA SALE). KT ghi 5 đơn "chưa vào CRM" nhưng 4 đơn kia CRM đã có (không lệch). Pie chỉ có 18 sale vì đang lọc sale (đúng theo ghi chú ngay dưới thẻ).
+- [x] **ĐÃ PUSH:** `tools/bonus-t10/recon_crm_vs_kt.py <file Huyền> <ra.xlsx>` → `DOI_CHIEU_CRM_vs_KT_T10.xlsx` (đối chiếu từng sale, cột chênh = 0; số CRM nhập tay từ ảnh, ô vàng). KHÔNG commit file Excel. KHÔNG sửa gas/js (không cần deploy / Ctrl+F5).
+- **CHƯA SỬA CODE — cần Duyên chọn:** (1) giữ Báo cáo B = chỉ Pos, nhập M46575 vào THEO DÕI ĐƠN CHIA SALE; hoặc (2) thêm vào Báo cáo B pie dòng/đoạn "đơn quầy 30%" lấy từ Báo cáo L (`buildStoreCaseReport_`) để tổng khớp KT. Chưa lý giải: thẻ ảnh ghi 1.008 đơn, dữ liệu file cho ~1.006 (giá trị khớp tuyệt đối, chỉ lệch cách đếm đơn).
+- **Đề xuất cập nhật KB (`docs/crm-kb/05`):** "Báo cáo B = chỉ Pos; đơn quầy 30% chỉ ở L/E → so với KT phải tách 2 nhóm A/B".
+- **ĐANG LÀM: không có việc dở.**
+
 ## 2026-11-03 (phiên 6) — File đối soát CHUẨN gửi kế toán (thưởng đã sửa Ngọc + sheet hoa hồng phiên 5) — XONG
 - **Quy trình chạy lại đủ:** extract_orders.py → calc_bonus.js → build_into_source.py → recalc.py → fix_filters.py → calc_commission.js → build_commission_sheet.py → recalc.py → fix_filters.py. (build_commission_sheet đọc cột **H** = TỔNG THƯỞNG của THUONG_Tong_theo_sale — đừng đổi thứ tự cột.)
 - [x] File cuối 14 sheet, recalc 0 lỗi (9.229 CT): TONG_THUONG_HOA_HONG_SALE (đầu file) + THUONG_Tong_theo_sale + THUONG_Chi_tiet + sheet gốc giữ nguyên. Thưởng 18 sale = **5.946.671đ** (gồm Ngọc thử việc 190.000đ); thực nhận 18 sale = **73.768.867đ** (hoa hồng 68.996.076 + thưởng 5.946.671 − trừ huỷ T09 1.173.880). Số cũ 72.223.869 / thưởng 4.401.673 của phiên 5 là trước khi sửa Ngọc + loại đơn MP/nguồn.
