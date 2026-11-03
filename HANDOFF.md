@@ -11,6 +11,10 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-03 (phiên 8) — Tối ưu màn hình Danh sách KH: css/18-list-pro.css — XONG 1/2 (Duyên: "tối ưu lại màn hình hiển thị của crm")
+- [x] **ĐÃ PUSH:** lớp CSS `css/18-list-pro.css` (phạm vi `html.ui-pro`, chỉ sidebar lọc KH + `#tab-list`; chỉ đổi hiển thị, KHÔNG đổi js/gas/extension → chỉ cần Ctrl+F5). Gỡ = bỏ 1 dòng `<link>` trong index.html. **NGUYÊN NHÂN GỐC (đo Chrome thật 1440px):** nhãn lọc/tiêu đề cột dùng `--hint` #9d9a94 cỡ 10px (tương phản ~2.4:1); nhãn "Cột hiển thị" bị bẻ 3 dòng làm thanh cột cao 73px (nay 41px); `#main-table{table-layout:fixed}` nên cột lấy `width` chứ không phải `min-width` → tiêu đề "Ngày mua gần nhất"/"Phân hạng KH" bị cắt.
+- [ ] **Làm tiếp:** Duyên xem thực tế (có dữ liệu) và gửi ảnh chỗ còn lệch: hàng dữ liệu bảng, thẻ khách/form CS, thanh `.toolbar` trên cùng; khung chung (css/05-sidenav, 13-shell) = bước 3 của phiên 7. Công cụ render thử: Playwright + `/usr/bin/google-chrome`, chặn mạng ngoài, giả `ome_sess_token`/`ome_auth` + `fetch` trả `{}`, đặt `localStorage.ome_shell_col='0'` để ghim menu.
+
 ## 2026-11-03 (phiên 7) — Thiết kế lại giao diện chuyên nghiệp, bắt đầu từ tab Báo cáo doanh số A–N (Duyên yêu cầu) — ĐANG LÀM 1/4
 - **Yêu cầu Duyên:** "thiết kế lại CRM như CRM chuyên nghiệp, mọi thứ còn hỗn độn". Duyên chọn làm TRƯỚC: các tab Báo cáo doanh số (A–L). Sau đó: khung chung (menu trái/thanh trên) → màn tra cứu & chăm sóc KH.
 - **Cách làm (không viết lại từ đầu):** thêm 1 lớp CSS `css/17-reports-pro.css`, phạm vi CHỈ `#salesreport-wrap`, chỉ dùng biến `:root` (chế độ tối vẫn đúng), nạp trước `99-dark-auto.css`. Gỡ = bỏ 1 dòng `<link>`. **NGUYÊN NHÂN GỐC hỗn độn:** 19 file CSS chồng nhau + mỗi báo cáo ghi style inline riêng (padding/viền/cỡ chữ lệch nhau); ô chọn báo cáo cũng là style inline nên lớp mới dùng `!important` cho đúng ô đó.
