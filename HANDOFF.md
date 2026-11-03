@@ -11,13 +11,15 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
-## 2026-11-03 (phiên 8) — Phạt thi đua T10: thêm Mến Bùi (menbui2002) vào nhóm FB chính (Duyên yêu cầu) — XONG bước 1/2, CHỜ cam kết của Mến
-- **Yêu cầu:** bản phạt T10 còn tính thiếu Mến Bùi, Mến cũng thuộc kênh FB chính → tính lại và gửi lại bản phạt T10.
-- **NGUYÊN NHÂN GỐC:** `Phat_tung_nguoi` (bảng tính) và `THIDUA_CONFIGS['2026-10']` (js/64-thidua.js) chỉ có 18 sale, thiếu `menbui2002` dù Du_lieu có 83 dòng của Mến (DT chia 515.298.333đ, trong đó kênh FB chính 99.530.833đ). Cam kết của Mến KHÔNG có trong file `Phat_thi_dua_T10_2026.xlsx` lẫn `đối_soát_tháng_10-huyền.xlsx`.
-- [x] **Bước 1/2 XONG:** bảng tính `Phat_thi_dua_T10_2026_v2.xlsx` (gửi Duyên trong chat, KHÔNG commit vì có tiền phạt từng người): thêm dòng Mến (K=1, đội Online), sửa dải công thức K4:K22/J4:J22/N24. Ô cam kết E22 để TRỐNG (tô vàng) → Mến hiện "CHƯA CÓ CAM KẾT", chưa tính phạt phần 8 tỷ; nhập cam kết là tự tính lại. Kết quả hiện tại: tổng phạt vẫn 1.480.000đ (FB 280.000 + phần còn lại 1.200.000), chỉ đổi cách chia: phạt FB chia 6 đầu người (5 sale FB chính + Duyên) = 46.667đ/người (trước 5 đầu người = 56.000đ). Nếu Mến KHÔNG đạt cam kết: phần còn lại chia 18 đầu = 66.667đ/người (hiện 17 đầu = 70.588đ).
-- **ĐANG LÀM:** chờ Duyên báo cam kết T10 của Mến.
-- **Việc kế tiếp:** (2) có cam kết → nhập vào ô E22 của bảng tính; thêm `{ name: 'Bùi Mến', user: 'menbui2002', team: 'Online', commit: <số>, fbMain: true }` vào `THIDUA_CONFIGS['2026-10']` (js/64-thidua.js ~dòng 21) rồi chạy `node tools/test-thidua.js` (kỳ vọng tổng phạt vẫn 1.480.000đ, chỉ đổi cách chia), Ctrl+F5 web. Xác nhận lại tên nguồn đơn kênh FB chính (Fb Phạm Thu Hiền) khớp với đơn của Mến. Lưu ý: sale khác có DT nhưng không trong bảng phạt (kieuHT1997, hongnguyen1995, trangbeCSKH1995...) — hỏi Duyên có cần thêm không.
-- Không sửa gas_v13.js, extension → không cần deploy GAS, không cần reload extension.
+## 2026-11-03 (phiên 8) — Phạt thi đua T10: thêm Mến Bùi (menbui2002), CHỈ tính kênh FB chính (Duyên chốt) — XONG 2/2
+- **Yêu cầu / chốt của Duyên:** bản phạt T10 thiếu Mến Bùi; Mến chỉ tính trên kênh FB chính (không có cam kết cá nhân, không dính phạt phần 8 tỷ).
+- **NGUYÊN NHÂN GỐC:** `Phat_tung_nguoi` và `THIDUA_CONFIGS['2026-10']` chỉ có 18 sale, thiếu `menbui2002`. Lần đầu mình hiểu nhầm Mến cũng có cam kết riêng và hỏi cam kết — sai, Duyên đã sửa lại ý.
+- [x] **Bước 1/2 XONG:** bảng tính `Phat_thi_dua_T10_2026_v2.xlsx` (gửi Duyên trong chat, KHÔNG commit vì có tiền phạt từng người): dòng Mến K=1, "Chỉ tính kênh FB chính", phạt phần 8 tỷ = 0. Kết quả: tổng phạt vẫn 1.480.000đ (FB 280.000 + còn lại 1.200.000); FB chia 6 đầu người (4 sale + Mến + Duyên) = 46.667đ/người (trước 56.000đ); phần còn lại vẫn 17 đầu người = 70.588đ. Mến tổng 46.667đ.
+- [x] **Bước 2/2 XONG:** `js/64-thidua.js` — thêm cờ `fbOnly` cho dòng cấu hình (không cam kết, `ok:true` nên không vào nhóm chia phạt phần còn lại, vẫn vào nhóm `fbMain`); thêm Mến vào `THIDUA_CONFIGS['2026-10']`; bảng hiển thị "—" ở cột cam kết/%/còn thiếu và ghi "Chỉ tính kênh FB chính". `tools/test-thidua.js` đổi kỳ vọng: T10 nFb 6 (58.333 ở ca nhỏ), thêm kiểm Mến penRest=0; chạy `node tools/test-thidua.js` → TẤT CẢ ĐẠT. `index.html` js/64 `?v=20261103b`.
+- **Cần reload:** Ctrl+F5 web (đổi js/64 + index.html). KHÔNG sửa gas_v13.js → không cần deploy GAS, không cần reload extension.
+- **Chưa kiểm:** đối chiếu bằng orders.json thật (file `tools/bonus-t10/orders.json` không có trong repo) — con số đã đối chiếu qua bảng tính. Doanh thu phần còn lại trong bảng tính vẫn gồm đơn ngoài FB của Mến (6,83 tỷ = 85,4%); nếu loại ra thì 80,2% vẫn cùng mức phạt 0,015% nên không đổi tiền.
+- **ĐANG LÀM:** không có việc dở.
+- **Việc kế tiếp:** hỏi Duyên kieuHT1997, hongnguyen1995, trangbeCSKH1995... (có doanh thu nhưng không trong bảng phạt) có cần tính phạt không; nút "Xuất Excel" mục thi đua (xem phiên 7).
 
 ## 2026-11-03 (phiên 7) — THI ĐUA THÁNG (T10 + T11): báo cáo thưởng/phạt từng Sale trong Báo cáo E (Duyên yêu cầu) — XONG bước 1/2 (chờ Duyên xác nhận cấu trúc T11)
 - **Yêu cầu:** làm báo cáo thi đua để Sale nắm được thưởng/phạt; T11 làm tương tự T10 (file `Thi đua tháng 11.docx`). Quy tắc T10 Duyên đã chốt: kênh FB chính "Fb Phạm Thu Hiền" có KPI riêng, phần còn lại = KPI tổng − KPI FB; phạt = tỷ lệ theo % hoàn thành × KPI từng phần; phạt FB chia đầu người cho sale FB chính + Duyên; phạt phần còn lại chia cho sale CHƯA đạt 100% cam kết + Duyên; Duyên không có doanh thu chỉ chia phạt.

@@ -18,7 +18,8 @@ var THIDUA_CONFIGS = {
     { name: 'Nguyễn Thị Bích', user: 'biichnguyen1993', team: 'Online', commit: 700e6, fbMain: true }, { name: 'Nguyễn Thị Tuyết Mai', user: 'mainguyen97', team: 'Online', commit: 400e6 },
     { name: 'Mai Thị Thu Huyền', user: 'huyenmaii1990', team: 'Online', commit: 1000e6, fbMain: true }, { name: 'Nguyễn Thị Thùy Dung', user: 'dungnguyen1995', team: 'Online', commit: 400e6, fbMain: true },
     { name: 'Tạ Thị Thúy Hà', user: 'thuyha88', team: 'Online', commit: 700e6 }, { name: 'Minh Quách', user: 'minhquach1995', team: 'Online', commit: 300e6 },
-    { name: 'Phạm Thị Hoàng Tươi', user: 'tuoipham1993', team: 'Online', commit: 500e6 }] },
+    { name: 'Phạm Thị Hoàng Tươi', user: 'tuoipham1993', team: 'Online', commit: 500e6 },
+    { name: 'Bùi Mến', user: 'menbui2002', team: 'Online', fbMain: true, fbOnly: true }] },
   '2026-11': { label: 'Tháng 11/2026', kpiTotal: 8500000000, kpiFb: 1500000000, duyenHeads: 1, commitments: [
     { name: 'Trịnh Phương Anh', user: 'anhtrinh1995', team: 'Văn phòng', commit: 650e6 }, { name: 'Đinh Thị Thu Thủy', user: 'thuydinh95', team: 'Văn phòng', commit: 900e6 },
     { name: 'Ninh Thị Ngà', user: 'ninhnga99', team: 'Văn phòng', commit: 1050e6, fbMain: true }, { name: 'Nguyễn Thị Hải Yến', user: 'yenNTH2004', team: 'Văn phòng', commit: 500e6 },
@@ -53,7 +54,7 @@ function _computeThiDua_(orders, ym) {
   var fb = _tdPart_(cfg.kpiFb, revFb), rest = _tdPart_(cfg.kpiTotal - cfg.kpiFb, revRest), heads = cfg.duyenHeads || 0;
   var rows = cfg.commitments.map(function (c) {
     var u = byUser[_tdFold_(c.user)] || { total: 0, fb: 0 }, pct = c.commit > 0 ? u.total / c.commit : 0;
-    return { name: c.name, user: c.user, team: c.team, fbMain: !!c.fbMain, commit: c.commit, rev: Math.round(u.total), revFb: Math.round(u.fb), pct: pct, ok: pct >= 1, gap: Math.max(0, Math.round(c.commit - u.total)), penFb: 0, penRest: 0, total: 0 };
+    return { name: c.name, user: c.user, team: c.team, fbMain: !!c.fbMain, fbOnly: !!c.fbOnly, commit: c.commit || 0, rev: Math.round(u.total), revFb: Math.round(u.fb), pct: pct, ok: c.fbOnly ? true : pct >= 1, gap: c.fbOnly ? 0 : Math.max(0, Math.round(c.commit - u.total)), penFb: 0, penRest: 0, total: 0 };
   });
   var nFb = rows.filter(function (r) { return r.fbMain; }).length + heads, nRest = rows.filter(function (r) { return !r.ok; }).length + heads;
   var perFb = nFb ? fb.penalty / nFb : 0, perRest = nRest ? rest.penalty / nRest : 0;
@@ -77,7 +78,7 @@ function _srThiDuaSectionHtml_(d) {
     _tdPartHtml_('Phần còn lại (bỏ kênh FB chính)', td.rest, td.nRest, td.perRest, 'Chia đều: sale chưa đạt cam kết + Duyên (Duyên không có doanh thu, chỉ chia phạt)') + '</div>';
   h += '<table class="dash-table"><thead><tr><th>Sale</th><th style="text-align:right">Cam kết</th><th style="text-align:right">Doanh thu</th><th style="text-align:right">% đạt</th><th style="text-align:right">Còn thiếu</th><th>Kết quả</th><th style="text-align:right">Phạt kênh FB</th><th style="text-align:right">Phạt phần còn lại</th><th style="text-align:right">Tổng phạt</th></tr></thead><tbody>';
   td.rows.forEach(function (r) {
-    h += '<tr><td>' + esc(r.name) + (r.fbMain ? ' <span style="font-size:10px;color:var(--muted)">(FB chính)</span>' : '') + '</td><td style="text-align:right">' + _srMoney(r.commit) + '</td><td style="text-align:right">' + _srMoney(r.rev) + '</td><td style="text-align:right">' + (Math.round(r.pct * 1000) / 10) + '%</td><td style="text-align:right">' + (r.gap ? _srMoney(r.gap) : '—') + '</td><td style="color:' + (r.ok ? 'var(--green)' : 'var(--red)') + '">' + (r.ok ? 'Đạt — không phạt' : 'Chưa đạt') + '</td><td style="text-align:right">' + (r.penFb ? _srMoney(r.penFb) : '—') + '</td><td style="text-align:right">' + (r.penRest ? _srMoney(r.penRest) : '—') + '</td><td style="text-align:right"><b>' + (r.total ? _srMoney(r.total) : '—') + '</b></td></tr>';
+    h += '<tr><td>' + esc(r.name) + (r.fbMain ? ' <span style="font-size:10px;color:var(--muted)">(FB chính)</span>' : '') + '</td><td style="text-align:right">' + (r.fbOnly ? '—' : _srMoney(r.commit)) + '</td><td style="text-align:right">' + _srMoney(r.rev) + '</td><td style="text-align:right">' + (r.fbOnly ? '—' : (Math.round(r.pct * 1000) / 10) + '%') + '</td><td style="text-align:right">' + (r.gap ? _srMoney(r.gap) : '—') + '</td><td style="color:' + (r.fbOnly ? 'var(--muted)' : r.ok ? 'var(--green)' : 'var(--red)') + '">' + (r.fbOnly ? 'Chỉ tính kênh FB chính' : r.ok ? 'Đạt — không phạt' : 'Chưa đạt') + '</td><td style="text-align:right">' + (r.penFb ? _srMoney(r.penFb) : '—') + '</td><td style="text-align:right">' + (r.penRest ? _srMoney(r.penRest) : '—') + '</td><td style="text-align:right"><b>' + (r.total ? _srMoney(r.total) : '—') + '</b></td></tr>';
   });
   h += '<tr><td>Duyên</td><td colspan="5" style="color:var(--muted)">Không có doanh thu — chỉ chia phạt</td><td style="text-align:right">' + _srMoney(td.duyen.penFb) + '</td><td style="text-align:right">' + _srMoney(td.duyen.penRest) + '</td><td style="text-align:right"><b>' + _srMoney(td.duyen.total) + '</b></td></tr>';
   h += '<tr style="font-weight:700"><td>Tổng</td><td colspan="5"></td><td style="text-align:right">' + _srMoney(td.totals.penFb) + '</td><td style="text-align:right">' + _srMoney(td.totals.penRest) + '</td><td style="text-align:right">' + _srMoney(td.totals.total) + '</td></tr></tbody></table>';
