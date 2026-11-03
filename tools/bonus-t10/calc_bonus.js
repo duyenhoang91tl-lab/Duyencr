@@ -12,7 +12,7 @@ const allOrders = JSON.parse(fs.readFileSync(W + '/orders.json', 'utf8')).filter
 const orders = allOrders;
 // CSKH menbui2002 (chua phan loai On/Off) duoc tinh THEM thuong theo CT Online chinh thuc CHI cho don co nguon don ten 'Facebook Pham Thu Hien'; sale khac tinh binh thuong nhu cu.
 const fold = v => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/\s+/g, ' ').trim();
-const EXTRA_CSKH = 'menbui2002', isFbSrc = o => fold(o.nguonDon) === 'facebook pham thu hien', hasName = (o, n) => String(o.saleBan || '').toLowerCase().split(/[,;\s]+/).indexOf(n) >= 0;
+const EXTRA_CSKH = 'menbui2002', isFbSrc = o => ['facebook pham thu hien', 'fb pham thu hien'].indexOf(fold(o.nguonDon)) >= 0, hasName = (o, n) => String(o.saleBan || '').toLowerCase().split(/[,;\s]+/).indexOf(n) >= 0;
 const chRaw = JSON.parse(fs.readFileSync(W + '/channels.json', 'utf8'));
 const base = () => ({ id: '', name: '', dateFrom: '', dateTo: '', audience: { online: true, offline: true }, product: '', requireProduct: '', extraNote: '', exclusionNote: '',
   tier: { enabled: false, rows: [] }, revenue: { enabled: false, scope: 'order', min: '', max: '' }, firstOrder: { enabled: false, amount: '' }, probationDay: { enabled: false, from: '', to: '' }, sources: [], prodRules: { enabled: false, items: [] }, bonusAmount: '' });
