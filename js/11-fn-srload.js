@@ -109,12 +109,17 @@ async function _srLoad(){
       var rGq = _pkQuickRange(_srState.gDateQuick);
       if (rGq){ _srState.gDateFrom = rGq.from; _srState.gDateTo = rGq.to; }
     }
+    // THUONG tinh theo DON GOC + NGAY LEN DON TREN BASE (co don Pos): keo Pos den hon (_srGPosTo_) roi loc theo baseNgayTao trong khoang loc (js/12 _srGFilterByBaseDate_)
     var dPosG = await _srFetch('salesReportB', {
-      dateFrom: _srState.gDateFrom, dateTo: _srState.gDateTo,
+      dateFrom: _srState.gDateFrom, dateTo: _srGPosTo_(_srState.gDateTo),
       sale: (_srState.gSale||[]).join(',')
     });
     _srRegisterIdentity_(dPosG);
     if (dPosG && dPosG.orders) dPosG.orders = dPosG.orders.map(function(o){ return Object.assign({}, o, { saleBan: (o.saleBanValid !== undefined ? o.saleBanValid : o.theSale), giaTriDon: o.giaTriSauGiam, ngayTao: o.ngayTaoDon }); });
+    if (dPosG && dPosG.orders){
+      var flG = _srGFilterByBaseDate_(dPosG.orders, _srState.gDateFrom, _srState.gDateTo);
+      dPosG.orders = flG.orders; dPosG.baseBasis = flG.info;   // baseBasis: ghi chu cach loc de hien tren bao cao
+    }
     _srState.dataG = dPosG;
   }
   _srState.loading = false;
