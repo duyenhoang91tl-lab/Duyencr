@@ -195,6 +195,7 @@ function _reconIndexRows_(info, groups, meta, B, warnings){
     ['Bộ lọc (Báo cáo B đang xem)', (info.filters && info.filters.length) ? info.filters.join(' | ') : '(không lọc thêm)'], [],
     ['CÁCH ĐỌC FILE'],
     ['• Cả 5 báo cáo dùng CÙNG khoảng ngày + bộ lọc của Báo cáo B lúc bấm nút. B, N, E, G tính từ cùng danh sách đơn Pos; L (khách qua cửa hàng) tải riêng từ trang tính cửa hàng cùng khoảng ngày.'],
+    ['• Nguồn số liệu: B, N, E, G lấy từ dữ liệu Báo cáo B ở lần bấm "Lọc" GẦN NHẤT (không đọc lại sheet khi xuất); L được tải MỚI từ trang tính cửa hàng ngay lúc bấm nút. Muốn số mới nhất: bấm "Lọc" lại rồi xuất.'],
     ['• Tên sheet có tiền tố theo báo cáo: "B …", "E …", "G …", "L …", "N …". Mỗi sheet giống file xuất lẻ của chính báo cáo đó (E chưa từng có file xuất lẻ).'],
     ['• Số của E (hoa hồng) và G (thưởng) tính theo CẤU HÌNH HIỆN TẠI (ngưỡng, % hoa hồng, chương trình thưởng) — đổi cấu hình thì số đổi theo. Cột có công thức (SUMIF / SUM / ROUND) tự tính lại khi sửa dữ liệu.'],
     ['• Các số trong sheet "Đối chiếu chéo" bên dưới là để soát nhanh B ↔ E ↔ G ↔ N: kỳ vọng chênh ≈ 0 (sai số < ' + tol + 'đ) trừ dòng ghi "tham khảo".'], []];
@@ -271,4 +272,44 @@ function _reconBuildWorkbook_(plan){
   var wb = XLSX.utils.book_new(), used = {};
   plan.items.forEach(function(it){ XLSX.utils.book_append_sheet(wb, _reconWs_(it), _reconSafeSheetName_(it.name, used)); });
   return wb;
+}
+
+// ── Nút "📗 Excel đối soát (B+E+G+L+N)" ở menu Tác vụ của Báo cáo B ──────────────────────────────────────────────────────────
+// Chỉ hiện cho người xem được CẢ E, G, L, N (admin luôn được): file gộp có hoa hồng/thưởng nên không mở cho người không có quyền xem các báo cáo đó.
+function _reconAllowed_(){
+  if (typeof _srIsAdmin === 'function' && _srIsAdmin()) return true;
+  if (typeof _srItems_ !== 'function') return false;
+  var items = _srItems_(), need = ['E', 'G', 'L', 'N'];
+  return need.every(function(code){ var it = items.filter(function(x){ return x[0] === code; })[0]; return !!it && !it[2]; });
+}
+var _reconBusy_ = false;
+async function exportReconAll_(){
+  if (_reconBusy_){ toast('Đang tải dữ liệu cho file đối soát — chờ xong rồi bấm lại.'); return; }
+  var dB = _srState.dataB;
+  if (!dB || !dB.orders){ alert('Chưa có dữ liệu Báo cáo B — bấm "Lọc" trước rồi xuất lại.'); return; }
+  if (typeof XLSX === 'undefined'){ alert('Thư viện xuất Excel chưa tải xong — thử lại sau vài giây.'); return; }
+  if (!_reconAllowed_()){ alert('Bạn chưa có quyền xem đủ Báo cáo E, G, L, N nên không xuất được file gộp.'); return; }
+  _reconBusy_ = true;
+  try {
+    // L (khách qua cửa hàng) cùng khoảng ngày + Sale đang lọc ở B. Lỗi/thiếu quyền KHÔNG chặn file: L thành sheet báo + cảnh báo ở Mục lục.
+    toast('⏳ Đang tải Báo cáo L (khách qua cửa hàng) cho file đối soát…');
+    var dL = null, lErr = '';
+    try {
+      dL = await _srFetch('storeCaseReport', { dateFrom: _srState.dateFrom, dateTo: _srState.dateTo, fresh: '1', sale: (_srState.bSale || []).join(',') });
+      if (!dL) lErr = _srState.lastFetchError || 'không có phản hồi';
+    } catch (eL){ lErr = (eL && eL.message) || String(eL); }
+    var info = { dateFrom: _srState.dateFrom, dateTo: _srState.dateTo, filters: (typeof _srBFilterDesc_ === 'function') ? _srBFilterDesc_() : [], at: new Date().toLocaleString('vi-VN'),
+      ymd: (typeof _ymd === 'function') ? _ymd(new Date()) : '', user: (typeof currentUser !== 'undefined' && currentUser && currentUser.name) || '', admin: (typeof _srIsAdmin === 'function') && _srIsAdmin() };
+    var plan = _reconCollect_(dB, dL || (lErr ? { ok: false, error: lErr } : null), info);
+    var wb = _reconBuildWorkbook_(plan);
+    XLSX.writeFile(wb, 'ExcelDoiSoat_B-E-G-L-N_' + (_srState.dateFrom || 'tu-dau') + '_' + (_srState.dateTo || 'den-nay') + '.xlsx');
+    var bad = plan.checks.filter(function(c){ return c.ok === false; });
+    toast('📗 Đã xuất Excel đối soát: ' + plan.items.length + ' sheet' + (plan.warnings.length ? ' · ⚠ ' + plan.warnings.length + ' cảnh báo' : '') + (bad.length ? ' · ⚠ ' + bad.length + ' mục lệch' : ' · đối chiếu chéo ✅ khớp'));
+    if (plan.warnings.length || bad.length){
+      alert('File đã tải về, nhưng có điều cần xem (chi tiết ở sheet "Mục lục"):\n\n' + plan.warnings.map(function(w){ return '• ' + w; }).concat(bad.map(function(c){ return '• Lệch ' + c.diff + 'đ: ' + c.name + ' (' + c.code + ')'; })).join('\n') +
+        (bad.length ? '\n\nNếu bạn vừa đổi bộ lọc (Sale/Team/nguồn…) mà CHƯA bấm "Lọc" lại thì số liệu và bộ lọc ghi trong file không khớp nhau — bấm "Lọc" rồi xuất lại.' : ''));
+    }
+  } catch (e){
+    alert('Không xuất được Excel đối soát: ' + ((e && e.message) || e));
+  } finally { _reconBusy_ = false; }
 }

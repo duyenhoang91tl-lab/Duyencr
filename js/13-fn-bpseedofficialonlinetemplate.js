@@ -1097,6 +1097,7 @@ function _srbSubCfg_(){
   function t(label, js, title, id){ c.tasks.push('<div'+(id?' id="'+id+'"':'')+(title?' title="'+esc(title)+'"':'')+' onclick="closeGearMenus();'+js+'">'+label+'</div>'); }
   if (sub === 'A' || sub === 'B'){
     t('📊 Xuất Excel', 'exportSalesReport()');
+    if (sub === 'B' && typeof _reconAllowed_ === 'function' && _reconAllowed_()) t('<b>📗 Excel đối soát (B+E+G+L+N) — 1 file</b>', 'exportReconAll_()', 'Tải 1 file Excel duy nhất gồm Báo cáo B, E, G, L, N cùng khoảng ngày + bộ lọc đang xem, có sheet "Mục lục" đối chiếu chéo các báo cáo');
     if (admin) t(sub === 'A' ? '📌 Cập nhật Sheet Base' : '📄 Xuất ra Sheet', 'exportSalesReportToSheet()', sub === 'A' ? 'Ghi đè vào ĐÚNG 1 tab cố định (BC_A_Base) — không tạo tab mới mỗi lần xuất' : 'Tạo 1 tab mới có timestamp, giữ lại lịch sử các lần xuất trước', 'sr-export-sheet-btn');
     if (admin) t('👁 Ẩn/Hiện Page &amp; Sale', '_srToggleHiddenPanel()', 'Chọn Page/kênh và Sale không thuộc phạm vi quản lý để ẩn khỏi mọi báo cáo chung');
   } else if (sub === 'C'){
@@ -1485,6 +1486,19 @@ function _srBuildExportBSheets_(dB, info, prefix, admin){
     { name: prefix + 'Đối chiếu tổng', rows: xb.checkRows, widths: [46, 20, 24, 18, 18, 22, 16, 12] });
   return { sheets: sheets, xb: xb };
 }
+// Mô tả bộ lọc Báo cáo B đang dùng (ghi vào sheet Tổng quan/Mục lục). DÙNG CHUNG cho nút "Xuất Excel" của B và "Excel đối soát" gộp (js/61).
+function _srBFilterDesc_(){
+  var f = [];
+  if ((_srState.bSale||[]).length) f.push('Sale: ' + _srState.bSale.join(', '));
+  if ((_srState.bNguon||[]).length) f.push('Nguồn đơn: ' + _srState.bNguon.join(', '));
+  if ((_srState.bMarketer||[]).length) f.push('Marketer: ' + _srState.bMarketer.join(', '));
+  if (_srState.bSanPham) f.push('Sản phẩm: ' + _srState.bSanPham);
+  if ((_srState.bCareStatus||[]).length) f.push('Trạng thái CS: ' + _srState.bCareStatus.join(', '));
+  if ((_srState.bKhStatus||[]).length) f.push('Trạng thái KH: ' + _srState.bKhStatus.join(', '));
+  if ((_srState.bZaloStatus||[]).length) f.push('Zalo: ' + _srState.bZaloStatus.join(', '));
+  if (_srState.bNickZalo) f.push('Nick Zalo: ' + _srState.bNickZalo);
+  return f;
+}
 function exportSalesReport(){
   if (_srState.sub === 'A'){
     var d = _srState.dataA;
@@ -1531,15 +1545,7 @@ function exportSalesReport(){
   } else {
     var dB = _srState.dataB;
     if (!dB){ alert('Chưa có dữ liệu để xuất — bấm "Lọc" trước.'); return; }
-    var fB = [];
-    if ((_srState.bSale||[]).length) fB.push('Sale: ' + _srState.bSale.join(', '));
-    if ((_srState.bNguon||[]).length) fB.push('Nguồn đơn: ' + _srState.bNguon.join(', '));
-    if ((_srState.bMarketer||[]).length) fB.push('Marketer: ' + _srState.bMarketer.join(', '));
-    if (_srState.bSanPham) fB.push('Sản phẩm: ' + _srState.bSanPham);
-    if ((_srState.bCareStatus||[]).length) fB.push('Trạng thái CS: ' + _srState.bCareStatus.join(', '));
-    if ((_srState.bKhStatus||[]).length) fB.push('Trạng thái KH: ' + _srState.bKhStatus.join(', '));
-    if ((_srState.bZaloStatus||[]).length) fB.push('Zalo: ' + _srState.bZaloStatus.join(', '));
-    if (_srState.bNickZalo) fB.push('Nick Zalo: ' + _srState.bNickZalo);
+    var fB = _srBFilterDesc_();
     var xbs = _srBuildExportBSheets_(dB, { dateFrom: _srState.dateFrom, dateTo: _srState.dateTo, filters: fB, at: new Date().toLocaleString('vi-VN') }, '', _srIsAdmin()), xb = xbs.xb;
     var wbB = XLSX.utils.book_new();
     xbs.sheets.forEach(function(s){

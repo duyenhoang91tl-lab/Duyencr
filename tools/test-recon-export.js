@@ -65,7 +65,7 @@ vm.runInContext('var _srLTienLbl_ = function(s) { return String(s || ""); };', w
 vm.runInContext(['_srCloseRateAvg_', '_srOrdNames_', '_srOrderShares_', '_srPureCalc_', '_srAdjTypes_', '_srPureOrders_', '_srPureDetailRows_', '_srPureBuildSheets_', '_srLLechSheet_', '_srLBuildAcctSheets_', '_srLBuildRows_'].map(n => fnSrc(j11, n)).join('\n'), w);
 vm.runInContext("var _SR_UNASSIGNED_ = '(chưa gán sale)'; var _srKeepSelectedSales_ = function(rows) { return rows; };", w);
 vm.runInContext(['_srGEligible_', '_srGSaleTypeLabel_', '_srGDecode_', '_srGBuildGroups_', '_srGBuildExport_', '_srGNum_', '_srGSheet_'].map(n => fnSrc(j12, n)).join('\n'), w);
-vm.runInContext(['_srExportBLabel_', '_srBuildExportB_', '_srBuildExportBSheets_'].map(n => fnSrc(j13, n)).join('\n'), w);
+vm.runInContext(['_srExportBLabel_', '_srBuildExportB_', '_srBuildExportBSheets_', '_srBFilterDesc_'].map(n => fnSrc(j13, n)).join('\n'), w);
 // Phan loai Sale theo moc ngay (js/62, ham THAT) + Thu nhap tung Sale cua Bao cao E (js/63, ham THAT)
 vm.runInContext("var SALE_CHANNEL_PERIODS = {}; var _cfgByAlias = function(m, n) { return m && m[n]; };", w);
 vm.runInContext(['_scpNorm_', '_scpListOf_', '_saleChannelOn_'].map(n => fnSrc(j62, n)).join('\n'), w);
@@ -168,6 +168,70 @@ const Badj = J(B); Badj.posAdjust = { applied: true, prevMonth: '2026-09', close
 w.__Ba = Badj; const pa = vm.runInContext('_reconCollect_(__Ba, __L, __info)', w);
 ok(pa.checks.filter(c => c.ok !== null).every(c => c.ok) && JSON.stringify(pa.items[0].rows).includes('TRƯỚC trừ hoàn/hủy tháng 2026-09'), 'co posAdjust (chot thang): doi chieu cheo so voi so TRUOC tru, van ✅ KHOP');
 
+// ===== 3b) Nut "Excel doi soat" o Bao cao B: exportReconAll_ =====
+const alerts = [], calls = [], saved = [];
+w.alert = m => alerts.push(String(m));
+if (XLSX) w.XLSX = { utils: XLSX.utils, writeFile: (wb, name) => saved.push({ wb, name }) };
+w._ymd = () => '2026-11-03';
+const reset = () => { alerts.length = 0; calls.length = 0; saved.length = 0; toasts.length = 0; };
+const setState = o => { w.__st = o; vm.runInContext('Object.keys(__st).forEach(function(k){ _srState[k] = __st[k]; })', w); };
+// B DA LOC theo Sale (GAS that) de du lieu va bo loc trong trang thai NHAT QUAN
+const Bsel = J(vm.runInContext('buildSalesReportB_({ dateFrom: "2026-10-01", dateTo: "2026-10-31", sale: ["anhtrinh1995"] })', ctx));
+setState({ dataB: Bsel, dateFrom: '2026-10-01', dateTo: '2026-10-31', bSale: ['anhtrinh1995'], bNguon: ['Zalo'], lastFetchError: '' });
+vm.runInContext("var currentUser = { name: 'Duyen', role: 'admin' }; var _srIsAdmin = function() { return currentUser.role === 'admin'; }; var _srItems_ = function() { return [['E', 'E', false], ['G', 'G', false], ['L', 'L', false], ['N', 'N', false]]; };", w);
+// phan quyen
+ok(vm.runInContext('_reconAllowed_()', w) === true, 'quyen: admin luon duoc xuat file gop');
+vm.runInContext("currentUser.role = 'cs'; _srItems_ = function() { return [['E', 'E', false], ['G', 'G', true], ['L', 'L', false], ['N', 'N', false]]; };", w);
+ok(vm.runInContext('_reconAllowed_()', w) === false, 'quyen: khong phai admin va 1 trong E/G/L/N dang an (G) -> KHONG xuat (file co hoa hong/thuong)');
+vm.runInContext("_srItems_ = function() { return [['E', 'E', false], ['G', 'G', false], ['L', 'L', false]]; };", w);
+ok(vm.runInContext('_reconAllowed_()', w) === false, 'quyen: thieu han 1 bao cao (N khong co trong danh sach) -> KHONG xuat');
+vm.runInContext("_srItems_ = function() { return [['E', 'E', false], ['G', 'G', false], ['L', 'L', false], ['N', 'N', false]]; };", w);
+ok(vm.runInContext('_reconAllowed_()', w) === true, 'quyen: khong phai admin nhung xem duoc du E, G, L, N -> duoc xuat');
+vm.runInContext("currentUser.role = 'admin';", w);
+ok(/sub === 'B' && typeof _reconAllowed_ === 'function' && _reconAllowed_\(\)\) t\('<b>📗 Excel đối soát \(B\+E\+G\+L\+N\) — 1 file<\/b>', 'exportReconAll_\(\)'/.test(j13), 'nut "Excel doi soat" chi gan o menu Tac vu Bao cao B (sub === B) va chi khi duoc phep');
+ok(/Xuất Excel', 'exportSalesReport\(\)'\);\n\s+if \(sub === 'B' && typeof _reconAllowed_/.test(j13), 'nut cu "Xuat Excel" cua B giu nguyen, nut moi nam ngay duoi');
+ok(JSON.stringify(vm.runInContext('_srBFilterDesc_()', w)) === JSON.stringify(['Sale: anhtrinh1995', 'Nguồn đơn: Zalo']), '_srBFilterDesc_: mo ta bo loc B dung (dung chung voi nut Xuat Excel cu)');
+ok(/var fB = _srBFilterDesc_\(\);/.test(j13), 'nut "Xuat Excel" cu cua B dung chung _srBFilterDesc_ (khong chep 2 noi)');
+let runButton = async () => {};   // chay SAU muc 4 (ghi .xlsx that + LibreOffice) vi muc 4 dung XLSX that
+if (XLSX) {
+  w._srFetch = async (action, params) => { calls.push({ action, params }); return L; };
+  runButton = async () => {
+    // 1) khong co du lieu B
+    setState({ dataB: null }); reset(); await vm.runInContext('exportReconAll_()', w);
+    ok(alerts.length === 1 && /Báo cáo B/.test(alerts[0]) && calls.length === 0 && saved.length === 0, 'chua loc B: bao, KHONG goi may chu, khong xuat file');
+    // 2) thanh cong
+    setState({ dataB: Bsel }); reset(); await vm.runInContext('exportReconAll_()', w);
+    ok(calls.length === 1 && calls[0].action === 'storeCaseReport' && calls[0].params.dateFrom === '2026-10-01' && calls[0].params.dateTo === '2026-10-31' && calls[0].params.fresh === '1' && calls[0].params.sale === 'anhtrinh1995', 'tai L dung: storeCaseReport cung khoang ngay + Sale dang loc cua B, bo cache (fresh=1): ' + JSON.stringify(calls[0] && calls[0].params));
+    ok(saved.length === 1 && saved[0].name === 'ExcelDoiSoat_B-E-G-L-N_2026-10-01_2026-10-31.xlsx' && saved[0].wb.SheetNames[0] === 'Mục lục' && saved[0].wb.SheetNames.length >= 20, 'ghi 1 file duy nhat dung ten, sheet dau Muc luc, du sheet: ' + (saved[0] && saved[0].name));
+    ok(alerts.length === 0 && toasts.some(t => /Đã xuất Excel đối soát/.test(t) && /đối chiếu chéo ✅ khớp/.test(t)), 'khong canh bao khi khop: chi toast xac nhan');
+    // 2b) doi bo loc Sale MA CHUA bam Loc lai (du lieu B khong loc, trang thai thi loc) -> file phai BAO LECH + goi y bam Loc lai
+    setState({ dataB: B }); reset(); await vm.runInContext('exportReconAll_()', w);
+    ok(saved.length === 1 && alerts.length === 1 && /Lệch/.test(alerts[0]) && /CHƯA bấm "Lọc"/.test(alerts[0]) && toasts.some(t => /mục lệch/.test(t)), 'bo loc doi ma chua Loc lai: van xuat file nhung BAO LECH + goi y bam "Loc" lai (khong im lang)');
+    setState({ dataB: Bsel });
+    // 3) L tra ve loi / null / nem loi -> VAN ra file
+    w._srFetch = async () => ({ ok: false, error: 'Không có quyền đọc trang tính cửa hàng' }); reset(); await vm.runInContext('exportReconAll_()', w);
+    ok(saved.length === 1 && saved[0].wb.SheetNames.includes('L (lỗi tải)') && alerts.length === 1 && /Báo cáo L/.test(alerts[0]) && /Không có quyền đọc/.test(alerts[0]), 'L tra loi tu may chu: van xuat file, sheet "L (loi tai)", hien canh bao ro ly do');
+    w._srFetch = async () => null; setState({ lastFetchError: 'Server trả về lỗi HTTP 500' }); reset(); await vm.runInContext('exportReconAll_()', w);
+    ok(saved.length === 1 && alerts.length === 1 && /HTTP 500/.test(alerts[0]), 'L khong co phan hoi: van xuat file, canh bao kem ly do (HTTP 500)');
+    w._srFetch = async () => { throw new Error('mat mang'); }; reset(); await vm.runInContext('exportReconAll_()', w);
+    ok(saved.length === 1 && alerts.length === 1 && /mat mang/.test(alerts[0]), 'L nem loi: van xuat file, canh bao kem ly do');
+    // 4) bam dup: chi 1 lan tai
+    let release; w._srFetch = (a, p) => { calls.push({ a }); return new Promise(r => { release = () => r(L); }); }; reset();
+    const p1 = vm.runInContext('exportReconAll_()', w); await new Promise(r => setTimeout(r, 5)); await vm.runInContext('exportReconAll_()', w);
+    ok(calls.length === 1 && toasts.some(t => /Đang tải dữ liệu cho file đối soát/.test(t)), 'bam dup khi dang tai: lan 2 bi chan (chi goi may chu 1 lan)');
+    release(); await p1;
+    ok(saved.length === 1 && vm.runInContext('_reconBusy_', w) === false, 'sau khi xong: mo khoa nut (bam lai duoc)');
+    // 5) khong du quyen
+    vm.runInContext("currentUser.role = 'cs'; _srItems_ = function() { return [['E', 'E', true], ['G', 'G', false], ['L', 'L', false], ['N', 'N', false]]; };", w);
+    w._srFetch = async (a, p) => { calls.push({ a }); return L; }; reset(); await vm.runInContext('exportReconAll_()', w);
+    ok(alerts.length === 1 && /quyền/.test(alerts[0]) && calls.length === 0 && saved.length === 0, 'khong du quyen: chan, khong goi may chu, khong xuat');
+    vm.runInContext("currentUser.role = 'admin';", w);
+    // 6) loi dung file khong lam treo nut
+    w._srFetch = async () => L; setState({ dataB: { totalOrders: 1, orders: [{ giaTriSauGiam: 'abc', bsx: 'khong-phai-mang' }], bySale: [] } }); reset();
+    await vm.runInContext('exportReconAll_()', w);
+    ok(vm.runInContext('_reconBusy_', w) === false && (saved.length === 1 || alerts.some(a => /Không xuất được/.test(a))), 'du lieu B hong: khong treo nut (busy=false), hoac van ra file voi sheet LOI, hoac bao loi ro');
+  };
+}
 // ===== 4) Ghi file .xlsx THAT, doc lai, tinh lai cong thuc =====
 if (XLSX) {
   w.__plan = plan;
@@ -206,4 +270,4 @@ if (XLSX) {
   } else console.log('(bo qua tinh lai LibreOffice: khong co soffice)');
 } else console.log('(bo qua kiem tra file .xlsx that: chua cai thu vien xlsx)');
 
-console.log(fails ? '\nFAILED ' + fails : '\nALL RECON-EXPORT TESTS PASSED'); process.exit(fails ? 1 : 0);
+runButton().then(() => { console.log(fails ? '\nFAILED ' + fails : '\nALL RECON-EXPORT TESTS PASSED'); process.exit(fails ? 1 : 0); });
