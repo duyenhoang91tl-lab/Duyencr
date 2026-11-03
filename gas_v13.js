@@ -5584,17 +5584,23 @@ function _extractCounterCodes_(text) {
 // luu cache 6 gio (khong tim ra: 10 phut). Tra ve chi so cot (0-based) hoac -1.
 // SUA 2026-10-05: ban dau quet MOI O cua MOI dong bang RegExp moi -> bao cao B qua 55 giay roi bi huy.
 function _detectBaseCounterCol_(sh, last) {
+  // NGUYEN NHAN GOC (2026-11-03, file Check nguoc Base: cotBase=-1, 0/1446 don ghep duoc): ma bo dem cua Base nam o COT U (DT_COL_BODEM = 20) — NGOAI vung A:T (DT_TONG_WIDTH = 20),
+  // ma ham nay cu chi quet cot 0..19 nen KHONG BAO GIO thay cot U -> tra -1 -> chi muc Base rong -> khong don Pos nao ghep duoc Base (B tinh thuan theo The Pos).
+  // Sua: quet toi het cot U (toi da 30 cot) va UU TIEN cot U neu co ma; doi khoa cache v1 -> v2 de bo gia tri -1 / sai cot da luu.
   var cache = CacheService.getScriptCache();
-  var ck = 'dtCounterCol_v1';
+  var ck = 'dtCounterCol_v2';
   try { var c = cache.get(ck); if (c !== null) { var v = parseInt(c, 10); if (!isNaN(v)) return v; } } catch (e0) {}
   var from = Math.max(2, last - 399);
-  var vals = sh.getRange(from, 1, last - from + 1, DT_TONG_WIDTH).getValues();
+  var lastCol = 0; try { lastCol = sh.getLastColumn(); } catch (eLc) {}
+  var width = Math.min(30, Math.max(DT_TONG_WIDTH, DT_COL_BODEM + 1));
+  if (lastCol > 0) width = Math.min(width, lastCol);
+  var vals = sh.getRange(from, 1, last - from + 1, width).getValues();
   var full = new RegExp('^' + COUNTER_CODE_INNER_ + '$', 'i');
   var part = new RegExp(COUNTER_CODE_RE_SRC_, 'i');
   var fullHits = [], partHits = [];
-  for (var ci = 0; ci < DT_TONG_WIDTH; ci++) { fullHits[ci] = 0; partHits[ci] = 0; }
+  for (var ci = 0; ci < width; ci++) { fullHits[ci] = 0; partHits[ci] = 0; }
   for (var i = 0; i < vals.length; i++) {
-    for (var cj = 0; cj < DT_TONG_WIDTH; cj++) {
+    for (var cj = 0; cj < width; cj++) {
       var cell = vals[i][cj];
       if (cell === '' || cell === null || cell === undefined || typeof cell === 'number' || cell instanceof Date) continue;
       var str = String(cell).trim();
@@ -5604,8 +5610,11 @@ function _detectBaseCounterCol_(sh, last) {
     }
   }
   var best = -1, bestN = 2;
-  for (var f = 0; f < DT_TONG_WIDTH; f++) if (fullHits[f] > bestN) { bestN = fullHits[f]; best = f; }
-  if (best < 0) { bestN = 2; for (var g = 0; g < DT_TONG_WIDTH; g++) if (fullHits[g] + partHits[g] > bestN) { bestN = fullHits[g] + partHits[g]; best = g; } }
+  if (DT_COL_BODEM < width && fullHits[DT_COL_BODEM] > bestN) { best = DT_COL_BODEM; }   // cot 'Ma bo dem' (U) co ma -> dung luon
+  else {
+    for (var f = 0; f < width; f++) if (fullHits[f] > bestN) { bestN = fullHits[f]; best = f; }
+    if (best < 0) { bestN = 2; for (var g = 0; g < width; g++) if (fullHits[g] + partHits[g] > bestN) { bestN = fullHits[g] + partHits[g]; best = g; } }
+  }
   try { cache.put(ck, String(best), best >= 0 ? 21600 : 600); } catch (e1) {}
   return best;
 }

@@ -11,6 +11,15 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-03 (phiên 10) — TÌM RA & SỬA: Báo cáo B không ghép được đơn Pos với Base vì dò sai cột mã bộ đếm — ĐÃ PUSH (CẦN DEPLOY GAS)
+- **Bằng chứng (file Check ngược Base xuất lại, kỳ T10):** Đơn Pos có ≥2 mã = **1.446**, đã ghép = **0**, Chẩn đoán: **cột mã bộ đếm = −1**, lỗi đọc = không, đọc Base 428 ms (đọc được sheet, chỉ không thấy cột).
+- **NGUYÊN NHÂN GỐC:** mã bộ đếm trên Base nằm ở **cột U** (`DT_COL_BODEM` = 20, ngoài vùng A:T `DT_TONG_WIDTH` = 20) nhưng `_detectBaseCounterCol_` chỉ quét cột 0..19 → luôn −1 → chỉ mục Base rỗng → mọi đơn tính thuần theo Thẻ Pos. (Commit d381555 ngày 15/10 đã biết mã ở cột U nhưng hàm dò này chưa sửa.)
+- [x] **ĐÃ PUSH:** `gas_v13.js` `_detectBaseCounterCol_` quét tới cột U (tối đa 30 cột, không vượt lastColumn), ƯU TIÊN cột U nếu có >2 mã, đổi khoá cache `dtCounterCol_v1` → `v2` (bỏ giá trị −1/sai cột đang cache). `gas/09_SalesReportB_POS.gs` sinh lại, `split-gas --check` OK. Test mới `tools/test-detect-bodem-col.js` (6 ca) + test-ghep-base-orders/multicode/search-bodem vẫn qua.
+- **⚠ DEPLOY GAS BẮT BUỘC** (đã đổi gas_v13.js): chờ Actions xanh / kiểm `count`→`ver` đúng bản mới. Rồi Ctrl+F5.
+- **⚠ TÁC ĐỘNG LỚN:** sau deploy Báo cáo B/E/G và thưởng sẽ chia theo ĐƠN GỐC BASE cho 1.446 đơn ghép (thay vì chia đều theo Thẻ Pos như hiện tại) → số theo từng sale sẽ ĐỔI; phần đối chiếu KT ở phiên 7 (khớp từng đồng nhờ chia đều theo Thẻ Pos) cần chạy lại, có thể xuất hiện lệch mới ở các đơn ghép.
+- **Việc kế tiếp:** (1) Duyên deploy + Ctrl+F5 → xuất lại "Check ngược Base" T10 (kỳ 01–31/10), gửi lại (kỳ vọng "đã ghép được" > 0, cột mã bộ đếm = 20). (2) So từng đơn ghép với file KT (17T10, 268T10, 416, 525, 765, 1222…), chạy lại recon/thưởng T10 với số mới. (3) Kiểm tra bảng thưởng/hoa hồng T10 đã gửi kế toán có cần tính lại theo đơn gốc Base không.
+- **ĐANG LÀM:** chờ deploy + file xuất lại.
+
 ## 2026-11-03 (phiên 9) — "Check ngược Base" xuất 3/11 cho thấy CRM GHÉP ĐƯỢC 0 ĐƠN với Base (Duyên gửi file) — ĐÃ THÊM CHẨN ĐOÁN, CHỜ XUẤT LẠI
 - **Phát hiện (file `BaoCao_Pos_CheckNguocBase_2026-11-03.xlsx`):** Tổng quan: đơn Pos có ≥2 mã bộ đếm = **11.112**, **đã ghép được = 0**, có mã nhưng KHÔNG khớp Base = **11.112**, nghi ghép chưa ghép 265. Sheet "Check ngược từng đơn"/"Chia theo sale" rỗng. Dữ liệu "Cần kiểm tra tay" trải 05/2025–04/2026 ⇒ kỳ xuất rất rộng, KHÔNG phải riêng 01–31/10/2026.
 - **Hệ quả:** Báo cáo B đang tính TOÀN BỘ theo Thẻ Pos chia đều (khớp lý do số CRM = chia đều thẻ Pos ở phiên 7). Chưa thể so "KT có theo đơn gốc Base không" vì CRM chưa ghép được đơn nào.
