@@ -11,6 +11,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-03 (phiên 12) — Check ngược Base xuất lần 3 (18:38) VẪN cột −1 / 428 ms: thêm chẩn đoán CHI TIẾT + đổi khoá cache — ĐÃ PUSH (CẦN DEPLOY GAS, workflow tự chạy)
+- **Hiện trạng:** 3 file xuất (18:28, 18:32, 18:38) cùng "cột −1, 428 ms, 0/1446 đơn ghép" dù deploy a4cca7e đã thành công 18:29. Cache GAS (`salesB5_` 120s) + Worker (60s) không giải thích được 10 phút ⇒ NGHI (1) trang dùng dữ liệu `_srState.dataB` tải TRƯỚC deploy (nút Xuất dùng lại dữ liệu đã tải, không gọi lại backend) — cần **bấm Lọc lại** rồi mới xuất; hoặc (2) code đã chạy nhưng cột U trống/khác ở 400 dòng cuối `DT TỔNG `.
+- [x] **ĐÃ PUSH:** `gas_v13.js` (+`gas/09`): `_detectBaseCounterCol_` ghi `_BASE_DETECT_DBG_` {dòng, cột sheet, số cột quét, dòng bắt đầu, cột chọn, 5 cột có nhiều mã nhất}; `ghep.ver='bodem-u-v3'` + `ghep.dbgBase` trả trong salesReportB; khoá cache dò cột `dtCounterCol_v2`→`v3`, cache báo cáo `salesB5_`→`salesB6_` (ép tính lại). `js/11` (`?v=20261103f`): sheet Tổng quan thêm 2 dòng "phiên bản dò cột" + "chi tiết dò cột". Test `tools/test-detect-bodem-col.js` cập nhật (qua).
+- **Cách đọc file xuất lần sau:** dòng "phiên bản dò cột" = `bodem-u-v3` ⇒ bản mới đã chạy; nếu ghi "(không có…)" ⇒ vẫn dữ liệu/backend cũ → Lọc lại. Dòng "chi tiết dò cột" cho biết cột nào có mã (vd `top:[{cot:20,...}]`) hoặc rỗng.
+- **Việc kế tiếp:** Duyên chờ Actions xanh → Ctrl+F5 → Báo cáo B kỳ 01–31/10 → **bấm Lọc** → xuất Check ngược Base → gửi lại. Nếu đã `bodem-u-v3` mà cột vẫn −1 → dựa `top` để sửa dò (vd quét thêm dòng ngoài 400 dòng cuối / đúng cột chứa mã).
+- **ĐANG LÀM:** chờ file xuất mới.
+
 ## 2026-11-03 (phiên 11) — Sau deploy: biểu đồ B đã gộp đơn quầy; gộp alias "Thuydinh1995"; xuất Check ngược Base 18:32 CHƯA cho kết luận — ĐÃ PUSH (js, chỉ Ctrl+F5)
 - **Deploy GAS bản sửa cột U ĐÃ THÀNH CÔNG** (workflow deploy-gas, commit a4cca7e, 11:29 UTC = 18:29 VN). File xuất 18:32:52 vẫn "cột −1, 428 ms" y hệt lần 18:28 ⇒ NGHI Cloudflare Worker trả bản cache cũ (báo cáo cache 60s + SWR trả bản cũ trước khi làm mới nền, xem cloudflare/worker.mjs `TTL_SEC`), KHÔNG kết luận được là sửa chưa ăn. **Việc cần làm: xuất lại lần nữa (sau ≥2 phút), nếu vẫn −1 mới là code chưa đủ** (khi đó nghi cột U của `DT TỔNG ` trống ở 400 dòng cuối → xem cuối mục).
 - **Ảnh Báo cáo B 18:33 (đã Ctrl+F5, có gộp đơn quầy):** tổng pie 6.487.907.867; dòng lạ **"Thuydinh1995" 3.960.000đ** = đơn quầy ghi tên khác của thuydinh95 → [x] **ĐÃ PUSH:** `js/63` `_srMergeStoreIntoBySale_` gộp theo `_cfgAliasesOf` vào dòng thuydinh95 (test `tools/test-store-share-b.js` thêm ca alias, qua; `?v=20261103e`).

@@ -7,7 +7,7 @@ let bad = 0; const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if
 function run(cols, rows, cache) {
   const store = cache || {};
   const body = 'var CacheService = { getScriptCache: function(){ return { get: function(k){ return k in STORE ? STORE[k] : null; }, put: function(k, v){ STORE[k] = v; } }; } };\n' +
-    line('DT_TONG_WIDTH') + '\n' + line('DT_COL_BODEM') + '\n' + line('COUNTER_CODE_INNER_') + '\n' + line('COUNTER_CODE_RE_SRC_') + '\n' + grab('_detectBaseCounterCol_') + '\nreturn _detectBaseCounterCol_(SH, ' + (rows.length + 1) + ');';
+    line('DT_TONG_WIDTH') + '\n' + line('DT_COL_BODEM') + '\n' + line('COUNTER_CODE_INNER_') + '\n' + line('COUNTER_CODE_RE_SRC_') + '\nvar _BASE_DETECT_DBG_ = null;\n' + grab('_detectBaseCounterCol_') + '\nreturn _detectBaseCounterCol_(SH, ' + (rows.length + 1) + ');';
   const sh = { getLastColumn: () => cols, getRange: (r, c, nr, nc) => ({ getValues: () => rows.slice(r - 2, r - 2 + nr).map(x => x.slice(c - 1, c - 1 + nc)) }) };
   return new Function('STORE', 'SH', body)(store, sh);
 }
@@ -18,6 +18,6 @@ ok(run(24, mk(50, -1)) === -1, 'khong cot nao co ma -> -1');
 const both = mk(50, 20); both.forEach((r, i) => { r[16] = 'ghi chu ' + (200 + i) + 'T10/2026'; });
 ok(run(24, both) === 20, 'cot U co ma + cot ghi chu co ma lan -> uu tien cot U');
 ok(run(20, mk(50, 5, 20)) === 5, 'sheet chi co 20 cot (A:T) van chay (khong vuot lastColumn)');
-const cache = { dtCounterCol_v1: '-1' };
-ok(run(24, mk(50, 20), cache) === 20 && cache.dtCounterCol_v2 === '20', 'cache cu v1=-1 bi bo qua (khoa v2) va luu v2=20');
+const cache = { dtCounterCol_v1: '-1', dtCounterCol_v2: '-1' };
+ok(run(24, mk(50, 20), cache) === 20 && cache.dtCounterCol_v3 === '20', 'cache cu v1/v2=-1 bi bo qua (khoa v3) va luu v3=20');
 console.log(bad ? bad + ' LOI' : 'TAT CA QUA'); process.exit(bad ? 1 : 0);

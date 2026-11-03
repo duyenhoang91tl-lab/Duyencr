@@ -45,9 +45,9 @@ function _extractCounterCodes_(text) {
 function _detectBaseCounterCol_(sh, last) {
   // NGUYEN NHAN GOC (2026-11-03, file Check nguoc Base: cotBase=-1, 0/1446 don ghep duoc): ma bo dem cua Base nam o COT U (DT_COL_BODEM = 20) — NGOAI vung A:T (DT_TONG_WIDTH = 20),
   // ma ham nay cu chi quet cot 0..19 nen KHONG BAO GIO thay cot U -> tra -1 -> chi muc Base rong -> khong don Pos nao ghep duoc Base (B tinh thuan theo The Pos).
-  // Sua: quet toi het cot U (toi da 30 cot) va UU TIEN cot U neu co ma; doi khoa cache v1 -> v2 de bo gia tri -1 / sai cot da luu.
+  // Sua: quet toi het cot U (toi da 30 cot) va UU TIEN cot U neu co ma; doi khoa cache v1 -> v2 -> v3 de bo gia tri -1 / sai cot da luu.
   var cache = CacheService.getScriptCache();
-  var ck = 'dtCounterCol_v2';
+  var ck = 'dtCounterCol_v3';
   try { var c = cache.get(ck); if (c !== null) { var v = parseInt(c, 10); if (!isNaN(v)) return v; } } catch (e0) {}
   var from = Math.max(2, last - 399);
   var lastCol = 0; try { lastCol = sh.getLastColumn(); } catch (eLc) {}
@@ -74,9 +74,15 @@ function _detectBaseCounterCol_(sh, last) {
     for (var f = 0; f < width; f++) if (fullHits[f] > bestN) { bestN = fullHits[f]; best = f; }
     if (best < 0) { bestN = 2; for (var g = 0; g < width; g++) if (fullHits[g] + partHits[g] > bestN) { bestN = fullHits[g] + partHits[g]; best = g; } }
   }
+  try {   // CHAN DOAN (xuat ra Check nguoc Base): kich thuoc sheet + cac cot co nhieu ma nhat — de biet vi sao -1
+    var topC = []; for (var tc = 0; tc < width; tc++) if (fullHits[tc] + partHits[tc] > 0) topC.push({ cot: tc, full: fullHits[tc], part: partHits[tc] });
+    topC.sort(function(a, b) { return (b.full + b.part) - (a.full + a.part); });
+    _BASE_DETECT_DBG_ = { dong: last, cot: lastCol, quet: width, tuDong: from, chon: best, top: topC.slice(0, 5) };
+  } catch (eDbg) {}
   try { cache.put(ck, String(best), best >= 0 ? 21600 : 600); } catch (e1) {}
   return best;
 }
+var _BASE_DETECT_DBG_ = null;
 
 // Doc "DT TỔNG " (Base) va CHI giu cac dong co ma bo dem nam trong wantedCodes (set chuan hoa).
 // Chi doc 5 CAT can dung (ma bo dem, trang thai, sale, gia tri) thay vi ca 20 cot, va chi chay regex tren o
@@ -831,7 +837,7 @@ function buildSalesReportB_(filters) {
     mismatchRows: mismatchCount, // so dong bi lech so cot giua san pham/ma/so luong — nen kiem tra tay
     acct: acctStats,
     ghepCheck: { count: ghepCheckCount, list: ghepCheck },
-    ghep: (function(){ ghepStats.cotBase = baseIdx ? baseIdx.colIdx : null; ghepStats.loi = ghepErr; ghepStats.msDocBase = ghepMs; return ghepStats; })(), // thong ke ghep don Pos<->Base: donCoMa, daGhep, khongKhopCount/trungDonGocCount (SO THAT, khong gioi han) + khongKhop[]/trungDonGoc[] (toi da 30 VI DU dau tien, dung .xxxCount de hien so luong, KHONG dung .length cua 2 mang nay — da tung bi chan tran am tham o 30)
+    ghep: (function(){ ghepStats.cotBase = baseIdx ? baseIdx.colIdx : null; ghepStats.loi = ghepErr; ghepStats.msDocBase = ghepMs; ghepStats.ver = 'bodem-u-v3'; ghepStats.dbgBase = _BASE_DETECT_DBG_; return ghepStats; })(), // thong ke ghep don Pos<->Base: donCoMa, daGhep, khongKhopCount/trungDonGocCount (SO THAT, khong gioi han) + khongKhop[]/trungDonGoc[] (toi da 30 VI DU dau tien, dung .xxxCount de hien so luong, KHONG dung .length cua 2 mang nay — da tung bi chan tran am tham o 30)
     orders: matched.map(function(m){
       return {
         bs: _drillPairs_(m.bs), bt: _drillPairsObj_(m.bt),   // dong gop vao bang Theo Sale / Team (cua so chi tiet khi bam o bao cao)

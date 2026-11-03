@@ -1606,6 +1606,8 @@ function _srBaseCheckExport_(){
     ['Chẩn đoán — cột mã bộ đếm trên Base (−1: không thấy cột, −2: lỗi đọc)', g.cotBase === undefined || g.cotBase === null ? '(backend chưa trả — cần deploy bản mới)' : g.cotBase],
     ['Chẩn đoán — lỗi đọc Base', g.loi ? String(g.loi) : '(không có)'],
     ['Chẩn đoán — thời gian đọc Base (ms)', g.msDocBase === undefined ? '' : g.msDocBase],
+    ['Chẩn đoán — phiên bản dò cột (bodem-u-v3 = bản mới đã chạy)', g.ver || '(không có → backend CŨ hoặc dữ liệu cũ: bấm Lọc lại rồi xuất)'],
+    ['Chẩn đoán — chi tiết dò cột Base (dòng/cột sheet, cột có nhiều mã nhất)', g.dbgBase ? JSON.stringify(g.dbgBase) : '(không có — kết quả dò lấy từ cache, hoặc backend cũ)'],
     ['', ''],
     ['Cách đọc', 'Sheet "Check ngược từng đơn": mỗi dòng = 1 đơn Pos × 1 đơn gốc Base; các cột tiền của đơn Pos chỉ ghi ở dòng đầu mỗi đơn nên SUM cột không bị lặp.'],
     ['', 'Sheet "Chia theo sale": phần tiền từng sale của mỗi đơn Pos theo đơn gốc Base (đã gồm quầy 30/70 nếu có). Lọc cột Sale rồi SUM "Tiền chia" = số trên bảng Theo Sale.'],
