@@ -40,7 +40,8 @@ function _tdPart_(kpi, rev) { var pct = kpi > 0 ? rev / kpi : 0, rate = _tdRate_
 // orders: mảng đơn Pos như Báo cáo E; ym: 'YYYY-MM'. Trả null nếu tháng chưa có cấu hình.
 function _computeThiDua_(orders, ym) {
   var cfg = THIDUA_CONFIGS[ym]; if (!cfg) return null;
-  var hasGoc = (orders || []).some(function (o) { return !!o.baseNgayTao; }), byUser = {}, revFb = 0, revRest = 0;
+  var hasGoc = (orders || []).some(function (o) { return !!o.baseNgayTao; }), byUser = {}, revFb = 0, revRest = 0, fbOnlySet = {};
+  cfg.commitments.forEach(function (c) { if (c.fbOnly) fbOnlySet[_tdFold_(c.user)] = true; });   // fbOnly (VD Mến): chỉ tính đơn kênh FB chính, đơn ngoài FB bị loại hẳn khỏi doanh thu
   (orders || []).forEach(function (o) {
     if (o.baoHanh) return;
     var ymd = o.baseNgayTao || _ddmmyyyyToYmd_(o.ngayTao); if (String(ymd || '').slice(0, 7) !== ym) return;
@@ -48,6 +49,7 @@ function _computeThiDua_(orders, ym) {
     var isFb = THIDUA_FB_SRC_.indexOf(_tdFold_(o.nguonDon)) >= 0;
     _orderRevenueShares_(o).forEach(function (x) {
       var k = _tdFold_(x.name); if (!k) return;
+      if (fbOnlySet[k] && !isFb) return;
       var u = byUser[k] || (byUser[k] = { total: 0, fb: 0 }); u.total += x.share; if (isFb) { u.fb += x.share; revFb += x.share; } else revRest += x.share;
     });
   });

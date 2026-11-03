@@ -20,6 +20,8 @@ ok(r.nRest === 16 + 1 && r.rows.filter(x => !x.ok).length === 16, '16 sale chua 
 ok(Math.abs(g('ninhnga99').penRest - 2000000 / 17) <= 1 && g('ninhnga99').total === 58333 + g('ninhnga99').penRest, 'tong phat 1 sale = FB + phan con lai');
 // Bien: dung 90% -> 0,015% ; 100% -> 0
 const mk = v => run([o(1, 'ninhnga99', 'Facebook Phạm Thu Hiền', v)], '2026-10').fb;
+{ const rm = run([o(1, 'menbui2002', 'Fb Phạm Thu Hiền', 100e6), o(2, 'menbui2002', 'Zalo', 400e6), o(3, 'anhtrinh1995', 'Zalo', 200e6)], '2026-10'); const m = rm.rows.find(x => x.user === 'menbui2002');
+  ok(m.rev === 100e6 && m.revFb === 100e6 && rm.rest.rev === 200e6 && rm.fb.rev === 100e6 && m.penRest === 0, 'Men chi tinh don kenh FB: don Zalo 400tr cua Men bi loai khoi doanh thu (con lai chi 200tr cua sale khac)'); }
 ok(mk(1.26e9).rate === 0.00015 && mk(1.4e9).penalty === 0 && mk(1.4e9).bonus === 700000 && mk(1.3e9).rate === 0.00005, 'moc 90% -> 0,015%; 100% -> khong phat (thuong 700.000); 92,9% -> 0,005%');
 // T11 cau hinh: KPI 8,5 ty, FB 1,5 ty, con lai 7 ty; 15 sale cam ket
 r = run([], '2026-11');
