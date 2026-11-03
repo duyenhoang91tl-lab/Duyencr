@@ -8,7 +8,7 @@
 //    • L: dữ liệu riêng của GAS `storeCaseReport` (khách qua cửa hàng) cùng khoảng ngày — nút (bước 3) tải rồi truyền vào đây.
 //  Mỗi báo cáo dùng LẠI hàm dựng sheet của nút xuất lẻ (không chép số liệu thứ hai):
 //    B → _srBuildExportBSheets_ (js/13) · G → _srGBuildExport_ (js/12) · N → _srPureBuildSheets_ (js/11) · L → _srLBuildRows_/_srLBuildAcctSheets_ (js/11)
-//    E → chưa từng có xuất Excel: dựng mới ở _reconBuildE_ (hoa hồng có công thức tính lại + chênh lệch, thưởng có SUMIF về chi tiết).
+//    E → _reconBuildE_: hoa hồng có công thức tính lại + chênh lệch, thưởng có SUMIF về chi tiết, và "Thu nhập từng Sale" (js/63 _computeSaleIncome_/_incomeExportRows_, giống nút xuất Thu nhập của E).
 //  Sheet đầu "Mục lục": cách đọc, danh sách sheet, ĐỐI CHIẾU CHÉO số tổng giữa các báo cáo, cảnh báo.
 //  Một báo cáo dựng lỗi KHÔNG làm hỏng cả file: sheet "<mã> LỖI" ghi lý do + cảnh báo ở Mục lục.
 // ═══════════════════════════════════════════════════════════════════════════
@@ -28,7 +28,7 @@ function _reconCol_(i){ var s = ''; i = i + 1; while (i > 0){ var m = (i - 1) % 
 
 // ── E: Hoa hồng nhân viên + Chương trình thưởng ────────────────────────────────────────────────────────────────────────
 // Trả { items:[{name, rows, mode}], revenue (tổng doanh thu 3 nhóm), commission (tổng hoa hồng), bonusTotal }
-function _reconBuildE_(orders){
+function _reconBuildE_(orders, storeData){
   var r4 = _reconR4_, c = _computeCommissionData_(orders), items = [];
   var lbl = (typeof _commThrLabel_ === 'function') ? _commThrLabel_() : String(c.threshold);
   var rev = c.totalRevenueAbove15 + c.totalRevenueBelow15 + c.totalRevenueChannel;
@@ -103,7 +103,17 @@ function _reconBuildE_(orders){
   }
   sumRows.push([], ['Ghi chú: "SL ước tính" của chương trình theo sản phẩm là ước lượng từ ô mô tả sản phẩm — nên đối chiếu lại trước khi chi.']);
   items.push({ name: 'E Thưởng', rows: sumRows, mode: 'num' }, { name: bn, rows: detRows, mode: 'num' });
-  return { items: items, revenue: rev, commission: c.totalCommission, bonusTotal: bonusTotal };
+  // "Thu nhập từng Sale" (js/63, phiên khác làm — mục Tổng hợp của Báo cáo E): hoa hồng theo mức đơn + kênh % riêng + đơn chia cửa hàng (L) + thưởng thử việc/chính thức.
+  // Dùng đúng _computeSaleIncome_/_incomeExportRows_ như nút "Xuất Excel Thu nhập" của E; phần cửa hàng lấy từ dữ liệu L đã tải cùng khoảng ngày.
+  var income = null;
+  if (typeof _computeSaleIncome_ === 'function' && typeof _incomeExportRows_ === 'function'){
+    var sd = (storeData && storeData.ok !== false && !storeData.error && storeData.rows) ? storeData : null;
+    income = _computeSaleIncome_(orders, sd);
+    var ix = _incomeExportRows_(income);
+    items.push({ name: 'E Thu nhập tổng hợp', rows: ix.sum, mode: 'num' }, { name: 'E Thu nhập chi tiết', rows: ix.det, mode: 'num' });
+    income.hasStore = !!sd;
+  }
+  return { items: items, revenue: rev, commission: c.totalCommission, bonusTotal: bonusTotal, income: income, nSales: c.bySale.length };
 }
 
 // ── G: Thưởng Sale (Thử việc / Chính thức) — dùng đúng _srGBuildExport_ như nút "Excel đầy đủ (gửi kế toán)" của G ──────────
@@ -162,7 +172,7 @@ function _reconCollect_(dB, dL, info){
     groups.B = bs.sheets; meta.xb = bs.xb;
     if (bs.xb.missing) warnings.push('Báo cáo B: máy chủ chưa trả phần chia chính xác theo sale (bsx/bcx) — bấm "Lọc" lại hoặc chờ deploy xong rồi xuất lại.');
   });
-  run('E', 'Báo cáo E', function(){ var e = _reconBuildE_(orders); groups.E = e.items; meta.e = e; });
+  run('E', 'Báo cáo E', function(){ var e = _reconBuildE_(orders, dL); groups.E = e.items; meta.e = e; });
   run('G', 'Báo cáo G', function(){ var g = _reconBuildG_(orders, info); groups.G = g.items; meta.g = g; });
   run('L', 'Báo cáo L', function(){
     var l = _reconBuildL_(dL); groups.L = l.items; meta.l = l;
@@ -217,6 +227,19 @@ function _reconIndexRows_(info, groups, meta, B, warnings){
   }
   if (meta.e) rows.push(['Tổng hoa hồng', 'E', _reconR2_(meta.e.commission), '', 'ℹ tham khảo', 'Tiền hoa hồng % (không phải doanh thu).']);
   if (meta.e) rows.push(['Tổng thưởng (chương trình thưởng ở E)', 'E', _reconR2_(meta.e.bonusTotal), '', 'ℹ tham khảo', 'Chưa lọc người đủ điều kiện nhận thưởng.']);
+  // "Thu nhập từng Sale" làm tròn từng khoản từng Sale (đ) nên cho phép sai số = 1đ + 1đ/Sale
+  if (meta.e && meta.e.income){
+    var inc = meta.e.income, t = inc.totals, tolI = 1 + (meta.e.nSales || 0);
+    var hh = t.tier + t.channelComm, th = t.trial + t.official, dH = _reconR2_(hh - meta.e.commission), dT = _reconR2_(th - meta.e.bonusTotal);
+    var rH = rows.length + 1;
+    rows.push(['Hoa hồng (mức đơn + kênh % riêng) trong "E Thu nhập"', 'E', _reconR2_(hh), { t: 'n', v: dH, f: 'C' + rH + '-C' + (rH - 2) }, Math.abs(dH) <= tolI ? okTxt : badTxt, 'Phải = "Tổng hoa hồng" của E (sai số làm tròn từng Sale ≤ ' + tolI + 'đ).']);
+    checks.push({ name: 'Hoa hồng ở Thu nhập', code: 'E', value: _reconR2_(hh), diff: dH, ok: Math.abs(dH) <= tolI });
+    var rT = rows.length + 1;
+    rows.push(['Thưởng (thử việc + chính thức) trong "E Thu nhập"', 'E', _reconR2_(th), { t: 'n', v: dT, f: 'C' + rT + '-C' + (rT - 2) }, Math.abs(dT) <= tolI ? okTxt : badTxt, 'Phải = "Tổng thưởng" của E (sai số làm tròn ≤ ' + tolI + 'đ).']);
+    checks.push({ name: 'Thưởng ở Thu nhập', code: 'E', value: _reconR2_(th), diff: dT, ok: Math.abs(dT) <= tolI });
+    rows.push(['Hoa hồng đơn chia với cửa hàng (L) trong "E Thu nhập"', 'E', _reconR2_(t.store), '', 'ℹ tham khảo', inc.hasStore ? 'Cộng thêm từ khách qua cửa hàng (Báo cáo L), nằm ngoài hoa hồng đơn Pos.' : 'Chưa có dữ liệu L nên = 0 (xem cảnh báo về L).']);
+    rows.push(['TỔNG THU NHẬP các Sale (hoa hồng + cửa hàng + thưởng)', 'E', _reconR2_(t.total), '', 'ℹ tham khảo', 'Số "TỔNG NHẬN" ở sheet "E Thu nhập tổng hợp".']);
+  }
   if (meta.g) rows.push(['Tổng thưởng (chỉ người đủ điều kiện nhận — Online/Văn phòng/Thử việc)', 'G', _reconR2_(meta.g.total), '', 'ℹ tham khảo', 'G chỉ tính cho đội Sale Online + Văn phòng và Sale Thử việc; có thể nhỏ hơn tổng thưởng ở E.']);
   if (warnings && warnings.length){ rows.push([], ['CẢNH BÁO']); warnings.forEach(function(w){ rows.push(['⚠ ' + w]); }); }
   return { rows: rows, checks: checks };

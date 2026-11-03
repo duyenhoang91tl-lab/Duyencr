@@ -1,10 +1,9 @@
 // ═══════════════════════════════════════════════════════
-//  MẪU LỌC NHANH cho Báo cáo doanh số (A, B, C, D, E, F, G, L) — Duyên yêu cầu 12/10/2026 (lọc theo Team hay lỗi → tự tạo mẫu).
+//  MẪU LỌC NHANH cho Báo cáo doanh số (A, B, C, D, E, F, G, L, M) — Duyên yêu cầu 12/10/2026 (lọc theo Team hay lỗi → tự tạo mẫu).
 //  Mẫu = tên + danh sách Sale (+ các bộ lọc khác của báo cáo đó như Kênh/Nguồn/Sản phẩm…) — KHÔNG gồm ngày (ngày vẫn chọn riêng).
 //  Bấm mẫu → gán thẳng bộ lọc rồi tải lại báo cáo, KHÔNG đi qua "Lọc theo Team" (_srSyncTeamToSale_).
 //  (18/10/2026, Duyên) MẪU DÙNG CHUNG MỌI BÁO CÁO: mẫu = tên + danh sách Sale (+ bộ lọc riêng của từng báo cáo nếu lưu từ báo cáo đó) — tạo ở 1 báo cáo thì
-//  báo cáo nào có ô Sale cũng bấm được; tên Sale tự đổi sang đúng tên có trong báo cáo đang xem (khớp theo danh tính/bí danh). H, I (chọn 1 CS) và M không có ô
-//  lọc nhiều Sale nên không có thanh mẫu. Mẫu theo TỪNG tài khoản; lưu ở trình duyệt (localStorage, khoá v2; mẫu cũ theo từng báo cáo (v1) tự gộp sang v2).
+//  báo cáo nào có ô Sale cũng bấm được; tên Sale tự đổi sang đúng tên có trong báo cáo đang xem (khớp theo danh tính/bí danh). H, I (chọn 1 CS, không phải nhiều Sale) chưa có thanh mẫu; M đã có từ 02/11/2026. Mẫu theo TỪNG tài khoản; lưu ở trình duyệt (localStorage, khoá v2; mẫu cũ theo từng báo cáo (v1) tự gộp sang v2).
 //  (16/10/2026) Ô mẫu chuyển vào thanh công cụ chung .srb-bar, cùng hàng 🧰 Tác vụ: 1 mẫu = nút, ≥2 mẫu = dropdown, có nút ✕ Tắt lọc nhanh.
 // ═══════════════════════════════════════════════════════
 (function(){
@@ -18,7 +17,11 @@
     E: { keys:['eSale','eKenh'], sale:'eSale', team:'eTeam', opts:'saleBOptions', custom:'eSaleCustomized' },
     F: { keys:['fSale'], sale:'fSale', team:'fTeam', opts:'saleBOptions', custom:'fSaleCustomized' },
     G: { keys:['gSale','gNguon','gMarketer','gSanPham'], sale:'gSale', opts:'saleBOptions', custom:'gSaleCustomized' },
-    L: { keys:['lSale'], sale:'lSale', opts:'saleBOptions', custom:'lSaleCustomized' }
+    L: { keys:['lSale'], sale:'lSale', opts:'saleBOptions', custom:'lSaleCustomized' },
+    M: { keys:['mSale','mNguon'], sale:'mSale', opts:'saleBOptions' },
+    // (02/11/2026) H/I lọc theo DANH SÁCH CS (hCsList/iCsList, mảng) — mẫu = danh sách tên; tên CS lấy từ lịch sử chia data (js/13 _hAssignCsNames_). hTeam/hCs/iTeam/iCs (chọn 1) được xoá khi áp mẫu để không loại nhầm.
+    H: { keys:['hCsList'], sale:'hCsList', optsFn:function(){ return _hAssignCsNames_(); }, reset:['hTeam','hCs'] },
+    I: { keys:['iCsList'], sale:'iCsList', optsFn:function(){ return _hAssignCsNames_(); }, reset:['iTeam','iCs'] }   // (02/11/2026) Báo cáo M (đơn chia) có ô Sale + Kênh bán nhiều lựa chọn như các báo cáo khác
   };
   CFG.K = CFG.G;   // K = màn Thưởng (cùng bộ lọc với G; _srState.sub === 'K' khi xem theo kiểu khác)
   function curSub(){ return (typeof _srState !== 'undefined') ? _srState.sub : ''; }
@@ -52,7 +55,45 @@
       var v = JSON.parse(raw); return Array.isArray(v) ? v : [];
     } catch(err){ return []; }
   }
-  function saveAll(list){ try { localStorage.setItem(storeKey(), JSON.stringify(list)); return true; } catch(err){ toastF('⚠ Không lưu được mẫu (trình duyệt chặn lưu dữ liệu).'); return false; } }
+  function saveAll(list){ try { localStorage.setItem(storeKey(), JSON.stringify(list)); markDirty(true); pushSoon(); return true; } catch(err){ toastF('⚠ Không lưu được mẫu (trình duyệt chặn lưu dữ liệu).'); return false; } }
+
+  // ── ĐỒNG BỘ LÊN SERVER (02/11/2026, Duyên: dùng được ở máy/trình duyệt khác) ──
+  //  Danh sách mẫu của từng tài khoản lưu ở sheet Settings, key `filterPresets_<username>` (action getSetting/setSetting có sẵn — KHÔNG cần sửa/deploy GAS).
+  //  Cơ chế "bản sau ghi đè bản trước" cho cả danh sách: lưu/sửa/xoá → ghi lên server (cờ "dirty" giữ đến khi ghi được); mở báo cáo lần đầu mỗi phiên →
+  //  nếu máy này không có thay đổi chưa đẩy thì LẤY bản server về (server rỗng mà máy có mẫu → đẩy lên lần đầu).
+  var PULLED = {}, _pushT = null;
+  function srvKey(){ return 'filterPresets_' + userKey(); }
+  function dirtyKey(){ return 'ome_sr_filter_presets_dirty:' + userKey(); }
+  function markDirty(on){ try { if (on) localStorage.setItem(dirtyKey(), '1'); else localStorage.removeItem(dirtyKey()); } catch(err){} }
+  function isDirty(){ try { return localStorage.getItem(dirtyKey()) === '1'; } catch(err){ return false; } }
+  function haveSrv(){ return typeof gsUrl !== 'undefined' && gsUrl && userKey() && typeof fetch === 'function'; }
+  function pushSoon(){ if (_pushT) clearTimeout(_pushT); _pushT = setTimeout(pushNow, 400); }
+  function pushNow(){
+    _pushT = null; if (!haveSrv()) return;
+    var val = JSON.stringify(loadAll()), uk = userKey();
+    fetch(gsUrl, { method:'POST', redirect:'follow', body: JSON.stringify({ action:'setSetting', key: srvKey(), value: val }) })
+      .then(function(r){ return r.json(); })
+      .then(function(j){ if (j && !j.error && j.ok !== false && uk === userKey() && JSON.stringify(loadAll()) === val) markDirty(false); })
+      .catch(function(){ /* giữ cờ dirty, lần mở sau thử lại */ });
+  }
+  function pullOnce(){
+    var uk = userKey(); if (!haveSrv() || PULLED[uk]) return; PULLED[uk] = 1;
+    if (isDirty()) { pushNow(); return; }   // máy này có thay đổi chưa đẩy lên (lần trước lỗi mạng) → đẩy trước, không lấy về đè
+    var sep = gsUrl.indexOf('?') === -1 ? '?' : '&';
+    fetch(gsUrl + sep + 'action=getSetting&key=' + encodeURIComponent(srvKey()), { redirect:'follow' })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if (uk !== userKey() || isDirty()) return;   // đổi tài khoản / vừa sửa trong lúc chờ → bỏ
+        var raw = j && j.value, local = loadAll();
+        if (raw === null || raw === undefined || raw === '') { if (local.length) pushNow(); return; }   // server chưa có → đẩy bản máy này lên
+        var arr; try { arr = JSON.parse(raw); } catch(err){ return; }
+        if (!Array.isArray(arr)) return;
+        if (JSON.stringify(arr) === JSON.stringify(local)) return;
+        try { localStorage.setItem(storeKey(), JSON.stringify(arr)); } catch(err2){ return; }
+        try { inject(); } catch(err3){}
+      })
+      .catch(function(){});
+  }
   function forSub(sub){ return CFG[sub] ? loadAll().filter(function(p){ return p; }) : []; }   // MỌI báo cáo có ô Sale đều thấy MỌI mẫu
   function emptyLike(v){ return Array.isArray(v) ? [] : (typeof v === 'boolean' ? false : ''); }
   // Bộ lọc riêng (không Sale) của báo cáo đang xem — chỉ khoá có giá trị
@@ -157,6 +198,7 @@
     var g = groupsFor(sub).filter(function(x){ return x.key === key; })[0]; if (!g) return;
     if (!g.sales.length) { toastF('⚠ Đội “' + g.label + '”: ' + (g.total ? 'không tên Sale nào khớp dữ liệu báo cáo đang xem' : 'chưa có Sale nào được phân loại (Báo cáo E → Phân loại Sale)')); return; }
     _srState[c.sale] = g.sales.slice();
+    (c.reset || []).forEach(function(k){ _srState[k] = ''; });
     if (c.team) _srState[c.team] = [];
     _srState['_autoSaleSig_' + c.sale] = '';
     if (c.custom) _srState[c.custom] = true;
@@ -194,6 +236,7 @@
     var wrap = document.getElementById('salesreport-wrap'); if (!wrap) return;
     ['fp-ctl','fp-bar','fp-info'].forEach(function(id){ var old = document.getElementById(id); if (old && old.parentNode) old.parentNode.removeChild(old); });
     var sub = curSub(); if (!CFG[sub]) return;
+    pullOnce();
     var bar = wrap.querySelector('.srb-bar'); if (!bar) return;
     var anchor = null; for (var i = bar.children.length - 1; i >= 0; i--) { if (bar.children[i].classList.contains('gear-menu')) { anchor = bar.children[i]; break; } }
     // (18/10/2026) Cụm mẫu đặt SAU 🧰 Tác vụ: thanh công cụ dài quá thì chip mẫu xuống dòng, còn Tác vụ luôn ở hàng đầu cùng ô chọn báo cáo/ngày/Bộ lọc/Lọc.
@@ -211,6 +254,7 @@
     if (prev && prev.extras && prev.extras[sub]) Object.keys(prev.extras[sub]).forEach(function(k){ if (c.keys.indexOf(k) !== -1) _srState[k] = emptyLike(_srState[k]); });
     var ex = p.extras && p.extras[sub];
     if (ex) c.keys.forEach(function(k){ if (k === c.sale) return; var v = ex[k]; _srState[k] = (v === undefined) ? emptyLike(_srState[k]) : (Array.isArray(v) ? v.slice() : v); });   // bộ lọc riêng lưu từ chính báo cáo này
+    (c.reset || []).forEach(function(k){ _srState[k] = ''; });   // H/I: bỏ ô chọn 1 Team/1 CS cũ
     if (c.team) _srState[c.team] = [];          // ô "Lọc theo Team" chỉ là công cụ điền ô Sale — mẫu đã chứa sẵn danh sách Sale
     if (c.custom) _srState[c.custom] = true;     // E/F/G/L: đã tự chỉnh Sale → không bị ghi đè bởi mặc định theo vai trò
     var before = JSON.stringify(c.keys.map(function(k){ return _srState[k]; }));
@@ -224,6 +268,7 @@
   function turnOff(){
     var sub = curSub(), c = CFG[sub]; if (!c) return;
     c.keys.forEach(function(k){ _srState[k] = emptyLike(_srState[k]); });
+    (c.reset || []).forEach(function(k){ _srState[k] = ''; });
     if (c.team) _srState[c.team] = [];
     if (c.custom) _srState[c.custom] = false;     // E/F/G/L: về mặc định theo vai trò
     ACT[sub] = '';
@@ -259,7 +304,8 @@
 
   // ── Hộp "Tạo / sửa mẫu": đặt tên + tick các Sale ──
   function saleOptionsFor(sub){
-    var c = CFG[sub], arr = (_srState[c.opts] && _srState[c.opts].length) ? _srState[c.opts] : (_srState.saleOptions || _srState.saleBOptions || []);
+    var c = CFG[sub]; if (c.optsFn) { try { return (c.optsFn() || []).filter(Boolean).map(String); } catch(err0){ return []; } }
+    var arr = (_srState[c.opts] && _srState[c.opts].length) ? _srState[c.opts] : (_srState.saleOptions || _srState.saleBOptions || []);
     return arr.filter(Boolean).map(String);
   }
   function openEditor(id){
@@ -344,5 +390,6 @@
   if (typeof _orig === 'function') {
     window.renderSalesReportTab = renderSalesReportTab = function(){ var r = _orig.apply(this, arguments); try { inject(); } catch(err){} return r; };
   }
+  window._fpSync = { pull: pullOnce, push: pushNow, reset: function(){ PULLED = {}; } };   // dùng cho test
   window._fpApplyGroup = applyGroup; window._fpGroups = groupsFor; window._fpApply = applyPreset; window._fpList = loadAll;   // dùng cho test
 })();

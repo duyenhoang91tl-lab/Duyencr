@@ -38,7 +38,7 @@ const B = J(vm.runInContext('buildSalesReportB_({ dateFrom: "2026-10-01", dateTo
 ok(B.orders.length === 5 && B.orders.every(o => Array.isArray(o.bsx)), 'B that tu GAS: 5 don, co bsx/bcx');
 
 // ===== 2) Ham THAT cua web =====
-const j01 = R('js/01-fn-splitmulti.js'), j11 = R('js/11-fn-srload.js'), j12 = R('js/12-fn-rendersalesreporttabe.js'), j13 = R('js/13-fn-bpseedofficialonlinetemplate.js'), j61 = R('js/61-recon-export.js');
+const j01 = R('js/01-fn-splitmulti.js'), j11 = R('js/11-fn-srload.js'), j12 = R('js/12-fn-rendersalesreporttabe.js'), j13 = R('js/13-fn-bpseedofficialonlinetemplate.js'), j61 = R('js/61-recon-export.js'), j62 = R('js/62-sale-channel-periods.js'), j63 = R('js/63-fn-saleincome.js');
 const fnSrc = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('khong thay ' + name); let d = 0, k = src.indexOf('{', i); for (let j = k; j < src.length; j++) { if (src[j] === '{') d++; else if (src[j] === '}' && --d === 0) return src.slice(i, j + 1); } };
 let XLSX = null; try { XLSX = require('xlsx'); } catch (e) {}
 const toasts = [];
@@ -66,6 +66,10 @@ vm.runInContext(['_srCloseRateAvg_', '_srOrdNames_', '_srOrderShares_', '_srPure
 vm.runInContext("var _SR_UNASSIGNED_ = '(chưa gán sale)'; var _srKeepSelectedSales_ = function(rows) { return rows; };", w);
 vm.runInContext(['_srGEligible_', '_srGSaleTypeLabel_', '_srGDecode_', '_srGBuildGroups_', '_srGBuildExport_', '_srGNum_', '_srGSheet_'].map(n => fnSrc(j12, n)).join('\n'), w);
 vm.runInContext(['_srExportBLabel_', '_srBuildExportB_', '_srBuildExportBSheets_'].map(n => fnSrc(j13, n)).join('\n'), w);
+// Phan loai Sale theo moc ngay (js/62, ham THAT) + Thu nhap tung Sale cua Bao cao E (js/63, ham THAT)
+vm.runInContext("var SALE_CHANNEL_PERIODS = {}; var _cfgByAlias = function(m, n) { return m && m[n]; };", w);
+vm.runInContext(['_scpNorm_', '_scpListOf_', '_saleChannelOn_'].map(n => fnSrc(j62, n)).join('\n'), w);
+vm.runInContext(['_incomeIsTrialProgram_', '_computeSaleIncome_', '_incomeExportRows_'].map(n => fnSrc(j63, n)).join('\n') + '\n' + j63.match(/var _INCOME_GROUPS_ = [^\n]*/)[0], w);
 vm.runInContext(j61, w);
 const info = { dateFrom: '2026-10-01', dateTo: '2026-10-31', filters: ['Sale: anhtrinh1995'], at: 'luc test', ymd: '2026-11-02', user: 'Duyen', admin: true };
 
@@ -81,7 +85,7 @@ w.__B = B; w.__L = L; w.__info = info;
 plan = vm.runInContext('_reconCollect_(__B, __L, __info)', w);
 const names = plan.items.map(i => i.name), cnt = (re) => names.filter(n => re.test(n)).length;
 ok(names[0] === 'Mục lục', 'sheet dau = "Muc luc"');
-ok(cnt(/^B /) === 6 && cnt(/^E /) >= 3 && cnt(/^G /) === 3 && cnt(/^L /) >= 3 && cnt(/^N /) === 4, 'du sheet 5 bao cao: ' + names.join(' | '));
+ok(cnt(/^B /) === 6 && cnt(/^E /) >= 6 && cnt(/^G /) === 3 && cnt(/^L /) >= 3 && cnt(/^N /) === 4, 'du sheet 5 bao cao: ' + names.join(' | '));
 const orderedOK = ['B', 'E', 'G', 'L', 'N'].every((p, i, a) => !i || names.findIndex(n => n.startsWith(p + ' ')) > names.findIndex(n => n.startsWith(a[i - 1] + ' ')));
 ok(orderedOK, 'thu tu sheet: B → E → G → L → N');
 ok(names.every(n => n.length <= 31) && new Set(names.map(n => n.toLowerCase())).size === names.length, 'ten sheet <= 31 ky tu va khong trung');
@@ -112,6 +116,13 @@ const ET = S('E Thưởng').rows, ED = S('E Thưởng chi tiết').rows;
 const etData = ET.filter(r => r.length === 6 && r[0] && r[0] !== 'Sale' && r[0] !== 'TỔNG');
 ok(etData.length === 3 && etData.every(r => /^SUMIF\('E Thưởng chi tiết'!\$A:\$A,A\d+,'E Thưởng chi tiết'!\$F:\$F\)$/.test(r[4].f) && r[5].v === 0 && r[1]), 'E Thuong: moi sale co SUMIF ve sheet chi tiet, chenh = 0, co loai sale');
 ok(ED.some(r => r[3] === 'CT <A>' && r[4] === 'Đơn <> 1 triệu'), 'E Thuong chi tiet: giai ma HTML (&lt; &gt;) trong cot Chi tiet');
+// --- E: Thu nhap tung Sale (js/63) + doi chieu cheo ---
+const TI = S('E Thu nhập tổng hợp').rows, TD = S('E Thu nhập chi tiết').rows;
+ok(TI[0][0] === 'Sale' && TI[0][7] === 'TỔNG NHẬN' && TI[TI.length - 1][0] === 'TỔNG' && TD[0][2] === 'Nguồn / chương trình', 'E Thu nhap: 2 sheet dung dinh dang nut xuat Thu nhap cua E (tong hop + chi tiet)');
+const chkH = plan.checks.find(x => x.name === 'Hoa hồng ở Thu nhập'), chkT = plan.checks.find(x => x.name === 'Thưởng ở Thu nhập');
+ok(chkH && chkH.ok === true && chkT && chkT.ok === true, 'Muc luc: hoa hong va thuong trong "E Thu nhap" khop tong hoa hong / tong thuong cua E: ' + JSON.stringify([chkH && chkH.diff, chkT && chkT.diff]));
+ok(TI[TI.length - 1][7] === TI[TI.length - 1].slice(2, 7).reduce((a, b) => a + b, 0), 'E Thu nhap: dong TONG = hoa hong + kenh + cua hang + thuong');
+ok(plan.meta.e.income.totals.store === 3000 && TD.some(r => r[1] === 'Hoa hồng đơn chia với cửa hàng' && r[0] === 'anhtrinh1995'), 'E Thu nhap: don chia cua hang (L: 300.000 chia them x 1% vi don < 15tr = 3.000) vao dung Sale: store=' + plan.meta.e.income.totals.store);
 // --- G ---
 const G = S('G Tổng hợp').rows;
 ok(G[0][0] === 'BÁO CÁO THƯỞNG SALE — ĐỐI CHIẾU THEO POS' && G.some(r => r[0] === 'Kỳ báo cáo' && /2026-10-01/.test(r[1])) && G.some(r => r[0] === 'Số đơn Pos dùng để tính' && r[1] === 5), 'G Tong hop: tieu de + ky + so don');
@@ -125,6 +136,14 @@ ok(S('L Tổng hợp theo Sale') && S('L Chi tiết đơn') && S('L KT chưa ghi
 ok(plan.meta.l.daTinh === 300000 && idxRows.some(r => r[1] === 'L' && r[2] === 300000), 'Muc luc: dong L ghi doanh thu chia them 300.000');
 // --- B ---
 ok(S('B Đối chiếu tổng').rows.some(r => String(r[0]).indexOf('✅ KHỚP') === 0), 'B: sheet "B Doi chieu tong" van ✅ KHOP');
+
+// --- G voi moc ngay (js/62): menbui2002 la Thu viec den 05/10 roi len Offline -> luot thuong ngay 05/10 vao nhom THU VIEC, khong mat tien ---
+vm.runInContext("SALE_CHANNEL_PERIODS = { menbui2002: [{ from: '2026-09-01', channel: 'probation' }, { from: '2026-10-06', channel: 'offline' }] };", w);
+const pm = vm.runInContext('_reconCollect_(__B, __L, __info)', w);
+const gm = pm.items.find(i => i.name === 'G Tổng hợp').rows;
+ok(pm.warnings.length === 0 && gm.some(r => r[1] === 'menbui2002' && r[0] === 'Thử việc') && !gm.some(r => r[1] === 'menbui2002' && r[0] === 'Chính thức'), 'G co moc ngay: luot thuong cua menbui2002 ngay 05/10 xep vao nhom Thu viec (theo loai TAI NGAY don), khong loi');
+ok(Math.abs(pm.meta.g.total - plan.meta.g.total) < 0.01 && plan.meta.g.total > 0, 'G co moc ngay: chuyen nhom Thu viec/Chinh thuc KHONG doi tong thuong (' + plan.meta.g.total + ' -> ' + pm.meta.g.total + ')');
+vm.runInContext('SALE_CHANNEL_PERIODS = {};', w);
 
 // ===== 3) Truong hop loi =====
 // L khong tai duoc
@@ -179,7 +198,10 @@ if (XLSX) {
       ok(unassignedSeen === 1, 'LibreOffice: dong "(chua gan sale)" cua B Doi chieu tong lech dung = -300.000 (don khong co sale, bang web an dong nay)');
       ok(seen >= 8 && bad.length === 0, 'LibreOffice TINH LAI cong thuc: ' + seen + ' o "Chenh lech" (E Hoa hong / E Thuong / B Doi chieu tong) deu = 0' + (bad.length ? ' LECH: ' + bad.join(',') : ''));
       const idx = rc.Sheets['Mục lục']; const diffs = Object.keys(idx).filter(k => /^D\d+$/.test(k) && typeof idx[k].v === 'number');
-      ok(diffs.length >= 3 && diffs.every(k => Math.abs(idx[k].v) < 1), 'LibreOffice tinh lai: cot "Chenh so voi B" o Muc luc deu ~ 0 cho dong ✅ (' + diffs.length + ' o co so)');
+      const lab = k => String((idx['A' + k.slice(1)] || {}).v || ''), nS = plan.meta.e.nSales;
+      // 4 dong so voi B: chenh < 1d. 2 dong "trong E Thu nhap" (js/63 lam tron dong tung khoan tung Sale): chenh <= 1d + 1d/Sale (dung dung sai ghi o Muc luc)
+      const dB = diffs.filter(k => !/Thu nhập/.test(lab(k))), dI = diffs.filter(k => /Thu nhập/.test(lab(k)));
+      ok(dB.length >= 3 && dB.every(k => Math.abs(idx[k].v) < 1) && dI.length === 2 && dI.every(k => Math.abs(idx[k].v) <= 1 + nS), 'LibreOffice tinh lai: cot "Chenh" o Muc luc: ' + dB.length + ' dong so voi B < 1d; 2 dong Thu nhap trong dung sai lam tron (' + dI.map(k => idx[k].v).join(', ') + ' <= ' + (1 + nS) + 'd)');
     } catch (e) { console.log('(bo qua LibreOffice: ' + e.message.split('\n')[0] + ')'); }
   } else console.log('(bo qua tinh lai LibreOffice: khong co soffice)');
 } else console.log('(bo qua kiem tra file .xlsx that: chua cai thu vien xlsx)');

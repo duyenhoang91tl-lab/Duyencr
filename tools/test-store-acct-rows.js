@@ -97,4 +97,30 @@ ok(noPh.buildStoreCaseReport_({ dateFrom: '2026-10-01', dateTo: '2026-10-31' }).
 ok(c._storeAcctClassify_([], { codes: {}, noYear: {}, phones: { '0912468474': { sheet: 't', line: 9 } } }, false, '0912468474').status === 'co-sdt' && c._storeAcctClassify_([], { codes: {}, noYear: {}, phones: {} }, false, '0912468474').status === 'thieu-ma' && c._storeAcctClassify_([], { codes: {}, noYear: {} }, false, '0912468474').status === 'thieu-ma', 'classify: co-sdt / thieu-ma / acct cu khong co phones');
 const loaded = c._loadAcctCodeSet_();
 ok(loaded.phones['0912468474'] && loaded.phones['0912468474'].line === 2 && loaded.phones['0979687852'].line === 4 && Object.keys(loaded.phones).length === 2, 'doc cot SDT: 2 so khac nhau (so lap chi lay dong dau), chuan hoa them so 0 dau');
+// ---- QUY TAC NGAY GHEP DON POS (Duyen chot 2026-11-02): thang 10 chi +1 ngay; tu ngay 03/11/2026 +-1 ngay ----
+const D = (row, thang, ngay, phone, extra) => R(Object.assign({ row, stt: String(row), saleRaw: 'ninhnga99', phone, tenKh: 'K' + row, thang, ngayHen: ngay }, extra || {}));
+const POSD = [pos(501, '0900000501', '10/10/2026'),                                                        // A: dung ngay
+  pos(502, '0900000502', '09/10/2026'),                                                                    // B: -1 (thang 10) -> KHONG ghep
+  pos(503, '0900000503', '11/10/2026'),                                                                    // C: +1 (thang 10) -> ghep
+  pos(504, '0900000504', '01/11/2026'), pos(505, '0900000505', '03/11/2026'),                              // D: hen 02/11: -1 khong ghep ; +1 ghep (khac phone)
+  pos(506, '0900000506', '02/11/2026'), pos(507, '0900000507', '04/11/2026'),                              // E: hen 03/11: -1 ghep ; +1 ghep (khac phone)
+  pos(508, '0900000508', '03/11/2026'), pos(509, '0900000508', '02/11/2026'),                              // F: hen 03/11, co don DUNG ngay -> chi lay don dung ngay
+  pos(510, '0900000510', '01/11/2026'),                                                                    // G: hen 31/10 (thang 10) , Pos 01/11 = +1 -> ghep
+  pos(511, '0900000511', '30/10/2026')];                                                                   // H: hen 31/10, Pos 30/10 = -1 -> KHONG ghep
+const rowsD = [D(2, '10', '10', '0900000501'), D(3, '10', '10', '0900000502'), D(4, '10', '10', '0900000503'), D(5, '11', '2', '0900000504'), D(6, '11', '2', '0900000505'),
+  D(7, '11', '3', '0900000506'), D(8, '11', '3', '0900000507'), D(9, '11', '3', '0900000508'), D(10, '10', '31', '0900000510'), D(11, '10', '31', '0900000511')];
+const repD = run(rowsD, POSD).buildStoreCaseReport_({ dateFrom: '2026-10-01', dateTo: '2026-11-30' });
+const hit = r => (repD.rows.find(x => x.row === r) || { orders: [] }).orders.map(o => o.posRow + (o.lech ? '(' + (o.lech > 0 ? '+1' : '-1') + ')' : '')).join(',');
+ok(repD.ok && repD.rows.length === 10, 'bao cao chay duoc voi 10 dong kiem tra ngay');
+ok(hit(2) === '501', 'A) hen 10/10, don Pos DUNG ngay -> ghep');
+ok(hit(3) === '', 'B) THANG 10: hen 10/10, don Pos 09/10 (-1) -> KHONG ghep (chi cho +1)');
+ok(hit(4) === '503(+1)', 'C) THANG 10: hen 10/10, don Pos 11/10 (+1) -> ghep, danh dau +1');
+ok(hit(5) === '', 'D1) hen 02/11 (van quy tac thang 10): don Pos 01/11 (-1) -> KHONG ghep');
+ok(hit(6) === '505(+1)', 'D2) hen 02/11: don Pos 03/11 (+1) -> ghep');
+ok(hit(7) === '506(-1)', 'E1) TU 03/11: hen 03/11, don Pos 02/11 (-1) -> ghep (quy tac moi +-1)');
+ok(hit(8) === '507(+1)', 'E2) TU 03/11: hen 03/11, don Pos 04/11 (+1) -> ghep');
+ok(hit(9) === '508', 'F) co don DUNG ngay thi chi lay don dung ngay, bo qua don lech');
+ok(hit(10) === '510(+1)' && hit(11) === '', 'G/H) hen 31/10: Pos 01/11 (+1) ghep; Pos 30/10 (-1) khong ghep');
+const noteC = repD.rows.find(x => x.row === 4).orders[0].note;
+ok(/lệch \+1 ngày/.test(noteC), 'ghi chu don lech +1 ngay van hien');
 process.exit(bad ? 1 : 0);

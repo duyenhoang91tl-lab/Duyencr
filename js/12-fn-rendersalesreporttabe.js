@@ -70,11 +70,19 @@ function _daysSinceStart_(startYmd, dateYmd){
 // Tra "Ngày bắt đầu" đã đặt cho 1 tên Sale (qua Quản lý tài khoản — 1 tài khoản có thể có nhiều
 // tên/bí danh, xem _acctNamesOf) — dùng chung nguồn "accounts" (đã tải sẵn toàn cục).
 function _saleStartDate_(name){
-  if (!name || typeof accounts === 'undefined') return '';
-  var al = _cfgAliasesOf(name);   // tên chính trên báo cáo có thể khác tên đã lưu trong tài khoản -> tra theo MỌI tên cùng người
-  for (var i = 0; i < accounts.length; i++){
-    var ns = _acctNamesOf(accounts[i]);
-    for (var j = 0; j < al.length; j++) if (ns.indexOf(al[j]) !== -1) return accounts[i].startDate || '';
+  if (!name) return '';
+  if (typeof accounts !== 'undefined'){
+    var al = _cfgAliasesOf(name);   // tên chính trên báo cáo có thể khác tên đã lưu trong tài khoản -> tra theo MỌI tên cùng người
+    for (var i = 0; i < accounts.length; i++){
+      var ns = _acctNamesOf(accounts[i]);
+      for (var j = 0; j < al.length; j++) if (ns.indexOf(al[j]) !== -1){ if (accounts[i].startDate) return accounts[i].startDate; i = accounts.length; break; }
+    }
+  }
+  // Tài khoản chưa đặt Ngày bắt đầu -> lấy "Ngày bắt đầu tính thưởng" (bonusFrom) của mốc Thử việc ở modal "Phân loại đội Sale" (js/62).
+  // KHÔNG dùng ngày `from` của mốc: thử việc tính tròn 1 tháng, còn ngày bắt đầu tính thưởng là SAU thời gian học việc (Duyên 2026-11-02).
+  if (typeof _scpGroupListOf_ === 'function' || typeof _scpListOf_ === 'function'){
+    var l = (typeof _scpGroupListOf_ === 'function') ? _scpGroupListOf_(name) : _scpListOf_(name);
+    for (var k = 0; k < l.length; k++) if (l[k].channel === 'probation' && l[k].bonusFrom) return l[k].bonusFrom;
   }
   return '';
 }
@@ -129,7 +137,14 @@ function _orderRevenueShares_(o){
 // p.prodRules = {enabled, items:[{code,name,amount}]} : thưởng theo TỪNG sản phẩm (khớp theo MÃ ở cột Mã sản phẩm, ghép vị trí với cột Số lượng):
 //   mỗi đơn được amount × số lượng của từng mã đã tích. Các chương trình sản phẩm KHÔNG ghi đè nhau (cộng dồn, mỗi chương trình 1 dòng).
 function _bonusNormSrc_(v){ return String(v==null?'':v).trim().toLowerCase(); }
+// p.excludeSources = [tên nguồn đơn] : LOẠI các đơn thuộc nguồn này khỏi chương trình (dùng được cùng hoặc không cùng p.sources). Không phân biệt hoa/thường.
+function _bonusHasSrcFilter_(p){ return !!(p && ((p.sources && p.sources.length) || (p.excludeSources && p.excludeSources.length))); }
+function _bonusSourceExcluded_(p, nguonDon){
+  var ex = (p && p.excludeSources) || [], s = _bonusNormSrc_(nguonDon);
+  return ex.some(function(x){ return _bonusNormSrc_(x) === s; });
+}
 function _bonusSourceOk_(p, nguonDon){
+  if (_bonusSourceExcluded_(p, nguonDon)) return false;
   var list = (p && p.sources) || [];
   if (!list.length) return true;
   var s = _bonusNormSrc_(nguonDon);
@@ -145,10 +160,13 @@ function _bonusOrderProductQtys_(o){
   });
   return out;
 }
-function _bonusAggSources_(g, sources){
+function _bonusAggSources_(g, sources, exclude){
   var agg = {name:g.name, date:g.date, revenue:0, count:0, firstOrderTime:null};
-  (sources||[]).forEach(function(sn){
-    var x = g.bySrc && g.bySrc[_bonusNormSrc_(sn)]; if (!x) return;
+  var ex = {}; (exclude||[]).forEach(function(n){ ex[_bonusNormSrc_(n)] = true; });
+  var names = (sources && sources.length) ? sources.map(_bonusNormSrc_) : Object.keys(g.bySrc || {});   // không chọn nguồn nào = mọi nguồn (trừ nguồn bị loại)
+  names.forEach(function(sn){
+    if (ex[sn]) return;
+    var x = g.bySrc && g.bySrc[sn]; if (!x) return;
     agg.revenue += x.revenue; agg.count += x.count;
     if (x.firstOrderTime && (agg.firstOrderTime===null || x.firstOrderTime < agg.firstOrderTime)) agg.firstOrderTime = x.firstOrderTime;
   });
@@ -191,14 +209,16 @@ function _computeBonusData_(orders){
   });
   Object.keys(bySaleDay).forEach(function(key){
     var g = bySaleDay[key];
-    var channel = _saleChannelOf_(g.name);
+    var channel = _saleChannelOn_(g.name, g.date);   // loại Sale TẠI NGÀY (mốc ngày ở js/62), không phải loại hiện tại
     // 3 nhóm riêng theo phạm vi "theo ngày" — CỘNG DỒN giữa các nhóm, trong 1 nhóm chỉ lấy cao nhất.
     var bestTier = null, bestRevDay = null, bestFirstOrder = null;
     BONUS_PROGRAMS.forEach(function(p){
       if (!_bonusProgramApplies_(p, g.date, channel, g.name)) return;
-      var gs = (p.sources && p.sources.length) ? _bonusAggSources_(g, p.sources) : g;   // CT theo nguồn: chỉ cộng đơn thuộc nguồn đã chọn
-      if (p.sources && p.sources.length && gs.count === 0 && gs.revenue === 0) return;   // ngày không có đơn nào thuộc nguồn đã chọn
+      var hasSrc = _bonusHasSrcFilter_(p);
+      var gs = hasSrc ? _bonusAggSources_(g, p.sources, p.excludeSources) : g;   // CT theo nguồn: chỉ cộng đơn thuộc nguồn đã chọn, bỏ nguồn bị loại
+      if (hasSrc && gs.count === 0 && gs.revenue === 0) return;   // ngày không có đơn nào thuộc nguồn áp dụng
       var srcTxt = (p.sources && p.sources.length) ? ' [nguồn: '+p.sources.join(', ')+']' : '';
+      if (p.excludeSources && p.excludeSources.length) srcTxt += ' [loại nguồn: '+p.excludeSources.join(', ')+']';
       if (p.revenue && p.revenue.enabled && p.revenue.scope === 'day'){
         var min = (p.revenue.min!=='' && p.revenue.min!=null) ? Number(p.revenue.min) : null;
         var max = (p.revenue.max!=='' && p.revenue.max!=null) ? Number(p.revenue.max) : null;
@@ -240,7 +260,7 @@ function _computeBonusData_(orders){
     var orderNames = Object.keys(_bonusNamesOfOrder_(o)).filter(Boolean), nParts = orderNames.length || 1;
     orderNames.forEach(function(name){ // mọi sale tham gia; tiền thưởng chia đều nParts
       if (!name) return;
-      var channel = _saleChannelOf_(name);
+      var channel = _saleChannelOn_(name, dateStr);   // loại Sale TẠI NGÀY ĐƠN (mốc ngày ở js/62)
       var best = null;
       var extra = [];   // CT thưởng theo SẢN PHẨM (mã): cộng dồn, không tranh "best" với CT khác
       BONUS_PROGRAMS.forEach(function(p){
@@ -341,6 +361,7 @@ function _srRenderE_(d){
 
   html += _goldRuleNoteHtml_(c);   // ghi chu luat vang kenh Nguon (chi hien khi co don ap dung)
 
+  html += _srIncomeSectionHtml_(d);   // THU NHAP TUNG SALE (js/63): tong hoa hong + thuong, bam Chi tiet xem tung nguon
   // b) Hoa hồng từng nhân viên
   _SR_COLTH_ROWSFN_['eSale'] = function(){ return _computeCommissionData_((_srState.dataE&&_srState.dataE.orders)||[]).bySale || []; };
   _SR_COLTH_GETTER_['eSale'] = { name: function(r){ return r.name; } };
@@ -583,8 +604,8 @@ function _srRenderF_(d){
 //  Có xuất CSV (chi tiết từng lượt thưởng / tổng hợp / đơn đã dùng để tính) để kế toán đối chiếu.
 //  Backend action failedOrderReport giữ nguyên (không còn tab nào gọi), chỉ bỏ giao diện.
 // ════════════════════════════════════════════════════════════════════
-function _srGSaleTypeLabel_(name){
-  var c = _saleChannelOf_(name);
+function _srGSaleTypeLabel_(name, chan){
+  var c = (chan !== undefined && chan !== '') ? chan : _saleChannelOf_(name);   // chan = loại của HÀNG (theo mốc ngày), bỏ trống → loại hiện tại
   return c === 'probation' ? 'Thử việc' : (c === 'online' ? 'Online' : (c === 'offline' ? 'Offline' : 'Chưa phân loại'));
 }
 function _srGDecode_(s){
@@ -601,17 +622,76 @@ function _srGBuildGroups_(orders){
   var bonus = _computeBonusData_(orders || []);
   var g = { tv: { rows: [], total: 0 }, ct: { rows: [], total: 0 }, total: 0, programs: {}, skipped: [] };
   bonus.bySale.forEach(function(r){
-    if (!_srGEligible_(r.name)) { g.skipped.push(r.name); return; }
-    g.total += r.total;
-    var isTv = _saleChannelOf_(r.name) === 'probation';
-    var grp = isTv ? g.tv : g.ct;
-    grp.rows.push(r); grp.total += r.total;
-    r.items.forEach(function(it){
-      var p = g.programs[it.program] || (g.programs[it.program] = { name: it.program, tvCount: 0, tvAmount: 0, ctCount: 0, ctAmount: 0 });
-      if (isTv){ p.tvCount++; p.tvAmount += it.amount; } else { p.ctCount++; p.ctAmount += it.amount; }
+    // Nhóm theo loại Sale TẠI NGÀY của từng lượt thưởng (mốc ngày ở js/62): Sale đổi Thử việc → Chính thức giữa kỳ
+    // xuất hiện ở CẢ 2 nhóm, mỗi nhóm chỉ gồm các lượt thưởng thuộc giai đoạn đó. Không có mốc → như cũ (theo loại hiện tại).
+    var tvItems = [], ctItems = [], ctChan = '', dropped = 0;
+    (r.items || []).forEach(function(it){
+      var ch = _saleChannelOn_(r.name, it.date);
+      if (ch === 'probation') tvItems.push(it);
+      else if (ch === 'online' || ch === 'offline'){ ctItems.push(it); if (!ctChan) ctChan = ch; }
+      else dropped++;
     });
+    if (!(r.items || []).length){   // không có lượt thưởng nào: giữ cách xét cũ theo loại hiện tại
+      if (!_srGEligible_(r.name)) { g.skipped.push(r.name); return; }
+      var c0 = _saleChannelOf_(r.name);
+      var row0 = { name: r.name, total: r.total, items: [], chan: c0 };
+      g.total += r.total;
+      if (c0 === 'probation'){ g.tv.rows.push(row0); g.tv.total += r.total; } else { g.ct.rows.push(row0); g.ct.total += r.total; }
+      return;
+    }
+    if (!tvItems.length && !ctItems.length) { g.skipped.push(r.name); return; }
+    function sum(a){ return a.reduce(function(x, it){ return x + (Number(it.amount) || 0); }, 0); }
+    function push(grp, items, chan, isTv){
+      var total = (!dropped && (isTv ? !ctItems.length : !tvItems.length)) ? r.total : sum(items);   // 1 nhóm duy nhất, không rớt lượt nào → giữ đúng tổng gốc
+      var row = {}; Object.keys(r).forEach(function(k){ row[k] = r[k]; });
+      row.items = items; row.total = total; row.chan = chan;
+      grp.rows.push(row); grp.total += total; g.total += total;
+      items.forEach(function(it){
+        var p = g.programs[it.program] || (g.programs[it.program] = { name: it.program, tvCount: 0, tvAmount: 0, ctCount: 0, ctAmount: 0 });
+        if (isTv){ p.tvCount++; p.tvAmount += it.amount; } else { p.ctCount++; p.ctAmount += it.amount; }
+      });
+    }
+    if (tvItems.length) push(g.tv, tvItems, 'probation', true);
+    if (ctItems.length) push(g.ct, ctItems, ctChan, false);
   });
   return g;
+}
+// Sale đang/đã Thử việc (SALE_CHANNELS hoặc có mốc Thử việc) nhưng KHÔNG có dòng thưởng nào ở mục Thử việc → báo LÝ DO cụ thể
+// (chưa đặt Ngày bắt đầu tính thưởng / không thấy đơn Pos mang tên Sale này / có đơn nhưng không đạt CT). Trả về mảng {name, reason}.
+function _srGProbationHints_(g, orders){
+  var names = {};
+  Object.keys(typeof SALE_CHANNELS !== 'undefined' ? SALE_CHANNELS : {}).forEach(function(n){ if (SALE_CHANNELS[n] === 'probation') names[n] = 1; });
+  Object.keys(typeof SALE_CHANNEL_PERIODS !== 'undefined' ? SALE_CHANNEL_PERIODS : {}).forEach(function(n){
+    if ((SALE_CHANNEL_PERIODS[n] || []).some(function(e){ return e && e.channel === 'probation'; })) names[n] = 1;
+  });
+  var shown = {}; g.tv.rows.forEach(function(r){ shown[String(r.name).toLowerCase()] = 1; });
+  var seen = {}, out = [];
+  Object.keys(names).forEach(function(n){
+    var grp = (typeof _scpGroupNames_ === 'function') ? _scpGroupNames_(n) : [n];
+    var al = {}; grp.concat(typeof _cfgAliasesOf === 'function' ? _cfgAliasesOf(n) : [n]).forEach(function(x){ al[String(x).toLowerCase()] = 1; });
+    var key = Object.keys(al).sort().join('|');
+    if (seen[key]) return; seen[key] = 1;
+    if (Object.keys(al).some(function(x){ return shown[x]; })) return;   // đã có dòng ở mục Thử việc
+    var mine = (orders || []).filter(function(o){ return Object.keys(_bonusNamesOfOrder_(o)).some(function(x){ return al[String(x).toLowerCase()]; }); });
+    var cnt = mine.length;
+    var sd = ''; for (var i = 0; i < grp.length && !sd; i++) sd = _saleStartDate_(grp[i]);
+    var rf = (typeof _srState !== 'undefined' && _srState.gDateFrom) || '', rt = (typeof _srState !== 'undefined' && _srState.gDateTo) || '';
+    var rng = (rf || rt) ? ' ('+esc(rf)+' → '+esc(rt)+')' : '';
+    // Thưởng tính theo ĐƠN GỐC, NGÀY LÊN ĐƠN TRÊN BASE (baseNgayTao), và đơn phải CÓ trên Pos (Duyên 02/11/2026).
+    var ymdOf = function(o){ return o.baseNgayTao || _ddmmyyyyToYmd_(o.ngayTao || o.ngayTaoDon); };
+    var reason;
+    if (!sd) reason = 'chưa đặt <b>Ngày bắt đầu tính thưởng</b> → các chương trình theo ngày thử việc không áp dụng (🏷️ Phân loại đội Sale → Sửa mốc → ô "Bắt đầu tính thưởng", rồi Lưu mốc)';
+    else if (rt && rt < sd) reason = 'kỳ đang xem'+rng+' kết thúc <b>trước Ngày bắt đầu '+esc(sd)+'</b> — chọn kỳ có ngày từ '+esc(sd)+' trở đi (vd Tháng trước)';
+    else if (!cnt) reason = 'Ngày bắt đầu '+esc(sd)+' nhưng <b>không thấy đơn Pos nào mang tên Sale này</b> trong kỳ'+rng+' — kiểm tra tên trên đơn có khớp tên/bí danh tài khoản không, và bộ lọc Sale đang chọn có gồm Sale này không';
+    else {
+      var nBase = mine.filter(function(o){ return !!o.baseNgayTao; }).length, nGoc = mine.filter(function(o){ return !!o.donGoc; }).length;
+      var nSau = mine.filter(function(o){ var y = ymdOf(o); return y && y >= sd; }).length;
+      reason = 'Ngày bắt đầu '+esc(sd)+', có '+cnt+' đơn Pos: '+nBase+' đơn đã ghép Base (có ngày lên Base), '+nGoc+' đơn gốc, '+nSau+' đơn có ngày lên Base từ ngày bắt đầu. '+
+        'Thưởng chỉ tính đơn có ngày lên đơn trên Base từ ngày bắt đầu — nếu số này = 0 thì đơn chưa ghép được Base hoặc lên Base trước ngày bắt đầu; nếu > 0 thì kiểm tra khoảng ngày/đối tượng của chương trình thưởng thử việc';
+    }
+    out.push({name: n, reason: reason});
+  });
+  return out;
 }
 function _srRenderG_(d){
   if (!d) return _srNoDataHtml_();
@@ -631,6 +711,9 @@ function _srRenderG_(d){
     '<div class="kpi-card"><div class="kpi-val">'+fmt((d.orders||[]).length)+'</div><div class="kpi-label">Đơn Pos dùng để tính</div></div>'+
     '</div>';
   if (g.skipped.length) html += '<div style="font-size:11.5px;color:#9a3412;margin-bottom:10px">Không tính thưởng cho '+g.skipped.length+' Sale chưa thuộc đội Online/Văn phòng: '+esc(g.skipped.slice(0,8).join(', '))+(g.skipped.length>8?'…':'')+' — phân loại ở Báo cáo E → "Phân loại Sale" nếu cần.</div>';
+  _srGProbationHints_(g, d.orders || []).forEach(function(h){
+    html += '<div style="font-size:11.5px;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:6px 10px;margin-bottom:8px">⚠️ Sale Thử việc <b>'+esc(h.name)+'</b> chưa có thưởng: '+h.reason+'.</div>';
+  });
   html += '<div style="margin-bottom:14px"><button class="btn sm" onclick="_srSetSub(\'K\')">📋 Chi tiết đơn thưởng (đếm sản phẩm)</button></div>';
 
   function groupTable(title, key, grp, isTv){
@@ -642,7 +725,7 @@ function _srRenderG_(d){
       var expanded = _srState.gBonusExpanded === rid;
       var sd = isTv ? _saleStartDate_(s.name) : '';
       h += '<tr><td>'+esc(s.name)+'</td>'+
-        '<td>'+(isTv ? (sd ? esc(sd) : '<span style="color:#9a3412">chưa đặt Ngày bắt đầu</span>') : esc(_srGSaleTypeLabel_(s.name)))+'</td>'+
+        '<td>'+(isTv ? (sd ? esc(sd) : '<span style="color:#9a3412">chưa đặt Ngày bắt đầu</span>') : esc(_srGSaleTypeLabel_(s.name, s.chan)))+'</td>'+
         '<td style="text-align:right">'+fmt(s.items.length)+'</td>'+
         '<td style="text-align:right"><b>'+_srMoney(s.total)+'</b></td>'+
         '<td style="white-space:nowrap"><button class="btn sm" data-sale="'+esc(s.name)+'" onclick="_bdOpenForSale(this.dataset.sale)" title="Xem danh sách đơn của sale này">Chi tiết</button> <button class="btn sm" onclick="_srState.gBonusExpanded='+(expanded ? "''" : "'"+rid+"'")+';renderSalesReportTab()" title="Các lượt thưởng">'+(expanded ? 'Ẩn' : 'Lượt thưởng')+'</button></td></tr>';
@@ -697,13 +780,13 @@ function _srGBuildExport_(d){
       var sd = pair[0] === 'Thử việc' ? _saleStartDate_(s.name) : '';
       s.items.forEach(function(it){
         var dn = sd ? _daysSinceStart_(sd, it.date) : '';
-        detail.push([pair[0], s.name, _srGSaleTypeLabel_(s.name), sd, it.date, dn === null ? '' : dn, it.scope, it.program, _srGDecode_(it.detail), it.maDonPos || it.orderId || '', it.amount, it.counter || '', it.nSP != null ? it.nSP : '', (it.vongRev != null ? it.vongRev : '')]);
+        detail.push([pair[0], s.name, _srGSaleTypeLabel_(s.name, s.chan), sd, it.date, dn === null ? '' : dn, it.scope, it.program, _srGDecode_(it.detail), it.maDonPos || it.orderId || '', it.amount, it.counter || '', it.nSP != null ? it.nSP : '', (it.vongRev != null ? it.vongRev : '')]);
       });
     });
   });
   var summary = [['Nhóm','Sale','Loại Sale','Ngày bắt đầu (Thử việc)','Số lượt thưởng','Tổng thưởng']];
   [['Thử việc', g.tv], ['Chính thức', g.ct]].forEach(function(pair){
-    pair[1].rows.forEach(function(s){ summary.push([pair[0], s.name, _srGSaleTypeLabel_(s.name), pair[0] === 'Thử việc' ? _saleStartDate_(s.name) : '', s.items.length, s.total]); });
+    pair[1].rows.forEach(function(s){ summary.push([pair[0], s.name, _srGSaleTypeLabel_(s.name, s.chan), pair[0] === 'Thử việc' ? _saleStartDate_(s.name) : '', s.items.length, s.total]); });
     summary.push([pair[0]+' — TỔNG','','','', pair[1].rows.reduce(function(a,r){return a+r.items.length;},0), pair[1].total]);
   });
   summary.push(['TỔNG CHUNG','','','','', g.total]);
@@ -990,18 +1073,21 @@ function _renderSaleChannelsModal(){
   // ── Bang phan loai tung Sale, dropdown dong theo SALE_GROUPS ──
   var names = (typeof _allCSNames === 'function' ? _allCSNames() : []).slice().sort(function(a,b){ return a.localeCompare(b,'vi'); });
   var q = (_scSearch||'').toLowerCase();
-  var filtered = names.filter(function(n){ return !q || n.toLowerCase().indexOf(q)!==-1; });
+  // GOM THEO NGƯỜI (cùng khớp Sale với báo cáo): biichnguyen1993 / Biichnguyen1993 hoặc nhiều tên của 1 tài khoản CS = 1 dòng, cài 1 lần áp dụng mọi tên
+  var groups = (typeof _groupNamesByPerson === 'function') ? _groupNamesByPerson(names) : names.map(function(n){ return { names: [n], primary: n }; });
+  var filtered = groups.filter(function(g){ return !q || g.names.some(function(n){ return n.toLowerCase().indexOf(q)!==-1; }); });
   html += '<input type="text" placeholder="🔍 Tìm nhanh theo tên..." value="'+esc(_scSearch||'')+'" oninput="_scSearch=this.value;_renderSaleChannelsModal()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;width:240px;margin-bottom:10px">';
-  html += '<table class="dash-table"><thead><tr><th>Tên</th><th style="width:220px">Đội</th></tr></thead><tbody>';
-  filtered.forEach(function(name){
-    var cur = _saleChannelOf_(name);
-    html += '<tr><td>'+esc(name)+'</td><td>'+
+  html += '<table class="dash-table"><thead><tr><th>Tên</th><th style="width:220px">Đội hiện tại</th><th style="min-width:200px">🗓 Mốc theo ngày</th></tr></thead><tbody>';
+  filtered.forEach(function(grp){
+    var name = grp.primary;
+    var cur = ''; grp.names.some(function(n){ cur = _saleChannelOf_(n) || ''; return cur; });   // tên nào trong nhóm đã phân loại thì lấy
+    html += '<tr><td>'+esc(grp.names.join(' / '))+(grp.names.length > 1 ? ' <span style="font-size:10px;color:var(--muted)">('+grp.names.length+' tên = 1 người)</span>' : '')+'</td><td>'+
       '<select onchange="_setSaleChannel(\''+esc(name).replace(/'/g,"\\'")+'\',this.value)" style="width:200px">'+
       '<option value=""'+(cur===''?' selected':'')+'>— Chưa phân loại —</option>'+
       SALE_GROUPS.map(function(g){ return '<option value="'+esc(g.key)+'"'+(cur===g.key?' selected':'')+'>'+esc(g.label)+'</option>'; }).join('')+
-      '</select></td></tr>';
+      '</select></td><td>'+_scpCellHtml_(name)+'</td></tr>' + _scpEditorRowHtml_(name, 3);
   });
-  if (!filtered.length) html += '<tr><td colspan="2" style="text-align:center;color:var(--muted);padding:14px">Không có tên nào khớp</td></tr>';
+  if (!filtered.length) html += '<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:14px">Không có tên nào khớp</td></tr>';
   html += '</tbody></table>';
   body.innerHTML = html;
 }
@@ -1013,8 +1099,11 @@ function _scSaveGroups(){
   _renderSaleChannelsModal();
 }
 function _setSaleChannel(name, val){
-  if (val) SALE_CHANNELS[name] = val; else delete SALE_CHANNELS[name];
+  // Ghi cho MỌI tên cùng 1 người (hoa/thường, bí danh tài khoản) để báo cáo tra tên nào cũng ra
+  var ns = (typeof _scpGroupNames_ === 'function') ? _scpGroupNames_(name) : [name];
+  ns.forEach(function(n){ if (val) SALE_CHANNELS[n] = val; else delete SALE_CHANNELS[n]; });
   saveSaleChannels();
+  if (ns.length > 1) _renderSaleChannelsModal();
 }
 
 function openChannelRatesModal(){
@@ -1097,7 +1186,7 @@ function _bpNewProgram(){
     audience: {online:false, offline:false}, product:'', requireProduct:'', extraNote:'', exclusionNote:'',
     tier: {enabled:false, rows:[]}, revenue: {enabled:false, scope:'order', min:'', max:''},
     firstOrder: {enabled:false, amount:''}, probationDay: {enabled:false, from:'', to:''},
-    sources: [], prodRules: {enabled:false, items:[]},
+    sources: [], excludeSources: [], prodRules: {enabled:false, items:[]},
     bonusAmount:'' };
 }
 // Chuong trinh cu luu tu truoc khi co firstOrder/probationDay se thieu 2 field nay -> bo sung
@@ -1119,6 +1208,7 @@ function _bpNormalize_(p){
   if (!p.firstOrder) p.firstOrder = {enabled:false, amount:''};
   if (!p.probationDay) p.probationDay = {enabled:false, from:'', to:''};
   if (!Array.isArray(p.sources)) p.sources = [];
+  if (!Array.isArray(p.excludeSources)) p.excludeSources = [];
   if (!p.prodRules) p.prodRules = {enabled:false, items:[]};
   if (!Array.isArray(p.prodRules.items)) p.prodRules.items = [];
   return p;
@@ -1138,6 +1228,7 @@ function _renderBonusProgramsModal(){
       if (p.product) mech.push('Sản phẩm ('+esc(p.product)+')');
       if (p.prodRules && p.prodRules.enabled && (p.prodRules.items||[]).length) mech.push('Thưởng theo sản phẩm ('+p.prodRules.items.length+' mã)');
       if (p.sources && p.sources.length) mech.push('Theo nguồn: '+esc(p.sources.join(', '))+' (Online + Offline)');
+      if (p.excludeSources && p.excludeSources.length) mech.push('Loại nguồn: '+esc(p.excludeSources.join(', ')));
       if (p.revenue && p.revenue.enabled) mech.push('Doanh thu theo '+(p.revenue.scope==='day'?'ngày':'đơn'));
       if (p.tier && p.tier.enabled) mech.push('Bậc số đơn/ngày');
       if (p.firstOrder && p.firstOrder.enabled) mech.push('Đơn đầu tiên/ngày');
@@ -1237,7 +1328,7 @@ function _bpEditFormHtml_(p){
     '</div>';
 }
 // ── Mục 4b: THƯỞNG THEO SẢN PHẨM (tìm tên/mã → tích → nhập tiền thưởng từng sản phẩm) ──
-var _bpProducts = null, _bpProdLoading = false, _bpProdErr = '', _bpProdQuery = '', _bpSrcQuery = '';
+var _bpProducts = null, _bpProdLoading = false, _bpProdErr = '', _bpProdQuery = '', _bpSrcQuery = '', _bpXSrcQuery = '';
 // Lọc TÙY CHỌN theo Size / Chất liệu khi tìm sản phẩm (bỏ qua = không lọc). Tuỳ chọn lấy từ bảng giá (priceCatalogFlat); so khớp với TÊN sản phẩm trên đơn (không dấu).
 var _bpFacets = null, _bpFacetLoading = false, _bpSizeSel = [], _bpMatSel = [];
 async function _bpLoadFacets_(){
@@ -1380,13 +1471,21 @@ function _bpSrcSectionHtml_(p){
   var h = '<div class="form-label">4c. Thưởng theo NGUỒN đơn <span style="font-weight:400;color:var(--muted);font-size:11px">(tích nguồn → chương trình CHỈ tính đơn thuộc các nguồn này, áp dụng CHUNG Online + Offline; cơ chế tính tạo ở các mục 6–10 như thường)</span></div>'+
     '<input type="text" id="bp-src-q" value="'+esc(_bpSrcQuery)+'" placeholder="🔍 Gõ để tìm nguồn..." oninput="_bpSrcQuery=this.value;_bpSrcRefresh_()" style="width:100%;margin-bottom:6px">'+
     '<div id="bp-src-list" style="max-height:150px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:6px;margin-bottom:6px">'+_bpSrcListHtml_()+'</div>'+
-    '<div id="bp-src-sel" style="font-size:12px;margin-bottom:12px">'+_bpSrcSelHtml_()+'</div>';
-  if (!(_srState && _srState.nguonOptions && _srState.nguonOptions.length) && typeof _srLoadOptions === 'function' && !_srState.optionsLoaded) setTimeout(function(){ _srLoadOptions().then(_bpSrcRefresh_).catch(function(){}); }, 0);
+    '<div style="display:flex;gap:6px;margin-bottom:6px"><input type="text" id="bp-src-add" placeholder="➕ Nguồn chưa có trong danh sách? Gõ đúng tên nguồn trên đơn (vd: Mỹ phẩm) rồi bấm Thêm" onkeydown="if(event.key===\'Enter\'){event.preventDefault();_bpSrcAdd()}" style="flex:1"><button class="btn sm secondary" type="button" onclick="_bpSrcAdd()">Thêm</button></div>'+
+    '<div id="bp-src-sel" style="font-size:12px;margin-bottom:12px">'+_bpSrcSelHtml_()+'</div>'+
+    '<div class="form-label">4d. LOẠI nguồn đơn <span style="font-weight:400;color:var(--muted);font-size:11px">(tích nguồn → đơn thuộc các nguồn này KHÔNG được tính cho chương trình, kể cả đếm số đơn/doanh số ngày. Dùng riêng hoặc cùng mục 4c)</span></div>'+
+    '<input type="text" id="bp-xsrc-q" value="'+esc(_bpXSrcQuery)+'" placeholder="🔍 Gõ để tìm nguồn cần loại..." oninput="_bpXSrcQuery=this.value;_bpXSrcRefresh_()" style="width:100%;margin-bottom:6px">'+
+    '<div id="bp-xsrc-list" style="max-height:150px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:6px;margin-bottom:6px">'+_bpXSrcListHtml_()+'</div>'+
+    '<div style="display:flex;gap:6px;margin-bottom:6px"><input type="text" id="bp-xsrc-add" placeholder="➕ Nguồn cần loại chưa có trong danh sách? Gõ đúng tên rồi bấm Thêm" onkeydown="if(event.key===\'Enter\'){event.preventDefault();_bpXSrcAdd()}" style="flex:1"><button class="btn sm secondary" type="button" onclick="_bpXSrcAdd()">Thêm</button></div>'+
+    '<div id="bp-xsrc-sel" style="font-size:12px;margin-bottom:12px">'+_bpXSrcSelHtml_()+'</div>';
+  if (!(_srState && _srState.nguonOptions && _srState.nguonOptions.length) && typeof _srLoadOptions === 'function' && !_srState.optionsLoaded) setTimeout(function(){ _srLoadOptions().then(function(){ _bpSrcRefresh_(); _bpXSrcRefresh_(); }).catch(function(){}); }, 0);
   return h;
 }
 function _bpSrcListHtml_(){
-  var opts = (_srState && _srState.nguonOptions) || [], q = _bpNorm_(_bpSrcQuery);
+  var opts = ((_srState && _srState.nguonOptions) || []).slice(), q = _bpNorm_(_bpSrcQuery);
   var picked = {}; (_bpDraft.sources||[]).forEach(function(x){ picked[_bonusNormSrc_(x)] = true; });
+  var known = {}; opts.forEach(function(n){ known[_bonusNormSrc_(n)] = true; });
+  (_bpDraft.sources||[]).forEach(function(x){ if (!known[_bonusNormSrc_(x)]){ opts.push(x); known[_bonusNormSrc_(x)] = true; } });   // nguồn gõ tay (chưa có trong dữ liệu đơn) vẫn hiện để bỏ tick được
   var list = opts.filter(function(n){ return !q || _bpNorm_(n).indexOf(q) !== -1; });
   if (!opts.length) return '<div style="color:var(--muted);font-size:12px;padding:6px">Đang tải danh sách nguồn… (hoặc mở Báo cáo doanh số rồi mở lại).</div>';
   if (!list.length) return '<div style="color:var(--muted);font-size:12px;padding:6px">Không có nguồn khớp.</div>';
@@ -1402,6 +1501,49 @@ function _bpSrcRefresh_(){
   var a = document.getElementById('bp-src-list'), b = document.getElementById('bp-src-sel');
   if (a) a.innerHTML = _bpSrcListHtml_();
   if (b) b.innerHTML = _bpSrcSelHtml_();
+}
+function _bpXSrcListHtml_(){
+  var opts = ((_srState && _srState.nguonOptions) || []).slice(), q = _bpNorm_(_bpXSrcQuery);
+  var picked = {}; (_bpDraft.excludeSources||[]).forEach(function(x){ picked[_bonusNormSrc_(x)] = true; });
+  var known = {}; opts.forEach(function(n){ known[_bonusNormSrc_(n)] = true; });
+  (_bpDraft.excludeSources||[]).forEach(function(x){ if (!known[_bonusNormSrc_(x)]){ opts.push(x); known[_bonusNormSrc_(x)] = true; } });
+  var list = opts.filter(function(n){ return !q || _bpNorm_(n).indexOf(q) !== -1; });
+  if (!opts.length) return '<div style="color:var(--muted);font-size:12px;padding:6px">Đang tải danh sách nguồn… (hoặc gõ tay ở ô bên dưới).</div>';
+  if (!list.length) return '<div style="color:var(--muted);font-size:12px;padding:6px">Không có nguồn khớp.</div>';
+  return list.map(function(n){
+    return '<label style="display:inline-flex;gap:5px;align-items:center;font-size:12px;margin:2px 10px 2px 0;cursor:pointer"><input type="checkbox" data-src="'+esc(n)+'" '+(picked[_bonusNormSrc_(n)]?'checked':'')+' onchange="_bpXSrcToggle(this.dataset.src,this.checked)"> '+esc(n)+'</label>';
+  }).join('');
+}
+function _bpXSrcSelHtml_(){
+  var s = _bpDraft.excludeSources || [];
+  return s.length ? ('Đang LOẠI '+s.length+' nguồn: <b>'+esc(s.join(', '))+'</b> — đơn thuộc các nguồn này không được tính.') : '<span class="guide-text" style="color:var(--muted)">Chưa loại nguồn nào.</span>';
+}
+function _bpXSrcRefresh_(){
+  var a = document.getElementById('bp-xsrc-list'), b = document.getElementById('bp-xsrc-sel');
+  if (a) a.innerHTML = _bpXSrcListHtml_();
+  if (b) b.innerHTML = _bpXSrcSelHtml_();
+}
+function _bpXSrcToggle(name, on){
+  var s = _bpDraft.excludeSources = _bpDraft.excludeSources || [];
+  var idx = s.findIndex(function(x){ return _bonusNormSrc_(x) === _bonusNormSrc_(name); });
+  if (on && idx === -1) s.push(name); else if (!on && idx !== -1) s.splice(idx, 1);
+  _bpXSrcRefresh_();
+}
+function _bpXSrcAdd(){
+  var el = document.getElementById('bp-xsrc-add'), v = el ? String(el.value || '').trim() : '';
+  if (!v) return;
+  _bpXSrcToggle(v, true);
+  if (el) el.value = '';
+  _bpXSrcQuery = ''; var q = document.getElementById('bp-xsrc-q'); if (q) q.value = '';
+  _bpXSrcRefresh_();
+}
+function _bpSrcAdd(){
+  var el = document.getElementById('bp-src-add'), v = el ? String(el.value || '').trim() : '';
+  if (!v) return;
+  _bpSrcToggle(v, true);
+  if (el) el.value = '';
+  _bpSrcQuery = ''; var q = document.getElementById('bp-src-q'); if (q) q.value = '';
+  _bpSrcRefresh_();
 }
 function _bpSrcToggle(name, on){
   var s = _bpDraft.sources = _bpDraft.sources || [];
