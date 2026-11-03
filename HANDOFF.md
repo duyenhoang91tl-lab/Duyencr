@@ -11,6 +11,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-03 (phiên 8) — Hướng 2: Báo cáo B "Theo Sale" GỘP phần Sale 30% đơn quầy (Duyên chọn) — ĐÃ CODE + TEST, CHỜ PUSH (cần token mới)
+- **NGUYÊN NHÂN GỐC:** xem mục phiên 7 — Báo cáo B chỉ cộng đơn Pos nên thiếu phần Sale 30% đơn quầy KT cộng vào.
+- [x] **Đã sửa (commit local, CHƯA PUSH vì tin nhắn này không có token — không dùng lại token cũ):** `js/63-fn-saleincome.js` thêm `_srMergeStoreIntoBySale_` + `_srStoreForBOk_` (hàm thuần, cùng quy tắc lọc với "Thu nhập từng Sale": bỏ khách không đến, đơn excluded, phần Trùng, ≤0). `js/11-fn-srload.js`: (a) nhánh nạp B gọi thêm `storeCaseReport` (cùng ngày/sale) → `_srState.dataBStore`, lỗi thì bỏ qua B vẫn như cũ; (b) `_srRenderB` dùng bySale đã gộp cho pie + bảng + dòng ghi chú xanh "đã gồm phần Sale 30% đơn quầy". Thẻ KPI "Số lượng đơn/Tổng giá trị" vẫn CHỈ Pos. Khi đang lọc nguồn/marketer/sản phẩm/CS/Zalo thì KHÔNG cộng đơn quầy. index.html bump js/11 + js/63 `?v=20261103d`.
+- [x] **Test:** `tools/test-store-share-b.js` (8 ca, qua) — gồm ca thực T10: số Pos từ ảnh + 24 dòng đơn quầy file KT → tổng 18 sale = 6.491.161.967 = KT 6.500.163.967 − M46575 9.002.000 (đơn chưa vào CRM). `tools/test-sale-income.js` vẫn qua.
+- **Việc kế tiếp:** (1) Duyên gửi token mới → push main. (2) Sau push: **Ctrl+F5** trang CRM; mở Báo cáo B 01–31/10, kỳ vọng pie ≈ 6.491.161.967 (hoặc 6.500.163.967 sau khi nhập M46575 vào THEO DÕI ĐƠN CHIA SALE). (3) Nếu số đơn quầy trong CRM (Báo cáo L) khác 24 dòng KT → báo lại để dò theo từng đơn. (4) Cập nhật `docs/crm-kb/05` ghi quy tắc mới.
+- **ĐANG LÀM:** chờ push. Không đổi gas_v13.js (không cần deploy).
+
 ## 2026-11-03 (phiên 7) — Thiết kế lại giao diện chuyên nghiệp, bắt đầu từ tab Báo cáo doanh số A–N (Duyên yêu cầu) — ĐANG LÀM 1/4
 - **Yêu cầu Duyên:** "thiết kế lại CRM như CRM chuyên nghiệp, mọi thứ còn hỗn độn". Duyên chọn làm TRƯỚC: các tab Báo cáo doanh số (A–L). Sau đó: khung chung (menu trái/thanh trên) → màn tra cứu & chăm sóc KH.
 - **Cách làm (không viết lại từ đầu):** thêm 1 lớp CSS `css/17-reports-pro.css`, phạm vi CHỈ `#salesreport-wrap`, chỉ dùng biến `:root` (chế độ tối vẫn đúng), nạp trước `99-dark-auto.css`. Gỡ = bỏ 1 dòng `<link>`. **NGUYÊN NHÂN GỐC hỗn độn:** 19 file CSS chồng nhau + mỗi báo cáo ghi style inline riêng (padding/viền/cỡ chữ lệch nhau); ô chọn báo cáo cũng là style inline nên lớp mới dùng `!important` cho đúng ô đó.

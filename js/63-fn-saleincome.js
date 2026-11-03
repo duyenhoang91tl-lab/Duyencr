@@ -124,3 +124,35 @@ function _srIncomeExportXlsx() {
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(x.det), 'Chi tiet');
   XLSX.writeFile(wb, 'ThuNhapSale_' + (_srState.eDateFrom || '') + '_' + (_srState.eDateTo || '') + '.xlsx');
 }
+
+// ── BÁO CÁO B "Theo Sale": gộp PHẦN SALE 30% ĐƠN QUẦY (Báo cáo L) vào doanh thu từng sale — Duyên chọn hướng 2 (2026-11-03) ──
+// NGUYÊN NHÂN GỐC: Báo cáo B chỉ cộng đơn Pos nên thiếu phần Sale 30% của đơn quầy mà KT cộng vào → biểu đồ tròn lệch KT (T10: 58.215.300đ trên 18 sale).
+// Cùng quy tắc với "Thu nhập từng Sale" (Báo cáo E): bỏ dòng khách KHÔNG đến, đơn excluded (hoàn), phần chia bị đánh dấu Trùng / ≤0.
+// Hàm THUẦN để test bằng Node: tools/test-store-share-b.js.
+function _srStoreForBOk_() {
+  var st = (typeof _srState !== 'undefined' && _srState) || {};
+  return ['bNguon', 'bMarketer', 'bSanPham', 'bCareStatus', 'bKhStatus', 'bZaloStatus', 'bNickZalo'].every(function (k) {
+    var v = st[k]; return Array.isArray(v) ? !v.length : !v;
+  });   // đang lọc nguồn/marketer/sản phẩm/CS… thì KHÔNG cộng đơn quầy (đơn quầy không có các trường này)
+}
+function _srMergeStoreIntoBySale_(bySale, storeData) {
+  var out = (bySale || []).map(function (r) { return Object.assign({}, r); }), idx = {}, total = 0, count = 0;
+  out.forEach(function (r, i) { idx[String(r.name || '').toLowerCase()] = i; });
+  ((storeData && storeData.rows) || []).forEach(function (row) {
+    if (row.koDen) return;
+    (row.orders || []).forEach(function (o) {
+      if (o.excluded) return;
+      (o.credits || []).forEach(function (cr) {
+        var amt = Number(cr.amount) || 0;
+        if (cr.dup || !(amt > 0) || !cr.sale) return;
+        var k = String(cr.sale).toLowerCase(), i = idx[k];
+        if (i === undefined) { out.push({ name: cr.sale, orders: 0, giaTri: 0, cod: 0 }); i = idx[k] = out.length - 1; }
+        out[i].giaTri = (out[i].giaTri || 0) + amt; out[i].orders = (out[i].orders || 0) + 1;
+        out[i].storeAmt = (out[i].storeAmt || 0) + amt; out[i].storeOrders = (out[i].storeOrders || 0) + 1;
+        total += amt; count++;
+      });
+    });
+  });
+  out.sort(function (a, b) { return (b.giaTri || 0) - (a.giaTri || 0); });
+  return { rows: out, storeTotal: total, storeOrders: count };
+}

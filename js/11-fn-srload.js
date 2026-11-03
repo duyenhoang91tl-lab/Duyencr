@@ -28,6 +28,14 @@ async function _srLoad(){
       careStatus: (_srState.bCareStatus||[]).join(','), khStatus: (_srState.bKhStatus||[]).join(','),
       zaloStatus: (_srState.bZaloStatus||[]).join(','), nickZalo: _srState.bNickZalo || ''
     });
+    // Phan Sale 30% DON QUAY (Bao cao L) gop vao bieu do/bang "Theo Sale" cho du doanh thu sale (Duyen 2026-11-03); loi/thieu quyen KHONG lam hong Bao cao B.
+    _srState.dataBStore = null;
+    if (typeof _srStoreForBOk_ === 'function' && _srStoreForBOk_()) {
+      try {
+        var dStoreB = await _srFetch('storeCaseReport', { dateFrom: _srState.dateFrom, dateTo: _srState.dateTo, sale: (_srState.bSale||[]).join(',') });
+        if (dStoreB && dStoreB.ok !== false && !dStoreB.error) _srState.dataBStore = dStoreB;
+      } catch (eStoreB) { /* bo qua: B van hien thi doanh thu Pos nhu cu */ }
+    }
   } else if (_srState.sub === 'C') {
     _srState.dataC = await _srFetch('salesReportC', {
       dateField: _srState.cDateField, periodType: _srState.cPeriodType,
@@ -1216,9 +1224,11 @@ function _srRenderB(d){
 
   _SR_COLTH_ROWSFN_['bSale'] = function(){ return (_srState.dataB && _srState.dataB.bySale) || []; };
   _SR_COLTH_GETTER_['bSale'] = { name: function(s){ return s.name; } };
-  var saleRows = _srApplyColFilters_(_srKeepSelectedSales_(d.bySale||[], _srState.bSale), 'bSale', _SR_COLTH_GETTER_['bSale']).filter(function(s){ return !_srState.bSaleSearch || (s.name||'').toLowerCase().indexOf(_srState.bSaleSearch.toLowerCase())!==-1; });
+  var bSaleMerged_ = _srMergeStoreIntoBySale_(d.bySale||[], (typeof _srStoreForBOk_ === 'function' && _srStoreForBOk_()) ? _srState.dataBStore : null);   // Pos + phần Sale 30% đơn quầy (Báo cáo L)
+  var saleRows = _srApplyColFilters_(_srKeepSelectedSales_(bSaleMerged_.rows, _srState.bSale), 'bSale', _SR_COLTH_GETTER_['bSale']).filter(function(s){ return !_srState.bSaleSearch || (s.name||'').toLowerCase().indexOf(_srState.bSaleSearch.toLowerCase())!==-1; });
   var saleHtmlB_ = '<div class="dash-section-title">Theo Sale <span class="sr-sub">(tiền chia đều cho số sale/đơn, số đơn giữ nguyên)</span>'+_srViewToggleHtml('bSaleView')+'</div>';
   saleHtmlB_ += '<input type="text" placeholder="🔍 Tìm nhanh theo tên sale..." value="'+esc(_srState.bSaleSearch)+'" oninput="_srState.bSaleSearch=this.value;renderSalesReportTab()" class="sr-input sr-w220">';
+  if (bSaleMerged_.storeTotal) saleHtmlB_ += '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:6px 10px;margin:8px 0;font-size:11.5px">🏬 Doanh thu từng sale <b>đã gồm phần Sale 30% đơn quầy</b> (Báo cáo L): <b>'+_srMoney(bSaleMerged_.storeTotal)+'</b> / '+fmt(bSaleMerged_.storeOrders)+' lượt đơn. Thẻ "Số lượng đơn" và "Tổng giá trị" phía trên vẫn chỉ tính đơn Pos.</div>';
   if (_srState.bSaleView === 'table'){
     saleHtmlB_ += '<table class="dash-table"><thead><tr>'+_srColTh_('bSale','name','Sale',_SR_COLTH_ROWSFN_['bSale'],_SR_COLTH_GETTER_['bSale'].name)+'<th class="r">Số đơn</th><th class="r">Giá trị sau giảm giá'+(pAdjOn?' <span style="font-weight:400;font-size:10.5px">(sau trừ)</span>':'')+'</th>'+(pAdjOn?'<th style="text-align:right" title="Phần hoàn/hủy của tháng '+esc(pAdj.prevMonth)+' phát sinh sau khi chốt">Trừ hoàn/hủy '+esc(pAdj.prevMonth)+'</th>':'')+'<th class="r">TB đơn</th><th class="r">COD</th></tr></thead><tbody>';
     saleRows.forEach(function(s){
