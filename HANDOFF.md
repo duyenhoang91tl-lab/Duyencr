@@ -11,6 +11,14 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-03 (phiên 9) — "Check ngược Base" xuất 3/11 cho thấy CRM GHÉP ĐƯỢC 0 ĐƠN với Base (Duyên gửi file) — ĐÃ THÊM CHẨN ĐOÁN, CHỜ XUẤT LẠI
+- **Phát hiện (file `BaoCao_Pos_CheckNguocBase_2026-11-03.xlsx`):** Tổng quan: đơn Pos có ≥2 mã bộ đếm = **11.112**, **đã ghép được = 0**, có mã nhưng KHÔNG khớp Base = **11.112**, nghi ghép chưa ghép 265. Sheet "Check ngược từng đơn"/"Chia theo sale" rỗng. Dữ liệu "Cần kiểm tra tay" trải 05/2025–04/2026 ⇒ kỳ xuất rất rộng, KHÔNG phải riêng 01–31/10/2026.
+- **Hệ quả:** Báo cáo B đang tính TOÀN BỘ theo Thẻ Pos chia đều (khớp lý do số CRM = chia đều thẻ Pos ở phiên 7). Chưa thể so "KT có theo đơn gốc Base không" vì CRM chưa ghép được đơn nào.
+- **NGUYÊN NHÂN GỐC có thể (chưa xác định, không truy cập được GAS thật từ môi trường này):** `_readBaseRowsByCounterCodes_` (gas_v13.js ~5617) trả chỉ mục rỗng khi: (a) lỗi đọc DT TỔNG (ghepErr bị nuốt → `colIdx: -2`), (b) không thấy sheet `DT TỔNG ` (dấu cách cuối tên), (c) `_detectBaseCounterCol_` (chỉ quét 400 dòng cuối, cache `dtCounterCol_v1` 6h/10 phút) trả −1 hoặc sai cột, (d) hết thời gian khi kỳ quá rộng.
+- [x] **ĐÃ PUSH (js/11, chỉ front-end, `?v=20261103e`):** file xuất Check ngược Base thêm 3 dòng "Chẩn đoán" trong sheet Tổng quan: cột mã bộ đếm trên Base (−1 không thấy / −2 lỗi), lỗi đọc Base, thời gian đọc (ms). Backend đã trả sẵn `ghep.cotBase/loi/msDocBase` → KHÔNG cần deploy GAS.
+- **Việc kế tiếp:** (1) Duyên Ctrl+F5 → Báo cáo B → kỳ **01/10–31/10/2026** → xuất lại "Check ngược Base" → gửi lại; đọc 3 dòng Chẩn đoán để biết lý do (−1/−2 hay lỗi). (2) Nếu cột = số ≥ 0 mà vẫn 0 ghép → mở sheet "Cần kiểm tra tay" xem mã (ví dụ 17T10/2026) có thật sự có trên `DT TỔNG ` không (Base chưa lên / bị lưu trữ sang sheet khác). (3) Sau khi ghép chạy được mới so từng đơn ghép với file KT (17T10, 268T10, 416, 525, 765, 1222…).
+- **ĐANG LÀM:** chờ file xuất lại. Không đổi gas_v13.js.
+
 ## 2026-11-03 (phiên 8) — Hướng 2: Báo cáo B "Theo Sale" GỘP phần Sale 30% đơn quầy (Duyên chọn) — ĐÃ CODE + TEST + ĐÃ PUSH
 - **NGUYÊN NHÂN GỐC:** xem mục phiên 7 — Báo cáo B chỉ cộng đơn Pos nên thiếu phần Sale 30% đơn quầy KT cộng vào.
 - [x] **Đã sửa + PUSH (token Duyên gửi ở tin sau):** `js/63-fn-saleincome.js` thêm `_srMergeStoreIntoBySale_` + `_srStoreForBOk_` (hàm thuần, cùng quy tắc lọc với "Thu nhập từng Sale": bỏ khách không đến, đơn excluded, phần Trùng, ≤0). `js/11-fn-srload.js`: (a) nhánh nạp B gọi thêm `storeCaseReport` (cùng ngày/sale) → `_srState.dataBStore`, lỗi thì bỏ qua B vẫn như cũ; (b) `_srRenderB` dùng bySale đã gộp cho pie + bảng + dòng ghi chú xanh "đã gồm phần Sale 30% đơn quầy". Thẻ KPI "Số lượng đơn/Tổng giá trị" vẫn CHỈ Pos. Khi đang lọc nguồn/marketer/sản phẩm/CS/Zalo thì KHÔNG cộng đơn quầy. index.html bump js/11 + js/63 `?v=20261103d`.

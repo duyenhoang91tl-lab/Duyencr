@@ -1602,6 +1602,10 @@ function _srBaseCheckExport_(){
     ['— mã trùng đơn gốc đã dùng', g.trungDonGocCount || 0],
     ['— bị bỏ vì mọi đơn gốc Base Thất bại', g.gocBiLoai || 0],
     ['Nghi ghép nhưng CHƯA ghép', (d.ghepCheck && d.ghepCheck.count) || 0],
+    // CHAN DOAN khi "da ghep duoc" = 0: backend doc Base (DT TONG) co that bai khong? (cotBase: -1 = khong tim thay cot ma bo dem, -2 = loi khi doc, so >= 0 = cot da dung)
+    ['Chẩn đoán — cột mã bộ đếm trên Base (−1: không thấy cột, −2: lỗi đọc)', g.cotBase === undefined || g.cotBase === null ? '(backend chưa trả — cần deploy bản mới)' : g.cotBase],
+    ['Chẩn đoán — lỗi đọc Base', g.loi ? String(g.loi) : '(không có)'],
+    ['Chẩn đoán — thời gian đọc Base (ms)', g.msDocBase === undefined ? '' : g.msDocBase],
     ['', ''],
     ['Cách đọc', 'Sheet "Check ngược từng đơn": mỗi dòng = 1 đơn Pos × 1 đơn gốc Base; các cột tiền của đơn Pos chỉ ghi ở dòng đầu mỗi đơn nên SUM cột không bị lặp.'],
     ['', 'Sheet "Chia theo sale": phần tiền từng sale của mỗi đơn Pos theo đơn gốc Base (đã gồm quầy 30/70 nếu có). Lọc cột Sale rồi SUM "Tiền chia" = số trên bảng Theo Sale.'],
