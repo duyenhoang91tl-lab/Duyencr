@@ -11,6 +11,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-04 (tối) — Web: gộp đơn NG "ghép/ship cùng đơn" khi chấm thưởng — BƯỚC 1/2 ĐÃ PUSH
+
+- [x] `js/12` `_bonusMergeGhep_` + `_bonusCodeTokens_` (port từ `tools/bonus-t10/calc_bonus.js`), gọi đầu `_computeBonusData_`: đơn ghi chú "NG139T10/2026 GHÉP/SHIP CÙNG ĐƠN 1326T10/2026" + đơn mang mã 1326T10, CÙNG BỘ SALE, 1 trong 2 là đơn NG → 1 bill (cộng giá trị, sản phẩm; ngày/saleShares lấy đơn GỐC; donGoc = có ít nhất 1 đơn gốc). 2 đơn gốc Base riêng (807T10+702T10) KHÔNG gộp. Test thêm 4 ca ở `tools/test-bonus-goc-split.js`; thêm 2 hàm vào danh sách nạp hàm của `test-bonus-programs.js` và `bonus-t10/calc_bonus.js`. js/12 `?v=20261104b`.
+- **NGUYÊN NHÂN GỐC:** đơn NG không phải đơn gốc nên (sau bước "chỉ tính đơn gốc") bị bỏ hẳn; từng đơn lẻ 5,85tr/5,45tr <10tr dù cùng 1 bill 11,3tr.
+- ⚠ Chưa gộp ở `buildCsStats_` (GAS, thưởng hiện trong extension) — chỉ web Báo cáo E/G. Ghi để làm sau nếu Duyên cần khớp.
+- [ ] **BƯỚC 2/2 (ĐANG LÀM):** Tourmaline cao cấp xét mốc 21,5tr/31,5tr theo GIÁ NIÊM YẾT trước giảm. CHẶN: sheet "dữ liệu đơn" chỉ có "giá sau giảm" (cột L), không có "Trị giá đơn hàng" trước giảm (chỉ có trong file xuất Pos offline) → web không có dữ liệu để xét.
+
 ## 2026-11-04 (chiều, bước 3) — Ô nhập "📌 Ép sale theo đơn" trong Sasum (thay cho sửa sheet Settings tay) — ĐÃ PUSH
 
 - [x] `js/65-order-sale-ovr.js` (mới) + nối `js/29-sidenav.js` (Cài đặt team → 📌 Ép sale theo đơn, chỉ admin) + `index.html` (`?v=20261104a`): bảng "Mã đơn (bộ đếm) → Tên sale", thêm/xoá dòng, kiểm tra mã sai/thiếu tên/trùng, lưu Settings `orderSaleOverride` (backend đã xử lý từ bước 2). Tải danh sách lỗi → khoá nút Lưu để không ghi đè mất dữ liệu cũ. Test: `node tools/test-order-sale-ovr-ui.js` (6 ca). Không đổi gas_v13.js ở bước này. `tools/build-dist.js` không chạy được ở máy chat (thiếu module) — để Actions build.

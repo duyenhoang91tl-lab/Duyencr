@@ -30,4 +30,15 @@ ok(r.total === 0, 'đơn không phải đơn gốc không tính số đơn (A ch
 const old = (id, s) => ({ id, saleBan: s, giaTriDon: 1e6, ngayTao: '20/10/2026 10:00' });
 r = calc([tier], [old(1, 'A'), old(2, 'A')]);
 ok(r.total === 50000, 'backend cũ: vẫn đếm theo thẻ Pos');
+// ===== Gộp đơn NG "ghép/ship cùng đơn" (Duyên 04/11/2026): 1326T10 (5,85tr) + NG139T10 (5,45tr) cùng sale = 1 bill 11,3tr =====
+const big = Object.assign({}, base, { id: 'm', name: 'Đơn từ 10tr', revenue: { enabled: true, scope: 'order', min: 10000000, max: '' }, bonusAmount: 20000 });
+const gh = (id, note, val, sale, goc, extra) => Object.assign({ id, saleBan: sale, giaTriDon: val, ghiChu: note, baseNgayTao: D, ngayTao: '20/10/2026 10:00', donGoc: goc, sanPham: 'x' }, extra || {});
+let O2 = [gh(1, '1326T10/2026', 5850000, 'thuydinh95', true, { saleShares: [{ name: 'thuydinh95', frac: 1 }] }), gh(2, 'NG139T10/2026 GHÉP CÙNG ĐƠN 1326T10/2026', 5450000, 'thuydinh95', false)];
+r = calc([big], O2);
+ok(r.total === 20000 && r.bySale.length === 1, 'đơn NG ghép cùng đơn gốc cùng sale → 1 bill 11,3tr đạt mốc 10tr (' + r.total + ')');
+O2 = [gh(1, '807T10/2026', 5850000, 'a', true, { saleShares: [{ name: 'a', frac: 1 }] }), gh(2, '702T10/2026 GHÉP CÙNG ĐƠN 807T10/2026', 5450000, 'a', true, { saleShares: [{ name: 'a', frac: 1 }] })];
+ok(calc([big], O2).total === 0, '2 đơn gốc Base riêng (không có NG) KHÔNG gộp → 0');
+O2 = [gh(1, '1326T10/2026', 5850000, 'a', true, { saleShares: [{ name: 'a', frac: 1 }] }), gh(2, 'NG139T10/2026 GHÉP CÙNG ĐƠN 1326T10/2026', 5450000, 'b', false, { saleShares: [{ name: 'b', frac: 1 }] })];
+ok(calc([big], O2).total === 0, 'khác bộ sale → không gộp');
+ok(calc([tier], [gh(1, '1326T10/2026', 5e6, 'A', true, { saleShares: [{ name: 'A', frac: 1 }] }), gh(2, 'NG1T10/2026 SHIP CÙNG ĐƠN 1326T10/2026', 5e6, 'A', false)]).total === 0, 'đơn gộp tính là 1 đơn (không đạt bậc 2 đơn/ngày)');
 process.exit(bad ? 1 : 0);

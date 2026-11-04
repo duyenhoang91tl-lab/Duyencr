@@ -184,8 +184,50 @@ function _bonusAggSources_(g, sources, exclude){
   });
   return agg;
 }
-function _computeBonusData_(orders){
+// GỘP ĐƠN "GHÉP / SHIP CÙNG ĐƠN" (Duyên 2026-11-04; port từ tools/bonus-t10/calc_bonus.js mergeGhep): đơn B ghi chú "NG139T10/2026 GHÉP CÙNG ĐƠN 1326T10/2026"
+// (hoặc "SHIP CÙNG ĐƠN …") + đơn A mang mã 1326T10, CÙNG BỘ SALE = MỘT bill → cộng giá trị/sản phẩm để xét mốc thưởng. CHỈ gộp khi 1 trong 2 là đơn thêm "NG…"
+// (2 đơn gốc Base riêng như 807T10 + 702T10 là 2 bill khác nhau, KHÔNG gộp). Đơn gộp lấy ngày/saleShares của đơn GỐC; donGoc = có ít nhất 1 đơn gốc.
+// NGUYÊN NHÂN GỐC: đơn NG không phải đơn gốc (ghi chú dòng đầu không phải mã sạch) nên bị bỏ khỏi thưởng, còn từng đơn lẻ <10tr (5,85tr + 5,45tr) không đủ mốc dù cùng 1 bill 11,3tr.
+function _bonusCodeTokens_(note){
+  var t = {}, up = String(note == null ? '' : note).normalize('NFC').toUpperCase(), re = /(^|[^A-Z0-9])((?:NG)?\d{1,5}T\d{1,2})(?:\/\d{2,4})?(?![A-Z0-9])/g, m;
+  while ((m = re.exec(up))) { t[m[2]] = true; }
+  return t;
+}
+function _bonusMergeGhep_(orders){
   orders = orders || [];
+  var GR = /(?:GH[EÉ]P|SHIP)\s+C[UÙ]NG\s+[ĐD][OƠ]N\s+((?:NG)?\d{1,5}T\d{1,2})(?![A-Z0-9])/;
+  var sKey = function(o){ return String(o.saleBan || '').toLowerCase().split(/[,;\s]+/).filter(Boolean).sort().join(','); };
+  var par = orders.map(function(_, i){ return i; });
+  function find(i){ while (par[i] !== i) { par[i] = par[par[i]]; i = par[i]; } return i; }
+  var toks = orders.map(function(o){ return _bonusCodeTokens_(o.ghiChu); });
+  var hasNG = function(t){ return Object.keys(t).some(function(c){ return /^NG/.test(c); }); };
+  var any = false;
+  orders.forEach(function(a, i){
+    var m = GR.exec(String(a.ghiChu == null ? '' : a.ghiChu).normalize('NFC').toUpperCase()); if (!m) return;
+    orders.forEach(function(b, j){
+      if (j === i || sKey(b) !== sKey(a) || !toks[j][m[1]]) return;
+      if (/^NG/.test(m[1]) || hasNG(toks[i]) || hasNG(toks[j])) { par[find(i)] = find(j); any = true; }
+    });
+  });
+  if (!any) return orders;
+  var grp = {}; orders.forEach(function(o, i){ var r = find(i); (grp[r] = grp[r] || []).push(i); });
+  var out = [];
+  orders.forEach(function(o, i){
+    var g = grp[find(i)]; if (g.length < 2) { out.push(o); return; } if (g[0] !== i) return;
+    var ps = g.map(function(k){ return orders[k]; });
+    var base = ps.filter(function(p){ return p.donGoc; })[0] || ps[0];
+    var m = Object.assign({}, base);
+    var join = function(f, sep){ return ps.map(function(p){ return p[f]; }).filter(Boolean).join(sep); };
+    m.giaTriDon = ps.reduce(function(a, p){ return a + (Number(p.giaTriDon) || 0); }, 0);
+    m.sanPham = join('sanPham', ', '); m.maSanPham = join('maSanPham', ';'); m.soLuong = join('soLuong', ', '); m.ghiChu = join('ghiChu', ' | ');
+    m.donGoc = ps.some(function(p){ return p.donGoc; }) ? true : base.donGoc;
+    m.ghepSoDon = ps.length;
+    out.push(m);
+  });
+  return out;
+}
+function _computeBonusData_(orders){
+  orders = _bonusMergeGhep_(orders || []);   // gộp đơn NG "ghép/ship cùng đơn" thành 1 bill trước khi chấm thưởng
   var bySale = {};
   function ensure(name){ if (!bySale[name]) bySale[name] = {total:0, items:[]}; return bySale[name]; }
 
