@@ -6730,7 +6730,7 @@ function buildCsStats_(cs, dateFrom, dateTo) {
     totalOrders++; revenue += share;
     // THUONG THEO DON: don dat quy tac thi TIEN THUONG CHIA DEU cho cac sale tham gia (yeu cau Duyen 2026-10-08; thay cho
     // quy tac "chi nguoi tao" 2026-10-07). nSales = so sale tren don; moi nguoi nhan best.amount / nSales.
-    var nSales = (o.saleShares && o.saleShares.length) ? o.saleShares.length
+    var nSales = (o.saleShares && o.saleShares.length) ? (o.saleShares.filter(function(x) { return Number(x.frac) > 0; }).length || o.saleShares.length)
       : (String(o.saleBanValid || '').split(',').map(function(x) { return x.trim(); }).filter(Boolean).length || 1);
     var bInfo = _bcOrderInfo_(Object.assign({}, o, { giaTriDon: giaTri }), prodMap, orderOvr);
     mine.push({ date: o.baseNgayTao || _csYmdFromDmy_(o.ngayTaoDon), time: (String(o.ngayTaoDon || '').match(/(\d{1,2}):(\d{2})/) || [''])[0], giaTri: giaTri, share: share, nSales: nSales, sanPham: o.sanPham,
@@ -6751,9 +6751,12 @@ function buildCsStats_(cs, dateFrom, dateTo) {
   var bonusItems = [], bonusTotal = 0;
   var byDay = {};
   mine.forEach(function(o) {
+    // THUONG THEO DON GOC (Duyen 2026-11-04): so don/ngay, don dau tien va doanh so ngay CHI tinh don goc (ma bo dem sach, co tren Base+Pos), theo ngay tao Base.
+    // Don chia A+B: moi nguoi +1 don, doanh so = phan duoc chia. Truoc day don khong phai don goc van bi dem so don (chi doanh thu moi bo loc goc).
+    if (!o.goc) return;
     if (!byDay[o.date]) byDay[o.date] = { date: o.date, revenue: 0, count: 0, first: null };
     var g = byDay[o.date];
-    if (o.goc) g.revenue += o.share; // doanh so ngay = phan DOANH THU da chia cua sale, CHI don goc (ma bo dem sach, co tren Base+Pos), theo ngay tao Base
+    g.revenue += o.share;
     g.count++;
     if (o.time && (g.first === null || o.time < g.first)) g.first = o.time;
   });
@@ -6789,6 +6792,7 @@ function buildCsStats_(cs, dateFrom, dateTo) {
     });
   });
   mine.forEach(function(o) {
+    if (!o.goc) return;   // thuong theo don cung chi tinh don goc
     var best = null;
     programs.forEach(function(p) {
       if (!_csBonusApplies_(p, o.date, channel, startYmd)) return;
