@@ -11,6 +11,14 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 
 
 
+## 2026-11-04 (phiên 21) — THƯỞNG T10: đơn có trên Pos nhưng Base Thất bại / không có trên Base → KHÔNG thưởng + CHECK TAY — XONG, đã push
+- **Duyên chốt:** VD 1015T09/2026 có trên Pos, Base không có (đơn Base đã hủy/thất bại) → không tính thưởng cho sale; tương tự mọi đơn có trên Pos mà không có trên Base → liệt kê check tay.
+- **CRM web/GAS ĐÃ làm đúng sẵn (không sửa):** `gas_v13.js` Báo cáo B: gốc Base toàn Huỷ/Hoàn/Thất bại → `gocBiLoai` (bỏ đơn Pos); đơn không khớp Base → `khongKhop` (check tay) và không có `donGoc` nên không vào thưởng (js/12 `_hasGocField`). Lỗi chỉ ở bản OFFLINE.
+- **NGUYÊN NHÂN GỐC offline:** `calc_bonus.js` không đối chiếu Base nên vẫn thưởng cho đơn Base Thất bại / không có Base. `tools/bonus-t10/add_base_date.py` nay gắn `loaiThuong` (`base-that-bai` | `khong-co-base`) + ghi `checktay.json`; `calc_bonus.js` bỏ đơn có `loaiThuong`. MỚI `tools/bonus-t10/build_delivery_xlsx.py` xuất file giao (tổng, chi tiết, sheet CHECK TAY, doanh thu ngày).
+- **Kết quả T10:** loại 47 dòng Pos (34 Base Thất bại, 13 không có Base — gồm 1015T09, 1008T09, 162T09, 1009–1014T09, 533T09 (ĐỔI)...); check tay 187 dòng (thêm 135 đơn thêm NG + 4 BH + 1 không đọc được mã — VẪN tính thưởng như cũ vì là đơn đi kèm không có dòng Base riêng). Tổng thưởng 4.073.340 → **3.833.340** (−240.000).
+- ⚠ Cần Duyên xem: (1) ~14 đơn "Base Thất bại" nhưng Pos trạng thái Đã nhận/Đã gửi hàng (VD 1223T10 23,3tr, 338T10 24,9tr) — có thể đã LÊN LẠI bằng mã Base khác (VD 94T10 "LÊN LẠI ĐƠN HOÀN ĐỔI") → check tay trước khi chốt trừ thưởng; (2) đơn ghi 2 mã "1346T10 + BH..." chỉ đối chiếu mã đầu tiên; (3) đơn T09 trên Pos T10 không có trong export Base T10 (Base file chỉ T10) — nếu Base có sheet T09 thì đưa vào để khỏi bị loại nhầm.
+- [ ] **VIỆC KẾ TIẾP:** Duyên duyệt danh sách CHECK TAY; còn lại như phiên 20 (xác nhận lệch ≤1 ngày, đối chiếu Báo cáo G/E sau deploy).
+
 ## 2026-11-04 (phiên 20) — THƯỞNG T10: Duyên chốt luật gộp GHÉP phải CÙNG NGÀY LÊN ĐƠN + thưởng ngày tính theo ngày Base — BƯỚC 1/2 (code) xong, đã push
 - **Duyên chốt:** (1) 3 ngày của trangNH2005 (3/10, 5/10, 6/10) phải xét doanh thu NGÀY theo ngày lên đơn GỐC trên Base xem có đạt mốc 60tr không; (2) 886T10/129T10 không thưởng là ĐÚNG; (3) đơn ghép cùng khách + cùng sale + cùng ngày lên đơn → gộp.
 - **Kết quả kiểm theo ngày Base (trangNH2005, chia đều theo số sale):** 3/10 = 34,75tr; 5/10 = 12,47tr; 6/10 = 36,45tr → KHÔNG đạt 60tr. Ngày gần mốc nhất: 20/10 = 58,73tr (thiếu 1,27tr), 23/10 chỉ 17,4tr theo Base.

@@ -8,7 +8,8 @@ const W = process.argv[2] || '.';
 const R = p => fs.readFileSync(path.join(__dirname, '..', '..', p), 'utf8');
 const fn = (src, n) => { const i = src.indexOf('\nfunction ' + n + '('); if (i < 0) throw new Error('khong thay ' + n); return src.slice(i + 1, src.indexOf('\n}\n', i) + 3); };
 const j12 = R('js/12-fn-rendersalesreporttabe.js'), j01 = R('js/01-fn-splitmulti.js'), j05 = R('js/05-fn-saveeditphone.js'), j27 = R('js/27-fn-bonuscore.js'), j62 = R('js/62-sale-channel-periods.js');
-const rawOrders0 = JSON.parse(fs.readFileSync(W + '/orders.json', 'utf8')).filter(o => !o.baoHanh && o.sheet !== 'ĐƠN MP' && !/\/\s*NGUỒN\s*\(/i.test(o.nguonDon || ''));   // bao hanh + don MP (my pham) + nguon don 'Facebook / NGUON (...)' van bi LOAI nhu cu (Duyen xac nhan 2026-11-03)
+const rawOrders0 = JSON.parse(fs.readFileSync(W + '/orders.json', 'utf8')).filter(o => !o.loaiThuong).filter(   // loaiThuong (add_base_date.py): don Base That bai / khong co tren Base -> khong thuong, check tay (Duyen 2026-11-04)
+  o => !o.baoHanh && o.sheet !== 'ĐƠN MP' && !/\/\s*NGUỒN\s*\(/i.test(o.nguonDon || ''));   // bao hanh + don MP (my pham) + nguon don 'Facebook / NGUON (...)' van bi LOAI nhu cu (Duyen xac nhan 2026-11-03)
 const rawOrders = rawOrders0;
 // GOP DON POS TACH (Duyen 2026-11-04): don Base "254T10/2026" len Pos tach 2 don, ghi chu "254T10/2026/1 TACH..", "254T10/2026/2 TACH.." -> la MOT don,
 // doanh thu = tong cac phan (9.000.000 + 8.500.000 = 17.500.000 -> moc 15tr). NGUYEN NHAN GOC truoc day: script nay doc tung dong Pos nhu 1 don rieng nen moi phan <10tr -> thuong 0.
