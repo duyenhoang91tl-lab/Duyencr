@@ -9,7 +9,7 @@ const ctx = { esc: s => String(s == null ? '' : s).replace(/&/g, '&amp;').replac
   _srState: { bSaleView: 'table', bSaleSearch: '', bSale: [], bTeamSearch: '', bNguonSearch: '', bMktSearch: '' },
   _srIsAdmin: () => false, _srViewToggleHtml: () => '', _srColTh_: (a, b, c) => '<th>' + c + '</th>', _srDrillAttr_: () => '', _srKeepSelectedSales_: r => r, _srApplyColFilters_: r => r,
   _srTotalRowHtml_: cells => '<tr class="tot">' + cells.map(c => '<td>' + c + '</td>').join('') + '</tr>', _srCloseRateKpiCard_: () => '', _srCloseRateBarHtml_: () => '',
-  _SR_COLTH_ROWSFN_: {}, _SR_COLTH_GETTER_: {}, _srNoDataHtml_: () => 'NODATA', _srPosMonthPanelHtml_: () => '', _srBaseCheckPanelHtml_: () => '', _srChartSvg: () => 'CHART' };
+  _SR_COLTH_ROWSFN_: {}, _SR_COLTH_GETTER_: {}, _srNoDataHtml_: () => 'NODATA', _srMergeStoreIntoBySale_: function(rows){ return { rows: rows, storeTotal: 0 }; }, _srPosMonthPanelHtml_: () => '', _srBaseCheckPanelHtml_: () => '', _srChartSvg: () => 'CHART' };
 vm.createContext(ctx);
 vm.runInContext(fnSrc('_srPosAdjustBannerHtml_') + '\n' + fnSrc('_srRenderB'), ctx);
 let h;

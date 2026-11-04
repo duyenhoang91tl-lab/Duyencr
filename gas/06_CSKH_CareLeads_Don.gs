@@ -611,7 +611,8 @@ function _donConvertRows_(vals, firstRow, lastNgay) {
       giaTriSauGiam: _normMoney_(r[11]),
       cod:           _normMoney_(r[12]),
       marketer:      r[13] ? String(r[13]).trim() : '',
-      ghiChu:        r[DON_COL_GHICHU] ? String(r[DON_COL_GHICHU]) : '' // cot Q — ghi chu don ("Ghép cùng đơn" + ma bo dem)
+      ghiChu:        r[DON_COL_GHICHU] ? String(r[DON_COL_GHICHU]) : '', // cot Q — ghi chu don ("Ghép cùng đơn" + ma bo dem)
+      tienTraTruoc:  _normMoney_(r[DON_COL_TRATRUOC])   // cot S — tien khach da chuyen khoan truoc (0 neu sheet khong co cot S / doc tu Supabase)
     } });
   }
   return { items: items, lastNgay: lastNgayTaoDon };
@@ -631,7 +632,7 @@ function readDonChiTiet_() {
   if (!sh) return [];
   var last = sh.getLastRow();
   if (last < 2) return [];
-  var vals = sh.getRange(2, 1, last - 1, Math.min(DON_CHITIET_WIDTH, sh.getMaxColumns())).getValues();
+  var vals = sh.getRange(2, 1, last - 1, Math.min(Math.max(DON_CHITIET_WIDTH, DON_COL_TRATRUOC + 1), sh.getMaxColumns())).getValues();   // A:S (S = Tiền trả trước)
   var conv = _donConvertRows_(vals, 2, '');
   // posRow = so dong THAT trong sheet "dữ liệu đơn" (header o dong 1) — de ke toan do lai tung don (Bao cao L). Chi gan o day
   // (khong sua _donConvertRows_ dung chung voi Supabase backfill). Cache cu <=90s chua co posRow thi chi hien trong tam.
