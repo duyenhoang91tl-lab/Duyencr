@@ -35,6 +35,13 @@ Bắt buộc `git merge origin/main` khi push bị từ chối; CẤM force-push
 - **Việc kế tiếp (cần quyết định của Duyên/KT, không tự sửa số):** (1) với từng đơn trong Lech_tung_don chốt bên nào đúng (Base hay Thẻ Pos) → nếu Base đúng thì KT sửa file; nếu Pos đúng thì sửa đơn gốc Base / bật loại trừ. (2) Thưởng + hoa hồng T10 đã gửi KT tính theo Thẻ Pos chia đều → nếu chốt theo Base phải chạy lại `calc_bonus.js` với đơn đã chia theo Base. (3) Còn lệch đơn quầy (phiên 11) và M46575.
 - **ĐANG LÀM:** chờ Duyên chốt từng đơn lệch.
 
+## 2026-11-04 (tiếp) — BH trả trước: CHẶN KHÔNG ÂM (Duyên yêu cầu) — đã push
+- **Yêu cầu:** tiền trả trước vượt giá trị đơn thì phần dư là TIỀN SHIP → không tính; doanh thu sale không âm. (Duyên ghi thêm "cột S k…" bị cụt — giữ cột S, chờ Duyên xác nhận nếu ý khác.)
+- [x] `_bhPrepaidDeduct_` (gas_v13.js): trừ = `min(tiền trả trước, max(0, giá trị đơn))`; `bhPrepaid.total` cũng là số đã chặn. Ví dụ: đơn 95.000 trả trước 135.000 → trừ 95.000, doanh thu 0 (40.000 là ship). Test `tools/test-bh-prepaid.js` sửa ca âm + thêm ca 2 sale (13 ca).
+- Số mẫu file Huyền T10: 27 đơn BH có thẻ sale, tiền trả trước thô 63.405.000, thực trừ sau chặn 63.325.000 (phần ship bỏ qua 80.000).
+- [ ] Việc Duyên: chờ Actions xanh → Ctrl+F5 → Lọc lại Báo cáo B (~2 phút). Xác nhận lại ý "cột S k…" nếu cột tiền trả trước thật không phải S (đổi `DON_COL_TRATRUOC`).
+
+
 ## 2026-11-04 — Đơn nguồn "Bảo hành" CÓ gắn thẻ sale: cột S "Tiền trả trước" TRỪ vào doanh thu sale (KT mới update) — BƯỚC 1/2 (backend GAS) đã push
 - **Yêu cầu Duyên:** đơn nguồn Bảo hành mà có thẻ sale thì lấy cột S "Tiền trả trước" trong "dữ liệu đơn" trừ khỏi doanh thu sale (bản chất: khách hoàn/hủy nhưng đã ck trước nên phải hoàn lại).
 - [x] **Bước 1 (gas_v13.js):** `DON_COL_TRATRUOC = 18` (cột S; `DON_CHITIET_WIDTH` vẫn 17 để KHÔNG đổi khoá dedup/nhập file/Supabase — chỉ `readDonChiTiet_` đọc rộng A:S); `_donConvertRows_` thêm `tienTraTruoc` (chuỗi "2.175.000" → số; sheet không có cột S → 0); `_mergeTachDon_` cộng tiền trả trước các phần; `_bhPrepaidDeduct_(row, hasSaleRow)`: chỉ nguồn "Bảo hành" (không phân biệt hoa/thường/dấu) + CÓ tên sale trên thẻ + tiền trả trước > 0. Trong `buildSalesReportB_` (sau `qRatio`): `giaTriSauGiam = giá trị đơn − tiền trả trước` (chia cho sale theo đúng tỷ lệ của đơn; KHÔNG chặn dưới 0 → BH 95.000 trả trước 135.000 = −40.000), giữ `giaTriTruTraTruoc`/`truTraTruoc` trên đơn; kết quả có `bhPrepaid {count,total}`. Mọi nơi dùng B (bySale, team, nguồn, Excel bsx/bcx, Đối chiếu tổng, báo cáo E/F) tự khớp vì trừ ở cấp đơn.

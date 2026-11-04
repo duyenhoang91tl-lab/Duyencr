@@ -5825,7 +5825,9 @@ function _tachDonKey_(ghiChu) { var t = _tachDonParse_(ghiChu); return t ? t.key
 function _bhPrepaidDeduct_(row, hasSaleRow) {
   var t = Number(row && row.tienTraTruoc) || 0;
   if (t <= 0 || !hasSaleRow) return 0;
-  return _stripVN_(String(row.nguonDon || '')).trim() === 'bao hanh' ? t : 0;
+  if (_stripVN_(String(row.nguonDon || '')).trim() !== 'bao hanh') return 0;
+  // Duyen 2026-11-04: CHAN KHONG AM — tien tra truoc vuot gia tri don thi phan du la TIEN SHIP (khach ck ca ship) nen KHONG tinh; chi tru toi da bang gia tri don.
+  return Math.min(t, Math.max(0, Number(row.giaTriSauGiam) || 0));
 }
 function _mergeTachDon_(rows) {
   var out = [], groups = {};
@@ -6200,7 +6202,7 @@ function buildSalesReportB_(filters) {
     var qRatio = _quaySaleRatio_(effRow.nguonDon, effRow.ghiChu, hasSaleRow);
     if (qRatio !== 1) effRow = Object.assign({}, effRow, { saleRatio: qRatio });
     // DON BAO HANH CO GAN THE SALE (KT yeu cau 2026-11-03): cot S "Tien tra truoc" = khach da chuyen khoan truoc, ban chat la hoan lai tien cho khach
-    // -> TRU khoi doanh thu cua sale (chia theo cung ty le sale cua don). Khong chan duoi 0: don BH nho hon tien tra truoc ra doanh thu am (dung ban chat hoan tien).
+    // -> TRU khoi doanh thu cua sale (chia theo cung ty le sale cua don), toi da bang gia tri don (phan tra truoc vuot gia tri don la tien ship, khong tinh -> doanh thu khong am).
     var bhDed = _bhPrepaidDeduct_(effRow, hasSaleRow);
     if (bhDed) { effRow = Object.assign({}, effRow, { giaTriTruTraTruoc: effRow.giaTriSauGiam, truTraTruoc: bhDed, giaTriSauGiam: (Number(effRow.giaTriSauGiam) || 0) - bhDed }); bhPrepaid.count++; bhPrepaid.total += bhDed; }
     // Gan co don can doi chieu ghep (KHONG doi tien): chua duoc ke toan xu ly + (ghi chu co chu "ghep" HOAC >=2 ma bo dem khong phai
